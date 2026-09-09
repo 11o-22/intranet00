@@ -28,13 +28,15 @@
             padding-bottom: 50px; box-sizing: border-box;
         }
 
-        /* 특이사항 빛나는 효과 */
+        /* 특이사항 빛나는 효과 (배경 테마 색상에 맞춘 은은한 효과) */
         .glow-effect {
-            color: #ffcccc !important; font-weight: bold; animation: textGlow 1.2s infinite alternate;
+            color: var(--theme-focus) !important;
+            font-weight: bold;
+            animation: textGlow 2s infinite alternate ease-in-out;
         }
         @keyframes textGlow {
-            from { text-shadow: 0 0 2px #ff4c4c; }
-            to { text-shadow: 0 0 10px #ff4c4c, 0 0 15px #ffd700; }
+            from { text-shadow: 0 0 2px rgba(255,255,255,0.1); }
+            to { text-shadow: 0 0 8px var(--theme-focus), 0 0 12px var(--theme-focus); }
         }
 
         /* 고급스러운 상점 구매/선택 버튼 */
@@ -50,6 +52,11 @@
             background: rgba(0,0,0,0.4); color: #666; border-color: #333; cursor: not-allowed; box-shadow: none;
         }
 
+        /* 게임 전용 버튼 복구 */
+        .game-btn { background: #444; color: white; border: none; padding: 8px 14px; cursor: pointer; margin: 6px 3px; font-size: 13px; border-radius: 3px; font-weight:bold; transition:all 0.2s;}
+        .game-btn:hover:not(:disabled) { background: var(--theme-focus); color:#111; }
+        .game-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
+
         /* 고급스러운 입력 필드 (테마 동적 적용) */
         #main-screen select, #main-screen input[type="text"], #main-screen input[type="number"], #main-screen input[type="password"], #main-screen textarea,
         #admin-screen select, #admin-screen input[type="text"], #admin-screen input[type="number"], #admin-screen input[type="password"], #admin-screen textarea,
@@ -60,7 +67,7 @@
             font-family: inherit; box-sizing: border-box; width: 100%;
         }
         .bet-input, #slot-bet, #roulette-target, #roulette-bet, #seotda-bet { width: 70px !important; display: inline-block !important; }
-        #vip-bet-input { width: 80px !important; display: inline-block !important; }
+        #vip-bet-input { width: 80px !important; display: inline-block !important; text-align:center; }
 
         #main-screen select, #admin-screen select, .modal-content select, #vip-game-overlay select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%23888888" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>') !important;
@@ -106,8 +113,6 @@
         body.theme-white .sub-tab.active { background: #ffffff !important; color: #000 !important; border-color: #94a3b8 !important; }
         body.theme-white .sub-panel { background: #ffffff !important; border-color: #cbd5e1 !important; }
         body.theme-white .panel-title { color: #0f172a !important; border-bottom-color: #e2e8f0 !important; }
-        body.theme-white .game-btn { background: #3b82f6 !important; color: #ffffff !important; }
-        body.theme-white .game-btn:hover { background: #2563eb !important; }
         body.theme-white .badge-table th { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #0f172a !important; font-weight:bold;}
         body.theme-white .badge-table td { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #0f172a !important; font-weight:bold;}
         body.theme-white .inv-card, body.theme-white .shop-item, body.theme-white .history-item, body.theme-white .letter-card { background: #f8fafc !important; border-color: #cbd5e1 !important; }
@@ -125,20 +130,14 @@
         body.theme-gold { --theme-bg-grad: linear-gradient(145deg, #1c1914, #0f0c0a); --theme-border: #a68a3f; --theme-text: #f3e5ab; --theme-focus: #ffd700; }
         body.theme-gold .container { background-color: #110e08 !important; color: #f3e5ab !important; border-color: #5c4b1e !important; }
         body.theme-gold .sub-panel, body.theme-gold .admin-panel-box, body.theme-gold .ranking-body { background-color: #1a150b !important; border-color: #5c4b1e !important; }
-        body.theme-gold .game-btn { background: #8c7335 !important; color: #fff !important; }
-        body.theme-gold .game-btn:hover { background: #d4af37 !important; color: #000 !important; }
 
         body.theme-navy { --theme-bg-grad: linear-gradient(145deg, #132238, #0b1320); --theme-border: #1e3a8a; --theme-text: #cbd5e1; --theme-focus: #3b82f6; }
         body.theme-navy .container { background-color: #0d141f !important; color: #cbd5e1 !important; border-color: #1e3a8a !important; }
         body.theme-navy .sub-panel, body.theme-navy .admin-panel-box, body.theme-navy .ranking-body { background-color: #101c2e !important; border-color: #1e3a8a !important; }
-        body.theme-navy .game-btn { background: #1d4ed8 !important; color: #fff !important; }
-        body.theme-navy .game-btn:hover { background: #2563eb !important; }
 
         body.theme-brown { --theme-bg-grad: linear-gradient(145deg, #2b1f17, #19120e); --theme-border: #8c5d3f; --theme-text: #e7dcd1; --theme-focus: #a66d48; }
         body.theme-brown .container { background-color: #17110d !important; color: #e7dcd1 !important; border-color: #593d2b !important; }
         body.theme-brown .sub-panel, body.theme-brown .admin-panel-box, body.theme-brown .ranking-body { background-color: #211812 !important; border-color: #593d2b !important; }
-        body.theme-brown .game-btn { background: #8c5d3f !important; color: #fff !important; }
-        body.theme-brown .game-btn:hover { background: #a66d48 !important; }
 
         body.theme-hanbok { --theme-bg-grad: linear-gradient(145deg, #ffffff, #f0f9ff); --theme-border: #7dd3fc; --theme-text: #2c3e50; --theme-focus: #2980b9; background-color: #bae6fd; }
         body.theme-hanbok .container { background-color: #e0f2fe !important; color: #2c3e50 !important; border-color: #38bdf8 !important; }
@@ -147,8 +146,6 @@
         body.theme-hanbok .emp-role-tag { color: #0369a1 !important; background: rgba(56, 189, 248, 0.2) !important; border-color: rgba(56, 189, 248, 0.5) !important; }
         body.theme-hanbok .sub-panel, body.theme-hanbok .admin-panel-box, body.theme-hanbok .ranking-body { background-color: #ffffff !important; border-color: #7dd3fc !important; color: #2c3e50 !important;}
         body.theme-hanbok .panel-title { color: #1a252f !important; border-bottom-color: #bae6fd !important; }
-        body.theme-hanbok .game-btn { background: #3498db !important; color: #ffffff !important; font-weight: bold; border-color: #2980b9 !important;}
-        body.theme-hanbok .game-btn:hover { background: #2980b9 !important; }
         body.theme-hanbok .inv-card, body.theme-hanbok .shop-item, body.theme-hanbok .history-item, body.theme-hanbok .letter-card { background: #f0f9ff !important; border-color: #bae6fd !important; color: #2c3e50 !important; font-weight:bold;}
         body.theme-hanbok .tabs-grid { border-color: #38bdf8 !important; }
         body.theme-hanbok .tab { border-color: #38bdf8 !important; color: #2c3e50 !important; background: #e0f2fe; font-weight:bold;}
@@ -178,20 +175,27 @@
         #main-screen, #admin-screen { display: none; padding: 15px; }
         .header-info { font-size: 12px; color: #666; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between;}
         
-        /* 오리지널 사원증 디자인 롤백 */
+        /* ★ 첫번째 오리지널 사원증 디자인으로 롤백 완료 */
         .id-card-badge {
-            background: var(--theme-bg-grad, #1e1e1e); border: 1px solid var(--theme-border, #444); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); overflow: hidden;
+            background: linear-gradient(145deg, #242424, #181818); border: 1px solid #444; border-radius: 8px;
+            padding: 14px; margin-bottom: 15px; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.6); overflow: hidden;
         }
-        .id-card-badge::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--badge-top-line, linear-gradient(90deg, #444, #888, #444)); transition: background 0.3s ease; }
+        .id-card-badge::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            background: var(--badge-top-line, linear-gradient(90deg, #ff4c4c, #ffd700, #ff4c4c)); transition: background 0.3s ease;
+        }
+        .id-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .id-chip-box { width: 28px; height: 20px; background: linear-gradient(135deg, #d4af37, #aa820a); border-radius: 3px; border: 1px solid #ffe57f; display: inline-block; }
+        .serial-badge-box { background: #111; border: 1px solid #333; padding: 3px 8px; border-radius: 4px; text-align: right; }
+        .serial-badge-box .serial-lbl { font-size: 8px; color: #777; letter-spacing: 1px; }
+        .serial-badge-box .serial-val { font-size: 11px; font-weight: bold; color: #aaa; font-family: monospace; }
         
-        .id-card-body { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; margin-top: 5px; }
-        .id-avatar-mini { width: 55px; height: 70px; background: #2b2b2b; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: center; align-items: center; overflow: hidden; font-size: 10px; color: #777; flex-shrink: 0; }
+        .id-card-body { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .id-avatar-mini { width: 48px; height: 58px; background: #2b2b2b; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: center; align-items: center; overflow: hidden; font-size: 9px; color: #777; flex-shrink: 0; }
         .id-avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
-        .id-info-details { display: flex; flex-direction: column; justify-content: center; width: 100%; }
-        .id-info-details .serial-row { font-size: 11px; font-family: monospace; color: #aaa; margin-bottom: 4px; text-align: right; border-bottom: 1px dashed #444; padding-bottom: 2px; }
-        .id-info-details .emp-name { font-size: 20px; font-weight: bold; color: inherit; margin-bottom: 2px; }
-        .id-info-details .emp-meta { font-size: 12px; color: #888; }
-        .emp-role-tag { font-size: 11px; color: #ffd700; background: rgba(255, 215, 0, 0.12); padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255, 215, 0, 0.3); margin-left: 4px; display: inline-block;}
+        .id-info-details .emp-name { font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 2px; }
+        .id-info-details .emp-meta { font-size: 12px; color: #aaa; }
+        .emp-role-tag { font-size: 11px; color: #ffd700; background: rgba(255, 215, 0, 0.12); padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255, 215, 0, 0.3); margin-left: 4px; }
 
         .pollution-container { margin-bottom: 12px; }
         .pollution-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; color: #aaa; }
@@ -205,8 +209,8 @@
         .status-value span { font-size: 11px; color: #888; }
 
         .action-buttons { display: flex; gap: 8px; margin-bottom: 15px; }
-        .action-buttons button { flex: 1; padding: 8px; background-color: transparent; border: 1px solid #444; color: #aaa; cursor: pointer; font-size: 12px; border-radius:3px; }
-        .action-buttons button:hover { background-color: #333; color: #fff; }
+        .action-buttons button { flex: 1; padding: 8px; background-color: transparent; border: 1px solid #444; color: #aaa; cursor: pointer; font-size: 12px; border-radius:3px; transition:all 0.2s; }
+        .action-buttons button:hover { background-color: #333; color: #fff; border-color:#fff;}
         .admin-access-btn { background-color: #551a1a !important; border: 1px solid #ff4c4c !important; color: #ff4c4c !important; }
 
         .tabs-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #333; margin-bottom: 15px; }
@@ -220,10 +224,6 @@
         .sub-panel { display: none; background: #1a1a1a; padding: 12px 10px; border: 1px solid #333; text-align: left; }
         .sub-panel.active { display: block; }
         .panel-title { font-size: 13px; color: #fff; margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 5px; text-align: center; }
-        
-        .game-btn { background: #444; color: white; border: none; padding: 8px 14px; cursor: pointer; margin: 6px 3px; font-size: 13px; border-radius: 3px; }
-        .game-btn:hover { background: #666; }
-        .game-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
 
         .badge-photo-box { width: 130px; height: 160px; background-color: rgba(0,0,0,0.5); margin: 0 auto 12px auto; border: 2px solid var(--theme-border); display: flex; justify-content: center; align-items: center; overflow: hidden; border-radius:4px;}
         .badge-photo-box img { width: 100%; height: 100%; object-fit: cover; }
@@ -366,7 +366,8 @@
 <div id="emp-detail-modal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
         <h3 id="detail-modal-title">사원 정보 열람</h3>
-        <div class="id-card-badge" id="detail-card-badge">
+        <!-- 사원증 원본 폼과 동일하게 렌더링 -->
+        <div class="id-card-badge" style="background: linear-gradient(145deg, #242424, #181818); border: 1px solid #444;">
             <div class="id-card-top">
                 <div class="id-chip-box"></div>
                 <div class="serial-badge-box">
@@ -377,7 +378,7 @@
             <div class="id-card-body">
                 <div class="id-avatar-mini" id="detail-card-photo"><span>PHOTO</span></div>
                 <div class="id-info-details">
-                    <div class="emp-name"><span id="detail-card-name" style="color:var(--theme-text);"></span> <span class="emp-role-tag" id="detail-card-position"></span></div>
+                    <div class="emp-name"><span id="detail-card-name" style="color:#fff;"></span> <span class="emp-role-tag" id="detail-card-position"></span></div>
                     <div class="emp-meta"><span id="detail-card-affiliation"></span> · <span id="detail-card-team"></span></div>
                 </div>
             </div>
@@ -404,8 +405,8 @@
         <h3 style="color:var(--theme-focus); font-weight:bold; margin-top:0;">⚔️ VIP 대전 신청</h3>
         <div id="vip-invite-text" style="color:var(--theme-text); margin-bottom: 25px; font-size:13px; line-height:1.6;"></div>
         <div style="display:flex; gap:10px;">
-            <button style="flex:1; background:var(--theme-focus); color:#111; font-weight:bold; border:none; padding:12px; border-radius:4px; cursor:pointer;" onclick="acceptVipInvite()">동의</button>
-            <button style="flex:1; background:transparent; color:var(--theme-text); border:1px solid var(--theme-border); padding:12px; border-radius:4px; cursor:pointer;" onclick="rejectVipInvite()">취소</button>
+            <button class="shop-buy-btn" style="flex:1; background:var(--theme-focus); color:#111; border:none;" onclick="acceptVipInvite()">동의</button>
+            <button class="shop-buy-btn" style="flex:1; background:transparent; color:var(--theme-text); border:1px solid var(--theme-border);" onclick="rejectVipInvite()">취소</button>
         </div>
     </div>
 </div>
@@ -589,7 +590,7 @@
                     </div>
                     <div>
                         베팅: <input type="number" id="slot-bet" class="bet-input" value="5" min="1">
-                        <button class="shop-buy-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
+                        <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
                 </div>
@@ -612,7 +613,7 @@
                     </div>
                     <div>
                         베팅 포인트: <input type="number" id="roulette-bet" class="bet-input" value="5" min="1">
-                        <button class="shop-buy-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
+                        <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
                     </div>
                     <div id="roulette-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">번호를 고르고 회전시키세요. (오염도 +2)</div>
                 </div>
@@ -638,11 +639,11 @@
                     </div>
                     <div id="seotda-controls-start">
                         베팅: <input type="number" id="seotda-bet" class="bet-input" value="5" min="1">
-                        <button class="shop-buy-btn" onclick="startSeotda()">패 돌리기</button>
+                        <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
                     </div>
                     <div id="seotda-controls-play" style="display:none;">
-                        <button class="shop-buy-btn" onclick="swapSeotdaCard()">선택 패 교환 (<span id="swap-count">2</span>회 남음)</button>
-                        <button class="shop-buy-btn" onclick="finishSeotda()" style="background:#771111; color:#fff; border-color:#ff4c4c;">승부 (쇼다운)</button>
+                        <button class="game-btn" onclick="swapSeotdaCard()">선택 패 교환 (<span id="swap-count">2</span>회 남음)</button>
+                        <button class="game-btn" onclick="finishSeotda()" style="background:#771111; color:#fff; border-color:#ff4c4c;">승부 (쇼다운)</button>
                     </div>
                     <div id="seotda-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
                 </div>
@@ -979,6 +980,7 @@
         return String(Math.floor(Math.random() * 9000 + 1000));
     }
 
+    // ★ 유쾌판매소 & 외계 쇼핑몰 전체 물품 복구
     const ITEM_CATALOG = {
         "익명 편지": { price: 20, usable: false, desc: "익명으로 사내의 누군가에게 편지를 보낼 수 있다." },
         "하급 물약": { price: 15, usable: true, effect: "heal", value: 5, targetable: true, desc: "오염도가 5% 회복된다." },
@@ -1037,17 +1039,6 @@
     }
 
     function getShopCycleKey() { return getTodayStr(); }
-    function getToday5ShopItems() {
-        if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
-        const userCodeStr = currentUser ? currentUser.code : "default"; const cycleKey = getShopCycleKey() + userCodeStr; 
-        let seed = 0; for (let i = 0; i < cycleKey.length; i++) seed += cycleKey.charCodeAt(i) * (i + 1);
-        let shuffled = [...ALL_10_ITEMS].sort((a, b) => {
-            let r1 = Math.sin(seed + a.length * 13 + a.charCodeAt(0)) * 10000;
-            let r2 = Math.sin(seed + b.length * 13 + b.charCodeAt(0)) * 10000;
-            return (r1 - Math.floor(r1)) - (r2 - Math.floor(r2));
-        });
-        return shuffled.slice(0, 5);
-    }
 
     function addHistoryLog(user, message) {
         if (!user.history) user.history = []; const now = new Date();
@@ -1252,7 +1243,7 @@
             rationInfoMsg.innerHTML = `<span style="color:#ff4c4c; font-weight:bold;">[여우 상담실 격리 중] 24시간 지급 차단 (퇴원까지 약 ${remainH}시간 남음)</span>`;
         } else { rationInfoMsg.innerHTML = `※ 상비약 정기 지급: 08:00 / 13:00 / 18:00 / 23:00`; }
 
-        document.getElementById('display-name').innerText = currentUser.name;
+        document.getElementById('display-name').innerText = (currentUser.badge && currentUser.badge.nickname) ? currentUser.badge.nickname : currentUser.name;
         document.getElementById('display-no').innerText = currentUser.no;
         document.getElementById('display-affiliation').innerText = currentUser.affiliation || "본사";
         document.getElementById('display-team').innerText = currentUser.team;
@@ -1338,9 +1329,10 @@
 
     function loadBadgeInfo() {
         if (!currentUser.badge) currentUser.badge = { photo: "", nickname: currentUser.name, notes: "특이사항 없음" };
+        else if (!currentUser.badge.nickname) currentUser.badge.nickname = currentUser.name;
         if (!currentUser.inventory) currentUser.inventory = ["상비약 (오염도 -10%)"];
         if (!currentUser.history) currentUser.history = []; if (!currentUser.letters) currentUser.letters = []; if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
-        document.getElementById('badge-nickname').value = currentUser.badge.nickname || "";
+        document.getElementById('badge-nickname').value = currentUser.badge.nickname;
         renderBadgePhoto(currentUser.badge.photo);
     }
     function renderBadgePhoto(dataUrl) {
@@ -1354,7 +1346,7 @@
         reader.onload = function(e) { currentUser.badge.photo = e.target.result; renderBadgePhoto(e.target.result); saveDB(); };
         reader.readAsDataURL(file);
     }
-    function saveBadgeInfo() { currentUser.badge.nickname = document.getElementById('badge-nickname').value.trim(); saveDB(); }
+    function saveBadgeInfo() { currentUser.badge.nickname = document.getElementById('badge-nickname').value.trim() || currentUser.name; saveDB(); updateUI();}
     function getSellPrice(itemName) { const cat = ITEM_CATALOG[itemName]; const basePrice = cat ? cat.price : 4; return Math.max(1, Math.floor(basePrice / 4)); }
 
     function unequipWeapon() {
@@ -1579,35 +1571,25 @@
 
     function renderRegularShop() {
         const container = document.getElementById('regular-shop-items-container'); if (!container) return;
-        const cycleKey = getShopCycleKey();
-        if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {}; if (!currentUser.purchaseRecord[cycleKey]) currentUser.purchaseRecord[cycleKey] = {};
-        const shopItems = getToday5ShopItems();
-        container.innerHTML = shopItems.map((itemName, idx) => {
-            const item = ITEM_CATALOG[itemName]; const itemId = `item_${itemName}`;
-            const boughtCount = currentUser.purchaseRecord[cycleKey][itemId] || 0;
-            const remaining = currentUser.code === 'kario0987' ? 99 : Math.max(0, 3 - boughtCount);
-            const isSoldOut = remaining === 0;
+        
+        // 전체 아이템 리스트 표시
+        container.innerHTML = ALL_10_ITEMS.map((itemName, idx) => {
+            const item = ITEM_CATALOG[itemName];
             return `
                 <div class="shop-item">
                     <div>
                         <span style="font-weight:bold;">${idx + 1}. ${itemName}</span><br>
-                        <span style="font-size:10px; color:#888;">${item.desc} (잔여: ${remaining === 99 ? '무제한' : remaining + '/3개'})</span>
+                        <span style="font-size:10px; color:#888;">${item.desc}</span>
                     </div>
-                    <button class="shop-buy-btn" ${isSoldOut ? 'disabled' : ''} onclick="buyRegularShopItem('${itemId}', '${itemName}', ${item.price})">
-                        ${isSoldOut ? '품절' : `${item.price} P`}
-                    </button>
+                    <button class="shop-buy-btn" onclick="buyRegularShopItem('${itemName}', ${item.price})">${item.price} P</button>
                 </div>
             `;
         }).join('');
     }
-    function buyRegularShopItem(itemId, itemName, price) {
-        const cycleKey = getShopCycleKey();
-        if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {}; if (!currentUser.purchaseRecord[cycleKey]) currentUser.purchaseRecord[cycleKey] = {};
-        const currentBought = currentUser.purchaseRecord[cycleKey][itemId] || 0;
-        if (currentUser.code !== 'kario0987' && currentBought >= 3) { showCustomAlert('금일 최대 구매 한도를 초과했습니다.'); return; }
+    function buyRegularShopItem(itemName, price) {
         if (currentUser.points < price) { showLuxuryAlert(); return; }
-        currentUser.points -= price; currentUser.purchaseRecord[cycleKey][itemId] = currentBought + 1;
-        currentUser.inventory.push(itemName); addHistoryLog(currentUser, `[상점 구매] ${itemName} (-${price} P)`);
+        currentUser.points -= price; currentUser.inventory.push(itemName); 
+        addHistoryLog(currentUser, `[상점 구매] ${itemName} (-${price} P)`);
         saveDB(); updateUI();
     }
 
@@ -1813,7 +1795,7 @@
                         <button class="shop-buy-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button></div>`;
             } else if (session.game === 'updown') {
                 area.innerHTML = `<div style="margin:10px 0;">
-                        <div style="font-size:12px; color:var(--theme-text); opacity:0.8; margin-bottom:8px; text-align:center; line-height:1.4;">1~999 중 자신이 생각하는 숫자에 가장 가까운 숫자를 적어주세요.<br>(시스템 숫자와 오차가 가장 적은 사원 승리)</div>
+                        <div style="font-size:12px; color:var(--theme-text); opacity:0.8; margin-bottom:8px; text-align:center; line-height:1.4;">1~999 중 자신이 생각하는 숫자에 가장 가까운 숫자를 적어주세요.</div>
                         <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; box-sizing: border-box;" placeholder="숫자 입력 (1~999)">
                         <button class="shop-buy-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button></div>`;
             }
@@ -1821,27 +1803,13 @@
 
         if (session.state === 'WAITING') {
             statusEl.innerText = "3초 내에 선택을 완료하세요!";
-            
-            // 양쪽 모두 선택 완료 시 지연 없이 평가 (방장이 주로 평가)
-            if (session.p1Choice != null && session.p2Choice != null) {
-                if (isP1) evaluateVipMultiResult(session);
-                // 방장 연결 끊김 대비
-                else setTimeout(() => { if (db.vipSessions[session.id] && db.vipSessions[session.id].state === 'WAITING') evaluateVipMultiResult(session); }, 1000);
-            } else if (Date.now() > session.endTime + 1500) {
-                // 타임오버 강제 진행 처리
-                if (isP1) {
-                    if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
-                    if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
-                    evaluateVipMultiResult(session);
-                }
-            }
         } else if (session.state === 'FINISHED') {
             statusEl.innerHTML = `<span style="color:var(--theme-text); font-size:14px; line-height:1.6;">${session.resultText}</span>`;
             document.getElementById('vip-game-timer').innerText = "-";
             
             if (isP1 && !session.deleteTimerStarted) {
                 session.deleteTimerStarted = true;
-                setTimeout(() => { delete db.vipSessions[session.id]; saveDB(); }, 4000);
+                setTimeout(() => { delete db.vipSessions[session.id]; saveDB(); }, 5000); // 5초 후 자동으로 창 닫힘
             }
         }
     }
@@ -1880,7 +1848,7 @@
         }
 
         let resultText = `[방장] ${p1User.name}: <b style="color:var(--theme-focus);">${p1c}</b> <br> [상대] ${p2User.name}: <b style="color:var(--theme-focus);">${p2c}</b><br><br>`;
-        if(session.game === 'updown') resultText += `(시스템 정답 숫자: <b>${session.targetNumber}</b>)<br>`;
+        if(session.game === 'updown') resultText += `(시스템 기준 숫자: <b>${session.targetNumber}</b>)<br>`;
 
         if (winner === 'draw') {
             resultText += `무승부! 베팅금이 유지됩니다.`;
@@ -1908,6 +1876,7 @@
         document.getElementById('vip-game-overlay').style.display = 'none'; myChoiceSubmitted = false;
     }
 
+    // 타이머 및 미입력 방지용 루프 (무조건 결과 표시)
     setInterval(() => {
         if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
             let session = db.vipSessions[activeVipSessionId];
@@ -1917,6 +1886,15 @@
                 if (remaining <= 0 && !myChoiceSubmitted) {
                     let autoPick = generateRandomChoice(session.game);
                     submitVipChoice(autoPick);
+                }
+                
+                // 만약 시간이 지나도 판정이 나지 않았다면 방장(P1) 권한으로 강제 평가 처리
+                if (Date.now() > session.endTime + 1500) {
+                    if (session.p1 === currentUser.code) {
+                        if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
+                        if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
+                        evaluateVipMultiResult(session);
+                    }
                 }
             }
         }
@@ -2088,7 +2066,7 @@
         addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`); saveDB(); updateUI();
     }
 
-    // --- 외계 쇼핑몰 (당일 1회 한정 기능 추가) ---
+    // --- 외계 쇼핑몰 ---
     let dealerCardValue = 7;
     function playHighLow(choice) {
         if (!currentUser) return;
@@ -2156,7 +2134,7 @@
     function buyAlienItem(itemName, price) {
         if (currentUser.points < price) { showLuxuryAlert(); return; }
         currentUser.points -= price; currentUser.inventory.push(itemName);
-        currentUser.alienBoughtToday = true; // 당일 구매 완료 표시
+        currentUser.alienBoughtToday = true; 
         addHistoryLog(currentUser, `[외계 구매] ${itemName} (-${price} P)`);
         setUFODialogue("좋은 거래 감사합니다.");
         saveDB(); updateUI();
@@ -2233,6 +2211,9 @@
         if (db.users[code] && db.users[code].name === name) {
             currentUser = db.users[code];
             
+            if (!currentUser.badge) currentUser.badge = { photo: "", nickname: currentUser.name, notes: "특이사항 없음" };
+            else if (!currentUser.badge.nickname) currentUser.badge.nickname = currentUser.name;
+
             if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
             if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
             
@@ -2256,24 +2237,17 @@
                 const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0'); const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0'); const s = String(sessionSeconds % 60).padStart(2, '0');
                 document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
                 
-                // 혈욕조 장착 시간 체크 (매 1초마다 누적)
+                // 혈욕조 장착 시간 체크
                 if (currentUser && currentUser.equippedWeapon === "혈욕조") {
-                    if (currentUser.bloodBathDate !== getTodayStr()) {
-                        currentUser.bloodBathDailyUsed = 0; currentUser.bloodBathDate = getTodayStr();
-                    }
+                    if (currentUser.bloodBathDate !== getTodayStr()) { currentUser.bloodBathDailyUsed = 0; currentUser.bloodBathDate = getTodayStr(); }
                     currentUser.bloodBathDailyUsed = (currentUser.bloodBathDailyUsed || 0) + 1000;
-                    currentUser.lastPollutionTime = Date.now(); // 장착 중 패시브 오염도 틱을 계속 미룸 (오염 정지)
-                    
-                    if (currentUser.bloodBathDailyUsed >= 3 * 3600 * 1000) {
-                        unequipWeapon();
-                        showCustomAlert("혈욕조의 일일 장착 한도(3시간)가 초과되어 자동 해제되었습니다.");
-                    }
+                    currentUser.lastPollutionTime = Date.now(); 
+                    if (currentUser.bloodBathDailyUsed >= 3 * 3600 * 1000) { unequipWeapon(); showCustomAlert("혈욕조의 일일 장착 한도(3시간)가 초과되어 자동 해제되었습니다."); }
                 } else {
                     checkPassivePollution(currentUser);
                 }
 
                 checkMedRations(currentUser); checkP2PExpiration();
-                
                 if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
             }, 1000);
         } else {
