@@ -388,6 +388,7 @@
         .btn-submit { background-color: #4CAF50; color: white; }
         .btn-cancel { background-color: #f44336; color: white; }
 
+        /* 사용자 커스텀 알림 */
         #custom-alert-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(3px);
         }
@@ -451,14 +452,15 @@
 
 <div id="pollution-overlay"></div>
 
-<div id="custom-alert-overlay" style="z-index: 99999999;">
+<!-- 화면 접속 시 잘못 보이지 않도록 모두 명시적으로 style="display:none;" 추가 -->
+<div id="custom-alert-overlay" style="display:none; z-index: 99999999;">
     <div class="custom-alert-box">
         <div class="custom-alert-msg" id="custom-alert-text">알림 내용</div>
         <button class="custom-alert-btn" onclick="closeCustomAlert()">확인</button>
     </div>
 </div>
 
-<div id="luxury-alert-overlay" style="z-index: 99999999;">
+<div id="luxury-alert-overlay" style="display:none; z-index: 99999999;">
     <div class="luxury-alert-box">
         <div style="font-size: 26px; margin-bottom: 15px;">💳</div>
         <div class="luxury-alert-msg" id="luxury-alert-text">보유하신 포인트가 부족합니다.</div>
@@ -467,7 +469,7 @@
 </div>
 
 <!-- 스마일 스티커 모달 -->
-<div id="item-target-modal" class="modal-overlay">
+<div id="item-target-modal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
         <h3 id="target-modal-title">아이템 사용 대상 선택</h3>
         <select id="item-target-select" style="width:100%; margin-bottom: 12px;"></select>
@@ -479,7 +481,7 @@
 </div>
 
 <!-- VIP 초대 수신 모달 -->
-<div id="vip-invite-overlay">
+<div id="vip-invite-overlay" style="display:none;">
     <div class="luxury-alert-box">
         <h3 style="color:var(--theme-text); margin-top:0;">⚔️ 1:1 대전 신청 도착</h3>
         <div id="vip-invite-text" style="color:var(--theme-text); margin-bottom: 20px; font-size:13px; line-height:1.5;"></div>
@@ -491,7 +493,7 @@
 </div>
 
 <!-- VIP 게임 진행 오버레이 -->
-<div id="vip-game-overlay">
+<div id="vip-game-overlay" style="display:none;">
     <div class="luxury-alert-box" style="width:90%; max-width:400px; padding:20px;">
         <h3 id="vip-game-title" style="color:var(--theme-text); margin-top:0;">VIP 대전</h3>
         <div id="vip-game-timer" style="font-size:36px; font-weight:bold; color:#ff4c4c; margin: 10px 0; text-shadow: 0 0 10px rgba(255,76,76,0.5);">3</div>
@@ -911,7 +913,7 @@
     </div>
 
     <!-- 사원 열람 모달 -->
-    <div id="employee-list-modal" class="modal-overlay">
+    <div id="employee-list-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
             <h3>사내 인적 정보 열람</h3>
             <div id="employee-cards-container" style="flex: 1; overflow-y: auto; max-height: 380px; margin-bottom: 12px;"></div>
@@ -922,7 +924,7 @@
     </div>
 
     <!-- 건의함 모달 -->
-    <div id="suggestion-modal" class="modal-overlay">
+    <div id="suggestion-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
             <h3>사내 건의함 접수</h3>
             <div style="flex-shrink: 0;">
@@ -1028,7 +1030,7 @@
         database = firebase.database();
     } catch(e) {
         console.error("Firebase Init Error:", e);
-        alert("시스템 데이터베이스 연결에 실패했습니다.");
+        // 오류로 나타나던 alert 구문 삭제
     }
 
     let currentUser = null;
