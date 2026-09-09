@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -31,6 +31,35 @@
             transition: all 0.5s ease;
             padding-bottom: 50px;
             box-sizing: border-box;
+        }
+
+        /* 알림 불빛 애니메이션 (공통) */
+        .notify-dot {
+            position: relative;
+        }
+        .notify-dot::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 10px;
+            height: 10px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4CAF50;
+            animation: pulse-green 1.5s infinite;
+            z-index: 10;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+
+        /* 포인트 획득 이펙트 */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5); }
         }
 
         /* 부서별 동적 테마 */
@@ -98,31 +127,38 @@
         .theme-brown .game-btn { background: #8c5d3f !important; color: #fff !important; }
         .theme-brown .game-btn:hover { background: #a66d48 !important; }
 
-        /* 재난관리국: 가독성을 높인 짙은 네이비 블루 테마 */
-        .theme-hanbok { background-color: #0a1128 !important; color: #e2e8f0 !important; border-color: #1d4ed8 !important; }
-        .theme-hanbok .container { background-color: #0f172a !important; border-color: #1e3a8a !important; }
-        .theme-hanbok .id-card-badge { background: linear-gradient(145deg, #1e293b, #0f172a) !important; border-color: #2563eb !important; box-shadow: 0 4px 15px rgba(0,0,0,0.4) !important; }
-        .theme-hanbok .serial-badge-box { background: #0b1120 !important; border-color: #1d4ed8 !important; }
-        .theme-hanbok .serial-badge-box .serial-val { color: #93c5fd !important; }
-        .theme-hanbok .id-avatar-mini { background: #1e293b !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
-        .theme-hanbok .emp-name { color: #f8fafc !important; }
-        .theme-hanbok .emp-meta { color: #93c5fd !important; }
-        .theme-hanbok .emp-role-tag { color: #bfdbfe !important; background: rgba(37, 99, 235, 0.2) !important; border-color: rgba(37, 99, 235, 0.5) !important; }
-        .theme-hanbok .sub-panel, .theme-hanbok .admin-panel-box, .theme-hanbok .ranking-body { background-color: #1e293b !important; border-color: #1d4ed8 !important; }
-        .theme-hanbok .panel-title { color: #f8fafc !important; border-bottom-color: #1d4ed8 !important; }
-        .theme-hanbok .game-btn { background: #2563eb !important; color: #ffffff !important; }
-        .theme-hanbok .game-btn:hover { background: #3b82f6 !important; }
-        .theme-hanbok .badge-table th { background: #0f172a !important; border-color: #1d4ed8 !important; color: #bfdbfe !important; }
-        .theme-hanbok .badge-table td { background: #1e293b !important; border-color: #1d4ed8 !important; color: #e2e8f0 !important; }
-        .theme-hanbok .badge-input { color: #e2e8f0 !important; }
-        .theme-hanbok .inv-card, .theme-hanbok .shop-item, .theme-hanbok .history-item, .theme-hanbok .letter-card { background: #0f172a !important; border-color: #1d4ed8 !important; color: #e2e8f0 !important; }
-        .theme-hanbok .inv-card-name, .theme-hanbok .letter-body { color: #f8fafc !important; }
-        .theme-hanbok .tabs-grid { border-color: #1d4ed8 !important; }
-        .theme-hanbok .tab { border-color: #1d4ed8 !important; color: #94a3b8 !important; background: #0f172a; }
-        .theme-hanbok .tab.active { color: #ffffff !important; border-bottom: 2px solid #ffffff !important; background: #1e293b; }
-        .theme-hanbok .sub-tab { background: #0f172a !important; border-color: #1d4ed8 !important; color: #94a3b8 !important; }
-        .theme-hanbok .sub-tab.active { background: #1e293b !important; color: #ffffff !important; border-color: #60a5fa !important; }
-        .theme-hanbok .bet-input, .theme-hanbok .input-group input, .theme-hanbok .modal-content input, .theme-hanbok .modal-content textarea, .theme-hanbok .modal-content select { background: #0b1120 !important; border-color: #1d4ed8 !important; color: #f8fafc !important; }
+        /* 재난관리국: 화사하고 눈이 편안한 파스텔 블루 테마 */
+        .theme-hanbok { background-color: #f0f9ff !important; color: #0c4a6e !important; border-color: #7dd3fc !important; }
+        .theme-hanbok .container { background-color: #e0f2fe !important; border-color: #38bdf8 !important; }
+        .theme-hanbok .id-card-badge { background: linear-gradient(145deg, #ffffff, #f0f9ff) !important; border-color: #7dd3fc !important; box-shadow: 0 4px 15px rgba(12, 74, 110, 0.1) !important; }
+        .theme-hanbok .serial-badge-box { background: #ffffff !important; border-color: #bae6fd !important; }
+        .theme-hanbok .serial-badge-box .serial-val { color: #0284c7 !important; }
+        .theme-hanbok .id-avatar-mini { background: #bae6fd !important; border-color: #7dd3fc !important; color: #0284c7 !important; }
+        .theme-hanbok .emp-name { color: #082f49 !important; }
+        .theme-hanbok .emp-meta { color: #0284c7 !important; }
+        .theme-hanbok .emp-role-tag { color: #0369a1 !important; background: rgba(56, 189, 248, 0.2) !important; border-color: rgba(56, 189, 248, 0.5) !important; }
+        .theme-hanbok .sub-panel, .theme-hanbok .admin-panel-box, .theme-hanbok .ranking-body { background-color: #ffffff !important; border-color: #7dd3fc !important; color: #0c4a6e !important;}
+        .theme-hanbok .panel-title { color: #082f49 !important; border-bottom-color: #bae6fd !important; }
+        .theme-hanbok .game-btn { background: #38bdf8 !important; color: #ffffff !important; font-weight: bold; border-color: #0284c7 !important;}
+        .theme-hanbok .game-btn:hover { background: #0ea5e9 !important; }
+        .theme-hanbok .badge-table th { background: #e0f2fe !important; border-color: #bae6fd !important; color: #0369a1 !important; }
+        .theme-hanbok .badge-table td { background: #ffffff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
+        .theme-hanbok .badge-input { color: #0c4a6e !important; }
+        .theme-hanbok .inv-card, .theme-hanbok .shop-item, .theme-hanbok .history-item, .theme-hanbok .letter-card { background: #f0f9ff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
+        .theme-hanbok .inv-card-name, .theme-hanbok .letter-body { color: #082f49 !important; }
+        .theme-hanbok .tabs-grid { border-color: #38bdf8 !important; }
+        .theme-hanbok .tab { border-color: #38bdf8 !important; color: #0284c7 !important; background: #e0f2fe; }
+        .theme-hanbok .tab.active { color: #082f49 !important; border-bottom: 2px solid #082f49 !important; background: #ffffff; font-weight: bold;}
+        .theme-hanbok .sub-tab { background: #e0f2fe !important; border-color: #7dd3fc !important; color: #0284c7 !important; }
+        .theme-hanbok .sub-tab.active { background: #ffffff !important; color: #082f49 !important; border-color: #0ea5e9 !important; font-weight: bold;}
+        .theme-hanbok .bet-input, .theme-hanbok .input-group input, .theme-hanbok .modal-content input, .theme-hanbok .modal-content textarea, .theme-hanbok .modal-content select { background: #f0f9ff !important; border-color: #7dd3fc !important; color: #082f49 !important; }
+        .theme-hanbok .status-label { color: #0369a1 !important; }
+        .theme-hanbok .status-value { color: #082f49 !important; }
+        .theme-hanbok .status-value span { color: #0284c7 !important; }
+        .theme-hanbok .action-buttons button { border-color: #7dd3fc !important; color: #0284c7 !important; }
+        .theme-hanbok .action-buttons button:hover { background-color: #bae6fd !important; color: #082f49 !important; }
+        .theme-hanbok .pollution-header { color: #0369a1 !important; }
+        .theme-hanbok .pollution-bar-bg { background-color: #e0f2fe !important; border-color: #7dd3fc !important; }
 
         #pollution-overlay {
             position: fixed;
@@ -138,11 +174,6 @@
         .pollution-danger {
             background: radial-gradient(circle, rgba(20,0,0,0.4) 40%, rgba(180,0,0,0.85) 100%);
             animation: dangerPulse 1.8s infinite ease-in-out;
-        }
-        @keyframes dangerPulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 0.9; }
-            100% { opacity: 0.6; }
         }
 
         #login-screen {
@@ -245,7 +276,7 @@
         .status-section { display: flex; justify-content: space-between; margin-bottom: 12px; border-top: 1px dashed #333; padding-top: 10px; }
         .status-item { display: flex; flex-direction: column; }
         .status-label { font-size: 11px; color: #888; margin-bottom: 4px; }
-        .status-value { font-size: 18px; font-weight: bold; color: #ffd700; }
+        .status-value { font-size: 18px; font-weight: bold; color: #ffd700; position: relative; }
         .status-value span { font-size: 11px; color: #888; }
 
         .action-buttons { display: flex; gap: 8px; margin-bottom: 15px; }
@@ -280,12 +311,10 @@
         .badge-table th { width: 30%; background: #222; border: 1px solid #333; padding: 7px; color: #aaa; text-align: left; }
         .badge-table td { background: #1c1c1c; border: 1px solid #333; padding: 7px; color: #eee; }
         .badge-input { width: 100%; background: transparent; border: none; color: #fff; font-family: inherit; font-size: 12px; outline: none; }
-        .badge-locked-text { color: #888; font-size: 10px; display: none; }
         .status-tag { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; font-size: 11px; }
 
         .inv-card { display: flex; justify-content: space-between; align-items: center; background: #222; border: 1px solid #444; padding: 8px 10px; margin-bottom: 6px; border-radius: 4px; font-size: 12px; }
         .inv-card-name { font-weight: bold; color: #eee; }
-        .inv-card-price { font-size: 10px; color: #ffd700; margin-left: 4px; }
         .inv-btn-group { display: flex; gap: 4px; }
         .inv-btn { padding: 4px 8px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
         .inv-btn-use { background: #2e7d32; color: white; }
@@ -588,12 +617,12 @@
 
             <div class="action-buttons">
                 <button onclick="openEmployeeListModal()">사원 열람</button>
-                <button onclick="openSuggestionModal()">건의함</button>
+                <button id="btn-suggestion" onclick="openSuggestionModal()">건의함</button>
                 <button onclick="logout()">단말 종료</button>
             </div>
             
             <div id="admin-button-container" style="display: none; margin-top: 10px;">
-                <button class="admin-access-btn" onclick="openAdminScreen()" style="width: 100%; padding: 10px; cursor: pointer;">통제 콘솔 열기 (상담사 전용)</button>
+                <button id="btn-admin-console" class="admin-access-btn" onclick="openAdminScreen()" style="width: 100%; padding: 10px; cursor: pointer;">통제 콘솔 열기 (상담사 전용)</button>
             </div>
         </div>
 
@@ -610,7 +639,7 @@
                 <button class="sub-tab active" onclick="switchRecordSubTab('rec-badge', this)">사원증</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-inventory', this)">소지품</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-history', this)">기록</button>
-                <button class="sub-tab" onclick="switchRecordSubTab('rec-letters', this)">익명 편지</button>
+                <button class="sub-tab" id="tab-btn-letters" onclick="switchRecordSubTab('rec-letters', this)">익명 편지</button>
             </div>
 
             <!-- 사원증 -->
@@ -657,7 +686,7 @@
 
             <!-- 소지품 -->
             <div id="rec-inventory" class="sub-panel">
-                <div class="panel-title">[보유 소지품 (판매가는 구매가의 1/4)]</div>
+                <div class="panel-title">[보유 소지품]</div>
                 <div style="font-size:10px; color:#888; margin-bottom:8px; text-align:center;" id="ration-info-msg">
                     ※ 상비약 정기 지급: 08:00 / 13:00 / 18:00 / 23:00
                 </div>
@@ -678,17 +707,18 @@
                 <div style="background: linear-gradient(145deg, #1b170e, #0a0805); padding: 15px; border: 1px solid #6e5722; margin-bottom: 15px; border-radius: 6px; box-shadow: inset 0 0 15px rgba(212, 175, 55, 0.05);">
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #4a3b18; padding-bottom:8px; margin-bottom:12px;">
                         <span style="font-weight:bold; color:#d4af37; font-size:13px; letter-spacing:1px;">✉ 은밀한 서신 발송</span>
-                        <span style="font-size:10px; color:#888;">[익명성 100% 보장]</span>
+                        <span style="font-size:10px; color:#888;">[익명성 보장 / 최대 300자]</span>
                     </div>
                     
                     <select id="letter-target-select" style="width:100%; font-size:12px; padding:8px 10px; margin-bottom: 8px; background:#18130a; color:#f3e5ab; border:1px solid #4a3b18; border-radius:3px; outline:none; box-sizing:border-box;"></select>
                     
-                    <textarea id="letter-content-input" rows="3" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요..." style="width:100%; font-size:12px; padding:10px; margin-bottom: 10px; background:#18130a; color:#eee; border:1px solid #4a3b18; border-radius:3px; outline:none; resize:none; box-sizing:border-box; line-height:1.4;"></textarea>
+                    <!-- 300자 제한 적용 -->
+                    <textarea id="letter-content-input" rows="3" maxlength="300" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요... (최대 300자)" style="width:100%; font-size:12px; padding:10px; margin-bottom: 10px; background:#18130a; color:#eee; border:1px solid #4a3b18; border-radius:3px; outline:none; resize:none; box-sizing:border-box; line-height:1.4;"></textarea>
                     
                     <button class="game-btn" style="width:100%; margin:0; background:linear-gradient(90deg, #6e5722, #a68a3f); color:#000; font-weight:bold; border:1px solid #d4af37; padding:10px; border-radius:4px; letter-spacing: 1px; transition: all 0.3s ease;" onmouseover="this.style.background='linear-gradient(90deg, #8c7335, #d4af37)'" onmouseout="this.style.background='linear-gradient(90deg, #6e5722, #a68a3f)'" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
                 </div>
 
-                <div style="font-size:11px; color:#888; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom:4px;">수신된 익명 편지</div>
+                <div style="font-size:11px; color:#888; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom:4px;">수신된 익명 편지 (최대 3개 보관)</div>
                 <div id="received-letters-container" style="max-height: 180px; overflow-y: auto;"></div>
             </div>
         </div>
@@ -1014,7 +1044,7 @@
         </div>
 
         <div class="admin-panel-box">
-            <h4>기존 사원 인사 발령</h4>
+            <h4>기존 사원 인사 발령 및 권한 제어</h4>
             <div style="font-size:12px; margin-bottom:6px;">
                 사번: <input type="text" id="adm-target-no" class="bet-input" style="width:70px;" placeholder="4516">
                 소속: <input type="text" id="adm-set-affiliation" class="bet-input" style="width:80px;" placeholder="백일몽 주식회사">
@@ -1023,7 +1053,10 @@
             <div style="font-size:12px; margin-bottom:8px;">
                 직급: <input type="text" id="adm-set-position" class="bet-input" style="width:70px;" placeholder="과장">
                 포인트: <input type="number" id="adm-target-points" class="bet-input" style="width:60px;" placeholder="30">
-                <button class="game-btn" onclick="adminUpdateEmployee()">발령 적용</button>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button class="game-btn" style="flex:1; margin:0;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
+                <button class="game-btn" style="flex:1; margin:0; background:#d4af37; color:#000; font-weight:bold;" onclick="adminToggleVIP()">VIP 권한 발급/회수</button>
             </div>
         </div>
 
@@ -1106,7 +1139,8 @@
                 blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null,
                 alienDate: "", alienTries: 0, ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-                badge: { photo: "", nickname: "기본사원", notes: "특이사항 없음" }
+                badge: { photo: "", nickname: "기본사원", notes: "특이사항 없음" },
+                hasNewLetter: false, hasNewReply: false
             },
             "kario0987": { 
                 code: "kario0987", name: "상담사", 
@@ -1117,7 +1151,8 @@
                 alienDate: getTodayStr(), alienTries: 0, ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
                 alienUnlockedItems: ["작두", "유리손포", "사과맛 물약", "제거약", "착한 친구"],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-                badge: { photo: "", nickname: "총괄상담사", notes: "1급 보안 인가자 (VVIP) / 여우 상담실 책임자" }
+                badge: { photo: "", nickname: "총괄상담사", notes: "1급 보안 인가자 (VVIP) / 여우 상담실 책임자" },
+                hasNewLetter: false, hasNewReply: false
             }
         },
         suggestions: [],
@@ -1128,7 +1163,6 @@
     database.ref('/').on('value', (snapshot) => {
         let data = snapshot.val();
         if (data) {
-            // 빈 배열(null) 방어 코드
             if (!data.suggestions) data.suggestions = [];
             else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
             
@@ -1164,19 +1198,16 @@
                 }
             }
         } else {
-            // DB가 텅 비어있으면 기본값 세팅
             saveDB();
         }
     });
 
-    // 접속자 수 카운팅
     database.ref('online').on('value', (snap) => {
         let val = snap.val();
         let count = val ? Object.keys(val).length : 0;
         document.getElementById('online-users-count').innerText = count === 0 ? 1 : count;
     });
 
-    // --- 파이어베이스 저장 (Socket.emit 역할) ---
     function saveDB() {
         database.ref('/').set(db);
     }
@@ -1272,7 +1303,7 @@
     const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
 
     const ALIEN_RANDOM_QUOTES = [
-        "물건을 본다 👌🏻", "관측을 한다.", "생체 신호를 확인한다.", "좋은 물건이 들어왔습니다.", "흥미로운 거래를 한다.", "미지의 파동을 분석한다."
+        "물건을 본다 👌🏻", "관측을 한다.", "생체 신호를 확인한다.", "좋은 물건이 들어왔습니다.", "흥미로운 거래를 연다.", "미지의 파동을 분석한다."
     ];
 
     function setUFODialogue(text) {
@@ -1316,13 +1347,15 @@
     }
 
     function getShopCycleKey() {
-        // 시간에 상관없이 당일 기준으로 사이클 갱신 (자정 리셋)
         return getTodayStr();
     }
 
     function getToday5ShopItems() {
         if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
-        const cycleKey = getShopCycleKey();
+        
+        const userCodeStr = currentUser ? currentUser.code : "default";
+        const cycleKey = getShopCycleKey() + userCodeStr; 
+        
         let seed = 0;
         for (let i = 0; i < cycleKey.length; i++) seed += cycleKey.charCodeAt(i) * (i + 1);
         
@@ -1443,7 +1476,7 @@
         } else if (team.includes("보안") || team.includes("경비")) {
             topLineColor = "linear-gradient(90deg, #001f3f, #1e3a8a, #001f3f)";
         } else if (aff.includes("재난관리국") || team.includes("재난관리")) {
-            topLineColor = "linear-gradient(90deg, #1d4ed8, #60a5fa, #1d4ed8)";
+            topLineColor = "linear-gradient(90deg, #38bdf8, #bae6fd, #38bdf8)";
         }
 
         document.documentElement.style.setProperty('--badge-top-line', topLineColor);
@@ -1510,11 +1543,80 @@
         document.getElementById('employee-list-modal').style.display = 'none';
     }
 
+    function openSuggestionModal() {
+        if (currentUser.hasNewReply) {
+            currentUser.hasNewReply = false;
+            saveDB();
+            updateUI();
+        }
+        document.getElementById('suggestion-modal').style.display = 'flex';
+        renderMySuggestions();
+    }
+
+    function closeSuggestionModal() {
+        document.getElementById('suggestion-modal').style.display = 'none';
+    }
+
+    function submitSuggestion() {
+        const title = document.getElementById('sugg-title').value.trim();
+        const content = document.getElementById('sugg-content').value.trim();
+        if (!title || !content) {
+            showCustomAlert("제목과 내용을 모두 입력해주세요.");
+            return;
+        }
+
+        if (!db.suggestions) db.suggestions = [];
+        db.suggestions.unshift({
+            id: Date.now(),
+            code: currentUser.code,
+            author: currentUser.name,
+            no: currentUser.no,
+            date: new Date().toLocaleString(),
+            title: title,
+            content: content,
+            status: 'PENDING',
+            reply: ''
+        });
+
+        saveDB();
+        updateUI();
+        document.getElementById('sugg-title').value = '';
+        document.getElementById('sugg-content').value = '';
+        renderMySuggestions();
+        showCustomAlert("건의함 접수가 완료되었습니다. 상담사의 답변을 기다려주세요.");
+    }
+
+    function renderMySuggestions() {
+        const listEl = document.getElementById('my-suggestion-list');
+        if (!db.suggestions) db.suggestions = [];
+        
+        const mySugg = db.suggestions.filter(s => s.code === currentUser.code);
+        if (mySugg.length === 0) {
+            listEl.innerHTML = '<div style="color:#666; font-size:11px; text-align:center; padding:10px;">접수한 건의 내역이 없습니다.</div>';
+            return;
+        }
+
+        listEl.innerHTML = mySugg.map(s => `
+            <div style="background:#222; border:1px solid #444; padding:8px; margin-bottom:8px; border-radius:4px;">
+                <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+                    <span>${s.date}</span>
+                    <span style="font-weight:bold; color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</span>
+                </div>
+                <div style="font-weight:bold; color:#fff; font-size:12px; margin-bottom:4px;">${s.title}</div>
+                <div style="color:#ccc; font-size:11px; margin-bottom:6px;">${s.content}</div>
+                ${s.status === 'RESOLVED' ? `
+                    <div style="background:#1a2e1a; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5; border:1px solid #2e7d32;">
+                        <b>[상담사 답변]</b><br>${s.reply}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+    }
+
     function renderEmployeeCards() {
         const container = document.getElementById('employee-cards-container');
         if (!container) return;
 
-        // 상담사(kario0987) 제외
         const usersList = Object.values(db.users).filter(u => u.code !== 'kario0987');
 
         container.innerHTML = usersList.map(u => {
@@ -1553,7 +1655,6 @@
 
         const currentToday = getTodayStr();
 
-        // 날짜가 바뀌었으면 (자정 통과) 실시간으로 리셋 진행
         if (currentUser.lastFacilityDate !== currentToday) {
             currentUser.facilityCount = 0;
             currentUser.facilityMax = 15;
@@ -1647,6 +1748,22 @@
 
         document.getElementById('alien-tries-left').innerText = Math.max(0, 2 - (currentUser.alienTries || 0));
 
+        // ★ 알림 불빛 로직 반영 ★
+        const tabBtnLetters = document.getElementById('tab-btn-letters');
+        if (currentUser.hasNewLetter) tabBtnLetters.classList.add('notify-dot');
+        else tabBtnLetters.classList.remove('notify-dot');
+
+        const btnSuggestion = document.getElementById('btn-suggestion');
+        if (currentUser.hasNewReply) btnSuggestion.classList.add('notify-dot');
+        else btnSuggestion.classList.remove('notify-dot');
+
+        const btnAdminConsole = document.getElementById('btn-admin-console');
+        if (currentUser.code === 'kario0987') {
+            const hasPendingSuggestion = db.suggestions && db.suggestions.some(s => s.status === 'PENDING');
+            if (hasPendingSuggestion) btnAdminConsole.classList.add('notify-dot');
+            else btnAdminConsole.classList.remove('notify-dot');
+        }
+
         checkVIPStatus();
         renderInventory();
         renderHistory();
@@ -1672,6 +1789,13 @@
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-record .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
+
+        // 익명 편지 탭 접속 시 불빛 해제
+        if (panelId === 'rec-letters' && currentUser.hasNewLetter) {
+            currentUser.hasNewLetter = false;
+            saveDB();
+            updateUI();
+        }
     }
 
     function switchGamePanel(panelId, btnEl) {
@@ -1867,7 +1991,7 @@
             if (currentUser.ticketAddedCount >= 5) {
                 const limitMsgs = [
                     '금일 공용시설 이용 한도 추가는 총 5회로 제한됩니다. 더 이상 횟수를 추가할 수 없습니다.',
-                    '오늘의 횟수 추가 기회가 모두 사라졌습니다. 내일 다시 시도해주세요.',
+                    '오늘의 횟수 추가 기회가 모두 사라 고 내일 다시 시도해주세요.',
                     '시스템 한도 초과: 잔여 추가 횟수가 모두 소진되어 사용할 수 없습니다.'
                 ];
                 showCustomAlert(limitMsgs[Math.floor(Math.random() * limitMsgs.length)]);
@@ -2014,6 +2138,14 @@
             content: content
         });
 
+        // ★ 최대 3개까지만 보관
+        if (targetUser.letters.length > 3) {
+            targetUser.letters.pop();
+        }
+
+        // 상대방에게 새 편지 알림 켜기
+        targetUser.hasNewLetter = true;
+
         currentUser.inventory.splice(letterIdx, 1);
         addHistoryLog(currentUser, `[익명 편지] 사번 ${targetUser.no} 대상 서신 전송 (편지지 소모)`);
 
@@ -2035,6 +2167,13 @@
                 <button onclick="deleteLetter(${idx})" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:#888; cursor:pointer; font-size:10px;">삭제</button>
             </div>
         `).join('');
+    }
+
+    function deleteLetter(idx) {
+        if (!currentUser.letters) return;
+        currentUser.letters.splice(idx, 1);
+        saveDB();
+        renderLetters();
     }
 
     function renderRegularShop() {
@@ -2413,10 +2552,14 @@
         applyPollutionToUser(winner, 3);
         applyPollutionToUser(loser, 5);
 
+        const isMeWin = (winner.code === currentUser.code);
+
         saveDB();
         updateUI();
 
-        const isMeWin = (winner.code === currentUser.code);
+        // ★ VIP 승리 시 이펙트 출력
+        if (isMeWin) showPointGainEffect(bet);
+
         const color = isMeWin ? '#4CAF50' : '#f44336';
         
         let txt = "";
@@ -2968,10 +3111,44 @@
         return true;
     }
 
+    // ★ 게임 등에서 포인트를 얻었을 때 이펙트 발동 및 적립
+    function showPointGainEffect(amount) {
+        const ptEl = document.getElementById('display-points');
+        if (!ptEl) return;
+        
+        // 글씨색 일시적 강조
+        ptEl.style.color = '#4CAF50';
+        ptEl.style.textShadow = '0 0 10px #4CAF50';
+        setTimeout(() => {
+            ptEl.style.color = '#ffd700'; // 원래 색상으로 복구
+            ptEl.style.textShadow = 'none';
+        }, 800);
+
+        // 떠오르는 숫자 애니메이션 생성
+        const rect = ptEl.getBoundingClientRect();
+        const floater = document.createElement('div');
+        floater.innerText = `+${amount}`;
+        floater.style.position = 'fixed';
+        floater.style.left = `${rect.left + rect.width / 2}px`;
+        floater.style.top = `${rect.top}px`;
+        floater.style.transform = 'translate(-50%, -50%)';
+        floater.style.color = '#4CAF50';
+        floater.style.fontWeight = 'bold';
+        floater.style.fontSize = '26px';
+        floater.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
+        floater.style.zIndex = '99999';
+        floater.style.pointerEvents = 'none';
+        floater.style.animation = 'floatUp 1.2s ease-out forwards';
+        
+        document.body.appendChild(floater);
+        setTimeout(() => { floater.remove(); }, 1200);
+    }
+
     function winPoints(amount) {
         currentUser.points += amount;
         saveDB();
         updateUI();
+        showPointGainEffect(amount); // 포인트 적립 시 이펙트 호출
     }
 
     function checkVIPStatus() {
@@ -3030,7 +3207,8 @@
             blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null,
             alienDate: getTodayStr(), alienTries: 0, ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
             inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-            badge: { photo: "", nickname: name, notes: "특이사항 없음" }
+            badge: { photo: "", nickname: name, notes: "특이사항 없음" },
+            hasNewLetter: false, hasNewReply: false
         };
 
         saveDB();
@@ -3068,6 +3246,40 @@
         saveDB();
         updateUI();
         showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
+    }
+
+    function adminToggleVIP() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        if (!targetNo) {
+            showCustomAlert('대상 사원의 사번을 입력해주세요.');
+            return;
+        }
+
+        let targetUser = null;
+        for (let code in db.users) {
+            if (db.users[code].no === targetNo) {
+                targetUser = db.users[code];
+                break;
+            }
+        }
+
+        if (!targetUser) {
+            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (targetUser.code === 'kario0987') {
+            showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.');
+            return;
+        }
+
+        targetUser.hasVIP = !targetUser.hasVIP;
+        const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
+        addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
+        
+        saveDB();
+        updateUI();
+        showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
     }
 
     function adminControlPollution(action) {
@@ -3183,8 +3395,10 @@
             sugg.status = 'RESOLVED';
             sugg.reply = replyText;
             
+            // 답변 작성 완료 후 대상 사원에게 알림 켜기
             let targetUser = db.users[sugg.code];
             if(targetUser) {
+                targetUser.hasNewReply = true;
                 addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`);
             }
 
@@ -3206,6 +3420,10 @@
         
         if (db.users[code] && db.users[code].name === name) {
             currentUser = db.users[code];
+            
+            // 데이터베이스 호환성용 필드 추가 확인
+            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
+            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
             
             // 파이어베이스 온라인 상태 기록
             database.ref('online/' + code).set(true);
@@ -3238,7 +3456,6 @@
                 checkMedRations(currentUser);
                 checkP2PExpiration();
                 
-                // 자정 리셋 실시간 감지 로직
                 if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) {
                     updateUI();
                 }
@@ -3250,7 +3467,6 @@
 
     function logout() {
         if (currentUser) {
-            // 로그아웃 시 파이어베이스 온라인 목록에서 즉시 제거
             database.ref('online/' + currentUser.code).remove();
         }
         clearInterval(sessionTimer);
