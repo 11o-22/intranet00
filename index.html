@@ -33,8 +33,11 @@
             box-sizing: border-box;
         }
 
-        /* 고급스러운 입력 필드 (셀렉트, 텍스트박스) 전면 개편 */
-        select, input[type="text"], input[type="number"], input[type="password"], textarea, .bet-input, .badge-input {
+        /* 고급스러운 입력 필드 (로그인 화면 제외, 시스템 내부만 적용) */
+        #main-screen select, #main-screen input[type="text"], #main-screen input[type="number"], #main-screen input[type="password"], #main-screen textarea,
+        #admin-screen select, #admin-screen input[type="text"], #admin-screen input[type="number"], #admin-screen input[type="password"], #admin-screen textarea,
+        .modal-content select, .modal-content input, .modal-content textarea,
+        #vip-game-overlay input {
             background: linear-gradient(145deg, #1c1914, #0f0c0a) !important;
             border: 1px solid #a68a3f !important;
             color: #f3e5ab !important;
@@ -48,18 +51,19 @@
             appearance: none;
             font-family: inherit;
         }
-        select {
+        #main-screen select, #admin-screen select, .modal-content select, #vip-game-overlay select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%23d4af37" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>') !important;
             background-repeat: no-repeat !important;
             background-position-x: 98% !important;
             background-position-y: 50% !important;
             padding-right: 25px !important;
         }
-        select option {
+        #main-screen select option, #admin-screen select option, .modal-content select option {
             background: #1c1914;
             color: #f3e5ab;
         }
-        select:focus, input:focus, textarea:focus {
+        #main-screen select:focus, #main-screen input:focus, #main-screen textarea:focus,
+        #admin-screen select:focus, #admin-screen input:focus, #admin-screen textarea:focus {
             border-color: #ffd700 !important;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 8px rgba(212, 175, 55, 0.4) !important;
         }
@@ -171,10 +175,7 @@
         .theme-hanbok .panel-title { color: #082f49 !important; border-bottom-color: #bae6fd !important; }
         .theme-hanbok .game-btn { background: #38bdf8 !important; color: #ffffff !important; font-weight: bold; border-color: #0284c7 !important;}
         .theme-hanbok .game-btn:hover { background: #0ea5e9 !important; }
-        .theme-hanbok .badge-table th { background: #e0f2fe !important; border-color: #bae6fd !important; color: #0369a1 !important; }
-        .theme-hanbok .badge-table td { background: #ffffff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
         .theme-hanbok .inv-card, .theme-hanbok .shop-item, .theme-hanbok .history-item, .theme-hanbok .letter-card { background: #f0f9ff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
-        .theme-hanbok .inv-card-name, .theme-hanbok .letter-body { color: #082f49 !important; }
         .theme-hanbok .tabs-grid { border-color: #38bdf8 !important; }
         .theme-hanbok .tab { border-color: #38bdf8 !important; color: #0284c7 !important; background: #e0f2fe; }
         .theme-hanbok .tab.active { color: #082f49 !important; border-bottom: 2px solid #082f49 !important; background: #ffffff; font-weight: bold;}
@@ -214,11 +215,23 @@
             box-sizing: border-box;
         }
         #login-screen h2 { color: #888; margin-bottom: 30px; letter-spacing: 2px; font-weight: normal; }
-        .input-group { width: 100%; margin-bottom: 15px; }
+        
+        /* 로그인 인풋칸 오리지널 테마 유지 */
+        .login-input-group { width: 100%; margin-bottom: 15px; }
+        .login-input-group input {
+            width: 100%; padding: 12px; background-color: #222 !important;
+            border: 1px solid #444 !important; color: #fff !important; box-sizing: border-box; font-size: 16px;
+            text-align: center; letter-spacing: 1px; border-radius: 0 !important;
+            background-image: none !important; box-shadow: none !important;
+        }
+        .login-input-group input:focus {
+            border-color: #888 !important; box-shadow: none !important;
+        }
+
         .login-btn {
             width: 100%; padding: 15px; background-color: #444;
             color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px;
-            letter-spacing: 2px;
+            letter-spacing: 2px; border-radius: 4px; transition: background-color 0.3s;
         }
         .login-btn:hover { background-color: #555; }
 
@@ -528,11 +541,11 @@
 <div class="container" id="app-container">
     <div id="login-screen">
         <h2>사내 시스템 접속</h2>
-        <div class="input-group">
-            <input type="text" id="nickname-input" placeholder="사원명 입력">
+        <div class="login-input-group">
+            <input type="text" id="nickname-input" placeholder="사원명 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
         </div>
-        <div class="input-group">
-            <input type="password" id="code-input" placeholder="인가 코드 입력">
+        <div class="login-input-group">
+            <input type="password" id="code-input" placeholder="인가 코드 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
         </div>
         <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
     </div>
@@ -675,6 +688,7 @@
             <div id="rec-letters" class="sub-panel">
                 <div class="panel-title">[무기명 익명 서신함]</div>
                 
+                <!-- ★ 고급스럽게 변경된 익명 편지 발송 폼 -->
                 <div style="background: linear-gradient(145deg, #1b170e, #0a0805); padding: 15px; border: 1px solid #6e5722; margin-bottom: 15px; border-radius: 6px; box-shadow: inset 0 0 15px rgba(212, 175, 55, 0.05);">
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #4a3b18; padding-bottom:8px; margin-bottom:12px;">
                         <span style="font-weight:bold; color:#d4af37; font-size:13px; letter-spacing:1px;">✉ 은밀한 서신 발송</span>
@@ -683,6 +697,7 @@
                     
                     <select id="letter-target-select" style="width:100%; margin-bottom: 8px;"></select>
                     
+                    <!-- 300자 제한 적용 -->
                     <textarea id="letter-content-input" rows="3" maxlength="300" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요... (최대 300자)" style="width:100%; margin-bottom: 10px;"></textarea>
                     
                     <button class="game-btn" style="width:100%; margin:0; background:linear-gradient(90deg, #6e5722, #a68a3f); color:#000; font-weight:bold; border:1px solid #d4af37; padding:10px; border-radius:4px; letter-spacing: 1px; transition: all 0.3s ease;" onmouseover="this.style.background='linear-gradient(90deg, #8c7335, #d4af37)'" onmouseout="this.style.background='linear-gradient(90deg, #6e5722, #a68a3f)'" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
@@ -1048,8 +1063,16 @@
     const firebaseConfig = {
         databaseURL: "https://corp-system-6a618-default-rtdb.firebaseio.com/"
     };
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+    
+    // 혹시 모를 로딩 에러 방지
+    let database;
+    try {
+        firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+    } catch(e) {
+        console.error("Firebase Init Error:", e);
+        alert("시스템 데이터베이스 연결에 실패했습니다.");
+    }
 
     let currentUser = null;
     let sessionSeconds = 0;
@@ -1107,62 +1130,63 @@
     };
 
     // --- 파이어베이스 실시간 수신 (Socket.on 역할) ---
-    database.ref('/').on('value', (snapshot) => {
-        let data = snapshot.val();
-        if (data) {
-            if (!data.suggestions) data.suggestions = [];
-            else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
-            
-            if (!data.p2pDeals) data.p2pDeals = [];
-            else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
-            
-            if (!data.vipInvites) data.vipInvites = {};
-            if (!data.vipSessions) data.vipSessions = {};
+    if (database) {
+        database.ref('/').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if (data) {
+                if (!data.suggestions) data.suggestions = [];
+                else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
+                
+                if (!data.p2pDeals) data.p2pDeals = [];
+                else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
+                
+                if (!data.vipInvites) data.vipInvites = {};
+                if (!data.vipSessions) data.vipSessions = {};
 
-            if (data.users) {
-                for(let key in data.users) {
-                    if(!data.users[key].inventory) data.users[key].inventory = [];
-                    if(!data.users[key].history) data.users[key].history = [];
-                    if(!data.users[key].letters) data.users[key].letters = [];
-                    if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
-                    if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
+                if (data.users) {
+                    for(let key in data.users) {
+                        if(!data.users[key].inventory) data.users[key].inventory = [];
+                        if(!data.users[key].history) data.users[key].history = [];
+                        if(!data.users[key].letters) data.users[key].letters = [];
+                        if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
+                        if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
+                    }
+                } else {
+                    data.users = {};
+                }
+
+                db = data;
+                
+                if (currentUser) {
+                    const updatedUser = db.users[currentUser.code];
+                    if (!updatedUser && currentUser.code !== 'kario0987') {
+                        logout();
+                        showCustomAlert('계정이 당국에 의해 말소되었습니다.');
+                        return;
+                    }
+                    currentUser = updatedUser;
+                    updateUI();
+                    
+                    if (document.getElementById('suggestion-modal').style.display === 'flex') {
+                        renderMySuggestions();
+                    }
+
+                    checkVipMultiplayerState();
                 }
             } else {
-                data.users = {};
+                saveDB();
             }
+        });
 
-            db = data;
-            
-            if (currentUser) {
-                const updatedUser = db.users[currentUser.code];
-                if (!updatedUser && currentUser.code !== 'kario0987') {
-                    logout();
-                    showCustomAlert('계정이 당국에 의해 말소되었습니다.');
-                    return;
-                }
-                currentUser = updatedUser;
-                updateUI();
-                
-                if (document.getElementById('suggestion-modal').style.display === 'flex') {
-                    renderMySuggestions();
-                }
-
-                checkVipMultiplayerState();
-            }
-        } else {
-            saveDB();
-        }
-    });
-
-    database.ref('online').on('value', (snap) => {
-        onlineUsersMap = snap.val() || {};
-        let count = Object.keys(onlineUsersMap).length;
-        document.getElementById('online-users-count').innerText = count === 0 ? 1 : count;
-        if(currentUser) renderVipOpponents();
-    });
+        database.ref('online').on('value', (snap) => {
+            onlineUsersMap = snap.val() || {};
+            document.getElementById('online-users-count').innerText = Math.max(1, Object.keys(onlineUsersMap).length);
+            if(currentUser) renderVipOpponents();
+        });
+    }
 
     function saveDB() {
-        database.ref('/').set(db);
+        if(database) database.ref('/').set(db);
     }
 
     // ----------------------------------------
@@ -1183,6 +1207,39 @@
 
     function closeLuxuryAlert() {
         document.getElementById('luxury-alert-overlay').style.display = 'none';
+    }
+
+    // ★ 포인트 획득 이펙트
+    function showPointGainEffect(amount) {
+        const ptEl = document.getElementById('display-points');
+        if (!ptEl) return;
+        
+        // 글씨색 일시적 강조
+        ptEl.style.color = '#4CAF50';
+        ptEl.style.textShadow = '0 0 10px #4CAF50';
+        setTimeout(() => {
+            ptEl.style.color = '#ffd700'; // 원래 색상으로 복구
+            ptEl.style.textShadow = 'none';
+        }, 800);
+
+        // 떠오르는 숫자 애니메이션 생성
+        const rect = ptEl.getBoundingClientRect();
+        const floater = document.createElement('div');
+        floater.innerText = `+${amount}`;
+        floater.style.position = 'fixed';
+        floater.style.left = `${rect.left + rect.width / 2}px`;
+        floater.style.top = `${rect.top}px`;
+        floater.style.transform = 'translate(-50%, -50%)';
+        floater.style.color = '#4CAF50';
+        floater.style.fontWeight = 'bold';
+        floater.style.fontSize = '26px';
+        floater.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
+        floater.style.zIndex = '99999';
+        floater.style.pointerEvents = 'none';
+        floater.style.animation = 'floatUp 1.2s ease-out forwards';
+        
+        document.body.appendChild(floater);
+        setTimeout(() => { floater.remove(); }, 1200);
     }
 
     function generateSerialNo(affiliation, position, team) {
@@ -1901,11 +1958,10 @@
                     <div class="inv-card">
                         <div>
                             <span class="inv-card-name">${item}</span>
-                            <span class="inv-card-price">(판매가: ${sellPrice} P)</span>
                         </div>
                         <div class="inv-btn-group">
                             ${isUsable ? `<button class="inv-btn inv-btn-use" onclick="useInventoryItem(${idx})">${useBtnText}</button>` : ''}
-                            <button class="inv-btn inv-btn-sell" onclick="sellInventoryItem(${idx})">판매</button>
+                            <button class="inv-btn inv-btn-sell" onclick="sellInventoryItem(${idx})">판매 (+${sellPrice}P)</button>
                         </div>
                     </div>
                 `;
@@ -2039,7 +2095,7 @@
         const sellPrice = getSellPrice(item);
 
         currentUser.inventory.splice(index, 1);
-        currentUser.points += sellPrice;
+        winPoints(sellPrice);
         addHistoryLog(currentUser, `[소지품 판매] ${item} 매각 (+${sellPrice} P)`);
         saveDB();
         updateUI();
@@ -2597,7 +2653,7 @@
         const isP1 = session.p1 === currentUser.code;
         const oppCode = isP1 ? session.p2 : session.p1;
         const oppName = db.users[oppCode] ? db.users[oppCode].name : '상대방';
-        const gameNames = { 'dice': '주사위', 'rps': '가위바위보', 'updown': '업다운' };
+        const gameNames = { 'dice': '주사위 (합산)', 'rps': '가위바위보', 'updown': '업다운 (단판)' };
 
         document.getElementById('vip-game-title').innerText = `[${gameNames[session.game]}] vs ${oppName}`;
         
@@ -2625,7 +2681,7 @@
                 area.innerHTML = `
                     <div style="margin:10px 0;">
                         <div style="font-size:12px; color:#aaa; margin-bottom:8px; text-align:center;">1~999 중 목표 숫자(<span style="color:#ffd700;">${session.targetNumber}</span>)에 가장 가까운 사람이 승리!</div>
-                        <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center;" placeholder="숫자 입력 (1~999)">
+                        <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; background:#111; color:#fff; border:1px solid #444;" placeholder="숫자 입력 (1~999)">
                         <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(parseInt(v) || Math.floor(Math.random()*999)+1)">입력 완료</button>
                     </div>
                 `;
@@ -2635,12 +2691,11 @@
         if (session.state === 'WAITING') {
             statusEl.innerText = "3초 내에 선택을 완료하세요!";
             
-            // 승부 판정 (둘 다 냈거나 시간이 다 된 경우 P1이 계산)
+            // 승부 판정
             if (isP1 && session.p1Choice != null && session.p2Choice != null) {
                 evaluateVipMultiResult(session);
             }
             if (isP1 && Date.now() > session.endTime + 1000) {
-                // 시간 초과 시 강제 제출 처리
                 if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
                 if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
                 evaluateVipMultiResult(session);
@@ -2719,6 +2774,10 @@
             addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
 
             resultText += `<span style="color:#4CAF50; font-size:16px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
+            
+            // 승자 클라이언트에 포인트 획득 이펙트 호출을 위해 세션 플래그 기록
+            session.winnerCode = winUser.code;
+            session.winAmount = session.bet;
         }
 
         session.resultText = resultText;
@@ -2726,6 +2785,14 @@
     }
 
     function closeVipGameOverlay() {
+        // 모달을 닫을 때 내가 승자였다면 포인트 이펙트 출력
+        if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
+            const s = db.vipSessions[activeVipSessionId];
+            if (s.state === 'FINISHED' && s.winnerCode === currentUser.code) {
+                showPointGainEffect(s.winAmount);
+            }
+        }
+
         document.getElementById('vip-game-overlay').style.display = 'none';
         myChoiceSubmitted = false;
     }
@@ -3123,6 +3190,366 @@
         updateUI();
     }
 
+    function useFacility(bet) {
+        if (currentUser.pollution >= 100) {
+            showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.');
+            return false;
+        }
+        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (currentUser.facilityCount >= currentUser.facilityMax) {
+            showCustomAlert('일일 이용 한도를 초과했습니다.');
+            return false;
+        }
+        
+        if (currentUser.points < bet) {
+            showLuxuryAlert();
+            return false;
+        }
+
+        currentUser.points -= bet;
+        currentUser.facilityCount += 1;
+        addPollution(2);
+        return true;
+    }
+
+    function winPoints(amount) {
+        currentUser.points += amount;
+        saveDB();
+        updateUI();
+        showPointGainEffect(amount); // 포인트 적립 시 이펙트 호출
+    }
+
+    function checkVIPStatus() {
+        const deniedBox = document.getElementById('vip-denied-box');
+        const allowedBox = document.getElementById('vip-allowed-box');
+        const displayVip = document.getElementById('display-vip');
+
+        if (currentUser.code === 'kario0987') {
+            displayVip.innerHTML = 'VVIP<span> (1급)</span>';
+            deniedBox.style.display = 'none';
+            allowedBox.style.display = 'block';
+        } else if (currentUser.hasVIP) {
+            displayVip.innerHTML = 'VIP<span> (2급)</span>';
+            deniedBox.style.display = 'none';
+            allowedBox.style.display = 'block';
+        } else {
+            displayVip.innerHTML = '일반<span> (3급)</span>';
+            deniedBox.style.display = 'block';
+            allowedBox.style.display = 'none';
+        }
+    }
+
+    // --- 통제 콘솔 ---
+    function openAdminScreen() {
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'block';
+        renderAdminSuggestions();
+    }
+
+    function closeAdminScreen() {
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        document.getElementById('ranking-bottom-bar').style.display = 'block';
+    }
+
+    function adminRegisterNewEmployee() {
+        const name = document.getElementById('new-emp-name').value.trim();
+        const code = document.getElementById('new-emp-code').value.trim();
+        const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
+        const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
+        const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
+
+        if (!name || !code) return;
+        if (db.users[code]) {
+            showCustomAlert('이미 존재하는 사원코드입니다.');
+            return;
+        }
+
+        const generatedNo = generateSerialNo(aff, pos, team);
+
+        db.users[code] = {
+            code: code, name: name, affiliation: aff, team: team, position: pos,
+            no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
+            facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
+            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null,
+            alienDate: getTodayStr(), alienTries: 0, ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
+            inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
+            badge: { photo: "", nickname: name, notes: "특이사항 없음" },
+            hasNewLetter: false, hasNewReply: false
+        };
+
+        saveDB();
+        document.getElementById('new-emp-name').value = '';
+        document.getElementById('new-emp-code').value = '';
+        document.getElementById('new-emp-pos').value = '';
+        document.getElementById('new-emp-aff').value = '';
+        document.getElementById('new-emp-team').value = '';
+        showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
+    }
+
+    function adminUpdateEmployee() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        const aff = document.getElementById('adm-set-affiliation').value.trim();
+        const team = document.getElementById('adm-set-team').value.trim();
+        const pos = document.getElementById('adm-set-position').value.trim();
+        const points = parseInt(document.getElementById('adm-target-points').value);
+
+        let targetUser = null;
+        for (let code in db.users) {
+            if (db.users[code].no === targetNo) {
+                targetUser = db.users[code];
+                break;
+            }
+        }
+
+        if (!targetUser) return;
+        if (aff) targetUser.affiliation = aff;
+        if (team) targetUser.team = team;
+        if (pos) targetUser.position = pos;
+        if (!isNaN(points)) targetUser.points = points;
+
+        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
+
+        saveDB();
+        updateUI();
+        showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
+    }
+
+    function adminToggleVIP() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        if (!targetNo) {
+            showCustomAlert('대상 사원의 사번을 입력해주세요.');
+            return;
+        }
+
+        let targetUser = null;
+        for (let code in db.users) {
+            if (db.users[code].no === targetNo) {
+                targetUser = db.users[code];
+                break;
+            }
+        }
+
+        if (!targetUser) {
+            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (targetUser.code === 'kario0987') {
+            showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.');
+            return;
+        }
+
+        targetUser.hasVIP = !targetUser.hasVIP;
+        const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
+        addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
+        
+        saveDB();
+        updateUI();
+        showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
+    }
+
+    function adminControlPollution(action) {
+        const targetNo = document.getElementById('adm-poll-target-no').value.trim();
+        if (!targetNo) {
+            showCustomAlert('대상 사원의 사번을 입력해주세요.');
+            return;
+        }
+
+        let targetUser = null;
+        for (let code in db.users) {
+            if (db.users[code].no === targetNo) {
+                targetUser = db.users[code];
+                break;
+            }
+        }
+
+        if (!targetUser) {
+            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (action === 'set') {
+            const val = parseInt(document.getElementById('adm-poll-set-val').value);
+            if (isNaN(val) || val < 0 || val > 100) {
+                showCustomAlert('0에서 100 사이의 수치를 입력해주세요.');
+                return;
+            }
+            targetUser.pollution = val;
+            if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
+        } else if (action === 'max') {
+            targetUser.pollution = 100;
+            targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
+        } else if (action === 'zero') {
+            targetUser.pollution = 0;
+            targetUser.quarantineUntil = 0;
+            targetUser.lastPollutionTime = Date.now();
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
+        }
+
+        saveDB();
+        updateUI();
+    }
+
+    function adminDeleteEmployee() {
+        const targetNo = document.getElementById('adm-delete-no').value.trim();
+        if (!targetNo) return;
+
+        let targetCode = null;
+        for (let code in db.users) {
+            if (db.users[code].no === targetNo) {
+                targetCode = code;
+                break;
+            }
+        }
+
+        if (!targetCode || targetCode === 'kario0987') return;
+
+        delete db.users[targetCode];
+        if (db.p2pDeals) {
+            db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
+        }
+
+        saveDB();
+        document.getElementById('adm-delete-no').value = '';
+        if (currentUser && currentUser.code === targetCode) logout();
+    }
+
+    function renderAdminSuggestions() {
+        const listEl = document.getElementById('admin-suggestion-list');
+        if (!db.suggestions || db.suggestions.length === 0) {
+            listEl.innerHTML = '<div style="color:#888; font-size:11px;">접수된 건의가 없습니다.</div>';
+            return;
+        }
+        listEl.innerHTML = db.suggestions.map((s, idx) => `
+            <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
+                <div class="suggestion-meta">
+                    <span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span>
+                    <button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px;">삭제</button>
+                </div>
+                <div style="font-weight:bold; color:#ffcccc; margin-bottom:3px;">${s.title}</div>
+                <div style="color:#ddd; margin-bottom:8px;">${s.content}</div>
+                
+                ${s.status === 'PENDING' ? `
+                    <div style="display:flex; gap:4px;">
+                        <input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요">
+                        <button class="game-btn" style="margin:0; background:#2e7d32;" onclick="adminReplySuggestion(${s.id})">해결 처리</button>
+                    </div>
+                ` : `
+                    <div style="background:#111; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5;">
+                        <b>[상담사 답변]</b> ${s.reply}
+                    </div>
+                `}
+            </div>
+        `).join('');
+    }
+
+    function adminReplySuggestion(id) {
+        const replyInput = document.getElementById(`admin-reply-${id}`);
+        const replyText = replyInput.value.trim();
+        if (!replyText) {
+            showCustomAlert("답변 내용을 입력해주세요.");
+            return;
+        }
+
+        const sugg = db.suggestions.find(s => s.id === id);
+        if (sugg) {
+            sugg.status = 'RESOLVED';
+            sugg.reply = replyText;
+            
+            // 답변 작성 완료 후 대상 사원에게 알림 켜기
+            let targetUser = db.users[sugg.code];
+            if(targetUser) {
+                targetUser.hasNewReply = true;
+                addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`);
+            }
+
+            saveDB();
+            renderAdminSuggestions();
+        }
+    }
+
+    function deleteSuggestion(index) {
+        db.suggestions.splice(index, 1);
+        saveDB();
+        renderAdminSuggestions();
+    }
+
+    // --- 로그인 / 세션 (파이어베이스 호환) ---
+    function attemptLogin() {
+        const name = document.getElementById('nickname-input').value.trim();
+        const code = document.getElementById('code-input').value.trim();
+        
+        if (db.users[code] && db.users[code].name === name) {
+            currentUser = db.users[code];
+            
+            // 데이터베이스 호환성용 필드 추가 확인
+            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
+            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
+            
+            // 파이어베이스 온라인 상태 기록
+            if(database) {
+                database.ref('online/' + code).set(true);
+                database.ref('online/' + code).onDisconnect().remove();
+            }
+
+            hasShownFoxAlert = currentUser.pollution >= 100;
+            checkPassivePollution(currentUser);
+            checkMedRations(currentUser);
+            checkP2PExpiration();
+
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            document.getElementById('ranking-bottom-bar').style.display = 'block';
+            
+            checkVIPStatus();
+            loadBadgeInfo();
+            updateUI();
+            
+            document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
+
+            sessionSeconds = 0;
+            clearInterval(sessionTimer);
+            sessionTimer = setInterval(() => {
+                sessionSeconds++;
+                const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(sessionSeconds % 60).padStart(2, '0');
+                document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
+                checkPassivePollution(currentUser);
+                checkMedRations(currentUser);
+                checkP2PExpiration();
+                
+                if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) {
+                    updateUI();
+                }
+            }, 1000);
+        } else {
+            showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
+        }
+    }
+
+    function logout() {
+        if (currentUser && database) {
+            database.ref('online/' + currentUser.code).remove();
+        }
+        clearInterval(sessionTimer);
+        currentUser = null;
+        hasShownFoxAlert = false;
+        updateVisualDistortion(0);
+        document.getElementById('nickname-input').value = '';
+        document.getElementById('code-input').value = '';
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+    }
 </script>
 
 </body>
