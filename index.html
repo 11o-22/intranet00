@@ -33,6 +33,38 @@
             box-sizing: border-box;
         }
 
+        /* 고급스러운 입력 필드 (셀렉트, 텍스트박스) 전면 개편 */
+        select, input[type="text"], input[type="number"], input[type="password"], textarea, .bet-input, .badge-input {
+            background: linear-gradient(145deg, #1c1914, #0f0c0a) !important;
+            border: 1px solid #a68a3f !important;
+            color: #f3e5ab !important;
+            border-radius: 4px !important;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 0 5px rgba(212, 175, 55, 0.1) !important;
+            padding: 8px 10px;
+            outline: none;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            font-family: inherit;
+        }
+        select {
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23d4af37" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>') !important;
+            background-repeat: no-repeat !important;
+            background-position-x: 98% !important;
+            background-position-y: 50% !important;
+            padding-right: 25px !important;
+        }
+        select option {
+            background: #1c1914;
+            color: #f3e5ab;
+        }
+        select:focus, input:focus, textarea:focus {
+            border-color: #ffd700 !important;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 8px rgba(212, 175, 55, 0.4) !important;
+        }
+        ::placeholder { color: #8c7335 !important; opacity: 0.7 !important; }
+
         /* 알림 불빛 애니메이션 (공통) */
         .notify-dot {
             position: relative;
@@ -92,10 +124,8 @@
         .theme-white .panel-title { color: #1e293b !important; border-bottom-color: #e2e8f0 !important; }
         .theme-white .game-btn { background: #3b82f6 !important; color: #ffffff !important; }
         .theme-white .game-btn:hover { background: #2563eb !important; }
-        .theme-white .bet-input, .theme-white .input-group input, .theme-white .modal-content input, .theme-white .modal-content textarea, .theme-white .modal-content select { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #0f172a !important; }
         .theme-white .badge-table th { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #334155 !important; }
         .theme-white .badge-table td { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #0f172a !important; }
-        .theme-white .badge-input { color: #0f172a !important; }
         .theme-white .badge-locked-text { color: #64748b !important; }
         .theme-white .inv-card, .theme-white .shop-item, .theme-white .history-item, .theme-white .letter-card { background: #f8fafc !important; border-color: #cbd5e1 !important; }
         .theme-white .inv-card-name, .theme-white .letter-body { color: #1e293b !important; }
@@ -143,7 +173,6 @@
         .theme-hanbok .game-btn:hover { background: #0ea5e9 !important; }
         .theme-hanbok .badge-table th { background: #e0f2fe !important; border-color: #bae6fd !important; color: #0369a1 !important; }
         .theme-hanbok .badge-table td { background: #ffffff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
-        .theme-hanbok .badge-input { color: #0c4a6e !important; }
         .theme-hanbok .inv-card, .theme-hanbok .shop-item, .theme-hanbok .history-item, .theme-hanbok .letter-card { background: #f0f9ff !important; border-color: #bae6fd !important; color: #0c4a6e !important; }
         .theme-hanbok .inv-card-name, .theme-hanbok .letter-body { color: #082f49 !important; }
         .theme-hanbok .tabs-grid { border-color: #38bdf8 !important; }
@@ -151,7 +180,6 @@
         .theme-hanbok .tab.active { color: #082f49 !important; border-bottom: 2px solid #082f49 !important; background: #ffffff; font-weight: bold;}
         .theme-hanbok .sub-tab { background: #e0f2fe !important; border-color: #7dd3fc !important; color: #0284c7 !important; }
         .theme-hanbok .sub-tab.active { background: #ffffff !important; color: #082f49 !important; border-color: #0ea5e9 !important; font-weight: bold;}
-        .theme-hanbok .bet-input, .theme-hanbok .input-group input, .theme-hanbok .modal-content input, .theme-hanbok .modal-content textarea, .theme-hanbok .modal-content select { background: #f0f9ff !important; border-color: #7dd3fc !important; color: #082f49 !important; }
         .theme-hanbok .status-label { color: #0369a1 !important; }
         .theme-hanbok .status-value { color: #082f49 !important; }
         .theme-hanbok .status-value span { color: #0284c7 !important; }
@@ -187,11 +215,6 @@
         }
         #login-screen h2 { color: #888; margin-bottom: 30px; letter-spacing: 2px; font-weight: normal; }
         .input-group { width: 100%; margin-bottom: 15px; }
-        .input-group input {
-            width: 100%; padding: 12px; background-color: #222;
-            border: 1px solid #444; color: #fff; box-sizing: border-box; font-size: 16px;
-            text-align: center; letter-spacing: 1px;
-        }
         .login-btn {
             width: 100%; padding: 15px; background-color: #444;
             color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px;
@@ -280,7 +303,7 @@
         .status-value span { font-size: 11px; color: #888; }
 
         .action-buttons { display: flex; gap: 8px; margin-bottom: 15px; }
-        .action-buttons button { flex: 1; padding: 8px; background-color: transparent; border: 1px solid #444; color: #aaa; cursor: pointer; font-size: 12px; }
+        .action-buttons button { flex: 1; padding: 8px; background-color: transparent; border: 1px solid #444; color: #aaa; cursor: pointer; font-size: 12px; border-radius:3px; }
         .action-buttons button:hover { background-color: #333; color: #fff; }
         .admin-access-btn { background-color: #551a1a !important; border: 1px solid #ff4c4c !important; color: #ff4c4c !important; }
 
@@ -302,7 +325,6 @@
         .game-btn { background: #444; color: white; border: none; padding: 8px 14px; cursor: pointer; margin: 6px 3px; font-size: 13px; border-radius: 3px; }
         .game-btn:hover { background: #666; }
         .game-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
-        .bet-input { width: 65px; padding: 5px; background: #111; border: 1px solid #555; color: #fff; text-align: center; border-radius: 3px; box-sizing: border-box; }
 
         .badge-photo-box { width: 130px; height: 160px; background-color: #222; margin: 0 auto 12px auto; border: 2px solid #555; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .badge-photo-box img { width: 100%; height: 100%; object-fit: cover; }
@@ -310,7 +332,6 @@
         .badge-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .badge-table th { width: 30%; background: #222; border: 1px solid #333; padding: 7px; color: #aaa; text-align: left; }
         .badge-table td { background: #1c1c1c; border: 1px solid #333; padding: 7px; color: #eee; }
-        .badge-input { width: 100%; background: transparent; border: none; color: #fff; font-family: inherit; font-size: 12px; outline: none; }
         .status-tag { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; font-size: 11px; }
 
         .inv-card { display: flex; justify-content: space-between; align-items: center; background: #222; border: 1px solid #444; padding: 8px 10px; margin-bottom: 6px; border-radius: 4px; font-size: 12px; }
@@ -371,7 +392,6 @@
         .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 10; }
         .modal-content { background-color: #1a1a1a; padding: 20px; border: 1px solid #555; width: 85%; box-sizing: border-box; }
         .modal-content h3 { color: #fff; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .modal-content input, .modal-content textarea, .modal-content select { width: 100%; padding: 10px; margin-bottom: 12px; background-color: #222; border: 1px solid #444; color: #fff; box-sizing: border-box; font-family: inherit; }
         .modal-btn-group { display: flex; gap: 10px; }
         .modal-btn-group button { flex: 1; padding: 10px; cursor: pointer; border: none; }
         .btn-submit { background-color: #4CAF50; color: white; }
@@ -387,8 +407,8 @@
         .custom-alert-btn { background: #771111; color: #fff; border: 1px solid #ff4c4c; padding: 9px 22px; font-size: 12px; cursor: pointer; border-radius: 4px; }
         .custom-alert-btn:hover { background: #991515; }
 
-        /* 고급진 포인트 부족 알림 모달 */
-        #luxury-alert-overlay {
+        /* 고급진 알림/승부 모달 (VIP) */
+        #luxury-alert-overlay, #vip-invite-overlay, #vip-game-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);
         }
         .luxury-alert-box {
@@ -425,7 +445,7 @@
         .suggestion-item { background: #1a0a0a; border: 1px solid #552222; padding: 8px; margin-bottom: 8px; font-size: 12px; border-radius:4px; }
         .suggestion-meta { color: #888; font-size: 10px; margin-bottom: 4px; display: flex; justify-content: space-between; }
 
-        /* VIP 라운지 전용 스타일 */
+        /* VIP 라운지 1:1 대전실 메인 */
         .vip-arena-box {
             background: linear-gradient(145deg, #1b170e, #100d08);
             border: 1px solid #d4af37;
@@ -442,98 +462,24 @@
             width: 100%;
             box-sizing: border-box;
         }
-        .vip-opponent-select {
-            flex: 65;
-            min-width: 0;
-            font-size: 11px;
-            padding: 7px 6px;
-            background: #222;
-            color: #fff;
-            border: 1px solid #555;
-            border-radius: 3px;
-            box-sizing: border-box;
-        }
-        .vip-bet-input {
-            flex: 35;
-            min-width: 0;
-            width: 100%;
-            font-size: 11px;
-            padding: 7px 6px;
-            background: #222;
-            color: #ffd700;
-            border: 1px solid #d4af37;
-            border-radius: 3px;
-            text-align: center;
-            font-weight: bold;
-            box-sizing: border-box;
-        }
         .vip-nav-btns { display: flex; gap: 5px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
         .vip-nav-btn { flex: 1; padding: 9px 0; background: #262015; border: 1px solid #6e5722; color: #d4af37; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; box-sizing: border-box; }
         .vip-nav-btn.active { background: #d4af37; color: #111; border-color: #fff; }
-        .vip-game-display {
-            background: #14110b; border: 1px dashed #6e5722; border-radius: 5px; padding: 12px; text-align: center; min-height: 140px; margin-bottom: 10px; box-sizing: border-box; width: 100%;
-        }
-        .vip-score-board { font-size: 18px; font-weight: bold; color: #ffd700; font-family: monospace; margin: 8px 0; }
-        .vip-round-tag { font-size: 11px; color: #ff9800; }
 
-        /* 고급 가위바위보 카드 스타일 */
-        .rps-card-deck {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 12px 0 6px 0;
-        }
-        .rps-luxury-card {
-            flex: 1;
-            max-width: 105px;
-            background: linear-gradient(145deg, #2a2213, #161208);
-            border: 1.5px solid #d4af37;
-            border-radius: 6px;
-            padding: 10px 4px;
-            cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 6px rgba(212, 175, 55, 0.2);
-            user-select: none;
-        }
-        .rps-luxury-card:hover {
-            transform: translateY(-5px);
-            border-color: #fff0a8;
-            box-shadow: 0 8px 18px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(212, 175, 55, 0.4);
-            background: linear-gradient(145deg, #382c16, #201a0b);
-        }
-        .rps-luxury-card:active {
-            transform: scale(0.95);
-        }
-        .rps-card-icon {
-            font-size: 28px;
-            margin-bottom: 4px;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
-        }
-        .rps-card-label {
-            font-size: 12px;
-            font-weight: bold;
-            color: #ffd700;
-            letter-spacing: 1px;
-        }
     </style>
 </head>
 <body>
 
 <div id="pollution-overlay"></div>
 
-<div id="custom-alert-overlay">
+<div id="custom-alert-overlay" style="z-index: 99999999;">
     <div class="custom-alert-box">
         <div class="custom-alert-msg" id="custom-alert-text">알림 내용</div>
         <button class="custom-alert-btn" onclick="closeCustomAlert()">확인</button>
     </div>
 </div>
 
-<!-- 고급진 포인트 부족 알림 모달 -->
-<div id="luxury-alert-overlay">
+<div id="luxury-alert-overlay" style="z-index: 99999999;">
     <div class="luxury-alert-box">
         <div style="font-size: 26px; margin-bottom: 15px; filter: drop-shadow(0 0 8px rgba(212,175,55,0.6));">💳</div>
         <div class="luxury-alert-msg" id="luxury-alert-text">보유하신 포인트가 부족합니다.</div>
@@ -541,15 +487,41 @@
     </div>
 </div>
 
-<!-- 스마일 스티커 대상 지정용 모달 -->
+<!-- 스마일 스티커 모달 -->
 <div id="item-target-modal" class="modal-overlay">
     <div class="modal-content">
         <h3 id="target-modal-title">아이템 사용 대상 선택</h3>
-        <select id="item-target-select" style="font-size:12px; margin-bottom: 12px;"></select>
+        <select id="item-target-select" style="width:100%; margin-bottom: 12px;"></select>
         <div class="modal-btn-group">
             <button class="btn-submit" onclick="confirmItemTarget()">사용</button>
             <button class="btn-cancel" onclick="closeItemTargetModal()" style="background:#444;">취소</button>
         </div>
+    </div>
+</div>
+
+<!-- VIP 초대 수신 모달 -->
+<div id="vip-invite-overlay">
+    <div class="luxury-alert-box">
+        <h3 style="color:#d4af37; margin-top:0;">⚔️ 1:1 대전 신청 도착</h3>
+        <div id="vip-invite-text" style="color:#f3e5ab; margin-bottom: 20px; font-size:13px; line-height:1.5;"></div>
+        <div style="display:flex; gap:10px;">
+            <button class="luxury-alert-btn" onclick="acceptVipInvite()" style="flex:1;">수락 (동의)</button>
+            <button class="luxury-alert-btn" onclick="rejectVipInvite()" style="flex:1; background:#4a1212; border-color:#ff4c4c; color:#ffcccc;">거절</button>
+        </div>
+    </div>
+</div>
+
+<!-- VIP 게임 진행 오버레이 -->
+<div id="vip-game-overlay">
+    <div class="luxury-alert-box" style="width:90%; max-width:400px; padding:20px;">
+        <h3 id="vip-game-title" style="color:#d4af37; margin-top:0;">VIP 대전</h3>
+        <div id="vip-game-timer" style="font-size:36px; font-weight:bold; color:#ff4c4c; margin: 10px 0; text-shadow: 0 0 10px rgba(255,76,76,0.5);">3</div>
+        
+        <div id="vip-game-area" style="min-height: 120px; display:flex; flex-direction:column; justify-content:center;">
+            <!-- 동적 렌더링 영역 -->
+        </div>
+        
+        <div id="vip-game-status" style="margin-top:15px; font-size:12px; color:#aaa;">상대방의 선택을 기다리는 중...</div>
     </div>
 </div>
 
@@ -703,17 +675,15 @@
             <div id="rec-letters" class="sub-panel">
                 <div class="panel-title">[무기명 익명 서신함]</div>
                 
-                <!-- ★ 고급스럽게 변경된 익명 편지 발송 폼 -->
                 <div style="background: linear-gradient(145deg, #1b170e, #0a0805); padding: 15px; border: 1px solid #6e5722; margin-bottom: 15px; border-radius: 6px; box-shadow: inset 0 0 15px rgba(212, 175, 55, 0.05);">
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #4a3b18; padding-bottom:8px; margin-bottom:12px;">
                         <span style="font-weight:bold; color:#d4af37; font-size:13px; letter-spacing:1px;">✉ 은밀한 서신 발송</span>
                         <span style="font-size:10px; color:#888;">[익명성 보장 / 최대 300자]</span>
                     </div>
                     
-                    <select id="letter-target-select" style="width:100%; font-size:12px; padding:8px 10px; margin-bottom: 8px; background:#18130a; color:#f3e5ab; border:1px solid #4a3b18; border-radius:3px; outline:none; box-sizing:border-box;"></select>
+                    <select id="letter-target-select" style="width:100%; margin-bottom: 8px;"></select>
                     
-                    <!-- 300자 제한 적용 -->
-                    <textarea id="letter-content-input" rows="3" maxlength="300" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요... (최대 300자)" style="width:100%; font-size:12px; padding:10px; margin-bottom: 10px; background:#18130a; color:#eee; border:1px solid #4a3b18; border-radius:3px; outline:none; resize:none; box-sizing:border-box; line-height:1.4;"></textarea>
+                    <textarea id="letter-content-input" rows="3" maxlength="300" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요... (최대 300자)" style="width:100%; margin-bottom: 10px;"></textarea>
                     
                     <button class="game-btn" style="width:100%; margin:0; background:linear-gradient(90deg, #6e5722, #a68a3f); color:#000; font-weight:bold; border:1px solid #d4af37; padding:10px; border-radius:4px; letter-spacing: 1px; transition: all 0.3s ease;" onmouseover="this.style.background='linear-gradient(90deg, #8c7335, #d4af37)'" onmouseout="this.style.background='linear-gradient(90deg, #6e5722, #a68a3f)'" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
                 </div>
@@ -749,7 +719,7 @@
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
                     <div>
-                        베팅: <input type="number" id="slot-bet" class="bet-input" value="5" min="1">
+                        베팅: <input type="number" id="slot-bet" class="bet-input" value="5" min="1" style="width:70px;">
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
@@ -770,11 +740,11 @@
                     </div>
                     <div style="margin-bottom:8px;">
                         베팅 번호(1~25): 
-                        <input type="number" id="roulette-target" class="bet-input" value="25" min="1" max="25">
+                        <input type="number" id="roulette-target" class="bet-input" value="25" min="1" max="25" style="width:70px;">
                     </div>
                     <div>
                         베팅 포인트: 
-                        <input type="number" id="roulette-bet" class="bet-input" value="5" min="1">
+                        <input type="number" id="roulette-bet" class="bet-input" value="5" min="1" style="width:70px;">
                         <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
                     </div>
                     <div id="roulette-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">번호를 고르고 회전시키세요. (오염도 +2)</div>
@@ -800,7 +770,7 @@
                         </div>
                     </div>
                     <div id="seotda-controls-start">
-                        베팅: <input type="number" id="seotda-bet" class="bet-input" value="5" min="1">
+                        베팅: <input type="number" id="seotda-bet" class="bet-input" value="5" min="1" style="width:70px;">
                         <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
                     </div>
                     <div id="seotda-controls-play" style="display:none;">
@@ -812,7 +782,7 @@
             </div>
         </div>
 
-        <!-- 3. VIP 시설 (1:1 라운지) -->
+        <!-- 3. VIP 시설 (1:1 실시간 대전실) -->
         <div id="tab-vip" class="tab-content" style="text-align: left;">
             <div id="vip-denied-box" style="display:none; text-align:center; padding: 25px 10px;">
                 <h4 style="color:#ff4c4c; margin-top:0;">[VIP 시설 접근 제한]</h4>
@@ -822,66 +792,34 @@
             <div id="vip-allowed-box" style="display:none;">
                 <div class="vip-arena-box">
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #6e5722; padding-bottom:6px; margin-bottom:10px;">
-                        <span style="font-weight:bold; color:#ffd700; font-size:13px;">★ VIP 라운지 1:1 포인트 대전실</span>
+                        <span style="font-weight:bold; color:#ffd700; font-size:13px;">★ VIP 라운지 1:1 실시간 포인트 대전실</span>
                         <span style="font-size:10px; color:#aaa;">[최소 베팅 100 P]</span>
                     </div>
 
-                    <!-- 대전 상대 및 판돈 설정 -->
+                    <div style="font-size:11px; color:#aaa; margin-bottom:10px; line-height:1.4;">
+                        ※ 현재 접속 중인 상대방에게 1:1 대결을 신청합니다.<br>
+                        ※ 상대가 수락하면 3초간의 실시간 상호 선택 승부가 시작됩니다.
+                    </div>
+
                     <div style="background:#18130a; padding:10px; border:1px solid #4a3b18; border-radius:4px; margin-bottom:10px; box-sizing:border-box;">
                         <div class="vip-wager-row">
-                            <select id="vip-opponent-select" class="vip-opponent-select"></select>
-                            <input type="number" id="vip-bet-input" class="vip-bet-input" placeholder="베팅(최소 100)" value="100" min="100">
+                            <select id="vip-opponent-select" style="width:100%;"></select>
+                            <input type="number" id="vip-bet-input" placeholder="베팅액(최소 100)" value="100" min="100" style="width:80px; text-align:center;">
                         </div>
                     </div>
 
-                    <!-- 3종 게임 선택 버튼 -->
                     <div class="vip-nav-btns">
-                        <button class="vip-nav-btn active" id="btn-vgame-dice" onclick="selectVipGame('dice')">1. 주사위</button>
-                        <button class="vip-nav-btn" id="btn-vgame-rps" onclick="selectVipGame('rps')">2. 가위바위보</button>
-                        <button class="vip-nav-btn" id="btn-vgame-updown" onclick="selectVipGame('updown')">3. 업 다운</button>
+                        <button class="vip-nav-btn active" id="btn-vgame-dice" onclick="selectVipGameType('dice')">1. 주사위 (합산)</button>
+                        <button class="vip-nav-btn" id="btn-vgame-rps" onclick="selectVipGameType('rps')">2. 가위바위보</button>
+                        <button class="vip-nav-btn" id="btn-vgame-updown" onclick="selectVipGameType('updown')">3. 업 다운 (단판)</button>
                     </div>
 
-                    <!-- 1. 주사위 뷰 -->
-                    <div id="vip-view-dice" class="vip-game-display">
-                        <div class="vip-round-tag">[주사위 합산 대결: 주사위 2개를 굴려 합이 높은 쪽 승리]</div>
-                        <div class="vip-score-board" id="vip-dice-result">나: ? vs 상대: ?</div>
-                        <button class="game-btn" onclick="playVipDice()" style="background:#d4af37; color:#000; font-weight:bold;">주사위 던지기</button>
-                    </div>
+                    <button class="game-btn" style="width:100%; margin:0; background:linear-gradient(145deg, #d4af37, #aa820a); color:#000; font-weight:bold; font-size:14px; padding:12px; border:1px solid #fff;" onclick="sendVipInvite()">⚔️ 대전 초대장 발송</button>
 
-                    <!-- 2. 가위바위보 뷰 (고급 카드형) -->
-                    <div id="vip-view-rps" class="vip-game-display" style="display:none;">
-                        <div class="vip-round-tag">[가위바위보 대결: 승부수를 담은 카드를 제시하세요]</div>
-                        <div class="vip-score-board" id="vip-rps-result">카드를 선택해 대결을 시작하세요</div>
-                        
-                        <div class="rps-card-deck">
-                            <div class="rps-luxury-card" onclick="playVipRPS('가위')">
-                                <div class="rps-card-icon">✌🏻</div>
-                                <div class="rps-card-label">가위 (SCISSORS)</div>
-                            </div>
-                            <div class="rps-luxury-card" onclick="playVipRPS('바위')">
-                                <div class="rps-card-icon">✊🏻</div>
-                                <div class="rps-card-label">바위 (ROCK)</div>
-                            </div>
-                            <div class="rps-luxury-card" onclick="playVipRPS('보')">
-                                <div class="rps-card-icon">🖐🏻</div>
-                                <div class="rps-card-label">보 (PAPER)</div>
-                            </div>
-                        </div>
+                    <div id="vip-online-list" style="margin-top:15px; border-top:1px dashed #4a3b18; padding-top:10px;">
+                        <div style="font-size:11px; color:#ffd700; margin-bottom:8px; font-weight:bold;">[현재 라운지 접속 명단]</div>
+                        <div id="vip-online-users-container" style="font-size:11px; color:#ddd; max-height:120px; overflow-y:auto;"></div>
                     </div>
-
-                    <!-- 3. 업다운 뷰 -->
-                    <div id="vip-view-updown" class="vip-game-display" style="display:none;">
-                        <div class="vip-round-tag">[업/다운: 1~999 사이의 무작위 목표 숫자를 맞추세요 (3회 기회)]</div>
-                        <div style="font-size:11px; color:#bbb; margin:6px 0;" id="vip-ud-status">남은 시도: 3회</div>
-                        <div class="vip-score-board" id="vip-ud-hint" style="font-size:13px; line-height:1.4;">숫자를 입력하세요</div>
-                        <div style="display:flex; justify-content:center; gap:6px; margin-top:8px;">
-                            <input type="number" id="vip-ud-input" min="1" max="999" placeholder="1~999" class="bet-input" style="width:80px;">
-                            <button class="game-btn" onclick="submitVipUpDownGuess()" style="background:#d4af37; color:#000; font-weight:bold;">입력</button>
-                            <button class="game-btn" onclick="resetVipUpDownGame()" style="background:#444;">새 게임</button>
-                        </div>
-                    </div>
-
-                    <div id="vip-game-msg" style="font-size:12px; color:#ffd700; text-align:center; min-height:18px; font-weight:bold; margin-top:6px;"></div>
                 </div>
             </div>
         </div>
@@ -904,7 +842,7 @@
                 <!-- 유쾌 판매소 -->
                 <div id="shop-regular" class="sub-panel active">
                     <div class="panel-title">[유쾌 판매소 - 금일 입고 물품]</div>
-                    <div style="font-size:10px; color:#888; margin-bottom:8px; text-align:center;">※ 10종 물품 중 5종 무작위 입고 (물품당 1일 최대 3개)</div>
+                    <div style="font-size:10px; color:#888; margin-bottom:8px; text-align:center;">※ 10종 물품 중 5종 입고 (사원별 개인화 / 최대 3개)</div>
                     <div id="regular-shop-items-container"></div>
                 </div>
 
@@ -915,32 +853,32 @@
                         <div style="font-size:11px; color:#aaa; margin-bottom:6px;">은밀한 1:1 제안서 작성</div>
                         
                         <div style="display:flex; gap:6px; margin-bottom:6px;">
-                            <select id="p2p-deal-mode" onchange="toggleP2PDealMode()" style="width:35%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;">
+                            <select id="p2p-deal-mode" onchange="toggleP2PDealMode()" style="width:40%;">
                                 <option value="give">일방 양도 (선물)</option>
                                 <option value="trade">조건부 교환</option>
                             </select>
-                            <select id="p2p-target-user" style="width:65%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;"></select>
+                            <select id="p2p-target-user" style="width:60%;"></select>
                         </div>
 
                         <div style="font-size:10px; color:#888; margin-bottom:3px;">내가 건넬 제물:</div>
                         <div style="display:flex; gap:6px; margin-bottom:6px;">
-                            <select id="p2p-offer-type" onchange="toggleP2POfferType()" style="width:35%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;">
+                            <select id="p2p-offer-type" onchange="toggleP2POfferType()" style="width:40%;">
                                 <option value="item">소지품</option>
                                 <option value="point">포인트</option>
                             </select>
-                            <select id="p2p-offer-item" style="width:65%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;"></select>
-                            <input type="number" id="p2p-offer-points" placeholder="건넬 포인트 수량" style="display:none; width:65%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;">
+                            <select id="p2p-offer-item" style="width:60%;"></select>
+                            <input type="number" id="p2p-offer-points" placeholder="건넬 포인트 수량" style="display:none; width:60%;">
                         </div>
 
                         <div id="p2p-demand-wrapper" style="display:none; border-top:1px dashed #333; padding-top:6px; margin-top:6px;">
                             <div style="font-size:10px; color:#ff9800; margin-bottom:3px;">상대에게 요구할 대가:</div>
                             <div style="display:flex; gap:6px; margin-bottom:6px;">
-                                <select id="p2p-demand-type" onchange="toggleP2PDemandType()" style="width:35%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;">
+                                <select id="p2p-demand-type" onchange="toggleP2PDemandType()" style="width:40%;">
                                     <option value="point">포인트 요구</option>
                                     <option value="item">소지품 요구</option>
                                 </select>
-                                <input type="number" id="p2p-demand-points" placeholder="요구 포인트" style="width:65%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;">
-                                <select id="p2p-demand-item" style="display:none; width:65%; font-size:11px; padding:5px; background:#222; border:1px solid #444; color:#fff;"></select>
+                                <input type="number" id="p2p-demand-points" placeholder="요구 포인트" style="width:60%;">
+                                <select id="p2p-demand-item" style="display:none; width:60%;"></select>
                             </div>
                         </div>
 
@@ -1015,8 +953,8 @@
         <div class="modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
             <h3>사내 건의함 접수</h3>
             <div style="flex-shrink: 0;">
-                <input type="text" id="sugg-title" placeholder="건의 제목 입력">
-                <textarea id="sugg-content" rows="3" placeholder="상담사 선생님께 건의할 내용을 기재하세요."></textarea>
+                <input type="text" id="sugg-title" placeholder="건의 제목 입력" style="margin-bottom:10px;">
+                <textarea id="sugg-content" rows="3" placeholder="상담사 선생님께 건의할 내용을 기재하세요." style="margin-bottom:10px;"></textarea>
                 <div class="modal-btn-group" style="margin-bottom: 15px;">
                     <button class="btn-submit" onclick="submitSuggestion()">접수</button>
                     <button class="btn-cancel" onclick="closeSuggestionModal()" style="background:#444;">닫기</button>
@@ -1118,6 +1056,13 @@
     let sessionTimer;
     let pendingTargetItemIdx = -1; 
     let hasShownFoxAlert = false;
+    let onlineUsersMap = {};
+
+    // 실시간 대전용 전역 변수
+    let currentVipGameType = 'dice';
+    let currentInviteId = null;
+    let activeVipSessionId = null;
+    let myChoiceSubmitted = false;
 
     // ★ 실시간 접속 기준 '오늘 날짜' 구하기 함수 (자정 리셋용)
     function getTodayStr() {
@@ -1156,7 +1101,9 @@
             }
         },
         suggestions: [],
-        p2pDeals: []
+        p2pDeals: [],
+        vipInvites: {},
+        vipSessions: {}
     };
 
     // --- 파이어베이스 실시간 수신 (Socket.on 역할) ---
@@ -1169,6 +1116,9 @@
             if (!data.p2pDeals) data.p2pDeals = [];
             else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
             
+            if (!data.vipInvites) data.vipInvites = {};
+            if (!data.vipSessions) data.vipSessions = {};
+
             if (data.users) {
                 for(let key in data.users) {
                     if(!data.users[key].inventory) data.users[key].inventory = [];
@@ -1196,6 +1146,8 @@
                 if (document.getElementById('suggestion-modal').style.display === 'flex') {
                     renderMySuggestions();
                 }
+
+                checkVipMultiplayerState();
             }
         } else {
             saveDB();
@@ -1203,9 +1155,10 @@
     });
 
     database.ref('online').on('value', (snap) => {
-        let val = snap.val();
-        let count = val ? Object.keys(val).length : 0;
+        onlineUsersMap = snap.val() || {};
+        let count = Object.keys(onlineUsersMap).length;
         document.getElementById('online-users-count').innerText = count === 0 ? 1 : count;
+        if(currentUser) renderVipOpponents();
     });
 
     function saveDB() {
@@ -1353,6 +1306,7 @@
     function getToday5ShopItems() {
         if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
         
+        // ★ 사용자 코드를 시드에 추가하여 모든 사람마다 다른 물건이 뜨게 만듦
         const userCodeStr = currentUser ? currentUser.code : "default";
         const cycleKey = getShopCycleKey() + userCodeStr; 
         
@@ -2294,14 +2248,14 @@
             if (res1.char === res2.char && res2.char === res3.char) {
                 let prize = bet * res1.mult;
                 winPoints(prize);
-                msg.innerHTML = `<span style="color:#4CAF50;">[3개 일치] ${res1.char} 잭팟! ×${res1.mult} 배 (+${prize} P)</span>`;
+                msg.innerHTML = `<span style="color:#4CAF50;">[3개 일치] ${res1.char} 잭팟! ×${res1.mult} 배</span>`;
                 addHistoryLog(currentUser, `[슬롯 대박] ${res1.char} 3개 적중 (+${prize} P)`);
             } else if (res1.char === res2.char || res2.char === res3.char || res1.char === res3.char) {
                 let matched = (res1.char === res2.char) ? res1 : (res2.char === res3.char ? res2 : res1);
                 let multiplier = Math.max(1, Math.round(matched.mult * 0.5));
                 let prize = bet * multiplier;
                 winPoints(prize);
-                msg.innerHTML = `<span style="color:#ffd700;">[2개 일치] ${matched.char} 적중! (×${multiplier}) 지급 (+${prize} P)</span>`;
+                msg.innerHTML = `<span style="color:#ffd700;">[2개 일치] ${matched.char} 적중! (×${multiplier}) 지급</span>`;
                 addHistoryLog(currentUser, `[슬롯 승리] ${matched.char} 2개 적중 (+${prize} P)`);
             } else {
                 msg.innerHTML = `<span style="color:#f44336;">완전 불일치. (-${bet} P)</span>`;
@@ -2344,7 +2298,7 @@
             if (outcomeNum === targetNum) {
                 let win = Math.floor(bet * outcomeMult);
                 winPoints(win);
-                msg.innerHTML = `<span style="color:#4CAF50;">[적중!] 번호 ${outcomeNum}! 배율 ×${outcomeMult} (+${win} P)</span>`;
+                msg.innerHTML = `<span style="color:#4CAF50;">[적중!] 번호 ${outcomeNum}! 배율 ×${outcomeMult}</span>`;
                 addHistoryLog(currentUser, `[룰렛 적중] 번호 ${outcomeNum} 베팅 성공 (+${win} P)`);
             } else {
                 msg.innerHTML = `<span style="color:#f44336;">[낙첨] 당첨 번호: ${outcomeNum} (배율 ×${outcomeMult})</span>`;
@@ -2459,7 +2413,7 @@
         if (pRes.score > dRes.score) {
             let winAmount = seotdaBet * pRes.mult;
             winPoints(winAmount);
-            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult}) (+${winAmount} P)</span>`;
+            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult})</span>`;
             addHistoryLog(currentUser, `[섯다 승리] ${pRes.name} vs 딜러 ${dRes.name} (+${winAmount} P)`);
         } else if (pRes.score < dRes.score) {
             msgEl.innerHTML = `<span style="color:#f44336;">[패배] 시스템(${dRes.name})에게 패배했습니다. (-${seotdaBet} P)</span>`;
@@ -2477,240 +2431,320 @@
     }
 
     // ==========================================
-    // VIP 라운지 1:1 대전 로직
+    // VIP 라운지 1:1 실시간 대전 로직
     // ==========================================
-    let currentVipGame = 'dice';
-    let vipTargetSecret = Math.floor(Math.random() * 999) + 1;
-    let vipUpDownAttempts = 3;
-    let vipPlayerBestDiff = 9999;
-    let vipOpponentBestDiff = 9999;
-    let vipOppMin = 1;
-    let vipOppMax = 999;
-
+    
     function renderVipOpponents() {
+        const listContainer = document.getElementById('vip-online-users-container');
         const sel = document.getElementById('vip-opponent-select');
-        if (!sel) return;
-        let opts = '<option value="">-- 대결할 사원 선택 --</option>';
-        for (let c in db.users) {
-            let u = db.users[c];
-            if (u.code !== currentUser.code && u.code !== 'kario0987') {
-                opts += `<option value="${u.code}">${u.name} (보유: ${u.points} P / 사번: ${u.no})</option>`;
+        if (!sel || !listContainer) return;
+
+        let opts = '<option value="">-- 접속 중인 사원 선택 --</option>';
+        let listHtml = '';
+        
+        for (let code in onlineUsersMap) {
+            let u = db.users[code];
+            if (u && code !== 'kario0987') {
+                if (code !== currentUser.code) {
+                    opts += `<option value="${code}">[🟢 접속중] ${u.name} (사번: ${u.no})</option>`;
+                }
+                listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:4px; padding:6px; background:rgba(255,255,255,0.03); border-radius:3px; border-left:3px solid #4CAF50;">
+                    <span>🟢 ${u.name} [${u.team}]</span>
+                    <span style="font-family:monospace; color:#ffd700;">${u.points} P</span>
+                </div>`;
             }
         }
+        
         sel.innerHTML = opts;
+        listContainer.innerHTML = listHtml || '접속 중인 다른 VIP 사원이 없습니다.';
     }
 
-    function selectVipGame(type) {
-        currentVipGame = type;
+    function selectVipGameType(type) {
+        currentVipGameType = type;
         document.querySelectorAll('.vip-nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`btn-vgame-${type}`).classList.add('active');
-
-        document.getElementById('vip-view-dice').style.display = (type === 'dice') ? 'block' : 'none';
-        document.getElementById('vip-view-rps').style.display = (type === 'rps') ? 'block' : 'none';
-        document.getElementById('vip-view-updown').style.display = (type === 'updown') ? 'block' : 'none';
-
-        document.getElementById('vip-game-msg').innerText = '';
-        if (type === 'updown') resetVipUpDownGame();
     }
 
-    function getVipWagerContext() {
+    function sendVipInvite() {
         const oppCode = document.getElementById('vip-opponent-select').value;
         const bet = parseInt(document.getElementById('vip-bet-input').value);
 
         if (!oppCode) {
-            showCustomAlert('대결할 상대 사원을 선택해주세요.');
-            return null;
+            showCustomAlert('초대할 사원을 선택해주세요.');
+            return;
         }
         const opponent = db.users[oppCode];
-        if (!opponent) return null;
-
+        if (!opponent || !onlineUsersMap[oppCode]) {
+            showCustomAlert('해당 사원이 현재 접속 중이지 않습니다.');
+            return;
+        }
         if (isNaN(bet) || bet < 100) {
             showCustomAlert('VIP 라운지의 최소 베팅 포인트는 100 P 입니다.');
-            return null;
+            return;
         }
         if (currentUser.points < bet) {
             showLuxuryAlert();
-            return null;
+            return;
         }
         if (opponent.points < bet) {
-            showCustomAlert(`상대 사원(${opponent.name})의 보유 포인트가 부족하여 대결을 시작할 수 없습니다.`);
-            return null;
-        }
-
-        return { opponent, bet };
-    }
-
-    function processVipResult(winner, loser, bet, gameName) {
-        if (winner === 'draw') {
-            document.getElementById('vip-game-msg').innerHTML = `<span style="color:#ffd700;">[무승부] 포인트 및 오염도 변동이 없습니다.</span>`;
+            showCustomAlert(`상대방(${opponent.name})의 포인트가 부족하여 신청할 수 없습니다.`);
             return;
         }
 
-        winner.points += bet;
-        loser.points -= bet;
-
-        applyPollutionToUser(winner, 3);
-        applyPollutionToUser(loser, 5);
-
-        const isMeWin = (winner.code === currentUser.code);
-
+        const inviteId = "inv_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+        db.vipInvites[inviteId] = {
+            id: inviteId,
+            from: currentUser.code,
+            fromName: currentUser.name,
+            to: oppCode,
+            game: currentVipGameType,
+            bet: bet,
+            timestamp: Date.now()
+        };
         saveDB();
-        updateUI();
-
-        // ★ VIP 승리 시 이펙트 출력
-        if (isMeWin) showPointGainEffect(bet);
-
-        const color = isMeWin ? '#4CAF50' : '#f44336';
-        
-        let txt = "";
-        if(isMeWin) {
-            let oppPollTxt = loser.code === 'kario0987' ? "면역" : "+5%";
-            let myPollTxt = winner.code === 'kario0987' ? "면역" : "+3%";
-            txt = `[승리] ${loser.name} 사원에게서 +${bet} P 획득! (오염도 나 ${myPollTxt}, 상대 ${oppPollTxt})`;
-        } else {
-            let oppPollTxt = winner.code === 'kario0987' ? "면역" : "+3%";
-            let myPollTxt = loser.code === 'kario0987' ? "면역" : "+5%";
-            txt = `[패배] ${winner.name} 사원에게 -${bet} P 상실! (오염도 나 ${myPollTxt}, 상대 ${oppPollTxt})`;
-        }
-        
-        document.getElementById('vip-game-msg').innerHTML = `<span style="color:${color};">${txt}</span>`;
-        addHistoryLog(currentUser, `[VIP ${gameName}] vs ${isMeWin ? loser.name : winner.name} (${isMeWin ? '승리 +'+bet : '패배 -'+bet} P)`);
-        addHistoryLog(isMeWin ? loser : winner, `[VIP ${gameName}] vs ${currentUser.name} (${isMeWin ? '패배 -'+bet : '승리 +'+bet} P)`);
+        showCustomAlert(`[${opponent.name}] 사원에게 대전 신청을 보냈습니다. 수락을 대기합니다.`);
     }
 
-    function playVipDice() {
-        const ctx = getVipWagerContext();
-        if (!ctx) return;
-        const { opponent, bet } = ctx;
-
-        const p1 = Math.floor(Math.random() * 6) + 1;
-        const p2 = Math.floor(Math.random() * 6) + 1;
-        const myTotal = p1 + p2;
-
-        const o1 = Math.floor(Math.random() * 6) + 1;
-        const o2 = Math.floor(Math.random() * 6) + 1;
-        const oppTotal = o1 + o2;
-
-        document.getElementById('vip-dice-result').innerText = `나: ${myTotal} (${p1}+${p2}) vs ${opponent.name}: ${oppTotal} (${o1}+${o2})`;
-
-        if (myTotal > oppTotal) {
-            processVipResult(currentUser, opponent, bet, '주사위');
-        } else if (myTotal < oppTotal) {
-            processVipResult(opponent, currentUser, bet, '주사위');
-        } else {
-            processVipResult('draw', null, bet, '주사위');
-        }
+    function showVipInviteModal(invite) {
+        const gameNames = { 'dice': '주사위', 'rps': '가위바위보', 'updown': '업다운' };
+        document.getElementById('vip-invite-text').innerHTML = `
+            <b style="color:#fff;">${invite.fromName}</b> 사원님이 1:1 승부를 요청했습니다.<br><br>
+            종목: <b>${gameNames[invite.game]}</b><br>
+            판돈: <b style="color:#ff4c4c;">${invite.bet} P</b>
+        `;
+        document.getElementById('vip-invite-overlay').style.display = 'flex';
     }
 
-    function playVipRPS(myChoice) {
-        const ctx = getVipWagerContext();
-        if (!ctx) return;
-        const { opponent, bet } = ctx;
-
-        const rpsPool = ['가위', '바위', '보'];
-        const oppChoice = rpsPool[Math.floor(Math.random() * 3)];
-
-        document.getElementById('vip-rps-result').innerText = `나 [${myChoice}] vs [${oppChoice}] ${opponent.name}`;
-
-        if (myChoice === oppChoice) {
-            processVipResult('draw', null, bet, '가위바위보');
-        } else if (
-            (myChoice === '가위' && oppChoice === '보') ||
-            (myChoice === '바위' && oppChoice === '가위') ||
-            (myChoice === '보' && oppChoice === '바위')
-        ) {
-            processVipResult(currentUser, opponent, bet, '가위바위보');
-        } else {
-            processVipResult(opponent, currentUser, bet, '가위바위보');
-        }
+    function closeVipInviteModal() {
+        document.getElementById('vip-invite-overlay').style.display = 'none';
     }
 
-    function resetVipUpDownGame() {
-        vipTargetSecret = Math.floor(Math.random() * 999) + 1;
-        vipUpDownAttempts = 3;
-        vipPlayerBestDiff = 9999;
-        vipOpponentBestDiff = 9999;
-        vipOppMin = 1;
-        vipOppMax = 999;
-        document.getElementById('vip-ud-status').innerText = '남은 시도: 3회';
-        document.getElementById('vip-ud-hint').innerText = '1~999 숫자를 제시하세요';
-        document.getElementById('vip-ud-input').value = '';
-        document.getElementById('vip-game-msg').innerText = '';
-    }
-
-    function submitVipUpDownGuess() {
-        const ctx = getVipWagerContext();
-        if (!ctx) return;
-        const { opponent, bet } = ctx;
-
-        if (vipUpDownAttempts <= 0) {
-            showCustomAlert('이미 3회 기회를 모두 소진했습니다. [새 게임]을 눌러 재시작하세요.');
+    function acceptVipInvite() {
+        const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
+        if (!inv) {
+            closeVipInviteModal();
             return;
         }
-
-        const guess = parseInt(document.getElementById('vip-ud-input').value);
-        if (isNaN(guess) || guess < 1 || guess > 999) {
-            showCustomAlert('1에서 999 사이의 정수를 입력하세요.');
+        
+        if (currentUser.points < inv.bet) {
+            showCustomAlert("포인트가 부족하여 수락할 수 없습니다.");
+            delete db.vipInvites[inv.id];
+            saveDB();
+            closeVipInviteModal();
             return;
         }
+        
+        delete db.vipInvites[inv.id];
+        
+        const sessId = "sess_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+        
+        db.vipSessions[sessId] = {
+            id: sessId,
+            p1: inv.from,
+            p2: currentUser.code,
+            game: inv.game,
+            bet: inv.bet,
+            targetNumber: Math.floor(Math.random() * 999) + 1,
+            state: 'WAITING',
+            startTime: Date.now() + 2000, 
+            endTime: Date.now() + 5000 
+        };
+        
+        saveDB();
+        closeVipInviteModal();
+    }
 
-        vipUpDownAttempts--;
+    function rejectVipInvite() {
+        const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
+        if (inv) {
+            delete db.vipInvites[inv.id];
+            saveDB();
+        }
+        closeVipInviteModal();
+    }
 
-        const myDiff = Math.abs(vipTargetSecret - guess);
-        if (myDiff < vipPlayerBestDiff) vipPlayerBestDiff = myDiff;
-
-        let myHint = "";
-        let myHit = false;
-        if (guess < vipTargetSecret) myHint = `[UP 🔺]`;
-        else if (guess > vipTargetSecret) myHint = `[DOWN 🔻]`;
-        else { myHint = `[정답!]`; myHit = true; }
-
-        const oppGuess = Math.floor(Math.random() * (vipOppMax - vipOppMin + 1)) + vipOppMin;
-        const oppDiff = Math.abs(vipTargetSecret - oppGuess);
-        if (oppDiff < vipOpponentBestDiff) vipOpponentBestDiff = oppDiff;
-
-        let oppHint = "";
-        let oppHit = false;
-        if (oppGuess < vipTargetSecret) {
-            oppHint = `[UP 🔺]`;
-            vipOppMin = oppGuess + 1;
-        } else if (oppGuess > vipTargetSecret) {
-            oppHint = `[DOWN 🔻]`;
-            vipOppMax = oppGuess - 1;
-        } else {
-            oppHint = `[정답!]`;
-            oppHit = true;
+    function checkVipMultiplayerState() {
+        if (db.vipInvites) {
+            let myInvite = Object.values(db.vipInvites).find(inv => inv.to === currentUser.code);
+            if (myInvite && currentInviteId !== myInvite.id) {
+                currentInviteId = myInvite.id;
+                showVipInviteModal(myInvite);
+            } else if (!myInvite && currentInviteId) {
+                currentInviteId = null;
+                closeVipInviteModal();
+            }
         }
 
-        document.getElementById('vip-ud-status').innerText = `남은 시도: ${vipUpDownAttempts}회 | 나: ${guess} ${myHint} vs 상대: ${oppGuess} ${oppHint}`;
-
-        if (myHit && oppHit) {
-            document.getElementById('vip-ud-hint').innerText = `[동시 정답!] 목표 숫자: ${vipTargetSecret}`;
-            processVipResult('draw', null, bet, '업다운');
-            vipUpDownAttempts = 0;
-        } else if (myHit) {
-            document.getElementById('vip-ud-hint').innerText = `[조기 승리!] 내가 먼저 맞췄습니다! (정답: ${vipTargetSecret})`;
-            processVipResult(currentUser, opponent, bet, '업다운');
-            vipUpDownAttempts = 0;
-        } else if (oppHit) {
-            document.getElementById('vip-ud-hint').innerText = `[상대 조기 승리!] 상대방이 먼저 맞췄습니다! (정답: ${vipTargetSecret})`;
-            processVipResult(opponent, currentUser, bet, '업다운');
-            vipUpDownAttempts = 0;
-        } else if (vipUpDownAttempts === 0) {
-            let finalMsg = `정답: [${vipTargetSecret}] | 최선 오차: 나(${vipPlayerBestDiff}) vs ${opponent.name}(${vipOpponentBestDiff})`;
-            document.getElementById('vip-ud-hint').innerText = finalMsg;
-
-            if (vipPlayerBestDiff < vipOpponentBestDiff) {
-                processVipResult(currentUser, opponent, bet, '업다운');
-            } else if (vipPlayerBestDiff > vipOpponentBestDiff) {
-                processVipResult(opponent, currentUser, bet, '업다운');
-            } else {
-                processVipResult('draw', null, bet, '업다운');
+        if (db.vipSessions) {
+            let mySession = Object.values(db.vipSessions).find(sess => sess.p1 === currentUser.code || sess.p2 === currentUser.code);
+            if (mySession) {
+                activeVipSessionId = mySession.id;
+                renderVipGameOverlay(mySession);
+            } else if (!mySession && activeVipSessionId) {
+                activeVipSessionId = null;
+                closeVipGameOverlay();
             }
         } else {
-            document.getElementById('vip-ud-hint').innerText = "다음 턴의 숫자를 입력하세요";
+            if (activeVipSessionId) {
+                activeVipSessionId = null;
+                closeVipGameOverlay();
+            }
         }
     }
+
+    function renderVipGameOverlay(session) {
+        document.getElementById('vip-game-overlay').style.display = 'flex';
+        const isP1 = session.p1 === currentUser.code;
+        const oppCode = isP1 ? session.p2 : session.p1;
+        const oppName = db.users[oppCode] ? db.users[oppCode].name : '상대방';
+        const gameNames = { 'dice': '주사위', 'rps': '가위바위보', 'updown': '업다운' };
+
+        document.getElementById('vip-game-title').innerText = `[${gameNames[session.game]}] vs ${oppName}`;
+        
+        const area = document.getElementById('vip-game-area');
+        const statusEl = document.getElementById('vip-game-status');
+
+        if (myChoiceSubmitted) {
+            area.innerHTML = '<div style="font-size:16px; color:#4CAF50; margin: 20px 0; text-align:center;">선택 완료! 판정 대기 중...</div>';
+        } else if (session.state === 'WAITING') {
+            if (session.game === 'dice') {
+                area.innerHTML = `
+                    <div style="margin:20px 0;">
+                        <button class="luxury-alert-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button>
+                    </div>
+                `;
+            } else if (session.game === 'rps') {
+                area.innerHTML = `
+                    <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
+                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
+                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
+                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button>
+                    </div>
+                `;
+            } else if (session.game === 'updown') {
+                area.innerHTML = `
+                    <div style="margin:10px 0;">
+                        <div style="font-size:12px; color:#aaa; margin-bottom:8px; text-align:center;">1~999 중 목표 숫자(<span style="color:#ffd700;">${session.targetNumber}</span>)에 가장 가까운 사람이 승리!</div>
+                        <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center;" placeholder="숫자 입력 (1~999)">
+                        <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(parseInt(v) || Math.floor(Math.random()*999)+1)">입력 완료</button>
+                    </div>
+                `;
+            }
+        }
+
+        if (session.state === 'WAITING') {
+            statusEl.innerText = "3초 내에 선택을 완료하세요!";
+            
+            // 승부 판정 (둘 다 냈거나 시간이 다 된 경우 P1이 계산)
+            if (isP1 && session.p1Choice != null && session.p2Choice != null) {
+                evaluateVipMultiResult(session);
+            }
+            if (isP1 && Date.now() > session.endTime + 1000) {
+                // 시간 초과 시 강제 제출 처리
+                if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
+                if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
+                evaluateVipMultiResult(session);
+            }
+            
+        } else if (session.state === 'FINISHED') {
+            statusEl.innerHTML = `<span style="color:#ffd700; font-size:14px; line-height:1.5;">${session.resultText}</span>`;
+            document.getElementById('vip-game-timer').innerText = "-";
+            
+            if (isP1 && !session.deleteTimerStarted) {
+                session.deleteTimerStarted = true;
+                setTimeout(() => {
+                    delete db.vipSessions[session.id];
+                    saveDB();
+                }, 4000);
+            }
+        }
+    }
+
+    function generateRandomChoice(game) {
+        if (game === 'dice') return Math.floor(Math.random()*11) + 2; 
+        if (game === 'rps') return ['가위','바위','보'][Math.floor(Math.random()*3)];
+        if (game === 'updown') return Math.floor(Math.random()*999) + 1;
+        return 0;
+    }
+
+    function submitVipChoice(choice) {
+        if (!activeVipSessionId || !db.vipSessions[activeVipSessionId]) return;
+        myChoiceSubmitted = true;
+        let session = db.vipSessions[activeVipSessionId];
+        if (session.p1 === currentUser.code) session.p1Choice = choice;
+        else session.p2Choice = choice;
+        saveDB();
+    }
+
+    function evaluateVipMultiResult(session) {
+        if (session.state === 'FINISHED') return;
+        session.state = 'FINISHED';
+
+        let p1User = db.users[session.p1];
+        let p2User = db.users[session.p2];
+        let p1c = session.p1Choice;
+        let p2c = session.p2Choice;
+
+        let winner = 'draw';
+        
+        if (session.game === 'dice') {
+            if (p1c > p2c) winner = 'p1';
+            else if (p2c > p1c) winner = 'p2';
+        } else if (session.game === 'rps') {
+            if (p1c === p2c) winner = 'draw';
+            else if ((p1c === '가위' && p2c === '보') || (p1c === '바위' && p2c === '가위') || (p1c === '보' && p2c === '바위')) winner = 'p1';
+            else winner = 'p2';
+        } else if (session.game === 'updown') {
+            let d1 = Math.abs(session.targetNumber - p1c);
+            let d2 = Math.abs(session.targetNumber - p2c);
+            if (d1 < d2) winner = 'p1';
+            else if (d2 < d1) winner = 'p2';
+        }
+
+        let resultText = `[나] ${p1User.name}: <b>${p1c}</b> <br> [상대] ${p2User.name}: <b>${p2c}</b><br><br>`;
+        
+        if (winner === 'draw') {
+            resultText += `무승부! 베팅금이 유지됩니다.`;
+        } else {
+            let winUser = winner === 'p1' ? p1User : p2User;
+            let loseUser = winner === 'p1' ? p2User : p1User;
+            
+            winUser.points += session.bet;
+            loseUser.points -= session.bet;
+            
+            applyPollutionToUser(winUser, 3);
+            applyPollutionToUser(loseUser, 5);
+
+            addHistoryLog(winUser, `[VIP 실시간 대전 승리] ${loseUser.name}에게 +${session.bet} P`);
+            addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
+
+            resultText += `<span style="color:#4CAF50; font-size:16px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
+        }
+
+        session.resultText = resultText;
+        saveDB();
+    }
+
+    function closeVipGameOverlay() {
+        document.getElementById('vip-game-overlay').style.display = 'none';
+        myChoiceSubmitted = false;
+    }
+
+    // 3초 카운트다운 타이머 (실시간 대전용)
+    setInterval(() => {
+        if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
+            let session = db.vipSessions[activeVipSessionId];
+            if (session.state === 'WAITING') {
+                let remaining = Math.max(0, Math.ceil((session.endTime - Date.now()) / 1000));
+                document.getElementById('vip-game-timer').innerText = remaining;
+                
+                if (remaining <= 0 && !myChoiceSubmitted) {
+                    let autoPick = generateRandomChoice(session.game);
+                    submitVipChoice(autoPick);
+                }
+            }
+        }
+    }, 500);
 
     // --- 1:1 밀실 거래 ---
     function checkP2PExpiration() {
@@ -2934,7 +2968,7 @@
         }
 
         if (deal.offerType === 'point') {
-            currentUser.points += deal.offerValue;
+            winPoints(deal.offerValue);
         } else {
             currentUser.inventory.push(deal.offerValue);
         }
@@ -3089,397 +3123,6 @@
         updateUI();
     }
 
-    function useFacility(bet) {
-        if (currentUser.pollution >= 100) {
-            showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.');
-            return false;
-        }
-        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
-        if (currentUser.facilityCount >= currentUser.facilityMax) {
-            showCustomAlert('일일 이용 한도를 초과했습니다.');
-            return false;
-        }
-        
-        if (currentUser.points < bet) {
-            showLuxuryAlert();
-            return false;
-        }
-
-        currentUser.points -= bet;
-        currentUser.facilityCount += 1;
-        addPollution(2);
-        return true;
-    }
-
-    // ★ 게임 등에서 포인트를 얻었을 때 이펙트 발동 및 적립
-    function showPointGainEffect(amount) {
-        const ptEl = document.getElementById('display-points');
-        if (!ptEl) return;
-        
-        // 글씨색 일시적 강조
-        ptEl.style.color = '#4CAF50';
-        ptEl.style.textShadow = '0 0 10px #4CAF50';
-        setTimeout(() => {
-            ptEl.style.color = '#ffd700'; // 원래 색상으로 복구
-            ptEl.style.textShadow = 'none';
-        }, 800);
-
-        // 떠오르는 숫자 애니메이션 생성
-        const rect = ptEl.getBoundingClientRect();
-        const floater = document.createElement('div');
-        floater.innerText = `+${amount}`;
-        floater.style.position = 'fixed';
-        floater.style.left = `${rect.left + rect.width / 2}px`;
-        floater.style.top = `${rect.top}px`;
-        floater.style.transform = 'translate(-50%, -50%)';
-        floater.style.color = '#4CAF50';
-        floater.style.fontWeight = 'bold';
-        floater.style.fontSize = '26px';
-        floater.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
-        floater.style.zIndex = '99999';
-        floater.style.pointerEvents = 'none';
-        floater.style.animation = 'floatUp 1.2s ease-out forwards';
-        
-        document.body.appendChild(floater);
-        setTimeout(() => { floater.remove(); }, 1200);
-    }
-
-    function winPoints(amount) {
-        currentUser.points += amount;
-        saveDB();
-        updateUI();
-        showPointGainEffect(amount); // 포인트 적립 시 이펙트 호출
-    }
-
-    function checkVIPStatus() {
-        const deniedBox = document.getElementById('vip-denied-box');
-        const allowedBox = document.getElementById('vip-allowed-box');
-        const displayVip = document.getElementById('display-vip');
-
-        if (currentUser.code === 'kario0987') {
-            displayVip.innerHTML = 'VVIP<span> (1급)</span>';
-            deniedBox.style.display = 'none';
-            allowedBox.style.display = 'block';
-        } else if (currentUser.hasVIP) {
-            displayVip.innerHTML = 'VIP<span> (2급)</span>';
-            deniedBox.style.display = 'none';
-            allowedBox.style.display = 'block';
-        } else {
-            displayVip.innerHTML = '일반<span> (3급)</span>';
-            deniedBox.style.display = 'block';
-            allowedBox.style.display = 'none';
-        }
-    }
-
-    // --- 통제 콘솔 ---
-    function openAdminScreen() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('ranking-bottom-bar').style.display = 'none';
-        document.getElementById('admin-screen').style.display = 'block';
-        renderAdminSuggestions();
-    }
-
-    function closeAdminScreen() {
-        document.getElementById('admin-screen').style.display = 'none';
-        document.getElementById('main-screen').style.display = 'block';
-        document.getElementById('ranking-bottom-bar').style.display = 'block';
-    }
-
-    function adminRegisterNewEmployee() {
-        const name = document.getElementById('new-emp-name').value.trim();
-        const code = document.getElementById('new-emp-code').value.trim();
-        const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
-        const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
-        const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
-
-        if (!name || !code) return;
-        if (db.users[code]) {
-            showCustomAlert('이미 존재하는 사원코드입니다.');
-            return;
-        }
-
-        const generatedNo = generateSerialNo(aff, pos, team);
-
-        db.users[code] = {
-            code: code, name: name, affiliation: aff, team: team, position: pos,
-            no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
-            facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null,
-            alienDate: getTodayStr(), alienTries: 0, ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
-            inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-            badge: { photo: "", nickname: name, notes: "특이사항 없음" },
-            hasNewLetter: false, hasNewReply: false
-        };
-
-        saveDB();
-        document.getElementById('new-emp-name').value = '';
-        document.getElementById('new-emp-code').value = '';
-        document.getElementById('new-emp-pos').value = '';
-        document.getElementById('new-emp-aff').value = '';
-        document.getElementById('new-emp-team').value = '';
-        showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
-    }
-
-    function adminUpdateEmployee() {
-        const targetNo = document.getElementById('adm-target-no').value.trim();
-        const aff = document.getElementById('adm-set-affiliation').value.trim();
-        const team = document.getElementById('adm-set-team').value.trim();
-        const pos = document.getElementById('adm-set-position').value.trim();
-        const points = parseInt(document.getElementById('adm-target-points').value);
-
-        let targetUser = null;
-        for (let code in db.users) {
-            if (db.users[code].no === targetNo) {
-                targetUser = db.users[code];
-                break;
-            }
-        }
-
-        if (!targetUser) return;
-        if (aff) targetUser.affiliation = aff;
-        if (team) targetUser.team = team;
-        if (pos) targetUser.position = pos;
-        if (!isNaN(points)) targetUser.points = points;
-
-        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
-
-        saveDB();
-        updateUI();
-        showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
-    }
-
-    function adminToggleVIP() {
-        const targetNo = document.getElementById('adm-target-no').value.trim();
-        if (!targetNo) {
-            showCustomAlert('대상 사원의 사번을 입력해주세요.');
-            return;
-        }
-
-        let targetUser = null;
-        for (let code in db.users) {
-            if (db.users[code].no === targetNo) {
-                targetUser = db.users[code];
-                break;
-            }
-        }
-
-        if (!targetUser) {
-            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
-            return;
-        }
-
-        if (targetUser.code === 'kario0987') {
-            showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.');
-            return;
-        }
-
-        targetUser.hasVIP = !targetUser.hasVIP;
-        const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
-        addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
-        
-        saveDB();
-        updateUI();
-        showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
-    }
-
-    function adminControlPollution(action) {
-        const targetNo = document.getElementById('adm-poll-target-no').value.trim();
-        if (!targetNo) {
-            showCustomAlert('대상 사원의 사번을 입력해주세요.');
-            return;
-        }
-
-        let targetUser = null;
-        for (let code in db.users) {
-            if (db.users[code].no === targetNo) {
-                targetUser = db.users[code];
-                break;
-            }
-        }
-
-        if (!targetUser) {
-            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
-            return;
-        }
-
-        if (action === 'set') {
-            const val = parseInt(document.getElementById('adm-poll-set-val').value);
-            if (isNaN(val) || val < 0 || val > 100) {
-                showCustomAlert('0에서 100 사이의 수치를 입력해주세요.');
-                return;
-            }
-            targetUser.pollution = val;
-            if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-            addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
-            showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
-        } else if (action === 'max') {
-            targetUser.pollution = 100;
-            targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-            addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
-            showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
-        } else if (action === 'zero') {
-            targetUser.pollution = 0;
-            targetUser.quarantineUntil = 0;
-            targetUser.lastPollutionTime = Date.now();
-            addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
-            showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
-        }
-
-        saveDB();
-        updateUI();
-    }
-
-    function adminDeleteEmployee() {
-        const targetNo = document.getElementById('adm-delete-no').value.trim();
-        if (!targetNo) return;
-
-        let targetCode = null;
-        for (let code in db.users) {
-            if (db.users[code].no === targetNo) {
-                targetCode = code;
-                break;
-            }
-        }
-
-        if (!targetCode || targetCode === 'kario0987') return;
-
-        delete db.users[targetCode];
-        if (db.p2pDeals) {
-            db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
-        }
-
-        saveDB();
-        document.getElementById('adm-delete-no').value = '';
-        if (currentUser && currentUser.code === targetCode) logout();
-    }
-
-    function renderAdminSuggestions() {
-        const listEl = document.getElementById('admin-suggestion-list');
-        if (!db.suggestions || db.suggestions.length === 0) {
-            listEl.innerHTML = '<div style="color:#888; font-size:11px;">접수된 건의가 없습니다.</div>';
-            return;
-        }
-        listEl.innerHTML = db.suggestions.map((s, idx) => `
-            <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
-                <div class="suggestion-meta">
-                    <span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span>
-                    <button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px;">삭제</button>
-                </div>
-                <div style="font-weight:bold; color:#ffcccc; margin-bottom:3px;">${s.title}</div>
-                <div style="color:#ddd; margin-bottom:8px;">${s.content}</div>
-                
-                ${s.status === 'PENDING' ? `
-                    <div style="display:flex; gap:4px;">
-                        <input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요">
-                        <button class="game-btn" style="margin:0; background:#2e7d32;" onclick="adminReplySuggestion(${s.id})">해결 처리</button>
-                    </div>
-                ` : `
-                    <div style="background:#111; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5;">
-                        <b>[상담사 답변]</b> ${s.reply}
-                    </div>
-                `}
-            </div>
-        `).join('');
-    }
-
-    function adminReplySuggestion(id) {
-        const replyInput = document.getElementById(`admin-reply-${id}`);
-        const replyText = replyInput.value.trim();
-        if (!replyText) {
-            showCustomAlert("답변 내용을 입력해주세요.");
-            return;
-        }
-
-        const sugg = db.suggestions.find(s => s.id === id);
-        if (sugg) {
-            sugg.status = 'RESOLVED';
-            sugg.reply = replyText;
-            
-            // 답변 작성 완료 후 대상 사원에게 알림 켜기
-            let targetUser = db.users[sugg.code];
-            if(targetUser) {
-                targetUser.hasNewReply = true;
-                addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`);
-            }
-
-            saveDB();
-            renderAdminSuggestions();
-        }
-    }
-
-    function deleteSuggestion(index) {
-        db.suggestions.splice(index, 1);
-        saveDB();
-        renderAdminSuggestions();
-    }
-
-    // --- 로그인 / 세션 (파이어베이스 호환) ---
-    function attemptLogin() {
-        const name = document.getElementById('nickname-input').value.trim();
-        const code = document.getElementById('code-input').value.trim();
-        
-        if (db.users[code] && db.users[code].name === name) {
-            currentUser = db.users[code];
-            
-            // 데이터베이스 호환성용 필드 추가 확인
-            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
-            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
-            
-            // 파이어베이스 온라인 상태 기록
-            database.ref('online/' + code).set(true);
-            database.ref('online/' + code).onDisconnect().remove();
-
-            hasShownFoxAlert = currentUser.pollution >= 100;
-            checkPassivePollution(currentUser);
-            checkMedRations(currentUser);
-            checkP2PExpiration();
-
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('main-screen').style.display = 'block';
-            document.getElementById('ranking-bottom-bar').style.display = 'block';
-            
-            checkVIPStatus();
-            loadBadgeInfo();
-            updateUI();
-            
-            document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
-
-            sessionSeconds = 0;
-            clearInterval(sessionTimer);
-            sessionTimer = setInterval(() => {
-                sessionSeconds++;
-                const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
-                const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
-                const s = String(sessionSeconds % 60).padStart(2, '0');
-                document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
-                checkPassivePollution(currentUser);
-                checkMedRations(currentUser);
-                checkP2PExpiration();
-                
-                if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) {
-                    updateUI();
-                }
-            }, 1000);
-        } else {
-            showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
-        }
-    }
-
-    function logout() {
-        if (currentUser) {
-            database.ref('online/' + currentUser.code).remove();
-        }
-        clearInterval(sessionTimer);
-        currentUser = null;
-        hasShownFoxAlert = false;
-        updateVisualDistortion(0);
-        document.getElementById('nickname-input').value = '';
-        document.getElementById('code-input').value = '';
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('admin-screen').style.display = 'none';
-        document.getElementById('ranking-bottom-bar').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'flex';
-    }
 </script>
 
 </body>
