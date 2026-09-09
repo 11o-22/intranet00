@@ -19,76 +19,60 @@
             background-color: #121212;
             color: #e0e0e0;
             font-family: 'Malgun Gothic', sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            overflow-x: hidden;
+            margin: 0; padding: 0; display: flex; justify-content: center; overflow-x: hidden;
             transition: background-color 0.5s ease;
         }
         .container {
-            width: 100%;
-            max-width: 450px;
-            background-color: #1a1a1a;
-            min-height: 100vh;
-            border: 1px solid #333;
-            position: relative;
-            transition: all 0.5s ease;
-            padding-bottom: 50px;
-            box-sizing: border-box;
+            width: 100%; max-width: 450px; background-color: #1a1a1a; min-height: 100vh;
+            border: 1px solid #333; position: relative; transition: all 0.5s ease;
+            padding-bottom: 50px; box-sizing: border-box;
         }
 
         /* 특이사항 빛나는 효과 */
         .glow-effect {
-            color: #ffcccc !important;
-            font-weight: bold;
-            animation: textGlow 1.2s infinite alternate;
+            color: #ffcccc !important; font-weight: bold; animation: textGlow 1.2s infinite alternate;
         }
         @keyframes textGlow {
             from { text-shadow: 0 0 2px #ff4c4c; }
             to { text-shadow: 0 0 10px #ff4c4c, 0 0 15px #ffd700; }
         }
 
+        /* 고급스러운 상점 구매/선택 버튼 */
+        .shop-buy-btn {
+            background: rgba(0,0,0,0.2); color: var(--theme-text); border: 1px solid var(--theme-border);
+            padding: 6px 14px; border-radius: 4px; font-weight: bold; font-size: 12px;
+            cursor: pointer; transition: all 0.3s ease; box-shadow: inset 0 1px 3px rgba(255,255,255,0.05);
+        }
+        .shop-buy-btn:hover:not(:disabled) {
+            background: var(--theme-focus); color: #111; border-color: #fff; box-shadow: 0 0 8px var(--theme-focus);
+        }
+        .shop-buy-btn:disabled {
+            background: rgba(0,0,0,0.4); color: #666; border-color: #333; cursor: not-allowed; box-shadow: none;
+        }
+
         /* 고급스러운 입력 필드 (테마 동적 적용) */
         #main-screen select, #main-screen input[type="text"], #main-screen input[type="number"], #main-screen input[type="password"], #main-screen textarea,
         #admin-screen select, #admin-screen input[type="text"], #admin-screen input[type="number"], #admin-screen input[type="password"], #admin-screen textarea,
-        .modal-content select, .modal-content input, .modal-content textarea,
-        #vip-game-overlay input {
-            background: var(--theme-bg-grad) !important;
-            border: 1px solid var(--theme-border) !important;
-            color: var(--theme-text) !important;
-            border-radius: 4px !important;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.3) !important;
-            padding: 8px 10px;
-            outline: none;
-            transition: all 0.3s ease;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            font-family: inherit;
-            box-sizing: border-box;
-            width: 100%;
+        .modal-content select, .modal-content input, .modal-content textarea, #vip-game-overlay input {
+            background: var(--theme-bg-grad) !important; border: 1px solid var(--theme-border) !important;
+            color: var(--theme-text) !important; border-radius: 4px !important; box-shadow: inset 0 2px 5px rgba(0,0,0,0.3) !important;
+            padding: 8px 10px; outline: none; transition: all 0.3s ease; -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            font-family: inherit; box-sizing: border-box; width: 100%;
         }
         .bet-input, #slot-bet, #roulette-target, #roulette-bet, #seotda-bet { width: 70px !important; display: inline-block !important; }
         #vip-bet-input { width: 80px !important; display: inline-block !important; }
 
         #main-screen select, #admin-screen select, .modal-content select, #vip-game-overlay select {
             background-image: url('data:image/svg+xml;utf8,<svg fill="%23888888" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>') !important;
-            background-repeat: no-repeat !important;
-            background-position-x: calc(100% - 5px) !important;
-            background-position-y: 50% !important;
-            padding-right: 25px !important;
+            background-repeat: no-repeat !important; background-position-x: calc(100% - 5px) !important; background-position-y: 50% !important; padding-right: 25px !important;
         }
         #main-screen select option, #admin-screen select option, .modal-content select option { background: #1c1c1c; color: #eee; }
-        #main-screen select:focus, #main-screen input:focus, #main-screen textarea:focus,
-        #admin-screen select:focus, #admin-screen input:focus, #admin-screen textarea:focus,
-        #vip-game-overlay input:focus {
-            border-color: var(--theme-focus) !important;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.4), 0 0 8px var(--theme-focus) !important;
+        #main-screen select:focus, #main-screen input:focus, #main-screen textarea:focus, #admin-screen select:focus, #admin-screen input:focus, #admin-screen textarea:focus, #vip-game-overlay input:focus {
+            border-color: var(--theme-focus) !important; box-shadow: inset 0 2px 5px rgba(0,0,0,0.4), 0 0 8px var(--theme-focus) !important;
         }
         ::placeholder { color: var(--theme-text) !important; opacity: 0.5 !important; }
 
-        /* 알림 불빛 애니메이션 (공통) */
+        /* 알림 불빛 애니메이션 */
         .notify-dot { position: relative; }
         .notify-dot::after {
             content: ''; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; background-color: #4CAF50;
@@ -97,42 +81,42 @@
         @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(76, 175, 80, 0); } 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); } }
         @keyframes floatUp { 0% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5); } }
 
+        /* ========================================================================= */
         /* 부서별 동적 테마 */
         body.theme-black { --theme-bg-grad: linear-gradient(145deg, #161616, #0d0d0d); --theme-border: #333; --theme-text: #dcdcdc; --theme-focus: #777; }
         body.theme-black .container { background-color: #0b0b0b !important; color: #dcdcdc !important; border-color: #222 !important; }
         body.theme-black .sub-panel, body.theme-black .admin-panel-box, body.theme-black .ranking-body { background-color: #121212 !important; }
 
-        body.theme-white { --theme-bg-grad: linear-gradient(145deg, #ffffff, #f7f9fa); --theme-border: #cbd5e1; --theme-text: #111111; --theme-focus: #3b82f6; background-color: #e2e8f0; }
-        body.theme-white .container { background-color: #f0f2f5 !important; color: #111 !important; border-color: #dcdde1 !important; }
-        body.theme-white .emp-name { color: #111 !important; }
-        body.theme-white .emp-meta { color: #333 !important; }
+        body.theme-white { --theme-bg-grad: linear-gradient(145deg, #ffffff, #f0f2f5); --theme-border: #94a3b8; --theme-text: #0f172a; --theme-focus: #2563eb; background-color: #e2e8f0; }
+        body.theme-white .container { background-color: #f8fafc !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
+        body.theme-white .emp-name { color: #0f172a !important; font-weight: 900 !important; }
+        body.theme-white .emp-meta { color: #334155 !important; font-weight: bold; }
         body.theme-white .emp-role-tag { color: #d97706 !important; background: rgba(217, 119, 6, 0.1) !important; border-color: rgba(217, 119, 6, 0.3) !important; }
         body.theme-white .pollution-bar-bg { background-color: #e2e8f0 !important; border-color: #cbd5e1 !important; }
         body.theme-white .status-section { border-top-color: #cbd5e1 !important; }
-        body.theme-white .status-label, body.theme-white .status-value span { color: #333 !important; }
+        body.theme-white .status-label, body.theme-white .status-value span { color: #475569 !important; font-weight:bold; }
         body.theme-white .status-value { color: #b45309 !important; }
-        body.theme-white .action-buttons button { border-color: #cbd5e1 !important; color: #111 !important; font-weight: bold; }
+        body.theme-white .action-buttons button { border-color: #cbd5e1 !important; color: #0f172a !important; font-weight: bold; }
         body.theme-white .action-buttons button:hover { background-color: #cbd5e1 !important; color: #000 !important; }
         body.theme-white .tabs-grid { border-color: #cbd5e1 !important; }
-        body.theme-white .tab { border-color: #cbd5e1 !important; color: #444 !important; background: #e2e8f0; font-weight:bold;}
-        body.theme-white .tab.active { color: #000 !important; border-bottom: 2px solid #000 !important; background: #ffffff; }
-        body.theme-white .tab-content { border-color: #cbd5e1 !important; background: #ffffff !important; color:#111 !important;}
-        body.theme-white .sub-tab { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #333 !important; }
+        body.theme-white .tab { border-color: #cbd5e1 !important; color: #475569 !important; background: #e2e8f0; font-weight:bold;}
+        body.theme-white .tab.active { color: #000 !important; border-bottom: 2px solid #2563eb !important; background: #ffffff; }
+        body.theme-white .tab-content { border-color: #cbd5e1 !important; background: #ffffff !important; color:#0f172a !important;}
+        body.theme-white .sub-tab { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #334155 !important; }
         body.theme-white .sub-tab.active { background: #ffffff !important; color: #000 !important; border-color: #94a3b8 !important; }
         body.theme-white .sub-panel { background: #ffffff !important; border-color: #cbd5e1 !important; }
-        body.theme-white .panel-title { color: #111 !important; border-bottom-color: #e2e8f0 !important; }
+        body.theme-white .panel-title { color: #0f172a !important; border-bottom-color: #e2e8f0 !important; }
         body.theme-white .game-btn { background: #3b82f6 !important; color: #ffffff !important; }
         body.theme-white .game-btn:hover { background: #2563eb !important; }
-        body.theme-white .badge-table th { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #111 !important; font-weight:bold;}
-        body.theme-white .badge-table td { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #111 !important; font-weight:bold;}
-        body.theme-white .badge-locked-text { color: #333 !important; }
+        body.theme-white .badge-table th { background: #e2e8f0 !important; border-color: #cbd5e1 !important; color: #0f172a !important; font-weight:bold;}
+        body.theme-white .badge-table td { background: #f8fafc !important; border-color: #cbd5e1 !important; color: #0f172a !important; font-weight:bold;}
         body.theme-white .inv-card, body.theme-white .shop-item, body.theme-white .history-item, body.theme-white .letter-card { background: #f8fafc !important; border-color: #cbd5e1 !important; }
-        body.theme-white .inv-card-name, body.theme-white .letter-body { color: #111 !important; font-weight:bold;}
+        body.theme-white .inv-card-name, body.theme-white .letter-body { color: #0f172a !important; font-weight:bold;}
         body.theme-white .slot-simple-paytable, body.theme-white .seotda-arena { background: #f1f5f9 !important; border-color: #cbd5e1 !important; }
         body.theme-white .slot-window { background: #e2e8f0 !important; border-color: #94a3b8 !important; }
         body.theme-white .slot-box { background: #ffffff !important; border-color: #cbd5e1 !important; }
-        body.theme-white .modal-content { background-color: #ffffff !important; border-color: #cbd5e1 !important; color: #111 !important; }
-        body.theme-white .modal-content h3 { color: #111 !important; border-bottom-color: #e2e8f0 !important; }
+        body.theme-white .modal-content { background-color: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important; }
+        body.theme-white .modal-content h3 { color: #0f172a !important; border-bottom-color: #e2e8f0 !important; }
         body.theme-white #ranking-bottom-bar { background: #f1f5f9 !important; border-top-color: #cbd5e1 !important; }
         body.theme-white .ranking-toggle-btn { background: #e2e8f0 !important; border-bottom-color: #cbd5e1 !important; color: #d97706 !important; }
         body.theme-white .ranking-body { background: #ffffff !important; }
@@ -178,6 +162,7 @@
         body.theme-hanbok .action-buttons button:hover { background-color: #bae6fd !important; color: #1a252f !important; }
         body.theme-hanbok .pollution-header { color: #2c3e50 !important; }
         body.theme-hanbok .pollution-bar-bg { background-color: #e0f2fe !important; border-color: #7dd3fc !important; }
+        /* ========================================================================= */
 
         #pollution-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; transition: opacity 0.5s ease; opacity: 0; }
         .pollution-danger { background: radial-gradient(circle, rgba(20,0,0,0.4) 40%, rgba(180,0,0,0.85) 100%); animation: dangerPulse 1.8s infinite ease-in-out; }
@@ -193,8 +178,12 @@
         #main-screen, #admin-screen { display: none; padding: 15px; }
         .header-info { font-size: 12px; color: #666; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between;}
         
-        .id-card-badge { background: var(--theme-bg-grad, #1e1e1e); border: 1px solid var(--theme-border, #444); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); overflow: hidden; }
+        /* 오리지널 사원증 디자인 롤백 */
+        .id-card-badge {
+            background: var(--theme-bg-grad, #1e1e1e); border: 1px solid var(--theme-border, #444); border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); overflow: hidden;
+        }
         .id-card-badge::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--badge-top-line, linear-gradient(90deg, #444, #888, #444)); transition: background 0.3s ease; }
+        
         .id-card-body { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; margin-top: 5px; }
         .id-avatar-mini { width: 55px; height: 70px; background: #2b2b2b; border: 1px solid #555; border-radius: 4px; display: flex; justify-content: center; align-items: center; overflow: hidden; font-size: 10px; color: #777; flex-shrink: 0; }
         .id-avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
@@ -236,21 +225,21 @@
         .game-btn:hover { background: #666; }
         .game-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
 
-        .badge-photo-box { width: 130px; height: 160px; background-color: #222; margin: 0 auto 12px auto; border: 2px solid #555; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .badge-photo-box { width: 130px; height: 160px; background-color: rgba(0,0,0,0.5); margin: 0 auto 12px auto; border: 2px solid var(--theme-border); display: flex; justify-content: center; align-items: center; overflow: hidden; border-radius:4px;}
         .badge-photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .badge-photo-placeholder { color: #666; font-size: 11px; text-align: center; }
         .badge-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .badge-table th { width: 30%; background: #222; border: 1px solid #333; padding: 7px; color: #aaa; text-align: left; }
-        .badge-table td { background: #1c1c1c; border: 1px solid #333; padding: 7px; color: #eee; }
+        .badge-table th { width: 30%; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); padding: 7px; color: var(--theme-text); text-align: left; opacity:0.9;}
+        .badge-table td { background: transparent; border: 1px solid var(--theme-border); padding: 7px; color: var(--theme-text); }
         .status-tag { font-weight: bold; padding: 2px 6px; border-radius: 3px; display: inline-block; font-size: 11px; }
 
-        .inv-card { display: flex; justify-content: space-between; align-items: center; background: #222; border: 1px solid #444; padding: 8px 10px; margin-bottom: 6px; border-radius: 4px; font-size: 12px; }
-        .inv-card-name { font-weight: bold; color: #eee; }
+        .inv-card { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid var(--theme-border); padding: 8px 10px; margin-bottom: 6px; border-radius: 4px; font-size: 12px; }
+        .inv-card-name { font-weight: bold; color: var(--theme-text); }
         .inv-btn-group { display: flex; gap: 4px; }
-        .inv-btn { padding: 4px 8px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
+        .inv-btn { padding: 4px 8px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; font-weight:bold;}
         .inv-btn-use { background: #2e7d32; color: white; }
         .inv-btn-use-other { background: #1976d2; color: white; }
-        .inv-btn-sell { background: #424242; color: #ddd; }
+        .inv-btn-sell { background: #424242; color: #ddd; border:1px solid #555;}
 
         .letter-card { background: #202020; border: 1px solid #3a3a3a; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 12px; position: relative; }
         .letter-meta { font-size: 10px; color: #ff9800; margin-bottom: 4px; }
@@ -279,20 +268,19 @@
         .seotda-card.selected { border-color: #ffd700; box-shadow: 0 0 10px #ffd700; transform: translateY(-4px); }
         .kwang-badge { position: absolute; top: 3px; right: 3px; font-size: 9px; background: #e50914; color: white; border-radius: 50%; width: 15px; height: 15px; display: flex; justify-content: center; align-items: center; border: 1px solid #fff; }
 
-        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 10px; margin-bottom: 8px; border: 1px solid #444; font-size: 12px; transition: all 0.3s ease;}
-        .shop-item span { color: #ddd; }
-        .shop-item button { padding: 5px 10px; background: #444; color: white; border: none; cursor: pointer; }
-
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px; margin-bottom: 8px; border: 1px solid var(--theme-border); font-size: 12px; transition: all 0.3s ease; border-radius:4px;}
+        .shop-item span { color: var(--theme-text); }
+        
         .ufo-display-box { text-align: center; margin: 10px 0 15px 0; cursor: pointer; }
         .ufo-gif-wrapper { display: inline-block; animation: ufoFloating 2.2s infinite ease-in-out; filter: drop-shadow(0 0 8px rgba(0, 255, 100, 0.5)); }
         @keyframes ufoFloating { 0% { transform: translateY(0px) rotate(0deg); } 25% { transform: translateY(-7px) rotate(2deg); } 50% { transform: translateY(-3px) rotate(-1deg); } 75% { transform: translateY(-9px) rotate(-2deg); } 100% { transform: translateY(0px) rotate(0deg); } }
         .ufo-dialogue-bubble { background: #0d1a10; border: 1px solid #4CAF50; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-weight: bold; color: #a3f7b5; margin: 8px auto 0 auto; max-width: 80%; text-align: center; box-shadow: 0 0 10px rgba(76, 175, 80, 0.3); letter-spacing: 0.5px; }
 
         .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 10; }
-        .modal-content { background-color: #1a1a1a; padding: 20px; border: 1px solid #555; width: 85%; box-sizing: border-box; }
-        .modal-content h3 { color: #fff; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .modal-content { background-color: var(--theme-bg-grad); border: 1px solid var(--theme-border); width: 85%; box-sizing: border-box; border-radius:8px; padding:20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);}
+        .modal-content h3 { color: var(--theme-text); margin-top: 0; border-bottom: 1px dashed var(--theme-border); padding-bottom: 10px; }
         .modal-btn-group { display: flex; gap: 10px; }
-        .modal-btn-group button { flex: 1; padding: 10px; cursor: pointer; border: none; }
+        .modal-btn-group button { flex: 1; padding: 10px; cursor: pointer; border: none; font-weight:bold; border-radius:4px;}
         .btn-submit { background-color: #4CAF50; color: white; }
         .btn-cancel { background-color: #f44336; color: white; }
 
@@ -303,20 +291,20 @@
         .custom-alert-btn { background: #771111; color: #fff; border: 1px solid #ff4c4c; padding: 9px 22px; font-size: 12px; cursor: pointer; border-radius: 4px; }
         .custom-alert-btn:hover { background: #991515; }
 
-        /* 고급진 알림/승부 모달 (VIP) - 테마 변수 적용 */
+        /* 고급진 알림/승부 모달 (VIP) */
         #luxury-alert-overlay, #vip-invite-overlay, #vip-game-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
-        .luxury-alert-box { background: var(--theme-bg-grad); border: 1px solid var(--theme-border); border-radius: 6px; width: 85%; max-width: 320px; padding: 25px; box-sizing: border-box; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0, 0.5); }
+        .luxury-alert-box { background: var(--theme-bg-grad); border: 1px solid var(--theme-border); border-radius: 8px; width: 85%; max-width: 320px; padding: 25px; box-sizing: border-box; text-align: center; box-shadow: 0 15px 40px rgba(0,0,0, 0.6); }
         .luxury-alert-msg { font-size: 14px; color: var(--theme-text); margin-bottom: 25px; line-height: 1.6; word-break: keep-all; font-weight: bold; letter-spacing: 0.5px; }
-        .luxury-alert-btn { background: transparent; color: var(--theme-text); border: 1px solid var(--theme-border); padding: 10px 28px; font-size: 13px; cursor: pointer; border-radius: 3px; font-weight: bold; transition: all 0.3s ease; }
-        .luxury-alert-btn:hover { background: var(--theme-focus); color: #111; }
+        .luxury-alert-btn { background: transparent; color: var(--theme-text); border: 1px solid var(--theme-border); padding: 10px 28px; font-size: 13px; cursor: pointer; border-radius: 4px; font-weight: bold; transition: all 0.3s ease; }
+        .luxury-alert-btn:hover { background: var(--theme-focus); color: #111; border-color: var(--theme-focus);}
 
-        .emp-list-card { display: flex; align-items: center; background: #242424; border: 1px solid #3a3a3a; border-radius: 5px; padding: 10px; margin-bottom: 8px; gap: 10px; cursor: pointer; transition: background 0.2s;}
-        .emp-list-card:hover { background: #333; }
+        .emp-list-card { display: flex; align-items: center; background: rgba(0,0,0,0.2); border: 1px solid var(--theme-border); border-radius: 5px; padding: 10px; margin-bottom: 8px; gap: 10px; cursor: pointer; transition: background 0.2s;}
+        .emp-list-card:hover { background: rgba(255,255,255,0.1); }
         .emp-list-avatar { width: 40px; height: 48px; background: #1a1a1a; border: 1px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #666; overflow: hidden; flex-shrink: 0; }
         .emp-list-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .emp-list-details { flex-grow: 1; text-align: left; }
-        .emp-list-title { font-size: 13px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; }
-        .emp-list-sub { font-size: 11px; color: #888; margin-top: 2px; }
+        .emp-list-title { font-size: 13px; font-weight: bold; color: var(--theme-text); display: flex; align-items: center; gap: 6px; }
+        .emp-list-sub { font-size: 11px; color: var(--theme-text); opacity:0.7; margin-top: 2px; }
 
         #ranking-bottom-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 450px; background: #161616; border-top: 1px solid #444; box-shadow: 0 -4px 12px rgba(0,0,0,0.8); z-index: 100; box-sizing: border-box; transition: all 0.3s ease; }
         .ranking-toggle-btn { width: 100%; background: #222; border: none; border-bottom: 1px solid #333; color: #ffd700; font-size: 12px; font-weight: bold; padding: 9px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
@@ -338,7 +326,7 @@
         .vip-arena-box { background: var(--theme-bg-grad); border: 1px solid var(--theme-border); padding: 14px; border-radius: 6px; box-sizing: border-box; width: 100%; }
         .vip-wager-row { display: flex; gap: 8px; align-items: center; width: 100%; box-sizing: border-box; }
         .vip-nav-btns { display: flex; gap: 5px; margin-bottom: 12px; width: 100%; box-sizing: border-box; }
-        .vip-nav-btn { flex: 1; padding: 9px 0; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); color: var(--theme-text); font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; box-sizing: border-box; }
+        .vip-nav-btn { flex: 1; padding: 9px 0; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); color: var(--theme-text); font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; box-sizing: border-box; transition:all 0.3s;}
         .vip-nav-btn.active { background: var(--theme-focus); color: #111; border-color: #fff; }
     </style>
 </head>
@@ -378,40 +366,46 @@
 <div id="emp-detail-modal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-height: 85vh; overflow-y: auto;">
         <h3 id="detail-modal-title">사원 정보 열람</h3>
-        <div class="id-card-badge" id="detail-card-badge" style="background:#1a1a1a; border-color:#444;">
+        <div class="id-card-badge" id="detail-card-badge">
+            <div class="id-card-top">
+                <div class="id-chip-box"></div>
+                <div class="serial-badge-box">
+                    <div class="serial-lbl">SERIAL NO.</div>
+                    <div class="serial-val" id="detail-card-no">0000</div>
+                </div>
+            </div>
             <div class="id-card-body">
                 <div class="id-avatar-mini" id="detail-card-photo"><span>PHOTO</span></div>
                 <div class="id-info-details">
-                    <div class="serial-row">SERIAL NO. <span id="detail-card-no" style="font-weight:bold; color:inherit;"></span></div>
-                    <div class="emp-name"><span id="detail-card-name" style="color:#fff;"></span> <span class="emp-role-tag" id="detail-card-position"></span></div>
+                    <div class="emp-name"><span id="detail-card-name" style="color:var(--theme-text);"></span> <span class="emp-role-tag" id="detail-card-position"></span></div>
                     <div class="emp-meta"><span id="detail-card-affiliation"></span> · <span id="detail-card-team"></span></div>
                 </div>
             </div>
             <table class="badge-table" style="margin-top:10px;">
                 <tr><th style="width:35%;">현재 상태</th><td><span id="detail-card-status" class="status-tag"></span></td></tr>
-                <tr><th>장착 장비</th><td><span id="detail-card-equipped" style="font-weight:bold; color:#d4af37;"></span></td></tr>
+                <tr><th>장착 장비</th><td><span id="detail-card-equipped" style="font-weight:bold; color:var(--theme-focus);"></span></td></tr>
                 <tr><th>특이사항</th><td><span id="detail-card-notes" style="font-size:11px; word-break:break-all;"></span></td></tr>
             </table>
         </div>
         
         <!-- 상담사 전용 익명 편지 열람란 -->
-        <div id="detail-card-letters-container" style="display:none; margin-top:15px; border-top:1px dashed #444; padding-top:10px;">
-            <div style="color:#ff9800; font-weight:bold; font-size:12px; margin-bottom:8px;">[상담사 전용] 익명 서신 발신자 추적</div>
-            <div id="detail-card-letters-list" style="max-height:150px; overflow-y:auto; background:#111; padding:8px; border-radius:4px; font-size:11px; color:#ddd;"></div>
+        <div id="detail-card-letters-container" style="display:none; margin-top:15px; border-top:1px dashed var(--theme-border); padding-top:10px;">
+            <div style="color:var(--theme-focus); font-weight:bold; font-size:12px; margin-bottom:8px;">[상담사 전용] 익명 서신 발신자 추적</div>
+            <div id="detail-card-letters-list" style="max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:8px; border-radius:4px; font-size:11px; color:var(--theme-text);"></div>
         </div>
 
-        <button class="btn-cancel" onclick="closeEmpDetailModal()" style="width:100%; margin-top:15px; background:#333;">닫기</button>
+        <button class="shop-buy-btn" onclick="closeEmpDetailModal()" style="width:100%; margin-top:15px;">닫기</button>
     </div>
 </div>
 
-<!-- VIP 초대 수신 모달 (세련되게 개선) -->
+<!-- VIP 초대 수신 모달 -->
 <div id="vip-invite-overlay" style="display:none;">
-    <div class="luxury-alert-box" style="background: rgba(15, 15, 15, 0.95); border: 1px solid #d4af37; box-shadow: 0 0 20px rgba(212,175,55,0.2); border-radius: 8px;">
-        <h3 style="color:#d4af37; font-weight:bold; margin-top:0;">⚔️ VIP 대전 신청</h3>
-        <div id="vip-invite-text" style="color:#eee; margin-bottom: 25px; font-size:13px; line-height:1.6;"></div>
+    <div class="luxury-alert-box">
+        <h3 style="color:var(--theme-focus); font-weight:bold; margin-top:0;">⚔️ VIP 대전 신청</h3>
+        <div id="vip-invite-text" style="color:var(--theme-text); margin-bottom: 25px; font-size:13px; line-height:1.6;"></div>
         <div style="display:flex; gap:10px;">
-            <button style="flex:1; background:#d4af37; color:#111; font-weight:bold; border:none; padding:12px; border-radius:4px; cursor:pointer;" onclick="acceptVipInvite()">동의</button>
-            <button style="flex:1; background:#333; color:#aaa; border:1px solid #555; padding:12px; border-radius:4px; cursor:pointer;" onclick="rejectVipInvite()">취소</button>
+            <button style="flex:1; background:var(--theme-focus); color:#111; font-weight:bold; border:none; padding:12px; border-radius:4px; cursor:pointer;" onclick="acceptVipInvite()">동의</button>
+            <button style="flex:1; background:transparent; color:var(--theme-text); border:1px solid var(--theme-border); padding:12px; border-radius:4px; cursor:pointer;" onclick="rejectVipInvite()">취소</button>
         </div>
     </div>
 </div>
@@ -446,12 +440,18 @@
         </div>
 
         <div class="id-card-badge">
+            <div class="id-card-top">
+                <div class="id-chip-box"></div>
+                <div class="serial-badge-box">
+                    <div class="serial-lbl">SERIAL NO.</div>
+                    <div class="serial-val" id="display-no">0000</div>
+                </div>
+            </div>
             <div class="id-card-body">
                 <div class="id-avatar-mini" id="card-mini-photo">
                     <span>PHOTO</span>
                 </div>
                 <div class="id-info-details">
-                    <div class="serial-row">SERIAL NO. <span id="display-no" style="font-weight:bold; color:inherit;">0000</span></div>
                     <div class="emp-name"><span id="display-name">사원이름</span> <span class="emp-role-tag" id="display-position">사원</span></div>
                     <div class="emp-meta"><span id="display-affiliation">본사</span> · <span id="display-team">기획 2팀</span></div>
                 </div>
@@ -516,18 +516,18 @@
                 </div>
                 <div style="text-align:center; margin-bottom: 12px;">
                     <input type="file" id="badge-photo-input" accept="image/*" style="display:none;" onchange="handlePhotoUpload(event)">
-                    <button class="game-btn" onclick="document.getElementById('badge-photo-input').click()">사진 등록 / 변경</button>
+                    <button class="shop-buy-btn" onclick="document.getElementById('badge-photo-input').click()">사진 등록 / 변경</button>
                 </div>
                 <table class="badge-table">
                     <tr><th>닉네임</th><td><input type="text" id="badge-nickname" class="badge-input" placeholder="닉네임 입력"></td></tr>
                     <tr><th>소속</th><td><span id="badge-affiliation-text" style="font-weight:bold;">본사</span></td></tr>
                     <tr><th>부서/소속팀</th><td><span id="badge-team-text" style="font-weight:bold;">기획 2팀</span></td></tr>
                     <tr><th>직급</th><td><span id="badge-position-text" style="font-weight:bold;">사원</span></td></tr>
-                    <tr><th>장착 장비</th><td><span id="badge-equipped-text" style="font-weight:bold; color:#d4af37;">없음</span></td></tr>
+                    <tr><th>장착 장비</th><td><span id="badge-equipped-text" style="font-weight:bold; color:var(--theme-focus);">없음</span></td></tr>
                     <tr><th>특이사항</th><td><span id="badge-notes-text" style="font-size:11px; word-break:break-all;">특이사항 없음</span></td></tr>
                     <tr><th>현재 상태</th><td><span id="badge-current-status" class="status-tag">정상</span></td></tr>
                 </table>
-                <button class="game-btn" style="width:100%; margin-top:10px;" onclick="saveBadgeInfo()">사원 정보 저장</button>
+                <button class="shop-buy-btn" style="width:100%; margin-top:10px;" onclick="saveBadgeInfo()">사원 정보 저장</button>
             </div>
 
             <!-- 소지품 -->
@@ -555,7 +555,7 @@
                     </div>
                     <select id="letter-target-select" style="width:100%; margin-bottom: 8px;"></select>
                     <textarea id="letter-content-input" rows="3" maxlength="300" placeholder="어둠 속에 묻어둘 당신의 진심을 적으세요... (최대 300자)" style="width:100%; margin-bottom: 10px;"></textarea>
-                    <button class="game-btn" style="width:100%; margin:0; background:var(--theme-focus); color:#111; font-weight:bold; border:none; padding:10px; border-radius:4px; letter-spacing: 1px; transition: all 0.3s ease;" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
+                    <button class="shop-buy-btn" style="width:100%; margin:0;" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
                 </div>
                 <div style="font-size:11px; color:#888; margin-bottom: 6px; border-bottom: 1px solid #333; padding-bottom:4px;">수신된 익명 편지 (최대 3개 보관)</div>
                 <div id="received-letters-container" style="max-height: 180px; overflow-y: auto;"></div>
@@ -589,7 +589,7 @@
                     </div>
                     <div>
                         베팅: <input type="number" id="slot-bet" class="bet-input" value="5" min="1">
-                        <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
+                        <button class="shop-buy-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
                 </div>
@@ -612,7 +612,7 @@
                     </div>
                     <div>
                         베팅 포인트: <input type="number" id="roulette-bet" class="bet-input" value="5" min="1">
-                        <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
+                        <button class="shop-buy-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
                     </div>
                     <div id="roulette-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">번호를 고르고 회전시키세요. (오염도 +2)</div>
                 </div>
@@ -638,18 +638,18 @@
                     </div>
                     <div id="seotda-controls-start">
                         베팅: <input type="number" id="seotda-bet" class="bet-input" value="5" min="1">
-                        <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
+                        <button class="shop-buy-btn" onclick="startSeotda()">패 돌리기</button>
                     </div>
                     <div id="seotda-controls-play" style="display:none;">
-                        <button class="game-btn" onclick="swapSeotdaCard()">선택 패 교환 (<span id="swap-count">2</span>회 남음)</button>
-                        <button class="game-btn" onclick="finishSeotda()" style="background:#771111;">승부 (쇼다운)</button>
+                        <button class="shop-buy-btn" onclick="swapSeotdaCard()">선택 패 교환 (<span id="swap-count">2</span>회 남음)</button>
+                        <button class="shop-buy-btn" onclick="finishSeotda()" style="background:#771111; color:#fff; border-color:#ff4c4c;">승부 (쇼다운)</button>
                     </div>
                     <div id="seotda-msg" style="font-size:12px; margin-top:10px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
                 </div>
             </div>
         </div>
 
-        <!-- 3. VIP 시설 (1:1 실시간 대전실) -->
+        <!-- 3. VIP 시설 -->
         <div id="tab-vip" class="tab-content" style="text-align: left;">
             <div id="vip-denied-box" style="display:none; text-align:center; padding: 25px 10px;">
                 <h4 style="color:#ff4c4c; margin-top:0;">[VIP 시설 접근 제한]</h4>
@@ -681,7 +681,7 @@
                         <button class="vip-nav-btn" id="btn-vgame-updown" onclick="selectVipGameType('updown')">3. 업 다운 (단판)</button>
                     </div>
 
-                    <button class="game-btn" style="width:100%; margin:0; background:var(--theme-focus); color:#111; font-weight:bold; font-size:14px; padding:12px; border:none;" onclick="sendVipInvite()">⚔️ 대전 초대장 발송</button>
+                    <button class="shop-buy-btn" style="width:100%; margin:0;" onclick="sendVipInvite()">⚔️ 대전 초대장 발송</button>
 
                     <div id="vip-online-list" style="margin-top:15px; border-top:1px dashed var(--theme-border); padding-top:10px;">
                         <div style="font-size:11px; color:var(--theme-text); margin-bottom:8px; font-weight:bold;">[현재 라운지 접속 명단]</div>
@@ -715,9 +715,8 @@
                 <!-- 밀실 거래 -->
                 <div id="shop-p2p" class="sub-panel">
                     <div class="panel-title">[밀실 거래 - 1:1 사원 은밀 거래소]</div>
-                    <div style="background:#111; padding: 10px; border: 1px solid #333; margin-bottom: 12px; border-radius: 4px;">
-                        <div style="font-size:11px; color:#aaa; margin-bottom:6px;">은밀한 1:1 제안서 작성</div>
-                        
+                    <div style="background:rgba(0,0,0,0.2); padding: 10px; border: 1px solid var(--theme-border); margin-bottom: 12px; border-radius: 4px;">
+                        <div style="font-size:11px; color:var(--theme-text); margin-bottom:6px;">은밀한 1:1 제안서 작성</div>
                         <div style="display:flex; gap:6px; margin-bottom:6px;">
                             <select id="p2p-deal-mode" onchange="toggleP2PDealMode()" style="width:40%;">
                                 <option value="give">일방 양도 (선물)</option>
@@ -725,7 +724,6 @@
                             </select>
                             <select id="p2p-target-user" style="width:60%;"></select>
                         </div>
-
                         <div style="font-size:10px; color:#888; margin-bottom:3px;">내가 건넬 제물:</div>
                         <div style="display:flex; gap:6px; margin-bottom:6px;">
                             <select id="p2p-offer-type" onchange="toggleP2POfferType()" style="width:35%;">
@@ -736,9 +734,8 @@
                             <input type="number" id="p2p-offer-item-qty" value="1" min="1" style="width:20%; text-align:center;" placeholder="수량">
                             <input type="number" id="p2p-offer-points" placeholder="건넬 포인트 수량" style="display:none; width:65%;">
                         </div>
-
-                        <div id="p2p-demand-wrapper" style="display:none; border-top:1px dashed #333; padding-top:6px; margin-top:6px;">
-                            <div style="font-size:10px; color:#ff9800; margin-bottom:3px;">상대에게 요구할 대가:</div>
+                        <div id="p2p-demand-wrapper" style="display:none; border-top:1px dashed var(--theme-border); padding-top:6px; margin-top:6px;">
+                            <div style="font-size:10px; color:var(--theme-focus); margin-bottom:3px;">상대에게 요구할 대가:</div>
                             <div style="display:flex; gap:6px; margin-bottom:6px;">
                                 <select id="p2p-demand-type" onchange="toggleP2PDemandType()" style="width:35%;">
                                     <option value="point">포인트 요구</option>
@@ -749,13 +746,10 @@
                                 <input type="number" id="p2p-demand-item-qty" value="1" min="1" style="display:none; width:20%; text-align:center;" placeholder="수량">
                             </div>
                         </div>
-
-                        <button class="game-btn" style="width:100%; margin:top:4px;" onclick="sendP2PDeal()">거래/양도 제안서 전달</button>
+                        <button class="shop-buy-btn" style="width:100%; margin-top:4px;" onclick="sendP2PDeal()">거래/양도 제안서 전달</button>
                     </div>
-
                     <div style="font-size:11px; color:#888; margin-bottom: 6px;">수신된 제안</div>
                     <div id="p2p-received-list" style="max-height: 140px; overflow-y: auto; margin-bottom:12px;"></div>
-
                     <div style="font-size:11px; color:#888; margin-bottom: 6px;">내가 보낸 제안</div>
                     <div id="p2p-sent-list" style="max-height: 140px; overflow-y: auto;"></div>
                 </div>
@@ -779,25 +773,23 @@
                         </div>
                         <div class="ufo-dialogue-bubble" id="ufo-dialogue-text">물건을 본다 👌🏻</div>
                     </div>
-
-                    <div id="alien-game-section" style="background:#151515; padding:10px; border:1px solid #333; margin-bottom:12px; border-radius:4px;">
-                        <div style="font-size:11px; color:#ff9800; margin-bottom:4px;">
-                            [외계 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">2</span> / 2회)
+                    <div id="alien-game-section" style="background:rgba(0,0,0,0.3); padding:10px; border:1px solid var(--theme-border); margin-bottom:12px; border-radius:4px;">
+                        <div style="font-size:11px; color:var(--theme-focus); margin-bottom:4px; font-weight:bold;">
+                            [외계 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:var(--theme-text);">2</span> / 2회)
                         </div>
                         <div style="margin: 8px 0;">
-                            <span style="display:inline-block; width:45px; height:60px; background:#2b2b2b; border:1px solid #888; border-radius:4px; line-height:60px; font-size:22px; font-weight:bold; color:#ffd700;" id="hl-dealer-card">7</span>
+                            <span style="display:inline-block; width:45px; height:60px; background:#2b2b2b; border:1px solid var(--theme-border); border-radius:4px; line-height:60px; font-size:22px; font-weight:bold; color:#ffd700;" id="hl-dealer-card">7</span>
                             <span style="font-size:13px; color:#aaa; margin:0 6px;">vs</span>
-                            <span style="display:inline-block; width:45px; height:60px; background:#2b2b2b; border:1px solid #888; border-radius:4px; line-height:60px; font-size:22px; font-weight:bold; color:#ffd700;" id="hl-player-card">?</span>
+                            <span style="display:inline-block; width:45px; height:60px; background:#2b2b2b; border:1px solid var(--theme-border); border-radius:4px; line-height:60px; font-size:22px; font-weight:bold; color:#ffd700;" id="hl-player-card">?</span>
                         </div>
                         <div>
-                            <button class="game-btn" id="btn-hl-high" onclick="playHighLow('HIGH')">HIGH</button>
-                            <button class="game-btn" id="btn-hl-low" onclick="playHighLow('LOW')">LOW</button>
+                            <button class="shop-buy-btn" id="btn-hl-high" onclick="playHighLow('HIGH')">HIGH</button>
+                            <button class="shop-buy-btn" id="btn-hl-low" onclick="playHighLow('LOW')">LOW</button>
                         </div>
                         <div id="hl-msg" style="font-size:12px; margin-top:6px; color:#aaa; min-height:16px;"></div>
                     </div>
-                    
                     <div style="text-align:left;">
-                        <div style="color:#4CAF50; font-size:12px; margin-bottom:8px; text-align:center; font-weight:bold;">★ 외계 특수 진열대 ★</div>
+                        <div style="color:var(--theme-focus); font-size:12px; margin-bottom:8px; text-align:center; font-weight:bold;">★ 외계 특수 진열대 ★</div>
                         <div id="alien-items-container"></div>
                     </div>
                 </div>
@@ -809,10 +801,10 @@
     <div id="employee-list-modal" class="modal-overlay" style="display:none;">
         <div class="modal-content" style="max-height: 80vh; display: flex; flex-direction: column;">
             <h3>사내 인적 정보 열람</h3>
-            <div style="font-size:11px; color:#888; margin-bottom:8px;">※ 사원 클릭 시 상세 사원증을 확인할 수 있습니다.</div>
+            <div style="font-size:11px; color:var(--theme-text); opacity:0.8; margin-bottom:8px;">※ 사원 클릭 시 상세 사원증을 확인할 수 있습니다.</div>
             <div id="employee-cards-container" style="flex: 1; overflow-y: auto; max-height: 380px; margin-bottom: 12px;"></div>
             <div class="modal-btn-group">
-                <button class="btn-cancel" onclick="closeEmployeeListModal()" style="background:#444;">닫기</button>
+                <button class="shop-buy-btn" onclick="closeEmployeeListModal()" style="width:100%;">닫기</button>
             </div>
         </div>
     </div>
@@ -825,19 +817,18 @@
                 <input type="text" id="sugg-title" placeholder="건의 제목 입력" style="margin-bottom:10px;">
                 <textarea id="sugg-content" rows="3" placeholder="상담사 선생님께 건의할 내용을 기재하세요." style="margin-bottom:10px;"></textarea>
                 <div class="modal-btn-group" style="margin-bottom: 15px;">
-                    <button class="btn-submit" onclick="submitSuggestion()">접수</button>
-                    <button class="btn-cancel" onclick="closeSuggestionModal()" style="background:#444;">닫기</button>
+                    <button class="shop-buy-btn" style="background:#4CAF50; color:#fff;" onclick="submitSuggestion()">접수</button>
+                    <button class="shop-buy-btn" onclick="closeSuggestionModal()">닫기</button>
                 </div>
             </div>
             <div style="font-size:12px; color:#aaa; margin-bottom:5px; font-weight:bold;">[내가 접수한 건의 내역]</div>
-            <div id="my-suggestion-list" style="flex: 1; overflow-y: auto; background:#111; border:1px solid #333; padding:8px; border-radius:4px;"></div>
+            <div id="my-suggestion-list" style="flex: 1; overflow-y: auto; background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); padding:8px; border-radius:4px;"></div>
         </div>
     </div>
 
     <!-- 통제 콘솔 (상담사 전용) -->
     <div id="admin-screen">
         <div class="admin-header">[보안 통제 콘솔] 인사 발령 및 등록 사원 관리</div>
-        
         <div class="admin-panel-box">
             <h4>신규 사원 등록 및 단말 권한 발급</h4>
             <div style="font-size:11px; display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px;">
@@ -847,9 +838,8 @@
                 <input type="text" id="new-emp-aff" placeholder="소속 (예: 어둠)">
                 <input type="text" id="new-emp-team" placeholder="소속팀 (예: 경비팀)">
             </div>
-            <button class="game-btn" style="width:100%; margin:0;" onclick="adminRegisterNewEmployee()">신규 사원 계정 발급 (사번 자동생성)</button>
+            <button class="shop-buy-btn" style="width:100%; margin:0;" onclick="adminRegisterNewEmployee()">신규 사원 계정 발급 (사번 자동생성)</button>
         </div>
-
         <div class="admin-panel-box">
             <h4>기존 사원 인사 발령 및 권한 제어</h4>
             <div style="font-size:12px; margin-bottom:6px;">
@@ -862,11 +852,10 @@
                 포인트: <input type="number" id="adm-target-points" class="bet-input" style="width:60px;" placeholder="30">
             </div>
             <div style="display:flex; gap:6px;">
-                <button class="game-btn" style="flex:1; margin:0;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
-                <button class="game-btn" style="flex:1; margin:0; background:var(--theme-focus); color:#000; font-weight:bold;" onclick="adminToggleVIP()">VIP 권한 발급/회수</button>
+                <button class="shop-buy-btn" style="flex:1; margin:0;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
+                <button class="shop-buy-btn" style="flex:1; margin:0; background:var(--theme-focus); color:#000; font-weight:bold;" onclick="adminToggleVIP()">VIP 권한 발급/회수</button>
             </div>
         </div>
-
         <div class="admin-panel-box" style="border-color: #ff9800; background-color: #26180a;">
             <h4 style="color: #ffb74d;">사원 오염도 원격 컨트롤</h4>
             <div style="font-size:12px; margin-bottom:6px;">
@@ -874,28 +863,25 @@
                 설정 수치(%): <input type="number" id="adm-poll-set-val" class="bet-input" style="width:60px;" min="0" max="100" placeholder="50">
             </div>
             <div style="display:flex; gap:6px;">
-                <button class="game-btn" style="flex:1; background:#d97706; margin:0;" onclick="adminControlPollution('set')">직접 수치 적용</button>
-                <button class="game-btn" style="flex:1; background:#b91c1c; margin:0;" onclick="adminControlPollution('max')">100% (상담실행)</button>
-                <button class="game-btn" style="flex:1; background:#047857; margin:0;" onclick="adminControlPollution('zero')">0% (정화)</button>
+                <button class="shop-buy-btn" style="flex:1; background:#d97706; margin:0; color:#fff;" onclick="adminControlPollution('set')">수치 적용</button>
+                <button class="shop-buy-btn" style="flex:1; background:#b91c1c; margin:0; color:#fff;" onclick="adminControlPollution('max')">100% (상담)</button>
+                <button class="shop-buy-btn" style="flex:1; background:#047857; margin:0; color:#fff;" onclick="adminControlPollution('zero')">0% (정화)</button>
             </div>
         </div>
-
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
             <h4 style="color: #ff8888;">사원 계정 말소 및 데이터 폐기</h4>
             <div style="font-size:12px; margin-bottom:6px;">
                 말소할 사번: <input type="text" id="adm-delete-no" class="bet-input" style="width:90px;" placeholder="4516">
-                <button class="game-btn" onclick="adminDeleteEmployee()" style="background:#771111; color:#fff;">계정 말소</button>
+                <button class="shop-buy-btn" onclick="adminDeleteEmployee()" style="background:#771111; color:#fff;">계정 말소</button>
             </div>
         </div>
-
         <div class="admin-panel-box">
             <h4>접수된 사원 건의함</h4>
             <div id="admin-suggestion-list" style="max-height: 200px; overflow-y: auto;"></div>
         </div>
-
         <div class="action-buttons">
-            <button onclick="closeAdminScreen()">사내 시스템 복귀</button>
-            <button onclick="logout()">단말 종료</button>
+            <button class="shop-buy-btn" onclick="closeAdminScreen()">사내 시스템 복귀</button>
+            <button class="shop-buy-btn" onclick="logout()">단말 종료</button>
         </div>
     </div>
 
@@ -912,57 +898,27 @@
 </div>
 
 <script>
-    // --- ★ 구글 파이어베이스 (Firebase) 초기화 세팅 ---
-    const firebaseConfig = {
-        databaseURL: "https://corp-system-6a618-default-rtdb.firebaseio.com/"
-    };
-    
+    const firebaseConfig = { databaseURL: "https://corp-system-6a618-default-rtdb.firebaseio.com/" };
     let database;
-    try {
-        firebase.initializeApp(firebaseConfig);
-        database = firebase.database();
-    } catch(e) {
-        console.error("Firebase Init Error:", e);
-    }
+    try { firebase.initializeApp(firebaseConfig); database = firebase.database(); } catch(e) { console.error("Firebase Init Error:", e); }
 
-    let currentUser = null;
-    let sessionSeconds = 0;
-    let sessionTimer;
-    let pendingTargetItemName = null; 
-    let pendingTargetAction = null; // 'sticker' or 'potion'
-    let hasShownFoxAlert = false;
-    let onlineUsersMap = {};
-
-    // 실시간 대전용 전역 변수
-    let currentVipGameType = 'dice';
-    let currentInviteId = null;
-    let activeVipSessionId = null;
-    let myChoiceSubmitted = false;
+    let currentUser = null; let sessionSeconds = 0; let sessionTimer;
+    let pendingTargetItemName = null; let pendingTargetAction = null; let hasShownFoxAlert = false; let onlineUsersMap = {};
+    let currentVipGameType = 'dice'; let currentInviteId = null; let activeVipSessionId = null; let myChoiceSubmitted = false;
 
     function getTodayStr() {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, '0');
-        const d = String(now.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
+        const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, '0'); const d = String(now.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`;
     }
 
-    let db = {
-        users: {}, suggestions: [], p2pDeals: [], vipInvites: {}, vipSessions: {}
-    };
+    let db = { users: {}, suggestions: [], p2pDeals: [], vipInvites: {}, vipSessions: {} };
 
     if (database) {
         database.ref('/').on('value', (snapshot) => {
             let data = snapshot.val();
             if (data) {
-                if (!data.suggestions) data.suggestions = [];
-                else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
-                
-                if (!data.p2pDeals) data.p2pDeals = [];
-                else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
-                
-                if (!data.vipInvites) data.vipInvites = {};
-                if (!data.vipSessions) data.vipSessions = {};
+                if (!data.suggestions) data.suggestions = []; else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
+                if (!data.p2pDeals) data.p2pDeals = []; else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
+                if (!data.vipInvites) data.vipInvites = {}; if (!data.vipSessions) data.vipSessions = {};
 
                 if (data.users) {
                     for(let key in data.users) {
@@ -972,55 +928,38 @@
                         if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
                         if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
                     }
-                } else {
-                    data.users = {};
-                }
-
+                } else { data.users = {}; }
                 db = data;
                 
                 if (currentUser) {
                     const updatedUser = db.users[currentUser.code];
-                    if (!updatedUser && currentUser.code !== 'kario0987') {
-                        logout(); showCustomAlert('계정이 당국에 의해 말소되었습니다.'); return;
-                    }
-                    currentUser = updatedUser;
-                    updateUI();
+                    if (!updatedUser && currentUser.code !== 'kario0987') { logout(); showCustomAlert('계정이 당국에 의해 말소되었습니다.'); return; }
+                    currentUser = updatedUser; updateUI();
                     if (document.getElementById('suggestion-modal').style.display === 'flex') renderMySuggestions();
                     checkVipMultiplayerState();
                 }
-            } else {
-                saveDB();
-            }
+            } else { saveDB(); }
         });
 
         database.ref('online').on('value', (snap) => {
-            onlineUsersMap = snap.val() || {};
-            document.getElementById('online-users-count').innerText = Math.max(1, Object.keys(onlineUsersMap).length);
+            onlineUsersMap = snap.val() || {}; document.getElementById('online-users-count').innerText = Math.max(1, Object.keys(onlineUsersMap).length);
             if(currentUser) renderVipOpponents();
         });
     }
 
     function saveDB() { if(database) database.ref('/').set(db); }
 
-    function showCustomAlert(message) {
-        document.getElementById('custom-alert-text').innerText = message;
-        document.getElementById('custom-alert-overlay').style.display = 'flex';
-    }
+    function showCustomAlert(message) { document.getElementById('custom-alert-text').innerText = message; document.getElementById('custom-alert-overlay').style.display = 'flex'; }
     function closeCustomAlert() { document.getElementById('custom-alert-overlay').style.display = 'none'; }
-    function showLuxuryAlert(message = '보유하신 포인트가 부족합니다.') {
-        document.getElementById('luxury-alert-text').innerText = message;
-        document.getElementById('luxury-alert-overlay').style.display = 'flex';
-    }
+    function showLuxuryAlert(message = '보유하신 포인트가 부족합니다.') { document.getElementById('luxury-alert-text').innerText = message; document.getElementById('luxury-alert-overlay').style.display = 'flex'; }
     function closeLuxuryAlert() { document.getElementById('luxury-alert-overlay').style.display = 'none'; }
 
     function showPointGainEffect(amount) {
-        const ptEl = document.getElementById('display-points');
-        if (!ptEl) return;
+        const ptEl = document.getElementById('display-points'); if (!ptEl) return;
         ptEl.style.color = '#4CAF50'; ptEl.style.textShadow = '0 0 10px #4CAF50';
         setTimeout(() => { ptEl.style.color = '#ffd700'; ptEl.style.textShadow = 'none'; }, 800);
 
-        const rect = ptEl.getBoundingClientRect();
-        const floater = document.createElement('div');
+        const rect = ptEl.getBoundingClientRect(); const floater = document.createElement('div');
         floater.innerText = `+${amount}`; floater.style.position = 'fixed';
         floater.style.left = `${rect.left + rect.width / 2}px`; floater.style.top = `${rect.top}px`;
         floater.style.transform = 'translate(-50%, -50%)'; floater.style.color = '#4CAF50';
@@ -1028,8 +967,7 @@
         floater.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)'; floater.style.zIndex = '99999';
         floater.style.pointerEvents = 'none'; floater.style.animation = 'floatUp 1.2s ease-out forwards';
         
-        document.body.appendChild(floater);
-        setTimeout(() => { floater.remove(); }, 1200);
+        document.body.appendChild(floater); setTimeout(() => { floater.remove(); }, 1200);
     }
 
     function generateSerialNo(affiliation, position, team) {
@@ -1083,8 +1021,7 @@
     function isQuarantined(user) { return user.quarantineUntil && Date.now() < user.quarantineUntil; }
 
     function checkMedRations(user) {
-        if (!user.receivedRations) user.receivedRations = [];
-        if (isQuarantined(user)) return;
+        if (!user.receivedRations) user.receivedRations = []; if (isQuarantined(user)) return;
         const now = new Date(); const datePrefix = getTodayStr(); const currentHour = now.getHours();
         const rationHours = [8, 13, 18, 23]; let given = false;
         rationHours.forEach(h => {
@@ -1115,15 +1052,14 @@
     function addHistoryLog(user, message) {
         if (!user.history) user.history = []; const now = new Date();
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-        user.history.unshift({ time: timeStr, text: message });
-        if (user.history.length > 10) user.history.pop();
+        user.history.unshift({ time: timeStr, text: message }); if (user.history.length > 10) user.history.pop();
         saveDB();
     }
 
     function isBlindfolded(user) { return user.blindfoldUntil && Date.now() < user.blindfoldUntil; }
     function checkPassivePollution(user) {
         if (user.code === 'kario0987') return; 
-        if (user.equippedWeapon === "혈욕조") return; // 장착 중 패시브 오염도 증가 방지
+        if (user.equippedWeapon === "혈욕조") return; 
 
         const now = Date.now(); const diffMs = now - user.lastPollutionTime; const threeHoursMs = 3 * 60 * 60 * 1000;
         if (diffMs >= threeHoursMs) {
@@ -1182,8 +1118,7 @@
     }
 
     function renderPointRanking() {
-        const wrapper = document.getElementById('ranking-items-wrapper');
-        if (!wrapper) return;
+        const wrapper = document.getElementById('ranking-items-wrapper'); if (!wrapper) return;
         const sortedUsers = Object.values(db.users).filter(u => u.code !== 'kario0987').sort((a, b) => b.points - a.points);
         const top3 = sortedUsers.slice(0, 3); const medalClasses = ['rank-1', 'rank-2', 'rank-3'];
         wrapper.innerHTML = top3.map((u, idx) => `
@@ -1206,50 +1141,30 @@
     function openEmployeeListModal() { renderEmployeeCards(); document.getElementById('employee-list-modal').style.display = 'flex'; }
     function closeEmployeeListModal() { document.getElementById('employee-list-modal').style.display = 'none'; }
     
-    // 타 사원증 모달 열기
     function openEmpDetailModal(code) {
-        const u = db.users[code];
-        if(!u) return;
+        const u = db.users[code]; if(!u) return;
         document.getElementById('detail-card-photo').innerHTML = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
-        document.getElementById('detail-card-no').innerText = u.no;
-        document.getElementById('detail-card-name').innerText = u.name;
-        document.getElementById('detail-card-position').innerText = u.position || "사원";
-        document.getElementById('detail-card-affiliation').innerText = u.affiliation || "본사";
+        document.getElementById('detail-card-no').innerText = u.no; document.getElementById('detail-card-name').innerText = u.name;
+        document.getElementById('detail-card-position').innerText = u.position || "사원"; document.getElementById('detail-card-affiliation').innerText = u.affiliation || "본사";
         document.getElementById('detail-card-team').innerText = u.team;
 
-        const statusInfo = getPollutionStatusInfo(u.pollution);
-        const statusEl = document.getElementById('detail-card-status');
-        statusEl.innerText = statusInfo.text;
-        statusEl.style.color = statusInfo.color; statusEl.style.backgroundColor = statusInfo.bg;
-        statusEl.style.border = `1px solid ${statusInfo.color}`;
+        const statusInfo = getPollutionStatusInfo(u.pollution); const statusEl = document.getElementById('detail-card-status');
+        statusEl.innerText = statusInfo.text; statusEl.style.color = statusInfo.color; statusEl.style.backgroundColor = statusInfo.bg; statusEl.style.border = `1px solid ${statusInfo.color}`;
 
         document.getElementById('detail-card-equipped').innerText = u.equippedWeapon || "없음";
         
         const noteEl = document.getElementById('detail-card-notes');
         const notes = (u.badge && u.badge.notes) ? u.badge.notes : "특이사항 없음";
-        noteEl.innerText = notes;
-        if(notes !== "특이사항 없음") noteEl.classList.add('glow-effect');
-        else noteEl.classList.remove('glow-effect');
+        noteEl.innerText = notes; if(notes !== "특이사항 없음") noteEl.classList.add('glow-effect'); else noteEl.classList.remove('glow-effect');
 
-        // 상담사 전용 익명 서신 내역 표시
-        const lettersContainer = document.getElementById('detail-card-letters-container');
-        const lettersList = document.getElementById('detail-card-letters-list');
+        const lettersContainer = document.getElementById('detail-card-letters-container'); const lettersList = document.getElementById('detail-card-letters-list');
         if (currentUser.code === 'kario0987') {
             lettersContainer.style.display = 'block';
             if (u.letters && u.letters.length > 0) {
-                lettersList.innerHTML = u.letters.map(l => 
-                    `<div style="margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
-                        <span style="color:#4CAF50;">[From: ${l.fromName || '알 수 없음'} (NO.${l.fromCode || '?'})]</span><br>
-                        ${l.content}
-                    </div>`
-                ).join('');
-            } else {
-                lettersList.innerHTML = '수신된 익명 편지가 없습니다.';
-            }
-        } else {
-            lettersContainer.style.display = 'none';
-        }
-
+                lettersList.innerHTML = u.letters.map(l => `<div style="margin-bottom:6px; border-bottom:1px solid var(--theme-border); padding-bottom:4px;">
+                        <span style="color:var(--theme-focus);">[From: ${l.fromName || '알 수 없음'} (NO.${l.fromCode || '?'})]</span><br>${l.content}</div>`).join('');
+            } else { lettersList.innerHTML = '수신된 익명 편지가 없습니다.'; }
+        } else { lettersContainer.style.display = 'none'; }
         document.getElementById('emp-detail-modal').style.display = 'flex';
     }
     function closeEmpDetailModal() { document.getElementById('emp-detail-modal').style.display = 'none'; }
@@ -1274,13 +1189,13 @@
         const mySugg = db.suggestions.filter(s => s.code === currentUser.code);
         if (mySugg.length === 0) { listEl.innerHTML = '<div style="color:#666; font-size:11px; text-align:center; padding:10px;">접수한 건의 내역이 없습니다.</div>'; return; }
         listEl.innerHTML = mySugg.map(s => `
-            <div style="background:#222; border:1px solid #444; padding:8px; margin-bottom:8px; border-radius:4px;">
+            <div style="background:rgba(0,0,0,0.2); border:1px solid var(--theme-border); padding:8px; margin-bottom:8px; border-radius:4px;">
                 <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
                     <span>${s.date}</span><span style="font-weight:bold; color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</span>
                 </div>
-                <div style="font-weight:bold; color:#fff; font-size:12px; margin-bottom:4px;">${s.title}</div>
-                <div style="color:#ccc; font-size:11px; margin-bottom:6px;">${s.content}</div>
-                ${s.status === 'RESOLVED' ? `<div style="background:#1a2e1a; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5; border:1px solid #2e7d32;"><b>[상담사 답변]</b><br>${s.reply}</div>` : ''}
+                <div style="font-weight:bold; color:var(--theme-text); font-size:12px; margin-bottom:4px;">${s.title}</div>
+                <div style="color:var(--theme-text); opacity:0.8; font-size:11px; margin-bottom:6px;">${s.content}</div>
+                ${s.status === 'RESOLVED' ? `<div style="background:rgba(76,175,80,0.1); padding:6px; border-radius:3px; font-size:11px; color:#4CAF50; border:1px solid #2e7d32;"><b>[상담사 답변]</b><br>${s.reply}</div>` : ''}
             </div>
         `).join('');
     }
@@ -1299,7 +1214,7 @@
                         <div class="emp-list-title"><span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe}</div>
                         <div class="emp-list-sub">사번: <span style="font-family:monospace;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}</div>
                         <div style="margin-top: 4px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:10px;">보유: ${u.points} P</span>
+                            <span style="font-size:10px; color:var(--theme-text);">보유: ${u.points} P</span>
                             <span class="status-tag" style="color:${statusInfo.color}; background:${statusInfo.bg}; border:1px solid ${statusInfo.color}; font-size:9px; padding:1px 5px;">${statusInfo.text} (${u.pollution}%)</span>
                         </div>
                     </div>
@@ -1359,8 +1274,7 @@
         const noteEl = document.getElementById('badge-notes-text');
         const notes = (currentUser.badge && currentUser.badge.notes) ? currentUser.badge.notes : "특이사항 없음";
         noteEl.innerText = notes;
-        if(notes !== "특이사항 없음") noteEl.classList.add('glow-effect');
-        else noteEl.classList.remove('glow-effect');
+        if(notes !== "특이사항 없음") noteEl.classList.add('glow-effect'); else noteEl.classList.remove('glow-effect');
 
         const statusInfo = getPollutionStatusInfo(currentUser.pollution);
         const statusEl = document.getElementById('badge-current-status');
@@ -1487,9 +1401,9 @@
     function renderInventory() {
         const container = document.getElementById('inventory-list-container'); let html = '';
         if (currentUser.equippedWeapon) {
-            html += `<div style="background:#2b2b2b; border:1px solid #d4af37; padding:8px 10px; margin-bottom:12px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
-                    <div><span style="font-size:10px; color:#d4af37;">[현재 장착 중]</span><span style="font-weight:bold; color:#fff; font-size:12px; margin-left:4px;">${currentUser.equippedWeapon}</span></div>
-                    <button onclick="unequipWeapon()" style="background:#444; border:none; color:#fff; padding:4px 8px; font-size:11px; cursor:pointer; border-radius:3px;">장착 해제</button>
+            html += `<div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-focus); padding:8px 10px; margin-bottom:12px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
+                    <div><span style="font-size:10px; color:var(--theme-focus);">[현재 장착 중]</span><span style="font-weight:bold; color:var(--theme-text); font-size:12px; margin-left:4px;">${currentUser.equippedWeapon}</span></div>
+                    <button class="shop-buy-btn" onclick="unequipWeapon()" style="padding:4px 8px; font-size:11px;">장착 해제</button>
                 </div>`;
         }
         if (!currentUser.inventory || currentUser.inventory.length === 0) {
@@ -1510,12 +1424,12 @@
 
                 return `
                     <div class="inv-card">
-                        <div><span class="inv-card-name">${item} <span style="color:#ffd700; margin-left:4px;">x${count}</span></span></div>
-                        <div class="inv-btn-group" style="flex-wrap:wrap; justify-content:flex-end;">
-                            ${(isUsable && cat.effect !== 'target_sticker') ? `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}', 'self')">${useBtnText}</button>` : ''}
-                            ${(cat && cat.effect === 'target_sticker') ? `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}', 'target')">${useBtnText}</button>` : ''}
-                            ${isTargetable ? `<button class="inv-btn inv-btn-use-other" onclick="useInventoryItem('${item}', 'target')">타인 사용</button>` : ''}
-                            <button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>
+                        <div><span class="inv-card-name">${item} <span style="color:var(--theme-focus); margin-left:4px;">x${count}</span></span></div>
+                        <div class="inv-btn-group" style="flex-wrap:wrap; justify-content:flex-end; gap:6px; margin-top:4px;">
+                            ${(isUsable && cat.effect !== 'target_sticker') ? `<button class="shop-buy-btn" style="background:#2e7d32; border-color:#2e7d32; color:#fff;" onclick="useInventoryItem('${item}', 'self')">${useBtnText}</button>` : ''}
+                            ${(cat && cat.effect === 'target_sticker') ? `<button class="shop-buy-btn" style="background:#2e7d32; border-color:#2e7d32; color:#fff;" onclick="useInventoryItem('${item}', 'target')">${useBtnText}</button>` : ''}
+                            ${isTargetable ? `<button class="shop-buy-btn" style="background:#1976d2; border-color:#1976d2; color:#fff;" onclick="useInventoryItem('${item}', 'target')">타인 사용</button>` : ''}
+                            <button class="shop-buy-btn" style="background:#424242; border-color:#555;" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>
                         </div>
                     </div>
                 `;
@@ -1612,7 +1526,6 @@
             const allItemKeys = Object.keys(ITEM_CATALOG).filter(k => k !== "랜덤박스");
             currentUser.inventory.push(allItemKeys[Math.floor(Math.random() * allItemKeys.length)]);
         } else {
-            // 본인이 물약/상비약 등 직접 사용
             applyPotionEffect(currentUser, itemName, false);
         }
 
@@ -1680,7 +1593,7 @@
                         <span style="font-weight:bold;">${idx + 1}. ${itemName}</span><br>
                         <span style="font-size:10px; color:#888;">${item.desc} (잔여: ${remaining === 99 ? '무제한' : remaining + '/3개'})</span>
                     </div>
-                    <button ${isSoldOut ? 'disabled style="background:#222; color:#555;"' : ''} onclick="buyRegularShopItem('${itemId}', '${itemName}', ${item.price})">
+                    <button class="shop-buy-btn" ${isSoldOut ? 'disabled' : ''} onclick="buyRegularShopItem('${itemId}', '${itemName}', ${item.price})">
                         ${isSoldOut ? '품절' : `${item.price} P`}
                     </button>
                 </div>
@@ -1842,8 +1755,8 @@
     function showVipInviteModal(invite) {
         const gameNames = { 'dice': '주사위', 'rps': '가위바위보', 'updown': '업다운' };
         document.getElementById('vip-invite-text').innerHTML = `
-            <b style="color:#d4af37; font-size:15px;">${invite.fromName}</b> 사원님이 1:1 승부를 요청했습니다.<br><br>
-            종목: <b style="color:#fff;">${gameNames[invite.game]}</b><br>
+            <b style="color:var(--theme-focus); font-size:15px;">${invite.fromName}</b> 사원님이 1:1 승부를 요청했습니다.<br><br>
+            종목: <b style="color:var(--theme-text);">${gameNames[invite.game]}</b><br>
             판돈: <b style="color:#ff4c4c;">${invite.bet} P</b>
         `;
         document.getElementById('vip-invite-overlay').style.display = 'flex';
@@ -1892,17 +1805,17 @@
             area.innerHTML = '<div style="font-size:16px; color:#4CAF50; margin: 20px 0; text-align:center;">선택 완료! 판정 대기 중...</div>';
         } else if (session.state === 'WAITING') {
             if (session.game === 'dice') {
-                area.innerHTML = `<div style="margin:20px 0;"><button class="luxury-alert-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button></div>`;
+                area.innerHTML = `<div style="margin:20px 0;"><button class="shop-buy-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button></div>`;
             } else if (session.game === 'rps') {
                 area.innerHTML = `<div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button></div>`;
+                        <button class="shop-buy-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
+                        <button class="shop-buy-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
+                        <button class="shop-buy-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button></div>`;
             } else if (session.game === 'updown') {
                 area.innerHTML = `<div style="margin:10px 0;">
                         <div style="font-size:12px; color:var(--theme-text); opacity:0.8; margin-bottom:8px; text-align:center; line-height:1.4;">1~999 중 자신이 생각하는 숫자에 가장 가까운 숫자를 적어주세요.<br>(시스템 숫자와 오차가 가장 적은 사원 승리)</div>
                         <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; box-sizing: border-box;" placeholder="숫자 입력 (1~999)">
-                        <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button></div>`;
+                        <button class="shop-buy-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button></div>`;
             }
         }
 
@@ -1966,7 +1879,7 @@
             if (d1 < d2) winner = 'p1'; else if (d2 < d1) winner = 'p2';
         }
 
-        let resultText = `[방장] ${p1User.name}: <b style="color:#d4af37;">${p1c}</b> <br> [상대] ${p2User.name}: <b style="color:#d4af37;">${p2c}</b><br><br>`;
+        let resultText = `[방장] ${p1User.name}: <b style="color:var(--theme-focus);">${p1c}</b> <br> [상대] ${p2User.name}: <b style="color:var(--theme-focus);">${p2c}</b><br><br>`;
         if(session.game === 'updown') resultText += `(시스템 정답 숫자: <b>${session.targetNumber}</b>)<br>`;
 
         if (winner === 'draw') {
@@ -1988,7 +1901,9 @@
     function closeVipGameOverlay() {
         if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
             const s = db.vipSessions[activeVipSessionId];
-            if (s.state === 'FINISHED' && s.winnerCode === currentUser.code) showPointGainEffect(s.winAmount);
+            if (s.state === 'FINISHED' && s.winnerCode === currentUser.code && !s.effectShown) {
+                showPointGainEffect(s.winAmount); s.effectShown = true;
+            }
         }
         document.getElementById('vip-game-overlay').style.display = 'none'; myChoiceSubmitted = false;
     }
@@ -2111,19 +2026,19 @@
         if (myReceived.length === 0) receivedList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">도착한 제안이 없습니다.</div>';
         else {
             receivedList.innerHTML = myReceived.map(deal => {
-                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} <span style="color:#ffd700;">x${deal.offerQty||1}</span>`;
-                const demandDesc = (deal.mode === 'give') ? `<span style="color:#4CAF50;">무상 양도 (대가 없음)</span>` : (deal.demandType === 'point' ? `${deal.demandValue} P 요구` : `'${deal.demandValue}' <span style="color:#ffd700;">x${deal.demandQty||1}</span> 요구`);
-                return `<div class="shop-item"><div><span style="font-weight:bold;">[제공] ${offerDesc}</span><br><span style="font-size:10px; color:#aaa;">발신: ${deal.fromName} | ${demandDesc}</span></div>
-                        <div style="display:flex; gap:4px;"><button onclick="acceptP2PDeal(${deal.id})" style="background:#2e7d32; padding:4px 8px; font-size:11px;">수락</button><button onclick="rejectP2PDeal(${deal.id})" style="background:#771111; padding:4px 8px; font-size:11px;">거절</button></div></div>`;
+                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} <span style="color:var(--theme-focus);">x${deal.offerQty||1}</span>`;
+                const demandDesc = (deal.mode === 'give') ? `<span style="color:#4CAF50;">무상 양도 (대가 없음)</span>` : (deal.demandType === 'point' ? `${deal.demandValue} P 요구` : `'${deal.demandValue}' <span style="color:var(--theme-focus);">x${deal.demandQty||1}</span> 요구`);
+                return `<div class="shop-item"><div><span style="font-weight:bold;">[제공] ${offerDesc}</span><br><span style="font-size:10px; color:var(--theme-text); opacity:0.8;">발신: ${deal.fromName} | ${demandDesc}</span></div>
+                        <div style="display:flex; gap:4px;"><button class="shop-buy-btn" onclick="acceptP2PDeal(${deal.id})" style="background:#2e7d32; color:#fff; border-color:#2e7d32;">수락</button><button class="shop-buy-btn" onclick="rejectP2PDeal(${deal.id})" style="background:#771111; color:#fff; border-color:#771111;">거절</button></div></div>`;
             }).join('');
         }
 
         if (mySent.length === 0) sentList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">대기 중인 보낸 제안이 없습니다.</div>';
         else {
             sentList.innerHTML = mySent.map(deal => {
-                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} <span style="color:#ffd700;">x${deal.offerQty||1}</span>`;
-                return `<div class="shop-item"><div><span style="font-weight:bold;">수신: ${deal.toName}</span><br><span style="font-size:10px; color:#aaa;">제물: ${offerDesc}</span></div>
-                        <button onclick="cancelP2PDeal(${deal.id})" style="background:#444; padding:4px 8px; font-size:11px;">철회</button></div>`;
+                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} <span style="color:var(--theme-focus);">x${deal.offerQty||1}</span>`;
+                return `<div class="shop-item"><div><span style="font-weight:bold;">수신: ${deal.toName}</span><br><span style="font-size:10px; color:var(--theme-text); opacity:0.8;">제물: ${offerDesc}</span></div>
+                        <button class="shop-buy-btn" onclick="cancelP2PDeal(${deal.id})">철회</button></div>`;
             }).join('');
         }
     }
@@ -2225,14 +2140,14 @@
 
         container.innerHTML = unlocked.map(itemName => {
             const item = ITEM_CATALOG[itemName];
-            const filterStyle = isBoughtToday ? 'filter: brightness(0.4); pointer-events:none;' : '';
+            const filterStyle = isBoughtToday ? 'filter: brightness(0.4); opacity: 0.6; pointer-events: none;' : '';
             return `
                 <div class="shop-item" style="${filterStyle}">
                     <div>
                         <span style="font-weight:bold;">${itemName}</span><br>
-                        <span style="font-size:10px; color:#888;">${item.desc}</span>
+                        <span style="font-size:10px; color:var(--theme-text); opacity:0.8;">${item.desc}</span>
                     </div>
-                    <button ${isBoughtToday ? 'disabled style="background:#222; color:#555;"' : ''} onclick="buyAlienItem('${itemName}', ${item.price})">${isBoughtToday ? '금일 품절' : item.price + ' P'}</button>
+                    <button class="shop-buy-btn" ${isBoughtToday ? 'disabled' : ''} onclick="buyAlienItem('${itemName}', ${item.price})">${isBoughtToday ? '금일 품절' : item.price + ' P'}</button>
                 </div>
             `;
         }).join('');
@@ -2299,7 +2214,7 @@
             <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
                 <div class="suggestion-meta"><span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span><button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px;">삭제</button></div>
                 <div style="font-weight:bold; color:#ffcccc; margin-bottom:3px;">${s.title}</div><div style="color:#ddd; margin-bottom:8px;">${s.content}</div>
-                ${s.status === 'PENDING' ? `<div style="display:flex; gap:4px;"><input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요"><button class="game-btn" style="margin:0; background:#2e7d32;" onclick="adminReplySuggestion(${s.id})">해결 처리</button></div>` : `<div style="background:#111; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5;"><b>[상담사 답변]</b> ${s.reply}</div>`}
+                ${s.status === 'PENDING' ? `<div style="display:flex; gap:4px;"><input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요"><button class="shop-buy-btn" style="margin:0; background:#2e7d32; color:#fff;" onclick="adminReplySuggestion(${s.id})">해결 처리</button></div>` : `<div style="background:#111; padding:6px; border-radius:3px; font-size:11px; color:#a3f7b5;"><b>[상담사 답변]</b> ${s.reply}</div>`}
             </div>
         `).join('');
     }
