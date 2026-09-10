@@ -3204,7 +3204,7 @@
         saveDB(); updateUI();
     }
 
-   // --- 우주 쇼핑몰 ---
+  // --- 우주 쇼핑몰 ---
     let dealerCardValue = 7;
     function playHighLow(choice) {
         if (!currentUser) return;
@@ -3268,6 +3268,39 @@
             btnH.disabled = false; btnL.disabled = false;
             updateUI();
         }, 1500);
+    }
+    
+    function renderAlienShop() {
+        const container = document.getElementById('alien-items-container');
+        if (!container) return;
+        
+        let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
+        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
+        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+        unlocked = unlocked.filter(item => {
+            if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
+            if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+            return true;
+        });
+
+        if (unlocked.length === 0) {
+            container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
+            return;
+        }
+
+        container.innerHTML = unlocked.map(itemName => {
+            const item = ITEM_CATALOG[itemName];
+            const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
+            return `
+                <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
+                    <div>
+                        <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
+                        <span style="font-size:10px; color:#aaa;">${item.desc}</span>
+                    </div>
+                    <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
+                </div>
+            `;
+        }).join('');
     }
 
     function buyAlienItem(itemName, price) {
