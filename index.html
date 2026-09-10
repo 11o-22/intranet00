@@ -105,25 +105,6 @@
             100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5); }
         }
 
-        /* 특이사항 빛남 애니메이션 */
-        @keyframes textGlow {
-            from { text-shadow: 0 0 2px #fff, 0 0 4px #ffd700; color: #ffd700; }
-            to { text-shadow: 0 0 5px #fff, 0 0 12px #ff9800; color: #ffeb3b; }
-        }
-        .glow-text { animation: textGlow 1.5s infinite alternate; font-weight: bold; }
-
-        /* 타인 아이템 사용 시 초록 불빛 펄스 */
-        @keyframes greenGlowPulse {
-            0% { box-shadow: 0 0 8px #4CAF50, inset 0 0 8px #4CAF50; border-color: #4CAF50; color: #4CAF50; }
-            50% { box-shadow: 0 0 20px #4CAF50, inset 0 0 20px #4CAF50; border-color: #a3f7b5; color: #a3f7b5; }
-            100% { box-shadow: 0 0 8px #4CAF50, inset 0 0 8px #4CAF50; border-color: #4CAF50; color: #4CAF50; }
-        }
-        .notify-green-glow {
-            animation: greenGlowPulse 1.5s infinite alternate !important;
-            border: 2px solid #4CAF50 !important;
-            border-radius: 8px;
-        }
-
         /* 바람에 흩날리는 연출 (여우 상담실) */
         @keyframes gentle-sway {
             0% { transform: rotate(-1deg) scale(1) translateY(0); }
@@ -248,201 +229,43 @@
         body.theme-hanbok input, body.theme-hanbok select, body.theme-hanbok textarea { background-color: #ffffff !important; color: #1a2b3c !important; border-color: #8ca3b8 !important; }
         body.theme-hanbok input:focus, body.theme-hanbok select:focus, body.theme-hanbok textarea:focus { border-color: #3b5a7a !important; box-shadow: 0 0 5px rgba(59, 90, 122, 0.4) !important; }
 
-        /* 모달 디자인 오버라이드 (재난관리국 테마 시인성) */
-        body.theme-hanbok .modal-content { background-color: #f0f4f8 !important; border-color: #8ca3b8 !important; color: #1a2b3c !important; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        body.theme-hanbok .modal-content h3 { color: #0f1b29 !important; border-bottom-color: #8ca3b8 !important; font-weight: bold; }
-        body.theme-hanbok .modal-content .emp-list-card { background: #ffffff !important; border-color: #8ca3b8 !important; }
-        body.theme-hanbok .modal-content .emp-list-card:hover { background: #e5edf5 !important; border-color: #3b5a7a !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        body.theme-hanbok .modal-content .emp-list-title { color: #0f1b29 !important; }
-        body.theme-hanbok .modal-content .emp-list-sub { color: #2a4359 !important; font-weight: bold; }
+        /* 모달 전용 테마 (사원 열람용) - 배경 및 텍스트 대비 최적화 */
+        .modal-theme-black { background: linear-gradient(145deg, #161616, #0d0d0d) !important; color: #dcdcdc !important; border-color: #333 !important; }
+        .modal-theme-black .badge-table th { background: #222 !important; color: #bbb !important; border-color: #333 !important; }
+        .modal-theme-black .badge-table td { background: #111 !important; color: #eee !important; border-color: #333 !important; }
+        .modal-theme-black .emp-name { color: #fff !important; }
 
-        #pollution-overlay {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            pointer-events: none; z-index: 9999; transition: opacity 0.5s ease; opacity: 0;
-        }
-        .pollution-danger {
-            background: radial-gradient(circle, rgba(20,0,0,0.4) 40%, rgba(180,0,0,0.85) 100%);
-            animation: dangerPulse 1.8s infinite ease-in-out;
-        }
+        .modal-theme-white { background: linear-gradient(145deg, #ffffff, #f7f9fa) !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
+        .modal-theme-white .badge-table th { background: #e2e8f0 !important; color: #1e293b !important; border-color: #94a3b8 !important; }
+        .modal-theme-white .badge-table td { background: #f8fafc !important; color: #0f172a !important; border-color: #94a3b8 !important; }
+        .modal-theme-white .emp-name { color: #0f172a !important; }
+        .modal-theme-white .id-info-details .serial-row { color: #334155 !important; border-bottom-color: #cbd5e1 !important;}
 
-        #login-screen {
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            height: 100vh; padding: 20px; box-sizing: border-box;
-        }
-        #login-screen h2 { color: #888; margin-bottom: 30px; letter-spacing: 2px; font-weight: normal; }
-        .login-input-group { width: 100%; margin-bottom: 15px; }
-        .login-input-group input {
-            width: 100%; padding: 12px; background-color: #222 !important;
-            border: 1px solid #444 !important; color: #fff !important; box-sizing: border-box; font-size: 16px;
-            text-align: center; letter-spacing: 1px; border-radius: 0 !important;
-            background-image: none !important; box-shadow: none !important;
-        }
-        .login-input-group input:focus { border-color: #888 !important; box-shadow: none !important; }
-        .login-btn {
-            width: 100%; padding: 15px; background-color: #444;
-            color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px;
-            letter-spacing: 2px; border-radius: 4px; transition: background-color 0.3s;
-        }
-        .login-btn:hover { background-color: #555; }
+        .modal-theme-gold { background: linear-gradient(145deg, #1c1914, #0f0c0a) !important; color: #f3e5ab !important; border-color: #a68a3f !important; }
+        .modal-theme-gold .badge-table th { background: #2b2518 !important; color: #d4af37 !important; border-color: #5c4b1e !important; }
+        .modal-theme-gold .badge-table td { background: #1a150b !important; color: #f3e5ab !important; border-color: #5c4b1e !important; }
+        .modal-theme-gold .emp-name { color: #ffd700 !important; }
 
-        #main-screen, #admin-screen { display: none; padding: 15px; }
-        .header-info { font-size: 12px; color: #666; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between;}
-        
-        /* 사원증 디자인 고급화 */
-        .id-card-badge {
-            background: var(--theme-bg-grad, #1e1e1e);
-            border: 1px solid var(--theme-border, #444);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            position: relative;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.4);
-            overflow: hidden;
-            transition: box-shadow 0.3s, border-color 0.3s;
-        }
-        .id-card-badge::before {
-            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
-            background: var(--badge-top-line, linear-gradient(90deg, #444, #888, #444));
-            transition: background 0.3s ease;
-        }
-        .id-card-body {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 15px;
-            margin-top: 5px;
-        }
-        .id-avatar-mini {
-            width: 55px; height: 70px;
-            background: #2b2b2b; border: 1px solid #555; border-radius: 4px;
-            display: flex; justify-content: center; align-items: center;
-            overflow: hidden; font-size: 10px; color: #777; flex-shrink: 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-        .id-avatar-mini img { width: 100%; height: 100%; object-fit: cover; }
-        .id-info-details {
-            display: flex; flex-direction: column; justify-content: center; width: 100%;
-        }
-        .id-info-details .serial-row {
-            font-size: 11px; font-family: monospace; color: #aaa; margin-bottom: 4px; text-align: right;
-            border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;
-        }
-        .id-info-details .emp-name { font-size: 20px; font-weight: bold; color: inherit; margin-bottom: 2px; }
-        .id-info-details .emp-meta { font-size: 12px; color: #888; }
-        .emp-role-tag { font-size: 11px; color: #ffd700; background: rgba(255, 215, 0, 0.12); padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255, 215, 0, 0.3); margin-left: 4px; display: inline-block;}
+        .modal-theme-navy { background: linear-gradient(145deg, #132238, #0b1320) !important; color: #cbd5e1 !important; border-color: #1e3a8a !important; }
+        .modal-theme-navy .badge-table th { background: #1e3a8a !important; color: #93c5fd !important; border-color: #1e3a8a !important; }
+        .modal-theme-navy .badge-table td { background: #101c2e !important; color: #cbd5e1 !important; border-color: #1e3a8a !important; }
+        .modal-theme-navy .emp-name { color: #bfdbfe !important; }
 
-        .pollution-container { margin-bottom: 12px; }
-        .pollution-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; color: #aaa; }
-        .pollution-bar-bg { width: 100%; height: 8px; background-color: #222; border: 1px solid #444; border-radius: 4px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
-        .pollution-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #4CAF50, #ff9800, #f44336); transition: width 0.3s; }
+        .modal-theme-brown { background: linear-gradient(145deg, #2b1f17, #19120e) !important; color: #e7dcd1 !important; border-color: #8c5d3f !important; }
+        .modal-theme-brown .badge-table th { background: #3d2b1f !important; color: #d5bdaf !important; border-color: #593d2b !important; }
+        .modal-theme-brown .badge-table td { background: #211812 !important; color: #e7dcd1 !important; border-color: #593d2b !important; }
+        .modal-theme-brown .emp-name { color: #f5ebe0 !important; }
 
-        .status-section { display: flex; justify-content: space-between; margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; }
-        .status-item { display: flex; flex-direction: column; }
-        .status-label { font-size: 11px; color: #888; margin-bottom: 4px; font-weight: bold; }
-        .status-value { font-size: 18px; font-weight: bold; color: #ffd700; position: relative; }
-        .status-value span { font-size: 11px; color: #888; font-weight: normal; }
+        .modal-theme-hanbok { background: linear-gradient(145deg, #d9e2ec, #f0f4f8) !important; color: #1a2b3c !important; border-color: #8ca3b8 !important; }
+        .modal-theme-hanbok .badge-table th { background: #bcccdc !important; color: #1a2b3c !important; border-color: #8ca3b8 !important; }
+        .modal-theme-hanbok .badge-table td { background: #e5edf5 !important; color: #0f1b29 !important; border-color: #8ca3b8 !important; }
+        .modal-theme-hanbok .emp-name { color: #0f1b29 !important; }
+        .modal-theme-hanbok .id-info-details .serial-row { color: #2a4359 !important; border-bottom-color: #8ca3b8 !important;}
 
-        .action-buttons { display: flex; gap: 8px; margin-bottom: 15px; }
-        .action-buttons button { flex: 1; padding: 8px; background-color: transparent; border: 1px solid #555; color: #bbb; cursor: pointer; font-size: 12px; border-radius:4px; font-weight: bold; transition: all 0.2s;}
-        .action-buttons button:hover { background-color: rgba(255,255,255,0.1); color: #fff; }
-        .admin-access-btn { background-color: #551a1a !important; border: 1px solid #ff4c4c !important; color: #ff4c4c !important; }
-
-        .tabs-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #333; margin-bottom: 15px; border-radius: 4px; overflow: hidden; }
-        .tab { padding: 12px; text-align: center; border-right: 1px solid #333; border-bottom: 1px solid #333; color: #888; cursor: pointer; font-size: 13px; font-weight: bold; transition: all 0.2s;}
-        .tab:nth-child(even) { border-right: none; }
-        .tab.active { color: #fff; border-bottom: 2px solid var(--theme-focus); background: rgba(255,255,255,0.03); }
-        
-        .tab-content { display: none; text-align: center; padding: 15px 10px; border: 1px solid #333; border-radius: 4px; background: rgba(0,0,0,0.2); }
-        .tab-content.active { display: block; }
-
-        .sub-tabs-grid { display: flex; gap: 4px; margin-bottom: 15px; }
-        .sub-tab { flex: 1; padding: 8px 0; background: #222; border: 1px solid #444; color: #888; cursor: pointer; font-size: 11px; font-weight: bold; border-radius: 3px; transition: all 0.2s; }
-        .sub-tab.active { background: #333; color: #fff; border-color: #777; }
-
-        .sub-panel { display: none; background: #1a1a1a; padding: 12px 10px; border: 1px solid #333; border-radius: 4px; text-align: left; }
-        .sub-panel.active { display: block; }
-        .panel-title { font-size: 13px; color: #fff; margin-bottom: 12px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 6px; text-align: center; }
-        
-        .game-btn { background: linear-gradient(145deg, #555, #444); color: white; border: 1px solid #666; padding: 8px 14px; cursor: pointer; margin: 6px 3px; font-size: 13px; border-radius: 4px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.15s ease; }
-        .game-btn:hover { background: linear-gradient(145deg, #666, #555); transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.4); }
-        .game-btn:active { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-        .game-btn:disabled { background: #222; color: #555; border-color: #333; cursor: not-allowed; box-shadow: none; transform: none; }
-
-        .badge-photo-box { width: 130px; height: 160px; background-color: #222; margin: 0 auto 12px auto; border: 2px solid #555; border-radius: 6px; display: flex; justify-content: center; align-items: center; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .badge-photo-box img { width: 100%; height: 100%; object-fit: cover; }
-        .badge-photo-placeholder { color: #666; font-size: 11px; text-align: center; }
-        
-        /* 사원증 정보 테이블 고급화 */
-        .badge-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; border-radius: 6px; overflow: hidden; border: 1px solid #333; }
-        .badge-table th { width: 30%; background: linear-gradient(180deg, #222, #1a1a1a); border-bottom: 1px solid #333; border-right: 1px solid #333; padding: 10px 8px; color: #bbb; text-align: left; font-weight: normal; }
-        .badge-table td { background: rgba(20,20,20,0.8); border-bottom: 1px solid #333; padding: 10px 8px; color: #eee; }
-        .badge-table tr:last-child th, .badge-table tr:last-child td { border-bottom: none; }
-        
-        .status-tag { font-weight: bold; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
-        .inv-card { display: flex; justify-content: space-between; align-items: center; background: #222; border: 1px solid #444; padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .inv-card-name { font-weight: bold; color: #eee; }
-        .inv-card-qty { font-size: 11px; color: #ff9800; font-weight: bold; margin-left: 6px; background: rgba(255,152,0,0.1); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(255,152,0,0.3); }
-        .inv-btn-group { display: flex; gap: 6px; }
-        .inv-btn { padding: 5px 10px; font-size: 11px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .inv-btn:active { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-        .inv-btn-use { background: linear-gradient(145deg, #388e3c, #2e7d32); color: white; border-color: #1b5e20; }
-        .inv-btn-target { background: linear-gradient(145deg, #0284c7, #0369a1); color: white; border-color: #0c4a6e; }
-        .inv-btn-sell { background: linear-gradient(145deg, #555, #424242); color: #ddd; border-color: #333; }
-
-        .letter-card { background: #202020; border: 1px solid #3a3a3a; padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 12px; position: relative; }
-        .letter-meta { font-size: 10px; color: #ff9800; margin-bottom: 4px; }
-        .letter-body { color: #ddd; word-break: break-all; }
-
-        .history-item { background: #151515; border-left: 3px solid #555; padding: 8px 10px; margin-bottom: 6px; font-size: 11px; }
-        .history-time { color: #888; font-size: 9px; margin-bottom: 2px; }
-
-        .slot-simple-paytable { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; margin-bottom: 12px; background: #111; padding: 8px; border: 1px solid #333; text-align: center; font-weight: bold; border-radius: 4px; }
-        .slot-window { display: flex; justify-content: center; gap: 10px; margin: 15px 0; background: #000; padding: 15px; border: 2px solid #555; border-radius: 8px; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); }
-        .slot-box { width: 65px; height: 80px; background: #222; border: 2px solid #444; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 38px; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
-        .slot-rolling { animation: reelRoll 0.1s infinite linear; }
-        @keyframes reelRoll {
-            0% { transform: translateY(-10px); filter: blur(2px); }
-            50% { transform: translateY(0px); filter: blur(3px); }
-            100% { transform: translateY(10px); filter: blur(2px); }
-        }
-
-        .roulette-wrapper { position: relative; width: 190px; height: 190px; margin: 15px auto; }
-        .roulette-pointer { position: absolute; top: -10px; left: calc(50% - 10px); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 18px solid #ff4c4c; z-index: 10; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
-        .roulette-wheel-outer { width: 100%; height: 100%; border-radius: 50%; border: 4px solid #444; background: conic-gradient(#331111 0deg 90deg, #111 90deg 180deg, #331111 180deg 270deg, #111 270deg 360deg); display: flex; justify-content: center; align-items: center; transition: transform 3.5s cubic-bezier(0.15, 0.9, 0.2, 1); box-shadow: 0 0 15px rgba(0,0,0,0.8); }
-        .roulette-inner-hub { width: 100px; height: 100px; border-radius: 50%; background: #1c1c1c; border: 2px solid #666; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 28px; font-weight: bold; color: #ffd700; box-shadow: 0 0 8px rgba(0,0,0,0.6); }
-
-        .seotda-arena { background: #111; padding: 15px; border: 1px solid #333; margin-bottom: 12px; text-align: center; border-radius: 6px; }
-        .seotda-row { margin-bottom: 15px; }
-        .seotda-row-label { font-size: 11px; color: #888; margin-bottom: 8px; font-weight: bold; }
-        .seotda-cards-box { display: flex; justify-content: center; gap: 12px; }
-        .seotda-card { width: 55px; height: 80px; background: linear-gradient(145deg, #990000, #660000); border: 2px solid #ccc; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 22px; font-weight: bold; color: white; cursor: pointer; position: relative; user-select: none; box-shadow: 2px 3px 6px rgba(0,0,0,0.6); transition: transform 0.2s; }
-        .seotda-card.back { background: linear-gradient(145deg, #333, #222); border: 2px dashed #666; color: #555; }
-        .seotda-card.selected { border-color: #ffd700; box-shadow: 0 0 12px #ffd700; transform: translateY(-6px); }
-        .kwang-badge { position: absolute; top: 4px; right: 4px; font-size: 9px; background: #e50914; color: white; border-radius: 50%; width: 16px; height: 16px; display: flex; justify-content: center; align-items: center; border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-
-        /* 상점 버튼 및 아이템 고급화 */
-        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 12px 15px; margin-bottom: 10px; border: 1px solid #444; border-radius: 6px; font-size: 12px; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .shop-item span { color: #ddd; }
-        .shop-item button { padding: 8px 14px; background: linear-gradient(145deg, #444, #333); color: white; border: 1px solid #5a5a5a; cursor: pointer; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: bold; transition: all 0.15s ease; }
-        .shop-item button:active:not([disabled]) { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 5px rgba(0,0,0,0.6); background: #2a2a2a; border-color: #444; }
-        .shop-item button:disabled { background: #222; color: #555; border-color: #333; box-shadow: none; cursor: not-allowed; }
-        .shop-item.sold-out { filter: grayscale(1); opacity: 0.5; pointer-events: none; background: #1a1a1a; }
-
-        .ufo-display-box { text-align: center; margin: 15px 0 20px 0; cursor: pointer; }
-        .ufo-gif-wrapper { display: inline-block; animation: ufoFloating 2.5s infinite ease-in-out; filter: drop-shadow(0 0 10px rgba(0, 162, 232, 0.6)); }
-        @keyframes ufoFloating {
-            0% { transform: translateY(0px) rotate(0deg); }
-            25% { transform: translateY(-8px) rotate(3deg); }
-            50% { transform: translateY(-4px) rotate(-1deg); }
-            75% { transform: translateY(-10px) rotate(-2deg); }
-            100% { transform: translateY(0px) rotate(0deg); }
-        }
-        .ufo-dialogue-bubble {
-            background: rgba(0, 162, 232, 0.1); border: 1px solid #00A2E8; border-radius: 8px; padding: 10px 15px; font-size: 13px; font-weight: bold; color: #99D9EA; margin: 12px auto 0 auto; max-width: 85%; text-align: center; box-shadow: 0 0 12px rgba(0, 162, 232, 0.3); letter-spacing: 0.5px;
-        }
-
+        /* 모달 오버레이 우선순위 설정 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(2px); }
+        #emp-detail-modal { z-index: 10010 !important; } /* 사원 상세 열람은 가장 위로 */
+        
         .modal-content { background-color: #1a1a1a; padding: 25px; border: 1px solid #555; border-radius: 8px; width: 85%; max-width: 420px; box-sizing: border-box; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         .modal-content h3 { color: #fff; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 12px; margin-bottom: 15px; }
         .modal-btn-group { display: flex; gap: 10px; margin-top: 15px; }
@@ -536,7 +359,7 @@
 <!-- 여우 상담실 비밀 방 오버레이 -->
 <div id="fox-room-overlay" class="modal-overlay" style="display:none; z-index:9999999; background:#000;">
     <div style="position:relative; width:100%; max-width:450px; height:100vh; overflow:hidden; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#111;">
-        <img src="Patients must be equal partners in their healthcare.jfif" style="width:100%; height:auto; animation: gentle-sway 4s infinite ease-in-out; opacity:0.85; border-radius:12px; margin-bottom:25px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <img src="여우상담실.jpg" style="width:100%; height:auto; animation: gentle-sway 4s infinite ease-in-out; opacity:0.85; border-radius:12px; margin-bottom:25px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
         <div style="background:rgba(20,20,20,0.9); padding:25px; border:1px solid #d4af37; border-radius:8px; width:85%; box-sizing: border-box; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
             <div id="fox-room-dialogue" style="color:#eee; font-size:15px; margin-bottom:25px; line-height:1.7; word-break:keep-all;"></div>
             <div style="display:flex; gap:12px;">
@@ -575,7 +398,7 @@
     </div>
 </div>
 
-<!-- VIP 초대 수신 모달 (디자인 수정) -->
+<!-- VIP 초대 수신 모달 -->
 <div id="vip-invite-overlay" style="display:none;">
     <div class="luxury-alert-box">
         <h3 style="color:#ffd700; margin-top:0; letter-spacing:1px; font-size:18px;">⚔️ 1:1 대전 신청 도착</h3>
@@ -601,9 +424,10 @@
     </div>
 </div>
 
-<!-- 사원 상세 정보 열람 모달 -->
-<div id="emp-detail-modal" class="modal-overlay" style="display:none; z-index: 10000;">
-    <div class="modal-content" style="max-width: 420px; padding: 25px;">
+<!-- 사원 상세 정보 열람 모달 (Z-index 및 테마 적용) -->
+<div id="emp-detail-modal" class="modal-overlay" style="display:none; z-index: 10010;">
+    <!-- 내부 내용은 스크립트에서 동적으로 채움 -->
+    <div class="modal-content" id="emp-detail-content-box" style="max-width: 420px; padding: 25px;">
         <h3 style="margin-top:0;">사원 기록 카드</h3>
         <div id="emp-detail-card-container"></div>
         <div class="modal-btn-group" style="margin-top:20px;">
@@ -630,8 +454,8 @@
             <span id="session-timer">세션 00:00:00</span>
         </div>
 
-        <!-- 사원증 인터페이스 (구조 건드리지 않음) -->
-        <div class="id-card-badge" onclick="clearItemGlow()" style="cursor: pointer;">
+        <!-- 사원증 인터페이스 -->
+        <div class="id-card-badge">
             <div class="id-card-body">
                 <div class="id-avatar-mini" id="card-mini-photo">
                     <span>PHOTO</span>
@@ -689,7 +513,7 @@
         <!-- 1. 정보 열람 -->
         <div id="tab-record" class="tab-content active">
             <div class="sub-tabs-grid">
-                <button class="sub-tab active" onclick="switchRecordSubTab('rec-badge', this)">사원증</button>
+                <button class="sub-tab active" id="tab-btn-badge" onclick="switchRecordSubTab('rec-badge', this)">사원증</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-inventory', this)">소지품</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-history', this)">기록</button>
                 <button class="sub-tab" id="tab-btn-letters" onclick="switchRecordSubTab('rec-letters', this)">익명 편지</button>
@@ -726,7 +550,7 @@
                         <td><span id="badge-equipped-text" style="font-weight:bold; color:#d4af37;">없음</span></td>
                     </tr>
                     <tr>
-                        <th>특이사항</th>
+                        <th id="badge-notes-th" style="position:relative;">특이사항</th>
                         <td><span id="badge-notes-text" style="font-size:11px; word-break:break-all; display:block; line-height:1.4; transition: all 0.3s;">특이사항 없음</span></td>
                     </tr>
                     <tr>
@@ -924,7 +748,7 @@
                 <!-- 유쾌 판매소 -->
                 <div id="shop-regular" class="sub-panel active">
                     <div class="panel-title">[유쾌 판매소 - 금일 입고 물품]</div>
-                    <div style="font-size:10px; color:#888; margin-bottom:12px; text-align:center;">※ 10종 물품 중 5종 랜덤 입고</div>
+                    <div style="font-size:10px; color:#888; margin-bottom:12px; text-align:center;">※ 11종 물품 중 5종 랜덤 입고</div>
                     <div id="regular-shop-items-container"></div>
                 </div>
 
@@ -966,7 +790,7 @@
                             </div>
                         </div>
 
-                        <button class="game-btn" style="width:100%; margin-top:10px; padding:10px;" onclick="sendP2PDeal()">거래/양도 제안서 전달</button>
+                        <button class="game-btn" style="width:100%; margin:top:10px; padding:10px;" onclick="sendP2PDeal()">거래/양도 제안서 전달</button>
                     </div>
 
                     <div style="font-size:12px; color:var(--theme-text); margin-bottom: 8px; font-weight:bold; padding-bottom:4px; border-bottom:1px solid #333;">수신된 제안</div>
@@ -1155,12 +979,32 @@
     let activeVipSessionId = null;
     let myChoiceSubmitted = false;
 
+    // 여우 상담실 연쇄 질문용 전역 변수
+    let currentFoxSequence = 0;
+    let foxReductionTotal = 0;
+    let activeFoxQuestions = [];
+
     function getTodayStr() {
         const now = new Date();
         const y = now.getFullYear();
         const m = String(now.getMonth() + 1).padStart(2, '0');
         const d = String(now.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
+    }
+
+    // 모달 배경 테마 판별 함수
+    function getThemeClassForUser(user) {
+        const aff = (user.affiliation || "").trim();
+        const team = (user.team || "").trim();
+        const pos = (user.position || "").trim();
+
+        if (aff === "백일몽 주식회사" && team.includes("현장탐사")) return 'modal-theme-black';
+        if (team.includes("연구") || team.includes("개발")) return 'modal-theme-white';
+        if (pos.includes("이사") || aff.includes("이사진") || pos.includes("상담")) return 'modal-theme-gold';
+        if (team.includes("경비") || team.includes("보안")) return 'modal-theme-navy';
+        if (aff.includes("심야토크쇼") || team.includes("토크쇼")) return 'modal-theme-brown';
+        if (aff.includes("재난관리국") || team.includes("재난관리")) return 'modal-theme-hanbok';
+        return '';
     }
 
     let db = {
@@ -1170,7 +1014,7 @@
                 affiliation: "백일몽 주식회사", team: "현장탐사팀", position: "사원",
                 no: "4516", points: 30, pollution: 0, lastPollutionTime: Date.now(), 
                 facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: "", alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
                 badge: { photo: "", nickname: "기본사원", notes: "특이사항 없음" },
@@ -1181,7 +1025,7 @@
                 affiliation: "통제본부", team: "여우 상담실", position: "수석 상담사",
                 no: "0000", points: 99999, pollution: 0, lastPollutionTime: Date.now(), 
                 facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: true,
-                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
                 alienUnlockedItems: ["작두", "유리손포", "사과맛 물약", "제거약", "착한 친구"],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
@@ -1216,6 +1060,13 @@
                         if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
                         if(!data.users[key].alienBoughtItems) data.users[key].alienBoughtItems = [];
                         if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
+                        
+                        if (data.users[key].equippedWeapon) {
+                            data.users[key].equippedWeapons = [data.users[key].equippedWeapon];
+                            delete data.users[key].equippedWeapon;
+                        }
+                        if(!data.users[key].equippedWeapons) data.users[key].equippedWeapons = [];
+
                         if(data.users[key].bloodBathDailyUsedMs === undefined) data.users[key].bloodBathDailyUsedMs = 0;
                         if(data.users[key].hasItemUsedOnMe === undefined) data.users[key].hasItemUsedOnMe = false;
                         if(data.users[key].foxRoomAnswered === undefined) data.users[key].foxRoomAnswered = false;
@@ -1346,12 +1197,13 @@
         "착한 친구": { price: 999, usable: true, targetable: false, effect: "equip", desc: "귀여운 분홍색 토끼 봉제인형. 장착 가능하다." },
         "보안팀 의상 세트": { price: 800, usable: true, targetable: false, effect: "equip", desc: "보안팀의 의상 세트, 착용이 가능하다." },
         "작두": { price: 999, usable: true, targetable: false, effect: "equip", desc: "영험한 기운이 담겨있는 무기. 장착 가능하다." },
-        "유리손포": { price: 800, usable: true, targetable: false, effect: "equip", desc: "재난관리국 요원들의 기본 지급 무기. 장착 가능하다." }
+        "유리손포": { price: 800, usable: true, targetable: false, effect: "equip", desc: "재난관리국 요원들의 기본 지급 무기. 장착 가능하다." },
+        "낡은 문패": { price: 60, usable: true, targetable: false, effect: "reduce_fox_time", desc: "사용 시 여우상담실 격리 시간을 3시간 단축시킨다." }
     };
 
-    const ALL_10_ITEMS = [
+    const REGULAR_SHOP_ITEMS = [
         "익명 편지", "하급 물약", "샤베트", "안대", "생수",
-        "중급 물약", "???의 티켓", "무전기", "작은 데일밴드", "전복죽"
+        "중급 물약", "???의 티켓", "무전기", "작은 데일밴드", "전복죽", "낡은 문패"
     ];
 
     const ALIEN_ITEMS_POOL = [
@@ -1372,7 +1224,12 @@
         "하루가 즐거우셨나요?",
         "안 좋은 일은 없으셨나요?",
         "요즘 수면은 충분하신가요?",
-        "최근 스트레스를 받는 일이 있었나요?"
+        "최근 스트레스를 받는 일이 있었나요?",
+        "동료들과의 관계는 원만하신가요?",
+        "자신의 업무에 만족하시나요?",
+        "충분한 휴식을 취하고 계신가요?",
+        "자신의 감정을 잘 통제하고 계신가요?",
+        "요즘 불안하거나 초조함을 느끼시나요?"
     ];
 
     function setUFODialogue(text) {
@@ -1416,12 +1273,12 @@
     function getShopCycleKey() { return getTodayStr(); }
 
     function getToday5ShopItems() {
-        if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
+        if (currentUser && currentUser.code === 'kario0987') return REGULAR_SHOP_ITEMS;
         const userCodeStr = currentUser ? currentUser.code : "default";
         const cycleKey = getShopCycleKey() + userCodeStr; 
         let seed = 0;
         for (let i = 0; i < cycleKey.length; i++) seed += cycleKey.charCodeAt(i) * (i + 1);
-        let shuffled = [...ALL_10_ITEMS].sort((a, b) => {
+        let shuffled = [...REGULAR_SHOP_ITEMS].sort((a, b) => {
             let r1 = Math.sin(seed + a.length * 13 + a.charCodeAt(0)) * 10000;
             let r2 = Math.sin(seed + b.length * 13 + b.charCodeAt(0)) * 10000;
             return (r1 - Math.floor(r1)) - (r2 - Math.floor(r2));
@@ -1439,7 +1296,7 @@
     }
 
     function isBlindfolded(user) {
-        if (user.equippedWeapon === "혈욕조") return true;
+        if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) return true;
         return user.blindfoldUntil && Date.now() < user.blindfoldUntil;
     }
 
@@ -1449,12 +1306,13 @@
         const diffMs = now - user.lastPollutionTime;
         const threeHoursMs = 3 * 60 * 60 * 1000;
 
-        if (user.equippedWeapon === "혈욕조") {
+        if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) {
             if(!user.bloodBathDailyUsedMs) user.bloodBathDailyUsedMs = 0;
             if(user.bloodBathEquippedAt) {
                 let equippedDuration = now - user.bloodBathEquippedAt;
                 if(user.bloodBathDailyUsedMs + equippedDuration >= threeHoursMs) {
-                    user.equippedWeapon = null;
+                    const idx = user.equippedWeapons.indexOf("혈욕조");
+                    if (idx !== -1) user.equippedWeapons.splice(idx, 1);
                     user.inventory.push("혈욕조");
                     user.bloodBathDailyUsedMs = threeHoursMs;
                     appendSystemBadgeNote("혈욕조 하루 이용 시간(3시간) 초과로 장착이 해제되었습니다.");
@@ -1467,6 +1325,19 @@
             const steps = Math.floor(diffMs / threeHoursMs);
             if (!isBlindfolded(user)) user.pollution = Math.min(100, user.pollution + (steps * 3));
             user.lastPollutionTime += steps * threeHoursMs;
+            saveDB();
+        }
+
+        // 여우 상담실 격리 종료 감지 시 오염도 20% 안정화 로직
+        if (user.quarantineUntil > 0 && Date.now() > user.quarantineUntil) {
+            user.quarantineUntil = 0;
+            user.pollution = 20;
+            user.lastPollutionTime = Date.now();
+            user.foxRoomAnswered = false;
+            addHistoryLog(user, `[격리 해제] 여우 상담실에서 퇴원 (오염도 20%로 안정화)`);
+            if (currentUser && user.code === currentUser.code) {
+                showCustomAlert("여우 상담실에서의 치료가 끝났습니다. 오염도가 20%로 안정화되어 현장으로 복귀합니다.");
+            }
             saveDB();
         }
     }
@@ -1595,6 +1466,13 @@
         const u = db.users[code];
         if (!u) return;
         const container = document.getElementById('emp-detail-card-container');
+        const contentBox = document.getElementById('emp-detail-content-box');
+        
+        // 대상 유저 소속에 맞는 테마 클래스 교체
+        contentBox.className = "modal-content"; // 리셋
+        const themeClass = getThemeClassForUser(u);
+        if(themeClass) contentBox.classList.add(themeClass);
+
         const photoSrc = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
         const statusInfo = getPollutionStatusInfo(u.pollution);
         
@@ -1602,27 +1480,28 @@
         if (currentUser.code === 'kario0987' && u.letters && u.letters.length > 0) {
             lettersHtml = `<div style="margin-top:15px; border-top:1px dashed #444; padding-top:15px;">
                 <div style="font-size:12px; color:#ff9800; font-weight:bold; margin-bottom:8px;">[수신된 익명 편지 - 열람 권한: 1급]</div>
-                ${u.letters.map(l => `<div style="background:#111; padding:8px; margin-bottom:6px; font-size:11px; border-radius:4px; border:1px solid #333;">발신: <span style="color:#aaa;">${l.fromName || '알수없음'}(${l.fromCode || '??'})</span><br><span style="color:#ddd; display:block; margin-top:4px;">${l.content}</span></div>`).join('')}
+                ${u.letters.map(l => `<div style="background:rgba(0,0,0,0.5); padding:8px; margin-bottom:6px; font-size:11px; border-radius:4px; border:1px solid #333;">발신: <span style="color:#aaa;">${l.fromName || '알수없음'}(${l.fromCode || '??'})</span><br><span style="color:#ddd; display:block; margin-top:4px;">${l.content}</span></div>`).join('')}
             </div>`;
         }
 
         const notes = (u.badge && u.badge.notes) ? u.badge.notes : "특이사항 없음";
         const isGlowing = (u.noteGlowUntil && Date.now() < u.noteGlowUntil) ? 'glow-text' : '';
+        const eqText = (u.equippedWeapons && u.equippedWeapons.length > 0) ? u.equippedWeapons.join(', ') : "없음";
 
         container.innerHTML = `
-            <div class="id-card-badge" style="background:#1e1e1e; margin-top:10px; box-shadow:none; border-color:#555;">
+            <div class="id-card-badge" style="background:transparent; margin-top:10px; box-shadow:none; border-color:inherit;">
                 <div class="id-card-body">
                     <div class="id-avatar-mini">${photoSrc}</div>
                     <div class="id-info-details">
-                        <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
-                        <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
-                        <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
+                        <div class="serial-row" style="color:inherit; border-color:inherit;">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
+                        <div class="emp-name" style="color:inherit;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
+                        <div class="emp-meta" style="color:inherit;">${u.affiliation || '본사'} · ${u.team}</div>
                     </div>
                 </div>
                 <table class="badge-table" style="margin-top:15px;">
                     <tr><th>닉네임</th><td>${(u.badge && u.badge.nickname) ? u.badge.nickname : u.name}</td></tr>
                     <tr><th>보유 포인트</th><td style="font-weight:bold; color:#ffd700;">${u.points} P</td></tr>
-                    <tr><th>장착 장비</th><td><span style="color:#d4af37; font-weight:bold;">${u.equippedWeapon || '없음'}</span></td></tr>
+                    <tr><th>장착 장비</th><td><span style="color:#d4af37; font-weight:bold;">${eqText}</span></td></tr>
                     <tr><th>현재 상태</th><td><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
                     <tr><th>특이사항</th><td class="${isGlowing}" style="word-break:break-all; font-size:11px; line-height:1.4;">${notes}</td></tr>
                 </table>
@@ -1717,30 +1596,48 @@
         document.getElementById('fox-loading-overlay').style.display = 'flex';
         setTimeout(() => {
             document.getElementById('fox-loading-overlay').style.display = 'none';
-            let q = foxQuestions[Math.floor(Math.random() * foxQuestions.length)];
-            let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
-            document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요?<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
-            document.getElementById('fox-room-overlay').style.display = 'flex';
+            activeFoxQuestions = [...foxQuestions].sort(() => 0.5 - Math.random()).slice(0, 5);
+            currentFoxSequence = 0;
+            foxReductionTotal = 0;
+            showNextFoxQuestion();
         }, 3000);
     }
 
+    function showNextFoxQuestion() {
+        if (currentFoxSequence >= 5) {
+            finishFoxRoomSequence();
+            return;
+        }
+        let q = activeFoxQuestions[currentFoxSequence];
+        let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
+        // 사용자님 설정에 맞추어 여우 상담실 호칭 '님'을 '당신'으로 표기
+        document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 당신은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요? (${currentFoxSequence + 1}/5)<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
+        document.getElementById('fox-room-overlay').style.display = 'flex';
+    }
+
     function answerFoxQuestion(answer) {
-        let hoursOptions = [6, 18, 24];
-        let hours = hoursOptions[Math.floor(Math.random() * hoursOptions.length)];
-        currentUser.quarantineUntil = Date.now() + (hours * 60 * 60 * 1000);
+        if (answer === 'yes') {
+            foxReductionTotal += 3.6;
+        } else {
+            foxReductionTotal += 1.2;
+        }
+        currentFoxSequence++;
+        showNextFoxQuestion();
+    }
+
+    function finishFoxRoomSequence() {
+        let finalHours = 24 - foxReductionTotal;
+        currentUser.quarantineUntil = Date.now() + (finalHours * 60 * 60 * 1000);
         currentUser.foxRoomAnswered = true;
         saveDB();
         document.getElementById('fox-room-overlay').style.display = 'none';
         updateUI();
-        showCustomAlert(`상담이 완료되었습니다. 시스템 판단에 따라 ${hours}시간 동안 안정을 취해주세요.`);
+        showCustomAlert(`상담이 완료되었습니다. 시스템 평가에 따라 ${finalHours.toFixed(1)}시간 동안 안정을 취해주세요.`);
     }
 
     function clearItemGlow() {
-        if (currentUser && currentUser.hasItemUsedOnMe) {
-            currentUser.hasItemUsedOnMe = false;
-            saveDB();
-            updateUI();
-        }
+        // 더이상 메인 사원증 영역 클릭 시 아이템 타겟 확인으로 간주하지 않고, 
+        // 탭 전환 등 명시적으로 '사원증' 탭을 확인할 때만 지워지도록 변경.
     }
 
     function updateUI() {
@@ -1760,7 +1657,7 @@
             currentUser.ticketAddedDate = currentToday; currentUser.ticketAddedCount = 0;
             saveDB();
         }
-        if (currentUser.bloodBathEquippedAt && currentUser.equippedWeapon === "혈욕조") {
+        if (currentUser.bloodBathEquippedAt && currentUser.equippedWeapons && currentUser.equippedWeapons.includes("혈욕조")) {
             const todayStr = new Date(currentUser.bloodBathEquippedAt).toLocaleDateString();
             if(todayStr !== new Date().toLocaleDateString()) {
                 currentUser.bloodBathDailyUsedMs = 0;
@@ -1788,17 +1685,6 @@
             currentUser.foxRoomAnswered = false;
         }
 
-        // 아이템 타겟 효과에 따른 사원증 빛남 연출
-        const idCardEl = document.querySelector('.id-card-badge');
-        const noteTextEl = document.getElementById('badge-notes-text');
-        if (currentUser.hasItemUsedOnMe) {
-            idCardEl.classList.add('notify-green-glow');
-            noteTextEl.classList.add('notify-green-glow');
-        } else {
-            idCardEl.classList.remove('notify-green-glow');
-            noteTextEl.classList.remove('notify-green-glow');
-        }
-
         const rationInfoMsg = document.getElementById('ration-info-msg');
         if (isQuarantined(currentUser)) {
             const remainH = Math.ceil((currentUser.quarantineUntil - Date.now()) / (1000 * 60 * 60));
@@ -1824,16 +1710,15 @@
         document.getElementById('badge-affiliation-text').innerText = currentUser.affiliation || "본사";
         document.getElementById('badge-team-text').innerText = currentUser.team;
         document.getElementById('badge-position-text').innerText = currentUser.position || "사원";
-        document.getElementById('badge-equipped-text').innerText = currentUser.equippedWeapon || "없음";
+        
+        const eqText = (currentUser.equippedWeapons && currentUser.equippedWeapons.length > 0) ? currentUser.equippedWeapons.join(', ') : "없음";
+        document.getElementById('badge-equipped-text').innerText = eqText;
         
         const noteGlowClass = (currentUser.noteGlowUntil && Date.now() < currentUser.noteGlowUntil) ? 'glow-text' : '';
         const noteEl = document.getElementById('badge-notes-text');
         noteEl.innerText = (currentUser.badge && currentUser.badge.notes) ? currentUser.badge.notes : "특이사항 없음";
         
-        // 아이템 사용 점등 효과가 우선 적용되도록 처리
-        if (!currentUser.hasItemUsedOnMe) {
-            noteEl.className = noteGlowClass;
-        }
+        noteEl.className = noteGlowClass;
 
         const statusInfo = getPollutionStatusInfo(currentUser.pollution);
         const statusEl = document.getElementById('badge-current-status');
@@ -1875,6 +1760,16 @@
         if (currentUser.hasNewReply) btnSuggestion.classList.add('notify-dot');
         else btnSuggestion.classList.remove('notify-dot');
 
+        const tabBtnBadge = document.getElementById('tab-btn-badge');
+        const badgeNotesTh = document.getElementById('badge-notes-th');
+        if (currentUser.hasItemUsedOnMe) {
+            tabBtnBadge.classList.add('notify-dot');
+            badgeNotesTh.classList.add('notify-dot');
+        } else {
+            tabBtnBadge.classList.remove('notify-dot');
+            badgeNotesTh.classList.remove('notify-dot');
+        }
+
         const btnAdminConsole = document.getElementById('btn-admin-console');
         if (currentUser.code === 'kario0987') {
             const hasPendingSuggestion = db.suggestions && db.suggestions.some(s => s.status === 'PENDING');
@@ -1902,6 +1797,9 @@
         if (panelId === 'rec-letters' && currentUser.hasNewLetter) {
             currentUser.hasNewLetter = false; saveDB(); updateUI();
         }
+        if (panelId === 'rec-badge' && currentUser.hasItemUsedOnMe) {
+            currentUser.hasItemUsedOnMe = false; saveDB(); updateUI();
+        }
     }
 
     function switchGamePanel(panelId, btnEl) {
@@ -1925,6 +1823,7 @@
         if (!currentUser.history) currentUser.history = [];
         if (!currentUser.letters) currentUser.letters = [];
         if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
+        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
         document.getElementById('badge-nickname').value = currentUser.badge.nickname || "";
         document.getElementById('badge-notes-text').innerText = currentUser.badge.notes || "특이사항 없음";
         renderBadgePhoto(currentUser.badge.photo);
@@ -1965,16 +1864,19 @@
         return Math.max(1, Math.floor(basePrice / 4));
     }
 
-    function unequipWeapon() {
-        if (!currentUser.equippedWeapon) return;
-        if (currentUser.equippedWeapon === "혈욕조") {
+    function unequipWeapon(itemName) {
+        if (!currentUser.equippedWeapons || !currentUser.equippedWeapons.includes(itemName)) return;
+        const idx = currentUser.equippedWeapons.indexOf(itemName);
+        
+        if (itemName === "혈욕조") {
             let equippedDuration = Date.now() - (currentUser.bloodBathEquippedAt || Date.now());
             if(!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
             currentUser.bloodBathDailyUsedMs += equippedDuration;
         }
-        currentUser.inventory.push(currentUser.equippedWeapon);
-        addHistoryLog(currentUser, `[장착 해제] ${currentUser.equippedWeapon} 해제 완료`);
-        currentUser.equippedWeapon = null;
+        
+        currentUser.equippedWeapons.splice(idx, 1);
+        currentUser.inventory.push(itemName);
+        addHistoryLog(currentUser, `[장착 해제] ${itemName} 해제 완료`);
         saveDB(); updateUI();
     }
 
@@ -2038,16 +1940,16 @@
     function renderInventory() {
         const container = document.getElementById('inventory-list-container');
         let html = '';
-        if (currentUser.equippedWeapon) {
-            html += `
+        if (currentUser.equippedWeapons && currentUser.equippedWeapons.length > 0) {
+            html += currentUser.equippedWeapons.map(eq => `
                 <div style="background:#2b2b2b; border:1px solid #d4af37; padding:10px; margin-bottom:12px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
                     <div>
                         <span style="font-size:10px; color:#d4af37; font-weight:bold;">[현재 장착 중]</span>
-                        <span style="font-weight:bold; color:#fff; font-size:13px; margin-left:6px;">${currentUser.equippedWeapon}</span>
+                        <span style="font-weight:bold; color:#fff; font-size:13px; margin-left:6px;">${eq}</span>
                     </div>
-                    <button onclick="unequipWeapon()" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333);">장착 해제</button>
+                    <button onclick="unequipWeapon('${eq}')" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333);">장착 해제</button>
                 </div>
-            `;
+            `).join('');
         }
         
         let counts = {};
@@ -2105,8 +2007,17 @@
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
             }
-            if (currentUser.equippedWeapon) unequipWeapon();
-            currentUser.equippedWeapon = itemName;
+            if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+            if (currentUser.equippedWeapons.length >= 3) {
+                showCustomAlert("장비는 최대 3개까지만 장착할 수 있습니다. 기존 장비를 해제해주세요.");
+                return;
+            }
+            if (currentUser.equippedWeapons.includes(itemName)) {
+                showCustomAlert("이미 장착하고 있는 장비입니다.");
+                return;
+            }
+            
+            currentUser.equippedWeapons.push(itemName);
             if(cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[장비 장착] ${itemName} 장착 완료`);
@@ -2143,6 +2054,14 @@
         if (cat.effect === 'heal') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - cat.value);
+        } else if (cat.effect === 'reduce_fox_time') {
+            if (targetUser.quarantineUntil && targetUser.quarantineUntil > Date.now()) {
+                targetUser.quarantineUntil -= 3 * 60 * 60 * 1000;
+                appendBadgeNoteToUser(targetUser, `낡은 문패 사용 (격리 시간 3시간 단축)`);
+            } else {
+                if(!isOthers) showCustomAlert('현재 여우상담실에 격리되어 있지 않습니다.');
+                return false;
+            }
         } else if (cat.effect === 'candy') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - 60);
@@ -3128,7 +3047,7 @@
             code: code, name: name, affiliation: aff, team: team, position: pos,
             no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
             facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
             alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
             inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
             badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
