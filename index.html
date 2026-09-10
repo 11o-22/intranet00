@@ -1496,6 +1496,36 @@
     function isBlindfolded(user) {
         if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) return true;
         return user.blindfoldUntil && Date.now() < user.blindfoldUntil;
+        
+    }
+    // ★ [추가] 은반지 및 버터 나이프 장착 여부 및 만료 체크 함수
+    function getPollutionMultiplier(user) {
+        if (!user.equippedWeapons) return 1; // 장착한 무기가 없으면 기본 배율(1배)
+        
+        // 은반지 착용 중이고 아직 120시간이 안 지났다면 오염도 증가율 0 (완전 차단)
+        if (user.equippedWeapons.includes("은반지")) {
+            if (user.silverRingExpireTime && Date.now() < user.silverRingExpireTime) {
+                return 0; 
+            } else if (user.silverRingExpireTime && Date.now() >= user.silverRingExpireTime) {
+                // 시간이 다 되면 은반지 파괴 및 인벤토리/장착에서 제거
+                let idx = user.equippedWeapons.indexOf("은반지");
+                if (idx > -1) user.equippedWeapons.splice(idx, 1);
+                addHistoryLog(user, `[장비 파괴] 은반지의 수명(120시간)이 다 되어 부서져 사라졌습니다.`);
+            }
+        }
+        
+        // 버터 나이프 착용 중이고 시간이 안 지났다면 오염도 증가율 0.5 (절반 감소)
+        if (user.equippedWeapons.includes("버터 나이프")) {
+            if (user.butterKnifeExpireTime && Date.now() < user.butterKnifeExpireTime) {
+                return 0.5;
+            } else if (user.butterKnifeExpireTime && Date.now() >= user.butterKnifeExpireTime) {
+                let idx = user.equippedWeapons.indexOf("버터 나이프");
+                if (idx > -1) user.equippedWeapons.splice(idx, 1);
+                addHistoryLog(user, `[장비 해제] 버터 나이프의 효과 시간(1시간)이 종료되었습니다.`);
+            }
+        }
+        
+        return 1;
     }
 
     function checkPassivePollution(user) {
@@ -1534,18 +1564,45 @@
             }
         }
 
+        // ★ [추가] 노스텔지어 끈 장착 중일 때 5분마다 오염도 1%씩 자동 감소
+    if (user.nostalgiaUntil && Date.now() < user.nostalgiaUntil) {
+        if (!user.nostalgiaLastReduced) user.nostalgiaLastReduced = Date.now();
+        const fiveMinutesMs = 5 * 60 * 1000;
+        const elapsedNostalgiaTime = Date.now() - user.nostalgiaLastReduced;
+        
+        if (elapsedNostalgiaTime >= fiveMinutesMs && user.pollution > 0) {
+            const steps = Math.floor(elapsedNostalgiaTime / fiveMinutesMs);
+            user.pollution = Math.max(0, user.pollution - steps);
+            user.nostalgiaLastReduced += steps * fiveMinutesMs;
+            saveDB();
+        }
+    } else if (user.nostalgiaUntil && Date.now() >= user.nostalgiaUntil) {
+        user.nostalgiaUntil = 0;
+        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 끈이 해제되었습니다.`);
+        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 효과 종료`);
+        saveDB();
+    }
+
         if (diffMs >= threeHoursMs && user.pollution < 100 && user.quarantineUntil === 0) {
             const steps = Math.floor(diffMs / threeHoursMs);
-            if (!isBlindfolded(user)) user.pollution = Math.min(100, user.pollution + (steps * 3));
+            if (!isBlindfolded(user)) {
+                // ★ [수정] 기본 오염도 증가량에 방어막 배율 곱하기 적용
+                let baseInc = steps * 3;
+                let finalInc = Math.round(baseInc * getPollutionMultiplier(user));
+                user.pollution = Math.min(100, user.pollution + finalInc);
+            }
             user.lastPollutionTime += steps * threeHoursMs;
             saveDB();
         }
-    }
 
     function addPollution(amount) {
         if (!currentUser || currentUser.code === 'kario0987') return; 
         if (isBlindfolded(currentUser)) return;
-        currentUser.pollution = Math.min(100, currentUser.pollution + amount);
+        let finalAmount = Math.round(amount * getPollutionMultiplier(currentUser));
+        if (finalAmount <= 0) return;
+        
+        // ★ [수정] amount 대신 방어막이 적용된 finalAmount를 더해야 합니다!
+        currentUser.pollution = Math.min(100, currentUser.pollution + finalAmount);
         saveDB();
         updateUI();
     }
@@ -1553,7 +1610,12 @@
     function applyPollutionToUser(user, amount) {
         if (!user || user.code === 'kario0987') return; 
         if (isBlindfolded(user)) return;
-        user.pollution = Math.min(100, user.pollution + amount);
+        
+        // ★ [추가] 타인에게 오염도를 줄 때도 방어막(은반지, 나이프) 적용
+        let finalAmount = Math.round(amount * getPollutionMultiplier(user));
+        if (finalAmount <= 0) return;
+
+        user.pollution = Math.min(100, user.pollution + finalAmount);
         if (user.pollution >= 100) {
             if (!user.quarantineUntil || Date.now() > user.quarantineUntil) {
                 user.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
@@ -2155,6 +2217,24 @@
             addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
             addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
         }
+        // ★ [추가] 노스텔지어 끈 장착 중일 때 5분마다 오염도 1%씩 자동 감소
+    if (user.nostalgiaUntil && Date.now() < user.nostalgiaUntil) {
+        if (!user.nostalgiaLastReduced) user.nostalgiaLastReduced = Date.now();
+        const fiveMinutesMs = 5 * 60 * 1000;
+        const elapsedNostalgiaTime = Date.now() - user.nostalgiaLastReduced;
+        
+        if (elapsedNostalgiaTime >= fiveMinutesMs && user.pollution > 0) {
+            const steps = Math.floor(elapsedNostalgiaTime / fiveMinutesMs);
+            user.pollution = Math.max(0, user.pollution - steps);
+            user.nostalgiaLastReduced += steps * fiveMinutesMs;
+            saveDB();
+        }
+    } else if (user.nostalgiaUntil && Date.now() >= user.nostalgiaUntil) {
+        user.nostalgiaUntil = 0;
+        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 끈이 해제되었습니다.`);
+        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 효과 종료`);
+        saveDB();
+    }
 
         removeItemFromInventory(currentUser, item, 1);
         saveDB(); updateUI(); closeItemTargetModal();
