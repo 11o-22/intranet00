@@ -3204,16 +3204,20 @@
         saveDB(); updateUI();
     }
 
-    // --- 우주 쇼핑몰 ---
+   // --- 우주 쇼핑몰 ---
     let dealerCardValue = 7;
     function playHighLow(choice) {
         if (!currentUser) return;
         if (currentUser.alienDate !== getTodayStr()) {
-            currentUser.alienDate = getTodayStr(); currentUser.alienTries = 0; currentUser.alienUnlockedItems = []; currentUser.alienBoughtItems = [];
+            currentUser.alienDate = getTodayStr(); 
+            currentUser.alienTries = 0; 
+            currentUser.alienUnlockedItems = []; 
+            currentUser.alienBoughtItems = [];
         }
         if (currentUser.code !== 'kario0987' && currentUser.alienTries >= 2) return;
-        if (currentUser.alienTries >= 2) return;
-        const btnH = document.getElementById('btn-hl-high'); const btnL = document.getElementById('btn-hl-low');
+        
+        const btnH = document.getElementById('btn-hl-high'); 
+        const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
 
         let playerCardValue = Math.floor(Math.random() * 13) + 1;
@@ -3224,7 +3228,7 @@
         let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
         currentUser.alienTries = (currentUser.alienTries || 0) + 1;
 
-       if (win) {
+        if (win) {
             setUFODialogue("……. ");
             msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>`;
             if (!currentUser.alienUnlockedItems) currentUser.alienUnlockedItems = [];
@@ -3232,23 +3236,16 @@
             const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
             const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
             
-            // ★ [추가] 과장급 이상인지 확인
             const allowedRanks = ["과장", "차장", "부장", "이사", "대표", "사장"];
             const isHighRank = allowedRanks.includes(currentUser.rank) || currentUser.code === 'kario0987';
             
-            // ★ [추가] 보안/경비팀인지 확인
             const isSecurityTeam = currentUser.team.includes("보안팀") || currentUser.team.includes("경비팀") || currentUser.code === 'kario0987';
 
             let availablePool = ALIEN_ITEMS_POOL.filter(item => {
                 if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
                 if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
-                
-                // ★ [추가] 과장급 전용 물품 차단 로직
                 if (["버터 나이프", "은반지", "빨간 리본", "고급진 술", "금고"].includes(item) && !isHighRank) return false;
-                
-                // ★ [추가] 보안/경비팀 전용 물품 차단 로직
                 if (item === "노스텔지어 끈" && !isSecurityTeam) return false;
-                
                 return true;
             });
 
@@ -3262,6 +3259,7 @@
             msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
             addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배`);
         }
+        
         saveDB();
         setTimeout(() => {
             dealerCardValue = Math.floor(Math.random() * 13) + 1;
@@ -3271,39 +3269,6 @@
             updateUI();
         }, 1500);
     }
-    
-    function renderAlienShop() {
-        const container = document.getElementById('alien-items-container');
-        if (!container) return;
-        
-        let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
-        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
-        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
-        unlocked = unlocked.filter(item => {
-            if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
-            if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
-            return true;
-        });
-
-        if (unlocked.length === 0) {
-            container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
-            return;
-        }
-
-        container.innerHTML = unlocked.map(itemName => {
-            const item = ITEM_CATALOG[itemName];
-            const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
-            return `
-                <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
-                    <div>
-                        <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
-                        <span style="font-size:10px; color:#aaa;">${item.desc}</span>
-                    </div>
-                    <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
-                </div>
-            `;
-        }).join('');
-    }
 
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
@@ -3312,15 +3277,16 @@
             return; 
         }
         if (currentUser.points < price) { showLuxuryAlert(); return; }
+        
         currentUser.points -= price; 
         currentUser.inventory.push(itemName);
         currentUser.alienBoughtItems.push(itemName);
         
         addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
         setUFODialogue("훌륭한 거래였습니다.");
-        saveDB(); updateUI();
+        saveDB(); 
+        updateUI();
     }
-
     function useFacility(bet) {
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
