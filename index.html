@@ -457,6 +457,8 @@
         /* 고급진 알림/승부 모달 (VIP) - 세련된 팝업 디자인 */
         #luxury-alert-overlay, #vip-invite-overlay, #vip-game-overlay, #fox-nameplate-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(8px);
+            touch-action: none;
+            overflow: hidden;
         }
         .luxury-alert-box {
             background: rgba(15, 15, 15, 0.95); border: 1px solid #ffd700; border-radius: 12px; width: 85%; max-width: 340px; padding: 30px; box-sizing: border-box; text-align: center; box-shadow: 0 15px 40px rgba(255, 215, 0, 0.15), inset 0 0 20px rgba(0,0,0,0.8);
