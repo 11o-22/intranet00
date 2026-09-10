@@ -3211,6 +3211,7 @@
         if (currentUser.alienDate !== getTodayStr()) {
             currentUser.alienDate = getTodayStr(); currentUser.alienTries = 0; currentUser.alienUnlockedItems = []; currentUser.alienBoughtItems = [];
         }
+        if (currentUser.code !== 'kario0987' && currentUser.alienTries >= 2) return;
         if (currentUser.alienTries >= 2) return;
         const btnH = document.getElementById('btn-hl-high'); const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
@@ -3306,9 +3307,11 @@
 
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
-        if (currentUser.alienBoughtItems.includes(itemName)) { showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); return; }
+        if (currentUser.code !== 'kario0987' && currentUser.alienBoughtItems.includes(itemName)) { 
+            showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); 
+            return; 
+        }
         if (currentUser.points < price) { showLuxuryAlert(); return; }
-        
         currentUser.points -= price; 
         currentUser.inventory.push(itemName);
         currentUser.alienBoughtItems.push(itemName);
