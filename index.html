@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -476,7 +476,8 @@
         <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
     </div>
 
-    <div id="main-screen">
+    <!-- main-screen 초기 로드 시 안전하게 감추기 위해 style 인라인 처리 -->
+    <div id="main-screen" style="display: none; padding: 15px;">
         <div class="header-info">
             <span>■■주 ■사 - 보안 인트라넷 (접속: <span id="online-users-count" style="color:#4CAF50; font-weight:bold;">1</span>명)</span>
             <span id="session-timer">세션 00:00:00</span>
@@ -902,7 +903,7 @@
     </div>
 
     <!-- 통제 콘솔 (상담사 전용) -->
-    <div id="admin-screen">
+    <div id="admin-screen" style="display: none; padding: 15px;">
         <div class="admin-header">[보안 통제 콘솔] 인사 발령 및 등록 사원 관리</div>
         
         <div class="admin-panel-box">
@@ -1639,6 +1640,7 @@
         }
         let q = activeFoxQuestions[currentFoxSequence];
         let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
+        // 사용자님 설정에 맞추어 여우 상담실 호칭 '님'
         document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요? (${currentFoxSequence + 1}/5)<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
         document.getElementById('fox-room-overlay').style.display = 'flex';
     }
@@ -2683,829 +2685,595 @@
             addHistoryLog(winUser, `[VIP 실시간 대전 승리] ${loseUser.name}에게 +${session.bet} P`);
             addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
 
-            resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! 
-            function renderVipOpponents() {
-            const listContainer = document.getElementById('vip-online-users-container');
-            const sel = document.getElementById('vip-opponent-select');
-            if (!sel || !listContainer) return;
-            let opts = '<option value="">-- 접속 중인 사원 선택 --</option>';
-            let listHtml = '';
-            for (let code in onlineUsersMap) {
-                let u = db.users[code];
-                if (u && code !== 'kario0987') {
-                    if (code !== currentUser.code) {
-                        opts += `<option value="${code}">[🟢 접속중] ${u.name} (사번: ${u.no})</option>`;
-                    }
-                    listHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:4px; padding:8px; background:rgba(255,255,255,0.05); border-radius:4px; border-left:3px solid #4CAF50;">
-                        <span>🟢 ${u.name} [${u.team}]</span>
-                        <span style="font-family:monospace; color:var(--theme-focus); font-weight:bold;">${u.points} P</span>
-                    </div>`;
-                }
-            }
-            sel.innerHTML = opts;
-            listContainer.innerHTML = listHtml || '<div style="text-align:center; padding:10px 0;">접속 중인 다른 VIP 사원이 없습니다.</div>';
+            resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
+            
+            session.winnerCode = winUser.code;
+            session.winAmount = session.bet;
         }
+        session.resultText = resultText;
+        saveDB();
+    }
 
-        function selectVipGameType(type) {
-            currentVipGameType = type;
-            document.querySelectorAll('.vip-nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`btn-vgame-${type}`).classList.add('active');
+    function closeVipGameOverlay() {
+        if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
+            const s = db.vipSessions[activeVipSessionId];
+            if (s.state === 'FINISHED' && s.winnerCode === currentUser.code) showPointGainEffect(s.winAmount);
         }
+        document.getElementById('vip-game-overlay').style.display = 'none';
+        myChoiceSubmitted = false;
+    }
 
-        function sendVipInvite() {
-            const oppCode = document.getElementById('vip-opponent-select').value;
-            const bet = parseInt(document.getElementById('vip-bet-input').value);
-
-            if (!oppCode) { showCustomAlert('초대할 사원을 선택해주세요.'); return; }
-            const opponent = db.users[oppCode];
-            if (!opponent || !onlineUsersMap[oppCode]) { showCustomAlert('해당 사원이 현재 접속 중이지 않습니다.'); return; }
-            if (isNaN(bet) || bet < 100) { showCustomAlert('VIP 라운지의 최소 베팅 포인트는 100 P 입니다.'); return; }
-            if (currentUser.points < bet) { showLuxuryAlert(); return; }
-            if (opponent.points < bet) { showCustomAlert(`상대방(${opponent.name})의 포인트가 부족하여 신청할 수 없습니다.`); return; }
-
-            const inviteId = "inv_" + Date.now() + "_" + Math.floor(Math.random()*1000);
-            db.vipInvites[inviteId] = { id: inviteId, from: currentUser.code, fromName: currentUser.name, to: oppCode, game: currentVipGameType, bet: bet, timestamp: Date.now() };
-            saveDB();
-            showCustomAlert(`[${opponent.name}] 사원에게 대전 신청을 보냈습니다. 수락을 대기합니다.`);
-        }
-
-        function showVipInviteModal(invite) {
-            const gameNames = { 'dice': '주사위', 'rps': '가위바위보', 'updown': '업다운' };
-            document.getElementById('vip-invite-text').innerHTML = `
-                <span style="color:#ffd700; font-size:16px; font-weight:bold;">${invite.fromName}</span> 사원님이 1:1 승부를 요청했습니다.<br><br>
-                종목: <b style="color:#fff;">${gameNames[invite.game]}</b><br>
-                판돈: <b style="color:#ff4c4c;">${invite.bet} P</b>
-            `;
-            document.getElementById('vip-invite-overlay').style.display = 'flex';
-        }
-        function closeVipInviteModal() { document.getElementById('vip-invite-overlay').style.display = 'none'; }
-
-        function acceptVipInvite() {
-            const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
-            if (!inv) { closeVipInviteModal(); return; }
-            if (currentUser.points < inv.bet) { showCustomAlert("포인트가 부족하여 수락할 수 없습니다."); delete db.vipInvites[inv.id]; saveDB(); closeVipInviteModal(); return; }
-            delete db.vipInvites[inv.id];
-            const sessId = "sess_" + Date.now() + "_" + Math.floor(Math.random()*1000);
-            db.vipSessions[sessId] = {
-                id: sessId, p1: inv.from, p2: currentUser.code, game: inv.game, bet: inv.bet, targetNumber: Math.floor(Math.random() * 999) + 1,
-                state: 'WAITING', startTime: Date.now() + 2000, endTime: Date.now() + 5000 
-            };
-            saveDB(); closeVipInviteModal();
-        }
-
-        function rejectVipInvite() {
-            const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
-            if (inv) { delete db.vipInvites[inv.id]; saveDB(); }
-            closeVipInviteModal();
-        }
-
-        function checkVipMultiplayerState() {
-            if (db.vipInvites) {
-                let myInvite = Object.values(db.vipInvites).find(inv => inv.to === currentUser.code);
-                if (myInvite && currentInviteId !== myInvite.id) {
-                    currentInviteId = myInvite.id; showVipInviteModal(myInvite);
-                } else if (!myInvite && currentInviteId) {
-                    currentInviteId = null; closeVipInviteModal();
-                }
-            }
-            if (db.vipSessions) {
-                let mySession = Object.values(db.vipSessions).find(sess => sess.p1 === currentUser.code || sess.p2 === currentUser.code);
-                if (mySession) {
-                    activeVipSessionId = mySession.id; renderVipGameOverlay(mySession);
-                } else if (!mySession && activeVipSessionId) {
-                    activeVipSessionId = null; closeVipGameOverlay();
-                }
-            } else {
-                if (activeVipSessionId) { activeVipSessionId = null; closeVipGameOverlay(); }
-            }
-        }
-
-        function renderVipGameOverlay(session) {
-            document.getElementById('vip-game-overlay').style.display = 'flex';
-            const isP1 = session.p1 === currentUser.code;
-            const oppCode = isP1 ? session.p2 : session.p1;
-            const oppName = db.users[oppCode] ? db.users[oppCode].name : '상대방';
-            const gameNames = { 'dice': '주사위 (합산)', 'rps': '가위바위보', 'updown': '업다운 (단판)' };
-
-            document.getElementById('vip-game-title').innerText = `[${gameNames[session.game]}] vs ${oppName}`;
-            const area = document.getElementById('vip-game-area');
-            const statusEl = document.getElementById('vip-game-status');
-
-            if (myChoiceSubmitted && session.state === 'WAITING') {
-                area.innerHTML = '<div style="font-size:16px; color:#4CAF50; margin: 20px 0; text-align:center;">선택 완료! 판정 대기 중...</div>';
-            } else if (session.state === 'WAITING') {
-                if (session.game === 'dice') {
-                    area.innerHTML = `
-                        <div style="margin:20px 0;">
-                            <button class="luxury-alert-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button>
-                        </div>
-                    `;
-                } else if (session.game === 'rps') {
-                    area.innerHTML = `
-                        <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
-                            <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
-                            <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
-                            <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button>
-                        </div>
-                    `;
-                } else if (session.game === 'updown') {
-                    area.innerHTML = `
-                        <div style="margin:10px 0;">
-                            <div style="font-size:13px; color:var(--theme-text); margin-bottom:8px; text-align:center;">시스템이 정한 비밀 숫자에 가장 가까운 숫자를 적으세요! (1~999)</div>
-                            <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; box-sizing: border-box;" placeholder="숫자 입력">
-                            <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button>
-                        </div>
-                    `;
-                }
-            }
-
-            if (session.state === 'WAITING') {
-                statusEl.innerText = "3초 내에 선택을 완료하세요!";
-                
-                // 승부 판정 (둘 다 입력했거나 시간 초과 시 강제 평가)
-                if (session.p1Choice != null && session.p2Choice != null) {
-                    if (isP1) evaluateVipMultiResult(session); // 중복 실행 방지를 위해 방장(P1)이 주로 평가
-                }
-                
-                // 타임 오버 시 강제 처리 (상대방이 튕기거나 미입력 시 무한정지 방지)
-                if (Date.now() > session.endTime + 1000) {
-                    if (isP1) { // P1이 연결되어 있다면 P1이 처리
-                        if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
-                        if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
-                        evaluateVipMultiResult(session);
-                    } else if (Date.now() > session.endTime + 3000) {
-                        // P1이 3초 넘게 처리 안하면 오프라인으로 간주하고 P2가 강제 처리
-                        if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
-                        if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
-                        evaluateVipMultiResult(session);
-                    }
-                }
-            } else if (session.state === 'FINISHED') {
-                statusEl.innerHTML = `<span style="color:#fff; font-size:15px; line-height:1.6;">${session.resultText}</span>`;
-                document.getElementById('vip-game-timer').innerText = "-";
-                
-                if (!session.closeTimerStarted) {
-                    session.closeTimerStarted = true;
-                    setTimeout(() => {
-                        closeVipGameOverlay();
-                        if (isP1) {
-                            delete db.vipSessions[session.id];
-                            saveDB();
-                        }
-                    }, 4000);
-                }
-            }
-        }
-
-        function generateRandomChoice(game) {
-            if (game === 'dice') return Math.floor(Math.random()*11) + 2; 
-            if (game === 'rps') return ['가위','바위','보'][Math.floor(Math.random()*3)];
-            if (game === 'updown') return Math.floor(Math.random()*999) + 1;
-            return 0;
-        }
-
-        function submitVipChoice(choice) {
-            if (!activeVipSessionId || !db.vipSessions[activeVipSessionId]) return;
-            myChoiceSubmitted = true;
+    setInterval(() => {
+        if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
             let session = db.vipSessions[activeVipSessionId];
-            if (session.p1 === currentUser.code) session.p1Choice = choice;
-            else session.p2Choice = choice;
-            saveDB();
-            
-            // 제출 즉시 두 명 모두 선택했으면 평가 실행
-            if (session.p1Choice != null && session.p2Choice != null) {
-                evaluateVipMultiResult(session);
-            }
-        }
-
-        function evaluateVipMultiResult(session) {
-            if (session.state === 'FINISHED') return;
-            session.state = 'FINISHED';
-
-            let p1User = db.users[session.p1];
-            let p2User = db.users[session.p2];
-            let p1c = session.p1Choice;
-            let p2c = session.p2Choice;
-            let winner = 'draw';
-            
-            let targetNumText = session.game === 'updown' ? `(비밀숫자: ${session.targetNumber})<br>` : '';
-
-            if (session.game === 'dice') {
-                if (p1c > p2c) winner = 'p1'; else if (p2c > p1c) winner = 'p2';
-            } else if (session.game === 'rps') {
-                if (p1c === p2c) winner = 'draw';
-                else if ((p1c === '가위' && p2c === '보') || (p1c === '바위' && p2c === '가위') || (p1c === '보' && p2c === '바위')) winner = 'p1';
-                else winner = 'p2';
-            } else if (session.game === 'updown') {
-                let d1 = Math.abs(session.targetNumber - p1c); let d2 = Math.abs(session.targetNumber - p2c);
-                if (d1 < d2) winner = 'p1'; else if (d2 < d1) winner = 'p2';
-            }
-
-            let resultText = `${targetNumText}[나] ${p1User.name}: <b style="color:#ffd700;">${p1c}</b> <br> [상대] ${p2User.name}: <b style="color:#ffd700;">${p2c}</b><br><br>`;
-            
-            if (winner === 'draw') {
-                resultText += `무승부! 베팅금이 유지됩니다.`;
-            } else {
-                let winUser = winner === 'p1' ? p1User : p2User;
-                let loseUser = winner === 'p1' ? p2User : p1User;
+            if (session.state === 'WAITING') {
+                let remaining = Math.max(0, Math.ceil((session.endTime - Date.now()) / 1000));
+                document.getElementById('vip-game-timer').innerText = remaining;
                 
-                winUser.points += session.bet;
-                loseUser.points -= session.bet;
-                applyPollutionToUser(winUser, 3);
-                applyPollutionToUser(loseUser, 5);
-
-                addHistoryLog(winUser, `[VIP 실시간 대전 승리] ${loseUser.name}에게 +${session.bet} P`);
-                addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
-
-                resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
-                
-                session.winnerCode = winUser.code;
-                session.winAmount = session.bet;
-            }
-            session.resultText = resultText;
-            saveDB();
-        }
-
-        function closeVipGameOverlay() {
-            if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
-                const s = db.vipSessions[activeVipSessionId];
-                if (s.state === 'FINISHED' && s.winnerCode === currentUser.code) showPointGainEffect(s.winAmount);
-            }
-            document.getElementById('vip-game-overlay').style.display = 'none';
-            myChoiceSubmitted = false;
-        }
-
-        setInterval(() => {
-            if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
-                let session = db.vipSessions[activeVipSessionId];
-                if (session.state === 'WAITING') {
-                    let remaining = Math.max(0, Math.ceil((session.endTime - Date.now()) / 1000));
-                    document.getElementById('vip-game-timer').innerText = remaining;
-                    
-                    if (remaining <= 0 && !myChoiceSubmitted) {
-                        let autoPick = generateRandomChoice(session.game);
-                        submitVipChoice(autoPick);
-                    }
+                if (remaining <= 0 && !myChoiceSubmitted) {
+                    let autoPick = generateRandomChoice(session.game);
+                    submitVipChoice(autoPick);
                 }
             }
-        }, 500);
+        }
+    }, 500);
 
-        // --- 1:1 밀실 거래 ---
-        function checkP2PExpiration() {
-            if (!db.p2pDeals) db.p2pDeals = [];
-            const now = Date.now();
-            const EXPIRY_MS = 24 * 60 * 60 * 1000;
-            let changed = false;
-            db.p2pDeals.forEach(deal => {
-                if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
-                    deal.status = 'EXPIRED'; changed = true;
-                    const sender = db.users[deal.fromCode];
-                    if (sender) {
-                        if (deal.offerType === 'point') sender.points += deal.offerValue;
-                        else {
-                            for(let i=0; i<deal.offerQty; i++) sender.inventory.push(deal.offerValue);
-                        }
-                        addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되어 회수되었습니다.`);
+    // --- 1:1 밀실 거래 ---
+    function checkP2PExpiration() {
+        if (!db.p2pDeals) db.p2pDeals = [];
+        const now = Date.now();
+        const EXPIRY_MS = 24 * 60 * 60 * 1000;
+        let changed = false;
+        db.p2pDeals.forEach(deal => {
+            if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
+                deal.status = 'EXPIRED'; changed = true;
+                const sender = db.users[deal.fromCode];
+                if (sender) {
+                    if (deal.offerType === 'point') sender.points += deal.offerValue;
+                    else {
+                        for(let i=0; i<deal.offerQty; i++) sender.inventory.push(deal.offerValue);
                     }
-                }
-            });
-            if (changed) saveDB();
-        }
-        function toggleP2PDealMode() {
-            const mode = document.getElementById('p2p-deal-mode').value;
-            document.getElementById('p2p-demand-wrapper').style.display = (mode === 'trade') ? 'block' : 'none';
-        }
-        function toggleP2POfferType() {
-            const type = document.getElementById('p2p-offer-type').value;
-            const itemSelect = document.getElementById('p2p-offer-item');
-            const pointsInput = document.getElementById('p2p-offer-points');
-            const qtyInput = document.getElementById('p2p-offer-qty');
-            if (type === 'item') { itemSelect.style.display = 'inline-block'; pointsInput.style.display = 'none'; qtyInput.style.display = 'inline-block';}
-            else { itemSelect.style.display = 'none'; pointsInput.style.display = 'inline-block'; qtyInput.style.display = 'none';}
-        }
-        function toggleP2PDemandType() {
-            const type = document.getElementById('p2p-demand-type').value;
-            const demandPoints = document.getElementById('p2p-demand-points');
-            const demandItem = document.getElementById('p2p-demand-item');
-            const qtyInput = document.getElementById('p2p-demand-qty');
-            if (type === 'point') { demandPoints.style.display = 'inline-block'; demandItem.style.display = 'none'; qtyInput.style.display = 'none'; }
-            else { demandPoints.style.display = 'none'; demandItem.style.display = 'inline-block'; qtyInput.style.display = 'inline-block'; }
-        }
-        function renderP2PSelectBoxes() {
-            const targetSelect = document.getElementById('p2p-target-user');
-            let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
-            for (let code in db.users) {
-                let u = db.users[code];
-                if (u.code !== 'kario0987' && u.no !== currentUser.no) targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
-            }
-            targetSelect.innerHTML = targetOpts;
-            const offerItemSelect = document.getElementById('p2p-offer-item');
-            
-            let counts = {};
-            if (currentUser.inventory) currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
-            let uniqueItems = Object.keys(counts);
-
-            if (uniqueItems.length === 0) offerItemSelect.innerHTML = '<option value="">(보유 소지품 없음)</option>';
-            else offerItemSelect.innerHTML = uniqueItems.map((item) => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
-            
-            const demandItemSelect = document.getElementById('p2p-demand-item');
-            demandItemSelect.innerHTML = Object.keys(ITEM_CATALOG).map(name => `<option value="${name}">${name}</option>`).join('');
-        }
-
-        function sendP2PDeal() {
-            const targetCode = document.getElementById('p2p-target-user').value;
-            if (!targetCode) return;
-            const targetUser = db.users[targetCode];
-            const dealMode = document.getElementById('p2p-deal-mode').value;
-            const offerType = document.getElementById('p2p-offer-type').value;
-            let offerValue;
-            let offerQty = 1;
-
-            if (offerType === 'item') {
-                const itemName = document.getElementById('p2p-offer-item').value;
-                offerQty = parseInt(document.getElementById('p2p-offer-qty').value) || 1;
-                if (!itemName) return;
-                
-                let count = currentUser.inventory.filter(it => it === itemName).length;
-                if (count < offerQty) { showCustomAlert("소지품 수량이 부족합니다."); return; }
-                
-                offerValue = itemName;
-                removeItemFromInventory(currentUser, itemName, offerQty);
-            } else {
-                const pts = parseInt(document.getElementById('p2p-offer-points').value);
-                if (isNaN(pts) || pts <= 0) return;
-                if (pts > currentUser.points) { showLuxuryAlert(); return; }
-                currentUser.points -= pts; offerValue = pts;
-            }
-
-            let demandType = null; let demandValue = null; let demandQty = 1;
-            if (dealMode === 'trade') {
-                demandType = document.getElementById('p2p-demand-type').value;
-                if (demandType === 'point') {
-                    const dPts = parseInt(document.getElementById('p2p-demand-points').value);
-                    if (isNaN(dPts) || dPts <= 0) {
-                        if (offerType === 'item') { for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); } else currentUser.points += offerValue; return;
-                    }
-                    demandValue = dPts;
-                } else {
-                    demandValue = document.getElementById('p2p-demand-item').value;
-                    demandQty = parseInt(document.getElementById('p2p-demand-qty').value) || 1;
+                    addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되어 회수되었습니다.`);
                 }
             }
-
-            if (!db.p2pDeals) db.p2pDeals = [];
-            db.p2pDeals.unshift({
-                id: Date.now(), fromCode: currentUser.code, fromName: currentUser.name, fromNo: currentUser.no,
-                toCode: targetCode, toName: targetUser.name, toNo: targetUser.no, mode: dealMode,
-                offerType: offerType, offerValue: offerValue, offerQty: offerQty, 
-                demandType: demandType, demandValue: demandValue, demandQty: demandQty,
-                status: 'PENDING', createdAt: Date.now()
-            });
-
-            const desc = (dealMode === 'give') ? `양도 제안` : `교환 제안`;
-            addHistoryLog(currentUser, `[밀실 제안] ${targetUser.name}(NO.${targetUser.no}) 대상 ${desc} 전송`);
-            saveDB(); updateUI();
+        });
+        if (changed) saveDB();
+    }
+    function toggleP2PDealMode() {
+        const mode = document.getElementById('p2p-deal-mode').value;
+        document.getElementById('p2p-demand-wrapper').style.display = (mode === 'trade') ? 'block' : 'none';
+    }
+    function toggleP2POfferType() {
+        const type = document.getElementById('p2p-offer-type').value;
+        const itemSelect = document.getElementById('p2p-offer-item');
+        const pointsInput = document.getElementById('p2p-offer-points');
+        const qtyInput = document.getElementById('p2p-offer-qty');
+        if (type === 'item') { itemSelect.style.display = 'inline-block'; pointsInput.style.display = 'none'; qtyInput.style.display = 'inline-block';}
+        else { itemSelect.style.display = 'none'; pointsInput.style.display = 'inline-block'; qtyInput.style.display = 'none';}
+    }
+    function toggleP2PDemandType() {
+        const type = document.getElementById('p2p-demand-type').value;
+        const demandPoints = document.getElementById('p2p-demand-points');
+        const demandItem = document.getElementById('p2p-demand-item');
+        const qtyInput = document.getElementById('p2p-demand-qty');
+        if (type === 'point') { demandPoints.style.display = 'inline-block'; demandItem.style.display = 'none'; qtyInput.style.display = 'none'; }
+        else { demandPoints.style.display = 'none'; demandItem.style.display = 'inline-block'; qtyInput.style.display = 'inline-block'; }
+    }
+    function renderP2PSelectBoxes() {
+        const targetSelect = document.getElementById('p2p-target-user');
+        let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
+        for (let code in db.users) {
+            let u = db.users[code];
+            if (u.code !== 'kario0987' && u.no !== currentUser.no) targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
         }
-        function renderP2PLists() {
-            checkP2PExpiration();
-            const receivedList = document.getElementById('p2p-received-list');
-            const sentList = document.getElementById('p2p-sent-list');
-            if (!receivedList || !sentList) return;
-            const allDeals = db.p2pDeals || [];
-            const myReceived = allDeals.filter(d => d.toCode === currentUser.code && d.status === 'PENDING');
-            const mySent = allDeals.filter(d => d.fromCode === currentUser.code && d.status === 'PENDING');
-
-            if (myReceived.length === 0) receivedList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">도착한 제안이 없습니다.</div>';
-            else {
-                receivedList.innerHTML = myReceived.map(deal => {
-                    const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
-                    const demandDesc = (deal.mode === 'give') ? `<span style="color:#4CAF50;">무상 양도 (대가 없음)</span>` : (deal.demandType === 'point' ? `${deal.demandValue} P 요구` : `'${deal.demandValue}' x${deal.demandQty} 요구`);
-                    return `
-                        <div class="shop-item">
-                            <div>
-                                <span style="font-weight:bold;">[제공] ${offerDesc}</span><br>
-                                <span style="font-size:10px; color:#aaa;">발신: ${deal.fromName} | ${demandDesc}</span>
-                            </div>
-                            <div style="display:flex; gap:4px;">
-                                <button onclick="acceptP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #4CAF50, #388e3c); color:white; border:1px solid #2e7d32; padding:6px 10px; font-size:11px;">수락</button>
-                                <button onclick="rejectP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #f44336, #d32f2f); color:white; border:1px solid #b71c1c; padding:6px 10px; font-size:11px;">거절</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            if (mySent.length === 0) sentList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">대기 중인 보낸 제안이 없습니다.</div>';
-            else {
-                sentList.innerHTML = mySent.map(deal => {
-                    const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
-                    return `
-                        <div class="shop-item">
-                            <div>
-                                <span style="font-weight:bold;">수신: ${deal.toName}</span><br>
-                                <span style="font-size:10px; color:#aaa;">제물: ${offerDesc}</span>
-                            </div>
-                            <button onclick="cancelP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #555, #444); color:white; border:1px solid #333; padding:6px 10px; font-size:11px;">철회</button>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-        function acceptP2PDeal(dealId) {
-            checkP2PExpiration();
-            const deal = db.p2pDeals.find(d => d.id === dealId);
-            if (!deal || deal.status !== 'PENDING') return;
-
-            const sender = db.users[deal.fromCode];
-            if (deal.mode === 'trade') {
-                if (deal.demandType === 'point') {
-                    let p = parseInt(deal.demandValue);
-                    if (isNaN(p)) return;
-                    if (currentUser.points < p) { showLuxuryAlert(); return; }
-                    currentUser.points -= p; 
-                    if (sender) sender.points += p;
-                } else {
-                    let reqQty = deal.demandQty || 1;
-                    let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
-                    if (count < reqQty) { showCustomAlert("요구하는 소지품 수량이 부족합니다."); return; }
-                    removeItemFromInventory(currentUser, deal.demandValue, reqQty);
-                    if (sender) {
-                        for(let i=0; i<reqQty; i++) sender.inventory.push(deal.demandValue);
-                    }
-                }
-            }
-            
-            if (deal.offerType === 'point') winPoints(parseInt(deal.offerValue) || 0);
-            else {
-                for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue);
-            }
-
-            deal.status = 'COMPLETED';
-            addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
-            if (sender) addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
-            saveDB(); updateUI();
-        }
-        function rejectP2PDeal(dealId) {
-            const deal = db.p2pDeals.find(d => d.id === dealId);
-            if (!deal || deal.status !== 'PENDING') return;
-            deal.status = 'REJECTED';
-            const sender = db.users[deal.fromCode];
-            if (sender) {
-                if (deal.offerType === 'point') sender.points += deal.offerValue; 
-                else { for(let i=0; i<(deal.offerQty||1); i++) sender.inventory.push(deal.offerValue); }
-                addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
-            }
-            addHistoryLog(currentUser, `[밀실 거절] ${deal.fromName} 사원의 제안 거절`);
-            saveDB(); updateUI();
-        }
-        function cancelP2PDeal(dealId) {
-            const deal = db.p2pDeals.find(d => d.id === dealId);
-            if (!deal || deal.status !== 'PENDING') return;
-            deal.status = 'CANCELLED';
-            if (deal.offerType === 'point') currentUser.points += deal.offerValue;
-            else { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
-            addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`);
-            saveDB(); updateUI();
-        }
-
-        // --- 우주 쇼핑몰 ---
-        let dealerCardValue = 7;
-        function playHighLow(choice) {
-            if (!currentUser) return;
-            if (currentUser.alienDate !== getTodayStr()) {
-                currentUser.alienDate = getTodayStr(); currentUser.alienTries = 0; currentUser.alienUnlockedItems = []; currentUser.alienBoughtItems = [];
-            }
-            if (currentUser.alienTries >= 2) return;
-            const btnH = document.getElementById('btn-hl-high'); const btnL = document.getElementById('btn-hl-low');
-            btnH.disabled = true; btnL.disabled = true;
-
-            let playerCardValue = Math.floor(Math.random() * 13) + 1;
-            while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 13) + 1; }
-            document.getElementById('hl-player-card').innerText = playerCardValue;
-            const msgEl = document.getElementById('hl-msg');
-
-            let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
-            currentUser.alienTries = (currentUser.alienTries || 0) + 1;
-
-            if (win) {
-                setUFODialogue("……. ");
-                msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>`;
-                if (!currentUser.alienUnlockedItems) currentUser.alienUnlockedItems = [];
-                const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
-                const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
-                let availablePool = ALIEN_ITEMS_POOL.filter(item => {
-                    if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
-                    if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
-                    return true;
-                });
-                let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
-                if (unpicked.length === 0) unpicked = [...availablePool];
-                let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
-                shuffled.slice(0, 3).forEach(it => { if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it); });
-                addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리`);
-            } else {
-                setUFODialogue(" 좋은 물건을 산다. ");
-                msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
-                addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배`);
-            }
-            saveDB();
-            setTimeout(() => {
-                dealerCardValue = Math.floor(Math.random() * 13) + 1;
-                document.getElementById('hl-dealer-card').innerText = dealerCardValue;
-                document.getElementById('hl-player-card').innerText = "?";
-                btnH.disabled = false; btnL.disabled = false;
-                updateUI();
-            }, 1500);
-        }
+        targetSelect.innerHTML = targetOpts;
+        const offerItemSelect = document.getElementById('p2p-offer-item');
         
-        function renderAlienShop() {
-            const container = document.getElementById('alien-items-container');
-            if (!container) return;
+        let counts = {};
+        if (currentUser.inventory) currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        let uniqueItems = Object.keys(counts);
+
+        if (uniqueItems.length === 0) offerItemSelect.innerHTML = '<option value="">(보유 소지품 없음)</option>';
+        else offerItemSelect.innerHTML = uniqueItems.map((item) => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
+        
+        const demandItemSelect = document.getElementById('p2p-demand-item');
+        demandItemSelect.innerHTML = Object.keys(ITEM_CATALOG).map(name => `<option value="${name}">${name}</option>`).join('');
+    }
+
+    function sendP2PDeal() {
+        const targetCode = document.getElementById('p2p-target-user').value;
+        if (!targetCode) return;
+        const targetUser = db.users[targetCode];
+        const dealMode = document.getElementById('p2p-deal-mode').value;
+        const offerType = document.getElementById('p2p-offer-type').value;
+        let offerValue;
+        let offerQty = 1;
+
+        if (offerType === 'item') {
+            const itemName = document.getElementById('p2p-offer-item').value;
+            offerQty = parseInt(document.getElementById('p2p-offer-qty').value) || 1;
+            if (!itemName) return;
             
-            let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
-            const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
-            const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
-            unlocked = unlocked.filter(item => {
-                if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
-                if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
-                return true;
-            });
+            let count = currentUser.inventory.filter(it => it === itemName).length;
+            if (count < offerQty) { showCustomAlert("소지품 수량이 부족합니다."); return; }
+            
+            offerValue = itemName;
+            removeItemFromInventory(currentUser, itemName, offerQty);
+        } else {
+            const pts = parseInt(document.getElementById('p2p-offer-points').value);
+            if (isNaN(pts) || pts <= 0) return;
+            if (pts > currentUser.points) { showLuxuryAlert(); return; }
+            currentUser.points -= pts; offerValue = pts;
+        }
 
-            if (unlocked.length === 0) {
-                container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
-                return;
+        let demandType = null; let demandValue = null; let demandQty = 1;
+        if (dealMode === 'trade') {
+            demandType = document.getElementById('p2p-demand-type').value;
+            if (demandType === 'point') {
+                const dPts = parseInt(document.getElementById('p2p-demand-points').value);
+                if (isNaN(dPts) || dPts <= 0) {
+                    if (offerType === 'item') { for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); } else currentUser.points += offerValue; return;
+                }
+                demandValue = dPts;
+            } else {
+                demandValue = document.getElementById('p2p-demand-item').value;
+                demandQty = parseInt(document.getElementById('p2p-demand-qty').value) || 1;
             }
+        }
 
-            container.innerHTML = unlocked.map(itemName => {
-                const item = ITEM_CATALOG[itemName];
-                const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
+        if (!db.p2pDeals) db.p2pDeals = [];
+        db.p2pDeals.unshift({
+            id: Date.now(), fromCode: currentUser.code, fromName: currentUser.name, fromNo: currentUser.no,
+            toCode: targetCode, toName: targetUser.name, toNo: targetUser.no, mode: dealMode,
+            offerType: offerType, offerValue: offerValue, offerQty: offerQty, 
+            demandType: demandType, demandValue: demandValue, demandQty: demandQty,
+            status: 'PENDING', createdAt: Date.now()
+        });
+
+        const desc = (dealMode === 'give') ? `양도 제안` : `교환 제안`;
+        addHistoryLog(currentUser, `[밀실 제안] ${targetUser.name}(NO.${targetUser.no}) 대상 ${desc} 전송`);
+        saveDB(); updateUI();
+    }
+    function renderP2PLists() {
+        checkP2PExpiration();
+        const receivedList = document.getElementById('p2p-received-list');
+        const sentList = document.getElementById('p2p-sent-list');
+        if (!receivedList || !sentList) return;
+        const allDeals = db.p2pDeals || [];
+        const myReceived = allDeals.filter(d => d.toCode === currentUser.code && d.status === 'PENDING');
+        const mySent = allDeals.filter(d => d.fromCode === currentUser.code && d.status === 'PENDING');
+
+        if (myReceived.length === 0) receivedList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">도착한 제안이 없습니다.</div>';
+        else {
+            receivedList.innerHTML = myReceived.map(deal => {
+                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
+                const demandDesc = (deal.mode === 'give') ? `<span style="color:#4CAF50;">무상 양도 (대가 없음)</span>` : (deal.demandType === 'point' ? `${deal.demandValue} P 요구` : `'${deal.demandValue}' x${deal.demandQty} 요구`);
                 return `
-                    <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
+                    <div class="shop-item">
                         <div>
-                            <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
-                            <span style="font-size:10px; color:#aaa;">${item.desc}</span>
+                            <span style="font-weight:bold;">[제공] ${offerDesc}</span><br>
+                            <span style="font-size:10px; color:#aaa;">발신: ${deal.fromName} | ${demandDesc}</span>
                         </div>
-                        <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
+                        <div style="display:flex; gap:4px;">
+                            <button onclick="acceptP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #4CAF50, #388e3c); color:white; border:1px solid #2e7d32; padding:6px 10px; font-size:11px;">수락</button>
+                            <button onclick="rejectP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #f44336, #d32f2f); color:white; border:1px solid #b71c1c; padding:6px 10px; font-size:11px;">거절</button>
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function buyAlienItem(itemName, price) {
-            if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
-            if (currentUser.alienBoughtItems.includes(itemName)) { showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); return; }
-            if (currentUser.points < price) { showLuxuryAlert(); return; }
-            
-            currentUser.points -= price; 
-            currentUser.inventory.push(itemName);
-            currentUser.alienBoughtItems.push(itemName);
-            
-            addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
-            setUFODialogue("훌륭한 거래였습니다.");
-            saveDB(); updateUI();
+        if (mySent.length === 0) sentList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">대기 중인 보낸 제안이 없습니다.</div>';
+        else {
+            sentList.innerHTML = mySent.map(deal => {
+                const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
+                return `
+                    <div class="shop-item">
+                        <div>
+                            <span style="font-weight:bold;">수신: ${deal.toName}</span><br>
+                            <span style="font-size:10px; color:#aaa;">제물: ${offerDesc}</span>
+                        </div>
+                        <button onclick="cancelP2PDeal(${deal.id})" style="background:linear-gradient(145deg, #555, #444); color:white; border:1px solid #333; padding:6px 10px; font-size:11px;">철회</button>
+                    </div>
+                `;
+            }).join('');
         }
+    }
+    function acceptP2PDeal(dealId) {
+        checkP2PExpiration();
+        const deal = db.p2pDeals.find(d => d.id === dealId);
+        if (!deal || deal.status !== 'PENDING') return;
 
-        function useFacility(bet) {
-            if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
-            if (!currentUser.facilityMax) currentUser.facilityMax = 15;
-            if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
-            if (currentUser.points < bet) { showLuxuryAlert(); return false; }
-            currentUser.points -= bet; currentUser.facilityCount += 1;
-            addPollution(2); return true;
-        }
-        function winPoints(amount) {
-            currentUser.points += amount; saveDB(); updateUI();
-            showPointGainEffect(amount); 
-        }
-
-        function checkVIPStatus() {
-            const deniedBox = document.getElementById('vip-denied-box');
-            const allowedBox = document.getElementById('vip-allowed-box');
-            const displayVip = document.getElementById('display-vip');
-
-            if (currentUser.code === 'kario0987') {
-                displayVip.innerHTML = 'VVIP<span> (1급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
-            } else if (currentUser.hasVIP) {
-                displayVip.innerHTML = 'VIP<span> (2급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+        const sender = db.users[deal.fromCode];
+        if (deal.mode === 'trade') {
+            if (deal.demandType === 'point') {
+                let p = parseInt(deal.demandValue);
+                if (isNaN(p)) return;
+                if (currentUser.points < p) { showLuxuryAlert(); return; }
+                currentUser.points -= p; 
+                if (sender) sender.points += p;
             } else {
-                displayVip.innerHTML = '일반<span> (3급)</span>'; deniedBox.style.display = 'block'; allowedBox.style.display = 'none';
+                let reqQty = deal.demandQty || 1;
+                let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
+                if (count < reqQty) { showCustomAlert("요구하는 소지품 수량이 부족합니다."); return; }
+                removeItemFromInventory(currentUser, deal.demandValue, reqQty);
+                if (sender) {
+                    for(let i=0; i<reqQty; i++) sender.inventory.push(deal.demandValue);
+                }
             }
         }
-
-        // --- 통제 콘솔 ---
-        function openAdminScreen() {
-            document.getElementById('main-screen').style.display = 'none';
-            document.getElementById('ranking-bottom-bar').style.display = 'none';
-            document.getElementById('admin-screen').style.display = 'block';
-            renderAdminSuggestions();
+        
+        if (deal.offerType === 'point') winPoints(parseInt(deal.offerValue) || 0);
+        else {
+            for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue);
         }
-        function closeAdminScreen() {
-            document.getElementById('admin-screen').style.display = 'none';
+
+        deal.status = 'COMPLETED';
+        addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
+        if (sender) addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
+        saveDB(); updateUI();
+    }
+    function rejectP2PDeal(dealId) {
+        const deal = db.p2pDeals.find(d => d.id === dealId);
+        if (!deal || deal.status !== 'PENDING') return;
+        deal.status = 'REJECTED';
+        const sender = db.users[deal.fromCode];
+        if (sender) {
+            if (deal.offerType === 'point') sender.points += deal.offerValue; 
+            else { for(let i=0; i<(deal.offerQty||1); i++) sender.inventory.push(deal.offerValue); }
+            addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
+        }
+        addHistoryLog(currentUser, `[밀실 거절] ${deal.fromName} 사원의 제안 거절`);
+        saveDB(); updateUI();
+    }
+    function cancelP2PDeal(dealId) {
+        const deal = db.p2pDeals.find(d => d.id === dealId);
+        if (!deal || deal.status !== 'PENDING') return;
+        deal.status = 'CANCELLED';
+        if (deal.offerType === 'point') currentUser.points += deal.offerValue;
+        else { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
+        addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`);
+        saveDB(); updateUI();
+    }
+
+    // --- 우주 쇼핑몰 ---
+    let dealerCardValue = 7;
+    function playHighLow(choice) {
+        if (!currentUser) return;
+        if (currentUser.alienDate !== getTodayStr()) {
+            currentUser.alienDate = getTodayStr(); currentUser.alienTries = 0; currentUser.alienUnlockedItems = []; currentUser.alienBoughtItems = [];
+        }
+        if (currentUser.alienTries >= 2) return;
+        const btnH = document.getElementById('btn-hl-high'); const btnL = document.getElementById('btn-hl-low');
+        btnH.disabled = true; btnL.disabled = true;
+
+        let playerCardValue = Math.floor(Math.random() * 13) + 1;
+        while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 13) + 1; }
+        document.getElementById('hl-player-card').innerText = playerCardValue;
+        const msgEl = document.getElementById('hl-msg');
+
+        let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
+        currentUser.alienTries = (currentUser.alienTries || 0) + 1;
+
+        if (win) {
+            setUFODialogue("……. ");
+            msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>`;
+            if (!currentUser.alienUnlockedItems) currentUser.alienUnlockedItems = [];
+            const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
+            const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+            let availablePool = ALIEN_ITEMS_POOL.filter(item => {
+                if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
+                if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+                return true;
+            });
+            let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
+            if (unpicked.length === 0) unpicked = [...availablePool];
+            let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
+            shuffled.slice(0, 3).forEach(it => { if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it); });
+            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리`);
+        } else {
+            setUFODialogue(" 좋은 물건을 산다. ");
+            msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
+            addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배`);
+        }
+        saveDB();
+        setTimeout(() => {
+            dealerCardValue = Math.floor(Math.random() * 13) + 1;
+            document.getElementById('hl-dealer-card').innerText = dealerCardValue;
+            document.getElementById('hl-player-card').innerText = "?";
+            btnH.disabled = false; btnL.disabled = false;
+            updateUI();
+        }, 1500);
+    }
+    
+    function renderAlienShop() {
+        const container = document.getElementById('alien-items-container');
+        if (!container) return;
+        
+        let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
+        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
+        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+        unlocked = unlocked.filter(item => {
+            if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
+            if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+            return true;
+        });
+
+        if (unlocked.length === 0) {
+            container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
+            return;
+        }
+
+        container.innerHTML = unlocked.map(itemName => {
+            const item = ITEM_CATALOG[itemName];
+            const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
+            return `
+                <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
+                    <div>
+                        <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
+                        <span style="font-size:10px; color:#aaa;">${item.desc}</span>
+                    </div>
+                    <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function buyAlienItem(itemName, price) {
+        if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
+        if (currentUser.alienBoughtItems.includes(itemName)) { showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); return; }
+        if (currentUser.points < price) { showLuxuryAlert(); return; }
+        
+        currentUser.points -= price; 
+        currentUser.inventory.push(itemName);
+        currentUser.alienBoughtItems.push(itemName);
+        
+        addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
+        setUFODialogue("훌륭한 거래였습니다.");
+        saveDB(); updateUI();
+    }
+
+    function useFacility(bet) {
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
+        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
+        if (currentUser.points < bet) { showLuxuryAlert(); return false; }
+        currentUser.points -= bet; currentUser.facilityCount += 1;
+        addPollution(2); return true;
+    }
+    function winPoints(amount) {
+        currentUser.points += amount; saveDB(); updateUI();
+        showPointGainEffect(amount); 
+    }
+
+    function checkVIPStatus() {
+        const deniedBox = document.getElementById('vip-denied-box');
+        const allowedBox = document.getElementById('vip-allowed-box');
+        const displayVip = document.getElementById('display-vip');
+
+        if (currentUser.code === 'kario0987') {
+            displayVip.innerHTML = 'VVIP<span> (1급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+        } else if (currentUser.hasVIP) {
+            displayVip.innerHTML = 'VIP<span> (2급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+        } else {
+            displayVip.innerHTML = '일반<span> (3급)</span>'; deniedBox.style.display = 'block'; allowedBox.style.display = 'none';
+        }
+    }
+
+    // --- 통제 콘솔 ---
+    function openAdminScreen() {
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'block';
+        renderAdminSuggestions();
+    }
+    function closeAdminScreen() {
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        document.getElementById('ranking-bottom-bar').style.display = 'block';
+    }
+    function adminRegisterNewEmployee() {
+        const name = document.getElementById('new-emp-name').value.trim();
+        const code = document.getElementById('new-emp-code').value.trim();
+        const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
+        const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
+        const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
+
+        if (!name || !code) return;
+        if (db.users[code]) { showCustomAlert('이미 존재하는 사원코드입니다.'); return; }
+        const generatedNo = generateSerialNo(aff, pos, team);
+
+        db.users[code] = {
+            code: code, name: name, affiliation: aff, team: team, position: pos,
+            no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
+            facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
+            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
+            inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
+            badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
+        };
+
+        saveDB();
+        document.getElementById('new-emp-name').value = ''; document.getElementById('new-emp-code').value = '';
+        document.getElementById('new-emp-pos').value = ''; document.getElementById('new-emp-aff').value = ''; document.getElementById('new-emp-team').value = '';
+        showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
+    }
+
+    function adminUpdateEmployee() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        const aff = document.getElementById('adm-set-affiliation').value.trim();
+        const team = document.getElementById('adm-set-team').value.trim();
+        const pos = document.getElementById('adm-set-position').value.trim();
+        const points = parseInt(document.getElementById('adm-target-points').value);
+
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) return;
+        if (aff) targetUser.affiliation = aff; if (team) targetUser.team = team; if (pos) targetUser.position = pos;
+        if (!isNaN(points)) targetUser.points = points;
+        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
+
+        saveDB(); updateUI(); showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
+    }
+
+    function adminToggleVIP() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+        if (targetUser.code === 'kario0987') { showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.'); return; }
+
+        targetUser.hasVIP = !targetUser.hasVIP;
+        const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
+        addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
+        saveDB(); updateUI(); showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
+    }
+
+    function adminControlPollution(action) {
+        const targetNo = document.getElementById('adm-poll-target-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+
+        if (action === 'set') {
+            const val = parseInt(document.getElementById('adm-poll-set-val').value);
+            if (isNaN(val) || val < 0 || val > 100) { showCustomAlert('0에서 100 사이의 수치를 입력해주세요.'); return; }
+            targetUser.pollution = val;
+            if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
+        } else if (action === 'max') {
+            targetUser.pollution = 100; targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
+        } else if (action === 'zero') {
+            targetUser.pollution = 0; targetUser.quarantineUntil = 0; targetUser.lastPollutionTime = Date.now();
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
+        }
+        saveDB(); updateUI();
+    }
+
+    function adminDeleteEmployee() {
+        const targetNo = document.getElementById('adm-delete-no').value.trim();
+        if (!targetNo) return;
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo);
+        if (!targetCode || targetCode === 'kario0987') return;
+        delete db.users[targetCode];
+        if (db.p2pDeals) db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
+        saveDB(); document.getElementById('adm-delete-no').value = '';
+        if (currentUser && currentUser.code === targetCode) logout();
+    }
+
+    function renderAdminSuggestions() {
+        const listEl = document.getElementById('admin-suggestion-list');
+        if (!db.suggestions || db.suggestions.length === 0) { listEl.innerHTML = '<div style="color:#888; font-size:11px;">접수된 건의가 없습니다.</div>'; return; }
+        listEl.innerHTML = db.suggestions.map((s, idx) => `
+            <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
+                <div class="suggestion-meta">
+                    <span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span>
+                    <button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px; font-weight:bold; border-radius:3px; padding:2px 6px;">삭제</button>
+                </div>
+                <div style="font-weight:bold; color:#ffcccc; margin-bottom:5px;">${s.title}</div>
+                <div style="color:#ddd; margin-bottom:10px; line-height:1.4;">${s.content}</div>
+                ${s.status === 'PENDING' ? `
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요">
+                        <button class="game-btn" style="margin:0; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20;" onclick="adminReplySuggestion(${s.id})">해결 처리</button>
+                    </div>
+                ` : `
+                    <div style="background:rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); padding:8px; border-radius:4px; font-size:11px; color:#a3f7b5;">
+                        <b>[상담사 답변]</b> ${s.reply}
+                    </div>
+                `}
+            </div>
+        `).join('');
+    }
+
+    function adminReplySuggestion(id) {
+        const replyInput = document.getElementById(`admin-reply-${id}`);
+        const replyText = replyInput.value.trim();
+        if (!replyText) { showCustomAlert("답변 내용을 입력해주세요."); return; }
+        const sugg = db.suggestions.find(s => s.id === id);
+        if (sugg) {
+            sugg.status = 'RESOLVED'; sugg.reply = replyText;
+            let targetUser = db.users[sugg.code];
+            if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 당신의 건의에 답변을 작성했습니다.`); }
+            saveDB(); renderAdminSuggestions();
+        }
+    }
+
+    function deleteSuggestion(index) { db.suggestions.splice(index, 1); saveDB(); renderAdminSuggestions(); }
+
+    function attemptLogin() {
+        const name = document.getElementById('nickname-input').value.trim();
+        const code = document.getElementById('code-input').value.trim();
+        
+        if (db.users[code] && db.users[code].name === name) {
+            currentUser = db.users[code];
+            
+            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
+            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
+            if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
+            if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
+            
+            if(database) {
+                database.ref('online/' + code).set(true);
+                database.ref('online/' + code).onDisconnect().remove();
+            }
+
+            hasShownFoxAlert = currentUser.pollution >= 100;
+            checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
+
+            document.getElementById('login-screen').style.display = 'none';
             document.getElementById('main-screen').style.display = 'block';
             document.getElementById('ranking-bottom-bar').style.display = 'block';
-        }
-        function adminRegisterNewEmployee() {
-            const name = document.getElementById('new-emp-name').value.trim();
-            const code = document.getElementById('new-emp-code').value.trim();
-            const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
-            const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
-            const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
-
-            if (!name || !code) return;
-            if (db.users[code]) { showCustomAlert('이미 존재하는 사원코드입니다.'); return; }
-            const generatedNo = generateSerialNo(aff, pos, team);
-
-            db.users[code] = {
-                code: code, name: name, affiliation: aff, team: team, position: pos,
-                no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
-                facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
-                alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
-                inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-                badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
-            };
-
-            saveDB();
-            document.getElementById('new-emp-name').value = ''; document.getElementById('new-emp-code').value = '';
-            document.getElementById('new-emp-pos').value = ''; document.getElementById('new-emp-aff').value = ''; document.getElementById('new-emp-team').value = '';
-            showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
-        }
-
-        function adminUpdateEmployee() {
-            const targetNo = document.getElementById('adm-target-no').value.trim();
-            const aff = document.getElementById('adm-set-affiliation').value.trim();
-            const team = document.getElementById('adm-set-team').value.trim();
-            const pos = document.getElementById('adm-set-position').value.trim();
-            const points = parseInt(document.getElementById('adm-target-points').value);
-
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) return;
-            if (aff) targetUser.affiliation = aff; if (team) targetUser.team = team; if (pos) targetUser.position = pos;
-            if (!isNaN(points)) targetUser.points = points;
-            targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
-
-            saveDB(); updateUI(); showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
-        }
-
-        function adminToggleVIP() {
-            const targetNo = document.getElementById('adm-target-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
-            if (targetUser.code === 'kario0987') { showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.'); return; }
-
-            targetUser.hasVIP = !targetUser.hasVIP;
-            const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
-            addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
-            saveDB(); updateUI(); showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
-        }
-
-        function adminControlPollution(action) {
-            const targetNo = document.getElementById('adm-poll-target-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
-
-            if (action === 'set') {
-                const val = parseInt(document.getElementById('adm-poll-set-val').value);
-                if (isNaN(val) || val < 0 || val > 100) { showCustomAlert('0에서 100 사이의 수치를 입력해주세요.'); return; }
-                targetUser.pollution = val;
-                if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
-            } else if (action === 'max') {
-                targetUser.pollution = 100; targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
-            } else if (action === 'zero') {
-                targetUser.pollution = 0; targetUser.quarantineUntil = 0; targetUser.lastPollutionTime = Date.now();
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
-            }
-            saveDB(); updateUI();
-        }
-
-        function adminDeleteEmployee() {
-            const targetNo = document.getElementById('adm-delete-no').value.trim();
-            if (!targetNo) return;
-            let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo);
-            if (!targetCode || targetCode === 'kario0987') return;
-            delete db.users[targetCode];
-            if (db.p2pDeals) db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
-            saveDB(); document.getElementById('adm-delete-no').value = '';
-            if (currentUser && currentUser.code === targetCode) logout();
-        }
-
-        function renderAdminSuggestions() {
-            const listEl = document.getElementById('admin-suggestion-list');
-            if (!db.suggestions || db.suggestions.length === 0) { listEl.innerHTML = '<div style="color:#888; font-size:11px;">접수된 건의가 없습니다.</div>'; return; }
-            listEl.innerHTML = db.suggestions.map((s, idx) => `
-                <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
-                    <div class="suggestion-meta">
-                        <span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span>
-                        <button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px; font-weight:bold; border-radius:3px; padding:2px 6px;">삭제</button>
-                    </div>
-                    <div style="font-weight:bold; color:#ffcccc; margin-bottom:5px;">${s.title}</div>
-                    <div style="color:#ddd; margin-bottom:10px; line-height:1.4;">${s.content}</div>
-                    ${s.status === 'PENDING' ? `
-                        <div style="display:flex; gap:6px;">
-                            <input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요">
-                            <button class="game-btn" style="margin:0; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20;" onclick="adminReplySuggestion(${s.id})">해결 처리</button>
-                        </div>
-                    ` : `
-                        <div style="background:rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); padding:8px; border-radius:4px; font-size:11px; color:#a3f7b5;">
-                            <b>[상담사 답변]</b> ${s.reply}
-                        </div>
-                    `}
-                </div>
-            `).join('');
-        }
-
-        function adminReplySuggestion(id) {
-            const replyInput = document.getElementById(`admin-reply-${id}`);
-            const replyText = replyInput.value.trim();
-            if (!replyText) { showCustomAlert("답변 내용을 입력해주세요."); return; }
-            const sugg = db.suggestions.find(s => s.id === id);
-            if (sugg) {
-                sugg.status = 'RESOLVED'; sugg.reply = replyText;
-                let targetUser = db.users[sugg.code];
-                if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 당신의 건의에 답변을 작성했습니다.`); }
-                saveDB(); renderAdminSuggestions();
-            }
-        }
-
-        function deleteSuggestion(index) { db.suggestions.splice(index, 1); saveDB(); renderAdminSuggestions(); }
-
-        function attemptLogin() {
-            const name = document.getElementById('nickname-input').value.trim();
-            const code = document.getElementById('code-input').value.trim();
             
-            if (db.users[code] && db.users[code].name === name) {
-                currentUser = db.users[code];
+            checkVIPStatus(); loadBadgeInfo(); updateUI();
+            
+            document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
+
+            sessionSeconds = 0; clearInterval(sessionTimer);
+            sessionTimer = setInterval(() => {
+                sessionSeconds++;
+                const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(sessionSeconds % 60).padStart(2, '0');
+                document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
+                checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
                 
-                if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
-                if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
-                if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
-                if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
+                if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
                 
-                if(database) {
-                    database.ref('online/' + code).set(true);
-                    database.ref('online/' + code).onDisconnect().remove();
+                // 특이사항 빛나는 효과 갱신 (초록불빛이 아닐 때만)
+                if (currentUser && currentUser.noteGlowUntil && Date.now() > currentUser.noteGlowUntil) {
+                    const el = document.getElementById('badge-notes-text');
+                    if (el.classList.contains('glow-text')) el.classList.remove('glow-text');
                 }
 
-                hasShownFoxAlert = currentUser.pollution >= 100;
-                checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
-
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-screen').style.display = 'block';
-                document.getElementById('ranking-bottom-bar').style.display = 'block';
-                
-                checkVIPStatus(); loadBadgeInfo(); updateUI();
-                
-                document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
-
-                sessionSeconds = 0; clearInterval(sessionTimer);
-                sessionTimer = setInterval(() => {
-                    sessionSeconds++;
-                    const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
-                    const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
-                    const s = String(sessionSeconds % 60).padStart(2, '0');
-                    document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
-                    checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
-                    
-                    if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
-                    
-                    // 특이사항 빛나는 효과 갱신 (초록불빛이 아닐 때만)
-                    if (currentUser && currentUser.noteGlowUntil && Date.now() > currentUser.noteGlowUntil) {
-                        const el = document.getElementById('badge-notes-text');
-                        if (el.classList.contains('glow-text')) el.classList.remove('glow-text');
+                // 여우 상담실 카운트다운 업데이트 (격리 중일 때)
+                if (currentUser && isQuarantined(currentUser)) {
+                    const remainMs = currentUser.quarantineUntil - Date.now();
+                    if (remainMs > 0) {
+                        const cdH = String(Math.floor(remainMs / (1000 * 60 * 60))).padStart(2, '0');
+                        const cdM = String(Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
+                        const cdS = String(Math.floor((remainMs % (1000 * 60)) / 1000)).padStart(2, '0');
+                        document.getElementById('fox-room-countdown').innerText = `${cdH}:${cdM}:${cdS}`;
                     }
+                }
 
-                    // 여우 상담실 카운트다운 업데이트 (격리 중일 때)
-                    if (currentUser && isQuarantined(currentUser)) {
-                        const remainMs = currentUser.quarantineUntil - Date.now();
-                        if (remainMs > 0) {
-                            const cdH = String(Math.floor(remainMs / (1000 * 60 * 60))).padStart(2, '0');
-                            const cdM = String(Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-                            const cdS = String(Math.floor((remainMs % (1000 * 60)) / 1000)).padStart(2, '0');
-                            document.getElementById('fox-room-countdown').innerText = `${cdH}:${cdM}:${cdS}`;
-                        }
-                    }
-
-                }, 1000);
-            } else {
-                showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
-            }
+            }, 1000);
+        } else {
+            showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
         }
+    }
 
-        function logout() {
-            if (currentUser && database) database.ref('online/' + currentUser.code).remove();
-            clearInterval(sessionTimer); currentUser = null; hasShownFoxAlert = false; updateVisualDistortion(0);
-            document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
-            document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
-            document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
-            document.body.className = ""; // 테마 초기화
-        }
-    </script>
+    function logout() {
+        if (currentUser && database) database.ref('online/' + currentUser.code).remove();
+        clearInterval(sessionTimer); currentUser = null; hasShownFoxAlert = false; updateVisualDistortion(0);
+        document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
+        document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
+        document.body.className = ""; // 테마 초기화
+    }
+</script>
 </body>
 </html>
