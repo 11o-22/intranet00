@@ -1211,6 +1211,16 @@
         database.ref('/').on('value', (snapshot) => {
             let data = snapshot.val();
             if (data) {
+                // ★ [추가] 서버에서 데이터를 받은 직후, 아직 로그인 안 된 상태면 자동 로그인 시도
+                if (!currentUser) {
+                    const savedCode = localStorage.getItem('corp_logged_code');
+                    if (savedCode && data.users && data.users[savedCode]) {
+                        const u = data.users[savedCode];
+                        document.getElementById('nickname-input').value = u.name;
+                        document.getElementById('code-input').value = u.code;
+                        attemptLogin();
+                    }
+                }
                 if (!data.suggestions) data.suggestions = [];
                 else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
                 
@@ -1261,16 +1271,6 @@
                     }
 
                     checkVipMultiplayerState();
-                }
-            } else {
-                    // ★ [추가] 서버에서 사원 명단을 모두 불러온 직후 자동 로그인 실행
-                    const savedCode = localStorage.getItem('corp_logged_code');
-                    if (savedCode && db.users[savedCode]) {
-                        const u = db.users[savedCode];
-                        document.getElementById('nickname-input').value = u.name;
-                        document.getElementById('code-input').value = u.code;
-                        attemptLogin(); // 자동 실행
-                    }
                 }
             } else {
                 saveDB();
