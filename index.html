@@ -3330,8 +3330,11 @@
         addPollution(2); 
         return true;
     }
+
     function winPoints(amount) {
-        currentUser.points += amount; saveDB(); updateUI();
+        currentUser.points += amount; 
+        saveDB(); 
+        updateUI();
         showPointGainEffect(amount); 
     }
 
@@ -3341,14 +3344,19 @@
         const displayVip = document.getElementById('display-vip');
 
         if (currentUser.code === 'kario0987') {
-            displayVip.innerHTML = 'VVIP<span> (1급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+            displayVip.innerHTML = 'VVIP<span> (1급)</span>'; 
+            deniedBox.style.display = 'none'; 
+            allowedBox.style.display = 'block';
         } else if (currentUser.hasVIP) {
-            displayVip.innerHTML = 'VIP<span> (2급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+            displayVip.innerHTML = 'VIP<span> (2급)</span>'; 
+            deniedBox.style.display = 'none'; 
+            allowedBox.style.display = 'block';
         } else {
-            displayVip.innerHTML = '일반<span> (3급)</span>'; deniedBox.style.display = 'block'; allowedBox.style.display = 'none';
+            displayVip.innerHTML = '일반<span> (3급)</span>'; 
+            deniedBox.style.display = 'block'; 
+            allowedBox.style.display = 'none';
         }
     }
-
     // --- 통제 콘솔 ---
     function openAdminScreen() {
         document.getElementById('main-screen').style.display = 'none';
