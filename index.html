@@ -378,22 +378,13 @@
 <!-- 여우 상담실 비밀 방 오버레이 -->
 <div id="fox-room-overlay" class="modal-overlay" style="display:none; z-index:9999999; background:#000;">
     <div style="position:relative; width:100%; max-width:450px; height:100vh; overflow:hidden; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#111;">
-        <img src="Patients must be equal partners in their healthcare.jfif" style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; animation: gentle-sway 4s infinite ease-in-out; opacity:0.85; z-index: 1;">
-        
-        <!-- 질문 컨테이너 -->
-        <div id="fox-room-content" style="position:relative; z-index:2; background:rgba(20,20,20,0.9); padding:25px; border:1px solid #d4af37; border-radius:8px; width:85%; box-sizing: border-box; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
+        <img src="Patients must be equal partners in their healthcare.jfif" style="width:100%; height:auto; animation: gentle-sway 4s infinite ease-in-out; opacity:0.85; border-radius:12px; margin-bottom:25px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <div style="background:rgba(20,20,20,0.9); padding:25px; border:1px solid #d4af37; border-radius:8px; width:85%; box-sizing: border-box; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
             <div id="fox-room-dialogue" style="color:#eee; font-size:15px; margin-bottom:25px; line-height:1.7; word-break:keep-all;"></div>
             <div style="display:flex; gap:12px;">
                 <button class="game-btn" style="flex:1; padding:15px; background:linear-gradient(145deg, #4CAF50, #388e3c); border-color:#2e7d32;" onclick="answerFoxQuestion('yes')">예</button>
                 <button class="game-btn" style="flex:1; padding:15px; background:linear-gradient(145deg, #f44336, #d32f2f); border-color:#b71c1c;" onclick="answerFoxQuestion('no')">아니오</button>
             </div>
-        </div>
-
-        <!-- 남은 시간 컨테이너 -->
-        <div id="fox-room-timer-container" style="display:none; position:relative; z-index:2; text-align:center; background:rgba(0,0,0,0.6); padding:30px; border-radius:12px; border:1px solid rgba(255,215,0,0.3);">
-            <div style="font-size:16px; color:#ffd700; margin-bottom:15px; font-weight:bold; letter-spacing:2px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">[ 여우 상담실 안정화 진행 중 ]</div>
-            <div id="fox-room-countdown" style="font-size:42px; font-weight:bold; color:#fff; text-shadow: 0 0 15px rgba(255,255,255,0.5); font-family:monospace; letter-spacing:3px;">00:00:00</div>
-            <div style="font-size:12px; color:#aaa; margin-top:15px;">안정이 완료될 때까지 시스템을 사용할 수 없습니다.</div>
         </div>
     </div>
 </div>
@@ -476,8 +467,7 @@
         <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
     </div>
 
-    <!-- main-screen 초기 로드 시 안전하게 감추기 위해 style 인라인 처리 -->
-    <div id="main-screen" style="display: none; padding: 15px;">
+    <div id="main-screen">
         <div class="header-info">
             <span>■■주 ■사 - 보안 인트라넷 (접속: <span id="online-users-count" style="color:#4CAF50; font-weight:bold;">1</span>명)</span>
             <span id="session-timer">세션 00:00:00</span>
@@ -542,7 +532,7 @@
         <!-- 1. 정보 열람 -->
         <div id="tab-record" class="tab-content active">
             <div class="sub-tabs-grid">
-                <button class="sub-tab active" id="tab-btn-badge" onclick="switchRecordSubTab('rec-badge', this); clearItemGlow()">사원증</button>
+                <button class="sub-tab active" onclick="switchRecordSubTab('rec-badge', this)">사원증</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-inventory', this)">소지품</button>
                 <button class="sub-tab" onclick="switchRecordSubTab('rec-history', this)">기록</button>
                 <button class="sub-tab" id="tab-btn-letters" onclick="switchRecordSubTab('rec-letters', this)">익명 편지</button>
@@ -579,7 +569,7 @@
                         <td><span id="badge-equipped-text" style="font-weight:bold; color:#d4af37;">없음</span></td>
                     </tr>
                     <tr>
-                        <th id="badge-notes-th" style="position:relative; cursor:pointer;" onclick="clearItemGlow()">특이사항</th>
+                        <th>특이사항</th>
                         <td><span id="badge-notes-text" style="font-size:11px; word-break:break-all; display:block; line-height:1.4; transition: all 0.3s;">특이사항 없음</span></td>
                     </tr>
                     <tr>
@@ -777,7 +767,7 @@
                 <!-- 유쾌 판매소 -->
                 <div id="shop-regular" class="sub-panel active">
                     <div class="panel-title">[유쾌 판매소 - 금일 입고 물품]</div>
-                    <div style="font-size:10px; color:#888; margin-bottom:12px; text-align:center;">※ 11종 물품 중 5종 랜덤 입고</div>
+                    <div style="font-size:10px; color:#888; margin-bottom:12px; text-align:center;">※ 10종 물품 중 5종 랜덤 입고</div>
                     <div id="regular-shop-items-container"></div>
                 </div>
 
@@ -903,7 +893,7 @@
     </div>
 
     <!-- 통제 콘솔 (상담사 전용) -->
-    <div id="admin-screen" style="display: none; padding: 15px;">
+    <div id="admin-screen">
         <div class="admin-header">[보안 통제 콘솔] 인사 발령 및 등록 사원 관리</div>
         
         <div class="admin-panel-box">
@@ -1008,11 +998,6 @@
     let activeVipSessionId = null;
     let myChoiceSubmitted = false;
 
-    // 여우 상담실 연쇄 질문용 전역 변수
-    let currentFoxSequence = 0;
-    let foxReductionTotal = 0;
-    let activeFoxQuestions = [];
-
     function getTodayStr() {
         const now = new Date();
         const y = now.getFullYear();
@@ -1090,6 +1075,7 @@
                         if(!data.users[key].alienBoughtItems) data.users[key].alienBoughtItems = [];
                         if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
                         
+                        // 구버전 장비 1개 지원 -> 3개 지원 배열화
                         if (data.users[key].equippedWeapon) {
                             data.users[key].equippedWeapons = [data.users[key].equippedWeapon];
                             delete data.users[key].equippedWeapon;
@@ -1226,13 +1212,12 @@
         "착한 친구": { price: 999, usable: true, targetable: false, effect: "equip", desc: "귀여운 분홍색 토끼 봉제인형. 장착 가능하다." },
         "보안팀 의상 세트": { price: 800, usable: true, targetable: false, effect: "equip", desc: "보안팀의 의상 세트, 착용이 가능하다." },
         "작두": { price: 999, usable: true, targetable: false, effect: "equip", desc: "영험한 기운이 담겨있는 무기. 장착 가능하다." },
-        "유리손포": { price: 800, usable: true, targetable: false, effect: "equip", desc: "재난관리국 요원들의 기본 지급 무기. 장착 가능하다." },
-        "낡은 문패": { price: 60, usable: true, targetable: false, effect: "reduce_fox_time", desc: "사용 시 여우상담실 격리 시간을 3시간 단축시킨다." }
+        "유리손포": { price: 800, usable: true, targetable: false, effect: "equip", desc: "재난관리국 요원들의 기본 지급 무기. 장착 가능하다." }
     };
 
-    const REGULAR_SHOP_ITEMS = [
+    const ALL_10_ITEMS = [
         "익명 편지", "하급 물약", "샤베트", "안대", "생수",
-        "중급 물약", "???의 티켓", "무전기", "작은 데일밴드", "전복죽", "낡은 문패"
+        "중급 물약", "???의 티켓", "무전기", "작은 데일밴드", "전복죽"
     ];
 
     const ALIEN_ITEMS_POOL = [
@@ -1253,12 +1238,7 @@
         "하루가 즐거우셨나요?",
         "안 좋은 일은 없으셨나요?",
         "요즘 수면은 충분하신가요?",
-        "최근 스트레스를 받는 일이 있었나요?",
-        "동료들과의 관계는 원만하신가요?",
-        "자신의 업무에 만족하시나요?",
-        "충분한 휴식을 취하고 계신가요?",
-        "자신의 감정을 잘 통제하고 계신가요?",
-        "요즘 불안하거나 초조함을 느끼시나요?"
+        "최근 스트레스를 받는 일이 있었나요?"
     ];
 
     function setUFODialogue(text) {
@@ -1302,12 +1282,12 @@
     function getShopCycleKey() { return getTodayStr(); }
 
     function getToday5ShopItems() {
-        if (currentUser && currentUser.code === 'kario0987') return REGULAR_SHOP_ITEMS;
+        if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
         const userCodeStr = currentUser ? currentUser.code : "default";
         const cycleKey = getShopCycleKey() + userCodeStr; 
         let seed = 0;
         for (let i = 0; i < cycleKey.length; i++) seed += cycleKey.charCodeAt(i) * (i + 1);
-        let shuffled = [...REGULAR_SHOP_ITEMS].sort((a, b) => {
+        let shuffled = [...ALL_10_ITEMS].sort((a, b) => {
             let r1 = Math.sin(seed + a.length * 13 + a.charCodeAt(0)) * 10000;
             let r2 = Math.sin(seed + b.length * 13 + b.charCodeAt(0)) * 10000;
             return (r1 - Math.floor(r1)) - (r2 - Math.floor(r2));
@@ -1354,20 +1334,6 @@
             const steps = Math.floor(diffMs / threeHoursMs);
             if (!isBlindfolded(user)) user.pollution = Math.min(100, user.pollution + (steps * 3));
             user.lastPollutionTime += steps * threeHoursMs;
-            saveDB();
-        }
-
-        // 여우 상담실 격리 종료 감지 시 오염도 20% 안정화 로직
-        if (user.quarantineUntil > 0 && Date.now() > user.quarantineUntil) {
-            user.quarantineUntil = 0;
-            user.pollution = 20;
-            user.lastPollutionTime = Date.now();
-            user.foxRoomAnswered = false;
-            addHistoryLog(user, `[격리 해제] 여우 상담실에서 퇴원 (오염도 20%로 안정화)`);
-            if (currentUser && user.code === currentUser.code) {
-                showCustomAlert("여우 상담실에서의 치료가 끝났습니다. 오염도가 20%로 안정화되어 현장으로 복귀합니다.");
-                updateUI(); 
-            }
             saveDB();
         }
     }
@@ -1626,51 +1592,30 @@
         document.getElementById('fox-loading-overlay').style.display = 'flex';
         setTimeout(() => {
             document.getElementById('fox-loading-overlay').style.display = 'none';
-            activeFoxQuestions = [...foxQuestions].sort(() => 0.5 - Math.random()).slice(0, 5);
-            currentFoxSequence = 0;
-            foxReductionTotal = 0;
-            showNextFoxQuestion();
+            let q = foxQuestions[Math.floor(Math.random() * foxQuestions.length)];
+            let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
+            document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요?<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
+            document.getElementById('fox-room-overlay').style.display = 'flex';
         }, 3000);
     }
 
-    function showNextFoxQuestion() {
-        if (currentFoxSequence >= 5) {
-            finishFoxRoomSequence();
-            return;
-        }
-        let q = activeFoxQuestions[currentFoxSequence];
-        let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
-        // 사용자님 설정에 맞추어 여우 상담실 호칭 '님'
-        document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요? (${currentFoxSequence + 1}/5)<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
-        document.getElementById('fox-room-overlay').style.display = 'flex';
-    }
-
     function answerFoxQuestion(answer) {
-        if (answer === 'yes') {
-            foxReductionTotal += 3.6;
-        } else {
-            foxReductionTotal += 1.2;
-        }
-        currentFoxSequence++;
-        showNextFoxQuestion();
-    }
-
-    function finishFoxRoomSequence() {
-        let finalHours = 24 - foxReductionTotal;
-        currentUser.quarantineUntil = Date.now() + (finalHours * 60 * 60 * 1000);
+        let hoursOptions = [6, 18, 24];
+        let hours = hoursOptions[Math.floor(Math.random() * hoursOptions.length)];
+        currentUser.quarantineUntil = Date.now() + (hours * 60 * 60 * 1000);
         currentUser.foxRoomAnswered = true;
         saveDB();
-        
-        // 오버레이 컨텐츠 전환
-        document.getElementById('fox-room-content').style.display = 'none';
-        document.getElementById('fox-room-timer-container').style.display = 'block';
-        
-        showCustomAlert(`상담이 완료되었습니다. 시스템 평가에 따라 ${finalHours.toFixed(1)}시간 동안 안정을 취해주세요.`);
+        document.getElementById('fox-room-overlay').style.display = 'none';
         updateUI();
+        showCustomAlert(`상담이 완료되었습니다. 시스템 판단에 따라 ${hours}시간 동안 안정을 취해주세요.`);
     }
 
     function clearItemGlow() {
-        // 명시적으로 탭 전환 시 빛나는 효과가 사라지도록 변경됨에 따라 여기서는 제거합니다.
+        if (currentUser && currentUser.hasItemUsedOnMe) {
+            currentUser.hasItemUsedOnMe = false;
+            saveDB();
+            updateUI();
+        }
     }
 
     function updateUI() {
@@ -1702,24 +1647,31 @@
         }
 
         // 100% 도달 시 여우 상담실 연출 및 로직
-        if (currentUser.pollution >= 100 && currentUser.quarantineUntil > Date.now()) {
-            if (!currentUser.foxRoomAnswered) {
-                if (!hasShownFoxAlert) {
-                    hasShownFoxAlert = true;
-                    startFoxRoomSequence();
+        if (currentUser.pollution >= 100) {
+            if (!currentUser.quarantineUntil || Date.now() > currentUser.quarantineUntil) {
+                if (!currentUser.foxRoomAnswered) {
+                    if (!hasShownFoxAlert) {
+                        hasShownFoxAlert = true;
+                        startFoxRoomSequence();
+                    }
                 }
             } else {
-                document.getElementById('fox-room-overlay').style.display = 'flex';
-                document.getElementById('fox-room-content').style.display = 'none';
-                document.getElementById('fox-room-timer-container').style.display = 'block';
                 if (!hasShownFoxAlert) hasShownFoxAlert = true;
             }
-        } else if (currentUser.pollution >= 100 && (!currentUser.quarantineUntil || currentUser.quarantineUntil <= Date.now())) {
-            // 안정화 로직이 checkPassivePollution에서 처리됨
         } else {
             hasShownFoxAlert = false;
             currentUser.foxRoomAnswered = false;
-            document.getElementById('fox-room-overlay').style.display = 'none';
+        }
+
+        // 아이템 타겟 효과에 따른 사원증 빛남 연출
+        const idCardEl = document.querySelector('.id-card-badge');
+        const noteTextEl = document.getElementById('badge-notes-text');
+        if (currentUser.hasItemUsedOnMe) {
+            idCardEl.classList.add('notify-green-glow');
+            noteTextEl.classList.add('notify-green-glow');
+        } else {
+            idCardEl.classList.remove('notify-green-glow');
+            noteTextEl.classList.remove('notify-green-glow');
         }
 
         const rationInfoMsg = document.getElementById('ration-info-msg');
@@ -1800,16 +1752,6 @@
         if (currentUser.hasNewReply) btnSuggestion.classList.add('notify-dot');
         else btnSuggestion.classList.remove('notify-dot');
 
-        const tabBtnBadge = document.getElementById('tab-btn-badge');
-        const badgeNotesTh = document.getElementById('badge-notes-th');
-        if (currentUser.hasItemUsedOnMe) {
-            tabBtnBadge.classList.add('notify-dot');
-            badgeNotesTh.classList.add('notify-dot');
-        } else {
-            tabBtnBadge.classList.remove('notify-dot');
-            badgeNotesTh.classList.remove('notify-dot');
-        }
-
         const btnAdminConsole = document.getElementById('btn-admin-console');
         if (currentUser.code === 'kario0987') {
             const hasPendingSuggestion = db.suggestions && db.suggestions.some(s => s.status === 'PENDING');
@@ -1836,9 +1778,6 @@
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'rec-letters' && currentUser.hasNewLetter) {
             currentUser.hasNewLetter = false; saveDB(); updateUI();
-        }
-        if (panelId === 'rec-badge' && currentUser.hasItemUsedOnMe) {
-            currentUser.hasItemUsedOnMe = false; saveDB(); updateUI();
         }
     }
 
@@ -2094,14 +2033,6 @@
         if (cat.effect === 'heal') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - cat.value);
-        } else if (cat.effect === 'reduce_fox_time') {
-            if (targetUser.quarantineUntil && targetUser.quarantineUntil > Date.now()) {
-                targetUser.quarantineUntil -= 3 * 60 * 60 * 1000;
-                appendBadgeNoteToUser(targetUser, `낡은 문패 사용 (격리 시간 3시간 단축)`);
-            } else {
-                if(!isOthers) showCustomAlert('현재 여우상담실에 격리되어 있지 않습니다.');
-                return false;
-            }
         } else if (cat.effect === 'candy') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - 60);
@@ -3197,7 +3128,7 @@
         if (sugg) {
             sugg.status = 'RESOLVED'; sugg.reply = replyText;
             let targetUser = db.users[sugg.code];
-            if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 당신의 건의에 답변을 작성했습니다.`); }
+            if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`); }
             saveDB(); renderAdminSuggestions();
         }
     }
@@ -3248,18 +3179,6 @@
                     const el = document.getElementById('badge-notes-text');
                     if (el.classList.contains('glow-text')) el.classList.remove('glow-text');
                 }
-
-                // 여우 상담실 카운트다운 업데이트 (격리 중일 때)
-                if (currentUser && isQuarantined(currentUser)) {
-                    const remainMs = currentUser.quarantineUntil - Date.now();
-                    if (remainMs > 0) {
-                        const cdH = String(Math.floor(remainMs / (1000 * 60 * 60))).padStart(2, '0');
-                        const cdM = String(Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
-                        const cdS = String(Math.floor((remainMs % (1000 * 60)) / 1000)).padStart(2, '0');
-                        document.getElementById('fox-room-countdown').innerText = `${cdH}:${cdM}:${cdS}`;
-                    }
-                }
-
             }, 1000);
         } else {
             showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
@@ -3275,5 +3194,6 @@
         document.body.className = ""; // 테마 초기화
     }
 </script>
+
 </body>
 </html>
