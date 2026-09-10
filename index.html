@@ -3160,10 +3160,13 @@
             }).join('');
         }
     }
-    function acceptP2PDeal(dealId) {
+        function acceptP2PDeal(dealId) {
         checkP2PExpiration();
-        const deal = db.p2pDeals.find(d => d.id === dealId);
-        if (!deal || deal.status !== 'PENDING') return;
+        if (!db.p2pDeals) return;
+        let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
+        if (dealIndex === -1) return;
+        let deal = db.p2pDeals[dealIndex];
+        if (deal.status !== 'PENDING') return;
 
         const sender = db.users[deal.fromCode];
         if (deal.mode === 'trade') {
@@ -3190,13 +3193,28 @@
         }
 
         deal.status = 'COMPLETED';
+        db.p2pDeals[dealIndex] = deal;
+
         addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
         if (sender) addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
-        saveDB(); updateUI();
+        
+        // ★ Firebase 경로 직접 업데이트
+        if (database) {
+            database.ref('p2pDeals').set(db.p2pDeals);
+            database.ref('users').set(db.users);
+        } else {
+            saveDB();
+        }
+        updateUI();
     }
+
     function rejectP2PDeal(dealId) {
-        const deal = db.p2pDeals.find(d => d.id === dealId);
-        if (!deal || deal.status !== 'PENDING') return;
+        if (!db.p2pDeals) return;
+        let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
+        if (dealIndex === -1) return;
+        let deal = db.p2pDeals[dealIndex];
+        if (deal.status !== 'PENDING') return;
+
         deal.status = 'REJECTED';
         const sender = db.users[deal.fromCode];
         if (sender) {
@@ -3205,18 +3223,41 @@
             addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
         }
         addHistoryLog(currentUser, `[밀실 거절] ${deal.fromName} 사원의 제안 거절`);
-        saveDB(); updateUI();
+        db.p2pDeals[dealIndex] = deal;
+
+        // ★ Firebase 경로 직접 업데이트
+        if (database) {
+            database.ref('p2pDeals').set(db.p2pDeals);
+            database.ref('users').set(db.users);
+        } else {
+            saveDB();
+        }
+        updateUI();
     }
+
     function cancelP2PDeal(dealId) {
-        const deal = db.p2pDeals.find(d => d.id === dealId);
-        if (!deal || deal.status !== 'PENDING') return;
+        if (!db.p2pDeals) return;
+        let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
+        if (dealIndex === -1) return;
+        let deal = db.p2pDeals[dealIndex];
+        if (deal.status !== 'PENDING') return;
+
         deal.status = 'CANCELLED';
         if (deal.offerType === 'point') currentUser.points += deal.offerValue;
         else { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
+        
         addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`);
-        saveDB(); updateUI();
-    }
+        db.p2pDeals[dealIndex] = deal;
 
+        // ★ Firebase 경로 직접 업데이트
+        if (database) {
+            database.ref('p2pDeals').set(db.p2pDeals);
+            database.ref('users').set(db.users);
+        } else {
+            saveDB();
+        }
+        updateUI();
+    }
   // --- 우주 쇼핑몰 ---
     let dealerCardValue = 7;
     function playHighLow(choice) {
