@@ -2750,6 +2750,11 @@
             
             if (!session.closeTimerStarted) {
                 session.closeTimerStarted = true;
+                if (session.isDraw) {
+                    showCustomAlert("🤝 승부가 나지 않았습니다. 무승부!");
+                } else if (session.winnerName) {
+                    showCustomAlert(`🏆 ${session.winnerName} 승리! 🏆`);
+                }
                 setTimeout(() => {
                     closeVipGameOverlay();
                     if (isP1) {
@@ -2809,6 +2814,7 @@
         
         if (winner === 'draw') {
             resultText += `무승부! 베팅금이 유지됩니다.`;
+            session.isDraw = true;
         } else {
             let winUser = winner === 'p1' ? p1User : p2User;
             let loseUser = winner === 'p1' ? p2User : p1User;
@@ -2824,6 +2830,7 @@
             resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
             
             session.winnerCode = winUser.code;
+            session.winnerName = winUser.name;
             session.winAmount = session.bet;
         }
         session.resultText = resultText;
