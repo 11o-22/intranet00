@@ -2311,6 +2311,15 @@
             const allItemKeys = Object.keys(ITEM_CATALOG).filter(k => k !== "랜덤박스");
             targetUser.inventory.push(allItemKeys[Math.floor(Math.random() * allItemKeys.length)]);
         }
+        else if (cat.effect === 'drink_wine') {
+            appendBadgeNoteToUser(targetUser, `[취함] 알코올 섭취 (10시간 지속)`);
+            if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
+        }
+
+        return true;
+    }
+
+    function sellInventoryItem(itemName) {
         return true;
     }
 
