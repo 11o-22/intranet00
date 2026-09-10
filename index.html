@@ -16,7 +16,6 @@
             --theme-border: #444;
             --theme-text: #eee;
             --theme-focus: #aaa;
-            --shop-item-name: #5b8bcf; /* 딥블루 기본값 (다크모드용 밝은 톤) */
             background-color: #121212;
             color: #e0e0e0;
             font-family: 'Malgun Gothic', sans-serif;
@@ -113,31 +112,29 @@
         }
         .glow-text { animation: textGlow 1.5s infinite alternate; font-weight: bold; }
 
-        /* 피격 시 초록색 알림 불빛 애니메이션 */
-        @keyframes greenGlow {
-            from { box-shadow: 0 0 5px #4CAF50, inset 0 0 5px #4CAF50; border-color: #4CAF50; text-shadow: 0 0 2px #4CAF50; }
-            to { box-shadow: 0 0 20px #81C784, inset 0 0 15px #81C784; border-color: #81C784; text-shadow: 0 0 8px #81C784; }
+        /* 타인 아이템 사용 시 초록 불빛 펄스 */
+        @keyframes greenGlowPulse {
+            0% { box-shadow: 0 0 8px #4CAF50, inset 0 0 8px #4CAF50; border-color: #4CAF50; color: #4CAF50; }
+            50% { box-shadow: 0 0 20px #4CAF50, inset 0 0 20px #4CAF50; border-color: #a3f7b5; color: #a3f7b5; }
+            100% { box-shadow: 0 0 8px #4CAF50, inset 0 0 8px #4CAF50; border-color: #4CAF50; color: #4CAF50; }
         }
-        .glow-green { animation: greenGlow 1.2s infinite alternate !important; border-color: #4CAF50 !important; }
-        .glow-green-text { animation: greenGlow 1.2s infinite alternate !important; color: #81C784 !important; font-weight: bold; }
-
-        /* 여우 상담실 바람 애니메이션 */
-        @keyframes wind-breeze {
-            0% { transform: skewX(0deg) rotate(0deg) scale(1); filter: brightness(1); }
-            50% { transform: skewX(1.5deg) rotate(0.5deg) scale(1.02); filter: brightness(1.05); }
-            100% { transform: skewX(0deg) rotate(0deg) scale(1); filter: brightness(1); }
+        .notify-green-glow {
+            animation: greenGlowPulse 1.5s infinite alternate !important;
+            border: 2px solid #4CAF50 !important;
+            border-radius: 8px;
         }
-        .wind-effect { animation: wind-breeze 5s infinite ease-in-out; transform-origin: bottom center; display: block; }
 
-        /* 스피너 로딩 */
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255, 152, 0, 0.3); border-top: 4px solid #ff9800; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 바람에 흩날리는 연출 (여우 상담실) */
+        @keyframes gentle-sway {
+            0% { transform: rotate(-1deg) scale(1) translateY(0); }
+            50% { transform: rotate(1.5deg) scale(1.02) translateY(-3px); }
+            100% { transform: rotate(-1deg) scale(1) translateY(0); }
+        }
 
         /* 부서별 동적 테마 */
         body.theme-black { 
             --theme-bg-grad: linear-gradient(145deg, #161616, #0d0d0d);
             --theme-border: #333; --theme-text: #dcdcdc; --theme-focus: #777;
-            --shop-item-name: #5b8bcf;
         }
         body.theme-black .container { background-color: #0b0b0b !important; color: #dcdcdc !important; border-color: #222 !important; }
         body.theme-black .sub-panel, body.theme-black .admin-panel-box, body.theme-black .ranking-body { background-color: #121212 !important; }
@@ -147,7 +144,6 @@
             color-scheme: light; /* OS 다크모드 영향 방지 */
             --theme-bg-grad: linear-gradient(145deg, #ffffff, #f7f9fa);
             --theme-border: #94a3b8; --theme-text: #0f172a; --theme-focus: #2563eb;
-            --shop-item-name: #2a4359; /* 밝은 테마용 채도낮은 딥블루 */
             background-color: #e2e8f0;
         }
         body.theme-white .container { background-color: #f8fafc !important; color: #0f172a !important; border-color: #cbd5e1 !important; }
@@ -191,7 +187,6 @@
         body.theme-gold { 
             --theme-bg-grad: linear-gradient(145deg, #1c1914, #0f0c0a);
             --theme-border: #a68a3f; --theme-text: #f3e5ab; --theme-focus: #ffd700;
-            --shop-item-name: #5b8bcf;
         }
         body.theme-gold .container { background-color: #110e08 !important; color: #f3e5ab !important; border-color: #5c4b1e !important; }
         body.theme-gold .sub-panel, body.theme-gold .admin-panel-box, body.theme-gold .ranking-body { background-color: #1a150b !important; border-color: #5c4b1e !important; }
@@ -201,7 +196,6 @@
         body.theme-navy { 
             --theme-bg-grad: linear-gradient(145deg, #132238, #0b1320);
             --theme-border: #1e3a8a; --theme-text: #cbd5e1; --theme-focus: #3b82f6;
-            --shop-item-name: #5b8bcf;
         }
         body.theme-navy .container { background-color: #0d141f !important; color: #cbd5e1 !important; border-color: #1e3a8a !important; }
         body.theme-navy .sub-panel, body.theme-navy .admin-panel-box, body.theme-navy .ranking-body { background-color: #101c2e !important; border-color: #1e3a8a !important; }
@@ -211,7 +205,6 @@
         body.theme-brown { 
             --theme-bg-grad: linear-gradient(145deg, #2b1f17, #19120e);
             --theme-border: #8c5d3f; --theme-text: #e7dcd1; --theme-focus: #a66d48;
-            --shop-item-name: #5b8bcf;
         }
         body.theme-brown .container { background-color: #17110d !important; color: #e7dcd1 !important; border-color: #593d2b !important; }
         body.theme-brown .sub-panel, body.theme-brown .admin-panel-box, body.theme-brown .ranking-body { background-color: #211812 !important; border-color: #593d2b !important; }
@@ -223,7 +216,6 @@
             color-scheme: light;
             --theme-bg-grad: linear-gradient(145deg, #d9e2ec, #f0f4f8);
             --theme-border: #8ca3b8; --theme-text: #1a2b3c; --theme-focus: #3b5a7a;
-            --shop-item-name: #2a4359;
             background-color: #bcccdc;
         }
         body.theme-hanbok .container { background-color: #e5edf5 !important; color: #1a2b3c !important; border-color: #8ca3b8 !important; }
@@ -235,7 +227,12 @@
         body.theme-hanbok .panel-title { color: #0f1b29 !important; border-bottom-color: #8ca3b8 !important; font-weight: bold;}
         body.theme-hanbok .game-btn { background: #3b5a7a !important; color: #ffffff !important; font-weight: bold; border-color: #2a4359 !important;}
         body.theme-hanbok .game-btn:hover { background: #2a4359 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+        
+        /* 인벤토리, 상점 등 요소 텍스트 딥블루 적용 */
         body.theme-hanbok .inv-card, body.theme-hanbok .shop-item, body.theme-hanbok .history-item, body.theme-hanbok .letter-card { background: #f0f4f8 !important; border-color: #8ca3b8 !important; color: #1a2b3c !important; font-weight: bold; }
+        body.theme-hanbok .inv-card-name, body.theme-hanbok .inv-card-qty, body.theme-hanbok .shop-item span { color: #2a4359 !important; font-weight: bold; }
+        body.theme-hanbok .vip-arena-box, body.theme-hanbok .vip-arena-box span { color: #1a2b3c !important; font-weight: bold; }
+        
         body.theme-hanbok .tabs-grid { border-color: #8ca3b8 !important; }
         body.theme-hanbok .tab { border-color: #8ca3b8 !important; background: #e5edf5; }
         body.theme-hanbok .tab.active { color: #0f1b29 !important; border-bottom: 2px solid #0f1b29 !important; background: #ffffff; font-weight: bold;}
@@ -250,15 +247,14 @@
         body.theme-hanbok .badge-table td { background: #f0f4f8 !important; border-color: #8ca3b8 !important; color: #0f1b29 !important; }
         body.theme-hanbok input, body.theme-hanbok select, body.theme-hanbok textarea { background-color: #ffffff !important; color: #1a2b3c !important; border-color: #8ca3b8 !important; }
         body.theme-hanbok input:focus, body.theme-hanbok select:focus, body.theme-hanbok textarea:focus { border-color: #3b5a7a !important; box-shadow: 0 0 5px rgba(59, 90, 122, 0.4) !important; }
-        
-        /* 한복 테마 내부에 들어가는 특정 텍스트들 강제 지정 */
-        body.theme-hanbok .inv-card-name, 
-        body.theme-hanbok .shop-item span, 
-        body.theme-hanbok .vip-arena-box, 
-        body.theme-hanbok .vip-arena-box div, 
-        body.theme-hanbok .vip-arena-box span { color: #1a2b3c !important; font-weight: bold; }
-        body.theme-hanbok .vip-nav-btn { color: #1a2b3c !important; border-color: #8ca3b8 !important; }
-        body.theme-hanbok .vip-nav-btn.active { background: #3b5a7a !important; color: #fff !important; }
+
+        /* 모달 디자인 오버라이드 (재난관리국 테마 시인성) */
+        body.theme-hanbok .modal-content { background-color: #f0f4f8 !important; border-color: #8ca3b8 !important; color: #1a2b3c !important; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        body.theme-hanbok .modal-content h3 { color: #0f1b29 !important; border-bottom-color: #8ca3b8 !important; font-weight: bold; }
+        body.theme-hanbok .modal-content .emp-list-card { background: #ffffff !important; border-color: #8ca3b8 !important; }
+        body.theme-hanbok .modal-content .emp-list-card:hover { background: #e5edf5 !important; border-color: #3b5a7a !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        body.theme-hanbok .modal-content .emp-list-title { color: #0f1b29 !important; }
+        body.theme-hanbok .modal-content .emp-list-sub { color: #2a4359 !important; font-weight: bold; }
 
         #pollution-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -292,7 +288,7 @@
         #main-screen, #admin-screen { display: none; padding: 15px; }
         .header-info { font-size: 12px; color: #666; margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; display: flex; justify-content: space-between;}
         
-        /* 사원증 디자인 고급화 (구조는 동일, CSS만 수정) */
+        /* 사원증 디자인 고급화 */
         .id-card-badge {
             background: var(--theme-bg-grad, #1e1e1e);
             border: 1px solid var(--theme-border, #444);
@@ -302,7 +298,7 @@
             position: relative;
             box-shadow: 0 6px 15px rgba(0,0,0,0.4);
             overflow: hidden;
-            transition: all 0.3s ease;
+            transition: box-shadow 0.3s, border-color 0.3s;
         }
         .id-card-badge::before {
             content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
@@ -385,7 +381,7 @@
         .status-tag { font-weight: bold; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
         .inv-card { display: flex; justify-content: space-between; align-items: center; background: #222; border: 1px solid #444; padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .inv-card-name { font-weight: bold; color: var(--shop-item-name); }
+        .inv-card-name { font-weight: bold; color: #eee; }
         .inv-card-qty { font-size: 11px; color: #ff9800; font-weight: bold; margin-left: 6px; background: rgba(255,152,0,0.1); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(255,152,0,0.3); }
         .inv-btn-group { display: flex; gap: 6px; }
         .inv-btn { padding: 5px 10px; font-size: 11px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
@@ -427,7 +423,6 @@
 
         /* 상점 버튼 및 아이템 고급화 */
         .shop-item { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 12px 15px; margin-bottom: 10px; border: 1px solid #444; border-radius: 6px; font-size: 12px; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .shop-item-title { font-weight: bold; font-size: 13px; color: var(--shop-item-name); }
         .shop-item span { color: #ddd; }
         .shop-item button { padding: 8px 14px; background: linear-gradient(145deg, #444, #333); color: white; border: 1px solid #5a5a5a; cursor: pointer; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: bold; transition: all 0.15s ease; }
         .shop-item button:active:not([disabled]) { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 5px rgba(0,0,0,0.6); background: #2a2a2a; border-color: #444; }
@@ -447,10 +442,9 @@
             background: rgba(0, 162, 232, 0.1); border: 1px solid #00A2E8; border-radius: 8px; padding: 10px 15px; font-size: 13px; font-weight: bold; color: #99D9EA; margin: 12px auto 0 auto; max-width: 85%; text-align: center; box-shadow: 0 0 12px rgba(0, 162, 232, 0.3); letter-spacing: 0.5px;
         }
 
-        /* 팝업 오버레이 (고정 위치) */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(2px); }
-        .modal-content { background-color: var(--theme-bg-grad, #1a1a1a); color: var(--theme-text, #fff); padding: 25px; border: 1px solid var(--theme-border, #555); border-radius: 8px; width: 85%; box-sizing: border-box; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .modal-content h3 { margin-top: 0; border-bottom: 1px solid var(--theme-border, #333); padding-bottom: 12px; margin-bottom: 15px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(2px); }
+        .modal-content { background-color: #1a1a1a; padding: 25px; border: 1px solid #555; border-radius: 8px; width: 85%; max-width: 420px; box-sizing: border-box; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal-content h3 { color: #fff; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 12px; margin-bottom: 15px; }
         .modal-btn-group { display: flex; gap: 10px; margin-top: 15px; }
         .modal-btn-group button { flex: 1; padding: 12px; cursor: pointer; border: none; font-weight: bold; border-radius: 4px; transition: all 0.2s; }
         .btn-submit { background: linear-gradient(145deg, #4CAF50, #388e3c); color: white; border: 1px solid #2e7d32 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
@@ -460,7 +454,7 @@
 
         /* 사용자 커스텀 알림 */
         #custom-alert-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 999999; justify-content: center; align-items: center; backdrop-filter: blur(4px);
+            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; backdrop-filter: blur(4px);
         }
         .custom-alert-box {
             background: linear-gradient(145deg, #1c1c1c, #121212); border: 1px solid #552222; border-radius: 10px; width: 85%; max-width: 320px; padding: 25px; box-sizing: border-box; text-align: center; box-shadow: 0 15px 40px rgba(180, 0, 0, 0.5);
@@ -486,12 +480,12 @@
         .luxury-alert-btn:hover { background: #ffd700; color: #000; box-shadow: 0 0 15px rgba(255,215,0,0.4); }
         .luxury-alert-btn:active { transform: scale(0.96); }
 
-        .emp-list-card { display: flex; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border, #3a3a3a); border-radius: 6px; padding: 12px; margin-bottom: 10px; gap: 12px; cursor: pointer; transition: background 0.2s, transform 0.2s;}
-        .emp-list-card:hover { background: rgba(255,255,255,0.05); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .emp-list-card { display: flex; align-items: center; background: #242424; border: 1px solid #3a3a3a; border-radius: 6px; padding: 12px; margin-bottom: 10px; gap: 12px; cursor: pointer; transition: background 0.2s, transform 0.2s;}
+        .emp-list-card:hover { background: #2a2a2a; border-color: #555; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         .emp-list-avatar { width: 45px; height: 55px; background: #1a1a1a; border: 1px solid #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #666; overflow: hidden; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
         .emp-list-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .emp-list-details { flex-grow: 1; text-align: left; }
-        .emp-list-title { font-size: 14px; font-weight: bold; color: var(--theme-text, #fff); display: flex; align-items: center; gap: 6px; margin-bottom: 2px;}
+        .emp-list-title { font-size: 14px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; margin-bottom: 2px;}
         .emp-list-sub { font-size: 11px; color: #888; margin-top: 2px; }
 
         #ranking-bottom-bar {
@@ -531,44 +525,37 @@
 
 <div id="pollution-overlay"></div>
 
-<!-- 여우 상담실 (오염도 100%) 비밀 공간 오버레이 -->
-<div id="quarantine-room-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#121212; z-index:999999; flex-direction:column; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
-    <!-- 로딩 화면 -->
-    <div id="quarantine-loading" style="color:#ff9800; font-size:16px; font-weight:bold; display:none; flex-direction:column; align-items:center;">
-        <div class="spinner"></div>
-        <div style="margin-top:20px; text-align:center; line-height:1.5;">🦊 심각한 오염이 발견되었습니다.<br>여우 상담실로 이송합니다.</div>
+<!-- 여우 상담실 로딩 오버레이 -->
+<div id="fox-loading-overlay" class="modal-overlay" style="display:none; z-index:9999999; flex-direction:column; background:#000;">
+    <div style="color:#fff; font-size:18px; text-align:center;">
+        <div style="font-size:50px; margin-bottom:20px; animation: textGlow 1.5s infinite alternate;">🦊</div>
+        <div style="line-height: 1.6;">심각한 오염이 발견되었습니다.<br>여우 상담실로 이송합니다.</div>
     </div>
-    
-    <!-- 상담실 본 화면 -->
-    <div id="quarantine-content" style="display:none; flex-direction:column; align-items:center; width:100%; max-width:400px; background:#fff; padding:20px; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.8); box-sizing:border-box;">
-        <img src="Patients must be equal partners in their healthcare.jfif" class="wind-effect" style="width:100%; border-radius:8px; margin-bottom:20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-        <div id="quarantine-text" style="color:#333; font-size:15px; font-weight:bold; margin-bottom:15px; text-align:center; line-height:1.6; word-break:keep-all;">
-            <!-- 동적 문구 삽입 -->
+</div>
+
+<!-- 여우 상담실 비밀 방 오버레이 -->
+<div id="fox-room-overlay" class="modal-overlay" style="display:none; z-index:9999999; background:#000;">
+    <div style="position:relative; width:100%; max-width:450px; height:100vh; overflow:hidden; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#111;">
+        <img src="Patients must be equal partners in their healthcare.jfif" style="width:100%; height:auto; animation: gentle-sway 4s infinite ease-in-out; opacity:0.85; border-radius:12px; margin-bottom:25px; box-shadow: 0 0 20px rgba(0,0,0,0.8);">
+        <div style="background:rgba(20,20,20,0.9); padding:25px; border:1px solid #d4af37; border-radius:8px; width:85%; box-sizing: border-box; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);">
+            <div id="fox-room-dialogue" style="color:#eee; font-size:15px; margin-bottom:25px; line-height:1.7; word-break:keep-all;"></div>
+            <div style="display:flex; gap:12px;">
+                <button class="game-btn" style="flex:1; padding:15px; background:linear-gradient(145deg, #4CAF50, #388e3c); border-color:#2e7d32;" onclick="answerFoxQuestion('yes')">예</button>
+                <button class="game-btn" style="flex:1; padding:15px; background:linear-gradient(145deg, #f44336, #d32f2f); border-color:#b71c1c;" onclick="answerFoxQuestion('no')">아니오</button>
+            </div>
         </div>
-        <div id="quarantine-question" style="color:#555; font-size:14px; margin-bottom:20px; text-align:center; font-weight:bold;">
-            <!-- 동적 질문 삽입 -->
-        </div>
-        <div id="quarantine-buttons" style="display:flex; gap:10px; width:100%;">
-            <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #4CAF50, #388e3c); color:white; padding:12px; font-size:15px; border:none;" onclick="answerQuarantine('yes')">예</button>
-            <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #f44336, #d32f2f); color:white; padding:12px; font-size:15px; border:none;" onclick="answerQuarantine('no')">아니오</button>
-        </div>
-    </div>
-    
-    <!-- 상태 메시지 (답변 후) -->
-    <div id="quarantine-status-msg" style="display:none; color:#ddd; font-size:15px; margin-top:20px; text-align:center; line-height:1.6;">
-        현재 안정을 취하는 중입니다.<br>퇴원까지 남은 시간: <span id="q-remain-time" style="color:#ffd700; font-weight:bold;"></span>
     </div>
 </div>
 
 <!-- 화면 접속 시 잘못 보이지 않도록 모두 명시적으로 style="display:none;" 추가 -->
-<div id="custom-alert-overlay" style="display:none;">
+<div id="custom-alert-overlay" style="display:none; z-index: 99999999;">
     <div class="custom-alert-box">
         <div class="custom-alert-msg" id="custom-alert-text">알림 내용</div>
         <button class="custom-alert-btn" onclick="closeCustomAlert()">확인</button>
     </div>
 </div>
 
-<div id="luxury-alert-overlay" style="display:none;">
+<div id="luxury-alert-overlay" style="display:none; z-index: 99999999;">
     <div class="luxury-alert-box">
         <div style="font-size: 26px; margin-bottom: 15px;">💳</div>
         <div class="luxury-alert-msg" id="luxury-alert-text">보유하신 포인트가 부족합니다.</div>
@@ -588,7 +575,7 @@
     </div>
 </div>
 
-<!-- VIP 초대 수신 모달 -->
+<!-- VIP 초대 수신 모달 (디자인 수정) -->
 <div id="vip-invite-overlay" style="display:none;">
     <div class="luxury-alert-box">
         <h3 style="color:#ffd700; margin-top:0; letter-spacing:1px; font-size:18px;">⚔️ 1:1 대전 신청 도착</h3>
@@ -615,8 +602,8 @@
 </div>
 
 <!-- 사원 상세 정보 열람 모달 -->
-<div id="emp-detail-modal" class="modal-overlay" style="display:none;">
-    <div class="modal-content" id="emp-detail-modal-content" style="max-width: 420px; padding: 25px;">
+<div id="emp-detail-modal" class="modal-overlay" style="display:none; z-index: 10000;">
+    <div class="modal-content" style="max-width: 420px; padding: 25px;">
         <h3 style="margin-top:0;">사원 기록 카드</h3>
         <div id="emp-detail-card-container"></div>
         <div class="modal-btn-group" style="margin-top:20px;">
@@ -643,8 +630,8 @@
             <span id="session-timer">세션 00:00:00</span>
         </div>
 
-        <!-- 사원증 인터페이스 -->
-        <div class="id-card-badge" id="main-id-card" onclick="clearItemInteractionGlow()" style="cursor: pointer;">
+        <!-- 사원증 인터페이스 (구조 건드리지 않음) -->
+        <div class="id-card-badge" onclick="clearItemGlow()" style="cursor: pointer;">
             <div class="id-card-body">
                 <div class="id-avatar-mini" id="card-mini-photo">
                     <span>PHOTO</span>
@@ -740,7 +727,7 @@
                     </tr>
                     <tr>
                         <th>특이사항</th>
-                        <td><span id="badge-notes-text" style="font-size:11px; word-break:break-all; display:block; line-height:1.4;">특이사항 없음</span></td>
+                        <td><span id="badge-notes-text" style="font-size:11px; word-break:break-all; display:block; line-height:1.4; transition: all 0.3s;">특이사항 없음</span></td>
                     </tr>
                     <tr>
                         <th>현재 상태</th>
@@ -1157,7 +1144,6 @@
     let currentUser = null;
     let sessionSeconds = 0;
     let sessionTimer;
-    let quarantineTimer;
     let pendingTargetItemName = ""; 
     let pendingTargetIsPotion = false;
     let hasShownFoxAlert = false;
@@ -1168,15 +1154,6 @@
     let currentInviteId = null;
     let activeVipSessionId = null;
     let myChoiceSubmitted = false;
-
-    // 여우 상담실 질문 세트
-    const Q_QUESTIONS = [
-        "오늘 식사는 맛있게 드셨나요?",
-        "하루가 즐거우셨나요?",
-        "최근 안 좋은 일은 없으셨나요?",
-        "지금 마음이 편안하신가요?",
-        "충분한 휴식을 취하고 계신가요?"
-    ];
 
     function getTodayStr() {
         const now = new Date();
@@ -1193,23 +1170,23 @@
                 affiliation: "백일몽 주식회사", team: "현장탐사팀", position: "사원",
                 no: "4516", points: 30, pollution: 0, lastPollutionTime: Date.now(), 
                 facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-                blindfoldUntil: 0, quarantineUntil: 0, quarantineAnswered: false, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: "", alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
                 badge: { photo: "", nickname: "기본사원", notes: "특이사항 없음" },
-                noteGlowUntil: 0, hasNewItemInteraction: false, hasNewLetter: false, hasNewReply: false
+                noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
             },
             "kario0987": { 
                 code: "kario0987", name: "상담사", 
                 affiliation: "통제본부", team: "여우 상담실", position: "수석 상담사",
                 no: "0000", points: 99999, pollution: 0, lastPollutionTime: Date.now(), 
                 facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: true,
-                blindfoldUntil: 0, quarantineUntil: 0, quarantineAnswered: false, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+                blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
                 alienUnlockedItems: ["작두", "유리손포", "사과맛 물약", "제거약", "착한 친구"],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
                 badge: { photo: "", nickname: "총괄상담사", notes: "1급 보안 인가자 (VVIP) / 여우 상담실 책임자" },
-                noteGlowUntil: 0, hasNewItemInteraction: false, hasNewLetter: false, hasNewReply: false
+                noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
             }
         },
         suggestions: [],
@@ -1240,8 +1217,8 @@
                         if(!data.users[key].alienBoughtItems) data.users[key].alienBoughtItems = [];
                         if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
                         if(data.users[key].bloodBathDailyUsedMs === undefined) data.users[key].bloodBathDailyUsedMs = 0;
-                        if(data.users[key].quarantineAnswered === undefined) data.users[key].quarantineAnswered = false;
-                        if(data.users[key].hasNewItemInteraction === undefined) data.users[key].hasNewItemInteraction = false;
+                        if(data.users[key].hasItemUsedOnMe === undefined) data.users[key].hasItemUsedOnMe = false;
+                        if(data.users[key].foxRoomAnswered === undefined) data.users[key].foxRoomAnswered = false;
                     }
                 } else {
                     data.users = {};
@@ -1388,6 +1365,14 @@
 
     const ALIEN_RANDOM_QUOTES = [
         "물건을 본다 👌🏻", "관측을 한다.", "생체 신호를 확인한다.", "좋은 물건이 들어왔습니다.", "흥미로운 거래를 연다.", "미지의 파동을 분석한다."
+    ];
+
+    let foxQuestions = [
+        "오늘 식사는 맛있게 드셨나요?",
+        "하루가 즐거우셨나요?",
+        "안 좋은 일은 없으셨나요?",
+        "요즘 수면은 충분하신가요?",
+        "최근 스트레스를 받는 일이 있었나요?"
     ];
 
     function setUFODialogue(text) {
@@ -1609,31 +1594,15 @@
     function openEmpDetailModal(code) {
         const u = db.users[code];
         if (!u) return;
-        
-        // 동적 테마 가져와서 팝업 내부 컬러 변경
-        const bodyEl = document.body;
-        let tGrad = '#1a1a1a', tBorder = '#555', tText = '#fff';
-        if(bodyEl.classList.contains('theme-white')) { tGrad = '#ffffff'; tBorder = '#94a3b8'; tText = '#0f172a'; }
-        else if(bodyEl.classList.contains('theme-gold')) { tGrad = 'linear-gradient(145deg, #1c1914, #0f0c0a)'; tBorder = '#a68a3f'; tText = '#f3e5ab'; }
-        else if(bodyEl.classList.contains('theme-navy')) { tGrad = 'linear-gradient(145deg, #132238, #0b1320)'; tBorder = '#1e3a8a'; tText = '#cbd5e1'; }
-        else if(bodyEl.classList.contains('theme-brown')) { tGrad = 'linear-gradient(145deg, #2b1f17, #19120e)'; tBorder = '#8c5d3f'; tText = '#e7dcd1'; }
-        else if(bodyEl.classList.contains('theme-hanbok')) { tGrad = '#ffffff'; tBorder = '#8ca3b8'; tText = '#1a2b3c'; }
-        else if(bodyEl.classList.contains('theme-black')) { tGrad = '#121212'; tBorder = '#333'; tText = '#dcdcdc'; }
-
-        const modalContent = document.getElementById('emp-detail-modal-content');
-        modalContent.style.background = tGrad;
-        modalContent.style.borderColor = tBorder;
-        modalContent.style.color = tText;
-
         const container = document.getElementById('emp-detail-card-container');
         const photoSrc = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
         const statusInfo = getPollutionStatusInfo(u.pollution);
         
         let lettersHtml = '';
         if (currentUser.code === 'kario0987' && u.letters && u.letters.length > 0) {
-            lettersHtml = `<div style="margin-top:15px; border-top:1px dashed ${tBorder}; padding-top:15px;">
+            lettersHtml = `<div style="margin-top:15px; border-top:1px dashed #444; padding-top:15px;">
                 <div style="font-size:12px; color:#ff9800; font-weight:bold; margin-bottom:8px;">[수신된 익명 편지 - 열람 권한: 1급]</div>
-                ${u.letters.map(l => `<div style="background:rgba(0,0,0,0.1); border:1px solid ${tBorder}; padding:8px; margin-bottom:6px; font-size:11px; border-radius:4px;">발신: <span style="font-weight:bold;">${l.fromName || '알수없음'}(${l.fromCode || '??'})</span><br><span style="display:block; margin-top:4px;">${l.content}</span></div>`).join('')}
+                ${u.letters.map(l => `<div style="background:#111; padding:8px; margin-bottom:6px; font-size:11px; border-radius:4px; border:1px solid #333;">발신: <span style="color:#aaa;">${l.fromName || '알수없음'}(${l.fromCode || '??'})</span><br><span style="color:#ddd; display:block; margin-top:4px;">${l.content}</span></div>`).join('')}
             </div>`;
         }
 
@@ -1641,21 +1610,21 @@
         const isGlowing = (u.noteGlowUntil && Date.now() < u.noteGlowUntil) ? 'glow-text' : '';
 
         container.innerHTML = `
-            <div class="id-card-badge" style="background:rgba(0,0,0,0.1); margin-top:10px; box-shadow:none; border-color:${tBorder}; color:${tText};">
+            <div class="id-card-badge" style="background:#1e1e1e; margin-top:10px; box-shadow:none; border-color:#555;">
                 <div class="id-card-body">
                     <div class="id-avatar-mini">${photoSrc}</div>
                     <div class="id-info-details">
-                        <div class="serial-row" style="border-color:${tBorder};">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
-                        <div class="emp-name" style="color:inherit;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
-                        <div class="emp-meta" style="color:inherit;">${u.affiliation || '본사'} · ${u.team}</div>
+                        <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
+                        <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
+                        <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
                     </div>
                 </div>
-                <table class="badge-table" style="margin-top:15px; border-color:${tBorder};">
-                    <tr><th style="background:rgba(0,0,0,0.1); border-color:${tBorder}; color:inherit;">닉네임</th><td style="background:rgba(0,0,0,0.05); border-color:${tBorder}; color:inherit;">${(u.badge && u.badge.nickname) ? u.badge.nickname : u.name}</td></tr>
-                    <tr><th style="background:rgba(0,0,0,0.1); border-color:${tBorder}; color:inherit;">보유 포인트</th><td style="background:rgba(0,0,0,0.05); border-color:${tBorder}; font-weight:bold; color:#ffd700;">${u.points} P</td></tr>
-                    <tr><th style="background:rgba(0,0,0,0.1); border-color:${tBorder}; color:inherit;">장착 장비</th><td style="background:rgba(0,0,0,0.05); border-color:${tBorder}; color:inherit;"><span style="color:#d4af37; font-weight:bold;">${u.equippedWeapon || '없음'}</span></td></tr>
-                    <tr><th style="background:rgba(0,0,0,0.1); border-color:${tBorder}; color:inherit;">현재 상태</th><td style="background:rgba(0,0,0,0.05); border-color:${tBorder}; color:inherit;"><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
-                    <tr><th style="background:rgba(0,0,0,0.1); border-color:${tBorder}; color:inherit;">특이사항</th><td style="background:rgba(0,0,0,0.05); border-color:${tBorder}; color:inherit;" class="${isGlowing}"><span style="word-break:break-all; font-size:11px; line-height:1.4;">${notes}</span></td></tr>
+                <table class="badge-table" style="margin-top:15px;">
+                    <tr><th>닉네임</th><td>${(u.badge && u.badge.nickname) ? u.badge.nickname : u.name}</td></tr>
+                    <tr><th>보유 포인트</th><td style="font-weight:bold; color:#ffd700;">${u.points} P</td></tr>
+                    <tr><th>장착 장비</th><td><span style="color:#d4af37; font-weight:bold;">${u.equippedWeapon || '없음'}</span></td></tr>
+                    <tr><th>현재 상태</th><td><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
+                    <tr><th>특이사항</th><td class="${isGlowing}" style="word-break:break-all; font-size:11px; line-height:1.4;">${notes}</td></tr>
                 </table>
                 ${lettersHtml}
             </div>
@@ -1744,6 +1713,36 @@
         }).join('');
     }
 
+    function startFoxRoomSequence() {
+        document.getElementById('fox-loading-overlay').style.display = 'flex';
+        setTimeout(() => {
+            document.getElementById('fox-loading-overlay').style.display = 'none';
+            let q = foxQuestions[Math.floor(Math.random() * foxQuestions.length)];
+            let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
+            document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요?<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
+            document.getElementById('fox-room-overlay').style.display = 'flex';
+        }, 3000);
+    }
+
+    function answerFoxQuestion(answer) {
+        let hoursOptions = [6, 18, 24];
+        let hours = hoursOptions[Math.floor(Math.random() * hoursOptions.length)];
+        currentUser.quarantineUntil = Date.now() + (hours * 60 * 60 * 1000);
+        currentUser.foxRoomAnswered = true;
+        saveDB();
+        document.getElementById('fox-room-overlay').style.display = 'none';
+        updateUI();
+        showCustomAlert(`상담이 완료되었습니다. 시스템 판단에 따라 ${hours}시간 동안 안정을 취해주세요.`);
+    }
+
+    function clearItemGlow() {
+        if (currentUser && currentUser.hasItemUsedOnMe) {
+            currentUser.hasItemUsedOnMe = false;
+            saveDB();
+            updateUI();
+        }
+    }
+
     function updateUI() {
         if (!currentUser) return;
         applyDepartmentTheme(currentUser);
@@ -1772,20 +1771,32 @@
             currentUser.bloodBathDailyUsedMs = 0;
         }
 
-        // 여우 상담실(격리) 로직
+        // 100% 도달 시 여우 상담실 연출 및 로직
         if (currentUser.pollution >= 100) {
             if (!currentUser.quarantineUntil || Date.now() > currentUser.quarantineUntil) {
-                // 처음 100% 도달 (또는 갱신)
-                currentUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000); // 24시간
-                currentUser.quarantineAnswered = false; 
-                saveDB();
-                triggerQuarantineTransition();
+                if (!currentUser.foxRoomAnswered) {
+                    if (!hasShownFoxAlert) {
+                        hasShownFoxAlert = true;
+                        startFoxRoomSequence();
+                    }
+                }
             } else {
-                showQuarantineRoom();
+                if (!hasShownFoxAlert) hasShownFoxAlert = true;
             }
-            return; // 일반 UI 업데이트 중지
         } else {
-            document.getElementById('quarantine-room-overlay').style.display = 'none';
+            hasShownFoxAlert = false;
+            currentUser.foxRoomAnswered = false;
+        }
+
+        // 아이템 타겟 효과에 따른 사원증 빛남 연출
+        const idCardEl = document.querySelector('.id-card-badge');
+        const noteTextEl = document.getElementById('badge-notes-text');
+        if (currentUser.hasItemUsedOnMe) {
+            idCardEl.classList.add('notify-green-glow');
+            noteTextEl.classList.add('notify-green-glow');
+        } else {
+            idCardEl.classList.remove('notify-green-glow');
+            noteTextEl.classList.remove('notify-green-glow');
         }
 
         const rationInfoMsg = document.getElementById('ration-info-msg');
@@ -1815,20 +1826,12 @@
         document.getElementById('badge-position-text').innerText = currentUser.position || "사원";
         document.getElementById('badge-equipped-text').innerText = currentUser.equippedWeapon || "없음";
         
+        const noteGlowClass = (currentUser.noteGlowUntil && Date.now() < currentUser.noteGlowUntil) ? 'glow-text' : '';
         const noteEl = document.getElementById('badge-notes-text');
         noteEl.innerText = (currentUser.badge && currentUser.badge.notes) ? currentUser.badge.notes : "특이사항 없음";
         
-        // 특이사항 및 사원증 깜빡임 효과 연동
-        const mainIdCard = document.getElementById('main-id-card');
-        if (currentUser.hasNewItemInteraction) {
-            mainIdCard.classList.add('glow-green');
-            noteEl.classList.add('glow-green-text');
-        } else {
-            mainIdCard.classList.remove('glow-green');
-            noteEl.classList.remove('glow-green-text');
-            
-            // 기존 골드빛 글로우
-            const noteGlowClass = (currentUser.noteGlowUntil && Date.now() < currentUser.noteGlowUntil) ? 'glow-text' : '';
+        // 아이템 사용 점등 효과가 우선 적용되도록 처리
+        if (!currentUser.hasItemUsedOnMe) {
             noteEl.className = noteGlowClass;
         }
 
@@ -1882,89 +1885,6 @@
         checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop(); renderPointRanking(); renderVipOpponents();
-    }
-
-    function clearItemInteractionGlow() {
-        if (currentUser && currentUser.hasNewItemInteraction) {
-            currentUser.hasNewItemInteraction = false;
-            saveDB();
-            updateUI();
-        }
-    }
-
-    function triggerQuarantineTransition() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('ranking-bottom-bar').style.display = 'none';
-        
-        const qOverlay = document.getElementById('quarantine-room-overlay');
-        const qLoading = document.getElementById('quarantine-loading');
-        const qContent = document.getElementById('quarantine-content');
-        const qStatus = document.getElementById('quarantine-status-msg');
-        
-        qOverlay.style.display = 'flex';
-        qLoading.style.display = 'flex';
-        qContent.style.display = 'none';
-        qStatus.style.display = 'none';
-
-        setTimeout(() => {
-            qLoading.style.display = 'none';
-            showQuarantineRoom();
-        }, 2500);
-    }
-
-    function showQuarantineRoom() {
-        document.getElementById('main-screen').style.display = 'none';
-        document.getElementById('ranking-bottom-bar').style.display = 'none';
-        
-        const qOverlay = document.getElementById('quarantine-room-overlay');
-        const qContent = document.getElementById('quarantine-content');
-        const qStatus = document.getElementById('quarantine-status-msg');
-        const qText = document.getElementById('quarantine-text');
-        const qQuestion = document.getElementById('quarantine-question');
-        const qButtons = document.getElementById('quarantine-buttons');
-        
-        qOverlay.style.display = 'flex';
-
-        if (currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil) {
-            if (!currentUser.quarantineAnswered) {
-                qContent.style.display = 'flex';
-                qStatus.style.display = 'none';
-                
-                const nickname = (currentUser.badge && currentUser.badge.nickname) ? currentUser.badge.nickname : currentUser.name;
-                qText.innerHTML = `[${nickname}] 당신은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 답을 해 주시겠어요?`;
-                
-                const randQ = Q_QUESTIONS[Math.floor(Math.random() * Q_QUESTIONS.length)];
-                qQuestion.innerText = `Q. ${randQ}`;
-            } else {
-                qContent.style.display = 'none';
-                qStatus.style.display = 'block';
-            }
-        } else {
-            // 시간이 다 된 경우 정화 및 복귀
-            currentUser.pollution = 0;
-            currentUser.quarantineUntil = 0;
-            saveDB();
-            updateUI();
-            document.getElementById('main-screen').style.display = 'block';
-            document.getElementById('ranking-bottom-bar').style.display = 'block';
-        }
-    }
-
-    function answerQuarantine(answer) {
-        if (!currentUser) return;
-        
-        // 6시간 ~ 18시간 단축
-        const reductionHours = Math.floor(Math.random() * 13) + 6; 
-        const reductionMs = reductionHours * 60 * 60 * 1000;
-        
-        currentUser.quarantineUntil = Math.max(Date.now(), currentUser.quarantineUntil - reductionMs);
-        currentUser.quarantineAnswered = true;
-        
-        addHistoryLog(currentUser, `[여우 상담실] 질문에 답변하여 격리 시간이 ${reductionHours}시간 단축되었습니다.`);
-        saveDB();
-        
-        showCustomAlert(`상담이 접수되었습니다. 회복 시간이 ${reductionHours}시간 단축되었습니다.`);
-        showQuarantineRoom();
     }
 
     function switchTab(tabId, el) {
@@ -2097,16 +2017,16 @@
         const item = pendingTargetItemName;
         const targetUser = db.users[targetCode];
 
+        targetUser.hasItemUsedOnMe = true;
+
         if (pendingTargetIsPotion) {
             applyItemEffect(targetUser, item, true);
             targetUser.noteGlowUntil = Date.now() + 10000; 
-            targetUser.hasNewItemInteraction = true;
             addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
             addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
         } else if (item === "스마일 스티커") {
             appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
             targetUser.noteGlowUntil = Date.now() + 10000;
-            targetUser.hasNewItemInteraction = true;
             addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
             addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
         }
@@ -2351,7 +2271,7 @@
             return `
                 <div class="shop-item ${isSoldOut ? 'sold-out' : ''}">
                     <div>
-                        <span class="shop-item-title">${idx + 1}. ${itemName}</span><br>
+                        <span style="font-weight:bold; font-size:13px;">${idx + 1}. ${itemName}</span><br>
                         <span style="font-size:10px; color:#888;">${item.desc} (잔여: ${remaining === 99 ? '무제한' : remaining + '/3개'})</span>
                     </div>
                     <button ${isSoldOut ? 'disabled' : ''} onclick="buyRegularShopItem('${itemId}', '${itemName}', ${item.price})">
@@ -3089,4 +3009,301 @@
             });
             let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
             if (unpicked.length === 0) unpicked = [...availablePool];
-            let shuffled = [...unpicked].sort(() => 0.
+            let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
+            shuffled.slice(0, 3).forEach(it => { if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it); });
+            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리`);
+        } else {
+            setUFODialogue(" 좋은 물건을 산다. ");
+            msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
+            addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배`);
+        }
+        saveDB();
+        setTimeout(() => {
+            dealerCardValue = Math.floor(Math.random() * 13) + 1;
+            document.getElementById('hl-dealer-card').innerText = dealerCardValue;
+            document.getElementById('hl-player-card').innerText = "?";
+            btnH.disabled = false; btnL.disabled = false;
+            updateUI();
+        }, 1500);
+    }
+    
+    function renderAlienShop() {
+        const container = document.getElementById('alien-items-container');
+        if (!container) return;
+        
+        let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
+        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
+        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+        unlocked = unlocked.filter(item => {
+            if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
+            if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+            return true;
+        });
+
+        if (unlocked.length === 0) {
+            container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
+            return;
+        }
+
+        container.innerHTML = unlocked.map(itemName => {
+            const item = ITEM_CATALOG[itemName];
+            const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
+            return `
+                <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
+                    <div>
+                        <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
+                        <span style="font-size:10px; color:#aaa;">${item.desc}</span>
+                    </div>
+                    <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function buyAlienItem(itemName, price) {
+        if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
+        if (currentUser.alienBoughtItems.includes(itemName)) { showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); return; }
+        if (currentUser.points < price) { showLuxuryAlert(); return; }
+        
+        currentUser.points -= price; 
+        currentUser.inventory.push(itemName);
+        currentUser.alienBoughtItems.push(itemName);
+        
+        addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
+        setUFODialogue("훌륭한 거래였습니다.");
+        saveDB(); updateUI();
+    }
+
+    function useFacility(bet) {
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
+        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
+        if (currentUser.points < bet) { showLuxuryAlert(); return false; }
+        currentUser.points -= bet; currentUser.facilityCount += 1;
+        addPollution(2); return true;
+    }
+    function winPoints(amount) {
+        currentUser.points += amount; saveDB(); updateUI();
+        showPointGainEffect(amount); 
+    }
+
+    function checkVIPStatus() {
+        const deniedBox = document.getElementById('vip-denied-box');
+        const allowedBox = document.getElementById('vip-allowed-box');
+        const displayVip = document.getElementById('display-vip');
+
+        if (currentUser.code === 'kario0987') {
+            displayVip.innerHTML = 'VVIP<span> (1급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+        } else if (currentUser.hasVIP) {
+            displayVip.innerHTML = 'VIP<span> (2급)</span>'; deniedBox.style.display = 'none'; allowedBox.style.display = 'block';
+        } else {
+            displayVip.innerHTML = '일반<span> (3급)</span>'; deniedBox.style.display = 'block'; allowedBox.style.display = 'none';
+        }
+    }
+
+    // --- 통제 콘솔 ---
+    function openAdminScreen() {
+        document.getElementById('main-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none';
+        document.getElementById('admin-screen').style.display = 'block';
+        renderAdminSuggestions();
+    }
+    function closeAdminScreen() {
+        document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('main-screen').style.display = 'block';
+        document.getElementById('ranking-bottom-bar').style.display = 'block';
+    }
+    function adminRegisterNewEmployee() {
+        const name = document.getElementById('new-emp-name').value.trim();
+        const code = document.getElementById('new-emp-code').value.trim();
+        const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
+        const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
+        const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
+
+        if (!name || !code) return;
+        if (db.users[code]) { showCustomAlert('이미 존재하는 사원코드입니다.'); return; }
+        const generatedNo = generateSerialNo(aff, pos, team);
+
+        db.users[code] = {
+            code: code, name: name, affiliation: aff, team: team, position: pos,
+            no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
+            facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
+            blindfoldUntil: 0, quarantineUntil: 0, equippedWeapon: null, bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
+            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
+            inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
+            badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
+        };
+
+        saveDB();
+        document.getElementById('new-emp-name').value = ''; document.getElementById('new-emp-code').value = '';
+        document.getElementById('new-emp-pos').value = ''; document.getElementById('new-emp-aff').value = ''; document.getElementById('new-emp-team').value = '';
+        showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
+    }
+
+    function adminUpdateEmployee() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        const aff = document.getElementById('adm-set-affiliation').value.trim();
+        const team = document.getElementById('adm-set-team').value.trim();
+        const pos = document.getElementById('adm-set-position').value.trim();
+        const points = parseInt(document.getElementById('adm-target-points').value);
+
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) return;
+        if (aff) targetUser.affiliation = aff; if (team) targetUser.team = team; if (pos) targetUser.position = pos;
+        if (!isNaN(points)) targetUser.points = points;
+        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
+
+        saveDB(); updateUI(); showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
+    }
+
+    function adminToggleVIP() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+        if (targetUser.code === 'kario0987') { showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.'); return; }
+
+        targetUser.hasVIP = !targetUser.hasVIP;
+        const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
+        addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
+        saveDB(); updateUI(); showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
+    }
+
+    function adminControlPollution(action) {
+        const targetNo = document.getElementById('adm-poll-target-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
+        let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+        if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+
+        if (action === 'set') {
+            const val = parseInt(document.getElementById('adm-poll-set-val').value);
+            if (isNaN(val) || val < 0 || val > 100) { showCustomAlert('0에서 100 사이의 수치를 입력해주세요.'); return; }
+            targetUser.pollution = val;
+            if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
+        } else if (action === 'max') {
+            targetUser.pollution = 100; targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
+        } else if (action === 'zero') {
+            targetUser.pollution = 0; targetUser.quarantineUntil = 0; targetUser.lastPollutionTime = Date.now();
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
+        }
+        saveDB(); updateUI();
+    }
+
+    function adminDeleteEmployee() {
+        const targetNo = document.getElementById('adm-delete-no').value.trim();
+        if (!targetNo) return;
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo);
+        if (!targetCode || targetCode === 'kario0987') return;
+        delete db.users[targetCode];
+        if (db.p2pDeals) db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
+        saveDB(); document.getElementById('adm-delete-no').value = '';
+        if (currentUser && currentUser.code === targetCode) logout();
+    }
+
+    function renderAdminSuggestions() {
+        const listEl = document.getElementById('admin-suggestion-list');
+        if (!db.suggestions || db.suggestions.length === 0) { listEl.innerHTML = '<div style="color:#888; font-size:11px;">접수된 건의가 없습니다.</div>'; return; }
+        listEl.innerHTML = db.suggestions.map((s, idx) => `
+            <div class="suggestion-item" style="border-color:${s.status === 'RESOLVED' ? '#4CAF50' : '#552222'};">
+                <div class="suggestion-meta">
+                    <span>[${s.author} / NO.${s.no}] ${s.date} - <b style="color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</b></span>
+                    <button onclick="deleteSuggestion(${idx})" style="background:#551a1a; border:none; color:#ff8888; cursor:pointer; font-size:10px; font-weight:bold; border-radius:3px; padding:2px 6px;">삭제</button>
+                </div>
+                <div style="font-weight:bold; color:#ffcccc; margin-bottom:5px;">${s.title}</div>
+                <div style="color:#ddd; margin-bottom:10px; line-height:1.4;">${s.content}</div>
+                ${s.status === 'PENDING' ? `
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="admin-reply-${s.id}" class="bet-input" style="flex:1; text-align:left;" placeholder="답변을 입력하세요">
+                        <button class="game-btn" style="margin:0; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20;" onclick="adminReplySuggestion(${s.id})">해결 처리</button>
+                    </div>
+                ` : `
+                    <div style="background:rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.3); padding:8px; border-radius:4px; font-size:11px; color:#a3f7b5;">
+                        <b>[상담사 답변]</b> ${s.reply}
+                    </div>
+                `}
+            </div>
+        `).join('');
+    }
+
+    function adminReplySuggestion(id) {
+        const replyInput = document.getElementById(`admin-reply-${id}`);
+        const replyText = replyInput.value.trim();
+        if (!replyText) { showCustomAlert("답변 내용을 입력해주세요."); return; }
+        const sugg = db.suggestions.find(s => s.id === id);
+        if (sugg) {
+            sugg.status = 'RESOLVED'; sugg.reply = replyText;
+            let targetUser = db.users[sugg.code];
+            if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`); }
+            saveDB(); renderAdminSuggestions();
+        }
+    }
+
+    function deleteSuggestion(index) { db.suggestions.splice(index, 1); saveDB(); renderAdminSuggestions(); }
+
+    function attemptLogin() {
+        const name = document.getElementById('nickname-input').value.trim();
+        const code = document.getElementById('code-input').value.trim();
+        
+        if (db.users[code] && db.users[code].name === name) {
+            currentUser = db.users[code];
+            
+            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
+            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
+            if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
+            if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
+            
+            if(database) {
+                database.ref('online/' + code).set(true);
+                database.ref('online/' + code).onDisconnect().remove();
+            }
+
+            hasShownFoxAlert = currentUser.pollution >= 100;
+            checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
+
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            document.getElementById('ranking-bottom-bar').style.display = 'block';
+            
+            checkVIPStatus(); loadBadgeInfo(); updateUI();
+            
+            document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
+
+            sessionSeconds = 0; clearInterval(sessionTimer);
+            sessionTimer = setInterval(() => {
+                sessionSeconds++;
+                const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(sessionSeconds % 60).padStart(2, '0');
+                document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
+                checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
+                
+                if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
+                
+                // 특이사항 빛나는 효과 갱신 (초록불빛이 아닐 때만)
+                if (currentUser && currentUser.noteGlowUntil && Date.now() > currentUser.noteGlowUntil) {
+                    const el = document.getElementById('badge-notes-text');
+                    if (el.classList.contains('glow-text')) el.classList.remove('glow-text');
+                }
+            }, 1000);
+        } else {
+            showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
+        }
+    }
+
+    function logout() {
+        if (currentUser && database) database.ref('online/' + currentUser.code).remove();
+        clearInterval(sessionTimer); currentUser = null; hasShownFoxAlert = false; updateVisualDistortion(0);
+        document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
+        document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
+        document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
+        document.body.className = ""; // 테마 초기화
+    }
+</script>
+
+</body>
+</html>
