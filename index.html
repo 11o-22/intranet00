@@ -1263,6 +1263,16 @@
                     checkVipMultiplayerState();
                 }
             } else {
+                    // ★ [추가] 서버에서 사원 명단을 모두 불러온 직후 자동 로그인 실행
+                    const savedCode = localStorage.getItem('corp_logged_code');
+                    if (savedCode && db.users[savedCode]) {
+                        const u = db.users[savedCode];
+                        document.getElementById('nickname-input').value = u.name;
+                        document.getElementById('code-input').value = u.code;
+                        attemptLogin(); // 자동 실행
+                    }
+                }
+            } else {
                 saveDB();
             }
         });
@@ -3421,16 +3431,6 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
             document.body.className = ""; // 테마 초기화
         }
-    // ★ [추가] 페이지가 로드될 때 저장된 로그인 정보가 있다면 자동 로그인
-    window.addEventListener('DOMContentLoaded', () => {
-        const savedCode = localStorage.getItem('corp_logged_code');
-        if (savedCode && db.users[savedCode]) {
-            const u = db.users[savedCode];
-            document.getElementById('nickname-input').value = u.name;
-            document.getElementById('code-input').value = u.code;
-            attemptLogin(); // 자동 실행
-        }
-    });
     </script>
 </body>
 </html>
