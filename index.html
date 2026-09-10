@@ -3325,8 +3325,10 @@
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
         if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
         if (currentUser.points < bet) { showLuxuryAlert(); return false; }
-        currentUser.points -= bet; currentUser.facilityCount += 1;
-        addPollution(2); return true;
+        currentUser.points -= bet; 
+        currentUser.facilityCount += 1;
+        addPollution(2); 
+        return true;
     }
     function winPoints(amount) {
         currentUser.points += amount; saveDB(); updateUI();
