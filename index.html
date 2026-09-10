@@ -1264,7 +1264,7 @@
                     const updatedUser = db.users[currentUser.code];
                     if (!updatedUser && currentUser.code !== 'kario0987') {
                         logout();
-                        showCustomAlert('계정이 당국에 의해 말소되었습니다.');
+                        showCustomAlert('계정이 상담사에 의해 말소되었습니다.');
                         return;
                     }
                     currentUser = updatedUser;
@@ -1578,8 +1578,18 @@
         }
     } else if (user.nostalgiaUntil && Date.now() >= user.nostalgiaUntil) {
         user.nostalgiaUntil = 0;
-        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 끈이 해제되었습니다.`);
-        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 효과 종료`);
+        let senderCode = user.nostalgiaSender || user.code; 
+        if (db.users[senderCode]) {
+            db.users[senderCode].inventory.push("노스텔지어 끈");
+            // 주인이 본인이 아닐 경우, 주인에게도 알림 로그를 남깁니다.
+            if (senderCode !== user.code) {
+                addHistoryLog(db.users[senderCode], `[아이템 회수] ${user.name} 사원에게서 노스텔지어 끈이 자동 회수되었습니다.`);
+            }
+        }
+        user.nostalgiaSender = null; // 회수 후 꼬리표 초기화
+        
+        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 주인의 인벤토리로 회수되었습니다.`);
+        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 자동 회수됨`);
         saveDB();
     }
 
@@ -1594,6 +1604,7 @@
             user.lastPollutionTime += steps * threeHoursMs;
             saveDB();
         }
+    }
 
     function addPollution(amount) {
         if (!currentUser || currentUser.code === 'kario0987') return; 
@@ -2206,39 +2217,31 @@
 
         targetUser.hasItemUsedOnMe = true;
 
-        if (pendingTargetIsPotion) {
-            applyItemEffect(targetUser, item, true);
-            targetUser.noteGlowUntil = Date.now() + 10000; 
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
-            addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
-        } else if (item === "스마일 스티커") {
-            appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
-            targetUser.noteGlowUntil = Date.now() + 10000;
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
-            addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
-        }
-        // ★ [추가] 노스텔지어 끈 장착 중일 때 5분마다 오염도 1%씩 자동 감소
-    if (user.nostalgiaUntil && Date.now() < user.nostalgiaUntil) {
-        if (!user.nostalgiaLastReduced) user.nostalgiaLastReduced = Date.now();
-        const fiveMinutesMs = 5 * 60 * 1000;
-        const elapsedNostalgiaTime = Date.now() - user.nostalgiaLastReduced;
+            if (pendingTargetIsPotion) {
+        applyItemEffect(targetUser, item, true);
+        targetUser.noteGlowUntil = Date.now() + 10000; 
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
+        addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
+    } else if (item === "스마일 스티커") {
+        appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
+        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+    } else if (item === "노스텔지어 끈") {
+        // ★ [추가] 타인에게 노스텔지어 끈 사용 시 상대방(targetUser)에게 5시간 타이머 세팅
+        targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
+        targetUser.nostalgiaLastReduced = Date.now();
+        targetUser.nostalgiaSender = currentUser.code; 
+        targetUser.noteGlowUntil = Date.now() + 10000;
         
-        if (elapsedNostalgiaTime >= fiveMinutesMs && user.pollution > 0) {
-            const steps = Math.floor(elapsedNostalgiaTime / fiveMinutesMs);
-            user.pollution = Math.max(0, user.pollution - steps);
-            user.nostalgiaLastReduced += steps * fiveMinutesMs;
-            saveDB();
-        }
-    } else if (user.nostalgiaUntil && Date.now() >= user.nostalgiaUntil) {
-        user.nostalgiaUntil = 0;
-        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 끈이 해제되었습니다.`);
-        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 효과 종료`);
-        saveDB();
+        appendBadgeNoteToUser(targetUser, `[장착됨] 누군가 당신에게 노스텔지어 끈을 매어주었습니다. (5시간 동안 오염도 서서히 감소)`);
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 노스텔지어 끈 장착`);
+        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
     }
 
-        removeItemFromInventory(currentUser, item, 1);
-        saveDB(); updateUI(); closeItemTargetModal();
-    }
+    removeItemFromInventory(currentUser, item, 1);
+    saveDB(); updateUI(); closeItemTargetModal();
+}
 
     function renderInventory() {
         const container = document.getElementById('inventory-list-container');
@@ -2395,7 +2398,17 @@
             appendBadgeNoteToUser(targetUser, `[취함] 알코올 섭취 (10시간 지속)`);
             if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
         }
-
+        else if (cat.effect === 'equip_nostalgia') {
+            if (targetUser.nostalgiaUntil && Date.now() < targetUser.nostalgiaUntil) {
+                if(!isOthers) showCustomAlert('이미 노스텔지어 끈 효과가 적용 중입니다.');
+                return false;
+            }
+            targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
+            targetUser.nostalgiaLastReduced = Date.now();
+            targetUser.nostalgiaSender = currentUser.code; 
+            appendBadgeNoteToUser(targetUser, `[장착됨] 노스텔지어 끈 장착 (5시간 동안 오염도 서서히 감소)`);
+            if(!isOthers) showCustomAlert("노스텔지어 끈을 장착했습니다. 5시간 동안 오염도가 서서히 감소합니다.");
+}
         return true;
     }
 
