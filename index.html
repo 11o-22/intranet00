@@ -2726,19 +2726,16 @@
         if (session.state === 'WAITING') {
             statusEl.innerText = "3초 내에 선택을 완료하세요!";
             
-            // 승부 판정 (둘 다 입력했거나 시간 초과 시 강제 평가)
             if (session.p1Choice != null && session.p2Choice != null) {
-                if (isP1) evaluateVipMultiResult(session); // 중복 실행 방지를 위해 방장(P1)이 주로 평가
+                if (isP1) evaluateVipMultiResult(session); 
             }
             
-            // 타임 오버 시 강제 처리 (상대방이 튕기거나 미입력 시 무한정지 방지)
             if (Date.now() > session.endTime + 1000) {
-                if (isP1) { // P1이 연결되어 있다면 P1이 처리
+                if (isP1) { 
                     if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
                     if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
                     evaluateVipMultiResult(session);
                 } else if (Date.now() > session.endTime + 3000) {
-                    // P1이 3초 넘게 처리 안하면 오프라인으로 간주하고 P2가 강제 처리
                     if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
                     if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
                     evaluateVipMultiResult(session);
@@ -2748,13 +2745,16 @@
             statusEl.innerHTML = `<span style="color:#fff; font-size:15px; line-height:1.6;">${session.resultText}</span>`;
             document.getElementById('vip-game-timer').innerText = "-";
             
-            if (!session.closeTimerStarted) {
-                session.closeTimerStarted = true;
+            if (window.lastFinishedSessionId !== session.id) {
+                window.lastFinishedSessionId = session.id; 
+                
+                // --- 승패 결과 팝업창 호출 ---
                 if (session.isDraw) {
                     showCustomAlert("🤝 승부가 나지 않았습니다. 무승부!");
                 } else if (session.winnerName) {
                     showCustomAlert(`🏆 ${session.winnerName} 승리! 🏆`);
                 }
+                
                 setTimeout(() => {
                     closeVipGameOverlay();
                     if (isP1) {
@@ -2781,7 +2781,6 @@
         else session.p2Choice = choice;
         saveDB();
         
-        // 제출 즉시 두 명 모두 선택했으면 평가 실행
         if (session.p1Choice != null && session.p2Choice != null) {
             evaluateVipMultiResult(session);
         }
@@ -2814,7 +2813,7 @@
         
         if (winner === 'draw') {
             resultText += `무승부! 베팅금이 유지됩니다.`;
-            session.isDraw = true;
+            session.isDraw = true; 
         } else {
             let winUser = winner === 'p1' ? p1User : p2User;
             let loseUser = winner === 'p1' ? p2User : p1User;
@@ -2830,7 +2829,7 @@
             resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
             
             session.winnerCode = winUser.code;
-            session.winnerName = winUser.name;
+            session.winnerName = winUser.name; 
             session.winAmount = session.bet;
         }
         session.resultText = resultText;
@@ -2860,7 +2859,6 @@
             }
         }
     }, 500);
-
     // --- 1:1 밀실 거래 ---
     function checkP2PExpiration() {
         if (!db.p2pDeals) db.p2pDeals = [];
