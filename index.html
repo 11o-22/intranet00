@@ -2684,7 +2684,7 @@
         }
     }
 
-    function renderVipGameOverlay(session) {
+   function renderVipGameOverlay(session) {
         document.getElementById('vip-game-overlay').style.display = 'flex';
         const isP1 = session.p1 === currentUser.code;
         const oppCode = isP1 ? session.p2 : session.p1;
@@ -2745,14 +2745,16 @@
             statusEl.innerHTML = `<span style="color:#fff; font-size:15px; line-height:1.6;">${session.resultText}</span>`;
             document.getElementById('vip-game-timer').innerText = "-";
             
-            if (window.lastFinishedSessionId !== session.id) {
-                window.lastFinishedSessionId = session.id; 
+            // ★ 수정된 부분: 팝업이 확실하게 한 번만 뜨도록 고유 플래그 처리
+            if (!window['popup_shown_' + session.id]) {
+                window['popup_shown_' + session.id] = true;
                 
-                // --- 승패 결과 팝업창 호출 ---
-                if (session.isDraw) {
-                    showCustomAlert("🤝 승부가 나지 않았습니다. 무승부!");
-                } else if (session.winnerName) {
-                    showCustomAlert(`🏆 ${session.winnerName} 승리! 🏆`);
+                // 확실하게 저장되어 있는 승자 코드(winnerCode)를 기반으로 팝업 호출
+                if (session.winnerCode && db.users[session.winnerCode]) {
+                    let wName = db.users[session.winnerCode].name;
+                    showCustomAlert(`🏆 [${wName}] 승리! 🏆`);
+                } else {
+                    showCustomAlert("🤝 무승부! 베팅금이 유지됩니다.");
                 }
                 
                 setTimeout(() => {
