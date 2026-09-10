@@ -1218,6 +1218,8 @@
                         const u = data.users[savedCode];
                         document.getElementById('nickname-input').value = u.name;
                         document.getElementById('code-input').value = u.code;
+                        // ★ [수정] 시스템이 준비할 시간을 0.5초 준 뒤 로그인 실행
+                        setTimeout(() => {
                         attemptLogin();
                     }
                 }
