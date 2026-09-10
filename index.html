@@ -3365,6 +3365,7 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             
             if (db.users[code] && db.users[code].name === name) {
                 currentUser = db.users[code];
+                localStorage.setItem('corp_logged_code', code);
                 
                 if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
                 if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
@@ -3420,6 +3421,16 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
             document.body.className = ""; // 테마 초기화
         }
+    // ★ [추가] 페이지가 로드될 때 저장된 로그인 정보가 있다면 자동 로그인
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedCode = localStorage.getItem('corp_logged_code');
+        if (savedCode && db.users[savedCode]) {
+            const u = db.users[savedCode];
+            document.getElementById('nickname-input').value = u.name;
+            document.getElementById('code-input').value = u.code;
+            attemptLogin(); // 자동 실행
+        }
+    });
     </script>
 </body>
 </html>
