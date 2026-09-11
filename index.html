@@ -3304,15 +3304,44 @@
     }
   // --- 우주 쇼핑몰 ---
     let dealerCardValue = 7;
-    function playHighLow(choice) {
+   function playHighLow(choice) {
         if (!currentUser) return;
-        if (currentUser.alienDate !== getTodayStr()) {
-            currentUser.alienDate = getTodayStr(); 
+        
+        const now = Date.now();
+        const fourHoursMs = 4 * 60 * 60 * 1000; // 4시간 (밀리초)
+
+        // 날짜가 바뀌면 횟수와 마지막 플레이 시간 초기화
+        const todayStr = getTodayStr();
+        if (currentUser.alienDate !== todayStr) {
+            currentUser.alienDate = todayStr; 
             currentUser.alienTries = 0; 
             currentUser.alienUnlockedItems = []; 
             currentUser.alienBoughtItems = [];
+            currentUser.lastAlienPlayTime = 0;
         }
-        if (currentUser.code !== 'kario0987' && currentUser.alienTries >= 2) return;
+
+        // 관리자(kario0987)는 쿨타임 및 횟수 제한 없음
+        if (currentUser.code !== 'kario0987') {
+            // 이미 2번 다 썼을 때
+            if (currentUser.alienTries >= 2) {
+                showCustomAlert("금일 우주 주파수 접속 기회(2회)를 모두 소진했습니다.");
+                return;
+            }
+
+            // 첫 번째 시도를 이미 했고, 두 번째 시도까지 4시간이 안 지났을 때
+            if (currentUser.alienTries === 1 && currentUser.lastAlienPlayTime) {
+                const elapsed = now - currentUser.lastAlienPlayTime;
+                if (elapsed < fourHoursMs) {
+                    const remainMinutes = Math.ceil((fourHoursMs - elapsed) / (60 * 1000));
+                    const remainHours = Math.floor(remainMinutes / 60);
+                    const mins = remainMinutes % 60;
+                    
+                    let timeMsg = remainHours > 0 ? `${remainHours}시간 ${mins}분` : `${mins}분`;
+                    showCustomAlert(`다음 우주 주파수 연결까지 약 ${timeMsg} 남았습니다.`);
+                    return;
+                }
+            }
+        }
         
         const btnH = document.getElementById('btn-hl-high'); 
         const btnL = document.getElementById('btn-hl-low');
@@ -3324,7 +3353,10 @@
         const msgEl = document.getElementById('hl-msg');
 
         let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
+        
+        // 횟수 증가 및 마지막 플레이 시간 기록
         currentUser.alienTries = (currentUser.alienTries || 0) + 1;
+        currentUser.lastAlienPlayTime = now;
 
         if (win) {
             setUFODialogue("……. ");
@@ -3367,7 +3399,6 @@
             updateUI();
         }, 1500);
     }
-    
    function renderAlienShop() {
         const container = document.getElementById('alien-items-container');
         if (!container) return;
@@ -3492,7 +3523,7 @@
             no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
             facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
             blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
-            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
+            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [], lastAlienPlayTime: 0
           inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
             badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
         };
