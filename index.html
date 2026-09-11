@@ -2536,8 +2536,84 @@
                 } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
             } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
         } else if (cat.effect === 'random_box') {
-            const allItemKeys = Object.keys(ITEM_CATALOG).filter(k => k !== "랜덤박스");
-            targetUser.inventory.push(allItemKeys[Math.floor(Math.random() * allItemKeys.length)]);
+            // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
+            const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬");
+            const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬");
+
+            // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
+            function getWeightedRandomItem(pool, user) {
+                let weights = [];
+                let totalWeight = 0;
+
+                for (let itemName of pool) {
+                    let itemData = ITEM_CATALOG[itemName];
+                    if (!itemData) continue;
+
+                    let price = parseInt(itemData.price, 10);
+                    if (isNaN(price)) price = 9999; // 가격이 '???' 같은 문자열이면 최고가 취급
+
+                    // 가격의 2.5제곱에 반비례하도록 설정 (1000 포인트짜리는 10 포인트짜리보다 약 10만 배 안 나오게 됨)
+                    let weight = 10000 / Math.pow(price, 2.5);
+
+                    // 3. 직급 및 소속 맞춤 조건 (확률 부스트)
+                    let hasCondition = false;
+                    let isMatched = false;
+                    
+                    let uAff = user.affiliation || "";
+                    let uTeam = user.team || "";
+                    let uPos = user.position || "사원";
+                    let isAdmin = user.code === 'kario0987';
+                    
+                    // ITEM_CATALOG에 명시된 restrict 속성 체크
+                    if (itemData.restrictRank || itemData.restrictDept) {
+                        hasCondition = true;
+                        let rankOk = !itemData.restrictRank || itemData.restrictRank.includes(uPos) || isAdmin;
+                        let deptOk = !itemData.restrictDept || itemData.restrictDept.some(d => uAff.includes(d) || uTeam.includes(d)) || isAdmin;
+                        if (rankOk && deptOk) isMatched = true;
+                    }
+                    // 별도 속성이 없는 우주 쇼핑몰 아이템 하드코딩 조건 체크
+                    else {
+                        let isDisasterTeam = uAff.includes("재난관리국") || uTeam.includes("재난관리") || isAdmin;
+                        let isSecurityTeam = uTeam.includes("보안팀") || uTeam.includes("경비팀") || isAdmin;
+                        let isDaydreamTeam = uAff.includes("백일몽 주식회사") || isAdmin;
+                        let isHighRank = ["과장", "차장", "부장", "이사", "대표", "사장"].includes(uPos) || isAdmin;
+
+                        if (itemName === "작두" || itemName === "유리손포") { hasCondition = true; if (isDisasterTeam) isMatched = true; }
+                        else if (itemName === "착한 친구" || itemName === "보안팀 의상 세트") { hasCondition = true; if (isDaydreamTeam) isMatched = true; }
+                        else if (["버터 나이프", "은반지", "빨간 리본", "고급진 술", "금고"].includes(itemName)) { hasCondition = true; if (isHighRank) isMatched = true; }
+                        else if (itemName === "노스텔지어 끈") { hasCondition = true; if (isSecurityTeam) isMatched = true; }
+                    }
+
+                    // 조건이 걸린 아이템일 때, 자격에 부합하면 확률을 25배 뻥튀기하고 맞지 않으면 0.05배(거의 안 나옴)로 패널티
+                    if (hasCondition) {
+                        if (isMatched) weight *= 25; 
+                        else weight *= 0.05; 
+                    }
+
+                    weights.push({ name: itemName, weight: weight });
+                    totalWeight += weight;
+                }
+
+                // 랜덤 뽑기 실행
+                let rand = Math.random() * totalWeight;
+                for (let i = 0; i < weights.length; i++) {
+                    rand -= weights[i].weight;
+                    if (rand <= 0) return weights[i].name;
+                }
+                return weights[weights.length - 1].name;
+            }
+
+            // 4. 60% 확률로 유쾌 판매소(regular), 40% 확률로 우주 쇼핑몰(alien) 선택
+            let isRegular = Math.random() < 0.6;
+            let selectedPool = isRegular ? regularPool : alienPool;
+            
+            let pickedItem = getWeightedRandomItem(selectedPool, targetUser);
+            targetUser.inventory.push(pickedItem);
+
+            // 유저 본인이 열었을 경우 무슨 아이템이 나왔는지 팝업으로 알려줌
+            if (!isOthers) {
+                showCustomAlert(`[랜덤박스] 두근두근... 앗! 상자 안에서 '${pickedItem}'(이)가 나왔습니다!`);
+            }
         }
         else if (cat.effect === 'drink_wine') {
             appendBadgeNoteToUser(targetUser, `[취함] 알코올 섭취 (10시간 지속)`);
@@ -3013,89 +3089,97 @@
     }
 
    function renderVipGameOverlay(session) {
-        document.getElementById('vip-game-overlay').style.display = 'flex';
-        const isP1 = session.p1 === currentUser.code;
-        const oppCode = isP1 ? session.p2 : session.p1;
-        const oppName = db.users[oppCode] ? db.users[oppCode].name : '상대방';
-        const gameNames = { 'dice': '주사위 (합산)', 'rps': '가위바위보', 'updown': '업다운 (단판)' };
+    document.getElementById('vip-game-overlay').style.display = 'flex';
+    const isP1 = session.p1 === currentUser.code;
+    const oppCode = isP1 ? session.p2 : session.p1;
+    const oppName = db.users[oppCode] ? db.users[oppCode].name : '상대방';
+    const gameNames = { 'dice': '주사위 (합산)', 'rps': '가위바위보', 'updown': '업다운 (단판)' };
 
-        document.getElementById('vip-game-title').innerText = `[${gameNames[session.game]}] vs ${oppName}`;
-        const area = document.getElementById('vip-game-area');
-        const statusEl = document.getElementById('vip-game-status');
+    document.getElementById('vip-game-title').innerText = `[${gameNames[session.game]}] vs ${oppName}`;
+    const area = document.getElementById('vip-game-area');
+    const statusEl = document.getElementById('vip-game-status');
 
-        if (myChoiceSubmitted && session.state === 'WAITING') {
-            area.innerHTML = '<div style="font-size:16px; color:#4CAF50; margin: 20px 0; text-align:center;">선택 완료! 판정 대기 중...</div>';
-        } else if (session.state === 'WAITING') {
-            if (session.game === 'dice') {
-                area.innerHTML = `
-                    <div style="margin:20px 0;">
-                        <button class="luxury-alert-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button>
-                    </div>
-                `;
-            } else if (session.game === 'rps') {
-                area.innerHTML = `
-                    <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
-                        <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button>
-                    </div>
-                `;
-            } else if (session.game === 'updown') {
-                area.innerHTML = `
-                    <div style="margin:10px 0;">
-                        <div style="font-size:13px; color:var(--theme-text); margin-bottom:8px; text-align:center;">시스템이 정한 비밀 숫자에 가장 가까운 숫자를 적으세요! (1~999)</div>
-                        <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; box-sizing: border-box;" placeholder="숫자 입력">
-                        <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button>
-                    </div>
-                `;
-            }
-        }
-
-        if (session.state === 'WAITING') {
-            statusEl.innerText = "3초 내에 선택을 완료하세요!";
-            
-            if (session.p1Choice != null && session.p2Choice != null) {
-                if (isP1) evaluateVipMultiResult(session); 
-            }
-            
-            if (Date.now() > session.endTime + 1000) {
-                if (isP1) { 
-                    if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
-                    if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
-                    evaluateVipMultiResult(session);
-                } else if (Date.now() > session.endTime + 3000) {
-                    if (session.p1Choice == null) session.p1Choice = generateRandomChoice(session.game);
-                    if (session.p2Choice == null) session.p2Choice = generateRandomChoice(session.game);
-                    evaluateVipMultiResult(session);
-                }
-            }
-        } else if (session.state === 'FINISHED') {
-            statusEl.innerHTML = `<span style="color:#fff; font-size:15px; line-height:1.6;">${session.resultText}</span>`;
-            document.getElementById('vip-game-timer').innerText = "-";
-            
-            // ★ 수정된 부분: 팝업이 확실하게 한 번만 뜨도록 고유 플래그 처리
-            if (!window['popup_shown_' + session.id]) {
-                window['popup_shown_' + session.id] = true;
-                
-                // 확실하게 저장되어 있는 승자 코드(winnerCode)를 기반으로 팝업 호출
-                if (session.winnerCode && db.users[session.winnerCode]) {
-                    let wName = db.users[session.winnerCode].name;
-                    showCustomAlert(`🏆 [${wName}] 승리! 🏆`);
-                } else {
-                    showCustomAlert("🤝 무승부! 베팅금이 유지됩니다.");
-                }
-                
-                setTimeout(() => {
-                    closeVipGameOverlay();
-                    if (isP1) {
-                        delete db.vipSessions[session.id];
-                        saveDB();
-                    }
-                }, 1500);
-            }
+    if (myChoiceSubmitted && session.state === 'WAITING') {
+        area.innerHTML = '<div style="font-size:16px; color:#4CAF50; margin: 20px 0; text-align:center;">선택 완료! 판정 대기 중...</div>';
+    } else if (session.state === 'WAITING') {
+        if (session.game === 'dice') {
+            area.innerHTML = `
+                <div style="margin:20px 0;">
+                    <button class="luxury-alert-btn" onclick="submitVipChoice(Math.floor(Math.random()*11)+2)" style="width:100%; padding:20px; font-size:18px;">🎲 주사위 던지기</button>
+                </div>
+            `;
+        } else if (session.game === 'rps') {
+            area.innerHTML = `
+                <div style="display:flex; justify-content:center; gap:10px; margin:20px 0;">
+                    <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('가위')">✌🏻</button>
+                    <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('바위')">✊🏻</button>
+                    <button class="luxury-alert-btn" style="flex:1; padding:15px; font-size:24px;" onclick="submitVipChoice('보')">🖐🏻</button>
+                </div>
+            `;
+        } else if (session.game === 'updown') {
+            area.innerHTML = `
+                <div style="margin:10px 0;">
+                    <div style="font-size:13px; color:var(--theme-text); margin-bottom:8px; text-align:center;">시스템이 정한 비밀 숫자에 가장 가까운 숫자를 적으세요! (1~999)</div>
+                    <input type="number" id="vip-multi-ud" style="width:100%; padding:15px; font-size:18px; text-align:center; box-sizing: border-box;" placeholder="숫자 입력">
+                    <button class="luxury-alert-btn" style="width:100%; margin-top:10px;" onclick="let v = document.getElementById('vip-multi-ud').value; submitVipChoice(v ? parseInt(v) : (Math.floor(Math.random()*999)+1))">입력 완료</button>
+                </div>
+            `;
         }
     }
 
+    if (session.state === 'WAITING') {
+        statusEl.innerText = "3초 내에 선택을 완료하세요!";
+        
+        // ★ 오직 P1(방장)만 결과 판정을 실행하도록 제한 (양쪽 동시 실행으로 인한 버그 방지)
+        if (isP1) {
+            if (session.p1Choice != null && session.p2Choice != null) {
+                evaluateVipMultiResult(session); 
+            } else if (Date.now() > session.endTime + 1500) {
+                if (session.p1Choice == null) { session.p1Choice = generateRandomChoice(session.game); database.ref('vipSessions/' + session.id).update({p1Choice: session.p1Choice}); }
+                if (session.p2Choice == null) { session.p2Choice = generateRandomChoice(session.game); database.ref('vipSessions/' + session.id).update({p2Choice: session.p2Choice}); }
+                evaluateVipMultiResult(session);
+            }
+        }
+    } else if (session.state === 'FINISHED') {
+        // 결과창 시점을 각 유저의 화면에 맞게 동적으로 표시
+        let targetNumText = session.game === 'updown' ? `(비밀숫자: ${session.targetNumber})<br>` : '';
+        let myChoiceText = isP1 ? session.p1Choice : session.p2Choice;
+        let oppChoiceText = isP1 ? session.p2Choice : session.p1Choice;
+        
+        let combinedText = `${targetNumText}[나]: <b style="color:#ffd700;">${myChoiceText}</b> <br> [상대]: <b style="color:#ffd700;">${oppChoiceText}</b><br><br>`;
+        
+        if (session.winnerCode) {
+            combinedText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${session.winnerName} 승리! (+${session.bet}P)</span>`;
+        } else {
+            combinedText += `무승부! 베팅금이 유지됩니다.`;
+        }
+        
+        statusEl.innerHTML = `<span style="color:#fff; font-size:15px; line-height:1.6;">${combinedText}</span>`;
+        document.getElementById('vip-game-timer').innerText = "-";
+        
+        if (!window['popup_shown_' + session.id]) {
+            window['popup_shown_' + session.id] = true;
+            
+            if (session.winnerCode) {
+                if (session.winnerCode === currentUser.code) {
+                    showCustomAlert(`🏆 당신의 승리! 🏆 (+${session.bet} P)`);
+                } else {
+                    showCustomAlert(`💀 [${session.winnerName}] 승리... 패배했습니다.`);
+                }
+            } else {
+                showCustomAlert("🤝 무승부! 베팅금이 유지됩니다.");
+            }
+            
+            setTimeout(() => {
+                closeVipGameOverlay();
+                if (isP1) {
+                    if (database) database.ref('vipSessions/' + session.id).remove();
+                    else { delete db.vipSessions[session.id]; saveDB(); }
+                }
+            }, 1800);
+        }
+    }
+}
     function generateRandomChoice(game) {
         if (game === 'dice') return Math.floor(Math.random()*11) + 2; 
         if (game === 'rps') return ['가위','바위','보'][Math.floor(Math.random()*3)];
@@ -3104,67 +3188,85 @@
     }
 
     function submitVipChoice(choice) {
-        if (!activeVipSessionId || !db.vipSessions[activeVipSessionId]) return;
-        myChoiceSubmitted = true;
-        let session = db.vipSessions[activeVipSessionId];
+    if (!activeVipSessionId || !db.vipSessions[activeVipSessionId]) return;
+    myChoiceSubmitted = true;
+    let session = db.vipSessions[activeVipSessionId];
+    
+    // Firebase 직접 업데이트로 상대방 데이터 덮어쓰기(증발) 방지
+    if (database) {
+        let updateData = {};
+        if (session.p1 === currentUser.code) updateData.p1Choice = choice;
+        else updateData.p2Choice = choice;
+        
+        database.ref('vipSessions/' + activeVipSessionId).update(updateData);
+    } else {
         if (session.p1 === currentUser.code) session.p1Choice = choice;
         else session.p2Choice = choice;
         saveDB();
-        
-        if (session.p1Choice != null && session.p2Choice != null) {
-            evaluateVipMultiResult(session);
-        }
+    }
+}
+
+   function evaluateVipMultiResult(session) {
+    if (session.state === 'FINISHED') return;
+    
+    let p1User = db.users[session.p1];
+    let p2User = db.users[session.p2];
+    
+    // 입력값이 문자열일 경우를 대비해 확실하게 숫자로 변환 (비교 버그 원인 차단)
+    let p1c = session.p1Choice;
+    let p2c = session.p2Choice;
+    if (session.game === 'dice' || session.game === 'updown') {
+        p1c = parseInt(p1c);
+        p2c = parseInt(p2c);
     }
 
-    function evaluateVipMultiResult(session) {
-        if (session.state === 'FINISHED') return;
-        session.state = 'FINISHED';
+    let winner = 'draw';
 
-        let p1User = db.users[session.p1];
-        let p2User = db.users[session.p2];
-        let p1c = session.p1Choice;
-        let p2c = session.p2Choice;
-        let winner = 'draw';
+    if (session.game === 'dice') {
+        if (p1c > p2c) winner = 'p1'; 
+        else if (p2c > p1c) winner = 'p2';
+    } else if (session.game === 'rps') {
+        if (p1c === p2c) winner = 'draw';
+        else if ((p1c === '가위' && p2c === '보') || (p1c === '바위' && p2c === '가위') || (p1c === '보' && p2c === '바위')) winner = 'p1';
+        else winner = 'p2';
+    } else if (session.game === 'updown') {
+        let d1 = Math.abs(session.targetNumber - p1c); 
+        let d2 = Math.abs(session.targetNumber - p2c);
+        if (d1 < d2) winner = 'p1'; 
+        else if (d2 < d1) winner = 'p2';
+    }
+
+    if (winner !== 'draw') {
+        let winUser = winner === 'p1' ? p1User : p2User;
+        let loseUser = winner === 'p1' ? p2User : p1User;
         
-        let targetNumText = session.game === 'updown' ? `(비밀숫자: ${session.targetNumber})<br>` : '';
+        winUser.points += session.bet;
+        loseUser.points -= session.bet;
+        applyPollutionToUser(winUser, 3);
+        applyPollutionToUser(loseUser, 5);
 
-        if (session.game === 'dice') {
-            if (p1c > p2c) winner = 'p1'; else if (p2c > p1c) winner = 'p2';
-        } else if (session.game === 'rps') {
-            if (p1c === p2c) winner = 'draw';
-            else if ((p1c === '가위' && p2c === '보') || (p1c === '바위' && p2c === '가위') || (p1c === '보' && p2c === '바위')) winner = 'p1';
-            else winner = 'p2';
-        } else if (session.game === 'updown') {
-            let d1 = Math.abs(session.targetNumber - p1c); let d2 = Math.abs(session.targetNumber - p2c);
-            if (d1 < d2) winner = 'p1'; else if (d2 < d1) winner = 'p2';
-        }
+        addHistoryLog(winUser, `[VIP 실시간 대전 승리] ${loseUser.name}에게 +${session.bet} P`);
+        addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
 
-        let resultText = `${targetNumText}[나] ${p1User.name}: <b style="color:#ffd700;">${p1c}</b> <br> [상대] ${p2User.name}: <b style="color:#ffd700;">${p2c}</b><br><br>`;
-        
-        if (winner === 'draw') {
-            resultText += `무승부! 베팅금이 유지됩니다.`;
-            session.isDraw = true; 
-        } else {
-            let winUser = winner === 'p1' ? p1User : p2User;
-            let loseUser = winner === 'p1' ? p2User : p1User;
-            
-            winUser.points += session.bet;
-            loseUser.points -= session.bet;
-            applyPollutionToUser(winUser, 3);
-            applyPollutionToUser(loseUser, 5);
+        session.winnerCode = winUser.code;
+        session.winnerName = winUser.name; 
+        session.winAmount = session.bet;
+    } else {
+        session.isDraw = true;
+    }
+    
+    // 최종 판정 상태 저장
+    session.state = 'FINISHED';
 
-            addHistoryLog(winUser, `[VIP 실시간 대전 승리] ${loseUser.name}에게 +${session.bet} P`);
-            addHistoryLog(loseUser, `[VIP 실시간 대전 패배] ${winUser.name}에게 -${session.bet} P`);
-
-            resultText += `<span style="color:#4CAF50; font-size:18px;">🎉 ${winUser.name} 승리! (+${session.bet}P)</span>`;
-            
-            session.winnerCode = winUser.code;
-            session.winnerName = winUser.name; 
-            session.winAmount = session.bet;
-        }
-        session.resultText = resultText;
+    // P1(방장)이 데이터 충돌 없이 확정 데이터를 저장
+    if (database) {
+        database.ref('users/' + session.p1).set(p1User);
+        database.ref('users/' + session.p2).set(p2User);
+        database.ref('vipSessions/' + session.id).set(session);
+    } else {
         saveDB();
     }
+}
 
     function closeVipGameOverlay() {
         if (activeVipSessionId && db.vipSessions && db.vipSessions[activeVipSessionId]) {
