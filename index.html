@@ -4157,30 +4157,43 @@ function getTodayStr() {
             saveDB(); updateUI(); showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
         }
 
-        function adminControlPollution(action) {
-            const targetNo = document.getElementById('adm-poll-target-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+       function adminControlPollution(action) {
+        const targetNo = document.getElementById('adm-poll-target-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
 
-            if (action === 'set') {
-                const val = parseInt(document.getElementById('adm-poll-set-val').value);
-                if (isNaN(val) || val < 0 || val > 100) { showCustomAlert('0에서 100 사이의 수치를 입력해주세요.'); return; }
-                targetUser.pollution = val;
-                if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
-            } else if (action === 'max') {
-                targetUser.pollution = 100; targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
-            } else if (action === 'zero') {
-                targetUser.pollution = 0; targetUser.quarantineUntil = 0; targetUser.lastPollutionTime = Date.now();
-                addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
-                showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
-            }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
+
+        if (action === 'set') {
+            const val = parseInt(document.getElementById('adm-poll-set-val').value, 10);
+            if (isNaN(val) || val < 0 || val > 100) { showCustomAlert('0에서 100 사이의 수치를 입력해주세요.'); return; }
+            targetUser.pollution = val;
+            if (val >= 100) targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 ${val}%로 설정되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 ${val}%로 변경되었습니다.`);
+        } else if (action === 'max') {
+            targetUser.pollution = 100; 
+            targetUser.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 100%가 되어 여우 상담실로 이송되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 100%가 되었습니다.`);
+        } else if (action === 'zero') {
+            targetUser.pollution = 0; 
+            targetUser.quarantineUntil = 0; 
+            targetUser.lastPollutionTime = Date.now();
+            addHistoryLog(targetUser, `[당국 제어] 오염도가 0%로 정화되고 퇴원 처리되었습니다.`);
+            showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
+        }
+
+        // ★ Firebase에 직접 강제 푸시
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                updateUI();
+            });
+        } else {
             saveDB(); updateUI();
         }
+    }
 // ==========================================
         // ★ 당국 특수 개입 로직 (아이템 강제 지급 & 횟수 리셋)
         // ==========================================
@@ -4191,110 +4204,187 @@ function getTodayStr() {
             select.innerHTML = allItems.map(name => `<option value="${name}">${name}</option>`).join('');
         }
 
-        function adminResetLimits() {
-            const targetNo = document.getElementById('adm-special-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+       function adminResetLimits() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
 
-            // 공용시설 및 우주 쇼핑몰 횟수 리셋
-            targetUser.facilityCount = 0;
-            targetUser.alienTries = 0;
-            
-            addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한이 전면 초기화되었습니다.`);
+        targetUser.facilityCount = 0;
+        targetUser.alienTries = 0;
+        
+        addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한이 전면 초기화되었습니다.`);
+        
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 시설 이용 횟수가 리셋되었습니다.`);
+                updateUI();
+            });
+        } else {
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 시설 이용 횟수가 리셋되었습니다.`);
         }
+    }
 
-        function adminGiveItem() {
-            const targetNo = document.getElementById('adm-special-no').value.trim();
-            const itemName = document.getElementById('adm-special-item').value;
-            const qty = parseInt(document.getElementById('adm-special-qty').value) || 1;
+    function adminGiveItem() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        const itemName = document.getElementById('adm-special-item').value;
+        const qty = parseInt(document.getElementById('adm-special-qty').value, 10) || 1;
 
-            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
 
-            // 아이템을 수량만큼 인벤토리에 강제 삽입
-            for (let i = 0; i < qty; i++) {
-                targetUser.inventory.push(itemName);
-            }
+        for (let i = 0; i < qty; i++) {
+            targetUser.inventory.push(itemName);
+        }
 
-            addHistoryLog(targetUser, `[당국 개입] 보급품 '${itemName}' ${qty}개가 인벤토리에 지급되었습니다.`);
+        addHistoryLog(targetUser, `[당국 개입] 보급품 '${itemName}' ${qty}개가 인벤토리에 지급되었습니다.`);
+
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})에게 ${itemName} ${qty}개를 지급했습니다.`);
+                updateUI();
+            });
+        } else {
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})에게 ${itemName} ${qty}개를 지급했습니다.`);
         }
-    // [추가] 1. 장착 아이템 강제 회수
-        function adminForceUnequip() {
-            const targetNo = document.getElementById('adm-special-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+    }
 
-            if (!targetUser.equippedWeapons || targetUser.equippedWeapons.length === 0) {
-                showCustomAlert('해당 사원은 현재 장착 중인 아이템이 없습니다.'); return;
+    function adminForceUnequip() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
+
+        if (!targetUser.equippedWeapons || targetUser.equippedWeapons.length === 0) {
+            showCustomAlert('해당 사원은 현재 장착 중인 아이템이 없습니다.'); return;
+        }
+
+        targetUser.equippedWeapons.forEach(weaponStr => {
+            let baseName = weaponStr;
+            if (baseName.includes("(연결:") || baseName.includes("(연동:")) {
+                baseName = baseName.split(" (")[0];
+            } else if (baseName === "🔮 여우구슬") {
+                baseName = "여우구슬";
             }
+            targetUser.inventory.push(baseName);
+        });
 
-            // 장착된 아이템의 꼬리표를 떼고 다시 인벤토리에 넣습니다.
-            targetUser.equippedWeapons.forEach(weaponStr => {
-                let baseName = weaponStr;
-                if (baseName.includes("(연결:") || baseName.includes("(연동:")) {
-                    baseName = baseName.split(" (")[0];
-                } else if (baseName === "🔮 여우구슬") {
-                    baseName = "여우구슬";
-                }
-                targetUser.inventory.push(baseName);
+        targetUser.equippedWeapons = [];
+        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
+
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
+                updateUI();
             });
-
-            targetUser.equippedWeapons = []; // 장착칸 완전히 비우기
-            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
+        } else {
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
         }
+    }
 
-        // [추가] 2. 특이사항 텍스트 강제 초기화
-        function adminClearNotes() {
-            const targetNo = document.getElementById('adm-special-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+    function adminClearNotes() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
 
-            if (!targetUser.badge) targetUser.badge = { photo: "", nickname: targetUser.name, notes: "특이사항 없음" };
-            targetUser.badge.notes = "특이사항 없음"; // 내용 초기화
-            
-            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 특이사항(상태)이 모두 지워졌습니다.`);
+        if (!targetUser.badge) targetUser.badge = { photo: "", nickname: targetUser.name, notes: "특이사항 없음" };
+        targetUser.badge.notes = "특이사항 없음";
+        
+        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 특이사항(상태)이 모두 지워졌습니다.`);
+
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 특이사항 칸이 초기화되었습니다.`);
+                updateUI();
+            });
+        } else {
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 특이사항 칸이 초기화되었습니다.`);
         }
+    }
 
-        // [추가] 3. 상태이상 소거 (기존 빈 버튼 기능 보완)
-        function adminClearStatus() {
-            const targetNo = document.getElementById('adm-special-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+    function adminClearStatus() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let targetUser = db.users[targetCode];
 
-            // 디버프 시간 강제 만료
-            targetUser.quarantineUntil = 0;
-            targetUser.blindfoldUntil = 0;
-            targetUser.slaveUntil = 0;
-            targetUser.nostalgiaUntil = 0;
-            targetUser.masterName = null;
-            
-            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 시스템적 상태이상이 소거되었습니다.`);
+        targetUser.quarantineUntil = 0;
+        targetUser.blindfoldUntil = 0;
+        targetUser.slaveUntil = 0;
+        targetUser.nostalgiaUntil = 0;
+        targetUser.masterName = null;
+        
+        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 시스템적 상태이상이 소거되었습니다.`);
+
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 상태이상 효과를 제거했습니다.`);
+                updateUI();
+            });
+        } else {
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 상태이상 효과를 제거했습니다.`);
         }
-        function adminDeleteEmployee() {
-            const targetNo = document.getElementById('adm-delete-no').value.trim();
-            if (!targetNo) return;
-            let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo);
-            if (!targetCode || targetCode === 'kario0987') return;
-            delete db.users[targetCode];
-            if (db.p2pDeals) db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
-            saveDB(); document.getElementById('adm-delete-no').value = '';
-            if (currentUser && currentUser.code === targetCode) logout();
+    }
+      function adminDeleteEmployee() {
+        const targetNo = document.getElementById('adm-delete-no').value.trim();
+        if (!targetNo) {
+            showCustomAlert('말소할 사원의 사번을 입력해주세요.');
+            return;
         }
+
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) {
+            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
+            return;
+        }
+        if (targetCode === 'kario0987') {
+            showCustomAlert('상담사(총괄 관리자) 계정은 말소할 수 없습니다.');
+            return;
+        }
+
+        let targetName = db.users[targetCode].name;
+
+        // 1. 로컬 데이터에서 제거
+        delete db.users[targetCode];
+        if (db.p2pDeals) {
+            db.p2pDeals = db.p2pDeals.filter(d => d.fromCode !== targetCode && d.toCode !== targetCode);
+        }
+
+        // 2. ★ Firebase 서버에서 해당 유저 경로와 관련 밀실 거래를 직접 삭제 및 동기화
+        if (database) {
+            let updates = {};
+            updates[`users/${targetCode}`] = null; // null을 넣으면 Firebase에서 해당 경로가 삭제됨
+            updates['p2pDeals'] = db.p2pDeals;
+
+            database.ref('/').update(updates).then(() => {
+                showCustomAlert(`[계정 말소] 사번 ${targetNo} (${targetName}) 계정이 성공적으로 폐기되었습니다.`);
+                document.getElementById('adm-delete-no').value = '';
+                updateUI();
+            }).catch((err) => {
+                console.error("Firebase 계정 말소 실패:", err);
+                showCustomAlert("서버 처리 중 오류가 발생했습니다.");
+            });
+        } else {
+            saveDB();
+            document.getElementById('adm-delete-no').value = '';
+            updateUI();
+            showCustomAlert(`[계정 말소] 사번 ${targetNo} (${targetName}) 계정이 성공적으로 폐기되었습니다.`);
+        }
+
+        if (currentUser && currentUser.code === targetCode) logout();
+    }
 
         function renderAdminSuggestions() {
             const listEl = document.getElementById('admin-suggestion-list');
