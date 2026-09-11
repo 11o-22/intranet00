@@ -2017,8 +2017,10 @@
             currentUser.facilityCount = 0; currentUser.facilityMax = 15; currentUser.lastFacilityDate = currentToday;
             saveDB();
         }
+        // 날짜가 바뀌면 당일 구매 기록만 리셋 (기회(alienTries)는 쿨타임 시스템으로 관리하므로 0으로 강제 초기화하지 않음)
         if (currentUser.alienDate !== currentToday) {
-            currentUser.alienDate = currentToday; currentUser.alienTries = 0; currentUser.alienUnlockedItems = []; currentUser.alienBoughtItems = [];
+            currentUser.alienDate = currentToday; 
+            currentUser.alienBoughtItems = [];
             saveDB();
         }
         if (currentUser.ticketAddedDate !== currentToday) {
@@ -3430,29 +3432,25 @@
         const now = Date.now();
         const fourHoursMs = 4 * 60 * 60 * 1000; // 4시간 (밀리초)
 
-        // 날짜가 바뀌면 횟수와 마지막 플레이 시간 초기화
         const todayStr = getTodayStr();
         if (currentUser.alienDate !== todayStr) {
             currentUser.alienDate = todayStr; 
-            currentUser.alienTries = 0; 
-            currentUser.alienUnlockedItems = []; 
             currentUser.alienBoughtItems = [];
-            currentUser.lastAlienPlayTime = 0;
         }
 
-        // 관리자(kario0987)는 쿨타임 및 횟수 제한 없음
+        // 관리자(kario0987)는 제한 없음
         if (currentUser.code !== 'kario0987') {
-            // 이미 2번 다 썼을 때
-            if (currentUser.alienTries >= 2) {
-                showCustomAlert("금일 우주 주파수 접속 기회(2회)를 모두 소진했습니다.");
-                return;
-            }
+            if (currentUser.alienTries === undefined) currentUser.alienTries = 0;
 
-            // 첫 번째 시도를 이미 했고, 두 번째 시도까지 4시간이 안 지났을 때
-            if (currentUser.alienTries === 1 && currentUser.lastAlienPlayTime) {
-                const elapsed = now - currentUser.lastAlienPlayTime;
-                if (elapsed < fourHoursMs) {
-                    const remainMinutes = Math.ceil((fourHoursMs - elapsed) / (60 * 1000));
+            // 만약 2번 모두 소진(0회 남음) 상태라면, 마지막 플레이 타임으로부터 4시간이 지났는지 체크
+            if (currentUser.alienTries >= 2) {
+                if (currentUser.lastAlienPlayTime && (now - currentUser.lastAlienPlayTime >= fourHoursMs)) {
+                    // 4시간이 지났다면 기회를 1회 복구해 줌 (2회 풀충전이 아님!)
+                    currentUser.alienTries = 1; 
+                } else {
+                    // 아직 4시간이 안 지났다면 차단
+                    const remainMs = fourHoursMs - (now - currentUser.lastAlienPlayTime);
+                    const remainMinutes = Math.ceil(remainMs / (60 * 1000));
                     const remainHours = Math.floor(remainMinutes / 60);
                     const mins = remainMinutes % 60;
                     
