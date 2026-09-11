@@ -1634,6 +1634,16 @@ function getTodayStr() {
         if (user.code === 'kario0987') return; 
         const now = Date.now();
         let changed = false; // ★ 변화 감지용 플래그
+
+        if (user.timedEffects) {
+            for (let i = user.timedEffects.length - 1; i >= 0; i--) {
+                if (now >= user.timedEffects[i].expireAt) {
+                    addHistoryLog(user, `[상태 해제] ${user.timedEffects[i].name} 효과가 종료되었습니다.`);
+                    user.timedEffects.splice(i, 1);
+                    changed = true;
+                }
+            }
+        }
         
         // 격리 해제 체크 및 낡은 문패 효과 적용
         if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
@@ -1814,7 +1824,29 @@ function getTodayStr() {
             user.badge.notes = `${existingNotes} | ${noteMsg}`;
         }
     }
+    function addTimedEffect(user, name, desc, hours) {
+        if (!user.timedEffects) user.timedEffects = [];
+        user.timedEffects.push({
+            name: name,
+            desc: desc,
+            expireAt: Date.now() + (hours * 60 * 60 * 1000)
+        });
+        saveDB();
+    }
 
+    // UI에 남은 시간을 계산해서 텍스트로 뽑아주는 함수
+    function getTimedEffectsText(user) {
+        if (!user.timedEffects || user.timedEffects.length === 0) return [];
+        const now = Date.now();
+        let activeTexts = [];
+        user.timedEffects.forEach(eff => {
+            let remainH = Math.ceil((eff.expireAt - now) / (1000 * 60 * 60));
+            if (remainH > 0) {
+                activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#ff9800; font-weight:bold;">(${remainH}시간 남음)</span>`);
+            }
+        });
+        return activeTexts;
+            }
     function renderPointRanking() {
         const wrapper = document.getElementById('ranking-items-wrapper');
         if (!wrapper) return;
@@ -2167,8 +2199,12 @@ function getTodayStr() {
         
         const noteGlowClass = (currentUser.noteGlowUntil && Date.now() < currentUser.noteGlowUntil) ? 'glow-text' : '';
         const noteEl = document.getElementById('badge-notes-text');
-        noteEl.innerText = (currentUser.badge && currentUser.badge.notes) ? currentUser.badge.notes : "특이사항 없음";
-        
+        let timedNotes = getTimedEffectsText(currentUser);
+        let manualNotes = (currentUser.badge && currentUser.badge.notes && currentUser.badge.notes !== "특이사항 없음") ? currentUser.badge.notes : "";
+
+        let finalNotesList = [];
+        if (manualNotes) finalNotesList.push(manualNotes);
+        if (timedNotes.length > 0) finalNotesList = finalNotesList.concat(timedNotes);
         // 아이템 사용 점등 효과가 우선 적용되도록 처리
         if (!currentUser.hasItemUsedOnMe) {
             noteEl.className = noteGlowClass;
@@ -2398,11 +2434,13 @@ function getTodayStr() {
         targetUser.noteGlowUntil = Date.now() + 10000; 
         addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 ${item} 사용`);
         addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
+        
     } else if (item === "스마일 스티커") {
-        appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name} ${cPos}에게 미미한 호감을 느낀다. (5시간 지속)`);
+        addTimedEffect(targetUser, '스마일 스티커', `${currentUser.name} ${cPos}에게 미미한 호감을 느낀다.`, 5);
         targetUser.noteGlowUntil = Date.now() + 10000;
         addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 스마일 스티커 부착`);
         addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+
     } else if (item === "빨간 리본") {
         if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
         if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
@@ -2421,15 +2459,15 @@ function getTodayStr() {
 
         addHistoryLog(currentUser, `[장착] ${targetUser.name} ${tPos}님과 빨간 리본 연결 완료`);
         addHistoryLog(targetUser, `[장착] ${currentUser.name} ${cPos}님과 빨간 리본 연결 완료`);
+        // (기존 노예 계약서 부분을 이렇게 수정)
     } else if (item === "노예 계약서") {
         targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
         targetUser.masterName = currentUser.name; 
-        
-        appendBadgeNoteToUser(targetUser, `[노예 계약] ${currentUser.name} ${cPos}의 노예 (3일 지속)`);
+        addTimedEffect(targetUser, '노예 계약', `${currentUser.name} ${cPos}의 노예`, 72);
         targetUser.noteGlowUntil = Date.now() + 10000;
-        
         addHistoryLog(currentUser, `[계약 체결] ${targetUser.name} ${tPos}님과 노예 계약을 체결했습니다.`);
         addHistoryLog(targetUser, `[상태 이상] ${currentUser.name} ${cPos}의 노예가 되었습니다.`);
+
     } else if (item === "노스텔지어 끈") {
         targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
         targetUser.nostalgiaLastReduced = Date.now();
@@ -2624,12 +2662,21 @@ function getTodayStr() {
         } else if (cat.effect === 'vip_pass') {
             if (targetUser.hasVIP) { if(!isOthers) showCustomAlert('이미 2급 보안 인가(VIP)가 승인되어 있습니다.'); return false; }
             targetUser.hasVIP = true; appendBadgeNoteToUser(targetUser, `2급 보안 인가 (VIP 라운지 출입 권한 획득)`);
-        } else if (cat.effect === 'grape_potion') appendBadgeNoteToUser(targetUser, `[포도맛 물약] 신체 파동 변조 (성별 반전 상태 3일)`);
-        else if (cat.effect === 'milk_potion') appendBadgeNoteToUser(targetUser, `[우유맛 물약] 신체 변이 (컨트/딕걸 3일 지속)`);
-        else if (cat.effect === 'apple_potion') appendBadgeNoteToUser(targetUser, `[사과맛 물약] ${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현 (3일 지속)`);
-        else if (cat.effect === 'orange_potion') appendBadgeNoteToUser(targetUser, `[오렌지맛 물약] 신체 퇴행 (어린아이 상태 3일 지속)`);
-        else if (cat.effect === 'peach_potion') appendBadgeNoteToUser(targetUser, `[복숭아맛 물약] 신체 감각 과민 (예민한 몸 상태 3일 지속)`);
-        else if (cat.effect === 'cure_potion') {
+                // (이 기존 코드들을 찾아서 아래 코드로 바꿔치기 하세요)
+        else if (cat.effect === 'grape_potion') addTimedEffect(targetUser, '포도맛 물약', '신체 파동 변조 (성별 반전 상태)', 72);
+        else if (cat.effect === 'milk_potion') addTimedEffect(targetUser, '우유맛 물약', '신체 변이 (컨트/딕걸)', 72);
+        else if (cat.effect === 'apple_potion') addTimedEffect(targetUser, '사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현`, 72);
+        else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 72);
+        else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 72);
+        else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 72);
+        else if (cat.effect === 'drink_wine') {
+            addTimedEffect(targetUser, '고급진 술', '알코올 섭취', 10);
+            if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
+        }
+        else if (cat.effect === 'equip_nostalgia') {
+            addTimedEffect(targetUser, '노스텔지어 끈', '오염도 서서히 감소 중', 5);
+            // (이후 기존의 노스텔지어 끈 조건문 코드는 그대로 둡니다)
+
             if (targetUser.badge && targetUser.badge.notes && targetUser.badge.notes !== "특이사항 없음") {
                 let notesArr = targetUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
                 if (notesArr.length > 0) {
