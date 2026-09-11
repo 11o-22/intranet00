@@ -3355,52 +3355,80 @@
         }
     }
         function acceptP2PDeal(dealId) {
-        checkP2PExpiration();
-        if (!db.p2pDeals) return;
-        let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
-        if (dealIndex === -1) return;
-        let deal = db.p2pDeals[dealIndex];
-        if (deal.status !== 'PENDING') return;
+    checkP2PExpiration();
+    if (!db.p2pDeals) return;
+    
+    // 1. 해당 거래 탐색
+    let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
+    if (dealIndex === -1) return;
+    let deal = db.p2pDeals[dealIndex];
+    if (deal.status !== 'PENDING') return;
 
-        const sender = db.users[deal.fromCode];
-        if (deal.mode === 'trade') {
-            if (deal.demandType === 'point') {
-                let p = parseInt(deal.demandValue);
-                if (isNaN(p)) return;
-                if (currentUser.points < p) { showLuxuryAlert(); return; }
-                currentUser.points -= p; 
-                if (sender) sender.points += p;
-            } else {
-                let reqQty = deal.demandQty || 1;
-                let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
-                if (count < reqQty) { showCustomAlert("요구하는 소지품 수량이 부족합니다."); return; }
-                removeItemFromInventory(currentUser, deal.demandValue, reqQty);
-                if (sender) {
-                    for(let i=0; i<reqQty; i++) sender.inventory.push(deal.demandValue);
+    const sender = db.users[deal.fromCode];
+
+    // 2. 조건부 교환(trade)인 경우 내가 대가를 지불
+    if (deal.mode === 'trade') {
+        if (deal.demandType === 'point') {
+            let p = parseInt(deal.demandValue, 10);
+            if (isNaN(p)) return;
+            if (currentUser.points < p) { 
+                showLuxuryAlert(); 
+                return; 
+            }
+            currentUser.points -= p; 
+            if (sender) {
+                sender.points = (sender.points || 0) + p;
+            }
+        } else {
+            let reqQty = deal.demandQty || 1;
+            let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
+            if (count < reqQty) { 
+                showCustomAlert("요구하는 소지품 수량이 부족합니다."); 
+                return; 
+            }
+            removeItemFromInventory(currentUser, deal.demandValue, reqQty);
+            if (sender) {
+                for (let i = 0; i < reqQty; i++) {
+                    sender.inventory.push(deal.demandValue);
                 }
             }
         }
-        
-        if (deal.offerType === 'point') winPoints(parseInt(deal.offerValue) || 0);
-        else {
-            for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue);
-        }
-
-        deal.status = 'COMPLETED';
-        db.p2pDeals[dealIndex] = deal;
-
-        addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
-        if (sender) addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
-        
-        // ★ Firebase 경로 직접 업데이트
-        if (database) {
-            database.ref('p2pDeals').set(db.p2pDeals);
-            database.ref('users').set(db.users);
-        } else {
-            saveDB();
-        }
-        updateUI();
     }
+    
+    // 3. 상대가 제공한 제물(포인트 또는 아이템) 수령
+    if (deal.offerType === 'point') {
+        let offerPt = parseInt(deal.offerValue, 10) || 0;
+        currentUser.points = (currentUser.points || 0) + offerPt;
+        showPointGainEffect(offerPt);
+    } else {
+        let offerCount = deal.offerQty || 1;
+        for (let i = 0; i < offerCount; i++) {
+            currentUser.inventory.push(deal.offerValue);
+        }
+    }
+
+    // 4. 거래 상태 종결 처리
+    deal.status = 'COMPLETED';
+    db.p2pDeals[dealIndex] = deal;
+
+    // 5. 로컬 유저 데이터 정합성 보장
+    db.users[currentUser.code] = currentUser;
+    if (sender) {
+        db.users[deal.fromCode] = sender;
+    }
+
+    // 6. 기록 추가
+    addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
+    if (sender) {
+        addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
+    }
+
+    // 7. Firebase 단일 루트 동기화 및 즉각 UI 갱신
+    saveDB();
+    updateUI();
+    renderP2PLists();
+}
+
 
     function rejectP2PDeal(dealId) {
         if (!db.p2pDeals) return;
