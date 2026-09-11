@@ -3403,7 +3403,6 @@
         const container = document.getElementById('alien-items-container');
         if (!container) return;
         
-        // ★ 관리자(kario0987)는 해금 여부와 무관하게 전체 풀(Pool)을 즉시 열람
         let unlocked = (currentUser && currentUser.code === 'kario0987') ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
         
         const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
@@ -3422,8 +3421,12 @@
 
         container.innerHTML = unlocked.map(itemName => {
             const item = ITEM_CATALOG[itemName];
-            if (!item) return ''; // 에러 방지용 안전장치
-            const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
+            if (!item) return '';
+            
+            // ★ [핵심] 관리자(kario0987)는 당일 구매 여부(isBoughtToday)와 상관없이 항상 구매 가능 상태로 설정
+            const isAdmin = (currentUser && currentUser.code === 'kario0987');
+            const isBoughtToday = !isAdmin && (currentUser.alienBoughtItems || []).includes(itemName);
+            
             return `
                 <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
                     <div>
