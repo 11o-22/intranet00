@@ -1619,6 +1619,7 @@
     function checkPassivePollution(user) {
         if (user.code === 'kario0987') return; 
         const now = Date.now();
+        let changed = false; // ★ 변화 감지용 플래그
         
         // 격리 해제 체크 및 낡은 문패 효과 적용
         if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
@@ -1627,9 +1628,7 @@
             user.quarantineExitPollution = 0;
             user.lastPollutionTime = now;
             addHistoryLog(user, `[여우 상담실] 격리 치료를 마치고 무사히 복귀했습니다.`);
-            saveDB();
-            if(currentUser && currentUser.code === user.code) updateUI();
-            return;
+            changed = true;
         }
 
         const diffMs = now - user.lastPollutionTime;
@@ -1648,56 +1647,66 @@
                     user.bloodBathDailyUsedMs = threeHoursMs;
                     appendSystemBadgeNote("혈욕조 하루 이용 시간(3시간) 초과로 장착이 해제되었습니다.");
                     addHistoryLog(user, `[장착 해제] 혈욕조 이용 한도 초과 자동 해제`);
+                    changed = true;
                 }
             }
         }
 
-        // ★ [추가] 노스텔지어 끈 장착 중일 때 5분마다 오염도 1%씩 자동 감소
-    if (user.nostalgiaUntil && Date.now() < user.nostalgiaUntil) {
-        if (!user.nostalgiaLastReduced) user.nostalgiaLastReduced = Date.now();
-        const fiveMinutesMs = 5 * 60 * 1000;
-        const elapsedNostalgiaTime = Date.now() - user.nostalgiaLastReduced;
-        
-        if (elapsedNostalgiaTime >= fiveMinutesMs && user.pollution > 0) {
-            const steps = Math.floor(elapsedNostalgiaTime / fiveMinutesMs);
-            user.pollution = Math.max(0, user.pollution - steps);
-            user.nostalgiaLastReduced += steps * fiveMinutesMs;
-            saveDB();
-        }
-    } else if (user.nostalgiaUntil && Date.now() >= user.nostalgiaUntil) {
-        user.nostalgiaUntil = 0;
-        let senderCode = user.nostalgiaSender || user.code; 
-        if (db.users[senderCode]) {
-            db.users[senderCode].inventory.push("노스텔지어 끈");
-            // 주인이 본인이 아닐 경우, 주인에게도 알림 로그를 남깁니다.
-            if (senderCode !== user.code) {
-                addHistoryLog(db.users[senderCode], `[아이템 회수] ${user.name} 사원에게서 노스텔지어 끈이 자동 회수되었습니다.`);
+        // 노스텔지어 끈 자동 감소 효과
+        if (user.nostalgiaUntil && now < user.nostalgiaUntil) {
+            if (!user.nostalgiaLastReduced) user.nostalgiaLastReduced = now;
+            const fiveMinutesMs = 5 * 60 * 1000;
+            const elapsedNostalgiaTime = now - user.nostalgiaLastReduced;
+            
+            if (elapsedNostalgiaTime >= fiveMinutesMs && user.pollution > 0) {
+                const steps = Math.floor(elapsedNostalgiaTime / fiveMinutesMs);
+                user.pollution = Math.max(0, user.pollution - steps);
+                user.nostalgiaLastReduced += steps * fiveMinutesMs;
+                changed = true;
             }
+        } else if (user.nostalgiaUntil && now >= user.nostalgiaUntil) {
+            user.nostalgiaUntil = 0;
+            let senderCode = user.nostalgiaSender || user.code; 
+            if (db.users[senderCode]) {
+                db.users[senderCode].inventory.push("노스텔지어 끈");
+                if (senderCode !== user.code) {
+                    addHistoryLog(db.users[senderCode], `[아이템 회수] ${user.name} 사원에게서 노스텔지어 끈이 자동 회수되었습니다.`);
+                }
+            }
+            user.nostalgiaSender = null; 
+            
+            appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 주인의 인벤토리로 회수되었습니다.`);
+            addHistoryLog(user, `[장착 해제] 노스텔지어 끈 자동 회수됨`);
+            changed = true;
         }
-        user.nostalgiaSender = null; // 회수 후 꼬리표 초기화
-        
-        appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 주인의 인벤토리로 회수되었습니다.`);
-        addHistoryLog(user, `[장착 해제] 노스텔지어 끈 자동 회수됨`);
-        saveDB();
-    }
-        if (user.slaveUntil && Date.now() >= user.slaveUntil) {
-        user.slaveUntil = 0;
-        user.masterName = null;
-        appendBadgeNoteToUser(user, `[계약 만료] 노예 계약 기간이 종료되어 해방되었습니다.`);
-        addHistoryLog(user, `[계약 해제] 노예 계약 만료`);
-        saveDB();
-    }
 
+        if (user.slaveUntil && now >= user.slaveUntil) {
+            user.slaveUntil = 0;
+            user.masterName = null;
+            appendBadgeNoteToUser(user, `[계약 만료] 노예 계약 기간이 종료되어 해방되었습니다.`);
+            addHistoryLog(user, `[계약 해제] 노예 계약 만료`);
+            changed = true;
+        }
+
+        // ★ 3시간당 오염도 3% 증가 핵심 로직
         if (diffMs >= threeHoursMs && user.pollution < 100 && user.quarantineUntil === 0) {
             const steps = Math.floor(diffMs / threeHoursMs);
             if (!isBlindfolded(user)) {
-                // ★ [수정] 기본 오염도 증가량에 방어막 배율 곱하기 적용
-                let baseInc = steps * 3;
-                let finalInc = Math.round(baseInc * getPollutionMultiplier(user));
-                user.pollution = Math.min(100, user.pollution + finalInc);
+                let baseInc = steps * 3; // 3시간마다 3씩
+                let finalInc = Math.round(baseInc * getPollutionMultiplier(user)); // 방어막 적용
+                if (finalInc > 0) {
+                    user.pollution = Math.min(100, user.pollution + finalInc);
+                    changed = true;
+                }
             }
             user.lastPollutionTime += steps * threeHoursMs;
+            changed = true;
+        }
+
+        // 오염도가 올랐거나 아이템 효과가 종료되었을 때만 강제로 화면을 갱신합니다.
+        if (changed) {
             saveDB();
+            if (currentUser && currentUser.code === user.code) updateUI();
         }
     }
 
@@ -1929,13 +1938,22 @@
         const container = document.getElementById('employee-cards-container');
         if (!container) return;
         const usersList = Object.values(db.users).filter(u => u.code !== 'kario0987');
+        
         container.innerHTML = usersList.map(u => {
             const statusInfo = getPollutionStatusInfo(u.pollution);
             const photoSrc = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
             const isMe = (currentUser && currentUser.code === u.code) ? `<span style="color:#4CAF50; font-size:10px; margin-left:6px; border: 1px solid #4CAF50; border-radius: 3px; padding: 2px 5px; font-weight:bold;">본인</span>` : '';
+            
+            // ★ 실시간 온라인 감지 (초록색 불빛)
+            const isOnline = onlineUsersMap[u.code] ? true : false;
+            const onlineDot = isOnline ? `<div style="position:absolute; top:-4px; left:-4px; width:12px; height:12px; background-color:#4CAF50; border-radius:50%; box-shadow:0 0 8px #4CAF50; border:2px solid #242424; z-index:10;"></div>` : '';
+
             return `
                 <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')">
-                    <div class="emp-list-avatar">${photoSrc}</div>
+                    <div class="emp-list-avatar" style="position:relative;">
+                        ${onlineDot}
+                        ${photoSrc}
+                    </div>
                     <div class="emp-list-details">
                         <div class="emp-list-title">
                             <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe}
