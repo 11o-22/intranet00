@@ -1346,7 +1346,23 @@
     }
 
     function saveDB() {
-        if(database) database.ref('/').set(db);
+        if (!database) return;
+        
+        let updates = {};
+        
+        // 1. 내 정보는 내 최신 상태로 덮어쓰기
+        if (currentUser) {
+            updates[`users/${currentUser.code}`] = currentUser;
+        }
+        
+        // 2. 공용 데이터 저장
+        updates['suggestions'] = db.suggestions || [];
+        updates['p2pDeals'] = db.p2pDeals || [];
+        updates['vipInvites'] = db.vipInvites || {};
+        updates['vipSessions'] = db.vipSessions || {};
+        
+        // set이 아닌 update를 사용하여 다른 유저의 데이터를 건드리지 않습니다.
+        database.ref('/').update(updates);
     }
 
     function showCustomAlert(message) {
@@ -2283,80 +2299,76 @@
     }
 
     function confirmItemTarget() {
-        if (!pendingTargetItemName) return;
-        const targetCode = document.getElementById('item-target-select').value;
-        if (!targetCode) { showCustomAlert("대상을 선택해주세요."); return; }
-        const item = pendingTargetItemName;
-        const targetUser = db.users[targetCode];
+    if (!pendingTargetItemName) return;
+    const targetCode = document.getElementById('item-target-select').value;
+    if (!targetCode) { showCustomAlert("대상을 선택해주세요."); return; }
+    const item = pendingTargetItemName;
+    const targetUser = db.users[targetCode];
 
-        targetUser.hasItemUsedOnMe = true;
+    targetUser.hasItemUsedOnMe = true;
 
-        // ★ [핵심] 본인과 상대방의 직급을 불러옵니다. (비어있으면 기본값 '사원' 적용)
-        const cPos = currentUser.position || '사원';
-        const tPos = targetUser.position || '사원';
+    const cPos = currentUser.position || '사원';
+    const tPos = targetUser.position || '사원';
 
-        if (pendingTargetIsPotion) {
-            applyItemEffect(targetUser, item, true);
-            targetUser.noteGlowUntil = Date.now() + 10000; 
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 ${item} 사용`);
-            addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
-        } else if (item === "스마일 스티커") {
-            appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name} ${cPos}에게 미미한 호감을 느낀다. (5시간 지속)`);
-            targetUser.noteGlowUntil = Date.now() + 10000;
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 스마일 스티커 부착`);
-            addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
-        } else if (item === "빨간 리본") {
-            // 빨간 리본 장착 처리
-            if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+    if (pendingTargetIsPotion) {
+        applyItemEffect(targetUser, item, true);
+        targetUser.noteGlowUntil = Date.now() + 10000; 
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 ${item} 사용`);
+        addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
+    } else if (item === "스마일 스티커") {
+        appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name} ${cPos}에게 미미한 호감을 느낀다. (5시간 지속)`);
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 스마일 스티커 부착`);
+        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+    } else if (item === "빨간 리본") {
+        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+        if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
 
-            if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
-                showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
-                closeItemTargetModal();
-                return;
-            }
-
-            // 장비 목록에 직급 표시
-            currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name} ${tPos})`);
-            targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name} ${cPos})`);
-
-            // 사원증 특이사항에 직급 반영
-            appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} ${tPos}님과 연결됨`);
-            appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} ${cPos}님과 연결됨`);
-
-            // 기록창에 직급 반영
-            addHistoryLog(currentUser, `[장착] ${targetUser.name} ${tPos}님과 빨간 리본 연결 완료`);
-            addHistoryLog(targetUser, `[장착] ${currentUser.name} ${cPos}님과 빨간 리본 연결 완료`);
-        } else if (item === "노예 계약서") {
-            targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
-            targetUser.masterName = currentUser.name; 
-            
-            appendBadgeNoteToUser(targetUser, `[노예 계약] ${currentUser.name} ${cPos}의 노예 (3일 지속)`);
-            targetUser.noteGlowUntil = Date.now() + 10000;
-            
-            addHistoryLog(currentUser, `[계약 체결] ${targetUser.name} ${tPos}님과 노예 계약을 체결했습니다.`);
-            addHistoryLog(targetUser, `[상태 이상] ${currentUser.name} ${cPos}의 노예가 되었습니다.`);
-        } else if (item === "노스텔지어 끈") {
-            targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
-            targetUser.nostalgiaLastReduced = Date.now();
-            targetUser.nostalgiaSender = currentUser.code; 
-            targetUser.noteGlowUntil = Date.now() + 10000;
-            
-            appendBadgeNoteToUser(targetUser, `[장착됨] 누군가 당신에게 노스텔지어 끈을 매어주었습니다. (5시간 동안 오염도 서서히 감소)`);
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 노스텔지어 끈 장착`);
-            addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
+        if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
+            showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
+            closeItemTargetModal();
+            return;
         }
+
+        currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name} ${tPos})`);
+        targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name} ${cPos})`);
+
+        appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} ${tPos}님과 연결됨`);
+        appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} ${cPos}님과 연결됨`);
+
+        addHistoryLog(currentUser, `[장착] ${targetUser.name} ${tPos}님과 빨간 리본 연결 완료`);
+        addHistoryLog(targetUser, `[장착] ${currentUser.name} ${cPos}님과 빨간 리본 연결 완료`);
+    } else if (item === "노예 계약서") {
+        targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
+        targetUser.masterName = currentUser.name; 
         
-        removeItemFromInventory(currentUser, item, 1);
-        if (database) {
-            database.ref('users').set(db.users);
-        } else {
-            saveDB();
-        }
-        saveDB(); 
-        updateUI(); 
-        closeItemTargetModal();
+        appendBadgeNoteToUser(targetUser, `[노예 계약] ${currentUser.name} ${cPos}의 노예 (3일 지속)`);
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        
+        addHistoryLog(currentUser, `[계약 체결] ${targetUser.name} ${tPos}님과 노예 계약을 체결했습니다.`);
+        addHistoryLog(targetUser, `[상태 이상] ${currentUser.name} ${cPos}의 노예가 되었습니다.`);
+    } else if (item === "노스텔지어 끈") {
+        targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
+        targetUser.nostalgiaLastReduced = Date.now();
+        targetUser.nostalgiaSender = currentUser.code; 
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        
+        appendBadgeNoteToUser(targetUser, `[장착됨] 누군가 당신에게 노스텔지어 끈을 매어주었습니다. (5시간 동안 오염도 서서히 감소)`);
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 노스텔지어 끈 장착`);
+        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
     }
+    
+    removeItemFromInventory(currentUser, item, 1);
+    
+    // ★ 동기화 누락 방지: 상대방의 정보는 Firebase에 직접 덮어씌웁니다.
+    if (database) {
+        database.ref(`users/${targetCode}`).set(targetUser);
+    }
+    
+    saveDB(); 
+    updateUI(); 
+    closeItemTargetModal();
+}
 
     function renderInventory() {
         const container = document.getElementById('inventory-list-container');
@@ -2666,30 +2678,36 @@
         select.innerHTML = options;
     }
 
-    function sendAnonymousLetter() {
-        const letterIdx = currentUser.inventory.indexOf("익명 편지");
-        if (letterIdx === -1) { showCustomAlert("소지품에 '익명 편지'가 없습니다."); return; }
-        const targetCode = document.getElementById('letter-target-select').value;
-        const content = document.getElementById('letter-content-input').value.trim();
-        if (!targetCode || !content) return;
+   function sendAnonymousLetter() {
+    const letterIdx = currentUser.inventory.indexOf("익명 편지");
+    if (letterIdx === -1) { showCustomAlert("소지품에 '익명 편지'가 없습니다."); return; }
+    const targetCode = document.getElementById('letter-target-select').value;
+    const content = document.getElementById('letter-content-input').value.trim();
+    if (!targetCode || !content) return;
 
-        let targetUser = db.users[targetCode];
-        if (!targetUser.letters) targetUser.letters = [];
-        targetUser.letters.unshift({ 
-            id: Date.now(), 
-            date: new Date().toLocaleString(), 
-            content: content,
-            fromCode: currentUser.code,
-            fromName: currentUser.name 
-        });
-        if (targetUser.letters.length > 3) targetUser.letters.pop();
-        targetUser.hasNewLetter = true;
+    let targetUser = db.users[targetCode];
+    if (!targetUser.letters) targetUser.letters = [];
+    targetUser.letters.unshift({ 
+        id: Date.now(), 
+        date: new Date().toLocaleString(), 
+        content: content,
+        fromCode: currentUser.code,
+        fromName: currentUser.name 
+    });
+    if (targetUser.letters.length > 3) targetUser.letters.pop();
+    targetUser.hasNewLetter = true;
 
-        currentUser.inventory.splice(letterIdx, 1);
-        addHistoryLog(currentUser, `[익명 편지] 사번 ${targetUser.no} 대상 서신 전송 (편지지 소모)`);
-        saveDB(); updateUI();
-        document.getElementById('letter-content-input').value = '';
+    currentUser.inventory.splice(letterIdx, 1);
+    addHistoryLog(currentUser, `[익명 편지] 사번 ${targetUser.no} 대상 서신 전송 (편지지 소모)`);
+    
+    // ★ 동기화 누락 방지: 편지를 받는 타인의 데이터 직접 갱신
+    if (database) {
+        database.ref(`users/${targetCode}`).set(targetUser);
     }
+    
+    saveDB(); updateUI();
+    document.getElementById('letter-content-input').value = '';
+}
 
     function renderLetters() {
         const container = document.getElementById('received-letters-container');
