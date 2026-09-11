@@ -1900,7 +1900,12 @@ function getTodayStr() {
             </div>`;
         }
 
-        const notes = (u.badge && u.badge.notes) ? u.badge.notes : "특이사항 없음";
+                let timedNotes = getTimedEffectsText(u);
+        let manualNotes = (u.badge && u.badge.notes && u.badge.notes !== "특이사항 없음") ? u.badge.notes : "";
+        let finalNotesList = [];
+        if (manualNotes) finalNotesList.push(manualNotes);
+        if (timedNotes.length > 0) finalNotesList = finalNotesList.concat(timedNotes);
+        const notes = finalNotesList.length > 0 ? finalNotesList.join('<br>') : "특이사항 없음";
         const isGlowing = (u.noteGlowUntil && Date.now() < u.noteGlowUntil) ? 'glow-text' : '';
         const equippedText = (u.equippedWeapons && u.equippedWeapons.length > 0) ? u.equippedWeapons.join(', ') : '없음';
 
