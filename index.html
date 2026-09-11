@@ -10,6 +10,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
+        * {
+            -webkit-tap-highlight-color: transparent; /* 모바일에서 터치할 때 생기는 기본 음영 제거 */
+        }
         /* 동적 테마 적용을 위한 CSS 변수 세팅 및 가독성 개선 */
         body {
             --theme-bg-grad: linear-gradient(145deg, #222, #111);
@@ -552,7 +555,7 @@
     }
     </style>
 </head>
-<body>
+<body ontouchstart="">
 
 <div id="pollution-overlay"></div>
 
