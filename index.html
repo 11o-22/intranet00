@@ -3784,6 +3784,103 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
             document.body.className = ""; // 테마 초기화
         }
+    // =========================================================================
+    // ★ 안드로이드/모바일 물리 뒤로가기 버튼 완벽 제어 로직 (History API) ★
+    // =========================================================================
+    let modalStack = [];
+    let isSystemAction = false;
+
+    function pushModal(modalId) {
+        modalStack.push(modalId);
+        // 모달이 열릴 때 가짜 히스토리를 브라우저에 하나 밀어넣음
+        history.pushState({ popup: modalId }, "", "");
+    }
+
+    function popModal(modalId) {
+        if (modalStack.length > 0 && modalStack[modalStack.length - 1] === modalId) {
+            modalStack.pop();
+            isSystemAction = true; // 우리가 직접 닫은 것이라는 표시
+            history.back(); // 브라우저 히스토리 한 칸 되돌리기
+            setTimeout(() => { isSystemAction = false; }, 300); // 안전 타이머
+        } else {
+            modalStack = modalStack.filter(id => id !== modalId);
+        }
+    }
+
+    // --- 1. 열기 함수들에 뒤로가기 스택(Push) 기능 주입 ---
+    const _openEmployeeListModal = openEmployeeListModal;
+    openEmployeeListModal = function() { pushModal('employee-list-modal'); _openEmployeeListModal(); };
+
+    const _openEmpDetailModal = openEmpDetailModal;
+    openEmpDetailModal = function(code) { pushModal('emp-detail-modal'); _openEmpDetailModal(code); };
+
+    const _openSuggestionModal = openSuggestionModal;
+    openSuggestionModal = function() { pushModal('suggestion-modal'); _openSuggestionModal(); };
+
+    const _openAdminScreen = openAdminScreen;
+    openAdminScreen = function() { pushModal('admin-screen'); _openAdminScreen(); };
+
+    const _openItemTargetModal = openItemTargetModal;
+    openItemTargetModal = function(i, p) { pushModal('item-target-modal'); _openItemTargetModal(i, p); };
+
+    const _showCustomAlert = showCustomAlert;
+    showCustomAlert = function(msg) { pushModal('custom-alert-overlay'); _showCustomAlert(msg); };
+
+    const _showLuxuryAlert = showLuxuryAlert;
+    showLuxuryAlert = function(msg) { pushModal('luxury-alert-overlay'); _showLuxuryAlert(msg); };
+
+    const _renderVipGameOverlay = renderVipGameOverlay;
+    renderVipGameOverlay = function(session) { pushModal('vip-game-overlay'); _renderVipGameOverlay(session); };
+
+    // --- 2. 기존 닫기(X) 버튼 함수들에 스택 정리(Pop) 기능 주입 ---
+    const _closeEmployeeListModal = closeEmployeeListModal;
+    closeEmployeeListModal = function() { _closeEmployeeListModal(); popModal('employee-list-modal'); };
+
+    const _closeEmpDetailModal = closeEmpDetailModal;
+    closeEmpDetailModal = function() { _closeEmpDetailModal(); popModal('emp-detail-modal'); };
+
+    const _closeSuggestionModal = closeSuggestionModal;
+    closeSuggestionModal = function() { _closeSuggestionModal(); popModal('suggestion-modal'); };
+
+    const _closeAdminScreen = closeAdminScreen;
+    closeAdminScreen = function() { _closeAdminScreen(); popModal('admin-screen'); };
+
+    const _closeItemTargetModal = closeItemTargetModal;
+    closeItemTargetModal = function() { _closeItemTargetModal(); popModal('item-target-modal'); };
+
+    const _closeCustomAlert = closeCustomAlert;
+    closeCustomAlert = function() { _closeCustomAlert(); popModal('custom-alert-overlay'); };
+
+    const _closeLuxuryAlert = closeLuxuryAlert;
+    closeLuxuryAlert = function() { _closeLuxuryAlert(); popModal('luxury-alert-overlay'); };
+
+    const _closeVipGameOverlay = closeVipGameOverlay;
+    closeVipGameOverlay = function() { _closeVipGameOverlay(); popModal('vip-game-overlay'); };
+
+    // --- 3. 기기 [뒤로가기] 버튼 감지 (popstate 이벤트) ---
+    window.addEventListener('popstate', function(e) {
+        // 화면의 닫기 버튼(X)을 눌러서 발생한 이벤트라면 무시
+        if (isSystemAction) {
+            isSystemAction = false;
+            return; 
+        }
+
+        // 스택에 열려있는 팝업이 있다면 꺼내서 닫기 실행
+        if (modalStack.length > 0) {
+            const targetModal = modalStack.pop();
+            
+            // 기존 오리지널 닫기 함수를 호출하여 화면에서 숨김
+            if (targetModal === 'emp-detail-modal') _closeEmpDetailModal();
+            else if (targetModal === 'employee-list-modal') _closeEmployeeListModal();
+            else if (targetModal === 'suggestion-modal') _closeSuggestionModal();
+            else if (targetModal === 'admin-screen') _closeAdminScreen();
+            else if (targetModal === 'item-target-modal') _closeItemTargetModal();
+            else if (targetModal === 'custom-alert-overlay') _closeCustomAlert();
+            else if (targetModal === 'luxury-alert-overlay') _closeLuxuryAlert();
+            else if (targetModal === 'vip-game-overlay') _closeVipGameOverlay();
+        }
+        // 스택이 비어있으면 메인 화면이므로 브라우저가 알아서 종료(나가기)됨
+    });
     </script>
 </body>
 </html>
