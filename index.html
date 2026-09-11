@@ -1380,14 +1380,14 @@
         "VIP실 출입증": { price: 555, usable: true, targetable: false, effect: "vip_pass", desc: "VIP 구역 출입이 가능한 카드이다." },
         "일반 담배": { price: 170, usable: true, targetable: true, effect: "heal", value: 40, desc: "담배 한 개비. 오염도 40% 회복" },
         "혈욕조": { price: 700, usable: true, targetable: false, effect: "equip_bloodbath", desc: "장착 시 하루 최대 3시간 동안 오염 수치가 오르지 않는다." },
-        "노예계약서": { price: 500, usable: false, desc: "누군가를 3 일간 마음대로 하고 싶으십니까?" },
+        "노예 계약서": { price: 1000, usable: true, targetable: true, effect: "slave_contract", desc: "원하는 사람을 3일 동안 노예로 계약한다." },
         "포도맛 물약": { price: 150, usable: true, targetable: true, effect: "grape_potion", desc: "사용 시 3 일간 성별이 바뀝니다." },
         "우유맛 물약": { price: 150, usable: true, targetable: true, effect: "milk_potion", desc: "사용 시 3일간 컨트/딕걸 상태가 됩니다." },
         "사과맛 물약": { price: 150, usable: true, targetable: true, effect: "apple_potion", desc: "사용 시 3일간 동물의 귀와 꼬리가 생깁니다." },
         "오렌지맛 물약": { price: 150, usable: true, targetable: true, effect: "orange_potion", desc: "사용 시 3일간 어린이 상태가 됩니다." },
         "복숭아맛 물약": { price: 150, usable: true, targetable: true, effect: "peach_potion", desc: "사용 시 3일간 예민한 몸이 됩니다." },
-        "제거약": { price: 400, usable: true, targetable: true, effect: "cure_potion", desc: "자신 또는 타인의 상태이상을 무작위로 하나 제거합니다." },
-        "랜덤박스": { price: 44, usable: true, targetable: true, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
+        "제거약": { price: 400, usable: true, targetable: false, effect: "cure_potion", desc: "자신 또는 타인의 상태이상을 무작위로 하나 제거합니다." },
+        "랜덤박스": { price: 44, usable: trle, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
         "착한 친구": { price: 999, usable: true, targetable: false, effect: "equip", desc: "귀여운 분홍색 토끼 봉제인형. 장착 가능하다." },
         "보안팀 의상 세트": { price: 800, usable: true, targetable: false, effect: "equip", desc: "보안팀의 의상 세트, 착용이 가능하다." },
         "작두": { price: 999, usable: true, targetable: false, effect: "equip", desc: "영험한 기운이 담겨있는 무기. 장착 가능하다." },
@@ -1590,6 +1590,13 @@
         
         appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 주인의 인벤토리로 회수되었습니다.`);
         addHistoryLog(user, `[장착 해제] 노스텔지어 끈 자동 회수됨`);
+        saveDB();
+    }
+        if (user.slaveUntil && Date.now() >= user.slaveUntil) {
+        user.slaveUntil = 0;
+        user.masterName = null;
+        appendBadgeNoteToUser(user, `[계약 만료] 노예 계약 기간이 종료되어 해방되었습니다.`);
+        addHistoryLog(user, `[계약 해제] 노예 계약 만료`);
         saveDB();
     }
 
@@ -2222,30 +2229,40 @@
             targetUser.noteGlowUntil = Date.now() + 10000; 
             addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
             addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
-        } else if (item === "스마일 스티커") {
-            appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
-            targetUser.noteGlowUntil = Date.now() + 10000;
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
-            addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
-        } else if (item === "빨간 리본") {
-            // ★ [추가] 빨간 리본 장착: 본인과 상대방 양쪽의 장착 장비 칸에 등록하고 연결 상태 표시
-            if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+       } else if (item === "스마일 스티커") {
+        appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
+        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+    } else if (item === "빨간 리본") {
+        // ★ [추가] 빨간 리본 장착: 본인과 상대방 양쪽의 장착 장비 칸에 등록하고 연결 상태 표시
+        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+        if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
 
-            if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
-                showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
-                closeItemTargetModal();
-                return;
-            }
+        if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
+            showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
+            closeItemTargetModal();
+            return;
+        }
 
-            currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name})`);
-            targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name})`);
+        currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name})`);
+        targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name})`);
 
-            appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} 사원과 연결됨`);
-            appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} 사원과 연결됨`);
+        appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} 사원과 연결됨`);
+        appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} 사원과 연결됨`);
 
-            addHistoryLog(currentUser, `[장착] ${targetUser.name} 사원과 빨간 리본 연결 완료`);
-            addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원과 빨간 리본 연결 완료`);
+        addHistoryLog(currentUser, `[장착] ${targetUser.name} 사원과 빨간 리본 연결 완료`);
+        addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원과 빨간 리본 연결 완료`);
+    } else if (item === "노예 계약서") {
+        // ★ [추가] 3일(72시간) 동안 노예 계약 상태 부여
+        targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
+        targetUser.masterName = currentUser.name; 
+        
+        appendBadgeNoteToUser(targetUser, `[노예 계약] ${currentUser.name}의 노예 (3일 지속)`);
+        targetUser.noteGlowUntil = Date.now() + 10000;
+        
+        addHistoryLog(currentUser, `[계약 체결] ${targetUser.name} 사원과 노예 계약을 체결했습니다.`);
+        addHistoryLog(targetUser, `[상태 이상] ${currentUser.name} 사원의 노예가 되었습니다.`);
     } else if (item === "노스텔지어 끈") {
         // ★ [추가] 타인에게 노스텔지어 끈 사용 시 상대방(targetUser)에게 5시간 타이머 세팅
         targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
@@ -2257,7 +2274,6 @@
         addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 노스텔지어 끈 장착`);
         addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
     }
-
     removeItemFromInventory(currentUser, item, 1);
         if (database) {
             database.ref('users').set(db.users);
@@ -2304,9 +2320,8 @@
                 if (isUsable) {
                     if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
-                    } else if (item === "빨간 리본") {
-                        // ★ [추가] 빨간 리본은 장착 시 상대를 지정해야 하므로 타인 선택 모달 호출
-                        useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">상대 장착</button>`;
+                    } else if (item === "빨간 리본" || item === "노예 계약서") {
+                        useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정 사용</button>`;
                     } else if (cat.effect === 'target_sticker') {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">타인 부착</button>`;
                     } else if (isTargetable) {
