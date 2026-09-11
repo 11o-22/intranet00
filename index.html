@@ -2561,41 +2561,93 @@ function getTodayStr() {
         container.innerHTML = html;
     }
 
-    function unequipWeapon(index) {
+            function unequipWeapon(index) {
         if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
-        let itemName = currentUser.equippedWeapons[index];
+        let itemNameFull = currentUser.equippedWeapons[index];
+        
+        let isDualItem = itemNameFull.includes("(연결:") || itemNameFull.includes("(연동:");
+        let baseItemName = itemNameFull;
+        
+        // 괄호를 떼고 원본 아이템 이름만 추출
+        if (isDualItem) {
+            baseItemName = itemNameFull.split(" (")[0]; 
+        } else if (itemNameFull === "🔮 여우구슬") {
+            baseItemName = "여우구슬";
+        }
 
-        if (itemName === "혈욕조") {
+        // 혈욕조 장착 시간 계산
+        if (baseItemName === "혈욕조") {
             let equippedDuration = Date.now() - (currentUser.bloodBathEquippedAt || Date.now());
             if(!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
             currentUser.bloodBathDailyUsedMs += equippedDuration;
         }
         
+        // 1. 내 장착칸에서 제거
         currentUser.equippedWeapons.splice(index, 1);
         
-        // ★ [추가] 여우구슬 해제 시 이모티콘을 떼고 원래 이름으로 인벤토리에 복구
-        if (itemName === "🔮 여우구슬") itemName = "여우구슬";
+        // 2. ★ 오직 해제를 누른 '당신'의 인벤토리에만 아이템이 환수됩니다.
+        currentUser.inventory.push(baseItemName);
+        addHistoryLog(currentUser, `[장착 해제] ${baseItemName} 해제 완료`);
 
-        currentUser.inventory.push(itemName);
-        addHistoryLog(currentUser, `[장착 해제] ${itemName} 해제 완료`);
+        // 3. 내 특이사항 메모에서 해당 장비 관련 텍스트 지우기
+        if (currentUser.badge && currentUser.badge.notes) {
+            let notesArr = currentUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
+            notesArr = notesArr.filter(n => !n.includes(baseItemName)); // 장비 이름이 포함된 메모 삭제
+            currentUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
+        }
+        
+        // 4. 상대방(파트너)의 장착칸 및 특이사항에서 강제로 제거 (인벤토리에는 주지 않음)
+        if (isDualItem && database) {
+            let expected1 = `연결: ${currentUser.name}`;
+            let expected2 = `연동: ${currentUser.name}`;
+            
+            for (let code in db.users) {
+                if (code === currentUser.code) continue; 
+                let u = db.users[code];
+                
+                if (u.equippedWeapons) {
+                    let pIdx = u.equippedWeapons.findIndex(w => 
+                        w.startsWith(baseItemName) && (w.includes(expected1) || w.includes(expected2))
+                    );
+                    
+                    if (pIdx !== -1) {
+                        // 파트너의 장착 슬롯에서 '삭제'만 진행
+                        u.equippedWeapons.splice(pIdx, 1);
+                        addHistoryLog(u, `[장착 해제] 연결된 파트너(${currentUser.name})에 의해 ${baseItemName} 장착이 해제되었습니다.`);
+                        
+                        // 파트너의 특이사항 메모에서도 관련 텍스트 삭제
+                        if (u.badge && u.badge.notes) {
+                            let pNotesArr = u.badge.notes.split(' | ').filter(n => n.trim() !== '');
+                            pNotesArr = pNotesArr.filter(n => !n.includes(baseItemName));
+                            u.badge.notes = (pNotesArr.length === 0) ? "특이사항 없음" : pNotesArr.join(' | ');
+                        }
+
+                        database.ref(`users/${code}`).set(u);
+                        break; 
+                    }
+                }
+            }
+        }
+        
         saveDB(); updateUI();
     }
 
-    function useInventoryItem(itemName) {
+
+        function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
         if (!cat || !cat.usable) return;
 
-        // ★ [수정] 여우구슬 장착 효과(equip_fox_bead) 추가
-        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet') {
+        // ★ [수정됨] 은반지(equip_silver_ring)와 버터 나이프(equip_butter_knife) 조건 추가
+        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife') {
             if (cat.effect === 'open_wallet') {
-            let randPoints = Math.floor(Math.random() * 251) + 250; // 250 ~ 500 P
-            currentUser.points += randPoints;
-            removeItemFromInventory(currentUser, itemName, 1);
-            showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
-            addHistoryLog(currentUser, `[아이템 사용] 지갑 열기 (+${randPoints} P)`);
-            saveDB(); updateUI();
-            return;
-        }
+                let randPoints = Math.floor(Math.random() * 251) + 250; // 250 ~ 500 P
+                currentUser.points += randPoints;
+                removeItemFromInventory(currentUser, itemName, 1);
+                showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
+                addHistoryLog(currentUser, `[아이템 사용] 지갑 열기 (+${randPoints} P)`);
+                saveDB(); updateUI();
+                return;
+            }
             if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
@@ -2612,12 +2664,20 @@ function getTodayStr() {
             } else {
                 currentUser.equippedWeapons.push(itemName);
             }
+
+            // ★ [신규 추가] 시간제 장착 아이템의 파괴 시간 기록
+            if (cat.effect === 'equip_silver_ring') {
+                currentUser.silverRingExpireTime = Date.now() + (120 * 60 * 60 * 1000);
+            } else if (cat.effect === 'equip_butter_knife') {
+                currentUser.butterKnifeExpireTime = Date.now() + (1 * 60 * 60 * 1000);
+            }
             
             if(cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[장비 장착] ${itemName} 장착 완료`);
             saveDB(); updateUI(); return;
         }
+
 
         if (cat.effect === 'target_sticker') { openItemTargetModal(itemName, false); return; }
 
