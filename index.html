@@ -1154,6 +1154,12 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0;" onclick="adminResetLimits()">횟수 리셋</button>
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #9C27B0, #7B1FA2); border-color:#6A1B9A; margin:0;" onclick="adminClearStatus()">상태이상 소거</button>
             </div>
+            <!-- ★ 강제 회수 / 특이사항 초기화 버튼 추가 -->
+            <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #e65100, #bf360c); border-color:#e65100; margin:0;" onclick="adminForceUnequip()">장비 강제 회수</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5d4037, #3e2723); border-color:#4e342e; margin:0;" onclick="adminClearNotes()">특이사항 초기화</button>
+            </div>
+            <!-- --------------------------------------- -->
             <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
                 <select id="adm-special-item" style="flex:2;"></select>
                 <input type="number" id="adm-special-qty" class="bet-input" style="width:50px;" value="1" min="1" placeholder="수량">
@@ -1231,7 +1237,27 @@
         const d = String(now.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
+function getTodayStr() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
 
+    // ★ [추가] 22시 기준으로 날짜 사이클을 계산하는 함수
+    function get22HourCycleStr() {
+        const now = new Date();
+        let cycleDate = new Date(now.getTime());
+        // 현재 시간이 밤 22시 이전이라면, 시스템상으로는 아직 '어제'로 취급합니다.
+        if (now.getHours() < 22) {
+            cycleDate.setDate(cycleDate.getDate() - 1);
+        }
+        const y = cycleDate.getFullYear();
+        const m = String(cycleDate.getMonth() + 1).padStart(2, '0');
+        const d = String(cycleDate.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}-22h`;
+    }
     let db = {
         users: {
             "1234": { 
@@ -2062,25 +2088,38 @@
         }
     }
 
-    function updateUI() {
+   function updateUI() {
         if (!currentUser) return;
         applyDepartmentTheme(currentUser);
 
-        const currentToday = getTodayStr();
-        if (currentUser.lastFacilityDate !== currentToday) {
-            currentUser.facilityCount = 0; currentUser.facilityMax = 15; currentUser.lastFacilityDate = currentToday;
+        const currentToday = getTodayStr(); // 자정(0시) 기준 날짜
+        const cycle22h = get22HourCycleStr(); // 22시 기준 날짜
+
+        // 1. 공용시설 이용 횟수는 '22시'를 기준으로 초기화됩니다. (포인트, 오염도는 유지)
+        if (currentUser.lastFacilityDate !== cycle22h) {
+            currentUser.facilityCount = 0; 
+            currentUser.facilityMax = 15; 
+            currentUser.lastFacilityDate = cycle22h;
             saveDB();
         }
-        // 날짜가 바뀌면 당일 구매 기록만 리셋 (기회(alienTries)는 쿨타임 시스템으로 관리하므로 0으로 강제 초기화하지 않음)
+        
+        // 티켓(아이템)으로 늘린 한도 역시 22시를 기준으로 함께 리셋됩니다.
+        if (currentUser.ticketAddedDate !== cycle22h) {
+            currentUser.ticketAddedDate = cycle22h; 
+            currentUser.ticketAddedCount = 0;
+            saveDB();
+        }
+
+        // 2. 우주 쇼핑몰은 '자정(0시)'을 기준으로 초기화됩니다.
         if (currentUser.alienDate !== currentToday) {
             currentUser.alienDate = currentToday; 
             currentUser.alienBoughtItems = [];
+            currentUser.alienUnlockedItems = []; // ★ 해금된 아이템 목록을 텅 비웁니다 (최소 0개 상태)
+            currentUser.alienTries = 0; // ★ 하이로우 게임 기회도 다시 0/2회로 리셋합니다.
             saveDB();
         }
-        if (currentUser.ticketAddedDate !== currentToday) {
-            currentUser.ticketAddedDate = currentToday; currentUser.ticketAddedCount = 0;
-            saveDB();
-        }
+
+        // 혈욕조 장착 시간 초기화 (이건 자정 기준 유지)
         if (currentUser.bloodBathEquippedAt && currentUser.equippedWeapons && currentUser.equippedWeapons.includes("혈욕조")) {
             const todayStr = new Date(currentUser.bloodBathEquippedAt).toLocaleDateString();
             if(todayStr !== new Date().toLocaleDateString()) {
@@ -2091,6 +2130,8 @@
         } else {
             currentUser.bloodBathDailyUsedMs = 0;
         }
+
+        // ... 이후 100% 도달 시 여우 상담실 연출 등 기존 코드 그대로 이어짐 ...
 
         // 100% 도달 시 여우 상담실 연출 및 로직
         if (currentUser.pollution >= 100) {
@@ -4110,6 +4151,67 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             addHistoryLog(targetUser, `[당국 개입] 보급품 '${itemName}' ${qty}개가 인벤토리에 지급되었습니다.`);
             saveDB(); updateUI();
             showCustomAlert(`사번 ${targetNo} (${targetUser.name})에게 ${itemName} ${qty}개를 지급했습니다.`);
+        }
+    // [추가] 1. 장착 아이템 강제 회수
+        function adminForceUnequip() {
+            const targetNo = document.getElementById('adm-special-no').value.trim();
+            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+
+            if (!targetUser.equippedWeapons || targetUser.equippedWeapons.length === 0) {
+                showCustomAlert('해당 사원은 현재 장착 중인 아이템이 없습니다.'); return;
+            }
+
+            // 장착된 아이템의 꼬리표를 떼고 다시 인벤토리에 넣습니다.
+            targetUser.equippedWeapons.forEach(weaponStr => {
+                let baseName = weaponStr;
+                if (baseName.includes("(연결:") || baseName.includes("(연동:")) {
+                    baseName = baseName.split(" (")[0];
+                } else if (baseName === "🔮 여우구슬") {
+                    baseName = "여우구슬";
+                }
+                targetUser.inventory.push(baseName);
+            });
+
+            targetUser.equippedWeapons = []; // 장착칸 완전히 비우기
+            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
+            saveDB(); updateUI();
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
+        }
+
+        // [추가] 2. 특이사항 텍스트 강제 초기화
+        function adminClearNotes() {
+            const targetNo = document.getElementById('adm-special-no').value.trim();
+            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+
+            if (!targetUser.badge) targetUser.badge = { photo: "", nickname: targetUser.name, notes: "특이사항 없음" };
+            targetUser.badge.notes = "특이사항 없음"; // 내용 초기화
+            
+            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 특이사항(상태)이 모두 지워졌습니다.`);
+            saveDB(); updateUI();
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 특이사항 칸이 초기화되었습니다.`);
+        }
+
+        // [추가] 3. 상태이상 소거 (기존 빈 버튼 기능 보완)
+        function adminClearStatus() {
+            const targetNo = document.getElementById('adm-special-no').value.trim();
+            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+
+            // 디버프 시간 강제 만료
+            targetUser.quarantineUntil = 0;
+            targetUser.blindfoldUntil = 0;
+            targetUser.slaveUntil = 0;
+            targetUser.nostalgiaUntil = 0;
+            targetUser.masterName = null;
+            
+            addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 시스템적 상태이상이 소거되었습니다.`);
+            saveDB(); updateUI();
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 상태이상 효과를 제거했습니다.`);
         }
         function adminDeleteEmployee() {
             const targetNo = document.getElementById('adm-delete-no').value.trim();
