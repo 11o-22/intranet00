@@ -3561,21 +3561,53 @@
         const generatedNo = generateSerialNo(aff, pos, team);
 
         db.users[code] = {
-            code: code, name: name, affiliation: aff, team: team, position: pos,
-            no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
-            facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
-            blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
-            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [], lastAlienPlayTime: 0,
-          inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
-            badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
+            code: code, 
+            name: name, 
+            affiliation: aff, 
+            team: team, 
+            position: pos,
+            no: generatedNo, 
+            points: 30, 
+            pollution: 0, 
+            lastPollutionTime: Date.now(),
+            facilityCount: 0, 
+            facilityMax: 15, 
+            lastFacilityDate: getTodayStr(), 
+            hasVIP: false,
+            blindfoldUntil: 0, 
+            quarantineUntil: 0, 
+            quarantineExitPollution: 0, 
+            equippedWeapons: [], 
+            bloodBathDailyUsedMs: 0, 
+            bloodBathEquippedAt: 0,
+            alienDate: getTodayStr(), 
+            alienTries: 0, 
+            alienBoughtItems: [], 
+            ticketAddedDate: "", 
+            ticketAddedCount: 0, 
+            alienUnlockedItems: [], 
+            lastAlienPlayTime: 0,
+            inventory: ["상비약 (오염도 -10%)"], 
+            receivedRations: [], 
+            history: [], 
+            letters: [], 
+            purchaseRecord: {},
+            badge: { photo: "", nickname: name, notes: "특이사항 없음" }, 
+            noteGlowUntil: 0, 
+            hasNewLetter: false, 
+            hasNewReply: false, 
+            hasItemUsedOnMe: false, 
+            foxRoomAnswered: false
         };
 
         saveDB();
-        document.getElementById('new-emp-name').value = ''; document.getElementById('new-emp-code').value = '';
-        document.getElementById('new-emp-pos').value = ''; document.getElementById('new-emp-aff').value = ''; document.getElementById('new-emp-team').value = '';
+        document.getElementById('new-emp-name').value = ''; 
+        document.getElementById('new-emp-code').value = '';
+        document.getElementById('new-emp-pos').value = ''; 
+        document.getElementById('new-emp-aff').value = ''; 
+        document.getElementById('new-emp-team').value = '';
         showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
     }
-
     function adminUpdateEmployee() {
 const targetNo = document.getElementById('adm-target-no').value.trim();
             const aff = document.getElementById('adm-set-affiliation').value.trim();
