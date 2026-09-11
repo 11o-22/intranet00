@@ -1366,6 +1366,17 @@
         database.ref('/').update(updates);
     }
 
+    unction removeItemFromInventory(user, itemName, qty) {
+        let removedCount = 0;
+        for (let i = user.inventory.length - 1; i >= 0; i--) {
+            if (user.inventory[i] === itemName) {
+                user.inventory.splice(i, 1);
+                removedCount++;
+                if (removedCount >= qty) break;
+            }
+        }
+    }
+
     function showCustomAlert(message) {
         document.getElementById('custom-alert-text').innerText = message;
         document.getElementById('custom-alert-overlay').style.display = 'flex';
@@ -2764,8 +2775,6 @@
         }
         return true;
     }
-
-    function sellInventoryItem(itemName) {
 
     function sellInventoryItem(itemName) {
         const sellPrice = getSellPrice(itemName);
