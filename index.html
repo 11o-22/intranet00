@@ -3157,18 +3157,24 @@ function getTodayStr() {
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
 
-        // ★ [핵심] 플레이어 승리 확률을 정확히 49%로 고정 (나머지 51%는 패배 또는 무승부)
-        let roll = Math.random() * 100; // 0 ~ 100 사이의 무작위 수
-        if (roll < 49) {
-            // 강제 승리 조작: 플레이어의 점수가 딜러보다 무조건 높게 설정 (동점이면 점수 미세 가산)
+        // ★ [조정] 플레이어의 좋은 패 확률을 10% 미만으로 제한 (땡, 광땡, 알리 등 높은 점수일 경우 일정 확률로 점수 강등)
+        let highCardRoll = Math.random() * 100;
+        if (pRes.score >= 700 && highCardRoll >= 9) { // 9% 확률로만 높은 패 유지, 나머지 91%는 낮은 끗수로 강등
+            pRes = { name: "망통", score: 500, mult: 2 };
+        }
+
+        // ★ [조정] 최종 승률을 30% 내외로 고정 (0 ~ 100 중 29 미만일 때만 승리 유도)
+        let winRoll = Math.random() * 100;
+        if (winRoll < 29) {
+            // 강제 승리 (플레이어 점수가 딜러보다 낮거나 같으면 우위로 조정)
             if (pRes.score <= dRes.score) {
-                pRes.score = dRes.score + 100;
-                pRes.name = "조작된 승리 족보";
+                pRes.score = dRes.score + 50;
+                pRes.name = "간신히 이긴 족보";
             }
         } else {
-            // 나머지 51% 확률 안에서 패배 또는 무승부 처리
+            // 나머지 71%는 패배 또는 무승부 유도
             if (pRes.score > dRes.score) {
-                pRes.score = dRes.score - 10; // 강제 패배 유도
+                pRes.score = dRes.score - 10;
             }
         }
 
