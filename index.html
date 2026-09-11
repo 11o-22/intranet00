@@ -2727,7 +2727,7 @@ function getTodayStr() {
         } else if (cat.effect === 'vip_pass') {
             if (targetUser.hasVIP) { if(!isOthers) showCustomAlert('이미 2급 보안 인가(VIP)가 승인되어 있습니다.'); return false; }
             targetUser.hasVIP = true; appendBadgeNoteToUser(targetUser, `2급 보안 인가 (VIP 라운지 출입 권한 획득)`);
-                // (이 기존 코드들을 찾아서 아래 코드로 바꿔치기 하세요)
+        }  // (이 기존 코드들을 찾아서 아래 코드로 바꿔치기 하세요)
         else if (cat.effect === 'grape_potion') addTimedEffect(targetUser, '포도맛 물약', '신체 파동 변조 (성별 반전 상태)', 72);
         else if (cat.effect === 'milk_potion') addTimedEffect(targetUser, '우유맛 물약', '신체 변이 (컨트/딕걸)', 72);
         else if (cat.effect === 'apple_potion') addTimedEffect(targetUser, '사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현`, 72);
@@ -2738,13 +2738,17 @@ function getTodayStr() {
             addTimedEffect(targetUser, '고급진 술', '알코올 섭취', 10);
             if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
         }
-        else if (cat.effect === 'equip_nostalgia') {
-            addTimedEffect(targetUser, '노스텔지어 끈', '오염도 서서히 감소 중', 5);
-            // (이후 기존의 노스텔지어 끈 조건문 코드는 그대로 둡니다)
-
+        else if (cat.effect === 'cure_potion') {
             if (targetUser.badge && targetUser.badge.notes && targetUser.badge.notes !== "특이사항 없음") {
                 let notesArr = targetUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
                 if (notesArr.length > 0) {
+                    let removeIdx = Math.floor(Math.random() * notesArr.length);
+                    let removedNote = notesArr.splice(removeIdx, 1);
+                    targetUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
+                    if(!isOthers) showCustomAlert(`[제거약 효과] 다음 상태이상이 씻겨나갔습니다:\n- ${removedNote}`);
+                } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
+            } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
+        }
                     let removeIdx = Math.floor(Math.random() * notesArr.length);
                     let removedNote = notesArr.splice(removeIdx, 1);
                     targetUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
