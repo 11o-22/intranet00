@@ -1411,7 +1411,7 @@
         "???의 티켓": { price: 42, usable: true, targetable: false, effect: "ticket", value: 5, desc: "공용 시설 이용 횟수 5회 추가 (최대 20회 상한)." },
         "무전기": { price: 51, usable: true, targetable: false, effect: "radio", value: 15, ticket: 5, desc: "공용 시설 이용 횟수 5회 추가 및 오염도 15% 회복." },
         "작은 데일밴드": { price: 2, usable: true, targetable: false, effect: "heal", value: 1, desc: "오염도 1% 회복." },
-        "전복죽": { price: 20, usable: true, targetable: fales, effect: "heal", value: 12, desc: "오염도 12% 회복." },
+        "전복죽": { price: 20, usable: true, targetable: false, effect: "heal", value: 12, desc: "오염도 12% 회복." },
         "상비약 (오염도 -10%)": { price: 12, usable: true, targetable: false, effect: "heal", value: 10, desc: "오염 지수가 10% 감소한다." },
         "노스텔지어 캔디": { price: 150, usable: true, targetable: false, effect: "candy", desc: "오염도 60% 회복, 공용 시설 횟수 5 추가." },
         "스마일 스티커": { price: 200, usable: true, targetable: true, effect: "target_sticker", desc: "누군가에게 몰래 부착하여 5시간 동안 당신에게 미미한 호감을 느끼게 합니다." },
@@ -3565,7 +3565,7 @@
             no: generatedNo, points: 30, pollution: 0, lastPollutionTime: Date.now(),
             facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
             blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
-            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [], lastAlienPlayTime: 0
+            alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [], lastAlienPlayTime: 0,
           inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
             badge: { photo: "", nickname: name, notes: "특이사항 없음" }, noteGlowUntil: 0, hasNewLetter: false, hasNewReply: false, hasItemUsedOnMe: false, foxRoomAnswered: false
         };
