@@ -2119,7 +2119,8 @@
 
         if (isLocked || isLimitReached) {
             document.getElementById('public-lock-notice').style.display = 'block';
-            document.getElementById('public-content-box').style.display = 'none';
+            // ★ none에서 block으로 변경! (안내문은 띄우되 게임판을 강제로 숨기지 않음)
+            document.getElementById('public-content-box').style.display = 'block';
         } else {
             document.getElementById('public-lock-notice').style.display = 'none';
             document.getElementById('public-content-box').style.display = 'block';
@@ -2805,20 +2806,11 @@
             return;
         }
 
-        // ★ [수정] 시작할 때는 횟수나 포인트를 차감하지 않고, 잔고와 이용 가능 여부만 체크합니다.
-        if (currentUser.pollution >= 100) {
-            showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.');
-            return;
-        }
+        // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return; }
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
-        if (currentUser.facilityCount >= currentUser.facilityMax) {
-            showCustomAlert('일일 이용 한도를 초과했습니다.');
-            return;
-        }
-        if (currentUser.points < bet) {
-            showLuxuryAlert();
-            return;
-        }
+        if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return; }
+        if (currentUser.points < bet) { showLuxuryAlert(); return; }
 
         seotdaBet = bet; 
         swapsLeft = 2; 
@@ -2841,18 +2833,53 @@
         document.getElementById('seotda-msg').innerText = "원하는 패를 교환하거나 승부를 겨루세요.";
     }
 
+    function swapSeotdaCard() {
+        if (selectedCardIdx === -1 || swapsLeft <= 0) return;
+        playerHand[selectedCardIdx - 1] = seotdaDeck.pop();
+        renderCard(`seotda-card-${selectedCardIdx}`, playerHand[selectedCardIdx - 1]);
+        swapsLeft--; document.getElementById('swap-count').innerText = swapsLeft;
+        document.getElementById(`seotda-card-${selectedCardIdx}`).classList.remove('selected');
+        selectedCardIdx = -1;
+        document.getElementById('player-result-label').innerText = calculateJokbo(playerHand[0], playerHand[1]).name;
+        if (swapsLeft === 0) document.getElementById('seotda-msg').innerText = "교환을 모두 마쳤습니다. 쇼다운을 진행하세요.";
+    }
+
+    function calculateJokbo(c1, c2) {
+        let m1 = c1.month, m2 = c2.month, isK1 = c1.isKwang, isK2 = c2.isKwang;
+        if (m1 > m2) { [m1, m2] = [m2, m1]; [isK1, isK2] = [isK2, isK1]; }
+        if (isK1 && isK2) {
+            if (m1 === 3 && m2 === 8) return { name: "38광땡", score: 1000, mult: 20 };
+            if ((m1 === 1 && m2 === 8) || (m1 === 1 && m2 === 3)) return { name: "광땡", score: 900, mult: 10 };
+        }
+        if (m1 === m2) return { name: `${m1}땡`, score: 700 + m1, mult: 2 };
+        if (m1 === 1 && m2 === 2) return { name: "알리", score: 650, mult: 2 };
+        if (m1 === 1 && m2 === 4) return { name: "독사", score: 640, mult: 2 };
+        if (m1 === 1 && m2 === 9) return { name: "구포", score: 630, mult: 2 };
+        if (m1 === 1 && m2 === 10) return { name: "장삥", score: 620, mult: 2 };
+        if (m1 === 4 && m2 === 10) return { name: "장사", score: 610, mult: 2 };
+        if (m1 === 4 && m2 === 6) return { name: "세륙", score: 600, mult: 2 };
+        let kkeut = (m1 + m2) % 10;
+        if (kkeut === 9) return { name: "갑오", score: 509, mult: 2 };
+        if (kkeut === 0) return { name: "망통", score: 500, mult: 2 };
+        return { name: `${kkeut}끗`, score: 500 + kkeut, mult: 2 };
+    }
+
     function finishSeotda() {
-        // ★ [핵심] 쇼다운(승부)을 누르는 바로 이 순간에 시설 이용 횟수와 베팅 포인트를 최종 차감합니다!
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        
+        // ★ [핵심] 쇼다운(승부)을 누르는 바로 이 순간에 최종 결산이 진행됩니다!
         if (currentUser.facilityCount >= currentUser.facilityMax || currentUser.points < seotdaBet) {
-            showCustomAlert('이용 횟수 또는 포인트가 부족하여 승부를 진행할 수 없습니다.');
+            showCustomAlert('이용 횟수 또는 포인트가 부족하여 승부를 진행할 수 없습니다. (대결 무효)');
+            document.getElementById('seotda-controls-play').style.display = 'none'; 
+            document.getElementById('seotda-controls-start').style.display = 'block';
             return;
         }
 
+        // 1. 포인트 및 횟수 최종 차감
         currentUser.points -= seotdaBet;
         currentUser.facilityCount += 1;
-        addPollution(2); // 공용시설 이용에 따른 오염도 상승
 
+        // 2. 패 오픈 및 결과 표시
         renderCard('dealer-card-1', dealerHand[0]); 
         renderCard('dealer-card-2', dealerHand[1]);
         
@@ -2866,19 +2893,20 @@
         if (pRes.score > dRes.score) {
             let winAmount = seotdaBet * pRes.mult; 
             winPoints(winAmount);
-            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult})</span>`;
+            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult}) -> +${winAmount} P</span>`;
             addHistoryLog(currentUser, `[섯다 승리] ${pRes.name} vs 딜러 ${dRes.name} (+${winAmount} P)`);
         } else if (pRes.score < dRes.score) {
             msgEl.innerHTML = `<span style="color:#f44336;">[패배] 시스템(${dRes.name})에게 패배했습니다. (-${seotdaBet} P)</span>`;
             addHistoryLog(currentUser, `[섯다 패배] ${pRes.name} vs 딜러 ${dRes.name} (-${seotdaBet} P)`);
-            saveDB();
-            updateUI();
+            saveDB(); updateUI();
         } else {
-            winPoints(seotdaBet); // 무승부 시 베팅금 반환
+            winPoints(seotdaBet);
             msgEl.innerHTML = `<span style="color:#ffd700;">[무승부] 동일 족보입니다. 베팅금이 반환되었습니다.</span>`;
             addHistoryLog(currentUser, `[섯다 무승부] ${pRes.name} vs 딜러 ${dRes.name} (반환)`);
         }
         
+        // 3. 공용시설 이용에 따른 오염도 상승 및 UI 리셋
+        addPollution(2); 
         document.getElementById('seotda-card-1').classList.remove('selected'); 
         document.getElementById('seotda-card-2').classList.remove('selected');
         document.getElementById('seotda-controls-play').style.display = 'none'; 
