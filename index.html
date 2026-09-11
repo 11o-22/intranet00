@@ -2417,11 +2417,32 @@
         container.innerHTML = html;
     }
 
+    function unequipWeapon(index) {
+        if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
+        let itemName = currentUser.equippedWeapons[index];
+
+        if (itemName === "혈욕조") {
+            let equippedDuration = Date.now() - (currentUser.bloodBathEquippedAt || Date.now());
+            if(!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
+            currentUser.bloodBathDailyUsedMs += equippedDuration;
+        }
+        
+        currentUser.equippedWeapons.splice(index, 1);
+        
+        // ★ [추가] 여우구슬 해제 시 이모티콘을 떼고 원래 이름으로 인벤토리에 복구
+        if (itemName === "🔮 여우구슬") itemName = "여우구슬";
+
+        currentUser.inventory.push(itemName);
+        addHistoryLog(currentUser, `[장착 해제] ${itemName} 해제 완료`);
+        saveDB(); updateUI();
+    }
+
     function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
         if (!cat || !cat.usable) return;
 
-        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
+        // ★ [수정] 여우구슬 장착 효과(equip_fox_bead) 추가
+        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead') {
             if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
@@ -2431,7 +2452,14 @@
                 showCustomAlert("장비는 최대 3개까지만 장착할 수 있습니다.");
                 return;
             }
-            currentUser.equippedWeapons.push(itemName);
+            
+            // ★ 여우구슬일 경우 이모티콘을 붙여서 장착
+            if (cat.effect === 'equip_fox_bead') {
+                currentUser.equippedWeapons.push(`🔮 ${itemName}`);
+            } else {
+                currentUser.equippedWeapons.push(itemName);
+            }
+            
             if(cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[장비 장착] ${itemName} 장착 완료`);
@@ -3445,6 +3473,9 @@
                 if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
                 if (["버터 나이프", "은반지", "빨간 리본", "고급진 술", "금고"].includes(item) && !isHighRank) return false;
                 if (item === "노스텔지어 끈" && !isSecurityTeam) return false;
+                // ★ [추가] 일반 사원은 여우구슬 획득 불가
+                if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
+                
                 return true;
             });
 
@@ -3480,6 +3511,8 @@
         unlocked = unlocked.filter(item => {
             if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
             if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+            // ★ 상담사가 아니면 여우구슬 절대 노출 불가
+            if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
             return true;
         });
 
@@ -3492,7 +3525,6 @@
             const item = ITEM_CATALOG[itemName];
             if (!item) return '';
             
-            // ★ [핵심] 관리자(kario0987)는 당일 구매 여부(isBoughtToday)와 상관없이 항상 구매 가능 상태로 설정
             const isAdmin = (currentUser && currentUser.code === 'kario0987');
             const isBoughtToday = !isAdmin && (currentUser.alienBoughtItems || []).includes(itemName);
             
@@ -3502,30 +3534,37 @@
                         <span style="font-weight:bold; font-size:13px; color:#00A2E8;">${itemName}</span><br>
                         <span style="font-size:10px; color:#aaa;">${item.desc}</span>
                     </div>
-                    <button onclick="buyAlienItem('${itemName}', ${item.price})" ${isBoughtToday ? 'disabled' : ''}>${isBoughtToday ? '품절' : item.price + ' P'}</button>
+                    <!-- ★ 따옴표 추가: 가격이 "???" 같은 문자열이어도 에러 나지 않음 -->
+                    <button onclick="buyAlienItem('${itemName}', '${item.price}')" ${isBoughtToday ? 'disabled' : ''}>
+                        ${isBoughtToday ? '품절' : item.price + ' P'}
+                    </button>
                 </div>
             `;
         }).join('');
     }
+
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
         
-        // 관리자(kario0987)는 당일 구매 제한 제외
         if (currentUser.code !== 'kario0987' && currentUser.alienBoughtItems.includes(itemName)) { 
             showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); 
             return; 
         }
-        if (currentUser.points < price) { showLuxuryAlert(); return; }
         
-        currentUser.points -= price; 
+        // ★ 가격이 "???"면 무료(0원)로 처리하여 포인트 에러 방지
+        let cost = parseInt(price);
+        if (isNaN(cost)) cost = 0; 
+
+        if (currentUser.points < cost) { showLuxuryAlert(); return; }
+        
+        currentUser.points -= cost; 
         currentUser.inventory.push(itemName);
         
-        // ★ [핵심] 관리자가 아닐 때만 구매 내역(품절용)에 추가합니다!
         if (currentUser.code !== 'kario0987') {
             currentUser.alienBoughtItems.push(itemName);
         }
         
-        addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
+        addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${cost} P)`);
         setUFODialogue("훌륭한 거래였습니다.");
         saveDB(); 
         updateUI();
