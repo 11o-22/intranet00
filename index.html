@@ -3139,10 +3139,9 @@ function getTodayStr() {
         return { name: `${kkeut}끗`, score: 500 + kkeut, mult: 2 };
     }
 
-    function finishSeotda() {
+   function finishSeotda() {
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
         
-        // ★ [핵심] 쇼다운(승부)을 누르는 바로 이 순간에 최종 결산이 진행됩니다!
         if (currentUser.facilityCount >= currentUser.facilityMax || currentUser.points < seotdaBet) {
             showCustomAlert('이용 횟수 또는 포인트가 부족하여 승부를 진행할 수 없습니다. (대결 무효)');
             document.getElementById('seotda-controls-play').style.display = 'none'; 
@@ -3154,12 +3153,28 @@ function getTodayStr() {
         currentUser.points -= seotdaBet;
         currentUser.facilityCount += 1;
 
-        // 2. 패 오픈 및 결과 표시
-        renderCard('dealer-card-1', dealerHand[0]); 
-        renderCard('dealer-card-2', dealerHand[1]);
-        
+        // 2. 족보 계산
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
+
+        // ★ [핵심] 플레이어 승리 확률을 정확히 49%로 고정 (나머지 51%는 패배 또는 무승부)
+        let roll = Math.random() * 100; // 0 ~ 100 사이의 무작위 수
+        if (roll < 49) {
+            // 강제 승리 조작: 플레이어의 점수가 딜러보다 무조건 높게 설정 (동점이면 점수 미세 가산)
+            if (pRes.score <= dRes.score) {
+                pRes.score = dRes.score + 100;
+                pRes.name = "조작된 승리 족보";
+            }
+        } else {
+            // 나머지 51% 확률 안에서 패배 또는 무승부 처리
+            if (pRes.score > dRes.score) {
+                pRes.score = dRes.score - 10; // 강제 패배 유도
+            }
+        }
+
+        // 3. 패 오픈 및 결과 표시
+        renderCard('dealer-card-1', dealerHand[0]); 
+        renderCard('dealer-card-2', dealerHand[1]);
         
         document.getElementById('player-result-label').innerText = pRes.name;
         document.getElementById('dealer-result-label').innerText = dRes.name;
@@ -3180,14 +3195,12 @@ function getTodayStr() {
             addHistoryLog(currentUser, `[섯다 무승부] ${pRes.name} vs 딜러 ${dRes.name} (반환)`);
         }
         
-        // 3. 공용시설 이용에 따른 오염도 상승 및 UI 리셋
         addPollution(2); 
         document.getElementById('seotda-card-1').classList.remove('selected'); 
         document.getElementById('seotda-card-2').classList.remove('selected');
         document.getElementById('seotda-controls-play').style.display = 'none'; 
         document.getElementById('seotda-controls-start').style.display = 'block';
     }
-
     // ==========================================
     // VIP 라운지 1:1 실시간 대전 로직
     // ==========================================
