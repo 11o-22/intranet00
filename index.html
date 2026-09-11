@@ -2217,16 +2217,35 @@
 
         targetUser.hasItemUsedOnMe = true;
 
-            if (pendingTargetIsPotion) {
-        applyItemEffect(targetUser, item, true);
-        targetUser.noteGlowUntil = Date.now() + 10000; 
-        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
-        addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
-    } else if (item === "스마일 스티커") {
-        appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
-        targetUser.noteGlowUntil = Date.now() + 10000;
-        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
-        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+        if (pendingTargetIsPotion) {
+            applyItemEffect(targetUser, item, true);
+            targetUser.noteGlowUntil = Date.now() + 10000; 
+            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name}에게 ${item} 사용`);
+            addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
+        } else if (item === "스마일 스티커") {
+            appendBadgeNoteToUser(targetUser, `[부착물] ${currentUser.name}에게 미미한 호감을 느낀다. (5시간 지속)`);
+            targetUser.noteGlowUntil = Date.now() + 10000;
+            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 스마일 스티커 부착`);
+            addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
+        } else if (item === "빨간 리본") {
+            // ★ [추가] 빨간 리본 장착: 본인과 상대방 양쪽의 장착 장비 칸에 등록하고 연결 상태 표시
+            if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+            if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+
+            if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
+                showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
+                closeItemTargetModal();
+                return;
+            }
+
+            currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name})`);
+            targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name})`);
+
+            appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} 사원과 연결됨`);
+            appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} 사원과 연결됨`);
+
+            addHistoryLog(currentUser, `[장착] ${targetUser.name} 사원과 빨간 리본 연결 완료`);
+            addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원과 빨간 리본 연결 완료`);
     } else if (item === "노스텔지어 끈") {
         // ★ [추가] 타인에게 노스텔지어 끈 사용 시 상대방(targetUser)에게 5시간 타이머 세팅
         targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
@@ -2240,6 +2259,11 @@
     }
 
     removeItemFromInventory(currentUser, item, 1);
+        if (database) {
+            database.ref('users').set(db.users);
+        } else {
+            saveDB();
+        }
     saveDB(); updateUI(); closeItemTargetModal();
 }
 
@@ -2276,10 +2300,13 @@
                 const isTargetable = cat ? cat.targetable : false;
                 const sellPrice = getSellPrice(item);
                 
-                let useBtnHtml = '';
+               let useBtnHtml = '';
                 if (isUsable) {
                     if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
+                    } else if (item === "빨간 리본") {
+                        // ★ [추가] 빨간 리본은 장착 시 상대를 지정해야 하므로 타인 선택 모달 호출
+                        useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">상대 장착</button>`;
                     } else if (cat.effect === 'target_sticker') {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">타인 부착</button>`;
                     } else if (isTargetable) {
@@ -3115,17 +3142,20 @@
         addHistoryLog(currentUser, `[밀실 제안] ${targetUser.name}(NO.${targetUser.no}) 대상 ${desc} 전송`);
         saveDB(); updateUI();
     }
-    function renderP2PLists() {
+   function renderP2PLists() {
         checkP2PExpiration();
         const receivedList = document.getElementById('p2p-received-list');
         const sentList = document.getElementById('p2p-sent-list');
         if (!receivedList || !sentList) return;
         const allDeals = db.p2pDeals || [];
+        
+        // ★ [수정] PENDING 상태이면서 현재 로그인한 유저가 관련 당사자인 것만 확실하게 필터링
         const myReceived = allDeals.filter(d => d.toCode === currentUser.code && d.status === 'PENDING');
         const mySent = allDeals.filter(d => d.fromCode === currentUser.code && d.status === 'PENDING');
 
-        if (myReceived.length === 0) receivedList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">도착한 제안이 없습니다.</div>';
-        else {
+        if (myReceived.length === 0) {
+            receivedList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">도착한 제안이 없습니다.</div>';
+        } else {
             receivedList.innerHTML = myReceived.map(deal => {
                 const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
                 const demandDesc = (deal.mode === 'give') ? `<span style="color:#4CAF50;">무상 양도 (대가 없음)</span>` : (deal.demandType === 'point' ? `${deal.demandValue} P 요구` : `'${deal.demandValue}' x${deal.demandQty} 요구`);
@@ -3144,8 +3174,9 @@
             }).join('');
         }
 
-        if (mySent.length === 0) sentList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">대기 중인 보낸 제안이 없습니다.</div>';
-        else {
+        if (mySent.length === 0) {
+            sentList.innerHTML = '<div style="color:#666; font-size:11px; padding:6px 0;">대기 중인 보낸 제안이 없습니다.</div>';
+        } else {
             sentList.innerHTML = mySent.map(deal => {
                 const offerDesc = deal.offerType === 'point' ? `${deal.offerValue} P` : `${deal.offerValue} x${deal.offerQty}`;
                 return `
@@ -3359,6 +3390,8 @@
 
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
+        
+        // ★ [추가] 관리자(kario0987) 계정은 당일 구매 제한을 받지 않음
         if (currentUser.code !== 'kario0987' && currentUser.alienBoughtItems.includes(itemName)) { 
             showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); 
             return; 
