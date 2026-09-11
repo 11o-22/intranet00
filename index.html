@@ -3368,13 +3368,16 @@
         }, 1500);
     }
     
-    function renderAlienShop() {
+   function renderAlienShop() {
         const container = document.getElementById('alien-items-container');
         if (!container) return;
         
-        let unlocked = currentUser.code === 'kario0987' ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
+        // ★ 관리자(kario0987)는 해금 여부와 무관하게 전체 풀(Pool)을 즉시 열람
+        let unlocked = (currentUser && currentUser.code === 'kario0987') ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
+        
         const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
         const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+        
         unlocked = unlocked.filter(item => {
             if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
             if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
@@ -3388,6 +3391,7 @@
 
         container.innerHTML = unlocked.map(itemName => {
             const item = ITEM_CATALOG[itemName];
+            if (!item) return ''; // 에러 방지용 안전장치
             const isBoughtToday = (currentUser.alienBoughtItems || []).includes(itemName);
             return `
                 <div class="shop-item ${isBoughtToday ? 'sold-out' : ''}">
@@ -3400,7 +3404,6 @@
             `;
         }).join('');
     }
-
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
         
