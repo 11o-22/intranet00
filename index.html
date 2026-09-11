@@ -3997,18 +3997,24 @@ function getTodayStr() {
         document.getElementById('main-screen').style.display = 'flex';
         document.getElementById('ranking-bottom-bar').style.display = 'block';
     }
-    function adminRegisterNewEmployee() {
+   function adminRegisterNewEmployee() {
         const name = document.getElementById('new-emp-name').value.trim();
         const code = document.getElementById('new-emp-code').value.trim();
         const pos = document.getElementById('new-emp-pos').value.trim() || "사원";
         const aff = document.getElementById('new-emp-aff').value.trim() || "백일몽 주식회사";
         const team = document.getElementById('new-emp-team').value.trim() || "현장탐사팀";
 
-        if (!name || !code) return;
-        if (db.users[code]) { showCustomAlert('이미 존재하는 사원코드입니다.'); return; }
+        if (!name || !code) {
+            showCustomAlert('사원명과 인가 코드를 모두 입력해주세요.');
+            return;
+        }
+        if (db.users[code]) {
+            showCustomAlert('이미 존재하는 사원코드입니다.');
+            return;
+        }
         const generatedNo = generateSerialNo(aff, pos, team);
 
-        db.users[code] = {
+        const newUserData = {
             code: code, 
             name: name, 
             affiliation: aff, 
@@ -4020,7 +4026,7 @@ function getTodayStr() {
             lastPollutionTime: Date.now(),
             facilityCount: 0, 
             facilityMax: 15, 
-            lastFacilityDate: getTodayStr(), 
+            lastFacilityDate: get22HourCycleStr(), 
             hasVIP: false,
             blindfoldUntil: 0, 
             quarantineUntil: 0, 
@@ -4048,13 +4054,28 @@ function getTodayStr() {
             foxRoomAnswered: false
         };
 
-        saveDB();
+        // 1. 로컬 db에 즉시 반영
+        db.users[code] = newUserData;
+
+        // 2. ★ Firebase 서버에 해당 유저 데이터를 직접 타겟팅하여 영구 저장
+        if (database) {
+            database.ref('users/' + code).set(newUserData).then(() => {
+                showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
+            }).catch((err) => {
+                console.error("Firebase 신규 사원 등록 실패:", err);
+                showCustomAlert("서버 저장 중 오류가 발생했습니다.");
+            });
+        } else {
+            saveDB();
+            showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
+        }
+
+        // 3. 입력창 초기화
         document.getElementById('new-emp-name').value = ''; 
         document.getElementById('new-emp-code').value = '';
         document.getElementById('new-emp-pos').value = ''; 
         document.getElementById('new-emp-aff').value = ''; 
         document.getElementById('new-emp-team').value = '';
-        showCustomAlert(`신규 사원 등록 완료! 자동 부여된 사번: ${generatedNo}`);
     }
     function adminUpdateEmployee() {
 const targetNo = document.getElementById('adm-target-no').value.trim();
