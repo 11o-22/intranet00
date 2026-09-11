@@ -1049,6 +1049,16 @@
                         <div style="font-size:12px; color:#00A2E8; margin-bottom:10px; font-weight:bold;">
                             [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">2</span> / 2회)
                         </div>
+                        <!-- 우주 쇼핑몰 탭 내부의 게임 섹션 -->
+    <div id="alien-game-section" style="background:#151515; padding:15px; border:1px solid #333; margin-bottom:15px; border-radius:6px; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);">
+        <div style="font-size:12px; color:#00A2E8; margin-bottom:5px; font-weight:bold;">
+            [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">2</span> / 2회)
+        </div>
+        <!-- ★ [추가] 실시간 남은 시간 타이머 표시줄 -->
+        <div id="alien-cooldown-timer" style="font-size:11px; color:#ff9800; margin-bottom:10px; font-weight:bold; display:none;"></div>
+        
+        <div style="margin: 12px 0; display:flex; justify-content:center; align-items:center; gap:15px;">
+            <!-- 이하 기존 카드 및 버튼 코드 유지 -->
                         <div style="margin: 12px 0; display:flex; justify-content:center; align-items:center; gap:15px;">
                             <span style="display:inline-block; width:50px; height:70px; background:linear-gradient(145deg, #333, #222); border:2px solid #666; border-radius:6px; line-height:70px; font-size:26px; font-weight:bold; color:#ffd700; box-shadow: 0 4px 8px rgba(0,0,0,0.6);" id="hl-dealer-card">7</span>
                             <span style="font-size:15px; color:#aaa; font-weight:bold;">VS</span>
@@ -1144,12 +1154,12 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #388e3c, #1b5e20); border-color:#1b5e20; margin:0;" onclick="adminControlPollution('zero')">0%(정화)</button>
             </div>
         </div>
-<!-- ★ [신규] 관리자 전용 특수 개입 패널 (아이템 강제 지급 및 횟수 초기화) -->
-        <div class="admin-panel-box" style="border-color: #4CAF50; background-color: #0b1a0b;">
-            <h4 style="color: #4CAF50;">당국 특수 개입 (아이템 지급 및 횟수 초기화)</h4>
+<div class="admin-panel-box" style="border-color: #4CAF50; background-color: #0b1a0b;">
+            <h4 style="color: #4CAF50;">당국 특수 개입 (아이템 지급 및 상태 제어)</h4>
             <div style="font-size:12px; margin-bottom:10px; display:flex; gap:8px; align-items:center;">
                 <input type="text" id="adm-special-no" class="bet-input" style="width:90px;" placeholder="사번 입력">
-                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0;" onclick="adminResetLimits()">공용/우주 시설 횟수 리셋</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0;" onclick="adminResetLimits()">횟수 리셋</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #9C27B0, #7B1FA2); border-color:#6A1B9A; margin:0;" onclick="adminClearStatus()">상태이상 소거</button>
             </div>
             <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
                 <select id="adm-special-item" style="flex:2;"></select>
@@ -3985,6 +3995,35 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
         }
         // 스택이 비어있으면 메인 화면이므로 브라우저가 알아서 종료(나가기)됨
     });
+    // ==========================================
+    // ★ 우주 쇼핑몰 4시간 쿨타임 실시간 타이머 갱신
+    // ==========================================
+    setInterval(() => {
+        const timerEl = document.getElementById('alien-cooldown-timer');
+        if (!timerEl || !currentUser || currentUser.code === 'kario0987') {
+            if (timerEl) timerEl.style.display = 'none';
+            return;
+        }
+
+        const now = Date.now();
+        const fourHoursMs = 4 * 60 * 60 * 1000;
+
+        // 첫 번째 시도를 했고, 4시간이 지나지 않았을 때만 타이머 가동
+        if (currentUser.alienTries === 1 && currentUser.lastAlienPlayTime) {
+            const elapsed = now - currentUser.lastAlienPlayTime;
+            if (elapsed < fourHoursMs) {
+                const remainMs = fourHoursMs - elapsed;
+                const remainHours = Math.floor(remainMs / (1000 * 60 * 60));
+                const remainMins = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+                const remainSecs = Math.floor((remainMs % (1000 * 60)) / 1000);
+
+                timerEl.innerText = `⏳ 다음 주파수 연결까지 남은 시간: ${String(remainHours).padStart(2,'0')}:${String(remainMins).padStart(2,'0')}:${String(remainSecs).padStart(2,'0')}`;
+                timerEl.style.display = 'block';
+                return;
+            }
+        }
+        timerEl.style.display = 'none';
+    }, 1000);
     </script>
 </body>
 </html>
