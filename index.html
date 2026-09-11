@@ -1290,24 +1290,21 @@ function getTodayStr() {
         vipSessions: {}
     };
 
-    if (database) {
+   if (database) {
         database.ref('/').on('value', (snapshot) => {
             let data = snapshot.val();
             if (data) {
-                // ★ [추가] 서버에서 데이터를 받은 직후, 아직 로그인 안 된 상태면 자동 로그인 시도
+                // 아직 로그인 전이라면 자동 로그인 처리
                 if (!currentUser) {
                     const savedCode = localStorage.getItem('corp_logged_code');
                     if (savedCode && data.users && data.users[savedCode]) {
                         const u = data.users[savedCode];
                         document.getElementById('nickname-input').value = u.name;
                         document.getElementById('code-input').value = u.code;
-                        
-                        // ★ [수정] 시스템이 준비할 시간을 0.5초 준 뒤 로그인 실행
-                        setTimeout(() => {
-                            attemptLogin();
-                        }, 500); 
+                        setTimeout(() => { attemptLogin(); }, 500); 
                     }
                 }
+                
                 if (!data.suggestions) data.suggestions = [];
                 else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
                 
@@ -1325,45 +1322,35 @@ function getTodayStr() {
                         if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
                         if(!data.users[key].alienBoughtItems) data.users[key].alienBoughtItems = [];
                         if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
-                        if(!data.users[key].equippedWeapons) {
-                            data.users[key].equippedWeapons = [];
-                            if (data.users[key].equippedWeapon) {
-                                data.users[key].equippedWeapons.push(data.users[key].equippedWeapon);
-                                delete data.users[key].equippedWeapon;
-                            }
-                        }
-                        if(data.users[key].bloodBathDailyUsedMs === undefined) data.users[key].bloodBathDailyUsedMs = 0;
-                        if(data.users[key].hasItemUsedOnMe === undefined) data.users[key].hasItemUsedOnMe = false;
-                        if(data.users[key].foxRoomAnswered === undefined) data.users[key].foxRoomAnswered = false;
-                        if(data.users[key].quarantineExitPollution === undefined) data.users[key].quarantineExitPollution = 0;
+                        if(!data.users[key].equippedWeapons) data.users[key].equippedWeapons = [];
                     }
                 } else {
                     data.users = db.users; 
-                    database.ref('users').set(db.users);
+                }
+
+                // ★ [핵심] 내가 로그인된 상태라면, 서버에서 가져온 전체 데이터 중 '내 계정' 정보보다 
+                // 내 로컬의 포인트나 인벤토리가 더 최신(변동 직후)일 수 있으므로 충돌을 방지합니다.
+                if (currentUser && data.users[currentUser.code]) {
+                    let serverMe = data.users[currentUser.code];
+                    // 만약 서버의 포인트/오염도가 내 로컬과 다르다면 최신 상태 유지 혹은 병합
+                    // 여기서는 공용 데이터와 타인 정보만 갱신하고 내 정보는 내가 바꾼 액션을 우선시합니다.
+                    data.users[currentUser.code] = currentUser; 
                 }
 
                 db = data;
                 
                 if (currentUser) {
-                    const updatedUser = db.users[currentUser.code];
-                    if (!updatedUser && currentUser.code !== 'kario0987') {
-                        logout();
-                        showCustomAlert('계정이 상담사에 의해 말소되었습니다.');
-                        return;
-                    }
-                    currentUser = updatedUser;
                     updateUI();
-                    
                     if (document.getElementById('suggestion-modal').style.display === 'flex') {
                         renderMySuggestions();
                     }
-
                     checkVipMultiplayerState();
                 }
             } else {
                 saveDB();
             }
         });
+    }
 
         database.ref('online').on('value', (snap) => {
             onlineUsersMap = snap.val() || {};
@@ -1373,24 +1360,21 @@ function getTodayStr() {
     }
 
     function saveDB() {
-        if (!database) return;
-        
-        let updates = {};
-        
-        // 1. 내 정보는 내 최신 상태로 덮어쓰기
-        if (currentUser) {
-            updates[`users/${currentUser.code}`] = currentUser;
-        }
-        
-        // 2. 공용 데이터 저장
-        updates['suggestions'] = db.suggestions || [];
-        updates['p2pDeals'] = db.p2pDeals || [];
-        updates['vipInvites'] = db.vipInvites || {};
-        updates['vipSessions'] = db.vipSessions || {};
-        
-        // set이 아닌 update를 사용하여 다른 유저의 데이터를 건드리지 않습니다.
-        database.ref('/').update(updates);
+    if (!database) return;
+    
+    // 1. 현재 로그인한 유저의 데이터가 있다면 내 고유 경로에 즉시 저장
+    if (currentUser) {
+        database.ref(`users/${currentUser.code}`).set(currentUser).catch(err => {
+            console.error("사용자 데이터 저장 실패:", err);
+        });
     }
+
+    // 2. 공용 데이터(건의함, 밀실 거래, VIP 등) 각각 안전하게 개별 저장
+    if (db.suggestions) database.ref('suggestions').set(db.suggestions);
+    if (db.p2pDeals) database.ref('p2pDeals').set(db.p2pDeals);
+    if (db.vipInvites) database.ref('vipInvites').set(db.vipInvites);
+    if (db.vipSessions) database.ref('vipSessions').set(db.vipSessions);
+}
 
     function removeItemFromInventory(user, itemName, qty) {
         let removedCount = 0;
