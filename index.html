@@ -3404,7 +3404,7 @@
     function buyAlienItem(itemName, price) {
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
         
-        // ★ [추가] 관리자(kario0987) 계정은 당일 구매 제한을 받지 않음
+        // 관리자(kario0987)는 당일 구매 제한 제외
         if (currentUser.code !== 'kario0987' && currentUser.alienBoughtItems.includes(itemName)) { 
             showCustomAlert("당일 해당 상품 구매 횟수를 초과했습니다."); 
             return; 
@@ -3413,7 +3413,11 @@
         
         currentUser.points -= price; 
         currentUser.inventory.push(itemName);
-        currentUser.alienBoughtItems.push(itemName);
+        
+        // ★ [핵심] 관리자가 아닐 때만 구매 내역(품절용)에 추가합니다!
+        if (currentUser.code !== 'kario0987') {
+            currentUser.alienBoughtItems.push(itemName);
+        }
         
         addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${price} P)`);
         setUFODialogue("훌륭한 거래였습니다.");
@@ -3606,6 +3610,7 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             const code = document.getElementById('code-input').value.trim();
             
             if (db.users[code] && db.users[code].name === name) {
+                document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
                 currentUser = db.users[code];
                 localStorage.setItem('corp_logged_code', code);
                 
