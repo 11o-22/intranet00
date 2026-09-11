@@ -1387,7 +1387,7 @@
         "오렌지맛 물약": { price: 150, usable: true, targetable: true, effect: "orange_potion", desc: "사용 시 3일간 어린이 상태가 됩니다." },
         "복숭아맛 물약": { price: 150, usable: true, targetable: true, effect: "peach_potion", desc: "사용 시 3일간 예민한 몸이 됩니다." },
         "제거약": { price: 400, usable: true, targetable: false, effect: "cure_potion", desc: "자신 또는 타인의 상태이상을 무작위로 하나 제거합니다." },
-        "랜덤박스": { price: 44, usable: trle, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
+        "랜덤박스": { price: 44, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
         "착한 친구": { price: 999, usable: true, targetable: false, effect: "equip", desc: "귀여운 분홍색 토끼 봉제인형. 장착 가능하다." },
         "보안팀 의상 세트": { price: 800, usable: true, targetable: false, effect: "equip", desc: "보안팀의 의상 세트, 착용이 가능하다." },
         "작두": { price: 999, usable: true, targetable: false, effect: "equip", desc: "영험한 기운이 담겨있는 무기. 장착 가능하다." },
@@ -2450,7 +2450,7 @@
             targetUser.nostalgiaSender = currentUser.code; 
             appendBadgeNoteToUser(targetUser, `[장착됨] 노스텔지어 끈 장착 (5시간 동안 오염도 서서히 감소)`);
             if(!isOthers) showCustomAlert("노스텔지어 끈을 장착했습니다. 5시간 동안 오염도가 서서히 감소합니다.");
-}
+       }
         return true;
     }
 
