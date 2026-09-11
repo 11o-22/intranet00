@@ -1391,15 +1391,22 @@
         const pos = (position || "").trim();
         const t = (team || "").trim();
 
+        // 1. 소속이 "어둠"인 경우 (0010 ~ 0099)
         if (aff.includes("어둠")) return `00${Math.floor(Math.random() * 90 + 10)}`;
 
-        const isManagerOrHigher = pos.includes("과장") || pos.includes("차장") || pos.includes("부장") || pos.includes("이사") || pos.includes("상담") || pos.includes("대표");
-        const isSecurity = t.includes("보안") || t.includes("경비");
+        // ★ [핵심] 2. 보안팀/경비팀인 경우 0001 ~ 0015 사이로 특수 사번 부여 (0000은 상담사 전용이므로 제외)
+        if (t.includes("보안") || t.includes("경비")) {
+            const randNum = Math.floor(Math.random() * 15) + 1; // 1부터 15까지 무작위 추출
+            return String(randNum).padStart(4, '0'); // 빈자리를 0으로 채워 무조건 4자리로 맞춤 (예: 0001, 0015)
+        }
 
-        if (isManagerOrHigher || isSecurity) return `0${Math.floor(Math.random() * 900 + 100)}`;
+        // 3. 간부급 직급인 경우 (0100 ~ 0999)
+        const isManagerOrHigher = pos.includes("과장") || pos.includes("차장") || pos.includes("부장") || pos.includes("이사") || pos.includes("상담") || pos.includes("대표");
+        if (isManagerOrHigher) return `0${Math.floor(Math.random() * 900 + 100)}`;
+        
+        // 4. 그 외 일반 사원 (1000 ~ 9999)
         return String(Math.floor(Math.random() * 9000 + 1000));
     }
-
     const ITEM_CATALOG = {
         "낡은 문패": { price: 60, usable: false, desc: "여우상담실 격리 시간을 3시간 단축시키며, 퇴원 시 오염도가 20%로 고정된다." },
         "익명 편지": { price: 20, usable: false, desc: "익명으로 사내의 누군가에게 편지를 보낼 수 있다." },
