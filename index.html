@@ -1141,7 +1141,19 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #388e3c, #1b5e20); border-color:#1b5e20; margin:0;" onclick="adminControlPollution('zero')">0%(정화)</button>
             </div>
         </div>
-
+<!-- ★ [신규] 관리자 전용 특수 개입 패널 (아이템 강제 지급 및 횟수 초기화) -->
+        <div class="admin-panel-box" style="border-color: #4CAF50; background-color: #0b1a0b;">
+            <h4 style="color: #4CAF50;">당국 특수 개입 (아이템 지급 및 횟수 초기화)</h4>
+            <div style="font-size:12px; margin-bottom:10px; display:flex; gap:8px; align-items:center;">
+                <input type="text" id="adm-special-no" class="bet-input" style="width:90px;" placeholder="사번 입력">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0;" onclick="adminResetLimits()">공용/우주 시설 횟수 리셋</button>
+            </div>
+            <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
+                <select id="adm-special-item" style="flex:2;"></select>
+                <input type="number" id="adm-special-qty" class="bet-input" style="width:50px;" value="1" min="1" placeholder="수량">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20; margin:0;" onclick="adminGiveItem()">물품 강제 꽂기</button>
+            </div>
+        </div>
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
             <h4 style="color: #ff8888;">사원 계정 말소 및 데이터 폐기</h4>
             <div style="font-size:12px; display:flex; gap:8px;">
@@ -3558,6 +3570,7 @@
         document.getElementById('ranking-bottom-bar').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'block';
         renderAdminSuggestions();
+        renderAdminItemSelect();
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';
@@ -3676,7 +3689,49 @@ const targetNo = document.getElementById('adm-target-no').value.trim();
             }
             saveDB(); updateUI();
         }
+// ==========================================
+        // ★ 당국 특수 개입 로직 (아이템 강제 지급 & 횟수 리셋)
+        // ==========================================
+        function renderAdminItemSelect() {
+            const select = document.getElementById('adm-special-item');
+            if(!select) return;
+            const allItems = Object.keys(ITEM_CATALOG);
+            select.innerHTML = allItems.map(name => `<option value="${name}">${name}</option>`).join('');
+        }
 
+        function adminResetLimits() {
+            const targetNo = document.getElementById('adm-special-no').value.trim();
+            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+
+            // 공용시설 및 우주 쇼핑몰 횟수 리셋
+            targetUser.facilityCount = 0;
+            targetUser.alienTries = 0;
+            
+            addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한이 전면 초기화되었습니다.`);
+            saveDB(); updateUI();
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 시설 이용 횟수가 리셋되었습니다.`);
+        }
+
+        function adminGiveItem() {
+            const targetNo = document.getElementById('adm-special-no').value.trim();
+            const itemName = document.getElementById('adm-special-item').value;
+            const qty = parseInt(document.getElementById('adm-special-qty').value) || 1;
+
+            if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
+            if (!targetUser) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+
+            // 아이템을 수량만큼 인벤토리에 강제 삽입
+            for (let i = 0; i < qty; i++) {
+                targetUser.inventory.push(itemName);
+            }
+
+            addHistoryLog(targetUser, `[당국 개입] 보급품 '${itemName}' ${qty}개가 인벤토리에 지급되었습니다.`);
+            saveDB(); updateUI();
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})에게 ${itemName} ${qty}개를 지급했습니다.`);
+        }
         function adminDeleteEmployee() {
             const targetNo = document.getElementById('adm-delete-no').value.trim();
             if (!targetNo) return;
