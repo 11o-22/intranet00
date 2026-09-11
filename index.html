@@ -4436,59 +4436,88 @@ function getTodayStr() {
         function deleteSuggestion(index) { db.suggestions.splice(index, 1); saveDB(); renderAdminSuggestions(); }
 
         function attemptLogin() {
-            const name = document.getElementById('nickname-input').value.trim();
-            const code = document.getElementById('code-input').value.trim();
-            
-            if (db.users[code] && db.users[code].name === name) {
-                document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
-                currentUser = db.users[code];
-                localStorage.setItem('corp_logged_code', code);
-                
-                if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
-                if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
-                if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
-                if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
-                if(currentUser.equippedWeapons === undefined) currentUser.equippedWeapons = [];
-                if(currentUser.quarantineExitPollution === undefined) currentUser.quarantineExitPollution = 0;
-                
-                if(database) {
-                    database.ref('online/' + code).set(true);
-                    database.ref('online/' + code).onDisconnect().remove();
-                }
+        const nameInput = document.getElementById('nickname-input');
+        const codeInput = document.getElementById('code-input');
+        
+        if (!nameInput || !codeInput) return;
 
-                hasShownFoxAlert = currentUser.pollution >= 100;
-                foxUseNameplate = false; // 로그인 시 초기화
-                checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
-
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-screen').style.display = 'flex';
-                document.getElementById('ranking-bottom-bar').style.display = 'block';
-                
-                checkVIPStatus(); loadBadgeInfo(); updateUI();
-                
-                document.getElementById('admin-button-container').style.display = (code === 'kario0987') ? 'block' : 'none';
-
-                sessionSeconds = 0; clearInterval(sessionTimer);
-                sessionTimer = setInterval(() => {
-                    sessionSeconds++;
-                    const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
-                    const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
-                    const s = String(sessionSeconds % 60).padStart(2, '0');
-                    document.getElementById('session-timer').innerText = `세션 ${h}:${m}:${s}`;
-                    checkPassivePollution(currentUser); checkMedRations(currentUser); checkP2PExpiration();
-                    
-                    if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
-                    
-                    // 특이사항 빛나는 효과 갱신 (초록불빛이 아닐 때만)
-                    if (currentUser && currentUser.noteGlowUntil && Date.now() > currentUser.noteGlowUntil) {
-                        const el = document.getElementById('badge-notes-text');
-                        if (el.classList.contains('glow-text')) el.classList.remove('glow-text');
-                    }
-                }, 1000);
-            } else {
-                showCustomAlert('인증 실패: 자격이 증명되지 않았습니다.');
-            }
+        const name = nameInput.value.trim();
+        const code = codeInput.value.trim();
+        
+        // 데이터베이스 객체가 아직 초기화되지 않았을 경우의 안전장치
+        if (!db || !db.users) {
+            showCustomAlert('서버와 연결 중입니다. 잠시 후 다시 시도해주세요.');
+            return;
         }
+
+        // 디버깅용 로그 (개발자 도구 F12 콘솔에서 확인 가능)
+        console.log("로그인 시도:", name, code);
+
+        // 해당 인가 코드(비밀번호)가 존재하고 사원명이 일치하는지 확인
+        if (db.users[code] && db.users[code].name === name) {
+            currentUser = db.users[code];
+            localStorage.setItem('corp_logged_code', code);
+            
+            // 필수 속성 누락 방지 기본값 세팅
+            if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
+            if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
+            if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
+            if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
+            if(currentUser.equippedWeapons === undefined) currentUser.equippedWeapons = [];
+            if(currentUser.quarantineExitPollution === undefined) currentUser.quarantineExitPollution = 0;
+            
+            if(database) {
+                database.ref('online/' + code).set(true);
+                database.ref('online/' + code).onDisconnect().remove();
+            }
+
+            hasShownFoxAlert = currentUser.pollution >= 100;
+            foxUseNameplate = false; 
+            checkPassivePollution(currentUser); 
+            checkMedRations(currentUser); 
+            checkP2PExpiration();
+
+            // 화면 전환
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'flex';
+            document.getElementById('ranking-bottom-bar').style.display = 'block';
+            
+            checkVIPStatus(); 
+            loadBadgeInfo(); 
+            updateUI();
+            
+            // 관리자 전용 통제 콘솔 버튼 노출 여부 결정
+            const adminContainer = document.getElementById('admin-button-container');
+            if (adminContainer) {
+                adminContainer.style.display = (code === 'kario0987') ? 'block' : 'none';
+            }
+
+            // 세션 타이머 가동
+            sessionSeconds = 0; 
+            clearInterval(sessionTimer);
+            sessionTimer = setInterval(() => {
+                sessionSeconds++;
+                const h = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(sessionSeconds % 60).padStart(2, '0');
+                const timerEl = document.getElementById('session-timer');
+                if (timerEl) timerEl.innerText = `세션 ${h}:${m}:${s}`;
+                
+                checkPassivePollution(currentUser); 
+                checkMedRations(currentUser); 
+                checkP2PExpiration();
+                
+                if (currentUser && currentUser.lastFacilityDate !== getTodayStr()) updateUI();
+                
+                if (currentUser && currentUser.noteGlowUntil && Date.now() > currentUser.noteGlowUntil) {
+                    const el = document.getElementById('badge-notes-text');
+                    if (el && el.classList.contains('glow-text')) el.classList.remove('glow-text');
+                }
+            }, 1000);
+        } else {
+            showCustomAlert('인증 실패: 사원명 또는 인가 코드가 일치하지 않습니다.');
+        }
+    }
 
         function logout() {
             if (currentUser && database) database.ref('online/' + currentUser.code).remove();
