@@ -4090,22 +4090,60 @@ function getTodayStr() {
         document.getElementById('new-emp-aff').value = ''; 
         document.getElementById('new-emp-team').value = '';
     }
-    function adminUpdateEmployee() {
-const targetNo = document.getElementById('adm-target-no').value.trim();
-            const aff = document.getElementById('adm-set-affiliation').value.trim();
-            const team = document.getElementById('adm-set-team').value.trim();
-            const pos = document.getElementById('adm-set-position').value.trim();
-            const points = parseInt(document.getElementById('adm-target-points').value);
+   function adminUpdateEmployee() {
+        const targetNo = document.getElementById('adm-target-no').value.trim();
+        const aff = document.getElementById('adm-set-affiliation').value.trim();
+        const team = document.getElementById('adm-set-team').value.trim();
+        const pos = document.getElementById('adm-set-position').value.trim();
+        const pointsInput = document.getElementById('adm-target-points').value.trim();
 
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) return;
-            if (aff) targetUser.affiliation = aff; if (team) targetUser.team = team; if (pos) targetUser.position = pos;
-            if (!isNaN(points)) targetUser.points = points;
-            targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
-
-            saveDB(); updateUI(); showCustomAlert(`발령 적용 완료! 변경된 사번: ${targetUser.no}`);
+        if (!targetNo) {
+            showCustomAlert('수정할 사원의 사번을 입력해주세요.');
+            return;
         }
 
+        // 1. 사번(no) 또는 코드(code)로 대상 사원 찾기
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) {
+            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
+            return;
+        }
+
+        let targetUser = db.users[targetCode];
+
+        // 2. 입력된 값들만 골라서 안전하게 갱신
+        if (aff) targetUser.affiliation = aff; 
+        if (team) targetUser.team = team; 
+        if (pos) targetUser.position = pos;
+        
+        if (pointsInput !== "") {
+            const parsedPoints = parseInt(pointsInput, 10);
+            if (!isNaN(parsedPoints)) {
+                targetUser.points = parsedPoints;
+            }
+        }
+
+        // 사번 재부팅 (소속/직급/팀이 바뀔 수 있으므로)
+        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
+
+        // 3. 로컬 DB 갱신
+        db.users[targetCode] = targetUser;
+
+        // 4. ★ Firebase 서버에 해당 유저 경로를 직접 타겟팅하여 즉시 영구 저장
+        if (database) {
+            database.ref('users/' + targetCode).set(targetUser).then(() => {
+                showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트: ${targetUser.points}P)`);
+                updateUI();
+            }).catch((err) => {
+                console.error("Firebase 관리자 발령 실패:", err);
+                showCustomAlert("서버 저장 중 오류가 발생했습니다.");
+            });
+        } else {
+            saveDB();
+            updateUI();
+            showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트: ${targetUser.points}P)`);
+        }
+    }
         function adminToggleVIP() {
             const targetNo = document.getElementById('adm-target-no').value.trim();
             if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
