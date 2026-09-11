@@ -1312,7 +1312,8 @@
                         if(data.users[key].quarantineExitPollution === undefined) data.users[key].quarantineExitPollution = 0;
                     }
                 } else {
-                    data.users = {};
+                    data.users = db.users; 
+                    database.ref('users').set(db.users);
                 }
 
                 db = data;
