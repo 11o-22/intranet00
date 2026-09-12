@@ -1794,7 +1794,6 @@ function getTodayStr() {
     }
 
     function renderDarkness() {
-        darkBriefingOpen = true;
         const body = document.getElementById('darkness-body');
          darkBriefingOpen = false;
         if (darkAudio.playing && !darkRun) darkAmbienceStop();
@@ -1824,7 +1823,7 @@ function getTodayStr() {
                 <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked ? 'opacity:0.45;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                         <div style="flex:1; min-width:0;">
-                           <div style="font-family:monospace; font-size:10px; color:#ff6b6b; margin-bottom:8px;">${z.code} — ${title}</div>
+                          <div style="font-family:monospace; font-size:10px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
                             <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${locked ? '■■■■■■' : z.name}</div>
                             <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
                             <div style="font-size:10px; color:#777; margin-top:5px;">
@@ -1942,7 +1941,7 @@ function getTodayStr() {
             <div style="text-align:left;">
                   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <div style="font-family:monospace; font-size:10px; color:#ff6b6b;">${z.code} — ${title}</div>
-                    <button id="dark-mute-btn" onclick="toggleDarkMute()" ...>${darkAudio.muted ? '🔇' : '🔊'}</button>
+                  <button id="dark-mute-btn" onclick="toggleDarkMute()" style="background:none; border:1px solid #333; color:#888; font-size:11px; padding:3px 7px; border-radius:4px; cursor:pointer;">${darkAudio.muted ? '🔇' : '🔊'}</button>
                 </div>
                 ${imgHtml}
                 <div style="background:#0a0a0a; border:1px solid #2a2a2a; border-radius:${imgHtml ? '0 0 6px 6px' : '6px'}; padding:16px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:14px; min-height:90px;">${text}</div>
@@ -3164,7 +3163,7 @@ function getTodayStr() {
                 checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop(); renderPointRanking(); renderVipOpponents();
-        if (!darkRun && !darkBriefingOpen) renderDarkness();
+        refreshAllBetDisplays();
         if (!darkRun && !darkBriefingOpen) renderDarkness();
    }
     
