@@ -1601,7 +1601,7 @@ function getTodayStr() {
         setTimeout(() => { floater.remove(); }, 1200);
     }
 
-    function generateSerialNo(affiliation, position, team) {
+        function generateSerialNo(affiliation, position, team, targetCode) {
          if (targetCode === 'kario0987') return "0000";
         const aff = (affiliation || "").trim();
         const pos = (position || "").trim();
