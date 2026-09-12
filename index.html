@@ -1030,6 +1030,7 @@
         <div id="tab-darkness" class="tab-content" style="text-align: left;">
             <div class="sub-tabs-grid">
                 <button class="sub-tab active" onclick="switchDarknessPanel('dark-main', this)">탐사 개시</button>
+                <button class="sub-tab" id="dark-party-tab" onclick="switchDarknessPanel('dark-party', this)">파티</button>       
                 <button class="sub-tab" onclick="switchDarknessPanel('dark-log', this)">탐사 기록</button>
             </div>
 
@@ -1038,6 +1039,11 @@
                 <div id="darkness-body" style="min-height:120px; font-size:12px; color:var(--theme-text); text-align:center; padding:20px 0;">
                     준비 중입니다.
                 </div>
+            </div>
+
+                        <div id="dark-party" class="sub-panel">
+                <div class="panel-title">[파티 편성]</div>
+                <div id="dark-party-body" style="min-height:120px;"></div>
             </div>
 
             <div id="dark-log" class="sub-panel">
@@ -1779,6 +1785,436 @@ function getTodayStr() {
         });
     }
 
+        // ★ 구역 점유 상태 (한 팀이 들어가면 다른 팀 진입 차단)
+    let darkOccupancy = {};
+    const DARK_OCCUPY_TIMEOUT = 3 * 60 * 60 * 1000; // 3시간 후 자동 해제
+
+    if (database) {
+        database.ref('darkOccupancy').on('value', (snap) => {
+            darkOccupancy = snap.val() || {};
+            if (currentUser && !darkRun && !darkBriefingOpen) {
+                const panel = document.getElementById('dark-main');
+                if (panel && panel.classList.contains('active')) renderDarkness();
+            }
+        });
+    }
+
+    // 유효한 점유인지 판정 (만료된 기록은 없는 것으로 취급)
+       function getZoneOccupant(zoneCode) {
+        const z = DARK_ZONES[zoneCode];
+        if (z && z.grade === 'D') return null;   // ★ D등급은 점유 잠금 없음 (동시 진입 허용)
+        const oc = darkOccupancy[zoneCode];
+        if (!oc) return null;
+        if (Date.now() - (oc.enteredAt || 0) > DARK_OCCUPY_TIMEOUT) return null;
+        return oc;
+    }
+
+        function occupyZone(zoneCode) {
+        if (!database) return;
+        const z = DARK_ZONES[zoneCode];
+        if (z && z.grade === 'D') return;   // ★ D등급은 점유 기록 생략
+        darkOccupancy[zoneCode] = {
+            leaderCode: currentUser.code,
+            leaderName: currentUser.name,
+            members: [currentUser.code],
+            enteredAt: Date.now()
+        };
+        database.ref('darkOccupancy/' + zoneCode).set(darkOccupancy[zoneCode]);
+    }
+
+    function releaseZone(zoneCode) {
+        if (!zoneCode) return;
+        delete darkOccupancy[zoneCode];
+        if (database) database.ref('darkOccupancy/' + zoneCode).remove();
+    }
+
+        // ==========================================
+    // ★ 파티 시스템
+    // ==========================================
+    let darkParties = {};
+    let myPartyId = null;
+    const PARTY_TIMEOUT = 30 * 60 * 1000; // 30분 후 자동 해산
+
+    if (database) {
+        database.ref('darkParties').on('value', (snap) => {
+            darkParties = snap.val() || {};
+            if (!currentUser) return;
+
+            // 내가 속한 방 탐색
+            let found = null;
+            for (let pid in darkParties) {
+                const p = darkParties[pid];
+                if (p.members && p.members[currentUser.code]) { found = pid; break; }
+            }
+            const prev = myPartyId;
+            myPartyId = found;
+
+            // 방장이 출발시켰다면 탐사 개시
+            if (found && darkParties[found].state === 'RUNNING' && !darkRun) {
+                launchPartyRun(darkParties[found]);
+                return;
+            }
+
+            const panel = document.getElementById('dark-party');
+            if (panel && panel.classList.contains('active')) renderPartyPanel();
+            if (prev !== found) updatePartyTabDot();
+        });
+    }
+
+    function updatePartyTabDot() {
+        const tab = document.getElementById('dark-party-tab');
+        if (!tab) return;
+        if (myPartyId) tab.classList.add('notify-dot');
+        else tab.classList.remove('notify-dot');
+    }
+
+    function getMyParty() {
+        return myPartyId ? darkParties[myPartyId] : null;
+    }
+
+    // 해당 구역에 이미 방이 있거나 탐사 중인지
+    function isZoneTaken(zoneCode) {
+        if (getZoneOccupant(zoneCode)) return true;
+        for (let pid in darkParties) {
+            const p = darkParties[pid];
+            if (p.zone === zoneCode && Date.now() - p.createdAt < PARTY_TIMEOUT) return true;
+        }
+        return false;
+    }
+
+    function createParty(zoneCode) {
+        const z = DARK_ZONES[zoneCode];
+        if (!z) return;
+        if (getMyParty()) { showCustomAlert('이미 다른 파티에 소속되어 있습니다. 먼저 나가주세요.'); return; }
+        if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 폐쇄되어 있습니다.'); return; }
+        if (isZoneTaken(zoneCode)) { showCustomAlert('해당 구역에는 이미 다른 파티가 편성되어 있습니다.'); return; }
+        if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
+        if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 파티를 편성할 수 없습니다.'); return; }
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치라 탐사에 나설 수 없습니다.'); return; }
+
+        const pid = 'pt_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        const party = {
+            id: pid, zone: zoneCode, leader: currentUser.code, leaderName: currentUser.name,
+            state: 'RECRUIT', createdAt: Date.now(),
+            members: {
+                [currentUser.code]: {
+                    code: currentUser.code, name: currentUser.name,
+                    position: currentUser.position || '사원',
+                    ready: false, equips: [], items: [], joinedAt: Date.now()
+                }
+            }
+        };
+        if (database) database.ref('darkParties/' + pid).set(party);
+        darkParties[pid] = party;
+        myPartyId = pid;
+        switchToPartyTab();
+    }
+
+    function joinParty(pid) {
+        const p = darkParties[pid];
+        if (!p) return;
+        if (getMyParty()) { showCustomAlert('이미 다른 파티에 소속되어 있습니다.'); return; }
+        if (p.state !== 'RECRUIT') { showCustomAlert('이미 출발한 파티입니다.'); return; }
+        const z = DARK_ZONES[p.zone];
+        const count = Object.keys(p.members || {}).length;
+        if (count >= z.max) { showCustomAlert('해당 파티의 정원이 가득 찼습니다.'); return; }
+        if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
+        if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 참가할 수 없습니다.'); return; }
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치라 참가할 수 없습니다.'); return; }
+
+        const m = {
+            code: currentUser.code, name: currentUser.name,
+            position: currentUser.position || '사원',
+            ready: false, equips: [], items: [], joinedAt: Date.now()
+        };
+        if (database) database.ref(`darkParties/${pid}/members/${currentUser.code}`).set(m);
+        myPartyId = pid;
+        switchToPartyTab();
+    }
+
+    function leaveParty() {
+        const p = getMyParty();
+        if (!p) return;
+        const pid = p.id;
+        const others = Object.keys(p.members).filter(c => c !== currentUser.code);
+
+        if (others.length === 0) {
+            if (database) database.ref('darkParties/' + pid).remove();
+            delete darkParties[pid];
+        } else {
+            if (database) {
+                database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
+                // 방장이 나가면 다음 사람에게 위임
+                if (p.leader === currentUser.code) {
+                    const next = p.members[others[0]];
+                    database.ref(`darkParties/${pid}`).update({ leader: next.code, leaderName: next.name });
+                }
+            }
+        }
+        myPartyId = null;
+        renderPartyPanel();
+    }
+
+    function kickMember(code) {
+        const p = getMyParty();
+        if (!p || p.leader !== currentUser.code) return;
+        if (code === currentUser.code) return;
+        if (database) database.ref(`darkParties/${p.id}/members/${code}`).remove();
+    }
+
+    function toggleReady() {
+        const p = getMyParty();
+        if (!p) return;
+        const me = p.members[currentUser.code];
+        if (!me) return;
+        if (database) database.ref(`darkParties/${p.id}/members/${currentUser.code}/ready`).set(!me.ready);
+    }
+
+    function launchParty() {
+        const p = getMyParty();
+        if (!p || p.leader !== currentUser.code) return;
+        const z = DARK_ZONES[p.zone];
+        const members = Object.values(p.members);
+
+        if (members.length < z.min) { showCustomAlert(`최소 ${z.min}인이 모여야 출발할 수 있습니다.`); return; }
+        if (members.some(m => !m.ready)) { showCustomAlert('아직 준비를 마치지 않은 사원이 있습니다.'); return; }
+        if (isZoneTaken(p.zone)) { showCustomAlert('방금 다른 팀이 해당 구역에 진입했습니다.'); return; }
+
+        if (database) {
+            database.ref('darkParties/' + p.id).update({ state: 'RUNNING', startedAt: Date.now() });
+            database.ref('darkOccupancy/' + p.zone).set({
+                leaderCode: p.leader, leaderName: p.leaderName,
+                members: Object.keys(p.members), enteredAt: Date.now(), partyId: p.id
+            });
+        }
+    }
+
+    // 파티 출발 시 각자 탐사 상태 초기화
+    function launchPartyRun(party) {
+        const me = party.members[currentUser.code];
+        if (!me) return;
+
+        currentUser.darkDate = getTodayStr();
+        currentUser.darkTries = (currentUser.darkTries || 0) + 1;
+
+        darkRun = {
+            zone: party.zone, step: 0, modifier: 0, success: 0, fail: 0,
+            carryEquips: me.equips || [], carryItems: me.items || [],
+            rerollUsed: false, lostItems: [], log: [],
+            partyId: party.id, isParty: true, isLeader: party.leader === currentUser.code
+        };
+
+        darkBriefingOpen = false;
+        darkAmbienceStart(party.zone);
+        addHistoryLog(currentUser, `[어둠 진입] ${party.zone} 파티 탐사 개시 (${Object.keys(party.members).length}인)`);
+        saveDB();
+
+        // 어둠 탐사 탭으로 이동
+        document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
+        const mainTab = document.querySelector('#tab-darkness .sub-tab');
+        if (mainTab) mainTab.classList.add('active');
+        document.getElementById('dark-main').classList.add('active');
+        renderDarkStep();
+    }
+
+    function switchToPartyTab() {
+        document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
+        const tab = document.getElementById('dark-party-tab');
+        if (tab) tab.classList.add('active');
+        document.getElementById('dark-party').classList.add('active');
+        renderPartyPanel();
+    }
+
+    // 만료된 방 자동 청소
+    setInterval(() => {
+        if (!database || !currentUser) return;
+        for (let pid in darkParties) {
+            const p = darkParties[pid];
+            if (p.state === 'RECRUIT' && Date.now() - p.createdAt > PARTY_TIMEOUT) {
+                database.ref('darkParties/' + pid).remove();
+            }
+        }
+    }, 60000);
+
+    // 만료된 점유 기록 자동 청소 (1분마다)
+    setInterval(() => {
+        if (!database || !currentUser) return;
+        for (let key in darkOccupancy) {
+            const oc = darkOccupancy[key];
+            if (oc && Date.now() - (oc.enteredAt || 0) > DARK_OCCUPY_TIMEOUT) {
+                database.ref('darkOccupancy/' + key).remove();
+            }
+        }
+    }, 60000);
+
+        function renderPartyPanel() {
+        const body = document.getElementById('dark-party-body');
+        if (!body || !currentUser) return;
+        const p = getMyParty();
+        if (p) { renderPartyRoom(p, body); return; }
+
+        // --- 모집 중인 방 목록 ---
+        let list = Object.values(darkParties).filter(pt =>
+            pt.state === 'RECRUIT' && Date.now() - pt.createdAt < PARTY_TIMEOUT
+        );
+
+        let html = `<div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
+                모집 중인 파티에 참가하거나, [탐사 개시] 탭에서 새 파티를 편성할 수 있습니다.<br>
+                <span style="font-size:10px;">※ 한 번에 하나의 파티에만 속할 수 있습니다.</span>
+            </div>`;
+
+        if (list.length === 0) {
+            html += `<div style="color:#666; font-size:12px; text-align:center; padding:25px 0;">현재 모집 중인 파티가 없습니다.</div>`;
+        } else {
+            html += list.map(pt => {
+                const z = DARK_ZONES[pt.zone];
+                const cnt = Object.keys(pt.members || {}).length;
+                const full = cnt >= z.max;
+                const waitMin = Math.floor((Date.now() - pt.createdAt) / 60000);
+                return `
+                    <div style="background:rgba(0,0,0,0.35); border:1px solid ${full ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${full ? 'opacity:0.5;' : ''}">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-family:monospace; font-size:10px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
+                                <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${z.name}</div>
+                                <div style="font-size:10px; color:#999;">방장 <b>${pt.leaderName}</b> · 대기 ${waitMin}분</div>
+                                <div style="font-size:11px; color:var(--theme-focus); font-weight:bold; margin-top:4px;">
+                                    ${cnt} / ${z.max} 명 ${cnt < z.min ? `<span style="color:#ff9800; font-size:10px;">(최소 ${z.min}인 필요)</span>` : ''}
+                                </div>
+                            </div>
+                            <div style="flex-shrink:0;">
+                                ${full
+                                    ? `<div style="font-size:10px; color:#666; font-weight:bold; text-align:center;">정원<br>마감</div>`
+                                    : `<button class="game-btn" style="margin:0; padding:8px 12px; font-size:11px;" onclick="joinParty('${pt.id}')">참가</button>`}
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+        body.innerHTML = html;
+    }
+
+    function renderPartyRoom(p, body) {
+        const z = DARK_ZONES[p.zone];
+        const members = Object.values(p.members || {});
+        const isLeader = p.leader === currentUser.code;
+        const me = p.members[currentUser.code];
+        const canStart = members.length >= z.min && members.every(m => m.ready);
+
+        let memberHtml = members.map(m => {
+            const crown = (m.code === p.leader) ? '👑 ' : '';
+            const readyTag = m.ready
+                ? `<span style="color:#4CAF50; font-size:10px; font-weight:bold;">● 준비 완료</span>`
+                : `<span style="color:#888; font-size:10px;">○ 준비 중</span>`;
+            const carry = (m.equips || []).concat(m.items || []);
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); border:1px solid #2a2a2a; border-radius:5px; padding:9px 11px; margin-bottom:6px; gap:8px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:12px; color:var(--theme-text); font-weight:bold;">${crown}${m.name} <span style="font-size:10px; color:#888; font-weight:normal;">${m.position}</span></div>
+                        <div style="margin-top:3px;">${readyTag}</div>
+                        ${carry.length ? `<div style="font-size:9px; color:#777; margin-top:3px;">반입: ${carry.join(', ')}</div>` : ''}
+                    </div>
+                    ${(isLeader && m.code !== currentUser.code)
+                        ? `<button class="game-btn" style="margin:0; padding:5px 9px; font-size:10px; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important; flex-shrink:0;" onclick="kickMember('${m.code}')">강퇴</button>`
+                        : ''}
+                </div>`;
+        }).join('');
+
+        body.innerHTML = `
+            <div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-bottom:14px;">
+                <div style="font-family:monospace; font-size:11px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
+                <div style="font-size:14px; font-weight:bold; margin:4px 0 8px 0; color:var(--theme-text);">${z.name}</div>
+                <div style="font-size:10px; color:#999; line-height:1.6;">
+                    ${z.brief}<br>
+                    난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · 정원 <b>${z.min}~${z.max}인</b> · 기본 보상 <b>${z.reward[0]}~${z.reward[1]} P</b>
+                </div>
+            </div>
+
+            <div style="font-size:11px; color:var(--theme-text); font-weight:bold; margin-bottom:7px; border-bottom:1px solid #333; padding-bottom:5px;">
+                참가자 (${members.length} / ${z.max})
+            </div>
+            ${memberHtml}
+
+            <div style="display:flex; gap:6px; margin-top:14px;">
+                <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:12px;" onclick="openPartyCarryModal()">반입품 선택</button>
+                <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:12px; ${me && me.ready ? 'background:linear-gradient(145deg, #2e7d32, #1b5e20) !important; border-color:#1b5e20 !important; color:#fff !important;' : ''}" onclick="toggleReady()">${me && me.ready ? '준비 해제' : '준비 완료'}</button>
+            </div>
+
+            ${isLeader ? `
+                <button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:13px; font-size:13px; ${canStart ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : 'opacity:0.45;'}" onclick="launchParty()" ${canStart ? '' : 'disabled'}>
+                    ${canStart ? '⚑ 어둠으로 진입' : `대기 중 (최소 ${z.min}인 · 전원 준비 필요)`}
+                </button>` : `
+                <div style="text-align:center; font-size:11px; color:#888; margin-top:10px; padding:10px; background:rgba(0,0,0,0.2); border-radius:5px;">
+                    방장 <b style="color:var(--theme-text);">${p.leaderName}</b>의 출발 신호를 기다리는 중입니다.
+                </div>`}
+
+            <button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:10px; font-size:11px;" onclick="leaveParty()">파티 나가기</button>
+
+            <div style="font-size:10px; color:#666; margin-top:12px; line-height:1.6; border-top:1px dashed #333; padding-top:10px;">
+                ※ 반입품은 각자 따로 선택합니다. (장비 2 / 소모품 3)<br>
+                ※ 30분 동안 출발하지 않으면 파티가 자동 해산됩니다.
+            </div>
+        `;
+    }
+
+    // --- 반입품 선택 모달 ---
+    function openPartyCarryModal() {
+        const p = getMyParty();
+        if (!p) return;
+        const me = p.members[currentUser.code];
+
+        let counts = {};
+        (currentUser.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        let equips = [], consums = [];
+        Object.keys(counts).forEach(it => {
+            const c = ITEM_CATALOG[it];
+            if (!c) return;
+            if (c.effect && c.effect.startsWith('equip')) equips.push(it);
+            else if (c.usable) consums.push(it);
+        });
+
+        const body = document.getElementById('dark-party-body');
+        body.innerHTML = `
+            <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--theme-text);">[반입 물품 선택]</div>
+            <div style="font-size:10px; color:#888; margin-bottom:12px; line-height:1.6;">
+                장비 최대 2점, 소모품 최대 3점.<br>
+                <b style="color:#aaa;">아무것도 반입하지 않아도 무방합니다.</b> 소모품 지참 시 판정에 +1 보정, 탐사 중 1회 재굴림 가능.<br>
+                <span style="color:#ff6b6b;">반입품은 탐사 중 소실될 수 있습니다.</span>
+            </div>
+
+            <div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">장비 (최대 2)</div>
+            <div style="margin-bottom:12px;">
+                ${equips.length ? equips.map(it => `<label style="display:block; font-size:11px; margin-bottom:5px; cursor:pointer;"><input type="checkbox" class="pt-eq" value="${it}" ${(me.equips||[]).includes(it)?'checked':''} style="width:auto; margin-right:6px;">${it} <span style="color:#777;">(보유 ${counts[it]})</span></label>`).join('') : '<div style="font-size:10px; color:#666;">반입 가능한 장비가 없습니다.</div>'}
+            </div>
+
+            <div style="font-size:11px; color:#4CAF50; font-weight:bold; margin-bottom:5px;">소모품 (최대 3)</div>
+            <div style="margin-bottom:16px;">
+                ${consums.length ? consums.map(it => `<label style="display:block; font-size:11px; margin-bottom:5px; cursor:pointer;"><input type="checkbox" class="pt-cs" value="${it}" ${(me.items||[]).includes(it)?'checked':''} style="width:auto; margin-right:6px;">${it} <span style="color:#777;">(보유 ${counts[it]})</span></label>`).join('') : '<div style="font-size:10px; color:#666;">반입 가능한 소모품이 없습니다.</div>'}
+            </div>
+
+            <div style="display:flex; gap:8px;">
+                <button class="game-btn" style="flex:1; margin:0; padding:12px;" onclick="renderPartyPanel()">취소</button>
+                <button class="game-btn" style="flex:2; margin:0; padding:12px;" onclick="savePartyCarry()">확정</button>
+            </div>
+        `;
+    }
+
+    function savePartyCarry() {
+        const p = getMyParty();
+        if (!p) return;
+        let eq = Array.from(document.querySelectorAll('.pt-eq:checked')).map(e => e.value);
+        let cs = Array.from(document.querySelectorAll('.pt-cs:checked')).map(e => e.value);
+        if (eq.length > 2) { showCustomAlert('장비는 최대 2점까지만 반입할 수 있습니다.'); return; }
+        if (cs.length > 3) { showCustomAlert('소모품은 최대 3점까지만 반입할 수 있습니다.'); return; }
+
+        if (database) {
+            database.ref(`darkParties/${p.id}/members/${currentUser.code}`).update({ equips: eq, items: cs });
+        }
+        renderPartyPanel();
+    }
+
     // 최종 개방 여부 판정 (상담사 설정이 시나리오 기본값보다 우선)
     function isZoneOpen(zoneCode) {
         const z = DARK_ZONES[zoneCode];
@@ -1826,24 +2262,33 @@ function getTodayStr() {
                     <span style="font-size:10px;">※ 공용시설 이용 횟수와는 별개로 집계됩니다.</span>
                 </div>`;
 
-        for (let key in DARK_ZONES) {
+            for (let key in DARK_ZONES) {
             const z = DARK_ZONES[key];
             const partySize = (z.min === z.max) ? `${z.min}인` : `${z.min}~${z.max}인`;
             const locked = !isZoneOpen(key);
+            const occupant = getZoneOccupant(key);
+            const isOccupied = occupant && occupant.leaderCode !== currentUser.code;
             html += `
-                <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked ? 'opacity:0.45;' : ''}">
+                <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : isOccupied ? '#7a5200' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked || isOccupied ? 'opacity:0.5;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                         <div style="flex:1; min-width:0;">
-                          <div style="font-family:monospace; font-size:10px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
+                            <div style="font-family:monospace; font-size:10px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
                             <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${locked ? '■■■■■■' : z.name}</div>
                             <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
+                            ${isOccupied ? `<div style="font-size:10px; color:#ff9800; margin-top:4px;">현재 <b>${occupant.leaderName}</b> 사원 팀이 탐사 중입니다.</div>` : ''}
                             <div style="font-size:10px; color:#777; margin-top:5px;">
-                          난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · ${partySize} · 기본 보상 ${z.reward[0]}~${z.reward[1]} P
+                                난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · ${partySize} · 기본 보상 ${z.reward[0]}~${z.reward[1]} P
                             </div>
                         </div>
                         <div style="flex-shrink:0;">
                             ${locked
                                 ? `<div style="font-size:10px; color:#666; font-weight:bold; text-align:center; line-height:1.5;">🔒<br>개방<br>준비 중</div>`
+                                : isOccupied
+                                ? `<div style="font-size:10px; color:#ff9800; font-weight:bold; text-align:center; line-height:1.5;">⛔<br>탐사<br>진행 중</div>`
+                                : z.max > 1
+                                ? (isZoneTaken(key)
+                                    ? `<div style="font-size:10px; color:#ff9800; font-weight:bold; text-align:center; line-height:1.5;">⛔<br>파티<br>편성됨</div>`
+                                    : `<button class="game-btn" style="margin:0; padding:8px 12px; font-size:11px;" onclick="createParty('${z.code}')">파티<br>모집</button>`)
                                 : `<button class="game-btn" style="margin:0; padding:8px 12px; font-size:11px;" onclick="openDarkBriefing('${z.code}')">진입</button>`}
                         </div>
                     </div>
@@ -1861,6 +2306,11 @@ function getTodayStr() {
         const z = DARK_ZONES[zoneCode];
         if (!z) return;
         if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 통제본부에 의해 폐쇄되어 있습니다.'); return; }
+                const oc = getZoneOccupant(zoneCode);
+        if (oc && oc.leaderCode !== currentUser.code) {
+            showCustomAlert(`${oc.leaderName} 사원 팀이 해당 구역을 탐사 중입니다. 종료될 때까지 진입할 수 없습니다.`);
+            return;
+        }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 어둠 탐사 횟수를 모두 소진했습니다. 자정에 초기화됩니다.'); return; }
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치에 도달하여 탐사에 나설 수 없습니다.'); return; }
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 탐사에 나설 수 없습니다.'); return; }
@@ -1917,6 +2367,12 @@ function getTodayStr() {
         const z = DARK_ZONES[zoneCode];
         if (!z) return;
         if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 폐쇄 상태입니다.'); return; }
+                const oc2 = getZoneOccupant(zoneCode);
+        if (oc2 && oc2.leaderCode !== currentUser.code) {
+            showCustomAlert('방금 다른 팀이 해당 구역에 진입했습니다.');
+            renderDarkness();
+            return;
+        }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
 
         let eq = Array.from(document.querySelectorAll('.dark-eq:checked')).map(e => e.value);
@@ -1933,6 +2389,7 @@ function getTodayStr() {
         };
 
                 darkBriefingOpen = false;
+                occupyZone(zoneCode);
                 darkAmbienceStart(zoneCode);
 
         addHistoryLog(currentUser, `[어둠 진입] ${zoneCode} 탐사 개시`);
@@ -2386,13 +2843,19 @@ function getTodayStr() {
             darkChoiceBtn("단말로 복귀한다.", "finishDarkRun()"));
 
         showPointGainEffect(total);
+         releaseZone(darkRun.zone);
         darkRun = null;
         saveDB();
     }
 
-       function finishDarkRun() {
+             function finishDarkRun() {
         darkAmbienceStop();
+        if (darkRun) {
+            releaseZone(darkRun.zone);
+            if (darkRun.partyId && database) database.ref('darkParties/' + darkRun.partyId).remove();
+        }
         darkRun = null;
+        myPartyId = null;
         updateUI();
         renderDarkness();
     }
@@ -3255,6 +3718,7 @@ function getTodayStr() {
         document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'dark-main') renderDarkness();
+        if (panelId === 'dark-party') renderPartyPanel();
         if (panelId === 'dark-log') renderDarkLogs();
     }
 
@@ -5721,13 +6185,15 @@ function getTodayStr() {
                         <div style="font-size:11px; color:#ddd; font-weight:bold; margin-top:2px;">${z.name}</div>
                         <div style="font-size:9px; color:#888; margin-top:3px;">
                             ${open ? '<span style="color:#4CAF50;">● 개방 중</span>' : '<span style="color:#f44336;">● 폐쇄 중</span>'}
-                            ${forced ? ' <span style="color:#ff9800;">(수동 설정)</span>' : ' <span style="color:#666;">(기본값)</span>'}
+                                                        ${forced ? ' <span style="color:#ff9800;">(수동 설정)</span>' : ' <span style="color:#666;">(기본값)</span>'}
+                            ${getZoneOccupant(key) ? `<br><span style="color:#ff6b6b;">⛔ ${getZoneOccupant(key).leaderName} 팀 탐사 중</span>` : ''}
                         </div>
                     </div>
                     <div style="display:flex; gap:5px; flex-shrink:0;">
                         <button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminSetZoneOpen('${key}', true)">개방</button>
                         <button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminSetZoneOpen('${key}', false)">폐쇄</button>
                         <button class="game-btn" style="margin:0; padding:6px 8px; font-size:10px;" onclick="adminSetZoneOpen('${key}', null)" title="시나리오 기본값으로 되돌림">초기화</button>
+                       <button class="game-btn" style="margin:0; padding:6px 8px; font-size:10px; background:linear-gradient(145deg, #ef6c00, #bf360c) !important; border-color:#e65100 !important; color:#fff !important;" onclick="adminReleaseZone('${key}')" title="점유 상태 강제 해제">해제</button>
                     </div>
                 </div>`;
         }).join('');
@@ -5752,7 +6218,13 @@ function getTodayStr() {
         const msg = (state === null) ? '기본값으로 초기화' : (state ? '개방' : '폐쇄');
         showCustomAlert(`${z.code} 구역이 [${msg}] 처리되었습니다.`);
     }
-
+    function adminReleaseZone(zoneCode) {
+        const oc = getZoneOccupant(zoneCode);
+        if (!oc) { showCustomAlert('해당 구역은 현재 점유 상태가 아닙니다.'); return; }
+        releaseZone(zoneCode);
+        renderAdminDarkZones();
+        showCustomAlert(`${zoneCode} 구역의 점유 상태(${oc.leaderName} 팀)를 강제 해제했습니다.`);
+    }
        function adminResetLimits() {
         const targetNo = document.getElementById('adm-special-no').value.trim();
         if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
@@ -6060,9 +6532,18 @@ function getTodayStr() {
             showCustomAlert('인증 실패: 사원명 또는 인가 코드가 일치하지 않습니다.');
         }
     }
-
+    // ★ 창 종료·새로고침 시 점유 해제
+    window.addEventListener('beforeunload', () => {
+        if (darkRun && darkRun.zone) {
+            if (database) database.ref('darkOccupancy/' + darkRun.zone).remove();
+        }
+    });
         function logout() {
             if (currentUser && database) database.ref('online/' + currentUser.code).remove();
+                    if (darkRun && darkRun.zone) releaseZone(darkRun.zone);
+                    if (myPartyId && !darkRun) leaveParty();
+        darkRun = null;
+        darkAmbienceStop();
             clearInterval(sessionTimer); currentUser = null; hasShownFoxAlert = false; foxUseNameplate = false; updateVisualDistortion(0);
             document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
             document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
