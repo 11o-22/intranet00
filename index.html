@@ -1354,18 +1354,26 @@ function getTodayStr() {
     function saveDB() {
     if (!database) return;
     
-    // 1. 현재 로그인한 유저의 데이터가 있다면 내 고유 경로에 즉시 저장
+    // 1. 현재 로그인한 유저의 데이터가 있다면 내 고유 경로에만 즉시 안전하게 저장
     if (currentUser) {
         database.ref(`users/${currentUser.code}`).set(currentUser).catch(err => {
             console.error("사용자 데이터 저장 실패:", err);
         });
     }
 
-    // 2. 공용 데이터(건의함, 밀실 거래, VIP 등) 각각 안전하게 개별 저장
-    if (db.suggestions) database.ref('suggestions').set(db.suggestions);
-    if (db.p2pDeals) database.ref('p2pDeals').set(db.p2pDeals);
-    if (db.vipInvites) database.ref('vipInvites').set(db.vipInvites);
-    if (db.vipSessions) database.ref('vipSessions').set(db.vipSessions);
+    // 2. 공용 데이터(건의함, 밀실 거래, VIP 등)는 전체를 덮어쓰지 않고 개별 경로만 각각 타겟팅하여 저장
+    if (db.suggestions) {
+        database.ref('suggestions').set(db.suggestions).catch(err => console.error("건의함 저장 실패:", err));
+    }
+    if (db.p2pDeals) {
+        database.ref('p2pDeals').set(db.p2pDeals).catch(err => console.error("밀실 거래 저장 실패:", err));
+    }
+    if (db.vipInvites) {
+        database.ref('vipInvites').set(db.vipInvites).catch(err => console.error("VIP 초대 저장 실패:", err));
+    }
+    if (db.vipSessions) {
+        database.ref('vipSessions').set(db.vipSessions).catch(err => console.error("VIP 세션 저장 실패:", err));
+    }
 }
 
     function removeItemFromInventory(user, itemName, qty) {
