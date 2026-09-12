@@ -3638,45 +3638,47 @@ function getTodayStr() {
         else { demandPoints.style.display = 'none'; demandItem.style.display = 'inline-block'; qtyInput.style.display = 'inline-block'; }
     }
     function renderP2PSelectBoxes() {
-        const targetSelect = document.getElementById('p2p-target-user');
-        if (!targetSelect) return;
+    const targetSelect = document.getElementById('p2p-target-user');
+    if (!targetSelect) return;
 
-        // ★ 현재 선택되어 있던 값이 있다면 임시로 저장해 둠 (튕김 현상 방지)
-        const currentSelectedVal = targetSelect.value;
+    // 사용자가 현재 드롭다운을 열고 조작 중일 때는 강제 갱신으로 인한 스크롤 튕김 방지
+    if (document.activeElement === targetSelect) {
+        return; 
+    }
 
-        let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
-        for (let code in db.users) {
-            let u = db.users[code];
-            // 자기 자신은 제외하고 다른 사원들만 목록에 담음
-            if (u.code !== 'kario0987' && (!currentUser || u.no !== currentUser.no)) {
-                targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
-            }
-        }
-        targetSelect.innerHTML = targetOpts;
+    const currentSelectedVal = targetSelect.value;
 
-        // 목록을 다시 그린 뒤, 방금 선택했던 값이 있다면 유지시켜 줌
-        if (currentSelectedVal) {
-            targetSelect.value = currentSelectedVal;
-        }
-
-        const offerItemSelect = document.getElementById('p2p-offer-item');
-        if (offerItemSelect && currentUser && currentUser.inventory) {
-            let counts = {};
-            currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
-            let uniqueItems = Object.keys(counts);
-
-            if (uniqueItems.length === 0) {
-                offerItemSelect.innerHTML = '<option value="">(보유 소지품 없음)</option>';
-            } else {
-                offerItemSelect.innerHTML = uniqueItems.map((item) => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
-            }
-        }
-        
-        const demandItemSelect = document.getElementById('p2p-demand-item');
-        if (demandItemSelect) {
-            demandItemSelect.innerHTML = Object.keys(ITEM_CATALOG).map(name => `<option value="${name}">${name}</option>`).join('');
+    let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
+    for (let code in db.users) {
+        let u = db.users[code];
+        if (u.code !== 'kario0987' && (!currentUser || u.no !== currentUser.no)) {
+            targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
         }
     }
+    targetSelect.innerHTML = targetOpts;
+
+    if (currentSelectedVal) {
+        targetSelect.value = currentSelectedVal;
+    }
+
+    const offerItemSelect = document.getElementById('p2p-offer-item');
+    if (offerItemSelect && currentUser && currentUser.inventory) {
+        let counts = {};
+        currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        let uniqueItems = Object.keys(counts);
+
+        if (uniqueItems.length === 0) {
+            offerItemSelect.innerHTML = '<option value="">(보유 소지품 없음)</option>';
+        } else {
+            offerItemSelect.innerHTML = uniqueItems.map((item) => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
+        }
+    }
+    
+    const demandItemSelect = document.getElementById('p2p-demand-item');
+    if (demandItemSelect && demandItemSelect.options.length <= 1) {
+        demandItemSelect.innerHTML = Object.keys(ITEM_CATALOG).map(name => `<option value="${name}">${name}</option>`).join('');
+    }
+}
     function sendP2PDeal() {
         const targetCode = document.getElementById('p2p-target-user').value;
         if (!targetCode) return;
