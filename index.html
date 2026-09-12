@@ -1501,6 +1501,8 @@ function getTodayStr() {
         "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." }
     };
 
+     const NO_SELL_ITEMS = ["여우구슬"];
+
     const ALL_10_ITEMS = [
         "익명 편지", "하급 물약", "샤베트", "안대", "생수",
         "중급 물약", "???의 티켓", "무전기", "낡은 문패", "전복죽"
@@ -2342,61 +2344,6 @@ function getTodayStr() {
         return Math.max(1, Math.floor(basePrice / 4));
     }
 
-    function unequipWeapon(index) {
-        if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
-        let itemNameFull = currentUser.equippedWeapons[index];
-        
-        // 연동/연결형 아이템인지 확인
-        let isDualItem = itemNameFull.includes("(연결:") || itemNameFull.includes("(연동:");
-        let baseItemName = itemNameFull;
-        
-        // 인벤토리로 돌아갈 땐 괄호를 떼고 원본 이름으로 복구
-        if (isDualItem) {
-            baseItemName = itemNameFull.split(" (")[0]; 
-        } else if (itemNameFull === "🔮 여우구슬") {
-            baseItemName = "여우구슬";
-        }
-
-        if (baseItemName === "혈욕조") {
-            let equippedDuration = Date.now() - (currentUser.bloodBathEquippedAt || Date.now());
-            if(!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
-            currentUser.bloodBathDailyUsedMs += equippedDuration;
-        }
-        
-        // 내 장착칸에서 제거 및 인벤토리 복구
-        currentUser.equippedWeapons.splice(index, 1);
-        currentUser.inventory.push(baseItemName);
-        addHistoryLog(currentUser, `[장착 해제] ${baseItemName} 해제 완료`);
-        
-        // 연동 아이템일 경우, 연결된 파트너를 찾아서 그 사람의 장착칸에서도 강제 해제
-        if (isDualItem && database) {
-            let cPos = currentUser.position || '사원';
-            let expected1 = `연결: ${currentUser.name} ${cPos}`;
-            let expected2 = `연동: ${currentUser.name} ${cPos}`;
-            
-            for (let code in db.users) {
-                if (code === currentUser.code) continue; // 나는 이미 뺐으니 패스
-                let u = db.users[code];
-                
-                if (u.equippedWeapons) {
-                    let pIdx = u.equippedWeapons.findIndex(w => 
-                        w.startsWith(baseItemName) && (w.includes(expected1) || w.includes(expected2))
-                    );
-                    
-                    if (pIdx !== -1) {
-                        u.equippedWeapons.splice(pIdx, 1);
-                        addHistoryLog(u, `[장착 해제] 연결된 파트너(${currentUser.name})에 의해 ${baseItemName} 장착이 해제되었습니다.`);
-                        // 상대방 데이터 갱신
-                        database.ref(`users/${code}`).set(u);
-                        break; // 파트너를 찾았으니 반복문 종료
-                    }
-                }
-            }
-        }
-        
-        saveDB(); updateUI();
-    }
-
     function openItemTargetModal(itemName, isPotion = false) {
         pendingTargetItemName = itemName;
         pendingTargetIsPotion = isPotion;
@@ -2543,12 +2490,17 @@ function getTodayStr() {
                     }
                 }
 
-                return `
+                 const sellBtnHtml = NO_SELL_ITEMS.includes(item)
+                    ? ''
+                    : `<button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>`;
+
+
+               return `
                     <div class="inv-card">
                         <div><span class="inv-card-name">${item}</span><span class="inv-card-qty">x${qty}</span></div>
                         <div class="inv-btn-group">
                             ${useBtnHtml}
-                            <button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>
+                            ${sellBtnHtml}
                         </div>
                     </div>
                 `;
@@ -2556,7 +2508,6 @@ function getTodayStr() {
         }
         container.innerHTML = html;
     }
-
             function unequipWeapon(index) {
         if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
         let itemNameFull = currentUser.equippedWeapons[index];
@@ -2629,21 +2580,23 @@ function getTodayStr() {
     }
 
 
-        function useInventoryItem(itemName) {
+       function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
         if (!cat || !cat.usable) return;
 
-        // ★ [수정됨] 은반지(equip_silver_ring)와 버터 나이프(equip_butter_knife) 조건 추가
-        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife') {
-            if (cat.effect === 'open_wallet') {
-                let randPoints = Math.floor(Math.random() * 251) + 250; // 250 ~ 500 P
-                currentUser.points += randPoints;
-                removeItemFromInventory(currentUser, itemName, 1);
-                showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
-                addHistoryLog(currentUser, `[아이템 사용] 지갑 열기 (+${randPoints} P)`);
-                saveDB(); updateUI();
-                return;
+        // ★ [수정] 지갑은 장착 아이템과 무관하므로 가장 먼저 단독 처리
+        if (cat.effect === 'open_wallet') {
+            let randPoints = Math.floor(Math.random() * 251) + 250; // 250 ~ 500 P
+            currentUser.points += randPoints;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 지갑 열기 (+${randPoints} P)`);
+            saveDB(); updateUI();
+            showPointGainEffect(randPoints);
+            showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
+            return;
+        
             }
+            
             if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
@@ -2899,8 +2852,8 @@ function getTodayStr() {
         }
         return true;
     }
-
-    function sellInventoryItem(itemName) {
+ function sellInventoryItem(itemName) {
+        if (NO_SELL_ITEMS.includes(itemName)) { showCustomAlert("해당 물품은 매각할 수 없습니다."); return; }
         const sellPrice = getSellPrice(itemName);
         removeItemFromInventory(currentUser, itemName, 1);
         winPoints(sellPrice);
@@ -3221,7 +3174,22 @@ function getTodayStr() {
         if (kkeut === 0) return { name: "망통", score: 500, mult: 2 };
         return { name: `${kkeut}끗`, score: 500 + kkeut, mult: 2 };
     }
-
+     function pickHandByCondition(condFn) {
+        let allCards = [];
+        for (let i = 1; i <= 10; i++) {
+            allCards.push({ month: i, isKwang: (i === 1 || i === 3 || i === 8) });
+            allCards.push({ month: i, isKwang: false });
+        }
+        let candidates = [];
+        for (let a = 0; a < allCards.length; a++) {
+            for (let b = a + 1; b < allCards.length; b++) {
+                let res = calculateJokbo(allCards[a], allCards[b]);
+                if (condFn(res)) candidates.push({ hand: [allCards[a], allCards[b]], res: res });
+            }
+        }
+        if (candidates.length === 0) return null;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    }
    function finishSeotda() {
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
         
@@ -3240,33 +3208,33 @@ function getTodayStr() {
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
 
-        // ★ [조정] 플레이어의 좋은 패 확률을 10% 미만으로 제한 (땡, 광땡, 알리 등 높은 점수일 경우 일정 확률로 점수 강등)
-        let highCardRoll = Math.random() * 100;
-        if (pRes.score >= 700 && highCardRoll >= 9) { // 9% 확률로만 높은 패 유지, 나머지 91%는 낮은 끗수로 강등
-            pRes = { name: "망통", score: 500, mult: 2 };
+        // ★ 높은 패(땡 이상)는 9% 확률로만 유지, 나머지는 실제 존재하는 낮은 패로 교체
+        if (pRes.score >= 700 && Math.random() * 100 >= 9) {
+            let picked = pickHandByCondition(r => r.score < 700);
+            if (picked) { playerHand = picked.hand; pRes = picked.res; }
         }
 
-        // ★ [조정] 최종 승률을 30% 내외로 고정 (0 ~ 100 중 29 미만일 때만 승리 유도)
+        // ★ 최종 승률 29% 내외로 고정 (점수만 조작하지 않고 패 자체를 갈아끼움)
         let winRoll = Math.random() * 100;
         if (winRoll < 29) {
-            // 강제 승리 (플레이어 점수가 딜러보다 낮거나 같으면 우위로 조정)
             if (pRes.score <= dRes.score) {
-                pRes.score = dRes.score + 50;
-                pRes.name = "간신히 이긴 족보";
+                let picked = pickHandByCondition(r => r.score > dRes.score);
+                if (picked) { playerHand = picked.hand; pRes = picked.res; }
             }
         } else {
-            // 나머지 71%는 패배 또는 무승부 유도
             if (pRes.score > dRes.score) {
-                pRes.score = dRes.score - 10;
+                let picked = pickHandByCondition(r => r.score < dRes.score)
+                          || pickHandByCondition(r => r.score <= dRes.score);
+                if (picked) { playerHand = picked.hand; pRes = picked.res; }
             }
         }
 
         // 3. 패 오픈 및 결과 표시
+        // ★ 조정된 플레이어 패를 다시 그려서 카드 그림·족보명·배율을 일치시킴
+        renderCard('seotda-card-1', playerHand[0]);
+        renderCard('seotda-card-2', playerHand[1]);
         renderCard('dealer-card-1', dealerHand[0]); 
         renderCard('dealer-card-2', dealerHand[1]);
-        
-        document.getElementById('player-result-label').innerText = pRes.name;
-        document.getElementById('dealer-result-label').innerText = dRes.name;
         
         let msgEl = document.getElementById('seotda-msg');
         if (pRes.score > dRes.score) {
