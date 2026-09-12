@@ -771,6 +771,17 @@
         </div>
 
         <!-- 1. 정보 열람 -->
+                <!-- ★ 여우 상담실 격리 중 안내 -->
+        <div id="quarantine-lock-box" style="display:none; text-align:center; padding:30px 15px; border:1px solid #d4af37; border-radius:8px; background:rgba(212,175,55,0.06); margin-bottom:15px;">
+            <div style="font-size:42px; margin-bottom:15px;">🦊</div>
+            <h4 style="color:#d4af37; margin:0 0 12px 0; font-size:15px;">여우 상담실 격리 중</h4>
+            <p style="font-size:12px; color:#bbb; line-height:1.7; margin:0;">
+                현재 안정을 취하고 있습니다.<br>
+                격리가 해제될 때까지 사내 시설 이용이 제한됩니다.<br><br>
+                <span style="color:#ff9800; font-weight:bold;">퇴원까지 약 <span id="quarantine-remain-text">--</span> 남음</span><br><br>
+                <span style="font-size:11px; color:#888;">※ 정보 열람(사원증·기록)은 계속 이용할 수 있습니다.</span>
+            </p>
+        </div>
         <div id="tab-record" class="tab-content active">
             <div class="sub-tabs-grid">
                 <button class="sub-tab active" id="tab-btn-badge" onclick="switchRecordSubTab('rec-badge', this); clearItemNotification();">사원증</button>
@@ -3109,6 +3120,50 @@ function getTodayStr() {
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
         document.getElementById('display-facility-max').innerText = currentUser.facilityMax;
 
+               // ★ 격리 중 시설 전면 차단 (정보 열람만 허용)
+        const inQuarantine = isQuarantined(currentUser);
+        const lockBox = document.getElementById('quarantine-lock-box');
+        const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
+
+        if (inQuarantine) {
+            const remainMs = currentUser.quarantineUntil - Date.now();
+            const rh = Math.floor(remainMs / (1000 * 60 * 60));
+            const rm = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+            const remainEl = document.getElementById('quarantine-remain-text');
+            if (remainEl) remainEl.innerText = rh > 0 ? `${rh}시간 ${rm}분` : `${rm}분`;
+
+            document.querySelectorAll('.tabs-grid .tab').forEach(t => {
+                const onclickStr = t.getAttribute('onclick') || '';
+                const isLockedTab = lockedTabs.some(id => onclickStr.includes(id));
+                if (isLockedTab) {
+                    t.style.opacity = '0.35';
+                    t.style.pointerEvents = 'none';
+                    if (!t.innerText.startsWith('🔒')) t.innerText = '🔒 ' + t.innerText;
+                } 
+            });
+
+            // 잠긴 탭이 열려 있으면 정보 열람으로 강제 이동
+            let activeLocked = lockedTabs.find(id => {
+                const el = document.getElementById(id);
+                return el && el.classList.contains('active');
+            });
+            if (activeLocked) {
+                document.getElementById(activeLocked).classList.remove('active');
+                document.getElementById('tab-record').classList.add('active');
+                document.querySelectorAll('.tabs-grid .tab').forEach(t => t.classList.remove('active'));
+                const recTab = document.querySelector('.tabs-grid .tab');
+                if (recTab) recTab.classList.add('active');
+            }
+            if (lockBox) lockBox.style.display = 'block';
+
+        } else {
+            document.querySelectorAll('.tabs-grid .tab').forEach(t => {
+                t.style.opacity = '';
+                t.style.pointerEvents = '';
+                if (t.innerText.startsWith('🔒 ')) t.innerText = t.innerText.replace('🔒 ', '');
+            });
+            if (lockBox) lockBox.style.display = 'none';
+        }
         const isLocked = currentUser.pollution >= 100;
         const isLimitReached = currentUser.facilityCount >= currentUser.facilityMax;
 
@@ -3556,6 +3611,7 @@ function getTodayStr() {
     }
          function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
+         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 소지품을 사용할 수 없습니다.'); return; }
         if (!cat || !cat.usable) return;
 
         // 지갑은 장착과 무관하므로 가장 먼저 단독 처리
@@ -3857,6 +3913,7 @@ function getTodayStr() {
         return true;
     }
  function sellInventoryItem(itemName) {
+     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 소지품을 매각할 수 없습니다.'); return; }
         if (NO_SELL_ITEMS.includes(itemName)) { showCustomAlert("해당 물품은 매각할 수 없습니다."); return; }
         const sellPrice = getSellPrice(itemName);
         removeItemFromInventory(currentUser, itemName, 1);
@@ -3889,6 +3946,7 @@ function getTodayStr() {
     }
 
    function sendAnonymousLetter() {
+    if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 서신을 보낼 수 없습니다.'); return; }   
     const letterIdx = currentUser.inventory.indexOf("익명 편지");
     if (letterIdx === -1) { showCustomAlert("소지품에 '익명 편지'가 없습니다."); return; }
     const targetCode = document.getElementById('letter-target-select').value;
@@ -3963,6 +4021,7 @@ function getTodayStr() {
     }
 
     function buyRegularShopItem(itemId, itemName, price) {
+         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 상점을 이용할 수 없습니다.'); return; }
         const cycleKey = getShopCycleKey();
         if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
         if (!currentUser.purchaseRecord[cycleKey]) currentUser.purchaseRecord[cycleKey] = {};
@@ -4395,6 +4454,7 @@ function getTodayStr() {
             return;
         }
         if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return; }
         
 
         // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
@@ -4552,6 +4612,7 @@ function getTodayStr() {
     }
 
     function sendVipInvite() {
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 대전을 신청할 수 없습니다.'); return; }   
         const oppCode = document.getElementById('vip-opponent-select').value;
         const bet = parseInt(document.getElementById('vip-bet-input').value);
 
@@ -4580,6 +4641,7 @@ function getTodayStr() {
     function closeVipInviteModal() { document.getElementById('vip-invite-overlay').style.display = 'none'; }
 
     function acceptVipInvite() {
+        if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 대전을 수락할 수 없습니다.'); rejectVipInvite(); return; }
         const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
         if (!inv) { closeVipInviteModal(); return; }
         if (currentUser.points < inv.bet) { showCustomAlert("포인트가 부족하여 수락할 수 없습니다."); delete db.vipInvites[inv.id]; saveDB(); closeVipInviteModal(); return; }
@@ -4907,6 +4969,7 @@ function getTodayStr() {
         }
     }
     function sendP2PDeal() {
+     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 제안할 수 없습니다.'); return; }  
     const targetCode = document.getElementById('p2p-target-user').value;
     if (!targetCode) {
         showCustomAlert("상대 사원을 선택해주세요.");
@@ -5017,6 +5080,7 @@ function getTodayStr() {
 }
    function renderP2PLists() {
         checkP2PExpiration();
+           if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }    
         const receivedList = document.getElementById('p2p-received-list');
         const sentList = document.getElementById('p2p-sent-list');
         if (!receivedList || !sentList) return;
@@ -5210,6 +5274,7 @@ function getTodayStr() {
     let dealerCardValue = 7;
    function playHighLow(choice) {
         if (!currentUser) return;
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 우주 주파수에 접속할 수 없습니다.'); return; }
         
         const now = Date.now();
         const fourHoursMs = 4 * 60 * 60 * 1000; // 4시간 (밀리초)
@@ -5368,6 +5433,7 @@ function getTodayStr() {
     }
 
     function buyAlienItem(itemName, price) {
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 상점을 이용할 수 없습니다.'); return; }
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
         
         if (currentUser.code !== 'kario0987' && currentUser.alienBoughtItems.includes(itemName)) { 
@@ -5394,6 +5460,7 @@ function getTodayStr() {
         updateUI();
     }
     function useFacility(bet) {
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return false; }
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
         if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
