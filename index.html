@@ -1730,7 +1730,10 @@ function getTodayStr() {
         "반 박자 늦은 그림자": { price: 250, usable: false, darkOnly: true, desc: "[어둠 회수품] 당신의 움직임을 아주 조금 늦게 따라한다. 아직 쓰임새가 밝혀지지 않았다." },
          "서명 없는 캔버스 조각": { price: 45, usable: false, darkOnly: true, desc: "[어둠 회수품] 손톱만 한 캔버스 조각. 아직 미지근하다." },
         "전시 안내 도록": { price: 110, usable: true, targetable: false, effect: "dark_catalog", darkOnly: true, desc: "[어둠 회수품] 어느 미술관의 도록. 사용 시 다음 어둠 탐사의 첫 판정에 +2 보정이 붙는다." },
-        "액자 뒤에 있던 것": { price: 300, usable: false, darkOnly: true, desc: "[어둠 회수품] 벽과 액자 사이에 끼어 있었다. 무엇인지는 아직 알 수 없다." }
+        "액자 뒤에 있던 것": { price: 300, usable: false, darkOnly: true, desc: "[어둠 회수품] 벽과 액자 사이에 끼어 있었다. 무엇인지는 아직 알 수 없다." },
+        "금이 간 손거울": { price: 55, usable: false, darkOnly: true, desc: "[어둠 회수품] 비스듬히 금이 갔다. 들여다보면 반응이 반 박자 빠르다." },
+        "세 번째 단어": { price: 130, usable: true, targetable: false, effect: "third_word", darkOnly: true, desc: "[어둠 회수품] 적히지 않은 단어. 사용 시 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있다." },
+        "먼저 웃은 쪽": { price: 320, usable: false, darkOnly: true, desc: "[어둠 회수품] 거울 속에서 먼저 웃은 쪽이 남긴 것. 무엇인지는 아직 알 수 없다." }
 
     };
 
@@ -1760,7 +1763,14 @@ function getTodayStr() {
         "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[200,300], ready:false },
         "Qtrew-B-330": { code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자", brief:"(함정 조심!)", danger:"중상", survival:"12%", min:2, max:4, reward:[100,200], ready:false },
         "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[100,200], ready:false },
-        "Qtrew-C-119": { code:"Qtrew-C-119", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"40%", min:2, max:2, reward:[50,100], ready:false },
+        "Qtrew-C-119": {
+            code:"Qtrew-C-119", grade:"C", name:"거울은 세 마디만 허락한다",
+            brief:"(거울이 늘어진 방. 한 사람은 안에, 한 사람은 밖에.)",
+            danger:"중", survival:"40%", min:2, max:2, reward:[50,100], ready:true,
+            voteMode:false, roleSplit:true,
+            intro:"복도 끝에서 문이 닫혔다.<br><br>정신을 차려 보니 방이다. 천장에서 거울이 늘어져 있다. 액자에 걸린 것이 아니라, 줄에 매달려 천천히 돌고 있다.<br>수십 개가 각기 다른 속도로 돈다. 비치는 것도 각기 다르다.<br><br>둘이 함께 들어왔는데, 지금 서로가 보이지 않는다.",
+            outro:"마지막 거울이 멈춘다.<br><br>거기 비친 것은 둘 다였다. 나란히 서 있었다.<br>실제로는 한 번도 마주치지 못했는데.<br><br>눈을 뜨니 복도다. 문은 열려 있다."
+        },
         "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[50,100], ready:false },
         "Qtrew-D-042": {
             code:"Qtrew-D-042", grade:"D", name:"가로등은 뒤에서부터 꺼진다",
@@ -1802,6 +1812,11 @@ function getTodayStr() {
             { name:"전시 안내 도록", chance:0.020 },
             { name:"액자 뒤에 있던 것", chance:0.010 }
         ]
+                "Qtrew-C-119": [
+            { name:"금이 간 손거울", chance:0.030 },
+            { name:"세 번째 단어", chance:0.020 },
+            { name:"먼저 웃은 쪽", chance:0.010 }
+        ],
     };
 
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
@@ -3037,6 +3052,7 @@ function getTodayStr() {
         const body = document.getElementById('darkness-body');
         if (!body || !darkRun) return;
          if (darkRun.isParty) watchPartyStep();
+        if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
 
         const s = darkRun.step;
@@ -3098,6 +3114,419 @@ function getTodayStr() {
             [idx[i], idx[j]] = [idx[j], idx[i]];
         }
         return idx.slice(0, n);
+    }
+
+        // ==========================================
+    // ★ Qtrew-C-119 「거울은 세 마디만 허락한다」
+    // ==========================================
+    const C119_WORDS = [
+        ['왼쪽', '오른쪽', '아니야'],
+        ['위', '아래', '멈춰'],
+        ['하나', '둘', '다시'],
+        ['가', '서', '뒤']
+    ];
+    const SIGNAL_LIMIT = 5;
+
+    let c119Ref = null, c119Key = null, c119State = null;
+
+    function c119Path() { return `darkC119/${darkRun.partyId}`; }
+
+    function attachC119Listener() {
+        if (!database || !darkRun || !darkRun.partyId) return;
+        if (c119Key === darkRun.partyId) return;
+        detachC119Listener();
+        c119Key = darkRun.partyId;
+        c119Ref = database.ref(c119Path());
+        c119Ref.on('value', (snap) => {
+            c119State = snap.val();
+            if (!c119State || !darkRun) return;
+            if (c119State.step != null && c119State.step !== darkRun.step) {
+                darkRun.step = c119State.step;
+            }
+            renderStep119();
+        });
+    }
+
+    function detachC119Listener() {
+        if (c119Ref) { try { c119Ref.off(); } catch(e) {} }
+        c119Ref = null; c119Key = null; c119State = null;
+    }
+
+    // 방장이 역할을 무작위 배정
+    function initC119() {
+        if (!darkRun.isLeader || !database) return;
+        const p = darkParties[darkRun.partyId];
+        if (!p) return;
+        const codes = Object.keys(p.members);
+        if (codes.length < 2) return;
+        const shuffled = codes.sort(() => Math.random() - 0.5);
+        database.ref(c119Path()).set({
+            inside: shuffled[0],
+            outside: shuffled[1],
+            insideName: p.members[shuffled[0]].name,
+            outsideName: p.members[shuffled[1]].name,
+            step: 0,
+            signals: {},
+            signalsLeft: SIGNAL_LIMIT,
+            muted: false,
+            answers: {},
+            wrong: 0,
+            createdAt: Date.now()
+        });
+    }
+
+    function myC119Role() {
+        if (!c119State) return null;
+        if (c119State.inside === currentUser.code) return 'inside';
+        if (c119State.outside === currentUser.code) return 'outside';
+        return null;
+    }
+
+    function sendWordSignal(word) {
+        if (!c119State || c119State.muted) return;
+        if ((c119State.signalsLeft || 0) <= 0) return;
+        if (myC119Role() !== 'inside') return;
+        database.ref(c119Path()).update({ signalsLeft: (c119State.signalsLeft || 0) - 1 });
+        database.ref(c119Path() + '/signals').push({ w: word, at: Date.now() });
+    }
+
+    function toggleC119Mute(on) {
+        if (myC119Role() !== 'outside') return;
+        database.ref(c119Path()).update({ muted: !!on });
+    }
+
+    function c119Advance(nextStep) {
+        if (!database) return;
+        database.ref(c119Path()).update({
+            step: nextStep, signals: null, signalsLeft: SIGNAL_LIMIT, muted: false
+        });
+    }
+
+    function renderSignalLog() {
+        if (!c119State || !c119State.signals) return '<span style="color:#666;">아직 신호가 없습니다.</span>';
+        const arr = Object.values(c119State.signals).sort((a, b) => a.at - b.at);
+        if (arr.length === 0) return '<span style="color:#666;">아직 신호가 없습니다.</span>';
+        return arr.map(s => `<span style="display:inline-block; background:rgba(212,175,55,0.12); border:1px solid #5a4a2a; color:#d4af37; border-radius:4px; padding:3px 9px; margin:0 4px 4px 0; font-weight:bold; font-size:12px;">${s.w}</span>`).join('');
+    }
+
+        function renderStep119() {
+        const body = document.getElementById('darkness-body');
+        if (!body || !darkRun) return;
+
+        attachC119Listener();
+        if (!c119State) {
+            if (darkRun.isLeader) initC119();
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">역할을 배정하는 중...</div>`, "intro");
+            return;
+        }
+
+        const role = myC119Role();
+        const s = darkRun.step;
+
+        if (s === 0) { render119Intro(role); return; }
+        if (s === 99) { renderDarkResult(); return; }
+
+        const gimmicks = [render119A, render119B, render119C, render119D];
+        if (gimmicks[s - 1]) gimmicks[s - 1](role);
+    }
+
+    function render119Intro(role) {
+        const body = document.getElementById('darkness-body');
+        const isInside = role === 'inside';
+        body.innerHTML = darkBox("진입",
+            DARK_ZONES[darkRun.zone].intro + `<br><br>
+            <div style="border-top:1px dashed #333; padding-top:14px; margin-top:6px;">
+                ${isInside
+                    ? `<span style="color:#ff6b6b; font-weight:bold; font-size:14px;">당신은 거울 안쪽에 있다.</span><br><br>
+                       사방이 유리다. 밖이 보이지만 소리는 거의 통하지 않는다.<br>
+                       목이 잠겼다. 정해진 몇 마디 외에는 소리가 나오지 않는다.<br><br>
+                       <span style="color:#d4af37;">밖에 있는 <b>${c119State.outsideName}</b> 사원에게 정답을 알려야 한다.</span>`
+                    : `<span style="color:#4CAF50; font-weight:bold; font-size:14px;">당신은 거울 바깥에 있다.</span><br><br>
+                       방 한쪽에 장치가 있다. 조작할 수 있는 것은 당신뿐이다.<br>
+                       다만 무엇이 정답인지는 보이지 않는다.<br><br>
+                       <span style="color:#d4af37;">안쪽의 <b>${c119State.insideName}</b> 사원이 보내는 신호에 의지해야 한다.</span>`}
+            </div>`,
+            (darkRun.isLeader
+                ? darkChoiceBtn("시작한다.", "c119Advance(1)")
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">방장의 신호를 기다리는 중입니다.</div>`)
+            + buildChatHtml(role === 'inside' ? 'muted' : 'normal'),
+            "intro");
+        if (role !== 'inside') { attachChatListener(darkRun.partyId); renderChatLog(); }
+    }
+
+    // 공통 레이아웃
+    function build119(role, title, insideText, outsideText, insideExtra, outsideExtra) {
+        const isInside = role === 'inside';
+        const wordSet = C119_WORDS[darkRun.step - 1] || C119_WORDS[0];
+        const body = document.getElementById('darkness-body');
+
+        const signalBox = `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:12px;">
+                <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:7px;">📡 수신된 신호</div>
+                <div style="min-height:26px;">${renderSignalLog()}</div>
+            </div>`;
+
+        body.innerHTML = darkBox(title,
+            isInside ? insideText : outsideText,
+            (isInside ? '' : signalBox)
+            + (isInside ? (insideExtra || '') : (outsideExtra || ''))
+            + (isInside ? signalBox : '')
+            + buildChatHtml(isInside ? 'words' : (c119State.muted ? 'normal' : 'normal'),
+                            wordSet, c119State.signalsLeft, c119State.muted),
+            "step" + darkRun.step);
+
+        attachChatListener(darkRun.partyId);
+        renderChatLog();
+    }
+
+    // --- 기믹 1: 거울 고르기 ---
+    function render119A(role) {
+        if (!darkRun.c119a) {
+            darkRun.c119a = true;
+            if (darkRun.isLeader && database && c119State.answerA == null) {
+                database.ref(c119Path()).update({ answerA: Math.floor(Math.random() * 6) + 1 });
+            }
+        }
+        const ans = c119State.answerA;
+        const dir = ans <= 3 ? '왼쪽' : '오른쪽';
+
+        build119(role, "기믹 1 — 여섯 개의 거울",
+            // 안쪽
+            `거울 여섯 개가 늘어서 있다. 다섯 개는 당신을 비춘다.<br>
+             <b style="color:#d4af37;">${ans}번째 거울만 아무것도 비추지 않는다.</b> 유리가 아니라 구멍이다.<br><br>
+             밖에서는 번호가 안 보일 것이다. 방향과 수를 알려야 한다.<br>
+             <span style="font-size:11px; color:#888;">(${dir}에서 ${ans <= 3 ? ans : 7 - ans}번째)</span>`,
+            // 바깥
+            `늘어선 거울이 여섯. 전부 같아 보인다.<br>
+             하나만 통과할 수 있고, 나머지는 손을 대면 유리가 깨진다.<br><br>
+             안쪽에서 신호가 올 것이다.`,
+            null,
+            // 바깥 조작부
+            `<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:12px;">
+                ${[1,2,3,4,5,6].map(n => `<button class="game-btn" style="margin:0; padding:14px 0; font-size:15px; font-weight:bold;" onclick="answer119A(${n})" ${c119State.muted ? '' : ''}>${n}</button>`).join('')}
+             </div>
+             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:10px; font-size:11px; ${c119State.muted ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : ''}" onclick="toggleC119Mute(${!c119State.muted})">
+                ${c119State.muted ? '■ 입력 중단 (상대 발언 허용)' : '▶ 입력 시작 (상대 발언 차단)'}
+             </button>`);
+    }
+
+    function answer119A(n) {
+        if (myC119Role() !== 'outside') return;
+        const ok = (n === c119State.answerA);
+        if (ok) { darkRun.success++; }
+        else { darkRun.fail++; applyPollutionToUser(currentUser, 4); database.ref(c119Path()).update({ wrong: (c119State.wrong || 0) + 1 }); }
+        darkRun.log.push(`[기믹 1] ${n}번 거울 선택 — ${ok ? '적중' : '오답'}`);
+        sendPartyChat(ok ? `${n}번 거울을 통과했습니다.` : `${n}번 거울이 깨졌습니다.`, true);
+
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 1 — 결과",
+            ok ? `${n}번 거울에 손을 넣는다. 저항이 없다.<br><br>팔이 통째로 들어간다. 유리가 아니었다.`
+               : `${n}번 거울이 소리 없이 갈라진다.<br>조각이 발밑에 떨어지는데, 떨어지는 소리는 한참 뒤에 났다.<br><br>다른 거울들이 조금씩 더 빨리 돌기 시작한다.`,
+            (darkRun.isLeader ? darkChoiceBtn("안쪽으로 들어간다.", "c119Advance(2)")
+                              : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
+            + buildChatHtml('normal'));
+        attachChatListener(darkRun.partyId); renderChatLog();
+    }
+
+    // --- 기믹 2: 손잡이 순서 ---
+    function render119B(role) {
+        if (darkRun.isLeader && database && !c119State.answerB) {
+            const order = [1,2,3,4].sort(() => Math.random() - 0.5);
+            database.ref(c119Path()).update({ answerB: order.join(''), inputB: '' });
+        }
+        const ansB = c119State.answerB || '';
+
+        build119(role, "기믹 2 — 네 개의 손잡이",
+            `벽에 손잡이 넷. 위·아래로 나뉘어 붙어 있다.<br>
+             당기는 순서가 정해져 있고, 그 순서가 당신 쪽 벽에만 새겨져 있다.<br><br>
+             <div style="background:rgba(212,175,55,0.1); border:1px solid #5a4a2a; border-radius:5px; padding:11px; text-align:center; font-size:20px; font-weight:bold; color:#d4af37; letter-spacing:6px;">
+                ${ansB.split('').join(' → ')}
+             </div>
+             <div style="font-size:11px; color:#888; margin-top:8px;">위쪽 둘은 1·2번, 아래쪽 둘은 3·4번이다.</div>`,
+            `손잡이가 넷. 번호는 붙어 있지 않다.<br>
+             왼쪽부터 위 두 개가 1·2번, 아래 두 개가 3·4번이라고 짐작할 뿐이다.<br><br>
+             순서를 틀리면 처음부터 다시다.`,
+            null,
+            `<div style="text-align:center; font-size:13px; font-family:monospace; color:var(--theme-focus); font-weight:bold; margin-bottom:10px; min-height:20px; letter-spacing:5px;">
+                ${(c119State.inputB || '').split('').join(' ') || '_ _ _ _'}
+             </div>
+             <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:8px;">
+                ${[1,2,3,4].map(n => `<button class="game-btn" style="margin:0; padding:14px 0; font-size:15px; font-weight:bold;" onclick="input119B(${n})">${n}</button>`).join('')}
+             </div>
+             <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:9px; font-size:11px;" onclick="clear119B()">입력 초기화</button>
+             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:10px; font-size:11px; ${c119State.muted ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : ''}" onclick="toggleC119Mute(${!c119State.muted})">
+                ${c119State.muted ? '■ 입력 중단 (상대 발언 허용)' : '▶ 입력 시작 (상대 발언 차단)'}
+             </button>`);
+    }
+
+    function input119B(n) {
+        if (myC119Role() !== 'outside') return;
+        let cur = (c119State.inputB || '') + n;
+        if (cur.length >= 4) {
+            const ok = cur === c119State.answerB;
+            if (ok) darkRun.success++;
+            else { darkRun.fail++; applyPollutionToUser(currentUser, 4); }
+            darkRun.log.push(`[기믹 2] 순서 ${cur} 입력 — ${ok ? '적중' : '오답'}`);
+            database.ref(c119Path()).update({ inputB: '' });
+            sendPartyChat(ok ? '손잡이가 순서대로 내려갔습니다.' : '손잡이가 전부 튕겨 올라왔습니다.', true);
+
+            document.getElementById('darkness-body').innerHTML = darkBox("기믹 2 — 결과",
+                ok ? `네 번째 손잡이가 끝까지 내려간다.<br>벽 안쪽에서 뭔가가 풀리는 소리가 난다.<br><br>거울 하나가 도는 것을 멈췄다.`
+                   : `세 번째에서 걸렸다. 손잡이가 전부 튕겨 올라온다.<br><br>천장의 거울들이 일제히 같은 방향으로 돌기 시작한다.<br>전부 당신 쪽을 보고 있다.`,
+                (darkRun.isLeader ? darkChoiceBtn("다음 방으로.", "c119Advance(3)")
+                                  : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
+                + buildChatHtml('normal'));
+            attachChatListener(darkRun.partyId); renderChatLog();
+        } else {
+            database.ref(c119Path()).update({ inputB: cur });
+        }
+    }
+
+    function clear119B() {
+        if (myC119Role() !== 'outside') return;
+        database.ref(c119Path()).update({ inputB: '' });
+    }
+
+    // --- 기믹 3: 미니게임 무게추 ---
+    function render119C(role) {
+        if (darkRun.isLeader && database && c119State.targetC == null) {
+            database.ref(c119Path()).update({ targetC: Math.floor(Math.random() * 30) + 35, posC: 0, runC: false });
+        }
+
+        build119(role, "기믹 3 — 무게추",
+            `천장에서 추가 내려온다. 줄에 눈금이 있다.<br>
+             <b style="color:#d4af37;">${c119State.targetC}</b> 눈금에서 멈춰야 바닥의 판이 열린다.<br><br>
+             그 이상 내려가면 줄이 끊어진다.<br>
+             <span style="font-size:11px; color:#888;">밖에서는 눈금이 보이지 않는다. '가'와 '서'로 맞춰야 한다.</span>`,
+            `손잡이를 놓으면 추가 내려간다.<br>눈금은 이쪽에서 보이지 않는다. 얼마나 내려갔는지 알 수 없다.<br><br>
+             안쪽의 신호에 맞춰 멈춰야 한다.`,
+            null,
+            `<div style="text-align:center; margin-bottom:12px;">
+                <div style="width:100%; height:14px; background:rgba(0,0,0,0.5); border:1px solid var(--theme-border); border-radius:7px; overflow:hidden; position:relative;">
+                    <div id="c119-bar" style="height:100%; width:${(c119State.posC || 0)}%; background:linear-gradient(90deg, #5a4a2a, #d4af37); transition:width 0.08s linear;"></div>
+                </div>
+                <div style="font-size:10px; color:#888; margin-top:6px;">추는 계속 내려갑니다. 신호가 오면 즉시 멈추세요.</div>
+             </div>
+             <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:14px; font-size:13px;" onclick="start119C()" ${c119State.runC ? 'disabled' : ''}>추를 내린다</button>
+             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:14px; font-size:13px; background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="stop119C()" ${c119State.runC ? '' : 'disabled'}>멈춘다</button>`);
+    }
+
+    let c119Timer = null;
+    function start119C() {
+        if (myC119Role() !== 'outside') return;
+        database.ref(c119Path()).update({ runC: true, posC: 0 });
+        let pos = 0;
+        clearInterval(c119Timer);
+        c119Timer = setInterval(() => {
+            pos += 1.2;
+            const bar = document.getElementById('c119-bar');
+            if (bar) bar.style.width = pos + '%';
+            database.ref(c119Path() + '/posC').set(Math.round(pos));
+            if (pos >= 100) { clearInterval(c119Timer); stop119C(); }
+        }, 90);
+    }
+
+    function stop119C() {
+        if (myC119Role() !== 'outside') return;
+        clearInterval(c119Timer);
+        const pos = c119State.posC || 0;
+        const target = c119State.targetC;
+        const diff = Math.abs(pos - target);
+        database.ref(c119Path()).update({ runC: false });
+
+        let ok = diff <= 5;
+        let over = pos > target + 12;
+        if (ok) darkRun.success++;
+        else { darkRun.fail++; applyPollutionToUser(currentUser, over ? 6 : 3); }
+        darkRun.log.push(`[기믹 3] 무게추 ${pos}/${target} — ${ok ? '적중' : '빗나감'}`);
+        sendPartyChat(ok ? '추가 제자리에 멈췄습니다.' : '추가 어긋났습니다.', true);
+
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 3 — 결과",
+            ok ? `추가 멎는다. 눈금이 정확히 맞았다.<br>바닥의 판이 소리 없이 옆으로 밀린다.<br><br>아래로 내려가는 계단이 보인다.`
+               : over ? `줄이 끊어졌다.<br>추가 바닥을 치는 소리가 방 전체를 울린다.<br><br>거울 몇 개가 줄에서 떨어져 깨졌다. 깨진 자리마다 뭔가가 서 있다.`
+                      : `추가 어중간한 데서 멎었다.<br>판은 열리지 않는다. 다만 아주 조금 벌어졌다.<br><br>그 틈으로 손을 넣어 억지로 벌린다.`,
+            (darkRun.isLeader ? darkChoiceBtn("마지막 문으로.", "c119Advance(4)")
+                              : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
+            + buildChatHtml('normal'));
+        attachChatListener(darkRun.partyId); renderChatLog();
+    }
+
+    // --- 기믹 4: 자물쇠 ---
+    function render119D(role) {
+        if (darkRun.isLeader && database && !c119State.answerD) {
+            let d = '';
+            for (let i = 0; i < 3; i++) d += Math.floor(Math.random() * 3) + 1;
+            database.ref(c119Path()).update({ answerD: d, inputD: '' });
+        }
+        const ansD = c119State.answerD || '';
+
+        build119(role, "기믹 4 — 마지막 문",
+            `문에 자물쇠가 걸려 있다. 숫자 세 자리.<br>
+             당신 쪽 벽에 세 개의 자국이 있다. 손톱으로 긁어 센 자국이다.<br><br>
+             <div style="background:rgba(212,175,55,0.1); border:1px solid #5a4a2a; border-radius:5px; padding:14px; text-align:center;">
+                ${ansD.split('').map(n => `<div style="font-size:22px; color:#d4af37; font-weight:bold; letter-spacing:4px; margin:2px 0;">${'|'.repeat(parseInt(n))}</div>`).join('')}
+             </div>
+             <div style="font-size:11px; color:#888; margin-top:8px;">세 줄, 각각 몇 개인지 세어 전해야 한다.<br>'하나'와 '둘'만으로 수를 만들 수 있다.</div>`,
+            `자물쇠 세 자리. 각 자리는 1에서 3 사이다.<br>
+             세 번 틀리면 문이 영영 잠긴다고, 문 옆에 적혀 있다.<br><br>
+             <span style="color:#ff9800; font-size:11px;">남은 시도: ${3 - (c119State.wrongD || 0)}회</span>`,
+            null,
+            `<div style="text-align:center; font-size:20px; font-family:monospace; color:var(--theme-focus); font-weight:bold; margin-bottom:12px; letter-spacing:8px; min-height:26px;">
+                ${(c119State.inputD || '').split('').join(' ') || '_ _ _'}
+             </div>
+             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px;">
+                ${[1,2,3].map(n => `<button class="game-btn" style="margin:0; padding:16px 0; font-size:17px; font-weight:bold;" onclick="input119D(${n})">${n}</button>`).join('')}
+             </div>
+             <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:9px; font-size:11px;" onclick="clear119D()">입력 초기화</button>
+             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:10px; font-size:11px; ${c119State.muted ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : ''}" onclick="toggleC119Mute(${!c119State.muted})">
+                ${c119State.muted ? '■ 입력 중단 (상대 발언 허용)' : '▶ 입력 시작 (상대 발언 차단)'}
+             </button>`);
+    }
+
+    function input119D(n) {
+        if (myC119Role() !== 'outside') return;
+        let cur = (c119State.inputD || '') + n;
+        if (cur.length >= 3) {
+            const ok = cur === c119State.answerD;
+            const wrongCount = (c119State.wrongD || 0) + (ok ? 0 : 1);
+            database.ref(c119Path()).update({ inputD: '', wrongD: wrongCount });
+
+            if (ok) {
+                darkRun.success += 2;
+                darkRun.log.push(`[기믹 4] 자물쇠 ${cur} — 해제`);
+                sendPartyChat('자물쇠가 풀렸습니다.', true);
+                finish119(true);
+            } else if (wrongCount >= 3) {
+                darkRun.fail += 2;
+                darkRun.failedRun = true;
+                applyPollutionToUser(currentUser, 8);
+                darkRun.log.push(`[기믹 4] 자물쇠 ${cur} — 최종 실패`);
+                sendPartyChat('자물쇠가 영영 잠겼습니다.', true);
+                finish119(false);
+            } else {
+                darkRun.fail++;
+                applyPollutionToUser(currentUser, 3);
+                darkRun.log.push(`[기믹 4] 자물쇠 ${cur} — 오답 (${wrongCount}/3)`);
+                sendPartyChat(`자물쇠가 걸렸습니다. (${3 - wrongCount}회 남음)`, true);
+            }
+        } else {
+            database.ref(c119Path()).update({ inputD: cur });
+        }
+    }
+
+    function clear119D() {
+        if (myC119Role() !== 'outside') return;
+        database.ref(c119Path()).update({ inputD: '' });
+    }
+
+    function finish119(ok) {
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 4 — 결과",
+            ok ? `자물쇠가 손 안에서 열린다.<br>문이 안쪽으로 밀린다.<br><br>거울 안쪽에 있던 사람이 걸어 나온다. 표정이 조금 이상하다.<br>거울 밖에 있던 사람도 같은 생각을 한다.`
+               : `세 번째가 틀렸다.<br>자물쇠가 안쪽으로 빨려 들어가고, 문이 벽이 된다.<br><br>거울들이 전부 멈춘다. 전부 같은 것을 비추고 있다.<br>둘 다 거기 있다. 나란히.`,
+            (darkRun.isLeader ? darkChoiceBtn(ok ? "밖으로 나간다." : "주저앉는다.", "c119Advance(99)")
+                              : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
+            + buildChatHtml('normal'));
+        attachChatListener(darkRun.partyId); renderChatLog();
     }
 
     function renderStep087() {
@@ -3483,6 +3912,8 @@ function getTodayStr() {
     function finishDarkDeath() {
         detachVoteListener();
         detachChatListener();
+        detachC119Listener();
+        clearInterval(c119Timer);
         if (darkRun) {
             if (darkRun.isParty && darkRun.isLeader && database) {
                 // 방장이 죽으면 남은 인원에게 위임
@@ -3595,7 +4026,7 @@ function getTodayStr() {
         saveDB();
     }
 
-                    function finishDarkRun() {
+        function finishDarkRun() {
         darkAmbienceStop();
         detachVoteListener();
         if (darkRun) {
@@ -3607,6 +4038,9 @@ function getTodayStr() {
             }
         }
         detachChatListener();
+        detachC119Listener();
+        clearInterval(c119Timer);
+        if (darkRun && darkRun.partyId && database) database.ref('darkC119/' + darkRun.partyId).remove();
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
@@ -4907,6 +5341,17 @@ function getTodayStr() {
             addHistoryLog(currentUser, `[아이템 사용] 전시 안내 도록 숙독`);
             saveDB(); updateUI();
             showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
+            return;
+        }
+
+                     if (cat.effect === 'third_word') {
+            if (currentUser.darkExtraReroll) { showCustomAlert('이미 재굴림 권한을 보유하고 있습니다.'); return; }
+            currentUser.darkExtraReroll = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            appendSystemBadgeNote(`[세 번째 단어] 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있습니다.`);
+            addHistoryLog(currentUser, `[아이템 사용] 세 번째 단어 발화`);
+            saveDB(); updateUI();
+            showCustomAlert('무언가를 말했다. 무슨 말이었는지 기억나지 않는다.');
             return;
         }
 
