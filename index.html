@@ -100,12 +100,15 @@
             border-radius: 50%; box-shadow: 0 0 8px #4CAF50;
             animation: pulse-green 1.5s infinite; z-index: 10;
         }
-        @keyframes pulse-green {
+               @keyframes pulse-green {
             0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
             70% { box-shadow: 0 0 0 6px rgba(76, 175, 80, 0); }
             100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
-        @keyframes floatUp {
+        @keyframes autoLoginSpin {
+            to { transform: rotate(360deg); }
+        }
+         @keyframes floatUp {
             0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
             100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5); }
         }
@@ -659,6 +662,12 @@
             <button class="btn-cancel" onclick="closeEmpDetailModal()" style="width:100%; background: #444; border-color: #555 !important;">닫기</button>
         </div>
     </div>
+</div>
+
+    <!-- 자동 로그인 진행 중 표시 -->
+<div id="auto-login-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#121212; z-index:99999999; justify-content:center; align-items:center; flex-direction:column;">
+    <div style="width:42px; height:42px; border:3px solid #333; border-top-color:#888; border-radius:50%; animation: autoLoginSpin 0.8s linear infinite;"></div>
+    <div style="color:#888; font-size:13px; margin-top:20px; letter-spacing:2px;">단말 인증 중...</div>
 </div>
 
 <div class="container" id="app-container">
@@ -1363,16 +1372,29 @@ function getTodayStr() {
     });
 }
         // ★ 빠른 자동 로그인: 전체 DB를 기다리지 않고 내 계정 노드만 즉시 조회
+        // ★ 빠른 자동 로그인: 전체 DB를 기다리지 않고 내 계정 노드만 즉시 조회
     let autoLoginTried = false;
+
+    function showAutoLoginOverlay(show) {
+        const el = document.getElementById('auto-login-overlay');
+        if (el) el.style.display = show ? 'flex' : 'none';
+    }
+
     function tryAutoLogin() {
         if (autoLoginTried || currentUser || !database) return;
         const savedCode = localStorage.getItem('corp_logged_code');
         if (!savedCode) return;
         autoLoginTried = true;
 
+        showAutoLoginOverlay(true); // ★ 인증 화면 표시
+
         database.ref('users/' + savedCode).once('value').then(snap => {
             const u = snap.val();
-            if (!u || currentUser) { autoLoginTried = false; return; }
+            if (!u || currentUser) {
+                autoLoginTried = false;
+                showAutoLoginOverlay(false);
+                return;
+            }
 
             if (!u.inventory) u.inventory = [];
             if (!u.history) u.history = [];
@@ -1382,11 +1404,14 @@ function getTodayStr() {
             document.getElementById('nickname-input').value = u.name;
             document.getElementById('code-input').value = u.code;
             attemptLogin();
+            showAutoLoginOverlay(false); // ★ 로그인 완료 후 해제
         }).catch(err => {
             autoLoginTried = false;
+            showAutoLoginOverlay(false);
             console.error("자동 로그인 실패:", err);
         });
     }
+    tryAutoLogin();
     tryAutoLogin();
 
         database.ref('online').on('value', (snap) => {
@@ -4775,6 +4800,7 @@ function getTodayStr() {
             document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
             document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
+             showAutoLoginOverlay(false); // ★ 잔여 오버레이 제거
             document.body.className = ""; // 테마 초기화
         }
     // =========================================================================
