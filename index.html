@@ -3974,7 +3974,49 @@ function getTodayStr() {
         addHistoryLog(currentUser, `[상점 구매] ${itemName} (-${price} P)`);
         saveDB(); updateUI();
     }
+    // ==========================================
+    // ★ 베팅 스테퍼 (섯다만 50 P 상한)
+    // ==========================================
+    const MAX_BET = 50;
+    const LIMITED_BETS = ['seotda-bet'];
 
+    function getBetValue(inputId) {
+        const el = document.getElementById(inputId);
+        if (!el) return 0;
+        let v = parseInt(el.value, 10);
+        return isNaN(v) ? 1 : v;
+    }
+
+    function applyBet(inputId, val) {
+        const el = document.getElementById(inputId);
+        const disp = document.getElementById(inputId + '-display');
+        if (!el) return;
+
+        let limit = currentUser ? currentUser.points : 1;
+        if (LIMITED_BETS.includes(inputId)) limit = Math.min(limit, MAX_BET);
+        if (limit < 1) limit = 1;
+
+        val = Math.max(1, Math.min(limit, val));
+        el.value = val;
+        if (disp) disp.innerText = val;
+    }
+
+    function adjustBet(inputId, delta) {
+        applyBet(inputId, getBetValue(inputId) + delta);
+    }
+
+    function setBetMax(inputId) {
+        let limit = currentUser ? currentUser.points : 1;
+        if (LIMITED_BETS.includes(inputId)) limit = Math.min(limit, MAX_BET);
+        applyBet(inputId, limit);
+    }
+
+    function refreshAllBetDisplays() {
+        ['slot-bet', 'roulette-bet', 'seotda-bet'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) applyBet(id, getBetValue(id));
+        });
+    }
     // --- 슬롯 머신 ---
     const slotSymbols = [
         { char: '🫀', mult: 40, weight: 2 }, { char: '🫁', mult: 25, weight: 5 },
