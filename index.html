@@ -3672,6 +3672,22 @@ function getTodayStr() {
         return user.quarantineUntil && Date.now() < user.quarantineUntil;
     }
 
+        // 격리 상태 배지 정보 (없으면 null)
+    function getQuarantineBadge(user) {
+        if (!user.quarantineUntil || Date.now() >= user.quarantineUntil) return null;
+        const remainMs = user.quarantineUntil - Date.now();
+        const h = Math.floor(remainMs / (1000 * 60 * 60));
+        const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+        // 2시간 이하 이송이면 '입원중', 그 외 일반 상담은 '상담중'
+        const isHospital = (user.quarantineExitPollution || 0) >= 40;
+        return {
+            label: isHospital ? '입원중' : '상담중',
+            color: isHospital ? '#ff6b6b' : '#d4af37',
+            bg: isHospital ? 'rgba(255,107,107,0.15)' : 'rgba(212,175,55,0.15)',
+            remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`
+        };
+    }
+
     function checkMedRations(user) {
         if (!user.receivedRations) user.receivedRations = [];
         if (isQuarantined(user)) return;
@@ -4017,6 +4033,7 @@ function getTodayStr() {
         const container = document.getElementById('emp-detail-card-container');
         const photoSrc = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
         const statusInfo = getPollutionStatusInfo(u.pollution);
+        const qb2 = getQuarantineBadge(u);
         
         let lettersHtml = '';
         if (currentUser.code === 'kario0987' && u.letters && u.letters.length > 0) {
@@ -4041,7 +4058,8 @@ function getTodayStr() {
                     <div class="id-avatar-mini">${photoSrc}</div>
                     <div class="id-info-details">
                         <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
-                        <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
+                         <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
+                        ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">🦊 여우 상담실 ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
                         <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
                     </div>
                 </div>
@@ -4120,20 +4138,24 @@ function getTodayStr() {
             const statusInfo = getPollutionStatusInfo(u.pollution);
             const photoSrc = (u.badge && u.badge.photo) ? `<img src="${u.badge.photo}" alt="사진">` : `<span>PHOTO</span>`;
             const isMe = (currentUser && currentUser.code === u.code) ? `<span style="color:#4CAF50; font-size:10px; margin-left:6px; border: 1px solid #4CAF50; border-radius: 3px; padding: 2px 5px; font-weight:bold;">본인</span>` : '';
+            const qb = getQuarantineBadge(u);
+            const quarantineTag = qb
+                ? `<span style="font-size:10px; color:${qb.color}; background:${qb.bg}; border:1px solid ${qb.color}; border-radius:3px; padding:2px 6px; font-weight:bold; margin-left:4px;">🦊 ${qb.label}</span>`
+                : '';
             
             // ★ 실시간 온라인 감지 (초록색 불빛)
             const isOnline = onlineUsersMap[u.code] ? true : false;
             const onlineDot = isOnline ? `<div style="position:absolute; top:-4px; left:-4px; width:12px; height:12px; background-color:#4CAF50; border-radius:50%; box-shadow:0 0 8px #4CAF50; border:2px solid #242424; z-index:10;"></div>` : '';
 
             return `
-                <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')">
+                                <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')" ${qb ? 'style="opacity:0.7; border-color:' + qb.color + ';"' : ''}>
                     <div class="emp-list-avatar" style="position:relative;">
                         ${onlineDot}
                         ${photoSrc}
                     </div>
                     <div class="emp-list-details">
-                        <div class="emp-list-title">
-                            <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe}
+                                                <div class="emp-list-title" style="flex-wrap:wrap;">
+                            <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe} ${quarantineTag}
                         </div>
                         <div class="emp-list-sub">사번: <span style="font-family:monospace; color:#bbb;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}</div>
                         <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
@@ -4341,12 +4363,20 @@ function getTodayStr() {
             noteEl.className = noteGlowClass;
         }
 
-        const statusInfo = getPollutionStatusInfo(currentUser.pollution);
+                const statusInfo = getPollutionStatusInfo(currentUser.pollution);
         const statusEl = document.getElementById('badge-current-status');
-        statusEl.innerText = statusInfo.text;
-        statusEl.style.color = statusInfo.color;
-        statusEl.style.backgroundColor = statusInfo.bg;
-        statusEl.style.border = `1px solid ${statusInfo.color}`;
+        const myQb = getQuarantineBadge(currentUser);
+        if (myQb) {
+            statusEl.innerText = `🦊 ${myQb.label} (${myQb.remain})`;
+            statusEl.style.color = myQb.color;
+            statusEl.style.backgroundColor = myQb.bg;
+            statusEl.style.border = `1px solid ${myQb.color}`;
+        } else {
+            statusEl.innerText = statusInfo.text;
+            statusEl.style.color = statusInfo.color;
+            statusEl.style.backgroundColor = statusInfo.bg;
+            statusEl.style.border = `1px solid ${statusInfo.color}`;
+        }
         
         if (!currentUser.facilityMax) currentUser.facilityMax = 15;
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
