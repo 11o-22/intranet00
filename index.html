@@ -1226,6 +1226,14 @@
             </div>
         </div>
 
+                <div class="admin-panel-box" style="border-color: #7e57c2; background-color: #17111f;">
+            <h4 style="color: #b39ddb;">어둠 구역 개방 통제</h4>
+            <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
+                각 구역의 출입 가능 여부를 직접 제어합니다. 폐쇄로 설정하면 모든 사원의 목록에서 잠금 처리됩니다.
+            </div>
+            <div id="admin-dark-zone-list"></div>
+        </div>
+
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
             <h4 style="color: #ff8888;">사원 계정 말소 및 데이터 폐기</h4>
             <div style="font-size:12px; display:flex; gap:8px;">
@@ -1675,6 +1683,28 @@ function getTodayStr() {
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
 
+        // ★ 상담사가 제어하는 구역 개방 상태 (Firebase 동기화)
+    let darkZoneOverride = {};
+
+    if (database) {
+        database.ref('darkZoneOverride').on('value', (snap) => {
+            darkZoneOverride = snap.val() || {};
+            if (currentUser && !darkRun) {
+                const panel = document.getElementById('dark-main');
+                if (panel && panel.classList.contains('active')) renderDarkness();
+            }
+        });
+    }
+
+    // 최종 개방 여부 판정 (상담사 설정이 시나리오 기본값보다 우선)
+    function isZoneOpen(zoneCode) {
+        const z = DARK_ZONES[zoneCode];
+        if (!z) return false;
+        if (darkZoneOverride[zoneCode] === true) return true;   // 강제 개방
+        if (darkZoneOverride[zoneCode] === false) return false; // 강제 폐쇄
+        return !!z.ready;
+    }
+
         function getDarkTriesLeft() {
         if (!currentUser) return 0;
         if (currentUser.darkDate !== getTodayStr()) return 3;
@@ -1714,7 +1744,7 @@ function getTodayStr() {
         for (let key in DARK_ZONES) {
             const z = DARK_ZONES[key];
             const partySize = (z.min === z.max) ? `${z.min}인` : `${z.min}~${z.max}인`;
-            const locked = !z.ready;
+            const locked = !isZoneOpen(key);
             html += `
                 <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked ? 'opacity:0.45;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -1744,7 +1774,8 @@ function getTodayStr() {
 
     function openDarkBriefing(zoneCode) {
         const z = DARK_ZONES[zoneCode];
-        if (!z || !z.ready) return;
+        if (!z) return;
+        if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 통제본부에 의해 폐쇄되어 있습니다.'); return; }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 어둠 탐사 횟수를 모두 소진했습니다. 자정에 초기화됩니다.'); return; }
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치에 도달하여 탐사에 나설 수 없습니다.'); return; }
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 탐사에 나설 수 없습니다.'); return; }
@@ -1799,6 +1830,7 @@ function getTodayStr() {
     function startDarkRun(zoneCode) {
         const z = DARK_ZONES[zoneCode];
         if (!z) return;
+        if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 폐쇄 상태입니다.'); return; }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
 
         let eq = Array.from(document.querySelectorAll('.dark-eq:checked')).map(e => e.value);
@@ -4831,6 +4863,7 @@ function getTodayStr() {
         document.getElementById('admin-screen').style.display = 'block';
         renderAdminSuggestions();
         renderAdminItemSelect();
+        renderAdminDarkZones();
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';
@@ -5030,6 +5063,52 @@ function getTodayStr() {
             const allItems = Object.keys(ITEM_CATALOG);
             select.innerHTML = allItems.map(name => `<option value="${name}">${name}</option>`).join('');
         }
+
+        function renderAdminDarkZones() {
+        const box = document.getElementById('admin-dark-zone-list');
+        if (!box) return;
+        box.innerHTML = Object.keys(DARK_ZONES).map(key => {
+            const z = DARK_ZONES[key];
+            const open = isZoneOpen(key);
+            const forced = darkZoneOverride[key] !== undefined;
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); border:1px solid #4a3a6a; border-radius:5px; padding:9px 11px; margin-bottom:7px; gap:10px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-family:monospace; font-size:10px; color:#b39ddb; font-weight:bold;">${z.code}</div>
+                        <div style="font-size:11px; color:#ddd; font-weight:bold; margin-top:2px;">${z.name}</div>
+                        <div style="font-size:9px; color:#888; margin-top:3px;">
+                            ${open ? '<span style="color:#4CAF50;">● 개방 중</span>' : '<span style="color:#f44336;">● 폐쇄 중</span>'}
+                            ${forced ? ' <span style="color:#ff9800;">(수동 설정)</span>' : ' <span style="color:#666;">(기본값)</span>'}
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-shrink:0;">
+                        <button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminSetZoneOpen('${key}', true)">개방</button>
+                        <button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminSetZoneOpen('${key}', false)">폐쇄</button>
+                        <button class="game-btn" style="margin:0; padding:6px 8px; font-size:10px;" onclick="adminSetZoneOpen('${key}', null)" title="시나리오 기본값으로 되돌림">초기화</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    function adminSetZoneOpen(zoneCode, state) {
+        if (state === null) delete darkZoneOverride[zoneCode];
+        else darkZoneOverride[zoneCode] = state;
+
+        if (database) {
+            database.ref('darkZoneOverride').set(darkZoneOverride).then(() => {
+                renderAdminDarkZones();
+            }).catch(err => {
+                console.error("구역 상태 저장 실패:", err);
+                showCustomAlert("서버 저장 중 오류가 발생했습니다.");
+            });
+        } else {
+            renderAdminDarkZones();
+        }
+
+        const z = DARK_ZONES[zoneCode];
+        const msg = (state === null) ? '기본값으로 초기화' : (state ? '개방' : '폐쇄');
+        showCustomAlert(`${z.code} 구역이 [${msg}] 처리되었습니다.`);
+    }
 
        function adminResetLimits() {
         const targetNo = document.getElementById('adm-special-no').value.trim();
