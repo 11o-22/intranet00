@@ -9,7 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <style>
+      <style>
         * {
             -webkit-tap-highlight-color: transparent; /* 모바일에서 터치할 때 생기는 기본 음영 제거 */
         }
@@ -560,6 +560,26 @@
         transform: none !important;
         cursor: not-allowed;
     }
+
+                  /* 베팅 스테퍼 */
+        .bet-stepper { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; margin: 10px 0; }
+        .bet-stepper .step-btn {
+            min-width: 34px; padding: 7px 6px; font-size: 12px; font-weight: bold;
+            background: var(--theme-bg-grad, linear-gradient(145deg, #333, #222));
+            border: 1px solid var(--theme-border, #555); color: var(--theme-text, #fff);
+            border-radius: 4px; cursor: pointer; transition: all 0.12s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        }
+        .bet-stepper .step-btn:hover { border-color: var(--theme-focus, #ffd700); }
+        .bet-stepper .step-btn:active { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); }
+        .bet-stepper .step-btn.wide { min-width: 44px; font-size: 11px; }
+        .bet-stepper .bet-display {
+            min-width: 62px; padding: 7px 8px; text-align: center; font-size: 15px; font-weight: bold;
+            font-family: monospace; color: var(--theme-focus, #ffd700);
+            background: rgba(0,0,0,0.45); border: 1px solid var(--theme-border, #555); border-radius: 4px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .bet-stepper .bet-max { background: linear-gradient(145deg, #b8860b, #8b6508) !important; color: #fff !important; border-color: #daa520 !important; }
     </style>
 </head>
 <body ontouchstart="">
@@ -863,8 +883,17 @@
                         <div class="slot-box" id="slot-box-2">🫁</div>
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
-                    <div style="margin-top:15px;">
-                        베팅: <input type="number" id="slot-bet" class="bet-input" value="5" min="1">
+                                        <div style="margin-top:15px;">
+                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+                        <div class="bet-stepper">
+                            <button class="step-btn wide" onclick="adjustBet('slot-bet', -10)">-10</button>
+                            <button class="step-btn" onclick="adjustBet('slot-bet', -1)">&lt;</button>
+                            <div class="bet-display" id="slot-bet-display">5</div>
+                            <button class="step-btn" onclick="adjustBet('slot-bet', 1)">&gt;</button>
+                            <button class="step-btn wide" onclick="adjustBet('slot-bet', 10)">+10</button>
+                            <button class="step-btn bet-max" onclick="setBetMax('slot-bet')">최대</button>
+                        </div>
+                        <input type="hidden" id="slot-bet" value="5">
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
@@ -883,13 +912,21 @@
                             </div>
                         </div>
                     </div>
-                    <div style="margin-bottom:10px; margin-top:20px;">
+                                        <div style="margin-bottom:10px; margin-top:20px;">
                         베팅 번호(1~25): 
                         <input type="number" id="roulette-target" class="bet-input" value="25" min="1" max="25">
                     </div>
                     <div>
-                        베팅 포인트: 
-                        <input type="number" id="roulette-bet" class="bet-input" value="5" min="1">
+                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+                        <div class="bet-stepper">
+                            <button class="step-btn wide" onclick="adjustBet('roulette-bet', -10)">-10</button>
+                            <button class="step-btn" onclick="adjustBet('roulette-bet', -1)">&lt;</button>
+                            <div class="bet-display" id="roulette-bet-display">5</div>
+                            <button class="step-btn" onclick="adjustBet('roulette-bet', 1)">&gt;</button>
+                            <button class="step-btn wide" onclick="adjustBet('roulette-bet', 10)">+10</button>
+                            <button class="step-btn bet-max" onclick="setBetMax('roulette-bet')">최대</button>
+                        </div>
+                        <input type="hidden" id="roulette-bet" value="5">
                         <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
                     </div>
                     <div id="roulette-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">번호를 고르고 회전시키세요. (오염도 +2)</div>
@@ -915,8 +952,17 @@
                             </div>
                         </div>
                     </div>
-                    <div id="seotda-controls-start">
-                        베팅: <input type="number" id="seotda-bet" class="bet-input" value="5" min="1">
+                                       <div id="seotda-controls-start">
+                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+                        <div class="bet-stepper">
+                            <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
+                            <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
+                            <div class="bet-display" id="seotda-bet-display">5</div>
+                            <button class="step-btn" onclick="adjustBet('seotda-bet', 1)">&gt;</button>
+                            <button class="step-btn wide" onclick="adjustBet('seotda-bet', 10)">+10</button>
+                            <button class="step-btn bet-max" onclick="setBetMax('seotda-bet')">최대</button>
+                        </div>
+                        <input type="hidden" id="seotda-bet" value="5">
                         <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
                     </div>
                     <div id="seotda-controls-play" style="display:none; display:flex; justify-content:center; gap:10px;">
@@ -2860,6 +2906,7 @@ function getTodayStr() {
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop(); renderPointRanking(); renderVipOpponents();
         if (!darkRun && !darkBriefingOpen) renderDarkness();
+        if (!darkRun && !darkBriefingOpen) renderDarkness();
    }
     
     function switchTab(tabId, el) {
@@ -3804,9 +3851,11 @@ function getTodayStr() {
     }
     function startSeotda() {
         let bet = parseInt(document.getElementById('seotda-bet').value);
-        if (isNaN(bet) || bet <= 0) {
+                if (isNaN(bet) || bet <= 0) {
             showCustomAlert('올바른 베팅 금액을 입력해주세요.');
             return;
+        }
+        if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
         }
 
         // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
@@ -3899,27 +3948,6 @@ function getTodayStr() {
         // 2. 족보 계산
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
-
-        // ★ 높은 패(땡 이상)는 9% 확률로만 유지, 나머지는 실제 존재하는 낮은 패로 교체
-        if (pRes.score >= 700 && Math.random() * 100 >= 9) {
-            let picked = pickHandByCondition(r => r.score < 700);
-            if (picked) { playerHand = picked.hand; pRes = picked.res; }
-        }
-
-        // ★ 최종 승률 29% 내외로 고정 (점수만 조작하지 않고 패 자체를 갈아끼움)
-        let winRoll = Math.random() * 100;
-        if (winRoll < 29) {
-            if (pRes.score <= dRes.score) {
-                let picked = pickHandByCondition(r => r.score > dRes.score);
-                if (picked) { playerHand = picked.hand; pRes = picked.res; }
-            }
-        } else {
-            if (pRes.score > dRes.score) {
-                let picked = pickHandByCondition(r => r.score < dRes.score)
-                          || pickHandByCondition(r => r.score <= dRes.score);
-                if (picked) { playerHand = picked.hand; pRes = picked.res; }
-            }
-        }
 
         // 3. 패 오픈 및 결과 표시
         // ★ 조정된 플레이어 패를 다시 그려서 카드 그림·족보명·배율을 일치시킴
