@@ -580,6 +580,30 @@
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
         }
         .bet-stepper .bet-max { background: linear-gradient(145deg, #b8860b, #8b6508) !important; color: #fff !important; border-color: #daa520 !important; }
+            /* 파티 채팅 */
+        .pchat-wrap { border:1px solid var(--theme-border); border-radius:6px; background:rgba(0,0,0,0.35); margin-top:12px; overflow:hidden; }
+        .pchat-head { display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:rgba(0,0,0,0.3); cursor:pointer; font-size:11px; font-weight:bold; color:var(--theme-text); border-bottom:1px solid transparent; }
+        .pchat-head.open { border-bottom-color:var(--theme-border); }
+        .pchat-body { display:none; }
+        .pchat-body.open { display:block; }
+        .pchat-log { max-height:170px; overflow-y:auto; padding:10px 11px; font-size:11px; line-height:1.6; }
+        .pchat-msg { margin-bottom:6px; word-break:break-word; }
+        .pchat-name { font-weight:bold; color:var(--theme-focus); }
+        .pchat-me .pchat-name { color:#4CAF50; }
+        .pchat-sys { color:#888; font-style:italic; font-size:10px; }
+        .pchat-time { color:#666; font-size:9px; margin-left:4px; }
+        .pchat-input-row { display:flex; gap:6px; padding:9px 11px; border-top:1px solid var(--theme-border); }
+        .pchat-input-row input { flex:1; font-size:12px !important; padding:7px 9px !important; }
+        .pchat-send { flex-shrink:0; padding:7px 14px; font-size:11px; }
+        .pchat-locked { padding:12px 11px; text-align:center; font-size:11px; color:#ff9800; background:rgba(255,152,0,0.07); }
+        .pchat-dot { display:inline-block; width:7px; height:7px; background:#4CAF50; border-radius:50%; margin-left:6px; box-shadow:0 0 6px #4CAF50; }
+
+        /* 세 단어 버튼 (C-119) */
+        .word-btns { display:flex; gap:6px; padding:10px 11px; border-top:1px solid var(--theme-border); }
+        .word-btn { flex:1; padding:11px 4px; font-size:13px; font-weight:bold; background:var(--theme-bg-grad); border:1px solid var(--theme-border); color:var(--theme-text); border-radius:5px; cursor:pointer; transition:all 0.12s; }
+        .word-btn:hover:not(:disabled) { border-color:var(--theme-focus); }
+        .word-btn:active:not(:disabled) { transform:translateY(2px) scale(0.96); }
+        .word-btn:disabled { opacity:0.3; cursor:not-allowed; }      
     </style>
 </head>
 <body ontouchstart="">
@@ -650,6 +674,18 @@
         </div>
     </div>
 </div>
+
+<!-- 어둠 탐사 파티 초대 -->
+<div id="dark-invite-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); z-index:99999; justify-content:center; align-items:center; backdrop-filter:blur(8px);">
+    <div class="luxury-alert-box" style="border-color:#7f0000; box-shadow:0 15px 40px rgba(180,0,0,0.25), inset 0 0 20px rgba(0,0,0,0.8);">
+        <h3 style="color:#ff6b6b; margin-top:0; letter-spacing:1px; font-size:17px;">🕯 어둠 탐사 동행 요청</h3>
+        <div id="dark-invite-text" style="color:#eee; margin-bottom:22px; font-size:13px; line-height:1.7;"></div>
+        <div style="display:flex; gap:10px;">
+            <button class="luxury-alert-btn" onclick="acceptDarkInvite()" style="flex:1; background:#7f0000; color:#fff; border-color:#b71c1c;">동행</button>
+            <button class="luxury-alert-btn" onclick="rejectDarkInvite()" style="flex:1; background:transparent; border-color:#888; color:#aaa;">거절</button>
+        </div>
+    </div>
+</div>    
 
 <!-- VIP 초대 수신 모달 (디자인 수정) -->
 <div id="vip-invite-overlay" style="display:none;">
@@ -1932,6 +1968,7 @@ function getTodayStr() {
         };
         if (database) database.ref(`darkParties/${pid}/members/${currentUser.code}`).set(m);
         myPartyId = pid;
+       setTimeout(() => sendPartyChat(`${currentUser.name} 사원이 합류했습니다.`, true), 400);
         switchToPartyTab();
     }
 
@@ -1939,6 +1976,7 @@ function getTodayStr() {
         const p = getMyParty();
         if (!p) return;
         const pid = p.id;
+        if (Object.keys(p.members).length > 1) sendPartyChat(`${currentUser.name} 사원이 파티를 떠났습니다.`, true);
         const others = Object.keys(p.members).filter(c => c !== currentUser.code);
 
         if (others.length === 0) {
@@ -1955,6 +1993,8 @@ function getTodayStr() {
             }
         }
         myPartyId = null;
+        detachChatListener();
+        partyChatOpen = false;
         renderPartyPanel();
     }
 
@@ -1962,6 +2002,8 @@ function getTodayStr() {
         const p = getMyParty();
         if (!p || p.leader !== currentUser.code) return;
         if (code === currentUser.code) return;
+        const kicked = p.members[code];
+        if (kicked) sendPartyChat(`${kicked.name} 사원이 파티에서 제외되었습니다.`, true);
         if (database) database.ref(`darkParties/${p.id}/members/${code}`).remove();
     }
 
@@ -2054,6 +2096,286 @@ function getTodayStr() {
             }
         }
     }, 60000);
+
+        // ==========================================
+    // ★ 파티 채팅
+    // ==========================================
+    let partyChatLog = [];
+    let partyChatOpen = false;
+    let partyChatUnread = 0;
+    let chatListenerRef = null;
+    let chatListenerId = null;
+
+    function attachChatListener(partyId) {
+        if (!database || !partyId) return;
+        if (chatListenerId === partyId) return;
+        detachChatListener();
+        chatListenerId = partyId;
+        chatListenerRef = database.ref('darkChats/' + partyId);
+        chatListenerRef.on('value', (snap) => {
+            const val = snap.val();
+            const arr = val ? Object.values(val).sort((a, b) => a.at - b.at) : [];
+            const grew = arr.length > partyChatLog.length;
+            partyChatLog = arr;
+            if (grew && !partyChatOpen) {
+                const last = arr[arr.length - 1];
+                if (last && last.code !== currentUser.code) partyChatUnread++;
+            }
+            renderChatLog();
+        });
+    }
+
+    function detachChatListener() {
+        if (chatListenerRef) { try { chatListenerRef.off(); } catch(e) {} }
+        chatListenerRef = null;
+        chatListenerId = null;
+        partyChatLog = [];
+        partyChatUnread = 0;
+    }
+
+    function sendPartyChat(text, isSystem) {
+        const pid = (darkRun && darkRun.partyId) || myPartyId;
+        if (!pid || !database) return;
+        const msg = String(text || '').trim();
+        if (!msg) return;
+        if (msg.length > 200) return;
+
+        database.ref('darkChats/' + pid).push({
+            code: isSystem ? 'SYSTEM' : currentUser.code,
+            name: isSystem ? '' : currentUser.name,
+            text: msg,
+            at: Date.now()
+        });
+    }
+
+    function submitPartyChat() {
+        const input = document.getElementById('pchat-input');
+        if (!input) return;
+        const v = input.value.trim();
+        if (!v) return;
+        sendPartyChat(v, false);
+        input.value = '';
+    }
+
+    function togglePartyChat() {
+        partyChatOpen = !partyChatOpen;
+        if (partyChatOpen) partyChatUnread = 0;
+        const head = document.getElementById('pchat-head');
+        const body = document.getElementById('pchat-body');
+        if (head) head.classList.toggle('open', partyChatOpen);
+        if (body) body.classList.toggle('open', partyChatOpen);
+        renderChatHead();
+        if (partyChatOpen) scrollChatBottom();
+    }
+
+    function renderChatHead() {
+        const el = document.getElementById('pchat-head-label');
+        if (!el) return;
+        el.innerHTML = `💬 파티 채팅${partyChatUnread > 0 && !partyChatOpen ? `<span class="pchat-dot"></span><span style="color:#4CAF50; font-size:10px; margin-left:4px;">${partyChatUnread}</span>` : ''}`;
+        const arrow = document.getElementById('pchat-arrow');
+        if (arrow) arrow.innerText = partyChatOpen ? '▼' : '▲';
+    }
+
+    function scrollChatBottom() {
+        const log = document.getElementById('pchat-log');
+        if (log) log.scrollTop = log.scrollHeight;
+    }
+
+    function renderChatLog() {
+        renderChatHead();
+        const log = document.getElementById('pchat-log');
+        if (!log) return;
+        if (partyChatLog.length === 0) {
+            log.innerHTML = `<div class="pchat-sys">아직 대화가 없습니다.</div>`;
+            return;
+        }
+        const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+        log.innerHTML = partyChatLog.map(m => {
+            const t = new Date(m.at);
+            const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+            if (m.code === 'SYSTEM') {
+                return `<div class="pchat-msg pchat-sys">— ${m.text}<span class="pchat-time">${ts}</span></div>`;
+            }
+            const mine = m.code === currentUser.code;
+            return `<div class="pchat-msg ${mine ? 'pchat-me' : ''}"><span class="pchat-name">${m.name}</span> ${m.text}<span class="pchat-time">${ts}</span></div>`;
+        }).join('');
+        if (atBottom || partyChatOpen) scrollChatBottom();
+    }
+
+    // 채팅 UI HTML 생성 (mode: 'normal' | 'words' | 'muted')
+    function buildChatHtml(mode, words, wordsLeft, muted) {
+        let inputArea = '';
+        if (mode === 'words') {
+            inputArea = `
+                <div style="font-size:10px; color:#888; text-align:center; padding:7px 11px 0 11px;">
+                    ${muted ? '<span style="color:#ff6b6b; font-weight:bold;">상대가 입력 중입니다. 지금은 말할 수 없습니다.</span>' : `전달 가능 횟수 <b style="color:var(--theme-focus);">${wordsLeft}</b>회`}
+                </div>
+                <div class="word-btns">
+                    ${(words || []).map(w => `<button class="word-btn" onclick="sendWordSignal('${w}')" ${muted || wordsLeft <= 0 ? 'disabled' : ''}>${w}</button>`).join('')}
+                </div>`;
+        } else if (mode === 'muted') {
+            inputArea = `<div class="pchat-locked">지금은 발언할 수 없습니다.</div>`;
+        } else {
+            inputArea = `
+                <div class="pchat-input-row">
+                    <input type="text" id="pchat-input" maxlength="200" placeholder="메시지 입력..." onkeypress="if(event.key==='Enter') submitPartyChat()">
+                    <button class="game-btn pchat-send" style="margin:0;" onclick="submitPartyChat()">전송</button>
+                </div>`;
+        }
+
+        return `
+            <div class="pchat-wrap">
+                <div class="pchat-head ${partyChatOpen ? 'open' : ''}" id="pchat-head" onclick="togglePartyChat()">
+                    <span id="pchat-head-label">💬 파티 채팅</span>
+                    <span id="pchat-arrow" style="font-size:10px; color:#888;">${partyChatOpen ? '▼' : '▲'}</span>
+                </div>
+                <div class="pchat-body ${partyChatOpen ? 'open' : ''}" id="pchat-body">
+                    <div class="pchat-log" id="pchat-log"></div>
+                    ${inputArea}
+                </div>
+            </div>`;
+    }
+
+        // ==========================================
+    // ★ 파티 초대
+    // ==========================================
+    let darkInvites = {};
+    let currentDarkInviteId = null;
+
+    if (database) {
+        database.ref('darkInvites').on('value', (snap) => {
+            darkInvites = snap.val() || {};
+            if (!currentUser) return;
+            checkDarkInvite();
+        });
+    }
+
+    function checkDarkInvite() {
+        const mine = Object.values(darkInvites).find(i =>
+            i.to === currentUser.code && Date.now() - i.at < 120000
+        );
+        if (mine && currentDarkInviteId !== mine.id) {
+            currentDarkInviteId = mine.id;
+            showDarkInviteModal(mine);
+        } else if (!mine && currentDarkInviteId) {
+            currentDarkInviteId = null;
+            closeDarkInviteModal();
+        }
+    }
+
+    function openInviteSelect() {
+        const p = getMyParty();
+        if (!p) return;
+        const z = DARK_ZONES[p.zone];
+        const cnt = Object.keys(p.members || {}).length;
+        if (cnt >= z.max) { showCustomAlert('이미 정원이 가득 찼습니다.'); return; }
+
+        let opts = '';
+        for (let code in onlineUsersMap) {
+            const u = db.users[code];
+            if (!u) continue;
+            if (code === currentUser.code) continue;
+            if (p.members[code]) continue;
+            let inOther = false;
+            for (let pid in darkParties) {
+                if (darkParties[pid].members && darkParties[pid].members[code]) { inOther = true; break; }
+            }
+            if (inOther) continue;
+            opts += `<option value="${code}">${u.name} (${u.position || '사원'} · 사번 ${u.no})</option>`;
+        }
+
+        const body = document.getElementById('dark-party-body');
+        body.innerHTML = `
+            <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--theme-text);">[사원 초대]</div>
+            <div style="font-size:10px; color:#888; margin-bottom:12px; line-height:1.6;">
+                현재 접속 중이며 다른 파티에 속하지 않은 사원만 표시됩니다.<br>
+                초대장은 2분간 유효합니다.
+            </div>
+            ${opts
+                ? `<select id="dark-invite-target" style="width:100%; margin-bottom:14px;">${opts}</select>`
+                : `<div style="font-size:11px; color:#666; text-align:center; padding:20px 0;">초대 가능한 사원이 없습니다.</div>`}
+            <div style="display:flex; gap:8px;">
+                <button class="game-btn" style="flex:1; margin:0; padding:12px;" onclick="renderPartyPanel()">돌아가기</button>
+                ${opts ? `<button class="game-btn" style="flex:2; margin:0; padding:12px;" onclick="sendDarkInvite()">초대장 발송</button>` : ''}
+            </div>`;
+    }
+
+    function sendDarkInvite() {
+        const p = getMyParty();
+        if (!p) return;
+        const target = document.getElementById('dark-invite-target').value;
+        if (!target) return;
+        const u = db.users[target];
+        if (!u) return;
+
+        const iid = 'di_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+        if (database) {
+            database.ref('darkInvites/' + iid).set({
+                id: iid, partyId: p.id, zone: p.zone,
+                from: currentUser.code, fromName: currentUser.name,
+                to: target, at: Date.now()
+            });
+        }
+        showCustomAlert(`${u.name} 사원에게 초대장을 보냈습니다.`);
+        renderPartyPanel();
+    }
+
+    function showDarkInviteModal(inv) {
+        const z = DARK_ZONES[inv.zone];
+        if (!z) return;
+        const p = darkParties[inv.partyId];
+        const cnt = p ? Object.keys(p.members || {}).length : 0;
+        document.getElementById('dark-invite-text').innerHTML = `
+            <span style="color:#ff6b6b; font-size:16px; font-weight:bold;">${inv.fromName}</span> 사원이<br>
+            어둠 탐사에 동행을 요청했습니다.<br><br>
+            <span style="font-family:monospace; font-size:11px; color:#ff6b6b;">${z.code}</span><br>
+            <b style="color:#fff; font-size:14px;">${z.name}</b><br><br>
+            <span style="font-size:12px; color:#aaa;">난이도 ${z.danger} · 생존율 ${z.survival}<br>현재 인원 ${cnt} / ${z.max}명</span>`;
+        document.getElementById('dark-invite-overlay').style.display = 'flex';
+    }
+
+    function closeDarkInviteModal() {
+        const el = document.getElementById('dark-invite-overlay');
+        if (el) el.style.display = 'none';
+    }
+
+    function acceptDarkInvite() {
+        const inv = Object.values(darkInvites).find(i => i.to === currentUser.code);
+        if (!inv) { closeDarkInviteModal(); return; }
+        if (database) database.ref('darkInvites/' + inv.id).remove();
+        currentDarkInviteId = null;
+        closeDarkInviteModal();
+        joinParty(inv.partyId);
+        switchTabById('tab-darkness');
+    }
+
+    function rejectDarkInvite() {
+        const inv = Object.values(darkInvites).find(i => i.to === currentUser.code);
+        if (inv && database) database.ref('darkInvites/' + inv.id).remove();
+        currentDarkInviteId = null;
+        closeDarkInviteModal();
+    }
+
+    // 탭 강제 전환 헬퍼
+    function switchTabById(tabId) {
+        document.querySelectorAll('.tabs-grid .tab').forEach(t => {
+            t.classList.remove('active');
+            if ((t.getAttribute('onclick') || '').includes(tabId)) t.classList.add('active');
+        });
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const el = document.getElementById(tabId);
+        if (el) el.classList.add('active');
+    }
+
+    // 만료된 초대장 청소
+    setInterval(() => {
+        if (!database || !currentUser) return;
+        for (let iid in darkInvites) {
+            if (Date.now() - (darkInvites[iid].at || 0) > 120000) {
+                database.ref('darkInvites/' + iid).remove();
+            }
+        }
+    }, 30000);
 
         function renderPartyPanel() {
         const body = document.getElementById('dark-party-body');
@@ -2156,13 +2478,21 @@ function getTodayStr() {
                     방장 <b style="color:var(--theme-text);">${p.leaderName}</b>의 출발 신호를 기다리는 중입니다.
                 </div>`}
 
-            <button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:10px; font-size:11px;" onclick="leaveParty()">파티 나가기</button>
+                        <div style="display:flex; gap:6px; margin-top:8px;">
+                ${members.length < z.max ? `<button class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;" onclick="openInviteSelect()">사원 초대</button>` : ''}
+                <button class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;" onclick="leaveParty()">파티 나가기</button>
+            </div>
+
+            ${buildChatHtml('normal')}
 
             <div style="font-size:10px; color:#666; margin-top:12px; line-height:1.6; border-top:1px dashed #333; padding-top:10px;">
                 ※ 반입품은 각자 따로 선택합니다. (장비 2 / 소모품 3)<br>
                 ※ 30분 동안 출발하지 않으면 파티가 자동 해산됩니다.
             </div>
         `;
+
+        attachChatListener(p.id);
+        renderChatLog();
     }
 
     // --- 반입품 선택 모달 ---
@@ -2828,10 +3158,14 @@ function getTodayStr() {
         addHistoryLog(currentUser, `[어둠 귀환] ${z.code} 탐사 완료 (+${total} P)`);
 
         if (!currentUser.darkLogs) currentUser.darkLogs = [];
-        currentUser.darkLogs.unshift({
+                currentUser.darkLogs.unshift({
             date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
             reward: total, success: darkRun.success, fail: darkRun.fail,
-            loot: gained, lost: darkRun.lostItems, detail: darkRun.log
+            loot: gained, lost: darkRun.lostItems, detail: darkRun.log,
+            chat: (darkRun.isParty && partyChatLog.length) ? partyChatLog.slice(-80).map(m => ({
+                n: m.code === 'SYSTEM' ? '' : m.name, t: m.text, s: m.code === 'SYSTEM'
+            })) : null,
+            party: darkRun.isParty ? true : false
         });
         if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
 
@@ -2854,14 +3188,19 @@ function getTodayStr() {
         saveDB();
     }
 
-             function finishDarkRun() {
+                 function finishDarkRun() {
         darkAmbienceStop();
         if (darkRun) {
             releaseZone(darkRun.zone);
-            if (darkRun.partyId && database) database.ref('darkParties/' + darkRun.partyId).remove();
+            if (darkRun.partyId && database) {
+                database.ref('darkParties/' + darkRun.partyId).remove();
+                database.ref('darkChats/' + darkRun.partyId).remove();
+            }
         }
+        detachChatListener();
         darkRun = null;
         myPartyId = null;
+        partyChatOpen = false;
         updateUI();
         renderDarkness();
     }
@@ -2873,15 +3212,30 @@ function getTodayStr() {
             c.innerHTML = '<div style="color:#666; font-size:11px; text-align:center; padding:20px 0;">기록된 탐사 이력이 없습니다.</div>';
             return;
         }
-        c.innerHTML = currentUser.darkLogs.map(l => `
+        c.innerHTML = currentUser.darkLogs.map((l, i) => `
             <div style="background:rgba(0,0,0,0.3); border-left:3px solid #7f0000; padding:10px 12px; margin-bottom:8px; border-radius:4px; font-size:11px;">
                 <div style="font-size:9px; color:#888; margin-bottom:4px;">${l.date}</div>
-                <div style="font-family:monospace; color:#ff6b6b; font-weight:bold;">${l.zone}</div>
+                <div style="font-family:monospace; color:#ff6b6b; font-weight:bold;">${l.zone}${l.party ? ' <span style="color:#38bdf8;">[파티]</span>' : ''}</div>
                 <div style="color:var(--theme-text); font-weight:bold; margin:3px 0;">${l.zoneName}</div>
                 <div style="color:#999;">성공 ${l.success} / 실패 ${l.fail} · 보상 <b style="color:#ffd700;">+${l.reward} P</b></div>
                 ${l.loot && l.loot.length ? `<div style="color:#4CAF50; margin-top:3px;">회수품: ${l.loot.join(', ')}</div>` : ''}
                 ${l.lost && l.lost.length ? `<div style="color:#f44336; margin-top:3px;">소실: ${l.lost.join(', ')}</div>` : ''}
+                ${l.chat && l.chat.length ? `
+                    <div style="margin-top:7px; padding-top:7px; border-top:1px dashed #333;">
+                        <button class="game-btn" style="margin:0; padding:5px 10px; font-size:10px;" onclick="toggleLogChat(${i})">💬 대화 기록 보기 (${l.chat.length})</button>
+                        <div id="logchat-${i}" style="display:none; margin-top:7px; background:rgba(0,0,0,0.35); border-radius:4px; padding:9px 10px; max-height:180px; overflow-y:auto; line-height:1.65;">
+                            ${l.chat.map(m => m.s
+                                ? `<div style="color:#888; font-style:italic; font-size:10px; margin-bottom:4px;">— ${m.t}</div>`
+                                : `<div style="margin-bottom:4px;"><span style="color:var(--theme-focus); font-weight:bold;">${m.n}</span> <span style="color:#ddd;">${m.t}</span></div>`
+                            ).join('')}
+                        </div>
+                    </div>` : ''}
             </div>`).join('');
+    }
+
+    function toggleLogChat(idx) {
+        const el = document.getElementById('logchat-' + idx);
+        if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
     }
 
     const ALIEN_RANDOM_QUOTES = [
