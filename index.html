@@ -1343,16 +1343,6 @@ function getTodayStr() {
     database.ref('/').on('value', (snapshot) => {
         let data = snapshot.val();
         if (data) {
-            if (!currentUser) {
-                const savedCode = localStorage.getItem('corp_logged_code');
-                if (savedCode && data.users && data.users[savedCode]) {
-                    const u = data.users[savedCode];
-                    document.getElementById('nickname-input').value = u.name;
-                    document.getElementById('code-input').value = u.code;
-                    setTimeout(() => { attemptLogin(); }, 500); 
-                }
-            }
-            
             if (data.users) {
                 for(let key in data.users) {
                     if(!data.users[key].inventory) data.users[key].inventory = [];
@@ -1372,6 +1362,32 @@ function getTodayStr() {
         }
     });
 }
+        // ★ 빠른 자동 로그인: 전체 DB를 기다리지 않고 내 계정 노드만 즉시 조회
+    let autoLoginTried = false;
+    function tryAutoLogin() {
+        if (autoLoginTried || currentUser || !database) return;
+        const savedCode = localStorage.getItem('corp_logged_code');
+        if (!savedCode) return;
+        autoLoginTried = true;
+
+        database.ref('users/' + savedCode).once('value').then(snap => {
+            const u = snap.val();
+            if (!u || currentUser) { autoLoginTried = false; return; }
+
+            if (!u.inventory) u.inventory = [];
+            if (!u.history) u.history = [];
+            if (!u.letters) u.letters = [];
+            db.users[savedCode] = u;
+
+            document.getElementById('nickname-input').value = u.name;
+            document.getElementById('code-input').value = u.code;
+            attemptLogin();
+        }).catch(err => {
+            autoLoginTried = false;
+            console.error("자동 로그인 실패:", err);
+        });
+    }
+    tryAutoLogin();
 
         database.ref('online').on('value', (snap) => {
             onlineUsersMap = snap.val() || {};
