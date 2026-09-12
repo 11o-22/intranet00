@@ -1225,7 +1225,7 @@
             </div>
             <div style="font-size:12px; margin-bottom:12px; display:flex; gap:6px;">
                 <input type="text" id="adm-set-position" class="bet-input" style="flex:1;" placeholder="직급(과장)">
-                <input type="number" id="adm-target-points" class="bet-input" style="flex:1;" placeholder="포인트(30)">
+                <input type="number" id="adm-target-points" class="bet-input" style="flex:1;" placeholder="포인트 증감(+30/-50)">
             </div>
             <div style="display:flex; gap:8px;">
                 <button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
@@ -1602,6 +1602,7 @@ function getTodayStr() {
     }
 
     function generateSerialNo(affiliation, position, team) {
+         if (targetCode === 'kario0987') return "0000";
         const aff = (affiliation || "").trim();
         const pos = (position || "").trim();
         const t = (team || "").trim();
@@ -5009,15 +5010,17 @@ function getTodayStr() {
         if (team) targetUser.team = team; 
         if (pos) targetUser.position = pos;
         
+               let pointDelta = 0;
         if (pointsInput !== "") {
             const parsedPoints = parseInt(pointsInput, 10);
             if (!isNaN(parsedPoints)) {
-                targetUser.points = parsedPoints;
+                pointDelta = parsedPoints;
+                targetUser.points = Math.max(0, (targetUser.points || 0) + parsedPoints);
+                addHistoryLog(targetUser, `[당국 지급] 포인트 ${parsedPoints >= 0 ? '+' : ''}${parsedPoints} P 조정 (현재 ${targetUser.points} P)`);
             }
         }
-
         // 사번 재부팅 (소속/직급/팀이 바뀔 수 있으므로)
-        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team);
+        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team, targetCode);
 
         // 3. 로컬 DB 갱신
         db.users[targetCode] = targetUser;
@@ -5025,7 +5028,7 @@ function getTodayStr() {
         // 4. ★ Firebase 서버에 해당 유저 경로를 직접 타겟팅하여 즉시 영구 저장
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
-                showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트: ${targetUser.points}P)`);
+              showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트 ${pointDelta >= 0 ? '+' : ''}${pointDelta} → 현재 ${targetUser.points}P)`);
                 updateUI();
             }).catch((err) => {
                 console.error("Firebase 관리자 발령 실패:", err);
