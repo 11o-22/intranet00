@@ -3856,7 +3856,7 @@ function getTodayStr() {
             return;
         }
         if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
-        }
+        
 
         // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return; }
