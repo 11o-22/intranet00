@@ -1674,7 +1674,11 @@ function getTodayStr() {
 
          "꺼진 가로등 전구": { price: 40, usable: true, targetable: false, effect: "equip_dead_bulb", darkOnly: true, desc: "[어둠 회수품] 심야 골목에서 떼어 온 전구. 장착 시 오염도 증가가 아주 미미하게 늦춰진다." },
         "1시 17분 버스표": { price: 90, usable: true, targetable: false, effect: "bus_ticket", darkOnly: true, desc: "[어둠 회수품] 목적지가 인쇄되지 않은 승차권. 사용 시 다음 어둠 탐사 1회의 오염도 상승이 면제된다." },
-        "반 박자 늦은 그림자": { price: 250, usable: false, darkOnly: true, desc: "[어둠 회수품] 당신의 움직임을 아주 조금 늦게 따라한다. 아직 쓰임새가 밝혀지지 않았다." }
+        "반 박자 늦은 그림자": { price: 250, usable: false, darkOnly: true, desc: "[어둠 회수품] 당신의 움직임을 아주 조금 늦게 따라한다. 아직 쓰임새가 밝혀지지 않았다." },
+         "서명 없는 캔버스 조각": { price: 45, usable: false, darkOnly: true, desc: "[어둠 회수품] 손톱만 한 캔버스 조각. 아직 미지근하다." },
+        "전시 안내 도록": { price: 110, usable: true, targetable: false, effect: "dark_catalog", darkOnly: true, desc: "[어둠 회수품] 어느 미술관의 도록. 사용 시 다음 어둠 탐사의 첫 판정에 +2 보정이 붙는다." },
+        "액자 뒤에 있던 것": { price: 300, usable: false, darkOnly: true, desc: "[어둠 회수품] 벽과 액자 사이에 끼어 있었다. 무엇인지는 아직 알 수 없다." }
+3. 구역별 전리품 분리
     };
 
      const NO_SELL_ITEMS = ["여우구슬"];
@@ -1718,14 +1722,34 @@ function getTodayStr() {
                 step3: "dark_alley_4.jpg"
             }
         },
-        "Qtrew-D-087": { code:"Qtrew-D-087", grade:"D", name:"■■■■", brief:"(개방 준비 중)", danger:"하", survival:"91%", min:1, max:1, reward:[30,60], ready:false }
+                "Qtrew-D-087": {
+            code:"Qtrew-D-087", grade:"D", name:"관람객은 손대지 마시오",
+            brief:"(눈을 뜨니 폐관한 미술관 안이었다.)",
+            danger:"하", survival:"91%", min:1, max:1, reward:[30,60], ready:true,
+            intro:"눈을 뜬다.<br><br>등이 배긴다. 벤치다. 전시실 한가운데 놓인, 관람객이 앉아 그림을 올려다보라고 만들어진 나무 벤치.<br>언제 잠들었는지 기억나지 않는다. 미술관에 온 기억도 없다.<br><br>천장 조명은 반쯤 꺼져 있고, 남은 불빛이 벽면의 액자들을 아래에서 위로 훑는다.<br>셔터는 내려와 있다. 안내 방송은 나오지 않는다.<br><br>그림들은 아주 얌전히, 제자리에 걸려 있다.",
+            outro:"발밑이 사라진다.<br><br>떨어지는 동안 위를 본다. 네모난 빛이 빠르게 멀어지고,<br>그 가장자리로 액자들이 줄지어 내려다보고 있다.<br>전부 제자리다. 하나도 움직이지 않았다.<br><br>눈을 뜨니 현관 앞이다. 손바닥에 캔버스 결이 남아 있다.",
+                    images: {
+                intro: "museum_1.jpg",
+                step1: "museum_2.jpg",
+                step2: "museum_3.jpg",
+                step3: "museum_4.jpg"
+            }
+        }
     };
 
-    const DARK_LOOT = [
-        { name:"꺼진 가로등 전구", chance:0.030 },
-        { name:"1시 17분 버스표", chance:0.020 },
-        { name:"반 박자 늦은 그림자", chance:0.010 }
-    ];
+       // 구역별 전용 회수품 테이블
+    const DARK_LOOT_BY_ZONE = {
+        "Qtrew-D-042": [
+            { name:"꺼진 가로등 전구", chance:0.030 },
+            { name:"1시 17분 버스표", chance:0.020 },
+            { name:"반 박자 늦은 그림자", chance:0.010 }
+        ],
+        "Qtrew-D-087": [
+            { name:"서명 없는 캔버스 조각", chance:0.030 },
+            { name:"전시 안내 도록", chance:0.020 },
+            { name:"액자 뒤에 있던 것", chance:0.010 }
+        ]
+    };
 
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
@@ -1924,9 +1948,11 @@ function getTodayStr() {
         return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${fn}">${label}</button>`;
     }
 
-    function renderDarkStep() {
+        function renderDarkStep() {
         const body = document.getElementById('darkness-body');
         if (!body || !darkRun) return;
+        if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
+
         const s = darkRun.step;
 
         if (s === 0) {
@@ -1956,6 +1982,229 @@ function getTodayStr() {
         } else if (s === 99) {
             renderDarkResult();
         }
+    }
+
+        // ==========================================
+    // ★ Qtrew-D-087 「관람객은 손대지 마시오」
+    // ==========================================
+    const ART_PIECES = [
+        { t:"《해질녘의 방파제》",   a:"작자 미상",       real:`손끝에 거친 캔버스 결이 걸린다. 물감이 두껍게 뭉친 자리가 딱딱하다.` },
+        { t:"《누워 있는 여자》",     a:"J. 뫼르",         real:`서늘하다. 오래 걸려 있던 천 특유의 먼지 냄새가 손에 묻는다.` },
+        { t:"《식탁 위의 사과 일곱》", a:"작자 미상",      real:`유화 표면이 매끄럽다. 손톱으로 긁으면 아주 얕게 소리가 난다.` },
+        { t:"《겨울 사냥》",         a:"P. 랑",           real:`캔버스가 팽팽하다. 누르면 북처럼 가볍게 울린다.` },
+        { t:"《무제 (붉은 계단)》",   a:"작자 미상",       real:`아크릴이다. 매끈하고 차갑다. 아무 일도 일어나지 않는다.` },
+        { t:"《어머니의 초상》",      a:"H. 베인",         real:`액자 모서리에 먼지가 두껍다. 몇 년은 손대지 않은 자리다.` },
+        { t:"《폐관 직전의 전시실》", a:"작자 미상",       real:`그림 속에도 벤치가 하나 있다. 만져보면 그냥 물감이다.` },
+        { t:"《창문 없는 방》",      a:"작자 미상",       real:`덧칠이 많다. 울퉁불퉁한 것이 손바닥에 그대로 읽힌다.` }
+    ];
+
+    const FAKE_CLUES = [
+        `손을 대는 순간 미지근하다.<br>겨울 실내에 걸린 캔버스가 사람 체온일 리 없다.`,
+        `표면 아래에서 무언가 한 번, 아주 느리게 뛴다.<br>맥이다. 손을 떼도 감각이 남는다.`,
+        `눌린 자리가 천천히 원래대로 돌아온다.<br>캔버스는 이러지 않는다.`,
+        `축축하다. 물감이 아니라, 안쪽에서 배어 나온 것이다.`
+    ];
+
+    function shuffled087(n) {
+        let idx = [...Array(ART_PIECES.length).keys()];
+        for (let i = idx.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [idx[i], idx[j]] = [idx[j], idx[i]];
+        }
+        return idx.slice(0, n);
+    }
+
+    function renderStep087() {
+        const body = document.getElementById('darkness-body');
+        const s = darkRun.step;
+
+        if (s === 0) {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("몸을 일으킨다.", "dark087Step1()"), "intro");
+
+        } else if (s === 1) {
+            body.innerHTML = darkBox("기믹 1 — 폐관 후",
+                `벤치에서 일어선다. 다리가 저리다.<br>전시실은 넓고, 발소리가 대리석 바닥을 타고 한참을 간다.<br><br>입구 쪽 셔터는 바닥까지 내려와 잠겨 있다.<br>비상구 표시등만 초록색으로 남아, 아무도 없는 복도를 비춘다.<br><br>어디서부터 볼까.`,
+                darkChoiceBtn("① 비상구 문을 확인해 본다.", "dark087Pick('exit')") +
+                darkChoiceBtn("② 안내 데스크를 뒤진다.", "dark087Pick('desk')") +
+                darkChoiceBtn("③ 조명 스위치를 찾아 전부 켠다.", "dark087Pick('light')") +
+                darkChoiceBtn("④ 곧장 1전시실로 들어간다.", "dark087Pick('hall')"), "step1");
+
+        } else if (s === 2) {
+            if (!darkRun.art) {
+                const picked = shuffled087(7);
+                darkRun.art = picked.map(i => ({ ...ART_PIECES[i], touched:false, clue:"" }));
+                darkRun.fakeIdx = Math.floor(Math.random() * darkRun.art.length);
+                darkRun.touchLeft = darkRun.hasCatalog ? 4 : 3;
+                darkRun.guessLeft = 2;
+            }
+            renderGallery087();
+
+        } else if (s === 3) {
+            const ok = darkRun.correct;
+            body.innerHTML = darkBox("기믹 3 — 떼어내기",
+                ok ? `찾았다.<br><br>액자에 손을 걸고 벽에서 떼어낸다. 생각보다 무겁다.<br>뒤편은 벽이 아니다. 벽이었던 적이 없는 것 같다.`
+                   : `아닌 것 같다. 하지만 더 만질 수는 없다.<br><br>남은 손의 감각을 믿고, 액자 하나에 손을 건다.<br>떼어낸다.`,
+                darkChoiceBtn("① 한 번에 힘껏 당긴다.", "dark087Roll('pull')") +
+                darkChoiceBtn("② 모서리부터 천천히 들어낸다.", "dark087Roll('slow')") +
+                darkChoiceBtn("③ 액자 뒤로 손을 먼저 넣어 본다.", "dark087Roll('reach')"), "step3");
+
+        } else if (s === 99) {
+            renderDarkResult();
+        }
+    }
+
+    function dark087Step1() { darkRun.step = 1; renderDarkStep(); }
+
+    function dark087Pick(pick) {
+        let txt = "", mod = 0;
+        if (pick === 'exit') {
+            txt = `비상구 문을 민다. 밀리지 않는다.<br>당겨도 같다. 경첩도, 손잡이도 멀쩡한데 문만 열리지 않는다.<br><br>표시등의 초록빛이 손등 위에서 미세하게 떨린다.<br>돌아서는데, 등 뒤에서 문이 한 번 덜컹였다.`;
+            mod = -1; applyPollutionToUser(currentUser, 2);
+        } else if (pick === 'desk') {
+            txt = `안내 데스크 서랍을 연다.<br>볼펜, 마른 물티슈, 그리고 얇은 도록 한 부.<br><br>펼쳐 본다. 이번 전시 출품작은 일곱 점.<br>일곱 점의 제목이 차례로 적혀 있고, 그 아래에 손글씨로 한 줄이 덧붙어 있다.<br><br><span style="color:#d4af37;">"여덟 번째는 대장되지 않았음."</span>`;
+            mod = 1; darkRun.hasCatalog = true;
+        } else if (pick === 'light') {
+            txt = `배전반을 찾아 스위치를 전부 올린다.<br>전시실이 한꺼번에 밝아진다. 눈이 아프도록 환하다.<br><br>그림들이 아주 선명하게 보인다.<br>선명해진 김에, 그림들도 이쪽을 아주 선명하게 보고 있는 것 같다.<br><br>밝긴 하다. 밝기만 하다.`;
+            mod = 0; applyPollutionToUser(currentUser, 3);
+        } else {
+            txt = `아무것도 하지 않고 1전시실로 걸어 들어간다.<br>벽을 따라 액자가 일곱, 균등한 간격으로 걸려 있다.<br><br>그림들은 움직이지 않는다.<br>처음부터 지금까지, 단 한 번도.`;
+            mod = 0;
+        }
+        darkRun.modifier += mod;
+        darkRun.log.push(`[기믹 1] ${pick === 'exit' ? '비상구' : pick === 'desk' ? '안내 데스크' : pick === 'light' ? '조명 점등' : '즉시 입장'} 선택`);
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 1 — 결과", txt,
+            darkChoiceBtn("전시실로 들어선다.", "darkRun.step=2; renderDarkStep();"));
+    }
+
+    function renderGallery087(msg) {
+        const body = document.getElementById('darkness-body');
+        let grid = darkRun.art.map((p, i) => {
+            const done = p.touched;
+            return `
+                <div style="border:1px solid ${done ? '#5a4a2a' : '#2a2a2a'}; background:${done ? 'rgba(90,74,42,0.12)' : 'rgba(0,0,0,0.35)'}; border-radius:5px; padding:9px 10px; margin-bottom:7px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:12px; color:#ddd; font-weight:bold;">${p.t}</div>
+                            <div style="font-size:10px; color:#777; margin-top:2px;">${p.a}</div>
+                            ${done ? `<div style="font-size:11px; color:#c9a86a; margin-top:7px; line-height:1.7;">${p.clue}</div>` : ''}
+                        </div>
+                        <div style="flex-shrink:0; display:flex; flex-direction:column; gap:4px;">
+                            ${done
+                                ? `<div style="font-size:10px; color:#666; text-align:center; padding-top:4px;">확인함</div>`
+                                : `<button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px;" onclick="dark087Touch(${i})">만진다</button>`}
+                            <button class="game-btn" style="margin:0; padding:6px 10px; font-size:10px; background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="dark087Guess(${i})">지목</button>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        body.innerHTML = darkBox("기믹 2 — 감식",
+            `일곱 점이 벽을 따라 걸려 있다. 전부 얌전하다.<br>이 중 하나는 그림이 아니다.<br><br>만져 보면 알 수 있다. 다만 손을 댈 때마다 무언가가 조금씩 옮겨 붙는다.<br><span style="color:#888; font-size:11px;">[남은 접촉 ${darkRun.touchLeft}회 · 지목 기회 ${darkRun.guessLeft}회 · 접촉 1회당 오염도 +2]</span>
+             ${msg ? `<div style="margin-top:12px; padding-top:10px; border-top:1px dashed #333; color:#ff9800;">${msg}</div>` : ''}`,
+            grid, "step2");
+    }
+
+    function dark087Touch(i) {
+        if (darkRun.touchLeft <= 0) { renderGallery087(`더는 손을 댈 수 없다. 손끝 감각이 남아 있지 않다.`); return; }
+        const p = darkRun.art[i];
+        if (p.touched) return;
+
+        p.touched = true;
+        darkRun.touchLeft--;
+        applyPollutionToUser(currentUser, 2);
+
+        if (i === darkRun.fakeIdx) {
+            p.clue = FAKE_CLUES[Math.floor(Math.random() * FAKE_CLUES.length)];
+            darkRun.foundHint = true;
+        } else {
+            p.clue = p.real;
+        }
+        darkRun.log.push(`[기믹 2] ${p.t} 접촉`);
+        renderGallery087();
+    }
+
+    function dark087Guess(i) {
+        const p = darkRun.art[i];
+        const isRight = (i === darkRun.fakeIdx);
+
+        if (isRight) {
+            darkRun.correct = true;
+            darkRun.success++;
+            darkRun.log.push(`[기믹 2] ${p.t} 지목 — 적중`);
+            document.getElementById('darkness-body').innerHTML = darkBox("기믹 2 — 결과",
+                `${p.t} 앞에 선다.<br><br>액자에 두 손을 얹는 순간, 그림이 아주 조금 이쪽으로 기운다.<br>밀린 것이 아니다. 기댄 것이다.<br><br>이거다.`,
+                darkChoiceBtn("액자를 떼어낸다.", "darkRun.step=3; renderDarkStep();"));
+            return;
+        }
+
+        darkRun.guessLeft--;
+        applyPollutionToUser(currentUser, 3);
+        darkRun.log.push(`[기믹 2] ${p.t} 지목 — 빗나감`);
+
+        if (darkRun.guessLeft > 0) {
+            renderGallery087(`${p.t} 앞에 선다. 아무 일도 일어나지 않는다.<br>그냥 그림이다. 뒤에서 누가 웃은 것 같지만, 돌아보지 않는다. <b>(지목 ${darkRun.guessLeft}회 남음)</b>`);
+        } else {
+            darkRun.correct = false;
+            darkRun.fail++;
+            document.getElementById('darkness-body').innerHTML = darkBox("기믹 2 — 결과",
+                `두 번 다 틀렸다.<br><br>손끝이 얼얼하다. 어느 것이 무엇이었는지 이제 구분이 가지 않는다.<br>남은 건 감뿐이다.`,
+                darkChoiceBtn("아무 액자에나 손을 건다.", "darkRun.step=3; renderDarkStep();"));
+        }
+    }
+
+    function dark087Roll(pick) {
+        const roll = Math.floor(Math.random()*20) + 1;
+        let bonus = rollDarkBonus();
+        if (currentUser.darkCatalogBonus) { bonus += 2; currentUser.darkCatalogBonus = false; }
+        const total = roll + bonus;
+
+        let DC = (pick === 'pull') ? 9 : (pick === 'slow') ? 11 : 13;
+        if (!darkRun.correct) DC += 4;
+
+        let outcome, txt;
+        if (roll === 20) outcome = 'crit';
+        else if (roll === 1) outcome = 'fumble';
+        else outcome = (total >= DC) ? 'pass' : 'fail';
+
+        if (outcome === 'crit') {
+            darkRun.success += 2; darkRun.critical = true;
+            txt = `액자가 벽에서 떨어져 나온다.<br>그 뒤에 있던 것은 벽이 아니라 깊이였다.<br><br>안쪽에서 아주 얕은 숨소리가 한 번 나고, 그걸로 끝이었다.<br>바닥에 뭔가가 떨어져 구른다. 주워 든다.`;
+        } else if (outcome === 'pass') {
+            darkRun.success++;
+            txt = pick === 'pull'
+                ? `한 번에 당긴다. 뭔가가 짧게 찢어지는 소리가 나고 액자가 손에 딸려 온다.<br>벽에는 아무 자국도 남지 않았다.<br><br>깔끔하게 끝났다.`
+                : pick === 'slow'
+                ? `모서리부터 조금씩 들어낸다.<br>벽과 액자 사이에서 미지근한 공기가 새어 나온다.<br><br>서두르지 않은 것이 다행이었다.`
+                : `액자 뒤로 손을 넣는다. 손등에 뭔가가 스친다.<br>잡지 않고, 그냥 밀어낸다.<br><br>액자가 벽에서 떨어진다. 손은 무사하다.`;
+        } else if (outcome === 'fail') {
+            darkRun.fail++; applyPollutionToUser(currentUser, 4);
+            txt = `떼어내기는 했다.<br>다만 손바닥에 캔버스 결이 그대로 찍혀 남았다.<br><br>문질러도 지워지지 않는다.`;
+        } else {
+            darkRun.fail += 2; applyPollutionToUser(currentUser, 8);
+            appendBadgeNoteToUser(currentUser, `[Qtrew-D-087] 손바닥에 캔버스 결이 남음`);
+            txt = `액자를 잡은 손이 안쪽으로 끌려 들어간다.<br>팔꿈치까지 들어갔다가, 무언가 흥미를 잃은 것처럼 놓아준다.<br><br>빠져나온 손은 분명 내 손인데, 결이 있다.`;
+        }
+
+        darkRun.log.push(`[기믹 3] d20 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+
+        let rerollBtn = '';
+        if ((outcome === 'fail' || outcome === 'fumble') && !darkRun.rerollUsed && darkRun.carryItems.length > 0) {
+            rerollBtn = darkChoiceBtn(`🔁 소모품 '${darkRun.carryItems[0]}'을(를) 써서 다시 굴린다. (1회)`, `dark087Reroll('${pick}')`);
+        }
+
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 3 — 판정",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${outcome==='crit'?'#4CAF50':outcome==='fumble'?'#f44336':'#ffd700'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            rerollBtn + darkChoiceBtn("발밑이 기울기 시작한다.", "darkRun.step=99; renderDarkStep();"));
+    }
+
+    function dark087Reroll(pick) {
+        const used = darkRun.carryItems.shift();
+        darkRun.rerollUsed = true;
+        darkRun.lostItems.push(used);
+        removeItemFromInventory(currentUser, used, 1);
+        darkRun.fail = Math.max(0, darkRun.fail - 1);
+        dark087Roll(pick);
     }
 
     function darkStep1() { darkRun.step = 1; renderDarkStep(); }
@@ -2090,8 +2339,9 @@ function getTodayStr() {
         if (currentUser.darkTicketFree) { pollInc = 0; currentUser.darkTicketFree = false; }
         if (pollInc > 0) applyPollutionToUser(currentUser, pollInc);
 
-        let gained = [];
-        DARK_LOOT.forEach(l => {
+               let gained = [];
+        const zoneLoot = DARK_LOOT_BY_ZONE[darkRun.zone] || [];
+        zoneLoot.forEach(l => {
             let c = l.chance * (darkRun.critical ? 3 : 1);
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
@@ -3325,6 +3575,16 @@ function getTodayStr() {
             saveDB(); updateUI();
             showCustomAlert('승차권을 개찰했습니다. 다음 탐사에서는 오염도가 오르지 않습니다.');
             return;
+                                 if (cat.effect === 'dark_catalog') {
+            if (currentUser.darkCatalogBonus) { showCustomAlert('이미 도록의 효과가 적용 중입니다.'); return; }
+            currentUser.darkCatalogBonus = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            appendSystemBadgeNote(`[전시 안내 도록] 다음 어둠 탐사의 첫 판정에 +2 보정이 적용됩니다.`);
+            addHistoryLog(currentUser, `[아이템 사용] 전시 안내 도록 숙독`);
+            saveDB(); updateUI();
+            showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
+            return;
+        }
         }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
