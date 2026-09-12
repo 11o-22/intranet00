@@ -1284,66 +1284,54 @@ function getTodayStr() {
     };
 
    if (database) {
-        database.ref('/').on('value', (snapshot) => {
-            let data = snapshot.val();
-            if (data) {
-                // 아직 로그인 전이라면 자동 로그인 처리
-                if (!currentUser) {
-                    const savedCode = localStorage.getItem('corp_logged_code');
-                    if (savedCode && data.users && data.users[savedCode]) {
-                        const u = data.users[savedCode];
-                        document.getElementById('nickname-input').value = u.name;
-                        document.getElementById('code-input').value = u.code;
-                        setTimeout(() => { attemptLogin(); }, 500); 
-                    }
-                }
-                
-                if (!data.suggestions) data.suggestions = [];
-                else if (!Array.isArray(data.suggestions)) data.suggestions = Object.values(data.suggestions);
-                
-                if (!data.p2pDeals) data.p2pDeals = [];
-                else if (!Array.isArray(data.p2pDeals)) data.p2pDeals = Object.values(data.p2pDeals);
-                
-                if (!data.vipInvites) data.vipInvites = {};
-                if (!data.vipSessions) data.vipSessions = {};
+    database.ref('p2pDeals').on('value', (snapshot) => {
+        let val = snapshot.val();
+        db.p2pDeals = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+        if (currentUser) {
+            renderP2PLists();
+        }
+    });
 
-                if (data.users) {
-                    for(let key in data.users) {
-                        if(!data.users[key].inventory) data.users[key].inventory = [];
-                        if(!data.users[key].history) data.users[key].history = [];
-                        if(!data.users[key].letters) data.users[key].letters = [];
-                        if(!data.users[key].alienUnlockedItems) data.users[key].alienUnlockedItems = [];
-                        if(!data.users[key].alienBoughtItems) data.users[key].alienBoughtItems = [];
-                        if(!data.users[key].receivedRations) data.users[key].receivedRations = [];
-                        if(!data.users[key].equippedWeapons) data.users[key].equippedWeapons = [];
-                    }
-                } else {
-                    data.users = db.users; 
-                }
+    database.ref('suggestions').on('value', (snapshot) => {
+        let val = snapshot.val();
+        db.suggestions = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+        if (currentUser && document.getElementById('suggestion-modal').style.display === 'flex') {
+            renderMySuggestions();
+        }
+    });
 
-                // ★ [핵심] 내가 로그인된 상태라면, 서버에서 가져온 전체 데이터 중 '내 계정' 정보보다 
-                // 내 로컬의 포인트나 인벤토리가 더 최신(변동 직후)일 수 있으므로 충돌을 방지합니다.
+    database.ref('/').on('value', (snapshot) => {
+        let data = snapshot.val();
+        if (data) {
+            if (!currentUser) {
+                const savedCode = localStorage.getItem('corp_logged_code');
+                if (savedCode && data.users && data.users[savedCode]) {
+                    const u = data.users[savedCode];
+                    document.getElementById('nickname-input').value = u.name;
+                    document.getElementById('code-input').value = u.code;
+                    setTimeout(() => { attemptLogin(); }, 500); 
+                }
+            }
+            
+            if (data.users) {
+                for(let key in data.users) {
+                    if(!data.users[key].inventory) data.users[key].inventory = [];
+                    if(!data.users[key].history) data.users[key].history = [];
+                    if(!data.users[key].letters) data.users[key].letters = [];
+                }
                 if (currentUser && data.users[currentUser.code]) {
-                    let serverMe = data.users[currentUser.code];
-                    // 만약 서버의 포인트/오염도가 내 로컬과 다르다면 최신 상태 유지 혹은 병합
-                    // 여기서는 공용 데이터와 타인 정보만 갱신하고 내 정보는 내가 바꾼 액션을 우선시합니다.
                     data.users[currentUser.code] = currentUser; 
                 }
-
-                db = data;
-                
-                if (currentUser) {
-                    updateUI();
-                    if (document.getElementById('suggestion-modal').style.display === 'flex') {
-                        renderMySuggestions();
-                    }
-                    checkVipMultiplayerState();
-                }
-            } else {
-                saveDB();
+                db.users = data.users;
             }
-        });
-    }
+            
+            if (currentUser) {
+                updateUI();
+                checkVipMultiplayerState();
+            }
+        }
+    });
+}
 
         database.ref('online').on('value', (snap) => {
             onlineUsersMap = snap.val() || {};
@@ -3852,15 +3840,21 @@ function getTodayStr() {
     checkP2PExpiration();
     if (!db.p2pDeals) return;
     
-    // 1. 해당 거래 탐색
     let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) return;
     let deal = db.p2pDeals[dealIndex];
     if (deal.status !== 'PENDING') return;
 
-    const sender = db.users[deal.fromCode];
+    const senderCode = deal.fromCode;
+    
+    // 서버에서 상대방 최신 데이터를 가져오거나 로컬에서 탐색
+    let sender = db.users[senderCode];
+    if (!sender) {
+        showCustomAlert("제안을 보낸 사원 정보를 찾을 수 없습니다.");
+        return;
+    }
 
-    // 2. 조건부 교환(trade)인 경우 내가 대가를 지불
+    // 조건부 교환(trade)인 경우 내가 요구받은 대가를 지불할 수 있는지 검사
     if (deal.mode === 'trade') {
         if (deal.demandType === 'point') {
             let p = parseInt(deal.demandValue, 10);
@@ -3870,9 +3864,7 @@ function getTodayStr() {
                 return; 
             }
             currentUser.points -= p; 
-            if (sender) {
-                sender.points = (sender.points || 0) + p;
-            }
+            sender.points = (sender.points || 0) + p;
         } else {
             let reqQty = deal.demandQty || 1;
             let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
@@ -3881,15 +3873,13 @@ function getTodayStr() {
                 return; 
             }
             removeItemFromInventory(currentUser, deal.demandValue, reqQty);
-            if (sender) {
-                for (let i = 0; i < reqQty; i++) {
-                    sender.inventory.push(deal.demandValue);
-                }
+            for (let i = 0; i < reqQty; i++) {
+                sender.inventory.push(deal.demandValue);
             }
         }
     }
     
-    // 3. 상대가 제공한 제물(포인트 또는 아이템) 수령
+    // 상대가 보낸 제물 수령
     if (deal.offerType === 'point') {
         let offerPt = parseInt(deal.offerValue, 10) || 0;
         currentUser.points = (currentUser.points || 0) + offerPt;
@@ -3901,28 +3891,34 @@ function getTodayStr() {
         }
     }
 
-    // 4. 거래 상태 종결 처리
     deal.status = 'COMPLETED';
     db.p2pDeals[dealIndex] = deal;
 
-    // 5. 로컬 유저 데이터 정합성 보장
-    db.users[currentUser.code] = currentUser;
-    if (sender) {
-        db.users[deal.fromCode] = sender;
-    }
-
-    // 6. 기록 추가
     addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
-    if (sender) {
-        addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
+    addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
+
+    // ★ Firebase에 나와 상대방(`sender`), 그리고 공용 `p2pDeals`를 동시에 안전하게 업데이트
+    if (database) {
+        let updates = {};
+        updates[`users/${currentUser.code}`] = currentUser;
+        updates[`users/${senderCode}`] = sender;
+        updates['p2pDeals'] = db.p2pDeals;
+
+        database.ref('/').update(updates).then(() => {
+            showCustomAlert("거래가 성공적으로 체결되었습니다.");
+            updateUI();
+            renderP2PLists();
+        }).catch((err) => {
+            console.error("밀실 거래 수락 실패:", err);
+            showCustomAlert("서버 통신 중 오류가 발생했습니다.");
+        });
+    } else {
+        saveDB(); 
+        updateUI(); 
+        renderP2PLists();
+        showCustomAlert("거래가 성공적으로 체결되었습니다.");
     }
-
-    // 7. Firebase 단일 루트 동기화 및 즉각 UI 갱신
-    saveDB();
-    updateUI();
-    renderP2PLists();
 }
-
 
     function rejectP2PDeal(dealId) {
         if (!db.p2pDeals) return;
