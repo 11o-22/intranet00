@@ -376,10 +376,14 @@
         
         .status-tag { font-weight: bold; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
-        .inv-card { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: var(--theme-text);}
+        .inv-card { display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: var(--theme-text); gap: 10px;}
+        .inv-card-info { flex: 1; min-width: 0; }
         .inv-card-name { font-weight: bold; color: inherit; }
+        .inv-card-desc { font-size: 10px; color: #999; margin-top: 5px; line-height: 1.45; word-break: keep-all; }
+        body.theme-white .inv-card-desc, body.theme-hanbok .inv-card-desc { color: #475569 !important; }
+        .inv-btn-group { flex-shrink: 0; }
         .inv-card-qty { font-size: 11px; color: #ff9800; font-weight: bold; margin-left: 6px; background: rgba(255,152,0,0.1); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(255,152,0,0.3); }
-        .inv-btn-group { display: flex; gap: 6px; }
+        .inv-btn-group { flex-shrink: 0; display: flex; gap: 6px; }
         .inv-btn { padding: 5px 10px; font-size: 11px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         .inv-btn:active { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
         .inv-btn-use { background: linear-gradient(145deg, #388e3c, #2e7d32); color: white; border-color: #1b5e20; }
@@ -1209,12 +1213,19 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5d4037, #3e2723); border-color:#4e342e; margin:0;" onclick="adminClearNotes()">특이사항 초기화</button>
             </div>
             <!-- --------------------------------------- -->
-            <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
+                        <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
                 <select id="adm-special-item" style="flex:2;"></select>
                 <input type="number" id="adm-special-qty" class="bet-input" style="width:50px;" value="1" min="1" placeholder="수량">
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20; margin:0;" onclick="adminGiveItem()">물품 강제 꽂기</button>
             </div>
+            <div style="font-size:12px; display:flex; gap:6px; align-items:center; margin-top:10px; border-top:1px dashed #2e7d32; padding-top:10px;">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #455a64, #37474f); border-color:#263238; margin:0;" onclick="adminLoadInventory()">소지품 조회</button>
+                <select id="adm-remove-item" style="flex:2;"><option value="">-- 사번 조회 필요 --</option></select>
+                <input type="number" id="adm-remove-qty" class="bet-input" style="width:50px;" value="1" min="1" placeholder="수량">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #c62828, #8e0000); border-color:#7f0000; margin:0;" onclick="adminRemoveItem()">물품 제거</button>
+            </div>
         </div>
+
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
             <h4 style="color: #ff8888;">사원 계정 말소 및 데이터 폐기</h4>
             <div style="font-size:12px; display:flex; gap:8px;">
@@ -1453,6 +1464,31 @@ function getTodayStr() {
                 removedCount++;
                 if (removedCount >= qty) break;
             }
+        }
+    }
+
+        // ===== 장착 소유권(장착시킨 사람) 관리 =====
+    function getEquipBaseName(fullName) {
+        let base = String(fullName || "");
+        if (base.startsWith("🔮 ")) base = base.replace("🔮 ", "");
+        if (base.includes(" (")) base = base.split(" (")[0];
+        return base.trim();
+    }
+    function setEquipOwner(user, fullName, ownerCode) {
+        if (!user.equipOwner) user.equipOwner = {};
+        user.equipOwner[fullName] = ownerCode;
+    }
+    function getEquipOwner(user, fullName) {
+        if (!user || !user.equipOwner) return null;
+        return user.equipOwner[fullName] || null;
+    }
+    function clearEquipOwner(user, fullName) {
+        if (user && user.equipOwner && user.equipOwner[fullName]) delete user.equipOwner[fullName];
+    }
+    function stripNoteByItem(user, baseName) {
+        if (user.badge && user.badge.notes) {
+            let arr = user.badge.notes.split(' | ').filter(n => n.trim() !== '' && !n.includes(baseName));
+            user.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
         }
     }
 
@@ -2503,9 +2539,12 @@ function getTodayStr() {
             return;
         }
 
-        currentUser.equippedWeapons.push(`빨간 리본 (연결: ${targetUser.name} ${tPos})`);
-        targetUser.equippedWeapons.push(`빨간 리본 (연결: ${currentUser.name} ${cPos})`);
-
+               let myRibbon = `빨간 리본 (연결: ${targetUser.name} ${tPos})`;
+        let targetRibbon = `빨간 리본 (연결: ${currentUser.name} ${cPos})`;
+        currentUser.equippedWeapons.push(myRibbon);
+        targetUser.equippedWeapons.push(targetRibbon);
+        setEquipOwner(currentUser, myRibbon, currentUser.code);
+        setEquipOwner(targetUser, targetRibbon, currentUser.code); // ★ 해제 권한은 장착 시행자에게
         appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} ${tPos}님과 연결됨`);
         appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} ${cPos}님과 연결됨`);
 
@@ -2543,23 +2582,64 @@ function getTodayStr() {
     closeItemTargetModal();
 }
 
-    function renderInventory() {
+       function renderInventory() {
         const container = document.getElementById('inventory-list-container');
         let html = '';
+
         if (currentUser.equippedWeapons && currentUser.equippedWeapons.length > 0) {
             currentUser.equippedWeapons.forEach((weapon, idx) => {
+                const base = getEquipBaseName(weapon);
+                const cat = ITEM_CATALOG[base];
+                const ownerCode = getEquipOwner(currentUser, weapon);
+                const isMine = !ownerCode || ownerCode === currentUser.code;
+                const ownerName = (ownerCode && db.users[ownerCode]) ? db.users[ownerCode].name : '';
                 html += `
-                    <div style="background:#2b2b2b; border:1px solid #d4af37; padding:10px; margin-bottom:12px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
-                        <div>
-                            <span style="font-size:10px; color:#d4af37; font-weight:bold;">[장착 중 슬롯 ${idx + 1}]</span>
-                            <span style="font-weight:bold; color:#fff; font-size:13px; margin-left:6px;">${weapon}</span>
+                    <div style="background:#2b2b2b; border:1px solid #d4af37; padding:10px; margin-bottom:12px; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                            <div style="flex:1; min-width:0;">
+                                <span style="font-size:10px; color:#d4af37; font-weight:bold;">[장착 중 슬롯 ${idx + 1}]</span>
+                                <span style="font-weight:bold; color:#fff; font-size:13px; margin-left:6px;">${weapon}</span>
+                                <div style="font-size:10px; color:#aaa; margin-top:5px; line-height:1.45;">${cat ? cat.desc : '정보 없음'}</div>
+                            </div>
+                            ${isMine
+                                ? `<button onclick="unequipWeapon(${idx})" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333); flex-shrink:0;">장착 해제</button>`
+                                : `<div style="font-size:10px; color:#ff8888; font-weight:bold; text-align:right; flex-shrink:0; line-height:1.6;">🔒 해제 불가<br><span style="color:#aaa; font-weight:normal;">${ownerName} 장착</span></div>`}
                         </div>
-                        <button onclick="unequipWeapon(${idx})" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333);">장착 해제</button>
                     </div>
                 `;
             });
         }
-        
+
+        // ★ 내가 타인에게 장착시킨 장비 (회수 가능)
+        let remoteHtml = '';
+        for (let code in db.users) {
+            if (code === currentUser.code) continue;
+            let u = db.users[code];
+            if (!u.equippedWeapons) continue;
+            u.equippedWeapons.forEach((w, i) => {
+                if (getEquipOwner(u, w) === currentUser.code) {
+                    const base = getEquipBaseName(w);
+                    const cat = ITEM_CATALOG[base];
+                    remoteHtml += `
+                        <div class="inv-card" style="border-color:#0284c7;">
+                            <div class="inv-card-info">
+                                <span class="inv-card-name">${w}</span>
+                                <span class="inv-card-qty" style="color:#38bdf8; background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.3);">${u.name}</span>
+                                <div class="inv-card-desc">${cat ? cat.desc : '정보 없음'}</div>
+                            </div>
+                            <div class="inv-btn-group">
+                                <button class="inv-btn inv-btn-target" onclick="retrieveEquipFromUser('${code}', ${i})">회수</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+        if (remoteHtml) {
+            html += `<div style="font-size:11px; color:#38bdf8; font-weight:bold; margin:14px 0 8px 0; border-bottom:1px solid #333; padding-bottom:5px;">[내가 타인에게 장착시킨 장비]</div>` + remoteHtml;
+            html += `<div style="font-size:11px; color:var(--theme-text); font-weight:bold; margin:14px 0 8px 0; border-bottom:1px solid #333; padding-bottom:5px;">[보관 중인 소지품]</div>`;
+        }
+
         let counts = {};
         if (currentUser.inventory) {
             currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
@@ -2574,9 +2654,11 @@ function getTodayStr() {
                 const cat = ITEM_CATALOG[item];
                 const isUsable = cat ? cat.usable : false;
                 const isTargetable = cat ? cat.targetable : false;
+                const desc = cat ? cat.desc : '알 수 없는 물품입니다.';
+                const priceText = cat ? (isNaN(parseInt(cat.price)) ? '???' : cat.price + ' P') : '-';
                 const sellPrice = getSellPrice(item);
-                
-               let useBtnHtml = '';
+
+                let useBtnHtml = '';
                 if (isUsable) {
                     if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
@@ -2594,14 +2676,16 @@ function getTodayStr() {
                     }
                 }
 
-                 const sellBtnHtml = NO_SELL_ITEMS.includes(item)
+                const sellBtnHtml = NO_SELL_ITEMS.includes(item)
                     ? ''
                     : `<button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>`;
 
-
-               return `
+                return `
                     <div class="inv-card">
-                        <div><span class="inv-card-name">${item}</span><span class="inv-card-qty">x${qty}</span></div>
+                        <div class="inv-card-info">
+                            <span class="inv-card-name">${item}</span><span class="inv-card-qty">x${qty}</span>
+                            <div class="inv-card-desc">${desc}<br><span style="color:#777;">정가 ${priceText} / 매각가 ${sellPrice} P</span></div>
+                        </div>
                         <div class="inv-btn-group">
                             ${useBtnHtml}
                             ${sellBtnHtml}
@@ -2612,78 +2696,92 @@ function getTodayStr() {
         }
         container.innerHTML = html;
     }
-            function unequipWeapon(index) {
+               function unequipWeapon(index) {
         if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
         let itemNameFull = currentUser.equippedWeapons[index];
-        
-        let isDualItem = itemNameFull.includes("(연결:") || itemNameFull.includes("(연동:");
-        let baseItemName = itemNameFull;
-        
-        // 괄호를 떼고 원본 아이템 이름만 추출
-        if (isDualItem) {
-            baseItemName = itemNameFull.split(" (")[0]; 
-        } else if (itemNameFull === "🔮 여우구슬") {
-            baseItemName = "여우구슬";
+        let baseItemName = getEquipBaseName(itemNameFull);
+
+        // ★ 장착시킨 사람만 해제 가능
+        const ownerCode = getEquipOwner(currentUser, itemNameFull);
+        if (ownerCode && ownerCode !== currentUser.code) {
+            const ownerName = db.users[ownerCode] ? db.users[ownerCode].name : "장착자";
+            showCustomAlert(`이 장비는 장착시킨 사원(${ownerName})만 해제할 수 있습니다.`);
+            return;
         }
 
-        // 혈욕조 장착 시간 계산
+        let isDualItem = itemNameFull.includes("(연결:") || itemNameFull.includes("(연동:");
+
         if (baseItemName === "혈욕조") {
             let equippedDuration = Date.now() - (currentUser.bloodBathEquippedAt || Date.now());
-            if(!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
+            if (!currentUser.bloodBathDailyUsedMs) currentUser.bloodBathDailyUsedMs = 0;
             currentUser.bloodBathDailyUsedMs += equippedDuration;
         }
-        
-        // 1. 내 장착칸에서 제거
+
         currentUser.equippedWeapons.splice(index, 1);
-        
-        // 2. ★ 오직 해제를 누른 '당신'의 인벤토리에만 아이템이 환수됩니다.
-        currentUser.inventory.push(baseItemName);
+        clearEquipOwner(currentUser, itemNameFull);
+        currentUser.inventory.push(baseItemName); // ★ 오직 장착자 인벤토리로만 환수
+        stripNoteByItem(currentUser, baseItemName);
         addHistoryLog(currentUser, `[장착 해제] ${baseItemName} 해제 완료`);
 
-        // 3. 내 특이사항 메모에서 해당 장비 관련 텍스트 지우기
-        if (currentUser.badge && currentUser.badge.notes) {
-            let notesArr = currentUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
-            notesArr = notesArr.filter(n => !n.includes(baseItemName)); // 장비 이름이 포함된 메모 삭제
-            currentUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
-        }
-        
-        // 4. 상대방(파트너)의 장착칸 및 특이사항에서 강제로 제거 (인벤토리에는 주지 않음)
-        if (isDualItem && database) {
-            let expected1 = `연결: ${currentUser.name}`;
-            let expected2 = `연동: ${currentUser.name}`;
-            
+        // 연동/연결 장비는 상대방 슬롯에서도 제거 (상대 인벤토리에는 지급하지 않음)
+        if (isDualItem) {
             for (let code in db.users) {
-                if (code === currentUser.code) continue; 
+                if (code === currentUser.code) continue;
                 let u = db.users[code];
-                
-                if (u.equippedWeapons) {
-                    let pIdx = u.equippedWeapons.findIndex(w => 
-                        w.startsWith(baseItemName) && (w.includes(expected1) || w.includes(expected2))
-                    );
-                    
-                    if (pIdx !== -1) {
-                        // 파트너의 장착 슬롯에서 '삭제'만 진행
-                        u.equippedWeapons.splice(pIdx, 1);
-                        addHistoryLog(u, `[장착 해제] 연결된 파트너(${currentUser.name})에 의해 ${baseItemName} 장착이 해제되었습니다.`);
-                        
-                        // 파트너의 특이사항 메모에서도 관련 텍스트 삭제
-                        if (u.badge && u.badge.notes) {
-                            let pNotesArr = u.badge.notes.split(' | ').filter(n => n.trim() !== '');
-                            pNotesArr = pNotesArr.filter(n => !n.includes(baseItemName));
-                            u.badge.notes = (pNotesArr.length === 0) ? "특이사항 없음" : pNotesArr.join(' | ');
-                        }
-
-                        database.ref(`users/${code}`).set(u);
-                        break; 
-                    }
+                if (!u.equippedWeapons) continue;
+                let pIdx = u.equippedWeapons.findIndex(w =>
+                    getEquipBaseName(w) === baseItemName &&
+                    (w.includes(`연결: ${currentUser.name}`) || w.includes(`연동: ${currentUser.name}`) || getEquipOwner(u, w) === currentUser.code)
+                );
+                if (pIdx !== -1) {
+                    let pFull = u.equippedWeapons[pIdx];
+                    u.equippedWeapons.splice(pIdx, 1);
+                    clearEquipOwner(u, pFull);
+                    stripNoteByItem(u, baseItemName);
+                    addHistoryLog(u, `[장착 해제] 장착자(${currentUser.name})에 의해 ${baseItemName} 연결이 해제되었습니다.`);
+                    if (database) database.ref(`users/${code}`).set(u);
+                    break;
                 }
             }
         }
-        
+
         saveDB(); updateUI();
     }
 
+    // ★ 내가 타인에게 장착시킨 장비 원격 회수
+    function retrieveEquipFromUser(targetCode, idx) {
+        let t = db.users[targetCode];
+        if (!t || !t.equippedWeapons || !t.equippedWeapons[idx]) return;
+        let full = t.equippedWeapons[idx];
+        if (getEquipOwner(t, full) !== currentUser.code) {
+            showCustomAlert("해당 장비의 장착 권한자가 아닙니다.");
+            return;
+        }
+        let base = getEquipBaseName(full);
 
+        t.equippedWeapons.splice(idx, 1);
+        clearEquipOwner(t, full);
+        stripNoteByItem(t, base);
+        addHistoryLog(t, `[장착 해제] ${currentUser.name} 사원이 ${base}을(를) 회수해 갔습니다.`);
+
+        if (full.includes("(연동:") || full.includes("(연결:")) {
+            let myIdx = currentUser.equippedWeapons.findIndex(w =>
+                getEquipBaseName(w) === base && (w.includes(`연동: ${t.name}`) || w.includes(`연결: ${t.name}`))
+            );
+            if (myIdx > -1) {
+                let mf = currentUser.equippedWeapons[myIdx];
+                currentUser.equippedWeapons.splice(myIdx, 1);
+                clearEquipOwner(currentUser, mf);
+                stripNoteByItem(currentUser, base);
+            }
+        }
+
+        currentUser.inventory.push(base);
+        addHistoryLog(currentUser, `[장비 회수] ${t.name} 사원에게서 ${base} 회수 완료`);
+
+        if (database) database.ref(`users/${targetCode}`).set(t);
+        saveDB(); updateUI();
+    }
          function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
         if (!cat || !cat.usable) return;
@@ -2713,11 +2811,9 @@ function getTodayStr() {
                 return;
             }
 
-            if (cat.effect === 'equip_fox_bead') {
-                currentUser.equippedWeapons.push(`🔮 ${itemName}`);
-            } else {
-                currentUser.equippedWeapons.push(itemName);
-            }
+             let equipName = (cat.effect === 'equip_fox_bead') ? `🔮 ${itemName}` : itemName;
+            currentUser.equippedWeapons.push(equipName);
+            setEquipOwner(currentUser, equipName, currentUser.code);
 
             if (cat.effect === 'equip_silver_ring') {
                 currentUser.silverRingExpireTime = Date.now() + (120 * 60 * 60 * 1000);
@@ -2935,6 +3031,8 @@ function getTodayStr() {
                 // 양쪽에 동시 장착
                 targetUser.equippedWeapons.push(targetEquipName);
                 currentUser.equippedWeapons.push(senderEquipName);
+                setEquipOwner(targetUser, targetEquipName, currentUser.code);
+                setEquipOwner(currentUser, senderEquipName, currentUser.code);
                 
                 appendBadgeNoteToUser(targetUser, `[장착됨] ${targetEquipName} 장착 적용`);
                 appendBadgeNoteToUser(currentUser, `[장착됨] ${senderEquipName} 장착 적용`);
@@ -2951,9 +3049,11 @@ function getTodayStr() {
                     return false;
                 }
                 
-                targetUser.equippedWeapons.push(itemName);
-                appendBadgeNoteToUser(targetUser, `[장착됨] ${itemName} 장착 적용`);
-                
+                                let cPosS = currentUser.position || '사원';
+                let equipLabel = isOthers ? `${itemName} (장착자: ${currentUser.name} ${cPosS})` : itemName;
+                targetUser.equippedWeapons.push(equipLabel);
+                setEquipOwner(targetUser, equipLabel, isOthers ? currentUser.code : targetUser.code);
+                appendBadgeNoteToUser(targetUser, `[장착됨] ${equipLabel} 장착 적용`);
                 if (isOthers) {
                     addHistoryLog(targetUser, `[장착] 누군가 당신에게 ${itemName}을(를) 강제 장착시켰습니다.`);
                     showCustomAlert(`${targetUser.name}님에게 ${itemName}을(를) 강제 장착시켰습니다.`);
@@ -4549,16 +4649,18 @@ function getTodayStr() {
             showCustomAlert('해당 사원은 현재 장착 중인 아이템이 없습니다.'); return;
         }
 
-        targetUser.equippedWeapons.forEach(weaponStr => {
-            let baseName = weaponStr;
-            if (baseName.includes("(연결:") || baseName.includes("(연동:")) {
-                baseName = baseName.split(" (")[0];
-            } else if (baseName === "🔮 여우구슬") {
-                baseName = "여우구슬";
+               targetUser.equippedWeapons.forEach(weaponStr => {
+            let baseName = getEquipBaseName(weaponStr);
+            let ownerCode = getEquipOwner(targetUser, weaponStr);
+            if (ownerCode && ownerCode !== targetCode && db.users[ownerCode]) {
+                db.users[ownerCode].inventory.push(baseName);
+                addHistoryLog(db.users[ownerCode], `[당국 개입] ${targetUser.name} 사원에게 장착했던 ${baseName}이(가) 회수되어 반환되었습니다.`);
+                if (database) database.ref('users/' + ownerCode).set(db.users[ownerCode]);
+            } else {
+                targetUser.inventory.push(baseName);
             }
-            targetUser.inventory.push(baseName);
         });
-
+        targetUser.equipOwner = {};
         targetUser.equippedWeapons = [];
         addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
 
