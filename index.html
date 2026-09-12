@@ -1877,7 +1877,10 @@ function getTodayStr() {
         if (getZoneOccupant(zoneCode)) return true;
         for (let pid in darkParties) {
             const p = darkParties[pid];
-            if (p.zone === zoneCode && Date.now() - p.createdAt < PARTY_TIMEOUT) return true;
+            if (p.zone !== zoneCode) continue;
+            const age = Date.now() - (p.createdAt || 0);
+            if (p.state === 'RECRUIT' && age < PARTY_TIMEOUT) return true;
+            if (p.state === 'RUNNING' && Date.now() - (p.startedAt || p.createdAt || 0) < DARK_OCCUPY_TIMEOUT) return true;
         }
         return false;
     }
@@ -2032,12 +2035,15 @@ function getTodayStr() {
         if (!database || !currentUser) return;
         for (let pid in darkParties) {
             const p = darkParties[pid];
+            if (!p) continue;
             if (p.state === 'RECRUIT' && Date.now() - p.createdAt > PARTY_TIMEOUT) {
+                database.ref('darkParties/' + pid).remove();
+            }
+            if (p.state === 'RUNNING' && Date.now() - (p.startedAt || p.createdAt || 0) > DARK_OCCUPY_TIMEOUT) {
                 database.ref('darkParties/' + pid).remove();
             }
         }
     }, 60000);
-
     // 만료된 점유 기록 자동 청소 (1분마다)
     setInterval(() => {
         if (!database || !currentUser) return;
@@ -6218,12 +6224,24 @@ function getTodayStr() {
         const msg = (state === null) ? '기본값으로 초기화' : (state ? '개방' : '폐쇄');
         showCustomAlert(`${z.code} 구역이 [${msg}] 처리되었습니다.`);
     }
-    function adminReleaseZone(zoneCode) {
+       function adminReleaseZone(zoneCode) {
         const oc = getZoneOccupant(zoneCode);
-        if (!oc) { showCustomAlert('해당 구역은 현재 점유 상태가 아닙니다.'); return; }
+        let removed = 0;
+
+        if (database) {
+            for (let pid in darkParties) {
+                if (darkParties[pid] && darkParties[pid].zone === zoneCode) {
+                    database.ref('darkParties/' + pid).remove();
+                    removed++;
+                }
+            }
+        }
         releaseZone(zoneCode);
         renderAdminDarkZones();
-        showCustomAlert(`${zoneCode} 구역의 점유 상태(${oc.leaderName} 팀)를 강제 해제했습니다.`);
+
+        if (!oc && removed === 0) { showCustomAlert('해당 구역은 현재 점유 상태가 아닙니다.'); return; }
+        showCustomAlert(`${zoneCode} 구역의 점유 및 파티 기록(${removed}건)을 강제 해제했습니다.`);
+    
     }
        function adminResetLimits() {
         const targetNo = document.getElementById('adm-special-no').value.trim();
