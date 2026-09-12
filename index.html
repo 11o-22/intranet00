@@ -1863,7 +1863,7 @@ function getTodayStr() {
             if (c.effect && c.effect.startsWith('equip')) equips.push(it);
             else if (c.usable) consums.push(it);
         });
-
+        darkBriefingOpen = true;
         const body = document.getElementById('darkness-body');
         body.innerHTML = `
             <div style="text-align:left;">
