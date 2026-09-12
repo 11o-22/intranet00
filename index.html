@@ -1769,7 +1769,14 @@ function getTodayStr() {
             danger:"중", survival:"40%", min:2, max:2, reward:[50,100], ready:true,
             voteMode:false, roleSplit:true,
             intro:"복도 끝에서 문이 닫혔다.<br><br>정신을 차려 보니 방이다. 천장에서 거울이 늘어져 있다. 액자에 걸린 것이 아니라, 줄에 매달려 천천히 돌고 있다.<br>수십 개가 각기 다른 속도로 돈다. 비치는 것도 각기 다르다.<br><br>둘이 함께 들어왔는데, 지금 서로가 보이지 않는다.",
-            outro:"마지막 거울이 멈춘다.<br><br>거기 비친 것은 둘 다였다. 나란히 서 있었다.<br>실제로는 한 번도 마주치지 못했는데.<br><br>눈을 뜨니 복도다. 문은 열려 있다."
+            outro:"마지막 거울이 멈춘다.<br><br>거기 비친 것은 둘 다였다. 나란히 서 있었다.<br>실제로는 한 번도 마주치지 못했는데.<br><br>눈을 뜨니 복도다. 문은 열려 있다.",
+                        outro:"마지막 거울이 멈춘다.<br><br>...",
+            images: {
+                intro: "mirror_1.jpg",
+                step1: "mirror_2.jpg",
+                step2: "mirror_3.jpg",
+                step3: "mirror_4.jpg"
+            }
         },
         "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[50,100], ready:false },
         "Qtrew-D-042": {
@@ -5839,7 +5846,8 @@ function getTodayStr() {
             darkAudio.master = master;
             darkAudio.playing = true;
 
-            if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
+                       if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
             else buildAlleyAmbience(ctx, master);
 
         } catch(e) { console.warn('앰비언스 생성 실패:', e); }
@@ -6008,6 +6016,130 @@ function getTodayStr() {
             darkAudio.timers.push(setTimeout(drip, 11000 + Math.random() * 22000));
         }
         darkAudio.timers.push(setTimeout(drip, 8000 + Math.random() * 10000));
+    }
+
+        // --- C-119 : 거울이 늘어진 방 ---
+    function buildMirrorAmbience(ctx, master) {
+        // 1) 유리질 고음 드론 — 아주 느리게 서로 어긋남
+        [196, 197.3, 294].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            g.gain.value = i === 2 ? 0.022 : 0.038;
+            const hp = ctx.createBiquadFilter();
+            hp.type = 'highpass'; hp.frequency.value = 150;
+            osc.connect(hp); hp.connect(g); g.connect(master);
+            osc.start();
+            darkAudio.nodes.push(osc);
+
+            const lfo = ctx.createOscillator();
+            const lfoG = ctx.createGain();
+            lfo.frequency.value = 0.041 + i * 0.013;
+            lfoG.gain.value = 0.028;
+            lfo.connect(lfoG); lfoG.connect(g.gain);
+            lfo.start();
+            darkAudio.nodes.push(lfo);
+        });
+
+        // 2) 저역 — 방 자체의 울림
+        const low = ctx.createOscillator();
+        const lowG = ctx.createGain();
+        low.type = 'sine';
+        low.frequency.value = 49;
+        lowG.gain.value = 0.085;
+        low.connect(lowG); lowG.connect(master);
+        low.start();
+        darkAudio.nodes.push(low);
+
+        // 3) 줄이 삐걱이며 도는 소리 (느리게 반복)
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 8);
+        noise.loop = true;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 620; bp.Q.value = 5;
+        const nGain = ctx.createGain();
+        nGain.gain.value = 0.05;
+        noise.connect(bp); bp.connect(nGain); nGain.connect(master);
+        noise.start();
+        darkAudio.nodes.push(noise);
+
+        // 회전 주기에 맞춰 소리가 커졌다 작아짐
+        const rotLfo = ctx.createOscillator();
+        const rotG = ctx.createGain();
+        rotLfo.frequency.value = 0.13;
+        rotG.gain.value = 0.04;
+        rotLfo.connect(rotG); rotG.connect(nGain.gain);
+        rotLfo.start();
+        darkAudio.nodes.push(rotLfo);
+
+        // 밴드패스 주파수도 함께 흔들어 '스치는' 질감
+        const bpLfo = ctx.createOscillator();
+        const bpG = ctx.createGain();
+        bpLfo.frequency.value = 0.09;
+        bpG.gain.value = 180;
+        bpLfo.connect(bpG); bpG.connect(bp.frequency);
+        bpLfo.start();
+        darkAudio.nodes.push(bpLfo);
+
+        // 4) 유리 부딪는 단발음 (불규칙, 두세 번 연달아)
+        function chime() {
+            if (!darkAudio.playing) return;
+            const hits = 1 + Math.floor(Math.random() * 3);
+            for (let k = 0; k < hits; k++) {
+                const t = ctx.currentTime + k * (0.07 + Math.random() * 0.12);
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1400 + Math.random() * 900, t);
+                const bp2 = ctx.createBiquadFilter();
+                bp2.type = 'bandpass'; bp2.frequency.value = 2200; bp2.Q.value = 14;
+                g.gain.setValueAtTime(0.032 + Math.random() * 0.018, t);
+                g.gain.exponentialRampToValueAtTime(0.0004, t + 0.42);
+                osc.connect(bp2); bp2.connect(g); g.connect(master);
+                osc.start(t); osc.stop(t + 0.5);
+            }
+            darkAudio.timers.push(setTimeout(chime, 7000 + Math.random() * 14000));
+        }
+        darkAudio.timers.push(setTimeout(chime, 4500 + Math.random() * 6000));
+
+        // 5) 아주 드물게, 유리에 금 가는 소리
+        function crack() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const src = ctx.createBufferSource();
+            src.buffer = makeNoiseBuffer(ctx, 0.5);
+            const hp = ctx.createBiquadFilter();
+            hp.type = 'highpass'; hp.frequency.value = 1800;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.045, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0005, t + 0.34);
+            src.connect(hp); hp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + 0.4);
+            darkAudio.timers.push(setTimeout(crack, 22000 + Math.random() * 30000));
+        }
+        darkAudio.timers.push(setTimeout(crack, 15000 + Math.random() * 12000));
+
+        // 6) 멀리서 나는 사람 목소리 비슷한 것 (아주 드물게, 말은 아님)
+        function murmur() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(120 + Math.random() * 60, t);
+            osc.frequency.linearRampToValueAtTime(95 + Math.random() * 40, t + 1.1);
+            const lp2 = ctx.createBiquadFilter();
+            lp2.type = 'lowpass'; lp2.frequency.value = 420; lp2.Q.value = 2;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.02, t + 0.35);
+            g.gain.exponentialRampToValueAtTime(0.0004, t + 1.3);
+            osc.connect(lp2); lp2.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 1.4);
+            darkAudio.timers.push(setTimeout(murmur, 28000 + Math.random() * 40000));
+        }
+        darkAudio.timers.push(setTimeout(murmur, 18000 + Math.random() * 20000));
     }
 
     function toggleDarkMute() {
