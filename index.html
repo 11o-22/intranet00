@@ -1797,6 +1797,7 @@ function getTodayStr() {
         darkBriefingOpen = true;
         const body = document.getElementById('darkness-body');
          darkBriefingOpen = false;
+        if (darkAudio.playing && !darkRun) darkAmbienceStop();
         if (!body || !currentUser) return;
 
         if (darkRun) { renderDarkStep(); return; }
@@ -1823,7 +1824,10 @@ function getTodayStr() {
                 <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked ? 'opacity:0.45;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                         <div style="flex:1; min-width:0;">
-                            <div style="font-family:monospace; font-size:11px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="font-family:monospace; font-size:10px; color:#ff6b6b;">${z.code} — ${title}</div>
+                    <button id="dark-mute-btn" onclick="toggleDarkMute()" style="background:none; border:1px solid #333; color:#888; font-size:11px; padding:3px 7px; border-radius:4px; cursor:pointer;">${darkAudio.muted ? '🔇' : '🔊'}</button>
+                </div>
                             <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${locked ? '■■■■■■' : z.name}</div>
                             <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
                             <div style="font-size:10px; color:#777; margin-top:5px;">
@@ -1922,6 +1926,7 @@ function getTodayStr() {
         };
 
                 darkBriefingOpen = false;
+                darkAmbienceStart(zoneCode);
 
         addHistoryLog(currentUser, `[어둠 진입] ${zoneCode} 탐사 개시`);
         saveDB();
@@ -2375,7 +2380,8 @@ function getTodayStr() {
         saveDB();
     }
 
-    function finishDarkRun() {
+       function finishDarkRun() {
+        darkAmbienceStop();
         darkRun = null;
         updateUI();
         renderDarkness();
@@ -4016,6 +4022,238 @@ function getTodayStr() {
             const el = document.getElementById(id);
             if (el) applyBet(id, getBetValue(id));
         });
+    }
+        // ==========================================
+    // ★ 어둠 탐사 앰비언스 (Web Audio 합성)
+    // ==========================================
+    let darkAudio = { ctx:null, master:null, nodes:[], timers:[], playing:false, muted:false };
+
+    function darkAmbienceStop() {
+        darkAudio.timers.forEach(t => clearTimeout(t));
+        darkAudio.timers = [];
+        if (darkAudio.master && darkAudio.ctx) {
+            try {
+                const now = darkAudio.ctx.currentTime;
+                darkAudio.master.gain.cancelScheduledValues(now);
+                darkAudio.master.gain.setValueAtTime(darkAudio.master.gain.value, now);
+                darkAudio.master.gain.linearRampToValueAtTime(0, now + 1.2);
+            } catch(e) {}
+        }
+        const oldNodes = darkAudio.nodes;
+        darkAudio.nodes = [];
+        setTimeout(() => {
+            oldNodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch(e) {} });
+        }, 1400);
+        darkAudio.playing = false;
+    }
+
+    // 갈색 잡음 버퍼 (바람·공기 질감)
+    function makeNoiseBuffer(ctx, seconds) {
+        const len = ctx.sampleRate * seconds;
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < len; i++) {
+            const white = Math.random() * 2 - 1;
+            last = (last + 0.02 * white) / 1.02;
+            d[i] = last * 3.5;
+        }
+        return buf;
+    }
+
+    function darkAmbienceStart(zoneCode) {
+        darkAmbienceStop();
+        if (darkAudio.muted) return;
+
+        try {
+            if (!darkAudio.ctx) darkAudio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = darkAudio.ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0, ctx.currentTime);
+            master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 3);
+            master.connect(ctx.destination);
+            darkAudio.master = master;
+            darkAudio.playing = true;
+
+            if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
+            else buildAlleyAmbience(ctx, master);
+
+        } catch(e) { console.warn('앰비언스 생성 실패:', e); }
+    }
+
+    // --- D-042 : 심야 골목 ---
+    function buildAlleyAmbience(ctx, master) {
+        // 1) 저역 드론 두 겹 (아주 느리게 어긋나며 맥놀이 발생)
+        [41, 41.7].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            g.gain.value = 0.10;
+            osc.connect(g); g.connect(master);
+            osc.start();
+            darkAudio.nodes.push(osc);
+
+            const lfo = ctx.createOscillator();
+            const lfoG = ctx.createGain();
+            lfo.frequency.value = 0.05 + i * 0.017;
+            lfoG.gain.value = 0.045;
+            lfo.connect(lfoG); lfoG.connect(g.gain);
+            lfo.start();
+            darkAudio.nodes.push(lfo);
+        });
+
+        // 2) 바람 (필터 걸린 갈색 잡음)
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 6);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 0.7;
+        const nGain = ctx.createGain();
+        nGain.gain.value = 0.16;
+        noise.connect(lp); lp.connect(nGain); nGain.connect(master);
+        noise.start();
+        darkAudio.nodes.push(noise);
+
+        // 바람 세기 흔들기
+        const windLfo = ctx.createOscillator();
+        const windG = ctx.createGain();
+        windLfo.frequency.value = 0.07;
+        windG.gain.value = 0.09;
+        windLfo.connect(windG); windG.connect(nGain.gain);
+        windLfo.start();
+        darkAudio.nodes.push(windLfo);
+
+        // 3) 불규칙한 발소리 (아주 가끔, 한 박자 늦게)
+        function step() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const src = ctx.createBufferSource();
+            src.buffer = makeNoiseBuffer(ctx, 0.2);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.frequency.value = 160 + Math.random() * 90; bp.Q.value = 3;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.09 + Math.random() * 0.05, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22);
+            src.connect(bp); bp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + 0.3);
+            darkAudio.timers.push(setTimeout(step, 3500 + Math.random() * 7000));
+        }
+        darkAudio.timers.push(setTimeout(step, 4000 + Math.random() * 4000));
+
+        // 4) 먼 곳의 금속성 울림 (드물게)
+        function distant() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(180 + Math.random() * 120, t);
+            osc.frequency.exponentialRampToValueAtTime(70, t + 2.4);
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.055, t + 0.5);
+            g.gain.exponentialRampToValueAtTime(0.0008, t + 2.6);
+            osc.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 2.8);
+            darkAudio.timers.push(setTimeout(distant, 14000 + Math.random() * 20000));
+        }
+        darkAudio.timers.push(setTimeout(distant, 9000 + Math.random() * 8000));
+    }
+
+    // --- D-087 : 폐관한 미술관 ---
+    function buildMuseumAmbience(ctx, master) {
+        // 1) 거의 무음에 가까운 실내 공명
+        [58, 87].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            g.gain.value = i === 0 ? 0.075 : 0.035;
+            osc.connect(g); g.connect(master);
+            osc.start();
+            darkAudio.nodes.push(osc);
+
+            const lfo = ctx.createOscillator();
+            const lfoG = ctx.createGain();
+            lfo.frequency.value = 0.03 + i * 0.011;
+            lfoG.gain.value = 0.03;
+            lfo.connect(lfoG); lfoG.connect(g.gain);
+            lfo.start();
+            darkAudio.nodes.push(lfo);
+        });
+
+        // 2) 공조기 백색소음 (아주 얇게)
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 6);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 260;
+        const nGain = ctx.createGain();
+        nGain.gain.value = 0.085;
+        noise.connect(lp); lp.connect(nGain); nGain.connect(master);
+        noise.start();
+        darkAudio.nodes.push(noise);
+
+        // 3) 형광등 잔떨림 (고음역, 미세하게)
+        const hum = ctx.createOscillator();
+        const humG = ctx.createGain();
+        hum.type = 'sawtooth';
+        hum.frequency.value = 120;
+        humG.gain.value = 0.008;
+        const humLp = ctx.createBiquadFilter();
+        humLp.type = 'lowpass'; humLp.frequency.value = 1800;
+        hum.connect(humLp); humLp.connect(humG); humG.connect(master);
+        hum.start();
+        darkAudio.nodes.push(hum);
+
+        // 4) 나무·액자 삐걱임 (불규칙)
+        function creak() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sawtooth';
+            const base = 280 + Math.random() * 350;
+            osc.frequency.setValueAtTime(base, t);
+            osc.frequency.linearRampToValueAtTime(base * (0.72 + Math.random() * 0.2), t + 0.6);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.frequency.value = base; bp.Q.value = 9;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.03 + Math.random() * 0.02, t + 0.18);
+            g.gain.exponentialRampToValueAtTime(0.0006, t + 0.75);
+            osc.connect(bp); bp.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 0.9);
+            darkAudio.timers.push(setTimeout(creak, 6000 + Math.random() * 13000));
+        }
+        darkAudio.timers.push(setTimeout(creak, 5000 + Math.random() * 6000));
+
+        // 5) 대리석 위 물방울 같은 단발음 (아주 드물게)
+        function drip() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(900 + Math.random() * 500, t);
+            osc.frequency.exponentialRampToValueAtTime(320, t + 0.13);
+            g.gain.setValueAtTime(0.05, t);
+            g.gain.exponentialRampToValueAtTime(0.0004, t + 0.5);
+            osc.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 0.6);
+            darkAudio.timers.push(setTimeout(drip, 11000 + Math.random() * 22000));
+        }
+        darkAudio.timers.push(setTimeout(drip, 8000 + Math.random() * 10000));
+    }
+
+    function toggleDarkMute() {
+        darkAudio.muted = !darkAudio.muted;
+        if (darkAudio.muted) darkAmbienceStop();
+        else if (darkRun) darkAmbienceStart(darkRun.zone);
+        const btn = document.getElementById('dark-mute-btn');
+        if (btn) btn.innerText = darkAudio.muted ? '🔇' : '🔊';
     }
     // --- 슬롯 머신 ---
     const slotSymbols = [
