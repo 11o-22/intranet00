@@ -2748,13 +2748,8 @@ function getTodayStr() {
                     if(!isOthers) showCustomAlert(`[제거약 효과] 다음 상태이상이 씻겨나갔습니다:\n- ${removedNote}`);
                 } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
             } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
-        }
-                    let removeIdx = Math.floor(Math.random() * notesArr.length);
-                    let removedNote = notesArr.splice(removeIdx, 1);
-                    targetUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
-                    if(!isOthers) showCustomAlert(`[제거약 효과] 다음 상태이상이 씻겨나갔습니다:\n- ${removedNote}`);
-                } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
-            } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
+        
+                    
         } else if (cat.effect === 'random_box') {
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
             const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬");
