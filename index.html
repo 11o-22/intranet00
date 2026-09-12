@@ -340,9 +340,9 @@
         .action-buttons button:hover { background-color: rgba(255,255,255,0.1); color: #fff; }
         .admin-access-btn { background-color: #551a1a !important; border: 1px solid #ff4c4c !important; color: #ff4c4c !important; }
 
-        .tabs-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #333; margin-bottom: 15px; border-radius: 4px; overflow: hidden; }
-        .tab { padding: 12px; text-align: center; border-right: 1px solid #333; border-bottom: 1px solid #333; color: #888; cursor: pointer; font-size: 13px; font-weight: bold; transition: all 0.2s;}
-        .tab:nth-child(even) { border-right: none; }
+        .tabs-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid #333; margin-bottom: 15px; border-radius: 4px; overflow: hidden; }
+        .tab { padding: 12px 6px; text-align: center; border-right: 1px solid #333; border-bottom: 1px solid #333; color: #888; cursor: pointer; font-size: 12px; font-weight: bold; transition: all 0.2s; word-break: keep-all; }
+        .tab:nth-child(3n) { border-right: none; }
         .tab.active { color: #fff; border-bottom: 2px solid var(--theme-focus); background: rgba(255,255,255,0.03); }
         
         .tab-content { display: none; text-align: center; padding: 15px 10px; border: 1px solid #333; border-radius: 4px; background: rgba(0,0,0,0.2); }
