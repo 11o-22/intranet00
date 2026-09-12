@@ -1682,6 +1682,7 @@ function getTodayStr() {
 
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
+    let darkBriefingOpen = false;   // 브리핑 화면 표시 중 여부
 
         // ★ 상담사가 제어하는 구역 개방 상태 (Firebase 동기화)
     let darkZoneOverride = {};
@@ -1722,7 +1723,9 @@ function getTodayStr() {
     }
 
     function renderDarkness() {
+        darkBriefingOpen = true;
         const body = document.getElementById('darkness-body');
+         darkBriefingOpen = false;
         if (!body || !currentUser) return;
 
         if (darkRun) { renderDarkStep(); return; }
@@ -1845,6 +1848,8 @@ function getTodayStr() {
             zone: zoneCode, step: 0, modifier: 0, success: 0, fail: 0,
             carryEquips: eq, carryItems: cs, rerollUsed: false, lostItems: [], log: []
         };
+
+                darkBriefingOpen = false;
 
         addHistoryLog(currentUser, `[어둠 진입] ${zoneCode} 탐사 개시`);
         saveDB();
@@ -2854,7 +2859,7 @@ function getTodayStr() {
                 checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop(); renderPointRanking(); renderVipOpponents();
-        if (!darkRun) renderDarkness();
+        if (!darkRun && !darkBriefingOpen) renderDarkness();
    }
     
     function switchTab(tabId, el) {
