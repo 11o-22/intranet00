@@ -1655,7 +1655,13 @@ function getTodayStr() {
             brief:"(밤 1시 17분. 집으로 가는 길이 조금 길어졌다.)",
             danger:"하", survival:"94%", min:1, max:1, reward:[30,60], ready:true,
             intro:"휴대폰 시계가 1시 17분에서 넘어가지 않는다.<br>몇 번을 껐다 켜도 같다.<br><br>언제나 지나던 골목인데, 오늘은 끝이 보이지 않는다.<br>가로등이 하나, 등 뒤에서부터 꺼진다.",
-            outro:"익숙한 현관 앞이다.<br>시계는 1시 18분을 가리키고 있다.<br><br>골목 쪽은 돌아보지 않기로 한다."
+            outro:"익숙한 현관 앞이다.<br>시계는 1시 18분을 가리키고 있다.<br><br>골목 쪽은 돌아보지 않기로 한다.",
+             images: {
+                intro: "dark_alley_1.jpg",
+                step1: "dark_alley_2.jpg",
+                step2: "dark_alley_3.jpg",
+                step3: "dark_alley_4.jpg"
+            }
         },
         "Qtrew-D-087": { code:"Qtrew-D-087", grade:"D", name:"■■■■", brief:"(개방 준비 중)", danger:"하", survival:"91%", min:1, max:1, reward:[30,60], ready:false }
     };
@@ -1813,11 +1819,19 @@ function getTodayStr() {
         renderDarkStep();
     }
 
-    function darkBox(title, text, extra) {
+    function darkBox(title, text, extra, imgKey) {
+        const z = DARK_ZONES[darkRun.zone];
+        let imgHtml = '';
+        if (imgKey && z.images && z.images[imgKey]) {
+            imgHtml = `<div style="width:100%; height:150px; overflow:hidden; border-radius:6px 6px 0 0; border:1px solid #2a2a2a; border-bottom:none; background:#000;">
+                <img src="${z.images[imgKey]}" style="width:100%; height:100%; object-fit:cover; opacity:0.75; filter:grayscale(0.4) contrast(1.1);" onerror="this.parentElement.style.display='none';">
+            </div>`;
+        }
         return `
             <div style="text-align:left;">
-                <div style="font-family:monospace; font-size:10px; color:#ff6b6b; margin-bottom:8px;">${DARK_ZONES[darkRun.zone].code} — ${title}</div>
-                <div style="background:#0a0a0a; border:1px solid #2a2a2a; border-radius:6px; padding:16px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:14px; min-height:90px;">${text}</div>
+                <div style="font-family:monospace; font-size:10px; color:#ff6b6b; margin-bottom:8px;">${z.code} — ${title}</div>
+                ${imgHtml}
+                <div style="background:#0a0a0a; border:1px solid #2a2a2a; border-radius:${imgHtml ? '0 0 6px 6px' : '6px'}; padding:16px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:14px; min-height:90px;">${text}</div>
                 ${extra}
             </div>`;
     }
@@ -1833,28 +1847,28 @@ function getTodayStr() {
 
         if (s === 0) {
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                darkChoiceBtn("걸음을 옮긴다.", "darkStep1()"));
+                darkChoiceBtn("걸음을 옮긴다.", "darkStep1()"), "intro");
         } else if (s === 1) {
             body.innerHTML = darkBox("기믹 1 — 세 갈래", 
                 `가로등이 등 뒤에서부터 순서대로 꺼진다.<br>앞쪽 세 개만 남았다.<br><br>왼쪽 끝에 편의점 불빛이 보인다.<br>오른쪽은 평소 쓰던 지름길이다.<br>뒤는… 방금 지나온 길이다.`,
                 darkChoiceBtn("① 편의점 불빛 쪽으로 간다.", "darkStep1Pick('store')") +
                 darkChoiceBtn("② 지름길로 빠진다.", "darkStep1Pick('short')") +
                 darkChoiceBtn("③ 왔던 길로 되돌아간다.", "darkStep1Pick('back')") +
-                darkChoiceBtn("④ 그 자리에 멈춰 선다.", "darkStep1Pick('stay')"));
+                darkChoiceBtn("④ 그 자리에 멈춰 선다.", "darkStep1Pick('stay')"), "step1");
         } else if (s === 2) {
             body.innerHTML = darkBox("기믹 2 — 신호등",
                 `사거리다. 차는 한 대도 없는데 신호등만 살아 있다.<br>빨강, 초록, 빨강… 주기가 맞지 않는다.<br><br>초록불이 켜지는 순간에 맞춰 건너야 한다.<br><span style="color:#888; font-size:11px;">[타이밍 판정 3회 — 버튼이 초록일 때 누르세요]</span>`,
                 `<div id="dark-cross-lamp" style="width:60px; height:60px; border-radius:50%; margin:0 auto 14px auto; background:#3a0000; border:3px solid #444; box-shadow:inset 0 0 12px rgba(0,0,0,0.8);"></div>
                  <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">건넌 횟수: <b id="dark-cross-count" style="color:var(--theme-focus);">0</b> / 3</div>
                  <button class="game-btn" id="dark-cross-btn" style="width:100%; margin:0; padding:14px;" onclick="darkCrossTap()">건넌다</button>
-                 <div id="dark-cross-msg" style="font-size:11px; color:#888; text-align:center; margin-top:10px; min-height:16px;"></div>`);
+                 <div id="dark-cross-msg" style="font-size:11px; color:#888; text-align:center; margin-top:10px; min-height:16px;"></div>`, "step2");
             startDarkCrossing();
         } else if (s === 3) {
             body.innerHTML = darkBox("기믹 3 — 자판기",
                 `골목 끝에 자판기가 서 있다. 불이 들어와 있다.<br>유리에 네가 비친다.<br><br>네가 멈췄는데, 비친 쪽은 반 박자 뒤에 멈췄다.`,
                 darkChoiceBtn("① 뒤를 돌아본다.", "darkStep3Pick('turn')") +
                 darkChoiceBtn("② 못 본 척 지나간다.", "darkStep3Pick('ignore')") +
-                darkChoiceBtn("③ 유리를 두드려 본다.", "darkStep3Pick('knock')"));
+                darkChoiceBtn("③ 유리를 두드려 본다.", "darkStep3Pick('knock')"), "step3");
         } else if (s === 99) {
             renderDarkResult();
         }
