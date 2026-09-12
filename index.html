@@ -2753,6 +2753,15 @@ function getTodayStr() {
                         if (isMatched) weight *= 25; 
                         else weight *= 0.05; 
                     }
+                    
+                // ★ 최소 확률 보장: 아무리 비싸도 전체의 0.000001% 확률은 남겨둠
+                const minW = totalWeight * 1e-8;
+                totalWeight = 0;
+                weights.forEach(w => {
+                    if (w.weight < minW) w.weight = minW;
+                    totalWeight += w.weight;
+                });
+
 
                     weights.push({ name: itemName, weight: weight });
                     totalWeight += weight;
@@ -2768,7 +2777,7 @@ function getTodayStr() {
             }
 
             // 4. 60% 확률로 유쾌 판매소(regular), 40% 확률로 우주 쇼핑몰(alien) 선택
-            let isRegular = Math.random() < 0.6;
+            let isRegular = Math.random() < 0.9;
             let selectedPool = isRegular ? regularPool : alienPool;
             
             let pickedItem = getWeightedRandomItem(selectedPool, targetUser);
@@ -3261,7 +3270,7 @@ function getTodayStr() {
     // ==========================================
     // VIP 라운지 1:1 실시간 대전 로직
     // ==========================================
-    function renderVipOpponents() {
+       function renderVipOpponents() {
         const listContainer = document.getElementById('vip-online-users-container');
         const sel = document.getElementById('vip-opponent-select');
         if (!sel || !listContainer) return;
@@ -3279,10 +3288,11 @@ function getTodayStr() {
                 </div>`;
             }
         }
-        sel.innerHTML = opts;
-        listContainer.innerHTML = listHtml || '<div style="text-align:center; padding:10px 0;">접속 중인 다른 VIP 사원이 없습니다.</div>';
-    }
+        updateSelectOptions(sel, opts);
 
+        const finalListHtml = listHtml || '<div style="text-align:center; padding:10px 0;">접속 중인 다른 VIP 사원이 없습니다.</div>';
+        if (listContainer.innerHTML !== finalListHtml) listContainer.innerHTML = finalListHtml;
+    }
     function selectVipGameType(type) {
         currentVipGameType = type;
         document.querySelectorAll('.vip-nav-btn').forEach(b => b.classList.remove('active'));
@@ -3570,9 +3580,9 @@ function getTodayStr() {
             if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
                 deal.status = 'EXPIRED'; changed = true;
                 const sender = db.users[deal.fromCode];
-                if (sender) {
-                    if (deal.offerType === 'point') sender.points += deal.offerValue;
-                    else {
+              if (sender) {
+                    // ★ 포인트는 차감 전이므로 회수 불필요 (아이템만 회수)
+                    if (deal.offerType !== 'point') {
                         for(let i=0; i<deal.offerQty; i++) sender.inventory.push(deal.offerValue);
                     }
                     addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되어 회수되었습니다.`);
@@ -3601,48 +3611,49 @@ function getTodayStr() {
         if (type === 'point') { demandPoints.style.display = 'inline-block'; demandItem.style.display = 'none'; qtyInput.style.display = 'none'; }
         else { demandPoints.style.display = 'none'; demandItem.style.display = 'inline-block'; qtyInput.style.display = 'inline-block'; }
     }
+        // ★ 목록 내용이 실제로 바뀌었을 때만 다시 그려서 깜박임·선택 풀림 방지
+    const _selectCache = {};
+    function updateSelectOptions(selectEl, optionsHtml) {
+        if (!selectEl) return;
+        const key = selectEl.id;
+        if (_selectCache[key] === optionsHtml) return; // 내용 동일 → 건드리지 않음
+        const prev = selectEl.value;
+        selectEl.innerHTML = optionsHtml;
+        _selectCache[key] = optionsHtml;
+        if (prev) selectEl.value = prev; // 선택하고 있던 값 복원
+    }
     function renderP2PSelectBoxes() {
-    const targetSelect = document.getElementById('p2p-target-user');
-    if (!targetSelect) return;
+        const targetSelect = document.getElementById('p2p-target-user');
+        if (!targetSelect) return;
 
-    // 사용자가 현재 드롭다운을 열고 조작 중일 때는 강제 갱신으로 인한 스크롤 튕김 방지
-    if (document.activeElement === targetSelect) {
-        return; 
-    }
+        let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
+        for (let code in db.users) {
+            let u = db.users[code];
+            if (u.code !== 'kario0987' && (!currentUser || u.no !== currentUser.no)) {
+                targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
+            }
+        }
+        updateSelectOptions(targetSelect, targetOpts);
 
-    const currentSelectedVal = targetSelect.value;
+        const offerItemSelect = document.getElementById('p2p-offer-item');
+        if (offerItemSelect && currentUser && currentUser.inventory) {
+            let counts = {};
+            currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+            let uniqueItems = Object.keys(counts);
+            let offerOpts = (uniqueItems.length === 0)
+                ? '<option value="">(보유 소지품 없음)</option>'
+                : uniqueItems.map(item => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
+            updateSelectOptions(offerItemSelect, offerOpts);
+        }
 
-    let targetOpts = '<option value="">-- 상대 사원 선택 --</option>';
-    for (let code in db.users) {
-        let u = db.users[code];
-        if (u.code !== 'kario0987' && (!currentUser || u.no !== currentUser.no)) {
-            targetOpts += `<option value="${code}">${u.name} (사번: ${u.no})</option>`;
+        const demandItemSelect = document.getElementById('p2p-demand-item');
+        if (demandItemSelect) {
+            let demandOpts = Object.keys(ITEM_CATALOG)
+                .filter(name => !NO_SELL_ITEMS.includes(name))
+                .map(name => `<option value="${name}">${name}</option>`).join('');
+            updateSelectOptions(demandItemSelect, demandOpts);
         }
     }
-    targetSelect.innerHTML = targetOpts;
-
-    if (currentSelectedVal) {
-        targetSelect.value = currentSelectedVal;
-    }
-
-    const offerItemSelect = document.getElementById('p2p-offer-item');
-    if (offerItemSelect && currentUser && currentUser.inventory) {
-        let counts = {};
-        currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
-        let uniqueItems = Object.keys(counts);
-
-        if (uniqueItems.length === 0) {
-            offerItemSelect.innerHTML = '<option value="">(보유 소지품 없음)</option>';
-        } else {
-            offerItemSelect.innerHTML = uniqueItems.map((item) => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');
-        }
-    }
-    
-    const demandItemSelect = document.getElementById('p2p-demand-item');
-    if (demandItemSelect && demandItemSelect.options.length <= 1) {
-        demandItemSelect.innerHTML = Object.keys(ITEM_CATALOG).map(name => `<option value="${name}">${name}</option>`).join('');
-    }
-}
     function sendP2PDeal() {
     const targetCode = document.getElementById('p2p-target-user').value;
     if (!targetCode) {
@@ -3679,7 +3690,6 @@ function getTodayStr() {
             showLuxuryAlert(); 
             return; 
         }
-        currentUser.points -= pts; 
         offerValue = pts;
     }
 
@@ -3696,8 +3706,6 @@ function getTodayStr() {
                 // 에러 발생 시 차감했던 제물 원상복구
                 if (offerType === 'item') { 
                     for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); 
-                } else { 
-                    currentUser.points += offerValue; 
                 }
                 return;
             }
@@ -3821,6 +3829,13 @@ function getTodayStr() {
         showCustomAlert("제안을 보낸 사원 정보를 찾을 수 없습니다.");
         return;
     }
+    if (deal.offerType === 'point') {
+     let checkPt = parseInt(deal.offerValue, 10) || 0;
+        if ((sender.points || 0) < checkPt) {
+            showCustomAlert(`${deal.fromName} 사원의 포인트가 부족하여 거래가 성립되지 않았습니다.`);
+            return;
+        }
+    }
 
     // 조건부 교환(trade)인 경우 내가 요구받은 대가를 지불할 수 있는지 검사
     if (deal.mode === 'trade') {
@@ -3848,8 +3863,9 @@ function getTodayStr() {
     }
     
     // 상대가 보낸 제물 수령
-    if (deal.offerType === 'point') {
+        if (deal.offerType === 'point') {
         let offerPt = parseInt(deal.offerValue, 10) || 0;
+        sender.points = (sender.points || 0) - offerPt; // ★ 이 시점에 발신자에게서 차감
         currentUser.points = (currentUser.points || 0) + offerPt;
         showPointGainEffect(offerPt);
     } else {
@@ -3897,9 +3913,9 @@ function getTodayStr() {
 
         deal.status = 'REJECTED';
         const sender = db.users[deal.fromCode];
-        if (sender) {
-            if (deal.offerType === 'point') sender.points += deal.offerValue; 
-            else { for(let i=0; i<(deal.offerQty||1); i++) sender.inventory.push(deal.offerValue); }
+         if (sender) {
+            // ★ 포인트는 차감된 적이 없으므로 반환하지 않음 (아이템만 회수)
+            if (deal.offerType !== 'point') { for(let i=0; i<(deal.offerQty||1); i++) sender.inventory.push(deal.offerValue); }
             addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
         }
         addHistoryLog(currentUser, `[밀실 거절] ${deal.fromName} 사원의 제안 거절`);
@@ -3923,8 +3939,8 @@ function getTodayStr() {
         if (deal.status !== 'PENDING') return;
 
         deal.status = 'CANCELLED';
-        if (deal.offerType === 'point') currentUser.points += deal.offerValue;
-        else { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
+                // ★ 포인트는 차감 전이므로 회수 불필요 (아이템만 회수)
+        if (deal.offerType !== 'point') { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
         
         addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`);
         db.p2pDeals[dealIndex] = deal;
