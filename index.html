@@ -729,10 +729,13 @@
         </div>
 
         <div class="tabs-grid">
+                    <div class="tabs-grid">
             <div class="tab active" onclick="switchTab('tab-record', this)">정보 열람</div>
             <div class="tab" onclick="switchTab('tab-public', this)">공용시설</div>
             <div class="tab" onclick="switchTab('tab-vip', this)">VIP 시설</div>
             <div class="tab" onclick="switchTab('tab-shop', this)">■■ 상점</div>
+            <div class="tab" onclick="switchTab('tab-darkness', this)">어둠 탐사</div>
+            <div class="tab" onclick="switchTab('tab-house', this)">사택</div>
         </div>
 
         <!-- 1. 정보 열람 -->
@@ -954,7 +957,45 @@
                 </div>
             </div>
         </div>
-        
+                <!-- 5. 어둠 탐사 -->
+        <div id="tab-darkness" class="tab-content" style="text-align: left;">
+            <div class="sub-tabs-grid">
+                <button class="sub-tab active" onclick="switchDarknessPanel('dark-main', this)">탐사 개시</button>
+                <button class="sub-tab" onclick="switchDarknessPanel('dark-log', this)">탐사 기록</button>
+            </div>
+
+            <div id="dark-main" class="sub-panel active">
+                <div class="panel-title">[어둠 탐사]</div>
+                <div id="darkness-body" style="min-height:120px; font-size:12px; color:var(--theme-text); text-align:center; padding:20px 0;">
+                    준비 중입니다.
+                </div>
+            </div>
+
+            <div id="dark-log" class="sub-panel">
+                <div class="panel-title">[탐사 기록]</div>
+                <div id="darkness-log-container" style="max-height:250px; overflow-y:auto;"></div>
+            </div>
+        </div>
+
+        <!-- 6. 사택 -->
+        <div id="tab-house" class="tab-content" style="text-align: left;">
+            <div class="sub-tabs-grid">
+                <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 사택</button>
+                <button class="sub-tab" onclick="switchHousePanel('house-visit', this)">방문</button>
+            </div>
+
+            <div id="house-main" class="sub-panel active">
+                <div class="panel-title">[내 사택]</div>
+                <div id="house-body" style="min-height:120px; font-size:12px; color:var(--theme-text); text-align:center; padding:20px 0;">
+                    준비 중입니다.
+                </div>
+            </div>
+
+            <div id="house-visit" class="sub-panel">
+                <div class="panel-title">[사택 방문]</div>
+                <div id="house-visit-container" style="min-height:120px;"></div>
+            </div>
+        </div>
         <!-- 4. ■■ 상점 -->
         <div id="tab-shop" class="tab-content" style="text-align: left;">
             <div id="shop-lock-notice" style="display:none; color:#ff4c4c; padding: 25px 10px; text-align:center; border: 1px solid #ff4c4c; border-radius: 6px; background: rgba(255,76,76,0.1);">
@@ -2296,6 +2337,19 @@ function getTodayStr() {
         document.querySelectorAll('#tab-shop .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'shop-alien') setUFODialogue("물건을 본다 👌🏻");
+    }
+        function switchDarknessPanel(panelId, btnEl) {
+        document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+        document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+    }
+
+    function switchHousePanel(panelId, btnEl) {
+        document.querySelectorAll('#tab-house .sub-tab').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+        document.querySelectorAll('#tab-house .sub-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
     }
 
     function loadBadgeInfo() {
