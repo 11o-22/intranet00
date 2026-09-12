@@ -2163,13 +2163,13 @@ function getTodayStr() {
 
         // 2. 우주 쇼핑몰은 '자정(0시)'을 기준으로 초기화됩니다.
         if (currentUser.alienDate !== currentToday) {
-            currentUser.alienDate = currentToday; 
-            currentUser.alienBoughtItems = [];
-            currentUser.alienUnlockedItems = []; // ★ 해금된 아이템 목록을 텅 비웁니다 (최소 0개 상태)
-            currentUser.alienTries = 0; // ★ 하이로우 게임 기회도 다시 0/2회로 리셋합니다.
+            currentUser.alienDate = currentToday;
+            currentUser.alienBoughtItems = [];   // 당일 구매 이력 해제
+            currentUser.alienUnlockedItems = []; // 해금 진열대 비움
+            currentUser.alienTries = 0;          // 하이로우 기회 2회 복구
+            currentUser.lastAlienPlayTime = 0;   // ★ 쿨타임 기록도 함께 초기화
             saveDB();
         }
-
         // 혈욕조 장착 시간 초기화 (이건 자정 기준 유지)
         if (currentUser.bloodBathEquippedAt && currentUser.equippedWeapons && currentUser.equippedWeapons.includes("혈욕조")) {
             const todayStr = new Date(currentUser.bloodBathEquippedAt).toLocaleDateString();
@@ -2285,6 +2285,16 @@ function getTodayStr() {
         }
 
         document.getElementById('alien-tries-left').innerText = Math.max(0, 2 - (currentUser.alienTries || 0));
+               // ★ 남은 기회가 0이면 HIGH/LOW 버튼 잠금
+        const hlH = document.getElementById('btn-hl-high');
+        const hlL = document.getElementById('btn-hl-low');
+        if (hlH && hlL) {
+            const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienTries || 0));
+            const coolDone = currentUser.lastAlienPlayTime && (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
+            const playable = triesLeft > 0 || coolDone;
+            hlH.disabled = !playable;
+            hlL.disabled = !playable;
+        }
 
         const tabBtnLetters = document.getElementById('tab-btn-letters');
         if (currentUser.hasNewLetter) tabBtnLetters.classList.add('notify-dot');
@@ -4014,28 +4024,35 @@ function getTodayStr() {
         const now = Date.now();
         const fourHoursMs = 4 * 60 * 60 * 1000; // 4시간 (밀리초)
 
+               // 자정 리셋은 updateUI가 전담하므로 여기선 방어만
         const todayStr = getTodayStr();
         if (currentUser.alienDate !== todayStr) {
-            currentUser.alienDate = todayStr; 
+            currentUser.alienDate = todayStr;
             currentUser.alienBoughtItems = [];
+            currentUser.alienUnlockedItems = [];
+            currentUser.alienTries = 0;
+            currentUser.lastAlienPlayTime = 0;
         }
 
         // 관리자(kario0987)는 제한 없음
         if (currentUser.code !== 'kario0987') {
             if (currentUser.alienTries === undefined) currentUser.alienTries = 0;
 
-            // 만약 2번 모두 소진(0회 남음) 상태라면, 마지막 플레이 타임으로부터 4시간이 지났는지 체크
             if (currentUser.alienTries >= 2) {
-                if (currentUser.lastAlienPlayTime && (now - currentUser.lastAlienPlayTime >= fourHoursMs)) {
-                    // 4시간이 지났다면 기회를 1회 복구해 줌 (2회 풀충전이 아님!)
-                    currentUser.alienTries = 1; 
+                // ★ 쿨타임 기록이 아예 없으면 무조건 차단 (기회 유실 방지)
+                if (!currentUser.lastAlienPlayTime) {
+                    showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
+                    return;
+                }
+
+                const elapsed = now - currentUser.lastAlienPlayTime;
+                if (elapsed >= fourHoursMs) {
+                    currentUser.alienTries = 1; // 4시간 경과 → 1회만 복구
                 } else {
-                    // 아직 4시간이 안 지났다면 차단
-                    const remainMs = fourHoursMs - (now - currentUser.lastAlienPlayTime);
+                    const remainMs = fourHoursMs - elapsed;
                     const remainMinutes = Math.ceil(remainMs / (60 * 1000));
                     const remainHours = Math.floor(remainMinutes / 60);
                     const mins = remainMinutes % 60;
-                    
                     let timeMsg = remainHours > 0 ? `${remainHours}시간 ${mins}분` : `${mins}분`;
                     showCustomAlert(`다음 우주 주파수 연결까지 약 ${timeMsg} 남았습니다.`);
                     return;
@@ -4082,11 +4099,22 @@ function getTodayStr() {
                 return true;
             });
 
-            let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
+                        let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
             if (unpicked.length === 0) unpicked = [...availablePool];
             let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
-            shuffled.slice(0, 3).forEach(it => { if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it); });
-            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리`);
+
+            // ★ 진열대는 최대 6개까지만 채움
+            const MAX_ALIEN_SLOTS = 6;
+            let room = MAX_ALIEN_SLOTS - currentUser.alienUnlockedItems.length;
+            let addCount = Math.min(3, Math.max(0, room));
+            shuffled.slice(0, addCount).forEach(it => {
+                if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it);
+            });
+
+            if (addCount === 0) {
+                msgEl.innerHTML = `<span style="color:#ffd700; font-weight:bold;">[인증 성공] 다만 진열대가 가득 차 더 이상 입고되지 않았습니다.</span>`;
+            }
+            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리 (+${addCount}종)`);
         } else {
             setUFODialogue(" 좋은 물건을 산다. ");
             msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
@@ -4098,7 +4126,10 @@ function getTodayStr() {
             dealerCardValue = Math.floor(Math.random() * 13) + 1;
             document.getElementById('hl-dealer-card').innerText = dealerCardValue;
             document.getElementById('hl-player-card').innerText = "?";
-            btnH.disabled = false; btnL.disabled = false;
+                        // ★ 기회가 남아있을 때만 버튼 재활성화
+            const canPlayAgain = (currentUser.code === 'kario0987') || (currentUser.alienTries < 2);
+            btnH.disabled = !canPlayAgain;
+            btnL.disabled = !canPlayAgain;
             updateUI();
         }, 1500);
     }
@@ -4118,7 +4149,7 @@ function getTodayStr() {
             if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
             return true;
         });
-
+        if (currentUser.code !== 'kario0987') unlocked = unlocked.slice(0, 6);
         if (unlocked.length === 0) {
             container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
             return;
