@@ -6252,8 +6252,10 @@ function getTodayStr() {
 
         targetUser.facilityCount = 0;
         targetUser.alienTries = 0;
+        targetUser.darkTries = 0;
+        targetUser.darkDate = getTodayStr();
         
-        addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한이 전면 초기화되었습니다.`);
+        addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한 및 어둠 탐사 횟수가 전면 초기화되었습니다.`);
         
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
