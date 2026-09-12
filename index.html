@@ -1615,7 +1615,11 @@ function getTodayStr() {
         "노스텔지어 끈": { price: 331, usable: true, targetable: true, effect: "equip_nostalgia", restrictDept: ["보안팀", "경비팀"], desc: "5시간 동안 장착 가능하다. 장착하는 도중에는 찼던 오염도가 서서히 줄어든다. (5분에 1%씩)" },
         
         // ★ [추가] 상담사 전용 아이템
-        "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." }
+        "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." },
+
+         "꺼진 가로등 전구": { price: 40, usable: true, targetable: false, effect: "equip_dead_bulb", darkOnly: true, desc: "[어둠 회수품] 심야 골목에서 떼어 온 전구. 장착 시 오염도 증가가 아주 미미하게 늦춰진다." },
+        "1시 17분 버스표": { price: 90, usable: true, targetable: false, effect: "bus_ticket", darkOnly: true, desc: "[어둠 회수품] 목적지가 인쇄되지 않은 승차권. 사용 시 다음 어둠 탐사 1회의 오염도 상승이 면제된다." },
+        "반 박자 늦은 그림자": { price: 250, usable: false, darkOnly: true, desc: "[어둠 회수품] 당신의 움직임을 아주 조금 늦게 따라한다. 아직 쓰임새가 밝혀지지 않았다." }
     };
 
      const NO_SELL_ITEMS = ["여우구슬"];
@@ -1634,6 +1638,416 @@ function getTodayStr() {
         "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약"
     ];
     const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
+
+        // ==========================================
+    // ★ 어둠 탐사 (Qtrew) 구역 데이터
+    // ==========================================
+    const DARK_ZONES = {
+        "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[300,500], ready:false },
+        "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[200,300], ready:false },
+        "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[200,300], ready:false },
+        "Qtrew-B-330": { code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자", brief:"(함정 조심!)", danger:"중상", survival:"12%", min:2, max:4, reward:[100,200], ready:false },
+        "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[100,200], ready:false },
+        "Qtrew-C-119": { code:"Qtrew-C-119", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"40%", min:2, max:2, reward:[50,100], ready:false },
+        "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[50,100], ready:false },
+        "Qtrew-D-042": {
+            code:"Qtrew-D-042", grade:"D", name:"가로등은 뒤에서부터 꺼진다",
+            brief:"(밤 1시 17분. 집으로 가는 길이 조금 길어졌다.)",
+            danger:"하", survival:"94%", min:1, max:1, reward:[30,60], ready:true,
+            intro:"휴대폰 시계가 1시 17분에서 넘어가지 않는다.<br>몇 번을 껐다 켜도 같다.<br><br>언제나 지나던 골목인데, 오늘은 끝이 보이지 않는다.<br>가로등이 하나, 등 뒤에서부터 꺼진다.",
+            outro:"익숙한 현관 앞이다.<br>시계는 1시 18분을 가리키고 있다.<br><br>골목 쪽은 돌아보지 않기로 한다."
+        },
+        "Qtrew-D-087": { code:"Qtrew-D-087", grade:"D", name:"■■■■", brief:"(개방 준비 중)", danger:"하", survival:"91%", min:1, max:1, reward:[30,60], ready:false }
+    };
+
+    const DARK_LOOT = [
+        { name:"꺼진 가로등 전구", chance:0.030 },
+        { name:"1시 17분 버스표", chance:0.020 },
+        { name:"반 박자 늦은 그림자", chance:0.010 }
+    ];
+
+    // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
+    let darkRun = null;
+
+        function getDarkTriesLeft() {
+        if (!currentUser) return 0;
+        if (currentUser.darkDate !== getTodayStr()) return 3;
+        return Math.max(0, 3 - (currentUser.darkTries || 0));
+    }
+
+    function rollDarkBonus() {
+        let b = 0;
+        if (currentUser.pollution < 30) b += 1;
+        if (currentUser.pollution >= 60) b -= 1;
+        if (currentUser.pollution >= 90) b -= 1;
+        if (darkRun && darkRun.carryItems && darkRun.carryItems.length > 0) b += 1;
+        if (darkRun) b += (darkRun.modifier || 0);
+        return b;
+    }
+
+    function renderDarkness() {
+        const body = document.getElementById('darkness-body');
+        if (!body || !currentUser) return;
+
+        if (darkRun) { renderDarkStep(); return; }
+
+        if (currentUser.darkDate !== getTodayStr()) {
+            currentUser.darkDate = getTodayStr();
+            currentUser.darkTries = 0;
+            saveDB();
+        }
+
+        const left = getDarkTriesLeft();
+        let html = `
+            <div style="text-align:left;">
+                <div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
+                    금일 잔여 탐사 횟수: <b style="color:var(--theme-focus);">${left} / 3회</b> (자정 초기화)<br>
+                    <span style="font-size:10px;">※ 공용시설 이용 횟수와는 별개로 집계됩니다.</span>
+                </div>`;
+
+        for (let key in DARK_ZONES) {
+            const z = DARK_ZONES[key];
+            const partySize = (z.min === z.max) ? `${z.min}인` : `${z.min}~${z.max}인`;
+            const locked = !z.ready;
+            html += `
+                <div style="background:rgba(0,0,0,0.35); border:1px solid ${locked ? '#333' : 'var(--theme-border)'}; border-radius:6px; padding:12px; margin-bottom:10px; ${locked ? 'opacity:0.45;' : ''}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-family:monospace; font-size:11px; color:#ff6b6b; font-weight:bold;">${z.code}</div>
+                            <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${locked ? '■■■■■■' : z.name}</div>
+                            <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
+                            <div style="font-size:10px; color:#777; margin-top:5px;">
+                                난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · ${partySize} · 보상 ${z.reward[0]}~${z.reward[1]} P
+                            </div>
+                        </div>
+                        <div style="flex-shrink:0;">
+                            ${locked
+                                ? `<div style="font-size:10px; color:#666; font-weight:bold; text-align:center; line-height:1.5;">🔒<br>개방<br>준비 중</div>`
+                                : `<button class="game-btn" style="margin:0; padding:8px 12px; font-size:11px;" onclick="openDarkBriefing('${z.code}')">진입</button>`}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        html += `<div style="font-size:10px; color:#666; margin-top:14px; line-height:1.6; border-top:1px dashed #333; padding-top:10px;">
+                ※ B등급 이상 구역에서 사망할 경우 보유 포인트와 소지품 전부가 소멸합니다.<br>
+                ※ 탐사 도중 창을 닫거나 새로고침하면 탐사는 중단되며 횟수는 복구되지 않습니다.
+            </div></div>`;
+        body.innerHTML = html;
+    }
+
+    function openDarkBriefing(zoneCode) {
+        const z = DARK_ZONES[zoneCode];
+        if (!z || !z.ready) return;
+        if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 어둠 탐사 횟수를 모두 소진했습니다. 자정에 초기화됩니다.'); return; }
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치에 도달하여 탐사에 나설 수 없습니다.'); return; }
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 탐사에 나설 수 없습니다.'); return; }
+
+        let counts = {};
+        (currentUser.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        let equips = [], consums = [];
+        Object.keys(counts).forEach(it => {
+            const c = ITEM_CATALOG[it];
+            if (!c) return;
+            if (c.effect && c.effect.startsWith('equip')) equips.push(it);
+            else if (c.usable) consums.push(it);
+        });
+
+        const body = document.getElementById('darkness-body');
+        body.innerHTML = `
+            <div style="text-align:left;">
+                <div style="font-family:monospace; font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:4px;">${z.code}</div>
+                <div style="font-size:15px; font-weight:bold; margin-bottom:10px; color:var(--theme-text);">${z.name}</div>
+                <div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:12px; font-size:11px; line-height:1.7; margin-bottom:14px;">
+                    ${z.brief}<br><br>
+                    난이도 <b>${z.danger}</b> / 예상 생존율 <b>${z.survival}</b><br>
+                    정원 <b>${z.min === z.max ? z.min + '인' : z.min + '~' + z.max + '인'}</b> / 보상 <b>${z.reward[0]}~${z.reward[1]} P</b><br>
+                    <span style="color:#4CAF50;">본 구역은 D등급으로, 사망 시 재산 소멸 규정이 적용되지 않습니다.</span><br>
+                    <span style="color:#ff9800;">귀환 시 오염도가 10% 상승합니다.</span>
+                </div>
+
+                <div style="font-size:12px; font-weight:bold; margin-bottom:6px; color:var(--theme-text);">[반입 물품 선택]</div>
+                <div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.6;">
+                    장비 최대 2점, 소모품 최대 3점까지 반입할 수 있습니다.<br>
+                    <b style="color:#aaa;">아무것도 반입하지 않고 진입해도 무방합니다.</b> 다만 소모품을 지참하면 판정에 +1 보정이 붙고, 탐사 중 1회에 한해 판정을 다시 굴릴 수 있습니다.<br>
+                    <span style="color:#ff6b6b;">반입한 물품은 탐사 중 소실될 수 있습니다.</span>
+                </div>
+
+                <div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">장비 (최대 2)</div>
+                <div id="dark-equip-box" style="margin-bottom:12px;">
+                    ${equips.length ? equips.map(it => `<label style="display:block; font-size:11px; margin-bottom:5px; cursor:pointer;"><input type="checkbox" class="dark-eq" value="${it}" style="width:auto; margin-right:6px;">${it} <span style="color:#777;">(보유 ${counts[it]})</span></label>`).join('') : '<div style="font-size:10px; color:#666;">반입 가능한 장비가 없습니다.</div>'}
+                </div>
+
+                <div style="font-size:11px; color:#4CAF50; font-weight:bold; margin-bottom:5px;">소모품 (최대 3)</div>
+                <div id="dark-consum-box" style="margin-bottom:16px;">
+                    ${consums.length ? consums.map(it => `<label style="display:block; font-size:11px; margin-bottom:5px; cursor:pointer;"><input type="checkbox" class="dark-cs" value="${it}" style="width:auto; margin-right:6px;">${it} <span style="color:#777;">(보유 ${counts[it]})</span></label>`).join('') : '<div style="font-size:10px; color:#666;">반입 가능한 소모품이 없습니다.</div>'}
+                </div>
+
+                <div style="display:flex; gap:8px;">
+                    <button class="game-btn" style="flex:1; margin:0; padding:12px;" onclick="renderDarkness()">돌아가기</button>
+                    <button class="game-btn" style="flex:2; margin:0; padding:12px; background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="startDarkRun('${z.code}')">어둠으로 진입</button>
+                </div>
+            </div>`;
+    }
+
+    function startDarkRun(zoneCode) {
+        const z = DARK_ZONES[zoneCode];
+        if (!z) return;
+        if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
+
+        let eq = Array.from(document.querySelectorAll('.dark-eq:checked')).map(e => e.value);
+        let cs = Array.from(document.querySelectorAll('.dark-cs:checked')).map(e => e.value);
+        if (eq.length > 2) { showCustomAlert('장비는 최대 2점까지만 반입할 수 있습니다.'); return; }
+        if (cs.length > 3) { showCustomAlert('소모품은 최대 3점까지만 반입할 수 있습니다.'); return; }
+
+        currentUser.darkDate = getTodayStr();
+        currentUser.darkTries = (currentUser.darkTries || 0) + 1;
+
+        darkRun = {
+            zone: zoneCode, step: 0, modifier: 0, success: 0, fail: 0,
+            carryEquips: eq, carryItems: cs, rerollUsed: false, lostItems: [], log: []
+        };
+
+        addHistoryLog(currentUser, `[어둠 진입] ${zoneCode} 탐사 개시`);
+        saveDB();
+        renderDarkStep();
+    }
+
+    function darkBox(title, text, extra) {
+        return `
+            <div style="text-align:left;">
+                <div style="font-family:monospace; font-size:10px; color:#ff6b6b; margin-bottom:8px;">${DARK_ZONES[darkRun.zone].code} — ${title}</div>
+                <div style="background:#0a0a0a; border:1px solid #2a2a2a; border-radius:6px; padding:16px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:14px; min-height:90px;">${text}</div>
+                ${extra}
+            </div>`;
+    }
+
+    function darkChoiceBtn(label, fn) {
+        return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${fn}">${label}</button>`;
+    }
+
+    function renderDarkStep() {
+        const body = document.getElementById('darkness-body');
+        if (!body || !darkRun) return;
+        const s = darkRun.step;
+
+        if (s === 0) {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("걸음을 옮긴다.", "darkStep1()"));
+        } else if (s === 1) {
+            body.innerHTML = darkBox("기믹 1 — 세 갈래", 
+                `가로등이 등 뒤에서부터 순서대로 꺼진다.<br>앞쪽 세 개만 남았다.<br><br>왼쪽 끝에 편의점 불빛이 보인다.<br>오른쪽은 평소 쓰던 지름길이다.<br>뒤는… 방금 지나온 길이다.`,
+                darkChoiceBtn("① 편의점 불빛 쪽으로 간다.", "darkStep1Pick('store')") +
+                darkChoiceBtn("② 지름길로 빠진다.", "darkStep1Pick('short')") +
+                darkChoiceBtn("③ 왔던 길로 되돌아간다.", "darkStep1Pick('back')") +
+                darkChoiceBtn("④ 그 자리에 멈춰 선다.", "darkStep1Pick('stay')"));
+        } else if (s === 2) {
+            body.innerHTML = darkBox("기믹 2 — 신호등",
+                `사거리다. 차는 한 대도 없는데 신호등만 살아 있다.<br>빨강, 초록, 빨강… 주기가 맞지 않는다.<br><br>초록불이 켜지는 순간에 맞춰 건너야 한다.<br><span style="color:#888; font-size:11px;">[타이밍 판정 3회 — 버튼이 초록일 때 누르세요]</span>`,
+                `<div id="dark-cross-lamp" style="width:60px; height:60px; border-radius:50%; margin:0 auto 14px auto; background:#3a0000; border:3px solid #444; box-shadow:inset 0 0 12px rgba(0,0,0,0.8);"></div>
+                 <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">건넌 횟수: <b id="dark-cross-count" style="color:var(--theme-focus);">0</b> / 3</div>
+                 <button class="game-btn" id="dark-cross-btn" style="width:100%; margin:0; padding:14px;" onclick="darkCrossTap()">건넌다</button>
+                 <div id="dark-cross-msg" style="font-size:11px; color:#888; text-align:center; margin-top:10px; min-height:16px;"></div>`);
+            startDarkCrossing();
+        } else if (s === 3) {
+            body.innerHTML = darkBox("기믹 3 — 자판기",
+                `골목 끝에 자판기가 서 있다. 불이 들어와 있다.<br>유리에 네가 비친다.<br><br>네가 멈췄는데, 비친 쪽은 반 박자 뒤에 멈췄다.`,
+                darkChoiceBtn("① 뒤를 돌아본다.", "darkStep3Pick('turn')") +
+                darkChoiceBtn("② 못 본 척 지나간다.", "darkStep3Pick('ignore')") +
+                darkChoiceBtn("③ 유리를 두드려 본다.", "darkStep3Pick('knock')"));
+        } else if (s === 99) {
+            renderDarkResult();
+        }
+    }
+
+    function darkStep1() { darkRun.step = 1; renderDarkStep(); }
+
+    function darkStep1Pick(pick) {
+        let txt = "", mod = 0;
+        if (pick === 'store') {
+            txt = `불빛 쪽으로 걷는다.<br>가까워질수록 간판 글자가 뒤집혀 보인다.<br>안에는 아무도 없고, 계산대 위 라디오만 켜져 있다.<br><br>불빛 아래 서 있으니 조금 낫다.`;
+            mod = 1;
+        } else if (pick === 'short') {
+            txt = `지름길로 들어선다.<br>벽에 붙은 전단지가 전부 같은 얼굴이다.<br>어제는 없던 것들이다.<br><br>빠르긴 하다. 빠르기만 하다.`;
+            mod = 0;
+        } else if (pick === 'back') {
+            txt = `돌아선다.<br><br>방금 지나온 길이 없다.<br>담벼락이 이어져 있을 뿐이다.<br>왔던 곳이 어디였는지 기억이 잘 나지 않는다.`;
+            mod = -1;
+            applyPollutionToUser(currentUser, 2);
+        } else {
+            txt = `그 자리에 선다.<br>발소리가 한 박자 늦게 멎는다.<br><br>숨을 고르는 동안 아무 일도 일어나지 않았다.<br>아무 일도 일어나지 않았다는 것이 이상하다.`;
+            mod = 0;
+        }
+        darkRun.modifier += mod;
+        darkRun.log.push(`[기믹 1] ${pick === 'store' ? '편의점' : pick === 'short' ? '지름길' : pick === 'back' ? '되돌아감' : '정지'} 선택`);
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 1 — 결과", txt,
+            darkChoiceBtn("계속 걷는다.", "darkRun.step=2; renderDarkStep();"));
+    }
+
+    // --- 미니게임: 신호등 건너기 ---
+    let darkCrossTimer = null, darkCrossGreen = false, darkCrossCount = 0, darkCrossMiss = 0;
+
+    function startDarkCrossing() {
+        darkCrossCount = 0; darkCrossMiss = 0; darkCrossGreen = false;
+        clearInterval(darkCrossTimer);
+        const lamp = document.getElementById('dark-cross-lamp');
+        function cycle() {
+            darkCrossGreen = !darkCrossGreen;
+            if (lamp) {
+                lamp.style.background = darkCrossGreen ? '#1b5e20' : '#3a0000';
+                lamp.style.boxShadow = darkCrossGreen ? '0 0 20px #4CAF50, inset 0 0 12px #2e7d32' : 'inset 0 0 12px rgba(0,0,0,0.8)';
+            }
+            clearTimeout(darkCrossTimer);
+            darkCrossTimer = setTimeout(cycle, darkCrossGreen ? (500 + Math.random()*500) : (700 + Math.random()*900));
+        }
+        cycle();
+    }
+
+    function darkCrossTap() {
+        if (!darkRun) return;
+        const msg = document.getElementById('dark-cross-msg');
+        if (darkCrossGreen) {
+            darkCrossCount++;
+            document.getElementById('dark-cross-count').innerText = darkCrossCount;
+            msg.innerHTML = `<span style="color:#4CAF50;">건넜다.</span>`;
+        } else {
+            darkCrossMiss++;
+            msg.innerHTML = `<span style="color:#f44336;">빨간불이다. 뒤에서 뭔가 한 걸음 다가왔다.</span>`;
+        }
+        if (darkCrossCount >= 3 || darkCrossMiss >= 3) {
+            clearTimeout(darkCrossTimer);
+            document.getElementById('dark-cross-btn').disabled = true;
+            const ok = darkCrossCount >= 3;
+            if (ok) { darkRun.success++; darkRun.modifier += 1; }
+            else { darkRun.fail++; darkRun.modifier -= 1; applyPollutionToUser(currentUser, 3); }
+            darkRun.log.push(`[기믹 2] 신호등 ${ok ? '통과' : '실패'} (${darkCrossCount}/3)`);
+            setTimeout(() => {
+                document.getElementById('darkness-body').innerHTML = darkBox("기믹 2 — 결과",
+                    ok ? `건너편 인도에 올라선다.<br>뒤를 보지 않고 걷는다.<br><br>신호등은 아직도 혼자 깜빡이고 있다.`
+                       : `결국 빨간불에 건넜다.<br>경적 소리가 났는데, 차는 없었다.<br><br>발목이 조금 무겁다.`,
+                    darkChoiceBtn("골목 끝으로 향한다.", "darkRun.step=3; renderDarkStep();"));
+            }, 1200);
+        }
+    }
+
+    function darkStep3Pick(pick) {
+        const roll = Math.floor(Math.random()*20) + 1;
+        const bonus = rollDarkBonus();
+        const total = roll + bonus;
+        const DC = pick === 'knock' ? 12 : (pick === 'turn' ? 10 : 8);
+
+        let outcome, txt;
+        if (roll === 20) outcome = 'crit';
+        else if (roll === 1) outcome = 'fumble';
+        else outcome = (total >= DC) ? 'pass' : 'fail';
+
+        if (outcome === 'crit') {
+            darkRun.success += 2; darkRun.critical = true;
+            txt = `유리 속의 것이 먼저 고개를 돌렸다.<br>그리고 천천히, 길 안쪽으로 걸어 들어갔다.<br><br>자판기 배출구에서 뭔가가 굴러 떨어진다.`;
+        } else if (outcome === 'pass') {
+            darkRun.success++;
+            txt = pick === 'turn' ? `돌아본다. 아무도 없다.<br>골목은 그냥 골목이다.<br><br>다시 앞을 보니 유리에 비친 상도 제자리에 있다.`
+                : pick === 'ignore' ? `보지 않는다. 걷는다.<br>유리가 등 뒤로 지나가는 동안 눈을 감지는 않았다.<br><br>그게 최선이었다.`
+                : `유리를 두드린다. 둔한 소리가 난다.<br>비친 쪽은 두드리지 않았다.<br><br>대신 손을 들어 인사를 했다. 그걸로 끝이었다.`;
+        } else if (outcome === 'fail') {
+            darkRun.fail++; applyPollutionToUser(currentUser, 4);
+            txt = `무언가 어긋난 채로 지나쳤다.<br>목덜미가 서늘하다.<br><br>자판기 불빛이 등 뒤에서 꺼지는 소리가 들렸다.`;
+        } else {
+            darkRun.fail += 2; applyPollutionToUser(currentUser, 8);
+            appendBadgeNoteToUser(currentUser, `[Qtrew-D-042] 반 박자 늦게 따라오는 기척이 남음`);
+            txt = `유리 속의 것과 눈이 마주쳤다.<br>그건 웃지 않았는데, 네 쪽이 웃고 있었다.<br><br>그때부터 네 그림자는 반 박자씩 늦다.`;
+        }
+
+        darkRun.log.push(`[기믹 3] d20 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+
+        let rerollBtn = '';
+        if ((outcome === 'fail' || outcome === 'fumble') && !darkRun.rerollUsed && darkRun.carryItems.length > 0) {
+            rerollBtn = darkChoiceBtn(`🔁 소모품 '${darkRun.carryItems[0]}'을(를) 써서 다시 굴린다. (1회)`, `darkReroll('${pick}')`);
+        }
+
+        document.getElementById('darkness-body').innerHTML = darkBox("기믹 3 — 판정",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${outcome==='crit'?'#4CAF50':outcome==='fumble'?'#f44336':'#ffd700'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            rerollBtn + darkChoiceBtn("골목을 빠져나간다.", "darkRun.step=99; renderDarkStep();"));
+    }
+
+    function darkReroll(pick) {
+        const used = darkRun.carryItems.shift();
+        darkRun.rerollUsed = true;
+        darkRun.lostItems.push(used);
+        removeItemFromInventory(currentUser, used, 1);
+        darkRun.success = Math.max(0, darkRun.success);
+        darkRun.fail = Math.max(0, darkRun.fail - 1);
+        darkStep3Pick(pick);
+    }
+
+    function renderDarkResult() {
+        const z = DARK_ZONES[darkRun.zone];
+        let base = Math.floor(Math.random() * (z.reward[1] - z.reward[0] + 1)) + z.reward[0];
+        let bonus = darkRun.success * 6 - darkRun.fail * 5;
+        let total = Math.max(10, base + bonus);
+
+        currentUser.points += total;
+
+        let pollInc = 10;
+        if (currentUser.darkTicketFree) { pollInc = 0; currentUser.darkTicketFree = false; }
+        if (pollInc > 0) applyPollutionToUser(currentUser, pollInc);
+
+        let gained = [];
+        DARK_LOOT.forEach(l => {
+            let c = l.chance * (darkRun.critical ? 3 : 1);
+            if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
+        });
+
+        addHistoryLog(currentUser, `[어둠 귀환] ${z.code} 탐사 완료 (+${total} P)`);
+
+        if (!currentUser.darkLogs) currentUser.darkLogs = [];
+        currentUser.darkLogs.unshift({
+            date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
+            reward: total, success: darkRun.success, fail: darkRun.fail,
+            loot: gained, lost: darkRun.lostItems, detail: darkRun.log
+        });
+        if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
+
+        const body = document.getElementById('darkness-body');
+        body.innerHTML = darkBox("귀환", z.outro,
+            `<div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
+                <div style="font-weight:bold; color:var(--theme-focus); margin-bottom:8px; border-bottom:1px dashed #444; padding-bottom:6px;">[탐사 정산서]</div>
+                기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
+                지급 포인트 <b style="color:#ffd700;">+${total} P</b><br>
+                오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}<br>
+                ${darkRun.lostItems.length ? `소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span><br>` : ''}
+                ${gained.length ? `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #444; color:#4CAF50; font-weight:bold;">✦ 회수품 발견: ${gained.join(', ')}</div>` : ''}
+            </div>` +
+            darkChoiceBtn("단말로 복귀한다.", "finishDarkRun()"));
+
+        showPointGainEffect(total);
+        darkRun = null;
+        saveDB();
+    }
+
+    function finishDarkRun() {
+        darkRun = null;
+        updateUI();
+        renderDarkness();
+    }
+
+    function renderDarkLogs() {
+        const c = document.getElementById('darkness-log-container');
+        if (!c) return;
+        if (!currentUser.darkLogs || currentUser.darkLogs.length === 0) {
+            c.innerHTML = '<div style="color:#666; font-size:11px; text-align:center; padding:20px 0;">기록된 탐사 이력이 없습니다.</div>';
+            return;
+        }
+        c.innerHTML = currentUser.darkLogs.map(l => `
+            <div style="background:rgba(0,0,0,0.3); border-left:3px solid #7f0000; padding:10px 12px; margin-bottom:8px; border-radius:4px; font-size:11px;">
+                <div style="font-size:9px; color:#888; margin-bottom:4px;">${l.date}</div>
+                <div style="font-family:monospace; color:#ff6b6b; font-weight:bold;">${l.zone}</div>
+                <div style="color:var(--theme-text); font-weight:bold; margin:3px 0;">${l.zoneName}</div>
+                <div style="color:#999;">성공 ${l.success} / 실패 ${l.fail} · 보상 <b style="color:#ffd700;">+${l.reward} P</b></div>
+                ${l.loot && l.loot.length ? `<div style="color:#4CAF50; margin-top:3px;">회수품: ${l.loot.join(', ')}</div>` : ''}
+                ${l.lost && l.lost.length ? `<div style="color:#f44336; margin-top:3px;">소실: ${l.lost.join(', ')}</div>` : ''}
+            </div>`).join('');
+    }
 
     const ALIEN_RANDOM_QUOTES = [
         "물건을 본다 👌🏻", "관측을 한다.", "생체 신호를 확인한다.", "좋은 물건이 들어왔습니다.", "흥미로운 거래를 연다.", "미지의 파동을 분석한다."
@@ -1718,6 +2132,7 @@ function getTodayStr() {
     // ★ [추가] 은반지 및 버터 나이프 장착 여부 및 만료 체크 함수
     function getPollutionMultiplier(user) {
         if (!user.equippedWeapons) return 1; // 장착한 무기가 없으면 기본 배율(1배)
+
         
         // 은반지 착용 중이고 아직 120시간이 안 지났다면 오염도 증가율 0 (완전 차단)
         if (user.equippedWeapons.includes("은반지")) {
@@ -1741,6 +2156,8 @@ function getTodayStr() {
                 addHistoryLog(user, `[장비 해제] 버터 나이프의 효과 시간(1시간)이 종료되었습니다.`);
             }
         }
+
+                if (user.equippedWeapons.includes("꺼진 가로등 전구")) return 0.9;
         
         return 1;
     }
@@ -2388,10 +2805,10 @@ function getTodayStr() {
             else btnAdminConsole.classList.remove('notify-dot');
         }
 
-        checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
+                checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop(); renderPointRanking(); renderVipOpponents();
-    }
+        if (!darkRun) renderDarkness();
 
     function switchTab(tabId, el) {
         document.querySelectorAll('.tabs-grid .tab').forEach(t => t.classList.remove('active'));
@@ -2424,11 +2841,13 @@ function getTodayStr() {
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'shop-alien') setUFODialogue("물건을 본다 👌🏻");
     }
-        function switchDarknessPanel(panelId, btnEl) {
+           function switchDarknessPanel(panelId, btnEl) {
         document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
+        if (panelId === 'dark-main') renderDarkness();
+        if (panelId === 'dark-log') renderDarkLogs();
     }
 
     function switchHousePanel(panelId, btnEl) {
@@ -2797,10 +3216,19 @@ function getTodayStr() {
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
             return;
         }
+                     if (cat.effect === 'bus_ticket') {
+            if (currentUser.darkTicketFree) { showCustomAlert('이미 승차권 효과가 적용 중입니다.'); return; }
+            currentUser.darkTicketFree = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            appendSystemBadgeNote(`[1시 17분 버스표] 다음 어둠 탐사 1회의 오염 상승이 면제됩니다.`);
+            addHistoryLog(currentUser, `[아이템 사용] 1시 17분 버스표 개찰`);
+            saveDB(); updateUI();
+            showCustomAlert('승차권을 개찰했습니다. 다음 탐사에서는 오염도가 오르지 않습니다.');
+            return;
+        }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
-        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife') {
-
+               if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb') {
             if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
