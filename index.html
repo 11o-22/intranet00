@@ -2060,6 +2060,11 @@ function getTodayStr() {
         const mainTab = document.querySelector('#tab-darkness .sub-tab');
         if (mainTab) mainTab.classList.add('active');
         document.getElementById('dark-main').classList.add('active');
+                watchPartyStep();
+        if (database) {
+            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).set(true);
+            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).onDisconnect().remove();
+        }
         renderDarkStep();
     }
 
@@ -2096,7 +2101,278 @@ function getTodayStr() {
             }
         }
     }, 60000);
+    // ==========================================
+    // ★ 파티 투표 시스템
+    // ==========================================
+    const VOTE_SECONDS = 45;
+    let voteListenerRef = null;
+    let voteListenerKey = null;
+    let currentVote = null;
+    let voteTickTimer = null;
+    let voteResolved = false;
 
+    function voteRefPath(partyId, step) {
+        return `darkVotes/${partyId}/step${step}`;
+    }
+
+    // 방장이 투표판을 개설
+    function openVote(options) {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        if (!darkRun.isLeader) return;
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).set({
+            options: options,
+            endAt: Date.now() + VOTE_SECONDS * 1000,
+            votes: {},
+            state: 'OPEN'
+        });
+    }
+
+    function attachVoteListener() {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        const key = `${darkRun.partyId}_${darkRun.step}`;
+        if (voteListenerKey === key) return;
+        detachVoteListener();
+        voteListenerKey = key;
+        voteResolved = false;
+        voteListenerRef = database.ref(voteRefPath(darkRun.partyId, darkRun.step));
+        voteListenerRef.on('value', (snap) => {
+            currentVote = snap.val();
+            if (!currentVote) return;
+            renderVoteState();
+            if (currentVote.state === 'DONE' && !voteResolved) {
+                voteResolved = true;
+                applyVoteResult(currentVote);
+            }
+        });
+        startVoteTick();
+    }
+
+    function detachVoteListener() {
+        if (voteListenerRef) { try { voteListenerRef.off(); } catch(e) {} }
+        voteListenerRef = null;
+        voteListenerKey = null;
+        currentVote = null;
+        clearInterval(voteTickTimer);
+        voteTickTimer = null;
+    }
+
+    function castVote(optId) {
+        if (!darkRun || !currentVote || currentVote.state !== 'OPEN') return;
+        if (currentVote.votes && currentVote.votes[currentUser.code]) return; // 재투표 불가
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step) + '/votes/' + currentUser.code)
+            .set({ opt: optId, name: currentUser.name, at: Date.now() });
+    }
+
+    function getPartyMemberCount() {
+        const p = darkParties[darkRun.partyId];
+        return p && p.members ? Object.keys(p.members).length : 1;
+    }
+
+    function startVoteTick() {
+        clearInterval(voteTickTimer);
+        voteTickTimer = setInterval(() => {
+            if (!darkRun || !currentVote) return;
+            const el = document.getElementById('vote-timer');
+            const remain = Math.max(0, Math.ceil((currentVote.endAt - Date.now()) / 1000));
+            if (el) el.innerText = remain;
+
+            if (currentVote.state !== 'OPEN') return;
+            const voted = currentVote.votes ? Object.keys(currentVote.votes).length : 0;
+            const total = getPartyMemberCount();
+
+            // 방장만 마감 처리
+            if (darkRun.isLeader && (voted >= total || remain <= 0)) {
+                closeVote();
+            }
+        }, 500);
+    }
+
+    function closeVote() {
+        if (!darkRun || !darkRun.isLeader || !currentVote) return;
+        if (currentVote.state !== 'OPEN') return;
+
+        const votes = currentVote.votes || {};
+        let tally = {};
+        currentVote.options.forEach(o => { tally[o.id] = []; });
+        for (let code in votes) {
+            const v = votes[code];
+            if (tally[v.opt]) tally[v.opt].push({ code: code, name: v.name });
+        }
+
+        let max = 0;
+        currentVote.options.forEach(o => { if (tally[o.id].length > max) max = tally[o.id].length; });
+
+        let winners = currentVote.options.filter(o => tally[o.id].length === max).map(o => o.id);
+        let picked;
+        if (max === 0) {
+            // 전원 기권 → 무작위
+            picked = currentVote.options[Math.floor(Math.random() * currentVote.options.length)].id;
+        } else {
+            picked = winners[Math.floor(Math.random() * winners.length)];
+        }
+
+        // 주사위 대표: 이긴 선택지 투표자 중 무작위 (없으면 방장)
+        const backers = tally[picked] || [];
+        const roller = backers.length > 0
+            ? backers[Math.floor(Math.random() * backers.length)]
+            : { code: currentUser.code, name: currentUser.name };
+
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).update({
+            state: 'DONE',
+            picked: picked,
+            tied: winners.length > 1 && max > 0,
+            tally: tally,
+            rollerCode: roller.code,
+            rollerName: roller.name,
+            seed: Math.floor(Math.random() * 1000000)
+        });
+    }
+
+    // 투표 결과를 각 클라이언트가 개별 적용
+    function applyVoteResult(vote) {
+        const votes = vote.votes || {};
+        const myVote = votes[currentUser.code];
+        const opt = vote.options.find(o => o.id === vote.picked);
+        if (!opt) return;
+
+        // 기권 페널티
+        if (!myVote) {
+            applyPollutionToUser(currentUser, 3);
+            if (!darkRun.abstains) darkRun.abstains = 0;
+            darkRun.abstains++;
+        }
+
+        // 내가 이긴 선택지에 투표했는지 기록 (정산용)
+        if (!darkRun.voteHistory) darkRun.voteHistory = [];
+        darkRun.voteHistory.push({
+            step: darkRun.step,
+            picked: vote.picked,
+            mine: myVote ? myVote.opt : null,
+            agreed: myVote ? (myVote.opt === vote.picked) : null
+        });
+
+        darkRun.lastRoller = { code: vote.rollerCode, name: vote.rollerName };
+        darkRun.voteSeed = vote.seed;
+
+        clearInterval(voteTickTimer);
+        setTimeout(() => { runVotedAction(opt, vote); }, 1400);
+    }
+
+    // 시나리오별 실행 분기 (각 시나리오에서 정의)
+    function runVotedAction(opt, vote) {
+        if (typeof window[opt.fn] === 'function') {
+            window[opt.fn](opt.arg, vote);
+        }
+    }
+
+    // --- 투표 화면 ---
+    function renderVoteBox(title, text, options, imgKey) {
+        const body = document.getElementById('darkness-body');
+        if (!body) return;
+        body.innerHTML = darkBox(title, text,
+            `<div id="vote-area"></div>${buildChatHtml('normal')}`, imgKey);
+        attachChatListener(darkRun.partyId);
+        renderChatLog();
+        if (darkRun.isLeader) openVote(options);
+        attachVoteListener();
+        renderVoteState();
+    }
+
+    function renderVoteState() {
+        const area = document.getElementById('vote-area');
+        if (!area || !currentVote) return;
+
+        const votes = currentVote.votes || {};
+        const myVote = votes[currentUser.code];
+        const total = getPartyMemberCount();
+        const voted = Object.keys(votes).length;
+        const remain = Math.max(0, Math.ceil((currentVote.endAt - Date.now()) / 1000));
+        const done = currentVote.state === 'DONE';
+
+        let tally = {};
+        currentVote.options.forEach(o => { tally[o.id] = []; });
+        for (let c in votes) { if (tally[votes[c].opt]) tally[votes[c].opt].push(votes[c].name); }
+
+        let html = currentVote.options.map(o => {
+            const backers = tally[o.id] || [];
+            const isMine = myVote && myVote.opt === o.id;
+            const isPicked = done && currentVote.picked === o.id;
+            return `
+                <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; position:relative;
+                    ${isPicked ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : ''}
+                    ${isMine && !done ? 'border-color:var(--theme-focus) !important; box-shadow:0 0 8px var(--theme-focus);' : ''}
+                    ${done && !isPicked ? 'opacity:0.4;' : ''}"
+                    onclick="castVote('${o.id}')" ${(myVote || done) ? 'disabled' : ''}>
+                    ${o.label}
+                    <span style="position:absolute; right:11px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:bold; color:${isPicked ? '#fff' : 'var(--theme-focus)'};">
+                        ${backers.length > 0 ? '●'.repeat(Math.min(backers.length, 5)) + ` ${backers.length}` : ''}
+                    </span>
+                </button>`;
+        }).join('');
+
+        if (done) {
+            const opt = currentVote.options.find(o => o.id === currentVote.picked);
+            html += `
+                <div style="text-align:center; font-size:11px; color:#aaa; margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:5px; line-height:1.7;">
+                    ${currentVote.tied ? '<span style="color:#ff9800;">동수 — 무작위로 갈렸습니다.</span><br>' : ''}
+                    결정: <b style="color:var(--theme-text);">${opt ? opt.label.replace(/^[①②③④⑤]\s*/, '') : '-'}</b><br>
+                    ${currentVote.rollerName ? `<span style="font-size:10px;">판정 담당: <b style="color:var(--theme-focus);">${currentVote.rollerName}</b></span>` : ''}
+                </div>`;
+        } else {
+            html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:11px; color:#888;">
+                    <span>⏱ <b id="vote-timer" style="color:${remain <= 10 ? '#ff6b6b' : 'var(--theme-focus)'}; font-size:14px;">${remain}</b>초 · 투표 ${voted}/${total}</span>
+                    ${darkRun.isLeader ? `<button class="game-btn" style="margin:0; padding:5px 10px; font-size:10px;" onclick="closeVote()">지금 마감</button>` : ''}
+                </div>
+                ${myVote ? `<div style="text-align:center; font-size:10px; color:#4CAF50; margin-top:7px;">선택 완료. 나머지를 기다립니다.</div>` : ''}`;
+        }
+        area.innerHTML = html;
+    }
+        // 파티면 투표 화면, 단독이면 그냥 선택 버튼
+    function renderChoiceStep(title, text, options, imgKey) {
+        if (darkRun.isParty) {
+            renderVoteBox(title, text, options, imgKey);
+        } else {
+            const body = document.getElementById('darkness-body');
+            body.innerHTML = darkBox(title, text,
+                options.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`).join(''),
+                imgKey);
+        }
+    }
+
+    // 결과 화면 (파티는 채팅 포함)
+    function renderResultStep(title, text, btnLabel, nextFn, imgKey) {
+        const body = document.getElementById('darkness-body');
+        body.innerHTML = darkBox(title, text,
+            darkChoiceBtn(btnLabel, nextFn) + (darkRun.isParty ? buildChatHtml('normal') : ''),
+            imgKey);
+        if (darkRun.isParty) { attachChatListener(darkRun.partyId); renderChatLog(); }
+    }
+
+    // 다음 단계로 (방장만 신호, 전원 동기화)
+    function partyAdvance(nextStep) {
+        if (!darkRun) return;
+        if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
+        if (darkRun.isLeader && database) {
+            database.ref(`darkParties/${darkRun.partyId}/curStep`).set(nextStep);
+        }
+    }
+
+    // 방장의 진행 신호 수신
+    function watchPartyStep() {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        if (darkRun._stepWatching) return;
+        darkRun._stepWatching = true;
+        database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
+            const s = snap.val();
+            if (s == null || !darkRun) return;
+            if (darkRun.step !== s) {
+                darkRun.step = s;
+                detachVoteListener();
+                renderDarkStep();
+            }
+        });
+    }
         // ==========================================
     // ★ 파티 채팅
     // ==========================================
@@ -2760,6 +3036,7 @@ function getTodayStr() {
         function renderDarkStep() {
         const body = document.getElementById('darkness-body');
         if (!body || !darkRun) return;
+         if (darkRun.isParty) watchPartyStep();
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
 
         const s = darkRun.step;
@@ -3136,19 +3413,54 @@ function getTodayStr() {
         darkStep3Pick(pick);
     }
 
-    function renderDarkResult() {
+       function renderDarkResult() {
         const z = DARK_ZONES[darkRun.zone];
         let base = Math.floor(Math.random() * (z.reward[1] - z.reward[0] + 1)) + z.reward[0];
-        let bonus = darkRun.success * 6 - darkRun.fail * 5;
-        let total = Math.max(10, base + bonus);
 
+        let bonus = 0;
+        if (darkRun.isParty && darkRun.voteHistory) {
+            // 파티: 내가 지지한 선택지의 성패만 반영
+            bonus = darkRun.success * 6 - darkRun.fail * 5;
+            let agreed = darkRun.voteHistory.filter(v => v.agreed === true).length;
+            let disagreed = darkRun.voteHistory.filter(v => v.agreed === false).length;
+            let abstained = darkRun.voteHistory.filter(v => v.agreed === null).length;
+            bonus = Math.round(bonus * (agreed / Math.max(1, agreed + disagreed + abstained)));
+            if (darkRun.critRoller) bonus += 10;
+        } else {
+            bonus = darkRun.success * 6 - darkRun.fail * 5;
+        }
+
+        let total = Math.max(10, base + bonus);
         currentUser.points += total;
 
         let pollInc = 10;
         if (currentUser.darkTicketFree) { pollInc = 0; currentUser.darkTicketFree = false; }
         if (pollInc > 0) applyPollutionToUser(currentUser, pollInc);
 
-               let gained = [];
+        // ★ C등급 이상 실패 페널티 (일부 소실)
+        let penaltyMsg = '';
+        if (darkRun.failedRun && z.grade === 'C') {
+            if (currentUser.points >= 10) {
+                currentUser.points -= 10;
+                penaltyMsg = `<div style="color:#f44336; margin-top:6px;">탈출 실패 — 포인트 10 P 압수</div>`;
+            } else {
+                applyPollutionToUser(currentUser, 8);
+                penaltyMsg = `<div style="color:#f44336; margin-top:6px;">탈출 실패 — 포인트가 없어 오염도 8% 추가</div>`;
+            }
+            // 장착품 제외, 소지품 중 무작위 1개 소실
+            const pool = (currentUser.inventory || []).filter(it => {
+                const c = ITEM_CATALOG[it];
+                return c && !NO_SELL_ITEMS.includes(it);
+            });
+            if (pool.length > 0) {
+                const lost = pool[Math.floor(Math.random() * pool.length)];
+                removeItemFromInventory(currentUser, lost, 1);
+                darkRun.lostItems.push(lost);
+                penaltyMsg += `<div style="color:#f44336;">소지품 '${lost}' 1개 소실</div>`;
+            }
+        }
+
+        let gained = [];
         const zoneLoot = DARK_LOOT_BY_ZONE[darkRun.zone] || [];
         zoneLoot.forEach(l => {
             let c = l.chance * (darkRun.critical ? 3 : 1);
@@ -3158,7 +3470,7 @@ function getTodayStr() {
         addHistoryLog(currentUser, `[어둠 귀환] ${z.code} 탐사 완료 (+${total} P)`);
 
         if (!currentUser.darkLogs) currentUser.darkLogs = [];
-                currentUser.darkLogs.unshift({
+        currentUser.darkLogs.unshift({
             date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
             reward: total, success: darkRun.success, fail: darkRun.fail,
             loot: gained, lost: darkRun.lostItems, detail: darkRun.log,
@@ -3173,28 +3485,32 @@ function getTodayStr() {
         body.innerHTML = darkBox("귀환", z.outro,
             `<div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
                 <div style="font-weight:bold; color:var(--theme-focus); margin-bottom:8px; border-bottom:1px dashed #444; padding-bottom:6px;">[탐사 정산서]</div>
-                 기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
+                기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
+                ${darkRun.isParty && darkRun.voteHistory ? `<span style="font-size:10px; color:#888;">판단 적중 ${darkRun.voteHistory.filter(v=>v.agreed===true).length}회${darkRun.abstains ? ` · 기권 ${darkRun.abstains}회` : ''}</span><br>` : ''}
                 <span style="font-size:10px; color:#888;">기본 ${base} P ${bonus >= 0 ? '+' : ''}${bonus} P (성적 가산)</span><br>
                 지급 포인트 <b style="color:#ffd700;">+${total} P</b><br>
-                오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}<br>
-                ${darkRun.lostItems.length ? `소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span><br>` : ''}
+                오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}
+                ${penaltyMsg}
+                ${darkRun.lostItems.length ? `<div style="margin-top:4px;">소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span></div>` : ''}
                 ${gained.length ? `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #444; color:#4CAF50; font-weight:bold;">✦ 회수품 발견: ${gained.join(', ')}</div>` : ''}
             </div>` +
             darkChoiceBtn("단말로 복귀한다.", "finishDarkRun()"));
 
         showPointGainEffect(total);
-         releaseZone(darkRun.zone);
+        releaseZone(darkRun.zone);
         darkRun = null;
         saveDB();
     }
 
-                 function finishDarkRun() {
+                    function finishDarkRun() {
         darkAmbienceStop();
+        detachVoteListener();
         if (darkRun) {
             releaseZone(darkRun.zone);
             if (darkRun.partyId && database) {
                 database.ref('darkParties/' + darkRun.partyId).remove();
                 database.ref('darkChats/' + darkRun.partyId).remove();
+                database.ref('darkVotes/' + darkRun.partyId).remove();
             }
         }
         detachChatListener();
