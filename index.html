@@ -4498,6 +4498,8 @@ function getTodayStr() {
         renderCard('seotda-card-2', playerHand[1]);
         renderCard('dealer-card-1', dealerHand[0]); 
         renderCard('dealer-card-2', dealerHand[1]);
+        document.getElementById('dealer-result-label').innerText = dRes.name;
+        document.getElementById('player-result-label').innerText = pRes.name;
         
         let msgEl = document.getElementById('seotda-msg');
         if (pRes.score > dRes.score) {
