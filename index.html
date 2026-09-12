@@ -1809,6 +1809,11 @@ function getTodayStr() {
 
        // 구역별 전용 회수품 테이블
     const DARK_LOOT_BY_ZONE = {
+        "Qtrew-C-119": [
+            { name:"금이 간 손거울", chance:0.030 },
+            { name:"세 번째 단어", chance:0.020 },
+            { name:"먼저 웃은 쪽", chance:0.010 }
+        ],
         "Qtrew-D-042": [
             { name:"꺼진 가로등 전구", chance:0.030 },
             { name:"1시 17분 버스표", chance:0.020 },
@@ -1819,13 +1824,7 @@ function getTodayStr() {
             { name:"전시 안내 도록", chance:0.020 },
             { name:"액자 뒤에 있던 것", chance:0.010 }
         ]
-                "Qtrew-C-119": [
-            { name:"금이 간 손거울", chance:0.030 },
-            { name:"세 번째 단어", chance:0.020 },
-            { name:"먼저 웃은 쪽", chance:0.010 }
-        ],
     };
-
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
     let darkBriefingOpen = false;   // 브리핑 화면 표시 중 여부
