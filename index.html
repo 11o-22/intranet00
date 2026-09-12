@@ -3680,59 +3680,117 @@ function getTodayStr() {
     }
 }
     function sendP2PDeal() {
-        const targetCode = document.getElementById('p2p-target-user').value;
-        if (!targetCode) return;
-        const targetUser = db.users[targetCode];
-        const dealMode = document.getElementById('p2p-deal-mode').value;
-        const offerType = document.getElementById('p2p-offer-type').value;
-        let offerValue;
-        let offerQty = 1;
-
-        if (offerType === 'item') {
-            const itemName = document.getElementById('p2p-offer-item').value;
-            offerQty = parseInt(document.getElementById('p2p-offer-qty').value) || 1;
-            if (!itemName) return;
-            
-            let count = currentUser.inventory.filter(it => it === itemName).length;
-            if (count < offerQty) { showCustomAlert("소지품 수량이 부족합니다."); return; }
-            
-            offerValue = itemName;
-            removeItemFromInventory(currentUser, itemName, offerQty);
-        } else {
-            const pts = parseInt(document.getElementById('p2p-offer-points').value);
-            if (isNaN(pts) || pts <= 0) return;
-            if (pts > currentUser.points) { showLuxuryAlert(); return; }
-            currentUser.points -= pts; offerValue = pts;
-        }
-
-        let demandType = null; let demandValue = null; let demandQty = 1;
-        if (dealMode === 'trade') {
-            demandType = document.getElementById('p2p-demand-type').value;
-            if (demandType === 'point') {
-                const dPts = parseInt(document.getElementById('p2p-demand-points').value);
-                if (isNaN(dPts) || dPts <= 0) {
-                    if (offerType === 'item') { for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); } else currentUser.points += offerValue; return;
-                }
-                demandValue = dPts;
-            } else {
-                demandValue = document.getElementById('p2p-demand-item').value;
-                demandQty = parseInt(document.getElementById('p2p-demand-qty').value) || 1;
-            }
-        }
-
-        if (!db.p2pDeals) db.p2pDeals = [];
-        db.p2pDeals.unshift({
-            id: Date.now(), fromCode: currentUser.code, fromName: currentUser.name, fromNo: currentUser.no,
-            toCode: targetCode, toName: targetUser.name, toNo: targetUser.no, mode: dealMode,
-            offerType: offerType, offerValue: offerValue, offerQty: offerQty, 
-            demandType: demandType, demandValue: demandValue, demandQty: demandQty,
-            status: 'PENDING', createdAt: Date.now()
-        });
-
-        const desc = (dealMode === 'give') ? `양도 제안` : `교환 제안`;
-        addHistoryLog(currentUser, `[밀실 제안] ${targetUser.name}(NO.${targetUser.no}) 대상 ${desc} 전송`);
-        saveDB(); updateUI();
+    const targetCode = document.getElementById('p2p-target-user').value;
+    if (!targetCode) {
+        showCustomAlert("상대 사원을 선택해주세요.");
+        return;
     }
+    const targetUser = db.users[targetCode];
+    const dealMode = document.getElementById('p2p-deal-mode').value;
+    const offerType = document.getElementById('p2p-offer-type').value;
+    let offerValue;
+    let offerQty = 1;
+
+    // 1. 내가 건넬 제물(포인트 또는 아이템) 검증 및 차감
+    if (offerType === 'item') {
+        const itemName = document.getElementById('p2p-offer-item').value;
+        offerQty = parseInt(document.getElementById('p2p-offer-qty').value) || 1;
+        if (!itemName) return;
+        
+        let count = currentUser.inventory.filter(it => it === itemName).length;
+        if (count < offerQty) { 
+            showCustomAlert("소지품 수량이 부족합니다."); 
+            return; 
+        }
+        
+        offerValue = itemName;
+        removeItemFromInventory(currentUser, itemName, offerQty);
+    } else {
+        const pts = parseInt(document.getElementById('p2p-offer-points').value, 10);
+        if (isNaN(pts) || pts <= 0) {
+            showCustomAlert("올바른 포인트를 입력해주세요.");
+            return;
+        }
+        if (pts > currentUser.points) { 
+            showLuxuryAlert(); 
+            return; 
+        }
+        currentUser.points -= pts; 
+        offerValue = pts;
+    }
+
+    // 2. 조건부 교환일 경우 상대에게 요구할 대가 세팅
+    let demandType = null; 
+    let demandValue = null; 
+    let demandQty = 1;
+    if (dealMode === 'trade') {
+        demandType = document.getElementById('p2p-demand-type').value;
+        if (demandType === 'point') {
+            const dPts = parseInt(document.getElementById('p2p-demand-points').value, 10);
+            if (isNaN(dPts) || dPts <= 0) {
+                showCustomAlert("요구할 포인트를 올바르게 입력해주세요.");
+                // 에러 발생 시 차감했던 제물 원상복구
+                if (offerType === 'item') { 
+                    for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); 
+                } else { 
+                    currentUser.points += offerValue; 
+                }
+                return;
+            }
+            demandValue = dPts;
+        } else {
+            demandValue = document.getElementById('p2p-demand-item').value;
+            demandQty = parseInt(document.getElementById('p2p-demand-qty').value) || 1;
+        }
+    }
+
+    // 3. 제안서 객체 생성 및 공용 p2pDeals 배열에 추가
+    if (!db.p2pDeals) db.p2pDeals = [];
+    const newDeal = {
+        id: Date.now(), 
+        fromCode: currentUser.code, 
+        fromName: currentUser.name, 
+        fromNo: currentUser.no,
+        toCode: targetCode, 
+        toName: targetUser.name, 
+        toNo: targetUser.no, 
+        mode: dealMode,
+        offerType: offerType, 
+        offerValue: offerValue, 
+        offerQty: offerQty, 
+        demandType: demandType, 
+        demandValue: demandValue, 
+        demandQty: demandQty,
+        status: 'PENDING', 
+        createdAt: Date.now()
+    };
+
+    db.p2pDeals.unshift(newDeal);
+
+    const desc = (dealMode === 'give') ? `양도 제안` : `교환 제안`;
+    addHistoryLog(currentUser, `[밀실 제안] ${targetUser.name}(NO.${targetUser.no}) 대상 ${desc} 전송`);
+
+    // 4. ★ Firebase에 내 정보(포인트 차감 반영)와 공용 제안 목록(p2pDeals)을 동시에 안전하게 푸시
+    if (database) {
+        let updates = {};
+        updates[`users/${currentUser.code}`] = currentUser;
+        updates['p2pDeals'] = db.p2pDeals;
+
+        database.ref('/').update(updates).then(() => {
+            showCustomAlert("밀실 제안서가 성공적으로 전달되었습니다.");
+            updateUI();
+            renderP2PLists();
+        }).catch((err) => {
+            console.error("밀실 거래 제안 전송 실패:", err);
+            showCustomAlert("서버 통신 중 오류가 발생했습니다.");
+        });
+    } else {
+        saveDB(); 
+        updateUI(); 
+        renderP2PLists();
+        showCustomAlert("밀실 제안서가 성공적으로 전달되었습니다.");
+    }
+}
    function renderP2PLists() {
         checkP2PExpiration();
         const receivedList = document.getElementById('p2p-received-list');
