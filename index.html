@@ -2642,11 +2642,7 @@ function getTodayStr() {
         if (finalAmount <= 0) return;
 
         user.pollution = Math.min(100, user.pollution + finalAmount);
-        if (user.pollution >= 100) {
-            if (!user.quarantineUntil || Date.now() > user.quarantineUntil) {
-                user.quarantineUntil = Date.now() + (24 * 60 * 60 * 1000);
-            }
-        }
+        
     }
 
     function getPollutionStatusInfo(pollution) {
