@@ -1678,7 +1678,7 @@ function getTodayStr() {
          "서명 없는 캔버스 조각": { price: 45, usable: false, darkOnly: true, desc: "[어둠 회수품] 손톱만 한 캔버스 조각. 아직 미지근하다." },
         "전시 안내 도록": { price: 110, usable: true, targetable: false, effect: "dark_catalog", darkOnly: true, desc: "[어둠 회수품] 어느 미술관의 도록. 사용 시 다음 어둠 탐사의 첫 판정에 +2 보정이 붙는다." },
         "액자 뒤에 있던 것": { price: 300, usable: false, darkOnly: true, desc: "[어둠 회수품] 벽과 액자 사이에 끼어 있었다. 무엇인지는 아직 알 수 없다." }
-3. 구역별 전리품 분리
+
     };
 
      const NO_SELL_ITEMS = ["여우구슬"];
@@ -3566,7 +3566,7 @@ function getTodayStr() {
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
             return;
         }
-                     if (cat.effect === 'bus_ticket') {
+                            if (cat.effect === 'bus_ticket') {
             if (currentUser.darkTicketFree) { showCustomAlert('이미 승차권 효과가 적용 중입니다.'); return; }
             currentUser.darkTicketFree = true;
             removeItemFromInventory(currentUser, itemName, 1);
@@ -3575,7 +3575,9 @@ function getTodayStr() {
             saveDB(); updateUI();
             showCustomAlert('승차권을 개찰했습니다. 다음 탐사에서는 오염도가 오르지 않습니다.');
             return;
-                                 if (cat.effect === 'dark_catalog') {
+        }
+
+        if (cat.effect === 'dark_catalog') {
             if (currentUser.darkCatalogBonus) { showCustomAlert('이미 도록의 효과가 적용 중입니다.'); return; }
             currentUser.darkCatalogBonus = true;
             removeItemFromInventory(currentUser, itemName, 1);
@@ -3585,7 +3587,9 @@ function getTodayStr() {
             showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
             return;
         }
-        }
+
+        // ★ 사라졌던 장착 아이템 판별 조건문 복구
+        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || ...
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
                if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb') {
