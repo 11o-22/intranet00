@@ -3413,6 +3413,99 @@ function getTodayStr() {
         darkStep3Pick(pick);
     }
 
+        // ==========================================
+    // ★ 어둠 탐사 사망 처리
+    // ==========================================
+    function darkDeath(reasonText) {
+        const z = DARK_ZONES[darkRun.zone];
+        const isHardZone = ['S', 'A', 'B'].includes(z.grade);
+
+        let lostPoints = 0;
+        let lostItems = [];
+
+        if (isHardZone) {
+            // B등급 이상 — 전재산 소멸
+            lostPoints = currentUser.points;
+            currentUser.points = 0;
+            lostItems = [...(currentUser.inventory || [])];
+            currentUser.inventory = [];
+            addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 사망. 보유 포인트 ${lostPoints} P와 소지품 전부 소실.`);
+        } else {
+            addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 의식을 잃음.`);
+        }
+
+        // 여우 상담실 2시간 이송
+        currentUser.pollution = 100;
+        currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+        currentUser.quarantineExitPollution = 40;
+        currentUser.foxRoomAnswered = true;   // 질문 절차 생략
+        appendBadgeNoteToUser(currentUser, `[${z.code}] 탐사 중 의식 불명 — 긴급 이송됨`);
+
+        // 파티 동료에게 알림
+        if (darkRun.isParty) {
+            sendPartyChat(`${currentUser.name} 사원의 신호가 끊겼습니다.`, true);
+            if (database) database.ref(`darkParties/${darkRun.partyId}/alive/${currentUser.code}`).remove();
+        }
+
+        if (!currentUser.darkLogs) currentUser.darkLogs = [];
+        currentUser.darkLogs.unshift({
+            date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
+            reward: 0, success: darkRun.success, fail: darkRun.fail,
+            loot: [], lost: lostItems.length ? ['(전부 소실)'] : darkRun.lostItems,
+            detail: darkRun.log, died: true,
+            chat: (darkRun.isParty && partyChatLog.length) ? partyChatLog.slice(-80).map(m => ({
+                n: m.code === 'SYSTEM' ? '' : m.name, t: m.text, s: m.code === 'SYSTEM'
+            })) : null,
+            party: darkRun.isParty ? true : false
+        });
+        if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
+
+        const body = document.getElementById('darkness-body');
+        body.innerHTML = darkBox("종료", reasonText || '시야가 좁아진다.<br><br>소리가 먼저 사라지고, 그다음에 감각이 사라졌다.',
+            `<div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
+                <div style="font-weight:bold; color:#ff6b6b; margin-bottom:8px; border-bottom:1px dashed #7f0000; padding-bottom:6px;">[사고 보고서]</div>
+                ${isHardZone
+                    ? `보유 포인트 <b style="color:#f44336;">-${lostPoints} P</b> (전액 소실)<br>
+                       소지품 <b style="color:#f44336;">${lostItems.length}종 전부 소실</b><br>`
+                    : `<span style="color:#aaa;">본 구역은 재산 소멸 규정이 적용되지 않습니다.</span><br>`}
+                오염도 <b style="color:#ff9800;">100%</b><br>
+                <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#d4af37;">
+                    🦊 여우 상담실로 긴급 이송됩니다.<br>
+                    <span style="font-size:10px; color:#aaa;">회복 예상 시간: 2시간 (퇴원 시 오염도 40%)</span>
+                </div>
+            </div>` +
+            darkChoiceBtn("의식을 잃는다.", "finishDarkDeath()"));
+
+        darkAmbienceStop();
+        saveDB();
+    }
+
+    function finishDarkDeath() {
+        detachVoteListener();
+        detachChatListener();
+        if (darkRun) {
+            if (darkRun.isParty && darkRun.isLeader && database) {
+                // 방장이 죽으면 남은 인원에게 위임
+                const p = darkParties[darkRun.partyId];
+                if (p && p.alive) {
+                    const others = Object.keys(p.alive).filter(c => c !== currentUser.code);
+                    if (others.length > 0 && p.members[others[0]]) {
+                        database.ref(`darkParties/${darkRun.partyId}`).update({
+                            leader: others[0], leaderName: p.members[others[0]].name
+                        });
+                    }
+                }
+            }
+            if (!darkRun.isParty) releaseZone(darkRun.zone);
+        }
+        darkRun = null;
+        myPartyId = null;
+        partyChatOpen = false;
+        hasShownFoxAlert = true;   // 상담실 팝업 중복 방지
+        updateUI();
+        renderDarkness();
+    }
+
        function renderDarkResult() {
         const z = DARK_ZONES[darkRun.zone];
         let base = Math.floor(Math.random() * (z.reward[1] - z.reward[0] + 1)) + z.reward[0];
@@ -3531,7 +3624,7 @@ function getTodayStr() {
         c.innerHTML = currentUser.darkLogs.map((l, i) => `
             <div style="background:rgba(0,0,0,0.3); border-left:3px solid #7f0000; padding:10px 12px; margin-bottom:8px; border-radius:4px; font-size:11px;">
                 <div style="font-size:9px; color:#888; margin-bottom:4px;">${l.date}</div>
-                <div style="font-family:monospace; color:#ff6b6b; font-weight:bold;">${l.zone}${l.party ? ' <span style="color:#38bdf8;">[파티]</span>' : ''}</div>
+               <div style="font-family:monospace; color:#ff6b6b; font-weight:bold;">${l.zone}${l.party ? ' <span style="color:#38bdf8;">[파티]</span>' : ''}${l.died ? ' <span style="color:#f44336;">[사망]</span>' : ''}</div>
                 <div style="color:var(--theme-text); font-weight:bold; margin:3px 0;">${l.zoneName}</div>
                 <div style="color:#999;">성공 ${l.success} / 실패 ${l.fail} · 보상 <b style="color:#ffd700;">+${l.reward} P</b></div>
                 ${l.loot && l.loot.length ? `<div style="color:#4CAF50; margin-top:3px;">회수품: ${l.loot.join(', ')}</div>` : ''}
