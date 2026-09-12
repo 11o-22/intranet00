@@ -1827,7 +1827,7 @@ function getTodayStr() {
                             <div style="font-weight:bold; font-size:13px; margin:3px 0; color:var(--theme-text);">${locked ? '■■■■■■' : z.name}</div>
                             <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
                             <div style="font-size:10px; color:#777; margin-top:5px;">
-                                난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · ${partySize} · 보상 ${z.reward[0]}~${z.reward[1]} P
+                          난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · ${partySize} · 기본 보상 ${z.reward[0]}~${z.reward[1]} P
                             </div>
                         </div>
                         <div style="flex-shrink:0;">
@@ -1872,7 +1872,8 @@ function getTodayStr() {
                 <div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:12px; font-size:11px; line-height:1.7; margin-bottom:14px;">
                     ${z.brief}<br><br>
                     난이도 <b>${z.danger}</b> / 예상 생존율 <b>${z.survival}</b><br>
-                    정원 <b>${z.min === z.max ? z.min + '인' : z.min + '~' + z.max + '인'}</b> / 보상 <b>${z.reward[0]}~${z.reward[1]} P</b><br>
+                                        정원 <b>${z.min === z.max ? z.min + '인' : z.min + '~' + z.max + '인'}</b> / 기본 보상 <b>${z.reward[0]}~${z.reward[1]} P</b><br>
+                    <span style="color:#aaa; font-size:10px;">※ 기믹 성공 1회당 +6 P 가산, 실패 1회당 -5 P 차감됩니다. 성적에 따라 기본 범위를 넘거나 밑돌 수 있으며, 최저 지급액은 10 P입니다.</span><br>
                     <span style="color:#4CAF50;">본 구역은 D등급으로, 사망 시 재산 소멸 규정이 적용되지 않습니다.</span><br>
                     <span style="color:#ff9800;">귀환 시 오염도가 10% 상승합니다.</span>
                 </div>
@@ -2360,7 +2361,8 @@ function getTodayStr() {
         body.innerHTML = darkBox("귀환", z.outro,
             `<div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
                 <div style="font-weight:bold; color:var(--theme-focus); margin-bottom:8px; border-bottom:1px dashed #444; padding-bottom:6px;">[탐사 정산서]</div>
-                기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
+                 기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
+                <span style="font-size:10px; color:#888;">기본 ${base} P ${bonus >= 0 ? '+' : ''}${bonus} P (성적 가산)</span><br>
                 지급 포인트 <b style="color:#ffd700;">+${total} P</b><br>
                 오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}<br>
                 ${darkRun.lostItems.length ? `소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span><br>` : ''}
