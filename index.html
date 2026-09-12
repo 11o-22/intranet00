@@ -728,8 +728,7 @@
             </div>
         </div>
 
-        <div class="tabs-grid">
-                    <div class="tabs-grid">
+        <div class="tabs-grid">           
             <div class="tab active" onclick="switchTab('tab-record', this)">정보 열람</div>
             <div class="tab" onclick="switchTab('tab-public', this)">공용시설</div>
             <div class="tab" onclick="switchTab('tab-vip', this)">VIP 시설</div>
@@ -2634,13 +2633,13 @@ function getTodayStr() {
     }
 
 
-       function useInventoryItem(itemName) {
+         function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
         if (!cat || !cat.usable) return;
 
-        // ★ [수정] 지갑은 장착 아이템과 무관하므로 가장 먼저 단독 처리
+        // 지갑은 장착과 무관하므로 가장 먼저 단독 처리
         if (cat.effect === 'open_wallet') {
-            let randPoints = Math.floor(Math.random() * 251) + 250; // 250 ~ 500 P
+            let randPoints = Math.floor(Math.random() * 251) + 250;
             currentUser.points += randPoints;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 지갑 열기 (+${randPoints} P)`);
@@ -2648,9 +2647,11 @@ function getTodayStr() {
             showPointGainEffect(randPoints);
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
             return;
-        
-            }
-            
+        }
+
+        // ★ 사라졌던 장착 아이템 판별 조건문 복구
+        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife') {
+
             if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
@@ -2660,32 +2661,30 @@ function getTodayStr() {
                 showCustomAlert("장비는 최대 3개까지만 장착할 수 있습니다.");
                 return;
             }
-            
-            // ★ 여우구슬일 경우 이모티콘을 붙여서 장착
+
             if (cat.effect === 'equip_fox_bead') {
                 currentUser.equippedWeapons.push(`🔮 ${itemName}`);
             } else {
                 currentUser.equippedWeapons.push(itemName);
             }
 
-            // ★ [신규 추가] 시간제 장착 아이템의 파괴 시간 기록
             if (cat.effect === 'equip_silver_ring') {
                 currentUser.silverRingExpireTime = Date.now() + (120 * 60 * 60 * 1000);
             } else if (cat.effect === 'equip_butter_knife') {
                 currentUser.butterKnifeExpireTime = Date.now() + (1 * 60 * 60 * 1000);
             }
-            
-            if(cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
+
+            if (cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[장비 장착] ${itemName} 장착 완료`);
-            saveDB(); updateUI(); return;
+            saveDB(); updateUI();
+            return;
         }
-
 
         if (cat.effect === 'target_sticker') { openItemTargetModal(itemName, false); return; }
 
         let usedSuccessfully = applyItemEffect(currentUser, itemName, false);
-        
+
         if (usedSuccessfully) {
             currentUser.noteGlowUntil = Date.now() + 5000;
             removeItemFromInventory(currentUser, itemName, 1);
@@ -2693,7 +2692,6 @@ function getTodayStr() {
             saveDB(); updateUI();
         }
     }
-
     function applyItemEffect(targetUser, itemName, isOthers = false) {
         const cat = ITEM_CATALOG[itemName];
         
@@ -2807,19 +2805,19 @@ function getTodayStr() {
                         if (isMatched) weight *= 25; 
                         else weight *= 0.05; 
                     }
-                    
-                // ★ 최소 확률 보장: 아무리 비싸도 전체의 0.000001% 확률은 남겨둠
+                
+
+
+                    weights.push({ name: itemName, weight: weight });
+                    totalWeight += weight;
+                }
+                   // ★ 최소 확률 보장: 아무리 비싸도 전체의 0.000001% 확률은 남겨둠
                 const minW = totalWeight * 1e-8;
                 totalWeight = 0;
                 weights.forEach(w => {
                     if (w.weight < minW) w.weight = minW;
                     totalWeight += w.weight;
                 });
-
-
-                    weights.push({ name: itemName, weight: weight });
-                    totalWeight += weight;
-                }
 
                 // 랜덤 뽑기 실행
                 let rand = Math.random() * totalWeight;
