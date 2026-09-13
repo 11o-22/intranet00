@@ -4599,8 +4599,9 @@ zg
         mountDarkChat('normal');
     }
 
-    function renderStep087() {
-       const body = darkBodyEl();
+       function renderStep087() {
+        const body = darkBodyEl();
+        const s = darkRun.step;
 
         if (s === 0) {
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
@@ -9920,6 +9921,27 @@ zg
   }
 
   // ================== 가로채기 ==================
+  
+  // 기존 renderDarkStep 함수 위에 이 코드 추가
+const originalRenderDarkStep = window.renderDarkStep;
+
+window.renderDarkStep = function () {
+  const zoneCode = darkRun?.zone || darkRun?.zoneCode;
+  
+  if (zoneCode === "Qtrew-C-176") {
+    if (!darkRun._c176Init) {
+      darkRun._c176Init = true;
+      initC176();
+    }
+    return; // C-176은 여기서 끝
+  }
+  
+  // C-176이 아니면 기존 함수 실행
+  if (typeof originalRenderDarkStep === "function") {
+    return originalRenderDarkStep.apply(this, arguments);
+  }
+};
+  
   const _orig = window.renderDarkStep;
   window.renderDarkStep = function () {
     const zoneCode = darkRun?.zone || darkRun?.zoneCode;
