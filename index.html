@@ -2018,6 +2018,7 @@ function getTodayStr() {
             partyId: darkRun.partyId || null,
             isParty: !!darkRun.isParty,
             isLeader: !!darkRun.isLeader,
+            counted: !!darkRun.counted,
             savedAt: Date.now()
         };
         database.ref('darkRuns/' + currentUser.code).set(snap);
@@ -2093,12 +2094,13 @@ function getTodayStr() {
         document.getElementById('dark-resume-overlay').style.display = 'none';
         window._pendingResume = null;
 
-        darkRun = {
+         darkRun = {
             zone: s.zone, step: s.step, modifier: s.modifier,
             success: s.success, fail: s.fail,
             carryEquips: s.carryEquips || [], carryItems: s.carryItems || [],
             rerollUsed: s.rerollUsed, lostItems: s.lostItems || [], log: s.log || [],
             partyId: s.partyId, isParty: s.isParty, isLeader: s.isLeader,
+            counted: s.counted !== false,
             rejoined: true
         };
 
@@ -2427,7 +2429,8 @@ function getTodayStr() {
             zone: party.zone, step: 0, modifier: 0, success: 0, fail: 0,
             carryEquips: me.equips || [], carryItems: me.items || [],
             rerollUsed: false, lostItems: [], log: [],
-            partyId: party.id, isParty: true, isLeader: party.leader === currentUser.code
+            partyId: party.id, isParty: true, isLeader: party.leader === currentUser.code,
+            counted: true
         };
 
         darkBriefingOpen = false;
@@ -3442,12 +3445,13 @@ function getTodayStr() {
         if (eq.length > 2) { showCustomAlert('장비는 최대 2점까지만 반입할 수 있습니다.'); return; }
         if (cs.length > 3) { showCustomAlert('소모품은 최대 3점까지만 반입할 수 있습니다.'); return; }
 
-        currentUser.darkDate = getTodayStr();
+               currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
 
         darkRun = {
             zone: zoneCode, step: 0, modifier: 0, success: 0, fail: 0,
-            carryEquips: eq, carryItems: cs, rerollUsed: false, lostItems: [], log: []
+            carryEquips: eq, carryItems: cs, rerollUsed: false, lostItems: [], log: [],
+            counted: true
         };
 
                 darkBriefingOpen = false;
