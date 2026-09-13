@@ -3547,13 +3547,15 @@ function getTodayStr() {
 
         function renderDarkStep() {
 
-            if (darkRun.zone === 'Qtrew-C-176') {
-    console.log('C-176 진입 감지됨');           // ← 이 로그가 찍히는지 확인
+           if (darkRun.zone === 'Qtrew-C-176') {
     if (typeof renderC176 === 'function') {
-        console.log('renderC176 호출 시도');
-        renderC176();
-    } else {
-        console.log('renderC176 함수가 없음');
+        // cfg를 가져와서 넘겨주기
+        c176Ref("config").once('value').then(snap => {
+            const cfg = snap.val();
+            if (cfg) {
+                renderC176(cfg);
+            }
+        });
     }
     return;
 }
