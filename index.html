@@ -9480,17 +9480,16 @@ function renderC176(cfg) {
     if (!cfg) {
         console.log('config 없음 → 감시 시작');
 
-        // 이미 리스너가 있으면 중복 방지
-        if (darkRun._c176ConfigListener) return;
+        // 이미 리스너가 붙어있으면 중복 방지
+        if (darkRun._c176WaitingForConfig) return;
+        darkRun._c176WaitingForConfig = true;
 
-        darkRun._c176ConfigListener = c176Ref("config").on('value', (snap) => {
+        c176Ref("config").on('value', (snap) => {
             const loadedCfg = snap.val();
             if (loadedCfg) {
-                console.log('config 생성됨! 렌더링 시작');
-                // 리스너 제거 (한 번만 사용)
-                c176Ref("config").off('value', darkRun._c176ConfigListener);
-                darkRun._c176ConfigListener = null;
-
+                console.log('config 생성 감지! 렌더링 시작');
+                darkRun._c176WaitingForConfig = false;
+                c176Ref("config").off('value'); // 리스너 제거
                 renderC176(loadedCfg);
             }
         });
@@ -9503,7 +9502,7 @@ function renderC176(cfg) {
         return;
     }
 
-    // config가 있으면 정상 렌더링
+    // config가 있으면 정상 진행
     if (cfg.phase === "waiting") {
         if (!cfg.rps.done) return renderRPS(cfg);
         const c = localCtx;
