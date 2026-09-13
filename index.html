@@ -9536,7 +9536,7 @@ function getTodayStr() {
     }
   }
 
-  function renderRPS(cfg) {
+ function renderRPS(cfg) {
     const body = darkBodyEl();
     const r = cfg.rps;
     const partner = pickPartner();
@@ -9547,8 +9547,10 @@ function getTodayStr() {
               : sRole === "B" ? "둘 다 아래를 원한다."
               : "둘 다 상관없다고 한다.";
 
-    const logHtml = r.rounds.length ? `<br><br><i style="color:#888;font-size:11px;">${r.rounds.join(" · ")}</i>` : "";
-    const score = r.rounds.length ? `<br><br><b>본인 ${r.sWin} : ${r.pWin} 동료</b>` : "";
+    // ★ [수정 핵심]: Firebase가 빈 배열을 삭제했을 경우를 대비한 안전 장치 추가
+    const roundsArray = r.rounds || []; 
+    const logHtml = roundsArray.length ? `<br><br><i style="color:#888;font-size:11px;">${roundsArray.join(" · ")}</i>` : "";
+    const score = roundsArray.length ? `<br><br><b>본인 ${r.sWin} : ${r.pWin} 동료</b>` : "";
 
     const opts = [
       { id: "rock", label: "✊ 바위", fn: "c176RpsVote", arg: "rock" },
@@ -9565,6 +9567,40 @@ function getTodayStr() {
       html, "rps");
     mountDarkChat('normal');
   }
+
+  // ★ 투표 처리 함수에도 안전 장치 추가
+  window.c176RpsVote = function(choice) {
+    if (!darkRun?.isLeader) {
+      castVote && castVote({ id: choice, arg: choice });
+      return;
+    }
+    const cfgRef = c176Ref("config");
+    cfgRef.once('value').then(snap => {
+      const cfg = snap.val();
+      if (!cfg || cfg.rps.done) return;
+      
+      const r = cfg.rps;
+      const opts = ["rock","scissors","paper"];
+      const opp = opts[Math.floor(Math.random()*3)];
+      const k2ko = { rock:"바위", scissors:"가위", paper:"보" };
+      
+      let out;
+      if (choice === opp) out = "무";
+      else if ((choice==="rock"&&opp==="scissors")||(choice==="scissors"&&opp==="paper")||(choice==="paper"&&opp==="rock")) {
+        out = "승"; r.sWin++;
+      } else { out = "패"; r.pWin++; }
+      
+      // ★ [수정 핵심]: rounds 배열이 없으면 여기서 생성해줌
+      if (!r.rounds) r.rounds = [];
+      r.rounds.push(`${k2ko[choice]}vs${k2ko[opp]}=${out}`);
+      
+      if (r.sWin >= 2 || r.pWin >= 2) {
+        r.done = true;
+        r.winner = r.sWin >= 2 ? "leader" : "partner";
+      }
+      cfgRef.update({ rps: r });
+    });
+  };
 
   function renderNormalChoice(room, idx, total) {
     const body = darkBodyEl();
