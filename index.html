@@ -3546,27 +3546,24 @@ function getTodayStr() {
     }
 
         function renderDarkStep() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
 
-           if (darkRun.zone === 'Qtrew-C-176') {
-    if (typeof renderC176 === 'function') {
-        renderC176();   // 그냥 이렇게 호출
-    }
-    return;
-}
-       const body = darkBodyEl();
-            if (!body || !darkRun) return;
-
-            if (darkRun.zone === 'Qtrew-C-176') {
-        if (typeof renderC176 === 'function') {
-            renderC176();
+        // ★ [수정됨] C-176 구역 진입 시 반드시 initC176()을 호출하여 방장이 설정을 만들게 함
+        if (darkRun.zone === 'Qtrew-C-176') {
+            if (!darkRun.c176Initialized && typeof initC176 === 'function') {
+                darkRun.c176Initialized = true;
+                initC176(); // 방장이 여기서 DB 설정을 생성하고 리스너를 부착합니다!
+            } else if (typeof renderC176 === 'function') {
+                renderC176(null); // 로딩 화면 호출
+            }
+            return;
         }
 
-        return;
-    }
-            if (darkRun.rejoined) { renderRejoinScene(); return; }
-            
-
-    saveDarkRunState();
+        if (darkRun.rejoined) { renderRejoinScene(); return; }
+        
+        saveDarkRunState();
+        // ... (이하 기존 코드와 동일)
     if (darkRun.isParty) watchPartyStep();
     if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
     if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
@@ -9427,8 +9424,11 @@ function getTodayStr() {
   let localCtx = null;
   let isFinalRoom = false;
 
-  function initC176() {
+ function initC176() {
     if (!darkRun?.partyId) return false;
+
+    // ★ 새 탐사 진입 시 리스너 중복 방지 플래그 초기화
+    window._c176ListenerAttached = false; 
 
     if (darkRun.isLeader) {
       const roomCount = Math.random() < 0.5 ? 3 : 4;
@@ -9455,10 +9455,20 @@ function getTodayStr() {
 
   function setupListeners() {
     if (!database || !darkRun?.partyId) return;
+    
+    // 리스너 중복 부착 방지
+    if (window._c176ListenerAttached) return; 
+    window._c176ListenerAttached = true;
 
     c176Ref("config").on('value', (snap) => {
       const cfg = snap.val();
-      if (!cfg) return;
+      
+      // ★ 방장이 DB를 세팅하기 전이면 로딩 화면을 강제 렌더링
+      if (!cfg) {
+          renderC176(null);
+          return;
+      }
+      
       isFinalRoom = cfg.currentIdx === cfg.rooms.length - 1;
 
       if (cfg.phase === "waiting" && cfg.rps?.done && !localCtx) {
@@ -9471,29 +9481,21 @@ function getTodayStr() {
     c176Ref("dice").on('value', (snap) => updateDiceResult(snap.val() || {}));
   }
 
-  // ★ 완벽하게 복구된 메인 렌더링 함수
   function renderC176(cfg) {
     const body = darkBodyEl();
     if (!body) return;
 
+    // 1. config가 없을 때 (초기 대기 화면) - 리스너 로직 제거하고 화면만 그립니다.
     if (!cfg) {
         body.innerHTML = `
             <div style="color:#aaa; padding:40px; text-align:center;">
                 <p>방장의 설정을 기다리는 중...</p>
             </div>
         `;
-        if (window._c176ConfigListenerAttached) return; 
-        window._c176ConfigListenerAttached = true;
-        
-        c176Ref("config").on('value', (snap) => {
-            const loadedCfg = snap.val();
-            if (loadedCfg) {
-                renderC176(loadedCfg);
-            }
-        });
         return;
     }
 
+    // 2. config가 있을 때 (waiting 단계)
     if (cfg.phase === "waiting") {
         if (!cfg.rps.done) return renderRPS(cfg);
         const c = localCtx;
@@ -9515,6 +9517,7 @@ function getTodayStr() {
         return;
     }
 
+    // 3. 그 외 진행 단계 로직
     const idx = cfg.currentIdx;
     if (!cfg.rooms || !cfg.rooms[idx]) return;
 
