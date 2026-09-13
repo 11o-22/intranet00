@@ -3099,6 +3099,7 @@ function getTodayStr() {
         if (!ov) return;
         ov.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+           partyChatOpen = true;
         const codeEl = document.getElementById('dro-code');
         if (codeEl && darkRun) codeEl.innerText = DARK_ZONES[darkRun.zone].code;
         const muteBtn = document.getElementById('dark-mute-btn');
