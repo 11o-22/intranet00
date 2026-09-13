@@ -9327,6 +9327,14 @@ function getTodayStr() {
     (function () {
   'use strict';
 
+  function updateDiceResult(dice) {
+  c176Ref("config").once('value').then(snap => {
+    const cfg = snap.val();
+    if (!cfg || !cfg.final) return;
+    renderFinalSequence(cfg.final, cfg.rooms[cfg.currentIdx]);
+  });
+}
+
   function renderRPS(cfg) {
   const body = darkBodyEl();
   const r = cfg.rps;
