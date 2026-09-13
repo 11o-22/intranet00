@@ -9471,14 +9471,20 @@ function getTodayStr() {
 
     c176Ref("checks").on('value', (snap) => updateCheckStatus(snap.val() || {}));
     c176Ref("dice").on('value', (snap) => updateDiceResult(snap.val() || {}));
-  }
 function renderC176(cfg) {
     const body = darkBodyEl();
     if (!body) return;
 
-    // config가 없으면 리스너를 한 번만 붙임
+    // 1. config가 없을 때 (초기 진입)
     if (!cfg) {
-        if (darkRun._c176ConfigListenerAttached) return;
+        // [수정 핵심]: 리스너 중복 검사 전에 무조건 로딩 화면부터 그립니다.
+        body.innerHTML = `
+            <div style="color:#aaa; padding:40px; text-align:center;">
+                <p>방장의 설정을 기다리는 중...</p>
+            </div>
+        `;
+
+        if (darkRun._c176ConfigListenerAttached) return; // 리스너가 이미 있다면 여기서 종료
         darkRun._c176ConfigListenerAttached = true;
 
         console.log('config 없음 → 영구 감시 시작');
@@ -9490,28 +9496,37 @@ function renderC176(cfg) {
                 renderC176(loadedCfg);
             }
         });
+        return;
+    }
 
+    // 2. config가 있을 때 (waiting 단계)
+   // 1. config가 없을 때 (초기 진입)
+    if (!cfg) {
         body.innerHTML = `
             <div style="color:#aaa; padding:40px; text-align:center;">
                 <p>방장의 설정을 기다리는 중...</p>
             </div>
         `;
+
+        // darkRun 대신 window 객체를 사용하여 절대적인 방어막 생성
+        if (window._c176ConfigListenerAttached) return; 
+        window._c176ConfigListenerAttached = true;
+
+        // 반드시 return(방어막) 아래에 로그를 두어야 합니다.
+        console.log('config 없음 → 영구 감시 시작');
+
+        c176Ref("config").on('value', (snap) => {
+            const loadedCfg = snap.val();
+            if (loadedCfg) {
+                console.log('config 생성됨! 렌더링');
+                renderC176(loadedCfg);
+            }
+        });
         return;
     }
 
-    // config가 있으면 정상 진행 (기존 코드)
-    if (cfg.phase === "waiting") {
-        if (!cfg.rps.done) return renderRPS(cfg);
-        const c = localCtx;
-        if (!c) return;
-        const roleLine = `<br><br><i style="color:#aaa;font-size:11px;">배정: ${c.td.name} = 위 / ${c.bd.name} = 아래</i>`;
-        body.innerHTML = darkBox("감각 재조정실", 
-            DARK_ZONES["Qtrew-C-176"].intro + roleLine + `<br><i style="color:#888;font-size:11px;">${cfg.roomCount}방</i>`, 
-            darkChoiceBtn("첫 방으로 진입", "c176StartRooms()"), "intro");
-        mountDarkChat('normal');
-        return;
-    }
-
+    // 당신이 작성해둔 다음 단계(phase) 렌더링 로직...
+}
     // ... 기존 choice, text, final 로직 그대로 ...
     const idx = cfg.currentIdx;
     const room = cfg.rooms[idx];
