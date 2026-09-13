@@ -2087,7 +2087,7 @@ function getTodayStr() {
     }
 
     // 파티 출발 시 각자 탐사 상태 초기화
-    function launchPartyRun(party) {
+       function launchPartyRun(party) {
         const me = party.members[currentUser.code];
         if (!me) return;
 
@@ -2107,9 +2107,14 @@ function getTodayStr() {
         addHistoryLog(currentUser, `[어둠 진입] ${party.zone} 파티 탐사 개시 (${Object.keys(party.members).length}인)`);
         saveDB();
 
-        // 어둠 탐사 탭으로 이동
-                renderDarkStep();
+        watchPartyStep();
+        if (database) {
+            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).set(true);
+            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).onDisconnect().remove();
+        }
 
+        renderDarkStep();
+    }
     function switchToPartyTab() {
         document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
