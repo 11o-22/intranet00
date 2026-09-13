@@ -9958,6 +9958,139 @@ window.renderDarkStep = function () {
 
 })();
 
+(function () {
+  'use strict';
+
+  window.ensureSexProfile = function (u) {
+    if (!u || typeof u !== "object") return u;
+    if (!["남성","여성"].includes(u.gender)) u.gender = "남성";
+    const r = (u.role || "M").toString().toUpperCase();
+    u.role = ["T","M","B"].includes(r) ? r : "M";
+    return u;
+  };
+
+  function injectBadgeFields() {
+    const table = document.querySelector('#rec-badge .badge-table');
+    if (!table || document.getElementById('badge-gender')) return false;
+
+    const tbody = table.tBodies[0] || table;
+    const noteRow = document.getElementById('badge-note-label')?.closest('tr');
+
+    const gTr = document.createElement('tr');
+    gTr.innerHTML = `
+      <th>성별</th>
+      <td>
+        <select id="badge-gender" class="badge-input" style="padding:6px; width:100%;">
+          <option value="남성">남성</option>
+          <option value="여성">여성</option>
+        </select>
+      </td>`;
+
+    const rTr = document.createElement('tr');
+    rTr.innerHTML = `
+      <th>성향</th>
+      <td>
+        <select id="badge-role" class="badge-input" style="padding:6px; width:100%;">
+          <option value="T">T (박는 쪽)</option>
+          <option value="M">M (둘 다 가능)</option>
+          <option value="B">B (박히는 쪽)</option>
+        </select>
+      </td>`;
+
+    if (noteRow) {
+      tbody.insertBefore(gTr, noteRow);
+      tbody.insertBefore(rTr, noteRow);
+    } else {
+      tbody.appendChild(gTr);
+      tbody.appendChild(rTr);
+    }
+    return true;
+  }
+
+  function populateBadgeFields() {
+    if (!currentUser) return;
+    ensureSexProfile(currentUser);
+    const g = document.getElementById('badge-gender');
+    const r = document.getElementById('badge-role');
+    if (g) g.value = currentUser.gender;
+    if (r) r.value = currentUser.role;
+  }
+
+  const origSave = window.saveBadgeInfo;
+  window.saveBadgeInfo = function () {
+    const g = document.getElementById('badge-gender');
+    const r = document.getElementById('badge-role');
+    if (currentUser) {
+      if (g) currentUser.gender = g.value;
+      if (r) currentUser.role = r.value;
+    }
+    if (origSave) origSave.apply(this, arguments);
+    updateTopTag();
+  };
+
+  function updateTopTag() {
+    if (!currentUser) return;
+    ensureSexProfile(currentUser);
+    const pos = document.getElementById('display-position');
+    if (!pos || !pos.parentNode) return;
+
+    let tag = document.getElementById('display-sex-tag');
+    if (!tag) {
+      tag = document.createElement('span');
+      tag.id = 'display-sex-tag';
+      tag.className = 'emp-role-tag';
+      tag.style.cssText = 'margin-left:4px; color:#e099c0; border-color:#e099c0;';
+      pos.parentNode.insertBefore(tag, pos.nextSibling);
+    }
+    const g = currentUser.gender === '여성' ? '女' : '男';
+    const r = (currentUser.role || 'M').toUpperCase();
+    tag.textContent = `${g}·${r}`;
+  }
+
+  function decorateEmpCards() {
+    document.querySelectorAll('.emp-list-card').forEach(card => {
+      const onclick = card.getAttribute('onclick') || '';
+      const match = onclick.match(/openEmpDetailModal\('([^']+)'\)/);
+      if (!match) return;
+      const code = match[1];
+      const u = db.users?.[code];
+      if (!u) return;
+
+      const title = card.querySelector('.emp-list-title');
+      if (!title || title.querySelector('.sex-tag')) return;
+
+      const g = u.gender === '여성' ? '女' : '男';
+      const r = (u.role || 'M').toUpperCase();
+
+      const tag = document.createElement('span');
+      tag.className = 'sex-tag emp-role-tag';
+      tag.style.cssText = 'font-size:10px; color:#e099c0; border:1px solid #e099c0; border-radius:3px; padding:1px 5px; margin-left:4px;';
+      tag.textContent = `${g}·${r}`;
+      title.appendChild(tag);
+    });
+  }
+
+  function init() {
+    injectBadgeFields();
+    setTimeout(populateBadgeFields, 300);
+    updateTopTag();
+    setInterval(updateTopTag, 2000);
+
+    const origRender = window.renderEmployeeCards;
+    window.renderEmployeeCards = function () {
+      if (origRender) origRender.apply(this, arguments);
+      setTimeout(decorateEmpCards, 100);
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+
 
     </script>
 </body> 
