@@ -3548,7 +3548,7 @@ function getTodayStr() {
         function renderDarkStep() {
        const body = darkBodyEl();
             if (!body || !darkRun) return;
-            if (darkRun.rejoined) { renderRejoinScene(); return; }
+
             if (darkRun.zone === 'Qtrew-C-176') {
         if (typeof renderC176 === 'function') {
             renderC176();
@@ -3556,6 +3556,8 @@ function getTodayStr() {
 
         return;
     }
+            if (darkRun.rejoined) { renderRejoinScene(); return; }
+            
 
     saveDarkRunState();
     if (darkRun.isParty) watchPartyStep();
