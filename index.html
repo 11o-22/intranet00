@@ -9327,6 +9327,36 @@ function getTodayStr() {
     (function () {
   'use strict';
 
+  function renderRPS(cfg) {
+  const body = darkBodyEl();
+  const r = cfg.rps;
+  const partner = pickPartner();
+  const sRole = ((currentUser.role || "M") + "").toUpperCase();
+  const pRole = ((partner.role || "M") + "").toUpperCase();
+
+  const msg = sRole === "T" ? "둘 다 위를 주장한다."
+            : sRole === "B" ? "둘 다 아래를 원한다."
+            : "둘 다 상관없다고 한다.";
+
+  const logHtml = r.rounds.length ? `<br><br><i style="color:#888;font-size:11px;">${r.rounds.join(" · ")}</i>` : "";
+  const score = r.rounds.length ? `<br><br><b>본인 ${r.sWin} : ${r.pWin} 동료</b>` : "";
+
+  const opts = [
+    { id: "rock", label: "✊ 바위", fn: "c176RpsVote", arg: "rock" },
+    { id: "scissors", label: "✌️ 가위", fn: "c176RpsVote", arg: "scissors" },
+    { id: "paper", label: "✋ 보", fn: "c176RpsVote", arg: "paper" }
+  ];
+
+  const html = opts.map(o =>
+    `<button class="game-btn" style="width:100%; margin:0 0 8px 0;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`
+  ).join("");
+
+  body.innerHTML = darkBox("대기실",
+    `동료의 성향은 <b>${pRole}</b>. 본인의 성향은 <b>${sRole}</b>.<br><br>${msg}<br><br><i style="color:#aaa;font-size:12px;">[3판 2선승제]</i>${logHtml}${score}`,
+    html, "rps");
+  mountDarkChat('normal');
+}
+
   // ================== 키워드 설정 ==================
   const KEYWORDS = {
     weak:  ["키스", "혀", "느", "받", "침"],
@@ -9505,7 +9535,7 @@ function getTodayStr() {
     const body = darkBodyEl();
     
     if (cfg.phase === "waiting") {
-      if (!cfg.rps.done) return renderRPS(cfg);
+      // if (!cfg.rps.done) return renderRPS(cfg);
       const c = localCtx;
       if (!c) return;
       const roleLine = `<br><br><i style="color:#aaa;font-size:11px;">배정: ${c.td.name} = 위 / ${c.bd.name} = 아래</i>`;
