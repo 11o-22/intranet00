@@ -9476,16 +9476,25 @@ function renderC176(cfg) {
     const body = darkBodyEl();
     if (!body) return;
 
-    // cfg가 없으면 Firebase에서 계속 감시
+    // config가 없으면 계속 감시
     if (!cfg) {
-        console.log('config가 아직 없음 → 감시 시작');
-        c176Ref("config").on('value', (snap) => {
+        console.log('config 없음 → 감시 시작');
+
+        // 이미 리스너가 있으면 중복 방지
+        if (darkRun._c176ConfigListener) return;
+
+        darkRun._c176ConfigListener = c176Ref("config").on('value', (snap) => {
             const loadedCfg = snap.val();
             if (loadedCfg) {
-                console.log('config 감지됨:', loadedCfg);
-                renderC176(loadedCfg);   // config가 생기면 다시 렌더링
+                console.log('config 생성됨! 렌더링 시작');
+                // 리스너 제거 (한 번만 사용)
+                c176Ref("config").off('value', darkRun._c176ConfigListener);
+                darkRun._c176ConfigListener = null;
+
+                renderC176(loadedCfg);
             }
         });
+
         body.innerHTML = `
             <div style="color:#aaa; padding:40px; text-align:center;">
                 <p>방장의 설정을 기다리는 중...</p>
@@ -9494,7 +9503,7 @@ function renderC176(cfg) {
         return;
     }
 
-    // 여기부터 정상 렌더링
+    // config가 있으면 정상 렌더링
     if (cfg.phase === "waiting") {
         if (!cfg.rps.done) return renderRPS(cfg);
         const c = localCtx;
