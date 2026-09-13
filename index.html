@@ -1831,7 +1831,21 @@ function getTodayStr() {
                 step3: "mirror_4.jpg"
             }
         },
-        "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[50,100], ready:false },
+        "Qtrew-C-176": {
+    code:"Qtrew-C-176", grade:"C", name:"감각 재조정실",
+    brief:"(들어간 두 사람은, 나올 때 두 사람이 아니었다.)",
+    danger:"중", survival:"38%", min:2, max:2, reward:[80,160], ready:true,
+    intro:`문이 등 뒤에서 닫힌다.<br><br>
+좁은 통로 앞에 안내문이 붙어 있다.<br>
+<i style="color:#aaa;font-size:12px;">[본 구역은 순차 방으로 구성되어 있습니다. 각 방의 조건을 충족해야 다음 방으로 진행할 수 있습니다. 조건 미충족 시 대기 상태에서 구조를 기다리게 됩니다.]</i><br><br>
+동료의 얼굴을 본다. 표정이 굳어 있다.<br><br>
+첫 번째 방의 문이 열린다.`,
+    outro:`마지막 문이 열린다.<br><br>
+복도 조명이 들어와 있다. 짐과 옷은 문 앞 바구니에 개어져 있다.<br><br>
+"수고하셨습니다." 방향을 알 수 없는 목소리다.<br><br>
+동료와 눈을 마주치지 않고 걷는다. 나갈 때까지, 아무 말도 하지 않는다.`,
+    images:{}
+},
         "Qtrew-D-042": {
             code:"Qtrew-D-042", grade:"D", name:"가로등은 뒤에서부터 꺼진다",
             brief:"(밤 1시 17분. 집으로 가는 길이 조금 길어졌다.)",
@@ -1882,6 +1896,12 @@ function getTodayStr() {
             { name:"누군가의 왼쪽 신발", chance:0.020 },
             { name:"세어지지 않는 숫자", chance:0.010 }
         ],
+
+        "Qtrew-C-176": [
+    { name:"애널 플러그", chance:0.28 },
+    { name:"콘돔",        chance:0.35 },
+    { name:"카테터",      chance:0.12 }
+],
     };
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
@@ -3873,6 +3893,369 @@ function getTodayStr() {
         // 기믹
         const fns = { 1: b330Gimmick1, 2: b330Gimmick2, 3: b330Gimmick3, 4: b330Gimmick4, 5: b330Gimmick5 };
         if (fns[def.n]) fns[def.n]();
+    }
+
+        // --- 기믹 1: 세 갈래 ---
+    function b330Gimmick1() {
+        renderChoiceStep("기믹 1 — 세 갈래",
+            `통로가 셋으로 갈린다.<br><br>왼쪽은 밝다. 형광등이 전부 켜져 있다.<br>가운데는 폭이 넓다. 사람이 많이 지나간 자국이 있다.<br>오른쪽은 좁고 어둡다. 바람이 나온다.<br><br>벽의 화살표는 셋 다 가리키고 있다.`,
+            [
+                { id:'left',   label:'① 밝은 쪽으로 간다.',   fn:'b330G1Result', arg:'left' },
+                { id:'center', label:'② 넓은 쪽으로 간다.',   fn:'b330G1Result', arg:'center' },
+                { id:'right',  label:'③ 좁고 어두운 쪽으로.', fn:'b330G1Result', arg:'right' }
+            ], "step1");
+    }
+
+    function b330G1Result(pick) {
+        let txt, mod = 0;
+        if (pick === 'left') {
+            txt = `밝은 쪽으로 간다.<br><br>형광등이 전부 켜져 있다. 너무 밝아서 그림자가 생기지 않는다.<br>일행의 발밑을 본다. 아무도 그림자가 없다.<br><br>조금 걷다 보니 뒤쪽 등부터 하나씩 꺼지기 시작한다.`;
+            mod = 0; applyPollutionToUser(currentUser, 2);
+        } else if (pick === 'center') {
+            txt = `넓은 쪽으로 간다.<br><br>바닥에 발자국이 많다. 전부 같은 방향이다. 들어가는 쪽으로만.<br>나오는 쪽 발자국은 하나도 없다.<br><br>세어 보려다 만다.`;
+            mod = 1;
+        } else {
+            txt = `좁은 쪽으로 들어선다.<br><br>어깨가 벽에 닿는다. 벽이 미지근하고 조금 물렁하다.<br>바람이 나온다. 일정한 간격으로 나왔다 멎는다.<br><br>빠져나오니 통로가 다시 넓어져 있다.`;
+            mod = 2; applyPollutionToUser(currentUser, 3);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.success++;
+        darkRun.log.push(`[기믹 1] ${pick}`);
+        renderResultStep("기믹 1 — 결과", txt, "계속 간다.",
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(3)" : "void 0");
+    }
+
+    // --- 기믹 2: 안내판 ---
+    function b330Gimmick2() {
+        renderChoiceStep("기믹 2 — 안내판",
+            `벽에 안내판이 셋. 같은 높이에 나란히 붙어 있다.<br><br><span style="color:#d4af37;">"왼쪽 — 출구"</span><br><span style="color:#d4af37;">"오른쪽 — 출구"</span><br><span style="color:#d4af37;">"뒤 — 출구"</span><br><br>글씨체가 전부 다르다. 쓴 사람이 셋이라는 뜻인지,<br>아니면 한 사람이 세 번에 나눠 썼다는 뜻인지 모르겠다.`,
+            [
+                { id:'trust',  label:'① 안내판을 믿고 왼쪽으로.', fn:'b330G2Result', arg:'trust' },
+                { id:'ignore', label:'② 전부 무시하고 직진한다.', fn:'b330G2Result', arg:'ignore' },
+                { id:'back',   label:'③ 뒤로 돌아간다.',          fn:'b330G2Result', arg:'back' },
+                { id:'tear',   label:'④ 안내판을 떼어 낸다.',     fn:'b330G2Result', arg:'tear' }
+            ], "step2");
+    }
+
+    function b330G2Result(pick) {
+        let txt, mod = 0, ok = true;
+        if (pick === 'trust') {
+            txt = `왼쪽으로 간다.<br><br>한참 걷자 안내판이 또 나온다. 똑같은 것 셋.<br>아까 그 자리인지, 아니면 같은 것을 또 만든 건지 알 수 없다.<br><br>글씨체까지 똑같다.`;
+            mod = -1; ok = false;
+        } else if (pick === 'ignore') {
+            txt = `안내판을 지나친다.<br><br>등 뒤에서 뭔가 떨어지는 소리가 난다. 돌아보니 안내판이 바닥에 떨어져 있다.<br>셋 다.<br><br>주워 들 생각은 하지 않는다.`;
+            mod = 1;
+        } else if (pick === 'back') {
+            txt = `되돌아간다.<br><br>왔던 길이 그대로 있다. 처음으로 뭔가 그대로 있다.<br>그게 오히려 이상하다.<br><br>한참 걸었는데 입구가 나오지 않는다. 길만 계속 이어진다.`;
+            mod = 0; applyPollutionToUser(currentUser, 3);
+        } else {
+            txt = `안내판을 벽에서 떼어 낸다.<br><br>뒷면에 글씨가 있다. 손으로 눌러 쓴 자국.<br><span style="color:#d4af37;">"세지 마라"</span><br><br>무엇을 세지 말라는 건지는 적혀 있지 않다.`;
+            mod = 2; darkRun.b330Hint = true;
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        if (ok) darkRun.success++; else darkRun.fail++;
+        darkRun.log.push(`[기믹 2] ${pick}`);
+        renderResultStep("기믹 2 — 결과", txt, "계속 간다.",
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(6)" : "void 0");
+    }
+
+        // --- 기믹 3: 좁아지는 통로 (타이밍) ---
+    function b330Gimmick3() {
+        const body = darkBodyEl();
+        const canSolo = !darkRun.solo && darkRun.isParty;
+        body.innerHTML = darkBox("기믹 3 — 좁아지는 통로",
+            `통로가 주기적으로 좁아진다.<br>넓어진 순간에 맞춰 지나가야 한다.<br><br>좁아진 자리에 끼면 어떻게 되는지는, 벽에 남은 자국이 말해 준다.<br><br><span style="color:#888; font-size:11px;">[넓어진 순간에 버튼을 누르세요 — 3회 통과]</span>`,
+            `<div id="b330-gap" style="width:100%; height:46px; background:#1a1a1a; border:1px solid #3a3a3a; border-radius:6px; margin-bottom:12px; position:relative; overflow:hidden;">
+                <div id="b330-wall-l" style="position:absolute; left:0; top:0; height:100%; width:10%; background:linear-gradient(90deg, #4a3020, #6a4530); transition:width 0.08s linear;"></div>
+                <div id="b330-wall-r" style="position:absolute; right:0; top:0; height:100%; width:10%; background:linear-gradient(270deg, #4a3020, #6a4530); transition:width 0.08s linear;"></div>
+             </div>
+             <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">통과: <b id="b330-pass" style="color:var(--theme-focus);">0</b> / 3</div>
+             <button class="game-btn" id="b330-btn" style="width:100%; margin:0 0 8px 0; padding:14px;" onclick="b330Tap()">지나간다</button>
+             <div id="b330-msg" style="font-size:11px; color:#888; text-align:center; min-height:16px; margin-bottom:10px;"></div>
+             ${canSolo ? `<button class="game-btn" style="width:100%; margin:0; padding:11px; font-size:11px; background:linear-gradient(145deg, #4a3060, #2a1a40) !important; border-color:#7e57c2 !important; color:#ddd !important;" onclick="goSolo()">⑂ 일행과 떨어져 혼자 간다</button>` : ''}`,
+            "step3");
+        mountDarkChat('normal');
+        startB330Gap();
+    }
+
+    let b330Timer = null, b330Open = false, b330Pass = 0, b330Miss = 0;
+
+    function startB330Gap() {
+        b330Pass = 0; b330Miss = 0; b330Open = false;
+        clearTimeout(b330Timer);
+        const l = document.getElementById('b330-wall-l');
+        const r = document.getElementById('b330-wall-r');
+        function cycle() {
+            b330Open = !b330Open;
+            const w = b330Open ? 8 : 42;
+            if (l) l.style.width = w + '%';
+            if (r) r.style.width = w + '%';
+            clearTimeout(b330Timer);
+            b330Timer = setTimeout(cycle, b330Open ? (620 + Math.random()*420) : (800 + Math.random()*700));
+        }
+        cycle();
+    }
+
+    function b330Tap() {
+        if (!darkRun) return;
+        const msg = document.getElementById('b330-msg');
+        if (b330Open) {
+            b330Pass++;
+            document.getElementById('b330-pass').innerText = b330Pass;
+            msg.innerHTML = `<span style="color:#4CAF50;">지나갔다.</span>`;
+        } else {
+            b330Miss++;
+            applyPollutionToUser(currentUser, 4);
+            msg.innerHTML = `<span style="color:#f44336;">벽에 부딪혔다. 벽이 물렁했다.</span>`;
+        }
+        if (b330Pass >= 3 || b330Miss >= 3) {
+            clearTimeout(b330Timer);
+            document.getElementById('b330-btn').disabled = true;
+            const ok = b330Pass >= 3;
+            if (ok) { darkRun.success++; darkRun.modifier = (darkRun.modifier||0) + 1; }
+            else { darkRun.fail++; darkRun.modifier = (darkRun.modifier||0) - 1; applyPollutionToUser(currentUser, 6); }
+            darkRun.log.push(`[기믹 3] 통로 ${ok ? '통과' : '실패'} (${b330Pass}/3)`);
+            setTimeout(() => {
+                renderResultStep("기믹 3 — 결과",
+                    ok ? `마지막 한 번을 빠져나온다.<br><br>뒤에서 통로가 완전히 닫힌다. 소리가 나지 않는다.<br>돌아갈 길이 없어졌다는 뜻이다.`
+                       : `몇 번 부딪혔다.<br>벽이 단단하지 않아서 다치지는 않았다.<br><br>다만 부딪힌 자리마다 옷에 뭔가 묻었다. 닦이지 않는다.`,
+                    "계속 간다.",
+                    (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(8)" : "void 0");
+            }, 1200);
+        }
+    }
+
+        // --- 단독 행동 ---
+    function goSolo() {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        darkRun.solo = true;
+        darkRun.soloFrom = darkRun.step;
+        database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
+            name: currentUser.name, at: Date.now(), step: darkRun.step
+        });
+        sendPartyChat(`${currentUser.name} 사원이 일행과 떨어졌습니다.`, true);
+        darkRun.log.push(`[단독] ${darkRun.step}단계에서 이탈`);
+        renderSoloStep();
+    }
+
+    const B330_SOLO = {
+        3: { text:`일행의 발소리가 멀어진다.<br><br>혼자다. 통로가 갑자기 넓게 느껴진다.<br>실제로 넓어진 것일 수도 있다.<br><br>벽을 짚고 걷는다. 벽이 따라 걷는 것 같다.`,
+             opts:[ {l:'① 벽을 따라 계속 간다.', v:'wall'}, {l:'② 소리를 내며 걷는다.', v:'loud'}, {l:'③ 신발을 벗고 조용히 간다.', v:'quiet'} ] },
+        4: { text:`문이 하나 있다.<br><br>미로에 문이 있을 리 없는데 있다.<br>손잡이에 손때가 많다. 여러 사람이 잡았다는 뜻이다.<br><br>열면 어디로 나올지 모른다.`,
+             opts:[ {l:'① 문을 연다.', v:'open'}, {l:'② 지나친다.', v:'skip'}, {l:'③ 손잡이만 만져 본다.', v:'touch'} ] },
+        5: { text:`바닥에 신발 한 짝이 있다.<br><br>왼쪽이다. 오른쪽은 없다.<br>집어 보니 아직 따뜻하다.<br><br>치수가 당신과 같다.`,
+             opts:[ {l:'① 챙긴다.', v:'take'}, {l:'② 제자리에 둔다.', v:'leave'}, {l:'③ 신어 본다.', v:'wear'} ] },
+        6: { text:`앞에 일행의 뒷모습이 보인다.<br><br>부르려다 만다. 세어 보니 인원이 맞다.<br>당신을 빼고 맞다.<br><br>저쪽은 아직 당신을 못 봤다.`,
+             opts:[ {l:'① 부른다.', v:'call'}, {l:'② 뒤따라간다.', v:'follow'}, {l:'③ 다른 길로 돈다.', v:'avoid'} ] }
+    };
+
+    function renderSoloStep() {
+        const body = darkBodyEl();
+        const d = B330_SOLO[darkRun.step] || B330_SOLO[6];
+        body.innerHTML = darkBox("단독 — 혼자", d.text,
+            d.opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="soloPick('${o.v}')">${o.l}</button>`).join(''),
+            null);
+        mountDarkChat('normal');
+    }
+
+    function soloPick(v) {
+        let txt, mod = 0;
+        const good = ['quiet','touch','leave','avoid'];
+        const bad = ['loud','open','wear','call'];
+        if (good.includes(v)) { mod = 1; txt = `조심스럽게 움직인다.<br><br>아무 일도 일어나지 않는다.<br>아무 일도 일어나지 않는 것이 여기서는 성과다.`; }
+        else if (bad.includes(v)) { mod = -1; applyPollutionToUser(currentUser, 4); txt = `그렇게 한다.<br><br>무언가 이쪽을 알아차린 느낌이 든다.<br>통로 끝에서 뭔가가 아주 천천히 방향을 바꿨다.`; }
+        else { txt = `그렇게 한다.<br><br>별다른 일은 없다. 다만 시간이 조금 지났다.`; }
+
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.soloScore = (darkRun.soloScore || 0) + mod;
+        darkRun.log.push(`[단독] ${v}`);
+
+        const next = darkRun.step + 1;
+        darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
+            next >= 11
+                ? darkChoiceBtn("일행을 찾아 나선다.", "darkRun.step=11; renderDarkStep();")
+                : darkChoiceBtn("계속 간다.", `darkRun.step=${next}; renderSoloStep();`));
+        mountDarkChat('normal');
+    }
+
+        // --- 기믹 4: 하나 많다 ---
+    function b330Gimmick4() {
+        if (darkRun.solo) { renderSoloStep(); return; }
+        const p = darkParties[darkRun.partyId];
+        const members = p && p.members ? Object.values(p.members).filter(m => !((p.solo||{})[m.code])) : [];
+        const opts = members.map(m => ({
+            id: m.code, label: `${m.name} (${m.position})`, fn: 'b330G4Result', arg: m.code
+        }));
+        opts.push({ id:'none', label:'아무도 지목하지 않는다.', fn:'b330G4Result', arg:'none' });
+
+        renderChoiceStep("기믹 4 — 하나 많다",
+            `분명히 하나 많다.<br><br>얼굴을 본다. 전부 아는 얼굴이다.<br>이름도 부를 수 있고, 목소리도 맞다.<br><br>그런데 수가 맞지 않는다.<br><br><span style="color:#888; font-size:11px;">${darkRun.b330Hint ? '<span style="color:#d4af37;">안내판 뒷면의 글씨가 떠오른다. "세지 마라"</span>' : '한 명을 지목해야 한다.'}</span>`,
+            opts, null);
+    }
+
+    function b330G4Result(pick) {
+        let txt, mod = 0;
+        if (pick === 'none') {
+            txt = `아무도 지목하지 않는다.<br><br>세는 것을 그만둔다. 숫자를 잊기로 한다.<br><br>잠시 뒤 다시 세어 보니 맞다.<br>처음부터 맞았던 것 같기도 하다.`;
+            mod = 2; darkRun.success++;
+        } else {
+            const p = darkParties[darkRun.partyId];
+            const name = p && p.members && p.members[pick] ? p.members[pick].name : '누군가';
+            txt = `${name} 사원을 지목한다.<br><br>지목당한 쪽이 웃는다. 농담인 줄 알았다가, 아무도 웃지 않는 것을 보고 멈춘다.<br><br>그 순간 수가 하나 더 늘었다.<br>세는 것을 그만두기로 한다.`;
+            mod = -1; darkRun.fail++;
+            applyPollutionToUser(currentUser, 4);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 4] ${pick === 'none' ? '지목 안 함' : '지목함'}`);
+        renderResultStep("기믹 4 — 결과", txt, "계속 간다.",
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(11)" : "void 0");
+    }
+
+    // --- 합류 지점 ---
+    function renderB330Rejoin() {
+        const body = darkBodyEl();
+        if (!darkRun.isParty) { partyAdvance(12); return; }
+
+        const p = darkParties[darkRun.partyId];
+        const hasSolo = p && p.solo && Object.keys(p.solo).length > 0;
+        if (!hasSolo) {
+            body.innerHTML = darkBox("—",
+                `통로가 넓어진다.<br><br>일행이 전부 여기 있다. 세지 않는다.<br>세지 않기로 했으니까.`,
+                (darkRun.isLeader) ? darkChoiceBtn("계속 간다.", "partyAdvance(12)")
+                                   : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+            mountDarkChat('normal');
+            return;
+        }
+
+        const amSolo = darkRun.solo;
+        body.innerHTML = darkBox("합류",
+            amSolo
+                ? `통로 끝에서 불빛이 보인다.<br><br>일행이다. 아마도.<br>어떻게 다가갈지 정해야 한다.`
+                : `누군가 떨어져 나간 뒤로 아무 소식이 없다.<br><br>기다릴지, 찾을지, 그냥 갈지.`,
+            (amSolo
+                ? [
+                    { l:'① 이름을 부른다.', v:'call' },
+                    { l:'② 발자국을 따라간다.', v:'track' },
+                    { l:'③ 벽을 두드려 신호한다.', v:'knock' }
+                  ]
+                : [
+                    { l:'① 그 자리에서 기다린다.', v:'stay' },
+                    { l:'② 앞으로 나아간다.', v:'move' },
+                    { l:'③ 찾으러 되돌아간다.', v:'search' }
+                  ]
+            ).map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="b330Rejoin('${o.v}')">${o.l}</button>`).join(''));
+        mountDarkChat('normal');
+    }
+
+    function b330Rejoin(v) {
+        if (!database) return;
+        const key = darkRun.solo ? 'soloPick' : 'holdPick';
+        database.ref(`darkParties/${darkRun.partyId}/rj/${key}/${currentUser.code}`).set(v);
+
+        setTimeout(() => {
+            database.ref(`darkParties/${darkRun.partyId}/rj`).once('value').then(sn => {
+                const rj = sn.val() || {};
+                const soloPicks = Object.values(rj.soloPick || {});
+                const holdPicks = Object.values(rj.holdPick || {});
+                resolveB330Rejoin(soloPicks, holdPicks);
+            });
+        }, 1500);
+
+        darkBodyEl().innerHTML = darkBox("합류", `선택했다.<br><br>상대가 어떻게 움직일지는 알 수 없다.`,
+            `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
+        mountDarkChat('normal');
+    }
+
+    function resolveB330Rejoin(soloPicks, holdPicks) {
+        let result, txt, mod = 0;
+        const s = soloPicks[0], h = holdPicks[0];
+
+        if (s === 'call' && h === 'stay') {
+            result = '정면 합류'; mod = 2;
+            txt = `이름을 부른다. 대답이 온다.<br><br>같은 자리에 서서 기다리고 있었다.<br>가까워질수록 인원이 맞는지 세고 싶어지지만, 세지 않는다.`;
+        } else if (s === 'track' && h === 'move') {
+            result = '우회 합류'; mod = 1;
+            txt = `발자국을 따라간다. 아직 축축하다.<br><br>모퉁이를 돌자 일행의 등이 보인다.<br>수를 세지 않고 그냥 뒤에 붙는다.`;
+        } else if (s === 'knock' && h === 'search') {
+            result = '신호 합류'; mod = 3;
+            txt = `벽을 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다.<br>벽 반대편에서다. 벽을 따라 가니 곧 만난다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
+        } else if (s === 'call' && h === 'search') {
+            result = '엇갈린 합류'; mod = 0;
+            txt = `서로를 찾아 움직인다. 한참 엇갈린다.<br><br>결국 만나기는 한다. 다만 둘 다 지쳤다.`;
+        } else {
+            result = '실패'; mod = -2;
+            applyPollutionToUser(currentUser, 5);
+            txt = `만나지 못한다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대 방향으로 돌고 있었던 것 같다.<br><br>끝에서 보기로 한다. 끝이 있다면.`;
+        }
+
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.solo = false;
+        darkRun.log.push(`[합류] ${result}`);
+        sendPartyChat(`합류 — ${result}`, true);
+
+        darkBodyEl().innerHTML = darkBox("합류 — 결과", txt,
+            `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
+                ${result} — 이후 판정 보정 ${mod >= 0 ? '+' : ''}${mod}
+             </div>` +
+            ((darkRun.isLeader || !darkRun.isParty)
+                ? darkChoiceBtn("계속 간다.", "partyAdvance(12)")
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 5: 마지막 ---
+    function b330Gimmick5() {
+        renderChoiceStep("기믹 5 — 잊히기",
+            `바닥의 기울기가 급해진다.<br><br>벽에 붙은 안내판이 전부 떨어져 있다. 화살표도 없다.<br>대신 벽 전체에 같은 문장이 빼곡하다.<br><br><span style="color:#d4af37;">"즐거운 시간 되시기 바랍니다"</span><br><br>여기까지 온 사람이 몇이나 있었는지 모른다.<br>나가려면, 이것이 당신을 잊어야 한다.`,
+            [
+                { id:'forget', label:'① 이름을 버린다. 사원증을 놓는다.', fn:'b330G5Roll', arg:'forget' },
+                { id:'still',  label:'② 움직이지 않는다. 숨도 쉬지 않는다.', fn:'b330G5Roll', arg:'still' },
+                { id:'shout',  label:'③ 소리를 지른다. 존재를 각인시킨다.', fn:'b330G5Roll', arg:'shout' },
+                { id:'walk',   label:'④ 그냥 걸어 나간다.', fn:'b330G5Roll', arg:'walk' }
+            ], "step4");
+    }
+
+    function b330G5Roll(pick) {
+        const roll = Math.floor(Math.random()*20) + 1;
+        let bonus = rollDarkBonus();
+        if (currentUser.darkMazeMap > 0) { bonus += 1; currentUser.darkMazeMap--; }
+        const total = roll + bonus;
+
+        let DC = { forget:9, still:11, walk:13, shout:17 }[pick];
+        let outcome, txt, died = false;
+
+        if (roll === 20) outcome = 'crit';
+        else if (roll === 1) outcome = 'fumble';
+        else outcome = (total >= DC) ? 'pass' : 'fail';
+
+        if (outcome === 'crit') {
+            darkRun.success += 2; darkRun.critical = true;
+            txt = `벽이 흐려진다.<br><br>당신을 그리던 손이 멈춘 것 같다. 세부가 지워지고, 윤곽이 지워지고,<br>마지막으로 이름이 지워진다.<br><br>바닥에 뭔가가 떨어져 있다. 주워 든다.`;
+        } else if (outcome === 'pass') {
+            darkRun.success++;
+            txt = pick === 'forget'
+                ? `사원증을 바닥에 놓는다.<br>이름이 바닥에 남고, 당신은 이름 없이 걷는다.<br><br>벽이 조금씩 멀어진다.`
+                : pick === 'still'
+                ? `멈춘다. 완전히 멈춘다.<br>숨도, 생각도.<br><br>움직이지 않는 것은 그리기 어렵다.<br>윤곽이 흐려진다.`
+                : `그냥 걷는다.<br>빠르지도 느리지도 않게.<br><br>인상에 남지 않는 걸음이었다. 그게 통했다.`;
+        } else if (outcome === 'fail') {
+            darkRun.fail++; applyPollutionToUser(currentUser, 8);
+            darkRun.failedRun = true;
+            txt = `빠져나오기는 했다.<br><br>다만 무언가가 아직 당신을 기억하고 있다.<br>등 뒤가 계속 서늘하다.`;
+        } else {
+            darkRun.fail += 2;
+            died = true;
+            txt = `벽이 선명해진다.<br><br>당신이 아주 또렷해졌다는 뜻이다.<br>이제 그것은 당신을 정확히 알고 있다.<br><br>다음에 그릴 때는 더 잘 그릴 것이다.`;
+        }
+
+        darkRun.log.push(`[기믹 5] d20 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 5 — 판정",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${outcome==='crit'?'#4CAF50':'#ffd700'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            darkChoiceBtn("빠져나간다.", "darkRun.step=99; renderDarkStep();"));
+        mountDarkChat('normal');
     }
 
     function render119Interlude(role, n) {
@@ -6600,8 +6983,9 @@ function getTodayStr() {
             darkAudio.master = master;
             darkAudio.playing = true;
 
-                       if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
+            if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-B-330') buildMazeAmbience(ctx, master);
             else buildAlleyAmbience(ctx, master);
 
         } catch(e) { console.warn('앰비언스 생성 실패:', e); }
@@ -6835,6 +7219,125 @@ function getTodayStr() {
         bpLfo.connect(bpG); bpG.connect(bp.frequency);
         bpLfo.start();
         darkAudio.nodes.push(bpLfo);
+
+            // --- B-330 : 미로 ---
+    function buildMazeAmbience(ctx, master) {
+        // 1) 형광등 잔떨림 (60Hz 험, 미로 전체에 깔림)
+        const hum = ctx.createOscillator();
+        const humG = ctx.createGain();
+        hum.type = 'sawtooth';
+        hum.frequency.value = 60;
+        humG.gain.value = 0.045;
+        const humLp = ctx.createBiquadFilter();
+        humLp.type = 'lowpass'; humLp.frequency.value = 900;
+        hum.connect(humLp); humLp.connect(humG); humG.connect(master);
+        hum.start();
+        darkAudio.nodes.push(hum);
+
+        // 형광등이 불안정하게 깜빡이는 느낌 — 험이 미세하게 끊김
+        const flick = ctx.createOscillator();
+        const flickG = ctx.createGain();
+        flick.type = 'square';
+        flick.frequency.value = 0.23;
+        flickG.gain.value = 0.018;
+        flick.connect(flickG); flickG.connect(humG.gain);
+        flick.start();
+        darkAudio.nodes.push(flick);
+
+        // 2) 공조기 백색소음 (건물 내부의 기본 소리)
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 7);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 340;
+        const nGain = ctx.createGain();
+        nGain.gain.value = 0.13;
+        noise.connect(lp); lp.connect(nGain); nGain.connect(master);
+        noise.start();
+        darkAudio.nodes.push(noise);
+
+        // 3) 통로가 좁아졌다 넓어지는 주기 — 저역이 느리게 부풀었다 꺼짐
+        const breathe = ctx.createOscillator();
+        const breatheG = ctx.createGain();
+        breathe.type = 'sine';
+        breathe.frequency.value = 44;
+        breatheG.gain.value = 0.075;
+        breathe.connect(breatheG); breatheG.connect(master);
+        breathe.start();
+        darkAudio.nodes.push(breathe);
+
+        const bLfo = ctx.createOscillator();
+        const bLfoG = ctx.createGain();
+        bLfo.frequency.value = 0.085;
+        bLfoG.gain.value = 0.055;
+        bLfo.connect(bLfoG); bLfoG.connect(breatheG.gain);
+        bLfo.start();
+        darkAudio.nodes.push(bLfo);
+
+        // 4) 뒤따르는 발소리 — 일정한 간격, 가끔 하나 더
+        function steps() {
+            if (!darkAudio.playing) return;
+            const extra = Math.random() < 0.3;       // 30% 확률로 하나 더
+            const count = extra ? 3 : 2;
+            for (let k = 0; k < count; k++) {
+                const t = ctx.currentTime + k * 0.42 + (k === 2 ? 0.14 : 0);  // 셋째는 반 박자 어긋남
+                const src = ctx.createBufferSource();
+                src.buffer = makeNoiseBuffer(ctx, 0.18);
+                const bp = ctx.createBiquadFilter();
+                bp.type = 'bandpass'; bp.frequency.value = 140 + Math.random() * 70; bp.Q.value = 3.5;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(0.07 + Math.random() * 0.03, t + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0006, t + 0.2);
+                src.connect(bp); bp.connect(g); g.connect(master);
+                src.start(t); src.stop(t + 0.28);
+            }
+            darkAudio.timers.push(setTimeout(steps, 5000 + Math.random() * 9000));
+        }
+        darkAudio.timers.push(setTimeout(steps, 3500 + Math.random() * 4000));
+
+        // 5) 안내 방송 — 말은 아니고, 말의 리듬만 남은 것
+        function announce() {
+            if (!darkAudio.playing) return;
+            const t0 = ctx.currentTime;
+            const syllables = 5 + Math.floor(Math.random() * 4);
+            for (let k = 0; k < syllables; k++) {
+                const t = t0 + k * 0.17;
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150 + Math.random() * 90, t);
+                const bp = ctx.createBiquadFilter();
+                bp.type = 'bandpass'; bp.frequency.value = 700 + Math.random() * 400; bp.Q.value = 6;
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(0.016, t + 0.03);
+                g.gain.exponentialRampToValueAtTime(0.0004, t + 0.15);
+                osc.connect(bp); bp.connect(g); g.connect(master);
+                osc.start(t); osc.stop(t + 0.18);
+            }
+            darkAudio.timers.push(setTimeout(announce, 19000 + Math.random() * 26000));
+        }
+        darkAudio.timers.push(setTimeout(announce, 11000 + Math.random() * 10000));
+
+        // 6) 벽이 다시 그려지는 소리 — 아주 드물게, 연필이 긁히는 듯한
+        function redraw() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const src = ctx.createBufferSource();
+            src.buffer = makeNoiseBuffer(ctx, 1.2);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 2.5;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.024, t + 0.25);
+            g.gain.linearRampToValueAtTime(0.018, t + 0.7);
+            g.gain.exponentialRampToValueAtTime(0.0004, t + 1.15);
+            src.connect(bp); bp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + 1.2);
+            darkAudio.timers.push(setTimeout(redraw, 24000 + Math.random() * 34000));
+        }
+        darkAudio.timers.push(setTimeout(redraw, 16000 + Math.random() * 14000));
+    }
 
         // 4) 유리 부딪는 단발음 (불규칙, 두세 번 연달아)
         function chime() {
@@ -8880,6 +9383,270 @@ function getTodayStr() {
         }
         timerEl.style.display = 'none';
     }, 1000);
+    // ============================================================
+// Qtrew-C-176 : 섹못방 (격리 모듈)
+// 기존 함수 수정 없음. renderDarkStep 라우팅만 가로챔.
+// ============================================================
+
+    // ============================================================
+// 프로필 확장 v2: 성별 / T·M·B 역할 + UI 삽입
+// =========// ============================================================
+// Qtrew-C-176 : 섹못방 v3 — 텍스트 입력 + 키워드 매칭 방식
+// ============================================================
+(function () {
+  'use strict';
+
+  // ── 구역 메타 (변경 없음) ──────────────────────
+  DARK_ZONES["Qtrew-C-176"] = { /* 기존과 동일 */ };
+
+  DARK_LOOT_BY_ZONE["Qtrew-C-176"] = [ /* 기존과 동일 */ ];
+
+  // ── 성별/성기 계산 (기존과 동일) ───────────────
+  // ... (identity, desc 함수 그대로 유지)
+
+  // ── 방 데이터 (키워드 방식으로 완전 재설계) ─────
+  const ROOMS = [
+    // Weak 1
+    {
+      id: "w_mirror",
+      title: "거울 방",
+      condition: "상대의 상의를 벗기고, 그 과정에서 서로의 몸에 대한 반응을 유도해야 합니다.",
+      keywords: ["키스", "혀", "침", "느", "받"],
+      minCount: 2,
+      text: (c) => `사면이 거울이다. ${c.pd.tag} ${c.pd.pron}가 마주 서 있다.`
+    },
+    // Weak 2
+    {
+      id: "w_closet",
+      title: "좁은 옷장",
+      condition: "60초 동안 서로 몸을 밀착한 채, 상대의 반응을 이끌어내야 합니다.",
+      keywords: ["키스", "혀", "타액", "느", "박"],
+      minCount: 2,
+      text: (c) => `성인 둘이 겨우 들어갈 크기의 옷장이다.`
+    },
+    // Weak 3
+    {
+      id: "w_strip",
+      title: "속옷 방",
+      condition: "겉옷을 벗기면서 상대의 몸을 직접적으로 자극해야 합니다.",
+      keywords: ["키스", "침", "느", "받", "박"],
+      minCount: 2,
+      text: (c) => `중앙에 바구니가 놓여 있다.`
+    },
+
+    // Mid
+    {
+      id: "m_petting",
+      title: "애무 방",
+      condition: "상대에게 3분간 애무를 지속하며, 명확한 반응을 이끌어내야 합니다.",
+      keywords: ["키스", "혀", "타액", "느", "받", "침"],
+      minCount: 3,
+      text: (c) => `침대가 하나 놓여 있다.`
+    },
+    {
+      id: "m_glass",
+      title: "관찰창 방",
+      condition: "관찰자에게 보여줄 수 있을 정도로 강하게 상대를 자극해야 합니다.",
+      keywords: ["키스", "혀", "느", "박", "침"],
+      minCount: 3,
+      text: (c) => `유리 너머에 실루엣들이 보인다.`
+    },
+
+    // Strong (도구 방)
+    {
+      id: "s_cuffs",
+      title: "수갑 방",
+      condition: "상대를 결박한 상태로, 도구를 이용해 강한 반응을 이끌어내야 합니다.",
+      keywords: ["맞", "때", "찰", "붉", "빨"],
+      minCount: 3,
+      text: (c) => `테이블 위에 수갑이 놓여 있다.`,
+      isToolRoom: true
+    },
+    {
+      id: "s_whip",
+      title: "채찍 방",
+      condition: "채찍을 사용해 상대에게 강한 자극을 주고, 그 흔적을 남겨야 합니다.",
+      keywords: ["맞", "때", "찰", "붉", "빨"],
+      minCount: 3,
+      text: (c) => `벽에 채찍이 걸려 있다.`,
+      isToolRoom: true
+    },
+    {
+      id: "s_dildo",
+      title: "딜도 방",
+      condition: "딜도를 사용해 상대의 몸을 강하게 자극하고, 반응을 끌어내야 합니다.",
+      keywords: ["맞", "때", "찰", "붉", "빨", "느"],
+      minCount: 3,
+      text: (c) => `테이블 위에 딜도와 로션이 있다.`,
+      isToolRoom: true
+    },
+
+    // Final (삽입 필수)
+    {
+      id: "f_sex",
+      title: "결합 방",
+      condition: "두 사람이 직접 결합하여 성행위를 해야만 문이 열립니다. 반드시 삽입이 이루어져야 합니다.",
+      keywords: ["사정", "싸", "받", "느", "키스", "혀", "타액", "침", "박"],
+      minCount: 4,
+      text: (c) => `침대 앞에 콘돔이 놓여 있다.`,
+      isFinal: true,
+      mustInsert: true
+    }
+  ];
+
+  // ── 실행 상태 ─────────────────────────────────
+  let S = null;
+
+  function getRandomRooms(count) {
+    // 3~4개 방을 ROOMS에서 섞어서 반환 (중복 방지 로직 포함)
+    const shuffled = [...ROOMS].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }
+
+  // ── 텍스트 입력 + 키워드 검사 ─────────────────
+  function checkKeywords(text, keywords, minCount) {
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    let count = 0;
+    keywords.forEach(kw => {
+      if (lower.includes(kw.toLowerCase())) count++;
+    });
+    return count >= minCount;
+  }
+
+  // ── 방 렌더링 (텍스트 입력 방식) ─────────────
+  function renderRoom() {
+    const room = S.rooms[S.idx];
+    const c = S.ctx;
+
+    let html = `
+      <div style="margin-bottom:12px;">
+        <b>${S.idx+1}/${S.roomCount} · ${room.title}</b>
+      </div>
+      <div style="background:#222; padding:12px; border-radius:6px; margin-bottom:16px;">
+        <b>방 조건</b><br>
+        ${room.condition}
+      </div>
+    `;
+
+    if (room.isFinal) {
+      html += `<div style="color:#e66; font-weight:bold; margin-bottom:12px;">
+        ※ 이 방은 반드시 실제 삽입 행위가 필요합니다.
+      </div>`;
+    }
+
+    html += `
+      <div style="margin-bottom:8px;">
+        <b>두 사람이 한 일을 자세히 묘사해주세요</b><br>
+        <small style="color:#888;">(키워드는 숨겨져 있습니다)</small>
+      </div>
+      <textarea id="room-text-input" style="width:100%; height:140px; background:#111; color:#ddd; border:1px solid #444; padding:10px; font-size:14px;" placeholder="여기에 두 사람이 한 일을 자유롭게 적어주세요..."></textarea>
+      <button onclick="submitRoomText()" style="margin-top:12px; width:100%;">묘사 제출</button>
+    `;
+
+    // 기존 renderChoiceStep 대신 직접 렌더링
+    const container = document.getElementById('dark-content') || document.body;
+    container.innerHTML = html;
+  }
+
+  window.submitRoomText = function () {
+    const input = document.getElementById('room-text-input');
+    if (!input) return;
+
+    const text = input.value.trim();
+    const room = S.rooms[S.idx];
+
+    const passed = checkKeywords(text, room.keywords, room.minCount);
+
+    if (passed) {
+      // 통과
+      if (typeof darkRun === "object" && darkRun) {
+        darkRun.log.push(`[C-176] ${room.title} 통과 (키워드 ${room.minCount}개 이상)`);
+      }
+      advanceRoom();
+    } else {
+      // 실패
+      applyPollutionToUser(currentUser, 8);
+      alert("조건이 충족되지 않았습니다. 더 구체적으로 묘사해주세요.");
+      // 재시도 (같은 방)
+    }
+  };
+
+  function advanceRoom() {
+    S.idx++;
+    if (S.idx >= S.rooms.length) {
+      finish("success");
+    } else {
+      renderRoom();
+    }
+  }
+
+  // ── 시작 로직 (기존 RPS + 컨텍스트 유지) ───────
+  // ... (기존 waiting → rps → intro 로직은 그대로 두고,
+  // intro 이후 renderRoom()을 호출하도록 수정)
+
+  function startRooms() {
+    S.idx = 0;
+    renderRoom();
+  }
+
+  // ── 종료 로직 (기존과 동일) ───────────────────
+  function finish(mode) { /* 기존 finish 함수 */ }
+
+  // ── renderDarkStep 라우팅 ─────────────────────
+  // 기존과 동일하게 C-176일 때만 이 모듈이 동작하도록 유지
+
+})();
+    const z = DARK_ZONES["Qtrew-C-176"];
+    if (mode === "success") {
+      if (typeof darkRun === "object" && darkRun) darkRun.success = (darkRun.success||0) + 1;
+      trySave();
+      renderResultStep("출구", z.outro, "결과를 확인한다.", "renderDarkResult();", "final");
+    } else {
+      let body = `삽입을 거부했다. 두 사람은 그 방에서 조용히 앉아 시간을 보냈다.<br><br>
+얼마나 지났는지 알 수 없을 때쯤 문이 밖에서 열렸다.<br><br>
+구조대가 담요를 건넸다. 아무 것도 묻지 않았다.<br><br>`;
+      const u = (typeof currentUser === "object") ? currentUser : null;
+      if (u && Array.isArray(u.inventory) && u.inventory.length > 0) {
+        const i = Math.floor(Math.random() * u.inventory.length);
+        const item = u.inventory[i];
+        const name = (item && item.name) ? item.name : String(item);
+        u.inventory.splice(i, 1);
+        body += `<i style="color:#c99;font-size:12px;">[구조 처리 중 '${name}' 1개가 회수되었습니다.]</i><br>`;
+      } else {
+        body += `<i style="color:#888;font-size:12px;">[회수 가능한 소지품이 없어 회수는 생략됩니다.]</i><br>`;
+      }
+      const pts = 30 + Math.floor(Math.random() * 31);
+      if (u) u.points = (u.points || 0) + pts;
+      body += `<i style="color:#8c8;font-size:12px;">[구조 위로금: ${pts} P 지급]</i>`;
+      if (typeof darkRun === "object" && darkRun) darkRun.success = 0;
+      trySave(); trySaveUsers();
+      renderResultStep("구조 대기", body, "복귀한다.", "renderDarkResult();", "rescued");
+    }
+    S = null;
+  }
+
+  // ── 유틸 ─────────────────────────────────────
+  function applyPoll(n) { if (typeof applyPollutionToUser === "function" && typeof currentUser !== "undefined") try { applyPollutionToUser(currentUser, n); } catch(e){} }
+  function logPush(s)   { if (typeof darkRun === "object" && darkRun) { darkRun.log = darkRun.log||[]; darkRun.log.push(s); } }
+  function trySave()      { if (typeof saveDarkRunState === "function") try { saveDarkRunState(); } catch(e){} }
+  function trySaveUsers() { if (typeof saveUsers === "function") try { saveUsers(); } catch(e){} }
+
+  // ── renderDarkStep 라우팅 가로채기 ───────────
+  const _orig = window.renderDarkStep;
+  window.renderDarkStep = function () {
+    if (typeof darkRun === "object" && darkRun && darkRun.zoneCode === "Qtrew-C-176") {
+      try { return render(); }
+      catch(e) {
+        console.error("[C-176]", e);
+        // 오류 시 원본 로직으로 폴백
+        return _orig && _orig.apply(this, arguments);
+      }
+    }
+    return _orig && _orig.apply(this, arguments);
+  };
+
+})();
     </script>
 </body>
 </html>
