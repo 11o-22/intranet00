@@ -7150,7 +7150,7 @@ function getTodayStr() {
     }
 
         // --- C-119 : 거울이 늘어진 방 ---
-    function buildMirrorAmbience(ctx, master) {}
+    function buildMirrorAmbience(ctx, master) {
         // 1) 유리질 고음 드론 — 아주 느리게 서로 어긋남
         [196, 197.3, 294].forEach((freq, i) => {
             const osc = ctx.createOscillator();
@@ -7212,6 +7212,8 @@ function getTodayStr() {
         bpLfo.connect(bpG); bpG.connect(bp.frequency);
         bpLfo.start();
         darkAudio.nodes.push(bpLfo);
+
+    }
 
             // --- B-330 : 미로 ---
     function buildMazeAmbience(ctx, master) {
