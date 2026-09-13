@@ -603,7 +603,17 @@
         .word-btn { flex:1; padding:11px 4px; font-size:13px; font-weight:bold; background:var(--theme-bg-grad); border:1px solid var(--theme-border); color:var(--theme-text); border-radius:5px; cursor:pointer; transition:all 0.12s; }
         .word-btn:hover:not(:disabled) { border-color:var(--theme-focus); }
         .word-btn:active:not(:disabled) { transform:translateY(2px) scale(0.96); }
-        .word-btn:disabled { opacity:0.3; cursor:not-allowed; }      
+        .word-btn:disabled { opacity:0.3; cursor:not-allowed; }   
+                  .react-btns { display:flex; gap:5px; padding:8px 11px 0 11px; }
+        .react-btn { flex:1; padding:8px 3px; font-size:10px; background:rgba(0,0,0,0.35); border:1px solid #3a3a3a; color:#888; border-radius:4px; cursor:pointer; transition:all 0.12s; }
+        .react-btn:hover:not(:disabled) { border-color:#5a4a2a; color:#d4af37; }
+        .react-btn:active:not(:disabled) { transform:translateY(1px) scale(0.97); }
+        .react-btn:disabled { opacity:0.3; cursor:not-allowed; }
+        .react-flash { animation: reactFlash 1.6s ease-out; }
+        @keyframes reactFlash {
+            0% { background:rgba(212,175,55,0.25); }
+            100% { background:transparent; }
+        }
     </style>
 </head>
 <body ontouchstart="">
@@ -3122,13 +3132,15 @@ function getTodayStr() {
     }
 
     // 채팅을 하단 고정 영역에 렌더
-    function mountDarkChat(mode, words, wordsLeft, muted) {
+        function mountDarkChat(mode, words, wordsLeft, muted) {
         const slot = document.getElementById('dro-chat');
         if (!slot) return;
         if (!darkRun || !darkRun.isParty) { slot.innerHTML = ''; return; }
-        slot.innerHTML = buildChatHtml(mode || 'normal', words, wordsLeft, muted);
+        const reactBar = (darkRun.zone === 'Qtrew-C-119' && c119State && darkRun.step > 0) ? buildReactBar() : '';
+        slot.innerHTML = reactBar + buildChatHtml(mode || 'normal', words, wordsLeft, muted);
         attachChatListener(darkRun.partyId);
         renderChatLog();
+        renderReactFlash();
     }
 
         function darkBox(title, text, extra, imgKey) {
@@ -3247,6 +3259,7 @@ function getTodayStr() {
                 darkRun.step = c119State.step;
             }
             renderStep119();
+            renderReactFlash();
         });
     }
 
@@ -3293,6 +3306,50 @@ function getTodayStr() {
         database.ref(c119Path() + '/signals').push({ w: word, at: Date.now() });
     }
 
+            // ★ 갇힌 자의 비언어 반응 (신호 횟수 소모 없음)
+    const C119_REACTS = [
+        { k:'knock',  label:'두드린다',   out:'벽 안쪽에서 한 번. 쿵.' },
+        { k:'hold',   label:'숨을 죽인다', out:'아무 소리도 나지 않는다. 그게 더 신경 쓰인다.' },
+        { k:'hit',    label:'벽을 친다',  out:'유리가 울린다. 급하다는 뜻 같다.' },
+        { k:'scrape', label:'긁는다',     out:'손톱이 유리를 긁는 소리. 길게.' }
+    ];
+
+    function sendReact(kind) {
+        if (myC119Role() !== 'inside') return;
+        if (!c119State) return;
+        database.ref(c119Path() + '/react').set({ k: kind, at: Date.now() });
+    }
+
+    let lastReactAt = 0;
+    function renderReactFlash() {
+        if (!c119State || !c119State.react) return;
+        if (c119State.react.at === lastReactAt) return;
+        lastReactAt = c119State.react.at;
+        if (myC119Role() !== 'outside') return;
+        const r = C119_REACTS.find(x => x.k === c119State.react.k);
+        if (!r) return;
+        const el = document.getElementById('react-recv');
+        if (el) {
+            el.innerHTML = `<span style="color:#d4af37;">${r.out}</span>`;
+            el.classList.remove('react-flash');
+            void el.offsetWidth;
+            el.classList.add('react-flash');
+        }
+    }
+
+    function buildReactBar() {
+        const role = myC119Role();
+        if (role === 'inside') {
+            return `<div class="react-btns">
+                ${C119_REACTS.map(r => `<button class="react-btn" onclick="sendReact('${r.k}')">${r.label}</button>`).join('')}
+            </div>`;
+        }
+        if (role === 'outside') {
+            return `<div id="react-recv" style="padding:8px 11px; font-size:10px; color:#666; min-height:16px; text-align:center; border-radius:4px;">—</div>`;
+        }
+        return '';
+    }
+
     function toggleC119Mute(on) {
         if (myC119Role() !== 'outside') return;
         database.ref(c119Path()).update({ muted: !!on });
@@ -3312,8 +3369,9 @@ function getTodayStr() {
         return arr.map(s => `<span style="display:inline-block; background:rgba(212,175,55,0.12); border:1px solid #5a4a2a; color:#d4af37; border-radius:4px; padding:3px 9px; margin:0 4px 4px 0; font-weight:bold; font-size:12px;">${s.w}</span>`).join('');
     }
 
-        function renderStep119() {
-       const body = darkBodyEl();
+           function renderStep119() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
 
         attachC119Listener();
         if (!c119State) {
@@ -3329,8 +3387,118 @@ function getTodayStr() {
         if (s === 0) { render119Intro(role); return; }
         if (s === 99) { renderDarkResult(); return; }
 
-        const gimmicks = [render119A, render119B, render119C, render119D];
-        if (gimmicks[s - 1]) gimmicks[s - 1](role);
+        const seq = {
+            1: () => render119Interlude(role, 1),
+            2: () => render119A(role),
+            3: () => render119Interlude(role, 2),
+            4: () => render119B(role),
+            5: () => render119Interlude(role, 3),
+            6: () => render119C(role),
+            7: () => render119Interlude(role, 4),
+            8: () => render119D(role)
+        };
+        if (seq[s]) seq[s]();
+                   // --- 막간 장면 ---
+    const C119_INTERLUDES = {
+        1: {
+            inside: `유리 안쪽 바닥에 뭔가 있다.<br><br>사원증이다. 이름 칸이 긁혀서 지워졌고, 사번만 남았다.<br><span style="color:#d4af37;">0031.</span><br><br>뒤집어 본다. 뒷면에 손톱으로 판 글씨.<br><span style="color:#d4af37;">"둘이 들어왔다"</span>`,
+            outside: `벽에 자국이 있다. 사람이 오래 기대어 있던 자리다.<br><br>그 아래에 무언가 세어놓은 흔적. 작대기 네 개씩 묶어서 여섯 묶음.<br>스물넷.<br><br>시간이었을까, 횟수였을까.`,
+            insideOpts: [
+                { l:'① 사원증을 챙긴다.', v:'take' },
+                { l:'② 그 자리에 둔다.', v:'leave' }
+            ],
+            outsideOpts: [
+                { l:'① 자국을 더 살펴본다.', v:'look' },
+                { l:'② 그냥 지나간다.', v:'pass' }
+            ]
+        },
+        2: {
+            inside: `거울 너머로 동료가 보인다. 등을 보이고 서 있다.<br><br>그런데 둘이다.<br>한 걸음 뒤에 하나 더. 똑같은 자세로.<br><br>말해야 하는데, 이걸 전할 단어가 없다.`,
+            outside: `복도를 걷는다. 양옆이 전부 거울이다.<br><br>비친 자신이 한 박자씩 늦게 따라온다. 처음엔 착각인 줄 알았다.<br>멈춰 서서 확인한다. 확실히 늦다.<br><br>등 뒤에서 유리 울리는 소리가 났다.`,
+            insideOpts: [
+                { l:'① 벽을 세게 두드린다.', v:'warn' },
+                { l:'② 가만히 지켜본다.', v:'watch' }
+            ],
+            outsideOpts: [
+                { l:'① 뒤를 돌아본다.', v:'turn' },
+                { l:'② 보지 않고 걷는다.', v:'walk' }
+            ]
+        },
+        3: {
+            inside: `유리에 글씨가 있다. 안쪽에서 쓴 것이다.<br>김이 서려야 보이는 종류의 글씨.<br><br>숨을 뱉어 본다. 천천히 떠오른다.<br><span style="color:#d4af37;">"세 마디로는 부족했다"</span><br><br>그 아래에 더 작게.<br><span style="color:#d4af37;">"먼저 나가라고 했다"</span>`,
+            outside: `문틀에 이름표 두 개가 나란히 붙어 있다.<br>둘 다 긁혀 있는데, 한쪽은 완전히 지워졌고 한쪽은 절반만 남았다.<br><br>남은 쪽을 읽어 본다. 읽는 순간 등이 서늘해진다.<br><span style="color:#d4af37;">당신의 부서 이름이다.</span>`,
+            insideOpts: [
+                { l:'① 같은 자리에 글씨를 덧쓴다.', v:'write' },
+                { l:'② 손으로 지운다.', v:'erase' }
+            ],
+            outsideOpts: [
+                { l:'① 이름표를 떼어 챙긴다.', v:'keep' },
+                { l:'② 원래대로 둔다.', v:'keepit' }
+            ]
+        },
+        4: {
+            inside: `마지막 방이다. 유리가 얇아졌다. 두드리면 소리가 잘 통할 것 같다.<br><br>바닥에 두 사람분의 자국이 있다. 나란히 앉아 있던 자국.<br>한쪽은 일어섰고, 한쪽은 일어서지 않았다.<br><br>일어서지 않은 쪽 자리에, 지금 당신이 앉아 있다.`,
+            outside: `문 앞이다. 자물쇠가 걸려 있다.<br><br>옆 벽에 보고서 한 장이 붙어 있다. 대부분 지워졌고 마지막 줄만 남았다.<br><span style="color:#d4af37;">"귀환 인원 1명. 신원 확인 불가."</span><br><br>한 명은 나왔다는 뜻이다.<br>누가 나왔는지는 적혀 있지 않다.`,
+            insideOpts: [
+                { l:'① 자리에서 일어선다.', v:'stand' },
+                { l:'② 그대로 앉아 있는다.', v:'sit' }
+            ],
+            outsideOpts: [
+                { l:'① 보고서를 떼어 낸다.', v:'tear' },
+                { l:'② 읽은 것을 잊기로 한다.', v:'forget' }
+            ]
+        }
+    };
+
+    function render119Interlude(role, n) {
+        const data = C119_INTERLUDES[n];
+        if (!data) return;
+        const isInside = role === 'inside';
+        const opts = isInside ? data.insideOpts : data.outsideOpts;
+        const picked = c119State[`il${n}_${role}`];
+        const body = darkBodyEl();
+
+        let optHtml;
+        if (picked) {
+            optHtml = `<div style="text-align:center; font-size:11px; color:#4CAF50; padding:10px; background:rgba(0,0,0,0.25); border-radius:5px;">선택했다. 동료를 기다린다.</div>`;
+        } else {
+            optHtml = opts.map(o =>
+                `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="pick119Interlude(${n},'${o.v}')">${o.l}</button>`
+            ).join('');
+        }
+
+        const bothDone = c119State[`il${n}_inside`] && c119State[`il${n}_outside`];
+        if (bothDone) {
+            optHtml += darkRun.isLeader
+                ? darkChoiceBtn("계속 간다.", `c119Advance(${n * 2})`)
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`;
+        }
+
+        body.innerHTML = darkBox(`— ${n}`, isInside ? data.inside : data.outside, optHtml,
+            n === 1 ? "intro" : null);
+        mountDarkChat(isInside ? 'words' : 'normal',
+            C119_WORDS[Math.min(n - 1, 3)], c119State.signalsLeft, c119State.muted);
+        updateDarkRoleLabel();
+    }
+
+    function pick119Interlude(n, val) {
+        const role = myC119Role();
+        if (!role || !database) return;
+        let upd = {};
+        upd[`il${n}_${role}`] = val;
+        database.ref(c119Path()).update(upd);
+
+        // 선택에 따른 보정
+        if (val === 'take' || val === 'look' || val === 'write' || val === 'keep') {
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+        }
+        if (val === 'turn' || val === 'erase') {
+            applyPollutionToUser(currentUser, 2);
+        }
+        if (val === 'warn') {
+            database.ref(c119Path()).update({ signalsLeft: (c119State.signalsLeft || 0) + 1 });
+        }
+        darkRun.log.push(`[막간 ${n}] ${role} — ${val}`);
     }
 
     function render119Intro(role) {
@@ -3372,7 +3540,7 @@ function getTodayStr() {
         body.innerHTML = darkBox(title,
             isInside ? insideText : outsideText,
             (isInside ? '' : signalBox) + (isInside ? (insideExtra || '') : (outsideExtra || '')),
-            "step" + darkRun.step);
+             {2:'step1', 4:'step2', 6:'step3', 8:'step4'}[darkRun.step] || null);
 
         mountDarkChat(isInside ? 'words' : 'normal', wordSet, c119State.signalsLeft, c119State.muted);
         updateDarkRoleLabel();
@@ -3420,7 +3588,7 @@ function getTodayStr() {
         darkBodyEl().innerHTML = darkBox("기믹 1 — 결과",
             ok ? `${n}번 거울에 손을 넣는다. 저항이 없다.<br><br>팔이 통째로 들어간다. 유리가 아니었다.`
                : `${n}번 거울이 소리 없이 갈라진다.<br>조각이 발밑에 떨어지는데, 떨어지는 소리는 한참 뒤에 났다.<br><br>다른 거울들이 조금씩 더 빨리 돌기 시작한다.`,
-            (darkRun.isLeader ? darkChoiceBtn("안쪽으로 들어간다.", "c119Advance(2)")
+            (darkRun.isLeader ? darkChoiceBtn("안쪽으로 들어간다.", "c119Advance(3)")
                               : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
                        );
         mountDarkChat('normal');
@@ -3471,7 +3639,7 @@ function getTodayStr() {
             darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
                 ok ? `네 번째 손잡이가 끝까지 내려간다.<br>벽 안쪽에서 뭔가가 풀리는 소리가 난다.<br><br>거울 하나가 도는 것을 멈췄다.`
                    : `세 번째에서 걸렸다. 손잡이가 전부 튕겨 올라온다.<br><br>천장의 거울들이 일제히 같은 방향으로 돌기 시작한다.<br>전부 당신 쪽을 보고 있다.`,
-                               (darkRun.isLeader ? darkChoiceBtn("다음 방으로.", "c119Advance(3)")
+                               (darkRun.isLeader ? darkChoiceBtn("다음 방으로.", "c119Advance(5)")
                                   : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
                 );
             mountDarkChat('normal');
@@ -3543,7 +3711,7 @@ function getTodayStr() {
             ok ? `추가 멎는다. 눈금이 정확히 맞았다.<br>바닥의 판이 소리 없이 옆으로 밀린다.<br><br>아래로 내려가는 계단이 보인다.`
                : over ? `줄이 끊어졌다.<br>추가 바닥을 치는 소리가 방 전체를 울린다.<br><br>거울 몇 개가 줄에서 떨어져 깨졌다. 깨진 자리마다 뭔가가 서 있다.`
                       : `추가 어중간한 데서 멎었다.<br>판은 열리지 않는다. 다만 아주 조금 벌어졌다.<br><br>그 틈으로 손을 넣어 억지로 벌린다.`,
-                        (darkRun.isLeader ? darkChoiceBtn("마지막 문으로.", "c119Advance(4)")
+                        (darkRun.isLeader ? darkChoiceBtn("마지막 문으로.", "c119Advance(7)")
                               : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
             );
         mountDarkChat('normal');
@@ -8164,13 +8332,18 @@ function getTodayStr() {
     closeVipGameOverlay = function() { _closeVipGameOverlay(); popModal('vip-game-overlay'); };
 
     // --- 3. 기기 [뒤로가기] 버튼 감지 (popstate 이벤트) ---
-       window.addEventListener('popstate', function(e) {
+         window.addEventListener('popstate', function(e) {
         // ★ 탐사 중에는 뒤로가기 차단
         if (darkRun) {
             history.pushState({ darkrun: true }, "", "");
             return;
         }
+
+        // 화면의 닫기 버튼(X)을 눌러서 발생한 이벤트라면 무시
         if (isSystemAction) {
+            isSystemAction = false;
+            return;
+        }
 
         // 스택에 열려있는 팝업이 있다면 꺼내서 닫기 실행
         if (modalStack.length > 0) {
