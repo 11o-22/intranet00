@@ -3549,13 +3549,7 @@ function getTodayStr() {
 
            if (darkRun.zone === 'Qtrew-C-176') {
     if (typeof renderC176 === 'function') {
-        // cfg를 가져와서 넘겨주기
-        c176Ref("config").once('value').then(snap => {
-            const cfg = snap.val();
-            if (cfg) {
-                renderC176(cfg);
-            }
-        });
+        renderC176();   // 그냥 이렇게 호출
     }
     return;
 }
