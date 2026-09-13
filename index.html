@@ -703,6 +703,17 @@
 </div>
 
 <!-- 어둠 탐사 파티 초대 -->
+<!-- 탐사 복귀 확인 -->
+<div id="dark-resume-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center; backdrop-filter:blur(8px);">
+    <div class="luxury-alert-box" style="border-color:#ff9800; box-shadow:0 15px 40px rgba(255,152,0,0.2), inset 0 0 20px rgba(0,0,0,0.8);">
+        <h3 style="color:#ff9800; margin-top:0; letter-spacing:1px; font-size:17px;">⚠ 미완료 탐사 감지</h3>
+        <div id="dark-resume-text" style="color:#eee; margin-bottom:22px; font-size:13px; line-height:1.7;"></div>
+        <div style="display:flex; gap:10px;">
+            <button class="luxury-alert-btn" onclick="acceptDarkResume()" style="flex:2; background:#7f0000; color:#fff; border-color:#b71c1c;">복귀한다</button>
+            <button class="luxury-alert-btn" onclick="declineDarkResume()" style="flex:1; background:transparent; border-color:#888; color:#aaa;">포기</button>
+        </div>
+    </div>
+</div>    
 <div id="dark-invite-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); z-index:99999; justify-content:center; align-items:center; backdrop-filter:blur(8px);">
     <div class="luxury-alert-box" style="border-color:#7f0000; box-shadow:0 15px 40px rgba(180,0,0,0.25), inset 0 0 20px rgba(0,0,0,0.8);">
         <h3 style="color:#ff6b6b; margin-top:0; letter-spacing:1px; font-size:17px;">🕯 어둠 탐사 동행 요청</h3>
@@ -1942,7 +1953,150 @@ function getTodayStr() {
             if (prev !== found) updatePartyTabDot();
         });
     }
+    // ==========================================
+    // ★ 탐사 상태 저장 / 복원 / 이탈 처리
+    // ==========================================
+    const REJOIN_GRACE = 30 * 1000;        // 이탈 판정 유예 30초
+    const REJOIN_LIMIT = 5 * 60 * 1000;    // 복귀 제한 5분
+    const ABSENCE_PENALTY = { S:30, A:25, B:20, C:10, D:5 };
 
+    function saveDarkRunState() {
+        if (!darkRun || !database || !currentUser) return;
+        const snap = {
+            zone: darkRun.zone, step: darkRun.step,
+            modifier: darkRun.modifier || 0,
+            success: darkRun.success || 0, fail: darkRun.fail || 0,
+            carryEquips: darkRun.carryEquips || [],
+            carryItems: darkRun.carryItems || [],
+            rerollUsed: !!darkRun.rerollUsed,
+            lostItems: darkRun.lostItems || [],
+            log: darkRun.log || [],
+            partyId: darkRun.partyId || null,
+            isParty: !!darkRun.isParty,
+            isLeader: !!darkRun.isLeader,
+            savedAt: Date.now()
+        };
+        database.ref('darkRuns/' + currentUser.code).set(snap);
+    }
+
+    function clearDarkRunState() {
+        if (!database || !currentUser) return;
+        database.ref('darkRuns/' + currentUser.code).remove();
+    }
+
+    // 로그인 시 진행 중이던 탐사 확인
+    function checkDarkRunResume() {
+        if (!database || !currentUser) return;
+        database.ref('darkRuns/' + currentUser.code).once('value').then(snap => {
+            const s = snap.val();
+            if (!s) return;
+
+            const away = Date.now() - (s.savedAt || 0);
+            const z = DARK_ZONES[s.zone];
+            if (!z) { clearDarkRunState(); return; }
+
+            if (away > REJOIN_LIMIT) {
+                // 5분 초과 — 실패 처리
+                const pen = ABSENCE_PENALTY[z.grade] || 5;
+                const actual = Math.min(currentUser.points, pen);
+                currentUser.points -= actual;
+                applyPollutionToUser(currentUser, 5);
+                addHistoryLog(currentUser, `[탐사 중단] ${z.code} 이탈 시간 초과로 실패 처리 (-${actual} P)`);
+
+                if (!currentUser.darkLogs) currentUser.darkLogs = [];
+                currentUser.darkLogs.unshift({
+                    date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
+                    reward: 0, success: s.success || 0, fail: s.fail || 0,
+                    loot: [], lost: s.lostItems || [], detail: s.log || [],
+                    aborted: true, party: !!s.isParty
+                });
+
+                clearDarkRunState();
+                if (s.partyId && database) {
+                    database.ref(`darkParties/${s.partyId}/alive/${currentUser.code}`).remove();
+                    database.ref(`darkParties/${s.partyId}/members/${currentUser.code}`).remove();
+                }
+                if (!s.isParty) releaseZone(s.zone);
+                saveDB(); updateUI();
+                showCustomAlert(`이탈 시간이 5분을 초과하여 ${z.code} 탐사가 실패 처리되었습니다.\n${actual} P가 차감되고 오염도가 5% 상승했습니다.`);
+                return;
+            }
+
+            // 5분 이내 — 복귀 가능
+            showDarkResumePrompt(s, away);
+        });
+    }
+
+    function showDarkResumePrompt(s, away) {
+        const z = DARK_ZONES[s.zone];
+        const left = Math.max(0, Math.ceil((REJOIN_LIMIT - away) / 1000));
+        const m = Math.floor(left / 60), sec = left % 60;
+
+        document.getElementById('dark-resume-text').innerHTML = `
+            <span style="font-family:monospace; font-size:11px; color:#ff6b6b;">${z.code}</span><br>
+            <b style="color:#fff; font-size:14px;">${z.name}</b><br><br>
+            진행 중이던 탐사가 있습니다.<br>
+            <span style="font-size:12px; color:#aaa;">${s.isParty ? '동료들이 아직 안에 있습니다.' : '아직 끝나지 않았습니다.'}</span><br><br>
+            <span style="color:#ff9800; font-weight:bold;">복귀 가능 시간 ${m}분 ${sec}초 남음</span><br>
+            <span style="font-size:10px; color:#888;">시간이 지나면 실패 처리되며 ${ABSENCE_PENALTY[z.grade] || 5} P가 차감됩니다.</span>`;
+        document.getElementById('dark-resume-overlay').style.display = 'flex';
+        window._pendingResume = s;
+    }
+
+    function acceptDarkResume() {
+        const s = window._pendingResume;
+        if (!s) return;
+        document.getElementById('dark-resume-overlay').style.display = 'none';
+        window._pendingResume = null;
+
+        darkRun = {
+            zone: s.zone, step: s.step, modifier: s.modifier,
+            success: s.success, fail: s.fail,
+            carryEquips: s.carryEquips || [], carryItems: s.carryItems || [],
+            rerollUsed: s.rerollUsed, lostItems: s.lostItems || [], log: s.log || [],
+            partyId: s.partyId, isParty: s.isParty, isLeader: s.isLeader,
+            rejoined: true
+        };
+
+        if (s.isParty && database) {
+            database.ref(`darkParties/${s.partyId}/alive/${currentUser.code}`).set(true);
+            database.ref(`darkParties/${s.partyId}/alive/${currentUser.code}`).onDisconnect().remove();
+            sendPartyChat(`${currentUser.name} 사원의 신호가 복구되었습니다.`, true);
+            // 현재 단계로 따라붙기
+            database.ref(`darkParties/${s.partyId}/curStep`).once('value').then(sn => {
+                const cur = sn.val();
+                if (cur != null) darkRun.step = cur;
+                darkAmbienceStart(darkRun.zone);
+                openDarkOverlay();
+                renderRejoinScene();
+            });
+        } else {
+            darkAmbienceStart(darkRun.zone);
+            openDarkOverlay();
+            renderRejoinScene();
+        }
+    }
+
+    function declineDarkResume() {
+        const s = window._pendingResume;
+        document.getElementById('dark-resume-overlay').style.display = 'none';
+        window._pendingResume = null;
+        if (!s) return;
+
+        const z = DARK_ZONES[s.zone];
+        const pen = ABSENCE_PENALTY[z.grade] || 5;
+        const actual = Math.min(currentUser.points, pen);
+        currentUser.points -= actual;
+        addHistoryLog(currentUser, `[탐사 포기] ${z.code} 자진 이탈 (-${actual} P)`);
+        clearDarkRunState();
+        if (s.partyId && database) {
+            database.ref(`darkParties/${s.partyId}/alive/${currentUser.code}`).remove();
+            database.ref(`darkParties/${s.partyId}/members/${currentUser.code}`).remove();
+        }
+        if (!s.isParty) releaseZone(s.zone);
+        saveDB(); updateUI();
+        showCustomAlert(`탐사를 포기했습니다. ${actual} P가 차감되었습니다.`);
+    }
     function updatePartyTabDot() {
         const tab = document.getElementById('dark-party-tab');
         if (!tab) return;
@@ -2104,6 +2258,7 @@ function getTodayStr() {
         darkBriefingOpen = false;
         darkAmbienceStart(party.zone);
         openDarkOverlay();
+        saveDarkRunState();   
         addHistoryLog(currentUser, `[어둠 진입] ${party.zone} 파티 탐사 개시 (${Object.keys(party.members).length}인)`);
         saveDB();
 
@@ -3083,7 +3238,7 @@ function getTodayStr() {
                 occupyZone(zoneCode);
                 darkAmbienceStart(zoneCode);
                 openDarkOverlay();
-             openDarkOverlay();
+                saveDarkRunState();
 
 
         addHistoryLog(currentUser, `[어둠 진입] ${zoneCode} 탐사 개시`);
@@ -3172,6 +3327,8 @@ function getTodayStr() {
 
         function renderDarkStep() {
        const body = darkBodyEl();
+            if (!body || !darkRun) return;
+        saveDarkRunState();
          if (darkRun.isParty) watchPartyStep();
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
@@ -3378,7 +3535,7 @@ function getTodayStr() {
            function renderStep119() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
-
+        saveDarkRunState();
         attachC119Listener();
         if (!c119State) {
             if (darkRun.isLeader) initC119();
@@ -4220,7 +4377,7 @@ function getTodayStr() {
         } else if (zone) {
             releaseZone(zone);
         }
-
+      clearDarkRunState();
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
@@ -4350,6 +4507,7 @@ function getTodayStr() {
         }
 
         detachChatListener();
+        clearDarkRunState();
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
@@ -8212,6 +8370,7 @@ function getTodayStr() {
             checkVIPStatus(); 
             loadBadgeInfo(); 
             updateUI();
+            setTimeout(() => checkDarkRunResume(), 800);
             
             // 관리자 전용 통제 콘솔 버튼 노출 여부 결정
             const adminContainer = document.getElementById('admin-button-container');
