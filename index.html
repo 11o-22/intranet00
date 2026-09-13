@@ -1771,7 +1771,10 @@ function getTodayStr() {
         "액자 뒤에 있던 것": { price: 300, usable: false, darkOnly: true, desc: "[어둠 회수품] 벽과 액자 사이에 끼어 있었다. 무엇인지는 아직 알 수 없다." },
         "금이 간 손거울": { price: 55, usable: false, darkOnly: true, desc: "[어둠 회수품] 비스듬히 금이 갔다. 들여다보면 반응이 반 박자 빠르다." },
         "세 번째 단어": { price: 130, usable: true, targetable: false, effect: "third_word", darkOnly: true, desc: "[어둠 회수품] 적히지 않은 단어. 사용 시 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있다." },
-        "먼저 웃은 쪽": { price: 320, usable: false, darkOnly: true, desc: "[어둠 회수품] 거울 속에서 먼저 웃은 쪽이 남긴 것. 무엇인지는 아직 알 수 없다." }
+        "먼저 웃은 쪽": { price: 320, usable: false, darkOnly: true, desc: "[어둠 회수품] 거울 속에서 먼저 웃은 쪽이 남긴 것. 무엇인지는 아직 알 수 없다." },
+        "접힌 안내도": { price: 70, usable: true, targetable: false, effect: "maze_map", darkOnly: true, desc: "[어둠 회수품] 몇 번을 펼쳐도 다른 그림이 나온다. 사용 시 다음 어둠 탐사의 첫 두 판정에 +1 보정." },
+        "누군가의 왼쪽 신발": { price: 140, usable: false, darkOnly: true, desc: "[어둠 회수품] 치수가 당신과 같다. 오른쪽은 없었다." },
+        "세어지지 않는 숫자": { price: 340, usable: false, darkOnly: true, desc: "[어둠 회수품] 적혀 있는데 읽을 수 없다. 볼 때마다 자릿수가 다르다." }
 
     };
 
@@ -1799,7 +1802,20 @@ function getTodayStr() {
         "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[300,500], ready:false },
         "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[200,300], ready:false },
         "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[200,300], ready:false },
-        "Qtrew-B-330": { code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자", brief:"(함정 조심!)", danger:"중상", survival:"12%", min:2, max:4, reward:[100,200], ready:false },
+                "Qtrew-B-330": {
+            code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자",
+            brief:"(함정 조심!)",
+            danger:"중상", survival:"12%", min:2, max:4, reward:[100,200], ready:true,
+            voteMode:true, soloFrom:3, soloTo:6,
+            intro:"안내 방송이 나오고 있다.<br><br><span style=\"color:#d4af37;\">\"미로 탈출 게임에 참가해 주셔서 감사합니다. 제한 시간은 없습니다. 함정을 조심하세요. 즐거운 시간 되시기 바랍니다.\"</span><br><br>목소리가 명랑하다. 같은 문장을 세 번 반복하는데, 세 번 다 억양이 똑같다.<br><br>벽에 안내판이 붙어 있다. 글씨가 흐릿하다.<br>누군가 미로를 대충 알고 있는 사람이 그린 것 같다.",
+            outro:"이름이 기억나지 않는다.<br><br>그게 다행이라는 것만 안다.<br>벽이 멀어지고, 안내 방송이 잦아들고, 화살표가 전부 같은 방향을 가리킨다.<br>처음으로 일치했다.<br><br>눈을 뜨니 복도다. 사원증에 적힌 이름을 한참 들여다봤다.",
+            images: {
+                intro: "maze_1.jpg",
+                step1: "maze_2.jpg",
+                step2: "maze_3.jpg",
+                step3: "maze_4.jpg"
+            }
+        },
         "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[100,200], ready:false },
         "Qtrew-C-119": {
             code:"Qtrew-C-119", grade:"C", name:"거울은 세 마디만 허락한다",
@@ -1859,7 +1875,13 @@ function getTodayStr() {
             { name:"서명 없는 캔버스 조각", chance:0.030 },
             { name:"전시 안내 도록", chance:0.020 },
             { name:"액자 뒤에 있던 것", chance:0.010 }
-        ]
+        ],
+
+            "Qtrew-B-330": [
+            { name:"접힌 안내도", chance:0.030 },
+            { name:"누군가의 왼쪽 신발", chance:0.020 },
+            { name:"세어지지 않는 숫자", chance:0.010 }
+        ],
     };
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
@@ -3509,6 +3531,7 @@ function getTodayStr() {
         saveDarkRunState();
          if (darkRun.isParty) watchPartyStep();
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
+        if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
 
         const s = darkRun.step;
@@ -3792,6 +3815,65 @@ function getTodayStr() {
             ]
         }
     };
+
+        // ==========================================
+    // ★ Qtrew-B-330 「미로를 빠져나가자」
+    // ==========================================
+    const B330_STEPS = {
+        0: { type:'intro' },
+        1: { type:'narr', img:'step1', text:`첫 통로다.<br><br>벽에 손을 대 본다. 미지근하다. 콘크리트가 이런 온도일 리 없다.<br>손을 떼면 자국이 남고, 그 자국이 아주 천천히 메워진다.<br><br>천장의 형광등은 세 개 중 하나만 켜져 있다.<br>꺼진 두 개에는 애초에 전구가 없다.` },
+        2: { type:'gimmick', n:1 },
+        3: { type:'narr', img:null, text:`돌아본다.<br><br>방금 지나온 자리에 표식을 남겼었다. 벽에 긁어 그은 자국.<br>없다.<br><br>벽은 같은 벽인데 자국만 사라졌다.<br>다시 그어 본다. 이번에는 보는 앞에서 천천히 메워진다.` },
+        4: { type:'narr', img:null, text:`걷는다.<br><br>발소리가 울린다. 세어 본다.<br><br>하나 많다.<br><br>멈춘다. 발소리도 멎는다. 다만 반 박자 늦게.` },
+        5: { type:'gimmick', n:2 },
+        6: { type:'narr', img:'step2', text:`통로가 좁아진다.<br>좁아졌다가 다시 넓어진다. 일정한 주기다.<br><br>숨을 쉬는 것 같다고 누군가 말하려다 만다.<br>말하면 정말 그렇게 될 것 같아서.<br><br>벽이 젖어 있다. 위에서 아래로 흐른 자국이 아니라, 안쪽에서 배어 나온 자국이다.` },
+        7: { type:'gimmick', n:3 },
+        8: { type:'narr', img:null, text:`안내판이 또 나온다.<br><br><span style="color:#d4af37;">"출구까지 남은 거리 — 없음"</span><br><br>그 아래에 작은 글씨.<br><span style="color:#d4af37;">"출구는 처음부터 없었습니다. 즐거운 시간 되시기 바랍니다."</span><br><br>안내 방송이 다시 시작된다. 아까와 똑같은 억양이다.` },
+        9: { type:'narr', img:null, text:`점호를 한다.<br><br>한 명씩 손을 든다. 세어 본다.<br>숫자가 맞지 않는다.<br><br>다시 센다. 이번에도 맞지 않는다. 아까와는 다른 숫자다.<br><br>아무도 먼저 입을 열지 않는다.` },
+        10: { type:'gimmick', n:4 },
+        11: { type:'rejoinpoint' },
+        12: { type:'narr', img:'step3', text:`바닥이 기울어 있다.<br><br>처음부터 기울어 있었다. 아주 미세해서 몰랐을 뿐이다.<br>여태 걸어온 게 아니라, 흘러온 것이었다.<br><br>벽에 손톱자국이 있다. 사람이 버티려고 한 자국이다.<br>그 옆에 또 하나. 또 하나. 셀 수 없이 많다.` },
+        13: { type:'gimmick', n:5 },
+        99: { type:'result' }
+    };
+
+    function renderStepB330() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        const def = B330_STEPS[darkRun.step];
+        if (!def) { renderDarkResult(); return; }
+
+        if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                (darkRun.isLeader || !darkRun.isParty)
+                    ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
+                "intro");
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'narr') {
+            body.innerHTML = darkBox("—", def.text,
+                (darkRun.isLeader || !darkRun.isParty)
+                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
+                def.img);
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'rejoinpoint') {
+            renderB330Rejoin();
+            return;
+        }
+
+        if (def.type === 'result') { renderDarkResult(); return; }
+
+        // 기믹
+        const fns = { 1: b330Gimmick1, 2: b330Gimmick2, 3: b330Gimmick3, 4: b330Gimmick4, 5: b330Gimmick5 };
+        if (fns[def.n]) fns[def.n]();
+    }
 
     function render119Interlude(role, n) {
         const data = C119_INTERLUDES[n];
@@ -6010,7 +6092,7 @@ function getTodayStr() {
             return;
         }
 
-                     if (cat.effect === 'third_word') {
+            if (cat.effect === 'third_word') {
             if (currentUser.darkExtraReroll) { showCustomAlert('이미 재굴림 권한을 보유하고 있습니다.'); return; }
             currentUser.darkExtraReroll = true;
             removeItemFromInventory(currentUser, itemName, 1);
@@ -6019,6 +6101,18 @@ function getTodayStr() {
             saveDB(); updateUI();
             showCustomAlert('무언가를 말했다. 무슨 말이었는지 기억나지 않는다.');
             return;
+
+            if (cat.effect === 'maze_map') {
+            if (currentUser.darkMazeMap) { showCustomAlert('이미 안내도 효과가 적용 중입니다.'); return; }
+            currentUser.darkMazeMap = 2;
+            removeItemFromInventory(currentUser, itemName, 1);
+            appendSystemBadgeNote(`[접힌 안내도] 다음 어둠 탐사의 첫 두 판정에 +1 보정이 적용됩니다.`);
+            addHistoryLog(currentUser, `[아이템 사용] 접힌 안내도 펼침`);
+            saveDB(); updateUI();
+            showCustomAlert('안내도를 펼쳤습니다. 이번에는 읽을 만한 그림이 나왔습니다.');
+            return;
+        }
+                         
         }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
