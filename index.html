@@ -1928,11 +1928,17 @@ function getTodayStr() {
     }
 
     // 해당 구역에 이미 방이 있거나 탐사 중인지
-    function isZoneTaken(zoneCode) {
-        if (getZoneOccupant(zoneCode)) return true;
+        function isZoneTaken(zoneCode) {
+        const oc = getZoneOccupant(zoneCode);
+        if (oc) {
+            const iAmIn = (oc.leaderCode === currentUser.code)
+                || (oc.members && Array.isArray(oc.members) && oc.members.includes(currentUser.code));
+            if (!iAmIn) return true;
+        }
         for (let pid in darkParties) {
             const p = darkParties[pid];
-            if (p.zone !== zoneCode) continue;
+            if (!p || p.zone !== zoneCode) continue;
+            if (p.members && p.members[currentUser.code]) continue;  // 내가 속한 방은 제외
             const age = Date.now() - (p.createdAt || 0);
             if (p.state === 'RECRUIT' && age < PARTY_TIMEOUT) return true;
             if (p.state === 'RUNNING' && Date.now() - (p.startedAt || p.createdAt || 0) < DARK_OCCUPY_TIMEOUT) return true;
@@ -2937,10 +2943,16 @@ function getTodayStr() {
         const z = DARK_ZONES[zoneCode];
         if (!z) return;
         if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 통제본부에 의해 폐쇄되어 있습니다.'); return; }
-                const oc = getZoneOccupant(zoneCode);
-        if (oc && oc.leaderCode !== currentUser.code) {
-            showCustomAlert(`${oc.leaderName} 사원 팀이 해당 구역을 탐사 중입니다. 종료될 때까지 진입할 수 없습니다.`);
-            return;
+                      const oc = getZoneOccupant(zoneCode);
+        if (oc) {
+            const myParty = getMyParty();
+            const iAmIn = (oc.leaderCode === currentUser.code)
+                || (oc.members && Array.isArray(oc.members) && oc.members.includes(currentUser.code))
+                || (myParty && oc.partyId === myParty.id);
+            if (!iAmIn) {
+                showCustomAlert(`${oc.leaderName} 사원 팀이 해당 구역을 탐사 중입니다. 종료될 때까지 진입할 수 없습니다.`);
+                return;
+            }
         }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 어둠 탐사 횟수를 모두 소진했습니다. 자정에 초기화됩니다.'); return; }
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 한계치에 도달하여 탐사에 나설 수 없습니다.'); return; }
@@ -2998,11 +3010,17 @@ function getTodayStr() {
         const z = DARK_ZONES[zoneCode];
         if (!z) return;
         if (!isZoneOpen(zoneCode)) { showCustomAlert('현재 해당 구역은 폐쇄 상태입니다.'); return; }
-                const oc2 = getZoneOccupant(zoneCode);
-        if (oc2 && oc2.leaderCode !== currentUser.code) {
-            showCustomAlert('방금 다른 팀이 해당 구역에 진입했습니다.');
-            renderDarkness();
-            return;
+                      const oc2 = getZoneOccupant(zoneCode);
+        if (oc2) {
+            const myParty = getMyParty();
+            const iAmIn = (oc2.leaderCode === currentUser.code)
+                || (oc2.members && Array.isArray(oc2.members) && oc2.members.includes(currentUser.code))
+                || (myParty && oc2.partyId === myParty.id);
+            if (!iAmIn) {
+                showCustomAlert('방금 다른 팀이 해당 구역에 진입했습니다.');
+                renderDarkness();
+                return;
+            }
         }
         if (getDarkTriesLeft() <= 0) { showCustomAlert('금일 탐사 횟수를 모두 소진했습니다.'); return; }
 
