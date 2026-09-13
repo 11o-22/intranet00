@@ -8325,6 +8325,57 @@ function getTodayStr() {
         }
     }
 
+        function adminLoadInventory() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        const sel = document.getElementById('adm-remove-item');
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let t = db.users[targetCode];
+
+        let counts = {};
+        (t.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        let keys = Object.keys(counts);
+        if (keys.length === 0) {
+            sel.innerHTML = '<option value="">(소지품 없음)</option>';
+            showCustomAlert(`${t.name} 사원의 소지품이 비어 있습니다.`);
+            return;
+        }
+        sel.innerHTML = keys.map(k => `<option value="${k}">${k} (보유:${counts[k]})</option>`).join('');
+        showCustomAlert(`${t.name} 사원의 소지품 ${keys.length}종을 불러왔습니다.`);
+    }
+
+    function adminRemoveItem() {
+        const targetNo = document.getElementById('adm-special-no').value.trim();
+        const itemName = document.getElementById('adm-remove-item').value;
+        const qty = parseInt(document.getElementById('adm-remove-qty').value, 10) || 1;
+
+        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        if (!itemName) { showCustomAlert('먼저 [소지품 조회]로 목록을 불러온 뒤 물품을 선택해주세요.'); return; }
+
+        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
+        let t = db.users[targetCode];
+
+        let have = (t.inventory || []).filter(it => it === itemName).length;
+        if (have === 0) { showCustomAlert('해당 사원은 그 물품을 보유하고 있지 않습니다.'); return; }
+        let removeQty = Math.min(have, qty);
+
+        removeItemFromInventory(t, itemName, removeQty);
+        addHistoryLog(t, `[당국 압수] '${itemName}' ${removeQty}개가 소지품에서 회수되었습니다.`);
+
+        if (database) {
+            database.ref('users/' + targetCode).set(t).then(() => {
+                showCustomAlert(`사번 ${targetNo} (${t.name})에게서 ${itemName} ${removeQty}개를 압수했습니다.`);
+                adminLoadInventory();
+                updateUI();
+            });
+        } else {
+            saveDB(); updateUI(); adminLoadInventory();
+            showCustomAlert(`사번 ${targetNo} (${t.name})에게서 ${itemName} ${removeQty}개를 압수했습니다.`);
+        }
+    }
+
     function adminForceUnequip() {
         const targetNo = document.getElementById('adm-special-no').value.trim();
         if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
