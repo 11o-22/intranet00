@@ -2414,7 +2414,10 @@ function getTodayStr() {
     // 파티 출발 시 각자 탐사 상태 초기화
        function launchPartyRun(party) {
         const me = party.members[currentUser.code];
-        if (!me) return;
+        if (darkRun) return;
+       if (darkRun) return;
+        if (party._launched) return;
+        party._launched = true;
 
         currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
@@ -3473,7 +3476,7 @@ function getTodayStr() {
         if (muteBtn) muteBtn.innerText = darkAudio.muted ? '🔇' : '🔊';
         updateDarkRoleLabel();
     }
-
+zg
     function closeDarkOverlay() {
         const ov = document.getElementById('dark-run-overlay');
         if (ov) ov.style.display = 'none';
@@ -7922,16 +7925,12 @@ function getTodayStr() {
         const now = Date.now();
         const EXPIRY_MS = 24 * 60 * 60 * 1000;
         let changed = false;
-        db.p2pDeals.forEach(deal => {
+               db.p2pDeals.forEach(deal => {
             if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
                 deal.status = 'EXPIRED'; changed = true;
                 const sender = db.users[deal.fromCode];
-              if (sender) {
-                    // ★ 포인트는 차감 전이므로 회수 불필요 (아이템만 회수)
-                    if (deal.offerType !== 'point') {
-                        for(let i=0; i<deal.offerQty; i++) sender.inventory.push(deal.offerValue);
-                    }
-                    addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되어 회수되었습니다.`);
+                if (sender) {
+                    addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되었습니다.`);
                 }
             }
         });
@@ -8026,7 +8025,7 @@ function getTodayStr() {
         }
         
         offerValue = itemName;
-        removeItemFromInventory(currentUser, itemName, offerQty);
+        
     } else {
         const pts = parseInt(document.getElementById('p2p-offer-points').value, 10);
         if (isNaN(pts) || pts <= 0) {
@@ -8050,11 +8049,8 @@ function getTodayStr() {
             const dPts = parseInt(document.getElementById('p2p-demand-points').value, 10);
             if (isNaN(dPts) || dPts <= 0) {
                 showCustomAlert("요구할 포인트를 올바르게 입력해주세요.");
-                // 에러 발생 시 차감했던 제물 원상복구
-                if (offerType === 'item') { 
-                    for(let i=0; i<offerQty; i++) currentUser.inventory.push(offerValue); 
-                }
-                return;
+                
+            
             }
             demandValue = dPts;
         } else {
@@ -8178,9 +8174,16 @@ function getTodayStr() {
         return;
     }
     if (deal.offerType === 'point') {
-     let checkPt = parseInt(deal.offerValue, 10) || 0;
+        let checkPt = parseInt(deal.offerValue, 10) || 0;
         if ((sender.points || 0) < checkPt) {
             showCustomAlert(`${deal.fromName} 사원의 포인트가 부족하여 거래가 성립되지 않았습니다.`);
+            return;
+        }
+    } else {
+        let need = deal.offerQty || 1;
+        let have = (sender.inventory || []).filter(it => it === deal.offerValue).length;
+        if (have < need) {
+            showCustomAlert(`${deal.fromName} 사원이 해당 물품을 더 이상 보유하고 있지 않습니다.`);
             return;
         }
     }
@@ -8216,8 +8219,9 @@ function getTodayStr() {
         sender.points = (sender.points || 0) - offerPt; // ★ 이 시점에 발신자에게서 차감
         currentUser.points = (currentUser.points || 0) + offerPt;
         showPointGainEffect(offerPt);
-    } else {
+        } else {
         let offerCount = deal.offerQty || 1;
+        removeItemFromInventory(sender, deal.offerValue, offerCount);   // ★ 이 시점에 발신자에게서 차감
         for (let i = 0; i < offerCount; i++) {
             currentUser.inventory.push(deal.offerValue);
         }
@@ -8262,8 +8266,7 @@ function getTodayStr() {
         deal.status = 'REJECTED';
         const sender = db.users[deal.fromCode];
          if (sender) {
-            // ★ 포인트는 차감된 적이 없으므로 반환하지 않음 (아이템만 회수)
-            if (deal.offerType !== 'point') { for(let i=0; i<(deal.offerQty||1); i++) sender.inventory.push(deal.offerValue); }
+
             addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
         }
         addHistoryLog(currentUser, `[밀실 거절] ${deal.fromName} 사원의 제안 거절`);
@@ -8288,7 +8291,7 @@ function getTodayStr() {
 
         deal.status = 'CANCELLED';
                 // ★ 포인트는 차감 전이므로 회수 불필요 (아이템만 회수)
-        if (deal.offerType !== 'point') { for(let i=0; i<(deal.offerQty||1); i++) currentUser.inventory.push(deal.offerValue); }
+        
         
         addHistoryLog(currentUser, `[밀실 철회] ${deal.toName} 대상 제안을 자진 철회하여 회수함`);
         db.p2pDeals[dealIndex] = deal;
