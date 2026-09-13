@@ -2097,6 +2097,134 @@ function getTodayStr() {
         saveDB(); updateUI();
         showCustomAlert(`탐사를 포기했습니다. ${actual} P가 차감되었습니다.`);
     }
+        // ==========================================
+    // ★ 복귀 합류 장면
+    // ==========================================
+    const REJOIN_SCENES = {
+        solo: {
+            text: `눈을 뜬다.<br><br>얼마나 지났는지 모르겠다. 벽에 등을 대고 주저앉아 있었다.<br>목덜미가 뻐근하고, 손에 쥐고 있던 것이 바닥에 떨어져 있다.<br><br>아직 나가지 못했다.`,
+            btn: `다시 일어선다.`
+        },
+        party: {
+            text: `정신이 든다.<br><br>뭔가에 맞았는지, 아니면 그냥 정신을 놓았는지 기억나지 않는다.<br>귀에서 울리던 소리가 서서히 잦아든다.<br><br>동료의 기척이 다시 잡힌다. 조금 떨어진 곳이다.`,
+            btn: `동료를 찾는다.`
+        }
+    };
+
+    function renderRejoinScene() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        const isParty = darkRun.isParty;
+        const sc = isParty ? REJOIN_SCENES.party : REJOIN_SCENES.solo;
+
+        if (!isParty) {
+            body.innerHTML = darkBox("복귀", sc.text,
+                darkChoiceBtn(sc.btn, "darkRun.rejoined=false; renderDarkStep();"));
+            return;
+        }
+
+        // 파티 — 합류 루트 선택
+        body.innerHTML = darkBox("복귀", sc.text,
+            darkChoiceBtn("① 큰 소리를 낸다. 위치를 알린다.", "pickRejoin('call')") +
+            darkChoiceBtn("② 발자국을 따라 조용히 움직인다.", "pickRejoin('track')") +
+            darkChoiceBtn("③ 거울에 비친 상을 쫓는다.", "pickRejoin('mirror')") +
+            darkChoiceBtn("④ 그 자리에서 기다린다.", "pickRejoin('wait')"));
+        mountDarkChat('normal');
+    }
+
+    function pickRejoin(route) {
+        if (!database || !darkRun) return;
+        database.ref(`darkParties/${darkRun.partyId}/rejoin/${currentUser.code}`).set({
+            route: route, at: Date.now()
+        });
+
+        // 잔류자 쪽 선택과 대조
+        database.ref(`darkParties/${darkRun.partyId}/hold`).once('value').then(sn => {
+            const hold = sn.val() || {};
+            const holdRoutes = Object.values(hold).map(h => h.route);
+            resolveRejoin(route, holdRoutes);
+        });
+    }
+
+    function resolveRejoin(myRoute, holdRoutes) {
+        let result, txt, mod = 0;
+
+        const stayed = holdRoutes.includes('stay');
+        const moved = holdRoutes.includes('move');
+        const searched = holdRoutes.includes('search');
+
+        if (myRoute === 'call' && stayed) {
+            result = '정면 합류';
+            txt = `소리를 낸다. 목이 잠겨 제대로 나오지 않지만, 유리는 잘 울린다.<br><br>멀지 않은 곳에서 대답 대신 발소리가 멎는다.<br>그쪽도 기다리고 있었다.<br><br>곧 마주친다. 서로 아무 말도 하지 않는다.`;
+            mod = 2;
+        } else if (myRoute === 'track' && moved) {
+            result = '우회 합류';
+            txt = `바닥에 남은 자국을 따라간다. 아직 축축하다.<br><br>모퉁이를 돌자 동료의 등이 보인다.<br>부르려다 만다. 등이 하나인 것을 확인하고 나서야 부른다.`;
+            mod = 1;
+        } else if (myRoute === 'mirror' && searched) {
+            result = '거울 합류';
+            txt = `거울에 비친 상을 쫓는다. 실제 방향과 반대로 가야 한다.<br><br>세 번 꺾으니 동료가 서 있다. 이쪽을 보고 있었다.<br>동시에 같은 거울을 보고 있었던 모양이다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
+            mod = 3;
+        } else if (myRoute === 'wait' && searched) {
+            result = '수색 합류';
+            txt = `움직이지 않는다. 찾으러 오는 쪽이 있을 것이다.<br><br>한참 뒤에 발소리가 가까워진다.<br>기다린 게 맞았다.`;
+            mod = 1;
+        } else {
+            result = '엇갈림';
+            txt = `움직인다. 한참을 움직인다.<br><br>동료가 지나간 자리는 있는데 동료가 없다.<br>서로 반대로 돌고 있었던 것 같다.<br><br>결국 각자 가기로 한다. 끝에서는 만날 것이다.`;
+            mod = -1;
+            applyPollutionToUser(currentUser, 3);
+        }
+
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.rejoined = false;
+        darkRun.log.push(`[복귀] ${result}`);
+        sendPartyChat(`${currentUser.name} 사원이 합류했습니다. (${result})`, true);
+
+        darkBodyEl().innerHTML = darkBox("합류", txt,
+            `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
+                ${result} — 이후 판정 보정 ${mod >= 0 ? '+' : ''}${mod}
+            </div>` +
+            darkChoiceBtn("계속 간다.", "renderDarkStep();"));
+        mountDarkChat('normal');
+
+        if (database) database.ref(`darkParties/${darkRun.partyId}/rejoin/${currentUser.code}`).remove();
+    }
+
+        // 잔류자가 혼자 있는 동안의 행동 선택
+    function pickHoldRoute(route) {
+        if (!database || !darkRun) return;
+        database.ref(`darkParties/${darkRun.partyId}/hold/${currentUser.code}`).set({
+            route: route, at: Date.now()
+        });
+        let txt;
+        if (route === 'stay') txt = `그 자리에 선다.<br>움직이면 엇갈릴 것 같다.<br><br>거울이 도는 소리만 계속된다.`;
+        else if (route === 'move') txt = `천천히 앞으로 간다.<br>자국을 남기며 걷는다. 따라올 수 있게.<br><br>등 뒤가 계속 신경 쓰인다.`;
+        else txt = `동료를 찾아 나선다.<br>거울마다 들여다본다. 비치는 것이 매번 조금씩 다르다.<br><br>그중 하나에 낯익은 뒷모습이 있었다.`;
+
+        darkBodyEl().innerHTML = darkBox("대기", txt,
+            darkChoiceBtn("계속 간다.", "renderDarkStep();"));
+        mountDarkChat('normal');
+    }
+
+    function showDarkToast(msg) {
+        const body = darkBodyEl();
+        if (!body) return;
+        let t = document.getElementById('dark-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'dark-toast';
+            t.style.cssText = 'position:absolute; top:56px; left:50%; transform:translateX(-50%); background:rgba(127,0,0,0.9); border:1px solid #b71c1c; color:#fff; font-size:11px; font-weight:bold; padding:9px 16px; border-radius:5px; z-index:50; box-shadow:0 4px 12px rgba(0,0,0,0.6); pointer-events:none; transition:opacity 0.4s;';
+            const ov = document.getElementById('dark-run-overlay');
+            if (ov && ov.firstElementChild) ov.firstElementChild.style.position = 'relative';
+            if (ov && ov.firstElementChild) ov.firstElementChild.appendChild(t);
+        }
+        t.innerText = msg;
+        t.style.opacity = '1';
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+    }
+    
     function updatePartyTabDot() {
         const tab = document.getElementById('dark-party-tab');
         if (!tab) return;
@@ -2557,7 +2685,7 @@ function getTodayStr() {
     }
 
     // 방장의 진행 신호 수신
-        function watchPartyStep() {
+            function watchPartyStep() {
         if (!darkRun || !darkRun.isParty || !database) return;
         if (darkRun._stepWatching) return;
         darkRun._stepWatching = true;
@@ -2572,21 +2700,70 @@ function getTodayStr() {
             }
         });
 
-        // ★ 동료 이탈 감시 — 최소 정원 미달이면 강제 귀환
+        // ★ 동료 이탈 감시
         database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
             if (!darkRun || !darkRun.isParty) return;
             const alive = snap.val() || {};
             const cnt = Object.keys(alive).length;
-            const z = DARK_ZONES[darkRun.zone];
-            if (cnt > 0 && cnt < z.min && !darkRun._abortNotified) {
-                darkRun._abortNotified = true;
-                sendPartyChat('동료의 신호가 끊겼습니다.', true);
-                darkBodyEl().innerHTML = darkBox("중단",
-                    `옆에 있던 기척이 사라졌다.<br><br>혼자서는 더 갈 수 없다.<br>왔던 길을 되짚는다.`,
-                    darkChoiceBtn("돌아간다.", "abortDarkRun()"));
-                mountDarkChat('normal');
+            const p = darkParties[darkRun.partyId];
+            const total = p && p.members ? Object.keys(p.members).length : cnt;
+
+            if (cnt < total && !darkRun._absenceNotified) {
+                darkRun._absenceNotified = true;
+                const gone = p && p.members
+                    ? Object.keys(p.members).filter(c => !alive[c]).map(c => p.members[c].name).join(', ')
+                    : '동료';
+                showDarkToast(`${gone} 사원의 신호가 끊겼습니다.`);
+                startAbsenceTimer();
+            } else if (cnt === total && darkRun._absenceNotified) {
+                darkRun._absenceNotified = false;
+                clearInterval(darkRun._absenceTimer);
+                showDarkToast(`동료의 신호가 복구되었습니다.`);
             }
         });
+    }
+
+    function startAbsenceTimer() {
+        if (!darkRun) return;
+        clearInterval(darkRun._absenceTimer);
+        darkRun._absenceStart = Date.now();
+        darkRun._absenceTimer = setInterval(() => {
+            if (!darkRun || !darkRun._absenceNotified) { clearInterval(darkRun._absenceTimer); return; }
+            const elapsed = Date.now() - darkRun._absenceStart;
+            const p = darkParties[darkRun.partyId];
+            const total = p && p.members ? Object.keys(p.members).length : 2;
+
+            if (elapsed > REJOIN_LIMIT) {
+                clearInterval(darkRun._absenceTimer);
+                if (total <= 2) {
+                    darkBodyEl().innerHTML = darkBox("중단",
+                        `기척이 완전히 사라졌다.<br><br>혼자서는 이 방을 나갈 수 없다.<br>왔던 쪽으로 되돌아간다.<br><br>문은 생각보다 쉽게 열렸다.`,
+                        darkChoiceBtn("돌아간다.", "abortDarkRunNoPenalty()"));
+                    mountDarkChat('normal');
+                }
+            }
+        }, 2000);
+    }
+
+    function abortDarkRunNoPenalty() {
+        if (!darkRun) return;
+        const z = DARK_ZONES[darkRun.zone];
+        addHistoryLog(currentUser, `[탐사 중단] ${z.code} 동료 이탈로 중단 (차감 없음)`);
+        if (!currentUser.darkLogs) currentUser.darkLogs = [];
+        currentUser.darkLogs.unshift({
+            date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
+            reward: 0, success: darkRun.success, fail: darkRun.fail,
+            loot: [], lost: [], detail: darkRun.log, aborted: true, party: true
+        });
+        saveDB();
+        finishDarkRun();
+    }
+
+    function abortDarkRun() {
+        if (!darkRun) return;
+        darkRun.failedRun = true;
+        darkRun.step = 99;
+        renderDarkResult();
     }
 
     function abortDarkRun() {
@@ -3328,6 +3505,7 @@ function getTodayStr() {
         function renderDarkStep() {
        const body = darkBodyEl();
             if (!body || !darkRun) return;
+            if (darkRun.rejoined) { renderRejoinScene(); return; }
         saveDarkRunState();
          if (darkRun.isParty) watchPartyStep();
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
@@ -3535,6 +3713,7 @@ function getTodayStr() {
            function renderStep119() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
+        if (darkRun.rejoined) { renderRejoinScene(); return; }
         saveDarkRunState();
         attachC119Listener();
         if (!c119State) {
