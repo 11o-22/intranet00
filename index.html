@@ -1423,6 +1423,7 @@
     let pendingTargetIsPotion = false;
     let hasShownFoxAlert = false;
     let onlineUsersMap = {};
+    const _selectCache = {};
 
     // 여우 상담실 상태 변수
     let foxQuestionIndex = 0;
@@ -3476,7 +3477,7 @@ function getTodayStr() {
         if (muteBtn) muteBtn.innerText = darkAudio.muted ? '🔇' : '🔊';
         updateDarkRoleLabel();
     }
-zg
+
     function closeDarkOverlay() {
         const ov = document.getElementById('dark-run-overlay');
         if (ov) ov.style.display = 'none';
@@ -7958,7 +7959,7 @@ zg
         else { demandPoints.style.display = 'none'; demandItem.style.display = 'inline-block'; qtyInput.style.display = 'inline-block'; }
     }
         // ★ 목록 내용이 실제로 바뀌었을 때만 다시 그려서 깜박임·선택 풀림 방지
-    const _selectCache = {};
+    
     function updateSelectOptions(selectEl, optionsHtml) {
         if (!selectEl) return;
         const key = selectEl.id;
