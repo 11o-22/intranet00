@@ -9474,33 +9474,54 @@ function getTodayStr() {
   }
 function renderC176(cfg) {
     const body = darkBodyEl();
-    if (!body) {
-        console.log('darkBodyEl()이 null을 반환함');
-        return;
-    }
+    if (!body) return;
 
-    // cfg가 없으면 강제로 불러오기
+    // cfg가 없으면 Firebase에서 계속 감시
     if (!cfg) {
-        console.log('cfg 없음 → Firebase에서 불러옴');
-        c176Ref("config").once('value').then(snap => {
-            const loaded = snap.val();
-            console.log('불러온 cfg:', loaded);
-            if (loaded) renderC176(loaded);
+        console.log('config가 아직 없음 → 감시 시작');
+        c176Ref("config").on('value', (snap) => {
+            const loadedCfg = snap.val();
+            if (loadedCfg) {
+                console.log('config 감지됨:', loadedCfg);
+                renderC176(loadedCfg);   // config가 생기면 다시 렌더링
+            }
         });
+        body.innerHTML = `
+            <div style="color:#aaa; padding:40px; text-align:center;">
+                <p>방장의 설정을 기다리는 중...</p>
+            </div>
+        `;
         return;
     }
 
-    console.log('renderC176 정상 실행, phase:', cfg.phase);
+    // 여기부터 정상 렌더링
+    if (cfg.phase === "waiting") {
+        if (!cfg.rps.done) return renderRPS(cfg);
+        const c = localCtx;
+        if (!c) return;
+        const roleLine = `<br><br><i style="color:#aaa;font-size:11px;">배정: ${c.td.name} = 위 / ${c.bd.name} = 아래</i>`;
+        body.innerHTML = darkBox("감각 재조정실", 
+            DARK_ZONES["Qtrew-C-176"].intro + roleLine + `<br><i style="color:#888;font-size:11px;">${cfg.roomCount}방</i>`, 
+            darkChoiceBtn("첫 방으로 진입", "c176StartRooms()"), "intro");
+        mountDarkChat('normal');
+        return;
+    }
 
-    // 여기서부터는 기존 로직 그대로 두거나, 일단 테스트용으로 단순하게
-    body.innerHTML = `
-        <div style="color:white; padding:20px; background:#222;">
-            <h2>C-176 테스트 화면</h2>
-            <p>phase: ${cfg.phase}</p>
-            <p>currentIdx: ${cfg.currentIdx}</p>
-            <button onclick="c176StartRooms()">테스트 버튼</button>
-        </div>
-    `;
+    const idx = cfg.currentIdx;
+    const room = cfg.rooms[idx];
+    isFinalRoom = idx === cfg.rooms.length - 1;
+
+    if (isFinalRoom && cfg.phase === "final") {
+        renderFinalSequence(cfg.final, room);
+        return;
+    }
+
+    if (cfg.phase === "choice") {
+        renderNormalChoice(room, idx, cfg.roomCount);
+    } else if (cfg.phase === "text") {
+        renderTextRoom(room, idx, cfg.roomCount);
+    }
+}
 }
   function renderRPS(cfg) {
     const body = darkBodyEl();
