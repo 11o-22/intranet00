@@ -3549,6 +3549,23 @@ function getTodayStr() {
        const body = darkBodyEl();
             if (!body || !darkRun) return;
             if (darkRun.rejoined) { renderRejoinScene(); return; }
+            if (darkRun.zone === 'Qtrew-C-176') {
+        if (typeof renderC176 === 'function') {
+            renderC176();
+            if (darkRun.zone === 'Qtrew-C-176') {
+    if (typeof renderC176 === 'function') renderC176();
+    return;
+}
+        }
+        return;
+    }
+
+    saveDarkRunState();
+    if (darkRun.isParty) watchPartyStep();
+    if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
+    if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
+    if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
+
         saveDarkRunState();
          if (darkRun.isParty) watchPartyStep();
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
@@ -9328,48 +9345,13 @@ function getTodayStr() {
         timerEl.style.display = 'none';
     }, 1000);
 
-    (function () {
+  // ============================================================
+// C-176 + 성별/성향 표시 통합본
+// ============================================================
+(function () {
   'use strict';
 
-  function updateDiceResult(dice) {
-  c176Ref("config").once('value').then(snap => {
-    const cfg = snap.val();
-    if (!cfg || !cfg.final) return;
-    renderFinalSequence(cfg.final, cfg.rooms[cfg.currentIdx]);
-  });
-}
-
-  function renderRPS(cfg) {
-  const body = darkBodyEl();
-  const r = cfg.rps;
-  const partner = pickPartner();
-  const sRole = ((currentUser.role || "M") + "").toUpperCase();
-  const pRole = ((partner.role || "M") + "").toUpperCase();
-
-  const msg = sRole === "T" ? "둘 다 위를 주장한다."
-            : sRole === "B" ? "둘 다 아래를 원한다."
-            : "둘 다 상관없다고 한다.";
-
-  const logHtml = r.rounds.length ? `<br><br><i style="color:#888;font-size:11px;">${r.rounds.join(" · ")}</i>` : "";
-  const score = r.rounds.length ? `<br><br><b>본인 ${r.sWin} : ${r.pWin} 동료</b>` : "";
-
-  const opts = [
-    { id: "rock", label: "✊ 바위", fn: "c176RpsVote", arg: "rock" },
-    { id: "scissors", label: "✌️ 가위", fn: "c176RpsVote", arg: "scissors" },
-    { id: "paper", label: "✋ 보", fn: "c176RpsVote", arg: "paper" }
-  ];
-
-  const html = opts.map(o =>
-    `<button class="game-btn" style="width:100%; margin:0 0 8px 0;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`
-  ).join("");
-
-  body.innerHTML = darkBox("대기실",
-    `동료의 성향은 <b>${pRole}</b>. 본인의 성향은 <b>${sRole}</b>.<br><br>${msg}<br><br><i style="color:#aaa;font-size:12px;">[3판 2선승제]</i>${logHtml}${score}`,
-    html, "rps");
-  mountDarkChat('normal');
-}
-
-  // ================== 키워드 설정 ==================
+  // ================== C-176 모듈 ==================
   const KEYWORDS = {
     weak:  ["키스", "혀", "느", "받", "침"],
     mid:   ["키스", "혀", "타액", "느", "받", "박"],
@@ -9378,59 +9360,11 @@ function getTodayStr() {
   };
   const MIN_COUNTS = { weak:2, mid:3, strong:3, final:4 };
 
-  // ================== 성별/성기 계산 ==================
-  const CUNT_FX = ["컨트화"], DICK_FX = ["딕걸화"], SWAP_FX = ["여성화","성전환"];
-
-  
-  function getFx(u) {
-    if (!u) return [];
-    const arr = u.effects || u.statusEffects || u.status || u.buffs || [];
-    if (!Array.isArray(arr)) return [];
-    return arr.map(e => typeof e === "string" ? e : ((e && e.name) || "")).filter(Boolean);
-  }
-  
-  function hasAny(list, joined) { 
-    return list.some(k => joined.includes(k)); 
-  }
-  
-  function identity(u) {
-    const base = (u && u.gender) || "남성";
-    const fx = getFx(u).join(" ");
-    const swap = hasAny(SWAP_FX, fx), cunt = hasAny(CUNT_FX, fx), dick = hasAny(DICK_FX, fx);
-    let gender, form, note = "";
-    if (base === "남성") {
-      if (swap) { gender="여성"; form="vagina"; note="성전환"; }
-      else if (cunt) { gender="남성"; form="vagina"; note="컨트"; }
-      else { gender="남성"; form="penis"; }
-    } else {
-      if (dick) { gender="여성"; form="penis"; note="딕걸"; }
-      else { gender="여성"; form="vagina"; }
-    }
-    return { gender, form, note };
-  }
-  
-  function desc(u) {
-    const id = identity(u);
-    const female = id.gender === "여성";
-    return {
-      id, name: (u && u.name) || "동료",
-      pron: female ? "그녀" : "그", poss: female ? "그녀의" : "그의",
-      body: female ? "여체" : "남체", genital: id.form === "penis" ? "성기" : "음부",
-      hole: id.form === "vagina" ? "안쪽" : "뒷쪽",
-      hasPenis: id.form === "penis", hasVagina: id.form === "vagina",
-      isDickgirl: female && id.form === "penis", isCuntboy: !female && id.form === "vagina",
-      role: ((u && u.role) || "M").toUpperCase(),
-      tag: id.note ? `[${id.gender}·${id.note}]` : `[${id.gender}]`
-    };
-  }
-
-  // ================== Firebase 헬퍼 ==================
   function c176Ref(path) {
     if (!database || !darkRun || !darkRun.partyId) return null;
     return database.ref(`darkParties/${darkRun.partyId}/c176/${path}`);
   }
 
-  // ================== 파트너/역할 ==================
   function pickPartner() {
     try {
       if (darkRun && darkRun.partyId && darkParties[darkRun.partyId]) {
@@ -9442,7 +9376,7 @@ function getTodayStr() {
     } catch(e) {}
     return { name:"동료", gender:"남성", role:"M" };
   }
-  
+
   function getMemberCodes() {
     try {
       return Object.keys(darkParties[darkRun.partyId].members || {});
@@ -9463,7 +9397,6 @@ function getTodayStr() {
     return rpsWinner === "self" ? { top:self, bottom:partner, method:"rps" } : { top:partner, bottom:self, method:"rps" };
   }
 
-  // ================== 방 템플릿 ==================
   const ROOM_TEMPLATES = {
     weak: [
       { title:"거울 방", condition:"상대의 상의를 벗기고, 그 과정에서 서로의 몸에 대한 반응을 유도해야 합니다." },
@@ -9488,7 +9421,6 @@ function getTodayStr() {
   let localCtx = null;
   let isFinalRoom = false;
 
-  // ================== 초기화 ==================
   function initC176() {
     if (!darkRun?.partyId) return false;
     if (darkRun.isLeader) {
@@ -9515,39 +9447,28 @@ function getTodayStr() {
 
   function setupListeners() {
     if (!database || !darkRun?.partyId) return;
-    
+
     c176Ref("config").on('value', (snap) => {
       const cfg = snap.val();
       if (!cfg) return;
       isFinalRoom = cfg.currentIdx === cfg.rooms.length - 1;
-      
+
       if (cfg.phase === "waiting" && cfg.rps?.done && !localCtx) {
         localCtx = assignRoles(currentUser, pickPartner(), cfg.rps.winner === "leader" ? "self" : "partner");
       }
       renderC176(cfg);
     });
 
-    c176Ref("choices").on('value', () => {
-      c176Ref("config").once('value', (s) => renderC176(s.val()));
-    });
-    
-    c176Ref("dice").on('value', (snap) => {
-      const dice = snap.val() || {};
-      updateDiceResult(dice);
-    });
-    
-    c176Ref("checks").on('value', (snap) => {
-      updateCheckStatus(snap.val() || {});
-    });
+    c176Ref("checks").on('value', (snap) => updateCheckStatus(snap.val() || {}));
+    c176Ref("dice").on('value', (snap) => updateDiceResult(snap.val() || {}));
   }
 
-  // ================== 렌더링 ==================
   function renderC176(cfg) {
     if (!cfg) return;
     const body = darkBodyEl();
-    
+
     if (cfg.phase === "waiting") {
-      // if (!cfg.rps.done) return renderRPS(cfg);
+      if (!cfg.rps.done) return renderRPS(cfg);
       const c = localCtx;
       if (!c) return;
       const roleLine = `<br><br><i style="color:#aaa;font-size:11px;">배정: ${c.td.name} = 위 / ${c.bd.name} = 아래</i>`;
@@ -9572,6 +9493,36 @@ function getTodayStr() {
     } else if (cfg.phase === "text") {
       renderTextRoom(room, idx, cfg.roomCount);
     }
+  }
+
+  function renderRPS(cfg) {
+    const body = darkBodyEl();
+    const r = cfg.rps;
+    const partner = pickPartner();
+    const sRole = ((currentUser.role || "M") + "").toUpperCase();
+    const pRole = ((partner.role || "M") + "").toUpperCase();
+
+    const msg = sRole === "T" ? "둘 다 위를 주장한다."
+              : sRole === "B" ? "둘 다 아래를 원한다."
+              : "둘 다 상관없다고 한다.";
+
+    const logHtml = r.rounds.length ? `<br><br><i style="color:#888;font-size:11px;">${r.rounds.join(" · ")}</i>` : "";
+    const score = r.rounds.length ? `<br><br><b>본인 ${r.sWin} : ${r.pWin} 동료</b>` : "";
+
+    const opts = [
+      { id: "rock", label: "✊ 바위", fn: "c176RpsVote", arg: "rock" },
+      { id: "scissors", label: "✌️ 가위", fn: "c176RpsVote", arg: "scissors" },
+      { id: "paper", label: "✋ 보", fn: "c176RpsVote", arg: "paper" }
+    ];
+
+    const html = opts.map(o =>
+      `<button class="game-btn" style="width:100%; margin:0 0 8px 0;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`
+    ).join("");
+
+    body.innerHTML = darkBox("대기실",
+      `동료의 성향은 <b>${pRole}</b>. 본인의 성향은 <b>${sRole}</b>.<br><br>${msg}<br><br><i style="color:#aaa;font-size:12px;">[3판 2선승제]</i>${logHtml}${score}`,
+      html, "rps");
+    mountDarkChat('normal');
   }
 
   function renderNormalChoice(room, idx, total) {
@@ -9604,37 +9555,27 @@ function getTodayStr() {
     mountDarkChat('normal');
   }
 
-  // ================== 마지막 방 특수 시퀀스 ==================
   function renderFinalSequence(final, room) {
     const c = localCtx;
     const isTop = c && c.td.name === currentUser.name;
     const body = darkBodyEl();
 
-    // Step 1: 제안
     if (!final.step || final.step === "propose") {
       if (isTop) {
         body.innerHTML = darkBox("결합 방", 
-          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#e66;">
-            <b>⚠ 필수 조건</b><br>이 방에서는 반드시 삽입을 통한 성행위를 완료해야 합니다.
-          </div><br><b>${c.bd.name}에게 제안합니다.</b>`,
+          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#e66;"><b>⚠ 필수 조건</b><br>이 방에서는 반드시 삽입을 통한 성행위를 완료해야 합니다.</div><br><b>${c.bd.name}에게 제안합니다.</b>`,
           `<button class="game-btn" style="width:100%; margin:0;" onclick="c176FinalAction('propose')">제안한다</button>`, "final");
       } else {
-        body.innerHTML = darkBox("결합 방", 
-          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#e66;">
-            <b>⚠ 필수 조건</b><br>이 방에서는 반드시 삽입을 통한 성행위를 완료해야 합니다.
-          </div><br><i style="color:#888;">${c.td.name}의 제안을 기다리는 중...</i>`, "", "final");
+        body.innerHTML = darkBox("결합 방", `<i style="color:#888;">${c.td.name}의 제안을 기다리는 중...</i>`, "", "final");
       }
       mountDarkChat('normal');
       return;
     }
 
-    // Step 2: 응답
     if (final.step === "response") {
       if (!isTop && !final.response) {
         body.innerHTML = darkBox("결합 방", 
-          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px;">
-            <b>${c.td.name}의 제안</b><br>성행위를 제안받았습니다.
-          </div><br><b>응답을 선택하세요</b>`,
+          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px;"><b>${c.td.name}의 제안</b><br>성행위를 제안받았습니다.</div><br><b>응답을 선택하세요</b>`,
           `<button class="game-btn" style="width:100%; margin:0 0 10px 0;" onclick="c176FinalAction('consent')">① 동의한다</button>
            <button class="game-btn" style="width:100%; margin:0; background:linear-gradient(145deg, #7f0000, #4a0000) !important;" onclick="c176FinalAction('refuse')">② 거절한다</button>`, "final");
         mountDarkChat('normal');
@@ -9648,11 +9589,9 @@ function getTodayStr() {
       if (final.response === "refuse") {
         if (isTop) {
           body.innerHTML = darkBox("결합 방", 
-            `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;">
-              <b>거절당했습니다</b><br>${c.bd.name}는 거절했습니다.
-            </div><br><b>선택하세요</b>`,
+            `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;"><b>거절당했습니다</b></div><br><b>선택하세요</b>`,
             `<button class="game-btn" style="width:100%; margin:0 0 10px 0; background:linear-gradient(145deg, #7f0000, #4a0000) !important;" onclick="c176FinalAction('force')">① 강제로 한다</button>
-             <button class="game-btn" style="width:100%; margin:0;" onclick="c176FinalAction('giveup')">② 포기한다 (구조 대기)</button>`, "final");
+             <button class="game-btn" style="width:100%; margin:0;" onclick="c176FinalAction('giveup')">② 포기한다</button>`, "final");
         } else {
           body.innerHTML = darkBox("결합 방", `<i style="color:#888;">${c.td.name}의 선택을 기다리는 중...</i>`, "", "final");
         }
@@ -9661,13 +9600,10 @@ function getTodayStr() {
       }
     }
 
-    // Step 3: 강제 → 반항
     if (final.step === "resist") {
       if (!isTop) {
         body.innerHTML = darkBox("결합 방", 
-          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;">
-            <b>강제 시도</b><br>${c.td.name}가 강제로 시도합니다.
-          </div><br><b>응답을 선택하세요</b>`,
+          `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;"><b>강제 시도</b></div><br><b>응답을 선택하세요</b>`,
           `<button class="game-btn" style="width:100%; margin:0;" onclick="c176FinalAction('resist')">반항한다</button>`, "final");
       } else {
         body.innerHTML = darkBox("결합 방", `<i style="color:#888;">${c.bd.name}의 반항을 기다리는 중...</i>`, "", "final");
@@ -9676,13 +9612,11 @@ function getTodayStr() {
       return;
     }
 
-    // Step 4: 주사위
     if (final.step === "dice") {
       renderDiceBattle(final, c);
       return;
     }
 
-    // Step 5: 결과
     if (final.step === "result") {
       renderFinalResult(final, c);
     }
@@ -9693,26 +9627,20 @@ function getTodayStr() {
     const myRoll = final.rolls?.[currentUser.code];
     const body = darkBodyEl();
     
-    let html = `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px;">
-      <b>주사위 대결</b><br>반항에 맞서 힘겨루기를 합니다.<br>
-      <span style="color:#d4af37;">높은 주사위가 이깁니다.</span>
-    </div><br>`;
+    let html = `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px;"><b>주사위 대결</b><br>높은 주사위가 이깁니다.</div><br>`;
     
     if (!myRoll) {
       html += `<button class="game-btn" style="width:100%; margin:0; font-size:16px;" onclick="c176RollDice()">🎲 주사위 던지기</button>`;
     } else {
-      html += `<div style="font-size:24px; text-align:center; margin:20px 0;">
-        내 주사위: <span style="color:#4CAF50; font-weight:bold;">${myRoll}</span>
-      </div><i style="color:#888;">상대의 주사위를 기다리는 중...</i>`;
+      html += `<div style="font-size:24px; text-align:center; margin:20px 0;">내 주사위: <span style="color:#4CAF50; font-weight:bold;">${myRoll}</span></div><i style="color:#888;">상대의 주사위를 기다리는 중...</i>`;
     }
     
     const rolls = final.rolls || {};
     const codes = getMemberCodes();
     if (codes.length === 2 && rolls[codes[0]] && rolls[codes[1]]) {
       const [c1, c2] = codes;
-      const r1 = rolls[c1].roll, r2 = rolls[c2].roll;
+      const r1 = rolls[codes[0]].roll, r2 = rolls[codes[1]].roll;
       const winner = r1 > r2 ? c1 : r2 > r1 ? c2 : null;
-      
       html += `<br><br><div style="text-align:center; font-size:18px;">`;
       html += `${darkParties[darkRun.partyId].members[c1].name}: ${r1}<br>`;
       html += `${darkParties[darkRun.partyId].members[c2].name}: ${r2}<br><br>`;
@@ -9724,7 +9652,6 @@ function getTodayStr() {
       }
       html += `</div>`;
     }
-    
     body.innerHTML = darkBox("결합 방 - 대결", html, "", "final");
     mountDarkChat('normal');
   }
@@ -9735,30 +9662,27 @@ function getTodayStr() {
     const body = darkBodyEl();
     
     if (winnerIsTop) {
-      body.innerHTML = darkBox(
-        "결합 방 - 승리",
-        `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#4CAF50;">
-          <b>${c.td.name}의 승리</b><br>강제 진행이 이루어집니다.
-        </div><br>성행위를 묘사해주세요.`,
+      body.innerHTML = darkBox("결합 방 - 승리",
+        `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#4CAF50;"><b>${c.td.name}의 승리</b><br>강제 진행이 이루어집니다.</div><br>성행위를 묘사해주세요.`,
         `<textarea id="c176-text" style="width:100%; height:120px; background:#111; color:#ddd; border:1px solid #444; padding:10px; font-size:14px;" placeholder="강제적인 상황을 묘사하세요..."></textarea>
          <div id="c176-feedback" style="margin-top:8px; font-size:11px;"></div>
-         <button class="game-btn" style="width:100%; margin-top:12px;" onclick="c176FinalTextSubmit()">제출</button>`,
-        "final"
-      );
+         <button class="game-btn" style="width:100%; margin-top:12px;" onclick="c176FinalTextSubmit()">제출</button>`, "final");
     } else {
-      body.innerHTML = darkBox(
-        "결합 방 - 실패",
-        `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;">
-          <b>${c.bd.name}의 승리</b><br>강제 진행을 막았습니다.
-        </div><br>구조를 기다립니다...`,
-        darkChoiceBtn("구조 대기", "finishC176('rescued')"),
-        "final"
-      );
+      body.innerHTML = darkBox("결합 방 - 실패",
+        `<div style="background:#222; padding:12px; border-radius:6px; margin-bottom:12px; color:#ff6b6b;"><b>${c.bd.name}의 승리</b><br>강제 진행을 막았습니다.</div><br>구조를 기다립니다...`,
+        darkChoiceBtn("구조 대기", "finishC176('rescued')"), "final");
     }
     mountDarkChat('normal');
   }
 
-  // ================== 액션 핸들러 ==================
+  function updateDiceResult(dice) {
+    c176Ref("config").once('value').then(snap => {
+      const cfg = snap.val();
+      if (!cfg || !cfg.final) return;
+      renderFinalSequence(cfg.final, cfg.rooms[cfg.currentIdx]);
+    });
+  }
+
   window.c176StartRooms = function() {
     c176Ref("config").update({ phase: "choice", currentIdx: 0 });
   };
@@ -9804,7 +9728,6 @@ function getTodayStr() {
       const choices = snap.val() || {};
       const members = getMemberCodes();
       if (Object.keys(choices).length >= members.length) {
-        const hasForce = Object.values(choices).some(c => c.choice === 'force');
         const hasRefuse = Object.values(choices).some(c => c.choice === 'refuse');
         if (hasRefuse) finishC176("rescued");
         else c176Ref("config").update({ phase: "text" });
@@ -9817,45 +9740,26 @@ function getTodayStr() {
     cfgRef.once('value').then(snap => {
       const cfg = snap.val();
       const final = cfg.final || {};
-      
-      if (action === 'propose') {
-        cfgRef.update({ final: { ...final, step: "response" } });
-      }
-      else if (action === 'consent') {
-        cfgRef.update({ final: { ...final, step: "text", response: "consent" } });
-        cfgRef.update({ phase: "text" });
-      }
-      else if (action === 'refuse') {
-        cfgRef.update({ final: { ...final, step: "response", response: "refuse" } });
-      }
-      else if (action === 'force') {
-        cfgRef.update({ final: { ...final, step: "resist" } });
-      }
-      else if (action === 'giveup') {
-        finishC176("rescued");
-      }
-      else if (action === 'resist') {
-        cfgRef.update({ final: { ...final, step: "dice", rolls: {} } });
-      }
+      if (action === 'propose') cfgRef.update({ final: { ...final, step: "response" } });
+      else if (action === 'consent') { cfgRef.update({ final: { ...final, step: "text", response: "consent" } }); cfgRef.update({ phase: "text" }); }
+      else if (action === 'refuse') cfgRef.update({ final: { ...final, step: "response", response: "refuse" } });
+      else if (action === 'force') cfgRef.update({ final: { ...final, step: "resist" } });
+      else if (action === 'giveup') finishC176("rescued");
+      else if (action === 'resist') cfgRef.update({ final: { ...final, step: "dice", rolls: {} } });
     });
   };
 
   window.c176RollDice = function() {
     const roll = Math.floor(Math.random() * 6) + 1;
     c176Ref("dice/" + currentUser.code).set({ roll, name: currentUser.name, at: Date.now() });
-    
     c176Ref("dice").once('value').then(snap => {
       const rolls = snap.val() || {};
       const codes = getMemberCodes();
       if (codes.length === 2 && rolls[codes[0]] && rolls[codes[1]]) {
         const r1 = rolls[codes[0]].roll, r2 = rolls[codes[1]].roll;
         const winner = r1 > r2 ? "top" : r2 > r1 ? "bottom" : null;
-        
-        if (winner) {
-          c176Ref("config/final").update({ step: "result", winner, rolls: { [codes[0]]: r1, [codes[1]]: r2 } });
-        } else {
-          c176Ref("dice").remove();
-        }
+        if (winner) c176Ref("config/final").update({ step: "result", winner, rolls: { [codes[0]]: r1, [codes[1]]: r2 } });
+        else c176Ref("dice").remove();
       }
     });
   };
@@ -9870,14 +9774,9 @@ function getTodayStr() {
       const cfg = snap.val();
       const room = cfg.rooms[cfg.currentIdx];
       const result = checkKeywords(text, room.keywords, room.minCount);
-      
-      c176Ref("checks/" + currentUser.code).set({
-        name: currentUser.name, passed: result.pass, count: result.count, reason: result.reason, at: Date.now()
-      });
-      
+      c176Ref("checks/" + currentUser.code).set({ name: currentUser.name, passed: result.pass, count: result.count, reason: result.reason, at: Date.now() });
       const btn = document.getElementById('c176-submit-btn');
       if (btn) { btn.disabled = true; btn.style.opacity = "0.5"; btn.innerText = "검사 완료"; }
-      
       const fb = document.getElementById('c176-feedback');
       if (fb) fb.innerHTML = result.pass ? `<span style="color:#4CAF50;">✓ ${result.count}개</span>` : `<span style="color:#ff6b6b;">✗ ${result.reason}</span>`;
     });
@@ -9888,7 +9787,6 @@ function getTodayStr() {
     if (!input) return;
     const text = input.value.trim();
     if (text.length < 20) { alert("더 구체적으로 적어주세요."); return; }
-    
     if (darkRun) {
       darkRun.log.push(`[C-176] 결합 방 (강제) 완료`);
       darkRun.success = (darkRun.success || 0) + 1;
@@ -9912,20 +9810,11 @@ function getTodayStr() {
       if (!cfg) return;
       const members = getMemberCodes();
       let passed = 0;
-      
-      members.forEach(code => {
-        if (checks[code]?.passed) passed++;
-      });
-      
+      members.forEach(code => { if (checks[code]?.passed) passed++; });
       if (passed >= members.length) {
         const nextIdx = cfg.currentIdx + 1;
-        if (nextIdx >= cfg.rooms.length) {
-          finishC176("success");
-        } else {
-          c176Ref("config").update({ phase: "choice", currentIdx: nextIdx });
-          c176Ref("choices").remove();
-          c176Ref("checks").remove();
-        }
+        if (nextIdx >= cfg.rooms.length) finishC176("success");
+        else c176Ref("config").update({ phase: "choice", currentIdx: nextIdx });
       }
     });
   }
@@ -9933,7 +9822,6 @@ function getTodayStr() {
   function finishC176(mode) {
     const z = DARK_ZONES["Qtrew-C-176"];
     const body = darkBodyEl();
-    
     if (darkRun?.partyId) {
       c176Ref("config").remove();
       c176Ref("choices").remove();
@@ -9941,7 +9829,6 @@ function getTodayStr() {
       c176Ref("dice").remove();
     }
     localCtx = null;
-
     if (mode === "success") {
       body.innerHTML = darkBox("출구", z.outro, darkChoiceBtn("결과 확인", "renderDarkResult()"), "final");
     } else {
@@ -9963,43 +9850,13 @@ function getTodayStr() {
     mountDarkChat('normal');
   }
 
-  // ================== 가로채기 ==================
-  
-  // 기존 renderDarkStep 함수 위에 이 코드 추가
-const originalRenderDarkStep = window.renderDarkStep;
-
-window.renderDarkStep = function () {
-  const zoneCode = darkRun?.zone || darkRun?.zoneCode;
-  
-  if (zoneCode === "Qtrew-C-176") {
-    if (!darkRun._c176Init) {
-      darkRun._c176Init = true;
-      initC176();
-    }
-    return; // C-176은 여기서 끝
-  }
-  
-  // C-176이 아니면 기존 함수 실행
-  if (typeof originalRenderDarkStep === "function") {
-    return originalRenderDarkStep.apply(this, arguments);
-  }
-};
-  
-  const _orig = window.renderDarkStep;
-  window.renderDarkStep = function () {
-    const zoneCode = darkRun?.zone || darkRun?.zoneCode;
-    if (zoneCode === "Qtrew-C-176") {
-      if (!darkRun._c176Init) {
-        darkRun._c176Init = true;
-        initC176();
-      }
-      return;
-    }
-    return _orig?.apply(this, arguments);
-  };
+  // ================== 외부 노출 ==================
+  window.renderC176 = renderC176;
+  window.initC176 = initC176;
 
 })();
 
+// ================== 성별/성향 표시 (Part 4) ==================
 (function () {
   'use strict';
 
@@ -10131,8 +9988,6 @@ window.renderDarkStep = function () {
     init();
   }
 })();
-
-
 
     </script>
 </body> 
