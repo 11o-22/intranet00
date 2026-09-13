@@ -379,21 +379,21 @@
         .inv-card { display: flex; justify-content: space-between; align-items: flex-start; background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); padding: 10px; margin-bottom: 8px; border-radius: 6px; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: var(--theme-text); gap: 10px;}
         .inv-card-info { flex: 1; min-width: 0; }
         .inv-card-name { font-weight: bold; color: inherit; }
-        .inv-card-desc { font-size: 10px; color: #999; margin-top: 5px; line-height: 1.45; word-break: keep-all; }
-        body.theme-white .inv-card-desc, body.theme-hanbok .inv-card-desc { color: #475569 !important; }
-        .inv-btn-group { flex-shrink: 0; }
         .inv-card-qty { font-size: 11px; color: #ff9800; font-weight: bold; margin-left: 6px; background: rgba(255,152,0,0.1); padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(255,152,0,0.3); }
-        .inv-btn-group { flex-shrink: 0; display: flex; gap: 6px; }
-        .inv-btn { padding: 5px 10px; font-size: 11px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .inv-card-desc { font-size: 10px; color: #999; margin-top: 5px; line-height: 1.45; word-break: keep-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .inv-card-desc.expanded { -webkit-line-clamp: unset; }
+        .inv-desc-more { font-size: 9px; color: #777; cursor: pointer; text-decoration: underline; margin-top: 3px; display: inline-block; }
+        body.theme-white .inv-card-desc, body.theme-hanbok .inv-card-desc { color: #475569 !important; }
+        body.theme-white .inv-desc-more, body.theme-hanbok .inv-desc-more { color: #64748b !important; }
+        .inv-btn-group { flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; align-items: stretch; min-width: 82px; }
+        .inv-btn { padding: 6px 8px; font-size: 10px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3); white-space: nowrap; text-align: center; }
         .inv-btn:active { transform: translateY(2px) scale(0.96); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
         .inv-btn-use { background: linear-gradient(145deg, #388e3c, #2e7d32); color: white; border-color: #1b5e20; }
         .inv-btn-target { background: linear-gradient(145deg, #0284c7, #0369a1); color: white; border-color: #0c4a6e; }
         .inv-btn-sell { background: linear-gradient(145deg, #555, #424242); color: #ddd; border-color: #333; }
-
         .letter-card { background: rgba(0,0,0,0.3); border: 1px solid var(--theme-border); padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 12px; position: relative; color: var(--theme-text); }
         .letter-meta { font-size: 10px; color: #ff9800; margin-bottom: 4px; }
         .letter-body { color: inherit; word-break: break-all; }
-
         .history-item { background: rgba(0,0,0,0.2); border-left: 3px solid #555; padding: 8px 10px; margin-bottom: 6px; font-size: 11px; color: var(--theme-text);}
         .history-time { color: #888; font-size: 9px; margin-bottom: 2px; }
 
@@ -2387,10 +2387,11 @@ function getTodayStr() {
     }
 
     // 방장의 진행 신호 수신
-    function watchPartyStep() {
+        function watchPartyStep() {
         if (!darkRun || !darkRun.isParty || !database) return;
         if (darkRun._stepWatching) return;
         darkRun._stepWatching = true;
+
         database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
             const s = snap.val();
             if (s == null || !darkRun) return;
@@ -2400,6 +2401,29 @@ function getTodayStr() {
                 renderDarkStep();
             }
         });
+
+        // ★ 동료 이탈 감시 — 최소 정원 미달이면 강제 귀환
+        database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
+            if (!darkRun || !darkRun.isParty) return;
+            const alive = snap.val() || {};
+            const cnt = Object.keys(alive).length;
+            const z = DARK_ZONES[darkRun.zone];
+            if (cnt > 0 && cnt < z.min && !darkRun._abortNotified) {
+                darkRun._abortNotified = true;
+                sendPartyChat('동료의 신호가 끊겼습니다.', true);
+                darkBodyEl().innerHTML = darkBox("중단",
+                    `옆에 있던 기척이 사라졌다.<br><br>혼자서는 더 갈 수 없다.<br>왔던 길을 되짚는다.`,
+                    darkChoiceBtn("돌아간다.", "abortDarkRun()"));
+                mountDarkChat('normal');
+            }
+        });
+    }
+
+    function abortDarkRun() {
+        if (!darkRun) return;
+        darkRun.failedRun = true;
+        darkRun.step = 99;
+        renderDarkResult();
     }
         // ==========================================
     // ★ 파티 채팅
@@ -3982,33 +4006,54 @@ function getTodayStr() {
         saveDB();
     }
 
-    function finishDarkDeath() {
-         closeDarkOverlay();
+        function finishDarkDeath() {
+        closeDarkOverlay();
         detachVoteListener();
-        detachChatListener();
         detachC119Listener();
+        detachChatListener();
         clearInterval(c119Timer);
-        if (darkRun) {
-            if (darkRun.isParty && darkRun.isLeader && database) {
-                // 방장이 죽으면 남은 인원에게 위임
-                const p = darkParties[darkRun.partyId];
-                if (p && p.alive) {
-                    const others = Object.keys(p.alive).filter(c => c !== currentUser.code);
+        darkAmbienceStop();
+
+        const pid = darkRun ? darkRun.partyId : null;
+        const zone = darkRun ? darkRun.zone : null;
+
+        if (pid && database) {
+            if (darkRun.isLeader) {
+                const p = darkParties[pid];
+                if (p && p.members) {
+                    const others = Object.keys(p.members).filter(c => c !== currentUser.code);
                     if (others.length > 0 && p.members[others[0]]) {
-                        database.ref(`darkParties/${darkRun.partyId}`).update({
+                        database.ref(`darkParties/${pid}`).update({
                             leader: others[0], leaderName: p.members[others[0]].name
                         });
                     }
                 }
             }
-            if (!darkRun.isParty) releaseZone(darkRun.zone);
+            database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
+            database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
+
+            database.ref(`darkParties/${pid}/members`).once('value').then(snap => {
+                const left = snap.val();
+                if (!left || Object.keys(left).length === 0) {
+                    database.ref('darkParties/' + pid).remove();
+                    database.ref('darkChats/' + pid).remove();
+                    database.ref('darkVotes/' + pid).remove();
+                    database.ref('darkC119/' + pid).remove();
+                    if (zone) releaseZone(zone);
+                }
+            });
+        } else if (zone) {
+            releaseZone(zone);
         }
+
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
-        hasShownFoxAlert = true;   // 상담실 팝업 중복 방지
+        partyChatLog = [];
+        hasShownFoxAlert = true;
         updateUI();
         renderDarkness();
+        renderPartyPanel();
     }
 
        function renderDarkResult() {
@@ -4100,27 +4145,43 @@ function getTodayStr() {
         saveDB();
     }
 
-        function finishDarkRun() {
+           function finishDarkRun() {
         closeDarkOverlay();
         darkAmbienceStop();
         detachVoteListener();
-        if (darkRun) {
-            releaseZone(darkRun.zone);
-            if (darkRun.partyId && database) {
-                database.ref('darkParties/' + darkRun.partyId).remove();
-                database.ref('darkChats/' + darkRun.partyId).remove();
-                database.ref('darkVotes/' + darkRun.partyId).remove();
-            }
-        }
-        detachChatListener();
         detachC119Listener();
         clearInterval(c119Timer);
-        if (darkRun && darkRun.partyId && database) database.ref('darkC119/' + darkRun.partyId).remove();
+
+        const pid = darkRun ? darkRun.partyId : null;
+        const zone = darkRun ? darkRun.zone : null;
+
+        if (zone) releaseZone(zone);
+
+        if (pid && database) {
+            // 내 멤버 기록 제거
+            database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
+            database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
+
+            // 마지막 한 명이면 방과 부속 데이터 전부 삭제
+            database.ref(`darkParties/${pid}/members`).once('value').then(snap => {
+                const left = snap.val();
+                if (!left || Object.keys(left).length === 0) {
+                    database.ref('darkParties/' + pid).remove();
+                    database.ref('darkChats/' + pid).remove();
+                    database.ref('darkVotes/' + pid).remove();
+                    database.ref('darkC119/' + pid).remove();
+                }
+            });
+        }
+
+        detachChatListener();
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
+        partyChatLog = [];
         updateUI();
         renderDarkness();
+        renderPartyPanel();
     }
 
     function renderDarkLogs() {
@@ -5181,7 +5242,7 @@ function getTodayStr() {
     closeItemTargetModal();
 }
 
-       function renderInventory() {
+          function renderInventory() {
         const container = document.getElementById('inventory-list-container');
         let html = '';
 
@@ -5201,7 +5262,7 @@ function getTodayStr() {
                                 <div style="font-size:10px; color:#aaa; margin-top:5px; line-height:1.45;">${cat ? cat.desc : '정보 없음'}</div>
                             </div>
                             ${isMine
-                                ? `<button onclick="unequipWeapon(${idx})" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333); flex-shrink:0;">장착 해제</button>`
+                                ? `<button onclick="unequipWeapon(${idx})" class="game-btn" style="margin:0; padding:6px 12px; background:linear-gradient(145deg, #555, #333); flex-shrink:0;">해제</button>`
                                 : `<div style="font-size:10px; color:#ff8888; font-weight:bold; text-align:right; flex-shrink:0; line-height:1.6;">🔒 해제 불가<br><span style="color:#aaa; font-weight:normal;">${ownerName} 장착</span></div>`}
                         </div>
                     </div>
@@ -5209,7 +5270,7 @@ function getTodayStr() {
             });
         }
 
-        // ★ 내가 타인에게 장착시킨 장비 (회수 가능)
+        // 내가 타인에게 장착시킨 장비 (회수 가능)
         let remoteHtml = '';
         for (let code in db.users) {
             if (code === currentUser.code) continue;
@@ -5248,7 +5309,7 @@ function getTodayStr() {
         if (uniqueItems.length === 0) {
             html += '<div style="color:#666; font-size:12px; padding:15px 0;">소지품이 비어 있습니다.</div>';
         } else {
-            html += uniqueItems.map((item) => {
+            html += uniqueItems.map((item, idx) => {
                 const qty = counts[item];
                 const cat = ITEM_CATALOG[item];
                 const isUsable = cat ? cat.usable : false;
@@ -5262,13 +5323,13 @@ function getTodayStr() {
                     if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
                     } else if (item === "빨간 리본" || item === "노예 계약서") {
-                        useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정 사용</button>`;
+                        useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;
                     } else if (cat.effect === 'target_sticker') {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">타인 부착</button>`;
                     } else if (isTargetable) {
                         useBtnHtml = `
-                            <button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">본인 사용</button>
-                            <button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', true)">타인 사용</button>
+                            <button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">본인</button>
+                            <button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', true)">타인</button>
                         `;
                     } else {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">사용</button>`;
@@ -5277,13 +5338,15 @@ function getTodayStr() {
 
                 const sellBtnHtml = NO_SELL_ITEMS.includes(item)
                     ? ''
-                    : `<button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 (+${sellPrice}P)</button>`;
+                    : `<button class="inv-btn inv-btn-sell" onclick="sellInventoryItem('${item}')">판매 +${sellPrice}</button>`;
 
                 return `
                     <div class="inv-card">
                         <div class="inv-card-info">
                             <span class="inv-card-name">${item}</span><span class="inv-card-qty">x${qty}</span>
-                            <div class="inv-card-desc">${desc}<br><span style="color:#777;">정가 ${priceText} / 매각가 ${sellPrice} P</span></div>
+                            <div class="inv-card-desc" id="desc-${idx}">${desc}</div>
+                            <span class="inv-desc-more" onclick="toggleDesc(${idx})">▾ 더보기</span>
+                            <div style="font-size:9px; color:#666; margin-top:3px;">정가 ${priceText} · 매각 ${sellPrice} P</div>
                         </div>
                         <div class="inv-btn-group">
                             ${useBtnHtml}
@@ -5294,6 +5357,22 @@ function getTodayStr() {
             }).join('');
         }
         container.innerHTML = html;
+    }
+
+            function toggleDesc(idx) {
+        const el = document.getElementById('desc-' + idx);
+        if (!el) return;
+        el.classList.toggle('expanded');
+        const btn = el.nextElementSibling;
+        if (btn) btn.innerText = el.classList.contains('expanded') ? '▴ 접기' : '▾ 더보기';
+    }
+
+    function toggleDesc(idx) {
+        const el = document.getElementById('desc-' + idx);
+        if (!el) return;
+        el.classList.toggle('expanded');
+        const btn = el.nextElementSibling;
+        if (btn) btn.innerText = el.classList.contains('expanded') ? '▴ 접기' : '▾ 더보기';
     }
                function unequipWeapon(index) {
         if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
@@ -5716,8 +5795,9 @@ function getTodayStr() {
         `).join('');
     }
 
-    function renderLetterTargetSelect() {
+       function renderLetterTargetSelect() {
         const select = document.getElementById('letter-target-select');
+        if (!select) return;
         let options = '<option value="">-- 수신 사원 선택 --</option>';
         for (let code in db.users) {
             let u = db.users[code];
@@ -5725,7 +5805,7 @@ function getTodayStr() {
                 options += `<option value="${code}">${u.name} (사번: ${u.no} / ${u.team})</option>`;
             }
         }
-        select.innerHTML = options;
+        updateSelectOptions(select, options);
     }
 
    function sendAnonymousLetter() {
