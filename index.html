@@ -9421,29 +9421,33 @@ function getTodayStr() {
   let localCtx = null;
   let isFinalRoom = false;
 
-  function initC176() {
-    if (!darkRun?.partyId) return false;
-    if (darkRun.isLeader) {
-      const roomCount = Math.random() < 0.5 ? 3 : 4;
-      const slots = roomCount === 3 ? ["weak","mid","final"] : ["weak","mid","strong","final"];
-      const rooms = slots.map(k => {
-        const pool = ROOM_TEMPLATES[k];
-        const tpl = pool[Math.floor(Math.random()*pool.length)];
-        return { ...tpl, slot:k, keywords:KEYWORDS[k], minCount:MIN_COUNTS[k] };
-      });
-      c176Ref("config").set({
-        roomCount, rooms, currentIdx: -1, phase: "waiting",
-        rps: { rounds:[], sWin:0, pWin:0, done:false },
-        final: { step: null },
-        createdAt: Date.now()
-      });
-      c176Ref("choices").remove();
-      c176Ref("checks").remove();
-      c176Ref("dice").remove();
-    }
-    setupListeners();
-    return true;
+ function initC176() {
+  if (!darkRun?.partyId) return false;
+
+  if (darkRun.isLeader) {
+    const roomCount = Math.random() < 0.5 ? 3 : 4;
+    const slots = roomCount === 3 ? ["weak","mid","final"] : ["weak","mid","strong","final"];
+    const rooms = slots.map(k => {
+      const pool = ROOM_TEMPLATES[k];
+      const tpl = pool[Math.floor(Math.random()*pool.length)];
+      return { ...tpl, slot:k, keywords:KEYWORDS[k], minCount:MIN_COUNTS[k] };
+    });
+    c176Ref("config").set({
+      roomCount, rooms, currentIdx: -1, phase: "waiting",
+      rps: { rounds:[], sWin:0, pWin:0, done:false },
+      final: { step: null },
+      createdAt: Date.now()
+    });
+    c176Ref("choices").remove();
+    c176Ref("checks").remove();
+    c176Ref("dice").remove();
   }
+
+  // ★ 여기로 이동 (모든 파티원이 리스너를 가져야 함)
+  setupListeners();
+
+  return true;
+}
 
   function setupListeners() {
     if (!database || !darkRun?.partyId) return;
