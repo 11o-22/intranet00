@@ -9474,48 +9474,34 @@ function getTodayStr() {
   }
 function renderC176(cfg) {
     const body = darkBodyEl();
-    if (!body) return;
+    if (!body) {
+        console.log('darkBodyEl()이 null을 반환함');
+        return;
+    }
 
-    // cfg가 없으면 Firebase에서 직접 불러오기
+    // cfg가 없으면 강제로 불러오기
     if (!cfg) {
+        console.log('cfg 없음 → Firebase에서 불러옴');
         c176Ref("config").once('value').then(snap => {
-            const loadedCfg = snap.val();
-            if (loadedCfg) {
-                renderC176(loadedCfg);  // 다시 호출
-            }
+            const loaded = snap.val();
+            console.log('불러온 cfg:', loaded);
+            if (loaded) renderC176(loaded);
         });
         return;
     }
 
-    // 여기부터 기존 렌더링 로직
-    if (cfg.phase === "waiting") {
-        if (!cfg.rps.done) return renderRPS(cfg);
-        const c = localCtx;
-        if (!c) return;
-        const roleLine = `<br><br><i style="color:#aaa;font-size:11px;">배정: ${c.td.name} = 위 / ${c.bd.name} = 아래</i>`;
-        body.innerHTML = darkBox("감각 재조정실", 
-            DARK_ZONES["Qtrew-C-176"].intro + roleLine + `<br><i style="color:#888;font-size:11px;">${cfg.roomCount}방</i>`, 
-            darkChoiceBtn("첫 방으로 진입", "c176StartRooms()"), "intro");
-        mountDarkChat('normal');
-        return;
-    }
+    console.log('renderC176 정상 실행, phase:', cfg.phase);
 
-    const idx = cfg.currentIdx;
-    const room = cfg.rooms[idx];
-    isFinalRoom = idx === cfg.rooms.length - 1;
-
-    if (isFinalRoom && cfg.phase === "final") {
-        renderFinalSequence(cfg.final, room);
-        return;
-    }
-
-    if (cfg.phase === "choice") {
-        renderNormalChoice(room, idx, cfg.roomCount);
-    } else if (cfg.phase === "text") {
-        renderTextRoom(room, idx, cfg.roomCount);
-    }
+    // 여기서부터는 기존 로직 그대로 두거나, 일단 테스트용으로 단순하게
+    body.innerHTML = `
+        <div style="color:white; padding:20px; background:#222;">
+            <h2>C-176 테스트 화면</h2>
+            <p>phase: ${cfg.phase}</p>
+            <p>currentIdx: ${cfg.currentIdx}</p>
+            <button onclick="c176StartRooms()">테스트 버튼</button>
+        </div>
+    `;
 }
-
   function renderRPS(cfg) {
     const body = darkBodyEl();
     const r = cfg.rps;
