@@ -583,10 +583,14 @@ const DARK_ZONES = {
         c119Ref.on('value', (snap) => {
             c119State = snap.val();
             if (!c119State || !darkRun) return;
-            if (c119State.step != null && c119State.step !== darkRun.step) {
+            const stepChanged = (c119State.step != null && c119State.step !== darkRun.step);
+            if (stepChanged) {
                 darkRun.step = c119State.step;
+                darkRun._c119Locked = false;
+                renderStep119();
+            } else if (!darkRun._c119Locked) {
+                renderStep119();
             }
-            renderStep119();
             renderReactFlash();
         });
     }
@@ -1329,23 +1333,27 @@ const DARK_ZONES = {
              </button>`);
     }
 
-    function answer119A(n) {
+       function answer119A(n) {
         if (myC119Role() !== 'outside') return;
+        if (!c119State || c119State.answerA == null) return;
         const ok = (n === c119State.answerA);
         if (ok) { darkRun.success++; }
-        else { darkRun.fail++; applyPollutionToUser(currentUser, 4); database.ref(c119Path()).update({ wrong: (c119State.wrong || 0) + 1 }); }
+        else {
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 4);
+            if (database) database.ref(c119Path()).update({ wrong: (c119State.wrong || 0) + 1 });
+        }
         darkRun.log.push(`[기믹 1] ${n}번 거울 선택 — ${ok ? '적중' : '오답'}`);
         sendPartyChat(ok ? `${n}번 거울을 통과했습니다.` : `${n}번 거울이 깨졌습니다.`, true);
 
+        darkRun._c119Locked = true;
         darkBodyEl().innerHTML = darkBox("기믹 1 — 결과",
             ok ? `${n}번 거울에 손을 넣는다. 저항이 없다.<br><br>팔이 통째로 들어간다. 유리가 아니었다.`
                : `${n}번 거울이 소리 없이 갈라진다.<br>조각이 발밑에 떨어지는데, 떨어지는 소리는 한참 뒤에 났다.<br><br>다른 거울들이 조금씩 더 빨리 돌기 시작한다.`,
             (darkRun.isLeader ? darkChoiceBtn("안쪽으로 들어간다.", "c119Advance(3)")
-                              : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`)
-                       );
+                              : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`));
         mountDarkChat('normal');
     }
-
     // --- 기믹 2: 손잡이 순서 ---
     function render119B(role) {
         if (darkRun.isLeader && database && !c119State.answerB) {
@@ -1387,6 +1395,8 @@ const DARK_ZONES = {
             darkRun.log.push(`[기믹 2] 순서 ${cur} 입력 — ${ok ? '적중' : '오답'}`);
             database.ref(c119Path()).update({ inputB: '' });
             sendPartyChat(ok ? '손잡이가 순서대로 내려갔습니다.' : '손잡이가 전부 튕겨 올라왔습니다.', true);
+
+                    darkRun._c119Locked = true;
 
             darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
                 ok ? `네 번째 손잡이가 끝까지 내려간다.<br>벽 안쪽에서 뭔가가 풀리는 소리가 난다.<br><br>거울 하나가 도는 것을 멈췄다.`
@@ -1458,6 +1468,8 @@ const DARK_ZONES = {
         else { darkRun.fail++; applyPollutionToUser(currentUser, over ? 6 : 3); }
         darkRun.log.push(`[기믹 3] 무게추 ${pos}/${target} — ${ok ? '적중' : '빗나감'}`);
         sendPartyChat(ok ? '추가 제자리에 멈췄습니다.' : '추가 어긋났습니다.', true);
+
+                darkRun._c119Locked = true;
 
         darkBodyEl().innerHTML= darkBox("기믹 3 — 결과",
             ok ? `추가 멎는다. 눈금이 정확히 맞았다.<br>바닥의 판이 소리 없이 옆으로 밀린다.<br><br>아래로 내려가는 계단이 보인다.`
@@ -1538,6 +1550,7 @@ const DARK_ZONES = {
     }
 
     function finish119(ok) {
+                darkRun._c119Locked = true;
         darkBodyEl().innerHTML = darkBox("기믹 4 — 결과",
             ok ? `자물쇠가 손 안에서 열린다.<br>문이 안쪽으로 밀린다.<br><br>거울 안쪽에 있던 사람이 걸어 나온다. 표정이 조금 이상하다.<br>거울 밖에 있던 사람도 같은 생각을 한다.`
                : `세 번째가 틀렸다.<br>자물쇠가 안쪽으로 빨려 들어가고, 문이 벽이 된다.<br><br>거울들이 전부 멈춘다. 전부 같은 것을 비추고 있다.<br>둘 다 거기 있다. 나란히.`,
