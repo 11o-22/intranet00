@@ -794,10 +794,10 @@ const DARK_ZONES = {
         8:  { type:'narr', text:`남은 사람끼리 걷는다.<br><br>말이 없다. 할 말이 없는 게 아니라, 소리를 내면 안 될 것 같아서다.<br><br>벽에 세어놓은 자국이 있다. 작대기 네 개씩 묶어서 여섯 묶음.<br>스물넷. 시간이었을까, 사람이었을까.` },
         9:  { type:'gimmick', n:3 },
         10: { type:'quiz', n:2 },
-        11: { type:'narr', img:'step2', text:`통로가 좁아진다.<br>좁아졌다가 다시 넓어진다. 일정한 주기다.<br><br>숨을 쉬는 것 같다고 누군가 말하려다 만다.<br>말하면 정말 그렇게 될 것 같아서.<br><br>벽이 젖어 있다. 위에서 아래로 흐른 자국이 아니라, 안쪽에서 배어 나온 자국이다.` },
+        11: { type:'rejoinpoint' },        
         12: { type:'abduct', n:1 },
         13: { type:'gimmick', n:4 },
-        14: { type:'narr', text:`점호를 한다.<br><br>한 명씩 손을 든다. 세어 본다.<br>숫자가 맞지 않는다.<br><br>다시 센다. 이번에도 맞지 않는다. 아까와는 다른 숫자다.<br><br>안내판 뒷면에 눌러 쓴 글씨가 떠오른다.` },
+        14: { type:'rejoinpoint' },
         15: { type:'quiz', n:3 },
         16: { type:'abduct', n:2 },
         17: { type:'gimmick', n:5 },
@@ -980,7 +980,7 @@ const DARK_ZONES = {
     function goSolo() {
         if (!darkRun || !darkRun.isParty || !database) return;
         darkRun.solo = true;
-        darkRun.soloFrom = darkRun.step;
+        darkRun.soloIdx = 0;
         database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
             name: currentUser.name, at: Date.now(), step: darkRun.step
         });
@@ -989,43 +989,85 @@ const DARK_ZONES = {
         renderSoloStep();
     }
 
-    const B330_SOLO = {
-        3: { text:`일행의 발소리가 멀어진다.<br><br>혼자다. 통로가 갑자기 넓게 느껴진다.<br>실제로 넓어진 것일 수도 있다.<br><br>벽을 짚고 걷는다. 벽이 따라 걷는 것 같다.`,
-             opts:[ {l:'① 벽을 따라 계속 간다.', v:'wall'}, {l:'② 소리를 내며 걷는다.', v:'loud'}, {l:'③ 신발을 벗고 조용히 간다.', v:'quiet'} ] },
-        4: { text:`문이 하나 있다.<br><br>미로에 문이 있을 리 없는데 있다.<br>손잡이에 손때가 많다. 여러 사람이 잡았다는 뜻이다.<br><br>열면 어디로 나올지 모른다.`,
-             opts:[ {l:'① 문을 연다.', v:'open'}, {l:'② 지나친다.', v:'skip'}, {l:'③ 손잡이만 만져 본다.', v:'touch'} ] },
-        5: { text:`바닥에 신발 한 짝이 있다.<br><br>왼쪽이다. 오른쪽은 없다.<br>집어 보니 아직 따뜻하다.<br><br>치수가 당신과 같다.`,
-             opts:[ {l:'① 챙긴다.', v:'take'}, {l:'② 제자리에 둔다.', v:'leave'}, {l:'③ 신어 본다.', v:'wear'} ] },
-        6: { text:`앞에 일행의 뒷모습이 보인다.<br><br>부르려다 만다. 세어 보니 인원이 맞다.<br>당신을 빼고 맞다.<br><br>저쪽은 아직 당신을 못 봤다.`,
-             opts:[ {l:'① 부른다.', v:'call'}, {l:'② 뒤따라간다.', v:'follow'}, {l:'③ 다른 길로 돈다.', v:'avoid'} ] }
-    };
+        const B330_SOLO = [
+        { text:`일행의 발소리가 멀어진다.<br><br>혼자다. 통로가 갑자기 넓게 느껴진다.<br>실제로 넓어진 것일 수도 있다.<br><br>벽을 짚고 걷는다. 벽이 따라 걷는 것 같다.`,
+          opts:[ {l:'① 벽을 따라 계속 간다.', v:'wall'}, {l:'② 소리를 내며 걷는다.', v:'loud'}, {l:'③ 신발을 벗고 조용히 간다.', v:'quiet'} ] },
 
-    function renderSoloStep() {
+        { text:`문이 하나 있다.<br><br>미로에 문이 있을 리 없는데 있다.<br>손잡이에 손때가 많다. 여러 사람이 잡았다는 뜻이다.<br><br>열면 어디로 나올지 모른다.`,
+          opts:[ {l:'① 문을 연다.', v:'open'}, {l:'② 지나친다.', v:'skip'}, {l:'③ 손잡이만 만져 본다.', v:'touch'} ] },
+
+        { text:`바닥에 신발 한 짝이 있다.<br><br>왼쪽이다. 오른쪽은 없다.<br>집어 보니 아직 따뜻하다.<br><br>치수가 당신과 같다.`,
+          opts:[ {l:'① 챙긴다.', v:'take'}, {l:'② 제자리에 둔다.', v:'leave'}, {l:'③ 신어 본다.', v:'wear'} ] },
+
+        { text:`통로가 두 갈래다.<br><br>한쪽은 위로 올라가고, 한쪽은 아래로 내려간다.<br>일행은 어느 쪽에 있을까. 아니면 어느 쪽에도 없을까.<br><br>표지판은 없다. 이번엔 정말로 없다.`,
+          opts:[ {l:'① 위로 올라간다.', v:'up'}, {l:'② 아래로 내려간다.', v:'down'}, {l:'③ 제자리에서 기다린다.', v:'hold'} ] },
+
+        { text:`앞에 일행의 뒷모습이 보인다.<br><br>부르려다 만다. 세어 보니 인원이 맞다.<br>당신을 빼고 맞다.<br><br>저쪽은 아직 당신을 못 봤다.`,
+          opts:[ {l:'① 부른다.', v:'call'}, {l:'② 뒤따라간다.', v:'follow'}, {l:'③ 다른 길로 돈다.', v:'avoid'} ] },
+
+        { text:`벽에 이름이 적혀 있다.<br><br>손톱으로 판 글씨다. 여러 개고, 깊이가 다 다르다.<br>오래된 것일수록 깊다.<br><br>맨 아래에 아직 얕은 것이 하나. 당신 이름이다.`,
+          opts:[ {l:'① 지운다.', v:'erase'}, {l:'② 더 깊게 판다.', v:'carve'}, {l:'③ 그냥 지나간다.', v:'ignore'} ] }
+    ];
+
+   function renderSoloStep() {
+        if (!darkRun) return;
+        if (darkRun.soloIdx == null) darkRun.soloIdx = 0;
+
+        // 합류 지점에 도달했으면 합류 시도
+        const def = B330_STEPS[darkRun.step];
+        if (def && def.type === 'rejoinpoint') { renderB330Rejoin(); return; }
+
+        if (darkRun.step >= 21) {
+            darkRun.modifier = (darkRun.modifier || 0) - 2;   // 혼자라 불리
+            b330Gimmick7();
+            return;
+        }
+
+        const d = B330_SOLO[darkRun.soloIdx % B330_SOLO.length];
         const body = darkBodyEl();
-        const d = B330_SOLO[darkRun.step] || B330_SOLO[6];
         body.innerHTML = darkBox("단독 — 혼자", d.text,
-            d.opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="soloPick('${o.v}')">${o.l}</button>`).join(''),
-            null);
+            d.opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="soloPick('${o.v}')">${o.l}</button>`).join(''));
         mountDarkChat('normal');
     }
 
     function soloPick(v) {
         let txt, mod = 0;
-        const good = ['quiet','touch','leave','avoid'];
-        const bad = ['loud','open','wear','call'];
-        if (good.includes(v)) { mod = 1; txt = `조심스럽게 움직인다.<br><br>아무 일도 일어나지 않는다.<br>아무 일도 일어나지 않는 것이 여기서는 성과다.`; }
-        else if (bad.includes(v)) { mod = -1; applyPollutionToUser(currentUser, 4); txt = `그렇게 한다.<br><br>무언가 이쪽을 알아차린 느낌이 든다.<br>통로 끝에서 뭔가가 아주 천천히 방향을 바꿨다.`; }
-        else { txt = `그렇게 한다.<br><br>별다른 일은 없다. 다만 시간이 조금 지났다.`; }
+        const good = ['quiet','touch','leave','avoid','ignore','hold'];
+        const bad  = ['loud','open','wear','call','carve','down'];
+
+        if (good.includes(v)) {
+            mod = 1;
+            txt = `조심스럽게 움직인다.<br><br>아무 일도 일어나지 않는다.<br>아무 일도 일어나지 않는 것이 여기서는 성과다.`;
+        } else if (bad.includes(v)) {
+            mod = -1;
+            applyPollutionToUser(currentUser, 5);
+            darkRun.fail++;
+            txt = `그렇게 한다.<br><br>무언가 이쪽을 알아차린 느낌이 든다.<br>통로 끝에서 뭔가가 아주 천천히 방향을 바꿨다.`;
+        } else {
+            txt = `그렇게 한다.<br><br>별다른 일은 없다. 다만 시간이 조금 지났다.`;
+        }
 
         darkRun.modifier = (darkRun.modifier || 0) + mod;
         darkRun.soloScore = (darkRun.soloScore || 0) + mod;
+        darkRun.soloIdx = (darkRun.soloIdx || 0) + 1;
         darkRun.log.push(`[단독] ${v}`);
 
-        const next = darkRun.step + 1;
+        // ★ 단독 중 위험 누적 시 치명
+        if ((darkRun.soloScore || 0) <= -3) {
+            darkRun.dying = 'solo';
+            renderRescueScene('solo');
+            return;
+        }
+
+        // 본대의 진행에 맞춰 따라간다
+        const nextStep = darkRun.step + 1;
+        const def = B330_STEPS[nextStep];
+        const isRejoin = def && def.type === 'rejoinpoint';
+
         darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
-            next >= 11
-                ? darkChoiceBtn("일행을 찾아 나선다.", "darkRun.step=11; renderDarkStep();")
-                : darkChoiceBtn("계속 간다.", `darkRun.step=${next}; renderSoloStep();`));
+            darkChoiceBtn(
+                isRejoin ? "인기척이 난다." : "계속 간다.",
+                `darkRun.step=${nextStep}; renderSoloStep();`));
         mountDarkChat('normal');
     }
 
@@ -1063,93 +1105,177 @@ const DARK_ZONES = {
     }
 
     // --- 합류 지점 ---
+       // ==========================================
+    // ★ 합류 시스템 (3지점 · 단독자끼리 자동 조우)
+    // ==========================================
+    const SOLO_MEET_SCENES = [
+        {
+            text: `통로 끝에서 발소리가 난다.<br><br>일행일 리 없다. 방향이 반대다.<br>멈춰 서서 기다린다. 소리가 가까워진다.<br><br>모퉁이를 돌아 나온 것은 사람이었다. 아는 얼굴이다.<br>둘 다 한참 말을 하지 않았다.`,
+            after: `서로 어디서 떨어졌는지 물어보지 않기로 한다.<br>대답이 맞지 않을까 봐.`
+        },
+        {
+            text: `벽 너머에서 소리가 난다. 두드리는 소리다.<br><br>세 번, 쉬고, 두 번.<br>같은 박자로 돌려준다. 잠시 뒤 같은 박자가 온다.<br><br>벽을 따라간다. 끝에서 문이 아닌 틈이 있었고,<br>거기에 사람이 끼어 있었다. 빼내는 데 한참 걸렸다.`,
+            after: `둘 다 손이 긁혔다.<br>긁힌 자국이 똑같은 모양이라는 건 나중에 알았다.`
+        }
+    ];
+
+    // 단독자끼리 자동 조우
+    function trySoloMeet() {
+        if (!darkRun || !darkRun.solo || !database) return false;
+        const p = darkParties[darkRun.partyId];
+        if (!p || !p.solo) return false;
+        const soloList = Object.keys(p.solo);
+        if (soloList.length < 2) return false;
+        if (darkRun.soloMet) return false;
+
+        // 첫 번째 단독자가 장면을 정한다
+        const first = soloList.sort()[0];
+        if (currentUser.code === first) {
+            const idx = Math.floor(Math.random() * SOLO_MEET_SCENES.length);
+            database.ref(`darkParties/${darkRun.partyId}/soloMeet`).set({ scene: idx, at: Date.now() });
+        }
+        return true;
+    }
+
+    function renderSoloMeet() {
+        if (!database) return;
+        database.ref(`darkParties/${darkRun.partyId}/soloMeet`).once('value').then(sn => {
+            const m = sn.val();
+            if (!m || !darkRun) return;
+            darkRun.soloMet = true;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+            const sc = SOLO_MEET_SCENES[m.scene] || SOLO_MEET_SCENES[0];
+
+            darkBodyEl().innerHTML = darkBox("조우", sc.text + `<br><br>${sc.after}`,
+                darkChoiceBtn("함께 간다.", "renderDarkStep();"));
+            mountDarkChat('normal');
+            sendPartyChat(`떨어져 있던 사원들이 서로를 찾았습니다.`, true);
+        });
+    }
+
+    // --- 합류 지점 ---
     function renderB330Rejoin() {
         const body = darkBodyEl();
-        if (!darkRun.isParty) { partyAdvance(12); return; }
+        if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
 
         const p = darkParties[darkRun.partyId];
         const hasSolo = p && p.solo && Object.keys(p.solo).length > 0;
+
         if (!hasSolo) {
             body.innerHTML = darkBox("—",
                 `통로가 넓어진다.<br><br>일행이 전부 여기 있다. 세지 않는다.<br>세지 않기로 했으니까.`,
-                (darkRun.isLeader) ? darkChoiceBtn("계속 간다.", "partyAdvance(12)")
-                                   : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+                (darkRun.isLeader
+                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+            mountDarkChat('normal');
+            return;
+        }
+
+        // 단독자 둘 이상이면 먼저 서로 만난다
+        if (darkRun.solo && !darkRun.soloMet && trySoloMeet()) {
+            setTimeout(() => renderSoloMeet(), 900);
+            body.innerHTML = darkBox("—",
+                `발소리가 들린다.<br><br>이쪽으로 오는 소리다.`,
+                `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">기다리는 중...</div>`);
             mountDarkChat('normal');
             return;
         }
 
         const amSolo = darkRun.solo;
-        body.innerHTML = darkBox("합류",
+        const attempt = (darkRun.rejoinTries || 0) + 1;
+
+        const soloOpts = [
+            { l:'① 이름을 부른다.', v:'call' },
+            { l:'② 발자국을 따라간다.', v:'track' },
+            { l:'③ 벽을 두드려 신호한다.', v:'knock' },
+            { l:'④ 그냥 앞으로 간다.', v:'forward' }
+        ];
+        const holdOpts = [
+            { l:'① 그 자리에서 기다린다.', v:'stay' },
+            { l:'② 앞으로 나아간다.', v:'move' },
+            { l:'③ 찾으러 되돌아간다.', v:'search' },
+            { l:'④ 소리를 내며 걷는다.', v:'loud' }
+        ];
+
+        body.innerHTML = darkBox(`합류 — ${attempt}차`,
             amSolo
-                ? `통로 끝에서 불빛이 보인다.<br><br>일행이다. 아마도.<br>어떻게 다가갈지 정해야 한다.`
-                : `누군가 떨어져 나간 뒤로 아무 소식이 없다.<br><br>기다릴지, 찾을지, 그냥 갈지.`,
-            (amSolo
-                ? [
-                    { l:'① 이름을 부른다.', v:'call' },
-                    { l:'② 발자국을 따라간다.', v:'track' },
-                    { l:'③ 벽을 두드려 신호한다.', v:'knock' }
-                  ]
-                : [
-                    { l:'① 그 자리에서 기다린다.', v:'stay' },
-                    { l:'② 앞으로 나아간다.', v:'move' },
-                    { l:'③ 찾으러 되돌아간다.', v:'search' }
-                  ]
-            ).map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="b330Rejoin('${o.v}')">${o.l}</button>`).join(''));
+                ? `통로가 갈린다. 어느 쪽에서 일행의 기척이 나는지 알 수 없다.<br><br>${attempt >= 3 ? '마지막 기회다. 다음은 없다.' : '놓치면 다음을 기약해야 한다.'}`
+                : `떨어져 나간 쪽의 소식이 없다.<br><br>${attempt >= 3 ? '더 기다릴 수 없다. 마지막이다.' : '어떻게 할지 정해야 한다.'}`,
+            (amSolo ? soloOpts : holdOpts)
+                .map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="b330Rejoin('${o.v}')">${o.l}</button>`)
+                .join(''));
         mountDarkChat('normal');
     }
 
     function b330Rejoin(v) {
         if (!database) return;
         const key = darkRun.solo ? 'soloPick' : 'holdPick';
-        database.ref(`darkParties/${darkRun.partyId}/rj/${key}/${currentUser.code}`).set(v);
+        const attempt = (darkRun.rejoinTries || 0) + 1;
+        database.ref(`darkParties/${darkRun.partyId}/rj${attempt}/${key}/${currentUser.code}`).set(v);
 
         setTimeout(() => {
-            database.ref(`darkParties/${darkRun.partyId}/rj`).once('value').then(sn => {
+            database.ref(`darkParties/${darkRun.partyId}/rj${attempt}`).once('value').then(sn => {
                 const rj = sn.val() || {};
                 const soloPicks = Object.values(rj.soloPick || {});
                 const holdPicks = Object.values(rj.holdPick || {});
-                resolveB330Rejoin(soloPicks, holdPicks);
+                resolveB330Rejoin(soloPicks, holdPicks, attempt);
             });
-        }, 1500);
+        }, 2000);
 
-        darkBodyEl().innerHTML = darkBox("합류", `선택했다.<br><br>상대가 어떻게 움직일지는 알 수 없다.`,
+        darkBodyEl().innerHTML = darkBox(`합류 — ${attempt}차`,
+            `선택했다.<br><br>상대가 어떻게 움직일지는 알 수 없다.`,
             `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
         mountDarkChat('normal');
     }
 
-    function resolveB330Rejoin(soloPicks, holdPicks) {
-        let result, txt, mod = 0;
+    function resolveB330Rejoin(soloPicks, holdPicks, attempt) {
+        let result, txt, mod = 0, joined = false;
         const s = soloPicks[0], h = holdPicks[0];
 
+        // 성공 조합
         if (s === 'call' && h === 'stay') {
-            result = '정면 합류'; mod = 2;
+            result = '정면 합류'; mod = 2; joined = true;
             txt = `이름을 부른다. 대답이 온다.<br><br>같은 자리에 서서 기다리고 있었다.<br>가까워질수록 인원이 맞는지 세고 싶어지지만, 세지 않는다.`;
         } else if (s === 'track' && h === 'move') {
-            result = '우회 합류'; mod = 1;
+            result = '우회 합류'; mod = 1; joined = true;
             txt = `발자국을 따라간다. 아직 축축하다.<br><br>모퉁이를 돌자 일행의 등이 보인다.<br>수를 세지 않고 그냥 뒤에 붙는다.`;
         } else if (s === 'knock' && h === 'search') {
-            result = '신호 합류'; mod = 3;
-            txt = `벽을 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다.<br>벽 반대편에서다. 벽을 따라 가니 곧 만난다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
-        } else if (s === 'call' && h === 'search') {
-            result = '엇갈린 합류'; mod = 0;
-            txt = `서로를 찾아 움직인다. 한참 엇갈린다.<br><br>결국 만나기는 한다. 다만 둘 다 지쳤다.`;
-        } else {
-            result = '실패'; mod = -2;
+            result = '신호 합류'; mod = 3; joined = true;
+            txt = `벽을 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다. 벽 반대편에서다.<br>벽을 따라 가니 곧 만난다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
+        } else if (s === 'forward' && h === 'loud') {
+            result = '우연 합류'; mod = 1; joined = true;
+            txt = `그냥 앞으로 간다. 방향 같은 건 이미 의미가 없다.<br><br>그런데 앞쪽에서 소리가 난다. 일부러 내는 소리다.<br>미로에서 소리를 내는 건 위험한데, 그걸 알면서도 냈다.`;
+        } else if (s === 'call' && h === 'loud') {
+            result = '소란 합류'; mod = -1; joined = true;
+            txt = `양쪽 다 소리를 낸다.<br><br>만나기는 한다. 다만 만난 자리에 다른 것도 와 있었다.<br>서둘러 자리를 뜬다.`;
             applyPollutionToUser(currentUser, 5);
-            txt = `만나지 못한다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대 방향으로 돌고 있었던 것 같다.<br><br>끝에서 보기로 한다. 끝이 있다면.`;
+        } else {
+            result = '엇갈림'; mod = -1;
+            txt = attempt >= 3
+                ? `끝내 만나지 못했다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.<br><br>각자 가기로 한다. 끝에서 보기로 한다. 끝이 있다면.`
+                : `움직인다. 한참을 움직인다.<br><br>동료가 지나간 자리는 있는데 동료가 없다.<br>아직 기회는 있다. 다음 갈림에서 다시 시도해 보기로 한다.`;
+            applyPollutionToUser(currentUser, 3);
         }
 
         darkRun.modifier = (darkRun.modifier || 0) + mod;
-        darkRun.solo = false;
-        darkRun.log.push(`[합류] ${result}`);
-        sendPartyChat(`합류 — ${result}`, true);
+        darkRun.rejoinTries = attempt;
+        darkRun.log.push(`[합류 ${attempt}차] ${result}`);
 
-        darkBodyEl().innerHTML = darkBox("합류 — 결과", txt,
+        if (joined) {
+            darkRun.solo = false;
+            darkRun.soloMet = false;
+            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+            sendPartyChat(`합류 성공 — ${result}`, true);
+        } else {
+            sendPartyChat(`합류 실패 — 엇갈렸습니다.`, true);
+        }
+
+        darkBodyEl().innerHTML = darkBox(`합류 ${attempt}차 — 결과`, txt,
             `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
                 ${result} — 이후 판정 보정 ${mod >= 0 ? '+' : ''}${mod}
              </div>` +
-            ((darkRun.isLeader || !darkRun.isParty)
-                ? darkChoiceBtn("계속 간다.", "partyAdvance(12)")
+            ((darkRun.isLeader || darkRun.solo)
+                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
                 : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
         mountDarkChat('normal');
     }
