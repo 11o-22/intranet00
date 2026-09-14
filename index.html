@@ -761,6 +761,13 @@
         </div>
 
                 <div class="admin-panel-box" style="border-color: #7e57c2; background-color: #17111f;">
+               <div class="admin-panel-box" style="border-color: #d4af37; background-color: #1c1608;">
+            <h4 style="color: #d4af37;">🦊 여우 상담실 관리</h4>
+            <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
+                현재 격리 중인 사원 목록입니다. 퇴원 처리하거나 격리 시간을 조정할 수 있습니다.
+            </div>
+            <div id="admin-fox-list"></div>
+        </div>
             <h4 style="color: #b39ddb;">어둠 구역 개방 통제</h4>
             <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
                 각 구역의 출입 가능 여부를 직접 제어합니다. 폐쇄로 설정하면 모든 사원의 목록에서 잠금 처리됩니다.
@@ -6254,6 +6261,7 @@ function getTodayStr() {
         renderAdminSuggestions();
         renderAdminItemSelect();
         renderAdminDarkZones();
+        renderAdminFoxRoom();
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';
@@ -6482,6 +6490,110 @@ function getTodayStr() {
                     </div>
                 </div>`;
         }).join('');
+    }
+
+        // ==========================================
+    // ★ 여우 상담실 관리
+    // ==========================================
+    function renderAdminFoxRoom() {
+        const box = document.getElementById('admin-fox-list');
+        if (!box) return;
+
+        const now = Date.now();
+        const inmates = Object.values(db.users).filter(u =>
+            u.quarantineUntil && now < u.quarantineUntil
+        );
+
+        if (inmates.length === 0) {
+            box.innerHTML = `<div style="font-size:11px; color:#666; text-align:center; padding:18px 0;">현재 격리 중인 사원이 없습니다.</div>`;
+            return;
+        }
+
+        box.innerHTML = inmates.map(u => {
+            const remainMs = u.quarantineUntil - now;
+            const h = Math.floor(remainMs / (1000 * 60 * 60));
+            const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+            const exitPoll = u.quarantineExitPollution || 0;
+            const isHospital = exitPoll >= 40;
+
+            return `
+                <div style="background:rgba(0,0,0,0.35); border:1px solid #5a4a2a; border-radius:6px; padding:11px; margin-bottom:9px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:9px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:12px; color:#fff; font-weight:bold;">
+                                ${u.name}
+                                <span style="font-size:10px; color:${isHospital ? '#ff6b6b' : '#d4af37'}; margin-left:5px;">${isHospital ? '입원중' : '상담중'}</span>
+                            </div>
+                            <div style="font-size:10px; color:#888; margin-top:3px;">
+                                사번 ${u.no} · ${u.team} · 오염도 ${u.pollution}%
+                            </div>
+                            <div style="font-size:11px; color:#ff9800; font-weight:bold; margin-top:4px;">
+                                퇴원까지 ${h}시간 ${m}분 · 퇴원 시 오염도 ${exitPoll}%
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', false)">즉시 퇴원</button>
+                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #0288d1, #01579b) !important; border-color:#01579b !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', true)">퇴원 + 정화</button>
+                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 1)">-1시간</button>
+                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 3)">-3시간</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    function adminFoxDischarge(code, purify) {
+        const u = db.users[code];
+        if (!u) return;
+
+        u.quarantineUntil = 0;
+        u.pollution = purify ? 0 : (u.quarantineExitPollution || 0);
+        u.quarantineExitPollution = 0;
+        u.lastPollutionTime = Date.now();
+        u.foxRoomAnswered = false;
+
+        addHistoryLog(u, purify
+            ? `[당국 개입] 상담사에 의해 퇴원 및 완전 정화 처리되었습니다.`
+            : `[당국 개입] 상담사에 의해 조기 퇴원 처리되었습니다. (오염도 ${u.pollution}%)`);
+
+        if (database) {
+            database.ref('users/' + code).set(u).then(() => {
+                renderAdminFoxRoom();
+                updateUI();
+            });
+        } else {
+            saveDB(); renderAdminFoxRoom(); updateUI();
+        }
+        showCustomAlert(`${u.name} 사원이 퇴원 처리되었습니다.${purify ? ' (오염도 0%)' : ` (오염도 ${u.pollution}%)`}`);
+    }
+
+    function adminFoxReduce(code, hours) {
+        const u = db.users[code];
+        if (!u || !u.quarantineUntil) return;
+
+        u.quarantineUntil -= hours * 60 * 60 * 1000;
+        const now = Date.now();
+
+        if (u.quarantineUntil <= now) {
+            adminFoxDischarge(code, false);
+            return;
+        }
+
+        const remainMs = u.quarantineUntil - now;
+        const h = Math.floor(remainMs / (1000 * 60 * 60));
+        const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+
+        addHistoryLog(u, `[당국 개입] 격리 시간이 ${hours}시간 단축되었습니다.`);
+
+        if (database) {
+            database.ref('users/' + code).set(u).then(() => {
+                renderAdminFoxRoom();
+                updateUI();
+            });
+        } else {
+            saveDB(); renderAdminFoxRoom(); updateUI();
+        }
+        showCustomAlert(`${u.name} 사원의 격리가 ${hours}시간 단축되었습니다. (남은 시간 ${h}시간 ${m}분)`);
     }
 
     function adminSetZoneOpen(zoneCode, state) {
