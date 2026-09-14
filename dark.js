@@ -782,27 +782,38 @@ const DARK_ZONES = {
         // ==========================================
     // ★ Qtrew-B-330 「미로를 빠져나가자」
     // ==========================================
-    const B330_STEPS = {
-        0: { type:'intro' },
-        1: { type:'narr', img:'step1', text:`첫 통로다.<br><br>벽에 손을 대 본다. 미지근하다. 콘크리트가 이런 온도일 리 없다.<br>손을 떼면 자국이 남고, 그 자국이 아주 천천히 메워진다.<br><br>천장의 형광등은 세 개 중 하나만 켜져 있다.<br>꺼진 두 개에는 애초에 전구가 없다.` },
-        2: { type:'gimmick', n:1 },
-        3: { type:'narr', img:null, text:`돌아본다.<br><br>방금 지나온 자리에 표식을 남겼었다. 벽에 긁어 그은 자국.<br>없다.<br><br>벽은 같은 벽인데 자국만 사라졌다.<br>다시 그어 본다. 이번에는 보는 앞에서 천천히 메워진다.` },
-        4: { type:'narr', img:null, text:`걷는다.<br><br>발소리가 울린다. 세어 본다.<br><br>하나 많다.<br><br>멈춘다. 발소리도 멎는다. 다만 반 박자 늦게.` },
-        5: { type:'gimmick', n:2 },
-        6: { type:'narr', img:'step2', text:`통로가 좁아진다.<br>좁아졌다가 다시 넓어진다. 일정한 주기다.<br><br>숨을 쉬는 것 같다고 누군가 말하려다 만다.<br>말하면 정말 그렇게 될 것 같아서.<br><br>벽이 젖어 있다. 위에서 아래로 흐른 자국이 아니라, 안쪽에서 배어 나온 자국이다.` },
-        7: { type:'gimmick', n:3 },
-        8: { type:'narr', img:null, text:`안내판이 또 나온다.<br><br><span style="color:#d4af37;">"출구까지 남은 거리 — 없음"</span><br><br>그 아래에 작은 글씨.<br><span style="color:#d4af37;">"출구는 처음부터 없었습니다. 즐거운 시간 되시기 바랍니다."</span><br><br>안내 방송이 다시 시작된다. 아까와 똑같은 억양이다.` },
-        9: { type:'narr', img:null, text:`점호를 한다.<br><br>한 명씩 손을 든다. 세어 본다.<br>숫자가 맞지 않는다.<br><br>다시 센다. 이번에도 맞지 않는다. 아까와는 다른 숫자다.<br><br>아무도 먼저 입을 열지 않는다.` },
-        10: { type:'gimmick', n:4 },
-        11: { type:'rejoinpoint' },
-        12: { type:'narr', img:'step3', text:`바닥이 기울어 있다.<br><br>처음부터 기울어 있었다. 아주 미세해서 몰랐을 뿐이다.<br>여태 걸어온 게 아니라, 흘러온 것이었다.<br><br>벽에 손톱자국이 있다. 사람이 버티려고 한 자국이다.<br>그 옆에 또 하나. 또 하나. 셀 수 없이 많다.` },
-        13: { type:'gimmick', n:5 },
+        const B330_STEPS = {
+        0:  { type:'intro' },
+        1:  { type:'narr', img:'step1', text:`첫 통로다.<br><br>벽에 손을 대 본다. 미지근하다. 콘크리트가 이런 온도일 리 없다.<br>손을 떼면 자국이 남고, 그 자국이 아주 천천히 메워진다.<br><br>천장의 형광등은 세 개 중 하나만 켜져 있다.<br>꺼진 두 개에는 애초에 전구가 없다.` },
+        2:  { type:'gimmick', n:1 },
+        3:  { type:'narr', text:`돌아본다.<br><br>방금 지나온 자리에 표식을 남겼었다. 벽에 긁어 그은 자국.<br>없다.<br><br>벽은 같은 벽인데 자국만 사라졌다.<br>다시 그어 본다. 이번에는 보는 앞에서 천천히 메워진다.<br><br>계단 벽에 붙어 있던 근무 수칙을 떠올린다. 네 조까지 있었다.` },
+        4:  { type:'quiz', n:1 },
+        5:  { type:'narr', text:`걷는다.<br><br>발소리가 울린다. 세어 본다.<br><br>하나 많다.<br><br>멈춘다. 발소리도 멎는다. 다만 반 박자 늦게.` },
+        6:  { type:'gimmick', n:2 },
+        7:  { type:'silent' },
+        8:  { type:'narr', text:`남은 사람끼리 걷는다.<br><br>말이 없다. 할 말이 없는 게 아니라, 소리를 내면 안 될 것 같아서다.<br><br>벽에 세어놓은 자국이 있다. 작대기 네 개씩 묶어서 여섯 묶음.<br>스물넷. 시간이었을까, 사람이었을까.` },
+        9:  { type:'gimmick', n:3 },
+        10: { type:'quiz', n:2 },
+        11: { type:'narr', img:'step2', text:`통로가 좁아진다.<br>좁아졌다가 다시 넓어진다. 일정한 주기다.<br><br>숨을 쉬는 것 같다고 누군가 말하려다 만다.<br>말하면 정말 그렇게 될 것 같아서.<br><br>벽이 젖어 있다. 위에서 아래로 흐른 자국이 아니라, 안쪽에서 배어 나온 자국이다.` },
+        12: { type:'abduct', n:1 },
+        13: { type:'gimmick', n:4 },
+        14: { type:'narr', text:`점호를 한다.<br><br>한 명씩 손을 든다. 세어 본다.<br>숫자가 맞지 않는다.<br><br>다시 센다. 이번에도 맞지 않는다. 아까와는 다른 숫자다.<br><br>안내판 뒷면에 눌러 쓴 글씨가 떠오른다.` },
+        15: { type:'quiz', n:3 },
+        16: { type:'abduct', n:2 },
+        17: { type:'gimmick', n:5 },
+        18: { type:'rejoinpoint' },
+        19: { type:'narr', img:'step3', text:`바닥이 기울어 있다.<br><br>처음부터 기울어 있었다. 아주 미세해서 몰랐을 뿐이다.<br>여태 걸어온 게 아니라, 흘러온 것이었다.<br><br>벽에 손톱자국이 있다. 사람이 버티려고 한 자국이다.<br>그 옆에 또 하나. 또 하나. 셀 수 없이 많다.` },
+        20: { type:'gimmick', n:6 },
+        21: { type:'gimmick', n:7 },
         99: { type:'result' }
     };
 
-    function renderStepB330() {
+        function renderStepB330() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
+        if (darkRun.isParty) watchDyingMembers();
+        if (darkRun.solo) { renderSoloStep(); return; }
+
         const def = B330_STEPS[darkRun.step];
         if (!def) { renderDarkResult(); return; }
 
@@ -826,18 +837,15 @@ const DARK_ZONES = {
             return;
         }
 
-        if (def.type === 'rejoinpoint') {
-            renderB330Rejoin();
-            return;
-        }
-
+        if (def.type === 'quiz')   { renderQuizStep(def.n); return; }
+        if (def.type === 'silent') { renderSilentWalk(); return; }
+        if (def.type === 'abduct') { renderAbduction(def.n); return; }
+        if (def.type === 'rejoinpoint') { renderB330Rejoin(); return; }
         if (def.type === 'result') { renderDarkResult(); return; }
 
-        // 기믹
-        const fns = { 1: b330Gimmick1, 2: b330Gimmick2, 3: b330Gimmick3, 4: b330Gimmick4, 5: b330Gimmick5 };
+        const fns = { 1:b330Gimmick1, 2:b330Gimmick2, 3:b330Gimmick3, 4:b330Gimmick4, 5:b330Gimmick5, 6:b330Gimmick6, 7:b330Gimmick7 };
         if (fns[def.n]) fns[def.n]();
     }
-
         // --- 기믹 1: 세 갈래 ---
     function b330Gimmick1() {
         renderChoiceStep("기믹 1 — 세 갈래",
@@ -899,7 +907,7 @@ const DARK_ZONES = {
         if (ok) darkRun.success++; else darkRun.fail++;
         darkRun.log.push(`[기믹 2] ${pick}`);
         renderResultStep("기믹 2 — 결과", txt, "계속 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(6)" : "void 0");
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(7)" : "void 0");
     }
 
         // --- 기믹 3: 좁아지는 통로 (타이밍) ---
@@ -963,7 +971,7 @@ const DARK_ZONES = {
                     ok ? `마지막 한 번을 빠져나온다.<br><br>뒤에서 통로가 완전히 닫힌다. 소리가 나지 않는다.<br>돌아갈 길이 없어졌다는 뜻이다.`
                        : `몇 번 부딪혔다.<br>벽이 단단하지 않아서 다치지는 않았다.<br><br>다만 부딪힌 자리마다 옷에 뭔가 묻었다. 닦이지 않는다.`,
                     "계속 간다.",
-                    (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(8)" : "void 0");
+                    (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(10)" : "void 0");
             }, 1200);
         }
     }
@@ -1051,7 +1059,7 @@ const DARK_ZONES = {
         darkRun.modifier = (darkRun.modifier || 0) + mod;
         darkRun.log.push(`[기믹 4] ${pick === 'none' ? '지목 안 함' : '지목함'}`);
         renderResultStep("기믹 4 — 결과", txt, "계속 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(11)" : "void 0");
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(14)" : "void 0");
     }
 
     // --- 합류 지점 ---
@@ -1147,18 +1155,18 @@ const DARK_ZONES = {
     }
 
     // --- 기믹 5: 마지막 ---
-    function b330Gimmick5() {
+    function b330Gimmick7() {
         renderChoiceStep("기믹 5 — 잊히기",
             `바닥의 기울기가 급해진다.<br><br>벽에 붙은 안내판이 전부 떨어져 있다. 화살표도 없다.<br>대신 벽 전체에 같은 문장이 빼곡하다.<br><br><span style="color:#d4af37;">"즐거운 시간 되시기 바랍니다"</span><br><br>여기까지 온 사람이 몇이나 있었는지 모른다.<br>나가려면, 이것이 당신을 잊어야 한다.`,
             [
-                { id:'forget', label:'① 이름을 버린다. 사원증을 놓는다.', fn:'b330G5Roll', arg:'forget' },
-                { id:'still',  label:'② 움직이지 않는다. 숨도 쉬지 않는다.', fn:'b330G5Roll', arg:'still' },
-                { id:'shout',  label:'③ 소리를 지른다. 존재를 각인시킨다.', fn:'b330G5Roll', arg:'shout' },
-                { id:'walk',   label:'④ 그냥 걸어 나간다.', fn:'b330G5Roll', arg:'walk' }
+                { id:'forget', label:'① 이름을 버린다. 사원증을 놓는다.', fn:'b330G7Roll', arg:'forget' },
+                { id:'still',  label:'② 움직이지 않는다. 숨도 쉬지 않는다.', fn:'b330G7Roll', arg:'still' },
+                { id:'shout',  label:'③ 소리를 지른다. 존재를 각인시킨다.', fn:'b330G7Roll', arg:'shout' },
+                { id:'walk',   label:'④ 그냥 걸어 나간다.', fn:'b330G7Roll', arg:'walk' }
             ], "step4");
     }
 
-    function b330G5Roll(pick) {
+        function b330G7Roll(pick) {
         const roll = Math.floor(Math.random()*20) + 1;
         let bonus = rollDarkBonus();
         if (currentUser.darkMazeMap > 0) { bonus += 1; currentUser.darkMazeMap--; }
@@ -1191,16 +1199,22 @@ const DARK_ZONES = {
             txt = `벽이 선명해진다.<br><br>당신이 아주 또렷해졌다는 뜻이다.<br>이제 그것은 당신을 정확히 알고 있다.<br><br>다음에 그릴 때는 더 잘 그릴 것이다.`;
         }
 
-        darkRun.log.push(`[기믹 5] d20 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+        darkRun.log.push(`[기믹 7] d20 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+
+        // ★ 실패 누적이 많으면 실패도 치명적 (구제 가능)
+        if (outcome === 'fail' && (darkRun.fail || 0) >= 6) {
+            darkRun.dying = 'final';
+            renderRescueScene('final');
+            return;
+        }
 
         if (died) { darkDeath(txt); return; }
 
-        darkBodyEl().innerHTML = darkBox("기믹 5 — 판정",
+        darkBodyEl().innerHTML = darkBox("기믹 7 — 판정",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${outcome==='crit'?'#4CAF50':'#ffd700'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             darkChoiceBtn("빠져나간다.", "darkRun.step=99; renderDarkStep();"));
         mountDarkChat('normal');
     }
-
     function render119Interlude(role, n) {
         const data = C119_INTERLUDES[n];
         if (!data) return;
@@ -1924,4 +1938,360 @@ const DARK_ZONES = {
         }
         mountDarkChat('normal');
         sendPartyChat(`${c.name} 사원이 바닥 아래로 사라졌습니다.`, true);
+    }
+
+        // ==========================================
+    // ★ 강제 실종 (무작위 지목 + d20 저항)
+    // ==========================================
+    function renderAbduction(round) {
+        const body = darkBodyEl();
+        const key = `abduct${round}`;
+
+        // 방장이 대상을 정한다
+        if (darkRun.isLeader && database && !darkRun[`_${key}Set`]) {
+            darkRun[`_${key}Set`] = true;
+            const p = darkParties[darkRun.partyId];
+            const alive = p && p.alive ? Object.keys(p.alive).filter(c => !(p.solo || {})[c]) : [currentUser.code];
+            if (alive.length > 0) {
+                const target = alive[Math.floor(Math.random() * alive.length)];
+                database.ref(`darkParties/${darkRun.partyId}/${key}`).set({
+                    target: target,
+                    name: (p && p.members && p.members[target]) ? p.members[target].name : '누군가',
+                    at: Date.now()
+                });
+            }
+        }
+
+        if (!database) { partyAdvance(darkRun.step + 1); return; }
+
+        database.ref(`darkParties/${darkRun.partyId}/${key}`).on('value', (sn) => {
+            const a = sn.val();
+            if (!a || !darkRun) return;
+            if (darkRun[`_${key}Shown`]) return;
+            darkRun[`_${key}Shown`] = true;
+
+            const isMe = a.target === currentUser.code;
+            if (isMe) {
+                body.innerHTML = darkBox("—",
+                    `어깨에 무게가 걸린다.<br><br>손이다. 뒤에서. 일행은 전부 앞에 있다.<br>돌아볼 새도 없이 끌린다. 발이 바닥에서 뜬다.<br><br>버틸 수 있을까.`,
+                    darkChoiceBtn("버틴다.", `resistAbduction(${round})`));
+            } else {
+                body.innerHTML = darkBox("—",
+                    `<b style="color:#ff6b6b;">${a.name}</b> 사원이 뒤로 끌려간다.<br><br>비명은 없다. 소리를 낼 틈이 없었다.<br>손을 뻗기엔 이미 멀다.<br><br>기다리는 수밖에 없다.`,
+                    `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">상황을 지켜보는 중...</div>`);
+            }
+            mountDarkChat('normal');
+        });
+    }
+
+    function resistAbduction(round) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        let bonus = rollDarkBonus();
+        const total = roll + bonus;
+        const DC = 13;
+
+        let txt, taken = false;
+        if (roll === 1) {
+            taken = true;
+            txt = `버틸 틈도 없었다.<br>발이 완전히 떴고, 통로가 뒤로 흘러간다.<br><br>일행의 뒷모습이 점점 작아진다. 아무도 돌아보지 않았다.`;
+            applyPollutionToUser(currentUser, 8);
+        } else if (total >= DC) {
+            txt = `벽을 짚고 버틴다. 손톱이 벗겨진다.<br><br>어깨의 무게가 사라진다. 놓아준 게 아니라 흥미를 잃은 것 같다.<br><br>돌아보니 아무도 없다. 일행도 아직 앞에 있다.`;
+            darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+        } else {
+            taken = true;
+            txt = `버텨 보지만 소용없다.<br>바닥이 미끄럽다. 애초에 잡을 것이 없었다.<br><br>끌려간 자리에 신발 한 짝이 남았다.`;
+            applyPollutionToUser(currentUser, 5);
+        }
+
+        darkRun.log.push(`[실종 ${round}] d20 ${roll}(+${bonus}) vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+
+        if (taken) {
+            darkRun.solo = true;
+            darkRun.soloReason = 'abduct';
+            darkRun.fail++;
+            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
+                name: currentUser.name, at: Date.now(), step: darkRun.step
+            });
+            sendPartyChat(`${currentUser.name} 사원이 끌려갔습니다.`, true);
+        } else {
+            sendPartyChat(`${currentUser.name} 사원이 버텨 냈습니다.`, true);
+        }
+
+        darkBodyEl().innerHTML = darkBox("—",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${taken ? '#f44336' : '#4CAF50'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            taken
+                ? darkChoiceBtn("일어선다.", "renderSoloStep();")
+                : (darkRun.isLeader
+                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+        mountDarkChat('normal');
+    }
+
+        // ==========================================
+    // ★ 구제 — 죽기 직전 동료가 살릴 수 있다 (3종)
+    // ==========================================
+    const RESCUE_OPTIONS = [
+        {
+            id: 'hand',
+            label: '① 손을 뻗는다.',
+            warn: '실패하면 당신도 함께 끌려갑니다.',
+            desc: '가장 빠르지만 가장 위험하다.'
+        },
+        {
+            id: 'item',
+            label: '② 반입한 소모품을 던진다.',
+            warn: '소모품 1개를 잃습니다. 없으면 시도할 수 없습니다.',
+            desc: '확실하지만 대가가 있다.'
+        },
+        {
+            id: 'name',
+            label: '③ 이름을 부른다.',
+            warn: '미로가 당신을 기억하게 됩니다. 이후 판정이 불리해집니다.',
+            desc: '되돌릴 수는 있다. 대신 표적이 바뀐다.'
+        }
+    ];
+
+    function renderRescueScene(reason) {
+        if (!darkRun) return;
+
+        // 위험 상태를 파티에 알린다
+        if (darkRun.isParty && database) {
+            database.ref(`darkParties/${darkRun.partyId}/dying/${currentUser.code}`).set({
+                name: currentUser.name, reason: reason, at: Date.now()
+            });
+            sendPartyChat(`⚠ ${currentUser.name} 사원이 위험합니다.`, true);
+        }
+
+        const body = darkBodyEl();
+        const txt = reason === 'quiz'
+            ? `세 번째다.<br><br>기억나지 않는다는 것을 미로가 알아차렸다.<br>벽이 가까워진다. 아니, 당신이 옅어지고 있다.<br><br>손끝부터 윤곽이 흐려진다.`
+            : `힘이 빠진다.<br><br>여기까지인 것 같다.<br>통로가 멀어지고, 소리가 먼저 사라진다.`;
+
+        body.innerHTML = darkBox("위험", txt,
+            darkRun.isParty
+                ? `<div style="text-align:center; font-size:11px; color:#ff6b6b; padding:14px; background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:5px;">
+                       동료의 도움을 기다리는 중...<br>
+                       <span style="font-size:10px; color:#888;">아무도 손을 뻗지 않으면 사라집니다.</span>
+                   </div>
+                   <button class="game-btn" style="width:100%; margin:12px 0 0 0; padding:11px; font-size:11px;" onclick="giveUpDying()">기다리지 않는다.</button>`
+                : darkChoiceBtn("눈을 감는다.", "confirmDeath()"));
+        mountDarkChat('normal');
+
+        if (darkRun.isParty) startDyingTimer();
+    }
+
+    let dyingTimer = null;
+    function startDyingTimer() {
+        clearTimeout(dyingTimer);
+        dyingTimer = setTimeout(() => {
+            if (darkRun && darkRun.dying) confirmDeath();
+        }, 45000);
+    }
+
+    function giveUpDying() { confirmDeath(); }
+
+    function confirmDeath() {
+        clearTimeout(dyingTimer);
+        if (darkRun && darkRun.isParty && database) {
+            database.ref(`darkParties/${darkRun.partyId}/dying/${currentUser.code}`).remove();
+        }
+        darkDeath(`더 버티지 못했다.<br><br>미로는 당신을 아주 정확히 기억하게 되었다.`);
+    }
+
+    // --- 구조하는 쪽 화면 ---
+    function watchDyingMembers() {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        if (darkRun._dyingWatch) return;
+        darkRun._dyingWatch = true;
+
+        database.ref(`darkParties/${darkRun.partyId}/dying`).on('value', (sn) => {
+            if (!darkRun) return;
+            const list = sn.val() || {};
+            const others = Object.keys(list).filter(c => c !== currentUser.code);
+            if (others.length === 0) return;
+            if (darkRun._rescueShown) return;
+            darkRun._rescueShown = true;
+            renderRescuePrompt(list[others[0]], others[0]);
+        });
+    }
+
+    function renderRescuePrompt(info, code) {
+        const body = darkBodyEl();
+        const hasItem = (darkRun.carryItems || []).length > 0;
+
+        body.innerHTML = darkBox("구조",
+            `<b style="color:#ff6b6b;">${info.name}</b> 사원의 윤곽이 흐려지고 있다.<br><br>
+             이대로 두면 몇 초 안에 사라진다.<br>
+             손을 쓸 수 있는 방법이 셋 있고, 전부 대가가 있다.<br><br>
+             <span style="color:#ff9800; font-size:11px;">⚠ 선택하기 전에 경고를 읽으세요.</span>`,
+            RESCUE_OPTIONS.map(o => {
+                const locked = (o.id === 'item' && !hasItem);
+                return `
+                    <div style="border:1px solid ${locked ? '#333' : '#7f0000'}; border-radius:6px; padding:11px; margin-bottom:9px; ${locked ? 'opacity:0.4;' : ''}">
+                        <div style="font-size:12px; color:var(--theme-text); font-weight:bold;">${o.label}</div>
+                        <div style="font-size:10px; color:#888; margin:4px 0 6px 0;">${o.desc}</div>
+                        <div style="font-size:10px; color:#ff6b6b; margin-bottom:8px;">⚠ ${o.warn}</div>
+                        <button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;" onclick="attemptRescue('${o.id}','${code}')" ${locked ? 'disabled' : ''}>
+                            ${locked ? '소모품 없음' : '시도한다'}
+                        </button>
+                    </div>`;
+            }).join('') +
+            `<button class="game-btn" style="width:100%; margin:6px 0 0 0; padding:11px; font-size:11px;" onclick="abandonRescue('${code}')">보고만 있는다.</button>`);
+        mountDarkChat('normal');
+    }
+
+    function attemptRescue(kind, code) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        let bonus = rollDarkBonus();
+        let DC = { hand: 11, item: 8, name: 10 }[kind];
+        const total = roll + bonus;
+        const ok = (roll !== 1) && (total >= DC);
+
+        let txt = '';
+
+        if (kind === 'item') {
+            const used = darkRun.carryItems.shift();
+            darkRun.lostItems.push(used);
+            removeItemFromInventory(currentUser, used, 1);
+        }
+
+        if (ok) {
+            darkRun.success++;
+            if (kind === 'hand') txt = `손을 뻗는다. 잡힌다.<br><br>끌어당기는 순간 무게가 두 배로 느껴지다가, 갑자기 가벼워진다.<br>놓아준 것이다.<br><br>둘 다 바닥에 주저앉는다.`;
+            else if (kind === 'item') txt = `가지고 있던 것을 던진다.<br><br>그것이 바닥에 닿는 순간, 흐려지던 윤곽이 멈춘다.<br>미로가 잠시 다른 데 관심을 돌렸다.`;
+            else {
+                txt = `이름을 부른다. 또박또박.<br><br>부르는 순간 벽이 이쪽을 향한다.<br>사라지던 쪽이 선명해지고, 부른 쪽이 흐려진다.<br><br>교환된 것이다.`;
+                darkRun.modifier = (darkRun.modifier || 0) - 2;
+                darkRun.marked = true;
+            }
+            if (database) database.ref(`darkParties/${darkRun.partyId}/dying/${code}`).remove();
+            sendPartyChat(`${currentUser.name} 사원이 동료를 붙잡았습니다.`, true);
+        } else {
+            darkRun.fail++;
+            if (kind === 'hand') {
+                txt = `손을 뻗는다. 닿는다.<br><br>그런데 끌려가는 쪽이 더 세다.<br>발이 미끄러지고, 같이 딸려 들어간다.<br><br>둘 다 흐려지기 시작한다.`;
+                darkRun.dying = 'rescue';
+                applyPollutionToUser(currentUser, 10);
+                darkBodyEl().innerHTML = darkBox("구조 — 실패",
+                    `<div style="text-align:center; font-size:26px; font-weight:bold; color:#f44336; margin-bottom:12px;">🎲 ${roll}</div>${txt}`,
+                    darkChoiceBtn("놓지 않는다.", "renderRescueScene('rescue')"));
+                mountDarkChat('normal');
+                return;
+            }
+            else if (kind === 'item') txt = `던진 것이 허공에서 사라진다.<br><br>바닥에 닿지 않았다. 애초에 바닥이 없었는지도 모른다.<br><br>흐려지는 속도가 조금 빨라졌다.`;
+            else {
+                txt = `이름을 부른다.<br><br>벽이 이쪽을 향한다. 그런데 사라지던 쪽은 그대로다.<br>표적만 늘었다.`;
+                darkRun.modifier = (darkRun.modifier || 0) - 2;
+                darkRun.marked = true;
+            }
+            applyPollutionToUser(currentUser, 6);
+            sendPartyChat(`${currentUser.name} 사원의 시도가 빗나갔습니다.`, true);
+        }
+
+        darkRun.log.push(`[구조] ${kind} d20 ${roll} vs DC${DC} — ${ok ? '성공' : '실패'}`);
+        darkRun._rescueShown = false;
+
+        darkBodyEl().innerHTML = darkBox(ok ? "구조 — 성공" : "구조 — 실패",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            (darkRun.isLeader
+                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+        mountDarkChat('normal');
+    }
+
+    function abandonRescue(code) {
+        darkRun._rescueShown = false;
+        darkRun.log.push(`[구조] 시도하지 않음`);
+        sendPartyChat(`${currentUser.name} 사원은 움직이지 않았습니다.`, true);
+        darkBodyEl().innerHTML = darkBox("구조",
+            `움직이지 않는다.<br><br>흐려지는 쪽을 본다. 눈이 마주친다.<br>원망하는 눈은 아니었다. 그게 더 남는다.<br><br>완전히 사라질 때까지 3초쯤 걸렸다.`,
+            (darkRun.isLeader
+                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+        mountDarkChat('normal');
+    }
+
+        // --- 기믹 5: 벽이 좁혀온다 ---
+    function b330Gimmick7() {
+        renderChoiceStep("기믹 5 — 좁혀오는 벽",
+            `양쪽 벽이 동시에 움직인다.<br><br>아까처럼 주기적인 게 아니다. 멈추지 않고 계속 좁아진다.<br>앞쪽에 문이 하나 보이는데, 거기까지 거리가 애매하다.<br><br>벽에 눌린 자국들이 있다. 사람 모양이다. 여러 개다.`,
+            [
+                { id:'run',   label:'① 전력으로 달린다.',           fn:'b330G5R', arg:'run' },
+                { id:'brace', label:'② 벽을 밀어 버틴다.',           fn:'b330G5R', arg:'brace' },
+                { id:'crawl', label:'③ 바닥에 엎드려 기어간다.',     fn:'b330G5R', arg:'crawl' },
+                { id:'back',  label:'④ 뒤로 물러난다.',             fn:'b330G5R', arg:'back' }
+            ], null);
+    }
+
+    function b330G5R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        let bonus = rollDarkBonus();
+        const total = roll + bonus;
+        const DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
+
+        let txt, died = false;
+
+        if (roll === 1) {
+            died = true;
+            txt = `늦었다.<br><br>양쪽이 닿는다. 소리는 나지 않았다.<br>벽이 다시 열렸을 때, 자국이 하나 늘어 있었다.`;
+        } else if (total >= DC) {
+            darkRun.success++;
+            txt = pick === 'run' ? `달린다. 문턱을 넘는 순간 뒤에서 벽이 맞물린다.<br><br>발뒤꿈치가 스쳤다. 그걸로 끝이었다.`
+                : pick === 'brace' ? `벽을 민다. 밀린다. 실제로 밀린다.<br><br>버티는 동안 일행이 지나간다. 마지막으로 손을 놓고 빠져나온다.`
+                : pick === 'crawl' ? `엎드린다. 바닥 쪽이 덜 좁아진다.<br><br>기어서 빠져나온다. 옷이 찢어졌지만 몸은 무사하다.`
+                : `물러난다. 벽이 따라오지 않는다.<br><br>기다렸다가 다시 진입하니 통로가 원래대로다.<br>시간을 잃었을 뿐이다.`;
+        } else {
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 9);
+            txt = `가까스로 빠져나온다.<br><br>갈비뼈 쪽이 아프다. 숨을 깊게 쉬면 더 아프다.<br>뒤를 보니 벽이 완전히 맞물려 있다.`;
+            if ((darkRun.fail || 0) >= 5) {
+                darkRun.dying = 'wall';
+                darkRun.log.push(`[기믹 5] d20 ${roll} — 치명`);
+                renderRescueScene('wall');
+                return;
+            }
+        }
+
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
+
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${total>=DC?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            (darkRun.isLeader || !darkRun.isParty)
+                ? darkChoiceBtn("계속 간다.", "partyAdvance(18)")
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 6: 마지막 갈림 ---
+    function b330Gimmick6() {
+        renderChoiceStep("기믹 6 — 마지막 갈림",
+            `통로가 둘로 갈린다.<br><br>왼쪽에서는 바람이 나온다. 바깥 공기 같다.<br>오른쪽에서는 아무것도 나오지 않는다. 아무것도.<br><br>벽의 화살표가 처음으로 한 방향만 가리킨다.<br>오른쪽이다.<br><br>여태 화살표가 맞은 적이 한 번이라도 있었던가.`,
+            [
+                { id:'left',  label:'① 바람이 나오는 쪽으로.',        fn:'b330G6R', arg:'left' },
+                { id:'right', label:'② 화살표를 따른다.',             fn:'b330G6R', arg:'right' },
+                { id:'split', label:'③ 나눠서 간다.',                 fn:'b330G6R', arg:'split' }
+            ], null);
+    }
+
+    function b330G6R(pick) {
+        let txt, mod = 0;
+        if (pick === 'left') {
+            txt = `바람 쪽으로 간다.<br><br>가까워질수록 바람이 따뜻해진다. 바깥 공기가 이럴 리 없다.<br>안쪽에서 나오는 것이다.<br><br>그래도 계속 간다. 이제 와서 돌아갈 수도 없다.`;
+            mod = 1; darkRun.success++;
+        } else if (pick === 'right') {
+            txt = `화살표를 따른다.<br><br>한 번도 맞은 적 없던 것이, 마지막에만 맞을 이유가 있을까.<br>그런데 이번엔 맞았다.<br><br>통로 끝에 빛이 있다. 형광등은 아니다.`;
+            mod = 2; darkRun.success++;
+        } else {
+            txt = `나눠서 간다.<br><br>양쪽 다 확인하기로 한다. 합리적인 판단이다.<br><br>갈라진 순간 통로가 닫힌다. 양쪽 다.<br>다시 만났을 때는 아무도 어느 쪽으로 갔는지 기억하지 못했다.`;
+            mod = -2; darkRun.fail++;
+            applyPollutionToUser(currentUser, 7);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 6] ${pick}`);
+        renderResultStep("기믹 6 — 결과", txt, "끝으로 간다.",
+            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(21)" : "void 0");
     }
