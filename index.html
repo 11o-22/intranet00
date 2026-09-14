@@ -3390,6 +3390,21 @@ function getTodayStr() {
                 }
             }
         }
+
+        if (user.blindfoldUntil && now >= user.blindfoldUntil) {
+            user.blindfoldUntil = 0;
+            if (user.badge && user.badge.notes) {
+                let arr = user.badge.notes.split(' | ').filter(n =>
+                    n.trim() !== '' &&
+                    !n.includes('안대') &&
+                    !n.includes('해피 메이커') &&
+                    !n.includes('오염 동결')
+                );
+                user.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
+            }
+            addHistoryLog(user, `[효과 종료] 오염 동결 효과가 만료되었습니다.`);
+            changed = true;
+        }
         
         // 격리 해제 체크 및 낡은 문패 효과 적용
         if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
@@ -4584,13 +4599,16 @@ function getTodayStr() {
 
         let usedSuccessfully = applyItemEffect(currentUser, itemName, false);
 
-        if (usedSuccessfully) {
+            if (usedSuccessfully) {
             currentUser.noteGlowUntil = Date.now() + 5000;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[물품 사용] ${itemName} 소모`);
-            saveDB(); updateUI();
+            if (database) {
+                database.ref('users/' + currentUser.code).set(currentUser).then(() => updateUI());
+            } else {
+                saveDB(); updateUI();
+            }
         }
-    }
     function applyItemEffect(targetUser, itemName, isOthers = false) {
         const cat = ITEM_CATALOG[itemName];
         
