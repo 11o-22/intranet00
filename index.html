@@ -39,9 +39,8 @@
 </div>
 
     <!-- ★ 어둠 탐사 전용 화면 -->
-<div id="dark-run-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000; z-index:9999998; justify-content:center; align-items:flex-start; overflow:hidden;">
-    <div style="width:100%; max-width:450px; height:100vh; display:flex; flex-direction:column; background:#0a0a0a; box-shadow:0 0 60px rgba(127,0,0,0.25);">
-        <!-- 상단 바 -->
+<div id="dark-run-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100dvh; background:#000; z-index:9999998; justify-content:center; align-items:flex-start; overflow:hidden;">
+    <div style="width:100%; max-width:450px; height:100dvh; display:flex; flex-direction:column; background:#0a0a0a; box-shadow:0 0 60px rgba(127,0,0,0.25);">
         <div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border-bottom:1px solid #2a2a2a; background:#0d0d0d;">
             <div style="font-family:monospace; font-size:11px; color:#ff6b6b; font-weight:bold;" id="dro-code">Qtrew-???</div>
             <div style="display:flex; gap:7px; align-items:center;">
@@ -49,10 +48,8 @@
                 <button id="dark-mute-btn" onclick="toggleDarkMute()" style="background:none; border:1px solid #333; color:#888; font-size:12px; padding:4px 8px; border-radius:4px; cursor:pointer;">🔊</button>
             </div>
         </div>
-        <!-- 본문 -->
-        <div id="dro-body" style="flex:1; overflow-y:auto; padding:14px; -webkit-overflow-scrolling:touch;"></div>
-        <!-- 채팅 고정 영역 -->
-        <div id="dro-chat" style="flex-shrink:0; border-top:1px solid #2a2a2a; background:#0d0d0d;"></div>
+        <div id="dro-body" style="flex:1; overflow-y:auto; padding:14px; -webkit-overflow-scrolling:touch; min-height:0;"></div>
+        <div id="dro-chat" style="flex-shrink:0; border-top:1px solid #2a2a2a; background:#0d0d0d; max-height:52dvh; overflow-y:auto;"></div>
     </div>
 </div>
 <!-- 여우 상담실 비밀 방 오버레이 -->
@@ -5594,8 +5591,18 @@ function getTodayStr() {
                 }
             }
         });
+                // ★ 완료/거절/취소/만료된 거래는 목록에서 제거 (최근 5건만 보관)
+        const done = db.p2pDeals.filter(d => d.status !== 'PENDING');
+        if (done.length > 5) {
+            const keep = done.slice(0, 5);
+            db.p2pDeals = db.p2pDeals.filter(d => d.status === 'PENDING' || keep.includes(d));
+            changed = true;
+        }
+
         if (changed) saveDB();
+
     }
+    
     function toggleP2PDealMode() {
         const mode = document.getElementById('p2p-deal-mode').value;
         document.getElementById('p2p-demand-wrapper').style.display = (mode === 'trade') ? 'block' : 'none';
@@ -5898,7 +5905,7 @@ function getTodayStr() {
         let updates = {};
         updates[`users/${currentUser.code}`] = currentUser;
         updates[`users/${senderCode}`] = sender;
-        updates['p2pDeals'] = db.p2pDeals;
+        updates[`p2pDeals/${dealIndex}/status`] = 'COMPLETED';
 
         database.ref('/').update(updates).then(() => {
             showCustomAlert("거래가 성공적으로 체결되었습니다.");
@@ -5933,9 +5940,10 @@ function getTodayStr() {
         db.p2pDeals[dealIndex] = deal;
 
         // ★ Firebase 경로 직접 업데이트
-        if (database) {
-            database.ref('p2pDeals').set(db.p2pDeals);
-            database.ref('users').set(db.users);
+                if (database) {
+            database.ref(`p2pDeals/${dealIndex}/status`).set('REJECTED');
+            if (sender) database.ref('users/' + deal.fromCode).set(sender);
+            database.ref('users/' + currentUser.code).set(currentUser);
         } else {
             saveDB();
         }
@@ -5957,9 +5965,9 @@ function getTodayStr() {
         db.p2pDeals[dealIndex] = deal;
 
         // ★ Firebase 경로 직접 업데이트
-        if (database) {
-            database.ref('p2pDeals').set(db.p2pDeals);
-            database.ref('users').set(db.users);
+                if (database) {
+            database.ref(`p2pDeals/${dealIndex}/status`).set('CANCELLED');
+            database.ref('users/' + currentUser.code).set(currentUser);
         } else {
             saveDB();
         }
