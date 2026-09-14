@@ -1297,11 +1297,15 @@ function getTodayStr() {
             rerollUsed: !!darkRun.rerollUsed,
             lostItems: darkRun.lostItems || [],
             log: darkRun.log || [],
+            isLeader: !!darkRun.isLeader,
+            memberCount: darkRun.memberCount || 1,
+            counted: !!darkRun.counted,
             partyId: darkRun.partyId || null,
             isParty: !!darkRun.isParty,
             isLeader: !!darkRun.isLeader,
             counted: !!darkRun.counted,
             savedAt: Date.now()
+            
         };
         database.ref('darkRuns/' + currentUser.code).set(snap);
     }
@@ -1382,6 +1386,7 @@ function getTodayStr() {
             carryEquips: s.carryEquips || [], carryItems: s.carryItems || [],
             rerollUsed: s.rerollUsed, lostItems: s.lostItems || [], log: s.log || [],
             partyId: s.partyId, isParty: s.isParty, isLeader: s.isLeader,
+            memberCount: s.memberCount || 1,
             counted: s.counted !== false,
             rejoined: true
         };
@@ -1565,7 +1570,7 @@ function getTodayStr() {
     }
 
     // 해당 구역에 이미 방이 있거나 탐사 중인지
-            function isZoneTaken(zoneCode) {
+              function isZoneTaken(zoneCode) {
         const oc = getZoneOccupant(zoneCode);
         if (oc) {
             const iAmIn = (oc.leaderCode === currentUser.code)
@@ -1577,7 +1582,6 @@ function getTodayStr() {
             if (!p || p.zone !== zoneCode) continue;
             if (p.members && p.members[currentUser.code]) continue;
 
-            // ★ 출발한 방인데 생존자가 없으면 죽은 방으로 간주하고 청소
             if (p.state === 'RUNNING') {
                 const aliveCount = p.alive ? Object.keys(p.alive).length : 0;
                 if (aliveCount === 0) {
@@ -1725,6 +1729,7 @@ function getTodayStr() {
             carryEquips: me.equips || [], carryItems: me.items || [],
             rerollUsed: false, lostItems: [], log: [],
             partyId: party.id, isParty: true, isLeader: party.leader === currentUser.code,
+            memberCount: Object.keys(party.members).length,
             counted: true
         };
 
@@ -1859,9 +1864,14 @@ function getTodayStr() {
             .set({ opt: optId, name: currentUser.name, at: Date.now() });
     }
 
-    function getPartyMemberCount() {
+       function getPartyMemberCount() {
+        if (!darkRun) return 1;
         const p = darkParties[darkRun.partyId];
-        return p && p.members ? Object.keys(p.members).length : 1;
+        if (p && p.alive && Object.keys(p.alive).length > 0) {
+            return Object.keys(p.alive).length;
+        }
+        if (p && p.members) return Object.keys(p.members).length;
+        return darkRun.memberCount || 1;
     }
 
     function startVoteTick() {

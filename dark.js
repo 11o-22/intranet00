@@ -2,19 +2,14 @@ const DARK_ZONES = {
         "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[300,500], ready:false },
         "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[200,300], ready:false },
         "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[200,300], ready:false },
-                "Qtrew-B-330": {
+                      "Qtrew-B-330": {
             code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자",
             brief:"(함정 조심!)",
-            danger:"중상", survival:"12%", min:2, max:4, reward:[100,200], ready:true,
+            danger:"중상", survival:"12%", min:2, max:4, reward:[180,320], ready:true,
             voteMode:true, soloFrom:3, soloTo:6,
             intro:"안내 방송이 나오고 있다.<br><br><span style=\"color:#d4af37;\">\"미로 탈출 게임에 참가해 주셔서 감사합니다. 제한 시간은 없습니다. 함정을 조심하세요. 즐거운 시간 되시기 바랍니다.\"</span><br><br>목소리가 명랑하다. 같은 문장을 세 번 반복하는데, 세 번 다 억양이 똑같다.<br><br>벽에 안내판이 붙어 있다. 글씨가 흐릿하다.<br>누군가 미로를 대충 알고 있는 사람이 그린 것 같다.",
             outro:"이름이 기억나지 않는다.<br><br>그게 다행이라는 것만 안다.<br>벽이 멀어지고, 안내 방송이 잦아들고, 화살표가 전부 같은 방향을 가리킨다.<br>처음으로 일치했다.<br><br>눈을 뜨니 복도다. 사원증에 적힌 이름을 한참 들여다봤다.",
-            images: {
-                intro: "maze_1.jpg",
-                step1: "maze_2.jpg",
-                step2: "maze_3.jpg",
-                step3: "maze_4.jpg"
-            }
+            images: { intro:"maze_1.jpg", step1:"maze_2.jpg", step2:"maze_3.jpg", step3:"maze_4.jpg" }
         },
         "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[100,200], ready:false },
         "Qtrew-C-119": {
@@ -1753,3 +1748,180 @@ const DARK_ZONES = {
         dark087Roll(pick);
     }
     
+    // ==========================================
+    // ★ 기억 퀴즈 (단답형)
+    // ==========================================
+    const B330_QUIZ = {
+        1: {
+            q: `벽에 붙어 있던 근무 수칙은 모두 몇 조였는가?`,
+            hint: `숫자로 입력`,
+            answers: ['4', '4조', '사', '네', '넷']
+        },
+        2: {
+            q: `벽에 세어놓은 작대기 자국은 몇 묶음이었는가?`,
+            hint: `숫자로 입력`,
+            answers: ['6', '6묶음', '여섯', '육']
+        },
+        3: {
+            q: `안내판 뒷면에 눌러 쓴 글씨는 무엇이었는가?`,
+            hint: `세 글자`,
+            answers: ['세지마라', '세지마', '세지말것', '세지마시오']
+        }
+    };
+
+    // 느슨한 정답 비교 (공백·문장부호·대소문자 무시)
+    function normalizeAnswer(s) {
+        return String(s || '')
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/[.,!?~'"·\-_]/g, '')
+            .trim();
+    }
+
+    function checkQuizAnswer(input, answers) {
+        const v = normalizeAnswer(input);
+        if (!v) return false;
+        return answers.some(a => normalizeAnswer(a) === v);
+    }
+
+    function renderQuizStep(n) {
+        const body = darkBodyEl();
+        const data = B330_QUIZ[n];
+        if (!data) { partyAdvance(darkRun.step + 1); return; }
+
+        const done = darkRun[`quiz${n}Done`];
+        if (done) {
+            body.innerHTML = darkBox("기억",
+                `${data.q}<br><br><span style="color:${done === 'ok' ? '#4CAF50' : '#f44336'};">${done === 'ok' ? '기억하고 있었다.' : '기억나지 않았다.'}</span>`,
+                (darkRun.isLeader
+                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+            mountDarkChat('normal');
+            return;
+        }
+
+        body.innerHTML = darkBox("기억",
+            `걸음이 멎는다.<br><br>벽이 앞을 막았다. 막다른 길은 아닌데, 더 갈 수가 없다.<br>벽에 글자가 떠오른다. 손으로 쓴 것처럼 한 획씩.<br><br><span style="color:#d4af37; font-size:13px;">${data.q}</span><br><br>
+             <span style="font-size:11px; color:#888;">각자 답을 적어야 한다. 틀린 사람만 대가를 치른다.<br>오답이 세 번 쌓이면 미로가 당신을 잊는다.</span>`,
+            `<div style="margin-bottom:10px;">
+                <input type="text" id="quiz-input" maxlength="30" placeholder="${data.hint}"
+                    style="width:100%; padding:12px; font-size:14px; text-align:center; box-sizing:border-box;"
+                    onkeypress="if(event.key==='Enter') submitQuiz(${n})">
+             </div>
+             <button class="game-btn" style="width:100%; margin:0; padding:13px;" onclick="submitQuiz(${n})">적어 낸다</button>
+             <div style="text-align:center; font-size:10px; color:#666; margin-top:9px;">
+                누적 오답 <b style="color:${(darkRun.quizWrong||0) >= 2 ? '#ff6b6b' : '#888'};">${darkRun.quizWrong || 0}</b> / 3
+             </div>`);
+        mountDarkChat('normal');
+    }
+
+    function submitQuiz(n) {
+        const el = document.getElementById('quiz-input');
+        if (!el) return;
+        const val = el.value.trim();
+        if (!val) { showCustomAlert('답을 적어 주세요.'); return; }
+
+        const data = B330_QUIZ[n];
+        const ok = checkQuizAnswer(val, data.answers);
+
+        if (ok) {
+            darkRun[`quiz${n}Done`] = 'ok';
+            darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+            darkRun.log.push(`[퀴즈 ${n}] 정답`);
+            sendPartyChat(`${currentUser.name} 사원이 기억해 냈습니다.`, true);
+        } else {
+            darkRun[`quiz${n}Done`] = 'no';
+            darkRun.fail++;
+            darkRun.quizWrong = (darkRun.quizWrong || 0) + 1;
+            applyPollutionToUser(currentUser, 6);
+            darkRun.log.push(`[퀴즈 ${n}] 오답 (${val})`);
+            sendPartyChat(`${currentUser.name} 사원이 답하지 못했습니다.`, true);
+
+            if (darkRun.quizWrong >= 3) {
+                darkRun.dying = 'quiz';
+                renderRescueScene('quiz');
+                return;
+            }
+        }
+        renderQuizStep(n);
+    }
+
+        // ==========================================
+    // ★ 침묵 구간 — 바닥이 꺼진다
+    // ==========================================
+    function renderSilentWalk() {
+        const body = darkBodyEl();
+        body.innerHTML = darkBox("—",
+            `<div id="silent-dots" style="text-align:center; font-size:26px; color:#444; letter-spacing:10px; padding:40px 0; min-height:120px;">…</div>`,
+            `<div id="silent-btn" style="opacity:0; transition:opacity 0.4s;"></div>`);
+        mountDarkChat('normal');
+
+        const dots = document.getElementById('silent-dots');
+        const seq = ['…', '… …', '… … …', '… … … …', '… … … … …'];
+        let i = 0;
+        const t = setInterval(() => {
+            if (!darkRun || !document.getElementById('silent-dots')) { clearInterval(t); return; }
+            i++;
+            if (i < seq.length) {
+                dots.innerText = seq[i];
+            } else {
+                clearInterval(t);
+                triggerFloorCollapse();
+            }
+        }, 2200);
+    }
+
+    function triggerFloorCollapse() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+
+        // 방장이 희생자를 정한다
+        if (darkRun.isLeader && database) {
+            const p = darkParties[darkRun.partyId];
+            const alive = p && p.alive ? Object.keys(p.alive) : [currentUser.code];
+            const victim = alive[Math.floor(Math.random() * alive.length)];
+            database.ref(`darkParties/${darkRun.partyId}/collapse`).set({
+                victim: victim,
+                name: (p && p.members && p.members[victim]) ? p.members[victim].name : '누군가',
+                at: Date.now()
+            });
+        }
+
+        // 결과 대기
+        if (database) {
+            database.ref(`darkParties/${darkRun.partyId}/collapse`).once('value').then(sn => {
+                const c = sn.val();
+                setTimeout(() => showCollapseResult(c), 700);
+            });
+        }
+
+        body.innerHTML = darkBox("—",
+            `<div style="text-align:center; font-size:26px; color:#666; letter-spacing:10px; padding:40px 0;">… … … … …</div>`,
+            `<div style="text-align:center; font-size:11px; color:#555;">발소리만 계속된다.</div>`);
+    }
+
+    function showCollapseResult(c) {
+        if (!c || !darkRun) return;
+        const isMe = c.victim === currentUser.code;
+        const body = darkBodyEl();
+
+        if (isMe) {
+            darkRun.solo = true;
+            darkRun.soloReason = 'collapse';
+            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
+                name: currentUser.name, at: Date.now(), step: darkRun.step
+            });
+            body.innerHTML = darkBox("추락",
+                `바닥이 없다.<br><br>디딜 자리가 있다고 생각한 곳에 아무것도 없었다.<br>떨어지는 동안 위를 본다. 네모난 구멍이 빠르게 작아진다.<br>일행의 얼굴이 잠깐 보였다가 사라진다.<br><br>등부터 닿는다. 숨이 멎었다가 돌아온다.<br>아프긴 한데, 죽을 정도는 아니다.<br><br>혼자다.`,
+                darkChoiceBtn("일어선다.", "renderSoloStep();"));
+        } else {
+            body.innerHTML = darkBox("추락",
+                `<b style="color:#ff6b6b;">${c.name}</b> 사원이 사라졌다.<br><br>소리도 없었다. 옆에 있다가 그냥 없어졌다.<br>돌아보니 바닥에 네모난 구멍이 있다.<br>아래는 보이지 않는다.<br><br>부르면 대답이 올 것 같지만, 부르지 않기로 한다.<br>여기서 소리를 내면 안 된다는 걸 다들 알고 있다.`,
+                (darkRun.isLeader
+                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+        }
+        mountDarkChat('normal');
+        sendPartyChat(`${c.name} 사원이 바닥 아래로 사라졌습니다.`, true);
+    }
