@@ -3482,16 +3482,17 @@ function getTodayStr() {
 
         // ★ 3시간당 오염도 3% 증가 핵심 로직
         if (diffMs >= threeHoursMs && user.pollution < 100 && user.quarantineUntil === 0) {
-            const steps = Math.floor(diffMs / threeHoursMs);
+            let steps = Math.floor(diffMs / threeHoursMs);
+            if (steps > 8) steps = 8;              // ★ 한 번에 최대 24% 까지만
             if (!isBlindfolded(user)) {
-                let baseInc = steps * 3; // 3시간마다 3씩
-                let finalInc = Math.round(baseInc * getPollutionMultiplier(user)); // 방어막 적용
+                let baseInc = steps * 3;
+                let finalInc = Math.round(baseInc * getPollutionMultiplier(user));
                 if (finalInc > 0) {
                     user.pollution = Math.min(100, user.pollution + finalInc);
                     changed = true;
                 }
             }
-            user.lastPollutionTime += steps * threeHoursMs;
+            user.lastPollutionTime = now;          // ★ 항상 현재 시각으로 리셋
             changed = true;
         }
 
@@ -5292,7 +5293,7 @@ function getTodayStr() {
         let listHtml = '';
         for (let code in onlineUsersMap) {
             let u = db.users[code];
-            if (u && code !== 'kario0987') {
+            if (u && code !== 'kario0987' && (u.hasVIP || u.code === 'kario0987')) {
                 if (code !== currentUser.code) {
                     opts += `<option value="${code}">[🟢 접속중] ${u.name} (사번: ${u.no})</option>`;
                 }
@@ -5319,8 +5320,13 @@ function getTodayStr() {
         const bet = parseInt(document.getElementById('vip-bet-input').value);
 
         if (!oppCode) { showCustomAlert('초대할 사원을 선택해주세요.'); return; }
-        const opponent = db.users[oppCode];
+
+                const opponent = db.users[oppCode];
         if (!opponent || !onlineUsersMap[oppCode]) { showCustomAlert('해당 사원이 현재 접속 중이지 않습니다.'); return; }
+        if (!opponent.hasVIP && opponent.code !== 'kario0987') {
+            showCustomAlert(`${opponent.name} 사원은 VIP 인가가 없어 대전을 신청할 수 없습니다.`);
+            return;
+        }
         if (isNaN(bet) || bet < 100) { showCustomAlert('VIP 라운지의 최소 베팅 포인트는 100 P 입니다.'); return; }
         if (currentUser.points < bet) { showLuxuryAlert(); return; }
         if (opponent.points < bet) { showCustomAlert(`상대방(${opponent.name})의 포인트가 부족하여 신청할 수 없습니다.`); return; }
@@ -5342,8 +5348,14 @@ function getTodayStr() {
     }
     function closeVipInviteModal() { document.getElementById('vip-invite-overlay').style.display = 'none'; }
 
-    function acceptVipInvite() {
+        function acceptVipInvite() {
+        if (!currentUser.hasVIP && currentUser.code !== 'kario0987') {
+            showCustomAlert('VIP 인가가 없어 대전에 참여할 수 없습니다.');
+            rejectVipInvite();
+            return;
+        }
         if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 대전을 수락할 수 없습니다.'); rejectVipInvite(); return; }
+
         const inv = Object.values(db.vipInvites).find(i => i.to === currentUser.code);
         if (!inv) { closeVipInviteModal(); return; }
         if (currentUser.points < inv.bet) { showCustomAlert("포인트가 부족하여 수락할 수 없습니다."); delete db.vipInvites[inv.id]; saveDB(); closeVipInviteModal(); return; }
@@ -5363,8 +5375,15 @@ function getTodayStr() {
     }
 
     function checkVipMultiplayerState() {
-        if (db.vipInvites) {
+                if (db.vipInvites) {
             let myInvite = Object.values(db.vipInvites).find(inv => inv.to === currentUser.code);
+
+            // ★ VIP 인가가 없으면 초대 자동 파기
+            if (myInvite && !currentUser.hasVIP && currentUser.code !== 'kario0987') {
+                if (database) database.ref('vipInvites/' + myInvite.id).remove();
+                myInvite = null;
+            }
+
             if (myInvite && currentInviteId !== myInvite.id) {
                 currentInviteId = myInvite.id; showVipInviteModal(myInvite);
             } else if (!myInvite && currentInviteId) {
@@ -6977,32 +6996,37 @@ function getTodayStr() {
     // ==========================================
     // ★ 우주 쇼핑몰 4시간 쿨타임 실시간 타이머 갱신
     // ==========================================
-    setInterval(() => {
-        const timerEl = document.getElementById('alien-cooldown-timer');
-        if (!timerEl || !currentUser || currentUser.code === 'kario0987') {
-            if (timerEl) timerEl.style.display = 'none';
-            return;
+       setInterval(() => {
+        if (!activeVipSessionId || !db.vipSessions || !db.vipSessions[activeVipSessionId]) return;
+        let session = db.vipSessions[activeVipSessionId];
+        if (session.state !== 'WAITING') return;
+
+        let remaining = Math.max(0, Math.ceil((session.endTime - Date.now()) / 1000));
+        const tEl = document.getElementById('vip-game-timer');
+        if (tEl) tEl.innerText = remaining;
+
+        if (remaining <= 0 && !myChoiceSubmitted) {
+            submitVipChoice(generateRandomChoice(session.game));
         }
 
-        const now = Date.now();
-        const fourHoursMs = 4 * 60 * 60 * 1000;
-
-        // 첫 번째 시도를 했고, 4시간이 지나지 않았을 때만 타이머 가동
-        if (currentUser.alienTries === 1 && currentUser.lastAlienPlayTime) {
-            const elapsed = now - currentUser.lastAlienPlayTime;
-            if (elapsed < fourHoursMs) {
-                const remainMs = fourHoursMs - elapsed;
-                const remainHours = Math.floor(remainMs / (1000 * 60 * 60));
-                const remainMins = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
-                const remainSecs = Math.floor((remainMs % (1000 * 60)) / 1000);
-
-                timerEl.innerText = `⏳ 다음 주파수 연결까지 남은 시간: ${String(remainHours).padStart(2,'0')}:${String(remainMins).padStart(2,'0')}:${String(remainSecs).padStart(2,'0')}`;
-                timerEl.style.display = 'block';
-                return;
+        // ★ P1이 판정을 책임진다
+        const isP1 = session.p1 === currentUser.code;
+        if (isP1 && Date.now() > session.endTime + 1500) {
+            let upd = {};
+            if (session.p1Choice == null) {
+                session.p1Choice = generateRandomChoice(session.game);
+                upd.p1Choice = session.p1Choice;
             }
+            if (session.p2Choice == null) {
+                session.p2Choice = generateRandomChoice(session.game);
+                upd.p2Choice = session.p2Choice;
+            }
+            if (Object.keys(upd).length && database) {
+                database.ref('vipSessions/' + session.id).update(upd);
+            }
+            evaluateVipMultiResult(session);
         }
-        timerEl.style.display = 'none';
-    }, 1000);
+    }, 500);
 
  
     </script>
