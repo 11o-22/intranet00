@@ -6941,10 +6941,14 @@ function getTodayStr() {
     closeVipGameOverlay = function() { _closeVipGameOverlay(); popModal('vip-game-overlay'); };
 
     // --- 3. 기기 [뒤로가기] 버튼 감지 (popstate 이벤트) ---
-         window.addEventListener('popstate', function(e) {
-        // ★ 탐사 중에는 뒤로가기 차단
+           let _lastPushBlock = 0;
+    window.addEventListener('popstate', function(e) {
         if (darkRun) {
-            history.pushState({ darkrun: true }, "", "");
+            const now = Date.now();
+            if (now - _lastPushBlock > 400) {
+                _lastPushBlock = now;
+                history.pushState({ darkrun: true }, "", "");
+            }
             return;
         }
 
