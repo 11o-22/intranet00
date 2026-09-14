@@ -1565,7 +1565,7 @@ function getTodayStr() {
     }
 
     // 해당 구역에 이미 방이 있거나 탐사 중인지
-        function isZoneTaken(zoneCode) {
+            function isZoneTaken(zoneCode) {
         const oc = getZoneOccupant(zoneCode);
         if (oc) {
             const iAmIn = (oc.leaderCode === currentUser.code)
@@ -1575,10 +1575,23 @@ function getTodayStr() {
         for (let pid in darkParties) {
             const p = darkParties[pid];
             if (!p || p.zone !== zoneCode) continue;
-            if (p.members && p.members[currentUser.code]) continue;  // 내가 속한 방은 제외
-            const age = Date.now() - (p.createdAt || 0);
-            if (p.state === 'RECRUIT' && age < PARTY_TIMEOUT) return true;
-            if (p.state === 'RUNNING' && Date.now() - (p.startedAt || p.createdAt || 0) < DARK_OCCUPY_TIMEOUT) return true;
+            if (p.members && p.members[currentUser.code]) continue;
+
+            // ★ 출발한 방인데 생존자가 없으면 죽은 방으로 간주하고 청소
+            if (p.state === 'RUNNING') {
+                const aliveCount = p.alive ? Object.keys(p.alive).length : 0;
+                if (aliveCount === 0) {
+                    if (database) {
+                        database.ref('darkParties/' + pid).remove();
+                        database.ref('darkOccupancy/' + zoneCode).remove();
+                    }
+                    continue;
+                }
+                if (Date.now() - (p.startedAt || p.createdAt || 0) < DARK_OCCUPY_TIMEOUT) return true;
+                continue;
+            }
+
+            if (p.state === 'RECRUIT' && Date.now() - (p.createdAt || 0) < PARTY_TIMEOUT) return true;
         }
         return false;
     }
@@ -1740,16 +1753,37 @@ function getTodayStr() {
     }
 
     // 만료된 방 자동 청소
-    setInterval(() => {
+        setInterval(() => {
         if (!database || !currentUser) return;
         for (let pid in darkParties) {
             const p = darkParties[pid];
             if (!p) continue;
-            if (p.state === 'RECRUIT' && Date.now() - p.createdAt > PARTY_TIMEOUT) {
+
+            // 모집 중인데 30분 경과
+            if (p.state === 'RECRUIT' && Date.now() - (p.createdAt || 0) > PARTY_TIMEOUT) {
                 database.ref('darkParties/' + pid).remove();
+                continue;
             }
-            if (p.state === 'RUNNING' && Date.now() - (p.startedAt || p.createdAt || 0) > DARK_OCCUPY_TIMEOUT) {
-                database.ref('darkParties/' + pid).remove();
+
+            if (p.state === 'RUNNING') {
+                const aliveCount = p.alive ? Object.keys(p.alive).length : 0;
+                const startedAgo = Date.now() - (p.startedAt || p.createdAt || 0);
+
+                // ★ 출발 1분 뒤에도 생존자가 없으면 전원 이탈로 간주
+                if (aliveCount === 0 && startedAgo > 60000) {
+                    database.ref('darkParties/' + pid).remove();
+                    database.ref('darkChats/' + pid).remove();
+                    database.ref('darkVotes/' + pid).remove();
+                    database.ref('darkC119/' + pid).remove();
+                    if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
+                    continue;
+                }
+
+                // 3시간 경과
+                if (startedAgo > DARK_OCCUPY_TIMEOUT) {
+                    database.ref('darkParties/' + pid).remove();
+                    if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
+                }
             }
         }
     }, 60000);
@@ -3204,8 +3238,17 @@ function getTodayStr() {
             </div>` +
             darkChoiceBtn("단말로 복귀한다.", "finishDarkRun()"));
 
-        showPointGainEffect(total);
+                showPointGainEffect(total);
         releaseZone(darkRun.zone);
+
+        // ★ 탐사 종료 시 파티 방을 즉시 해산 (구역 재입장 가능하게)
+        if (darkRun.partyId && database) {
+            database.ref('darkParties/' + darkRun.partyId).remove();
+            database.ref('darkOccupancy/' + darkRun.zone).remove();
+            database.ref('darkVotes/' + darkRun.partyId).remove();
+            database.ref('darkC119/' + darkRun.partyId).remove();
+        }
+
         darkRun = null;
         saveDB();
     }
@@ -3221,26 +3264,15 @@ function getTodayStr() {
         const zone = darkRun ? darkRun.zone : null;
 
         if (zone) releaseZone(zone);
-
         if (pid && database) {
-            // 내 멤버 기록 제거
-            database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
-            database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
-
-            // 마지막 한 명이면 방과 부속 데이터 전부 삭제
-            database.ref(`darkParties/${pid}/members`).once('value').then(snap => {
-                const left = snap.val();
-                if (!left || Object.keys(left).length === 0) {
-                    database.ref('darkParties/' + pid).remove();
-                    database.ref('darkChats/' + pid).remove();
-                    database.ref('darkVotes/' + pid).remove();
-                    database.ref('darkC119/' + pid).remove();
-                }
-            });
+            database.ref('darkParties/' + pid).remove();
+            database.ref('darkChats/' + pid).remove();
+            database.ref('darkVotes/' + pid).remove();
+            database.ref('darkC119/' + pid).remove();
         }
 
-        detachChatListener();
         clearDarkRunState();
+        detachChatListener();
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
@@ -6465,6 +6497,8 @@ function getTodayStr() {
             showCustomAlert(`사번 ${targetNo}의 오염도가 0%로 정화되었습니다.`);
         }
 
+        targetUser._adminStamp = Date.now();
+
         // ★ Firebase에 직접 강제 푸시
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
@@ -6576,6 +6610,8 @@ function getTodayStr() {
             ? `[당국 개입] 상담사에 의해 퇴원 및 완전 정화 처리되었습니다.`
             : `[당국 개입] 상담사에 의해 조기 퇴원 처리되었습니다. (오염도 ${u.pollution}%)`);
 
+            u._adminStamp = Date.now();
+
         if (database) {
             database.ref('users/' + code).set(u).then(() => {
                 renderAdminFoxRoom();
@@ -6604,6 +6640,8 @@ function getTodayStr() {
         const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
 
         addHistoryLog(u, `[당국 개입] 격리 시간이 ${hours}시간 단축되었습니다.`);
+
+        u._adminStamp = Date.now(); 
 
         if (database) {
             database.ref('users/' + code).set(u).then(() => {
@@ -6713,6 +6751,8 @@ function getTodayStr() {
 
         addHistoryLog(targetUser, `[당국 개입] 보급품 '${itemName}' ${qty}개가 인벤토리에 지급되었습니다.`);
 
+        targetUser._adminStamp = Date.now(); 
+
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
                 showCustomAlert(`사번 ${targetNo} (${targetUser.name})에게 ${itemName} ${qty}개를 지급했습니다.`);
@@ -6763,6 +6803,8 @@ function getTodayStr() {
         removeItemFromInventory(t, itemName, removeQty);
         addHistoryLog(t, `[당국 압수] '${itemName}' ${removeQty}개가 소지품에서 회수되었습니다.`);
 
+         t._adminStamp = Date.now();
+
         if (database) {
             database.ref('users/' + targetCode).set(t).then(() => {
                 showCustomAlert(`사번 ${targetNo} (${t.name})에게서 ${itemName} ${removeQty}개를 압수했습니다.`);
@@ -6801,6 +6843,8 @@ function getTodayStr() {
         targetUser.equippedWeapons = [];
         addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
 
+        targetUser._adminStamp = Date.now();
+
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
                 showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
@@ -6823,6 +6867,8 @@ function getTodayStr() {
         targetUser.badge.notes = "특이사항 없음";
         
         addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 특이사항(상태)이 모두 지워졌습니다.`);
+
+        targetUser._adminStamp = Date.now();
 
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
@@ -6849,6 +6895,8 @@ function getTodayStr() {
         targetUser.masterName = null;
         
         addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 시스템적 상태이상이 소거되었습니다.`);
+
+        targetUser._adminStamp = Date.now();
 
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
