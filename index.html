@@ -2637,8 +2637,9 @@ function getTodayStr() {
 
         if (darkRun) { renderDarkStep(); return; }
 
-        if (currentUser.darkDate !== getTodayStr()) {
-            currentUser.darkDate = getTodayStr();
+                // ★ 어둠 탐사 횟수 자정 초기화
+        if (currentUser.darkDate !== currentToday) {
+            currentUser.darkDate = currentToday;
             currentUser.darkTries = 0;
             saveDB();
         }
