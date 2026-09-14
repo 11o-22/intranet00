@@ -733,7 +733,12 @@
             <h4 style="color: #4CAF50;">당국 특수 개입 (아이템 지급 및 상태 제어)</h4>
             <div style="font-size:12px; margin-bottom:10px; display:flex; gap:8px; align-items:center;">
                 <input type="text" id="adm-special-no" class="bet-input" style="width:90px;" placeholder="사번 입력">
-                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0;" onclick="adminResetLimits()">횟수 리셋</button>
+            </div>
+            <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #1976D2, #1565C0); border-color:#0D47A1; margin:0; font-size:11px;" onclick="adminResetLimits('facility')">공용시설<br>충전</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #00838f, #006064); border-color:#004d40; margin:0; font-size:11px;" onclick="adminResetLimits('alien')">우주 주파수<br>충전</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #7f0000, #4a0000); border-color:#b71c1c; margin:0; font-size:11px;" onclick="adminResetLimits('dark')">어둠 탐사<br>충전</button>
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #455a64, #37474f); border-color:#263238; margin:0; font-size:11px;" onclick="adminResetLimits('all')">전체<br>충전</button>
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #9C27B0, #7B1FA2); border-color:#6A1B9A; margin:0;" onclick="adminClearStatus()">상태이상 소거</button>
             </div>
             <!-- ★ 강제 회수 / 특이사항 초기화 버튼 추가 -->
@@ -6517,31 +6522,47 @@ function getTodayStr() {
         showCustomAlert(`${zoneCode} 구역의 점유 및 파티 기록(${removed}건)을 강제 해제했습니다.`);
     
     }
-       function adminResetLimits() {
+           function adminResetLimits(kind) {
         const targetNo = document.getElementById('adm-special-no').value.trim();
         if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
         let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
         if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
         let targetUser = db.users[targetCode];
 
-        targetUser.facilityCount = 0;
-        targetUser.alienTries = 0;
-        targetUser.darkTries = 0;
-        targetUser.darkDate = getTodayStr();
-        
-        addHistoryLog(targetUser, `[당국 개입] 일일 시설 이용 제한 및 어둠 탐사 횟수가 전면 초기화되었습니다.`);
-        
+        let msgs = [];
+
+        if (kind === 'facility' || kind === 'all') {
+            targetUser.facilityCount = 0;
+            targetUser.lastFacilityDate = get22HourCycleStr();
+            msgs.push('공용시설 이용 횟수');
+        }
+        if (kind === 'alien' || kind === 'all') {
+            targetUser.alienTries = 0;
+            targetUser.lastAlienPlayTime = 0;
+            targetUser.alienDate = getTodayStr();
+            msgs.push('우주 주파수 접속 기회');
+        }
+        if (kind === 'dark' || kind === 'all') {
+            targetUser.darkTries = 0;
+            targetUser.darkDate = getTodayStr();
+            msgs.push('어둠 탐사 횟수');
+        }
+
+        if (msgs.length === 0) { showCustomAlert('충전할 항목이 지정되지 않았습니다.'); return; }
+
+        const label = msgs.join(', ');
+        addHistoryLog(targetUser, `[당국 개입] ${label}이(가) 충전되었습니다.`);
+
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
-                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 시설 이용 횟수가 리셋되었습니다.`);
+                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 ${label}을(를) 충전했습니다.`);
                 updateUI();
             });
         } else {
             saveDB(); updateUI();
-            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 시설 이용 횟수가 리셋되었습니다.`);
+            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 ${label}을(를) 충전했습니다.`);
         }
     }
-
     function adminGiveItem() {
         const targetNo = document.getElementById('adm-special-no').value.trim();
         const itemName = document.getElementById('adm-special-item').value;
