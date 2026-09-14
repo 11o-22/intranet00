@@ -682,8 +682,9 @@ const DARK_ZONES = {
         database.ref(c119Path()).update({ muted: !!on });
     }
 
-    function c119Advance(nextStep) {
+        function c119Advance(nextStep) {
         if (!database) return;
+        if (darkRun) darkRun._c119Locked = false;
         database.ref(c119Path()).update({
             step: nextStep, signals: null, signalsLeft: SIGNAL_LIMIT, muted: false
         });

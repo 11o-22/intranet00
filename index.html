@@ -2054,11 +2054,15 @@ function getTodayStr() {
     }
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
-    function partyAdvance(nextStep) {
+       function partyAdvance(nextStep) {
         if (!darkRun) return;
         if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
         if (darkRun.isLeader && database) {
             database.ref(`darkParties/${darkRun.partyId}/curStep`).set(nextStep);
+            // ★ 방장 본인도 즉시 이동
+            darkRun.step = nextStep;
+            detachVoteListener();
+            renderDarkStep();
         }
     }
 
