@@ -1191,15 +1191,6 @@ function getTodayStr() {
     ];
     const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
 
-    if (database) {
-        database.ref('darkOccupancy').on('value', (snap) => {
-            darkOccupancy = snap.val() || {};
-            if (currentUser && !darkRun && !darkBriefingOpen) {
-                const panel = document.getElementById('dark-main');
-                if (panel && panel.classList.contains('active')) renderDarkness();
-            }
-        });
-    }
 
     // 유효한 점유인지 판정 (만료된 기록은 없는 것으로 취급)
        function getZoneOccupant(zoneCode) {

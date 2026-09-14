@@ -90,7 +90,16 @@ const DARK_ZONES = {
     let darkZoneOverride = {};
     let darkOccupancy = {};
      const DARK_OCCUPY_TIMEOUT = 3 * 60 * 60 * 1000; // 3시간 후 자동 해제
-
+    
+     if (database) {
+        database.ref('darkOccupancy').on('value', (snap) => {
+            darkOccupancy = snap.val() || {};
+            if (currentUser && !darkRun && !darkBriefingOpen) {
+                const panel = document.getElementById('dark-main');
+                if (panel && panel.classList.contains('active')) renderDarkness();
+            }
+        });
+    }
 
     if (database) {
         database.ref('darkZoneOverride').on('value', (snap) => {
