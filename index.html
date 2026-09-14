@@ -1181,7 +1181,7 @@ function getTodayStr() {
         "고급진 술": { price: 444, usable: true, targetable: false, effect: "drink_wine", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "누군가의 방에서 나온 술. 마시면 10시간 동안 취한다." },
         "금고": { price: 777, usable: true, targetable: false, effect: "safe_box", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "???" },
         "노스텔지어 끈": { price: 331, usable: true, targetable: true, effect: "equip_nostalgia", restrictDept: ["보안팀", "경비팀"], desc: "5시간 동안 장착 가능하다. 장착하는 도중에는 찼던 오염도가 서서히 줄어든다. (5분에 1%씩)" },
-        
+                "사직서": { price: "???", usable: true, targetable: false, effect: "resign_letter", adminOnly: true, desc: "[특수] 아직 제출하지 않은 사직서. 어둠 속에서 죽음에 이르렀을 때 단 한 번, 당신을 그 자리에서 퇴근시킨다. 포인트와 소지품은 지켜진다." },
         // ★ [추가] 상담사 전용 아이템
         "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." },
 
@@ -1200,7 +1200,7 @@ function getTodayStr() {
 
     };
 
-     const NO_SELL_ITEMS = ["여우구슬"];
+    const NO_SELL_ITEMS = ["여우구슬", "사직서"];
 
     const ALL_10_ITEMS = [
         "익명 편지", "하급 물약", "샤베트", "안대", "생수",
@@ -2685,7 +2685,7 @@ function getTodayStr() {
         }
 
         html += `<div style="font-size:10px; color:#666; margin-top:14px; line-height:1.6; border-top:1px dashed #333; padding-top:10px;">
-                ※ B등급 이상 구역에서 사망할 경우 보유 포인트와 소지품 전부가 소멸합니다.<br>
+                ※ B등급 이상 구역에서 사망할 경우 보유 포인트 전액과 반입한 물품이 소멸합니다.<br>
                 ※ 탐사 도중 창을 닫거나 새로고침하면 탐사는 중단되며 횟수는 복구되지 않습니다.
             </div></div>`;
         body.innerHTML = html;
@@ -3052,19 +3052,62 @@ function getTodayStr() {
     // ★ 어둠 탐사 사망 처리
     // ==========================================
     function darkDeath(reasonText) {
-        const z = DARK_ZONES[darkRun.zone];
+                // ★ 사직서 — 죽음 회피 + 재산 보호 + 즉시 귀환
+        if (currentUser.resignShield) {
+            currentUser.resignShield = false;
+            const z2 = DARK_ZONES[darkRun.zone];
+            addHistoryLog(currentUser, `[사직] ${z2.code}에서 사직서를 제출하고 이탈했습니다.`);
+            appendBadgeNoteToUser(currentUser, `[사직 반려됨] 제출은 수리되지 않았다.`);
+
+            if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 사직서를 제출했습니다.`, true);
+
+            if (!currentUser.darkLogs) currentUser.darkLogs = [];
+            currentUser.darkLogs.unshift({
+                date: new Date().toLocaleString(), zone: z2.code, zoneName: z2.name,
+                reward: 0, success: darkRun.success, fail: darkRun.fail,
+                loot: [], lost: [], detail: darkRun.log, resigned: true,
+                party: !!darkRun.isParty
+            });
+
+            darkBodyEl().innerHTML = darkBox("사직",
+                `${reasonText}<br><br>
+                 <span style="color:#d4af37;">— 품 안에서 종이가 부스럭거린다.<br>
+                 언제 썼는지 기억나지 않는 사직서다.<br><br>
+                 꺼내 든다. 아무도 받아 가지 않는데, 그냥 든 것만으로 주변이 물러난다.<br>
+                 규정상 퇴근한 사람은 건드릴 수 없다는 듯이.</span><br><br>
+                 눈을 뜨니 복도다. 사직서는 없다.<br>처음부터 없었던 것 같기도 하다.`,
+                `<div style="background:rgba(212,175,55,0.1); border:1px solid #5a4a2a; border-radius:6px; padding:13px; font-size:12px; line-height:1.8; margin-bottom:14px;">
+                    <div style="font-weight:bold; color:#d4af37; margin-bottom:7px;">[사직 처리]</div>
+                    보유 포인트 <b style="color:#4CAF50;">전액 보존</b><br>
+                    소지품 <b style="color:#4CAF50;">전량 보존</b><br>
+                    <span style="font-size:10px; color:#888;">탐사 보상은 지급되지 않습니다.</span>
+                 </div>` +
+                darkChoiceBtn("퇴근한다.", "finishDarkDeath()"));
+
+            darkAmbienceStop();
+            saveDB();
+            return;
+        }
+                const z = DARK_ZONES[darkRun.zone];
         const isHardZone = ['S', 'A', 'B'].includes(z.grade);
 
         let lostPoints = 0;
         let lostItems = [];
 
         if (isHardZone) {
-            // B등급 이상 — 전재산 소멸
+            // ★ B등급 이상 — 포인트 전액 + 반입품만 소멸
             lostPoints = currentUser.points;
             currentUser.points = 0;
-            lostItems = [...(currentUser.inventory || [])];
-            currentUser.inventory = [];
-            addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 사망. 보유 포인트 ${lostPoints} P와 소지품 전부 소실.`);
+
+            const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
+            carried.forEach(it => {
+                removeItemFromInventory(currentUser, it, 1);
+                lostItems.push(it);
+            });
+
+            addHistoryLog(currentUser, lostItems.length
+                ? `[어둠 사망] ${z.code}에서 사망. 포인트 ${lostPoints} P와 반입품 ${lostItems.length}점 소실.`
+                : `[어둠 사망] ${z.code}에서 사망. 포인트 ${lostPoints} P 소실.`);
         } else {
             addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 의식을 잃음.`);
         }
@@ -3086,7 +3129,7 @@ function getTodayStr() {
         currentUser.darkLogs.unshift({
             date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
             reward: 0, success: darkRun.success, fail: darkRun.fail,
-            loot: [], lost: lostItems.length ? ['(전부 소실)'] : darkRun.lostItems,
+                       loot: [], lost: lostItems.length ? lostItems : darkRun.lostItems,
             detail: darkRun.log, died: true,
             chat: (darkRun.isParty && partyChatLog.length) ? partyChatLog.slice(-80).map(m => ({
                 n: m.code === 'SYSTEM' ? '' : m.name, t: m.text, s: m.code === 'SYSTEM'
@@ -3099,9 +3142,12 @@ function getTodayStr() {
         body.innerHTML = darkBox("종료", reasonText || '시야가 좁아진다.<br><br>소리가 먼저 사라지고, 그다음에 감각이 사라졌다.',
             `<div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
                 <div style="font-weight:bold; color:#ff6b6b; margin-bottom:8px; border-bottom:1px dashed #7f0000; padding-bottom:6px;">[사고 보고서]</div>
-                ${isHardZone
+                               ${isHardZone
                     ? `보유 포인트 <b style="color:#f44336;">-${lostPoints} P</b> (전액 소실)<br>
-                       소지품 <b style="color:#f44336;">${lostItems.length}종 전부 소실</b><br>`
+                       ${lostItems.length
+                            ? `반입품 <b style="color:#f44336;">${lostItems.join(', ')}</b> 소실<br>`
+                            : `<span style="color:#aaa;">반입한 물품이 없어 소실 없음</span><br>`}
+                       <span style="font-size:10px; color:#888;">보관 중이던 소지품은 무사합니다.</span><br>`
                     : `<span style="color:#aaa;">본 구역은 재산 소멸 규정이 적용되지 않습니다.</span><br>`}
                 오염도 <b style="color:#ff9800;">100%</b><br>
                 <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#d4af37;">
@@ -4602,6 +4648,18 @@ function getTodayStr() {
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
             return;
         }
+    
+
+        if (cat.effect === 'resign_letter') {
+            if (currentUser.resignShield) { showCustomAlert('이미 사직서를 품고 있습니다.'); return; }
+            currentUser.resignShield = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            appendSystemBadgeNote(`[사직서] 품 안에 넣어 두었다. 언제든 낼 수 있다.`);
+            addHistoryLog(currentUser, `[아이템 사용] 사직서를 품에 넣음`);
+            saveDB(); updateUI();
+            showCustomAlert('사직서를 품에 넣었습니다.\n다음 죽음의 순간, 당신은 그 자리에서 퇴근합니다.');
+            return;
+        }
                             if (cat.effect === 'bus_ticket') {
             if (currentUser.darkTicketFree) { showCustomAlert('이미 승차권 효과가 적용 중입니다.'); return; }
             currentUser.darkTicketFree = true;
@@ -4752,8 +4810,8 @@ function getTodayStr() {
                     
         } else if (cat.effect === 'random_box') {
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
-            const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬");
-            const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬");
+            const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서");
+            const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서");
 
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
             function getWeightedRandomItem(pool, user) {
