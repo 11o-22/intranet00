@@ -3873,6 +3873,7 @@ function getTodayStr() {
     }
 
    function updateUI() {
+            if (currentUser.points < 0) currentUser.points = 0;
         if (!currentUser) return;
         applyDepartmentTheme(currentUser);
 
@@ -5374,28 +5375,36 @@ function getTodayStr() {
         closeVipInviteModal();
     }
 
-    function checkVipMultiplayerState() {
-                if (db.vipInvites) {
+        function checkVipMultiplayerState() {
+        if (db.vipInvites) {
             let myInvite = Object.values(db.vipInvites).find(inv => inv.to === currentUser.code);
 
-            // ★ VIP 인가가 없으면 초대 자동 파기
-            if (myInvite && !currentUser.hasVIP && currentUser.code !== 'kario0987') {
+            // ★ VIP 인가 없음 / 격리 중이면 조용히 파기 (팝업 없음)
+            if (myInvite && (isQuarantined(currentUser) || (!currentUser.hasVIP && currentUser.code !== 'kario0987'))) {
                 if (database) database.ref('vipInvites/' + myInvite.id).remove();
+                delete db.vipInvites[myInvite.id];
                 myInvite = null;
+                currentInviteId = null;
+                closeVipInviteModal();
             }
 
             if (myInvite && currentInviteId !== myInvite.id) {
-                currentInviteId = myInvite.id; showVipInviteModal(myInvite);
+                currentInviteId = myInvite.id;
+                showVipInviteModal(myInvite);
             } else if (!myInvite && currentInviteId) {
-                currentInviteId = null; closeVipInviteModal();
+                currentInviteId = null;
+                closeVipInviteModal();
             }
         }
+
         if (db.vipSessions) {
             let mySession = Object.values(db.vipSessions).find(sess => sess.p1 === currentUser.code || sess.p2 === currentUser.code);
             if (mySession) {
-                activeVipSessionId = mySession.id; renderVipGameOverlay(mySession);
+                activeVipSessionId = mySession.id;
+                renderVipGameOverlay(mySession);
             } else if (!mySession && activeVipSessionId) {
-                activeVipSessionId = null; closeVipGameOverlay();
+                activeVipSessionId = null;
+                closeVipGameOverlay();
             }
         } else {
             if (activeVipSessionId) { activeVipSessionId = null; closeVipGameOverlay(); }
@@ -5554,8 +5563,10 @@ function getTodayStr() {
         let winUser = winner === 'p1' ? p1User : p2User;
         let loseUser = winner === 'p1' ? p2User : p1User;
         
-        winUser.points += session.bet;
-        loseUser.points -= session.bet;
+               const actualBet = Math.min(session.bet, Math.max(0, loseUser.points));
+        winUser.points += actualBet;
+        loseUser.points = Math.max(0, loseUser.points - actualBet);
+        session.winAmount = actualBet;
         applyPollutionToUser(winUser, 3);
         applyPollutionToUser(loseUser, 5);
 
@@ -5564,7 +5575,7 @@ function getTodayStr() {
 
         session.winnerCode = winUser.code;
         session.winnerName = winUser.name; 
-        session.winAmount = session.bet;
+       
     } else {
         session.isDraw = true;
     }
@@ -5696,12 +5707,13 @@ function getTodayStr() {
         }
     }
     function sendP2PDeal() {
-     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 제안할 수 없습니다.'); return; }  
-    const targetCode = document.getElementById('p2p-target-user').value;
-    if (!targetCode) {
-        showCustomAlert("상대 사원을 선택해주세요.");
-        return;
-    }
+             if (isQuarantined(currentUser)) {
+            closeVipInviteModal();
+            const q = Object.values(db.vipInvites || {}).find(i => i.to === currentUser.code);
+            if (q && database) database.ref('vipInvites/' + q.id).remove();
+            currentInviteId = null;
+            return;
+        }
     const targetUser = db.users[targetCode];
     const dealMode = document.getElementById('p2p-deal-mode').value;
     const offerType = document.getElementById('p2p-offer-type').value;
