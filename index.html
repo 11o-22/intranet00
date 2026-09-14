@@ -898,6 +898,16 @@ function getTodayStr() {
         }
     });
 
+        database.ref('vipInvites').on('value', (snapshot) => {
+        db.vipInvites = snapshot.val() || {};
+        if (currentUser) checkVipMultiplayerState();
+    });
+
+    database.ref('vipSessions').on('value', (snapshot) => {
+        db.vipSessions = snapshot.val() || {};
+        if (currentUser) checkVipMultiplayerState();
+    });
+
     database.ref('/').on('value', (snapshot) => {
         let data = snapshot.val();
         if (data) {
