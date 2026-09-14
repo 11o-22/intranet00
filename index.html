@@ -929,9 +929,16 @@ function getTodayStr() {
                     if(!data.users[key].history) data.users[key].history = [];
                     if(!data.users[key].letters) data.users[key].letters = [];
                 }
-                if (currentUser && data.users[currentUser.code]) {
-                    data.users[currentUser.code] = currentUser; 
+                                if (currentUser && data.users[currentUser.code]) {
+                    const srv = data.users[currentUser.code];
+                    // ★ 서버 쪽에 관리자 개입 표시가 있으면 그걸 우선한다
+                    if (srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
+                        currentUser = srv;
+                    } else {
+                        data.users[currentUser.code] = currentUser;
+                    }
                 }
+                
                 db.users = data.users;
             }
             
@@ -1972,6 +1979,16 @@ function getTodayStr() {
                 ${myVote ? `<div style="text-align:center; font-size:10px; color:#4CAF50; margin-top:7px;">선택 완료. 나머지를 기다립니다.</div>` : ''}`;
         }
         area.innerHTML = html;
+    }
+
+        function renderVoteBox(title, text, options, imgKey) {
+        const body = darkBodyEl();
+        if (!body) return;
+        body.innerHTML = darkBox(title, text, `<div id="vote-area"></div>`, imgKey);
+        mountDarkChat('normal');
+        if (darkRun.isLeader) openVote(options);
+        attachVoteListener();
+        renderVoteState();
     }
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
     function renderChoiceStep(title, text, options, imgKey) {
@@ -6261,7 +6278,7 @@ function getTodayStr() {
         renderAdminSuggestions();
         renderAdminItemSelect();
         renderAdminDarkZones();
-        renderAdminFoxRoom();
+        
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';
@@ -6389,6 +6406,8 @@ function getTodayStr() {
         // 3. 로컬 DB 갱신
         db.users[targetCode] = targetUser;
 
+        targetUser._adminStamp = Date.now(); 
+
         // 4. ★ Firebase 서버에 해당 유저 경로를 직접 타겟팅하여 즉시 영구 저장
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
@@ -6398,6 +6417,7 @@ function getTodayStr() {
                 console.error("Firebase 관리자 발령 실패:", err);
                 showCustomAlert("서버 저장 중 오류가 발생했습니다.");
             });
+
         } else {
             saveDB();
             updateUI();
@@ -6664,6 +6684,8 @@ function getTodayStr() {
 
         const label = msgs.join(', ');
         addHistoryLog(targetUser, `[당국 개입] ${label}이(가) 충전되었습니다.`);
+
+                targetUser._adminStamp = Date.now();
 
         if (database) {
             database.ref('users/' + targetCode).set(targetUser).then(() => {
