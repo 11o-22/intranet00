@@ -3671,9 +3671,7 @@ function getTodayStr() {
     }
     // ★ [추가] 은반지 및 버터 나이프 장착 여부 및 만료 체크 함수
     function getPollutionMultiplier(user) {
-        if (user.equippedWeapons.includes("방진복 안감")) return 0.8;
-        if (!user.equippedWeapons) return 1; // 장착한 무기가 없으면 기본 배율(1배)
-
+        if (!user.equippedWeapons) return 1;
         
         // 은반지 착용 중이고 아직 120시간이 안 지났다면 오염도 증가율 0 (완전 차단)
         if (user.equippedWeapons.includes("은반지")) {
@@ -3714,6 +3712,8 @@ function getTodayStr() {
                 addHistoryLog(user, `[장비 회수] 작두의 기운이 다해 소지품으로 돌아갔습니다.`);
             }
         }
+
+             if (user.equippedWeapons.includes("방진복 안감")) return 0.8;
         
         return 1;
     }
@@ -5617,7 +5617,17 @@ function getTodayStr() {
         }).join('');
     }
 
+    let _buyLock = false;
+    function buyGuard() {
+        if (_buyLock) return false;
+        _buyLock = true;
+        setTimeout(() => { _buyLock = false; }, 700);
+        return true;
+    }
+
+
     function buyRegularShopItem(itemId, itemName, price) {
+                if (!buyGuard()) return;
          if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 상점을 이용할 수 없습니다.'); return; }
         const cycleKey = getShopCycleKey();
         if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
@@ -6880,6 +6890,7 @@ function getTodayStr() {
     }
 
     function buyAlienItem(itemName, price) {
+                if (!buyGuard()) return;
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 상점을 이용할 수 없습니다.'); return; }
         if (!currentUser.alienBoughtItems) currentUser.alienBoughtItems = [];
         
