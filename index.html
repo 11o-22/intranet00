@@ -1914,7 +1914,7 @@ function getTodayStr() {
         return darkRun.memberCount || 1;
     }
 
-    function startVoteTick() {
+      function startVoteTick() {
         clearInterval(voteTickTimer);
         voteTickTimer = setInterval(() => {
             if (!darkRun || !currentVote) return;
@@ -1926,16 +1926,21 @@ function getTodayStr() {
             const voted = currentVote.votes ? Object.keys(currentVote.votes).length : 0;
             const total = getPartyMemberCount();
 
-            // 방장만 마감 처리
-            if (darkRun.isLeader && (voted >= total || remain <= 0)) {
-                closeVote();
+            // ★ 방장이 없거나 응답이 없으면 아무나 마감
+            const p = darkParties[darkRun.partyId];
+            const leaderAlive = p && p.alive && p.alive[p.leader];
+
+            if (voted >= total || remain <= 0) {
+                if (darkRun.isLeader || !leaderAlive || remain <= -3) closeVote();
             }
         }, 500);
     }
 
     function closeVote() {
-        if (!darkRun || !darkRun.isLeader || !currentVote) return;
+        
+        if (!darkRun || !currentVote) return;
         if (currentVote.state !== 'OPEN') return;
+        // 방장 조건 제거
 
         const votes = currentVote.votes || {};
         let tally = {};
@@ -2094,37 +2099,20 @@ function getTodayStr() {
     }
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
-          function partyAdvance(nextStep) {
+              function partyAdvance(nextStep) {
         if (!darkRun) return;
         if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
+        if (!database) { darkRun.step = nextStep; renderDarkStep(); return; }
 
-        if (darkRun.isLeader && database) {
-            database.ref(`darkParties/${darkRun.partyId}/curStep`).set(nextStep);
-            darkRun.step = nextStep;
-            detachVoteListener();
-            renderDarkStep();
-            return;
-        }
+        // ★ 누구든 진행 가능. 이미 그 단계면 무시된다
+        database.ref(`darkParties/${darkRun.partyId}/curStep`).transaction(cur => {
+            if (cur != null && cur >= nextStep) return;   // 이미 진행됨
+            return nextStep;
+        });
 
-        // ★ 방장이 아니어도 30초 넘게 멈춰 있으면 직접 진행
-        if (database) {
-            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
-                const alive = sn.val() || {};
-                const p = darkParties[darkRun.partyId];
-                const leaderAlive = p && alive[p.leader];
-                if (!leaderAlive) {
-                    database.ref(`darkParties/${darkRun.partyId}`).update({
-                        leader: currentUser.code,
-                        leaderName: currentUser.name,
-                        curStep: nextStep
-                    });
-                    darkRun.isLeader = true;
-                    darkRun.step = nextStep;
-                    detachVoteListener();
-                    renderDarkStep();
-                }
-            });
-        }
+        darkRun.step = nextStep;
+        detachVoteListener();
+        renderDarkStep();
     }
             function startAbsenceTimer() {
         if (!darkRun) return;
@@ -3174,7 +3162,7 @@ function getTodayStr() {
         appendBadgeNoteToUser(currentUser, `[${z.code}] 탐사 중 의식 불명 — 긴급 이송됨`);
 
         // 파티 동료에게 알림
-        if (darkRun.isParty) {
+               if (darkRun.isParty) {
             sendPartyChat(`${currentUser.name} 사원의 신호가 끊겼습니다.`, true);
             if (database) database.ref(`darkParties/${darkRun.partyId}/alive/${currentUser.code}`).remove();
         }

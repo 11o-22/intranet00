@@ -858,7 +858,10 @@ const DARK_ZONES = {
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
                 (darkRun.isLeader || !darkRun.isParty)
                     ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`,
                 "intro");
             mountDarkChat('normal');
             return;
@@ -868,7 +871,10 @@ const DARK_ZONES = {
             body.innerHTML = darkBox("—", def.text,
                 (darkRun.isLeader || !darkRun.isParty)
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`,
                 def.img);
             mountDarkChat('normal');
             return;
@@ -1203,7 +1209,10 @@ const DARK_ZONES = {
                 `통로가 넓어진다.<br><br>일행이 전부 여기 있다. 세지 않는다.<br>세지 않기로 했으니까.`,
                 (darkRun.isLeader
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
             mountDarkChat('normal');
             return;
         }
@@ -1313,7 +1322,10 @@ const DARK_ZONES = {
              </div>` +
             ((darkRun.isLeader || darkRun.solo)
                 ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
         mountDarkChat('normal');
     }
 
@@ -2001,7 +2013,10 @@ function input119D(n) {
                 `${data.q}<br><br><span style="color:${done === 'ok' ? '#4CAF50' : '#f44336'};">${done === 'ok' ? '기억하고 있었다.' : '기억나지 않았다.'}</span>`,
                 (darkRun.isLeader
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
             mountDarkChat('normal');
             return;
         }
@@ -2138,7 +2153,10 @@ function input119D(n) {
                 `<b style="color:#ff6b6b;">${c.name}</b> 사원이 사라졌다.<br><br>소리도 없었다. 옆에 있다가 그냥 없어졌다.<br>돌아보니 바닥에 네모난 구멍이 있다.<br>아래는 보이지 않는다.<br><br>부르면 대답이 올 것 같지만, 부르지 않기로 한다.<br>여기서 소리를 내면 안 된다는 걸 다들 알고 있다.`,
                 (darkRun.isLeader
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
         }
         mountDarkChat('normal');
         sendPartyChat(`${c.name} 사원이 바닥 아래로 사라졌습니다.`, true);
@@ -2229,7 +2247,10 @@ function input119D(n) {
                 ? darkChoiceBtn("일어선다.", "renderSoloStep();")
                 : (darkRun.isLeader
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
         mountDarkChat('normal');
     }
 
@@ -2402,7 +2423,10 @@ function input119D(n) {
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             (darkRun.isLeader
                 ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
         mountDarkChat('normal');
     }
 
@@ -2414,7 +2438,10 @@ function input119D(n) {
             `움직이지 않는다.<br><br>흐려지는 쪽을 본다. 눈이 마주친다.<br>원망하는 눈은 아니었다. 그게 더 남는다.<br><br>완전히 사라질 때까지 3초쯤 걸렸다.`,
             (darkRun.isLeader
                 ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`));
+                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`));
         mountDarkChat('normal');
     }
 
@@ -2467,7 +2494,10 @@ function input119D(n) {
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${total>=DC?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             (darkRun.isLeader || !darkRun.isParty)
                 ? darkChoiceBtn("계속 간다.", "partyAdvance(18)")
-                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`);
         mountDarkChat('normal');
     }
 
@@ -2550,7 +2580,10 @@ function input119D(n) {
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${total>=DC?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             (darkRun.isLeader || !darkRun.isParty)
                 ? darkChoiceBtn("계속 간다.", "partyAdvance(18)")
-                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                         선임의 신호를 기다리는 중...<br>
+                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                       </div>`);
         mountDarkChat('normal');
     }
 
