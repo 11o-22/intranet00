@@ -2744,14 +2744,15 @@ function input119D(n) {
     }
 
     // 속성 실효 수치 (등급 배율 적용)
-       function gearValue(user, attr) {
+    function gearValue(user, attr) {
         const g = getGear(user);
         if (!g || !g.attrs || !g.attrs.includes(attr)) return 0;
-        let gi = GEAR_GRADES.indexOf(g.grade);
-        if (g.attrBoost && g.attrBoost[attr]) gi = Math.min(GEAR_GRADES.length - 1, gi + g.attrBoost[attr]);
-        const mult = GEAR_MULT[GEAR_GRADES[gi]] || 1;
+        const mult = GEAR_MULT[g.grade] || 1;
         const base = GEAR_BASE[attr] || 0;
-        if (attr === 'break' || attr === 'sense' || attr === 'hide') return Math.round(base * mult);
+        // 정수형 보정(파괴·감각·은신)은 반올림
+        if (attr === 'break' || attr === 'sense' || attr === 'hide') {
+            return Math.round(base * mult);
+        }
         return base * mult;
     }
 
@@ -2806,7 +2807,7 @@ function input119D(n) {
         openGearModal('속성 선택', html);
     }
 
-       function pickGearAttr(attr) {
+    function pickGearAttr(attr) {
         const g = getGear(currentUser);
         if (!g || !GEAR_ATTRS[attr]) return;
         if ((g.attrs || []).length >= (g.slots || 1)) return;
@@ -2814,21 +2815,14 @@ function input119D(n) {
 
         if (!g.attrs) g.attrs = [];
         g.attrs.push(attr);
-
-        let extraMsg = '';
-        if (currentUser.gearBlank) {
-            currentUser.gearBlank = false;
-            if (!g.attrBoost) g.attrBoost = {};
-            g.attrBoost[attr] = 1;
-            extraMsg = '\n각인지가 타면서 한 단계 깊게 새겨졌습니다.';
-        }
-
         addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 ${GEAR_ATTRS[attr].name} 속성을 새겼습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
 
         closeGearModal();
         updateUI();
-        showCustomAlert(`${GEAR_ATTRS[attr].icon} ${GEAR_ATTRS[attr].name} 속성이 새겨졌습니다.${extraMsg}`);
+        showCustomAlert(`${GEAR_ATTRS[attr].icon} ${GEAR_ATTRS[attr].name} 속성이 새겨졌습니다.`);
     }
 
     // --- 강화 ---
@@ -2860,38 +2854,28 @@ function input119D(n) {
         openGearModal('장비 강화', html);
     }
 
-       function tryGearUpgrade() {
+    function tryGearUpgrade() {
         const g = getGear(currentUser);
         if (!g) return;
         const up = GEAR_UPGRADE[g.grade];
         if (!up) return;
         if (currentUser.points < up.cost) { showLuxuryAlert(); return; }
 
-        const polish = currentUser.gearPolish || 0;
-        const rate = Math.min(0.99, up.rate + polish);
-        const ok = Math.random() < rate;
+        const ok = Math.random() < up.rate;
         const from = g.grade;
-        const hadProtect = !!currentUser.gearProtect;
-
-        currentUser.gearPolish = 0;
 
         if (ok) {
             currentUser.points -= up.cost;
             g.grade = up.to;
-            currentUser.gearProtect = false;
-            addHistoryLog(currentUser, `[강화 성공] '${g.name}' ${from} → ${up.to} (-${up.cost} P)`);
+            addHistoryLog(currentUser, `[강화 성공] '${g.name}'이(가) ${from} → ${up.to} 등급이 되었습니다. (-${up.cost} P)`);
         } else {
             const loss = Math.floor(up.cost / 2);
             currentUser.points = Math.max(0, currentUser.points - loss);
-            if (hadProtect) {
-                currentUser.gearProtect = false;
-                addHistoryLog(currentUser, `[강화 실패] 보호권이 등급을 지켰습니다. (-${loss} P)`);
-            } else {
-                addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화 실패 (-${loss} P)`);
-            }
+            addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화에 실패했습니다. (-${loss} P)`);
         }
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
 
         const html = `
             <div style="text-align:center; padding:18px 0;">
@@ -2902,15 +2886,13 @@ function input119D(n) {
                 <div style="font-size:12px; color:#ccc; line-height:1.8;">
                     ${ok
                         ? `${g.name}이(가) <b style="color:#d4bbff;">${up.to}등급</b>이 되었습니다.<br>손에 쥔 무게가 조금 달라졌다.`
-                        : (hadProtect
-                            ? `아무 일도 일어나지 않았다.<br><span style="color:#4CAF50;">보호권이 등급을 지켰다.</span>`
-                            : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`)}
-                    ${polish > 0 ? `<br><span style="font-size:10px; color:#888;">연마제 보정 +${Math.round(polish*100)}% 적용됨</span>` : ''}
+                        : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`}
                 </div>
             </div>
             <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="closeGearModal(); updateUI();">확인</button>`;
         openGearModal(ok ? '강화 성공' : '강화 실패', html);
     }
+
     // --- 재료 조합 ---
     function combineSecondSlot() {
         const mats = ['맞물리지 않는 조각', '지워지지 않는 자국', '반죽에 섞이지 않은 것'];
@@ -3465,18 +3447,10 @@ function input119D(n) {
             return;
         }
 
-                if (def.type === 'narr') {
+        if (def.type === 'narr') {
             const d = B508_NARR[def.n];
-            let extra = '';
-            if ([5,12,15].includes(def.n) && consumeQFlag('monster_hint')) {
-                const mk = def.n === 5 ? 'kneader' : def.n === 12 ? 'cashier' : 'courier';
-                const m = B508_MONSTERS[mk];
-                extra = `<div style="margin-top:12px; padding:10px; background:rgba(201,168,255,0.08); border:1px solid #4a3a6a; border-radius:5px; font-size:11px; color:#c9a8ff;">
-                    ◈ 도청 기록 — ${m.name}은(는) ${m.senses === 'sound' ? '소리' : m.senses === 'sight' ? '시선' : '냄새'}에 반응한다.<br>${m.danger}
-                </div>`;
-            }
             const showNotice = darkRun.step >= 11;
-            body.innerHTML = darkBox("—", d.text + extra,
+            body.innerHTML = darkBox("—", d.text,
                 (showNotice ? noticeBarHtml() : '') +
                 darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`),
                 d.img);
@@ -4104,16 +4078,13 @@ function input119D(n) {
     const QSHOP_OPEN = 13;   // 13시 개점
     const QSHOP_CLOSE = 22;  // 22시 폐점
 
-    function qshopIsOpen() {
-        const h = new Date().getHours();
-        return h >= QSHOP_OPEN && h < QSHOP_CLOSE;
+        function qshopIsOpen() {
+        return true;
     }
 
-    // 4시간 단위 교대 (13~17 / 17~21 / 21~22)
-    function qshopSlotKey() {
+       function qshopSlotKey() {
         const now = new Date();
-        const h = now.getHours();
-        const slot = Math.floor((h - QSHOP_OPEN) / 4);
+        const slot = Math.floor(now.getHours() / 4);
         return `${getTodayStr()}-s${slot}`;
     }
 
@@ -4153,13 +4124,11 @@ function input119D(n) {
         if (!currentUser.qshopRecord[cycleKey]) currentUser.qshopRecord[cycleKey] = {};
         const rec = currentUser.qshopRecord[cycleKey];
 
-        const now = new Date();
+                const now = new Date();
         const nextSwap = new Date(now);
-        const h = now.getHours();
-        const nextH = Math.min(QSHOP_CLOSE, QSHOP_OPEN + (Math.floor((h - QSHOP_OPEN) / 4) + 1) * 4);
+        const nextH = (Math.floor(now.getHours() / 4) + 1) * 4;
         nextSwap.setHours(nextH, 0, 0, 0);
         const remainMin = Math.max(0, Math.floor((nextSwap - now) / 60000));
-
         box.innerHTML = `
             <div style="text-align:center; font-family:monospace; font-size:13px; color:#888; letter-spacing:3px; padding:14px 0 16px 0; border-bottom:1px dashed #333; margin-bottom:14px;">
                 클리어를 바랍니다.
@@ -4190,6 +4159,7 @@ function input119D(n) {
     }
 
     function buyQShopItem(name, price) {
+                if (!buyGuard()) return;
         if (!qshopIsOpen()) { showCustomAlert('연결이 끊어졌습니다.'); return; }
         const cycleKey = qshopSlotKey();
         if (!currentUser.qshopRecord) currentUser.qshopRecord = {};
