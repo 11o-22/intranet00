@@ -2067,57 +2067,38 @@ function getTodayStr() {
     }
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
-       function partyAdvance(nextStep) {
+          function partyAdvance(nextStep) {
         if (!darkRun) return;
         if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
+
         if (darkRun.isLeader && database) {
             database.ref(`darkParties/${darkRun.partyId}/curStep`).set(nextStep);
-            // ★ 방장 본인도 즉시 이동
             darkRun.step = nextStep;
             detachVoteListener();
             renderDarkStep();
+            return;
+        }
+
+        // ★ 방장이 아니어도 30초 넘게 멈춰 있으면 직접 진행
+        if (database) {
+            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
+                const alive = sn.val() || {};
+                const p = darkParties[darkRun.partyId];
+                const leaderAlive = p && alive[p.leader];
+                if (!leaderAlive) {
+                    database.ref(`darkParties/${darkRun.partyId}`).update({
+                        leader: currentUser.code,
+                        leaderName: currentUser.name,
+                        curStep: nextStep
+                    });
+                    darkRun.isLeader = true;
+                    darkRun.step = nextStep;
+                    detachVoteListener();
+                    renderDarkStep();
+                }
+            });
         }
     }
-
-    // 방장의 진행 신호 수신
-            function watchPartyStep() {
-        if (!darkRun || !darkRun.isParty || !database) return;
-        if (darkRun._stepWatching) return;
-        darkRun._stepWatching = true;
-
-        database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
-            const s = snap.val();
-            if (s == null || !darkRun) return;
-            if (darkRun.step !== s) {
-                darkRun.step = s;
-                detachVoteListener();
-                renderDarkStep();
-            }
-        });
-
-        // ★ 동료 이탈 감시
-        database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
-            if (!darkRun || !darkRun.isParty) return;
-            const alive = snap.val() || {};
-            const cnt = Object.keys(alive).length;
-            const p = darkParties[darkRun.partyId];
-            const total = p && p.members ? Object.keys(p.members).length : cnt;
-
-            if (cnt < total && !darkRun._absenceNotified) {
-                darkRun._absenceNotified = true;
-                const gone = p && p.members
-                    ? Object.keys(p.members).filter(c => !alive[c]).map(c => p.members[c].name).join(', ')
-                    : '동료';
-                showDarkToast(`${gone} 사원의 신호가 끊겼습니다.`);
-                startAbsenceTimer();
-            } else if (cnt === total && darkRun._absenceNotified) {
-                darkRun._absenceNotified = false;
-                clearInterval(darkRun._absenceTimer);
-                showDarkToast(`동료의 신호가 복구되었습니다.`);
-            }
-        });
-    }
-
     function startAbsenceTimer() {
         if (!darkRun) return;
         clearInterval(darkRun._absenceTimer);
@@ -3191,19 +3172,18 @@ function getTodayStr() {
         const pid = darkRun ? darkRun.partyId : null;
         const zone = darkRun ? darkRun.zone : null;
 
-        if (pid && database) {
-            if (darkRun.isLeader) {
+               if (pid && database) {
+            if (darkRun && darkRun.isLeader) {
                 const p = darkParties[pid];
-                if (p && p.members) {
-                    const others = Object.keys(p.members).filter(c => c !== currentUser.code);
-                    if (others.length > 0 && p.members[others[0]]) {
-                        database.ref(`darkParties/${pid}`).update({
-                            leader: others[0], leaderName: p.members[others[0]].name
-                        });
-                    }
+                const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => c !== currentUser.code) : [];
+                if (alive.length > 0 && p.members && p.members[alive[0]]) {
+                    database.ref(`darkParties/${pid}`).update({
+                        leader: alive[0],
+                        leaderName: p.members[alive[0]].name
+                    });
                 }
             }
-            database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
+            
             database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
 
             database.ref(`darkParties/${pid}/members`).once('value').then(snap => {
