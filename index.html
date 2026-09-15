@@ -6090,13 +6090,19 @@ function getTodayStr() {
     addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
 
     // ★ Firebase에 나와 상대방(`sender`), 그리고 공용 `p2pDeals`를 동시에 안전하게 업데이트
-    if (database) {
-        let updates = {};
-        updates[`users/${currentUser.code}`] = currentUser;
-        updates[`users/${senderCode}`] = sender;
-        updates[`p2pDeals/${dealIndex}/status`] = 'COMPLETED';
+       if (database) {
+        database.ref('p2pDeals').once('value').then(snap => {
+            const v = snap.val() || [];
+            const arr = Array.isArray(v) ? v : Object.values(v);
+            const realIdx = arr.findIndex(d => d && d.id === deal.id);
 
-        database.ref('/').update(updates).then(() => {
+            let updates = {};
+            updates[`users/${currentUser.code}`] = currentUser;
+            updates[`users/${senderCode}`] = sender;
+            if (realIdx >= 0) updates[`p2pDeals/${realIdx}/status`] = 'COMPLETED';
+
+            return database.ref('/').update(updates);
+        }).then(() => {
             showCustomAlert("거래가 성공적으로 체결되었습니다.");
             updateUI();
             renderP2PLists();
@@ -6105,13 +6111,10 @@ function getTodayStr() {
             showCustomAlert("서버 통신 중 오류가 발생했습니다.");
         });
     } else {
-        saveDB(); 
-        updateUI(); 
-        renderP2PLists();
+        saveDB(); updateUI(); renderP2PLists();
         showCustomAlert("거래가 성공적으로 체결되었습니다.");
     }
 }
-
     function rejectP2PDeal(dealId) {
         if (!db.p2pDeals) return;
         let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
