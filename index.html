@@ -3855,7 +3855,12 @@ function getTodayStr() {
         if (timedNotes.length > 0) finalNotesList = finalNotesList.concat(timedNotes);
         const notes = finalNotesList.length > 0 ? finalNotesList.join('<br>') : "특이사항 없음";
         const isGlowing = (u.noteGlowUntil && Date.now() < u.noteGlowUntil) ? 'glow-text' : '';
-        const equippedText = (u.equippedWeapons && u.equippedWeapons.length > 0) ? u.equippedWeapons.join(', ') : '없음';
+               const uGear = getGear(u) ? gearLabel(u) : '';
+        const uEq = (u.equippedWeapons && u.equippedWeapons.length > 0) ? u.equippedWeapons.join(', ') : '';
+        const equippedText =
+            (uGear ? `<span style="color:#c9a8ff;">${uGear}</span>` : '') +
+            (uGear && uEq ? '<br>' : '') +
+            (uEq || (uGear ? '' : '없음'));
 
         container.innerHTML = `
             <div class="id-card-badge" style="background:#1e1e1e; margin-top:10px; box-shadow:none; border-color:#555;">
@@ -3871,8 +3876,7 @@ function getTodayStr() {
                 <table class="badge-table" style="margin-top:15px;">
                     <tr><th>닉네임</th><td>${(u.badge && u.badge.nickname) ? u.badge.nickname : u.name}</td></tr>
                     <tr><th>보유 포인트</th><td style="font-weight:bold; color:#ffd700;">${u.points} P</td></tr>
-                    <tr><th>장착 장비</th><td><span style="color:#d4af37; font-weight:bold;">${equippedText}</span></td></tr>
-                    <tr><th>현재 상태</th><td><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
+                    <tr><th>장착 장비</th><td style="font-weight:bold; color:#d4af37; line-height:1.6;">${equippedText}</td></tr> <tr><th>현재 상태</th><td><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
                     <tr><th>특이사항</th><td class="${isGlowing}" style="word-break:break-all; font-size:11px; line-height:1.4;">${notes}</td></tr>
                 </table>
                 ${lettersHtml}
@@ -3953,6 +3957,11 @@ function getTodayStr() {
             const isOnline = onlineUsersMap[u.code] ? true : false;
             const onlineDot = isOnline ? `<div style="position:absolute; top:-4px; left:-4px; width:12px; height:12px; background-color:#4CAF50; border-radius:50%; box-shadow:0 0 8px #4CAF50; border:2px solid #242424; z-index:10;"></div>` : '';
 
+                        const listGear = getGear(u);
+            const gearTag = listGear && listGear.attrs && listGear.attrs.length
+                ? `<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">${GEAR_MARK[listGear.grade] || ''}${listGear.icon} ${listGear.name}</div>`
+                : '';
+
             return `
                                 <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')" ${qb ? 'style="opacity:0.7; border-color:' + qb.color + ';"' : ''}>
                     <div class="emp-list-avatar" style="position:relative;">
@@ -3964,6 +3973,7 @@ function getTodayStr() {
                             <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe} ${quarantineTag}
                         </div>
                         <div class="emp-list-sub">사번: <span style="font-family:monospace; color:#bbb;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}</div>
+                        ${gearTag}
                         <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-size:11px; font-weight:bold; color:#ffd700;">${u.points} P</span>
                             <span class="status-tag" style="color:${statusInfo.color}; background:${statusInfo.bg}; border:1px solid ${statusInfo.color};">
