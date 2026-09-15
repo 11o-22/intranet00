@@ -3337,7 +3337,7 @@ function getTodayStr() {
         saveDB();
     }
 
-           function finishDarkRun() {
+          function finishDarkRun() {
         closeDarkOverlay();
         darkAmbienceStop();
         detachVoteListener();
@@ -3357,6 +3357,7 @@ function getTodayStr() {
 
         clearDarkRunState();
         detachChatListener();
+        window._launchingParty = null;
         darkRun = null;
         myPartyId = null;
         partyChatOpen = false;
@@ -3365,7 +3366,6 @@ function getTodayStr() {
         renderDarkness();
         renderPartyPanel();
     }
-
     function renderDarkLogs() {
         const c = document.getElementById('darkness-log-container');
         if (!c) return;
