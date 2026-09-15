@@ -6102,6 +6102,7 @@ function getTodayStr() {
 
     deal.status = 'COMPLETED';
     db.p2pDeals[dealIndex] = deal;
+      sender._adminStamp = Date.now();
 
     addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
     addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
@@ -6142,6 +6143,7 @@ function getTodayStr() {
         deal.status = 'REJECTED';
         const sender = db.users[deal.fromCode];
          if (sender) {
+            sender._adminStamp = Date.now();
 
             addHistoryLog(sender, `[밀실 거절] ${currentUser.name} 사원이 제안을 거절하여 제물이 회수되었습니다.`);
         }
