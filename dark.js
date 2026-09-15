@@ -1,21 +1,21 @@
 const DARK_ZONES = {
-        "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[300,500], ready:false },
-        "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[200,300], ready:false },
-        "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[200,300], ready:false },
+        "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[1500,2500], ready:false },
+        "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[1000,1500], ready:false },
+        "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[1000,1500], ready:false },
                       "Qtrew-B-330": {
             code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자",
             brief:"(함정 조심!)",
-            danger:"중상", survival:"12%", min:2, max:4, reward:[180,320], ready:true,
+            danger:"중상", survival:"12%", min:2, max:4, reward:[900,1600], ready:true,
             voteMode:true, soloFrom:3, soloTo:6,
             intro:"안내 방송이 나오고 있다.<br><br><span style=\"color:#d4af37;\">\"미로 탈출 게임에 참가해 주셔서 감사합니다. 제한 시간은 없습니다. 함정을 조심하세요. 즐거운 시간 되시기 바랍니다.\"</span><br><br>목소리가 명랑하다. 같은 문장을 세 번 반복하는데, 세 번 다 억양이 똑같다.<br><br>벽에 안내판이 붙어 있다. 글씨가 흐릿하다.<br>누군가 미로를 대충 알고 있는 사람이 그린 것 같다.",
             outro:"이름이 기억나지 않는다.<br><br>그게 다행이라는 것만 안다.<br>벽이 멀어지고, 안내 방송이 잦아들고, 화살표가 전부 같은 방향을 가리킨다.<br>처음으로 일치했다.<br><br>눈을 뜨니 복도다. 사원증에 적힌 이름을 한참 들여다봤다.",
             images: { intro:"maze_1.jpg", step1:"maze_2.jpg", step2:"maze_3.jpg", step3:"maze_4.jpg" }
         },
-        "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[100,200], ready:false },
+        "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[900,1600], ready:false },
         "Qtrew-C-119": {
             code:"Qtrew-C-119", grade:"C", name:"거울은 세 마디만 허락한다",
             brief:"(거울이 늘어진 방. 한 사람은 안에, 한 사람은 밖에.)",
-            danger:"중", survival:"40%", min:2, max:2, reward:[50,100], ready:true,
+            danger:"중", survival:"40%", min:2, max:2, reward:[250,500], ready:true,
             voteMode:false, roleSplit:true,
             intro:"복도 끝에서 문이 닫혔다.<br><br>정신을 차려 보니 방이다. 천장에서 거울이 늘어져 있다. 액자에 걸린 것이 아니라, 줄에 매달려 천천히 돌고 있다.<br>수십 개가 각기 다른 속도로 돈다. 비치는 것도 각기 다르다.<br><br>둘이 함께 들어왔는데, 지금 서로가 보이지 않는다.",
             outro:"마지막 거울이 멈춘다.<br><br>거기 비친 것은 둘 다였다. 나란히 서 있었다.<br>실제로는 한 번도 마주치지 못했는데.<br><br>눈을 뜨니 복도다. 문은 열려 있다.",
@@ -26,12 +26,12 @@ const DARK_ZONES = {
                 step3: "mirror_4.jpg"
             }
         },
-         "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[50,100], ready:false },
+         "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[250,500], ready:false },
        
         "Qtrew-D-042": {
             code:"Qtrew-D-042", grade:"D", name:"가로등은 뒤에서부터 꺼진다",
             brief:"(밤 1시 17분. 집으로 가는 길이 조금 길어졌다.)",
-            danger:"하", survival:"94%", min:1, max:1, reward:[30,60], ready:true,
+            danger:"하", survival:"94%", min:1, max:1, reward:[200,400], ready:true,
             intro:"휴대폰 시계가 1시 17분에서 넘어가지 않는다.<br>몇 번을 껐다 켜도 같다.<br><br>언제나 지나던 골목인데, 오늘은 끝이 보이지 않는다.<br>가로등이 하나, 등 뒤에서부터 꺼진다.",
             outro:"익숙한 현관 앞이다.<br>시계는 1시 18분을 가리키고 있다.<br><br>골목 쪽은 돌아보지 않기로 한다.",
             images: {
@@ -44,7 +44,7 @@ const DARK_ZONES = {
         "Qtrew-D-087": {
             code:"Qtrew-D-087", grade:"D", name:"관람객은 손대지 마시오",
             brief:"(눈을 뜨니 폐관한 미술관 안이었다.)",
-            danger:"하", survival:"91%", min:1, max:1, reward:[30,60], ready:true,
+            danger:"하", survival:"91%", min:1, max:1, reward:[200,400], ready:true,
             intro:"눈을 뜬다.<br><br>등이 배긴다. 벤치다. 전시실 한가운데 놓인, 관람객이 앉아 그림을 올려다보라고 만들어진 나무 벤치.<br>언제 잠들었는지 기억나지 않는다. 미술관에 온 기억도 없다.<br><br>천장 조명은 반쯤 꺼져 있고, 남은 불빛이 벽면의 액자들을 아래에서 위로 훑는다.<br>셔터는 내려와 있다. 안내 방송은 나오지 않는다.<br><br>그림들은 아주 얌전히, 제자리에 걸려 있다.",
             outro:"발밑이 사라진다.<br><br>떨어지는 동안 위를 본다. 네모난 빛이 빠르게 멀어지고,<br>그 가장자리로 액자들이 줄지어 내려다보고 있다.<br>전부 제자리다. 하나도 움직이지 않았다.<br><br>눈을 뜨니 현관 앞이다. 손바닥에 캔버스 결이 남아 있다.",
             images: {
@@ -60,17 +60,20 @@ const DARK_ZONES = {
         "Qtrew-C-119": [
             { name:"금이 간 손거울", chance:0.003 },
             { name:"세 번째 단어", chance:0.002 },
-            { name:"먼저 웃은 쪽", chance:0.001 }
+            { name:"먼저 웃은 쪽", chance:0.001 },
+            { name:"맞물리지 않는 조각", chance:0.05 }
         ],
         "Qtrew-B-330": [
             { name:"접힌 안내도", chance:0.003 },
             { name:"누군가의 왼쪽 신발", chance:0.002 },
-            { name:"세어지지 않는 숫자", chance:0.001 }
+            { name:"세어지지 않는 숫자", chance:0.001 },
+            { name:"지워지지 않는 자국", chance:0.05 }
         ],
         "Qtrew-B-508": [
             { name:"읽을 수 없는 라벨", chance:0.003 },
             { name:"덜 구워진 것", chance:0.002 },
-            { name:"영업시간 안내판", chance:0.001 }
+            { name:"영업시간 안내판", chance:0.001 },
+            { name:"반죽에 섞이지 않은 것", chance:0.05 }
         ],
         "Qtrew-D-042": [
             { name:"꺼진 가로등 전구", chance:0.003 },
@@ -2597,3 +2600,208 @@ function input119D(n) {
             }
         });
 }
+    // ==========================================
+    // ★ 전용 장비 (Soul Gear)
+    // ==========================================
+    const GEAR_ATTRS = {
+        evade:  { name:'회피', icon:'✦', desc:'즉사 판정을 확률적으로 무효화하고, 강제 지목에 저항합니다.' },
+        break:  { name:'파괴', icon:'✧', desc:'막힌 것을 뚫는 판정의 난이도를 낮춥니다.' },
+        heal:   { name:'치유', icon:'❋', desc:'탐사 중 오염도 상승을 줄이고, 동료 구조 성공률을 높입니다.' },
+        luck:   { name:'행운', icon:'✺', desc:'사망 시 재산 일부를 지키고, 회수품 확률이 오릅니다.' },
+        sense:  { name:'감각', icon:'◈', desc:'정보·감식·기억 판정에 강해집니다.' },
+        hide:   { name:'은신', icon:'◐', desc:'어둠의 표적이 되는 판정을 피합니다.' }
+    };
+
+    const GEAR_GRADES = ['D', 'C', 'B', 'A', 'S'];
+    const GEAR_MULT = { D: 1.0, C: 1.5, B: 2.0, A: 2.8, S: 4.0 };
+    const GEAR_UPGRADE = {
+        D: { to:'C', rate:0.70, cost:3000 },
+        C: { to:'B', rate:0.40, cost:8000 },
+        B: { to:'A', rate:0.12, cost:20000 },
+        A: { to:'S', rate:0.01, cost:50000 }
+    };
+
+    // 속성별 기본 수치 (D등급 기준, 등급 배율 적용)
+    const GEAR_BASE = {
+        evade:  0.08,   // 즉사 무효 확률
+        break:  1,      // DC 감소
+        heal:   0.10,   // 오염 감소율
+        luck:   0.15,   // 재산 보존 판정 성공률
+        sense:  1,      // 판정 보정
+        hide:   1       // 판정 보정
+    };
+
+    function getGear(user) {
+        return (user && user.soulGear) ? user.soulGear : null;
+    }
+
+    function gearHas(user, attr) {
+        const g = getGear(user);
+        return !!(g && g.attrs && g.attrs.includes(attr));
+    }
+
+    // 속성 실효 수치 (등급 배율 적용)
+    function gearValue(user, attr) {
+        const g = getGear(user);
+        if (!g || !g.attrs || !g.attrs.includes(attr)) return 0;
+        const mult = GEAR_MULT[g.grade] || 1;
+        const base = GEAR_BASE[attr] || 0;
+        // 정수형 보정(파괴·감각·은신)은 반올림
+        if (attr === 'break' || attr === 'sense' || attr === 'hide') {
+            return Math.round(base * mult);
+        }
+        return base * mult;
+    }
+
+       const GEAR_MARK = { D: '◇', C: '◆', B: '❖', A: '✦', S: '✷' };
+
+    function gearLabel(user) {
+        const g = getGear(user);
+        if (!g) return '없음';
+        const hasAttr = g.attrs && g.attrs.length > 0;
+        if (!hasAttr) return `${g.name} — 속성 미지정`;
+        const mark = (GEAR_MARK[g.grade] || '') + (g.icon || '');
+        const attrs = g.attrs.map(a => GEAR_ATTRS[a] ? GEAR_ATTRS[a].name : a).join(' · ');
+        return `${mark} ${g.name} — ${attrs}`;
+    }
+
+        // ==========================================
+    // ★ 전용 장비 — 사원 조작
+    // ==========================================
+    function openGearModal(title, bodyHtml) {
+        document.getElementById('gear-modal-title').innerText = title;
+        document.getElementById('gear-modal-body').innerHTML = bodyHtml;
+        document.getElementById('gear-modal').style.display = 'flex';
+    }
+    function closeGearModal() {
+        document.getElementById('gear-modal').style.display = 'none';
+    }
+
+    // --- 속성 선택 ---
+    function openGearAttrPick() {
+        const g = getGear(currentUser);
+        if (!g) return;
+        if ((g.attrs || []).length >= (g.slots || 1)) { showCustomAlert('더 새길 자리가 없습니다.'); return; }
+
+        const taken = g.attrs || [];
+        const html = `
+            <div style="font-size:11px; color:#aaa; line-height:1.7; margin-bottom:13px;">
+                하나를 고르면 되돌릴 수 없습니다.<br>
+                등급이 오르면 선택한 속성의 효과도 함께 강해집니다.
+            </div>` +
+            Object.keys(GEAR_ATTRS).map(k => {
+                const a = GEAR_ATTRS[k];
+                const dup = taken.includes(k);
+                return `
+                    <div style="border:1px solid ${dup ? '#333' : '#4a3a6a'}; border-radius:6px; padding:11px; margin-bottom:8px; ${dup ? 'opacity:0.35;' : ''}">
+                        <div style="font-size:13px; color:#d4bbff; font-weight:bold;">${a.icon} ${a.name}</div>
+                        <div style="font-size:10px; color:#999; margin:5px 0 8px 0; line-height:1.6;">${a.desc}</div>
+                        <button class="game-btn" style="width:100%; margin:0; padding:8px; font-size:11px;" onclick="pickGearAttr('${k}')" ${dup ? 'disabled' : ''}>
+                            ${dup ? '이미 새겨짐' : '이것으로 새긴다'}
+                        </button>
+                    </div>`;
+            }).join('');
+        openGearModal('속성 선택', html);
+    }
+
+    function pickGearAttr(attr) {
+        const g = getGear(currentUser);
+        if (!g || !GEAR_ATTRS[attr]) return;
+        if ((g.attrs || []).length >= (g.slots || 1)) return;
+        if ((g.attrs || []).includes(attr)) return;
+
+        if (!g.attrs) g.attrs = [];
+        g.attrs.push(attr);
+        addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 ${GEAR_ATTRS[attr].name} 속성을 새겼습니다.`);
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        closeGearModal();
+        updateUI();
+        showCustomAlert(`${GEAR_ATTRS[attr].icon} ${GEAR_ATTRS[attr].name} 속성이 새겨졌습니다.`);
+    }
+
+    // --- 강화 ---
+    function openGearUpgrade() {
+        const g = getGear(currentUser);
+        if (!g) return;
+        const up = GEAR_UPGRADE[g.grade];
+        if (!up) { showCustomAlert('이미 최고 등급입니다.'); return; }
+
+        const html = `
+            <div style="text-align:center; font-size:15px; color:#fff; font-weight:bold; margin-bottom:14px;">
+                ${GEAR_MARK[g.grade]} ${g.grade}
+                <span style="color:#666; margin:0 9px;">→</span>
+                <span style="color:#d4bbff;">${GEAR_MARK[up.to]} ${up.to}</span>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #4a3a6a; border-radius:6px; padding:12px; font-size:12px; line-height:1.9; margin-bottom:13px;">
+                성공 확률 <b style="color:${up.rate >= 0.4 ? '#4CAF50' : up.rate >= 0.1 ? '#ff9800' : '#f44336'};">${(up.rate * 100).toFixed(up.rate < 0.1 ? 1 : 0)}%</b><br>
+                필요 포인트 <b style="color:#ffd700;">${up.cost.toLocaleString()} P</b><br>
+                <span style="color:#f44336;">실패 시 ${Math.floor(up.cost / 2).toLocaleString()} P가 차감됩니다.</span><br>
+                <span style="font-size:10px; color:#888;">등급이 내려가지는 않습니다.</span>
+            </div>
+            <div style="font-size:11px; color:#888; text-align:center; margin-bottom:12px;">
+                보유 포인트 <b style="color:#ffd700;">${currentUser.points.toLocaleString()} P</b>
+            </div>
+            <button class="game-btn" style="width:100%; margin:0; padding:12px; ${currentUser.points >= up.cost ? 'background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;' : 'opacity:0.4;'}"
+                onclick="tryGearUpgrade()" ${currentUser.points >= up.cost ? '' : 'disabled'}>
+                ${currentUser.points >= up.cost ? '강화를 시도한다' : '포인트가 부족합니다'}
+            </button>`;
+        openGearModal('장비 강화', html);
+    }
+
+    function tryGearUpgrade() {
+        const g = getGear(currentUser);
+        if (!g) return;
+        const up = GEAR_UPGRADE[g.grade];
+        if (!up) return;
+        if (currentUser.points < up.cost) { showLuxuryAlert(); return; }
+
+        const ok = Math.random() < up.rate;
+        const from = g.grade;
+
+        if (ok) {
+            currentUser.points -= up.cost;
+            g.grade = up.to;
+            addHistoryLog(currentUser, `[강화 성공] '${g.name}'이(가) ${from} → ${up.to} 등급이 되었습니다. (-${up.cost} P)`);
+        } else {
+            const loss = Math.floor(up.cost / 2);
+            currentUser.points = Math.max(0, currentUser.points - loss);
+            addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화에 실패했습니다. (-${loss} P)`);
+        }
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        const html = `
+            <div style="text-align:center; padding:18px 0;">
+                <div style="font-size:38px; margin-bottom:12px;">${ok ? '✷' : '✕'}</div>
+                <div style="font-size:15px; color:${ok ? '#4CAF50' : '#f44336'}; font-weight:bold; margin-bottom:10px;">
+                    ${ok ? '강화 성공' : '강화 실패'}
+                </div>
+                <div style="font-size:12px; color:#ccc; line-height:1.8;">
+                    ${ok
+                        ? `${g.name}이(가) <b style="color:#d4bbff;">${up.to}등급</b>이 되었습니다.<br>손에 쥔 무게가 조금 달라졌다.`
+                        : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`}
+                </div>
+            </div>
+            <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="closeGearModal(); updateUI();">확인</button>`;
+        openGearModal(ok ? '강화 성공' : '강화 실패', html);
+    }
+
+    // --- 재료 조합 ---
+    function combineSecondSlot() {
+        const mats = ['맞물리지 않는 조각', '지워지지 않는 자국', '반죽에 섞이지 않은 것'];
+        const missing = mats.filter(m => !(currentUser.inventory || []).includes(m));
+        if (missing.length > 0) { showCustomAlert(`재료가 부족합니다.\n부족: ${missing.join(', ')}`); return; }
+
+        mats.forEach(m => removeItemFromInventory(currentUser, m, 1));
+        currentUser.inventory.push('두 번째 자리');
+        addHistoryLog(currentUser, `[조합] 재료 3종을 합쳐 '두 번째 자리'를 만들었습니다.`);
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        showCustomAlert('세 조각이 맞물렸습니다.\n「두 번째 자리」를 얻었습니다.');
+    }
