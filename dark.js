@@ -2312,7 +2312,7 @@ function input119D(n) {
         clearTimeout(dyingTimer);
         dyingTimer = setTimeout(() => {
             if (darkRun && darkRun.dying) confirmDeath();
-        }, 45000);
+               }, 90000);
     }
 
     function giveUpDying() { confirmDeath(); }
@@ -2370,8 +2370,9 @@ function input119D(n) {
     function attemptRescue(kind, code) {
         const roll = Math.floor(Math.random() * 20) + 1;
         let bonus = rollDarkBonus('hide');
-        let DC = { hand: 11, item: 8, name: 10 }[kind];
-        DC -= Math.round(gearValue(currentUser, 'heal') * 10);
+                let DC = { hand: 8, item: 5, name: 7 }[kind];
+        DC -= Math.round(gearValue(currentUser, 'heal') * 12);
+        if (DC < 2) DC = 2;
         const total = roll + bonus;
         const ok = (roll !== 1) && (total >= DC);
 
@@ -2396,15 +2397,21 @@ function input119D(n) {
             sendPartyChat(`${currentUser.name} 사원이 동료를 붙잡았습니다.`, true);
         } else {
             darkRun.fail++;
-            if (kind === 'hand') {
-                txt = `손을 뻗는다. 닿는다.<br><br>그런데 끌려가는 쪽이 더 세다.<br>발이 미끄러지고, 같이 딸려 들어간다.<br><br>둘 다 흐려지기 시작한다.`;
-                darkRun.dying = 'rescue';
-                applyPollutionToUser(currentUser, 10);
-                darkBodyEl().innerHTML = darkBox("구조 — 실패",
-                    `<div style="text-align:center; font-size:26px; font-weight:bold; color:#f44336; margin-bottom:12px;">🎲 ${roll}</div>${txt}`,
-                    darkChoiceBtn("놓지 않는다.", "renderRescueScene('rescue')"));
-                mountDarkChat('normal');
-                return;
+                       if (kind === 'hand') {
+                const healSave = gearValue(currentUser, 'heal') > 0;
+                if (healSave) {
+                    txt = `손을 뻗는다. 끌려가는 힘이 세다.<br><br>버티지 못하고 놓쳤다.<br>다만 당신까지 딸려 들어가지는 않았다.`;
+                    applyPollutionToUser(currentUser, 5);
+                } else {
+                    txt = `손을 뻗는다. 닿는다.<br><br>그런데 끌려가는 쪽이 더 세다.<br>발이 미끄러지고, 같이 딸려 들어간다.<br><br>둘 다 흐려지기 시작한다.`;
+                    darkRun.dying = 'rescue';
+                    applyPollutionToUser(currentUser, 10);
+                    darkBodyEl().innerHTML = darkBox("구조 — 실패",
+                        `<div style="text-align:center; font-size:26px; font-weight:bold; color:#f44336; margin-bottom:12px;">🎲 ${roll}</div>${txt}`,
+                        darkChoiceBtn("놓지 않는다.", "renderRescueScene('rescue')"));
+                    mountDarkChat('normal');
+                    return;
+                }
             }
             else if (kind === 'item') txt = `던진 것이 허공에서 사라진다.<br><br>바닥에 닿지 않았다. 애초에 바닥이 없었는지도 모른다.<br><br>흐려지는 속도가 조금 빨라졌다.`;
             else {
