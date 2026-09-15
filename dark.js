@@ -1331,7 +1331,7 @@ const DARK_ZONES = {
 
         function b330G7Roll(pick) {
         const roll = Math.floor(Math.random()*20) + 1;
-        let bonus = rollDarkBonus();
+        let bonus = rollDarkBonus ('hide');
         if (currentUser.darkMazeMap > 0) { bonus += 1; currentUser.darkMazeMap--; }
         const total = roll + bonus;
 
@@ -2348,7 +2348,7 @@ function input119D(n) {
 
     function attemptRescue(kind, code) {
         const roll = Math.floor(Math.random() * 20) + 1;
-        let bonus = rollDarkBonus();
+        let bonus = rollDarkBonus('hide');
         let DC = { hand: 11, item: 8, name: 10 }[kind];
         DC -= Math.round(gearValue(currentUser, 'heal') * 10);
         const total = roll + bonus;
@@ -2432,7 +2432,7 @@ function input119D(n) {
 
     function b330G5R(pick) {
         const roll = Math.floor(Math.random() * 20) + 1;
-        let bonus = rollDarkBonus();
+        let bonus = rollDarkBonus('sense');
         const total = roll + bonus;
         const DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
 
@@ -2515,7 +2515,7 @@ function input119D(n) {
 
     function b330G5R(pick) {
         const roll = Math.floor(Math.random() * 20) + 1;
-        let bonus = rollDarkBonus();
+        let bonus = rollDarkBonus('sense');
         const total = roll + bonus;
         let DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
         DC -= gearValue(currentUser, 'break');
@@ -2636,13 +2636,13 @@ function input119D(n) {
     };
 
     // 속성별 기본 수치 (D등급 기준, 등급 배율 적용)
-    const GEAR_BASE = {
-        evade:  0.08,   // 즉사 무효 확률
-        break:  1,      // DC 감소
-        heal:   0.10,   // 오염 감소율
-        luck:   0.15,   // 재산 보존 판정 성공률
-        sense:  1,      // 판정 보정
-        hide:   1       // 판정 보정
+        const GEAR_BASE = {
+        evade:  0.18,   // 즉사 무효 확률 (D 18% → S 72%)
+        break:  2,      // DC 감소 (D -2 → S -8)
+        heal:   0.25,   // 오염 감소율 (D 25% → S 100%)
+        luck:   0.30,   // 재산 보존 성공률 (D 30% → S 100%+)
+        sense:  2,      // 판정 보정 (D +2 → S +8)
+        hide:   2       // 판정 보정 (D +2 → S +8)
     };
 
     function getGear(user) {
@@ -2957,4 +2957,10 @@ function input119D(n) {
         updateUI();
         openSafePanel();
         showPointGainEffect(amt);
+    }
+
+        function gearTagHtml() {
+        const g = getGear(currentUser);
+        if (!g || !g.attrs || g.attrs.length === 0) return '';
+        return `<div style="font-size:10px; color:#c9a8ff; margin-top:5px; font-weight:normal;">${GEAR_MARK[g.grade] || ''}${g.icon} ${g.name} 적용 중</div>`;
     }
