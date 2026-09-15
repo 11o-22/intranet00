@@ -2100,18 +2100,18 @@ function getTodayStr() {
             });
         }
     }
-    function startAbsenceTimer() {
+           function startAbsenceTimer() {
         if (!darkRun) return;
-        clearInterval(darkRun._absenceTimer);
+        if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
         darkRun._absenceStart = Date.now();
-        darkRun._absenceTimer = setInterval(() => {
-            if (!darkRun || !darkRun._absenceNotified) { clearInterval(darkRun._absenceTimer); return; }
+        const timerId = setInterval(() => {
+            if (!darkRun || !darkRun._absenceNotified) { clearInterval(timerId); return; }
             const elapsed = Date.now() - darkRun._absenceStart;
             const p = darkParties[darkRun.partyId];
             const total = p && p.members ? Object.keys(p.members).length : 2;
 
             if (elapsed > REJOIN_LIMIT) {
-                clearInterval(darkRun._absenceTimer);
+                clearInterval(timerId);
                 if (total <= 2) {
                     darkBodyEl().innerHTML = darkBox("중단",
                         `기척이 완전히 사라졌다.<br><br>혼자서는 이 방을 나갈 수 없다.<br>왔던 쪽으로 되돌아간다.<br><br>문은 생각보다 쉽게 열렸다.`,
@@ -2120,8 +2120,8 @@ function getTodayStr() {
                 }
             }
         }, 2000);
+        darkRun._absenceTimer = timerId;
     }
-
     function abortDarkRunNoPenalty() {
         if (!darkRun) return;
         const z = DARK_ZONES[darkRun.zone];
@@ -3203,6 +3203,10 @@ function getTodayStr() {
         const zone = darkRun ? darkRun.zone : null;
 
                if (pid && database) {
+                 database.ref(`darkParties/${pid}/curStep`).off();
+            database.ref(`darkParties/${pid}/leader`).off();
+            database.ref(`darkParties/${pid}/alive`).off();
+
             if (darkRun && darkRun.isLeader) {
                 const p = darkParties[pid];
                 const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => c !== currentUser.code) : [];
@@ -3350,6 +3354,9 @@ function getTodayStr() {
 
         if (zone) releaseZone(zone);
         if (pid && database) {
+            database.ref(`darkParties/${pid}/curStep`).off();
+            database.ref(`darkParties/${pid}/leader`).off();
+            database.ref(`darkParties/${pid}/alive`).off();
             database.ref('darkParties/' + pid).remove();
             database.ref('darkChats/' + pid).remove();
             database.ref('darkVotes/' + pid).remove();

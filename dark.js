@@ -2571,7 +2571,7 @@ function input119D(n) {
         });
 
         // ★ 동료 이탈 감시
-        database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
+               database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
             if (!darkRun || !darkRun.isParty) return;
             const alive = snap.val() || {};
             const cnt = Object.keys(alive).length;
@@ -2587,8 +2587,8 @@ function input119D(n) {
                 startAbsenceTimer();
             } else if (cnt === total && darkRun._absenceNotified) {
                 darkRun._absenceNotified = false;
-                clearInterval(darkRun._absenceTimer);
+                if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
                 showDarkToast(`동료의 신호가 복구되었습니다.`);
             }
         });
-    }
+}
