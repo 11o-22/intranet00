@@ -797,17 +797,21 @@
             </div>
             <div id="admin-dark-zone-list"></div>
         </div>
-                        <div class="admin-panel-box" style="border-color: #6a4c93; background-color: #17121f;">
+               <div class="admin-panel-box" style="border-color: #6a4c93; background-color: #17121f;">
             <h4 style="color: #c9a8ff;">⚔ 전용 장비 지급</h4>
             <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
-                속성 없는 D등급으로 지급됩니다. 속성은 사원이 직접 선택합니다.<br>
-                한 사람당 하나만 보유하며, 새로 주면 기존 장비는 사라집니다.
+                이름과 이모지를 직접 정해 지급합니다. D등급 · 속성 없음으로 시작하며,<br>
+                속성은 사원이 직접 선택합니다. 한 사람당 하나만 보유합니다.
             </div>
-            <div id="admin-gear-catalog" style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-bottom:10px;"></div>
+            <div style="font-size:12px; display:flex; gap:6px; align-items:center; margin-bottom:7px;">
+                <input type="text" id="adm-gear-icon" class="bet-input" style="width:60px; text-align:center; font-size:16px;" placeholder="🔪" maxlength="4">
+                <input type="text" id="adm-gear-name" class="bet-input" style="flex:1;" placeholder="장비 이름">
+            </div>
+            <div id="adm-gear-quick" style="display:flex; flex-wrap:wrap; gap:3px; margin-bottom:9px;"></div>
+            <button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:9px; background:linear-gradient(145deg, #6a4c93, #4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminGiveGear()">지급</button>
             <button class="game-btn" style="width:100%; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminRemoveGear()">전용 장비 회수</button>
             <div id="admin-gear-list" style="margin-top:12px;"></div>
         </div>
-
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
             <h4 style="color: #ff8888;">사원 계정 말소 및 데이터 폐기</h4>
             <div style="font-size:12px; display:flex; gap:8px;">
