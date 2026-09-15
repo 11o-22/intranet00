@@ -2134,6 +2134,10 @@ function getTodayStr() {
     }
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
        function renderChoiceStep(title, text, options, imgKey) {
+        if (consumeQFlag('safe_hint') && options.length > 0) {
+            options[0].label = '◈ ' + options[0].label;
+            showDarkToast('일지에 표시된 쪽이 있다.');
+        }
         const jakduBtn = jakduAvailable()
             ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ 작두로 박살낸다 (1회)</button>`
             : '';
@@ -2724,11 +2728,15 @@ function getTodayStr() {
         if (hasEquip(currentUser, '착한 친구')) b += 2;
         // ★ 유리손포 — 정보 판정에 +3
         if (hasEquip(currentUser, '유리손포') && kind === 'sense') b += 3;
+                // rollDarkBonus 끝부분
+        if (hasEquip(currentUser, '실리카겔') && darkRun && ['Qtrew-B-508','Qtrew-C-119'].includes(darkRun.zone)) b += 2;
+        if (hasEquip(currentUser, '은박 담요') && darkRun && darkRun.zone === 'Qtrew-B-508') b += 2;
 
                 // ★ ??? 소모품 보정
         if (qFlag('dark_light')) b += 2;
         if (qFlag('next_plus')) { b += 1; consumeQFlag('next_plus'); }
         if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) b += 4;
+
 
         return b;
     }
@@ -3663,6 +3671,7 @@ function getTodayStr() {
     }
     // ★ [추가] 은반지 및 버터 나이프 장착 여부 및 만료 체크 함수
     function getPollutionMultiplier(user) {
+        if (user.equippedWeapons.includes("방진복 안감")) return 0.8;
         if (!user.equippedWeapons) return 1; // 장착한 무기가 없으면 기본 배율(1배)
 
         
@@ -4969,6 +4978,89 @@ function getTodayStr() {
             return;
         }
 
+                // ===== ??? 장비 관련 =====
+        if (cat.effect === 'q_protect') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            if (currentUser.gearProtect) { showCustomAlert('이미 보호권이 적용되어 있습니다.'); return; }
+            currentUser.gearProtect = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 파손 보호권 — 다음 강화 실패 시 등급이 보존됩니다.`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('보호권이 장비에 스몄습니다.\n다음 강화 실패 시 등급이 내려가지 않습니다.');
+            return;
+        }
+
+        if (cat.effect === 'q_polish') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            currentUser.gearPolish = (currentUser.gearPolish || 0) + 0.10;
+            if (currentUser.gearPolish > 0.30) currentUser.gearPolish = 0.30;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 각인 연마제 — 강화 확률 +${Math.round(currentUser.gearPolish * 100)}%`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert(`날을 갈았습니다.\n다음 강화 확률이 ${Math.round(currentUser.gearPolish * 100)}% 올랐습니다. (최대 30%)`);
+            return;
+        }
+
+        if (cat.effect === 'q_appraise') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            const up = GEAR_UPGRADE[g.grade];
+            if (!up) { showCustomAlert('이미 최고 등급입니다.'); return; }
+            const bonus = currentUser.gearPolish || 0;
+            const rate = Math.min(0.99, up.rate + bonus);
+            removeItemFromInventory(currentUser, itemName, 1);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert(
+                `[감정 결과]\n\n` +
+                `${g.grade} → ${up.to}\n` +
+                `성공 확률 ${(rate * 100).toFixed(1)}%\n` +
+                `필요 포인트 ${up.cost.toLocaleString()} P\n` +
+                `실패 시 ${Math.floor(up.cost / 2).toLocaleString()} P 차감\n` +
+                (currentUser.gearProtect ? `\n보호권 적용 중 — 등급 유지` : '')
+            );
+            return;
+        }
+
+        if (cat.effect === 'q_reattr') {
+            const g = getGear(currentUser);
+            if (!g || !g.attrs || g.attrs.length === 0) { showCustomAlert('바꿀 속성이 없습니다.'); return; }
+            openGearReattr(itemName);
+            return;
+        }
+
+        if (cat.effect === 'q_repair') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            if (!currentUser.gearBroken) { showCustomAlert('손상된 기록이 없습니다.'); return; }
+            const idx = GEAR_GRADES.indexOf(g.grade);
+            if (idx < GEAR_GRADES.length - 1) g.grade = GEAR_GRADES[idx + 1];
+            currentUser.gearBroken = false;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 재봉 도구 — '${g.name}'이(가) ${g.grade}등급으로 복구되었습니다.`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert(`꿰맨 자리가 원래보다 단단합니다.\n${g.grade}등급으로 돌아왔습니다.`);
+            return;
+        }
+
+        if (cat.effect === 'q_blank') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            if ((g.attrs || []).length >= (g.slots || 1)) { showCustomAlert('새길 자리가 없습니다.'); return; }
+            currentUser.gearBlank = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 빈 각인지 — 다음 속성이 한 단계 높게 새겨집니다.`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('종이가 장비에 붙었습니다.\n다음에 새길 속성이 한 단계 강해집니다.');
+            return;
+        }
+
                 if (cat.effect === 'safe_box') {
             const safes = getSafes(currentUser);
             safes.push({ amount: 0, lastInterest: Date.now(), createdAt: Date.now() });
@@ -5129,8 +5221,7 @@ function getTodayStr() {
     }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
-               if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb') {
-            if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
+          if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu' || cat.effect === 'equip_liner' || cat.effect === 'equip_silica' || cat.effect === 'equip_foil') { if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
             }
