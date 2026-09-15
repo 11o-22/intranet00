@@ -3083,7 +3083,7 @@ function getTodayStr() {
         darkStep3Pick(pick);
     }
 
-            function darkDeath(reasonText) {
+                function darkDeath(reasonText) {
         // ★ 회피 — 즉사를 확률적으로 무효화
         const evadeRate = gearValue(currentUser, 'evade');
         if (evadeRate > 0 && !darkRun._evadeUsed && Math.random() < evadeRate) {
@@ -3102,10 +3102,6 @@ function getTodayStr() {
             saveDB();
             return;
         }
-
-            }
-            
-        function darkDeath(reasonText) {
         // ★ 사직서를 반입했다면 선택권을 준다
         const hasResign = (darkRun.carryItems || []).includes('사직서');
         if (hasResign && !darkRun._resignAsked) {
