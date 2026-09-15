@@ -504,9 +504,27 @@
                 <!-- 5. 어둠 탐사 -->
         <div id="tab-darkness" class="tab-content" style="text-align: left;">
             <div class="sub-tabs-grid">
+                <button class="sub-tab" onclick="switchDarknessPanel('dark-lost', this)">기록 소실</button>
                 <button class="sub-tab active" onclick="switchDarknessPanel('dark-main', this)">탐사 개시</button>
                 <button class="sub-tab" id="dark-party-tab" onclick="switchDarknessPanel('dark-party', this)">파티</button>       
                 <button class="sub-tab" onclick="switchDarknessPanel('dark-log', this)">탐사 기록</button>
+            </div>
+
+                        <div id="dark-lost" class="sub-panel">
+                <div class="panel-title">[기록 소실]</div>
+                <div style="min-height:200px; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:30px 15px;">
+                    <div style="font-family:monospace; font-size:11px; color:#444; letter-spacing:2px; margin-bottom:18px; text-align:center; line-height:2;">
+                        ■■■■■■■■■■<br>
+                        ■■■■&nbsp;&nbsp;&nbsp;&nbsp;■■■■<br>
+                        ■■■■■■■■■■
+                    </div>
+                    <div style="font-size:12px; color:#666; text-align:center; line-height:1.9;">
+                        — 소실되어 찾을 수 없습니다. —
+                    </div>
+                    <div style="font-size:10px; color:#333; margin-top:20px; text-align:center; font-family:monospace;">
+                        RECOVERY ATTEMPT FAILED
+                    </div>
+                </div>
             </div>
 
             <div id="dark-main" class="sub-panel active">
@@ -4375,7 +4393,7 @@ function getTodayStr() {
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'shop-alien') setUFODialogue("물건을 본다 👌🏻");
     }
-           function switchDarknessPanel(panelId, btnEl) {
+    function switchDarknessPanel(panelId, btnEl) {
         document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-darkness .sub-panel').forEach(p => p.classList.remove('active'));
