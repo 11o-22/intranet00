@@ -2100,10 +2100,11 @@ function getTodayStr() {
             });
         }
     }
-           function startAbsenceTimer() {
+            function startAbsenceTimer() {
         if (!darkRun) return;
         if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
         darkRun._absenceStart = Date.now();
+
         const timerId = setInterval(() => {
             if (!darkRun || !darkRun._absenceNotified) { clearInterval(timerId); return; }
             const elapsed = Date.now() - darkRun._absenceStart;
@@ -2120,6 +2121,7 @@ function getTodayStr() {
                 }
             }
         }, 2000);
+
         darkRun._absenceTimer = timerId;
     }
     function abortDarkRunNoPenalty() {

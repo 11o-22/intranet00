@@ -1610,15 +1610,20 @@ const DARK_ZONES = {
                 </div>
                 <div style="font-size:10px; color:#888; margin-top:6px;">추는 계속 내려갑니다. 신호가 오면 즉시 멈추세요.</div>
              </div>
-             <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:14px; font-size:13px;" onclick="start119C()" ${c119State.runC ? 'disabled' : ''}>추를 내린다</button>
-             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:14px; font-size:13px; background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="stop119C()" ${c119State.runC ? '' : 'disabled'}>멈춘다</button>`);
+            <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:14px; font-size:13px;" id="c119-start-btn" onclick="start119C()">추를 내린다</button>
+             <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:14px; font-size:13px; background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" id="c119-stop-btn" onclick="stop119C()" disabled>멈춘다</button>`);
     }
 
     let c119Timer = null;
-       function start119C() {
+          function start119C() {
         if (myC119Role() !== 'outside') return;
-        if (darkRun) darkRun._c119Locked = true;      // ★ 리렌더 차단
-        database.ref(c119Path()).update({ runC: true, posC: 0 });
+        if (darkRun) darkRun._c119Locked = true;
+
+        const sBtn = document.getElementById('c119-start-btn');
+        const eBtn = document.getElementById('c119-stop-btn');
+        if (sBtn) sBtn.disabled = true;
+        if (eBtn) eBtn.disabled = false;
+
         let pos = 0;
         clearInterval(c119Timer);
         c119Timer = setInterval(() => {
