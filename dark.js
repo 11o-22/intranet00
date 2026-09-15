@@ -573,17 +573,17 @@ const DARK_ZONES = {
 
     function c119Path() { return `darkC119/${darkRun.partyId}`; }
 
-    function attachC119Listener() {
+        function attachC119Listener() {
         if (!database || !darkRun || !darkRun.partyId) return;
         if (c119Key === darkRun.partyId) return;
         detachC119Listener();
         c119Key = darkRun.partyId;
         c119Ref = database.ref(c119Path());
-               c119Ref.on('value', (snap) => {
+
+        c119Ref.on('value', (snap) => {
             c119State = snap.val();
             if (!c119State || !darkRun) return;
 
-            // ★ 서버 단계가 다르면 잠금과 무관하게 무조건 따라간다
             if (c119State.step != null && c119State.step !== darkRun.step) {
                 darkRun.step = c119State.step;
                 darkRun._c119Locked = false;
@@ -591,13 +591,9 @@ const DARK_ZONES = {
                 renderReactFlash();
                 return;
             }
-
-            // 같은 단계인데 결과 화면이 떠 있으면 덮어쓰지 않는다
             if (!darkRun._c119Locked) renderStep119();
             renderReactFlash();
-        
         });
-
     }
 
     function detachC119Listener() {
@@ -714,10 +710,13 @@ const DARK_ZONES = {
         if (darkRun.rejoined) { renderRejoinScene(); return; }
         saveDarkRunState();
         attachC119Listener();
+               attachC119Listener();
         if (!c119State) {
             if (darkRun.isLeader) initC119();
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
                 `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">역할을 배정하는 중...</div>`, "intro");
+            // ★ 데이터가 들어왔는데 화면이 안 바뀐 경우 대비
+            setTimeout(() => { if (c119State && darkRun) renderStep119(); }, 1000);
             return;
         }
 
