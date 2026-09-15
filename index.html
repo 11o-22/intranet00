@@ -1220,10 +1220,10 @@ function getTodayStr() {
         "체리맛 물약": { price: 1500, usable: true, targetable: true, effect: "cherry_potion", desc: "사용 시 3일간 신체 부위 중 일부가 예민하게 개발된다." },
         "제거약": { price: 4000, usable: true, targetable: false, effect: "cure_potion", desc: "자신 또는 타인의 상태이상을 무작위로 하나 제거합니다." },
         "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
-        "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip", desc: "귀여운 분홍색 토끼 봉제인형. 장착 가능하다." },
-        "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip", desc: "보안팀의 의상 세트, 착용이 가능하다." },
-        "작두": { price: 9999, usable: true, targetable: false, effect: "equip", desc: "영험한 기운이 담겨있는 무기. 장착 가능하다." },
-        "유리손포": { price: 8000, usable: true, targetable: false, effect: "equip", desc: "재난관리국 요원들의 기본 지급 무기. 장착 가능하다." },
+         "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip_rabbit", desc: "귀여운 분홍색 토끼 봉제인형. 장착 시 어둠의 판정에 행운이 더해지고, 공용시설 승률이 크게 오른다. 약간의 회피 효과도 있다." },
+        "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip_security", desc: "보안팀의 의상 세트. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
+        "작두": { price: 9999, usable: true, targetable: false, effect: "equip_jakdu", desc: "영험한 기운이 담긴 무기. 어떤 기믹이든 한 번은 무조건 박살낸다. 죽어도 사라지지 않으며, 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
+        "유리손포": { price: 8000, usable: true, targetable: true, effect: "equip_sonpo", desc: "재난관리국의 기본 지급 무기. 삿된 것을 읽어 낸다. 기믹의 단서가 선명하게 보이며, 공용시설 승률이 크게 오른다. 타인에게 착용시킬 수도 있다." },
         "버터 나이프": { price: 2222, usable: true, targetable: false, effect: "equip_butter_knife", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "장착 가능한 나이프. 장착 시 1시간 동안 오염도를 절반으로 줄여준다." },
         "누군가가 쓴 부적": { price: 4000, usable: true, targetable: false, effect: "equip_amulet", restrictDept: ["재난관리국", "재난관리"], desc: "장착 시 슬롯머신의 당첨 확률이 상승한다." },
         "다이아 애널 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_plug", desc: "반짝이는 다이아몬드가 박힌 애널 플러그. 본인이나 타인의 장착칸에 강제 장착된다." },
@@ -2098,15 +2098,33 @@ function getTodayStr() {
         renderVoteState();
     }
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
-    function renderChoiceStep(title, text, options, imgKey) {
+       function renderChoiceStep(title, text, options, imgKey) {
+        const jakduBtn = jakduAvailable()
+            ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ 작두로 박살낸다 (1회)</button>`
+            : '';
+
         if (darkRun.isParty) {
             renderVoteBox(title, text, options, imgKey);
+            const area = document.getElementById('vote-area');
+            if (area && jakduBtn) area.insertAdjacentHTML('afterend', jakduBtn);
         } else {
-           const body = darkBodyEl();
+            const body = darkBodyEl();
             body.innerHTML = darkBox(title, text,
-                options.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`).join(''),
+                options.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`).join('') + jakduBtn,
                 imgKey);
         }
+    }
+
+    function jakduSmash() {
+        if (!useJakdu()) return;
+        darkRun.success += 2;
+        darkRun.modifier = (darkRun.modifier || 0) + 1;
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 작두를 휘둘렀습니다.`, true);
+
+        darkBodyEl().innerHTML = darkBox("작두",
+            `칼을 뽑는다.<br><br>무엇을 베었는지는 보지 못했다.<br>다만 앞을 막고 있던 것이 더 이상 앞에 없다.<br><br>날에 아무것도 묻지 않았다. 그게 더 이상하다.`,
+            darkChoiceBtn("지나간다.", `partyAdvance(${darkRun.step + 1})`));
+        mountDarkChat('normal');
     }
 
     // 결과 화면 (파티는 채팅 포함)
@@ -2654,7 +2672,7 @@ function getTodayStr() {
         return Math.max(0, 3 - (currentUser.darkTries || 0));
     }
 
-       function rollDarkBonus(kind) {
+           function rollDarkBonus(kind) {
         let b = 0;
         if (currentUser.pollution < 30) b += 1;
         if (currentUser.pollution >= 60) b -= 1;
@@ -2662,12 +2680,15 @@ function getTodayStr() {
         if (darkRun && darkRun.carryItems && darkRun.carryItems.length > 0) b += 1;
         if (darkRun) b += (darkRun.modifier || 0);
 
-        // ★ 전용 장비 속성
         if (kind === 'sense') b += gearValue(currentUser, 'sense');
         if (kind === 'hide')  b += gearValue(currentUser, 'hide');
         if (kind !== 'sense') b += Math.floor(gearValue(currentUser, 'sense') / 2);
         if (kind !== 'hide')  b += Math.floor(gearValue(currentUser, 'hide') / 2);
 
+        // ★ 착한 친구 — 판정 전반에 +2
+        if (hasEquip(currentUser, '착한 친구')) b += 2;
+        // ★ 유리손포 — 정보 판정에 +3
+        if (hasEquip(currentUser, '유리손포') && kind === 'sense') b += 3;
 
         return b;
     }
@@ -3089,7 +3110,31 @@ function getTodayStr() {
         darkStep3Pick(pick);
     }
 
-                function darkDeath(reasonText) {
+    
+
+                    function darkDeath(reasonText) {
+        // ★ 보안팀 의상 세트 — 하루 1회 죽음 방지
+        const todayStr = getTodayStr();
+        if (hasEquip(currentUser, '보안팀 의상 세트') && currentUser.securitySaveDate !== todayStr) {
+            currentUser.securitySaveDate = todayStr;
+            darkRun.fail = Math.max(0, darkRun.fail - 1);
+            applyPollutionToUser(currentUser, 6);
+            addHistoryLog(currentUser, `[보안팀 의상] 치명적 상황에서 살아남았습니다. (일 1회)`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+
+            darkBodyEl().innerHTML = darkBox("—",
+                `${reasonText}<br><br>
+                 <span style="color:#4fc3f7;">— 옷이 먼저 버텼다.<br>
+                 어깨 쪽 천이 찢어지면서 힘이 분산된다. 규격품은 규격품이다.<br><br>
+                 숨이 돌아온다. 오늘은 여기까지다.</span>`,
+                darkChoiceBtn("자세를 낮춘다.", "renderDarkStep();"));
+            mountDarkChat('normal');
+            return;
+        }
+
+        // 회피 블록 ...
+                    
         // ★ 회피 — 즉사를 확률적으로 무효화
         const evadeRate = gearValue(currentUser, 'evade');
         if (evadeRate > 0 && !darkRun._evadeUsed && Math.random() < evadeRate) {
@@ -3603,6 +3648,21 @@ function getTodayStr() {
         }
 
                 if (user.equippedWeapons.includes("꺼진 가로등 전구")) return 0.9;
+
+                        // 작두 착용 중이면 오염 완전 차단, 4시간 후 자동 회수
+        if (user.equippedWeapons.includes("작두")) {
+            if (user.jakduExpireTime && Date.now() < user.jakduExpireTime) {
+                return 0;
+            } else if (user.jakduExpireTime && Date.now() >= user.jakduExpireTime) {
+                let idx = user.equippedWeapons.indexOf("작두");
+                if (idx > -1) {
+                    user.equippedWeapons.splice(idx, 1);
+                    user.inventory.push("작두");
+                }
+                user.jakduExpireTime = 0;
+                addHistoryLog(user, `[장비 회수] 작두의 기운이 다해 소지품으로 돌아갔습니다.`);
+            }
+        }
         
         return 1;
     }
@@ -3619,6 +3679,30 @@ function getTodayStr() {
                     user.timedEffects.splice(i, 1);
                     changed = true;
                 }
+            }
+        }
+
+                // ★ 보안팀 의상 세트 — 오염 80% 이상이면 1시간 동안 10분마다 3% 정화
+        if (user.equippedWeapons && user.equippedWeapons.includes("보안팀 의상 세트")) {
+            if (user.pollution >= 80 && !user.securityPurgeUntil) {
+                user.securityPurgeUntil = now + (60 * 60 * 1000);
+                user.securityPurgeLast = now;
+                addHistoryLog(user, `[보안팀 의상] 위험 수치 감지. 정화 프로토콜이 가동됩니다.`);
+                changed = true;
+            }
+            if (user.securityPurgeUntil && now < user.securityPurgeUntil) {
+                const tenMin = 10 * 60 * 1000;
+                if (!user.securityPurgeLast) user.securityPurgeLast = now;
+                const steps = Math.floor((now - user.securityPurgeLast) / tenMin);
+                if (steps > 0 && user.pollution > 0) {
+                    user.pollution = Math.max(0, user.pollution - steps * 3);
+                    user.securityPurgeLast += steps * tenMin;
+                    changed = true;
+                }
+            } else if (user.securityPurgeUntil && now >= user.securityPurgeUntil) {
+                user.securityPurgeUntil = 0;
+                user.securityPurgeLast = 0;
+                changed = true;
             }
         }
 
@@ -4679,7 +4763,7 @@ function getTodayStr() {
 
                 let useBtnHtml = '';
                 if (isUsable) {
-                    if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath') {
+        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
                     } else if (item === "빨간 리본" || item === "노예 계약서") {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;
@@ -4929,6 +5013,9 @@ function getTodayStr() {
             } else if (cat.effect === 'equip_butter_knife') {
                 currentUser.butterKnifeExpireTime = Date.now() + (1 * 60 * 60 * 1000);
             }
+              else if (cat.effect === 'equip_jakdu') {
+                currentUser.jakduExpireTime = Date.now() + (4 * 60 * 60 * 1000);
+            }
 
             if (cat.effect === 'equip_bloodbath') currentUser.bloodBathEquippedAt = Date.now();
             removeItemFromInventory(currentUser, itemName, 1);
@@ -5115,6 +5202,23 @@ function getTodayStr() {
             appendBadgeNoteToUser(targetUser, `[장착됨] 노스텔지어 끈 장착 (5시간 동안 오염도 서서히 감소)`);
             if(!isOthers) showCustomAlert("노스텔지어 끈을 장착했습니다. 5시간 동안 오염도가 서서히 감소합니다.");
        }
+       else if (cat.effect === 'equip_sonpo') {
+            if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+            if (targetUser.equippedWeapons.length >= 3) {
+                if (!isOthers) showCustomAlert('장착 슬롯이 가득 찼습니다.');
+                return false;
+            }
+            const label = isOthers ? `유리손포 (장착자: ${currentUser.name})` : '유리손포';
+            targetUser.equippedWeapons.push(label);
+            setEquipOwner(targetUser, label, isOthers ? currentUser.code : targetUser.code);
+            appendBadgeNoteToUser(targetUser, `[장착됨] 유리손포 — 삿된 것이 선명해진다.`);
+            if (isOthers) {
+                addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원이 유리손포를 채웠습니다.`);
+                showCustomAlert(`${targetUser.name}님에게 유리손포를 장착시켰습니다.`);
+            } else {
+                showCustomAlert('유리손포를 장착했습니다.');
+            }
+        }
         else if (cat.effect === 'cherry_potion') {
             appendBadgeNoteToUser(targetUser, `[체리맛 물약] 신체 부위 중 일부가 예민하게 개발됨 (3일 지속)`);
         }
@@ -5375,10 +5479,11 @@ function getTodayStr() {
         // 부적 장착 여부 확인
         let hasAmulet = currentUser.equippedWeapons && currentUser.equippedWeapons.includes("누군가가 쓴 부적");
         
-        // 부적이 있으면 꽝 확률이 62%에서 40%로 하락, 대박 확률이 5%에서 15%로 3배 상승
-        let failChance = hasAmulet ? 0.40 : 0.62;
-        let jackpotChance = hasAmulet ? 0.55 : 0.67; 
+        const luckM = facilityLuckMult(currentUser);
 
+        let failChance = (hasAmulet ? 0.40 : 0.62) / luckM;
+        let jackpotSpan = (hasAmulet ? 0.15 : 0.05) * luckM;
+        let jackpotChance = failChance + jackpotSpan;
         if (rollType < failChance) {
             // 완전 꽝 (3개 다름)
             let shuffled = [...slotSymbols].sort(() => 0.5 - Math.random());
@@ -5440,6 +5545,16 @@ function getTodayStr() {
 
         setTimeout(() => {
             let outcomeNum = 0, outcomeMult = 0;
+
+            if (luckM > 1 && Math.random() < 0.05 * (luckM - 1)) {
+                outcomeNum = targetNum;
+            } else if (Math.random() < 0.03 * luckM) {
+                outcomeNum = 25;
+            } else {
+                outcomeNum = Math.floor(Math.random() * 24) + 1;
+            }
+            outcomeMult = (outcomeNum === 25) ? 20 : (outcomeNum <= 11 ? 2.5 : 2.1);
+
             if (Math.random() < 0.03) { outcomeNum = 25; outcomeMult = 20; }
             else { outcomeNum = Math.floor(Math.random() * 24) + 1; outcomeMult = (outcomeNum <= 11) ? 2.5 : 2.1; }
             display.innerText = outcomeNum;
@@ -5583,6 +5698,12 @@ function getTodayStr() {
         // 2. 족보 계산
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
+
+        const luckM = facilityLuckMult(currentUser);
+        if (luckM > 1 && pRes.score <= dRes.score && Math.random() < 0.18 * (luckM - 1)) {
+            let picked = pickHandByCondition(r => r.score > dRes.score);
+            if (picked) { playerHand = picked.hand; pRes = picked.res; }
+        }
 
         // 3. 패 오픈 및 결과 표시
         // ★ 조정된 플레이어 패를 다시 그려서 카드 그림·족보명·배율을 일치시킴
@@ -6414,6 +6535,14 @@ function getTodayStr() {
         const msgEl = document.getElementById('hl-msg');
 
         let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
+        const luckM = facilityLuckMult(currentUser);
+        if (!win && luckM > 1 && Math.random() < 0.12 * (luckM - 1)) {
+            win = true;
+            playerCardValue = choice === 'HIGH'
+                ? Math.min(13, dealerCardValue + 1 + Math.floor(Math.random() * 3))
+                : Math.max(1, dealerCardValue - 1 - Math.floor(Math.random() * 3));
+            document.getElementById('hl-player-card').innerText = playerCardValue;
+        }
         
         // 횟수 증가 및 마지막 플레이 시간 기록
         currentUser.alienTries = (currentUser.alienTries || 0) + 1;

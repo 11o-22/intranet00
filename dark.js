@@ -3288,7 +3288,8 @@ function input119D(n) {
             const done = searched[key];
             // 감각이 높으면 힌트가 보인다
             let hintTag = '';
-            if (senseVal >= 4 && !done) {
+            
+                        if ((senseVal >= 4 || hasEquip(currentUser, '유리손포')) && !done) {
                 const here = Object.keys(b508State.placed || {}).some(id =>
                     b508State.placed[id].area === area && b508State.placed[id].spot === sp && !(b508State.found || {})[id]);
                 if (here) hintTag = `<span style="color:#c9a8ff; font-size:9px; margin-left:5px;">◈ 무언가 느껴진다</span>`;
@@ -3963,4 +3964,37 @@ function input119D(n) {
             darkAudio.timers.push(setTimeout(bell, 26000 + Math.random() * 30000));
         }
         darkAudio.timers.push(setTimeout(bell, 15000 + Math.random() * 12000));
+    }
+
+        // ==========================================
+    // ★ 특수 장비 효과
+    // ==========================================
+    function hasEquip(user, name) {
+        if (!user || !user.equippedWeapons) return false;
+        return user.equippedWeapons.some(w => getEquipBaseName(w) === name);
+    }
+
+    // 착한 친구 + 유리손포 — 공용시설 행운 배율
+    function facilityLuckMult(user) {
+        let m = 1;
+        if (hasEquip(user, '착한 친구')) m *= 2.5;
+        if (hasEquip(user, '유리손포')) m *= 2.5;
+        return m;
+    }
+
+    // 착한 친구 — 어둠 판정 행운 보정
+    function rabbitBonus(user) {
+        return hasEquip(user, '착한 친구') ? 0.5 : 0;
+    }
+
+    // 작두 — 기믹 1회 무조건 성공
+    function jakduAvailable() {
+        return darkRun && !darkRun._jakduUsed && hasEquip(currentUser, '작두');
+    }
+
+    function useJakdu() {
+        if (!jakduAvailable()) return false;
+        darkRun._jakduUsed = true;
+        darkRun.log.push('[작두] 기믹 강제 돌파');
+        return true;
     }
