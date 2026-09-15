@@ -2819,3 +2819,142 @@ function input119D(n) {
         updateUI();
         showCustomAlert('세 조각이 맞물렸습니다.\n「두 번째 자리」를 얻었습니다.');
     }
+
+        // ==========================================
+    // ★ 금고
+    // ==========================================
+    const SAFE_CAP = 50000;
+    const SAFE_RATE = 0.006;
+
+    function getSafes(user) {
+        if (!user.safeBoxes) user.safeBoxes = [];
+        return user.safeBoxes;
+    }
+
+    function safeTotal(user) {
+        return getSafes(user).reduce((a, s) => a + (s.amount || 0), 0);
+    }
+
+    function safeCapacity(user) {
+        return getSafes(user).length * SAFE_CAP;
+    }
+
+    // 이자 정산 (하루 단위, 접속 시 자동 계산)
+    function applySafeInterest(user) {
+        const safes = getSafes(user);
+        if (safes.length === 0) return false;
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+        let changed = false;
+
+        safes.forEach(s => {
+            if (!s.lastInterest) { s.lastInterest = now; return; }
+            const days = Math.floor((now - s.lastInterest) / dayMs);
+            if (days <= 0 || !s.amount) return;
+
+            let amt = s.amount;
+            for (let i = 0; i < days; i++) amt = amt * (1 + SAFE_RATE);
+            const gained = Math.round(amt) - s.amount;
+
+            if (gained > 0) {
+                s.amount = Math.min(SAFE_CAP, s.amount + gained);
+                s.lastInterest += days * dayMs;
+                changed = true;
+                addHistoryLog(user, `[금고 이자] ${days}일분 이자 ${gained.toLocaleString()} P가 적립되었습니다.`);
+            } else {
+                s.lastInterest += days * dayMs;
+            }
+        });
+        return changed;
+    }
+
+    function openSafePanel() {
+        const safes = getSafes(currentUser);
+        if (safes.length === 0) { showCustomAlert('보유한 금고가 없습니다.'); return; }
+
+        const total = safeTotal(currentUser);
+        const cap = safeCapacity(currentUser);
+
+        const html = `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #5a4a2a; border-radius:6px; padding:12px; font-size:12px; line-height:1.9; margin-bottom:13px;">
+                보관 중 <b style="color:#ffd700;">${total.toLocaleString()} P</b> / ${cap.toLocaleString()} P<br>
+                보유 금고 <b>${safes.length}개</b> · 일 이자 <b style="color:#4CAF50;">0.6%</b><br>
+                <span style="font-size:10px; color:#888;">금고 속 포인트는 어둠에서 잃지 않습니다.</span>
+            </div>
+            <div style="font-size:11px; color:#aaa; margin-bottom:6px;">보유 포인트 <b style="color:#ffd700;">${currentUser.points.toLocaleString()} P</b></div>
+            <input type="number" id="safe-amount" class="bet-input" style="width:100%; margin-bottom:9px; text-align:center;" placeholder="금액 입력" min="1">
+            <div style="display:flex; gap:6px; margin-bottom:13px;">
+                <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="safeDeposit()">입금</button>
+                <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="safeWithdraw()">출금</button>
+            </div>
+            <div style="font-size:10px; color:#c9a8ff; font-weight:bold; margin-bottom:5px;">금고 목록</div>
+            ${safes.map((s, i) => `
+                <div style="background:rgba(0,0,0,0.25); border:1px solid #4a3a2a; border-radius:5px; padding:8px 10px; margin-bottom:5px; font-size:11px; display:flex; justify-content:space-between;">
+                    <span style="color:#aaa;">금고 ${i + 1}</span>
+                    <span style="color:${s.amount >= SAFE_CAP ? '#ff9800' : '#ffd700'}; font-weight:bold;">
+                        ${(s.amount || 0).toLocaleString()} / ${SAFE_CAP.toLocaleString()} P
+                    </span>
+                </div>`).join('')}`;
+        openGearModal('🔐 금고', html);
+    }
+
+    function safeDeposit() {
+        const el = document.getElementById('safe-amount');
+        let amt = parseInt(el.value, 10);
+        if (isNaN(amt) || amt <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
+        if (amt > currentUser.points) { showLuxuryAlert(); return; }
+
+        const safes = getSafes(currentUser);
+        let remain = amt, stored = 0;
+
+        for (let s of safes) {
+            if (remain <= 0) break;
+            const room = SAFE_CAP - (s.amount || 0);
+            if (room <= 0) continue;
+            const put = Math.min(room, remain);
+            s.amount = (s.amount || 0) + put;
+            if (!s.lastInterest) s.lastInterest = Date.now();
+            remain -= put;
+            stored += put;
+        }
+
+        if (stored === 0) { showCustomAlert('모든 금고가 가득 찼습니다.\n금고를 더 구매해야 합니다.'); return; }
+
+        currentUser.points -= stored;
+        addHistoryLog(currentUser, `[금고 입금] ${stored.toLocaleString()} P를 보관했습니다.`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        updateUI();
+        openSafePanel();
+        showCustomAlert(remain > 0
+            ? `${stored.toLocaleString()} P를 넣었습니다.\n금고가 가득 차 ${remain.toLocaleString()} P는 넣지 못했습니다.`
+            : `${stored.toLocaleString()} P를 보관했습니다.`);
+    }
+
+    function safeWithdraw() {
+        const el = document.getElementById('safe-amount');
+        let amt = parseInt(el.value, 10);
+        if (isNaN(amt) || amt <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
+
+        const total = safeTotal(currentUser);
+        if (amt > total) { showCustomAlert(`금고에 ${total.toLocaleString()} P밖에 없습니다.`); return; }
+
+        const safes = getSafes(currentUser);
+        let remain = amt;
+        for (let i = safes.length - 1; i >= 0; i--) {
+            if (remain <= 0) break;
+            const take = Math.min(safes[i].amount || 0, remain);
+            safes[i].amount -= take;
+            remain -= take;
+        }
+
+        currentUser.points += amt;
+        addHistoryLog(currentUser, `[금고 출금] ${amt.toLocaleString()} P를 꺼냈습니다.`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        updateUI();
+        openSafePanel();
+        showPointGainEffect(amt);
+    }
