@@ -3842,6 +3842,7 @@ function getTodayStr() {
             id: Date.now(), code: currentUser.code, author: currentUser.name, no: currentUser.no,
             date: new Date().toLocaleString(), title: title, content: content, status: 'PENDING', reply: ''
         });
+               if (database) database.ref('suggestions').set(db.suggestions);
         saveDB(); updateUI();
         document.getElementById('sugg-title').value = ''; document.getElementById('sugg-content').value = '';
         renderMySuggestions();
@@ -7077,16 +7078,30 @@ function getTodayStr() {
             const replyText = replyInput.value.trim();
             if (!replyText) { showCustomAlert("답변 내용을 입력해주세요."); return; }
             const sugg = db.suggestions.find(s => s.id === id);
-            if (sugg) {
+                       if (sugg) {
                 sugg.status = 'RESOLVED'; sugg.reply = replyText;
                 let targetUser = db.users[sugg.code];
-                if(targetUser) { targetUser.hasNewReply = true; addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`); }
-                saveDB(); renderAdminSuggestions();
+                if (targetUser) {
+                    targetUser.hasNewReply = true;
+                    addHistoryLog(targetUser, `[건의 답변] 상담사가 귀하의 건의에 답변을 작성했습니다.`);
+                    if (database) database.ref('users/' + sugg.code).set(targetUser);
+                }
+                if (database) database.ref('suggestions').set(db.suggestions);
+                renderAdminSuggestions();
             }
         }
 
-        function deleteSuggestion(index) { db.suggestions.splice(index, 1); saveDB(); renderAdminSuggestions(); }
-
+            function deleteSuggestion(index) {
+        db.suggestions.splice(index, 1);
+        if (database) {
+            database.ref('suggestions').set(db.suggestions).then(() => {
+                renderAdminSuggestions();
+            });
+        } else {
+            saveDB();
+            renderAdminSuggestions();
+        }
+    }
         function attemptLogin() {
         const nameInput = document.getElementById('nickname-input');
         const codeInput = document.getElementById('code-input');
