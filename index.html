@@ -1012,7 +1012,7 @@ function getTodayStr() {
             document.getElementById('online-users-count').innerText = Math.max(1, visible);
             if(currentUser) renderVipOpponents();
         });
-        
+
     function saveDB() {
     if (!database) return;
     
@@ -5983,8 +5983,7 @@ function getTodayStr() {
 }
    function renderP2PLists() {
         checkP2PExpiration();
-           if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }    
-        const receivedList = document.getElementById('p2p-received-list');
+       const receivedList = document.getElementById('p2p-received-list');
         const sentList = document.getElementById('p2p-sent-list');
         if (!receivedList || !sentList) return;
         const allDeals = db.p2pDeals || [];
@@ -6033,6 +6032,7 @@ function getTodayStr() {
     }
         function acceptP2PDeal(dealId) {
     checkP2PExpiration();
+    if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }
     if (!db.p2pDeals) return;
     
     let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
