@@ -2523,3 +2523,53 @@ function input119D(n) {
                               : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`));
         mountDarkChat('normal');
     }
+        function watchPartyStep() {
+        if (!darkRun || !darkRun.isParty || !database) return;
+        if (darkRun._stepWatching) return;
+        darkRun._stepWatching = true;
+
+        database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
+            const s = snap.val();
+            if (s == null || !darkRun) return;
+            if (darkRun.step !== s) {
+                darkRun.step = s;
+                detachVoteListener();
+                renderDarkStep();
+            }
+        });
+
+        // ★ 방장 교체 감지
+        database.ref(`darkParties/${darkRun.partyId}/leader`).on('value', (snap) => {
+            if (!darkRun) return;
+            const newLeader = snap.val();
+            if (!newLeader) return;
+            const wasLeader = darkRun.isLeader;
+            darkRun.isLeader = (newLeader === currentUser.code);
+            if (!wasLeader && darkRun.isLeader) {
+                showDarkToast('선임이 되었습니다.');
+                renderDarkStep();
+            }
+        });
+
+        // ★ 동료 이탈 감시
+        database.ref(`darkParties/${darkRun.partyId}/alive`).on('value', (snap) => {
+            if (!darkRun || !darkRun.isParty) return;
+            const alive = snap.val() || {};
+            const cnt = Object.keys(alive).length;
+            const p = darkParties[darkRun.partyId];
+            const total = p && p.members ? Object.keys(p.members).length : cnt;
+
+            if (cnt < total && !darkRun._absenceNotified) {
+                darkRun._absenceNotified = true;
+                const gone = p && p.members
+                    ? Object.keys(p.members).filter(c => !alive[c]).map(c => p.members[c].name).join(', ')
+                    : '동료';
+                showDarkToast(`${gone} 사원의 신호가 끊겼습니다.`);
+                startAbsenceTimer();
+            } else if (cnt === total && darkRun._absenceNotified) {
+                darkRun._absenceNotified = false;
+                clearInterval(darkRun._absenceTimer);
+                showDarkToast(`동료의 신호가 복구되었습니다.`);
+            }
+        });
+    }
