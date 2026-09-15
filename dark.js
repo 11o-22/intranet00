@@ -3768,6 +3768,7 @@ function input119D(n) {
     }
 
         // --- 지목 ---
+      // --- 지목 ---
     function renderB508Mark(n) {
         const need5 = (darkRun.memberCount || 3) >= 5;
         if (n === 2 && !need5) { partyAdvance(darkRun.step + 1); return; }
