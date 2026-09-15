@@ -1927,6 +1927,14 @@ function input119D(n) {
     }
 
     function dark087Roll(pick) {
+                if (consumeQFlag('force_open')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("돌파",
+                `못을 끼워 넣는다. 몇 번 흔들자 걸린 것이 풀린다.<br><br>생각보다 쉬웠다. 애초에 잠겨 있지 않았던 것 같기도 하다.`,
+                darkChoiceBtn("지나간다.", `partyAdvance(${darkRun.step + 1})`));
+            mountDarkChat('normal');
+            return;
+        }
         const roll = Math.floor(Math.random()*20) + 1;
         let bonus = rollDarkBonus('sense');
         if (currentUser.darkCatalogBonus) { bonus += 2; currentUser.darkCatalogBonus = false; }
@@ -2067,6 +2075,14 @@ function input119D(n) {
             darkRun.log.push(`[퀴즈 ${n}] 정답`);
             sendPartyChat(`${currentUser.name} 사원이 기억해 냈습니다.`, true);
                } else {
+
+            if (consumeQFlag('quiz_undo')) {
+                darkRun[`quiz${n}Done`] = 'ok';
+                darkRun.success++;
+                sendPartyChat(`${currentUser.name} 사원이 답을 고쳐 적었습니다.`, true);
+                renderQuizStep(n);
+                return;
+            }
             // ★ 감각이 높으면 오답을 한 번 무를 수 있다
             const senseVal = gearValue(currentUser, 'sense');
             if (senseVal >= 3 && !darkRun._senseSaved) {
@@ -2078,6 +2094,8 @@ function input119D(n) {
                 renderQuizStep(n);
                 return;
             }
+
+            
 
             darkRun[`quiz${n}Done`] = 'no';
             darkRun.fail++;
@@ -2222,6 +2240,14 @@ function input119D(n) {
     }
 
     function resistAbduction(round) {
+                if (consumeQFlag('no_mark')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("—",
+                `명찰을 내민다.<br><br>손이 멈춘다. 이름이 목록에 없는 모양이다.<br>다른 쪽으로 간다.`,
+                darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            mountDarkChat('normal');
+            return;
+        }
         const roll = Math.floor(Math.random() * 20) + 1;
                 let bonus = rollDarkBonus('hide');
         const total = roll + bonus;
@@ -2566,6 +2592,14 @@ function input119D(n) {
     }
 
     function b330G5R(pick) {
+                if (consumeQFlag('force_open')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("돌파",
+                `못을 끼워 넣는다. 몇 번 흔들자 걸린 것이 풀린다.<br><br>생각보다 쉬웠다. 애초에 잠겨 있지 않았던 것 같기도 하다.`,
+                darkChoiceBtn("지나간다.", `partyAdvance(${darkRun.step + 1})`));
+            mountDarkChat('normal');
+            return;
+        }
         const roll = Math.floor(Math.random() * 20) + 1;
         let bonus = rollDarkBonus('sense');
         const total = roll + bonus;
@@ -3098,8 +3132,12 @@ function input119D(n) {
         return (darkRun && darkRun.notice) ? darkRun.notice : 0;
     }
 
-    function addNotice(amount, reason) {
+       function addNotice(amount, reason) {
         if (!darkRun) return;
+        if (amount > 0 && consumeQFlag('no_notice')) {
+            showDarkToast('봉투 안은 조용했다.');
+            return;
+        }
         let amt = amount;
         // 은신 속성이 상승을 줄인다
         const hideVal = gearValue(currentUser, 'hide');
@@ -3276,7 +3314,8 @@ function input119D(n) {
         const searched = b508State.searched || {};
         const used = Object.keys(searched).filter(k => k.startsWith(area + '|')).length;
         const limit = SEARCH_LIMIT[area] || 3;
-        const left = Math.max(0, limit - used);
+        const bonusSearch = qFlag('extra_search') ? 1 : 0;
+        const left = Math.max(0, limit + bonusSearch - used);
 
         const spots = B508_SPOTS[area] || [];
         const senseVal = gearValue(currentUser, 'sense');
@@ -3289,7 +3328,7 @@ function input119D(n) {
             // 감각이 높으면 힌트가 보인다
             let hintTag = '';
             
-                        if ((senseVal >= 4 || hasEquip(currentUser, '유리손포')) && !done) {
+                 if ((senseVal >= 4 || hasEquip(currentUser, '유리손포') || qFlag('reveal_doc')) && !done) {
                 const here = Object.keys(b508State.placed || {}).some(id =>
                     b508State.placed[id].area === area && b508State.placed[id].spot === sp && !(b508State.found || {})[id]);
                 if (here) hintTag = `<span style="color:#c9a8ff; font-size:9px; margin-left:5px;">◈ 무언가 느껴진다</span>`;
@@ -3474,6 +3513,15 @@ function input119D(n) {
         const roll = Math.floor(Math.random() * 20) + 1;
         const bonus = rollDarkBonus('hide');
         const DC = { crawl: 9, wait: 11, throw: 12, rush: 17 }[pick] - gearValue(currentUser, 'break');
+               // b508G2R (소리)
+        if (consumeQFlag('immune_sound')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
+                `귀마개를 꼈다.<br><br>발소리가 나지 않는다. 숨소리도 새지 않는다.<br>반죽공은 끝까지 고개를 돌리지 않았다.`,
+                noticeBarHtml() + darkChoiceBtn("안쪽으로 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderNoticeBar(); mountDarkChat('normal');
+            return;
+        }
         const ok = roll !== 1 && (roll + bonus) >= DC;
 
         let txt;
@@ -3568,6 +3616,15 @@ function input119D(n) {
         const roll = Math.floor(Math.random() * 20) + 1;
         const bonus = rollDarkBonus('hide');
         const DC = { down: 9, back: 12, mirror: 10, stare: 18 }[pick] - gearValue(currentUser, 'break');
+               // b508G4R (시선)
+        if (consumeQFlag('immune_sight')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("기믹 4 — 결과",
+                `색안경 너머로 본다.<br><br>눈이 몇 개 떠지는 게 보이지만, 초점이 맞지 않는다.<br>마주친 것으로 치지 않는 모양이다.`,
+                noticeBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderNoticeBar(); mountDarkChat('normal');
+            return;
+        }
         const ok = roll !== 1 && (roll + bonus) >= DC;
 
         let txt, died = false;
@@ -3619,6 +3676,15 @@ function input119D(n) {
         const bleeding = (darkRun.fail || 0) >= 3;
         let DC = { flour: 8, heat: 10, bait: 11, plain: 15 }[pick] - gearValue(currentUser, 'break');
         if (bleeding) DC += 3;
+                // b508G5R (냄새)
+        if (consumeQFlag('immune_smell')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
+                `수건으로 닦은 자리에서 아무 냄새도 나지 않는다.<br><br>배달원이 바로 앞을 지나간다. 코가 한 번도 멈추지 않았다.`,
+                noticeBarHtml() + darkChoiceBtn("매장으로.", `partyAdvance(${darkRun.step + 1})`));
+            renderNoticeBar(); mountDarkChat('normal');
+            return;
+        }
         const ok = roll !== 1 && (roll + bonus) >= DC;
 
         let txt, died = false;
@@ -3806,6 +3872,14 @@ function input119D(n) {
     }
 
     function b508Resist(n) {
+                if (consumeQFlag('no_mark')) {
+            darkRun.success++;
+            darkBodyEl().innerHTML = darkBox("—",
+                `명찰을 내민다.<br><br>손이 멈춘다. 이름이 목록에 없는 모양이다.<br>다른 쪽으로 간다.`,
+                darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            mountDarkChat('normal');
+            return;
+        }
         const roll = Math.floor(Math.random() * 20) + 1;
         const bonus = rollDarkBonus('hide');
         const DC = 15;
@@ -3997,4 +4071,146 @@ function input119D(n) {
         darkRun._jakduUsed = true;
         darkRun.log.push('[작두] 기믹 강제 돌파');
         return true;
+    }
+        // ==========================================
+    // ★ ??? 상점
+    // ==========================================
+    const QSHOP_OPEN = 13;   // 13시 개점
+    const QSHOP_CLOSE = 22;  // 22시 폐점
+
+    function qshopIsOpen() {
+        const h = new Date().getHours();
+        return h >= QSHOP_OPEN && h < QSHOP_CLOSE;
+    }
+
+    // 4시간 단위 교대 (13~17 / 17~21 / 21~22)
+    function qshopSlotKey() {
+        const now = new Date();
+        const h = now.getHours();
+        const slot = Math.floor((h - QSHOP_OPEN) / 4);
+        return `${getTodayStr()}-s${slot}`;
+    }
+
+    function qshopItems() {
+        const all = Object.keys(ITEM_CATALOG).filter(k => ITEM_CATALOG[k].qShop);
+        const key = qshopSlotKey();
+        let seed = 0;
+        for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i) * (i + 7);
+        const shuffled = all.slice().sort((a, b) => {
+            const ra = Math.sin(seed + a.length * 17 + a.charCodeAt(0)) * 10000;
+            const rb = Math.sin(seed + b.length * 17 + b.charCodeAt(0)) * 10000;
+            return (ra - Math.floor(ra)) - (rb - Math.floor(rb));
+        });
+        return shuffled.slice(0, 15);
+    }
+
+    function renderQShop() {
+        const box = document.getElementById('qshop-body');
+        if (!box || !currentUser) return;
+
+        if (!qshopIsOpen()) {
+            const h = new Date().getHours();
+            box.innerHTML = `
+                <div style="padding:34px 12px; text-align:center; font-family:monospace; font-size:12px; color:#555; line-height:2.2; border:1px solid rgba(255,76,76,0.2); border-radius:6px; background:rgba(255,0,0,0.03);">
+                    [SIGNAL LOST]<br>
+                    ■■■■■■■■■■<br><br>
+                    <span style="color:#666; font-family:'Malgun Gothic',sans-serif; font-size:11px;">
+                        ${h < QSHOP_OPEN ? `${QSHOP_OPEN}시부터 연결됩니다.` : '금일 연결이 종료되었습니다.'}
+                    </span>
+                </div>`;
+            return;
+        }
+
+        const items = qshopItems();
+        const cycleKey = qshopSlotKey();
+        if (!currentUser.qshopRecord) currentUser.qshopRecord = {};
+        if (!currentUser.qshopRecord[cycleKey]) currentUser.qshopRecord[cycleKey] = {};
+        const rec = currentUser.qshopRecord[cycleKey];
+
+        const now = new Date();
+        const nextSwap = new Date(now);
+        const h = now.getHours();
+        const nextH = Math.min(QSHOP_CLOSE, QSHOP_OPEN + (Math.floor((h - QSHOP_OPEN) / 4) + 1) * 4);
+        nextSwap.setHours(nextH, 0, 0, 0);
+        const remainMin = Math.max(0, Math.floor((nextSwap - now) / 60000));
+
+        box.innerHTML = `
+            <div style="text-align:center; font-family:monospace; font-size:13px; color:#888; letter-spacing:3px; padding:14px 0 16px 0; border-bottom:1px dashed #333; margin-bottom:14px;">
+                클리어를 바랍니다.
+            </div>
+            <div style="font-size:10px; color:#666; text-align:center; margin-bottom:14px;">
+                진열은 ${Math.floor(remainMin / 60)}시간 ${remainMin % 60}분 뒤에 바뀝니다. · 항목당 2개 한정
+            </div>
+            ${items.map(name => {
+                const it = ITEM_CATALOG[name];
+                const bought = rec[name] || 0;
+                const left = currentUser.code === 'kario0987' ? 99 : Math.max(0, 2 - bought);
+                const soldOut = left === 0;
+                return `
+                    <div class="shop-item ${soldOut ? 'sold-out' : ''}" style="border-color:#3a3a3a;">
+                        <div style="flex:1; min-width:0;">
+                            <span style="font-weight:bold; font-size:12px;">${name}</span>
+                            <span style="font-size:10px; color:#666; margin-left:5px;">${left === 99 ? '' : `(${left}/2)`}</span><br>
+                            <span style="font-size:10px; color:#888; line-height:1.5;">${it.desc.replace('[???] ', '')}</span>
+                        </div>
+                        <button ${soldOut ? 'disabled' : ''} onclick="buyQShopItem('${name}', ${it.price})" style="flex-shrink:0;">
+                            ${soldOut ? '품절' : it.price + ' P'}
+                        </button>
+                    </div>`;
+            }).join('')}
+            <div style="text-align:center; font-size:9px; color:#333; font-family:monospace; margin-top:16px;">
+                ■■■■■■■■■■■■■■
+            </div>`;
+    }
+
+    function buyQShopItem(name, price) {
+        if (!qshopIsOpen()) { showCustomAlert('연결이 끊어졌습니다.'); return; }
+        const cycleKey = qshopSlotKey();
+        if (!currentUser.qshopRecord) currentUser.qshopRecord = {};
+        if (!currentUser.qshopRecord[cycleKey]) currentUser.qshopRecord[cycleKey] = {};
+        const bought = currentUser.qshopRecord[cycleKey][name] || 0;
+
+        if (currentUser.code !== 'kario0987' && bought >= 2) { showCustomAlert('이 진열에서는 더 가져갈 수 없습니다.'); return; }
+        if (currentUser.points < price) { showLuxuryAlert(); return; }
+
+        currentUser.points -= price;
+        currentUser.qshopRecord[cycleKey][name] = bought + 1;
+        currentUser.inventory.push(name);
+        addHistoryLog(currentUser, `[??? 구매] ${name} (-${price} P)`);
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        renderQShop();
+    }
+        // ==========================================
+    // ★ ??? 소모품 효과
+    // ==========================================
+    function qFlag(name) {
+        return darkRun && darkRun.qFlags && darkRun.qFlags[name];
+    }
+
+    function setQFlag(name, val) {
+        if (!darkRun) return;
+        if (!darkRun.qFlags) darkRun.qFlags = {};
+        darkRun.qFlags[name] = val;
+    }
+
+    function consumeQFlag(name) {
+        if (!qFlag(name)) return false;
+        delete darkRun.qFlags[name];
+        return true;
+    }
+
+    // 탐사 밖에서 쓴 효과는 유저 객체에 저장했다가 진입 시 옮긴다
+    function moveUserQFlags() {
+        if (!darkRun || !currentUser.qPending) return;
+        darkRun.qFlags = Object.assign({}, darkRun.qFlags || {}, currentUser.qPending);
+        currentUser.qPending = null;
+        saveDB();
+    }
+
+    function addPendingFlag(name, val) {
+        if (!currentUser.qPending) currentUser.qPending = {};
+        currentUser.qPending[name] = val;
     }

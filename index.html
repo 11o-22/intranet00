@@ -635,11 +635,9 @@
                 </div>
 
                 <!-- ??? -->
-                <div id="shop-unknown" class="sub-panel" style="text-align:center;">
+                                <div id="shop-unknown" class="sub-panel">
                     <div class="panel-title">[???]</div>
-                    <div style="padding: 30px 10px; color:#ff4c4c; font-family: monospace; font-size:13px; line-height:1.6; border:1px solid rgba(255,76,76,0.3); border-radius:6px; background:rgba(255,0,0,0.05); margin-top:20px;">
-                        [SIGNAL LOST]<br>인증 프로토콜이 변조되었습니다.<br>■■■■■■■■ (접근 거부)
-                    </div>
+                    <div id="qshop-body"></div>
                 </div>
 
                 <!-- 우주 쇼핑몰 -->
@@ -1253,8 +1251,43 @@ function getTodayStr() {
                 "맞물리지 않는 조각": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 어디에도 맞지 않는 유리 조각. 다른 두 조각과 함께라면 무언가가 된다." },
         "지워지지 않는 자국": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 벽에서 뜯어 온 자국. 종이에 옮겨 붙었다." },
         "반죽에 섞이지 않은 것": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 끝내 섞이지 않았다. 아직 따뜻하다." },
-        "두 번째 자리": { price: "???", usable: true, targetable: false, effect: "second_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 사용 시 소모된다." }
+        "두 번째 자리": { price: "???", usable: true, targetable: false, effect: "second_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 사용 시 소모된다." },
+        // ===== ??? 상점 전용 =====
+        "파손 보호권": { price: 130, usable: true, targetable: false, effect: "q_protect", qShop: true, desc: "[???] 다음 강화에 실패해도 등급이 내려가지 않는다." },
+        "속성 변경권": { price: 140, usable: true, targetable: false, effect: "q_reattr", qShop: true, desc: "[???] 전용 장비의 속성 하나를 지우고 다시 고를 수 있다." },
+        "각인 연마제": { price: 90, usable: true, targetable: false, effect: "q_polish", qShop: true, desc: "[???] 다음 강화 성공 확률이 10% 오른다." },
+        "등급 감정서": { price: 40, usable: true, targetable: false, effect: "q_appraise", qShop: true, desc: "[???] 현재 강화 성공률과 기대 결과를 열람한다." },
+        "재봉 도구": { price: 120, usable: true, targetable: false, effect: "q_repair", qShop: true, desc: "[???] 전용 장비의 손상을 되돌린다. 등급 하락을 1회 복구." },
+        "빈 각인지": { price: 110, usable: true, targetable: false, effect: "q_blank", qShop: true, desc: "[???] 속성 슬롯이 열려 있어야 쓸 수 있다. 다음 속성 선택 시 등급이 한 단계 높게 적용된다." },
 
+        "젖은 수건": { price: 25, usable: true, targetable: false, effect: "q_towel", qShop: true, desc: "[???] 냄새를 지운다. 후각 판정 1회를 무효화한다." },
+        "귀마개": { price: 30, usable: true, targetable: false, effect: "q_earplug", qShop: true, desc: "[???] 소리를 죽인다. 청각 판정 1회를 무효화한다." },
+        "색안경": { price: 30, usable: true, targetable: false, effect: "q_shade", qShop: true, desc: "[???] 시선을 가린다. 시각 판정 1회를 무효화한다." },
+        "분필": { price: 20, usable: true, targetable: false, effect: "q_chalk", qShop: true, desc: "[???] 남긴 표식이 한 번은 지워지지 않는다." },
+        "마른 빵조각": { price: 35, usable: true, targetable: false, effect: "q_crumb", qShop: true, desc: "[???] 쫓는 것을 한 번 다른 곳으로 돌린다. 주목도 20 감소." },
+        "손톱깎이": { price: 20, usable: true, targetable: false, effect: "q_clip", qShop: true, desc: "[???] 흔적을 다듬는다. 주목도 10 감소." },
+        "식은 커피": { price: 45, usable: true, targetable: false, effect: "q_coffee", qShop: true, desc: "[???] 정신이 든다. 판정 1회를 다시 굴릴 수 있다." },
+        "반창고": { price: 25, usable: true, targetable: false, effect: "heal", value: 5, qShop: true, desc: "[???] 오염도가 5% 회복된다." },
+        "고무장갑": { price: 40, usable: true, targetable: false, effect: "q_glove", qShop: true, desc: "[???] 만지는 판정 1회를 안전하게 넘긴다." },
+        "종이봉투": { price: 50, usable: true, targetable: false, effect: "q_bag", qShop: true, desc: "[???] 뒤집어쓰면 한 번은 못 본 척해 준다. 주목도 상승 1회 무효." },
+        "나침반 조각": { price: 60, usable: true, targetable: false, effect: "q_compass", qShop: true, desc: "[???] 방향 감각이 돌아온다. 합류 판정에 +4." },
+        "삐뚤어진 못": { price: 35, usable: true, targetable: false, effect: "q_nail", qShop: true, desc: "[???] 잠긴 것을 한 번 연다. 돌파 판정 1회 자동 성공." },
+        "빈 약통": { price: 30, usable: true, targetable: false, effect: "q_pill", qShop: true, desc: "[???] 상태이상 하나를 지운다." },
+        "마스크": { price: 40, usable: true, targetable: false, effect: "q_mask", qShop: true, desc: "[???] 탐사 중 오염 상승 1회를 막는다." },
+        "라이터 돌": { price: 45, usable: true, targetable: false, effect: "q_flint", qShop: true, desc: "[???] 어두운 곳에서 판정에 +2. 탐사 1회 지속." },
+        "낡은 명찰": { price: 55, usable: true, targetable: false, effect: "q_badge", qShop: true, desc: "[???] 지목을 한 번 피한다. 이름이 다르게 읽힌다." },
+        "접힌 지폐": { price: 20, usable: true, targetable: false, effect: "q_bill", qShop: true, desc: "[???] 펴 보면 얼마인지 알 수 있다. 30~90 P." },
+        "사탕": { price: 25, usable: true, targetable: false, effect: "q_candy", qShop: true, desc: "[???] 입에 물면 다음 판정에 +1." },
+        "구부러진 스푼": { price: 35, usable: true, targetable: false, effect: "q_spoon", qShop: true, desc: "[???] 탐색 횟수를 1회 늘린다." },
+        "덜 마른 잉크": { price: 40, usable: true, targetable: false, effect: "q_ink", qShop: true, desc: "[???] 퀴즈 오답 1회를 없던 것으로 한다." },
+
+        "배치도 사본": { price: 70, usable: true, targetable: false, effect: "q_map", qShop: true, desc: "[???] 찾지 못한 물건 하나의 위치가 드러난다." },
+        "근무 일지": { price: 80, usable: true, targetable: false, effect: "q_journal", qShop: true, desc: "[???] 다음 기믹에서 안전한 선택지가 표시된다." },
+        "도청 기록": { price: 90, usable: true, targetable: false, effect: "q_tape", qShop: true, desc: "[???] 다음 개체가 무엇에 반응하는지 미리 알 수 있다." },
+
+        "방진복 안감": { price: 120, usable: true, targetable: false, effect: "equip_liner", qShop: true, desc: "[???] 장착형. 오염이 누적되는 구역에서 상승량이 20% 줄어든다." },
+        "실리카겔": { price: 100, usable: true, targetable: false, effect: "equip_silica", qShop: true, desc: "[???] 장착형. 습한 구역에서 판정에 +2." },
+        "은박 담요": { price: 110, usable: true, targetable: false, effect: "equip_foil", qShop: true, desc: "[???] 장착형. 열기가 있는 구역에서 피해가 줄어든다." }
     };
 
         const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
@@ -1790,6 +1823,8 @@ function getTodayStr() {
             _c119Locked: false,
             counted: true
         };
+
+                moveUserQFlags();
 
         darkBriefingOpen = false;
         darkAmbienceStart(party.zone);
@@ -2690,6 +2725,11 @@ function getTodayStr() {
         // ★ 유리손포 — 정보 판정에 +3
         if (hasEquip(currentUser, '유리손포') && kind === 'sense') b += 3;
 
+                // ★ ??? 소모품 보정
+        if (qFlag('dark_light')) b += 2;
+        if (qFlag('next_plus')) { b += 1; consumeQFlag('next_plus'); }
+        if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) b += 4;
+
         return b;
     }
 
@@ -2853,6 +2893,8 @@ function getTodayStr() {
             carryEquips: eq, carryItems: cs, rerollUsed: false, lostItems: [], log: [],
             counted: true
         };
+
+                moveUserQFlags();
 
                 darkBriefingOpen = false;
                 occupyZone(zoneCode);
@@ -3091,7 +3133,7 @@ function getTodayStr() {
         darkRun.log.push(`[기믹 3] d20 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
 
         let rerollBtn = '';
-        if ((outcome === 'fail' || outcome === 'fumble') && !darkRun.rerollUsed && darkRun.carryItems.length > 0) {
+           if ((outcome === 'fail' || outcome === 'fumble') && (qFlag('reroll') || (!darkRun.rerollUsed && darkRun.carryItems.length > 0))) {
             rerollBtn = darkChoiceBtn(`🔁 소모품 '${darkRun.carryItems[0]}'을(를) 써서 다시 굴린다. (1회)`, `darkReroll('${pick}')`);
         }
 
@@ -3827,6 +3869,11 @@ function getTodayStr() {
         if (!user || user.code === 'kario0987') return; 
         if (isBlindfolded(user)) return;
 
+                if (darkRun && user.code === currentUser.code && consumeQFlag('block_poll')) {
+            showDarkToast('마스크가 걸러 냈다.');
+            return;
+        }
+
         let finalAmount = Math.round(amount * getPollutionMultiplier(user));
 
         // ★ 치유 — 탐사 중 오염 상승 감소
@@ -4437,7 +4484,7 @@ function getTodayStr() {
 
                 checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
-        renderAlienShop(); renderPointRanking(); renderVipOpponents();
+        renderAlienShop();renderQShop(); renderPointRanking(); renderVipOpponents();
         refreshAllBetDisplays();
         if (!darkRun && !darkBriefingOpen) renderDarkness();
    }
@@ -4472,6 +4519,7 @@ function getTodayStr() {
         document.querySelectorAll('#tab-shop .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'shop-alien') setUFODialogue("물건을 본다 👌🏻");
+        if (panelId === 'shop-unknown') renderQShop();
     }
     function switchDarknessPanel(panelId, btnEl) {
         document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
@@ -4966,6 +5014,94 @@ function getTodayStr() {
             addHistoryLog(currentUser, `[아이템 사용] 전시 안내 도록 숙독`);
             saveDB(); updateUI();
             showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
+            return;
+        }
+
+                // ===== ??? 소모품 =====
+        const qMap = {
+            q_towel:   { flag:'immune_smell', msg:'수건으로 몸을 닦았습니다. 냄새가 한 번은 지워집니다.' },
+            q_earplug: { flag:'immune_sound', msg:'귀를 막았습니다. 소리가 한 번은 새지 않습니다.' },
+            q_shade:   { flag:'immune_sight', msg:'색안경을 썼습니다. 시선이 한 번은 마주치지 않습니다.' },
+            q_chalk:   { flag:'mark_keep',    msg:'분필을 챙겼습니다. 표식이 한 번은 남습니다.' },
+            q_coffee:  { flag:'reroll',       msg:'정신이 듭니다. 판정을 한 번 다시 굴릴 수 있습니다.' },
+            q_glove:   { flag:'safe_touch',   msg:'장갑을 꼈습니다. 만지는 판정 한 번이 안전합니다.' },
+            q_bag:     { flag:'no_notice',    msg:'봉투를 뒤집어썼습니다. 주목도 상승 한 번이 없던 일이 됩니다.' },
+            q_compass: { flag:'rejoin_boost', msg:'방향 감각이 돌아옵니다. 합류 판정에 +4.' },
+            q_nail:    { flag:'force_open',   msg:'못을 챙겼습니다. 잠긴 것 하나를 열 수 있습니다.' },
+            q_mask:    { flag:'block_poll',   msg:'마스크를 썼습니다. 오염 상승 한 번을 막습니다.' },
+            q_flint:   { flag:'dark_light',   msg:'불씨를 챙겼습니다. 이번 탐사 판정에 +2.' },
+            q_badge:   { flag:'no_mark',      msg:'명찰을 바꿔 달았습니다. 지목을 한 번 피합니다.' },
+            q_candy:   { flag:'next_plus',    msg:'사탕을 물었습니다. 다음 판정에 +1.' },
+            q_spoon:   { flag:'extra_search', msg:'스푼을 챙겼습니다. 탐색을 한 번 더 할 수 있습니다.' },
+            q_ink:     { flag:'quiz_undo',    msg:'잉크가 아직 마르지 않았습니다. 오답 하나를 고칠 수 있습니다.' },
+            q_map:     { flag:'reveal_doc',   msg:'배치도를 펼쳤습니다. 물건 하나의 위치가 드러납니다.' },
+            q_journal: { flag:'safe_hint',    msg:'일지를 읽었습니다. 다음 기믹에서 안전한 쪽이 보입니다.' },
+            q_tape:    { flag:'monster_hint', msg:'기록을 들었습니다. 다음 개체의 습성을 알게 됩니다.' }
+        };
+
+        if (qMap[cat.effect]) {
+            const q = qMap[cat.effect];
+            if (darkRun) {
+                if (qFlag(q.flag)) { showCustomAlert('이미 같은 효과가 준비되어 있습니다.'); return; }
+                setQFlag(q.flag, true);
+            } else {
+                if (currentUser.qPending && currentUser.qPending[q.flag]) { showCustomAlert('이미 같은 효과가 준비되어 있습니다.'); return; }
+                addPendingFlag(q.flag, true);
+            }
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] ${itemName}`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+            updateUI();
+            if (darkRun) renderDarkStep();
+            showCustomAlert(q.msg);
+            return;
+        }
+
+        // 즉발형
+        if (cat.effect === 'q_crumb') {
+            if (!darkRun) { showCustomAlert('탐사 중에만 쓸 수 있습니다.'); return; }
+            addNotice(-20, '빵조각을 던짐');
+            removeItemFromInventory(currentUser, itemName, 1);
+            saveDB(); renderDarkStep();
+            showCustomAlert('빵조각을 멀리 던졌습니다. 그쪽으로 몰려갑니다.');
+            return;
+        }
+        if (cat.effect === 'q_clip') {
+            if (!darkRun) { showCustomAlert('탐사 중에만 쓸 수 있습니다.'); return; }
+            addNotice(-10, '흔적 정리');
+            removeItemFromInventory(currentUser, itemName, 1);
+            saveDB(); renderDarkStep();
+            showCustomAlert('흔적을 다듬었습니다.');
+            return;
+        }
+        if (cat.effect === 'q_pill') {
+            if (currentUser.timedEffects && currentUser.timedEffects.length > 0) {
+                const gone = currentUser.timedEffects.shift();
+                appendSystemBadgeNote(`[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
+            } else if (currentUser.badge && currentUser.badge.notes !== '특이사항 없음') {
+                let arr = currentUser.badge.notes.split(' | ').filter(n => n.trim());
+                arr.shift();
+                currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+            } else {
+                showCustomAlert('제거할 상태이상이 없습니다.'); return;
+            }
+            removeItemFromInventory(currentUser, itemName, 1);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+            updateUI();
+            showCustomAlert('약통을 비웠습니다.');
+            return;
+        }
+        if (cat.effect === 'q_bill') {
+            const got = Math.floor(Math.random() * 61) + 30;
+            currentUser.points += got;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 접힌 지폐 (+${got} P)`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+            updateUI(); showPointGainEffect(got);
+            showCustomAlert(`펴 보니 ${got} P였습니다.`);
             return;
         }
 
