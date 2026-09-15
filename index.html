@@ -1257,7 +1257,7 @@ function getTodayStr() {
 
     };
 
-        const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리"];
+        const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
 
     const ALL_10_ITEMS = [
         "익명 편지", "하급 물약", "샤베트", "안대", "생수",
@@ -1269,7 +1269,7 @@ function getTodayStr() {
         "일반 담배", "혈욕조", "노예 계약서", "포도맛 물약",
         "우유맛 물약", "사과맛 물약", "오렌지맛 물약", "복숭아맛 물약", "제거약", "랜덤박스",
         "작두", "유리손포", "착한 친구", "보안팀 의상 세트", "버터 나이프", "은반지",
-        "빨간 리본", "고급진 술", "금고", "노스텔지어 끈", "여우구슬",
+        "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
         "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약"
     ];
     const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
@@ -5100,8 +5100,8 @@ function getTodayStr() {
                     
         } else if (cat.effect === 'random_box') {
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
-            const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서");
-            const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서");
+                        const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
+            const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
 
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
             function getWeightedRandomItem(pool, user) {
@@ -6568,6 +6568,7 @@ function getTodayStr() {
                 if (item === "노스텔지어 끈" && !isSecurityTeam) return false;
                 // ★ [추가] 일반 사원은 여우구슬 획득 불가
                 if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
+                if (item === "금고" && currentUser.code !== 'kario0987') return false;
                 
                 return true;
             });
@@ -6620,6 +6621,7 @@ function getTodayStr() {
             if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
             // ★ 상담사가 아니면 여우구슬 절대 노출 불가
             if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
+            if (item === "금고" && currentUser.code !== 'kario0987') return false;
             return true;
         });
         if (currentUser.code !== 'kario0987') unlocked = unlocked.slice(0, 6);
