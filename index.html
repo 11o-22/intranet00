@@ -6563,20 +6563,30 @@ function getTodayStr() {
             showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트: ${targetUser.points}P)`);
         }
     }
-        function adminToggleVIP() {
-            const targetNo = document.getElementById('adm-target-no').value.trim();
-            if (!targetNo) { showCustomAlert('대상 사원의 사번을 입력해주세요.'); return; }
-            let targetUser = Object.values(db.users).find(u => u.no === targetNo);
-            if (!targetUser) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
-            if (targetUser.code === 'kario0987') { showCustomAlert('상담사는 이미 최고 보안 인가(VVIP)를 가지고 있습니다.'); return; }
+       function adminToggleVIP() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-            targetUser.hasVIP = !targetUser.hasVIP;
-            const statusStr = targetUser.hasVIP ? "발급 (2급)" : "회수 (3급)";
-            addHistoryLog(targetUser, `[당국 제어] VIP 라운지 출입 권한이 ${statusStr}되었습니다.`);
-            saveDB(); updateUI(); showCustomAlert(`사번 ${targetUser.no} (${targetUser.name})의 VIP 권한이 [${statusStr}] 처리되었습니다.`);
-        }
+        let granted = [], revoked = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u || code === 'kario0987') return;
+            u.hasVIP = !u.hasVIP;
+            u._adminStamp = Date.now();
+            addHistoryLog(u, `[당국 제어] VIP 출입 권한이 ${u.hasVIP ? '발급' : '회수'}되었습니다.`);
+            if (database) database.ref('users/' + code).set(u);
+            (u.hasVIP ? granted : revoked).push(u.name);
+        });
 
-          function adminControlPollution(action) {
+        if (!database) saveDB();
+        updateUI();
+        showCustomAlert(
+            (granted.length ? `VIP 발급: ${granted.join(', ')}\n` : '') +
+            (revoked.length ? `VIP 회수: ${revoked.join(', ')}` : '')
+        );
+    }
+
+       function adminControlPollution(action) {
         const targets = getAdminTargets();
         if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
@@ -6599,7 +6609,9 @@ function getTodayStr() {
             } else if (action === 'zero') {
                 u.pollution = 0;
                 u.quarantineUntil = 0;
+                u.quarantineExitPollution = 0;
                 u.lastPollutionTime = Date.now();
+                u.foxRoomAnswered = false;
             }
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 제어] 오염도가 조정되었습니다. (현재 ${u.pollution}%)`);
@@ -6843,11 +6855,17 @@ function getTodayStr() {
         showCustomAlert(`${zoneCode} 구역의 점유 및 파티 기록(${removed}건)을 강제 해제했습니다.`);
     
     }
-              function adminResetLimits(kind) {
+         function adminResetLimits(kind) {
         const targets = getAdminTargets();
         if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-        let msgs = [];
+        let label = [];
+        if (kind === 'facility' || kind === 'all') label.push('공용시설');
+        if (kind === 'alien' || kind === 'all') label.push('우주 주파수');
+        if (kind === 'dark' || kind === 'all') label.push('어둠 탐사');
+        if (label.length === 0) { showCustomAlert('충전할 항목이 지정되지 않았습니다.'); return; }
+
+        let names = [];
         targets.forEach(code => {
             const u = db.users[code];
             if (!u) return;
@@ -6865,15 +6883,16 @@ function getTodayStr() {
                 u.darkDate = getTodayStr();
             }
             u._adminStamp = Date.now();
-            addHistoryLog(u, `[당국 개입] 이용 횟수가 충전되었습니다.`);
+            addHistoryLog(u, `[당국 개입] ${label.join(', ')} 이용 횟수가 충전되었습니다.`);
             if (database) database.ref('users/' + code).set(u);
-            msgs.push(u.name);
+            names.push(u.name);
         });
 
         if (!database) saveDB();
         updateUI();
-        showCustomAlert(`${msgs.length}명의 횟수를 충전했습니다.\n(${msgs.join(', ')})`);
+        showCustomAlert(`${names.length}명의 ${label.join(', ')} 횟수를 충전했습니다.\n(${names.join(', ')})`);
     }
+
        function adminGiveItem() {
         const targets = getAdminTargets();
         if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
@@ -6899,158 +6918,152 @@ function getTodayStr() {
         showCustomAlert(`${names.length}명에게 ${itemName} ${qty}개를 지급했습니다.\n(${names.join(', ')})`);
     }
 
-        function adminLoadInventory() {
-        const targetNo = document.getElementById('adm-special-no').value.trim();
+       function adminLoadInventory() {
+        const targets = getAdminTargets();
         const sel = document.getElementById('adm-remove-item');
-        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
-        let t = db.users[targetCode];
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
+        // 선택된 전원의 소지품을 합쳐서 목록화
         let counts = {};
-        (t.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
-        let keys = Object.keys(counts);
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            (u.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        });
+
+        const keys = Object.keys(counts);
         if (keys.length === 0) {
             sel.innerHTML = '<option value="">(소지품 없음)</option>';
-            showCustomAlert(`${t.name} 사원의 소지품이 비어 있습니다.`);
+            showCustomAlert('선택한 사원들의 소지품이 비어 있습니다.');
             return;
         }
-        sel.innerHTML = keys.map(k => `<option value="${k}">${k} (보유:${counts[k]})</option>`).join('');
-        showCustomAlert(`${t.name} 사원의 소지품 ${keys.length}종을 불러왔습니다.`);
+        sel.innerHTML = keys.map(k => `<option value="${k}">${k} (합계:${counts[k]})</option>`).join('');
+        showCustomAlert(`${targets.length}명의 소지품 ${keys.length}종을 불러왔습니다.`);
     }
+     function adminRemoveItem() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-    function adminRemoveItem() {
-        const targetNo = document.getElementById('adm-special-no').value.trim();
         const itemName = document.getElementById('adm-remove-item').value;
         const qty = parseInt(document.getElementById('adm-remove-qty').value, 10) || 1;
-
-        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
         if (!itemName) { showCustomAlert('먼저 [소지품 조회]로 목록을 불러온 뒤 물품을 선택해주세요.'); return; }
 
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
-        let t = db.users[targetCode];
-
-        let have = (t.inventory || []).filter(it => it === itemName).length;
-        if (have === 0) { showCustomAlert('해당 사원은 그 물품을 보유하고 있지 않습니다.'); return; }
-        let removeQty = Math.min(have, qty);
-
-        removeItemFromInventory(t, itemName, removeQty);
-        addHistoryLog(t, `[당국 압수] '${itemName}' ${removeQty}개가 소지품에서 회수되었습니다.`);
-
-         t._adminStamp = Date.now();
-
-        if (database) {
-            database.ref('users/' + targetCode).set(t).then(() => {
-                showCustomAlert(`사번 ${targetNo} (${t.name})에게서 ${itemName} ${removeQty}개를 압수했습니다.`);
-                adminLoadInventory();
-                updateUI();
-            });
-        } else {
-            saveDB(); updateUI(); adminLoadInventory();
-            showCustomAlert(`사번 ${targetNo} (${t.name})에게서 ${itemName} ${removeQty}개를 압수했습니다.`);
-        }
-    }
-
-    function adminForceUnequip() {
-        const targetNo = document.getElementById('adm-special-no').value.trim();
-        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
-        let targetUser = db.users[targetCode];
-
-        if (!targetUser.equippedWeapons || targetUser.equippedWeapons.length === 0) {
-            showCustomAlert('해당 사원은 현재 장착 중인 아이템이 없습니다.'); return;
-        }
-
-               targetUser.equippedWeapons.forEach(weaponStr => {
-            let baseName = getEquipBaseName(weaponStr);
-            let ownerCode = getEquipOwner(targetUser, weaponStr);
-            if (ownerCode && ownerCode !== targetCode && db.users[ownerCode]) {
-                db.users[ownerCode].inventory.push(baseName);
-                addHistoryLog(db.users[ownerCode], `[당국 개입] ${targetUser.name} 사원에게 장착했던 ${baseName}이(가) 회수되어 반환되었습니다.`);
-                if (database) database.ref('users/' + ownerCode).set(db.users[ownerCode]);
-            } else {
-                targetUser.inventory.push(baseName);
-            }
+        let done = [], skipped = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            const have = (u.inventory || []).filter(it => it === itemName).length;
+            if (have === 0) { skipped.push(u.name); return; }
+            const removeQty = Math.min(have, qty);
+            removeItemFromInventory(u, itemName, removeQty);
+            addHistoryLog(u, `[당국 압수] '${itemName}' ${removeQty}개가 회수되었습니다.`);
+            u._adminStamp = Date.now();
+            if (database) database.ref('users/' + code).set(u);
+            done.push(u.name);
         });
-        targetUser.equipOwner = {};
-        targetUser.equippedWeapons = [];
-        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 장착 장비가 강제 회수되었습니다.`);
 
-        targetUser._adminStamp = Date.now();
+        if (!database) saveDB();
+        updateUI();
+        renderAdminTargetList();
+        showCustomAlert(
+            `${done.length}명에게서 ${itemName}을(를) 회수했습니다.` +
+            (done.length ? `\n(${done.join(', ')})` : '') +
+            (skipped.length ? `\n\n미보유: ${skipped.join(', ')}` : '')
+        );
+    }
+     function adminForceUnequip() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-        if (database) {
-            database.ref('users/' + targetCode).set(targetUser).then(() => {
-                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
-                updateUI();
+        let names = [], skipped = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            if (!u.equippedWeapons || u.equippedWeapons.length === 0) { skipped.push(u.name); return; }
+
+            u.equippedWeapons.forEach(weaponStr => {
+                const baseName = getEquipBaseName(weaponStr);
+                const ownerCode = getEquipOwner(u, weaponStr);
+                if (ownerCode && ownerCode !== code && db.users[ownerCode]) {
+                    db.users[ownerCode].inventory.push(baseName);
+                    addHistoryLog(db.users[ownerCode], `[당국 개입] ${u.name} 사원에게 장착했던 ${baseName}이(가) 반환되었습니다.`);
+                    db.users[ownerCode]._adminStamp = Date.now();
+                    if (database) database.ref('users/' + ownerCode).set(db.users[ownerCode]);
+                } else {
+                    u.inventory.push(baseName);
+                }
             });
-        } else {
-            saveDB(); updateUI();
-            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 장착 아이템이 강제 회수되었습니다.`);
-        }
+            u.equipOwner = {};
+            u.equippedWeapons = [];
+            u._adminStamp = Date.now();
+            addHistoryLog(u, `[당국 개입] 모든 장착 장비가 강제 회수되었습니다.`);
+            if (database) database.ref('users/' + code).set(u);
+            names.push(u.name);
+        });
+
+        if (!database) saveDB();
+        updateUI();
+        showCustomAlert(
+            `${names.length}명의 장착 장비를 회수했습니다.` +
+            (names.length ? `\n(${names.join(', ')})` : '') +
+            (skipped.length ? `\n\n장착 없음: ${skipped.join(', ')}` : '')
+        );
+    }
+      function adminClearNotes() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+
+        let names = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            if (!u.badge) u.badge = { photo: "", nickname: u.name, notes: "특이사항 없음" };
+            u.badge.notes = "특이사항 없음";
+            u.timedEffects = [];
+            u.noteGlowUntil = 0;
+            u.hasItemUsedOnMe = false;
+            u._adminStamp = Date.now();
+            addHistoryLog(u, `[당국 개입] 특이사항이 초기화되었습니다.`);
+            if (database) database.ref('users/' + code).set(u);
+            names.push(u.name);
+        });
+
+        if (!database) saveDB();
+        updateUI();
+        showCustomAlert(`${names.length}명의 특이사항을 초기화했습니다.\n(${names.join(', ')})`);
     }
 
-        function adminClearNotes() {
-        const targetNo = document.getElementById('adm-special-no').value.trim();
-        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
-        let targetUser = db.users[targetCode];
+      function adminClearStatus() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-        if (!targetUser.badge) targetUser.badge = { photo: "", nickname: targetUser.name, notes: "특이사항 없음" };
-        targetUser.badge.notes = "특이사항 없음";
-        targetUser.timedEffects = [];              // ★ 시간제 효과도 함께 제거
-        targetUser.noteGlowUntil = 0;
-        targetUser.hasItemUsedOnMe = false;
-        targetUser._adminStamp = Date.now();
+        let names = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            u.quarantineUntil = 0;
+            u.quarantineExitPollution = 0;
+            u.blindfoldUntil = 0;
+            u.slaveUntil = 0;
+            u.masterName = null;
+            u.nostalgiaUntil = 0;
+            u.nostalgiaSender = null;
+            u.timedEffects = [];
+            u.silverRingExpireTime = 0;
+            u.butterKnifeExpireTime = 0;
+            u.foxRoomAnswered = false;
+            u.lastPollutionTime = Date.now();
+            u._adminStamp = Date.now();
+            addHistoryLog(u, `[당국 개입] 모든 상태이상이 소거되었습니다.`);
+            if (database) database.ref('users/' + code).set(u);
+            names.push(u.name);
+        });
 
-        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 특이사항과 상태 표시가 모두 지워졌습니다.`);
-
-        if (database) {
-            database.ref('users/' + targetCode).set(targetUser).then(() => {
-                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 특이사항이 초기화되었습니다.`);
-                updateUI();
-            });
-        } else {
-            saveDB(); updateUI();
-            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 특이사항이 초기화되었습니다.`);
-        }
+        if (!database) saveDB();
+        updateUI();
+        showCustomAlert(`${names.length}명의 상태이상을 제거했습니다.\n(${names.join(', ')})`);
     }
 
-        function adminClearStatus() {
-        const targetNo = document.getElementById('adm-special-no').value.trim();
-        if (!targetNo) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) { showCustomAlert('해당 사번을 찾을 수 없습니다.'); return; }
-        let targetUser = db.users[targetCode];
-
-        targetUser.quarantineUntil = 0;
-        targetUser.quarantineExitPollution = 0;
-        targetUser.blindfoldUntil = 0;
-        targetUser.slaveUntil = 0;
-        targetUser.masterName = null;
-        targetUser.nostalgiaUntil = 0;
-        targetUser.nostalgiaSender = null;
-        targetUser.timedEffects = [];              // ★ 물약·스티커 등 시간제 효과 전부 제거
-        targetUser.silverRingExpireTime = 0;
-        targetUser.butterKnifeExpireTime = 0;
-        targetUser.foxRoomAnswered = false;
-        targetUser.lastPollutionTime = Date.now();
-        targetUser._adminStamp = Date.now();
-
-        addHistoryLog(targetUser, `[당국 개입] 관리자에 의해 모든 상태이상이 소거되었습니다.`);
-
-        if (database) {
-            database.ref('users/' + targetCode).set(targetUser).then(() => {
-                showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 상태이상 효과를 제거했습니다.`);
-                updateUI();
-            });
-        } else {
-            saveDB(); updateUI();
-            showCustomAlert(`사번 ${targetNo} (${targetUser.name})의 모든 상태이상 효과를 제거했습니다.`);
-        }
-    }
       function adminDeleteEmployee() {
         const targetNo = document.getElementById('adm-delete-no').value.trim();
         if (!targetNo) {
