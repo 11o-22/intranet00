@@ -11,8 +11,21 @@ const DARK_ZONES = {
             outro:"이름이 기억나지 않는다.<br><br>그게 다행이라는 것만 안다.<br>벽이 멀어지고, 안내 방송이 잦아들고, 화살표가 전부 같은 방향을 가리킨다.<br>처음으로 일치했다.<br><br>눈을 뜨니 복도다. 사원증에 적힌 이름을 한참 들여다봤다.",
             images: { intro:"maze_1.jpg", step1:"maze_2.jpg", step2:"maze_3.jpg", step3:"maze_4.jpg" }
         },
-        "Qtrew-B-508": { code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게", brief:"(안녕하세요, %$#@빵가게 입니다!)", danger:"중상", survival:"9%", min:3, max:5, reward:[900,1600], ready:false },
-        "Qtrew-C-119": {
+               "Qtrew-B-508": {
+            code:"Qtrew-B-508", grade:"B", name:"%$#@빵가게",
+            brief:"(안녕하세요, %$#@빵가게 입니다!)",
+            danger:"중상", survival:"9%", min:3, max:5, reward:[900,1600], ready:true,
+            voteMode:true, hunt:true,
+            intro:"밀가루 냄새에 눈을 뜬다.<br><br>지하 저장고다. 포대가 천장까지 쌓여 있고, 형광등 하나가 깜빡인다.<br>어떻게 들어왔는지 기억나지 않는다.<br><br>위층에서 소리가 난다. 반죽을 치대는 소리다.<br>규칙적이고, 성실하고, 아주 젖어 있다.<br><br>스피커에서 안내가 나온다.<br><span style=\"color:#d4af37;\">\"안녕하세요, %$#@빵가게입니다. 오늘도 신선한 재료로 정성껏 준비하겠습니다.\"</span><br><br>벽에 붙은 안내문이 눈에 들어온다.<br><span style=\"color:#d4af37;\">\"출고 서류가 갖춰지지 않은 상품은 폐기됩니다.\"</span>",
+            outro:"봉지 안은 따뜻하다.<br><br>흔들린다. 누군가 들고 걷는다. 유리문 열리는 소리, 종소리, 바깥 공기.<br><br>한참 뒤에 봉지가 열린다.<br>빛이 들어온다. 눈을 감는다.<br><br>눈을 뜨니 복도다. 손에 밀가루가 묻어 있다. 털어도 계속 나온다.",
+             images: {
+                intro: "bakery_1.jpg",
+                step1: "bakery_2.jpg",
+                step2: "bakery_3.jpg",
+                step3: "bakery_4.jpg"
+             }
+        },
+         "Qtrew-C-119": {
             code:"Qtrew-C-119", grade:"C", name:"거울은 세 마디만 허락한다",
             brief:"(거울이 늘어진 방. 한 사람은 안에, 한 사람은 밖에.)",
             danger:"중", survival:"40%", min:2, max:2, reward:[250,500], ready:true,
@@ -169,7 +182,9 @@ const DARK_ZONES = {
             if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-B-330') buildMazeAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-B-508') buildBakeryAmbience(ctx, master);
             else buildAlleyAmbience(ctx, master);
+            
 
         } catch(e) { console.warn('앰비언스 생성 실패:', e); }
     }
@@ -3003,4 +3018,948 @@ function input119D(n) {
         const g = getGear(currentUser);
         if (!g || !g.attrs || g.attrs.length === 0) return '';
         return `<div style="font-size:10px; color:#c9a8ff; margin-top:5px; font-weight:normal;">${GEAR_MARK[g.grade] || ''}${g.icon} ${g.name} 적용 중</div>`;
+    }
+
+        // ==========================================
+    // ★ Qtrew-B-508 「%$#@빵가게」
+    // ==========================================
+    const B508_DOCS = [
+        { id:'d01', name:'재료 반입 명세서',  where:'basement', hint:'포대 사이 어딘가에 끼워져 있을 것이다.' },
+        { id:'d02', name:'계량 기록지',       where:'basement', hint:'저울 근처에 있을 법하다.' },
+        { id:'d03', name:'배합 승인 도장',    where:'dough',    hint:'반죽대 위, 밀가루에 파묻혀 있다.' },
+        { id:'d04', name:'위생 점검표',       where:'dough',    hint:'싱크대 옆 게시판.' },
+        { id:'d05', name:'발효 시간 기록',    where:'proof',    hint:'선반마다 붙은 표를 봐야 한다.' },
+        { id:'d06', name:'온습도 관리 카드',  where:'proof',    hint:'벽에 걸린 계기 아래.' },
+        { id:'d07', name:'소성 일지',         where:'oven',     hint:'오븐 문에 자석으로 붙어 있다.' },
+        { id:'d08', name:'화상 사고 보고서',  where:'oven',     hint:'구급함 안에 접혀 있다.' },
+        { id:'d09', name:'진열 배치도',       where:'store',    hint:'계산대 서랍.' },
+        { id:'d10', name:'출고 검수증',       where:'upper',    hint:'2층 사무실에만 있다.' },
+        { id:'d11', name:'폐기물 처리 확인서', where:'upper',   hint:'2층 작업장 안쪽.' },
+        { id:'d12', name:'대표자 서명란',     where:'upper',    hint:'2층 어딘가. 서명은 아직 안 되어 있다.' }
+    ];
+
+    const B508_AREAS = {
+        basement: '지하 저장고',
+        dough:    '반죽실',
+        proof:    '발효실',
+        oven:     '오븐실',
+        store:    '매장',
+        upper:    '2층'
+    };
+
+    // 인원별 필요 서류 수
+    function b508RequiredDocs() {
+        const n = darkRun && darkRun.memberCount ? darkRun.memberCount : 3;
+        if (n >= 5) return 12;
+        if (n === 4) return 9;
+        return 7;
+    }
+
+        const B508_MONSTERS = {
+        kneader: {
+            name: '반죽공',
+            senses: 'sound',
+            desc: `앞치마가 허리까지 젖어 있다. 젖은 것은 물이 아니다.<br>
+                   눈이 있어야 할 자리에 밀가루가 눌러 붙어 굳었다. 그래서 보지 못한다.<br>
+                   대신 귀가 얼굴의 절반을 차지한다. 소리가 나면 그쪽으로 얼굴 전체가 돌아간다.<br>
+                   팔이 팔꿈치부터 두 번 더 꺾인다. 그 팔로 반죽을 친다. 쉬지 않고.`,
+            idle: `쿵. 쿵. 쿵.<br>반죽 치는 소리가 일정하다. 숨소리는 들리지 않는다.`,
+            alert: `소리가 멎는다.<br><br>팔이 공중에 멈춘 채로, 얼굴만 이쪽으로 돌아간다.<br>귀가 벌어진다. 안쪽이 붉다.<br><br>쿵. 쿵. 발소리가 시작된다. 반죽 치던 박자 그대로.`,
+            danger: '소리를 내면 안 된다.'
+        },
+        cashier: {
+            name: '계산원',
+            senses: 'sight',
+            desc: `계산대 뒤에 서 있다. 자세가 완벽하다. 사람이 오래 연습한 자세다.<br>
+                   얼굴에 눈이 많다. 세어 보려다 만다. 세면 알아차릴 것 같아서.<br>
+                   전부 감겨 있는데, 하나씩 순서대로 뜬다. 천천히.<br>
+                   입은 웃는 모양으로 굳었다. 벌어지지 않는다.`,
+            idle: `미동도 없다.<br>감긴 눈들이 아주 느리게 돌아가는 것이 눈꺼풀 너머로 보인다.`,
+            alert: `눈 하나가 떠진다.<br><br>정확히 이쪽이다.<br>다른 눈들도 차례로 떠진다. 전부 같은 곳을 본다.<br><br>계산대를 짚고 천천히 넘어온다. 다리가 관절 없이 접힌다.`,
+            danger: '눈을 마주치면 안 된다.'
+        },
+        courier: {
+            name: '배달원',
+            senses: 'smell',
+            desc: `헬멧을 쓰고 있다. 벗겨지지 않는다. 자란 살이 헬멧을 물고 있다.<br>
+                   코가 헬멧 밖으로 튀어나와 있다. 그 부분만 계속 벌름거린다.<br>
+                   등에 배달통을 멨다. 안에서 무언가 자세를 바꾸는 소리가 난다.<br>
+                   손에 장갑을 꼈는데, 손가락이 남는다. 세 개쯤.`,
+            idle: `킁. 킁.<br>코를 벌름거리며 천천히 원을 그리며 돈다.`,
+            alert: `코가 멈춘다.<br><br>헬멧이 이쪽으로 기울어진다. 안에서 젖은 숨소리가 샌다.<br>배달통이 흔들린다. 안쪽에서 두드리는 소리.<br><br>달리기 시작한다. 생각보다 빠르다.`,
+            danger: '피나 땀 냄새를 남기면 안 된다.'
+        }
+    };
+
+        // ==========================================
+    // ★ 주목도
+    // ==========================================
+    function getNotice() {
+        return (darkRun && darkRun.notice) ? darkRun.notice : 0;
+    }
+
+    function addNotice(amount, reason) {
+        if (!darkRun) return;
+        let amt = amount;
+        // 은신 속성이 상승을 줄인다
+        const hideVal = gearValue(currentUser, 'hide');
+        if (hideVal > 0 && amt > 0) amt = Math.max(1, Math.round(amt * (1 - hideVal * 0.08)));
+
+        darkRun.notice = Math.max(0, Math.min(100, getNotice() + amt));
+        if (reason) darkRun.log.push(`[주목도] ${reason} (${amt >= 0 ? '+' : ''}${amt} → ${darkRun.notice})`);
+        renderNoticeBar();
+
+        if (darkRun.notice >= 100 && !darkRun._caught) {
+            darkRun._caught = true;
+            setTimeout(() => b508Caught(), 600);
+        }
+    }
+
+    function renderNoticeBar() {
+        const el = document.getElementById('notice-bar');
+        if (!el) return;
+        const n = getNotice();
+        const color = n >= 75 ? '#f44336' : n >= 45 ? '#ff9800' : '#4CAF50';
+        const label = n >= 75 ? '발각 직전' : n >= 45 ? '경계' : '고요';
+        el.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+                <span>주목도 — <b style="color:${color};">${label}</b></span>
+                <span style="color:${color}; font-weight:bold;">${n} / 100</span>
+            </div>
+            <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:${n}%; background:${color}; transition:width 0.4s;"></div>
+            </div>`;
+    }
+
+    function noticeBarHtml() {
+        return `<div id="notice-bar" style="margin-bottom:12px;"></div>`;
+    }
+
+    // 붙잡힘
+    function b508Caught() {
+        if (!darkRun) return;
+        const m = darkRun._lastMonster ? B508_MONSTERS[darkRun._lastMonster] : B508_MONSTERS.kneader;
+        darkDeath(
+            `${m.alert}<br><br>` +
+            `도망칠 자리가 없다. 통로가 언제부터인가 막혀 있었다.<br><br>` +
+            `손이 어깨에 닿는다. 생각보다 부드럽다.<br>` +
+            `<span style="color:#d4af37;">"오늘 재료가 아주 좋네요."</span>`
+        );
+    }
+
+        const B508_NARR = {
+        1: { img:'step1', text:`포대에 라벨이 붙어 있다.<br><br>읽으려고 하면 글자가 자리를 바꾼다. 한 글자씩은 알아보겠는데 단어가 되지 않는다.<br><br>하나를 뜯어 본다. 밀가루가 맞다. 냄새도 맞다.<br>다만 그 안에 섞여 있는 것들이 밀가루보다 굵다.<br>손가락으로 헤집다가 그만둔다.` },
+
+        2: { text:`위층 소리가 계속된다.<br><br>반죽을 치대는 소리라고 생각했는데, 듣고 있으면 그게 아니다.<br>치대는 소리에는 끝이 있다. 들었다 내리치고, 쉬고, 다시.<br><br>이건 쉬지 않는다.<br>그리고 가끔, 아주 가끔 짧고 높은 소리가 섞인다.<br>반죽에서 날 수 있는 소리가 아니다.` },
+
+        3: { text:`계단 아래에 물이 고여 있다.<br><br>천장에서 떨어진 것이 아니다. 위에서 흘러내린 것이다.<br>계단을 따라 한 칸씩, 얇게.<br><br>손가락을 대 본다. 미지근하다.<br>냄새를 맡으려다 만다. 맡으면 알게 될 것 같아서.` },
+
+        4: { text:`계단 벽에 근무 수칙이 붙어 있다. 코팅이 벗겨졌고 글씨는 선명하다.<br><br><span style="color:#d4af37;">1. 재료는 신선할 때 손질합니다.<br>2. 재료의 소리에 응답하지 않습니다.<br>3. 재료와 눈을 맞추지 않습니다.<br>4. 재료가 이름을 말하면 보고합니다.</span><br><br>네 번째 줄 아래에 손톱으로 긁은 자국이 있다.<br>누군가 지우려다 만 것 같다. 절반쯤 지워졌고, 절반은 남았다.<br><br>남은 절반에 이름 하나가 보인다.` },
+
+        5: { img:'step2', text:`반죽실 문틈으로 안을 본다.<br><br>${B508_MONSTERS.kneader.desc}<br><br>${B508_MONSTERS.kneader.idle}<br><br><span style="color:#ff6b6b;">${B508_MONSTERS.kneader.danger}</span>` },
+
+        6: { text:`반죽대 아래를 지나간다.<br><br>바닥이 미끄럽다. 물이 아니다.<br>손바닥에 뭔가 걸린다. 단추다. 셔츠 단추.<br>그 옆에 또 하나. 또 하나. 크기가 제각각이다.<br><br>세어 보니 스물 몇 개쯤 된다.<br>한 벌에 단추가 몇 개 달리는지 떠올려 보다가 그만둔다.` },
+
+        7: { text:`직원 하나가 지나간다.<br><br>앞치마를 입었고, 인사를 한다. 목소리가 명랑하다.<br>얼굴이 부풀어 있다. 피부 아래에서 뭔가가 자리를 옮긴다.<br>볼에 건포도 같은 것이 박혀 있는데, 건포도가 아니다. 그쪽도 이쪽을 보고 있다.<br><br>웃는다. 입꼬리가 올라가면서 뺨이 조금 찢어진다.<br>안에서 흰 것이 몇 마리 떨어진다. 직원은 그걸 주워 반죽에 넣는다.<br><br><span style="color:#d4af37;">"오늘 재료가 아주 좋네요."</span><br><br><span style="color:#ff9800;">지금부터 이곳은 당신들을 의식하기 시작한다.</span>` },
+
+        8: { text:`복도가 길다.<br><br>양옆에 문이 있는데 손잡이가 없다. 밀어도 당겨도 열리지 않는다.<br>문틈으로 빛이 새는 곳이 하나 있다.<br><br>들여다보려고 몸을 숙이는 순간, 안쪽에서 빛이 가려진다.<br>무언가 문 바로 뒤에 서 있다. 이쪽을 보고 있는 자세로.<br><br>일어선다. 천천히. 소리 나지 않게.` },
+
+        9: { text:`발효실이다.<br><br>선반마다 천이 덮여 있다. 천 아래가 부풀어 있다.<br>사람 크기다.<br><br>하나가 천천히 움직인다. 부푸는 것이 아니라, 뒤척이는 것이다.<br>천 아래에서 손이 나온다. 손가락이 여섯이다. 여섯 번째는 나중에 붙인 것 같다.<br><br>아무도 천을 걷지 않는다.` },
+
+        10: { text:`천 아래에서 소리가 난다.<br><br>말이다. 말이었던 것의 잔해다. 자음만 남고 모음이 빠졌다.<br>여러 개가 동시에 난다. 선반 전체에서.<br><br>그중 하나가 또렷해진다.<br><span style="color:#d4af37;">"...아직... 안... 익었어요..."</span><br><br>발효실 문을 닫는다. 소리가 멎지 않는다.` },
+
+        11: { text:`계산대 옆에 주문서가 쌓여 있다.<br><br>대부분 읽을 수 없는 글자인데, 수량만은 숫자로 적혀 있다.<br>오늘 날짜에 <b>5</b>.<br><br>그 아래 칸에 이름이 적혀 있다. 손글씨다.<br>일행 중 하나의 이름이 거기 있다.<br><br>먼저 본 사람이 아무 말도 하지 않는다.` },
+
+        12: { text:`계산대 뒤를 본다.<br><br>${B508_MONSTERS.cashier.desc}<br><br>${B508_MONSTERS.cashier.idle}<br><br><span style="color:#ff6b6b;">${B508_MONSTERS.cashier.danger}</span>` },
+
+        13: { text:`뒤쪽 통로로 돌아간다.<br><br>벽에 손자국이 있다. 밀가루 묻은 손으로 짚은 자국.<br>높이가 일정하지 않다. 어떤 건 천장 가까이에 있다.<br><br>손자국 하나에 손을 대 본다. 크기가 맞는다.<br>정확히 맞는다.` },
+
+        14: { img:'step3', text:`오븐실이다.<br><br>열기가 밀려온다. 숨을 쉬면 목이 마른다.<br>오븐이 여섯. 전부 돌아가고 있고, 유리창에 김이 서려 안이 보이지 않는다.<br><br>세 번째 오븐 유리 안쪽에 손자국이 있다.<br>안에서 찍은 자국이다.<br><br>타이머가 울린다. 아무도 열지 않는다.` },
+
+        15: { text:`배달원이 지나간다.<br><br>${B508_MONSTERS.courier.desc}<br><br>${B508_MONSTERS.courier.idle}<br><br><span style="color:#ff6b6b;">${B508_MONSTERS.courier.danger}</span>` },
+
+        16: { text:`구급함이 벽에 걸려 있다.<br><br>열어 본다. 붕대가 전부 쓰인 흔적이 있다. 감았다가 푼 것들이다.<br>말려서 다시 넣어 두었다. 아껴 쓴 티가 난다.<br><br>맨 아래에 명찰이 하나 깔려 있다.<br>이름 칸이 긁혀 지워졌고, 사번만 남았다.` },
+
+        17: { text:`매장이다.<br><br>진열대가 환하다. 빵이 가지런하고, 값표가 붙어 있고, 냄새가 좋다.<br>여기까지 오니 그냥 빵가게 같다.<br><br>의자와 테이블이 놓여 있다. 나무 같은데 나무가 아니다.<br>테이블 다리에 관절이 있다. 등받이에 결이 있는데, 결이 아니라 무늬다.<br><br>앉으려던 사람이 그만둔다. 의자가 아주 조금 기울었다.<br>피한 것인지 맞이한 것인지 모르겠다.` },
+
+        18: { text:`유리문 밖으로 사람이 지나간다.<br><br>평범한 저녁이다. 우산을 든 사람, 통화하는 사람, 손잡은 사람.<br>아무도 이쪽을 보지 않는다.<br><br>손을 흔들어 본다. 유리를 두드려 본다.<br>소리가 밖으로 나가지 않는다.<br><br>한 사람이 문을 열고 들어온다.<br>진열대에서 빵을 하나 고르고, 계산하고, 나간다.<br>계산원과 웃으며 인사를 나눈다.<br><br>그 사람 눈에는 이쪽이 안 보인다. 아니면, 상품으로 보인다.` },
+
+        19: { text:`안내 방송이 나온다.<br><br><span style="color:#d4af37;">"금일 영업을 종료합니다. 남은 상품은 폐기됩니다. 이용해 주셔서 감사합니다."</span><br><br>폐기라는 단어에서 다들 멈춘다.<br><br>진열대 위 빵들은 조용하다. 팔려 나간 것들도 조용했을 것이다.<br>남은 것들이 어떻게 되는지는 아래층에서 이미 봤다.` },
+
+        20: { text:`셔터가 내려오기 시작한다.<br><br>안쪽에서 발소리가 모인다. 셋이다. 서로 다른 박자.<br>쿵. 쿵. — 관절 접히는 소리. — 킁. 킁.<br><br>서두를 시간도 없다.<br>포장대 위에 봉지가 놓여 있다. 사람이 들어갈 크기다.<br><br>정식 출고품이 되어야 한다. 서류가 갖춰졌다면.` }
+    };
+
+        // ==========================================
+    // ★ 서류 탐색
+    // ==========================================
+    const B508_SPOTS = {
+        basement: ['밀가루 포대 더미', '낡은 저울', '벽에 걸린 앞치마', '계단 밑 상자', '배수구 옆 선반'],
+        dough:    ['반죽대 아래', '싱크대 뒤', '게시판', '밀대가 걸린 고리', '작업복 주머니'],
+        proof:    ['첫 번째 선반', '벽에 걸린 계기', '천이 쌓인 바구니', '구석의 수레', '온도계 뒤'],
+        oven:     ['세 번째 오븐 문', '구급함', '장작 더미', '환풍구 아래', '식힘망 선반'],
+        store:    ['계산대 서랍', '진열대 아래', '테이블 밑', '메뉴판 뒤', '화분 속'],
+        upper:    ['사무실 책상', '서류 캐비닛', '작업대 위', '벽에 걸린 액자', '의자 아래', '창가 선반']
+    };
+
+    // 탐색 가능 횟수 (구역당)
+    const SEARCH_LIMIT = { basement:3, dough:3, proof:3, oven:3, store:3, upper:4 };
+
+    // 방장이 서류 위치를 정한다
+    function initB508Docs() {
+        if (!darkRun || !darkRun.isLeader || !database) return;
+        const placed = {};
+        Object.keys(B508_AREAS).forEach(area => {
+            const spots = B508_SPOTS[area];
+            const docs = B508_DOCS.filter(d => d.where === area);
+            const picked = spots.slice().sort(() => Math.random() - 0.5);
+            docs.forEach((d, i) => { placed[d.id] = { area: area, spot: picked[i % picked.length] }; });
+        });
+        database.ref(`darkParties/${darkRun.partyId}/b508`).set({
+            placed: placed, found: {}, searched: {}, at: Date.now()
+        });
+    }
+
+    let b508Ref = null, b508Key = null, b508State = null;
+
+    function attachB508Listener() {
+        if (!database || !darkRun || !darkRun.partyId) return;
+        if (b508Key === darkRun.partyId) return;
+        if (b508Ref) { try { b508Ref.off(); } catch(e) {} }
+        b508Key = darkRun.partyId;
+        b508Ref = database.ref(`darkParties/${darkRun.partyId}/b508`);
+        b508Ref.on('value', snap => {
+            b508State = snap.val();
+            const box = document.getElementById('b508-search-area');
+            if (box && darkRun) renderSearchSpots(darkRun._curArea);
+        });
+    }
+
+    function detachB508Listener() {
+        if (b508Ref) { try { b508Ref.off(); } catch(e) {} }
+        b508Ref = null; b508Key = null; b508State = null;
+    }
+
+    function foundCount() {
+        return b508State && b508State.found ? Object.keys(b508State.found).length : 0;
+    }
+
+    // --- 탐색 화면 ---
+    function renderSearch(area) {
+        if (!darkRun) return;
+        darkRun._curArea = area;
+        attachB508Listener();
+
+        if (!b508State) {
+            if (darkRun.isLeader) initB508Docs();
+            darkBodyEl().innerHTML = darkBox(B508_AREAS[area] + " — 탐색",
+                `주변을 둘러본다.`,
+                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">서류 위치를 파악하는 중...</div>`);
+            setTimeout(() => { if (b508State) renderSearch(area); }, 1200);
+            return;
+        }
+
+        const body = darkBodyEl();
+        body.innerHTML = darkBox(B508_AREAS[area] + " — 탐색",
+            `필요한 서류를 찾아야 한다.<br><br>
+             뒤질 때마다 소리가 난다. 조용히 할수록 좋지만, 시간도 없다.<br><br>
+             <span style="font-size:11px; color:#888;">확보 <b style="color:#4CAF50;">${foundCount()}</b> / ${b508RequiredDocs()}장 필요</span>`,
+            noticeBarHtml() + `<div id="b508-search-area"></div>`);
+        renderNoticeBar();
+        renderSearchSpots(area);
+        mountDarkChat('normal');
+    }
+
+    function renderSearchSpots(area) {
+        const box = document.getElementById('b508-search-area');
+        if (!box || !b508State || !area) return;
+
+        const searched = b508State.searched || {};
+        const used = Object.keys(searched).filter(k => k.startsWith(area + '|')).length;
+        const limit = SEARCH_LIMIT[area] || 3;
+        const left = Math.max(0, limit - used);
+
+        const spots = B508_SPOTS[area] || [];
+        const senseVal = gearValue(currentUser, 'sense');
+
+        let html = `<div style="font-size:10px; color:#888; margin-bottom:8px;">남은 탐색 ${left}회 · 1회당 주목도 +8</div>`;
+
+        html += spots.map(sp => {
+            const key = area + '|' + sp;
+            const done = searched[key];
+            // 감각이 높으면 힌트가 보인다
+            let hintTag = '';
+            if (senseVal >= 4 && !done) {
+                const here = Object.keys(b508State.placed || {}).some(id =>
+                    b508State.placed[id].area === area && b508State.placed[id].spot === sp && !(b508State.found || {})[id]);
+                if (here) hintTag = `<span style="color:#c9a8ff; font-size:9px; margin-left:5px;">◈ 무언가 느껴진다</span>`;
+            }
+            return `
+                <div style="background:rgba(0,0,0,0.25); border:1px solid ${done ? '#333' : '#4a3a2a'}; border-radius:5px; padding:9px 11px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; ${done ? 'opacity:0.45;' : ''}">
+                    <span style="font-size:11px; color:#ddd; flex:1;">${sp}${hintTag}
+                        ${done ? `<br><span style="font-size:9px; color:#777;">${done.result || '아무것도 없었다'}</span>` : ''}
+                    </span>
+                    ${done ? '' : `<button class="game-btn" style="margin:0; padding:6px 11px; font-size:10px; flex-shrink:0;" onclick="doSearch('${area}','${sp}')" ${left <= 0 ? 'disabled' : ''}>뒤진다</button>`}
+                </div>`;
+        }).join('');
+
+        html += `<button class="game-btn" style="width:100%; margin-top:10px; padding:11px; font-size:12px;" onclick="finishSearch()">이 구역을 벗어난다</button>`;
+        box.innerHTML = html;
+    }
+
+    function doSearch(area, spot) {
+        if (!b508State || !database) return;
+        const key = area + '|' + spot;
+        if ((b508State.searched || {})[key]) return;
+
+        const placed = b508State.placed || {};
+        const found = b508State.found || {};
+        const hitId = Object.keys(placed).find(id =>
+            placed[id].area === area && placed[id].spot === spot && !found[id]);
+
+        addNotice(8, `${B508_AREAS[area]} 탐색`);
+
+        if (hitId) {
+            const doc = B508_DOCS.find(d => d.id === hitId);
+            database.ref(`darkParties/${darkRun.partyId}/b508/found/${hitId}`).set({
+                by: currentUser.name, at: Date.now()
+            });
+            database.ref(`darkParties/${darkRun.partyId}/b508/searched/${key}`).set({
+                by: currentUser.name, result: `📄 ${doc.name} 발견`
+            });
+            darkRun.success++;
+            sendPartyChat(`${currentUser.name} 사원이 「${doc.name}」을(를) 찾았습니다.`, true);
+            showDarkToast(`📄 ${doc.name}`);
+        } else {
+            const emptyTexts = [
+                '먼지만 가득했다.',
+                '아무것도 없었다.',
+                '빈 봉투가 하나 나왔다. 안은 비어 있다.',
+                '손에 뭔가 묻었다. 닦이지 않는다.',
+                '무언가 손을 스쳤다. 다시 보니 없다.'
+            ];
+            database.ref(`darkParties/${darkRun.partyId}/b508/searched/${key}`).set({
+                by: currentUser.name, result: emptyTexts[Math.floor(Math.random() * emptyTexts.length)]
+            });
+        }
+    }
+
+    function finishSearch() {
+        if (!darkRun) return;
+        partyAdvance(darkRun.step + 1);
+    }
+
+        const B508_STEPS = {
+        0:  { type:'intro' },
+        1:  { type:'narr', n:1 },
+        2:  { type:'narr', n:2 },
+        3:  { type:'search', area:'basement' },
+        4:  { type:'gimmick', n:1 },
+        5:  { type:'narr', n:3 },
+        6:  { type:'narr', n:4 },
+        7:  { type:'narr', n:5 },
+        8:  { type:'gimmick', n:2 },
+        9:  { type:'search', area:'dough' },
+        10: { type:'narr', n:6 },
+        11: { type:'narr', n:7 },
+        12: { type:'mark', n:1 },
+        13: { type:'narr', n:8 },
+        14: { type:'narr', n:9 },
+        15: { type:'search', area:'proof' },
+        16: { type:'gimmick', n:3 },
+        17: { type:'narr', n:10 },
+        18: { type:'narr', n:11 },
+        19: { type:'narr', n:12 },
+        20: { type:'gimmick', n:4 },
+        21: { type:'mark', n:2 },
+        22: { type:'narr', n:13 },
+        23: { type:'narr', n:14 },
+        24: { type:'search', area:'oven' },
+        25: { type:'narr', n:15 },
+        26: { type:'gimmick', n:5 },
+        27: { type:'narr', n:16 },
+        28: { type:'narr', n:17 },
+        29: { type:'search', area:'store' },
+        30: { type:'narr', n:18 },
+        31: { type:'gimmick', n:6 },
+        32: { type:'narr', n:19 },
+        33: { type:'narr', n:20 },
+        34: { type:'gimmick', n:7 },
+        99: { type:'result' }
+    };
+
+    function renderStepB508() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        if (darkRun.rejoined) { renderRejoinScene(); return; }
+        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); }
+        saveDarkRunState();
+        attachB508Listener();
+
+        if (darkRun.taken) { renderB508Upper(); return; }
+
+        const def = B508_STEPS[darkRun.step];
+        if (!def) { renderDarkResult(); return; }
+
+        if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("일어선다.", "partyAdvance(1)"), "intro");
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'narr') {
+            const d = B508_NARR[def.n];
+            const showNotice = darkRun.step >= 11;
+            body.innerHTML = darkBox("—", d.text,
+                (showNotice ? noticeBarHtml() : '') +
+                darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`),
+                d.img);
+            if (showNotice) renderNoticeBar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'search') { renderSearch(def.area); return; }
+        if (def.type === 'mark')   { renderB508Mark(def.n); return; }
+        if (def.type === 'result') { renderDarkResult(); return; }
+
+        const fns = { 1:b508G1, 2:b508G2, 3:b508G3, 4:b508G4, 5:b508G5, 6:b508G6, 7:b508G7 };
+        if (fns[def.n]) fns[def.n]();
+    }
+
+        // --- 기믹 1: 저장고 탈출 ---
+    function b508G1() {
+        renderChoiceStep("기믹 1 — 저장고",
+            `나가는 길은 계단뿐이다.<br><br>계단 위 문은 잠겨 있지 않다. 밀면 열린다.<br>다만 열면 위층에서 알아차릴 것이다.<br><br>구석에 환기구가 있다. 좁고, 기름때가 두껍다.`,
+            [
+                { id:'stair', label:'① 계단으로 올라간다.',        fn:'b508G1R', arg:'stair' },
+                { id:'vent',  label:'② 환기구로 기어간다.',        fn:'b508G1R', arg:'vent' },
+                { id:'hide',  label:'③ 포대 사이에 숨어 살핀다.',  fn:'b508G1R', arg:'hide' }
+            ], "step1");
+    }
+
+    function b508G1R(pick) {
+        let txt, mod = 0;
+        if (pick === 'stair') {
+            txt = `문을 민다. 경첩이 소리를 내지 않는다. 기름칠이 잘 되어 있다.<br><br>위층은 밝다. 아무도 돌아보지 않는다.<br>다들 각자 할 일을 하고 있다. 너무 열심히 하고 있다.`;
+            addNotice(6, '계단 이용');
+            darkRun.success++;
+        } else if (pick === 'vent') {
+            txt = `환기구로 들어간다. 기름때가 손에 엉긴다.<br><br>한참 기어가다 아래를 본다. 격자 너머로 작업대가 보인다.<br>그 위에 놓인 것을 보고 멈춘다.<br><br>내려가는 걸 잠시 미룬다.`;
+            mod = 2; darkRun.success++; applyPollutionToUser(currentUser, 4);
+        } else {
+            txt = `포대 뒤에 숨어 계단을 살핀다.<br><br>직원 하나가 내려온다. 포대를 하나 집어 들고 올라간다.<br>어깨에 메는데, 포대 안쪽에서 뭔가 자세를 고친다.<br><br>직원은 신경 쓰지 않는다. 익숙한 모양이다.`;
+            mod = 1; darkRun.success++;
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 1] ${pick}`);
+        renderResultStep("기믹 1 — 결과", txt, "계단을 오른다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 2: 반죽실 (소리) ---
+    function b508G2() {
+        darkRun._lastMonster = 'kneader';
+        renderChoiceStep("기믹 2 — 반죽실",
+            `반죽공이 등을 보이고 있다.<br><br>통과하려면 그 옆을 지나야 한다. 거리는 두 걸음도 안 된다.<br>귀가 얼굴의 절반이다. 지금도 아주 조금씩 움직이고 있다.<br><br><span style="color:#ff6b6b;">소리를 내면 안 된다.</span>`,
+            [
+                { id:'crawl', label:'① 신발을 벗고 기어간다.',      fn:'b508G2R', arg:'crawl' },
+                { id:'wait',  label:'② 반죽 치는 박자에 맞춰 걷는다.', fn:'b508G2R', arg:'wait' },
+                { id:'throw', label:'③ 반대쪽으로 뭔가를 던진다.',   fn:'b508G2R', arg:'throw' },
+                { id:'rush',  label:'④ 단숨에 뛰어 지나간다.',      fn:'b508G2R', arg:'rush' }
+            ], null);
+    }
+
+    function b508G2R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = { crawl: 9, wait: 11, throw: 12, rush: 17 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt;
+        if (ok) {
+            txt = pick === 'crawl' ? `신발을 벗어 손에 든다. 바닥이 미끄럽고 미지근하다.<br><br>기어서 지나간다. 반죽공의 발이 바로 옆에 있다.<br>발톱이 바닥을 긁고 있다. 아주 천천히.<br><br>지나쳤다. 귀는 움직이지 않았다.`
+                : pick === 'wait' ? `박자를 센다. 쿵. 쿵. 쿵.<br><br>치는 순간에 맞춰 한 걸음씩. 소리가 소리에 묻힌다.<br><br>세 걸음 만에 지나쳤다. 박자는 흐트러지지 않았다.`
+                : pick === 'throw' ? `주머니에 있던 단추를 반대쪽으로 던진다.<br><br>딱, 하고 작은 소리.<br>반죽공의 얼굴 전체가 그쪽으로 돌아간다. 몸은 그대로인 채로.<br><br>그 사이에 지나간다.`
+                : `달린다.<br><br>지나쳤다. 운이 좋았다.<br>등 뒤에서 반죽 치는 소리가 한 박자 멎었다가, 다시 시작된다.`;
+            darkRun.success++;
+            addNotice(pick === 'rush' ? 15 : 5, '반죽실 통과');
+        } else {
+            txt = `소리가 났다.<br><br>${B508_MONSTERS.kneader.alert}`;
+            darkRun.fail++;
+            addNotice(28, '반죽공에게 감지됨');
+            applyPollutionToUser(currentUser, 7);
+        }
+
+        darkRun.log.push(`[기믹 2] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
+        darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            noticeBarHtml() + darkChoiceBtn("안쪽으로 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 3: 발효실 (제한시간) ---
+    let b508Timer = null;
+    function b508G3() {
+        const body = darkBodyEl();
+        body.innerHTML = darkBox("기믹 3 — 발효실",
+            `선반 사이를 지나야 한다.<br><br>천 아래 것들이 깨어나고 있다. 지나갈수록 움직임이 커진다.<br>완전히 깨기 전에 빠져나가야 한다.<br><br><span style="color:#888; font-size:11px;">[제한 시간 안에 선택하세요]</span>`,
+            noticeBarHtml() +
+            `<div style="text-align:center; font-size:30px; font-weight:bold; color:#ff6b6b; margin-bottom:14px;" id="b508-count">12</div>` +
+            darkChoiceBtn("① 천을 전부 덮어 주며 간다.", "b508G3R('cover')") +
+            darkChoiceBtn("② 눈을 감고 벽만 짚고 간다.", "b508G3R('blind')") +
+            darkChoiceBtn("③ 뛰어서 빠져나간다.", "b508G3R('run')"));
+        renderNoticeBar();
+        mountDarkChat('normal');
+
+        let t = 12;
+        clearInterval(b508Timer);
+        b508Timer = setInterval(() => {
+            t--;
+            const el = document.getElementById('b508-count');
+            if (!el || !darkRun) { clearInterval(b508Timer); return; }
+            el.innerText = t;
+            if (t <= 0) { clearInterval(b508Timer); b508G3R('late'); }
+        }, 1000);
+    }
+
+    function b508G3R(pick) {
+        clearInterval(b508Timer);
+        let txt, mod = 0;
+        if (pick === 'cover') {
+            txt = `천을 끌어당겨 덮어 준다. 손이 천 안으로 들어간다. 저항하지 않는다.<br><br>덮고 나자 움직임이 잦아든다.<br>다른 선반에서도 하나씩 조용해진다.<br><br>고맙다는 뜻인지, 아니면 그냥 때가 된 건지 모르겠다.`;
+            mod = 2; darkRun.success++; addNotice(4, '발효실 통과');
+        } else if (pick === 'blind') {
+            txt = `눈을 감는다. 벽을 짚고 걷는다.<br><br>손끝에 천이 스친다. 천이 아니라 다른 것도 스친다.<br>잡히지는 않았다. 잡을 힘이 아직 없는 것 같았다.<br><br>눈을 뜨니 문 앞이다.`;
+            mod = 1; darkRun.success++; addNotice(6, '발효실 통과');
+            applyPollutionToUser(currentUser, 4);
+        } else if (pick === 'run') {
+            txt = `뛴다.<br><br>선반이 흔들리고, 천이 벗겨지고, 그 아래 것들이 전부 일어난다.<br>문을 닫는 순간 손 하나가 문틈에 끼었다.<br>손가락이 여섯이다.<br><br>문을 더 세게 닫는다.`;
+            mod = -1; darkRun.fail++; addNotice(22, '발효실에서 소란');
+            applyPollutionToUser(currentUser, 8);
+        } else {
+            txt = `망설이는 사이 천이 전부 벗겨졌다.<br><br>스물 몇 개가 동시에 일어나 앉는다. 전부 같은 방향을 본다.<br>비명은 나오지 않았다. 목이 이미 마른 상태였다.<br><br>겨우 빠져나왔다.`;
+            mod = -2; darkRun.fail++; addNotice(30, '발효실에서 지체');
+            applyPollutionToUser(currentUser, 12);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 3] ${pick}`);
+        darkBodyEl().innerHTML = darkBox("기믹 3 — 결과", txt,
+            noticeBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+        // --- 기믹 4: 계산원 (시선) ---
+    function b508G4() {
+        darkRun._lastMonster = 'cashier';
+        renderChoiceStep("기믹 4 — 계산대",
+            `계산대를 지나야 서류함에 닿는다.<br><br>계산원이 서 있다. 눈이 많고, 아직 전부 감겨 있다.<br>하나씩 순서대로 떠지고 있다. 지금 세 개쯤 떠 있다.<br><br><span style="color:#ff6b6b;">눈을 마주치면 안 된다.</span>`,
+            [
+                { id:'down',   label:'① 바닥만 보고 지나간다.',      fn:'b508G4R', arg:'down' },
+                { id:'back',   label:'② 등을 보인 채 뒷걸음질한다.', fn:'b508G4R', arg:'back' },
+                { id:'mirror', label:'③ 거울에 비친 것만 보고 간다.', fn:'b508G4R', arg:'mirror' },
+                { id:'stare',  label:'④ 똑바로 마주 본다.',          fn:'b508G4R', arg:'stare' }
+            ], null);
+    }
+
+    function b508G4R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = { down: 9, back: 12, mirror: 10, stare: 18 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt, died = false;
+        if (ok) {
+            txt = pick === 'stare'
+                ? `마주 본다. 눈이 전부 떠진다. 세어 보면 열두 개쯤.<br><br>한참 본다. 눈싸움이라고 부르기엔 한쪽만 눈이 많다.<br><br>먼저 감은 건 저쪽이었다.<br>지나가는 동안 다시 뜨지 않았다.`
+                : pick === 'down' ? `바닥만 본다. 계산대 아래에 신발이 여럿 놓여 있다.<br>짝이 맞는 것이 하나도 없다.<br><br>세지 않고 지나간다.`
+                : pick === 'back' ? `등을 보인 채 뒷걸음질한다.<br><br>보이지 않으니 더 무섭다. 목덜미가 계속 서늘하다.<br>부딪히지 않고 문에 닿았다.`
+                : `유리 진열장에 비친 상만 보고 걷는다.<br><br>비친 계산원은 움직이지 않는다.<br>실제로도 움직이지 않았기를 바란다.`;
+            darkRun.success++;
+            addNotice(pick === 'stare' ? 12 : 5, '계산대 통과');
+        } else if (roll === 1) {
+            died = true;
+            txt = `눈이 마주쳤다.<br><br>${B508_MONSTERS.cashier.alert}<br><br>관절 없이 접히는 다리가 생각보다 빨랐다.`;
+        } else {
+            txt = `시선이 스쳤다.<br><br>눈 몇 개가 이쪽을 향한 채로 멈춘다.<br>따라오지는 않는다. 아직은.`;
+            darkRun.fail++;
+            addNotice(25, '계산원과 시선 접촉');
+            applyPollutionToUser(currentUser, 7);
+        }
+
+        darkRun.log.push(`[기믹 4] ${pick} d20 ${roll} vs DC${DC}`);
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 4 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            noticeBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 5: 배달원 (냄새) ---
+    function b508G5() {
+        darkRun._lastMonster = 'courier';
+        const bleeding = (darkRun.fail || 0) >= 3;
+        renderChoiceStep("기믹 5 — 오븐실",
+            `배달원이 원을 그리며 돌고 있다.<br><br>코가 계속 벌름거린다. 헬멧 안에서 젖은 숨소리가 샌다.<br>${bleeding ? '<span style="color:#ff6b6b;">여기까지 오면서 어딘가 찢어졌다. 피 냄새가 난다.</span><br>' : ''}<br><span style="color:#ff6b6b;">냄새를 남기면 안 된다.</span>`,
+            [
+                { id:'flour', label:'① 밀가루를 뒤집어쓴다.',       fn:'b508G5R', arg:'flour' },
+                { id:'heat',  label:'② 오븐 열기 쪽으로 붙어 간다.', fn:'b508G5R', arg:'heat' },
+                { id:'bait',  label:'③ 반죽 조각을 던져 유인한다.',  fn:'b508G5R', arg:'bait' },
+                { id:'plain', label:'④ 그냥 지나간다.',             fn:'b508G5R', arg:'plain' }
+            ], "step3");
+    }
+
+    function b508G5R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const bleeding = (darkRun.fail || 0) >= 3;
+        let DC = { flour: 8, heat: 10, bait: 11, plain: 15 }[pick] - gearValue(currentUser, 'break');
+        if (bleeding) DC += 3;
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt, died = false;
+        if (ok) {
+            txt = pick === 'flour' ? `밀가루 포대를 뜯어 뒤집어쓴다.<br><br>눈에 들어가고 목이 막힌다. 기침이 나오려는 걸 참는다.<br><br>배달원이 바로 옆을 지나간다. 코가 한 번 멈췄다가, 다시 돈다.`
+                : pick === 'heat' ? `오븐 쪽 벽에 붙어 간다. 열기에 살이 익는 느낌이다.<br><br>냄새가 열에 타서 흩어진다.<br>팔뚝이 붉어졌지만 지나쳤다.`
+                : pick === 'bait' ? `반죽 조각을 반대쪽으로 던진다.<br><br>배달원이 그쪽으로 달려간다. 정말 빠르다.<br>저 속도로 쫓겼으면 어땠을지 생각하지 않기로 한다.`
+                : `그냥 지나간다. 운이 좋았다.<br><br>배달원이 등 뒤에서 한 번 멈췄다가, 다시 원을 그린다.`;
+            darkRun.success++;
+            addNotice(pick === 'plain' ? 12 : 5, '오븐실 통과');
+            if (pick === 'heat') applyPollutionToUser(currentUser, 5);
+        } else if (roll === 1) {
+            died = true;
+            txt = `코가 멈춘다.<br><br>${B508_MONSTERS.courier.alert}<br><br>배달통이 열리는 소리를 마지막으로 들었다.`;
+        } else {
+            txt = `헬멧이 이쪽으로 기울어진다.<br><br>알아차렸다. 다만 아직 확신하지 못한 모양이다.<br>천천히 이쪽으로 원을 좁혀 온다.`;
+            darkRun.fail++;
+            addNotice(26, '배달원에게 냄새 노출');
+            applyPollutionToUser(currentUser, 8);
+        }
+
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll} vs DC${DC}`);
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            noticeBarHtml() + darkChoiceBtn("매장으로.", `partyAdvance(${darkRun.step + 1})`));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 6: 포장 (타이밍) ---
+    let b508PackTimer = null, b508PackOn = false, b508PackHit = 0;
+    function b508G6() {
+        darkBodyEl().innerHTML = darkBox("기믹 6 — 포장",
+            `포장대 위에 봉지가 있다.<br><br>기계가 주기적으로 봉지 입구를 봉한다.<br>봉해지는 순간에 손이 들어가 있으면 안 된다.<br><br><span style="color:#888; font-size:11px;">[초록일 때 눌러 서류를 넣으세요 — 3회]</span>`,
+            noticeBarHtml() +
+            `<div id="b508-seal" style="width:56px; height:56px; border-radius:50%; margin:0 auto 14px auto; background:#3a0000; border:3px solid #444;"></div>
+             <div style="text-align:center; font-size:12px; color:#aaa; margin-bottom:10px;">넣은 횟수: <b id="b508-pack" style="color:var(--theme-focus);">0</b> / 3</div>
+             <button class="game-btn" id="b508-pack-btn" style="width:100%; margin:0; padding:14px;" onclick="b508PackTap()">넣는다</button>
+             <div id="b508-pack-msg" style="font-size:11px; color:#888; text-align:center; margin-top:10px; min-height:16px;"></div>`);
+        renderNoticeBar();
+        mountDarkChat('normal');
+
+        b508PackHit = 0; b508PackOn = false;
+        clearTimeout(b508PackTimer);
+        const lamp = document.getElementById('b508-seal');
+        function cycle() {
+            b508PackOn = !b508PackOn;
+            if (lamp) {
+                lamp.style.background = b508PackOn ? '#1b5e20' : '#3a0000';
+                lamp.style.boxShadow = b508PackOn ? '0 0 18px #4CAF50' : 'none';
+            }
+            clearTimeout(b508PackTimer);
+            b508PackTimer = setTimeout(cycle, b508PackOn ? (520 + Math.random()*380) : (700 + Math.random()*600));
+        }
+        cycle();
+    }
+
+    function b508PackTap() {
+        if (!darkRun) return;
+        const msg = document.getElementById('b508-pack-msg');
+        if (b508PackOn) {
+            b508PackHit++;
+            document.getElementById('b508-pack').innerText = b508PackHit;
+            msg.innerHTML = `<span style="color:#4CAF50;">넣었다.</span>`;
+        } else {
+            msg.innerHTML = `<span style="color:#f44336;">기계가 물었다. 손가락이 아니어서 다행이다.</span>`;
+            addNotice(9, '포장 실패');
+            applyPollutionToUser(currentUser, 4);
+        }
+        if (b508PackHit >= 3) {
+            clearTimeout(b508PackTimer);
+            document.getElementById('b508-pack-btn').disabled = true;
+            darkRun.success++;
+            setTimeout(() => {
+                darkBodyEl().innerHTML = darkBox("기믹 6 — 결과",
+                    `서류를 봉지 안에 밀어 넣는다.<br><br>기계가 입구를 봉한다. 깔끔하게.<br>바깥에서 보면 그냥 상품이다.<br><br>이제 실려 나가기만 하면 된다.`,
+                    noticeBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+                renderNoticeBar();
+                mountDarkChat('normal');
+            }, 900);
+        }
+    }
+
+    // --- 기믹 7: 출고 ---
+    function b508G7() {
+        const need = b508RequiredDocs();
+        const got = foundCount() + (darkRun._gotKey ? 1 : 0);
+        const enough = got >= need;
+        const luckVal = gearValue(currentUser, 'luck');
+        const canTryKey = !enough && luckVal > 0 && !darkRun._keyTried;
+
+        darkBodyEl().innerHTML = darkBox("기믹 7 — 출고",
+            `셔터가 절반쯤 내려왔다.<br><br>출고대 앞이다. 검수 담당이 서류를 받아 넘긴다.<br>숫자가 맞으면 상품, 아니면 폐기.<br><br>
+             <div style="background:rgba(0,0,0,0.35); border:1px solid #5a4a2a; border-radius:6px; padding:12px; font-size:12px; line-height:1.9; margin-top:6px;">
+                확보한 서류 <b style="color:${enough ? '#4CAF50' : '#f44336'};">${got}</b> / ${need}장<br>
+                ${enough ? '<span style="color:#4CAF50;">요건을 충족했다.</span>' : '<span style="color:#f44336;">모자란다.</span>'}
+             </div>`,
+            noticeBarHtml() +
+            (enough
+                ? darkChoiceBtn("서류를 내민다.", "b508Ship(true)")
+                : (canTryKey
+                    ? darkChoiceBtn(`✺ 주머니를 뒤진다. (행운)`, "b508TryKey()") + darkChoiceBtn("그냥 내민다.", "b508Ship(false)")
+                    : darkChoiceBtn("그냥 내민다.", "b508Ship(false)"))));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    function b508TryKey() {
+        darkRun._keyTried = true;
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const luckVal = gearValue(currentUser, 'luck');
+        const DC = Math.max(4, 16 - Math.round(luckVal * 14));
+        const ok = roll >= DC;
+
+        if (ok) {
+            darkRun._gotKey = true;
+            darkRun.log.push(`[출고] 행운으로 열쇠 확보 (d20 ${roll} vs DC${DC})`);
+            sendPartyChat(`${currentUser.name} 사원이 주머니에서 무언가를 꺼냈습니다.`, true);
+        }
+
+        darkBodyEl().innerHTML = darkBox("주머니",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(DC ${DC})</span></div>` +
+            (ok
+                ? `주머니에 뭔가 잡힌다.<br><br>작은 열쇠다. 언제 들어왔는지 모르겠다.<br>손잡이에 글자가 새겨져 있다. <span style="color:#d4af37;">"출고"</span><br><br>검수 담당이 그걸 보고 고개를 끄덕인다.<br>서류 한 장 값은 되는 모양이다.`
+                : `주머니를 뒤진다.<br><br>단추 하나, 밀가루, 그리고 손가락에 묻은 것.<br>쓸모 있는 건 없었다.`),
+            darkChoiceBtn("서류를 내민다.", `b508Ship(${ok})`));
+        mountDarkChat('normal');
+    }
+
+    function b508Ship(enough) {
+        if (enough) {
+            darkRun.success += 2;
+            darkRun.log.push(`[출고] 성공`);
+            darkBodyEl().innerHTML = darkBox("출고",
+                `검수 담당이 서류를 한 장씩 넘긴다.<br>도장이 찍히는 소리가 규칙적이다.<br><br>마지막 장에서 멈춘다. 한참 본다.<br>그리고 봉지 입구를 봉한다.<br><br><span style="color:#d4af37;">"정상 출고품입니다. 감사합니다."</span>`,
+                darkChoiceBtn("실려 나간다.", "darkRun.step=99; renderDarkStep();"));
+            mountDarkChat('normal');
+        } else {
+            darkRun.fail += 2;
+            darkRun.failedRun = true;
+            darkDeath(
+                `검수 담당이 서류를 센다. 두 번 센다.<br><br>고개를 젓는다. 미안해하는 표정이다. 진심으로.<br><br>` +
+                `<span style="color:#d4af37;">"폐기 처리하겠습니다. 다음에는 더 신선하게 오세요."</span>`
+            );
+        }
+    }
+
+        // --- 지목 ---
+    function renderB508Mark(n) {
+        const need5 = (darkRun.memberCount || 3) >= 5;
+        if (n === 2 && !need5) { partyAdvance(darkRun.step + 1); return; }
+
+        const key = `b508mark${n}`;
+        if (darkRun.isLeader && database && !darkRun[`_${key}Set`]) {
+            darkRun[`_${key}Set`] = true;
+            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
+                const alive = Object.keys(sn.val() || {});
+                if (alive.length === 0) return;
+                const t = alive[Math.floor(Math.random() * alive.length)];
+                database.ref(`darkParties/${darkRun.partyId}/${key}`).set({ target: t, at: Date.now() });
+            });
+        }
+
+        if (!database) { partyAdvance(darkRun.step + 1); return; }
+
+        database.ref(`darkParties/${darkRun.partyId}/${key}`).on('value', sn => {
+            const m = sn.val();
+            if (!m || !darkRun || darkRun[`_${key}Shown`]) return;
+            darkRun[`_${key}Shown`] = true;
+            const isMe = m.target === currentUser.code;
+
+            darkBodyEl().innerHTML = darkBox("—",
+                isMe
+                    ? `포대가 하나 더 필요하다고, 누군가 말한다.<br><br>어깨에 손이 걸린다. 밀가루가 묻은 손이다.<br>가볍게 끌린다. 저항할 틈이 없을 만큼 자연스럽게.<br><br>버틸 수 있을까.`
+                    : `옆에 있던 사람이 사라진다.<br><br>소리도 없었다. 포대 하나가 계단 위로 올라가는 것만 보였다.<br>포대 안쪽에서 자세를 고치는 움직임.<br><br>부르지 않기로 한다. 여기서 소리를 내면 안 된다.`,
+                noticeBarHtml() + (isMe
+                    ? darkChoiceBtn("버틴다.", `b508Resist(${n})`)
+                    : darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)));
+            renderNoticeBar();
+            mountDarkChat('normal');
+        });
+    }
+
+    function b508Resist(n) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = 15;
+        const taken = roll === 1 || (roll + bonus) < DC;
+
+        let txt;
+        if (taken) {
+            txt = `버텨 보지만 소용없다.<br><br>손이 하나 더 늘어난다. 그리고 또 하나.<br>발이 바닥에서 뜨고, 천장이 멀어진다.<br><br>계단 위로 올라간다. 위층은 조명이 더 밝았다.`;
+            darkRun.taken = true;
+            darkRun.upperIdx = 0;
+            darkRun.fail++;
+            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({ name: currentUser.name, at: Date.now() });
+            sendPartyChat(`${currentUser.name} 사원이 위층으로 끌려갔습니다.`, true);
+        } else {
+            txt = `팔꿈치로 밀어낸다. 살이 물컹하게 들어갔다가 돌아온다.<br><br>손이 놓인다. 놓아준 게 아니라 흥미를 잃은 것 같다.<br><br>돌아보니 아무도 없다. 밀가루 자국만 어깨에 남았다.`;
+            darkRun.success++;
+            addNotice(10, '지목 저항');
+        }
+
+        darkRun.log.push(`[지목 ${n}] d20 ${roll} vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+        darkBodyEl().innerHTML = darkBox("—",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${taken?'#f44336':'#4CAF50'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            taken
+                ? darkChoiceBtn("눈을 뜬다.", "renderB508Upper();")
+                : darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        mountDarkChat('normal');
+    }
+
+    // --- 2층 ---
+    const B508_UPPER = [
+        { text:`눈을 뜬다. 작업대 위다.<br><br>천장 조명이 수술실처럼 밝다. 그늘이 생기지 않는다.<br>몸은 묶여 있지 않다. 묶을 필요가 없다고 판단한 모양이다.<br><br>일어나 앉는다. 방이 넓다. 가구가 많다.<br><br>의자 하나가 아주 천천히 이쪽으로 방향을 바꿨다.`,
+          opts:[ {l:'① 가구를 자세히 본다.', v:'look'}, {l:'② 보지 않고 문을 찾는다.', v:'door'} ] },
+
+        { text:`의자다. 등받이에 결이 있고, 다리에 관절이 있다.<br><br>앉는 자리 천이 아주 얕게 오르내린다.<br>숨이다.<br><br>테이블도 마찬가지다. 상판이 미지근하다.<br>손을 대자 상판 아래에서 뭔가가 손을 따라 움직였다.<br><br>벽에 걸린 액자에는 가죽이 발려 있다. 무두질이 잘 되어 있다.<br>가장자리에 점이 있다. 점은 무두질로 지워지지 않는다.`,
+          opts:[ {l:'① 의자에게 말을 건다.', v:'talk'}, {l:'② 액자를 떼어 낸다.', v:'frame'}, {l:'③ 아무것도 하지 않는다.', v:'still'} ] },
+
+        { text:`방 안쪽에서 소리가 난다.<br><br>비명이다. 짧고, 높고, 정확히 같은 길이로 반복된다.<br>일정한 간격으로. 녹음처럼.<br><br>소리를 따라가니 선반이 있다.<br>장신구가 늘어서 있다. 팔찌, 목걸이, 귀걸이.<br>전부 뼈다. 잘 다듬었다.<br><br>그중 하나가 소리를 내고 있다. 반지다.<br>아주 작은 목소리로, 같은 말을 반복한다.`,
+          opts:[ {l:'① 반지를 집어 든다.', v:'take'}, {l:'② 귀를 막는다.', v:'ear'}, {l:'③ 뭐라고 하는지 듣는다.', v:'listen'} ] }
+    ];
+
+    function renderB508Upper() {
+        if (!darkRun) return;
+        if (darkRun.upperIdx == null) darkRun.upperIdx = 0;
+        attachB508Listener();
+
+        if (darkRun.upperIdx >= B508_UPPER.length) { renderSearch('upper'); return; }
+
+        const d = B508_UPPER[darkRun.upperIdx];
+        darkBodyEl().innerHTML = darkBox("2층 — 혼자", d.text,
+            noticeBarHtml() +
+            d.opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="b508UpperPick('${o.v}')">${o.l}</button>`).join(''));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    function b508UpperPick(v) {
+        let txt, mod = 0;
+        const good = ['door','still','ear','frame'];
+        const bad  = ['talk','take','listen'];
+
+        if (v === 'listen') {
+            txt = `귀를 가까이 댄다.<br><br>반지가 말한다. 아주 작게, 같은 말을.<br><span style="color:#d4af37;">"...괜찮아요... 금방... 끝나요..."</span><br><br>누군가를 안심시키려던 말이었을 것이다.<br>그 말을 지금도 하고 있다.`;
+            mod = -1; applyPollutionToUser(currentUser, 10);
+        } else if (v === 'talk') {
+            txt = `의자에게 말을 건다. 이름을 묻는다.<br><br>대답은 없다. 다만 등받이가 아주 천천히 이쪽으로 기울었다.<br>기대라는 뜻인지, 도망가라는 뜻인지 모르겠다.<br><br>기대지 않았다.`;
+            mod = -1; applyPollutionToUser(currentUser, 8);
+        } else if (v === 'take') {
+            txt = `반지를 집는다. 따뜻하다.<br><br>손에 쥐자 소리가 멎는다.<br>놓자 다시 시작된다.<br><br>주머니에 넣는다. 소리가 계속 난다. 주머니 안에서.`;
+            mod = 0; applyPollutionToUser(currentUser, 6);
+        } else {
+            txt = `그렇게 한다.<br><br>아무 일도 일어나지 않는다.<br>여기서는 그게 최선이다.`;
+            mod = 1;
+        }
+
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.upperIdx = (darkRun.upperIdx || 0) + 1;
+        darkRun.log.push(`[2층] ${v}`);
+
+        darkBodyEl().innerHTML = darkBox("2층 — 결과", txt,
+            darkChoiceBtn(darkRun.upperIdx >= B508_UPPER.length ? "서류를 찾는다." : "계속 본다.", "renderB508Upper();"));
+        mountDarkChat('normal');
+    }
+
+        function buildBakeryAmbience(ctx, master) {
+        // 오븐 저역
+        const low = ctx.createOscillator();
+        const lowG = ctx.createGain();
+        low.type = 'sine'; low.frequency.value = 52;
+        lowG.gain.value = 0.09;
+        low.connect(lowG); lowG.connect(master);
+        low.start(); darkAudio.nodes.push(low);
+
+        // 환풍기
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 7);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 400;
+        const nG = ctx.createGain(); nG.gain.value = 0.12;
+        noise.connect(lp); lp.connect(nG); nG.connect(master);
+        noise.start(); darkAudio.nodes.push(noise);
+
+        // 반죽 치는 소리 — 젖고 규칙적
+        function knead() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const src = ctx.createBufferSource();
+            src.buffer = makeNoiseBuffer(ctx, 0.3);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'lowpass'; bp.frequency.value = 220;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.1, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0008, t + 0.3);
+            src.connect(bp); bp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + 0.35);
+            darkAudio.timers.push(setTimeout(knead, 1100 + Math.random() * 200));
+        }
+        darkAudio.timers.push(setTimeout(knead, 800));
+
+        // 가끔 섞이는 짧고 높은 소리
+        function cry() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(680 + Math.random() * 300, t);
+            osc.frequency.exponentialRampToValueAtTime(420, t + 0.18);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 5;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.03, t + 0.03);
+            g.gain.exponentialRampToValueAtTime(0.0005, t + 0.22);
+            osc.connect(bp); bp.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 0.28);
+            darkAudio.timers.push(setTimeout(cry, 13000 + Math.random() * 22000));
+        }
+        darkAudio.timers.push(setTimeout(cry, 7000 + Math.random() * 8000));
+
+        // 오븐 타이머
+        function bell() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            for (let k = 0; k < 3; k++) {
+                const tt = t + k * 0.35;
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(1180, tt);
+                g.gain.setValueAtTime(0.035, tt);
+                g.gain.exponentialRampToValueAtTime(0.0004, tt + 0.3);
+                osc.connect(g); g.connect(master);
+                osc.start(tt); osc.stop(tt + 0.35);
+            }
+            darkAudio.timers.push(setTimeout(bell, 26000 + Math.random() * 30000));
+        }
+        darkAudio.timers.push(setTimeout(bell, 15000 + Math.random() * 12000));
     }
