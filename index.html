@@ -2649,13 +2649,18 @@ function getTodayStr() {
         return Math.max(0, 3 - (currentUser.darkTries || 0));
     }
 
-    function rollDarkBonus() {
+       function rollDarkBonus(kind) {
         let b = 0;
         if (currentUser.pollution < 30) b += 1;
         if (currentUser.pollution >= 60) b -= 1;
         if (currentUser.pollution >= 90) b -= 1;
         if (darkRun && darkRun.carryItems && darkRun.carryItems.length > 0) b += 1;
         if (darkRun) b += (darkRun.modifier || 0);
+
+        // ★ 전용 장비 속성
+        if (kind === 'sense') b += gearValue(currentUser, 'sense');
+        if (kind === 'hide')  b += gearValue(currentUser, 'hide');
+
         return b;
     }
 
@@ -3030,7 +3035,7 @@ function getTodayStr() {
 
     function darkStep3Pick(pick) {
         const roll = Math.floor(Math.random()*20) + 1;
-        const bonus = rollDarkBonus();
+        const bonus = rollDarkBonus('sense')
         const total = roll + bonus;
         const DC = pick === 'knock' ? 12 : (pick === 'turn' ? 10 : 8);
 
@@ -3078,9 +3083,28 @@ function getTodayStr() {
         darkStep3Pick(pick);
     }
 
-        // ==========================================
-    // ★ 어둠 탐사 사망 처리
-    // ==========================================
+            function darkDeath(reasonText) {
+        // ★ 회피 — 즉사를 확률적으로 무효화
+        const evadeRate = gearValue(currentUser, 'evade');
+        if (evadeRate > 0 && !darkRun._evadeUsed && Math.random() < evadeRate) {
+            darkRun._evadeUsed = true;
+            const g = getGear(currentUser);
+            darkRun.fail = Math.max(0, darkRun.fail - 1);
+            applyPollutionToUser(currentUser, 5);
+
+            darkBodyEl().innerHTML = darkBox("—",
+                `${reasonText}<br><br>
+                 <span style="color:#d4bbff;">— 몸이 먼저 움직였다.<br>
+                 ${g.icon} ${g.name}이(가) 손에 걸리는 감각, 그리고 반 발자국.<br>
+                 그 반 발자국이 전부였다.</span>`,
+                darkChoiceBtn("숨을 고른다.", "renderDarkStep();"));
+            mountDarkChat('normal');
+            saveDB();
+            return;
+        }
+
+            }
+            
         function darkDeath(reasonText) {
         // ★ 사직서를 반입했다면 선택권을 준다
         const hasResign = (darkRun.carryItems || []).includes('사직서');
@@ -3112,24 +3136,38 @@ function getTodayStr() {
         let lostPoints = 0;
         let lostItems = [];
 
-        if (isHardZone) {
-            // ★ B등급 이상 — 포인트 전액 + 반입품만 소멸
-            lostPoints = currentUser.points;
-            currentUser.points = 0;
+                if (isHardZone) {
+            const luckRate = gearValue(currentUser, 'luck');
+            const saved = luckRate > 0 && Math.random() < luckRate;
 
-            const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
-            carried.forEach(it => {
-                removeItemFromInventory(currentUser, it, 1);
-                lostItems.push(it);
-            });
+            if (saved) {
+                // ★ 행운 — 절반 미만 보존
+                const keepRatio = 0.30 + Math.random() * 0.15;
+                const kept = Math.floor(currentUser.points * keepRatio);
+                lostPoints = currentUser.points - kept;
+                currentUser.points = kept;
 
-            addHistoryLog(currentUser, lostItems.length
-                ? `[어둠 사망] ${z.code}에서 사망. 포인트 ${lostPoints} P와 반입품 ${lostItems.length}점 소실.`
-                : `[어둠 사망] ${z.code}에서 사망. 포인트 ${lostPoints} P 소실.`);
+                const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
+                const loseCount = Math.ceil(carried.length / 2);
+                carried.slice(0, loseCount).forEach(it => {
+                    removeItemFromInventory(currentUser, it, 1);
+                    lostItems.push(it);
+                });
+                darkRun._luckSaved = true;
+                addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 사망. 일부를 지켜냈습니다. (-${lostPoints} P)`);
+            } else {
+                lostPoints = currentUser.points;
+                currentUser.points = 0;
+                const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
+                carried.forEach(it => {
+                    removeItemFromInventory(currentUser, it, 1);
+                    lostItems.push(it);
+                });
+                addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 사망. 포인트 ${lostPoints} P와 반입품 소실.`);
+            }
         } else {
             addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 의식을 잃음.`);
         }
-
         // 여우 상담실 2시간 이송
         currentUser.pollution = 100;
         currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
@@ -3168,6 +3206,7 @@ function getTodayStr() {
                        <span style="font-size:10px; color:#888;">보관 중이던 소지품은 무사합니다.</span><br>`
                     : `<span style="color:#aaa;">본 구역은 재산 소멸 규정이 적용되지 않습니다.</span><br>`}
                 오염도 <b style="color:#ff9800;">100%</b><br>
+                 ${darkRun._luckSaved ? `<div style="color:#4CAF50; margin-top:6px;">✺ 행운 — 일부를 지켜냈습니다.</div>` : ''}
                 <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#d4af37;">
                     🦊 여우 상담실로 긴급 이송됩니다.<br>
                     <span style="font-size:10px; color:#aaa;">회복 예상 시간: 2시간 (퇴원 시 오염도 40%)</span>
@@ -3322,8 +3361,9 @@ function getTodayStr() {
 
         let gained = [];
         const zoneLoot = DARK_LOOT_BY_ZONE[darkRun.zone] || [];
-        zoneLoot.forEach(l => {
+                zoneLoot.forEach(l => {
             let c = l.chance * (darkRun.critical ? 3 : 1);
+            if (gearValue(currentUser, 'luck') > 0) c *= 2;    // ★ 행운
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
 
@@ -3697,16 +3737,20 @@ function getTodayStr() {
         updateUI();
     }
 
-    function applyPollutionToUser(user, amount) {
+        function applyPollutionToUser(user, amount) {
         if (!user || user.code === 'kario0987') return; 
         if (isBlindfolded(user)) return;
-        
-        // ★ [추가] 타인에게 오염도를 줄 때도 방어막(은반지, 나이프) 적용
-        let finalAmount = Math.round(amount * getPollutionMultiplier(user));
-        if (finalAmount <= 0) return;
 
+        let finalAmount = Math.round(amount * getPollutionMultiplier(user));
+
+        // ★ 치유 — 탐사 중 오염 상승 감소
+        if (darkRun && user.code === currentUser.code) {
+            const healRate = gearValue(user, 'heal');
+            if (healRate > 0) finalAmount = Math.round(finalAmount * (1 - healRate));
+        }
+
+        if (finalAmount <= 0) return;
         user.pollution = Math.min(100, user.pollution + finalAmount);
-        
     }
 
     function getPollutionStatusInfo(pollution) {

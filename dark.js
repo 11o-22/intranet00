@@ -1901,12 +1901,13 @@ function input119D(n) {
 
     function dark087Roll(pick) {
         const roll = Math.floor(Math.random()*20) + 1;
-        let bonus = rollDarkBonus();
+        let bonus = rollDarkBonus('sense');
         if (currentUser.darkCatalogBonus) { bonus += 2; currentUser.darkCatalogBonus = false; }
         const total = roll + bonus;
 
         let DC = (pick === 'pull') ? 9 : (pick === 'slow') ? 11 : 13;
         if (!darkRun.correct) DC += 4;
+        DC -= gearValue(currentUser, 'break');
 
         let outcome, txt;
         if (roll === 20) outcome = 'crit';
@@ -2035,7 +2036,19 @@ function input119D(n) {
             darkRun.modifier = (darkRun.modifier || 0) + 1;
             darkRun.log.push(`[퀴즈 ${n}] 정답`);
             sendPartyChat(`${currentUser.name} 사원이 기억해 냈습니다.`, true);
-        } else {
+               } else {
+            // ★ 감각이 높으면 오답을 한 번 무를 수 있다
+            const senseVal = gearValue(currentUser, 'sense');
+            if (senseVal >= 3 && !darkRun._senseSaved) {
+                darkRun._senseSaved = true;
+                darkRun[`quiz${n}Done`] = 'ok';
+                darkRun.success++;
+                darkRun.log.push(`[퀴즈 ${n}] 감각으로 떠올림`);
+                sendPartyChat(`${currentUser.name} 사원이 뒤늦게 기억해 냈습니다.`, true);
+                renderQuizStep(n);
+                return;
+            }
+
             darkRun[`quiz${n}Done`] = 'no';
             darkRun.fail++;
             darkRun.quizWrong = (darkRun.quizWrong || 0) + 1;
@@ -2177,7 +2190,7 @@ function input119D(n) {
 
     function resistAbduction(round) {
         const roll = Math.floor(Math.random() * 20) + 1;
-        let bonus = rollDarkBonus();
+                let bonus = rollDarkBonus('hide');
         const total = roll + bonus;
         const DC = 13;
 
@@ -2337,6 +2350,7 @@ function input119D(n) {
         const roll = Math.floor(Math.random() * 20) + 1;
         let bonus = rollDarkBonus();
         let DC = { hand: 11, item: 8, name: 10 }[kind];
+        DC -= Math.round(gearValue(currentUser, 'heal') * 10);
         const total = roll + bonus;
         const ok = (roll !== 1) && (total >= DC);
 
@@ -2503,8 +2517,8 @@ function input119D(n) {
         const roll = Math.floor(Math.random() * 20) + 1;
         let bonus = rollDarkBonus();
         const total = roll + bonus;
-        const DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
-
+        let DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
+        DC -= gearValue(currentUser, 'break');
         let txt, died = false;
 
         if (roll === 1) {
