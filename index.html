@@ -4108,9 +4108,12 @@ function getTodayStr() {
         let timedNotes = getTimedEffectsText(currentUser);
         let manualNotes = (currentUser.badge && currentUser.badge.notes && currentUser.badge.notes !== "특이사항 없음") ? currentUser.badge.notes : "";
 
-        let finalNotesList = [];
+               let finalNotesList = [];
         if (manualNotes) finalNotesList.push(manualNotes);
         if (timedNotes.length > 0) finalNotesList = finalNotesList.concat(timedNotes);
+
+        noteEl.innerHTML = finalNotesList.length > 0 ? finalNotesList.join('<br>') : "특이사항 없음";
+
         // 아이템 사용 점등 효과가 우선 적용되도록 처리
         if (!currentUser.hasItemUsedOnMe) {
             noteEl.className = noteGlowClass;
