@@ -2659,6 +2659,9 @@ function getTodayStr() {
         // ★ 전용 장비 속성
         if (kind === 'sense') b += gearValue(currentUser, 'sense');
         if (kind === 'hide')  b += gearValue(currentUser, 'hide');
+        if (kind !== 'sense') b += Math.floor(gearValue(currentUser, 'sense') / 2);
+        if (kind !== 'hide')  b += Math.floor(gearValue(currentUser, 'hide') / 2);
+
 
         return b;
     }
