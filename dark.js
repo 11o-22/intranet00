@@ -1615,8 +1615,9 @@ const DARK_ZONES = {
     }
 
     let c119Timer = null;
-    function start119C() {
+       function start119C() {
         if (myC119Role() !== 'outside') return;
+        if (darkRun) darkRun._c119Locked = true;      // ★ 리렌더 차단
         database.ref(c119Path()).update({ runC: true, posC: 0 });
         let pos = 0;
         clearInterval(c119Timer);
@@ -1624,15 +1625,15 @@ const DARK_ZONES = {
             pos += 1.2;
             const bar = document.getElementById('c119-bar');
             if (bar) bar.style.width = pos + '%';
-            database.ref(c119Path() + '/posC').set(Math.round(pos));
+            if (darkRun) darkRun._c119LocalPos = Math.round(pos);
             if (pos >= 100) { clearInterval(c119Timer); stop119C(); }
         }, 90);
     }
 
-    function stop119C() {
+      function stop119C() {
         if (myC119Role() !== 'outside') return;
         clearInterval(c119Timer);
-        const pos = c119State.posC || 0;
+        const pos = darkRun._c119LocalPos || 0;
         const target = c119State.targetC;
         const diff = Math.abs(pos - target);
         const ok = diff <= 5;
