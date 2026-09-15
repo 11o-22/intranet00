@@ -1006,12 +1006,13 @@ function getTodayStr() {
     tryAutoLogin();
     tryAutoLogin();
 
-        database.ref('online').on('value', (snap) => {
+               database.ref('online').on('value', (snap) => {
             onlineUsersMap = snap.val() || {};
-            document.getElementById('online-users-count').innerText = Math.max(1, Object.keys(onlineUsersMap).length);
+            const visible = Object.keys(onlineUsersMap).filter(c => c !== 'kario0987').length;
+            document.getElementById('online-users-count').innerText = Math.max(1, visible);
             if(currentUser) renderVipOpponents();
         });
-
+        
     function saveDB() {
     if (!database) return;
     
@@ -2340,10 +2341,11 @@ function getTodayStr() {
         if (cnt >= z.max) { showCustomAlert('이미 정원이 가득 찼습니다.'); return; }
 
         let opts = '';
-        for (let code in onlineUsersMap) {
+              for (let code in onlineUsersMap) {
             const u = db.users[code];
             if (!u) continue;
             if (code === currentUser.code) continue;
+            if (code === 'kario0987' && currentUser.code !== 'kario0987') continue;
             if (p.members[code]) continue;
             let inOther = false;
             for (let pid in darkParties) {
@@ -2453,8 +2455,9 @@ function getTodayStr() {
         if (p) { renderPartyRoom(p, body); return; }
 
         // --- 모집 중인 방 목록 ---
-        let list = Object.values(darkParties).filter(pt =>
+               let list = Object.values(darkParties).filter(pt =>
             pt.state === 'RECRUIT' && Date.now() - pt.createdAt < PARTY_TIMEOUT
+            && (pt.leader !== 'kario0987' || currentUser.code === 'kario0987')
         );
 
         let html = `<div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
