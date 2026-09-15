@@ -56,28 +56,32 @@ const DARK_ZONES = {
         }
     };
        
-    const DARK_LOOT_BY_ZONE = {
+          const DARK_LOOT_BY_ZONE = {
         "Qtrew-C-119": [
-            { name:"금이 간 손거울", chance:0.030 },
-            { name:"세 번째 단어", chance:0.020 },
-            { name:"먼저 웃은 쪽", chance:0.010 }
+            { name:"금이 간 손거울", chance:0.003 },
+            { name:"세 번째 단어", chance:0.002 },
+            { name:"먼저 웃은 쪽", chance:0.001 }
+        ],
+        "Qtrew-B-330": [
+            { name:"접힌 안내도", chance:0.003 },
+            { name:"누군가의 왼쪽 신발", chance:0.002 },
+            { name:"세어지지 않는 숫자", chance:0.001 }
+        ],
+        "Qtrew-B-508": [
+            { name:"읽을 수 없는 라벨", chance:0.003 },
+            { name:"덜 구워진 것", chance:0.002 },
+            { name:"영업시간 안내판", chance:0.001 }
         ],
         "Qtrew-D-042": [
-            { name:"꺼진 가로등 전구", chance:0.030 },
-            { name:"1시 17분 버스표", chance:0.020 },
-            { name:"반 박자 늦은 그림자", chance:0.010 }
+            { name:"꺼진 가로등 전구", chance:0.003 },
+            { name:"1시 17분 버스표", chance:0.002 },
+            { name:"반 박자 늦은 그림자", chance:0.001 }
         ],
         "Qtrew-D-087": [
-            { name:"서명 없는 캔버스 조각", chance:0.030 },
-            { name:"전시 안내 도록", chance:0.020 },
-            { name:"액자 뒤에 있던 것", chance:0.010 }
-        ],
-
-            "Qtrew-B-330": [
-            { name:"접힌 안내도", chance:0.030 },
-            { name:"누군가의 왼쪽 신발", chance:0.020 },
-            { name:"세어지지 않는 숫자", chance:0.010 }
-        ],
+            { name:"서명 없는 캔버스 조각", chance:0.003 },
+            { name:"전시 안내 도록", chance:0.002 },
+            { name:"액자 뒤에 있던 것", chance:0.001 }
+        ]
     };
     // 탐사 진행 상태 (새로고침 시 소멸 → 중단 처리)
     let darkRun = null;
