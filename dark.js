@@ -704,26 +704,30 @@ const DARK_ZONES = {
         return arr.map(s => `<span style="display:inline-block; background:rgba(212,175,55,0.12); border:1px solid #5a4a2a; color:#d4af37; border-radius:4px; padding:3px 9px; margin:0 4px 4px 0; font-weight:bold; font-size:12px;">${s.w}</span>`).join('');
     }
 
-           function renderStep119() {
+            function renderStep119() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
         if (darkRun.rejoined) { renderRejoinScene(); return; }
         saveDarkRunState();
+
         attachC119Listener();
-               attachC119Listener();
+
         if (!c119State) {
             if (darkRun.isLeader) initC119();
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">역할을 배정하는 중...</div>`, "intro");
-            // ★ 데이터가 들어왔는데 화면이 안 바뀐 경우 대비
+                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">
+                    역할을 배정하는 중...<br>
+                    <button class="game-btn" style="margin-top:14px; padding:9px 16px; font-size:11px;" onclick="forceC119Refresh()">다시 시도</button>
+                 </div>`, "intro");
             setTimeout(() => { if (c119State && darkRun) renderStep119(); }, 1000);
+            setTimeout(() => { if (c119State && darkRun) renderStep119(); }, 2500);
             return;
         }
 
         const role = myC119Role();
         const s = darkRun.step;
 
-       if (s === 0) { render119Intro(role); return; }
+        if (s === 0) { render119Intro(role); return; }
         if (s === 99) { renderDarkResult(); return; }
         if (s === 2 && c119State.resultA) { show119ResultA(); return; }
         if (s === 4 && c119State.resultB) { show119ResultB(); return; }
@@ -741,7 +745,22 @@ const DARK_ZONES = {
             8: () => render119D(role)
         };
         if (seq[s]) seq[s]();
-           }
+    }
+
+        function forceC119Refresh() {
+        if (!darkRun || !database) return;
+        database.ref(c119Path()).once('value').then(snap => {
+            const v = snap.val();
+            if (v) {
+                c119State = v;
+                darkRun._c119Locked = false;
+                renderStep119();
+            } else if (darkRun.isLeader) {
+                initC119();
+                setTimeout(() => forceC119Refresh(), 1200);
+            }
+        });
+    }
                    // --- 막간 장면 ---
     const C119_INTERLUDES = {
         1: {
