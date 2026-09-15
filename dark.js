@@ -2426,3 +2426,56 @@ const DARK_ZONES = {
         renderResultStep("기믹 6 — 결과", txt, "끝으로 간다.",
             (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(21)" : "void 0");
     }
+
+        // --- 기믹 5: 벽이 좁혀온다 ---
+    function b330Gimmick5() {
+        renderChoiceStep("기믹 5 — 좁혀오는 벽",
+            `양쪽 벽이 동시에 움직인다.<br><br>아까처럼 주기적인 게 아니다. 멈추지 않고 계속 좁아진다.<br>앞쪽에 문이 하나 보이는데, 거기까지 거리가 애매하다.<br><br>벽에 눌린 자국들이 있다. 사람 모양이다. 여러 개다.`,
+            [
+                { id:'run',   label:'① 전력으로 달린다.',           fn:'b330G5R', arg:'run' },
+                { id:'brace', label:'② 벽을 밀어 버틴다.',           fn:'b330G5R', arg:'brace' },
+                { id:'crawl', label:'③ 바닥에 엎드려 기어간다.',     fn:'b330G5R', arg:'crawl' },
+                { id:'back',  label:'④ 뒤로 물러난다.',             fn:'b330G5R', arg:'back' }
+            ], null);
+    }
+
+    function b330G5R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        let bonus = rollDarkBonus();
+        const total = roll + bonus;
+        const DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
+
+        let txt, died = false;
+
+        if (roll === 1) {
+            died = true;
+            txt = `늦었다.<br><br>양쪽이 닿는다. 소리는 나지 않았다.<br>벽이 다시 열렸을 때, 자국이 하나 늘어 있었다.`;
+        } else if (total >= DC) {
+            darkRun.success++;
+            txt = pick === 'run' ? `달린다. 문턱을 넘는 순간 뒤에서 벽이 맞물린다.<br><br>발뒤꿈치가 스쳤다. 그걸로 끝이었다.`
+                : pick === 'brace' ? `벽을 민다. 밀린다. 실제로 밀린다.<br><br>버티는 동안 일행이 지나간다. 마지막으로 손을 놓고 빠져나온다.`
+                : pick === 'crawl' ? `엎드린다. 바닥 쪽이 덜 좁아진다.<br><br>기어서 빠져나온다. 옷이 찢어졌지만 몸은 무사하다.`
+                : `물러난다. 벽이 따라오지 않는다.<br><br>기다렸다가 다시 진입하니 통로가 원래대로다.<br>시간을 잃었을 뿐이다.`;
+        } else {
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 9);
+            txt = `가까스로 빠져나온다.<br><br>갈비뼈 쪽이 아프다. 숨을 깊게 쉬면 더 아프다.<br>뒤를 보니 벽이 완전히 맞물려 있다.`;
+            if ((darkRun.fail || 0) >= 5) {
+                darkRun.dying = 'wall';
+                darkRun.log.push(`[기믹 5] d20 ${roll} — 치명`);
+                renderRescueScene('wall');
+                return;
+            }
+        }
+
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
+
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${total>=DC?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            (darkRun.isLeader || !darkRun.isParty)
+                ? darkChoiceBtn("계속 간다.", "partyAdvance(18)")
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`);
+        mountDarkChat('normal');
+    }
