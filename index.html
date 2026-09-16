@@ -4700,12 +4700,12 @@ function getTodayStr() {
         addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 노스텔지어 끈 장착`);
         addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
     }
-    
-    removeItemFromInventory(currentUser, item, 1);
-    
-    // ★ 동기화 누락 방지: 상대방의 정보는 Firebase에 직접 덮어씌웁니다.
+      removeItemFromInventory(currentUser, item, 1);
+
+    targetUser._adminStamp = Date.now();
     if (database) {
         database.ref(`users/${targetCode}`).set(targetUser);
+        database.ref(`users/${currentUser.code}`).set(currentUser);
     }
     
     saveDB(); 
@@ -5402,6 +5402,10 @@ function getTodayStr() {
                         const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
             const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
 
+                            targetUser._adminStamp = Date.now();
+                if (database) database.ref('users/' + targetUser.code).set(targetUser);
+
+                
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
             function getWeightedRandomItem(pool, user) {
                 let weights = [];
@@ -5634,12 +5638,13 @@ function getTodayStr() {
     if (targetUser.letters.length > 3) targetUser.letters.pop();
     targetUser.hasNewLetter = true;
 
-    currentUser.inventory.splice(letterIdx, 1);
+        currentUser.inventory.splice(letterIdx, 1);
     addHistoryLog(currentUser, `[익명 편지] 사번 ${targetUser.no} 대상 서신 전송 (편지지 소모)`);
-    
-    // ★ 동기화 누락 방지: 편지를 받는 타인의 데이터 직접 갱신
+
+    targetUser._adminStamp = Date.now();
     if (database) {
         database.ref(`users/${targetCode}`).set(targetUser);
+        database.ref(`users/${currentUser.code}`).set(currentUser);
     }
     
     saveDB(); updateUI();
