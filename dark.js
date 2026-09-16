@@ -4,7 +4,7 @@ const DARK_ZONES = {
             code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다",
             brief:"(물고기가 인간이 되었다.)",
             danger:"최상", survival:"0.5%", min:3, max:4, reward:[1000,1500], ready:true,
-            voteMode:true, deepSea:true,
+            voteMode:false, deepSea:true,
             intro:"물이다.<br><br>눈을 뜨니 이미 잠겨 있다. 숨은 쉬어진다. 그게 첫 번째로 이상한 점이다.<br>두 번째는 옷이 젖지 않았다는 것이다.<br><br>발밑이 보이지 않는다. 아래가 어디까지인지 가늠이 안 된다.<br>위를 본다. 수면이 있다. 아주 멀다.<br>손을 뻗으면 닿을 것 같은데, 그건 거리를 잴 기준이 없어서다.<br><br>옆에서 무언가 지나간다.<br>크기를 모르겠다. 가까이 있는 작은 것인지, 멀리 있는 큰 것인지.<br><br>아래에서 불빛이 하나 켜진다. 그리고 둘. 셋.<br>줄지어 켜진다. 길처럼.",
             outro:"수면을 뚫고 나온다.<br><br>공기가 낯설다. 목이 아프다. 한참 기침했다.<br>손등을 본다. 손등이다. 확인하고 나서야 안심이 됐다.<br><br>눈을 뜨니 현관 앞이다.<br>며칠 동안 물을 마실 때마다 잠깐씩 멈추게 됐다.<br>삼키는 감각이 어색해서.",
             images: {
@@ -6589,7 +6589,7 @@ function input119D(n) {
         // --- 기믹 1: 첫 무리 ---
     function a667G1() {
         addDepth(5);
-        renderChoiceStep("기믹 1 — 무리",
+        renderA667Choice("기믹 1 — 무리",
             distort(`은색 무리가 앞을 막는다.<br><br>
                 지나가려면 헤치고 가야 한다.<br>
                 전부 고개를 돌려 이쪽을 보고 있다. 몸은 그대로인 채로.`),
@@ -6623,7 +6623,7 @@ function input119D(n) {
     // --- 기믹 2: 크기 ---
     function a667G2() {
         addDepth(6);
-        renderChoiceStep("기믹 2 — 크기",
+        renderA667Choice("기믹 2 — 크기",
             distort(`위쪽이 어두워진다.<br><br>
                 구름이 낀 것 같은데, 물속에는 구름이 없다.<br>
                 무언가 지나가고 있다. 아직 끝나지 않았다.<br><br>
@@ -6675,7 +6675,7 @@ function input119D(n) {
     // --- 기믹 3: 첫 대화 ---
     function a667G3() {
         addDepth(5);
-        renderChoiceStep("기믹 3 — 첫 말",
+        renderA667Choice("기믹 3 — 첫 말",
             distort(`목소리가 묻는다.<br><br>
                 <span style="color:#4fc3f7;">"많이 내려오셨네요. 힘드시죠?"</span><br><br>
                 친절하다. 정말로 걱정하는 목소리다.<br>
@@ -6711,7 +6711,7 @@ function input119D(n) {
     // --- 기믹 4: 작업복 ---
     function a667G4() {
         addDepth(6);
-        renderChoiceStep("기믹 4 — 작업복",
+       renderA667Choice("기믹 4 — 작업복",
             distort(`걸려 있던 작업복을 다시 본다.<br><br>
                 사번이 적혀 있다. 아는 번호는 아니다. 그런데 형식은 같다.<br>
                 주머니가 불룩하다. 뭔가 들어 있다.`),
@@ -6746,7 +6746,7 @@ function input119D(n) {
         // --- 기믹 5: 등불 ---
     function a667G5() {
         addDepth(8);
-        renderChoiceStep("기믹 5 — 등불",
+       renderA667Choice("기믹 5 — 등불",
             distort(`등불을 든 것들 사이를 지나야 한다.<br><br>
                 전부 아래를 비추고 있다. 일하는 중이다.<br>
                 방해하면 안 될 것 같은 분위기다.<br><br>
@@ -6783,7 +6783,7 @@ function input119D(n) {
     // --- 기믹 6: 건물 ---
     function a667G6() {
         addDepth(7);
-        renderChoiceStep("기믹 6 — 창문",
+        renderA667Choice("기믹 6 — 창문",
             distort(`유리 안쪽에서 누가 얼굴을 대고 있다.<br><br>
                 같은 자리, 같은 높이. 다만 얼굴이 다르다.<br>
                 입을 움직인다. 뭔가 말하고 있다.<br><br>
@@ -6820,7 +6820,7 @@ function input119D(n) {
     function a667G7() {
         addDepth(5);
         const h = getHumanity();
-        renderChoiceStep("기믹 7 — 묻기",
+        renderA667Choice("기믹 7 — 묻기",
             distort(`올라가는 길을 아는 것은 저것뿐이다.<br><br>
                 물어봐야 한다. 대화를 하면 그만큼 닮아진다.<br>
                 그래도 물어야 한다.<br><br>
@@ -6860,7 +6860,7 @@ function input119D(n) {
     function a667G8() {
         const h = getHumanity();
         const hasRoute = darkRun.a667Route || darkRun.a667Truth;
-        renderChoiceStep("기믹 8 — 위로",
+        renderA667Choice("기믹 8 — 위로",
             distort(`올라가야 한다.<br><br>
                 수면은 보이지 않는다. 방향만 안다.<br>
                 올라가려면 이유가 필요하다고 했다.<br><br>
@@ -7085,4 +7085,15 @@ function input119D(n) {
             darkAudio.timers.push(setTimeout(voice, 22000 + Math.random() * 30000));
         }
         darkAudio.timers.push(setTimeout(voice, 14000));
+    }
+        function renderA667Choice(title, text, options, imgKey) {
+        const body = darkBodyEl();
+        body.innerHTML = darkBox(title, distort(text),
+            deepBarHtml() +
+            maybeShuffle(options).map(o =>
+                `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`
+            ).join(''),
+            imgKey);
+        renderDeepBar();
+        mountDarkChat('normal');
     }
