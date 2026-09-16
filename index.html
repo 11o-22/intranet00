@@ -8396,7 +8396,7 @@ function getTodayStr() {
     const _openSuggestionModal = openSuggestionModal;
     openSuggestionModal = function() { pushModal('suggestion-modal'); _openSuggestionModal(); };
 
-    const _openAdminScreen = openAdminScreen; _renderAdminRoomList();
+    const _openAdminScreen = openAdminScreen; renderAdminRoomList();
     openAdminScreen = function() { pushModal('admin-screen'); _openAdminScreen(); };
 
     const _openItemTargetModal = openItemTargetModal;
