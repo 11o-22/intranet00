@@ -276,6 +276,17 @@
                 <button class="sub-tab" id="tab-btn-letters" onclick="switchRecordSubTab('rec-letters', this)">익명 편지</button>
             </div>
 
+                            <div class="sub-tabs-grid">
+                    <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 방</button>
+                    <button class="sub-tab" id="house-chat-tab" onclick="switchHousePanel('house-chat', this)">대화</button>
+                    <button class="sub-tab" onclick="switchHousePanel('house-storage', this)">보관함</button>
+                    <button class="sub-tab" onclick="switchHousePanel('house-kitchen', this)">주방</button>
+                </div>
+                <div id="house-main" class="sub-panel active"><div id="house-main-body"></div></div>
+                <div id="house-chat" class="sub-panel"><div id="house-chat-body"></div></div>
+                <div id="house-storage" class="sub-panel"><div id="house-storage-body"></div></div>
+                <div id="house-kitchen" class="sub-panel"><div id="house-kitchen-body"></div></div>
+
             <!-- 사원증 -->
             <div id="rec-badge" class="sub-panel active">
                 <div class="badge-photo-box" id="badge-photo-display">
@@ -557,7 +568,7 @@
         </div>
 
         <!-- 6. 사택 -->
-                    <div id="tab-house" class="tab-panel">
+                    <div id="tab-house" class="tab-content">
                 <div class="sub-tabs-grid">
                     <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 방</button>
                     <button class="sub-tab" onclick="switchHousePanel('house-storage', this)">보관함</button>
@@ -4676,7 +4687,7 @@ function getTodayStr() {
                 checkVIPStatus(); renderInventory(); renderHistory(); renderLetters();
         renderLetterTargetSelect(); renderRegularShop(); renderP2PSelectBoxes(); renderP2PLists();
         renderAlienShop();renderQShop(); renderPointRanking(); renderVipOpponents();
-        refreshAllBetDisplays();
+        refreshAllBetDisplays(); updateHouseChatDot();
         if (!darkRun && !darkBriefingOpen) renderDarkness();
    }
     
@@ -4727,6 +4738,7 @@ function getTodayStr() {
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-house .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
+        if (panelId === 'house-chat') renderHouseChat();
     }
 
     function loadBadgeInfo() {
@@ -8297,6 +8309,7 @@ function getTodayStr() {
 
             hasShownFoxAlert = currentUser.pollution >= 100;
             foxUseNameplate = false; 
+            detachHouseChat();
             checkPassivePollution(currentUser); 
             checkMedRations(currentUser); 
             if (applySafeInterest(currentUser)) saveDB();

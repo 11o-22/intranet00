@@ -8383,3 +8383,159 @@ function input119D(n) {
         updateUI();
         renderHouse();
     }
+
+        // ==========================================
+    // ★ 사택 채팅
+    // ==========================================
+    let houseChatRef = null, houseChatKey = null, houseChatLog = [];
+
+    function houseRoomId() {
+        const h = getHouse(currentUser);
+        if (!h.roomie) return null;
+        return [currentUser.code, h.roomie].sort().join('_');
+    }
+
+    function attachHouseChat() {
+        const rid = houseRoomId();
+        if (!database || !rid) return;
+        if (houseChatKey === rid) return;
+        detachHouseChat();
+        houseChatKey = rid;
+        houseChatRef = database.ref('houseChats/' + rid).limitToLast(100);
+        houseChatRef.on('value', snap => {
+            const v = snap.val() || {};
+            houseChatLog = Object.keys(v).sort().map(k => v[k]);
+            renderHouseChatLog();
+            updateHouseChatDot();
+        });
+    }
+
+    function detachHouseChat() {
+        if (houseChatRef) { try { houseChatRef.off(); } catch(e) {} }
+        houseChatRef = null;
+        houseChatKey = null;
+    }
+
+    function sendHouseChat() {
+        const input = document.getElementById('hchat-input');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        const rid = houseRoomId();
+        if (!rid || !database) return;
+
+        database.ref('houseChats/' + rid).push({
+            code: currentUser.code,
+            name: currentUser.name,
+            text: text,
+            at: Date.now()
+        });
+        input.value = '';
+
+        // 상대에게 알림
+        const r = getRoomie(currentUser);
+        if (r) {
+            r.houseChatUnread = Date.now();
+            r._adminStamp = Date.now();
+            database.ref('users/' + r.code).set(r);
+        }
+    }
+
+        function renderHouseChat() {
+        const box = document.getElementById('house-chat-body');
+        if (!box || !currentUser) return;
+        const r = getRoomie(currentUser);
+
+        if (!r) {
+            box.innerHTML = `
+                <div class="panel-title">[대화]</div>
+                <div style="text-align:center; font-size:11px; color:#666; padding:40px 0;">
+                    동거인이 없습니다.
+                </div>`;
+            return;
+        }
+
+        attachHouseChat();
+
+        // 읽음 처리
+        currentUser.houseChatRead = Date.now();
+        currentUser.houseChatUnread = 0;
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        updateHouseChatDot();
+
+        box.innerHTML = `
+            <div class="panel-title">[대화]</div>
+            <div style="font-size:11px; color:#888; margin-bottom:10px;">
+                ${r.name} 사원
+                <span style="color:${onlineUsersMap[r.code] ? '#4CAF50' : '#666'}; margin-left:5px;">
+                    ${onlineUsersMap[r.code] ? '● 재실' : '○ 부재'}
+                </span>
+                <span style="color:#555; font-size:10px; margin-left:6px;">지난 대화는 남습니다</span>
+            </div>
+            <div id="hchat-log" style="height:46vh; overflow-y:auto; background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:10px; -webkit-overflow-scrolling:touch;"></div>
+            <div style="display:flex; gap:6px;">
+                <input type="text" id="hchat-input" maxlength="200" placeholder="메시지 입력..." style="flex:1; font-size:12px; padding:9px;" onkeypress="if(event.key==='Enter') sendHouseChat()">
+                <button class="game-btn" style="margin:0; padding:9px 16px; font-size:11px; flex-shrink:0;" onclick="sendHouseChat()">전송</button>
+            </div>`;
+        renderHouseChatLog();
+    }
+
+    function renderHouseChatLog() {
+        const log = document.getElementById('hchat-log');
+        if (!log) return;
+
+        if (houseChatLog.length === 0) {
+            log.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:20px 0;">아직 오간 말이 없습니다.</div>`;
+            return;
+        }
+
+        let lastDate = '';
+        log.innerHTML = houseChatLog.map(m => {
+            const d = new Date(m.at);
+            const dateStr = d.toLocaleDateString();
+            let dateSep = '';
+            if (dateStr !== lastDate) {
+                lastDate = dateStr;
+                dateSep = `<div style="text-align:center; font-size:9px; color:#555; margin:10px 0 7px 0;">— ${dateStr} —</div>`;
+            }
+            const mine = m.code === currentUser.code;
+            const time = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+            return dateSep + `
+                <div style="margin-bottom:7px; text-align:${mine ? 'right' : 'left'};">
+                    <div style="display:inline-block; max-width:80%; background:${mine ? 'rgba(76,175,80,0.12)' : 'rgba(255,255,255,0.05)'}; border:1px solid ${mine ? '#2e5c31' : '#333'}; border-radius:8px; padding:7px 10px; text-align:left;">
+                        ${mine ? '' : `<div style="font-size:9px; color:var(--theme-focus); font-weight:bold; margin-bottom:3px;">${m.name}</div>`}
+                        <div style="font-size:11px; color:#ddd; line-height:1.55; word-break:break-word;">${m.text}</div>
+                        <div style="font-size:8px; color:#666; margin-top:3px; text-align:right;">${time}</div>
+                    </div>
+                </div>`;
+        }).join('');
+        log.scrollTop = log.scrollHeight;
+    }
+
+        function updateHouseChatDot() {
+        const tab = document.getElementById('house-chat-tab');
+        if (!tab || !currentUser) return;
+        const r = getRoomie(currentUser);
+        if (!r) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+
+        const unread = (currentUser.houseChatUnread || 0) > (currentUser.houseChatRead || 0);
+        tab.innerHTML = unread
+            ? `대화 <span style="display:inline-block; width:6px; height:6px; background:#f44336; border-radius:50%; box-shadow:0 0 5px #f44336; vertical-align:middle; margin-left:3px;"></span>`
+            : '대화';
+
+        // 사택 탭 자체에도 표시
+        const houseTab = document.querySelector('.tab-btn[onclick*="tab-house"]');
+        if (houseTab) {
+            houseTab.style.position = 'relative';
+            let dot = houseTab.querySelector('.house-dot');
+            if (unread && !dot) {
+                dot = document.createElement('span');
+                dot.className = 'house-dot';
+                dot.style.cssText = 'position:absolute; top:4px; right:6px; width:6px; height:6px; background:#f44336; border-radius:50%; box-shadow:0 0 5px #f44336;';
+                houseTab.appendChild(dot);
+            } else if (!unread && dot) {
+                dot.remove();
+            }
+        }
+    }
