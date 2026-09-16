@@ -3683,33 +3683,7 @@ function getTodayStr() {
             </div>`).join('');
     }
  
-            if (wasTraitor) {
-                const win = darkRun.a214TraitorWin && doneCnt >= 3;
-                a214Summary = `
-                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #7f0000;">
-                        <div style="font-weight:bold; color:#ff6b6b; margin-bottom:6px;">[신도 보고]</div>
-                        과업 달성 <b style="color:${doneCnt >= 3 ? '#4CAF50' : '#f44336'};">${doneCnt} / 3</b><br>
-                        ${ms.map(x => `<span style="font-size:10px; color:${x.done >= x.goal ? '#4CAF50' : '#888'};">${x.done >= x.goal ? '✔' : '✕'} ${x.name}</span>`).join('<br>')}<br>
-                        <div style="margin-top:7px; font-size:13px; font-weight:bold; color:${win ? '#4CAF50' : darkRun.a214Confessed ? '#ff9800' : '#f44336'};">
-                            ${win ? '◉ 신도 승리' : darkRun.a214Confessed ? '◉ 배교 — 함께 귀환' : '◉ 신도 실패'}
-                        </div>
-                    </div>`;
-            } else {
-                const traitorName = a214State ? a214State.traitorName : '알 수 없음';
-                const exposed = a214State ? (a214State.exposed || 0) : 0;
-                const success = sealed || broke;
-                a214Summary = `
-                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #5a4a2a;">
-                        <div style="font-weight:bold; color:#d4af37; margin-bottom:6px;">[탐사 보고]</div>
-                        봉인 결과 <b style="color:${success ? '#4CAF50' : '#f44336'};">${sealed ? '봉인 완료' : broke ? '파괴 완료' : ranAway ? '방치' : '미완'}</b><br>
-                        신도 정체 <b style="color:#ff6b6b;">${traitorName}</b><br>
-                        지목 성공 <b>${exposed}회</b><br>
-                        <div style="margin-top:7px; font-size:13px; font-weight:bold; color:${success ? '#4CAF50' : '#f44336'};">
-                            ${success ? '◈ 임무 성공' : '◈ 임무 실패'}
-                        </div>
-                    </div>`;
-            }
-
+         
     function toggleLogChat(idx) {
         const el = document.getElementById('logchat-' + idx);
         if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
