@@ -93,6 +93,17 @@
         </div>
     </div>
 </div>
+<div id="text-input-modal" class="modal-overlay" style="display:none; z-index:10003;">
+    <div class="modal-content" style="max-width:380px;">
+        <h3 id="text-input-title">입력</h3>
+        <div id="text-input-desc" style="font-size:11px; color:#aaa; margin-bottom:12px; line-height:1.6;"></div>
+        <input type="text" id="text-input-field" maxlength="30" style="width:100%; margin-bottom:14px;" placeholder="">
+        <div class="modal-btn-group">
+            <button class="btn-submit" onclick="confirmTextInput()">확인</button>
+            <button class="btn-cancel" onclick="closeTextInput()">취소</button>
+        </div>
+    </div>
+</div>
 <div id="gear-modal" class="modal-overlay" style="display:none; z-index:10002;">
     <div class="modal-content" style="max-width:420px; border-color:#6a4c93;">
         <h3 id="gear-modal-title" style="color:#c9a8ff; border-bottom-color:#4a3a6a;">전용 장비</h3>
@@ -5405,12 +5416,15 @@ function getTodayStr() {
         else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 72);
         else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 72);
         else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 72);
+        
         else if (cat.effect === 'drink_wine') {
             addTimedEffect(targetUser, '고급진 술', '알코올 섭취', 10);
             if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
         }
                else if (cat.effect === 'cure_potion') {
             const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+
+            
 
             const idxs = [];
             (targetUser.timedEffects || []).forEach((eff, i) => {
@@ -5559,8 +5573,25 @@ function getTodayStr() {
                 showCustomAlert('유리손포를 장착했습니다.');
             }
         }
-        else if (cat.effect === 'cherry_potion') {
-            appendBadgeNoteToUser(targetUser, `[체리맛 물약] 신체 부위 중 일부가 예민하게 개발됨 (3일 지속)`);
+               else if (cat.effect === 'cherry_potion') {
+            const applyCherry = (part) => {
+                addTimedEffect(targetUser, '체리맛 물약', `${part} 부위가 예민하게 개발됨`, 72);
+                targetUser._adminStamp = Date.now();
+                if (database) {
+                    database.ref('users/' + targetUser.code).set(targetUser);
+                    database.ref('users/' + currentUser.code).set(currentUser);
+                }
+                updateUI();
+                showCustomAlert(`${isOthers ? targetUser.name + '님의 ' : ''}${part} 부위에 효과가 적용되었습니다.`);
+            };
+
+            openTextInput(
+                '체리맛 물약',
+                `개발될 부위를 적어 주세요.<br><span style="color:#888; font-size:10px;">적은 내용이 특이사항에 표시됩니다.</span>`,
+                '예: 목덜미',
+                applyCherry
+            );
+            return true;
         }
        else if (['equip_plug', 'equip_sync_hole', 'equip_sync_dildo', 'equip_egg'].includes(cat.effect)) {
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
@@ -8228,6 +8259,32 @@ function getTodayStr() {
             evaluateVipMultiResult(session);
         }
     }, 500);
+
+        let _textInputCallback = null;
+
+    function openTextInput(title, desc, placeholder, callback) {
+        document.getElementById('text-input-title').innerText = title;
+        document.getElementById('text-input-desc').innerHTML = desc;
+        const f = document.getElementById('text-input-field');
+        f.value = '';
+        f.placeholder = placeholder || '';
+        _textInputCallback = callback;
+        document.getElementById('text-input-modal').style.display = 'flex';
+        setTimeout(() => f.focus(), 100);
+    }
+
+    function closeTextInput() {
+        document.getElementById('text-input-modal').style.display = 'none';
+        _textInputCallback = null;
+    }
+
+    function confirmTextInput() {
+        const v = document.getElementById('text-input-field').value.trim();
+        if (!v) { showCustomAlert('내용을 입력해주세요.'); return; }
+        const cb = _textInputCallback;
+        closeTextInput();
+        if (cb) cb(v);
+    }
 
  
     </script>
