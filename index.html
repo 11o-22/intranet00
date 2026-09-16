@@ -2151,7 +2151,7 @@ function getTodayStr() {
             renderA667Choice(title, text, options, imgKey);
             return;
         }
-        
+
         const jakduBtn = jakduAvailable()
             ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ 작두로 박살낸다 (1회)</button>`
             : '';
@@ -5898,7 +5898,7 @@ function getTodayStr() {
     // ★ 베팅 스테퍼 (섯다만 50 P 상한)
     // ==========================================
     const MAX_BET = 50;
-    const LIMITED_BETS = ['seotda-bet'];
+    const LIMITED_BETS = ['seotda-bet', 'slot-bet', 'roulette-bet'];
 
     function getBetValue(inputId) {
         const el = document.getElementById(inputId);
@@ -5926,11 +5926,9 @@ function getTodayStr() {
     }
 
     function setBetMax(inputId) {
-        let limit = currentUser ? currentUser.points : 1;
-        if (LIMITED_BETS.includes(inputId)) limit = Math.min(limit, MAX_BET);
-        applyBet(inputId, limit);
+        const cap = LIMITED_BETS.includes(inputId) ? MAX_BET : currentUser.points;
+        applyBet(inputId, Math.min(currentUser.points, cap));
     }
-
     function refreshAllBetDisplays() {
         ['slot-bet', 'roulette-bet', 'seotda-bet'].forEach(id => {
             const el = document.getElementById(id);
@@ -5971,8 +5969,8 @@ function getTodayStr() {
         
         const luckM = facilityLuckMult(currentUser);
 
-        let failChance = (hasAmulet ? 0.40 : 0.62) / luckM;
-        let jackpotSpan = (hasAmulet ? 0.15 : 0.05) * luckM;
+        let failChance = (hasAmulet ? 0.55 : 0.76) / luckM;
+        let jackpotSpan = (hasAmulet ? 0.08 : 0.025) * luckM;
         let jackpotChance = failChance + jackpotSpan;
         if (rollType < failChance) {
             // 완전 꽝 (3개 다름)
