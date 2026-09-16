@@ -642,3 +642,40 @@
         #admin-fox-list,
         #admin-room-list,
         #adm-target-list { max-height: 160px; overflow-y: auto; }
+
+                #admin-screen {
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        #admin-screen * {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .admin-panel-box {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        .admin-panel-box input,
+        .admin-panel-box select,
+        .admin-panel-box button {
+            max-width: 100%;
+            min-width: 0;
+        }
+        .admin-panel-box .bet-input {
+            width: 100% !important;
+            min-width: 0;
+        }
+        #adm-gear-quick {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+                @media (max-width: 480px) {
+            .admin-panel-box div[style*="display:flex"],
+            .admin-panel-box div[style*="display: flex"] {
+                flex-wrap: wrap !important;
+            }
+            .admin-panel-box button { font-size: 10px !important; }
+            #adm-target-list label { font-size: 10px !important; }
+        }
