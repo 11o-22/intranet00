@@ -4738,12 +4738,15 @@ function getTodayStr() {
         if (panelId === 'dark-log') renderDarkLogs();
     }
 
-    function switchHousePanel(panelId, btnEl) {
+        function switchHousePanel(panelId, btnEl) {
         document.querySelectorAll('#tab-house .sub-tab').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-house .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
+        if (panelId === 'house-main') renderHouse();
         if (panelId === 'house-chat') renderHouseChat();
+        if (panelId === 'house-storage') renderHouseStorage();
+        if (panelId === 'house-kitchen') renderKitchen();
     }
 
     function loadBadgeInfo() {
