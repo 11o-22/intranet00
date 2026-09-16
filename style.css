@@ -643,13 +643,22 @@
         #admin-room-list,
         #adm-target-list { max-height: 160px; overflow-y: auto; }
 
-                   #admin-screen {
+                 #admin-screen {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
             width: 100%;
             max-width: 450px;
-            margin: 0 auto;
-            box-sizing: border-box;
+            height: 100dvh;
+            overflow-y: auto;
             overflow-x: hidden;
+            box-sizing: border-box;
+            padding: 14px 12px 50px 12px;
+            background: #0d0d0d;
+            z-index: 9999;
         }
+        
         #admin-screen * {
             max-width: 100%;
             box-sizing: border-box;
