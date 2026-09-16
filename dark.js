@@ -39,7 +39,20 @@ const DARK_ZONES = {
                 step3: "mirror_4.jpg"
             }
         },
-         "Qtrew-C-176": { code:"Qtrew-C-176", grade:"C", name:"■■■■", brief:"(개방 준비 중)", danger:"중", survival:"38%", min:2, max:2, reward:[250,500], ready:false },
+                 "Qtrew-C-176": {
+            code:"Qtrew-C-176", grade:"C", name:"돌아오지 않는 발소리",
+            brief:"(복도 끝에서 무언가 긁는 소리가 난다.)",
+            danger:"중", survival:"38%", min:1, max:2, reward:[250,500], ready:true,
+            voteMode:false, noDeath:true,
+            intro:"복도다.<br><br>천장 등이 하나 걸러 하나씩 꺼져 있다. 밝은 자리와 어두운 자리가 번갈아 놓인다.<br>바닥에 뭔가 흩어져 있는데, 어두운 쪽이라 형태가 잡히지 않는다.<br><br>복도 끝에서 소리가 난다.<br>긁는 소리다. 규칙적이지 않고, 지치지도 않는다.<br><br>가까이 가고 싶지 않다.<br>그런데 발이 그쪽으로 향한다.",
+            outro:"복도가 밝다.<br><br>흩어져 있던 것들이 이제 보인다. 전부 장난감이었다.<br>긁는 소리는 멎었다. 문이 열렸으니까.<br><br>눈을 뜨니 현관 앞이다.<br>손등에 무언가 스친 자국이 있다. 따뜻하다.<br><br>한참을 그대로 서 있었다.",
+            images: {
+                intro: "pet_1.jpg",
+                step1: "pet_2.jpg",
+                step2: "pet_3.jpg",
+                step3: "pet_4.jpg"
+            }
+        },
        
         "Qtrew-D-042": {
             code:"Qtrew-D-042", grade:"D", name:"가로등은 뒤에서부터 꺼진다",
@@ -76,6 +89,13 @@ const DARK_ZONES = {
             { name:"먼저 웃은 쪽", chance:0.001 },
             { name:"맞물리지 않는 조각", chance:0.05 }
         ],
+
+                "Qtrew-C-176": [
+            { name:"꿰맨 자국", chance:0.003 },
+            { name:"걸려 있던 자리", chance:0.002 },
+            { name:"따라온 발소리", chance:0.001 }
+        ],
+
         "Qtrew-B-330": [
             { name:"접힌 안내도", chance:0.003 },
             { name:"누군가의 왼쪽 신발", chance:0.002 },
@@ -181,6 +201,7 @@ const DARK_ZONES = {
 
             if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-C-176') buildPetAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-B-330') buildMazeAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-B-508') buildBakeryAmbience(ctx, master);
             else buildAlleyAmbience(ctx, master);
@@ -4278,4 +4299,458 @@ function input119D(n) {
         closeGearModal();
         updateUI();
         showCustomAlert(`${GEAR_ATTRS[attr].name} 속성이 지워졌습니다.\n소지품 탭에서 새로 선택하세요.`);
+
+
+    }
+
+        // ==========================================
+    // ★ Qtrew-C-176 「돌아오지 않는 발소리」
+    // ==========================================
+       const C176_NARR = {
+        1: { img:'step1', text:`복도를 걷는다.<br><br>
+            긁는 소리가 점점 가까워진다. 복도 끝에 문이 하나 있다.<br>
+            소리는 그 안에서 난다. 안쪽에서 바깥으로.<br><br>
+            나가고 싶은 것이다. 그것만은 확실하다.<br><br>
+            손잡이를 잡는다. 잠겨 있지는 않다.<br>
+            다만 안쪽에서는 여는 법을 모르는 모양이다.<br>
+            손잡이가 아니라 문 아래쪽만 계속 긁고 있다.<br><br>
+            그 높이를 알고 있다.<br>
+            현관에서 그 높이만큼만 기다리던 것이 있었다.` },
+
+        2: { text:`벽에 글자가 있다.<br><br>
+            손으로 쓴 것도, 새긴 것도 아니다.<br>
+            김이 서린 유리에 쓴 것처럼, 보는 각도에 따라 나타났다 사라진다.<br><br>
+            세 글자쯤 되는 것 같기도 하고, 두 글자인 것 같기도 하다.<br>
+            읽으려고 하면 흐려지고, 포기하면 다시 떠오른다.<br><br>
+            아는 이름이다.<br>
+            하루에 몇 번씩 불렀던 이름. 밥그릇 앞에서, 현관에서, 잠들기 전에.<br>
+            부르면 늘 대답이 왔다. 말은 아니었지만 대답이었다.<br><br>
+            소리 내어 불러 본 지 오래됐다.` },
+
+        3: { text:`이름을 말하자 긁는 소리가 멎었다.<br><br>
+            잠깐의 정적. 그리고 다른 소리가 시작된다.<br>
+            무언가가 이쪽으로 오고 있다.<br><br>
+            작은 발소리 같기도 하고, 어딘가 톡톡 튀는 소리 같기도 하다.<br>
+            울음소리일까. 대체 뭐지.<br><br>
+            빠르다. 서두르는 게 아니라 반가워서 빠른 속도다.<br>
+            그런 속도를 내는 것은 하나뿐이었다.<br><br>
+            무섭지는 않다.<br>
+            그게 더 이상하다. 여기서는 전부 무서워야 하는데.` },
+
+        4: { img:'step2', text:`복도가 조금 밝아졌다.<br><br>
+            바닥에 흩어져 있던 것들이 이제 형태가 보인다.<br>
+            아까는 뼈처럼 보였는데, 아니었다.<br><br>
+            고무로 된 것. 한쪽이 닳아 반들반들하다.<br>
+            천으로 된 것. 솜이 비어져 나왔는데도 버리지 못한 것.<br>
+            딸랑거리는 것. 소리가 나야 좋아했으니까.<br><br>
+            전부 누군가 오래 가지고 논 것들이다.<br><br>
+            치우지 못한 사람도 있었을 것이다.<br>
+            치웠다가 다시 꺼내 본 사람도 있었을 것이다.` },
+
+        5: { text:`물건들 사이에 앉는다.<br><br>
+            하나를 집어 든다. 이빨 자국이 있다. 작다.<br>
+            물어뜯을 때 고개를 흔들던 방향까지 자국에 남아 있다.<br><br>
+            다른 걸 집는다. 털이 붙어 있다.<br>
+            색이 기억난다. 손바닥에 닿던 감촉도 기억난다.<br>
+            빗질할 때 그렇게 싫어하더니, 다 하고 나면 옆에 와서 누웠다.<br><br>
+            여기 있는 것들은 남의 것이 아니다.<br>
+            그런데 어느 것이 그 아이 것이었는지는 헷갈린다.<br><br>
+            매일 봤던 것인데.<br>
+            그게 미안하다.<br>
+            잊은 게 아니라 흐려진 거라고, 스스로에게 몇 번 설명해 봤다.` },
+
+        6: { text:`소리가 여러 겹으로 들린다.<br><br>
+            어디선가 들었던 소리들이다. 전부 조금씩 비슷하고, 조금씩 다르다.<br><br>
+            현관문 열리는 소리에 반응하던 소리.<br>
+            간식 봉지 뜯는 소리를 듣고 달려오던 소리.<br>
+            밤에 혼자 자기 싫어서 문 앞에서 내던 소리.<br><br>
+            그중 하나만 그 아이 것이다.<br><br>
+            매일 들었던 소리인데 지금은 구분이 안 된다.<br>
+            사진은 남는데 소리는 남지 않는다.<br>
+            그걸 나중에야 알았다.<br><br>
+            녹음해 둘걸.<br>
+            그런 생각을 해 본 사람이 여기까지 온 것 같다.` },
+
+        7: { img:'step3', text:`복도 끝이다.<br><br>
+            문틈으로 빛이 새어 나온다. 형광등이 아니라 다른 빛이다.<br>
+            오후 세 시쯤의 볕 같다. 창가에 네모나게 떨어지던 그 빛.<br><br>
+            그 자리를 좋아했다.<br>
+            해가 옮겨 가면 따라서 옮겨 눕던 것도 기억난다.<br>
+            그 모습이 바보 같아서 자주 웃었다.<br><br>
+            긁는 소리는 이제 나지 않는다.<br>
+            대신 문 바로 뒤에 기척이 있다.<br><br>
+            앉아서 기다리고 있다.<br>
+            오래 기다린 자세로. 그런데 지친 기색은 없는 자세로.` },
+
+        8: { text:`문 앞에 선다.<br><br>
+            손잡이가 아까보다 낮아 보인다.<br>
+            아니면 이쪽이 앉은 건지도 모르겠다.<br><br>
+            열면 만날 수 있을까.<br>
+            만나면, 다시 보내야 할까.<br><br>
+            마지막을 기억한다. 품이 가벼웠던 것도.<br>
+            괜찮다고 말해 줬어야 했는데 그 말이 안 나왔던 것도.<br>
+            대신 이름만 계속 불렀다. 그게 전부였다.<br><br>
+            지금이라면 뭐라고 할까.<br><br>
+            손이 손잡이 위에서 멈춰 있다. 한참을.<br>
+            뒤에서 무언가 꼬리를 흔드는 소리가 난다.<br>
+            소리가 날 리 없는데, 들린다.` }
+    };
+
+    const C176_STEPS = {
+        0: { type:'intro' },
+        1: { type:'narr', n:1 },
+        2: { type:'narr', n:2 },
+        3: { type:'puzzle', n:1 },   // 이름
+        4: { type:'narr', n:3 },
+        5: { type:'narr', n:4 },
+        6: { type:'puzzle', n:2 },   // 물건
+        7: { type:'narr', n:5 },
+        8: { type:'narr', n:6 },
+        9: { type:'puzzle', n:3 },   // 소리
+        10:{ type:'narr', n:7 },
+        11:{ type:'narr', n:8 },
+        12:{ type:'puzzle', n:4 },   // 마지막 문
+        99:{ type:'result' }
+    };
+
+    function renderStepC176() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        if (darkRun.isParty) watchPartyStep();
+        saveDarkRunState();
+
+        const def = C176_STEPS[darkRun.step];
+        if (!def) { renderDarkResult(); return; }
+
+        if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("복도를 걷는다.", "c176Advance(1)"), "intro");
+            if (darkRun.isParty) mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'narr') {
+            const d = C176_NARR[def.n];
+            body.innerHTML = darkBox("—", d.text,
+                darkChoiceBtn("계속 간다.", `c176Advance(${darkRun.step + 1})`), d.img);
+            if (darkRun.isParty) mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'result') { renderDarkResult(); return; }
+
+        const fns = { 1:c176Name, 2:c176Item, 3:c176Sound, 4:c176Door };
+        if (fns[def.n]) fns[def.n]();
+    }
+
+    // 이 구역은 각자 진행 (파티여도 동기화하지 않음)
+    function c176Advance(next) {
+        if (!darkRun) return;
+        darkRun.step = next;
+        renderDarkStep();
+    }
+
+        // ==========================================
+    // ★ C-176 퍼즐
+    // ==========================================
+    function c176Name() {
+        const body = darkBodyEl();
+        body.innerHTML = darkBox("벽",
+            `글자에 손을 댄다.<br><br>
+             따뜻하다. 벽이 아니라 숨결 같다.<br>
+             손가락을 떼면 다시 흐려진다.<br><br>
+             읽는 것으로는 안 되는 모양이다.<br>
+             불러야 한다.`,
+            `<div style="font-size:11px; color:#888; text-align:center; margin-bottom:10px; line-height:1.7;">
+                이름을 적어 주세요.<br>
+                <span style="font-size:10px; color:#666;">당신이 알던 이름이면 됩니다.</span>
+             </div>
+             <input type="text" id="c176-name" maxlength="20" placeholder="" style="width:100%; padding:13px; font-size:15px; text-align:center; box-sizing:border-box; margin-bottom:10px;" onkeypress="if(event.key==='Enter') c176NameSubmit()">
+             <button class="game-btn" style="width:100%; margin:0; padding:13px;" onclick="c176NameSubmit()">부른다</button>`,
+            "step1");
+        if (darkRun.isParty) mountDarkChat('normal');
+        setTimeout(() => { const f = document.getElementById('c176-name'); if (f) f.focus(); }, 200);
+    }
+
+    function c176NameSubmit() {
+        const el = document.getElementById('c176-name');
+        if (!el) return;
+        const name = el.value.trim();
+        if (!name) { showCustomAlert('이름을 적어 주세요.'); return; }
+
+        darkRun.petName = name;
+        darkRun.success++;
+        darkRun.log.push(`[C-176] 이름을 불렀다`);
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 누군가의 이름을 불렀습니다.`, true);
+
+        c176Warm(1);
+
+        darkBodyEl().innerHTML = darkBox("벽",
+            `<div style="text-align:center; font-size:22px; color:#d4af37; font-weight:bold; letter-spacing:3px; margin:8px 0 18px 0;">${name}</div>
+             글자가 선명해진다.<br><br>
+             벽에서 떨어져 나와 공중에 잠깐 떠 있다가, 흩어진다.<br>
+             연기처럼이 아니라 털처럼.<br><br>
+             복도 저쪽에서 뭔가 벌떡 일어나는 소리가 났다.`,
+            darkChoiceBtn("귀를 기울인다.", `c176Advance(${darkRun.step + 1})`));
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+        const C176_ITEMS = [
+        { id:'doll',  label:'한쪽이 닳은 인형',       txt:`집어 든다. 솜이 비어져 나왔다.<br>몇 번이나 꿰매 준 자국이 있다. 바느질 솜씨가 엉망이다.<br><br>버리려다 말았던 기억이 난다.<br>대신 빨아서 말렸다. 볕에 널어놓으니 이상하게 뿌듯했다.` },
+        { id:'cloth', label:'작은 옷',                 txt:`펼쳐 본다. 생각보다 작다.<br>입히면 싫어하면서도 가만히 있었다. 참아 주는 얼굴이었다.<br><br>사진이 몇 장 남아 있을 것이다.<br>그 옷을 입은 사진만 유독 많다.` },
+        { id:'shoe',  label:'짝이 없는 신발',          txt:`한 짝뿐이다. 나머지는 어디 갔는지 모르겠다.<br>물고 다니다 어딘가 숨겨 뒀을 것이다.<br><br>숨긴 자리를 끝내 못 찾았다.<br>이사 갈 때 나올 줄 알았는데, 나오지 않았다.` },
+        { id:'leash', label:'낡은 끈',                 txt:`손에 감아 본다. 길이가 몸에 익어 있다.<br>이만큼 나가면 멈추고, 이만큼이면 따라온다는 걸 손이 기억한다.<br><br>현관에 걸어 두었던 자리가 한동안 비어 있었다.<br>치우는 데 몇 달이 걸렸다.` },
+        { id:'bowl',  label:'이가 나간 그릇',          txt:`가장자리가 조금 깨졌다. 물고 흔들다 떨어뜨려서 그렇다.<br><br>밥을 주면 먹기 전에 꼭 이쪽을 한 번 봤다.<br>먹어도 되냐고 묻는 건지, 고맙다는 건지 몰랐다.<br>지금도 모른다.` },
+        { id:'ball',  label:'딸랑거리는 공',           txt:`흔들어 본다. 소리가 난다.<br>이 소리만 나면 어디 있든 달려왔다.<br><br>어느 순간부터 달려오지 않았다.<br>귀가 어두워진 건지, 다리가 아팠던 건지.<br>물어볼 수가 없었다.` }
+    ];
+
+    function c176Item() {
+        const body = darkBodyEl();
+        const shuffled = C176_ITEMS.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+        darkRun._c176Items = shuffled.map(i => i.id);
+
+        body.innerHTML = darkBox("바닥",
+            `물건들 사이에 앉는다.<br><br>
+             전부 낯이 익다. 전부 낯설기도 하다.<br>
+             하나를 집으면 그게 그 아이 것이 될 것 같다.<br><br>
+             <span style="font-size:11px; color:#888;">틀린 답은 없습니다.</span>`,
+            shuffled.map(i => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:13px; text-align:left; font-size:12px; font-weight:normal;" onclick="c176ItemPick('${i.id}')">${i.label}</button>`).join(''),
+            "step2");
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+    function c176ItemPick(id) {
+        const it = C176_ITEMS.find(i => i.id === id);
+        if (!it) return;
+        darkRun.petItem = it.label;
+        darkRun.success++;
+        darkRun.log.push(`[C-176] ${it.label}`);
+        c176Warm(2);
+
+        darkBodyEl().innerHTML = darkBox("바닥", it.txt,
+            `<div style="text-align:center; font-size:11px; color:#d4af37; margin:14px 0; padding:10px; background:rgba(212,175,55,0.07); border-radius:5px;">
+                ${darkRun.petName ? `${darkRun.petName}의 것이었다.` : '그 아이의 것이었다.'}
+             </div>` +
+            darkChoiceBtn("품에 넣는다.", `c176Advance(${darkRun.step + 1})`));
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+        const C176_SOUNDS = [
+        { id:'door',  label:'현관문이 열릴 때 나던 소리',
+          txt:`그 소리다.<br><br>열쇠가 돌아가는 소리보다 먼저 반응했다.<br>엘리베이터에서 내리는 발소리만으로 알았다고, 가족들이 그랬다.<br><br>세상에서 제일 반가워하는 것이 매일 문 앞에 있었다.<br>그게 당연한 줄 알았다.` },
+        { id:'snack', label:'봉지 뜯을 때 나던 소리',
+          txt:`그 소리다.<br><br>자고 있다가도 벌떡 일어났다.<br>부엌 바닥에 미끄러지면서 달려오던 발톱 소리까지 같이 들린다.<br><br>일부러 봉지를 부스럭거려 본 적도 있다.<br>속아 주는 얼굴이 웃겨서.` },
+        { id:'night', label:'밤에 문 앞에서 내던 소리',
+          txt:`그 소리다.<br><br>혼자 자기 싫어서 문 앞에 앉아 내던 소리.<br>처음엔 단호하게 안 된다고 했다가, 결국 늘 문을 열어 줬다.<br><br>침대 발치가 항상 따뜻했다.<br>그 무게가 없어진 뒤로 한동안 잠이 안 왔다.` },
+        { id:'sleep', label:'잠들 때 내던 숨소리',
+          txt:`그 소리다.<br><br>옆에 누워 있으면 숨소리가 점점 느려졌다.<br>그 박자에 맞추다 보면 이쪽도 잠들었다.<br><br>세상에서 제일 안심되는 소리였다.<br>지금 방이 조용한 건 그래서다.` },
+        { id:'greet', label:'이름을 부르면 대답하던 소리',
+          txt:`그 소리다.<br><br>말은 아니었지만 분명 대답이었다.<br>부르면 늘 돌아왔다. 귀찮아하면서도 왔다.<br><br>마지막에도 불렀다.<br>대답은 없었지만, 들었을 거라고 생각하기로 했다.` }
+    ];
+
+    function c176Sound() {
+        const body = darkBodyEl();
+        const shuffled = C176_SOUNDS.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+
+        body.innerHTML = darkBox("소리",
+            `눈을 감는다.<br><br>
+             소리들이 겹쳐서 들린다. 어느 것이 먼저인지 모르겠다.<br>
+             하나에 귀를 기울이면 나머지가 물러난다.<br><br>
+             <span style="font-size:11px; color:#888;">기억나는 것을 고르세요.</span>`,
+            shuffled.map(s => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:13px; text-align:left; font-size:12px; font-weight:normal;" onclick="c176SoundPick('${s.id}')">${s.label}</button>`).join(''),
+            null);
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+    function c176SoundPick(id) {
+        const s = C176_SOUNDS.find(x => x.id === id);
+        if (!s) return;
+        darkRun.petSound = s.label;
+        darkRun.success++;
+        darkRun.log.push(`[C-176] ${s.label}`);
+        c176Warm(3);
+
+        darkBodyEl().innerHTML = darkBox("소리", s.txt,
+            darkChoiceBtn("눈을 뜬다.", `c176Advance(${darkRun.step + 1})`));
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+        function c176Door() {
+        const nm = darkRun.petName || '그 아이';
+        darkBodyEl().innerHTML = darkBox("문",
+            `문 뒤에서 기다리는 기척이 있다.<br><br>
+             열면 만날 수 있다. 그건 알겠다.<br>
+             다만 만난 다음이 문제다.<br><br>
+             여기서 나가려면 문을 지나야 한다.<br>
+             지나간다는 건, 두고 간다는 뜻이기도 하다.`,
+            darkChoiceBtn("① 문을 연다.", "c176End('open')") +
+            darkChoiceBtn("② 열지 않고 돌아선다.", "c176End('leave')") +
+            darkChoiceBtn(`③ 문 앞에서 이름을 한 번 더 부른다.`, "c176End('call')"),
+            "step4");
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+    function c176End(pick) {
+        const nm = darkRun.petName || '그 아이';
+        darkRun.c176Ending = pick;
+        darkRun.success += 2;
+        darkRun.log.push(`[C-176] 결말 — ${pick}`);
+        c176Warm(4);
+
+        let txt;
+        if (pick === 'open') {
+            txt = `문을 연다.<br><br>
+                빛이 먼저 나온다. 오후 세 시의 볕.<br>
+                그 안에 ${nm}이(가) 앉아 있다.<br><br>
+                일어서지 않는다. 달려들지도 않는다.<br>
+                그냥 이쪽을 본다. 오래 기다린 얼굴로, 그런데 원망은 없는 얼굴로.<br><br>
+                무릎을 꿇고 앉는다. 손을 뻗는다.<br>
+                닿기 직전에, 이쪽에서 먼저 손을 거둔다.<br><br>
+                닿으면 못 갈 것 같아서.<br><br>
+                ${nm}이(가) 고개를 조금 기울인다. 늘 하던 그 각도로.<br>
+                그리고 일어서서, 안쪽으로 걸어 들어간다.<br>
+                한 번 돌아본다. 두 번은 돌아보지 않는다.<br><br>
+                문이 닫힌다. 안에서 닫는 소리다.<br>
+                이제 혼자서도 문을 여닫을 수 있게 된 모양이다.`;
+        } else if (pick === 'leave') {
+            txt = `손을 내린다.<br><br>
+                열지 않기로 한다.<br>
+                열면 무너질 것 같아서가 아니라, 기다리게 하고 싶지 않아서.<br><br>
+                문에 이마를 댄다. 따뜻하다.<br>
+                안쪽에서도 뭔가가 문에 기대는 기척이 난다.<br>
+                같은 높이가 아니라, 조금 아래쪽에.<br><br>
+                한참 그러고 있었다.<br><br>
+                돌아선다. 복도가 밝다.<br>
+                등 뒤에서 긁는 소리는 나지 않는다.<br>
+                울지도 않는다. 보내 주는 쪽이 우는 법은 없으니까.<br><br>
+                걸어 나온다. 뒤는 보지 않았다.<br>
+                그게 지금 할 수 있는 최선이었다.`;
+        } else {
+            txt = `문 앞에 앉는다.<br><br>
+                그리고 이름을 부른다.<br>
+                <span style="color:#d4af37; font-size:15px; font-weight:bold;">${nm}.</span><br><br>
+                한 번 더 부른다. 아까보다 작게.<br>
+                밥 줄 때처럼, 자기 전처럼, 아무 일도 아닐 때처럼.<br><br>
+                안쪽에서 꼬리가 바닥을 치는 소리가 난다.<br>
+                한 번. 두 번. 세 번.<br><br>
+                그거면 됐다.<br>
+                문은 열지 않는다. 열 필요가 없어졌다.<br><br>
+                일어선다. 무릎이 저리다. 오래 앉아 있었던 모양이다.<br><br>
+                복도를 걸어 나오는 동안,<br>
+                뒤에서 따라오는 발소리가 났다.<br>
+                돌아보면 없을 것을 알아서, 돌아보지 않았다.<br>
+                현관까지 따라왔다.`;
+        }
+
+        darkBodyEl().innerHTML = darkBox("문", txt,
+            `<div style="text-align:center; font-size:11px; color:#888; margin:16px 0; padding:12px; background:rgba(212,175,55,0.06); border:1px solid #5a4a2a; border-radius:6px; line-height:1.9;">
+                ${darkRun.petItem ? `품에 ${darkRun.petItem}이(가) 있다.<br>` : ''}
+                ${darkRun.petSound ? `${darkRun.petSound}가 아직 귀에 남아 있다.` : ''}
+             </div>` +
+            darkChoiceBtn("복도를 나선다.", "darkRun.step=99; renderDarkStep();"));
+        if (darkRun.isParty) mountDarkChat('normal');
+    }
+
+        // --- C-176 : 돌아오지 않는 발소리 ---
+    function buildPetAmbience(ctx, master) {
+        darkAudio.petPhase = 0;
+
+        // 저역 드론 — 처음엔 무겁게
+        const low = ctx.createOscillator();
+        const lowG = ctx.createGain();
+        low.type = 'sine'; low.frequency.value = 46;
+        lowG.gain.value = 0.1;
+        low.connect(lowG); lowG.connect(master);
+        low.start();
+        darkAudio.nodes.push(low);
+        darkAudio.petLowG = lowG;
+
+        // 공기음
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 7);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 300;
+        const nG = ctx.createGain(); nG.gain.value = 0.08;
+        noise.connect(lp); lp.connect(nG); nG.connect(master);
+        noise.start();
+        darkAudio.nodes.push(noise);
+        darkAudio.petLp = lp;
+
+        // 따뜻한 화음 — 처음엔 꺼져 있다가 단계마다 켜진다
+        const warmG = ctx.createGain();
+        warmG.gain.value = 0;
+        warmG.connect(master);
+        darkAudio.petWarmG = warmG;
+        [261.6, 329.6, 392.0].forEach((f, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = f;
+            g.gain.value = i === 0 ? 0.05 : 0.03;
+            o.connect(g); g.connect(warmG);
+            o.start();
+            darkAudio.nodes.push(o);
+        });
+
+        // 문 긁는 소리 — 후반엔 멎는다
+        function scratch() {
+            if (!darkAudio.playing) return;
+            if (darkAudio.petPhase < 3) {
+                const t = ctx.currentTime;
+                const reps = 2 + Math.floor(Math.random() * 3);
+                for (let k = 0; k < reps; k++) {
+                    const tt = t + k * 0.22;
+                    const src = ctx.createBufferSource();
+                    src.buffer = makeNoiseBuffer(ctx, 0.2);
+                    const bp = ctx.createBiquadFilter();
+                    bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 4;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.035, tt);
+                    g.gain.exponentialRampToValueAtTime(0.0005, tt + 0.18);
+                    src.connect(bp); bp.connect(g); g.connect(master);
+                    src.start(tt); src.stop(tt + 0.22);
+                }
+            }
+            darkAudio.timers.push(setTimeout(scratch, 6000 + Math.random() * 9000));
+        }
+        darkAudio.timers.push(setTimeout(scratch, 2500));
+
+        // 작은 발소리 — 후반에 등장
+        function paws() {
+            if (!darkAudio.playing) return;
+            if (darkAudio.petPhase >= 2) {
+                const t = ctx.currentTime;
+                for (let k = 0; k < 4; k++) {
+                    const tt = t + k * 0.13;
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(140 + Math.random() * 50, tt);
+                    g.gain.setValueAtTime(0.03, tt);
+                    g.gain.exponentialRampToValueAtTime(0.0004, tt + 0.1);
+                    osc.connect(g); g.connect(master);
+                    osc.start(tt); osc.stop(tt + 0.13);
+                }
+            }
+            darkAudio.timers.push(setTimeout(paws, 9000 + Math.random() * 12000));
+        }
+        darkAudio.timers.push(setTimeout(paws, 6000));
+    }
+
+    // 퍼즐을 풀 때마다 따뜻해진다
+    function c176Warm(phase) {
+        if (!darkAudio.ctx || !darkAudio.playing) return;
+        darkAudio.petPhase = phase;
+        const now = darkAudio.ctx.currentTime;
+        try {
+            if (darkAudio.petWarmG) {
+                darkAudio.petWarmG.gain.linearRampToValueAtTime(0.05 * phase, now + 3);
+            }
+            if (darkAudio.petLowG) {
+                darkAudio.petLowG.gain.linearRampToValueAtTime(Math.max(0.02, 0.1 - phase * 0.022), now + 3);
+            }
+            if (darkAudio.petLp) {
+                darkAudio.petLp.frequency.linearRampToValueAtTime(300 + phase * 350, now + 3);
+            }
+        } catch (e) {}
     }

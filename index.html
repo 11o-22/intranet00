@@ -1301,7 +1301,11 @@ function getTodayStr() {
 
         "방진복 안감": { price: 120, usable: true, targetable: false, effect: "equip_liner", qShop: true, desc: "[???] 장착형. 오염이 누적되는 구역에서 상승량이 20% 줄어든다." },
         "실리카겔": { price: 100, usable: true, targetable: false, effect: "equip_silica", qShop: true, desc: "[???] 장착형. 습한 구역에서 판정에 +2." },
-        "은박 담요": { price: 110, usable: true, targetable: false, effect: "equip_foil", qShop: true, desc: "[???] 장착형. 열기가 있는 구역에서 피해가 줄어든다." }
+        "은박 담요": { price: 110, usable: true, targetable: false, effect: "equip_foil", qShop: true, desc: "[???] 장착형. 열기가 있는 구역에서 피해가 줄어든다." },
+                "꿰맨 자국": { price: 90, usable: false, darkOnly: true, desc: "[어둠 회수품] 인형에서 뜯어낸 실밥. 바느질이 엉망이다. 급하게 꿰맨 티가 난다." },
+        "걸려 있던 자리": { price: 180, usable: false, darkOnly: true, desc: "[어둠 회수품] 현관 벽의 못 자국. 오래 무언가 걸려 있던 흔적." },
+        "따라온 발소리": { price: 420, usable: true, targetable: false, effect: "q_paw", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 어둠 탐사에서 판정 1회를 대신 받아 준다." }
+    
     };
 
         const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
@@ -3020,6 +3024,7 @@ function getTodayStr() {
         if (darkRun.isParty) watchPartyStep();
 
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
+        if (darkRun.zone === 'Qtrew-C-176') { renderStepC176(); return; }
         if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
         if (darkRun.zone === 'Qtrew-B-508') { renderStepB508(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
@@ -3202,6 +3207,20 @@ function getTodayStr() {
                  숨이 돌아온다. 오늘은 여기까지다.</span>`,
                 darkChoiceBtn("자세를 낮춘다.", "renderDarkStep();"));
             mountDarkChat('normal');
+            return;
+        }
+
+                if (consumeQFlag('paw_guard')) {
+            darkRun.fail = Math.max(0, darkRun.fail - 1);
+            darkRun._dead = false;
+            darkBodyEl().innerHTML = darkBox("—",
+                `${reasonText}<br><br>
+                 <span style="color:#d4af37;">— 뒤에서 뭔가가 앞으로 나선다.<br>
+                 밀려나는 감각. 그리고 발소리가 멀어진다.<br><br>
+                 돌아보면 없을 것을 안다. 그래도 한 번 돌아봤다.</span>`,
+                darkChoiceBtn("일어선다.", "renderDarkStep();"));
+            mountDarkChat('normal');
+            saveDB();
             return;
         }
 
@@ -5025,6 +5044,17 @@ function getTodayStr() {
             saveDB(); updateUI();
             showPointGainEffect(randPoints);
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
+            return;
+        }
+
+                if (cat.effect === 'q_paw') {
+            if (darkRun) { setQFlag('paw_guard', true); }
+            else { addPendingFlag('paw_guard', true); }
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 따라온 발소리`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('발소리가 뒤에 붙었습니다.\n다음 위험을 한 번 대신 받아 줍니다.');
             return;
         }
 
