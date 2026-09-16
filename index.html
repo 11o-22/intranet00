@@ -5989,6 +5989,7 @@ function getTodayStr() {
     // ==========================================
     const MAX_BET = 50;
     const LIMITED_BETS = ['seotda-bet', 'slot-bet', 'roulette-bet'];
+    const BET_CAPS = { 'slot-bet': 2000 };
 
     function getBetValue(inputId) {
         const el = document.getElementById(inputId);
@@ -5997,13 +5998,15 @@ function getTodayStr() {
         return isNaN(v) ? 1 : v;
     }
 
-    function applyBet(inputId, val) {
+        function applyBet(inputId, val) {
         const el = document.getElementById(inputId);
         const disp = document.getElementById(inputId + '-display');
         if (!el) return;
 
         let limit = currentUser ? currentUser.points : 1;
-        if (LIMITED_BETS.includes(inputId)) limit = Math.min(limit, MAX_BET);
+        if (LIMITED_BETS.includes(inputId)) {
+            limit = Math.min(limit, BET_CAPS[inputId] || MAX_BET);
+        }
         if (limit < 1) limit = 1;
 
         val = Math.max(1, Math.min(limit, val));
@@ -6016,7 +6019,7 @@ function getTodayStr() {
     }
 
     function setBetMax(inputId) {
-        const cap = LIMITED_BETS.includes(inputId) ? MAX_BET : currentUser.points;
+        const cap = LIMITED_BETS.includes(inputId) ? (BET_CAPS[inputId] || MAX_BET) : currentUser.points;
         applyBet(inputId, Math.min(currentUser.points, cap));
     }
     function refreshAllBetDisplays() {
