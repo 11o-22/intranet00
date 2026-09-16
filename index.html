@@ -2182,6 +2182,9 @@ function getTodayStr() {
     }
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
+
+    let _advLock = 0;
+    
       function partyAdvance(nextStep) {
         if (!darkRun) return;
         const now = Date.now();
