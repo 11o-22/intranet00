@@ -2358,10 +2358,21 @@ function input119D(n) {
 
     function giveUpDying() { confirmDeath(); }
 
-    function confirmDeath() {
+       function confirmDeath() {
         clearTimeout(dyingTimer);
         if (darkRun && darkRun.isParty && database) {
             database.ref(`darkParties/${darkRun.partyId}/dying/${currentUser.code}`).remove();
+            // ★ 죽기 전에 방장이면 즉시 위임
+            if (darkRun.isLeader) {
+                const p = darkParties[darkRun.partyId];
+                const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => c !== currentUser.code) : [];
+                if (alive.length > 0 && p.members && p.members[alive[0]]) {
+                    database.ref(`darkParties/${darkRun.partyId}`).update({
+                        leader: alive[0], leaderName: p.members[alive[0]].name
+                    });
+                }
+            }
+            database.ref(`darkParties/${darkRun.partyId}/alive/${currentUser.code}`).remove();
         }
         darkDeath(`더 버티지 못했다.<br><br>미로는 당신을 아주 정확히 기억하게 되었다.`);
     }
@@ -2404,7 +2415,8 @@ function input119D(n) {
                         </button>
                     </div>`;
             }).join('') +
-            `<button class="game-btn" style="width:100%; margin:6px 0 0 0; padding:11px; font-size:11px;" onclick="abandonRescue('${code}')">보고만 있는다.</button>`);
+                        `<button class="game-btn" style="width:100%; margin:6px 0 0 0; padding:11px; font-size:11px;" onclick="abandonRescue('${code}')">보고만 있는다.</button>` +
+            `<button class="game-btn" style="width:100%; margin:6px 0 0 0; padding:10px; font-size:10px;" onclick="darkRun._rescueShown=false; partyAdvance(darkRun.step + 1);">먼저 간다</button>`);
         mountDarkChat('normal');
     }
 
@@ -2438,13 +2450,14 @@ function input119D(n) {
             sendPartyChat(`${currentUser.name} 사원이 동료를 붙잡았습니다.`, true);
         } else {
             darkRun.fail++;
-                       if (kind === 'hand') {
+                                   if (kind === 'hand') {
                 const healSave = gearValue(currentUser, 'heal') > 0;
-                if (healSave) {
+                if (healSave || darkRun._rescueChain) {
                     txt = `손을 뻗는다. 끌려가는 힘이 세다.<br><br>버티지 못하고 놓쳤다.<br>다만 당신까지 딸려 들어가지는 않았다.`;
-                    applyPollutionToUser(currentUser, 5);
+                    applyPollutionToUser(currentUser, 6);
                 } else {
-                    txt = `손을 뻗는다. 닿는다.<br><br>그런데 끌려가는 쪽이 더 세다.<br>발이 미끄러지고, 같이 딸려 들어간다.<br><br>둘 다 흐려지기 시작한다.`;
+                    darkRun._rescueChain = true;
+                    txt = `손을 뻗는다. 닿는다.<br><br>그런데 끌려가는 쪽이 더 세다.<br>발이 미끄러지고, 같이 딸려 들어간다.`;
                     darkRun.dying = 'rescue';
                     applyPollutionToUser(currentUser, 10);
                     darkBodyEl().innerHTML = darkBox("구조 — 실패",
@@ -2489,9 +2502,13 @@ function input119D(n) {
                                     : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
                          선임의 신호를 기다리는 중...<br>
                          <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                         
                        </div>`));
+                    
         mountDarkChat('normal');
     }
+
+
 
         // --- 기믹 5: 벽이 좁혀온다 ---
     function b330Gimmick7() {
@@ -3068,9 +3085,9 @@ function input119D(n) {
         { id:'d08', name:'화상 사고 보고서',  where:'oven',     hint:'구급함 안에 접혀 있다.' },
         { id:'d09', name:'진열 배치도',       where:'store',    hint:'계산대 서랍.' },
         { id:'d10', name:'출고 검수증',       where:'upper',    hint:'2층 사무실에만 있다.' },
-        { id:'d11', name:'폐기물 처리 확인서', where:'upper',   hint:'2층 작업장 안쪽.' },
-        { id:'d12', name:'대표자 서명란',     where:'upper',    hint:'2층 어딘가. 서명은 아직 안 되어 있다.' }
-    ];
+        { id:'d11', name:'폐기물 처리 확인서', where:'store',   hint:'매장 안쪽 창고.' },
+        { id:'d12', name:'대표자 서명란',     where:'oven',     hint:'오븐실 게시판.' }
+       ];
 
     const B508_AREAS = {
         basement: '지하 저장고',
@@ -3082,13 +3099,12 @@ function input119D(n) {
     };
 
     // 인원별 필요 서류 수
-    function b508RequiredDocs() {
+       function b508RequiredDocs() {
         const n = darkRun && darkRun.memberCount ? darkRun.memberCount : 3;
-        if (n >= 5) return 12;
-        if (n === 4) return 9;
-        return 7;
+        if (n >= 5) return 8;
+        if (n === 4) return 6;
+        return 5;
     }
-
         const B508_MONSTERS = {
         kneader: {
             name: '반죽공',
@@ -3240,7 +3256,7 @@ function input119D(n) {
     };
 
     // 탐색 가능 횟수 (구역당)
-    const SEARCH_LIMIT = { basement:3, dough:3, proof:3, oven:3, store:3, upper:4 };
+       const SEARCH_LIMIT = { basement:5, dough:5, proof:5, oven:5, store:5, upper:6 };
 
     // 방장이 서류 위치를 정한다
     function initB508Docs() {
@@ -3356,7 +3372,7 @@ function input119D(n) {
         const hitId = Object.keys(placed).find(id =>
             placed[id].area === area && placed[id].spot === spot && !found[id]);
 
-        addNotice(8, `${B508_AREAS[area]} 탐색`);
+               addNotice(4, `${B508_AREAS[area]} 탐색`);
 
         if (hitId) {
             const doc = B508_DOCS.find(d => d.id === hitId);
@@ -3776,8 +3792,7 @@ function input119D(n) {
         const got = foundCount() + (darkRun._gotKey ? 1 : 0);
         const enough = got >= need;
         const luckVal = gearValue(currentUser, 'luck');
-        const canTryKey = !enough && luckVal > 0 && !darkRun._keyTried;
-
+        const canTryKey = !enough && !darkRun._keyTried;
         darkBodyEl().innerHTML = darkBox("기믹 7 — 출고",
             `셔터가 절반쯤 내려왔다.<br><br>출고대 앞이다. 검수 담당이 서류를 받아 넘긴다.<br>숫자가 맞으면 상품, 아니면 폐기.<br><br>
              <div style="background:rgba(0,0,0,0.35); border:1px solid #5a4a2a; border-radius:6px; padding:12px; font-size:12px; line-height:1.9; margin-top:6px;">
@@ -3794,11 +3809,11 @@ function input119D(n) {
         mountDarkChat('normal');
     }
 
-    function b508TryKey() {
+       function b508TryKey() {
         darkRun._keyTried = true;
         const roll = Math.floor(Math.random() * 20) + 1;
         const luckVal = gearValue(currentUser, 'luck');
-        const DC = Math.max(4, 16 - Math.round(luckVal * 14));
+        const DC = Math.max(4, 12 - Math.round(luckVal * 14));
         const ok = roll >= DC;
 
         if (ok) {
@@ -3824,9 +3839,29 @@ function input119D(n) {
                 `검수 담당이 서류를 한 장씩 넘긴다.<br>도장이 찍히는 소리가 규칙적이다.<br><br>마지막 장에서 멈춘다. 한참 본다.<br>그리고 봉지 입구를 봉한다.<br><br><span style="color:#d4af37;">"정상 출고품입니다. 감사합니다."</span>`,
                 darkChoiceBtn("실려 나간다.", "darkRun.step=99; renderDarkStep();"));
             mountDarkChat('normal');
+            return;
+        }
+
+        // ★ 서류 부족 — 즉사가 아니라 판정
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = 12;
+        const survived = roll !== 1 && (roll + bonus) >= DC;
+
+        darkRun.fail += 2;
+        darkRun.failedRun = true;
+        darkRun.log.push(`[출고] 서류 부족 — d20 ${roll} vs DC${DC}`);
+
+        if (survived) {
+            applyPollutionToUser(currentUser, 12);
+            darkBodyEl().innerHTML = darkBox("출고",
+                `검수 담당이 서류를 센다. 두 번 센다.<br><br>고개를 젓는다.<br><span style="color:#d4af37;">"폐기 처리하겠습니다."</span><br><br>` +
+                `폐기함으로 옮겨지는 동안, 봉지 옆이 터져 있는 걸 발견한다.<br>` +
+                `수거차가 흔들리는 순간 빠져나온다.<br><br>` +
+                `골목에 떨어졌다. 보상은 없다. 다만 살아 있다.`,
+                darkChoiceBtn("기어 나간다.", "darkRun.step=99; renderDarkStep();"));
+            mountDarkChat('normal');
         } else {
-            darkRun.fail += 2;
-            darkRun.failedRun = true;
             darkDeath(
                 `검수 담당이 서류를 센다. 두 번 센다.<br><br>고개를 젓는다. 미안해하는 표정이다. 진심으로.<br><br>` +
                 `<span style="color:#d4af37;">"폐기 처리하겠습니다. 다음에는 더 신선하게 오세요."</span>`

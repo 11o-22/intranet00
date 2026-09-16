@@ -1216,7 +1216,7 @@ function getTodayStr() {
         "오렌지맛 물약": { price: 1500, usable: true, targetable: true, effect: "orange_potion", desc: "사용 시 3일간 어린이 상태가 됩니다." },
         "복숭아맛 물약": { price: 1500, usable: true, targetable: true, effect: "peach_potion", desc: "사용 시 3일간 예민한 몸이 됩니다." },
         "체리맛 물약": { price: 1500, usable: true, targetable: true, effect: "cherry_potion", desc: "사용 시 3일간 신체 부위 중 일부가 예민하게 개발된다." },
-        "제거약": { price: 4000, usable: true, targetable: false, effect: "cure_potion", desc: "자신 또는 타인의 상태이상을 무작위로 하나 제거합니다." },
+               "제거약": { price: 4000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화 하나를 무작위로 되돌린다. 물약 외의 상태에는 듣지 않는다." },
         "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
          "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip_rabbit", desc: "귀여운 분홍색 토끼 봉제인형. 장착 시 어둠의 판정에 행운이 더해지고, 공용시설 승률이 크게 오른다. 약간의 회피 효과도 있다." },
         "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip_security", desc: "보안팀의 의상 세트. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
@@ -1277,6 +1277,8 @@ function getTodayStr() {
         "라이터 돌": { price: 45, usable: true, targetable: false, effect: "q_flint", qShop: true, desc: "[???] 어두운 곳에서 판정에 +2. 탐사 1회 지속." },
         "낡은 명찰": { price: 55, usable: true, targetable: false, effect: "q_badge", qShop: true, desc: "[???] 지목을 한 번 피한다. 이름이 다르게 읽힌다." },
         "접힌 지폐": { price: 20, usable: true, targetable: false, effect: "q_bill", qShop: true, desc: "[???] 펴 보면 얼마인지 알 수 있다. 30~90 P." },
+        "덧씌운 붕대": { price: 230, usable: true, targetable: false, effect: "q_cleanse", qShop: true, desc: "[???] 어둠에서 얻은 흔적 하나를 덮어 가린다. 무작위로 하나가 사라진다." },
+        "지우개 조각": { price: 400, usable: true, targetable: false, effect: "q_cleanse_all", qShop: true, desc: "[???] 어둠에서 얻은 흔적을 전부 지운다. 쓰고 나면 손끝이 한동안 저리다." },    
         "사탕": { price: 25, usable: true, targetable: false, effect: "q_candy", qShop: true, desc: "[???] 입에 물면 다음 판정에 +1." },
         "구부러진 스푼": { price: 35, usable: true, targetable: false, effect: "q_spoon", qShop: true, desc: "[???] 탐색 횟수를 1회 늘린다." },
         "덜 마른 잉크": { price: 40, usable: true, targetable: false, effect: "q_ink", qShop: true, desc: "[???] 퀴즈 오답 1회를 없던 것으로 한다." },
@@ -3773,11 +3775,23 @@ function getTodayStr() {
         }
         
         // 격리 해제 체크 및 낡은 문패 효과 적용
-        if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
+                if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
             user.quarantineUntil = 0;
             user.pollution = user.quarantineExitPollution || 0;
             user.quarantineExitPollution = 0;
             user.lastPollutionTime = now;
+
+            // ★ 퇴원 시 탐사 사고 관련 문구 제거
+            if (user.badge && user.badge.notes) {
+                let arr = user.badge.notes.split(' | ').filter(n =>
+                    n.trim() !== '' &&
+                    !n.includes('의식 불명') &&
+                    !n.includes('긴급 이송') &&
+                    !n.includes('사직 반려')
+                );
+                user.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
+            }
+
             addHistoryLog(user, `[여우 상담실] 격리 치료를 마치고 무사히 복귀했습니다.`);
             changed = true;
         }
@@ -3815,7 +3829,7 @@ function getTodayStr() {
                 user.nostalgiaLastReduced += steps * fiveMinutesMs;
                 changed = true;
             }
-        } else if (user.nostalgiaUntil && now >= user.nostalgiaUntil) {
+               } else if (user.nostalgiaUntil && now >= user.nostalgiaUntil) {
             user.nostalgiaUntil = 0;
             let senderCode = user.nostalgiaSender || user.code; 
             if (db.users[senderCode]) {
@@ -3824,9 +3838,17 @@ function getTodayStr() {
                     addHistoryLog(db.users[senderCode], `[아이템 회수] ${user.name} 사원에게서 노스텔지어 끈이 자동 회수되었습니다.`);
                 }
             }
-            user.nostalgiaSender = null; 
-            
-            appendBadgeNoteToUser(user, `[노스텔지어 끈 만료] 5시간 장착 시간이 종료되어 주인의 인벤토리로 회수되었습니다.`);
+            user.nostalgiaSender = null;
+            user.nostalgiaLastReduced = 0;
+
+            // ★ 특이사항에서 노스텔지어 관련 문구 제거
+            if (user.badge && user.badge.notes) {
+                let arr = user.badge.notes.split(' | ').filter(n =>
+                    n.trim() !== '' && !n.includes('노스텔지어')
+                );
+                user.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
+            }
+
             addHistoryLog(user, `[장착 해제] 노스텔지어 끈 자동 회수됨`);
             changed = true;
         }
@@ -5005,6 +5027,43 @@ function getTodayStr() {
             return;
         }
 
+                if (cat.effect === 'q_cleanse' || cat.effect === 'q_cleanse_all') {
+            const DARK_KEYS = ['Qtrew-', '캔버스 결', '반 박자', '그림자', '손바닥', '미로', '빵가게', '거울', '의식 불명', '긴급 이송', '사직 반려'];
+            if (!currentUser.badge || !currentUser.badge.notes || currentUser.badge.notes === '특이사항 없음') {
+                showCustomAlert('지울 흔적이 없습니다.'); return;
+            }
+
+            let arr = currentUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
+            const darkIdx = [];
+            arr.forEach((n, i) => { if (DARK_KEYS.some(k => n.includes(k))) darkIdx.push(i); });
+
+            if (darkIdx.length === 0) { showCustomAlert('어둠에서 얻은 흔적이 없습니다.'); return; }
+
+            let removedNames = [];
+            if (cat.effect === 'q_cleanse_all') {
+                removedNames = darkIdx.map(i => arr[i]);
+                arr = arr.filter((n, i) => !darkIdx.includes(i));
+            } else {
+                const pick = darkIdx[Math.floor(Math.random() * darkIdx.length)];
+                removedNames.push(arr[pick]);
+                arr.splice(pick, 1);
+            }
+
+            currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] ${itemName} — 흔적 ${removedNames.length}건 제거`);
+
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+            updateUI();
+            showCustomAlert(
+                cat.effect === 'q_cleanse_all'
+                    ? `흔적 ${removedNames.length}건이 전부 지워졌습니다.`
+                    : `다음 흔적이 덮였습니다.\n\n${removedNames[0]}`
+            );
+            return;
+        }
+
         if (cat.effect === 'q_appraise') {
             const g = getGear(currentUser);
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
@@ -5313,18 +5372,31 @@ function getTodayStr() {
             addTimedEffect(targetUser, '고급진 술', '알코올 섭취', 10);
             if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
         }
-        else if (cat.effect === 'cure_potion') {
-            if (targetUser.badge && targetUser.badge.notes && targetUser.badge.notes !== "특이사항 없음") {
-                let notesArr = targetUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
-                if (notesArr.length > 0) {
-                    let removeIdx = Math.floor(Math.random() * notesArr.length);
-                    let removedNote = notesArr.splice(removeIdx, 1);
-                    targetUser.badge.notes = (notesArr.length === 0) ? "특이사항 없음" : notesArr.join(' | ');
-                    if(!isOthers) showCustomAlert(`[제거약 효과] 다음 상태이상이 씻겨나갔습니다:\n- ${removedNote}`);
-                } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
-            } else { if(!isOthers) showCustomAlert("현재 제거할 상태이상이 없습니다."); return false; }
-        
-                    
+               else if (cat.effect === 'cure_potion') {
+            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+
+            const idxs = [];
+            (targetUser.timedEffects || []).forEach((eff, i) => {
+                if (POTION_NAMES.includes(eff.name)) idxs.push(i);
+            });
+
+            if (idxs.length === 0) {
+                if (!isOthers) showCustomAlert('제거할 물약 효과가 없습니다.');
+                return false;
+            }
+
+            const pick = idxs[Math.floor(Math.random() * idxs.length)];
+            const removed = targetUser.timedEffects.splice(pick, 1)[0];
+
+            if (targetUser.badge && targetUser.badge.notes) {
+                let arr = targetUser.badge.notes.split(' | ').filter(n =>
+                    n.trim() !== '' && !n.includes(removed.name)
+                );
+                targetUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+            }
+
+            addHistoryLog(targetUser, `[제거약] ${removed.name} 효과가 씻겨 나갔습니다.`);
+            if (!isOthers) showCustomAlert(`[제거약 효과]\n${removed.name}의 효과가 사라졌습니다.`);
         } else if (cat.effect === 'random_box') {
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
                         const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
@@ -7429,6 +7501,16 @@ function getTodayStr() {
         u.quarantineExitPollution = 0;
         u.lastPollutionTime = Date.now();
         u.foxRoomAnswered = false;
+
+        if (u.badge && u.badge.notes) {
+            let arr = u.badge.notes.split(' | ').filter(n =>
+                n.trim() !== '' &&
+                !n.includes('의식 불명') &&
+                !n.includes('긴급 이송') &&
+                !n.includes('사직 반려')
+            );
+            u.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
+        }
 
         addHistoryLog(u, purify
             ? `[당국 개입] 상담사에 의해 퇴원 및 완전 정화 처리되었습니다.`
