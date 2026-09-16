@@ -5154,7 +5154,7 @@ function input119D(n) {
                 darkRun._a214Notice = true;
                 setTimeout(() => sendPartyChat('이 구역에는 일행 중 한 명이 신도로 섞여 있습니다. 세 번의 지목 기회가 주어집니다.', true), 1000);
             }
-            
+
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
                 a214BarHtml() + a214RoleCard() +
                 darkChoiceBtn("내려간다.", "partyAdvance(1)"), "intro");
@@ -5259,8 +5259,10 @@ function input119D(n) {
         const myVote = votes[currentUser.code];
         const voted = Object.keys(votes).length;
 
-        const opts = alive.map(c => {
-            const nm = (p.members && p.members[c]) ? p.members[c].name : c;
+              const opts = alive.map(c => {
+            const nm = (p && p.members && p.members[c] && p.members[c].name)
+                ? p.members[c].name
+                : (db.users[c] ? db.users[c].name : c);
             const cnt = Object.values(votes).filter(v => v === c).length;
             const mine = myVote === c;
             return `
@@ -5303,7 +5305,9 @@ function input119D(n) {
 
         const hit = top === a214State.traitor;
         const p = darkParties[darkRun.partyId];
-        const nm = (p && p.members && p.members[top]) ? p.members[top].name : '누군가';
+                const nm = (p && p.members && p.members[top] && p.members[top].name)
+            ? p.members[top].name
+            : (db.users[top] ? db.users[top].name : '누군가');
 
         database.ref(a214Path()).update({
             [`voteResult${n}`]: { target: top, name: nm, hit: hit, at: Date.now() },
