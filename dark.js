@@ -4822,13 +4822,12 @@ function input119D(n) {
     }
 
     // 방장이 신도와 미션을 배정
-      function initA214() {
+         function initA214() {
         if (!darkRun || !darkRun.isLeader || !database) return;
         database.ref(`darkParties/${darkRun.partyId}`).once('value').then(snap => {
             const room = snap.val() || {};
             let members = room.members;
 
-            // members가 비었으면 alive로 대체
             if (!members || Object.keys(members).length === 0) {
                 const alive = room.alive || {};
                 members = {};
