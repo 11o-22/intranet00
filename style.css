@@ -479,8 +479,9 @@
         .emp-list-title { font-size: 14px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 6px; margin-bottom: 2px;}
         .emp-list-sub { font-size: 11px; color: #888; margin-top: 2px; }
 
-        #ranking-bottom-bar {
-            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 450px; background: #161616; border-top: 1px solid #444; box-shadow: 0 -4px 12px rgba(0,0,0,0.8); z-index: 100; box-sizing: border-box; transition: all 0.3s ease;
+         #ranking-bottom-bar {
+            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 450px; background: #161616; border-top: 1px solid #444; box-shadow: 0 -4px 12px rgba(0,0,0,0.8); z-index: 100; box-sizing: border-box; transition: all 0.3s ease;
+            padding-bottom: env(safe-area-inset-bottom);
         }
         .ranking-toggle-btn {
             width: 100%; background: #222; border: none; border-bottom: 1px solid #333; color: #ffd700; font-size: 12px; font-weight: bold; padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; transition: background 0.2s;
