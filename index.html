@@ -4423,7 +4423,10 @@ function getTodayStr() {
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
+                if (!currentUser.facilityMax || currentUser.facilityMax < 20) {
+            currentUser.facilityMax = 20;
+            saveDB();
+        }
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
         document.getElementById('display-facility-max').innerText = currentUser.facilityMax;
 
