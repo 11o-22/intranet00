@@ -3168,6 +3168,10 @@ function getTodayStr() {
     
 
                     function darkDeath(reasonText) {
+                
+        if (darkRun && darkRun._dead) return;   // 중복 호출 차단
+        if (darkRun) darkRun._dead = true; 
+
         // ★ 보안팀 의상 세트 — 하루 1회 죽음 방지
         const todayStr = getTodayStr();
         if (hasEquip(currentUser, '보안팀 의상 세트') && currentUser.securitySaveDate !== todayStr) {
@@ -3177,6 +3181,8 @@ function getTodayStr() {
             addHistoryLog(currentUser, `[보안팀 의상] 치명적 상황에서 살아남았습니다. (일 1회)`);
             if (database) database.ref('users/' + currentUser.code).set(currentUser);
             else saveDB();
+
+              darkRun._dead = false;   
 
             darkBodyEl().innerHTML = darkBox("—",
                 `${reasonText}<br><br>
@@ -3197,6 +3203,7 @@ function getTodayStr() {
             const g = getGear(currentUser);
             darkRun.fail = Math.max(0, darkRun.fail - 1);
             applyPollutionToUser(currentUser, 5);
+              darkRun._dead = false;   
 
             darkBodyEl().innerHTML = darkBox("—",
                 `${reasonText}<br><br>
@@ -3213,6 +3220,7 @@ function getTodayStr() {
         if (hasResign && !darkRun._resignAsked) {
             darkRun._resignAsked = true;
             darkRun._deathReason = reasonText;
+                
 
             darkBodyEl().innerHTML = darkBox("—",
                 `${reasonText}<br><br>
@@ -3322,6 +3330,7 @@ function getTodayStr() {
 
         function useResignLetter() {
         if (!darkRun) return;
+        darkRun._dead = false;
         const z = DARK_ZONES[darkRun.zone];
 
         // 반입 목록과 인벤토리에서 제거
