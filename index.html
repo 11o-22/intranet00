@@ -567,17 +567,21 @@
             </div>
         </div>
 
-        <!-- 6. 사택 -->
                     <div id="tab-house" class="tab-content">
                 <div class="sub-tabs-grid">
                     <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 방</button>
+                    <button class="sub-tab" id="house-chat-tab" onclick="switchHousePanel('house-chat', this)">대화</button>
                     <button class="sub-tab" onclick="switchHousePanel('house-storage', this)">보관함</button>
                     <button class="sub-tab" onclick="switchHousePanel('house-kitchen', this)">주방</button>
                 </div>
                 <div id="house-main" class="sub-panel active"><div id="house-main-body"></div></div>
+                <div id="house-chat" class="sub-panel"><div id="house-chat-body"></div></div>
                 <div id="house-storage" class="sub-panel"><div id="house-storage-body"></div></div>
                 <div id="house-kitchen" class="sub-panel"><div id="house-kitchen-body"></div></div>
             </div>
+
+        <!-- 6. 사택 -->
+                    
 
             <div id="house-visit" class="sub-panel">
                 <div class="panel-title">[사택 방문]</div>
