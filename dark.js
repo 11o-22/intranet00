@@ -7660,7 +7660,7 @@ function input119D(n) {
                 <div style="font-size:16px; color:#fff; font-weight:bold;">${info.name}</div>
                 <div style="font-size:11px; color:#999; margin-top:6px; line-height:1.6;">${info.label}</div>
                 <div style="font-size:10px; color:#666; margin-top:8px;">
-                    회복 속도 시간당 ${info.heal}% · 보관함 ${h.storage.length}/${HOUSE_STORAGE_MAX}칸
+                    회복 속도 시간당 ${info.heal}% · 보관함 ${(h.storage||[]).length}/${HOUSE_STORAGE_MAX}칸
                 </div>
             </div>
 
@@ -7714,7 +7714,6 @@ function input119D(n) {
         renderHouseNotes();
         renderAnomalyBox();
     }
-
         function houseMove() {
         const g = houseGrade(currentUser);
         const nextG = HOUSE_GRADES[HOUSE_GRADES.indexOf(g) + 1];
