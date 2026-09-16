@@ -5985,18 +5985,34 @@ function getTodayStr() {
         document.getElementById('seotda-controls-play').style.display = 'flex';
         document.getElementById('seotda-msg').innerText = "원하는 패를 교환하거나 승부를 겨루세요.";
     }
-
     function swapSeotdaCard() {
         if (selectedCardIdx === -1 || swapsLeft <= 0) return;
-        playerHand[selectedCardIdx - 1] = seotdaDeck.pop();
-        renderCard(`seotda-card-${selectedCardIdx}`, playerHand[selectedCardIdx - 1]);
-        swapsLeft--; document.getElementById('swap-count').innerText = swapsLeft;
+        if (seotdaDeck.length === 0) { showCustomAlert('더 뽑을 패가 없습니다.'); return; }
+
+        const keepIdx = selectedCardIdx === 1 ? 1 : 0;   // 안 바꾸는 쪽
+        const keepCard = playerHand[keepIdx];
+
+        // 남은 패 중 손에 있는 것과 겹치지 않는 카드만 후보로
+        let candIdx = -1;
+        for (let i = 0; i < seotdaDeck.length; i++) {
+            const c = seotdaDeck[i];
+            const dupWithKeep = (c.month === keepCard.month && c.isKwang === keepCard.isKwang);
+            const dupWithDealer = dealerHand.some(d => d.month === c.month && d.isKwang === c.isKwang);
+            if (!dupWithKeep && !dupWithDealer) { candIdx = i; break; }
+        }
+        if (candIdx === -1) candIdx = 0;   // 후보가 없으면 그냥 맨 위
+
+        const newCard = seotdaDeck.splice(candIdx, 1)[0];
+        playerHand[selectedCardIdx - 1] = newCard;
+
+        renderCard(`seotda-card-${selectedCardIdx}`, newCard);
+        swapsLeft--;
+        document.getElementById('swap-count').innerText = swapsLeft;
         document.getElementById(`seotda-card-${selectedCardIdx}`).classList.remove('selected');
         selectedCardIdx = -1;
         document.getElementById('player-result-label').innerText = calculateJokbo(playerHand[0], playerHand[1]).name;
-        if (swapsLeft === 0) document.getElementById('seotda-msg').innerText = "교환을 모두 마쳤습니다. 쇼다운을 진행하세요.";
+        if (swapsLeft === 0) document.getElementById('seotda-msg').innerText = "교환을 마쳤습니다. 쇼다운을 진행하세요.";
     }
-
         function calculateJokbo(c1, c2) {
         let m1 = c1.month, m2 = c2.month, isK1 = c1.isKwang, isK2 = c2.isKwang;
         if (m1 > m2) { [m1, m2] = [m2, m1]; [isK1, isK2] = [isK2, isK1]; }
