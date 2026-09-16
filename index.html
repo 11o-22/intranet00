@@ -7378,6 +7378,7 @@ function getTodayStr() {
         renderAdminGearList();
         renderAdminGearQuick();
         renderAdminGearList();
+        renderAdminRoomList();
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';
@@ -8396,9 +8397,8 @@ function getTodayStr() {
     const _openSuggestionModal = openSuggestionModal;
     openSuggestionModal = function() { pushModal('suggestion-modal'); _openSuggestionModal(); };
 
-    const _openAdminScreen = openAdminScreen; renderAdminRoomList();
+        const _openAdminScreen = openAdminScreen;
     openAdminScreen = function() { pushModal('admin-screen'); _openAdminScreen(); };
-
     const _openItemTargetModal = openItemTargetModal;
     openItemTargetModal = function(i, p) { pushModal('item-target-modal'); _openItemTargetModal(i, p); };
 
