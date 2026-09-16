@@ -1,7 +1,20 @@
 const DARK_ZONES = {
         "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[1500,2500], ready:false },
-        "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[1000,1500], ready:false },
-                "Qtrew-A-214": {
+                "Qtrew-A-667": {
+            code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다",
+            brief:"(물고기가 인간이 되었다.)",
+            danger:"최상", survival:"0.5%", min:3, max:4, reward:[1000,1500], ready:true,
+            voteMode:true, deepSea:true,
+            intro:"물이다.<br><br>눈을 뜨니 이미 잠겨 있다. 숨은 쉬어진다. 그게 첫 번째로 이상한 점이다.<br>두 번째는 옷이 젖지 않았다는 것이다.<br><br>발밑이 보이지 않는다. 아래가 어디까지인지 가늠이 안 된다.<br>위를 본다. 수면이 있다. 아주 멀다.<br>손을 뻗으면 닿을 것 같은데, 그건 거리를 잴 기준이 없어서다.<br><br>옆에서 무언가 지나간다.<br>크기를 모르겠다. 가까이 있는 작은 것인지, 멀리 있는 큰 것인지.<br><br>아래에서 불빛이 하나 켜진다. 그리고 둘. 셋.<br>줄지어 켜진다. 길처럼.",
+            outro:"수면을 뚫고 나온다.<br><br>공기가 낯설다. 목이 아프다. 한참 기침했다.<br>손등을 본다. 손등이다. 확인하고 나서야 안심이 됐다.<br><br>눈을 뜨니 현관 앞이다.<br>며칠 동안 물을 마실 때마다 잠깐씩 멈추게 됐다.<br>삼키는 감각이 어색해서.",
+            images: {
+                intro: "deep_1.jpg",
+                step1: "deep_2.jpg",
+                step2: "deep_3.jpg",
+                step3: "deep_4.jpg"
+            }
+        },
+              "Qtrew-A-214": {
             code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서",
             brief:"(여기 사람들은 전부 같은 것을 보고 있습니다.)",
             danger:"상", survival:"3%", min:4, max:6, reward:[1000,1500], ready:true,
@@ -214,6 +227,7 @@ const DARK_ZONES = {
 
             if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-A-214') buildCultAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-A-667') buildDeepAmbience(ctx, master);   
             else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-176') buildPetAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-B-330') buildMazeAmbience(ctx, master);
@@ -6203,4 +6217,872 @@ function input119D(n) {
                 <div style="font-size:9px; color:#c9a8ff; font-weight:bold; margin-bottom:4px;">발동 중</div>
                 ${keys.map(k => `<div style="font-size:10px; color:#d4bbff; line-height:1.6;">◈ ${QFLAG_LABELS[k] || k}</div>`).join('')}
             </div>`;
+    }
+
+        // ==========================================
+    // ★ Qtrew-A-667 「물고기가 인간이 되었다」
+    // ==========================================
+    const A667_MAXDEPTH = 100;
+
+    function getHumanity() {
+        return (darkRun && darkRun.humanity != null) ? darkRun.humanity : 100;
+    }
+    function getDepth() {
+        return (darkRun && darkRun.depth != null) ? darkRun.depth : 0;
+    }
+
+    function addHumanity(amount, reason) {
+        if (!darkRun) return;
+        darkRun.humanity = Math.max(0, Math.min(100, getHumanity() + amount));
+        if (reason) darkRun.log.push(`[인간성] ${reason} (${amount >= 0 ? '+' : ''}${amount} → ${darkRun.humanity})`);
+        renderDeepBar();
+        if (darkRun.humanity <= 0 && !darkRun._turned) {
+            darkRun._turned = true;
+            setTimeout(() => a667Turned(), 700);
+        }
+    }
+
+    function addDepth(amount) {
+        if (!darkRun) return;
+        darkRun.depth = Math.max(0, Math.min(A667_MAXDEPTH, getDepth() + amount));
+        // 깊어질수록 인간성이 저절로 깎인다
+        if (amount > 0) {
+            const drain = Math.floor(darkRun.depth / 25);
+            if (drain > 0) addHumanity(-drain, '수압');
+        }
+        renderDeepBar();
+    }
+
+    function deepBarHtml() {
+        return `<div id="deep-bar" style="margin-bottom:12px;"></div>`;
+    }
+
+    function renderDeepBar() {
+        const el = document.getElementById('deep-bar');
+        if (!el || !darkRun) return;
+        const h = getHumanity();
+        const d = getDepth();
+        const hColor = h >= 70 ? '#4CAF50' : h >= 40 ? '#ff9800' : '#f44336';
+        const hLabel = h >= 70 ? '사람' : h >= 40 ? '흔들림' : h >= 15 ? '경계' : '거의';
+
+        el.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+                <span>인간성 — <b style="color:${hColor};">${hLabel}</b></span>
+                <span style="color:${hColor}; font-weight:bold;">${h} / 100</span>
+            </div>
+            <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden; margin-bottom:8px;">
+                <div style="height:100%; width:${h}%; background:${hColor}; transition:width 0.5s;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+                <span>수심</span>
+                <span style="color:#4fc3f7; font-weight:bold;">${d} m</span>
+            </div>
+            <div style="width:100%; height:5px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:3px; overflow:hidden;">
+                <div style="height:100%; width:${d}%; background:linear-gradient(90deg,#0277bd,#01579b); transition:width 0.6s;"></div>
+            </div>`;
+    }
+
+    // 인간성 0 — 변이
+    function a667Turned() {
+        darkRun.fail += 3;
+        darkDeath(
+            `숨이 편해진다.<br><br>` +
+            `아까부터 쉬고 있었는데, 이제야 그게 자연스럽다.<br>` +
+            `목 옆이 열렸다 닫힌다. 언제부터인지는 모르겠다.<br><br>` +
+            `아래에서 불빛들이 다가온다. 반가워하는 속도다.<br>` +
+            `한 마리가 앞에 선다. 사람 얼굴이다.<br><br>` +
+            `<span style="color:#4fc3f7;">"오래 걸리셨네요."</span><br><br>` +
+            `무슨 말인지 알아들었다. 그게 마지막이었다.`
+        );
+    }
+
+        // 수심이 깊으면 글자가 흔들린다
+    function distort(text) {
+        const d = getDepth();
+        if (d < 50) return text;
+        const rate = d >= 85 ? 0.10 : d >= 70 ? 0.06 : 0.03;
+        return text.split('').map(ch => {
+            if (ch === '<' || ch === '>' || ch === ' ') return ch;
+            if (Math.random() < rate) {
+                return `<span style="opacity:0.35; filter:blur(1px);">${ch}</span>`;
+            }
+            return ch;
+        }).join('');
+    }
+
+    // 인간성이 낮으면 선택지 순서가 뒤바뀐다
+    function maybeShuffle(options) {
+        const h = getHumanity();
+        if (h >= 40) return options;
+        if (Math.random() > (h < 20 ? 0.5 : 0.25)) return options;
+        const arr = options.slice();
+        const i = Math.floor(Math.random() * arr.length);
+        const j = Math.floor(Math.random() * arr.length);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+        return arr;
+    }
+
+        const A667_CHECKS = [
+        { q:'손가락이 몇 개입니까?',        a:['10','열','십','열개','10개'] },
+        { q:'당신의 이름을 적으십시오.',    a:null },
+        { q:'숨을 쉬고 있습니까?',          a:['네','예','응','yes','쉬고있다','그렇다'] },
+        { q:'물은 마시는 것입니까, 있는 것입니까?', a:['마시는','마시는것','마신다'] },
+        { q:'당신은 무엇입니까?',           a:['사람','인간','나','사원'] }
+    ];
+
+    function renderSelfCheck(next) {
+        const c = A667_CHECKS[Math.floor(Math.random() * A667_CHECKS.length)];
+        darkRun._checkAns = c.a;
+        darkRun._checkNext = next;
+
+        darkBodyEl().innerHTML = darkBox("확인",
+            distort(`잠깐 멈춘다.<br><br>
+                여기 오래 있으면 잊는다고 들었다.<br>
+                잊기 전에 확인해 두기로 한다.<br><br>
+                <span style="color:#4fc3f7; font-size:14px;">${c.q}</span>`),
+            deepBarHtml() +
+            `<input type="text" id="selfcheck-input" maxlength="20" placeholder="" style="width:100%; padding:12px; font-size:14px; text-align:center; box-sizing:border-box; margin-bottom:10px;" onkeypress="if(event.key==='Enter') submitSelfCheck()">
+             <button class="game-btn" style="width:100%; margin:0; padding:12px;" onclick="submitSelfCheck()">적는다</button>`);
+        renderDeepBar();
+        mountDarkChat('normal');
+        setTimeout(() => { const f = document.getElementById('selfcheck-input'); if (f) f.focus(); }, 200);
+    }
+
+    function submitSelfCheck() {
+        const el = document.getElementById('selfcheck-input');
+        if (!el) return;
+        const v = el.value.trim();
+        if (!v) { showCustomAlert('적어 주세요.'); return; }
+
+        const ans = darkRun._checkAns;
+        const ok = (ans === null) ? true : checkQuizAnswer(v, ans);
+
+        if (ok) {
+            addHumanity(+8, '자각');
+            darkRun.success++;
+        } else {
+            addHumanity(-12, '자각 실패');
+            darkRun.fail++;
+        }
+
+        darkBodyEl().innerHTML = darkBox("확인",
+            ok
+                ? `적는다.<br><br>손이 기억하고 있었다. 머리보다 먼저.<br>아직은 괜찮다.`
+                : `적으려는데 잘 안 나온다.<br><br>분명히 알던 것인데 지금은 헷갈린다.<br>물속에서는 원래 그렇다고, 스스로에게 설명해 본다.<br><br>설명이 잘 됐다. 그게 더 문제다.`,
+            deepBarHtml() + darkChoiceBtn("계속 내려간다.", `partyAdvance(${darkRun._checkNext})`));
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
+
+        const A667_NARR = {
+        1: { img:'step1', text:`불빛을 따라 내려간다.<br><br>
+            줄지어 켜진 것들이 길처럼 보인다. 실제로 길일 수도 있다.<br>
+            누군가 지나다니라고 켜 놓은 것처럼 간격이 일정하다.<br><br>
+            귀가 먹먹하다. 삼키면 잠깐 풀렸다가 다시 막힌다.<br>
+            그 감각만이 지금 몸이 어디쯤 있는지 알려 준다.<br><br>
+            아래는 여전히 안 보인다.` },
+
+        2: { text:`물고기가 지나간다.<br><br>
+            평범하다. 손바닥만 하고, 은색이고, 무리 지어 다닌다.<br>
+            이상한 점은 없다.<br><br>
+            다만 지나가면서 전부 고개를 돌렸다.<br>
+            물고기는 고개를 돌리지 않는다. 몸 전체로 방향을 바꾼다.<br><br>
+            고개만 돌아갔다.` },
+
+        3: { text:`무언가 스쳐 지나간다.<br><br>
+            크기를 모르겠다. 바로 옆의 작은 것인지, 저 멀리 있는 큰 것인지.<br>
+            물속에서는 거리를 잴 기준이 없다.<br><br>
+            지나간 뒤에 물살이 왔다.<br>
+            한참 뒤에 왔다.<br><br>
+            그 시간 차이가 크기를 알려 준다. 알고 싶지 않았다.` },
+
+        4: { img:'step2', text:`빛이 사라졌다.<br><br>
+            위를 본다. 수면이 보이지 않는다. 언제부터인지 모르겠다.<br>
+            올라가는 방향을 잃었다는 뜻이다.<br><br>
+            공기 방울을 만들어 본다. 위로 간다.<br>
+            방향은 알겠는데 거리를 모르겠다.<br><br>
+            아래에서 다시 불빛이 켜진다.<br>
+            내려가는 길만 밝다.` },
+
+        5: { text:`물고기가 또 지나간다.<br><br>
+            이번 것은 조금 크다. 그리고 비늘 사이에 뭔가 있다.<br>
+            자세히 보니 손톱이다. 아주 작은.<br><br>
+            열 개인지 세어 보려다 그만둔다.<br><br>
+            세면 알게 될 것 같아서.` },
+
+        6: { text:`바위 틈에 뭔가 걸려 있다.<br><br>
+            옷이다. 우리 회사 작업복이다. 사번 자수까지 그대로다.<br>
+            찢기지 않았다. 벗어 둔 것처럼 얌전히 걸려 있다.<br><br>
+            벗을 이유가 있었다는 뜻이다.<br>
+            벗고 나서 뭘 했는지는 생각하지 않기로 한다.<br><br>
+            사번을 외워 둔다. 나중에 확인하려고.` },
+
+        7: { text:`말소리가 난다.<br><br>
+            물속에서 소리가 이렇게 잘 들릴 리 없는데 들린다.<br>
+            귀로 듣는 게 아닌 것 같다.<br><br>
+            <span style="color:#4fc3f7;">"많이 내려오셨네요."</span><br><br>
+            친절하다. 걱정하는 목소리다.<br>
+            그게 제일 무섭다.` },
+
+        8: { text:`앞에 하나가 떠 있다.<br><br>
+            사람 크기다. 팔이 있고 다리가 있다.<br>
+            다만 관절이 하나씩 더 있다. 접히는 방향이 자유롭다.<br><br>
+            얼굴은 사람이다. 정말로 사람이다.<br>
+            표정도 있다. 미안해하는 표정이다.<br><br>
+            <span style="color:#4fc3f7;">"여기까지 오시면 힘드실 텐데."</span><br><br>
+            길을 비켜 준다. 지나가라는 뜻이다.` },
+
+        9: { text:`손등을 본다.<br><br>
+            아까부터 자꾸 보게 된다. 확인하려고.<br>
+            손등이다. 아직 손등이다.<br><br>
+            다만 손가락 사이가 조금 얇아졌다.<br>
+            원래 이랬던가.<br><br>
+            옆 사람 손을 본다. 같은 상태다.<br>
+            서로 말하지 않기로 했다.` },
+
+        10: { img:'step3', text:`불빛이 많아졌다.<br><br>
+            수십 개, 수백 개. 전부 일정한 간격으로 떠 있다.<br>
+            가까이 가 보니 각각에 하나씩 매달려 있다.<br><br>
+            등불을 단 것들이다. 그런데 등불이 몸에서 난 게 아니라 손에 들려 있다.<br>
+            손으로 들고 있다.<br><br>
+            전부 같은 쪽을 밝히고 있다. 아래쪽이다.<br>
+            일하는 중인 것 같다.` },
+
+        11: { text:`하나가 다가온다.<br><br>
+            등불을 들어 이쪽을 비춘다. 눈이 부시다.<br>
+            한참 본다. 확인하는 눈빛이다.<br><br>
+            <span style="color:#4fc3f7;">"아직이시네요."</span><br><br>
+            아직 뭐냐고 묻고 싶은데 입이 잘 안 벌어진다.<br>
+            물이 들어올까 봐 참는 습관이 생겼다.<br><br>
+            그것은 기다려 준다. 서두르지 않는다.<br>
+            시간은 많다는 자세다.` },
+
+        12: { text:`바닥이 보인다.<br><br>
+            진흙이다. 발이 닿자 푹 들어간다.<br>
+            발자국이 남는다. 그리고 천천히 메워진다.<br><br>
+            주변에 발자국이 많다. 전부 한 방향이다.<br>
+            내려온 발자국만 있고 올라간 발자국은 없다.<br><br>
+            당연하다. 올라갈 때는 걷지 않으니까.<br>
+            그렇게 생각하고 나서, 그 생각이 이상하다는 걸 알았다.` },
+
+        13: { text:`건물이 있다.<br><br>
+            물속에 건물이 있다. 우리 회사 건물과 구조가 같다.<br>
+            창문 위치까지 같다.<br><br>
+            안에 불이 켜져 있다. 사람 그림자가 움직인다.<br>
+            출근한 사람들처럼 바쁘다.<br><br>
+            유리에 얼굴을 대 본다.<br>
+            안쪽에서도 누가 얼굴을 댄다. 같은 자리에.<br><br>
+            거울이 아니다. 얼굴이 다르다.` },
+
+        14: { text:`안으로 들어간다.<br><br>
+            복도가 익숙하다. 걸음이 저절로 간다.<br>
+            자기 자리를 찾아가는 몸이다.<br><br>
+            책상이 있다. 명패가 놓여 있다.<br>
+            읽는다.<br><br>
+            <span style="color:#4fc3f7;">내 이름이다.</span><br><br>
+            의자가 조금 빠져 있다. 방금 누가 일어난 것처럼.` },
+
+        15: { img:'step4', text:`가장 아래다.<br><br>
+            방이 하나 있고, 가운데에 하나가 앉아 있다.<br>
+            완전히 사람이다. 어디를 봐도 사람이다.<br><br>
+            앉은 자세도, 손을 모은 방식도, 숨 쉬는 박자도.<br>
+            흉내가 아니라 그냥 사람이다.<br><br>
+            그것이 고개를 든다.<br><br>
+            <span style="color:#4fc3f7;">"오래 준비했습니다."</span><br><br>
+            무엇을 준비했는지는 말하지 않는다.` },
+
+        16: { text:`돌아가야 한다.<br><br>
+            올라가는 길을 아는 것은 저것뿐이다.<br>
+            물어봐야 한다. 그러려면 대화를 해야 한다.<br><br>
+            대화를 하면 그만큼 닮아진다.<br>
+            여기까지 오면서 배운 것이 그거였다.<br><br>
+            아무도 먼저 입을 열지 않는다.<br>
+            그것은 기다린다. 얼마든지 기다릴 수 있는 자세로.` }
+    };
+
+    const A667_STEPS = {
+        0:  { type:'intro' },
+        1:  { type:'narr', n:1 },
+        2:  { type:'gimmick', n:1 },
+        3:  { type:'narr', n:2 },
+        4:  { type:'check' },
+        5:  { type:'narr', n:3 },
+        6:  { type:'gimmick', n:2 },
+        7:  { type:'narr', n:4 },
+        8:  { type:'split', n:1 },
+        9:  { type:'narr', n:5 },
+        10: { type:'gimmick', n:3 },
+        11: { type:'narr', n:6 },
+        12: { type:'check' },
+        13: { type:'rejoin', n:1 },
+        14: { type:'narr', n:7 },
+        15: { type:'gimmick', n:4 },
+        16: { type:'narr', n:8 },
+        17: { type:'narr', n:9 },
+        18: { type:'check' },
+        19: { type:'narr', n:10 },
+        20: { type:'gimmick', n:5 },
+        21: { type:'narr', n:11 },
+        22: { type:'split', n:2 },
+        23: { type:'narr', n:12 },
+        24: { type:'rejoin', n:2 },
+        25: { type:'narr', n:13 },
+        26: { type:'gimmick', n:6 },
+        27: { type:'narr', n:14 },
+        28: { type:'check' },
+        29: { type:'narr', n:15 },
+        30: { type:'narr', n:16 },
+        31: { type:'gimmick', n:7 },
+        32: { type:'gimmick', n:8 },
+        99: { type:'result' }
+    };
+
+    function renderStepA667() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        if (darkRun.rejoined) { renderRejoinScene(); return; }
+        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); }
+        saveDarkRunState();
+
+        if (darkRun.humanity == null) darkRun.humanity = 100;
+        if (darkRun.depth == null) darkRun.depth = 0;
+
+        const def = A667_STEPS[darkRun.step];
+        if (!def) { renderDarkResult(); return; }
+
+        if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                deepBarHtml() +
+                `<div style="background:rgba(79,195,247,0.06); border:1px solid #1a4a6a; border-radius:6px; padding:13px; margin-bottom:13px; font-size:11px; color:#ccc; line-height:1.8;">
+                    <div style="font-size:12px; color:#4fc3f7; font-weight:bold; margin-bottom:8px;">◈ 주의</div>
+                    깊이 내려갈수록 <b style="color:#ff9800;">인간성</b>이 줄어듭니다.<br>
+                    말을 섞을수록, 오래 머무를수록 줄어듭니다.<br>
+                    0이 되면 돌아올 수 없습니다.<br><br>
+                    <span style="font-size:10px; color:#888;">중간중간 스스로를 확인하십시오. 그게 유일한 회복 수단입니다.</span>
+                 </div>` +
+                darkChoiceBtn("내려간다.", "partyAdvance(1)"), "intro");
+            renderDeepBar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'narr') {
+            addDepth(3);
+            const d = A667_NARR[def.n];
+            body.innerHTML = darkBox("—", distort(d.text),
+                deepBarHtml() + darkChoiceBtn("계속 내려간다.", `partyAdvance(${darkRun.step + 1})`),
+                d.img);
+            renderDeepBar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'check')  { renderSelfCheck(darkRun.step + 1); return; }
+        if (def.type === 'split')  { renderA667Split(def.n); return; }
+        if (def.type === 'rejoin') { renderA667Rejoin(def.n); return; }
+        if (def.type === 'result') { renderDarkResult(); return; }
+
+        const fns = { 1:a667G1, 2:a667G2, 3:a667G3, 4:a667G4, 5:a667G5, 6:a667G6, 7:a667G7, 8:a667G8 };
+        if (fns[def.n]) fns[def.n]();
+    }
+
+        // --- 기믹 1: 첫 무리 ---
+    function a667G1() {
+        addDepth(5);
+        renderChoiceStep("기믹 1 — 무리",
+            distort(`은색 무리가 앞을 막는다.<br><br>
+                지나가려면 헤치고 가야 한다.<br>
+                전부 고개를 돌려 이쪽을 보고 있다. 몸은 그대로인 채로.`),
+            maybeShuffle([
+                { id:'slow',  label:'① 천천히 헤치고 간다.',      fn:'a667G1R', arg:'slow' },
+                { id:'still', label:'② 멈춰서 지나가길 기다린다.', fn:'a667G1R', arg:'still' },
+                { id:'push',  label:'③ 밀치고 지나간다.',         fn:'a667G1R', arg:'push' },
+                { id:'look',  label:'④ 마주 본다.',               fn:'a667G1R', arg:'look' }
+            ]), "step1");
+    }
+
+    function a667G1R(pick) {
+        let txt, hum = 0;
+        if (pick === 'slow') {
+            txt = `천천히 손으로 물을 가른다.<br><br>무리가 갈라진다. 닿지 않게 비켜 준다.<br>배려받았다는 느낌이 든다. 물고기한테.`;
+            hum = -2; darkRun.success++;
+        } else if (pick === 'still') {
+            txt = `멈춘다. 무리가 지나간다.<br><br>오래 걸린다. 그동안 전부 이쪽을 본다.<br>다 지나가고 나서도 한참 움직일 수가 없었다.`;
+            hum = 0; darkRun.success++;
+        } else if (pick === 'push') {
+            txt = `밀치고 간다.<br><br>손에 닿는다. 비늘이 아니라 피부 같다. 미지근하다.<br>밀린 것들이 소리를 낸다. 아픈 소리가 아니라 놀란 소리다.`;
+            hum = -6; darkRun.fail++;
+        } else {
+            txt = `마주 본다.<br><br>수십 개의 눈이 동시에 이쪽을 본다.<br>눈동자에 초점이 있다. 물고기 눈에는 초점이 없어야 하는데.<br><br>먼저 시선을 피한 건 이쪽이었다.`;
+            hum = -4; darkRun.success++;
+        }
+        addHumanity(hum, `기믹 1 ${pick}`);
+        renderResultStep("기믹 1 — 결과", distort(txt), "내려간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 2: 크기 ---
+    function a667G2() {
+        addDepth(6);
+        renderChoiceStep("기믹 2 — 크기",
+            distort(`위쪽이 어두워진다.<br><br>
+                구름이 낀 것 같은데, 물속에는 구름이 없다.<br>
+                무언가 지나가고 있다. 아직 끝나지 않았다.<br><br>
+                한참 지나간다. 계속 지나간다.`),
+            maybeShuffle([
+                { id:'down',  label:'① 바닥에 붙어 숨는다.',    fn:'a667G2R', arg:'down' },
+                { id:'freeze',label:'② 움직이지 않는다.',       fn:'a667G2R', arg:'freeze' },
+                { id:'watch', label:'③ 끝까지 올려다본다.',     fn:'a667G2R', arg:'watch' },
+                { id:'swim',  label:'④ 반대쪽으로 헤엄친다.',   fn:'a667G2R', arg:'swim' }
+            ]), null);
+    }
+
+    function a667G2R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = { down: 9, freeze: 10, watch: 16, swim: 13 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt, hum = 0, died = false;
+        if (pick === 'watch') {
+            if (ok) {
+                txt = `끝까지 올려다본다.<br><br>끝이 없다. 시야 전체가 그것이다.<br>눈이 있었다. 하나. 이쪽을 보고 있었다.<br><br>본 것을 후회한다. 다만 본 것으로 하나 알게 됐다.<br>저것은 관심이 없다. 그게 유일한 다행이었다.`;
+                hum = -12; darkRun.success++;
+                darkRun.modifier = (darkRun.modifier || 0) + 2;
+            } else {
+                died = true;
+                txt = `끝까지 올려다본다.<br><br>끝이 없다.<br>보고 있으면 눈이 그것을 정리하지 못한다.<br><br>정리하려고 애쓰다가, 무언가 다른 것이 정리를 대신해 준다.<br>그다음은 편했다.`;
+            }
+        } else if (ok) {
+            txt = pick === 'down' ? `바닥에 붙는다. 진흙이 얼굴까지 덮는다.<br><br>위로 지나가는 그림자가 한참 이어진다.<br>숨을 참았다. 참을 필요가 없었는데도.`
+                : pick === 'freeze' ? `움직이지 않는다.<br><br>물속에서 완전히 멈추는 건 어렵다. 그래도 멈췄다.<br>지나갔다. 알아채지 못한 것 같다.`
+                : `반대쪽으로 헤엄친다.<br><br>한참 헤엄쳤는데 그림자가 여전히 위에 있다.<br>속도가 문제가 아니라 크기가 문제였다.<br><br>결국 멈췄고, 그다음에 지나갔다.`;
+            hum = -3; darkRun.success++;
+        } else {
+            txt = `늦었다.<br><br>그림자가 이쪽을 지날 때 물살에 휩쓸린다.<br>한참 굴렀다. 방향을 완전히 잃었다.<br><br>정신을 차리니 아까보다 훨씬 아래다.`;
+            hum = -8; darkRun.fail++;
+            addDepth(12);
+        }
+
+        if (died) { darkDeath(txt); return; }
+        addHumanity(hum, `기믹 2 ${pick}`);
+        darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${distort(txt)}`,
+            deepBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 3: 첫 대화 ---
+    function a667G3() {
+        addDepth(5);
+        renderChoiceStep("기믹 3 — 첫 말",
+            distort(`목소리가 묻는다.<br><br>
+                <span style="color:#4fc3f7;">"많이 내려오셨네요. 힘드시죠?"</span><br><br>
+                친절하다. 정말로 걱정하는 목소리다.<br>
+                대답하면 뭔가 시작될 것 같고, 안 하면 실례인 것 같다.`),
+            maybeShuffle([
+                { id:'no',    label:'① 대답하지 않는다.',          fn:'a667G3R', arg:'no' },
+                { id:'yes',   label:'② "네"라고 답한다.',          fn:'a667G3R', arg:'yes' },
+                { id:'ask',   label:'③ 누구냐고 되묻는다.',        fn:'a667G3R', arg:'ask' },
+                { id:'thank', label:'④ 고맙다고 한다.',            fn:'a667G3R', arg:'thank' }
+            ]), null);
+    }
+
+    function a667G3R(pick) {
+        let txt, hum = 0;
+        if (pick === 'no') {
+            txt = `대답하지 않는다.<br><br>목소리가 잠깐 멎었다가 다시 말한다.<br><span style="color:#4fc3f7;">"괜찮습니다. 아직 익숙하지 않으실 테니까요."</span><br><br>기다려 준다. 서두르지 않는다.`;
+            hum = +2; darkRun.success++;
+        } else if (pick === 'yes') {
+            txt = `"네."<br><br>말이 입 밖으로 나오는데 물이 들어오지 않는다.<br>그 사실을 깨닫고 나서 목이 서늘해졌다.<br><br><span style="color:#4fc3f7;">"그러실 겁니다. 조금만 더 가시면 편해져요."</span>`;
+            hum = -8; darkRun.fail++;
+        } else if (pick === 'ask') {
+            txt = `누구냐고 묻는다.<br><br><span style="color:#4fc3f7;">"저도 처음엔 여쭤봤어요."</span><br><br>대답이 아니다. 그런데 대답처럼 들린다.<br>그게 더 신경 쓰인다.`;
+            hum = -5; darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+        } else {
+            txt = `고맙다고 한다.<br><br>목소리가 기뻐한다. 진심으로 기뻐한다.<br><span style="color:#4fc3f7;">"별말씀을요. 곧 같이 일하게 될 텐데요."</span><br><br>같이라는 말이 오래 남는다.`;
+            hum = -10; darkRun.fail++;
+        }
+        addHumanity(hum, `기믹 3 ${pick}`);
+        renderResultStep("기믹 3 — 결과", distort(txt), "내려간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 4: 작업복 ---
+    function a667G4() {
+        addDepth(6);
+        renderChoiceStep("기믹 4 — 작업복",
+            distort(`걸려 있던 작업복을 다시 본다.<br><br>
+                사번이 적혀 있다. 아는 번호는 아니다. 그런데 형식은 같다.<br>
+                주머니가 불룩하다. 뭔가 들어 있다.`),
+            maybeShuffle([
+                { id:'pocket', label:'① 주머니를 뒤진다.',      fn:'a667G4R', arg:'pocket' },
+                { id:'wear',   label:'② 입어 본다.',            fn:'a667G4R', arg:'wear' },
+                { id:'take',   label:'③ 챙겨서 간다.',          fn:'a667G4R', arg:'take' },
+                { id:'leave',  label:'④ 그대로 둔다.',          fn:'a667G4R', arg:'leave' }
+            ]), null);
+    }
+
+    function a667G4R(pick) {
+        let txt, hum = 0;
+        if (pick === 'pocket') {
+            txt = `주머니를 뒤진다.<br><br>사원증이 나온다. 사진이 있다.<br>사람 얼굴이다. 웃고 있다.<br><br>뒷면에 손글씨가 있다.<br><span style="color:#4fc3f7;">"내려가면 안 됨"</span><br><br>글씨가 흔들린다. 급하게 쓴 것 같다.`;
+            hum = +5; darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 2;
+        } else if (pick === 'wear') {
+            txt = `입어 본다. 딱 맞는다.<br><br>어깨선도, 소매 길이도. 재단한 것처럼 맞는다.<br>내 치수를 아는 사람이 만든 옷 같다.<br><br>벗으려는데 잘 안 벗겨진다. 겨우 벗었다.`;
+            hum = -12; darkRun.fail++;
+        } else if (pick === 'take') {
+            txt = `접어서 챙긴다.<br><br>무겁다. 물을 먹어서가 아니라 원래 무겁다.<br>들고 가는 동안 계속 어깨가 눌린다.<br><br>나중에 꺼내 보면 알게 될 것 같다.`;
+            hum = -3; darkRun.success++;
+        } else {
+            txt = `그대로 둔다.<br><br>지나가면서 한 번 더 본다.<br>바람에 흔들리듯 옷자락이 움직인다. 물살은 없는데.<br><br>손을 흔드는 것처럼 보였다.`;
+            hum = 0; darkRun.success++;
+        }
+        addHumanity(hum, `기믹 4 ${pick}`);
+        renderResultStep("기믹 4 — 결과", distort(txt), "계속 간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+        // --- 기믹 5: 등불 ---
+    function a667G5() {
+        addDepth(8);
+        renderChoiceStep("기믹 5 — 등불",
+            distort(`등불을 든 것들 사이를 지나야 한다.<br><br>
+                전부 아래를 비추고 있다. 일하는 중이다.<br>
+                방해하면 안 될 것 같은 분위기다.<br><br>
+                하나가 등불을 내민다. 들어 보라는 뜻이다.`),
+            maybeShuffle([
+                { id:'refuse', label:'① 받지 않는다.',            fn:'a667G5R', arg:'refuse' },
+                { id:'hold',   label:'② 받아서 든다.',            fn:'a667G5R', arg:'hold' },
+                { id:'help',   label:'③ 무엇을 찾냐고 묻는다.',   fn:'a667G5R', arg:'help' },
+                { id:'douse',  label:'④ 등불을 꺼 버린다.',       fn:'a667G5R', arg:'douse' }
+            ]), "step3");
+    }
+
+    function a667G5R(pick) {
+        let txt, hum = 0;
+        if (pick === 'refuse') {
+            txt = `고개를 젓는다.<br><br>그것이 등불을 거둔다. 실망한 기색은 없다.<br>다만 다음에 또 권할 자세다.<br><br>지나가는 동안 전부 하던 일을 멈추고 지켜봤다.`;
+            hum = +3; darkRun.success++;
+        } else if (pick === 'hold') {
+            txt = `받아서 든다. 가볍다.<br><br>손에 들자 자연스럽게 아래를 비추게 된다.<br>팔이 알아서 움직였다.<br><br>정신을 차리고 내려놓는다.<br>옆에 있던 것이 고개를 끄덕인다. 잘했다는 뜻 같다.`;
+            hum = -14; darkRun.fail++;
+        } else if (pick === 'help') {
+            txt = `무엇을 찾느냐고 묻는다.<br><br><span style="color:#4fc3f7;">"떨어진 걸 찾습니다. 가끔 위에서 떨어져요."</span><br><br>무엇이 떨어지냐고는 묻지 않았다.<br>이미 알 것 같아서.`;
+            hum = -6; darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+        } else {
+            txt = `등불을 꺼 버린다.<br><br>주변이 조용해진다. 전부 동시에 멈춘다.<br>어둠 속에서 수백 개의 얼굴이 이쪽을 향한다.<br><br>한참 뒤에 등불이 다시 켜진다. 아무 일 없었다는 듯이.<br>다만 하나가 더 늘어 있다.`;
+            hum = -8; darkRun.fail++;
+            darkRun.modifier = (darkRun.modifier || 0) - 2;
+        }
+        addHumanity(hum, `기믹 5 ${pick}`);
+        renderResultStep("기믹 5 — 결과", distort(txt), "지나간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 6: 건물 ---
+    function a667G6() {
+        addDepth(7);
+        renderChoiceStep("기믹 6 — 창문",
+            distort(`유리 안쪽에서 누가 얼굴을 대고 있다.<br><br>
+                같은 자리, 같은 높이. 다만 얼굴이 다르다.<br>
+                입을 움직인다. 뭔가 말하고 있다.<br><br>
+                유리 너머라 소리는 안 들린다. 읽어야 한다.`),
+            maybeShuffle([
+                { id:'read',   label:'① 입모양을 읽는다.',        fn:'a667G6R', arg:'read' },
+                { id:'back',   label:'② 물러난다.',               fn:'a667G6R', arg:'back' },
+                { id:'knock',  label:'③ 유리를 두드린다.',        fn:'a667G6R', arg:'knock' },
+                { id:'mimic',  label:'④ 같은 입모양을 따라한다.', fn:'a667G6R', arg:'mimic' }
+            ]), null);
+    }
+
+    function a667G6R(pick) {
+        let txt, hum = 0;
+        if (pick === 'read') {
+            txt = `입모양을 읽는다.<br><br>같은 말을 반복하고 있다. 세 음절.<br><span style="color:#4fc3f7;">"나 가 라"</span><br><br>읽고 나자 그쪽이 고개를 끄덕인다.<br>전해졌다는 걸 안 것이다.`;
+            hum = +6; darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 2;
+        } else if (pick === 'back') {
+            txt = `물러난다.<br><br>유리 안쪽 얼굴이 따라서 물러난다. 같은 속도로.<br>거리가 유지된다.<br><br>돌아설 때까지 계속 그 거리였다.`;
+            hum = 0; darkRun.success++;
+        } else if (pick === 'knock') {
+            txt = `유리를 두드린다.<br><br>안쪽에서도 두드린다. 같은 자리, 같은 박자.<br>조금 더 세게 두드린다. 저쪽도 세게 두드린다.<br><br>유리에 금이 간다. 어느 쪽에서 간 건지 모르겠다.`;
+            hum = -9; darkRun.fail++;
+        } else {
+            txt = `같은 입모양을 따라한다.<br><br>세 음절. 발음해 보니 아는 말이다.<br>말하고 나서야 무슨 말인지 알았다.<br><br>안쪽 얼굴이 웃는다.<br>이제 둘 다 같은 말을 했다.`;
+            hum = -15; darkRun.fail++;
+        }
+        addHumanity(hum, `기믹 6 ${pick}`);
+        renderResultStep("기믹 6 — 결과", distort(txt), "안으로 간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 7: 대화 ---
+    function a667G7() {
+        addDepth(5);
+        const h = getHumanity();
+        renderChoiceStep("기믹 7 — 묻기",
+            distort(`올라가는 길을 아는 것은 저것뿐이다.<br><br>
+                물어봐야 한다. 대화를 하면 그만큼 닮아진다.<br>
+                그래도 물어야 한다.<br><br>
+                <span style="color:#888; font-size:11px;">현재 인간성 ${h}. 대화마다 줄어듭니다.</span>`),
+            maybeShuffle([
+                { id:'direct', label:'① 올라가는 길을 묻는다.',          fn:'a667G7R', arg:'direct' },
+                { id:'why',    label:'② 왜 인간이 되려 하냐고 묻는다.',  fn:'a667G7R', arg:'why' },
+                { id:'name',   label:'③ 이름을 묻는다.',                 fn:'a667G7R', arg:'name' },
+                { id:'silent', label:'④ 아무것도 묻지 않는다.',          fn:'a667G7R', arg:'silent' }
+            ]), "step4");
+    }
+
+    function a667G7R(pick) {
+        let txt, hum = 0;
+        if (pick === 'direct') {
+            txt = `올라가는 길을 묻는다.<br><br><span style="color:#4fc3f7;">"위로 가시면 됩니다. 계속 위로."</span><br><br>그게 다냐고 묻자 고개를 끄덕인다.<br><span style="color:#4fc3f7;">"어려운 건 방향이 아니라 이유예요.<br>올라갈 이유가 남아 있으면 올라가집니다."</span>`;
+            hum = -8; darkRun.success++;
+            darkRun.a667Route = true;
+        } else if (pick === 'why') {
+            txt = `왜 인간이 되려 하느냐고 묻는다.<br><br>그것이 처음으로 표정을 바꾼다. 곤란해하는 표정이다.<br><br><span style="color:#4fc3f7;">"되려던 게 아니에요.<br>오래 보다 보면 닮아지는 거죠. 그뿐입니다."</span><br><br>오래 봤다는 말이 걸린다.<br>누가 누구를 봤다는 건지.`;
+            hum = -12; darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 3;
+            darkRun.a667Truth = true;
+        } else if (pick === 'name') {
+            txt = `이름을 묻는다.<br><br>그것이 이름을 말한다.<br>아는 이름이다. 작업복 사번의 주인일 것이다.<br><br><span style="color:#4fc3f7;">"오래 안 썼는데, 아직 기억하고 있었네요."</span><br><br>기뻐한다. 그게 제일 견디기 어려웠다.`;
+            hum = -18; darkRun.success++;
+            darkRun.a667Name = true;
+        } else {
+            txt = `아무것도 묻지 않는다.<br><br>그것이 기다린다. 한참 기다린다.<br>기다리다가 먼저 말한다.<br><br><span style="color:#4fc3f7;">"안 물어보시는군요. 잘하셨어요."</span><br><br>칭찬이 아니었다. 아쉬워하는 말투였다.`;
+            hum = +5; darkRun.success++;
+        }
+        addHumanity(hum, `기믹 7 ${pick}`);
+        renderResultStep("기믹 7 — 결과", distort(txt), "일어선다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 8: 올라가기 ---
+    function a667G8() {
+        const h = getHumanity();
+        const hasRoute = darkRun.a667Route || darkRun.a667Truth;
+        renderChoiceStep("기믹 8 — 위로",
+            distort(`올라가야 한다.<br><br>
+                수면은 보이지 않는다. 방향만 안다.<br>
+                올라가려면 이유가 필요하다고 했다.<br><br>
+                <span style="color:#888; font-size:11px;">인간성 ${h} · ${hasRoute ? '길을 들었다' : '길을 모른다'}</span>`),
+            maybeShuffle([
+                { id:'name',   label:'① 자기 이름을 계속 부르며 올라간다.', fn:'a667G8R', arg:'name' },
+                { id:'air',    label:'② 숨을 참고 올라간다.',               fn:'a667G8R', arg:'air' },
+                { id:'nolook', label:'③ 아래를 보지 않고 올라간다.',        fn:'a667G8R', arg:'nolook' },
+                { id:'stay',   label:'④ 여기 남는다.',                      fn:'a667G8R', arg:'stay' }
+            ]), null);
+    }
+
+    function a667G8R(pick) {
+        if (pick === 'stay') {
+            darkRun.fail += 3;
+            darkDeath(
+                `남기로 한다.<br><br>` +
+                `이유를 설명할 수는 없다. 다만 여기가 편하다.<br>` +
+                `숨 쉬는 게 이제 자연스럽다. 아까부터 그랬다.<br><br>` +
+                `누군가 등불을 건넨다. 이번에는 받는다.<br>` +
+                `아래를 비춘다. 팔이 알아서 움직인다.<br><br>` +
+                `<span style="color:#4fc3f7;">"잘 오셨습니다."</span>`
+            );
+            return;
+        }
+
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('sense') + Math.floor(getHumanity() / 12);
+        const hasRoute = darkRun.a667Route || darkRun.a667Truth;
+        let DC = { name: 11, air: 14, nolook: 12 }[pick];
+        if (!hasRoute) DC += 4;
+        DC -= gearValue(currentUser, 'break');
+
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+        let txt;
+
+        if (ok) {
+            darkRun.success += 2;
+            txt = pick === 'name' ? `이름을 부르며 올라간다.<br><br>내 이름이다. 소리 내어 부르면 몸이 그쪽으로 기운다.<br>부르는 동안은 잊지 않는다.<br><br>물이 옅어진다. 위가 밝아진다.`
+                : pick === 'air' ? `숨을 참는다.<br><br>참을 필요가 없는데 참는다. 그게 인간이 하는 짓이니까.<br>폐가 아프다. 아픈 게 반갑다.<br><br>터지기 직전에 수면이 보였다.`
+                : `아래를 보지 않는다.<br><br>불빛들이 따라 올라오는 기척이 난다. 돌아보지 않는다.<br>돌아보면 이유가 하나 생길 것 같아서.<br><br>끝까지 보지 않았다.`;
+        } else if (roll === 1) {
+            darkDeath(
+                `올라간다.<br><br>` +
+                `한참 올라갔는데 아직이다. 더 올라간다.<br>` +
+                `이상하다 싶어 위를 본다.<br><br>` +
+                `불빛이 있다. 줄지어 켜진 것들이.<br>` +
+                `내려올 때 봤던 것과 같다.<br><br>` +
+                `방향을 잃은 게 아니었다. 아래가 두 개였다.`
+            );
+            return;
+        } else {
+            darkRun.fail++;
+            darkRun.failedRun = true;
+            addHumanity(-15, '귀환 실패');
+            txt = `올라간다. 겨우 올라간다.<br><br>수면을 뚫었을 때 이미 지쳐 있었다.<br>뭔가를 두고 온 것 같은데 뭔지 모르겠다.<br><br>확인하려고 아래를 봤다. 아무것도 없었다.<br>그게 더 허전했다.`;
+        }
+
+        darkRun.log.push(`[기믹 8] ${pick} d20 ${roll} vs DC${DC}`);
+        darkBodyEl().innerHTML = darkBox("기믹 8 — 귀환",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            darkChoiceBtn("수면으로.", "darkRun.step=99; renderDarkStep();"));
+        mountDarkChat('normal');
+    }
+
+        function renderA667Split(n) {
+        const texts = {
+            1: `조류가 온다.<br><br>갑자기 물살이 바뀐다. 손을 뻗어도 잡히지 않는다.<br>일행이 각자 다른 방향으로 밀려난다.`,
+            2: `바닥이 갈라진다.<br><br>진흙이 꺼지면서 아래로 빨려 들어간다.<br>어디로 떨어지는지는 알 수 없다.`
+        };
+        darkBodyEl().innerHTML = darkBox(`갈림 ${n}`, distort(texts[n]),
+            deepBarHtml() +
+            darkChoiceBtn("① 흐름에 맡긴다.", `a667SplitPick(${n},'flow')`) +
+            darkChoiceBtn("② 거슬러 버틴다.", `a667SplitPick(${n},'resist')`) +
+            darkChoiceBtn("③ 아무나 붙잡는다.", `a667SplitPick(${n},'grab')`));
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
+
+    function a667SplitPick(n, v) {
+        darkRun.solo = true;
+        darkRun.splitPick = v;
+        if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({ name: currentUser.name, at: Date.now() });
+        if (v === 'resist') { addDepth(4); addHumanity(+3, '버팀'); }
+        else if (v === 'grab') { addHumanity(-4, '붙잡음'); }
+        else { addDepth(10); }
+        sendPartyChat(`${currentUser.name} 사원이 휩쓸렸습니다.`, true);
+
+        darkBodyEl().innerHTML = darkBox(`갈림 ${n}`,
+            distort(`휩쓸린다.<br><br>일행의 모습이 물에 지워진다.<br>혼자다. 물속에서 혼자는 소리도 없다.`),
+            deepBarHtml() + darkChoiceBtn("가라앉는다.", `partyAdvance(${darkRun.step + 1})`));
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
+
+    function renderA667Rejoin(n) {
+        darkBodyEl().innerHTML = darkBox(`합류 ${n}차`,
+            distort(`어디선가 기척이 난다.<br><br>사람인지 아닌지 알 수 없다.<br>확인하려면 다가가야 하고, 다가가면 늦을 수도 있다.`),
+            deepBarHtml() +
+            darkChoiceBtn("① 이름을 부른다.", `a667RejoinPick(${n},'call')`) +
+            darkChoiceBtn("② 불빛을 따라간다.", `a667RejoinPick(${n},'light')`) +
+            darkChoiceBtn("③ 기척 쪽으로 간다.", `a667RejoinPick(${n},'feel')`) +
+            darkChoiceBtn("④ 그 자리에 있는다.", `a667RejoinPick(${n},'stay')`));
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
+
+    function a667RejoinPick(n, v) {
+        if (!database) return;
+        database.ref(`darkParties/${darkRun.partyId}/a667rj${n}/${currentUser.code}`).set({ pick: v, name: currentUser.name });
+
+        setTimeout(() => {
+            database.ref(`darkParties/${darkRun.partyId}/a667rj${n}`).once('value').then(snap => {
+                const picks = snap.val() || {};
+                const others = Object.keys(picks).filter(c => c !== currentUser.code).map(c => picks[c].pick);
+                const pair = { call:'stay', stay:'call', light:'light', feel:'feel' };
+                const ok = others.some(o => pair[v] === o);
+
+                let txt, hum = 0;
+                if (ok) {
+                    txt = `만난다.<br><br>얼굴을 확인한다. 두 번 확인한다.<br>사람이다. 아는 얼굴이다.<br><br>손을 잡는다. 손가락 사이가 얇아진 건 서로 말하지 않았다.`;
+                    hum = +6;
+                    darkRun.solo = false;
+                    database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+                    darkRun.modifier = (darkRun.modifier || 0) + 2;
+                } else {
+                    txt = `기척 쪽으로 간다.<br><br>아무도 없다. 대신 등불이 하나 놓여 있다.<br>누가 두고 간 것처럼 얌전히.<br><br>들지 않고 지나간다.`;
+                    hum = -6;
+                    addDepth(6);
+                }
+                addHumanity(hum, `합류 ${n}차`);
+                darkBodyEl().innerHTML = darkBox(`합류 ${n}차 — 결과`, distort(txt),
+                    deepBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+                renderDeepBar();
+                mountDarkChat('normal');
+            });
+        }, 2200);
+
+        darkBodyEl().innerHTML = darkBox(`합류 ${n}차`, distort(`움직인다.`),
+            deepBarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">확인하는 중...</div>`);
+        renderDeepBar();
+    }
+
+        function buildDeepAmbience(ctx, master) {
+        const low = ctx.createOscillator();
+        const lowG = ctx.createGain();
+        low.type = 'sine'; low.frequency.value = 38;
+        lowG.gain.value = 0.12;
+        low.connect(lowG); lowG.connect(master);
+        low.start(); darkAudio.nodes.push(low);
+
+        const noise = ctx.createBufferSource();
+        noise.buffer = makeNoiseBuffer(ctx, 9);
+        noise.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 180;
+        const nG = ctx.createGain(); nG.gain.value = 0.14;
+        noise.connect(lp); lp.connect(nG); nG.connect(master);
+        noise.start(); darkAudio.nodes.push(noise);
+
+        // 압력 — 아주 느린 맥동
+        const pLfo = ctx.createOscillator();
+        const pG = ctx.createGain();
+        pLfo.frequency.value = 0.06;
+        pG.gain.value = 0.05;
+        pLfo.connect(pG); pG.connect(lowG.gain);
+        pLfo.start(); darkAudio.nodes.push(pLfo);
+
+        // 고래 소리 같은 것 — 아주 멀리서
+        function moan() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(70 + Math.random() * 40, t);
+            o.frequency.linearRampToValueAtTime(48 + Math.random() * 20, t + 3.2);
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.045, t + 0.9);
+            g.gain.exponentialRampToValueAtTime(0.0005, t + 3.6);
+            o.connect(g); g.connect(master);
+            o.start(t); o.stop(t + 3.8);
+            darkAudio.timers.push(setTimeout(moan, 18000 + Math.random() * 26000));
+        }
+        darkAudio.timers.push(setTimeout(moan, 8000));
+
+        // 물방울 / 딸깍
+        function click() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const src = ctx.createBufferSource();
+            src.buffer = makeNoiseBuffer(ctx, 0.1);
+            const bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 9;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.03, t);
+            g.gain.exponentialRampToValueAtTime(0.0004, t + 0.09);
+            src.connect(bp); bp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + 0.12);
+            darkAudio.timers.push(setTimeout(click, 4000 + Math.random() * 9000));
+        }
+        darkAudio.timers.push(setTimeout(click, 3000));
+
+        // 말소리 비슷한 것
+        function voice() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            for (let k = 0; k < 4; k++) {
+                const tt = t + k * 0.22;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(190 + Math.random() * 70, tt);
+                const lp2 = ctx.createBiquadFilter();
+                lp2.type = 'lowpass'; lp2.frequency.value = 400;
+                g.gain.setValueAtTime(0, tt);
+                g.gain.linearRampToValueAtTime(0.02, tt + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.0004, tt + 0.2);
+                o.connect(lp2); lp2.connect(g); g.connect(master);
+                o.start(tt); o.stop(tt + 0.24);
+            }
+            darkAudio.timers.push(setTimeout(voice, 22000 + Math.random() * 30000));
+        }
+        darkAudio.timers.push(setTimeout(voice, 14000));
     }
