@@ -7395,14 +7395,13 @@ function getTodayStr() {
         renderAdminRoomList();
         initAdminAccordion();
     }
-        function initAdminAccordion() {
-        document.querySelectorAll('#admin-screen .admin-panel-box').forEach((box, i) => {
+    function initAdminAccordion() {
+        document.querySelectorAll('#admin-screen .admin-panel-box').forEach(box => {
             const h = box.querySelector('h4');
             if (!h || h.dataset.acc) return;
             h.dataset.acc = '1';
             h.onclick = () => box.classList.toggle('collapsed');
-            // 첫 번째만 펼친 상태로 시작
-            if (i > 0) box.classList.add('collapsed');
+            box.classList.add('collapsed');
         });
     }
     function closeAdminScreen() {
@@ -7810,7 +7809,8 @@ function getTodayStr() {
             return;
         }
 
-        box.innerHTML = `<div style="font-size:10px; color:#c9a8ff; font-weight:bold; margin-bottom:6px;">현재 보유자 (${owners.length}명)</div>` +
+              box.innerHTML = `<div style="font-size:10px; color:#c9a8ff; font-weight:bold; margin-bottom:6px;">현재 보유자 (${owners.length}명)</div>
+            <div style="max-height:160px; overflow-y:auto; padding-right:3px;">` +
             owners.map(u => {
                 const g = u.soulGear;
                 const attrs = (g.attrs || []).map(a => GEAR_ATTRS[a] ? GEAR_ATTRS[a].icon + GEAR_ATTRS[a].name : a).join(' · ') || '미지정';
@@ -7821,7 +7821,7 @@ function getTodayStr() {
                         <span style="color:#c9a8ff;">[${g.grade}] ${g.name}</span>
                         <span style="color:#aaa;"> — ${attrs}</span>
                     </div>`;
-            }).join('');
+            }).join('') + `</div>`;
     }
 
         const GEAR_ICON_PRESET = [

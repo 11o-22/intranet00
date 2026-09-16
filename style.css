@@ -637,3 +637,8 @@
             .admin-panel-box h4 { font-size: 12px; margin-bottom: 8px; }
             #admin-screen { padding: 12px 10px 50px 10px; }
         }
+
+                #admin-gear-list,
+        #admin-fox-list,
+        #admin-room-list,
+        #adm-target-list { max-height: 160px; overflow-y: auto; }
