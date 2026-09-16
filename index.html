@@ -7388,6 +7388,17 @@ function getTodayStr() {
         renderAdminGearQuick();
         renderAdminGearList();
         renderAdminRoomList();
+        initAdminAccordion();
+    }
+        function initAdminAccordion() {
+        document.querySelectorAll('#admin-screen .admin-panel-box').forEach((box, i) => {
+            const h = box.querySelector('h4');
+            if (!h || h.dataset.acc) return;
+            h.dataset.acc = '1';
+            h.onclick = () => box.classList.toggle('collapsed');
+            // 첫 번째만 펼친 상태로 시작
+            if (i > 0) box.classList.add('collapsed');
+        });
     }
     function closeAdminScreen() {
         document.getElementById('admin-screen').style.display = 'none';

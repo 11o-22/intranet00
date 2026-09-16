@@ -613,3 +613,27 @@
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
+
+                .admin-panel-box { position: relative; }
+        .admin-panel-box > h4 {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .admin-panel-box > h4::after {
+            content: '▾';
+            font-size: 11px;
+            opacity: 0.6;
+            transition: transform 0.2s;
+        }
+        .admin-panel-box.collapsed > h4::after { transform: rotate(-90deg); }
+        .admin-panel-box.collapsed > *:not(h4) { display: none !important; }
+        #admin-screen { padding-bottom: 40px; }
+        
+                @media (max-width: 480px) {
+            .admin-panel-box { padding: 10px 11px; margin-bottom: 9px; }
+            .admin-panel-box h4 { font-size: 12px; margin-bottom: 8px; }
+            #admin-screen { padding: 12px 10px 50px 10px; }
+        }
