@@ -2675,6 +2675,11 @@ function input119D(n) {
         if (darkRun._stepWatching) return;
         darkRun._stepWatching = true;
 
+        database.ref(`darkParties/${darkRun.partyId}/curStep`).off();
+        database.ref(`darkParties/${darkRun.partyId}/leader`).off();
+        database.ref(`darkParties/${darkRun.partyId}/alive`).off();
+
+
         database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
             const s = snap.val();
             if (s == null || !darkRun) return;
