@@ -6671,11 +6671,14 @@ function getTodayStr() {
     checkP2PExpiration();
     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }
     if (!db.p2pDeals) return;
+
+
     
     let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
     if (dealIndex === -1) return;
     let deal = db.p2pDeals[dealIndex];
     if (deal.status !== 'PENDING') return;
+    deal.status = 'PROCESSING'; 
 
     const senderCode = deal.fromCode;
     
@@ -6748,17 +6751,20 @@ function getTodayStr() {
 
     // ★ Firebase에 나와 상대방(`sender`), 그리고 공용 `p2pDeals`를 동시에 안전하게 업데이트
        if (database) {
-        database.ref('p2pDeals').once('value').then(snap => {
+        const myData = currentUser;
+        const senderData = sender;
+        const dealId = deal.id;
+
+        Promise.all([
+            database.ref('users/' + currentUser.code).set(myData),
+            database.ref('users/' + senderCode).set(senderData)
+        ]).then(() => {
+            return database.ref('p2pDeals').once('value');
+        }).then(snap => {
             const v = snap.val() || [];
             const arr = Array.isArray(v) ? v : Object.values(v);
-            const realIdx = arr.findIndex(d => d && d.id === deal.id);
-
-            let updates = {};
-            updates[`users/${currentUser.code}`] = currentUser;
-            updates[`users/${senderCode}`] = sender;
-            if (realIdx >= 0) updates[`p2pDeals/${realIdx}/status`] = 'COMPLETED';
-
-            return database.ref('/').update(updates);
+            const realIdx = arr.findIndex(d => d && d.id === dealId);
+            if (realIdx >= 0) return database.ref(`p2pDeals/${realIdx}/status`).set('COMPLETED');
         }).then(() => {
             showCustomAlert("거래가 성공적으로 체결되었습니다.");
             updateUI();
