@@ -2620,8 +2620,17 @@ function getTodayStr() {
                 <div style="font-size:10px; color:#999; line-height:1.6;">
                     ${z.brief}<br>
                     난이도 <b>${z.danger}</b> · 생존율 <b>${z.survival}</b> · 정원 <b>${z.min}~${z.max}인</b> · 기본 보상 <b>${z.reward[0]}~${z.reward[1]} P</b>
-                </div>
+                                            <div style="font-size:10px; color:#999; line-height:1.5;">${z.brief}</div>
+                            ${z.warn ? `<div style="display:inline-block; font-size:9px; color:#ff9800; border:1px solid #7a5200; background:rgba(255,152,0,0.08); border-radius:3px; padding:2px 6px; margin-top:5px;">⚠ ${z.warn}</div>` : ''}
+                    </div>
             </div>
+
+                        ${z.warn ? `
+                <div style="background:rgba(255,152,0,0.08); border:1px solid #7a5200; border-radius:6px; padding:12px; margin:12px 0; font-size:11px; color:#ffb74d; line-height:1.8;">
+                    <b>⚠ 사전 안내</b><br>
+                    ${z.warn}<br>
+                    <span style="font-size:10px; color:#aaa;">해당 소재가 부담스러우시면 진입하지 않으셔도 됩니다.</span>
+                </div>` : ''}
 
             <div style="font-size:11px; color:var(--theme-text); font-weight:bold; margin-bottom:7px; border-bottom:1px solid #333; padding-bottom:5px;">
                 참가자 (${members.length} / ${z.max})

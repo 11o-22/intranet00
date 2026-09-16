@@ -42,6 +42,7 @@ const DARK_ZONES = {
                  "Qtrew-C-176": {
             code:"Qtrew-C-176", grade:"C", name:"돌아오지 않는 발소리",
             brief:"(복도 끝에서 무언가 긁는 소리가 난다.)",
+            warn:"트라우마 유발 가능성 주의 — 반려동물 상실",
             danger:"중", survival:"38%", min:1, max:2, reward:[250,500], ready:true,
             voteMode:false, noDeath:true,
             intro:"복도다.<br><br>천장 등이 하나 걸러 하나씩 꺼져 있다. 밝은 자리와 어두운 자리가 번갈아 놓인다.<br>바닥에 뭔가 흩어져 있는데, 어두운 쪽이라 형태가 잡히지 않는다.<br><br>복도 끝에서 소리가 난다.<br>긁는 소리다. 규칙적이지 않고, 지치지도 않는다.<br><br>가까이 가고 싶지 않다.<br>그런데 발이 그쪽으로 향한다.",
@@ -890,16 +891,18 @@ const DARK_ZONES = {
         const def = B330_STEPS[darkRun.step];
         if (!def) { renderDarkResult(); return; }
 
-        if (def.type === 'intro') {
-            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                (darkRun.isLeader || !darkRun.isParty)
-                    ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
-                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
-                         선임의 신호를 기다리는 중...<br>
-                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
-                       </div>`,
+               if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입",
+                `<div style="background:rgba(255,152,0,0.07); border:1px solid #7a5200; border-radius:6px; padding:12px; margin-bottom:14px; font-size:11px; color:#ffb74d; line-height:1.8;">
+                    <b>⚠ 사전 안내</b><br>
+                    이 구역은 반려동물과의 이별을 다룹니다.<br>
+                    <span style="color:#aaa;">지금 돌아가셔도 탐사 횟수는 소모되지 않습니다.</span>
+                 </div>` +
+                DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("복도를 걷는다.", "c176Advance(1)") +
+                `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:11px; font-size:11px;" onclick="c176Withdraw()">돌아간다</button>`,
                 "intro");
-            mountDarkChat('normal');
+            if (darkRun.isParty) mountDarkChat('normal');
             return;
         }
 
@@ -4753,4 +4756,11 @@ function input119D(n) {
                 darkAudio.petLp.frequency.linearRampToValueAtTime(300 + phase * 350, now + 3);
             }
         } catch (e) {}
+    }
+        function c176Withdraw() {
+        if (!darkRun) return;
+        currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
+        addHistoryLog(currentUser, `[탐사 철회] ${darkRun.zone} 진입 전 철회 (횟수 반환)`);
+        saveDB();
+        finishDarkRun();
     }
