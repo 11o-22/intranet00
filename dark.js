@@ -5144,6 +5144,17 @@ function input119D(n) {
         if (!def) { renderDarkResult(); return; }
 
         if (def.type === 'intro') {
+
+             if (!darkRun._a214Briefed) {
+                darkRun._a214Briefed = true;
+                setTimeout(() => showDarkToast(isTraitor() ? '◉ 당신은 신도입니다' : '⚠ 일행 중 하나는 신도입니다'), 600);
+            }
+
+                        if (darkRun.isLeader && !darkRun._a214Notice) {
+                darkRun._a214Notice = true;
+                setTimeout(() => sendPartyChat('이 구역에는 일행 중 한 명이 신도로 섞여 있습니다. 세 번의 지목 기회가 주어집니다.', true), 1000);
+            }
+            
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
                 a214BarHtml() + a214RoleCard() +
                 darkChoiceBtn("내려간다.", "partyAdvance(1)"), "intro");
@@ -5151,6 +5162,7 @@ function input119D(n) {
             mountDarkChat('normal');
             return;
         }
+        
 
         if (def.type === 'narr') {
             const d = A214_NARR[def.n];
@@ -5204,14 +5216,23 @@ function input119D(n) {
                     </div>
                 </div>`;
         }
-        return `
+                return `
             <div style="background:rgba(212,175,55,0.07); border:1px solid #5a4a2a; border-radius:6px; padding:13px; margin-bottom:13px;">
                 <div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:8px;">◈ 임무</div>
                 <div style="font-size:11px; color:#ccc; line-height:1.8;">
                     아래층의 빛을 봉인하거나 파괴해야 합니다.<br>
-                    제한 시간이 지나면 전원 돌아올 수 없습니다.<br><br>
-                    <span style="color:#ff9800;">일행 중 하나는 이미 빛을 보았습니다.</span><br>
-                    <span style="font-size:10px; color:#888;">세 번의 지목 기회가 있습니다.</span>
+                    제한 시간이 지나면 전원 돌아올 수 없습니다.
+                </div>
+            </div>
+            <div style="background:rgba(127,0,0,0.12); border:1px solid #7f0000; border-radius:6px; padding:13px; margin-bottom:13px;">
+                <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:8px;">⚠ 경고</div>
+                <div style="font-size:11px; color:#ccc; line-height:1.8;">
+                    <b style="color:#ff9800;">일행 중 한 명은 이미 빛을 보았습니다.</b><br>
+                    그 사람은 다른 목적을 가지고 들어왔습니다.<br>
+                    누구인지는 본인만 압니다.<br><br>
+                    세 번의 지목 기회가 있습니다.<br>
+                    <span style="color:#f44336;">세 번째에 맞히면 그 자리에서 끝납니다.</span><br>
+                    <span style="font-size:10px; color:#888;">틀리면 무고한 사원이 묶입니다.</span>
                 </div>
             </div>`;
     }
@@ -5590,7 +5611,7 @@ function input119D(n) {
              <div style="width:100%; height:16px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:8px; overflow:hidden; margin-bottom:14px;">
                 <div id="combat-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#7f0000,#f44336); transition:width 0.08s;"></div>
              </div>
-             <button class="game-btn" id="combat-btn" style="width:100%; margin:0; padding:22px; font-size:17px; font-weight:bold; background:linear-gradient(145deg,#7f0000,#4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="combatTap()">
+           <button class="game-btn" id="combat-btn" style="width:100%; margin:0; padding:22px; font-size:17px; font-weight:bold; background:linear-gradient(145deg,#7f0000,#4a0000) !important; border-color:#b71c1c !important; color:#fff !important; touch-action:manipulation; user-select:none;" ontouchstart="event.preventDefault(); combatTap();" onclick="combatTap()">
                 ${cfg.label || '뿌리친다'}
              </button>
              <div id="combat-msg" style="text-align:center; font-size:11px; color:#888; margin-top:10px; min-height:16px;"></div>`);
@@ -5612,8 +5633,13 @@ function input119D(n) {
         }, 1000);
     }
 
+       let _lastTap = 0;
     function combatTap() {
         if (!a214Combat.active) return;
+        const now = Date.now();
+        if (now - _lastTap < 40) return;
+        _lastTap = now;
+
         a214Combat.count++;
         const pct = Math.min(100, (a214Combat.count / a214Combat.need) * 100);
         const bar = document.getElementById('combat-bar');
@@ -5720,7 +5746,7 @@ function input119D(n) {
                 모시러 온 자세다.<br><br>
                 <span style="color:#d4af37;">"안내해 드리겠습니다."</span><br><br>
                 발이 바닥에서 뜬다.`,
-            seconds: 8, need: 18, label: '뿌리친다',
+            sseconds: 10, need: 15, label: '뿌리친다',
             onWin: () => {
                 darkRun.success++;
                 setTimeout(() => a214G3Second(), 500);
@@ -5747,7 +5773,7 @@ function input119D(n) {
                 사람이다. 거꾸로 매달려 있다가 놓은 것이다.<br><br>
                 이번에는 조심스럽지 않다.<br>
                 목을 잡는다.`,
-            seconds: 6, need: 22, label: '떼어낸다',
+            seconds: 8, need: 18, label: '떼어낸다',
             onWin: () => {
                 darkRun.success++;
                 darkRun.modifier = (darkRun.modifier || 0) + 2;
@@ -5993,20 +6019,20 @@ function input119D(n) {
                 일행이 붙잡는다. 여럿이 동시에.<br>
                 밀어내야 한다.`,
             seconds: 7, need: 24, label: '밀어낸다',
-            onWin: () => {
-                darkRun.a214TraitorWin = true;
-                const ms = a214State.missions || [];
-                const done = ms.filter(x => x.done >= x.goal).length;
-                darkRun.success += 3;
-                darkBodyEl().innerHTML = darkBox("저지",
-                    `밀어낸다.<br><br>
-                     봉인이 흐트러진다. 빛이 다시 퍼진다.<br>
-                     일행의 얼굴을 본다. 이해하지 못하는 얼굴이다.<br><br>
-                     설명할 생각은 없다.<br>
-                     저쪽에서 손이 뻗어 온다. 이번에는 잡는다.<br><br>
-                     <span style="color:#d4af37;">"수고하셨습니다."</span><br><br>
-                     ${done >= 3 ? '과업을 전부 마쳤다. 나갈 수 있다.' : '과업이 남았지만, 여기까지다.'}`,
-                    darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+                       onWin: () => {
+                darkRun.success++;
+                darkRun.modifier = (darkRun.modifier || 0) + 2;
+                a214Combat.active = false;
+                clearInterval(a214Combat.timer);
+                const nextStep = darkRun.step + 1;
+                darkBodyEl().innerHTML = darkBox("기믹 3 — 결과",
+                    `떼어낸다.<br><br>
+                     바닥에 떨어진 것이 일어나지 않는다. 꺾인 자세 그대로 이쪽을 본다.<br>
+                     그리고 웃는다.<br><br>
+                     <span style="color:#d4af37;">"좋습니다. 그 힘이 필요합니다."</span><br><br>
+                     칭찬받은 것 같아서 기분이 나쁘다.`,
+                    a214BarHtml() + darkChoiceBtn("달린다.", `darkRun.step=${nextStep}; renderDarkStep(); if(database) database.ref('darkParties/${darkRun.partyId}/curStep').set(${nextStep});`));
+                renderA214Bar();
                 mountDarkChat('normal');
             },
             onLose: () => {

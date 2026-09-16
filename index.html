@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>■■주 ■사 사내 시스템</title>
     
     <!-- ★ 구글 파이어베이스 (Firebase) 라이브러리 연동 -->
@@ -2184,7 +2184,7 @@ function getTodayStr() {
     // 다음 단계로 (방장만 신호, 전원 동기화)
 
     let _advLock = 0;
-    
+
       function partyAdvance(nextStep) {
         if (!darkRun) return;
         const now = Date.now();
@@ -2954,8 +2954,10 @@ function getTodayStr() {
         if (codeEl && darkRun) codeEl.innerText = DARK_ZONES[darkRun.zone].code;
         const muteBtn = document.getElementById('dark-mute-btn');
         if (muteBtn) muteBtn.innerText = darkAudio.muted ? '🔇' : '🔊';
+        
         updateDarkRoleLabel();
     }
+    
 
     function closeDarkOverlay() {
         const ov = document.getElementById('dark-run-overlay');

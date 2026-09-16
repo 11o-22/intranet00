@@ -602,3 +602,13 @@
             0% { background:rgba(212,175,55,0.25); }
             100% { background:transparent; }
         }
+                #combat-btn {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .game-btn, .word-btn, button {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
