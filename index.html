@@ -3003,7 +3003,7 @@ function getTodayStr() {
         renderReactFlash();
     }
 
-        function darkBox(title, text, extra, imgKey) {
+    function darkBox(title, text, extra, imgKey) {
         const z = DARK_ZONES[darkRun.zone];
         let imgHtml = '';
         if (imgKey && z.images && z.images[imgKey]) {
@@ -3016,6 +3016,7 @@ function getTodayStr() {
                 <div style="font-size:10px; color:#666; margin-bottom:8px; letter-spacing:1px;">${title}</div>
                 ${imgHtml}
                 <div style="background:#111; border:1px solid #2a2a2a; border-radius:${imgHtml ? '0 0 6px 6px' : '6px'}; padding:16px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:14px; min-height:90px;">${text}</div>
+                ${qFlagBarHtml()}
                 ${extra}
             </div>`;
     }
@@ -3032,6 +3033,7 @@ function getTodayStr() {
         saveDarkRunState();
         if (darkRun.isParty) watchPartyStep();
 
+        if (darkRun.zone === 'Qtrew-A-214') { renderStepA214(); return; }
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
         if (darkRun.zone === 'Qtrew-C-176') { renderStepC176(); return; }
         if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
@@ -3415,6 +3417,9 @@ function getTodayStr() {
         detachC119Listener();
         detachChatListener();
         clearInterval(c119Timer);
+        detachA214Listener();
+        clearInterval(a214Timer);
+        if (a214Combat.timer) clearInterval(a214Combat.timer);
         darkAmbienceStop();
 
         const pid = darkRun ? darkRun.partyId : null;
@@ -3477,6 +3482,10 @@ function getTodayStr() {
             if (darkRun.critRoller) bonus += 10;
         } else {
             bonus = darkRun.success * 6 - darkRun.fail * 5;
+             if (darkRun.zone === 'Qtrew-A-214') {
+            if (darkRun.a214TraitorWin) bonus += 600;
+            else if (darkRun.a214Confessed) bonus -= 300;
+        }
         }
 
         let total = Math.max(10, base + bonus);
@@ -3566,6 +3575,9 @@ function getTodayStr() {
         darkAmbienceStop();
         detachVoteListener();
         detachC119Listener();
+        detachA214Listener();
+        clearInterval(a214Timer);
+        if (a214Combat.timer) clearInterval(a214Combat.timer);
         clearInterval(c119Timer);
 
         const pid = darkRun ? darkRun.partyId : null;
@@ -5291,11 +5303,10 @@ function getTodayStr() {
             if (database) database.ref('users/' + currentUser.code).set(currentUser);
             else saveDB();
             updateUI();
-            if (darkRun) renderDarkStep();
+            if (darkRun) { renderDarkStep(); showDarkToast('◈ ' + itemName); }
             showCustomAlert(q.msg);
             return;
         }
-
         // 즉발형
         if (cat.effect === 'q_crumb') {
             if (!darkRun) { showCustomAlert('탐사 중에만 쓸 수 있습니다.'); return; }

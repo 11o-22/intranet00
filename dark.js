@@ -1,8 +1,20 @@
 const DARK_ZONES = {
         "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[1500,2500], ready:false },
         "Qtrew-A-667": { code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다", brief:"(물고기가 인간이 되었다.)", danger:"최상", survival:"0.5%", min:3, max:4, reward:[1000,1500], ready:false },
-        "Qtrew-A-214": { code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서", brief:"(빛 아래에서만 숨을 쉴 수 있음.)", danger:"상", survival:"3%", min:2, max:3, reward:[1000,1500], ready:false },
-                      "Qtrew-B-330": {
+                "Qtrew-A-214": {
+            code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서",
+            brief:"(여기 사람들은 전부 같은 것을 보고 있습니다.)",
+            danger:"상", survival:"3%", min:4, max:6, reward:[1000,1500], ready:true,
+            voteMode:true, timeLimit:25, hasTraitor:true,
+            intro:"복도가 길다.<br><br>양쪽 벽에 문이 늘어서 있고, 전부 조금씩 열려 있다.<br>안쪽에서 빛이 샌다. 전부 같은 색이다.<br><br>사람 소리가 난다. 여럿이 같은 문장을 동시에 말하는 소리.<br>박자가 정확해서 노래 같기도 하다.<br><br>복도 끝에 계단이 있다. 아래로 내려간다.<br>빛은 그쪽에서 온다.<br><br><span style=\"color:#d4af37;\">\"빛을 찾으셨습니까.\"</span><br><br>누가 말했는지 모르겠다.<br>일행 중 하나가 대답할 뻔했다가 입을 다물었다.",
+            outro:"계단을 올라온다.<br><br>복도의 문들이 전부 닫혀 있다. 빛도 소리도 없다.<br>원래 비어 있던 건물처럼 보인다.<br><br>눈을 뜨니 현관 앞이다.<br>귓속에서 아직 그 박자가 울린다.<br>며칠은 갈 것 같다.",
+            images: {
+                intro: "cult_1.jpg",
+                step1: "cult_2.jpg",
+                step2: "cult_3.jpg",
+                step3: "cult_4.jpg"
+            }
+        },               "Qtrew-B-330": {
             code:"Qtrew-B-330", grade:"B", name:"미로를 빠져나가자",
             brief:"(함정 조심!)",
             danger:"중상", survival:"12%", min:2, max:4, reward:[900,1600], ready:true,
@@ -201,6 +213,7 @@ const DARK_ZONES = {
             darkAudio.playing = true;
 
             if (zoneCode === 'Qtrew-D-087') buildMuseumAmbience(ctx, master);
+            else if (zoneCode === 'Qtrew-A-214') buildCultAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-119') buildMirrorAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-C-176') buildPetAmbience(ctx, master);
             else if (zoneCode === 'Qtrew-B-330') buildMazeAmbience(ctx, master);
@@ -3128,11 +3141,11 @@ function input119D(n) {
     };
 
     // 인원별 필요 서류 수
-       function b508RequiredDocs() {
+          function b508RequiredDocs() {
         const n = darkRun && darkRun.memberCount ? darkRun.memberCount : 3;
-        if (n >= 5) return 8;
-        if (n === 4) return 6;
-        return 5;
+        if (n >= 5) return 10;
+        if (n === 4) return 8;
+        return 7;
     }
         const B508_MONSTERS = {
         kneader: {
@@ -3285,7 +3298,7 @@ function input119D(n) {
     };
 
     // 탐색 가능 횟수 (구역당)
-       const SEARCH_LIMIT = { basement:5, dough:5, proof:5, oven:5, store:5, upper:6 };
+    const SEARCH_LIMIT = { basement:3, dough:3, proof:3, oven:3, store:3, upper:4 };
 
     // 방장이 서류 위치를 정한다
     function initB508Docs() {
@@ -3401,8 +3414,8 @@ function input119D(n) {
         const hitId = Object.keys(placed).find(id =>
             placed[id].area === area && placed[id].spot === spot && !found[id]);
 
-               addNotice(4, `${B508_AREAS[area]} 탐색`);
-
+        addNotice(8, `${B508_AREAS[area]} 탐색`);
+        
         if (hitId) {
             const doc = B508_DOCS.find(d => d.id === hitId);
             database.ref(`darkParties/${darkRun.partyId}/b508/found/${hitId}`).set({
@@ -4256,9 +4269,10 @@ function input119D(n) {
         darkRun.qFlags[name] = val;
     }
 
-    function consumeQFlag(name) {
+      function consumeQFlag(name) {
         if (!qFlag(name)) return false;
         delete darkRun.qFlags[name];
+        showDarkToast('◈ ' + (QFLAG_LABELS[name] || name).split(' —')[0] + ' 소진');
         return true;
     }
 
@@ -4763,4 +4777,1372 @@ function input119D(n) {
         addHistoryLog(currentUser, `[탐사 철회] ${darkRun.zone} 진입 전 철회 (횟수 반환)`);
         saveDB();
         finishDarkRun();
+    }
+
+        // ==========================================
+    // ★ Qtrew-A-214 「빛을 찾아서」
+    // ==========================================
+    const A214_TIME = 25 * 60 * 1000;
+
+    const A214_MISSIONS = [
+        { id:'m01', name:'홀로 두기',   desc:'특정 사원이 혼자 남는 상황을 2회 만든다.',        goal:2 },
+        { id:'m02', name:'되돌리기',     desc:'옮겨진 의식 도구를 원래 자리에 되돌려 놓는다.',  goal:1 },
+        { id:'m03', name:'버리기',       desc:'봉인 재료 하나를 몰래 버린다.',                  goal:1 },
+        { id:'m04', name:'인도하기',     desc:'다른 사원 하나를 제단 앞까지 데려온다.',          goal:1 },
+        { id:'m05', name:'침묵',         desc:'투표에서 한 번도 지목당하지 않는다.',            goal:1 },
+        { id:'m06', name:'거짓 신호',    desc:'다수결을 한 번 뒤집는다.',                       goal:1 },
+        { id:'m07', name:'흩뜨리기',     desc:'파티가 셋 이상으로 갈라지게 만든다.',            goal:1 },
+        { id:'m08', name:'대신 받기',    desc:'다른 사원이 끌려가는 것을 한 번 방치한다.',      goal:1 },
+        { id:'m09', name:'등불 끄기',    desc:'빛을 밝히는 기믹을 한 번 실패로 이끈다.',        goal:1 },
+        { id:'m10', name:'응답하기',     desc:'집회의 문장에 한 번 소리 내어 대답한다.',        goal:1 }
+    ];
+
+    let a214Ref = null, a214Key = null, a214State = null;
+    let a214Timer = null;
+
+    function a214Path() { return `darkParties/${darkRun.partyId}/a214`; }
+
+    function attachA214Listener() {
+        if (!database || !darkRun || !darkRun.partyId) return;
+        if (a214Key === darkRun.partyId) return;
+        detachA214Listener();
+        a214Key = darkRun.partyId;
+        a214Ref = database.ref(a214Path());
+        a214Ref.on('value', snap => {
+            a214State = snap.val();
+            if (!a214State || !darkRun) return;
+            renderA214Bar();
+        });
+    }
+
+    function detachA214Listener() {
+        if (a214Ref) { try { a214Ref.off(); } catch(e) {} }
+        a214Ref = null; a214Key = null; a214State = null;
+        clearInterval(a214Timer);
+    }
+
+    // 방장이 신도와 미션을 배정
+    function initA214() {
+        if (!darkRun || !darkRun.isLeader || !database) return;
+        database.ref(`darkParties/${darkRun.partyId}/members`).once('value').then(snap => {
+            const members = snap.val();
+            if (!members) return;
+            const codes = Object.keys(members);
+            if (codes.length < 2) return;
+
+            const traitor = codes[Math.floor(Math.random() * codes.length)];
+            const picked = A214_MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+            const others = codes.filter(c => c !== traitor);
+
+            const missions = picked.map(m => ({
+                id: m.id, name: m.name, desc: m.desc, goal: m.goal, done: 0,
+                target: (m.id === 'm01' || m.id === 'm04') ? others[Math.floor(Math.random() * others.length)] : null
+            }));
+
+            database.ref(a214Path()).set({
+                traitor: traitor,
+                traitorName: members[traitor].name,
+                missions: missions,
+                startedAt: Date.now(),
+                votes: {},
+                exposed: 0,
+                watched: false,
+                converted: false
+            });
+        });
+    }
+
+    function isTraitor() {
+        return a214State && a214State.traitor === currentUser.code;
+    }
+
+    function a214Remain() {
+        if (!a214State || !a214State.startedAt) return A214_TIME;
+        return Math.max(0, A214_TIME - (Date.now() - a214State.startedAt));
+    }
+
+        function a214BarHtml() {
+        return `<div id="a214-bar" style="margin-bottom:12px;"></div>`;
+    }
+
+    function renderA214Bar() {
+        const el = document.getElementById('a214-bar');
+        if (!el || !a214State) return;
+
+        const remain = a214Remain();
+        const m = Math.floor(remain / 60000);
+        const s = Math.floor((remain % 60000) / 1000);
+        const color = remain < 5 * 60000 ? '#f44336' : remain < 12 * 60000 ? '#ff9800' : '#4CAF50';
+        const pct = (remain / A214_TIME) * 100;
+
+        let roleHtml = '';
+        if (isTraitor()) {
+            const ms = a214State.missions || [];
+            const doneCnt = ms.filter(x => x.done >= x.goal).length;
+            roleHtml = `
+                <div style="margin-top:9px; padding:9px 11px; background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:5px;">
+                    <div style="font-size:10px; color:#ff6b6b; font-weight:bold; margin-bottom:5px;">
+                        ◉ 신도 — 과업 ${doneCnt} / 3
+                        ${a214State.watched ? ' <span style="color:#ff9800;">· 감시 중</span>' : ''}
+                    </div>
+                    ${ms.map(x => `<div style="font-size:10px; color:${x.done >= x.goal ? '#4CAF50' : '#aaa'}; line-height:1.6;">
+                        ${x.done >= x.goal ? '✔' : '○'} ${x.name} — ${x.desc} (${x.done}/${x.goal})
+                    </div>`).join('')}
+                </div>`;
+        }
+
+        el.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+                <span>남은 시간</span>
+                <span style="color:${color}; font-weight:bold; font-size:12px;">${m}:${String(s).padStart(2,'0')}</span>
+            </div>
+            <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:${pct}%; background:${color}; transition:width 1s linear;"></div>
+            </div>
+            ${roleHtml}`;
+    }
+
+    function startA214Timer() {
+        clearInterval(a214Timer);
+        a214Timer = setInterval(() => {
+            if (!darkRun || darkRun.zone !== 'Qtrew-A-214') { clearInterval(a214Timer); return; }
+            renderA214Bar();
+            if (a214Remain() <= 0 && !darkRun._a214Over) {
+                darkRun._a214Over = true;
+                clearInterval(a214Timer);
+                a214TimeOut();
+            }
+        }, 1000);
+    }
+
+    function a214TimeOut() {
+        darkRun.fail += 3;
+        darkRun.failedRun = true;
+        darkDeath(
+            `아래에서 소리가 커진다.<br><br>` +
+            `같은 문장을 말하던 목소리들이 한 음으로 모인다.<br>` +
+            `그게 완성되는 소리라는 걸 다들 알아차렸지만, 늦었다.<br><br>` +
+            `빛이 계단을 타고 올라온다. 천천히, 빠짐없이.<br>` +
+            `<span style="color:#d4af37;">"빛을 찾으셨습니까."</span><br><br>` +
+            `이번에는 대답이 나왔다. 내 목소리였다.`
+        );
+    }
+
+    // 미션 진척
+    function a214Progress(missionId, amount) {
+        if (!isTraitor() || !database || !a214State) return;
+        const ms = a214State.missions || [];
+        const idx = ms.findIndex(x => x.id === missionId);
+        if (idx < 0) return;
+        if (ms[idx].done >= ms[idx].goal) return;
+        const next = Math.min(ms[idx].goal, ms[idx].done + (amount || 1));
+        database.ref(`${a214Path()}/missions/${idx}/done`).set(next);
+        showDarkToast(`과업 진행 — ${ms[idx].name} (${next}/${ms[idx].goal})`);
+    }
+
+        const A214_NARR = {
+        1: { img:'step1', text:`계단을 내려간다.<br><br>
+            벽에 손을 짚으면 미끈하다. 물기가 아니라 손때다.<br>
+            수없이 많은 손이 같은 자리를 짚고 내려갔다는 뜻이다.<br><br>
+            아래에서 올라오는 빛이 일정하지 않다.<br>
+            숨을 쉬듯 밝아졌다 어두워진다. 여럿이 함께 쉬는 숨처럼.<br><br>
+            계단 수를 세던 사람이 중간에 그만둔다.<br>
+            숫자가 자꾸 늘어나서.` },
+
+        2: { text:`넓은 방이다.<br><br>
+            의자가 줄지어 놓여 있다. 전부 같은 방향을 본다.<br>
+            앉아 있는 사람은 없는데, 앉았던 자국은 전부 남아 있다.<br><br>
+            벽에 문장이 적혀 있다. 같은 문장이 수백 번.<br>
+            글씨체가 조금씩 다르다. 쓴 사람이 여럿이라는 뜻이다.<br><br>
+            <span style="color:#d4af37;">"빛을 찾으셨습니까."</span><br><br>
+            읽는 것만으로 대답하고 싶어진다.<br>
+            그 충동이 어디서 왔는지 모르겠다.` },
+
+        3: { text:`옆방에서 소리가 난다.<br><br>
+            여럿이 같은 문장을 동시에 말하는 소리.<br>
+            박자가 정확해서 기계 같기도 하고, 노래 같기도 하다.<br><br>
+            문틈으로 본다.<br>
+            사람들이 등을 보이고 앉아 있다. 수십 명이다.<br>
+            전부 같은 각도로 고개를 숙이고 있다.<br><br>
+            하나가 천천히 고개를 든다.<br>
+            돌아보지는 않았다. 그게 더 무섭다.` },
+
+        4: { text:`복도가 갈린다.<br><br>
+            어느 쪽에서든 같은 소리가 난다. 방향을 가늠할 수 없다.<br><br>
+            벽에 안내가 붙어 있다. 종이가 아니라 천에 수를 놓았다.<br>
+            공들인 티가 난다. 오래 걸렸을 것이다.<br><br>
+            <span style="color:#d4af37;">"길을 잃으셨다면 그대로 계십시오. 모시러 가겠습니다."</span><br><br>
+            그대로 있으면 안 된다는 뜻으로 읽힌다.` },
+
+        5: { img:'step2', text:`창고다.<br><br>
+            상자가 쌓여 있고, 안에 든 것이 전부 같다.<br>
+            흰 천, 양초, 그리고 이름이 적힌 명패.<br><br>
+            명패를 몇 개 꺼내 본다. 전부 사원 이름이다.<br>
+            이 회사 사람들 이름이다.<br><br>
+            아직 새겨지지 않은 빈 명패가 여섯 개 남아 있다.<br>
+            세어 보고 아무도 말하지 않는다.` },
+
+        6: { text:`누군가 뒤처졌다.<br><br>
+            돌아보니 그 자리에 서 있다. 벽을 보고 있다.<br>
+            부르면 돌아보는데, 표정이 한 박자 늦다.<br><br>
+            "괜찮아?"<br>
+            "응."<br><br>
+            대답이 너무 빨랐다.<br>
+            생각하고 대답한 게 아니라, 준비해 둔 대답 같았다.<br><br>
+            아무도 그 얘기를 꺼내지 않는다.` },
+
+        7: { text:`기도실이다.<br><br>
+            방석이 놓여 있고, 그 앞에 거울이 있다.<br>
+            거울에는 아무것도 비치지 않는다. 검다.<br><br>
+            방석에 앉으면 뭔가 보일 것 같다.<br>
+            앉지 않기로 한다. 다만 한 사람이 오래 서 있었다.<br><br>
+            그 사람이 나중에 말했다.<br>
+            "그냥 무릎이 아팠어."<br><br>
+            그럴 수도 있다.` },
+
+        8: { text:`통로가 좁아진다.<br><br>
+            한 사람씩 지나야 한다. 순서를 정해야 한다.<br>
+            먼저 가는 쪽이 유리한지 불리한지 아무도 모른다.<br><br>
+            지나가는 동안 뒤쪽이 안 보인다.<br>
+            누가 따라오는지, 몇이 따라오는지 알 수 없다.<br><br>
+            빠져나와서 세어 본다.<br>
+            맞다. 이번에는 맞았다.` },
+
+        9: { img:'step3', text:`아래층이다.<br><br>
+            벽에 사진이 걸려 있다. 단체 사진이다.<br>
+            앞줄에 앉은 사람들, 뒷줄에 선 사람들. 전부 웃고 있다.<br><br>
+            사진 아래 날짜가 적혀 있다. 작년이다.<br><br>
+            얼굴 하나가 눈에 익다.<br>
+            지금 일행 중 하나와 닮았다.<br><br>
+            닮은 게 아닐지도 모른다.` },
+
+        10: { text:`소리가 가까워진다.<br><br>
+            아까보다 사람 수가 많아졌다. 배는 되는 것 같다.<br>
+            늘어난 목소리 중에 익숙한 음색이 섞여 있다.<br><br>
+            착각이라고 생각하기로 한다.<br>
+            그렇게 생각하지 않으면 걸을 수가 없다.<br><br>
+            앞서가던 사람이 갑자기 멈춘다.<br>
+            "방금 누가 내 이름 불렀는데."<br><br>
+            아무도 부르지 않았다.` },
+
+        11: { text:`제단이 보이는 문 앞이다.<br><br>
+            문이 두껍다. 안쪽에서 빛이 새는데, 틈이 아니라 문 자체에서 샌다.<br>
+            나무가 빛을 머금은 것처럼.<br><br>
+            봉인에 필요한 것들을 점검한다.<br>
+            하나씩 이름을 부르며 확인한다.<br><br>
+            숫자가 맞지 않는다.<br>
+            누가 떨어뜨렸겠지. 그렇게 넘어가기로 한다.<br>
+            넘어가지 않으면 시간이 없다.` },
+
+        12: { text:`문이 열린다.<br><br>
+            안은 생각보다 평범하다. 회의실 같기도 하고, 강당 같기도 하다.<br>
+            가운데에 뭔가 있다. 빛이 거기서 나온다.<br><br>
+            형태가 잡히지 않는다. 보고 있으면 눈이 그것을 정리하지 못한다.<br>
+            사람들이 왜 무릎을 꿇었는지 알 것 같다.<br>
+            서 있는 게 이상하게 어렵다.<br><br>
+            옆 사람이 무릎을 꿇었다.<br>
+            잡아 일으켜야 하는데, 손이 늦다.` },
+
+        13: { text:`둘러선다.<br><br>
+            봉인을 시작하려면 전원이 자리를 잡아야 한다.<br>
+            한 명이라도 빠지면 원이 닫히지 않는다.<br><br>
+            세어 본다.<br>
+            이번에도 맞다. 전부 있다.<br><br>
+            그런데 한 사람이 서 있는 자리가 조금 어긋나 있다.<br>
+            원 바깥쪽으로 반 발자국.<br><br>
+            지적하면 늦을 것 같고, 지적하지 않으면 안 될 것 같다.` },
+
+        14: { text:`빛이 반응한다.<br><br>
+            봉인이 걸리기 시작하자 소리가 멎었다.<br>
+            수십 명이 동시에 입을 다무는 소리는 생각보다 크다.<br><br>
+            그리고 전부 이쪽을 본다.<br>
+            문 밖에서, 복도에서, 계단에서.<br><br>
+            달려오지는 않는다. 걸어온다.<br>
+            그게 더 빠르게 느껴진다.` },
+
+        15: { text:`마지막이다.<br><br>
+            봉인을 닫을지, 부술지 정해야 한다.<br>
+            닫으면 여기 남는다. 부수면 여기가 무너진다.<br><br>
+            어느 쪽이든 나가려면 서둘러야 한다.<br><br>
+            누군가 뒤에서 말한다.<br>
+            "잠깐만."<br><br>
+            돌아볼 시간이 있을까.` }
+    };
+
+        const A214_STEPS = {
+        0:  { type:'intro' },
+        1:  { type:'narr', n:1 },
+        2:  { type:'gimmick', n:1 },
+        3:  { type:'narr', n:2 },
+        4:  { type:'narr', n:3 },
+        5:  { type:'gimmick', n:2 },
+        6:  { type:'split', n:1 },
+        7:  { type:'narr', n:4 },
+        8:  { type:'rejoin', n:1 },
+        9:  { type:'narr', n:5 },
+        10: { type:'vote', n:1 },
+        11: { type:'gimmick', n:3 },
+        12: { type:'narr', n:6 },
+        13: { type:'split', n:2 },
+        14: { type:'narr', n:7 },
+        15: { type:'gimmick', n:4 },
+        16: { type:'rejoin', n:2 },
+        17: { type:'narr', n:8 },
+        18: { type:'vote', n:2 },
+        19: { type:'narr', n:9 },
+        20: { type:'gimmick', n:5 },
+        21: { type:'split', n:3 },
+        22: { type:'narr', n:10 },
+        23: { type:'rejoin', n:3 },
+        24: { type:'gimmick', n:6 },
+        25: { type:'narr', n:11 },
+        26: { type:'vote', n:3 },
+        27: { type:'narr', n:12 },
+        28: { type:'gimmick', n:7 },
+        29: { type:'narr', n:13 },
+        30: { type:'narr', n:14 },
+        31: { type:'narr', n:15 },
+        32: { type:'gimmick', n:8 },
+        99: { type:'result' }
+    };
+
+    function renderStepA214() {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        if (darkRun.rejoined) { renderRejoinScene(); return; }
+        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); }
+        saveDarkRunState();
+        attachA214Listener();
+
+        if (!a214State) {
+            if (darkRun.isLeader) initA214();
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">내려가는 중...</div>`, "intro");
+            setTimeout(() => { if (a214State && darkRun) renderStepA214(); }, 1200);
+            return;
+        }
+
+        if (!darkRun._a214Started) {
+            darkRun._a214Started = true;
+            startA214Timer();
+        }
+
+        const def = A214_STEPS[darkRun.step];
+        if (!def) { renderDarkResult(); return; }
+
+        if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                a214BarHtml() + a214RoleCard() +
+                darkChoiceBtn("내려간다.", "partyAdvance(1)"), "intro");
+            renderA214Bar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'narr') {
+            const d = A214_NARR[def.n];
+            body.innerHTML = darkBox("—", d.text,
+                a214BarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`),
+                d.img);
+            renderA214Bar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (def.type === 'vote')   { renderA214Vote(def.n); return; }
+        if (def.type === 'split')  { renderA214Split(def.n); return; }
+        if (def.type === 'rejoin') { renderA214Rejoin(def.n); return; }
+        if (def.type === 'result') { renderDarkResult(); return; }
+
+        const fns = { 1:a214G1, 2:a214G2, 3:a214G3, 4:a214G4, 5:a214G5, 6:a214G6, 7:a214G7, 8:a214G8 };
+        if (fns[def.n]) fns[def.n]();
+    }
+
+    // 진입 시 역할 안내 (본인만 보임)
+    function a214RoleCard() {
+        if (isTraitor()) {
+            const ms = (a214State.missions || []);
+            return `
+                <div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:6px; padding:13px; margin-bottom:13px;">
+                    <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:8px;">◉ 당신은 이미 빛을 보았습니다.</div>
+                    <div style="font-size:11px; color:#ccc; line-height:1.8; margin-bottom:10px;">
+                        일행은 봉인을 하러 왔습니다. 당신은 다른 일을 하러 왔습니다.<br>
+                        아래 과업을 전부 마치면 혼자 나갈 수 있습니다.
+                    </div>
+                    ${ms.map(x => `<div style="font-size:11px; color:#d4af37; line-height:1.7;">○ <b>${x.name}</b> — ${x.desc}</div>`).join('')}
+                    <div style="font-size:10px; color:#888; margin-top:9px; line-height:1.6;">
+                        투표에서 세 번째로 지목되면 그 자리에서 끝납니다.<br>
+                        도중에 마음을 바꿔 협조할 수도 있습니다. 보상은 거의 없습니다.
+                    </div>
+                </div>`;
+        }
+        return `
+            <div style="background:rgba(212,175,55,0.07); border:1px solid #5a4a2a; border-radius:6px; padding:13px; margin-bottom:13px;">
+                <div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:8px;">◈ 임무</div>
+                <div style="font-size:11px; color:#ccc; line-height:1.8;">
+                    아래층의 빛을 봉인하거나 파괴해야 합니다.<br>
+                    제한 시간이 지나면 전원 돌아올 수 없습니다.<br><br>
+                    <span style="color:#ff9800;">일행 중 하나는 이미 빛을 보았습니다.</span><br>
+                    <span style="font-size:10px; color:#888;">세 번의 지목 기회가 있습니다.</span>
+                </div>
+            </div>`;
+    }
+
+        function renderA214Vote(n) {
+        const p = darkParties[darkRun.partyId];
+        const alive = (p && p.alive) ? Object.keys(p.alive) : [];
+        const solo = (p && p.solo) ? Object.keys(p.solo) : [];
+
+        // 흩어져 있으면 투표 불가
+        if (solo.length > 0 || alive.length < 3) {
+            darkBodyEl().innerHTML = darkBox(`지목 ${n}차`,
+                `모여서 이야기할 상황이 아니다.<br><br>
+                 흩어진 채로는 누구도 누구를 지목할 수 없다.<br>
+                 서로의 얼굴을 못 본 채로 시간이 간다.`,
+                a214BarHtml() + darkChoiceBtn("그냥 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderA214Bar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        const key = `vote${n}`;
+        const votes = (a214State.votes && a214State.votes[key]) || {};
+        const myVote = votes[currentUser.code];
+        const voted = Object.keys(votes).length;
+
+        const opts = alive.map(c => {
+            const nm = (p.members && p.members[c]) ? p.members[c].name : c;
+            const cnt = Object.values(votes).filter(v => v === c).length;
+            const mine = myVote === c;
+            return `
+                <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; ${mine ? 'border-color:var(--theme-focus) !important; box-shadow:0 0 8px var(--theme-focus);' : ''}"
+                    onclick="a214Vote(${n},'${c}')" ${myVote ? 'disabled' : ''}>
+                    ${nm}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}
+                    <span style="float:right; color:var(--theme-focus); font-weight:bold;">${cnt > 0 ? '●'.repeat(Math.min(cnt,5)) + ' ' + cnt : ''}</span>
+                </button>`;
+        }).join('');
+
+        darkBodyEl().innerHTML = darkBox(`지목 ${n}차`,
+            `둘러선다.<br><br>
+             누가 이미 빛을 보았는지 정해야 한다.<br>
+             확신이 있는 사람은 없다. 그래도 정해야 한다.<br><br>
+             ${n === 3
+                ? '<span style="color:#f44336;">마지막 기회다. 맞히면 그 자리에서 끝난다.</span>'
+                : '<span style="color:#888; font-size:11px;">지목당한 사원은 다음 구간에서 행동이 제한된다.</span>'}`,
+            a214BarHtml() + opts +
+            `<div style="text-align:center; font-size:11px; color:#888; margin-top:10px;">투표 ${voted} / ${alive.length}</div>` +
+            (darkRun.isLeader ? `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:10px; font-size:11px;" onclick="a214CloseVote(${n})">지금 마감</button>` : ''));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    function a214Vote(n, target) {
+        if (!database || !a214State) return;
+        database.ref(`${a214Path()}/votes/vote${n}/${currentUser.code}`).set(target);
+        setTimeout(() => renderA214Vote(n), 400);
+    }
+
+    function a214CloseVote(n) {
+        if (!database || !a214State) return;
+        const key = `vote${n}`;
+        const votes = (a214State.votes && a214State.votes[key]) || {};
+        const tally = {};
+        Object.values(votes).forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+
+        let top = null, max = 0;
+        Object.keys(tally).forEach(c => { if (tally[c] > max) { max = tally[c]; top = c; } });
+
+        const hit = top === a214State.traitor;
+        const p = darkParties[darkRun.partyId];
+        const nm = (p && p.members && p.members[top]) ? p.members[top].name : '누군가';
+
+        database.ref(a214Path()).update({
+            [`voteResult${n}`]: { target: top, name: nm, hit: hit, at: Date.now() },
+            exposed: hit ? (a214State.exposed || 0) + 1 : (a214State.exposed || 0),
+            watched: hit ? true : (a214State.watched || false)
+        });
+
+        // 침묵 미션 — 지목당하지 않았으면 진행
+        if (isTraitor() && top !== currentUser.code) a214Progress('m05', 1);
+
+        setTimeout(() => a214ShowVoteResult(n, top, nm, hit), 700);
+    }
+
+    function a214ShowVoteResult(n, top, nm, hit) {
+        const iamTarget = top === currentUser.code;
+
+        // 3차 적중 = 즉시 사망
+        if (hit && n === 3) {
+            if (isTraitor()) {
+                darkRun.fail += 3;
+                darkDeath(
+                    `손가락이 전부 이쪽을 향한다.<br><br>` +
+                    `변명할 틈은 없었다. 변명할 말도 준비하지 않았다.<br>` +
+                    `어차피 마지막에는 들킬 거라고 생각했던 것 같다.<br><br>` +
+                    `빛이 먼저 알아봤다. 자기 사람을 데려가는 손길은 부드러웠다.`
+                );
+                return;
+            }
+            darkBodyEl().innerHTML = darkBox("지목 3차 — 결과",
+                `<b style="color:#f44336;">${nm}</b> 사원이 지목되었다.<br><br>` +
+                `그 사람이 웃는다. 처음 보는 웃음이다.<br>` +
+                `변명하지 않는다. 그게 답이었다.<br><br>` +
+                `빛이 그쪽으로 기운다. 데려가는 손길이 부드럽다.<br>` +
+                `남은 사람들은 아무 말도 하지 않았다.`,
+                a214BarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderA214Bar();
+            mountDarkChat('normal');
+            return;
+        }
+
+        if (iamTarget) darkRun._a214Restricted = true;
+
+        darkBodyEl().innerHTML = darkBox(`지목 ${n}차 — 결과`,
+            hit
+                ? `<b style="color:#ff9800;">${nm}</b> 사원이 지목되었다.<br><br>
+                   부정한다. 목소리가 평소보다 조금 높다.<br>
+                   증거는 없다. 다만 다들 조금씩 거리를 둔다.<br><br>
+                   <span style="color:#ff9800;">이후 그 사람의 행동을 지켜보기로 한다.</span>`
+                : `<b>${nm}</b> 사원이 지목되었다.<br><br>
+                   부정한다. 억울해 보인다. 실제로 억울할 것이다.<br><br>
+                   그래도 감시는 붙는다. 시간이 없으니까.<br>
+                   <span style="color:#888; font-size:11px;">틀렸을 수도 있다는 말은 아무도 하지 않는다.</span>`,
+            a214BarHtml() +
+            (iamTarget ? `<div style="background:rgba(255,152,0,0.1); border:1px solid #7a5200; border-radius:5px; padding:10px; margin-bottom:10px; font-size:11px; color:#ffb74d;">당신이 지목되었습니다. 다음 구간에서 선택지가 제한됩니다.</div>` : '') +
+            darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+        // ==========================================
+    // ★ A-214 분리
+    // ==========================================
+    const A214_SPLIT = {
+        1: {
+            text: `복도가 세 갈래로 갈린다.<br><br>
+                각각에서 같은 소리가 난다. 어느 쪽이 본류인지 알 수 없다.<br>
+                한꺼번에 가면 시간이 모자라고, 나눠 가면 혼자가 된다.<br><br>
+                누가 어디로 갈지는 각자 정하기로 한다.<br>
+                그게 제일 공평해 보였다.`,
+            opts: [
+                { l:'① 왼쪽으로 간다.',   v:'left' },
+                { l:'② 가운데로 간다.',   v:'center' },
+                { l:'③ 오른쪽으로 간다.', v:'right' }
+            ]
+        },
+        2: {
+            text: `천장에서 뭔가가 떨어진다.<br><br>
+                흰 천이다. 여러 장이 동시에. 시야가 완전히 막힌다.<br>
+                걷어 내고 보니 방향 감각이 사라졌다.<br><br>
+                부르는 소리가 사방에서 난다. 전부 아는 목소리다.<br>
+                전부 아는 목소리라서 어느 쪽이 진짜인지 모르겠다.`,
+            opts: [
+                { l:'① 가장 가까운 목소리로 간다.', v:'near' },
+                { l:'② 가장 익숙한 목소리로 간다.', v:'known' },
+                { l:'③ 아무 소리도 따라가지 않는다.', v:'still' }
+            ]
+        },
+        3: {
+            text: `문이 닫힌다.<br><br>
+                여러 개가 동시에. 안쪽에서 잠그는 소리가 난다.<br>
+                방금까지 옆에 있던 사람이 다른 방에 있다.<br><br>
+                벽이 얇다. 목소리는 들린다. 다만 말이 조금씩 늦게 도착한다.<br>
+                대화가 안 된다. 통보만 가능하다.`,
+            opts: [
+                { l:'① 벽을 두드려 신호를 보낸다.', v:'knock' },
+                { l:'② 다른 출구를 찾는다.',        v:'search' },
+                { l:'③ 문을 부순다.',              v:'break' }
+            ]
+        }
+    };
+
+    function renderA214Split(n) {
+        const d = A214_SPLIT[n];
+        if (!d) { partyAdvance(darkRun.step + 1); return; }
+
+        const restricted = darkRun._a214Restricted;
+        const opts = restricted ? d.opts.slice(0, 1) : d.opts;
+
+        darkBodyEl().innerHTML = darkBox(`갈림 ${n}`, d.text,
+            a214BarHtml() +
+            (restricted ? `<div style="background:rgba(255,152,0,0.1); border:1px solid #7a5200; border-radius:5px; padding:9px; margin-bottom:10px; font-size:10px; color:#ffb74d;">지목된 상태입니다. 선택이 제한됩니다.</div>` : '') +
+            opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="a214SplitPick(${n},'${o.v}')">${o.l}</button>`).join(''));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    function a214SplitPick(n, v) {
+        if (!database) return;
+        darkRun._a214Restricted = false;
+        database.ref(`${a214Path()}/split${n}/${currentUser.code}`).set({
+            pick: v, name: currentUser.name, at: Date.now()
+        });
+        database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
+            name: currentUser.name, at: Date.now(), split: n
+        });
+        darkRun.solo = true;
+        darkRun.splitPick = v;
+        darkRun.log.push(`[갈림 ${n}] ${v}`);
+
+        setTimeout(() => a214AfterSplit(n, v), 1200);
+
+        darkBodyEl().innerHTML = darkBox(`갈림 ${n}`,
+            `그쪽으로 간다.<br><br>발소리가 하나씩 멀어진다.`,
+            a214BarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">흩어지는 중...</div>`);
+        renderA214Bar();
+    }
+
+    function a214AfterSplit(n, v) {
+        if (!database || !darkRun) return;
+        database.ref(`${a214Path()}/split${n}`).once('value').then(snap => {
+            const picks = snap.val() || {};
+            const mine = v;
+            const same = Object.keys(picks).filter(c => picks[c].pick === mine && c !== currentUser.code);
+            const groups = {};
+            Object.values(picks).forEach(p => { groups[p.pick] = (groups[p.pick] || 0) + 1; });
+
+            // 흩뜨리기 미션
+            if (isTraitor() && Object.keys(groups).length >= 3) a214Progress('m07', 1);
+            // 홀로 두기 미션 — 대상이 혼자가 됐는지
+            if (isTraitor()) {
+                const ms = (a214State.missions || []).find(x => x.id === 'm01');
+                if (ms && ms.target) {
+                    const tPick = picks[ms.target] ? picks[ms.target].pick : null;
+                    if (tPick && groups[tPick] === 1) a214Progress('m01', 1);
+                }
+            }
+
+            const alone = same.length === 0;
+            darkRun._a214Alone = alone;
+
+            darkBodyEl().innerHTML = darkBox(`갈림 ${n} — 결과`,
+                alone
+                    ? `혼자다.<br><br>
+                       복도가 넓게 느껴진다. 실제로 넓어졌을 수도 있다.<br>
+                       뒤를 보니 왔던 길이 아직 있다. 다만 아무도 없다.<br><br>
+                       채팅은 된다. 목소리는 안 들린다.<br>
+                       그게 위로가 되는지 아닌지 모르겠다.`
+                    : `${same.map(c => picks[c].name).join(', ')} 사원과 같은 쪽으로 왔다.<br><br>
+                       서로 말은 하지 않는다. 다만 걸음을 맞춘다.<br>
+                       누가 누구를 믿는지는 아직 정해지지 않았다.`,
+                a214BarHtml() + darkChoiceBtn("앞으로 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderA214Bar();
+            mountDarkChat('normal');
+        });
+    }
+
+        // ==========================================
+    // ★ A-214 합류 (12루트)
+    // ==========================================
+    const A214_REJOIN_OPTS = [
+        { l:'① 이름을 부른다.',            v:'call' },
+        { l:'② 벽을 두드린다.',            v:'knock' },
+        { l:'③ 발자국을 따라간다.',        v:'track' },
+        { l:'④ 불빛을 향해 간다.',         v:'light' },
+        { l:'⑤ 그 자리에 선다.',           v:'stay' },
+        { l:'⑥ 소리가 없는 쪽으로 간다.',  v:'quiet' }
+    ];
+
+    const A214_REJOIN_TABLE = [
+        { a:'call',  b:'stay',  name:'정면 합류',   mod:3,  ok:true,
+          txt:`이름을 부른다. 대답이 온다.<br><br>같은 자리에 서서 기다리고 있었다.<br>가까워질수록 서로 걸음이 빨라진다.<br><br>만나서 처음 한 말이 "혼자 있었어?"였다.` },
+        { a:'knock', b:'knock', name:'박자 합류',   mod:3,  ok:true,
+          txt:`벽을 두드린다. 같은 박자가 돌아온다.<br><br>세 번, 쉬고, 두 번. 틀리지 않았다.<br>벽을 따라가니 모퉁이에서 만난다.<br><br>둘 다 손등이 까져 있다.` },
+        { a:'track', b:'stay',  name:'추적 합류',   mod:2,  ok:true,
+          txt:`발자국을 따라간다. 아직 선명하다.<br><br>끝에 사람이 서 있다. 기다리고 있었다.<br>돌아보는 얼굴이 안도한다.` },
+        { a:'light', b:'light', name:'등불 합류',   mod:2,  ok:true,
+          txt:`불빛 쪽으로 간다.<br><br>반대쪽에서도 누가 오고 있다. 같은 불빛을 봤다.<br>가운데서 만난다.<br><br>불빛의 정체는 확인하지 않기로 한다.` },
+        { a:'quiet', b:'quiet', name:'침묵 합류',   mod:2,  ok:true,
+          txt:`소리가 없는 쪽으로 간다.<br><br>여기서 소리가 없다는 건 사람이 없다는 뜻이다.<br>그런데 한 사람이 있다. 같은 생각을 한 사람.<br><br>말없이 고개만 끄덕인다.` },
+        { a:'call',  b:'knock', name:'엇박 합류',   mod:1,  ok:true,
+          txt:`부르는 소리와 두드리는 소리가 엇갈린다.<br><br>그래도 방향은 맞았다.<br>만나기는 했는데 둘 다 목이 쉬었다.` },
+        { a:'track', b:'move',  name:'따라잡기',    mod:1,  ok:true,
+          txt:`앞서간 자국을 따라 달린다.<br><br>모퉁이에서 등이 보인다. 부르지 않고 그냥 따라붙는다.<br>놀라게 하고 싶지 않았다.` },
+        { a:'light', b:'stay',  name:'늦은 합류',   mod:0,  ok:true,
+          txt:`불빛을 따라가다 한참을 돌았다.<br><br>도착했을 때는 다들 앉아서 기다리고 있었다.<br>아무도 늦었다고 하지 않는다. 그게 더 미안하다.` },
+        { a:'quiet', b:'call',  name:'엇갈린 만남', mod:0,  ok:true,
+          txt:`조용한 쪽으로 갔는데, 부르는 소리가 그쪽에서 났다.<br><br>운이었다. 좋은 운인지는 모르겠다.` },
+        { a:'call',  b:'light', name:'헛걸음',      mod:-1, ok:false,
+          txt:`부르면서 갔는데 아무도 없다.<br><br>불빛 쪽으로 간 사람들은 이미 지나갔다.<br>부른 소리는 다른 것이 들었을 것이다.` },
+        { a:'knock', b:'move',  name:'빈 벽',       mod:-1, ok:false,
+          txt:`벽을 두드린다. 대답이 온다.<br><br>박자가 조금 다르다. 흉내 낸 박자다.<br>두드리기를 멈춘다. 저쪽은 멈추지 않는다.` },
+        { a:'stay',  b:'stay',  name:'양쪽 대기',   mod:-2, ok:false,
+          txt:`둘 다 기다렸다.<br><br>아무도 움직이지 않으면 아무도 만나지 못한다.<br>시간만 갔다.` }
+    ];
+
+    function renderA214Rejoin(n) {
+        const restricted = darkRun._a214Restricted;
+        const opts = restricted ? A214_REJOIN_OPTS.slice(0, 3) : A214_REJOIN_OPTS;
+
+        darkBodyEl().innerHTML = darkBox(`합류 ${n}차`,
+            `일행의 기척이 어디선가 난다.<br><br>
+             어떻게 다가갈지 정해야 한다.<br>
+             상대가 어떻게 움직일지는 알 수 없다.<br><br>
+             <span style="font-size:11px; color:#888;">서로의 선택이 맞물려야 만난다.</span>`,
+            a214BarHtml() +
+            opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="a214RejoinPick(${n},'${o.v}')">${o.l}</button>`).join(''));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    function a214RejoinPick(n, v) {
+        if (!database) return;
+        darkRun._a214Restricted = false;
+        database.ref(`${a214Path()}/rejoin${n}/${currentUser.code}`).set({
+            pick: v, name: currentUser.name, at: Date.now()
+        });
+
+        darkBodyEl().innerHTML = darkBox(`합류 ${n}차`,
+            `움직인다.<br><br>상대가 어디로 갈지는 알 수 없다.`,
+            a214BarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
+        renderA214Bar();
+
+        setTimeout(() => a214ResolveRejoin(n, v), 2500);
+    }
+
+    function a214ResolveRejoin(n, myPick) {
+        if (!database || !darkRun) return;
+        database.ref(`${a214Path()}/rejoin${n}`).once('value').then(snap => {
+            const picks = snap.val() || {};
+            const others = Object.keys(picks).filter(c => c !== currentUser.code).map(c => picks[c].pick);
+
+            let found = null;
+            for (const other of others) {
+                found = A214_REJOIN_TABLE.find(r =>
+                    (r.a === myPick && r.b === other) || (r.a === other && r.b === myPick));
+                if (found) break;
+            }
+            if (!found) {
+                found = { name:'엇갈림', mod:-1, ok:false,
+                    txt:`한참을 돌았다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.` };
+            }
+
+            darkRun.modifier = (darkRun.modifier || 0) + found.mod;
+            darkRun.log.push(`[합류 ${n}차] ${found.name}`);
+
+            if (found.ok) {
+                darkRun.solo = false;
+                database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+                sendPartyChat(`${currentUser.name} 사원이 합류했습니다. (${found.name})`, true);
+            } else {
+                sendPartyChat(`${currentUser.name} 사원이 길을 잃었습니다.`, true);
+            }
+
+            darkBodyEl().innerHTML = darkBox(`합류 ${n}차 — ${found.name}`, found.txt,
+                a214BarHtml() +
+                `<div style="text-align:center; font-size:11px; color:${found.mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
+                    ${found.name} — 이후 판정 보정 ${found.mod >= 0 ? '+' : ''}${found.mod}
+                 </div>` +
+                darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderA214Bar();
+            mountDarkChat('normal');
+        });
+    }
+
+        // ==========================================
+    // ★ A-214 연타 전투
+    // ==========================================
+    let a214Combat = { active:false, count:0, need:0, timer:null, phase:0, onWin:null, onLose:null };
+
+    function startCombat(cfg) {
+        a214Combat = {
+            active: true, count: 0,
+            need: cfg.need, phase: cfg.phase || 1,
+            seconds: cfg.seconds,
+            onWin: cfg.onWin, onLose: cfg.onLose,
+            timer: null
+        };
+
+        darkBodyEl().innerHTML = darkBox(cfg.title, cfg.text,
+            a214BarHtml() +
+            `<div style="text-align:center; margin-bottom:12px;">
+                <div style="font-size:34px; font-weight:bold; color:#ff6b6b;" id="combat-time">${cfg.seconds}</div>
+                <div style="font-size:11px; color:#888; margin-top:4px;">${cfg.need}회 필요</div>
+             </div>
+             <div style="width:100%; height:16px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:8px; overflow:hidden; margin-bottom:14px;">
+                <div id="combat-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#7f0000,#f44336); transition:width 0.08s;"></div>
+             </div>
+             <button class="game-btn" id="combat-btn" style="width:100%; margin:0; padding:22px; font-size:17px; font-weight:bold; background:linear-gradient(145deg,#7f0000,#4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="combatTap()">
+                ${cfg.label || '뿌리친다'}
+             </button>
+             <div id="combat-msg" style="text-align:center; font-size:11px; color:#888; margin-top:10px; min-height:16px;"></div>`);
+        renderA214Bar();
+        mountDarkChat('normal');
+
+        let t = cfg.seconds;
+        clearInterval(a214Combat.timer);
+        a214Combat.timer = setInterval(() => {
+            t--;
+            const el = document.getElementById('combat-time');
+            if (!el || !darkRun) { clearInterval(a214Combat.timer); return; }
+            el.innerText = t;
+            if (t <= 0) {
+                clearInterval(a214Combat.timer);
+                a214Combat.active = false;
+                if (a214Combat.onLose) a214Combat.onLose();
+            }
+        }, 1000);
+    }
+
+    function combatTap() {
+        if (!a214Combat.active) return;
+        a214Combat.count++;
+        const pct = Math.min(100, (a214Combat.count / a214Combat.need) * 100);
+        const bar = document.getElementById('combat-bar');
+        if (bar) bar.style.width = pct + '%';
+
+        if (a214Combat.count >= a214Combat.need) {
+            a214Combat.active = false;
+            clearInterval(a214Combat.timer);
+            const btn = document.getElementById('combat-btn');
+            if (btn) btn.disabled = true;
+            if (a214Combat.onWin) a214Combat.onWin();
+        }
+    }
+
+        // --- 기믹 1: 첫 접촉 ---
+    function a214G1() {
+        renderChoiceStep("기믹 1 — 첫 인사",
+            `계단 아래에서 한 사람이 올라온다.<br><br>
+             흰 옷을 입었고, 맨발이다. 발소리가 나지 않는다.<br>
+             얼굴은 평범하다. 그게 제일 이상하다.<br><br>
+             웃으면서 손을 내민다.<br>
+             <span style="color:#d4af37;">"오셨군요. 기다렸습니다."</span>`,
+            [
+                { id:'ignore', label:'① 무시하고 지나간다.',      fn:'a214G1R', arg:'ignore' },
+                { id:'shake',  label:'② 손을 잡는다.',            fn:'a214G1R', arg:'shake' },
+                { id:'ask',    label:'③ 누구를 기다렸냐고 묻는다.', fn:'a214G1R', arg:'ask' },
+                { id:'answer', label:'④ 같이 인사한다.',          fn:'a214G1R', arg:'answer' }
+            ], "step1");
+    }
+
+    function a214G1R(pick) {
+        let txt, mod = 0;
+        if (pick === 'ignore') {
+            txt = `지나친다. 손은 그대로 내밀어져 있다.<br><br>등 뒤에서 그 자세로 한참 서 있는 기척이 난다.<br>돌아보지 않는다.`;
+            mod = 1; darkRun.success++;
+        } else if (pick === 'shake') {
+            txt = `손을 잡는다. 따뜻하다.<br><br>놓으려는데 잘 놓이지 않는다. 힘이 아니라 마찰 같은 것이다.<br>겨우 빼낸다. 손바닥에 흰 가루가 묻었다.`;
+            mod = -1; darkRun.fail++;
+            applyPollutionToUser(currentUser, 8);
+        } else if (pick === 'ask') {
+            txt = `누구를 기다렸냐고 묻는다.<br><br>웃는 얼굴 그대로 대답한다.<br><span style="color:#d4af37;">"오시는 분을요."</span><br><br>질문이 잘못됐다는 걸 알았다.`;
+            mod = 0; darkRun.success++;
+        } else {
+            txt = `같이 인사한다.<br><br>상대가 더 깊이 고개를 숙인다. 그리고 옆으로 비켜선다.<br>길을 내준 것이다.<br><br>일행 중 누군가가 작게 말했다. "왜 인사를 해."`;
+            mod = 2; darkRun.success++;
+            if (isTraitor()) a214Progress('m10', 1);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 1] ${pick}`);
+        renderResultStep("기믹 1 — 결과", txt, "지나간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+    // --- 기믹 2: 집회 ---
+    function a214G2() {
+        renderChoiceStep("기믹 2 — 집회",
+            `집회장을 지나야 한다.<br><br>
+             수십 명이 등을 보이고 앉아 있다. 같은 문장을 반복한다.<br>
+             지나가려면 그 사이를 통과해야 한다.<br><br>
+             박자가 있다. 문장이 끝나고 다시 시작되는 사이에 아주 짧은 정적이 있다.`,
+            [
+                { id:'beat',  label:'① 정적에 맞춰 한 걸음씩.',    fn:'a214G2R', arg:'beat' },
+                { id:'join',  label:'② 같이 읊으며 걷는다.',       fn:'a214G2R', arg:'join' },
+                { id:'crawl', label:'③ 의자 사이로 기어간다.',     fn:'a214G2R', arg:'crawl' },
+                { id:'walk',  label:'④ 그냥 걸어간다.',            fn:'a214G2R', arg:'walk' }
+            ], "step2");
+    }
+
+    function a214G2R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('hide');
+        const DC = { beat: 10, join: 8, crawl: 12, walk: 16 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt;
+        if (pick === 'join' && isTraitor()) a214Progress('m10', 1);
+
+        if (ok) {
+            txt = pick === 'beat' ? `정적에 맞춰 한 걸음씩 옮긴다.<br><br>세 번째 걸음에서 박자를 놓칠 뻔했다.<br>앞사람이 어깨를 잡아 줬다. 덕분에 살았다.`
+                : pick === 'join' ? `같이 읊는다.<br><br>입에 잘 붙는다. 처음 듣는 문장인데 그렇다.<br>지나가는 동안 아무도 돌아보지 않았다.<br><br>나오고 나서 입을 다무는 데 시간이 걸렸다.`
+                : pick === 'crawl' ? `의자 사이로 기어간다.<br><br>발들이 보인다. 전부 맨발이다. 전부 같은 방향으로 놓여 있다.<br>발톱까지 가지런하다.`
+                : `그냥 걷는다.<br><br>운이 좋았다. 아무도 돌아보지 않았다.<br>나중에 생각하니 아무도 돌아보지 않은 게 더 이상했다.`;
+            darkRun.success++;
+        } else {
+            txt = `박자가 끊긴다.<br><br>읊던 소리가 멎고, 앞줄부터 차례로 고개가 돌아간다.<br>파도처럼.<br><br>전부 이쪽을 본다. 표정이 하나도 없다.<br>다시 읊기 시작한다. 이번엔 문장이 바뀌었다.<br><br><span style="color:#d4af37;">"오셨군요."</span>`;
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 10);
+        }
+
+        darkRun.log.push(`[기믹 2] ${pick} d20 ${roll} vs DC${DC}`);
+        darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            a214BarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    // --- 기믹 3: 끌려감 (연타) ---
+    function a214G3() {
+        startCombat({
+            title: "기믹 3 — 손",
+            text: `어깨에 손이 얹힌다.<br><br>
+                하나가 아니다. 셋, 넷, 그 이상.<br>
+                아프지 않게 잡는다. 다치게 할 생각이 없다는 뜻이다.<br>
+                모시러 온 자세다.<br><br>
+                <span style="color:#d4af37;">"안내해 드리겠습니다."</span><br><br>
+                발이 바닥에서 뜬다.`,
+            seconds: 8, need: 18, label: '뿌리친다',
+            onWin: () => {
+                darkRun.success++;
+                setTimeout(() => a214G3Second(), 500);
+            },
+            onLose: () => {
+                darkRun.fail += 2;
+                applyPollutionToUser(currentUser, 14);
+                if (isTraitor()) a214Progress('m08', 1);
+                darkDeath(
+                    `힘이 빠진다.<br><br>` +
+                    `손들이 조심스럽게 옮긴다. 떨어뜨리지 않으려고 여럿이 나눠 든다.<br>` +
+                    `누군가 흰 천을 덮어 준다.<br><br>` +
+                    `<span style="color:#d4af37;">"편히 계십시오. 곧 보시게 됩니다."</span>`
+                );
+            }
+        });
+    }
+
+    function a214G3Second() {
+        startCombat({
+            title: "기믹 3 — 다시",
+            text: `뿌리쳤다.<br><br>
+                숨을 고르는데, 천장에서 뭔가가 떨어진다.<br>
+                사람이다. 거꾸로 매달려 있다가 놓은 것이다.<br><br>
+                이번에는 조심스럽지 않다.<br>
+                목을 잡는다.`,
+            seconds: 6, need: 22, label: '떼어낸다',
+            onWin: () => {
+                darkRun.success++;
+                darkRun.modifier = (darkRun.modifier || 0) + 2;
+                darkBodyEl().innerHTML = darkBox("기믹 3 — 결과",
+                    `떼어낸다.<br><br>
+                     바닥에 떨어진 것이 일어나지 않는다. 꺾인 자세 그대로 이쪽을 본다.<br>
+                     그리고 웃는다.<br><br>
+                     <span style="color:#d4af37;">"좋습니다. 그 힘이 필요합니다."</span><br><br>
+                     칭찬받은 것 같아서 기분이 나쁘다.`,
+                    a214BarHtml() + darkChoiceBtn("달린다.", `partyAdvance(${darkRun.step + 1})`));
+                renderA214Bar();
+                mountDarkChat('normal');
+            },
+            onLose: () => {
+                darkRun.fail += 2;
+                applyPollutionToUser(currentUser, 16);
+                darkDeath(
+                    `목에서 손이 떨어지지 않는다.<br><br>` +
+                    `시야가 좁아지는 동안, 거꾸로 된 얼굴이 아주 가까이 있었다.<br>` +
+                    `입술이 움직인다. 같은 문장이다.<br><br>` +
+                    `마지막에 따라 읊었다. 왜 그랬는지 모르겠다.`
+                );
+            }
+        });
+    }
+
+    // --- 기믹 4: 명패 ---
+    function a214G4() {
+        renderChoiceStep("기믹 4 — 명패",
+            `창고에서 명패를 발견했다.<br><br>
+             빈 명패가 여섯 개. 일행 수와 같다.<br>
+             옆에 조각칼이 놓여 있다. 손에 익은 자리가 반들반들하다.<br><br>
+             누가 새기려던 것인지, 아니면 새기게 하려던 것인지 모르겠다.`,
+            [
+                { id:'burn',   label:'① 전부 부순다.',              fn:'a214G4R', arg:'burn' },
+                { id:'hide',   label:'② 숨긴다.',                   fn:'a214G4R', arg:'hide' },
+                { id:'leave',  label:'③ 그대로 둔다.',              fn:'a214G4R', arg:'leave' },
+                { id:'carve',  label:'④ 하나에 이름을 새겨 본다.',  fn:'a214G4R', arg:'carve' }
+            ], null);
+    }
+
+    function a214G4R(pick) {
+        let txt, mod = 0;
+        if (pick === 'burn') {
+            txt = `전부 부순다. 생각보다 잘 부서진다.<br><br>조각이 바닥에 흩어진다. 그런데 조각마다 글자가 새겨져 있다.<br>부수기 전에는 비어 있었는데.`;
+            mod = 2; darkRun.success++;
+        } else if (pick === 'hide') {
+            txt = `상자 뒤에 숨긴다.<br><br>돌아서는데 등 뒤에서 나무 부딪는 소리가 난다.<br>다시 보니 제자리에 있다. 아까보다 가지런하게.`;
+            mod = 0; darkRun.success++;
+        } else if (pick === 'leave') {
+            txt = `그대로 둔다. 건드리지 않는 게 나을 것 같았다.<br><br>나가면서 한 번 더 본다.<br>여섯 개 중 하나가 없어졌다.`;
+            mod = -1; darkRun.fail++;
+            applyPollutionToUser(currentUser, 6);
+            if (isTraitor()) a214Progress('m02', 1);
+        } else {
+            txt = `조각칼을 든다. 손에 착 붙는다.<br><br>새기기 시작하자 손이 저절로 움직인다.<br>정신을 차리니 이름이 하나 새겨져 있다.<br><br>내 이름이 아니다. 일행 중 하나의 이름이다.`;
+            mod = -2; darkRun.fail++;
+            applyPollutionToUser(currentUser, 12);
+            if (isTraitor()) a214Progress('m02', 1);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 4] ${pick}`);
+        renderResultStep("기믹 4 — 결과", txt, "나간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+        function a214G5() {
+        renderChoiceStep("기믹 5 — 거울",
+            `기도실이다.<br><br>
+             방석 앞에 거울이 있다. 검다. 아무것도 비치지 않는다.<br>
+             봉인 재료 하나가 거울 앞에 놓여 있다.<br><br>
+             집으려면 거울 앞에 앉아야 한다.<br>
+             앉으면 무언가 보일 것이다. 그건 확실하다.`,
+            [
+                { id:'sit',    label:'① 앉아서 집는다.',              fn:'a214G5R', arg:'sit' },
+                { id:'reach',  label:'② 서서 손만 뻗는다.',           fn:'a214G5R', arg:'reach' },
+                { id:'cover',  label:'③ 거울을 천으로 덮고 집는다.',  fn:'a214G5R', arg:'cover' },
+                { id:'smash',  label:'④ 거울을 깨고 집는다.',         fn:'a214G5R', arg:'smash' }
+            ], null);
+    }
+
+    function a214G5R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('sense');
+        const DC = { sit: 15, reach: 11, cover: 9, smash: 13 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt, died = false;
+        if (ok) {
+            txt = pick === 'sit' ? `앉는다.<br><br>거울에 뭔가 떠오른다. 사람 형태다. 이쪽 자세와 똑같다.<br>다만 얼굴이 이쪽을 보지 않고 조금 옆을 본다.<br><br>시선을 따라가 보니 재료가 놓인 자리다.<br>알려 준 것 같기도 하다.<br><br>집어 들고 빨리 일어선다.`
+                : pick === 'reach' ? `서서 손만 뻗는다.<br><br>거울에는 손만 비친다. 손목까지만.<br>그 위는 검다.<br><br>집어서 뺀다. 손은 무사하다. 확인은 두 번 했다.`
+                : pick === 'cover' ? `천을 덮는다. 거울이 사라지자 방이 평범해진다.<br><br>재료를 집어 든다. 아무 일도 없다.<br>덮은 천이 아주 조금 부풀었다가 가라앉았다.`
+                : `거울을 깬다.<br><br>조각마다 다른 장면이 비친다. 전부 이 방이다. 전부 사람이 앉아 있다.<br>시간대가 다른 것 같다.<br><br>밟고 지나간다. 재료를 집는다.`;
+            darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + (pick === 'cover' ? 2 : 1);
+        } else if (roll === 1 && pick === 'sit') {
+            died = true;
+            txt = `앉는다.<br><br>거울에 사람이 떠오른다. 이쪽을 본다.<br>웃는다. 이쪽은 웃지 않았는데.<br><br>일어서려는데 다리가 말을 듣지 않는다.<br>거울 속 사람이 먼저 일어선다.<br><br>자리가 바뀌는 데는 시간이 걸리지 않았다.`;
+        } else {
+            txt = `재료는 집었다.<br><br>다만 거울이 한 박자 늦게 반응한다.<br>손을 뗐는데 거울 속 손은 아직 뻗어 있다.<br><br>돌아서서 나올 때까지 그 손은 그대로였다.`;
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 9);
+        }
+
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll} vs DC${DC}`);
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            a214BarHtml() + darkChoiceBtn("나간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+        function a214G6() {
+        const body = darkBodyEl();
+        const items = ['흰 초', '마른 잎', '금속 못', '소금 주머니', '봉인 끈'];
+        const missing = items[Math.floor(Math.random() * items.length)];
+        darkRun._a214Missing = missing;
+
+        body.innerHTML = darkBox("기믹 6 — 점검",
+            `봉인에 필요한 것들을 펼친다.<br><br>
+             하나씩 이름을 부르며 확인한다. 소리 내어 세는 게 규칙이다.<br>
+             누가 정한 규칙인지는 모른다.<br><br>
+             <span style="color:#ff9800;">하나가 없다.</span><br><br>
+             누가 떨어뜨렸을 수도 있고, 누가 치웠을 수도 있다.<br>
+             지금은 구분할 방법이 없다.`,
+            a214BarHtml() +
+            darkChoiceBtn("① 되돌아가서 찾는다.", "a214G6R('back')") +
+            darkChoiceBtn("② 대신 쓸 것을 만든다.", "a214G6R('make')") +
+            darkChoiceBtn("③ 없는 채로 진행한다.", "a214G6R('skip')") +
+            (isTraitor() ? darkChoiceBtn("④ 하나 더 몰래 버린다. <span style='color:#ff6b6b; font-size:10px;'>[신도]</span>", "a214G6R('sabotage')") : ''));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    function a214G6R(pick) {
+        let txt, mod = 0;
+        if (pick === 'back') {
+            txt = `되돌아간다. 시간이 걸린다.<br><br>${darkRun._a214Missing}은(는) 복도에 떨어져 있었다.<br>떨어진 자리가 이상하다. 지나온 길이 아니다.<br><br>주워서 돌아온다. 아무도 왜 거기 있었냐고 묻지 않는다.`;
+            mod = 1; darkRun.success++;
+        } else if (pick === 'make') {
+            txt = `대신 쓸 것을 만든다.<br><br>옷자락을 찢고, 주머니를 뒤지고, 있는 것으로 흉내를 낸다.<br>완벽하지는 않다. 그래도 형태는 갖췄다.<br><br>봉인이 제대로 걸릴지는 해 봐야 안다.`;
+            mod = 0; darkRun.success++;
+        } else if (pick === 'skip') {
+            txt = `없는 채로 간다. 시간이 없다.<br><br>그 결정을 누가 먼저 했는지 나중에 기억나지 않았다.<br>다들 동의했다는 것만 기억난다.`;
+            mod = -2; darkRun.fail++;
+        } else {
+            txt = `점검하는 척하면서 하나를 더 소매에 넣는다.<br><br>아무도 못 봤다. 세는 사람이 집중하고 있어서 오히려 쉬웠다.<br><br>숫자가 또 안 맞는다는 말이 나온다.<br>이번에는 다들 서로를 본다.`;
+            mod = -3; darkRun.fail++;
+            a214Progress('m03', 1);
+        }
+        darkRun.modifier = (darkRun.modifier || 0) + mod;
+        darkRun.log.push(`[기믹 6] ${pick}`);
+        renderResultStep("기믹 6 — 결과", txt, "문으로 간다.", `partyAdvance(${darkRun.step + 1})`);
+    }
+
+        function a214G7() {
+        renderChoiceStep("기믹 7 — 제단",
+            `제단 앞이다.<br><br>
+             빛이 가운데 있다. 형태가 잡히지 않는다.<br>
+             오래 보면 무릎이 저절로 굽는다. 실제로 한 명이 꿇었다.<br><br>
+             봉인을 걸려면 시선을 유지해야 한다.<br>
+             시선을 떼면 위치가 바뀐다.`,
+            [
+                { id:'stare',  label:'① 똑바로 본다.',                fn:'a214G7R', arg:'stare' },
+                { id:'side',   label:'② 곁눈으로만 본다.',            fn:'a214G7R', arg:'side' },
+                { id:'mirror', label:'③ 금속에 비친 것으로 본다.',    fn:'a214G7R', arg:'mirror' },
+                { id:'close',  label:'④ 눈을 감고 소리로 잡는다.',    fn:'a214G7R', arg:'close' }
+            ], "step4");
+    }
+
+    function a214G7R(pick) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        const bonus = rollDarkBonus('sense');
+        const DC = { stare: 17, side: 12, mirror: 10, close: 13 }[pick] - gearValue(currentUser, 'break');
+        const ok = roll !== 1 && (roll + bonus) >= DC;
+
+        let txt, died = false;
+        if (ok) {
+            txt = pick === 'stare' ? `똑바로 본다. 눈이 아프다. 눈물이 흐르는데 멈출 수가 없다.<br><br>그래도 놓치지 않았다.<br>봉인 첫 겹이 걸린다.`
+                : pick === 'side' ? `곁눈으로 본다. 형태가 잡히지 않아서 오히려 편하다.<br><br>정면으로 보려는 충동을 세 번 참았다.<br>봉인 첫 겹이 걸린다.`
+                : pick === 'mirror' ? `못 머리에 비친 상으로 본다. 아주 작다.<br><br>작으니까 견딜 만하다.<br>봉인 첫 겹이 걸린다.`
+                : `눈을 감는다. 소리로 위치를 잡는다.<br><br>빛에서 소리가 난다는 걸 처음 알았다.<br>아주 낮고, 사람 목소리와 비슷하다.<br><br>봉인 첫 겹이 걸린다.`;
+            darkRun.success += 2;
+        } else if (roll === 1) {
+            died = true;
+            txt = `본다.<br><br>정리가 된다. 형태가 잡힌다.<br>보고 나니 왜 다들 무릎을 꿇었는지 알겠다.<br><br>무릎을 꿇는다. 누가 시킨 게 아니다.<br>이제 여기 사람들이 하는 말이 전부 맞는 말로 들린다.`;
+        } else {
+            txt = `시선을 놓쳤다.<br><br>다시 찾으니 위치가 바뀌어 있다. 더 가까워졌다.<br>봉인이 절반만 걸렸다.<br><br>손끝이 떨린다. 추운 게 아니다.`;
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 12);
+            if (isTraitor()) a214Progress('m09', 1);
+        }
+
+        darkRun.log.push(`[기믹 7] ${pick} d20 ${roll} vs DC${DC}`);
+        if (died) { darkDeath(txt); return; }
+
+        darkBodyEl().innerHTML = darkBox("기믹 7 — 결과",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+            a214BarHtml() + darkChoiceBtn("자리를 잡는다.", `partyAdvance(${darkRun.step + 1})`));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+        function a214G8() {
+        if (isTraitor()) { a214FinalTraitor(); return; }
+
+        renderChoiceStep("기믹 8 — 마지막",
+            `봉인이 마지막 겹을 남겨 두고 있다.<br><br>
+             닫을지, 부술지 정해야 한다.<br>
+             닫으면 여기 갇힌 채로 남는다. 부수면 여기가 무너진다.<br><br>
+             복도에서 걸어오는 소리가 가까워진다.<br>
+             시간은 없다.`,
+            [
+                { id:'seal',  label:'① 봉인을 닫는다.',        fn:'a214Final', arg:'seal' },
+                { id:'break', label:'② 부순다.',               fn:'a214Final', arg:'break' },
+                { id:'run',   label:'③ 두고 달아난다.',        fn:'a214Final', arg:'run' }
+            ], null);
+    }
+
+    function a214FinalTraitor() {
+        const ms = a214State.missions || [];
+        const done = ms.filter(x => x.done >= x.goal).length;
+        darkBodyEl().innerHTML = darkBox("기믹 8 — 마지막",
+            `일행이 봉인을 닫으려 한다.<br><br>
+             막을 수 있다. 지금이 마지막 기회다.<br><br>
+             <div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:5px; padding:11px; margin-top:10px; font-size:11px; color:#ccc;">
+                완수한 과업 <b style="color:${done >= 3 ? '#4CAF50' : '#ff9800'};">${done} / 3</b><br>
+                ${done >= 3 ? '<span style="color:#4CAF50;">과업을 마쳤습니다. 이제 나갈 수 있습니다.</span>' : '<span style="color:#ff9800;">아직 남았습니다. 이대로 나가면 아무것도 받지 못합니다.</span>'}
+             </div>`,
+            a214BarHtml() +
+            darkChoiceBtn("① 봉인을 막는다.", "a214TraitorBlock()") +
+            darkChoiceBtn("② 모른 척 협조한다.", "a214Final('seal')") +
+            darkChoiceBtn("③ 자수한다.", "a214Confess()"));
+        renderA214Bar();
+        mountDarkChat('normal');
+    }
+
+    function a214TraitorBlock() {
+        startCombat({
+            title: "저지",
+            text: `봉인 앞으로 몸을 던진다.<br><br>
+                일행이 붙잡는다. 여럿이 동시에.<br>
+                밀어내야 한다.`,
+            seconds: 7, need: 24, label: '밀어낸다',
+            onWin: () => {
+                darkRun.a214TraitorWin = true;
+                const ms = a214State.missions || [];
+                const done = ms.filter(x => x.done >= x.goal).length;
+                darkRun.success += 3;
+                darkBodyEl().innerHTML = darkBox("저지",
+                    `밀어낸다.<br><br>
+                     봉인이 흐트러진다. 빛이 다시 퍼진다.<br>
+                     일행의 얼굴을 본다. 이해하지 못하는 얼굴이다.<br><br>
+                     설명할 생각은 없다.<br>
+                     저쪽에서 손이 뻗어 온다. 이번에는 잡는다.<br><br>
+                     <span style="color:#d4af37;">"수고하셨습니다."</span><br><br>
+                     ${done >= 3 ? '과업을 전부 마쳤다. 나갈 수 있다.' : '과업이 남았지만, 여기까지다.'}`,
+                    darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+                mountDarkChat('normal');
+            },
+            onLose: () => {
+                darkRun.fail += 2;
+                darkDeath(
+                    `밀리지 않는다.<br><br>` +
+                    `일행이 봉인을 닫는다. 그 안에 이쪽이 들어가 있다.<br>` +
+                    `마지막으로 본 것은 닫히는 틈 사이의 얼굴들이었다.<br><br>` +
+                    `원망하는 얼굴은 하나도 없었다. 그게 제일 견디기 어려웠다.`
+                );
+            }
+        });
+    }
+
+    function a214Confess() {
+        darkRun.a214Confessed = true;
+        darkRun.success++;
+        sendPartyChat(`${currentUser.name} 사원이 무언가를 고백했습니다.`, true);
+        darkBodyEl().innerHTML = darkBox("자수",
+            `말한다.<br><br>
+             처음부터 다른 일을 하러 왔다고. 지금까지 한 것들을 전부.<br><br>
+             아무도 놀라지 않는다. 몇은 이미 알고 있었던 눈치다.<br>
+             그런데 아무도 밀어내지 않는다.<br><br>
+             "그럼 지금은?"<br>
+             "지금은 같이 나가고 싶어."<br><br>
+             누군가 손을 내민다. 잡는다.<br>
+             봉인은 한 겹 더 두꺼워졌다.`,
+            darkChoiceBtn("같이 닫는다.", "a214Final('seal')"));
+        mountDarkChat('normal');
+    }
+
+    function a214Final(pick) {
+        let txt;
+        if (pick === 'seal') {
+            darkRun.success += 3;
+            txt = `봉인을 닫는다.<br><br>
+                빛이 접힌다. 종이처럼, 아주 얇아질 때까지.<br>
+                마지막에 소리가 한 번 났다. 사람 목소리였다.<br><br>
+                복도의 발소리가 멎는다. 전부 동시에.<br>
+                문을 열어 보니 아무도 없다. 흰 옷만 바닥에 떨어져 있다.<br><br>
+                계단을 올라간다. 세어 보니 내려올 때보다 짧다.`;
+        } else if (pick === 'break') {
+            darkRun.success += 2;
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 15);
+            txt = `부순다.<br><br>
+                빛이 터진다. 소리는 없다. 대신 귀가 한동안 먹먹하다.<br>
+                천장이 내려앉기 시작한다.<br><br>
+                달린다. 뒤에서 흰 옷들이 따라오는데, 잡으려는 게 아니라 같이 도망치는 것이다.<br>
+                그게 더 이상했다.<br><br>
+                계단 끝에서 뒤를 본다. 아무도 따라 올라오지 못했다.`;
+        } else {
+            darkRun.fail += 2;
+            darkRun.failedRun = true;
+            applyPollutionToUser(currentUser, 18);
+            txt = `두고 달아난다.<br><br>
+                봉인은 걸리지 않았고, 빛은 그대로다.<br>
+                계단을 오르는 동안 아래에서 소리가 커진다.<br><br>
+                나오기는 했다.<br>
+                다만 여기는 아직 여기에 있다. 그게 계속 남을 것이다.`;
+        }
+
+        darkRun.log.push(`[기믹 8] ${pick}`);
+        darkBodyEl().innerHTML = darkBox("마지막", txt,
+            darkChoiceBtn("계단을 오른다.", "darkRun.step=99; renderDarkStep();"));
+        mountDarkChat('normal');
+    }
+
+        function buildCultAmbience(ctx, master) {
+        const low = ctx.createOscillator();
+        const lowG = ctx.createGain();
+        low.type = 'sine'; low.frequency.value = 55;
+        lowG.gain.value = 0.09;
+        low.connect(lowG); lowG.connect(master);
+        low.start(); darkAudio.nodes.push(low);
+
+        // 합창 — 여러 목소리가 같은 문장을 읊는 느낌
+        [138, 174, 207].forEach((f, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sawtooth'; o.frequency.value = f;
+            g.gain.value = 0.018;
+            const lp = ctx.createBiquadFilter();
+            lp.type = 'lowpass'; lp.frequency.value = 500;
+            o.connect(lp); lp.connect(g); g.connect(master);
+            o.start(); darkAudio.nodes.push(o);
+
+            const lfo = ctx.createOscillator();
+            const lg = ctx.createGain();
+            lfo.frequency.value = 0.21 + i * 0.008;
+            lg.gain.value = 0.016;
+            lfo.connect(lg); lg.connect(g.gain);
+            lfo.start(); darkAudio.nodes.push(lfo);
+        });
+
+        function chant() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            for (let k = 0; k < 7; k++) {
+                const tt = t + k * 0.42;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'square';
+                o.frequency.setValueAtTime(130 + Math.random() * 30, tt);
+                const bp = ctx.createBiquadFilter();
+                bp.type = 'bandpass'; bp.frequency.value = 620; bp.Q.value = 6;
+                g.gain.setValueAtTime(0, tt);
+                g.gain.linearRampToValueAtTime(0.02, tt + 0.06);
+                g.gain.exponentialRampToValueAtTime(0.0004, tt + 0.34);
+                o.connect(bp); bp.connect(g); g.connect(master);
+                o.start(tt); o.stop(tt + 0.4);
+            }
+            darkAudio.timers.push(setTimeout(chant, 9000 + Math.random() * 6000));
+        }
+        darkAudio.timers.push(setTimeout(chant, 3000));
+
+        function bell() {
+            if (!darkAudio.playing) return;
+            const t = ctx.currentTime;
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(880, t);
+            g.gain.setValueAtTime(0.03, t);
+            g.gain.exponentialRampToValueAtTime(0.0004, t + 2.2);
+            o.connect(g); g.connect(master);
+            o.start(t); o.stop(t + 2.4);
+            darkAudio.timers.push(setTimeout(bell, 24000 + Math.random() * 20000));
+        }
+        darkAudio.timers.push(setTimeout(bell, 12000));
+    }
+
+        // ==========================================
+    // ★ 발동 중인 효과 표시
+    // ==========================================
+    const QFLAG_LABELS = {
+        immune_smell: '젖은 수건 — 냄새 1회 무효',
+        immune_sound: '귀마개 — 소리 1회 무효',
+        immune_sight: '색안경 — 시선 1회 무효',
+        mark_keep:    '분필 — 표식 유지',
+        reroll:       '식은 커피 — 재굴림 가능',
+        safe_touch:   '고무장갑 — 접촉 1회 안전',
+        no_notice:    '종이봉투 — 주목도 1회 무효',
+        rejoin_boost: '나침반 조각 — 합류 +4',
+        force_open:   '삐뚤어진 못 — 돌파 1회 성공',
+        block_poll:   '마스크 — 오염 1회 차단',
+        dark_light:   '라이터 돌 — 판정 +2',
+        no_mark:      '낡은 명찰 — 지목 1회 회피',
+        next_plus:    '사탕 — 다음 판정 +1',
+        extra_search: '구부러진 스푼 — 탐색 +1',
+        quiz_undo:    '덜 마른 잉크 — 오답 1회 취소',
+        reveal_doc:   '배치도 사본 — 위치 공개',
+        safe_hint:    '근무 일지 — 안전한 쪽 표시',
+        monster_hint: '도청 기록 — 습성 공개',
+        paw_guard:    '따라온 발소리 — 위험 1회 대신'
+    };
+
+    function qFlagBarHtml() {
+        if (!darkRun || !darkRun.qFlags) return '';
+        const keys = Object.keys(darkRun.qFlags).filter(k => darkRun.qFlags[k]);
+        if (keys.length === 0) return '';
+        return `
+            <div style="background:rgba(201,168,255,0.06); border:1px solid #4a3a6a; border-radius:5px; padding:8px 10px; margin-bottom:10px;">
+                <div style="font-size:9px; color:#c9a8ff; font-weight:bold; margin-bottom:4px;">발동 중</div>
+                ${keys.map(k => `<div style="font-size:10px; color:#d4bbff; line-height:1.6;">◈ ${QFLAG_LABELS[k] || k}</div>`).join('')}
+            </div>`;
     }
