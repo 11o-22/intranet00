@@ -3475,21 +3475,28 @@ function getTodayStr() {
         const z = DARK_ZONES[darkRun.zone];
         let base = Math.floor(Math.random() * (z.reward[1] - z.reward[0] + 1)) + z.reward[0];
 
-        let bonus = 0;
-        if (darkRun.isParty && darkRun.voteHistory) {
-            // 파티: 내가 지지한 선택지의 성패만 반영
-            bonus = darkRun.success * 6 - darkRun.fail * 5;
-            let agreed = darkRun.voteHistory.filter(v => v.agreed === true).length;
-            let disagreed = darkRun.voteHistory.filter(v => v.agreed === false).length;
-            let abstained = darkRun.voteHistory.filter(v => v.agreed === null).length;
-            bonus = Math.round(bonus * (agreed / Math.max(1, agreed + disagreed + abstained)));
-            if (darkRun.critRoller) bonus += 10;
+                const GRADE_BONUS = { S: 4, A: 3, B: 2, C: 1.5, D: 1 };
+        let bonus = (darkRun.success * 6 - darkRun.fail * 5) * (GRADE_BONUS[z.grade] || 1);
+
+        if (darkRun.isParty && darkRun.voteHistory && darkRun.voteHistory.length > 0) {
+            const agreed = darkRun.voteHistory.filter(v => v.agreed === true).length;
+            const ratio = 0.5 + 0.5 * (agreed / darkRun.voteHistory.length);
+            bonus = Math.round(bonus * ratio);
         } else {
-            bonus = darkRun.success * 6 - darkRun.fail * 5;
-             if (darkRun.zone === 'Qtrew-A-214') {
+            bonus = Math.round(bonus);
+        }
+        if (darkRun.critRoller) bonus += 10;
+
+        if (darkRun.zone === 'Qtrew-A-214') {
             if (darkRun.a214TraitorWin) bonus += 600;
             else if (darkRun.a214Confessed) bonus -= 300;
-        }
+            else {
+                const sealed = darkRun.log.some(l => l.includes('[기믹 8] seal'));
+                const broke = darkRun.log.some(l => l.includes('[기믹 8] break'));
+                if (sealed) bonus += 500;
+                else if (broke) bonus += 350;
+            }
+            if (a214State && (a214State.exposed || 0) > 0) bonus += 150 * a214State.exposed;
         }
 
         let total = Math.max(10, base + bonus);
