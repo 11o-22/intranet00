@@ -3339,6 +3339,11 @@ function getTodayStr() {
             chat: (darkRun.isParty && partyChatLog.length) ? partyChatLog.slice(-80).map(m => ({
                 n: m.code === 'SYSTEM' ? '' : m.name, t: m.text, s: m.code === 'SYSTEM'
             })) : null,
+                        a214: darkRun.zone === 'Qtrew-A-214' && a214State ? {
+                traitor: a214State.traitorName,
+                wasMe: a214State.traitor === currentUser.code,
+                missions: (a214State.missions || []).filter(x => x.done >= x.goal).length
+            } : null,
             party: darkRun.isParty ? true : false
         });
         if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
@@ -3357,6 +3362,7 @@ function getTodayStr() {
                 오염도 <b style="color:#ff9800;">100%</b><br>
                  ${darkRun._luckSaved ? `<div style="color:#4CAF50; margin-top:6px;">✺ 행운 — 일부를 지켜냈습니다.</div>` : ''}
                 <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#d4af37;">
+                ${darkRun.zone === 'Qtrew-A-214' && a214State ? `<div style="margin-top:6px; color:#ff6b6b;">신도: ${a214State.traitorName}</div>` : ''}
                     🦊 여우 상담실로 긴급 이송됩니다.<br>
                     <span style="font-size:10px; color:#aaa;">회복 예상 시간: 2시간 (퇴원 시 오염도 40%)</span>
                 </div>
@@ -3547,6 +3553,7 @@ function getTodayStr() {
                 <span style="font-size:10px; color:#888;">기본 ${base} P ${bonus >= 0 ? '+' : ''}${bonus} P (성적 가산)</span><br>
                 지급 포인트 <b style="color:#ffd700;">+${total} P</b><br>
                 오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}
+                 ${a214Summary}
                 ${penaltyMsg}
                 ${darkRun.lostItems.length ? `<div style="margin-top:4px;">소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span></div>` : ''}
                 ${gained.length ? `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #444; color:#4CAF50; font-weight:bold;">✦ 회수품 발견: ${gained.join(', ')}</div>` : ''}
@@ -3630,6 +3637,44 @@ function getTodayStr() {
                     </div>` : ''}
             </div>`).join('');
     }
+
+            // ★ A-214 결과 요약
+        let a214Summary = '';
+        if (darkRun.zone === 'Qtrew-A-214') {
+            const wasTraitor = a214State && a214State.traitor === currentUser.code;
+            const ms = (a214State && a214State.missions) || [];
+            const doneCnt = ms.filter(x => x.done >= x.goal).length;
+            const sealed = darkRun.log.some(l => l.includes('[기믹 8] seal'));
+            const broke = darkRun.log.some(l => l.includes('[기믹 8] break'));
+            const ranAway = darkRun.log.some(l => l.includes('[기믹 8] run'));
+
+            if (wasTraitor) {
+                const win = darkRun.a214TraitorWin && doneCnt >= 3;
+                a214Summary = `
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #7f0000;">
+                        <div style="font-weight:bold; color:#ff6b6b; margin-bottom:6px;">[신도 보고]</div>
+                        과업 달성 <b style="color:${doneCnt >= 3 ? '#4CAF50' : '#f44336'};">${doneCnt} / 3</b><br>
+                        ${ms.map(x => `<span style="font-size:10px; color:${x.done >= x.goal ? '#4CAF50' : '#888'};">${x.done >= x.goal ? '✔' : '✕'} ${x.name}</span>`).join('<br>')}<br>
+                        <div style="margin-top:7px; font-size:13px; font-weight:bold; color:${win ? '#4CAF50' : darkRun.a214Confessed ? '#ff9800' : '#f44336'};">
+                            ${win ? '◉ 신도 승리' : darkRun.a214Confessed ? '◉ 배교 — 함께 귀환' : '◉ 신도 실패'}
+                        </div>
+                    </div>`;
+            } else {
+                const traitorName = a214State ? a214State.traitorName : '알 수 없음';
+                const exposed = a214State ? (a214State.exposed || 0) : 0;
+                const success = sealed || broke;
+                a214Summary = `
+                    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #5a4a2a;">
+                        <div style="font-weight:bold; color:#d4af37; margin-bottom:6px;">[탐사 보고]</div>
+                        봉인 결과 <b style="color:${success ? '#4CAF50' : '#f44336'};">${sealed ? '봉인 완료' : broke ? '파괴 완료' : ranAway ? '방치' : '미완'}</b><br>
+                        신도 정체 <b style="color:#ff6b6b;">${traitorName}</b><br>
+                        지목 성공 <b>${exposed}회</b><br>
+                        <div style="margin-top:7px; font-size:13px; font-weight:bold; color:${success ? '#4CAF50' : '#f44336'};">
+                            ${success ? '◈ 임무 성공' : '◈ 임무 실패'}
+                        </div>
+                    </div>`;
+            }
+        }
 
     function toggleLogChat(idx) {
         const el = document.getElementById('logchat-' + idx);
