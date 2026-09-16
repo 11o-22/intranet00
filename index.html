@@ -557,17 +557,15 @@
         </div>
 
         <!-- 6. 사택 -->
-        <div id="tab-house" class="tab-content" style="text-align: left;">
-            <div class="sub-tabs-grid">
-                <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 사택</button>
-                <button class="sub-tab" onclick="switchHousePanel('house-visit', this)">방문</button>
-            </div>
-
-            <div id="house-main" class="sub-panel active">
-                <div class="panel-title">[내 사택]</div>
-                <div id="house-body" style="min-height:120px; font-size:12px; color:var(--theme-text); text-align:center; padding:20px 0;">
-                    준비 중입니다.
+                    <div id="tab-house" class="tab-panel">
+                <div class="sub-tabs-grid">
+                    <button class="sub-tab active" onclick="switchHousePanel('house-main', this)">내 방</button>
+                    <button class="sub-tab" onclick="switchHousePanel('house-storage', this)">보관함</button>
+                    <button class="sub-tab" onclick="switchHousePanel('house-kitchen', this)">주방</button>
                 </div>
+                <div id="house-main" class="sub-panel active"><div id="house-main-body"></div></div>
+                <div id="house-storage" class="sub-panel"><div id="house-storage-body"></div></div>
+                <div id="house-kitchen" class="sub-panel"><div id="house-kitchen-body"></div></div>
             </div>
 
             <div id="house-visit" class="sub-panel">
@@ -722,6 +720,17 @@
     <!-- 통제 콘솔 (상담사 전용) -->
     <div id="admin-screen">
         <div class="admin-header">[보안 통제 콘솔] 인사 발령 및 등록 사원 관리</div>
+
+                <div class="admin-panel-box" style="border-color: #00838f; background-color: #0d1a1c;">
+            <h4 style="color: #4dd0e1;">🏠 사택 호실 배정</h4>
+            <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
+                대상 목록에서 <b>정확히 두 명</b>을 선택하고 배정하세요.<br>
+                한 명만 선택하면 동거인 없이 단독 배정됩니다.
+            </div>
+            <button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:9px; background:linear-gradient(145deg, #00838f, #006064) !important; border-color:#0097a7 !important; color:#fff !important;" onclick="adminAssignRoom()">호실 배정</button>
+            <button class="game-btn" style="width:100%; margin:0; padding:8px; font-size:11px;" onclick="adminClearRoom()">배정 해제</button>
+            <div id="admin-room-list" style="margin-top:12px;"></div>
+        </div>
         
         <div class="admin-panel-box">
             <h4>신규 사원 등록 및 단말 권한 발급</h4>
@@ -1299,7 +1308,12 @@ function getTodayStr() {
         "따라온 발소리": { price: 420, usable: true, targetable: false, effect: "q_paw", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 어둠 탐사에서 판정 1회를 대신 받아 준다." },
     
         "확정 승인서": { price: "???", usable: true, targetable: false, effect: "q_guarantee", darkOnly: true, desc: "[조합품] 다음 강화가 반드시 성공한다. 등급 제한 없음." },
-        "세 번째 자리": { price: "???", usable: true, targetable: false, effect: "third_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 최대 3개까지." }
+        "세 번째 자리": { price: "???", usable: true, targetable: false, effect: "third_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 최대 3개까지." },
+
+         "쌀 한 컵": { price: 40, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
+        "말린 채소": { price: 55, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
+        "통조림 고기": { price: 80, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
+        "이름 없는 향신료": { price: 120, usable: false, cookMat: true, desc: "[재료] 냄새가 매번 다르다. 사택 주방에서 쓸 수 있다." }
     };
 
         const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
@@ -2763,6 +2777,9 @@ function getTodayStr() {
         if (qFlag('next_plus')) { b += 1; consumeQFlag('next_plus'); }
         if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) b += 4;
         if (qFlag('chant_bonus') && kind === 'hide') b += 5;
+        if (qFlag('meal_bonus1')) b += 1;
+        if (qFlag('meal_bonus2')) b += 2;
+        if (qFlag('meal_bonus3')) b += 3;
 
 
         return b;
@@ -8242,6 +8259,8 @@ function getTodayStr() {
         function attemptLogin() {
         const nameInput = document.getElementById('nickname-input');
         const codeInput = document.getElementById('code-input');
+
+                    setTimeout(() => checkAnomaly(), 1200);
         
         if (!nameInput || !codeInput) return;
 
@@ -8377,7 +8396,7 @@ function getTodayStr() {
     const _openSuggestionModal = openSuggestionModal;
     openSuggestionModal = function() { pushModal('suggestion-modal'); _openSuggestionModal(); };
 
-    const _openAdminScreen = openAdminScreen;
+    const _openAdminScreen = openAdminScreen; _renderAdminRoomList();
     openAdminScreen = function() { pushModal('admin-screen'); _openAdminScreen(); };
 
     const _openItemTargetModal = openItemTargetModal;

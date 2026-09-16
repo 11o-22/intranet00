@@ -7575,3 +7575,811 @@ function input119D(n) {
         updateUI();
         showCustomAlert(`맞물렸습니다.\n「${r.name}」을(를) 얻었습니다.`);
     }
+
+        // ==========================================
+    // ★ 사택
+    // ==========================================
+    const HOUSE_GRADES = ['D', 'C', 'B', 'A', 'S'];
+    const HOUSE_INFO = {
+        D: { name:'지하 1층', cost:0,        heal:1, label:'습하고 어둡다. 벽에서 물소리가 난다.', anomaly:0.45 },
+        C: { name:'1~3층',    cost:50000,    heal:2, label:'평범하다. 평범해서 좋다.',            anomaly:0.30 },
+        B: { name:'4~6층',    cost:200000,   heal:3, label:'볕이 든다. 오후에 특히.',             anomaly:0.15 },
+        A: { name:'7~9층',    cost:1500000,  heal:5, label:'조용하다. 아래층 소리가 안 들린다.',  anomaly:0 },
+        S: { name:'옥탑',     cost:18250000, heal:8, label:'전망이 좋다. 다만 창이 하나 더 있다.', anomaly:0 }
+    };
+    const HOUSE_STORAGE_MAX = 20;
+
+    function getHouse(user) {
+        if (!user.house) {
+            user.house = {
+                grade: 'D',
+                roomie: null,
+                storage: [],
+                notes: [],
+                decor: [],
+                lastRest: 0,
+                restCount: 0,
+                restDate: '',
+                anomaly: null,
+                anomalyDate: ''
+            };
+        }
+        if (!user.house.storage) user.house.storage = [];
+        if (!user.house.notes) user.house.notes = [];
+        if (!user.house.decor) user.house.decor = [];
+        return user.house;
+    }
+
+    function getRoomie(user) {
+        const h = getHouse(user);
+        if (!h.roomie) return null;
+        return db.users[h.roomie] || null;
+    }
+
+    // 두 사람은 같은 등급을 공유한다 (높은 쪽 기준)
+    function houseGrade(user) {
+        const h = getHouse(user);
+        const r = getRoomie(user);
+        if (!r) return h.grade;
+        const rh = getHouse(r);
+        const a = HOUSE_GRADES.indexOf(h.grade);
+        const b = HOUSE_GRADES.indexOf(rh.grade);
+        return HOUSE_GRADES[Math.max(a, b)];
+    }
+
+        function switchHousePanel(panelId, btnEl) {
+        document.querySelectorAll('#tab-house .sub-tab').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+        document.querySelectorAll('#tab-house .sub-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        if (panelId === 'house-main') renderHouse();
+        if (panelId === 'house-storage') renderHouseStorage();
+        if (panelId === 'house-kitchen') renderKitchen();
+    }
+
+    function renderHouse() {
+        const box = document.getElementById('house-main-body');
+        if (!box || !currentUser) return;
+
+        const h = getHouse(currentUser);
+        const g = houseGrade(currentUser);
+        const info = HOUSE_INFO[g];
+        const r = getRoomie(currentUser);
+        const nextG = HOUSE_GRADES[HOUSE_GRADES.indexOf(g) + 1];
+        const next = nextG ? HOUSE_INFO[nextG] : null;
+
+        const today = getTodayStr();
+        if (h.restDate !== today) { h.restCount = 0; h.restDate = today; }
+        const restLeft = Math.max(0, 3 - (h.restCount || 0));
+
+        box.innerHTML = `
+            <div class="panel-title">[사택]</div>
+
+            <div style="background:linear-gradient(145deg,#1e1a14,#141110); border:1px solid #5a4a2a; border-radius:8px; padding:14px; margin-bottom:14px;">
+                <div style="font-size:10px; color:#d4af37; letter-spacing:1px; margin-bottom:6px;">${g}등급 호실</div>
+                <div style="font-size:16px; color:#fff; font-weight:bold;">${info.name}</div>
+                <div style="font-size:11px; color:#999; margin-top:6px; line-height:1.6;">${info.label}</div>
+                <div style="font-size:10px; color:#666; margin-top:8px;">
+                    회복 속도 시간당 ${info.heal}% · 보관함 ${h.storage.length}/${HOUSE_STORAGE_MAX}칸
+                </div>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-bottom:14px;">
+                <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:7px;">동거인</div>
+                ${r
+                    ? `<div style="font-size:13px; color:#fff; font-weight:bold;">${r.name}
+                         <span style="font-size:10px; color:${onlineUsersMap[r.code] ? '#4CAF50' : '#666'}; margin-left:6px;">${onlineUsersMap[r.code] ? '● 재실' : '○ 부재'}</span>
+                       </div>
+                       <div style="font-size:10px; color:#888; margin-top:4px;">사번 ${r.no} · ${r.team} · 오염도 ${r.pollution}%</div>
+                       <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;">
+                         <button class="inv-btn inv-btn-use" style="flex:1; min-width:78px;" onclick="houseTreat()">치료해 주기</button>
+                         <button class="inv-btn inv-btn-target" style="flex:1; min-width:78px;" onclick="openHouseNote()">쪽지 남기기</button>
+                       </div>`
+                    : `<div style="font-size:11px; color:#666;">배정된 동거인이 없습니다. 혼자 쓰는 중입니다.</div>`}
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-bottom:14px;">
+                <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:7px;">휴식</div>
+                <div style="font-size:11px; color:#aaa; line-height:1.6;">
+                    현재 오염도 <b style="color:#ff9800;">${currentUser.pollution}%</b><br>
+                    한 번 쉬면 <b style="color:#4CAF50;">${info.heal * 3}%</b> 회복됩니다.
+                </div>
+                <div style="font-size:10px; color:#666; margin-top:5px;">금일 잔여 ${restLeft}회</div>
+                <button class="game-btn" style="width:100%; margin-top:10px; padding:11px;" onclick="houseRest()" ${restLeft <= 0 ? 'disabled' : ''}>
+                    ${restLeft > 0 ? '눕는다' : '오늘은 충분히 쉬었다'}
+                </button>
+            </div>
+
+            <div id="house-anomaly-box"></div>
+
+            ${next ? `
+                <div style="background:rgba(0,0,0,0.3); border:1px solid #5a4a2a; border-radius:6px; padding:12px; margin-bottom:14px;">
+                    <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:7px;">이사</div>
+                    <div style="font-size:11px; color:#aaa; line-height:1.7;">
+                        ${info.name} → <b style="color:#fff;">${next.name}</b> (${nextG}등급)<br>
+                        회복 속도 ${info.heal}% → <b style="color:#4CAF50;">${next.heal}%</b><br>
+                        ${next.anomaly === 0 ? '<span style="color:#4CAF50;">이상 현상 없음</span>' : `이상 현상 발생률 ${Math.round(info.anomaly*100)}% → ${Math.round(next.anomaly*100)}%`}
+                    </div>
+                    <div style="font-size:12px; color:#ffd700; font-weight:bold; margin-top:8px;">${next.cost.toLocaleString()} P</div>
+                    <button class="game-btn" style="width:100%; margin-top:9px; padding:11px; ${currentUser.points >= next.cost ? '' : 'opacity:0.4;'}" onclick="houseMove()" ${currentUser.points >= next.cost ? '' : 'disabled'}>
+                        ${currentUser.points >= next.cost ? '이사한다' : '포인트가 부족합니다'}
+                    </button>
+                </div>` : `
+                <div style="background:rgba(212,175,55,0.07); border:1px solid #5a4a2a; border-radius:6px; padding:12px; margin-bottom:14px; text-align:center; font-size:11px; color:#d4af37;">
+                    최상층입니다. 더 올라갈 곳이 없습니다.
+                </div>`}
+
+            <div id="house-note-box"></div>
+        `;
+        renderHouseNotes();
+        renderAnomalyBox();
+    }
+
+        function houseMove() {
+        const g = houseGrade(currentUser);
+        const nextG = HOUSE_GRADES[HOUSE_GRADES.indexOf(g) + 1];
+        if (!nextG) { showCustomAlert('더 올라갈 곳이 없습니다.'); return; }
+        const next = HOUSE_INFO[nextG];
+        if (currentUser.points < next.cost) { showLuxuryAlert(); return; }
+        if (!buyGuard()) return;
+
+        currentUser.points -= next.cost;
+        const h = getHouse(currentUser);
+        h.grade = nextG;
+        addHistoryLog(currentUser, `[사택] ${next.name}(으)로 이사했습니다. (-${next.cost.toLocaleString()} P)`);
+
+        // 동거인도 같이 올라간다
+        const r = getRoomie(currentUser);
+        if (r) {
+            const rh = getHouse(r);
+            rh.grade = nextG;
+            r._adminStamp = Date.now();
+            addHistoryLog(r, `[사택] ${currentUser.name} 사원이 ${next.name}(으)로 이사를 신청했습니다.`);
+            if (database) database.ref('users/' + r.code).set(r);
+        }
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        renderHouse();
+        showCustomAlert(`${next.name}(으)로 옮겼습니다.\n${next.label}`);
+    }
+
+    function houseRest() {
+        const h = getHouse(currentUser);
+        const today = getTodayStr();
+        if (h.restDate !== today) { h.restCount = 0; h.restDate = today; }
+        if ((h.restCount || 0) >= 3) { showCustomAlert('오늘은 충분히 쉬었습니다.'); return; }
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 사택을 이용할 수 없습니다.'); return; }
+
+        const g = houseGrade(currentUser);
+        const info = HOUSE_INFO[g];
+        let heal = info.heal * 3;
+
+        // 동거인이 같이 있으면 보정
+        const r = getRoomie(currentUser);
+        const together = r && onlineUsersMap[r.code];
+        if (together) heal = Math.round(heal * 1.5);
+
+        const before = currentUser.pollution;
+        currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+        h.restCount = (h.restCount || 0) + 1;
+        h.lastRest = Date.now();
+        addHistoryLog(currentUser, `[사택] 휴식으로 오염도가 ${before - currentUser.pollution}% 회복되었습니다.`);
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        renderHouse();
+        showCustomAlert(
+            together
+                ? `${r.name} 사원이 옆에 있습니다.\n혼자일 때보다 잘 쉬었습니다.\n\n오염도 -${before - currentUser.pollution}%`
+                : `한숨 잤습니다.\n\n오염도 -${before - currentUser.pollution}%`
+        );
+    }
+
+      function adminAssignRoom() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택해주세요.'); return; }
+        if (targets.length > 2) { showCustomAlert('한 호실에는 최대 두 명까지 배정할 수 있습니다.'); return; }
+
+        const [a, b] = targets;
+        const ua = db.users[a], ub = b ? db.users[b] : null;
+        if (!ua) return;
+
+        const ha = getHouse(ua);
+        ha.roomie = b || null;
+        ua._adminStamp = Date.now();
+        addHistoryLog(ua, ub ? `[사택] ${ub.name} 사원과 같은 호실에 배정되었습니다.` : `[사택] 단독 호실에 배정되었습니다.`);
+        if (database) database.ref('users/' + a).set(ua);
+
+        if (ub) {
+            const hb = getHouse(ub);
+            hb.roomie = a;
+            hb.grade = ha.grade;
+            ub._adminStamp = Date.now();
+            addHistoryLog(ub, `[사택] ${ua.name} 사원과 같은 호실에 배정되었습니다.`);
+            if (database) database.ref('users/' + b).set(ub);
+        }
+
+        if (!database) saveDB();
+        updateUI();
+        renderAdminRoomList();
+        showCustomAlert(ub ? `${ua.name} · ${ub.name} 두 사원을 같은 호실에 배정했습니다.` : `${ua.name} 사원을 단독 호실에 배정했습니다.`);
+    }
+
+    function adminClearRoom() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택해주세요.'); return; }
+        let names = [];
+        targets.forEach(code => {
+            const u = db.users[code];
+            if (!u) return;
+            const h = getHouse(u);
+            const mate = h.roomie ? db.users[h.roomie] : null;
+            if (mate) {
+                const mh = getHouse(mate);
+                mh.roomie = null;
+                mate._adminStamp = Date.now();
+                if (database) database.ref('users/' + mate.code).set(mate);
+            }
+            h.roomie = null;
+            u._adminStamp = Date.now();
+            addHistoryLog(u, `[사택] 호실 배정이 해제되었습니다.`);
+            if (database) database.ref('users/' + code).set(u);
+            names.push(u.name);
+        });
+        if (!database) saveDB();
+        updateUI();
+        renderAdminRoomList();
+        showCustomAlert(`${names.length}명의 호실 배정을 해제했습니다.`);
+    }
+
+    function renderAdminRoomList() {
+        const box = document.getElementById('admin-room-list');
+        if (!box) return;
+        const rooms = [];
+        const seen = new Set();
+        Object.values(db.users).forEach(u => {
+            if (u.code === 'kario0987' || seen.has(u.code)) return;
+            const h = u.house;
+            if (!h) return;
+            seen.add(u.code);
+            const mate = h.roomie ? db.users[h.roomie] : null;
+            if (mate) seen.add(mate.code);
+            rooms.push({ a: u, b: mate, grade: h.grade });
+        });
+
+        if (rooms.length === 0) {
+            box.innerHTML = `<div style="font-size:10px; color:#666; text-align:center; padding:12px 0;">배정된 호실이 없습니다.</div>`;
+            return;
+        }
+        box.innerHTML = `<div style="font-size:10px; color:#4dd0e1; font-weight:bold; margin-bottom:6px;">현재 호실 (${rooms.length})</div>` +
+            rooms.map(r => `
+                <div style="background:rgba(0,0,0,0.3); border:1px solid #1a4a4a; border-radius:5px; padding:8px 10px; margin-bottom:5px; font-size:10px;">
+                    <span style="color:#4dd0e1;">[${r.grade}]</span>
+                    <span style="color:#fff; font-weight:bold;">${r.a.name}</span>
+                    ${r.b ? ` · <span style="color:#fff; font-weight:bold;">${r.b.name}</span>` : ` <span style="color:#666;">(단독)</span>`}
+                </div>`).join('');
+    }
+    
+        // ==========================================
+    // ★ 사택 — 보관함
+    // ==========================================
+    function houseStorageRef(user) {
+        // 동거인이 있으면 둘 중 먼저 배정된 쪽(코드 오름차순)의 보관함을 공용으로 쓴다
+        const h = getHouse(user);
+        if (!h.roomie) return user.code;
+        return [user.code, h.roomie].sort()[0];
+    }
+
+    function getSharedStorage() {
+        const ownerCode = houseStorageRef(currentUser);
+        const owner = db.users[ownerCode];
+        if (!owner) return [];
+        return getHouse(owner).storage || [];
+    }
+
+    function saveSharedStorage(arr) {
+        const ownerCode = houseStorageRef(currentUser);
+        const owner = db.users[ownerCode];
+        if (!owner) return;
+        getHouse(owner).storage = arr;
+        owner._adminStamp = Date.now();
+        if (database) database.ref('users/' + ownerCode).set(owner);
+        else saveDB();
+    }
+
+    function renderHouseStorage() {
+        const box = document.getElementById('house-storage-body');
+        if (!box || !currentUser) return;
+
+        const storage = getSharedStorage();
+        const r = getRoomie(currentUser);
+        const myInv = currentUser.inventory || [];
+
+        let counts = {};
+        myInv.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        const myItems = Object.keys(counts);
+
+        box.innerHTML = `
+            <div class="panel-title">[보관함]</div>
+            <div style="font-size:11px; color:#888; line-height:1.7; margin-bottom:12px;">
+                ${r ? `${r.name} 사원과 함께 쓰는 공간입니다. 서로 꺼낼 수 있습니다.` : '혼자 쓰는 보관함입니다.'}<br>
+                <span style="color:#4CAF50;">여기 둔 물건은 어둠에서 잃지 않습니다.</span>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-bottom:14px;">
+                <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:8px;">
+                    보관 중 (${storage.length} / ${HOUSE_STORAGE_MAX})
+                </div>
+                ${storage.length === 0
+                    ? `<div style="font-size:11px; color:#666; padding:8px 0;">비어 있습니다.</div>`
+                    : storage.map((s, i) => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <div style="flex:1; min-width:0;">
+                                <span style="font-size:12px; color:#ddd;">${s.name}</span>
+                                <div style="font-size:9px; color:#666;">${s.by} 보관 · ${new Date(s.at).toLocaleDateString()}</div>
+                            </div>
+                            <button class="inv-btn inv-btn-use" style="flex-shrink:0;" onclick="takeFromStorage(${i})">꺼내기</button>
+                        </div>`).join('')}
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px;">
+                <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:8px;">내 소지품에서 넣기</div>
+                ${myItems.length === 0
+                    ? `<div style="font-size:11px; color:#666;">넣을 물건이 없습니다.</div>`
+                    : myItems.map(it => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0;">
+                            <span style="font-size:11px; color:#ddd; flex:1;">${it} <span style="color:#ff9800;">x${counts[it]}</span></span>
+                            <button class="inv-btn inv-btn-target" style="flex-shrink:0;" onclick="putToStorage('${it}')">넣기</button>
+                        </div>`).join('')}
+            </div>`;
+    }
+
+    function putToStorage(itemName) {
+        if (!buyGuard()) return;
+        const storage = getSharedStorage();
+        if (storage.length >= HOUSE_STORAGE_MAX) { showCustomAlert('보관함이 가득 찼습니다.'); return; }
+        if (!(currentUser.inventory || []).includes(itemName)) { showCustomAlert('해당 물품이 없습니다.'); return; }
+
+        removeItemFromInventory(currentUser, itemName, 1);
+        storage.push({ name: itemName, by: currentUser.name, byCode: currentUser.code, at: Date.now() });
+        saveSharedStorage(storage);
+        addHistoryLog(currentUser, `[사택] '${itemName}'을(를) 보관함에 넣었습니다.`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        updateUI();
+        renderHouseStorage();
+    }
+
+    function takeFromStorage(idx) {
+        if (!buyGuard()) return;
+        const storage = getSharedStorage();
+        const item = storage[idx];
+        if (!item) return;
+
+        storage.splice(idx, 1);
+        currentUser.inventory.push(item.name);
+        saveSharedStorage(storage);
+        addHistoryLog(currentUser, `[사택] 보관함에서 '${item.name}'을(를) 꺼냈습니다.`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        updateUI();
+        renderHouseStorage();
+
+        if (item.byCode !== currentUser.code) {
+            const owner = db.users[item.byCode];
+            if (owner) {
+                addHistoryLog(owner, `[사택] ${currentUser.name} 사원이 보관함에서 '${item.name}'을(를) 꺼냈습니다.`);
+                owner._adminStamp = Date.now();
+                if (database) database.ref('users/' + owner.code).set(owner);
+            }
+        }
+    }
+
+        function openHouseNote() {
+        const r = getRoomie(currentUser);
+        if (!r) { showCustomAlert('동거인이 없습니다.'); return; }
+        openTextInput(
+            '쪽지',
+            `${r.name} 사원에게 남길 말을 적으세요.<br><span style="color:#888; font-size:10px;">방에 붙여 둡니다. 최근 다섯 장만 남습니다.</span>`,
+            '예: 밥 먹고 가',
+            (text) => {
+                const ownerCode = houseStorageRef(currentUser);
+                const owner = db.users[ownerCode];
+                if (!owner) return;
+                const h = getHouse(owner);
+                if (!h.notes) h.notes = [];
+                h.notes.unshift({ by: currentUser.name, text: text, at: Date.now() });
+                if (h.notes.length > 5) h.notes.pop();
+                owner._adminStamp = Date.now();
+                if (database) database.ref('users/' + ownerCode).set(owner);
+                else saveDB();
+
+                addHistoryLog(r, `[사택] ${currentUser.name} 사원이 쪽지를 남겼습니다.`);
+                r._adminStamp = Date.now();
+                if (database) database.ref('users/' + r.code).set(r);
+
+                renderHouse();
+                showCustomAlert('쪽지를 붙여 두었습니다.');
+            }
+        );
+    }
+
+    function renderHouseNotes() {
+        const box = document.getElementById('house-note-box');
+        if (!box) return;
+        const ownerCode = houseStorageRef(currentUser);
+        const owner = db.users[ownerCode];
+        const notes = owner ? (getHouse(owner).notes || []) : [];
+
+        if (notes.length === 0) { box.innerHTML = ''; return; }
+        box.innerHTML = `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px;">
+                <div style="font-size:10px; color:#888; font-weight:bold; margin-bottom:8px;">붙어 있는 쪽지</div>
+                ${notes.map(n => `
+                    <div style="background:rgba(212,175,55,0.06); border-left:2px solid #5a4a2a; padding:8px 10px; margin-bottom:6px;">
+                        <div style="font-size:11px; color:#ddd; line-height:1.6; word-break:break-all;">${n.text}</div>
+                        <div style="font-size:9px; color:#666; margin-top:4px;">— ${n.by} · ${new Date(n.at).toLocaleString()}</div>
+                    </div>`).join('')}
+            </div>`;
+    }
+
+    function houseTreat() {
+        const r = getRoomie(currentUser);
+        if (!r) { showCustomAlert('동거인이 없습니다.'); return; }
+        if (!buyGuard()) return;
+        if (r.pollution <= 0) { showCustomAlert(`${r.name} 사원은 지금 멀쩡합니다.`); return; }
+
+        const h = getHouse(currentUser);
+        const today = getTodayStr();
+        if (h.treatDate !== today) { h.treatCount = 0; h.treatDate = today; }
+        if ((h.treatCount || 0) >= 2) { showCustomAlert('오늘은 더 돌봐 줄 수 없습니다.'); return; }
+
+        // 내 오염도를 조금 가져온다
+        const amount = 12;
+        const taken = Math.min(amount, r.pollution);
+        r.pollution = Math.max(0, r.pollution - taken);
+        applyPollutionToUser(currentUser, Math.ceil(taken / 3));
+        h.treatCount = (h.treatCount || 0) + 1;
+
+        addHistoryLog(r, `[사택] ${currentUser.name} 사원이 돌봐 주었습니다. (오염도 -${taken}%)`);
+        addHistoryLog(currentUser, `[사택] ${r.name} 사원을 돌봤습니다. (오염도 -${taken}% 대신 일부를 나눠 받음)`);
+
+        r._adminStamp = Date.now();
+        if (database) {
+            database.ref('users/' + r.code).set(r);
+            database.ref('users/' + currentUser.code).set(currentUser);
+        } else saveDB();
+
+        updateUI();
+        renderHouse();
+        showCustomAlert(`${r.name} 사원의 오염도를 ${taken}% 낮췄습니다.\n대신 일부가 이쪽으로 옮았습니다.`);
+    }
+
+        // ==========================================
+    // ★ 사택 — 주방
+    // ==========================================
+    const RECIPES = [
+        { id:'porridge', name:'묽은 죽', mats:['쌀 한 컵'],
+          effect:'오염도 8% 회복', desc:'별맛은 없지만 속이 편하다.' },
+        { id:'soup', name:'채소 국', mats:['쌀 한 컵','말린 채소'],
+          effect:'오염도 15% 회복 · 다음 탐사 판정 +1', desc:'국물이 뜨겁다. 그게 전부인데 그게 좋다.' },
+        { id:'stew', name:'고기 조림', mats:['통조림 고기','말린 채소'],
+          effect:'다음 탐사 판정 +2 · 어둠 첫 오염 1회 차단', desc:'오래 끓였다. 기다린 값은 한다.' },
+        { id:'feast', name:'제대로 된 한 끼', mats:['쌀 한 컵','말린 채소','통조림 고기','이름 없는 향신료'],
+          effect:'오염도 25% 회복 · 판정 +3 · 치명 판정 1회 무효', desc:'둘이 마주 앉아 먹었다. 오랜만이었다.' }
+    ];
+
+    const COOK_MATS = ['쌀 한 컵', '말린 채소', '통조림 고기', '이름 없는 향신료'];
+
+    function renderKitchen() {
+        const box = document.getElementById('house-kitchen-body');
+        if (!box || !currentUser) return;
+        const inv = currentUser.inventory || [];
+        const r = getRoomie(currentUser);
+        const together = r && onlineUsersMap[r.code];
+
+        const h = getHouse(currentUser);
+        const today = getTodayStr();
+        if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
+        const left = Math.max(0, 2 - (h.cookCount || 0));
+
+        box.innerHTML = `
+            <div class="panel-title">[주방]</div>
+            <div style="font-size:11px; color:#888; line-height:1.7; margin-bottom:12px;">
+                재료를 넣고 끓입니다. 금일 잔여 <b style="color:#4CAF50;">${left}회</b><br>
+                ${together ? `<span style="color:#d4af37;">${r.name} 사원이 있습니다. 같이 먹으면 효과가 커집니다.</span>` : '<span style="color:#666;">혼자 먹습니다.</span>'}
+            </div>
+
+            ${RECIPES.map(rc => {
+                const have = rc.mats.map(m => ({ name:m, ok: inv.includes(m) }));
+                const can = have.every(x => x.ok) && left > 0;
+                return `
+                    <div style="border:1px solid ${can ? '#5a4a2a' : '#333'}; border-radius:6px; padding:12px; margin-bottom:10px; ${can ? '' : 'opacity:0.55;'}">
+                        <div style="font-size:13px; color:#d4af37; font-weight:bold;">${rc.name}</div>
+                        <div style="font-size:10px; color:#999; margin:4px 0 6px 0;">${rc.desc}</div>
+                        <div style="font-size:10px; color:#4CAF50; margin-bottom:7px;">${rc.effect}</div>
+                        ${have.map(x => `<div style="font-size:10px; color:${x.ok ? '#4CAF50' : '#777'};">${x.ok ? '✔' : '○'} ${x.name}</div>`).join('')}
+                        <button class="game-btn" style="width:100%; margin-top:9px; padding:9px; font-size:11px;" onclick="doCook('${rc.id}')" ${can ? '' : 'disabled'}>
+                            ${left <= 0 ? '오늘은 그만' : (have.every(x=>x.ok) ? '만든다' : '재료 부족')}
+                        </button>
+                    </div>`;
+            }).join('')}
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-top:14px;">
+                <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:9px;">재료 구입</div>
+                <div style="font-size:10px; color:#666; margin-bottom:9px;">아래층 매점에서 받아 옵니다.</div>
+                ${COOK_MATS.map(m => {
+                    const it = ITEM_CATALOG[m];
+                    if (!it) return '';
+                    const have = inv.filter(x => x === m).length;
+                    return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <div style="flex:1; min-width:0;">
+                                <span style="font-size:11px; color:#ddd;">${m}</span>
+                                ${have ? `<span style="font-size:10px; color:#ff9800; margin-left:5px;">보유 ${have}</span>` : ''}
+                            </div>
+                            <button class="inv-btn inv-btn-use" style="flex-shrink:0;" onclick="buyCookMat('${m}', ${it.price})">${it.price} P</button>
+                        </div>`;
+                }).join('')}
+            </div>`;
+    }
+
+    function buyCookMat(name, price) {
+        if (!buyGuard()) return;
+        if (currentUser.points < price) { showLuxuryAlert(); return; }
+        currentUser.points -= price;
+        currentUser.inventory.push(name);
+        addHistoryLog(currentUser, `[사택 매점] ${name} 구입 (-${price} P)`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        renderKitchen();
+    }
+
+    function doCook(id) {
+        if (!buyGuard()) return;
+        const rc = RECIPES.find(x => x.id === id);
+        if (!rc) return;
+        const inv = currentUser.inventory || [];
+        const missing = rc.mats.filter(m => !inv.includes(m));
+        if (missing.length) { showCustomAlert(`재료가 부족합니다.\n${missing.join(', ')}`); return; }
+
+        const h = getHouse(currentUser);
+        const today = getTodayStr();
+        if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
+        if ((h.cookCount || 0) >= 2) { showCustomAlert('오늘은 충분히 먹었습니다.'); return; }
+
+        rc.mats.forEach(m => removeItemFromInventory(currentUser, m, 1));
+        h.cookCount = (h.cookCount || 0) + 1;
+
+        const r = getRoomie(currentUser);
+        const together = r && onlineUsersMap[r.code];
+        const mult = together ? 1.5 : 1;
+
+        let msg = [];
+        if (id === 'porridge') {
+            const heal = Math.round(8 * mult);
+            currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+            msg.push(`오염도 -${heal}%`);
+        } else if (id === 'soup') {
+            const heal = Math.round(15 * mult);
+            currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+            addPendingFlag('meal_bonus1', true);
+            msg.push(`오염도 -${heal}%`, '다음 탐사 판정 +1');
+        } else if (id === 'stew') {
+            addPendingFlag('meal_bonus2', true);
+            addPendingFlag('block_poll', true);
+            msg.push('다음 탐사 판정 +2', '첫 오염 1회 차단');
+        } else {
+            const heal = Math.round(25 * mult);
+            currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+            addPendingFlag('meal_bonus3', true);
+            addPendingFlag('paw_guard', true);
+            msg.push(`오염도 -${heal}%`, '다음 탐사 판정 +3', '치명 판정 1회 무효');
+        }
+
+        if (together) {
+            const share = Math.round(8 * (id === 'feast' ? 2 : 1));
+            r.pollution = Math.max(0, r.pollution - share);
+            r._adminStamp = Date.now();
+            addHistoryLog(r, `[사택] ${currentUser.name} 사원이 ${rc.name}을(를) 만들어 나눠 먹었습니다. (오염도 -${share}%)`);
+            if (database) database.ref('users/' + r.code).set(r);
+        }
+
+        addHistoryLog(currentUser, `[사택] ${rc.name}을(를) 만들어 먹었습니다.`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+        updateUI();
+        renderKitchen();
+        showCustomAlert(`${rc.name}\n\n${rc.desc}\n\n${msg.join('\n')}${together ? `\n\n${r.name} 사원도 같이 먹었습니다.` : ''}`);
+    }
+
+        // ==========================================
+    // ★ 사택 — 이상 현상
+    // ==========================================
+    const ANOMALIES = [
+        { id:'knock', name:'문 두드리는 소리',
+          text:`새벽에 문을 두드리는 소리가 났다.<br><br>세 번, 쉬고, 두 번.<br>동거인은 자고 있었다. 확인하러 갔을 때는 멎었다.<br><br>문 아래로 그림자가 지나갔다.`,
+          opts:[
+            { l:'① 문을 연다.', v:'open', poll:12, item:true },
+            { l:'② 무시하고 잔다.', v:'ignore', poll:5 },
+            { l:'③ 같은 박자로 두드려 답한다.', v:'reply', poll:8, item:true }
+          ] },
+        { id:'wet', name:'젖은 발자국',
+          text:`현관에서 방까지 발자국이 이어져 있다.<br><br>물기가 아직 마르지 않았다.<br>맨발이고, 발가락이 여섯이다.<br><br>침대 앞에서 멈춰 있다.`,
+          opts:[
+            { l:'① 닦아 낸다.', v:'clean', poll:6 },
+            { l:'② 크기를 재 본다.', v:'measure', poll:10, item:true },
+            { l:'③ 따라가 본다.', v:'follow', poll:15, item:true }
+          ] },
+        { id:'extra', name:'하나 더',
+          text:`칫솔이 세 개다.<br><br>둘이 사는 집인데 세 개다.<br>동거인에게 물어보니 자기 것도 아니라고 한다.<br><br>세 번째 것만 젖어 있다.`,
+          opts:[
+            { l:'① 버린다.', v:'throw', poll:8 },
+            { l:'② 그대로 둔다.', v:'keep', poll:14 },
+            { l:'③ 써 본다.', v:'use', poll:20, item:true }
+          ] },
+        { id:'voice', name:'벽 너머',
+          text:`옆방에서 대화 소리가 난다.<br><br>옆방은 비어 있다. 아무도 살지 않는다.<br>목소리가 둘이다. 하나는 낯익다.<br><br>당신 목소리다.`,
+          opts:[
+            { l:'① 벽에 귀를 댄다.', v:'listen', poll:13, item:true },
+            { l:'② 벽을 두드린다.', v:'bang', poll:9 },
+            { l:'③ 이어폰을 낀다.', v:'block', poll:4 }
+          ] },
+
+                  { id:'door', name:'없던 문', danger:true,
+          text:`복도 끝에 문이 하나 더 있다.<br><br>
+            어제까지 벽이었다. 호수도 붙어 있다. 우리 호수 다음 번호다.<br>
+            그 번호는 원래 없는 번호다.<br><br>
+            문 아래로 빛이 샌다. 안에서 누가 움직인다.<br>
+            발소리가 둘이다.`,
+          opts:[
+            { l:'① 문을 연다.', v:'open', poll:20, risk:0.18, item:true },
+            { l:'② 호수를 적어 두고 신고한다.', v:'report', poll:8, risk:0 },
+            { l:'③ 문 앞에서 기다린다.', v:'wait', poll:14, risk:0.08, item:true }
+          ] },
+
+        { id:'mirror2', name:'거울 속의 방', danger:true,
+          text:`욕실 거울에 비친 방이 조금 다르다.<br><br>
+            가구 배치가 반대인 건 당연한데, 없는 물건이 하나 있다.<br>
+            침대 위에 사람이 누워 있다. 이쪽에는 아무도 없다.<br><br>
+            자세히 보니 자고 있는 게 아니다.<br>
+            거울 쪽을 보고 있다. 눈을 뜬 채로.`,
+          opts:[
+            { l:'① 거울을 깬다.', v:'smash', poll:16, risk:0.12, item:true },
+            { l:'② 천을 덮는다.', v:'cover', poll:6, risk:0 },
+            { l:'③ 손을 흔들어 본다.', v:'wave', poll:22, risk:0.25, item:true }
+          ] },
+
+        { id:'roomie', name:'돌아온 사람', danger:true,
+          text:`동거인이 돌아왔다.<br><br>
+            현관에서 신발을 벗고, 손을 씻고, 방으로 들어간다.<br>
+            늘 하던 순서 그대로다.<br><br>
+            다만 아까 연락이 왔었다. 오늘은 늦는다고.<br>
+            지금 방에 들어간 사람은 누구인가.`,
+          opts:[
+            { l:'① 이름을 부른다.', v:'call', poll:18, risk:0.20, item:true },
+            { l:'② 방에 들어가 확인한다.', v:'check', poll:24, risk:0.30, item:true },
+            { l:'③ 집을 나간다.', v:'leave', poll:10, risk:0 }
+          ] }
+    ];
+
+    function checkAnomaly() {
+        if (!currentUser) return;
+        const h = getHouse(currentUser);
+        const g = houseGrade(currentUser);
+        const info = HOUSE_INFO[g];
+        if (info.anomaly === 0) { h.anomaly = null; return; }
+
+        const today = getTodayStr();
+        if (h.anomalyDate === today) return;
+        h.anomalyDate = today;
+
+               if (Math.random() < info.anomaly) {
+            // 위험 현상은 20% 확률로만 선택된다
+            const pool = Math.random() < 0.2
+                ? ANOMALIES.filter(x => x.danger)
+                : ANOMALIES.filter(x => !x.danger);
+            const a = pool[Math.floor(Math.random() * pool.length)];
+            h.anomaly = { id: a.id, at: Date.now() };
+        } else {
+            h.anomaly = null;
+        }
+    }
+
+       function renderAnomalyBox() {
+        const box = document.getElementById('house-anomaly-box');
+        if (!box) return;
+        const h = getHouse(currentUser);
+        if (!h.anomaly) { box.innerHTML = ''; return; }
+        const a = ANOMALIES.find(x => x.id === h.anomaly.id);
+        if (!a) { box.innerHTML = ''; return; }
+
+        const dangerTag = a.danger
+            ? `<div style="display:inline-block; font-size:9px; color:#f44336; border:1px solid #7f0000; background:rgba(127,0,0,0.2); border-radius:3px; padding:2px 6px; margin-left:6px;">위험</div>`
+            : '';
+
+        box.innerHTML = `
+            <div style="background:rgba(127,0,0,${a.danger ? '0.2' : '0.12'}); border:1px solid ${a.danger ? '#b71c1c' : '#7f0000'}; border-radius:6px; padding:13px; margin-bottom:14px;">
+                <div style="font-size:10px; color:#ff6b6b; font-weight:bold; margin-bottom:8px;">⚠ ${a.name}${dangerTag}</div>
+                <div style="font-size:11px; color:#ccc; line-height:1.8; margin-bottom:11px;">${a.text}</div>
+                ${a.danger ? `<div style="font-size:10px; color:#ff9800; margin-bottom:9px;">선택에 따라 돌아오지 못할 수도 있습니다.</div>` : ''}
+                ${a.opts.map(o => {
+                    const riskTag = o.risk >= 0.2 ? ' <span style="color:#f44336; font-size:9px;">[매우 위험]</span>'
+                        : o.risk > 0 ? ' <span style="color:#ff9800; font-size:9px;">[위험]</span>' : '';
+                    return `<button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:11px; text-align:left; font-size:11px; font-weight:normal;" onclick="resolveAnomaly('${a.id}','${o.v}')">${o.l}${riskTag}</button>`;
+                }).join('')}
+            </div>`;
+    }
+
+   function resolveAnomaly(aid, pick) {
+        if (!buyGuard()) return;
+        const a = ANOMALIES.find(x => x.id === aid);
+        if (!a) return;
+        const o = a.opts.find(x => x.v === pick);
+        if (!o) return;
+
+        const h = getHouse(currentUser);
+        h.anomaly = null;
+
+        // ★ 위험 판정
+        const risk = o.risk || 0;
+        if (risk > 0 && Math.random() < risk) {
+            houseIncident(a, o);
+            return;
+        }
+
+        applyPollutionToUser(currentUser, o.poll);
+
+        let gained = null;
+        if (o.item && Math.random() < 0.35) {
+            const pool = ['꿰맨 자국', '지워진 이름표', '읽을 수 없는 라벨', '접힌 안내도', '걸려 있던 자리'];
+            gained = pool[Math.floor(Math.random() * pool.length)];
+            currentUser.inventory.push(gained);
+        }
+
+        addHistoryLog(currentUser, `[사택 이상] ${a.name} — 대응함 (오염도 +${o.poll}%)`);
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        updateUI();
+        renderHouse();
+        showCustomAlert(
+            `${a.name}\n\n대응했습니다. 오염도가 ${o.poll}% 올랐습니다.` +
+            (gained ? `\n\n남은 것: ${gained}` : '')
+        );
+    }
+
+        function houseIncident(a, o) {
+        const INCIDENT_TEXT = {
+            door:    `문을 지난다.<br><br>안쪽은 우리 집이다. 구조가 똑같다.<br>다만 현관에 신발이 네 켤레다.<br><br>안방에서 둘이 나온다. 아는 얼굴이다.<br>하나는 동거인이고, 하나는 이쪽이다.<br><br>그쪽이 먼저 인사한다.<br>"어서 와."<br><br>문은 닫혔다. 이번에는 안에서.`,
+            mirror2: `손을 흔든다.<br><br>거울 속 사람이 일어난다. 천천히, 관절을 하나씩 펴면서.<br>거울 앞까지 걸어온다.<br><br>유리에 손을 댄다. 이쪽도 모르게 손을 댔다.<br>손바닥이 맞닿는다. 유리가 없는 것처럼.<br><br>당겨진다.`,
+            roomie:  `방문을 연다.<br><br>동거인이 침대에 앉아 있다. 뒤돌아 앉아 있다.<br>부른다. 대답한다. 목소리도 같다.<br><br>어깨에 손을 얹는다.<br>고개가 돌아간다. 몸은 그대로인 채로.<br><br>"왜 그래?"<br>얼굴도 같다. 전부 같다.<br>한 가지만 다르다. 이쪽을 처음 보는 눈이다.`
+        };
+
+        const txt = INCIDENT_TEXT[a.id] || `무언가 잘못되었다.`;
+
+        applyPollutionToUser(currentUser, 30);
+        addHistoryLog(currentUser, `[사택 사고] ${a.name} — 오염도가 크게 올랐습니다. (+30%)`);
+        appendBadgeNoteToUser(currentUser, `[사택 사고] ${a.name}`);
+
+        const r = getRoomie(currentUser);
+        if (r) {
+            addHistoryLog(r, `[사택] ${currentUser.name} 사원이 호실에서 이상한 일을 겪었습니다.`);
+            r._adminStamp = Date.now();
+            if (database) database.ref('users/' + r.code).set(r);
+        }
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+
+        showCustomAlert(
+            `[사택 사고]\n\n${a.name}\n\n` +
+            txt.replace(/<br>/g, '\n').replace(/<[^>]+>/g, '') +
+            `\n\n───────────\n오염도 +30%`
+        );
+
+        updateUI();
+        renderHouse();
+    }
