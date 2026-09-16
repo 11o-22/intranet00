@@ -4322,13 +4322,13 @@ function getTodayStr() {
         // 2. 우주 쇼핑몰은 '자정(0시)'을 기준으로 초기화됩니다.
         if (currentUser.alienDate !== currentToday) {
             currentUser.alienDate = currentToday;
-            currentUser.alienBoughtItems = [];   // 당일 구매 이력 해제
-            currentUser.alienUnlockedItems = []; // 해금 진열대 비움
-            currentUser.alienTries = 0;          // 하이로우 기회 2회 복구
-            currentUser.lastAlienPlayTime = 0;   // ★ 쿨타임 기록도 함께 초기화
+            currentUser.alienBoughtItems = [];
+            currentUser.alienUnlockedItems = [];
+            currentUser.alienTries = 0;
+            currentUser.alienDailyUsed = 0;
+            currentUser.lastAlienPlayTime = 0;
             saveDB();
         }
-
          if (currentUser.darkDate !== currentToday) {
             currentUser.darkDate = currentToday;
             currentUser.darkTries = 0;
@@ -4514,12 +4514,12 @@ function getTodayStr() {
             document.getElementById('shop-content-box').style.display = 'block';
         }
 
-        document.getElementById('alien-tries-left').innerText = Math.max(0, 2 - (currentUser.alienTries || 0));
+                document.getElementById('alien-tries-left').innerText = Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
                // ★ 남은 기회가 0이면 HIGH/LOW 버튼 잠금
         const hlH = document.getElementById('btn-hl-high');
         const hlL = document.getElementById('btn-hl-low');
         if (hlH && hlL) {
-            const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienTries || 0));
+                       const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
             const coolDone = currentUser.lastAlienPlayTime && (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
             const playable = triesLeft > 0 || coolDone;
             hlH.disabled = !playable;
@@ -6901,23 +6901,29 @@ function getTodayStr() {
             currentUser.alienBoughtItems = [];
             currentUser.alienUnlockedItems = [];
             currentUser.alienTries = 0;
+            currentUser.alienDailyUsed = 0;
             currentUser.lastAlienPlayTime = 0;
         }
-
         // 관리자(kario0987)는 제한 없음
         if (currentUser.code !== 'kario0987') {
             if (currentUser.alienTries === undefined) currentUser.alienTries = 0;
+            if (currentUser.alienDailyUsed === undefined) currentUser.alienDailyUsed = 0;
 
+            // ★ 하루 총 2회 상한
+            if (currentUser.alienDailyUsed >= 2) {
+                showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
+                return;
+            }
+
+            // 4시간 쿨타임
             if (currentUser.alienTries >= 2) {
-                // ★ 쿨타임 기록이 아예 없으면 무조건 차단 (기회 유실 방지)
                 if (!currentUser.lastAlienPlayTime) {
-                    showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
+                    showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다.');
                     return;
                 }
-
                 const elapsed = now - currentUser.lastAlienPlayTime;
                 if (elapsed >= fourHoursMs) {
-                    currentUser.alienTries = 1; // 4시간 경과 → 1회만 복구
+                    currentUser.alienTries = 1;
                 } else {
                     const remainMs = fourHoursMs - elapsed;
                     const remainMinutes = Math.ceil(remainMs / (60 * 1000));
@@ -6929,7 +6935,6 @@ function getTodayStr() {
                 }
             }
         }
-        
         const btnH = document.getElementById('btn-hl-high'); 
         const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
@@ -6951,6 +6956,7 @@ function getTodayStr() {
         
         // 횟수 증가 및 마지막 플레이 시간 기록
         currentUser.alienTries = (currentUser.alienTries || 0) + 1;
+        currentUser.alienDailyUsed = (currentUser.alienDailyUsed || 0) + 1;
         currentUser.lastAlienPlayTime = now;
 
         if (win) {
@@ -7712,8 +7718,9 @@ function getTodayStr() {
                 u.facilityCount = 0;
                 u.lastFacilityDate = get22HourCycleStr();
             }
-            if (kind === 'alien' || kind === 'all') {
+                 if (kind === 'alien' || kind === 'all') {
                 u.alienTries = 0;
+                u.alienDailyUsed = 0;
                 u.lastAlienPlayTime = 0;
                 u.alienDate = getTodayStr();
             }
