@@ -109,6 +109,21 @@ const DARK_ZONES = {
     };
        
           const DARK_LOOT_BY_ZONE = {
+
+      "Qtrew-A-214": [
+            { name:"지워진 이름표", chance:0.030 },
+            { name:"맨발의 자국", chance:0.015 },
+            { name:"같은 문장", chance:0.008 },
+            { name:"접힌 무릎", chance:0.004 }
+        ],
+        
+     "Qtrew-A-667": [
+            { name:"삼키지 못한 공기", chance:0.030 },
+            { name:"젖지 않은 사원증", chance:0.015 },
+            { name:"여섯 번째 손가락", chance:0.008 },
+            { name:"위에서 떨어진 것", chance:0.004 }
+        ],
+
         "Qtrew-C-119": [
             { name:"금이 간 손거울", chance:0.003 },
             { name:"세 번째 단어", chance:0.002 },
@@ -2927,24 +2942,37 @@ function input119D(n) {
         openGearModal('장비 강화', html);
     }
 
-    function tryGearUpgrade() {
+         function tryGearUpgrade() {
         const g = getGear(currentUser);
         if (!g) return;
         const up = GEAR_UPGRADE[g.grade];
         if (!up) return;
         if (currentUser.points < up.cost) { showLuxuryAlert(); return; }
 
-        const ok = Math.random() < up.rate;
+        const polish = currentUser.gearPolish || 0;
+        const rate = currentUser.gearGuarantee ? 1.0 : Math.min(0.99, up.rate + polish);
+        const ok = Math.random() < rate;
         const from = g.grade;
+        const hadProtect = !!currentUser.gearProtect;
+        const hadGuarantee = !!currentUser.gearGuarantee;
+
+        currentUser.gearPolish = 0;
+        currentUser.gearGuarantee = false;
 
         if (ok) {
             currentUser.points -= up.cost;
             g.grade = up.to;
+            currentUser.gearProtect = false;
             addHistoryLog(currentUser, `[강화 성공] '${g.name}'이(가) ${from} → ${up.to} 등급이 되었습니다. (-${up.cost} P)`);
         } else {
             const loss = Math.floor(up.cost / 2);
             currentUser.points = Math.max(0, currentUser.points - loss);
-            addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화에 실패했습니다. (-${loss} P)`);
+            if (hadProtect) {
+                currentUser.gearProtect = false;
+                addHistoryLog(currentUser, `[강화 실패] 보호권이 등급을 지켰습니다. (-${loss} P)`);
+            } else {
+                addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화에 실패했습니다. (-${loss} P)`);
+            }
         }
 
         if (database) database.ref('users/' + currentUser.code).set(currentUser);
@@ -2959,7 +2987,11 @@ function input119D(n) {
                 <div style="font-size:12px; color:#ccc; line-height:1.8;">
                     ${ok
                         ? `${g.name}이(가) <b style="color:#d4bbff;">${up.to}등급</b>이 되었습니다.<br>손에 쥔 무게가 조금 달라졌다.`
-                        : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`}
+                        : (hadProtect
+                            ? `아무 일도 일어나지 않았다.<br><span style="color:#4CAF50;">보호권이 등급을 지켰다.</span>`
+                            : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`)}
+                    ${polish > 0 ? `<br><span style="font-size:10px; color:#888;">연마제 보정 +${Math.round(polish*100)}% 적용됨</span>` : ''}
+                    ${hadGuarantee ? `<br><span style="font-size:10px; color:#c9a8ff;">확정 승인서 사용됨</span>` : ''}
                 </div>
             </div>
             <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="closeGearModal(); updateUI();">확인</button>`;
@@ -6248,6 +6280,13 @@ function input119D(n) {
     }
 
     function addDepth(amount) {
+
+        if (amount > 0) {
+            let drain = Math.floor(darkRun.depth / 15) * 2;
+            if (qFlag('deep_anchor')) drain = Math.floor(drain / 2);
+            if (drain > 0) addHumanity(-drain, '수압');
+        }
+
         if (!darkRun) return;
         darkRun.depth = Math.max(0, Math.min(A667_MAXDEPTH, getDepth() + amount));
         if (amount > 0) {
@@ -6373,11 +6412,18 @@ function input119D(n) {
             addHumanity(+4, '자각');
             darkRun.success++;
             darkRun._checkFail = 0;
-        } else {
-            addHumanity(-18, '자각 실패');
-            darkRun.fail++;
-            darkRun._checkFail = (darkRun._checkFail || 0) + 1;
 
+         } else {
+            if (consumeQFlag('deep_id')) {
+                addHumanity(+2, '사원증');
+                darkRun._checkFail = 0;
+                darkBodyEl().innerHTML = darkBox("확인",
+                    `적으려는데 안 나온다.<br><br>주머니에서 사원증을 꺼낸다.<br>적혀 있다. 읽는다. 소리 내어 읽는다.<br><br>사원증이 녹아 없어진다. 한 번뿐이었던 모양이다.`,
+                    deepBarHtml() + darkChoiceBtn("계속 내려간다.", `partyAdvance(${darkRun._checkNext})`));
+                renderDeepBar(); mountDarkChat('normal');
+                return;
+            }
+            addHumanity(-18, '자각 실패');
             // ★ 두 번 틀리면 치명
             if (darkRun._checkFail >= 2) {
                 darkRun.dying = 'forget';
@@ -6560,7 +6606,8 @@ function input119D(n) {
 
     function renderStepA667() {
 
-                if (darkRun.humanity == null) darkRun.humanity = 70;
+        if (darkRun.humanity == null) darkRun.humanity = qFlag('deep_air') ? 90 : 70;
+        
         if (darkRun.depth == null) darkRun.depth = 0;
         if (darkRun.solo && darkRun.driftIdx != null && darkRun.driftIdx < 2) { renderDrift(); return; }
 
@@ -6927,20 +6974,124 @@ function input119D(n) {
     }
 
     // --- 기믹 8: 올라가기 ---
-    function a667G8() {
+        function a667G8() {
         const h = getHumanity();
         const hasRoute = darkRun.a667Route || darkRun.a667Truth;
+
+        // 히든 조건
+        const truthReady = darkRun.a667Truth && darkRun.a667Name && h >= 30;
+        const coexistReady = h >= 8 && h <= 25;
+        const rescueReady = darkRun.a667Name && (currentUser.inventory || []).includes('여섯 번째 손가락');
+
+        let opts = [
+            { id:'name',   label:'① 자기 이름을 계속 부르며 올라간다.', fn:'a667G8R', arg:'name' },
+            { id:'air',    label:'② 숨을 참고 올라간다.',               fn:'a667G8R', arg:'air' },
+            { id:'nolook', label:'③ 아래를 보지 않고 올라간다.',        fn:'a667G8R', arg:'nolook' },
+            { id:'stay',   label:'④ 여기 남는다.',                      fn:'a667G8R', arg:'stay' }
+        ];
+        if (truthReady)   opts.push({ id:'truth',   label:'⑤ 마지막으로 하나만 더 묻는다. <span style="color:#4fc3f7; font-size:10px;">[?]</span>', fn:'a667Hidden', arg:'truth' });
+        if (coexistReady) opts.push({ id:'coexist', label:'⑥ 올라가지도 남지도 않는다. <span style="color:#4fc3f7; font-size:10px;">[?]</span>', fn:'a667Hidden', arg:'coexist' });
+        if (rescueReady)  opts.push({ id:'rescue',  label:'⑦ 이름을 부른 쪽을 데려간다. <span style="color:#4fc3f7; font-size:10px;">[?]</span>', fn:'a667Hidden', arg:'rescue' });
+
         renderA667Choice("기믹 8 — 위로",
-            distort(`올라가야 한다.<br><br>
-                수면은 보이지 않는다. 방향만 안다.<br>
-                올라가려면 이유가 필요하다고 했다.<br><br>
-                <span style="color:#888; font-size:11px;">인간성 ${h} · ${hasRoute ? '길을 들었다' : '길을 모른다'}</span>`),
-            maybeShuffle([
-                { id:'name',   label:'① 자기 이름을 계속 부르며 올라간다.', fn:'a667G8R', arg:'name' },
-                { id:'air',    label:'② 숨을 참고 올라간다.',               fn:'a667G8R', arg:'air' },
-                { id:'nolook', label:'③ 아래를 보지 않고 올라간다.',        fn:'a667G8R', arg:'nolook' },
-                { id:'stay',   label:'④ 여기 남는다.',                      fn:'a667G8R', arg:'stay' }
-            ]), null);
+            `올라가야 한다.<br><br>
+             수면은 보이지 않는다. 방향만 안다.<br>
+             올라가려면 이유가 필요하다고 했다.<br><br>
+             <span style="color:#888; font-size:11px;">인간성 ${h} · ${hasRoute ? '길을 들었다' : '길을 모른다'}</span>`,
+            opts, null);
+    }
+
+    function a667Hidden(kind) {
+        if (kind === 'truth') {
+            darkRun.success += 4;
+            darkRun.hiddenRoute = 'truth';
+            darkRun.critical = true;
+            darkBodyEl().innerHTML = darkBox("— 진실",
+                `묻는다. 왜 하필 인간이냐고.<br><br>
+                 그것이 오래 침묵한다. 처음으로 시간을 쓴다.<br><br>
+                 <span style="color:#4fc3f7;">"위에서 자꾸 떨어지거든요."</span><br><br>
+                 손을 편다. 손바닥에 뭔가 있다.<br>
+                 사원증이다. 사번이 여럿 적혀 있다. 긁어 지우고 다시 쓴 자국.<br><br>
+                 <span style="color:#4fc3f7;">"떨어진 걸 주우면 그 사람이 조금씩 옮아요.<br>
+                 우리가 하려던 게 아니라, 그냥 그렇게 돼요.<br>
+                 그래서 계속 줍는 겁니다. 안 주우면 더 많이 옮으니까."</span><br><br>
+                 청소부였다.<br>
+                 이 아래에서 가장 성실한 것들이었다.<br><br>
+                 그것이 길을 알려 준다. 정확한 방향으로.<br>
+                 <span style="color:#4fc3f7;">"위에 계신 분들께 전해 주세요. 그만 버리시라고."</span>`,
+                deepBarHtml() + darkChoiceBtn("올라간다.", "darkRun.step=99; renderDarkStep();"));
+            renderDeepBar(); mountDarkChat('normal');
+            return;
+        }
+
+        if (kind === 'coexist') {
+            const roll = Math.floor(Math.random() * 20) + 1;
+            const ok = roll >= 9;
+            if (ok) {
+                darkRun.success += 3;
+                darkRun.hiddenRoute = 'coexist';
+                darkBodyEl().innerHTML = darkBox("— 경계",
+                    `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll}</div>
+                     올라가지 않는다. 남지도 않는다.<br><br>
+                     중간에 머문다. 물도 공기도 아닌 층이 있다.<br>
+                     숨이 반쯤 쉬어지고 반쯤 안 쉬어진다. 견딜 만하다.<br><br>
+                     아래에서 올려다보고, 위에서 내려다본다.<br>
+                     양쪽 다 이쪽을 자기 쪽이라고 생각하는 것 같다.<br><br>
+                     한참 있다가 그냥 걸어 올라왔다.<br>
+                     걸어서. 물속인데 걸어서.<br><br>
+                     <span style="color:#4fc3f7;">손등을 본다. 손등이다. 다만 아까와는 조금 다르다.</span>`,
+                    deepBarHtml() + darkChoiceBtn("올라간다.", "darkRun.step=99; renderDarkStep();"));
+                renderDeepBar(); mountDarkChat('normal');
+            } else {
+                darkDeath(
+                    `올라가지도 남지도 않으려 했다.<br><br>` +
+                    `중간은 없었다. 그건 위에서 보는 사람들의 착각이다.<br>` +
+                    `아래에서는 전부 아래다.<br><br>` +
+                    `가라앉는 동안 편했다. 그게 답이었다.`
+                );
+            }
+            return;
+        }
+
+        if (kind === 'rescue') {
+            const roll = Math.floor(Math.random() * 20) + 1;
+            const bonus = Math.floor(getHumanity() / 10);
+            const ok = (roll + bonus) >= 14;
+            removeItemFromInventory(currentUser, '여섯 번째 손가락', 1);
+
+            if (ok) {
+                darkRun.success += 5;
+                darkRun.hiddenRoute = 'rescue';
+                darkRun.critical = true;
+                darkBodyEl().innerHTML = darkBox("— 귀환",
+                    `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(+${bonus})</span></div>
+                     이름을 부른다. 아까 들은 이름을.<br><br>
+                     그것이 멈춘다. 오래 안 쓴 이름이라고 했었다.<br>
+                     두 번 부른다. 세 번 부른다.<br><br>
+                     손을 내민다. 손가락이 여섯이다.<br>
+                     주머니에서 꺼낸 것을 맞춰 본다. 자리가 맞는다.<br><br>
+                     잡는다. 같이 올라간다.<br>
+                     올라가는 동안 그것이 점점 가벼워진다.<br>
+                     수면을 뚫었을 때는 사람 하나 무게였다.<br><br>
+                     <span style="color:#4fc3f7;">기록에는 없는 사번이었다.<br>
+                     찾아보니 삼 년 전 실종 처리된 사원이었다.</span>`,
+                    deepBarHtml() + darkChoiceBtn("올라간다.", "darkRun.step=99; renderDarkStep();"));
+                renderDeepBar(); mountDarkChat('normal');
+            } else {
+                darkRun.fail += 2;
+                addHumanity(-20, '구조 실패');
+                darkBodyEl().innerHTML = darkBox("— 실패",
+                    `<div style="text-align:center; font-size:26px; font-weight:bold; color:#f44336; margin-bottom:12px;">🎲 ${roll}</div>
+                     이름을 부른다.<br><br>
+                     그것이 돌아본다. 그리고 고개를 젓는다.<br><br>
+                     <span style="color:#4fc3f7;">"저는 이제 여기 사람입니다."</span><br><br>
+                     손을 내밀지 않는다.<br>
+                     혼자 올라왔다. 올라오는 내내 뒤가 무거웠다.`,
+                    deepBarHtml() + darkChoiceBtn("올라간다.", "darkRun.step=99; renderDarkStep();"));
+                renderDeepBar(); mountDarkChat('normal');
+            }
+            return;
+        }
     }
 
     function a667G8R(pick) {
@@ -7359,4 +7510,68 @@ function input119D(n) {
         });
     }
 
-    
+        // ==========================================
+    // ★ 조합
+    // ==========================================
+    const CRAFT_RECIPES = [
+        {
+            id: 'second_slot',
+            name: '두 번째 자리',
+            desc: '전용 장비의 속성 슬롯을 하나 더 연다.',
+            mats: ['맞물리지 않는 조각', '지워지지 않는 자국', '반죽에 섞이지 않은 것']
+        },
+        {
+            id: 'guarantee',
+            name: '확정 승인서',
+            desc: '다음 강화가 반드시 성공한다.',
+            mats: ['맨발의 자국', '여섯 번째 손가락', '누군가의 왼쪽 신발']
+        },
+        {
+            id: 'third_slot',
+            name: '세 번째 자리',
+            desc: '속성 슬롯을 세 번째까지 연다.',
+            mats: ['접힌 무릎', '위에서 떨어진 것', '먼저 웃은 쪽']
+        }
+    ];
+
+    function renderCraftPanel() {
+        const myGear = getGear(currentUser);
+        const inv = currentUser.inventory || [];
+
+        const html = CRAFT_RECIPES.map(r => {
+            const have = r.mats.map(m => ({ name: m, ok: inv.includes(m) }));
+            const canMake = have.every(h => h.ok);
+            return `
+                <div style="border:1px solid ${canMake ? '#6a4c93' : '#333'}; border-radius:6px; padding:12px; margin-bottom:10px; ${canMake ? '' : 'opacity:0.55;'}">
+                    <div style="font-size:13px; color:#c9a8ff; font-weight:bold;">${r.name}</div>
+                    <div style="font-size:10px; color:#999; margin:4px 0 8px 0;">${r.desc}</div>
+                    ${have.map(h => `<div style="font-size:10px; color:${h.ok ? '#4CAF50' : '#777'};">${h.ok ? '✔' : '○'} ${h.name}</div>`).join('')}
+                    <button class="game-btn" style="width:100%; margin-top:9px; padding:9px; font-size:11px;" onclick="doCraft('${r.id}')" ${canMake ? '' : 'disabled'}>
+                        ${canMake ? '조합한다' : '재료 부족'}
+                    </button>
+                </div>`;
+        }).join('');
+
+        openGearModal('⚗ 조합', 
+            `<div style="font-size:11px; color:#aaa; line-height:1.7; margin-bottom:13px;">
+                어둠에서 가져온 것들을 맞춰 봅니다.<br>
+                <span style="color:#888; font-size:10px;">재료는 모두 소모됩니다.</span>
+             </div>` + html);
+    }
+
+    function doCraft(id) {
+        const r = CRAFT_RECIPES.find(x => x.id === id);
+        if (!r) return;
+        const inv = currentUser.inventory || [];
+        const missing = r.mats.filter(m => !inv.includes(m));
+        if (missing.length > 0) { showCustomAlert(`재료가 부족합니다.\n${missing.join(', ')}`); return; }
+
+        r.mats.forEach(m => removeItemFromInventory(currentUser, m, 1));
+        currentUser.inventory.push(r.name);
+        addHistoryLog(currentUser, `[조합] ${r.mats.join(' + ')} → ${r.name}`);
+
+        if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+        closeGearModal();
+        updateUI();
+        showCustomAlert(`맞물렸습니다.\n「${r.name}」을(를) 얻었습니다.`);
+    }

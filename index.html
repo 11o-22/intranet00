@@ -1064,29 +1064,13 @@ function getTodayStr() {
         });
 
     function saveDB() {
-    if (!database) return;
-    
-    // 1. 현재 로그인한 유저의 데이터가 있다면 내 고유 경로에만 즉시 안전하게 저장
-    if (currentUser) {
-        database.ref(`users/${currentUser.code}`).set(currentUser).catch(err => {
-            console.error("사용자 데이터 저장 실패:", err);
-        });
+        if (!database) return;
+        if (currentUser) {
+            database.ref(`users/${currentUser.code}`).set(currentUser).catch(err => {
+                console.error("사용자 데이터 저장 실패:", err);
+            });
+        }
     }
-
-    // 2. 공용 데이터(건의함, 밀실 거래, VIP 등)는 전체를 덮어쓰지 않고 개별 경로만 각각 타겟팅하여 저장
-    if (db.suggestions) {
-        database.ref('suggestions').set(db.suggestions).catch(err => console.error("건의함 저장 실패:", err));
-    }
-    if (db.p2pDeals) {
-        database.ref('p2pDeals').set(db.p2pDeals).catch(err => console.error("밀실 거래 저장 실패:", err));
-    }
-    if (db.vipInvites) {
-        database.ref('vipInvites').set(db.vipInvites).catch(err => console.error("VIP 초대 저장 실패:", err));
-    }
-    if (db.vipSessions) {
-        database.ref('vipSessions').set(db.vipSessions).catch(err => console.error("VIP 세션 저장 실패:", err));
-    }
-}
 
     function removeItemFromInventory(user, itemName, qty) {
         let removedCount = 0;
@@ -1259,8 +1243,12 @@ function getTodayStr() {
         "접힌 안내도": { price: 70, usable: true, targetable: false, effect: "maze_map", darkOnly: true, desc: "[어둠 회수품] 몇 번을 펼쳐도 다른 그림이 나온다. 사용 시 다음 어둠 탐사의 첫 두 판정에 +1 보정." },
         "누군가의 왼쪽 신발": { price: 140, usable: false, darkOnly: true, desc: "[어둠 회수품] 치수가 당신과 같다. 오른쪽은 없었다." },
         "세어지지 않는 숫자": { price: 340, usable: false, darkOnly: true, desc: "[어둠 회수품] 적혀 있는데 읽을 수 없다. 볼 때마다 자릿수가 다르다." },
-                "맞물리지 않는 조각": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 어디에도 맞지 않는 유리 조각. 다른 두 조각과 함께라면 무언가가 된다." },
+        "맞물리지 않는 조각": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 어디에도 맞지 않는 유리 조각. 다른 두 조각과 함께라면 무언가가 된다." },
         "지워지지 않는 자국": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 벽에서 뜯어 온 자국. 종이에 옮겨 붙었다." },
+        "삼키지 못한 공기": { price: 260, usable: true, targetable: false, effect: "a667_air", darkOnly: true, desc: "[어둠 회수품] 물속에서 건져 올린 공기 방울. 사용 시 다음 심해 탐사에서 인간성이 20 회복된 채로 시작한다." },
+        "젖지 않은 사원증": { price: 480, usable: true, targetable: false, effect: "a667_id", darkOnly: true, desc: "[어둠 회수품] 물에 잠겨 있었는데 젖지 않았다. 사진 속 얼굴이 당신을 닮았다. 사용 시 자각 확인 실패 1회를 무효화한다." },
+        "여섯 번째 손가락": { price: 900, usable: false, darkOnly: true, desc: "[어둠 회수품] 잘린 자리가 아물어 있다. 원래 거기 있던 것처럼." },
+        "위에서 떨어진 것": { price: 1400, usable: true, targetable: false, effect: "a667_anchor", darkOnly: true, desc: "[어둠 회수품] 등불을 든 것들이 찾고 있던 것. 사용 시 다음 심해 탐사에서 수압 감소가 절반이 된다." },
         "반죽에 섞이지 않은 것": { price: 800, usable: false, darkOnly: true, desc: "[조합 재료] 끝내 섞이지 않았다. 아직 따뜻하다." },
         "두 번째 자리": { price: "???", usable: true, targetable: false, effect: "second_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 사용 시 소모된다." },
         // ===== ??? 상점 전용 =====
@@ -1302,10 +1290,16 @@ function getTodayStr() {
         "방진복 안감": { price: 120, usable: true, targetable: false, effect: "equip_liner", qShop: true, desc: "[???] 장착형. 오염이 누적되는 구역에서 상승량이 20% 줄어든다." },
         "실리카겔": { price: 100, usable: true, targetable: false, effect: "equip_silica", qShop: true, desc: "[???] 장착형. 습한 구역에서 판정에 +2." },
         "은박 담요": { price: 110, usable: true, targetable: false, effect: "equip_foil", qShop: true, desc: "[???] 장착형. 열기가 있는 구역에서 피해가 줄어든다." },
-                "꿰맨 자국": { price: 90, usable: false, darkOnly: true, desc: "[어둠 회수품] 인형에서 뜯어낸 실밥. 바느질이 엉망이다. 급하게 꿰맨 티가 난다." },
+        "꿰맨 자국": { price: 90, usable: false, darkOnly: true, desc: "[어둠 회수품] 인형에서 뜯어낸 실밥. 바느질이 엉망이다. 급하게 꿰맨 티가 난다." },
+        "지워진 이름표": { price: 240, usable: false, darkOnly: true, desc: "[어둠 회수품] 창고에서 가져온 명패. 이름 칸이 긁혀 있다. 긁은 사람이 손톱을 썼다." },
+        "맨발의 자국": { price: 420, usable: false, darkOnly: true, desc: "[어둠 회수품] 바닥에서 떠낸 자국. 발가락이 가지런하다. 너무 가지런하다." },
+        "같은 문장": { price: 780, usable: true, targetable: false, effect: "a214_chant", darkOnly: true, desc: "[어둠 회수품] 읊으면 입에 붙는다. 사용 시 다음 어둠 탐사에서 지목·주목 판정에 +5." },
+        "접힌 무릎": { price: 1300, usable: false, darkOnly: true, desc: "[어둠 회수품] 관절이 하나 더 있다. 어느 쪽으로도 접힌다." },
         "걸려 있던 자리": { price: 180, usable: false, darkOnly: true, desc: "[어둠 회수품] 현관 벽의 못 자국. 오래 무언가 걸려 있던 흔적." },
-        "따라온 발소리": { price: 420, usable: true, targetable: false, effect: "q_paw", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 어둠 탐사에서 판정 1회를 대신 받아 준다." }
+        "따라온 발소리": { price: 420, usable: true, targetable: false, effect: "q_paw", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 어둠 탐사에서 판정 1회를 대신 받아 준다." },
     
+        "확정 승인서": { price: "???", usable: true, targetable: false, effect: "q_guarantee", darkOnly: true, desc: "[조합품] 다음 강화가 반드시 성공한다. 등급 제한 없음." },
+        "세 번째 자리": { price: "???", usable: true, targetable: false, effect: "third_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 최대 3개까지." }
     };
 
         const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
@@ -2749,6 +2743,7 @@ function getTodayStr() {
         if (currentUser.pollution >= 90) b -= 1;
         if (darkRun && darkRun.carryItems && darkRun.carryItems.length > 0) b += 1;
         if (darkRun) b += (darkRun.modifier || 0);
+        
 
         if (kind === 'sense') b += gearValue(currentUser, 'sense');
         if (kind === 'hide')  b += gearValue(currentUser, 'hide');
@@ -2767,6 +2762,7 @@ function getTodayStr() {
         if (qFlag('dark_light')) b += 2;
         if (qFlag('next_plus')) { b += 1; consumeQFlag('next_plus'); }
         if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) b += 4;
+        if (qFlag('chant_bonus') && kind === 'hide') b += 5;
 
 
         return b;
@@ -3037,12 +3033,12 @@ function getTodayStr() {
         saveDarkRunState();
         if (darkRun.isParty) watchPartyStep();
 
-        if (darkRun.zone === 'Qtrew-A-214') { renderStepA214(); return; }
-        if (darkRun.zone === 'Qtrew-A-667') { renderStepA667(); return; }
         if (darkRun.zone === 'Qtrew-C-119') { renderStep119(); return; }
         if (darkRun.zone === 'Qtrew-C-176') { renderStepC176(); return; }
         if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
         if (darkRun.zone === 'Qtrew-B-508') { renderStepB508(); return; }
+        if (darkRun.zone === 'Qtrew-A-214') { renderStepA214(); return; }
+        if (darkRun.zone === 'Qtrew-A-667') { renderStepA667(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
 
         const s = darkRun.step;
@@ -3506,6 +3502,13 @@ function getTodayStr() {
             if (a214State && (a214State.exposed || 0) > 0) bonus += 150 * a214State.exposed;
         }
 
+                if (darkRun.zone === 'Qtrew-A-667') {
+            if (darkRun.hiddenRoute === 'truth')   bonus += 900;
+            if (darkRun.hiddenRoute === 'rescue')  bonus += 1400;
+            if (darkRun.hiddenRoute === 'coexist') bonus += 700;
+            bonus += Math.floor(getHumanity() * 4);
+        }
+
         let total = Math.max(10, base + bonus);
         currentUser.points += total;
 
@@ -3546,7 +3549,18 @@ function getTodayStr() {
             }
         }
 
-
+        let a667Summary = '';
+        if (darkRun.zone === 'Qtrew-A-667') {
+            const routeName = { truth:'◈ 진실 — 청소부', rescue:'◈ 귀환 — 데려옴', coexist:'◈ 경계 — 양쪽' }[darkRun.hiddenRoute];
+            a667Summary = `
+                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #1a4a6a;">
+                    <div style="font-weight:bold; color:#4fc3f7; margin-bottom:6px;">[심해 보고]</div>
+                    남은 인간성 <b style="color:${getHumanity() >= 50 ? '#4CAF50' : '#ff9800'};">${getHumanity()} / 100</b><br>
+                    도달 수심 <b>${getDepth()} m</b><br>
+                    ${routeName ? `<div style="margin-top:7px; font-size:13px; font-weight:bold; color:#4fc3f7;">${routeName}</div>` : ''}
+                </div>`;
+        }
+        
         let pollInc = 10;
         if (currentUser.darkTicketFree) { pollInc = 0; currentUser.darkTicketFree = false; }
         if (pollInc > 0) applyPollutionToUser(currentUser, pollInc);
@@ -3596,16 +3610,19 @@ function getTodayStr() {
         });
         if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
 
-        const body = darkBodyEl();
+               const body = darkBodyEl();
         body.innerHTML = darkBox("귀환", z.outro,
             `<div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
                 <div style="font-weight:bold; color:var(--theme-focus); margin-bottom:8px; border-bottom:1px dashed #444; padding-bottom:6px;">[탐사 정산서]</div>
                 기믹 성공 <b style="color:#4CAF50;">${darkRun.success}</b> / 실패 <b style="color:#f44336;">${darkRun.fail}</b><br>
-                ${darkRun.isParty && darkRun.voteHistory ? `<span style="font-size:10px; color:#888;">판단 적중 ${darkRun.voteHistory.filter(v=>v.agreed===true).length}회${darkRun.abstains ? ` · 기권 ${darkRun.abstains}회` : ''}</span><br>` : ''}
+                ${darkRun.isParty && darkRun.voteHistory && darkRun.voteHistory.length > 0
+                    ? `<span style="font-size:10px; color:#888;">판단 적중 ${darkRun.voteHistory.filter(v=>v.agreed===true).length}회${darkRun.abstains ? ` · 기권 ${darkRun.abstains}회` : ''}</span><br>`
+                    : ''}
                 <span style="font-size:10px; color:#888;">기본 ${base} P ${bonus >= 0 ? '+' : ''}${bonus} P (성적 가산)</span><br>
                 지급 포인트 <b style="color:#ffd700;">+${total} P</b><br>
                 오염도 <b style="color:#ff9800;">+${pollInc}%</b>${pollInc === 0 ? ' <span style="color:#4CAF50; font-size:10px;">(버스표 효과)</span>' : ''}
-                 ${a214Summary}
+                ${a214Summary}
+                ${a667Summary}
                 ${penaltyMsg}
                 ${darkRun.lostItems.length ? `<div style="margin-top:4px;">소실 물품 <span style="color:#f44336;">${darkRun.lostItems.join(', ')}</span></div>` : ''}
                 ${gained.length ? `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #444; color:#4CAF50; font-weight:bold;">✦ 회수품 발견: ${gained.join(', ')}</div>` : ''}
@@ -5126,6 +5143,74 @@ function getTodayStr() {
             return;
         }
 
+                if (cat.effect === 'q_guarantee') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            if (currentUser.gearGuarantee) { showCustomAlert('이미 승인서가 적용되어 있습니다.'); return; }
+            currentUser.gearGuarantee = true;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[조합품 사용] 확정 승인서 — 다음 강화 확정 성공`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('도장이 찍혔습니다.\n다음 강화는 반드시 성공합니다.');
+            return;
+        }
+        if (cat.effect === 'third_slot') {
+            const g = getGear(currentUser);
+            if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+            if ((g.slots || 1) < 2) { showCustomAlert('두 번째 자리를 먼저 열어야 합니다.'); return; }
+            if ((g.slots || 1) >= 3) { showCustomAlert('이미 세 자리가 모두 열려 있습니다.'); return; }
+            g.slots = 3;
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[조합품 사용] 세 번째 자리`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('자리가 하나 더 생겼습니다.\n소지품 탭에서 속성을 선택하세요.');
+            return;
+        }
+
+                if (cat.effect === 'a214_chant') {
+            if (darkRun) setQFlag('chant_bonus', true);
+            else addPendingFlag('chant_bonus', true);
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 같은 문장`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('입에 붙습니다.\n다음 탐사에서 눈에 덜 띕니다.');
+            return;
+        }
+
+                if (cat.effect === 'a667_air') {
+            if (darkRun) { setQFlag('deep_air', true); addHumanity(+20, '공기'); }
+            else addPendingFlag('deep_air', true);
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 삼키지 못한 공기`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('숨이 트입니다.\n다음 심해 탐사에서 인간성이 20 높은 채로 시작합니다.');
+            return;
+        }
+        if (cat.effect === 'a667_id') {
+            if (darkRun) setQFlag('deep_id', true);
+            else addPendingFlag('deep_id', true);
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 젖지 않은 사원증`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('사원증을 품에 넣었습니다.\n잊어도 한 번은 되돌릴 수 있습니다.');
+            return;
+        }
+        if (cat.effect === 'a667_anchor') {
+            if (darkRun) setQFlag('deep_anchor', true);
+            else addPendingFlag('deep_anchor', true);
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[아이템 사용] 위에서 떨어진 것`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            updateUI();
+            showCustomAlert('무게가 손에 익습니다.\n다음 심해 탐사에서 수압이 절반으로 느껴집니다.');
+            return;
+        }
+
                 if (cat.effect === 'q_paw') {
             if (darkRun) { setQFlag('paw_guard', true); }
             else { addPendingFlag('paw_guard', true); }
@@ -5184,15 +5269,21 @@ function getTodayStr() {
             return;
         }
 
-                if (cat.effect === 'q_cleanse' || cat.effect === 'q_cleanse_all') {
-            const DARK_KEYS = ['Qtrew-', '캔버스 결', '반 박자', '그림자', '손바닥', '미로', '빵가게', '거울', '의식 불명', '긴급 이송', '사직 반려'];
+        if (cat.effect === 'q_cleanse' || cat.effect === 'q_cleanse_all') {
+            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+            const DARK_KEYS = ['Qtrew-', '캔버스 결', '반 박자', '손바닥', '손등에', '여섯 손가락', '의식 불명', '긴급 이송', '사직 반려', '발목에'];
+
             if (!currentUser.badge || !currentUser.badge.notes || currentUser.badge.notes === '특이사항 없음') {
                 showCustomAlert('지울 흔적이 없습니다.'); return;
             }
 
             let arr = currentUser.badge.notes.split(' | ').filter(n => n.trim() !== '');
             const darkIdx = [];
-            arr.forEach((n, i) => { if (DARK_KEYS.some(k => n.includes(k))) darkIdx.push(i); });
+            arr.forEach((n, i) => {
+                // 물약 이름이 들어간 줄은 제외
+                if (POTION_NAMES.some(p => n.includes(p))) return;
+                if (DARK_KEYS.some(k => n.includes(k))) darkIdx.push(i);
+            });
 
             if (darkIdx.length === 0) { showCustomAlert('어둠에서 얻은 흔적이 없습니다.'); return; }
 
@@ -5220,7 +5311,6 @@ function getTodayStr() {
             );
             return;
         }
-
         if (cat.effect === 'q_appraise') {
             const g = getGear(currentUser);
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
@@ -6602,11 +6692,22 @@ function getTodayStr() {
         if (done.length > 5) {
             const keep = done.slice(0, 5);
             db.p2pDeals = db.p2pDeals.filter(d => d.status === 'PENDING' || keep.includes(d));
-            changed = true;
+           
         }
 
-        if (changed) saveDB();
-
+              if (changed && database) {
+            const expired = db.p2pDeals.filter(d => d && d.status === 'EXPIRED');
+            if (expired.length) {
+                database.ref('p2pDeals').once('value').then(snap => {
+                    const v = snap.val() || [];
+                    const arr = Array.isArray(v) ? v : Object.values(v);
+                    expired.forEach(e => {
+                        const idx = arr.findIndex(d => d && d.id === e.id);
+                        if (idx >= 0) database.ref(`p2pDeals/${idx}/status`).set('EXPIRED');
+                    });
+                });
+            }
+        }
     }
     
     function toggleP2PDealMode() {
@@ -6765,17 +6866,26 @@ function getTodayStr() {
         updates[`users/${currentUser.code}`] = currentUser;
         updates['p2pDeals'] = db.p2pDeals;
 
-        database.ref('/').update(updates).then(() => {
-            showCustomAlert("밀실 제안서가 성공적으로 전달되었습니다.");
+         if (database) {
+        // 서버의 실제 길이를 확인해 그 자리에만 기록
+        database.ref('p2pDeals').once('value').then(snap => {
+            const v = snap.val() || [];
+            const len = Array.isArray(v) ? v.length : Object.keys(v).length;
+            return database.ref(`p2pDeals/${len}`).set(newDeal);
+        }).then(() => {
             updateUI();
             renderP2PLists();
-        }).catch((err) => {
-            console.error("밀실 거래 제안 전송 실패:", err);
-            showCustomAlert("서버 통신 중 오류가 발생했습니다.");
+            showCustomAlert(`${targetUser.name} 사원에게 제안을 보냈습니다.`);
+        }).catch(err => {
+            console.error("밀실 제안 전송 실패:", err);
+            showCustomAlert("서버 전송 중 오류가 발생했습니다.");
         });
     } else {
-        saveDB(); 
-        updateUI(); 
+        saveDB();
+        updateUI();
+        renderP2PLists();
+        showCustomAlert(`${targetUser.name} 사원에게 제안을 보냈습니다.`);
+    }
         renderP2PLists();
         showCustomAlert("밀실 제안서가 성공적으로 전달되었습니다.");
     }
