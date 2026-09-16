@@ -7097,3 +7097,15 @@ function input119D(n) {
         renderDeepBar();
         mountDarkChat('normal');
     }
+
+        function renderA667Choice(title, text, options, imgKey) {
+        const body = darkBodyEl();
+        body.innerHTML = darkBox(title, distort(text),
+            deepBarHtml() +
+            maybeShuffle(options).map(o =>
+                `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`
+            ).join(''),
+            imgKey);
+        renderDeepBar();
+        mountDarkChat('normal');
+    }
