@@ -1771,7 +1771,7 @@ function getTodayStr() {
             delete darkParties[pid];
         } else {
             if (database) {
-                database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
+                
                 // 방장이 나가면 다음 사람에게 위임
                 if (p.leader === currentUser.code) {
                     const next = p.members[others[0]];
@@ -1822,12 +1822,12 @@ function getTodayStr() {
     }
 
     // 파티 출발 시 각자 탐사 상태 초기화
-       function launchPartyRun(party) {
-        const me = party.members[currentUser.code];
+          function launchPartyRun(party) {
+        const me = party.members ? party.members[currentUser.code] : null;
+        if (!me) return;
         if (darkRun) return;
-       if (darkRun) return;
-        if (party._launched) return;
-        party._launched = true;
+        if (window._launchingParty === party.id) return;
+        window._launchingParty = party.id;
 
         currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
@@ -1842,19 +1842,29 @@ function getTodayStr() {
             counted: true
         };
 
-                moveUserQFlags();
+        moveUserQFlags();
 
         darkBriefingOpen = false;
         darkAmbienceStart(party.zone);
         openDarkOverlay();
-        saveDarkRunState();   
+        saveDarkRunState();
         addHistoryLog(currentUser, `[어둠 진입] ${party.zone} 파티 탐사 개시 (${Object.keys(party.members).length}인)`);
         saveDB();
 
         watchPartyStep();
+
         if (database) {
-            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).set(true);
-            database.ref(`darkParties/${party.id}/alive/${currentUser.code}`).onDisconnect().remove();
+            const aliveRef = database.ref(`darkParties/${party.id}/alive/${currentUser.code}`);
+            aliveRef.set(true);
+            aliveRef.onDisconnect().remove();
+
+            // ★ 연결 복구 시 다시 등록
+            database.ref('.info/connected').on('value', (snap) => {
+                if (snap.val() === true && darkRun && darkRun.partyId === party.id) {
+                    aliveRef.set(true);
+                    aliveRef.onDisconnect().remove();
+                }
+            });
         }
 
         renderDarkStep();
@@ -1880,28 +1890,8 @@ function getTodayStr() {
                 database.ref('darkParties/' + pid).remove();
                 continue;
             }
+       }
 
-            if (p.state === 'RUNNING') {
-                const aliveCount = p.alive ? Object.keys(p.alive).length : 0;
-                const startedAgo = Date.now() - (p.startedAt || p.createdAt || 0);
-
-                // ★ 출발 1분 뒤에도 생존자가 없으면 전원 이탈로 간주
-                if (aliveCount === 0 && startedAgo > 60000) {
-                    database.ref('darkParties/' + pid).remove();
-                    database.ref('darkChats/' + pid).remove();
-                    database.ref('darkVotes/' + pid).remove();
-                    database.ref('darkC119/' + pid).remove();
-                    if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
-                    continue;
-                }
-
-                // 3시간 경과
-                if (startedAgo > DARK_OCCUPY_TIMEOUT) {
-                    database.ref('darkParties/' + pid).remove();
-                    if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
-                }
-            }
-        }
     }, 60000);
     // 만료된 점유 기록 자동 청소 (1분마다)
     setInterval(() => {
@@ -2192,8 +2182,11 @@ function getTodayStr() {
     }
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
-              function partyAdvance(nextStep) {
+      function partyAdvance(nextStep) {
         if (!darkRun) return;
+        const now = Date.now();
+        if (now - _advLock < 500) return;   // ★ 0.5초 내 중복 차단
+        _advLock = now;
         if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
         if (!database) { darkRun.step = nextStep; renderDarkStep(); return; }
 

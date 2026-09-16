@@ -4822,13 +4822,22 @@ function input119D(n) {
     }
 
     // 방장이 신도와 미션을 배정
-    function initA214() {
+      function initA214() {
         if (!darkRun || !darkRun.isLeader || !database) return;
-        database.ref(`darkParties/${darkRun.partyId}/members`).once('value').then(snap => {
-            const members = snap.val();
-            if (!members) return;
+        database.ref(`darkParties/${darkRun.partyId}`).once('value').then(snap => {
+            const room = snap.val() || {};
+            let members = room.members;
+
+            // members가 비었으면 alive로 대체
+            if (!members || Object.keys(members).length === 0) {
+                const alive = room.alive || {};
+                members = {};
+                Object.keys(alive).forEach(c => {
+                    members[c] = { code: c, name: (db.users[c] ? db.users[c].name : c) };
+                });
+            }
             const codes = Object.keys(members);
-            if (codes.length < 2) return;
+            if (codes.length === 0) { console.warn('A214: 인원을 찾을 수 없음'); return; }
 
             const traitor = codes[Math.floor(Math.random() * codes.length)];
             const picked = A214_MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
@@ -4836,7 +4845,8 @@ function input119D(n) {
 
             const missions = picked.map(m => ({
                 id: m.id, name: m.name, desc: m.desc, goal: m.goal, done: 0,
-                target: (m.id === 'm01' || m.id === 'm04') ? others[Math.floor(Math.random() * others.length)] : null
+                target: ((m.id === 'm01' || m.id === 'm04') && others.length)
+                    ? others[Math.floor(Math.random() * others.length)] : null
             }));
 
             database.ref(a214Path()).set({
@@ -4851,7 +4861,6 @@ function input119D(n) {
             });
         });
     }
-
     function isTraitor() {
         return a214State && a214State.traitor === currentUser.code;
     }
@@ -5117,8 +5126,13 @@ function input119D(n) {
         if (!a214State) {
             if (darkRun.isLeader) initA214();
             body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">내려가는 중...</div>`, "intro");
+                `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">
+                    내려가는 중...<br>
+                    <button class="game-btn" style="margin-top:14px; padding:9px 16px; font-size:11px;" onclick="forceA214Init()">다시 시도</button>
+                    <button class="game-btn" style="margin-top:8px; padding:9px 16px; font-size:11px;" onclick="finishDarkRun()">나가기</button>
+                 </div>`, "intro");
             setTimeout(() => { if (a214State && darkRun) renderStepA214(); }, 1200);
+            setTimeout(() => { if (a214State && darkRun) renderStepA214(); }, 3000);
             return;
         }
 
@@ -5156,6 +5170,21 @@ function input119D(n) {
 
         const fns = { 1:a214G1, 2:a214G2, 3:a214G3, 4:a214G4, 5:a214G5, 6:a214G6, 7:a214G7, 8:a214G8 };
         if (fns[def.n]) fns[def.n]();
+    }
+
+        function forceA214Init() {
+        if (!darkRun || !database) return;
+        database.ref(`darkParties/${darkRun.partyId}`).once('value').then(snap => {
+            const room = snap.val();
+            if (!room) {
+                showCustomAlert('탐사 기록이 서버에서 사라졌습니다.\n안전하게 귀환합니다.');
+                finishDarkRun();
+                return;
+            }
+            if (room.a214) { a214State = room.a214; renderStepA214(); return; }
+            if (darkRun.isLeader) { initA214(); setTimeout(() => forceA214Init(), 1500); }
+            else showCustomAlert('선임이 아직 준비되지 않았습니다.');
+        });
     }
 
     // 진입 시 역할 안내 (본인만 보임)
