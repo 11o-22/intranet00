@@ -920,7 +920,7 @@ function getTodayStr() {
                 code: "1234", name: "기본사원", 
                 affiliation: "백일몽 주식회사", team: "현장탐사팀", position: "사원",
                 no: "4516", points: 30, pollution: 0, lastPollutionTime: Date.now(), 
-                facilityCount: 0, facilityMax: 15, lastFacilityDate: getTodayStr(), hasVIP: false,
+                facilityCount: 0, facilityMax: 20, lastFacilityDate: getTodayStr(), hasVIP: false,
                 blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: "", alienTries: 0, alienBoughtItems: [], ticketAddedDate: "", ticketAddedCount: 0, alienUnlockedItems: [],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
@@ -1277,6 +1277,7 @@ function getTodayStr() {
         "라이터 돌": { price: 45, usable: true, targetable: false, effect: "q_flint", qShop: true, desc: "[???] 어두운 곳에서 판정에 +2. 탐사 1회 지속." },
         "낡은 명찰": { price: 55, usable: true, targetable: false, effect: "q_badge", qShop: true, desc: "[???] 지목을 한 번 피한다. 이름이 다르게 읽힌다." },
         "접힌 지폐": { price: 20, usable: true, targetable: false, effect: "q_bill", qShop: true, desc: "[???] 펴 보면 얼마인지 알 수 있다. 30~90 P." },
+        "밤샘 신청서": { price: 120, usable: true, targetable: false, effect: "q_darktry", qShop: true, desc: "[???] 금일 어둠 탐사 횟수가 1회 늘어난다. 하루 2회까지 제출할 수 있다." },
         "덧씌운 붕대": { price: 230, usable: true, targetable: false, effect: "q_cleanse", qShop: true, desc: "[???] 어둠에서 얻은 흔적 하나를 덮어 가린다. 무작위로 하나가 사라진다." },
         "지우개 조각": { price: 400, usable: true, targetable: false, effect: "q_cleanse_all", qShop: true, desc: "[???] 어둠에서 얻은 흔적을 전부 지운다. 쓰고 나면 손끝이 한동안 저리다." },    
         "사탕": { price: 25, usable: true, targetable: false, effect: "q_candy", qShop: true, desc: "[???] 입에 물면 다음 판정에 +1." },
@@ -2707,10 +2708,12 @@ function getTodayStr() {
         return !!z.ready;
     }
 
-        function getDarkTriesLeft() {
+           function getDarkTriesLeft() {
         if (!currentUser) return 0;
-        if (currentUser.darkDate !== getTodayStr()) return 3;
-        return Math.max(0, 3 - (currentUser.darkTries || 0));
+        const today = getTodayStr();
+        if (currentUser.darkDate !== today) return 3;
+        const base = 3;
+        return Math.max(0, base - (currentUser.darkTries || 0));
     }
 
            function rollDarkBonus(kind) {
@@ -4284,7 +4287,7 @@ function getTodayStr() {
         // 1. 공용시설 이용 횟수는 '22시'를 기준으로 초기화됩니다. (포인트, 오염도는 유지)
         if (currentUser.lastFacilityDate !== cycle22h) {
             currentUser.facilityCount = 0; 
-            currentUser.facilityMax = 15; 
+            currentUser.facilityMax = 20;  
             currentUser.lastFacilityDate = cycle22h;
             saveDB();
         }
@@ -4306,9 +4309,11 @@ function getTodayStr() {
             saveDB();
         }
 
-        if (currentUser.darkDate !== currentToday) {
+         if (currentUser.darkDate !== currentToday) {
             currentUser.darkDate = currentToday;
             currentUser.darkTries = 0;
+            currentUser.darkTryAdded = 0;
+            currentUser.darkTryAddDate = currentToday;
             saveDB();
         }
 
@@ -4418,7 +4423,7 @@ function getTodayStr() {
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
         document.getElementById('display-facility-max').innerText = currentUser.facilityMax;
 
@@ -5014,6 +5019,26 @@ function getTodayStr() {
             return;
         }
 
+                if (cat.effect === 'q_darktry') {
+            const today = getTodayStr();
+            if (currentUser.darkTryAddDate !== today) {
+                currentUser.darkTryAddDate = today;
+                currentUser.darkTryAdded = 0;
+            }
+            if ((currentUser.darkTryAdded || 0) >= 2) {
+                showCustomAlert('금일 제출 한도(2회)를 모두 사용했습니다.'); return;
+            }
+            currentUser.darkTryAdded = (currentUser.darkTryAdded || 0) + 1;
+            currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[??? 사용] 밤샘 신청서 — 탐사 횟수 +1 (금일 ${currentUser.darkTryAdded}/2)`);
+            if (database) database.ref('users/' + currentUser.code).set(currentUser);
+            else saveDB();
+            updateUI();
+            showCustomAlert(`신청서가 수리되었습니다.\n금일 탐사 횟수가 1회 늘었습니다. (잔여 ${getDarkTriesLeft()}회)`);
+            return;
+        }
+
         if (cat.effect === 'q_polish') {
             const g = getGear(currentUser);
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
@@ -5346,8 +5371,8 @@ function getTodayStr() {
         } else if (cat.effect === 'candy') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - 60);
-            if (!targetUser.facilityMax) targetUser.facilityMax = 15;
-            targetUser.facilityMax = Math.min(20, targetUser.facilityMax + 5);
+            if (!targetUser.facilityMax) targetUser.facilityMax = 20; 
+            targetUser.facilityMax = Math.min(25, targetUser.facilityMax + 5);
             appendBadgeNoteToUser(targetUser, `노스텔지어 캔디 복용 완료`);
         } else if (cat.effect === 'blindfold' || cat.effect === 'happy_maker') {
             if (isBlindfolded(targetUser)) { if(!isOthers) showCustomAlert('이미 효과가 적용 중입니다.'); return false; }
@@ -5355,8 +5380,8 @@ function getTodayStr() {
             targetUser.blindfoldUntil = Date.now() + (h * 60 * 60 * 1000);
             appendBadgeNoteToUser(targetUser, `${itemName} 효과 발동 (${h}시간 오염 동결)`);
         } else if (cat.effect === 'ticket' || cat.effect === 'radio') {
-            if (!targetUser.facilityMax) targetUser.facilityMax = 15;
-            targetUser.facilityMax = Math.min(20, targetUser.facilityMax + (cat.value || cat.ticket));
+            if (!targetUser.facilityMax) targetUser.facilityMax = 20; 
+            targetUser.facilityMax = Math.min(25, targetUser.facilityMax + (cat.value || cat.ticket));
             if (cat.effect === 'radio' && targetUser.pollution > 0) targetUser.pollution = Math.max(0, targetUser.pollution - cat.value);
         } else if (cat.effect === 'vip_pass') {
             if (targetUser.hasVIP) { if(!isOthers) showCustomAlert('이미 2급 보안 인가(VIP)가 승인되어 있습니다.'); return false; }
@@ -5924,7 +5949,7 @@ function getTodayStr() {
 
         // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return; }
-        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return; }
         if (currentUser.points < bet) { showLuxuryAlert(); return; }
 
@@ -5996,7 +6021,7 @@ function getTodayStr() {
         return candidates[Math.floor(Math.random() * candidates.length)];
     }
    function finishSeotda() {
-        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         
         if (currentUser.facilityCount >= currentUser.facilityMax || currentUser.points < seotdaBet) {
             showCustomAlert('이용 횟수 또는 포인트가 부족하여 승부를 진행할 수 없습니다. (대결 무효)');
@@ -6997,7 +7022,7 @@ function getTodayStr() {
     function useFacility(bet) {
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return false; }
         if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
-        if (!currentUser.facilityMax) currentUser.facilityMax = 15;
+        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
         if (currentUser.points < bet) { showLuxuryAlert(); return false; }
         currentUser.points -= bet; 
@@ -7079,7 +7104,7 @@ function getTodayStr() {
             pollution: 0, 
             lastPollutionTime: Date.now(),
             facilityCount: 0, 
-            facilityMax: 15, 
+            facilityMax: 20, 
             lastFacilityDate: get22HourCycleStr(), 
             hasVIP: false,
             blindfoldUntil: 0, 
@@ -7629,6 +7654,13 @@ function getTodayStr() {
             if (kind === 'dark' || kind === 'all') {
                 u.darkTries = 0;
                 u.darkDate = getTodayStr();
+                u.darkTryAdded = 0;
+                u.darkTryAddDate = getTodayStr();
+            }
+            if (kind === 'facility' || kind === 'all') {
+                u.facilityCount = 0;
+                u.facilityMax = 20;
+                u.lastFacilityDate = get22HourCycleStr();
             }
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] ${label.join(', ')} 이용 횟수가 충전되었습니다.`);
