@@ -1284,8 +1284,7 @@ function getTodayStr() {
         "종이봉투": { price: 50, usable: true, targetable: false, effect: "q_bag", qShop: true, desc: "[???] 뒤집어쓰면 한 번은 못 본 척해 준다. 주목도 상승 1회 무효." },
         "나침반 조각": { price: 60, usable: true, targetable: false, effect: "q_compass", qShop: true, desc: "[???] 방향 감각이 돌아온다. 합류 판정에 +4." },
         "삐뚤어진 못": { price: 35, usable: true, targetable: false, effect: "q_nail", qShop: true, desc: "[???] 잠긴 것을 한 번 연다. 돌파 판정 1회 자동 성공." },
-        "빈 약통": { price: 30, usable: true, targetable: false, effect: "q_pill", qShop: true, desc: "[???] 상태이상 하나를 지운다." },
-        "마스크": { price: 40, usable: true, targetable: false, effect: "q_mask", qShop: true, desc: "[???] 탐사 중 오염 상승 1회를 막는다." },
+        "빈 약통": { price: 30, usable: true, targetable: false, effect: "q_pill", qShop: true, desc: "[???] 상태이상 하나를 지운다. 물약으로 생긴 변화에는 듣지 않는다." }, "마스크": { price: 40, usable: true, targetable: false, effect: "q_mask", qShop: true, desc: "[???] 탐사 중 오염 상승 1회를 막는다." },
         "라이터 돌": { price: 45, usable: true, targetable: false, effect: "q_flint", qShop: true, desc: "[???] 어두운 곳에서 판정에 +2. 탐사 1회 지속." },
         "낡은 명찰": { price: 55, usable: true, targetable: false, effect: "q_badge", qShop: true, desc: "[???] 지목을 한 번 피한다. 이름이 다르게 읽힌다." },
         "접힌 지폐": { price: 20, usable: true, targetable: false, effect: "q_bill", qShop: true, desc: "[???] 펴 보면 얼마인지 알 수 있다. 30~90 P." },
@@ -5498,17 +5497,23 @@ function getTodayStr() {
             showCustomAlert('흔적을 다듬었습니다.');
             return;
         }
-        if (cat.effect === 'q_pill') {
-            if (currentUser.timedEffects && currentUser.timedEffects.length > 0) {
-                const gone = currentUser.timedEffects.shift();
+                if (cat.effect === 'q_pill') {
+            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+
+            // 물약이 아닌 시간제 효과만 대상
+            const idxs = [];
+            (currentUser.timedEffects || []).forEach((eff, i) => {
+                if (!POTION_NAMES.includes(eff.name)) idxs.push(i);
+            });
+
+            if (idxs.length > 0) {
+                const gone = currentUser.timedEffects.splice(idxs[0], 1)[0];
                 appendSystemBadgeNote(`[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
-            } else if (currentUser.badge && currentUser.badge.notes !== '특이사항 없음') {
-                let arr = currentUser.badge.notes.split(' | ').filter(n => n.trim());
-                arr.shift();
-                currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
             } else {
-                showCustomAlert('제거할 상태이상이 없습니다.'); return;
+                showCustomAlert('제거할 수 있는 상태이상이 없습니다.\n물약으로 생긴 변화에는 듣지 않습니다.');
+                return;
             }
+
             removeItemFromInventory(currentUser, itemName, 1);
             if (database) database.ref('users/' + currentUser.code).set(currentUser);
             else saveDB();
