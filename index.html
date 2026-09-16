@@ -4696,6 +4696,7 @@ function getTodayStr() {
         el.classList.add('active');
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
+                if (tabId === 'tab-house') renderHouse();
     }
 
     function switchRecordSubTab(panelId, btnEl) {
