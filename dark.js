@@ -9056,5 +9056,31 @@ ${picked.map(m => '- ' + m.text).join('\n')}
         showDarkToast(`✺ 손이 미끄러졌다. 다시 굴린다. (${newRoll})`);
         return newRoll;
     }
+function adminSeizeSafe() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
+    let done = [], skipped = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u) return;
+        const safes = u.safeBoxes || [];
+        if (safes.length === 0) { skipped.push(u.name); return; }
+
+        const total = safes.reduce((a, s) => a + (s.amount || 0), 0);
+        const cnt = safes.length;
+        u.safeBoxes = [];
+        u._adminStamp = Date.now();
+        addHistoryLog(u, `[당국 압수] 금고 ${cnt}개와 보관 중이던 ${total.toLocaleString()} P가 압수되었습니다.`);
+        if (database) database.ref('users/' + code).set(u);
+        done.push(`${u.name}(${total.toLocaleString()} P)`);
+    });
+
+    if (!database) saveDB();
+    updateUI();
+    showCustomAlert(
+        (done.length ? `금고를 압수했습니다.\n${done.join('\n')}` : '') +
+        (skipped.length ? `\n\n금고 없음: ${skipped.join(', ')}` : '')
+    );
+}
         

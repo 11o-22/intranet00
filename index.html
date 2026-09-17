@@ -422,17 +422,18 @@
                         <div class="slot-box" id="slot-box-2">🫁</div>
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
-                                        <div style="margin-top:15px;">
-                                            <div style="margin-top:15px;">
+<div style="margin-top:15px;">
     <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 1000)</div>
     <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
-    <button class="game-btn" style="flex:0 0 54px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
-    <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
-    <input type="number" id="slot-bet" value="5" min="1" max="1000"
-           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:0 6px; height:auto;">
-    <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+        <button class="game-btn" style="flex:0 0 54px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
+        <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
+        <input type="number" id="slot-bet" value="5" min="1" max="1000"
+               style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:0 6px; height:auto;">
+        <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+    </div>
+    <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
 </div>
-                        <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
+<div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
                 </div>
@@ -858,6 +859,9 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #e65100, #bf360c); border-color:#e65100; margin:0;" onclick="adminForceUnequip()">장비 강제 회수</button>
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5d4037, #3e2723); border-color:#4e342e; margin:0;" onclick="adminClearNotes()">특이사항 초기화</button>
             </div>
+            <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
+    <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5a4a2a, #3a2f18) !important; border-color:#7a6a3a !important; margin:0;" onclick="adminSeizeSafe()">금고 압수</button>
+</div>
             <!-- --------------------------------------- -->
                         <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
                 <select id="adm-special-item" style="flex:2;"></select>
