@@ -8762,23 +8762,23 @@ ${picked.map(m => '- ' + m.text).join('\n')}
         }
     }
 
-    function renderFoxChat() {
-        const box = document.getElementById('fox-chat-log');
-        if (!box) return;
-        box.innerHTML = foxChatLog.map(m => {
-            const mine = m.who === 'me';
-            return `
-                <div style="margin-bottom:10px; text-align:${mine ? 'right' : 'left'};">
-                    <div style="display:inline-block; max-width:82%; background:${mine ? 'rgba(76,175,80,0.1)' : 'rgba(212,175,55,0.08)'}; border:1px solid ${mine ? '#2e5c31' : '#5a4a2a'}; border-radius:9px; padding:9px 12px; text-align:left;">
-                        ${mine ? '' : `<div style="font-size:9px; color:#d4af37; font-weight:bold; margin-bottom:4px;">🦊 여우 상담사</div>`}
-                        <div style="font-size:12px; color:#f0f0f0; line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
-                    </div>
-                </div>`;
-        }).join('') + (foxBusy
-            ? `<div style="text-align:left; margin-bottom:10px;"><div style="display:inline-block; background:rgba(212,175,55,0.05); border:1px solid #3a3020; border-radius:9px; padding:9px 12px; font-size:11px; color:#888;">…</div></div>`
-            : '');
-        box.scrollTop = box.scrollHeight;
-    }
+   function renderFoxChat() {
+    const box = document.getElementById('fox-chat-log');
+    if (!box) return;
+    box.innerHTML = foxChatLog.map(m => {
+        const mine = m.who === 'me';
+        return `
+            <div style="margin-bottom:10px; text-align:${mine ? 'right' : 'left'};">
+                <div style="display:inline-block; max-width:82%; background:${mine ? 'rgba(76,175,80,0.18)' : 'rgba(212,175,55,0.16)'}; border:1px solid ${mine ? '#2e5c31' : '#5a4a2a'}; border-radius:9px; padding:9px 12px; text-align:left;">
+                    ${mine ? '' : `<div style="font-size:9px; color:#d4af37; font-weight:bold; margin-bottom:4px;">🦊 여우 상담사</div>`}
+                    <div style="font-size:12px; color:var(--theme-text); line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
+                </div>
+            </div>`;
+    }).join('') + (foxBusy
+        ? `<div style="text-align:left; margin-bottom:10px;"><div style="display:inline-block; background:rgba(212,175,55,0.05); border:1px solid #3a3020; border-radius:9px; padding:9px 12px; font-size:11px; color:var(--theme-text); opacity:0.6;">…</div></div>`
+        : '');
+    box.scrollTop = box.scrollHeight;
+}
 
     function saveFoxLog() {
         if (foxChatLog.length === 0) return;
