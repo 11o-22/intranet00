@@ -23,7 +23,7 @@ export default async function handler(req, res) {
                 'X-Title': 'Qtrew Intranet'
             },
             body: JSON.stringify({
-                model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition',
+                model: 'cognitivecomputations/NeverSleep: Lumimaid v0.2 70B',
                 max_tokens: 600,
                 temperature: 0.9,
                 messages: fullMessages

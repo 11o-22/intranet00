@@ -93,6 +93,7 @@ const DARK_ZONES = {
                 step3: "dark_alley_4.jpg"
             }
         },
+
         "Qtrew-D-087": {
             code:"Qtrew-D-087", grade:"D", name:"관람객은 손대지 마시오",
             brief:"(눈을 뜨니 폐관한 미술관 안이었다.)",
@@ -104,6 +105,8 @@ const DARK_ZONES = {
                 step1: "museum_2.jpg",
                 step2: "museum_3.jpg",
                 step3: "museum_4.jpg"
+
+            
             }
         }
     };
