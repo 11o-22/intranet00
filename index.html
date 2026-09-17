@@ -423,16 +423,14 @@
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
                                         <div style="margin-top:15px;">
-                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 </div>
-                        <div class="bet-stepper">
-                            <button class="step-btn wide" onclick="adjustBet('slot-bet', 10)">+10</button>
-                            <button class="step-btn bet-max" onclick="setBetMax('slot-bet')">최대</button>
-
-                        </div>
-                        <input type="number" id="slot-bet" value="5" min="1" placeholder="베팅 포인트"
-       style="width:100%; text-align:center; font-size:16px; padding:11px; margin-bottom:8px;">
-<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:9px; font-size:11px;" onclick="setBetMax('slot-bet')">보유 전액</button>
-                        <input type="hidden" id="slot-bet" value="5">
+                        <<div style="font-size:11px; color:#888; margin-bottom:6px;">베팅</div>
+<div style="display:flex; gap:6px; align-items:center; justify-content:center; margin-bottom:8px;">
+    <button class="step-btn wide" style="flex:0 0 auto;" onclick="adjustBet('slot-bet', 100)">+100</button>
+    <button class="step-btn wide" style="flex:0 0 auto;" onclick="adjustBet('slot-bet', 10)">+10</button>
+    <input type="number" id="slot-bet" value="5" min="1"
+           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:10px;">
+    <button class="step-btn bet-max" style="flex:0 0 auto;" onclick="setBetMax('slot-bet')">최대</button>
+</div>
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
                     <div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
