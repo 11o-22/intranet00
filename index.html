@@ -222,7 +222,7 @@
                 <div class="id-info-details">
                     <div class="serial-row">SERIAL NO. <span id="display-no" style="font-weight:bold; color:inherit;">0000</span></div>
                     <div class="emp-name"><span id="display-name">사원이름</span> <span class="emp-role-tag" id="display-position">사원</span></div>
-                    <div class="emp-meta"><span id="display-affiliation">본사</span> · <span id="display-team">기획 2팀</span></div>
+                   <div class="emp-meta"><span id="display-affiliation">본사</span> · <span id="display-team">기획 2팀</span><span id="display-gp"></span></div>
                 </div>
             </div>
 
@@ -1290,6 +1290,7 @@ function getTodayStr() {
         "다이아 애널 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_plug", desc: "반짝이는 다이아몬드가 박힌 애널 플러그. 본인이나 타인의 장착칸에 강제 장착된다." },
         "감각 연동 오나홀": { price: 7777, usable: true, targetable: true, effect: "equip_sync_hole", desc: "지정한 상대의 구멍과 감각이 연결된다. 상대방의 장착칸에 강제로 장착된다." },
         "감각 연동 딜도": { price: 7762, usable: true, targetable: true, effect: "equip_sync_dildo", desc: "지정한 상대의 자지와 감각이 연결된다. 상대방의 장착칸에 강제로 장착된다." },
+        "클리 흡입기": { price: 12000, usable: true, targetable: true, effect: "equip_clit", desc: "클리를 민감하게 개발해 준다. 오염도 20%를 낮춘다." },
         "에그 바이브": { price: 2000, usable: true, targetable: true, effect: "equip_egg", desc: "자신이나 타인에게 사용하여 짜릿한 진동을 선사한다. 장착칸에 등록된다." },
         "지갑": { price: 3333, usable: true, targetable: false, effect: "open_wallet", desc: "열면 2500~5000 포인트 사이의 무작위 포인트를 얻는다." },
         "은반지": { price: 3458, usable: true, targetable: false, effect: "equip_silver_ring", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "장착 가능하다. 장착 시 120시간 동안 오염도를 완전히 차단해 준다. 다만 120시간이 지나면 부서져 사라진다." },
@@ -1387,7 +1388,7 @@ function getTodayStr() {
         "우유맛 물약", "사과맛 물약", "오렌지맛 물약", "복숭아맛 물약", "제거약", "랜덤박스",
         "작두", "유리손포", "착한 친구", "보안팀 의상 세트", "버터 나이프", "은반지",
         "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
-        "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약"
+        "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기"
     ];
     const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
 
@@ -4428,8 +4429,11 @@ function getTodayStr() {
                                                 <div class="emp-list-title" style="flex-wrap:wrap;">
                             <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe} ${quarantineTag}
                         </div>
-                        <div class="emp-list-sub">사번: <span style="font-family:monospace; color:#bbb;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}</div>
-                        ${gearTag}
+                       <div class="emp-list-sub">사번: <span style="font-family:monospace; color:#bbb;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}${
+                       (u.badge && (u.badge.gender || u.badge.posTag))
+                       ? ' · ' + [u.badge.gender, u.badge.posTag].filter(Boolean).join(' / ')
+                                              : ''
+                            }</div>
                         <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-size:11px; font-weight:bold; color:#ffd700;">${u.points} P</span>
                             <span class="status-tag" style="color:${statusInfo.color}; background:${statusInfo.bg}; border:1px solid ${statusInfo.color};">
@@ -4618,6 +4622,12 @@ function getTodayStr() {
         document.getElementById('display-no').innerText = currentUser.no;
         document.getElementById('display-affiliation').innerText = currentUser.affiliation || "본사";
         document.getElementById('display-team').innerText = currentUser.team;
+
+        const gp = [];
+if (currentUser.badge && currentUser.badge.gender) gp.push(currentUser.badge.gender);
+if (currentUser.badge && currentUser.badge.posTag) gp.push(currentUser.badge.posTag);
+document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join(' / ') : '';
+
         document.getElementById('display-position').innerText = currentUser.position || "사원";
         document.getElementById('display-points').innerText = currentUser.points;
         document.getElementById('pollution-text').innerText = `${currentUser.pollution} / 100%`;
@@ -5917,7 +5927,26 @@ function getTodayStr() {
             );
             return true;
         }
-       else if (['equip_plug', 'equip_sync_hole', 'equip_sync_dildo', 'equip_egg'].includes(cat.effect)) {
+       else if (cat.effect === 'equip_clit') {
+    if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+    if (targetUser.equippedWeapons.length >= 3) {
+        if (!isOthers) showCustomAlert("장착 슬롯이 가득 찼습니다.");
+        return false;
+    }
+    const cPos = currentUser.position || '사원';
+    const label = isOthers ? `클리 흡입기 (장착자: ${currentUser.name} ${cPos})` : '클리 흡입기';
+    targetUser.equippedWeapons.push(label);
+    setEquipOwner(targetUser, label, isOthers ? currentUser.code : targetUser.code);
+    targetUser.pollution = Math.max(0, targetUser.pollution - 20);
+    appendBadgeNoteToUser(targetUser, `[장착됨] ${label} 장착 적용`);
+    if (isOthers) {
+        addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원이 클리 흡입기를 장착시켰습니다.`);
+        showCustomAlert(`${targetUser.name}님에게 클리 흡입기를 장착시켰습니다.`);
+    } else {
+        showCustomAlert('클리 흡입기를 장착했습니다.');
+    }
+}
+        else if (['equip_plug', 'equip_sync_hole', 'equip_sync_dildo', 'equip_egg'].includes(cat.effect)) {
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
             
             // 연동 기구 (나와 상대방 양쪽 모두 장착)
