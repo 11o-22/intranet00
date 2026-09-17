@@ -424,14 +424,13 @@
                     </div>
                                         <div style="margin-top:15px;">
                                             <div style="margin-top:15px;">
-    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트</div>
+    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 1000)</div>
     <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
-    <button class="game-btn" style="flex:0 0 52px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
-    <button class="game-btn" style="flex:0 0 46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
-    <input type="number" id="slot-bet" value="5" min="1"
-           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:10px 6px;">
-    <button class="game-btn" style="flex:0 0 46px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
-
+    <button class="game-btn" style="flex:0 0 54px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
+    <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
+    <input type="number" id="slot-bet" value="5" min="1" max="1000"
+           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:0 6px; height:auto;">
+    <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
 </div>
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
@@ -6150,8 +6149,8 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
     // ==========================================
     const MAX_BET = 50;
     const POINT_CAP = 30000000;
-    const LIMITED_BETS = ['seotda-bet', 'roulette-bet'];
-    const BET_CAPS = {};
+    const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet'];
+    const BET_CAPS = { 'slot-bet': 1000 };
     
 
     function getBetValue(inputId) {
@@ -6207,9 +6206,10 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
     }
 function playSlot() {
     let bet = parseInt(document.getElementById('slot-bet').value);
-    if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
-    if (bet > currentUser.points) { showLuxuryAlert(); return; }
-    if (!useFacility(bet)) return;
+if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
+if (bet > 1000) { showCustomAlert('슬롯 최대 베팅 한도는 1000 P입니다.'); return; }
+if (bet > currentUser.points) { showLuxuryAlert(); return; }
+if (!useFacility(bet)) return;
 
     const btn = document.getElementById('btn-slot');
     btn.disabled = true;
