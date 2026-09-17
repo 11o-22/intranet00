@@ -413,30 +413,28 @@
 
                 <!-- 슬롯 -->
                 <div id="panel-slot" class="sub-panel active" style="text-align:center;">
-                    <div class="panel-title">[적출 슬롯머신]</div>
-                    <div class="slot-simple-paytable">
-                        <div>🫀 ×40</div><div>🫁 ×25</div><div>👁 ×15</div><div>🦵🏼 ×8</div><div>🖐🏻 ×5</div><div>👂🏻 ×3</div>
-                    </div>
-                    <div class="slot-window">
-                        <div class="slot-box" id="slot-box-1">🫀</div>
-                        <div class="slot-box" id="slot-box-2">🫁</div>
-                        <div class="slot-box" id="slot-box-3">👁</div>
-                    </div>
-<div style="margin-top:15px;">
-    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 1000)</div>
-    <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
-        <button class="game-btn" style="flex:0 0 54px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
-        <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
-        <input type="number" id="slot-bet" value="5" min="1" max="1000"
-               style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:0 6px; height:auto;">
-        <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+    <div class="panel-title">[적출 슬롯머신]</div>
+    <div class="slot-simple-paytable">
+        <div>🫀 ×40</div><div>🫁 ×25</div><div>👁 ×15</div><div>🦵🏼 ×8</div><div>🖐🏻 ×5</div><div>👂🏻 ×3</div>
     </div>
-    <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
+    <div class="slot-window">
+        <div class="slot-box" id="slot-box-1">🫀</div>
+        <div class="slot-box" id="slot-box-2">🫁</div>
+        <div class="slot-box" id="slot-box-3">👁</div>
+    </div>
+    <div style="margin-top:15px;">
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 1000)</div>
+        <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
+            <button class="game-btn" style="flex:0 0 54px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
+            <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
+            <input type="number" id="slot-bet" value="5" min="1" max="1000"
+                   style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:0 6px;">
+            <button class="game-btn" style="flex:0 0 48px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+        </div>
+        <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
+    </div>
+    <div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
 </div>
-<div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
-                    </div>
-                    <div id="slot-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅액을 지정하고 레버를 당기세요. (오염도 +2)</div>
-                </div>
 
                 <!-- 룰렛 -->
                 <div id="panel-roulette" class="sub-panel" style="text-align:center;">
