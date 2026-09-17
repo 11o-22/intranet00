@@ -7393,11 +7393,12 @@ function getTodayStr() {
             catch (e) { console.warn('관리자 패널 렌더 실패:', fn.name, e.message); }
         });
     }
-    
-    function initAdminAccordion() {
+
+        function initAdminAccordion() {
         document.querySelectorAll('#admin-screen .admin-panel-box').forEach(box => {
             const h = box.querySelector('h4');
             if (!h || h.dataset.acc) return;
+            if (box.querySelector('#adm-target-list')) { box.classList.remove('collapsed'); return; }
             h.dataset.acc = '1';
             h.onclick = () => box.classList.toggle('collapsed');
             box.classList.add('collapsed');
