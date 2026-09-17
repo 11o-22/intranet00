@@ -23,7 +23,7 @@ export default async function handler(req, res) {
                 'X-Title': 'Qtrew Intranet'
             },
             body: JSON.stringify({
-         model : 'sao10k/l3.1-euryale-70b',
+         model : 'anthropic/claude-sonnet-4.5',
                 max_tokens: 600,
                 temperature: 0.9,
                 messages: fullMessages
