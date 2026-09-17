@@ -7380,21 +7380,20 @@ function getTodayStr() {
         }
     }
     // --- 통제 콘솔 ---
-    function openAdminScreen() {
+       function openAdminScreen() {
         document.getElementById('main-screen').style.display = 'none';
         document.getElementById('ranking-bottom-bar').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'block';
-        renderAdminSuggestions();
-        renderAdminItemSelect();
-        renderAdminDarkZones();
-        renderAdminTargetList();
-        renderAdminFoxRoom();
-        renderAdminGearList();
-        renderAdminGearQuick();
-        renderAdminGearList();
-        renderAdminRoomList();
-        initAdminAccordion();
+
+        [renderAdminSuggestions, renderAdminItemSelect, renderAdminDarkZones,
+         renderAdminTargetList, renderAdminFoxRoom, renderAdminGearQuick,
+         renderAdminGearList, renderAdminRoomList, initAdminAccordion]
+        .forEach(fn => {
+            try { if (typeof fn === 'function') fn(); }
+            catch (e) { console.warn('관리자 패널 렌더 실패:', fn.name, e.message); }
+        });
     }
+    
     function initAdminAccordion() {
         document.querySelectorAll('#admin-screen .admin-panel-box').forEach(box => {
             const h = box.querySelector('h4');
