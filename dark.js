@@ -7665,16 +7665,6 @@ function safeDeposit() {
         return HOUSE_GRADES[Math.max(a, b)];
     }
 
-        function switchHousePanel(panelId, btnEl) {
-        document.querySelectorAll('#tab-house .sub-tab').forEach(b => b.classList.remove('active'));
-        btnEl.classList.add('active');
-        document.querySelectorAll('#tab-house .sub-panel').forEach(p => p.classList.remove('active'));
-        document.getElementById(panelId).classList.add('active');
-        if (panelId === 'house-main') renderHouse();
-        if (panelId === 'house-storage') renderHouseStorage();
-        if (panelId === 'house-kitchen') renderKitchen();
-    }
-
     function renderHouse() {
         const box = document.getElementById('house-main-body');
         if (!box || !currentUser) return;
@@ -7815,35 +7805,41 @@ function safeDeposit() {
         );
     }
 
-      function adminAssignRoom() {
-        const targets = getAdminTargets();
-        if (targets.length === 0) { showCustomAlert('대상을 선택해주세요.'); return; }
-        if (targets.length > 2) { showCustomAlert('한 호실에는 최대 두 명까지 배정할 수 있습니다.'); return; }
+     function adminAssignRoom() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택해주세요.'); return; }
+    if (targets.length > 2) { showCustomAlert('한 호실에는 최대 두 명까지 배정할 수 있습니다.'); return; }
 
-        const [a, b] = targets;
-        const ua = db.users[a], ub = b ? db.users[b] : null;
-        if (!ua) return;
+    const [a, b] = targets;
+    const ua = db.users[a], ub = b ? db.users[b] : null;
+    if (!ua) return;
 
-        const ha = getHouse(ua);
-        ha.roomie = b || null;
-        ua._adminStamp = Date.now();
-        addHistoryLog(ua, ub ? `[사택] ${ub.name} 사원과 같은 호실에 배정되었습니다.` : `[사택] 단독 호실에 배정되었습니다.`);
-        if (database) database.ref('users/' + a).set(ua);
+    const ha = getHouse(ua);
+    ha.roomie = b || null;
+    addHistoryLog(ua, ub ? `[사택] ${ub.name} 사원과 같은 호실에 배정되었습니다.` : `[사택] 단독 호실에 배정되었습니다.`);
 
-        if (ub) {
-            const hb = getHouse(ub);
-            hb.roomie = a;
-            hb.grade = ha.grade;
-            ub._adminStamp = Date.now();
-            addHistoryLog(ub, `[사택] ${ua.name} 사원과 같은 호실에 배정되었습니다.`);
-            if (database) database.ref('users/' + b).set(ub);
-        }
+    const updates = {};
+    updates[`users/${a}/house`] = ha;
+    updates[`users/${a}/history`] = ua.history;
+    updates[`users/${a}/_adminStamp`] = Date.now();
 
-        if (!database) saveDB();
-        updateUI();
-        renderAdminRoomList();
-        showCustomAlert(ub ? `${ua.name} · ${ub.name} 두 사원을 같은 호실에 배정했습니다.` : `${ua.name} 사원을 단독 호실에 배정했습니다.`);
+    if (ub) {
+        const hb = getHouse(ub);
+        hb.roomie = a;
+        hb.grade = ha.grade;
+        addHistoryLog(ub, `[사택] ${ua.name} 사원과 같은 호실에 배정되었습니다.`);
+        updates[`users/${b}/house`] = hb;
+        updates[`users/${b}/history`] = ub.history;
+        updates[`users/${b}/_adminStamp`] = Date.now();
     }
+
+    if (database) database.ref('/').update(updates);
+    else saveDB();
+
+    updateUI();
+    renderAdminRoomList();
+    showCustomAlert(ub ? `${ua.name} · ${ub.name} 두 사원을 같은 호실에 배정했습니다.` : `${ua.name} 사원을 단독 호실에 배정했습니다.`);
+}
 
     function adminClearRoom() {
         const targets = getAdminTargets();
@@ -8471,13 +8467,10 @@ function safeDeposit() {
 
         // 상대에게 알림
         const r = getRoomie(currentUser);
-        if (r) {
-            r.houseChatUnread = Date.now();
-            r._adminStamp = Date.now();
-            database.ref('users/' + r.code).set(r);
-        }
-    }
-
+if (r) {
+    database.ref('users/' + r.code + '/houseChatUnread').set(Date.now());
+     }
+ }
         function renderHouseChat() {
         const box = document.getElementById('house-chat-body');
         if (!box || !currentUser) return;
@@ -8562,7 +8555,7 @@ function safeDeposit() {
             : '대화';
 
         // 사택 탭 자체에도 표시
-        const houseTab = document.querySelector('.tab-btn[onclick*="tab-house"]');
+        const houseTab = document.querySelector(''.tabs-grid .tab[onclick*="tab-house"]);
         if (houseTab) {
             houseTab.style.position = 'relative';
             let dot = houseTab.querySelector('.house-dot');
@@ -8758,7 +8751,7 @@ ${picked.map(m => '- ' + m.text).join('\n')}
                 <div style="margin-bottom:10px; text-align:${mine ? 'right' : 'left'};">
                     <div style="display:inline-block; max-width:82%; background:${mine ? 'rgba(76,175,80,0.1)' : 'rgba(212,175,55,0.08)'}; border:1px solid ${mine ? '#2e5c31' : '#5a4a2a'}; border-radius:9px; padding:9px 12px; text-align:left;">
                         ${mine ? '' : `<div style="font-size:9px; color:#d4af37; font-weight:bold; margin-bottom:4px;">🦊 여우 상담사</div>`}
-                        <div style="font-size:12px; color:#ddd; line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
+                        <div style="font-size:12px; color:#f0f0f0; line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
                     </div>
                 </div>`;
         }).join('') + (foxBusy
@@ -9068,27 +9061,27 @@ ${picked.map(m => '- ' + m.text).join('\n')}
         outro: `마지막 문이 열린다.<br><br>
             밖은복도였다.언제부터 여기에 있었는지 모르겠다.<br><br>
             돌아보니 문이 없었다. 원래 그랬던 걸까. 꿈이었을까.<br>
-            손바닥에 먼지가 묻어 있어요. 아주 오래된 먼지예요.<br><br>
-            옆 사람과 눈이 마주쳐요.<br>
-            무슨 말을 해야 할지 몰라서 아무 말도 안 했어요.`,
+            손바닥에 먼지가 묻어 있다. 아주 오래된 먼지였다.<br><br>
+            옆 사람과 눈이 마주친다.<br>
+            무슨 말을 해야 할까. 결국 둘 다 아무 말도 하지 않았다.`,
 
         ui: {
-            waitTurn: '동료가 움직이는 중이에요...',
-            yourTurn: '당신의 차례예요.',
-            timeout: '시간이 지났어요. 차례가 넘어가요.',
-            roomClear: '문이 열려요.',
-            allClear: '마지막 문이 열려요.',
-            failTurns: '더 있을 수 없어요. 천장이 낮아지고 있어요.',
-            noTicket: '입장권이 필요해요.',
-            thinking: '무언가 지켜보고 있어요...',
-            inputPlaceholder: '무엇을 하는지 적어 주세요...',
+            waitTurn: '동료가 움직이는 중입니다...',
+            yourTurn: '당신의 차례입니다.',
+            timeout: '시간이 지났습니다. 차례가 넘어갑니다.',
+            roomClear: '문이 열립니다.',
+            allClear: '마지막 문이 열립니다.',
+            failTurns: '더 있을 수 없다. 천장이 낮아지고 있다.',
+            noTicket: '입장권이 필요합니다.',
+            thinking: '무언가 지켜보고 있다...',
+            inputPlaceholder: '당신이 해야하는 행위를 적으세요...',
             submitBtn: '움직인다',
-            emptyLog: '아직 아무도 움직이지 않았어요.',
+            emptyLog: '아직 아무도 움직이지 않았다.',
             roomLabel: (cur, total) => `${cur} / ${total}번째 방`,
-            turnOf: (name) => `${name} 님의 차례예요.`
+            turnOf: (name) => `${name} 님의 차례입니다.`
         },
 
-        fail: `천장이 어깨에 닿아요.<br><br>
+        fail: `천장이 어깨에 닿는다.<br><br>
             더 서 있을 수가 없어요. 둘 다 무릎을 꿇어요.<br>
             벽의 글씨가 마지막으로 바뀌어요.<br><br>
             <span style="color:#7fd4d4;">"다음에는 더 가까이 계십시오."</span><br><br>
