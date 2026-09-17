@@ -3884,7 +3884,6 @@ function getTodayStr() {
         const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
         user.history.unshift({ time: timeStr, text: message });
         if (user.history.length > 10) user.history.pop();
-        saveDB();
     }
 
     function isBlindfolded(user) {
@@ -4868,83 +4867,81 @@ function getTodayStr() {
         pendingTargetItemName = "";
     }
 
-    function confirmItemTarget() {
-    if (!pendingTargetItemName) return;
-    const targetCode = document.getElementById('item-target-select').value;
-    if (!targetCode) { showCustomAlert("대상을 선택해주세요."); return; }
-    const item = pendingTargetItemName;
-    const targetUser = db.users[targetCode];
+       async function confirmItemTarget() {
+        const select = document.getElementById('item-target-select');
+        if (!select) return;
+        const targetCode = select.value;
+        if (!targetCode) { showCustomAlert('대상 사원을 선택해주세요.'); return; }
+        if (!buyGuard()) return;
 
-    targetUser.hasItemUsedOnMe = true;
+        const item = pendingTargetItem;
+        closeItemTargetModal();
 
-    const cPos = currentUser.position || '사원';
-    const tPos = targetUser.position || '사원';
-
-    if (pendingTargetIsPotion) {
-        applyItemEffect(targetUser, item, true);
-        targetUser.noteGlowUntil = Date.now() + 10000; 
-        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 ${item} 사용`);
-        addHistoryLog(targetUser, `[아이템 체감] 누군가가 당신에게 ${item}을(를) 사용했습니다.`);
-        
-    } else if (item === "스마일 스티커") {
-        addTimedEffect(targetUser, '스마일 스티커', `${currentUser.name} ${cPos}에게 미미한 호감을 느낀다.`, 5);
-        targetUser.noteGlowUntil = Date.now() + 10000;
-        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 스마일 스티커 부착`);
-        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에 스티커를 부착했습니다.`);
-
-    } else if (item === "빨간 리본") {
-        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-        if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-
-        if (currentUser.equippedWeapons.length >= 3 || targetUser.equippedWeapons.length >= 3) {
-            showCustomAlert("본인 또는 상대방의 장착 슬롯(최대 3개)이 가득 찼습니다.");
-            closeItemTargetModal();
+        if (!(currentUser.inventory || []).includes(item)) {
+            showCustomAlert('해당 물품이 없습니다.');
             return;
         }
 
-               let myRibbon = `빨간 리본 (연결: ${targetUser.name} ${tPos})`;
-        let targetRibbon = `빨간 리본 (연결: ${currentUser.name} ${cPos})`;
-        currentUser.equippedWeapons.push(myRibbon);
-        targetUser.equippedWeapons.push(targetRibbon);
-        setEquipOwner(currentUser, myRibbon, currentUser.code);
-        setEquipOwner(targetUser, targetRibbon, currentUser.code); // ★ 해제 권한은 장착 시행자에게
-        appendBadgeNoteToUser(currentUser, `[빨간 리본 장착] ${targetUser.name} ${tPos}님과 연결됨`);
-        appendBadgeNoteToUser(targetUser, `[빨간 리본 장착] ${currentUser.name} ${cPos}님과 연결됨`);
+        if (!database) {
+            const t = db.users[targetCode];
+            if (!t) return;
+            if (applyItemEffect(t, item, true) === false) return;
+            t.hasItemUsedOnMe = true;
+            removeItemFromInventory(currentUser, item, 1);
+            addHistoryLog(currentUser, `[아이템 사용] ${t.name} 사원에게 '${item}' 사용`);
+            saveDB(); updateUI();
+            showCustomAlert(`${t.name} 사원에게 '${item}'을(를) 사용했습니다.`);
+            return;
+        }
 
-        addHistoryLog(currentUser, `[장착] ${targetUser.name} ${tPos}님과 빨간 리본 연결 완료`);
-        addHistoryLog(targetUser, `[장착] ${currentUser.name} ${cPos}님과 빨간 리본 연결 완료`);
-        // (기존 노예 계약서 부분을 이렇게 수정)
-    } else if (item === "노예 계약서") {
-        targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
-        targetUser.masterName = currentUser.name; 
-        addTimedEffect(targetUser, '노예 계약', `${currentUser.name} ${cPos}의 노예`, 72);
-        targetUser.noteGlowUntil = Date.now() + 10000;
-        addHistoryLog(currentUser, `[계약 체결] ${targetUser.name} ${tPos}님과 노예 계약을 체결했습니다.`);
-        addHistoryLog(targetUser, `[상태 이상] ${currentUser.name} ${cPos}의 노예가 되었습니다.`);
+        try {
+            // 서버에서 대상 정보를 새로 읽는다
+            const snap = await database.ref('users/' + targetCode).once('value');
+            const targetUser = snap.val();
+            if (!targetUser) { showCustomAlert('대상 사원 정보를 불러오지 못했습니다.'); return; }
+            if (!targetUser.inventory) targetUser.inventory = [];
+            if (!targetUser.timedEffects) targetUser.timedEffects = [];
+            if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+            if (!targetUser.history) targetUser.history = [];
 
-    } else if (item === "노스텔지어 끈") {
-        targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
-        targetUser.nostalgiaLastReduced = Date.now();
-        targetUser.nostalgiaSender = currentUser.code; 
-        targetUser.noteGlowUntil = Date.now() + 10000;
-        
-        appendBadgeNoteToUser(targetUser, `[장착됨] 누군가 당신에게 노스텔지어 끈을 매어주었습니다. (5시간 동안 오염도 서서히 감소)`);
-        addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} ${tPos}에게 노스텔지어 끈 장착`);
-        addHistoryLog(targetUser, `[상태 이상] 누군가 등 뒤에서 노스텔지어 끈을 채웠습니다.`);
+            const success = applyItemEffect(targetUser, item, true);
+            if (success === false) return;
+
+            targetUser.hasItemUsedOnMe = true;
+            removeItemFromInventory(currentUser, item, 1);
+            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 '${item}' 사용`);
+
+            const stamp = Date.now();
+            const updates = {};
+            updates[`users/${targetCode}/timedEffects`] = targetUser.timedEffects;
+            updates[`users/${targetCode}/badge`] = targetUser.badge || {};
+            updates[`users/${targetCode}/equippedWeapons`] = targetUser.equippedWeapons;
+            updates[`users/${targetCode}/equipOwner`] = targetUser.equipOwner || {};
+            updates[`users/${targetCode}/inventory`] = targetUser.inventory;
+            updates[`users/${targetCode}/history`] = targetUser.history;
+            updates[`users/${targetCode}/pollution`] = targetUser.pollution;
+            updates[`users/${targetCode}/hasItemUsedOnMe`] = true;
+            updates[`users/${targetCode}/_adminStamp`] = stamp;
+            updates[`users/${targetCode}/slaveUntil`] = targetUser.slaveUntil || 0;
+            updates[`users/${targetCode}/masterName`] = targetUser.masterName || null;
+            updates[`users/${targetCode}/nostalgiaUntil`] = targetUser.nostalgiaUntil || 0;
+            updates[`users/${targetCode}/nostalgiaSender`] = targetUser.nostalgiaSender || null;
+            updates[`users/${targetCode}/blindfoldUntil`] = targetUser.blindfoldUntil || 0;
+
+            updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+            updates[`users/${currentUser.code}/history`] = currentUser.history;
+
+            await database.ref('/').update(updates);
+
+            db.users[targetCode] = targetUser;
+            updateUI();
+            showCustomAlert(`${targetUser.name} 사원에게 '${item}'을(를) 사용했습니다.`);
+
+        } catch (e) {
+            console.error('아이템 사용 실패:', e);
+            showCustomAlert('서버 저장 중 오류가 발생했습니다.');
+        }
     }
-      removeItemFromInventory(currentUser, item, 1);
-
-    targetUser._adminStamp = Date.now();
-    if (database) {
-        database.ref(`users/${targetCode}`).set(targetUser);
-        database.ref(`users/${currentUser.code}`).set(currentUser);
-    }
-    
-    saveDB(); 
-    updateUI(); 
-    closeItemTargetModal();
-}
-
           function renderInventory() {
         const container = document.getElementById('inventory-list-container');
         let html = '';
@@ -7158,6 +7155,8 @@ function getTodayStr() {
             currentUser._adminStamp = stamp;
 
             addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래 수락 완료`);
+            await database.ref(`users/${currentUser.code}/history`).set(currentUser.history);
+
             updateUI();
             renderP2PLists();
             showCustomAlert('거래가 성공적으로 체결되었습니다.');
