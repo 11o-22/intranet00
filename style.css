@@ -709,3 +709,16 @@
             left: 50%;
             transform: translateX(-50%);
         }
+
+        .admin-panel-box select {
+    min-width: 110px !important;
+    flex: 1 1 110px !important;
+}
+.admin-panel-box .bet-input[type="number"] {
+    width: 56px !important;
+    flex: 0 0 56px !important;
+}
+.admin-panel-box button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}

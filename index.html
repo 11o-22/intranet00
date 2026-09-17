@@ -310,6 +310,29 @@
                         <td><input type="text" id="badge-nickname" class="badge-input" placeholder="닉네임 입력"></td>
                     </tr>
                     <tr>
+    <th>성별</th>
+    <td>
+        <select id="badge-gender" class="badge-input">
+            <option value="">미지정</option>
+            <option value="남성">남성</option>
+            <option value="여성">여성</option>
+        </select>
+    </td>
+</tr>
+<tr>
+    <th>포지션</th>
+    <td>
+        <select id="badge-position-tag" class="badge-input">
+            <option value="">미지정</option>
+            <option value="T">T</option>
+            <option value="TM">TM</option>
+            <option value="M">M</option>
+            <option value="BM">BM</option>
+            <option value="B">B</option>
+        </select>
+    </td>
+</tr>
+                    <tr>
                         <th>소속</th>
                         <td><span id="badge-affiliation-text" style="font-weight:bold;">본사</span></td>
                     </tr>
@@ -4306,6 +4329,8 @@ function getTodayStr() {
                 </div>
                 <table class="badge-table" style="margin-top:15px;">
                     <tr><th>닉네임</th><td>${(u.badge && u.badge.nickname) ? u.badge.nickname : u.name}</td></tr>
+                    <tr><th>성별</th><td>${(u.badge && u.badge.gender) ? u.badge.gender : '미지정'}</td></tr>
+                    <tr><th>포지션</th><td>${(u.badge && u.badge.posTag) ? u.badge.posTag : '미지정'}</td></tr> 
                     <tr><th>보유 포인트</th><td style="font-weight:bold; color:#ffd700;">${u.points} P</td></tr>
                     <tr><th>장착 장비</th><td style="font-weight:bold; color:#d4af37; line-height:1.6;">${equippedText}</td></tr> <tr><th>현재 상태</th><td><span class="status-tag" style="background:${statusInfo.bg}; color:${statusInfo.color}; border:1px solid ${statusInfo.color};">${statusInfo.text} (${u.pollution}%)</span></td></tr>
                     <tr><th>특이사항</th><td class="${isGlowing}" style="word-break:break-all; font-size:11px; line-height:1.4;">${notes}</td></tr>
@@ -4811,6 +4836,8 @@ function getTodayStr() {
         if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
         document.getElementById('badge-nickname').value = currentUser.badge.nickname || "";
         document.getElementById('badge-notes-text').innerText = currentUser.badge.notes || "특이사항 없음";
+        document.getElementById('badge-gender').value = currentUser.badge.gender || "";
+        document.getElementById('badge-position-tag').value = currentUser.badge.posTag || "";
         renderBadgePhoto(currentUser.badge.photo);
     }
 
@@ -4838,10 +4865,12 @@ function getTodayStr() {
         reader.readAsDataURL(file);
     }
 
-    function saveBadgeInfo() {
-        currentUser.badge.nickname = document.getElementById('badge-nickname').value.trim();
-        saveDB();
-    }
+   function saveBadgeInfo() {
+    currentUser.badge.nickname = document.getElementById('badge-nickname').value.trim();
+    currentUser.badge.gender = document.getElementById('badge-gender').value;
+    currentUser.badge.posTag = document.getElementById('badge-position-tag').value;
+    saveDB();
+}
 
     function getSellPrice(itemName) {
         const cat = ITEM_CATALOG[itemName];
