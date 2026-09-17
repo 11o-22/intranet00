@@ -7037,117 +7037,137 @@ function getTodayStr() {
             }).join('');
         }
     }
-        function acceptP2PDeal(dealId) {
-    checkP2PExpiration();
-    if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }
-    if (!db.p2pDeals) return;
+     async function acceptP2PDeal(dealId) {
+        if (!buyGuard()) return;
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return; }
+        if (!database) { showCustomAlert('서버에 연결되어 있지 않습니다.'); return; }
 
+        try {
+            // 1) 서버에서 거래 원본을 다시 읽는다
+            const dealSnap = await database.ref('p2pDeals').once('value');
+            const rawDeals = dealSnap.val() || [];
+            const arr = Array.isArray(rawDeals) ? rawDeals : Object.values(rawDeals);
+            const idx = arr.findIndex(d => d && d.id === dealId);
+            if (idx < 0) { showCustomAlert('거래를 찾을 수 없습니다.'); return; }
 
-    
-    let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
-    if (dealIndex === -1) return;
-    let deal = db.p2pDeals[dealIndex];
-    if (deal.status !== 'PENDING') return;
-    deal.status = 'PROCESSING'; 
+            const deal = arr[idx];
+            if (deal.status !== 'PENDING') { showCustomAlert('이미 처리된 거래입니다.'); renderP2PLists(); return; }
+            if (deal.toCode !== currentUser.code) { showCustomAlert('본인 앞으로 온 제안이 아닙니다.'); return; }
 
-    const senderCode = deal.fromCode;
-    
-    // 서버에서 상대방 최신 데이터를 가져오거나 로컬에서 탐색
-    let sender = db.users[senderCode];
-    if (!sender) {
-        showCustomAlert("제안을 보낸 사원 정보를 찾을 수 없습니다.");
-        return;
-    }
-    if (deal.offerType === 'point') {
-        let checkPt = parseInt(deal.offerValue, 10) || 0;
-        if ((sender.points || 0) < checkPt) {
-            showCustomAlert(`${deal.fromName} 사원의 포인트가 부족하여 거래가 성립되지 않았습니다.`);
-            return;
-        }
-    } else {
-        let need = deal.offerQty || 1;
-        let have = (sender.inventory || []).filter(it => it === deal.offerValue).length;
-        if (have < need) {
-            showCustomAlert(`${deal.fromName} 사원이 해당 물품을 더 이상 보유하고 있지 않습니다.`);
-            return;
-        }
-    }
+            // 2) 처리 중으로 잠근다
+            await database.ref(`p2pDeals/${idx}/status`).set('PROCESSING');
 
-    // 조건부 교환(trade)인 경우 내가 요구받은 대가를 지불할 수 있는지 검사
-    if (deal.mode === 'trade') {
-        if (deal.demandType === 'point') {
-            let p = parseInt(deal.demandValue, 10);
-            if (isNaN(p)) return;
-            if (currentUser.points < p) { 
-                showLuxuryAlert(); 
-                return; 
+            // 3) 양쪽 사용자를 서버에서 새로 읽는다
+            const [meSnap, senderSnap] = await Promise.all([
+                database.ref('users/' + currentUser.code).once('value'),
+                database.ref('users/' + deal.fromCode).once('value')
+            ]);
+            const me = meSnap.val();
+            const sender = senderSnap.val();
+            if (!me || !sender) {
+                await database.ref(`p2pDeals/${idx}/status`).set('PENDING');
+                showCustomAlert('사원 정보를 불러오지 못했습니다.');
+                return;
             }
-            currentUser.points -= p; 
-            sender.points = (sender.points || 0) + p;
-        } else {
-            let reqQty = deal.demandQty || 1;
-            let count = currentUser.inventory.filter(it => it === deal.demandValue).length;
-            if (count < reqQty) { 
-                showCustomAlert("요구하는 소지품 수량이 부족합니다."); 
-                return; 
+            if (!me.inventory) me.inventory = [];
+            if (!sender.inventory) sender.inventory = [];
+
+            // 4) 서버 값으로 검증
+            const offerQty = deal.offerQty || 1;
+            const demandQty = deal.demandQty || 1;
+
+            if (deal.offerType === 'point') {
+                const pt = parseInt(deal.offerValue, 10) || 0;
+                if ((sender.points || 0) < pt) {
+                    await database.ref(`p2pDeals/${idx}/status`).set('EXPIRED');
+                    showCustomAlert(`${deal.fromName} 사원의 포인트가 부족하여 거래가 무산되었습니다.`);
+                    renderP2PLists();
+                    return;
+                }
+            } else {
+                const have = sender.inventory.filter(it => it === deal.offerValue).length;
+                if (have < offerQty) {
+                    await database.ref(`p2pDeals/${idx}/status`).set('EXPIRED');
+                    showCustomAlert(`${deal.fromName} 사원이 해당 물품을 더 이상 보유하고 있지 않습니다.`);
+                    renderP2PLists();
+                    return;
+                }
             }
-            removeItemFromInventory(currentUser, deal.demandValue, reqQty);
-            for (let i = 0; i < reqQty; i++) {
-                sender.inventory.push(deal.demandValue);
+
+            if (deal.mode === 'trade') {
+                if (deal.demandType === 'point') {
+                    const pt = parseInt(deal.demandValue, 10) || 0;
+                    if ((me.points || 0) < pt) {
+                        await database.ref(`p2pDeals/${idx}/status`).set('PENDING');
+                        showLuxuryAlert();
+                        return;
+                    }
+                } else {
+                    const have = me.inventory.filter(it => it === deal.demandValue).length;
+                    if (have < demandQty) {
+                        await database.ref(`p2pDeals/${idx}/status`).set('PENDING');
+                        showCustomAlert(`요구하신 물품 '${deal.demandValue}' ${demandQty}개가 부족합니다.`);
+                        return;
+                    }
+                }
             }
-        }
-    }
-    
-    // 상대가 보낸 제물 수령
-        if (deal.offerType === 'point') {
-        let offerPt = parseInt(deal.offerValue, 10) || 0;
-        sender.points = (sender.points || 0) - offerPt; // ★ 이 시점에 발신자에게서 차감
-        currentUser.points = (currentUser.points || 0) + offerPt;
-        showPointGainEffect(offerPt);
-        } else {
-        let offerCount = deal.offerQty || 1;
-        removeItemFromInventory(sender, deal.offerValue, offerCount);   // ★ 이 시점에 발신자에게서 차감
-        for (let i = 0; i < offerCount; i++) {
-            currentUser.inventory.push(deal.offerValue);
-        }
-    }
 
-    deal.status = 'COMPLETED';
-    db.p2pDeals[dealIndex] = deal;
-      sender._adminStamp = Date.now();
+            // 5) 실제 이동
+            if (deal.offerType === 'point') {
+                const pt = parseInt(deal.offerValue, 10) || 0;
+                sender.points = Math.max(0, (sender.points || 0) - pt);
+                me.points = (me.points || 0) + pt;
+            } else {
+                for (let i = 0; i < offerQty; i++) {
+                    const p = sender.inventory.indexOf(deal.offerValue);
+                    if (p > -1) sender.inventory.splice(p, 1);
+                    me.inventory.push(deal.offerValue);
+                }
+            }
 
-    addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래/양도 수락 완료`);
-    addHistoryLog(sender, `[밀실 성사] ${currentUser.name} 사원이 제안을 수락함`);
+            if (deal.mode === 'trade') {
+                if (deal.demandType === 'point') {
+                    const pt = parseInt(deal.demandValue, 10) || 0;
+                    me.points = Math.max(0, (me.points || 0) - pt);
+                    sender.points = (sender.points || 0) + pt;
+                } else {
+                    for (let i = 0; i < demandQty; i++) {
+                        const p = me.inventory.indexOf(deal.demandValue);
+                        if (p > -1) me.inventory.splice(p, 1);
+                        sender.inventory.push(deal.demandValue);
+                    }
+                }
+            }
 
-    // ★ Firebase에 나와 상대방(`sender`), 그리고 공용 `p2pDeals`를 동시에 안전하게 업데이트
-       if (database) {
-        const myData = currentUser;
-        const senderData = sender;
-        const dealId = deal.id;
+            // 6) 바뀐 항목만 저장
+            const stamp = Date.now();
+            const updates = {};
+            updates[`users/${currentUser.code}/points`] = me.points;
+            updates[`users/${currentUser.code}/inventory`] = me.inventory;
+            updates[`users/${currentUser.code}/_adminStamp`] = stamp;
+            updates[`users/${deal.fromCode}/points`] = sender.points;
+            updates[`users/${deal.fromCode}/inventory`] = sender.inventory;
+            updates[`users/${deal.fromCode}/_adminStamp`] = stamp;
+            updates[`p2pDeals/${idx}/status`] = 'COMPLETED';
 
-        Promise.all([
-            database.ref('users/' + currentUser.code).set(myData),
-            database.ref('users/' + senderCode).set(senderData)
-        ]).then(() => {
-            return database.ref('p2pDeals').once('value');
-        }).then(snap => {
-            const v = snap.val() || [];
-            const arr = Array.isArray(v) ? v : Object.values(v);
-            const realIdx = arr.findIndex(d => d && d.id === dealId);
-            if (realIdx >= 0) return database.ref(`p2pDeals/${realIdx}/status`).set('COMPLETED');
-        }).then(() => {
-            showCustomAlert("거래가 성공적으로 체결되었습니다.");
+            await database.ref('/').update(updates);
+
+            // 7) 내 화면 동기화
+            currentUser.points = me.points;
+            currentUser.inventory = me.inventory;
+            currentUser._adminStamp = stamp;
+
+            addHistoryLog(currentUser, `[밀실 성사] ${deal.fromName} 사원과의 거래 수락 완료`);
             updateUI();
             renderP2PLists();
-        }).catch((err) => {
-            console.error("밀실 거래 수락 실패:", err);
-            showCustomAlert("서버 통신 중 오류가 발생했습니다.");
-        });
-    } else {
-        saveDB(); updateUI(); renderP2PLists();
-        showCustomAlert("거래가 성공적으로 체결되었습니다.");
+            showCustomAlert('거래가 성공적으로 체결되었습니다.');
+
+        } catch (e) {
+            console.error('밀실 거래 실패:', e);
+            showCustomAlert('거래 처리 중 오류가 발생했습니다.');
+            renderP2PLists();
+        }
     }
-}
     function rejectP2PDeal(dealId) {
         if (!db.p2pDeals) return;
         let dealIndex = db.p2pDeals.findIndex(d => d.id === dealId);
