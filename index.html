@@ -423,13 +423,15 @@
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
                                         <div style="margin-top:15px;">
-                        <<div style="font-size:11px; color:#888; margin-bottom:6px;">베팅</div>
-<div style="display:flex; gap:6px; align-items:center; justify-content:center; margin-bottom:8px;">
-    <button class="step-btn wide" style="flex:0 0 auto;" onclick="adjustBet('slot-bet', 100)">+100</button>
-    <button class="step-btn wide" style="flex:0 0 auto;" onclick="adjustBet('slot-bet', 10)">+10</button>
+                                            <div style="margin-top:15px;">
+    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트</div>
+    <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
+                <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
+    <button class="step-btn wide" style="flex:0 0 52px; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
+    <button class="step-btn wide" style="flex:0 0 46px; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
     <input type="number" id="slot-bet" value="5" min="1"
-           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:10px;">
-    <button class="step-btn bet-max" style="flex:0 0 auto;" onclick="setBetMax('slot-bet')">최대</button>
+           style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:10px 6px;">
+    <button class="step-btn bet-max" style="flex:0 0 46px; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
 </div>
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
@@ -483,19 +485,19 @@
                             </div>
                         </div>
                     </div>
-                                       <div id="seotda-controls-start">
-                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
-                        <div class="bet-stepper">
-                            <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
-                            <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
-                            <div class="bet-display" id="seotda-bet-display">5</div>
-                            <button class="step-btn" onclick="adjustBet('seotda-bet', 1)">&gt;</button>
-                            <button class="step-btn wide" onclick="adjustBet('seotda-bet', 10)">+10</button>
-                            <button class="step-btn bet-max" onclick="setBetMax('seotda-bet')">최대</button>
-                        </div>
-                        <input type="hidden" id="seotda-bet" value="5">
-                        <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
-                    </div>
+                              <div id="seotda-controls-start">
+    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+    <div class="bet-stepper">
+        <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
+        <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
+        <div class="bet-display" id="seotda-bet-display">5</div>
+        <button class="step-btn" onclick="adjustBet('seotda-bet', 1)">&gt;</button>
+        <button class="step-btn wide" onclick="adjustBet('seotda-bet', 10)">+10</button>
+        <button class="step-btn bet-max" onclick="setBetMax('seotda-bet')">최대</button>
+    </div>
+    <input type="hidden" id="seotda-bet" value="5">
+    <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
+</div>
                     <div id="seotda-controls-play" style="display:none; display:flex; justify-content:center; gap:10px;">
                         <button class="game-btn" onclick="swapSeotdaCard()" style="flex:1;">선택 패 교환 (<span id="swap-count">2</span>회)</button>
                         <button class="game-btn" onclick="finishSeotda()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000); border-color:#d32f2f;">승부 (쇼다운)</button>
