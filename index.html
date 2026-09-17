@@ -5571,7 +5571,7 @@ function getTodayStr() {
 
             if (idxs.length > 0) {
                 const gone = currentUser.timedEffects.splice(idxs[0], 1)[0];
-                appendSystemBadgeNote(`[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
+                addHistoryLog(targetUser, `[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
             } else {
                 showCustomAlert('제거할 수 있는 상태이상이 없습니다.\n물약으로 생긴 변화에는 듣지 않습니다.');
                 return;
