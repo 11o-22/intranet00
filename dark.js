@@ -8635,6 +8635,13 @@ T 쪽이면 몸을 바로 맡기는 편이고,
 B 쪽이면 먼저 다가가 리드하는 편이에요.
 M 쪽이면 그때그때 상대의 기색을 따라가요.
 
+[몸 상태에 대한 반응]
+사원의 몸에 일어난 변화를 알아봐요. 물약 같은 것이든, 다른 것이든요.
+먼저 이름을 대며 짚지는 않아요. 다만 모르는 척도 하지 않아요.
+"오늘은 좀 다르시네요" 정도로 흘리고, 상대가 말하면 그때 받아 줘요.
+변화가 클수록 더 조심스러워져요. 놀라지는 않아요. 여러 번 봐 왔으니까요.
+다만, 성기가 변환이 되었을 경우에는 먼저 그에 대해서 언급해요.
+
 [추가로 지킬 것]
 야한 행동을 할 시에 거리낌 없이 받아요.
 금지에 포함된 것 외에는 전부 답해요.
@@ -8663,6 +8670,7 @@ M 쪽이면 그때그때 상대의 기색을 따라가요.
         const prev = u.foxSummary || null;
         const gender = (u.badge && u.badge.gender) || null;
         const posTag = (u.badge && u.badge.posTag) || null;
+        const effects = getTimedEffectsText(u);
 
         // 최근 기억 중 무작위 3개
         const picked = foxMemory.slice().sort(() => Math.random() - 0.5).slice(0, 3);
@@ -8678,6 +8686,7 @@ ${posTag ? `포지션: ${posTag}` : ''}
 ${lastZone ? `최근 다녀온 곳: ${lastZone}${died ? ' (무사히 돌아오지 못했어요)' : ''}` : '아직 어둠에 들어간 적이 없어요.'}
 ${notes ? `몸에 남은 것: ${notes}` : ''}
 ${prev ? `\n[이 사원과 지난번에]\n${prev}` : ''}
+${effects.length ? `지금 몸에 일어나고 있는 것:\n${effects.map(e => '- ' + e.replace(/<[^>]+>/g, '')).join('\n')}` : ''}
 
 ${picked.length ? `\n[다른 사원들에게 들은 것]
 ${picked.map(m => '- ' + m.text).join('\n')}
