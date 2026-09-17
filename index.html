@@ -7497,7 +7497,8 @@ if (bet > currentUser.points) { showLuxuryAlert(); return; }
         if (currentUser.points < bet) { showLuxuryAlert(); return false; }
         currentUser.points -= bet; 
         currentUser.facilityCount += 1;
-        addPollution(2); 
+        addPollution(2);
+        saveDB(); 
         return true;
     }
 
