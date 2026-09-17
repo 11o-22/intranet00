@@ -726,3 +726,11 @@
 
 .admin-panel-box #adm-target-points { min-width: 120px !important; }
 #slot-bet { height: 46px !important; padding: 0 6px !important; }
+
+#slot-bet {
+    border-width: 2px !important;
+    border-color: var(--theme-focus) !important;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6) !important;
+    font-weight: bold !important;
+    color: var(--theme-focus) !important;
+}
