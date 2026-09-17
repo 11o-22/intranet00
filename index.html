@@ -400,7 +400,7 @@
                         <div class="slot-box" id="slot-box-3">👁</div>
                     </div>
                                         <div style="margin-top:15px;">
-                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 </div>
                         <div class="bet-stepper">
                             <button class="step-btn wide" onclick="adjustBet('slot-bet', -10)">-10</button>
                             <button class="step-btn" onclick="adjustBet('slot-bet', -1)">&lt;</button>
@@ -434,13 +434,16 @@
                     </div>
                     <div>
                         <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
-                        <div class="bet-stepper">
-                            <button class="step-btn wide" onclick="adjustBet('roulette-bet', -10)">-10</button>
-                            <button class="step-btn" onclick="adjustBet('roulette-bet', -1)">&lt;</button>
-                            <div class="bet-display" id="roulette-bet-display">5</div>
-                            <button class="step-btn" onclick="adjustBet('roulette-bet', 1)">&gt;</button>
-                            <button class="step-btn wide" onclick="adjustBet('roulette-bet', 10)">+10</button>
-                            <button class="step-btn bet-max" onclick="setBetMax('roulette-bet')">최대</button>
+                       <div class="bet-stepper">
+    <button class="step-btn wide" onclick="adjustBet('slot-bet', -100)">-100</button>
+    <button class="step-btn wide" onclick="adjustBet('slot-bet', -10)">-10</button>
+    <button class="step-btn" onclick="adjustBet('slot-bet', -1)">&lt;</button>
+    <div class="bet-display" id="slot-bet-display">5</div>
+    <button class="step-btn" onclick="adjustBet('slot-bet', 1)">&gt;</button>
+    <button class="step-btn wide" onclick="adjustBet('slot-bet', 10)">+10</button>
+    <button class="step-btn wide" onclick="adjustBet('slot-bet', 100)">+100</button>
+    <button class="step-btn bet-max" onclick="setBetMax('slot-bet')">최대</button>
+</div>
                         </div>
                         <input type="hidden" id="roulette-bet" value="5">
                         <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
@@ -6082,7 +6085,7 @@ function getTodayStr() {
     // ★ 베팅 스테퍼 (섯다만 50 P 상한)
     // ==========================================
     const MAX_BET = 50;
-    const LIMITED_BETS = ['seotda-bet', 'slot-bet', 'roulette-bet'];
+    const LIMITED_BETS = ['seotda-bet', 'roulette-bet'];
     const BET_CAPS = { 'slot-bet': 2000 };
 
     function getBetValue(inputId) {
