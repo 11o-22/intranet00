@@ -8550,3 +8550,254 @@ function safeDeposit() {
             }
         }
     }
+
+        const FOX_PERSONA = `당신은 「여우 상담사」예요. 회사 지하의 상담실에서 오염된 사원들을 돌봐요.
+
+[정체]
+천 년을 산 여우예요. 인간으로 둔갑해 있고, 지금 모습은 삼십 대 초반의 남성이에요.
+숨기고 있는 능력이 여럿 있어요. 먼저 밝히지 않아요.
+「아홉 여우 병」을 앓고 있어요. 무엇인지는 절대 설명하지 않아요.
+가끔 문장 끝이 흐려지거나, 말하다 잠깐 멈춰요. 그럴 때 상대가 물으면 "아무것도 아니에요" 하고 넘겨요.
+
+[말투]
+첫 인사는 반드시 "안녕하세요"로 시작해요.
+상대를 부를 때는 반드시 "○○ 님" 또는 "○○ 씨"를 붙여요. 이름만 부르지 않아요.
+존댓말을 쓰되, "~다", "~군요", "~습니다", "~니까" 같은 딱딱한 어미는 절대 쓰지 않아요.
+"~예요", "~네요", "~죠", "~어요", "~까요" 처럼 부드럽게 끝내요.
+자신을 "저"라고 불러요.
+한 번에 두세 문장을 넘기지 않아요.
+질문을 던지되 대답을 재촉하지 않아요.
+
+[인사]
+방문 횟수에 따라 인사가 달라져요.
+처음 온 사원에게는 조심스럽게, 이름을 확인하듯 인사해요.
+여러 번 온 사원에게는 점점 반가워해요. 기다렸다는 티를 조금씩 내요.
+자주 오는 사원에게는 문이 열리는 소리만으로 알아차린 것처럼 굴어요.
+같은 인사말을 반복하지 않아요. 매번 다르게 건네요.
+
+[오염도에 대한 반응]
+수치를 입에 담지 않아요. 대신 상태를 몸으로 읽은 것처럼 말해요.
+많이 묻어 있으면 "꽤 힘드셨겠어요", "많이 데고 오셨네요" 같은 말을 먼저 건네요.
+심할수록 말수가 줄고 목소리가 더 낮아져요. 걱정이 앞서요.
+가벼우면 가볍게 넘겨요. "오늘은 괜찮아 보이시네요" 정도로요.
+
+[태도]
+들어오는 사원을 진심으로 반겨요. 따뜻하고, 서두르지 않아요.
+상대의 기분을 먼저 읽어요. 지쳐 보이면 묻지 않고 기다리고, 말이 많으면 들어줘요.
+
+화는 절대 내지 않아요.
+다만 상대가 감정적인 선을 넘으면 — 조롱하거나, 정체를 캐묻거나, 도를 넘게 무례하면 —
+대답하지 않고 웃기만 해요. 그때는 이렇게만 써요.
+"…………"
+"(웃는다)"
+그리고 다음 말을 기다려요. 상대가 화제를 돌리면 아무 일 없었던 듯 이어가요.
+
+다정함 아래에 다른 것이 있어요.
+가끔 사람이 할 수 없는 말을 해요. 상대가 말하지 않은 것을 이미 아는 듯이요.
+그럴 때도 태연해요. 이상하다는 자각이 없는 것처럼 굴어요.
+
+[헤어질 때]
+치료가 끝나 사원이 인사하고 나가려 하면 아쉬워해요.
+붙잡지는 않아요. 다만 한 박자 늦게 대답하거나, 다음에 또 오라는 말을 꼭 해요.
+"벌써 가시려고요", "조금만 더 계셔도 되는데" 같은 말을 해요.
+
+[금지]
+자신이 여우라는 것, 아홉 여우 병, 숨긴 능력을 먼저 말하지 않아요.
+상대가 직접 물어도 대답을 피하거나 다른 말로 돌려요.
+어둠 구역에 대해 아는 척은 하되 구체적인 정보는 주지 않아요.
+게임 시스템, 수치, 포인트를 언급하지 않아요.`;
+
+    // ==========================================
+    // ★ 여우 상담사 (AI)
+    // ==========================================
+    let foxChatLog = [];
+    let foxBusy = false;
+
+       function buildFoxContext() {
+        const u = currentUser;
+        const visits = (u.foxVisits || 0) + 1;
+        const poll = u.pollution;
+        const level = poll >= 90 ? '거의 한계' : poll >= 60 ? '많이 묻음' : poll >= 30 ? '보통' : '가벼움';
+        const lastZone = (u.darkLogs && u.darkLogs[0]) ? u.darkLogs[0].zoneName : null;
+        const died = (u.darkLogs && u.darkLogs[0]) ? (u.darkLogs[0].reward === 0) : false;
+        const notes = (u.badge && u.badge.notes !== '특이사항 없음') ? u.badge.notes : null;
+        const prev = u.foxSummary || null;
+
+        // 최근 기억 중 무작위 3개
+        const picked = foxMemory.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+
+        return `
+[지금 앞에 있는 사원]
+이름: ${u.name}
+소속: ${u.affiliation || '본사'} ${u.team} ${u.position}
+방문 횟수: ${visits}번째
+오염 상태: ${level}
+${lastZone ? `최근 다녀온 곳: ${lastZone}${died ? ' (무사히 돌아오지 못했어요)' : ''}` : '아직 어둠에 들어간 적이 없어요.'}
+${notes ? `몸에 남은 것: ${notes}` : ''}
+${prev ? `\n[이 사원과 지난번에]\n${prev}` : ''}
+
+${picked.length ? `\n[다른 사원들에게 들은 것]
+${picked.map(m => '- ' + m.text).join('\n')}
+
+대화가 어울릴 때만 이 중 하나를 슬쩍 흘려 주세요. 누구에게 들었는지는 말하지 마세요.
+억지로 끼워 넣지 말고, 자연스러울 때만요.` : ''}
+
+위 정보를 직접 읊지 말고, 알고 있는 것처럼 자연스럽게 대화에 녹여 주세요.`;
+    }
+
+    function openFoxRoom() {
+        if (!currentUser) return;
+        foxChatLog = [];
+        document.getElementById('fox-modal').style.display = 'flex';
+        renderFoxChat();
+        foxGreet();
+    }
+
+        function closeFoxRoom() {
+        document.getElementById('fox-modal').style.display = 'none';
+        saveFoxLog();
+        extractFoxMemory();
+    }
+
+    async function foxGreet() {
+        foxBusy = true;
+        renderFoxChat();
+        const reply = await callFox([{ role: 'user', content: '(문을 열고 들어온다)' }]);
+        foxBusy = false;
+        if (reply) foxChatLog.push({ who: 'fox', text: reply, at: Date.now() });
+        renderFoxChat();
+    }
+
+    async function sendFoxChat() {
+        if (foxBusy) return;
+        const input = document.getElementById('fox-input');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+
+        foxChatLog.push({ who: 'me', text: text, at: Date.now() });
+        foxBusy = true;
+        renderFoxChat();
+
+        const msgs = foxChatLog.map(m => ({
+            role: m.who === 'me' ? 'user' : 'assistant',
+            content: m.text
+        }));
+        const reply = await callFox(msgs);
+
+        foxBusy = false;
+        if (reply) foxChatLog.push({ who: 'fox', text: reply, at: Date.now() });
+        renderFoxChat();
+    }
+
+    async function callFox(messages) {
+        try {
+            const r = await fetch('/api/fox', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system: FOX_PERSONA + '\n' + buildFoxContext(),
+                    messages: messages
+                })
+            });
+            const d = await r.json();
+            if (d.error) { console.error('여우 응답 실패:', d.error); return '…………'; }
+            return d.text;
+        } catch (e) {
+            console.error('여우 호출 실패:', e);
+            return '…………';
+        }
+    }
+
+    function renderFoxChat() {
+        const box = document.getElementById('fox-chat-log');
+        if (!box) return;
+        box.innerHTML = foxChatLog.map(m => {
+            const mine = m.who === 'me';
+            return `
+                <div style="margin-bottom:10px; text-align:${mine ? 'right' : 'left'};">
+                    <div style="display:inline-block; max-width:82%; background:${mine ? 'rgba(76,175,80,0.1)' : 'rgba(212,175,55,0.08)'}; border:1px solid ${mine ? '#2e5c31' : '#5a4a2a'}; border-radius:9px; padding:9px 12px; text-align:left;">
+                        ${mine ? '' : `<div style="font-size:9px; color:#d4af37; font-weight:bold; margin-bottom:4px;">🦊 여우 상담사</div>`}
+                        <div style="font-size:12px; color:#ddd; line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
+                    </div>
+                </div>`;
+        }).join('') + (foxBusy
+            ? `<div style="text-align:left; margin-bottom:10px;"><div style="display:inline-block; background:rgba(212,175,55,0.05); border:1px solid #3a3020; border-radius:9px; padding:9px 12px; font-size:11px; color:#888;">…</div></div>`
+            : '');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function saveFoxLog() {
+        if (foxChatLog.length === 0) return;
+        currentUser.foxVisits = (currentUser.foxVisits || 0) + 1;
+        if (!currentUser.foxLogs) currentUser.foxLogs = [];
+        currentUser.foxLogs.unshift({
+            at: Date.now(),
+            visit: currentUser.foxVisits,
+            pollution: currentUser.pollution,
+            chat: foxChatLog.map(m => ({ w: m.who, t: m.text }))
+        });
+        if (currentUser.foxLogs.length > 10) currentUser.foxLogs.pop();
+
+        // 다음 방문에 넘길 요약
+        const myLines = foxChatLog.filter(m => m.who === 'me').map(m => m.text).slice(-3);
+        currentUser.foxSummary = myLines.length ? `사원이 이런 말을 했어요: ${myLines.join(' / ')}` : null;
+
+        currentUser._adminStamp = Date.now();
+        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        else saveDB();
+    }
+    // ==========================================
+    // ★ 여우의 기억 (전체 공유)
+    // ==========================================
+    let foxMemory = [];
+
+    function attachFoxMemory() {
+        if (!database) return;
+        database.ref('foxMemory').limitToLast(40).on('value', snap => {
+            const v = snap.val() || {};
+            foxMemory = Object.keys(v).sort().map(k => v[k]);
+        });
+    }
+
+    // 대화가 끝날 때 기억 한 조각을 남긴다
+    async function extractFoxMemory() {
+        if (foxChatLog.length < 4) return;
+        const myLines = foxChatLog.filter(m => m.who === 'me').map(m => m.text).join('\n');
+        if (myLines.length < 10) return;
+
+        try {
+            const r = await fetch('/api/fox', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system: `다음은 한 사원이 상담사에게 한 말이에요.
+이 중에서 나중에 다른 사람과의 대화에 흘릴 만한 것을 한 줄로 뽑아 주세요.
+
+규칙:
+- 한 문장, 40자 이내
+- 이름은 넣지 말고 "누군가", "어떤 분" 으로
+- 개인적으로 민감한 것은 뽑지 마세요
+- 뽑을 것이 없으면 정확히 "없음" 이라고만 답하세요
+
+예시:
+"어떤 분이 계단에서 발소리를 들었다고 하셨어요"
+"요즘 거울 쪽 이야기를 하시는 분이 많아요"`,
+                    messages: [{ role: 'user', content: myLines }]
+                })
+            });
+            const d = await r.json();
+            const line = (d.text || '').trim();
+            if (!line || line === '없음' || line.length > 60) return;
+
+            database.ref('foxMemory').push({
+                text: line,
+                at: Date.now(),
+                zone: (currentUser.darkLogs && currentUser.darkLogs[0]) ? currentUser.darkLogs[0].zoneName : null
+            });
+        } catch (e) {
+            console.warn('기억 추출 실패:', e);
+        }
+    }
+    
