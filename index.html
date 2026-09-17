@@ -4846,6 +4846,8 @@ function getTodayStr() {
         return Math.max(1, Math.floor(basePrice / 4));
     }
 
+        let pendingTargetItem = null;
+
     function openItemTargetModal(itemName, isPotion = false) {
         pendingTargetItemName = itemName;
         pendingTargetIsPotion = isPotion;
@@ -4874,7 +4876,7 @@ function getTodayStr() {
         if (!targetCode) { showCustomAlert('대상 사원을 선택해주세요.'); return; }
         if (!buyGuard()) return;
 
-        const item = pendingTargetItem;
+        const item = pendingTargetItemName;
         closeItemTargetModal();
 
         if (!(currentUser.inventory || []).includes(item)) {
