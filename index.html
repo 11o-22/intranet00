@@ -6205,12 +6205,14 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         for (let s of slotSymbols) { if (r < s.weight) return s; r -= s.weight; }
         return slotSymbols[slotSymbols.length - 1];
     }
-    function playSlot() {
-        let bet = parseInt(document.getElementById('slot-bet').value);
-if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
-if (bet > currentUser.points) { showLuxuryAlert(); return; }
-        const btn = document.getElementById('btn-slot');
-        btn.disabled = true;
+function playSlot() {
+    let bet = parseInt(document.getElementById('slot-bet').value);
+    if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
+    if (bet > currentUser.points) { showLuxuryAlert(); return; }
+    if (!useFacility(bet)) return;
+
+    const btn = document.getElementById('btn-slot');
+    btn.disabled = true;
         const b1 = document.getElementById('slot-box-1'); const b2 = document.getElementById('slot-box-2'); const b3 = document.getElementById('slot-box-3');
         const msg = document.getElementById('slot-msg');
         b1.classList.add('slot-rolling'); b2.classList.add('slot-rolling'); b3.classList.add('slot-rolling');
