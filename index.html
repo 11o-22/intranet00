@@ -3367,9 +3367,25 @@ function getTodayStr() {
         appendBadgeNoteToUser(currentUser, `[${z.code}] 탐사 중 의식 불명 — 긴급 이송됨`);
 
         // 파티 동료에게 알림
-               if (darkRun.isParty) {
+        if (darkRun.isParty && database) {
+            const pid = darkRun.partyId;
+            const myCode = currentUser.code;
+
+            if (darkRun.isLeader) {
+                database.ref(`darkParties/${pid}/alive`).once('value').then(sn => {
+                    const alive = Object.keys(sn.val() || {}).filter(c => c !== myCode);
+                    if (alive.length > 0) {
+                        const p = darkParties[pid];
+                        const nm = (p && p.members && p.members[alive[0]] && p.members[alive[0]].name)
+                            ? p.members[alive[0]].name
+                            : (db.users[alive[0]] ? db.users[alive[0]].name : '동료');
+                        database.ref(`darkParties/${pid}`).update({ leader: alive[0], leaderName: nm });
+                    }
+                });
+            }
+
+            database.ref(`darkParties/${pid}/alive/${myCode}`).remove();
             sendPartyChat(`${currentUser.name} 사원의 신호가 끊겼습니다.`, true);
-            if (database) database.ref(`darkParties/${darkRun.partyId}/alive/${currentUser.code}`).remove();
         }
 
         if (!currentUser.darkLogs) currentUser.darkLogs = [];
@@ -8344,7 +8360,11 @@ function getTodayStr() {
             detachHouseChat();
             checkPassivePollution(currentUser); 
             checkMedRations(currentUser); 
-            if (applySafeInterest(currentUser)) saveDB();
+                       if (applySafeInterest(currentUser)) {
+                currentUser._adminStamp = Date.now();
+                if (database) database.ref('users/' + currentUser.code).set(currentUser);
+                else saveDB();
+            }
             checkP2PExpiration();
 
             // 화면 전환

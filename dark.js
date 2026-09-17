@@ -3092,7 +3092,8 @@ function input119D(n) {
         openGearModal('🔐 금고', html);
     }
 
-    function safeDeposit() {
+function safeDeposit() {
+        if (!buyGuard()) return;
         const el = document.getElementById('safe-amount');
         let amt = parseInt(el.value, 10);
         if (isNaN(amt) || amt <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
@@ -3115,18 +3116,25 @@ function input119D(n) {
         if (stored === 0) { showCustomAlert('모든 금고가 가득 찼습니다.\n금고를 더 구매해야 합니다.'); return; }
 
         currentUser.points -= stored;
+        currentUser._adminStamp = Date.now();
         addHistoryLog(currentUser, `[금고 입금] ${stored.toLocaleString()} P를 보관했습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
 
-        updateUI();
-        openSafePanel();
+        if (database) {
+            database.ref('users/' + currentUser.code).set(currentUser).then(() => {
+                updateUI();
+                openSafePanel();
+            });
+        } else {
+            saveDB(); updateUI(); openSafePanel();
+        }
+
         showCustomAlert(remain > 0
             ? `${stored.toLocaleString()} P를 넣었습니다.\n금고가 가득 차 ${remain.toLocaleString()} P는 넣지 못했습니다.`
             : `${stored.toLocaleString()} P를 보관했습니다.`);
     }
 
     function safeWithdraw() {
+        if (!buyGuard()) return;
         const el = document.getElementById('safe-amount');
         let amt = parseInt(el.value, 10);
         if (isNaN(amt) || amt <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
@@ -3144,15 +3152,19 @@ function input119D(n) {
         }
 
         currentUser.points += amt;
+        currentUser._adminStamp = Date.now();
         addHistoryLog(currentUser, `[금고 출금] ${amt.toLocaleString()} P를 꺼냈습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
 
-        updateUI();
-        openSafePanel();
-        showPointGainEffect(amt);
+        if (database) {
+            database.ref('users/' + currentUser.code).set(currentUser).then(() => {
+                updateUI();
+                openSafePanel();
+                showPointGainEffect(amt);
+            });
+        } else {
+            saveDB(); updateUI(); openSafePanel(); showPointGainEffect(amt);
+        }
     }
-
         function gearTagHtml() {
         const g = getGear(currentUser);
         if (!g || !g.attrs || g.attrs.length === 0) return '';
