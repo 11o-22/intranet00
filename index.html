@@ -3558,12 +3558,14 @@ function getTodayStr() {
         renderPartyPanel();
     }
 
-    function renderDarkResult() {
+        function renderDarkResult() {
         if (darkRun && darkRun._settled) return;
         if (darkRun) darkRun._settled = true;
-        const z = DARK_ZONES[darkRun.zone];
 
-                const GRADE_BONUS = { S: 4, A: 3, B: 2, C: 1.5, D: 1 };
+        const z = DARK_ZONES[darkRun.zone];
+        let base = Math.floor(Math.random() * (z.reward[1] - z.reward[0] + 1)) + z.reward[0];
+
+        const GRADE_BONUS = { S: 4, A: 3, B: 2, C: 1.5, D: 1 };
         let bonus = (darkRun.success * 6 - darkRun.fail * 5) * (GRADE_BONUS[z.grade] || 1);
 
         if (darkRun.isParty && darkRun.voteHistory && darkRun.voteHistory.length > 0) {
