@@ -4527,7 +4527,6 @@ function getTodayStr() {
     }
 
    function updateUI() {
-    const POINT_CAP = 30000000;
             if (currentUser.points < 0) currentUser.points = 0;
             if (currentUser.points > POINT_CAP) currentUser.points = POINT_CAP;
         if (!currentUser) return;
@@ -6145,8 +6144,9 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
     // ★ 베팅 스테퍼 (섯다만 50 P 상한)
     // ==========================================
     const MAX_BET = 50;
+    const POINT_CAP = 30000000;
     const LIMITED_BETS = ['seotda-bet', 'roulette-bet'];
-    const BET_CAPS = { 'slot-bet': 2000 };
+    
 
     function getBetValue(inputId) {
         const el = document.getElementById(inputId);
@@ -7499,6 +7499,7 @@ if (bet > currentUser.points) { showLuxuryAlert(); return; }
         addPollution(2); 
         return true;
     }
+
 
     function winPoints(amount) {
     currentUser.points = Math.min(POINT_CAP, currentUser.points + amount);
