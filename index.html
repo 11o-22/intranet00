@@ -425,9 +425,9 @@
                                         <div style="margin-top:15px;">
                         <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 </div>
                         <div class="bet-stepper">
-                            <button class="step-btn wide" onclick="adjustBet('slot-bet', -10)">-10</button>
-                            <button class="step-btn" onclick="adjustBet('slot-bet', -1)">&lt;</button>
-                            <div class="bet-display" id="slot-bet-display">5</div>
+                            <input type="number" id="slot-bet" value="5" min="1" placeholder="베팅 포인트"
+       style="width:100%; text-align:center; font-size:16px; padding:11px; margin-bottom:8px;">
+<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:9px; font-size:11px;" onclick="setBetMax('slot-bet')">보유 전액</button>
                             <button class="step-btn" onclick="adjustBet('slot-bet', 1)">&gt;</button>
                             <button class="step-btn wide" onclick="adjustBet('slot-bet', 10)">+10</button>
                             <button class="step-btn bet-max" onclick="setBetMax('slot-bet')">최대</button>
@@ -655,15 +655,15 @@
                         </div>
 
                         <div style="font-size:11px; color:#aaa; margin-bottom:4px;">내가 건넬 제물:</div>
-                        <div style="display:flex; gap:8px; margin-bottom:10px;">
-                            <select id="p2p-offer-type" onchange="toggleP2POfferType()" style="width:30%;">
-                                <option value="item">소지품</option>
-                                <option value="point">포인트</option>
-                            </select>
-                            <select id="p2p-offer-item" style="width:40%;"></select>
-                            <input type="number" id="p2p-offer-points" placeholder="건넬 포인트" style="display:none; width:40%;">
-                            <input type="number" id="p2p-offer-qty" value="1" min="1" placeholder="수량" style="width:25%;" title="아이템 수량">
-                        </div>
+<div style="display:flex; gap:6px; margin-bottom:10px;">
+    <select id="p2p-offer-type" onchange="toggleP2POfferType()" style="flex:1 1 90px; min-width:0;">
+        <option value="item">소지품</option>
+        <option value="point">포인트</option>
+    </select>
+    <select id="p2p-offer-item" style="flex:2 1 120px; min-width:0;"></select>
+    <input type="number" id="p2p-offer-points" placeholder="건넬 포인트" style="display:none; flex:2 1 120px; min-width:0;">
+    <input type="number" id="p2p-offer-qty" value="1" min="1" placeholder="수량" style="flex:0 0 52px; min-width:0;" title="아이템 수량">
+</div>
 
                         <div id="p2p-demand-wrapper" style="display:none; border-top:1px dashed var(--theme-border); padding-top:10px; margin-top:10px;">
                             <div style="font-size:11px; color:#ff9800; margin-bottom:4px; font-weight:bold;">상대에게 요구할 대가:</div>
@@ -6199,9 +6199,8 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
     }
     function playSlot() {
         let bet = parseInt(document.getElementById('slot-bet').value);
-        if (isNaN(bet) || bet <= 0) return;
-        if (!useFacility(bet)) return;
-
+if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
+if (bet > currentUser.points) { showLuxuryAlert(); return; }
         const btn = document.getElementById('btn-slot');
         btn.disabled = true;
         const b1 = document.getElementById('slot-box-1'); const b2 = document.getElementById('slot-box-2'); const b3 = document.getElementById('slot-box-3');
