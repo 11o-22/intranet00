@@ -427,7 +427,11 @@
                         <div class="bet-stepper">
                             <button class="step-btn wide" onclick="adjustBet('slot-bet', 10)">+10</button>
                             <button class="step-btn bet-max" onclick="setBetMax('slot-bet')">최대</button>
+
                         </div>
+                        <input type="number" id="slot-bet" value="5" min="1" placeholder="베팅 포인트"
+       style="width:100%; text-align:center; font-size:16px; padding:11px; margin-bottom:8px;">
+<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:9px; font-size:11px;" onclick="setBetMax('slot-bet')">보유 전액</button>
                         <input type="hidden" id="slot-bet" value="5">
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
@@ -453,7 +457,7 @@
                     </div>
                     <div>
                         <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
-                        
+
                         </div>
                         <input type="hidden" id="roulette-bet" value="5">
                         <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
