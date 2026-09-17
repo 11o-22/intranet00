@@ -8,33 +8,34 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'messages가 필요합니다.' });
     }
 
+    // OpenRouter는 system을 messages 배열 안에 넣는다
+    const fullMessages = system
+        ? [{ role: 'system', content: system }, ...messages]
+        : messages;
+
     try {
-        const r = await fetch('https://api.anthropic.com/v1/messages', {
+        const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': process.env.ANTHROPIC_API_KEY,
-                'anthropic-version': '2023-06-01'
+                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                'HTTP-Referer': 'https://intranet00.vercel.app',
+                'X-Title': 'Qtrew Intranet'
             },
             body: JSON.stringify({
-                model: 'claude-sonnet-4-6',
+                model: 'anthropic/claude-sonnet-4.5',
                 max_tokens: 600,
-                system: system || '',
-                messages: messages
+                messages: fullMessages
             })
         });
 
         const data = await r.json();
         if (!r.ok) {
-            console.error('API 오류:', data);
+            console.error('API 오류:', JSON.stringify(data));
             return res.status(r.status).json({ error: '응답 실패' });
         }
 
-        const text = (data.content || [])
-            .filter(c => c.type === 'text')
-            .map(c => c.text)
-            .join('\n');
-
+        const text = data.choices?.[0]?.message?.content || '';
         return res.status(200).json({ text });
     } catch (e) {
         console.error('중계 실패:', e);
