@@ -933,18 +933,13 @@ const DARK_ZONES = {
         const def = B330_STEPS[darkRun.step];
         if (!def) { renderDarkResult(); return; }
 
-               if (def.type === 'intro') {
-            body.innerHTML = darkBox("진입",
-                `<div style="background:rgba(255,152,0,0.07); border:1px solid #7a5200; border-radius:6px; padding:12px; margin-bottom:14px; font-size:11px; color:#ffb74d; line-height:1.8;">
-                    <b>⚠ 사전 안내</b><br>
-                    이 구역은 반려동물과의 이별을 다룹니다.<br>
-                    <span style="color:#aaa;">지금 돌아가셔도 탐사 횟수는 소모되지 않습니다.</span>
-                 </div>` +
-                DARK_ZONES[darkRun.zone].intro,
-                darkChoiceBtn("복도를 걷는다.", "c176Advance(1)") +
-                `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:11px; font-size:11px;" onclick="c176Withdraw()">돌아간다</button>`,
+                if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+                (darkRun.isLeader || !darkRun.isParty)
+                    ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
+                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
                 "intro");
-            if (darkRun.isParty) mountDarkChat('normal');
+            mountDarkChat('normal');
             return;
         }
 
@@ -4497,9 +4492,17 @@ function safeDeposit() {
         const def = C176_STEPS[darkRun.step];
         if (!def) { renderDarkResult(); return; }
 
-        if (def.type === 'intro') {
-            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                darkChoiceBtn("복도를 걷는다.", "c176Advance(1)"), "intro");
+                if (def.type === 'intro') {
+            body.innerHTML = darkBox("진입",
+                `<div style="background:rgba(255,152,0,0.07); border:1px solid #7a5200; border-radius:6px; padding:12px; margin-bottom:14px; font-size:11px; color:#ffb74d; line-height:1.8;">
+                    <b>⚠ 사전 안내</b><br>
+                    이 구역은 반려동물과의 이별을 다룹니다.<br>
+                    <span style="color:#aaa;">지금 돌아가셔도 탐사 횟수는 소모되지 않습니다.</span>
+                 </div>` +
+                DARK_ZONES[darkRun.zone].intro,
+                darkChoiceBtn("복도를 걷는다.", "c176Advance(1)") +
+                `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:11px; font-size:11px;" onclick="c176Withdraw()">돌아간다</button>`,
+                "intro");
             if (darkRun.isParty) mountDarkChat('normal');
             return;
         }
