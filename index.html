@@ -4527,7 +4527,9 @@ function getTodayStr() {
     }
 
    function updateUI() {
+    const POINT_CAP = 30000000;
             if (currentUser.points < 0) currentUser.points = 0;
+            if (currentUser.points > POINT_CAP) currentUser.points = POINT_CAP;
         if (!currentUser) return;
         applyDepartmentTheme(currentUser);
 
@@ -7499,11 +7501,11 @@ if (bet > currentUser.points) { showLuxuryAlert(); return; }
     }
 
     function winPoints(amount) {
-        currentUser.points += amount; 
-        saveDB(); 
-        updateUI();
-        showPointGainEffect(amount); 
-    }
+    currentUser.points = Math.min(POINT_CAP, currentUser.points + amount);
+    saveDB();
+    updateUI();
+    showPointGainEffect(amount);
+}
 
     function checkVIPStatus() {
         const deniedBox = document.getElementById('vip-denied-box');
