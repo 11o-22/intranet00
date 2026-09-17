@@ -846,9 +846,9 @@
                 이름과 이모지를 직접 정해 지급합니다. D등급 · 속성 없음으로 시작하며,<br>
                 속성은 사원이 직접 선택합니다. 한 사람당 하나만 보유합니다.
             </div>
-            <div style="font-size:12px; display:flex; gap:6px; align-items:center; margin-bottom:7px;">
-                <input type="text" id="adm-gear-icon" class="bet-input" style="width:60px; text-align:center; font-size:16px;" placeholder="🔪" maxlength="4">
-                <input type="text" id="adm-gear-name" class="bet-input" style="flex:1;" placeholder="장비 이름">
+                       <div style="font-size:12px; margin-bottom:7px;">
+                <input type="text" id="adm-gear-icon" class="bet-input" style="width:100%; text-align:center; font-size:18px; margin-bottom:6px; box-sizing:border-box;" placeholder="이모지" maxlength="4">
+                <input type="text" id="adm-gear-name" class="bet-input" style="width:100%; font-size:13px; box-sizing:border-box;" placeholder="장비 이름">
             </div>
                         <div id="adm-gear-quick" style="display:flex; flex-wrap:wrap; gap:3px; margin-bottom:9px; max-height:150px; overflow-y:auto; padding:5px; background:rgba(0,0,0,0.25); border:1px solid #4a3a6a; border-radius:5px;"></div>
             <button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:9px; background:linear-gradient(145deg, #6a4c93, #4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminGiveGear()">지급</button>
@@ -2204,49 +2204,64 @@ function getTodayStr() {
 
     // 다음 단계로 (방장만 신호, 전원 동기화)
 
-    let _advLock = 0;
+        let _advLock = 0;
 
-      function partyAdvance(nextStep) {
+    function partyAdvance(nextStep) {
         if (!darkRun) return;
         const now = Date.now();
-        if (now - _advLock < 500) return;   // ★ 0.5초 내 중복 차단
+        if (now - _advLock < 500) return;
         _advLock = now;
-        if (!darkRun.isParty) { darkRun.step = nextStep; renderDarkStep(); return; }
-        if (!database) { darkRun.step = nextStep; renderDarkStep(); return; }
 
-        // ★ 누구든 진행 가능. 이미 그 단계면 무시된다
-        database.ref(`darkParties/${darkRun.partyId}/curStep`).transaction(cur => {
-            if (cur != null && cur >= nextStep) return;   // 이미 진행됨
-            return nextStep;
+        if (!darkRun.isParty || !database) {
+            darkRun.step = nextStep;
+            renderDarkStep();
+            return;
+        }
+
+        const pid = darkRun.partyId;
+        const key = `ready${nextStep}`;
+        database.ref(`darkParties/${pid}/${key}/${currentUser.code}`).set(Date.now());
+        renderAdvanceWait(nextStep);
+    }
+
+    function renderAdvanceWait(nextStep) {
+        const pid = darkRun.partyId;
+        const key = `ready${nextStep}`;
+        const ref = database.ref(`darkParties/${pid}/${key}`);
+
+        if (darkRun._advWatch === key) return;
+        darkRun._advWatch = key;
+        darkRun._advStart = Date.now();
+
+        const go = () => {
+            if (!darkRun || darkRun._advWatch !== key) return;
+            ref.off();
+            darkRun._advWatch = null;
+            database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
+                if (cur != null && cur >= nextStep) return;
+                return nextStep;
+            });
+            darkRun.step = nextStep;
+            detachVoteListener();
+            renderDarkStep();
+        };
+
+        ref.on('value', snap => {
+            if (!darkRun || darkRun._advWatch !== key) return;
+            const cnt = Object.keys(snap.val() || {}).length;
+            const total = getPartyMemberCount();
+            const el = document.getElementById('adv-wait');
+            if (el) el.innerHTML = `${cnt} / ${total}명 준비`;
+            if (cnt >= total) go();
         });
 
-        darkRun.step = nextStep;
-        detachVoteListener();
-        renderDarkStep();
-    }
-            function startAbsenceTimer() {
-        if (!darkRun) return;
-        if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
-        darkRun._absenceStart = Date.now();
+        setTimeout(go, 8000);
 
-        const timerId = setInterval(() => {
-            if (!darkRun || !darkRun._absenceNotified) { clearInterval(timerId); return; }
-            const elapsed = Date.now() - darkRun._absenceStart;
-            const p = darkParties[darkRun.partyId];
-            const total = p && p.members ? Object.keys(p.members).length : 2;
-
-            if (elapsed > REJOIN_LIMIT) {
-                clearInterval(timerId);
-                if (total <= 2) {
-                    darkBodyEl().innerHTML = darkBox("중단",
-                        `기척이 완전히 사라졌다.<br><br>혼자서는 이 방을 나갈 수 없다.<br>왔던 쪽으로 되돌아간다.<br><br>문은 생각보다 쉽게 열렸다.`,
-                        darkChoiceBtn("돌아간다.", "abortDarkRunNoPenalty()"));
-                    mountDarkChat('normal');
-                }
-            }
-        }, 2000);
-
-        darkRun._absenceTimer = timerId;
+        const btns = darkBodyEl().querySelectorAll('.game-btn');
+        btns.forEach(b => { b.disabled = true; });
+        const last = btns[btns.length - 1];
+        if (last) last.innerHTML = `<span id="adv-wait">준비 중...</span>`;
+    
     }
     function abortDarkRunNoPenalty() {
         if (!darkRun) return;

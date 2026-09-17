@@ -674,8 +674,8 @@
             min-width: 0;
         }
         .admin-panel-box .bet-input {
-            width: 100% !important;
             min-width: 0;
+            box-sizing: border-box;
         }
         #adm-gear-quick {
             max-width: 100%;
