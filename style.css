@@ -714,7 +714,8 @@
     min-width: 110px !important;
     flex: 1 1 110px !important;
 }
-.admin-panel-box .bet-input[type="number"] {
+.admin-panel-box #adm-special-qty,
+.admin-panel-box #adm-remove-qty {
     width: 56px !important;
     flex: 0 0 56px !important;
 }
@@ -722,3 +723,5 @@
     flex-shrink: 0;
     white-space: nowrap;
 }
+
+.admin-panel-box #adm-target-points { min-width: 120px !important; }
