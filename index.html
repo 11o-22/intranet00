@@ -426,12 +426,12 @@
                                             <div style="margin-top:15px;">
     <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트</div>
     <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
-                <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:8px;">
-    <button class="step-btn wide" style="flex:0 0 52px; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
-    <button class="step-btn wide" style="flex:0 0 46px; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
+    <button class="game-btn" style="flex:0 0 52px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
+    <button class="game-btn" style="flex:0 0 46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
     <input type="number" id="slot-bet" value="5" min="1"
            style="flex:1 1 auto; min-width:0; text-align:center; font-size:16px; padding:10px 6px;">
-    <button class="step-btn bet-max" style="flex:0 0 46px; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+    <button class="game-btn" style="flex:0 0 46px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
+
 </div>
                         <button class="game-btn" id="btn-slot" onclick="playSlot()">레버 당기기</button>
                     </div>
