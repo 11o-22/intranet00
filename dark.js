@@ -8555,7 +8555,7 @@ if (r) {
             : '대화';
 
         // 사택 탭 자체에도 표시
-        const houseTab = document.querySelector(''.tabs-grid .tab[onclick*="tab-house"]);
+        const houseTab = document.querySelector('.tabs-grid .tab[onclick*="tab-house"]');
         if (houseTab) {
             houseTab.style.position = 'relative';
             let dot = houseTab.querySelector('.house-dot');
