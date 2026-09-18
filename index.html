@@ -6466,7 +6466,7 @@ else if (cat.effect === 'slave_contract') {
     // ==========================================
     const MAX_BET = 50;
     const POINT_CAP = 30000000;
-    const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet'];
+    const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet', 'bj-bet'];
     const BET_CAPS = { 'slot-bet': 1000 };
     
 
@@ -6502,7 +6502,7 @@ else if (cat.effect === 'slave_contract') {
         applyBet(inputId, Math.min(currentUser.points, cap));
     }
     function refreshAllBetDisplays() {
-        ['slot-bet', 'roulette-bet', 'seotda-bet'].forEach(id => {
+        ['slot-bet', 'roulette-bet', 'seotda-bet', 'bj-bet'].forEach(id => {
             const el = document.getElementById(id);
             if (el) applyBet(id, getBetValue(id));
         });
