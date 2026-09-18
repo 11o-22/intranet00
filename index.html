@@ -420,6 +420,7 @@
                     <button class="sub-tab active" onclick="switchGamePanel('panel-slot', this)">슬롯</button>
                     <button class="sub-tab" onclick="switchGamePanel('panel-roulette', this)">룰렛</button>
                     <button class="sub-tab" onclick="switchGamePanel('panel-seotda', this)">섯다</button>
+                    <button class="sub-tab" onclick="switchGamePanel('panel-blackjack', this)">블랙잭</button>
                 </div>
 
                 <!-- 슬롯 -->
@@ -522,6 +523,41 @@
             </div>
         </div>
 
+        <div id="panel-blackjack" class="sub-panel" style="text-align:center;">
+    <div class="panel-title">[야간 경비실 블랙잭]</div>
+    <div class="seotda-arena">
+        <div class="seotda-row">
+            <div class="seotda-row-label">딜러 <span id="bj-dealer-score" style="color:#ffd700;">?</span></div>
+            <div class="seotda-cards-box" id="bj-dealer-cards"></div>
+        </div>
+        <div style="height:1px; background:rgba(255,255,255,0.1); margin:15px 0;"></div>
+        <div class="seotda-row">
+            <div class="seotda-row-label">사원 <span id="bj-player-score" style="color:#ffd700;">-</span></div>
+            <div class="seotda-cards-box" id="bj-player-cards"></div>
+        </div>
+    </div>
+
+    <div id="bj-controls-start">
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+        <div class="bet-stepper">
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', -10)">-10</button>
+            <button class="step-btn" onclick="adjustBet('bj-bet', -1)">&lt;</button>
+            <div class="bet-display" id="bj-bet-display">5</div>
+            <button class="step-btn" onclick="adjustBet('bj-bet', 1)">&gt;</button>
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', 10)">+10</button>
+            <button class="step-btn bet-max" onclick="setBetMax('bj-bet')">최대</button>
+        </div>
+        <input type="hidden" id="bj-bet" value="5">
+        <button class="game-btn" onclick="startBlackjack()">카드를 받는다</button>
+    </div>
+
+   <div id="bj-controls-play" style="display:none; flex-direction:column; gap:8px;">
+    <div id="bj-swap-info" style="font-size:11px; color:#888;"></div>
+    <div style="display:flex; gap:10px;">
+        <button class="game-btn" onclick="bjHit()" style="flex:1;">한 장 더</button>
+        <button class="game-btn" onclick="bjStand()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000) !important; border-color:#d32f2f !important;">멈춘다</button>
+    </div>
+</div>
         <!-- 3. VIP 시설 (1:1 실시간 대전실) -->
         <div id="tab-vip" class="tab-content" style="text-align: left;">
             <div id="vip-denied-box" style="display:none; text-align:center; padding: 25px 10px; border: 1px solid #ff4c4c; border-radius: 6px; background: rgba(255,76,76,0.1);">

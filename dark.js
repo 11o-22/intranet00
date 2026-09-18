@@ -9111,3 +9111,137 @@ function renderMaintenanceState() {
         ? '<span style="color:#ff6b6b;">● 점검 중 — 일반 사원 접속 차단</span>'
         : '<span style="color:#4CAF50;">● 정상 운영 중</span>';
 }
+
+let bjDeck = [], bjPlayer = [], bjDealer = [], bjBet = 0;
+let bjSwapsLeft = 0, bjSwapPhase = false;
+
+function bjNewDeck() {
+    bjDeck = [];
+    for (let s = 0; s < 4; s++) for (let v = 1; v <= 13; v++) bjDeck.push(v);
+    for (let i = bjDeck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bjDeck[i], bjDeck[j]] = [bjDeck[j], bjDeck[i]];
+    }
+}
+
+function bjScore(hand) {
+    let total = 0, aces = 0;
+    hand.forEach(v => {
+        if (v === 1) { total += 11; aces++; }
+        else total += Math.min(10, v);
+    });
+    while (total > 21 && aces > 0) { total -= 10; aces--; }
+    return total;
+}
+
+function bjLabel(v) {
+    return v === 1 ? 'A' : v === 11 ? 'J' : v === 12 ? 'Q' : v === 13 ? 'K' : String(v);
+}
+
+function bjRender(hideDealer) {
+    document.getElementById('bj-player-cards').innerHTML =
+        bjPlayer.map((v, i) => {
+            const clickable = bjSwapPhase && bjSwapsLeft > 0;
+            return `<div class="seotda-card" ${clickable ? `onclick="bjSwap(${i})" style="cursor:pointer;"` : ''}>${bjLabel(v)}</div>`;
+        }).join('');
+    document.getElementById('bj-dealer-cards').innerHTML =
+        bjDealer.map((v, i) => (hideDealer && i > 0)
+            ? `<div class="seotda-card back">?</div>`
+            : `<div class="seotda-card">${bjLabel(v)}</div>`).join('');
+    document.getElementById('bj-player-score').innerText = bjScore(bjPlayer);
+    document.getElementById('bj-dealer-score').innerText = hideDealer ? '?' : bjScore(bjDealer);
+
+    const info = document.getElementById('bj-swap-info');
+    if (info) {
+        info.innerHTML = (bjSwapPhase && bjSwapsLeft > 0)
+            ? `내 카드를 눌러 딜러의 뒷장과 맞바꿉니다. <b style="color:var(--theme-focus);">${bjSwapsLeft}</b>회 남음`
+            : `<span style="color:#666;">교환은 끝났습니다.</span>`;
+    }
+}
+
+function startBlackjack() {
+    const bet = parseInt(document.getElementById('bj-bet').value);
+    if (isNaN(bet) || bet <= 0) { showCustomAlert('올바른 베팅 금액을 입력해주세요.'); return; }
+    if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
+    if (!useFacility(bet)) return;
+
+    bjBet = bet;
+    bjNewDeck();
+    bjPlayer = [bjDeck.pop(), bjDeck.pop()];
+    bjDealer = [bjDeck.pop(), bjDeck.pop()];
+    bjSwapsLeft = 3;
+    bjSwapPhase = true;
+
+    document.getElementById('bj-controls-start').style.display = 'none';
+    document.getElementById('bj-controls-play').style.display = 'flex';
+    document.getElementById('bj-msg').innerText = '한 장 더 받거나 멈추세요.';
+    bjRender(true);
+
+    if (bjScore(bjPlayer) === 21) bjStand();
+}
+
+function bjHit() {
+    bjSwapPhase = false;
+    bjPlayer.push(bjDeck.pop());
+    bjRender(true);
+    if (bjScore(bjPlayer) > 21) bjFinish('bust');
+}
+
+function bjStand() {
+    while (bjScore(bjDealer) < 17) bjDealer.push(bjDeck.pop());
+    bjFinish('show');
+}
+
+function bjFinish(mode) {
+    bjRender(false);
+    const p = bjScore(bjPlayer), d = bjScore(bjDealer);
+    const msg = document.getElementById('bj-msg');
+
+    let result;
+    if (mode === 'bust' || p > 21) result = 'lose';
+    else if (d > 21) result = 'win';
+    else if (p > d) result = 'win';
+    else if (p < d) result = 'lose';
+    else result = 'draw';
+
+    const luckM = facilityLuckMult(currentUser);
+    if (result === 'lose' && luckM > 1 && p <= 21 && Math.random() < 0.15 * (luckM - 1)) {
+        result = 'win';
+    }
+
+    if (result === 'win') {
+        const mult = (p === 21 && bjPlayer.length === 2) ? 2.5 : 2;
+        const prize = Math.floor(bjBet * mult);
+        winPoints(prize);
+        msg.innerHTML = `<span style="color:#4CAF50;">[승리] ${p} vs ${d} (×${mult}) +${prize} P</span>`;
+        addHistoryLog(currentUser, `[블랙잭 승리] ${p} vs 딜러 ${d} (+${prize} P)`);
+    } else if (result === 'draw') {
+        winPoints(bjBet);
+        msg.innerHTML = `<span style="color:#ffd700;">[무승부] ${p} vs ${d} — 베팅금 반환</span>`;
+        addHistoryLog(currentUser, `[블랙잭 무승부] ${p} vs 딜러 ${d}`);
+    } else {
+        msg.innerHTML = `<span style="color:#f44336;">[패배] ${p} vs ${d} (-${bjBet} P)</span>`;
+        addHistoryLog(currentUser, `[블랙잭 패배] ${p} vs 딜러 ${d} (-${bjBet} P)`);
+        saveDB(); updateUI();
+    }
+
+    document.getElementById('bj-controls-play').style.display = 'none';
+    document.getElementById('bj-controls-start').style.display = 'block';
+}
+function bjSwap(idx) {
+    if (!bjSwapPhase || bjSwapsLeft <= 0) return;
+    if (idx < 0 || idx >= bjPlayer.length) return;
+
+    const tmp = bjPlayer[idx];
+    bjPlayer[idx] = bjDealer[1];
+    bjDealer[1] = tmp;
+    bjSwapsLeft--;
+
+    if (bjSwapsLeft <= 0) bjSwapPhase = false;
+    bjRender(true);
+
+    const msg = document.getElementById('bj-msg');
+    if (msg) msg.innerHTML = `<span style="color:#ffd700;">딜러의 뒷장과 바꿨습니다.</span>`;
+
+    if (bjScore(bjPlayer) > 21) bjFinish('bust');
+}
