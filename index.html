@@ -5925,23 +5925,69 @@ hlL.disabled = !playable;
             appendBadgeNoteToUser(targetUser, `[취함] 알코올 섭취 (10시간 지속)`);
             if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
         }
-        else if (cat.effect === 'equip_nostalgia') {
-            if (targetUser.nostalgiaUntil && Date.now() < targetUser.nostalgiaUntil) {
-                if(!isOthers) showCustomAlert('이미 노스텔지어 끈 효과가 적용 중입니다.');
-                return false;
-            }
-            targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
-            targetUser.nostalgiaLastReduced = Date.now();
-            targetUser.nostalgiaSender = currentUser.code; 
-            appendBadgeNoteToUser(targetUser, `[장착됨] 노스텔지어 끈 장착 (5시간 동안 오염도 서서히 감소)`);
-            if(!isOthers) showCustomAlert("노스텔지어 끈을 장착했습니다. 5시간 동안 오염도가 서서히 감소합니다.");
-       }
-       else if (cat.effect === 'equip_sonpo') {
+       else if (cat.effect === 'equip_nostalgia') {
+    if (targetUser.nostalgiaUntil && Date.now() < targetUser.nostalgiaUntil) {
+        if(!isOthers) showCustomAlert('이미 노스텔지어 끈 효과가 적용 중입니다.');
+        return false;
+    }
+    targetUser.nostalgiaUntil = Date.now() + (5 * 60 * 60 * 1000);
+    targetUser.nostalgiaLastReduced = Date.now();
+    targetUser.nostalgiaSender = currentUser.code; 
+    appendBadgeNoteToUser(targetUser, `[장착됨] 노스텔지어 끈 장착 (5시간 동안 오염도 서서히 감소)`);
+    if(!isOthers) showCustomAlert("노스텔지어 끈을 장착했습니다. 5시간 동안 오염도가 서서히 감소합니다.");
+}
+else if (cat.effect === 'equip_red_ribbon') {
+    if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+    if (targetUser.equippedWeapons.length >= 3) {
+        showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
+        return false;
+    }
+    if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+    if (currentUser.equippedWeapons.length >= 3) {
+        showCustomAlert('당신의 장착 슬롯이 가득 찼습니다.');
+        return false;
+    }
+
+    const cPos = currentUser.position || '사원';
+    const tPos = targetUser.position || '사원';
+    const targetLabel = `빨간 리본 (연결: ${currentUser.name} ${cPos})`;
+    const senderLabel = `빨간 리본 (연결: ${targetUser.name} ${tPos})`;
+
+    targetUser.equippedWeapons.push(targetLabel);
+    currentUser.equippedWeapons.push(senderLabel);
+    setEquipOwner(targetUser, targetLabel, currentUser.code);
+    setEquipOwner(currentUser, senderLabel, currentUser.code);
+
+    appendBadgeNoteToUser(targetUser, `[장착됨] ${targetLabel}`);
+    appendBadgeNoteToUser(currentUser, `[장착됨] ${senderLabel}`);
+
+    addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원이 빨간 리본으로 연결했습니다.`);
+    showCustomAlert(`${targetUser.name} 사원과 빨간 리본으로 연결되었습니다.`);
+}
+else if (cat.effect === 'equip_sonpo') {
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
             if (targetUser.equippedWeapons.length >= 3) {
                 if (!isOthers) showCustomAlert('장착 슬롯이 가득 찼습니다.');
                 return false;
             }
+
+            else if (cat.effect === 'target_sticker') {
+    addTimedEffect(targetUser, '스마일 스티커', `${currentUser.name} 사원에게 미미한 호감을 느낀다`, 5);
+    addHistoryLog(targetUser, `[부착] 누군가 당신에게 스티커를 붙였습니다.`);
+    if (isOthers) showCustomAlert(`${targetUser.name} 사원에게 스티커를 몰래 붙였습니다.`);
+}
+else if (cat.effect === 'slave_contract') {
+    if (targetUser.slaveUntil && Date.now() < targetUser.slaveUntil) {
+        showCustomAlert('이미 다른 계약이 진행 중입니다.');
+        return false;
+    }
+    targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
+    targetUser.masterName = currentUser.name;
+    appendBadgeNoteToUser(targetUser, `[계약] ${currentUser.name} 사원과 노예 계약 (3일)`);
+    addHistoryLog(targetUser, `[계약] ${currentUser.name} 사원과 노예 계약이 체결되었습니다.`);
+    showCustomAlert(`${targetUser.name} 사원과 3일간의 계약을 체결했습니다.`);
+}
+
             const label = isOthers ? `유리손포 (장착자: ${currentUser.name})` : '유리손포';
             targetUser.equippedWeapons.push(label);
             setEquipOwner(targetUser, label, isOthers ? currentUser.code : targetUser.code);
