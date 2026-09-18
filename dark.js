@@ -11536,3 +11536,37 @@ function watchPurge() {
         );
     });
 }
+
+function adminEditGear() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+
+    const icon = document.getElementById('adm-gear-icon').value.trim();
+    const name = document.getElementById('adm-gear-name').value.trim();
+    if (!icon && !name) { showCustomAlert('바꿀 이모지나 이름을 입력해주세요.'); return; }
+
+    let done = [], skipped = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u) return;
+        if (!u.soulGear) { skipped.push(u.name); return; }
+
+        const before = (u.soulGear.icon || '') + ' ' + u.soulGear.name;
+        if (icon) u.soulGear.icon = icon;
+        if (name) u.soulGear.name = name;
+        const after = (u.soulGear.icon || '') + ' ' + u.soulGear.name;
+
+        u._adminStamp = Date.now();
+        addHistoryLog(u, `[전용 장비] 명칭이 변경되었습니다. (${before} → ${after})`);
+        if (database) database.ref('users/' + code).set(u);
+        done.push(`${u.name}: ${after}`);
+    });
+
+    if (!database) saveDB();
+    updateUI();
+    renderAdminGearList();
+    showCustomAlert(
+        (done.length ? `수정 완료\n${done.join('\n')}` : '') +
+        (skipped.length ? `\n\n장비 없음: ${skipped.join(', ')}` : '')
+    );
+}
