@@ -4211,18 +4211,7 @@ if (database) {
         }
     }
 
-    
-if (!user.lastSatietyTime) user.lastSatietyTime = now;
 
-const satietyStep = 2 * 60 * 60 * 1000;   // 2시간마다 5 감소
-const sDiff = now - user.lastSatietyTime;
-if (sDiff >= satietyStep) {
-    let steps = Math.floor(sDiff / satietyStep);
-    if (steps > 12) steps = 12;
-    user.satiety = Math.max(0, user.satiety - steps * 5);
-    user.lastSatietyTime = now;
-    changed = true;
-}
 
     function addPollution(amount) {
         if (!currentUser || currentUser.code === 'kario0987') return; 
