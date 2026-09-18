@@ -10081,5 +10081,330 @@ function s010Result(title, roll, bonus, DC, ok, txt) {
     renderInfectBar();
     mountDarkChat('normal');
 }
+// --- 기믹 9: 단독 돌파 (회피) ---
+function s010G9() {
+    renderChoiceStep("기믹 9 — 혼자",
+        `혼자다.<br><br>
+         앞이 막혔다. 둘. 좁은 통로라 피할 자리가 없다.<br>
+         뒤도 막혔다. 방금 지나온 곳에서 소리가 난다.<br><br>
+         <span style="color:#888; font-size:11px;">✦ 회피가 유리합니다.</span>`,
+        [
+            { id:'slide', label:'① 바닥으로 미끄러져 지나간다.', fn:'s010G9R', arg:'slide' },
+            { id:'climb', label:'② 선반을 타고 넘는다.',         fn:'s010G9R', arg:'climb' },
+            { id:'push',  label:'③ 밀치고 뚫는다.',              fn:'s010G9R', arg:'push' }
+        ], null);
+}
+function s010G9R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('hide') + Math.round(gearValue(currentUser, 'evade') * 14);
+    const DC = { slide: 13, climb: 12, push: 16 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
 
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        txt = pick === 'slide' ? `무릎을 접고 바닥으로 미끄러진다.<br><br>다리 사이로 빠져나간다. 발목을 스쳤지만 잡히지 않았다.<br>일어나서 뒤를 안 봤다.`
+            : pick === 'climb' ? `선반에 발을 건다. 흔들린다.<br><br>위로 올라가 반대편으로 뛰어내린다.<br>착지할 때 소리가 났지만 이미 지나온 뒤였다.`
+            : `어깨로 밀친다.<br><br>하나가 넘어졌다. 넘어진 채로 팔을 뻗는다.<br>그 손을 밟고 지나갔다.`;
+    } else if (roll === 1) {
+        darkRun.fail += 2;
+        addInfect(20, '통로에서 붙잡힘');
+        applyPollutionToUser(currentUser, 12);
+        txt = `잡혔다.<br><br>둘이 동시에 달려들었다. 벽에 밀린다.<br>목을 막았는데 팔을 물렸다.<br><br>빠져나오긴 했다. 팔이 뜨겁다.`;
+    } else {
+        darkRun.fail++;
+        addInfect(10, '돌파 실패');
+        txt = `지나가긴 했다.<br><br>옷이 찢어지고 어깨가 긁혔다.<br>긁힌 건지 물린 건지 지금은 구분이 안 간다.`;
+    }
+    darkRun.log.push(`[기믹 9] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 9 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 10: 무전 (연결) ---
+function s010G10() {
+    renderChoiceStep("기믹 10 — 무전",
+        `무전기가 지직거린다.<br><br>
+         주파수를 맞춰야 동료와 닿는다.<br>
+         맞추는 동안 소리가 새어 나간다. 저것들도 듣는다.<br><br>
+         <span style="color:#888; font-size:11px;">⊙ 연결이 유리합니다.</span>`,
+        [
+            { id:'tune',  label:'① 천천히 주파수를 훑는다.',   fn:'s010G10R', arg:'tune' },
+            { id:'code',  label:'② 두드림으로 신호를 보낸다.', fn:'s010G10R', arg:'code' },
+            { id:'shout', label:'③ 볼륨을 올려 부른다.',       fn:'s010G10R', arg:'shout' }
+        ], null);
+}
+function s010G10R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('rejoin');
+    const DC = { tune: 12, code: 10, shout: 16 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        setQFlag('s010_radio', true);
+        txt = pick === 'code' ? `무전기 몸체를 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다. 살아 있다.<br>위치까지는 모르겠지만, 방향은 알겠다.`
+            : pick === 'tune' ? `다이얼을 아주 천천히 돌린다.<br><br>세 번째에서 걸렸다. 목소리다. 아는 목소리다.<br>이름을 말하기 전에 서로 알아봤다.`
+            : `볼륨을 올려 부른다.<br><br>대답이 왔다. 크게 왔다.<br>그리고 복도 끝에서 뭔가가 그쪽으로 몰려가는 소리도 같이 들렸다.`;
+        if (pick === 'shout') addInfect(6, '무전 노출');
+    } else {
+        darkRun.fail++;
+        darkRun.modifier = (darkRun.modifier || 0) - 1;
+        txt = `대답이 없다.<br><br>아니, 대답 비슷한 것이 왔다.<br>말이 아니라 숨소리였다. 젖어 있었다.<br><br>무전기를 껐다.`;
+    }
+    darkRun.log.push(`[기믹 10] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 10 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 11: 어둠 속 이동 (감각) ---
+function s010G11() {
+    renderChoiceStep("기믹 11 — 비상등",
+        `비상등이 일정한 간격으로 깜빡인다.<br><br>
+         밝을 때 보면 아무것도 없고, 어두울 때 뭔가 움직인다.<br>
+         깜빡이는 주기에 맞춰 움직여야 한다.<br><br>
+         <span style="color:#888; font-size:11px;">◈ 감각이 유리합니다.</span>`,
+        [
+            { id:'beat',  label:'① 주기를 세고 맞춰 움직인다.', fn:'s010G11R', arg:'beat' },
+            { id:'dark',  label:'② 어두울 때만 움직인다.',      fn:'s010G11R', arg:'dark' },
+            { id:'light', label:'③ 밝을 때만 움직인다.',        fn:'s010G11R', arg:'light' },
+            { id:'blind', label:'④ 눈을 감고 소리로 간다.',     fn:'s010G11R', arg:'blind' }
+        ], "step3");
+}
+function s010G11R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense');
+    const DC = { beat: 12, dark: 15, light: 11, blind: 14 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        txt = pick === 'beat' ? `센다. 하나, 둘, 셋에 꺼지고 다섯에 켜진다.<br><br>박자에 맞춰 세 걸음씩 옮긴다.<br>끝까지 어긋나지 않았다.`
+            : pick === 'light' ? `밝을 때만 움직인다.<br><br>보이는 동안만 걷는다. 그게 제일 마음이 놓인다.<br>다만 이쪽도 보인다는 뜻이었다. 운이 좋았다.`
+            : pick === 'dark' ? `어두울 때 움직인다.<br><br>앞이 안 보여서 두 번 부딪혔다. 둘 다 벽이었다.<br>세 번째는 벽이 아니었는데, 그쪽도 놀란 것 같았다.`
+            : `눈을 감는다.<br><br>발소리와 숨소리만으로 방향을 잡는다.<br>어둠 속에서 눈을 뜨고 있는 것보다 낫다.`;
+    } else {
+        darkRun.fail++;
+        addInfect(9, '비상등 구간 실패');
+        applyPollutionToUser(currentUser, 7);
+        txt = `박자를 놓쳤다.<br><br>불이 켜졌을 때 한가운데 서 있었다.<br>전부 이쪽을 보고 있었다.<br><br>불이 다시 꺼졌고, 그때부터는 뛰었다.`;
+    }
+    darkRun.log.push(`[기믹 11] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 11 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 12: 물린 동료 (치유) ---
+function s010G12() {
+    renderChoiceStep("기믹 12 — 물린 동료",
+        `동료가 팔을 붙잡고 있다.<br><br>
+         물렸다. 본인도 안다. 말을 안 할 뿐이다.<br>
+         지금 손을 쓰면 늦출 수 있다. 시간이 걸린다.<br><br>
+         <span style="color:#888; font-size:11px;">❋ 치유가 유리합니다.</span>`,
+        [
+            { id:'treat', label:'① 시간을 들여 처치한다.',   fn:'s010G12R', arg:'treat' },
+            { id:'quick', label:'② 붕대만 감고 간다.',       fn:'s010G12R', arg:'quick' },
+            { id:'leave', label:'③ 두고 간다.',              fn:'s010G12R', arg:'leave' }
+        ], null);
+}
+function s010G12R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 12);
+    const DC = { treat: 13, quick: 9, leave: 0 }[pick];
+    const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
+
+    let txt;
+    if (pick === 'leave') {
+        darkRun.fail++;
+        darkRun.modifier = (darkRun.modifier || 0) - 2;
+        applyPollutionToUser(currentUser, 10);
+        txt = `두고 간다.<br><br>붙잡지 않았다. 부르지도 않았다.<br>그쪽도 따라오지 않았다.<br><br>모퉁이를 돌기 전에 한 번 돌아봤다. 같은 자리에 앉아 있었다.`;
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 동료를 두고 왔습니다.`, true);
+    } else if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        if (darkRun.isParty && database) {
+            database.ref(`darkParties/${darkRun.partyId}/heals`).push({
+                by: currentUser.name, at: Date.now(), amount: 14
+            });
+        }
+        txt = pick === 'treat' ? `소독하고, 죽은 살을 걷어내고, 다시 감는다.<br><br>오래 걸렸다. 그동안 아무 말도 안 했다.<br>끝나고 나서 고맙다는 말도 없었다. 그게 편했다.`
+            : `붕대만 빠르게 감는다.<br><br>완전하지 않다는 걸 둘 다 안다.<br>그래도 안 하는 것보다는 낫다.`;
+    } else {
+        darkRun.fail++;
+        txt = `손이 늦었다.<br><br>감는 동안에도 검은 자국이 번진다.<br>번지는 속도가 눈에 보인다는 게 이상했다.`;
+    }
+    darkRun.log.push(`[기믹 12] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 12 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 13: 명단 대조 (응시) ---
+function s010G13() {
+    renderChoiceStep("기믹 13 — 명단",
+        `주워 온 명찰과 근무 명단을 맞춰 본다.<br><br>
+         사번이 맞아떨어지지 않는 것이 하나 있다.<br>
+         우리 것도 아니고, 쓰러진 것들 것도 아니다.<br><br>
+         <span style="color:#888; font-size:11px;">❂ 응시가 유리합니다.</span>`,
+        [
+            { id:'trace', label:'① 사번을 거슬러 올라간다.',   fn:'s010G13R', arg:'trace' },
+            { id:'ask',   label:'② 일행에게 물어본다.',        fn:'s010G13R', arg:'ask' },
+            { id:'drop',  label:'③ 명찰을 버린다.',            fn:'s010G13R', arg:'drop' }
+        ], null);
+}
+function s010G13R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze')
+        + (qFlag('s010_tags') ? 6 : 0);
+    const DC = { trace: 13, ask: 11, drop: 0 }[pick];
+    const ok = pick === 'drop' ? false : (roll !== 1 && (roll + bonus) >= DC);
+
+    let txt;
+    if (pick === 'drop') {
+        txt = `버린다.<br><br>알아서 좋을 게 없다고 생각했다.<br>버린 자리를 한 번 더 봤다. 명찰이 없었다.<br><br>누가 주워 갔다.`;
+        addInfect(5, '명찰 유기');
+        darkRun.fail++;
+    } else if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        setQFlag('s010_roster', true);
+        txt = pick === 'trace' ? `사번 앞자리를 본다. 검역반 소속이다.<br><br>검역반은 이 층에 배치된 적이 없다.<br>그럼 왜 여기 있었나.<br><br><span style="color:#d4af37;">이후 감염체 식별 판정에 보정이 붙는다.</span>`
+            : `일행에게 보여준다.<br><br>다들 모른다고 한다. 한 사람이 조금 늦게 대답했다.<br>늦은 만큼만 기억해 두기로 한다.<br><br><span style="color:#d4af37;">이후 지목 판정에 보정이 붙는다.</span>`;
+    } else {
+        darkRun.fail++;
+        txt = `맞춰 보다 포기한다.<br><br>숫자가 자꾸 어긋난다. 세 번 세었는데 세 번 다 다르다.<br>명찰을 주머니에 도로 넣었다.`;
+    }
+    darkRun.log.push(`[기믹 13] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 13 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 14: 감염체 식별 (감각) ---
+function s010G14() {
+    const hint = qFlag('s010_roster');
+    renderChoiceStep("기믹 14 — 구분",
+        `일행 중 하나가 이상하다.<br><br>
+         걸음이 반 박자 늦고, 말수가 줄었고, 소매를 안 걷는다.<br>
+         전부 그럴 수 있는 이유가 있다. 그게 문제다.<br><br>
+         ${hint ? '<span style="color:#d4af37;">명단에서 본 것이 떠오른다.</span><br><br>' : ''}
+         <span style="color:#888; font-size:11px;">◈ 감각이 유리합니다. 증상기라면 더 잘 보입니다.</span>`,
+        [
+            { id:'smell', label:'① 냄새로 가린다.',         fn:'s010G14R', arg:'smell' },
+            { id:'pulse', label:'② 맥을 짚어 본다.',        fn:'s010G14R', arg:'pulse' },
+            { id:'talk',  label:'③ 말을 걸어 반응을 본다.', fn:'s010G14R', arg:'talk' },
+            { id:'skip',  label:'④ 확인하지 않는다.',       fn:'s010G14R', arg:'skip' }
+        ], null);
+}
+function s010G14R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('detect') + (qFlag('s010_roster') ? 3 : 0);
+    const DC = { smell: 12, pulse: 11, talk: 14, skip: 0 }[pick];
+    const ok = pick === 'skip' ? false : (roll !== 1 && (roll + bonus) >= DC);
+
+    let txt;
+    if (pick === 'skip') {
+        darkRun.fail++;
+        addInfect(8, '확인 회피');
+        txt = `확인하지 않는다.<br><br>알게 되면 뭔가 해야 하니까.<br>모르는 동안은 아무것도 안 해도 된다.<br><br>그렇게 한 시간쯤 더 걸었다.`;
+    } else if (ok) {
+        darkRun.success++;
+        setQFlag('s010_marked', true);
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        txt = pick === 'pulse' ? `손목을 잡는다. 맥이 없다.<br><br>없는 게 아니라, 너무 느려서 셀 수가 없다.<br>잡은 손을 놓지 않은 채로 눈을 마주쳤다.<br><br>상대가 먼저 웃었다.`
+            : pick === 'smell' ? `가까이 선다. 냄새가 다르다.<br><br>소독약 아래에 다른 게 깔려 있다. 익숙한 냄새다.<br>복도에서 맡았던 것과 같다.`
+            : `아무 말이나 건다. 어제 뭐 먹었냐고.<br><br>대답이 왔다. 정확한 대답이었다.<br>그런데 대답하기 전에 한 박자 멈췄다.<br>기억을 찾은 게 아니라, 계산한 시간이었다.`;
+    } else {
+        darkRun.fail++;
+        txt = `구분이 안 간다.<br><br>다들 지쳐 있고, 다들 말수가 줄었고, 다들 어딘가 다쳤다.<br>이 상태에서 뭘 어떻게 가려낸다는 건가.`;
+    }
+    darkRun.log.push(`[기믹 14] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 14 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 15: 제압 (파괴) ---
+function s010G15() {
+    renderChoiceStep("기믹 15 — 제압",
+        `넘어간 것이 달려든다.<br><br>
+         아까까지 같이 걷던 사람이다.<br>
+         멈춰야 한다. 멈추는 방법은 몇 가지뿐이다.<br><br>
+         <span style="color:#888; font-size:11px;">✧ 파괴가 유리합니다.</span>`,
+        [
+            { id:'hold',  label:'① 눌러서 묶는다.',           fn:'s010G15R', arg:'hold' },
+            { id:'bolt',  label:'② 검역용 볼트를 쓴다.',      fn:'s010G15R', arg:'bolt' },
+            { id:'flee',  label:'③ 문을 닫고 달아난다.',      fn:'s010G15R', arg:'flee' }
+        ], null);
+}
+function s010G15R(pick) {
+    if (pick === 'bolt') {
+        const has = (currentUser.inventory || []).includes('검역용 볼트');
+        if (!has) {
+            showCustomAlert('검역용 볼트가 없습니다.');
+            s010G15();
+            return;
+        }
+        removeItemFromInventory(currentUser, '검역용 볼트', 1);
+        darkRun.success += 2;
+        darkRun.log.push(`[기믹 15] 볼트 사용`);
+        s010Result("기믹 15 — 결과", 20, 0, 0, true,
+            `볼트를 관자놀이에 댄다.<br><br>
+             한 번에 끝났다. 소리도 거의 안 났다.<br>
+             이런 용도로 만든 물건이라는 걸 그제야 알았다.<br><br>
+             바닥에 눕힌다. 눈을 감겨 주려다 말았다.<br>
+             이미 감고 있었다.`);
+        return;
+    }
+
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
+    const DC = { hold: 15, flee: 12 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        txt = pick === 'hold' ? `덮쳐서 바닥에 누른다.<br><br>힘이 사람 것이 아니다. 관절이 꺾이는데도 계속 밀어붙인다.<br>셋이 붙어서 겨우 묶었다.<br><br>묶인 채로 계속 이쪽을 본다.`
+            : `문을 닫는다.<br><br>손이 문틈에 끼었다. 더 세게 닫았다.<br>안쪽에서 계속 두드린다. 박자가 일정하다.<br><br>멀어질 때까지 그 소리가 따라왔다.`;
+    } else {
+        darkRun.fail++;
+        addInfect(16, '제압 실패');
+        applyPollutionToUser(currentUser, 10);
+        txt = `밀렸다.<br><br>목을 막았는데 손목을 물렸다.<br>떼어내는 데 시간이 걸렸다. 이가 깊게 박혀 있었다.`;
+    }
+    darkRun.log.push(`[기믹 15] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 15 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 16: 검역 기록 (응시) ---
+function s010G16() {
+    renderChoiceStep("기믹 16 — 기록",
+        `검사 기록이 벽 한 면을 채우고 있다.<br><br>
+         전부 음성이다. 한 장도 빠짐없이.<br>
+         마지막 기록은 새벽 세 시에 멈춰 있다.<br><br>
+         <span style="color:#888; font-size:11px;">❂ 응시가 유리합니다.</span>`,
+        [
+            { id:'count', label:'① 장수를 센다.',              fn:'s010G16R', arg:'count' },
+            { id:'time',  label:'② 시각 순서를 따져 본다.',     fn:'s010G16R', arg:'time' },
+            { id:'stamp', label:'③ 도장을 대조한다.',          fn:'s010G16R', arg:'stamp' }
+        ], "step4");
+}
+function s010G16R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze');
+    const DC = { count: 12, time: 13, stamp: 11 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        setQFlag('s010_record', true);
+        txt = pick === 'count' ? `센다. 스물세 장.<br><br>근무 인원은 스물셋이었다. 전원 음성.<br>그런데 명단에는 스물넷이 적혀 있다.<br><br>검사받지 않은 사람이 하나 있었다.`
+            : pick === 'time' ? `시각을 따라간다.<br><br>10분 간격으로 찍혀 있다. 규칙적이다.<br>딱 한 군데, 2시 40분과 3시 사이가 비어 있다.<br><br>그 20분에 무슨 일이 있었다.`
+            : `도장을 대조한다.<br><br>전부 같은 도장인데, 세 장만 각도가 다르다.<br>왼손으로 찍은 것이다.<br><br>검역관은 오른손잡이였다.`;
+    } else {
+        darkRun.fail++;
+        txt = `읽다가 눈이 흐려진다.<br><br>글자가 겹쳐 보인다. 같은 문장이 반복되는 것 같기도 하다.<br>오래 본 탓이라고 생각하기로 한다.`;
+        addInfect(4, '기록 판독 실패');
+    }
+    darkRun.log.push(`[기믹 16] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 16 — 결과", roll, bonus, DC, ok, txt);
+}
 
