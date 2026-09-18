@@ -9718,7 +9718,7 @@ function renderStepS010() {
     const body = darkBodyEl();
     if (!body || !darkRun) return;
     if (darkRun.rejoined) { renderRejoinScene(); return; }
-    if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); }
+    if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); watchPurge(); }
     saveDarkRunState();
     attachS010Listener();
 
