@@ -11368,7 +11368,6 @@ function renderTurnedStep() {
     renderInfectBar();
     mountDarkChat('normal');
 }
-
 // ==========================================
 // ★ S-010 정산 보너스
 // ==========================================
