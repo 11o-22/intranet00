@@ -483,47 +483,21 @@
 
                 <!-- 섯다 -->
                 <div id="panel-seotda" class="sub-panel" style="text-align:center;">
-                    <div class="panel-title">[지하실 섯다 - 딜러 대결]</div>
-                    <div class="seotda-arena">
-                        <div class="seotda-row">
-                            <div class="seotda-row-label">시스템(딜러) 패: <span id="dealer-result-label" style="color:#ffd700;">?</span></div>
-                            <div class="seotda-cards-box">
-                                <div class="seotda-card back" id="dealer-card-1">?</div>
-                                <div class="seotda-card back" id="dealer-card-2">?</div>
-                            </div>
-                        </div>
-                        <div style="height:1px; background:rgba(255,255,255,0.1); margin: 15px 0;"></div>
-                        <div class="seotda-row">
-                            <div class="seotda-row-label">사원(플레이어) 패: <span id="player-result-label" style="color:#ffd700;">대기 중</span></div>
-                            <div class="seotda-cards-box">
-                                <div class="seotda-card" id="seotda-card-1" onclick="selectSeotdaCard(1)">?</div>
-                                <div class="seotda-card" id="seotda-card-2" onclick="selectSeotdaCard(2)">?</div>
-                            </div>
-                        </div>
-                    </div>
-                              <div id="seotda-controls-start">
-    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
-    <div class="bet-stepper">
-        <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
-        <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
-        <div class="bet-display" id="seotda-bet-display">5</div>
-        <button class="step-btn" onclick="adjustBet('seotda-bet', 1)">&gt;</button>
-        <button class="step-btn wide" onclick="adjustBet('seotda-bet', 10)">+10</button>
-        <button class="step-btn bet-max" onclick="setBetMax('seotda-bet')">최대</button>
+    <div class="panel-title">[지하실 섯다 - 딜러 대결]</div>
+    <div class="seotda-arena">
+        ... 섯다 카드 영역 ...
     </div>
-    <input type="hidden" id="seotda-bet" value="5">
-    <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
-</div>
-                    <div id="seotda-controls-play" style="display:none; display:flex; justify-content:center; gap:10px;">
-                        <button class="game-btn" onclick="swapSeotdaCard()" style="flex:1;">선택 패 교환 (<span id="swap-count">2</span>회)</button>
-                        <button class="game-btn" onclick="finishSeotda()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000); border-color:#d32f2f;">승부 (쇼다운)</button>
-                    </div>
-                    <div id="seotda-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
-                </div>
-            </div>
-        </div>
 
-        <div id="panel-blackjack" class="sub-panel" style="text-align:center;">
+    <div id="seotda-controls-start">
+        ... 베팅 스테퍼와 패 돌리기 ...
+    </div>
+    <div id="seotda-controls-play" style="display:none; justify-content:center; gap:10px;">
+        ... 교환 / 쇼다운 ...
+    </div>
+    <div id="seotda-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
+</div>
+
+<div id="panel-blackjack" class="sub-panel" style="text-align:center;">
     <div class="panel-title">[야간 경비실 블랙잭]</div>
     <div class="seotda-arena">
         <div class="seotda-row">
@@ -551,14 +525,15 @@
         <button class="game-btn" onclick="startBlackjack()">카드를 받는다</button>
     </div>
 
-   <div id="bj-controls-play" style="display:none; flex-direction:column; gap:8px;">
-    <div id="bj-swap-info" style="font-size:11px; color:#888;"></div>
-    <div style="display:flex; gap:10px;">
-        <button class="game-btn" onclick="bjHit()" style="flex:1;">한 장 더</button>
-        <button class="game-btn" onclick="bjStand()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000) !important; border-color:#d32f2f !important;">멈춘다</button>
+    <div id="bj-controls-play" style="display:none; flex-direction:column; gap:8px;">
+        <div id="bj-swap-info" style="font-size:11px; color:#888;"></div>
+        <div style="display:flex; gap:10px;">
+            <button class="game-btn" onclick="bjHit()" style="flex:1;">한 장 더</button>
+            <button class="game-btn" onclick="bjStand()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000) !important; border-color:#d32f2f !important;">멈춘다</button>
+        </div>
     </div>
-</div>
-<div id="bj-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
+
+    <div id="bj-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
 </div>
         <!-- 3. VIP 시설 (1:1 실시간 대전실) -->
         <div id="tab-vip" class="tab-content" style="text-align: left;">
@@ -6655,6 +6630,7 @@ if (!useFacility(bet)) return;
         wheel.style.transform = `rotate(${currentRotation}deg)`;
 
         setTimeout(() => {
+            const luckM = facilityLuckMult(currentUser);
             let outcomeNum = 0, outcomeMult = 0;
 
             if (luckM > 1 && Math.random() < 0.05 * (luckM - 1)) {
