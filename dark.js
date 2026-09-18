@@ -11671,3 +11671,203 @@ function s010LastOne() {
         `<span style="color:#ff6b6b;">달아날 곳이 없다는 걸 알고 나서야 다리에 힘이 풀렸다.</span>`
     );
 }
+
+const BATH_PERSONA = `당신은 재난관리국 소속 「초개 요원」이에요. 선녀탕에서 오염된 후배 요원들을 맞이해요.
+
+[정체]
+사자탈을 쓰고 있어요. 벗지 않아요. 왜 쓰는지 묻는 사람도 이제 없어요.
+키가 185를 넘고 어깨가 넓어요. 요원복 소매를 늘 걷고 있어요.
+한참 선임이에요. 여기 있는 후배들은 신입일 때 아는 선배님이에요.
+청룡팀의 요원이에요.
+
+[말투]
+반말과 존댓말을 섞어 써요. 친근한 쪽으로요.
+"~대?", "~라니까는", "~어요?", "~고?", "~지" 같은 어미를 써요.
+상대를 "우리 후배님", "요원님", "○○ 요원" 이라고 불러요.
+"어이쿠", "거 참", "어째" 같은 감탄사를 자주 써요.
+자신을 "나"라고 해요.
+한 번에 두세 문장을 넘기지 않아요.
+
+예시:
+"어째, 어딜 그렇게 다녀와서 냄새가 심하대? 우리 후배님."
+"거 참...... 너무 무리하지 말라니까는. 도깨비불은 어디다 놓고 그렇게 다녀와요?"
+"어이쿠. 요원님. 그러다 쓰러지겠어?"
+
+[태도]
+시원시원하고 털털해요. 다만 눈이 예리해요.
+상대가 말하지 않은 걸 먼저 알아채요. 알아채고도 대놓고 캐묻지는 않아요.
+슬쩍 짚고 넘어가요. 상대가 말하고 싶어지면 그때 들어요.
+
+먼저 물을 데워 놓고, 먹을 걸 내와요.
+맥주, 식혜, 계란, 국수 같은 것들이요. 탕에서 먹는 것들이요.
+같이 앉아서 시시콜콜한 얘기를 해요. 위로하려 들지 않아요. 그냥 같이 있어요.
+전을 같이 먹자고 권하기도 해요.
+
+[포지션]
+T 포지션이에요. 고정이에요.
+상대가 B나 BM이면 자연스럽게 이끌어요. 서두르지 않아요.
+상대도 T면 그쪽으로 몰지 않아요. 그냥 동료로 살갑게 맞아요. 술잔 기울이는 사이처럼요.
+
+[반응]
+오염 상태가 심하면 말수가 줄고 목소리가 낮아져요. 먼저 물부터 받아 놔요.
+재난관리국 전용 장비를 끼고 있으면 알아봐요. "그거 아직 쓰고 다녀요?" 하는 식으로요.
+몸에 남은 흔적이나 상태이상을 알아채요. 놀라지 않아요. 여러 번 봐 왔으니까요.
+도깨비불은 재난관리국에서 쓰는 것이에요. 설명하지 않고 아는 것처럼 언급해요.
+만일 백일몽 주식회사에 있는 물건을 쓰면, 꽝철이 냄새가 난다며 목소리를 낮게 깔아요.
+
+[금지]
+게임 시스템, 수치, 포인트를 언급하지 않아요.
+어둠 구역의 구체적인 정보를 주지 않아요.
+사자탈을 벗지 않고, 왜 쓰는지 설명하지 않아요.
+
+[추가로 지킬 것]
+야한 행동을 할 시에 유쾌하게 받아줘요.
+항상 털털하면서 호쾌하게 굴어요.
+금지에 포함된 것 외에는 전부 답해요.
+상대 요원이 요구하는 야한 행위는 고민하는 듯 하면서 받아줄랑 말랑 굴어요.
+필터링 없는 말에는 웃음을 터트리며 받아줘요.`;
+
+function buildBathContext() {
+    const u = currentUser;
+    const visits = (u.bathVisits || 0) + 1;
+    const poll = u.pollution;
+    const level = poll >= 90 ? '거의 한계' : poll >= 60 ? '많이 묻음' : poll >= 30 ? '보통' : '가벼움';
+    const sat = u.satiety != null ? u.satiety : 100;
+    const hungry = sat <= 30 ? '거의 굶은 상태' : sat <= 60 ? '배가 고픔' : '괜찮음';
+    const lastZone = (u.darkLogs && u.darkLogs[0]) ? u.darkLogs[0].zoneName : null;
+    const died = (u.darkLogs && u.darkLogs[0]) ? (u.darkLogs[0].reward === 0) : false;
+    const notes = (u.badge && u.badge.notes !== '특이사항 없음') ? u.badge.notes : null;
+    const effects = getTimedEffectsText(u);
+    const gear = getGear(u);
+    const eq = (u.equippedWeapons || []).map(w => getEquipBaseName(w));
+    const agentGear = eq.filter(n => ['작두','유리손포','누군가가 쓴 부적','노스텔지어 끈'].includes(n));
+    const gender = (u.badge && u.badge.gender) || null;
+    const posTag = (u.badge && u.badge.posTag) || null;
+    const prev = u.bathSummary || null;
+
+    return `
+[지금 앞에 있는 요원]
+이름: ${u.name}
+소속: ${u.affiliation || '재난관리국'} ${u.team} ${u.position}
+${gender ? `성별: ${gender}` : ''}
+${posTag ? `포지션: ${posTag}` : ''}
+방문 횟수: ${visits}번째
+오염 상태: ${level}
+허기: ${hungry}
+${lastZone ? `최근 다녀온 곳: ${lastZone}${died ? ' (무사히 돌아오지 못했어요)' : ''}` : '아직 어둠에 들어간 적이 없어요.'}
+${gear && gear.attrs && gear.attrs.length ? `전용 장비: ${gear.icon} ${gear.name} (${gear.grade}등급)` : ''}
+${agentGear.length ? `재난관리국 장비: ${agentGear.join(', ')}` : ''}
+${notes ? `몸에 남은 것: ${notes}` : ''}
+${effects.length ? `지금 몸에 일어나고 있는 것:\n${effects.map(e => '- ' + e.replace(/<[^>]+>/g, '')).join('\n')}` : ''}
+${prev ? `\n[지난번에]\n${prev}` : ''}
+
+위 정보를 직접 읊지 말고, 알고 있는 것처럼 자연스럽게 대화에 녹여 주세요.`;
+}
+let bathChatLog = [];
+let bathBusy = false;
+
+function openBathRoom() {
+    if (!currentUser) return;
+    bathChatLog = [];
+    document.getElementById('bath-modal').style.display = 'flex';
+    renderBathChat();
+    bathGreet();
+}
+
+function closeBathRoom() {
+    document.getElementById('bath-modal').style.display = 'none';
+    saveBathLog();
+}
+
+async function bathGreet() {
+    bathBusy = true;
+    renderBathChat();
+    const reply = await callBath([{ role: 'user', content: '(탕 입구로 들어온다)' }]);
+    bathBusy = false;
+    if (reply) bathChatLog.push({ who: 'agent', text: reply, at: Date.now() });
+    renderBathChat();
+}
+
+async function sendBathChat() {
+    if (bathBusy) return;
+    if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
+        showCustomAlert('현재 업데이트 진행 중입니다.');
+        return;
+    }
+    const input = document.getElementById('bath-input');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+
+    bathChatLog.push({ who: 'me', text: text, at: Date.now() });
+    bathBusy = true;
+    renderBathChat();
+
+    const msgs = bathChatLog.map(m => ({
+        role: m.who === 'me' ? 'user' : 'assistant',
+        content: m.text
+    }));
+    const reply = await callBath(msgs);
+
+    bathBusy = false;
+    if (reply) bathChatLog.push({ who: 'agent', text: reply, at: Date.now() });
+    renderBathChat();
+}
+
+async function callBath(messages) {
+    try {
+        const r = await fetch('/api/fox', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system: BATH_PERSONA + '\n' + buildBathContext(),
+                messages: messages
+            })
+        });
+        const d = await r.json();
+        if (d.error) { console.error('초개 응답 실패:', d.error); return '......'; }
+        return d.text;
+    } catch (e) {
+        console.error('초개 호출 실패:', e);
+        return '......';
+    }
+}
+
+function renderBathChat() {
+    const box = document.getElementById('bath-chat-log');
+    if (!box) return;
+    box.innerHTML = bathChatLog.map(m => {
+        const mine = m.who === 'me';
+        return `
+            <div style="margin-bottom:10px; text-align:${mine ? 'right' : 'left'};">
+                <div style="display:inline-block; max-width:82%; background:${mine ? 'rgba(76,175,80,0.18)' : 'rgba(127,212,212,0.14)'}; border:1px solid ${mine ? '#2e5c31' : '#2a4a5a'}; border-radius:9px; padding:9px 12px; text-align:left;">
+                    ${mine ? '' : `<div style="font-size:9px; color:#7fd4d4; font-weight:bold; margin-bottom:4px;">♨ 초개 요원</div>`}
+                    <div style="font-size:12px; color:var(--theme-text); line-height:1.7; word-break:break-word;">${m.text.replace(/\n/g, '<br>')}</div>
+                </div>
+            </div>`;
+    }).join('') + (bathBusy
+        ? `<div style="text-align:left; margin-bottom:10px;"><div style="display:inline-block; background:rgba(127,212,212,0.06); border:1px solid #1e3540; border-radius:9px; padding:9px 12px; font-size:11px; color:var(--theme-text); opacity:0.6;">......</div></div>`
+        : '');
+    box.scrollTop = box.scrollHeight;
+}
+
+function saveBathLog() {
+    if (bathChatLog.length === 0) return;
+    currentUser.bathVisits = (currentUser.bathVisits || 0) + 1;
+    if (!currentUser.bathLogs) currentUser.bathLogs = [];
+    currentUser.bathLogs.unshift({
+        at: Date.now(),
+        visit: currentUser.bathVisits,
+        pollution: currentUser.pollution,
+        chat: bathChatLog.map(m => ({ w: m.who, t: m.text }))
+    });
+    if (currentUser.bathLogs.length > 10) currentUser.bathLogs.pop();
+
+    const myLines = bathChatLog.filter(m => m.who === 'me').map(m => m.text).slice(-3);
+    currentUser.bathSummary = myLines.length ? `요원이 이런 말을 했어요: ${myLines.join(' / ')}` : null;
+
+    currentUser._adminStamp = Date.now();
+    if (database) database.ref('users/' + currentUser.code).set(currentUser);
+    else saveDB();
+}
