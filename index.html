@@ -6787,7 +6787,55 @@ function bjSwap(idx) {
             return;
         }
 
-        let bjDeck = [], bjPlayer = [], bjDealer = [], bjBet = 0;
+ 
+        // 1. 포인트 및 횟수 최종 차감
+        currentUser.points -= seotdaBet;
+        currentUser.facilityCount += 1;
+
+        // 2. 족보 계산
+        let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
+        let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
+
+        const luckM = facilityLuckMult(currentUser);
+        if (luckM > 1 && pRes.score <= dRes.score && Math.random() < 0.18 * (luckM - 1)) {
+            let picked = pickHandByCondition(r => r.score > dRes.score);
+            if (picked) { playerHand = picked.hand; pRes = picked.res; }
+        }
+
+        // 3. 패 오픈 및 결과 표시
+        // ★ 조정된 플레이어 패를 다시 그려서 카드 그림·족보명·배율을 일치시킴
+        renderCard('seotda-card-1', playerHand[0]);
+        renderCard('seotda-card-2', playerHand[1]);
+        renderCard('dealer-card-1', dealerHand[0]); 
+        renderCard('dealer-card-2', dealerHand[1]);
+        document.getElementById('dealer-result-label').innerText = dRes.name;
+        document.getElementById('player-result-label').innerText = pRes.name;
+        
+        let msgEl = document.getElementById('seotda-msg');
+        if (pRes.score > dRes.score) {
+            let winAmount = seotdaBet * pRes.mult; 
+            winPoints(winAmount);
+            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult}) -> +${winAmount} P</span>`;
+            addHistoryLog(currentUser, `[섯다 승리] ${pRes.name} vs 딜러 ${dRes.name} (+${winAmount} P)`);
+        } else if (pRes.score < dRes.score) {
+            msgEl.innerHTML = `<span style="color:#f44336;">[패배] 시스템(${dRes.name})에게 패배했습니다. (-${seotdaBet} P)</span>`;
+            addHistoryLog(currentUser, `[섯다 패배] ${pRes.name} vs 딜러 ${dRes.name} (-${seotdaBet} P)`);
+            saveDB(); updateUI();
+         } else {
+            const refund = Math.floor(seotdaBet / 2);
+            winPoints(refund);
+            msgEl.innerHTML = `<span style="color:#ffd700;">[무승부] 동일 족보입니다. 베팅금의 절반만 반환됩니다. (+${refund} P)</span>`;
+            addHistoryLog(currentUser, `[섯다 무승부] ${pRes.name} vs 딜러 ${dRes.name} (절반 반환 +${refund} P)`);
+        }
+        
+        addPollution(2); 
+        document.getElementById('seotda-card-1').classList.remove('selected'); 
+        document.getElementById('seotda-card-2').classList.remove('selected');
+        document.getElementById('seotda-controls-play').style.display = 'none'; 
+        document.getElementById('seotda-controls-start').style.display = 'block';
+    }
+
+           let bjDeck = [], bjPlayer = [], bjDealer = [], bjBet = 0;
 let bjSwapsLeft = 0, bjSwapPhase = false;
 
 function bjNewDeck() {
@@ -6924,52 +6972,6 @@ function bjFinish(mode) {
     document.getElementById('bj-controls-start').style.display = 'block';
 }
 
-        // 1. 포인트 및 횟수 최종 차감
-        currentUser.points -= seotdaBet;
-        currentUser.facilityCount += 1;
-
-        // 2. 족보 계산
-        let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
-        let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
-
-        const luckM = facilityLuckMult(currentUser);
-        if (luckM > 1 && pRes.score <= dRes.score && Math.random() < 0.18 * (luckM - 1)) {
-            let picked = pickHandByCondition(r => r.score > dRes.score);
-            if (picked) { playerHand = picked.hand; pRes = picked.res; }
-        }
-
-        // 3. 패 오픈 및 결과 표시
-        // ★ 조정된 플레이어 패를 다시 그려서 카드 그림·족보명·배율을 일치시킴
-        renderCard('seotda-card-1', playerHand[0]);
-        renderCard('seotda-card-2', playerHand[1]);
-        renderCard('dealer-card-1', dealerHand[0]); 
-        renderCard('dealer-card-2', dealerHand[1]);
-        document.getElementById('dealer-result-label').innerText = dRes.name;
-        document.getElementById('player-result-label').innerText = pRes.name;
-        
-        let msgEl = document.getElementById('seotda-msg');
-        if (pRes.score > dRes.score) {
-            let winAmount = seotdaBet * pRes.mult; 
-            winPoints(winAmount);
-            msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult}) -> +${winAmount} P</span>`;
-            addHistoryLog(currentUser, `[섯다 승리] ${pRes.name} vs 딜러 ${dRes.name} (+${winAmount} P)`);
-        } else if (pRes.score < dRes.score) {
-            msgEl.innerHTML = `<span style="color:#f44336;">[패배] 시스템(${dRes.name})에게 패배했습니다. (-${seotdaBet} P)</span>`;
-            addHistoryLog(currentUser, `[섯다 패배] ${pRes.name} vs 딜러 ${dRes.name} (-${seotdaBet} P)`);
-            saveDB(); updateUI();
-         } else {
-            const refund = Math.floor(seotdaBet / 2);
-            winPoints(refund);
-            msgEl.innerHTML = `<span style="color:#ffd700;">[무승부] 동일 족보입니다. 베팅금의 절반만 반환됩니다. (+${refund} P)</span>`;
-            addHistoryLog(currentUser, `[섯다 무승부] ${pRes.name} vs 딜러 ${dRes.name} (절반 반환 +${refund} P)`);
-        }
-        
-        addPollution(2); 
-        document.getElementById('seotda-card-1').classList.remove('selected'); 
-        document.getElementById('seotda-card-2').classList.remove('selected');
-        document.getElementById('seotda-controls-play').style.display = 'none'; 
-        document.getElementById('seotda-controls-start').style.display = 'block';
-    }
     // ==========================================
     // VIP 라운지 1:1 실시간 대전 로직
     // ==========================================
