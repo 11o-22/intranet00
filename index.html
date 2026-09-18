@@ -500,15 +500,42 @@
                 <div id="panel-seotda" class="sub-panel" style="text-align:center;">
     <div class="panel-title">[지하실 섯다 - 딜러 대결]</div>
     <div class="seotda-arena">
-        ... 섯다 카드 영역 ...
+        <div class="seotda-row">
+            <div class="seotda-row-label">시스템(딜러) 패: <span id="dealer-result-label" style="color:#ffd700;">?</span></div>
+            <div class="seotda-cards-box">
+                <div class="seotda-card back" id="dealer-card-1">?</div>
+                <div class="seotda-card back" id="dealer-card-2">?</div>
+            </div>
+        </div>
+        <div style="height:1px; background:rgba(255,255,255,0.1); margin: 15px 0;"></div>
+        <div class="seotda-row">
+            <div class="seotda-row-label">사원(플레이어) 패: <span id="player-result-label" style="color:#ffd700;">대기 중</span></div>
+            <div class="seotda-cards-box">
+                <div class="seotda-card" id="seotda-card-1" onclick="selectSeotdaCard(1)">?</div>
+                <div class="seotda-card" id="seotda-card-2" onclick="selectSeotdaCard(2)">?</div>
+            </div>
+        </div>
     </div>
 
     <div id="seotda-controls-start">
-        ... 베팅 스테퍼와 패 돌리기 ...
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+        <div class="bet-stepper">
+            <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
+            <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
+            <div class="bet-display" id="seotda-bet-display">5</div>
+            <button class="step-btn" onclick="adjustBet('seotda-bet', 1)">&gt;</button>
+            <button class="step-btn wide" onclick="adjustBet('seotda-bet', 10)">+10</button>
+            <button class="step-btn bet-max" onclick="setBetMax('seotda-bet')">최대</button>
+        </div>
+        <input type="hidden" id="seotda-bet" value="5">
+        <button class="game-btn" onclick="startSeotda()">패 돌리기</button>
     </div>
+
     <div id="seotda-controls-play" style="display:none; justify-content:center; gap:10px;">
-        ... 교환 / 쇼다운 ...
+        <button class="game-btn" onclick="swapSeotdaCard()" style="flex:1;">선택 패 교환 (<span id="swap-count">2</span>회)</button>
+        <button class="game-btn" onclick="finishSeotda()" style="flex:1; background:linear-gradient(145deg, #b71c1c, #7f0000); border-color:#d32f2f;">승부 (쇼다운)</button>
     </div>
+
     <div id="seotda-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">베팅을 시작하세요. (오염도 +2)</div>
 </div>
 
