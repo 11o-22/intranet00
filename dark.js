@@ -8731,10 +8731,14 @@ ${picked.map(m => '- ' + m.text).join('\n')}
 
     async function sendFoxChat() {
         if (foxBusy) return;
+    if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
+        showCustomAlert('현재 업데이트 진행 중입니다.');
+        return;
+    }
+        if (foxBusy) return;
         const input = document.getElementById('fox-input');
         if (!input) return;
         const text = input.value.trim();
-        if (!text) return;
         input.value = '';
 
         foxChatLog.push({ who: 'me', text: text, at: Date.now() });

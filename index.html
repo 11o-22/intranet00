@@ -8890,6 +8890,9 @@ function adminGiveItem() {
         }
     });
         function logout() {
+             const foxModal = document.getElementById('fox-modal');
+    if (foxModal) foxModal.style.display = 'none';
+    foxChatLog = [];
             if (currentUser && database) database.ref('online/' + currentUser.code).remove();
                     if (darkRun && darkRun.zone) releaseZone(darkRun.zone);
                     if (myPartyId && !darkRun) leaveParty();
