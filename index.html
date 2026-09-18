@@ -1418,6 +1418,7 @@ if (database) {
         "재봉 도구": { price: 120, usable: true, targetable: false, effect: "q_repair", qShop: true, desc: "[???] 전용 장비의 손상을 되돌린다. 등급 하락을 1회 복구." },
         "빈 각인지": { price: 110, usable: true, targetable: false, effect: "q_blank", qShop: true, desc: "[???] 속성 슬롯이 열려 있어야 쓸 수 있다. 다음 속성 선택 시 등급이 한 단계 높게 적용된다." },
 
+        "검역용 볼트": { price: 900, usable: true, targetable: false, effect: "q_bolt", qShop: true, desc: "[???] 감염된 것을 확실히 멈춘다. 한 번뿐이다." },
         "젖은 수건": { price: 25, usable: true, targetable: false, effect: "q_towel", qShop: true, desc: "[???] 냄새를 지운다. 후각 판정 1회를 무효화한다." },
         "귀마개": { price: 30, usable: true, targetable: false, effect: "q_earplug", qShop: true, desc: "[???] 소리를 죽인다. 청각 판정 1회를 무효화한다." },
         "색안경": { price: 30, usable: true, targetable: false, effect: "q_shade", qShop: true, desc: "[???] 시선을 가린다. 시각 판정 1회를 무효화한다." },
@@ -1455,6 +1456,12 @@ if (database) {
         "접힌 무릎": { price: 1300, usable: false, darkOnly: true, desc: "[어둠 회수품] 관절이 하나 더 있다. 어느 쪽으로도 접힌다." },
         "걸려 있던 자리": { price: 180, usable: false, darkOnly: true, desc: "[어둠 회수품] 현관 벽의 못 자국. 오래 무언가 걸려 있던 흔적." },
         "따라온 발소리": { price: 420, usable: true, targetable: false, effect: "q_paw", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 어둠 탐사에서 판정 1회를 대신 받아 준다." },
+        "물린 자국이 없는 팔": { price: 400, usable: false, darkOnly: true, desc: "[어둠 회수품] 어디에도 물린 자국이 없다. 그래서 잘린 것이다." },
+"덜 마른 붕대": { price: 600, usable: true, targetable: false, effect: "s010_bandage", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 탐사에서 감염도 상승이 30% 줄어든다." },
+"이름이 지워진 명찰 다발": { price: 900, usable: true, targetable: false, effect: "s010_tags", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 탐사의 명단 대조 판정에 +6." },
+"멎지 않는 심박계": { price: 1600, usable: true, targetable: false, effect: "s010_pulse", darkOnly: true, desc: "[어둠 회수품] 사용 시 다음 탐사에서 동료의 감염도가 보인다." },
+"열리지 않는 검역 도장": { price: 4000, usable: true, targetable: false, effect: "s010_seal", darkOnly: true, desc: "[어둠 회수품] 사용 시 전향을 한 번 유예한다. 감염도가 59로 고정된다." },
+"각성 돌파권": { price: "???", usable: true, targetable: false, effect: "awaken", darkOnly: true, desc: "[???] 전용 장비의 한계를 넘는다. S등급 장비를 L등급으로 승급시킬 수 있게 된다." },
     
         "확정 승인서": { price: "???", usable: true, targetable: false, effect: "q_guarantee", darkOnly: true, desc: "[조합품] 다음 강화가 반드시 성공한다. 등급 제한 없음." },
         "세 번째 자리": { price: "???", usable: true, targetable: false, effect: "third_slot", darkOnly: true, desc: "[조합품] 전용 장비에 속성을 하나 더 새길 수 있다. 최대 3개까지." },
@@ -5459,6 +5466,20 @@ hlL.disabled = !playable;
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
             return;
         }
+
+        if (cat.effect === 'awaken') {
+    const g = getGear(currentUser);
+    if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
+    if (g.grade !== 'S') { showCustomAlert('S등급 장비에만 쓸 수 있습니다.'); return; }
+    if (currentUser.gearAwakened) { showCustomAlert('이미 한계를 넘어섰습니다.'); return; }
+    currentUser.gearAwakened = true;
+    removeItemFromInventory(currentUser, itemName, 1);
+    addHistoryLog(currentUser, `[각성] '${g.name}'의 한계가 풀렸습니다. L등급 승급이 가능합니다.`);
+    if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+    updateUI();
+    showCustomAlert('무언가가 풀리는 소리가 났습니다.\n\n이제 L등급으로 올릴 수 있습니다.');
+    return;
+}
 
                 if (cat.effect === 'q_guarantee') {
             const g = getGear(currentUser);

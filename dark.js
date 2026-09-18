@@ -1,5 +1,26 @@
 const DARK_ZONES = {
-        "Qtrew-S-001": { code:"Qtrew-S-001", grade:"S", name:"■■■■■■", brief:"(기밀 — 열람 권한 없음)", danger:"최상", survival:"0.1%", min:4, max:5, reward:[1500,2500], ready:false },
+        "Qtrew-S-010": {
+    code:"Qtrew-S-010", grade:"S", name:"검역 실패",
+    brief:"(전원 귀환한 기록이 없습니다.)",
+    warn:"트라우마 유발 가능성 주의 — 감염, 동료 간 살해",
+    danger:"최상", survival:"0.1%", min:5, max:8, reward:[10000,18000], ready:false,
+    voteMode:true, infection:true, timeLimit:40,
+    intro:`사이렌이 멎은 직후다.<br><br>
+        복도에 비닐이 겹겹이 쳐져 있다. 검역 구역을 나누던 것이다.<br>
+        전부 찢겨 있다. 안쪽에서 찢은 것이다.<br><br>
+        바닥에 명찰이 흩어져 있다. 밟지 않으려다 결국 밟는다.<br>
+        소리가 났다. 어디선가 그 소리에 반응하는 기척이 있다.<br><br>
+        벽에 붙은 안내가 아직 읽힌다.<br>
+        <span style="color:#7fd4d4;">"물린 인원은 즉시 신고하십시오. 숨기면 전원이 위험합니다."</span><br><br>
+        그 아래에 손으로 쓴 글씨가 있다.<br>
+        <span style="color:#ff6b6b;">"신고해도 똑같았다"</span>`,
+    outro:`셔터가 등 뒤에서 내려온다.<br><br>
+        밖은 아침이다. 아무 일도 없었던 것처럼 밝다.<br>
+        손등을 확인한다. 팔을 걷어 본다. 두 번 확인한다.<br><br>
+        눈을 뜨니 현관 앞이다.<br>
+        한동안 사람이 많은 곳에서 숨을 참는 버릇이 생겼다.`,
+    images: { intro:"quar_1.jpg", step1:"quar_2.jpg", step2:"quar_3.jpg", step3:"quar_4.jpg", step4:"quar_5.jpg" }
+},
                 "Qtrew-A-667": {
             code:"Qtrew-A-667", grade:"A", name:"물고기가 인간이 되었다",
             brief:"(물고기가 인간이 되었다.)",
@@ -112,6 +133,15 @@ const DARK_ZONES = {
     };
        
           const DARK_LOOT_BY_ZONE = {
+
+            "Qtrew-S-010": [
+    { name:"물린 자국이 없는 팔", chance:0.030 },
+    { name:"덜 마른 붕대", chance:0.020 },
+    { name:"이름이 지워진 명찰 다발", chance:0.012 },
+    { name:"멎지 않는 심박계", chance:0.006 },
+    { name:"열리지 않는 검역 도장", chance:0.002 },
+    { name:"각성 돌파권", chance:0.00001 }
+],
 
       "Qtrew-A-214": [
             { name:"지워진 이름표", chance:0.030 },
@@ -2809,14 +2839,15 @@ function input119D(n) {
         gaze:  { name:'응시', icon:'❂', desc:'기억과 자각 판정에 강해집니다. 잊는 속도가 느려집니다.' }
     };
 
-    const GEAR_GRADES = ['D', 'C', 'B', 'A', 'S'];
-    const GEAR_MULT = { D: 1.0, C: 1.5, B: 2.0, A: 2.8, S: 4.0 };
-    const GEAR_UPGRADE = {
-        D: { to:'C', rate:0.70, cost:3000 },
-        C: { to:'B', rate:0.40, cost:8000 },
-        B: { to:'A', rate:0.12, cost:20000 },
-        A: { to:'S', rate:0.01, cost:50000 }
-    };
+    const GEAR_GRADES = ['D', 'C', 'B', 'A', 'S', 'L'];
+const GEAR_MULT = { D: 1.0, C: 1.5, B: 2.0, A: 2.8, S: 4.0, L: 6.0 };
+const GEAR_UPGRADE = {
+    D: { to:'C', rate:0.70, cost:3000 },
+    C: { to:'B', rate:0.40, cost:8000 },
+    B: { to:'A', rate:0.12, cost:20000 },
+    A: { to:'S', rate:0.01, cost:50000 },
+    S: { to:'L', rate:0.001, cost:300000 }
+};
 
     // 속성별 기본 수치 (D등급 기준, 등급 배율 적용)
         const GEAR_BASE = {
@@ -2852,7 +2883,7 @@ function input119D(n) {
         return base * mult;
     }
 
-       const GEAR_MARK = { D: '◇', C: '◆', B: '❖', A: '✦', S: '✷' };
+       const GEAR_MARK = { D: '◇', C: '◆', B: '❖', A: '✦', S: '✷', L: '✹' };
 
     function gearLabel(user) {
         const g = getGear(user);
@@ -2951,12 +2982,15 @@ function input119D(n) {
     }
 
          function tryGearUpgrade() {
+            
         const g = getGear(currentUser);
         if (!g) return;
         const up = GEAR_UPGRADE[g.grade];
         if (!up) return;
-        if (currentUser.points < up.cost) { showLuxuryAlert(); return; }
-
+        if (up.to === 'L' && !currentUser.gearAwakened) {
+        showCustomAlert('한계에 막혀 있습니다.\n「각성 돌파권」이 필요합니다.');
+        return;
+    }
         const polish = currentUser.gearPolish || 0;
         const rate = currentUser.gearGuarantee ? 1.0 : Math.min(0.99, up.rate + polish);
         const ok = Math.random() < rate;
