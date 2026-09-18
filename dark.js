@@ -3,7 +3,7 @@ const DARK_ZONES = {
     code:"Qtrew-S-010", grade:"S", name:"검역 실패",
     brief:"(전원 귀환한 기록이 없습니다.)",
     warn:"트라우마 유발 가능성 주의 — 감염, 동료 간 살해",
-    danger:"최상", survival:"0.1%", min:5, max:8, reward:[10000,18000], ready:false,
+    danger:"최상", survival:"0.1%", min:5, max:8, reward:[10000,15000], ready:false,
     voteMode:true, infection:true, timeLimit:40,
     intro:`사이렌이 멎은 직후다.<br><br>
         복도에 비닐이 겹겹이 쳐져 있다. 검역 구역을 나누던 것이다.<br>
@@ -3589,7 +3589,7 @@ function safeDeposit() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
         if (darkRun.rejoined) { renderRejoinScene(); return; }
-        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); watchPurge(); }
+        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); watchPurge(); watchWipe(); }
         saveDarkRunState();
         attachB508Listener();
 
@@ -9204,6 +9204,8 @@ function addInfect(amount, reason) {
     }
 }
 
+s010CheckWipe('infect');
+
 // 파티에 내 감염도를 알린다
 function syncInfect() {
     if (!darkRun || !darkRun.isParty || !database) return;
@@ -10093,12 +10095,29 @@ function s010G8R(pick) {
 }
 
 function s010Result(title, roll, bonus, DC, ok, txt) {
+    if (ok) darkRun._s010Streak = 0;
+    else darkRun._s010Streak = (darkRun._s010Streak || 0) + 1;
+
+    if (!ok && darkRun._s010Streak >= 3) {
+        darkRun.fail += 2;
+        darkDeath(
+            `세 번째다.<br><br>` +
+            `계속 어긋난다. 손이 늦고, 판단이 늦고, 발이 늦다.<br>` +
+            `그걸 저쪽도 알아차렸다.<br><br>` +
+            `몰려온다. 이번에는 한 방향이 아니다.`
+        );
+        return;
+    }
+
+    if (s010CheckWipe('result')) return;
+
     darkBodyEl().innerHTML = darkBox(title,
         `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
         infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
     renderInfectBar();
     mountDarkChat('normal');
 }
+
 // --- 기믹 9: 단독 돌파 (회피) ---
 function s010G9() {
     renderChoiceStep("기믹 9 — 혼자",
@@ -10372,7 +10391,7 @@ function s010G15R(pick) {
 
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = { hold: 15, flee: 12 }[pick];
+    const DC = { hold: 21, flee: 16 }[pick];
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -11494,7 +11513,7 @@ function doPurge(code, nm, how) {
 
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = 17;
+    const DC = 24;
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     if (ok) {
@@ -11513,7 +11532,7 @@ function doPurge(code, nm, how) {
             '덮친다.<br><br>힘이 사람 것이 아니다. 관절이 꺾이는데도 계속 밀어붙인다.<br>목을 눌렀다. 오래 눌렀다.<br><br>움직임이 멎고도 한참 손을 못 뗐다.');
     } else {
         darkRun.fail++;
-        addInfect(20, '제압 실패');
+        addInfect(32, '제압 실패');
         applyPollutionToUser(currentUser, 12);
         darkRun.log.push('[처치] ' + nm + ' — 맨손 실패');
         s010Result("—", roll, bonus, DC, false,
@@ -11572,5 +11591,78 @@ function adminEditGear() {
     showCustomAlert(
         (done.length ? `수정 완료\n${done.join('\n')}` : '') +
         (skipped.length ? `\n\n장비 없음: ${skipped.join(', ')}` : '')
+    );
+}
+
+// ==========================================
+// ★ S-010 전멸 판정
+// ==========================================
+function s010CheckWipe(reason) {
+    if (!darkRun || darkRun.zone !== 'Qtrew-S-010') return false;
+    if (darkRun._dead) return false;
+
+    // 감염도 100 — 즉사
+    if (getInfect() >= 100) {
+        darkRun.fail += 3;
+        darkDeath(
+            `무릎이 꺾인다.<br><br>` +
+            `일어서려는데 팔이 말을 안 듣는다. 목이 돌아간다.<br>` +
+            `아프지 않다. 그게 제일 무섭다.<br><br>` +
+            `시야 가장자리가 붉어진다. 그리고 아주 또렷해진다.<br>` +
+            `동료들이 어디 있는지 알겠다.<br><br>` +
+            `<span style="color:#ff6b6b;">그 상태로 얼마나 있었는지는 기억나지 않는다.</span>`
+        );
+        return true;
+    }
+
+    // 실패 누적 — 강제 전멸
+    const limit = 14;
+    if ((darkRun.fail || 0) >= limit) {
+        darkRun.failedRun = true;
+        darkRun.fail += 2;
+        darkDeath(
+            `더 못 간다.<br><br>` +
+            `다친 데가 너무 많다. 어디가 어떻게 다쳤는지 세지도 못한다.<br>` +
+            `벽에 기대는데 손이 미끄러진다. 벽이 젖어 있다.<br><br>` +
+            `복도 양쪽에서 동시에 온다.<br>` +
+            `막을 것이 없다. 막을 힘도 없다.`
+        );
+        return true;
+    }
+
+    return false;
+}
+
+// 파티 전원 전향 감시
+function watchWipe() {
+    if (!darkRun || !darkRun.isParty || !database) return;
+    if (darkRun._wipeWatch) return;
+    darkRun._wipeWatch = true;
+
+    database.ref(`darkParties/${darkRun.partyId}/infect`).on('value', snap => {
+        if (!darkRun || darkRun._dead || darkRun.turned) return;
+        const st = snap.val() || {};
+        const codes = Object.keys(st);
+        if (codes.length < 2) return;
+        const others = codes.filter(c => c !== currentUser.code);
+        if (others.length === 0) return;
+        const allTurned = others.every(c => st[c].turned);
+        if (allTurned && !darkRun._wipeShown) {
+            darkRun._wipeShown = true;
+            setTimeout(() => s010LastOne(), 900);
+        }
+    });
+}
+
+function s010LastOne() {
+    if (!darkRun || darkRun._dead) return;
+    darkRun.fail += 2;
+    darkDeath(
+        `혼자 남았다.<br><br>` +
+        `전부 넘어갔다. 한 명씩, 순서대로.<br>` +
+        `마지막까지 이름을 불렀는데 아무도 대답하지 않았다.<br><br>` +
+        `복도 끝에서 전부 이쪽을 보고 있다.<br>` +
+        `아는 얼굴들이다. 전부 아는 얼굴이다.<br><br>` +
+        `<span style="color:#ff6b6b;">달아날 곳이 없다는 걸 알고 나서야 다리에 힘이 풀렸다.</span>`
     );
 }

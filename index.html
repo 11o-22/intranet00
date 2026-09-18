@@ -2972,6 +2972,10 @@ if (database) {
         if (qFlag('meal_bonus3')) b += 3;
 
          b += infectBonus(kind);
+
+         if (darkRun && darkRun.zone === 'Qtrew-S-010' && b > 6) {
+    b = 6 + Math.floor((b - 6) / 2);
+}
            
          return b;
     }
