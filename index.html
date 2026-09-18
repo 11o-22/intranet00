@@ -2962,6 +2962,7 @@ if (database) {
         if (kind === 'hide')  b += gearValue(currentUser, 'hide');
         if (kind !== 'sense') b += Math.floor(gearValue(currentUser, 'sense') / 2);
         if (kind !== 'hide')  b += Math.floor(gearValue(currentUser, 'hide') / 2);
+        if (kind === 'rejoin') b += gearValue(currentUser, 'bond');
 
         // ★ 착한 친구 — 판정 전반에 +2
         if (hasEquip(currentUser, '착한 친구')) b += 2;

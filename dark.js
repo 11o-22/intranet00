@@ -2152,8 +2152,9 @@ function input119D(n) {
                 return;
             }
             // ★ 감각이 높으면 오답을 한 번 무를 수 있다
+            const gazeVal = gearValue(currentUser, 'gaze');
             const senseVal = gearValue(currentUser, 'sense');
-            if (senseVal >= 3 && !darkRun._senseSaved) {
+            if ((gazeVal >= 3 || senseVal >= 3) && !darkRun._senseSaved) {
                 darkRun._senseSaved = true;
                 darkRun[`quiz${n}Done`] = 'ok';
                 darkRun.success++;
@@ -2520,6 +2521,7 @@ function input119D(n) {
             darkRun.fail++;
                                    if (kind === 'hand') {
                 const healSave = gearValue(currentUser, 'heal') > 0;
+                const bondSave = gearValue(currentUser, 'bond') > 0;
                 if (healSave || darkRun._rescueChain) {
                     txt = `손을 뻗는다. 끌려가는 힘이 세다.<br><br>버티지 못하고 놓쳤다.<br>다만 당신까지 딸려 들어가지는 않았다.`;
                     applyPollutionToUser(currentUser, 6);
@@ -2802,7 +2804,9 @@ function input119D(n) {
         heal:   { name:'치유', icon:'❋', desc:'탐사 중 오염도 상승을 줄이고, 동료 구조 성공률을 높입니다.' },
         luck:   { name:'행운', icon:'✺', desc:'사망 시 재산 일부를 지키고, 회수품 확률이 오릅니다.' },
         sense:  { name:'감각', icon:'◈', desc:'정보·감식·기억 판정에 강해집니다.' },
-        hide:   { name:'은신', icon:'◐', desc:'어둠의 표적이 되는 판정을 피합니다.' }
+        hide:   { name:'은신', icon:'◐', desc:'어둠의 표적이 되는 판정을 피합니다.' },
+        bond:  { name:'연결', icon:'⊙', desc:'합류 판정에 강해지고, 동료를 구하다 함께 끌려가지 않습니다.' },
+        gaze:  { name:'응시', icon:'❂', desc:'기억과 자각 판정에 강해집니다. 잊는 속도가 느려집니다.' }
     };
 
     const GEAR_GRADES = ['D', 'C', 'B', 'A', 'S'];
@@ -2821,7 +2825,9 @@ function input119D(n) {
         heal:   0.25,   // 오염 감소율 (D 25% → S 100%)
         luck:   0.30,   // 재산 보존 성공률 (D 30% → S 100%+)
         sense:  2,      // 판정 보정 (D +2 → S +8)
-        hide:   2       // 판정 보정 (D +2 → S +8)
+        hide:   2,       // 판정 보정 (D +2 → S +8)
+        bond:  3,      // 합류 판정 보정 (D +3 → S +12)
+        gaze:  3       // 기억 판정 보정
     };
 
     function getGear(user) {
@@ -2840,9 +2846,9 @@ function input119D(n) {
         const mult = GEAR_MULT[g.grade] || 1;
         const base = GEAR_BASE[attr] || 0;
         // 정수형 보정(파괴·감각·은신)은 반올림
-        if (attr === 'break' || attr === 'sense' || attr === 'hide') {
-            return Math.round(base * mult);
-        }
+        if (attr === 'break' || attr === 'sense' || attr === 'hide' || attr === 'bond' || attr === 'gaze') {
+    return Math.round(base * mult);
+}
         return base * mult;
     }
 
@@ -6301,6 +6307,10 @@ function safeDeposit() {
 
     function addHumanity(amount, reason) {
         if (!darkRun) return;
+         if (amount < 0) {
+        const gaze = gearValue(currentUser, 'gaze');
+        if (gaze > 0) amount = Math.round(amount * (1 - gaze * 0.05));
+    }
         darkRun.humanity = Math.max(0, Math.min(100, getHumanity() + amount));
         if (reason) darkRun.log.push(`[인간성] ${reason} (${amount >= 0 ? '+' : ''}${amount} → ${darkRun.humanity})`);
         renderDeepBar();
@@ -6446,7 +6456,7 @@ function safeDeposit() {
         const ok = (ans === null) ? true : checkQuizAnswer(v, ans);
 
         if (ok) {
-            addHumanity(+4, '자각');
+            addHumanity(+4 + Math.floor(gearValue(currentUser, 'gaze') / 3), '자각');
             darkRun.success++;
             darkRun._checkFail = 0;
 
