@@ -879,11 +879,13 @@
     <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5a4a2a, #3a2f18) !important; border-color:#7a6a3a !important; margin:0;" onclick="adminSeizeSafe()">금고 압수</button>
 </div>
             <!-- --------------------------------------- -->
-                        <div style="font-size:12px; display:flex; gap:6px; align-items:center;">
-                <select id="adm-special-item" style="flex:2;"></select>
-                <input type="number" id="adm-special-qty" class="bet-input" style="width:50px;" value="1" min="1" placeholder="수량">
-                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #388e3c, #2e7d32); border-color:#1b5e20; margin:0;" onclick="adminGiveItem()">물품 강제 꽂기</button>
-            </div>
+             <div style="font-size:12px; display:flex; gap:6px; align-items:flex-start;">
+    <select id="adm-special-item" multiple size="8" style="flex:2; min-width:120px; height:auto;"></select>
+    <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+        <input type="number" id="adm-special-qty" class="bet-input" value="1" min="1" placeholder="수량">
+        <button class="game-btn" style="margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminGiveItem()">물품 강제 꽂기</button>
+    </div>
+</div>
             <div style="font-size:12px; display:flex; gap:6px; align-items:center; margin-top:10px; border-top:1px dashed #2e7d32; padding-top:10px;">
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #455a64, #37474f); border-color:#263238; margin:0;" onclick="adminLoadInventory()">소지품 조회</button>
                 <select id="adm-remove-item" style="flex:2;"><option value="">-- 사번 조회 필요 --</option></select>
@@ -8294,31 +8296,33 @@ if (!useFacility(bet)) return;
         showCustomAlert(`${names.length}명의 ${label.join(', ')} 횟수를 충전했습니다.\n(${names.join(', ')})`);
     }
 
-       function adminGiveItem() {
-        const targets = getAdminTargets();
-        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+function adminGiveItem() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-        const itemName = document.getElementById('adm-special-item').value;
-        const qty = parseInt(document.getElementById('adm-special-qty').value, 10) || 1;
-        if (!itemName) { showCustomAlert('지급할 물품을 선택해주세요.'); return; }
+    const sel = document.getElementById('adm-special-item');
+    const items = Array.from(sel.selectedOptions).map(o => o.value);
+    const qty = parseInt(document.getElementById('adm-special-qty').value, 10) || 1;
+    if (items.length === 0) { showCustomAlert('지급할 물품을 선택해주세요.'); return; }
 
-        let names = [];
-        targets.forEach(code => {
-            const u = db.users[code];
-            if (!u) return;
-            if (!u.inventory) u.inventory = [];
+    let names = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u) return;
+        if (!u.inventory) u.inventory = [];
+        items.forEach(itemName => {
             for (let i = 0; i < qty; i++) u.inventory.push(itemName);
-            addHistoryLog(u, `[당국 개입] 보급품 '${itemName}' ${qty}개가 지급되었습니다.`);
-            u._adminStamp = Date.now();
-            if (database) database.ref('users/' + code).set(u);
-            names.push(u.name);
         });
+        addHistoryLog(u, `[당국 개입] 보급품 ${items.length}종이 지급되었습니다. (${items.join(', ')})`);
+        u._adminStamp = Date.now();
+        if (database) database.ref('users/' + code).set(u);
+        names.push(u.name);
+    });
 
-        if (!database) saveDB();
-        updateUI();
-        showCustomAlert(`${names.length}명에게 ${itemName} ${qty}개를 지급했습니다.\n(${names.join(', ')})`);
-    }
-
+    if (!database) saveDB();
+    updateUI();
+    showCustomAlert(`${names.length}명에게 ${items.length}종을 각 ${qty}개씩 지급했습니다.\n\n${items.join(', ')}`);
+}
        function adminLoadInventory() {
         const targets = getAdminTargets();
         const sel = document.getElementById('adm-remove-item');
