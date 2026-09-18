@@ -9774,4 +9774,312 @@ function s010Brief() {
         </div>`;
 }
 
+// --- 기믹 1: 비닐 통로 (은신) ---
+function s010G1() {
+    renderChoiceStep("기믹 1 — 비닐 통로",
+        `겹겹이 쳐진 비닐을 지나야 한다.<br><br>
+         젖히면 소리가 난다. 얇은 비닐이 서로 스치는 소리.<br>
+         안쪽에서 무언가 그 소리를 기다리고 있다.<br><br>
+         <span style="color:#888; font-size:11px;">◐ 은신이 유리합니다.</span>`,
+        [
+            { id:'slow',  label:'① 한 겹씩 천천히 젖힌다.', fn:'s010G1R', arg:'slow' },
+            { id:'cut',   label:'② 아래쪽을 잘라 기어간다.', fn:'s010G1R', arg:'cut' },
+            { id:'rush',  label:'③ 단숨에 뚫고 지나간다.',   fn:'s010G1R', arg:'rush' }
+        ], "step1");
+}
+function s010G1R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('hide');
+    const DC = { slow: 11, cut: 9, rush: 17 }[pick] - gearValue(currentUser, 'break');
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        txt = pick === 'slow' ? `한 겹씩 젖힌다. 손목만 써서.<br><br>세 겹을 지나는 데 한참 걸렸다.<br>그동안 아무것도 오지 않았다.`
+            : pick === 'cut' ? `아래쪽을 잘라 기어간다.<br><br>바닥이 끈적하다. 무릎에 묻는 걸 신경 쓰지 않기로 한다.<br><br>소리는 나지 않았다.`
+            : `밀고 지나간다.<br><br>소리가 크게 났다. 그런데 아무 반응이 없다.<br>이쪽이 운이 좋았거나, 저쪽이 아직 배가 안 고팠거나.`;
+        darkRun.success++;
+    } else {
+        txt = `비닐이 크게 흔들린다.<br><br>안쪽에서 뭔가 일어서는 소리가 난다.<br>느리게, 관절을 하나씩 펴면서.`;
+        darkRun.fail++;
+        addInfect(6, '비닐 통로 실패');
+        applyPollutionToUser(currentUser, 5);
+    }
+    darkRun.log.push(`[기믹 1] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 1 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 2: 첫 무리 (회피) ---
+function s010G2() {
+    renderChoiceStep("기믹 2 — 첫 무리",
+        `복도 중간이 막혔다.<br><br>
+         넷쯤 된다. 아직 이쪽을 못 봤다.<br>
+         벽을 따라가면 돌아갈 수 있는데, 그러려면 등을 보여야 한다.<br><br>
+         <span style="color:#888; font-size:11px;">✦ 회피가 유리합니다.</span>`,
+        [
+            { id:'side',  label:'① 벽을 따라 돌아간다.',   fn:'s010G2R', arg:'side' },
+            { id:'dash',  label:'② 틈으로 달려 지나간다.', fn:'s010G2R', arg:'dash' },
+            { id:'bait',  label:'③ 반대쪽에 소리를 낸다.', fn:'s010G2R', arg:'bait' },
+            { id:'wait',  label:'④ 지나갈 때까지 기다린다.', fn:'s010G2R', arg:'wait' }
+        ], null);
+}
+function s010G2R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('hide') + gearValue(currentUser, 'evade') * 10;
+    const DC = { side: 12, dash: 15, bait: 10, wait: 13 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        txt = pick === 'bait' ? `깨진 유리 조각을 반대쪽으로 던진다.<br><br>전부 그쪽으로 고개를 돌린다. 몸까지 돌리는 데 시간이 걸린다.<br>그 사이에 지나간다.`
+            : pick === 'wait' ? `숨을 죽이고 기다린다.<br><br>지나가는 데 이 분쯤 걸렸다.<br>이 분이 길다는 걸 처음 알았다.`
+            : pick === 'side' ? `벽에 붙어 돈다.<br><br>어깨가 벽을 긁는다. 소리가 날까 봐 옷을 말아 쥔다.<br><br>등 뒤로 지나간다. 돌아보지 않았다.`
+            : `틈으로 달린다.<br><br>손이 옷깃을 스쳤다. 잡히지는 않았다.<br>반 발자국 차이였다.`;
+        darkRun.success++;
+    } else if (roll === 1) {
+        darkRun.fail += 2;
+        addInfect(18, '무리에 붙잡힘');
+        applyPollutionToUser(currentUser, 10);
+        txt = `잡혔다.<br><br>손이 여럿이다. 어깨, 팔, 목덜미.<br>이로 무는 감각은 생각보다 둔했다.<br><br>겨우 빠져나왔다. 팔뚝이 뜨겁다.`;
+    } else {
+        darkRun.fail++;
+        addInfect(9, '무리 통과 실패');
+        txt = `스쳤다.<br><br>손톱이 팔을 긁었다. 피는 안 났는데 자국이 남았다.<br>자국을 보지 않기로 한다.`;
+    }
+    darkRun.log.push(`[기믹 2] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 2 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 3: 셔터 (파괴) ---
+function s010G3() {
+    renderChoiceStep("기믹 3 — 반쯤 내려온 셔터",
+        `셔터가 허리 높이에서 멈춰 있다.<br><br>
+         기어서 지나갈 수 있다. 다만 지나는 동안 무방비다.<br>
+         억지로 올릴 수도 있다. 소리가 크게 날 것이다.<br><br>
+         <span style="color:#888; font-size:11px;">✧ 파괴가 유리합니다.</span>`,
+        [
+            { id:'crawl', label:'① 기어서 지나간다.',       fn:'s010G3R', arg:'crawl' },
+            { id:'force', label:'② 억지로 밀어 올린다.',     fn:'s010G3R', arg:'force' },
+            { id:'prop',  label:'③ 뭔가를 괴고 통과한다.',   fn:'s010G3R', arg:'prop' }
+        ], null);
+}
+function s010G3R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense');
+    const DC = { crawl: 12, force: 14, prop: 11 }[pick] - gearValue(currentUser, 'break');
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        txt = pick === 'force' ? `핸들을 잡고 힘을 준다.<br><br>금속이 비명을 지른다. 소리가 복도 끝까지 간다.<br>다 올라간 뒤에 서둘러 지나갔다.`
+            : pick === 'prop' ? `소화기를 괴어 둔다.<br><br>셔터가 그 위에 얹힌다. 무게가 실리는 소리가 난다.<br>차례로 지나간다. 마지막 사람이 소화기를 뺐다.`
+            : `기어서 지나간다.<br><br>등이 셔터에 닿는다. 차갑다.<br>중간에 옷이 걸려 한 번 멈췄다. 그때가 제일 길었다.`;
+        darkRun.success++;
+    } else {
+        darkRun.fail++;
+        addInfect(8, '셔터 통과 실패');
+        applyPollutionToUser(currentUser, 6);
+        txt = `셔터가 내려왔다.<br><br>어깨를 눌렀다. 빠져나오는 데 시간이 걸렸다.<br>그 사이 무언가 발목을 잡았다. 차서 떼어 냈다.`;
+    }
+    darkRun.log.push(`[기믹 3] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 3 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 4: 소리 추적 (감각) ---
+function s010G4() {
+    renderChoiceStep("기믹 4 — 소리",
+        `복도 전체에서 소리가 난다.<br><br>
+         전부 같은 소리는 아니다. 섞여 있다.<br>
+         그중 하나는 사람의 것이다. 구분해 내야 한다.<br><br>
+         <span style="color:#888; font-size:11px;">◈ 감각이 유리합니다.</span>`,
+        [
+            { id:'listen', label:'① 벽에 귀를 대고 가른다.',  fn:'s010G4R', arg:'listen' },
+            { id:'call',   label:'② 이쪽에서 불러 본다.',     fn:'s010G4R', arg:'call' },
+            { id:'ignore', label:'③ 전부 무시하고 지나간다.', fn:'s010G4R', arg:'ignore' }
+        ], null);
+}
+function s010G4R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense');
+    const DC = { listen: 11, call: 16, ignore: 13 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 1;
+        txt = pick === 'listen' ? `벽에 귀를 댄다.<br><br>층층이 들린다. 끄는 소리, 긁는 소리, 그리고 숨소리.<br>숨소리는 하나뿐이다. 왼쪽 세 번째 문.<br><br>그쪽은 피해 가기로 한다.`
+            : pick === 'call' ? `작게 불러 본다.<br><br>대답이 왔다. 사람 목소리다.<br>다만 대답이 너무 빨랐다. 기다리고 있었던 것처럼.<br><br>그쪽으로는 가지 않았다.`
+            : `전부 무시한다.<br><br>듣지 않으면 없는 것과 같다고, 스스로에게 설명한다.<br>설명이 잘 됐다.`;
+    } else {
+        darkRun.fail++;
+        addInfect(5, '소리 판별 실패');
+        txt = `잘못 짚었다.<br><br>사람 소리라고 생각한 쪽에서 나온 것은 사람이 아니었다.<br>사람 소리를 내는 법을 알고 있을 뿐이었다.`;
+    }
+    darkRun.log.push(`[기믹 4] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 4 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 5: 바리케이드 (파괴) ---
+function s010G5() {
+    renderChoiceStep("기믹 5 — 바리케이드",
+        `문을 막아야 한다.<br><br>
+         쓸 만한 것은 많은데 시간이 없다.<br>
+         튼튼하게 쌓으면 오래 걸리고, 빨리 쌓으면 약하다.<br><br>
+         <span style="color:#888; font-size:11px;">✧ 파괴가 유리합니다.</span>`,
+        [
+            { id:'solid', label:'① 시간을 들여 단단히 쌓는다.', fn:'s010G5R', arg:'solid' },
+            { id:'quick', label:'② 되는 대로 빨리 막는다.',     fn:'s010G5R', arg:'quick' },
+            { id:'weld',  label:'③ 경첩 자체를 망가뜨린다.',    fn:'s010G5R', arg:'weld' }
+        ], "step2");
+}
+function s010G5R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
+    const DC = { solid: 14, quick: 10, weld: 13 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    if (ok) {
+        darkRun.success++;
+        darkRun.s010Barricade = pick === 'solid' ? 3 : pick === 'weld' ? 2 : 1;
+    } else {
+        darkRun.fail++;
+        darkRun.s010Barricade = 0;
+    }
+
+    const txt = ok
+        ? (pick === 'solid' ? `책상, 캐비닛, 침상 프레임까지 얹는다.<br><br>손이 여럿이라 생각보다 빨랐다.<br>밀어 보니 꿈쩍도 안 한다.`
+          : pick === 'weld' ? `경첩을 부순다. 문이 틀에 끼인 채로 굳었다.<br><br>여는 것보다 부수는 게 어려워졌다.<br>저쪽도 그럴 것이다.`
+          : `되는 대로 밀어 붙인다.<br><br>모양은 엉망인데 일단 막혔다.<br>얼마나 버틸지는 모르겠다.`)
+        : `쌓다가 무너뜨렸다.<br><br>소리가 크게 났다. 바깥에서 반응이 왔다.<br>다시 쌓을 시간은 없다.`;
+
+    darkRun.log.push(`[기믹 5] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 5 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 6: 응급처치 (치유) ---
+function s010G6() {
+    renderChoiceStep("기믹 6 — 물린 자리",
+        `팔뚝에 자국이 있다.<br><br>
+         깊지는 않다. 다만 가장자리가 검게 죽어 가고 있다.<br>
+         지금 처치하면 진행이 늦어진다. 아마도.<br><br>
+         <span style="color:#888; font-size:11px;">❋ 치유가 유리합니다.</span>`,
+        [
+            { id:'clean', label:'① 소독하고 붕대를 감는다.',   fn:'s010G6R', arg:'clean' },
+            { id:'burn',  label:'② 불로 지진다.',              fn:'s010G6R', arg:'burn' },
+            { id:'cut',   label:'③ 물린 부위를 도려낸다.',     fn:'s010G6R', arg:'cut' },
+            { id:'leave', label:'④ 그냥 둔다.',                fn:'s010G6R', arg:'leave' }
+        ], null);
+}
+function s010G6R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 10);
+    const DC = { clean: 10, burn: 14, cut: 17, leave: 0 }[pick];
+    const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
+
+    let txt;
+    if (pick === 'leave') {
+        addInfect(12, '처치하지 않음');
+        darkRun.fail++;
+        txt = `그냥 둔다.<br><br>지금은 아프지 않다. 그게 더 나쁜 신호라는 걸 안다.<br>소매를 내려 덮는다.`;
+    } else if (ok) {
+        const cut = { clean: 4, burn: 9, cut: 15 }[pick];
+        darkRun.infect = Math.max(0, getInfect() - cut);
+        renderInfectBar(); syncInfect();
+        darkRun.success++;
+        txt = pick === 'clean' ? `소독약을 붓는다. 숨을 참는다.<br><br>붕대를 감는다. 감는 손이 떨려서 두 번 다시 감았다.<br><br><span style="color:#4CAF50;">감염도 -${cut}</span>`
+            : pick === 'burn' ? `라이터를 댄다.<br><br>소리를 내지 않으려고 옷자락을 물었다.<br>냄새가 한참 남았다.<br><br><span style="color:#4CAF50;">감염도 -${cut}</span>`
+            : `도려낸다.<br><br>깊게, 한 번에. 망설이면 못 한다.<br>피가 많이 났다. 그래도 검은 부분은 없어졌다.<br><br><span style="color:#4CAF50;">감염도 -${cut}</span>`;
+        if (pick !== 'clean') applyPollutionToUser(currentUser, pick === 'cut' ? 12 : 7);
+    } else {
+        darkRun.fail++;
+        addInfect(7, '처치 실패');
+        applyPollutionToUser(currentUser, 8);
+        txt = `손이 미끄러졌다.<br><br>상처가 더 벌어졌다. 붕대가 금방 젖는다.<br>이걸로는 안 될 것 같다.`;
+    }
+    darkRun.log.push(`[기믹 6] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 6 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 7: 보급 상자 (행운) ---
+function s010G7() {
+    renderChoiceStep("기믹 7 — 남은 상자",
+        `상자가 셋 남아 있다.<br><br>
+         전부 열 시간은 없다. 하나만 고를 수 있다.<br>
+         겉으로는 구분이 안 된다.<br><br>
+         <span style="color:#888; font-size:11px;">✺ 행운이 유리합니다.</span>`,
+        [
+            { id:'a', label:'① 가장 무거운 것.',       fn:'s010G7R', arg:'a' },
+            { id:'b', label:'② 봉인이 뜯긴 것.',       fn:'s010G7R', arg:'b' },
+            { id:'c', label:'③ 구석에 밀려 있던 것.',  fn:'s010G7R', arg:'c' }
+        ], null);
+}
+function s010G7R(pick) {
+    const luck = gearValue(currentUser, 'luck');
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + Math.round(luck * 12);
+    const DC = 12;
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        const gain = ['덜 마른 붕대', '검역용 볼트'][Math.floor(Math.random() * 2)];
+        currentUser.inventory.push(gain);
+        darkRun.modifier = (darkRun.modifier || 0) + 1;
+        txt = `열어 본다.<br><br>쓸 만한 것이 들어 있다.<br>누군가 챙겨 두고 가져가지 못한 것이다.<br><br><span style="color:#4CAF50;">✦ ${gain} 획득</span>`;
+    } else {
+        darkRun.fail++;
+        addInfect(4, '빈 상자');
+        txt = `열어 본다.<br><br>비어 있다. 정확히 말하면 비어 있지 않다.<br>안쪽에 뭔가 웅크리고 있었고, 열자마자 튀어나왔다.<br><br>겨우 밀어냈다.`;
+    }
+    darkRun.log.push(`[기믹 7] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 7 — 결과", roll, bonus, DC, ok, txt);
+}
+
+// --- 기믹 8: 냄새 차단 (은신) ---
+function s010G8() {
+    renderChoiceStep("기믹 8 — 냄새",
+        `저것들이 냄새로 찾는다.<br><br>
+         피 냄새, 땀 냄새, 살아 있는 것의 냄새.<br>
+         지울 방법이 몇 가지 있는데 전부 대가가 있다.<br><br>
+         <span style="color:#888; font-size:11px;">◐ 은신이 유리합니다.</span>`,
+        [
+            { id:'chem',  label:'① 소독약을 뒤집어쓴다.',     fn:'s010G8R', arg:'chem' },
+            { id:'blood', label:'② 저것들의 피를 바른다.',    fn:'s010G8R', arg:'blood' },
+            { id:'cold',  label:'③ 냉장고에 들어갔다 나온다.', fn:'s010G8R', arg:'cold' }
+        ], null);
+}
+function s010G8R(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('hide');
+    const DC = { chem: 10, blood: 13, cold: 12 }[pick];
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        setQFlag('s010_masked', true);
+        txt = pick === 'chem' ? `소독약을 머리부터 붓는다.<br><br>눈이 맵고 목이 탄다. 한참 기침했다.<br>그래도 냄새는 확실히 지워졌다.`
+            : pick === 'blood' ? `쓰러진 것에서 긁어 바른다.<br><br>미지근하다. 그게 제일 견디기 어려웠다.<br><br>지나가는 동안 아무도 돌아보지 않았다.`
+            : `냉장고에 들어간다. 문을 닫고 센다.<br><br>백까지 세고 나왔다. 손끝이 하얗다.<br>체온이 낮으면 덜 알아본다는 말이 있었다.`;
+        if (pick === 'blood') addInfect(8, '피를 바름');
+        if (pick === 'cold') applyPollutionToUser(currentUser, 6);
+    } else {
+        darkRun.fail++;
+        addInfect(5, '냄새 차단 실패');
+        txt = `제대로 안 됐다.<br><br>지나가는 길에 하나가 고개를 돌렸다.<br>코를 벌름거린다. 아직 확신은 못 한 눈치다.`;
+    }
+    darkRun.log.push(`[기믹 8] ${pick} d20 ${roll} vs DC${DC}`);
+    s010Result("기믹 8 — 결과", roll, bonus, DC, ok, txt);
+}
+
+function s010Result(title, roll, bonus, DC, ok, txt) {
+    darkBodyEl().innerHTML = darkBox(title,
+        `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+        infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
 
