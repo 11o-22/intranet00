@@ -9083,4 +9083,18 @@ function adminSeizeSafe() {
         (skipped.length ? `\n\n금고 없음: ${skipped.join(', ')}` : '')
     );
 }
-        
+        function setMaintenance(on) {
+    if (!database) return;
+    database.ref('maintenance').set(!!on).then(() => {
+        renderMaintenanceState();
+        showCustomAlert(on ? '점검 모드가 시작되었습니다.' : '점검 모드가 해제되었습니다.');
+    });
+}
+
+function renderMaintenanceState() {
+    const el = document.getElementById('maintenance-state');
+    if (!el) return;
+    el.innerHTML = maintenanceMode
+        ? '<span style="color:#ff6b6b;">● 점검 중 — 일반 사원 접속 차단</span>'
+        : '<span style="color:#4CAF50;">● 정상 운영 중</span>';
+}

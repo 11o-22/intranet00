@@ -572,6 +572,12 @@
                 </div>
             </div>
 
+            <div id="maintenance-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100dvh; background:#0d0d0d; z-index:99999999; justify-content:center; align-items:center; flex-direction:column;">
+    <div style="font-size:42px; margin-bottom:18px;">🔧</div>
+    <div style="color:#d4af37; font-size:15px; font-weight:bold; letter-spacing:1px;">현재 업데이트 진행중입니다</div>
+    <div style="color:#888; font-size:12px; margin-top:10px;">잠시만 기다려 주세요</div>
+</div>
+
             <div id="dark-main" class="sub-panel active">
                 <div class="panel-title">[어둠 탐사]</div>
                 <div id="darkness-body" style="min-height:120px; font-size:12px; color:var(--theme-text); text-align:center; padding:20px 0;">
@@ -754,6 +760,18 @@
     <!-- 통제 콘솔 (상담사 전용) -->
     <div id="admin-screen">
         <div class="admin-header">[보안 통제 콘솔] 인사 발령 및 등록 사원 관리</div>
+
+        <div class="admin-panel-box" style="border-color:#d4af37; background-color:#1c1608;">
+    <h4 style="color:#d4af37;">🔧 점검 모드</h4>
+    <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
+        켜면 상담사를 제외한 전원이 접속할 수 없고, 접속 중인 사원은 즉시 종료됩니다.
+    </div>
+    <div id="maintenance-state" style="font-size:11px; font-weight:bold; margin-bottom:9px;"></div>
+    <div style="display:flex; gap:6px;">
+        <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="setMaintenance(true)">점검 시작</button>
+        <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="setMaintenance(false)">점검 종료</button>
+    </div>
+</div>
 
                 <div class="admin-panel-box" style="border-color: #7f0000; background-color: #1a0d0d;">
             <h4 style="color: #ff6b6b;">어둠 구역 개방 통제</h4>
@@ -1083,6 +1101,7 @@ function getTodayStr() {
     }
 
     function tryAutoLogin() {
+        if (maintenanceMode) return;
         if (autoLoginTried || currentUser || !database) return;
         const savedCode = localStorage.getItem('corp_logged_code');
         if (!savedCode) return;
@@ -1122,6 +1141,20 @@ function getTodayStr() {
             document.getElementById('online-users-count').innerText = Math.max(1, visible);
             if(currentUser) renderVipOpponents();
         });
+
+        let maintenanceMode = false;
+
+if (database) {
+    database.ref('maintenance').on('value', snap => {
+        maintenanceMode = !!snap.val();
+        const el = document.getElementById('maintenance-overlay');
+        if (el) el.style.display = maintenanceMode ? 'flex' : 'none';
+        if (maintenanceMode && currentUser && currentUser.code !== 'kario0987') {
+            logout();
+        }
+    });
+}
+        
 
     function saveDB() {
         if (!database) return;
@@ -7546,7 +7579,7 @@ if (!useFacility(bet)) return;
 
         [renderAdminSuggestions, renderAdminItemSelect, renderAdminDarkZones,
          renderAdminTargetList, renderAdminFoxRoom, renderAdminGearQuick,
-         renderAdminGearList, renderAdminRoomList, initAdminAccordion]
+         renderAdminGearList, renderAdminRoomList, renderMaintenanceState, initAdminAccordion]
         .forEach(fn => {
             try { if (typeof fn === 'function') fn(); }
             catch (e) { console.warn('관리자 패널 렌더 실패:', fn.name, e.message); }
@@ -8504,6 +8537,10 @@ if (!useFacility(bet)) return;
         const name = nameInput.value.trim();
         const code = codeInput.value.trim();
         
+        if (maintenanceMode && code !== 'kario0987') {
+    showCustomAlert('현재 업데이트 진행 중입니다. 잠시만 기다려 주세요.');
+    return;
+}
         // 데이터베이스 객체가 아직 초기화되지 않았을 경우의 안전장치
         if (!db || !db.users) {
             showCustomAlert('서버와 연결 중입니다. 잠시 후 다시 시도해주세요.');
