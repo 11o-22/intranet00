@@ -879,12 +879,18 @@
     <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5a4a2a, #3a2f18) !important; border-color:#7a6a3a !important; margin:0;" onclick="adminSeizeSafe()">금고 압수</button>
 </div>
             <!-- --------------------------------------- -->
-             <div style="font-size:12px; display:flex; gap:6px; align-items:flex-start;">
-    <select id="adm-special-item" multiple size="8" style="flex:2; min-width:120px; height:auto;"></select>
-    <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-        <input type="number" id="adm-special-qty" class="bet-input" value="1" min="1" placeholder="수량">
-        <button class="game-btn" style="margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminGiveItem()">물품 강제 꽂기</button>
+         <div style="border:1px solid #2e7d32; border-radius:6px; padding:10px; background:rgba(0,0,0,0.25); margin-bottom:8px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:11px; color:#a5d6a7; font-weight:bold;">물품 선택 (다중 가능)</span>
+        <button class="game-btn" style="margin:0; padding:4px 9px; font-size:10px;" onclick="admItemSelectNone()">선택 해제</button>
     </div>
+    <input type="text" id="adm-item-search" placeholder="물품 이름 검색" style="width:100%; margin-bottom:8px; font-size:11px;" oninput="renderAdminItemSelect()">
+    <div id="adm-item-list" style="max-height:200px; overflow-y:auto; padding-right:4px;"></div>
+    <div style="font-size:10px; color:#888; margin-top:7px;">선택됨: <b id="adm-item-count" style="color:#4CAF50;">0</b>종</div>
+</div>
+<div style="display:flex; gap:6px;">
+    <input type="number" id="adm-special-qty" class="bet-input" value="1" min="1" placeholder="수량" style="flex:0 0 70px;">
+    <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminGiveItem()">물품 강제 꽂기</button>
 </div>
             <div style="font-size:12px; display:flex; gap:6px; align-items:center; margin-top:10px; border-top:1px dashed #2e7d32; padding-top:10px;">
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #455a64, #37474f); border-color:#263238; margin:0;" onclick="adminLoadInventory()">소지품 조회</button>
@@ -7849,11 +7855,30 @@ if (!useFacility(bet)) return;
         // ★ 당국 특수 개입 로직 (아이템 강제 지급 & 횟수 리셋)
         // ==========================================
         function renderAdminItemSelect() {
-            const select = document.getElementById('adm-special-item');
-            if(!select) return;
-            const allItems = Object.keys(ITEM_CATALOG);
-            select.innerHTML = allItems.map(name => `<option value="${name}">${name}</option>`).join('');
-        }
+    const box = document.getElementById('adm-item-list');
+    if (!box) return;
+    const q = (document.getElementById('adm-item-search')?.value || '').trim();
+    const checked = new Set(Array.from(document.querySelectorAll('.adm-item-cb:checked')).map(c => c.value));
+
+    box.innerHTML = Object.keys(ITEM_CATALOG)
+        .filter(n => !q || n.includes(q))
+        .map(n => `
+            <label style="display:flex; align-items:center; gap:7px; padding:5px 3px; font-size:11px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <input type="checkbox" class="adm-item-cb" value="${n}" ${checked.has(n) ? 'checked' : ''} style="width:auto; margin:0;" onchange="updateAdmItemCount()">
+                <span style="color:#ddd;">${n}</span>
+            </label>`).join('');
+    updateAdmItemCount();
+}
+
+function updateAdmItemCount() {
+    const el = document.getElementById('adm-item-count');
+    if (el) el.innerText = document.querySelectorAll('.adm-item-cb:checked').length;
+}
+
+function admItemSelectNone() {
+    document.querySelectorAll('.adm-item-cb').forEach(c => { c.checked = false; });
+    updateAdmItemCount();
+}
 
             // ==========================================
     // ★ 다중 대상 선택
@@ -8301,7 +8326,7 @@ function adminGiveItem() {
     if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
     const sel = document.getElementById('adm-special-item');
-    const items = Array.from(sel.selectedOptions).map(o => o.value);
+    const items = Array.from(document.querySelectorAll('.adm-item-cb:checked')).map(c => c.value);
     const qty = parseInt(document.getElementById('adm-special-qty').value, 10) || 1;
     if (items.length === 0) { showCustomAlert('지급할 물품을 선택해주세요.'); return; }
 
