@@ -3589,7 +3589,7 @@ function safeDeposit() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
         if (darkRun.rejoined) { renderRejoinScene(); return; }
-        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); }
+        if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); watchPurge(); }
         saveDarkRunState();
         attachB508Listener();
 
@@ -9293,6 +9293,9 @@ function triggerTurn() {
     darkRun.turned = true;
     darkRun.turnGoal = 3;      // 감염시켜야 할 인원
     darkRun.turnDone = 0;
+    darkRun.turnGoal = 3;
+    darkRun.turnDone = 0;
+    darkRun.turnDeadline = Date.now() + 12 * 60 * 1000;   // 12분
     darkRun.log.push(`[전향] 감염도 ${getInfect()} — 넘어감`);
     syncInfect();
 
@@ -9311,7 +9314,8 @@ function triggerTurn() {
         `<div style="background:rgba(127,0,0,0.2); border:1px solid #b71c1c; border-radius:6px; padding:13px; margin-bottom:12px; font-size:11px; color:#ff9baa; line-height:1.8;">
             <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:7px;">◉ 목표가 바뀌었습니다</div>
             동료 <b>3인</b>을 감염시키면 여기서 나갈 수 있습니다.<br>
-            달성 시 보상은 절반입니다.<br><br>
+            <b style="color:#ff6b6b;">12분 안에 못 하면 굶어 죽습니다.</b><br>
+             달성 시 보상은 절반입니다.<br><br>
             <span style="font-size:10px; color:#aaa;">
                 판정 전반에 +3, 은신에 추가 +2.<br>
                 동료는 「검역용 볼트」로만 당신을 멈출 수 있습니다.
@@ -9721,6 +9725,16 @@ function renderStepS010() {
 
     // 전향자는 별도 흐름
     if (darkRun.turned) { renderTurnedStep(); return; }
+
+    if (darkRun.isParty && s010State) {
+        const turnedOnes = Object.keys(s010State).filter(c =>
+            c !== currentUser.code && s010State[c].turned && !(darkRun._purged || {})[c]);
+        if (turnedOnes.length > 0 && !darkRun._purgeShown) {
+            darkRun._purgeShown = true;
+            renderPurge(turnedOnes[0]);
+            return;
+        }
+    }
 
     const def = S010_STEPS[darkRun.step];
     if (!def) { renderDarkResult(); return; }
@@ -11364,9 +11378,11 @@ function renderTurnedStep() {
     const head = '<div style="background:rgba(127,0,0,0.18); border:1px solid #b71c1c; border-radius:6px; padding:11px; margin-bottom:12px; font-size:11px; color:#ff9baa;">과업 <b>'
         + (darkRun.turnDone || 0) + ' / ' + darkRun.turnGoal + '</b> — 동료를 옮긴다</div>';
 
-    body.innerHTML = darkBox("◉ 감염체", scene, infectBarHtml() + head + btns);
-    renderInfectBar();
-    mountDarkChat('normal');
+    body.innerHTML = darkBox("◉ 감염체", scene,
+    '<div id="turn-timer"></div>' + infectBarHtml() + head + btns);
+renderInfectBar();
+renderTurnTimer();
+mountDarkChat('normal');
 }
 // ==========================================
 // ★ S-010 정산 보너스
@@ -11390,4 +11406,133 @@ function s010Bonus() {
     else if (darkRun.s010Ending === 'out') b += 1000;
 
     return b;
+}
+
+function renderTurnTimer() {
+    const el = document.getElementById('turn-timer');
+    if (!el || !darkRun || !darkRun.turnDeadline) return;
+    const remain = Math.max(0, darkRun.turnDeadline - Date.now());
+    const m = Math.floor(remain / 60000);
+    const s = Math.floor((remain % 60000) / 1000);
+    const color = remain < 180000 ? '#f44336' : '#ff9800';
+    el.innerHTML = `<div style="text-align:center; font-size:11px; color:${color}; margin-bottom:10px;">
+        굶주림까지 <b style="font-size:14px;">${m}:${String(s).padStart(2,'0')}</b></div>`;
+    if (remain <= 0 && !darkRun._starved) {
+        darkRun._starved = true;
+        turnedStarve();
+    }
+}
+
+function turnedStarve() {
+    darkRun.fail += 2;
+    darkDeath(
+        `배가 고프다.<br><br>` +
+        `아까보다 훨씬 고프다. 견딜 수 있는 종류가 아니다.<br>` +
+        `힘이 빠진다. 벽을 짚는데 손이 미끄러진다.<br><br>` +
+        `복도에 주저앉는다. 일어설 수가 없다.<br>` +
+        `아무것도 못 먹었다. 그게 전부였다.`
+    );
+}
+
+function renderPurge(code) {
+    const p = darkParties[darkRun.partyId];
+    let nm = (p && p.members && p.members[code]) ? p.members[code].name : (db.users[code] ? db.users[code].name : '동료');
+    nm = String(nm).replace(/['"\\]/g, '');
+    const hasBolt = (currentUser.inventory || []).includes('검역용 볼트');
+
+    darkBodyEl().innerHTML = darkBox("—",
+        '<b style="color:#ff6b6b;">' + nm + '</b> 사원이 이쪽을 본다.<br><br>' +
+        '걸음이 달라졌다. 무릎이 한 박자 늦게 따라온다.<br>' +
+        '이름을 부르는데 대답이 없다.<br><br>가까워지고 있다.',
+        infectBarHtml() +
+        (hasBolt
+            ? '<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; background:linear-gradient(145deg,#7f0000,#4a0000) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="doPurge(&quot;' + code + '&quot;,&quot;' + nm + '&quot;,&quot;bolt&quot;)">① 검역용 볼트를 쓴다.</button>'
+            : '<div style="font-size:10px; color:#666; padding:9px; text-align:center; background:rgba(0,0,0,0.25); border-radius:5px; margin-bottom:8px;">검역용 볼트가 없다. 맨손으로는 확실하지 않다.</div>')
+        + '<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="doPurge(&quot;' + code + '&quot;,&quot;' + nm + '&quot;,&quot;hold&quot;)">② 맨손으로 제압한다.</button>'
+        + '<button class="game-btn" style="width:100%; margin:0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="doPurge(&quot;' + code + '&quot;,&quot;' + nm + '&quot;,&quot;flee&quot;)">③ 문을 닫고 달아난다.</button>');
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function doPurge(code, nm, how) {
+    if (!darkRun._purged) darkRun._purged = {};
+    darkRun._purgeShown = false;
+
+    if (how === 'flee') {
+        darkRun._purged[code] = true;
+        darkRun.modifier = (darkRun.modifier || 0) - 1;
+        addInfect(6, '전향자 회피');
+        darkRun.log.push('[대응] ' + nm + ' 회피');
+        s010Result("—", 10, 0, 0, true,
+            '문을 닫는다.<br><br>손이 문틈에 끼었다. 더 세게 닫았다.<br>안쪽에서 두드린다. 박자가 일정하다.<br><br>멀어질 때까지 그 소리가 따라왔다.');
+        return;
+    }
+
+    if (how === 'bolt') {
+        if (!(currentUser.inventory || []).includes('검역용 볼트')) {
+            showCustomAlert('검역용 볼트가 없습니다.');
+            return;
+        }
+        removeItemFromInventory(currentUser, '검역용 볼트', 1);
+        darkRun._purged[code] = true;
+        darkRun.success += 2;
+        darkRun.log.push('[처치] ' + nm + ' — 볼트');
+        if (database) {
+            database.ref('darkParties/' + darkRun.partyId + '/purge').push({
+                to: code, by: currentUser.name, at: Date.now()
+            });
+        }
+        sendPartyChat(nm + ' 사원이 멈췄습니다.', true);
+        s010Result("—", 20, 0, 0, true,
+            '볼트를 관자놀이에 댄다.<br><br>한 번에 끝났다. 소리도 거의 안 났다.<br><br>바닥에 눕힌다. 눈을 감겨 주려다 말았다.<br>이미 감고 있었다.');
+        return;
+    }
+
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
+    const DC = 17;
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    if (ok) {
+        darkRun._purged[code] = true;
+        darkRun.success++;
+        addInfect(8, '맨손 제압');
+        applyPollutionToUser(currentUser, 8);
+        darkRun.log.push('[처치] ' + nm + ' — 맨손 성공');
+        if (database) {
+            database.ref('darkParties/' + darkRun.partyId + '/purge').push({
+                to: code, by: currentUser.name, at: Date.now()
+            });
+        }
+        sendPartyChat(nm + ' 사원을 제압했습니다.', true);
+        s010Result("—", roll, bonus, DC, true,
+            '덮친다.<br><br>힘이 사람 것이 아니다. 관절이 꺾이는데도 계속 밀어붙인다.<br>목을 눌렀다. 오래 눌렀다.<br><br>움직임이 멎고도 한참 손을 못 뗐다.');
+    } else {
+        darkRun.fail++;
+        addInfect(20, '제압 실패');
+        applyPollutionToUser(currentUser, 12);
+        darkRun.log.push('[처치] ' + nm + ' — 맨손 실패');
+        s010Result("—", roll, bonus, DC, false,
+            '밀렸다.<br><br>목을 막았는데 팔을 물렸다.<br>떼어내는 데 시간이 걸렸다. 이가 깊게 박혀 있었다.<br><br>겨우 밀어내고 달아났다.');
+    }
+}
+
+function watchPurge() {
+    if (!darkRun || !darkRun.isParty || !database) return;
+    if (darkRun._purgeWatch) return;
+    darkRun._purgeWatch = true;
+
+    database.ref('darkParties/' + darkRun.partyId + '/purge').on('child_added', snap => {
+        const v = snap.val();
+        if (!v || !darkRun || v.to !== currentUser.code) return;
+        if (darkRun._dead) return;
+        darkRun.fail += 2;
+        darkDeath(
+            '앞을 막는 것이 있다.<br><br>' +
+            '아는 얼굴인데 이름이 안 떠오른다.<br>' +
+            '손을 뻗는다. 닿기 전에 뭔가가 먼저 닿았다.<br><br>' +
+            '<span style="color:#ff6b6b;">' + v.by + ' 사원이었다.</span><br><br>' +
+            '아프지는 않았다. 그게 마지막 감각이었다.'
+        );
+    });
 }

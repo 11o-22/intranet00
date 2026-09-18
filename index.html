@@ -2092,6 +2092,7 @@ if (database) {
     if (panel && panel.classList.contains('active')) renderAlienTimer();
 }, 1000); 
 
+
     // 만료된 점유 기록 자동 청소 (1분마다)
     setInterval(() => {
         if (!database || !currentUser) return;
@@ -2102,6 +2103,7 @@ if (database) {
             }
         }
     }, 60000);
+
     // ==========================================
     // ★ 파티 투표 시스템
     // ==========================================
@@ -2748,12 +2750,17 @@ if (database) {
     // 만료된 초대장 청소
     setInterval(() => {
         if (!database || !currentUser) return;
+        
         for (let iid in darkInvites) {
             if (Date.now() - (darkInvites[iid].at || 0) > 120000) {
                 database.ref('darkInvites/' + iid).remove();
             }
         }
     }, 30000);
+
+    setInterval(() => {
+    if (darkRun && darkRun.turned && darkRun.turnDeadline) renderTurnTimer();
+}, 1000);
 
         function renderPartyPanel() {
         const body = document.getElementById('dark-party-body');
