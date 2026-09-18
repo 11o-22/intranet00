@@ -734,3 +734,9 @@
     font-weight: bold !important;
     color: var(--theme-focus) !important;
 }
+
+#p2p-offer-qty, #p2p-demand-qty, #p2p-offer-points, #p2p-demand-points {
+    background: var(--theme-bg-grad) !important;
+    border: 1px solid var(--theme-border) !important;
+    color: var(--theme-text) !important;
+}
