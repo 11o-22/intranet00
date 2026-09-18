@@ -1984,6 +1984,13 @@ if (database) {
        }
 
     }, 60000);
+
+    setInterval(() => {
+    if (!currentUser) return;
+    const panel = document.getElementById('shop-alien');
+    if (panel && panel.classList.contains('active')) renderAlienTimer();
+}, 1000); 
+
     // 만료된 점유 기록 자동 청소 (1분마다)
     setInterval(() => {
         if (!database || !currentUser) return;
