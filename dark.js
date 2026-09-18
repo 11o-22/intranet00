@@ -11008,3 +11008,384 @@ function doS010Search(area, spot) {
     saveDB();
     renderS010Search(area);
 }
+
+// ==========================================
+// ★ S-010 분리 / 단독 / 합류
+// ==========================================
+const S010_SPLIT = {
+    1: `복도가 무너진다.<br><br>
+        천장 배관이 내려앉으면서 통로가 셋으로 갈린다.<br>
+        어느 쪽이든 돌아 나오면 만날 수 있다. 그럴 것이다.<br><br>
+        누가 어디로 갈지 정할 시간은 없다.`,
+    2: `무리가 가운데를 가른다.<br><br>
+        밀려나는 방향이 제각각이다. 붙잡을 틈이 없다.<br>
+        각자 흩어진다.`
+};
+
+function renderS010Split(n) {
+    darkBodyEl().innerHTML = darkBox(`갈림 ${n}`, S010_SPLIT[n] || S010_SPLIT[1],
+        infectBarHtml() +
+        darkChoiceBtn("① 왼쪽으로 간다.", `s010SplitPick(${n},'left')`) +
+        darkChoiceBtn("② 가운데로 간다.", `s010SplitPick(${n},'center')`) +
+        darkChoiceBtn("③ 오른쪽으로 간다.", `s010SplitPick(${n},'right')`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function s010SplitPick(n, v) {
+    darkRun.solo = true;
+    darkRun.splitPick = v;
+    if (darkRun.isParty && database) {
+        database.ref(`darkParties/${darkRun.partyId}/s010split${n}/${currentUser.code}`).set({
+            pick: v, name: currentUser.name, at: Date.now()
+        });
+        database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
+            name: currentUser.name, at: Date.now()
+        });
+        sendPartyChat(`${currentUser.name} 사원이 갈라졌습니다.`, true);
+    }
+    darkRun.log.push(`[갈림 ${n}] ${v}`);
+
+    darkBodyEl().innerHTML = darkBox(`갈림 ${n}`,
+        `그쪽으로 간다.<br><br>
+         발소리가 하나씩 멀어진다.<br>
+         모퉁이를 돌기 전에 한 번 돌아봤다. 아무도 안 보고 있었다.`,
+        infectBarHtml() + darkChoiceBtn("혼자 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+const S010_SOLO = {
+    1: { text:`혼자다.<br><br>복도에 물이 고여 있다. 발목까지 온다.<br>바닥이 안 보인다. 밟을 때마다 뭔가 걸린다.`,
+         opts:[{l:'① 벽을 짚고 천천히 간다.',v:'wall'},{l:'② 물을 헤치고 빨리 간다.',v:'fast'},{l:'③ 뭐가 걸리는지 확인한다.',v:'check'}] },
+    2: { text:`문이 하나 있다.<br><br>안쪽에서 두드리는 소리가 난다. 규칙적이다.<br>사람이 내는 박자다. 아니면 사람이었던 것이 내는 박자다.`,
+         opts:[{l:'① 열어 본다.',v:'open'},{l:'② 같은 박자로 두드려 본다.',v:'knock'},{l:'③ 지나친다.',v:'pass'}] },
+    3: { text:`거울이 있다. 화장실 세면대 위.<br><br>비친 얼굴을 본다. 눈 밑이 검다.<br>목덜미에 뭔가 있는 것 같아서 고개를 돌린다.`,
+         opts:[{l:'① 자세히 확인한다.',v:'look'},{l:'② 보지 않고 나간다.',v:'leave'},{l:'③ 거울을 깬다.',v:'break'}] },
+    4: { text:`발소리가 따라온다.<br><br>일정한 거리를 두고 계속 온다. 빨라지지도 느려지지도 않는다.<br>사람이라면 불렀을 것이다.`,
+         opts:[{l:'① 멈춰 서서 확인한다.',v:'stop'},{l:'② 속도를 올린다.',v:'run'},{l:'③ 숨어서 지나보낸다.',v:'hide'}] },
+    5: { text:`동료의 무전이 잡힌다.<br><br>목소리가 멀다. 위치를 말하는데 단어가 끊긴다.<br>"...삼층... 계단... 오지 마..."`,
+         opts:[{l:'① 그쪽으로 간다.',v:'go'},{l:'② 다시 물어본다.',v:'ask'},{l:'③ 말대로 가지 않는다.',v:'obey'}] },
+    6: { text:`막다른 곳이다.<br><br>돌아서는데 왔던 길에 뭔가 서 있다.<br>움직이지 않는다. 이쪽을 보고 있는 것 같기도 하고 아닌 것 같기도 하다.`,
+         opts:[{l:'① 천천히 다가간다.',v:'near'},{l:'② 벽을 타고 돌아간다.',v:'around'},{l:'③ 달려서 지나친다.',v:'dash'}] }
+};
+
+function renderS010Solo(n) {
+    const d = S010_SOLO[n];
+    if (!d) { partyAdvance(darkRun.step + 1); return; }
+    darkBodyEl().innerHTML = darkBox("단독 — 혼자", d.text,
+        infectBarHtml() +
+        d.opts.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s010SoloPick('${o.v}')">${o.l}</button>`).join(''));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function s010SoloPick(v) {
+    const good = ['wall','knock','leave','hide','obey','around'];
+    const bad  = ['fast','open','look','stop','go','near'];
+
+    let txt, inf = 0, mod = 0;
+    if (good.includes(v)) {
+        mod = 1; darkRun.success++;
+        txt = `조심스럽게 움직인다.<br><br>아무 일도 일어나지 않는다.<br>여기서는 그게 성과다.`;
+    } else if (bad.includes(v)) {
+        mod = -1; inf = 9; darkRun.fail++;
+        txt = `그렇게 한다.<br><br>무언가 이쪽을 알아차렸다.<br>거리를 좁혀 온다. 서두르지 않는 속도로.`;
+    } else {
+        txt = `그렇게 한다.<br><br>별일은 없었다. 시간만 지났다.`;
+    }
+
+    darkRun.modifier = (darkRun.modifier || 0) + mod;
+    if (inf) addInfect(inf, `단독 ${v}`);
+    darkRun.log.push(`[단독] ${v}`);
+
+    darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
+        infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function renderS010Rejoin(n) {
+    darkBodyEl().innerHTML = darkBox(`합류 ${n}차`,
+        `기척이 난다.<br><br>
+         사람인지 아닌지 알 수 없다. 확인하려면 다가가야 한다.<br>
+         다가가면 늦을 수도 있다.`,
+        infectBarHtml() +
+        darkChoiceBtn("① 이름을 부른다.", `s010RejoinPick(${n},'call')`) +
+        darkChoiceBtn("② 무전으로 확인한다.", `s010RejoinPick(${n},'radio')`) +
+        darkChoiceBtn("③ 그 자리에 선다.", `s010RejoinPick(${n},'stay')`) +
+        darkChoiceBtn("④ 발자국을 따라간다.", `s010RejoinPick(${n},'track')`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function s010RejoinPick(n, v) {
+    if (!darkRun.isParty || !database) {
+        darkRun.solo = false;
+        partyAdvance(darkRun.step + 1);
+        return;
+    }
+    database.ref(`darkParties/${darkRun.partyId}/s010rj${n}/${currentUser.code}`).set({ pick: v, name: currentUser.name });
+
+    setTimeout(() => {
+        database.ref(`darkParties/${darkRun.partyId}/s010rj${n}`).once('value').then(snap => {
+            const picks = snap.val() || {};
+            const others = Object.keys(picks).filter(c => c !== currentUser.code).map(c => picks[c].pick);
+            const pair = { call:'stay', stay:'call', radio:'radio', track:'stay' };
+            const ok = others.some(o => pair[v] === o) || (v === 'radio' && qFlag('s010_radio'));
+
+            let txt, mod;
+            if (ok) {
+                mod = 2;
+                darkRun.solo = false;
+                database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+                sendPartyChat(`${currentUser.name} 사원이 합류했습니다.`, true);
+                txt = `만난다.<br><br>
+                       얼굴을 확인한다. 두 번 확인한다.<br>
+                       팔을 걷어 보여준다. 상대도 걷는다.<br><br>
+                       둘 다 자국이 있었다. 아무 말도 안 했다.`;
+            } else {
+                mod = -1;
+                addInfect(8, '합류 실패');
+                txt = `아무도 없다.<br><br>
+                       지나간 자국은 있는데 사람이 없다.<br>
+                       같은 통로를 반대로 돌고 있었던 것 같다.`;
+            }
+            darkRun.modifier = (darkRun.modifier || 0) + mod;
+            darkRun.log.push(`[합류 ${n}차] ${v} — ${ok ? '성공' : '실패'}`);
+
+            darkBodyEl().innerHTML = darkBox(`합류 ${n}차 — 결과`, txt,
+                infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderInfectBar();
+            mountDarkChat('normal');
+        });
+    }, 2200);
+
+    darkBodyEl().innerHTML = darkBox(`합류 ${n}차`, `움직인다.`,
+        infectBarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">확인하는 중...</div>`);
+    renderInfectBar();
+}
+
+// ==========================================
+// ★ S-010 격리 투표
+// ==========================================
+function renderS010Vote(n) {
+    if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
+
+    const p = darkParties[darkRun.partyId];
+    const alive = (p && p.alive) ? Object.keys(p.alive) : [];
+    if (alive.length < 3) { partyAdvance(darkRun.step + 1); return; }
+
+    const key = `s010v${n}`;
+    const votes = (darkRun._s010Votes && darkRun._s010Votes[key]) || {};
+
+    const opts = alive.map(c => {
+        const nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+        const inf = s010State && s010State[c] ? s010State[c] : null;
+        const tag = inf ? (inf.turned ? ' <span style="color:#7f0000;">전향</span>' : inf.v >= INFECT_SYMPTOM ? ' <span style="color:#ff9800;">증상</span>' : '') : '';
+        return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s010Vote(${n},'${c}')">${nm}${tag}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}</button>`;
+    }).join('');
+
+    darkBodyEl().innerHTML = darkBox(`격리 ${n}차`,
+        `둘러선다.<br><br>
+         누구를 남길지 정해야 한다.<br>
+         남겨진 사람은 문 반대편에 있게 된다.<br><br>
+         <span style="font-size:11px; color:#888;">규정이 그렇다. 규정을 만든 사람은 여기 없다.</span>`,
+        infectBarHtml() + opts +
+        `<button class="game-btn" style="width:100%; margin:6px 0 0 0; padding:11px; font-size:11px;" onclick="s010Vote(${n},'none')">아무도 남기지 않는다</button>`);
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function s010Vote(n, target) {
+    let txt, mod = 0;
+    if (target === 'none') {
+        mod = 1;
+        darkRun.success++;
+        txt = `아무도 남기지 않는다.<br><br>
+               전부 데리고 간다. 느려지는 걸 감수하기로 한다.<br><br>
+               누가 말했다. "나중에 후회할 텐데."<br>
+               후회할 일이 생기려면 나중이 있어야 한다.`;
+    } else if (target === currentUser.code) {
+        mod = 2;
+        darkRun.success += 2;
+        applyPollutionToUser(currentUser, 8);
+        txt = `자기를 남기겠다고 한다.<br><br>
+               말리는 사람이 있었다. 오래 말리지는 않았다.<br><br>
+               문이 닫힌다. 바깥에서 잠그는 소리가 난다.<br>
+               반대편 발소리가 멀어지는 걸 끝까지 들었다.<br><br>
+               <span style="color:#d4af37;">한참 뒤에 다시 열렸다. 돌아온 사람이 있었다.</span>`;
+    } else {
+        const p = darkParties[darkRun.partyId];
+        const nm = (p && p.members && p.members[target]) ? p.members[target].name : '누군가';
+        const inf = s010State && s010State[target];
+        const right = inf && (inf.turned || inf.v >= INFECT_SYMPTOM);
+        mod = right ? 2 : -2;
+        if (right) darkRun.success++; else darkRun.fail++;
+        txt = right
+            ? `<b>${nm}</b> 사원을 남긴다.<br><br>
+               부정하지 않았다. 소매를 걷어 보이고는 먼저 문 안으로 들어갔다.<br><br>
+               문이 닫히기 전에 뭐라고 말했다. 못 들었다.<br>
+               다시 물어볼 수 없게 됐다.`
+            : `<b>${nm}</b> 사원을 남긴다.<br><br>
+               부정한다. 소매를 걷어 보인다. 아무것도 없다.<br>
+               그래도 남긴다. 시간이 없으니까.<br><br>
+               문이 닫힌다. 두드리는 소리가 한참 따라왔다.<br>
+               <span style="color:#ff6b6b;">아무것도 없었다.</span>`;
+        if (!right) applyPollutionToUser(currentUser, 10);
+    }
+
+    darkRun.modifier = (darkRun.modifier || 0) + mod;
+    darkRun.log.push(`[격리 ${n}차] ${target === 'none' ? '없음' : target === currentUser.code ? '본인' : '지목'}`);
+
+    darkBodyEl().innerHTML = darkBox(`격리 ${n}차 — 결과`, txt,
+        infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+// ==========================================
+// ★ S-010 기억 퀴즈
+// ==========================================
+const S010_QUIZ = {
+    1: { q:`처음 밟았던 명찰의 사번은 몇 자리였는가?`, hint:`숫자로 입력`, a:['4','4자리','네','넷','사'] },
+    2: { q:`벽에 붙어 있던 근무 인원표의 야간 인원은?`, hint:`숫자로 입력`, a:['9','9명','아홉','구'] },
+    3: { q:`검역 기록의 마지막 시각은 몇 시였는가?`, hint:`숫자로 입력`, a:['3','3시','세시','세','삼'] }
+};
+
+function renderS010Quiz(n) {
+    const d = S010_QUIZ[n];
+    if (!d) { partyAdvance(darkRun.step + 1); return; }
+
+    const done = darkRun[`s010q${n}`];
+    if (done) {
+        darkBodyEl().innerHTML = darkBox("기억",
+            `${d.q}<br><br><span style="color:${done === 'ok' ? '#4CAF50' : '#f44336'};">${done === 'ok' ? '기억하고 있었다.' : '기억나지 않았다.'}</span>`,
+            infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderInfectBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    darkBodyEl().innerHTML = darkBox("기억",
+        `걸음이 멎는다.<br><br>
+         잊는 것이 첫 증상이라고 했다.<br>
+         확인해야 한다.<br><br>
+         <span style="color:#7fd4d4; font-size:13px;">${d.q}</span>`,
+        infectBarHtml() +
+        `<input type="text" id="s010-quiz-input" maxlength="20" placeholder="${d.hint}" style="width:100%; padding:12px; font-size:14px; text-align:center; box-sizing:border-box; margin-bottom:10px;" onkeypress="if(event.key==='Enter') submitS010Quiz(${n})">
+         <button class="game-btn" style="width:100%; margin:0; padding:12px;" onclick="submitS010Quiz(${n})">적어 낸다</button>`);
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function submitS010Quiz(n) {
+    const el = document.getElementById('s010-quiz-input');
+    if (!el) return;
+    const v = el.value.trim();
+    if (!v) { showCustomAlert('답을 적어 주세요.'); return; }
+
+    const d = S010_QUIZ[n];
+    let ok = checkQuizAnswer(v, d.a);
+
+    if (!ok && gearValue(currentUser, 'gaze') >= 3 && !darkRun._s010QuizSaved) {
+        darkRun._s010QuizSaved = true;
+        ok = true;
+        showDarkToast('❂ 뒤늦게 떠올랐다.');
+    }
+
+    if (ok) {
+        darkRun[`s010q${n}`] = 'ok';
+        darkRun.success++;
+        darkRun.infect = Math.max(0, getInfect() - 4);
+        renderInfectBar(); syncInfect();
+    } else {
+        darkRun[`s010q${n}`] = 'no';
+        darkRun.fail++;
+        addInfect(12, `기억 실패 ${n}`);
+    }
+    darkRun.log.push(`[기억 ${n}] ${ok ? '정답' : '오답'}`);
+    renderS010Quiz(n);
+}
+
+// ==========================================
+// ★ 전향자 전용 화면
+// ==========================================
+const TURNED_SCENES = [
+    `복도가 다르게 보인다.<br><br>어둠이 걸리적거리지 않는다. 형태가 그냥 보인다.<br>동료들이 어디 있는지도 안다. 벽 너머인데도.<br><br>가까이 있는 것이 하나 있다.`,
+    `숨을 참을 필요가 없다.<br><br>참는 걸 잊었다는 걸 한참 뒤에 알았다.<br>목이 마르지도 않다.<br><br>다만 배가 고프다.`,
+    `이름이 잘 안 떠오른다.<br><br>얼굴은 기억난다. 어제 같이 밥을 먹었다.<br>누구였는지가 안 떠오른다.<br><br>그게 지금은 별로 중요하지 않다.`,
+    `누가 부른다.<br><br>대답하려는데 소리가 안 나온다.<br>목이 아니라 다른 데가 막혔다.<br><br>대신 걸음을 옮겼다. 그쪽으로.`
+];
+
+function renderTurnedStep() {
+    const body = darkBodyEl();
+    if (!body || !darkRun) return;
+
+    if (darkRun.turnDone >= darkRun.turnGoal) {
+        body.innerHTML = darkBox("—",
+            `충분하다.<br><br>
+             더 이상 배가 고프지 않다.<br>
+             복도 끝으로 걸어간다. 셔터는 잠겨 있는데, 잠긴 게 문제가 되지 않는다.<br><br>
+             나가는 방법을 이제 안다.`,
+            infectBarHtml() + darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+        renderInfectBar();
+        return;
+    }
+
+    if (!darkRun.isParty) {
+        body.innerHTML = darkBox("—",
+            `혼자다.<br><br>
+             옮길 상대가 없다. 여기서 더 할 일이 없다.<br><br>
+             복도에 앉는다. 앉아서 기다린다.<br>
+             누군가 올 것이다. 언젠가.`,
+            infectBarHtml() + darkChoiceBtn("기다린다.", "darkRun.step=99; renderDarkStep();"));
+        renderInfectBar();
+        return;
+    }
+
+    const p = darkParties[darkRun.partyId];
+    const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => c !== currentUser.code) : [];
+    const targets = alive.filter(c => !(s010State && s010State[c] && s010State[c].turned));
+
+    const scene = TURNED_SCENES[(darkRun.turnDone || 0) % TURNED_SCENES.length];
+
+    body.innerHTML = darkBox("◉ 감염체", scene,
+        infectBarHtml() +
+        `<div style="background:rgba(127,0,0,0.18); border:1px solid #b71c1c; border-radius:6px; padding:11px; margin-bottom:12px; font-size:11px; color:#ff9baa;">
+            과업 <b>${darkRun.turnDone || 0} / ${darkRun.turnGoal}</b> — 동료를 옮긴다
+         </div>` +
+        (targets.length === 0
+            ? `<div style="text-align:center; font-size:11px; color:#888; padding:14px;">닿을 수 있는 것이 없다. 기다린다.</div>
+               <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="renderTurnedStep()">다시 살핀다</button>`
+            : targets.map(c => {
+                const nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+                return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; background:linear-gradient(145deg,#4a0f0f,#2a0808) !important; border-color:#7f0000 !important; color:#ff9baa !important;" onclick="turnedBite('${c}','${nm}')">${nm} 쪽으로 간다</button>`;
+              }).join(''));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+// ==========================================
+// ★ S-010 정산 보너스
+// ==========================================
+function s010Bonus() {
+    if (!darkRun || darkRun.zone !== 'Qtrew-S-010') return 0;
+    let b = 0;
+
+    if (darkRun.turned) {
+        // 전향 성공 — 절반
+        return darkRun.turnDone >= darkRun.turnGoal ? -1 : -2;
+    }
+
+    const inf = getInfect();
+    if (inf === 0) b += 3000;
+    else if (inf < 20) b += 1500;
+    else if (inf < 40) b += 500;
+
+    if (darkRun.s010Ending === 'close') b += 6000;
+    else if (darkRun.s010Ending === 'report') b += 3000;
+    else if (darkRun.s010Ending === 'out') b += 1000;
+
+    return b;
+}

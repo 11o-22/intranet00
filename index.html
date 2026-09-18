@@ -3758,7 +3758,16 @@ if (database) {
             bonus += Math.floor(getHumanity() * 4);
         }
 
+        if (darkRun.zone === 'Qtrew-S-010') {
+            const sb = s010Bonus();
+            if (sb === -2) bonus -= 4000;
+            else if (sb !== -1) bonus += sb;
+        }
+
         let total = Math.max(10, base + bonus);
+        if (darkRun.zone === 'Qtrew-S-010' && darkRun.turned && darkRun.turnDone >= darkRun.turnGoal) {
+            total = Math.floor(total * 0.5);
+        }
         currentUser.points += total;
 
         let a214Summary = '';
