@@ -9385,3 +9385,181 @@ function watchBites() {
     });
 }
 
+// ==========================================
+// ★ Qtrew-S-010 단계 구성
+// ==========================================
+const S010_STEPS = {
+    0:  { type:'intro' },
+
+    // --- 1구간: 진입과 첫 무리 ---
+    1:  { type:'narr', n:1, img:'step1' },
+    2:  { type:'narr', n:2 },
+    3:  { type:'gimmick', n:1 },      // 비닐 통로 (은신)
+    4:  { type:'narr', n:3 },
+    5:  { type:'gimmick', n:2 },      // 첫 무리 (회피)
+    6:  { type:'narr', n:4 },
+    7:  { type:'check' },             // 감염 검사
+    8:  { type:'narr', n:5 },
+    9:  { type:'gimmick', n:3 },      // 셔터 (파괴)
+    10: { type:'narr', n:6 },
+    11: { type:'gimmick', n:4 },      // 소리 추적 (감각)
+    12: { type:'narr', n:7 },
+
+    // --- 2구간: 보급소 ---
+    13: { type:'narr', n:8, img:'step2' },
+    14: { type:'search', area:'storage' },
+    15: { type:'gimmick', n:5 },      // 바리케이드 (파괴)
+    16: { type:'narr', n:9 },
+    17: { type:'defense', n:1 },      // 방어전 연타
+    18: { type:'narr', n:10 },
+    19: { type:'search', area:'clinic' },
+    20: { type:'gimmick', n:6 },      // 응급처치 (치유)
+    21: { type:'narr', n:11 },
+    22: { type:'check' },
+    23: { type:'gimmick', n:7 },      // 보급 상자 (행운)
+    24: { type:'narr', n:12 },
+    25: { type:'quiz', n:1 },         // 기억 (응시)
+    26: { type:'narr', n:13 },
+    27: { type:'gimmick', n:8 },      // 냄새 차단 (은신)
+    28: { type:'narr', n:14 },
+
+    // --- 3구간: 분리 ---
+    29: { type:'split', n:1 },
+    30: { type:'solo', n:1 },
+    31: { type:'solo', n:2 },
+    32: { type:'gimmick', n:9 },      // 단독 돌파 (회피)
+    33: { type:'solo', n:3 },
+    34: { type:'narr', n:15 },
+    35: { type:'gimmick', n:10 },     // 무전 (연결)
+    36: { type:'solo', n:4 },
+    37: { type:'check' },
+    38: { type:'narr', n:16, img:'step3' },
+    39: { type:'gimmick', n:11 },     // 어둠 속 이동 (감각)
+    40: { type:'solo', n:5 },
+    41: { type:'narr', n:17 },
+    42: { type:'gimmick', n:12 },     // 물린 자 (치유)
+    43: { type:'solo', n:6 },
+    44: { type:'rejoin', n:1 },
+
+    // --- 4구간: 재합류와 첫 전향 ---
+    45: { type:'narr', n:18 },
+    46: { type:'gimmick', n:13 },     // 명단 대조 (응시)
+    47: { type:'narr', n:19 },
+    48: { type:'defense', n:2 },
+    49: { type:'narr', n:20 },
+    50: { type:'check' },
+    51: { type:'gimmick', n:14 },     // 감염체 식별 (감각)
+    52: { type:'narr', n:21 },
+    53: { type:'vote', n:1 },         // 격리 투표
+    54: { type:'narr', n:22 },
+    55: { type:'gimmick', n:15 },     // 제압 (파괴)
+    56: { type:'narr', n:23 },
+    57: { type:'quiz', n:2 },
+    58: { type:'narr', n:24 },
+
+    // --- 5구간: 검역소 ---
+    59: { type:'narr', n:25, img:'step4' },
+    60: { type:'search', area:'quarantine' },
+    61: { type:'gimmick', n:16 },     // 검역 기록 (응시)
+    62: { type:'narr', n:26 },
+    63: { type:'gimmick', n:17 },     // 소독실 (치유)
+    64: { type:'check' },
+    65: { type:'narr', n:27 },
+    66: { type:'vote', n:2 },
+    67: { type:'gimmick', n:18 },     // 격벽 (파괴)
+    68: { type:'narr', n:28 },
+    69: { type:'defense', n:3 },
+    70: { type:'narr', n:29 },
+    71: { type:'gimmick', n:19 },     // 환기구 (은신)
+    72: { type:'quiz', n:3 },
+
+    // --- 6구간: 탈출로 ---
+    73: { type:'narr', n:30 },
+    74: { type:'gimmick', n:20 },     // 무리 돌파 (회피)
+    75: { type:'narr', n:31 },
+    76: { type:'split', n:2 },
+    77: { type:'gimmick', n:21 },     // 단독 (행운)
+    78: { type:'rejoin', n:2 },
+    79: { type:'narr', n:32 },
+    80: { type:'defense', n:4 },
+    81: { type:'check' },
+    82: { type:'narr', n:33 },
+    83: { type:'gimmick', n:22 },     // 마지막 합류 (연결)
+    84: { type:'narr', n:34 },
+    85: { type:'vote', n:3 },
+    86: { type:'narr', n:35 },
+
+    // --- 최종 ---
+    87: { type:'gimmick', n:23 },     // 셔터 조작
+    88: { type:'narr', n:36 },
+    89: { type:'gimmick', n:24 },     // 최후 판정
+    99: { type:'result' }
+};
+
+function renderStepS010() {
+    const body = darkBodyEl();
+    if (!body || !darkRun) return;
+    if (darkRun.rejoined) { renderRejoinScene(); return; }
+    if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); watchBites(); }
+    saveDarkRunState();
+    attachS010Listener();
+
+    if (darkRun.infect == null) darkRun.infect = 0;
+    if (darkRun.turned) applyTurnedTheme(true);
+
+    // 전향자는 별도 흐름
+    if (darkRun.turned) { renderTurnedStep(); return; }
+
+    const def = S010_STEPS[darkRun.step];
+    if (!def) { renderDarkResult(); return; }
+
+    if (def.type === 'intro') {
+        body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+            infectBarHtml() + s010Brief() +
+            darkChoiceBtn("비닐을 젖힌다.", "partyAdvance(1)"), "intro");
+        renderInfectBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    if (def.type === 'narr') {
+        const d = S010_NARR[def.n];
+        if (!d) { partyAdvance(darkRun.step + 1); return; }
+        body.innerHTML = darkBox("—", d.text,
+            infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`),
+            def.img);
+        renderInfectBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    if (def.type === 'check')   { renderS010Check(darkRun.step + 1); return; }
+    if (def.type === 'defense') { renderS010Defense(def.n); return; }
+    if (def.type === 'search')  { renderS010Search(def.area); return; }
+    if (def.type === 'split')   { renderS010Split(def.n); return; }
+    if (def.type === 'rejoin')  { renderS010Rejoin(def.n); return; }
+    if (def.type === 'solo')    { renderS010Solo(def.n); return; }
+    if (def.type === 'vote')    { renderS010Vote(def.n); return; }
+    if (def.type === 'quiz')    { renderS010Quiz(def.n); return; }
+    if (def.type === 'result')  { renderDarkResult(); return; }
+
+    if (def.type === 'gimmick') {
+        const fn = window['s010G' + def.n];
+        if (typeof fn === 'function') fn();
+        else partyAdvance(darkRun.step + 1);
+        return;
+    }
+}
+
+function s010Brief() {
+    return `
+        <div style="background:rgba(127,0,0,0.12); border:1px solid #7f0000; border-radius:6px; padding:13px; margin-bottom:13px; font-size:11px; color:#ccc; line-height:1.8;">
+            <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:8px;">⚠ 감염</div>
+            물릴 때마다 감염도가 오릅니다.<br>
+            <b style="color:#ff9800;">30</b>을 넘으면 증상이 나타나고, <b style="color:#f44336;">60</b>을 넘으면 돌아올 수 없습니다.<br><br>
+            증상기에는 판정이 불리해지지만, 같은 것을 더 잘 알아봅니다.<br>
+            <span style="font-size:10px; color:#888;">전향한 동료는 「검역용 볼트」로만 멈출 수 있습니다.</span>
+        </div>`;
+}
+
+

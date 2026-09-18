@@ -3262,9 +3262,11 @@ if (database) {
         if (darkRun.zone === 'Qtrew-C-176') { renderStepC176(); return; }
         if (darkRun.zone === 'Qtrew-B-330') { renderStepB330(); return; }
         if (darkRun.zone === 'Qtrew-B-508') { renderStepB508(); return; }
+        if (darkRun.zone === 'Qtrew-S-010') { renderStepS010(); return; }
         if (darkRun.zone === 'Qtrew-A-214') { renderStepA214(); return; }
         if (darkRun.zone === 'Qtrew-A-667') { renderStepA667(); return; }
         if (darkRun.zone === 'Qtrew-D-087') { renderStep087(); return; }
+        
 
         const s = darkRun.step;
 
@@ -3666,9 +3668,12 @@ if (database) {
         detachChatListener();
         clearInterval(c119Timer);
         detachA214Listener();
+        detachS010Listener();
+        applyTurnedTheme(false);
         clearInterval(a214Timer);
         if (a214Combat.timer) clearInterval(a214Combat.timer);
         darkAmbienceStop();
+
 
         const pid = darkRun ? darkRun.partyId : null;
         const zone = darkRun ? darkRun.zone : null;
@@ -3897,6 +3902,8 @@ if (database) {
         clearInterval(a214Timer);
         if (a214Combat.timer) clearInterval(a214Combat.timer);
         clearInterval(c119Timer);
+        detachS010Listener();
+        applyTurnedTheme(false);
 
         const pid = darkRun ? darkRun.partyId : null;
         const zone = darkRun ? darkRun.zone : null;
