@@ -4929,20 +4929,47 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
         const starveLocked = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
         const starving = (currentUser.satiety || 0) <= 0 && !isQuarantined(currentUser);
+
+        const qBox = document.getElementById('quarantine-lock-box');
+if (qBox) {
+    qBox.style.borderColor = agent ? '#2a4a5a' : '#d4af37';
+    qBox.style.background = agent ? 'rgba(127,212,212,0.06)' : 'rgba(212,175,55,0.06)';
+}
         
 
 
-        if (inQuarantine) {
-            const remainMs = currentUser.quarantineUntil - Date.now();
-            const rh = Math.floor(remainMs / (1000 * 60 * 60));
-            const rm = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+       if (inQuarantine) {
+    const remainMs = currentUser.quarantineUntil - Date.now();
+    const rh = Math.floor(remainMs / (1000 * 60 * 60));
+    const rm = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
             const remainEl = document.getElementById('quarantine-remain-text');
             if (remainEl) remainEl.innerText = rh > 0 ? `${rh}시간 ${rm}분` : `${rm}분`;
 
             const qBtn = document.getElementById('quarantine-enter-btn');
-    if (qBtn) qBtn.innerHTML = isDisasterAgent(currentUser)
-        ? '♨ 초개 요원에게 간다'
-        : '🦊 상담사와 이야기한다';
+const agent = isDisasterAgent(currentUser);
+if (qBtn) qBtn.innerHTML = agent ? '♨ 초개 요원에게 간다' : '🦊 상담사와 이야기한다';
+
+const qIcon = document.querySelector('#quarantine-lock-box > div:first-child');
+if (qIcon) qIcon.innerText = agent ? '♨' : '🦊';
+
+const qTitle = document.querySelector('#quarantine-lock-box h4');
+if (qTitle) {
+    qTitle.innerText = agent ? '선녀탕 입욕 중' : '여우 상담실 격리 중';
+    qTitle.style.color = agent ? '#7fd4d4' : '#d4af37';
+}
+
+const qDesc = document.querySelector('#quarantine-lock-box p');
+if (qDesc) {
+    qDesc.innerHTML = agent
+        ? `물에 몸을 담그고 있습니다.<br>
+           오염이 빠질 때까지 사내 시설 이용이 제한됩니다.<br><br>
+           <span style="color:#ff9800; font-weight:bold;">퇴실까지 약 <span id="quarantine-remain-text">--</span> 남음</span><br><br>
+           <span style="font-size:11px; color:#888;">※ 정보 열람(사원증·기록)은 계속 이용할 수 있습니다.</span>`
+        : `현재 안정을 취하고 있습니다.<br>
+           격리가 해제될 때까지 사내 시설 이용이 제한됩니다.<br><br>
+           <span style="color:#ff9800; font-weight:bold;">퇴원까지 약 <span id="quarantine-remain-text">--</span> 남음</span><br><br>
+           <span style="font-size:11px; color:#888;">※ 정보 열람(사원증·기록)은 계속 이용할 수 있습니다.</span>`;
+}
 
 
             document.querySelectorAll('.tabs-grid .tab').forEach(t => {
