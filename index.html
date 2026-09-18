@@ -1321,13 +1321,16 @@ if (database) {
         "혈욕조": { price: 7000, usable: true, targetable: false, effect: "equip_bloodbath", desc: "장착 시 하루 최대 3시간 동안 오염 수치가 오르지 않는다." },
         "노예 계약서": { price: 10000, usable: true, targetable: true, effect: "slave_contract", desc: "원하는 사람을 3일 동안 노예로 계약한다." },
         "포도맛 물약": { price: 1500, usable: true, targetable: true, effect: "grape_potion", desc: "사용 시 3 일간 성별이 바뀝니다." },
+        "파인애플맛 물약": { price: 1500, usable: true, targetable: true, effect: "pineapple_potion", desc: "사용 시 3일간 손바닥만 하게 작아집니다." },
+        "투명 물약": { price: 1500, usable: true, targetable: true, effect: "clear_potion", desc: "기간이 있는 효과 하나를 영구히 고정한다. 제거약으로만 풀 수 있다." },
+        "자두맛 물약": { price: 1500, usable: true, targetable: true, effect: "plum_potion", desc: "사용 시 3일간 신체에서 케이크 맛이 납니다." },
+        "무지개 물약": { price: 3000, usable: true, targetable: true, effect: "rainbow_potion", desc: "무슨 맛인지 알 수 없다. 다른 물약 중 하나의 효과가 무작위로 나타난다." },
         "우유맛 물약": { price: 1500, usable: true, targetable: true, effect: "milk_potion", desc: "사용 시 3일간 컨트/딕걸 상태가 됩니다." },
         "사과맛 물약": { price: 1500, usable: true, targetable: true, effect: "apple_potion", desc: "사용 시 3일간 동물의 귀와 꼬리가 생깁니다." },
         "오렌지맛 물약": { price: 1500, usable: true, targetable: true, effect: "orange_potion", desc: "사용 시 3일간 어린이 상태가 됩니다." },
         "복숭아맛 물약": { price: 1500, usable: true, targetable: true, effect: "peach_potion", desc: "사용 시 3일간 예민한 몸이 됩니다." },
         "체리맛 물약": { price: 1500, usable: true, targetable: true, effect: "cherry_potion", desc: "사용 시 3일간 신체 부위 중 일부가 예민하게 개발된다." },
-               "제거약": { price: 4000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화 하나를 무작위로 되돌린다. 물약 외의 상태에는 듣지 않는다." },
-        "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
+         "제거약": { price: 4000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화나 계약 하나를 무작위로 되돌린다." },       "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
          "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip_rabbit", desc: "귀여운 분홍색 토끼 봉제인형. 장착 시 어둠의 판정에 행운이 더해지고, 공용시설 승률이 크게 오른다. 약간의 회피 효과도 있다." },
         "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip_security", desc: "보안팀의 의상 세트. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
         "작두": { price: 9999, usable: true, targetable: false, effect: "equip_jakdu", desc: "영험한 기운이 담긴 무기. 어떤 기믹이든 한 번은 무조건 박살낸다. 죽어도 사라지지 않으며, 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
@@ -1460,9 +1463,12 @@ if (database) {
         "우유맛 물약", "사과맛 물약", "오렌지맛 물약", "복숭아맛 물약", "제거약", "랜덤박스",
         "작두", "유리손포", "착한 친구", "보안팀 의상 세트", "버터 나이프", "은반지",
         "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
-        "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기"
+        "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기",
+        "파인애플맛 물약", "투명 물약", "자두맛 물약", "무지개 물약"
     ];
-    const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비"];
+        const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비", "사막여우", "수달"];
+
+        const CAKE_LIST = ["치즈", "고구마", "생크림", "딸기", "자두", "초코", "티라미수"];
 
 
     // 유효한 점유인지 판정 (만료된 기록은 없는 것으로 취급)
@@ -4053,7 +4059,8 @@ if (database) {
 
         if (user.timedEffects) {
             for (let i = user.timedEffects.length - 1; i >= 0; i--) {
-                if (now >= user.timedEffects[i].expireAt) {
+    if (user.timedEffects[i].fixed) continue;
+    if (now >= user.timedEffects[i].expireAt) {
                     addHistoryLog(user, `[상태 해제] ${user.timedEffects[i].name} 효과가 종료되었습니다.`);
                     user.timedEffects.splice(i, 1);
                     changed = true;
@@ -4180,9 +4187,9 @@ if (database) {
             changed = true;
         }
 
-        if (user.slaveUntil && now >= user.slaveUntil) {
-            user.slaveUntil = 0;
-            user.masterName = null;
+        if (user.slaveUntil && !user.slaveFixed && now >= user.slaveUntil) {
+    user.slaveUntil = 0;
+    user.masterName = null;
             appendBadgeNoteToUser(user, `[계약 만료] 노예 계약 기간이 종료되어 해방되었습니다.`);
             addHistoryLog(user, `[계약 해제] 노예 계약 만료`);
             changed = true;
@@ -4320,17 +4327,21 @@ if (database) {
 
     // UI에 남은 시간을 계산해서 텍스트로 뽑아주는 함수
     function getTimedEffectsText(user) {
-        if (!user.timedEffects || user.timedEffects.length === 0) return [];
-        const now = Date.now();
-        let activeTexts = [];
-        user.timedEffects.forEach(eff => {
-            let remainH = Math.ceil((eff.expireAt - now) / (1000 * 60 * 60));
-            if (remainH > 0) {
-                activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#ff9800; font-weight:bold;">(${remainH}시간 남음)</span>`);
-            }
-        });
-        return activeTexts;
-            }
+    if (!user.timedEffects || user.timedEffects.length === 0) return [];
+    const now = Date.now();
+    let activeTexts = [];
+    user.timedEffects.forEach(eff => {
+        if (eff.fixed) {
+            activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#4fc3f7; font-weight:bold;">(고정됨)</span>`);
+            return;
+        }
+        let remainH = Math.ceil((eff.expireAt - now) / (1000 * 60 * 60));
+        if (remainH > 0) {
+            activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#ff9800; font-weight:bold;">(${remainH}시간 남음)</span>`);
+        }
+    });
+    return activeTexts;
+}
     function renderPointRanking() {
         const wrapper = document.getElementById('ranking-items-wrapper');
         if (!wrapper) return;
@@ -4776,6 +4787,10 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         const inQuarantine = isQuarantined(currentUser);
         const lockBox = document.getElementById('quarantine-lock-box');
         const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
+        const starveLocked = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
+        const starving = (currentUser.satiety || 0) <= 0 && !isQuarantined(currentUser);
+        
+
 
         if (inQuarantine) {
             const remainMs = currentUser.quarantineUntil - Date.now();
@@ -4808,15 +4823,46 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             }
             if (lockBox) lockBox.style.display = 'block';
 
+       } else if (starving) {
+    document.querySelectorAll('.tabs-grid .tab').forEach(t => {
+        const onclickStr = t.getAttribute('onclick') || '';
+        const isLocked = starveLocked.some(id => onclickStr.includes(id));
+        if (isLocked) {
+            t.style.opacity = '0.35';
+            t.style.pointerEvents = 'none';
+            if (!t.innerText.startsWith('🍽')) t.innerText = '🍽 ' + t.innerText;
         } else {
-            document.querySelectorAll('.tabs-grid .tab').forEach(t => {
-                t.style.opacity = '';
-                t.style.pointerEvents = '';
-                if (t.innerText.startsWith('🔒 ')) t.innerText = t.innerText.replace('🔒 ', '');
-            });
-            if (lockBox) lockBox.style.display = 'none';
+            t.style.opacity = '';
+            t.style.pointerEvents = '';
+            if (t.innerText.startsWith('🍽 ')) t.innerText = t.innerText.replace('🍽 ', '');
         }
-        const isLocked = currentUser.pollution >= 100;
+    });
+
+    let activeLocked = starveLocked.find(id => {
+        const el = document.getElementById(id);
+        return el && el.classList.contains('active');
+    });
+    if (activeLocked) {
+        document.getElementById(activeLocked).classList.remove('active');
+        document.getElementById('tab-house').classList.add('active');
+        document.querySelectorAll('.tabs-grid .tab').forEach(t => t.classList.remove('active'));
+        const houseTab = document.querySelector('.tabs-grid .tab[onclick*="tab-house"]');
+        if (houseTab) houseTab.classList.add('active');
+        renderHouse();
+    }
+        if (lockBox) lockBox.style.display = 'none';
+
+} else {
+    document.querySelectorAll('.tabs-grid .tab').forEach(t => {
+        t.style.opacity = '';
+        t.style.pointerEvents = '';
+        if (t.innerText.startsWith('🔒 ')) t.innerText = t.innerText.replace('🔒 ', '');
+        if (t.innerText.startsWith('🍽 ')) t.innerText = t.innerText.replace('🍽 ', '');
+    });
+    if (lockBox) lockBox.style.display = 'none';
+}
+
+const isLocked = currentUser.pollution >= 100;
         const isLimitReached = currentUser.facilityCount >= currentUser.facilityMax;
 
         if (isLocked || isLimitReached) {
@@ -5850,39 +5896,97 @@ hlL.disabled = !playable;
         else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 72);
         else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 72);
         else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 72);
+        else if (cat.effect === 'pineapple_potion') addTimedEffect(targetUser, '파인애플맛 물약', '신체 축소 (손바닥 크기)', 72);
+else if (cat.effect === 'plum_potion') addTimedEffect(targetUser, '자두맛 물약', `신체에서 ${CAKE_LIST[Math.floor(Math.random() * CAKE_LIST.length)]} 케이크 맛이 남`, 72);
+else if (cat.effect === 'clear_potion') {
+    const candidates = [];
+
+    (targetUser.timedEffects || []).forEach((e, i) => {
+        if (!e.fixed) candidates.push({ type: 'effect', idx: i, name: e.name });
+    });
+
+    if (targetUser.slaveUntil && Date.now() < targetUser.slaveUntil && !targetUser.slaveFixed) {
+        candidates.push({ type: 'slave', name: '노예 계약' });
+    }
+
+    if (candidates.length === 0) {
+        if (!isOthers) showCustomAlert('고정할 수 있는 효과가 없습니다.');
+        return false;
+    }
+
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+
+    if (pick.type === 'effect') {
+        const e = targetUser.timedEffects[pick.idx];
+        e.fixed = true;
+        e.expireAt = Number.MAX_SAFE_INTEGER;
+    } else {
+        targetUser.slaveFixed = true;
+        targetUser.slaveUntil = Number.MAX_SAFE_INTEGER;
+    }
+
+    addHistoryLog(targetUser, `[투명 물약] ${pick.name} 효과가 영구히 고정되었습니다.`);
+    showCustomAlert(`${pick.name} 효과가 고정되었습니다.\n제거약으로만 풀 수 있습니다.`);
+}
+else if (cat.effect === 'rainbow_potion') {
+    const pool = ['grape_potion','milk_potion','apple_potion','orange_potion','peach_potion','cherry_potion','pineapple_potion','plum_potion'];
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    const names = {
+        grape_potion:['포도맛 물약','신체 파동 변조 (성별 반전 상태)'],
+        milk_potion:['우유맛 물약','신체 변이 (컨트/딕걸)'],
+        apple_potion:['사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random()*ANIMAL_LIST.length)]}의 귀와 꼬리 발현`],
+        orange_potion:['오렌지맛 물약','신체 퇴행 (어린아이 상태)'],
+        peach_potion:['복숭아맛 물약','신체 감각 과민 (예민한 몸 상태)'],
+        cherry_potion:['체리맛 물약','신체 부위 중 일부가 예민하게 개발됨'],
+        pineapple_potion:['파인애플맛 물약','신체 축소 (손바닥 크기)'],
+        plum_potion:['자두맛 물약', `신체에서 ${CAKE_LIST[Math.floor(Math.random()*CAKE_LIST.length)]} 케이크 맛이 남`]
+    };
+    const [nm, ds] = names[picked];
+    addTimedEffect(targetUser, nm, ds, 72);
+    showCustomAlert(`[무지개 물약]\n\n${nm}의 효과가 나타났습니다.\n${ds}`);
+}
         
-        else if (cat.effect === 'drink_wine') {
-            addTimedEffect(targetUser, '고급진 술', '알코올 섭취', 10);
-            if(!isOthers) showCustomAlert("술을 마셨습니다... 세상이 빙글빙글 돕니다.");
-        }
-               else if (cat.effect === 'cure_potion') {
-            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+ else if (cat.effect === 'cure_potion') {
+    const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','파인애플맛 물약','자두맛 물약'];
 
-            
+    const candidates = [];
 
-            const idxs = [];
-            (targetUser.timedEffects || []).forEach((eff, i) => {
-                if (POTION_NAMES.includes(eff.name)) idxs.push(i);
-            });
+    (targetUser.timedEffects || []).forEach((eff, i) => {
+        if (POTION_NAMES.includes(eff.name)) candidates.push({ type: 'effect', idx: i, name: eff.name });
+    });
 
-            if (idxs.length === 0) {
-                if (!isOthers) showCustomAlert('제거할 물약 효과가 없습니다.');
-                return false;
-            }
+    if (targetUser.slaveUntil && (targetUser.slaveFixed || Date.now() < targetUser.slaveUntil)) {
+        candidates.push({ type: 'slave', name: '노예 계약' });
+    }
 
-            const pick = idxs[Math.floor(Math.random() * idxs.length)];
-            const removed = targetUser.timedEffects.splice(pick, 1)[0];
+    if (candidates.length === 0) {
+        if (!isOthers) showCustomAlert('제거할 효과가 없습니다.');
+        return false;
+    }
 
-            if (targetUser.badge && targetUser.badge.notes) {
-                let arr = targetUser.badge.notes.split(' | ').filter(n =>
-                    n.trim() !== '' && !n.includes(removed.name)
-                );
-                targetUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
-            }
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    let removedName = pick.name;
 
-            addHistoryLog(targetUser, `[제거약] ${removed.name} 효과가 씻겨 나갔습니다.`);
-            if (!isOthers) showCustomAlert(`[제거약 효과]\n${removed.name}의 효과가 사라졌습니다.`);
-        } else if (cat.effect === 'random_box') {
+    if (pick.type === 'effect') {
+        targetUser.timedEffects.splice(pick.idx, 1);
+    } else {
+        targetUser.slaveUntil = 0;
+        targetUser.slaveFixed = false;
+        targetUser.masterName = null;
+    }
+
+    if (targetUser.badge && targetUser.badge.notes) {
+        const key = pick.type === 'slave' ? '노예 계약' : removedName;
+        let arr = targetUser.badge.notes.split(' | ').filter(n =>
+            n.trim() !== '' && !n.includes(key)
+        );
+        targetUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+
+    addHistoryLog(targetUser, `[제거약] ${removedName} 효과가 씻겨 나갔습니다.`);
+    if (!isOthers) showCustomAlert(`[제거약 효과]\n${removedName}의 효과가 사라졌습니다.`);
+}
+else if (cat.effect === 'random_box') {
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
                         const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
             const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
@@ -6399,7 +6503,7 @@ if (!useFacility(bet)) return;
         // 부적 장착 여부 확인
         let hasAmulet = currentUser.equippedWeapons && currentUser.equippedWeapons.includes("누군가가 쓴 부적");
         
-        const luckM = facilityLuckMult(currentUser);
+        const luckM = 1 + (facilityLuckMult(currentUser) - 1) / 10;
 
         let failChance = (hasAmulet ? 0.55 : 0.76) / luckM;
         let jackpotSpan = (hasAmulet ? 0.08 : 0.025) * luckM;

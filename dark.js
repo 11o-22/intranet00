@@ -4187,11 +4187,11 @@ function safeDeposit() {
 
     // 착한 친구 + 유리손포 — 공용시설 행운 배율
     function facilityLuckMult(user) {
-        let m = 1;
-        if (hasEquip(user, '착한 친구')) m *= 2.5;
-        if (hasEquip(user, '유리손포')) m *= 2.5;
-        return m;
-    }
+    let m = 1;
+    if (hasEquip(user, '착한 친구')) m *= 1.15;
+    if (hasEquip(user, '유리손포')) m *= 1.15;
+    return m;
+}
 
     // 착한 친구 — 어둠 판정 행운 보정
     function rabbitBonus(user) {
@@ -7666,6 +7666,15 @@ function safeDeposit() {
     }
 
     function renderHouse() {
+
+        const starveNotice = (currentUser.satiety || 0) <= 0
+    ? `<div style="background:rgba(255,152,0,0.1); border:1px solid #7a5200; border-radius:6px; padding:13px; margin-bottom:14px; font-size:12px; color:#ffb74d; line-height:1.8;">
+         <b>🍽 더는 서 있기 어렵습니다</b><br>
+         손이 떨리고 눈앞이 흐립니다. 주방에서 무언가 만들어 먹어야 합니다.<br>
+         <span style="font-size:10px; color:#aaa;">포만감이 회복될 때까지 사내 시설을 이용할 수 없습니다.</span>
+       </div>`
+    : '';
+
         const box = document.getElementById('house-main-body');
         if (!box || !currentUser) return;
 
