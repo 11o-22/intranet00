@@ -8782,6 +8782,32 @@ if (!useFacility(bet)) return;
         }
     }, 500);
 
+    function renderAlienTimer() {
+    const el = document.getElementById('alien-cooldown-timer');
+    if (!el || !currentUser) return;
+
+    if (currentUser.code === 'kario0987') { el.style.display = 'none'; return; }
+
+    const used = currentUser.alienDailyUsed || 0;
+    const tries = currentUser.alienTries || 0;
+
+    if (used >= 2) {
+        el.style.display = 'block';
+        el.innerHTML = `금일 연결 기회를 모두 소진했습니다. (자정 초기화)`;
+        return;
+    }
+    if (tries < 2 || !currentUser.lastAlienPlayTime) { el.style.display = 'none'; return; }
+
+    const remain = (4 * 60 * 60 * 1000) - (Date.now() - currentUser.lastAlienPlayTime);
+    if (remain <= 0) { el.style.display = 'none'; return; }
+
+    const h = Math.floor(remain / 3600000);
+    const m = Math.floor((remain % 3600000) / 60000);
+    const s = Math.floor((remain % 60000) / 1000);
+    el.style.display = 'block';
+    el.innerHTML = `다음 연결까지 ${h}시간 ${String(m).padStart(2,'0')}분 ${String(s).padStart(2,'0')}초`;
+}
+
         let _textInputCallback = null;
 
     function openTextInput(title, desc, placeholder, callback) {
