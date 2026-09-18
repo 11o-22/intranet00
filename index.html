@@ -2988,8 +2988,9 @@ if (database) {
         if (qFlag('meal_bonus2')) b += 2;
         if (qFlag('meal_bonus3')) b += 3;
 
-
-        return b;
+         b += infectBonus(kind);
+           
+         return b;
     }
 
     function renderDarkness() {

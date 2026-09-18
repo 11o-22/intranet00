@@ -9156,3 +9156,232 @@ function renderMaintenanceState() {
         : '<span style="color:#4CAF50;">● 정상 운영 중</span>';
 }
 
+// ==========================================
+// ★ Qtrew-S-010 감염 시스템
+// ==========================================
+const INFECT_TURN = 60;     // 전향 기준선
+const INFECT_SYMPTOM = 30;  // 증상 시작
+
+function getInfect() {
+    return (darkRun && darkRun.infect != null) ? darkRun.infect : 0;
+}
+
+function isTurned() {
+    return !!(darkRun && darkRun.turned);
+}
+
+function isSymptomatic() {
+    return getInfect() >= INFECT_SYMPTOM && !isTurned();
+}
+
+function addInfect(amount, reason) {
+    if (!darkRun) return;
+
+    if (amount > 0) {
+        // 치유 속성이 진행을 늦춘다
+        const heal = gearValue(currentUser, 'heal');
+        if (heal > 0) amount = Math.round(amount * (1 - heal * 0.6));
+        // 붕대
+        if (qFlag('s010_bandage')) amount = Math.round(amount * 0.7);
+        if (amount < 1) amount = 1;
+    }
+
+    darkRun.infect = Math.max(0, Math.min(100, getInfect() + amount));
+    if (reason) darkRun.log.push(`[감염] ${reason} (${amount >= 0 ? '+' : ''}${amount} → ${darkRun.infect})`);
+    renderInfectBar();
+    syncInfect();
+
+    if (darkRun.infect >= INFECT_TURN && !darkRun.turned) {
+        // 검역 도장으로 한 번 유예
+        if (consumeQFlag('s010_seal')) {
+            darkRun.infect = 59;
+            showDarkToast('도장이 찍혔다. 아직은 아니다.');
+            renderInfectBar();
+            syncInfect();
+            return;
+        }
+        setTimeout(() => triggerTurn(), 800);
+    }
+}
+
+// 파티에 내 감염도를 알린다
+function syncInfect() {
+    if (!darkRun || !darkRun.isParty || !database) return;
+    database.ref(`darkParties/${darkRun.partyId}/infect/${currentUser.code}`).set({
+        name: currentUser.name,
+        v: getInfect(),
+        turned: !!darkRun.turned,
+        at: Date.now()
+    });
+}
+
+let s010Ref = null, s010Key = null, s010State = null;
+
+function attachS010Listener() {
+    if (!database || !darkRun || !darkRun.partyId) return;
+    if (s010Key === darkRun.partyId) return;
+    if (s010Ref) { try { s010Ref.off(); } catch(e) {} }
+    s010Key = darkRun.partyId;
+    s010Ref = database.ref(`darkParties/${darkRun.partyId}/infect`);
+    s010Ref.on('value', snap => {
+        s010State = snap.val() || {};
+        renderInfectBar();
+    });
+}
+
+function detachS010Listener() {
+    if (s010Ref) { try { s010Ref.off(); } catch(e) {} }
+    s010Ref = null; s010Key = null; s010State = null;
+}
+
+function infectBarHtml() {
+    return `<div id="infect-bar" style="margin-bottom:12px;"></div>`;
+}
+
+function renderInfectBar() {
+    const el = document.getElementById('infect-bar');
+    if (!el || !darkRun) return;
+
+    const v = getInfect();
+    const color = v >= INFECT_TURN ? '#7f0000' : v >= INFECT_SYMPTOM ? '#ff6b6b' : '#4CAF50';
+    const label = isTurned() ? '전향' : v >= INFECT_SYMPTOM ? '증상 발현' : v > 0 ? '노출' : '이상 없음';
+
+    // 동료 감염도 — 심박계가 있으면 수치, 없으면 상태만
+    let mates = '';
+    if (darkRun.isParty && s010State) {
+        const seePulse = qFlag('s010_pulse');
+        const rows = Object.keys(s010State)
+            .filter(c => c !== currentUser.code)
+            .map(c => {
+                const m = s010State[c];
+                const c2 = m.turned ? '#7f0000' : m.v >= INFECT_SYMPTOM ? '#ff9800' : '#4CAF50';
+                const txt = m.turned ? '전향' : seePulse ? `${m.v}` : (m.v >= INFECT_SYMPTOM ? '증상' : '정상');
+                return `<span style="color:${c2}; margin-right:9px;">${m.name} ${txt}</span>`;
+            }).join('');
+        if (rows) mates = `<div style="font-size:9px; margin-top:6px; line-height:1.7;">${rows}</div>`;
+    }
+
+    el.innerHTML = `
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+            <span>감염도 — <b style="color:${color};">${label}</b></span>
+            <span style="color:${color}; font-weight:bold;">${v} / 100</span>
+        </div>
+        <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden;">
+            <div style="height:100%; width:${v}%; background:${color}; transition:width 0.5s;"></div>
+        </div>
+        ${isSymptomatic() ? `<div style="font-size:9px; color:#ff9800; margin-top:5px;">⚠ 판정 -2 · 감염체 감지 +3</div>` : ''}
+        ${mates}`;
+}
+
+// 감염 상태에 따른 판정 보정
+function infectBonus(kind) {
+    if (!darkRun || darkRun.zone !== 'Qtrew-S-010') return 0;
+    let b = 0;
+    if (isSymptomatic()) {
+        b -= 2;
+        if (kind === 'detect') b += 5;
+    }
+    if (isTurned()) {
+        b += 3;
+        if (kind === 'hide') b += 2;
+    }
+    return b;
+}
+
+function triggerTurn() {
+    if (!darkRun || darkRun.turned) return;
+    darkRun.turned = true;
+    darkRun.turnGoal = 3;      // 감염시켜야 할 인원
+    darkRun.turnDone = 0;
+    darkRun.log.push(`[전향] 감염도 ${getInfect()} — 넘어감`);
+    syncInfect();
+
+    if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원의 응답이 끊겼습니다.`, true);
+
+    applyTurnedTheme(true);
+
+    darkBodyEl().innerHTML = darkBox("—",
+        `열이 내린다.<br><br>
+         아까까지 아프던 자리가 아무렇지 않다.<br>
+         숨이 편하다. 오래 참고 있었다는 걸 이제야 안다.<br><br>
+         주변이 아주 또렷하다. 소리가 층층이 들린다.<br>
+         동료들의 위치를 눈을 감고도 알 수 있다.<br><br>
+         배가 고프다.<br>
+         그게 지금 유일하게 확실한 감각이다.`,
+        `<div style="background:rgba(127,0,0,0.2); border:1px solid #b71c1c; border-radius:6px; padding:13px; margin-bottom:12px; font-size:11px; color:#ff9baa; line-height:1.8;">
+            <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:7px;">◉ 목표가 바뀌었습니다</div>
+            동료 <b>3인</b>을 감염시키면 여기서 나갈 수 있습니다.<br>
+            달성 시 보상은 절반입니다.<br><br>
+            <span style="font-size:10px; color:#aaa;">
+                판정 전반에 +3, 은신에 추가 +2.<br>
+                동료는 「검역용 볼트」로만 당신을 멈출 수 있습니다.
+            </span>
+         </div>` +
+        darkChoiceBtn("일어선다.", "renderDarkStep();"));
+    mountDarkChat('normal');
+}
+
+// 전향 시 화면 전체를 붉게
+function applyTurnedTheme(on) {
+    const ov = document.getElementById('dark-run-overlay');
+    if (!ov) return;
+    const inner = ov.firstElementChild;
+    if (!inner) return;
+    if (on) {
+        inner.style.background = '#0f0505';
+        inner.style.boxShadow = '0 0 80px rgba(180,0,0,0.5), inset 0 0 120px rgba(127,0,0,0.35)';
+        const code = document.getElementById('dro-code');
+        if (code) { code.style.color = '#ff3b3b'; code.innerText = 'Qtrew-S-010 · 감염체'; }
+    } else {
+        inner.style.background = '#0a0a0a';
+        inner.style.boxShadow = '0 0 60px rgba(127,0,0,0.25)';
+    }
+}
+
+// 물기 — 전향자가 동료를 감염시킨다
+function turnedBite(targetCode, targetName) {
+    if (!darkRun || !darkRun.turned || !database) return;
+
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('hide');
+    const DC = 12;
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    if (ok) {
+        database.ref(`darkParties/${darkRun.partyId}/bites`).push({
+            from: currentUser.code, fromName: currentUser.name,
+            to: targetCode, amount: 22, at: Date.now()
+        });
+        darkRun.turnDone = (darkRun.turnDone || 0) + 1;
+        darkRun.success++;
+        darkRun.log.push(`[물기] ${targetName} 성공 (${darkRun.turnDone}/${darkRun.turnGoal})`);
+    } else {
+        darkRun.fail++;
+        darkRun.log.push(`[물기] ${targetName} 실패`);
+    }
+
+    darkBodyEl().innerHTML = darkBox("—",
+        `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#ff3b3b':'#888'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>` +
+        (ok
+            ? `뒤에서 잡는다.<br><br>어깨를 눌러 고정하고, 목덜미에 이를 댄다.<br>저항이 짧다. 생각보다 훨씬 짧다.<br><br>놓아준다. 죽이려던 게 아니니까.<br><br><span style="color:#ff6b6b;">${targetName} 사원이 옮았다. (${darkRun.turnDone} / ${darkRun.turnGoal})</span>`
+            : `달려든다.<br><br>팔이 먼저 올라왔다. 막힌다.<br>${targetName} 사원이 뒤로 물러난다. 이쪽을 보는 눈이 달라졌다.<br><br>들켰다.`),
+        darkChoiceBtn(darkRun.turnDone >= darkRun.turnGoal ? "충분하다." : "다음을 노린다.",
+            darkRun.turnDone >= darkRun.turnGoal ? "darkRun.step=99; renderDarkStep();" : "renderDarkStep();"));
+    mountDarkChat('normal');
+}
+
+// 물린 것을 수신
+function watchBites() {
+    if (!darkRun || !darkRun.isParty || !database) return;
+    if (darkRun._biteWatch) return;
+    darkRun._biteWatch = true;
+
+    database.ref(`darkParties/${darkRun.partyId}/bites`).on('child_added', snap => {
+        const b = snap.val();
+        if (!b || !darkRun || b.to !== currentUser.code) return;
+        if (darkRun.turned) return;
+        addInfect(b.amount || 22, `${b.fromName}에게 물림`);
+        showDarkToast(`⚠ ${b.fromName} 사원에게 물렸다.`);
+    });
+}
+
