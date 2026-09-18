@@ -9724,7 +9724,11 @@ function renderStepS010() {
     if (darkRun.turned) applyTurnedTheme(true);
 
     // 전향자는 별도 흐름
-    if (darkRun.turned) { renderTurnedStep(); return; }
+    if (darkRun.turned) {
+    if (darkRun.step === 99) { renderDarkResult(); return; }
+    renderTurnedStep();
+    return;
+}
 
     if (darkRun.isParty && s010State) {
         const turnedOnes = Object.keys(s010State).filter(c =>
