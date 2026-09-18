@@ -4780,11 +4780,11 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         const hlH = document.getElementById('btn-hl-high');
         const hlL = document.getElementById('btn-hl-low');
         if (hlH && hlL) {
-                       const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
-            const coolDone = currentUser.lastAlienPlayTime && (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
-            const playable = triesLeft > 0 || coolDone;
-            hlH.disabled = !playable;
-            hlL.disabled = !playable;
+      const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
+const coolDone = !currentUser.lastAlienPlayTime || (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
+const playable = triesLeft > 0 && coolDone;
+hlH.disabled = !playable;
+hlL.disabled = !playable;
         }
 
         const tabBtnLetters = document.getElementById('tab-btn-letters');
@@ -7343,37 +7343,28 @@ if (!useFacility(bet)) return;
             currentUser.alienDailyUsed = 0;
             currentUser.lastAlienPlayTime = 0;
         }
+
         // 관리자(kario0987)는 제한 없음
         if (currentUser.code !== 'kario0987') {
-            if (currentUser.alienTries === undefined) currentUser.alienTries = 0;
-            if (currentUser.alienDailyUsed === undefined) currentUser.alienDailyUsed = 0;
+    if (currentUser.alienDailyUsed === undefined) currentUser.alienDailyUsed = 0;
 
-            // ★ 하루 총 2회 상한
-            if (currentUser.alienDailyUsed >= 2) {
-                showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
-                return;
-            }
+    // 하루 2회 상한
+    if (currentUser.alienDailyUsed >= 2) {
+        showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
+        return;
+    }
 
-            // 4시간 쿨타임
-            if (currentUser.alienTries >= 2) {
-                if (!currentUser.lastAlienPlayTime) {
-                    showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다.');
-                    return;
-                }
-                const elapsed = now - currentUser.lastAlienPlayTime;
-                if (elapsed >= fourHoursMs) {
-                    currentUser.alienTries = 1;
-                } else {
-                    const remainMs = fourHoursMs - elapsed;
-                    const remainMinutes = Math.ceil(remainMs / (60 * 1000));
-                    const remainHours = Math.floor(remainMinutes / 60);
-                    const mins = remainMinutes % 60;
-                    let timeMsg = remainHours > 0 ? `${remainHours}시간 ${mins}분` : `${mins}분`;
-                    showCustomAlert(`다음 우주 주파수 연결까지 약 ${timeMsg} 남았습니다.`);
-                    return;
-                }
-            }
+    // 2회차는 1회차로부터 4시간 뒤에만
+    if (currentUser.alienDailyUsed >= 1 && currentUser.lastAlienPlayTime) {
+        const elapsed = now - currentUser.lastAlienPlayTime;
+        if (elapsed < fourHoursMs) {
+            const remainMin = Math.ceil((fourHoursMs - elapsed) / 60000);
+            const h = Math.floor(remainMin / 60), m = remainMin % 60;
+            showCustomAlert(`다음 우주 주파수 연결까지 약 ${h > 0 ? h + '시간 ' : ''}${m}분 남았습니다.`);
+            return;
         }
+    }
+}
         const btnH = document.getElementById('btn-hl-high'); 
         const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
@@ -7394,7 +7385,7 @@ if (!useFacility(bet)) return;
         }
         
         // 횟수 증가 및 마지막 플레이 시간 기록
-        currentUser.alienTries = (currentUser.alienTries || 0) + 1;
+        
         currentUser.alienDailyUsed = (currentUser.alienDailyUsed || 0) + 1;
         currentUser.lastAlienPlayTime = now;
 
@@ -8785,18 +8776,15 @@ if (!useFacility(bet)) return;
     function renderAlienTimer() {
     const el = document.getElementById('alien-cooldown-timer');
     if (!el || !currentUser) return;
-
     if (currentUser.code === 'kario0987') { el.style.display = 'none'; return; }
 
     const used = currentUser.alienDailyUsed || 0;
-    const tries = currentUser.alienTries || 0;
-
     if (used >= 2) {
         el.style.display = 'block';
-        el.innerHTML = `금일 연결 기회를 모두 소진했습니다. (자정 초기화)`;
+        el.innerHTML = '금일 연결 기회를 모두 소진했습니다. (자정 초기화)';
         return;
     }
-    if (tries < 2 || !currentUser.lastAlienPlayTime) { el.style.display = 'none'; return; }
+    if (used < 1 || !currentUser.lastAlienPlayTime) { el.style.display = 'none'; return; }
 
     const remain = (4 * 60 * 60 * 1000) - (Date.now() - currentUser.lastAlienPlayTime);
     if (remain <= 0) { el.style.display = 'none'; return; }
