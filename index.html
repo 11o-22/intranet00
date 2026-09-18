@@ -3606,7 +3606,7 @@ if (database) {
     }
 
         function renderDarkResult() {
-        if (darkRun && darkRun._settled) return;
+        if (darkRun && (darkRun._dead || darkRun._settled)) return;
         if (darkRun) darkRun._settled = true;
 
         const z = DARK_ZONES[darkRun.zone];
