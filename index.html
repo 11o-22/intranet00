@@ -226,18 +226,25 @@
                 </div>
             </div>
 
-            <div class="pollution-container">
-                <div class="pollution-header">
-                    <span>오염도 수치 <span id="blindfold-status" style="display:none; color:#4CAF50; font-size:9px;">[장비/효과로 인해 동결중]</span></span>
-                    <span id="pollution-text">0 / 100%</span>
-                </div>
-                <div class="pollution-container">
+           <!-- 포만감 (위로) -->
+<div class="pollution-container">
     <div class="pollution-header">
         <span>포만감</span>
         <span id="satiety-text">100 / 100</span>
     </div>
     <div class="pollution-bar-bg">
         <div class="pollution-bar-fill" id="satiety-fill" style="background:linear-gradient(90deg, #f44336, #ff9800, #8bc34a);"></div>
+    </div>
+</div>
+
+<!-- 오염도 (아래로) -->
+<div class="pollution-container">
+    <div class="pollution-header">
+        <span>오염도 수치 <span id="blindfold-status" style="display:none; color:#4CAF50; font-size:9px;">[장비/효과로 인해 동결중]</span></span>
+        <span id="pollution-text">0 / 100%</span>
+    </div>
+    <div class="pollution-bar-bg">
+        <div class="pollution-bar-fill" id="pollution-fill"></div>
     </div>
 </div>
                 <div class="pollution-bar-bg">
@@ -1322,7 +1329,7 @@ if (database) {
         "노예 계약서": { price: 10000, usable: true, targetable: true, effect: "slave_contract", desc: "원하는 사람을 3일 동안 노예로 계약한다." },
         "포도맛 물약": { price: 1500, usable: true, targetable: true, effect: "grape_potion", desc: "사용 시 3 일간 성별이 바뀝니다." },
         "파인애플맛 물약": { price: 1500, usable: true, targetable: true, effect: "pineapple_potion", desc: "사용 시 3일간 손바닥만 하게 작아집니다." },
-        "투명 물약": { price: 1500, usable: true, targetable: true, effect: "clear_potion", desc: "기간이 있는 효과 하나를 영구히 고정한다. 제거약으로만 풀 수 있다." },
+        "투명 물약": { price: 13000, usable: true, targetable: true, effect: "clear_potion", desc: "기간이 있는 효과 하나를 영구히 고정한다. 제거약으로만 풀 수 있다." },
         "자두맛 물약": { price: 1500, usable: true, targetable: true, effect: "plum_potion", desc: "사용 시 3일간 신체에서 케이크 맛이 납니다." },
         "무지개 물약": { price: 3000, usable: true, targetable: true, effect: "rainbow_potion", desc: "무슨 맛인지 알 수 없다. 다른 물약 중 하나의 효과가 무작위로 나타난다." },
         "우유맛 물약": { price: 1500, usable: true, targetable: true, effect: "milk_potion", desc: "사용 시 3일간 컨트/딕걸 상태가 됩니다." },
