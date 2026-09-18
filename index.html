@@ -4124,6 +4124,7 @@ if (database) {
 
         const diffMs = now - user.lastPollutionTime;
         const threeHoursMs = 3 * 60 * 60 * 1000;
+        if (user.satiety === undefined) user.satiety = 100;
 
         if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) {
             if(!user.bloodBathDailyUsedMs) user.bloodBathDailyUsedMs = 0;
@@ -4210,7 +4211,7 @@ if (database) {
         }
     }
 
-    if (user.satiety === undefined) user.satiety = 100;
+    
 if (!user.lastSatietyTime) user.lastSatietyTime = now;
 
 const satietyStep = 2 * 60 * 60 * 1000;   // 2시간마다 5 감소
