@@ -11347,21 +11347,24 @@ function renderTurnedStep() {
     const p = darkParties[darkRun.partyId];
     const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => c !== currentUser.code) : [];
     const targets = alive.filter(c => !(s010State && s010State[c] && s010State[c].turned));
-
     const scene = TURNED_SCENES[(darkRun.turnDone || 0) % TURNED_SCENES.length];
 
-    body.innerHTML = darkBox("◉ 감염체", scene,
-        infectBarHtml() +
-        `<div style="background:rgba(127,0,0,0.18); border:1px solid #b71c1c; border-radius:6px; padding:11px; margin-bottom:12px; font-size:11px; color:#ff9baa;">
-            과업 <b>${darkRun.turnDone || 0} / ${darkRun.turnGoal}</b> — 동료를 옮긴다
-         </div>` +
-        (targets.length === 0
-            ? `<div style="text-align:center; font-size:11px; color:#888; padding:14px;">닿을 수 있는 것이 없다. 기다린다.</div>
-               <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="renderTurnedStep()">다시 살핀다</button>`
-            : targets.map(c => {
-                const nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
-                return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; background:linear-gradient(145deg,#4a0f0f,#2a0808) !important; border-color:#7f0000 !important; color:#ff9baa !important;" onclick="turnedBite('${c}','${nm}')">${nm} 쪽으로 간다</button>`;
-              }).join(''));
+    let btns = '';
+    if (targets.length === 0) {
+        btns = '<div style="text-align:center; font-size:11px; color:#888; padding:14px;">닿을 수 있는 것이 없다. 기다린다.</div>'
+             + '<button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="renderTurnedStep()">다시 살핀다</button>';
+    } else {
+        targets.forEach(c => {
+            let nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+            nm = String(nm).replace(/['"\\]/g, '');
+            btns += '<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; background:linear-gradient(145deg,#4a0f0f,#2a0808) !important; border-color:#7f0000 !important; color:#ff9baa !important;" onclick="turnedBite(&quot;' + c + '&quot;,&quot;' + nm + '&quot;)">' + nm + ' 쪽으로 간다</button>';
+        });
+    }
+
+    const head = '<div style="background:rgba(127,0,0,0.18); border:1px solid #b71c1c; border-radius:6px; padding:11px; margin-bottom:12px; font-size:11px; color:#ff9baa;">과업 <b>'
+        + (darkRun.turnDone || 0) + ' / ' + darkRun.turnGoal + '</b> — 동료를 옮긴다</div>';
+
+    body.innerHTML = darkBox("◉ 감염체", scene, infectBarHtml() + head + btns);
     renderInfectBar();
     mountDarkChat('normal');
 }
