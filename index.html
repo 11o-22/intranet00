@@ -4839,7 +4839,7 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         btnEl.classList.add('active');
         document.querySelectorAll('#tab-shop .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
-        if (panelId === 'shop-alien') setUFODialogue("물건을 본다 👌🏻");
+        if (panelId === 'shop-alien') { setUFODialogue("물건을 본다 👌🏻"); renderAlienTimer(); }
         if (panelId === 'shop-unknown') renderQShop();
     }
     function switchDarknessPanel(panelId, btnEl) {
