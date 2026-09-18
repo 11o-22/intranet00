@@ -231,6 +231,15 @@
                     <span>오염도 수치 <span id="blindfold-status" style="display:none; color:#4CAF50; font-size:9px;">[장비/효과로 인해 동결중]</span></span>
                     <span id="pollution-text">0 / 100%</span>
                 </div>
+                <div class="pollution-container">
+    <div class="pollution-header">
+        <span>포만감</span>
+        <span id="satiety-text">100 / 100</span>
+    </div>
+    <div class="pollution-bar-bg">
+        <div class="pollution-bar-fill" id="satiety-fill" style="background:linear-gradient(90deg, #f44336, #ff9800, #8bc34a);"></div>
+    </div>
+</div>
                 <div class="pollution-bar-bg">
                     <div class="pollution-bar-fill" id="pollution-fill"></div>
                 </div>
@@ -1410,15 +1419,40 @@ if (database) {
          "쌀 한 컵": { price: 40, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
         "말린 채소": { price: 55, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
         "통조림 고기": { price: 80, usable: false, cookMat: true, desc: "[재료] 사택 주방에서 쓸 수 있다." },
-        "이름 없는 향신료": { price: 120, usable: false, cookMat: true, desc: "[재료] 냄새가 매번 다르다. 사택 주방에서 쓸 수 있다." }
+        "이름 없는 향신료": { price: 120, usable: false, cookMat: true, desc: "[재료] 냄새가 매번 다르다. 사택 주방에서 쓸 수 있다." },
+         
+                // ===== 디저트 =====
+"호두 파이": { price: 28, usable: true, targetable: false, effect: "food", satiety: 12, desc: "포만감 12 회복. 바삭하고 달다." },
+"우유 푸딩": { price: 24, usable: true, targetable: false, effect: "food", satiety: 10, heal: 3, desc: "포만감 10 회복, 오염도 3% 감소. 목 넘김이 부드럽다." },
+"군고구마": { price: 20, usable: true, targetable: false, effect: "food", satiety: 15, desc: "포만감 15 회복. 손이 따뜻해진다." },
+
+// ===== 식사 =====
+"된장찌개 정식": { price: 45, usable: true, targetable: false, effect: "food", satiety: 28, desc: "포만감 28 회복. 집에서 먹던 맛이 난다." },
+"간짜장": { price: 42, usable: true, targetable: false, effect: "food", satiety: 26, desc: "포만감 26 회복. 면이 붇기 전에 먹어야 한다." },
+"연어 덮밥": { price: 55, usable: true, targetable: false, effect: "food", satiety: 25, heal: 6, desc: "포만감 25 회복, 오염도 6% 감소. 비린내가 전혀 없다." },
+"카르보나라": { price: 50, usable: true, targetable: false, effect: "food", satiety: 27, desc: "포만감 27 회복. 느끼한데 계속 들어간다." },
+"삼계탕": { price: 70, usable: true, targetable: false, effect: "food", satiety: 32, ticket: 2, desc: "포만감 32 회복, 공용시설 이용 2회 추가. 먹고 나면 기운이 돈다." },
+"마라탕": { price: 65, usable: true, targetable: false, effect: "food", satiety: 30, ticket: 2, desc: "포만감 30 회복, 공용시설 이용 2회 추가. 정신이 번쩍 든다." },
+"돈코츠 라멘": { price: 58, usable: true, targetable: false, effect: "food", satiety: 29, darkTry: 1, desc: "포만감 29 회복, 어둠 탐사 횟수 1회 추가. 밤을 새울 각오가 선다." },
+
+// ===== 기괴한 음식 =====
+"검은 국수": { price: 90, usable: true, targetable: false, effect: "food", satiety: 45, pollute: 18, desc: "포만감 45 회복, 오염도 18% 상승. 씹을 때마다 다른 맛이 난다." },
+"눈알 조림": { price: 85, usable: true, targetable: false, effect: "food", satiety: 42, pollute: 22, desc: "포만감 42 회복, 오염도 22% 상승. 마주 보지 않는 편이 낫다." },
+"이름 모를 부위 구이": { price: 95, usable: true, targetable: false, effect: "food", satiety: 50, pollute: 25, desc: "포만감 50 회복, 오염도 25% 상승. 무엇인지 묻지 않기로 한다." },
+"움직이는 젤리": { price: 78, usable: true, targetable: false, effect: "food", satiety: 38, pollute: 12, heal: 0, ticket: 1, desc: "포만감 38 회복, 오염도 12% 상승, 공용시설 이용 1회 추가. 삼킨 뒤에도 움직인다." },
+"뜨겁지 않은 국": { price: 88, usable: true, targetable: false, effect: "food", satiety: 40, pollute: 15, darkTry: 1, desc: "포만감 40 회복, 오염도 15% 상승, 어둠 탐사 횟수 1회 추가. 식지도 데워지지도 않는다." }
+    
     };
 
         const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
 
-    const ALL_10_ITEMS = [
-        "익명 편지", "하급 물약", "샤베트", "안대", "생수",
-        "중급 물약", "???의 티켓", "무전기", "낡은 문패", "전복죽"
-    ];
+    const ALL_25_ITEMS = [
+    "익명 편지", "하급 물약", "샤베트", "안대", "생수",
+    "중급 물약", "???의 티켓", "무전기", "낡은 문패", "전복죽",
+    "호두 파이", "우유 푸딩", "군고구마", "된장찌개 정식", "간짜장",
+    "연어 덮밥", "카르보나라", "삼계탕", "마라탕", "돈코츠 라멘",
+    "검은 국수", "눈알 조림", "이름 모를 부위 구이", "움직이는 젤리", "뜨겁지 않은 국"
+];
 
     const ALIEN_ITEMS_POOL = [
         "노스텔지어 캔디", "스마일 스티커", "해피 메이커", "VIP실 출입증",
@@ -3947,7 +3981,7 @@ if (database) {
             let r2 = Math.sin(seed + b.length * 13 + b.charCodeAt(0)) * 10000;
             return (r1 - Math.floor(r1)) - (r2 - Math.floor(r2));
         });
-        return shuffled.slice(0, 5);
+        return shuffled.slice(0, 8);
     }
 
     function addHistoryLog(user, message) {
@@ -4175,6 +4209,19 @@ if (database) {
             if (currentUser && currentUser.code === user.code) updateUI();
         }
     }
+
+    if (user.satiety === undefined) user.satiety = 100;
+if (!user.lastSatietyTime) user.lastSatietyTime = now;
+
+const satietyStep = 2 * 60 * 60 * 1000;   // 2시간마다 5 감소
+const sDiff = now - user.lastSatietyTime;
+if (sDiff >= satietyStep) {
+    let steps = Math.floor(sDiff / satietyStep);
+    if (steps > 12) steps = 12;
+    user.satiety = Math.max(0, user.satiety - steps * 5);
+    user.lastSatietyTime = now;
+    changed = true;
+}
 
     function addPollution(amount) {
         if (!currentUser || currentUser.code === 'kario0987') return; 
@@ -4678,6 +4725,9 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         document.getElementById('display-points').innerText = currentUser.points;
         document.getElementById('pollution-text').innerText = `${currentUser.pollution} / 100%`;
         document.getElementById('pollution-fill').style.width = `${currentUser.pollution}%`;
+        if (currentUser.satiety === undefined) currentUser.satiety = 100;
+        document.getElementById('satiety-text').innerText = `${currentUser.satiety} / 100`;
+        document.getElementById('satiety-fill').style.width = `${currentUser.satiety}%`;
 
         const blindfoldEl = document.getElementById('blindfold-status');
         blindfoldEl.style.display = isBlindfolded(currentUser) ? 'inline' : 'none';
@@ -5587,7 +5637,7 @@ hlL.disabled = !playable;
             if (currentUser.darkTicketFree) { showCustomAlert('이미 승차권 효과가 적용 중입니다.'); return; }
             currentUser.darkTicketFree = true;
             removeItemFromInventory(currentUser, itemName, 1);
-            appendSystemBadgeNote(`[1시 17분 버스표] 다음 어둠 탐사 1회의 오염 상승이 면제됩니다.`);
+           addHistoryLog(`[1시 17분 버스표] 다음 어둠 탐사 1회의 오염 상승이 면제됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 1시 17분 버스표 개찰`);
             saveDB(); updateUI();
             showCustomAlert('승차권을 개찰했습니다. 다음 탐사에서는 오염도가 오르지 않습니다.');
@@ -5598,7 +5648,7 @@ hlL.disabled = !playable;
             if (currentUser.darkCatalogBonus) { showCustomAlert('이미 도록의 효과가 적용 중입니다.'); return; }
             currentUser.darkCatalogBonus = true;
             removeItemFromInventory(currentUser, itemName, 1);
-            appendSystemBadgeNote(`[전시 안내 도록] 다음 어둠 탐사의 첫 판정에 +2 보정이 적용됩니다.`);
+           addHistoryLog(`[전시 안내 도록] 다음 어둠 탐사의 첫 판정에 +2 보정이 적용됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 전시 안내 도록 숙독`);
             saveDB(); updateUI();
             showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
@@ -5702,7 +5752,7 @@ hlL.disabled = !playable;
             if (currentUser.darkExtraReroll) { showCustomAlert('이미 재굴림 권한을 보유하고 있습니다.'); return; }
             currentUser.darkExtraReroll = true;
             removeItemFromInventory(currentUser, itemName, 1);
-            appendSystemBadgeNote(`[세 번째 단어] 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있습니다.`);
+           addHistoryLog(`[세 번째 단어] 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있습니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 세 번째 단어 발화`);
             saveDB(); updateUI();
             showCustomAlert('무언가를 말했다. 무슨 말이었는지 기억나지 않는다.');
@@ -5712,7 +5762,7 @@ hlL.disabled = !playable;
             if (currentUser.darkMazeMap) { showCustomAlert('이미 안내도 효과가 적용 중입니다.'); return; }
             currentUser.darkMazeMap = 2;
             removeItemFromInventory(currentUser, itemName, 1);
-            appendSystemBadgeNote(`[접힌 안내도] 다음 어둠 탐사의 첫 두 판정에 +1 보정이 적용됩니다.`);
+           addHistoryLog(`[접힌 안내도] 다음 어둠 탐사의 첫 두 판정에 +1 보정이 적용됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 접힌 안내도 펼침`);
             saveDB(); updateUI();
             showCustomAlert('안내도를 펼쳤습니다. 이번에는 읽을 만한 그림이 나왔습니다.');
@@ -5849,6 +5899,40 @@ hlL.disabled = !playable;
 
                             targetUser._adminStamp = Date.now();
                 if (database) database.ref('users/' + targetUser.code).set(targetUser);
+
+                else if (cat.effect === 'food') {
+    if (targetUser.satiety === undefined) targetUser.satiety = 100;
+    if (targetUser.satiety >= 100) {
+        if (!isOthers) showCustomAlert('이미 배가 부릅니다.');
+        return false;
+    }
+
+    targetUser.satiety = Math.min(100, targetUser.satiety + (cat.satiety || 0));
+    targetUser.lastSatietyTime = Date.now();
+
+    let msg = [`포만감 +${cat.satiety}`];
+
+    if (cat.heal) {
+        targetUser.pollution = Math.max(0, targetUser.pollution - cat.heal);
+        msg.push(`오염도 -${cat.heal}%`);
+    }
+    if (cat.pollute) {
+        applyPollutionToUser(targetUser, cat.pollute);
+        msg.push(`오염도 +${cat.pollute}%`);
+    }
+    if (cat.ticket) {
+        if (!targetUser.facilityMax) targetUser.facilityMax = 20;
+        targetUser.facilityMax = Math.min(25, targetUser.facilityMax + cat.ticket);
+        msg.push(`공용시설 +${cat.ticket}회`);
+    }
+    if (cat.darkTry) {
+        targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
+        msg.push(`어둠 탐사 +${cat.darkTry}회`);
+    }
+
+    addHistoryLog(targetUser, `[식사] ${itemName} 섭취 (${msg.join(', ')})`);
+    if (!isOthers) showCustomAlert(`${itemName}\n\n${msg.join('\n')}`);
+}
 
                 
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
@@ -7712,7 +7796,9 @@ if (!useFacility(bet)) return;
             hasNewLetter: false, 
             hasNewReply: false, 
             hasItemUsedOnMe: false, 
-            foxRoomAnswered: false
+            foxRoomAnswered: false,
+            satiety: 100,
+            lastSatietyTime: Date.now()
         };
 
         // 1. 로컬 db에 즉시 반영
