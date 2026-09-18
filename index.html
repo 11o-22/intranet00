@@ -6735,6 +6735,7 @@ if (!useFacility(bet)) return;
                 msg.innerHTML = `<span style="color:#f44336;">완전 불일치. (-${bet} P)</span>`;
                 addHistoryLog(currentUser, `[슬롯 패배] 릴 불일치 (-${bet} P)`);
             }
+            msg.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             btn.disabled = false;
         }, 1900);
     }
