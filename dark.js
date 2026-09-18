@@ -10779,3 +10779,232 @@ function s010G24R(pick) {
         darkChoiceBtn("끝낸다.", "darkRun.step=99; renderDarkStep();"));
     mountDarkChat('normal');
 }
+
+// ==========================================
+// ★ S-010 감염 검사
+// ==========================================
+const S010_CHECKS = [
+    { q:'팔을 걷어 보십시오. 물린 자국이 몇 군데입니까?', a:null },
+    { q:'지금 손끝에 감각이 있습니까?', a:['네','예','있다','응','yes','있음'] },
+    { q:'마지막으로 먹은 것은 무엇입니까?', a:null },
+    { q:'동료의 이름을 하나 적으십시오.', a:null },
+    { q:'배가 고픕니까?', a:['아니오','아니요','아뇨','없다','안고프다','no','아님'] }
+];
+
+function renderS010Check(next) {
+    const c = S010_CHECKS[Math.floor(Math.random() * S010_CHECKS.length)];
+    darkRun._s010Ans = c.a;
+    darkRun._s010Next = next;
+
+    darkBodyEl().innerHTML = darkBox("자가 검진",
+        `멈춘다.<br><br>
+         규정대로라면 한 시간마다 서로를 확인해야 한다.<br>
+         아무도 지키지 않던 규정인데, 지금은 다들 지킨다.<br><br>
+         <span style="color:#7fd4d4; font-size:14px;">${c.q}</span>`,
+        infectBarHtml() +
+        `<input type="text" id="s010-check-input" maxlength="24" placeholder="" style="width:100%; padding:12px; font-size:14px; text-align:center; box-sizing:border-box; margin-bottom:10px;" onkeypress="if(event.key==='Enter') submitS010Check()">
+         <button class="game-btn" style="width:100%; margin:0; padding:12px;" onclick="submitS010Check()">적는다</button>`);
+    renderInfectBar();
+    mountDarkChat('normal');
+    setTimeout(() => { const f = document.getElementById('s010-check-input'); if (f) f.focus(); }, 200);
+}
+
+function submitS010Check() {
+    const el = document.getElementById('s010-check-input');
+    if (!el) return;
+    const v = el.value.trim();
+    if (!v) { showCustomAlert('적어 주세요.'); return; }
+
+    const ans = darkRun._s010Ans;
+    const ok = (ans === null) ? true : checkQuizAnswer(v, ans);
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        darkRun.infect = Math.max(0, getInfect() - 3);
+        renderInfectBar(); syncInfect();
+        txt = `적는다.<br><br>손이 떨리지 않았다. 그걸 확인하려고 한 검사였다.<br>다들 서로의 답을 흘끗 본다. 아무 말도 안 한다.`;
+    } else {
+        addInfect(10, '검진 실패');
+        txt = `적으려다 멈춘다.<br><br>알던 것인데 안 나온다.<br>옆에서 기다린다. 기다리는 시간이 길어진다.<br><br>결국 아무거나 적었다.`;
+    }
+
+    darkBodyEl().innerHTML = darkBox("자가 검진", txt,
+        infectBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun._s010Next})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+// ==========================================
+// ★ S-010 방어전
+// ==========================================
+const S010_DEFENSE = {
+    1: { sec:14, need:18, text:`문이 흔들린다.<br><br>바리케이드가 밀린다. 한쪽 다리가 들린다.<br>등으로 받쳐야 한다.`, label:'버틴다' },
+    2: { sec:12, need:22, text:`창문이 깨진다.<br><br>손이 여럿 들어온다. 유리에 팔이 갈리는데도 계속 들어온다.<br>밀어내야 한다.`, label:'밀어낸다' },
+    3: { sec:11, need:25, text:`검역소 문이 안쪽으로 휜다.<br><br>여기가 뚫리면 뒤로 물러날 곳이 없다.`, label:'막는다' },
+    4: { sec:10, need:28, text:`마지막 통로다.<br><br>양쪽에서 동시에 온다. 등을 맞대고 버틴다.`, label:'버틴다' }
+};
+
+function renderS010Defense(n) {
+    const d = S010_DEFENSE[n];
+    if (!d) { partyAdvance(darkRun.step + 1); return; }
+
+    const bonus = darkRun.s010Barricade || 0;
+    const need = Math.max(8, d.need - bonus * 3);
+
+    darkBodyEl().innerHTML = darkBox(`방어 ${n}`, d.text,
+        infectBarHtml() +
+        `<div style="text-align:center; margin-bottom:12px;">
+            <div style="font-size:34px; font-weight:bold; color:#ff6b6b;" id="s010-def-time">${d.sec}</div>
+            <div style="font-size:11px; color:#888; margin-top:4px;">${need}회 필요${bonus ? ` <span style="color:#4CAF50;">(바리케이드 -${bonus*3})</span>` : ''}</div>
+         </div>
+         <div style="width:100%; height:16px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:8px; overflow:hidden; margin-bottom:14px;">
+            <div id="s010-def-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#7f0000,#f44336); transition:width 0.08s;"></div>
+         </div>
+         <button class="game-btn" id="s010-def-btn" style="width:100%; margin:0; padding:22px; font-size:17px; font-weight:bold; background:linear-gradient(145deg,#7f0000,#4a0000) !important; border-color:#b71c1c !important; color:#fff !important; touch-action:manipulation; user-select:none;" ontouchstart="event.preventDefault(); s010DefTap();" onclick="s010DefTap()">${d.label}</button>`);
+    renderInfectBar();
+    mountDarkChat('normal');
+
+    darkRun._defCount = 0;
+    darkRun._defNeed = need;
+    darkRun._defActive = true;
+    let t = d.sec;
+    clearInterval(darkRun._defTimer);
+    darkRun._defTimer = setInterval(() => {
+        t--;
+        const el = document.getElementById('s010-def-time');
+        if (!el || !darkRun) { clearInterval(darkRun._defTimer); return; }
+        el.innerText = t;
+        if (t <= 0) {
+            clearInterval(darkRun._defTimer);
+            darkRun._defActive = false;
+            s010DefResult(false, n);
+        }
+    }, 1000);
+}
+
+let _defLastTap = 0;
+function s010DefTap() {
+    if (!darkRun || !darkRun._defActive) return;
+    const now = Date.now();
+    if (now - _defLastTap < 40) return;
+    _defLastTap = now;
+
+    darkRun._defCount++;
+    const pct = Math.min(100, (darkRun._defCount / darkRun._defNeed) * 100);
+    const bar = document.getElementById('s010-def-bar');
+    if (bar) bar.style.width = pct + '%';
+
+    if (darkRun._defCount >= darkRun._defNeed) {
+        darkRun._defActive = false;
+        clearInterval(darkRun._defTimer);
+        const btn = document.getElementById('s010-def-btn');
+        if (btn) btn.disabled = true;
+        s010DefResult(true, 0);
+    }
+}
+
+function s010DefResult(ok, n) {
+    if (ok) {
+        darkRun.success++;
+        darkRun.log.push(`[방어] 성공`);
+    } else {
+        darkRun.fail++;
+        addInfect(15, '방어 실패');
+        applyPollutionToUser(currentUser, 12);
+        darkRun.log.push(`[방어] 실패 (${darkRun._defCount}/${darkRun._defNeed})`);
+    }
+
+    darkBodyEl().innerHTML = darkBox("방어 — 결과",
+        ok ? `밀어냈다.<br><br>
+              문이 다시 닫힌다. 손 몇 개가 끼었고, 그대로 뒀다.<br>
+              숨이 차서 한동안 말을 못 했다.`
+           : `뚫렸다.<br><br>
+              쏟아져 들어온다. 뒤로 물러나면서 쳐냈다.<br>
+              어디를 물렸는지는 나중에야 알았다.`,
+        infectBarHtml() + darkChoiceBtn("물러난다.", `partyAdvance(${darkRun.step + 1})`));
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+// ==========================================
+// ★ S-010 탐색
+// ==========================================
+const S010_AREAS = { storage:'보급소', clinic:'의무실', quarantine:'검역소' };
+
+const S010_SPOTS = {
+    storage: ['넘어진 선반', '잠긴 캐비닛', '천장 배관 위', '문 뒤 구석', '깨진 상자 더미'],
+    clinic:  ['세 번째 침상', '약품 냉장고', '커튼 뒤', '의료 폐기물통', '간호 데스크'],
+    quarantine: ['검사 기록함', '소독 장비함', '격리실 침대 밑', '방호복 걸이', '폐기 명단 서랍']
+};
+
+const S010_FINDS = [
+    { name:'검역용 볼트', w:3 },
+    { name:'덜 마른 붕대', w:4 },
+    { name:'상비약 (오염도 -10%)', w:5 },
+    { name:'마스크', w:4 },
+    { name:'반창고', w:4 }
+];
+
+function renderS010Search(area) {
+    if (!darkRun) return;
+    darkRun._s010Area = area;
+    if (!darkRun.s010Searched) darkRun.s010Searched = {};
+
+    const used = Object.keys(darkRun.s010Searched).filter(k => k.startsWith(area + '|')).length;
+    const limit = 3 + (qFlag('extra_search') ? 1 : 0);
+    const left = Math.max(0, limit - used);
+
+    const spots = S010_SPOTS[area] || [];
+    const luck = gearValue(currentUser, 'luck');
+
+    const html = spots.map(sp => {
+        const key = area + '|' + sp;
+        const done = darkRun.s010Searched[key];
+        return `
+            <div style="background:rgba(0,0,0,0.25); border:1px solid ${done ? '#333' : '#5a2a2a'}; border-radius:5px; padding:9px 11px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; ${done ? 'opacity:0.45;' : ''}">
+                <span style="font-size:11px; color:#ddd; flex:1;">${sp}
+                    ${done ? `<br><span style="font-size:9px; color:#777;">${done}</span>` : ''}
+                </span>
+                ${done ? '' : `<button class="game-btn" style="margin:0; padding:6px 11px; font-size:10px; flex-shrink:0;" onclick="doS010Search('${area}','${sp}')" ${left <= 0 ? 'disabled' : ''}>뒤진다</button>`}
+            </div>`;
+    }).join('');
+
+    darkBodyEl().innerHTML = darkBox(S010_AREAS[area] + " — 탐색",
+        `쓸 만한 것이 남아 있을지 모른다.<br><br>
+         뒤지는 데는 시간이 걸리고, 시간이 걸리면 저것들이 온다.<br><br>
+         <span style="font-size:11px; color:#888;">남은 탐색 ${left}회 · 1회당 감염 위험</span>`,
+        infectBarHtml() + html +
+        `<button class="game-btn" style="width:100%; margin-top:10px; padding:11px; font-size:12px;" onclick="partyAdvance(${darkRun.step + 1})">이 구역을 벗어난다</button>`);
+    renderInfectBar();
+    mountDarkChat('normal');
+}
+
+function doS010Search(area, spot) {
+    if (!darkRun) return;
+    const key = area + '|' + spot;
+    if (darkRun.s010Searched[key]) return;
+
+    const luck = gearValue(currentUser, 'luck');
+    const roll = Math.random() + luck * 0.35;
+
+    if (roll > 0.45) {
+        let total = S010_FINDS.reduce((a, f) => a + f.w, 0);
+        let r = Math.random() * total, got = S010_FINDS[0].name;
+        for (const f of S010_FINDS) { r -= f.w; if (r <= 0) { got = f.name; break; } }
+        currentUser.inventory.push(got);
+        darkRun.s010Searched[key] = `✦ ${got}`;
+        darkRun.success++;
+        showDarkToast(`✦ ${got}`);
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 ${got}을(를) 찾았습니다.`, true);
+    } else if (roll > 0.18) {
+        darkRun.s010Searched[key] = '아무것도 없었다.';
+    } else {
+        darkRun.s010Searched[key] = '뭔가 튀어나왔다.';
+        addInfect(11, `${S010_AREAS[area]} 탐색 중 습격`);
+        applyPollutionToUser(currentUser, 6);
+        showDarkToast('⚠ 안쪽에 있었다.');
+    }
+    saveDB();
+    renderS010Search(area);
+}
