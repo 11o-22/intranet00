@@ -662,15 +662,15 @@
 
                         <div id="p2p-demand-wrapper" style="display:none; border-top:1px dashed var(--theme-border); padding-top:10px; margin-top:10px;">
                             <div style="font-size:11px; color:#ff9800; margin-bottom:4px; font-weight:bold;">상대에게 요구할 대가:</div>
-                            <div style="display:flex; gap:8px; margin-bottom:5px;">
-                                <select id="p2p-demand-type" onchange="toggleP2PDemandType()" style="width:30%;">
-                                    <option value="point">포인트</option>
-                                    <option value="item">소지품</option>
-                                </select>
-                                <input type="number" id="p2p-demand-points" placeholder="요구 포인트" style="width:40%;">
-                                <select id="p2p-demand-item" style="display:none; width:40%;"></select>
-                                <input type="number" id="p2p-demand-qty" value="1" min="1" placeholder="수량" style="display:none; width:25%;" title="아이템 수량">
-                            </div>
+                            <div style="display:flex; gap:6px; margin-bottom:5px;">
+    <select id="p2p-demand-type" onchange="toggleP2PDemandType()" style="flex:1 1 90px; min-width:0;">
+        <option value="point">포인트</option>
+        <option value="item">소지품</option>
+    </select>
+    <input type="number" id="p2p-demand-points" placeholder="요구 포인트" style="flex:2 1 120px; min-width:0;">
+    <select id="p2p-demand-item" style="display:none; flex:2 1 120px; min-width:0;"></select>
+    <input type="number" id="p2p-demand-qty" value="1" min="1" placeholder="수량" style="display:none; flex:0 0 52px; min-width:0;" title="아이템 수량">
+</div>
                         </div>
 
                         <button class="game-btn" style="width:100%; margin-top:10px; padding:10px;" onclick="sendP2PDeal()">거래/양도 제안서 전달</button>
