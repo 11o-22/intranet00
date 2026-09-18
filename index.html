@@ -963,6 +963,7 @@
     }
 
     let currentUser = null;
+    let maintenanceMode = false;
     let sessionSeconds = 0;
     let sessionTimer;
     let pendingTargetItemName = ""; 
@@ -1141,8 +1142,6 @@ function getTodayStr() {
             document.getElementById('online-users-count').innerText = Math.max(1, visible);
             if(currentUser) renderVipOpponents();
         });
-
-        let maintenanceMode = false;
 
 if (database) {
     database.ref('maintenance').on('value', snap => {
