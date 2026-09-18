@@ -4675,7 +4675,6 @@ if (database) {
     }
 
 function startFoxRoomSequence() {
-    const agent = isDisasterAgent(currentUser);
     const ov = document.getElementById('fox-loading-overlay');
     if (ov) {
         ov.querySelector('div > div:first-child').innerText = agent ? '♨' : '🦊';
@@ -4925,6 +4924,7 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
 
                // ★ 격리 중 시설 전면 차단 (정보 열람만 허용)
         const inQuarantine = isQuarantined(currentUser);
+        const agent = isDisasterAgent(currentUser);
         const lockBox = document.getElementById('quarantine-lock-box');
         const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
         const starveLocked = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
