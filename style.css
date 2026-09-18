@@ -740,3 +740,13 @@
     border: 1px solid var(--theme-border) !important;
     color: var(--theme-text) !important;
 }
+
+#panel-blackjack .seotda-card {
+    background: linear-gradient(145deg, #4a4a4a, #2e2e2e);
+    border-color: #888;
+}
+#panel-blackjack .seotda-card.back {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border: 2px dashed #555;
+    color: #555;
+}
