@@ -294,9 +294,9 @@
                 <span style="color:#ff9800; font-weight:bold;">퇴원까지 약 <span id="quarantine-remain-text">--</span> 남음</span><br><br>
                 <span style="font-size:11px; color:#888;">※ 정보 열람(사원증·기록)은 계속 이용할 수 있습니다.</span>
             </p>
-            <button class="game-btn" style="width:100%; margin-top:16px; padding:12px; background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important; border-color:#7a6a3a !important; color:#d4af37 !important;" onclick="openFoxRoom()">
-                🦊 상담사와 이야기한다
-            </button>
+            <button class="game-btn" id="quarantine-enter-btn" style="width:100%; margin-top:16px; padding:12px;" onclick="enterQuarantineRoom()">
+    🦊 상담사와 이야기한다
+</button>
         </div>
         <div id="tab-record" class="tab-content active">
             <div class="sub-tabs-grid">
@@ -2972,6 +2972,7 @@ if (database) {
         if (qFlag('meal_bonus3')) b += 3;
 
          b += infectBonus(kind);
+         
 
          if (darkRun && darkRun.zone === 'Qtrew-S-010' && b > 6) {
     b = 6 + Math.floor((b - 6) / 2);
@@ -2979,6 +2980,12 @@ if (database) {
            
          return b;
     }
+
+    function isDisasterAgent(user) {
+    const aff = (user.affiliation || '');
+    const team = (user.team || '');
+    return aff.includes('재난관리') || team.includes('재난관리');
+}
 
     function renderDarkness() {
         const body = document.getElementById('darkness-body');
@@ -3807,6 +3814,7 @@ if (database) {
         }
         
         let pollInc = 10;
+        if (darkRun.zone === 'Qtrew-S-010') pollInc = 50 + Math.floor(getInfect() / 2);
         if (currentUser.darkTicketFree) { pollInc = 0; currentUser.darkTicketFree = false; }
         if (pollInc > 0) applyPollutionToUser(currentUser, pollInc);
 
@@ -3971,6 +3979,14 @@ if (database) {
         "요즘 수면은 충분하신가요?",
         "최근 스트레스를 받는 일이 있었나요?"
     ];
+
+    let bathQuestions = [
+    "밥은 챙겨 드셨고?",
+    "요즘 잠은 좀 주무시나~?",
+    "혼자 다녀오신 건가?",
+    "다친 데는 없고?",
+    "누구 원망스러운 사람 있습니까?"
+];
 
     function setUFODialogue(text) {
         const el = document.getElementById('ufo-dialogue-text');
@@ -4611,26 +4627,40 @@ if (database) {
         startFoxRoomSequence();
     }
 
-    function startFoxRoomSequence() {
-        document.getElementById('fox-loading-overlay').style.display = 'flex';
-        foxQuestionIndex = 0;
-        foxTimeReduction = 0;
-        setTimeout(() => {
-            document.getElementById('fox-loading-overlay').style.display = 'none';
-            document.getElementById('fox-room-overlay').style.display = 'flex';
-            updateFoxRoomQuestion();
-        }, 3000);
+function startFoxRoomSequence() {
+    const agent = isDisasterAgent(currentUser);
+    const ov = document.getElementById('fox-loading-overlay');
+    if (ov) {
+        ov.querySelector('div > div:first-child').innerText = agent ? '♨' : '🦊';
+        ov.querySelector('div > div:last-child').innerHTML = agent
+            ? '오염 수치가 한계를 넘었습니다.<br>선녀탕으로 이송합니다.'
+            : '심각한 오염이 발견되었습니다.<br>여우 상담실로 이송합니다.';
+        ov.style.display = 'flex';
     }
+    foxQuestionIndex = 0;
+    foxTimeReduction = 0;
+    setTimeout(() => {
+        if (ov) ov.style.display = 'none';
+        document.getElementById('fox-room-overlay').style.display = 'flex';
+        updateFoxRoomQuestion();
+    }, 3000);
+}
 
     function updateFoxRoomQuestion() {
-        if (foxQuestionIndex >= foxQuestions.length) {
-            finishFoxRoomSequence();
-            return;
-        }
-        let q = foxQuestions[foxQuestionIndex];
-        let displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
-        document.getElementById('fox-room-dialogue').innerHTML = `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 솔직하게 답을 해 주시겠어요? (${foxQuestionIndex + 1}/5)<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
+    const agent = isDisasterAgent(currentUser);
+    const qs = agent ? bathQuestions : foxQuestions;
+
+    if (foxQuestionIndex >= qs.length) {
+        finishFoxRoomSequence();
+        return;
     }
+    const q = qs[foxQuestionIndex];
+    const displayName = currentUser.badge && currentUser.badge.nickname ? currentUser.badge.nickname : currentUser.name;
+
+    document.getElementById('fox-room-dialogue').innerHTML = agent
+        ? `${displayName} 요원님, 상태가 영 아니네?.<br>몇 가지만 묻고 바로 들여보내 드릴게. (${foxQuestionIndex + 1}/5)<br><br><span style="color:#7fd4d4; font-weight:bold;">Q. ${q}</span>`
+        : `${displayName} 님은 현재 관리가 필요한 상황입니다.<br>제가 하는 질문에 솔직하게 답을 해 주시겠어요? (${foxQuestionIndex + 1}/5)<br><br><span style="color:#d4af37; font-weight:bold;">Q. ${q}</span>`;
+}
 
     function answerFoxQuestion(answer) {
         if (answer === 'yes') {
@@ -4643,25 +4673,30 @@ if (database) {
     }
 
        function finishFoxRoomSequence() {
-        let finalHours = 24 - foxTimeReduction;
-        if (foxUseNameplate) {
-            finalHours -= 3;
-            currentUser.quarantineExitPollution = 20;
-        } else {
-            currentUser.quarantineExitPollution = 0;
-        }
-        
-        finalHours = Math.max(0, finalHours);
-        
-        currentUser.quarantineUntil = Date.now() + (finalHours * 60 * 60 * 1000);
-        currentUser.foxRoomAnswered = true;
-        saveDB();
-        document.getElementById('fox-room-overlay').style.display = 'none';
-        updateUI();
-        
-        showCustomAlert(`상담이 완료되었습니다. 시스템 판단에 따라 약 ${Math.ceil(finalHours)}시간 동안 안정을 취해주세요.`);
-        setTimeout(() => openFoxRoom(), 1200);
+    const agent = isDisasterAgent(currentUser);
+    let finalHours = 24 - foxTimeReduction;
+    if (foxUseNameplate) {
+        finalHours -= 3;
+        currentUser.quarantineExitPollution = 20;
+    } else {
+        currentUser.quarantineExitPollution = 0;
     }
+    finalHours = Math.max(0, finalHours);
+
+    currentUser.quarantineUntil = Date.now() + (finalHours * 60 * 60 * 1000);
+    currentUser.foxRoomAnswered = true;
+    if (agent) currentUser.satiety = Math.max(currentUser.satiety || 0, 50);
+    saveDB();
+
+    document.getElementById('fox-room-overlay').style.display = 'none';
+    updateUI();
+
+    showCustomAlert(agent
+        ? `안정 처리되었습니다. 약 ${Math.ceil(finalHours)}시간 동안 탕에 머무릅니다.`
+        : `상담이 완료되었습니다. 시스템 판단에 따라 약 ${Math.ceil(finalHours)}시간 동안 안정을 취해주세요.`);
+
+    setTimeout(() => agent ? openBathRoom() : openFoxRoom(), 1200);
+}
 
     function clearItemNotification() {
         if (currentUser && currentUser.hasItemUsedOnMe) {
@@ -4850,6 +4885,12 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             const rm = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
             const remainEl = document.getElementById('quarantine-remain-text');
             if (remainEl) remainEl.innerText = rh > 0 ? `${rh}시간 ${rm}분` : `${rm}분`;
+
+            const qBtn = document.getElementById('quarantine-enter-btn');
+    if (qBtn) qBtn.innerHTML = isDisasterAgent(currentUser)
+        ? '♨ 초개 요원에게 간다'
+        : '🦊 상담사와 이야기한다';
+
 
             document.querySelectorAll('.tabs-grid .tab').forEach(t => {
                 const onclickStr = t.getAttribute('onclick') || '';

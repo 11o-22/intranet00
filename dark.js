@@ -8750,6 +8750,11 @@ ${picked.map(m => '- ' + m.text).join('\n')}
 위 정보를 직접 읊지 말고, 알고 있는 것처럼 자연스럽게 대화에 녹여 주세요.`;
     }
 
+    function enterQuarantineRoom() {
+    if (isDisasterAgent(currentUser)) openBathRoom();
+    else openFoxRoom();
+}
+
     function openFoxRoom() {
         if (!currentUser) return;
         foxChatLog = [];
