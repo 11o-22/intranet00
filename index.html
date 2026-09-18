@@ -454,12 +454,18 @@
                         <input type="number" id="roulette-target" class="bet-input" value="25" min="1" max="25">
                     </div>
                     <div>
-                        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
-
-                        </div>
-                        <input type="hidden" id="roulette-bet" value="5">
-                        <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
-                    </div>
+    <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+    <div class="bet-stepper">
+        <button class="step-btn wide" onclick="adjustBet('roulette-bet', -10)">-10</button>
+        <button class="step-btn" onclick="adjustBet('roulette-bet', -1)">&lt;</button>
+        <div class="bet-display" id="roulette-bet-display">5</div>
+        <button class="step-btn" onclick="adjustBet('roulette-bet', 1)">&gt;</button>
+        <button class="step-btn wide" onclick="adjustBet('roulette-bet', 10)">+10</button>
+        <button class="step-btn bet-max" onclick="setBetMax('roulette-bet')">최대</button>
+    </div>
+    <input type="hidden" id="roulette-bet" value="5">
+    <button class="game-btn" id="btn-roulette" onclick="playRoulette()">룰렛 회전</button>
+</div>
                     <div id="roulette-msg" style="font-size:12px; margin-top:12px; color:#aaa; min-height:16px;">번호를 고르고 회전시키세요. (오염도 +2)</div>
                 </div>
 
