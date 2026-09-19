@@ -8788,6 +8788,12 @@ ${picked.map(m => '- ' + m.text).join('\n')}
     }
 
     async function sendFoxChat() {
+
+        if (aiChatOff && currentUser.code !== 'kario0987') {
+    showCustomAlert('지금은 대화할 수 없습니다.');
+    return;
+}
+
         if (foxBusy) return;
     if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
         showCustomAlert('현재 업데이트 진행 중입니다.');
@@ -11804,6 +11810,11 @@ async function bathGreet() {
 }
 
 async function sendBathChat() {
+    if (aiChatOff && currentUser.code !== 'kario0987') {
+    showCustomAlert('지금은 대화할 수 없습니다.');
+    return;
+}
+
     if (bathBusy) return;
     if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
         showCustomAlert('현재 업데이트 진행 중입니다.');
@@ -11923,4 +11934,20 @@ function adminSetGearGrade() {
         (done.length ? `등급 조정\n${done.join('\n')}` : '') +
         (skipped.length ? `\n\n장비 없음: ${skipped.join(', ')}` : '')
     );
+}
+
+function setAiChat(on) {
+    if (!database) return;
+    database.ref('aiChatOff').set(!on).then(() => {
+        renderAiChatState();
+        showCustomAlert(on ? '대화가 허용되었습니다.' : '대화가 차단되었습니다.');
+    });
+}
+
+function renderAiChatState() {
+    const el = document.getElementById('aichat-state');
+    if (!el) return;
+    el.innerHTML = aiChatOff
+        ? '<span style="color:#ff6b6b;">● 차단 중 — 대화 불가</span>'
+        : '<span style="color:#4CAF50;">● 정상 — 대화 가능</span>';
 }
