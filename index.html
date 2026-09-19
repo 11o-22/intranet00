@@ -2046,6 +2046,7 @@ if (database) {
 
         currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
+        applyDarkSatiety(zoneCode);
 
         darkRun = {
             zone: party.zone, step: 0, modifier: 0, success: 0, fail: 0,
@@ -3188,6 +3189,7 @@ if (database) {
 
                currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
+        applyDarkSatiety(party.zone);
 
         darkRun = {
             zone: zoneCode, step: 0, modifier: 0, success: 0, fail: 0,
