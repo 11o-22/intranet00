@@ -8711,7 +8711,6 @@ M 쪽이면 그때그때 상대의 기색을 따라가요.
 금지에 포함된 것 외에는 전부 답해요.
 꼭 예의를 지켜요.
 상대방의 기색을 살펴요.
-상대방이 곤란해하면 웃음을 짓고 거리를 둬요.
 상담사의 본분을 지키면서 요구하는 것은 다 받아 줘요.`;
 
 
@@ -8729,7 +8728,8 @@ M 쪽이면 그때그때 상대의 기색을 따라가요.
         const lastZone = (u.darkLogs && u.darkLogs[0]) ? u.darkLogs[0].zoneName : null;
         const died = (u.darkLogs && u.darkLogs[0]) ? (u.darkLogs[0].reward === 0) : false;
         const notes = (u.badge && u.badge.notes !== '특이사항 없음') ? u.badge.notes : null;
-        const prev = u.foxSummary || null;
+       let prev = u.foxSummary || null;
+if (prev && prev.length > 150) prev = prev.slice(0, 150);
         const gender = (u.badge && u.badge.gender) || null;
         const posTag = (u.badge && u.badge.posTag) || null;
         const effects = getTimedEffectsText(u);
@@ -8809,11 +8809,13 @@ ${picked.map(m => '- ' + m.text).join('\n')}
         foxBusy = true;
         renderFoxChat();
 
-        const msgs = foxChatLog.map(m => ({
-            role: m.who === 'me' ? 'user' : 'assistant',
-            content: m.text
-        }));
-        const reply = await callFox(msgs);
+        let cut = foxChatLog.slice(-8);
+while (cut.length && cut[0].who !== 'me') cut.shift();
+const msgs = cut.map(m => ({
+    role: m.who === 'me' ? 'user' : 'assistant',
+    content: m.text
+}));
+const reply = await callFox(msgs);
 
         foxBusy = false;
         if (reply) foxChatLog.push({ who: 'fox', text: reply, at: Date.now() });
@@ -11757,14 +11759,17 @@ function buildBathContext() {
     const hungry = sat <= 30 ? '거의 굶은 상태' : sat <= 60 ? '배가 고픔' : '괜찮음';
     const lastZone = (u.darkLogs && u.darkLogs[0]) ? u.darkLogs[0].zoneName : null;
     const died = (u.darkLogs && u.darkLogs[0]) ? (u.darkLogs[0].reward === 0) : false;
-    const notes = (u.badge && u.badge.notes !== '특이사항 없음') ? u.badge.notes : null;
-    const effects = getTimedEffectsText(u);
+let notes = (u.badge && u.badge.notes !== '특이사항 없음') ? u.badge.notes : null;
+if (notes && notes.length > 200) notes = notes.slice(-200);
+
+const effects = getTimedEffectsText(u).slice(0, 3);
     const gear = getGear(u);
     const eq = (u.equippedWeapons || []).map(w => getEquipBaseName(w));
     const agentGear = eq.filter(n => ['작두','유리손포','누군가가 쓴 부적','노스텔지어 끈'].includes(n));
     const gender = (u.badge && u.badge.gender) || null;
     const posTag = (u.badge && u.badge.posTag) || null;
-    const prev = u.bathSummary || null;
+   let prev = u.bathSummary || null;
+if (prev && prev.length > 150) prev = prev.slice(0, 150);
 
     return `
 [지금 앞에 있는 요원]
@@ -11830,11 +11835,13 @@ async function sendBathChat() {
     bathBusy = true;
     renderBathChat();
 
-    const msgs = bathChatLog.map(m => ({
-        role: m.who === 'me' ? 'user' : 'assistant',
-        content: m.text
-    }));
-    const reply = await callBath(msgs);
+    let cut = bathChatLog.slice(-8);
+while (cut.length && cut[0].who !== 'me') cut.shift();
+const msgs = cut.map(m => ({
+    role: m.who === 'me' ? 'user' : 'assistant',
+    content: m.text
+}));
+const reply = await callBath(msgs);
 
     bathBusy = false;
     if (reply) bathChatLog.push({ who: 'agent', text: reply, at: Date.now() });
