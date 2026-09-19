@@ -11938,7 +11938,7 @@ function saveBathLog() {
     else saveDB();
 }
 
-const DARK_SATIETY = { D: 30, C: 38, B: 45, A: 52, S: 60 };
+const DARK_SATIETY = { D: 10, C: 14, B: 18, A: 22, S: 28 };
 
 function applyDarkSatiety(zoneCode) {
     const z = DARK_ZONES[zoneCode];
