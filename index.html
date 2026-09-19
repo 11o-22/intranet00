@@ -3077,7 +3077,7 @@ return b;
         let html = `
             <div style="text-align:left;">
                 <div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
-                    금일 잔여 탐사 횟수: <b style="color:var(--theme-focus);">${left} / 3회</b> (자정 초기화)<br>
+                    금일 잔여 탐사 횟수: <b style="color:var(--theme-focus);">${left} / 4회</b> (자정 초기화)<br>
                     <span style="font-size:10px;">※ 공용시설 이용 횟수와는 별개로 집계됩니다.</span>
                 </div>`;
 
@@ -3213,7 +3213,7 @@ return b;
 
                currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
-        applyDarkSatiety(party.zone);
+       applyDarkSatiety(zoneCode);
 
         darkRun = {
             zone: zoneCode, step: 0, modifier: 0, success: 0, fail: 0,
@@ -8052,7 +8052,7 @@ function bjFinish(mode) {
     });
 }
   // --- 우주 쇼핑몰 ---
-    let dealerCardValue = 7;
+   let dealerCardValue = 50; 
    function playHighLow(choice) {
         if (!currentUser) return;
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 우주 주파수에 접속할 수 없습니다.'); return; }
@@ -8096,8 +8096,8 @@ function bjFinish(mode) {
         const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
 
-       let dealerCardValue = Math.floor(Math.random() * 100) + 1;
-       while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 100) + 1; }
+    let playerCardValue = Math.floor(Math.random() * 99) + 1;
+      while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 99) + 1; }
         document.getElementById('hl-player-card').innerText = playerCardValue;
         const msgEl = document.getElementById('hl-msg');
 
@@ -8106,7 +8106,7 @@ function bjFinish(mode) {
         if (!win && luckM > 1 && Math.random() < 0.12 * (luckM - 1)) {
             win = true;
            playerCardValue = choice === 'HIGH'
-    ? Math.min(100, dealerCardValue + 1 + Math.floor(Math.random() * 10))
+    ? Math.min(99, dealerCardValue + 1 + Math.floor(Math.random() * 10))
     : Math.max(1, dealerCardValue - 1 - Math.floor(Math.random() * 10));
             document.getElementById('hl-player-card').innerText = playerCardValue;
         }
@@ -8164,12 +8164,12 @@ function bjFinish(mode) {
         }
         
         saveDB();
-        setTimeout(() => {
-    dealerCardValue = Math.floor(Math.random() * 100) + 1;
+      setTimeout(() => {
+    dealerCardValue = Math.floor(Math.random() * 99) + 1;
     document.getElementById('hl-dealer-card').innerText = dealerCardValue;
             document.getElementById('hl-player-card').innerText = "?";
                         // ★ 기회가 남아있을 때만 버튼 재활성화
-            const canPlayAgain = (currentUser.code === 'kario0987') || (currentUser.alienTries < 2);
+            const canPlayAgain = (currentUser.code === 'kario0987') || (currentUser.alienTries < 3);
             btnH.disabled = !canPlayAgain;
             btnL.disabled = !canPlayAgain;
             updateUI();
@@ -9359,6 +9359,9 @@ function adminGiveItem() {
             checkVIPStatus(); 
             loadBadgeInfo(); 
             updateUI();
+            dealerCardValue = Math.floor(Math.random() * 99) + 1;
+const hlCard = document.getElementById('hl-dealer-card');
+if (hlCard) hlCard.innerText = dealerCardValue;
             setTimeout(() => checkDarkRunResume(), 800);
             
             // 관리자 전용 통제 콘솔 버튼 노출 여부 결정
