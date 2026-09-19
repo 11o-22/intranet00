@@ -4352,7 +4352,7 @@ function b508RequiredDocs() {
         addHistoryLog(currentUser, `[??? 구매] ${name} (-${price} P)`);
 
         if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+        else saveFields({ points:1, inventory:1, history:1 });
         updateUI();
         renderQShop();
     }
@@ -8231,7 +8231,7 @@ function b508RequiredDocs() {
         currentUser.inventory.push(name);
         addHistoryLog(currentUser, `[사택 매점] ${name} 구입 (-${price} P)`);
         if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+        else saveFields({ points:1, inventory:1, history:1 });
         updateUI();
         renderKitchen();
     }
