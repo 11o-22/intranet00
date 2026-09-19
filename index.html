@@ -6189,48 +6189,48 @@ else if (cat.effect === 'rainbow_potion') {
 
     addHistoryLog(targetUser, `[제거약] ${removedName} 효과가 씻겨 나갔습니다.`);
     if (!isOthers) showCustomAlert(`[제거약 효과]\n${removedName}의 효과가 사라졌습니다.`);
-}
-else if (cat.effect === 'random_box') {
+
+            } else if (cat.effect === 'food') {
+            if (targetUser.satiety === undefined) targetUser.satiety = 100;
+            if (targetUser.satiety >= 100) {
+                if (!isOthers) showCustomAlert('이미 배가 부릅니다.');
+                return false;
+            }
+
+            targetUser.satiety = Math.min(100, targetUser.satiety + (cat.satiety || 0));
+            targetUser.lastSatietyTime = Date.now();
+
+            let msg = [`포만감 +${cat.satiety}`];
+
+            if (cat.heal) {
+                targetUser.pollution = Math.max(0, targetUser.pollution - cat.heal);
+                msg.push(`오염도 -${cat.heal}%`);
+            }
+            if (cat.pollute) {
+                applyPollutionToUser(targetUser, cat.pollute);
+                msg.push(`오염도 +${cat.pollute}%`);
+            }
+            if (cat.ticket) {
+                if (!targetUser.facilityMax) targetUser.facilityMax = 20;
+                targetUser.facilityMax = Math.min(25, targetUser.facilityMax + cat.ticket);
+                msg.push(`공용시설 +${cat.ticket}회`);
+            }
+            if (cat.darkTry) {
+                targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
+                msg.push(`어둠 탐사 +${cat.darkTry}회`);
+            }
+
+            addHistoryLog(targetUser, `[식사] ${itemName} 섭취 (${msg.join(', ')})`);
+            if (!isOthers) showCustomAlert(`${itemName}\n\n${msg.join('\n')}`);
+        } else if (cat.effect === 'random_box') {
+
             // 1. 유쾌 판매소(60%) 및 우주 쇼핑몰(40%) 풀 분리 ('여우구슬'과 자기 자신 제외)
                         const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
             const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
 
                             targetUser._adminStamp = Date.now();
                 if (database) database.ref('users/' + targetUser.code).set(targetUser);
-
-                else if (cat.effect === 'food') {
-    if (targetUser.satiety === undefined) targetUser.satiety = 100;
-    if (targetUser.satiety >= 100 && !cat.heal && !cat.ticket && !cat.darkTry) {
-    if (!isOthers) showCustomAlert('이미 배가 부릅니다.');
-    return false;
-}
-
-    targetUser.satiety = Math.min(100, targetUser.satiety + (cat.satiety || 0));
-    targetUser.lastSatietyTime = Date.now();
-
-    let msg = [`포만감 +${cat.satiety}`];
-
-    if (cat.heal) {
-        targetUser.pollution = Math.max(0, targetUser.pollution - cat.heal);
-        msg.push(`오염도 -${cat.heal}%`);
-    }
-    if (cat.pollute) {
-        applyPollutionToUser(targetUser, cat.pollute);
-        msg.push(`오염도 +${cat.pollute}%`);
-    }
-    if (cat.ticket) {
-        if (!targetUser.facilityMax) targetUser.facilityMax = 20;
-        targetUser.facilityMax = Math.min(25, targetUser.facilityMax + cat.ticket);
-        msg.push(`공용시설 +${cat.ticket}회`);
-    }
-    if (cat.darkTry) {
-        targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
-        msg.push(`어둠 탐사 +${cat.darkTry}회`);
-    }
-
-    addHistoryLog(targetUser, `[식사] ${itemName} 섭취 (${msg.join(', ')})`);
-    if (!isOthers) showCustomAlert(`${itemName}\n\n${msg.join('\n')}`);
-}
+           
 
                 
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
