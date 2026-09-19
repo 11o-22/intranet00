@@ -11888,3 +11888,30 @@ function applyDarkSatiety(zoneCode) {
     currentUser.satiety = Math.max(0, (currentUser.satiety != null ? currentUser.satiety : 100) - cut);
     currentUser.lastSatietyTime = Date.now();
 }
+function adminSetGearGrade() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+    const grade = document.getElementById('adm-gear-grade').value;
+    if (!GEAR_GRADES.includes(grade)) return;
+
+    let done = [], skipped = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u || !u.soulGear) { if (u) skipped.push(u.name); return; }
+        const before = u.soulGear.grade;
+        u.soulGear.grade = grade;
+        if (grade === 'L') u.gearAwakened = true;
+        u._adminStamp = Date.now();
+        addHistoryLog(u, `[전용 장비] 등급이 조정되었습니다. (${before} → ${grade})`);
+        if (database) database.ref('users/' + code).set(u);
+        done.push(`${u.name}: ${before} → ${grade}`);
+    });
+
+    if (!database) saveDB();
+    updateUI();
+    renderAdminGearList();
+    showCustomAlert(
+        (done.length ? `등급 조정\n${done.join('\n')}` : '') +
+        (skipped.length ? `\n\n장비 없음: ${skipped.join(', ')}` : '')
+    );
+}

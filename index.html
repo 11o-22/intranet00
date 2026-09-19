@@ -996,10 +996,23 @@
                 <input type="text" id="adm-gear-icon" class="bet-input" style="width:100%; text-align:center; font-size:18px; margin-bottom:6px; box-sizing:border-box;" placeholder="이모지" maxlength="4">
                 <input type="text" id="adm-gear-name" class="bet-input" style="width:100%; font-size:13px; box-sizing:border-box;" placeholder="장비 이름">
             </div>
+
+            
                         <div id="adm-gear-quick" style="display:flex; flex-wrap:wrap; gap:3px; margin-bottom:9px; max-height:150px; overflow-y:auto; padding:5px; background:rgba(0,0,0,0.25); border:1px solid #4a3a6a; border-radius:5px;"></div>
             <button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:9px; background:linear-gradient(145deg, #6a4c93, #4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminGiveGear()">지급</button>
             <button class="game-btn" style="width:100%; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminRemoveGear()">전용 장비 회수</button>
             <button class="game-btn" style="width:100%; margin:7px 0 0 0; padding:8px; font-size:11px; background:linear-gradient(145deg, #0288d1, #01579b) !important; border-color:#0277bd !important; color:#fff !important;" onclick="adminEditGear()">이름 · 이모지 수정</button>
+            <div style="display:flex; gap:6px; margin-top:7px;">
+    <select id="adm-gear-grade" style="flex:2; font-size:11px;">
+        <option value="D">D등급</option>
+        <option value="C">C등급</option>
+        <option value="B">B등급</option>
+        <option value="A">A등급</option>
+        <option value="S">S등급</option>
+        <option value="L">L등급</option>
+    </select>
+    <button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminSetGearGrade()">등급 설정</button>
+</div>
             <div id="admin-gear-list" style="margin-top:12px;"></div>
         </div>
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
@@ -1382,18 +1395,20 @@ if (database) {
         "VIP실 출입증": { price: 5555, usable: true, targetable: false, effect: "vip_pass", desc: "VIP 구역 출입이 가능한 카드이다." },
         "일반 담배": { price: 1704, usable: true, targetable: false, effect: "heal", value: 40, desc: "담배 한 개비. 오염도 40% 회복" },
         "혈욕조": { price: 7000, usable: true, targetable: false, effect: "equip_bloodbath", desc: "장착 시 하루 최대 3시간 동안 오염 수치가 오르지 않는다." },
-        "노예 계약서": { price: 10000, usable: true, targetable: true, effect: "slave_contract", desc: "원하는 사람을 3일 동안 노예로 계약한다." },
+        "노예 계약서": { price: 1000000, usable: true, targetable: true, effect: "slave_contract", desc: "원하는 사람을 3일 동안 노예로 계약한다." },
         "포도맛 물약": { price: 1500, usable: true, targetable: true, effect: "grape_potion", desc: "사용 시 3 일간 성별이 바뀝니다." },
         "파인애플맛 물약": { price: 1500, usable: true, targetable: true, effect: "pineapple_potion", desc: "사용 시 3일간 손바닥만 하게 작아집니다." },
         "투명 물약": { price: 13000, usable: true, targetable: true, effect: "clear_potion", desc: "기간이 있는 효과 하나를 영구히 고정한다. 제거약으로만 풀 수 있다." },
         "자두맛 물약": { price: 1500, usable: true, targetable: true, effect: "plum_potion", desc: "사용 시 3일간 신체에서 케이크 맛이 납니다." },
         "무지개 물약": { price: 3000, usable: true, targetable: true, effect: "rainbow_potion", desc: "무슨 맛인지 알 수 없다. 다른 물약 중 하나의 효과가 무작위로 나타난다." },
         "우유맛 물약": { price: 1500, usable: true, targetable: true, effect: "milk_potion", desc: "사용 시 3일간 컨트/딕걸 상태가 됩니다." },
-        "사과맛 물약": { price: 1500, usable: true, targetable: true, effect: "apple_potion", desc: "사용 시 3일간 동물의 귀와 꼬리가 생깁니다." },
+        "사과맛 물약": { price: 1500, usable: true, targetable: true, effect: "apple_potion", desc: "사용 시 3일간 해당 동물의 귀와 꼬리가 생기며 동물의 특성을 고스란히 받는다." },
         "오렌지맛 물약": { price: 1500, usable: true, targetable: true, effect: "orange_potion", desc: "사용 시 3일간 어린이 상태가 됩니다." },
         "복숭아맛 물약": { price: 1500, usable: true, targetable: true, effect: "peach_potion", desc: "사용 시 3일간 예민한 몸이 됩니다." },
         "체리맛 물약": { price: 1500, usable: true, targetable: true, effect: "cherry_potion", desc: "사용 시 3일간 신체 부위 중 일부가 예민하게 개발된다." },
-         "제거약": { price: 4000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화나 계약 하나를 무작위로 되돌린다." },       "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
+        "석류맛 물약": { price: 15000, usable: true, targetable: false, effect: "pomegranate_potion", desc: "누구에게 갈지 알 수 없다. 현존하는 물약 중 하나가 무작위 사원에게 적용된다." }, 
+        "곶감맛 물약": { price: 1500, usable: true, targetable: true, effect: "persimmon_potion", desc: "사용 시 3일간 원하는 코스튬을 입게 된다." },
+        "제거약": { price: 40000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화나 계약 하나를 무작위로 되돌린다." },       "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
          "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip_rabbit", desc: "귀여운 분홍색 토끼 봉제인형. 장착 시 어둠의 판정에 행운이 더해지고, 공용시설 승률이 크게 오른다. 약간의 회피 효과도 있다." },
         "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip_security", desc: "보안팀의 의상 세트. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
         "작두": { price: 9999, usable: true, targetable: false, effect: "equip_jakdu", desc: "영험한 기운이 담긴 무기. 어떤 기믹이든 한 번은 무조건 박살낸다. 죽어도 사라지지 않으며, 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
@@ -1409,8 +1424,9 @@ if (database) {
         "은반지": { price: 3458, usable: true, targetable: false, effect: "equip_silver_ring", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "장착 가능하다. 장착 시 120시간 동안 오염도를 완전히 차단해 준다. 다만 120시간이 지나면 부서져 사라진다." },
         "빨간 리본": { price: 1000, usable: true, targetable: true, effect: "equip_red_ribbon", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "특정 사원을 지정해 자신과 연결이 되게 한다." },
         "고급진 술": { price: 4444, usable: true, targetable: false, effect: "drink_wine", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "누군가의 방에서 나온 술. 마시면 10시간 동안 취한다." },
-                "금고": { price: 77777777, usable: true, targetable: false, effect: "safe_box", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "포인트를 보관할 수 있다. 하루 0.6%의 이자가 붙고, 어둠 속에서도 잃지 않는다. 금고 하나당 5만 P까지." },      "노스텔지어 끈": { price: 3319, usable: true, targetable: true, effect: "equip_nostalgia", restrictDept: ["보안팀", "경비팀"], desc: "5시간 동안 장착 가능하다. 장착하는 도중에는 찼던 오염도가 서서히 줄어든다. (5분에 1%씩)" },    
+        "금고": { price: 77777777, usable: true, targetable: false, effect: "safe_box", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "포인트를 보관할 수 있다. 하루 0.6%의 이자가 붙고, 어둠 속에서도 잃지 않는다. 금고 하나당 5만 P까지." },      "노스텔지어 끈": { price: 3319, usable: true, targetable: true, effect: "equip_nostalgia", restrictDept: ["보안팀", "경비팀"], desc: "5시간 동안 장착 가능하다. 장착하는 도중에는 찼던 오염도가 서서히 줄어든다. (5분에 1%씩)" },    
         "사직서": { price: "???", usable: false, carryOnly: true, adminOnly: true, desc: "[특수] 아직 제출하지 않은 사직서. 어둠 속에서 죽음에 이르렀을 때, 이것을 지니고 있다면 단 한 번 그 자리에서 퇴근할 수 있다. 반입해야 효력이 있다." },// ★ [추가] 상담사 전용 아이템
+        "세뇌 만년필": { price: 30000, usable: true, targetable: true, effect: "equip_brainwash", desc: "상대방에게 장착 시 강력한 세뇌를 건다. 오염도 50% 증가." },
         "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." },
 
          "꺼진 가로등 전구": { price: 40, usable: true, targetable: false, effect: "equip_dead_bulb", darkOnly: true, desc: "[어둠 회수품] 심야 골목에서 떼어 온 전구. 장착 시 오염도 증가가 아주 미미하게 늦춰진다." },
@@ -1534,7 +1550,8 @@ if (database) {
         "작두", "유리손포", "착한 친구", "보안팀 의상 세트", "버터 나이프", "은반지",
         "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
         "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기",
-        "파인애플맛 물약", "투명 물약", "자두맛 물약", "무지개 물약"
+        "파인애플맛 물약", "투명 물약", "자두맛 물약", "무지개 물약",
+        "곶감맛 물약", "세뇌 만년필", "석류맛 물약"
     ];
         const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비", "사막여우", "수달"];
 
@@ -5765,7 +5782,7 @@ hlL.disabled = !playable;
         }
 
         if (cat.effect === 'q_cleanse' || cat.effect === 'q_cleanse_all') {
-            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','곶감맛 물약'];
             const DARK_KEYS = ['Qtrew-', '캔버스 결', '반 박자', '손바닥', '손등에', '여섯 손가락', '의식 불명', '긴급 이송', '사직 반려', '발목에'];
 
             if (!currentUser.badge || !currentUser.badge.notes || currentUser.badge.notes === '특이사항 없음') {
@@ -5968,7 +5985,7 @@ hlL.disabled = !playable;
             return;
         }
                 if (cat.effect === 'q_pill') {
-            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약'];
+            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','곶감맛 물약'];
 
             // 물약이 아닌 시간제 효과만 대상
             const idxs = [];
@@ -6111,7 +6128,7 @@ hlL.disabled = !playable;
         }  // (이 기존 코드들을 찾아서 아래 코드로 바꿔치기 하세요)
         else if (cat.effect === 'grape_potion') addTimedEffect(targetUser, '포도맛 물약', '신체 파동 변조 (성별 반전 상태)', 72);
         else if (cat.effect === 'milk_potion') addTimedEffect(targetUser, '우유맛 물약', '신체 변이 (컨트/딕걸)', 72);
-        else if (cat.effect === 'apple_potion') addTimedEffect(targetUser, '사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현`, 72);
+else if (cat.effect === 'apple_potion') addTimedEffect(targetUser, '사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현 및 습성 발현`, 72);
         else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 72);
         else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 72);
         else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 72);
@@ -6166,7 +6183,7 @@ else if (cat.effect === 'rainbow_potion') {
 }
         
  else if (cat.effect === 'cure_potion') {
-    const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','파인애플맛 물약','자두맛 물약'];
+    const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','파인애플맛 물약','자두맛 물약','곶감맛 물약'];
 
     const candidates = [];
 
@@ -6382,6 +6399,24 @@ else if (cat.effect === 'equip_sonpo') {
                 return false;
             }
 
+            else if (cat.effect === 'equip_brainwash') {
+    if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+    if (targetUser.equippedWeapons.length >= 3) {
+        showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
+        return false;
+    }
+    const cPos = currentUser.position || '사원';
+    const label = isOthers ? `세뇌 만년필 (시술자: ${currentUser.name} ${cPos})` : '세뇌 만년필';
+    targetUser.equippedWeapons.push(label);
+    setEquipOwner(targetUser, label, isOthers ? currentUser.code : targetUser.code);
+    applyPollutionToUser(targetUser, 50);
+    appendBadgeNoteToUser(targetUser, `[세뇌됨] ${label}`);
+    addHistoryLog(targetUser, `[세뇌] ${currentUser.name} 사원에게 세뇌 만년필이 꽂혔습니다.`);
+    showCustomAlert(isOthers
+        ? `${targetUser.name} 사원에게 세뇌를 걸었습니다.`
+        : '만년필을 스스로 꽂았습니다.');
+}
+
             else if (cat.effect === 'target_sticker') {
     addTimedEffect(targetUser, '스마일 스티커', `${currentUser.name} 사원에게 미미한 호감을 느낀다`, 5);
     addHistoryLog(targetUser, `[부착] 누군가 당신에게 스티커를 붙였습니다.`);
@@ -6410,6 +6445,75 @@ else if (cat.effect === 'slave_contract') {
                 showCustomAlert('유리손포를 장착했습니다.');
             }
         }
+        else if (cat.effect === 'persimmon_potion') {
+    const applyCostume = (costume) => {
+        addTimedEffect(targetUser, '곶감맛 물약', `${costume} 착용 상태`, 72);
+        targetUser._adminStamp = Date.now();
+        if (database) {
+            database.ref('users/' + targetUser.code).set(targetUser);
+            database.ref('users/' + currentUser.code).set(currentUser);
+        }
+        updateUI();
+        showCustomAlert(`${isOthers ? targetUser.name + '님이 ' : ''}${costume}을(를) 입었습니다.`);
+    };
+
+    openTextInput(
+        '곶감맛 물약',
+        `입을 코스튬을 적어 주세요.<br><span style="color:#888; font-size:10px;">적은 내용이 특이사항에 표시됩니다.</span>`,
+        '예: 토끼 옷',
+        applyCostume
+    );
+    return true;
+}
+
+else if (cat.effect === 'pomegranate_potion') {
+    const pool = ['grape_potion','milk_potion','apple_potion','orange_potion','peach_potion','cherry_potion','pineapple_potion','plum_potion','persimmon_potion'];
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+
+    const candidates = Object.keys(db.users).filter(c => c !== 'kario0987');
+    if (candidates.length === 0) { showCustomAlert('적용할 사원이 없습니다.'); return false; }
+    const victimCode = candidates[Math.floor(Math.random() * candidates.length)];
+    const victim = db.users[victimCode];
+    if (!victim) return false;
+    if (!victim.timedEffects) victim.timedEffects = [];
+
+    const finish = (name, desc) => {
+        victim.timedEffects.push({ name: name, desc: desc, expireAt: Date.now() + 72 * 60 * 60 * 1000 });
+        victim._adminStamp = Date.now();
+        victim.hasItemUsedOnMe = true;
+        addHistoryLog(victim, `[석류맛 물약] 누군가 던진 물약이 당신에게 닿았습니다. (${name})`);
+        if (database) database.ref('users/' + victimCode).set(victim);
+        updateUI();
+        showCustomAlert(`${victim.name} 님에게 적용되었습니다.\n\n${name}\n${desc}`);
+    };
+
+    if (picked === 'cherry_potion') {
+        openTextInput('석류맛 물약',
+            `개발될 부위를 적어 주세요.<br><span style="color:#888; font-size:10px;">누구에게 갈지는 알 수 없습니다.</span>`,
+            '예: 목덜미',
+            (part) => finish('체리맛 물약', `${part} 부위가 예민하게 개발됨`));
+        return true;
+    }
+    if (picked === 'persimmon_potion') {
+        openTextInput('석류맛 물약',
+            `입힐 코스튬을 적어 주세요.<br><span style="color:#888; font-size:10px;">누구에게 갈지는 알 수 없습니다.</span>`,
+            '예: 토끼 옷',
+            (costume) => finish('곶감맛 물약', `${costume} 착용 상태`));
+        return true;
+    }
+
+    const names = {
+        grape_potion:['포도맛 물약','신체 파동 변조 (성별 반전 상태)'],
+        milk_potion:['우유맛 물약','신체 변이 (컨트/딕걸)'],
+        apple_potion:['사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random()*ANIMAL_LIST.length)]}의 귀와 꼬리 발현 및 습성 발현`],
+        orange_potion:['오렌지맛 물약','신체 퇴행 (어린아이 상태)'],
+        peach_potion:['복숭아맛 물약','신체 감각 과민 (예민한 몸 상태)'],
+        pineapple_potion:['파인애플맛 물약','신체 축소 (손바닥 크기)'],
+        plum_potion:['자두맛 물약', `신체에서 ${CAKE_LIST[Math.floor(Math.random()*CAKE_LIST.length)]} 케이크 맛이 남`]
+    };
+    const [nm, ds] = names[picked];
+    finish(nm, ds);
+}
                else if (cat.effect === 'cherry_potion') {
             const applyCherry = (part) => {
                 addTimedEffect(targetUser, '체리맛 물약', `${part} 부위가 예민하게 개발됨`, 72);
