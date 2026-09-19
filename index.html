@@ -1187,11 +1187,14 @@ function getTodayStr() {
                                 if (currentUser && data.users[currentUser.code]) {
                     const srv = data.users[currentUser.code];
                     // ★ 서버 쪽에 관리자 개입 표시가 있으면 그걸 우선한다
-                    if (srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
-                        currentUser = srv;
-                    } else {
-                        data.users[currentUser.code] = currentUser;
-                    }
+                   if (srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
+    ['points','inventory','pollution','satiety','equippedWeapons','badge','history','timedEffects','house','soulGear'].forEach(k => {
+        if (srv[k] !== undefined) currentUser[k] = srv[k];
+    });
+    currentUser._adminStamp = srv._adminStamp;
+} else {
+    data.users[currentUser.code] = currentUser;
+}
                 }
                 
                 db.users = data.users;
@@ -4462,7 +4465,7 @@ if (user.code === 'kario0987') {
         
         // ★ [수정] amount 대신 방어막이 적용된 finalAmount를 더해야 합니다!
         currentUser.pollution = Math.min(100, currentUser.pollution + finalAmount);
-        saveDB();
+        saveFields({ points:1, facilityCount:1, satiety:1 });
         updateUI();
     }
 
@@ -8322,7 +8325,7 @@ function bjFinish(mode) {
         
         addHistoryLog(currentUser, `[우주 구매] ${itemName} (-${cost} P)`);
         setUFODialogue("훌륭한 거래였습니다.");
-        saveDB(); 
+        saveFields({ points:1, inventory:1, history:1, alienBoughtItems:1 });
         updateUI();
     }
     function useFacility(bet) {
@@ -8337,7 +8340,7 @@ function bjFinish(mode) {
         currentUser.satiety = Math.max(0, (currentUser.satiety != null ? currentUser.satiety : 100) - 3);
     }
     addPollution(2); 
-    saveDB(); 
+    saveFields({ points:1, facilityCount:1, satiety:1 });
     return true;
 }
 
@@ -8347,6 +8350,16 @@ function bjFinish(mode) {
     saveDB();
     updateUI();
     showPointGainEffect(amount);
+}
+
+function saveFields(fields) {
+    if (!database || !currentUser) { saveDB(); return; }
+    const updates = {};
+    Object.keys(fields).forEach(k => {
+        updates[`users/${currentUser.code}/${k}`] = currentUser[k];
+    });
+    updates[`users/${currentUser.code}/_adminStamp`] = Date.now();
+    database.ref('/').update(updates);
 }
 
     function checkVIPStatus() {
