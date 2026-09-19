@@ -9355,7 +9355,7 @@ function turnedBite(targetCode, targetName) {
 
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC = 12;
+    const DC = s010DC(12);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     if (ok) {
@@ -9815,7 +9815,7 @@ function s010G1() {
 function s010G1R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC = { slow: 11, cut: 9, rush: 17 }[pick] - gearValue(currentUser, 'break');
+    const DC = s010DC({ slow: 11, cut: 9, rush: 17 }[pick]) - gearValue(currentUser, 'break');
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -9851,7 +9851,7 @@ function s010G2() {
 function s010G2R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide') + gearValue(currentUser, 'evade') * 10;
-    const DC = { side: 12, dash: 15, bait: 10, wait: 13 }[pick];
+    const DC = s010DC( { side: 12, dash: 15, bait: 10, wait: 13 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -9891,7 +9891,7 @@ function s010G3() {
 function s010G3R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = { crawl: 12, force: 14, prop: 11 }[pick] - gearValue(currentUser, 'break');
+    const DC = s010DC({ crawl: 12, force: 14, prop: 11 }[pick]) - gearValue(currentUser, 'break');
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -9926,7 +9926,7 @@ function s010G4() {
 function s010G4R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = { listen: 11, call: 16, ignore: 13 }[pick];
+    const DC = s010DC({ listen: 11, call: 16, ignore: 13 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -9961,7 +9961,7 @@ function s010G5() {
 function s010G5R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = { solid: 14, quick: 10, weld: 13 }[pick];
+    const DC = s010DC({ solid: 14, quick: 10, weld: 13 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     if (ok) {
@@ -9999,7 +9999,7 @@ function s010G6() {
 function s010G6R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 10);
-    const DC = { clean: 10, burn: 14, cut: 17, leave: 0 }[pick];
+    const DC =s010DC( { clean: 10, burn: 14, cut: 17, leave: 0 }[pick]);
     const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
 
     let txt;
@@ -10043,7 +10043,7 @@ function s010G7R(pick) {
     const luck = gearValue(currentUser, 'luck');
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(luck * 12);
-    const DC = 12;
+    const DC = s010DC(12);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10078,7 +10078,7 @@ function s010G8() {
 function s010G8R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC = { chem: 10, blood: 13, cold: 12 }[pick];
+    const DC =s010DC( { chem: 10, blood: 13, cold: 12 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10097,6 +10097,10 @@ function s010G8R(pick) {
     }
     darkRun.log.push(`[기믹 8] ${pick} d20 ${roll} vs DC${DC}`);
     s010Result("기믹 8 — 결과", roll, bonus, DC, ok, txt);
+}
+
+function s010DC(base) {
+    return base + 5;
 }
 
 function s010Result(title, roll, bonus, DC, ok, txt) {
@@ -10139,7 +10143,7 @@ function s010G9() {
 function s010G9R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide') + Math.round(gearValue(currentUser, 'evade') * 14);
-    const DC = { slide: 13, climb: 12, push: 16 }[pick];
+    const DC =s010DC( { slide: 13, climb: 12, push: 16 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10178,7 +10182,7 @@ function s010G10() {
 function s010G10R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('rejoin');
-    const DC = { tune: 12, code: 10, shout: 16 }[pick];
+    const DC = s010DC({ tune: 12, code: 10, shout: 16 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10216,7 +10220,7 @@ function s010G11() {
 function s010G11R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = { beat: 12, dark: 15, light: 11, blind: 14 }[pick];
+    const DC = s010DC({ beat: 12, dark: 15, light: 11, blind: 14 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10252,7 +10256,7 @@ function s010G12() {
 function s010G12R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 12);
-    const DC = { treat: 13, quick: 9, leave: 0 }[pick];
+    const DC =s010DC( { treat: 13, quick: 9, leave: 0 }[pick]);
     const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
 
     let txt;
@@ -10297,7 +10301,7 @@ function s010G13R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze')
         + (qFlag('s010_tags') ? 6 : 0);
-    const DC = { trace: 13, ask: 11, drop: 0 }[pick];
+    const DC = s010DC({ trace: 13, ask: 11, drop: 0 }[pick]);
     const ok = pick === 'drop' ? false : (roll !== 1 && (roll + bonus) >= DC);
 
     let txt;
@@ -10338,7 +10342,7 @@ function s010G14() {
 function s010G14R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('detect') + (qFlag('s010_roster') ? 3 : 0);
-    const DC = { smell: 12, pulse: 11, talk: 14, skip: 0 }[pick];
+    const DC = s010DC({ smell: 12, pulse: 11, talk: 14, skip: 0 }[pick]);
     const ok = pick === 'skip' ? false : (roll !== 1 && (roll + bonus) >= DC);
 
     let txt;
@@ -10396,7 +10400,7 @@ function s010G15R(pick) {
 
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = { hold: 21, flee: 16 }[pick];
+    const DC =s010DC( { hold: 21, flee: 16 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10430,7 +10434,7 @@ function s010G16() {
 function s010G16R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze');
-    const DC = { count: 12, time: 13, stamp: 11 }[pick];
+    const DC = s010DC({ count: 12, time: 13, stamp: 11 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10466,7 +10470,7 @@ function s010G17() {
 function s010G17R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 10);
-    const DC = { full: 14, half: 11, hold: 12 }[pick];
+    const DC =s010DC( { full: 14, half: 11, hold: 12 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10504,7 +10508,7 @@ function s010G18() {
 function s010G18R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break') * 2;
-    const DC = { crank: 15, half: 11, break: 13 }[pick];
+    const DC = s010DC({ crank: 15, half: 11, break: 13 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10539,7 +10543,7 @@ function s010G19() {
 function s010G19R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide') + (qFlag('s010_masked') ? 3 : 0);
-    const DC = { follow: 13, avoid: 12, wait: 10 }[pick];
+    const DC =s010DC( { follow: 13, avoid: 12, wait: 10 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10573,7 +10577,7 @@ function s010G20() {
 function s010G20R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('hide') + Math.round(gearValue(currentUser, 'evade') * 14);
-    const DC = { all: 14, split: 12, wall: 15 }[pick];
+    const DC = s010DC({ all: 14, split: 12, wall: 15 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10614,7 +10618,7 @@ function s010G21R(pick) {
     const luck = gearValue(currentUser, 'luck');
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(luck * 14);
-    const DC = 13;
+    const DC =s010DC( 13);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10647,7 +10651,7 @@ function s010G22() {
 function s010G22R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('rejoin') + (qFlag('s010_radio') ? 4 : 0);
-    const DC = { radio: 11, light: 13, wait: 15 }[pick];
+    const DC = s010DC({ radio: 11, light: 13, wait: 15 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     let txt;
@@ -10760,7 +10764,7 @@ function s010G24R(pick) {
     const inf = getInfect();
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') - Math.floor(inf / 10);
-    const DC = { out: 12, report: 14, close: 17 }[pick];
+    const DC = s010DC({ out: 12, report: 14, close: 17 }[pick]);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     if (pick === 'close') {
@@ -11518,7 +11522,7 @@ function doPurge(code, nm, how) {
 
     const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = 24;
+    const DC = s010DC(24);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     if (ok) {

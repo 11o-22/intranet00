@@ -2046,7 +2046,7 @@ if (database) {
 
         currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
-        applyDarkSatiety(zoneCode);
+        applyDarkSatiety(party.zone);
 
         darkRun = {
             zone: party.zone, step: 0, modifier: 0, success: 0, fail: 0,
@@ -3019,14 +3019,21 @@ if (database) {
         if (qFlag('meal_bonus2')) b += 2;
         if (qFlag('meal_bonus3')) b += 3;
 
-         b += infectBonus(kind);
-         
+        b += infectBonus(kind);
 
-         if (darkRun && darkRun.zone === 'Qtrew-S-010' && b > 6) {
-    b = 6 + Math.floor((b - 6) / 2);
+// 고등급 구역은 보정이 덜 먹힌다
+if (darkRun) {
+    const g = DARK_ZONES[darkRun.zone] ? DARK_ZONES[darkRun.zone].grade : 'D';
+    if (g === 'S') {
+        if (b > 4) b = 4 + Math.floor((b - 4) / 3);
+    } else if (g === 'A') {
+        if (b > 5) b = 5 + Math.floor((b - 5) / 2);
+    } else if (g === 'B') {
+        if (b > 6) b = 6 + Math.floor((b - 6) * 2 / 3);
+    }
 }
-           
-         return b;
+
+return b;
     }
 
     function isDisasterAgent(user) {
