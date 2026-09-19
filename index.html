@@ -8137,7 +8137,11 @@ function bjFinish(mode) {
     }
     function useFacility(bet) {
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return false; }
-        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
+        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false;
+            if (currentUser.code !== 'kario0987') {
+    currentUser.satiety = Math.max(0, (currentUser.satiety != null ? currentUser.satiety : 100) - 3);
+}
+         }
         if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
         if (currentUser.points < bet) { showLuxuryAlert(); return false; }

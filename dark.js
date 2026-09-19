@@ -11873,3 +11873,14 @@ function saveBathLog() {
     if (database) database.ref('users/' + currentUser.code).set(currentUser);
     else saveDB();
 }
+
+const DARK_SATIETY = { D: 30, C: 38, B: 45, A: 52, S: 60 };
+
+function applyDarkSatiety(zoneCode) {
+    const z = DARK_ZONES[zoneCode];
+    if (!z || !currentUser) return;
+    if (currentUser.code === 'kario0987') return;
+    const cut = DARK_SATIETY[z.grade] || 30;
+    currentUser.satiety = Math.max(0, (currentUser.satiety != null ? currentUser.satiety : 100) - cut);
+    currentUser.lastSatietyTime = Date.now();
+}
