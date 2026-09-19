@@ -4552,15 +4552,21 @@ if (user.code === 'kario0987') {
             user.badge.notes = `${existingNotes} | ${noteMsg}`;
         }
     }
-    function addTimedEffect(user, name, desc, hours) {
-        if (!user.timedEffects) user.timedEffects = [];
-        user.timedEffects.push({
-            name: name,
-            desc: desc,
-            expireAt: Date.now() + (hours * 60 * 60 * 1000)
-        });
-        saveDB();
+   function addTimedEffect(user, name, desc, hours) {
+    if (!user.timedEffects) user.timedEffects = [];
+    const now = Date.now();
+    const add = hours * 60 * 60 * 1000;
+
+    const exist = user.timedEffects.find(e => e.name === name && !e.fixed);
+    if (exist) {
+        const base = Math.max(now, exist.expireAt || now);
+        exist.expireAt = base + add;
+        exist.desc = desc;
+    } else {
+        user.timedEffects.push({ name: name, desc: desc, expireAt: now + add });
+        if (user.code === currentUser.code) saveFields({ timedEffects:1 });
     }
+}
 
     // UI에 남은 시간을 계산해서 텍스트로 뽑아주는 함수
     function getTimedEffectsText(user) {
