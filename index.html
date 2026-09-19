@@ -7166,8 +7166,8 @@ function bjSwap(idx) {
         
         let msgEl = document.getElementById('seotda-msg');
         if (pRes.score > dRes.score) {
-            let winAmount = seotdaBet * pRes.mult; 
-            winPoints(winAmount);
+        let winAmount = Math.floor(seotdaBet * pRes.mult); 
+        winPoints(winAmount);    
             msgEl.innerHTML = `<span style="color:#4CAF50;">[승리!] ${pRes.name} 달성! (×${pRes.mult}) -> +${winAmount} P</span>`;
             addHistoryLog(currentUser, `[섯다 승리] ${pRes.name} vs 딜러 ${dRes.name} (+${winAmount} P)`);
         } else if (pRes.score < dRes.score) {
@@ -8330,7 +8330,8 @@ function bjFinish(mode) {
     return true;
 }
 
-    function winPoints(amount) {
+   function winPoints(amount) {
+    amount = Math.floor(amount);
     currentUser.points = Math.min(POINT_CAP, currentUser.points + amount);
     saveDB();
     updateUI();
