@@ -777,7 +777,7 @@
 
                     <div id="alien-game-section" style="background:#151515; padding:15px; border:1px solid #333; margin-bottom:15px; border-radius:6px; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);">
                         <div style="font-size:12px; color:#00A2E8; margin-bottom:4px; font-weight:bold;">
-                            [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">2</span> / 2회)
+                            [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">3</span> / 2회)
                         </div>
                         <!-- 타이머가 들어갈 깔끔한 위치 -->
                         <div id="alien-cooldown-timer" style="font-size:11px; color:#ff9800; margin-bottom:10px; font-weight:bold; display:none;"></div>
@@ -2982,8 +2982,8 @@ if (database) {
            function getDarkTriesLeft() {
         if (!currentUser) return 0;
         const today = getTodayStr();
-        if (currentUser.darkDate !== today) return 3;
-        const base = 3;
+       if (currentUser.darkDate !== today) return 4;
+       const base = 4;
         return Math.max(0, base - (currentUser.darkTries || 0));
     }
 
@@ -5080,12 +5080,12 @@ const isLocked = currentUser.pollution >= 100;
             document.getElementById('shop-content-box').style.display = 'block';
         }
 
-                document.getElementById('alien-tries-left').innerText = Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
+                document.getElementById('alien-tries-left').innerText = Math.max(0, 3 - (currentUser.alienDailyUsed || 0));
                // ★ 남은 기회가 0이면 HIGH/LOW 버튼 잠금
         const hlH = document.getElementById('btn-hl-high');
         const hlL = document.getElementById('btn-hl-low');
         if (hlH && hlL) {
-      const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 2 - (currentUser.alienDailyUsed || 0));
+      const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 3 - (currentUser.alienDailyUsed || 0));
 const coolDone = !currentUser.lastAlienPlayTime || (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
 const playable = triesLeft > 0 && coolDone;
 hlH.disabled = !playable;
@@ -7965,7 +7965,7 @@ function bjFinish(mode) {
     if (currentUser.alienDailyUsed === undefined) currentUser.alienDailyUsed = 0;
 
     // 하루 2회 상한
-    if (currentUser.alienDailyUsed >= 2) {
+    if (currentUser.alienDailyUsed >= 3) {
         showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
         return;
     }
@@ -7985,8 +7985,8 @@ function bjFinish(mode) {
         const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
 
-        let playerCardValue = Math.floor(Math.random() * 13) + 1;
-        while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 13) + 1; }
+       let dealerCardValue = Math.floor(Math.random() * 100) + 1;
+       while (playerCardValue === dealerCardValue) { playerCardValue = Math.floor(Math.random() * 100) + 1; }
         document.getElementById('hl-player-card').innerText = playerCardValue;
         const msgEl = document.getElementById('hl-msg');
 
@@ -7994,9 +7994,9 @@ function bjFinish(mode) {
         const luckM = facilityLuckMult(currentUser);
         if (!win && luckM > 1 && Math.random() < 0.12 * (luckM - 1)) {
             win = true;
-            playerCardValue = choice === 'HIGH'
-                ? Math.min(13, dealerCardValue + 1 + Math.floor(Math.random() * 3))
-                : Math.max(1, dealerCardValue - 1 - Math.floor(Math.random() * 3));
+           playerCardValue = choice === 'HIGH'
+    ? Math.min(100, dealerCardValue + 1 + Math.floor(Math.random() * 10))
+    : Math.max(1, dealerCardValue - 1 - Math.floor(Math.random() * 10));
             document.getElementById('hl-player-card').innerText = playerCardValue;
         }
         
@@ -8054,8 +8054,8 @@ function bjFinish(mode) {
         
         saveDB();
         setTimeout(() => {
-            dealerCardValue = Math.floor(Math.random() * 13) + 1;
-            document.getElementById('hl-dealer-card').innerText = dealerCardValue;
+    dealerCardValue = Math.floor(Math.random() * 100) + 1;
+    document.getElementById('hl-dealer-card').innerText = dealerCardValue;
             document.getElementById('hl-player-card').innerText = "?";
                         // ★ 기회가 남아있을 때만 버튼 재활성화
             const canPlayAgain = (currentUser.code === 'kario0987') || (currentUser.alienTries < 2);
@@ -9456,7 +9456,7 @@ if (bathModal) bathModal.style.display = 'none';
     if (currentUser.code === 'kario0987') { el.style.display = 'none'; return; }
 
     const used = currentUser.alienDailyUsed || 0;
-    if (used >= 2) {
+    if (used >= 3) {
         el.style.display = 'block';
         el.innerHTML = '금일 연결 기회를 모두 소진했습니다. (자정 초기화)';
         return;
