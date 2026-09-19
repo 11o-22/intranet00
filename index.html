@@ -3284,16 +3284,39 @@ return b;
     }
 
     // 채팅을 하단 고정 영역에 렌더
-        function mountDarkChat(mode, words, wordsLeft, muted) {
-        const slot = document.getElementById('dro-chat');
-        if (!slot) return;
-        if (!darkRun || !darkRun.isParty) { slot.innerHTML = ''; return; }
-        const reactBar = (darkRun.zone === 'Qtrew-C-119' && c119State && darkRun.step > 0) ? buildReactBar() : '';
-        slot.innerHTML = reactBar + buildChatHtml(mode || 'normal', words, wordsLeft, muted);
-        attachChatListener(darkRun.partyId);
+      function mountDarkChat(mode, words, wordsLeft, muted) {
+    const slot = document.getElementById('dro-chat');
+    if (!slot) return;
+    if (!darkRun || !darkRun.isParty) { slot.innerHTML = ''; return; }
+
+    const reactBar = (darkRun.zone === 'Qtrew-C-119' && c119State && darkRun.step > 0) ? buildReactBar() : '';
+    const key = (mode || 'normal') + '|' + (wordsLeft || 0) + '|' + (muted ? 1 : 0) + '|' + reactBar.length;
+
+    // 같은 구성이면 다시 그리지 않는다
+    if (slot.dataset.chatKey === key && document.getElementById('pchat-log')) {
         renderChatLog();
         renderReactFlash();
+        return;
     }
+
+    // 입력 중이던 내용 보존
+    const prev = document.getElementById('pchat-input');
+    const keep = prev ? prev.value : '';
+    const wasFocused = prev && document.activeElement === prev;
+
+    slot.innerHTML = reactBar + buildChatHtml(mode || 'normal', words, wordsLeft, muted);
+    slot.dataset.chatKey = key;
+
+    attachChatListener(darkRun.partyId);
+    renderChatLog();
+    renderReactFlash();
+
+    const now = document.getElementById('pchat-input');
+    if (now && keep) {
+        now.value = keep;
+        if (wasFocused) { now.focus(); now.setSelectionRange(keep.length, keep.length); }
+    }
+}
 
     function darkBox(title, text, extra, imgKey) {
         const z = DARK_ZONES[darkRun.zone];

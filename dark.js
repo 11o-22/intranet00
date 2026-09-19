@@ -8524,44 +8524,53 @@ if (r) {
     database.ref('users/' + r.code + '/houseChatUnread').set(Date.now());
      }
  }
-        function renderHouseChat() {
-        const box = document.getElementById('house-chat-body');
-        if (!box || !currentUser) return;
-        const r = getRoomie(currentUser);
+       function renderHouseChat() {
+    const box = document.getElementById('house-chat-body');
+    if (!box || !currentUser) return;
+    const r = getRoomie(currentUser);
 
-        if (!r) {
-            box.innerHTML = `
-                <div class="panel-title">[대화]</div>
-                <div style="text-align:center; font-size:11px; color:#666; padding:40px 0;">
-                    동거인이 없습니다.
-                </div>`;
-            return;
-        }
-
-        attachHouseChat();
-
-        // 읽음 처리
-        currentUser.houseChatRead = Date.now();
-        currentUser.houseChatUnread = 0;
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        updateHouseChatDot();
-
+    if (!r) {
         box.innerHTML = `
             <div class="panel-title">[대화]</div>
-            <div style="font-size:11px; color:#888; margin-bottom:10px;">
-                ${r.name} 사원
-                <span style="color:${onlineUsersMap[r.code] ? '#4CAF50' : '#666'}; margin-left:5px;">
-                    ${onlineUsersMap[r.code] ? '● 재실' : '○ 부재'}
-                </span>
-                <span style="color:#555; font-size:10px; margin-left:6px;">지난 대화는 남습니다</span>
-            </div>
-            <div id="hchat-log" style="height:46vh; overflow-y:auto; background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:10px; -webkit-overflow-scrolling:touch;"></div>
-            <div style="display:flex; gap:6px;">
-                <input type="text" id="hchat-input" maxlength="200" placeholder="메시지 입력..." style="flex:1; font-size:12px; padding:9px;" onkeypress="if(event.key==='Enter') sendHouseChat()">
-                <button class="game-btn" style="margin:0; padding:9px 16px; font-size:11px; flex-shrink:0;" onclick="sendHouseChat()">전송</button>
+            <div style="text-align:center; font-size:11px; color:#666; padding:40px 0;">
+                동거인이 없습니다.
             </div>`;
-        renderHouseChatLog();
+        return;
     }
+
+    attachHouseChat();
+
+    currentUser.houseChatRead = Date.now();
+    currentUser.houseChatUnread = 0;
+    if (database) database.ref('users/' + currentUser.code + '/houseChatRead').set(currentUser.houseChatRead);
+    updateHouseChatDot();
+
+    // 이미 그려져 있으면 상태 줄만 갱신하고 끝낸다
+    if (document.getElementById('hchat-input')) {
+        const st = document.getElementById('hchat-status');
+        if (st) st.innerHTML = `${r.name} 사원
+            <span style="color:${onlineUsersMap[r.code] ? '#4CAF50' : '#666'}; margin-left:5px;">
+                ${onlineUsersMap[r.code] ? '● 재실' : '○ 부재'}
+            </span>`;
+        renderHouseChatLog();
+        return;
+    }
+
+    box.innerHTML = `
+        <div class="panel-title">[대화]</div>
+        <div id="hchat-status" style="font-size:11px; color:#888; margin-bottom:10px;">
+            ${r.name} 사원
+            <span style="color:${onlineUsersMap[r.code] ? '#4CAF50' : '#666'}; margin-left:5px;">
+                ${onlineUsersMap[r.code] ? '● 재실' : '○ 부재'}
+            </span>
+        </div>
+        <div id="hchat-log" style="height:46vh; overflow-y:auto; background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:10px; -webkit-overflow-scrolling:touch;"></div>
+        <div style="display:flex; gap:6px;">
+            <input type="text" id="hchat-input" maxlength="200" placeholder="메시지 입력..." style="flex:1; font-size:12px; padding:9px;" onkeypress="if(event.key==='Enter') sendHouseChat()">
+            <button class="game-btn" style="margin:0; padding:9px 16px; font-size:11px; flex-shrink:0;" onclick="sendHouseChat()">전송</button>
+        </div>`;
+    renderHouseChatLog();
+}
 
     function renderHouseChatLog() {
         const log = document.getElementById('hchat-log');
