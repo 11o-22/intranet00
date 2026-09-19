@@ -4245,6 +4245,19 @@ if (database) {
             changed = true;
         }
 
+            if (user.satiety === undefined) user.satiety = 100;
+    if (!user.lastSatietyTime) user.lastSatietyTime = now;
+
+    const satietyStep = 2 * 60 * 60 * 1000;
+    const sDiff = now - user.lastSatietyTime;
+    if (sDiff >= satietyStep) {
+        let steps = Math.floor(sDiff / satietyStep);
+        if (steps > 12) steps = 12;
+        user.satiety = Math.max(0, user.satiety - steps * 5);
+        user.lastSatietyTime = now;
+        changed = true;
+    }
+
         const diffMs = now - user.lastPollutionTime;
         const threeHoursMs = 3 * 60 * 60 * 1000;
         if (user.satiety === undefined) user.satiety = 100;
