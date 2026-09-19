@@ -2373,15 +2373,25 @@ if (database) {
         area.innerHTML = html;
     }
 
-        function renderVoteBox(title, text, options, imgKey) {
-        const body = darkBodyEl();
-        if (!body) return;
-        body.innerHTML = darkBox(title, text, `<div id="vote-area"></div>`, imgKey);
-        mountDarkChat('normal');
-        if (darkRun.isLeader) openVote(options);
-        attachVoteListener();
-        renderVoteState();
-    }
+       function renderVoteBox(title, text, options, imgKey) {
+    const body = darkBodyEl();
+    if (!body) return;
+    body.innerHTML = darkBox(title, text, `<div id="vote-area"></div>`);
+    mountDarkChat('normal');
+
+    if (darkRun.isLeader) openVote(options);
+    attachVoteListener();
+    renderVoteState();
+
+    // 3초 안에 투표판이 안 열리면 아무나 연다
+    setTimeout(() => {
+        if (!darkRun || !document.getElementById('vote-area')) return;
+        if (currentVote) return;
+        const p = darkParties[darkRun.partyId];
+        const leaderAlive = p && p.alive && p.alive[p.leader];
+        if (!leaderAlive || !darkRun.isLeader) openVote(options);
+    }, 3000);
+}
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
        function renderChoiceStep(title, text, options, imgKey) {
         if (consumeQFlag('safe_hint') && options.length > 0) {
