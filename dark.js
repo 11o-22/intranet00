@@ -8789,6 +8789,10 @@ ${picked.map(m => '- ' + m.text).join('\n')}
     }
 
     function enterQuarantineRoom() {
+    if (aiChatOff && currentUser.code !== 'kario0987') {
+        showCustomAlert('지금은 이용할 수 없습니다.');
+        return;
+    }
     if (isDisasterAgent(currentUser)) openBathRoom();
     else openFoxRoom();
 }

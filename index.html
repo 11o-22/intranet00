@@ -1268,17 +1268,23 @@ if (database) {
 
 if (database) {
     database.ref('aiChatOff').on('value', snap => {
-        aiChatOff = !!snap.val();
-        renderAiChatState();
+    aiChatOff = !!snap.val();
+    renderAiChatState();
 
-        if (aiChatOff && currentUser && currentUser.code !== 'kario0987') {
-            const fm = document.getElementById('fox-modal');
-            const bm = document.getElementById('bath-modal');
-            if (fm && fm.style.display === 'flex') closeFoxRoom();
-            if (bm && bm.style.display === 'flex') closeBathRoom();
-        }
-        if (currentUser) updateUI();
-    });
+    const blocked = aiChatOff && currentUser && currentUser.code !== 'kario0987';
+
+    const qBtn = document.getElementById('quarantine-enter-btn');
+    if (qBtn) qBtn.style.display = blocked ? 'none' : 'block';
+
+    if (blocked) {
+        const fm = document.getElementById('fox-modal');
+        const bm = document.getElementById('bath-modal');
+        if (fm && fm.style.display === 'flex') closeFoxRoom();
+        if (bm && bm.style.display === 'flex') closeBathRoom();
+    }
+    if (currentUser) updateUI();
+});
+
 }
         
 
