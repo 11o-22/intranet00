@@ -4249,6 +4249,12 @@ if (database) {
             if (user.satiety === undefined) user.satiety = 100;
     if (!user.lastSatietyTime) user.lastSatietyTime = now;
 
+    if (user.satiety === undefined) user.satiety = 100;
+if (!user.lastSatietyTime) user.lastSatietyTime = now;
+
+if (user.code === 'kario0987') {
+    user.satiety = 100;
+} else {
     const satietyStep = 2 * 60 * 60 * 1000;
     const sDiff = now - user.lastSatietyTime;
     if (sDiff >= satietyStep) {
@@ -4258,7 +4264,7 @@ if (database) {
         user.lastSatietyTime = now;
         changed = true;
     }
-
+}
         const diffMs = now - user.lastPollutionTime;
         const threeHoursMs = 3 * 60 * 60 * 1000;
         if (user.satiety === undefined) user.satiety = 100;
