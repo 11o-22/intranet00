@@ -8793,7 +8793,7 @@ ${picked.map(m => '- ' + m.text).join('\n')}
         showCustomAlert('지금은 이용할 수 없습니다.');
         return;
     }
-    if (isDisasterAgent(currentUser)) openBathRoom();
+    if (isBathUser(currentUser)) openBathRoom();
     else openFoxRoom();
 }
 
@@ -11990,4 +11990,20 @@ function renderAiChatState() {
     el.innerHTML = aiChatOff
         ? '<span style="color:#ff6b6b;">● 차단 중 — 대화 불가</span>'
         : '<span style="color:#4CAF50;">● 정상 — 대화 가능</span>';
+}
+
+function pickQuarantine(dest) {
+    currentUser.quarantineDest = dest;
+    const agent = dest === 'bath';
+
+    document.getElementById('quarantine-pick-overlay').style.display = 'none';
+
+    const img = document.getElementById('fox-room-img');
+    if (img) img.src = agent ? 'bath.png' : 'fox.png';
+
+    const box = document.querySelector('#fox-room-overlay > div > div:last-child');
+    if (box) box.style.borderColor = agent ? '#2a4a5a' : '#d4af37';
+
+    document.getElementById('fox-room-overlay').style.display = 'flex';
+    updateFoxRoomQuestion();
 }

@@ -66,6 +66,22 @@
     </div>
 </div>
 
+<div id="quarantine-pick-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100dvh; background:#0a0a0a; z-index:10002; justify-content:center; align-items:center; padding:20px; box-sizing:border-box;">
+    <div style="width:100%; max-width:380px;">
+        <div style="text-align:center; font-size:13px; color:#aaa; margin-bottom:22px; line-height:1.8;">
+            안정이 필요한 상태입니다.<br>어디로 가시겠습니까?
+        </div>
+        <button class="game-btn" style="width:100%; margin:0 0 10px 0; padding:18px; font-size:14px; background:linear-gradient(145deg,#3a2f18,#1c1608) !important; border-color:#5a4a2a !important; color:#d4af37 !important;" onclick="pickQuarantine('fox')">
+            🦊 여우 상담실
+            <div style="font-size:10px; color:#888; margin-top:5px; font-weight:normal;">백일몽 주식회사 · 상담을 통한 안정</div>
+        </button>
+        <button class="game-btn" style="width:100%; margin:0; padding:18px; font-size:14px; background:linear-gradient(145deg,#1a3038,#0b1418) !important; border-color:#2a4a5a !important; color:#7fd4d4 !important;" onclick="pickQuarantine('bath')">
+            ♨ 선녀탕
+            <div style="font-size:10px; color:#888; margin-top:5px; font-weight:normal;">재난관리국 · 온천을 통한 정화</div>
+        </button>
+    </div>
+</div>
+
 <!-- 화면 접속 시 잘못 보이지 않도록 모두 명시적으로 style="display:none;" 추가 -->
 <div id="custom-alert-overlay" style="display:none; z-index: 99999999;">
     <div class="custom-alert-box">
@@ -4801,32 +4817,22 @@ if (user.code === 'kario0987') {
     }
 
 function startFoxRoomSequence() {
-     const agent = isDisasterAgent(currentUser);
     const ov = document.getElementById('fox-loading-overlay');
     if (ov) {
-        ov.querySelector('div > div:first-child').innerText = agent ? '♨' : '🦊';
-        ov.querySelector('div > div:last-child').innerHTML = agent
-            ? '오염 수치가 한계를 넘었습니다.<br>선녀탕으로 이송합니다.'
-            : '심각한 오염이 발견되었습니다.<br>여우 상담실로 이송합니다.';
+        ov.querySelector('div > div:first-child').innerText = '⚠';
+        ov.querySelector('div > div:last-child').innerHTML = '오염 수치가 한계를 넘었습니다.<br>안정 조치가 필요합니다.';
         ov.style.display = 'flex';
     }
     foxQuestionIndex = 0;
     foxTimeReduction = 0;
     setTimeout(() => {
-    if (ov) ov.style.display = 'none';
-    const img = document.getElementById('fox-room-img');
-    if (img) img.src = agent ? 'bath.png' : 'fox.png';
-
-    const box = document.querySelector('#fox-room-overlay > div > div:last-child');
-if (box) box.style.borderColor = agent ? '#2a4a5a' : '#d4af37';
-
-    document.getElementById('fox-room-overlay').style.display = 'flex';
-    updateFoxRoomQuestion();
-}, 3000);
+        if (ov) ov.style.display = 'none';
+        document.getElementById('quarantine-pick-overlay').style.display = 'flex';
+    }, 3000);
 }
 
     function updateFoxRoomQuestion() {
-    const agent = isDisasterAgent(currentUser);
+    const agent = isBathUser(currentUser);
     const qs = agent ? bathQuestions : foxQuestions;
 
     if (foxQuestionIndex >= qs.length) {
@@ -4852,7 +4858,7 @@ if (box) box.style.borderColor = agent ? '#2a4a5a' : '#d4af37';
     }
 
        function finishFoxRoomSequence() {
-    const agent = isDisasterAgent(currentUser);
+    const agent = isBathUser(currentUser);
     let finalHours = 24 - foxTimeReduction;
     if (foxUseNameplate) {
         finalHours -= 3;
@@ -5052,7 +5058,7 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
 
                // ★ 격리 중 시설 전면 차단 (정보 열람만 허용)
         const inQuarantine = isQuarantined(currentUser);
-        const agent = isDisasterAgent(currentUser);
+        const agent = isBathUser(currentUser);
         const lockBox = document.getElementById('quarantine-lock-box');
         const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
         const starveLocked = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
@@ -5070,7 +5076,7 @@ if (qBox) {
     const remainMs = currentUser.quarantineUntil - Date.now();
     const rh = Math.floor(remainMs / (1000 * 60 * 60));
     const rm = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
-     const agent = isDisasterAgent(currentUser);
+     const agent = isBathUser(currentUser);
             
 
 const qBtn = document.getElementById('quarantine-enter-btn');
@@ -9426,6 +9432,7 @@ function adminGiveItem() {
             if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
             if(currentUser.hasNewReply === undefined) currentUser.hasNewReply = false;
             if(currentUser.hasItemUsedOnMe === undefined) currentUser.hasItemUsedOnMe = false;
+            if(currentUser.quarantineDest === undefined) currentUser.quarantineDest = null;
             if(currentUser.foxRoomAnswered === undefined) currentUser.foxRoomAnswered = false;
             if(currentUser.equippedWeapons === undefined) currentUser.equippedWeapons = [];
             if(currentUser.quarantineExitPollution === undefined) currentUser.quarantineExitPollution = 0;
