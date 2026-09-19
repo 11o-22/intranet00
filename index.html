@@ -4058,11 +4058,12 @@ if (database) {
     const agent = isDisasterAgent(user);
 
     return {
-        label: agent ? '온천욕' : (isHospital ? '입원중' : '상담중'),
-        color: agent ? '#7fd4d4' : (isHospital ? '#ff6b6b' : '#d4af37'),
-        bg: agent ? 'rgba(127,212,212,0.15)' : (isHospital ? 'rgba(255,107,107,0.15)' : 'rgba(212,175,55,0.15)'),
-        remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`
-    };
+    label: agent ? '온천욕' : (isHospital ? '입원중' : '상담중'),
+    icon: agent ? '♨' : '🦊',
+    color: agent ? '#7fd4d4' : (isHospital ? '#ff6b6b' : '#d4af37'),
+    bg: agent ? 'rgba(127,212,212,0.15)' : (isHospital ? 'rgba(255,107,107,0.15)' : 'rgba(212,175,55,0.15)'),
+    remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`
+};
 }
 
     function checkMedRations(user) {
@@ -4546,7 +4547,7 @@ if (database) {
                     <div class="id-info-details">
                         <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
                          <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
-                        ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">🦊 여우 상담실 ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
+                         ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">${qb2.icon} ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
                         <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
                     </div>
                 </div>
@@ -4629,9 +4630,8 @@ if (database) {
             const isMe = (currentUser && currentUser.code === u.code) ? `<span style="color:#4CAF50; font-size:10px; margin-left:6px; border: 1px solid #4CAF50; border-radius: 3px; padding: 2px 5px; font-weight:bold;">본인</span>` : '';
             const qb = getQuarantineBadge(u);
             const quarantineTag = qb
-                ? `<span style="font-size:10px; color:${qb.color}; background:${qb.bg}; border:1px solid ${qb.color}; border-radius:3px; padding:2px 6px; font-weight:bold; margin-left:4px;">🦊 ${qb.label}</span>`
-                : '';
-            
+             ? `<span style="font-size:10px; color:${qb.color}; background:${qb.bg}; border:1px solid ${qb.color}; border-radius:3px; padding:2px 6px; font-weight:bold; margin-left:4px;">${qb.icon} ${qb.label}</span>`
+              : '';
             // ★ 실시간 온라인 감지 (초록색 불빛)
             const isOnline = onlineUsersMap[u.code] ? true : false;
             const onlineDot = isOnline ? `<div style="position:absolute; top:-4px; left:-4px; width:12px; height:12px; background-color:#4CAF50; border-radius:50%; box-shadow:0 0 8px #4CAF50; border:2px solid #242424; z-index:10;"></div>` : '';
@@ -4919,7 +4919,7 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         const statusEl = document.getElementById('badge-current-status');
         const myQb = getQuarantineBadge(currentUser);
         if (myQb) {
-            statusEl.innerText = `🦊 ${myQb.label} (${myQb.remain})`;
+           statusEl.innerText = `${myQb.icon} ${myQb.label} (${myQb.remain})`;
             statusEl.style.color = myQb.color;
             statusEl.style.backgroundColor = myQb.bg;
             statusEl.style.border = `1px solid ${myQb.color}`;
