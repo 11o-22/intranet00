@@ -4165,6 +4165,9 @@ return b;
         return user.quarantineUntil && Date.now() < user.quarantineUntil;
     }
 
+    function isBathUser(user) {
+    return (user.quarantineDest || 'fox') === 'bath';
+}
         // 격리 상태 배지 정보 (없으면 null)
    function getQuarantineBadge(user) {
     if (!user.quarantineUntil || Date.now() >= user.quarantineUntil) return null;
