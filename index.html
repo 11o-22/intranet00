@@ -2983,7 +2983,7 @@ if (database) {
     // --- 반입품 선택 모달 ---
     function openPartyCarryModal() {
         const p = getMyParty();
-if (p) { renderPartyRoom(p, body); return; }
+        if (!p) return;
         const me = p.members[currentUser.code];
 
         let counts = {};
