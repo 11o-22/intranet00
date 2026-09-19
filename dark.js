@@ -8146,15 +8146,28 @@ function b508RequiredDocs() {
     // ★ 사택 — 주방
     // ==========================================
     const RECIPES = [
-        { id:'porridge', name:'묽은 죽', mats:['쌀 한 컵'],
-          effect:'오염도 8% 회복', desc:'별맛은 없지만 속이 편하다.' },
-        { id:'soup', name:'채소 국', mats:['쌀 한 컵','말린 채소'],
-          effect:'오염도 15% 회복 · 다음 탐사 판정 +1', desc:'국물이 뜨겁다. 그게 전부인데 그게 좋다.' },
-        { id:'stew', name:'고기 조림', mats:['통조림 고기','말린 채소'],
-          effect:'다음 탐사 판정 +2 · 어둠 첫 오염 1회 차단', desc:'오래 끓였다. 기다린 값은 한다.' },
-        { id:'feast', name:'제대로 된 한 끼', mats:['쌀 한 컵','말린 채소','통조림 고기','이름 없는 향신료'],
-          effect:'오염도 25% 회복 · 판정 +3 · 치명 판정 1회 무효', desc:'둘이 마주 앉아 먹었다. 오랜만이었다.' }
-    ];
+    { id:'porridge', name:'묽은 죽', mats:['쌀 한 컵'],
+      effect:'오염도 8% 회복', desc:'별맛은 없지만 속이 편하다.' },
+    { id:'soup', name:'채소 국', mats:['쌀 한 컵','말린 채소'],
+      effect:'오염도 15% 회복 · 다음 탐사 판정 +1', desc:'국물이 뜨겁다. 그게 전부인데 그게 좋다.' },
+    { id:'stew', name:'고기 조림', mats:['통조림 고기','말린 채소'],
+      effect:'다음 탐사 판정 +2 · 어둠 첫 오염 1회 차단', desc:'오래 끓였다. 기다린 값은 한다.' },
+    { id:'feast', name:'제대로 된 한 끼', mats:['쌀 한 컵','말린 채소','통조림 고기','이름 없는 향신료'],
+      effect:'오염도 25% 회복 · 판정 +3 · 치명 판정 1회 무효', desc:'둘이 마주 앉아 먹었다. 오랜만이었다.' },
+
+    { id:'emergency', name:'맹물죽', mats:[],
+      effect:'포만감 +10', desc:'쌀 몇 톨과 물. 맛은 없지만 배는 찬다.' },
+    { id:'kimbap', name:'김밥', mats:['쌀 한 컵','말린 채소'],
+      effect:'포만감 +30', desc:'한식. 손에 밥알이 붙는다.' },
+    { id:'ramen', name:'라멘', mats:['쌀 한 컵','통조림 고기','말린 채소'],
+      effect:'포만감 +35', desc:'일식. 국물이 진하다.' },
+    { id:'friedrice', name:'볶음밥', mats:['쌀 한 컵','통조림 고기'],
+      effect:'포만감 +32', desc:'중식. 불 맛이 난다.' },
+    { id:'pasta', name:'파스타', mats:['쌀 한 컵','말린 채소','이름 없는 향신료'],
+      effect:'포만감 +34', desc:'양식. 면이 잘 익었다.' }
+];
+
+    const FOOD_IDS = ['emergency','kimbap','ramen','friedrice','pasta'];
 
     const COOK_MATS = ['쌀 한 컵', '말린 채소', '통조림 고기', '이름 없는 향신료'];
 
@@ -8177,9 +8190,9 @@ function b508RequiredDocs() {
                 ${together ? `<span style="color:#d4af37;">${r.name} 사원이 있습니다. 같이 먹으면 효과가 커집니다.</span>` : '<span style="color:#666;">혼자 먹습니다.</span>'}
             </div>
 
-            ${RECIPES.map(rc => {
+            ${RECIPES.filter(rc => rc.id !== 'emergency' || (currentUser.satiety || 0) <= 0).map(rc => {
                 const have = rc.mats.map(m => ({ name:m, ok: inv.includes(m) }));
-                const can = have.every(x => x.ok) && left > 0;
+                const can = have.every(x => x.ok) && (FOOD_IDS.includes(rc.id) || left > 0);
                 return `
                     <div style="border:1px solid ${can ? '#5a4a2a' : '#333'}; border-radius:6px; padding:12px; margin-bottom:10px; ${can ? '' : 'opacity:0.55;'}">
                         <div style="font-size:13px; color:#d4af37; font-weight:bold;">${rc.name}</div>
@@ -8227,28 +8240,44 @@ function b508RequiredDocs() {
         if (!buyGuard()) return;
         const rc = RECIPES.find(x => x.id === id);
         if (!rc) return;
+
+        if (id === 'emergency' && (currentUser.satiety || 0) > 0) {
+        showCustomAlert('아직 그 정도로 배가 고프지는 않습니다.');
+        return;
+    }
+
         const inv = currentUser.inventory || [];
         const missing = rc.mats.filter(m => !inv.includes(m));
         if (missing.length) { showCustomAlert(`재료가 부족합니다.\n${missing.join(', ')}`); return; }
 
         const h = getHouse(currentUser);
-        const today = getTodayStr();
-        if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
-        if ((h.cookCount || 0) >= 2) { showCustomAlert('오늘은 충분히 먹었습니다.'); return; }
+const today = getTodayStr();
 
+const isFood = FOOD_IDS.includes(id);
+
+if (!isFood) {
+    if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
+    if ((h.cookCount || 0) >= 2) { showCustomAlert('오늘은 충분히 먹었습니다.'); return; }
+}
         rc.mats.forEach(m => removeItemFromInventory(currentUser, m, 1));
-        h.cookCount = (h.cookCount || 0) + 1;
+       if (!isFood) h.cookCount = (h.cookCount || 0) + 1;
 
         const r = getRoomie(currentUser);
         const together = r && onlineUsersMap[r.code];
         const mult = together ? 1.5 : 1;
 
         let msg = [];
-        if (id === 'porridge') {
-            const heal = Math.round(8 * mult);
-            currentUser.pollution = Math.max(0, currentUser.pollution - heal);
-            msg.push(`오염도 -${heal}%`);
-        } else if (id === 'soup') {
+if (isFood) {
+    const gain = { emergency:10, kimbap:30, ramen:35, friedrice:32, pasta:34 }[id];
+    const before = currentUser.satiety != null ? currentUser.satiety : 100;
+    currentUser.satiety = Math.min(100, before + gain);
+    currentUser.lastSatietyTime = Date.now();
+    msg.push(`포만감 +${currentUser.satiety - before}`);
+} else if (id === 'porridge') {
+    const heal = Math.round(8 * mult);
+    currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+    msg.push(`오염도 -${heal}%`);
+} else if (id === 'soup') {
             const heal = Math.round(15 * mult);
             currentUser.pollution = Math.max(0, currentUser.pollution - heal);
             addPendingFlag('meal_bonus1', true);
