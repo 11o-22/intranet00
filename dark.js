@@ -3241,12 +3241,12 @@ function safeDeposit() {
     };
 
     // 인원별 필요 서류 수
-          function b508RequiredDocs() {
-        const n = darkRun && darkRun.memberCount ? darkRun.memberCount : 3;
-        if (n >= 5) return 10;
-        if (n === 4) return 8;
-        return 7;
-    }
+function b508RequiredDocs() {
+    const n = darkRun && darkRun.memberCount ? darkRun.memberCount : 3;
+    if (n >= 5) return 12;
+    if (n === 4) return 10;
+    return 8;
+}
         const B508_MONSTERS = {
         kneader: {
             name: '반죽공',
@@ -3987,7 +3987,7 @@ function safeDeposit() {
         // ★ 서류 부족 — 즉사가 아니라 판정
         const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
-        const DC = 12;
+        const DC = 20;
         const survived = roll !== 1 && (roll + bonus) >= DC;
 
         darkRun.fail += 2;
