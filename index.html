@@ -4049,20 +4049,21 @@ if (database) {
     }
 
         // 격리 상태 배지 정보 (없으면 null)
-    function getQuarantineBadge(user) {
-        if (!user.quarantineUntil || Date.now() >= user.quarantineUntil) return null;
-        const remainMs = user.quarantineUntil - Date.now();
-        const h = Math.floor(remainMs / (1000 * 60 * 60));
-        const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
-        // 2시간 이하 이송이면 '입원중', 그 외 일반 상담은 '상담중'
-        const isHospital = (user.quarantineExitPollution || 0) >= 40;
-        return {
-            label: isHospital ? '입원중' : '상담중',
-            color: isHospital ? '#ff6b6b' : '#d4af37',
-            bg: isHospital ? 'rgba(255,107,107,0.15)' : 'rgba(212,175,55,0.15)',
-            remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`
-        };
-    }
+   function getQuarantineBadge(user) {
+    if (!user.quarantineUntil || Date.now() >= user.quarantineUntil) return null;
+    const remainMs = user.quarantineUntil - Date.now();
+    const h = Math.floor(remainMs / (1000 * 60 * 60));
+    const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+    const isHospital = (user.quarantineExitPollution || 0) >= 40;
+    const agent = isDisasterAgent(user);
+
+    return {
+        label: agent ? '온천욕' : (isHospital ? '입원중' : '상담중'),
+        color: agent ? '#7fd4d4' : (isHospital ? '#ff6b6b' : '#d4af37'),
+        bg: agent ? 'rgba(127,212,212,0.15)' : (isHospital ? 'rgba(255,107,107,0.15)' : 'rgba(212,175,55,0.15)'),
+        remain: h > 0 ? `${h}시간 ${m}분` : `${m}분`
+    };
+}
 
     function checkMedRations(user) {
         if (!user.receivedRations) user.receivedRations = [];
@@ -4675,6 +4676,7 @@ if (database) {
     }
 
 function startFoxRoomSequence() {
+     const agent = isDisasterAgent(currentUser);
     const ov = document.getElementById('fox-loading-overlay');
     if (ov) {
         ov.querySelector('div > div:first-child').innerText = agent ? '♨' : '🦊';
