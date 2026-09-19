@@ -4458,16 +4458,15 @@ if (user.code === 'kario0987') {
 
 
     function addPollution(amount) {
-        if (!currentUser || currentUser.code === 'kario0987') return; 
-        if (isBlindfolded(currentUser)) return;
-        let finalAmount = Math.round(amount * getPollutionMultiplier(currentUser));
-        if (finalAmount <= 0) return;
-        
-        // ★ [수정] amount 대신 방어막이 적용된 finalAmount를 더해야 합니다!
-        currentUser.pollution = Math.min(100, currentUser.pollution + finalAmount);
-        saveFields({ points:1, facilityCount:1, satiety:1 });
-        updateUI();
-    }
+    if (!currentUser || currentUser.code === 'kario0987') return; 
+    if (isBlindfolded(currentUser)) return;
+    let finalAmount = Math.round(amount * getPollutionMultiplier(currentUser));
+    if (finalAmount <= 0) return;
+
+    currentUser.pollution = Math.min(100, currentUser.pollution + finalAmount);
+    saveFields({ pollution:1 });
+    updateUI();
+}
 
         function applyPollutionToUser(user, amount) {
         if (!user || user.code === 'kario0987') return; 
