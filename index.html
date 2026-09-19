@@ -6192,10 +6192,10 @@ else if (cat.effect === 'rainbow_potion') {
 
             } else if (cat.effect === 'food') {
             if (targetUser.satiety === undefined) targetUser.satiety = 100;
-            if (targetUser.satiety >= 100) {
-                if (!isOthers) showCustomAlert('이미 배가 부릅니다.');
-                return false;
-            }
+          if (targetUser.satiety >= 100 && !cat.heal && !cat.pollute && !cat.ticket && !cat.darkTry) {
+    if (!isOthers) showCustomAlert('이미 배가 부릅니다.');
+    return false;
+}
 
             targetUser.satiety = Math.min(100, targetUser.satiety + (cat.satiety || 0));
             targetUser.lastSatietyTime = Date.now();
