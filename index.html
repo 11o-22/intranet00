@@ -1277,7 +1277,7 @@ if (database) {
             if (fm && fm.style.display === 'flex') closeFoxRoom();
             if (bm && bm.style.display === 'flex') closeBathRoom();
         }
-        updateUI();
+        if (currentUser) updateUI();
     });
 }
         
@@ -4867,9 +4867,10 @@ if (box) box.style.borderColor = agent ? '#2a4a5a' : '#d4af37';
     }
 
    function updateUI() {
+     if (!currentUser) return;
             if (currentUser.points < 0) currentUser.points = 0;
             if (currentUser.points > POINT_CAP) currentUser.points = POINT_CAP;
-        if (!currentUser) return;
+       
         applyDepartmentTheme(currentUser);
 
         const currentToday = getTodayStr(); // 자정(0시) 기준 날짜
