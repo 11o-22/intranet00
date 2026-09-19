@@ -2848,10 +2848,11 @@ if (database) {
         if (p) { renderPartyRoom(p, body); return; }
 
         // --- 모집 중인 방 목록 ---
-               let list = Object.values(darkParties).filter(pt =>
-            pt.state === 'RECRUIT' && Date.now() - pt.createdAt < PARTY_TIMEOUT
-            && (pt.leader !== 'kario0987' || currentUser.code === 'kario0987')
-        );
+             let list = Object.values(darkParties).filter(pt =>
+    pt && pt.zone && DARK_ZONES[pt.zone]
+    && pt.state === 'RECRUIT' && Date.now() - pt.createdAt < PARTY_TIMEOUT
+    && (pt.leader !== 'kario0987' || currentUser.code === 'kario0987')
+);
 
         let html = `<div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
                 모집 중인 파티에 참가하거나, [탐사 개시] 탭에서 새 파티를 편성할 수 있습니다.<br>
@@ -2890,7 +2891,11 @@ if (database) {
     }
 
     function renderPartyRoom(p, body) {
-        const z = DARK_ZONES[p.zone];
+    const z = DARK_ZONES[p.zone];
+    if (!z) {
+        body.innerHTML = `<div style="font-size:11px; color:#666; padding:20px 0; text-align:center;">사라진 구역입니다.</div>`;
+        return;
+    }
         const members = Object.values(p.members || {});
         const isLeader = p.leader === currentUser.code;
         const me = p.members[currentUser.code];
@@ -2972,7 +2977,7 @@ if (database) {
     // --- 반입품 선택 모달 ---
     function openPartyCarryModal() {
         const p = getMyParty();
-        if (!p) return;
+if (p) { renderPartyRoom(p, body); return; }
         const me = p.members[currentUser.code];
 
         let counts = {};
