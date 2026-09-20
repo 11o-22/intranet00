@@ -14148,3 +14148,211 @@ function s003Result(title, roll, bonus, DC, ok, txt) {
 function s003DC(base) {
     return base + 6;
 }
+
+function renderS003Vote(n) {
+    if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
+
+    const p = darkParties[darkRun.partyId];
+    const alive = (p && p.alive) ? Object.keys(p.alive) : [];
+    if (alive.length < 2) { partyAdvance(darkRun.step + 1); return; }
+
+    const cast = darkRun.taleCast || {};
+    const title = n === 1 ? '누구의 결말을 따를 것인가' : '누구를 남길 것인가';
+    const text = n === 1
+        ? `이야기는 하나뿐이다.<br><br>
+           일곱 개가 섞여 있지만, 끝은 하나로만 적힌다.<br>
+           누구의 이야기로 끝낼지 정해야 한다.<br><br>
+           <span style="font-size:11px; color:#888;">고른 사람의 동화가 결말이 됩니다.</span>`
+        : `등장인물이 하나 많다.<br><br>
+           아무도 맡지 않은 이름이 계속 불린다.<br>
+           누군가 그 이름을 받아야 나머지가 나갈 수 있다.<br><br>
+           <span style="font-size:11px; color:#ff6b6b;">고른 사람은 마지막 판정에 크게 불리해집니다.</span>`;
+
+    const opts = alive.map(c => {
+        const nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+        const r = cast[c] ? TALE_ROLES[cast[c]] : null;
+        return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s003Vote(${n},'${c}')">
+                    ${r ? r.icon + ' ' : ''}${nm}${r ? ` <span style="color:#888; font-size:10px;">— ${r.tale}</span>` : ''}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}
+                </button>`;
+    }).join('');
+
+    darkBodyEl().innerHTML = darkBox(title, text, loreBarHtml() + opts);
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function s003Vote(n, target) {
+    const p = darkParties[darkRun.partyId];
+    const cast = darkRun.taleCast || {};
+    const nm = (p && p.members && p.members[target]) ? p.members[target].name : '누군가';
+    const r = cast[target] ? TALE_ROLES[cast[target]] : null;
+    const isMe = target === currentUser.code;
+
+    let txt, mod = 0;
+
+    if (n === 1) {
+        darkRun.s003Ending = cast[target] || null;
+        mod = isMe ? 2 : 1;
+        darkRun.success++;
+        addLore(5, '결말 선택');
+        txt = isMe
+            ? `내 이야기로 끝내기로 했다.<br><br>
+               책장이 이쪽으로 기운다. 문장이 이쪽 이름을 중심으로 다시 배열된다.<br><br>
+               <span style="color:#d4af37;">${r ? r.tale : ''}의 결말로 향한다.</span>`
+            : `<b>${nm}</b> 사원의 이야기로 끝내기로 했다.<br><br>
+               배경이 그쪽으로 기운다. 이쪽은 조연이 된다.<br>
+               조연은 덜 죽는다. 대신 덜 남는다.<br><br>
+               <span style="color:#d4af37;">${r ? r.tale : ''}의 결말로 향한다.</span>`;
+    } else {
+        if (isMe) {
+            darkRun.s003Stayed = true;
+            mod = -4;
+            darkRun.success += 2;
+            addLore(10, '이름을 받음');
+            txt = `내가 받겠다고 했다.<br><br>
+                   불리던 이름이 멎는다. 대신 그 이름이 몸에 얹힌다.<br>
+                   무겁지는 않다. 다만 원래 이름이 조금 흐려졌다.<br><br>
+                   <span style="color:#ff6b6b;">마지막 판정이 크게 불리해진다.</span>`;
+        } else {
+            mod = 1;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+            txt = `<b>${nm}</b> 사원을 골랐다.<br><br>
+                   그쪽이 고개를 끄덕인다. 거부하지 않았다.<br>
+                   거부할 수 있었는지는 모르겠다.<br><br>
+                   불리던 이름이 멎었다.`;
+        }
+    }
+
+    darkRun.modifier = (darkRun.modifier || 0) + mod;
+    darkRun.log.push(`[투표 ${n}] ${isMe ? '본인' : nm}`);
+
+    darkBodyEl().innerHTML = darkBox(title2(n), txt,
+        loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function title2(n) {
+    return n === 1 ? '결말 — 결정' : '이름 — 결정';
+}
+
+function renderS003Ending() {
+    const lore = getLore();
+    const pages = (darkRun.talePages || []).length;
+    const role = darkRun.taleRole ? TALE_ROLES[darkRun.taleRole] : null;
+    const trueEnd = pages >= 5;
+
+    darkBodyEl().innerHTML = darkBox("마지막 장",
+        `책이 덮이려 한다.<br><br>
+         덮이기 전에 나가야 한다. 나가는 방법은 적혀 있지 않다.<br>
+         적혀 있지 않은 것을 하려면, 적히지 않은 곳으로 가야 한다.<br><br>
+         <div style="background:rgba(0,0,0,0.3); border:1px solid #5a4a2a; border-radius:6px; padding:12px; font-size:11px; line-height:1.9; margin-top:8px;">
+            배역 <b style="color:#d4af37;">${role ? role.name : '—'}</b><br>
+            이해도 <b style="color:${lore >= 60 ? '#ff6b6b' : '#7fd4d4'};">${lore}</b> / ${LORE_LIMIT}<br>
+            찢어진 장 <b style="color:${trueEnd ? '#d4af37' : '#888'};">${pages}</b> / 5
+            ${trueEnd ? '<br><span style="color:#d4af37;">— 다른 결말이 열려 있다.</span>' : ''}
+         </div>`,
+        loreBarHtml() +
+        darkChoiceBtn("① 적힌 대로 끝낸다.", "s003EndPick('written')") +
+        darkChoiceBtn("② 빈칸으로 걸어 들어간다.", "s003EndPick('blank')") +
+        (trueEnd ? darkChoiceBtn("③ 찢어진 장을 끼워 넣는다.", "s003EndPick('true')") : ''));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function s003EndPick(pick) {
+    const lore = getLore();
+    const pages = (darkRun.talePages || []).length;
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    let bonus = rollDarkBonus('sense') - Math.floor(lore / 12) + pages * 2;
+    if (darkRun.s003Stayed) bonus -= 8;
+    if (darkRun.s003Ending && darkRun.s003Ending === darkRun.taleRole) bonus += 3;
+
+    const DC = { written: 14, blank: 18, true: 12 }[pick] + 6;
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    darkRun.s003Route = pick;
+
+    if (pick === 'true' && ok) {
+        darkRun.success += 5;
+        darkRun.critical = true;
+        darkBodyEl().innerHTML = darkBox("— 끼워 넣음",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:#d4af37; margin-bottom:12px;">🎲 ${roll}</div>
+             찢어진 장을 제자리에 끼운다.<br><br>
+             다섯 장이 맞물리자 문장이 다시 읽힌다.<br>
+             원래 이야기가 아니다. 원래 이야기였던 것이다.<br><br>
+             <span style="color:#d4af37;">"등장인물이 모자랍니다."</span><br>
+             그 문장 아래 원래 적혀 있던 것이 드러난다.<br>
+             <span style="color:#d4af37;">"— 이미 채워졌습니다. 오래전에."</span><br><br>
+             책이 스스로 덮인다. 덮이면서 이쪽을 밀어낸다.<br>
+             밀려나는 게 이렇게 반가운 일인 줄 몰랐다.`,
+            darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+        mountDarkChat('normal');
+        return;
+    }
+
+    if (pick === 'blank') {
+        if (ok) {
+            darkRun.success += 3;
+            darkBodyEl().innerHTML = darkBox("— 빈칸",
+                `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll}</div>
+                 색이 없는 쪽으로 걸었다.<br><br>
+                 몇 걸음 만에 발소리가 안 난다. 소리가 적히지 않는 곳이라서다.<br>
+                 계속 걷는다. 걷는다는 말도 여기서는 안 맞는다.<br><br>
+                 어느 순간 종이가 끝났다.<br>
+                 끝난 자리에 문이 있었다. 문이라기보다 여백이었다.`,
+                darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+            mountDarkChat('normal');
+        } else {
+            darkDeath(
+                `색이 없는 쪽으로 걸었다.<br><br>` +
+                `몇 걸음 만에 발소리가 멎고, 그다음에 발이 멎는다.<br>` +
+                `적히지 않은 곳에서는 움직임도 적히지 않는다.<br><br>` +
+                `서 있는 자세 그대로 멈췄다.<br>` +
+                `<span style="color:#d4af37;">한참 뒤, 그 자리에 문장이 한 줄 늘었다.</span>`
+            );
+        }
+        return;
+    }
+
+    if (ok) {
+        darkRun.success += 2;
+        darkBodyEl().innerHTML = darkBox("— 끝",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>
+             적힌 대로 끝냈다.<br><br>
+             마지막 문장이 완성되고, 그 뒤에 마침표가 찍힌다.<br>
+             마침표가 찍히는 순간 주변이 접힌다.<br><br>
+             접히는 쪽에 있지 않아서 다행이었다.`,
+            darkChoiceBtn("나간다.", "darkRun.step=99; renderDarkStep();"));
+        mountDarkChat('normal');
+    } else {
+        darkDeath(
+            `적힌 대로 끝내려는데, 적힌 것이 바뀐다.<br><br>` +
+            `읽을 때마다 다르다. 따라가려니 따라갈 수가 없다.<br><br>` +
+            `마침표가 엉뚱한 자리에 찍혔다.<br>` +
+            `문장 중간이었다. 이쪽이 있던 자리였다.`
+        );
+    }
+}
+
+function s003Bonus() {
+    if (!darkRun || darkRun.zone !== 'Qtrew-S-003') return 0;
+    let b = 0;
+
+    const pages = (darkRun.talePages || []).length;
+    b += pages * 900;
+
+    const lore = getLore();
+    if (lore < 20) b += 3000;
+    else if (lore < 40) b += 1500;
+    else if (lore >= 70) b -= 2000;
+
+    if (darkRun.s003Route === 'true') b += 8000;
+    else if (darkRun.s003Route === 'blank') b += 4000;
+    else if (darkRun.s003Route === 'written') b += 1500;
+
+    if (darkRun.s003Stayed) b += 5000;
+    if ((darkRun.tabooCount || 0) === 0) b += 2000;
+
+    return b;
+}

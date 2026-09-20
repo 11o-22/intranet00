@@ -4002,6 +4002,8 @@ return b;
                  database.ref(`darkParties/${pid}/curStep`).off();
             database.ref(`darkParties/${pid}/leader`).off();
             database.ref(`darkParties/${pid}/alive`).off();
+                database.ref(`darkParties/${pid}/alive`).off();
+    try { database.ref(`darkParties/${pid}/taleCast`).off(); } catch(e) {}
 
             if (darkRun && darkRun.isLeader) {
                 const p = darkParties[pid];
@@ -4088,6 +4090,10 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             if (sb === -2) bonus -= 4000;
             else if (sb !== -1) bonus += sb;
         }
+
+        if (darkRun.zone === 'Qtrew-S-003') {
+    bonus += s003Bonus();
+}
 
         let total = Math.max(10, base + bonus);
         if (darkRun.zone === 'Qtrew-S-010' && darkRun.turned && darkRun.turnDone >= darkRun.turnGoal) {
@@ -4245,14 +4251,16 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
 
         if (zone) releaseZone(zone);
         if (pid && database) {
-            database.ref(`darkParties/${pid}/curStep`).off();
-            database.ref(`darkParties/${pid}/leader`).off();
-            database.ref(`darkParties/${pid}/alive`).off();
-            database.ref('darkParties/' + pid).remove();
-            database.ref('darkChats/' + pid).remove();
-            database.ref('darkVotes/' + pid).remove();
-            database.ref('darkC119/' + pid).remove();
-        }
+    database.ref(`darkParties/${pid}/curStep`).off();
+    database.ref(`darkParties/${pid}/leader`).off();
+    database.ref(`darkParties/${pid}/alive`).off();
+    try { database.ref(`darkParties/${pid}/taleCast`).off(); } catch(e) {}
+    database.ref('darkParties/' + pid).remove();
+    database.ref('darkChats/' + pid).remove();
+    database.ref('darkVotes/' + pid).remove();
+    database.ref('darkC119/' + pid).remove();
+}
+        
 
         clearDarkRunState();
         detachChatListener();
