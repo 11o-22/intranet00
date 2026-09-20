@@ -12723,11 +12723,14 @@ function applyCoupleTheme(user) {
     if (old) old.remove();
 
     if (!user || !user.couple) {
-        ['--couple-color','--theme-focus','--theme-border','--theme-bg-grad','--theme-text'].forEach(k => body.style.removeProperty(k));
-        document.documentElement.style.removeProperty('--couple-color');
-        applyDepartmentTheme(user);
-        return;
-    }
+    ['--couple-color','--theme-focus','--theme-border','--theme-bg-grad','--theme-text'].forEach(k => body.style.removeProperty(k));
+    body.style.removeProperty('background');
+    body.style.removeProperty('background-attachment');
+    const cont0 = document.querySelector('.container');
+    if (cont0) cont0.style.removeProperty('background');
+    applyDepartmentTheme(user);
+    return;
+}
 
     const c = user.couple;
     const hex = c.hex || '#d4af37';
@@ -12739,6 +12742,12 @@ function applyCoupleTheme(user) {
     body.style.setProperty('--theme-border', hex + '66', 'important');
     body.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`, 'important');
     body.style.setProperty('--theme-text', '#f0f0f0', 'important');
+
+    body.style.background = `linear-gradient(160deg, ${hex}18, #0a0a0a 60%)`;
+    body.style.backgroundAttachment = 'fixed';
+    const cont = document.querySelector('.container');
+    if (cont) cont.style.background = `linear-gradient(170deg, ${hex}1c, #0d0d0d 55%)`;
+
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);
 
