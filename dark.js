@@ -10868,16 +10868,17 @@ function s010ShutterFail() {
 // --- 기믹 24: 최후 판정 ---
 function s010G24() {
     const inf = getInfect();
-    renderChoiceStep("기믹 24 — 밖으로",
+    darkBodyEl().innerHTML = darkBox("기믹 24 — 밖으로",
         `셔터 너머가 아침이다.<br><br>
          밖에는 사람이 있다. 출근하는 사람들, 지나가는 사람들.<br>
          지금 나가면 무엇이 같이 나가는지 아무도 모른다.<br><br>
          <span style="font-size:11px; color:${inf >= INFECT_SYMPTOM ? '#ff6b6b' : '#888'};">현재 감염도 ${inf}</span>`,
-        [
-            { id:'out',    label:'① 그냥 나간다.',                 fn:'s010G24R', arg:'out' },
-            { id:'report', label:'② 밖에 알리고 검역을 요청한다.',  fn:'s010G24R', arg:'report' },
-            { id:'close',  label:'③ 셔터를 다시 내린다.',           fn:'s010G24R', arg:'close' }
-        ], null);
+        infectBarHtml() +
+        darkChoiceBtn("① 그냥 나간다.", "s010G24R('out')") +
+        darkChoiceBtn("② 밖에 알리고 검역을 요청한다.", "s010G24R('report')") +
+        darkChoiceBtn("③ 셔터를 다시 내린다.", "s010G24R('close')"));
+    renderInfectBar();
+    mountDarkChat('normal');
 }
 function s010G24R(pick) {
     const inf = getInfect();
@@ -12845,4 +12846,318 @@ function runNotice() {
     el.classList.add('running');
 
     setTimeout(() => runNotice(), 14000);
+}
+
+let marketPosts = {};
+let marketTab = 'sell';
+const MARKET_FEE = 0.10;
+const MARKET_TTL = 3 * 24 * 60 * 60 * 1000;
+const MARKET_MAX = 20;
+
+function marketSellable() {
+    const pool = new Set();
+    (typeof ALL_10_ITEMS !== 'undefined' ? ALL_10_ITEMS : []).forEach(n => pool.add(n));
+    (typeof ALIEN_ITEMS_POOL !== 'undefined' ? ALIEN_ITEMS_POOL : []).forEach(n => pool.add(n));
+    Object.keys(ITEM_CATALOG).forEach(n => { if (ITEM_CATALOG[n].qShop) pool.add(n); });
+    return pool;
+}
+
+function attachMarket() {
+    if (!database || window._mkAttached) return;
+    window._mkAttached = true;
+    database.ref('market').on('value', snap => {
+        marketPosts = snap.val() || {};
+        const panel = document.getElementById('shop-market');
+        if (panel && panel.classList.contains('active')) renderMarket();
+    });
+}
+
+function switchMarketTab(t) {
+    marketTab = t;
+    ['sell','buy','mine'].forEach(k => {
+        const b = document.getElementById('mk-tab-' + k);
+        if (b) b.style.opacity = (k === t) ? '1' : '0.5';
+    });
+    const ft = document.getElementById('mk-form-title');
+    if (ft) ft.innerText = t === 'buy' ? '구합니다 등록' : '팝니다 등록';
+    renderMarketForm();
+    renderMarket();
+}
+
+function renderMarketForm() {
+    const sel = document.getElementById('mk-item');
+    if (!sel) return;
+    const pool = marketSellable();
+
+    if (marketTab === 'buy') {
+        sel.innerHTML = Array.from(pool).sort().map(n => `<option value="${n}">${n}</option>`).join('');
+        document.getElementById('mk-price').placeholder = '희망 가격 (P)';
+    } else {
+        const counts = {};
+        (currentUser.inventory || []).forEach(it => { if (pool.has(it)) counts[it] = (counts[it] || 0) + 1; });
+        const keys = Object.keys(counts);
+        sel.innerHTML = keys.length
+            ? keys.map(n => `<option value="${n}">${n} ×${counts[n]}</option>`).join('')
+            : `<option value="">팔 수 있는 물품이 없습니다</option>`;
+        document.getElementById('mk-price').placeholder = '판매 가격 (P)';
+    }
+}
+
+function renderMarket() {
+    const box = document.getElementById('mk-list');
+    if (!box || !currentUser) return;
+
+    const now = Date.now();
+    let list = Object.values(marketPosts).filter(p => p && p.state === 'OPEN' && now - p.at < MARKET_TTL);
+
+    if (marketTab === 'mine') list = list.filter(p => p.seller === currentUser.code);
+    else list = list.filter(p => p.type === marketTab);
+
+    list.sort((a, b) => b.at - a.at);
+
+    if (list.length === 0) {
+        box.innerHTML = `<div style="font-size:11px; color:#666; padding:22px 0;">등록된 글이 없습니다.</div>`;
+        return;
+    }
+
+    box.innerHTML = list.map(p => {
+        const mine = p.seller === currentUser.code;
+        const hours = Math.max(0, Math.ceil((MARKET_TTL - (now - p.at)) / 3600000));
+        const offers = p.offers ? Object.values(p.offers) : [];
+
+        let action = '';
+        if (mine) {
+            action = `<button class="game-btn" style="margin:0; padding:7px 12px; font-size:10px; background:linear-gradient(145deg,#555,#333) !important;" onclick="cancelMarket('${p.id}')">내린다</button>`;
+        } else if (p.type === 'sell') {
+            action = `<button class="game-btn" style="margin:0; padding:7px 12px; font-size:10px;" onclick="buyMarket('${p.id}')">구매</button>`;
+        } else {
+            action = `<button class="game-btn" style="margin:0; padding:7px 12px; font-size:10px;" onclick="openOffer('${p.id}')">제시</button>`;
+        }
+
+        const offerHtml = (p.type === 'buy' && offers.length > 0)
+            ? `<div style="margin-top:9px; border-top:1px dashed #333; padding-top:8px;">
+                ${offers.sort((a,b)=>a.price-b.price).map(o => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; padding:4px 0;">
+                        <span style="color:#aaa;">${o.name} — <b style="color:var(--theme-focus);">${o.price.toLocaleString()} P</b></span>
+                        ${mine ? `<button class="game-btn" style="margin:0; padding:4px 9px; font-size:9px;" onclick="acceptOffer('${p.id}','${o.id}')">수락</button>` : ''}
+                    </div>`).join('')}
+               </div>`
+            : '';
+
+        return `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid ${mine ? 'var(--theme-focus)' : 'var(--theme-border)'}; border-radius:6px; padding:11px; margin-bottom:9px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:9px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:9px; color:${p.type === 'sell' ? '#4CAF50' : '#4fc3f7'}; font-weight:bold;">
+                            ${p.type === 'sell' ? '팝니다' : '구합니다'} · ${p.sellerName}${mine ? ' (본인)' : ''}
+                        </div>
+                        <div style="font-size:13px; font-weight:bold; color:var(--theme-text); margin:3px 0;">
+                            ${p.item} ${p.qty > 1 ? `×${p.qty}` : ''}
+                        </div>
+                        <div style="font-size:12px; color:var(--theme-focus); font-weight:bold;">${p.price.toLocaleString()} P</div>
+                        ${p.memo ? `<div style="font-size:10px; color:#888; margin-top:4px;">${p.memo}</div>` : ''}
+                        <div style="font-size:9px; color:#666; margin-top:4px;">${hours}시간 남음${offers.length ? ` · 제시 ${offers.length}건` : ''}</div>
+                    </div>
+                    <div style="flex-shrink:0;">${action}</div>
+                </div>
+                ${offerHtml}
+            </div>`;
+    }).join('');
+}
+
+function postMarket() {
+    if (!buyGuard()) return;
+    if (!database) { showCustomAlert('서버 연결이 필요합니다.'); return; }
+    if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장터를 이용할 수 없습니다.'); return; }
+
+    const item = document.getElementById('mk-item').value;
+    const qty = parseInt(document.getElementById('mk-qty').value, 10) || 1;
+    const price = parseInt(document.getElementById('mk-price').value, 10);
+    const memo = document.getElementById('mk-memo').value.trim();
+
+    if (!item) { showCustomAlert('물품을 선택해주세요.'); return; }
+    if (isNaN(price) || price <= 0) { showCustomAlert('가격을 입력해주세요.'); return; }
+    if (qty <= 0) { showCustomAlert('수량을 확인해주세요.'); return; }
+
+    const mineCount = Object.values(marketPosts).filter(p =>
+        p && p.state === 'OPEN' && p.seller === currentUser.code && Date.now() - p.at < MARKET_TTL).length;
+    if (mineCount >= MARKET_MAX) { showCustomAlert(`등록은 ${MARKET_MAX}건까지 가능합니다.`); return; }
+
+    const type = marketTab === 'buy' ? 'buy' : 'sell';
+
+    if (type === 'sell') {
+        const have = (currentUser.inventory || []).filter(x => x === item).length;
+        if (have < qty) { showCustomAlert('소지 수량이 부족합니다.'); return; }
+        for (let i = 0; i < qty; i++) removeItemFromInventory(currentUser, item, 1);
+    } else {
+        if (currentUser.points < price) { showCustomAlert('보유 포인트가 부족합니다.'); return; }
+    }
+
+    const id = 'mk_' + Date.now() + '_' + Math.floor(Math.random() * 900 + 100);
+    const post = {
+        id: id, type: type,
+        seller: currentUser.code, sellerName: currentUser.name,
+        item: item, qty: qty, price: price, memo: memo || null,
+        state: 'OPEN', at: Date.now()
+    };
+
+    const updates = {};
+    updates[`market/${id}`] = post;
+    if (type === 'sell') updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+
+    database.ref('/').update(updates).then(() => {
+        addHistoryLog(currentUser, `[장터] ${type === 'sell' ? '판매' : '구매'} 등록 — ${item} ${qty > 1 ? '×' + qty : ''} (${price.toLocaleString()} P)`);
+        database.ref(`users/${currentUser.code}/history`).set(currentUser.history);
+        document.getElementById('mk-price').value = '';
+        document.getElementById('mk-memo').value = '';
+        updateUI();
+        renderMarketForm();
+        showCustomAlert('등록되었습니다.');
+    });
+}
+
+function cancelMarket(id) {
+    if (!database) return;
+    const p = marketPosts[id];
+    if (!p || p.seller !== currentUser.code || p.state !== 'OPEN') return;
+
+    const updates = {};
+    updates[`market/${id}/state`] = 'CANCELLED';
+
+    if (p.type === 'sell') {
+        for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
+        updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+    }
+
+    database.ref('/').update(updates).then(() => {
+        addHistoryLog(currentUser, `[장터] 등록을 내렸습니다 — ${p.item}`);
+        database.ref(`users/${currentUser.code}/history`).set(currentUser.history);
+        updateUI();
+        showCustomAlert(p.type === 'sell' ? '물품을 돌려받았습니다.' : '내렸습니다.');
+    });
+}
+
+async function buyMarket(id) {
+    if (!buyGuard()) return;
+    if (!database) return;
+    if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장터를 이용할 수 없습니다.'); return; }
+
+    const snap = await database.ref('market/' + id).once('value');
+    const p = snap.val();
+    if (!p || p.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+    if (p.seller === currentUser.code) return;
+    if (currentUser.points < p.price) { showLuxuryAlert(); return; }
+
+    const fee = Math.floor(p.price * MARKET_FEE);
+    const net = p.price - fee;
+
+    const sSnap = await database.ref('users/' + p.seller).once('value');
+    const seller = sSnap.val();
+    if (!seller) { showCustomAlert('판매자 정보를 찾을 수 없습니다.'); return; }
+
+    currentUser.points -= p.price;
+    for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
+    addHistoryLog(currentUser, `[장터 구매] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${p.sellerName} (-${p.price.toLocaleString()} P)`);
+
+    seller.points = Math.min(POINT_CAP, (seller.points || 0) + net);
+    addHistoryLog(seller, `[장터 판매] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`);
+
+    const updates = {};
+    updates[`market/${id}/state`] = 'SOLD';
+    updates[`market/${id}/buyer`] = currentUser.code;
+    updates[`market/${id}/buyerName`] = currentUser.name;
+    updates[`users/${currentUser.code}/points`] = currentUser.points;
+    updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+    updates[`users/${currentUser.code}/history`] = currentUser.history;
+    updates[`users/${p.seller}/points`] = seller.points;
+    updates[`users/${p.seller}/history`] = seller.history;
+    updates[`users/${p.seller}/_adminStamp`] = Date.now();
+
+    await database.ref('/').update(updates);
+    updateUI();
+    showCustomAlert(`${p.item}${p.qty > 1 ? ' ×' + p.qty : ''}을(를) 구매했습니다.`);
+}
+
+let pendingOfferId = null;
+
+function openOffer(id) {
+    const p = marketPosts[id];
+    if (!p) return;
+    const have = (currentUser.inventory || []).filter(x => x === p.item).length;
+    if (have < p.qty) { showCustomAlert(`'${p.item}'이(가) ${p.qty}개 필요합니다.`); return; }
+
+    pendingOfferId = id;
+    openTextInput(
+        '가격 제시',
+        `${p.sellerName} 사원이 <b>${p.item}</b>${p.qty > 1 ? ` ×${p.qty}` : ''}을(를) 구하고 있습니다.<br>희망가 ${p.price.toLocaleString()} P<br><br>받을 포인트를 적어주세요.`,
+        String(p.price),
+        submitOffer
+    );
+}
+
+function submitOffer(v) {
+    const price = parseInt(v, 10);
+    if (isNaN(price) || price <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
+    const id = pendingOfferId;
+    pendingOfferId = null;
+    if (!id || !database) return;
+
+    const oid = 'of_' + Date.now() + '_' + Math.floor(Math.random() * 900 + 100);
+    database.ref(`market/${id}/offers/${oid}`).set({
+        id: oid, by: currentUser.code, name: currentUser.name,
+        price: price, at: Date.now()
+    }).then(() => showCustomAlert('제시했습니다.'));
+}
+
+async function acceptOffer(postId, offerId) {
+    if (!buyGuard()) return;
+    if (!database) return;
+
+    const snap = await database.ref('market/' + postId).once('value');
+    const p = snap.val();
+    if (!p || p.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+    if (p.seller !== currentUser.code) return;
+
+    const o = p.offers ? p.offers[offerId] : null;
+    if (!o) { showCustomAlert('제시가 취소되었습니다.'); renderMarket(); return; }
+    if (currentUser.points < o.price) { showLuxuryAlert(); return; }
+
+    const sSnap = await database.ref('users/' + o.by).once('value');
+    const other = sSnap.val();
+    if (!other) { showCustomAlert('상대 정보를 찾을 수 없습니다.'); return; }
+
+    const have = (other.inventory || []).filter(x => x === p.item).length;
+    if (have < p.qty) { showCustomAlert('상대가 물품을 더 이상 갖고 있지 않습니다.'); return; }
+
+    const fee = Math.floor(o.price * MARKET_FEE);
+    const net = o.price - fee;
+
+    currentUser.points -= o.price;
+    for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
+    addHistoryLog(currentUser, `[장터 성사] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${o.name} (-${o.price.toLocaleString()} P)`);
+
+    const inv = (other.inventory || []).slice();
+    for (let i = 0; i < p.qty; i++) {
+        const idx = inv.indexOf(p.item);
+        if (idx > -1) inv.splice(idx, 1);
+    }
+    other.points = Math.min(POINT_CAP, (other.points || 0) + net);
+    addHistoryLog(other, `[장터 성사] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`);
+
+    const updates = {};
+    updates[`market/${postId}/state`] = 'SOLD';
+    updates[`market/${postId}/buyer`] = o.by;
+    updates[`market/${postId}/buyerName`] = o.name;
+    updates[`market/${postId}/dealPrice`] = o.price;
+    updates[`users/${currentUser.code}/points`] = currentUser.points;
+    updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+    updates[`users/${currentUser.code}/history`] = currentUser.history;
+    updates[`users/${o.by}/points`] = other.points;
+    updates[`users/${o.by}/inventory`] = inv;
+    updates[`users/${o.by}/history`] = other.history;
+    updates[`users/${o.by}/_adminStamp`] = Date.now();
+
+    await database.ref('/').update(updates);
+    updateUI();
+    showCustomAlert(`${o.name} 사원과 거래가 성사되었습니다.`);
 }
