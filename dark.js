@@ -12743,10 +12743,10 @@ function applyCoupleTheme(user) {
     body.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`, 'important');
     body.style.setProperty('--theme-text', '#f0f0f0', 'important');
 
-    body.style.background = `linear-gradient(160deg, ${hex}18, #0a0a0a 60%)`;
-    body.style.backgroundAttachment = 'fixed';
-    const cont = document.querySelector('.container');
-    if (cont) cont.style.background = `linear-gradient(170deg, ${hex}1c, #0d0d0d 55%)`;
+body.style.background = hex + '18';
+body.style.backgroundAttachment = 'fixed';
+const cont = document.querySelector('.container');
+if (cont) cont.style.background = hex + '1c';
 
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);

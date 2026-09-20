@@ -5583,6 +5583,7 @@ hlL.disabled = !playable;
             updates[`users/${currentUser.code}/history`] = currentUser.history;
             updates[`users/${currentUser.code}/couple`] = currentUser.couple || null;
             updates[`users/${currentUser.code}/badge`] = currentUser.badge;
+            updates[`users/${targetCode}/couple`] = targetUser.couple || null;
 
             await database.ref('/').update(updates);
 
