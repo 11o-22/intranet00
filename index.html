@@ -3868,14 +3868,19 @@ return b;
             releaseZone(zone);
         }
       clearDarkRunState();
-        darkRun = null;
-        myPartyId = null;
-        partyChatOpen = false;
-        partyChatLog = [];
-        hasShownFoxAlert = true;
-        updateUI();
-        renderDarkness();
-        renderPartyPanel();
+darkRun = null;
+myPartyId = null;
+partyChatOpen = false;
+partyChatLog = [];
+
+hasShownFoxAlert = false;
+currentUser.foxRoomAnswered = false;
+currentUser.quarantineUntil = 0;
+
+updateUI();
+renderDarkness();
+renderPartyPanel();
+setTimeout(() => startFoxRoomSequence(), 600);
     }
 
         function renderDarkResult() {
