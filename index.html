@@ -2582,9 +2582,19 @@ if (database) {
         }
 
         if (darkRun.zone === 'Qtrew-A-667') {
-            renderA667Choice(title, text, options, imgKey);
-            return;
-        }
+    renderA667Choice(title, text, options, imgKey);
+    return;
+}
+
+if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
+    const bar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml() : loreBarHtml();
+    darkBodyEl().innerHTML = darkBox(title, text,
+        bar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join(''),
+        imgKey);
+    if (darkRun.zone === 'Qtrew-S-010') renderInfectBar(); else renderLoreBar();
+    mountDarkChat('normal');
+    return;
+}
 
         const jakduBtn = jakduAvailable()
             ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ 작두로 박살낸다 (1회)</button>`
