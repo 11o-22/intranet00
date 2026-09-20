@@ -2916,7 +2916,11 @@ if (database) {
         body.innerHTML = html;
     }
 
+
     function renderPartyRoom(p, body) {
+    const _prev = document.getElementById('pchat-input');
+    const _keep = _prev ? _prev.value : '';
+    const _focused = _prev && document.activeElement === _prev;
     const z = DARK_ZONES[p.zone];
     if (!z) {
         body.innerHTML = `<div style="font-size:11px; color:#666; padding:20px 0; text-align:center;">사라진 구역입니다.</div>`;
@@ -2998,7 +3002,13 @@ if (database) {
 
         attachChatListener(p.id);
         renderChatLog();
+
+    const _now = document.getElementById('pchat-input');
+    if (_now && _keep) {
+        _now.value = _keep;
+        if (_focused) { _now.focus(); _now.setSelectionRange(_keep.length, _keep.length); }
     }
+}
 
     // --- 반입품 선택 모달 ---
     function openPartyCarryModal() {
