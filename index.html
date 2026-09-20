@@ -5560,7 +5560,7 @@ hlL.disabled = !playable;
             if (success === false) return;
 
             targetUser.hasItemUsedOnMe = true;
-            removeItemFromInventory(currentUser, item, 1);
+           if (item !== '💍 커플링') removeItemFromInventory(currentUser, item, 1);
             addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 '${item}' 사용`);
 
             const stamp = Date.now();
@@ -6730,7 +6730,7 @@ else if (cat.effect === 'couple_ring') {
     targetUser.couple = { ...data, partner: currentUser.code, partnerName: currentUser.name };
 
     if (!targetUser.inventory) targetUser.inventory = [];
-    targetUser.inventory.push('💍 커플링');
+if (!targetUser.inventory.includes('💍 커플링')) targetUser.inventory.push('💍 커플링');
 
     appendBadgeNoteToUser(targetUser, `[커플] ${pending.emoji} ${currentUser.name}의 애인`);
     appendBadgeNoteToUser(currentUser, `[커플] ${pending.emoji} ${targetUser.name}의 애인`);
