@@ -5578,10 +5578,11 @@ hlL.disabled = !playable;
             updates[`users/${targetCode}/nostalgiaUntil`] = targetUser.nostalgiaUntil || 0;
             updates[`users/${targetCode}/nostalgiaSender`] = targetUser.nostalgiaSender || null;
             updates[`users/${targetCode}/blindfoldUntil`] = targetUser.blindfoldUntil || 0;
-
             updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
             updates[`users/${currentUser.code}/history`] = currentUser.history;
-
+            updates[`users/${currentUser.code}/couple`] = currentUser.couple || null;
+            updates[`users/${currentUser.code}/badge`] = currentUser.badge;
+            
             await database.ref('/').update(updates);
 
             db.users[targetCode] = targetUser;
