@@ -957,26 +957,26 @@ const DARK_ZONES = {
         99: { type:'result' }
     };
 
-        function renderStepB330() {
-        const body = darkBodyEl();
-        if (!body || !darkRun) return;
-        if (darkRun.isParty) watchDyingMembers();
-        if (darkRun.solo) { renderSoloStep(); return; }
-        if (def.type === 'rescue') { (def.n === 1 ? b330Rescue1() : b330Rescue2()); return; }
+function renderStepB330() {
+    const body = darkBodyEl();
+    if (!body || !darkRun) return;
+    if (darkRun.isParty) watchDyingMembers();
+    if (darkRun.solo) { renderSoloStep(); return; }
 
-        const def = B330_STEPS[darkRun.step];
-        if (!def) { renderDarkResult(); return; }
+    const def = B330_STEPS[darkRun.step];
+    if (!def) { renderDarkResult(); return; }
 
-                if (def.type === 'intro') {
-            body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
-                (darkRun.isLeader || !darkRun.isParty)
-                    ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
-                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
-                "intro");
-            mountDarkChat('normal');
-            return;
-        }
+    if (def.type === 'rescue') { (def.n === 1 ? b330Rescue1() : b330Rescue2()); return; }
 
+    if (def.type === 'intro') {
+        body.innerHTML = darkBox("진입", DARK_ZONES[darkRun.zone].intro,
+            (darkRun.isLeader || !darkRun.isParty)
+                ? darkChoiceBtn("안으로 들어간다.", "partyAdvance(1)")
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...</div>`,
+            "intro");
+        mountDarkChat('normal');
+        return;
+    }
         if (def.type === 'narr') {
             body.innerHTML = darkBox("—", def.text,
                 (darkRun.isLeader || !darkRun.isParty)
