@@ -3788,10 +3788,13 @@ return b;
         saveDB();
     }
 
-        function useResignLetter() {
-        if (!darkRun) return;
-        darkRun._dead = false;
-        const z = DARK_ZONES[darkRun.zone];
+       function useResignLetter() {
+    if (!darkRun) return;
+    darkRun._dead = false;
+    setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 600);
+    darkRun._resigned = true;
+    currentUser.pollution = Math.min(99, currentUser.pollution);
+    const z = DARK_ZONES[darkRun.zone];
 
         // 반입 목록과 인벤토리에서 제거
         const idx = darkRun.carryItems.indexOf('사직서');
@@ -3892,7 +3895,7 @@ currentUser.quarantineUntil = 0;
 updateUI();
 renderDarkness();
 renderPartyPanel();
-setTimeout(() => startFoxRoomSequence(), 600);
+setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 600);
     }
 
         function renderDarkResult() {
