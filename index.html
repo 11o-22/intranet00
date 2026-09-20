@@ -470,6 +470,10 @@
                         <td><span id="badge-position-text" style="font-weight:bold;">사원</span></td>
                     </tr>
                     <tr>
+                         <th>커플</th>
+                        <td id="badge-couple-cell" style="font-size:11px;">솔로</td>
+                     </tr>
+                    <tr>
                         <th>장착 장비</th>
                         <td><span id="badge-equipped-text" style="font-weight:bold; color:#d4af37;">없음</span></td>
                     </tr>
@@ -5438,6 +5442,17 @@ hlL.disabled = !playable;
         document.getElementById('badge-gender').value = currentUser.badge.gender || "";
         document.getElementById('badge-position-tag').value = currentUser.badge.posTag || "";
         renderBadgePhoto(currentUser.badge.photo);
+
+        const bcEl = document.getElementById('badge-couple-cell');
+if (bcEl) {
+    if (currentUser.couple) {
+        const c = currentUser.couple;
+        bcEl.innerHTML = `<span style="color:${c.hex}; font-weight:bold;">${c.emoji}</span> ${c.partnerName}의 애인`;
+    } else {
+        bcEl.innerHTML = `<span style="color:#666;">솔로</span>`;
+    }
+}
+
     }
 
     function renderBadgePhoto(dataUrl) {
