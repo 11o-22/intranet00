@@ -5367,12 +5367,21 @@ hlL.disabled = !playable;
    }
     
     function switchTab(tabId, el) {
-        document.querySelectorAll('.tabs-grid .tab').forEach(t => t.classList.remove('active'));
-        el.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-                if (tabId === 'tab-house') renderHouse();
+    const ov = document.getElementById('tetris-overlay');
+    if (ov && ov.style.display === 'flex') {
+        if (tet && !tet.over && tet.mode === 'duel') { showCustomAlert('대전 중에는 나갈 수 없습니다.'); return; }
+        if (tet) { clearInterval(tet.timer); tet = null; }
+        document.removeEventListener('keydown', tetKey);
+        detachDuel();
+        ov.style.display = 'none';
     }
+
+    document.querySelectorAll('.tabs-grid .tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if (tabId === 'tab-house') renderHouse();
+}
 
     function switchRecordSubTab(panelId, btnEl) {
         document.querySelectorAll('#tab-record .sub-tab').forEach(b => b.classList.remove('active'));
