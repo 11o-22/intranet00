@@ -326,11 +326,6 @@
             <span id="session-timer">세션 00:00:00</span>
         </div>
 
-        <div id="notice-ticker" style="display:none; background:rgba(0,0,0,0.5); border:1px solid var(--theme-border); border-radius:5px; margin-bottom:10px; overflow:hidden; white-space:nowrap; position:relative; height:26px;">
-    <div style="position:absolute; left:0; top:0; bottom:0; width:26px; background:var(--theme-bg-grad); border-right:1px solid var(--theme-border); display:flex; align-items:center; justify-content:center; font-size:12px; z-index:2;">📢</div>
-    <div id="notice-ticker-text" style="position:absolute; white-space:nowrap; font-size:11px; color:var(--theme-focus); line-height:26px; padding-left:8px;"></div>
-</div>
-
         <!-- 사원증 인터페이스 -->
         <div class="id-card-badge">
             <div class="id-card-body">
@@ -9957,6 +9952,12 @@ if (bathModal) bathModal.style.display = 'none';
  
     </script>
     <script src="dark.js"></script>
+
+    <div id="notice-ticker" style="display:none; position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:450px; z-index:99999; background:rgba(0,0,0,0.88); border-bottom:1px solid var(--theme-border); overflow:hidden; white-space:nowrap; height:28px;">
+        <div style="position:absolute; left:0; top:0; bottom:0; width:28px; background:rgba(0,0,0,0.9); border-right:1px solid var(--theme-border); display:flex; align-items:center; justify-content:center; font-size:13px; z-index:2;">📢</div>
+        <div id="notice-ticker-text" style="position:absolute; white-space:nowrap; font-size:11px; color:var(--theme-focus); line-height:28px; padding-left:8px;"></div>
+    </div>
+    
 </body> 
 </html>
 
