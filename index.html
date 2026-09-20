@@ -331,6 +331,7 @@
                     <div class="serial-row">SERIAL NO. <span id="display-no" style="font-weight:bold; color:inherit;">0000</span></div>
                     <div class="emp-name"><span id="display-name">사원이름</span> <span class="emp-role-tag" id="display-position">사원</span></div>
                    <div class="emp-meta"><span id="display-affiliation">본사</span> · <span id="display-team">기획 2팀</span><span id="display-gp"></span></div>
+                   <div id="display-couple" style="display:none; font-size:11px; margin-top:4px;"></div>
                 </div>
             </div>
 
@@ -4871,6 +4872,9 @@ if (user.code === 'kario0987') {
             const quarantineTag = qb
              ? `<span style="font-size:10px; color:${qb.color}; background:${qb.bg}; border:1px solid ${qb.color}; border-radius:3px; padding:2px 6px; font-weight:bold; margin-left:4px;">${qb.icon} ${qb.label}</span>`
               : '';
+              const cp = u.couple;
+const cpStyle = cp ? `box-shadow: inset 0 0 22px ${cp.hex}22; border-color:${cp.hex}55;` : '';
+const cpMark = cp ? `<span style="color:${cp.hex}; margin-left:4px;" title="${cp.partnerName}의 애인">${cp.emoji}</span>` : '';
             // ★ 실시간 온라인 감지 (초록색 불빛)
             const isOnline = onlineUsersMap[u.code] ? true : false;
             const onlineDot = isOnline ? `<div style="position:absolute; top:-4px; left:-4px; width:12px; height:12px; background-color:#4CAF50; border-radius:50%; box-shadow:0 0 8px #4CAF50; border:2px solid #242424; z-index:10;"></div>` : '';
@@ -4881,20 +4885,21 @@ if (user.code === 'kario0987') {
                 : '';
 
             return `
-                                <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')" ${qb ? 'style="opacity:0.7; border-color:' + qb.color + ';"' : ''}>
+                               <div class="emp-list-card" onclick="openEmpDetailModal('${u.code}')" style="${qb ? 'opacity:0.7; border-color:' + qb.color + ';' : ''} ${cpStyle}">
                     <div class="emp-list-avatar" style="position:relative;">
                         ${onlineDot}
                         ${photoSrc}
                     </div>
                     <div class="emp-list-details">
                                                 <div class="emp-list-title" style="flex-wrap:wrap;">
-                            <span>${u.name}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe} ${quarantineTag}
+                           <span>${u.name}${cpMark}</span> <span class="emp-role-tag">${u.position || '사원'}</span> ${isMe} ${quarantineTag}
                         </div>
                        <div class="emp-list-sub">사번: <span style="font-family:monospace; color:#bbb;">${u.no}</span> | ${u.affiliation || '본사'} · ${u.team}${
                        (u.badge && (u.badge.gender || u.badge.posTag))
                        ? ' · ' + [u.badge.gender, u.badge.posTag].filter(Boolean).join(' / ')
                                               : ''
                             }</div>
+                            ${cp ? `<div style="font-size:10px; color:${cp.hex}; margin-top:3px;">커플-${cp.emoji} ${cp.partnerName}의 애인</div>` : ''}
                         <div style="margin-top: 6px; display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-size:11px; font-weight:bold; color:#ffd700;">${u.points} P</span>
                             <span class="status-tag" style="color:${statusInfo.color}; background:${statusInfo.bg}; border:1px solid ${statusInfo.color};">
@@ -5101,6 +5106,17 @@ function startFoxRoomSequence() {
         document.getElementById('display-no').innerText = currentUser.no;
         document.getElementById('display-affiliation').innerText = currentUser.affiliation || "본사";
         document.getElementById('display-team').innerText = currentUser.team;
+
+        const cpEl = document.getElementById('display-couple');
+if (cpEl) {
+    if (currentUser.couple) {
+        const c = currentUser.couple;
+        cpEl.style.display = 'block';
+        cpEl.innerHTML = `<span style="color:${c.hex}; font-weight:bold;">커플-${c.emoji}</span> <span style="color:#aaa;">${c.partnerName}의 애인</span>`;
+    } else {
+        cpEl.style.display = 'none';
+    }
+}
 
         const gp = [];
 if (currentUser.badge && currentUser.badge.gender) gp.push(currentUser.badge.gender);
@@ -5593,6 +5609,7 @@ hlL.disabled = !playable;
                         ${hasAllMats && !hasSlotItem ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#6a4c93,#4a2c73); color:#fff;" onclick="combineSecondSlot()">재료 조합</button>` : ''}
                     </div>
                 </div>
+                
             `;
         }
 
@@ -5685,9 +5702,13 @@ hlL.disabled = !playable;
                 const priceText = cat ? (isNaN(parseInt(cat.price)) ? '???' : cat.price + ' P') : '-';
                 const sellPrice = getSellPrice(item);
 
-                let useBtnHtml = '';
-                if (isUsable) {
-        if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
+               let useBtnHtml = '';
+if (isUsable) {
+    if (item === '💍 커플링') {
+        useBtnHtml = currentUser.couple
+            ? `<button class="inv-btn" style="background:linear-gradient(145deg,#555,#333); color:#ddd;" onclick="breakCouple()">해제</button>`
+            : `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">사용</button>`;
+    } else if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
                     } else if (item === "빨간 리본" || item === "노예 계약서") {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;
