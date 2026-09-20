@@ -13621,7 +13621,154 @@ alice: {
       {l:'② 모르겠다고 한다.', v:'dunno', ok:true},
       {l:'③ 같은 질문을 되돌려 준다.', v:'back', lore:9}
     ]}
-}
+},
+
+
+// dorothy
+3: { text:`마법사를 만났다.<br><br>
+    커튼 뒤에 사람이 있다. 커튼을 걷으면 끝난다고 들었다.<br>
+    그런데 커튼이 너무 많다. 걷어도 걷어도 또 있다.<br><br>
+    뒤에서 목소리가 난다. <span style="color:#888;">"몇 장째인지 세고 있니?"</span>`,
+    opts:[
+      {l:'① 계속 걷는다.', v:'open', ok:false},
+      {l:'② 세지 않고 지나친다.', v:'ignore', ok:true},
+      {l:'③ 몇 장인지 센다.', v:'count', lore:13}
+    ]},
+4: { text:`구두를 세 번 부딪치면 돌아간다고 한다.<br><br>
+    한 번 부딪쳤다. 발밑이 얇아진다.<br>
+    두 번 부딪쳤다. 주변이 종이로 돌아간다.<br><br>
+    세 번째를 부딪치기 전에, 누가 옷자락을 잡는다.<br>
+    동료다. 아직 배역을 못 벗은 얼굴이다.`,
+    opts:[
+      {l:'① 손을 잡고 함께 친다.', v:'together', ok:true},
+      {l:'② 혼자 친다.', v:'alone', ok:false},
+      {l:'③ 구두를 벗어 건넨다.', v:'give', taboo:true}
+    ]},
+
+// jack
+3: { text:`거인이 냄새를 맡는다.<br><br>
+    <span style="color:#888;">"피 냄새가 난다."</span><br><br>
+    본인 손을 본다. 피가 묻어 있다. 언제 묻었는지 모르겠다.<br>
+    씻을 물이 없고, 숨길 곳도 없다.`,
+    opts:[
+      {l:'① 옷에 문지른다.', v:'wipe', ok:false},
+      {l:'② 가만히 있는다.', v:'still', ok:true},
+      {l:'③ 누구 피인지 확인한다.', v:'whose', lore:15}
+    ]},
+4: { text:`도끼가 쥐어져 있다.<br><br>
+    콩나무를 자르면 거인이 떨어진다. 그건 안다.<br>
+    자르는 동안 위에 누가 남는지는 생각하지 않기로 했다.<br><br>
+    위에서 이름을 부르는 소리가 난다. 아는 목소리다.`,
+    opts:[
+      {l:'① 자른다.', v:'cut', ok:true},
+      {l:'② 기다린다.', v:'wait', ok:false},
+      {l:'③ 위를 본다.', v:'up', ok:false}
+    ]},
+
+// hood
+3: { text:`늑대의 배를 가른다.<br><br>
+    안에 할머니가 있다. 멀쩡하다. 너무 멀쩡하다.<br>
+    삼켜진 사람의 얼굴이 아니다.<br><br>
+    <span style="color:#888;">"늦었구나. 안에서 기다렸단다."</span>`,
+    opts:[
+      {l:'① 꺼낸다.', v:'pull', ok:false},
+      {l:'② 배를 다시 꿰맨다.', v:'sew', ok:true},
+      {l:'③ 얼마나 있었는지 묻는다.', v:'ask', lore:12}
+    ]},
+4: { text:`돌을 채워 넣어야 한다.<br><br>
+    늑대 배에 돌을 넣고 꿰매면 끝난다고 들었다.<br>
+    그런데 돌이 전부 따뜻하다. 방금까지 누가 쥐고 있던 것처럼.<br><br>
+    하나가 유난히 따뜻하다.`,
+    opts:[
+      {l:'① 전부 넣는다.', v:'all', ok:true},
+      {l:'② 따뜻한 것만 뺀다.', v:'pick', ok:false},
+      {l:'③ 그 돌을 본다.', v:'stare', lore:14}
+    ]},
+
+// peter
+3: { text:`후크가 기다린다.<br><br>
+    시계 소리가 들린다. 악어 배 속의 시계다.<br>
+    그런데 박자가 심장 박자와 똑같다. 이쪽 심장과.<br><br>
+    <span style="color:#888;">"언제부터 세고 있었지?"</span>`,
+    opts:[
+      {l:'① 듣지 않는다.', v:'ignore', ok:true},
+      {l:'② 박자를 맞춰 본다.', v:'match', lore:13},
+      {l:'③ 시계를 찾는다.', v:'find', ok:false}
+    ]},
+4: { text:`아이들이 돌아가겠다고 한다.<br><br>
+    창문을 열어 주면 돌아갈 수 있다.<br>
+    다만 열어 준 쪽은 남는다. 그게 규칙이다.<br><br>
+    아이 하나가 묻는다. <span style="color:#888;">"형은 몇 살이야?"</span>`,
+    opts:[
+      {l:'① 창문을 연다.', v:'open', ok:true},
+      {l:'② 대답한다.', v:'age', taboo:true},
+      {l:'③ 함께 나간다.', v:'follow', ok:false}
+    ]},
+
+// ariel
+3: { text:`왕자의 결혼식이다.<br><br>
+    신부가 이쪽을 본다. 목소리가 익숙하다.<br>
+    팔아넘긴 그 목소리다.<br><br>
+    신부가 웃으며 말한다. <span style="color:#888;">"고마워요, 잘 쓸게요."</span>`,
+    opts:[
+      {l:'① 참는다.', v:'endure', ok:true},
+      {l:'② 소리 내어 부정한다.', v:'shout', taboo:true},
+      {l:'③ 왕자의 소매를 잡는다.', v:'grab', ok:false}
+    ]},
+4: { text:`칼이 주어졌다.<br><br>
+    왕자를 찌르면 돌아갈 수 있다고 한다. 언니들이 머리카락과 바꿔 온 칼이다.<br>
+    손잡이에 머리카락이 아직 감겨 있다.<br><br>
+    바다가 밝아 온다. 시간이 없다.`,
+    opts:[
+      {l:'① 칼을 버린다.', v:'drop', ok:true},
+      {l:'② 찌른다.', v:'stab', ok:false},
+      {l:'③ 머리카락을 확인한다.', v:'hair', lore:15}
+    ]},
+
+// pinocchio
+3: { text:`고래 배 속이다.<br><br>
+    아버지가 있다. 늙었다. 너무 늙었다.<br>
+    <span style="color:#888;">"몇 년이나 기다렸는지 아니?"</span><br><br>
+    숫자를 말해 준다. 그 숫자가 이쪽이 기억하는 것보다 훨씬 크다.`,
+    opts:[
+      {l:'① 아니라고 한다.', v:'deny', taboo:true},
+      {l:'② 미안하다고 한다.', v:'sorry', ok:true},
+      {l:'③ 왜 그렇게 됐는지 묻는다.', v:'why', lore:12}
+    ]},
+4: { text:`요정이 나타났다.<br><br>
+    <span style="color:#888;">"사람이 되고 싶니?"</span><br><br>
+    되고 싶다고 하면 된다. 다만 사람이 되면 여기서 나갈 수 없다.<br>
+    나무는 종이에 그려질 수 있지만, 사람은 종이에 갇힌다.`,
+    opts:[
+      {l:'① 나무로 남겠다고 한다.', v:'wood', ok:true},
+      {l:'② 사람이 되겠다고 한다.', v:'human', ok:false},
+      {l:'③ 대답하지 않는다.', v:'silent', lore:8}
+    ]},
+
+// alice
+3: { text:`여왕의 재판이다.<br><br>
+    죄목이 읽히는데, 전부 이쪽이 한 일이다.<br>
+    한 적 없는 일인데 한 일로 적혀 있다.<br><br>
+    <span style="color:#888;">"인정합니까?"</span>`,
+    opts:[
+      {l:'① 인정한다.', v:'admit', taboo:true},
+      {l:'② 침묵한다.', v:'silent', ok:true},
+      {l:'③ 누가 적었는지 묻는다.', v:'who', lore:13}
+    ]},
+4: { text:`카드들이 덤빈다.<br><br>
+    <span style="color:#888;">"너희는 그냥 카드일 뿐이야."</span><br>
+    그렇게 말하면 흩어진다고 들었다.<br><br>
+    그런데 카드 하나하나에 얼굴이 그려져 있다.<br>
+    전부 아는 얼굴이다. 동료들 얼굴이다.`,
+    opts:[
+      {l:'① 그래도 말한다.', v:'say', ok:true},
+      {l:'② 얼굴을 확인한다.', v:'look', lore:16},
+      {l:'③ 눈을 감는다.', v:'shut', ok:false}
+    ]}
+
+    
+
+
 };
 
 function renderTaleScene(round) {
@@ -13697,6 +13844,8 @@ function pickTale(round, idx) {
     darkRun.log.push(`[${role.name} ${round}장] ${o.v} d20 ${roll} vs DC${DC}`);
     s003Result(`${role.name}의 장 — 결과`, roll, bonus, DC, ok, txt);
 }
+
+
 
 const S003_STEPS = {
     0:  { type:'intro' },
