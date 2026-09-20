@@ -13472,6 +13472,232 @@ const S003_NARR = {
     둘 중 하나를 먼저 해야 하는데, 순서가 없다.` }
 };
 
+const TALE_SCENES = {
+dorothy: {
+1: { text:`길이 갈린다.<br><br>
+    한쪽은 노란 벽돌, 한쪽은 벽돌을 뜯어낸 자리다.<br>
+    뜯어낸 쪽에서 바람이 분다. 집 냄새가 난다.<br><br>
+    구두가 발에 꽉 낀다. 아까보다 조여 온다.`,
+    opts:[
+      {l:'① 노란 길로 간다.', v:'road', ok:true},
+      {l:'② 집 냄새를 따라간다.', v:'home', ok:false},
+      {l:'③ 구두를 느슨하게 한다.', v:'loose', taboo:true}
+    ]},
+2: { text:`허수아비가 서 있다.<br><br>
+    머리에 짚이 아니라 종이가 들어 있다. 글씨가 적힌 종이다.<br>
+    <span style="color:#888;">"뇌를 주신다고 했는데, 대신 이걸 넣어 주셨어요."</span><br><br>
+    읽어 달라고 한다. 읽으면 무슨 일이 생길지는 말해 주지 않는다.`,
+    opts:[
+      {l:'① 읽어 준다.', v:'read', lore:12},
+      {l:'② 종이를 빼 준다.', v:'pull', ok:true},
+      {l:'③ 그냥 지나간다.', v:'pass', ok:false}
+    ]}
+},
+
+jack: {
+1: { text:`콩나무 아래다.<br><br>
+    줄기가 굵다. 사람 팔뚝만 한 덩굴이 꼬여 있는데,<br>
+    자세히 보면 덩굴이 아니라 손가락이다.<br><br>
+    올라가려면 그걸 잡아야 한다.`,
+    opts:[
+      {l:'① 잡고 올라간다.', v:'climb', ok:true},
+      {l:'② 다른 곳을 잡고 오른다.', v:'other', ok:false},
+      {l:'③ 얼마나 왔는지 확인한다.', v:'look', taboo:true}
+    ]},
+2: { text:`구름 위다.<br><br>
+    거인의 집이 있다. 문이 열려 있다.<br>
+    안쪽에 사람이 쌓여 있다. 정확히는 사람이었던 것들이.<br><br>
+    전부 같은 자세다. 올려다보는 자세다.`,
+    opts:[
+      {l:'① 무엇을 봤는지 확인한다.', v:'check', lore:14},
+      {l:'② 황금 거위를 찾는다.', v:'goose', ok:true},
+      {l:'③ 바로 내려간다.', v:'down', taboo:true}
+    ]}
+},
+
+hood: {
+1: { text:`숲길이다.<br><br>
+    꽃이 피어 있다. 길 밖에만 피어 있다.<br>
+    할머니가 좋아하던 색이다. 정확히 그 색이다.<br><br>
+    누가 알고 심은 것 같다.`,
+    opts:[
+      {l:'① 길만 따라간다.', v:'road', ok:true},
+      {l:'② 꽃을 꺾는다.', v:'flower', taboo:true},
+      {l:'③ 바구니를 확인한다.', v:'basket', ok:false}
+    ]},
+2: { text:`할머니 집이다.<br><br>
+    침대에 누가 누워 있다. 이불이 높다.<br>
+    <span style="color:#888;">"얘야, 문을 잠갔니?"</span><br><br>
+    할머니 목소리다. 다만 방향이 이상하다.<br>
+    침대가 아니라 등 뒤에서 들렸다.`,
+    opts:[
+      {l:'① 돌아본다.', v:'turn', taboo:true},
+      {l:'② 침대 쪽을 본 채로 대답한다.', v:'hold', ok:true},
+      {l:'③ 문으로 물러난다.', v:'door', ok:false}
+    ]}
+},
+
+peter: {
+1: { text:`날 수 있다고 한다.<br><br>
+    <span style="color:#888;">"즐거운 생각을 하면 돼."</span><br><br>
+    즐거운 생각을 떠올리려는데, 떠오르는 게 전부 오래된 것들이다.<br>
+    오래됐다는 건 그만큼 시간이 지났다는 뜻이고,<br>
+    그 사실을 의식하는 순간 발이 무거워진다.`,
+    opts:[
+      {l:'① 가장 최근의 즐거움을 떠올린다.', v:'recent', ok:true},
+      {l:'② 어릴 적을 떠올린다.', v:'old', ok:false},
+      {l:'③ 몇 년 전인지 세어 본다.', v:'count', taboo:true}
+    ]},
+2: { text:`그림자가 떨어져 나갔다.<br><br>
+    구석에서 혼자 움직인다. 이쪽을 흉내 내는 게 아니라 다른 짓을 한다.<br>
+    꿰매 붙여야 한다는데, 실이 없다.<br><br>
+    그림자가 손짓한다. 제 쪽으로 오라고.`,
+    opts:[
+      {l:'① 붙잡아 꿰맨다.', v:'sew', ok:true},
+      {l:'② 무엇을 하는지 본다.', v:'watch', lore:11},
+      {l:'③ 그냥 둔다.', v:'leave', ok:false}
+    ]}
+},
+
+ariel: {
+1: { text:`뭍이다.<br><br>
+    다리로 걷는 게 익숙하지 않다. 한 걸음마다 유리 위를 딛는 느낌이다.<br>
+    아프다. 아프다고 말할 수가 없다.<br><br>
+    옆에서 누가 괜찮냐고 묻는다.`,
+    opts:[
+      {l:'① 고개를 끄덕인다.', v:'nod', ok:true},
+      {l:'② 대답한다.', v:'speak', taboo:true},
+      {l:'③ 손으로 적어 보인다.', v:'write', ok:false}
+    ]},
+2: { text:`바다에서 누가 올라온다.<br><br>
+    상체만 있다. 아래가 없는 게 아니라, 아래를 어디에 두고 왔다.<br>
+    눈이 풀려 있고 웃고 있다. 약을 먹은 사람처럼 군다.<br><br>
+    <span style="color:#888;">"언니, 나 이제 안 아파. 안 아픈 게 이런 거였어."</span><br><br>
+    손을 내민다. 잡으라는 건지 잡아 달라는 건지 모르겠다.`,
+    opts:[
+      {l:'① 손을 잡는다.', v:'hold', ok:false},
+      {l:'② 무엇을 주고 그렇게 됐는지 살핀다.', v:'check', lore:13},
+      {l:'③ 물러난다.', v:'back', ok:true}
+    ]}
+},
+
+pinocchio: {
+1: { text:`여우가 서 있다.<br><br>
+    눈이 하나 없다. 빠진 자리를 그대로 두고 웃는다.<br>
+    빠진 쪽으로도 이쪽을 보는 것 같다.<br><br>
+    <span style="color:#888;">"학교에 가는 것보다 좋은 게 있단다. 뭘 갖고 있니?"</span>`,
+    opts:[
+      {l:'① 가진 것을 말한다.', v:'tell', ok:true},
+      {l:'② 아무것도 없다고 한다.', v:'lie', taboo:true},
+      {l:'③ 되묻는다.', v:'ask', lore:10}
+    ]},
+2: { text:`거래가 끝나고 여우가 묻는다.<br><br>
+    <span style="color:#888;">"너, 사람이니?"</span><br><br>
+    손등을 본다. 나뭇결이 있다. 없었던 것 같은데.<br>
+    확신이 서지 않는다.`,
+    opts:[
+      {l:'① 모르겠다고 한다.', v:'unsure', ok:true},
+      {l:'② 사람이라고 한다.', v:'human', taboo:true},
+      {l:'③ 손등을 보여 준다.', v:'show', ok:false}
+    ]}
+},
+
+alice: {
+1: { text:`문이 작다.<br><br>
+    옆에 병이 있다. 이름표에 <b>마셔라</b>라고 적혀 있다.<br>
+    아래에 작은 글씨가 있다. 읽으려면 몸을 굽혀야 한다.<br><br>
+    굽히면 문이 한 뼘 더 작아진다.`,
+    opts:[
+      {l:'① 그냥 마신다.', v:'drink', ok:false},
+      {l:'② 작은 글씨를 읽는다.', v:'read', lore:12},
+      {l:'③ 문을 부순다.', v:'break', ok:true}
+    ]},
+2: { text:`모자 장수가 수수께끼를 낸다.<br><br>
+    <span style="color:#888;">"까마귀는 왜 책상을 닮았을까?"</span><br><br>
+    답이 있는 질문이 아니라고 들은 적 있다.<br>
+    그런데 이쪽은 답을 아는 얼굴로 기다린다.`,
+    opts:[
+      {l:'① 답한다.', v:'answer', taboo:true},
+      {l:'② 모르겠다고 한다.', v:'dunno', ok:true},
+      {l:'③ 같은 질문을 되돌려 준다.', v:'back', lore:9}
+    ]}
+}
+};
+
+function renderTaleScene(round) {
+    if (!darkRun.taleRole) { partyAdvance(darkRun.step + 1); return; }
+    const role = TALE_ROLES[darkRun.taleRole];
+    const set = TALE_SCENES[darkRun.taleRole];
+    const sc = set ? set[round] : null;
+
+    if (!sc) {
+        darkBodyEl().innerHTML = darkBox(`${role.name}의 장`,
+            `이 장은 아직 쓰이지 않았다.<br><br>빈 페이지를 넘긴다.`,
+            loreBarHtml() + darkChoiceBtn("넘긴다.", `partyAdvance(${darkRun.step + 1})`));
+        renderLoreBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    darkBodyEl().innerHTML = darkBox(`${role.icon} ${role.name}의 장`,
+        sc.text,
+        loreBarHtml() +
+        `<div style="font-size:10px; color:#ff6b6b; margin-bottom:9px; padding:7px 9px; background:rgba(255,107,107,0.08); border-radius:5px;">
+            금기 — ${role.taboo}
+         </div>` +
+        sc.opts.map((o, i) => darkChoiceBtn(o.l, `pickTale(${round}, ${i})`)).join(''));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function pickTale(round, idx) {
+    const role = TALE_ROLES[darkRun.taleRole];
+    const sc = TALE_SCENES[darkRun.taleRole][round];
+    const o = sc.opts[idx];
+
+    if (o.taboo) {
+        darkRun.log.push(`[${role.name} ${round}장] 금기 — ${o.v}`);
+        breakTaboo(o.v);
+        if (darkRun._dead) return;
+
+        darkBodyEl().innerHTML = darkBox(`${role.name}의 장`,
+            `<span style="color:#ff6b6b;">— 하마터면.</span><br><br>
+             몸이 먼저 멈췄다. 이유는 모르겠다.<br>
+             다만 계속했으면 안 됐다는 것만은 안다.<br><br>
+             <span style="font-size:11px; color:#888;">${role.warn}</span>`,
+            loreBarHtml() + darkChoiceBtn("물러선다.", `partyAdvance(${darkRun.step + 1})`));
+        renderLoreBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + (qFlag('s003_shoe') ? 6 : 0);
+    const DC = s003DC(o.ok ? 11 : 15);
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    if (o.lore) addLore(o.lore, `${role.name} ${round}장`);
+
+    let txt;
+    if (ok) {
+        darkRun.success++;
+        darkRun.modifier = (darkRun.modifier || 0) + 1;
+        txt = `그렇게 했다.<br><br>
+               이야기가 잠시 멈췄다가, 다시 흐른다.<br>
+               이번에는 이쪽 쪽으로 흘렀다.`;
+    } else {
+        darkRun.fail++;
+        addLore(7, '어긋남');
+        applyPollutionToUser(currentUser, 8);
+        txt = `그렇게 했다.<br><br>
+               이야기가 흔들린다. 문장이 한 번 되감겼다가 다시 나아간다.<br>
+               되감기는 동안 뭔가를 잃었다. 무엇인지는 모르겠다.`;
+    }
+
+    darkRun.log.push(`[${role.name} ${round}장] ${o.v} d20 ${roll} vs DC${DC}`);
+    s003Result(`${role.name}의 장 — 결과`, roll, bonus, DC, ok, txt);
+}
+
 const S003_STEPS = {
     0:  { type:'intro' },
 
