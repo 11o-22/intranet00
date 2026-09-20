@@ -12686,14 +12686,12 @@ async function breakCouple() {
     const c = currentUser.couple;
     const pName = c.partnerName;
 
-    stripNoteByItem(currentUser, '[커플]');
     currentUser.couple = null;
     addHistoryLog(currentUser, `[커플 해제] ${pName} 사원과의 관계를 정리했습니다.`);
 
     if (database) {
         const updates = {};
         updates[`users/${currentUser.code}/couple`] = null;
-        updates[`users/${currentUser.code}/badge`] = currentUser.badge;
         updates[`users/${currentUser.code}/history`] = currentUser.history;
         updates[`users/${c.partner}/couple`] = null;
         updates[`users/${c.partner}/_adminStamp`] = Date.now();
@@ -12701,9 +12699,7 @@ async function breakCouple() {
         const pSnap = await database.ref(`users/${c.partner}`).once('value');
         const p = pSnap.val();
         if (p) {
-            stripNoteByItem(p, '[커플]');
             addHistoryLog(p, `[커플 해제] ${currentUser.name} 사원과의 관계가 정리되었습니다.`);
-            updates[`users/${c.partner}/badge`] = p.badge;
             updates[`users/${c.partner}/history`] = p.history;
         }
         await database.ref('/').update(updates);
