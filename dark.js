@@ -1315,34 +1315,25 @@ mountDarkChat('normal');
 
     // --- 합류 지점 ---
     function renderB330Rejoin() {
-        const body = darkBodyEl();
-        if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
+    const body = darkBodyEl();
+    if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
 
-        const p = darkParties[darkRun.partyId];
-        const hasSolo = p && p.solo && Object.keys(p.solo).length > 0;
+    const p = darkParties[darkRun.partyId];
+    const hasSolo = p && p.solo && Object.keys(p.solo).length > 0;
+    const leaderAway = !!(p && p.solo && p.leader && p.solo[p.leader]);
 
-        if (!hasSolo) {
-            body.innerHTML = darkBox("—",
-                `통로가 넓어진다.<br><br>일행이 전부 여기 있다. 세지 않는다.<br>세지 않기로 했으니까.`,
-                (darkRun.isLeader
-                    ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                                        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
-                         선임의 신호를 기다리는 중...<br>
-                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
-                       </div>`));
-            mountDarkChat('normal');
-            return;
-        }
-
-        // 단독자 둘 이상이면 먼저 서로 만난다
-        if (darkRun.solo && !darkRun.soloMet && trySoloMeet()) {
-            setTimeout(() => renderSoloMeet(), 900);
-            body.innerHTML = darkBox("—",
-                `발소리가 들린다.<br><br>이쪽으로 오는 소리다.`,
-                `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">기다리는 중...</div>`);
-            mountDarkChat('normal');
-            return;
-        }
+    if (!hasSolo) {
+        body.innerHTML = darkBox("—",
+            `통로가 넓어진다.<br><br>일행이 전부 여기 있다. 세지 않는다.<br>세지 않기로 했으니까.`,
+            ((darkRun.isLeader || leaderAway)
+                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                     선임의 신호를 기다리는 중...<br>
+                     <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+                   </div>`));
+        mountDarkChat('normal');
+        return;
+    }
 
         const amSolo = darkRun.solo;
         const attempt = (darkRun.rejoinTries || 0) + 1;
@@ -1404,60 +1395,63 @@ mountDarkChat('normal');
     mountDarkChat('normal');
 }
 
-    function resolveB330Rejoin(soloPicks, holdPicks, attempt) {
-        let result, txt, mod = 0, joined = false;
-        const s = soloPicks[0], h = holdPicks[0];
+   function resolveB330Rejoin(soloPicks, holdPicks, attempt) {
+    let result, txt, mod = 0, joined = false;
+    const s = soloPicks[0], h = holdPicks[0];
 
-        // 성공 조합
-        if (s === 'call' && h === 'stay') {
-            result = '정면 합류'; mod = 2; joined = true;
-            txt = `이름을 부른다. 대답이 온다.<br><br>같은 자리에 서서 기다리고 있었다.<br>가까워질수록 인원이 맞는지 세고 싶어지지만, 세지 않는다.`;
-        } else if (s === 'track' && h === 'move') {
-            result = '우회 합류'; mod = 1; joined = true;
-            txt = `발자국을 따라간다. 아직 축축하다.<br><br>모퉁이를 돌자 일행의 등이 보인다.<br>수를 세지 않고 그냥 뒤에 붙는다.`;
-        } else if (s === 'knock' && h === 'search') {
-            result = '신호 합류'; mod = 3; joined = true;
-            txt = `벽을 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다. 벽 반대편에서다.<br>벽을 따라 가니 곧 만난다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
-        } else if (s === 'forward' && h === 'loud') {
-            result = '우연 합류'; mod = 1; joined = true;
-            txt = `그냥 앞으로 간다. 방향 같은 건 이미 의미가 없다.<br><br>그런데 앞쪽에서 소리가 난다. 일부러 내는 소리다.<br>미로에서 소리를 내는 건 위험한데, 그걸 알면서도 냈다.`;
-        } else if (s === 'call' && h === 'loud') {
-            result = '소란 합류'; mod = -1; joined = true;
-            txt = `양쪽 다 소리를 낸다.<br><br>만나기는 한다. 다만 만난 자리에 다른 것도 와 있었다.<br>서둘러 자리를 뜬다.`;
-            applyPollutionToUser(currentUser, 5);
-        } else {
-            result = '엇갈림'; mod = -1;
-            txt = attempt >= 3
-                ? `끝내 만나지 못했다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.<br><br>각자 가기로 한다. 끝에서 보기로 한다. 끝이 있다면.`
-                : `움직인다. 한참을 움직인다.<br><br>동료가 지나간 자리는 있는데 동료가 없다.<br>아직 기회는 있다. 다음 갈림에서 다시 시도해 보기로 한다.`;
-            applyPollutionToUser(currentUser, 3);
-        }
+    const pp = darkParties[darkRun.partyId];
+    const leaderAway = !!(pp && pp.solo && pp.leader && pp.solo[pp.leader]);
 
-        darkRun.modifier = (darkRun.modifier || 0) + mod;
-        darkRun.rejoinTries = attempt;
-        darkRun.log.push(`[합류 ${attempt}차] ${result}`);
-
-        if (joined) {
-            darkRun.solo = false;
-            darkRun.soloMet = false;
-            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
-            sendPartyChat(`합류 성공 — ${result}`, true);
-        } else {
-            sendPartyChat(`합류 실패 — 엇갈렸습니다.`, true);
-        }
-
-        darkBodyEl().innerHTML = darkBox(`합류 ${attempt}차 — 결과`, txt,
-            `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
-                ${result} — 이후 판정 보정 ${mod >= 0 ? '+' : ''}${mod}
-             </div>` +
-            ((darkRun.isLeader || darkRun.solo)
-                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
-                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
-                         선임의 신호를 기다리는 중...<br>
-                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
-                       </div>`));
-        mountDarkChat('normal');
+    // 성공 조합
+    if (s === 'call' && h === 'stay') {
+        result = '정면 합류'; mod = 2; joined = true;
+        txt = `이름을 부른다. 대답이 온다.<br><br>같은 자리에 서서 기다리고 있었다.<br>가까워질수록 인원이 맞는지 세고 싶어지지만, 세지 않는다.`;
+    } else if (s === 'track' && h === 'move') {
+        result = '우회 합류'; mod = 1; joined = true;
+        txt = `발자국을 따라간다. 아직 축축하다.<br><br>모퉁이를 돌자 일행의 등이 보인다.<br>수를 세지 않고 그냥 뒤에 붙는다.`;
+    } else if (s === 'knock' && h === 'search') {
+        result = '신호 합류'; mod = 3; joined = true;
+        txt = `벽을 두드린다. 세 번, 쉬고, 두 번.<br><br>같은 박자가 돌아온다. 벽 반대편에서다.<br>벽을 따라 가니 곧 만난다.<br><br><span style="color:#d4af37;">서로가 본 것이 맞춰진다.</span>`;
+    } else if (s === 'forward' && h === 'loud') {
+        result = '우연 합류'; mod = 1; joined = true;
+        txt = `그냥 앞으로 간다. 방향 같은 건 이미 의미가 없다.<br><br>그런데 앞쪽에서 소리가 난다. 일부러 내는 소리다.<br>미로에서 소리를 내는 건 위험한데, 그걸 알면서도 냈다.`;
+    } else if (s === 'call' && h === 'loud') {
+        result = '소란 합류'; mod = -1; joined = true;
+        txt = `양쪽 다 소리를 낸다.<br><br>만나기는 한다. 다만 만난 자리에 다른 것도 와 있었다.<br>서둘러 자리를 뜬다.`;
+        applyPollutionToUser(currentUser, 5);
+    } else {
+        result = '엇갈림'; mod = -1;
+        txt = attempt >= 3
+            ? `끝내 만나지 못했다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.<br><br>각자 가기로 한다. 끝에서 보기로 한다. 끝이 있다면.`
+            : `움직인다. 한참을 움직인다.<br><br>동료가 지나간 자리는 있는데 동료가 없다.<br>아직 기회는 있다. 다음 갈림에서 다시 시도해 보기로 한다.`;
+        applyPollutionToUser(currentUser, 3);
     }
+
+    darkRun.modifier = (darkRun.modifier || 0) + mod;
+    darkRun.rejoinTries = attempt;
+    darkRun.log.push(`[합류 ${attempt}차] ${result}`);
+
+    if (joined) {
+        darkRun.solo = false;
+        darkRun.soloMet = false;
+        if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+        sendPartyChat(`합류 성공 — ${result}`, true);
+    } else {
+        sendPartyChat(`합류 실패 — 엇갈렸습니다.`, true);
+    }
+
+    darkBodyEl().innerHTML = darkBox(`합류 ${attempt}차 — 결과`, txt,
+        `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
+            ${result} — 이후 판정 보정 ${mod >= 0 ? '+' : ''}${mod}
+         </div>` +
+        ((darkRun.isLeader || darkRun.solo || leaderAway)
+            ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+            : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                 선임의 신호를 기다리는 중...<br>
+                 <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
+               </div>`));
+    mountDarkChat('normal');
+}
 
     // --- 기믹 5: 마지막 ---
        function b330Gimmick7() {
