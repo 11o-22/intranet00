@@ -12628,3 +12628,97 @@ function normalizeCoupleColor(input) {
 function randomCouplePattern() {
     return COUPLE_PATTERNS[Math.floor(Math.random() * COUPLE_PATTERNS.length)];
 }
+
+function openCoupleSetup() {
+    const box = document.getElementById('couple-color-list');
+    if (box) box.innerHTML = Object.keys(COUPLE_COLORS)
+        .map(k => `<span style="color:${COUPLE_COLORS[k]}; margin-right:7px; cursor:pointer;" onclick="document.getElementById('couple-color').value='${k}'">${k}</span>`).join('');
+    document.getElementById('couple-emoji').value = '';
+    document.getElementById('couple-color').value = '';
+    document.getElementById('couple-setup-modal').style.display = 'flex';
+}
+
+function confirmCoupleSetup() {
+    const emoji = document.getElementById('couple-emoji').value.trim();
+    const colorRaw = document.getElementById('couple-color').value.trim();
+    if (!emoji) { showCustomAlert('이모지를 입력해주세요.'); return; }
+
+    const color = normalizeCoupleColor(colorRaw);
+    if (!color) { showCustomAlert('알 수 없는 색상입니다.\n목록에서 골라주세요.'); return; }
+
+    currentUser._pendingCouple = { emoji: emoji, color: color };
+    document.getElementById('couple-setup-modal').style.display = 'none';
+    openItemTargetModal('💍 커플링');
+}
+
+async function breakCouple() {
+    if (!currentUser.couple) return;
+    const c = currentUser.couple;
+    const pName = c.partnerName;
+
+    const ok = await new Promise(res => {
+        showCustomConfirm(`${pName} 사원과의 커플을 해제하시겠습니까?`, () => res(true), () => res(false));
+    });
+    if (!ok) return;
+
+    stripNoteByItem(currentUser, '[커플]');
+    currentUser.couple = null;
+    addHistoryLog(currentUser, `[커플 해제] ${pName} 사원과의 관계를 정리했습니다.`);
+
+    if (database) {
+        const updates = {};
+        updates[`users/${currentUser.code}/couple`] = null;
+        updates[`users/${currentUser.code}/badge`] = currentUser.badge;
+        updates[`users/${currentUser.code}/history`] = currentUser.history;
+        updates[`users/${c.partner}/couple`] = null;
+        updates[`users/${c.partner}/_adminStamp`] = Date.now();
+
+        const pSnap = await database.ref(`users/${c.partner}`).once('value');
+        const p = pSnap.val();
+        if (p) {
+            stripNoteByItem(p, '[커플]');
+            addHistoryLog(p, `[커플 해제] ${currentUser.name} 사원과의 관계가 정리되었습니다.`);
+            updates[`users/${c.partner}/badge`] = p.badge;
+            updates[`users/${c.partner}/history`] = p.history;
+        }
+        await database.ref('/').update(updates);
+    } else saveDB();
+
+    applyCoupleTheme(currentUser);
+    updateUI();
+    showCustomAlert('해제되었습니다.');
+}
+
+function applyCoupleTheme(user) {
+    const body = document.body;
+    COUPLE_PATTERNS.forEach(p => body.classList.remove('cp-' + p));
+    body.classList.remove('couple-themed');
+
+    const old = document.getElementById('couple-emoji-bg');
+    if (old) old.remove();
+
+    if (!user || !user.couple) {
+        document.documentElement.style.removeProperty('--couple-color');
+        applyDepartmentTheme(user);
+        return;
+    }
+
+    const c = user.couple;
+    const hex = c.hex || '#d4af37';
+
+    document.documentElement.style.setProperty('--couple-color', hex);
+    document.documentElement.style.setProperty('--theme-focus', hex);
+    document.documentElement.style.setProperty('--theme-border', hex + '66');
+    document.documentElement.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`);
+
+    body.classList.add('couple-themed', 'cp-' + c.pattern);
+
+    const EMOJI_PATTERNS = { heart:'♥', rabbit:'🐰', star:'★', apple:'🍎', cherry:'🍒', lemon:'🍋' };
+    if (EMOJI_PATTERNS[c.pattern]) {
+        const div = document.createElement('div');
+        div.id = 'couple-emoji-bg';
+        div.style.cssText = `position:fixed; top:0; left:0; right:0; bottom:0; pointer-events:none; z-index:0; opacity:0.06; font-size:22px; line-height:46px; letter-spacing:24px; color:${hex}; overflow:hidden; word-break:break-all;`;
+        div.innerText = EMOJI_PATTERNS[c.pattern].repeat(900);
+        document.body.appendChild(div);
+    }
+}

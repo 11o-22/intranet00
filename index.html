@@ -45,6 +45,23 @@
     </div>
 </div>
 
+<div id="couple-setup-modal" class="modal-overlay" style="display:none; z-index:10004;">
+    <div class="modal-content" style="max-width:380px;">
+        <h3>💍 커플링</h3>
+        <div style="font-size:11px; color:#888; margin-bottom:14px; line-height:1.7;">
+            둘의 단말에 같은 빛이 돕니다.<br>
+            무늬는 정해지지 않습니다.
+        </div>
+        <div style="font-size:11px; color:#aaa; margin-bottom:5px;">이모지</div>
+        <input type="text" id="couple-emoji" maxlength="4" placeholder="예: 🌙" style="width:100%; margin-bottom:10px; text-align:center; font-size:20px; padding:9px;">
+        <div style="font-size:11px; color:#aaa; margin-bottom:5px;">색상 (영문)</div>
+        <input type="text" id="couple-color" maxlength="20" placeholder="예: skyblue" style="width:100%; margin-bottom:6px; font-size:13px; padding:9px;">
+        <div id="couple-color-list" style="font-size:9px; color:#666; line-height:1.8; max-height:80px; overflow-y:auto; margin-bottom:12px; background:rgba(0,0,0,0.25); padding:8px; border-radius:5px;"></div>
+        <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px;" onclick="confirmCoupleSetup()">상대를 고른다</button>
+        <button class="btn-cancel" onclick="document.getElementById('couple-setup-modal').style.display='none'" style="width:100%; background:#444; border-color:#555 !important;">취소</button>
+    </div>
+</div>
+
 <!-- 여우 상담실 낡은 문패 사용 팝업 -->
 <div id="fox-nameplate-overlay">
     <div class="luxury-alert-box">
@@ -4990,7 +5007,8 @@ function startFoxRoomSequence() {
             if (currentUser.points < 0) currentUser.points = 0;
             if (currentUser.points > POINT_CAP) currentUser.points = POINT_CAP;
        
-        applyDepartmentTheme(currentUser);
+        if (currentUser.couple) applyCoupleTheme(currentUser);
+        else applyDepartmentTheme(currentUser);
 
         const currentToday = getTodayStr(); // 자정(0시) 기준 날짜
         const cycle22h = get22HourCycleStr(); // 22시 기준 날짜
@@ -5843,6 +5861,15 @@ hlL.disabled = !playable;
     return;
 }
 
+if (cat.effect === 'couple_ring') {
+    if (currentUser.couple) {
+        showCustomAlert('이미 이어져 있습니다.\n해제 후 다시 사용해주세요.');
+        return;
+    }
+    openCoupleSetup();
+    return;
+}
+
                 if (cat.effect === 'q_guarantee') {
             const g = getGear(currentUser);
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
@@ -6605,6 +6632,46 @@ else if (cat.effect === 'equip_sonpo') {
     showCustomAlert(isOthers
         ? `${targetUser.name} 사원에게 세뇌를 걸었습니다.`
         : '만년필을 스스로 꽂았습니다.');
+}
+
+else if (cat.effect === 'couple_ring') {
+    if (!isOthers) {
+        showCustomAlert('상대를 지정해야 합니다.');
+        return false;
+    }
+    if (targetUser.code === currentUser.code) {
+        showCustomAlert('자기 자신에게는 쓸 수 없습니다.');
+        return false;
+    }
+
+    const pending = currentUser._pendingCouple;
+    if (!pending) { showCustomAlert('설정이 완료되지 않았습니다.'); return false; }
+
+    const pattern = randomCouplePattern();
+    const data = {
+        partner: targetUser.code,
+        partnerName: targetUser.name,
+        emoji: pending.emoji,
+        color: pending.color.name,
+        hex: pending.color.hex,
+        pattern: pattern,
+        since: Date.now()
+    };
+
+    currentUser.couple = { ...data, partner: targetUser.code, partnerName: targetUser.name };
+    targetUser.couple = { ...data, partner: currentUser.code, partnerName: currentUser.name };
+
+    if (!targetUser.inventory) targetUser.inventory = [];
+    targetUser.inventory.push('💍 커플링');
+
+    appendBadgeNoteToUser(targetUser, `[커플] ${pending.emoji} ${currentUser.name}의 애인`);
+    appendBadgeNoteToUser(currentUser, `[커플] ${pending.emoji} ${targetUser.name}의 애인`);
+    addHistoryLog(targetUser, `[커플링] ${currentUser.name} 사원과 커플이 되었습니다.`);
+    addHistoryLog(currentUser, `[커플링] ${targetUser.name} 사원과 커플이 되었습니다.`);
+
+    delete currentUser._pendingCouple;
+    applyCoupleTheme(currentUser);
+    showCustomAlert(`${targetUser.name} 사원과 이어졌습니다.\n\n${pending.emoji} ${pending.color.name}`);
 }
 
             else if (cat.effect === 'target_sticker') {
