@@ -12838,9 +12838,11 @@ function duelAttack(n) {
 function watchDuelAttack() {
     if (!duelId || !database || !tet) return;
     const key = duelIsHost ? 'atkToHost' : 'atkToGuest';
+    const since = Date.now();
     database.ref(`duels/${duelId}/${key}`).on('child_added', snap => {
         const v = snap.val();
         if (!v || !tet || tet.over) return;
+        if (v.at < since) return;
         tet.garbage = (tet.garbage || 0) + v.n;
         const msg = document.getElementById('tetris-msg');
         if (msg) {
