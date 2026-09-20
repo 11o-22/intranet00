@@ -6674,7 +6674,7 @@ else if (cat.effect === 'equip_brainwash') {
         showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
-    
+
     const cPos = currentUser.position || '사원';
     const label = isOthers ? `세뇌 만년필 (시술자: ${currentUser.name} ${cPos})` : '세뇌 만년필';
     targetUser.equippedWeapons.push(label);
@@ -6744,17 +6744,7 @@ else if (cat.effect === 'slave_contract') {
     showCustomAlert(`${targetUser.name} 사원과 3일간의 계약을 체결했습니다.`);
 }
 
-            const label = isOthers ? `유리손포 (장착자: ${currentUser.name})` : '유리손포';
-            targetUser.equippedWeapons.push(label);
-            setEquipOwner(targetUser, label, isOthers ? currentUser.code : targetUser.code);
-            appendBadgeNoteToUser(targetUser, `[장착됨] 유리손포 — 삿된 것이 선명해진다.`);
-            if (isOthers) {
-                addHistoryLog(targetUser, `[장착] ${currentUser.name} 사원이 유리손포를 채웠습니다.`);
-                showCustomAlert(`${targetUser.name}님에게 유리손포를 장착시켰습니다.`);
-            } else {
-                showCustomAlert('유리손포를 장착했습니다.');
-            }
-        }
+        
         else if (cat.effect === 'persimmon_potion') {
     const applyCostume = (costume) => {
         addTimedEffect(targetUser, '곶감맛 물약', `${costume} 착용 상태`, 72);
