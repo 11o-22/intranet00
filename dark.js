@@ -12722,10 +12722,13 @@ function applyCoupleTheme(user) {
     const old = document.getElementById('couple-emoji-bg');
     if (old) old.remove();
 
-    if (!user || !user.couple) {
+   if (!user || !user.couple) {
     ['--couple-color','--theme-bg-grad','--theme-border','--theme-focus','--theme-text','--theme-sub','--theme-accent'].forEach(k => body.style.removeProperty(k));
+    body.style.removeProperty('background-color');
+    const cont0 = document.querySelector('.container');
+    if (cont0) cont0.style.removeProperty('background-color');
     applyDepartmentTheme(user);
-    return
+    return;
 }
 
     const c = user.couple;
@@ -12751,6 +12754,10 @@ body.style.setProperty('--theme-accent', hex, 'important');
 
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);
+
+    body.style.setProperty('background-color', `color-mix(in srgb, ${hex} 8%, #121212)`, 'important');
+const cont = document.querySelector('.container');
+if (cont) cont.style.setProperty('background-color', `color-mix(in srgb, ${hex} 10%, #1a1a1a)`, 'important');
 
     const EMOJI_PATTERNS = { heart:'♥', rabbit:'🐰', star:'★', apple:'🍎', cherry:'🍒', lemon:'🍋' };
     if (EMOJI_PATTERNS[c.pattern]) {
