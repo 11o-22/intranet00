@@ -1,4 +1,29 @@
 const DARK_ZONES = {
+
+    "Qtrew-S-003": {
+    code:"Qtrew-S-003", grade:"S", name:"동화의 뒷면",
+    brief:"(대출 기록이 없습니다. 반납 기록만 있습니다.)",
+    warn:"트라우마 유발 가능성 주의 — 신체 변형, 아동 형상, 강제 배역",
+    danger:"최상", survival:"0.1%", min:5, max:7, reward:[20000,30000], ready:false,
+    voteMode:true, tale:true, timeLimit:45,
+    intro:`책이 펼쳐져 있다.<br><br>
+        아무도 펼치지 않았는데 펼쳐져 있다.<br>
+        종이가 두껍고, 가장자리가 축축하다.<br><br>
+        그림이 그려져 있다. 어릴 때 본 적 있는 그림이다.<br>
+        다만 인물들의 눈이 전부 정면을 보고 있다.<br>
+        그림 속에서 이쪽을 본다는 뜻이다.<br><br>
+        첫 장에 적혀 있다.<br>
+        <span style="color:#d4af37;">"등장인물이 모자랍니다."</span><br><br>
+        <span style="color:#ff6b6b;">"채워 주십시오."</span>`,
+    outro:`책이 덮인다.<br><br>
+        표지가 낯설다. 제목이 없다.<br>
+        펼쳐 보려는데 손이 말을 듣지 않는다.<br><br>
+        눈을 뜨니 도서관 앞이다. 비가 오고 있다.<br>
+        한동안 동화책을 읽어 주지 못했다.<br>
+        읽으면 그 안의 누군가가 이쪽을 볼 것 같아서.`,
+    images: { intro:"tale_1.jpg", step1:"tale_2.jpg", step2:"tale_3.jpg", step3:"tale_4.jpg", step4:"tale_5.jpg" }
+},
+
         "Qtrew-S-010": {
     code:"Qtrew-S-010", grade:"S", name:"검역 실패",
     brief:"(전원 귀환한 기록이 없습니다.)",
@@ -133,6 +158,15 @@ const DARK_ZONES = {
     };
        
           const DARK_LOOT_BY_ZONE = {
+
+            "Qtrew-S-003": [
+    { name:"읽히지 않는 삽화", chance:0.030 },
+    { name:"마른 빵부스러기 주머니", chance:0.020 },
+    { name:"한쪽만 남은 유리 구두", chance:0.012 },
+    { name:"말을 삼킨 조개", chance:0.006 },
+    { name:"찢어지지 않는 마지막 장", chance:0.002 },
+    { name:"각성 돌파권", chance:0.00001 }
+],
 
             "Qtrew-S-010": [
     { name:"물린 자국이 없는 팔", chance:0.030 },
@@ -13160,4 +13194,205 @@ async function acceptOffer(postId, offerId) {
     await database.ref('/').update(updates);
     updateUI();
     showCustomAlert(`${o.name} 사원과 거래가 성사되었습니다.`);
+}
+const TALE_ROLES = {
+    dorothy: {
+        name:'도로시', tale:'오즈의 마법사', icon:'🌪',
+        taboo:'구두를 벗는 것',
+        warn:'구두를 벗으면 돌아갈 곳이 사라집니다.',
+        death:`구두를 벗었다.<br><br>
+            발바닥이 땅에 닿는 순간, 땅이 사라진다.<br>
+            떨어지는 게 아니라 <b>떨어질 곳이 없어진다.</b><br><br>
+            집이 어디였는지 떠올리려는데, 그 단어가 먼저 지워진다.`
+    },
+    jack: {
+        name:'잭', tale:'잭과 콩나무', icon:'🌱',
+        taboo:'아래를 내려다보는 것',
+        warn:'내려다보면 올라온 높이를 몸이 기억합니다.',
+        death:`아래를 봤다.<br><br>
+            구름 밑으로 끝이 안 보인다. 그제야 얼마나 올라왔는지 안다.<br>
+            몸이 그 숫자를 계산한다.<br><br>
+            계산이 끝나자, 몸이 그만큼을 한 번에 치른다.`
+    },
+    hood: {
+        name:'빨간 망토', tale:'빨간 망토', icon:'🧺',
+        taboo:'길을 벗어나는 것',
+        warn:'길 밖에서는 늑대가 오지 않습니다. 다른 것이 옵니다.',
+        death:`길을 벗어났다.<br><br>
+            꽃이 예뻤다. 그게 전부였다.<br><br>
+            뒤에서 부르는 소리가 난다. 할머니 목소리다.<br>
+            할머니는 이미 집에 있는데.<br><br>
+            돌아본 것이 마지막이었다.`
+    },
+    peter: {
+        name:'피터', tale:'피터팬', icon:'🗡',
+        taboo:'자신의 나이를 말하는 것',
+        warn:'나이를 말하면 그 숫자만큼 한 번에 자랍니다.',
+        death:`나이를 말했다.<br><br>
+            말이 끝나기 전에 무릎이 꺾인다. 뼈가 늘어나는 소리가 안에서 난다.<br>
+            손등에 주름이 잡히고, 시야가 흐려진다.<br><br>
+            어른이 된 사람은 여기 있을 수 없다.`
+    },
+    ariel: {
+        name:'에리얼', tale:'인어공주', icon:'🫧',
+        taboo:'소리를 내는 것',
+        warn:'목소리는 이미 팔렸습니다. 쓰면 대금이 청구됩니다.',
+        death:`소리를 냈다.<br><br>
+            비명이었다. 짧았다.<br><br>
+            발끝부터 투명해진다. 아프지는 않다.<br>
+            손을 들어 보려는데, 손이 이미 물이다.`
+    },
+    pinocchio: {
+        name:'피노키오', tale:'피노키오', icon:'🪵',
+        taboo:'거짓을 말하는 것',
+        warn:'여기서는 모르는 것도 거짓이 됩니다.',
+        death:`거짓을 말했다.<br><br>
+            코가 자란다. 천천히, 그러다 갑자기.<br>
+            천장에 닿고, 천장을 뚫고, 계속 자란다.<br><br>
+            몸이 따라가지 못해 목이 먼저 들린다.`
+    },
+    alice: {
+        name:'앨리스', tale:'이상한 나라의 앨리스', icon:'🫖',
+        taboo:'질문에 답하는 것',
+        warn:'여기서 답은 계약입니다.',
+        death:`답했다.<br><br>
+            맞는 답이었다. 그게 문제였다.<br><br>
+            <span style="color:#d4af37;">"정답입니다. 그럼 약속대로."</span><br><br>
+            무엇을 약속했는지 기억나지 않는다.<br>
+            상대는 기억하고 있었다.`
+    }
+};
+
+const TALE_KEYS = Object.keys(TALE_ROLES);
+
+const LORE_LIMIT = 80;
+
+function getLore() {
+    return (darkRun && darkRun.lore != null) ? darkRun.lore : 0;
+}
+
+function addLore(amount, reason) {
+    if (!darkRun) return;
+
+    if (amount > 0) {
+        const gaze = gearValue(currentUser, 'gaze');
+        if (gaze > 0) amount = Math.round(amount * (1 - gaze * 0.04));
+        if (amount < 1) amount = 1;
+    }
+
+    darkRun.lore = Math.max(0, Math.min(100, getLore() + amount));
+    if (reason) darkRun.log.push(`[이해] ${reason} (${amount >= 0 ? '+' : ''}${amount} → ${darkRun.lore})`);
+    renderLoreBar();
+
+    if (darkRun.lore >= LORE_LIMIT && !darkRun._loreGone) {
+        if (consumeQFlag('s003_lastpage')) {
+            darkRun.lore = 79;
+            showDarkToast('마지막 장이 버텨 주었다.');
+            renderLoreBar();
+            return;
+        }
+        darkRun._loreGone = true;
+        setTimeout(() => taleAssimilate(), 800);
+    }
+}
+
+function taleAssimilate() {
+    if (!darkRun || darkRun._dead) return;
+    darkRun.fail += 3;
+    darkDeath(
+        `이제 알겠다.<br><br>` +
+        `왜 늑대가 말을 하는지, 왜 콩나무가 하늘까지 자라는지.<br>` +
+        `전부 말이 된다. 처음부터 말이 됐다.<br><br>` +
+        `이상하다고 느꼈던 게 이상했던 것이다.<br><br>` +
+        `<span style="color:#d4af37;">책장이 넘어간다. 이제 이쪽이 그림이다.</span>`
+    );
+}
+
+function loreBarHtml() {
+    return `<div id="lore-bar" style="margin-bottom:12px;"></div>`;
+}
+
+function renderLoreBar() {
+    const el = document.getElementById('lore-bar');
+    if (!el || !darkRun) return;
+
+    const v = getLore();
+    const color = v >= LORE_LIMIT ? '#d4af37' : v >= 50 ? '#ffb74d' : '#7fd4d4';
+    const label = v >= LORE_LIMIT ? '동화됨' : v >= 50 ? '깊이 읽음' : v > 0 ? '읽는 중' : '아직 모름';
+
+    const role = darkRun.taleRole ? TALE_ROLES[darkRun.taleRole] : null;
+    const pages = (darkRun.talePages || []).length;
+
+    el.innerHTML = `
+        ${role ? `<div style="font-size:10px; color:#d4af37; margin-bottom:6px;">
+            ${role.icon} <b>${role.name}</b> · ${role.tale}
+            <span style="color:#888; margin-left:6px;">금기 — ${role.taboo}</span>
+        </div>` : ''}
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:4px;">
+            <span>이해도 — <b style="color:${color};">${label}</b></span>
+            <span style="color:${color}; font-weight:bold;">${v} / ${LORE_LIMIT}</span>
+        </div>
+        <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden;">
+            <div style="height:100%; width:${Math.min(100, v / LORE_LIMIT * 100)}%; background:${color}; transition:width 0.5s;"></div>
+        </div>
+        <div style="font-size:9px; color:#666; margin-top:5px;">찢어진 장 ${pages} / 5</div>`;
+}
+
+function assignTaleRoles() {
+    if (!darkRun) return;
+    if (darkRun.taleRole) return;
+
+    const n = darkRun.memberCount || 5;
+    const shuffled = [...TALE_KEYS].sort(() => 0.5 - Math.random()).slice(0, Math.min(7, Math.max(5, n)));
+
+    if (!darkRun.isParty || !database) {
+        darkRun.taleRole = shuffled[0];
+        darkRun.taleCast = { [currentUser.code]: shuffled[0] };
+        return;
+    }
+
+    if (darkRun.isLeader) {
+        const p = darkParties[darkRun.partyId];
+        const codes = (p && p.alive) ? Object.keys(p.alive) : [currentUser.code];
+        const cast = {};
+        codes.forEach((c, i) => { cast[c] = shuffled[i % shuffled.length]; });
+        database.ref(`darkParties/${darkRun.partyId}/taleCast`).set(cast);
+    }
+}
+
+function attachTaleCast() {
+    if (!database || !darkRun || !darkRun.partyId) return;
+    if (darkRun._castWatch) return;
+    darkRun._castWatch = true;
+
+    database.ref(`darkParties/${darkRun.partyId}/taleCast`).on('value', snap => {
+        const cast = snap.val();
+        if (!cast || !darkRun) return;
+        darkRun.taleCast = cast;
+        if (cast[currentUser.code]) darkRun.taleRole = cast[currentUser.code];
+        renderLoreBar();
+    });
+}
+
+function breakTaboo(reason) {
+    if (!darkRun || !darkRun.taleRole) return;
+    const role = TALE_ROLES[darkRun.taleRole];
+
+    if (consumeQFlag('s003_shell')) {
+        showDarkToast('조개가 대신 삼켰다.');
+        darkRun.log.push(`[금기] ${role.name} — 조개로 무효`);
+        return;
+    }
+
+    darkRun.tabooCount = (darkRun.tabooCount || 0) + 1;
+    darkRun.log.push(`[금기] ${role.name} ${reason} (${darkRun.tabooCount}회)`);
+
+    if (darkRun.tabooCount >= 2) {
+        darkRun.fail += 2;
+        darkDeath(role.death);
+        return;
+    }
+
+    addLore(12, '금기 접촉');
+    showDarkToast(`⚠ ${role.warn}`);
 }
