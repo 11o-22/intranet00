@@ -8247,8 +8247,8 @@ function bjFinish(mode) {
             if (unpicked.length === 0) unpicked = [...availablePool];
             let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
 
-            // ★ 진열대는 최대 6개까지만 채움
-            const MAX_ALIEN_SLOTS = 6;
+            // ★ 진열대는 최대 9개까지만 채움
+            const MAX_ALIEN_SLOTS = 9;
             let room = MAX_ALIEN_SLOTS - currentUser.alienUnlockedItems.length;
             let addCount = Math.min(3, Math.max(0, room));
             shuffled.slice(0, addCount).forEach(it => {
