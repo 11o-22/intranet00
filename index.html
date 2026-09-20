@@ -5756,6 +5756,8 @@ hlL.disabled = !playable;
             saveDB(); updateUI();
             showPointGainEffect(randPoints);
             showCustomAlert(`지갑을 열어 ${randPoints} P를 획득했습니다!`);
+
+            saveFields({ timedEffects:1 });
             return;
         }
 
