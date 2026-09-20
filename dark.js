@@ -12751,9 +12751,9 @@ body.style.setProperty('--theme-accent', hex, 'important');
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);
 
-    body.style.setProperty('background-color', `color-mix(in srgb, ${hex} 8%, #121212)`, 'important');
+    body.style.setProperty('background-color', `color-mix(in srgb, ${hex} 22%, #121212)`, 'important');
 const cont = document.querySelector('.container');
-if (cont) cont.style.setProperty('background-color', `color-mix(in srgb, ${hex} 10%, #1a1a1a)`, 'important');
+if (cont) cont.style.setProperty('background-color', `color-mix(in srgb, ${hex} 26%, #1a1a1a)`, 'important');
 
     const EMOJI_PATTERNS = { heart:'♥', rabbit:'🐰', star:'★', apple:'🍎', cherry:'🍒', lemon:'🍋' };
     if (EMOJI_PATTERNS[c.pattern]) {
