@@ -4786,9 +4786,13 @@ if (user.code === 'kario0987') {
                     <div class="id-avatar-mini">${photoSrc}</div>
                     <div class="id-info-details">
                         <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
-                         <div class="emp-name" style="color:#fff;">${u.name} <span class="emp-role-tag">${u.position || '사원'}</span></div>
+                        <div class="emp-name" style="color:#fff;">${u.name}${u.couple ? `<span style="color:${u.couple.hex}; margin-left:4px;">${u.couple.emoji}</span>` : ''} <span class="emp-role-tag">${u.position || '사원'}</span></div>
                          ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">${qb2.icon} ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
                         <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
+                        ${u.couple ? `<div style="font-size:11px; margin-top:5px;">
+    <span style="color:${u.couple.hex}; font-weight:bold;">커플-${u.couple.emoji}</span>
+    <span style="color:#aaa;"> ${u.couple.partnerName}의 애인</span>
+</div>` : ''}
                     </div>
                 </div>
                 <table class="badge-table" style="margin-top:15px;">
