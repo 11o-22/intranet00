@@ -12723,14 +12723,9 @@ function applyCoupleTheme(user) {
     if (old) old.remove();
 
     if (!user || !user.couple) {
-    ['--couple-color','--theme-focus','--theme-border','--theme-bg-grad','--theme-text'].forEach(k => body.style.removeProperty(k));
-    body.style.removeProperty('background');
-    body.style.removeProperty('background-attachment');
-    body.style.removeProperty('--theme-text');
-    const cont0 = document.querySelector('.container');
-    if (cont0) cont0.style.removeProperty('background');
+    ['--couple-color','--theme-bg-grad','--theme-border','--theme-focus','--theme-text','--theme-sub','--theme-accent'].forEach(k => body.style.removeProperty(k));
     applyDepartmentTheme(user);
-    return;
+    return
 }
 
     const c = user.couple;
@@ -12744,10 +12739,15 @@ function applyCoupleTheme(user) {
     body.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`, 'important');
     body.style.setProperty('--theme-text', '#f0f0f0', 'important');
 
-body.style.background = `color-mix(in srgb, ${hex} 10%, #0a0a0a)`;
-body.style.backgroundAttachment = 'fixed';
-const cont = document.querySelector('.container');
-if (cont) cont.style.background = `color-mix(in srgb, ${hex} 14%, #101010)`;
+body.style.setProperty('--couple-color', hex, 'important');
+body.style.setProperty('--theme-bg-grad', `linear-gradient(180deg, ${hex}26 0%, #14141a 55%, ${hex}1a 100%)`, 'important');
+body.style.setProperty('--theme-border', hex, 'important');
+body.style.setProperty('--theme-focus', hex, 'important');
+body.style.setProperty('--theme-text', '#f0f0f0', 'important');
+body.style.setProperty('--theme-sub', hex + 'aa', 'important');
+body.style.setProperty('--theme-accent', hex, 'important');
+
+
 
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);
