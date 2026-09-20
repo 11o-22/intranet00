@@ -12077,3 +12077,526 @@ function pickQuarantine(dest) {
     document.getElementById('fox-room-overlay').style.display = 'flex';
     updateFoxRoomQuestion();
 }
+
+// ==========================================
+// ★ 사택 오락실 — 테트리스
+// ==========================================
+const TET_COLORS = {
+    I:'#4fc3f7', O:'#ffd54f', T:'#ba68c8', S:'#81c784',
+    Z:'#e57373', J:'#7986cb', L:'#ffb74d'
+};
+const TET_SHAPES = {
+    I:[[0,1],[1,1],[2,1],[3,1]],
+    O:[[1,0],[2,0],[1,1],[2,1]],
+    T:[[1,0],[0,1],[1,1],[2,1]],
+    S:[[1,0],[2,0],[0,1],[1,1]],
+    Z:[[0,0],[1,0],[1,1],[2,1]],
+    J:[[0,0],[0,1],[1,1],[2,1]],
+    L:[[2,0],[0,1],[1,1],[2,1]]
+};
+
+let tet = null;
+
+function renderTetrisLobby() {
+    const box = document.getElementById('tetris-lobby');
+    if (!box || !currentUser) return;
+    const r = getRoomie(currentUser);
+
+    const others = Object.values(db.users)
+        .filter(u => u.code !== currentUser.code && u.code !== 'kario0987' && (!r || u.code !== r.code))
+        .sort((a, b) => {
+            const ao = onlineUsersMap[a.code] ? 0 : 1;
+            const bo = onlineUsersMap[b.code] ? 0 : 1;
+            if (ao !== bo) return ao - bo;
+            return a.name.localeCompare(b.name);
+        });
+
+    box.innerHTML = `
+        <div style="font-size:11px; color:#888; margin-bottom:14px; line-height:1.7;">
+            낡은 오락기가 한 대 있다. 전원은 들어온다.<br>
+            <span style="font-size:10px;">※ 1회 이용료 50 P</span>
+        </div>
+
+        <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px;" onclick="startTetris('solo')">솔로 모드 (50 P)</button>
+
+        ${r
+            ? `<button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="openDuelSetup('${r.code}')">대전 모드 (동거인 · ${r.name})</button>`
+            : `<div style="font-size:10px; color:#666; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px; margin-bottom:9px;">동거인이 없습니다.</div>`}
+
+        <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px; background:linear-gradient(145deg,#2a4a5a,#152830) !important; border-color:#3a6a7a !important; color:#7fd4d4 !important;" onclick="toggleDuelPick()">대전 모드 (상대 선택)</button>
+
+        <div id="duel-pick-box" style="display:none; background:rgba(0,0,0,0.3); border:1px solid #2a4a5a; border-radius:6px; padding:11px; margin-bottom:9px;">
+            <select id="duel-target" style="width:100%; font-size:12px; margin-bottom:8px;">
+                ${others.map(u =>
+                    `<option value="${u.code}">${u.name} · ${u.no}${onlineUsersMap[u.code] ? ' ●' : ''}</option>`).join('')}
+            </select>
+            <button class="game-btn" style="width:100%; margin:0; padding:10px; font-size:11px;" onclick="openDuelSetup(document.getElementById('duel-target').value)">이 사원에게 신청</button>
+        </div>
+
+        <div style="font-size:10px; color:#666; margin-top:14px; line-height:1.7; border-top:1px dashed #333; padding-top:10px;">
+            지운 줄 10 이하 — 포만감 +10 · 오염도 -10<br>
+            지운 줄 20 이상 — 포만감 +25 · 오염도 -25<br>
+            지운 줄 40 이상 — 포만감 +50 · 오염도 -50
+        </div>`;
+}
+
+function toggleDuelPick() {
+    const box = document.getElementById('duel-pick-box');
+    if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+function startTetris(mode) {
+    if (mode === 'solo') {
+        if (currentUser.points < 50) { showLuxuryAlert(); return; }
+        currentUser.points -= 50;
+        saveFields({ points:1 });
+        updateUI();
+    }
+
+    const ov = document.getElementById('tetris-overlay');
+    ov.style.display = 'flex';
+    document.getElementById('tetris-msg').innerText = '';
+    document.getElementById('tetris-rival').innerHTML = '';
+    document.getElementById('tetris-title').innerText = mode === 'duel' ? '사택 오락실 — 대전' : '사택 오락실';
+
+    tet = {
+        mode: mode,
+        grid: Array.from({length:20}, () => Array(10).fill(null)),
+        cur: null, next: tetRandom(), pos: {x:3,y:0}, rot: 0,
+        lines: 0, score: 0, over: false, timer: null, speed: 700
+    };
+    tetSpawn();
+    tetDraw();
+    tet.timer = setInterval(tetTick, tet.speed);
+    document.addEventListener('keydown', tetKey);
+}
+
+function tetRandom() {
+    const keys = Object.keys(TET_SHAPES);
+    return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function tetCells(type, rot, ox, oy) {
+    let cells = TET_SHAPES[type].map(([x,y]) => [x,y]);
+    for (let r = 0; r < rot; r++) {
+        cells = cells.map(([x,y]) => [3 - y, x]);
+    }
+    const minX = Math.min(...cells.map(c => c[0]));
+    const minY = Math.min(...cells.map(c => c[1]));
+    return cells.map(([x,y]) => [x - minX + ox, y - minY + oy]);
+}
+
+function tetFits(type, rot, ox, oy) {
+    return tetCells(type, rot, ox, oy).every(([x,y]) =>
+        x >= 0 && x < 10 && y >= 0 && y < 20 && !tet.grid[y][x]);
+}
+
+function tetSpawn() {
+    tet.cur = tet.next;
+    tet.next = tetRandom();
+    tet.rot = 0;
+    tet.pos = { x:3, y:0 };
+    if (!tetFits(tet.cur, 0, 3, 0)) tetGameOver();
+}
+
+function tetTick() {
+    if (!tet || tet.over) return;
+    if (tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y + 1)) {
+        tet.pos.y++;
+    } else {
+        tetLock();
+    }
+    tetDraw();
+}
+
+function tetLock() {
+    tetCells(tet.cur, tet.rot, tet.pos.x, tet.pos.y).forEach(([x,y]) => {
+        if (y >= 0 && y < 20) tet.grid[y][x] = tet.cur;
+    });
+
+    let cleared = 0;
+    for (let y = 19; y >= 0; y--) {
+        if (tet.grid[y].every(c => c)) {
+            tet.grid.splice(y, 1);
+            tet.grid.unshift(Array(10).fill(null));
+            cleared++;
+            y++;
+        }
+    }
+    if (cleared > 0) {
+        tet.lines += cleared;
+        tet.score += [0, 100, 300, 500, 800][cleared];
+        if (tet.lines % 10 === 0 && tet.speed > 180) {
+            tet.speed -= 60;
+            clearInterval(tet.timer);
+            tet.timer = setInterval(tetTick, tet.speed);
+        }
+        if (tet.mode === 'duel' && typeof duelSync === 'function') duelSync();
+    }
+    tetSpawn();
+}
+
+function tetMove(dir) {
+    if (!tet || tet.over) return;
+    if (tetFits(tet.cur, tet.rot, tet.pos.x + dir, tet.pos.y)) tet.pos.x += dir;
+    tetDraw();
+}
+
+function tetRotate() {
+    if (!tet || tet.over) return;
+    const nr = (tet.rot + 1) % 4;
+    if (tetFits(tet.cur, nr, tet.pos.x, tet.pos.y)) tet.rot = nr;
+    else if (tetFits(tet.cur, nr, tet.pos.x - 1, tet.pos.y)) { tet.rot = nr; tet.pos.x--; }
+    else if (tetFits(tet.cur, nr, tet.pos.x + 1, tet.pos.y)) { tet.rot = nr; tet.pos.x++; }
+    tetDraw();
+}
+
+function tetDrop() {
+    if (!tet || tet.over) return;
+    while (tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y + 1)) tet.pos.y++;
+    tetLock();
+    tetDraw();
+}
+
+function tetKey(e) {
+    if (!tet || tet.over) return;
+    if (e.key === 'ArrowLeft') { tetMove(-1); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { tetMove(1); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { tetRotate(); e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { tetTick(); e.preventDefault(); }
+    else if (e.key === ' ') { tetDrop(); e.preventDefault(); }
+}
+
+function tetDraw() {
+    const board = document.getElementById('tetris-board');
+    if (!board || !tet) return;
+
+    const view = tet.grid.map(row => row.slice());
+    if (!tet.over) {
+        tetCells(tet.cur, tet.rot, tet.pos.x, tet.pos.y).forEach(([x,y]) => {
+            if (y >= 0 && y < 20 && x >= 0 && x < 10) view[y][x] = tet.cur;
+        });
+    }
+
+    board.innerHTML = view.map(row => row.map(c =>
+        `<div style="background:${c ? TET_COLORS[c] : 'rgba(255,255,255,0.03)'}; border-radius:2px;"></div>`
+    ).join('')).join('');
+
+    const nextBox = document.getElementById('tetris-next');
+    if (nextBox) {
+        const ncells = tetCells(tet.next, 0, 0, 0);
+        let g = Array.from({length:4}, () => Array(4).fill(null));
+        ncells.forEach(([x,y]) => { if (y < 4 && x < 4) g[y][x] = tet.next; });
+        nextBox.innerHTML = g.map(row => row.map(c =>
+            `<div style="background:${c ? TET_COLORS[c] : 'transparent'}; border-radius:2px;"></div>`
+        ).join('')).join('');
+    }
+
+    document.getElementById('tetris-lines').innerText = tet.lines;
+    document.getElementById('tetris-score').innerText = tet.score;
+}
+
+function tetGameOver() {
+    if (!tet || tet.over) return;
+    tet.over = true;
+    clearInterval(tet.timer);
+    document.removeEventListener('keydown', tetKey);
+
+    if (tet.mode === 'duel') { if (typeof duelLose === 'function') duelLose(); return; }
+
+    let sat = 10, poll = 10;
+    if (tet.lines >= 40) { sat = 50; poll = 50; }
+    else if (tet.lines >= 20) { sat = 25; poll = 25; }
+
+    const before = currentUser.satiety != null ? currentUser.satiety : 100;
+    currentUser.satiety = Math.min(100, before + sat);
+    currentUser.pollution = Math.max(0, currentUser.pollution - poll);
+    currentUser.lastSatietyTime = Date.now();
+    saveFields({ satiety:1, pollution:1, lastSatietyTime:1 });
+    updateUI();
+
+    document.getElementById('tetris-msg').innerHTML =
+        `<span style="color:#d4af37; font-weight:bold;">종료 — ${tet.lines}줄 / ${tet.score}점</span><br>
+         <span style="font-size:11px; color:#4CAF50;">포만감 +${currentUser.satiety - before} · 오염도 -${poll}</span>`;
+}
+
+function exitTetris() {
+    if (tet && !tet.over && tet.mode === 'duel') {
+        showCustomAlert('대전 중에는 나갈 수 없습니다.');
+        return;
+    }
+    if (tet) { clearInterval(tet.timer); tet = null; }
+    document.removeEventListener('keydown', tetKey);
+    detachDuel();
+    document.getElementById('tetris-overlay').style.display = 'none';
+    renderTetrisLobby();
+}
+
+let duelId = null, duelRef = null, duelState = null, duelIsHost = false;
+let duelInvite = null, duelTarget = null;
+
+function openDuelSetup(targetCode) {
+    if (!targetCode) { showCustomAlert('상대를 선택해주세요.'); return; }
+    if (!onlineUsersMap[targetCode]) { showCustomAlert('상대가 접속 중이 아닙니다.'); return; }
+    if (currentUser.points < 50) { showLuxuryAlert(); return; }
+
+    duelTarget = targetCode;
+    const t = db.users[targetCode];
+    document.getElementById('duel-setup-title').innerText = `${t ? t.name : '?'} 사원에게 대전 신청`;
+    document.getElementById('duel-setup-modal').style.display = 'flex';
+    renderDuelStake();
+}
+
+function closeDuelSetup() {
+    document.getElementById('duel-setup-modal').style.display = 'none';
+    duelTarget = null;
+}
+
+function renderDuelStake() {
+    const type = document.getElementById('duel-stake-type').value;
+    document.getElementById('duel-stake-point').style.display = type === 'point' ? 'block' : 'none';
+    document.getElementById('duel-stake-item').style.display = type === 'item' ? 'block' : 'none';
+    document.getElementById('duel-stake-text').style.display = type === 'text' ? 'block' : 'none';
+
+    if (type === 'item') {
+        const counts = {};
+        (currentUser.inventory || []).forEach(it => { counts[it] = (counts[it] || 0) + 1; });
+        const sel = document.getElementById('duel-stake-item');
+        sel.innerHTML = Object.keys(counts).length
+            ? Object.keys(counts).map(it => `<option value="${it}">${it} ×${counts[it]}</option>`).join('')
+            : `<option value="">소지품이 없습니다</option>`;
+    }
+}
+
+function sendDuelRequest() {
+    if (!database || !duelTarget) return;
+    const type = document.getElementById('duel-stake-type').value;
+    let stake = { type: type };
+
+    if (type === 'point') {
+        const v = parseInt(document.getElementById('duel-stake-point').value, 10);
+        if (isNaN(v) || v <= 0) { showCustomAlert('걸 포인트를 입력해주세요.'); return; }
+        if (v > currentUser.points - 50) { showCustomAlert('이용료를 제외한 보유 포인트를 넘을 수 없습니다.'); return; }
+        stake.value = v;
+        stake.label = `${v.toLocaleString()} P`;
+    } else if (type === 'item') {
+        const it = document.getElementById('duel-stake-item').value;
+        if (!it) { showCustomAlert('걸 소지품이 없습니다.'); return; }
+        stake.value = it;
+        stake.label = it;
+    } else {
+        const tx = document.getElementById('duel-stake-text').value.trim();
+        if (!tx) { showCustomAlert('내용을 적어주세요.'); return; }
+        stake.value = tx;
+        stake.label = tx;
+    }
+
+    const id = 'duel_' + Date.now() + '_' + Math.floor(Math.random() * 900 + 100);
+    database.ref('duels/' + id).set({
+        id: id,
+        host: currentUser.code, hostName: currentUser.name,
+        guest: duelTarget, guestName: (db.users[duelTarget] || {}).name || '?',
+        stake: stake,
+        state: 'INVITE',
+        createdAt: Date.now(),
+        hostLines: 0, guestLines: 0,
+        hostAlive: true, guestAlive: true
+    });
+
+    duelId = id;
+    duelIsHost = true;
+    attachDuel(id);
+    closeDuelSetup();
+    showCustomAlert('신청했습니다. 상대의 응답을 기다립니다.');
+}
+
+function attachDuel(id) {
+    if (duelRef) { try { duelRef.off(); } catch(e) {} }
+    duelRef = database.ref('duels/' + id);
+    duelRef.on('value', snap => {
+        duelState = snap.val();
+        if (!duelState) { detachDuel(); return; }
+        handleDuelState();
+    });
+}
+
+function detachDuel() {
+    if (duelRef) { try { duelRef.off(); } catch(e) {} }
+    duelRef = null; duelId = null; duelState = null; duelIsHost = false;
+}
+
+function handleDuelState() {
+    const d = duelState;
+    if (!d) return;
+
+    if (d.state === 'REJECTED') {
+        showCustomAlert(`${d.guestName} 사원이 거절했습니다.`);
+        database.ref('duels/' + d.id).remove();
+        detachDuel();
+        return;
+    }
+
+    if (d.state === 'PLAYING' && (!tet || tet.mode !== 'duel')) {
+        startTetris('duel');
+        showDuelRival();
+        return;
+    }
+
+    if (d.state === 'PLAYING' && tet && tet.mode === 'duel') {
+        showDuelRival();
+        const iAmHost = d.host === currentUser.code;
+        const rivalDead = iAmHost ? !d.guestAlive : !d.hostAlive;
+        const meDead = iAmHost ? !d.hostAlive : !d.guestAlive;
+        if (rivalDead && !meDead) duelWin();
+        return;
+    }
+}
+
+function showDuelRival() {
+    const el = document.getElementById('tetris-rival');
+    if (!el || !duelState) return;
+    const d = duelState;
+    const iAmHost = d.host === currentUser.code;
+    const rn = iAmHost ? d.guestName : d.hostName;
+    const rl = iAmHost ? d.guestLines : d.hostLines;
+    const ra = iAmHost ? d.guestAlive : d.hostAlive;
+    el.innerHTML = `
+        <div style="border-top:1px dashed #333; padding-top:8px; margin-top:8px;">
+            <div style="color:#c9a8ff; font-weight:bold; font-size:10px;">${rn}</div>
+            <div style="font-size:15px; font-weight:bold; color:${ra ? '#ddd' : '#f44336'};">${rl}줄</div>
+            <div style="font-size:9px; color:${ra ? '#4CAF50' : '#f44336'};">${ra ? '진행 중' : '무너짐'}</div>
+            <div style="font-size:9px; color:#888; margin-top:6px;">걸린 것<br><b style="color:#d4af37;">${d.stake.label}</b></div>
+        </div>`;
+}
+
+function duelSync() {
+    if (!duelId || !database || !tet) return;
+    const key = duelIsHost ? 'hostLines' : 'guestLines';
+    database.ref(`duels/${duelId}/${key}`).set(tet.lines);
+}
+
+function duelLose() {
+    if (!duelId || !database) return;
+    const key = duelIsHost ? 'hostAlive' : 'guestAlive';
+    database.ref(`duels/${duelId}/${key}`).set(false);
+
+    const d = duelState;
+    const winName = duelIsHost ? d.guestName : d.hostName;
+    const winCode = duelIsHost ? d.guest : d.host;
+
+    settleDuel(winCode, currentUser.code, d.stake, winName, currentUser.name);
+
+    document.getElementById('tetris-msg').innerHTML =
+        `<span style="color:#f44336; font-weight:bold;">패배 — ${tet.lines}줄</span><br>
+         <span style="font-size:11px; color:#888;">${winName} 사원에게 ${d.stake.label}을(를) 넘겼습니다.</span>`;
+    document.getElementById('tetris-quit').style.display = 'block';
+}
+
+function duelWin() {
+    if (!tet || tet.over) return;
+    tet.over = true;
+    clearInterval(tet.timer);
+    document.removeEventListener('keydown', tetKey);
+
+    const d = duelState;
+    const loseName = duelIsHost ? d.guestName : d.hostName;
+
+    document.getElementById('tetris-msg').innerHTML =
+        `<span style="color:#4CAF50; font-weight:bold;">승리 — ${tet.lines}줄</span><br>
+         <span style="font-size:11px; color:#d4af37;">${loseName} 사원에게서 ${d.stake.label}을(를) 받았습니다.</span>`;
+    document.getElementById('tetris-quit').style.display = 'block';
+}
+
+function settleDuel(winCode, loseCode, stake, winName, loseName) {
+    if (!database) return;
+
+    const updates = {};
+    if (stake.type === 'point') {
+        const w = db.users[winCode], l = db.users[loseCode];
+        if (w) updates[`users/${winCode}/points`] = Math.min(POINT_CAP, (w.points || 0) + stake.value);
+        if (l) updates[`users/${loseCode}/points`] = Math.max(0, (l.points || 0) - stake.value);
+    } else if (stake.type === 'item') {
+        const w = db.users[winCode], l = db.users[loseCode];
+        if (l) {
+            const inv = (l.inventory || []).slice();
+            const i = inv.indexOf(stake.value);
+            if (i > -1) inv.splice(i, 1);
+            updates[`users/${loseCode}/inventory`] = inv;
+        }
+        if (w) updates[`users/${winCode}/inventory`] = (w.inventory || []).concat([stake.value]);
+    }
+
+    updates[`users/${winCode}/_adminStamp`] = Date.now();
+    updates[`users/${loseCode}/_adminStamp`] = Date.now();
+    database.ref('/').update(updates);
+
+    // 전체 공지 기록
+    database.ref('duelLogs').push({
+        at: Date.now(),
+        winName: winName, loseName: loseName,
+        stakeType: stake.type, stakeLabel: stake.label
+    });
+
+    const w = db.users[winCode], l = db.users[loseCode];
+    if (w) { addHistoryLog(w, `[대전 승리] ${loseName} 사원에게서 ${stake.label} 획득`); database.ref(`users/${winCode}/history`).set(w.history); }
+    if (l) { addHistoryLog(l, `[대전 패배] ${winName} 사원에게 ${stake.label} 상실`); database.ref(`users/${loseCode}/history`).set(l.history); }
+
+    setTimeout(() => database.ref('duels/' + duelId).remove(), 4000);
+}
+
+// 신청 수신
+function watchDuelInvites() {
+    if (!database || !currentUser) return;
+    database.ref('duels').on('child_added', snap => {
+        const d = snap.val();
+        if (!d || d.guest !== currentUser.code || d.state !== 'INVITE') return;
+        if (Date.now() - d.createdAt > 60000) return;
+        duelInvite = d;
+        document.getElementById('duel-invite-body').innerHTML =
+            `<b style="color:#c9a8ff;">${d.hostName}</b> 사원이 오락기 앞에 서 있습니다.<br><br>
+             걸린 것<br><b style="color:#d4af37; font-size:14px;">${d.stake.label}</b><br><br>
+             <span style="font-size:10px; color:#888;">받으면 같은 것을 걸게 됩니다. 이용료 50 P</span>`;
+        document.getElementById('duel-invite-modal').style.display = 'flex';
+    });
+}
+
+function acceptDuel() {
+    if (!duelInvite || !database) return;
+    if (currentUser.points < 50) { showLuxuryAlert(); return; }
+
+    if (duelInvite.stake.type === 'point' && currentUser.points - 50 < duelInvite.stake.value) {
+        showCustomAlert('걸린 포인트가 부족합니다.');
+        return;
+    }
+    if (duelInvite.stake.type === 'item' && !(currentUser.inventory || []).includes(duelInvite.stake.value)) {
+        showCustomAlert(`'${duelInvite.stake.value}'이(가) 없습니다.`);
+        return;
+    }
+
+    currentUser.points -= 50;
+    saveFields({ points:1 });
+
+    duelId = duelInvite.id;
+    duelIsHost = false;
+    document.getElementById('duel-invite-modal').style.display = 'none';
+    database.ref(`duels/${duelId}/state`).set('PLAYING');
+    attachDuel(duelId);
+    duelInvite = null;
+}
+
+function rejectDuel() {
+    if (!duelInvite || !database) return;
+    database.ref(`duels/${duelInvite.id}/state`).set('REJECTED');
+    document.getElementById('duel-invite-modal').style.display = 'none';
+    duelInvite = null;
+}
+
+// 전체 공지
+function watchDuelLogs() {
+    if (!database) return;
+    database.ref('duelLogs').limitToLast(1).on('child_added', snap => {
+        const v = snap.val();
+        if (!v || Date.now() - v.at > 15000) return;
+        showCustomAlert(`[사내 알림]\n\n${v.winName} 사원이 ${v.loseName} 사원을 이겼습니다.\n걸린 것: ${v.stakeLabel}`);
+    });
+}
