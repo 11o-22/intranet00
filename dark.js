@@ -1213,15 +1213,22 @@ function renderStepB330() {
         }
 
         // 본대의 진행에 맞춰 따라간다
-        const nextStep = darkRun.step + 1;
-        const def = B330_STEPS[nextStep];
-        const isRejoin = def && def.type === 'rejoinpoint';
+       const nextStep = darkRun.step + 1;
+const def = B330_STEPS[nextStep];
+const isRejoin = def && def.type === 'rejoinpoint';
 
-        darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
-            darkChoiceBtn(
-                isRejoin ? "인기척이 난다." : "계속 간다.",
-                `darkRun.step=${nextStep}; renderSoloStep();`));
-        mountDarkChat('normal');
+const pp = darkParties[darkRun.partyId];
+const partyStep = (pp && pp.curStep) || 0;
+const capped = Math.min(nextStep, Math.max(partyStep, darkRun.step));
+
+darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
+    (capped > darkRun.step
+        ? darkChoiceBtn(isRejoin ? "인기척이 난다." : "계속 간다.", `darkRun.step=${capped}; renderSoloStep();`)
+        : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+             더 갈 곳이 없다. 벽에 기대 기다린다.<br>
+             <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="renderSoloStep()">주변을 살핀다</button>
+           </div>`));
+mountDarkChat('normal');
     }
 
         // --- 기믹 4: 하나 많다 ---
@@ -1363,26 +1370,39 @@ function renderStepB330() {
         mountDarkChat('normal');
     }
 
-    function b330Rejoin(v) {
-        if (!database) return;
-        const key = darkRun.solo ? 'soloPick' : 'holdPick';
-        const attempt = (darkRun.rejoinTries || 0) + 1;
-        database.ref(`darkParties/${darkRun.partyId}/rj${attempt}/${key}/${currentUser.code}`).set(v);
+   function b330Rejoin(v) {
+    if (!database) return;
+    const key = darkRun.solo ? 'soloPick' : 'holdPick';
+    const need = darkRun.solo ? 'holdPick' : 'soloPick';
+    const attempt = (darkRun.rejoinTries || 0) + 1;
+    const ref = database.ref(`darkParties/${darkRun.partyId}/rj${attempt}`);
 
-        setTimeout(() => {
-            database.ref(`darkParties/${darkRun.partyId}/rj${attempt}`).once('value').then(sn => {
-                const rj = sn.val() || {};
-                const soloPicks = Object.values(rj.soloPick || {});
-                const holdPicks = Object.values(rj.holdPick || {});
-                resolveB330Rejoin(soloPicks, holdPicks, attempt);
-            });
-        }, 2000);
+    ref.child(`${key}/${currentUser.code}`).set(v);
 
-        darkBodyEl().innerHTML = darkBox(`합류 — ${attempt}차`,
-            `선택했다.<br><br>상대가 어떻게 움직일지는 알 수 없다.`,
-            `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
-        mountDarkChat('normal');
-    }
+    if (darkRun._rjWatch) { try { darkRun._rjWatch.off(); } catch(e) {} }
+    darkRun._rjWatch = ref;
+    darkRun._rjStart = Date.now();
+
+    ref.on('value', sn => {
+        if (!darkRun) return;
+        const rj = sn.val() || {};
+        const soloPicks = Object.values(rj.soloPick || {});
+        const holdPicks = Object.values(rj.holdPick || {});
+        const waited = Date.now() - darkRun._rjStart;
+
+        // 양쪽이 모였거나, 90초를 넘기면 진행
+        if ((soloPicks.length > 0 && holdPicks.length > 0) || waited > 90000) {
+            try { ref.off(); } catch(e) {}
+            darkRun._rjWatch = null;
+            resolveB330Rejoin(soloPicks, holdPicks, attempt);
+        }
+    });
+
+    darkBodyEl().innerHTML = darkBox(`합류 — ${attempt}차`,
+        `선택했다.<br><br>상대가 어떻게 움직일지는 알 수 없다.`,
+        `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
+    mountDarkChat('normal');
+}
 
     function resolveB330Rejoin(soloPicks, holdPicks, attempt) {
         let result, txt, mod = 0, joined = false;
