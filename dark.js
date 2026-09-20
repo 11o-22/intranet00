@@ -12083,7 +12083,7 @@ function pickQuarantine(dest) {
 // ==========================================
 const TET_COLORS = {
     I:'#4fc3f7', O:'#ffd54f', T:'#ba68c8', S:'#81c784',
-    Z:'#e57373', J:'#7986cb', L:'#ffb74d'
+    Z:'#e57373', J:'#7986cb', L:'#ffb74d', G:'#5a5a5a'
 };
 const TET_SHAPES = {
     I:[[0,1],[1,1],[2,1],[3,1]],
@@ -12159,12 +12159,14 @@ function startTetris(mode) {
     document.getElementById('tetris-rival').innerHTML = '';
     document.getElementById('tetris-title').innerText = mode === 'duel' ? '사택 오락실 — 대전' : '사택 오락실';
 
-    tet = {
-        mode: mode,
-        grid: Array.from({length:20}, () => Array(10).fill(null)),
-        cur: null, next: tetRandom(), pos: {x:3,y:0}, rot: 0,
-        lines: 0, score: 0, over: false, timer: null, speed: 700
-    };
+   tet = {
+    mode: mode,
+    grid: Array.from({length:20}, () => Array(10).fill(null)),
+    cur: null, next: tetRandom(), pos: {x:3,y:0}, rot: 0,
+    hold: null, holdUsed: false,
+    lines: 0, score: 0, over: false, timer: null, speed: 700,
+    garbage: 0
+};
     tetSpawn();
     tetDraw();
     tet.timer = setInterval(tetTick, tet.speed);
@@ -12196,6 +12198,7 @@ function tetSpawn() {
     tet.next = tetRandom();
     tet.rot = 0;
     tet.pos = { x:3, y:0 };
+    tet.holdUsed = false;
     if (!tetFits(tet.cur, 0, 3, 0)) tetGameOver();
 }
 
@@ -12223,16 +12226,26 @@ function tetLock() {
             y++;
         }
     }
-    if (cleared > 0) {
-        tet.lines += cleared;
-        tet.score += [0, 100, 300, 500, 800][cleared];
-        if (tet.lines % 10 === 0 && tet.speed > 180) {
-            tet.speed -= 60;
-            clearInterval(tet.timer);
-            tet.timer = setInterval(tetTick, tet.speed);
-        }
-        if (tet.mode === 'duel' && typeof duelSync === 'function') duelSync();
+   if (cleared > 0) {
+    tet.lines += cleared;
+    tet.score += [0, 100, 300, 500, 800][cleared];
+    if (tet.lines % 10 === 0 && tet.speed > 180) {
+        tet.speed -= 60;
+        clearInterval(tet.timer);
+        tet.timer = setInterval(tetTick, tet.speed);
     }
+    if (tet.mode === 'duel') {
+        duelSync();
+        const atk = [0, 0, 1, 2, 4][cleared];
+        if (atk > 0) duelAttack(atk);
+    }
+}
+
+// 받아둔 쓰레기 줄을 올린다
+if (tet.garbage > 0) {
+    tetRaiseGarbage(tet.garbage);
+    tet.garbage = 0;
+}
     tetSpawn();
 }
 
@@ -12265,6 +12278,7 @@ function tetKey(e) {
     else if (e.key === 'ArrowUp') { tetRotate(); e.preventDefault(); }
     else if (e.key === 'ArrowDown') { tetTick(); e.preventDefault(); }
     else if (e.key === ' ') { tetDrop(); e.preventDefault(); }
+    else if (e.key === 'c' || e.key === 'C') { tetHold(); e.preventDefault(); }
 }
 
 function tetDraw() {
@@ -12291,6 +12305,17 @@ function tetDraw() {
             `<div style="background:${c ? TET_COLORS[c] : 'transparent'}; border-radius:2px;"></div>`
         ).join('')).join('');
     }
+
+    const holdBox = document.getElementById('tetris-hold');
+if (holdBox) {
+    let g = Array.from({length:4}, () => Array(4).fill(null));
+    if (tet.hold) {
+        tetCells(tet.hold, 0, 0, 0).forEach(([x,y]) => { if (y < 4 && x < 4) g[y][x] = tet.hold; });
+    }
+    holdBox.innerHTML = g.map(row => row.map(c =>
+        `<div style="background:${c ? (tet.holdUsed ? '#555' : TET_COLORS[c]) : 'transparent'}; border-radius:2px;"></div>`
+    ).join('')).join('');
+}
 
     document.getElementById('tetris-lines').innerText = tet.lines;
     document.getElementById('tetris-score').innerText = tet.score;
@@ -12422,6 +12447,10 @@ function attachDuel(id) {
 
 function detachDuel() {
     if (duelRef) { try { duelRef.off(); } catch(e) {} }
+    if (duelId && database) {
+        try { database.ref(`duels/${duelId}/atkToHost`).off(); } catch(e) {}
+        try { database.ref(`duels/${duelId}/atkToGuest`).off(); } catch(e) {}
+    }
     duelRef = null; duelId = null; duelState = null; duelIsHost = false;
 }
 
@@ -12437,10 +12466,11 @@ function handleDuelState() {
     }
 
     if (d.state === 'PLAYING' && (!tet || tet.mode !== 'duel')) {
-        startTetris('duel');
-        showDuelRival();
-        return;
-    }
+    startTetris('duel');
+    watchDuelAttack();
+    showDuelRival();
+    return;
+}
 
     if (d.state === 'PLAYING' && tet && tet.mode === 'duel') {
         showDuelRival();
@@ -12721,4 +12751,57 @@ function applyCoupleTheme(user) {
         div.innerText = EMOJI_PATTERNS[c.pattern].repeat(900);
         document.body.appendChild(div);
     }
+}
+
+function tetHold() {
+    if (!tet || tet.over || tet.holdUsed) return;
+    const cur = tet.cur;
+    if (tet.hold) {
+        tet.cur = tet.hold;
+        tet.hold = cur;
+    } else {
+        tet.hold = cur;
+        tet.cur = tet.next;
+        tet.next = tetRandom();
+    }
+    tet.rot = 0;
+    tet.pos = { x:3, y:0 };
+    tet.holdUsed = true;
+    if (!tetFits(tet.cur, 0, 3, 0)) { tetGameOver(); return; }
+    tetDraw();
+}
+
+function tetRaiseGarbage(n) {
+    if (!tet) return;
+    for (let i = 0; i < n; i++) {
+        const hole = Math.floor(Math.random() * 10);
+        const row = Array(10).fill('G');
+        row[hole] = null;
+        tet.grid.shift();
+        tet.grid.push(row);
+    }
+    // 밀려 올라간 만큼 현재 블록도 올린다
+    tet.pos.y = Math.max(0, tet.pos.y - n);
+    if (!tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y)) tetGameOver();
+}
+
+function duelAttack(n) {
+    if (!duelId || !database) return;
+    const key = duelIsHost ? 'atkToGuest' : 'atkToHost';
+    database.ref(`duels/${duelId}/${key}`).push({ n: n, at: Date.now() });
+}
+
+function watchDuelAttack() {
+    if (!duelId || !database || !tet) return;
+    const key = duelIsHost ? 'atkToHost' : 'atkToGuest';
+    database.ref(`duels/${duelId}/${key}`).on('child_added', snap => {
+        const v = snap.val();
+        if (!v || !tet || tet.over) return;
+        tet.garbage = (tet.garbage || 0) + v.n;
+        const msg = document.getElementById('tetris-msg');
+        if (msg) {
+            msg.innerHTML = `<span style="color:#f44336; font-weight:bold;">⚠ ${v.n}줄이 올라옵니다</span>`;
+            setTimeout(() => { if (msg.innerText.includes('올라옵니다')) msg.innerHTML = ''; }, 1500);
+        }
+    });
 }
