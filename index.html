@@ -1178,7 +1178,8 @@
     } catch(e) {
         console.error("Firebase Init Error:", e);
     }
-
+    
+    let pendingCouple = null;
     let currentUser = null;
     let maintenanceMode = false;
     let aiChatOff = false;
@@ -5582,7 +5583,7 @@ hlL.disabled = !playable;
             updates[`users/${currentUser.code}/history`] = currentUser.history;
             updates[`users/${currentUser.code}/couple`] = currentUser.couple || null;
             updates[`users/${currentUser.code}/badge`] = currentUser.badge;
-            
+
             await database.ref('/').update(updates);
 
             db.users[targetCode] = targetUser;
@@ -6685,7 +6686,7 @@ else if (cat.effect === 'couple_ring') {
         return false;
     }
 
-    const pending = currentUser._pendingCouple;
+    delete currentUser._pendingCouple;
     if (!pending) { showCustomAlert('설정이 완료되지 않았습니다.'); return false; }
 
     const pattern = randomCouplePattern();

@@ -12676,7 +12676,7 @@ function confirmCoupleSetup() {
     const color = normalizeCoupleColor(colorRaw);
     if (!color) { showCustomAlert('알 수 없는 색상입니다.\n목록에서 골라주세요.'); return; }
 
-    currentUser._pendingCouple = { emoji: emoji, color: color };
+    pendingCouple = { emoji: emoji, color: color };
     document.getElementById('couple-setup-modal').style.display = 'none';
     openItemTargetModal('💍 커플링');
 }
