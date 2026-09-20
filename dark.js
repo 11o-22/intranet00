@@ -12723,6 +12723,7 @@ function applyCoupleTheme(user) {
     if (old) old.remove();
 
     if (!user || !user.couple) {
+        ['--couple-color','--theme-focus','--theme-border','--theme-bg-grad','--theme-text'].forEach(k => body.style.removeProperty(k));
         document.documentElement.style.removeProperty('--couple-color');
         applyDepartmentTheme(user);
         return;
@@ -12731,10 +12732,13 @@ function applyCoupleTheme(user) {
     const c = user.couple;
     const hex = c.hex || '#d4af37';
 
-    document.documentElement.style.setProperty('--couple-color', hex);
-    document.documentElement.style.setProperty('--theme-focus', hex);
-    document.documentElement.style.setProperty('--theme-border', hex + '66');
-    document.documentElement.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`);
+    Array.from(body.classList).forEach(cl => { if (cl.startsWith('theme-')) body.classList.remove(cl); });
+
+    body.style.setProperty('--couple-color', hex, 'important');
+    body.style.setProperty('--theme-focus', hex, 'important');
+    body.style.setProperty('--theme-border', hex + '66', 'important');
+    body.style.setProperty('--theme-bg-grad', `linear-gradient(145deg, ${hex}22, #0f0f0f)`, 'important');
+    body.style.setProperty('--theme-text', '#f0f0f0', 'important');
 
     body.classList.add('couple-themed', 'cp-' + c.pattern);
 
