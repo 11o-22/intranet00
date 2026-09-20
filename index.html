@@ -3832,6 +3832,7 @@ return b;
         clearInterval(a214Timer);
         if (a214Combat.timer) clearInterval(a214Combat.timer);
         darkAmbienceStop();
+        stopAbsenceTimer();
 
 
         const pid = darkRun ? darkRun.partyId : null;
@@ -4103,6 +4104,7 @@ setTimeout(() => startFoxRoomSequence(), 600);
         updateUI();
         renderDarkness();
         renderPartyPanel();
+        stopAbsenceTimer();
     }
     function renderDarkLogs() {
         const c = document.getElementById('darkness-log-container');

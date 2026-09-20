@@ -2825,6 +2825,61 @@ function input119D(n) {
             }
         });
 }
+
+const ABSENCE_LIMIT = 180;   // 3분
+
+function startAbsenceTimer() {
+    if (!darkRun) return;
+    if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
+    darkRun._absenceStart = Date.now();
+
+    darkRun._absenceTimer = setInterval(() => {
+        if (!darkRun || !darkRun._absenceNotified) { stopAbsenceTimer(); return; }
+
+        const sec = Math.floor((Date.now() - darkRun._absenceStart) / 1000);
+        const left = ABSENCE_LIMIT - sec;
+
+        if (left === 120 || left === 60 || left === 30) {
+            showDarkToast(`응답 없는 동료를 ${left}초 뒤 제외하고 진행합니다.`);
+        }
+
+        if (left <= 0) {
+            stopAbsenceTimer();
+            dropAbsentMembers();
+        }
+    }, 1000);
+}
+
+function stopAbsenceTimer() {
+    if (!darkRun) return;
+    if (darkRun._absenceTimer) clearInterval(darkRun._absenceTimer);
+    darkRun._absenceTimer = null;
+    darkRun._absenceNotified = false;
+}
+
+function dropAbsentMembers() {
+    if (!darkRun || !darkRun.isParty || !database) return;
+    if (!darkRun.isLeader) return;   // 방장만 처리
+
+    database.ref(`darkParties/${darkRun.partyId}`).once('value').then(snap => {
+        const p = snap.val();
+        if (!p || !p.members) return;
+        const alive = p.alive || {};
+        const gone = Object.keys(p.members).filter(c => !alive[c]);
+        if (gone.length === 0) return;
+
+        const updates = {};
+        gone.forEach(c => {
+            updates[`darkParties/${darkRun.partyId}/members/${c}`] = null;
+            updates[`darkParties/${darkRun.partyId}/ready${darkRun.step}/${c}`] = null;
+        });
+        database.ref('/').update(updates);
+
+        const names = gone.map(c => p.members[c].name).join(', ');
+        sendPartyChat(`${names} 사원을 제외하고 진행합니다.`, true);
+        showDarkToast('남은 인원으로 진행합니다.');
+    });
+}
     // ==========================================
     // ★ 전용 장비 (Soul Gear)
     // ==========================================
