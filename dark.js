@@ -13396,3 +13396,324 @@ function breakTaboo(reason) {
     addLore(12, '금기 접촉');
     showDarkToast(`⚠ ${role.warn}`);
 }
+
+const S003_STEPS = {
+    0:  { type:'intro' },
+
+    // --- 1구간: 책 속으로 ---
+    1:  { type:'narr', n:1, img:'step1' },
+    2:  { type:'cast' },                    // 배역 배정
+    3:  { type:'narr', n:2 },
+    4:  { type:'gimmick', n:1 },            // 공통 — 첫 장 (응시)
+    5:  { type:'narr', n:3 },
+    6:  { type:'page', n:1 },               // 찢어진 장 탐색
+    7:  { type:'gimmick', n:2 },            // 공통 — 삽화 (감각)
+    8:  { type:'narr', n:4 },
+
+    // --- 2구간: 각자의 동화 (1차) ---
+    9:  { type:'tale', round:1 },
+    10: { type:'narr', n:5 },
+    11: { type:'gimmick', n:3 },            // 공통 — 목차 (연결)
+    12: { type:'lore' },                    // 이해도 검사
+    13: { type:'narr', n:6, img:'step2' },
+    14: { type:'page', n:2 },
+    15: { type:'gimmick', n:4 },            // 공통 — 길 (회피)
+
+    // --- 3구간: 각자의 동화 (2차) ---
+    16: { type:'tale', round:2 },
+    17: { type:'narr', n:7 },
+    18: { type:'gimmick', n:5 },            // 공통 — 차 마시기 (은신)
+    19: { type:'vote', n:1 },               // 누구의 결말을 따를지
+    20: { type:'narr', n:8 },
+    21: { type:'page', n:3 },
+    22: { type:'lore' },
+
+    // --- 4구간: 뒤틀림 ---
+    23: { type:'narr', n:9, img:'step3' },
+    24: { type:'tale', round:3 },
+    25: { type:'gimmick', n:6 },            // 공통 — 삼켜진 장 (파괴)
+    26: { type:'narr', n:10 },
+    27: { type:'page', n:4 },
+    28: { type:'gimmick', n:7 },            // 공통 — 이름 부르기 (치유)
+    29: { type:'vote', n:2 },
+    30: { type:'narr', n:11 },
+
+    // --- 5구간: 결말 ---
+    31: { type:'narr', n:12, img:'step4' },
+    32: { type:'tale', round:4 },
+    33: { type:'page', n:5 },
+    34: { type:'lore' },
+    35: { type:'gimmick', n:8 },            // 공통 — 마지막 장 (행운)
+    36: { type:'narr', n:13 },
+    37: { type:'ending' },                  // 최종 판정
+    99: { type:'result' }
+};
+
+function renderStepS003() {
+    const body = darkBodyEl();
+    if (!body || !darkRun) return;
+    if (darkRun.rejoined) { renderRejoinScene(); return; }
+    if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); attachTaleCast(); }
+    saveDarkRunState();
+
+    if (darkRun.lore == null) darkRun.lore = 0;
+    if (!darkRun.talePages) darkRun.talePages = [];
+
+    const def = S003_STEPS[darkRun.step];
+    if (!def) { renderDarkResult(); return; }
+
+    if (def.type === 'intro') {
+        body.innerHTML = darkBox("첫 장", DARK_ZONES[darkRun.zone].intro,
+            loreBarHtml() + s003Brief() +
+            darkChoiceBtn("책장을 넘긴다.", "partyAdvance(1)"), "intro");
+        renderLoreBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    if (def.type === 'narr') {
+        const d = S003_NARR[def.n];
+        if (!d) { partyAdvance(darkRun.step + 1); return; }
+        body.innerHTML = darkBox("—", d.text,
+            loreBarHtml() + darkChoiceBtn("계속 읽는다.", `partyAdvance(${darkRun.step + 1})`),
+            def.img);
+        renderLoreBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    if (def.type === 'cast')    { renderTaleCast(); return; }
+    if (def.type === 'tale')    { renderTaleScene(def.round); return; }
+    if (def.type === 'page')    { renderTornPage(def.n); return; }
+    if (def.type === 'lore')    { renderLoreCheck(darkRun.step + 1); return; }
+    if (def.type === 'vote')    { renderS003Vote(def.n); return; }
+    if (def.type === 'ending')  { renderS003Ending(); return; }
+    if (def.type === 'result')  { renderDarkResult(); return; }
+
+    if (def.type === 'gimmick') {
+        const fn = window['s003G' + def.n];
+        if (typeof fn === 'function') fn();
+        else partyAdvance(darkRun.step + 1);
+        return;
+    }
+}
+
+function s003Brief() {
+    return `
+        <div style="background:rgba(212,175,55,0.08); border:1px solid #5a4a2a; border-radius:6px; padding:13px; margin-bottom:13px; font-size:11px; color:#ccc; line-height:1.8;">
+            <div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:8px;">📖 규칙</div>
+            들어가면 <b>배역</b>이 주어집니다. 거부할 수 없습니다.<br>
+            배역마다 <b style="color:#ff6b6b;">금기</b>가 있습니다. 두 번 어기면 그 이야기대로 끝납니다.<br><br>
+            이해도가 <b style="color:#d4af37;">${LORE_LIMIT}</b>에 닿으면 돌아올 수 없습니다.<br>
+            알아갈수록 유리하고, 알아갈수록 위험합니다.<br><br>
+            <span style="font-size:10px; color:#888;">찢어진 장 5개를 모으면 다른 결말이 열립니다.</span>
+        </div>`;
+}
+
+function renderTaleCast() {
+    assignTaleRoles();
+
+    const wait = darkRun.isParty && !darkRun.taleRole;
+    if (wait) {
+        darkBodyEl().innerHTML = darkBox("배역",
+            `책이 이름을 부르기 시작한다.<br><br>순서가 있는 것 같지는 않다.`,
+            loreBarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:14px;">배역을 기다리는 중...</div>`);
+        renderLoreBar();
+        mountDarkChat('normal');
+        setTimeout(() => renderTaleCast(), 1200);
+        return;
+    }
+
+    const role = TALE_ROLES[darkRun.taleRole];
+    const cast = darkRun.taleCast || {};
+    const p = darkRun.isParty ? darkParties[darkRun.partyId] : null;
+
+    const others = Object.keys(cast)
+        .filter(c => c !== currentUser.code)
+        .map(c => {
+            const nm = (p && p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+            const r = TALE_ROLES[cast[c]];
+            return `<div style="font-size:10px; color:#aaa; padding:3px 0;">${r.icon} <b style="color:#ddd;">${nm}</b> — ${r.name}</div>`;
+        }).join('');
+
+    darkBodyEl().innerHTML = darkBox("배역",
+        `이름이 불린다.<br><br>
+         부르는 쪽이 누구인지는 보이지 않는다.<br>
+         다만 부르는 순간 몸이 먼저 대답한다.<br><br>
+         <div style="background:rgba(212,175,55,0.1); border:1px solid #5a4a2a; border-radius:6px; padding:14px; margin-top:10px; text-align:center;">
+            <div style="font-size:30px; margin-bottom:8px;">${role.icon}</div>
+            <div style="font-size:16px; color:#d4af37; font-weight:bold;">${role.name}</div>
+            <div style="font-size:11px; color:#888; margin-top:4px;">${role.tale}</div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #5a4a2a; font-size:11px; color:#ff6b6b;">
+                금기 — <b>${role.taboo}</b><br>
+                <span style="font-size:10px; color:#aaa;">${role.warn}</span>
+            </div>
+         </div>
+         ${others ? `<div style="margin-top:12px; border-top:1px dashed #333; padding-top:9px;"><div style="font-size:10px; color:#666; margin-bottom:5px;">함께 불린 이름</div>${others}</div>` : ''}`,
+        loreBarHtml() + darkChoiceBtn("대답한다.", `partyAdvance(${darkRun.step + 1})`));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+const S003_PAGE_SPOTS = {
+    1: ['젖은 표지 안쪽', '삽화 뒤', '접힌 모서리'],
+    2: ['늑대의 배 속', '할머니의 침대 밑', '바구니 바닥'],
+    3: ['찻잔 아래', '거울 뒤', '시계 안'],
+    4: ['고래의 이 사이', '배의 늑골', '기름 램프 옆'],
+    5: ['마지막 문장 다음', '페이지 번호 자리', '없는 줄']
+};
+
+function renderTornPage(n) {
+    const spots = S003_PAGE_SPOTS[n] || S003_PAGE_SPOTS[1];
+    const got = (darkRun.talePages || []).includes(n);
+
+    if (got) {
+        darkBodyEl().innerHTML = darkBox("찢어진 장",
+            `이미 찾았다.<br><br>주머니 안에서 종이가 뒤척인다.`,
+            loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        renderLoreBar();
+        mountDarkChat('normal');
+        return;
+    }
+
+    darkBodyEl().innerHTML = darkBox("찢어진 장",
+        `한 장이 없다.<br><br>
+         찢긴 자리가 들쭉날쭉하다. 누가 급하게 뜯었다.<br>
+         근처에 있을 것이다. 찾는 데 시간이 걸린다.<br><br>
+         <span style="font-size:11px; color:#888;">한 곳만 뒤질 수 있습니다.</span>`,
+        loreBarHtml() +
+        spots.map((s, i) => darkChoiceBtn(`${['①','②','③'][i]} ${s}`, `pickPageSpot(${n}, ${i})`)).join(''));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function pickPageSpot(n, idx) {
+    const luck = gearValue(currentUser, 'luck');
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus('sense') + Math.round(luck * 10) + (qFlag('s003_crumb') ? 3 : 0);
+    const DC = 15;
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    let txt;
+    if (ok) {
+        darkRun.talePages.push(n);
+        darkRun.success++;
+        addLore(6, `찢어진 장 ${n}`);
+        txt = `찾았다.<br><br>
+               종이가 축축하다. 글씨가 번져 있는데 읽을 수는 있다.<br>
+               읽지 않는 편이 나았을 문장이다.<br><br>
+               <span style="color:#d4af37;">✦ 찢어진 장 ${n} 확보 (${darkRun.talePages.length} / 5)</span>`;
+    } else {
+        darkRun.fail++;
+        addLore(4, '헛짚음');
+        applyPollutionToUser(currentUser, 6);
+        txt = `없다.<br><br>
+               대신 다른 게 나왔다. 손톱 자국이 난 종이다.<br>
+               누가 여기를 먼저 뒤졌다는 뜻이다.<br><br>
+               그 사람은 찾았을까.`;
+    }
+
+    darkRun.log.push(`[찢어진 장 ${n}] d20 ${roll} vs DC${DC}`);
+    s003Result("찢어진 장 — 결과", roll, bonus, DC, ok, txt);
+}
+
+const S003_LORE_Q = [
+    { q:'늑대는 왜 말을 합니까?', good:['모른다','모름','몰라','글쎄','알 수 없다'] },
+    { q:'콩나무 위에는 무엇이 있습니까?', good:['모른다','모름','몰라','글쎄'] },
+    { q:'당신의 이름은 무엇입니까?', good:null },
+    { q:'이 이야기의 결말을 아십니까?', good:['아니오','아니요','아뇨','모른다','몰라'] },
+    { q:'돌아가고 싶습니까?', good:null }
+];
+
+function renderLoreCheck(next) {
+    const c = S003_LORE_Q[Math.floor(Math.random() * S003_LORE_Q.length)];
+    darkRun._loreQ = c;
+    darkRun._loreNext = next;
+
+    darkBodyEl().innerHTML = darkBox("질문",
+        `책이 멈춘다.<br><br>
+         글자가 줄지어 있다가, 한 줄만 남기고 흩어진다.<br>
+         읽으라는 뜻이다. 대답하라는 뜻이기도 하다.<br><br>
+         <span style="color:#d4af37; font-size:14px;">${c.q}</span><br><br>
+         <span style="font-size:10px; color:#888;">답하지 않아도 됩니다. 답하면 더 알게 됩니다.</span>`,
+        loreBarHtml() +
+        `<input type="text" id="s003-lore-input" maxlength="24" placeholder="" style="width:100%; padding:12px; font-size:14px; text-align:center; box-sizing:border-box; margin-bottom:10px;" onkeypress="if(event.key==='Enter') submitLoreCheck()">
+         <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px;" onclick="submitLoreCheck()">답한다</button>
+         <button class="game-btn" style="width:100%; margin:0; padding:11px; font-size:11px; background:linear-gradient(145deg,#333,#1a1a1a) !important;" onclick="skipLoreCheck()">입을 다문다</button>`);
+    renderLoreBar();
+    mountDarkChat('normal');
+    setTimeout(() => { const f = document.getElementById('s003-lore-input'); if (f) f.focus(); }, 200);
+}
+
+function submitLoreCheck() {
+    const el = document.getElementById('s003-lore-input');
+    if (!el) return;
+    const v = el.value.trim();
+    if (!v) { showCustomAlert('적어 주세요.'); return; }
+
+    const c = darkRun._loreQ;
+    const safe = c.good ? checkQuizAnswer(v, c.good) : false;
+
+    if (darkRun.taleRole === 'alice') breakTaboo('답함');
+
+    let txt;
+    if (safe) {
+        darkRun.success++;
+        addLore(3, '조심스러운 답');
+        txt = `모른다고 적었다.<br><br>
+               글자가 잠시 머물다 사라진다. 만족한 것 같지는 않다.<br>
+               다만 더 묻지 않는다.`;
+    } else {
+        darkRun.success++;
+        addLore(14, '알아버림');
+        txt = `적었다.<br><br>
+               적고 나서 그게 어디서 나온 답인지 생각한다.<br>
+               생각나지 않는다. 그런데 맞는 것 같다.<br><br>
+               <span style="color:#d4af37;">알게 되었다. 알면 안 되는 쪽으로.</span>`;
+    }
+
+    darkBodyEl().innerHTML = darkBox("질문", txt,
+        loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun._loreNext})`));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function skipLoreCheck() {
+    darkRun.modifier = (darkRun.modifier || 0) - 1;
+    darkRun.log.push('[질문] 침묵');
+
+    darkBodyEl().innerHTML = darkBox("질문",
+        `입을 다물었다.<br><br>
+         글자가 오래 머문다. 기다리는 것 같다.<br>
+         끝내 답하지 않자 한 줄이 덧붙는다.<br><br>
+         <span style="color:#888;">"그럼 나중에 묻겠습니다."</span>`,
+        loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun._loreNext})`));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function s003Result(title, roll, bonus, DC, ok, txt) {
+    if (ok) darkRun._s003Streak = 0;
+    else darkRun._s003Streak = (darkRun._s003Streak || 0) + 1;
+
+    if (!ok && darkRun._s003Streak >= 3) {
+        darkRun.fail += 2;
+        darkDeath(
+            `세 번째다.<br><br>` +
+            `이야기가 이쪽을 기다려 주지 않는다.<br>` +
+            `문장이 앞서가고, 따라가지 못한 것은 문단 밖으로 밀린다.<br><br>` +
+            `밀린 자리에는 아무것도 적히지 않는다.`
+        );
+        return;
+    }
+
+    darkBodyEl().innerHTML = darkBox(title,
+        `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
+        loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+    renderLoreBar();
+    mountDarkChat('normal');
+}
+
+function s003DC(base) {
+    return base + 6;
+}
