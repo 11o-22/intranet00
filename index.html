@@ -5651,6 +5651,21 @@ hlL.disabled = !playable;
                 </div>`;
         }
 
+        if (currentUser.couple) {
+    const c = currentUser.couple;
+    html += `
+        <div style="background:linear-gradient(145deg, ${c.hex}22, #1a1a1a); border:1px solid ${c.hex}; padding:10px; margin-bottom:8px; border-radius:6px;">
+            <div style="font-size:10px; color:${c.hex}; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">[커플링]</div>
+            <div style="font-size:14px; color:#fff; font-weight:bold;">
+                ${c.emoji} ${c.partnerName}의 애인
+            </div>
+            <div style="font-size:10px; color:#888; margin-top:6px;">
+                ${c.color} · 슬롯을 차지하지 않습니다
+            </div>
+            <button class="inv-btn" style="width:100%; margin-top:9px; padding:8px; background:linear-gradient(145deg,#555,#333); color:#ddd;" onclick="breakCouple()">해제</button>
+        </div>`;
+}
+
         if (currentUser.equippedWeapons && currentUser.equippedWeapons.length > 0) {
             currentUser.equippedWeapons.forEach((weapon, idx) => {
                 const base = getEquipBaseName(weapon);
@@ -5725,11 +5740,11 @@ hlL.disabled = !playable;
 
                let useBtnHtml = '';
 if (isUsable) {
-    if (item === '💍 커플링') {
-        useBtnHtml = currentUser.couple
-            ? `<button class="inv-btn" style="background:linear-gradient(145deg,#555,#333); color:#ddd;" onclick="breakCouple()">해제</button>`
-            : `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">사용</button>`;
-    } else if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
+   if (item === '💍 커플링') {
+    useBtnHtml = currentUser.couple
+        ? `<button class="inv-btn" style="background:#2a2a2a; color:#666;" disabled>사용 중</button>`
+        : `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">사용</button>`;
+}else if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
                     } else if (item === "빨간 리본" || item === "노예 계약서") {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;

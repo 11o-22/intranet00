@@ -12686,11 +12686,6 @@ async function breakCouple() {
     const c = currentUser.couple;
     const pName = c.partnerName;
 
-    const ok = await new Promise(res => {
-        showCustomConfirm(`${pName} 사원과의 커플을 해제하시겠습니까?`, () => res(true), () => res(false));
-    });
-    if (!ok) return;
-
     stripNoteByItem(currentUser, '[커플]');
     currentUser.couple = null;
     addHistoryLog(currentUser, `[커플 해제] ${pName} 사원과의 관계를 정리했습니다.`);
