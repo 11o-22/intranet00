@@ -750,3 +750,51 @@
     border: 2px dashed #555;
     color: #555;
 }
+
+body.couple-themed {
+    background-attachment: fixed;
+}
+body.cp-stripe .container::before,
+body.cp-grid .container::before,
+body.cp-dot .container::before,
+body.cp-wave .container::before,
+body.cp-diagonal .container::before,
+body.cp-heart .container::before,
+body.cp-rabbit .container::before,
+body.cp-star .container::before,
+body.cp-apple .container::before,
+body.cp-cherry .container::before,
+body.cp-lemon .container::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.07;
+}
+
+body.cp-stripe .container::before {
+    background-image: repeating-linear-gradient(90deg, var(--couple-color) 0 2px, transparent 2px 14px);
+}
+body.cp-grid .container::before {
+    background-image:
+        repeating-linear-gradient(0deg, var(--couple-color) 0 1px, transparent 1px 22px),
+        repeating-linear-gradient(90deg, var(--couple-color) 0 1px, transparent 1px 22px);
+}
+body.cp-dot .container::before {
+    background-image: radial-gradient(var(--couple-color) 1.5px, transparent 1.6px);
+    background-size: 18px 18px;
+}
+body.cp-wave .container::before {
+    background-image: repeating-radial-gradient(circle at 50% 100%, transparent 0 12px, var(--couple-color) 12px 13px);
+    background-size: 40px 40px;
+}
+body.cp-diagonal .container::before {
+    background-image: repeating-linear-gradient(45deg, var(--couple-color) 0 2px, transparent 2px 16px);
+}
+body.cp-heart .container::before { background-image: none; }
+body.cp-rabbit .container::before { background-image: none; }
+body.cp-star .container::before { background-image: none; }
+body.cp-apple .container::before { background-image: none; }
+body.cp-cherry .container::before { background-image: none; }
+body.cp-lemon .container::before { background-image: none; }

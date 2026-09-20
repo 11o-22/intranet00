@@ -12600,3 +12600,31 @@ function watchDuelLogs() {
         showCustomAlert(`[사내 알림]\n\n${v.winName} 사원이 ${v.loseName} 사원을 이겼습니다.\n걸린 것: ${v.stakeLabel}`);
     });
 }
+
+const COUPLE_COLORS = {
+    red:'#e53935', crimson:'#c62828', scarlet:'#d32f2f', ruby:'#b71c1c',
+    pink:'#ec407a', rose:'#f06292', magenta:'#d81b60', fuchsia:'#e91e63',
+    coral:'#ff7043', salmon:'#ff8a65', orange:'#fb8c00', tangerine:'#f57c00',
+    amber:'#ffb300', gold:'#d4af37', yellow:'#fdd835', lemon:'#fff176',
+    lime:'#c0ca33', green:'#43a047', emerald:'#2e7d32', mint:'#4db6ac',
+    jade:'#00897b', teal:'#00796b', cyan:'#00acc1', aqua:'#26c6da',
+    skyblue:'#4fc3f7', blue:'#1e88e5', navy:'#1565c0', cobalt:'#3949ab',
+    indigo:'#3f51b5', violet:'#7e57c2', purple:'#8e24aa', lavender:'#b39ddb',
+    plum:'#9c27b0', wine:'#6a1b9a', brown:'#795548', chocolate:'#5d4037',
+    beige:'#d7ccc8', ivory:'#f5f0e1', silver:'#b0bec5', gray:'#78909c',
+    charcoal:'#455a64', black:'#37474f', white:'#eceff1'
+};
+
+const COUPLE_PATTERNS = ['stripe','grid','dot','wave','diagonal','heart','rabbit','star','apple','cherry','lemon','none'];
+
+function normalizeCoupleColor(input) {
+    if (!input) return null;
+    const key = String(input).trim().toLowerCase().replace(/\s+/g, '');
+    if (COUPLE_COLORS[key]) return { name: key, hex: COUPLE_COLORS[key] };
+    if (/^#[0-9a-f]{6}$/i.test(key)) return { name: key, hex: key };
+    return null;
+}
+
+function randomCouplePattern() {
+    return COUPLE_PATTERNS[Math.floor(Math.random() * COUPLE_PATTERNS.length)];
+}

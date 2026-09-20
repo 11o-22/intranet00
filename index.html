@@ -1550,6 +1550,7 @@ if (database) {
         "금고": { price: 77777777, usable: true, targetable: false, effect: "safe_box", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "포인트를 보관할 수 있다. 하루 0.6%의 이자가 붙고, 어둠 속에서도 잃지 않는다. 금고 하나당 5만 P까지." },      "노스텔지어 끈": { price: 3319, usable: true, targetable: true, effect: "equip_nostalgia", restrictDept: ["보안팀", "경비팀"], desc: "5시간 동안 장착 가능하다. 장착하는 도중에는 찼던 오염도가 서서히 줄어든다. (5분에 1%씩)" },    
         "사직서": { price: "???", usable: false, carryOnly: true, adminOnly: true, desc: "[특수] 아직 제출하지 않은 사직서. 어둠 속에서 죽음에 이르렀을 때, 이것을 지니고 있다면 단 한 번 그 자리에서 퇴근할 수 있다. 반입해야 효력이 있다." },// ★ [추가] 상담사 전용 아이템
         "세뇌 만년필": { price: 30000, usable: true, targetable: true, effect: "equip_brainwash", desc: "상대방에게 장착 시 강력한 세뇌를 건다. 오염도 50% 증가." },
+        "💍 커플링": { price: "???", usable: true, targetable: true, effect: "couple_ring", noSell: true, desc: "한 쌍으로만 의미가 있다. 사용 시 상대를 지정하고, 둘의 단말 인터페이스가 같은 빛을 띠게 된다." },
         "여우구슬": { price: "???", usable: true, targetable: false, effect: "equip_fox_bead", desc: "무슨 소원이든 들어주는 여우구슬이다." },
 
          "꺼진 가로등 전구": { price: 40, usable: true, targetable: false, effect: "equip_dead_bulb", darkOnly: true, desc: "[어둠 회수품] 심야 골목에서 떼어 온 전구. 장착 시 오염도 증가가 아주 미미하게 늦춰진다." },
@@ -1656,7 +1657,7 @@ if (database) {
     
     };
 
-        const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고"];
+        const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고","💍 커플링"];
 
     const ALL_10_ITEMS = [
     "익명 편지", "하급 물약", "샤베트", "안대", "생수",
