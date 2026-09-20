@@ -12827,9 +12827,6 @@ function tetRaiseGarbage(n) {
         tet.grid.shift();
         tet.grid.push(row);
     }
-    // 밀려 올라간 만큼 현재 블록도 올린다
-    tet.pos.y = Math.max(0, tet.pos.y - n);
-    if (!tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y)) tetGameOver();
 }
 
 function duelAttack(n) {
