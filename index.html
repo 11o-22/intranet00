@@ -834,32 +834,7 @@
                             <select id="p2p-target-user" style="width:60%;"></select>
                         </div>
 
-                        <div id="shop-market" class="sub-panel" style="text-align:center;">
-    <div class="panel-title">[사내 장터]</div>
-    <div style="font-size:10px; color:#888; margin-bottom:12px; line-height:1.7;">
-        사원 간 직거래 게시판입니다. 등록 시 물품은 예치됩니다.<br>
-        <span style="font-size:9px;">※ 수수료 10% · 3일 후 자동 만료 · 1인 20건</span>
-    </div>
-
-    <div style="display:flex; gap:6px; margin-bottom:12px;">
-        <button class="game-btn" id="mk-tab-sell" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('sell')">팝니다</button>
-        <button class="game-btn" id="mk-tab-buy" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('buy')">구합니다</button>
-        <button class="game-btn" id="mk-tab-mine" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('mine')">내 글</button>
-    </div>
-
-    <div style="border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:12px; background:rgba(0,0,0,0.25);">
-        <div id="mk-form-title" style="font-size:11px; color:var(--theme-focus); font-weight:bold; margin-bottom:8px;">팝니다 등록</div>
-        <select id="mk-item" style="width:100%; font-size:12px; margin-bottom:7px;"></select>
-        <div style="display:flex; gap:6px; margin-bottom:7px;">
-            <input type="number" id="mk-qty" value="1" min="1" placeholder="수량" style="flex:0 0 64px; font-size:12px;">
-            <input type="number" id="mk-price" min="1" placeholder="가격 (P)" style="flex:1; font-size:12px;">
-        </div>
-        <input type="text" id="mk-memo" maxlength="40" placeholder="한 줄 메모 (선택)" style="width:100%; font-size:11px; margin-bottom:8px;">
-        <button class="game-btn" style="width:100%; margin:0; padding:10px; font-size:12px;" onclick="postMarket()">등록한다</button>
-    </div>
-
-    <div id="mk-list"></div>
-</div>
+                       
 
                         <div style="font-size:11px; color:#aaa; margin-bottom:4px;">내가 건넬 제물:</div>
 <div style="display:flex; gap:6px; margin-bottom:10px;">
@@ -894,6 +869,33 @@
                     <div style="font-size:12px; color:var(--theme-text); margin-bottom: 8px; font-weight:bold; padding-bottom:4px; border-bottom:1px solid #333;">내가 보낸 제안</div>
                     <div id="p2p-sent-list" style="max-height: 160px; overflow-y: auto; padding-right:5px;"></div>
                 </div>
+
+                 <div id="shop-market" class="sub-panel" style="text-align:center;">
+    <div class="panel-title">[사내 장터]</div>
+    <div style="font-size:10px; color:#888; margin-bottom:12px; line-height:1.7;">
+        사원 간 직거래 게시판입니다. 등록 시 물품은 예치됩니다.<br>
+        <span style="font-size:9px;">※ 수수료 10% · 3일 후 자동 만료 · 1인 20건</span>
+    </div>
+
+    <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <button class="game-btn" id="mk-tab-sell" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('sell')">팝니다</button>
+        <button class="game-btn" id="mk-tab-buy" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('buy')">구합니다</button>
+        <button class="game-btn" id="mk-tab-mine" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="switchMarketTab('mine')">내 글</button>
+    </div>
+
+    <div style="border:1px solid var(--theme-border); border-radius:6px; padding:11px; margin-bottom:12px; background:rgba(0,0,0,0.25);">
+        <div id="mk-form-title" style="font-size:11px; color:var(--theme-focus); font-weight:bold; margin-bottom:8px;">팝니다 등록</div>
+        <select id="mk-item" style="width:100%; font-size:12px; margin-bottom:7px;"></select>
+        <div style="display:flex; gap:6px; margin-bottom:7px;">
+            <input type="number" id="mk-qty" value="1" min="1" placeholder="수량" style="flex:0 0 64px; font-size:12px;">
+            <input type="number" id="mk-price" min="1" placeholder="가격 (P)" style="flex:1; font-size:12px;">
+        </div>
+        <input type="text" id="mk-memo" maxlength="40" placeholder="한 줄 메모 (선택)" style="width:100%; font-size:11px; margin-bottom:8px;">
+        <button class="game-btn" style="width:100%; margin:0; padding:10px; font-size:12px;" onclick="postMarket()">등록한다</button>
+    </div>
+
+    <div id="mk-list"></div>
+</div>
 
                 <!-- ??? -->
                                 <div id="shop-unknown" class="sub-panel">
