@@ -13481,7 +13481,7 @@ dorothy: {
     opts:[
       {l:'① 노란 길로 간다.', v:'road', ok:true},
       {l:'② 집 냄새를 따라간다.', v:'home', ok:false},
-      {l:'③ 구두를 느슨하게 한다.', v:'loose', taboo:true}
+      {l:'③ 구두를 느슨하게 한다.', v:'loose', taboo:true},
     ]},
 2: { text:`허수아비가 서 있다.<br><br>
     머리에 짚이 아니라 종이가 들어 있다. 글씨가 적힌 종이다.<br>
@@ -13490,7 +13490,7 @@ dorothy: {
     opts:[
       {l:'① 읽어 준다.', v:'read', lore:12},
       {l:'② 종이를 빼 준다.', v:'pull', ok:true},
-      {l:'③ 그냥 지나간다.', v:'pass', ok:false}
+      {l:'③ 그냥 지나간다.', v:'pass', ok:false},
     ]}
 },
 
@@ -13502,7 +13502,7 @@ jack: {
     opts:[
       {l:'① 잡고 올라간다.', v:'climb', ok:true},
       {l:'② 다른 곳을 잡고 오른다.', v:'other', ok:false},
-      {l:'③ 얼마나 왔는지 확인한다.', v:'look', taboo:true}
+      {l:'③ 얼마나 왔는지 확인한다.', v:'look', taboo:true},
     ]},
 2: { text:`구름 위다.<br><br>
     거인의 집이 있다. 문이 열려 있다.<br>
@@ -13511,7 +13511,7 @@ jack: {
     opts:[
       {l:'① 무엇을 봤는지 확인한다.', v:'check', lore:14},
       {l:'② 황금 거위를 찾는다.', v:'goose', ok:true},
-      {l:'③ 바로 내려간다.', v:'down', taboo:true}
+      {l:'③ 바로 내려간다.', v:'down', taboo:true},
     ]}
 },
 
@@ -13523,7 +13523,7 @@ hood: {
     opts:[
       {l:'① 길만 따라간다.', v:'road', ok:true},
       {l:'② 꽃을 꺾는다.', v:'flower', taboo:true},
-      {l:'③ 바구니를 확인한다.', v:'basket', ok:false}
+      {l:'③ 바구니를 확인한다.', v:'basket', ok:false},
     ]},
 2: { text:`할머니 집이다.<br><br>
     침대에 누가 누워 있다. 이불이 높다.<br>
@@ -13533,7 +13533,7 @@ hood: {
     opts:[
       {l:'① 돌아본다.', v:'turn', taboo:true},
       {l:'② 침대 쪽을 본 채로 대답한다.', v:'hold', ok:true},
-      {l:'③ 문으로 물러난다.', v:'door', ok:false}
+      {l:'③ 문으로 물러난다.', v:'door', ok:false},
     ]}
 },
 
@@ -13546,7 +13546,7 @@ peter: {
     opts:[
       {l:'① 가장 최근의 즐거움을 떠올린다.', v:'recent', ok:true},
       {l:'② 어릴 적을 떠올린다.', v:'old', ok:false},
-      {l:'③ 몇 년 전인지 세어 본다.', v:'count', taboo:true}
+      {l:'③ 몇 년 전인지 세어 본다.', v:'count', taboo:true},
     ]},
 2: { text:`그림자가 떨어져 나갔다.<br><br>
     구석에서 혼자 움직인다. 이쪽을 흉내 내는 게 아니라 다른 짓을 한다.<br>
@@ -13555,7 +13555,7 @@ peter: {
     opts:[
       {l:'① 붙잡아 꿰맨다.', v:'sew', ok:true},
       {l:'② 무엇을 하는지 본다.', v:'watch', lore:11},
-      {l:'③ 그냥 둔다.', v:'leave', ok:false}
+      {l:'③ 그냥 둔다.', v:'leave', ok:false},
     ]}
 },
 
@@ -13567,7 +13567,7 @@ ariel: {
     opts:[
       {l:'① 고개를 끄덕인다.', v:'nod', ok:true},
       {l:'② 대답한다.', v:'speak', taboo:true},
-      {l:'③ 손으로 적어 보인다.', v:'write', ok:false}
+      {l:'③ 손으로 적어 보인다.', v:'write', ok:false},
     ]},
 2: { text:`바다에서 누가 올라온다.<br><br>
     상체만 있다. 아래가 없는 게 아니라, 아래를 어디에 두고 왔다.<br>
@@ -13577,7 +13577,7 @@ ariel: {
     opts:[
       {l:'① 손을 잡는다.', v:'hold', ok:false},
       {l:'② 무엇을 주고 그렇게 됐는지 살핀다.', v:'check', lore:13},
-      {l:'③ 물러난다.', v:'back', ok:true}
+      {l:'③ 물러난다.', v:'back', ok:true},
     ]}
 },
 
@@ -13589,7 +13589,7 @@ pinocchio: {
     opts:[
       {l:'① 가진 것을 말한다.', v:'tell', ok:true},
       {l:'② 아무것도 없다고 한다.', v:'lie', taboo:true},
-      {l:'③ 되묻는다.', v:'ask', lore:10}
+      {l:'③ 되묻는다.', v:'ask', lore:10},
     ]},
 2: { text:`거래가 끝나고 여우가 묻는다.<br><br>
     <span style="color:#888;">"너, 사람이니?"</span><br><br>
@@ -13598,7 +13598,7 @@ pinocchio: {
     opts:[
       {l:'① 모르겠다고 한다.', v:'unsure', ok:true},
       {l:'② 사람이라고 한다.', v:'human', taboo:true},
-      {l:'③ 손등을 보여 준다.', v:'show', ok:false}
+      {l:'③ 손등을 보여 준다.', v:'show', ok:false},
     ]}
 },
 
@@ -13610,7 +13610,7 @@ alice: {
     opts:[
       {l:'① 그냥 마신다.', v:'drink', ok:false},
       {l:'② 작은 글씨를 읽는다.', v:'read', lore:12},
-      {l:'③ 문을 부순다.', v:'break', ok:true}
+      {l:'③ 문을 부순다.', v:'break', ok:true},
     ]},
 2: { text:`모자 장수가 수수께끼를 낸다.<br><br>
     <span style="color:#888;">"까마귀는 왜 책상을 닮았을까?"</span><br><br>
@@ -13619,7 +13619,7 @@ alice: {
     opts:[
       {l:'① 답한다.', v:'answer', taboo:true},
       {l:'② 모르겠다고 한다.', v:'dunno', ok:true},
-      {l:'③ 같은 질문을 되돌려 준다.', v:'back', lore:9}
+      {l:'③ 같은 질문을 되돌려 준다.', v:'back', lore:9},
     ]}
 },
 
@@ -13632,7 +13632,7 @@ alice: {
     opts:[
       {l:'① 계속 걷는다.', v:'open', ok:false},
       {l:'② 세지 않고 지나친다.', v:'ignore', ok:true},
-      {l:'③ 몇 장인지 센다.', v:'count', lore:13}
+      {l:'③ 몇 장인지 센다.', v:'count', lore:13},
     ]},
 4: { text:`구두를 세 번 부딪치면 돌아간다고 한다.<br><br>
     한 번 부딪쳤다. 발밑이 얇아진다.<br>
@@ -13642,7 +13642,7 @@ alice: {
     opts:[
       {l:'① 손을 잡고 함께 친다.', v:'together', ok:true},
       {l:'② 혼자 친다.', v:'alone', ok:false},
-      {l:'③ 구두를 벗어 건넨다.', v:'give', taboo:true}
+      {l:'③ 구두를 벗어 건넨다.', v:'give', taboo:true},
     ]},
 
 // jack
@@ -13653,7 +13653,7 @@ alice: {
     opts:[
       {l:'① 옷에 문지른다.', v:'wipe', ok:false},
       {l:'② 가만히 있는다.', v:'still', ok:true},
-      {l:'③ 누구 피인지 확인한다.', v:'whose', lore:15}
+      {l:'③ 누구 피인지 확인한다.', v:'whose', lore:15},
     ]},
 4: { text:`도끼가 쥐어져 있다.<br><br>
     콩나무를 자르면 거인이 떨어진다. 그건 안다.<br>
@@ -13662,7 +13662,7 @@ alice: {
     opts:[
       {l:'① 자른다.', v:'cut', ok:true},
       {l:'② 기다린다.', v:'wait', ok:false},
-      {l:'③ 위를 본다.', v:'up', ok:false}
+      {l:'③ 위를 본다.', v:'up', ok:false},
     ]},
 
 // hood
@@ -13673,7 +13673,7 @@ alice: {
     opts:[
       {l:'① 꺼낸다.', v:'pull', ok:false},
       {l:'② 배를 다시 꿰맨다.', v:'sew', ok:true},
-      {l:'③ 얼마나 있었는지 묻는다.', v:'ask', lore:12}
+      {l:'③ 얼마나 있었는지 묻는다.', v:'ask', lore:12},
     ]},
 4: { text:`돌을 채워 넣어야 한다.<br><br>
     늑대 배에 돌을 넣고 꿰매면 끝난다고 들었다.<br>
@@ -13682,7 +13682,7 @@ alice: {
     opts:[
       {l:'① 전부 넣는다.', v:'all', ok:true},
       {l:'② 따뜻한 것만 뺀다.', v:'pick', ok:false},
-      {l:'③ 그 돌을 본다.', v:'stare', lore:14}
+      {l:'③ 그 돌을 본다.', v:'stare', lore:14},
     ]},
 
 // peter
@@ -13693,7 +13693,7 @@ alice: {
     opts:[
       {l:'① 듣지 않는다.', v:'ignore', ok:true},
       {l:'② 박자를 맞춰 본다.', v:'match', lore:13},
-      {l:'③ 시계를 찾는다.', v:'find', ok:false}
+      {l:'③ 시계를 찾는다.', v:'find', ok:false},
     ]},
 4: { text:`아이들이 돌아가겠다고 한다.<br><br>
     창문을 열어 주면 돌아갈 수 있다.<br>
@@ -13702,7 +13702,7 @@ alice: {
     opts:[
       {l:'① 창문을 연다.', v:'open', ok:true},
       {l:'② 대답한다.', v:'age', taboo:true},
-      {l:'③ 함께 나간다.', v:'follow', ok:false}
+      {l:'③ 함께 나간다.', v:'follow', ok:false},
     ]},
 
 // ariel
@@ -13713,7 +13713,7 @@ alice: {
     opts:[
       {l:'① 참는다.', v:'endure', ok:true},
       {l:'② 소리 내어 부정한다.', v:'shout', taboo:true},
-      {l:'③ 왕자의 소매를 잡는다.', v:'grab', ok:false}
+      {l:'③ 왕자의 소매를 잡는다.', v:'grab', ok:false},
     ]},
 4: { text:`칼이 주어졌다.<br><br>
     왕자를 찌르면 돌아갈 수 있다고 한다. 언니들이 머리카락과 바꿔 온 칼이다.<br>
@@ -13722,7 +13722,7 @@ alice: {
     opts:[
       {l:'① 칼을 버린다.', v:'drop', ok:true},
       {l:'② 찌른다.', v:'stab', ok:false},
-      {l:'③ 머리카락을 확인한다.', v:'hair', lore:15}
+      {l:'③ 머리카락을 확인한다.', v:'hair', lore:15},
     ]},
 
 // pinocchio
@@ -13733,7 +13733,7 @@ alice: {
     opts:[
       {l:'① 아니라고 한다.', v:'deny', taboo:true},
       {l:'② 미안하다고 한다.', v:'sorry', ok:true},
-      {l:'③ 왜 그렇게 됐는지 묻는다.', v:'why', lore:12}
+      {l:'③ 왜 그렇게 됐는지 묻는다.', v:'why', lore:12},
     ]},
 4: { text:`요정이 나타났다.<br><br>
     <span style="color:#888;">"사람이 되고 싶니?"</span><br><br>
@@ -13742,7 +13742,7 @@ alice: {
     opts:[
       {l:'① 나무로 남겠다고 한다.', v:'wood', ok:true},
       {l:'② 사람이 되겠다고 한다.', v:'human', ok:false},
-      {l:'③ 대답하지 않는다.', v:'silent', lore:8}
+      {l:'③ 대답하지 않는다.', v:'silent', lore:8},
     ]},
 
 // alice
@@ -13753,7 +13753,7 @@ alice: {
     opts:[
       {l:'① 인정한다.', v:'admit', taboo:true},
       {l:'② 침묵한다.', v:'silent', ok:true},
-      {l:'③ 누가 적었는지 묻는다.', v:'who', lore:13}
+      {l:'③ 누가 적었는지 묻는다.', v:'who', lore:13},
     ]},
 4: { text:`카드들이 덤빈다.<br><br>
     <span style="color:#888;">"너희는 그냥 카드일 뿐이야."</span><br>
@@ -13763,10 +13763,10 @@ alice: {
     opts:[
       {l:'① 그래도 말한다.', v:'say', ok:true},
       {l:'② 얼굴을 확인한다.', v:'look', lore:16},
-      {l:'③ 눈을 감는다.', v:'shut', ok:false}
+      {l:'③ 눈을 감는다.', v:'shut', ok:false},
     ]}
 
-    
+
 
 
 };
