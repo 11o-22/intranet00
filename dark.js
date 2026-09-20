@@ -12627,7 +12627,7 @@ function watchDuelLogs() {
     database.ref('duelLogs').limitToLast(1).on('child_added', snap => {
         const v = snap.val();
         if (!v || Date.now() - v.at > 15000) return;
-        showCustomAlert(`[사내 알림]\n\n${v.winName} 사원이 ${v.loseName} 사원을 이겼습니다.\n걸린 것: ${v.stakeLabel}`);
+        pushNotice(`🎮 <b>${v.winName}</b> 사원이 <b>${v.loseName}</b> 사원을 이겼습니다. — 걸린 것: ${v.stakeLabel}`);
     });
 }
 
@@ -12804,4 +12804,33 @@ function watchDuelAttack() {
             setTimeout(() => { if (msg.innerText.includes('올라옵니다')) msg.innerHTML = ''; }, 1500);
         }
     });
+}
+
+let noticeQueue = [];
+let noticeRunning = false;
+
+function pushNotice(text) {
+    noticeQueue.push(text);
+    if (!noticeRunning) runNotice();
+}
+
+function runNotice() {
+    const bar = document.getElementById('notice-ticker');
+    const el = document.getElementById('notice-ticker-text');
+    if (!bar || !el) return;
+
+    if (noticeQueue.length === 0) {
+        noticeRunning = false;
+        bar.style.display = 'none';
+        return;
+    }
+
+    noticeRunning = true;
+    bar.style.display = 'block';
+    el.classList.remove('running');
+    void el.offsetWidth;
+    el.innerHTML = noticeQueue.shift();
+    el.classList.add('running');
+
+    setTimeout(() => runNotice(), 14000);
 }

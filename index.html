@@ -326,6 +326,11 @@
             <span id="session-timer">세션 00:00:00</span>
         </div>
 
+        <div id="notice-ticker" style="display:none; background:rgba(0,0,0,0.5); border:1px solid var(--theme-border); border-radius:5px; margin-bottom:10px; overflow:hidden; white-space:nowrap; position:relative; height:26px;">
+    <div style="position:absolute; left:0; top:0; bottom:0; width:26px; background:var(--theme-bg-grad); border-right:1px solid var(--theme-border); display:flex; align-items:center; justify-content:center; font-size:12px; z-index:2;">📢</div>
+    <div id="notice-ticker-text" style="position:absolute; white-space:nowrap; font-size:11px; color:var(--theme-focus); line-height:26px; padding-left:8px;"></div>
+</div>
+
         <!-- 사원증 인터페이스 -->
         <div class="id-card-badge">
             <div class="id-card-body">
@@ -6686,7 +6691,7 @@ else if (cat.effect === 'couple_ring') {
         return false;
     }
 
-    delete currentUser._pendingCouple;
+    const pending = pendingCouple;
     if (!pending) { showCustomAlert('설정이 완료되지 않았습니다.'); return false; }
 
     const pattern = randomCouplePattern();
@@ -6711,7 +6716,7 @@ else if (cat.effect === 'couple_ring') {
     addHistoryLog(targetUser, `[커플링] ${currentUser.name} 사원과 커플이 되었습니다.`);
     addHistoryLog(currentUser, `[커플링] ${targetUser.name} 사원과 커플이 되었습니다.`);
 
-    delete currentUser._pendingCouple;
+    pendingCouple = null;
     applyCoupleTheme(currentUser);
     showCustomAlert(`${targetUser.name} 사원과 이어졌습니다.\n\n${pending.emoji} ${pending.color.name}`);
 }

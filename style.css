@@ -798,3 +798,11 @@ body.cp-star .container::before { background-image: none; }
 body.cp-apple .container::before { background-image: none; }
 body.cp-cherry .container::before { background-image: none; }
 body.cp-lemon .container::before { background-image: none; }
+
+@keyframes tickerSlide {
+    0%   { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+#notice-ticker-text.running {
+    animation: tickerSlide 14s linear;
+}
