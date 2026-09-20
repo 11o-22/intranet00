@@ -1308,13 +1308,16 @@ if (database) {
         
 
     function saveDB() {
-        if (!database) return;
-        if (currentUser) {
-            database.ref(`users/${currentUser.code}`).set(currentUser).catch(err => {
-                console.error("사용자 데이터 저장 실패:", err);
-            });
-        }
-    }
+    if (!database || !currentUser) return;
+    const SKIP = ['letters','timedEffects','equippedWeapons','equipOwner','hasNewLetter','hasNewReply','hasItemUsedOnMe','slaveUntil','masterName','nostalgiaUntil','nostalgiaSender','blindfoldUntil','houseChatUnread','badge'];
+    const payload = {};
+    Object.keys(currentUser).forEach(k => {
+        if (!SKIP.includes(k)) payload[k] = currentUser[k];
+    });
+    database.ref(`users/${currentUser.code}`).update(payload).catch(err => {
+        console.error("사용자 데이터 저장 실패:", err);
+    });
+}
 
     function removeItemFromInventory(user, itemName, qty) {
         let removedCount = 0;
@@ -6763,37 +6766,60 @@ else if (cat.effect === 'pomegranate_potion') {
         updateSelectOptions(select, options);
     }
 
-   function sendAnonymousLetter() {
-    if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 서신을 보낼 수 없습니다.'); return; }   
+   async function sendAnonymousLetter() {
+    if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 서신을 보낼 수 없습니다.'); return; }
     const letterIdx = currentUser.inventory.indexOf("익명 편지");
     if (letterIdx === -1) { showCustomAlert("소지품에 '익명 편지'가 없습니다."); return; }
     const targetCode = document.getElementById('letter-target-select').value;
     const content = document.getElementById('letter-content-input').value.trim();
     if (!targetCode || !content) return;
 
-    let targetUser = db.users[targetCode];
-    if (!targetUser.letters) targetUser.letters = [];
-    targetUser.letters.unshift({ 
-        id: Date.now(), 
-        date: new Date().toLocaleString(), 
-        content: content,
-        fromCode: currentUser.code,
-        fromName: currentUser.name 
-    });
-    if (targetUser.letters.length > 3) targetUser.letters.pop();
-    targetUser.hasNewLetter = true;
+    if (!database) {
+        let t = db.users[targetCode];
+        if (!t) return;
+        if (!t.letters) t.letters = [];
+        t.letters.unshift({ id:Date.now(), date:new Date().toLocaleString(), content, fromCode:currentUser.code, fromName:currentUser.name });
+        if (t.letters.length > 3) t.letters.pop();
+        t.hasNewLetter = true;
+        currentUser.inventory.splice(letterIdx, 1);
+        addHistoryLog(currentUser, `[익명 편지] 사번 ${t.no} 대상 서신 전송 (편지지 소모)`);
+        saveDB(); updateUI();
+        document.getElementById('letter-content-input').value = '';
+        showCustomAlert('서신이 전송되었습니다.');
+        return;
+    }
+
+    try {
+        const snap = await database.ref(`users/${targetCode}/letters`).once('value');
+        let letters = snap.val() || [];
+        letters.unshift({
+            id: Date.now(),
+            date: new Date().toLocaleString(),
+            content: content,
+            fromCode: currentUser.code,
+            fromName: currentUser.name
+        });
+        if (letters.length > 3) letters.pop();
 
         currentUser.inventory.splice(letterIdx, 1);
-    addHistoryLog(currentUser, `[익명 편지] 사번 ${targetUser.no} 대상 서신 전송 (편지지 소모)`);
+        const noSnap = await database.ref(`users/${targetCode}/no`).once('value');
+        addHistoryLog(currentUser, `[익명 편지] 사번 ${noSnap.val()} 대상 서신 전송 (편지지 소모)`);
 
-    targetUser._adminStamp = Date.now();
-    if (database) {
-        database.ref(`users/${targetCode}`).set(targetUser);
-        database.ref(`users/${currentUser.code}`).set(currentUser);
+        const updates = {};
+        updates[`users/${targetCode}/letters`] = letters;
+        updates[`users/${targetCode}/hasNewLetter`] = true;
+        updates[`users/${targetCode}/_adminStamp`] = Date.now();
+        updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+        updates[`users/${currentUser.code}/history`] = currentUser.history;
+        await database.ref('/').update(updates);
+
+        updateUI();
+        document.getElementById('letter-content-input').value = '';
+        showCustomAlert('서신이 전송되었습니다.');
+    } catch (e) {
+        console.error('서신 전송 실패:', e);
+        showCustomAlert('전송 중 오류가 발생했습니다.');
     }
-    
-    saveDB(); updateUI();
-    document.getElementById('letter-content-input').value = '';
 }
 
     function renderLetters() {
