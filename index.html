@@ -1439,12 +1439,6 @@ if (database) {
     function clearEquipOwner(user, fullName) {
         if (user && user.equipOwner && user.equipOwner[fullName]) delete user.equipOwner[fullName];
     }
-    function stripNoteByItem(user, baseName) {
-        if (user.badge && user.badge.notes) {
-            let arr = user.badge.notes.split(' | ').filter(n => n.trim() !== '' && !n.includes(baseName));
-            user.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
-        }
-    }
 
     function showCustomAlert(message) {
         document.getElementById('custom-alert-text').innerText = message;
@@ -4796,10 +4790,11 @@ if (user.code === 'kario0987') {
                         <div class="emp-name" style="color:#fff;">${u.name}${u.couple ? `<span style="color:${u.couple.hex}; margin-left:4px;">${u.couple.emoji}</span>` : ''} <span class="emp-role-tag">${u.position || '사원'}</span></div>
                          ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">${qb2.icon} ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
                         <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>
-                        ${u.couple ? `<div style="font-size:11px; margin-top:5px;">
-    <span style="color:${u.couple.hex}; font-weight:bold;">커플-${u.couple.emoji}</span>
-    <span style="color:#aaa;"> ${u.couple.partnerName}의 애인</span>
-</div>` : ''}
+                       <div style="font-size:11px; margin-top:5px;">
+    ${u.couple
+        ? `<span style="color:${u.couple.hex}; font-weight:bold;">커플 ${u.couple.emoji}</span> <span style="color:#aaa;">${u.couple.partnerName}의 애인</span>`
+        : `<span style="color:#666;">솔로</span>`}
+</div>
                     </div>
                 </div>
                 <table class="badge-table" style="margin-top:15px;">
@@ -5120,12 +5115,12 @@ function startFoxRoomSequence() {
 
         const cpEl = document.getElementById('display-couple');
 if (cpEl) {
+    cpEl.style.display = 'block';
     if (currentUser.couple) {
         const c = currentUser.couple;
-        cpEl.style.display = 'block';
-        cpEl.innerHTML = `<span style="color:${c.hex}; font-weight:bold;">커플-${c.emoji}</span> <span style="color:#aaa;">${c.partnerName}의 애인</span>`;
+        cpEl.innerHTML = `<span style="color:${c.hex}; font-weight:bold;">커플 ${c.emoji}</span> <span style="color:#aaa;">${c.partnerName}의 애인</span>`;
     } else {
-        cpEl.style.display = 'none';
+        cpEl.innerHTML = `<span style="color:#666;">솔로</span>`;
     }
 }
 
@@ -6733,8 +6728,6 @@ else if (cat.effect === 'couple_ring') {
     if (!targetUser.inventory) targetUser.inventory = [];
 if (!targetUser.inventory.includes('💍 커플링')) targetUser.inventory.push('💍 커플링');
 
-    appendBadgeNoteToUser(targetUser, `[커플] ${pending.emoji} ${currentUser.name}의 애인`);
-    appendBadgeNoteToUser(currentUser, `[커플] ${pending.emoji} ${targetUser.name}의 애인`);
     addHistoryLog(targetUser, `[커플링] ${currentUser.name} 사원과 커플이 되었습니다.`);
     addHistoryLog(currentUser, `[커플링] ${targetUser.name} 사원과 커플이 되었습니다.`);
 
