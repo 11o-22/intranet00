@@ -1444,7 +1444,16 @@ if (database) {
         }
     }
 
-        // ===== 장착 소유권(장착시킨 사람) 관리 =====
+           // 특이사항에서 해당 장비 관련 문구 제거
+    function stripNoteByItem(user, itemName) {
+        if (!user || !user.badge || !user.badge.notes) return;
+        const arr = user.badge.notes.split(' | ').filter(n => n.trim() !== '' && !n.includes(itemName));
+        user.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+    
+    // ===== 장착 소유권(장착시킨 사람) 관리 =====
+
+
     function getEquipBaseName(fullName) {
         let base = String(fullName || "");
         if (base.startsWith("🔮 ")) base = base.replace("🔮 ", "");
