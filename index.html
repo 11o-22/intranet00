@@ -4793,7 +4793,7 @@ if (user.code === 'kario0987') {
     let activeTexts = [];
     user.timedEffects.forEach(eff => {
         if (eff.fixed) {
-            activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#4fc3f7; font-weight:bold;">(고정됨)</span>`);
+           activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#4fc3f7; font-weight:bold;">(영구)</span>`);
             return;
         }
         let remainH = Math.ceil((eff.expireAt - now) / (1000 * 60 * 60));
@@ -6555,9 +6555,12 @@ else if (cat.effect === 'clear_potion') {
         const e = targetUser.timedEffects[pick.idx];
         e.fixed = true;
         e.expireAt = Number.MAX_SAFE_INTEGER;
-    } else {
+        } else {
         targetUser.slaveFixed = true;
         targetUser.slaveUntil = Number.MAX_SAFE_INTEGER;
+        if (targetUser.badge && targetUser.badge.notes) {
+            targetUser.badge.notes = targetUser.badge.notes.replace(/노예 계약 \(3일\)/g, '노예 계약 (영구)');
+        }
     }
 
     addHistoryLog(targetUser, `[투명 물약] ${pick.name} 효과가 영구히 고정되었습니다.`);
