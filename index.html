@@ -6128,8 +6128,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 밤샘 신청서 — 탐사 횟수 +1 (금일 ${currentUser.darkTryAdded}/2)`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(`신청서가 수리되었습니다.\n금일 탐사 횟수가 1회 늘었습니다. (잔여 ${getDarkTriesLeft()}회)`);
             return;
@@ -6180,8 +6179,7 @@ if (cat.effect === 'couple_ring') {
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] ${itemName} — 흔적 ${removedNames.length}건 제거`);
 
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(
                 cat.effect === 'q_cleanse_all'
@@ -6251,8 +6249,7 @@ if (cat.effect === 'couple_ring') {
             safes.push({ amount: 0, lastInterest: Date.now(), createdAt: Date.now() });
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[금고] 금고를 설치했습니다. (총 ${safes.length}개)`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(`금고를 설치했습니다.\n최대 ${SAFE_CAP.toLocaleString()} P까지 보관할 수 있습니다.`);
             return;
@@ -6265,8 +6262,7 @@ if (cat.effect === 'couple_ring') {
             g.slots = 2;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 두 번째 속성 자리가 열렸습니다.`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('자리가 하나 더 생겼습니다.\n소지품 탭에서 속성을 선택하세요.');
             return;
@@ -6327,8 +6323,7 @@ if (cat.effect === 'couple_ring') {
             }
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] ${itemName}`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI();
             if (darkRun) { renderDarkStep(); showDarkToast('◈ ' + itemName); }
             showCustomAlert(q.msg);
@@ -6369,8 +6364,7 @@ if (cat.effect === 'couple_ring') {
             }
 
             removeItemFromInventory(currentUser, itemName, 1);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();     
             updateUI();
             showCustomAlert('약통을 비웠습니다.');
             return;
@@ -6380,8 +6374,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.points += got;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 접힌 지폐 (+${got} P)`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+            saveSelfFull();
             updateUI(); showPointGainEffect(got);
             showCustomAlert(`펴 보니 ${got} P였습니다.`);
             return;
