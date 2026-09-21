@@ -9892,6 +9892,7 @@ function adminGiveItem() {
         if (db.users[code] && db.users[code].name === name) {
             currentUser = db.users[code];
             localStorage.setItem('corp_logged_code', code);
+            claimSession(code);
             
             // 필수 속성 누락 방지 기본값 세팅
             if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
