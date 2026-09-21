@@ -3661,7 +3661,44 @@ function b508RequiredDocs() {
 
     function finishSearch() {
         if (!darkRun) return;
+        if (darkRun._curArea === 'upper' && darkRun.taken) { b508LeaveUpper(); return; }
         partyAdvance(darkRun.step + 1);
+    }
+
+    // 2층 탈출
+    function b508LeaveUpper() {
+        darkRun.taken = false;
+        darkRun.upperIdx = null;
+        darkRun._curArea = null;
+        darkRun.log.push('[2층] 탈출');
+
+        if (database && darkRun.isParty) {
+            database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+            sendPartyChat(`${currentUser.name} 사원이 2층에서 내려왔습니다.`, true);
+        }
+
+        darkBodyEl().innerHTML = darkBox("2층 — 탈출",
+            `사무실 구석에 좁은 계단이 있다.<br><br>
+             직원용이다. 난간에 밀가루 손자국이 층층이 찍혀 있다.<br>
+             내려가는 동안 뒤에서 의자가 한 번 삐걱였다. 따라오지는 않았다.<br><br>
+             아래층에서 익숙한 목소리가 들린다.`,
+            noticeBarHtml() + darkChoiceBtn("일행에게 간다.", "b508Rejoin()"));
+        renderNoticeBar();
+        mountDarkChat('normal');
+    }
+
+    // 일행이 있는 단계로 합류
+    function b508Rejoin() {
+        if (!darkRun) return;
+        if (!darkRun.isParty || !database) { partyAdvance(darkRun.step + 1); return; }
+
+        database.ref(`darkParties/${darkRun.partyId}/curStep`).once('value').then(sn => {
+            if (!darkRun) return;
+            const cur = sn.val() || 0;
+            darkRun.step = Math.max(cur, darkRun.step + 1);
+            detachVoteListener();
+            renderDarkStep();
+        });
     }
 
         const B508_STEPS = {
