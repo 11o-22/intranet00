@@ -1218,6 +1218,24 @@
     let maintenanceMode = false;
     let aiChatOff = false;
     let pendingSaves = 0;
+
+    const SESSION_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function claimSession(code) {
+    if (!database) return;
+    const ref = database.ref('sessions/' + code);
+    ref.set(SESSION_ID);
+    ref.on('value', s => {
+        if (!currentUser || currentUser.code !== code) { ref.off(); return; }
+        const v = s.val();
+        if (v && v !== SESSION_ID) {
+            ref.off();
+            showCustomAlert('다른 곳에서 같은 계정으로 접속했습니다.\n이 창은 종료됩니다.');
+            setTimeout(() => logout(), 300);
+        }
+    });
+}
+
     let sessionSeconds = 0;
     let sessionTimer;
     let pendingTargetItemName = ""; 
@@ -9832,7 +9850,7 @@ function adminGiveItem() {
             renderAdminSuggestions();
         }
     }
-        function attemptLogin() {
+       async function attemptLogin() {
         const nameInput = document.getElementById('nickname-input');
         const codeInput = document.getElementById('code-input');
 
@@ -9856,6 +9874,19 @@ function adminGiveItem() {
 
         // 디버깅용 로그 (개발자 도구 F12 콘솔에서 확인 가능)
         console.log("로그인 시도:", name, code);
+
+                if (database && code) {
+            try {
+                const snap = await database.ref('users/' + code).once('value');
+                const u = snap.val();
+                if (u) {
+                    if (!u.inventory) u.inventory = [];
+                    if (!u.history) u.history = [];
+                    if (!u.letters) u.letters = [];
+                    db.users[code] = u;     // ★ 코드 속 기본값이 아니라 서버 값으로
+                }
+            } catch (e) { console.error('로그인 조회 실패:', e); }
+        }
 
         // 해당 인가 코드(비밀번호)가 존재하고 사원명이 일치하는지 확인
         if (db.users[code] && db.users[code].name === name) {
