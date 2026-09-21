@@ -5920,7 +5920,7 @@ if (isUsable) {
         const btn = el.nextElementSibling;
         if (btn) btn.innerText = el.classList.contains('expanded') ? '▴ 접기' : '▾ 더보기';
     }
-               function unequipWeapon(index) {
+                 function unequipWeapon(index) {
         if (!currentUser.equippedWeapons || currentUser.equippedWeapons.length <= index) return;
         let itemNameFull = currentUser.equippedWeapons[index];
         let baseItemName = getEquipBaseName(itemNameFull);
@@ -5943,11 +5943,11 @@ if (isUsable) {
 
         currentUser.equippedWeapons.splice(index, 1);
         clearEquipOwner(currentUser, itemNameFull);
-        currentUser.inventory.push(baseItemName); // ★ 오직 장착자 인벤토리로만 환수
+        currentUser.inventory.push(baseItemName);
         stripNoteByItem(currentUser, baseItemName);
         addHistoryLog(currentUser, `[장착 해제] ${baseItemName} 해제 완료`);
 
-        // 연동/연결 장비는 상대방 슬롯에서도 제거 (상대 인벤토리에는 지급하지 않음)
+        // 연동/연결 장비는 상대방 슬롯에서도 제거
         if (isDualItem) {
             for (let code in db.users) {
                 if (code === currentUser.code) continue;
@@ -5963,13 +5963,19 @@ if (isUsable) {
                     clearEquipOwner(u, pFull);
                     stripNoteByItem(u, baseItemName);
                     addHistoryLog(u, `[장착 해제] 장착자(${currentUser.name})에 의해 ${baseItemName} 연결이 해제되었습니다.`);
-                    if (database) database.ref(`users/${code}`).set(u);
+                    updateUserFields(code, {
+                        equippedWeapons: u.equippedWeapons,
+                        equipOwner: u.equipOwner || {},
+                        badge: u.badge || {},
+                        history: u.history
+                    });
                     break;
                 }
             }
         }
 
-        saveDB(); updateUI();
+        saveSelfFull();
+        updateUI();
     }
 
     // ★ 내가 타인에게 장착시킨 장비 원격 회수
@@ -6003,8 +6009,14 @@ if (isUsable) {
         currentUser.inventory.push(base);
         addHistoryLog(currentUser, `[장비 회수] ${t.name} 사원에게서 ${base} 회수 완료`);
 
-        if (database) database.ref(`users/${targetCode}`).set(t);
-        saveDB(); updateUI();
+        updateUserFields(targetCode, {
+            equippedWeapons: t.equippedWeapons,
+            equipOwner: t.equipOwner || {},
+            badge: t.badge || {},
+            history: t.history
+        });
+        saveSelfFull();
+        updateUI();
     }
 
     // ★ 소속 제한 장비
