@@ -2369,14 +2369,11 @@ const EQUIP_AFFIL = {
     }
 
     // 방장이 투표판을 개설
-    function openVote(options) {
+       function openVote(options) {
         if (!darkRun || !darkRun.isParty || !database) return;
-        if (!darkRun.isLeader) return;
-        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).set({
-            options: options,
-            endAt: Date.now() + VOTE_SECONDS * 1000,
-            votes: {},
-            state: 'OPEN'
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).transaction(v => {
+            if (v) return;   // 이미 열려 있으면 그대로
+            return { options: options, endAt: Date.now() + VOTE_SECONDS * 1000, votes: {}, state: 'OPEN' };
         });
     }
 
@@ -2426,68 +2423,57 @@ const EQUIP_AFFIL = {
         return darkRun.memberCount || 1;
     }
 
-      function startVoteTick() {
+        function getVoteMemberCount() {
+        if (!darkRun) return 1;
+        const p = darkParties[darkRun.partyId];
+        if (!p || !p.alive) return getPartyMemberCount();
+        const solo = p.solo || {};
+        return Math.max(1, Object.keys(p.alive).filter(c => !solo[c]).length);
+    }
+
+    function startVoteTick() {
         clearInterval(voteTickTimer);
         voteTickTimer = setInterval(() => {
             if (!darkRun || !currentVote) return;
+            const raw = Math.ceil((currentVote.endAt - Date.now()) / 1000);
             const el = document.getElementById('vote-timer');
-            const remain = Math.max(0, Math.ceil((currentVote.endAt - Date.now()) / 1000));
-            if (el) el.innerText = remain;
+            if (el) el.innerText = Math.max(0, raw);
 
             if (currentVote.state !== 'OPEN') return;
             const voted = currentVote.votes ? Object.keys(currentVote.votes).length : 0;
-            const total = getPartyMemberCount();
-
-            // ★ 방장이 없거나 응답이 없으면 아무나 마감
-            const p = darkParties[darkRun.partyId];
-            const leaderAlive = p && p.alive && p.alive[p.leader];
-
-            if (voted >= total || remain <= 0) {
-                if (darkRun.isLeader || !leaderAlive || remain <= -3) closeVote();
-            }
+            if (voted >= getVoteMemberCount() || raw <= 0) closeVote();   // ★ 누구든
         }, 500);
     }
+        function closeVote() {
+        if (!darkRun || !currentVote || currentVote.state !== 'OPEN' || !database) return;
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).transaction(v => {
+            if (!v || v.state !== 'OPEN') return;
+            const votes = v.votes || {};
+            const tally = {};
+            v.options.forEach(o => { tally[o.id] = []; });
+            Object.keys(votes).forEach(code => {
+                const x = votes[code];
+                if (tally[x.opt]) tally[x.opt].push({ code: code, name: x.name });
+            });
+            let max = 0;
+            v.options.forEach(o => { if (tally[o.id].length > max) max = tally[o.id].length; });
+            const winners = v.options.filter(o => tally[o.id].length === max).map(o => o.id);
+            const picked = (max === 0)
+                ? v.options[Math.floor(Math.random() * v.options.length)].id
+                : winners[Math.floor(Math.random() * winners.length)];
+            const backers = tally[picked] || [];
+            const roller = backers.length
+                ? backers[Math.floor(Math.random() * backers.length)]
+                : { code: currentUser.code, name: currentUser.name };
 
-    function closeVote() {
-        
-        if (!darkRun || !currentVote) return;
-        if (currentVote.state !== 'OPEN') return;
-        // 방장 조건 제거
-
-        const votes = currentVote.votes || {};
-        let tally = {};
-        currentVote.options.forEach(o => { tally[o.id] = []; });
-        for (let code in votes) {
-            const v = votes[code];
-            if (tally[v.opt]) tally[v.opt].push({ code: code, name: v.name });
-        }
-
-        let max = 0;
-        currentVote.options.forEach(o => { if (tally[o.id].length > max) max = tally[o.id].length; });
-
-        let winners = currentVote.options.filter(o => tally[o.id].length === max).map(o => o.id);
-        let picked;
-        if (max === 0) {
-            // 전원 기권 → 무작위
-            picked = currentVote.options[Math.floor(Math.random() * currentVote.options.length)].id;
-        } else {
-            picked = winners[Math.floor(Math.random() * winners.length)];
-        }
-
-        // 주사위 대표: 이긴 선택지 투표자 중 무작위 (없으면 방장)
-        const backers = tally[picked] || [];
-        const roller = backers.length > 0
-            ? backers[Math.floor(Math.random() * backers.length)]
-            : { code: currentUser.code, name: currentUser.name };
-
-        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).update({
-            state: 'DONE',
-            picked: picked,
-            tied: winners.length > 1 && max > 0,
-            tally: tally,
-            rollerCode: roller.code,
-            rollerName: roller.name,
-            seed: Math.floor(Math.random() * 1000000)
+            v.state = 'DONE';
+            v.picked = picked;
+            v.tied = winners.length > 1 && max > 0;
+            v.tally = tally;
+            v.rollerCode = roller.code;
+            v.rollerName = roller.name;
+            v.seed = Math.floor(Math.random() * 1000000);
+            return v;
         });
     }
 
@@ -2518,7 +2504,8 @@ const EQUIP_AFFIL = {
         darkRun.voteSeed = vote.seed;
 
         clearInterval(voteTickTimer);
-        setTimeout(() => { runVotedAction(opt, vote); }, 1400);
+                const stepAt = darkRun.step;
+        setTimeout(() => { if (darkRun && darkRun.step === stepAt) runVotedAction(opt, vote); }, 1400);
     }
 
     // 시나리오별 실행 분기 (각 시나리오에서 정의)
@@ -2582,27 +2569,20 @@ const EQUIP_AFFIL = {
         area.innerHTML = html;
     }
 
-       function renderVoteBox(title, text, options, imgKey) {
-    const body = darkBodyEl();
-    if (!body) return;
-    body.innerHTML = darkBox(title, text, `<div id="vote-area"></div>`);
-    mountDarkChat('normal');
-
-    if (darkRun.isLeader) openVote(options);
-    attachVoteListener();
-    renderVoteState();
-
-    // 3초 안에 투표판이 안 열리면 아무나 연다
-    setTimeout(() => {
-        if (!darkRun || !document.getElementById('vote-area')) return;
-        if (currentVote) return;
-        const p = darkParties[darkRun.partyId];
-        const leaderAlive = p && p.alive && p.alive[p.leader];
-        if (!leaderAlive || !darkRun.isLeader) openVote(options);
-    }, 3000);
-}
+        function renderVoteBox(title, text, options, imgKey, topHtml) {
+        const body = darkBodyEl();
+        if (!body) return;
+        body.innerHTML = darkBox(title, text,
+            (topHtml || '') +
+            `<div id="vote-area"><div style="text-align:center; font-size:11px; color:#888; padding:12px;">선택지를 펼치는 중...</div></div>`,
+            imgKey);
+        mountDarkChat('normal');
+        openVote(options);        // ★ 누구나 호출 (트랜잭션이라 한 번만 열림)
+        attachVoteListener();
+        renderVoteState();
+    }
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
-             function renderChoiceStep(title, text, options, imgKey) {
+       function renderChoiceStep(title, text, options, imgKey) {
         if (consumeQFlag('safe_hint') && options.length > 0) {
             options[0].label = '◈ ' + options[0].label;
             showDarkToast('일지에 표시된 쪽이 있다.');
@@ -2613,30 +2593,31 @@ const EQUIP_AFFIL = {
             return;
         }
 
-        if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
-            const bar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml() : loreBarHtml();
-            darkBodyEl().innerHTML = darkBox(title, text,
-                bar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join(''),
-                imgKey);
-            if (darkRun.zone === 'Qtrew-S-010') renderInfectBar(); else renderLoreBar();
-            mountDarkChat('normal');
-            return;
-        }
+        // ★ 함께 있는가
+        const together = darkRun.isParty && !darkRun.solo && !darkRun.taken;
+
+        const zoneBar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml()
+                      : darkRun.zone === 'Qtrew-S-003' ? loreBarHtml() : '';
+        const refreshBar = () => {
+            if (darkRun.zone === 'Qtrew-S-010') renderInfectBar();
+            else if (darkRun.zone === 'Qtrew-S-003') renderLoreBar();
+        };
 
         const jakduBtn = jakduAvailable()
             ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ ${smashWeapon()}로 박살낸다 (1회)</button>`
             : '';
 
-        if (darkRun.isParty) {
-            renderVoteBox(title, text, options, imgKey);
+        if (together) {
+            renderVoteBox(title, text, options, imgKey, zoneBar);
             const area = document.getElementById('vote-area');
             if (area && jakduBtn) area.insertAdjacentHTML('afterend', jakduBtn);
         } else {
-            const body = darkBodyEl();
-            body.innerHTML = darkBox(title, text,
-                options.map(o => `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="${o.fn}('${o.arg}')">${o.label}</button>`).join('') + jakduBtn,
+            darkBodyEl().innerHTML = darkBox(title, text,
+                zoneBar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join('') + jakduBtn,
                 imgKey);
+            if (darkRun.isParty) mountDarkChat('normal');
         }
+        refreshBar();
     }
 
     function jakduSmash() {
@@ -2687,17 +2668,20 @@ function renderAdvanceWait(nextStep) {
     const ref = database.ref(`darkParties/${pid}/ready${nextStep}`);
     let finished = false;                      // ★ 전역 대신 클로저 플래그
 
-       const go = () => {
+           const go = () => {
         if (finished) return;
         finished = true;
         try { ref.off(); } catch (e) {}
         if (!darkRun) return;
         darkRun._advTo = null;
+
+        if (darkRun.step >= nextStep) return;      // ★ 이미 지나간 단계면 되감지 않음
+        darkRun.step = nextStep;                   // ★ 트랜잭션보다 먼저
+
         database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
             if (cur != null && cur >= nextStep) return;
             return nextStep;
         });
-        darkRun.step = nextStep;
         detachVoteListener();
         renderDarkStep();
     };

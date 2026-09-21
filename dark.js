@@ -2857,7 +2857,7 @@ function input119D(n) {
         database.ref(`darkParties/${darkRun.partyId}/curStep`).on('value', (snap) => {
             const s = snap.val();
             if (s == null || !darkRun) return;
-            if (darkRun.step !== s) {
+            if (s > darkRun.step) {
                 darkRun.step = s;
                 darkRun._advTo = null;        
                 detachVoteListener();
@@ -3520,7 +3520,7 @@ function b508RequiredDocs() {
 
     // 방장이 서류 위치를 정한다
     function initB508Docs() {
-        if (!darkRun || !darkRun.isLeader || !database) return;
+        if (!darkRun || !database) return;
         const placed = {};
         Object.keys(B508_AREAS).forEach(area => {
             const spots = B508_SPOTS[area];
@@ -3528,11 +3528,11 @@ function b508RequiredDocs() {
             const picked = spots.slice().sort(() => Math.random() - 0.5);
             docs.forEach((d, i) => { placed[d.id] = { area: area, spot: picked[i % picked.length] }; });
         });
-        database.ref(`darkParties/${darkRun.partyId}/b508`).set({
-            placed: placed, found: {}, searched: {}, at: Date.now()
+        database.ref(`darkParties/${darkRun.partyId}/b508`).transaction(cur => {
+            if (cur && cur.placed) return;
+            return { placed: placed, found: {}, searched: {}, at: Date.now() };
         });
     }
-
     let b508Ref = null, b508Key = null, b508State = null;
 
     function attachB508Listener() {
@@ -3563,12 +3563,12 @@ function b508RequiredDocs() {
         darkRun._curArea = area;
         attachB508Listener();
 
-        if (!b508State) {
-            if (darkRun.isLeader) initB508Docs();
+                if (!b508State) {
+            initB508Docs();   // ★ 누구나
             darkBodyEl().innerHTML = darkBox(B508_AREAS[area] + " — 탐색",
                 `주변을 둘러본다.`,
                 `<div style="text-align:center; color:#888; font-size:12px; padding:20px 0;">서류 위치를 파악하는 중...</div>`);
-            setTimeout(() => { if (b508State) renderSearch(area); }, 1200);
+            setTimeout(() => { if (darkRun && darkRun._curArea === area) renderSearch(area); }, 1200);  // ★ 계속 재시도
             return;
         }
 
@@ -4131,44 +4131,74 @@ function b508RequiredDocs() {
 
         // --- 지목 ---
       // --- 지목 ---
-    function renderB508Mark(n) {
+        function renderB508Mark(n) {
+        const body = darkBodyEl();
+        if (!body || !darkRun) return;
+        const myStep = darkRun.step;
         const need5 = (darkRun.memberCount || 3) >= 5;
-        if (n === 2 && !need5) { partyAdvance(darkRun.step + 1); return; }
+        if (n === 2 && !need5) { partyAdvance(myStep + 1); return; }
+        if (!database || !darkRun.isParty) { partyAdvance(myStep + 1); return; }
 
         const key = `b508mark${n}`;
-        if (darkRun.isLeader && database && !darkRun[`_${key}Set`]) {
-            darkRun[`_${key}Set`] = true;
-            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
-                const alive = Object.keys(sn.val() || {});
-                if (alive.length === 0) return;
-                const t = alive[Math.floor(Math.random() * alive.length)];
-                database.ref(`darkParties/${darkRun.partyId}/${key}`).set({ target: t, at: Date.now() });
-            });
+        const pid = darkRun.partyId;
+
+        const done = darkRun[`_${key}Done`];
+        if (done === 'taken') { renderB508Upper(); return; }
+        if (done === 'safe') {
+            body.innerHTML = darkBox("—", `어깨의 밀가루를 턴다.<br><br>일행은 아직 앞에 있다.`,
+                noticeBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${myStep + 1})`));
+            renderNoticeBar(); mountDarkChat('normal');
+            return;
         }
 
-        if (!database) { partyAdvance(darkRun.step + 1); return; }
+        // ★ 먼저 그린다
+        body.innerHTML = darkBox("—",
+            `위층에서 누가 계단을 내려온다.<br><br>포대를 세는 소리가 난다. 하나, 둘, 셋.<br>숫자가 모자란 모양이다.`,
+            noticeBarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">숨을 죽이는 중...</div>`);
+        renderNoticeBar(); mountDarkChat('normal');
 
-        database.ref(`darkParties/${darkRun.partyId}/${key}`).on('value', sn => {
+        const ref = database.ref(`darkParties/${pid}/${key}`);
+        let shown = false;
+
+        const pickTarget = () => {
+            const p = darkParties[pid] || {};
+            const solo = p.solo || {};
+            const alive = p.alive ? Object.keys(p.alive).filter(c => !solo[c]) : [];
+            if (!alive.length) return;
+            const t = alive[Math.floor(Math.random() * alive.length)];
+            ref.transaction(cur => (cur && cur.target) ? undefined : { target: t, at: Date.now() });
+        };
+
+        if (darkRun.isLeader) pickTarget();
+        const t1 = setTimeout(() => { if (darkRun && darkRun.step === myStep && !shown) pickTarget(); }, 3000);
+        const t2 = setTimeout(() => {
+            if (darkRun && darkRun.step === myStep && !shown) { try { ref.off(); } catch(e) {} partyAdvance(myStep + 1); }
+        }, 9000);
+
+        try { ref.off(); } catch (e) {}
+        ref.on('value', sn => {
             const m = sn.val();
-            if (!m || !darkRun || darkRun[`_${key}Shown`]) return;
-            darkRun[`_${key}Shown`] = true;
+            if (!m || !m.target || !darkRun || darkRun.step !== myStep || shown) return;
+            shown = true;
+            clearTimeout(t1); clearTimeout(t2);
+            try { ref.off(); } catch (e) {}
             const isMe = m.target === currentUser.code;
 
-            darkBodyEl().innerHTML = darkBox("—",
+            body.innerHTML = darkBox("—",
                 isMe
                     ? `포대가 하나 더 필요하다고, 누군가 말한다.<br><br>어깨에 손이 걸린다. 밀가루가 묻은 손이다.<br>가볍게 끌린다. 저항할 틈이 없을 만큼 자연스럽게.<br><br>버틸 수 있을까.`
                     : `옆에 있던 사람이 사라진다.<br><br>소리도 없었다. 포대 하나가 계단 위로 올라가는 것만 보였다.<br>포대 안쪽에서 자세를 고치는 움직임.<br><br>부르지 않기로 한다. 여기서 소리를 내면 안 된다.`,
                 noticeBarHtml() + (isMe
                     ? darkChoiceBtn("버틴다.", `b508Resist(${n})`)
-                    : darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)));
-            renderNoticeBar();
-            mountDarkChat('normal');
+                    : darkChoiceBtn("계속 간다.", `partyAdvance(${myStep + 1})`)));
+            renderNoticeBar(); mountDarkChat('normal');
         });
     }
 
     function b508Resist(n) {
                 if (consumeQFlag('no_mark')) {
             darkRun.success++;
+                        darkRun[`_b508mark${n}Done`] = 'safe';
             darkBodyEl().innerHTML = darkBox("—",
                 `명찰을 내민다.<br><br>손이 멈춘다. 이름이 목록에 없는 모양이다.<br>다른 쪽으로 간다.`,
                 darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
@@ -4195,6 +4225,7 @@ function b508RequiredDocs() {
         }
 
         darkRun.log.push(`[지목 ${n}] d20 ${roll} vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+                darkRun[`_b508mark${n}Done`] = taken ? 'taken' : 'safe';
         darkBodyEl().innerHTML = darkBox("—",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${taken?'#f44336':'#4CAF50'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             taken
@@ -5047,6 +5078,8 @@ function b508RequiredDocs() {
             a214State = snap.val();
             if (!a214State || !darkRun) return;
             renderA214Bar();
+                        const def = A214_STEPS[darkRun.step];
+            if (def && def.type === 'vote' && !darkRun[`_a214v${def.n}Shown`]) renderA214Vote(def.n);
         });
     }
 
@@ -5473,12 +5506,12 @@ function b508RequiredDocs() {
             </div>`;
     }
 
-        function renderA214Vote(n) {
+           function renderA214Vote(n) {
+        if (!darkRun || !a214State) return;
         const p = darkParties[darkRun.partyId];
         const alive = (p && p.alive) ? Object.keys(p.alive) : [];
         const solo = (p && p.solo) ? Object.keys(p.solo) : [];
 
-        // 흩어져 있으면 투표 불가
         if (solo.length > 0 || alive.length < 3) {
             darkBodyEl().innerHTML = darkBox(`지목 ${n}차`,
                 `모여서 이야기할 상황이 아니다.<br><br>
@@ -5490,15 +5523,27 @@ function b508RequiredDocs() {
             return;
         }
 
-        const key = `vote${n}`;
-        const votes = (a214State.votes && a214State.votes[key]) || {};
+        // ★ 결과가 나왔으면 모두에게 결과
+        const res = a214State[`voteResult${n}`];
+        if (res) { a214ShowVoteResult(n, res.target, res.name, res.hit); return; }
+
+        const votes = (a214State.votes && a214State.votes[`vote${n}`]) || {};
         const myVote = votes[currentUser.code];
         const voted = Object.keys(votes).length;
 
-              const opts = alive.map(c => {
+        // ★ 전원 투표하면 자동 마감
+        if (voted >= alive.length) a214CloseVote(n);
+
+        // ★ 45초 지나면 누구든 마감
+        if (!darkRun[`_a214v${n}Timer`]) {
+            darkRun[`_a214v${n}Timer`] = setTimeout(() => {
+                if (darkRun && a214State && !a214State[`voteResult${n}`]) a214CloseVote(n);
+            }, 45000);
+        }
+
+        const opts = alive.map(c => {
             const nm = (p && p.members && p.members[c] && p.members[c].name)
-                ? p.members[c].name
-                : (db.users[c] ? db.users[c].name : c);
+                ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
             const cnt = Object.values(votes).filter(v => v === c).length;
             const mine = myVote === c;
             return `
@@ -5517,8 +5562,8 @@ function b508RequiredDocs() {
                 ? '<span style="color:#f44336;">마지막 기회다. 맞히면 그 자리에서 끝난다.</span>'
                 : '<span style="color:#888; font-size:11px;">지목당한 사원은 다음 구간에서 행동이 제한된다.</span>'}`,
             a214BarHtml() + opts +
-            `<div style="text-align:center; font-size:11px; color:#888; margin-top:10px;">투표 ${voted} / ${alive.length}</div>` +
-            (darkRun.isLeader ? `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:10px; font-size:11px;" onclick="a214CloseVote(${n})">지금 마감</button>` : ''));
+            `<div style="text-align:center; font-size:11px; color:#888; margin-top:10px;">투표 ${voted} / ${alive.length}${myVote ? ' · 나머지를 기다리는 중' : ''}</div>` +
+            `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:10px; font-size:11px;" onclick="a214CloseVote(${n})">지금 마감</button>`);
         renderA214Bar();
         mountDarkChat('normal');
     }
@@ -5526,46 +5571,48 @@ function b508RequiredDocs() {
     function a214Vote(n, target) {
         if (!database || !a214State) return;
         database.ref(`${a214Path()}/votes/vote${n}/${currentUser.code}`).set(target);
-        setTimeout(() => renderA214Vote(n), 400);
+        // 화면 갱신은 리스너가 한다
     }
 
     function a214CloseVote(n) {
-        if (!database || !a214State) return;
-        const key = `vote${n}`;
-        const votes = (a214State.votes && a214State.votes[key]) || {};
-        const tally = {};
-        Object.values(votes).forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+        if (!database || !darkRun) return;
+        const p = darkParties[darkRun.partyId] || {};
+        const nameOf = c => (p.members && p.members[c] && p.members[c].name)
+            ? p.members[c].name : (db.users[c] ? db.users[c].name : '누군가');
 
-        let top = null, max = 0;
-        Object.keys(tally).forEach(c => { if (tally[c] > max) { max = tally[c]; top = c; } });
+        database.ref(a214Path()).transaction(st => {
+            if (!st || st[`voteResult${n}`]) return;
+            const votes = (st.votes && st.votes[`vote${n}`]) || {};
+            const tally = {};
+            Object.values(votes).forEach(v => { tally[v] = (tally[v] || 0) + 1; });
+            let top = null, max = 0;
+            Object.keys(tally).forEach(c => { if (tally[c] > max) { max = tally[c]; top = c; } });
 
-        const hit = top === a214State.traitor;
-        let finalHit = hit;
-        if (hit && isTraitor()) {
-            const luckVal = gearValue(currentUser, 'luck');
-            if (luckVal > 0 && Math.random() < luckVal * 0.6) {
-                finalHit = false;
-                darkRun.log.push('[행운] 지목을 흘렸다');
-            }
-        }
-        const p = darkParties[darkRun.partyId];
-                const nm = (p && p.members && p.members[top] && p.members[top].name)
-            ? p.members[top].name
-            : (db.users[top] ? db.users[top].name : '누군가');
-
-        database.ref(a214Path()).update({
-            [`voteResult${n}`]: { target: top, name: nm, hit: hit, at: Date.now() },
-            exposed: hit ? (a214State.exposed || 0) + 1 : (a214State.exposed || 0),
-            watched: hit ? true : (a214State.watched || false)
+            const hit = !!top && top === st.traitor;
+            st[`voteResult${n}`] = { target: top, name: top ? nameOf(top) : null, hit: hit, at: Date.now() };
+            if (hit) { st.exposed = (st.exposed || 0) + 1; st.watched = true; }
+            return st;
         });
-
-        // 침묵 미션 — 지목당하지 않았으면 진행
-        if (isTraitor() && top !== currentUser.code) a214Progress('m05', 1);
-
-        setTimeout(() => a214ShowVoteResult(n, top, nm, hit), 700);
     }
 
+
     function a214ShowVoteResult(n, top, nm, hit) {
+                if (darkRun[`_a214v${n}Shown`]) return;
+        darkRun[`_a214v${n}Shown`] = true;
+        clearTimeout(darkRun[`_a214v${n}Timer`]);
+
+        // 신도 과업: 지목 안 당함 (각자 화면에서 판정)
+        if (isTraitor() && top !== currentUser.code) a214Progress('m05', 1);
+
+        // 아무도 안 찍었을 때
+        if (!top) {
+            darkBodyEl().innerHTML = darkBox(`지목 ${n}차 — 결과`,
+                `아무도 손가락을 들지 않았다.<br><br>눈치만 보다 시간이 갔다.`,
+                a214BarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+            renderA214Bar();
+            mountDarkChat('normal');
+            return;
+        }
         const iamTarget = top === currentUser.code;
 
         if (iamTarget) {
@@ -5999,7 +6046,7 @@ function b508RequiredDocs() {
                 모시러 온 자세다.<br><br>
                 <span style="color:#d4af37;">"안내해 드리겠습니다."</span><br><br>
                 발이 바닥에서 뜬다.`,
-            sseconds: 8, need: 16, label: '뿌리친다',
+           seconds: 8, need: 16, label: '뿌리친다',
             onWin: () => {
                 darkRun.success++;
                 setTimeout(() => a214G3Second(), 500);
@@ -13354,27 +13401,35 @@ function renderLoreBar() {
 }
 
 function assignTaleRoles() {
-    if (!darkRun) return;
-    if (darkRun.taleRole) return;
+    if (!darkRun || darkRun.taleRole) return;
 
-    const n = darkRun.memberCount || 5;
-    const shuffled = [...TALE_KEYS].sort(() => 0.5 - Math.random()).slice(0, Math.min(7, Math.max(5, n)));
-
+    // 단독
     if (!darkRun.isParty || !database) {
-        darkRun.taleRole = shuffled[0];
-        darkRun.taleCast = { [currentUser.code]: shuffled[0] };
+        const pick = TALE_KEYS[Math.floor(Math.random() * TALE_KEYS.length)];
+        darkRun.taleRole = pick;
+        darkRun.taleCast = { [currentUser.code]: pick };
         return;
     }
 
-    if (darkRun.isLeader) {
-        const p = darkParties[darkRun.partyId];
-        const codes = (p && p.alive) ? Object.keys(p.alive) : [currentUser.code];
-        const cast = {};
-        codes.forEach((c, i) => { cast[c] = shuffled[i % shuffled.length]; });
-        database.ref(`darkParties/${darkRun.partyId}/taleCast`).set(cast);
-    }
-}
+    // 파티 — 누구든 호출 가능, 이미 정해진 배역은 절대 안 바꾸고 빈자리만 채운다
+    const pid = darkRun.partyId;
+    const p = darkParties[pid] || {};
+    const codes = Object.keys(p.members || {});
+    if (!codes.includes(currentUser.code)) codes.push(currentUser.code);
 
+    database.ref(`darkParties/${pid}/taleCast`).transaction(cur => {
+        const cast = cur || {};
+        const used = new Set(Object.values(cast));
+        const pool = TALE_KEYS.filter(k => !used.has(k)).sort(() => Math.random() - 0.5);
+        let changed = false;
+        codes.forEach(c => {
+            if (cast[c]) return;
+            cast[c] = pool.length ? pool.shift() : TALE_KEYS[Math.floor(Math.random() * TALE_KEYS.length)];
+            changed = true;
+        });
+        return changed ? cast : undefined;   // 바뀐 게 없으면 쓰지 않음
+    });
+}
 function attachTaleCast() {
     if (!database || !darkRun || !darkRun.partyId) return;
     if (darkRun._castWatch) return;
@@ -13382,9 +13437,18 @@ function attachTaleCast() {
 
     database.ref(`darkParties/${darkRun.partyId}/taleCast`).on('value', snap => {
         const cast = snap.val();
-        if (!cast || !darkRun) return;
-        darkRun.taleCast = cast;
-        if (cast[currentUser.code]) darkRun.taleRole = cast[currentUser.code];
+        if (!darkRun) return;
+        if (cast) darkRun.taleCast = cast;
+
+        // 한 번 받은 배역은 고정
+        if (!darkRun.taleRole && cast && cast[currentUser.code]) {
+            darkRun.taleRole = cast[currentUser.code];
+            saveDarkRunState();
+        }
+
+        // 배역표에 내가 없으면 내 자리 채우기
+        if (!cast || !cast[currentUser.code]) assignTaleRoles();
+
         renderLoreBar();
     });
 }
