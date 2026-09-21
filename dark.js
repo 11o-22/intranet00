@@ -8227,7 +8227,7 @@ function b508RequiredDocs() {
             </div>`;
     }
 
-    function houseTreat() {
+       function houseTreat() {
         const r = getRoomie(currentUser);
         if (!r) { showCustomAlert('동거인이 없습니다.'); return; }
         if (!buyGuard()) return;
@@ -8248,17 +8248,13 @@ function b508RequiredDocs() {
         addHistoryLog(r, `[사택] ${currentUser.name} 사원이 돌봐 주었습니다. (오염도 -${taken}%)`);
         addHistoryLog(currentUser, `[사택] ${r.name} 사원을 돌봤습니다. (오염도 -${taken}% 대신 일부를 나눠 받음)`);
 
-        r._adminStamp = Date.now();
-        if (database) {
-            database.ref('users/' + r.code).set(r);
-            database.ref('users/' + currentUser.code).set(currentUser);
-        } else saveDB();
+        updateUserFields(r.code, { pollution: r.pollution, history: r.history });
+        saveSelfFull();
 
         updateUI();
         renderHouse();
         showCustomAlert(`${r.name} 사원의 오염도를 ${taken}% 낮췄습니다.\n대신 일부가 이쪽으로 옮았습니다.`);
     }
-
         // ==========================================
     // ★ 사택 — 주방
     // ==========================================
