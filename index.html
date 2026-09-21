@@ -1845,6 +1845,10 @@ const EQUIP_AFFIL = {
             isParty: !!darkRun.isParty,
             isLeader: !!darkRun.isLeader,
             counted: !!darkRun.counted,
+            taleRole: darkRun.taleRole || null,
+            lore: darkRun.lore || 0,
+            talePages: darkRun.talePages || [],
+            tabooCount: darkRun.tabooCount || 0,
             savedAt: Date.now()
             
         };
@@ -1929,6 +1933,10 @@ const EQUIP_AFFIL = {
             partyId: s.partyId, isParty: s.isParty, isLeader: s.isLeader,
             memberCount: s.memberCount || 1,
             counted: s.counted !== false,
+            taleRole: s.taleRole || null,
+            lore: s.lore || 0,
+            talePages: s.talePages || [],
+            tabooCount: s.tabooCount || 0,
             rejoined: true
         };
 
