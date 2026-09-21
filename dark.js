@@ -4340,6 +4340,7 @@ function b508RequiredDocs() {
     // ==========================================
     function hasEquip(user, name) {
         if (!user || !user.equippedWeapons) return false;
+        if (!canWearItem(user, name)) return false;
         return user.equippedWeapons.some(w => getEquipBaseName(w) === name);
     }
 
@@ -4357,8 +4358,15 @@ function b508RequiredDocs() {
     }
 
     // 작두 — 기믹 1회 무조건 성공
+        // 돌파 무기: 작두 또는 버터 나이프
+    function smashWeapon() {
+        if (hasEquip(currentUser, '작두')) return '작두';
+        if (hasEquip(currentUser, '버터 나이프')) return '버터 나이프';
+        return null;
+    }
+
     function jakduAvailable() {
-        return darkRun && !darkRun._jakduUsed && hasEquip(currentUser, '작두');
+        return darkRun && !darkRun._jakduUsed && !!smashWeapon();
     }
 
     function useJakdu() {
@@ -11911,7 +11919,7 @@ if (notes && notes.length > 200) notes = notes.slice(-200);
 const effects = getTimedEffectsText(u).slice(0, 3);
     const gear = getGear(u);
     const eq = (u.equippedWeapons || []).map(w => getEquipBaseName(w));
-    const agentGear = eq.filter(n => ['작두','유리손포','누군가가 쓴 부적','노스텔지어 끈'].includes(n));
+    const agentGear = eq.filter(n => ['작두','유리손포','누군가가 쓴 부적','사자탈'].includes(n));
     const gender = (u.badge && u.badge.gender) || null;
     const posTag = (u.badge && u.badge.posTag) || null;
    let prev = u.bathSummary || null;

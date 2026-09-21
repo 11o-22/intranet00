@@ -1595,9 +1595,10 @@ if (database) {
         "제거약": { price: 40000, usable: true, targetable: true, effect: "cure_potion", desc: "물약으로 생긴 신체 변화나 계약 하나를 무작위로 되돌린다." },       "랜덤박스": { price: 440, usable: true, targetable: false, effect: "random_box", desc: "안에서 무작위로 아무 아이템 하나가 나옵니다." },
          "착한 친구": { price: 9999, usable: true, targetable: false, effect: "equip_rabbit", desc: "귀여운 분홍색 토끼 봉제인형. 장착 시 어둠의 판정에 행운이 더해지고, 공용시설 승률이 크게 오른다. 약간의 회피 효과도 있다." },
         "보안팀 의상 세트": { price: 8000, usable: true, targetable: false, effect: "equip_security", desc: "보안팀의 의상 세트. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
+        "사자탈": { price: 8000, usable: true, targetable: false, effect: "equip_lion", desc: "[재난관리국 전용] 오래 쓴 티가 나는 사자탈. 하루 한 번 어둠에서의 죽음을 막아 주며, 오염도가 80%를 넘으면 한 시간 동안 자동 정화된다." },
         "작두": { price: 9999, usable: true, targetable: false, effect: "equip_jakdu", desc: "영험한 기운이 담긴 무기. 어떤 기믹이든 한 번은 무조건 박살낸다. 죽어도 사라지지 않으며, 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
         "유리손포": { price: 8000, usable: true, targetable: true, effect: "equip_sonpo", desc: "재난관리국의 기본 지급 무기. 삿된 것을 읽어 낸다. 기믹의 단서가 선명하게 보이며, 공용시설 승률이 크게 오른다. 타인에게 착용시킬 수도 있다." },
-        "버터 나이프": { price: 5555, usable: true, targetable: false, effect: "equip_butter_knife", restrictRank: ["과장", "차장", "부장", "이사", "대표", "사장"], desc: "장착 가능한 나이프. 장착 시 1시간 동안 오염도를 절반으로 줄여준다." },
+        "버터 나이프": { price: 5555, usable: true, targetable: false, effect: "equip_butter_knife", desc: "[백일몽 주식회사 전용] 공간을 가르는 힘이 있다. 어떤 기믹이든 한 번은 무조건 갈라낸다. 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
         "누군가가 쓴 부적": { price: 4000, usable: true, targetable: false, effect: "equip_amulet", restrictDept: ["재난관리국", "재난관리"], desc: "장착 시 슬롯머신의 당첨 확률이 상승한다." },
         "다이아 애널 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_plug", desc: "반짝이는 다이아몬드가 박힌 애널 플러그. 본인이나 타인의 장착칸에 강제 장착된다." },
         "감각 연동 오나홀": { price: 7777, usable: true, targetable: true, effect: "equip_sync_hole", desc: "지정한 상대의 구멍과 감각이 연결된다. 상대방의 장착칸에 강제로 장착된다." },
@@ -1733,6 +1734,16 @@ if (database) {
     "검은 국수", "눈알 조림", "이름 모를 부위 구이", "움직이는 젤리", "뜨겁지 않은 국"
 ];
 
+const EQUIP_AFFIL = {
+    '착한 친구':        '백일몽',
+    '보안팀 의상 세트':  '백일몽',
+    '버터 나이프':       '백일몽',
+    '작두':             '재난관리',
+    '유리손포':          '재난관리',
+    '누군가가 쓴 부적':   '재난관리',
+    '사자탈':           '재난관리'
+};
+
     const ALIEN_ITEMS_POOL = [
         "노스텔지어 캔디", "스마일 스티커", "해피 메이커", "VIP실 출입증",
         "일반 담배", "혈욕조", "노예 계약서", "포도맛 물약",
@@ -1741,9 +1752,9 @@ if (database) {
         "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
         "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기",
         "파인애플맛 물약", "투명 물약", "자두맛 물약", "무지개 물약",
-        "곶감맛 물약", "세뇌 만년필", "석류맛 물약", "바나나맛 물약"
+        "곶감맛 물약", "세뇌 만년필", "석류맛 물약", "바나나맛 물약", "사자탈"
     ];
-        const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비", "사막여우", "수달"];
+        const ANIMAL_LIST = ["개", "고양이", "토끼", "사자", "늑대", "호랑이", "곰", "담비", "사막여우", "햄스터", "수달"];
 
         const CAKE_LIST = ["치즈", "고구마", "생크림", "딸기", "자두", "초코", "티라미수"];
 
@@ -2583,29 +2594,29 @@ if (database) {
     }, 3000);
 }
         // 파티면 투표 화면, 단독이면 그냥 선택 버튼
-       function renderChoiceStep(title, text, options, imgKey) {
+             function renderChoiceStep(title, text, options, imgKey) {
         if (consumeQFlag('safe_hint') && options.length > 0) {
             options[0].label = '◈ ' + options[0].label;
             showDarkToast('일지에 표시된 쪽이 있다.');
         }
 
         if (darkRun.zone === 'Qtrew-A-667') {
-    renderA667Choice(title, text, options, imgKey);
-    return;
-}
+            renderA667Choice(title, text, options, imgKey);
+            return;
+        }
 
-if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
-    const bar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml() : loreBarHtml();
-    darkBodyEl().innerHTML = darkBox(title, text,
-        bar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join(''),
-        imgKey);
-    if (darkRun.zone === 'Qtrew-S-010') renderInfectBar(); else renderLoreBar();
-    mountDarkChat('normal');
-    return;
-}
+        if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
+            const bar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml() : loreBarHtml();
+            darkBodyEl().innerHTML = darkBox(title, text,
+                bar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join(''),
+                imgKey);
+            if (darkRun.zone === 'Qtrew-S-010') renderInfectBar(); else renderLoreBar();
+            mountDarkChat('normal');
+            return;
+        }
 
         const jakduBtn = jakduAvailable()
-            ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ 작두로 박살낸다 (1회)</button>`
+            ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ ${smashWeapon()}로 박살낸다 (1회)</button>`
             : '';
 
         if (darkRun.isParty) {
@@ -2621,13 +2632,17 @@ if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
     }
 
     function jakduSmash() {
+        const w = smashWeapon();
         if (!useJakdu()) return;
         darkRun.success += 2;
         darkRun.modifier = (darkRun.modifier || 0) + 1;
-        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 작두를 휘둘렀습니다.`, true);
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 ${w}를 휘둘렀습니다.`, true);
 
-        darkBodyEl().innerHTML = darkBox("작두",
-            `칼을 뽑는다.<br><br>무엇을 베었는지는 보지 못했다.<br>다만 앞을 막고 있던 것이 더 이상 앞에 없다.<br><br>날에 아무것도 묻지 않았다. 그게 더 이상하다.`,
+        const txt = (w === '버터 나이프')
+            ? `나이프를 쥔다. 날이 무디다.<br><br>그런데 앞을 막고 있던 것이 버터처럼 갈라진다.<br>저항이 없었다. 처음부터 무른 것이었던 것처럼.<br><br>날에는 아무것도 묻지 않았다.`
+            : `칼을 뽑는다.<br><br>무엇을 베었는지는 보지 못했다.<br>다만 앞을 막고 있던 것이 더 이상 앞에 없다.<br><br>날에 아무것도 묻지 않았다. 그게 더 이상하다.`;
+
+        darkBodyEl().innerHTML = darkBox(w, txt,
             darkChoiceBtn("지나간다.", `partyAdvance(${darkRun.step + 1})`));
         mountDarkChat('normal');
     }
@@ -3765,27 +3780,34 @@ return b;
         if (darkRun && darkRun._dead) return;   // 중복 호출 차단
         if (darkRun) darkRun._dead = true; 
 
-        // ★ 보안팀 의상 세트 — 하루 1회 죽음 방지
+               // ★ 보안팀 의상 세트 / 사자탈 — 하루 1회 죽음 방지 (공유)
         const todayStr = getTodayStr();
-        if (hasEquip(currentUser, '보안팀 의상 세트') && currentUser.securitySaveDate !== todayStr) {
+        const guard = hasEquip(currentUser, '보안팀 의상 세트') ? '보안팀 의상 세트'
+                    : hasEquip(currentUser, '사자탈') ? '사자탈' : null;
+
+        if (guard && currentUser.securitySaveDate !== todayStr) {
             currentUser.securitySaveDate = todayStr;
             darkRun.fail = Math.max(0, darkRun.fail - 1);
             applyPollutionToUser(currentUser, 6);
-            addHistoryLog(currentUser, `[보안팀 의상] 치명적 상황에서 살아남았습니다. (일 1회)`);
-saveSelfFull();
+            addHistoryLog(currentUser, `[${guard}] 치명적 상황에서 살아남았습니다. (일 1회)`);
+            saveSelfFull();
 
-              darkRun._dead = false;   
+            darkRun._dead = false;
+
+            const saveTxt = (guard === '사자탈')
+                ? `— 탈이 먼저 버텼다.<br>
+                   갈기 쪽이 찢겨 나가면서 힘이 흩어진다. 오래 쓴 물건은 오래 버틴다.<br><br>
+                   숨이 돌아온다. 오늘은 여기까지다.`
+                : `— 옷이 먼저 버텼다.<br>
+                   어깨 쪽 천이 찢어지면서 힘이 분산된다. 규격품은 규격품이다.<br><br>
+                   숨이 돌아온다. 오늘은 여기까지다.`;
 
             darkBodyEl().innerHTML = darkBox("—",
-                `${reasonText}<br><br>
-                 <span style="color:#4fc3f7;">— 옷이 먼저 버텼다.<br>
-                 어깨 쪽 천이 찢어지면서 힘이 분산된다. 규격품은 규격품이다.<br><br>
-                 숨이 돌아온다. 오늘은 여기까지다.</span>`,
+                `${reasonText}<br><br><span style="color:#4fc3f7;">${saveTxt}</span>`,
                 darkChoiceBtn("자세를 낮춘다.", "renderDarkStep();"));
             mountDarkChat('normal');
             return;
         }
-
                 if (consumeQFlag('paw_guard')) {
             darkRun.fail = Math.max(0, darkRun.fail - 1);
             darkRun._dead = false;
@@ -4453,15 +4475,20 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             }
         }
         
-        // 버터 나이프 착용 중이고 시간이 안 지났다면 오염도 증가율 0.5 (절반 감소)
+                // 버터 나이프 — 작두와 동일: 4시간 오염 차단, 만료 시 소지품으로 회수
         if (user.equippedWeapons.includes("버터 나이프")) {
             if (user.butterKnifeExpireTime && Date.now() < user.butterKnifeExpireTime) {
-                return 0.5;
+                return 0;
             } else if (user.butterKnifeExpireTime && Date.now() >= user.butterKnifeExpireTime) {
                 let idx = user.equippedWeapons.indexOf("버터 나이프");
-                if (idx > -1) user.equippedWeapons.splice(idx, 1);
-                addHistoryLog(user, `[장비 해제] 버터 나이프의 효과 시간(1시간)이 종료되었습니다.`);
+                if (idx > -1) {
+                    user.equippedWeapons.splice(idx, 1);
+                    user.inventory.push("버터 나이프");
+                }
+                user.butterKnifeExpireTime = 0;
+                addHistoryLog(user, `[장비 회수] 버터 나이프의 기운이 다해 소지품으로 돌아갔습니다.`);
             }
+    
         }
 
                 if (user.equippedWeapons.includes("꺼진 가로등 전구")) return 0.9;
@@ -4503,7 +4530,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         }
 
                 // ★ 보안팀 의상 세트 — 오염 80% 이상이면 1시간 동안 10분마다 3% 정화
-        if (user.equippedWeapons && user.equippedWeapons.includes("보안팀 의상 세트")) {
+        if (user.equippedWeapons && (user.equippedWeapons.includes("보안팀 의상 세트") || user.equippedWeapons.includes("사자탈"))) {
             if (user.pollution >= 80 && !user.securityPurgeUntil) {
                 user.securityPurgeUntil = now + (60 * 60 * 1000);
                 user.securityPurgeLast = now;
@@ -5631,6 +5658,10 @@ if (bcEl) {
         if (!database) {
             const t = db.users[targetCode];
             if (!t) return;
+                        if (!canWearItem(currentUser, item) || !canWearItem(t, item)) {
+                showCustomAlert('착용 조건이 맞지 않습니다.');
+                return;
+            }
             if (applyItemEffect(t, item, true) === false) return;
             t.hasItemUsedOnMe = true;
             removeItemFromInventory(currentUser, item, 1);
@@ -5649,6 +5680,10 @@ if (bcEl) {
             if (!targetUser.timedEffects) targetUser.timedEffects = [];
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
             if (!targetUser.history) targetUser.history = [];
+                        if (!canWearItem(currentUser, item) || !canWearItem(targetUser, item)) {
+                showCustomAlert('착용 조건이 맞지 않습니다.');
+                return;
+            }
 
             const success = applyItemEffect(targetUser, item, true);
             if (success === false) return;
@@ -5839,7 +5874,7 @@ if (isUsable) {
     useBtnHtml = currentUser.couple
         ? `<button class="inv-btn" style="background:#2a2a2a; color:#666;" disabled>사용 중</button>`
         : `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">사용</button>`;
-}else if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu') {
+}else if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu'|| cat.effect === 'equip_lion') {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">장착</button>`;
                     } else if (item === "빨간 리본" || item === "노예 계약서") {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;
@@ -5979,11 +6014,25 @@ if (isUsable) {
         if (database) database.ref(`users/${targetCode}`).set(t);
         saveDB(); updateUI();
     }
+
+    // ★ 소속 제한 장비
+function canWearItem(user, itemName) {
+    const need = EQUIP_AFFIL[itemName];
+    if (!need) return true;                          // 제한 없는 물품
+    if (!user) return false;
+    if (user.code === 'kario0987') return true;      // 상담사는 예외
+    const where = (user.affiliation || '') + ' ' + (user.team || '');
+    return where.includes(need);
+}
    
          function useInventoryItem(itemName) {
         const cat = ITEM_CATALOG[itemName];
          if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 소지품을 사용할 수 없습니다.'); return; }
         if (!cat || !cat.usable) return;
+                if (!canWearItem(currentUser, itemName)) {
+            showCustomAlert('착용 조건이 맞지 않습니다.');
+            return;
+        }
 
         // 지갑은 장착과 무관하므로 가장 먼저 단독 처리
         if (cat.effect === 'open_wallet') {
@@ -6404,7 +6453,7 @@ if (cat.effect === 'couple_ring') {
     }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
-          if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu' || cat.effect === 'equip_liner' || cat.effect === 'equip_silica' || cat.effect === 'equip_foil') { if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
+          if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu' || cat.effect === 'equip_liner' || cat.effect === 'equip_silica' || cat.effect === 'equip_foil' || cat.effect === 'equip_lion') { if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
                 showCustomAlert("혈욕조의 하루 최대 장착 시간(3시간)을 모두 소진했습니다.");
                 return;
             }
@@ -6421,7 +6470,7 @@ if (cat.effect === 'couple_ring') {
             if (cat.effect === 'equip_silver_ring') {
                 currentUser.silverRingExpireTime = Date.now() + (120 * 60 * 60 * 1000);
             } else if (cat.effect === 'equip_butter_knife') {
-                currentUser.butterKnifeExpireTime = Date.now() + (1 * 60 * 60 * 1000);
+               currentUser.butterKnifeExpireTime = Date.now() + (4 * 60 * 60 * 1000);
             }
               else if (cat.effect === 'equip_jakdu') {
                 currentUser.jakduExpireTime = Date.now() + (4 * 60 * 60 * 1000);
@@ -6653,24 +6702,26 @@ else if (cat.effect === 'rainbow_potion') {
                         if (rankOk && deptOk) isMatched = true;
                     }
                     // 별도 속성이 없는 우주 쇼핑몰 아이템 하드코딩 조건 체크
+                                        // 별도 속성이 없는 우주 쇼핑몰 아이템 하드코딩 조건 체크
                     else {
                         let isDisasterTeam = uAff.includes("재난관리국") || uTeam.includes("재난관리") || isAdmin;
                         let isSecurityTeam = uTeam.includes("보안팀") || uTeam.includes("경비팀") || isAdmin;
                         let isDaydreamTeam = uAff.includes("백일몽 주식회사") || isAdmin;
                         let isHighRank = ["과장", "차장", "부장", "이사", "대표", "사장"].includes(uPos) || isAdmin;
 
-                        if (itemName === "작두" || itemName === "유리손포") { hasCondition = true; if (isDisasterTeam) isMatched = true; }
-                        else if (itemName === "착한 친구" || itemName === "보안팀 의상 세트") { hasCondition = true; if (isDaydreamTeam) isMatched = true; }
-                        else if (["버터 나이프", "은반지", "빨간 리본", "고급진 술", "금고"].includes(itemName)) { hasCondition = true; if (isHighRank) isMatched = true; }
-                        else if (itemName === "노스텔지어 끈") { hasCondition = true; if (isSecurityTeam) isMatched = true; }
+                        if (itemName === "작두" || itemName === "유리손포" || itemName === "사자탈") {
+                            hasCondition = true; if (isDisasterTeam) isMatched = true;
+                        }
+                        else if (itemName === "착한 친구" || itemName === "보안팀 의상 세트" || itemName === "버터 나이프") {
+                            hasCondition = true; if (isDaydreamTeam) isMatched = true;
+                        }
+                        else if (["은반지", "빨간 리본", "고급진 술", "금고"].includes(itemName)) {
+                            hasCondition = true; if (isHighRank) isMatched = true;
+                        }
+                        else if (itemName === "노스텔지어 끈") {
+                            hasCondition = true; if (isSecurityTeam) isMatched = true;
+                        }
                     }
-
-                    // 조건이 걸린 아이템일 때, 자격에 부합하면 확률을 25배 뻥튀기하고 맞지 않으면 0.05배(거의 안 나옴)로 패널티
-                    if (hasCondition) {
-                        if (isMatched) weight *= 25; 
-                        else weight *= 0.05; 
-                    }
-                
 
 
                     weights.push({ name: itemName, weight: weight });
@@ -8548,9 +8599,9 @@ function bjFinish(mode) {
             const isSecurityTeam = currentUser.team.includes("보안팀") || currentUser.team.includes("경비팀") || currentUser.code === 'kario0987';
 
             let availablePool = ALIEN_ITEMS_POOL.filter(item => {
-                if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적") && !isDisasterTeam) return false;
-                if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
-                if (["버터 나이프", "은반지", "빨간 리본", "고급진 술", "금고"].includes(item) && !isHighRank) return false;
+                if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return false;
+                if ((item === "착한 친구" || item === "보안팀 의상 세트" || item === "버터 나이프") && !isDaydreamTeam) return false;
+                if (["은반지", "빨간 리본", "고급진 술", "금고"].includes(item) && !isHighRank) return false;
                 if (item === "노스텔지어 끈" && !isSecurityTeam) return false;
                 // ★ [추가] 일반 사원은 여우구슬 획득 불가
                 if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
@@ -8603,8 +8654,8 @@ function bjFinish(mode) {
         const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
         
         unlocked = unlocked.filter(item => {
-            if ((item === "작두" || item === "유리손포") && !isDisasterTeam) return false;
-            if ((item === "착한 친구" || item === "보안팀 의상 세트") && !isDaydreamTeam) return false;
+            if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return false;
+            if ((item === "착한 친구" || item === "보안팀 의상 세트" || item === "버터 나이프") && !isDaydreamTeam) return false;
             // ★ 상담사가 아니면 여우구슬 절대 노출 불가
             if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
             if (item === "금고" && currentUser.code !== 'kario0987') return false;
