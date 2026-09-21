@@ -1060,7 +1060,7 @@ function renderStepB330() {
         darkRun.success++;
         darkRun.log.push(`[기믹 1] ${pick}`);
         renderResultStep("기믹 1 — 결과", txt, "계속 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(3)" : "void 0");
+         "partyAdvance(3)");
     }
 
     // --- 기믹 2: 안내판 ---
@@ -1094,7 +1094,7 @@ function renderStepB330() {
         if (ok) darkRun.success++; else darkRun.fail++;
         darkRun.log.push(`[기믹 2] ${pick}`);
         renderResultStep("기믹 2 — 결과", txt, "계속 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(7)" : "void 0");
+            "partyAdvance(7)");
     }
 
         // --- 기믹 3: 좁아지는 통로 (타이밍) ---
@@ -1158,7 +1158,7 @@ function renderStepB330() {
                     ok ? `마지막 한 번을 빠져나온다.<br><br>뒤에서 통로가 완전히 닫힌다. 소리가 나지 않는다.<br>돌아갈 길이 없어졌다는 뜻이다.`
                        : `몇 번 부딪혔다.<br>벽이 단단하지 않아서 다치지는 않았다.<br><br>다만 부딪힌 자리마다 옷에 뭔가 묻었다. 닦이지 않는다.`,
                     "계속 간다.",
-                    (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(10)" : "void 0");
+                    "partyAdvance(10)");
             }, 1200);
         }
     }
@@ -1295,7 +1295,7 @@ mountDarkChat('normal');
         darkRun.modifier = (darkRun.modifier || 0) + mod;
         darkRun.log.push(`[기믹 4] ${pick === 'none' ? '지목 안 함' : '지목함'}`);
         renderResultStep("기믹 4 — 결과", txt, "계속 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(14)" : "void 0");
+         "partyAdvance(14)");
     }
 
     // --- 합류 지점 ---
@@ -2345,50 +2345,132 @@ function input119D(n) {
         // ==========================================
     // ★ 강제 실종 (무작위 지목 + d20 저항)
     // ==========================================
-    function renderAbduction(round) {
+        function renderAbduction(round) {
         const body = darkBodyEl();
-        const key = `abduct${round}`;
+        if (!body || !darkRun) return;
 
-        // 방장이 대상을 정한다
-        if (darkRun.isLeader && database && !darkRun[`_${key}Set`]) {
-            darkRun[`_${key}Set`] = true;
-            const p = darkParties[darkRun.partyId];
-            const alive = p && p.alive ? Object.keys(p.alive).filter(c => !(p.solo || {})[c]) : [currentUser.code];
-            if (alive.length > 0) {
-                const target = alive[Math.floor(Math.random() * alive.length)];
-                database.ref(`darkParties/${darkRun.partyId}/${key}`).set({
-                    target: target,
-                    name: (p && p.members && p.members[target]) ? p.members[target].name : '누군가',
-                    at: Date.now()
-                });
-            }
+        const key = `abduct${round}`;
+        const myStep = darkRun.step;
+        const pid = darkRun.partyId;
+
+        // 파티가 아니거나 서버가 없으면 그냥 넘어간다
+        if (!database || !darkRun.isParty) { partyAdvance(myStep + 1); return; }
+
+        // ★ 이미 이 단계를 끝낸 상태로 다시 들어온 경우 (복귀·재렌더)
+        const done = darkRun[`_${key}Done`];
+        if (done === 'taken') { renderSoloStep(); return; }
+        if (done === 'safe') {
+            body.innerHTML = darkBox("—",
+                `어깨의 무게는 사라졌다.<br><br>일행은 아직 앞에 있다.`,
+                darkChoiceBtn("계속 간다.", `partyAdvance(${myStep + 1})`));
+            mountDarkChat('normal');
+            return;
         }
 
-        if (!database) { partyAdvance(darkRun.step + 1); return; }
+        // ★ 1) 무조건 먼저 화면을 그린다
+        body.innerHTML = darkBox("—",
+            `걸음이 멎는다.<br><br>
+             뒤쪽에서 기척이 난다. 발소리가 아니다. 무언가 끌리는 소리다.<br><br>
+             아무도 돌아보지 않는다.`,
+            `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">주변을 살피는 중...</div>`);
+        mountDarkChat('normal');
 
-        database.ref(`darkParties/${darkRun.partyId}/${key}`).on('value', (sn) => {
+        const ref = database.ref(`darkParties/${pid}/${key}`);
+        let shown = false;
+
+        // 대상 선정 — 누가 호출하든 한 번만 기록된다
+        const pickTarget = () => {
+            const p = darkParties[pid];
+            const solo = (p && p.solo) || {};
+            const alive = (p && p.alive) ? Object.keys(p.alive).filter(c => !solo[c]) : [];
+            if (alive.length === 0) return;
+            const target = alive[Math.floor(Math.random() * alive.length)];
+            const nm = (p && p.members && p.members[target] && p.members[target].name)
+                ? p.members[target].name
+                : (db.users[target] ? db.users[target].name : '누군가');
+            ref.transaction(cur => {
+                if (cur && cur.target) return;          // 이미 정해졌으면 건드리지 않음
+                return { target: target, name: nm, at: Date.now() };
+            });
+        };
+
+        if (darkRun.isLeader) pickTarget();
+
+        // ★ 2) 방장이 안 뽑으면 3초 뒤 아무나 뽑는다
+        const t1 = setTimeout(() => {
+            if (!darkRun || darkRun.step !== myStep || shown) return;
+            pickTarget();
+        }, 3000);
+
+        // ★ 3) 그래도 아무것도 안 오면 넘어간다
+        const t2 = setTimeout(() => {
+            if (!darkRun || darkRun.step !== myStep || shown) return;
+            try { ref.off(); } catch (e) {}
+            partyAdvance(myStep + 1);
+        }, 9000);
+
+        try { ref.off(); } catch (e) {}
+        ref.on('value', (sn) => {
             const a = sn.val();
-            if (!a || !darkRun) return;
-            if (darkRun[`_${key}Shown`]) return;
-            darkRun[`_${key}Shown`] = true;
-
+            if (!a || !a.target || !darkRun || darkRun.step !== myStep) return;
             const isMe = a.target === currentUser.code;
-            if (isMe) {
-                body.innerHTML = darkBox("—",
-                    `어깨에 무게가 걸린다.<br><br>손이다. 뒤에서. 일행은 전부 앞에 있다.<br>돌아볼 새도 없이 끌린다. 발이 바닥에서 뜬다.<br><br>버틸 수 있을까.`,
-                    darkChoiceBtn("버틴다.", `resistAbduction(${round})`));
-            } else {
-                body.innerHTML = darkBox("—",
-                    `<b style="color:#ff6b6b;">${a.name}</b> 사원이 뒤로 끌려간다.<br><br>비명은 없다. 소리를 낼 틈이 없었다.<br>손을 뻗기엔 이미 멀다.<br><br>기다리는 수밖에 없다.`,
-                    `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">상황을 지켜보는 중...</div>`);
+
+            // --- 대상 공개 (한 번만) ---
+            if (!shown) {
+                shown = true;
+                clearTimeout(t1);
+                clearTimeout(t2);
+
+                if (isMe) {
+                    body.innerHTML = darkBox("—",
+                        `어깨에 무게가 걸린다.<br><br>
+                         손이다. 뒤에서. 일행은 전부 앞에 있다.<br>
+                         돌아볼 새도 없이 끌린다. 발이 바닥에서 뜬다.<br><br>
+                         버틸 수 있을까.`,
+                        darkChoiceBtn("버틴다.", `resistAbduction(${round})`));
+                } else {
+                    body.innerHTML = darkBox("—",
+                        `<b style="color:#ff6b6b;">${a.name}</b> 사원이 뒤로 끌려간다.<br><br>
+                         비명은 없다. 소리를 낼 틈이 없었다.<br>
+                         손을 뻗기엔 이미 멀다.<br><br>
+                         기다리는 수밖에 없다.`,
+                        `<div id="abd-act">
+                            <div style="text-align:center; font-size:11px; color:#888; padding:12px;">
+                                상황을 지켜보는 중...<br>
+                                <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${myStep + 1})">먼저 간다</button>
+                            </div>
+                         </div>`);
+                }
+                mountDarkChat('normal');
             }
-            mountDarkChat('normal');
+
+            // --- ★ 4) 지켜보는 쪽: 결과 수신 ---
+            if (!isMe && a.result && !darkRun[`_${key}Seen`]) {
+                darkRun[`_${key}Seen`] = true;
+                const taken = a.result === 'taken';
+                const act = document.getElementById('abd-act');
+                const txt = taken
+                    ? `끌려간 자리에 신발 한 짝이 남았다.<br><br>
+                       <b style="color:#ff6b6b;">${a.name}</b> 사원은 돌아오지 않았다.<br>
+                       부르지 않기로 한다.`
+                    : `발소리가 돌아온다.<br><br>
+                       <b style="color:#4CAF50;">${a.name}</b> 사원이 벽을 짚고 서 있다.<br>
+                       손톱이 몇 개 벗겨져 있다. 아무도 묻지 않는다.`;
+                if (act) {
+                    act.innerHTML =
+                        `<div style="background:#111; border:1px solid #2a2a2a; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; color:#ddd; margin-bottom:12px;">${txt}</div>` +
+                        darkChoiceBtn("계속 간다.", `partyAdvance(${myStep + 1})`);
+                }
+                try { ref.off(); } catch (e) {}
+            }
         });
     }
 
     function resistAbduction(round) {
                 if (consumeQFlag('no_mark')) {
             darkRun.success++;
+                        darkRun[`_abduct${round}Done`] = 'safe';
+            if (database) database.ref(`darkParties/${darkRun.partyId}/abduct${round}/result`).set('safe');
             darkBodyEl().innerHTML = darkBox("—",
                 `명찰을 내민다.<br><br>손이 멈춘다. 이름이 목록에 없는 모양이다.<br>다른 쪽으로 간다.`,
                 darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
@@ -2416,6 +2498,7 @@ function input119D(n) {
         }
 
         darkRun.log.push(`[실종 ${round}] d20 ${roll}(+${bonus}) vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+        
 
         if (taken) {
             darkRun.solo = true;
@@ -2657,63 +2740,6 @@ function input119D(n) {
     }
 
 
-
-        // --- 기믹 5: 벽이 좁혀온다 ---
-    function b330Gimmick7() {
-        renderChoiceStep("기믹 5 — 좁혀오는 벽",
-            `양쪽 벽이 동시에 움직인다.<br><br>아까처럼 주기적인 게 아니다. 멈추지 않고 계속 좁아진다.<br>앞쪽에 문이 하나 보이는데, 거기까지 거리가 애매하다.<br><br>벽에 눌린 자국들이 있다. 사람 모양이다. 여러 개다.`,
-            [
-                { id:'run',   label:'① 전력으로 달린다.',           fn:'b330G5R', arg:'run' },
-                { id:'brace', label:'② 벽을 밀어 버틴다.',           fn:'b330G5R', arg:'brace' },
-                { id:'crawl', label:'③ 바닥에 엎드려 기어간다.',     fn:'b330G5R', arg:'crawl' },
-                { id:'back',  label:'④ 뒤로 물러난다.',             fn:'b330G5R', arg:'back' }
-            ], null);
-    }
-
-    function b330G5R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
-        let bonus = rollDarkBonus('sense');
-        const total = roll + bonus;
-        const DC = { run: 14, brace: 19, crawl: 16, back: 17 }[pick] - gearValue(currentUser, 'break');
-
-        let txt, died = false;
-
-        if (roll === 1) {
-            died = true;
-            txt = `늦었다.<br><br>양쪽이 닿는다. 소리는 나지 않았다.<br>벽이 다시 열렸을 때, 자국이 하나 늘어 있었다.`;
-        } else if (total >= DC) {
-            darkRun.success++;
-            txt = pick === 'run' ? `달린다. 문턱을 넘는 순간 뒤에서 벽이 맞물린다.<br><br>발뒤꿈치가 스쳤다. 그걸로 끝이었다.`
-                : pick === 'brace' ? `벽을 민다. 밀린다. 실제로 밀린다.<br><br>버티는 동안 일행이 지나간다. 마지막으로 손을 놓고 빠져나온다.`
-                : pick === 'crawl' ? `엎드린다. 바닥 쪽이 덜 좁아진다.<br><br>기어서 빠져나온다. 옷이 찢어졌지만 몸은 무사하다.`
-                : `물러난다. 벽이 따라오지 않는다.<br><br>기다렸다가 다시 진입하니 통로가 원래대로다.<br>시간을 잃었을 뿐이다.`;
-        } else {
-            darkRun.fail++;
-            applyPollutionToUser(currentUser, 9);
-            txt = `가까스로 빠져나온다.<br><br>갈비뼈 쪽이 아프다. 숨을 깊게 쉬면 더 아프다.<br>뒤를 보니 벽이 완전히 맞물려 있다.`;
-            if ((darkRun.fail || 0) >= 5) {
-                darkRun.dying = 'wall';
-                darkRun.log.push(`[기믹 5] d20 ${roll} — 치명`);
-                renderRescueScene('wall');
-                return;
-            }
-        }
-
-        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
-
-        if (died) { darkDeath(txt); return; }
-
-        darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
-            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${total>=DC?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
-            (darkRun.isLeader || !darkRun.isParty)
-                ? darkChoiceBtn("계속 간다.", "partyAdvance(18)")
-                                    : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
-                         선임의 신호를 기다리는 중...<br>
-                         <button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(${darkRun.step + 1})">먼저 간다</button>
-                       </div>`);
-        mountDarkChat('normal');
-    }
-
     // --- 기믹 6: 마지막 갈림 ---
     function b330Gimmick6() {
         renderChoiceStep("기믹 6 — 마지막 갈림",
@@ -2741,7 +2767,7 @@ function input119D(n) {
         darkRun.modifier = (darkRun.modifier || 0) + mod;
         darkRun.log.push(`[기믹 6] ${pick}`);
         renderResultStep("기믹 6 — 결과", txt, "끝으로 간다.",
-            (darkRun.isLeader || !darkRun.isParty) ? "partyAdvance(21)" : "void 0");
+          "partyAdvance(21)");
     }
 
         // --- 기믹 5: 벽이 좁혀온다 ---
@@ -2833,6 +2859,7 @@ function input119D(n) {
             if (s == null || !darkRun) return;
             if (darkRun.step !== s) {
                 darkRun.step = s;
+                darkRun._advTo = null;        
                 detachVoteListener();
                 renderDarkStep();
             }
@@ -3047,8 +3074,7 @@ const GEAR_UPGRADE = {
         g.attrs.push(attr);
         addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 ${GEAR_ATTRS[attr].name} 속성을 새겼습니다.`);
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
 
         closeGearModal();
         updateUI();
@@ -3120,8 +3146,7 @@ const GEAR_UPGRADE = {
             }
         }
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
 
         const html = `
             <div style="text-align:center; padding:18px 0;">
@@ -3153,8 +3178,7 @@ const GEAR_UPGRADE = {
         currentUser.inventory.push('두 번째 자리');
         addHistoryLog(currentUser, `[조합] 재료 3종을 합쳐 '두 번째 자리'를 만들었습니다.`);
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
         updateUI();
         showCustomAlert('세 조각이 맞물렸습니다.\n「두 번째 자리」를 얻었습니다.');
     }
@@ -3264,14 +3288,10 @@ function safeDeposit() {
         currentUser._adminStamp = Date.now();
         addHistoryLog(currentUser, `[금고 입금] ${stored.toLocaleString()} P를 보관했습니다.`);
 
-        if (database) {
-            database.ref('users/' + currentUser.code).set(currentUser).then(() => {
-                updateUI();
-                openSafePanel();
-            });
-        } else {
-            saveDB(); updateUI(); openSafePanel();
-        }
+        saveSelfFull().then(() => {
+    updateUI();
+    openSafePanel();
+});
 
         showCustomAlert(remain > 0
             ? `${stored.toLocaleString()} P를 넣었습니다.\n금고가 가득 차 ${remain.toLocaleString()} P는 넣지 못했습니다.`
@@ -3300,15 +3320,10 @@ function safeDeposit() {
         currentUser._adminStamp = Date.now();
         addHistoryLog(currentUser, `[금고 출금] ${amt.toLocaleString()} P를 꺼냈습니다.`);
 
-        if (database) {
-            database.ref('users/' + currentUser.code).set(currentUser).then(() => {
-                updateUI();
-                openSafePanel();
-                showPointGainEffect(amt);
-            });
-        } else {
-            saveDB(); updateUI(); openSafePanel(); showPointGainEffect(amt);
-        }
+        saveSelfFull().then(() => {
+    updateUI();
+    openSafePanel();
+});
     }
         function gearTagHtml() {
         const g = getGear(currentUser);
@@ -4454,11 +4469,12 @@ function b508RequiredDocs() {
         currentUser.inventory.push(name);
         addHistoryLog(currentUser, `[??? 구매] ${name} (-${price} P)`);
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveFields({ points:1, inventory:1, history:1 });
+
+        saveSelfFull();
         updateUI();
         renderQShop();
     }
+
         // ==========================================
     // ★ ??? 소모품 효과
     // ==========================================
@@ -4515,7 +4531,7 @@ function b508RequiredDocs() {
         g.attrs = g.attrs.filter(a => a !== attr);
         removeItemFromInventory(currentUser, itemName, 1);
         addHistoryLog(currentUser, `[??? 사용] 속성 변경권 — ${GEAR_ATTRS[attr].name} 속성을 지웠습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+        saveSelfFull();
         closeGearModal();
         updateUI();
         showCustomAlert(`${GEAR_ATTRS[attr].name} 속성이 지워졌습니다.\n소지품 탭에서 새로 선택하세요.`);
@@ -7755,7 +7771,7 @@ function b508RequiredDocs() {
         currentUser.inventory.push(r.name);
         addHistoryLog(currentUser, `[조합] ${r.mats.join(' + ')} → ${r.name}`);
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+        saveSelfFull();
         closeGearModal();
         updateUI();
         showCustomAlert(`맞물렸습니다.\n「${r.name}」을(를) 얻었습니다.`);
@@ -7921,8 +7937,7 @@ function b508RequiredDocs() {
             if (database) database.ref('users/' + r.code).set(r);
         }
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
         updateUI();
         renderHouse();
         showCustomAlert(`${next.name}(으)로 옮겼습니다.\n${next.label}`);
@@ -7950,8 +7965,7 @@ function b508RequiredDocs() {
         h.lastRest = Date.now();
         addHistoryLog(currentUser, `[사택] 휴식으로 오염도가 ${before - currentUser.pollution}% 회복되었습니다.`);
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
         updateUI();
         renderHouse();
         showCustomAlert(
@@ -8136,7 +8150,7 @@ function b508RequiredDocs() {
         storage.push({ name: itemName, by: currentUser.name, byCode: currentUser.code, at: Date.now() });
         saveSharedStorage(storage);
         addHistoryLog(currentUser, `[사택] '${itemName}'을(를) 보관함에 넣었습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        saveSelfFull();
         updateUI();
         renderHouseStorage();
     }
@@ -8151,7 +8165,7 @@ function b508RequiredDocs() {
         currentUser.inventory.push(item.name);
         saveSharedStorage(storage);
         addHistoryLog(currentUser, `[사택] 보관함에서 '${item.name}'을(를) 꺼냈습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
+        saveSelfFull();
         updateUI();
         renderHouseStorage();
 
@@ -8333,11 +8347,13 @@ function b508RequiredDocs() {
         currentUser.points -= price;
         currentUser.inventory.push(name);
         addHistoryLog(currentUser, `[사택 매점] ${name} 구입 (-${price} P)`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveFields({ points:1, inventory:1, history:1 });
+       
+       
+        saveSelfFull();
         updateUI();
-        renderKitchen();
+        renderQShop();
     }
+
 
     function doCook(id) {
         if (!buyGuard()) return;
@@ -8406,8 +8422,7 @@ if (isFood) {
         }
 
         addHistoryLog(currentUser, `[사택] ${rc.name}을(를) 만들어 먹었습니다.`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
         updateUI();
         renderKitchen();
         showCustomAlert(`${rc.name}\n\n${rc.desc}\n\n${msg.join('\n')}${together ? `\n\n${r.name} 사원도 같이 먹었습니다.` : ''}`);
@@ -8558,8 +8573,7 @@ if (isFood) {
         }
 
         addHistoryLog(currentUser, `[사택 이상] ${a.name} — 대응함 (오염도 +${o.poll}%)`);
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
 
         updateUI();
         renderHouse();
@@ -8589,8 +8603,7 @@ if (isFood) {
             if (database) database.ref('users/' + r.code).set(r);
         }
 
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
 
         showCustomAlert(
             `[사택 사고]\n\n${a.name}\n\n` +
@@ -9012,8 +9025,7 @@ const reply = await callFox(msgs);
         currentUser.foxSummary = myLines.length ? `사원이 이런 말을 했어요: ${myLines.join(' / ')}` : null;
 
         currentUser._adminStamp = Date.now();
-        if (database) database.ref('users/' + currentUser.code).set(currentUser);
-        else saveDB();
+       saveSelfFull();
     }
     // ==========================================
     // ★ 여우의 기억 (전체 공유)
@@ -12038,9 +12050,9 @@ function saveBathLog() {
     const myLines = bathChatLog.filter(m => m.who === 'me').map(m => m.text).slice(-3);
     currentUser.bathSummary = myLines.length ? `요원이 이런 말을 했어요: ${myLines.join(' / ')}` : null;
 
-    currentUser._adminStamp = Date.now();
-    if (database) database.ref('users/' + currentUser.code).set(currentUser);
-    else saveDB();
+   
+    saveSelfFull();
+   
 }
 
 const DARK_SATIETY = { D: 10, C: 14, B: 18, A: 22, S: 28 };

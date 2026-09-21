@@ -1217,6 +1217,7 @@
     let currentUser = null;
     let maintenanceMode = false;
     let aiChatOff = false;
+    let pendingSaves = 0;
     let sessionSeconds = 0;
     let sessionTimer;
     let pendingTargetItemName = ""; 
@@ -1316,35 +1317,38 @@ function getTodayStr() {
         if (currentUser) checkVipMultiplayerState();
     });
 
-    database.ref('/').on('value', (snapshot) => {
-        let data = snapshot.val();
-        if (data) {
-            if (data.users) {
-                for(let key in data.users) {
-                    if(!data.users[key].inventory) data.users[key].inventory = [];
-                    if(!data.users[key].history) data.users[key].history = [];
-                    if(!data.users[key].letters) data.users[key].letters = [];
-                }
-                                if (currentUser && data.users[currentUser.code]) {
-                    const srv = data.users[currentUser.code];
-                    // ★ 서버 쪽에 관리자 개입 표시가 있으면 그걸 우선한다
-                   if (srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
-    ['points','inventory','pollution','satiety','equippedWeapons','badge','history','timedEffects','house','soulGear'].forEach(k => {
-        if (srv[k] !== undefined) currentUser[k] = srv[k];
-    });
-    currentUser._adminStamp = srv._adminStamp;
-} else {
-    data.users[currentUser.code] = currentUser;
-}
-                }
-                
-                db.users = data.users;
+       database.ref('users').on('value', (snapshot) => {
+        const users = snapshot.val();
+        if (!users) return;
+
+        for (let key in users) {
+            if (!users[key].inventory) users[key].inventory = [];
+            if (!users[key].history) users[key].history = [];
+            if (!users[key].letters) users[key].letters = [];
+        }
+
+        if (currentUser && users[currentUser.code]) {
+            const srv = users[currentUser.code];
+
+            // 내가 저장 중이 아닐 때만, 남이 바꾼 값을 받아온다
+            if (pendingSaves === 0 && srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
+                ['points','inventory','pollution','satiety','equippedWeapons','badge',
+                 'history','timedEffects','house','soulGear','letters','couple',
+                 'hasNewLetter','hasItemUsedOnMe'].forEach(k => {
+                    if (srv[k] !== undefined) currentUser[k] = srv[k];
+                });
+                currentUser._adminStamp = srv._adminStamp;
             }
-            
-            if (currentUser) {
-                updateUI();
-                checkVipMultiplayerState();
-            }
+
+            // 항상 내 라이브 객체로 연결 (db.users[내코드] 가 낡은 사본이 되지 않게)
+            users[currentUser.code] = currentUser;
+        }
+
+        db.users = users;
+
+        if (currentUser) {
+            updateUI();
+            checkVipMultiplayerState();
         }
     });
 }
@@ -1432,16 +1436,20 @@ if (database) {
 }
         
 
-    function saveDB() {
+   function saveDB() {
     if (!database || !currentUser) return;
-    const SKIP = ['letters','timedEffects','equippedWeapons','equipOwner','hasNewLetter','hasNewReply','hasItemUsedOnMe','slaveUntil','masterName','nostalgiaUntil','nostalgiaSender','blindfoldUntil','houseChatUnread','badge'];
+    const SKIP = ['letters','timedEffects','equippedWeapons','equipOwner','hasNewLetter',
+                  'hasNewReply','hasItemUsedOnMe','slaveUntil','masterName','nostalgiaUntil',
+                  'nostalgiaSender','blindfoldUntil','houseChatUnread','badge'];
+    const stamp = stampNow();
     const payload = {};
-    Object.keys(currentUser).forEach(k => {
-        if (!SKIP.includes(k)) payload[k] = currentUser[k];
-    });
-    database.ref(`users/${currentUser.code}`).update(payload).catch(err => {
-        console.error("사용자 데이터 저장 실패:", err);
-    });
+    Object.keys(currentUser).forEach(k => { if (!SKIP.includes(k)) payload[k] = currentUser[k]; });
+    payload._adminStamp = stamp;
+
+    pendingSaves++;
+    database.ref(`users/${currentUser.code}`).update(payload)
+        .catch(e => console.error('저장 실패:', e))
+        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
 }
 
     function removeItemFromInventory(user, itemName, qty) {
@@ -2635,63 +2643,69 @@ if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
 
         let _advLock = 0;
 
-    function partyAdvance(nextStep) {
-        if (!darkRun) return;
-        const now = Date.now();
-        if (now - _advLock < 500) return;
-        _advLock = now;
+// let _advLock = 0;   ← 삭제
 
-        if (!darkRun.isParty || !database) {
-            darkRun.step = nextStep;
-            renderDarkStep();
-            return;
-        }
+function partyAdvance(nextStep) {
+    if (!darkRun) return;
 
-        const pid = darkRun.partyId;
-        const key = `ready${nextStep}`;
-        database.ref(`darkParties/${pid}/${key}/${currentUser.code}`).set(Date.now());
-        renderAdvanceWait(nextStep);
+    if (!darkRun.isParty || !database) {
+        darkRun.step = nextStep;
+        renderDarkStep();
+        return;
     }
+    if (darkRun._advTo === nextStep) return;   // 같은 목적지 중복 클릭만 차단
+    darkRun._advTo = nextStep;
 
-    function renderAdvanceWait(nextStep) {
-        const pid = darkRun.partyId;
-        const key = `ready${nextStep}`;
-        const ref = database.ref(`darkParties/${pid}/${key}`);
+    const pid = darkRun.partyId;
+    database.ref(`darkParties/${pid}/ready${nextStep}/${currentUser.code}`).set(Date.now());
+    renderAdvanceWait(nextStep);
+}
 
-        if (darkRun._advWatch === key) return;
-        darkRun._advWatch = key;
-        darkRun._advStart = Date.now();
+function renderAdvanceWait(nextStep) {
+    const pid = darkRun.partyId;
+    const ref = database.ref(`darkParties/${pid}/ready${nextStep}`);
+    let finished = false;                      // ★ 전역 대신 클로저 플래그
 
-        const go = () => {
-            if (!darkRun || darkRun._advWatch !== key) return;
-            ref.off();
-            darkRun._advWatch = null;
-            database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
-                if (cur != null && cur >= nextStep) return;
-                return nextStep;
-            });
-            darkRun.step = nextStep;
-            detachVoteListener();
-            renderDarkStep();
-        };
-
-        ref.on('value', snap => {
-            if (!darkRun || darkRun._advWatch !== key) return;
-            const cnt = Object.keys(snap.val() || {}).length;
-            const total = getPartyMemberCount();
-            const el = document.getElementById('adv-wait');
-            if (el) el.innerHTML = `${cnt} / ${total}명 준비`;
-            if (cnt >= total) go();
+       const go = () => {
+        if (finished) return;
+        finished = true;
+        try { ref.off(); } catch (e) {}
+        if (!darkRun) return;
+        darkRun._advTo = null;
+        database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
+            if (cur != null && cur >= nextStep) return;
+            return nextStep;
         });
+        darkRun.step = nextStep;
+        detachVoteListener();
+        renderDarkStep();
+    };
 
-        setTimeout(go, 8000);
+    ref.on('value', snap => {
+        if (finished || !darkRun) return;
+        const cnt = Object.keys(snap.val() || {}).length;
+        const total = getPartyMemberCount();
+        const el = document.getElementById('adv-wait');
+        if (el) el.innerText = `${cnt} / ${total}명 준비`;
+        if (cnt >= total) go();
+    });
 
-        const btns = darkBodyEl().querySelectorAll('.game-btn');
+    // 파티가 이미 먼저 넘어갔으면 즉시 따라간다
+    database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
+        const cur = sn.val();
+        if (cur != null && cur >= nextStep) go();
+    });
+
+    setTimeout(go, 6000);                      // ★ 무조건 실행되는 안전장치
+
+    const body = darkBodyEl();
+    if (body) {
+        const btns = body.querySelectorAll('.game-btn');
         btns.forEach(b => { b.disabled = true; });
         const last = btns[btns.length - 1];
         if (last) last.innerHTML = `<span id="adv-wait">준비 중...</span>`;
-    
     }
+}
     function abortDarkRunNoPenalty() {
         if (!darkRun) return;
         const z = DARK_ZONES[darkRun.zone];
@@ -5559,7 +5573,7 @@ if (bcEl) {
             const resized = canvas.toDataURL('image/jpeg', 0.7);
             currentUser.badge.photo = resized;
             renderBadgePhoto(resized);
-            saveDB();
+            saveFields({ badge: 1 });
         };
         img.src = e.target.result;
     };
@@ -5570,7 +5584,7 @@ if (bcEl) {
     currentUser.badge.nickname = document.getElementById('badge-nickname').value.trim();
     currentUser.badge.gender = document.getElementById('badge-gender').value;
     currentUser.badge.posTag = document.getElementById('badge-position-tag').value;
-    saveDB();
+   saveFields({ badge: 1 });
 }
 
     function getSellPrice(itemName) {
@@ -5996,7 +6010,7 @@ if (isUsable) {
     currentUser.gearAwakened = true;
     removeItemFromInventory(currentUser, itemName, 1);
     addHistoryLog(currentUser, `[각성] '${g.name}'의 한계가 풀렸습니다. L등급 승급이 가능합니다.`);
-    if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+    saveSelfFull();
     updateUI();
     showCustomAlert('무언가가 풀리는 소리가 났습니다.\n\n이제 L등급으로 올릴 수 있습니다.');
     return;
@@ -6018,7 +6032,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.gearGuarantee = true;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[조합품 사용] 확정 승인서 — 다음 강화 확정 성공`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('도장이 찍혔습니다.\n다음 강화는 반드시 성공합니다.');
             return;
@@ -6031,7 +6045,7 @@ if (cat.effect === 'couple_ring') {
             g.slots = 3;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[조합품 사용] 세 번째 자리`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('자리가 하나 더 생겼습니다.\n소지품 탭에서 속성을 선택하세요.');
             return;
@@ -6042,7 +6056,7 @@ if (cat.effect === 'couple_ring') {
             else addPendingFlag('chant_bonus', true);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 같은 문장`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('입에 붙습니다.\n다음 탐사에서 눈에 덜 띕니다.');
             return;
@@ -6053,7 +6067,7 @@ if (cat.effect === 'couple_ring') {
             else addPendingFlag('deep_air', true);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 삼키지 못한 공기`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('숨이 트입니다.\n다음 심해 탐사에서 인간성이 20 높은 채로 시작합니다.');
             return;
@@ -6063,7 +6077,7 @@ if (cat.effect === 'couple_ring') {
             else addPendingFlag('deep_id', true);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 젖지 않은 사원증`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('사원증을 품에 넣었습니다.\n잊어도 한 번은 되돌릴 수 있습니다.');
             return;
@@ -6073,7 +6087,7 @@ if (cat.effect === 'couple_ring') {
             else addPendingFlag('deep_anchor', true);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 위에서 떨어진 것`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('무게가 손에 익습니다.\n다음 심해 탐사에서 수압이 절반으로 느껴집니다.');
             return;
@@ -6084,7 +6098,7 @@ if (cat.effect === 'couple_ring') {
             else { addPendingFlag('paw_guard', true); }
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[아이템 사용] 따라온 발소리`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('발소리가 뒤에 붙었습니다.\n다음 위험을 한 번 대신 받아 줍니다.');
             return;
@@ -6098,7 +6112,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.gearProtect = true;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 파손 보호권 — 다음 강화 실패 시 등급이 보존됩니다.`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('보호권이 장비에 스몄습니다.\n다음 강화 실패 시 등급이 내려가지 않습니다.');
             return;
@@ -6131,7 +6145,7 @@ if (cat.effect === 'couple_ring') {
             if (currentUser.gearPolish > 0.30) currentUser.gearPolish = 0.30;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 각인 연마제 — 강화 확률 +${Math.round(currentUser.gearPolish * 100)}%`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(`날을 갈았습니다.\n다음 강화 확률이 ${Math.round(currentUser.gearPolish * 100)}% 올랐습니다. (최대 30%)`);
             return;
@@ -6187,7 +6201,7 @@ if (cat.effect === 'couple_ring') {
             const bonus = currentUser.gearPolish || 0;
             const rate = Math.min(0.99, up.rate + bonus);
             removeItemFromInventory(currentUser, itemName, 1);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(
                 `[감정 결과]\n\n` +
@@ -6216,7 +6230,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.gearBroken = false;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 재봉 도구 — '${g.name}'이(가) ${g.grade}등급으로 복구되었습니다.`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert(`꿰맨 자리가 원래보다 단단합니다.\n${g.grade}등급으로 돌아왔습니다.`);
             return;
@@ -6229,7 +6243,7 @@ if (cat.effect === 'couple_ring') {
             currentUser.gearBlank = true;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 빈 각인지 — 다음 속성이 한 단계 높게 새겨집니다.`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser); else saveDB();
+            saveSelfFull();
             updateUI();
             showCustomAlert('종이가 장비에 붙었습니다.\n다음에 새길 속성이 한 단계 강해집니다.');
             return;
@@ -7496,8 +7510,9 @@ function bjSwap(idx) {
 
  
         // 1. 포인트 및 횟수 최종 차감
-        currentUser.points -= seotdaBet;
-        currentUser.facilityCount += 1;
+       changePoints(-seotdaBet);
+currentUser.facilityCount += 1;
+saveFields({ facilityCount:1 });
 
         // 2. 족보 계산
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
@@ -7527,7 +7542,7 @@ function bjSwap(idx) {
         } else if (pRes.score < dRes.score) {
             msgEl.innerHTML = `<span style="color:#f44336;">[패배] 시스템(${dRes.name})에게 패배했습니다. (-${seotdaBet} P)</span>`;
             addHistoryLog(currentUser, `[섯다 패배] ${pRes.name} vs 딜러 ${dRes.name} (-${seotdaBet} P)`);
-            saveDB(); updateUI();
+            
          } else {
             const refund = Math.floor(seotdaBet / 2);
             winPoints(refund);
@@ -8668,39 +8683,91 @@ function bjFinish(mode) {
         saveFields({ points:1, inventory:1, history:1, alienBoughtItems:1 });
         updateUI();
     }
-    function useFacility(bet) {
+function useFacility(bet) {
     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return false; }
     if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
-    if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
+    if (!currentUser.facilityMax) currentUser.facilityMax = 20;
     if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
     if (currentUser.points < bet) { showLuxuryAlert(); return false; }
-    currentUser.points -= bet; 
+
+    changePoints(-bet);
     currentUser.facilityCount += 1;
     if (currentUser.code !== 'kario0987') {
         currentUser.satiety = Math.max(0, (currentUser.satiety != null ? currentUser.satiety : 100) - 3);
     }
-    addPollution(2); 
-    saveFields({ points:1, facilityCount:1, satiety:1 });
+    addPollution(2);
+    saveFields({ facilityCount:1, satiety:1 });
     return true;
 }
 
-   function winPoints(amount) {
-    amount = Math.floor(amount);
-    currentUser.points = Math.min(POINT_CAP, currentUser.points + amount);
-    saveDB();
+function changePoints(delta) {
+    if (!currentUser) return;
+    currentUser.points = Math.max(0, Math.min(POINT_CAP, (currentUser.points || 0) + delta));
+    if (database) {
+        const stamp = stampNow();
+        database.ref(`users/${currentUser.code}/points`).transaction(p => {
+            const base = (p == null) ? currentUser.points : p;
+            return Math.max(0, Math.min(POINT_CAP, base + delta));
+        });
+        database.ref(`users/${currentUser.code}/_adminStamp`).set(stamp);
+    }
     updateUI();
+}
+
+ function winPoints(amount) {
+    amount = Math.floor(amount);
+    changePoints(amount);
     showPointGainEffect(amount);
+}
+
+function stampNow() {
+    const t = Date.now();
+    if (currentUser) currentUser._adminStamp = t;
+    return t;
 }
 
 function saveFields(fields) {
     if (!database || !currentUser) { saveDB(); return; }
+    const stamp = stampNow();
     const updates = {};
-    Object.keys(fields).forEach(k => {
-        updates[`users/${currentUser.code}/${k}`] = currentUser[k];
-    });
-    updates[`users/${currentUser.code}/_adminStamp`] = Date.now();
-    database.ref('/').update(updates);
+    Object.keys(fields).forEach(k => { updates[`users/${currentUser.code}/${k}`] = currentUser[k]; });
+    updates[`users/${currentUser.code}/_adminStamp`] = stamp;
+
+    pendingSaves++;
+    database.ref('/').update(updates)
+        .catch(e => console.error('저장 실패:', e))
+        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
 }
+
+// 남(또는 나)의 특정 필드만 저장
+function updateUserFields(code, fields) {
+    if (!database) { saveDB(); return Promise.resolve(); }
+    const stamp = Date.now();
+    fields._adminStamp = stamp;
+
+    if (currentUser && code === currentUser.code) {
+        currentUser._adminStamp = stamp;          // ★ 내 계정이면 로컬 스탬프도 맞춤
+        pendingSaves++;
+        return database.ref('users/' + code).update(fields)
+            .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+    }
+    return database.ref('users/' + code).update(fields);
+}
+
+// 내 행동으로 바뀐 것 전부 저장 (편지·알림만 제외)
+function saveSelfFull() {
+    if (!database || !currentUser) return Promise.resolve();
+    const SKIP = ['letters','hasNewLetter','hasNewReply','hasItemUsedOnMe','houseChatUnread'];
+    const stamp = stampNow();
+    const payload = {};
+    Object.keys(currentUser).forEach(k => { if (!SKIP.includes(k)) payload[k] = currentUser[k]; });
+    payload._adminStamp = stamp;
+    pendingSaves++;
+    return database.ref('users/' + currentUser.code).update(payload)
+        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+}
+
+
 
     function checkVIPStatus() {
         const deniedBox = document.getElementById('vip-denied-box');
