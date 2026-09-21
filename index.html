@@ -2639,9 +2639,7 @@ if (darkRun.zone === 'Qtrew-S-010' || darkRun.zone === 'Qtrew-S-003') {
         mountDarkChat('normal');
     }
 
-    // 다음 단계로 (방장만 신호, 전원 동기화)
 
-        let _advLock = 0;
 
 // let _advLock = 0;   ← 삭제
 
@@ -3774,8 +3772,7 @@ return b;
             darkRun.fail = Math.max(0, darkRun.fail - 1);
             applyPollutionToUser(currentUser, 6);
             addHistoryLog(currentUser, `[보안팀 의상] 치명적 상황에서 살아남았습니다. (일 1회)`);
-            if (database) database.ref('users/' + currentUser.code).set(currentUser);
-            else saveDB();
+saveSelfFull();
 
               darkRun._dead = false;   
 
@@ -6449,15 +6446,11 @@ if (cat.effect === 'couple_ring') {
         let usedSuccessfully = applyItemEffect(currentUser, itemName, false);
 
             if (usedSuccessfully) {
-            currentUser.noteGlowUntil = Date.now() + 5000;
-            removeItemFromInventory(currentUser, itemName, 1);
-            addHistoryLog(currentUser, `[물품 사용] ${itemName} 소모`);
-            if (database) {
-                database.ref('users/' + currentUser.code).set(currentUser).then(() => updateUI());
-            } else {
-                saveDB(); updateUI();
-            }
-        }
+    currentUser.noteGlowUntil = Date.now() + 5000;
+    removeItemFromInventory(currentUser, itemName, 1);
+    addHistoryLog(currentUser, `[물품 사용] ${itemName} 소모`);
+    saveSelfFull().then(() => updateUI());
+}
     }
     function applyItemEffect(targetUser, itemName, isOthers = false) {
         const cat = ITEM_CATALOG[itemName];
@@ -6632,9 +6625,7 @@ else if (cat.effect === 'rainbow_potion') {
                         const regularPool = ALL_10_ITEMS.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
             const alienPool = ALIEN_ITEMS_POOL.filter(k => k !== "랜덤박스" && k !== "여우구슬" && k !== "사직서" && k !== "금고");
 
-                            targetUser._adminStamp = Date.now();
-                if (database) database.ref('users/' + targetUser.code).set(targetUser);
-           
+                            
 
                 
             // 2. 가중치 추첨 내부 함수 (가격이 비쌀수록 획득 확률이 기하급수적으로 감소)
@@ -6859,12 +6850,11 @@ else if (cat.effect === 'slave_contract') {
         else if (cat.effect === 'persimmon_potion') {
     const applyCostume = (costume) => {
         addTimedEffect(targetUser, '곶감맛 물약', `${costume} 착용 상태`, 72);
-        targetUser._adminStamp = Date.now();
-        if (database) {
-            database.ref('users/' + targetUser.code).set(targetUser);
-            database.ref('users/' + currentUser.code).set(currentUser);
-        }
-        updateUI();
+        if (targetUser.code !== currentUser.code) {
+    updateUserFields(targetUser.code, { timedEffects: targetUser.timedEffects, hasItemUsedOnMe: true });
+}
+saveSelfFull();
+updateUI();
         showCustomAlert(`${isOthers ? targetUser.name + '님이 ' : ''}${costume}을(를) 입었습니다.`);
     };
 
@@ -6890,10 +6880,10 @@ else if (cat.effect === 'pomegranate_potion') {
 
     const finish = (name, desc) => {
         victim.timedEffects.push({ name: name, desc: desc, expireAt: Date.now() + 72 * 60 * 60 * 1000 });
-        victim._adminStamp = Date.now();
-        victim.hasItemUsedOnMe = true;
-        addHistoryLog(victim, `[석류맛 물약] 누군가 던진 물약이 당신에게 닿았습니다. (${name})`);
-        if (database) database.ref('users/' + victimCode).set(victim);
+victim.hasItemUsedOnMe = true;
+addHistoryLog(victim, `[석류맛 물약] 누군가 던진 물약이 당신에게 닿았습니다. (${name})`);
+if (victimCode === currentUser.code) saveSelfFull();
+else updateUserFields(victimCode, { timedEffects: victim.timedEffects, history: victim.history, hasItemUsedOnMe: true });
         updateUI();
         showCustomAlert(`${victim.name} 님에게 적용되었습니다.\n\n${name}\n${desc}`);
     };
@@ -6929,11 +6919,11 @@ else if (cat.effect === 'pomegranate_potion') {
             const applyCherry = (part) => {
                 addTimedEffect(targetUser, '체리맛 물약', `${part} 부위가 예민하게 개발됨`, 72);
                 targetUser._adminStamp = Date.now();
-                if (database) {
-                    database.ref('users/' + targetUser.code).set(targetUser);
-                    database.ref('users/' + currentUser.code).set(currentUser);
-                }
-                updateUI();
+                if (targetUser.code !== currentUser.code) {
+    updateUserFields(targetUser.code, { timedEffects: targetUser.timedEffects, hasItemUsedOnMe: true });
+}
+saveSelfFull();
+updateUI();
                 showCustomAlert(`${isOthers ? targetUser.name + '님의 ' : ''}${part} 부위에 효과가 적용되었습니다.`);
             };
 
@@ -9843,11 +9833,9 @@ function adminGiveItem() {
             detachHouseChat();
             checkPassivePollution(currentUser); 
             checkMedRations(currentUser); 
-                       if (applySafeInterest(currentUser)) {
-                currentUser._adminStamp = Date.now();
-                if (database) database.ref('users/' + currentUser.code).set(currentUser);
-                else saveDB();
-            }
+             if (applySafeInterest(currentUser)) {
+              saveSelfFull();
+        }
             checkP2PExpiration();
             watchDuelInvites();
             watchDuelLogs();

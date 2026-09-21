@@ -8599,8 +8599,8 @@ if (isFood) {
         const r = getRoomie(currentUser);
         if (r) {
             addHistoryLog(r, `[사택] ${currentUser.name} 사원이 호실에서 이상한 일을 겪었습니다.`);
-            r._adminStamp = Date.now();
-            if (database) database.ref('users/' + r.code).set(r);
+            updateUserFields(r.code, { pollution: r.pollution, history: r.history });
+            saveSelfFull();
         }
 
        saveSelfFull();
