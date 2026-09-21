@@ -14229,6 +14229,265 @@ function s003DC(base) {
     return base + 6;
 }
 
+// ==========================================
+// ★ S-003 공통 기믹
+// ==========================================
+
+// 공통 판정기
+function s003Resolve(title, cfg, pick) {
+    const o = cfg[pick];
+    if (!o || !darkRun) return;
+
+    // 배역 금기
+    if (o.taboo && o.taboo.includes(darkRun.taleRole)) {
+        breakTaboo(o.tabooWhy || pick);
+        if (!darkRun || darkRun._dead) return;
+    }
+
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = rollDarkBonus(o.kind || 'sense') + (o.extra ? o.extra() : 0);
+    const DC = s003DC(o.dc);
+    const ok = roll !== 1 && (roll + bonus) >= DC;
+
+    if (o.lore) addLore(o.lore, title);
+
+    if (ok) {
+        darkRun.success++;
+        if (o.mod) darkRun.modifier = (darkRun.modifier || 0) + o.mod;
+        if (o.onOk) o.onOk();
+    } else {
+        darkRun.fail++;
+        addLore(o.failLore || 6, `${title} 실패`);
+        applyPollutionToUser(currentUser, o.failPoll || 6);
+        if (o.onFail) o.onFail();
+    }
+
+    darkRun.log.push(`[${title}] ${pick} d20 ${roll} vs DC${DC}`);
+    s003Result(`${title} — 결과`, roll, bonus, DC, ok, ok ? o.okTxt : o.failTxt);
+}
+
+const gGaze  = () => gearValue(currentUser, 'gaze');
+const gEvade = () => Math.round(gearValue(currentUser, 'evade') * 14);
+const gBreak = () => gearValue(currentUser, 'break') * 2;
+const gHeal  = () => Math.round(gearValue(currentUser, 'heal') * 12);
+const gLuck  = () => Math.round(gearValue(currentUser, 'luck') * 14);
+
+// --- 기믹 1: 첫 장 (응시) ---
+const S003_G1 = {
+    read: { dc: 11, kind: 'sense', extra: gGaze, lore: 6, mod: 1,
+        okTxt: `끝까지 읽는다.<br><br>문장이 끝나는 곳에서 종이가 스스로 넘어간다.<br>무슨 내용이었는지는 벌써 흐릿하다. 다만 손끝이 기억한다.`,
+        failTxt: `읽다가 멈춘다.<br><br>세 번째 줄에서 내 이름이 나왔다. 틀린 철자로.<br>고쳐 읽으려는 순간 글자가 한 칸씩 밀려난다.` },
+    look: { dc: 9, kind: 'sense', extra: gGaze,
+        okTxt: `글자는 건너뛰고 그림만 본다.<br><br>그림 속 인물들이 전부 같은 쪽을 가리키고 있다.<br>그쪽으로 종이가 넘어간다.`,
+        failTxt: `그림을 오래 봤다.<br><br>그림 속 인물 하나가 손가락을 거둔다.<br>대신 이쪽을 가리킨다.` },
+    close: { dc: 12, kind: 'sense', extra: gGaze, failLore: 10,
+        okTxt: `눈을 감고 넘긴다.<br><br>종이가 손가락을 한 번 붙잡았다가 놓아준다.<br>눈을 떴을 땐 이미 다음 장이다.`,
+        failTxt: `눈을 감은 동안 누군가 읽어 주었다.<br><br>귀에 대고, 아주 작게.<br>무슨 내용인지 알아버렸다.` }
+};
+function s003G1() {
+    renderChoiceStep("기믹 1 — 첫 장",
+        `첫 장이 넘어가지 않는다.<br><br>
+         종이가 두껍고 축축하다. 글자가 번져 있는데, 번진 방향이 이상하다.<br>
+         바깥쪽이 아니라 안쪽으로 번졌다.<br><br>
+         읽으라는 것 같다. 읽으면 안 될 것 같기도 하다.<br><br>
+         <span style="color:#888; font-size:11px;">❂ 응시가 유리합니다.</span>`,
+        [
+            { id:'read',  label:'① 끝까지 읽는다.',          fn:'s003G1R', arg:'read' },
+            { id:'look',  label:'② 그림만 본다.',            fn:'s003G1R', arg:'look' },
+            { id:'close', label:'③ 눈을 감고 넘긴다.',        fn:'s003G1R', arg:'close' }
+        ], null);
+}
+function s003G1R(pick) { s003Resolve("기믹 1", S003_G1, pick); }
+
+// --- 기믹 2: 삽화 (감각) ---
+const S003_G2 = {
+    follow: { dc: 11, kind: 'sense', mod: 1,
+        okTxt: `삽화를 따라간다.<br><br>세 번 옮겨 가더니 멈춘다. 멈춘 자리 아래에 계단이 있다.<br>그림이 길을 알려 준 것이다. 왜 그랬는지는 모르겠다.`,
+        failTxt: `따라가다 보니 원래 자리다.<br><br>삽화는 제자리에 떠 있다. 그림 속 인물이 조금 웃는다.<br>한 바퀴 돈 동안 무언가 빠져나갔다.` },
+    wait: { dc: 9, kind: 'sense',
+        okTxt: `움직이지 않는다.<br><br>삽화가 먼저 지친다. 천천히 내려앉아 바닥의 그림이 된다.<br>그 위를 밟고 지나간다.`,
+        failTxt: `기다린다. 한참을.<br><br>삽화 속 인물이 한 명 늘었다.<br>옷차림이 낯익다.` },
+    grab: { dc: 10, kind: 'sense', mod: 1, failPoll: 9,
+        okTxt: `액자 가장자리를 붙잡는다.<br><br>그림이 버둥거리다 멈춘다.<br>뒷면에 연필로 적힌 글씨. <span style="color:#d4af37;">"다음 장은 왼쪽"</span>`,
+        failTxt: `붙잡는 순간 손이 그림 안으로 들어간다.<br><br>빼내는 데 시간이 걸렸다.<br>손등에 물감이 묻었는데, 씻어도 안 지워진다.` }
+};
+function s003G2() {
+    renderChoiceStep("기믹 2 — 삽화",
+        `삽화가 떠 있다.<br><br>
+         다가가면 한 칸 옆으로 옮겨 간다. 그림 속에서 누가 이쪽을 보고 있다.<br>
+         붙잡으려면 빨라야 하고, 놓치면 계속 따라가게 된다.<br><br>
+         <span style="color:#888; font-size:11px;">◈ 감각이 유리합니다.</span>`,
+        [
+            { id:'follow', label:'① 따라간다.',                fn:'s003G2R', arg:'follow' },
+            { id:'wait',   label:'② 멈춰서 기다린다.',          fn:'s003G2R', arg:'wait' },
+            { id:'grab',   label:'③ 액자 가장자리를 붙잡는다.',  fn:'s003G2R', arg:'grab' }
+        ], null);
+}
+function s003G2R(pick) { s003Resolve("기믹 2", S003_G2, pick); }
+
+// --- 기믹 3: 목차 (연결) ---
+const S003_G3 = {
+    call: { dc: 9, kind: 'rejoin', mod: 2, taboo: ['ariel'], tabooWhy: '소리를 냄',
+        okTxt: `서로의 이름을 부른다. 배역 이름이 아니라 진짜 이름을.<br><br>목차의 챕터 제목이 하나씩 고쳐진다.<br>제대로 된 이름으로.`,
+        failTxt: `이름을 부르는데 목소리가 겹친다.<br><br>누가 누구를 불렀는지 알 수 없다.<br>목차가 한 줄씩 지워진다.` },
+    hold: { dc: 10, kind: 'rejoin', mod: 2,
+        okTxt: `손을 잡는다. 전원이.<br><br>그 상태로 장을 넘긴다. 넘어가는 동안 아무도 흩어지지 않았다.<br>같은 페이지에 도착했다.`,
+        failTxt: `잡은 손이 미끄러진다.<br><br>종이가 넘어가는 순간 한 사람이 다른 장에 떨어졌다.<br>곧 돌아왔지만, 표정이 조금 달라져 있었다.` },
+    self: { dc: 12, kind: 'rejoin', lore: 6,
+        okTxt: `자기 챕터를 찾아간다.<br><br>페이지 번호가 맞다. 내 이야기가 거기 있다.<br>다 읽지는 않았다. 결말은 아직 안 적혀 있었다.`,
+        failTxt: `자기 챕터를 찾는데 번호가 어긋난다.<br><br>다른 사람의 장에 들어갔다.<br>거기서 본 결말을 잊을 수가 없다.` }
+};
+function s003G3() {
+    renderChoiceStep("기믹 3 — 목차",
+        `목차가 펼쳐져 있다.<br><br>
+         챕터 제목이 전부 사람 이름이다. 우리 이름이다. 배역 이름과 나란히.<br>
+         페이지 번호가 조금씩 어긋나 있다. 같은 장을 가리키는 게 없다.<br><br>
+         이대로 넘기면 각자 다른 장으로 흩어질 것 같다.<br><br>
+         <span style="color:#888; font-size:11px;">⊙ 연결이 유리합니다.</span>`,
+        [
+            { id:'call', label:'① 서로 이름을 불러 확인한다.', fn:'s003G3R', arg:'call' },
+            { id:'hold', label:'② 손을 잡고 함께 넘긴다.',    fn:'s003G3R', arg:'hold' },
+            { id:'self', label:'③ 자기 챕터만 찾아간다.',     fn:'s003G3R', arg:'self' }
+        ], null);
+}
+function s003G3R(pick) { s003Resolve("기믹 3", S003_G3, pick); }
+
+// --- 기믹 4: 길 (회피) ---
+const S003_G4 = {
+    run: { dc: 11, kind: 'hide', extra: gEvade, mod: 1,
+        okTxt: `달린다.<br><br>뒤에서 길이 접혀 올라온다. 발뒤꿈치 바로 뒤까지.<br>마지막 벽돌에서 뛰었다. 착지했을 땐 다음 문단이었다.`,
+        failTxt: `달리다가 벽돌 하나가 빠진다.<br><br>그 아래에도 같은 길이 있다.<br>한 층 내려간 셈이다. 다시 올라오는 데 시간이 걸렸다.` },
+    brick: { dc: 10, kind: 'hide', extra: gEvade,
+        okTxt: `노란 벽돌만 골라 밟는다.<br><br>빠진 자리를 피해서. 천천히.<br>길이 접히는 속도보다 아주 조금 빨랐다.`,
+        failTxt: `색이 바랜 벽돌을 밟았다.<br><br>노란색이 아니었다. 원래 노란색이었던 것이었다.<br>발목까지 빠졌다.` },
+    off: { dc: 8, kind: 'hide', extra: gEvade, taboo: ['hood'], tabooWhy: '길을 벗어남', failLore: 8,
+        okTxt: `길 밖으로 뛴다.<br><br>여백에 떨어졌다. 아무것도 없는 흰 곳.<br>길이 알아서 지나가고, 다시 내려온다.`,
+        failTxt: `길 밖으로 뛰었는데 착지할 곳이 없다.<br><br>여백은 바닥이 아니었다.<br>누가 손을 뻗어 끌어올렸다.` }
+};
+function s003G4() {
+    renderChoiceStep("기믹 4 — 길",
+        `길이 접힌다.<br><br>
+         뒤쪽부터 종이처럼 접혀 올라온다. 접힌 자리는 다시 펴지지 않는다.<br>
+         앞쪽은 노란 벽돌. 군데군데 빠져 있다.<br><br>
+         <span style="color:#888; font-size:11px;">✦ 회피가 유리합니다.</span>`,
+        [
+            { id:'run',   label:'① 전력으로 달린다.',         fn:'s003G4R', arg:'run' },
+            { id:'brick', label:'② 벽돌만 골라 밟는다.',       fn:'s003G4R', arg:'brick' },
+            { id:'off',   label:'③ 길 밖으로 뛰어내린다.',     fn:'s003G4R', arg:'off' }
+        ], null);
+}
+function s003G4R(pick) { s003Resolve("기믹 4", S003_G4, pick); }
+
+// --- 기믹 5: 차 마시기 (은신) ---
+const S003_G5 = {
+    pretend: { dc: 10, kind: 'hide', mod: 1,
+        okTxt: `잔을 들고 입에 대는 척만 한다.<br><br>모자 쓴 것이 만족스럽게 고개를 끄덕인다.<br>다음 자리로 옮기라는 손짓. 그대로 빠져나온다.`,
+        failTxt: `입에 대는 척했는데 입술이 젖었다.<br><br>차는 없었는데 젖었다.<br>무슨 맛이었는지는 말하고 싶지 않다.` },
+    move: { dc: 11, kind: 'hide',
+        okTxt: `모두가 자리를 옮길 때 같이 옮긴다.<br><br>한 칸씩. 규칙대로.<br>세 번째 옮겼을 때 탁자 끝에 문이 있었다.`,
+        failTxt: `자리를 옮기다 빈 의자에 앉았다.<br><br>앉자마자 의자가 기뻐했다.<br>일어나는 데 한참 걸렸다.` },
+    answer: { dc: 8, kind: 'hide', taboo: ['alice'], tabooWhy: '질문에 답함', lore: 5,
+        okTxt: `"제 차례입니다."<br><br>모자 쓴 것이 박수를 친다. 정답이라는 뜻이다.<br>차를 따라 주고, 문을 가리킨다.`,
+        failTxt: `"제 차례입니다."<br><br>틀렸다. 차례는 아까 지나갔다.<br>빈 의자가 하나 줄었다.` }
+};
+function s003G5() {
+    renderChoiceStep("기믹 5 — 차 마시기",
+        `탁자가 차려져 있다. 의자가 인원보다 두 개 많다.<br><br>
+         모자 쓴 것이 찻주전자를 든다. 차는 없는데 김이 오른다.<br>
+         <span style="color:#d4af37;">"누구 차례지?"</span><br><br>
+         다들 조용하다. 대답하는 쪽이 지는 것 같다.<br><br>
+         <span style="color:#888; font-size:11px;">◐ 은신이 유리합니다.</span>`,
+        [
+            { id:'pretend', label:'① 마시는 척한다.',          fn:'s003G5R', arg:'pretend' },
+            { id:'move',    label:'② 다 같이 자리를 옮긴다.',   fn:'s003G5R', arg:'move' },
+            { id:'answer',  label:'③ "제 차례입니다." 라고 답한다.', fn:'s003G5R', arg:'answer' }
+        ], null);
+}
+function s003G5R(pick) { s003Resolve("기믹 5", S003_G5, pick); }
+
+// --- 기믹 6: 삼켜진 장 (파괴) ---
+const S003_G6 = {
+    tear: { dc: 11, kind: 'sense', extra: gBreak, mod: 1,
+        okTxt: `찢는다. 한 장, 두 장.<br><br>찢긴 틈으로 바깥 문단이 보인다.<br>종이 조각이 손에 한참 붙어 있었다.`,
+        failTxt: `찢으려는데 종이가 늘어난다.<br><br>찢기는 게 아니라 늘어난다. 살처럼.<br>손을 뗐다. 손바닥에 글자가 찍혀 있다.` },
+    burn: { dc: 10, kind: 'sense', extra: gBreak, lore: 4, failPoll: 10,
+        okTxt: `불을 붙인다.<br><br>생각보다 잘 탄다. 타면서 문장을 읊는 소리가 난다.<br>다 타기 전에 빠져나왔다.`,
+        failTxt: `불이 붙었다. 너무 잘 붙었다.<br><br>연기에서 글자 냄새가 난다.<br>들이마신 만큼 알게 됐다.` },
+    squeeze: { dc: 12, kind: 'sense', extra: gBreak,
+        okTxt: `페이지 사이의 틈을 찾는다.<br><br>얇다. 숨을 내쉬고 옆으로 비집는다.<br>빠져나왔을 때 옷에 글자가 몇 개 묻어 있었다.`,
+        failTxt: `틈에 끼었다.<br><br>앞뒤로 문장이 짓누른다.<br>한참 버둥거린 뒤에야 빠져나왔다.` }
+};
+function s003G6() {
+    renderChoiceStep("기믹 6 — 삼켜진 장",
+        `사방이 종이다.<br><br>
+         페이지들이 뭉쳐서 벽이 됐다. 축축하고, 미지근하다.<br>
+         무언가의 배 속 같다. 늑대인지 고래인지는 모르겠다.<br><br>
+         벽이 아주 천천히 조여 온다.<br><br>
+         <span style="color:#888; font-size:11px;">✧ 파괴가 유리합니다.</span>`,
+        [
+            { id:'tear',    label:'① 찢고 나간다.',          fn:'s003G6R', arg:'tear' },
+            { id:'burn',    label:'② 불을 붙인다.',          fn:'s003G6R', arg:'burn' },
+            { id:'squeeze', label:'③ 틈을 찾아 비집는다.',    fn:'s003G6R', arg:'squeeze' }
+        ], null);
+}
+function s003G6R(pick) { s003Resolve("기믹 6", S003_G6, pick); }
+
+// --- 기믹 7: 이름 부르기 (치유) ---
+const S003_G7 = {
+    real: { dc: 10, kind: 'sense', extra: gHeal, mod: 1, taboo: ['ariel'], tabooWhy: '소리를 냄',
+        onOk: () => addLore(-8, '진짜 이름'),
+        okTxt: `진짜 이름을 부른다.<br><br>흐려지던 윤곽이 멈춘다. 그리고 천천히 돌아온다.<br>이쪽 이름도 조금 선명해졌다.`,
+        failTxt: `진짜 이름을 부르는데, 혀가 꼬인다.<br><br>배역 이름이 먼저 나왔다.<br>윤곽이 한 번 더 흐려진다.` },
+    role: { dc: 8, kind: 'sense', extra: gHeal, lore: 10,
+        okTxt: `배역 이름으로 부른다.<br><br>대답이 온다. 아주 자연스럽게.<br>돌아오긴 했다. 다만 그 이름으로 돌아왔다.`,
+        failTxt: `배역 이름으로 불렀다.<br><br>대답은 왔는데, 목소리가 다르다.<br>이야기 속 목소리다.` },
+    hold: { dc: 11, kind: 'sense', extra: gHeal, mod: 1,
+        okTxt: `말없이 손을 잡는다.<br><br>손은 흐려지지 않는다. 손만은 끝까지 남아 있었다.<br>그걸 붙잡고 기다리니 나머지도 돌아왔다.`,
+        failTxt: `손을 잡았는데 손이 종이 같다.<br><br>너무 세게 잡으면 찢어질 것 같아서 힘을 뺐다.<br>그 틈에 조금 더 흐려졌다.` }
+};
+function s003G7() {
+    renderChoiceStep("기믹 7 — 이름 부르기",
+        `한 사람의 윤곽이 흐려진다.<br><br>
+         책이 그 사람을 배역 이름으로만 부르기 시작했다.<br>
+         진짜 이름이 한 글자씩 지워지고 있다.<br><br>
+         붙잡으려면 불러야 한다. 어떤 이름으로 부를지 정해야 한다.<br><br>
+         <span style="color:#888; font-size:11px;">❋ 치유가 유리합니다.</span>`,
+        [
+            { id:'real', label:'① 진짜 이름을 부른다.',     fn:'s003G7R', arg:'real' },
+            { id:'role', label:'② 배역 이름으로 부른다.',   fn:'s003G7R', arg:'role' },
+            { id:'hold', label:'③ 말없이 손을 잡는다.',     fn:'s003G7R', arg:'hold' }
+        ], null);
+}
+function s003G7R(pick) { s003Resolve("기믹 7", S003_G7, pick); }
+
+// --- 기믹 8: 마지막 장 (행운) ---
+const S003_G8 = {
+    back: { dc: 10, kind: 'sense', extra: gLuck, mod: 2,
+        onOk: () => addLore(-6, '돌아온 문장'),
+        okTxt: `"그리고 모두 돌아왔다."<br><br>문장이 종이에 스며든다. 거부당하지 않았다.<br>책이 조금 가벼워졌다.`,
+        failTxt: `"그리고 모두 돌아왔다."<br><br>문장이 튕겨 나온다. 이 책의 문장이 아니라는 듯이.<br>대신 다른 문장이 그 자리에 적힌다.` },
+    forget: { dc: 10, kind: 'sense', extra: gLuck, mod: 2,
+        okTxt: `"그리고 아무도 기억하지 않았다."<br><br>종이가 조용해진다. 만족한 것 같다.<br>기억하지 않는 것도 끝이긴 하다.`,
+        failTxt: `"그리고 아무도 기억하지 않았다."<br><br>적는 순간 옆 사람 이름이 떠오르지 않는다.<br>한참 뒤에야 돌아왔다.` },
+    goon: { dc: 10, kind: 'sense', extra: gLuck, mod: 2, lore: 6,
+        okTxt: `"그리고 이야기는 계속되었다."<br><br>책이 웃는 소리가 난다.<br>그래도 이번 장은 여기서 끝이다. 계속되는 건 다음 사람의 몫이다.`,
+        failTxt: `"그리고 이야기는 계속되었다."<br><br>종이가 한 장 더 생긴다. 또 한 장.<br>끝이 멀어진다.` }
+};
+function s003G8() {
+    renderChoiceStep("기믹 8 — 마지막 장",
+        `결말 바로 앞 장이다.<br><br>
+         빈 줄이 하나 있고, 그 옆에 문장 세 개가 연필로 흐리게 적혀 있다.<br>
+         그중 하나가 원래 이 자리에 있던 문장이다.<br><br>
+         어느 것인지는 적혀 있지 않다. 고르는 수밖에 없다.<br><br>
+         <span style="color:#888; font-size:11px;">✺ 행운이 유리합니다.</span>`,
+        [
+            { id:'back',   label:'① "그리고 모두 돌아왔다."',          fn:'s003G8R', arg:'back' },
+            { id:'forget', label:'② "그리고 아무도 기억하지 않았다."',  fn:'s003G8R', arg:'forget' },
+            { id:'goon',   label:'③ "그리고 이야기는 계속되었다."',     fn:'s003G8R', arg:'goon' }
+        ], null);
+}
+function s003G8R(pick) { s003Resolve("기믹 8", S003_G8, pick); }
+
 function renderS003Vote(n) {
     if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
 
