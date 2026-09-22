@@ -2754,17 +2754,30 @@ function partyAdvance(nextStep) {
 function renderAdvanceWait(nextStep) {
     const pid = darkRun.partyId;
     const ref = database.ref(`darkParties/${pid}/ready${nextStep}`);
-    let finished = false;                      // ★ 전역 대신 클로저 플래그
+    let finished = false;
 
-           const go = () => {
+    // 화면 먼저 준비
+    const body = darkBodyEl();
+    if (body) {
+        const btns = body.querySelectorAll('.game-btn');
+        btns.forEach(b => { b.disabled = true; });
+        const last = btns[btns.length - 1];
+        if (last) last.innerHTML = `<span id="adv-wait">준비 중...</span>`;
+        if (!document.getElementById('adv-wait-list')) {
+            body.insertAdjacentHTML('beforeend',
+                `<div id="adv-wait-list" style="font-size:10px; color:#888; text-align:center; margin-top:6px; line-height:1.6;"></div>`);
+        }
+    }
+
+    const go = () => {
         if (finished) return;
         finished = true;
         try { ref.off(); } catch (e) {}
         if (!darkRun) return;
         darkRun._advTo = null;
 
-        if (darkRun.step >= nextStep) return;      // ★ 이미 지나간 단계면 되감지 않음
-        darkRun.step = nextStep;                   // ★ 트랜잭션보다 먼저
+        if (darkRun.step >= nextStep) return;
+        darkRun.step = nextStep;
 
         database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
             if (cur != null && cur >= nextStep) return;
@@ -2776,28 +2789,31 @@ function renderAdvanceWait(nextStep) {
 
     ref.on('value', snap => {
         if (finished || !darkRun) return;
-        const cnt = Object.keys(snap.val() || {}).length;
+        const got = snap.val() || {};
+        const cnt = Object.keys(got).length;
         const total = advTotal();
+
         const el = document.getElementById('adv-wait');
         if (el) el.innerText = `${cnt} / ${total}명 준비`;
+
+        // 아직 안 누른 사람 이름
+        const p = darkParties[pid] || {};
+        const solo = p.solo || {};
+        const waitFor = Object.keys(p.alive || {})
+            .filter(c => !got[c] && !(solo[c] && solo[c].lair))
+            .map(c => (p.members && p.members[c] && p.members[c].name) || c);
+        const wl = document.getElementById('adv-wait-list');
+        if (wl) wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
+
         if (cnt >= total) go();
     });
 
-    // 파티가 이미 먼저 넘어갔으면 즉시 따라간다
     database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
         const cur = sn.val();
         if (cur != null && cur >= nextStep) go();
     });
 
-       setTimeout(go, advTimeout(darkRun.step));                    // ★ 무조건 실행되는 안전장치
-
-    const body = darkBodyEl();
-    if (body) {
-        const btns = body.querySelectorAll('.game-btn');
-        btns.forEach(b => { b.disabled = true; });
-        const last = btns[btns.length - 1];
-        if (last) last.innerHTML = `<span id="adv-wait">준비 중...</span>`;
-    }
+    setTimeout(go, advTimeout(darkRun.step));
 }
     function abortDarkRunNoPenalty() {
         if (!darkRun) return;
