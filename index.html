@@ -3132,17 +3132,22 @@ setInterval(() => {
     if (!database || !currentUser) return;
     const now = Date.now();
     Object.values(marketPosts).forEach(p => {
-        if (!p || p.state !== 'OPEN') return;
+        if (!p || p.state !== 'OPEN' || p.seller !== currentUser.code) return;
         if (now - p.at < MARKET_TTL) return;
-        if (p.seller !== currentUser.code) return;
 
-        const updates = {};
-        updates[`market/${p.id}/state`] = 'EXPIRED';
-        if (p.type === 'sell') {
-            for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
-            updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
-        }
-        database.ref('/').update(updates);
+        database.ref('market/' + p.id).transaction(x => {
+            if (!x || x.state !== 'OPEN') return;
+            x.state = 'EXPIRED';
+            return x;
+        }).then(res => {
+            if (!res.committed) return;
+            const v = res.snapshot.val();
+            if (v.type === 'sell') {
+                for (let i = 0; i < v.qty; i++) currentUser.inventory.push(v.item);
+                saveFields({ inventory: 1 });
+                updateUI();
+            }
+        });
     });
 }, 60000);
 

@@ -8267,43 +8267,58 @@ function b508RequiredDocs() {
             </div>`;
     }
 
-    function putToStorage(itemName) {
+      function putToStorage(itemName) {
         if (!buyGuard()) return;
-        const storage = getSharedStorage();
-        if (storage.length >= HOUSE_STORAGE_MAX) { showCustomAlert('보관함이 가득 찼습니다.'); return; }
         if (!(currentUser.inventory || []).includes(itemName)) { showCustomAlert('해당 물품이 없습니다.'); return; }
+        if (!database) return;
 
-        removeItemFromInventory(currentUser, itemName, 1);
-        storage.push({ name: itemName, by: currentUser.name, byCode: currentUser.code, at: Date.now() });
-        saveSharedStorage(storage);
-        addHistoryLog(currentUser, `[사택] '${itemName}'을(를) 보관함에 넣었습니다.`);
-        saveSelfFull();
-        updateUI();
-        renderHouseStorage();
+        const ownerCode = houseStorageRef(currentUser);
+        const entry = { name: itemName, by: currentUser.name, byCode: currentUser.code, at: Date.now() };
+
+        database.ref(`users/${ownerCode}/house/storage`).transaction(arr => {
+            arr = arr ? (Array.isArray(arr) ? arr : Object.values(arr)) : [];
+            if (arr.length >= HOUSE_STORAGE_MAX) return;
+            arr.push(entry);
+            return arr;
+        }).then(res => {
+            if (!res.committed) { showCustomAlert('보관함이 가득 찼습니다.'); return; }
+            const owner = db.users[ownerCode];
+            if (owner) getHouse(owner).storage = res.snapshot.val() || [];
+            database.ref(`users/${ownerCode}/_adminStamp`).set(Date.now());   // 주인 화면 동기화
+
+            removeItemFromInventory(currentUser, itemName, 1);
+            addHistoryLog(currentUser, `[사택] '${itemName}'을(를) 보관함에 넣었습니다.`);
+            saveFields({ inventory: 1, history: 1 });
+            updateUI();
+            renderHouseStorage();
+        });
     }
 
     function takeFromStorage(idx) {
         if (!buyGuard()) return;
-        const storage = getSharedStorage();
-        const item = storage[idx];
-        if (!item) return;
+        if (!database) return;
+        const local = getSharedStorage()[idx];
+        if (!local) return;
+        const ownerCode = houseStorageRef(currentUser);
 
-        storage.splice(idx, 1);
-        currentUser.inventory.push(item.name);
-        saveSharedStorage(storage);
-        addHistoryLog(currentUser, `[사택] 보관함에서 '${item.name}'을(를) 꺼냈습니다.`);
-        saveSelfFull();
-        updateUI();
-        renderHouseStorage();
+        database.ref(`users/${ownerCode}/house/storage`).transaction(arr => {
+            arr = arr ? (Array.isArray(arr) ? arr : Object.values(arr)) : [];
+            const i = arr.findIndex(s => s && s.name === local.name && s.at === local.at && s.byCode === local.byCode);
+            if (i < 0) return;          // 이미 누가 꺼냄
+            arr.splice(i, 1);
+            return arr;
+        }).then(res => {
+            if (!res.committed) { showCustomAlert('이미 꺼내진 물건입니다.'); renderHouseStorage(); return; }
+            const owner = db.users[ownerCode];
+            if (owner) getHouse(owner).storage = res.snapshot.val() || [];
+            database.ref(`users/${ownerCode}/_adminStamp`).set(Date.now());
 
-        if (item.byCode !== currentUser.code) {
-            const owner = db.users[item.byCode];
-            if (owner) {
-                addHistoryLog(owner, `[사택] ${currentUser.name} 사원이 보관함에서 '${item.name}'을(를) 꺼냈습니다.`);
-                owner._adminStamp = Date.now();
-                if (database) database.ref('users/' + owner.code).set(owner);
-            }
-        }
+            currentUser.inventory.push(local.name);
+            addHistoryLog(currentUser, `[사택] 보관함에서 '${local.name}'을(를) 꺼냈습니다.`);
+            saveFields({ inventory: 1, history: 1 });
+            updateUI();
+            renderHouseStorage();
+        });
     }
 
         function openHouseNote() {
@@ -13184,25 +13199,23 @@ function postMarket() {
     });
 }
 
-function cancelMarket(id) {
+async function cancelMarket(id) {
+    if (!buyGuard()) return;
     if (!database) return;
-    const p = marketPosts[id];
-    if (!p || p.seller !== currentUser.code || p.state !== 'OPEN') return;
 
-    const updates = {};
-    updates[`market/${id}/state`] = 'CANCELLED';
-
-    if (p.type === 'sell') {
-        for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
-        updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
-    }
-
-    database.ref('/').update(updates).then(() => {
-        addHistoryLog(currentUser, `[장터] 등록을 내렸습니다 — ${p.item}`);
-        database.ref(`users/${currentUser.code}/history`).set(currentUser.history);
-        updateUI();
-        showCustomAlert(p.type === 'sell' ? '물품을 돌려받았습니다.' : '내렸습니다.');
+    const res = await database.ref('market/' + id).transaction(p => {
+        if (!p || p.state !== 'OPEN' || p.seller !== currentUser.code) return;
+        p.state = 'CANCELLED';
+        return p;
     });
+    if (!res.committed) { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+
+    const p = res.snapshot.val();
+    if (p.type === 'sell') for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
+    addHistoryLog(currentUser, `[장터] 등록을 내렸습니다 — ${p.item}`);
+    saveFields({ inventory: 1, history: 1 });
+    updateUI();
+    showCustomAlert(p.type === 'sell' ? '물품을 돌려받았습니다.' : '내렸습니다.');
 }
 
 async function buyMarket(id) {
