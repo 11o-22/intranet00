@@ -3001,28 +3001,38 @@ const GEAR_UPGRADE = {
         return !!(g && g.attrs && g.attrs.includes(attr));
     }
 
+        // 속성별 등급 — 첫 속성은 본체 등급, 나머지는 각자 등급 (없으면 D)
+    function gearAttrGrade(g, attr) {
+        if (!g || !g.attrs) return 'D';
+        const idx = g.attrs.indexOf(attr);
+        if (idx <= 0) return g.grade;
+        return (g.attrGrades && g.attrGrades[attr]) || 'D';
+    }
+
     // 속성 실효 수치 (등급 배율 적용)
-    function gearValue(user, attr) {
+        function gearValue(user, attr) {
         const g = getGear(user);
         if (!g || !g.attrs || !g.attrs.includes(attr)) return 0;
-        const mult = GEAR_MULT[g.grade] || 1;
+        const mult = GEAR_MULT[gearAttrGrade(g, attr)] || 1;
         const base = GEAR_BASE[attr] || 0;
-        // 정수형 보정(파괴·감각·은신)은 반올림
         if (attr === 'break' || attr === 'sense' || attr === 'hide' || attr === 'bond' || attr === 'gaze') {
-    return Math.round(base * mult);
-}
+            return Math.round(base * mult);
+        }
         return base * mult;
     }
 
        const GEAR_MARK = { D: '◇', C: '◆', B: '❖', A: '✦', S: '✷', L: '✹' };
 
-    function gearLabel(user) {
+        function gearLabel(user) {
         const g = getGear(user);
         if (!g) return '없음';
         const hasAttr = g.attrs && g.attrs.length > 0;
         if (!hasAttr) return `${g.name} — 속성 미지정`;
         const mark = (GEAR_MARK[g.grade] || '') + (g.icon || '');
-        const attrs = g.attrs.map(a => GEAR_ATTRS[a] ? GEAR_ATTRS[a].name : a).join(' · ');
+        const attrs = g.attrs.map(a => {
+            const nm = GEAR_ATTRS[a] ? GEAR_ATTRS[a].name : a;
+            return `${nm} ${gearAttrGrade(g, a)}`;
+        }).join(' · ');
         return `${mark} ${g.name} — ${attrs}`;
     }
 
@@ -3073,6 +3083,10 @@ const GEAR_UPGRADE = {
 
         if (!g.attrs) g.attrs = [];
         g.attrs.push(attr);
+                if (g.attrs.length > 1) {
+            if (!g.attrGrades) g.attrGrades = {};
+            g.attrGrades[attr] = 'D';
+        }
         addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 ${GEAR_ATTRS[attr].name} 속성을 새겼습니다.`);
 
        saveSelfFull();
@@ -3083,90 +3097,97 @@ const GEAR_UPGRADE = {
     }
 
     // --- 강화 ---
-    function openGearUpgrade() {
+        function openGearUpgrade() {
         const g = getGear(currentUser);
         if (!g) return;
-        const up = GEAR_UPGRADE[g.grade];
-        if (!up) { showCustomAlert('이미 최고 등급입니다.'); return; }
+        const list = (g.attrs && g.attrs.length) ? g.attrs : [null];
 
-        const html = `
-            <div style="text-align:center; font-size:15px; color:#fff; font-weight:bold; margin-bottom:14px;">
-                ${GEAR_MARK[g.grade]} ${g.grade}
-                <span style="color:#666; margin:0 9px;">→</span>
-                <span style="color:#d4bbff;">${GEAR_MARK[up.to]} ${up.to}</span>
-            </div>
-            <div style="background:rgba(0,0,0,0.3); border:1px solid #4a3a6a; border-radius:6px; padding:12px; font-size:12px; line-height:1.9; margin-bottom:13px;">
-                성공 확률 <b style="color:${up.rate >= 0.4 ? '#4CAF50' : up.rate >= 0.1 ? '#ff9800' : '#f44336'};">${(up.rate * 100).toFixed(up.rate < 0.1 ? 1 : 0)}%</b><br>
-                필요 포인트 <b style="color:#ffd700;">${up.cost.toLocaleString()} P</b><br>
-                <span style="color:#f44336;">실패 시 ${Math.floor(up.cost / 2).toLocaleString()} P가 차감됩니다.</span><br>
-                <span style="font-size:10px; color:#888;">등급이 내려가지는 않습니다.</span>
-            </div>
+        const rows = list.map((a, i) => {
+            const gr = (i === 0) ? g.grade : gearAttrGrade(g, a);
+            const up = GEAR_UPGRADE[gr];
+            const nm = a ? `${GEAR_ATTRS[a].icon} ${GEAR_ATTRS[a].name}` : '본체';
+            const can = up && currentUser.points >= up.cost;
+            return `
+                <div style="border:1px solid #4a3a6a; border-radius:6px; padding:11px; margin-bottom:9px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:13px; color:#d4bbff; font-weight:bold;">${nm}</span>
+                        <span style="font-size:13px; color:#fff; font-weight:bold;">${GEAR_MARK[gr] || ''} ${gr}</span>
+                    </div>
+                    <div style="font-size:10px; color:#888; margin:5px 0 8px 0;">
+                        ${i === 0 ? '본체 등급 · ' : ''}${up
+                            ? `→ ${up.to} · 확률 ${(up.rate * 100).toFixed(up.rate < 0.1 ? 1 : 0)}% · ${up.cost.toLocaleString()} P`
+                            : '최고 등급'}
+                    </div>
+                    <button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;" onclick="tryGearUpgrade(${i})" ${can ? '' : 'disabled'}>
+                        ${!up ? '더 오를 수 없음' : can ? '강화한다' : '포인트 부족'}
+                    </button>
+                </div>`;
+        }).join('');
+
+        openGearModal('장비 강화', `
             <div style="font-size:11px; color:#888; text-align:center; margin-bottom:12px;">
                 보유 포인트 <b style="color:#ffd700;">${currentUser.points.toLocaleString()} P</b>
             </div>
-            <button class="game-btn" style="width:100%; margin:0; padding:12px; ${currentUser.points >= up.cost ? 'background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;' : 'opacity:0.4;'}"
-                onclick="tryGearUpgrade()" ${currentUser.points >= up.cost ? '' : 'disabled'}>
-                ${currentUser.points >= up.cost ? '강화를 시도한다' : '포인트가 부족합니다'}
-            </button>`;
-        openGearModal('장비 강화', html);
+            ${rows}
+            <div style="font-size:10px; color:#888; text-align:center; line-height:1.6;">
+                실패 시 비용의 절반이 차감됩니다. 등급은 내려가지 않습니다.
+            </div>`);
     }
 
-         function tryGearUpgrade() {
-            
+    function tryGearUpgrade(idx) {
+        idx = idx || 0;
         const g = getGear(currentUser);
         if (!g) return;
-        const up = GEAR_UPGRADE[g.grade];
+        const attr = (g.attrs && g.attrs[idx]) || null;
+        const from = (idx === 0) ? g.grade : gearAttrGrade(g, attr);
+        const up = GEAR_UPGRADE[from];
         if (!up) return;
+        if (currentUser.points < up.cost) { showLuxuryAlert(); return; }
         if (up.to === 'L' && !currentUser.gearAwakened) {
-        showCustomAlert('한계에 막혀 있습니다.\n「각성 돌파권」이 필요합니다.');
-        return;
-    }
+            showCustomAlert('한계에 막혀 있습니다.\n「각성 돌파권」이 필요합니다.');
+            return;
+        }
+
         const polish = currentUser.gearPolish || 0;
         const rate = currentUser.gearGuarantee ? 1.0 : Math.min(0.99, up.rate + polish);
         const ok = Math.random() < rate;
-        const from = g.grade;
         const hadProtect = !!currentUser.gearProtect;
         const hadGuarantee = !!currentUser.gearGuarantee;
+        const nm = attr ? GEAR_ATTRS[attr].name : '본체';
 
         currentUser.gearPolish = 0;
         currentUser.gearGuarantee = false;
 
         if (ok) {
-            currentUser.points -= up.cost;
-            g.grade = up.to;
+            changePoints(-up.cost);
+            if (idx === 0) g.grade = up.to;
+            else { if (!g.attrGrades) g.attrGrades = {}; g.attrGrades[attr] = up.to; }
             currentUser.gearProtect = false;
-            addHistoryLog(currentUser, `[강화 성공] '${g.name}'이(가) ${from} → ${up.to} 등급이 되었습니다. (-${up.cost} P)`);
+            addHistoryLog(currentUser, `[강화 성공] '${g.name}' ${nm} ${from} → ${up.to} (-${up.cost} P)`);
         } else {
             const loss = Math.floor(up.cost / 2);
-            currentUser.points = Math.max(0, currentUser.points - loss);
-            if (hadProtect) {
-                currentUser.gearProtect = false;
-                addHistoryLog(currentUser, `[강화 실패] 보호권이 등급을 지켰습니다. (-${loss} P)`);
-            } else {
-                addHistoryLog(currentUser, `[강화 실패] '${g.name}' 강화에 실패했습니다. (-${loss} P)`);
-            }
+            changePoints(-loss);
+            if (hadProtect) currentUser.gearProtect = false;
+            addHistoryLog(currentUser, `[강화 실패] '${g.name}' ${nm} 강화 실패${hadProtect ? ' — 보호권이 지켰습니다' : ''} (-${loss} P)`);
         }
 
-       saveSelfFull();
+        saveSelfFull();
 
-        const html = `
+        openGearModal(ok ? '강화 성공' : '강화 실패', `
             <div style="text-align:center; padding:18px 0;">
                 <div style="font-size:38px; margin-bottom:12px;">${ok ? '✷' : '✕'}</div>
                 <div style="font-size:15px; color:${ok ? '#4CAF50' : '#f44336'}; font-weight:bold; margin-bottom:10px;">
-                    ${ok ? '강화 성공' : '강화 실패'}
+                    ${nm} ${ok ? '강화 성공' : '강화 실패'}
                 </div>
                 <div style="font-size:12px; color:#ccc; line-height:1.8;">
-                    ${ok
-                        ? `${g.name}이(가) <b style="color:#d4bbff;">${up.to}등급</b>이 되었습니다.<br>손에 쥔 무게가 조금 달라졌다.`
-                        : (hadProtect
-                            ? `아무 일도 일어나지 않았다.<br><span style="color:#4CAF50;">보호권이 등급을 지켰다.</span>`
-                            : `아무 일도 일어나지 않았다.<br>포인트만 사라졌다.`)}
-                    ${polish > 0 ? `<br><span style="font-size:10px; color:#888;">연마제 보정 +${Math.round(polish*100)}% 적용됨</span>` : ''}
+                    ${ok ? `<b style="color:#d4bbff;">${from} → ${up.to}</b>` : (hadProtect ? '<span style="color:#4CAF50;">보호권이 등급을 지켰다.</span>' : '포인트만 사라졌다.')}
+                    ${polish > 0 ? `<br><span style="font-size:10px; color:#888;">연마제 보정 +${Math.round(polish * 100)}% 적용됨</span>` : ''}
                     ${hadGuarantee ? `<br><span style="font-size:10px; color:#c9a8ff;">확정 승인서 사용됨</span>` : ''}
                 </div>
             </div>
-            <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="closeGearModal(); updateUI();">확인</button>`;
-        openGearModal(ok ? '강화 성공' : '강화 실패', html);
+            <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:11px;" onclick="openGearUpgrade()">계속 강화</button>
+            <button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="closeGearModal(); updateUI();">닫기</button>`);
+        updateUI();
     }
 
     // --- 재료 조합 ---
@@ -4606,6 +4627,7 @@ function b508RequiredDocs() {
         const g = getGear(currentUser);
         if (!g) return;
         g.attrs = g.attrs.filter(a => a !== attr);
+                if (g.attrGrades) delete g.attrGrades[attr];
         removeItemFromInventory(currentUser, itemName, 1);
         addHistoryLog(currentUser, `[??? 사용] 속성 변경권 — ${GEAR_ATTRS[attr].name} 속성을 지웠습니다.`);
         saveSelfFull();
