@@ -96,6 +96,16 @@ function skinHslToHex(h, s, l) {
     return '#' + to(f(0)) + to(f(8)) + to(f(4));
 }
 
+let _skinFontsLoaded = false;
+function loadSkinFonts() {
+    if (_skinFontsLoaded) return;
+    _skinFontsLoaded = true;
+    const fam = SKIN_FONTS.map(f => 'family=' + f.family.replace(/ /g, '+') + ':wght@400;700').join('&');
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${fam}&display=swap`;
+    document.head.appendChild(link);
+}
 
 // --- 무작위 조합 ---
 function rollUiSkin() {
