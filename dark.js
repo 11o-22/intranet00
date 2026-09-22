@@ -13176,38 +13176,39 @@ async function buyMarket(id) {
     if (!database) return;
     if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장터를 이용할 수 없습니다.'); return; }
 
-    const snap = await database.ref('market/' + id).once('value');
-    const p = snap.val();
-    if (!p || p.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
-    if (p.seller === currentUser.code) return;
-    if (currentUser.points < p.price) { showLuxuryAlert(); return; }
+    const p0 = marketPosts[id];
+    if (!p0 || p0.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+    if (p0.seller === currentUser.code) return;
+    if (currentUser.points < p0.price) { showLuxuryAlert(); return; }
 
+    // ★ 글을 먼저 잠근다 (두 명이 동시에 사는 것 방지)
+    const res = await database.ref('market/' + id).transaction(p => {
+        if (!p || p.state !== 'OPEN') return;
+        p.state = 'SOLD';
+        p.buyer = currentUser.code;
+        p.buyerName = currentUser.name;
+        p.soldAt = Date.now();
+        return p;
+    });
+    if (!res.committed) { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+
+    const p = res.snapshot.val();
     const fee = Math.floor(p.price * MARKET_FEE);
     const net = p.price - fee;
 
-    const sSnap = await database.ref('users/' + p.seller).once('value');
-    const seller = sSnap.val();
-    if (!seller) { showCustomAlert('판매자 정보를 찾을 수 없습니다.'); return; }
-
-    currentUser.points -= p.price;
+    // 구매자
+    changePoints(-p.price);
     for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
-    addHistoryLog(currentUser, `[장터 구매] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${p.sellerName} (-${p.price.toLocaleString()} P)`);
+    addHistoryLog(currentUser, `[장터 구매] ${p.item}${p.qty > 1 ? ' ×' + p.qty : ''} — ${p.sellerName} (-${p.price.toLocaleString()} P)`);
+    saveFields({ inventory: 1, history: 1 });
 
-    seller.points = Math.min(POINT_CAP, (seller.points || 0) + net);
-    addHistoryLog(seller, `[장터 판매] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`);
+    // ★ 판매자 — 받을 돈함으로
+    database.ref('payouts/' + p.seller).push({
+        amount: net,
+        at: Date.now(),
+        note: `[장터 판매] ${p.item}${p.qty > 1 ? ' ×' + p.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`
+    });
 
-    const updates = {};
-    updates[`market/${id}/state`] = 'SOLD';
-    updates[`market/${id}/buyer`] = currentUser.code;
-    updates[`market/${id}/buyerName`] = currentUser.name;
-    updates[`users/${currentUser.code}/points`] = currentUser.points;
-    updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
-    updates[`users/${currentUser.code}/history`] = currentUser.history;
-    updates[`users/${p.seller}/points`] = seller.points;
-    updates[`users/${p.seller}/history`] = seller.history;
-    updates[`users/${p.seller}/_adminStamp`] = Date.now();
-
-    await database.ref('/').update(updates);
     updateUI();
     showCustomAlert(`${p.item}${p.qty > 1 ? ' ×' + p.qty : ''}을(를) 구매했습니다.`);
 }
@@ -13247,51 +13248,54 @@ async function acceptOffer(postId, offerId) {
     if (!buyGuard()) return;
     if (!database) return;
 
-    const snap = await database.ref('market/' + postId).once('value');
-    const p = snap.val();
-    if (!p || p.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
-    if (p.seller !== currentUser.code) return;
-
-    const o = p.offers ? p.offers[offerId] : null;
+    const p0 = marketPosts[postId];
+    if (!p0 || p0.state !== 'OPEN') { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
+    if (p0.seller !== currentUser.code) return;
+    const o = p0.offers ? p0.offers[offerId] : null;
     if (!o) { showCustomAlert('제시가 취소되었습니다.'); renderMarket(); return; }
     if (currentUser.points < o.price) { showLuxuryAlert(); return; }
 
-    const sSnap = await database.ref('users/' + o.by).once('value');
-    const other = sSnap.val();
-    if (!other) { showCustomAlert('상대 정보를 찾을 수 없습니다.'); return; }
+    // 상대 소지품 확인 (서버에서 새로)
+    const sSnap = await database.ref('users/' + o.by + '/inventory').once('value');
+    const raw = sSnap.val() || [];
+    const inv = Array.isArray(raw) ? raw.slice() : Object.values(raw);
+    if (inv.filter(x => x === p0.item).length < p0.qty) {
+        showCustomAlert('상대가 물품을 더 이상 갖고 있지 않습니다.');
+        return;
+    }
 
-    const have = (other.inventory || []).filter(x => x === p.item).length;
-    if (have < p.qty) { showCustomAlert('상대가 물품을 더 이상 갖고 있지 않습니다.'); return; }
+    // ★ 글 잠금
+    const res = await database.ref('market/' + postId).transaction(p => {
+        if (!p || p.state !== 'OPEN') return;
+        p.state = 'SOLD';
+        p.buyer = o.by;
+        p.buyerName = o.name;
+        p.dealPrice = o.price;
+        return p;
+    });
+    if (!res.committed) { showCustomAlert('이미 처리된 글입니다.'); renderMarket(); return; }
 
     const fee = Math.floor(o.price * MARKET_FEE);
     const net = o.price - fee;
 
-    currentUser.points -= o.price;
-    for (let i = 0; i < p.qty; i++) currentUser.inventory.push(p.item);
-    addHistoryLog(currentUser, `[장터 성사] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${o.name} (-${o.price.toLocaleString()} P)`);
-
-    const inv = (other.inventory || []).slice();
-    for (let i = 0; i < p.qty; i++) {
-        const idx = inv.indexOf(p.item);
+    // 상대 — 물건 빼기 + 받을 돈함
+    for (let i = 0; i < p0.qty; i++) {
+        const idx = inv.indexOf(p0.item);
         if (idx > -1) inv.splice(idx, 1);
     }
-    other.points = Math.min(POINT_CAP, (other.points || 0) + net);
-    addHistoryLog(other, `[장터 성사] ${p.item} ${p.qty > 1 ? '×' + p.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`);
+    updateUserFields(o.by, { inventory: inv });
+    database.ref('payouts/' + o.by).push({
+        amount: net,
+        at: Date.now(),
+        note: `[장터 성사] ${p0.item}${p0.qty > 1 ? ' ×' + p0.qty : ''} — ${currentUser.name} (+${net.toLocaleString()} P, 수수료 ${fee.toLocaleString()} P)`
+    });
 
-    const updates = {};
-    updates[`market/${postId}/state`] = 'SOLD';
-    updates[`market/${postId}/buyer`] = o.by;
-    updates[`market/${postId}/buyerName`] = o.name;
-    updates[`market/${postId}/dealPrice`] = o.price;
-    updates[`users/${currentUser.code}/points`] = currentUser.points;
-    updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
-    updates[`users/${currentUser.code}/history`] = currentUser.history;
-    updates[`users/${o.by}/points`] = other.points;
-    updates[`users/${o.by}/inventory`] = inv;
-    updates[`users/${o.by}/history`] = other.history;
-    updates[`users/${o.by}/_adminStamp`] = Date.now();
+    // 나
+    changePoints(-o.price);
+    for (let i = 0; i < p0.qty; i++) currentUser.inventory.push(p0.item);
+    addHistoryLog(currentUser, `[장터 성사] ${p0.item}${p0.qty > 1 ? ' ×' + p0.qty : ''} — ${o.name} (-${o.price.toLocaleString()} P)`);
+    saveFields({ inventory: 1, history: 1 });
 
-    await database.ref('/').update(updates);
     updateUI();
     showCustomAlert(`${o.name} 사원과 거래가 성사되었습니다.`);
 }

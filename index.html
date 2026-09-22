@@ -8779,6 +8779,34 @@ function changePoints(delta) {
     updateUI();
 }
 
+let payoutRef = null;
+
+function attachPayouts() {
+    if (!database || !currentUser) return;
+    if (payoutRef) { try { payoutRef.off(); } catch (e) {} }
+    const me = currentUser.code;
+    payoutRef = database.ref('payouts/' + me);
+
+    payoutRef.on('child_added', snap => {
+        const id = snap.key, v = snap.val();
+        if (!v || v.claimed || !currentUser || currentUser.code !== me) return;
+
+        // 한 번만 수령되게 잠근 뒤 지급
+        database.ref(`payouts/${me}/${id}`).transaction(x => {
+            if (!x || x.claimed) return;
+            x.claimed = true;
+            return x;
+        }).then(res => {
+            if (!res.committed) return;
+            changePoints(v.amount);
+            addHistoryLog(currentUser, v.note || `[입금] +${v.amount.toLocaleString()} P`);
+            saveFields({ history: 1 });
+            showPointGainEffect(v.amount);
+            database.ref(`payouts/${me}/${id}`).remove();
+        });
+    });
+}
+
  function winPoints(amount) {
     amount = Math.floor(amount);
     changePoints(amount);
@@ -9881,6 +9909,7 @@ function adminGiveItem() {
             currentUser = db.users[code];
             localStorage.setItem('corp_logged_code', code);
             claimSession(code);
+            attachPayouts();
             
             // 필수 속성 누락 방지 기본값 세팅
             if(currentUser.hasNewLetter === undefined) currentUser.hasNewLetter = false;
@@ -9961,6 +9990,7 @@ if (hlCard) hlCard.innerText = dealerCardValue;
         }
     });
         function logout() {
+                        if (payoutRef) { try { payoutRef.off(); } catch (e) {} payoutRef = null; }
              const foxModal = document.getElementById('fox-modal');
     if (foxModal) foxModal.style.display = 'none';
 
