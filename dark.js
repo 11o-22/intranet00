@@ -3083,9 +3083,19 @@ const GEAR_UPGRADE = {
 
         if (!g.attrs) g.attrs = [];
         g.attrs.push(attr);
-                if (g.attrs.length > 1) {
+                        const blank = !!currentUser.gearBlank;
+        if (g.attrs.length > 1) {
+            // 두 번째 이후 속성: D부터, 빈 각인지면 C부터
             if (!g.attrGrades) g.attrGrades = {};
-            g.attrGrades[attr] = 'D';
+            g.attrGrades[attr] = blank ? 'C' : 'D';
+        } else if (blank) {
+            // 첫 속성: 본체 등급 한 단계 (L은 각성 돌파권이 필요하므로 제외)
+            const nx = GEAR_UPGRADE[g.grade];
+            if (nx && nx.to !== 'L') g.grade = nx.to;
+        }
+        if (blank) {
+            currentUser.gearBlank = false;
+            addHistoryLog(currentUser, `[빈 각인지] ${GEAR_ATTRS[attr].name} 속성이 한 단계 높게 새겨졌습니다.`);
         }
         addHistoryLog(currentUser, `[전용 장비] '${g.name}'에 ${GEAR_ATTRS[attr].name} 속성을 새겼습니다.`);
 
