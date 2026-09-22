@@ -1326,12 +1326,13 @@ function getTodayStr() {
 
             // 내가 저장 중이 아닐 때만, 남이 바꾼 값을 받아온다
             if (pendingSaves === 0 && srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
-                ['points','inventory','pollution','satiety','equippedWeapons','badge',
-                 'history','timedEffects','house','soulGear','letters','couple',
-                 'hasNewLetter','hasItemUsedOnMe'].forEach(k => {
-                    if (srv[k] !== undefined) currentUser[k] = srv[k];
-                });
-                currentUser._adminStamp = srv._adminStamp;
+                // ★ 남이 바꿨으면 서버 기준으로 전부 맞춘다
+                Object.keys(currentUser).forEach(k => { if (!(k in srv)) delete currentUser[k]; });
+                Object.keys(srv).forEach(k => { currentUser[k] = srv[k]; });
+                if (!currentUser.inventory) currentUser.inventory = [];
+                if (!currentUser.history) currentUser.history = [];
+                if (!currentUser.letters) currentUser.letters = [];
+                if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
             }
 
             // 항상 내 라이브 객체로 연결 (db.users[내코드] 가 낡은 사본이 되지 않게)
@@ -9038,64 +9039,52 @@ function saveSelfFull() {
         document.getElementById('new-emp-aff').value = ''; 
         document.getElementById('new-emp-team').value = '';
     }
-   function adminUpdateEmployee() {
+       function adminUpdateEmployee() {
         const targetNo = document.getElementById('adm-target-no').value.trim();
         const aff = document.getElementById('adm-set-affiliation').value.trim();
         const team = document.getElementById('adm-set-team').value.trim();
         const pos = document.getElementById('adm-set-position').value.trim();
         const pointsInput = document.getElementById('adm-target-points').value.trim();
 
-        if (!targetNo) {
-            showCustomAlert('수정할 사원의 사번을 입력해주세요.');
-            return;
+        if (!targetNo) { showCustomAlert('수정할 사원의 사번을 입력해주세요.'); return; }
+        const targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
+        if (!targetCode) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+        const u = db.users[targetCode];
+
+        const fields = {};
+        const aff2 = aff || u.affiliation, team2 = team || u.team, pos2 = pos || u.position;
+        if (aff) fields.affiliation = aff;
+        if (team) fields.team = team;
+        if (pos) fields.position = pos;
+        if (aff || team || pos) fields.no = generateSerialNo(aff2, pos2, team2, targetCode);
+
+        let delta = parseInt(pointsInput, 10);
+        if (isNaN(delta)) delta = 0;
+
+        if (Object.keys(fields).length === 0 && !delta) { showCustomAlert('바꿀 내용을 입력해주세요.'); return; }
+
+        const tmp = { history: (u.history || []).slice() };
+        if (aff || team || pos) addHistoryLog(tmp, `[인사 발령] ${aff2} · ${team2} · ${pos2} (사번 ${fields.no})`);
+        if (delta) addHistoryLog(tmp, `[당국 지급] 포인트 ${delta >= 0 ? '+' : ''}${delta} P 조정`);
+        fields.history = tmp.history;
+
+        if (targetCode === currentUser.code) Object.assign(currentUser, fields);
+
+        const jobs = [updateUserFields(targetCode, fields)];
+        if (delta) {
+            jobs.push(database.ref(`users/${targetCode}/points`).transaction(p =>
+                Math.max(0, Math.min(POINT_CAP, (p || 0) + delta))));
         }
 
-        // 1. 사번(no) 또는 코드(code)로 대상 사원 찾기
-        let targetCode = Object.keys(db.users).find(c => db.users[c].no === targetNo || c === targetNo);
-        if (!targetCode) {
-            showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.');
-            return;
-        }
-
-        let targetUser = db.users[targetCode];
-
-        // 2. 입력된 값들만 골라서 안전하게 갱신
-        if (aff) targetUser.affiliation = aff; 
-        if (team) targetUser.team = team; 
-        if (pos) targetUser.position = pos;
-        
-               let pointDelta = 0;
-        if (pointsInput !== "") {
-            const parsedPoints = parseInt(pointsInput, 10);
-            if (!isNaN(parsedPoints)) {
-                pointDelta = parsedPoints;
-                targetUser.points = Math.max(0, (targetUser.points || 0) + parsedPoints);
-                addHistoryLog(targetUser, `[당국 지급] 포인트 ${parsedPoints >= 0 ? '+' : ''}${parsedPoints} P 조정 (현재 ${targetUser.points} P)`);
-            }
-        }
-        // 사번 재부팅 (소속/직급/팀이 바뀔 수 있으므로)
-        targetUser.no = generateSerialNo(targetUser.affiliation, targetUser.position, targetUser.team, targetCode);
-
-        // 3. 로컬 DB 갱신
-        db.users[targetCode] = targetUser;
-
-        targetUser._adminStamp = Date.now(); 
-
-        // 4. ★ Firebase 서버에 해당 유저 경로를 직접 타겟팅하여 즉시 영구 저장
-        if (database) {
-            database.ref('users/' + targetCode).set(targetUser).then(() => {
-              showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트 ${pointDelta >= 0 ? '+' : ''}${pointDelta} → 현재 ${targetUser.points}P)`);
-                updateUI();
-            }).catch((err) => {
-                console.error("Firebase 관리자 발령 실패:", err);
-                showCustomAlert("서버 저장 중 오류가 발생했습니다.");
-            });
-
-        } else {
-            saveDB();
+        Promise.all(jobs).then(() => {
+            showCustomAlert(`${u.name} 사원 발령 완료` +
+                (fields.no ? `\n새 사번: ${fields.no}` : '') +
+                (delta ? `\n포인트 ${delta >= 0 ? '+' : ''}${delta}` : ''));
             updateUI();
-            showCustomAlert(`사번 ${targetNo} 정보 발령 완료! (새 사번: ${targetUser.no}, 포인트: ${targetUser.points}P)`);
-        }
+        }).catch(e => {
+            console.error('발령 실패:', e);
+            showCustomAlert('서버 저장 중 오류가 발생했습니다.');
+        });
     }
        function adminToggleVIP() {
         const targets = getAdminTargets();
@@ -9508,70 +9497,52 @@ function admItemSelectNone() {
         const u = db.users[code];
         if (!u) return;
 
-        u.quarantineUntil = 0;
-        u.pollution = purify ? 0 : (u.quarantineExitPollution || 0);
-        u.quarantineExitPollution = 0;
-        u.lastPollutionTime = Date.now();
-        u.foxRoomAnswered = false;
+        let notes = (u.badge && u.badge.notes) || '특이사항 없음';
+        const arr = notes.split(' | ').filter(n =>
+            n.trim() !== '' && !n.includes('의식 불명') && !n.includes('긴급 이송') && !n.includes('사직 반려'));
+        const badge = Object.assign({}, u.badge || {}, { notes: arr.length ? arr.join(' | ') : '특이사항 없음' });
 
-        if (u.badge && u.badge.notes) {
-            let arr = u.badge.notes.split(' | ').filter(n =>
-                n.trim() !== '' &&
-                !n.includes('의식 불명') &&
-                !n.includes('긴급 이송') &&
-                !n.includes('사직 반려')
-            );
-            u.badge.notes = arr.length ? arr.join(' | ') : "특이사항 없음";
-        }
-
-        addHistoryLog(u, purify
+        const newPoll = purify ? 0 : (u.quarantineExitPollution || 0);
+        const tmp = { history: (u.history || []).slice() };
+        addHistoryLog(tmp, purify
             ? `[당국 개입] 상담사에 의해 퇴원 및 완전 정화 처리되었습니다.`
-            : `[당국 개입] 상담사에 의해 조기 퇴원 처리되었습니다. (오염도 ${u.pollution}%)`);
+            : `[당국 개입] 상담사에 의해 조기 퇴원 처리되었습니다. (오염도 ${newPoll}%)`);
 
-            u._adminStamp = Date.now();
+        const fields = {
+            quarantineUntil: 0,
+            quarantineExitPollution: 0,
+            pollution: newPoll,
+            lastPollutionTime: Date.now(),
+            foxRoomAnswered: false,
+            badge: badge,
+            history: tmp.history
+        };
+        if (code === currentUser.code) Object.assign(currentUser, fields);
 
-        if (database) {
-            database.ref('users/' + code).set(u).then(() => {
-                renderAdminFoxRoom();
-                updateUI();
-            });
-        } else {
-            saveDB(); renderAdminFoxRoom(); updateUI();
-        }
-        showCustomAlert(`${u.name} 사원이 퇴원 처리되었습니다.${purify ? ' (오염도 0%)' : ` (오염도 ${u.pollution}%)`}`);
+        updateUserFields(code, fields).then(() => { renderAdminFoxRoom(); updateUI(); });
+        showCustomAlert(`${u.name} 사원이 퇴원 처리되었습니다. (오염도 ${newPoll}%)`);
     }
 
     function adminFoxReduce(code, hours) {
         const u = db.users[code];
         if (!u || !u.quarantineUntil) return;
 
-        u.quarantineUntil -= hours * 60 * 60 * 1000;
-        const now = Date.now();
+        const newUntil = u.quarantineUntil - hours * 60 * 60 * 1000;
+        if (newUntil <= Date.now()) { adminFoxDischarge(code, false); return; }
 
-        if (u.quarantineUntil <= now) {
-            adminFoxDischarge(code, false);
-            return;
-        }
+        const remainMs = newUntil - Date.now();
+        const h = Math.floor(remainMs / 3600000);
+        const m = Math.floor((remainMs % 3600000) / 60000);
 
-        const remainMs = u.quarantineUntil - now;
-        const h = Math.floor(remainMs / (1000 * 60 * 60));
-        const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
+        const tmp = { history: (u.history || []).slice() };
+        addHistoryLog(tmp, `[당국 개입] 격리 시간이 ${hours}시간 단축되었습니다.`);
 
-        addHistoryLog(u, `[당국 개입] 격리 시간이 ${hours}시간 단축되었습니다.`);
+        const fields = { quarantineUntil: newUntil, history: tmp.history };
+        if (code === currentUser.code) Object.assign(currentUser, fields);
 
-        u._adminStamp = Date.now(); 
-
-        if (database) {
-            database.ref('users/' + code).set(u).then(() => {
-                renderAdminFoxRoom();
-                updateUI();
-            });
-        } else {
-            saveDB(); renderAdminFoxRoom(); updateUI();
-        }
+        updateUserFields(code, fields).then(() => { renderAdminFoxRoom(); updateUI(); });
         showCustomAlert(`${u.name} 사원의 격리가 ${hours}시간 단축되었습니다. (남은 시간 ${h}시간 ${m}분)`);
     }
-
     function adminSetZoneOpen(zoneCode, state) {
         if (state === null) delete darkZoneOverride[zoneCode];
         else darkZoneOverride[zoneCode] = state;
