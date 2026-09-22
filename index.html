@@ -4082,8 +4082,8 @@ return b;
     }
 
        function useResignLetter() {
-    if (!darkRun) return;
-    darkRun._dead = false;
+        if (!darkRun) return;
+    darkRun._dead = true;   // 퇴근 처리 중 — 일행 진행에 끌려가지 않게
     setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 600);
     darkRun._resigned = true;
     currentUser.pollution = Math.min(99, currentUser.pollution);
@@ -4098,6 +4098,18 @@ return b;
         appendBadgeNoteToUser(currentUser, `[사직 반려됨] 제출은 수리되지 않았다.`);
 
         if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원이 사직서를 제출했습니다.`, true);
+
+                if (darkRun.isParty && database) {
+            const pid = darkRun.partyId;
+            const p = darkParties[pid];
+            if (darkRun.isLeader && p && p.alive) {
+                const next = Object.keys(p.alive).find(c => c !== currentUser.code);
+                if (next && p.members && p.members[next]) {
+                    database.ref(`darkParties/${pid}`).update({ leader: next, leaderName: p.members[next].name });
+                }
+            }
+            database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
+        }
 
         if (!currentUser.darkLogs) currentUser.darkLogs = [];
         currentUser.darkLogs.unshift({
@@ -10371,6 +10383,20 @@ if (bathModal) bathModal.style.display = 'none';
         if (cb) cb(v);
     }
 
+        // ★ 어둠 탐사 화면 — 화면이 바뀐 직후 0.6초간 버튼 입력 무시 (연타·겹쳐 누르기 방지)
+    (function () {
+        const dro = document.getElementById('dro-body');
+        if (!dro) return;
+        let lockUntil = 0;
+        new MutationObserver(() => { lockUntil = Date.now() + 600; })
+            .observe(dro, { childList: true });
+        dro.addEventListener('click', e => {
+            if (Date.now() < lockUntil && e.target.closest('button')) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }, true);
+    })();
  
     </script>
     <script src="dark.js"></script>
