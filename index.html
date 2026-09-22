@@ -4111,16 +4111,8 @@ return b;
             
             database.ref(`darkParties/${pid}/alive/${currentUser.code}`).remove();
 
-            database.ref(`darkParties/${pid}/members`).once('value').then(snap => {
-                const left = snap.val();
-                if (!left || Object.keys(left).length === 0) {
-                    database.ref('darkParties/' + pid).remove();
-                    database.ref('darkChats/' + pid).remove();
-                    database.ref('darkVotes/' + pid).remove();
-                    database.ref('darkC119/' + pid).remove();
-                    if (zone) releaseZone(zone);
-                }
-            });
+            partyRunCleanup(pid, zone);
+            
         } else if (zone) {
             releaseZone(zone);
         }
@@ -4314,19 +4306,33 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             </div>` +
             darkChoiceBtn("단말로 복귀한다.", "finishDarkRun()"));
 
-                showPointGainEffect(total);
-        releaseZone(darkRun.zone);
+                        showPointGainEffect(total);
 
-        // ★ 탐사 종료 시 파티 방을 즉시 해산 (구역 재입장 가능하게)
-        if (darkRun.partyId && database) {
-            database.ref('darkParties/' + darkRun.partyId).remove();
-            database.ref('darkOccupancy/' + darkRun.zone).remove();
-            database.ref('darkVotes/' + darkRun.partyId).remove();
-            database.ref('darkC119/' + darkRun.partyId).remove();
-        }
+        if (darkRun.partyId) partyRunCleanup(darkRun.partyId, darkRun.zone);
+        else releaseZone(darkRun.zone);
 
         darkRun = null;
         saveDB();
+    }
+
+        // 파티 탐사에서 나 혼자 빠지고, 마지막 사람일 때만 정리
+    function partyRunCleanup(pid, zone) {
+        if (!database || !pid) return;
+        const me = currentUser.code;
+        const aliveRef = database.ref(`darkParties/${pid}/alive/${me}`);
+        try { aliveRef.onDisconnect().cancel(); } catch (e) {}
+
+        aliveRef.remove()
+            .then(() => database.ref(`darkParties/${pid}/alive`).once('value'))
+            .then(snap => {
+                const left = snap.val();
+                if (left && Object.keys(left).length > 0) return;   // 아직 남은 사람 있음
+                database.ref('darkParties/' + pid).remove();
+                database.ref('darkChats/' + pid).remove();
+                database.ref('darkVotes/' + pid).remove();
+                database.ref('darkC119/' + pid).remove();
+                if (zone) database.ref('darkOccupancy/' + zone).remove();
+            });
     }
 
           function finishDarkRun() {
@@ -4344,17 +4350,15 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         const pid = darkRun ? darkRun.partyId : null;
         const zone = darkRun ? darkRun.zone : null;
 
-        if (zone) releaseZone(zone);
-        if (pid && database) {
-    database.ref(`darkParties/${pid}/curStep`).off();
-    database.ref(`darkParties/${pid}/leader`).off();
-    database.ref(`darkParties/${pid}/alive`).off();
-    try { database.ref(`darkParties/${pid}/taleCast`).off(); } catch(e) {}
-    database.ref('darkParties/' + pid).remove();
-    database.ref('darkChats/' + pid).remove();
-    database.ref('darkVotes/' + pid).remove();
-    database.ref('darkC119/' + pid).remove();
-}
+              if (pid && database) {
+            database.ref(`darkParties/${pid}/curStep`).off();
+            database.ref(`darkParties/${pid}/leader`).off();
+            database.ref(`darkParties/${pid}/alive`).off();
+            try { database.ref(`darkParties/${pid}/taleCast`).off(); } catch (e) {}
+            partyRunCleanup(pid, zone);
+        } else if (zone) {
+            releaseZone(zone);
+        }
         
 
         clearDarkRunState();
