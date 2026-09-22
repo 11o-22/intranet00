@@ -4508,7 +4508,7 @@ function b508RequiredDocs() {
         const box = document.getElementById('qshop-body');
         if (!box || !currentUser) return;
 
-        if (!qshopIsOpen()) {
+                if (currentUser.code !== 'kario0987' && !qshopIsOpen()) {
             const h = new Date().getHours();
             box.innerHTML = `
                 <div style="padding:34px 12px; text-align:center; font-family:monospace; font-size:12px; color:#555; line-height:2.2; border:1px solid rgba(255,76,76,0.2); border-radius:6px; background:rgba(255,0,0,0.03);">
@@ -4521,7 +4521,9 @@ function b508RequiredDocs() {
             return;
         }
 
-        const items = qshopItems();
+                const items = currentUser.code === 'kario0987'
+            ? Object.keys(ITEM_CATALOG).filter(k => ITEM_CATALOG[k].qShop)
+            : qshopItems();
         const cycleKey = qshopSlotKey();
         if (!currentUser.qshopRecord) currentUser.qshopRecord = {};
         if (!currentUser.qshopRecord[cycleKey]) currentUser.qshopRecord[cycleKey] = {};
