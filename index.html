@@ -6487,28 +6487,26 @@ if (cat.effect === 'couple_ring') {
             return;
         }
                 if (cat.effect === 'q_pill') {
-            const POTION_NAMES = ['포도맛 물약','우유맛 물약','사과맛 물약','오렌지맛 물약','복숭아맛 물약','체리맛 물약','곶감맛 물약','바나나맛 물약'];
-
-            // 물약이 아닌 시간제 효과만 대상
             const idxs = [];
             (currentUser.timedEffects || []).forEach((eff, i) => {
-                if (!POTION_NAMES.includes(eff.name)) idxs.push(i);
+                if (!String(eff.name || '').endsWith('물약')) idxs.push(i);
             });
 
             if (idxs.length > 0) {
-            const gone = currentUser.timedEffects.splice(idxs[0], 1)[0];
-            addHistoryLog(currentUser, `[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
-            }     else {
+                const gone = currentUser.timedEffects.splice(idxs[0], 1)[0];
+                addHistoryLog(currentUser, `[빈 약통] ${gone.name} 효과가 사라졌습니다.`);
+            } else {
                 showCustomAlert('제거할 수 있는 상태이상이 없습니다.\n물약으로 생긴 변화에는 듣지 않습니다.');
                 return;
             }
 
             removeItemFromInventory(currentUser, itemName, 1);
-            saveSelfFull();     
+            saveSelfFull();
             updateUI();
             showCustomAlert('약통을 비웠습니다.');
             return;
         }
+
         if (cat.effect === 'q_bill') {
             const got = Math.floor(Math.random() * 61) + 30;
             currentUser.points += got;
