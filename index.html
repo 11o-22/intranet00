@@ -4578,10 +4578,38 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         return 1;
     }
 
+        // 같은 이름의 물약 효과는 하나로 합치고 남은 시간을 더한다
+    function mergeTimedEffects(user) {
+        const list = user && user.timedEffects;
+        if (!list || list.length < 2) return false;
+
+        const now = Date.now();
+        const merged = [];
+        let changed = false;
+
+        list.forEach(eff => {
+            const same = merged.find(m => m.name === eff.name);
+            if (!same) { merged.push(eff); return; }
+
+            changed = true;
+            if (same.fixed || eff.fixed) {
+                same.fixed = true;              // 하나라도 고정이면 고정
+                return;
+            }
+            const add = Math.max(0, (eff.expireAt || now) - now);   // 새로 들어온 쪽의 남은 시간
+            same.expireAt = Math.max(same.expireAt || now, now) + add;
+        });
+
+        if (changed) user.timedEffects = merged;
+        return changed;
+    }
+
     function checkPassivePollution(user) {
         if (user.code === 'kario0987') return; 
         const now = Date.now();
         let changed = false; // ★ 변화 감지용 플래그
+
+        if (user === currentUser && mergeTimedEffects(user)) changed = true;
 
         if (user.timedEffects) {
             for (let i = user.timedEffects.length - 1; i >= 0; i--) {
