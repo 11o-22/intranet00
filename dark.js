@@ -3181,7 +3181,7 @@ const GEAR_UPGRADE = {
             addHistoryLog(currentUser, `[강화 실패] '${g.name}' ${nm} 강화 실패${hadProtect ? ' — 보호권이 지켰습니다' : ''} (-${loss} P)`);
         }
 
-        saveSelfFull();
+                saveFields({ soulGear: 1, gearPolish: 1, gearGuarantee: 1, gearProtect: 1, history: 1 });
 
         openGearModal(ok ? '강화 성공' : '강화 실패', `
             <div style="text-align:center; padding:18px 0;">

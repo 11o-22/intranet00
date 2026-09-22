@@ -8962,13 +8962,27 @@ function saveSelfFull() {
     const SKIP = ['letters','hasNewLetter','hasNewReply','hasItemUsedOnMe','houseChatUnread'];
     const stamp = stampNow();
     const payload = {};
-    Object.keys(currentUser).forEach(k => { if (!SKIP.includes(k)) payload[k] = currentUser[k]; });
+    Object.keys(currentUser).forEach(k => {
+        if (SKIP.includes(k) || currentUser[k] === undefined) return;
+        payload[k] = currentUser[k];
+    });
     payload._adminStamp = stamp;
-    pendingSaves++;
-    return database.ref('users/' + currentUser.code).update(payload)
-        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
-}
 
+    let clean;
+    try { clean = JSON.parse(JSON.stringify(payload)); }   // 안쪽 undefined 제거
+    catch (e) { console.error('저장 데이터 변환 실패:', e); return Promise.resolve(); }
+
+    pendingSaves++;
+    try {
+        return database.ref('users/' + currentUser.code).update(clean)
+            .catch(e => console.error('저장 실패:', e))
+            .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+    } catch (e) {
+        pendingSaves = Math.max(0, pendingSaves - 1);
+        console.error('저장 실패:', e);
+        return Promise.resolve();
+    }
+}
     // --- 통제 콘솔 ---
        function openAdminScreen() {
         document.getElementById('main-screen').style.display = 'none';
