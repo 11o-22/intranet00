@@ -13,21 +13,57 @@ if (typeof ALIEN_ITEMS_POOL !== 'undefined' && !ALIEN_ITEMS_POOL.includes('벽�
 }
 
 // --- 재료 ---
-// 색: 모든 색상(0~359도)을 깊은 보석 톤 바탕으로 쓰고, 금속 또는 같은 계열의 밝은 광택을 강조색으로 얹는다
-const SKIN_HUES = [
-    [0, '루비'], [14, '가닛'], [26, '코냑'], [38, '호박'], [50, '샴페인'],
-    [66, '올리브'], [88, '압생트'], [118, '에메랄드'], [150, '비취'], [172, '공작'],
-    [192, '사파이어'], [214, '코발트'], [232, '미드나잇'], [252, '자수정'], [274, '로열 퍼플'],
-    [298, '자두'], [318, '로즈'], [338, '버건디']
-];
-const SKIN_METALS = [
-    { name: '골드',        hex: '#d4af37' },
-    { name: '샴페인 골드', hex: '#e6c98f' },
-    { name: '로즈 골드',   hex: '#e0a899' },
-    { name: '플래티넘',    hex: '#d9dde3' },
-    { name: '앤틱 브론즈', hex: '#b58d57' },
-    { name: '실버',        hex: '#c0c7cf' },
-    { name: '진주',        hex: '#efe6d8' }
+// 색: 이름 붙은 팔레트 46종 (어두운 28 · 밝은 18)
+// base 바탕 · panel 겉면 · accent 강조 · text 글씨
+const SKIN_PALETTES = [
+    // --- 어두운 계열 ---
+    { name:'루비와 골드',          base:'#1a0709', panel:'#2a0e12', accent:'#d4af37' },
+    { name:'버건디와 샴페인',      base:'#1c0a10', panel:'#2d1119', accent:'#e6c98f' },
+    { name:'가닛과 로즈 골드',     base:'#1d0b0b', panel:'#2e1413', accent:'#e0a899' },
+    { name:'코냑과 황동',          base:'#1b0f07', panel:'#2b180c', accent:'#c9a063' },
+    { name:'호박과 앤틱 골드',     base:'#1a1206', panel:'#2a1d0b', accent:'#d9b25a' },
+    { name:'마호가니와 골드',      base:'#190c08', panel:'#2a140d', accent:'#d4af37' },
+    { name:'초콜릿과 샴페인',      base:'#140c08', panel:'#22150e', accent:'#e6c98f' },
+    { name:'올리브와 브론즈',      base:'#12130a', panel:'#1e2012', accent:'#b58d57' },
+    { name:'압생트와 샴페인',      base:'#0e150b', panel:'#182314', accent:'#d8d08a' },
+    { name:'에메랄드와 골드',      base:'#06140e', panel:'#0c2218', accent:'#d4af37' },
+    { name:'포레스트와 실버',      base:'#0a130d', panel:'#132117', accent:'#c0c7cf' },
+    { name:'비취와 진주',          base:'#071413', panel:'#0e2220', accent:'#efe6d8' },
+    { name:'딥 틸과 골드',         base:'#061416', panel:'#0c2326', accent:'#d4af37' },
+    { name:'공작과 로즈 골드',     base:'#06121a', panel:'#0b1f2a', accent:'#e0a899' },
+    { name:'사파이어와 플래티넘',  base:'#070d1c', panel:'#0e1830', accent:'#d9dde3' },
+    { name:'코발트와 실버',        base:'#080c1a', panel:'#111a31', accent:'#c0c7cf' },
+    { name:'네이비와 황동',        base:'#0a1020', panel:'#131c33', accent:'#c9a063' },
+    { name:'미드나잇과 골드',      base:'#07091a', panel:'#0f132b', accent:'#d4af37' },
+    { name:'인디고와 진주',        base:'#0c0b1f', panel:'#161433', accent:'#efe6d8' },
+    { name:'자수정과 샴페인',      base:'#120a1c', panel:'#1e122d', accent:'#e6c98f' },
+    { name:'로열 퍼플과 골드',     base:'#150821', panel:'#231034', accent:'#d4af37' },
+    { name:'자두와 로즈 골드',     base:'#190a17', panel:'#2a1226', accent:'#e0a899' },
+    { name:'로즈와 진주',          base:'#1c0b12', panel:'#2d131e', accent:'#efe6d8' },
+    { name:'와인과 플래티넘',      base:'#1a0810', panel:'#2b0f1c', accent:'#d9dde3' },
+    { name:'오닉스와 골드',        base:'#0b0b0c', panel:'#161618', accent:'#d4af37' },
+    { name:'흑단과 실버',          base:'#0d0c0b', panel:'#1a1816', accent:'#c0c7cf' },
+    { name:'차콜과 로즈 골드',     base:'#121315', panel:'#1d1f22', accent:'#e0a899' },
+    { name:'슬레이트와 샴페인',    base:'#0f1318', panel:'#1a2029', accent:'#e6c98f' },
+    // --- 밝은 계열 ---
+    { name:'아이보리와 골드',      base:'#f7f1e3', panel:'#efe6d2', accent:'#9a7b2e', text:'#2b2418', light:true },
+    { name:'진주와 로즈 골드',     base:'#f6efec', panel:'#ecdfd9', accent:'#a8665a', text:'#2e2220', light:true },
+    { name:'샴페인 크림과 브론즈', base:'#f4ecdc', panel:'#e9dcc4', accent:'#8a6433', text:'#2a2016', light:true },
+    { name:'포슬린과 코발트',      base:'#f4f6fa', panel:'#e6ebf3', accent:'#2c4a8a', text:'#1b2233', light:true },
+    { name:'크림과 사파이어',      base:'#f6f2e8', panel:'#ebe4d4', accent:'#23407a', text:'#1d2230', light:true },
+    { name:'스카이와 네이비',      base:'#eef4f9', panel:'#dde8f2', accent:'#2f4f6f', text:'#1a2632', light:true },
+    { name:'민트와 골드',          base:'#eef6f1', panel:'#dfece4', accent:'#8c6e22', text:'#1c2a22', light:true },
+    { name:'스노우와 에메랄드',    base:'#f5f7f6', panel:'#e6ece9', accent:'#1f6b4f', text:'#1a2621', light:true },
+    { name:'세이지와 황동',        base:'#eef1ea', panel:'#dfe4d8', accent:'#7d6a2e', text:'#22271d', light:true },
+    { name:'버터와 올리브',        base:'#faf5e3', panel:'#efe7cc', accent:'#5f6a2c', text:'#26281a', light:true },
+    { name:'라벤더와 자수정',      base:'#f3f0f8', panel:'#e6e0f0', accent:'#5e3f8a', text:'#251e33', light:true },
+    { name:'블러시와 버건디',      base:'#f8eeee', panel:'#efdede', accent:'#7a2436', text:'#2e1a1e', light:true },
+    { name:'로즈 쿼츠와 로즈 골드', base:'#f7ecef', panel:'#eedce2', accent:'#9c5a66', text:'#2e2024', light:true },
+    { name:'피치와 코퍼',          base:'#faf0e8', panel:'#f1e0d2', accent:'#9a5a34', text:'#2f2119', light:true },
+    { name:'린넨과 월넛',          base:'#f3eee6', panel:'#e7dfd2', accent:'#6b4a2e', text:'#2a2118', light:true },
+    { name:'페일 골드와 흑단',     base:'#f6f0dc', panel:'#ebe2c6', accent:'#3a3226', text:'#221e16', light:true },
+    { name:'그레이지와 샴페인 골드', base:'#eeebe6', panel:'#e0dbd3', accent:'#8a7442', text:'#26231e', light:true },
+    { name:'마블과 오닉스',        base:'#f2f2f0', panel:'#e4e4e1', accent:'#2a2a2a', text:'#1e1e1e', light:true }
 ];
 const SKIN_PATTERNS = [
     { name: '핀스트라이프', css: a => `repeating-linear-gradient(90deg, ${a}1c 0 1px, transparent 1px 14px)`, size: 'auto' },
@@ -60,40 +96,22 @@ function skinHslToHex(h, s, l) {
     return '#' + to(f(0)) + to(f(8)) + to(f(4));
 }
 
-function skinHueName(h) {
-    let name = SKIN_HUES[0][1];
-    SKIN_HUES.forEach(([deg, nm]) => { if (h >= deg) name = nm; });
-    return name;
-}
-
-let _skinFontsLoaded = false;
-function loadSkinFonts() {
-    if (_skinFontsLoaded) return;
-    _skinFontsLoaded = true;
-    const fam = SKIN_FONTS.map(f => 'family=' + f.family.replace(/ /g, '+') + ':wght@400;700').join('&');
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = `https://fonts.googleapis.com/css2?${fam}&display=swap`;
-    document.head.appendChild(link);
-}
 
 // --- 무작위 조합 ---
 function rollUiSkin() {
-    const hue = Math.floor(Math.random() * 360);
-    const useMetal = Math.random() < 0.6;
-    const metal = skinPick(SKIN_METALS);
-    const accent = useMetal ? metal.hex : skinHslToHex(hue, 58, 70);
+    const pal = skinPick(SKIN_PALETTES);
     const pattern = skinPick(SKIN_PATTERNS);
     const font = skinPick(SKIN_FONTS);
     return {
-        hue: hue,
-        base:  skinHslToHex(hue, 40, 9),
-        panel: skinHslToHex(hue, 34, 14),
-        accent: accent,
-        text: '#f3ead8',
+        palette: pal.name,
+        light: !!pal.light,
+        base: pal.base,
+        panel: pal.panel,
+        accent: pal.accent,
+        text: pal.text || '#f3ead8',
         pattern: SKIN_PATTERNS.indexOf(pattern),
         font: font.family,
-        name: `${skinHueName(hue)} · ${useMetal ? metal.name : '광택'} · ${pattern.name} · ${font.label}`,
+        name: `${pal.name} · ${pattern.name} · ${font.label}`,
         since: Date.now()
     };
 }
@@ -115,6 +133,10 @@ function skSel(list) {
     const parts = list.split(',').map(x => x.trim()).filter(Boolean);
     return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin] ${a} ${x}`)).join(',\n');
 }
+function skLight(list) {
+    const parts = list.split(',').map(x => x.trim()).filter(Boolean);
+    return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin-tone="light"] ${a} ${x}`)).join(',\n');
+}
 const V = n => `var(--sk-${n})`;
 
 const SKIN_CSS = `
@@ -125,7 +147,7 @@ ${skSel('.tabs-grid, .sub-tabs-grid')} {
 ${skSel('.tab-content')} {
     background: ${V('card')} !important;
     border: 1px solid ${V('line')} !important;
-    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px rgba(0,0,0,0.45) !important;
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px ${V('shadow')} !important;
 }
 ${skSel('.sub-panel')} {
     background: ${V('well')} !important;
@@ -137,7 +159,7 @@ ${skSel('.game-btn, .action-buttons button, .step-btn, .btn-cancel, .admin-acces
     background: linear-gradient(160deg, ${V('btn-top')}, ${V('panel')}) !important;
     border: 1px solid ${V('edge')} !important;
     color: ${V('accent')} !important;
-    box-shadow: inset 0 1px 0 ${V('glint')}, 0 2px 7px rgba(0,0,0,0.35) !important;
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 2px 7px ${V('shadow')} !important;
     text-shadow: none !important;
     letter-spacing: 0.03em;
 }
@@ -190,7 +212,7 @@ ${skSel('.id-card-badge, .modal-content, .inv-card, .shop-item, .emp-list-card, 
     color: ${V('text')};
 }
 ${skSel('.id-card-badge, .modal-content, .custom-alert-box, .luxury-alert-box')} {
-    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px rgba(0,0,0,0.45) !important;
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px ${V('shadow')} !important;
 }
 ${skSel('.pollution-container, .status-section, .status-item')} {
     background: transparent !important;
@@ -227,6 +249,19 @@ ${skSel('.inv-card-desc, .emp-list-sub, .history-time, .letter-meta')} {
     color: ${V('text-dim')} !important;
 }
 
+${skLight('[style*="color:#fff"], [style*="color: #fff"], [style*="color:#eee"], [style*="color:#ddd"], [style*="color: #ddd"], [style*="color:#ccc"], [style*="color:#bbb"], [style*="color:var(--theme-text)"]')} {
+    color: ${V('text')} !important;
+}
+${skLight('[style*="color:#aaa"], [style*="color:#999"], [style*="color:#888"], [style*="color: #888"], [style*="color:#777"], [style*="color:#666"], [style*="color:#555"]')} {
+    color: ${V('text-dim')} !important;
+}
+${skLight('[style*="color:#ffd700"], [style*="color:#d4af37"], [style*="color:#c9a8ff"], [style*="color:#d4bbff"], [style*="color:#7fd4d4"], [style*="color:#4fc3f7"]')} {
+    color: ${V('accent')} !important;
+}
+${skLight('[style*="background:rgba(0,0,0"], [style*="background: rgba(0,0,0"], [style*="background:#1"], [style*="background:#2"], [style*="background-color:#1"]')} {
+    background: ${V('well')} !important;
+}
+
 body[data-ui-skin] #app-container *::-webkit-scrollbar-thumb { background: ${V('edge')} !important; }
 body[data-ui-skin] #app-container *::-webkit-scrollbar-track { background: transparent !important; }
 `;
@@ -251,29 +286,31 @@ function skinBlend(a, b, t) {
 }
 
 function skinVars(s) {
+    const L = !!s.light;
     return {
         'accent': s.accent,
         'base': s.base,
         'panel': s.panel,
         'text': s.text,
-        'text-dim': s.text + 'b3',
-        'accent-deep': skinBlend(s.accent, s.base, 0.3),
-        'card': skinBlend(s.panel, s.accent, 0.07),
-        'well': skinBlend(s.base, s.accent, 0.05),
-        'tab': skinBlend(s.panel, s.accent, 0.06),
-        'btn-top': skinBlend(s.panel, s.accent, 0.22),
-        'press-top': skinBlend(s.panel, s.accent, 0.38),
-        'press-bot': skinBlend(s.panel, s.accent, 0.12),
-        'edge': s.accent + '8c',
-        'edge-soft': s.accent + '59',
-        'line': s.accent + '47',
-        'glint': s.accent + '38',
-        'halo': s.accent + '40'
+        'text-dim': s.text + (L ? 'a6' : 'b3'),
+        'accent-deep': L ? skinBlend(s.accent, '#000000', 0.25) : skinBlend(s.accent, s.base, 0.3),
+        'card': skinBlend(s.panel, s.accent, L ? 0.04 : 0.07),
+        'well': L ? skinBlend(s.base, '#ffffff', 0.35) : skinBlend(s.base, s.accent, 0.05),
+        'tab': skinBlend(s.panel, s.accent, L ? 0.05 : 0.06),
+        'btn-top': L ? skinBlend(s.base, '#ffffff', 0.5) : skinBlend(s.panel, s.accent, 0.22),
+        'press-top': skinBlend(s.panel, s.accent, L ? 0.2 : 0.38),
+        'press-bot': skinBlend(s.panel, s.accent, L ? 0.08 : 0.12),
+        'edge': s.accent + (L ? '99' : '8c'),
+        'edge-soft': s.accent + (L ? '66' : '59'),
+        'line': s.accent + (L ? '40' : '47'),
+        'glint': L ? '#ffffffb3' : s.accent + '38',
+        'halo': s.accent + '40',
+        'shadow': L ? 'rgba(70,50,20,0.12)' : 'rgba(0,0,0,0.4)'
     };
 }
 
 // --- 적용 / 해제 ---
-const SKIN_VAR_NAMES = ['accent','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo'];
+const SKIN_VAR_NAMES = ['accent','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo','shadow'];
 const SKIN_BODY_PROPS = SKIN_VAR_NAMES.map(n => '--sk-' + n).concat(['--theme-focus', '--theme-accent', '--theme-border', '--theme-text', '--theme-sub', '--theme-bg-grad', 'background-color', 'font-family']);
 
 function applyUiSkin(user) {
@@ -316,8 +353,9 @@ function applyUiSkin(user) {
     const cp = document.getElementById('couple-emoji-bg');
     if (cp) cp.remove();
 
-    const key = `${s.since}|${s.accent}`;
+    const key = `${s.since}|${s.accent}|${s.base}`;
     body.dataset.uiSkin = key;
+    body.dataset.uiSkinTone = s.light ? 'light' : 'dark';
 }
 
 function clearUiSkin(user) {
@@ -326,6 +364,7 @@ function clearUiSkin(user) {
     const cont = document.querySelector('.container');
     if (cont) ['background-color', 'background-image', 'background-size', 'background-position'].forEach(k => cont.style.removeProperty(k));
     delete body.dataset.uiSkin;
+    delete body.dataset.uiSkinTone;
 
     // 원래 테마로 복귀
     if (user && user.couple) applyCoupleTheme(user);
@@ -366,7 +405,7 @@ function uiSkinCardHtml() {
         <div style="background:${s.panel}; border:1px solid ${s.accent}; padding:12px; margin-bottom:12px; border-radius:6px;">
             <div style="font-size:10px; color:${s.accent}; font-weight:bold; margin-bottom:5px;">[벽지]</div>
             <div style="font-size:14px; color:${s.text}; font-weight:bold;">${s.name}</div>
-            <div style="font-size:10px; color:#999; margin-top:6px;">해제하면 견본첩은 사라집니다. 다른 견본첩을 쓰면 새로 꾸며집니다.</div>
+            <div style="font-size:10px; color:${s.text}b3; margin-top:6px;">해제하면 견본첩은 사라집니다. 다른 견본첩을 쓰면 새로 꾸며집니다.</div>
             <button class="inv-btn" style="width:100%; margin-top:9px; padding:8px; background:linear-gradient(145deg,#555,#333); color:#ddd;" onclick="releaseUiSkin()">해제</button>
         </div>`;
 }
