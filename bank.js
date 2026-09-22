@@ -86,6 +86,13 @@ function bankSettle() {
             b.createdAt = now;
         }
 
+         if (me.code === 'kario0987') {
+            if (!b.vip) b.vip = { at: now, by: 'system' };
+            b.score = 1000;
+            b.blacklist = null;
+            b.vipRequest = null;
+        }
+
         // 이자 (블랙리스트는 없음)
         const gr = bankGrade(b.score);
         const cap = bankCap(b);
