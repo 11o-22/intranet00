@@ -14066,7 +14066,10 @@ function renderTaleCast() {
             loreBarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:14px;">배역을 기다리는 중...</div>`);
         renderLoreBar();
         mountDarkChat('normal');
-        setTimeout(() => renderTaleCast(), 1200);
+                const myStep = darkRun.step;
+        setTimeout(() => {
+            if (darkRun && darkRun.step === myStep && !darkRun.taleRole) renderTaleCast();
+        }, 1200);
         return;
     }
 

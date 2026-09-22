@@ -1021,6 +1021,10 @@
                 <button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
                 <button class="game-btn" style="flex:1; margin:0; background:linear-gradient(145deg, #ffd700, #daa520); color:#000; font-weight:bold; border-color:#b8860b; padding:10px;" onclick="adminAdjustCredit()">신용 점수 조정</button>
             </div>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminBankBlacklist(true)">은행 블랙리스트</button>
+                <button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="adminBankBlacklist(false)">블랙리스트 해제</button>
+            </div>
         </div>
 
         <!-- 타 사원 오염도 직접 제어 패널 -->
@@ -2654,6 +2658,16 @@ function partyAdvance(nextStep) {
     renderAdvanceWait(nextStep);
 }
 
+    // 각자 진행하는 단계는 오래 기다린다
+    function advTimeout(fromStep) {
+        if (!darkRun) return 6000;
+        if (darkRun.zone === 'Qtrew-S-003' && typeof S003_STEPS !== 'undefined') {
+            const def = S003_STEPS[fromStep];
+            if (def && ['cast', 'tale', 'lore', 'page'].includes(def.type)) return 45000;
+        }
+        return 6000;
+    }
+
 function renderAdvanceWait(nextStep) {
     const pid = darkRun.partyId;
     const ref = database.ref(`darkParties/${pid}/ready${nextStep}`);
@@ -2692,7 +2706,7 @@ function renderAdvanceWait(nextStep) {
         if (cur != null && cur >= nextStep) go();
     });
 
-    setTimeout(go, 6000);                      // ★ 무조건 실행되는 안전장치
+       setTimeout(go, advTimeout(darkRun.step));                    // ★ 무조건 실행되는 안전장치
 
     const body = darkBodyEl();
     if (body) {
