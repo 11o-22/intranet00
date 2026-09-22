@@ -762,12 +762,12 @@ function s003Dice(roll, bonus, DC, ok) {
     return `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus >= 0 ? '+' : ''}${bonus} / DC ${DC})</span></div>`;
 }
 
-function s003SetSolo(on) {
+function s003SetSolo(on, lair) {
     if (!darkRun) return;
     darkRun.solo = !!on;
     if (!database || !darkRun.isParty) return;
     const ref = database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`);
-    if (on) ref.set({ name: currentUser.name, at: Date.now(), zone: 'S-003' });
+    if (on) ref.set({ name: currentUser.name, at: Date.now(), zone: 'S-003', lair: !!lair });
     else ref.remove();
 }
 
@@ -854,12 +854,25 @@ function s003Abd(id) {
 function renderS003Abduct(n) {
     const body = darkBodyEl();
     const myStep = darkRun.step;
-
-    // 파티가 아니거나 이미 떨어져 있으면 넘어간다
-    if (!database || !darkRun.isParty || darkRun.solo) { partyAdvance(myStep + 1); return; }
-
     const pid = darkRun.partyId;
     const key = `s003abd${n}`;
+
+    // ★ 이전 화면의 타이머 정리
+    clearTimeout(darkRun._abdT1);
+    clearTimeout(darkRun._abdT2);
+
+    if (!database || !darkRun.isParty) { partyAdvance(myStep + 1); return; }
+
+    // ★ 흩어져 있으면 자동으로 넘기지 않고 알려만 준다
+    if (darkRun.solo) {
+        body.innerHTML = darkBox("—",
+            `멀리 다른 장에서 비명이 들린다.<br><br>
+             누구 목소리인지는 모르겠다. 지금은 여기서 갈 수 없다.`,
+            loreBarHtml() + darkChoiceBtn("계속 읽는다.", `partyAdvance(${myStep + 1})`));
+        renderLoreBar(); mountDarkChat('normal');
+        return;
+    }
+
     const done = darkRun['_' + key];
     if (done) {
         body.innerHTML = darkBox("—", `책장이 조용해졌다.<br><br>일행은 아직 앞에 있다.`,
@@ -896,17 +909,20 @@ function renderS003Abduct(n) {
     };
 
     if (darkRun.isLeader) pick();
-    const t1 = setTimeout(() => { if (darkRun && darkRun.step === myStep && !shown) pick(); }, 3000);
-    const t2 = setTimeout(() => {
+    darkRun._abdT1 = setTimeout(() => {
+        if (darkRun && darkRun.step === myStep && !shown) pick();
+    }, 3000);
+    darkRun._abdT2 = setTimeout(() => {
         if (darkRun && darkRun.step === myStep && !shown) { try { ref.off(); } catch (e) {} partyAdvance(myStep + 1); }
-    }, 10000);
+    }, 15000);
 
     try { ref.off(); } catch (e) {}
     ref.on('value', sn => {
         const m = sn.val();
         if (!m || !m.target || !darkRun || darkRun.step !== myStep || shown) return;
         shown = true;
-        clearTimeout(t1); clearTimeout(t2);
+        clearTimeout(darkRun._abdT1);
+        clearTimeout(darkRun._abdT2);
         try { ref.off(); } catch (e) {}
 
         const a = s003Abd(m.abd);
@@ -928,7 +944,6 @@ function renderS003Abduct(n) {
         renderLoreBar(); mountDarkChat('normal');
     });
 }
-
 function s003Resist(n) {
     if (!darkRun) return;
     const cur = darkRun._s003AbdCur || {};
@@ -971,7 +986,7 @@ function s003Resist(n) {
     darkRun.fail++;
     addLore(6, `${a.name}에게 끌려감`);
     applyPollutionToUser(currentUser, 8);
-    s003SetSolo(true);
+    s003SetSolo(true, true);
     darkRun.s003Lair = { n: n, abd: a.id };
     sendPartyChat(`${currentUser.name} 사원이 ${a.name}에게 끌려갔습니다.`, true);
 

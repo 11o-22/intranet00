@@ -2718,13 +2718,22 @@ function partyAdvance(nextStep) {
 }
 
     // 각자 진행하는 단계는 오래 기다린다
-    function advTimeout(fromStep) {
+        function advTimeout(fromStep) {
         if (!darkRun) return 6000;
         if (darkRun.zone === 'Qtrew-S-003' && typeof S003_STEPS !== 'undefined') {
             const def = S003_STEPS[fromStep];
             if (def && ['cast', 'tale', 'lore', 'page', 'scatter', 'sscene', 'regroup', 'abduct'].includes(def.type)) return 45000;
+            return 25000;   // S-003 은 읽을 글이 많아 일반 단계도 넉넉히
         }
         return 6000;
+    }
+
+        function advTotal() {
+        const base = getPartyMemberCount();
+        const p = darkRun && darkParties[darkRun.partyId];
+        if (!p || !p.solo) return base;
+        const away = Object.values(p.solo).filter(s => s && s.lair).length;
+        return Math.max(1, base - away);
     }
 
 function renderAdvanceWait(nextStep) {
@@ -2753,7 +2762,7 @@ function renderAdvanceWait(nextStep) {
     ref.on('value', snap => {
         if (finished || !darkRun) return;
         const cnt = Object.keys(snap.val() || {}).length;
-        const total = getPartyMemberCount();
+        const total = advTotal();
         const el = document.getElementById('adv-wait');
         if (el) el.innerText = `${cnt} / ${total}명 준비`;
         if (cnt >= total) go();
