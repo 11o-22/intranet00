@@ -5113,7 +5113,7 @@ const cpMark = cp ? `<span style="color:${cp.hex}; margin-left:4px;" title="${cp
 
                         const listGear = getGear(u);
             const gearTag = listGear && listGear.attrs && listGear.attrs.length
-                ? `<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">${GEAR_MARK[listGear.grade] || ''}${listGear.icon} ${listGear.name}</div>`
+                ? `<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">${gearLabel(u)}</div>`
                 : '';
 
             return `
@@ -5803,7 +5803,9 @@ if (bcEl) {
 
             targetUser.hasItemUsedOnMe = true;
            if (item !== '💍 커플링') removeItemFromInventory(currentUser, item, 1);
-            addHistoryLog(currentUser, `[아이템 사용] ${targetUser.name} 사원에게 '${item}' 사용`);
+                        addHistoryLog(currentUser, String((ITEM_CATALOG[item] || {}).effect || '').startsWith('equip')
+                ? `[장비 장착] ${targetUser.name} 사원에게 '${item}' 장착`
+                : `[아이템 사용] ${targetUser.name} 사원에게 '${item}' 사용`);
 
             const stamp = Date.now();
             const updates = {};
@@ -5847,7 +5849,8 @@ if (bcEl) {
         if (myGear) {
             const hasAttr = myGear.attrs && myGear.attrs.length > 0;
             const canPick = (myGear.attrs || []).length < (myGear.slots || 1);
-            const up = GEAR_UPGRADE[myGear.grade];
+                        const up = (myGear.attrs && myGear.attrs.length ? myGear.attrs : [null])
+                .some((a, i) => GEAR_UPGRADE[i === 0 ? myGear.grade : gearAttrGrade(myGear, a)]);
             const mats = ['맞물리지 않는 조각', '지워지지 않는 자국', '반죽에 섞이지 않은 것'];
             const hasAllMats = mats.every(m => (currentUser.inventory || []).includes(m));
             const hasSlotItem = (currentUser.inventory || []).includes('두 번째 자리');
@@ -5861,11 +5864,12 @@ if (bcEl) {
                     </div>
                     <div style="font-size:11px; color:#aaa; margin-top:7px; line-height:1.7;">
                         ${hasAttr
-                            ? myGear.attrs.map(a => `<span style="color:#d4bbff; font-weight:bold;">${GEAR_ATTRS[a].icon} ${GEAR_ATTRS[a].name}</span>`).join('<br>')
+                    ? myGear.attrs.map((a, i) => `<span style="color:#d4bbff; font-weight:bold;">${GEAR_ATTRS[a].icon} ${GEAR_ATTRS[a].name} <span style="color:#fff;">${i === 0 ? myGear.grade : gearAttrGrade(myGear, a)}</span></span>`).join('<br>')
                             : '<span style="color:#ff9800;">속성이 없습니다. 선택해야 효력이 생깁니다.</span>'}
                     </div>
                     <div style="font-size:10px; color:#666; margin-top:8px;">
                         속성 ${(myGear.attrs || []).length} / ${myGear.slots || 1} · 사망해도 소실되지 않습니다
+                                            ${currentUser.gearBlank ? `<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">◈ 빈 각인지 부착 — 다음 속성이 한 단계 높게 새겨집니다</div>` : ''}
                     </div>
                     <div style="display:flex; gap:5px; margin-top:11px; flex-wrap:wrap;">
                         ${canPick ? `<button class="inv-btn inv-btn-target" style="flex:1; min-width:78px;" onclick="openGearAttrPick()">속성 선택</button>` : ''}
@@ -5993,10 +5997,11 @@ if (isUsable) {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', false)">대상 지정</button>`;
                     } else if (cat.effect === 'target_sticker') {
                         useBtnHtml = `<button class="inv-btn inv-btn-target" onclick="useInventoryItem('${item}')">타인 부착</button>`;
-                    } else if (isTargetable) {
+                        } else if (isTargetable) {
+                        const eqWord = String(cat.effect || '').startsWith('equip') ? '장착 ' : '';
                         useBtnHtml = `
-                            <button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">본인</button>
-                            <button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', true)">타인</button>
+                            <button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">${eqWord}본인</button>
+                            <button class="inv-btn inv-btn-target" onclick="openItemTargetModal('${item}', true)">${eqWord}타인</button>
                         `;
                     } else {
                         useBtnHtml = `<button class="inv-btn inv-btn-use" onclick="useInventoryItem('${item}')">사용</button>`;
@@ -6413,6 +6418,7 @@ if (cat.effect === 'couple_ring') {
             const g = getGear(currentUser);
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
             if ((g.attrs || []).length >= (g.slots || 1)) { showCustomAlert('새길 자리가 없습니다.'); return; }
+            if (currentUser.gearBlank) { showCustomAlert('이미 빈 각인지가 붙어 있습니다.\n다음 속성을 새긴 뒤에 쓸 수 있습니다.'); return; }
             currentUser.gearBlank = true;
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 빈 각인지 — 다음 속성이 한 단계 높게 새겨집니다.`);
@@ -6450,7 +6456,6 @@ if (cat.effect === 'couple_ring') {
             if (currentUser.darkTicketFree) { showCustomAlert('이미 승차권 효과가 적용 중입니다.'); return; }
             currentUser.darkTicketFree = true;
             removeItemFromInventory(currentUser, itemName, 1);
-           addHistoryLog(`[1시 17분 버스표] 다음 어둠 탐사 1회의 오염 상승이 면제됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 1시 17분 버스표 개찰`);
             saveSelfFull(); updateUI();
             showCustomAlert('승차권을 개찰했습니다. 다음 탐사에서는 오염도가 오르지 않습니다.');
@@ -6461,7 +6466,6 @@ if (cat.effect === 'couple_ring') {
             if (currentUser.darkCatalogBonus) { showCustomAlert('이미 도록의 효과가 적용 중입니다.'); return; }
             currentUser.darkCatalogBonus = true;
             removeItemFromInventory(currentUser, itemName, 1);
-           addHistoryLog(`[전시 안내 도록] 다음 어둠 탐사의 첫 판정에 +2 보정이 적용됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 전시 안내 도록 숙독`);
             saveSelfFull();updateUI();
             showCustomAlert('도록을 읽었습니다. 다음 탐사의 첫 판정이 조금 수월해집니다.');
@@ -6560,24 +6564,24 @@ if (cat.effect === 'couple_ring') {
             if (currentUser.darkExtraReroll) { showCustomAlert('이미 재굴림 권한을 보유하고 있습니다.'); return; }
             currentUser.darkExtraReroll = true;
             removeItemFromInventory(currentUser, itemName, 1);
-           addHistoryLog(`[세 번째 단어] 다음 어둠 탐사에서 판정 1회를 다시 굴릴 수 있습니다.`);
+           
             addHistoryLog(currentUser, `[아이템 사용] 세 번째 단어 발화`);
             saveSelfFull(); updateUI();
             showCustomAlert('무언가를 말했다. 무슨 말이었는지 기억나지 않는다.');
             return;
 
+            }
+
             if (cat.effect === 'maze_map') {
             if (currentUser.darkMazeMap) { showCustomAlert('이미 안내도 효과가 적용 중입니다.'); return; }
             currentUser.darkMazeMap = 2;
             removeItemFromInventory(currentUser, itemName, 1);
-           addHistoryLog(`[접힌 안내도] 다음 어둠 탐사의 첫 두 판정에 +1 보정이 적용됩니다.`);
             addHistoryLog(currentUser, `[아이템 사용] 접힌 안내도 펼침`);
             saveSelfFull(); updateUI();
             showCustomAlert('안내도를 펼쳤습니다. 이번에는 읽을 만한 그림이 나왔습니다.');
             return;
         }
                          
-    }
 
         // ★ 사라졌던 장착 아이템 판별 조건문 복구
           if (cat.effect === 'equip' || cat.effect === 'equip_bloodbath' || cat.effect === 'equip_fox_bead' || cat.effect === 'equip_amulet' || cat.effect === 'equip_silver_ring' || cat.effect === 'equip_butter_knife' || cat.effect === 'equip_dead_bulb' || cat.effect === 'equip_rabbit' || cat.effect === 'equip_security' || cat.effect === 'equip_jakdu' || cat.effect === 'equip_liner' || cat.effect === 'equip_silica' || cat.effect === 'equip_foil' || cat.effect === 'equip_lion') { if (cat.effect === 'equip_bloodbath' && currentUser.bloodBathDailyUsedMs >= 3 * 3600 * 1000) {
@@ -6617,7 +6621,8 @@ if (cat.effect === 'couple_ring') {
             if (usedSuccessfully) {
     currentUser.noteGlowUntil = Date.now() + 5000;
     removeItemFromInventory(currentUser, itemName, 1);
-    addHistoryLog(currentUser, `[물품 사용] ${itemName} 소모`);
+        addHistoryLog(currentUser, String(cat.effect || '').startsWith('equip')
+        ? `[장비 장착] ${itemName}` : `[물품 사용] ${itemName} 소모`);
     saveSelfFull().then(() => updateUI());
 }
     }
@@ -9487,7 +9492,7 @@ function admItemSelectNone() {
             <div style="max-height:160px; overflow-y:auto; padding-right:3px;">` +
             owners.map(u => {
                 const g = u.soulGear;
-                const attrs = (g.attrs || []).map(a => GEAR_ATTRS[a] ? GEAR_ATTRS[a].icon + GEAR_ATTRS[a].name : a).join(' · ') || '미지정';
+                                const attrs = (g.attrs || []).map((a, i) => (GEAR_ATTRS[a] ? GEAR_ATTRS[a].icon + GEAR_ATTRS[a].name : a) + ' ' + (i === 0 ? g.grade : gearAttrGrade(g, a))).join(' · ') || '미지정';
                 return `
                     <div style="background:rgba(0,0,0,0.3); border:1px solid #4a3a6a; border-radius:5px; padding:8px 10px; margin-bottom:5px; font-size:10px;">
                         <span style="color:#fff; font-weight:bold;">${u.name}</span>
