@@ -2,12 +2,13 @@
 // ★ 사내 은행
 // ==========================================
 const BANK_GRADES = [
-    { g:1, min:850, cap:500000, rate:0.006, loan:60000, fee:0.03, label:'1등급' },
-    { g:2, min:700, cap:150000, rate:0.005, loan:20000, fee:0.05, label:'2등급' },
-    { g:3, min:500, cap:50000,  rate:0.004, loan:5000,  fee:0.08, label:'3등급' },
-    { g:4, min:300, cap:20000,  rate:0.003, loan:1000,  fee:0.12, label:'4등급' },
-    { g:5, min:0,   cap:5000,   rate:0.002, loan:0,     fee:0,    label:'5등급' }
+    { g:1, min:850, cap:10000000, rate:0.006, loan:60000, fee:0.03, label:'1등급' },
+    { g:2, min:700, cap:3000000,  rate:0.005, loan:20000, fee:0.05, label:'2등급' },
+    { g:3, min:500, cap:500000,   rate:0.004, loan:5000,  fee:0.08, label:'3등급' },
+    { g:4, min:300, cap:200000,   rate:0.003, loan:1000,  fee:0.12, label:'4등급' },
+    { g:5, min:0,   cap:50000,    rate:0.002, loan:0,     fee:0,    label:'5등급' }
 ];
+const BANK_VIP = { cap: 30000000, label: 'VIP' };
 const BANK_LOAN_DAYS = 3;
 const BANK_DAY = 24 * 60 * 60 * 1000;
 
@@ -24,7 +25,10 @@ function bankPath(code) { return 'bank/' + code; }
 function bankGrade(score) {
     return BANK_GRADES.find(x => (score || 0) >= x.min) || BANK_GRADES[BANK_GRADES.length - 1];
 }
-function bankCap(b) { return bankGrade(b && b.score).cap + ((b && b.capBonus) || 0); }
+function bankCap(b) {
+    const base = (b && b.vip && !b.blacklist) ? BANK_VIP.cap : bankGrade(b && b.score).cap;
+    return base + ((b && b.capBonus) || 0);
+}
 function bankClamp(s) { return Math.max(0, Math.min(1000, s)); }
 function bankOverdue(b) { return !!(b && b.loan && Date.now() > b.loan.dueAt); }
 function bankBlack(b) { return !!(b && b.blacklist); }
@@ -84,7 +88,7 @@ function bankSettle() {
 
         // 이자 (블랙리스트는 없음)
         const gr = bankGrade(b.score);
-        const cap = gr.cap + (b.capBonus || 0);
+        const cap = bankCap(b);
         const days = Math.floor((now - (b.lastInterest || now)) / BANK_DAY);
         if (days > 0) {
             if ((b.deposit || 0) > 0 && !b.blacklist) {
@@ -115,7 +119,7 @@ function bankSettle() {
             else if (overDays >= 5) b.loan.seize = true;
         }
 
-        if (b.blacklist) b.score = 0;
+        if (b.blacklist) { b.score = 0; b.vip = null; b.vipRequest = null; }
         return b;
     }).then(res => {
         const b = res.snapshot && res.snapshot.val();
@@ -252,6 +256,8 @@ function bankBorrow() {
         if (recent.length >= BANK_BL_LOANS) {
             b.blacklist = { at: now, reason: '24시간 안에 대출을 반복함', by: 'system' };
             b.score = 0;
+            b.vip = null;           // ★ 추가
+            b.vipRequest = null;
             b.lastOp = 'blacklisted';
             return b;
         }
@@ -366,8 +372,9 @@ function checkVIPStatus() {
     if (!el) return;
     if (!bankState) { el.innerHTML = '-'; return; }
     if (bankBlack(bankState)) { el.innerHTML = '<span style="color:#f44336;">블랙리스트</span>'; return; }
-    const gr = bankGrade(bankState.score);
-    el.innerHTML = gr.label + (bankOverdue(bankState) ? '<span style="color:#f44336;"> 연체</span>' : '');
+    const late = bankOverdue(bankState) ? '<span style="color:#f44336;"> 연체</span>' : '';
+    if (bankState.vip) { el.innerHTML = '<span style="color:#d4af37;">VIP</span>' + late; return; }
+    el.innerHTML = bankGrade(bankState.score).label + late;
 }
 
 // --- 화면 ---
@@ -384,6 +391,7 @@ function renderBank() {
 
     const b = bankState;
     const black = bankBlack(b);
+    const vip = !!b.vip && !black;
     const score = b.score || 0;
     const gr = bankGrade(score);
     const cap = bankCap(b);
@@ -391,7 +399,8 @@ function renderBank() {
     const loan = b.loan;
     const overdue = bankOverdue(b);
     const recent = bankRecentLoans(b);
-    const gradeColor = black ? '#f44336' : ({ 1:'#d4af37', 2:'#c9a8ff', 3:'#4fc3f7', 4:'#aaa', 5:'#777' }[gr.g]);
+    const gradeColor = black ? '#f44336' : vip ? '#d4af37' : ({ 1:'#d4af37', 2:'#c9a8ff', 3:'#4fc3f7', 4:'#aaa', 5:'#777' }[gr.g]);
+    const man = n => (n >= 10000 ? (n / 10000).toLocaleString() + '만' : n.toLocaleString());
 
     let html = `<div class="panel-title">[사내 은행]</div>`;
 
@@ -407,19 +416,47 @@ function renderBank() {
 
     // 신용
     html += `
-        <div style="background:rgba(0,0,0,0.35); border:1px solid var(--theme-border); border-radius:8px; padding:14px; margin-bottom:14px;">
+        <div style="background:rgba(0,0,0,0.35); border:1px solid ${vip ? '#d4af37' : 'var(--theme-border)'}; border-radius:8px; padding:14px; margin-bottom:14px;">
             <div style="display:flex; justify-content:space-between; align-items:baseline;">
                 <span style="font-size:11px; color:#888;">신용 등급</span>
-                <span style="font-size:20px; font-weight:bold; color:${gradeColor};">${black ? '블랙리스트' : gr.label}</span>
+                <span style="font-size:20px; font-weight:bold; color:${gradeColor};">${black ? '블랙리스트' : vip ? 'VIP' : gr.label}</span>
             </div>
             <div style="width:100%; height:7px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden; margin:9px 0 5px 0;">
                 <div style="height:100%; width:${score / 10}%; background:${gradeColor};"></div>
             </div>
             <div style="font-size:10px; color:#888; display:flex; justify-content:space-between;">
                 <span>${score} / 1000</span>
-                <span>${black ? '점수 동결' : next ? `${next.label}까지 ${next.min - score}점` : '최고 등급'}</span>
+                <span>${black ? '점수 동결' : vip ? 'VIP 회원' : next ? `${next.label}까지 ${next.min - score}점` : 'VIP는 심사가 필요합니다'}</span>
             </div>
         </div>`;
+
+    // VIP
+    html += `<div style="background:rgba(212,175,55,0.06); border:1px solid #5a4a2a; border-radius:6px; padding:13px; margin-bottom:14px;">
+        <div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:8px;">VIP</div>`;
+    if (vip) {
+        html += `<div style="font-size:11px; color:#ccc; line-height:1.8;">
+                VIP 회원입니다. 예금 한도 <b style="color:#d4af37;">${man(BANK_VIP.cap)} P</b><br>
+                <span style="font-size:10px; color:#888;">승인일 ${new Date(b.vip.at).toLocaleDateString()}</span>
+            </div>`;
+    } else if (b.vipRequest) {
+        html += `<div style="font-size:11px; color:#ffb74d; line-height:1.8;">
+                심사 대기 중입니다.<br>
+                <span style="color:#aaa;">상담사에게 찾아가 심사를 받으세요.</span>
+            </div>`;
+    } else if (black) {
+        html += `<div style="font-size:11px; color:#666; text-align:center; padding:6px 0;">거래 정지 상태에서는 신청할 수 없습니다.</div>`;
+    } else if (score >= 850) {
+        const cool = b.vipRejectedAt && (Date.now() - b.vipRejectedAt < BANK_DAY);
+        html += `<div style="font-size:10px; color:#888; line-height:1.7; margin-bottom:10px;">
+                1등급 사원은 VIP 심사를 신청할 수 있습니다.<br>
+                승인되면 예금 한도가 ${man(BANK_VIP.cap)} P가 됩니다.
+                ${cool ? `<br><span style="color:#ff9800;">최근 반려되었습니다. ${bankFmtLeft(BANK_DAY - (Date.now() - b.vipRejectedAt))} 뒤 다시 신청할 수 있습니다.</span>` : ''}
+            </div>
+            <button class="game-btn" style="width:100%; margin:0; padding:10px;" onclick="bankApplyVip()" ${cool || overdue ? 'disabled' : ''}>VIP 심사 신청</button>`;
+    } else {
+        html += `<div style="font-size:11px; color:#666; text-align:center; padding:6px 0;">🔒 1등급 달성 후 심사를 신청할 수 있습니다.</div>`;
+    }
+    html += `</div>`;
 
     // 예금
     html += `
@@ -484,16 +521,19 @@ function renderBank() {
     html += `
         <details style="font-size:10px; color:#888;">
             <summary style="cursor:pointer; margin-bottom:8px;">등급별 혜택 보기</summary>
+            <div style="display:flex; justify-content:space-between; padding:5px 3px; border-bottom:1px solid rgba(255,255,255,0.05); color:#d4af37; ${vip ? 'font-weight:bold;' : ''}">
+                <span>VIP (심사)</span>
+                <span>예금 ${man(BANK_VIP.cap)} · 1등급 혜택 동일</span>
+            </div>
             ${BANK_GRADES.map(x => `
-                <div style="display:flex; justify-content:space-between; padding:5px 3px; border-bottom:1px solid rgba(255,255,255,0.05); ${(!black && x.g === gr.g) ? 'color:var(--theme-focus); font-weight:bold;' : ''}">
+                <div style="display:flex; justify-content:space-between; padding:5px 3px; border-bottom:1px solid rgba(255,255,255,0.05); ${(!black && !vip && x.g === gr.g) ? 'color:var(--theme-focus); font-weight:bold;' : ''}">
                     <span>${x.label} (${x.min}+)</span>
-                    <span>예금 ${(x.cap / 1000)}K · ${(x.rate * 100).toFixed(1)}% · 대출 ${x.loan ? (x.loan / 1000) + 'K' : '불가'}</span>
+                    <span>예금 ${man(x.cap)} · ${(x.rate * 100).toFixed(1)}% · 대출 ${x.loan ? man(x.loan) : '불가'}</span>
                 </div>`).join('')}
         </details>`;
 
     box.innerHTML = html;
 }
-
 // --- 관리자: 신용 점수 조정 ---
 function adminAdjustCredit() {
     const targets = getAdminTargets();
@@ -522,6 +562,8 @@ function adminBankBlacklist(on) {
                     b = b || {};
                     b.blacklist = { at: Date.now(), reason: reason, by: 'admin' };
                     b.score = 0;
+                    b.vip = null;           // ★ 추가
+                    b.vipRequest = null;  
                     return b;
                 });
             });
@@ -539,4 +581,108 @@ function adminBankBlacklist(on) {
         });
         showCustomAlert(`${targets.length}명의 블랙리스트를 해제했습니다.\n신용 300점(4등급)부터 다시 시작합니다.`);
     }
+}
+
+// ==========================================
+// ★ VIP 심사
+// ==========================================
+function bankApplyVip() {
+    if (!buyGuard()) return;
+    const b = bankState;
+    if (!b || !database) return;
+    if (b.vip) { showCustomAlert('이미 VIP 회원입니다.'); return; }
+    if (bankBlack(b)) { showCustomAlert('거래 정지 상태에서는 신청할 수 없습니다.'); return; }
+    if ((b.score || 0) < 850) { showCustomAlert('1등급만 신청할 수 있습니다.'); return; }
+    if (b.vipRequest) { showCustomAlert('이미 심사 대기 중입니다.'); return; }
+    if (bankOverdue(b)) { showCustomAlert('연체 중에는 신청할 수 없습니다.'); return; }
+    if (b.vipRejectedAt && Date.now() - b.vipRejectedAt < BANK_DAY) { showCustomAlert('반려 후 24시간이 지나야 다시 신청할 수 있습니다.'); return; }
+
+    database.ref(bankPath(currentUser.code) + '/vipRequest').set({
+        at: Date.now(), score: b.score, name: currentUser.name, no: currentUser.no
+    });
+    addHistoryLog(currentUser, '[은행] VIP 심사를 신청했습니다.');
+    saveFields({ history: 1 });
+    showCustomAlert('VIP 심사를 신청했습니다.\n\n상담사에게 찾아가 심사를 받으세요.');
+}
+
+// --- 관리자 ---
+function renderAdminVipList() {
+    const box = document.getElementById('admin-vip-list');
+    if (!box || !database) return;
+    box.innerHTML = `<div style="font-size:10px; color:#888; padding:8px 0;">불러오는 중...</div>`;
+
+    database.ref('bank').once('value').then(snap => {
+        const all = snap.val() || {};
+        const reqs = [], vips = [];
+        Object.keys(all).forEach(code => {
+            const b = all[code];
+            if (b && b.vipRequest) reqs.push({ code, b });
+            if (b && b.vip) vips.push({ code, b });
+        });
+        const nameOf = c => db.users[c] ? `${db.users[c].name} · ${db.users[c].no}` : c;
+
+        let html = `<div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:6px;">심사 대기 (${reqs.length})</div>`;
+        html += reqs.length ? reqs.map(({ code, b }) => `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid #5a4a2a; border-radius:5px; padding:9px 10px; margin-bottom:6px;">
+                <div style="font-size:12px; color:#fff; font-weight:bold;">${nameOf(code)}</div>
+                <div style="font-size:10px; color:#888; margin:3px 0 8px 0;">
+                    신용 ${b.score} · 예금 ${(b.deposit || 0).toLocaleString()} P · 신청 ${new Date(b.vipRequest.at).toLocaleString()}
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="game-btn" style="flex:1; margin:0; padding:7px; font-size:11px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminVipDecide('${code}', true)">승인</button>
+                    <button class="game-btn" style="flex:1; margin:0; padding:7px; font-size:11px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminVipDecide('${code}', false)">반려</button>
+                </div>
+            </div>`).join('')
+            : `<div style="font-size:10px; color:#666; padding:4px 0 10px 0;">대기 중인 신청이 없습니다.</div>`;
+
+        html += `<div style="font-size:10px; color:#d4af37; font-weight:bold; margin:10px 0 6px 0;">VIP 회원 (${vips.length})</div>`;
+        html += vips.length ? vips.map(({ code, b }) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); border:1px solid #333; border-radius:5px; padding:7px 10px; margin-bottom:5px;">
+                <span style="font-size:11px; color:#ddd;">${nameOf(code)}
+                    <span style="font-size:9px; color:#888;"> · ${new Date(b.vip.at).toLocaleDateString()}</span>
+                </span>
+                <button class="game-btn" style="margin:0; padding:5px 10px; font-size:10px;" onclick="adminVipRevoke('${code}')">박탈</button>
+            </div>`).join('')
+            : `<div style="font-size:10px; color:#666; padding:4px 0;">VIP 회원이 없습니다.</div>`;
+
+        box.innerHTML = html;
+    });
+}
+
+function adminVipDecide(code, ok) {
+    if (!database) return;
+    database.ref(bankPath(code)).transaction(b => {
+        if (!b || !b.vipRequest) return;
+        if (ok) b.vip = { at: Date.now(), by: 'admin' };
+        else b.vipRejectedAt = Date.now();
+        b.vipRequest = null;
+        return b;
+    }).then(res => {
+        if (!res.committed) { showCustomAlert('이미 처리된 신청입니다.'); renderAdminVipList(); return; }
+        const u = db.users[code];
+        if (u) {
+            addHistoryLog(u, ok ? '[은행] VIP 심사를 통과했습니다.' : '[은행] VIP 심사에서 반려되었습니다.');
+            updateUserFields(code, { history: u.history });
+        }
+        showCustomAlert(ok ? 'VIP로 승인했습니다.' : '반려했습니다.');
+        renderAdminVipList();
+    });
+}
+
+function adminVipRevoke(code) {
+    if (!database) return;
+    database.ref(bankPath(code)).transaction(b => {
+        if (!b || !b.vip) return;
+        b.vip = null;
+        return b;
+    }).then(res => {
+        if (!res.committed) return;
+        const u = db.users[code];
+        if (u) {
+            addHistoryLog(u, '[은행] VIP 자격이 박탈되었습니다.');
+            updateUserFields(code, { history: u.history });
+        }
+        showCustomAlert('VIP 자격을 박탈했습니다.');
+        renderAdminVipList();
+    });
 }
