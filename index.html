@@ -1141,6 +1141,21 @@
     </select>
     <button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminSetGearGrade()">등급 설정</button>
 </div>
+<div style="display:flex; gap:6px; margin-top:7px;">
+    <select id="adm-gear-slot" style="flex:1; font-size:11px;">
+        <option value="1">2번째 속성</option>
+        <option value="2">3번째 속성</option>
+    </select>
+    <select id="adm-gear-attr-grade" style="flex:1; font-size:11px;">
+        <option value="D">D등급</option>
+        <option value="C">C등급</option>
+        <option value="B">B등급</option>
+        <option value="A">A등급</option>
+        <option value="S">S등급</option>
+        <option value="L">L등급</option>
+    </select>
+    <button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminSetGearAttrGrade()">속성 등급</button>
+</div>
             <div id="admin-gear-list" style="margin-top:12px;"></div>
         </div>
         <div class="admin-panel-box" style="border-color: #882222; background-color: #221111;">
@@ -9490,6 +9505,43 @@ function admItemSelectNone() {
         updateUI();
         renderAdminGearList();
         showCustomAlert(names.length ? `${names.length}명의 전용 장비를 회수했습니다.\n(${names.join(', ')})` : '회수할 장비가 없습니다.');
+    }
+
+        function adminSetGearAttrGrade() {
+        const targets = getAdminTargets();
+        if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+        if (!database) return;
+
+        const idx = parseInt(document.getElementById('adm-gear-slot').value, 10);
+        const grade = document.getElementById('adm-gear-attr-grade').value;
+        const done = [], skipped = [];
+
+        const jobs = targets.map(code => {
+            const u = db.users[code];
+            const g = u && u.soulGear;
+            const attr = g && g.attrs && g.attrs[idx];
+            if (!attr) { if (u) skipped.push(u.name); return null; }
+
+            const nm = GEAR_ATTRS[attr] ? GEAR_ATTRS[attr].name : attr;
+            const tmp = { history: (u.history || []).slice() };
+            addHistoryLog(tmp, `[당국 개입] '${g.name}'의 ${nm} 속성이 ${grade}등급으로 조정되었습니다.`);
+            done.push(`${u.name}(${nm})`);
+
+            if (code === currentUser.code) {
+                if (!g.attrGrades) g.attrGrades = {};
+                g.attrGrades[attr] = grade;
+            }
+            return database.ref(`users/${code}/soulGear/attrGrades/${attr}`).set(grade)
+                .then(() => updateUserFields(code, { history: tmp.history }));
+        }).filter(Boolean);
+
+        Promise.all(jobs).then(() => { renderAdminGearList(); updateUI(); })
+            .catch(e => { console.error('속성 등급 설정 실패:', e); showCustomAlert('서버 저장 중 오류가 발생했습니다.'); });
+
+        showCustomAlert(
+            (done.length ? `${idx + 1}번째 속성을 ${grade}등급으로 설정했습니다.\n${done.join(', ')}` : '설정된 사원이 없습니다.') +
+            (skipped.length ? `\n\n해당 칸에 속성이 없음: ${skipped.join(', ')}` : '')
+        );
     }
 
     function renderAdminGearList() {
