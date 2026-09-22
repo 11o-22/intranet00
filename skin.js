@@ -5,7 +5,7 @@
 
 // --- 아이템 등록 ---
 ITEM_CATALOG['벽지 견본첩'] = {
-    price: 10000, usable: true, targetable: false, effect: 'ui_skin',
+    price: 4500, usable: true, targetable: false, effect: 'ui_skin',
     desc: '넘길 때마다 다른 방이 나온다. 사용하면 단말의 색·무늬·글꼴이 무작위로 바뀐다. 해제하면 견본첩은 사라진다.'
 };
 if (typeof ALIEN_ITEMS_POOL !== 'undefined' && !ALIEN_ITEMS_POOL.includes('벽지 견본첩')) {
@@ -98,8 +98,183 @@ function rollUiSkin() {
     };
 }
 
+
+// --- 전체 인터페이스 스타일 ---
+// 벽지가 적용되면 body 에 data-ui-skin 이 붙고, 아래 규칙이 소속·커플 테마 위에 덮인다.
+// 색 섞기는 전부 JS 에서 미리 계산해 변수로 넣는다 (구형 모바일 브라우저 호환).
+// 어둠 탐사 화면·오락기·여우 상담실·선녀탕은 고유 분위기를 지키도록 제외한다.
+const SK_AREAS = [
+    '#app-container',
+    '.modal-overlay:not(#fox-modal):not(#bath-modal)',
+    '#custom-alert-overlay',
+    '#luxury-alert-overlay',
+    '#vip-invite-overlay',
+    '#fox-nameplate-overlay'
+];
+function skSel(list) {
+    const parts = list.split(',').map(x => x.trim()).filter(Boolean);
+    return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin] ${a} ${x}`)).join(',\n');
+}
+const V = n => `var(--sk-${n})`;
+
+const SKIN_CSS = `
+${skSel('.tabs-grid, .sub-tabs-grid')} {
+    background: transparent !important;
+    border-color: ${V('line')} !important;
+}
+${skSel('.tab-content')} {
+    background: ${V('card')} !important;
+    border: 1px solid ${V('line')} !important;
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+${skSel('.sub-panel')} {
+    background: ${V('well')} !important;
+    border: 1px solid ${V('line')} !important;
+    color: ${V('text')} !important;
+}
+
+${skSel('.game-btn, .action-buttons button, .step-btn, .btn-cancel, .admin-access-btn, .ranking-toggle-btn, .shop-item button, .inv-btn, .vip-nav-btn')} {
+    background: linear-gradient(160deg, ${V('btn-top')}, ${V('panel')}) !important;
+    border: 1px solid ${V('edge')} !important;
+    color: ${V('accent')} !important;
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 2px 7px rgba(0,0,0,0.35) !important;
+    text-shadow: none !important;
+    letter-spacing: 0.03em;
+}
+${skSel('.game-btn:active, .action-buttons button:active, .step-btn:active, .shop-item button:active, .inv-btn:active')} {
+    background: linear-gradient(160deg, ${V('press-top')}, ${V('press-bot')}) !important;
+}
+${skSel('.game-btn:disabled, .shop-item button:disabled, .inv-btn:disabled, .step-btn:disabled')} {
+    opacity: 0.4 !important;
+    box-shadow: none !important;
+}
+${skSel('.inv-btn-use, .btn-submit, .login-btn, .custom-alert-btn, .luxury-alert-btn, #rec-badge .game-btn')} {
+    background: linear-gradient(160deg, ${V('accent')}, ${V('accent-deep')}) !important;
+    border: 1px solid ${V('accent')} !important;
+    color: ${V('base')} !important;
+    font-weight: 700 !important;
+}
+${skSel('.inv-btn-sell, .btn-cancel')} {
+    background: transparent !important;
+    color: ${V('text-dim')} !important;
+    border-color: ${V('line')} !important;
+}
+
+${skSel('.tab, .sub-tab')} {
+    background: ${V('tab')} !important;
+    border: 1px solid ${V('line')} !important;
+    color: ${V('text-dim')} !important;
+    box-shadow: none !important;
+}
+${skSel('.tab.active, .sub-tab.active')} {
+    background: linear-gradient(160deg, ${V('accent')}, ${V('accent-deep')}) !important;
+    border-color: ${V('accent')} !important;
+    color: ${V('base')} !important;
+    font-weight: 700 !important;
+}
+
+${skSel('input, select, textarea, .bet-input, .badge-input, .bet-display')} {
+    background: ${V('base')} !important;
+    color: ${V('text')} !important;
+    border: 1px solid ${V('edge-soft')} !important;
+}
+${skSel('input:focus, select:focus, textarea:focus')} {
+    outline: none !important;
+    border-color: ${V('accent')} !important;
+    box-shadow: 0 0 0 2px ${V('halo')} !important;
+}
+
+${skSel('.id-card-badge, .modal-content, .inv-card, .shop-item, .emp-list-card, .status-item, .history-item, .letter-card, .suggestion-item, .admin-panel-box, .seotda-arena, .slot-window, .ranking-body, .custom-alert-box, .luxury-alert-box, .badge-photo-box, .badge-table, .pollution-container, .status-section')} {
+    background: ${V('card')} !important;
+    border-color: ${V('line')} !important;
+    color: ${V('text')};
+}
+${skSel('.id-card-badge, .modal-content, .custom-alert-box, .luxury-alert-box')} {
+    box-shadow: inset 0 1px 0 ${V('glint')}, 0 6px 18px rgba(0,0,0,0.45) !important;
+}
+${skSel('.pollution-container, .status-section, .status-item')} {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+${skSel('.panel-title, h2, h3, h4, .status-label, .serial-row, .pollution-header, .badge-table th')} {
+    color: ${V('accent')} !important;
+    border-color: ${V('line')} !important;
+    letter-spacing: 0.04em;
+}
+${skSel('.status-value, .emp-name, .badge-table td, .emp-list-title, .inv-card-name, .header-info, .emp-meta')} {
+    color: ${V('text')} !important;
+}
+${skSel('.status-value')} {
+    color: ${V('accent')} !important;
+}
+${skSel('.emp-role-tag, .inv-card-qty, .status-tag')} {
+    background: transparent !important;
+    border: 1px solid ${V('edge')} !important;
+    color: ${V('accent')} !important;
+}
+${skSel('.badge-table th')} {
+    background: ${V('well')} !important;
+}
+${skSel('.badge-table th, .badge-table td')} {
+    border-color: ${V('line')} !important;
+}
+${skSel('.pollution-bar-bg')} {
+    background: ${V('base')} !important;
+    border: 1px solid ${V('line')} !important;
+}
+${skSel('.inv-card-desc, .emp-list-sub, .history-time, .letter-meta')} {
+    color: ${V('text-dim')} !important;
+}
+
+body[data-ui-skin] #app-container *::-webkit-scrollbar-thumb { background: ${V('edge')} !important; }
+body[data-ui-skin] #app-container *::-webkit-scrollbar-track { background: transparent !important; }
+`;
+
+function injectSkinStyle() {
+    let st = document.getElementById('ui-skin-style');
+    if (!st) {
+        st = document.createElement('style');
+        st.id = 'ui-skin-style';
+        document.head.appendChild(st);
+    }
+    if (st.textContent !== SKIN_CSS) st.textContent = SKIN_CSS;
+    // style.css 보다 뒤에 오도록 항상 맨 끝으로
+    if (document.head.lastElementChild !== st) document.head.appendChild(st);
+}
+
+// 두 색을 섞는다 (t = b 쪽 비율 0~1)
+function skinBlend(a, b, t) {
+    const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
+    const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+    return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+
+function skinVars(s) {
+    return {
+        'accent': s.accent,
+        'base': s.base,
+        'panel': s.panel,
+        'text': s.text,
+        'text-dim': s.text + 'b3',
+        'accent-deep': skinBlend(s.accent, s.base, 0.3),
+        'card': skinBlend(s.panel, s.accent, 0.07),
+        'well': skinBlend(s.base, s.accent, 0.05),
+        'tab': skinBlend(s.panel, s.accent, 0.06),
+        'btn-top': skinBlend(s.panel, s.accent, 0.22),
+        'press-top': skinBlend(s.panel, s.accent, 0.38),
+        'press-bot': skinBlend(s.panel, s.accent, 0.12),
+        'edge': s.accent + '8c',
+        'edge-soft': s.accent + '59',
+        'line': s.accent + '47',
+        'glint': s.accent + '38',
+        'halo': s.accent + '40'
+    };
+}
+
 // --- 적용 / 해제 ---
-const SKIN_BODY_PROPS = ['--theme-focus', '--theme-accent', '--theme-border', '--theme-text', '--theme-sub', '--theme-bg-grad', 'background-color', 'font-family'];
+const SKIN_VAR_NAMES = ['accent','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo'];
+const SKIN_BODY_PROPS = SKIN_VAR_NAMES.map(n => '--sk-' + n).concat(['--theme-focus', '--theme-accent', '--theme-border', '--theme-text', '--theme-sub', '--theme-bg-grad', 'background-color', 'font-family']);
 
 function applyUiSkin(user) {
     const s = user && user.uiSkin;
@@ -109,8 +284,16 @@ function applyUiSkin(user) {
         return;
     }
     loadSkinFonts();
+    injectSkinStyle();
+
+    // 소속·커플 테마 클래스를 걷어 낸다 (해제하면 다시 붙는다)
+    Array.from(body.classList).forEach(c => {
+        if (c.startsWith('theme-') || c.startsWith('cp-') || c === 'couple-themed') body.classList.remove(c);
+    });
 
     const set = (k, v) => body.style.setProperty(k, v, 'important');
+    const vars = skinVars(s);
+    Object.keys(vars).forEach(k => set('--sk-' + k, vars[k]));
     set('--theme-focus', s.accent);
     set('--theme-accent', s.accent);
     set('--theme-border', s.accent + '66');
