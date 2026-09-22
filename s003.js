@@ -1510,7 +1510,7 @@ function renderS003Vote(n) {
            <span style="font-size:11px; color:#ff6b6b;">고른 사람은 마지막 판정에 크게 불리해집니다.</span>`;
 
     const opts = alive.map(c => {
-        const nm = (p.members && p.members[c]) ? p.members[c].name : (db.users[c] ? db.users[c].name : c);
+        const nm = (p.members && p.members[c]) ? p.members[c].name : safename(c);
         const r = cast[c] ? TALE_ROLES[cast[c]] : null;
         return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s003Vote(${n},'${c}')">
                     ${r ? r.icon + ' ' : ''}${nm}${r ? ` <span style="color:#888; font-size:10px;">— ${r.tale}</span>` : ''}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}

@@ -140,14 +140,24 @@ const SK_AREAS = [
     '#fox-nameplate-overlay'
 ];
 function skSel(list) {
-    const parts = list.split(',').map(x => x.trim()).filter(Boolean);
+    const parts = (Array.isArray(list) ? list : list.split(',')).map(x => x.trim()).filter(Boolean);
     return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin] ${a} ${x}`)).join(',\n');
 }
 function skLight(list) {
-    const parts = list.split(',').map(x => x.trim()).filter(Boolean);
+    const parts = (Array.isArray(list) ? list : list.split(',')).map(x => x.trim()).filter(Boolean);
     return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin-tone="light"] ${a} ${x}`)).join(',\n');
 }
 const V = n => `var(--sk-${n})`;
+
+// 코드 곳곳에 직접 박혀 있는 어두운 배경들 (밝은 벽지에서 밝게 덮는다)
+const SK_DARK_BG = [
+    '[style*="background:#0"]', '[style*="background:#1"]', '[style*="background:#2"]', '[style*="background:#3"]',
+    '[style*="background: #0"]', '[style*="background: #1"]', '[style*="background: #2"]',
+    '[style*="background-color:#0"]', '[style*="background-color:#1"]', '[style*="background-color:#2"]',
+    '[style*="background:rgba(0"]', '[style*="background: rgba(0"]', '[style*="background-color:rgba(0"]',
+    '[style*="background:linear-gradient(145deg"]', '[style*="background: linear-gradient(145deg"]',
+    '[style*="background:linear-gradient(160deg"]', '[style*="background:linear-gradient(180deg"]'
+];
 
 const SKIN_CSS = `
 ${skSel('.tabs-grid, .sub-tabs-grid')} {
@@ -268,8 +278,10 @@ ${skLight('[style*="color:#aaa"], [style*="color:#999"], [style*="color:#888"], 
 ${skLight('[style*="color:#ffd700"], [style*="color:#d4af37"], [style*="color:#c9a8ff"], [style*="color:#d4bbff"], [style*="color:#7fd4d4"], [style*="color:#4fc3f7"]')} {
     color: ${V('accent')} !important;
 }
-${skLight('[style*="background:rgba(0,0,0"], [style*="background: rgba(0,0,0"], [style*="background:#1"], [style*="background:#2"], [style*="background-color:#1"]')} {
+${skLight(SK_DARK_BG)} {
     background: ${V('well')} !important;
+    border-color: ${V('line')} !important;
+    color: ${V('text')} !important;
 }
 
 body[data-ui-skin] #app-container *::-webkit-scrollbar-thumb { background: ${V('edge')} !important; }

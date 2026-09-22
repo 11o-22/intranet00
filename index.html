@@ -2801,7 +2801,7 @@ function renderAdvanceWait(nextStep) {
         const solo = p.solo || {};
         const waitFor = Object.keys(p.alive || {})
             .filter(c => !got[c] && !(solo[c] && solo[c].lair))
-            .map(c => (p.members && p.members[c] && p.members[c].name) || c);
+        .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
         const wl = document.getElementById('adv-wait-list');
         if (wl) wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
 
@@ -4566,6 +4566,18 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             return (r1 - Math.floor(r1)) - (r2 - Math.floor(r2));
         });
         return shuffled.slice(0, 8);
+    }
+
+        // 사원 코드는 인가 코드이므로 화면에 절대 노출하지 않는다
+    function safeName(code) {
+        if (!code) return '동료';
+        const u = db.users[code];
+        if (u && u.name) return u.name;
+        if (typeof darkParties !== 'undefined' && typeof darkRun !== 'undefined' && darkRun && darkRun.partyId) {
+            const p = darkParties[darkRun.partyId];
+            if (p && p.members && p.members[code] && p.members[code].name) return p.members[code].name;
+        }
+        return '사원';
     }
 
     function addHistoryLog(user, message) {
