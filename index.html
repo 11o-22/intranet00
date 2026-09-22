@@ -2177,6 +2177,7 @@ const EQUIP_AFFIL = {
         };
         if (database) database.ref('darkParties/' + pid).set(party);
         darkParties[pid] = party;
+        if (database) database.ref(`darkParties/${pid}/members/${currentUser.code}`).onDisconnect().remove();
         myPartyId = pid;
         switchToPartyTab();
     }
@@ -2199,31 +2200,39 @@ const EQUIP_AFFIL = {
             ready: false, equips: [], items: [], joinedAt: Date.now()
         };
         if (database) database.ref(`darkParties/${pid}/members/${currentUser.code}`).set(m);
+        if (database) database.ref(`darkParties/${pid}/members/${currentUser.code}`).onDisconnect().remove();
         myPartyId = pid;
        setTimeout(() => sendPartyChat(`${currentUser.name} 사원이 합류했습니다.`, true), 400);
         switchToPartyTab();
     }
 
-    function leaveParty() {
+       function leaveParty() {
         const p = getMyParty();
         if (!p) return;
         const pid = p.id;
-        if (Object.keys(p.members).length > 1) sendPartyChat(`${currentUser.name} 사원이 파티를 떠났습니다.`, true);
-        const others = Object.keys(p.members).filter(c => c !== currentUser.code);
+        const others = Object.keys(p.members || {}).filter(c => c !== currentUser.code);
 
-        if (others.length === 0) {
-            if (database) database.ref('darkParties/' + pid).remove();
-            delete darkParties[pid];
-        } else {
-            if (database) {
-                
-                // 방장이 나가면 다음 사람에게 위임
+        if (others.length > 0) sendPartyChat(`${currentUser.name} 사원이 파티를 떠났습니다.`, true);
+
+        if (database) {
+            // 이탈 시 자동 삭제 예약 해제
+            database.ref(`darkParties/${pid}/members/${currentUser.code}`).onDisconnect().cancel();
+
+            if (others.length === 0) {
+                database.ref('darkParties/' + pid).remove();
+                database.ref('darkChats/' + pid).remove();
+            } else {
+                // 방장이면 다음 사람에게 위임
                 if (p.leader === currentUser.code) {
                     const next = p.members[others[0]];
                     database.ref(`darkParties/${pid}`).update({ leader: next.code, leaderName: next.name });
                 }
+                // ★ 명단에서 나를 지운다
+                database.ref(`darkParties/${pid}/members/${currentUser.code}`).remove();
             }
         }
+
+        delete darkParties[pid];
         myPartyId = null;
         detachChatListener();
         partyChatOpen = false;
@@ -2269,6 +2278,7 @@ const EQUIP_AFFIL = {
     // 파티 출발 시 각자 탐사 상태 초기화
           function launchPartyRun(party) {
         const me = party.members ? party.members[currentUser.code] : null;
+        if (database) database.ref(`darkParties/${party.id}/members/${currentUser.code}`).onDisconnect().cancel();
         if (!me) return;
         if (darkRun) return;
         if (window._launchingParty === party.id) return;
