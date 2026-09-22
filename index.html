@@ -8914,12 +8914,17 @@ function changePoints(delta) {
     if (!currentUser) return;
     currentUser.points = Math.max(0, Math.min(POINT_CAP, (currentUser.points || 0) + delta));
     if (database) {
+        const code = currentUser.code;
         const stamp = stampNow();
-        database.ref(`users/${currentUser.code}/points`).transaction(p => {
-            const base = (p == null) ? currentUser.points : p;
-            return Math.max(0, Math.min(POINT_CAP, base + delta));
-        });
-        database.ref(`users/${currentUser.code}/_adminStamp`).set(stamp);
+        pendingSaves++;
+        Promise.all([
+            database.ref(`users/${code}/points`).transaction(p => {
+                const base = (p == null) ? currentUser.points : p;
+                return Math.max(0, Math.min(POINT_CAP, base + delta));
+            }),
+            database.ref(`users/${code}/_adminStamp`).set(stamp)
+        ]).catch(e => console.error('포인트 저장 실패:', e))
+          .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
     }
     updateUI();
 }

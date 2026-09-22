@@ -3168,21 +3168,21 @@ const GEAR_UPGRADE = {
         currentUser.gearPolish = 0;
         currentUser.gearGuarantee = false;
 
+                let spend;
         if (ok) {
-            changePoints(-up.cost);
+            spend = up.cost;
             if (idx === 0) g.grade = up.to;
             else { if (!g.attrGrades) g.attrGrades = {}; g.attrGrades[attr] = up.to; }
             currentUser.gearProtect = false;
             addHistoryLog(currentUser, `[강화 성공] '${g.name}' ${nm} ${from} → ${up.to} (-${up.cost} P)`);
         } else {
-            const loss = Math.floor(up.cost / 2);
-            changePoints(-loss);
+            spend = Math.floor(up.cost / 2);
             if (hadProtect) currentUser.gearProtect = false;
-            addHistoryLog(currentUser, `[강화 실패] '${g.name}' ${nm} 강화 실패${hadProtect ? ' — 보호권이 지켰습니다' : ''} (-${loss} P)`);
+            addHistoryLog(currentUser, `[강화 실패] '${g.name}' ${nm} 강화 실패${hadProtect ? ' — 보호권이 지켰습니다' : ''} (-${spend} P)`);
         }
 
-                saveFields({ soulGear: 1, gearPolish: 1, gearGuarantee: 1, gearProtect: 1, history: 1 });
-
+        saveFields({ soulGear: 1, gearPolish: 1, gearGuarantee: 1, gearProtect: 1, history: 1 });
+        changePoints(-spend);
         openGearModal(ok ? '강화 성공' : '강화 실패', `
             <div style="text-align:center; padding:18px 0;">
                 <div style="font-size:38px; margin-bottom:12px;">${ok ? '✷' : '✕'}</div>
