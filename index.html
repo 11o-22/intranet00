@@ -2383,17 +2383,27 @@ const EQUIP_AFFIL = {
     }
 
     // 방장이 투표판을 개설
-        function openVote(options) {
+    function openVote(options) {
         if (!darkRun || !darkRun.isParty || !database) return;
-        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).transaction(v => {
-            if (v && v.options) return;          // 이미 열려 있으면 그대로
+        const me = currentUser.code;
+        const ref = database.ref(voteRefPath(darkRun.partyId, darkRun.step));
+
+        ref.transaction(v => {
+            if (v && v.options) return;              // 이미 열려 있음
             v = v || {};
             v.options = options;
             v.openedAt = Date.now();
-            v.endAt = null;                      // ★ 전원 모이면 시작
+            v.endAt = null;
             v.votes = v.votes || {};
             v.state = 'OPEN';
+            v.seen = v.seen || {};
+            v.seen[me] = true;                       // ★ 도착 표시도 같이
             return v;
+        }).then(res => {
+            // 이미 열려 있었으면 도착 표시만 따로
+            if (!res.committed) ref.child('seen/' + me).set(true);
+        }).catch(() => {
+            ref.child('seen/' + me).set(true);
         });
     }
     function attachVoteListener() {
@@ -2509,9 +2519,9 @@ const EQUIP_AFFIL = {
             v.tally = tally;
             v.rollerCode = roller.code;
             v.rollerName = roller.name;
-            v.seed = Math.floor(Math.random() * 1000000);
+            v.endAt = Date.now() + VOTE_SECONDS * 1000;
             return v;
-        });
+        }).catch(() => {});
     }
 
     // 투표 결과를 각 클라이언트가 개별 적용
@@ -2620,9 +2630,7 @@ const EQUIP_AFFIL = {
             `<div id="vote-area"><div style="text-align:center; font-size:11px; color:#888; padding:12px;">선택지를 펼치는 중...</div></div>`,
             imgKey);
         mountDarkChat('normal');
-        openVote(options);
-        // ★ 도착 표시
-        database.ref(voteRefPath(darkRun.partyId, darkRun.step) + '/seen/' + currentUser.code).set(true);
+                openVote(options);
         attachVoteListener();
         renderVoteState();
     }
