@@ -806,3 +806,33 @@ body.cp-lemon .container::before { background-image: none; }
 #notice-ticker-text.running {
     animation: tickerSlide 14s linear;
 }
+
+/* 재난관리국 테마 — 은행 글씨색 */
+body.theme-hanbok #bank-body,
+body.theme-hanbok #bank-body details,
+body.theme-hanbok #bank-body summary {
+    color: var(--theme-text);
+}
+body.theme-hanbok #bank-body [style*="color:#666"],
+body.theme-hanbok #bank-body [style*="color:#777"],
+body.theme-hanbok #bank-body [style*="color:#888"],
+body.theme-hanbok #bank-body [style*="color:#aaa"],
+body.theme-hanbok #bank-body [style*="color:#ccc"],
+body.theme-hanbok #bank-body [style*="color:#ddd"],
+body.theme-hanbok #bank-body [style*="color:#fff"] {
+    color: var(--theme-text) !important;
+}
+body.theme-hanbok #bank-body [style*="color:#ffd700"],
+body.theme-hanbok #bank-body [style*="color:#d4af37"] {
+    color: #8a6400 !important;
+}
+body.theme-hanbok #bank-body [style*="color:#ffb74d"],
+body.theme-hanbok #bank-body [style*="color:#ff9800"] {
+    color: #b35c00 !important;
+}
+body.theme-hanbok #bank-body [style*="color:#ff9baa"] {
+    color: #b71c1c !important;
+}
+body.theme-hanbok #bank-body input {
+    color: var(--theme-text);
+}
