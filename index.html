@@ -4609,6 +4609,15 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             addHistoryLog(user, `[효과 종료] 오염 동결 효과가 만료되었습니다.`);
             changed = true;
         }
+
+                // 만료 처리가 저장 안 돼서 남아 있던 문구 정리
+        if (!isBlindfolded(user) && user.badge && user.badge.notes &&
+            /안대|해피 메이커|오염 동결/.test(user.badge.notes)) {
+            const arr = user.badge.notes.split(' | ').filter(n =>
+                n.trim() !== '' && !n.includes('안대') && !n.includes('해피 메이커') && !n.includes('오염 동결'));
+            user.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+            changed = true;
+        }
         
         // 격리 해제 체크 및 낡은 문패 효과 적용
                 if (user.quarantineUntil > 0 && now >= user.quarantineUntil) {
@@ -4733,9 +4742,10 @@ if (user.code === 'kario0987') {
             changed = true;
         }
 
+
         // 오염도가 올랐거나 아이템 효과가 종료되었을 때만 강제로 화면을 갱신합니다.
         if (changed) {
-            saveDB();
+            saveSelfFull();
             if (currentUser && currentUser.code === user.code) updateUI();
         }
     }
@@ -4973,7 +4983,7 @@ if (user.code === 'kario0987') {
     function openSuggestionModal() {
         if (currentUser.hasNewReply) {
             currentUser.hasNewReply = false;
-            saveDB(); updateUI();
+            saveFields({ hasNewReply: 1 }); updateUI();
         }
         document.getElementById('suggestion-modal').style.display = 'flex';
         renderMySuggestions();
@@ -5161,10 +5171,10 @@ function startFoxRoomSequence() {
     setTimeout(() => agent ? openBathRoom() : openFoxRoom(), 1200);
 }
 
-    function clearItemNotification() {
+       function clearItemNotification() {
         if (currentUser && currentUser.hasItemUsedOnMe) {
             currentUser.hasItemUsedOnMe = false;
-            saveDB();
+            saveFields({ hasItemUsedOnMe: 1 });
             updateUI();
         }
     }
@@ -5543,7 +5553,7 @@ hlL.disabled = !playable;
         document.querySelectorAll('#tab-record .sub-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(panelId).classList.add('active');
         if (panelId === 'rec-letters' && currentUser.hasNewLetter) {
-            currentUser.hasNewLetter = false; saveDB(); updateUI();
+            currentUser.hasNewLetter = false; saveFields({ hasNewLetter: 1 }); updateUI();
         }
     }
 
@@ -7223,7 +7233,12 @@ updateUI();
             </div>
         `).join('');
     }
-    function deleteLetter(idx) { if(!currentUser.letters) return; currentUser.letters.splice(idx, 1); saveDB(); renderLetters(); }
+        function deleteLetter(idx) {
+        if (!currentUser.letters) return;
+        currentUser.letters.splice(idx, 1);
+        saveFields({ letters: 1 });
+        renderLetters();
+    }
 
     function renderRegularShop() {
         const container = document.getElementById('regular-shop-items-container');
