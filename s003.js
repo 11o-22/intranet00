@@ -1394,6 +1394,7 @@ function renderStepS003() {
     const body = darkBodyEl();
     if (!body || !darkRun) return;
     if (darkRun._dead) return;
+    if (getLore() >= LORE_LIMIT && !darkRun._loreGone) { darkRun._loreGone = true; taleAssimilate(); return; }
     if (darkRun.rejoined) { renderRejoinScene(); return; }
     if (darkRun.isParty) { watchPartyStep(); watchDyingMembers(); attachTaleCast(); }
     saveDarkRunState();

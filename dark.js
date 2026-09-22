@@ -13435,7 +13435,11 @@ function addLore(amount, reason) {
 }
 
 function taleAssimilate() {
-    if (!darkRun || darkRun._dead) return;
+    if (!darkRun) return;
+    // 다른 사망 처리 중이면 표시만 풀어 두고, 다음 화면에서 다시 확인한다
+    if (darkRun._dead) { darkRun._loreGone = false; return; }
+    if (getLore() < LORE_LIMIT) { darkRun._loreGone = false; return; }
+
     darkRun.fail += 3;
     darkDeath(
         `이제 알겠다.<br><br>` +
@@ -13444,6 +13448,13 @@ function taleAssimilate() {
         `이상하다고 느꼈던 게 이상했던 것이다.<br><br>` +
         `<span style="color:#d4af37;">책장이 넘어간다. 이제 이쪽이 그림이다.</span>`
     );
+
+    // 보호 장비 등으로 살아남았으면 이해도를 한계 바로 아래로 되돌린다
+    if (darkRun && !darkRun._dead) {
+        darkRun.lore = LORE_LIMIT - 1;
+        darkRun._loreGone = false;
+        renderLoreBar();
+    }
 }
 
 function loreBarHtml() {
