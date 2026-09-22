@@ -2858,6 +2858,7 @@ function input119D(n) {
             const s = snap.val();
             if (s == null || !darkRun) return;
             if (s > darkRun.step) {
+                if (darkRun._dead) return;
                 darkRun.step = s;
                 darkRun._advTo = null;        
                 detachVoteListener();
@@ -13440,7 +13441,6 @@ function renderLoreBar() {
 function assignTaleRoles() {
     if (!darkRun || darkRun.taleRole) return;
 
-    // 단독
     if (!darkRun.isParty || !database) {
         const pick = TALE_KEYS[Math.floor(Math.random() * TALE_KEYS.length)];
         darkRun.taleRole = pick;
@@ -13448,7 +13448,6 @@ function assignTaleRoles() {
         return;
     }
 
-    // 파티 — 누구든 호출 가능, 이미 정해진 배역은 절대 안 바꾸고 빈자리만 채운다
     const pid = darkRun.partyId;
     const p = darkParties[pid] || {};
     const codes = Object.keys(p.members || {});
@@ -13464,9 +13463,10 @@ function assignTaleRoles() {
             cast[c] = pool.length ? pool.shift() : TALE_KEYS[Math.floor(Math.random() * TALE_KEYS.length)];
             changed = true;
         });
-        return changed ? cast : undefined;   // 바뀐 게 없으면 쓰지 않음
+        return changed ? cast : undefined;
     });
 }
+
 function attachTaleCast() {
     if (!database || !darkRun || !darkRun.partyId) return;
     if (darkRun._castWatch) return;
@@ -13475,17 +13475,15 @@ function attachTaleCast() {
     database.ref(`darkParties/${darkRun.partyId}/taleCast`).on('value', snap => {
         const cast = snap.val();
         if (!darkRun) return;
-        if (cast) darkRun.taleCast = cast;
-
-        // 한 번 받은 배역은 고정
-        if (!darkRun.taleRole && cast && cast[currentUser.code]) {
-            darkRun.taleRole = cast[currentUser.code];
-            saveDarkRunState();
+        if (cast) {
+            darkRun.taleCast = cast;
+            // ★ 서버 배역표를 기준으로 맞춘다 (서로 보는 배역이 달라지지 않게)
+            if (cast[currentUser.code] && darkRun.taleRole !== cast[currentUser.code]) {
+                darkRun.taleRole = cast[currentUser.code];
+                saveDarkRunState();
+            }
         }
-
-        // 배역표에 내가 없으면 내 자리 채우기
         if (!cast || !cast[currentUser.code]) assignTaleRoles();
-
         renderLoreBar();
     });
 }
@@ -14255,13 +14253,24 @@ function s003Result(title, roll, bonus, DC, ok, txt) {
         return;
     }
 
+    const warn = (!ok && darkRun._s003Streak === 2)
+        ? `<div style="background:rgba(127,0,0,0.18); border:1px solid #b71c1c; border-radius:5px; padding:9px; margin-bottom:10px; font-size:11px; color:#ff6b6b; text-align:center;">
+             ⚠ 두 번 연속 어긋났다. 한 번 더 어긋나면 문단 밖으로 밀려난다.
+           </div>`
+        : '';
+
+    const loreWarn = (getLore() >= 65 && getLore() < LORE_LIMIT)
+        ? `<div style="background:rgba(212,175,55,0.12); border:1px solid #5a4a2a; border-radius:5px; padding:9px; margin-bottom:10px; font-size:11px; color:#d4af37; text-align:center;">
+             ⚠ 너무 많이 알아버렸다. 이해도 ${LORE_LIMIT}에 닿으면 돌아올 수 없다.
+           </div>`
+        : '';
+
     darkBodyEl().innerHTML = darkBox(title,
         `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
-        loreBarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
+        loreBarHtml() + warn + loreWarn + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
     renderLoreBar();
     mountDarkChat('normal');
 }
-
 function s003DC(base) {
     return base + 6;
 }

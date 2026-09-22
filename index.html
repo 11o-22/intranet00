@@ -1839,6 +1839,7 @@ const EQUIP_AFFIL = {
             lore: darkRun.lore || 0,
             talePages: darkRun.talePages || [],
             tabooCount: darkRun.tabooCount || 0,
+            
             savedAt: Date.now()
             
         };
@@ -3588,6 +3589,7 @@ return b;
         function renderDarkStep() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
+        if (darkRun._dead) return;
         if (darkRun.rejoined) { renderRejoinScene(); return; }
         saveDarkRunState();
         if (darkRun.isParty) watchPartyStep();
@@ -4001,8 +4003,9 @@ return b;
         saveDB();
     }
 
-    function refuseResign() {
+       function refuseResign() {
         if (!darkRun) return;
+        darkRun._dead = false;              // ★ 잠금을 풀어야 사망 처리가 진행됨
         darkDeath(darkRun._deathReason || '더 버티지 못했다.');
     }
 
