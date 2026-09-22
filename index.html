@@ -2361,7 +2361,7 @@ const EQUIP_AFFIL = {
     // ==========================================
     // ★ 파티 투표 시스템
     // ==========================================
-    const VOTE_SECONDS = 85;
+    const VOTE_SECONDS = 40;
     let voteListenerRef = null;
     let voteListenerKey = null;
     let currentVote = null;
@@ -2373,14 +2373,19 @@ const EQUIP_AFFIL = {
     }
 
     // 방장이 투표판을 개설
-       function openVote(options) {
+        function openVote(options) {
         if (!darkRun || !darkRun.isParty || !database) return;
         database.ref(voteRefPath(darkRun.partyId, darkRun.step)).transaction(v => {
-            if (v) return;   // 이미 열려 있으면 그대로
-            return { options: options, endAt: Date.now() + VOTE_SECONDS * 1000, votes: {}, state: 'OPEN' };
+            if (v && v.options) return;          // 이미 열려 있으면 그대로
+            v = v || {};
+            v.options = options;
+            v.openedAt = Date.now();
+            v.endAt = null;                      // ★ 전원 모이면 시작
+            v.votes = v.votes || {};
+            v.state = 'OPEN';
+            return v;
         });
     }
-
     function attachVoteListener() {
         if (!darkRun || !darkRun.isParty || !database) return;
         const key = `${darkRun.partyId}_${darkRun.step}`;
@@ -2435,17 +2440,35 @@ const EQUIP_AFFIL = {
         return Math.max(1, Object.keys(p.alive).filter(c => !solo[c]).length);
     }
 
+        function startVoteClock() {
+        if (!darkRun || !database) return;
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step)).transaction(v => {
+            if (!v || v.state !== 'OPEN' || v.endAt) return;
+            v.endAt = Date.now() + VOTE_SECONDS * 1000;
+            return v;
+        });
+    }
+
     function startVoteTick() {
         clearInterval(voteTickTimer);
         voteTickTimer = setInterval(() => {
-            if (!darkRun || !currentVote) return;
-            const raw = Math.ceil((currentVote.endAt - Date.now()) / 1000);
+            if (!darkRun || !currentVote || currentVote.state !== 'OPEN') return;
+            const v = currentVote;
+            const total = getVoteMemberCount();
             const el = document.getElementById('vote-timer');
-            if (el) el.innerText = Math.max(0, raw);
 
-            if (currentVote.state !== 'OPEN') return;
-            const voted = currentVote.votes ? Object.keys(currentVote.votes).length : 0;
-            if (voted >= getVoteMemberCount() || raw <= 0) closeVote();   // ★ 누구든
+            // 모이는 중
+            if (!v.endAt) {
+                const seen = v.seen ? Object.keys(v.seen).length : 0;
+                if (el) el.innerText = `모이는 중 ${seen}/${total}`;
+                if (seen >= total || Date.now() - (v.openedAt || Date.now()) > 20000) startVoteClock();
+                return;
+            }
+
+            const raw = Math.ceil((v.endAt - Date.now()) / 1000);
+            if (el) el.innerText = Math.max(0, raw) + '초';
+            const voted = v.votes ? Object.keys(v.votes).length : 0;
+            if (voted >= total || raw <= 0) closeVote();
         }, 500);
     }
         function closeVote() {
@@ -2482,34 +2505,36 @@ const EQUIP_AFFIL = {
     }
 
     // 투표 결과를 각 클라이언트가 개별 적용
-    function applyVoteResult(vote) {
+        function applyVoteResult(vote) {
         const votes = vote.votes || {};
         const myVote = votes[currentUser.code];
         const opt = vote.options.find(o => o.id === vote.picked);
         if (!opt) return;
 
-        // 기권 페널티
         if (!myVote) {
             applyPollutionToUser(currentUser, 3);
-            if (!darkRun.abstains) darkRun.abstains = 0;
-            darkRun.abstains++;
+            darkRun.abstains = (darkRun.abstains || 0) + 1;
         }
-
-        // 내가 이긴 선택지에 투표했는지 기록 (정산용)
         if (!darkRun.voteHistory) darkRun.voteHistory = [];
         darkRun.voteHistory.push({
-            step: darkRun.step,
-            picked: vote.picked,
+            step: darkRun.step, picked: vote.picked,
             mine: myVote ? myVote.opt : null,
             agreed: myVote ? (myVote.opt === vote.picked) : null
         });
-
         darkRun.lastRoller = { code: vote.rollerCode, name: vote.rollerName };
         darkRun.voteSeed = vote.seed;
 
+        // ★ 자동 진행 대신 버튼으로
+        darkRun._votePending = { opt: opt, vote: vote, step: darkRun.step };
         clearInterval(voteTickTimer);
-                const stepAt = darkRun.step;
-        setTimeout(() => { if (darkRun && darkRun.step === stepAt) runVotedAction(opt, vote); }, 1400);
+        renderVoteState();
+    }
+
+    function runPendingVote() {
+        const pv = darkRun && darkRun._votePending;
+        if (!pv || darkRun.step !== pv.step) return;
+        darkRun._votePending = null;
+        runVotedAction(pv.opt, pv.vote);
     }
 
     // 시나리오별 실행 분기 (각 시나리오에서 정의)
@@ -2524,23 +2549,25 @@ const EQUIP_AFFIL = {
 
     function renderVoteState() {
         const area = document.getElementById('vote-area');
-        if (!area || !currentVote) return;
+        if (!area || !currentVote || !currentVote.options) return;
 
-        const votes = currentVote.votes || {};
+        const v = currentVote;
+        const votes = v.votes || {};
         const myVote = votes[currentUser.code];
-        const total = getPartyMemberCount();
+        const total = getVoteMemberCount();
         const voted = Object.keys(votes).length;
-        const remain = Math.max(0, Math.ceil((currentVote.endAt - Date.now()) / 1000));
-        const done = currentVote.state === 'DONE';
+        const seen = v.seen ? Object.keys(v.seen).length : 0;
+        const done = v.state === 'DONE';
+        const remain = v.endAt ? Math.max(0, Math.ceil((v.endAt - Date.now()) / 1000)) : null;
 
-        let tally = {};
-        currentVote.options.forEach(o => { tally[o.id] = []; });
+        const tally = {};
+        v.options.forEach(o => { tally[o.id] = []; });
         for (let c in votes) { if (tally[votes[c].opt]) tally[votes[c].opt].push(votes[c].name); }
 
-        let html = currentVote.options.map(o => {
+        let html = v.options.map(o => {
             const backers = tally[o.id] || [];
             const isMine = myVote && myVote.opt === o.id;
-            const isPicked = done && currentVote.picked === o.id;
+            const isPicked = done && v.picked === o.id;
             return `
                 <button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; position:relative;
                     ${isPicked ? 'background:linear-gradient(145deg, #7f0000, #4a0000) !important; border-color:#b71c1c !important; color:#fff !important;' : ''}
@@ -2555,25 +2582,27 @@ const EQUIP_AFFIL = {
         }).join('');
 
         if (done) {
-            const opt = currentVote.options.find(o => o.id === currentVote.picked);
+            const opt = v.options.find(o => o.id === v.picked);
             html += `
                 <div style="text-align:center; font-size:11px; color:#aaa; margin-top:10px; padding:10px; background:rgba(0,0,0,0.3); border-radius:5px; line-height:1.7;">
-                    ${currentVote.tied ? '<span style="color:#ff9800;">동수 — 무작위로 갈렸습니다.</span><br>' : ''}
-                    결정: <b style="color:var(--theme-text);">${opt ? opt.label.replace(/^[①②③④⑤]\s*/, '') : '-'}</b><br>
-                    ${currentVote.rollerName ? `<span style="font-size:10px;">판정 담당: <b style="color:var(--theme-focus);">${currentVote.rollerName}</b></span>` : ''}
-                </div>`;
+                    ${v.tied ? '<span style="color:#ff9800;">동수 — 무작위로 갈렸습니다.</span><br>' : ''}
+                    ${!myVote ? '<span style="color:#ff9800;">고르지 못했다. 일행이 정했다.</span><br>' : ''}
+                    결정: <b style="color:var(--theme-text);">${opt ? opt.label.replace(/^[①②③④⑤]\s*/, '') : '-'}</b>
+                </div>` +
+                (darkRun._votePending
+                    ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px;" onclick="runPendingVote()">진행한다</button>`
+                    : '');
         } else {
             html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:11px; color:#888;">
-                    <span>⏱ <b id="vote-timer" style="color:${remain <= 10 ? '#ff6b6b' : 'var(--theme-focus)'}; font-size:14px;">${remain}</b>초 · 투표 ${voted}/${total}</span>
-                    ${darkRun.isLeader ? `<button class="game-btn" style="margin:0; padding:5px 10px; font-size:10px;" onclick="closeVote()">지금 마감</button>` : ''}
+                    <span>⏱ <b id="vote-timer" style="color:${remain !== null && remain <= 10 ? '#ff6b6b' : 'var(--theme-focus)'}; font-size:13px;">${remain === null ? `모이는 중 ${seen}/${total}` : remain + '초'}</b> · 투표 ${voted}/${total}</span>
+                    ${(darkRun.isLeader && v.endAt) ? `<button class="game-btn" style="margin:0; padding:5px 10px; font-size:10px;" onclick="closeVote()">지금 마감</button>` : ''}
                 </div>
                 ${myVote ? `<div style="text-align:center; font-size:10px; color:#4CAF50; margin-top:7px;">선택 완료. 나머지를 기다립니다.</div>` : ''}`;
         }
         area.innerHTML = html;
     }
-
-        function renderVoteBox(title, text, options, imgKey, topHtml) {
+    function renderVoteBox(title, text, options, imgKey, topHtml) {
         const body = darkBodyEl();
         if (!body) return;
         body.innerHTML = darkBox(title, text,
@@ -2581,7 +2610,9 @@ const EQUIP_AFFIL = {
             `<div id="vote-area"><div style="text-align:center; font-size:11px; color:#888; padding:12px;">선택지를 펼치는 중...</div></div>`,
             imgKey);
         mountDarkChat('normal');
-        openVote(options);        // ★ 누구나 호출 (트랜잭션이라 한 번만 열림)
+        openVote(options);
+        // ★ 도착 표시
+        database.ref(voteRefPath(darkRun.partyId, darkRun.step) + '/seen/' + currentUser.code).set(true);
         attachVoteListener();
         renderVoteState();
     }
