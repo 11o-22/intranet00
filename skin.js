@@ -72,7 +72,10 @@ const SKIN_PATTERNS = [
     { name: '격자',         css: a => `linear-gradient(${a}14 1px, transparent 1px), linear-gradient(90deg, ${a}14 1px, transparent 1px)`, size: '22px 22px' },
     { name: '진주 점',      css: a => `radial-gradient(${a}26 1.2px, transparent 1.7px)`, size: '16px 16px' },
     { name: '헤링본',       css: a => `repeating-linear-gradient(45deg, ${a}12 0 2px, transparent 2px 12px), repeating-linear-gradient(-45deg, ${a}0e 0 2px, transparent 2px 12px)`, size: 'auto' },
-    { name: '비단 결',      css: a => `repeating-linear-gradient(170deg, ${a}0c 0 1px, transparent 1px 5px), linear-gradient(180deg, ${a}10, transparent 40%, ${a}0a)`, size: 'auto' }
+    { name: '비단 결',      css: a => `repeating-linear-gradient(170deg, ${a}0c 0 1px, transparent 1px 5px), linear-gradient(180deg, ${a}10, transparent 40%, ${a}0a)`, size: 'auto' },
+    { name: '민무늬',       css: a => 'none', size: 'auto' },
+    { name: '민무늬',       css: a => 'none', size: 'auto' },
+    { name: '민무늬',       css: a => 'none', size: 'auto' }
 ];
 const SKIN_FONTS = [
     { family: 'Nanum Myeongjo', label: '나눔명조' },
