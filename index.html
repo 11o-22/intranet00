@@ -7419,7 +7419,7 @@ updateUI();
         currentUser.purchaseRecord[cycleKey][itemId] = currentBought + 1;
         currentUser.inventory.push(itemName);
         addHistoryLog(currentUser, `[상점 구매] ${itemName} (-${price} P)`);
-        saveFields({ points:1, inventory:1, history:1 }); updateUI();
+        saveFields({ points:1, inventory:1, history:1, purchaseRecord:1 }); updateUI();
     }
     // ==========================================
     // ★ 베팅 스테퍼 (섯다만 50 P 상한)
