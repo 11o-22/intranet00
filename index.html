@@ -2991,7 +2991,7 @@ function renderAdvanceWait(nextStep) {
              return `<div class="pchat-msg ${mine ? 'pchat-me' : ''}"><span class="pchat-name" style="${m.spec ? 'color:#7fd4d4;' : ''}">${m.spec ? '👁 ' : ''}${m.name}</span> ${m.text}<span class="pchat-time">${ts}</span></div>`;
         }).join('');
         if (atBottom || partyChatOpen) scrollChatBottom();
-    }
+    } 
 
     // 채팅 UI HTML 생성 (mode: 'normal' | 'words' | 'muted')
     function buildChatHtml(mode, words, wordsLeft, muted) {

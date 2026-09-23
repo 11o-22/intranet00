@@ -269,5 +269,5 @@ function buildSpectateUI() {
             renderSpectateList();
         }
         return r;
-    };
+    }; 
 })();
