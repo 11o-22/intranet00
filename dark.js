@@ -8112,9 +8112,9 @@ function b508RequiredDocs() {
         if (r) {
             const rh = getHouse(r);
             rh.grade = nextG;
-            r._adminStamp = Date.now();
+            updateUserFields(r.code, { 'house/grade': nextG, history: r.history });
             addHistoryLog(r, `[사택] ${currentUser.name} 사원이 ${next.name}(으)로 이사를 신청했습니다.`);
-            if (database) database.ref('users/' + r.code).set(r);
+           
         }
 
        saveSelfFull();
@@ -8177,6 +8177,14 @@ function b508RequiredDocs() {
         const hb = getHouse(ub);
         hb.roomie = a;
         hb.grade = ha.grade;
+                // 공용 보관함은 코드가 앞서는 쪽 — 다른 쪽 물건을 옮겨 둔다
+        const ownerIsA = [a, b].sort()[0] === a;
+        const keep = ownerIsA ? ha : hb;
+        const give = ownerIsA ? hb : ha;
+        if ((give.storage || []).length) {
+            keep.storage = (keep.storage || []).concat(give.storage);
+            give.storage = [];
+        }
         addHistoryLog(ub, `[사택] ${ua.name} 사원과 같은 호실에 배정되었습니다.`);
         updates[`users/${b}/house`] = hb;
         updates[`users/${b}/history`] = ub.history;
@@ -8191,33 +8199,25 @@ function b508RequiredDocs() {
     showCustomAlert(ub ? `${ua.name} · ${ub.name} 두 사원을 같은 호실에 배정했습니다.` : `${ua.name} 사원을 단독 호실에 배정했습니다.`);
 }
 
-    function adminClearRoom() {
+        function adminClearRoom() {
         const targets = getAdminTargets();
         if (targets.length === 0) { showCustomAlert('대상을 선택해주세요.'); return; }
-        let names = [];
+        const names = [];
         targets.forEach(code => {
             const u = db.users[code];
             if (!u) return;
-            const h = getHouse(u);
-            const mate = h.roomie ? db.users[h.roomie] : null;
-            if (mate) {
-                const mh = getHouse(mate);
-                mh.roomie = null;
-                mate._adminStamp = Date.now();
-                if (database) database.ref('users/' + mate.code).set(mate);
+            const mate = u.house && u.house.roomie;
+            if (mate && db.users[mate]) {
+                updateUserFields(mate, { 'house/roomie': null });
             }
-            h.roomie = null;
-            u._adminStamp = Date.now();
             addHistoryLog(u, `[사택] 호실 배정이 해제되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            updateUserFields(code, { 'house/roomie': null, history: u.history });
             names.push(u.name);
         });
-        if (!database) saveDB();
         updateUI();
         renderAdminRoomList();
         showCustomAlert(`${names.length}명의 호실 배정을 해제했습니다.`);
     }
-
     function renderAdminRoomList() {
         const box = document.getElementById('admin-room-list');
         if (!box) return;
@@ -8388,14 +8388,15 @@ function b508RequiredDocs() {
                 const h = getHouse(owner);
                 if (!h.notes) h.notes = [];
                 h.notes.unshift({ by: currentUser.name, text: text, at: Date.now() });
+                                
                 if (h.notes.length > 5) h.notes.pop();
-                owner._adminStamp = Date.now();
-                if (database) database.ref('users/' + ownerCode).set(owner);
-                else saveDB();
+                if (database) {
+                    database.ref(`users/${ownerCode}/house/notes`).set(h.notes);
+                    database.ref(`users/${ownerCode}/_adminStamp`).set(Date.now());
+                }
 
                 addHistoryLog(r, `[사택] ${currentUser.name} 사원이 쪽지를 남겼습니다.`);
-                r._adminStamp = Date.now();
-                if (database) database.ref('users/' + r.code).set(r);
+                updateUserFields(r.code, { history: r.history });
 
                 renderHouse();
                 showCustomAlert('쪽지를 붙여 두었습니다.');
@@ -8607,9 +8608,9 @@ if (isFood) {
         if (together) {
             const share = Math.round(8 * (id === 'feast' ? 2 : 1));
             r.pollution = Math.max(0, r.pollution - share);
-            r._adminStamp = Date.now();
+            
             addHistoryLog(r, `[사택] ${currentUser.name} 사원이 ${rc.name}을(를) 만들어 나눠 먹었습니다. (오염도 -${share}%)`);
-            if (database) database.ref('users/' + r.code).set(r);
+            updateUserFields(r.code, { pollution: r.pollution, history: r.history });
         }
 
         addHistoryLog(currentUser, `[사택] ${rc.name}을(를) 만들어 먹었습니다.`);
@@ -9462,6 +9463,14 @@ const reply = await callFox(msgs);
 
         // ★ 행운 — 대실패(굴림 1)를 확률적으로 무효화하고 다시 굴린다
     function luckReroll(roll) {
+                // 식은 커피 — 낮게 나오면 한 번 다시 굴린다
+        if (roll <= 9 && darkRun && qFlag('reroll')) {
+            consumeQFlag('reroll');
+            const nr = Math.floor(Math.random() * 20) + 1;
+            darkRun.log.push(`[식은 커피] 재굴림 (${roll} → ${nr})`);
+            showDarkToast(`☕ 정신이 들었다. 다시 굴린다. (${roll} → ${nr})`);
+            roll = nr;
+        }
         if (roll !== 1) return roll;
         if (!darkRun || darkRun._luckRerollUsed) return roll;
         const luckVal = gearValue(currentUser, 'luck');

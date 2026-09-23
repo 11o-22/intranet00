@@ -92,6 +92,7 @@
             <div style="font-family:monospace; font-size:11px; color:#ff6b6b; font-weight:bold;" id="dro-code">Qtrew-???</div>
             <div style="display:flex; gap:7px; align-items:center;">
                 <span id="dro-role" style="font-size:10px; color:#888;"></span>
+                                <button onclick="darkResync()" style="background:none; border:1px solid #333; color:#888; font-size:12px; padding:4px 8px; border-radius:4px; cursor:pointer;">↻</button>
                 <button id="dark-mute-btn" onclick="toggleDarkMute()" style="background:none; border:1px solid #333; color:#888; font-size:12px; padding:4px 8px; border-radius:4px; cursor:pointer;">🔊</button>
             </div>
         </div>
@@ -1347,14 +1348,9 @@ function getTodayStr() {
             const srv = users[currentUser.code];
 
             // 내가 저장 중이 아닐 때만, 남이 바꾼 값을 받아온다
+                       _lastSrvMe = srv;   // 건너뛰더라도 최신 서버 값은 기억해 둔다
             if (pendingSaves === 0 && srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
-                // ★ 남이 바꿨으면 서버 기준으로 전부 맞춘다
-                Object.keys(currentUser).forEach(k => { if (!(k in srv)) delete currentUser[k]; });
-                Object.keys(srv).forEach(k => { currentUser[k] = srv[k]; });
-                if (!currentUser.inventory) currentUser.inventory = [];
-                if (!currentUser.history) currentUser.history = [];
-                if (!currentUser.letters) currentUser.letters = [];
-                if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+                applyServerMe(srv);
             }
 
             // 항상 내 라이브 객체로 연결 (db.users[내코드] 가 낡은 사본이 되지 않게)
@@ -1451,6 +1447,26 @@ if (database) {
 });
 
 }
+
+    let _lastSrvMe = null;
+
+    function applyServerMe(srv) {
+        Object.keys(currentUser).forEach(k => { if (!(k in srv)) delete currentUser[k]; });
+        Object.keys(srv).forEach(k => { currentUser[k] = srv[k]; });
+        if (!currentUser.inventory) currentUser.inventory = [];
+        if (!currentUser.history) currentUser.history = [];
+        if (!currentUser.letters) currentUser.letters = [];
+        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+    }
+
+    function onSaveDone() {
+        pendingSaves = Math.max(0, pendingSaves - 1);
+        if (pendingSaves > 0 || !currentUser || !_lastSrvMe) return;
+        if (_lastSrvMe._adminStamp && _lastSrvMe._adminStamp !== currentUser._adminStamp) {
+            applyServerMe(_lastSrvMe);
+            updateUI();
+        }
+    }
         
 
    function saveDB() {
@@ -1466,7 +1482,7 @@ if (database) {
     pendingSaves++;
     database.ref(`users/${currentUser.code}`).update(payload)
         .catch(e => console.error('저장 실패:', e))
-        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+        .finally(onSaveDone);
 }
 
     function removeItemFromInventory(user, itemName, qty) {
@@ -2784,9 +2800,9 @@ function partyAdvance(nextStep) {
 function renderAdvanceWait(nextStep) {
     const pid = darkRun.partyId;
     const ref = database.ref(`darkParties/${pid}/ready${nextStep}`);
-    let finished = false;
+    const startedAt = Date.now();
+    let finished = false, lastGot = {}, poll = null;
 
-    // 화면 먼저 준비
     const body = darkBodyEl();
     if (body) {
         const btns = body.querySelectorAll('.game-btn');
@@ -2802,72 +2818,63 @@ function renderAdvanceWait(nextStep) {
     const go = () => {
         if (finished) return;
         finished = true;
+        clearInterval(poll);
         try { ref.off(); } catch (e) {}
         if (!darkRun) return;
         darkRun._advTo = null;
 
-        if (darkRun.step >= nextStep) return;
+        if (darkRun.step >= nextStep) { renderDarkStep(); return; }   // 이미 넘어갔으면 화면만 다시
         darkRun.step = nextStep;
 
-        database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
-            if (cur != null && cur >= nextStep) return;
-            return nextStep;
-        });
+        if (!darkRun.solo) {   // 혼자 떨어진 사람은 본대를 끌고 가지 않는다
+            database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
+                if (cur != null && cur >= nextStep) return;
+                return nextStep;
+            });
+        }
         detachVoteListener();
         renderDarkStep();
     };
 
-    ref.on('value', snap => {
+    const check = () => {
         if (finished || !darkRun) return;
-        const got = snap.val() || {};
-        const cnt = Object.keys(got).length;
-        const total = advTotal();
-
-        const el = document.getElementById('adv-wait');
-        if (el) el.innerText = `${cnt} / ${total}명 준비`;
-
-        // 아직 안 누른 사람 이름
         const p = darkParties[pid] || {};
         const solo = p.solo || {};
-        const waitFor = Object.keys(p.alive || {})
-            .filter(c => !got[c] && !(solo[c] && solo[c].lair))
-        .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
+        const group = darkRun.solo
+            ? [currentUser.code]
+            : Object.keys(p.alive || {}).filter(c => !solo[c]);
+        const need = Math.max(1, group.length);
+        const cnt = group.filter(c => lastGot[c]).length;
+
+        const el = document.getElementById('adv-wait');
+        if (el) el.innerText = `${cnt} / ${need}명 준비`;
         const wl = document.getElementById('adv-wait-list');
-        if (wl) wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
-
-        if (cnt >= total) go();
-    });
-
-    database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
-        const cur = sn.val();
-        if (cur != null && cur >= nextStep) go();
-    });
-
-        const waitTick = () => {
-        if (finished || !darkRun) return;
-        // 아직 투표가 열려 있으면 더 기다린다
-        if (currentVote && currentVote.state === 'OPEN' && darkRun.step < nextStep) {
-            setTimeout(waitTick, 5000);
-            return;
+        if (wl) {
+            const waitFor = group.filter(c => !lastGot[c])
+                .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
+            wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
         }
+        if (cnt >= need) go();
+    };
+
+    ref.on('value', snap => { lastGot = snap.val() || {}; check(); });
+    poll = setInterval(check, 3000);   // 누가 끊겨 인원이 줄어도 다시 센다
+
+    if (!darkRun.solo) {
+        database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
+            const cur = sn.val();
+            if (cur != null && cur >= nextStep) go();
+        });
+    }
+
+    const waitTick = () => {
+        if (finished || !darkRun) return;
+        const voting = currentVote && currentVote.state === 'OPEN' && darkRun.step < nextStep;
+        if (voting && Date.now() - startedAt < 150000) { setTimeout(waitTick, 5000); return; }
         go();
     };
     setTimeout(waitTick, advTimeout(darkRun.step));
 }
-    function abortDarkRunNoPenalty() {
-        if (!darkRun) return;
-        const z = DARK_ZONES[darkRun.zone];
-        addHistoryLog(currentUser, `[탐사 중단] ${z.code} 동료 이탈로 중단 (차감 없음)`);
-        if (!currentUser.darkLogs) currentUser.darkLogs = [];
-        currentUser.darkLogs.unshift({
-            date: new Date().toLocaleString(), zone: z.code, zoneName: z.name,
-            reward: 0, success: darkRun.success, fail: darkRun.fail,
-            loot: [], lost: [], detail: darkRun.log, aborted: true, party: true
-        });
-        saveDB();
-        finishDarkRun();
-    }
-
     function abortDarkRun() {
         if (!darkRun) return;
         darkRun.failedRun = true;
@@ -4458,6 +4465,25 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
                 database.ref('darkC119/' + pid).remove();
                 if (zone) database.ref('darkOccupancy/' + zone).remove();
             });
+    }
+
+        function darkResync() {
+        if (!darkRun) return;
+        darkRun._advTo = null;
+        darkRun._votePending = null;
+        detachVoteListener();
+        if (!darkRun.isParty || !database) { renderDarkStep(); return; }
+
+        database.ref(`darkParties/${darkRun.partyId}`).once('value').then(sn => {
+            const p = sn.val();
+            if (!p) {
+                showCustomAlert('탐사 기록이 사라졌습니다.\n안전하게 귀환합니다.');
+                finishDarkRun();
+                return;
+            }
+            if (!darkRun.solo && p.curStep != null && p.curStep > darkRun.step) darkRun.step = p.curStep;
+            renderDarkStep();
+        });
     }
 
           function finishDarkRun() {
@@ -9067,7 +9093,7 @@ function changePoints(delta) {
             }),
             database.ref(`users/${code}/_adminStamp`).set(stamp)
         ]).catch(e => console.error('포인트 저장 실패:', e))
-          .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+          .finally(onSaveDone);
     }
     updateUI();
 }
@@ -9122,7 +9148,7 @@ function saveFields(fields) {
     pendingSaves++;
     database.ref('/').update(updates)
         .catch(e => console.error('저장 실패:', e))
-        .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+        .finally(onSaveDone);
 }
 
 // 남(또는 나)의 특정 필드만 저장
@@ -9135,7 +9161,7 @@ function updateUserFields(code, fields) {
         currentUser._adminStamp = stamp;          // ★ 내 계정이면 로컬 스탬프도 맞춤
         pendingSaves++;
         return database.ref('users/' + code).update(fields)
-            .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+            .finally(onSaveDone);
     }
     return database.ref('users/' + code).update(fields);
 }
@@ -9160,7 +9186,7 @@ function saveSelfFull() {
     try {
         return database.ref('users/' + currentUser.code).update(clean)
             .catch(e => console.error('저장 실패:', e))
-            .finally(() => { pendingSaves = Math.max(0, pendingSaves - 1); });
+            .finally(onSaveDone);
     } catch (e) {
         pendingSaves = Math.max(0, pendingSaves - 1);
         console.error('저장 실패:', e);
