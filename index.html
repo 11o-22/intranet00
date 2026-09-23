@@ -1030,6 +1030,13 @@
                 <button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="adminUpdateEmployee()">기본 발령 적용</button>
                 <button class="game-btn" style="flex:1; margin:0; background:linear-gradient(145deg, #ffd700, #daa520); color:#000; font-weight:bold; border-color:#b8860b; padding:10px;" onclick="adminAdjustCredit()">신용 점수 조정</button>
             </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+    <input type="text" id="adm-new-code" class="bet-input" style="flex:2;" placeholder="새 인가 코드">
+    <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminChangeCode()">인가 코드 변경</button>
+</div>
+<div style="font-size:10px; color:#888; margin-top:5px; line-height:1.5;">
+    ※ 위 사번 칸의 사원이 대상입니다. 접속 중이거나 탐사 중이면 변경할 수 없습니다.
+</div>
                         <div style="display:flex; gap:8px; margin-top:8px;">
                 <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="adminBankBlacklist(true)">은행 블랙리스트</button>
                 <button class="game-btn" style="flex:1; margin:0; padding:10px;" onclick="adminBankBlacklist(false)">블랙리스트 해제</button>
@@ -9206,6 +9213,102 @@ function saveSelfFull() {
             console.error('발령 실패:', e);
             showCustomAlert('서버 저장 중 오류가 발생했습니다.');
         });
+    }
+
+        async function adminChangeCode() {
+        const no = document.getElementById('adm-target-no').value.trim();
+        const newCode = document.getElementById('adm-new-code').value.trim();
+        if (!no) { showCustomAlert('대상 사번을 입력해주세요.'); return; }
+        if (!newCode) { showCustomAlert('새 인가 코드를 입력해주세요.'); return; }
+        if (!database) { showCustomAlert('서버 연결이 필요합니다.'); return; }
+        if (/[.#$\[\]\/\s]/.test(newCode)) { showCustomAlert('코드에 쓸 수 없는 문자가 있습니다.\n(공백, . # $ [ ] / 제외)'); return; }
+
+        const oldCode = Object.keys(db.users).find(c => db.users[c].no === no || c === no);
+        if (!oldCode) { showCustomAlert('해당 사번을 가진 사원을 찾을 수 없습니다.'); return; }
+        if (oldCode === 'kario0987') { showCustomAlert('상담사 계정의 코드는 여기서 바꿀 수 없습니다.'); return; }
+        if (oldCode === newCode) { showCustomAlert('지금과 같은 코드입니다.'); return; }
+        if (db.users[newCode]) { showCustomAlert('이미 사용 중인 코드입니다.'); return; }
+        if (onlineUsersMap[oldCode]) { showCustomAlert('대상이 접속 중입니다.\n단말을 종료한 뒤 다시 시도해주세요.'); return; }
+
+        const u = db.users[oldCode];
+        const nm = u.name;
+        if (!confirm(`${nm} 사원(사번 ${u.no})의 인가 코드를 바꿉니다.\n바꾼 뒤에는 새 코드로만 접속할 수 있습니다.\n\n진행할까요?`)) return;
+
+        try {
+            const [snapU, snapRun] = await Promise.all([
+                database.ref('users/' + oldCode).once('value'),
+                database.ref('darkRuns/' + oldCode).once('value')
+            ]);
+            const data = snapU.val();
+            if (!data) { showCustomAlert('사원 정보를 불러오지 못했습니다.'); return; }
+            if (snapRun.val()) { showCustomAlert('진행 중인 탐사가 있습니다.\n정리된 뒤에 다시 시도해주세요.'); return; }
+
+            data.code = newCode;
+            addHistoryLog(data, `[당국 개입] 인가 코드가 재발급되었습니다.`);
+
+            const updates = {};
+            updates[`users/${newCode}`] = data;
+            updates[`users/${oldCode}`] = null;
+            updates[`sessions/${oldCode}`] = null;
+            updates[`online/${oldCode}`] = null;
+            updates[`darkRuns/${oldCode}`] = null;
+
+            // 받을 돈함 이전
+            const pay = (await database.ref('payouts/' + oldCode).once('value')).val();
+            if (pay) { updates[`payouts/${newCode}`] = pay; updates[`payouts/${oldCode}`] = null; }
+
+            // 다른 사원에 남은 참조
+            Object.keys(db.users).forEach(c => {
+                if (c === oldCode) return;
+                const o = db.users[c];
+                if (o.house && o.house.roomie === oldCode) updates[`users/${c}/house/roomie`] = newCode;
+                if (o.couple && o.couple.partner === oldCode) updates[`users/${c}/couple/partner`] = newCode;
+                if (o.nostalgiaSender === oldCode) updates[`users/${c}/nostalgiaSender`] = newCode;
+                if (o.equipOwner) {
+                    Object.keys(o.equipOwner).forEach(k => {
+                        if (o.equipOwner[k] === oldCode) updates[`users/${c}/equipOwner/${k}`] = newCode;
+                    });
+                }
+            });
+
+            // 밀실 거래 · 건의함 · 장터
+            const [dSnap, sSnap, mSnap] = await Promise.all([
+                database.ref('p2pDeals').once('value'),
+                database.ref('suggestions').once('value'),
+                database.ref('market').once('value')
+            ]);
+            const deals = dSnap.val() || [];
+            (Array.isArray(deals) ? deals : Object.values(deals)).forEach((d, i) => {
+                if (!d) return;
+                if (d.fromCode === oldCode) updates[`p2pDeals/${i}/fromCode`] = newCode;
+                if (d.toCode === oldCode) updates[`p2pDeals/${i}/toCode`] = newCode;
+            });
+            const sugg = sSnap.val() || [];
+            (Array.isArray(sugg) ? sugg : Object.values(sugg)).forEach((x, i) => {
+                if (x && x.code === oldCode) updates[`suggestions/${i}/code`] = newCode;
+            });
+            const mk = mSnap.val() || {};
+            Object.keys(mk).forEach(id => {
+                const pst = mk[id];
+                if (!pst) return;
+                if (pst.seller === oldCode) updates[`market/${id}/seller`] = newCode;
+                if (pst.buyer === oldCode) updates[`market/${id}/buyer`] = newCode;
+                if (pst.offers) Object.keys(pst.offers).forEach(oid => {
+                    if (pst.offers[oid] && pst.offers[oid].by === oldCode) updates[`market/${id}/offers/${oid}/by`] = newCode;
+                });
+            });
+
+            await database.ref('/').update(updates);
+
+            db.users[newCode] = data;
+            delete db.users[oldCode];
+            document.getElementById('adm-new-code').value = '';
+            updateUI();
+            showCustomAlert(`${nm} 사원의 인가 코드가 재발급되었습니다.\n\n새 코드를 본인에게 직접 전달해주세요.`);
+        } catch (e) {
+            console.error('코드 변경 실패:', e);
+            showCustomAlert('변경 중 오류가 발생했습니다.');
+        }
     }
        function adminToggleVIP() {
         const targets = getAdminTargets();
