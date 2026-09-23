@@ -6891,15 +6891,15 @@ if (cat.effect === 'couple_ring') {
             if (targetUser.hasVIP) { if(!isOthers) showCustomAlert('이미 2급 보안 인가(VIP)가 승인되어 있습니다.'); return false; }
             targetUser.hasVIP = true; appendBadgeNoteToUser(targetUser, `2급 보안 인가 (VIP 라운지 출입 권한 획득)`);
         }  // (이 기존 코드들을 찾아서 아래 코드로 바꿔치기 하세요)
-        else if (cat.effect === 'grape_potion') addTimedEffect(targetUser, '포도맛 물약', '신체 파동 변조 (성별 반전 상태)', 72);
-        else if (cat.effect === 'milk_potion') addTimedEffect(targetUser, '우유맛 물약', '신체 변이 (컨트/딕걸)', 72);
-        else if (cat.effect === 'banana_potion') addTimedEffect(targetUser, '바나나맛 물약', `완전한 ${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}로 변이 (인간 형태 상실)`, 72);
+        else if (cat.effect === 'grape_potion') addTimedEffect(targetUser, '포도맛 물약', '신체 파동 변조 (성별 반전 상태)', 24);
+        else if (cat.effect === 'milk_potion') addTimedEffect(targetUser, '우유맛 물약', '신체 변이 (컨트/딕걸)', 24);
+        else if (cat.effect === 'banana_potion') addTimedEffect(targetUser, '바나나맛 물약', `완전한 ${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}로 변이 (인간 형태 상실)`, 3);
 else if (cat.effect === 'apple_potion') addTimedEffect(targetUser, '사과맛 물약', `${ANIMAL_LIST[Math.floor(Math.random() * ANIMAL_LIST.length)]}의 귀와 꼬리 발현 및 습성 발현`, 72);
-        else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 72);
-        else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 72);
-        else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 72);
-        else if (cat.effect === 'pineapple_potion') addTimedEffect(targetUser, '파인애플맛 물약', '신체 축소 (손바닥 크기)', 72);
-else if (cat.effect === 'plum_potion') addTimedEffect(targetUser, '자두맛 물약', `신체에서 ${CAKE_LIST[Math.floor(Math.random() * CAKE_LIST.length)]} 케이크 맛이 남`, 72);
+        else if (cat.effect === 'orange_potion') addTimedEffect(targetUser, '오렌지맛 물약', '신체 퇴행 (어린아이 상태)', 3);
+        else if (cat.effect === 'peach_potion') addTimedEffect(targetUser, '복숭아맛 물약', '신체 감각 과민 (예민한 몸 상태)', 24);
+        else if (cat.effect === 'cherry_potion') addTimedEffect(targetUser, '체리맛 물약', '신체 부위 중 일부가 예민하게 개발됨', 24);
+        else if (cat.effect === 'pineapple_potion') addTimedEffect(targetUser, '파인애플맛 물약', '신체 축소 (손바닥 크기)', 24);
+else if (cat.effect === 'plum_potion') addTimedEffect(targetUser, '자두맛 물약', `신체에서 ${CAKE_LIST[Math.floor(Math.random() * CAKE_LIST.length)]} 케이크 맛이 남`, 24);
 else if (cat.effect === 'clear_potion') {
     const candidates = [];
 
