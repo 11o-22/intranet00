@@ -9368,6 +9368,9 @@ function saveSelfFull() {
             // 받을 돈함 이전
             const pay = (await database.ref('payouts/' + oldCode).once('value')).val();
             if (pay) { updates[`payouts/${newCode}`] = pay; updates[`payouts/${oldCode}`] = null; }
+                        // 은행 계좌 이전
+            const bank = (await database.ref('bank/' + oldCode).once('value')).val();
+            if (bank) { updates[`bank/${newCode}`] = bank; updates[`bank/${oldCode}`] = null; }
 
             // 다른 사원에 남은 참조
             Object.keys(db.users).forEach(c => {
