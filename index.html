@@ -945,6 +945,17 @@
         켜면 상담사를 제외한 전원이 접속할 수 없고, 접속 중인 사원은 즉시 종료됩니다.
     </div>
     <div id="maintenance-state" style="font-size:11px; font-weight:bold; margin-bottom:9px;"></div>
+    <div style="border-top:1px dashed #5a4a2a; margin-top:10px; padding-top:10px;">
+    <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:6px;">테스터 지정</div>
+    <div style="font-size:10px; color:#aaa; margin-bottom:8px; line-height:1.5;">
+        대상 목록에서 선택한 뒤 누르세요. 테스터는 점검 중에도 접속할 수 있습니다.
+    </div>
+    <div style="display:flex; gap:6px;">
+        <button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="adminSetTester(true)">테스터 지정</button>
+        <button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="adminSetTester(false)">해제</button>
+    </div>
+    <div id="admin-tester-list" style="margin-top:9px;"></div>
+</div>
     <div style="display:flex; gap:6px;">
         <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#c62828,#8e0000) !important; border-color:#7f0000 !important; color:#fff !important;" onclick="setMaintenance(true)">점검 시작</button>
         <button class="game-btn" style="flex:1; margin:0; padding:10px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="setMaintenance(false)">점검 종료</button>
@@ -1090,6 +1101,10 @@
             </div>
             <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
     <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5a4a2a, #3a2f18) !important; border-color:#7a6a3a !important; margin:0;" onclick="adminSeizeSafe()">금고 압수</button>
+        <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important; margin:0;" onclick="adminBreakCouple()">커플 해제</button>
+</div>
+<div style="font-size:12px; margin-bottom:10px;">
+    <button class="game-btn" style="width:100%; margin:0; padding:10px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="adminFixCouples()">끊긴 커플 관계 정리</button>
 </div>
             <!-- --------------------------------------- -->
          <div style="border:1px solid #2e7d32; border-radius:6px; padding:10px; background:rgba(0,0,0,0.25); margin-bottom:8px;">
@@ -1374,6 +1389,17 @@ function getTodayStr() {
         if (el) el.style.display = show ? 'flex' : 'none';
     }
 
+        let testerList = {};
+    if (database) {
+        database.ref('testers').on('value', snap => {
+            testerList = snap.val() || {};
+            renderAdminTesterList();
+        });
+    }
+    function canBypassMaintenance(code) {
+        return code === 'kario0987' || !!testerList[code];
+    }
+
     function tryAutoLogin() {
         if (maintenanceMode) return;
         if (autoLoginTried || currentUser || !database) return;
@@ -1420,8 +1446,9 @@ if (database) {
     database.ref('maintenance').on('value', snap => {
         maintenanceMode = !!snap.val();
         const el = document.getElementById('maintenance-overlay');
-        if (el) el.style.display = maintenanceMode ? 'flex' : 'none';
-        if (maintenanceMode && currentUser && currentUser.code !== 'kario0987') {
+                const bypass = currentUser && canBypassMaintenance(currentUser.code);
+        if (el) el.style.display = (maintenanceMode && !bypass) ? 'flex' : 'none';
+                if (maintenanceMode && currentUser && !canBypassMaintenance(currentUser.code)) {
             logout();
         }
     });
@@ -9213,7 +9240,7 @@ function saveSelfFull() {
 
         [renderAdminSuggestions, renderAdminItemSelect, renderAdminDarkZones,
          renderAdminTargetList, renderAdminFoxRoom, renderAdminGearQuick,
-         renderAdminGearList, renderAdminRoomList, renderMaintenanceState, initAdminAccordion, renderAdminVipList]
+         renderAdminGearList, renderAdminRoomList,          renderAdminGearList, renderAdminRoomList, renderMaintenanceState, renderAdminTesterList, initAdminAccordion, renderAdminVipList]
         .forEach(fn => {
             try { if (typeof fn === 'function') fn(); }
             catch (e) { console.warn('관리자 패널 렌더 실패:', fn.name, e.message); }
@@ -10338,7 +10365,7 @@ function adminGiveItem() {
         const name = nameInput.value.trim();
         const code = codeInput.value.trim();
         
-        if (maintenanceMode && code !== 'kario0987') {
+               if (maintenanceMode && !canBypassMaintenance(code)) {
     showCustomAlert('현재 업데이트 진행 중입니다. 잠시만 기다려 주세요.');
     return;
 }
@@ -10390,6 +10417,16 @@ function adminGiveItem() {
             detachHouseChat();
             checkPassivePollution(currentUser); 
             checkMedRations(currentUser); 
+                        // 상대가 사라졌으면 스스로 풀린다
+            if (currentUser.couple) {
+                const pc = currentUser.couple.partner;
+                const pu = pc ? db.users[pc] : null;
+                if (!pu || !pu.couple || pu.couple.partner !== currentUser.code) {
+                    currentUser.couple = null;
+                    addHistoryLog(currentUser, `[커플 해제] 상대의 기록이 확인되지 않아 관계가 정리되었습니다.`);
+                    saveFields({ couple: 1, history: 1 });
+                }
+            }
              if (applySafeInterest(currentUser)) {
               saveSelfFull();
         }

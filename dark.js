@@ -9203,7 +9203,7 @@ ${picked.map(m => '- ' + m.text).join('\n')}
 }
 
         if (foxBusy) return;
-    if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
+        if (maintenanceMode && (!currentUser || !canBypassMaintenance(currentUser.code))) {
         showCustomAlert('현재 업데이트 진행 중입니다.');
         return;
     }
@@ -9550,6 +9550,74 @@ const reply = await callFox(msgs);
         showDarkToast(`✺ 손이 미끄러졌다. 다시 굴린다. (${newRoll})`);
         return newRoll;
     }
+
+    // 선택한 사원의 커플 관계를 양쪽 다 푼다
+function adminBreakCouple() {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+
+    const done = [], skipped = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u) return;
+        if (!u.couple) { skipped.push(u.name); return; }
+
+        const pCode = u.couple.partner;
+        const pName = u.couple.partnerName || '상대';
+        u.couple = null;
+        addHistoryLog(u, `[당국 개입] 커플 관계가 해제되었습니다. (${pName})`);
+        updateUserFields(code, { couple: null, history: u.history });
+
+        const p = db.users[pCode];
+        if (p && p.couple && p.couple.partner === code) {
+            p.couple = null;
+            addHistoryLog(p, `[당국 개입] 커플 관계가 해제되었습니다. (${u.name})`);
+            updateUserFields(pCode, { couple: null, history: p.history });
+        }
+        done.push(u.name);
+    });
+
+    if (currentUser && !currentUser.couple) applyCoupleTheme(currentUser);
+    updateUI();
+    showCustomAlert(
+        (done.length ? `커플 해제: ${done.join(', ')}` : '') +
+        (skipped.length ? `\n\n커플 아님: ${skipped.join(', ')}` : '')
+    );
+}
+
+// 상대가 사라졌거나 짝이 맞지 않는 관계를 전부 정리한다
+function adminFixCouples() {
+    if (!database) return;
+    const fixed = [];
+
+    Object.keys(db.users).forEach(code => {
+        const u = db.users[code];
+        if (!u || !u.couple) return;
+
+        const pCode = u.couple.partner;
+        const p = db.users[pCode];
+
+        let broken = false, why = '';
+        if (!pCode) { broken = true; why = '상대 미지정'; }
+        else if (!p) { broken = true; why = '상대 계정 없음'; }
+        else if (!p.couple) { broken = true; why = '상대가 이미 해제함'; }
+        else if (p.couple.partner !== code) { broken = true; why = '짝이 어긋남'; }
+
+        if (!broken) return;
+
+        u.couple = null;
+        addHistoryLog(u, `[당국 정리] 끊긴 커플 관계가 해제되었습니다. (${why})`);
+        updateUserFields(code, { couple: null, history: u.history });
+        fixed.push(`${u.name} — ${why}`);
+    });
+
+    if (currentUser && !currentUser.couple) applyCoupleTheme(currentUser);
+    updateUI();
+    showCustomAlert(fixed.length
+        ? `${fixed.length}건을 정리했습니다.\n\n${fixed.join('\n')}`
+        : '끊긴 커플 관계가 없습니다.');
+}
+
 function adminSeizeSafe() {
     const targets = getAdminTargets();
     if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
@@ -9583,6 +9651,37 @@ function adminSeizeSafe() {
         renderMaintenanceState();
         showCustomAlert(on ? '점검 모드가 시작되었습니다.' : '점검 모드가 해제되었습니다.');
     });
+}
+
+function adminSetTester(on) {
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+    if (!database) return;
+
+    const updates = {};
+    const names = [];
+    targets.forEach(code => {
+        const u = db.users[code];
+        if (!u) return;
+        updates['testers/' + code] = on ? { name: u.name, at: Date.now() } : null;
+        addHistoryLog(u, `[당국 개입] 테스터 권한이 ${on ? '부여' : '회수'}되었습니다.`);
+        updateUserFields(code, { history: u.history });
+        names.push(u.name);
+    });
+
+    database.ref('/').update(updates).then(() => {
+        showCustomAlert(`${names.length}명을 테스터로 ${on ? '지정' : '해제'}했습니다.\n(${names.join(', ')})`);
+    });
+}
+
+function renderAdminTesterList() {
+    const box = document.getElementById('admin-tester-list');
+    if (!box) return;
+    const keys = Object.keys(testerList);
+    box.innerHTML = keys.length
+        ? `<div style="font-size:10px; color:#4CAF50; line-height:1.8;">현재 테스터 ${keys.length}명<br>` +
+          keys.map(c => (testerList[c].name || c)).join(', ') + `</div>`
+        : `<div style="font-size:10px; color:#666;">지정된 테스터가 없습니다.</div>`;
 }
 
 function renderMaintenanceState() {
@@ -12238,7 +12337,7 @@ async function sendBathChat() {
 }
 
     if (bathBusy) return;
-    if (maintenanceMode && (!currentUser || currentUser.code !== 'kario0987')) {
+        if (maintenanceMode && (!currentUser || !canBypassMaintenance(currentUser.code))) {
         showCustomAlert('현재 업데이트 진행 중입니다.');
         return;
     }
