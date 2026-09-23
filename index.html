@@ -4828,6 +4828,18 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             }
         }
 
+                // 옥탑 — 하루 한 번 오염도 정화
+        if (user.house && typeof houseGrade === 'function' && houseGrade(user) === 'S') {
+            const today = getTodayStr();
+            if (user.house.purgeDate !== today && user.pollution > 0) {
+                user.house.purgeDate = today;
+                const before = user.pollution;
+                user.pollution = Math.max(0, user.pollution - 15);
+                addHistoryLog(user, `[옥탑] 아침 공기에 오염도가 ${before - user.pollution}% 가셨습니다.`);
+                changed = true;
+            }
+        }
+
         if (user.blindfoldUntil && now >= user.blindfoldUntil) {
             user.blindfoldUntil = 0;
             if (user.badge && user.badge.notes) {

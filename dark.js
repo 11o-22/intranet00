@@ -7962,13 +7962,26 @@ function b508RequiredDocs() {
     // ==========================================
     const HOUSE_GRADES = ['D', 'C', 'B', 'A', 'S'];
     const HOUSE_INFO = {
-        D: { name:'지하 1층', cost:0,        heal:1, label:'습하고 어둡다. 벽에서 물소리가 난다.', anomaly:0.45 },
-        C: { name:'1~3층',    cost:50000,    heal:2, label:'평범하다. 평범해서 좋다.',            anomaly:0.30 },
-        B: { name:'4~6층',    cost:200000,   heal:3, label:'볕이 든다. 오후에 특히.',             anomaly:0.15 },
-        A: { name:'7~9층',    cost:1500000,  heal:5, label:'조용하다. 아래층 소리가 안 들린다.',  anomaly:0 },
-        S: { name:'옥탑',     cost:18250000, heal:8, label:'전망이 좋다. 다만 창이 하나 더 있다.', anomaly:0 }
+        D: { name:'지하 1층', cost:0,        heal:1, label:'습하고 어둡다. 벽에서 물소리가 난다.', anomaly:0.45,
+             storage:15, rest:3, cook:2, freeGame:false, vault:0, perk:'—' },
+        C: { name:'1~3층',    cost:50000,    heal:2, label:'평범하다. 평범해서 좋다.',            anomaly:0.30,
+             storage:20, rest:4, cook:2, freeGame:false, vault:0, perk:'휴식 1회 추가' },
+        B: { name:'4~6층',    cost:200000,   heal:3, label:'볕이 든다. 오후에 특히.',             anomaly:0.15,
+             storage:30, rest:4, cook:3, freeGame:false, vault:0, perk:'휴식·요리 각 1회 추가' },
+        A: { name:'7~9층',    cost:1500000,  heal:5, label:'조용하다. 아래층 소리가 안 들린다.',  anomaly:0,
+             storage:40, rest:4, cook:3, freeGame:true,  vault:0, perk:'오락기 무료 · 휴식 시 포만감 +5 · 이상 현상 없음' },
+        S: { name:'옥탑',     cost:18250000, heal:8, label:'전망이 좋다. 다만 창이 하나 더 있다.', anomaly:0,
+             storage:60, rest:4, cook:3, freeGame:true,  vault:50000, perk:'오락기 무료 · 포만감 +5 · 일 1회 오염도 -15 · 포인트 보관 50,000 P' }
     };
     const HOUSE_STORAGE_MAX = 20;
+
+    function houseInfoOf(user) {
+        return HOUSE_INFO[houseGrade(user)] || HOUSE_INFO.D;
+    }
+
+    function houseStorageMax(user) {
+        return houseInfoOf(user).storage || HOUSE_STORAGE_MAX;
+    }
 
     function getHouse(user) {
         if (!user.house) {
@@ -8030,7 +8043,7 @@ function b508RequiredDocs() {
 
         const today = getTodayStr();
         if (h.restDate !== today) { h.restCount = 0; h.restDate = today; }
-        const restLeft = Math.max(0, 3 - (h.restCount || 0));
+        const restLeft = Math.max(0, info.rest - (h.restCount || 0));
 
         box.innerHTML = `
             <div class="panel-title">[사택]</div>
@@ -8040,7 +8053,7 @@ function b508RequiredDocs() {
                 <div style="font-size:16px; color:#fff; font-weight:bold;">${info.name}</div>
                 <div style="font-size:11px; color:#999; margin-top:6px; line-height:1.6;">${info.label}</div>
                 <div style="font-size:10px; color:#666; margin-top:8px;">
-                    회복 속도 시간당 ${info.heal}% · 보관함 ${(h.storage||[]).length}/${HOUSE_STORAGE_MAX}칸
+                    회복 속도 시간당 ${info.heal}% · 보관함 ${(h.storage||[]).length}/${info.storage}칸
                 </div>
             </div>
 
@@ -8070,6 +8083,21 @@ function b508RequiredDocs() {
                 </button>
             </div>
 
+                        ${info.vault > 0 ? `
+                <div style="background:rgba(212,175,55,0.07); border:1px solid #5a4a2a; border-radius:6px; padding:12px; margin-bottom:14px;">
+                    <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:7px;">옥탑 금고</div>
+                    <div style="font-size:12px; color:#ffd700; font-weight:bold;">${(h.vault || 0).toLocaleString()} P <span style="font-size:10px; color:#888; font-weight:normal;">/ ${info.vault.toLocaleString()} P</span></div>
+                    <div style="font-size:10px; color:#888; margin-top:5px;">어둠에서 잃지 않습니다. 이자는 붙지 않습니다.</div>
+                    <input type="number" id="house-vault-amt" class="bet-input" style="width:100%; margin-top:9px; text-align:center;" placeholder="금액 입력" min="1">
+                    <div style="display:flex; gap:6px; margin-top:7px;">
+                        <button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="houseVault(1)">넣기</button>
+                        <button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;" onclick="houseVault(-1)">빼기</button>
+                    </div>
+                </div>` : `
+                <div style="background:rgba(0,0,0,0.25); border:1px solid #333; border-radius:6px; padding:11px; margin-bottom:14px; font-size:10px; color:#666; line-height:1.7;">
+                    <b style="color:#888;">등급 혜택</b><br>${info.perk}
+                </div>`}
+
             <div id="house-anomaly-box"></div>
 
             ${next ? `
@@ -8093,6 +8121,38 @@ function b508RequiredDocs() {
         `;
         renderHouseNotes();
         renderAnomalyBox();
+    }
+
+        function houseVault(dir) {
+        if (!buyGuard()) return;
+        const info = houseInfoOf(currentUser);
+        if (!info.vault) { showCustomAlert('옥탑에서만 쓸 수 있습니다.'); return; }
+
+        const el = document.getElementById('house-vault-amt');
+        let amt = parseInt(el.value, 10);
+        if (isNaN(amt) || amt <= 0) { showCustomAlert('올바른 금액을 입력해주세요.'); return; }
+
+        const h = getHouse(currentUser);
+        if (!h.vault) h.vault = 0;
+
+        if (dir > 0) {
+            if (amt > currentUser.points) { showLuxuryAlert(); return; }
+            const room = info.vault - h.vault;
+            if (room <= 0) { showCustomAlert('더 넣을 자리가 없습니다.'); return; }
+            amt = Math.min(amt, room);
+            currentUser.points -= amt;
+            h.vault += amt;
+            addHistoryLog(currentUser, `[옥탑 금고] ${amt.toLocaleString()} P를 넣었습니다.`);
+        } else {
+            if (amt > h.vault) { showCustomAlert(`보관 중인 금액은 ${h.vault.toLocaleString()} P입니다.`); return; }
+            h.vault -= amt;
+            currentUser.points += amt;
+            addHistoryLog(currentUser, `[옥탑 금고] ${amt.toLocaleString()} P를 꺼냈습니다.`);
+        }
+
+        saveFields({ points: 1, house: 1, history: 1 });
+        updateUI();
+        renderHouse();
     }
         function houseMove() {
         const g = houseGrade(currentUser);
@@ -8127,7 +8187,9 @@ function b508RequiredDocs() {
         const h = getHouse(currentUser);
         const today = getTodayStr();
         if (h.restDate !== today) { h.restCount = 0; h.restDate = today; }
-        if ((h.restCount || 0) >= 3) { showCustomAlert('오늘은 충분히 쉬었습니다.'); return; }
+        if ((h.restCount || 0) >= (HOUSE_INFO[houseGrade(currentUser)] || HOUSE_INFO.D).rest) {
+            showCustomAlert('오늘은 충분히 쉬었습니다.'); return;
+        }
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 사택을 이용할 수 없습니다.'); return; }
 
         const g = houseGrade(currentUser);
@@ -8141,6 +8203,11 @@ function b508RequiredDocs() {
 
         const before = currentUser.pollution;
         currentUser.pollution = Math.max(0, currentUser.pollution - heal);
+                if (info.freeGame) {
+            const sb = currentUser.satiety != null ? currentUser.satiety : 100;
+            currentUser.satiety = Math.min(100, sb + 5);
+            currentUser.lastSatietyTime = Date.now();
+        }
         h.restCount = (h.restCount || 0) + 1;
         h.lastRest = Date.now();
         addHistoryLog(currentUser, `[사택] 휴식으로 오염도가 ${before - currentUser.pollution}% 회복되었습니다.`);
@@ -8294,7 +8361,7 @@ function b508RequiredDocs() {
 
             <div style="background:rgba(0,0,0,0.3); border:1px solid var(--theme-border); border-radius:6px; padding:12px; margin-bottom:14px;">
                 <div style="font-size:10px; color:#d4af37; font-weight:bold; margin-bottom:8px;">
-                    보관 중 (${storage.length} / ${HOUSE_STORAGE_MAX})
+                                  보관 중 (${storage.length} / ${houseStorageMax(currentUser)})
                 </div>
                 ${storage.length === 0
                     ? `<div style="font-size:11px; color:#666; padding:8px 0;">비어 있습니다.</div>`
@@ -8330,7 +8397,7 @@ function b508RequiredDocs() {
 
         database.ref(`users/${ownerCode}/house/storage`).transaction(arr => {
             arr = arr ? (Array.isArray(arr) ? arr : Object.values(arr)) : [];
-            if (arr.length >= HOUSE_STORAGE_MAX) return;
+                        if (arr.length >= houseStorageMax(currentUser)) return;
             arr.push(entry);
             return arr;
         }).then(res => {
@@ -8490,7 +8557,7 @@ function b508RequiredDocs() {
         const h = getHouse(currentUser);
         const today = getTodayStr();
         if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
-        const left = Math.max(0, 2 - (h.cookCount || 0));
+            const left = Math.max(0, houseInfoOf(currentUser).cook - (h.cookCount || 0));
 
         box.innerHTML = `
             <div class="panel-title">[주방]</div>
@@ -8568,7 +8635,7 @@ const isFood = FOOD_IDS.includes(id);
 
 if (!isFood) {
     if (h.cookDate !== today) { h.cookCount = 0; h.cookDate = today; }
-    if ((h.cookCount || 0) >= 2) { showCustomAlert('오늘은 충분히 먹었습니다.'); return; }
+       if ((h.cookCount || 0) >= houseInfoOf(currentUser).cook) { showCustomAlert('오늘은 충분히 먹었습니다.'); return; }
 }
         rc.mats.forEach(m => removeItemFromInventory(currentUser, m, 1));
        if (!isFood) h.cookCount = (h.cookCount || 0) + 1;
@@ -12362,10 +12429,10 @@ function renderTetrisLobby() {
     box.innerHTML = `
         <div style="font-size:11px; color:#888; margin-bottom:14px; line-height:1.7;">
             낡은 오락기가 한 대 있다. 전원은 들어온다.<br>
-            <span style="font-size:10px;">※ 1회 이용료 50 P</span>
+                        <span style="font-size:10px;">${houseInfoOf(currentUser).freeGame ? '※ 사택 등급 혜택 — 이용료 면제' : '※ 1회 이용료 50 P'}</span>
         </div>
 
-        <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px;" onclick="startTetris('solo')">솔로 모드 (50 P)</button>
+                <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px;" onclick="startTetris('solo')">솔로 모드 ${houseInfoOf(currentUser).freeGame ? '(무료)' : '(50 P)'}</button>
 
         ${r
             ? `<button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:14px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="openDuelSetup('${r.code}')">대전 모드 (동거인 · ${r.name})</button>`
@@ -12394,7 +12461,7 @@ function toggleDuelPick() {
 }
 
 function startTetris(mode) {
-    if (mode === 'solo') {
+       if (mode === 'solo' && !houseInfoOf(currentUser).freeGame) {
         if (currentUser.points < 50) { showLuxuryAlert(); return; }
         currentUser.points -= 50;
         saveFields({ points:1 });
@@ -12611,7 +12678,7 @@ let duelInvite = null, duelTarget = null;
 function openDuelSetup(targetCode) {
     if (!targetCode) { showCustomAlert('상대를 선택해주세요.'); return; }
     if (!onlineUsersMap[targetCode]) { showCustomAlert('상대가 접속 중이 아닙니다.'); return; }
-    if (currentUser.points < 50) { showLuxuryAlert(); return; }
+    if (!houseInfoOf(currentUser).freeGame && currentUser.points < 50) { showLuxuryAlert(); return; }
 
     duelTarget = targetCode;
     const t = db.users[targetCode];
@@ -12840,7 +12907,8 @@ function watchDuelInvites() {
 
 function acceptDuel() {
     if (!duelInvite || !database) return;
-    if (currentUser.points < 50) { showLuxuryAlert(); return; }
+    const _free = houseInfoOf(currentUser).freeGame;
+    if (!_free && currentUser.points < 50) { showLuxuryAlert(); return; }
 
     if (duelInvite.stake.type === 'point' && currentUser.points - 50 < duelInvite.stake.value) {
         showCustomAlert('걸린 포인트가 부족합니다.');
@@ -12851,8 +12919,7 @@ function acceptDuel() {
         return;
     }
 
-    currentUser.points -= 50;
-    saveFields({ points:1 });
+        if (!_free) { currentUser.points -= 50; saveFields({ points:1 }); }
 
     duelId = duelInvite.id;
     duelIsHost = false;
