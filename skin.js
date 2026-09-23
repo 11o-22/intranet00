@@ -5,11 +5,15 @@
 
 // --- 아이템 등록 ---
 ITEM_CATALOG['벽지 견본첩'] = {
-    price: 4500, usable: true, targetable: false, effect: 'ui_skin',
+    price: 50, usable: true, targetable: false, effect: 'ui_skin',
     desc: '넘길 때마다 다른 방이 나온다. 사용하면 단말의 색·무늬·글꼴이 무작위로 바뀐다. 해제하면 견본첩은 사라진다.'
 };
-if (typeof ALIEN_ITEMS_POOL !== 'undefined' && !ALIEN_ITEMS_POOL.includes('벽지 견본첩')) {
-    ALIEN_ITEMS_POOL.push('벽지 견본첩');
+const SKIN_ITEM = '벽지 견본첩';
+const SKIN_DAILY = 5;   // 유쾌 판매소 하루 구매 한도
+// 우주 쇼핑몰에는 넣지 않는다 (유쾌 판매소 고정 진열)
+if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
+    const i = ALIEN_ITEMS_POOL.indexOf(SKIN_ITEM);
+    if (i > -1) ALIEN_ITEMS_POOL.splice(i, 1);
 }
 
 // --- 재료 ---
@@ -181,7 +185,7 @@ ${skSel('.sub-panel')} {
 ${skSel('.game-btn, .action-buttons button, .step-btn, .btn-cancel, .admin-access-btn, .ranking-toggle-btn, .shop-item button, .inv-btn, .vip-nav-btn')} {
     background: linear-gradient(160deg, ${V('btn-top')}, ${V('panel')}) !important;
     border: 1px solid ${V('edge')} !important;
-    color: ${V('accent')} !important;
+    color: ${V('accent-text')} !important;
     box-shadow: inset 0 1px 0 ${V('glint')}, 0 2px 7px ${V('shadow')} !important;
     text-shadow: none !important;
     letter-spacing: 0.03em;
@@ -243,7 +247,7 @@ ${skSel('.pollution-container, .status-section, .status-item')} {
 }
 
 ${skSel('.panel-title, h2, h3, h4, .status-label, .serial-row, .pollution-header, .badge-table th')} {
-    color: ${V('accent')} !important;
+    color: ${V('accent-text')} !important;
     border-color: ${V('line')} !important;
     letter-spacing: 0.04em;
 }
@@ -251,12 +255,12 @@ ${skSel('.status-value, .emp-name, .badge-table td, .emp-list-title, .inv-card-n
     color: ${V('text')} !important;
 }
 ${skSel('.status-value')} {
-    color: ${V('accent')} !important;
+    color: ${V('accent-text')} !important;
 }
 ${skSel('.emp-role-tag, .inv-card-qty, .status-tag')} {
     background: transparent !important;
     border: 1px solid ${V('edge')} !important;
-    color: ${V('accent')} !important;
+    color: ${V('accent-text')} !important;
 }
 ${skSel('.badge-table th')} {
     background: ${V('well')} !important;
@@ -279,11 +283,18 @@ ${skLight('[style*="color:#aaa"], [style*="color:#999"], [style*="color:#888"], 
     color: ${V('text-dim')} !important;
 }
 ${skLight('[style*="color:#ffd700"], [style*="color:#d4af37"], [style*="color:#c9a8ff"], [style*="color:#d4bbff"], [style*="color:#7fd4d4"], [style*="color:#4fc3f7"]')} {
-    color: ${V('accent')} !important;
+    color: ${V('accent-text')} !important;
 }
 ${skLight(SK_DARK_BG)} {
     background: ${V('well')} !important;
     border-color: ${V('line')} !important;
+    color: ${V('text')} !important;
+}
+
+${skSel('.custom-alert-msg, .luxury-alert-msg, #custom-alert-text, #luxury-alert-text, #vip-invite-text, #emp-detail-card-container, .modal-content > div, .modal-content > p, .modal-content label')} {
+    color: ${V('text')} !important;
+}
+${skSel('.custom-alert-box, .luxury-alert-box, .modal-content')} {
     color: ${V('text')} !important;
 }
 
@@ -310,10 +321,32 @@ function skinBlend(a, b, t) {
     return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
 
+// 밝기(0~1)
+function skinLum(hex) {
+    const v = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+}
+function skinContrast(a, b) {
+    const l1 = skinLum(a), l2 = skinLum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+// 글씨로 쓸 강조색 — 바탕과 충분히 구분될 때까지 어둡게/밝게 민다
+function skinReadable(accent, bg) {
+    const toward = skinLum(bg) > 0.4 ? '#000000' : '#ffffff';
+    let c = accent;
+    for (let t = 0; t <= 0.8 && skinContrast(c, bg) < 4.5; t += 0.06) {
+        c = skinBlend(accent, toward, t);
+    }
+    return c;
+}
+
 function skinVars(s) {
     const L = !!s.light;
     return {
         'accent': s.accent,
+        'accent-text': skinReadable(s.accent, skinBlend(s.panel, s.accent, L ? 0.04 : 0.07)),
+        'accent-on-base': skinReadable(s.accent, s.base),
         'base': s.base,
         'panel': s.panel,
         'text': s.text,
@@ -335,7 +368,7 @@ function skinVars(s) {
 }
 
 // --- 적용 / 해제 ---
-const SKIN_VAR_NAMES = ['accent','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo','shadow'];
+const SKIN_VAR_NAMES = ['accent','accent-text','accent-on-base','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo','shadow'];
 const SKIN_BODY_PROPS = SKIN_VAR_NAMES.map(n => '--sk-' + n).concat(['--theme-focus', '--theme-accent', '--theme-border', '--theme-text', '--theme-sub', '--theme-bg-grad', 'background-color', 'font-family']);
 
 function applyUiSkin(user) {
@@ -456,6 +489,59 @@ function uiSkinCardHtml() {
         const r = _renderInventory.apply(this, arguments);
         const box = document.getElementById('inventory-list-container');
         if (box && currentUser && currentUser.uiSkin) box.insertAdjacentHTML('afterbegin', uiSkinCardHtml());
+        return r;
+    };
+
+
+    // 유쾌 판매소 — 벽지 견본첩 고정 진열 (하루 5개)
+    const _getToday5ShopItems = getToday5ShopItems;
+    getToday5ShopItems = function () {
+        const list = _getToday5ShopItems.apply(this, arguments).filter(n => n !== SKIN_ITEM);
+        return [SKIN_ITEM].concat(list);
+    };
+
+    const _buyRegularShopItem = buyRegularShopItem;
+    buyRegularShopItem = function (itemId, itemName, price) {
+        if (itemName !== SKIN_ITEM) return _buyRegularShopItem.apply(this, arguments);
+        if (!buyGuard()) return;
+        if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 상점을 이용할 수 없습니다.'); return; }
+
+        const key = getShopCycleKey();
+        if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
+        if (!currentUser.purchaseRecord[key]) currentUser.purchaseRecord[key] = {};
+        const bought = currentUser.purchaseRecord[key][itemId] || 0;
+        if (currentUser.code !== 'kario0987' && bought >= SKIN_DAILY) { showCustomAlert(`벽지 견본첩은 하루 ${SKIN_DAILY}개까지 살 수 있습니다.`); return; }
+        if (currentUser.points < price) { showLuxuryAlert(); return; }
+
+        currentUser.points -= price;
+        currentUser.purchaseRecord[key][itemId] = bought + 1;
+        currentUser.inventory.push(itemName);
+        addHistoryLog(currentUser, `[상점 구매] ${itemName} (-${price} P)`);
+        saveFields({ points: 1, inventory: 1, history: 1, purchaseRecord: 1 });
+        updateUI();
+    };
+
+    const _renderRegularShop = renderRegularShop;
+    renderRegularShop = function () {
+        const r = _renderRegularShop.apply(this, arguments);
+        const box = document.getElementById('regular-shop-items-container');
+        if (!box || !currentUser) return r;
+        // 벽지 줄의 잔여 표기를 하루 한도에 맞춘다
+        const key = getShopCycleKey();
+        const bought = ((currentUser.purchaseRecord || {})[key] || {})['item_' + SKIN_ITEM] || 0;
+        const left = currentUser.code === 'kario0987' ? 99 : Math.max(0, SKIN_DAILY - bought);
+        Array.from(box.querySelectorAll('.shop-item')).forEach(el => {
+            if (!el.innerText.includes(SKIN_ITEM)) return;
+            const info = el.querySelector('span[style*="color:#888"]');
+            if (info) info.innerHTML = `${ITEM_CATALOG[SKIN_ITEM].desc} (잔여: ${left === 99 ? '무제한' : left + '/' + SKIN_DAILY + '개'})`;
+            const btn = el.querySelector('button');
+            if (btn) {
+                const out = left === 0;
+                btn.disabled = out;
+                btn.innerText = out ? '품절' : ITEM_CATALOG[SKIN_ITEM].price + ' P';
+                el.classList.toggle('sold-out', out);
+            }
+        });
         return r;
     };
 
