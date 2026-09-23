@@ -709,6 +709,11 @@ function epicDoomChain(name) {
     const _epicFinish = epicFinish;
     epicFinish = function () {
         if (er && er._doomTick) clearInterval(er._doomTick);
+
+        if (typeof clearDarkRunState === 'function') clearDarkRunState();
+        else if (database && currentUser) database.ref('darkRuns/' + currentUser.code).remove();
+
+
         const pid = darkRun ? darkRun.partyId : null;
         if (pid && database) {
             try {
