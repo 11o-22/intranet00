@@ -12340,13 +12340,14 @@ function renderTetrisLobby() {
     if (!box || !currentUser) return;
     const r = getRoomie(currentUser);
 
-    const others = Object.values(db.users)
-        .filter(u => u.code !== currentUser.code && u.code !== 'kario0987' && (!r || u.code !== r.code))
+        const others = Object.values(db.users)
+        .filter(u => u && u.name && u.code && u.code !== currentUser.code
+                     && u.code !== 'kario0987' && (!r || u.code !== r.code))
         .sort((a, b) => {
             const ao = onlineUsersMap[a.code] ? 0 : 1;
             const bo = onlineUsersMap[b.code] ? 0 : 1;
             if (ao !== bo) return ao - bo;
-            return a.name.localeCompare(b.name);
+            return String(a.name).localeCompare(String(b.name));
         });
 
     box.innerHTML = `
