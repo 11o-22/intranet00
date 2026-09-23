@@ -185,6 +185,8 @@ function epicStart(isParty, pid) {
     applyDarkSatiety(EPIC_CODE);
     saveFields({ darkDate:1, darkTries:1, satiety:1 });
 
+    if (typeof clearDarkRunState === 'function') clearDarkRunState();
+   
     darkAmbienceStart(EPIC_CODE);
     openDarkOverlay();
     const el = document.getElementById('dro-code');
@@ -310,6 +312,16 @@ function epicBar() {
 function epicMap() {
     if (!er) return;
     epicWatchHelp();
+
+        if (database) {
+        database.ref('darkRuns/' + currentUser.code).set({
+            zone: EPIC_CODE, step: 0, savedAt: Date.now(),
+            success: darkRun.success, fail: darkRun.fail,
+            log: darkRun.log.slice(-20), lostItems: [],
+            isParty: !!darkRun.isParty, partyId: darkRun.partyId || null,
+            epic: true
+        });
+    }
 
     const cur = EPIC_PLACES[er.place];
     const list = Object.keys(EPIC_PLACES).filter(k => k !== er.place && epicCanEnter(k));
@@ -689,6 +701,11 @@ function epicFinish() {
         try { database.ref(`darkParties/${pid}/epicHelp`).off(); } catch (e) {}
         partyRunCleanup(pid, EPIC_CODE);
     }
+
+        if (typeof clearDarkRunState === 'function') clearDarkRunState();
+    else if (database) database.ref('darkRuns/' + currentUser.code).remove();
+
+    
     er = null;
     darkRun = null;
     updateUI();

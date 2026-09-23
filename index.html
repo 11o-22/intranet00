@@ -1970,6 +1970,12 @@ const EQUIP_AFFIL = {
                 return;
             }
 
+                        if (s.epic || s.zone === 'Qtrew-???-■■■') {
+                clearDarkRunState();
+                if (s.partyId && database) database.ref(`darkParties/${s.partyId}/alive/${currentUser.code}`).remove();
+                return;
+            }
+
             // 5분 이내 — 복귀 가능
             showDarkResumePrompt(s, away);
         });
