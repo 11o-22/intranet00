@@ -9389,24 +9389,27 @@ function saveSelfFull() {
                 database.ref('suggestions').once('value'),
                 database.ref('market').once('value')
             ]);
-            const deals = dSnap.val() || [];
-            (Array.isArray(deals) ? deals : Object.values(deals)).forEach((d, i) => {
-                if (!d) return;
-                if (d.fromCode === oldCode) updates[`p2pDeals/${i}/fromCode`] = newCode;
-                if (d.toCode === oldCode) updates[`p2pDeals/${i}/toCode`] = newCode;
+            const walk = (snapVal, fn) => {
+                if (!snapVal) return;
+                Object.keys(snapVal).forEach(k => { if (snapVal[k]) fn(k, snapVal[k]); });
+            };
+
+            walk(dSnap.val(), (k, d) => {
+                if (d.fromCode === oldCode) updates[`p2pDeals/${k}/fromCode`] = newCode;
+                if (d.toCode === oldCode) updates[`p2pDeals/${k}/toCode`] = newCode;
             });
-            const sugg = sSnap.val() || [];
-            (Array.isArray(sugg) ? sugg : Object.values(sugg)).forEach((x, i) => {
-                if (x && x.code === oldCode) updates[`suggestions/${i}/code`] = newCode;
+
+            walk(sSnap.val(), (k, x) => {
+                if (x.code === oldCode) updates[`suggestions/${k}/code`] = newCode;
             });
-            const mk = mSnap.val() || {};
-            Object.keys(mk).forEach(id => {
-                const pst = mk[id];
-                if (!pst) return;
-                if (pst.seller === oldCode) updates[`market/${id}/seller`] = newCode;
-                if (pst.buyer === oldCode) updates[`market/${id}/buyer`] = newCode;
+
+            walk(mSnap.val(), (k, pst) => {
+                if (pst.seller === oldCode) updates[`market/${k}/seller`] = newCode;
+                if (pst.buyer === oldCode) updates[`market/${k}/buyer`] = newCode;
                 if (pst.offers) Object.keys(pst.offers).forEach(oid => {
-                    if (pst.offers[oid] && pst.offers[oid].by === oldCode) updates[`market/${id}/offers/${oid}/by`] = newCode;
+                    if (pst.offers[oid] && pst.offers[oid].by === oldCode) {
+                        updates[`market/${k}/offers/${oid}/by`] = newCode;
+                    }
                 });
             });
 
@@ -9418,8 +9421,10 @@ function saveSelfFull() {
             updateUI();
             showCustomAlert(`${nm} 사원의 인가 코드가 재발급되었습니다.\n\n새 코드를 본인에게 직접 전달해주세요.`);
         } catch (e) {
-            console.error('코드 변경 실패:', e);
-            showCustomAlert('변경 중 오류가 발생했습니다.');
+                        console.error('코드 변경 실패:', e);
+            showCustomAlert('변경에 실패했습니다.\n\n' + (e && e.message ? e.message : '알 수 없는 오류'));
+            return;
+            
         }
     }
        function adminToggleVIP() {
