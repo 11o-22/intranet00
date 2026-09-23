@@ -9499,6 +9499,8 @@ function addInfect(amount, reason) {
     renderInfectBar();
     syncInfect();
 
+     if (s010CheckWipe('infect')) return;
+
     if (darkRun.infect >= INFECT_TURN && !darkRun.turned) {
         // 검역 도장으로 한 번 유예
         if (consumeQFlag('s010_seal')) {
@@ -9511,8 +9513,6 @@ function addInfect(amount, reason) {
         setTimeout(() => triggerTurn(), 800);
     }
 }
-
-s010CheckWipe('infect');
 
 // 파티에 내 감염도를 알린다
 function syncInfect() {

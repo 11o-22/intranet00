@@ -1889,7 +1889,8 @@ const EQUIP_AFFIL = {
 
     // 로그인 시 진행 중이던 탐사 확인
     function checkDarkRunResume() {
-        if (!database || !currentUser) return;
+                if (!database || !currentUser) return;
+        if (darkRun) return;            // 이미 탐사 중이면 복귀 창을 띄우지 않는다
         database.ref('darkRuns/' + currentUser.code).once('value').then(snap => {
             const s = snap.val();
             if (!s) return;
@@ -1947,6 +1948,11 @@ const EQUIP_AFFIL = {
     }
 
     function acceptDarkResume() {
+                if (darkRun) {
+            document.getElementById('dark-resume-overlay').style.display = 'none';
+            window._pendingResume = null;
+            return;
+        }
         const s = window._pendingResume;
         if (!s) return;
         document.getElementById('dark-resume-overlay').style.display = 'none';
@@ -2740,14 +2746,26 @@ function partyAdvance(nextStep) {
 }
 
     // 각자 진행하는 단계는 오래 기다린다
-        function advTimeout(fromStep) {
+    function advTimeout(fromStep) {
         if (!darkRun) return 6000;
-        if (darkRun.zone === 'Qtrew-S-003' && typeof S003_STEPS !== 'undefined') {
-            const def = S003_STEPS[fromStep];
-            if (def && ['cast', 'tale', 'lore', 'page', 'scatter', 'sscene', 'regroup', 'abduct'].includes(def.type)) return 45000;
-            return 25000;   // S-003 은 읽을 글이 많아 일반 단계도 넉넉히
-        }
-        return 6000;
+
+        const MAPS = {
+            'Qtrew-S-003': (typeof S003_STEPS !== 'undefined') ? S003_STEPS : null,
+            'Qtrew-S-010': (typeof S010_STEPS !== 'undefined') ? S010_STEPS : null,
+            'Qtrew-A-214': (typeof A214_STEPS !== 'undefined') ? A214_STEPS : null,
+            'Qtrew-A-667': (typeof A667_STEPS !== 'undefined') ? A667_STEPS : null,
+            'Qtrew-B-508': (typeof B508_STEPS !== 'undefined') ? B508_STEPS : null,
+            'Qtrew-B-330': (typeof B330_STEPS !== 'undefined') ? B330_STEPS : null
+        };
+        const map = MAPS[darkRun.zone];
+        const def = map ? map[fromStep] : null;
+
+        // 고르거나 적어야 하는 단계는 넉넉히 기다린다
+        const LONG = ['gimmick','vote','quiz','check','search','defense','split','rejoin',
+                      'solo','mark','tale','lore','page','cast','ending',
+                      'scatter','sscene','regroup','abduct'];
+        if (def && LONG.includes(def.type)) return 90000;
+        return 30000;
     }
 
         function advTotal() {
@@ -2820,7 +2838,16 @@ function renderAdvanceWait(nextStep) {
         if (cur != null && cur >= nextStep) go();
     });
 
-    setTimeout(go, advTimeout(darkRun.step));
+        const waitTick = () => {
+        if (finished || !darkRun) return;
+        // 아직 투표가 열려 있으면 더 기다린다
+        if (currentVote && currentVote.state === 'OPEN' && darkRun.step < nextStep) {
+            setTimeout(waitTick, 5000);
+            return;
+        }
+        go();
+    };
+    setTimeout(waitTick, advTimeout(darkRun.step));
 }
     function abortDarkRunNoPenalty() {
         if (!darkRun) return;
@@ -3716,6 +3743,13 @@ return b;
         if (!body || !darkRun) return;
         if (darkRun._dead) return;
         if (darkRun.rejoined) { renderRejoinScene(); return; }
+                if (darkRun.isParty) {
+            const _p = darkParties[darkRun.partyId];
+            if (_p && _p.zone && _p.zone !== darkRun.zone) {
+                darkRun.zone = _p.zone;   // 파티가 들어간 구역으로 되돌린다
+                saveDarkRunState();
+            }
+        }
         saveDarkRunState();
         if (darkRun.isParty) watchPartyStep();
 
