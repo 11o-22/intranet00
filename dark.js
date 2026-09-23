@@ -4445,12 +4445,65 @@ function b508RequiredDocs() {
     }
 
     // 착한 친구 + 유리손포 — 공용시설 행운 배율
+        // 타인이 채워 준 것만 효력이 있다
+    function plugActive(user, name) {
+        if (!user || !user.equippedWeapons) return false;
+        return user.equippedWeapons.some(w => {
+            if (getEquipBaseName(w) !== name) return false;
+            const owner = getEquipOwner(user, w);
+            return owner && owner !== user.code;
+        });
+    }
+
     function facilityLuckMult(user) {
-    let m = 1;
-    if (hasEquip(user, '착한 친구')) m *= 1.15;
-    if (hasEquip(user, '유리손포')) m *= 1.15;
-    return m;
-}
+        let m = 1;
+        if (hasEquip(user, '착한 친구')) m *= 1.15;
+        if (hasEquip(user, '유리손포')) m *= 1.15;
+
+        const anal = plugActive(user, '다이아 애널 플러그');
+        const vag  = plugActive(user, '다이아 보지 플러그');
+        if (anal && vag) m *= 3.5;
+        else if (anal) m *= 3;
+
+        return m;
+    }
+
+    // 다이아 보지 플러그 — 기믹 돌파 횟수
+    function diaCharges() {
+        if (!currentUser) return 0;
+        if (!plugActive(currentUser, '다이아 보지 플러그')) return 0;
+        return plugActive(currentUser, '다이아 애널 플러그') ? 4 : 2;
+    }
+
+    function diaAvailable() {
+        if (!darkRun || diaCharges() === 0) return false;
+        if (currentUser.diaDate !== getTodayStr()) return true;
+        return (currentUser.diaUsed || 0) < diaCharges();
+    }
+
+    function useDiaPlug() {
+        if (!diaAvailable()) return;
+        if (currentUser.diaDate !== getTodayStr()) {
+            currentUser.diaDate = getTodayStr();
+            currentUser.diaUsed = 0;
+        }
+        currentUser.diaUsed = (currentUser.diaUsed || 0) + 1;
+        const left = diaCharges() - currentUser.diaUsed;
+
+        darkRun.success += 2;
+        darkRun.modifier = (darkRun.modifier || 0) + 1;
+        darkRun.log.push(`[다이아] 기믹 돌파 (잔여 ${left})`);
+        saveFields({ diaDate: 1, diaUsed: 1 });
+        if (darkRun.isParty) sendPartyChat(`${currentUser.name} 사원 쪽에서 빛이 번졌습니다.`, true);
+
+        darkBodyEl().innerHTML = darkBox("다이아",
+            `다이아의 빛이 기믹을 밀어냅니다.<br><br>
+             앞을 막고 있던 것이 물러난다. 저항이 없다.<br>
+             빛은 몸 안쪽에서 나왔다.<br><br>
+             <span style="font-size:11px; color:#888;">금일 잔여 ${left}회</span>`,
+            darkChoiceBtn("지나간다.", `partyAdvance(${darkRun.step + 1})`));
+        mountDarkChat('normal');
+    }
 
     // 착한 친구 — 어둠 판정 행운 보정
     function rabbitBonus(user) {

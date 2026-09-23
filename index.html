@@ -1626,7 +1626,8 @@ if (database) {
         "유리손포": { price: 8000, usable: true, targetable: true, effect: "equip_sonpo", desc: "재난관리국의 기본 지급 무기. 삿된 것을 읽어 낸다. 기믹의 단서가 선명하게 보이며, 공용시설 승률이 크게 오른다. 타인에게 착용시킬 수도 있다." },
         "버터 나이프": { price: 9999, usable: true, targetable: false, effect: "equip_butter_knife", desc: "[백일몽 주식회사 전용] 공간을 가르는 힘이 있다. 어떤 기믹이든 한 번은 무조건 갈라낸다. 착용 시 4시간 동안 오염이 오르지 않는다. 4시간 후 자동 회수." },
         "누군가가 쓴 부적": { price: 4000, usable: true, targetable: false, effect: "equip_amulet", restrictDept: ["재난관리국", "재난관리"], desc: "장착 시 슬롯머신의 당첨 확률이 상승한다." },
-        "다이아 애널 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_plug", desc: "반짝이는 다이아몬드가 박힌 애널 플러그. 본인이나 타인의 장착칸에 강제 장착된다." },
+        "다이아 애널 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_plug", desc: "다이아 보지 플러그와 한 세트. 타인이 채워 주었을 때만 힘이 돈다. 공용시설 행운 200% 상승, 어둠 판정 +2. 세트로 갖추면 행운이 250%까지 오른다." },
+        "다이아 보지 플러그": { price: 3596, usable: true, targetable: true, effect: "equip_vplug", desc: "다이아 애널 플러그와 한 세트. 타인이 채워 주었을 때만 힘이 돈다. 어둠에서 하루 두 번 기믹을 밀어내고, 사망 시 한 번은 상담실·선녀탕으로 끌려가지 않는다. 세트로 갖추면 돌파가 하루 네 번이 된다." },
         "감각 연동 오나홀": { price: 7777, usable: true, targetable: true, effect: "equip_sync_hole", desc: "지정한 상대의 구멍과 감각이 연결된다. 상대방의 장착칸에 강제로 장착된다." },
         "감각 연동 딜도": { price: 7762, usable: true, targetable: true, effect: "equip_sync_dildo", desc: "지정한 상대의 자지와 감각이 연결된다. 상대방의 장착칸에 강제로 장착된다." },
         "클리 흡입기": { price: 12000, usable: true, targetable: true, effect: "equip_clit", desc: "클리를 민감하게 개발해 준다. 오염도 20%를 낮춘다." },
@@ -1776,7 +1777,7 @@ const EQUIP_AFFIL = {
         "우유맛 물약", "사과맛 물약", "오렌지맛 물약", "복숭아맛 물약", "제거약", "랜덤박스",
         "작두", "유리손포", "착한 친구", "보안팀 의상 세트", "버터 나이프", "은반지",
         "빨간 리본", "고급진 술", "노스텔지어 끈", "여우구슬",
-        "누군가가 쓴 부적", "다이아 애널 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기",
+        "누군가가 쓴 부적", "다이아 애널 플러그", "다이아 보지 플러그", "감각 연동 오나홀", "감각 연동 딜도", "에그 바이브", "지갑", "체리맛 물약", "클리 흡입기",
         "파인애플맛 물약", "투명 물약", "자두맛 물약", "무지개 물약",
         "곶감맛 물약", "세뇌 만년필", "석류맛 물약", "바나나맛 물약", "사자탈"
     ];
@@ -2689,13 +2690,17 @@ const EQUIP_AFFIL = {
             ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ ${smashWeapon()}로 박살낸다 (1회)</button>`
             : '';
 
+                    const diaBtn = diaAvailable()
+            ? `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#6a4c93,#3a2560) !important; border-color:#c9a8ff !important; color:#fff !important;" onclick="useDiaPlug()">◆ 다이아의 빛으로 밀어낸다 (잔여 ${diaCharges() - (currentUser.diaDate === getTodayStr() ? (currentUser.diaUsed || 0) : 0)}회)</button>`
+            : '';
+
         if (together) {
             renderVoteBox(title, text, options, imgKey, zoneBar);
             const area = document.getElementById('vote-area');
-            if (area && jakduBtn) area.insertAdjacentHTML('afterend', jakduBtn);
+             if (area && (jakduBtn || diaBtn)) area.insertAdjacentHTML('afterend', jakduBtn + diaBtn);
         } else {
             darkBodyEl().innerHTML = darkBox(title, text,
-                zoneBar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join('') + jakduBtn,
+                                zoneBar + options.map(o => darkChoiceBtn(o.label, `${o.fn}('${o.arg}')`)).join('') + jakduBtn + diaBtn,
                 imgKey);
             if (darkRun.isParty) mountDarkChat('normal');
         }
@@ -3418,6 +3423,7 @@ setInterval(() => {
 
         // ★ 착한 친구 — 판정 전반에 +2
         if (hasEquip(currentUser, '착한 친구')) b += 2;
+        if (plugActive(currentUser, '다이아 애널 플러그')) b += 2;
         // ★ 유리손포 — 정보 판정에 +3
         if (hasEquip(currentUser, '유리손포') && kind === 'sense') b += 3;
                 // rollDarkBonus 끝부분
@@ -4050,12 +4056,21 @@ return b;
             addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 의식을 잃음.`);
         }
         // 여우 상담실 2시간 이송
-        currentUser.pollution = 100;
-        currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
-        currentUser.quarantineExitPollution = 40;
-        currentUser.foxRoomAnswered = true;   // 질문 절차 생략
-        appendBadgeNoteToUser(currentUser, `[${z.code}] 탐사 중 의식 불명 — 긴급 이송됨`);
-                bankAddScore(-10);
+                // 여우 상담실 2시간 이송
+        const diaGuard = plugActive(currentUser, '다이아 보지 플러그') && !currentUser.diaSaveUsed;
+        if (diaGuard) {
+            currentUser.diaSaveUsed = true;
+            currentUser.pollution = 95;
+            currentUser.quarantineUntil = 0;
+            currentUser.quarantineExitPollution = 0;
+            currentUser.foxRoomAnswered = true;
+            addHistoryLog(currentUser, `[다이아] 빛이 끌려가는 것을 막았습니다. (1회 한정)`);
+        } else {
+            currentUser.pollution = 100;
+            currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+            currentUser.quarantineExitPollution = 40;
+            currentUser.foxRoomAnswered = true;   // 질문 절차 생략
+        }
 
         // 파티 동료에게 알림
         if (darkRun.isParty && database) {
@@ -4112,8 +4127,11 @@ return b;
                  ${darkRun._luckSaved ? `<div style="color:#4CAF50; margin-top:6px;">✺ 행운 — 일부를 지켜냈습니다.</div>` : ''}
                 <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#d4af37;">
                 ${darkRun.zone === 'Qtrew-A-214' && a214State ? `<div style="margin-top:6px; color:#ff6b6b;">신도: ${a214State.traitorName}</div>` : ''}
-                    🦊 여우 상담실로 긴급 이송됩니다.<br>
-                    <span style="font-size:10px; color:#aaa;">회복 예상 시간: 2시간 (퇴원 시 오염도 40%)</span>
+                                        ${diaGuard
+                        ? `◆ 다이아의 빛이 끌려가는 것을 막았습니다.<br>
+                           <span style="font-size:10px; color:#aaa;">이송되지 않습니다. 오염도 95%로 남습니다. (1회 한정)</span>`
+                        : `🦊 여우 상담실로 긴급 이송됩니다.<br>
+                           <span style="font-size:10px; color:#aaa;">회복 예상 시간: 2시간 (퇴원 시 오염도 40%)</span>`}
                 </div>
             </div>` +
             darkChoiceBtn("의식을 잃는다.", "finishDarkDeath()"));
@@ -4752,6 +4770,34 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             } else if (user.securityPurgeUntil && now >= user.securityPurgeUntil) {
                 user.securityPurgeUntil = 0;
                 user.securityPurgeLast = 0;
+                changed = true;
+            }
+        }
+
+                // 다이아 보지 플러그 — 착용 조건이 깨지면 스스로 빠진다
+        if (user.equippedWeapons && user.equippedWeapons.length > 0) {
+            for (let i = user.equippedWeapons.length - 1; i >= 0; i--) {
+                const full = user.equippedWeapons[i];
+                if (getEquipBaseName(full) !== '다이아 보지 플러그') continue;
+                if (canWearVPlug(user).ok) continue;
+
+                const ownerCode = getEquipOwner(user, full) || user.code;
+                user.equippedWeapons.splice(i, 1);
+                clearEquipOwner(user, full);
+                stripNoteByItem(user, '다이아 보지 플러그');
+                addHistoryLog(user, `[장착 해제] 몸이 조건을 잃어 다이아 보지 플러그가 빠졌습니다.`);
+
+                if (ownerCode === user.code) {
+                    user.inventory.push('다이아 보지 플러그');
+                } else {
+                    const owner = db.users[ownerCode];
+                    if (owner) {
+                        if (!owner.inventory) owner.inventory = [];
+                        owner.inventory.push('다이아 보지 플러그');
+                        addHistoryLog(owner, `[장비 회수] ${user.name} 사원에게 채웠던 다이아 보지 플러그가 돌아왔습니다.`);
+                        updateUserFields(ownerCode, { inventory: owner.inventory, history: owner.history });
+                    }
+                }
                 changed = true;
             }
         }
@@ -6246,6 +6292,22 @@ if (isUsable) {
         updateUI();
     }
 
+
+        // 다이아 보지 플러그 착용 조건
+    function canWearVPlug(user) {
+        const potion = (user.timedEffects || []).some(e =>
+            e.name === '우유맛 물약' || e.name === '포도맛 물약');
+        const gender = (user.badge && user.badge.gender) || '';
+
+        if (!gender) return { ok: false, msg: '사원증에 성별이 등록되어 있지 않습니다.' };
+        if (gender === '남성' && !potion) {
+            return { ok: false, msg: '남성은 우유맛 또는 포도맛 물약을 복용 중일 때만 착용할 수 있습니다.' };
+        }
+        if (gender === '여성' && potion) {
+            return { ok: false, msg: '물약의 효과가 남아 있는 동안에는 착용할 수 없습니다.' };
+        }
+        return { ok: true };
+    }
     // ★ 소속 제한 장비
 function canWearItem(user, itemName) {
     const need = EQUIP_AFFIL[itemName];
@@ -7234,7 +7296,16 @@ updateUI();
         showCustomAlert('클리 흡입기를 장착했습니다.');
     }
 }
-        else if (['equip_plug', 'equip_sync_hole', 'equip_sync_dildo', 'equip_egg'].includes(cat.effect)) {
+                else if (['equip_plug', 'equip_vplug', 'equip_sync_hole', 'equip_sync_dildo', 'equip_egg'].includes(cat.effect)) {
+                                if (cat.effect === 'equip_vplug') {
+                const chk = canWearVPlug(targetUser);
+                if (!chk.ok) {
+                    showCustomAlert(
+                        (isOthers ? `${targetUser.name} 사원은 착용할 수 없습니다.\n\n` : '') + chk.msg
+                    );
+                    return false;
+                }
+            }
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
             
             // 연동 기구 (나와 상대방 양쪽 모두 장착)
@@ -8839,6 +8910,12 @@ function bjFinish(mode) {
             
             const isSecurityTeam = currentUser.team.includes("보안팀") || currentUser.team.includes("경비팀") || currentUser.code === 'kario0987';
 
+                        // 진열 후보에 오를 확률 자체를 낮춘다
+            const RARE_ALIEN = {
+                "다이아 애널 플러그": 0.01,
+                "다이아 보지 플러그": 0.01
+            };
+
             let availablePool = ALIEN_ITEMS_POOL.filter(item => {
                 if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return false;
                 if ((item === "착한 친구" || item === "보안팀 의상 세트" || item === "버터 나이프") && !isDaydreamTeam) return false;
@@ -8847,6 +8924,7 @@ function bjFinish(mode) {
                 // ★ [추가] 일반 사원은 여우구슬 획득 불가
                 if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
                 if (item === "금고" && currentUser.code !== 'kario0987') return false;
+                 if (RARE_ALIEN[item] !== undefined && Math.random() >= RARE_ALIEN[item]) return false;
                 
                 return true;
             });
