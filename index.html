@@ -10098,13 +10098,17 @@ function adminGiveItem() {
             u.equippedWeapons.forEach(weaponStr => {
                 const baseName = getEquipBaseName(weaponStr);
                 const ownerCode = getEquipOwner(u, weaponStr);
-                if (ownerCode && ownerCode !== code && db.users[ownerCode]) {
+                               if (ownerCode && ownerCode !== code && db.users[ownerCode]) {
                     db.users[ownerCode].inventory.push(baseName);
                     addHistoryLog(db.users[ownerCode], `[당국 개입] ${u.name} 사원에게 장착했던 ${baseName}이(가) 반환되었습니다.`);
                     db.users[ownerCode]._adminStamp = Date.now();
                     if (database) database.ref('users/' + ownerCode).set(db.users[ownerCode]);
                 } else {
+                    // 장착자가 없거나 사라진 계정이면 착용자에게 남긴다
                     u.inventory.push(baseName);
+                    if (ownerCode && ownerCode !== code) {
+                        addHistoryLog(u, `[당국 개입] 장착자 계정이 확인되지 않아 ${baseName}을(를) 본인 소지품으로 이관했습니다.`);
+                    }
                 }
             });
             u.equipOwner = {};
