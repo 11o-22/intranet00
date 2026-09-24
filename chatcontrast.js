@@ -45,8 +45,26 @@
 #bath-modal .modal-content { background: #0b1418 !important; }
 
 /* 어둠 탐사 대화 */
-.pchat-log, .pchat-log * { color: #eaeaea !important; }
-.pchat-log .pchat-sys { color: #9a9a9a !important; }
+/* 어둠 탐사 대화 — 바탕을 어둡게 깔고 글자를 밝게 */
+.pchat-wrap, .pchat-body, .pchat-log {
+    background: rgba(0,0,0,0.55) !important;
+}
+.pchat-head {
+    background: rgba(0,0,0,0.7) !important;
+    color: #f0f0f0 !important;
+}
+.pchat-head * { color: #f0f0f0 !important; }
+.pchat-log, .pchat-log * {
+    color: #f2f2f2 !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+}
+.pchat-log .pchat-sys, .pchat-log .pchat-sys * {
+    color: #d8d8d8 !important;
+    font-style: italic;
+}
+.pchat-log .pchat-name { color: #ffd76a !important; }
+.pchat-log .pchat-time { color: #b0b0b0 !important; }
+.pchat-log .pchat-me .pchat-name { color: #9fe8e8 !important; }
 #pchat-input {
     background: rgba(0,0,0,0.55) !important;
     color: #fff !important;
