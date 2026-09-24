@@ -7713,8 +7713,9 @@ if (!useFacility(bet)) return;
         
         const luckM = 1 + (facilityLuckMult(currentUser) - 1) / 10;
 
-        let failChance = (hasAmulet ? 0.55 : 0.76) / luckM;
-        let jackpotSpan = (hasAmulet ? 0.08 : 0.025) * luckM;
+        let failChance = Math.max(0.22, (hasAmulet ? 0.55 : 0.76) / luckM);
+        let jackpotSpan = Math.min(0.18, (hasAmulet ? 0.08 : 0.025) * luckM);
+        if (failChance + jackpotSpan > 0.92) jackpotSpan = 0.92 - failChance;
         let jackpotChance = failChance + jackpotSpan;
         if (rollType < failChance) {
             // 완전 꽝 (3개 다름)
