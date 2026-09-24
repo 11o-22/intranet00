@@ -83,7 +83,7 @@ const FRAMES = [
     position:relative;
     border:2px solid rgba(212,175,55,0.75) !important;
     border-radius:7px;
-    background-color:#0a0a08;
+    background-color:#0a0a08 !important;
     animation:frSPulse 3.8s ease-in-out infinite;
     overflow:hidden;
     isolation:isolate;
@@ -106,7 +106,10 @@ const FRAMES = [
 .fr-s01 > * { position:relative; z-index:2; }
 `;
     FRAMES.forEach(function (f) {
-        if (f.c) css += `.fr-${f.id}{ ${f.c} border-radius:7px; }\n`;
+              if (f.c) {
+            const body = f.c.replace(/;\s*/g, ' !important; ');
+            css += `.fr-${f.id}{ ${body} border-radius:7px !important; }\n`;
+        }
     });
     const st = document.createElement('style');
     st.id = 'frame-css';
