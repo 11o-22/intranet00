@@ -192,7 +192,7 @@ function buyFrameBook() {
                         </div>
                     </div>
                     <button class="game-btn" style="margin:0; padding:9px 13px; font-size:12px; flex-shrink:0;" onclick="buyFrameBook()" ${left ? '' : 'disabled'}>
-                        ${left ? '1,200 P' : '품절'}
+                        ${left ? '100 P' : '품절'}
                     </button>
                 </div>
             </div>`);
