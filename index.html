@@ -1795,7 +1795,7 @@ if (database) {
     
     };
 
-        const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고","💍 커플링"];
+    const NO_SELL_ITEMS = ["여우구슬", "사직서", "두 번째 자리", "금고","💍 커플링"];
 
     const ALL_10_ITEMS = [
     "익명 편지", "하급 물약", "샤베트", "안대", "생수",
@@ -6073,6 +6073,9 @@ if (bcEl) {
             const mats = ['맞물리지 않는 조각', '지워지지 않는 자국', '반죽에 섞이지 않은 것'];
             const hasAllMats = mats.every(m => (currentUser.inventory || []).includes(m));
             const hasSlotItem = (currentUser.inventory || []).includes('두 번째 자리');
+                        const hasMats3 = typeof hasThirdMats === 'function' && hasThirdMats();
+            const hasSlot3 = (currentUser.inventory || []).includes('세 번째 자리');
+            const canMake3 = hasMats3 && !hasSlot3 && (myGear.slots || 1) === 2;
 
             html += `
                 <div style="background:linear-gradient(145deg,#1d1730,#120e1f); border:1px solid #6a4c93; padding:13px; margin-bottom:14px; border-radius:8px; box-shadow:0 3px 10px rgba(106,76,147,0.25);">
@@ -6093,7 +6096,9 @@ if (bcEl) {
                     <div style="display:flex; gap:5px; margin-top:11px; flex-wrap:wrap;">
                         ${canPick ? `<button class="inv-btn inv-btn-target" style="flex:1; min-width:78px;" onclick="openGearAttrPick()">속성 선택</button>` : ''}
                         ${up ? `<button class="inv-btn inv-btn-use" style="flex:1; min-width:78px;" onclick="openGearUpgrade()">강화</button>` : `<button class="inv-btn" style="flex:1; min-width:78px; background:#2a2a2a; color:#666;" disabled>최고 등급</button>`}
-                        ${hasAllMats && !hasSlotItem ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#6a4c93,#4a2c73); color:#fff;" onclick="combineSecondSlot()">재료 조합</button>` : ''}
+                        
+                        ${hasAllMats && !hasSlotItem && (myGear.slots || 1) === 1 ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#6a4c93,#4a2c73); color:#fff;" onclick="combineSecondSlot()">두 번째 자리 조합</button>` : ''}
+                        ${canMake3 ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#8a3c93,#5a1c73); color:#fff;" onclick="combineThirdSlot()">세 번째 자리 조합</button>` : ''}
                     </div>
                 </div>
                 
@@ -10722,6 +10727,7 @@ if (bathModal) bathModal.style.display = 'none';
  
     </script>
     <script src="dark.js"></script>
+    <script src="thirdslot.js"></script>
         <script src="bank.js"></script>
         <script src="skin.js"></script>
         <script src="invcat.js"></script>
