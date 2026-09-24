@@ -12476,6 +12476,14 @@ function renderAiChatState() {
 }
 
 function pickQuarantine(dest) {
+
+        if (!currentUser) {
+        const ov = document.getElementById('quarantine-pick-overlay');
+        if (ov) ov.style.display = 'none';
+        showCustomAlert('세션이 끊어졌습니다. 다시 접속해 주세요.');
+        return;
+    }
+    
     currentUser.quarantineDest = dest;
     const agent = dest === 'bath';
 
