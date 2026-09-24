@@ -1506,9 +1506,17 @@ if (database) {
     Object.keys(currentUser).forEach(k => { if (!SKIP.includes(k)) payload[k] = currentUser[k]; });
     payload._adminStamp = stamp;
 
+    let clean;
+    try { clean = JSON.parse(JSON.stringify(payload)); }
+    catch (e) { console.error('저장 데이터 변환 실패:', e); return; }
+
+    Object.keys(clean).forEach(k => {
+        if (/[.#$\[\]\/]/.test(k)) delete clean[k];
+    });
+
     pendingSaves++;
-    database.ref(`users/${currentUser.code}`).update(payload)
-        .catch(e => console.error('저장 실패:', e))
+    database.ref(`users/${currentUser.code}`).update(clean)
+        .catch(e => console.error('저장 실패:', e, Object.keys(clean)))
         .finally(onSaveDone);
 }
 
@@ -7449,7 +7457,8 @@ updateUI();
         removeItemFromInventory(currentUser, itemName, 1);
         winPoints(sellPrice);
         addHistoryLog(currentUser, `[소지품 판매] ${itemName} 매각 (+${sellPrice} P)`);
-        saveDB(); updateUI();
+                saveFields({ inventory: 1, history: 1 });
+        updateUI();
     }
 
     function renderHistory() {
