@@ -2371,6 +2371,10 @@ const EQUIP_AFFIL = {
         if (darkRun) return;
         if (window._launchingParty === party.id) return;
         window._launchingParty = party.id;
+                if (database && party.leader === currentUser.code) {
+            database.ref(`darkParties/${party.id}/taleCast`).remove();
+            database.ref(`darkVotes/${party.id}`).remove();
+        }
 
         currentUser.darkDate = getTodayStr();
         currentUser.darkTries = (currentUser.darkTries || 0) + 1;
