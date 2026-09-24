@@ -2828,9 +2828,10 @@ function partyAdvance(nextStep) {
         const def = map ? map[fromStep] : null;
 
         // 고르거나 적어야 하는 단계는 넉넉히 기다린다
-        const LONG = ['gimmick','vote','quiz','check','search','defense','split','rejoin',
+                const LONG = ['gimmick','vote','quiz','check','search','defense','split','rejoin',
                       'solo','mark','tale','lore','page','cast','ending',
-                      'scatter','sscene','regroup','abduct'];
+                      'scatter','sscene','regroup','abduct',
+                      'role','taboo','pages','read','answer','choose','story','part','assign'];
         if (def && LONG.includes(def.type)) return 90000;
         return 30000;
     }
@@ -2909,7 +2910,7 @@ function renderAdvanceWait(nextStep) {
     if (!darkRun.solo) {
         database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
             const cur = sn.val();
-            if (cur != null && cur >= nextStep) go();
+        if (cur != null && cur > nextStep) go();
         });
     }
 
