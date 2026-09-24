@@ -9440,6 +9440,13 @@ function saveSelfFull() {
         if (oldCode === newCode) { showCustomAlert('지금과 같은 코드입니다.'); return; }
         if (db.users[newCode]) { showCustomAlert('이미 사용 중인 코드입니다.'); return; }
         if (onlineUsersMap[oldCode]) { showCustomAlert('대상이 접속 중입니다.\n단말을 종료한 뒤 다시 시도해주세요.'); return; }
+                for (let pid in darkParties) {
+            const p = darkParties[pid];
+            if (p && ((p.members && p.members[oldCode]) || (p.alive && p.alive[oldCode]))) {
+                showCustomAlert('대상이 파티에 속해 있습니다.\n탐사가 끝난 뒤에 다시 시도해주세요.');
+                return;
+            }
+        }
 
         const u = db.users[oldCode];
         const nm = u.name;
@@ -9463,6 +9470,36 @@ function saveSelfFull() {
             updates[`sessions/${oldCode}`] = null;
             updates[`online/${oldCode}`] = null;
             updates[`darkRuns/${oldCode}`] = null;
+
+                        const pSnap = await database.ref('darkParties').once('value');
+            const parties = pSnap.val() || {};
+            Object.keys(parties).forEach(function (pid) {
+                const p = parties[pid] || {};
+                if (p.leader === oldCode) {
+                    updates[`darkParties/${pid}/leader`] = newCode;
+                }
+                if (p.members && p.members[oldCode]) {
+                    const m = p.members[oldCode];
+                    m.code = newCode;
+                    updates[`darkParties/${pid}/members/${newCode}`] = m;
+                    updates[`darkParties/${pid}/members/${oldCode}`] = null;
+                }
+                if (p.alive && p.alive[oldCode]) {
+                    updates[`darkParties/${pid}/alive/${newCode}`] = true;
+                    updates[`darkParties/${pid}/alive/${oldCode}`] = null;
+                }
+                Object.keys(p).forEach(function (k) {
+                    if (!/^ready\d+$/.test(k)) return;
+                    if (p[k] && p[k][oldCode]) {
+                        updates[`darkParties/${pid}/${k}/${newCode}`] = p[k][oldCode];
+                        updates[`darkParties/${pid}/${k}/${oldCode}`] = null;
+                    }
+                });
+                if (p.taleCast && p.taleCast[oldCode]) {
+                    updates[`darkParties/${pid}/taleCast/${newCode}`] = p.taleCast[oldCode];
+                    updates[`darkParties/${pid}/taleCast/${oldCode}`] = null;
+                }
+            });
 
             // 받을 돈함 이전
             const pay = (await database.ref('payouts/' + oldCode).once('value')).val();
