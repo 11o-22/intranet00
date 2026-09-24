@@ -600,7 +600,8 @@ function epicDeath(txt) {
 
     // 상담실 · 선녀탕 이송
     currentUser.pollution = 100;
-    currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+     currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+     currentUser.quarantineHospital = true;
     currentUser.quarantineExitPollution = 40;
     currentUser.foxRoomAnswered = true;
     appendBadgeNoteToUser(currentUser, `[${EPIC_CODE}] 탐사 중 의식 불명 — 긴급 이송됨`);
