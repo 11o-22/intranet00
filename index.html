@@ -6042,7 +6042,8 @@ if (bcEl) {
             if (success === false) return;
 
             targetUser.hasItemUsedOnMe = true;
-           if (item !== '💍 커플링') removeItemFromInventory(currentUser, item, 1);
+                       const _eq = String((ITEM_CATALOG[item] || {}).effect || '').startsWith('equip');
+            if (item !== '💍 커플링' && !_eq) removeItemFromInventory(currentUser, item, 1);
                         addHistoryLog(currentUser, String((ITEM_CATALOG[item] || {}).effect || '').startsWith('equip')
                 ? `[장비 장착] ${targetUser.name} 사원에게 '${item}' 장착`
                 : `[아이템 사용] ${targetUser.name} 사원에게 '${item}' 사용`);
