@@ -154,7 +154,9 @@ EQUIP_AFFIL["■■ 씨앗"]    = "백일몽";
 EQUIP_AFFIL["소원권"]      = "백일몽";
 
 ["루비 클리 피어싱","루비 유두 피어싱","사인참사검","사원증 뱃지","가터밸트",
- "??? 안경","유리구슬","■■ 씨앗","소원권","도깨비 불"].forEach(n => {
+ "??? 안경","유리구슬","■■ 씨앗","소원권","도깨비 불"]
+ .concat(Object.keys(NEW_POTIONS))
+ .forEach(n => {
     if (!ALIEN_ITEMS_POOL.includes(n)) ALIEN_ITEMS_POOL.push(n);
 });
 if (typeof NO_SELL_ITEMS !== 'undefined') NO_SELL_ITEMS.push("소원권");

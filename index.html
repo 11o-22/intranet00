@@ -3455,8 +3455,8 @@ setInterval(() => {
            function getDarkTriesLeft() {
         if (!currentUser) return 0;
         const today = getTodayStr();
-       if (currentUser.darkDate !== today) return 4;
-       const base = 4;
+       if (currentUser.darkDate !== today) return 8;
+       const base = 8;
         return Math.max(0, base - (currentUser.darkTries || 0));
     }
 
@@ -3534,7 +3534,7 @@ return b;
         let html = `
             <div style="text-align:left;">
                 <div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
-                    금일 잔여 탐사 횟수: <b style="color:var(--theme-focus);">${left} / 4회</b> (자정 초기화)<br>
+                    금일 잔여 탐사 횟수: <b style="color:var(--theme-focus);">${left} / 8회</b> (자정 초기화)<br>
                     <span style="font-size:10px;">※ 공용시설 이용 횟수와는 별개로 집계됩니다.</span>
                 </div>`;
 
