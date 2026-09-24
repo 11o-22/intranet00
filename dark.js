@@ -5225,7 +5225,7 @@ function b508RequiredDocs() {
                 const alive = room.alive || {};
                 members = {};
                 Object.keys(alive).forEach(c => {
-                    members[c] = { code: c, name: safename(c) };
+                    members[c] = { code: c, name: safeName(c) };
                 });
             }
             const codes = Object.keys(members);
@@ -5668,7 +5668,7 @@ function b508RequiredDocs() {
 
         const opts = alive.map(c => {
             const nm = (p && p.members && p.members[c] && p.members[c].name)
-                ? p.members[c].name : safename(c);
+                ? p.members[c].name : safeName(c);
             const cnt = Object.values(votes).filter(v => v === c).length;
             const mine = myVote === c;
             return `
@@ -11758,7 +11758,7 @@ function renderS010Vote(n) {
     const votes = (darkRun._s010Votes && darkRun._s010Votes[key]) || {};
 
     const opts = alive.map(c => {
-        const nm = (p.members && p.members[c]) ? p.members[c].name : safename(c);
+        const nm = (p.members && p.members[c]) ? p.members[c].name : safeName(c);
         const inf = s010State && s010State[c] ? s010State[c] : null;
         const tag = inf ? (inf.turned ? ' <span style="color:#7f0000;">전향</span>' : inf.v >= INFECT_SYMPTOM ? ' <span style="color:#ff9800;">증상</span>' : '') : '';
         return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s010Vote(${n},'${c}')">${nm}${tag}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}</button>`;
@@ -11933,7 +11933,7 @@ function renderTurnedStep() {
              + '<button class="game-btn" style="width:100%; margin:0; padding:11px;" onclick="renderTurnedStep()">다시 살핀다</button>';
     } else {
         targets.forEach(c => {
-            let nm = (p.members && p.members[c]) ? p.members[c].name : safename(c);
+            let nm = (p.members && p.members[c]) ? p.members[c].name : safeName(c);
             nm = String(nm).replace(/['"\\]/g, '');
             btns += '<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal; background:linear-gradient(145deg,#4a0f0f,#2a0808) !important; border-color:#7f0000 !important; color:#ff9baa !important;" onclick="turnedBite(&quot;' + c + '&quot;,&quot;' + nm + '&quot;)">' + nm + ' 쪽으로 간다</button>';
         });
@@ -14371,7 +14371,7 @@ function renderTaleCast() {
     const others = Object.keys(cast)
         .filter(c => c !== currentUser.code)
         .map(c => {
-            const nm = (p && p.members && p.members[c]) ? p.members[c].name : safename(c);
+            const nm = (p && p.members && p.members[c]) ? p.members[c].name : safeName(c);
             const r = TALE_ROLES[cast[c]];
             return `<div style="font-size:10px; color:#aaa; padding:3px 0;">${r.icon} <b style="color:#ddd;">${nm}</b> — ${r.name}</div>`;
         }).join('');
@@ -14848,7 +14848,7 @@ function renderS003Vote(n) {
            <span style="font-size:11px; color:#ff6b6b;">고른 사람은 마지막 판정에 크게 불리해집니다.</span>`;
 
     const opts = alive.map(c => {
-        const nm = (p.members && p.members[c]) ? p.members[c].name : safename(c);
+        const nm = (p.members && p.members[c]) ? p.members[c].name : safeName(c);
         const r = cast[c] ? TALE_ROLES[cast[c]] : null;
         return `<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;" onclick="s003Vote(${n},'${c}')">
                     ${r ? r.icon + ' ' : ''}${nm}${r ? ` <span style="color:#888; font-size:10px;">— ${r.tale}</span>` : ''}${c === currentUser.code ? ' <span style="color:#666; font-size:10px;">(본인)</span>' : ''}
