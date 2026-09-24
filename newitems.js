@@ -685,3 +685,28 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
 
 console.log('[신규 아이템] 물약 10 · S-003 10 · 범용 20 · 우주 10 = 50종 등록 완료');
 
+
+// B-330 합류 자동 성립
+(function autoRejoin() {
+    if (typeof b330Rejoin !== 'function') return;
+    const _r = b330Rejoin;
+    b330Rejoin = function (v) {
+        if (!darkRun) return;
+        const attempt = (darkRun.rejoinTries || 0) + 1;
+        darkRun.rejoinTries = attempt;
+        darkRun.modifier = (darkRun.modifier || 0) + 2;
+        darkRun.solo = false;
+        darkRun.soloMet = false;
+        darkRun.log.push(`[합류 ${attempt}차] 자동 합류`);
+        if (database) {
+            database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+            database.ref(`darkParties/${darkRun.partyId}/rj${attempt}`).remove();
+        }
+        if (typeof sendPartyChat === 'function') sendPartyChat(`합류했습니다.`, true);
+
+        darkBodyEl().innerHTML = darkBox(`합류 — ${attempt}차`,
+            `한참 헤맸다.<br><br>모퉁이를 돌자 일행이 서 있었다.<br>서로 아무 말도 하지 않는다.<br><br>수를 세지 않고 그냥 뒤에 붙는다.`,
+            darkChoiceBtn('계속 간다.', `partyAdvance(${darkRun.step + 1})`));
+        mountDarkChat('normal');
+    };
+})();
