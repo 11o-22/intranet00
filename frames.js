@@ -142,7 +142,7 @@ function frDraw() {
 // 견본첩
 // ==========================================
 ITEM_CATALOG['테두리 견본첩'] = {
-    price: 1200, usable: true, targetable: false, effect: 'frame_book',
+    price: 100, usable: true, targetable: false, effect: 'frame_book',
     desc: '사원증에 두를 테두리가 한 장 들어 있다. 무엇이 나올지는 열어야 안다.'
 };
 if (typeof NO_SELL_ITEMS !== 'undefined') NO_SELL_ITEMS.push('테두리 견본첩');
