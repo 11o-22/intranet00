@@ -3803,6 +3803,9 @@ return b;
 
 
         function renderDarkStep() {
+        if (window._rdsLock) return;
+        window._rdsLock = true;
+        setTimeout(function () { window._rdsLock = false; }, 120);
         const body = darkBodyEl();
         if (!body || !darkRun) return;
         if (darkRun._dead) return;

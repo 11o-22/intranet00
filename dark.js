@@ -2863,6 +2863,7 @@ function input119D(n) {
                 darkRun._advTo = null;        
                 detachVoteListener();
                 renderDarkStep();
+                if (darkRun.step !== cur) { darkRun.step = cur; renderDarkStep(); }
             }
         });
 
