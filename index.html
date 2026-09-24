@@ -9003,10 +9003,7 @@ function bjFinish(mode) {
             const isSecurityTeam = currentUser.team.includes("보안팀") || currentUser.team.includes("경비팀") || currentUser.code === 'kario0987';
 
                         // 진열 후보에 오를 확률 자체를 낮춘다
-            const RARE_ALIEN = {
-                "다이아 애널 플러그": 0.01,
-                "다이아 보지 플러그": 0.01
-            };
+                    const RARE_ALIEN = window.RARE_ALIEN_RATE || { '다이아 애널 플러그': 0.01, '다이아 보지 플러그': 0.01 };
 
             let availablePool = ALIEN_ITEMS_POOL.filter(item => {
                 if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return false;
@@ -10742,6 +10739,7 @@ if (bathModal) bathModal.style.display = 'none';
     </script>
     <script src="dark.js"></script>
     <script src="thirdslot.js"></script>
+    <script src="newitems.js"></script>
         <script src="bank.js"></script>
         <script src="skin.js"></script>
         <script src="invcat.js"></script>
