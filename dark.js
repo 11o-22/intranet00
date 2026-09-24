@@ -8481,7 +8481,9 @@ function b508RequiredDocs() {
                                 
                 if (h.notes.length > 5) h.notes.pop();
                 if (database) {
-                    database.ref(`users/${ownerCode}/house/notes`).set(h.notes);
+                 database.ref(`users/${ownerCode}/house/notes`).set(h.notes);
+                    if (db.users[ownerCode] && db.users[ownerCode].house) db.users[ownerCode].house.notes = h.notes;
+                    if (currentUser.code === ownerCode && currentUser.house) currentUser.house.notes = h.notes;
                     database.ref(`users/${ownerCode}/_adminStamp`).set(Date.now());
                 }
 

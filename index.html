@@ -1500,7 +1500,7 @@ if (database) {
     if (!database || !currentUser) return;
     const SKIP = ['letters','timedEffects','equippedWeapons','equipOwner','hasNewLetter',
                   'hasNewReply','hasItemUsedOnMe','slaveUntil','masterName','nostalgiaUntil',
-                  'nostalgiaSender','blindfoldUntil','houseChatUnread','badge'];
+                    'nostalgiaSender','blindfoldUntil','houseChatUnread','badge','house'];
     const stamp = stampNow();
     const payload = {};
     Object.keys(currentUser).forEach(k => { if (!SKIP.includes(k)) payload[k] = currentUser[k]; });
@@ -9246,7 +9246,7 @@ function updateUserFields(code, fields) {
 // 내 행동으로 바뀐 것 전부 저장 (편지·알림만 제외)
 function saveSelfFull() {
     if (!database || !currentUser) return Promise.resolve();
-    const SKIP = ['letters','hasNewLetter','hasNewReply','hasItemUsedOnMe','houseChatUnread'];
+    const SKIP = ['letters','hasNewLetter','hasNewReply','hasItemUsedOnMe','houseChatUnread','house'];
     const stamp = stampNow();
     const payload = {};
     Object.keys(currentUser).forEach(k => {
