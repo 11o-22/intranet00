@@ -4128,6 +4128,7 @@ return b;
             currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
             currentUser.quarantineExitPollution = 40;
             currentUser.foxRoomAnswered = true;   // 질문 절차 생략
+            currentUser.quarantineHospital = true;
         }
 
         // 파티 동료에게 알림
@@ -4651,7 +4652,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
     const remainMs = user.quarantineUntil - Date.now();
     const h = Math.floor(remainMs / (1000 * 60 * 60));
     const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
-    const isHospital = (user.quarantineExitPollution || 0) >= 40;
+    const isHospital = !!user.quarantineHospital || (user.quarantineExitPollution || 0) >= 40;
     const agent = isDisasterAgent(user);
 
     return {
@@ -4920,6 +4921,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             user.quarantineUntil = 0;
             user.pollution = user.quarantineExitPollution || 0;
             user.quarantineExitPollution = 0;
+            user.quarantineExitPollution = 0;
+            user.quarantineHospital = false;
             user.lastPollutionTime = now;
 
             // ★ 퇴원 시 탐사 사고 관련 문구 제거
@@ -5401,6 +5404,7 @@ const cpMark = cp ? `<span style="color:${cp.hex}; margin-left:4px;" title="${cp
     }
 
 function startFoxRoomSequence() {
+        if (currentUser && currentUser.quarantineHospital) return;
     const ov = document.getElementById('fox-loading-overlay');
     if (ov) {
         ov.querySelector('div > div:first-child').innerText = '⚠';
@@ -9985,6 +9989,7 @@ function admItemSelectNone() {
         const fields = {
             quarantineUntil: 0,
             quarantineExitPollution: 0,
+            quarantineHospital: false,
             pollution: newPoll,
             lastPollutionTime: Date.now(),
             foxRoomAnswered: false,
