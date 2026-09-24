@@ -4480,8 +4480,8 @@ function b508RequiredDocs() {
 
     function facilityLuckMult(user) {
         let m = 1;
-        if (hasEquip(user, '착한 친구')) m *= 1.15;
-        if (hasEquip(user, '유리손포')) m *= 1.15;
+        if (hasEquip(user, '착한 친구')) m *= 4;
+         if (hasEquip(user, '유리손포')) m *= 4;
 
         const anal = plugActive(user, '다이아 애널 플러그');
         const vag  = plugActive(user, '다이아 보지 플러그');
