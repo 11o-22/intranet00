@@ -667,4 +667,21 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
     };
 })();
 
+// 각성 돌파권 — S-003 · S-010 전용, 0.2%
+(function fixAwaken() {
+    const n = '각성 돌파권';
+    Object.keys(DARK_LOOT_BY_ZONE).forEach(z => {
+        const i = DARK_LOOT_BY_ZONE[z].findIndex(l => l.name === n);
+        if (i < 0) return;
+        if (z === 'Qtrew-S-003' || z === 'Qtrew-S-010') DARK_LOOT_BY_ZONE[z][i].chance = 0.002;
+        else DARK_LOOT_BY_ZONE[z].splice(i, 1);
+    });
+    ['Qtrew-S-003', 'Qtrew-S-010'].forEach(z => {
+        if (!DARK_LOOT_BY_ZONE[z]) DARK_LOOT_BY_ZONE[z] = [];
+        if (!DARK_LOOT_BY_ZONE[z].some(l => l.name === n))
+            DARK_LOOT_BY_ZONE[z].push({ name: n, chance: 0.002 });
+    });
+})();
+
 console.log('[신규 아이템] 물약 10 · S-003 10 · 범용 20 · 우주 10 = 50종 등록 완료');
+
