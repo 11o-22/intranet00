@@ -1411,8 +1411,14 @@ mountDarkChat('normal');
     ref.on('value', sn => {
         if (!darkRun) return;
         const rj = sn.val() || {};
-        const soloPicks = Object.values(rj.soloPick || {});
-        const holdPicks = Object.values(rj.holdPick || {});
+        const _al = (darkParties[darkRun.partyId] || {}).alive || {};
+        const _pick = function (o) {
+            const out = [];
+            Object.keys(o || {}).forEach(function (k) { if (_al[k]) out.push(o[k]); });
+            return out;
+        };
+        const soloPicks = _pick(rj.soloPick);
+        const holdPicks = _pick(rj.holdPick);
         const waited = Date.now() - darkRun._rjStart;
 
         // 양쪽이 모였거나, 90초를 넘기면 진행
@@ -1431,7 +1437,17 @@ mountDarkChat('normal');
 
    function resolveB330Rejoin(soloPicks, holdPicks, attempt) {
     let result, txt, mod = 0, joined = false;
-    const s = soloPicks[0], h = holdPicks[0];
+    const PAIRS = [
+        ['call','stay'], ['track','move'], ['knock','search'],
+        ['forward','loud'], ['call','loud']
+    ];
+    let s = soloPicks[0], h = holdPicks[0];
+    for (let i = 0; i < PAIRS.length; i++) {
+        if (soloPicks.includes(PAIRS[i][0]) && holdPicks.includes(PAIRS[i][1])) {
+            s = PAIRS[i][0]; h = PAIRS[i][1];
+            break;
+        }
+    }
 
     const pp = darkParties[darkRun.partyId];
     const leaderAway = !!(pp && pp.solo && pp.leader && pp.solo[pp.leader]);
@@ -1470,9 +1486,15 @@ mountDarkChat('normal');
         darkRun.soloMet = false;
         if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
         sendPartyChat(`합류 성공 — ${result}`, true);
-    } else {
+       } else {
         sendPartyChat(`합류 실패 — 엇갈렸습니다.`, true);
+        if (attempt >= 3) {
+            darkRun.solo = false;
+            darkRun.soloMet = false;
+            if (database) database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+        }
     }
+    if (database) database.ref(`darkParties/${darkRun.partyId}/rj${attempt}`).remove();
 
     darkBodyEl().innerHTML = darkBox(`합류 ${attempt}차 — 결과`, txt,
         `<div style="text-align:center; font-size:11px; color:${mod > 0 ? '#4CAF50' : '#ff9800'}; margin-bottom:12px; padding:9px; background:rgba(0,0,0,0.25); border-radius:5px;">
