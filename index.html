@@ -5404,7 +5404,8 @@ const cpMark = cp ? `<span style="color:${cp.hex}; margin-left:4px;" title="${cp
     }
 
 function startFoxRoomSequence() {
-        if (currentUser && currentUser.quarantineHospital) return;
+     if (currentUser && currentUser.quarantineHospital) return;
+    if (darkRun) return;   // 탐사 중에는 사망 처리가 먼저다
     const ov = document.getElementById('fox-loading-overlay');
     if (ov) {
         ov.querySelector('div > div:first-child').innerText = '⚠';
@@ -5538,7 +5539,7 @@ function startFoxRoomSequence() {
         // ... 이후 100% 도달 시 여우 상담실 연출 등 기존 코드 그대로 이어짐 ...
 
         // 100% 도달 시 여우 상담실 연출 및 로직
-        if (currentUser.pollution >= 100) {
+                if (currentUser.pollution >= 100 && !darkRun) {
             if (!currentUser.quarantineUntil || Date.now() > currentUser.quarantineUntil) {
                 if (!currentUser.foxRoomAnswered) {
                     if (!hasShownFoxAlert) {
