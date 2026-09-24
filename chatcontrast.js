@@ -117,11 +117,10 @@
         });
     }
 
-    window.fixChatContrast = function () {
-        ['fox-chat-log', 'bath-chat-log', 'pchat-log'].forEach(function (id) {
+       window.fixChatContrast = function () {
+        ['fox-chat-log', 'bath-chat-log'].forEach(function (id) {
             fix(document.getElementById(id));
         });
-        document.querySelectorAll('.pchat-log').forEach(fix);
     };
 
     // 대화가 갱신될 때마다 다시 잡는다
