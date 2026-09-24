@@ -10532,7 +10532,9 @@ if (bathModal) bathModal.style.display = 'none';
             document.getElementById('nickname-input').value = ''; document.getElementById('code-input').value = '';
             document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('ranking-bottom-bar').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
-             showAutoLoginOverlay(false); // ★ 잔여 오버레이 제거
+            ['quarantine-pick-overlay','fox-loading-overlay','fox-room-overlay','fox-nameplate-overlay']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+            showAutoLoginOverlay(false); // ★ 잔여 오버레이 제거
             document.body.className = ""; // 테마 초기화
         }
     // =========================================================================
