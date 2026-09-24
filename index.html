@@ -5450,6 +5450,11 @@ function startFoxRoomSequence() {
     }
 
        function finishFoxRoomSequence() {
+            if (currentUser && currentUser.quarantineHospital) {
+        document.getElementById('fox-room-overlay').style.display = 'none';
+        updateUI();
+        return;
+    }
     const agent = isBathUser(currentUser);
     let finalHours = 24 - foxTimeReduction;
     if (foxUseNameplate) {
