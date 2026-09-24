@@ -8608,9 +8608,13 @@ function b508RequiredDocs() {
         addHistoryLog(currentUser, `[사택 매점] ${name} 구입 (-${price} P)`);
        
        
-        saveSelfFull();
+                saveSelfFull();
         updateUI();
-        renderQShop();
+        if (typeof renderQShop === 'function') renderQShop();
+        const _k = document.getElementById('house-kitchen');
+        if (_k && _k.classList.contains('active')) renderKitchen();
+        const _s = document.getElementById('house-storage');
+        if (_s && _s.classList.contains('active') && typeof renderHouseStorage === 'function') renderHouseStorage();
     }
 
 
@@ -12483,7 +12487,7 @@ function pickQuarantine(dest) {
         showCustomAlert('세션이 끊어졌습니다. 다시 접속해 주세요.');
         return;
     }
-    
+
     currentUser.quarantineDest = dest;
     const agent = dest === 'bath';
 
