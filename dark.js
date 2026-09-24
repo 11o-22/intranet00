@@ -1422,7 +1422,12 @@ mountDarkChat('normal');
         const waited = Date.now() - darkRun._rjStart;
 
         // 양쪽이 모였거나, 90초를 넘기면 진행
-        if ((soloPicks.length > 0 && holdPicks.length > 0) || waited > 90000) {
+                const _p = darkParties[darkRun.partyId] || {};
+        const _soloN = Object.keys(_p.solo || {}).length;
+        const _both = (soloPicks.length > 0 && holdPicks.length > 0);
+        const _onlyHold = (_soloN === 0 && holdPicks.length > 0);
+        const _onlySolo = (_soloN > 0 && holdPicks.length === 0 && soloPicks.length >= _soloN);
+        if (_both || _onlyHold || _onlySolo || waited > 60000) {
             try { ref.off(); } catch(e) {}
             darkRun._rjWatch = null;
             resolveB330Rejoin(soloPicks, holdPicks, attempt);
