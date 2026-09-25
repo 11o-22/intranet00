@@ -13375,7 +13375,8 @@ function renderMarket() {
     }
 
     box.innerHTML = list.map(p => {
-        const mine = p.seller === currentUser.code;
+                   if (!currentUser) return;
+            const mine = p.seller === currentUser.code;
         const hours = Math.max(0, Math.ceil((MARKET_TTL - (now - p.at)) / 3600000));
         const offers = p.offers ? Object.values(p.offers) : [];
 
@@ -13475,6 +13476,7 @@ async function cancelMarket(id) {
     if (!database) return;
 
     const res = await database.ref('market/' + id).transaction(p => {
+        if (!currentUser) return;
         if (!p || p.state !== 'OPEN' || p.seller !== currentUser.code) return;
         p.state = 'CANCELLED';
         return p;

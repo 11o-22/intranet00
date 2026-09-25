@@ -10569,9 +10569,10 @@ if (hlCard) hlCard.innerText = dealerCardValue;
     });
         function logout() {
                         if (payoutRef) { try { payoutRef.off(); } catch (e) {} payoutRef = null; }
-                                    if (database) {
-                try { database.ref('duels').off(); } catch (e) {}
-                try { database.ref('duelLogs').off(); } catch (e) {}
+                                                if (database) {
+                ['duels', 'duelLogs', 'market'].forEach(function (p) {
+                    try { database.ref(p).off(); } catch (e) {}
+                });
             }
              const foxModal = document.getElementById('fox-modal');
     if (foxModal) foxModal.style.display = 'none';
