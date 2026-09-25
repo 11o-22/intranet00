@@ -5186,7 +5186,7 @@ if (user.code === 'kario0987') {
         if (!wrapper) return;
         const sortedUsers = Object.values(db.users)
             .filter(u => u.code !== 'kario0987')
-            .sort((a, b) => b.points - a.points);
+         .sort((a, b) => (b.points || 0) - (a.points || 0));
         const top3 = sortedUsers.slice(0, 3);
         const medalClasses = ['rank-1', 'rank-2', 'rank-3'];
         wrapper.innerHTML = top3.map((u, idx) => `
@@ -5196,7 +5196,7 @@ if (user.code === 'kario0987') {
                     <span style="font-weight:bold;">${u.name}</span>
                     <span style="font-size:10px; color:#888; margin-left:6px;">(${u.team} · NO.${u.no})</span>
                 </div>
-                <div style="font-weight:bold; font-family:monospace;">${u.points.toLocaleString()} P</div>
+                               <div style="font-weight:bold; font-family:monospace;">${(u.points || 0).toLocaleString()} P</div>
             </div>
         `).join('');
     }
