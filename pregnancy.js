@@ -291,32 +291,43 @@ function rejectPregAsk() {
 // 확률 표시 — 사원증 탭
 // ==========================================
 (function showMyRate() {
+    function rateHTML() {
+        const r = myRates(currentUser);
+        return `
+            <div style="font-size:10px; color:#c9a8ff; letter-spacing:1px; margin-bottom:4px;">[생체 기록]</div>
+            DNA <b style="font-family:monospace; color:#4fc3f7;">${dnaOf(currentUser)}</b><br>
+            ${r.sire !== null ? `임신시킬 확률 <b style="color:#ffd700;">${r.sire}%</b><br>` : ''}
+            ${r.bear !== null ? `임신될 확률 <b style="color:#ff8fb1;">${r.bear}%</b>` : ''}
+            ${r.sire === null && r.bear === null ? '<span style="color:#888;">해당 없음</span>' : ''}
+            <div style="font-size:9px; color:#666; margin-top:5px;">본인에게만 보입니다.</div>`;
+    }
     function put() {
         const panel = document.getElementById('rec-badge');
-        if (!panel || !currentUser || document.getElementById('preg-rate-box')) return;
+        if (!panel || !currentUser) return;
+
+        const old = document.getElementById('preg-rate-box');
+        if (old) {
+            // 이미 있으면 내용만 바꾼다. 지웠다 붙이면 높이가 출렁여 깜빡인다.
+            const next = rateHTML();
+            if (old.innerHTML !== next) old.innerHTML = next;
+            return;
+        }
+
         const btn = panel.querySelector('button[onclick*="saveBadgeInfo"]');
         if (!btn) return;
-        const r = myRates(currentUser);
-        btn.insertAdjacentHTML('beforebegin', `
-            <div id="preg-rate-box" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">
-                <div style="font-size:10px; color:#c9a8ff; letter-spacing:1px; margin-bottom:4px;">[생체 기록]</div>
-                DNA <b style="font-family:monospace; color:#4fc3f7;">${dnaOf(currentUser)}</b><br>
-                ${r.sire !== null ? `임신시킬 확률 <b style="color:#ffd700;">${r.sire}%</b><br>` : ''}
-                ${r.bear !== null ? `임신될 확률 <b style="color:#ff8fb1;">${r.bear}%</b>` : ''}
-                ${r.sire === null && r.bear === null ? '<span style="color:#888;">해당 없음</span>' : ''}
-                <div style="font-size:9px; color:#666; margin-top:5px;">본인에게만 보입니다.</div>
-            </div>`);
+        btn.insertAdjacentHTML('beforebegin',
+            `<div id="preg-rate-box" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">${rateHTML()}</div>`);
     }
     put();
     setTimeout(put, 900);
     setTimeout(put, 2500);
     if (typeof updateUI === 'function') {
         const _u = updateUI;
+        let tick = null;
         updateUI = function () {
             const r = _u.apply(this, arguments);
-            const box = document.getElementById('preg-rate-box');
-            if (box) box.remove();
-            setTimeout(put, 40);
+            clearTimeout(tick);
+            tick = setTimeout(put, 40);
             return r;
         };
     }
