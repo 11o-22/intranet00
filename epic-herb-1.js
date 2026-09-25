@@ -3,7 +3,7 @@
 // index.html 에서 epic-priest-4.js 다음에 불러온다
 // ==========================================
 
-epicSlot('forest', 'herbalist').push(
+epicSlot('forest', 'herbal').push(
 { title:'검은 숲 — 안 자라는 자리',
   text:`풀이 없는 자리가 있다.<br><br>
     둥글게. 가장자리까지는 자라다 딱 멈춘다.<br>
@@ -33,7 +33,7 @@ epicSlot('forest', 'herbalist').push(
   ] }
 );
 
-epicSlot('village', 'herbalist').push(
+epicSlot('village', 'herbal').push(
 { title:'빈 마을 — 마당의 약초',
   text:`집집 마당에 약초가 자란다.<br><br>
     심어 놓은 것이다. 줄 맞춰 있다.<br>
@@ -49,7 +49,7 @@ epicSlot('village', 'herbalist').push(
   ] }
 );
 
-epicSlot('temple', 'herbalist').push(
+epicSlot('temple', 'herbal').push(
 { title:'신전 — 마른 꽃',
   text:`제단 뒤에 마른 꽃이 있다.<br><br>
     약초꾼은 마른 것을 본다. 말리는 방식으로 쓰임을 안다.<br>
@@ -65,7 +65,7 @@ epicSlot('temple', 'herbalist').push(
   ] }
 );
 
-epicSlot('grave', 'herbalist').push(
+epicSlot('grave', 'herbal').push(
 { title:'묘지 — 자라는 것',
   text:`봉분에 풀이 자란다.<br><br>
     스물둘은 잔디다. 하나만 다르다.<br>
@@ -81,7 +81,7 @@ epicSlot('grave', 'herbalist').push(
   ] }
 );
 
-epicSlot('lake', 'herbalist').push(
+epicSlot('lake', 'herbal').push(
 { title:'거울 호수 — 물가의 풀',
   text:`물가에 풀이 자란다.<br><br>
     물에 비친 쪽도 자란다. 당연하다.<br>
@@ -99,7 +99,7 @@ epicSlot('lake', 'herbalist').push(
   ] }
 );
 
-epicSlot('ruin', 'herbalist').push(
+epicSlot('ruin', 'herbal').push(
 { title:'폐허 — 돌 틈의 것',
   text:`돌 사이에 뭔가 자란다.<br><br>
     빛이 안 드는 자리다. 자랄 수 없는 자리.<br>
@@ -117,7 +117,7 @@ epicSlot('ruin', 'herbalist').push(
   ] }
 );
 
-epicSlot('market', 'herbalist').push(
+epicSlot('market', 'herbal').push(
 { title:'장터 — 약초 좌판',
   text:`말린 풀이 쌓여 있다.<br><br>
     약초꾼은 말린 것을 보면 언제 뜯었는지 안다.<br>
@@ -133,7 +133,7 @@ epicSlot('market', 'herbalist').push(
   ] }
 );
 
-epicSlot('castle', 'herbalist').push(
+epicSlot('castle', 'herbal').push(
 { title:'성 — 약방',
   text:`방 하나에 약병이 있다.<br><br>
     선반에 줄 맞춰 있다. 이름표가 붙어 있다.<br>
@@ -149,7 +149,7 @@ epicSlot('castle', 'herbalist').push(
   ] }
 );
 
-epicSlot('road', 'herbalist').push(
+epicSlot('road', 'herbal').push(
 { title:'끊긴 길 — 안개 속의 것',
   text:`안개 가장자리에 풀이 자란다.<br><br>
     안개 쪽으로 기울어 있다. 빛은 반대쪽인데.<br>
@@ -165,7 +165,7 @@ epicSlot('road', 'herbalist').push(
   ] }
 );
 
-epicSlot('tower', 'herbalist').push(
+epicSlot('tower', 'herbal').push(
 { title:'탑 — 높은 데 자라는 것',
   text:`벽 틈에 풀이 있다.<br><br>
     높다. 씨가 올라올 데가 아니다.<br>
@@ -181,7 +181,7 @@ epicSlot('tower', 'herbalist').push(
   ] }
 );
 
-epicSlot('gate', 'herbalist').push(
+epicSlot('gate', 'herbal').push(
 { title:'성문 — 문턱의 풀',
   text:`문턱 틈에 풀이 나 있다.<br><br>
     밟히면 안 자란다. 사람이 안 지났다는 뜻이다.<br>

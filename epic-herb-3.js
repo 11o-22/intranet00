@@ -3,7 +3,7 @@
 // index.html 에서 epic-herb-2.js 다음에 불러온다
 // ==========================================
 
-epicSlot('forest', 'herbalist').push(
+epicSlot('forest', 'herbal').push(
 { title:'검은 숲 — 잎이 여섯인 것',
   text:`다섯 잎이 약이고 여섯 잎이 독이다.<br><br>
     한 잎 차이다.<br>
@@ -35,7 +35,7 @@ epicSlot('forest', 'herbalist').push(
   ] }
 );
 
-epicSlot('village', 'herbalist').push(
+epicSlot('village', 'herbal').push(
 { title:'빈 마을 — 한날에 심은 것',
   text:`스물셋 줄이 한날에 심어졌다.<br><br>
     한 사람이 하루에 심을 양이 아니다.<br>
@@ -51,7 +51,7 @@ epicSlot('village', 'herbalist').push(
   ] }
 );
 
-epicSlot('temple', 'herbalist').push(
+epicSlot('temple', 'herbal').push(
 { title:'신전 — 마지막 다발',
   text:`마지막 다발이 제일 컸다.<br><br>
     여섯 달째에 많이 필요했다는 뜻이다.<br>
@@ -69,7 +69,7 @@ epicSlot('temple', 'herbalist').push(
   ] }
 );
 
-epicSlot('grave', 'herbalist').push(
+epicSlot('grave', 'herbal').push(
 { title:'묘지 — 제일 굵은 풀',
   text:`가운데 봉분 풀이 제일 굵다.<br><br>
     양분이 제일 많다는 뜻이다.<br>
@@ -87,7 +87,7 @@ epicSlot('grave', 'herbalist').push(
   ] }
 );
 
-epicSlot('castle', 'herbalist').push(
+epicSlot('castle', 'herbal').push(
 { title:'성 — 비어 있던 병',
   text:`제일 센 병만 비어 있었다.<br><br>
     다 썼다는 뜻이다.<br>
@@ -105,7 +105,7 @@ epicSlot('castle', 'herbalist').push(
   ] }
 );
 
-epicSlot('ruin', 'herbalist').push(
+epicSlot('ruin', 'herbal').push(
 { title:'폐허 — 덮은 뒤',
   text:`돌로 덮었거나 못 덮었거나.<br><br>
     하얀 것은 계속 자란다.<br>
@@ -121,7 +121,7 @@ epicSlot('ruin', 'herbalist').push(
   ] }
 );
 
-epicSlot('market', 'herbalist').push(
+epicSlot('market', 'herbal').push(
 { title:'장터 — 재어서 묶은 것',
   text:`다발마다 무게가 정확히 같았다.<br><br>
     쓸 사람이 정해졌을 때 그렇게 묶는다.<br>
@@ -137,7 +137,7 @@ epicSlot('market', 'herbalist').push(
   ] }
 );
 
-epicSlot('lake', 'herbalist').push(
+epicSlot('lake', 'herbal').push(
 { title:'거울 호수 — 나중 모습',
   text:`비친 쪽이 더 자라 있다.<br><br>
     나중 모습이 비치는 것이다.<br>
@@ -155,7 +155,7 @@ epicSlot('lake', 'herbalist').push(
   ] }
 );
 
-epicSlot('tower', 'herbalist').push(
+epicSlot('tower', 'herbal').push(
 { title:'탑 — 올라가면서 심었다',
   text:`아래부터 위로 심었다.<br><br>
     올라가면서 하나씩.<br>
@@ -171,7 +171,7 @@ epicSlot('tower', 'herbalist').push(
   ] }
 );
 
-epicSlot('road', 'herbalist').push(
+epicSlot('road', 'herbal').push(
 { title:'끊긴 길 — 안개를 먹는 것',
   text:`뿌리가 안개 쪽으로만 간다.<br><br>
     안개를 먹는다.<br>

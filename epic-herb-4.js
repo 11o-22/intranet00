@@ -3,7 +3,7 @@
 // index.html 에서 epic-herb-3.js 다음에 불러온다
 // ==========================================
 
-epicSlot('forest', 'herbalist').push(
+epicSlot('forest', 'herbal').push(
 { title:'검은 숲 — 표를 남기고 간다',
   text:`독 무더기가 있는 자리다.<br><br>
     남기면 누가 찾아오고 안 남기면 누가 잘못 뜯는다.<br>
@@ -18,7 +18,7 @@ epicSlot('forest', 'herbalist').push(
   ] }
 );
 
-epicSlot('village', 'herbalist').push(
+epicSlot('village', 'herbal').push(
 { title:'빈 마을 — 다시 심는다',
   text:`캔 자리가 비어 있다.<br><br>
     약초꾼은 캔 자리에 다시 심는다.<br>
@@ -33,7 +33,7 @@ epicSlot('village', 'herbalist').push(
   ] }
 );
 
-epicSlot('temple', 'herbalist').push(
+epicSlot('temple', 'herbal').push(
 { title:'신전 — 싸서 두고 간다',
   text:`잠 오는 꽃을 천에 쌌다.<br><br>
     태우면 안 되고 버리면 누가 줍는다.<br>
@@ -48,7 +48,7 @@ epicSlot('temple', 'herbalist').push(
   ] }
 );
 
-epicSlot('grave', 'herbalist').push(
+epicSlot('grave', 'herbal').push(
 { title:'묘지 — 덮고 간다',
   text:`뿌리 끝은 안 봤다.<br><br>
     보면 알게 되고 알면 도움이 안 된다.<br>
@@ -63,7 +63,7 @@ epicSlot('grave', 'herbalist').push(
   ] }
 );
 
-epicSlot('castle', 'herbalist').push(
+epicSlot('castle', 'herbal').push(
 { title:'성 — 병을 엎어 둔다',
   text:`맛은 안 봤다.<br><br>
     남은 것이 있으면 누가 마신다.<br>
@@ -79,7 +79,7 @@ epicSlot('castle', 'herbalist').push(
   ] }
 );
 
-epicSlot('ruin', 'herbalist').push(
+epicSlot('ruin', 'herbal').push(
 { title:'폐허 — 소금 자국',
   text:`뿌린 소금이 하얗게 남았다.<br><br>
     땅이 죽으면 한동안 안 자란다.<br>
@@ -95,7 +95,7 @@ epicSlot('ruin', 'herbalist').push(
   ] }
 );
 
-epicSlot('lake', 'herbalist').push(
+epicSlot('lake', 'herbal').push(
 { title:'거울 호수 — 안 본 채로',
   text:`물을 안 봤다.<br><br>
     나중 모습을 보면 그렇게 된다.<br>
@@ -110,7 +110,7 @@ epicSlot('lake', 'herbalist').push(
   ] }
 );
 
-epicSlot('market', 'herbalist').push(
+epicSlot('market', 'herbal').push(
 { title:'장터 — 다시 채운다',
   text:`한 다발을 가져갔다.<br><br>
     스물둘이 남았다.<br>
@@ -125,7 +125,7 @@ epicSlot('market', 'herbalist').push(
   ] }
 );
 
-epicSlot('tower', 'herbalist').push(
+epicSlot('tower', 'herbal').push(
 { title:'탑 — 남겨 두고 간다',
   text:`심은 사람은 안 내려왔다.<br><br>
     심은 게 다 남아 있었다.<br>
@@ -140,7 +140,7 @@ epicSlot('tower', 'herbalist').push(
   ] }
 );
 
-epicSlot('road', 'herbalist').push(
+epicSlot('road', 'herbal').push(
 { title:'끊긴 길 — 이쪽 것만',
   text:`뿌리 한쪽만 잘라 챙겼다.<br><br>
     안개 쪽은 안 캤다.<br>
@@ -155,7 +155,7 @@ epicSlot('road', 'herbalist').push(
   ] }
 );
 
-epicSlot('gate', 'herbalist').push(
+epicSlot('gate', 'herbal').push(
 { title:'성문 — 나가기 전에',
   text:`주머니가 찼다.<br><br>
     약초꾼은 나가기 전에 정리한다.<br>

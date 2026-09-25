@@ -3,7 +3,7 @@
 // index.html 에서 epic-herb-1.js 다음에 불러온다
 // ==========================================
 
-epicSlot('forest', 'herbalist').push(
+epicSlot('forest', 'herbal').push(
 { title:'검은 숲 — 나눠 뜯는다',
   text:`쓸 만한 것이 흩어져 있다.<br><br>
     혼자 뜯으면 오래 걸린다. 오래 걸리면 어두워진다.<br>
@@ -22,7 +22,7 @@ epicSlot('forest', 'herbalist').push(
   ] }
 );
 
-epicSlot('village', 'herbalist').push(
+epicSlot('village', 'herbal').push(
 { title:'빈 마을 — 같이 캔다',
   text:`마당마다 약초가 있다.<br><br>
     스물셋 줄이다. 혼자 캐면 하루가 간다.<br>
@@ -41,7 +41,7 @@ epicSlot('village', 'herbalist').push(
   ] }
 );
 
-epicSlot('temple', 'herbalist').push(
+epicSlot('temple', 'herbal').push(
 { title:'신전 — 약을 나눈다',
   text:`마른 꽃이 있다.<br><br>
     잠 오는 것이다. 쓰기에 따라 다르다.<br>
@@ -60,7 +60,7 @@ epicSlot('temple', 'herbalist').push(
   ] }
 );
 
-epicSlot('grave', 'herbalist').push(
+epicSlot('grave', 'herbal').push(
 { title:'묘지 — 같이 뽑는다',
   text:`봉분에 풀이 자란다.<br><br>
     스물셋 개다. 혼자 뽑으면 오래 걸린다.<br>
@@ -79,7 +79,7 @@ epicSlot('grave', 'herbalist').push(
   ] }
 );
 
-epicSlot('castle', 'herbalist').push(
+epicSlot('castle', 'herbal').push(
 { title:'성 — 약방을 정리한다',
   text:`병이 스물셋이다.<br><br>
     쏟아지면 큰일이다. 잠 오는 것이라.<br>
@@ -98,7 +98,7 @@ epicSlot('castle', 'herbalist').push(
   ] }
 );
 
-epicSlot('lake', 'herbalist').push(
+epicSlot('lake', 'herbal').push(
 { title:'거울 호수 — 같이 견준다',
   text:`물에 비친 풀이 더 크다.<br><br>
     혼자 보면 손이 간다. 뜯고 싶어진다.<br>
@@ -114,7 +114,7 @@ epicSlot('lake', 'herbalist').push(
   ] }
 );
 
-epicSlot('ruin', 'herbalist').push(
+epicSlot('ruin', 'herbal').push(
 { title:'폐허 — 덮어 둔다',
   text:`돌 틈의 하얀 것이다.<br><br>
     뽑으면 안 된다. 덮어 둬야 한다.<br>
@@ -133,7 +133,7 @@ epicSlot('ruin', 'herbalist').push(
   ] }
 );
 
-epicSlot('market', 'herbalist').push(
+epicSlot('market', 'herbal').push(
 { title:'장터 — 골라 준다',
   text:`말린 풀이 쌓여 있다.<br><br>
     좋은 것과 상한 것이 섞여 있다.<br>
@@ -152,7 +152,7 @@ epicSlot('market', 'herbalist').push(
   ] }
 );
 
-epicSlot('road', 'herbalist').push(
+epicSlot('road', 'herbal').push(
 { title:'끊긴 길 — 뿌리를 따라간다',
   text:`뿌리가 안개 쪽으로 간다.<br><br>
     어디까지 가는지 보려면 파야 한다.<br>
@@ -171,7 +171,7 @@ epicSlot('road', 'herbalist').push(
   ] }
 );
 
-epicSlot('tower', 'herbalist').push(
+epicSlot('tower', 'herbal').push(
 { title:'탑 — 올려다 심은 것',
   text:`벽 틈에 심어진 것이다.<br><br>
     씨가 무거워서 바람으로 못 온다.<br>
@@ -190,7 +190,7 @@ epicSlot('tower', 'herbalist').push(
   ] }
 );
 
-epicSlot('gate', 'herbalist').push(
+epicSlot('gate', 'herbal').push(
 { title:'성문 — 같이 뜯는다',
   text:`문턱 양옆에 흔한 풀이 났다.<br><br>
     상처에 붙이는 것이다. 많을수록 좋다.<br>
