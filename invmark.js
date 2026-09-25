@@ -210,5 +210,5 @@ function decorateInv() {
         });
     });
 }
-
+  
 console.log('[소지품] 즐겨찾기 · 자물쇠 · 확인 팝업 적용'); 
