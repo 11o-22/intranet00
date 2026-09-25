@@ -129,8 +129,8 @@ function bankSettle() {
         if (b.blacklist) { b.score = 0; b.vip = null; b.vipRequest = null; }
         return b;
     }).then(res => {
-        const b = res.snapshot && res.snapshot.val();
-        if (!b) return;
+                const b = res.snapshot && res.snapshot.val();
+        if (!b || !currentUser) return;
 
         if (b.loan && b.loan.notice) {
             database.ref(bankPath(me.code) + '/loan/notice').set(false);
@@ -147,8 +147,8 @@ function bankSettle() {
                 x.loan.seize = false;
                 if (x.loan.owe <= 0) x.loan = null;
                 return x;
-            }).then(r => {
-                if (!r.committed) return;
+                        }).then(r => {
+                if (!r.committed || !currentUser) return;
                 changePoints(-take);
                 addHistoryLog(currentUser, `[은행 압류] 연체 대출금 ${take.toLocaleString()} P가 회수되었습니다.`);
                 saveFields({ history: 1 });
@@ -165,7 +165,7 @@ function bankSettle() {
                 x.capBonus = (x.capBonus || 0) + bonus;
                 return x;
             }).then(r => {
-                if (!r.committed) return;
+                if (!r.committed || !currentUser) return;
                 currentUser.safeBoxes = [];
                 currentUser.safeMigrated = true;
                 addHistoryLog(currentUser, `[은행] 금고 ${safes.length}개의 ${total.toLocaleString()} P가 예금으로 이전되었습니다.`);
