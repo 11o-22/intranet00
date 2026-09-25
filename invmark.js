@@ -132,9 +132,13 @@ function closeInvConfirm() {
 (function hookRender() {
     if (typeof renderInventory !== 'function') return;
     const _r = renderInventory;
+    let tick = null;
     renderInventory = function () {
         const r = _r.apply(this, arguments);
-        setTimeout(decorateInv, 40);
+        clearTimeout(tick);
+        tick = setTimeout(function () {
+            try { decorateInv(); } catch (e) { console.warn('[소지품] 표식 실패:', e); }
+        }, 60);
         return r;
     };
 })();
@@ -183,13 +187,29 @@ function decorateInv() {
     });
 
     // 즐겨찾기를 위로
-    const favs = cards.filter(c => {
+    // invcat.js 가 카드를 분류 상자 안에 넣으므로, 같은 부모 안에서만 옮긴다.
+    // box 를 기준으로 옮기면 insertBefore 가 터지고 높이가 출렁인다.
+    const byParent = new Map();
+    cards.forEach(function (c) {
         const e = c.querySelector('.inv-card-name');
-        return e && isFav(e.innerText.trim());
+        if (!e || !isFav(e.innerText.trim())) return;
+        if (!byParent.has(c.parentElement)) byParent.set(c.parentElement, []);
+        byParent.get(c.parentElement).push(c);
     });
-    favs.reverse().forEach(function (c) {
-        const first = box.querySelector('.inv-card');
-        if (first && first !== c) box.insertBefore(c, first);
+
+    byParent.forEach(function (list, parent) {
+        // 이미 맨 앞에 몰려 있으면 손대지 않는다
+        const kids = Array.from(parent.querySelectorAll(':scope > .inv-card'));
+        let sorted = true;
+        for (let i = 0; i < list.length; i++) {
+            if (kids[i] !== list[i]) { sorted = false; break; }
+        }
+        if (sorted) return;
+
+        const anchor = kids[0];
+        list.forEach(function (c) {
+            if (c !== anchor) parent.insertBefore(c, anchor);
+        });
     });
 }
 

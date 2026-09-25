@@ -460,7 +460,7 @@ function uiSkinCardHtml() {
     const s = currentUser && currentUser.uiSkin;
     if (!s) return '';
     return `
-        <div style="background:${s.panel}; border:1px solid ${s.accent}; padding:12px; margin-bottom:12px; border-radius:6px;">
+        <div class="ui-skin-card" style="background:${s.panel}; border:1px solid ${s.accent}; padding:12px; margin-bottom:12px; border-radius:6px;">
             <div style="font-size:10px; color:${s.accent}; font-weight:bold; margin-bottom:5px;">[벽지]</div>
             <div style="font-size:14px; color:${s.text}; font-weight:bold;">${s.name}</div>
             <div style="font-size:10px; color:${s.text}b3; margin-top:6px;">해제하면 견본첩은 사라집니다. 다른 견본첩을 쓰면 새로 꾸며집니다.</div>
@@ -488,7 +488,9 @@ function uiSkinCardHtml() {
     renderInventory = function () {
         const r = _renderInventory.apply(this, arguments);
         const box = document.getElementById('inventory-list-container');
-        if (box && currentUser && currentUser.uiSkin) box.insertAdjacentHTML('afterbegin', uiSkinCardHtml());
+        if (box && currentUser && currentUser.uiSkin && !box.querySelector('.ui-skin-card')) {
+            box.insertAdjacentHTML('afterbegin', uiSkinCardHtml());
+        }
         return r;
     };
 
