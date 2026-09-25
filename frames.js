@@ -343,12 +343,19 @@ function frOf(user, slot) {
 }
 function frApply(el, id) {
     if (!el) return;
+    // 이미 같은 상태면 건드리지 않는다.
+    // 클래스를 지웠다 붙이면 애니메이션이 처음부터 다시 돌아 깜빡인다.
+    const cur = Array.from(el.classList).find(c => /^fr-/.test(c) && c !== 'fr-wrap') || '';
+    const want = id ? 'fr-' + id : '';
+    if (cur === want && el.classList.contains('fr-wrap') === !!id) return;
+
     Array.from(el.classList).forEach(c => { if (/^fr-/.test(c)) el.classList.remove(c); });
     el.classList.remove('fr-wrap');
     if (!id) return;
     el.classList.add('fr-wrap', 'fr-' + id);
 }
 
+let _frTick = null;
 function frRefresh() {
     if (!currentUser) return;
     frApply(document.getElementById('badge-photo-display'), frOf(currentUser, 'badge'));
@@ -367,7 +374,8 @@ function frRefresh() {
     const _f = window[n];
     window[n] = function () {
         const r = _f.apply(this, arguments);
-        setTimeout(frRefresh, 30);
+        clearTimeout(_frTick);
+        _frTick = setTimeout(frRefresh, 40);   // 연속 호출은 한 번으로 묶는다
         return r;
     };
 });
