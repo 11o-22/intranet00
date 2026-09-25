@@ -180,4 +180,4 @@ epicSlot('road', 'merchant').push(
         dieText:`장이 서 있는 데로 가는 게 상인이다.<br><br>가서 파는 게 아니라 팔리는 장도 있다.<br>안개 위에 자국이 둘이 됐다.` },
       good:`귀를 기울이다 막았다.<br><br>소리가 났다. 흥정하는 소리였다.<br>장이 서 있으면 가고 싶어진다. 그게 상인이다.<br><br>안 들었다. 귀를 막고 돌아섰다.`, flag:'coveredEarsMerchant' }
   ] }
-); 
+);

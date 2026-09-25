@@ -207,4 +207,4 @@ epicSlot('road', 'merchant').push(
       good:`안개 쪽으로 던졌다. 두 번 닿았다.<br><br>가장자리에서는 소리가 난다. 안쪽은 안 난다.<br>소리가 안 나는 데까지가 땅이 아니다.<br><br>흥정 소리는 땅이 없는 데서 난다.`, flag:'soundFromNowhere',
       bad:`세 번 다 안쪽으로 갔다.<br><br>소리가 하나도 안 났다.<br>돌을 잃었다.` }
   ] }
-); 
+);
