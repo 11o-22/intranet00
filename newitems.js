@@ -189,7 +189,7 @@ function hasWear(name) {
 
 function smashCharges() {
     if (!currentUser) return 0;
-    let n = 0;
+    let n = currentUser.dnaSmash || 0;
     const clit = rubyActive(currentUser, '루비 클리 피어싱');
     const nip  = rubyActive(currentUser, '루비 유두 피어싱');
     if (clit) n += nip ? 2 : 1;

@@ -217,8 +217,8 @@ function ensureDnaItem(user) {
         eff = { effect: 'b_mix', ticket: 8, luck: 6, point: 5000 };
         desc = '공용시설 8회 · 6시간 행운 세 배 · 5,000 P.';
     } else {
-        eff = { effect: 'b_mix', dark: 3, heal: 40, hide: 2 };
-        desc = '어둠 탐사 3회 · 오염도 40% 회복 · 지목 2회 회피.';
+        eff = { effect: 'b_mix', dark: 3, heal: 40, smash: 2 };
+        desc = '어둠 탐사 3회 · 오염도 40% 회복 · 매 탐사마다 기믹 2회 파훼.';
     }
 
     ITEM_CATALOG[nm] = Object.assign({
@@ -285,6 +285,10 @@ function rollBirthItem(parentA, parentB) {
         if (cat.guard) { if (typeof nAdd === 'function') nAdd('c_pain', cat.guard); msg.push(`치명 방어 ${cat.guard}회`); }
         if (cat.reroll) { if (typeof nAdd === 'function') nAdd('c_reroll', cat.reroll); msg.push(`재굴림 ${cat.reroll}회`); }
         if (cat.hide) { if (typeof nAdd === 'function') nAdd('no_mark', cat.hide); msg.push(`지목 회피 ${cat.hide}회`); }
+                if (cat.smash) {
+            currentUser.dnaSmash = (currentUser.dnaSmash || 0) + cat.smash;
+            msg.push(`매 탐사 기믹 파훼 ${cat.smash}회`);
+        }
 
         removeItemFromInventory(currentUser, itemName, 1);
         addHistoryLog(currentUser, `[출산품] ${itemName} 사용`);
