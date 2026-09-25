@@ -199,4 +199,4 @@ epicSlot('road', 'merchant').push(
         dieText:`값을 부르면 흥정이 성립한다.<br><br>성립한 흥정은 사야 끝난다.<br>안개 위에 자국이 둘이 됐다.` },
       good:`입을 열다가 다물었다.<br><br>값을 되받으면 흥정이 성립한다. 성립하면 사야 끝난다.<br>사려면 건너야 한다.<br><br>안 불렀다. 값을 듣고도 아무 말 안 했다.`, flag:'didntCounterOffer' }
   ] }
-);
+); 
