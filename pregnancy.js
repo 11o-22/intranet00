@@ -289,12 +289,19 @@ function rejectPregAsk() {
 (function showMyRate() {
     function put() {
         const panel = document.getElementById('rec-badge');
-        if (!panel || !currentUser || document.getElementById('preg-rate-box')) return;
+               if (!panel || !currentUser) return;
+        const r0 = myRates(currentUser);
+        const key = dnaOf(currentUser) + '|' + r0.sire + '|' + r0.bear;
+        const old = document.getElementById('preg-rate-box');
+        if (old) {
+            if (old.dataset.key === key) return;
+            old.remove();
+        }
         const btn = panel.querySelector('button[onclick*="saveBadgeInfo"]');
         if (!btn) return;
         const r = myRates(currentUser);
         btn.insertAdjacentHTML('beforebegin', `
-            <div id="preg-rate-box" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">
+           <div id="preg-rate-box" data-key="${key}" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">
                 <div style="font-size:10px; color:#c9a8ff; letter-spacing:1px; margin-bottom:4px;">[생체 기록]</div>
                 DNA <b style="font-family:monospace; color:#4fc3f7;">${dnaOf(currentUser)}</b><br>
                 ${r.sire !== null ? `임신시킬 확률 <b style="color:#ffd700;">${r.sire}%</b><br>` : ''}
@@ -310,8 +317,6 @@ function rejectPregAsk() {
         const _u = updateUI;
         updateUI = function () {
             const r = _u.apply(this, arguments);
-            const box = document.getElementById('preg-rate-box');
-            if (box) box.remove();
             setTimeout(put, 40);
             return r;
         };
