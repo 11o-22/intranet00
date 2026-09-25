@@ -75,8 +75,6 @@ const FRAMES = [
 .fr-wrap {
     position:relative;
     border-radius:7px;
-    outline:1px solid rgba(0,0,0,0.6);
-    outline-offset:0;
     isolation:isolate;
 }
 
