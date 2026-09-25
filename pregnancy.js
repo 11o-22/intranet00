@@ -4,6 +4,7 @@
 // ==========================================
 
 const PREG_HOURS = 48;            // 이틀 뒤 출산
+const PREG_CARE_DAILY = 8;        // 하루 돌봄 횟수
 const PREG_MAX_SIRES = 5;         // 한 명이 받을 수 있는 최대 인원
 const PREG_COST_MAX = 3000;       // 포인트로 낼 때 상한
 
@@ -127,10 +128,12 @@ function addPregBtn(code) {
         </div>`;
         if (isMySire(t)) {
             const last = (p.careAt || {})[currentUser.code] || 0;
-            const ok = Date.now() - last >= 6 * 3600000;
-            const nx = Math.max(0, Math.ceil((last + 6 * 3600000 - Date.now()) / 60000));
+            const gap = (typeof CARE_GAP !== 'undefined') ? CARE_GAP : 3600000;
+            const dayLeft = (typeof careLeftToday === 'function') ? careLeftToday(p) : 8;
+            const ok = Date.now() - last >= gap && dayLeft > 0;
+            const nx = Math.max(0, Math.ceil((last + gap - Date.now()) / 60000));
             html += `<button class="game-btn" style="width:100%; margin-top:8px; padding:11px; ${ok ? 'background:linear-gradient(145deg,#c2185b,#880e4f) !important; border-color:#e91e63 !important; color:#fff !important;' : 'opacity:0.4;'}" onclick="openCarePanel('${code}')" ${ok ? '' : 'disabled'}>
-                ${ok ? '🤍 돌본다' : `다음 돌봄까지 ${nx}분`}
+                ${ok ? `🤍 돌본다 <span style="font-size:10px; color:#ffd76a;">(오늘 ${dayLeft}회 남음)</span>` : (dayLeft <= 0 ? '오늘은 다 돌봤습니다' : `다음 돌봄까지 ${nx}분`)}
             </button>`;
         }
     }
@@ -176,11 +179,12 @@ function doPregnancy(code) {
     const t = db.users[code];
     if (!t) return;
 
+    const sure = hasSureBear(t);                   // 딸기맛 물약 — 한 번에 된다
     const myR = roleFlipped(currentUser) ? sireRateAlt(currentUser) : sireRate(currentUser);
     const tR = roleFlipped(t) ? bearRateAlt(t) : bearRate(t);
     const chance = (myR / 100) * (tR / 100) * 6;   // 합산 보정
 
-    const ok = Math.random() < chance;
+    const ok = sure || Math.random() < chance;
 
     if (!ok) {
         addHistoryLog(currentUser, `[시도] ${t.name} 사원 — 이번에는 되지 않았습니다.`);
@@ -206,7 +210,7 @@ function doPregnancy(code) {
     updateUI();
 
     pregBroadcast(`축! <b style="color:#ff8fb1;">${currentUser.name}</b> 사원이 <b style="color:#ff8fb1;">${t.name}</b> 사원을 임신시켰습니다! 하!`);
-    showCustomAlert(`성공했습니다.\n\n${t.name} 사원이 당신의 아이를 가졌습니다.\n${PREG_HOURS}시간 뒤에 나옵니다.\n\n6시간마다 돌보지 않으면 상담실로 이송됩니다.`);
+    showCustomAlert(`성공했습니다.${sure ? '\n(딸기맛 물약)' : ''}\n\n${t.name} 사원이 당신의 아이를 가졌습니다.\n${PREG_HOURS}시간 뒤에 나옵니다.\n\n하루 ${PREG_CARE_DAILY}번까지 돌볼 수 있습니다. (최소 1시간 간격)\n오래 방치하면 상담실로 이송됩니다.`);
     closeEmpDetailModal();
 }
 
@@ -289,19 +293,12 @@ function rejectPregAsk() {
 (function showMyRate() {
     function put() {
         const panel = document.getElementById('rec-badge');
-               if (!panel || !currentUser) return;
-        const r0 = myRates(currentUser);
-        const key = dnaOf(currentUser) + '|' + r0.sire + '|' + r0.bear;
-        const old = document.getElementById('preg-rate-box');
-        if (old) {
-            if (old.dataset.key === key) return;
-            old.remove();
-        }
+        if (!panel || !currentUser || document.getElementById('preg-rate-box')) return;
         const btn = panel.querySelector('button[onclick*="saveBadgeInfo"]');
         if (!btn) return;
         const r = myRates(currentUser);
         btn.insertAdjacentHTML('beforebegin', `
-           <div id="preg-rate-box" data-key="${key}" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">
+            <div id="preg-rate-box" style="background:rgba(0,0,0,0.28); border:1px solid #4a3a6a; border-radius:6px; padding:10px 12px; margin:11px 0; font-size:11px; line-height:1.9;">
                 <div style="font-size:10px; color:#c9a8ff; letter-spacing:1px; margin-bottom:4px;">[생체 기록]</div>
                 DNA <b style="font-family:monospace; color:#4fc3f7;">${dnaOf(currentUser)}</b><br>
                 ${r.sire !== null ? `임신시킬 확률 <b style="color:#ffd700;">${r.sire}%</b><br>` : ''}
@@ -317,6 +314,8 @@ function rejectPregAsk() {
         const _u = updateUI;
         updateUI = function () {
             const r = _u.apply(this, arguments);
+            const box = document.getElementById('preg-rate-box');
+            if (box) box.remove();
             setTimeout(put, 40);
             return r;
         };

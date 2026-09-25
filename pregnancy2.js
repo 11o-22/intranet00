@@ -3,8 +3,32 @@
 // index.html 에서 pregnancy.js 다음에 불러온다
 // ==========================================
 
-const CARE_GAP = 6 * 3600000;      // 6시간
+const CARE_GAP = 1 * 3600000;      // 최소 1시간 간격
 const CARE_GRACE = 30 * 60000;     // 30분 유예
+const NEGLECT_GAP = 6 * 3600000;   // 이만큼 안 돌보면 방치
+
+// 오늘 돌본 횟수 / 남은 횟수
+function careDayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+function careUsedToday(p) {
+    if (!p || !p.careDay) return 0;
+    const v = p.careDay[currentUser.code];
+    if (!v || v.d !== careDayKey()) return 0;
+    return v.n || 0;
+}
+function careLeftToday(p) {
+    const cap = (typeof PREG_CARE_DAILY !== 'undefined') ? PREG_CARE_DAILY : 8;
+    return Math.max(0, cap - careUsedToday(p));
+}
+function careAddToday(p, n) {
+    if (!p.careDay) p.careDay = {};
+    const k = careDayKey();
+    const v = p.careDay[currentUser.code];
+    if (!v || v.d !== k) p.careDay[currentUser.code] = { d: k, n: n };
+    else v.n = (v.n || 0) + n;
+}
 
 // ==========================================
 // 돌봄 화면
@@ -19,6 +43,11 @@ function openCarePanel(code) {
         showCustomAlert(`아직 이릅니다.\n${m}분 뒤에 다시 오세요.`);
         return;
     }
+    const left = careLeftToday(p);
+    if (left <= 0) {
+        showCustomAlert(`오늘은 다 돌봤습니다.\n\n하루 ${PREG_CARE_DAILY}번까지입니다.`);
+        return;
+    }
 
     const inv = currentUser.inventory || [];
     const owned = Object.keys(PREG_ITEMS).filter(n => inv.includes(n));
@@ -27,6 +56,7 @@ function openCarePanel(code) {
         <div style="font-size:11px; color:#aaa; line-height:1.8; margin-bottom:13px;">
             <b style="color:#ff8fb1;">${t.name}</b> 사원을 돌봅니다.<br>
             포인트를 쓰거나, 사택에서 산 물건을 쓸 수 있습니다.<br>
+            오늘 <b style="color:#ffd76a;">${left}회</b> 남았습니다. (하루 ${PREG_CARE_DAILY}회 · 최소 1시간 간격)<br>
             <span style="color:#ff9800;">6시간 안에 돌보지 않으면 당신이 상담실로 갑니다.</span>
         </div>
 
@@ -64,6 +94,9 @@ function doCare(code, cost, item) {
     if (!t || !isPregnant(t)) return;
     const p = pregOf(t);
 
+    const left = careLeftToday(p);
+    if (left <= 0) { showCustomAlert(`오늘은 다 돌봤습니다.\n\n하루 ${PREG_CARE_DAILY}번까지입니다.`); return; }
+
     let uses = 1;
     if (item) {
         if (!(currentUser.inventory || []).includes(item)) { showCustomAlert('그 물건이 없습니다.'); return; }
@@ -74,9 +107,11 @@ function doCare(code, cost, item) {
         currentUser.points -= cost;
         uses = cost >= 3000 ? 3 : cost >= 1200 ? 2 : 1;
     }
+    if (uses > left) uses = left;     // 하루 한도를 넘지 않는다
 
     if (!p.careAt) p.careAt = {};
     p.careAt[currentUser.code] = Date.now() + (uses - 1) * CARE_GAP;
+    careAddToday(p, uses);
     if (!p.careCount) p.careCount = {};
     p.careCount[currentUser.code] = (p.careCount[currentUser.code] || 0) + uses;
 
@@ -90,7 +125,7 @@ function doCare(code, cost, item) {
     saveFields({ points: 1, inventory: 1, history: 1 });
     closeGearModal();
     updateUI();
-    showCustomAlert(`${t.name} 사원을 돌봤습니다.\n\n다음 돌봄까지 ${uses * 6}시간입니다.`);
+    showCustomAlert(`${t.name} 사원을 돌봤습니다. (${uses}회분)\n\n다음 돌봄까지 ${uses}시간입니다.\n오늘 ${careLeftToday(p)}회 남았습니다.`);
 }
 
 // ==========================================
@@ -105,7 +140,7 @@ function checkPregNeglect() {
         (p.sires || []).forEach(function (s) {
             if (s.code !== currentUser.code) return;
             const last = (p.careAt || {})[currentUser.code] || s.at || 0;
-            if (Date.now() - last < CARE_GAP + CARE_GRACE) return;
+            if (Date.now() - last < NEGLECT_GAP + CARE_GRACE) return;
             if (currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil) return;
 
             currentUser.quarantineUntil = Date.now() + 3 * 3600000;
