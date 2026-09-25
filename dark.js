@@ -13034,6 +13034,7 @@ function watchDuelInvites() {
     if (!database || !currentUser) return;
     database.ref('duels').on('child_added', snap => {
         const d = snap.val();
+               if (!currentUser) return;
         if (!d || d.guest !== currentUser.code || d.state !== 'INVITE') return;
         if (Date.now() - d.createdAt > 60000) return;
         duelInvite = d;
