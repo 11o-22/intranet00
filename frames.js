@@ -72,7 +72,13 @@ const FRAMES = [
 @keyframes frWave { 0%,100%{box-shadow:inset 0 -6px 14px rgba(60,160,180,0.20);} 50%{box-shadow:inset 0 -14px 22px rgba(60,160,180,0.38);} }
 @keyframes frFlame { 0%,100%{box-shadow:0 0 12px rgba(255,180,60,0.35);} 50%{box-shadow:0 0 22px rgba(255,210,110,0.65);} }
 
-.fr-wrap { position:relative; border-radius:7px; }
+.fr-wrap {
+    position:relative;
+    border-radius:7px;
+    outline:1px solid rgba(0,0,0,0.6);
+    outline-offset:0;
+    isolation:isolate;
+}
 
 /* ===== S — ■■의 ■■■ ===== */
 @keyframes frSRing { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
@@ -83,7 +89,7 @@ const FRAMES = [
     position:relative;
     border:2px solid rgba(212,175,55,0.75) !important;
     border-radius:7px;
-    background-color:#0a0a08 !important;
+    background-color:#0a0a08;
     animation:frSPulse 3.8s ease-in-out infinite;
     overflow:hidden;
     isolation:isolate;
@@ -105,12 +111,30 @@ const FRAMES = [
 }
 .fr-s01 > * { position:relative; z-index:2; }
 `;
+    // 벽지(skin.js)가 background·border-color 를 !important 로 덮어쓴다.
+    // 같은 !important 끼리는 명시도가 먼저이므로, 벽지보다 높은 명시도로 깐다.
+    const FR_SCOPE = [
+        '',
+        'html body ',
+        'body[data-ui-skin] #app-container ',
+        'body[data-ui-skin] .modal-overlay ',
+        'body[data-ui-skin] #custom-alert-overlay ',
+        'body[data-ui-skin] #luxury-alert-overlay ',
+        'body[data-ui-skin] #vip-invite-overlay ',
+        'body[data-ui-skin] #fox-nameplate-overlay '
+    ];
+    function frBang(decl) {
+        return decl.split(';').map(s => s.trim()).filter(Boolean)
+            .map(d => /!important/.test(d) ? d : d + ' !important').join('; ') + ';';
+    }
     FRAMES.forEach(function (f) {
-              if (f.c) {
-            const body = f.c.replace(/;\s*/g, ' !important; ');
-            css += `.fr-${f.id}{ ${body} border-radius:7px !important; }\n`;
-        }
+        if (!f.c) return;
+        const sel = FR_SCOPE.map(p => `${p}.fr-${f.id}.fr-wrap`).join(',\n');
+        css += `${sel} { ${frBang(f.c)} border-radius:7px !important; }\n`;
     });
+    // S등급은 자체 규칙을 쓰므로 명시도만 올려 준다
+    css += FR_SCOPE.map(p => `${p}.fr-s01.fr-wrap`).join(',\n') +
+        ` { border:2px solid rgba(212,175,55,0.75) !important; background-color:#0a0a08 !important; }\n`;
     const st = document.createElement('style');
     st.id = 'frame-css';
     st.textContent = css;
@@ -145,7 +169,7 @@ function frDraw() {
 // 견본첩
 // ==========================================
 ITEM_CATALOG['테두리 견본첩'] = {
-    price: 100, usable: true, targetable: false, effect: 'frame_book',
+    price: 1200, usable: true, targetable: false, effect: 'frame_book',
     desc: '사원증에 두를 테두리가 한 장 들어 있다. 무엇이 나올지는 열어야 안다.'
 };
 if (typeof NO_SELL_ITEMS !== 'undefined') NO_SELL_ITEMS.push('테두리 견본첩');
@@ -195,7 +219,7 @@ function buyFrameBook() {
                         </div>
                     </div>
                     <button class="game-btn" style="margin:0; padding:9px 13px; font-size:12px; flex-shrink:0;" onclick="buyFrameBook()" ${left ? '' : 'disabled'}>
-                        ${left ? '100 P' : '품절'}
+                        ${left ? '1,200 P' : '품절'}
                     </button>
                 </div>
             </div>`);
@@ -282,7 +306,7 @@ function openFramePanel() {
                 return `
                 <div style="border:1px solid #3a3a3a; border-radius:6px; padding:9px 11px; margin-bottom:6px;">
                     <div style="display:flex; align-items:center; gap:9px; margin-bottom:7px;">
-                        <div class="fr-${f.id}" style="width:34px; height:34px; flex-shrink:0;"></div>
+                        <div class="fr-wrap fr-${f.id}" style="width:34px; height:34px; flex-shrink:0;"></div>
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:12px; color:#fff; font-weight:bold;">${f.n}</div>
                             <div style="font-size:10px; color:${FRAME_COLOR[f.g]};">${f.g}등급</div>
