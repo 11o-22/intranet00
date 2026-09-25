@@ -132,13 +132,11 @@ function closeInvConfirm() {
 (function hookRender() {
     if (typeof renderInventory !== 'function') return;
     const _r = renderInventory;
-    let tick = null;
     renderInventory = function () {
         const r = _r.apply(this, arguments);
-        clearTimeout(tick);
-        tick = setTimeout(function () {
-            try { decorateInv(); } catch (e) { console.warn('[소지품] 표식 실패:', e); }
-        }, 60);
+        // 반드시 같은 프레임 안에서 붙인다.
+        // setTimeout 을 쓰면 버튼 없는 화면이 한 번 그려지고, 그만큼 높이가 출렁인다.
+        try { decorateInv(); } catch (e) { console.warn('[소지품] 표식 실패:', e); }
         return r;
     };
 })();
