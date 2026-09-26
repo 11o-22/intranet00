@@ -90,7 +90,6 @@ ${sel} {
         border: none !important;
     border-radius: 7px !important;
         overflow: hidden !important;
-    background-color: ${f.bg} !important;
 }
 `;
         css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap > *:not(.fv-canvas)').join(',\n')
