@@ -62,6 +62,15 @@ const VIDEO_FRAMES = [
     pointer-events: none !important;
      z-index: 3 !important;
     border-radius: 6px;
+
+        -webkit-mask-image:
+        linear-gradient(to right, #000 0 16px, transparent 16px calc(100% - 16px), #000 calc(100% - 16px) 100%),
+        linear-gradient(to bottom, #000 0 12px, transparent 12px calc(100% - 12px), #000 calc(100% - 12px) 100%);
+    -webkit-mask-composite: source-over;
+    mask-image:
+        linear-gradient(to right, #000 0 16px, transparent 16px calc(100% - 16px), #000 calc(100% - 16px) 100%),
+        linear-gradient(to bottom, #000 0 12px, transparent 12px calc(100% - 12px), #000 calc(100% - 12px) 100%);
+    mask-composite: add;
 }
 `;
     VIDEO_FRAMES.forEach(function (f) {
