@@ -415,9 +415,11 @@ function resetDnaGifts(doIt) {
     });
 
     // 사번 순으로 줄 세운다 — 배정이 흔들리지 않게
+    // 사번과 무관하게 섞는다 — 인가 코드로 흩어 놓는다
+    // 같은 사람은 몇 번을 돌려도 같은 자리에 온다
+    real.forEach(function (x) { x.k = seedOf('shuffle|' + x.code); });
     real.sort(function (a, b) {
-        const na = String(a.u.no || '9999'), nb = String(b.u.no || '9999');
-        if (na !== nb) return na < nb ? -1 : 1;
+        if (a.k !== b.k) return a.k - b.k;
         return a.code < b.code ? -1 : 1;
     });
 
