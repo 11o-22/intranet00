@@ -69,12 +69,22 @@ function hasSureBear(user) {
     return !!user && hasPotion(user, '딸기맛 물약');
 }
 
-// 역할을 뒤집는 물약 셋
-const FLIP_POTIONS = ['우유맛 물약', '포도맛 물약', '망고맛 물약'];
-function hasFlipPotion(user) {
+// 남성에게 자궁을 주는 물약 — 하나라도 있으면 임신할 수 있다
+const BEAR_POTIONS = ['우유맛 물약', '포도맛 물약', '망고맛 물약'];
+// 여성에게서 임신 능력을 뺏는 물약 — 망고맛은 자궁 문신이라 해당 없다
+const UNBEAR_POTIONS = ['우유맛 물약', '포도맛 물약'];
+
+function hasBearPotion(user) {
     if (!user) return false;
-    return FLIP_POTIONS.some(n => hasPotion(user, n));
+    return BEAR_POTIONS.some(n => hasPotion(user, n));
 }
+function hasUnbearPotion(user) {
+    if (!user) return false;
+    return UNBEAR_POTIONS.some(n => hasPotion(user, n));
+}
+// 이전 이름 호환
+function hasFlipPotion(user) { return hasBearPotion(user); }
+const FLIP_POTIONS = BEAR_POTIONS;
 
 // 다이아 보지 플러그를 차고 있는가
 // 차고 있으면 새로 임신할 수 없다. 이미 임신한 것은 유지된다.
@@ -87,12 +97,13 @@ function hasVaginaPlug(user) {
 }
 
 // 임신할 수 있는 쪽
-// 남성 + 우유/포도/망고 중 하나  또는  여성 + 그 셋 다 없음
+//   남성 : 우유 · 포도 · 망고 중 하나라도 있으면 가능
+//   여성 : 우유 · 포도가 없으면 가능 (망고는 자궁 문신이라 막지 않는다)
 function canBear(user) {
     if (!user) return false;
     const g = genderOf(user);
-    if (g === '남성') return hasFlipPotion(user);
-    if (g === '여성') return !hasFlipPotion(user);
+    if (g === '남성') return hasBearPotion(user);
+    if (g === '여성') return !hasUnbearPotion(user);
     return false;                      // 성별 미지정은 해당 없음
 }
 
@@ -112,7 +123,8 @@ function canBearNow(user) {
 function roleFlipped(user) {
     const g = genderOf(user);
     if (!g) return false;
-    return hasFlipPotion(user);
+    if (g === '남성') return hasBearPotion(user);
+    return hasUnbearPotion(user);
 }
 
 // 화면에 보여 줄 확률 (본인 것만)
@@ -271,15 +283,95 @@ function buildAllDnaItems() {
 // ==========================================
 // 출산 추첨
 // ==========================================
-function rollBirthItem(parentA, parentB) {
-    // 부모의 고유 아이템 0.01%
-    [parentA, parentB].forEach(function (p) {
-        if (p) ensureDnaItem(p);
-    });
+// 아이템 등급 — 값이 클수록 좋은 것
+function birthTier(it) {
+    if (it.e === 'b_mix') return 3;                                  // 복합
+    if (it.e === 'b_point') return it.v >= 1500 ? 3 : it.v >= 800 ? 2 : 1;
+    if (it.e === 'heal')    return it.v >= 25 ? 3 : it.v >= 15 ? 2 : 1;
+    if (it.e === 'b_blind') return it.v >= 5 ? 3 : it.v >= 3 ? 2 : 1;
+    if (it.e === 'b_luck')  return (it.mult === 3 || it.v >= 3) ? 3 : 2;
+    if (it.e === 'b_ticket')return it.v >= 4 ? 3 : it.v >= 2 ? 2 : 1;
+    if (it.e === 'b_guard' || it.e === 'b_reroll') return 3;
+    if (it.e === 'b_bonus') return it.v >= 3 ? 3 : it.v >= 2 ? 2 : 1;
+    if (it.e === 'b_hide')  return 2;
+    if (it.e === 'b_dark')  return 2;
+    return 1;
+}
+
+// 돌봄을 얼마나 채웠는가 (0 ~ 1)
+// 이틀 동안 하루 8회씩, 총 16회가 만점
+function careFill(preg) {
+    if (!preg) return 0;
+    const total = Object.values(preg.careCount || {}).reduce((a, b) => a + b, 0);
+    const goal = (typeof PREG_CARE_DAILY !== 'undefined' ? PREG_CARE_DAILY : 8) * 2;
+    return Math.max(0, Math.min(1, total / goal));
+}
+
+// 출산 아이템 추첨
+// fill 0 → 지금까지와 같다
+// fill 1 → 상급이 훨씬 자주 나오고, 고유 아이템도 아주 조금 잘 나온다
+function rollBirthItem(parentA, parentB, fill) {
+    [parentA, parentB].forEach(function (p) { if (p) ensureDnaItem(p); });
+
+    const f = Math.max(0, Math.min(1, fill || 0));
+
+    // 고유 아이템 — 0.01% 에서 최대 0.04% 까지만
+    const dnaRate = 0.0001 * (1 + f * 3);
     const r = Math.random();
-    if (r < 0.0001 && parentA) return dnaItemName(parentA);
-    if (r < 0.0002 && parentB) return dnaItemName(parentB);
-    return BIRTH_ITEMS[Math.floor(Math.random() * BIRTH_ITEMS.length)].n;
+    if (r < dnaRate && parentA) return dnaItemName(parentA);
+    if (r < dnaRate * 2 && parentB) return dnaItemName(parentB);
+
+    // 등급 가중치 — 다 채우면 상급이 여섯 배쯤 잘 나온다
+    const W = {
+        1: 1 - f * 0.75,          // 1.00 → 0.25
+        2: 1 + f * 0.6,           // 1.00 → 1.60
+        3: 0.45 + f * 2.35        // 0.45 → 2.80
+    };
+
+    let total = 0;
+    const pool = BIRTH_ITEMS.map(function (it) {
+        const w = W[birthTier(it)] || 1;
+        total += w;
+        return { it: it, w: w };
+    });
+
+    let x = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+        x -= pool[i].w;
+        if (x <= 0) return pool[i].it.n;
+    }
+    return pool[pool.length - 1].it.n;
+}
+
+// 지금 가진 고유 아이템 전체 보기
+function listDnaItems() {
+    const rows = Object.keys(db.users || {}).map(function (c) {
+        const u = db.users[c];
+        if (!u || c === 'kario0987') return null;
+        const nm = ensureDnaItem(u);
+        const cat = ITEM_CATALOG[nm] || {};
+        const eff = [];
+        if (cat.effect === 'heal') eff.push('오염도 -' + cat.value + '%');
+        if (cat.heal) eff.push('오염도 -' + cat.heal + '%');
+        if (cat.point) eff.push(cat.point.toLocaleString() + ' P');
+        if (cat.ticket) eff.push('공용시설 +' + cat.ticket + '회');
+        if (cat.dark) eff.push('어둠 탐사 +' + cat.dark + '회');
+        if (cat.bonus) eff.push('판정 +' + cat.bonus);
+        if (cat.guard) eff.push('치명 방어 ' + cat.guard + '회');
+        if (cat.reroll) eff.push('재굴림 ' + cat.reroll + '회');
+        if (cat.hide) eff.push('지목 회피 ' + cat.hide + '회');
+        if (cat.luck) eff.push(cat.luck + '시간 행운 세 배');
+        return {
+            사원: u.name, 사번: u.no, DNA: dnaOf(u),
+            아이템: nm.split(' · ')[0],
+            성능: eff.join(' · ')
+        };
+    }).filter(Boolean);
+
+    console.log('%c===== 유전자 고유 아이템 (' + rows.length + '명) =====', 'color:#c9a8ff; font-size:13px');
+    console.table(rows);
+    console.log('출현 확률: 기본 0.01% · 돌봄 16회를 다 채우면 0.04%');
+    return rows;
 }
 
 // ==========================================
