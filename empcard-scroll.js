@@ -49,27 +49,21 @@
                 const box = document.getElementById('emp-detail-card-container');
                 if (box) box.scrollTop = 0;
             }, 80);
+            setTimeout(addHint, 220);
             return r;
         };
     }
 
-    // 임신 버튼이 붙고 나면 거기까지 보이게 한 번 알려 준다
-    if (typeof addPregBtn === 'function') {
-        const _a = addPregBtn;
-        addPregBtn = function () {
-            const r = _a.apply(this, arguments);
-            setTimeout(function () {
-                const box = document.getElementById('emp-detail-card-container');
-                const btn = document.getElementById('preg-btn-box');
-                if (!box || !btn) return;
-                if (box.scrollHeight <= box.clientHeight) return;   // 스크롤 없으면 그만
-
-                if (document.getElementById('preg-scroll-hint')) return;
-                btn.insertAdjacentHTML('beforebegin',
-                    `<div id="preg-scroll-hint" style="text-align:center; font-size:10px; color:#888; margin-top:10px;">▾ 아래에 더 있습니다</div>`);
-            }, 120);
-            return r;
-        };
+    // 아래에 더 있다는 표시
+    // addPregBtn 은 감싸지 않는다. 감싸면 원본을 못 읽어 점검이 어긋난다.
+    function addHint() {
+        const box = document.getElementById('emp-detail-card-container');
+        const btn = document.getElementById('preg-btn-box');
+        if (!box || !btn) return;
+        if (box.scrollHeight <= box.clientHeight) return;   // 스크롤 없으면 그만
+        if (document.getElementById('preg-scroll-hint')) return;
+        btn.insertAdjacentHTML('beforebegin',
+            `<div id="preg-scroll-hint" style="text-align:center; font-size:10px; color:#888; margin-top:10px;">▾ 아래에 더 있습니다</div>`);
     }
 
     console.log('[사원 카드] 스크롤 보정 적용');
