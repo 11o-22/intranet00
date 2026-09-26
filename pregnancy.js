@@ -210,7 +210,7 @@ function doPregnancy(code) {
     updateUI();
 
     pregBroadcast(`축! <b style="color:#ff8fb1;">${currentUser.name}</b> 사원이 <b style="color:#ff8fb1;">${t.name}</b> 사원을 임신시켰습니다! 하!`);
-    showCustomAlert(`성공했습니다.${sure ? '\n(딸기맛 물약)' : ''}\n\n${t.name} 사원이 당신의 아이를 가졌습니다.\n${PREG_HOURS}시간 뒤에 나옵니다.\n\n하루 ${PREG_CARE_DAILY}번까지 돌볼 수 있습니다. (최소 1시간 간격)\n오래 방치하면 상담실로 이송됩니다.`);
+    showCustomAlert(`성공했습니다.${sure ? '\n(딸기맛 물약)' : ''}\n\n${t.name} 사원이 당신의 아이를 가졌습니다.\n${PREG_HOURS}시간 뒤에 나옵니다.\n\n하루 ${PREG_CARE_DAILY}번까지 돌볼 수 있습니다. (최소 1시간 간격)\n8시간 넘게 방치하면 상담실로 이송됩니다.\n(자정부터 오전 10시까지는 세지 않습니다.)`);
     closeEmpDetailModal();
 }
 

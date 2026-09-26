@@ -5,7 +5,8 @@
 
 const CARE_GAP = 1 * 3600000;      // 최소 1시간 간격
 const CARE_GRACE = 30 * 60000;     // 30분 유예
-const NEGLECT_GAP = 6 * 3600000;   // 이만큼 안 돌보면 방치
+const NEGLECT_HOURS = 8;           // 이만큼 안 돌보면 방치 (밤 시간 제외)
+const NIGHT_END_HOUR = 10;         // 자정~이 시각까지는 안 센다
 
 // 오늘 돌본 횟수 / 남은 횟수
 function careDayKey() {
@@ -129,10 +130,36 @@ function doCare(code, cost, item) {
 }
 
 // ==========================================
-// 방치 감시 — 아버지가 상담실로
+// 방치 감시 — 8시간 (자정~오전 10시 제외)
 // ==========================================
+// 자정~오전 10시는 안 센다. 그 시간을 뺀 실제 경과를 구한다.
+function awakeMs(from, to) {
+    if (!from || to <= from) return 0;
+    let total = 0;
+    let cur = from;
+    let guard = 0;
+    while (cur < to && guard++ < 400) {
+        const d = new Date(cur);
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const wake = dayStart + NIGHT_END_HOUR * 3600000;   // 그날 오전 10시
+        const nextDay = dayStart + 24 * 3600000;
+        const segEnd = Math.min(to, nextDay);
+        const segStart = Math.max(cur, wake);
+        if (segEnd > segStart) total += segEnd - segStart;
+        cur = nextDay;
+    }
+    return total;
+}
+
+// 지금이 안 세는 시간대인가
+function inNightWindow(t) {
+    return new Date(t || Date.now()).getHours() < NIGHT_END_HOUR;
+}
+
 function checkPregNeglect() {
     if (!currentUser || !database) return;
+    if (inNightWindow()) return;                 // 자정~오전 10시는 넘어간다
+
     Object.keys(db.users || {}).forEach(function (c) {
         const u = db.users[c];
         if (!u || !isPregnant(u)) return;
@@ -140,7 +167,8 @@ function checkPregNeglect() {
         (p.sires || []).forEach(function (s) {
             if (s.code !== currentUser.code) return;
             const last = (p.careAt || {})[currentUser.code] || s.at || 0;
-            if (Date.now() - last < NEGLECT_GAP + CARE_GRACE) return;
+            if (!last) return;
+            if (awakeMs(last, Date.now()) < NEGLECT_HOURS * 3600000) return;
             if (currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil) return;
 
             currentUser.quarantineUntil = Date.now() + 3 * 3600000;
@@ -155,7 +183,7 @@ function checkPregNeglect() {
             updateUserFields(c, { preg: p });
             saveFields({ quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, history: 1 });
             updateUI();
-            showCustomAlert(`${u.name} 사원을 오래 돌보지 않았습니다.\n\n상담실로 이송됩니다. (3시간)`);
+            showCustomAlert(`${u.name} 사원을 ${NEGLECT_HOURS}시간 넘게 돌보지 않았습니다.\n\n상담실로 이송됩니다. (3시간)`);
         });
     });
 }
