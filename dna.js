@@ -232,53 +232,7 @@ BIRTH_ITEMS.forEach(function (b) {
 // ==========================================
 // 고유 DNA 아이템 — 사원마다 하나, 자동 생성
 // ==========================================
-const DNA_PREFIX = ['잊힌','첫','마지막','이름 없는','물려받은','닳지 않는','되돌아온','두 번 접힌','세어지지 않는','꺼지지 않는'];
-const DNA_NOUN   = ['맥박','숨결','핏줄','뼈','홍채','목소리','체온','그림자','지문','심장'];
-
-function dnaItemName(user) {
-    const s = seedOf('dnaItem|' + user.code);
-    const p = DNA_PREFIX[Math.floor(seedRand(s, 11) * DNA_PREFIX.length)];
-    const n = DNA_NOUN[Math.floor(seedRand(s, 12) * DNA_NOUN.length)];
-    return `${p} ${n} · ${dnaOf(user)}`;
-}
-
-function ensureDnaItem(user) {
-    if (!user) return null;
-    const nm = dnaItemName(user);
-    if (ITEM_CATALOG[nm]) return nm;
-    const s = seedOf('dnaEff|' + user.code);
-    const kind = Math.floor(seedRand(s, 21) * 4);
-
-    let eff, desc;
-    if (kind === 0) {
-        eff = { effect: 'heal', value: 60 };
-        desc = '오염도 60% 회복.';
-    } else if (kind === 1) {
-        eff = { effect: 'b_mix', bonus: 5, guard: 1, reroll: 2 };
-        desc = '다음 탐사 판정에 +5 · 치명적 상황 1회 방어 · 재굴림 2회.';
-    } else if (kind === 2) {
-        eff = { effect: 'b_mix', ticket: 8, luck: 6, point: 5000 };
-        desc = '공용시설 8회 · 6시간 행운 세 배 · 5,000 P.';
-    } else {
-        eff = { effect: 'b_mix', dark: 3, heal: 40, hide: 2 };
-        desc = '어둠 탐사 3회 · 오염도 40% 회복 · 지목 2회 회피.';
-    }
-
-    ITEM_CATALOG[nm] = Object.assign({
-        price: 30000, usable: true, targetable: false, birth: true, dnaOwner: user.code,
-        desc: `[고유] ${user.name} 사원의 것. ${desc}`
-    }, eff);
-    if (typeof NO_SELL_ITEMS !== 'undefined' && !NO_SELL_ITEMS.includes(nm)) NO_SELL_ITEMS.push(nm);
-    return nm;
-}
-
-// 접속 중인 전원의 고유 아이템을 미리 만들어 둔다
-function buildAllDnaItems() {
-    Object.keys(db.users || {}).forEach(function (c) {
-        const u = db.users[c];
-        if (u && u.code !== 'kario0987') ensureDnaItem(u);
-    });
-}
+// ★ 고유 아이템 이름·효과는 dna-gifts.js 에서 정의한다
 
 // ==========================================
 // 출산 추첨
@@ -341,37 +295,6 @@ function rollBirthItem(parentA, parentB, fill) {
         if (x <= 0) return pool[i].it.n;
     }
     return pool[pool.length - 1].it.n;
-}
-
-// 지금 가진 고유 아이템 전체 보기
-function listDnaItems() {
-    const rows = Object.keys(db.users || {}).map(function (c) {
-        const u = db.users[c];
-        if (!u || c === 'kario0987') return null;
-        const nm = ensureDnaItem(u);
-        const cat = ITEM_CATALOG[nm] || {};
-        const eff = [];
-        if (cat.effect === 'heal') eff.push('오염도 -' + cat.value + '%');
-        if (cat.heal) eff.push('오염도 -' + cat.heal + '%');
-        if (cat.point) eff.push(cat.point.toLocaleString() + ' P');
-        if (cat.ticket) eff.push('공용시설 +' + cat.ticket + '회');
-        if (cat.dark) eff.push('어둠 탐사 +' + cat.dark + '회');
-        if (cat.bonus) eff.push('판정 +' + cat.bonus);
-        if (cat.guard) eff.push('치명 방어 ' + cat.guard + '회');
-        if (cat.reroll) eff.push('재굴림 ' + cat.reroll + '회');
-        if (cat.hide) eff.push('지목 회피 ' + cat.hide + '회');
-        if (cat.luck) eff.push(cat.luck + '시간 행운 세 배');
-        return {
-            사원: u.name, 사번: u.no, DNA: dnaOf(u),
-            아이템: nm.split(' · ')[0],
-            성능: eff.join(' · ')
-        };
-    }).filter(Boolean);
-
-    console.log('%c===== 유전자 고유 아이템 (' + rows.length + '명) =====', 'color:#c9a8ff; font-size:13px');
-    console.table(rows);
-    console.log('출현 확률: 기본 0.01% · 돌봄 16회를 다 채우면 0.04%');
-    return rows;
 }
 
 // ==========================================
@@ -456,5 +379,4 @@ function listDnaItems() {
     };
 })();
 
-setTimeout(buildAllDnaItems, 2000);
 console.log('[DNA] 출산 아이템 70종 등록');
