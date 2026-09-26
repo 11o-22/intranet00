@@ -1302,6 +1302,10 @@ function renderS003SScene(n) {
     if (!sc) { partyAdvance(darkRun.step + 1); return; }
     darkRun.solo = true;
 
+    if (database && darkRun.partyId) {
+    database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set(true);
+}
+
     renderChoiceStep(sc.title,
         sc.text + `<br><br><span style="color:#888; font-size:11px;">${sc.hint}</span>`,
         sc.opts.map((o, i) => ({ id: 'o' + i, label: o.l, fn: 's003SPick', arg: `${n}${g}${i}` })),

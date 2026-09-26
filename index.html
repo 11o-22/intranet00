@@ -2911,10 +2911,13 @@ function renderAdvanceWait(nextStep) {
     ref.on('value', snap => { lastGot = snap.val() || {}; check(); });
     poll = setInterval(check, 3000);   // 누가 끊겨 인원이 줄어도 다시 센다
 
-    if (!darkRun.solo) {
-        database.ref(`darkParties/${pid}/curStep`).once('value').then(sn => {
-            const cur = sn.val();
-        if (cur != null && cur > nextStep) go();
+       if (!darkRun.solo && !darkRun.taken) {
+        database.ref(`darkParties/${pid}/solo/${currentUser.code}`).once('value').then(sn => {
+            if (sn.val()) return;          // 서버가 나를 혼자로 보면 따라가지 않는다
+            return database.ref(`darkParties/${pid}/curStep`).once('value').then(s2 => {
+                const cur = s2.val();
+                if (cur != null && cur > nextStep) go();
+            });
         });
     }
 
