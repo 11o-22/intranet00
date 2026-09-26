@@ -7,7 +7,7 @@
 // 상담사에게 육아휴직을 신청해 허가를 받아야 쓸 수 있게 한다.
 
 // 허가가 필요한 물건 — 6회분 이상
-const LEAVE_MIN_CARE = 6;
+const LEAVE_MIN_CARE = 2;
 
 function needsLeave(itemName) {
     const it = (typeof PREG_ITEMS !== 'undefined') ? PREG_ITEMS[itemName] : null;
@@ -119,7 +119,7 @@ function addLeaveBox(code) {
             <div style="font-size:12px; color:#81c784; font-weight:bold; margin-bottom:7px;">육아휴직 승인됨</div>
             <div style="font-size:10px; color:#888; margin-bottom:8px; line-height:1.7;">
                 남은 사용 <b style="color:#4CAF50;">${left}회</b><br>
-                ${big.length ? '아래 물건을 쓸 수 있습니다.' : '아홉 회분 물건이 없습니다.'}
+                ${big.length ? '아래 물건을 쓸 수 있습니다.' : '여러 회분 물건이 없습니다.'}
             </div>
             ${big.map(n => `
                 <button class="game-btn" style="width:100%; margin:0 0 5px 0; padding:9px; font-size:11px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="doCare('${code}', 0, '${n}')">
@@ -280,7 +280,7 @@ function pregLeaveDecide(code, uses) {
             <div class="admin-panel-box" id="admin-leave-box" style="border-color:#c2185b; background-color:#1f1015;">
                 <h4 style="color:#ff8fb1;">🍼 육아휴직 심사</h4>
                 <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
-                    아홉 회분 물건('밤새 켜 둔 등')을 쓰려면 허가가 필요합니다.<br>
+                    여러 회분 물건('밤새 켜 둔 등')을 쓰려면 허가가 필요합니다.<br>
                     승인 횟수만큼 쓸 수 있고, 다 쓰면 다시 신청해야 합니다.
                 </div>
                 <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:9px;" onclick="renderPregLeaveList()">새로고침</button>
