@@ -21,8 +21,28 @@ function gearGradeList() {
 }
 
 // ==========================================
-// 한 단계 내린다
+// 뒤쪽 자리부터 깎는다
 // ==========================================
+//
+// 속성이 셋이면 세 번째부터 한 단계씩 내려간다.
+// D 에서 한 번 더 맞으면 그 자리가 사라진다.
+// 자리가 다 없어지고 본체가 D 에서 맞으면 부서진다.
+
+function gearAttrGradeOf(g, key, idx) {
+    if (idx === 0) return g.grade;
+    if (typeof gearAttrGrade === 'function') {
+        try { return gearAttrGrade(g, key); } catch (e) { /* 무시 */ }
+    }
+    return (g.attrGrades && g.attrGrades[key]) || g.grade;
+}
+
+function gearAttrName(key) {
+    if (typeof GEAR_ATTRS !== 'undefined' && GEAR_ATTRS[key]) {
+        return GEAR_ATTRS[key].icon + ' ' + GEAR_ATTRS[key].name;
+    }
+    return key;
+}
+
 function breakGear(why, rate) {
     if (!currentUser || !darkRun) return false;
     if (typeof getGear !== 'function') return false;
@@ -41,35 +61,78 @@ function breakGear(why, rate) {
         return false;
     }
 
-    const G = gearGradeList();
-    const i = G.indexOf(g.grade);
+        const G = gearGradeList();
+    const attrs = g.attrs || [];
 
-    // D 아래는 없다 — 부서진다
-    if (i <= 0) {
-        const nm = g.name;
-        currentUser.soulGear = null;
-        currentUser.gearBroken = false;
-        addHistoryLog(currentUser, '[장비 파손] ' + nm + '이(가) 부서져 사라졌습니다. (' + why + ')');
-        darkRun.log.push('[장비] ' + nm + ' 소실 — ' + why);
+    // L 등급은 상하지 않는다
+    const lv = attrs.length ? gearAttrGradeOf(g, attrs[attrs.length - 1], attrs.length - 1) : g.grade;
+    if (lv === 'L') {
+        darkRun.log.push('[장비] L등급은 상하지 않는다 — ' + why);
+        if (typeof showDarkToast === 'function') showDarkToast('◈ 흠집조차 안 난다.');
+        return false;
+    }
+    
+
+    // 맨 뒤 자리부터 본다
+    const idx = Math.max(0, attrs.length - 1);
+    const key = attrs[idx];
+    const cur = gearAttrGradeOf(g, key, idx);
+    const pos = G.indexOf(cur);
+
+    // --- 두 번째 이후 자리 ---
+    if (idx > 0) {
+        if (pos > 0) {
+            // 한 단계 내린다
+            if (!g.attrGrades) g.attrGrades = {};
+            g.attrGrades[key] = G[pos - 1];
+            currentUser.gearBroken = true;
+            const msg = gearAttrName(key) + ' ' + cur + ' → ' + G[pos - 1];
+            addHistoryLog(currentUser, '[장비 손상] ' + g.name + ' · ' + msg + ' (' + why + ')');
+            darkRun.log.push('[장비] ' + msg + ' — ' + why);
+            saveSelfFull();
+            if (typeof showDarkToast === 'function') showDarkToast('✗ ' + msg);
+            return true;
+        }
+        // D 에서 또 맞으면 그 자리가 사라진다
+        const nm = gearAttrName(key);
+        attrs.splice(idx, 1);
+        if (g.attrGrades) delete g.attrGrades[key];
+        g.slots = Math.max(1, (g.slots || 1) - 1);
+        currentUser.gearBroken = true;
+        addHistoryLog(currentUser, '[장비 손상] ' + g.name + ' 의 ' + nm + ' 자리가 닫혔습니다. (' + why + ')');
+        darkRun.log.push('[장비] ' + nm + ' 자리 소실 — ' + why);
         saveSelfFull();
-
-        if (typeof showDarkToast === 'function') showDarkToast('✗ ' + nm + ' 이(가) 부서졌다.');
+        if (typeof showDarkToast === 'function') showDarkToast('✗ ' + nm + ' 자리가 닫혔다.');
         setTimeout(function () {
-            showCustomAlert(nm + '이(가) 부서졌습니다.\n\n' + why + '\n\n조각도 남지 않았습니다.');
+            showCustomAlert(g.name + '\n\n' + nm + ' 자리가 닫혔습니다.\n' + why
+                + '\n\n남은 자리 ' + attrs.length + '개');
         }, 400);
         return true;
     }
 
-    const before = g.grade;
-    g.grade = G[i - 1];
-    currentUser.gearBroken = true;
-    addHistoryLog(currentUser, '[장비 손상] ' + g.name + ' ' + before + ' → ' + g.grade + ' (' + why + ')');
-    darkRun.log.push('[장비] ' + before + ' → ' + g.grade + ' — ' + why);
-    saveSelfFull();
-
-    if (typeof showDarkToast === 'function') {
-        showDarkToast('✗ ' + g.name + ' ' + before + ' → ' + g.grade);
+    // --- 첫 자리 = 본체 등급 ---
+    if (pos > 0) {
+        const before = g.grade;
+        g.grade = G[pos - 1];
+        currentUser.gearBroken = true;
+        addHistoryLog(currentUser, '[장비 손상] ' + g.name + ' ' + before + ' → ' + g.grade + ' (' + why + ')');
+        darkRun.log.push('[장비] ' + before + ' → ' + g.grade + ' — ' + why);
+        saveSelfFull();
+        if (typeof showDarkToast === 'function') showDarkToast('✗ ' + g.name + ' ' + before + ' → ' + g.grade);
+        return true;
     }
+
+    // D 에서 또 맞으면 부서진다
+    const nm = g.name;
+    currentUser.soulGear = null;
+    currentUser.gearBroken = false;
+    addHistoryLog(currentUser, '[장비 파손] ' + nm + '이(가) 부서져 사라졌습니다. (' + why + ')');
+    darkRun.log.push('[장비] ' + nm + ' 소실 — ' + why);
+    saveSelfFull();
+    if (typeof showDarkToast === 'function') showDarkToast('✗ ' + nm + ' 이(가) 부서졌다.');
+    setTimeout(function () {
+        showCustomAlert(nm + '이(가) 부서졌습니다.\n\n' + why + '\n\n조각도 남지 않았습니다.');
+    }, 400);
     return true;
 }
 
@@ -157,17 +220,25 @@ function breakGear(why, rate) {
 function gearBreakState() {
     console.log('%c===== 전용 장비 파손 =====', 'color:#e53935; font-size:13px');
     const g = (typeof getGear === 'function') ? getGear(currentUser) : null;
-    if (!g) { console.log('  전용 장비가 없습니다.'); }
+    if (!g) console.log('  전용 장비가 없습니다.');
     else {
-        console.log('  ' + g.icon + ' ' + g.name + ' · ' + g.grade + '등급');
-        console.log('  손상 기록:', currentUser.gearBroken ? '있음 (재봉 도구로 복구 가능)' : '없음');
+        console.log('  ' + g.icon + ' ' + g.name + ' · 본체 ' + g.grade + '등급 · 자리 ' + (g.slots || 1) + '개');
+        const attrs = g.attrs || [];
+        if (!attrs.length) console.log('  속성 없음');
+        else console.table(attrs.map(function (k, i) {
+            return {
+                자리: i + 1,
+                속성: gearAttrName(k),
+                등급: gearAttrGradeOf(g, k, i),
+                깎이는순서: (attrs.length - i) + '번째'
+            };
+        }));
+        console.log('  다음에 맞을 자리:', attrs.length ? (attrs.length + '번 (' + gearAttrName(attrs[attrs.length - 1]) + ')') : '본체');
+        console.log('  손상 기록:', currentUser.gearBroken ? '있음 (재봉 도구로 복구)' : '없음');
         console.log('  보호권:', currentUser.gearProtect ? '있음' : '없음');
     }
-    console.log('  확률:');
-    console.log('    눈 1        ' + (GEAR_BREAK.fumble * 100) + '%');
-    console.log('    눈 3 이하   ' + (GEAR_BREAK.low * 100) + '%');
-    console.log('    죽음 회피   ' + (GEAR_BREAK.death * 100) + '%');
-    console.log('    기믹 파훼   ' + (GEAR_BREAK.gimmick * 100) + '%');
+    console.log('  확률: 눈1 ' + (GEAR_BREAK.fumble * 100) + '% · 눈3이하 ' + (GEAR_BREAK.low * 100)
+        + '% · 죽음회피 ' + (GEAR_BREAK.death * 100) + '% · 기믹 ' + (GEAR_BREAK.gimmick * 100) + '%');
     console.log('  연결:');
     ['luckReroll', 'darkDeath', 'jakduSmash', 'rubySmash'].forEach(function (n) {
         if (typeof window[n] !== 'function') { console.log('    (없음) ' + n); return; }
