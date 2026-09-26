@@ -1,477 +1,382 @@
 // ==========================================
-// ★ 유전자 고유 아이템 — 60종 (이름·성능 전부 다름)
-// index.html 에서 dna.js 다음에 불러온다
+// ★ DNA · 임신 아이템 70종
+// index.html 에서 invmark.js 다음에 불러온다
 // ==========================================
-//
-// 사원마다 하나씩, 이름도 성능도 겹치지 않는다.
-// 장착형이다. 차고 있는 동안만 힘이 돈다.
-//
-//   gim   기믹 파훼 (탐사당 N회)
-//   eva   판정 회피 (탐사당 N회)
-//   luck  행운 (탐사당 N회 — 나쁜 결과를 한 번 뒤집는다)
-//   death 즉사 회피 (탐사당 1회)
-//   pct   공용시설 행운 배율 (착용 중 영구)
-//   dark  어둠 탐사 횟수 (착용 중 영구)
-//   fac   공용시설 이용 횟수 (착용 중 영구)
 
-const DNA_GIFTS = [
-    { n:'별빛을 담은 구슬', e:{ death:1 }, d:'즉사 회피 1회' },
-    { n:'하늘색 조각 퍼즐', e:{ pct:500 }, d:'공용시설 행운 500%' },
-    { n:'반쯤 녹은 서리 꽃', e:{ fac:7, pct:300 }, d:'공용시설 행운 300% · 공용시설 +7회' },
-    { n:'잠들지 않는 등불', e:{ fac:8, pct:300 }, d:'공용시설 행운 300% · 공용시설 +8회' },
-    { n:'물결이 멈춘 유리병', e:{ dark:2, pct:300 }, d:'공용시설 행운 300% · 어둠 탐사 +2회' },
-    { n:'달을 삼킨 조개', e:{ luck:3, pct:300 }, d:'행운 3회 · 공용시설 행운 300%' },
-    { n:'첫눈이 남긴 실', e:{ luck:4, pct:300 }, d:'행운 4회 · 공용시설 행운 300%' },
-    { n:'빛이 고인 깃털', e:{ eva:3, pct:300 }, d:'회피 3회 · 공용시설 행운 300%' },
-    { n:'숨을 쉬는 모래시계', e:{ eva:4, pct:300 }, d:'회피 4회 · 공용시설 행운 300%' },
-    { n:'안개로 짠 손수건', e:{ gim:1, pct:300 }, d:'기믹 파훼 1회 · 공용시설 행운 300%' },
-    { n:'여덟 번 접힌 종이학', e:{ fac:6, pct:400 }, d:'공용시설 행운 400% · 공용시설 +6회' },
-    { n:'녹지 않는 얼음 열쇠', e:{ fac:7, pct:400 }, d:'공용시설 행운 400% · 공용시설 +7회' },
-    { n:'소리가 나지 않는 방울', e:{ dark:1, pct:400 }, d:'공용시설 행운 400% · 어둠 탐사 +1회' },
-    { n:'노을을 가둔 호박', e:{ luck:2, pct:400 }, d:'행운 2회 · 공용시설 행운 400%' },
-    { n:'뿌리 없는 유리 꽃', e:{ luck:3, pct:400 }, d:'행운 3회 · 공용시설 행운 400%' },
-    { n:'밤을 적신 리본', e:{ eva:2, pct:400 }, d:'회피 2회 · 공용시설 행운 400%' },
-    { n:'그림자가 없는 촛대', e:{ eva:3, pct:400 }, d:'회피 3회 · 공용시설 행운 400%' },
-    { n:'바람이 새긴 문양', e:{ gim:1, pct:400 }, d:'기믹 파훼 1회 · 공용시설 행운 400%' },
-    { n:'이슬이 굳은 목걸이', e:{ dark:3, gim:1 }, d:'기믹 파훼 1회 · 어둠 탐사 +3회' },
-    { n:'금이 가지 않는 거울 조각', e:{ gim:2, luck:2 }, d:'기믹 파훼 2회 · 행운 2회' },
-    { n:'별자리를 옮긴 지도', e:{ gim:2, luck:3 }, d:'기믹 파훼 2회 · 행운 3회' },
-    { n:'심장을 닮은 씨앗', e:{ gim:2, luck:4 }, d:'기믹 파훼 2회 · 행운 4회' },
-    { n:'잠긴 물의 반지', e:{ eva:2, gim:2 }, d:'기믹 파훼 2회 · 회피 2회' },
-    { n:'구름을 뜬 국자', e:{ eva:3, gim:2 }, d:'기믹 파훼 2회 · 회피 3회' },
-    { n:'불이 붙지 않는 성냥', e:{ eva:4, gim:2 }, d:'기믹 파훼 2회 · 회피 4회' },
-    { n:'눈을 감은 나침반', e:{ dark:1, gim:2 }, d:'기믹 파훼 2회 · 어둠 탐사 +1회' },
-    { n:'빗물로 만든 방울', e:{ dark:2, gim:2 }, d:'기믹 파훼 2회 · 어둠 탐사 +2회' },
-    { n:'시들지 않는 마른 잎', e:{ fac:6, gim:2 }, d:'기믹 파훼 2회 · 공용시설 +6회' },
-    { n:'온기가 남은 재', e:{ fac:7, gim:2 }, d:'기믹 파훼 2회 · 공용시설 +7회' },
-    { n:'파도가 놓고 간 열쇠', e:{ fac:8, gim:2 }, d:'기믹 파훼 2회 · 공용시설 +8회' },
-    { n:'천천히 도는 팽이', e:{ dark:2, eva:4 }, d:'회피 4회 · 어둠 탐사 +2회' },
-    { n:'깃털보다 가벼운 돌', e:{ dark:2, luck:4 }, d:'행운 4회 · 어둠 탐사 +2회' },
-    { n:'두 번 피는 꽃봉오리', e:{ dark:2, fac:8 }, d:'어둠 탐사 +2회 · 공용시설 +8회' },
-    { n:'이름이 지워진 부적', e:{ dark:3, eva:2 }, d:'회피 2회 · 어둠 탐사 +3회' },
-    { n:'빛을 먹는 수정', e:{ dark:3, eva:3 }, d:'회피 3회 · 어둠 탐사 +3회' },
-    { n:'흐르지 않는 모래', e:{ dark:3, eva:4 }, d:'회피 4회 · 어둠 탐사 +3회' },
-    { n:'메아리를 담은 잔', e:{ dark:3, luck:2 }, d:'행운 2회 · 어둠 탐사 +3회' },
-    { n:'서리로 쓴 편지', e:{ dark:3, luck:3 }, d:'행운 3회 · 어둠 탐사 +3회' },
-    { n:'꺼지지 않는 반딧불', e:{ dark:3, luck:4 }, d:'행운 4회 · 어둠 탐사 +3회' },
-    { n:'바늘 없는 나침반', e:{ dark:3, fac:6 }, d:'어둠 탐사 +3회 · 공용시설 +6회' },
-    { n:'무게가 없는 열매', e:{ dark:3, fac:7 }, d:'어둠 탐사 +3회 · 공용시설 +7회' },
-    { n:'은빛으로 굳은 물방울', e:{ dark:3, fac:8 }, d:'어둠 탐사 +3회 · 공용시설 +8회' },
-    { n:'하늘을 비춘 손거울', e:{ eva:3, fac:7, luck:2 }, d:'회피 3회 · 행운 2회 · 공용시설 +7회' },
-    { n:'뒤집히지 않는 모래시계', e:{ eva:4, fac:7, luck:2 }, d:'회피 4회 · 행운 2회 · 공용시설 +7회' },
-    { n:'달빛으로 뜬 실타래', e:{ eva:2, fac:7, luck:3 }, d:'회피 2회 · 행운 3회 · 공용시설 +7회' },
-    { n:'소리를 삼킨 종', e:{ eva:3, fac:7, luck:3 }, d:'회피 3회 · 행운 3회 · 공용시설 +7회' },
-    { n:'계절을 건너뛴 봉오리', e:{ eva:4, fac:7, luck:3 }, d:'회피 4회 · 행운 3회 · 공용시설 +7회' },
-    { n:'젖지 않는 종이배', e:{ eva:2, fac:7, luck:4 }, d:'회피 2회 · 행운 4회 · 공용시설 +7회' },
-    { n:'빛이 새는 조약돌', e:{ eva:3, fac:7, luck:4 }, d:'회피 3회 · 행운 4회 · 공용시설 +7회' },
-    { n:'닫히지 않는 작은 문', e:{ dark:2, gim:1, luck:2 }, d:'기믹 파훼 1회 · 행운 2회 · 어둠 탐사 +2회' },
-    { n:'별을 세던 주판', e:{ fac:7, gim:1, luck:2 }, d:'기믹 파훼 1회 · 행운 2회 · 공용시설 +7회' },
-    { n:'녹슬지 않는 나사', e:{ fac:8, gim:1, luck:2 }, d:'기믹 파훼 1회 · 행운 2회 · 공용시설 +8회' },
-    { n:'숨을 참은 풍선', e:{ eva:3, gim:1, luck:2 }, d:'기믹 파훼 1회 · 회피 3회 · 행운 2회' },
-    { n:'안개가 고인 병뚜껑', e:{ eva:4, gim:1, luck:2 }, d:'기믹 파훼 1회 · 회피 4회 · 행운 2회' },
-    { n:'빛으로 엮은 매듭', e:{ dark:1, gim:1, luck:3 }, d:'기믹 파훼 1회 · 행운 3회 · 어둠 탐사 +1회' },
-    { n:'돌아오지 않는 부메랑', e:{ dark:2, gim:1, luck:3 }, d:'기믹 파훼 1회 · 행운 3회 · 어둠 탐사 +2회' },
-    { n:'얼지 않는 샘물 한 방울', e:{ fac:6, gim:1, luck:3 }, d:'기믹 파훼 1회 · 행운 3회 · 공용시설 +6회' },
-    { n:'떨어지지 않는 낙엽', e:{ fac:7, gim:1, luck:3 }, d:'기믹 파훼 1회 · 행운 3회 · 공용시설 +7회' },
-    { n:'시간이 비껴간 태엽', e:{ fac:8, gim:1, luck:3 }, d:'기믹 파훼 1회 · 행운 3회 · 공용시설 +8회' },
-    { n:'처음을 기억하는 단추', e:{ eva:2, gim:1, luck:3 }, d:'기믹 파훼 1회 · 회피 2회 · 행운 3회' }
+// ==========================================
+// DNA — 사번 기반 고정값
+// ==========================================
+const DNA_BASE = ['A','T','G','C'];
+
+function seedOf(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+function seedRand(seed, n) {
+    let x = seed + n * 2654435761;
+    x = Math.imul(x ^ (x >>> 15), 2246822507);
+    x = Math.imul(x ^ (x >>> 13), 3266489909);
+    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+function dnaOf(user) {
+    if (!user) return '----';
+    if (user.dna) return user.dna;
+    const s = seedOf(user.code + '|' + (user.no || ''));
+    let d = '';
+    for (let i = 0; i < 8; i++) d += DNA_BASE[Math.floor(seedRand(s, i) * 4)];
+    user.dna = d;
+    if (user.code === (currentUser && currentUser.code)) saveFields({ dna: 1 });
+    else updateUserFields(user.code, { dna: d });
+    return d;
+}
+
+// 임신 성공률 — 같은 사람은 항상 같다
+function sireRate(user) {                    // 시키는 쪽 0.5 ~ 35%
+    const s = seedOf('sire|' + user.code);
+    return Math.round((0.5 + seedRand(s, 1) * 34.5) * 10) / 10;
+}
+function bearRate(user) {                    // 되는 쪽 0.1 ~ 30%
+    const s = seedOf('bear|' + user.code);
+    return Math.round((0.1 + seedRand(s, 2) * 29.9) * 10) / 10;
+}
+// 물약 등으로 역할이 바뀌었을 때의 반대편 확률
+function sireRateAlt(user) {
+    const s = seedOf('sireAlt|' + user.code);
+    return Math.round((0.5 + seedRand(s, 3) * 34.5) * 10) / 10;
+}
+function bearRateAlt(user) {
+    const s = seedOf('bearAlt|' + user.code);
+    return Math.round((0.1 + seedRand(s, 4) * 29.9) * 10) / 10;
+}
+
+// ==========================================
+// 역할 판정
+// ==========================================
+function hasPotion(user, name) {
+    return (user.timedEffects || []).some(e => e.name === name);
+}
+function genderOf(user) {
+    return (user.badge && user.badge.gender) || '';
+}
+
+// 딸기맛 물약 — 확률을 무시한다
+function hasSureBear(user) {
+    return !!user && hasPotion(user, '딸기맛 물약');
+}
+
+// 남성에게 자궁을 주는 물약 — 하나라도 있으면 임신할 수 있다
+const BEAR_POTIONS = ['우유맛 물약', '포도맛 물약', '망고맛 물약'];
+// 여성에게서 임신 능력을 뺏는 물약 — 망고맛은 자궁 문신이라 해당 없다
+const UNBEAR_POTIONS = ['우유맛 물약', '포도맛 물약'];
+
+function hasBearPotion(user) {
+    if (!user) return false;
+    return BEAR_POTIONS.some(n => hasPotion(user, n));
+}
+function hasUnbearPotion(user) {
+    if (!user) return false;
+    return UNBEAR_POTIONS.some(n => hasPotion(user, n));
+}
+// 이전 이름 호환
+function hasFlipPotion(user) { return hasBearPotion(user); }
+const FLIP_POTIONS = BEAR_POTIONS;
+
+// 다이아 보지 플러그를 차고 있는가
+// 차고 있으면 새로 임신할 수 없다. 이미 임신한 것은 유지된다.
+function hasVaginaPlug(user) {
+    if (!user || !user.equippedWeapons) return false;
+    return user.equippedWeapons.some(function (w) {
+        const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w);
+        return base === '다이아 보지 플러그';
+    });
+}
+
+// 임신할 수 있는 쪽
+//   남성 : 우유 · 포도 · 망고 중 하나라도 있으면 가능
+//   여성 : 우유 · 포도가 없으면 가능 (망고는 자궁 문신이라 막지 않는다)
+function canBear(user) {
+    if (!user) return false;
+    const g = genderOf(user);
+    if (g === '남성') return hasBearPotion(user);
+    if (g === '여성') return !hasUnbearPotion(user);
+    return false;                      // 성별 미지정은 해당 없음
+}
+
+// 임신시킬 수 있는 쪽 — 받는 쪽이면 시킬 수 없다
+function canSire(user) {
+    if (!user) return false;
+    if (!genderOf(user)) return false; // 성별 미지정은 해당 없음
+    return !canBear(user);
+}
+
+// 지금 새로 임신할 수 있는가 (플러그까지 본다)
+function canBearNow(user) {
+    return canBear(user) && !hasVaginaPlug(user);
+}
+
+// 물약으로 역할이 뒤집혔는가
+function roleFlipped(user) {
+    const g = genderOf(user);
+    if (!g) return false;
+    if (g === '남성') return hasBearPotion(user);
+    return hasUnbearPotion(user);
+}
+
+// 화면에 보여 줄 확률 (본인 것만)
+function myRates(user) {
+    const flip = roleFlipped(user);
+    return {
+        sire: canSire(user) ? (flip ? sireRateAlt(user) : sireRate(user)) : null,
+        bear: canBear(user) ? (flip ? bearRateAlt(user) : bearRate(user)) : null
+    };
+}
+
+// ==========================================
+// 임신 아이템 70종
+// ==========================================
+const BIRTH_ITEMS = [
+    // --- 오염 계열 20 ---
+    { n:'작게 접힌 배냇저고리', e:'heal', v:18, d:'오염도 18% 회복.' },
+    { n:'첫 울음', e:'heal', v:25, d:'오염도 25% 회복.' },
+    { n:'따뜻한 손자국', e:'heal', v:15, d:'오염도 15% 회복.' },
+    { n:'식지 않는 젖병', e:'heal', v:30, d:'오염도 30% 회복.' },
+    { n:'잠든 숨소리', e:'b_blind', v:3, d:'3시간 동안 오염도가 오르지 않는다.' },
+    { n:'포대기', e:'b_blind', v:5, d:'5시간 동안 오염도가 오르지 않는다.' },
+    { n:'자장가 한 소절', e:'b_blind', v:2, d:'2시간 동안 오염도가 오르지 않는다.' },
+    { n:'마르지 않은 배냇머리', e:'heal', v:12, d:'오염도 12% 회복.' },
+    { n:'작은 발자국 본', e:'heal', v:20, d:'오염도 20% 회복.' },
+    { n:'이름을 적기 전의 종이', e:'heal', v:22, d:'오염도 22% 회복.' },
+    { n:'삼키지 못한 젖', e:'heal', v:10, d:'오염도 10% 회복.' },
+    { n:'뒤집기 전의 몸', e:'heal', v:16, d:'오염도 16% 회복.' },
+    { n:'움켜쥔 손가락', e:'heal', v:14, d:'오염도 14% 회복.' },
+    { n:'가라앉은 딸꾹질', e:'heal', v:8, d:'오염도 8% 회복.' },
+    { n:'처음 뜬 눈', e:'b_blind', v:4, d:'4시간 동안 오염도가 오르지 않는다.' },
+    { n:'덜 자란 손톱', e:'heal', v:9, d:'오염도 9% 회복.' },
+    { n:'목을 가누기 전', e:'heal', v:11, d:'오염도 11% 회복.' },
+    { n:'빨지 않은 손등', e:'heal', v:13, d:'오염도 13% 회복.' },
+    { n:'울다 만 자리', e:'heal', v:17, d:'오염도 17% 회복.' },
+    { n:'식은 체온', e:'heal', v:19, d:'오염도 19% 회복.' },
+
+    // --- 공용시설 계열 20 ---
+    { n:'첫 동전', e:'b_luck', v:2, d:'2시간 동안 공용시설 행운이 두 배가 된다.' },
+    { n:'흔들린 딸랑이', e:'b_ticket', v:3, d:'공용시설 이용 3회 추가.' },
+    { n:'손에 쥔 단추', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
+    { n:'뒤집힌 카드', e:'b_luck', v:3, d:'3시간 동안 공용시설 행운이 두 배가 된다.' },
+    { n:'세 번 굴린 주사위', e:'b_luck', v:1, d:'1시간 동안 공용시설 행운이 세 배가 된다.', mult:3 },
+    { n:'접힌 영수증', e:'b_point', v:800, d:'800 P를 얻는다.' },
+    { n:'구겨진 지폐', e:'b_point', v:1500, d:'1,500 P를 얻는다.' },
+    { n:'빈 봉투', e:'b_point', v:400, d:'400 P를 얻는다.' },
+    { n:'꽉 찬 저금통', e:'b_point', v:3000, d:'3,000 P를 얻는다.' },
+    { n:'금이 간 구슬', e:'b_ticket', v:4, d:'공용시설 이용 4회 추가.' },
+    { n:'짝 없는 양말', e:'b_ticket', v:1, d:'공용시설 이용 1회 추가.' },
+    { n:'돌려 감은 태엽', e:'b_luck', v:2, d:'2시간 동안 공용시설 행운이 두 배가 된다.' },
+    { n:'무늬가 지워진 딱지', e:'b_point', v:600, d:'600 P를 얻는다.' },
+    { n:'쥐었다 편 손', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
+    { n:'한쪽만 남은 신발', e:'b_point', v:900, d:'900 P를 얻는다.' },
+    { n:'맞지 않는 퍼즐 조각', e:'b_luck', v:4, d:'4시간 동안 공용시설 행운이 두 배가 된다.' },
+    { n:'뒤늦게 나온 이', e:'b_ticket', v:3, d:'공용시설 이용 3회 추가.' },
+    { n:'첫 걸음의 흔들림', e:'b_point', v:1200, d:'1,200 P를 얻는다.' },
+    { n:'숨겨 둔 사탕', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
+    { n:'잃어버린 이름표', e:'b_point', v:700, d:'700 P를 얻는다.' },
+
+    // --- 어둠 계열 20 ---
+    { n:'어둠에서 온 태동', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
+    { n:'눈을 감고 나온 것', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
+    { n:'탯줄 매듭', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
+    { n:'숨을 참은 자리', e:'b_bonus', v:3, d:'다음 탐사의 모든 판정에 +3.' },
+    { n:'따라 나온 그림자', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
+    { n:'세어지지 않은 손가락', e:'b_reroll', v:2, d:'다음 탐사에서 판정을 2회 다시 굴린다.' },
+    { n:'울지 않은 아이', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
+    { n:'거꾸로 나온 것', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
+    { n:'물에서 건진 숨', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
+    { n:'이름 없이 태어난 것', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
+    { n:'두 번 접힌 태반', e:'b_reroll', v:1, d:'다음 탐사에서 판정을 1회 다시 굴린다.' },
+    { n:'빛을 본 적 없는 눈', e:'b_bonus', v:1, d:'다음 탐사의 모든 판정에 +1.' },
+    { n:'돌아보지 않은 등', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
+    { n:'삼킨 울음', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
+    { n:'마르지 않은 양수', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
+    { n:'다섯이 아닌 손', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
+    { n:'숨을 나눈 자국', e:'b_reroll', v:1, d:'다음 탐사에서 판정을 1회 다시 굴린다.' },
+    { n:'접힌 무릎 자국', e:'b_bonus', v:1, d:'다음 탐사의 모든 판정에 +1.' },
+    { n:'헤아리지 못한 밤', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
+    { n:'먼저 나온 손', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
+
+    // --- 복합 10 ---
+    { n:'닮지 않은 얼굴', e:'b_mix', v:0, d:'오염도 15% 회복 · 공용시설 이용 2회 추가.', heal:15, ticket:2 },
+    { n:'둘의 눈을 가진 것', e:'b_mix', v:0, d:'오염도 20% 회복 · 다음 탐사 판정에 +2.', heal:20, bonus:2 },
+    { n:'양쪽을 닮은 것', e:'b_mix', v:0, d:'공용시설 이용 3회 추가 · 어둠 탐사 1회 추가.', ticket:3, dark:1 },
+    { n:'누구도 닮지 않은 것', e:'b_mix', v:0, d:'오염도 25% 회복 · 1,000 P.', heal:25, point:1000 },
+    { n:'세 번째 얼굴', e:'b_mix', v:0, d:'다음 탐사 판정에 +3 · 치명적 상황 1회 방어.', bonus:3, guard:1 },
+    { n:'거울에 비친 아이', e:'b_mix', v:0, d:'오염도 18% 회복 · 3시간 행운 두 배.', heal:18, luck:3 },
+    { n:'이름을 두 번 가진 것', e:'b_mix', v:0, d:'공용시설 4회 · 1,500 P.', ticket:4, point:1500 },
+    { n:'울지 않고 웃은 것', e:'b_mix', v:0, d:'오염도 22% 회복 · 지목 1회 회피.', heal:22, hide:1 },
+    { n:'숨을 두 번 쉰 것', e:'b_mix', v:0, d:'어둠 탐사 1회 · 재굴림 1회.', dark:1, reroll:1 },
+    { n:'돌아온 아이', e:'b_mix', v:0, d:'오염도 30% 회복 · 2,000 P · 공용시설 3회.', heal:30, point:2000, ticket:3 }
 ];
 
-
-// ==========================================
-// 번호 배정 — 한 번 받으면 바뀌지 않는다
-// ==========================================
-// 제대로 된 사원인가 — 유령에게는 번호를 주지 않는다
-function isRealUser(u) {
-    return !!(u && typeof u === 'object'
-        && u.code && typeof u.code === 'string'
-        && u.name && typeof u.name === 'string'
-        && u.code !== 'kario0987');
-}
-
-function dnaGiftIndex(user) {
-    if (!isRealUser(user)) return -1;
-    if (user.dnaGift !== undefined && user.dnaGift !== null) return user.dnaGift;
-
-    // 이미 쓰인 번호를 피해 가장 작은 빈 번호를 준다
-    // 유령이 잡고 있는 번호는 빈 것으로 친다
-    const used = new Set();
-    Object.keys(db.users || {}).forEach(function (c) {
-        const u = db.users[c];
-        if (!isRealUser(u)) return;
-        if (u.dnaGift !== undefined && u.dnaGift !== null) used.add(u.dnaGift);
-    });
-
-    let idx = 0;
-    while (used.has(idx) && idx < DNA_GIFTS.length) idx++;
-    if (idx >= DNA_GIFTS.length) {
-        // 60명을 넘으면 사번 기반으로 돌려쓴다
-        idx = seedOf('gift|' + user.code) % DNA_GIFTS.length;
-    }
-
-    user.dnaGift = idx;
-    if (currentUser && user.code === currentUser.code) saveFields({ dnaGift: 1 });
-    else updateUserFields(user.code, { dnaGift: idx });
-    return idx;
-}
-
-function dnaGiftOf(user) {
-    const i = dnaGiftIndex(user);
-    return (i >= 0 && DNA_GIFTS[i]) ? DNA_GIFTS[i] : null;
-}
-
-// 이름 — 뒤에 DNA 를 붙여 한 번 더 갈라 둔다
-function dnaItemName(user) {
-    const g = dnaGiftOf(user);
-    if (!g) return '';
-    return g.n + ' · ' + dnaOf(user);
-}
-
-function ensureDnaItem(user) {
-    if (!isRealUser(user)) return null;
-    const g = dnaGiftOf(user);
-    if (!g) return null;
-    const nm = dnaItemName(user);
-    if (!nm) return null;
-    if (ITEM_CATALOG[nm]) return nm;
-
-    ITEM_CATALOG[nm] = {
-        price: 30000, usable: true, targetable: false,
-        effect: 'equip_dna', dnaOwner: user.code, dnaEff: g.e,
-        desc: '[고유] ' + user.name + ' 사원의 것. 장착하면 ' + g.d + '.'
+BIRTH_ITEMS.forEach(function (b) {
+    ITEM_CATALOG[b.n] = {
+        price: 300, usable: true, targetable: false,
+        effect: b.e, value: b.v, birth: true, desc: '[출산] ' + b.d,
+        heal: b.heal, ticket: b.ticket, bonus: b.bonus, dark: b.dark,
+        point: b.point, luck: b.luck, hide: b.hide, reroll: b.reroll,
+        guard: b.guard, mult: b.mult
     };
-    if (typeof NO_SELL_ITEMS !== 'undefined' && !NO_SELL_ITEMS.includes(nm)) NO_SELL_ITEMS.push(nm);
-    return nm;
+});
+
+// ==========================================
+// 고유 DNA 아이템 — 사원마다 하나, 자동 생성
+// ==========================================
+// ★ 고유 아이템 이름·효과는 dna-gifts.js 에서 정의한다
+
+// ==========================================
+// 출산 추첨
+// ==========================================
+// 아이템 등급 — 값이 클수록 좋은 것
+function birthTier(it) {
+    if (it.e === 'b_mix') return 3;                                  // 복합
+    if (it.e === 'b_point') return it.v >= 1500 ? 3 : it.v >= 800 ? 2 : 1;
+    if (it.e === 'heal')    return it.v >= 25 ? 3 : it.v >= 15 ? 2 : 1;
+    if (it.e === 'b_blind') return it.v >= 5 ? 3 : it.v >= 3 ? 2 : 1;
+    if (it.e === 'b_luck')  return (it.mult === 3 || it.v >= 3) ? 3 : 2;
+    if (it.e === 'b_ticket')return it.v >= 4 ? 3 : it.v >= 2 ? 2 : 1;
+    if (it.e === 'b_guard' || it.e === 'b_reroll') return 3;
+    if (it.e === 'b_bonus') return it.v >= 3 ? 3 : it.v >= 2 ? 2 : 1;
+    if (it.e === 'b_hide')  return 2;
+    if (it.e === 'b_dark')  return 2;
+    return 1;
 }
 
-function buildAllDnaItems() {
-    Object.keys(db.users || {}).forEach(function (c) {
-        const u = db.users[c];
-        if (isRealUser(u)) ensureDnaItem(u);
+// 돌봄을 얼마나 채웠는가 (0 ~ 1)
+// 이틀 동안 하루 8회씩, 총 16회가 만점
+function careFill(preg) {
+    if (!preg) return 0;
+    const total = Object.values(preg.careCount || {}).reduce((a, b) => a + b, 0);
+    const goal = (typeof PREG_CARE_DAILY !== 'undefined' ? PREG_CARE_DAILY : 8) * 2;
+    return Math.max(0, Math.min(1, total / goal));
+}
+
+// 출산 아이템 추첨
+// fill 0 → 지금까지와 같다
+// fill 1 → 상급이 훨씬 자주 나오고, 고유 아이템도 아주 조금 잘 나온다
+function rollBirthItem(parentA, parentB, fill) {
+    [parentA, parentB].forEach(function (p) { if (p) ensureDnaItem(p); });
+
+    const f = Math.max(0, Math.min(1, fill || 0));
+
+    // 고유 아이템 — 0.01% 에서 최대 0.04% 까지만
+    const dnaRate = 0.0001 * (1 + f * 3);
+    const r = Math.random();
+    if (r < dnaRate && parentA) return dnaItemName(parentA);
+    if (r < dnaRate * 2 && parentB) return dnaItemName(parentB);
+
+    // 등급 가중치 — 다 채우면 상급이 여섯 배쯤 잘 나온다
+    const W = {
+        1: 1 - f * 0.75,          // 1.00 → 0.25
+        2: 1 + f * 0.6,           // 1.00 → 1.60
+        3: 0.45 + f * 2.35        // 0.45 → 2.80
+    };
+
+    let total = 0;
+    const pool = BIRTH_ITEMS.map(function (it) {
+        const w = W[birthTier(it)] || 1;
+        total += w;
+        return { it: it, w: w };
     });
-}
 
-// ==========================================
-// 장착
-// ==========================================
-function myDnaEquip() {
-    if (!currentUser || !currentUser.equippedWeapons) return null;
-    for (let i = 0; i < currentUser.equippedWeapons.length; i++) {
-        const w = currentUser.equippedWeapons[i];
-        const cat = ITEM_CATALOG[getEquipBaseName(w)] || ITEM_CATALOG[w];
-        if (cat && cat.effect === 'equip_dna') return cat.dnaEff || null;
+    let x = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+        x -= pool[i].w;
+        if (x <= 0) return pool[i].it.n;
     }
-    return null;
+    return pool[pool.length - 1].it.n;
 }
 
-(function hookEquip() {
-    if (typeof useInventoryItem !== 'function') return;
+// ==========================================
+// 출산 아이템 효과
+// ==========================================
+(function hookBirthUse() {
+    const _use = useInventoryItem;
+    useInventoryItem = function (itemName) {
+        const cat = ITEM_CATALOG[itemName];
+        if (!cat || !cat.birth) return _use.apply(this, arguments);
+        if (window._birthOk !== itemName) return _use.apply(this, arguments);
+        window._birthOk = null;
+
+        const msg = [];
+        const heal = cat.heal || (cat.effect === 'heal' ? cat.value : 0);
+        if (heal) { currentUser.pollution = Math.max(0, currentUser.pollution - heal); msg.push(`오염도 -${heal}%`); }
+        if (cat.point) { currentUser.points += cat.point; msg.push(`+${cat.point.toLocaleString()} P`); }
+        if (cat.ticket) {
+            if (!currentUser.facilityMax) currentUser.facilityMax = 20;
+            currentUser.facilityMax = Math.min(40, currentUser.facilityMax + cat.ticket);
+            msg.push(`공용시설 +${cat.ticket}회`);
+        }
+        if (cat.dark) { currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - cat.dark); msg.push(`어둠 탐사 +${cat.dark}회`); }
+        if (cat.effect === 'b_blind') {
+            currentUser.blindfoldUntil = Math.max(currentUser.blindfoldUntil || 0, Date.now()) + cat.value * 3600000;
+            msg.push(`${cat.value}시간 오염 동결`);
+        }
+        if (cat.effect === 'b_luck' || cat.luck) {
+            const h = cat.luck || cat.value;
+            addTimedEffect(currentUser, '아이의 운', `공용시설 행운 ${cat.mult === 3 ? '세' : '두'} 배`, h);
+            msg.push(`${h}시간 행운 상승`);
+        }
+        if (cat.bonus) { if (typeof nAdd === 'function') nAdd('c_batt', cat.bonus); msg.push(`다음 탐사 판정 +${cat.bonus}`); }
+        if (cat.guard) { if (typeof nAdd === 'function') nAdd('c_pain', cat.guard); msg.push(`치명 방어 ${cat.guard}회`); }
+        if (cat.reroll) { if (typeof nAdd === 'function') nAdd('c_reroll', cat.reroll); msg.push(`재굴림 ${cat.reroll}회`); }
+        if (cat.hide) { if (typeof nAdd === 'function') nAdd('no_mark', cat.hide); msg.push(`지목 회피 ${cat.hide}회`); }
+
+        removeItemFromInventory(currentUser, itemName, 1);
+        addHistoryLog(currentUser, `[출산품] ${itemName} 사용`);
+        saveSelfFull();
+        updateUI();
+        showCustomAlert(`${itemName}\n\n${msg.join(' · ')}`);
+    };
+})();
+
+// 확인 팝업을 거쳐 오도록
+(function bridgeConfirm() {
     const _u = useInventoryItem;
     useInventoryItem = function (itemName) {
         const cat = ITEM_CATALOG[itemName];
-        if (!cat || cat.effect !== 'equip_dna') return _u.apply(this, arguments);
-        if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장착할 수 없습니다.'); return; }
-
-        if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-        if (myDnaEquip()) { showCustomAlert('고유 아이템은 하나만 찰 수 있습니다.'); return; }
-        if (currentUser.equippedWeapons.length >= 5) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
-
-        currentUser.equippedWeapons.push(itemName);
-        setEquipOwner(currentUser, itemName, currentUser.code);
-        removeItemFromInventory(currentUser, itemName, 1);
-
-        const e = cat.dnaEff || {};
-        if (e.fac) {
-            currentUser.dnaFacBonus = e.fac;
-            currentUser.facilityMax = (currentUser.facilityMax || 20) + e.fac;
+        if (cat && cat.birth && window._invOk === itemName) {
+            window._birthOk = itemName;
         }
-        appendBadgeNoteToUser(currentUser, '[장착됨] ' + itemName.split(' · ')[0]);
-        addHistoryLog(currentUser, '[고유 장비] ' + itemName.split(' · ')[0] + ' 장착');
-        saveSelfFull();
-        updateUI();
-        showCustomAlert(itemName.split(' · ')[0] + '\n\n' + (cat.desc.split('장착하면 ')[1] || ''));
+        return _u.apply(this, arguments);
     };
 })();
 
-(function hookUnequip() {
-    if (typeof unequipWeapon !== 'function') return;
-    const _f = unequipWeapon;
-    unequipWeapon = function (index) {
-        const w = currentUser.equippedWeapons && currentUser.equippedWeapons[index];
-        const cat = w ? (ITEM_CATALOG[getEquipBaseName(w)] || ITEM_CATALOG[w]) : null;
-        const isDna = cat && cat.effect === 'equip_dna';
-        const r = _f.apply(this, arguments);
-        if (isDna && currentUser.dnaFacBonus) {
-            currentUser.facilityMax = Math.max(20, (currentUser.facilityMax || 20) - currentUser.dnaFacBonus);
-            currentUser.dnaFacBonus = 0;
-            saveFields({ facilityMax: 1, dnaFacBonus: 1 });
-            updateUI();
-        }
-        return r;
-    };
-})();
-
-// ==========================================
-// 효과 연결
-// ==========================================
-
-// 공용시설 행운
-(function hookLuckPct() {
+// 행운 효과 연결
+(function hookLuckChild() {
     if (typeof facilityLuckMult !== 'function') return;
     const _f = facilityLuckMult;
     facilityLuckMult = function (user) {
         let m = _f.apply(this, arguments);
         const u = user || currentUser;
-        if (u && currentUser && u.code === currentUser.code) {
-            const e = myDnaEquip();
-            if (e && e.pct) m *= (e.pct / 100);
-        }
+        if (u && (u.timedEffects || []).some(e => e.name === '아이의 운')) m *= 2;
         return m;
     };
 })();
 
-// 어둠 탐사 횟수
-(function hookDarkTries() {
-    if (typeof getDarkTriesLeft !== 'function') return;
-    const _f = getDarkTriesLeft;
-    getDarkTriesLeft = function () {
-        let n = _f.apply(this, arguments);
-        const e = myDnaEquip();
-        if (e && e.dark) n += e.dark;
-        return n;
+// 재굴림 연결
+(function hookRerollChild() {
+    if (typeof luckReroll !== 'function' || typeof nUse !== 'function') return;
+    const _l = luckReroll;
+    luckReroll = function (roll) {
+        roll = _l.apply(this, arguments);
+        if (darkRun && roll <= 7 && nUse('c_reroll')) {
+            const nr = Math.floor(Math.random() * 20) + 1;
+            if (typeof showDarkToast === 'function') showDarkToast(`◈ 다시 굴린다. (${roll} → ${nr})`);
+            return nr;
+        }
+        return roll;
     };
 })();
 
-// 탐사에 들어갈 때 회수를 채운다
-let dnaCharge = { gim: 0, eva: 0, luck: 0, death: 0 };
-
-function resetDnaCharge() {
-    const e = myDnaEquip() || {};
-    dnaCharge = {
-        gim: e.gim || 0, eva: e.eva || 0,
-        luck: e.luck || 0, death: e.death || 0
-    };
-}
-
-(function hookRunStart() {
-    ['startDarkRun', 'launchPartyRun'].forEach(function (n) {
-        if (typeof window[n] !== 'function') return;
-        const _f = window[n];
-        window[n] = function () {
-            const r = _f.apply(this, arguments);
-            setTimeout(resetDnaCharge, 200);
-            return r;
-        };
-    });
-})();
-
-function dnaUse(key) {
-    if (!dnaCharge[key] || dnaCharge[key] <= 0) return false;
-    dnaCharge[key]--;
-    return true;
-}
-
-// 즉사 · 회피
-(function hookDeath() {
-    const iv = setInterval(function () {
-        if (typeof darkDeath !== 'function') return;
-        if (darkDeath._dnaHooked) { clearInterval(iv); return; }
-        const _d = darkDeath;
-        darkDeath = function (reason) {
-            if (darkRun && !darkRun._dead) {
-                if (dnaUse('death') || dnaUse('eva')) {
-                    darkRun.fail = Math.max(0, darkRun.fail - 1);
-                    applyPollutionToUser(currentUser, 4);
-                    const g = myDnaEquip();
-                    darkBodyEl().innerHTML = darkBox('—',
-                        reason + '<br><br><span style="color:#8fd4ff;">— 품 안의 것이 먼저 반응했다.<br>' +
-                        '빛이 한 번 일렁이고, 그것으로 끝이었다.</span>',
-                        darkChoiceBtn('숨을 고른다.', 'renderDarkStep();'));
-                    mountDarkChat('normal');
-                    saveDB();
-                    return;
-                }
-            }
-            return _d.apply(this, arguments);
-        };
-        darkDeath._dnaHooked = true;
-        clearInterval(iv);
-    }, 500);
-})();
-
-// 행운 — 낮은 눈을 한 번 되돌린다
-(function hookLuckRoll() {
-    const iv = setInterval(function () {
-        if (typeof luckReroll !== 'function') return;
-        if (luckReroll._dnaHooked) { clearInterval(iv); return; }
-        const _l = luckReroll;
-        luckReroll = function (roll) {
-            roll = _l.apply(this, arguments);
-            if (darkRun && roll <= 6 && dnaUse('luck')) {
-                const nr = Math.floor(Math.random() * 20) + 1;
-                if (typeof showDarkToast === 'function') showDarkToast('✦ 고유의 운 (' + roll + ' → ' + nr + ')');
-                return nr;
-            }
-            return roll;
-        };
-        luckReroll._dnaHooked = true;
-        clearInterval(iv);
-    }, 500);
-})();
-
-// 기믹 파훼 — 작두와 같은 자리에 버튼이 선다
-(function hookSmash() {
-    const iv = setInterval(function () {
-        if (typeof jakduAvailable !== 'function') return;
-        if (jakduAvailable._dnaHooked) { clearInterval(iv); return; }
-        const _j = jakduAvailable;
-        jakduAvailable = function () {
-            if (_j.apply(this, arguments)) return true;
-            return dnaCharge.gim > 0;
-        };
-        jakduAvailable._dnaHooked = true;
-
-        if (typeof smashWeapon === 'function') {
-            const _s = smashWeapon;
-            smashWeapon = function () {
-                const w = _s.apply(this, arguments);
-                if (w) return w;
-                const e = myDnaEquip();
-                if (e && dnaCharge.gim > 0) {
-                    const nm = (currentUser.equippedWeapons || [])
-                        .find(x => { const c = ITEM_CATALOG[getEquipBaseName(x)] || ITEM_CATALOG[x]; return c && c.effect === 'equip_dna'; });
-                    return nm ? nm.split(' · ')[0] : '고유의 것';
-                }
-                return w;
-            };
-        }
-        if (typeof useJakdu === 'function') {
-            const _u = useJakdu;
-            useJakdu = function () {
-                if (_u.apply(this, arguments)) return true;
-                return dnaUse('gim');
-            };
-        }
-        clearInterval(iv);
-    }, 500);
-})();
-
-// ==========================================
-// 목록
-// ==========================================
-function listDnaItems() {
-    const rows = Object.keys(db.users || {}).map(function (c) {
-        const u = db.users[c];
-        if (!isRealUser(u)) return null;
-        ensureDnaItem(u);
-        const g = dnaGiftOf(u);
-        if (!g) return null;
-        return {
-            번호: dnaGiftIndex(u), 사원: u.name, 사번: u.no,
-            DNA: dnaOf(u), 아이템: g.n, 성능: g.d
-        };
-    }).filter(Boolean).sort((a, b) => a.번호 - b.번호);
-
-    console.log('%c===== 유전자 고유 아이템 (' + rows.length + '명) =====', 'color:#c9a8ff; font-size:13px');
-    console.table(rows);
-    console.log('전체 ' + DNA_GIFTS.length + '종 · 이름과 성능이 서로 겹치지 않습니다.');
-    console.log('출현 확률: 기본 0.01% · 돌봄 16회를 다 채우면 0.04%');
-    return rows;
-}
-
-// 아직 안 쓰인 것까지 전부
-function listAllDnaGifts() {
-    const taken = {};
-    Object.keys(db.users || {}).forEach(function (c) {
-        const u = db.users[c];
-        if (isRealUser(u) && u.dnaGift !== undefined && u.dnaGift !== null) taken[u.dnaGift] = u.name;
-    });
-    console.log('%c===== 고유 아이템 전체 ' + DNA_GIFTS.length + '종 =====', 'color:#c9a8ff; font-size:13px');
-    console.table(DNA_GIFTS.map(function (g, i) {
-        return { 번호: i, 아이템: g.n, 성능: g.d, 주인: taken[i] || '-' };
-    }));
-}
-
-setTimeout(buildAllDnaItems, 2500);
-console.log('[DNA] 고유 아이템 ' + DNA_GIFTS.length + '종 — listAllDnaGifts() 로 전체 보기');
-
-// ==========================================
-// 번호 재배정 — 유령이 물고 있던 것을 되찾는다
-// ==========================================
-// resetDnaGifts()       훑기만
-// resetDnaGifts(true)   실제로 다시 짬
-function resetDnaGifts(doIt) {
-    if (!currentUser || currentUser.code !== 'kario0987') {
-        console.error('상담사 계정에서만 쓸 수 있습니다.');
-        return;
-    }
-
-    const ghosts = [], real = [];
-    Object.keys(db.users || {}).forEach(function (c) {
-        const u = db.users[c];
-        if (c === 'kario0987') return;
-        if (isRealUser(u)) real.push({ code: c, u: u });
-        else ghosts.push({ code: c, u: u || {} });
-    });
-
-    // 사번 순으로 줄 세운다 — 배정이 흔들리지 않게
-    real.sort(function (a, b) {
-        const na = String(a.u.no || '9999'), nb = String(b.u.no || '9999');
-        if (na !== nb) return na < nb ? -1 : 1;
-        return a.code < b.code ? -1 : 1;
-    });
-
-    console.log('%c===== 고유 아이템 번호 재배정 =====', 'color:#c9a8ff; font-size:13px');
-
-    if (ghosts.length) {
-        console.warn('사원이 아닌 항목 ' + ghosts.length + '건');
-        console.table(ghosts.map(function (x) {
-            return {
-                키: x.code,
-                이름: x.u.name === undefined ? '(없음)' : x.u.name,
-                사번: x.u.no === undefined ? '(없음)' : x.u.no,
-                물고있던번호: x.u.dnaGift === undefined ? '-' : x.u.dnaGift,
-                아이템: (x.u.dnaGift != null && DNA_GIFTS[x.u.dnaGift]) ? DNA_GIFTS[x.u.dnaGift].n : '-'
-            };
-        }));
-    } else console.log('사원이 아닌 항목은 없습니다.');
-
-    const plan = real.map(function (x, i) {
-        return {
-            사원: x.u.name, 사번: x.u.no,
-            이전: x.u.dnaGift === undefined ? '-' : x.u.dnaGift,
-            새번호: i,
-            아이템: DNA_GIFTS[i] ? DNA_GIFTS[i].n : '?',
-            성능: DNA_GIFTS[i] ? DNA_GIFTS[i].d : '?'
-        };
-    });
-    console.log('사원 ' + real.length + '명');
-    console.table(plan);
-
-    if (doIt !== true) {
-        console.log('%c훑기만 했습니다. 다시 짜려면 resetDnaGifts(true)', 'color:#ffd700');
-        return;
-    }
-
-    // 옛 이름으로 만들어 둔 목록 항목을 지운다
-    Object.keys(ITEM_CATALOG).forEach(function (k) {
-        if (ITEM_CATALOG[k] && ITEM_CATALOG[k].dnaOwner) delete ITEM_CATALOG[k];
-    });
-
-    const updates = {};
-    ghosts.forEach(function (x) { updates['users/' + x.code + '/dnaGift'] = null; });
-    real.forEach(function (x, i) {
-        x.u.dnaGift = i;
-        updates['users/' + x.code + '/dnaGift'] = i;
-    });
-
-    database.ref('/').update(updates).then(function () {
-        buildAllDnaItems();
-        console.log('%c✓ ' + real.length + '명에게 다시 배정했습니다.', 'color:#4CAF50; font-size:13px');
-        if (ghosts.length) console.log('  유령 ' + ghosts.length + '건의 번호를 회수했습니다.');
-        console.log('  새로고침하면 반영됩니다.');
-        if (typeof updateUI === 'function') updateUI();
-    }).catch(function (e) {
-        console.error('재배정 실패:', e);
-    });
-}
+console.log('[DNA] 출산 아이템 70종 등록');

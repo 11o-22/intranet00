@@ -81,15 +81,25 @@ const DNA_GIFTS = [
 // ==========================================
 // 번호 배정 — 한 번 받으면 바뀌지 않는다
 // ==========================================
+// 제대로 된 사원인가 — 유령에게는 번호를 주지 않는다
+function isRealUser(u) {
+    return !!(u && typeof u === 'object'
+        && u.code && typeof u.code === 'string'
+        && u.name && typeof u.name === 'string'
+        && u.code !== 'kario0987');
+}
+
 function dnaGiftIndex(user) {
-    if (!user) return 0;
+    if (!isRealUser(user)) return -1;
     if (user.dnaGift !== undefined && user.dnaGift !== null) return user.dnaGift;
 
     // 이미 쓰인 번호를 피해 가장 작은 빈 번호를 준다
+    // 유령이 잡고 있는 번호는 빈 것으로 친다
     const used = new Set();
     Object.keys(db.users || {}).forEach(function (c) {
         const u = db.users[c];
-        if (u && u.dnaGift !== undefined && u.dnaGift !== null) used.add(u.dnaGift);
+        if (!isRealUser(u)) return;
+        if (u.dnaGift !== undefined && u.dnaGift !== null) used.add(u.dnaGift);
     });
 
     let idx = 0;
@@ -106,20 +116,24 @@ function dnaGiftIndex(user) {
 }
 
 function dnaGiftOf(user) {
-    return DNA_GIFTS[dnaGiftIndex(user)] || DNA_GIFTS[0];
+    const i = dnaGiftIndex(user);
+    return (i >= 0 && DNA_GIFTS[i]) ? DNA_GIFTS[i] : null;
 }
 
 // 이름 — 뒤에 DNA 를 붙여 한 번 더 갈라 둔다
 function dnaItemName(user) {
-    if (!user) return '';
-    return dnaGiftOf(user).n + ' · ' + dnaOf(user);
+    const g = dnaGiftOf(user);
+    if (!g) return '';
+    return g.n + ' · ' + dnaOf(user);
 }
 
 function ensureDnaItem(user) {
-    if (!user) return null;
-    const nm = dnaItemName(user);
-    if (ITEM_CATALOG[nm]) return nm;
+    if (!isRealUser(user)) return null;
     const g = dnaGiftOf(user);
+    if (!g) return null;
+    const nm = dnaItemName(user);
+    if (!nm) return null;
+    if (ITEM_CATALOG[nm]) return nm;
 
     ITEM_CATALOG[nm] = {
         price: 30000, usable: true, targetable: false,
@@ -133,7 +147,7 @@ function ensureDnaItem(user) {
 function buildAllDnaItems() {
     Object.keys(db.users || {}).forEach(function (c) {
         const u = db.users[c];
-        if (u && u.code !== 'kario0987') ensureDnaItem(u);
+        if (isRealUser(u)) ensureDnaItem(u);
     });
 }
 
@@ -348,9 +362,10 @@ function dnaUse(key) {
 function listDnaItems() {
     const rows = Object.keys(db.users || {}).map(function (c) {
         const u = db.users[c];
-        if (!u || c === 'kario0987') return null;
+        if (!isRealUser(u)) return null;
         ensureDnaItem(u);
         const g = dnaGiftOf(u);
+        if (!g) return null;
         return {
             번호: dnaGiftIndex(u), 사원: u.name, 사번: u.no,
             DNA: dnaOf(u), 아이템: g.n, 성능: g.d
@@ -369,7 +384,7 @@ function listAllDnaGifts() {
     const taken = {};
     Object.keys(db.users || {}).forEach(function (c) {
         const u = db.users[c];
-        if (u && u.dnaGift !== undefined && u.dnaGift !== null) taken[u.dnaGift] = u.name;
+        if (isRealUser(u) && u.dnaGift !== undefined && u.dnaGift !== null) taken[u.dnaGift] = u.name;
     });
     console.log('%c===== 고유 아이템 전체 ' + DNA_GIFTS.length + '종 =====', 'color:#c9a8ff; font-size:13px');
     console.table(DNA_GIFTS.map(function (g, i) {
@@ -379,3 +394,84 @@ function listAllDnaGifts() {
 
 setTimeout(buildAllDnaItems, 2500);
 console.log('[DNA] 고유 아이템 ' + DNA_GIFTS.length + '종 — listAllDnaGifts() 로 전체 보기');
+
+// ==========================================
+// 번호 재배정 — 유령이 물고 있던 것을 되찾는다
+// ==========================================
+// resetDnaGifts()       훑기만
+// resetDnaGifts(true)   실제로 다시 짬
+function resetDnaGifts(doIt) {
+    if (!currentUser || currentUser.code !== 'kario0987') {
+        console.error('상담사 계정에서만 쓸 수 있습니다.');
+        return;
+    }
+
+    const ghosts = [], real = [];
+    Object.keys(db.users || {}).forEach(function (c) {
+        const u = db.users[c];
+        if (c === 'kario0987') return;
+        if (isRealUser(u)) real.push({ code: c, u: u });
+        else ghosts.push({ code: c, u: u || {} });
+    });
+
+    // 사번 순으로 줄 세운다 — 배정이 흔들리지 않게
+    real.sort(function (a, b) {
+        const na = String(a.u.no || '9999'), nb = String(b.u.no || '9999');
+        if (na !== nb) return na < nb ? -1 : 1;
+        return a.code < b.code ? -1 : 1;
+    });
+
+    console.log('%c===== 고유 아이템 번호 재배정 =====', 'color:#c9a8ff; font-size:13px');
+
+    if (ghosts.length) {
+        console.warn('사원이 아닌 항목 ' + ghosts.length + '건');
+        console.table(ghosts.map(function (x) {
+            return {
+                키: x.code,
+                이름: x.u.name === undefined ? '(없음)' : x.u.name,
+                사번: x.u.no === undefined ? '(없음)' : x.u.no,
+                물고있던번호: x.u.dnaGift === undefined ? '-' : x.u.dnaGift,
+                아이템: (x.u.dnaGift != null && DNA_GIFTS[x.u.dnaGift]) ? DNA_GIFTS[x.u.dnaGift].n : '-'
+            };
+        }));
+    } else console.log('사원이 아닌 항목은 없습니다.');
+
+    const plan = real.map(function (x, i) {
+        return {
+            사원: x.u.name, 사번: x.u.no,
+            이전: x.u.dnaGift === undefined ? '-' : x.u.dnaGift,
+            새번호: i,
+            아이템: DNA_GIFTS[i] ? DNA_GIFTS[i].n : '?',
+            성능: DNA_GIFTS[i] ? DNA_GIFTS[i].d : '?'
+        };
+    });
+    console.log('사원 ' + real.length + '명');
+    console.table(plan);
+
+    if (doIt !== true) {
+        console.log('%c훑기만 했습니다. 다시 짜려면 resetDnaGifts(true)', 'color:#ffd700');
+        return;
+    }
+
+    // 옛 이름으로 만들어 둔 목록 항목을 지운다
+    Object.keys(ITEM_CATALOG).forEach(function (k) {
+        if (ITEM_CATALOG[k] && ITEM_CATALOG[k].dnaOwner) delete ITEM_CATALOG[k];
+    });
+
+    const updates = {};
+    ghosts.forEach(function (x) { updates['users/' + x.code + '/dnaGift'] = null; });
+    real.forEach(function (x, i) {
+        x.u.dnaGift = i;
+        updates['users/' + x.code + '/dnaGift'] = i;
+    });
+
+    database.ref('/').update(updates).then(function () {
+        buildAllDnaItems();
+        console.log('%c✓ ' + real.length + '명에게 다시 배정했습니다.', 'color:#4CAF50; font-size:13px');
+        if (ghosts.length) console.log('  유령 ' + ghosts.length + '건의 번호를 회수했습니다.');
+        console.log('  새로고침하면 반영됩니다.');
+        if (typeof updateUI === 'function') updateUI();
+    }).catch(function (e) {
+        console.error('재배정 실패:', e);
+    });
+}
