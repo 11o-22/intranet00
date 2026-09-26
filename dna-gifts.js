@@ -118,7 +118,29 @@ function dnaGiftIndex(user) {
 
 function dnaGiftOf(user) {
     const i = dnaGiftIndex(user);
-    return (i >= 0 && DNA_GIFTS[i]) ? DNA_GIFTS[i] : null;
+    const base = (i >= 0 && DNA_GIFTS[i]) ? DNA_GIFTS[i] : null;
+    if (!base) return null;
+
+    // 상담사가 따로 얹어 준 것이 있으면 합친다
+    const ex = user && user.dnaExtra;
+    if (!ex || !Object.keys(ex).length) return base;
+
+    const e = Object.assign({}, base.e);
+    Object.keys(ex).forEach(function (k) {
+        e[k] = (e[k] || 0) + ex[k];
+    });
+
+    const NM = { death:'즉사 회피', gim:'기믹 파훼', eva:'회피', luck:'행운',
+                 bon:'판정', pct:'공용시설 행운', dark:'어둠 탐사', fac:'공용시설' };
+    const d = Object.keys(e).map(function (k) {
+        if (k === 'pct') return NM[k] + ' ' + e[k] + '%';
+        if (k === 'bon') return NM[k] + ' +' + e[k];
+        if (k === 'death') return NM[k] + ' ' + e[k] + '회';
+        if (k === 'dark' || k === 'fac') return NM[k] + ' +' + e[k] + '회';
+        return NM[k] + ' ' + e[k] + '회';
+    }).join(' · ');
+
+    return { n: base.n, e: e, p: base.p, d: d, boosted: true };
 }
 
 // 이름 — 뒤에 DNA 를 붙여 한 번 더 갈라 둔다
