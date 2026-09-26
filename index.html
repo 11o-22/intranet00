@@ -2891,10 +2891,10 @@ function renderAdvanceWait(nextStep) {
         if (finished || !darkRun) return;
         const p = darkParties[pid] || {};
         const solo = p.solo || {};
-        const group = darkRun.solo
+              const iAmSolo = darkRun.solo || !!solo[currentUser.code];
+        const group = iAmSolo
             ? [currentUser.code]
             : Object.keys(p.alive || {}).filter(c => !solo[c]);
-        const need = Math.max(1, group.length);
         const cnt = group.filter(c => lastGot[c]).length;
 
         const el = document.getElementById('adv-wait');
@@ -2911,9 +2911,9 @@ function renderAdvanceWait(nextStep) {
     ref.on('value', snap => { lastGot = snap.val() || {}; check(); });
     poll = setInterval(check, 3000);   // 누가 끊겨 인원이 줄어도 다시 센다
 
-       if (!darkRun.solo && !darkRun.taken) {
+           if (!darkRun.solo && !darkRun.taken) {
         database.ref(`darkParties/${pid}/solo/${currentUser.code}`).once('value').then(sn => {
-            if (sn.val()) return;          // 서버가 나를 혼자로 보면 따라가지 않는다
+            if (sn.val()) { darkRun.solo = true; return; }
             return database.ref(`darkParties/${pid}/curStep`).once('value').then(s2 => {
                 const cur = s2.val();
                 if (cur != null && cur > nextStep) go();
