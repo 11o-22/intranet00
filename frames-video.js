@@ -94,8 +94,19 @@ ${sel} {
 `;
         css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap > *:not(.fv-canvas)').join(',\n')
             + ' { position: relative !important; z-index: 2 !important; }\n';
-                css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap .fv-canvas').join(',\n')
-            + ` { inset: 0 !important; opacity: ${f.opacity} !important; }\n`;
+                     const t0 = Math.round(f.ring * 0.5), t1 = f.ring;
+        const ringMask = `
+        linear-gradient(to right, #000 0 ${t0}px, rgba(0,0,0,0) ${t1}px, rgba(0,0,0,0) calc(100% - ${t1}px), #000 calc(100% - ${t0}px) 100%),
+        linear-gradient(to bottom, #000 0 ${t0}px, rgba(0,0,0,0) ${t1}px, rgba(0,0,0,0) calc(100% - ${t1}px), #000 calc(100% - ${t0}px) 100%)`;
+        css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap .fv-canvas').join(',\n')
+            + ` {
+    inset: 0 !important;
+    opacity: ${f.opacity} !important;
+    -webkit-mask-image: ${ringMask};
+    -webkit-mask-composite: source-over;
+    mask-image: ${ringMask};
+    mask-composite: add;
+}\n`;
 
                     css += `
 #employee-cards-container .emp-list-card.fr-${f.id}.fr-wrap,
