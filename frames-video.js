@@ -60,7 +60,7 @@ const VIDEO_FRAMES = [
     object-fit: fill !important;
     mix-blend-mode: screen !important;
     pointer-events: none !important;
-    z-index: 0 !important;
+     z-index: 3 !important;
     border-radius: 6px;
 }
 `;
