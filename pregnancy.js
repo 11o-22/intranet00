@@ -140,7 +140,16 @@ function addPregBtn(code) {
 
     // 임신시키기
     const meSire = canSire(currentUser);
-    const tBear = canBear(t);
+    const tBear = (typeof canBearNow === 'function') ? canBearNow(t) : canBear(t);
+
+    // 플러그 때문에 막힌 경우는 이유를 알려 준다
+    if (meSire && canBear(t) && !tBear && !isPregnant(t)) {
+        html += `<div style="background:rgba(0,0,0,0.3); border:1px solid #4a3a6a; border-radius:6px; padding:9px 11px; margin-top:10px; font-size:11px; color:#aaa; line-height:1.7;">
+            상대가 <b style="color:#c9a8ff;">다이아 보지 플러그</b>를 차고 있습니다.<br>
+            <span style="font-size:10px; color:#888;">빼면 할 수 있습니다.</span>
+        </div>`;
+    }
+
     if (meSire && tBear && sireCount(t) < PREG_MAX_SIRES && !isMySire(t)) {
         const near = isPartner(currentUser, t);
         html += `<button id="preg-do-btn" class="game-btn" style="width:100%; margin-top:8px; padding:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="tryPregnancy('${code}')">
@@ -161,6 +170,10 @@ function tryPregnancy(code) {
     if (!t) return;
     if (!canSire(currentUser)) { showCustomAlert('지금은 할 수 없는 상태입니다.'); return; }
     if (!canBear(t)) { showCustomAlert('상대가 받을 수 있는 상태가 아닙니다.'); return; }
+    if (typeof hasVaginaPlug === 'function' && hasVaginaPlug(t)) {
+        showCustomAlert('상대가 다이아 보지 플러그를 차고 있습니다.\n\n빼야 할 수 있습니다.');
+        return;
+    }
     if (sireCount(t) >= PREG_MAX_SIRES) { showCustomAlert(`이미 ${PREG_MAX_SIRES}명이 있습니다.`); return; }
     if (isMySire(t)) { showCustomAlert('이미 당신의 아이를 가지고 있습니다.'); return; }
 
@@ -178,6 +191,12 @@ function tryPregnancy(code) {
 function doPregnancy(code) {
     const t = db.users[code];
     if (!t) return;
+    // 수락 직전에 플러그를 채운 경우를 막는다
+    if (typeof hasVaginaPlug === 'function' && hasVaginaPlug(t)) {
+        showCustomAlert(`${t.name} 사원이 다이아 보지 플러그를 차고 있습니다.\n\n진행되지 않았습니다.`);
+        return;
+    }
+    if (!canBear(t)) { showCustomAlert('상대가 받을 수 있는 상태가 아닙니다.'); return; }
 
     const sure = hasSureBear(t);                   // 딸기맛 물약 — 한 번에 된다
     const myR = roleFlipped(currentUser) ? sireRateAlt(currentUser) : sireRate(currentUser);

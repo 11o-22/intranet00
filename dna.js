@@ -69,24 +69,50 @@ function hasSureBear(user) {
     return !!user && hasPotion(user, '딸기맛 물약');
 }
 
+// 역할을 뒤집는 물약 셋
+const FLIP_POTIONS = ['우유맛 물약', '포도맛 물약', '망고맛 물약'];
+function hasFlipPotion(user) {
+    if (!user) return false;
+    return FLIP_POTIONS.some(n => hasPotion(user, n));
+}
+
+// 다이아 보지 플러그를 차고 있는가
+// 차고 있으면 새로 임신할 수 없다. 이미 임신한 것은 유지된다.
+function hasVaginaPlug(user) {
+    if (!user || !user.equippedWeapons) return false;
+    return user.equippedWeapons.some(function (w) {
+        const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w);
+        return base === '다이아 보지 플러그';
+    });
+}
+
 // 임신할 수 있는 쪽
+// 남성 + 우유/포도/망고 중 하나  또는  여성 + 그 셋 다 없음
 function canBear(user) {
     if (!user) return false;
-    if (genderOf(user) === '여성') return true;
-    return hasPotion(user, '우유맛 물약') || hasPotion(user, '포도맛 물약') || hasPotion(user, '망고맛 물약') || hasPotion(user, '딸기맛 물약');
+    const g = genderOf(user);
+    if (g === '남성') return hasFlipPotion(user);
+    if (g === '여성') return !hasFlipPotion(user);
+    return false;                      // 성별 미지정은 해당 없음
 }
-// 임신시킬 수 있는 쪽
+
+// 임신시킬 수 있는 쪽 — 받는 쪽이면 시킬 수 없다
 function canSire(user) {
     if (!user) return false;
-    if (genderOf(user) === '남성') return true;
-    return hasPotion(user, '우유맛 물약') || hasPotion(user, '포도맛 물약');
+    if (!genderOf(user)) return false; // 성별 미지정은 해당 없음
+    return !canBear(user);
 }
+
+// 지금 새로 임신할 수 있는가 (플러그까지 본다)
+function canBearNow(user) {
+    return canBear(user) && !hasVaginaPlug(user);
+}
+
 // 물약으로 역할이 뒤집혔는가
 function roleFlipped(user) {
     const g = genderOf(user);
-    if (g === '여성') return canSire(user);
-    if (g === '남성') return hasPotion(user, '우유맛 물약') || hasPotion(user, '포도맛 물약') || hasPotion(user, '망고맛 물약') || hasPotion(user, '딸기맛 물약');
-    return false;
+    if (!g) return false;
+    return hasFlipPotion(user);
 }
 
 // 화면에 보여 줄 확률 (본인 것만)
