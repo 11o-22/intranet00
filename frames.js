@@ -3,9 +3,9 @@
 // index.html 에서 allamount.js 다음에 불러온다
 // ==========================================
 
-const FRAME_REFUND = { D: 20, C: 30, B: 40, A: 50, S: 60 };
-const FRAME_WEIGHT = { D: 60, C: 25, B: 10, A: 4.5, S: 0.5 };
-const FRAME_COLOR  = { D: '#9e9e9e', C: '#4fc3f7', B: '#c9a8ff', A: '#ffd700', S: '#ff6b9d' };
+const FRAME_REFUND = { D: 20, C: 30, B: 40, A: 50, S: 60, L: 120 };
+const FRAME_WEIGHT = { D: 60, C: 25, B: 10, A: 4.5, S: 0.5, L: 0.05 };
+const FRAME_COLOR  = { D: '#9e9e9e', C: '#4fc3f7', B: '#c9a8ff', A: '#ffd700', S: '#ff6b9d', L: '#00e5ff' };
 
 const FRAMES = [
     // ===== D 16종 · 사무 =====
@@ -291,7 +291,7 @@ function openFramePanel() {
             <button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="frSet('hist','')">기록 해제</button>
         </div>
         <div style="max-height:46vh; overflow-y:auto; padding-right:4px;">
-        ${['S','A','B','C','D'].map(g => {
+        ${['L','S','A','B','C','D'].map(g => {
             const list = FRAMES.filter(f => f.g === g);
             const have = list.filter(f => frOwned(f.id));
             return `
