@@ -18,7 +18,8 @@ const VIDEO_FRAMES = [
         id: 'v01', g: 'L', n: '뇌명',
         ring: 13,          // 띠 두께 (px)
         bandX: 0.17,       // 영상에서 좌우 번개가 차지하는 비율
-        bandY: 0.22,       // 영상에서 위아래 번개가 차지하는 비율
+        bandY: 0.22,    
+        padL: 0.018, padR: 0.023, padT: 0, padB: 0,   // 원본 검은 여백   // 영상에서 위아래 번개가 차지하는 비율
         opacity: 1,
         bg: '#02080e',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -185,16 +186,22 @@ html body .fr-${f.id}.fr-wrap {
 
             const bx = Math.max(2, Math.round(vw * L.f.bandX));
             const by = Math.max(2, Math.round(vh * L.f.bandY));
+            
+
 
             ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
             ctx.clearRect(0, 0, W, H);
             ctx.globalCompositeOperation = 'lighter';
 
+                      const mL = Math.round(vw * (L.f.padL || 0)), mR = Math.round(vw * (L.f.padR || 0));
+            const mT = Math.round(vh * (L.f.padT || 0)), mB = Math.round(vh * (L.f.padB || 0));
+            const iw = vw - mL - mR, ih = vh - mT - mB;
+
             // 위 · 아래 · 왼쪽 · 오른쪽
-            ctx.drawImage(vid, 0, 0, vw, by, 0, 0, W, T);
-            ctx.drawImage(vid, 0, vh - by, vw, by, 0, H - T, W, T);
-            ctx.drawImage(vid, 0, 0, bx, vh, 0, 0, T, H);
-            ctx.drawImage(vid, vw - bx, 0, bx, vh, W - T, 0, T, H);
+            ctx.drawImage(vid, mL, mT, iw, by, 0, 0, W, T);
+            ctx.drawImage(vid, mL, vh - mB - by, iw, by, 0, H - T, W, T);
+            ctx.drawImage(vid, mL, mT, bx, ih, 0, 0, T, H);
+            ctx.drawImage(vid, vw - mR - bx, mT, bx, ih, W - T, 0, T, H);
 
             ctx.globalCompositeOperation = 'source-over';
         });
