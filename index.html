@@ -6853,7 +6853,7 @@ if (cat.effect === 'couple_ring') {
                 return;
             }
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 5) {
+            if (currentUser.equippedWeapons.length >= 8) {
                 showCustomAlert("장비는 최대 5개까지만 장착할 수 있습니다.");
                 return;
             }
@@ -7172,12 +7172,12 @@ else if (cat.effect === 'rainbow_potion') {
 }
 else if (cat.effect === 'equip_red_ribbon') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 5) {
+    if (targetUser.equippedWeapons.length >= 8) {
         showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
     if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-    if (currentUser.equippedWeapons.length >= 5) {
+    if (currentUser.equippedWeapons.length >= 8) {
         showCustomAlert('당신의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -7200,7 +7200,7 @@ else if (cat.effect === 'equip_red_ribbon') {
 
 }else if (cat.effect === 'equip_sonpo') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 5) {
+    if (targetUser.equippedWeapons.length >= 8) {
         if (!isOthers) showCustomAlert('장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -7217,7 +7217,7 @@ else if (cat.effect === 'equip_red_ribbon') {
 }
 else if (cat.effect === 'equip_brainwash') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 5) {
+    if (targetUser.equippedWeapons.length >= 8) {
         showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -7381,7 +7381,7 @@ updateUI();
         }
        else if (cat.effect === 'equip_clit') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 5) {
+    if (targetUser.equippedWeapons.length >= 8) {
         if (!isOthers) showCustomAlert("장착 슬롯이 가득 찼습니다.");
         return false;
     }
@@ -7414,11 +7414,11 @@ updateUI();
             if (cat.effect === 'equip_sync_hole' || cat.effect === 'equip_sync_dildo') {
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
                 
-                if (currentUser.equippedWeapons.length >= 5) {
+                if (currentUser.equippedWeapons.length >= 8) {
                     if(!isOthers) showCustomAlert("당신의 장착 슬롯이 가득 차서 연동 기구를 사용할 수 없습니다.");
                     return false;
                 }
-                if (targetUser.equippedWeapons.length >= 5) {
+                if (targetUser.equippedWeapons.length >= 8) {
                     if(!isOthers) showCustomAlert("대상의 장착 슬롯이 가득 찼습니다.");
                     return false;
                 }
@@ -7446,7 +7446,7 @@ updateUI();
             } 
             // 단일 장착 기구 (다이아 애널 플러그, 에그 바이브 등)
             else {
-                if (targetUser.equippedWeapons.length >= 5) {
+                if (targetUser.equippedWeapons.length >= 8) {
                     if(!isOthers) showCustomAlert("대상(본인 포함)의 장착 슬롯이 가득 찼습니다.");
                     return false;
                 }

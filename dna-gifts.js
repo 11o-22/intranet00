@@ -175,7 +175,7 @@ function myDnaEquip() {
 
         if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
         if (myDnaEquip()) { showCustomAlert('고유 아이템은 하나만 찰 수 있습니다.'); return; }
-        if (currentUser.equippedWeapons.length >= 5) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
+        if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
 
         currentUser.equippedWeapons.push(itemName);
         setEquipOwner(currentUser, itemName, currentUser.code);

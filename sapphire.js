@@ -61,7 +61,7 @@ function hasSapClamp(user)   { return sapActive(user, '사파이어 젖꼭지 �
             if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장착할 수 없습니다.'); return; }
 
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 5) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
+            if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
 
             currentUser.equippedWeapons.push(itemName);
             setEquipOwner(currentUser, itemName, currentUser.code);
@@ -83,7 +83,7 @@ function hasSapClamp(user)   { return sapActive(user, '사파이어 젖꼭지 �
             if (!targetUser) return false;
 
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-            if (targetUser.equippedWeapons.length >= 5) {
+            if (targetUser.equippedWeapons.length >= 8) {
                 showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
                 return false;
             }

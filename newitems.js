@@ -347,7 +347,7 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
         // --- 우주 장비 ---
         if (NEW_EQUIP.includes(cat.effect)) {
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 5) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
+            if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
             currentUser.equippedWeapons.push(itemName);
             if (typeof setEquipOwner === 'function') setEquipOwner(currentUser, itemName, currentUser.code);
             if (cat.effect === 'equip_garter') currentUser.garterExpire = Date.now() + 24 * 3600 * 1000;
@@ -464,7 +464,7 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
 
         if (['equip_ruby_clit','equip_ruby_nip','equip_garter'].includes(cat.effect)) {
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-            if (targetUser.equippedWeapons.length >= 5) { showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.'); return false; }
+            if (targetUser.equippedWeapons.length >= 8) { showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.'); return false; }
             const label = isOthers ? `${itemName} (장착자: ${currentUser.name})` : itemName;
             targetUser.equippedWeapons.push(label);
             if (typeof setEquipOwner === 'function')
