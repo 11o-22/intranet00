@@ -13,7 +13,7 @@
 const VIDEO_FRAMES = [
     {
         id: 'v01', g: 'L', n: '뇌명',
-        src: 'frames/lightning.webm',
+        src: 'frames/lightning.mp4',
         poster: '',                     // 첫 장면 그림 (없어도 된다)
         opacity: 0.95,
         border: '2px solid rgba(90,200,255,0.55)',
