@@ -4,7 +4,7 @@
 // ==========================================
 
 const PREG_HOURS = 48;            // 이틀 뒤 출산
-const PREG_CARE_DAILY = 8;        // 하루 돌봄 횟수
+const PREG_CARE_DAILY = 5;        // 하루 돌봄 횟수
 const PREG_MAX_SIRES = 5;         // 한 명이 받을 수 있는 최대 인원
 const PREG_COST_MAX = 3000;       // 포인트로 낼 때 상한
 

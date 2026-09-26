@@ -240,7 +240,7 @@ BIRTH_ITEMS.forEach(function (b) {
 // 아이템 등급 — 값이 클수록 좋은 것
 function birthTier(it) {
     if (it.e === 'b_mix') return 3;                                  // 복합
-    if (it.e === 'b_point') return it.v >= 1500 ? 3 : it.v >= 800 ? 2 : 1;
+   if (it.e === 'b_point') return it.v >= 15000 ? 3 : it.v >= 8000 ? 2 : 1;
     if (it.e === 'heal')    return it.v >= 25 ? 3 : it.v >= 15 ? 2 : 1;
     if (it.e === 'b_blind') return it.v >= 5 ? 3 : it.v >= 3 ? 2 : 1;
     if (it.e === 'b_luck')  return (it.mult === 3 || it.v >= 3) ? 3 : 2;
