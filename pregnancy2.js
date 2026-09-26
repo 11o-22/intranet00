@@ -245,6 +245,22 @@ function checkPregBirth() {
     const count = n >= 5 ? 5 : n >= 2 ? Math.min(n, 4) : (1 + Math.floor(Math.random() * 3));
 
     const fill = (typeof careFill === 'function') ? careFill(p) : 0;
+
+    // 고유 아이템인지, 누구 것인지 판별
+    const ownerOf = function (nm) {
+        const c = ITEM_CATALOG[nm];
+        return (c && c.dnaOwner) ? c.dnaOwner : null;
+    };
+    // 고유가 아닌 것을 하나 뽑는다
+    const plainItem = function (a, b) {
+        for (let k = 0; k < 40; k++) {
+            const x = rollBirthItem(a, b, fill);
+            if (!ownerOf(x)) return x;
+        }
+        return BIRTH_ITEMS[Math.floor(Math.random() * BIRTH_ITEMS.length)].n;
+    };
+
+    // got[i] 는 i 번째 아버지와의 몫
     const got = [];
     for (let i = 0; i < count; i++) {
         const other = sires[i % n];
@@ -252,7 +268,40 @@ function checkPregBirth() {
         got.push(rollBirthItem(currentUser, oUser, fill));
     }
 
-    got.forEach(x => currentUser.inventory.push(x));
+    // 어미 몫 · 아비 몫을 따로 담는다
+    // 고유 아이템은 주인에게만 간다. 상대는 다른 것을 받는다.
+    const mineGot = [];
+    const sireGot = {};
+    for (let i = 0; i < count; i++) {
+        const other = sires[i % n];
+        const oCode = other ? other.code : null;
+        const oUser = oCode ? db.users[oCode] : null;
+        const item = got[i];
+        const own = ownerOf(item);
+
+        if (!own) {
+            // 고유가 아니면 양쪽 다 같은 것
+            mineGot.push(item);
+            if (oCode) (sireGot[oCode] = sireGot[oCode] || []).push(item);
+            continue;
+        }
+
+        if (own === currentUser.code) {
+            mineGot.push(item);
+            if (oCode) (sireGot[oCode] = sireGot[oCode] || []).push(plainItem(currentUser, oUser));
+        } else if (oCode && own === oCode) {
+            (sireGot[oCode] = sireGot[oCode] || []).push(item);
+            mineGot.push(plainItem(currentUser, oUser));
+        } else {
+            // 둘 다 주인이 아니면 고유가 아닌 것으로 바꾼다
+            const sub = plainItem(currentUser, oUser);
+            got[i] = sub;
+            mineGot.push(sub);
+            if (oCode) (sireGot[oCode] = sireGot[oCode] || []).push(sub);
+        }
+    }
+
+    mineGot.forEach(x => currentUser.inventory.push(x));
 
     // 특이사항 정리
     if (currentUser.badge && currentUser.badge.notes) {
@@ -261,25 +310,28 @@ function checkPregBirth() {
     }
     currentUser.preg = null;
 
-    addHistoryLog(currentUser, `[출산] ${count}개가 나왔습니다. (${got.join(', ')})`);
+    addHistoryLog(currentUser, `[출산] ${count}개가 나왔습니다. (${mineGot.join(', ')})`);
     saveSelfFull();
     updateUI();
 
     // 아버지들에게도
-    sires.forEach(function (s, i) {
+    sires.forEach(function (s) {
         const f = db.users[s.code];
         if (!f) return;
-        const item = got[i % got.length];
+        const list = sireGot[s.code] || [];
+        if (!list.length) return;
         if (!f.inventory) f.inventory = [];
-        f.inventory.push(item);
-        addHistoryLog(f, `[출산] ${currentUser.name} 사원에게서 '${item}'이(가) 나왔습니다.`);
+        list.forEach(function (item) {
+            f.inventory.push(item);
+            addHistoryLog(f, `[출산] ${currentUser.name} 사원에게서 '${item}'이(가) 나왔습니다.`);
+        });
         updateUserFields(s.code, { inventory: f.inventory, history: f.history });
     });
 
     pregBroadcast(`<b style="color:#ff8fb1;">${currentUser.name}</b> 사원이 ${count}개를 낳았습니다.`);
     const totalCare = Object.values(p.careCount || {}).reduce((a, b) => a + b, 0);
     const goal = PREG_CARE_DAILY * 2;
-    showCustomAlert(`나왔습니다.\n\n${got.join('\n')}\n\n돌봄 ${totalCare} / ${goal}회`
+    showCustomAlert(`나왔습니다.\n\n${mineGot.join('\n')}\n\n돌봄 ${totalCare} / ${goal}회`
         + (fill >= 1 ? '\n다 채웠습니다. 좋은 것이 나왔을 겁니다.' : '')
         + `\n\n아버지들에게도 하나씩 갔습니다.`);
     setTimeout(function () { if (currentUser) currentUser._birthing = false; }, 5000);
