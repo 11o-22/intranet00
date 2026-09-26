@@ -87,16 +87,16 @@ const VIDEO_FRAMES = [
         css += `
 ${sel} {
     position: relative !important;
-    border: ${f.ring}px solid transparent !important;
+        border: none !important;
     border-radius: 7px !important;
-    overflow: visible !important;
+        overflow: hidden !important;
     background-color: ${f.bg} !important;
 }
 `;
         css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap > *:not(.fv-canvas)').join(',\n')
             + ' { position: relative !important; z-index: 2 !important; }\n';
-        css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap .fv-canvas').join(',\n')
-            + ` { inset: -${f.ring}px !important; opacity: ${f.opacity} !important; }\n`;
+                css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap .fv-canvas').join(',\n')
+            + ` { inset: 0 !important; opacity: ${f.opacity} !important; }\n`;
     });
 
     const st = document.createElement('style');
