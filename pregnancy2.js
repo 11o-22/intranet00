@@ -1,460 +1,406 @@
 // ==========================================
-// ★ DNA · 임신 아이템 70종
-// index.html 에서 invmark.js 다음에 불러온다
+// ★ 임신 — 돌봄 · 출산 · 이송
+// index.html 에서 pregnancy.js 다음에 불러온다
 // ==========================================
 
-// ==========================================
-// DNA — 사번 기반 고정값
-// ==========================================
-const DNA_BASE = ['A','T','G','C'];
+const CARE_GAP = 1 * 3600000;      // 최소 1시간 간격
+const CARE_GRACE = 30 * 60000;     // 30분 유예
+const NEGLECT_HOURS = 8;           // 이만큼 안 돌보면 방치 (밤 시간 제외)
+const NIGHT_END_HOUR = 10;         // 자정~이 시각까지는 안 센다
 
-function seedOf(str) {
-    let h = 2166136261;
-    for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
+// 오늘 돌본 횟수 / 남은 횟수
+function careDayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+function careUsedToday(p) {
+    if (!p || !p.careDay) return 0;
+    const v = p.careDay[currentUser.code];
+    if (!v || v.d !== careDayKey()) return 0;
+    return v.n || 0;
+}
+function careLeftToday(p) {
+    const cap = (typeof PREG_CARE_DAILY !== 'undefined') ? PREG_CARE_DAILY : 8;
+    return Math.max(0, cap - careUsedToday(p));
+}
+function careAddToday(p, n) {
+    if (!p.careDay) p.careDay = {};
+    const k = careDayKey();
+    const v = p.careDay[currentUser.code];
+    if (!v || v.d !== k) p.careDay[currentUser.code] = { d: k, n: n };
+    else v.n = (v.n || 0) + n;
+}
+
+// ==========================================
+// 돌봄 화면
+// ==========================================
+function openCarePanel(code) {
+    const t = db.users[code];
+    if (!t || !isPregnant(t)) return;
+    const p = pregOf(t);
+    const last = (p.careAt || {})[currentUser.code] || 0;
+    if (Date.now() - last < CARE_GAP) {
+        const m = Math.ceil((last + CARE_GAP - Date.now()) / 60000);
+        showCustomAlert(`아직 이릅니다.\n${m}분 뒤에 다시 오세요.`);
+        return;
     }
-    return h >>> 0;
-}
-function seedRand(seed, n) {
-    let x = seed + n * 2654435761;
-    x = Math.imul(x ^ (x >>> 15), 2246822507);
-    x = Math.imul(x ^ (x >>> 13), 3266489909);
-    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
-}
+    const left = careLeftToday(p);
+    if (left <= 0) {
+        showCustomAlert(`오늘은 다 돌봤습니다.\n\n하루 ${PREG_CARE_DAILY}번까지입니다.`);
+        return;
+    }
 
-function dnaOf(user) {
-    if (!user) return '----';
-    if (user.dna) return user.dna;
-    const s = seedOf(user.code + '|' + (user.no || ''));
-    let d = '';
-    for (let i = 0; i < 8; i++) d += DNA_BASE[Math.floor(seedRand(s, i) * 4)];
-    user.dna = d;
-    if (user.code === (currentUser && currentUser.code)) saveFields({ dna: 1 });
-    else updateUserFields(user.code, { dna: d });
-    return d;
-}
+    const inv = currentUser.inventory || [];
+    const owned = Object.keys(PREG_ITEMS).filter(n => inv.includes(n));
 
-// 임신 성공률 — 같은 사람은 항상 같다
-function sireRate(user) {                    // 시키는 쪽 0.5 ~ 35%
-    const s = seedOf('sire|' + user.code);
-    return Math.round((0.5 + seedRand(s, 1) * 34.5) * 10) / 10;
-}
-function bearRate(user) {                    // 되는 쪽 0.1 ~ 30%
-    const s = seedOf('bear|' + user.code);
-    return Math.round((0.1 + seedRand(s, 2) * 29.9) * 10) / 10;
-}
-// 물약 등으로 역할이 바뀌었을 때의 반대편 확률
-function sireRateAlt(user) {
-    const s = seedOf('sireAlt|' + user.code);
-    return Math.round((0.5 + seedRand(s, 3) * 34.5) * 10) / 10;
-}
-function bearRateAlt(user) {
-    const s = seedOf('bearAlt|' + user.code);
-    return Math.round((0.1 + seedRand(s, 4) * 29.9) * 10) / 10;
-}
+    const html = `
+        <div style="font-size:11px; color:#aaa; line-height:1.8; margin-bottom:13px;">
+            <b style="color:#ff8fb1;">${t.name}</b> 사원을 돌봅니다.<br>
+            포인트를 쓰거나, 사택에서 산 물건을 쓸 수 있습니다.<br>
+            오늘 <b style="color:#ffd76a;">${left}회</b> 남았습니다. (하루 ${PREG_CARE_DAILY}회 · 최소 1시간 간격)<br>
+            ${careBank() > 0 ? `쌓아 둔 회분 <b style="color:#4CAF50;">${careBank()}회</b><br>` : ''}
+            <span style="color:#ff9800;">${NEGLECT_HOURS}시간 넘게 돌보지 않으면 당신이 상담실로 갑니다.</span><br>
+            <span style="font-size:10px; color:#888;">자정부터 오전 ${NIGHT_END_HOUR}시까지는 세지 않습니다.</span>
+        </div>
 
-// ==========================================
-// 역할 판정
-// ==========================================
-function hasPotion(user, name) {
-    return (user.timedEffects || []).some(e => e.name === name);
-}
-function genderOf(user) {
-    return (user.badge && user.badge.gender) || '';
-}
+        <div style="border:1px solid #4a3a6a; border-radius:6px; padding:11px; margin-bottom:9px;">
+            <div style="font-size:12px; color:#c9a8ff; font-weight:bold; margin-bottom:7px;">포인트로</div>
+            <div style="font-size:10px; color:#888; margin-bottom:8px;">보유 ${currentUser.points.toLocaleString()} P</div>
+            <div style="display:flex; gap:5px;">
+                ${[500, 1200, 3000].map(v => `
+                    <button class="game-btn" style="flex:1; margin:0; padding:9px 4px; font-size:11px;" onclick="doCare('${code}', ${v}, '')" ${currentUser.points >= v ? '' : 'disabled'}>
+                        ${v.toLocaleString()} P
+                    </button>`).join('')}
+            </div>
+        </div>
 
-// 딸기맛 물약 — 확률을 무시한다
-function hasSureBear(user) {
-    return !!user && hasPotion(user, '딸기맛 물약');
-}
+        <div style="border:1px solid #4a3a6a; border-radius:6px; padding:11px;">
+            <div style="font-size:12px; color:#c9a8ff; font-weight:bold; margin-bottom:7px;">물건으로</div>
+            ${owned.length ? owned.map(n => {
+                const cnt = inv.filter(x => x === n).length;
+                return `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); border-radius:5px; padding:8px 10px; margin-bottom:5px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:11px; color:#fff;">${n} <span style="color:#888;">x${cnt}</span></div>
+                        <div style="font-size:9px; color:#888;">${PREG_ITEMS[n].care}회분</div>
+                    </div>
+                    <button class="game-btn" style="margin:0; padding:6px 11px; font-size:10px;" onclick="doCare('${code}', 0, '${n}')">쓴다</button>
+                </div>`;
+            }).join('') : '<div style="font-size:10px; color:#666;">가진 물건이 없습니다. 사택 매점에서 살 수 있습니다.</div>'}
+        </div>
 
-// 남성에게 자궁을 주는 물약 — 하나라도 있으면 임신할 수 있다
-const BEAR_POTIONS = ['우유맛 물약', '포도맛 물약', '망고맛 물약'];
-// 여성에게서 임신 능력을 뺏는 물약 — 망고맛은 자궁 문신이라 해당 없다
-const UNBEAR_POTIONS = ['우유맛 물약', '포도맛 물약'];
+        ${careBank() > 0 ? `
+        <div style="border:1px solid #2e7d32; border-radius:6px; padding:11px; margin-top:9px;">
+            <div style="font-size:12px; color:#81c784; font-weight:bold; margin-bottom:7px;">쌓아 둔 회분</div>
+            <div style="font-size:10px; color:#888; margin-bottom:8px;">
+                지난번에 다 못 쓴 것입니다. ${careBank()}회 남아 있습니다.
+            </div>
+            <button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg,#388e3c,#2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="doCare('${code}', 0, '@bank')">
+                ${Math.min(careBank(), left)}회분 쓴다
+            </button>
+        </div>` : ''}`;
 
-function hasBearPotion(user) {
-    if (!user) return false;
-    return BEAR_POTIONS.some(n => hasPotion(user, n));
-}
-function hasUnbearPotion(user) {
-    if (!user) return false;
-    return UNBEAR_POTIONS.some(n => hasPotion(user, n));
-}
-// 이전 이름 호환
-function hasFlipPotion(user) { return hasBearPotion(user); }
-const FLIP_POTIONS = BEAR_POTIONS;
-
-// 다이아 보지 플러그를 차고 있는가
-// 차고 있으면 새로 임신할 수 없다. 이미 임신한 것은 유지된다.
-function hasVaginaPlug(user) {
-    if (!user || !user.equippedWeapons) return false;
-    return user.equippedWeapons.some(function (w) {
-        const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w);
-        return base === '다이아 보지 플러그';
-    });
+    openGearModal('돌봄', html);
 }
 
-// 임신할 수 있는 쪽
-//   남성 : 우유 · 포도 · 망고 중 하나라도 있으면 가능
-//   여성 : 우유 · 포도가 없으면 가능 (망고는 자궁 문신이라 막지 않는다)
-function canBear(user) {
-    if (!user) return false;
-    const g = genderOf(user);
-    if (g === '남성') return hasBearPotion(user);
-    if (g === '여성') return !hasUnbearPotion(user);
-    return false;                      // 성별 미지정은 해당 없음
-}
+function doCare(code, cost, item) {
+    if (!buyGuard()) return;
+    const t = db.users[code];
+    if (!t || !isPregnant(t)) return;
+    const p = pregOf(t);
 
-// 임신시킬 수 있는 쪽 — 받는 쪽이면 시킬 수 없다
-function canSire(user) {
-    if (!user) return false;
-    if (!genderOf(user)) return false; // 성별 미지정은 해당 없음
-    return !canBear(user);
-}
+    const left = careLeftToday(p);
+    if (left <= 0) { showCustomAlert(`오늘은 다 돌봤습니다.\n\n하루 ${PREG_CARE_DAILY}번까지입니다.`); return; }
 
-// 지금 새로 임신할 수 있는가 (플러그까지 본다)
-function canBearNow(user) {
-    return canBear(user) && !hasVaginaPlug(user);
-}
-
-// 물약으로 역할이 뒤집혔는가
-function roleFlipped(user) {
-    const g = genderOf(user);
-    if (!g) return false;
-    if (g === '남성') return hasBearPotion(user);
-    return hasUnbearPotion(user);
-}
-
-// 화면에 보여 줄 확률 (본인 것만)
-function myRates(user) {
-    const flip = roleFlipped(user);
-    return {
-        sire: canSire(user) ? (flip ? sireRateAlt(user) : sireRate(user)) : null,
-        bear: canBear(user) ? (flip ? bearRateAlt(user) : bearRate(user)) : null
-    };
-}
-
-// ==========================================
-// 임신 아이템 70종
-// ==========================================
-const BIRTH_ITEMS = [
-    // --- 오염 계열 20 ---
-    { n:'작게 접힌 배냇저고리', e:'heal', v:18, d:'오염도 18% 회복.' },
-    { n:'첫 울음', e:'heal', v:25, d:'오염도 25% 회복.' },
-    { n:'따뜻한 손자국', e:'heal', v:15, d:'오염도 15% 회복.' },
-    { n:'식지 않는 젖병', e:'heal', v:30, d:'오염도 30% 회복.' },
-    { n:'잠든 숨소리', e:'b_blind', v:3, d:'3시간 동안 오염도가 오르지 않는다.' },
-    { n:'포대기', e:'b_blind', v:5, d:'5시간 동안 오염도가 오르지 않는다.' },
-    { n:'자장가 한 소절', e:'b_blind', v:2, d:'2시간 동안 오염도가 오르지 않는다.' },
-    { n:'마르지 않은 배냇머리', e:'heal', v:12, d:'오염도 12% 회복.' },
-    { n:'작은 발자국 본', e:'heal', v:20, d:'오염도 20% 회복.' },
-    { n:'이름을 적기 전의 종이', e:'heal', v:22, d:'오염도 22% 회복.' },
-    { n:'삼키지 못한 젖', e:'heal', v:10, d:'오염도 10% 회복.' },
-    { n:'뒤집기 전의 몸', e:'heal', v:16, d:'오염도 16% 회복.' },
-    { n:'움켜쥔 손가락', e:'heal', v:14, d:'오염도 14% 회복.' },
-    { n:'가라앉은 딸꾹질', e:'heal', v:8, d:'오염도 8% 회복.' },
-    { n:'처음 뜬 눈', e:'b_blind', v:4, d:'4시간 동안 오염도가 오르지 않는다.' },
-    { n:'덜 자란 손톱', e:'heal', v:9, d:'오염도 9% 회복.' },
-    { n:'목을 가누기 전', e:'heal', v:11, d:'오염도 11% 회복.' },
-    { n:'빨지 않은 손등', e:'heal', v:13, d:'오염도 13% 회복.' },
-    { n:'울다 만 자리', e:'heal', v:17, d:'오염도 17% 회복.' },
-    { n:'식은 체온', e:'heal', v:19, d:'오염도 19% 회복.' },
-
-    // --- 공용시설 계열 20 ---
-    { n:'첫 동전', e:'b_luck', v:2, d:'2시간 동안 공용시설 행운이 두 배가 된다.' },
-    { n:'흔들린 딸랑이', e:'b_ticket', v:3, d:'공용시설 이용 3회 추가.' },
-    { n:'손에 쥔 단추', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
-    { n:'뒤집힌 카드', e:'b_luck', v:3, d:'3시간 동안 공용시설 행운이 두 배가 된다.' },
-    { n:'세 번 굴린 주사위', e:'b_luck', v:1, d:'1시간 동안 공용시설 행운이 세 배가 된다.', mult:3 },
-    { n:'접힌 영수증', e:'b_point', v:800, d:'800 P를 얻는다.' },
-    { n:'구겨진 지폐', e:'b_point', v:1500, d:'1,500 P를 얻는다.' },
-    { n:'빈 봉투', e:'b_point', v:400, d:'400 P를 얻는다.' },
-    { n:'꽉 찬 저금통', e:'b_point', v:3000, d:'3,000 P를 얻는다.' },
-    { n:'금이 간 구슬', e:'b_ticket', v:4, d:'공용시설 이용 4회 추가.' },
-    { n:'짝 없는 양말', e:'b_ticket', v:1, d:'공용시설 이용 1회 추가.' },
-    { n:'돌려 감은 태엽', e:'b_luck', v:2, d:'2시간 동안 공용시설 행운이 두 배가 된다.' },
-    { n:'무늬가 지워진 딱지', e:'b_point', v:600, d:'600 P를 얻는다.' },
-    { n:'쥐었다 편 손', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
-    { n:'한쪽만 남은 신발', e:'b_point', v:900, d:'900 P를 얻는다.' },
-    { n:'맞지 않는 퍼즐 조각', e:'b_luck', v:4, d:'4시간 동안 공용시설 행운이 두 배가 된다.' },
-    { n:'뒤늦게 나온 이', e:'b_ticket', v:3, d:'공용시설 이용 3회 추가.' },
-    { n:'첫 걸음의 흔들림', e:'b_point', v:1200, d:'1,200 P를 얻는다.' },
-    { n:'숨겨 둔 사탕', e:'b_ticket', v:2, d:'공용시설 이용 2회 추가.' },
-    { n:'잃어버린 이름표', e:'b_point', v:700, d:'700 P를 얻는다.' },
-
-    // --- 어둠 계열 20 ---
-    { n:'어둠에서 온 태동', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
-    { n:'눈을 감고 나온 것', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
-    { n:'탯줄 매듭', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
-    { n:'숨을 참은 자리', e:'b_bonus', v:3, d:'다음 탐사의 모든 판정에 +3.' },
-    { n:'따라 나온 그림자', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
-    { n:'세어지지 않은 손가락', e:'b_reroll', v:2, d:'다음 탐사에서 판정을 2회 다시 굴린다.' },
-    { n:'울지 않은 아이', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
-    { n:'거꾸로 나온 것', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
-    { n:'물에서 건진 숨', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
-    { n:'이름 없이 태어난 것', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
-    { n:'두 번 접힌 태반', e:'b_reroll', v:1, d:'다음 탐사에서 판정을 1회 다시 굴린다.' },
-    { n:'빛을 본 적 없는 눈', e:'b_bonus', v:1, d:'다음 탐사의 모든 판정에 +1.' },
-    { n:'돌아보지 않은 등', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
-    { n:'삼킨 울음', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
-    { n:'마르지 않은 양수', e:'b_bonus', v:2, d:'다음 탐사의 모든 판정에 +2.' },
-    { n:'다섯이 아닌 손', e:'b_guard', v:1, d:'다음 탐사에서 치명적 상황을 한 번 넘긴다.' },
-    { n:'숨을 나눈 자국', e:'b_reroll', v:1, d:'다음 탐사에서 판정을 1회 다시 굴린다.' },
-    { n:'접힌 무릎 자국', e:'b_bonus', v:1, d:'다음 탐사의 모든 판정에 +1.' },
-    { n:'헤아리지 못한 밤', e:'b_hide', v:1, d:'다음 탐사에서 지목을 한 번 피한다.' },
-    { n:'먼저 나온 손', e:'b_dark', v:1, d:'어둠 탐사 횟수 1회 추가.' },
-
-    // --- 복합 10 ---
-    { n:'닮지 않은 얼굴', e:'b_mix', v:0, d:'오염도 15% 회복 · 공용시설 이용 2회 추가.', heal:15, ticket:2 },
-    { n:'둘의 눈을 가진 것', e:'b_mix', v:0, d:'오염도 20% 회복 · 다음 탐사 판정에 +2.', heal:20, bonus:2 },
-    { n:'양쪽을 닮은 것', e:'b_mix', v:0, d:'공용시설 이용 3회 추가 · 어둠 탐사 1회 추가.', ticket:3, dark:1 },
-    { n:'누구도 닮지 않은 것', e:'b_mix', v:0, d:'오염도 25% 회복 · 1,000 P.', heal:25, point:1000 },
-    { n:'세 번째 얼굴', e:'b_mix', v:0, d:'다음 탐사 판정에 +3 · 치명적 상황 1회 방어.', bonus:3, guard:1 },
-    { n:'거울에 비친 아이', e:'b_mix', v:0, d:'오염도 18% 회복 · 3시간 행운 두 배.', heal:18, luck:3 },
-    { n:'이름을 두 번 가진 것', e:'b_mix', v:0, d:'공용시설 4회 · 1,500 P.', ticket:4, point:1500 },
-    { n:'울지 않고 웃은 것', e:'b_mix', v:0, d:'오염도 22% 회복 · 지목 1회 회피.', heal:22, hide:1 },
-    { n:'숨을 두 번 쉰 것', e:'b_mix', v:0, d:'어둠 탐사 1회 · 재굴림 1회.', dark:1, reroll:1 },
-    { n:'돌아온 아이', e:'b_mix', v:0, d:'오염도 30% 회복 · 2,000 P · 공용시설 3회.', heal:30, point:2000, ticket:3 }
-];
-
-BIRTH_ITEMS.forEach(function (b) {
-    ITEM_CATALOG[b.n] = {
-        price: 300, usable: true, targetable: false,
-        effect: b.e, value: b.v, birth: true, desc: '[출산] ' + b.d,
-        heal: b.heal, ticket: b.ticket, bonus: b.bonus, dark: b.dark,
-        point: b.point, luck: b.luck, hide: b.hide, reroll: b.reroll,
-        guard: b.guard, mult: b.mult
-    };
-});
-
-// ==========================================
-// 고유 DNA 아이템 — 사원마다 하나, 자동 생성
-// ==========================================
-const DNA_PREFIX = ['잊힌','첫','마지막','이름 없는','물려받은','닳지 않는','되돌아온','두 번 접힌','세어지지 않는','꺼지지 않는'];
-const DNA_NOUN   = ['맥박','숨결','핏줄','뼈','홍채','목소리','체온','그림자','지문','심장'];
-
-function dnaItemName(user) {
-    const s = seedOf('dnaItem|' + user.code);
-    const p = DNA_PREFIX[Math.floor(seedRand(s, 11) * DNA_PREFIX.length)];
-    const n = DNA_NOUN[Math.floor(seedRand(s, 12) * DNA_NOUN.length)];
-    return `${p} ${n} · ${dnaOf(user)}`;
-}
-
-function ensureDnaItem(user) {
-    if (!user) return null;
-    const nm = dnaItemName(user);
-    if (ITEM_CATALOG[nm]) return nm;
-    const s = seedOf('dnaEff|' + user.code);
-    const kind = Math.floor(seedRand(s, 21) * 4);
-
-    let eff, desc;
-    if (kind === 0) {
-        eff = { effect: 'heal', value: 60 };
-        desc = '오염도 60% 회복.';
-    } else if (kind === 1) {
-        eff = { effect: 'b_mix', bonus: 5, guard: 1, reroll: 2 };
-        desc = '다음 탐사 판정에 +5 · 치명적 상황 1회 방어 · 재굴림 2회.';
-    } else if (kind === 2) {
-        eff = { effect: 'b_mix', ticket: 8, luck: 6, point: 5000 };
-        desc = '공용시설 8회 · 6시간 행운 세 배 · 5,000 P.';
+    let uses = 1;
+    let banked = 0;
+    if (item === '@bank') {
+        if (careBank() <= 0) { showCustomAlert('쌓아 둔 회분이 없습니다.'); return; }
+        uses = Math.min(careBank(), left);
+        careBankUse(uses);
+        banked = careBank();
+    } else if (item) {
+        if (!(currentUser.inventory || []).includes(item)) { showCustomAlert('그 물건이 없습니다.'); return; }
+        const give = PREG_ITEMS[item] ? PREG_ITEMS[item].care : 1;
+        removeItemFromInventory(currentUser, item, 1);
+        // 하루 한도를 넘는 회분은 버리지 않고 쌓아 둔다
+        careBankAdd(give);
+        uses = Math.min(careBank(), left);
+        careBankUse(uses);
+        banked = careBank();
     } else {
-        eff = { effect: 'b_mix', dark: 3, heal: 40, hide: 2 };
-        desc = '어둠 탐사 3회 · 오염도 40% 회복 · 지목 2회 회피.';
+        if (currentUser.points < cost) { showLuxuryAlert(); return; }
+        currentUser.points -= cost;
+        uses = cost >= 3000 ? 3 : cost >= 1200 ? 2 : 1;
+        if (uses > left) uses = left;
     }
+    if (uses <= 0) { showCustomAlert('오늘은 더 돌볼 수 없습니다.'); return; }
 
-    ITEM_CATALOG[nm] = Object.assign({
-        price: 30000, usable: true, targetable: false, birth: true, dnaOwner: user.code,
-        desc: `[고유] ${user.name} 사원의 것. ${desc}`
-    }, eff);
-    if (typeof NO_SELL_ITEMS !== 'undefined' && !NO_SELL_ITEMS.includes(nm)) NO_SELL_ITEMS.push(nm);
-    return nm;
+    if (!p.careAt) p.careAt = {};
+    p.careAt[currentUser.code] = Date.now() + (uses - 1) * CARE_GAP;
+    careAddToday(p, uses);
+    if (!p.careCount) p.careCount = {};
+    p.careCount[currentUser.code] = (p.careCount[currentUser.code] || 0) + uses;
+
+    t.preg = p;
+    addHistoryLog(currentUser, `[돌봄] ${t.name} 사원을 돌봤습니다. (${uses}회분)`);
+    addHistoryLog(t, `[돌봄] ${currentUser.name} 사원이 들렀습니다.`);
+    t.satiety = Math.min(100, (t.satiety || 100) + 5);
+    t.pollution = Math.max(0, (t.pollution || 0) - 3);
+
+    updateUserFields(code, { preg: p, history: t.history, satiety: t.satiety, pollution: t.pollution });
+    saveFields({ points: 1, inventory: 1, history: 1, pregCareBank: 1 });
+    closeGearModal();
+    updateUI();
+    showCustomAlert(`${t.name} 사원을 돌봤습니다. (${uses}회분)\n\n다음 돌봄까지 ${uses}시간입니다.\n오늘 ${careLeftToday(p)}회 남았습니다.`
+        + (banked > 0 ? `\n\n남은 회분 ${banked}회는 다음에 쓸 수 있습니다.` : ''));
 }
 
-// 접속 중인 전원의 고유 아이템을 미리 만들어 둔다
-function buildAllDnaItems() {
+// ==========================================
+// 쌓아 둔 돌봄 회분
+// ==========================================
+function careBank() {
+    return (currentUser && currentUser.pregCareBank) || 0;
+}
+function careBankAdd(n) {
+    if (!currentUser) return;
+    currentUser.pregCareBank = careBank() + n;
+}
+function careBankUse(n) {
+    if (!currentUser) return;
+    currentUser.pregCareBank = Math.max(0, careBank() - n);
+}
+
+// ==========================================
+// 방치 감시 — 8시간 (자정~오전 10시 제외)
+// ==========================================
+// 자정~오전 10시는 안 센다. 그 시간을 뺀 실제 경과를 구한다.
+function awakeMs(from, to) {
+    if (!from || to <= from) return 0;
+    let total = 0;
+    let cur = from;
+    let guard = 0;
+    while (cur < to && guard++ < 400) {
+        const d = new Date(cur);
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const wake = dayStart + NIGHT_END_HOUR * 3600000;   // 그날 오전 10시
+        const nextDay = dayStart + 24 * 3600000;
+        const segEnd = Math.min(to, nextDay);
+        const segStart = Math.max(cur, wake);
+        if (segEnd > segStart) total += segEnd - segStart;
+        cur = nextDay;
+    }
+    return total;
+}
+
+// 지금이 안 세는 시간대인가
+function inNightWindow(t) {
+    return new Date(t || Date.now()).getHours() < NIGHT_END_HOUR;
+}
+
+function checkPregNeglect() {
+    if (!currentUser || !database) return;
+    if (inNightWindow()) return;                 // 자정~오전 10시는 넘어간다
+
     Object.keys(db.users || {}).forEach(function (c) {
         const u = db.users[c];
-        if (u && u.code !== 'kario0987') ensureDnaItem(u);
+        if (!u || !isPregnant(u)) return;
+        const p = pregOf(u);
+        (p.sires || []).forEach(function (s) {
+            if (s.code !== currentUser.code) return;
+            const last = (p.careAt || {})[currentUser.code] || s.at || 0;
+            if (!last) return;
+            if (awakeMs(last, Date.now()) < NEGLECT_HOURS * 3600000) return;
+            if (currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil) return;
+
+            currentUser.quarantineUntil = Date.now() + 3 * 3600000;
+            currentUser.quarantineExitPollution = 30;
+            currentUser.quarantineHospital = false;
+            currentUser.foxRoomAnswered = true;
+            if (!p.careAt) p.careAt = {};
+            p.careAt[currentUser.code] = Date.now();
+            u.preg = p;
+
+            addHistoryLog(currentUser, `[방치] ${u.name} 사원을 돌보지 않아 상담실로 이송되었습니다.`);
+            updateUserFields(c, { preg: p });
+            saveFields({ quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, history: 1 });
+            updateUI();
+            showCustomAlert(`${u.name} 사원을 ${NEGLECT_HOURS}시간 넘게 돌보지 않았습니다.\n\n상담실로 이송됩니다. (3시간)`);
+        });
     });
 }
 
 // ==========================================
-// 출산 추첨
+// 출산
 // ==========================================
-// 아이템 등급 — 값이 클수록 좋은 것
-function birthTier(it) {
-    if (it.e === 'b_mix') return 3;                                  // 복합
-    if (it.e === 'b_point') return it.v >= 1500 ? 3 : it.v >= 800 ? 2 : 1;
-    if (it.e === 'heal')    return it.v >= 25 ? 3 : it.v >= 15 ? 2 : 1;
-    if (it.e === 'b_blind') return it.v >= 5 ? 3 : it.v >= 3 ? 2 : 1;
-    if (it.e === 'b_luck')  return (it.mult === 3 || it.v >= 3) ? 3 : 2;
-    if (it.e === 'b_ticket')return it.v >= 4 ? 3 : it.v >= 2 ? 2 : 1;
-    if (it.e === 'b_guard' || it.e === 'b_reroll') return 3;
-    if (it.e === 'b_bonus') return it.v >= 3 ? 3 : it.v >= 2 ? 2 : 1;
-    if (it.e === 'b_hide')  return 2;
-    if (it.e === 'b_dark')  return 2;
-    return 1;
-}
+function checkPregBirth() {
+    if (!currentUser || !database) return;
+    if (!isPregnant(currentUser)) return;
+    const p = pregOf(currentUser);
+    if (Date.now() < p.due) return;
+    if (currentUser._birthing) return;
+    currentUser._birthing = true;
 
-// 돌봄을 얼마나 채웠는가 (0 ~ 1)
-// 이틀 동안 하루 8회씩, 총 16회가 만점
-function careFill(preg) {
-    if (!preg) return 0;
-    const total = Object.values(preg.careCount || {}).reduce((a, b) => a + b, 0);
-    const goal = (typeof PREG_CARE_DAILY !== 'undefined' ? PREG_CARE_DAILY : 8) * 2;
-    return Math.max(0, Math.min(1, total / goal));
-}
+    const sires = p.sires || [];
+    const n = sires.length;
+    const count = n >= 5 ? 5 : n >= 2 ? Math.min(n, 4) : (1 + Math.floor(Math.random() * 3));
 
-// 출산 아이템 추첨
-// fill 0 → 지금까지와 같다
-// fill 1 → 상급이 훨씬 자주 나오고, 고유 아이템도 아주 조금 잘 나온다
-function rollBirthItem(parentA, parentB, fill) {
-    [parentA, parentB].forEach(function (p) { if (p) ensureDnaItem(p); });
-
-    const f = Math.max(0, Math.min(1, fill || 0));
-
-    // 고유 아이템 — 0.01% 에서 최대 0.04% 까지만
-    const dnaRate = 0.0001 * (1 + f * 3);
-    const r = Math.random();
-    if (r < dnaRate && parentA) return dnaItemName(parentA);
-    if (r < dnaRate * 2 && parentB) return dnaItemName(parentB);
-
-    // 등급 가중치 — 다 채우면 상급이 여섯 배쯤 잘 나온다
-    const W = {
-        1: 1 - f * 0.75,          // 1.00 → 0.25
-        2: 1 + f * 0.6,           // 1.00 → 1.60
-        3: 0.45 + f * 2.35        // 0.45 → 2.80
-    };
-
-    let total = 0;
-    const pool = BIRTH_ITEMS.map(function (it) {
-        const w = W[birthTier(it)] || 1;
-        total += w;
-        return { it: it, w: w };
-    });
-
-    let x = Math.random() * total;
-    for (let i = 0; i < pool.length; i++) {
-        x -= pool[i].w;
-        if (x <= 0) return pool[i].it.n;
+    const fill = (typeof careFill === 'function') ? careFill(p) : 0;
+    const got = [];
+    for (let i = 0; i < count; i++) {
+        const other = sires[i % n];
+        const oUser = other ? db.users[other.code] : null;
+        got.push(rollBirthItem(currentUser, oUser, fill));
     }
-    return pool[pool.length - 1].it.n;
+
+    got.forEach(x => currentUser.inventory.push(x));
+
+    // 특이사항 정리
+    if (currentUser.badge && currentUser.badge.notes) {
+        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
+        currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+    currentUser.preg = null;
+
+    addHistoryLog(currentUser, `[출산] ${count}개가 나왔습니다. (${got.join(', ')})`);
+    saveSelfFull();
+    updateUI();
+
+    // 아버지들에게도
+    sires.forEach(function (s, i) {
+        const f = db.users[s.code];
+        if (!f) return;
+        const item = got[i % got.length];
+        if (!f.inventory) f.inventory = [];
+        f.inventory.push(item);
+        addHistoryLog(f, `[출산] ${currentUser.name} 사원에게서 '${item}'이(가) 나왔습니다.`);
+        updateUserFields(s.code, { inventory: f.inventory, history: f.history });
+    });
+
+    pregBroadcast(`<b style="color:#ff8fb1;">${currentUser.name}</b> 사원이 ${count}개를 낳았습니다.`);
+    const totalCare = Object.values(p.careCount || {}).reduce((a, b) => a + b, 0);
+    const goal = PREG_CARE_DAILY * 2;
+    showCustomAlert(`나왔습니다.\n\n${got.join('\n')}\n\n돌봄 ${totalCare} / ${goal}회`
+        + (fill >= 1 ? '\n다 채웠습니다. 좋은 것이 나왔을 겁니다.' : '')
+        + `\n\n아버지들에게도 하나씩 갔습니다.`);
+    setTimeout(function () { if (currentUser) currentUser._birthing = false; }, 5000);
 }
 
-// 지금 가진 고유 아이템 전체 보기
-function listDnaItems() {
-    const rows = Object.keys(db.users || {}).map(function (c) {
-        const u = db.users[c];
-        if (!u || c === 'kario0987') return null;
-        const nm = ensureDnaItem(u);
-        const cat = ITEM_CATALOG[nm] || {};
-        const eff = [];
-        if (cat.effect === 'heal') eff.push('오염도 -' + cat.value + '%');
-        if (cat.heal) eff.push('오염도 -' + cat.heal + '%');
-        if (cat.point) eff.push(cat.point.toLocaleString() + ' P');
-        if (cat.ticket) eff.push('공용시설 +' + cat.ticket + '회');
-        if (cat.dark) eff.push('어둠 탐사 +' + cat.dark + '회');
-        if (cat.bonus) eff.push('판정 +' + cat.bonus);
-        if (cat.guard) eff.push('치명 방어 ' + cat.guard + '회');
-        if (cat.reroll) eff.push('재굴림 ' + cat.reroll + '회');
-        if (cat.hide) eff.push('지목 회피 ' + cat.hide + '회');
-        if (cat.luck) eff.push(cat.luck + '시간 행운 세 배');
-        return {
-            사원: u.name, 사번: u.no, DNA: dnaOf(u),
-            아이템: nm.split(' · ')[0],
-            성능: eff.join(' · ')
+// ==========================================
+// 물약 만료 시 임신 해제
+// ==========================================
+function checkPregPotion() {
+    if (!currentUser || !isPregnant(currentUser)) return;
+    if (genderOf(currentUser) === '여성') return;
+    if (canBear(currentUser)) return;
+
+    const p = pregOf(currentUser);
+    (p.sires || []).forEach(function (s) {
+        const f = db.users[s.code];
+        if (!f) return;
+        addHistoryLog(f, `[임신 해제] ${currentUser.name} 사원의 몸이 조건을 잃었습니다.`);
+        updateUserFields(s.code, { history: f.history });
+    });
+
+    currentUser.preg = null;
+    if (currentUser.badge && currentUser.badge.notes) {
+        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
+        currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+    addHistoryLog(currentUser, `[임신 해제] 물약의 효과가 끝나 임신 상태가 사라졌습니다.`);
+    saveSelfFull();
+    updateUI();
+    showCustomAlert('몸이 돌아왔습니다.\n임신 상태가 사라졌습니다.');
+}
+
+setInterval(function () {
+    if (!currentUser) return;
+    checkPregBirth();
+    checkPregPotion();
+    checkPregNeglect();
+}, 60000);
+setTimeout(function () {
+    if (!currentUser) return;
+    checkPregBirth();
+    checkPregPotion();
+}, 4000);
+
+// ==========================================
+// 사택 매점 비치
+// ==========================================
+(function hookStore() {
+    function put() {
+        const box = document.getElementById('house-main-body');
+        if (!box || !currentUser || document.getElementById('preg-store')) return;
+        if (box.innerHTML.length < 50) return;
+
+        const rows = Object.keys(PREG_ITEMS).map(function (n) {
+            const it = PREG_ITEMS[n];
+            return `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); border-radius:5px; padding:8px 10px; margin-bottom:5px;">
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:11px; color:#fff;">${n}</div>
+                    <div style="font-size:9px; color:#888;">${it.d}</div>
+                </div>
+                <button class="game-btn" style="margin:0; padding:6px 11px; font-size:10px; flex-shrink:0;" onclick="buyPregItem('${n}')">${it.price.toLocaleString()} P</button>
+            </div>`;
+        }).join('');
+
+        box.insertAdjacentHTML('beforeend', `
+            <div id="preg-store" style="border:1px solid #c2185b; border-radius:6px; padding:12px; margin-top:13px; background:rgba(194,24,91,0.05);">
+                <div style="font-size:11px; color:#ff8fb1; font-weight:bold; margin-bottom:8px;">🤍 돌봄 용품</div>
+                <div style="font-size:10px; color:#888; margin-bottom:9px; line-height:1.6;">
+                    임신한 사원을 돌볼 때 씁니다. 여러 번치를 한 번에 채울 수 있습니다.
+                </div>
+                ${rows}
+            </div>`);
+    }
+    if (typeof renderHouse === 'function') {
+        const _r = renderHouse;
+        renderHouse = function () {
+            const r = _r.apply(this, arguments);
+            setTimeout(put, 90);
+            return r;
         };
-    }).filter(Boolean);
+    }
+    setTimeout(put, 1500);
+})();
 
-    console.log('%c===== 유전자 고유 아이템 (' + rows.length + '명) =====', 'color:#c9a8ff; font-size:13px');
-    console.table(rows);
-    console.log('출현 확률: 기본 0.01% · 돌봄 16회를 다 채우면 0.04%');
-    return rows;
+function buyPregItem(n) {
+    if (!buyGuard()) return;
+    const it = PREG_ITEMS[n];
+    if (!it) return;
+    if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 살 수 없습니다.'); return; }
+    if (currentUser.points < it.price) { showLuxuryAlert(); return; }
+    currentUser.points -= it.price;
+    currentUser.inventory.push(n);
+    addHistoryLog(currentUser, `[사택 매점] ${n} 구입 (-${it.price} P)`);
+    saveFields({ points: 1, inventory: 1, history: 1 });
+    updateUI();
+    showCustomAlert(`${n}을(를) 샀습니다.`);
 }
 
 // ==========================================
-// 출산 아이템 효과
+// 내 방에 임신 상태 표시
 // ==========================================
-(function hookBirthUse() {
-    const _use = useInventoryItem;
-    useInventoryItem = function (itemName) {
-        const cat = ITEM_CATALOG[itemName];
-        if (!cat || !cat.birth) return _use.apply(this, arguments);
-        if (window._birthOk !== itemName) return _use.apply(this, arguments);
-        window._birthOk = null;
-
-        const msg = [];
-        const heal = cat.heal || (cat.effect === 'heal' ? cat.value : 0);
-        if (heal) { currentUser.pollution = Math.max(0, currentUser.pollution - heal); msg.push(`오염도 -${heal}%`); }
-        if (cat.point) { currentUser.points += cat.point; msg.push(`+${cat.point.toLocaleString()} P`); }
-        if (cat.ticket) {
-            if (!currentUser.facilityMax) currentUser.facilityMax = 20;
-            currentUser.facilityMax = Math.min(40, currentUser.facilityMax + cat.ticket);
-            msg.push(`공용시설 +${cat.ticket}회`);
-        }
-        if (cat.dark) { currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - cat.dark); msg.push(`어둠 탐사 +${cat.dark}회`); }
-        if (cat.effect === 'b_blind') {
-            currentUser.blindfoldUntil = Math.max(currentUser.blindfoldUntil || 0, Date.now()) + cat.value * 3600000;
-            msg.push(`${cat.value}시간 오염 동결`);
-        }
-        if (cat.effect === 'b_luck' || cat.luck) {
-            const h = cat.luck || cat.value;
-            addTimedEffect(currentUser, '아이의 운', `공용시설 행운 ${cat.mult === 3 ? '세' : '두'} 배`, h);
-            msg.push(`${h}시간 행운 상승`);
-        }
-        if (cat.bonus) { if (typeof nAdd === 'function') nAdd('c_batt', cat.bonus); msg.push(`다음 탐사 판정 +${cat.bonus}`); }
-        if (cat.guard) { if (typeof nAdd === 'function') nAdd('c_pain', cat.guard); msg.push(`치명 방어 ${cat.guard}회`); }
-        if (cat.reroll) { if (typeof nAdd === 'function') nAdd('c_reroll', cat.reroll); msg.push(`재굴림 ${cat.reroll}회`); }
-        if (cat.hide) { if (typeof nAdd === 'function') nAdd('no_mark', cat.hide); msg.push(`지목 회피 ${cat.hide}회`); }
-
-        removeItemFromInventory(currentUser, itemName, 1);
-        addHistoryLog(currentUser, `[출산품] ${itemName} 사용`);
-        saveSelfFull();
-        updateUI();
-        showCustomAlert(`${itemName}\n\n${msg.join(' · ')}`);
+(function showMyPreg() {
+    if (typeof renderHouse !== 'function') return;
+    const _r = renderHouse;
+    renderHouse = function () {
+        const r = _r.apply(this, arguments);
+        setTimeout(function () {
+            const box = document.getElementById('house-main-body');
+            if (!box || !currentUser || document.getElementById('my-preg-box')) return;
+            if (!isPregnant(currentUser)) return;
+            const p = pregOf(currentUser);
+            const left = Math.max(0, Math.ceil((p.due - Date.now()) / 3600000));
+            box.insertAdjacentHTML('afterbegin', `
+                <div id="my-preg-box" style="background:rgba(194,24,91,0.08); border:1px solid #c2185b; border-radius:6px; padding:11px; margin-bottom:11px; font-size:11px; line-height:1.9;">
+                    <b style="color:#ff8fb1;">임신 중</b> · 출산까지 <b>${left}시간</b><br>
+                    아버지 ${p.sires.map(s => s.name).join(', ')}<br>
+                    <span style="font-size:10px; color:#888;">나오는 수는 아버지 수에 따라 정해집니다.</span>
+                </div>`);
+        }, 70);
+        return r;
     };
 })();
 
-// 확인 팝업을 거쳐 오도록
-(function bridgeConfirm() {
-    const _u = useInventoryItem;
-    useInventoryItem = function (itemName) {
-        const cat = ITEM_CATALOG[itemName];
-        if (cat && cat.birth && window._invOk === itemName) {
-            window._birthOk = itemName;
-        }
-        return _u.apply(this, arguments);
-    };
-})();
-
-// 행운 효과 연결
-(function hookLuckChild() {
-    if (typeof facilityLuckMult !== 'function') return;
-    const _f = facilityLuckMult;
-    facilityLuckMult = function (user) {
-        let m = _f.apply(this, arguments);
-        const u = user || currentUser;
-        if (u && (u.timedEffects || []).some(e => e.name === '아이의 운')) m *= 2;
-        return m;
-    };
-})();
-
-// 재굴림 연결
-(function hookRerollChild() {
-    if (typeof luckReroll !== 'function' || typeof nUse !== 'function') return;
-    const _l = luckReroll;
-    luckReroll = function (roll) {
-        roll = _l.apply(this, arguments);
-        if (darkRun && roll <= 7 && nUse('c_reroll')) {
-            const nr = Math.floor(Math.random() * 20) + 1;
-            if (typeof showDarkToast === 'function') showDarkToast(`◈ 다시 굴린다. (${roll} → ${nr})`);
-            return nr;
-        }
-        return roll;
-    };
-})();
-
-setTimeout(buildAllDnaItems, 2000);
-console.log('[DNA] 출산 아이템 70종 등록');
+console.log('[임신] 돌봄 · 출산 · 이송 적용');
