@@ -180,6 +180,8 @@ function epicStart(isParty, pid) {
         helped: 0, danger: null, started: Date.now()
     };
 
+    currentUser.darkDate = getTodayStr();
+    currentUser.darkTries = (currentUser.darkTries || 0) + 1;
     applyDarkSatiety(EPIC_CODE);
     saveFields({ darkDate:1, darkTries:1, satiety:1 });
 
