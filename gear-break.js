@@ -10,10 +10,10 @@
 // 파손 보호권 · 재봉 도구로 막거나 되돌릴 수 있다.
 
 const GEAR_BREAK = {
-    fumble: 0.35,      // 1이 나왔을 때
-    low: 0.10,         // 3 이하가 나왔을 때
-    death: 0.50,       // 죽을 뻔한 것을 넘겼을 때
-    gimmick: 0.15      // 기믹을 부술 때
+    fumble: 0.14,      // 1이 나왔을 때
+    low: 0.04,         // 3 이하가 나왔을 때
+    death: 0.20,       // 죽을 뻔한 것을 넘겼을 때
+    gimmick: 0.06      // 기믹을 부술 때
 };
 
 function gearGradeList() {
