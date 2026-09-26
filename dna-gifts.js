@@ -16,7 +16,7 @@
 
 const DNA_GIFTS = [
     { n:'불이 붙지 않는 성냥', e:{ death:1 }, p:100, d:'즉사 회피 1회' },
-    { n:'눈을 감은 나침반', e:{ pct:500 }, p:100, d:'공용시설 행운 500%' },
+    { n:'눈을 감은 나침반', e:{ pct:500 }, p:100, d:'공용시설 행운 600%' },
     { n:'별빛을 담은 구슬', e:{ dark:3, luck:4 }, p:102, d:'행운 4회 · 어둠 탐사 +3회' },
     { n:'첫눈이 남긴 실', e:{ fac:7, pct:420 }, p:101, d:'공용시설 행운 420% · 공용시설 +7회' },
     { n:'빛이 고인 깃털', e:{ luck:4, pct:360 }, p:101, d:'행운 4회 · 공용시설 행운 360%' },
@@ -414,9 +414,7 @@ function resetDnaGifts(doIt) {
         else ghosts.push({ code: c, u: u || {} });
     });
 
-    // 사번 순으로 줄 세운다 — 배정이 흔들리지 않게
-    // 사번과 무관하게 섞는다 — 인가 코드로 흩어 놓는다
-    // 같은 사람은 몇 번을 돌려도 같은 자리에 온다
+    
     real.forEach(function (x) { x.k = seedOf('shuffle|' + x.code); });
     real.sort(function (a, b) {
         if (a.k !== b.k) return a.k - b.k;
