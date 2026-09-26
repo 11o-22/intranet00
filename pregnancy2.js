@@ -242,7 +242,10 @@ function checkPregBirth() {
 
     const sires = p.sires || [];
     const n = sires.length;
-    const count = n >= 5 ? 5 : n >= 2 ? Math.min(n, 4) : (1 + Math.floor(Math.random() * 3));
+    let count = n >= 5 ? 5 : n >= 2 ? Math.min(n, 4) : (1 + Math.floor(Math.random() * 3));
+    // 사파이어 요도 플러그 — 남이 채워 준 경우에만
+    if (typeof sapCountBonus === 'function') count += sapCountBonus(currentUser);
+    count = Math.min(8, count);
 
     const fill = (typeof careFill === 'function') ? careFill(p) : 0;
 
