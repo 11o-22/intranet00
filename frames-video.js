@@ -96,6 +96,18 @@ ${sel} {
             + ' { position: relative !important; z-index: 2 !important; }\n';
                 css += SCOPE.map(p => p + '.fr-' + f.id + '.fr-wrap .fv-canvas').join(',\n')
             + ` { inset: 0 !important; opacity: ${f.opacity} !important; }\n`;
+
+                    css += `
+#employee-cards-container .emp-list-card.fr-${f.id}.fr-wrap,
+#history-list-container .history-item.fr-${f.id}.fr-wrap,
+#badge-photo-display.fr-${f.id}.fr-wrap,
+#emp-detail-card-container.fr-${f.id}.fr-wrap,
+html body .fr-${f.id}.fr-wrap {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+`;
     });
 
     const st = document.createElement('style');
