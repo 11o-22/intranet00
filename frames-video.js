@@ -64,12 +64,12 @@ const VIDEO_FRAMES = [
     border-radius: 6px;
 
         -webkit-mask-image:
-        linear-gradient(to right, #000 0 16px, transparent 16px calc(100% - 16px), #000 calc(100% - 16px) 100%),
-        linear-gradient(to bottom, #000 0 12px, transparent 12px calc(100% - 12px), #000 calc(100% - 12px) 100%);
+        linear-gradient(to right, #000 0 5px, rgba(0,0,0,0) 38px, rgba(0,0,0,0) calc(100% - 38px), #000 calc(100% - 5px) 100%),
+        linear-gradient(to bottom, #000 0 4px, rgba(0,0,0,0) 24px, rgba(0,0,0,0) calc(100% - 24px), #000 calc(100% - 4px) 100%);
     -webkit-mask-composite: source-over;
     mask-image:
-        linear-gradient(to right, #000 0 16px, transparent 16px calc(100% - 16px), #000 calc(100% - 16px) 100%),
-        linear-gradient(to bottom, #000 0 12px, transparent 12px calc(100% - 12px), #000 calc(100% - 12px) 100%);
+        linear-gradient(to right, #000 0 5px, rgba(0,0,0,0) 38px, rgba(0,0,0,0) calc(100% - 38px), #000 calc(100% - 5px) 100%),
+        linear-gradient(to bottom, #000 0 4px, rgba(0,0,0,0) 24px, rgba(0,0,0,0) calc(100% - 24px), #000 calc(100% - 4px) 100%);
     mask-composite: add;
 }
 `;
