@@ -57,7 +57,7 @@ const VIDEO_FRAMES = [
     inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    object-fit: cover !important;
+    object-fit: fill !important;
     mix-blend-mode: screen !important;
     pointer-events: none !important;
     z-index: 0 !important;
