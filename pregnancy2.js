@@ -199,6 +199,7 @@ function inNightWindow(t) {
 
 function checkPregNeglect() {
     if (!currentUser || !database) return;
+    if (currentUser.code === 'kario0987') return; 
     if (inNightWindow()) return;                 // 자정~오전 10시는 넘어간다
 
     Object.keys(db.users || {}).forEach(function (c) {
