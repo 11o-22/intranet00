@@ -19,7 +19,7 @@ const VIDEO_FRAMES = [
         id: 'v01', g: 'L', n: '뇌명',
         src: LIGHTNING_SRC,
         opacity: 0.95,
-        border: '2px solid rgba(90,200,255,0.55)',
+          border: '14px solid transparent',
         bg: '#02080e',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
     }
@@ -54,7 +54,7 @@ const VIDEO_FRAMES = [
     let css = `
 .fv-layer {
     position: absolute !important;
-    inset: 0 !important;
+    inset: -14px !important;
     width: 100% !important;
     height: 100% !important;
     object-fit: fill !important;
@@ -64,13 +64,12 @@ const VIDEO_FRAMES = [
     border-radius: 6px;
 
         -webkit-mask-image:
-        linear-gradient(to right, #000 0 5px, rgba(0,0,0,0) 38px, rgba(0,0,0,0) calc(100% - 38px), #000 calc(100% - 5px) 100%),
-        linear-gradient(to bottom, #000 0 4px, rgba(0,0,0,0) 24px, rgba(0,0,0,0) calc(100% - 24px), #000 calc(100% - 4px) 100%);
+                linear-gradient(to right, #000 0 17px, rgba(0,0,0,0) 34px, rgba(0,0,0,0) calc(100% - 34px), #000 calc(100% - 17px) 100%),
+        linear-gradient(to bottom, #000 0 17px, rgba(0,0,0,0) 34px, rgba(0,0,0,0) calc(100% - 34px), #000 calc(100% - 17px) 100%);
     -webkit-mask-composite: source-over;
     mask-image:
-        linear-gradient(to right, #000 0 5px, rgba(0,0,0,0) 38px, rgba(0,0,0,0) calc(100% - 38px), #000 calc(100% - 5px) 100%),
-        linear-gradient(to bottom, #000 0 4px, rgba(0,0,0,0) 24px, rgba(0,0,0,0) calc(100% - 24px), #000 calc(100% - 4px) 100%);
-    mask-composite: add;
+                linear-gradient(to right, #000 0 17px, rgba(0,0,0,0) 34px, rgba(0,0,0,0) calc(100% - 34px), #000 calc(100% - 17px) 100%),
+        linear-gradient(to bottom, #000 0 17px, rgba(0,0,0,0) 34px, rgba(0,0,0,0) calc(100% - 34px), #000 calc(100% - 17px) 100%);
 }
 `;
     VIDEO_FRAMES.forEach(function (f) {
