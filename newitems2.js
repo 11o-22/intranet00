@@ -1287,6 +1287,30 @@ const SELF = {
 })();
 
 // ==========================================
+// 소지품 버튼 글자 — 「타인」을 「표적」으로
+// ==========================================
+(function renameTargetBtn() {
+    const NAMES = ['황룡의 눈', '산군의 도움'];
+    function fix() {
+        const btns = document.querySelectorAll('button[onclick]');
+        for (let i = 0; i < btns.length; i++) {
+            const b = btns[i];
+            const oc = b.getAttribute('onclick') || '';
+            let hit = false;
+            for (let j = 0; j < NAMES.length; j++) {
+                if (oc.indexOf(NAMES[j]) >= 0) { hit = true; break; }
+            }
+            if (!hit) continue;
+            const t = (b.textContent || '').trim();
+            if (t === '표적') continue;
+            if (/타인|대상|에게|사용/.test(t)) b.textContent = '표적';
+        }
+    }
+    setInterval(fix, 700);
+    setTimeout(fix, 900);
+})();
+
+// ==========================================
 // 14. 확인
 // ==========================================
 window.newItemState = function () {
