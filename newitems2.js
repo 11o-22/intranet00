@@ -194,6 +194,28 @@ function hasAny(u, name) {
     return hasEquipped(u, name) || (u.inventory || []).indexOf(name) >= 0;
 }
 
+// 소지품에 둔 채로 몸에 걸치는 것들 — 표적 버튼을 같이 남기기 위해
+function wornOn(u, name) {
+    if (!u) return false;
+    if (u.wornItems && u.wornItems[name]) return true;
+    return hasEquipped(u, name);
+}
+
+function toggleWorn(name) {
+    const u = currentUser;
+    if (!u.wornItems) u.wornItems = {};
+    const on = !u.wornItems[name];
+    if (on) u.wornItems[name] = 1; else delete u.wornItems[name];
+    saveFields({ wornItems: 1 });
+    appendBadgeNoteToUser(u, (on ? '[장착됨] ' : '[해제] ') + name);
+    addHistoryLog(u, (on ? '[장착] ' : '[해제] ') + name);
+    saveSelfFull();
+    updateUI();
+    showCustomAlert(on
+        ? name + '을(를) 몸에 걸었습니다.\n\n표적을 눌러 사원을 고르세요.'
+        : name + '을(를) 내려놓았습니다.');
+}
+
 // ==========================================
 // 3. 정산 보너스 — 어둠이 끝날 때 받는다
 // ==========================================
@@ -979,7 +1001,10 @@ function gone(nm) {
 const SELF = {
 
     n_dream: null, n_scale: null, n_lamp: null, n_rope: null, n_stone: null,
-    equip_n_cage: null, equip_n_dragon: null, equip_n_tiger: null,      // 장착형
+    equip_n_cage: null,                                                 // 장착형
+
+    equip_n_dragon: function (nm) { toggleWorn(nm); },
+    equip_n_tiger:  function (nm) { toggleWorn(nm); },
 
     n_button: function (nm) {
         const left = 3 - ((currentUser.useCnt && currentUser.useCnt[nm]) || 0);
@@ -1191,8 +1216,9 @@ const SELF = {
                 const nm2 = isDragon ? '황룡의 눈' : '산군의 도움';
                 const cap = 2;
 
-                if (!hasEquipped(currentUser, nm2)) {
-                    showCustomAlert(nm2 + '을(를) 먼저 몸에 걸어야 합니다.'); return false;
+                if (!wornOn(currentUser, nm2)) {
+                    showCustomAlert(nm2 + '을(를) 먼저 몸에 걸어야 합니다.\n\n'
+                        + '소지품에서 「장착」을 누르세요.'); return false;
                 }
                 if (targetUser.code === currentUser.code) {
                     showCustomAlert('자기 자신은 고를 수 없습니다.'); return false;
@@ -1291,6 +1317,12 @@ window.newItemState = function () {
     console.log('  확정 구출권:', rescueGuarantee() || '없음');
     console.log('  낚시 줄 방어:', u.lineGuard || 0);
     console.log('  은심장:', hasSilverHeart(u) ? (u.heartSaves || 0) + '회' : '없음');
+    console.log('  몸에 걸친 것:', Object.keys(u.wornItems || {}).join(' · ') || '(없음)');
+    ['황룡의 눈', '산군의 도움'].forEach(function (n) {
+        if (!hasAny(u, n)) return;
+        console.log('  ' + n + ' — 장착', wornOn(u, n) ? 'O' : '-',
+                    '· 오늘 남은 횟수', dayLeft(u, n, 2));
+    });
 };
 
 console.log('[신규] 26종 등록 — newItemState() · heartState() · giveSilverHeart(사번)');
