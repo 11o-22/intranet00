@@ -1306,8 +1306,31 @@ const SELF = {
             if (/타인|대상|에게|사용/.test(t)) b.textContent = '표적';
         }
     }
-    setInterval(fix, 700);
-    setTimeout(fix, 900);
+    // 그린 직후에 바로 바꾼다 — 주기로 돌리면 다시 그릴 때마다 글자가 왔다 갔다 한다
+    let busy = false;
+    const run = function () {
+        if (busy) return;
+        busy = true;
+        try { fix(); } catch (e) { }
+        busy = false;
+    };
+
+    new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
+
+    const iv = setInterval(function () {
+        if (typeof renderInventory !== 'function') return;
+        if (renderInventory._targetLabel) { clearInterval(iv); return; }
+        const _r = renderInventory;
+        renderInventory = function () {
+            const out = _r.apply(this, arguments);
+            run();
+            return out;
+        };
+        renderInventory._targetLabel = true;
+        clearInterval(iv);
+    }, 500);
+
+    setTimeout(run, 900);
 })();
 
 // ==========================================
