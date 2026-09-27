@@ -112,6 +112,7 @@ function writePlea() {
          <span style="color:#888; font-size:10px;">사정을 적으면 읽고 판단합니다. (최대 ${PLEA_MAX}자)</span>`,
         '예: 맡은 일이 남아 있습니다',
         function (text) {
+                        if (fld) fld.setAttribute('maxlength', 30);
             const remain = Math.max(0, currentUser.quarantineUntil - Date.now());
             pleaRef(currentUser.code).set({
                 code: currentUser.code,
@@ -133,6 +134,11 @@ function writePlea() {
                 showCustomAlert('접수 중 오류가 발생했습니다.');
             });
         });
+
+            // 공용 입력칸이 30자로 묶여 있다 — 탄원서 동안만 늘린다
+    const fld = document.getElementById('text-input-field');
+    if (fld) fld.setAttribute('maxlength', PLEA_MAX);
+
 }
 
 // 격리 안내가 다시 그려질 때마다
