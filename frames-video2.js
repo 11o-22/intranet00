@@ -104,10 +104,7 @@ VIDEO_FRAMES_S.forEach(function (f) {
     css += `
 ${sel} {
     position: relative !important;
-    border: ${f.ring}px solid transparent !important;
-    border-radius: 7px !important;
     overflow: visible !important;
-    background-color: ${f.bg} !important;
     outline: none !important;
     box-shadow: none !important;
 }
@@ -115,7 +112,7 @@ ${sel} {
     css += SCOPE.map(function (p) { return p + '.fr-' + f.id + '.fr-wrap > *:not(.fv2-canvas)'; }).join(',\n')
         + ' { position: relative !important; z-index: 2 !important; }\n';
     css += SCOPE.map(function (p) { return p + '.fr-' + f.id + '.fr-wrap .fv2-canvas'; }).join(',\n')
-        + ` { inset: -${f.ring}px !important; opacity: ${f.opacity} !important; }\n`;
+        + ` { opacity: ${f.opacity} !important; }\n`;
 });
 
 // 글자가 빛에 묻히지 않게
@@ -183,26 +180,34 @@ function paint(now) {
         if (W < 8 || H < 8) return;
 
         const cv = L.cv, ctx = L.ctx, T = L.f.ring;
-        if (cv._w !== W || cv._h !== H) {
-            cv.width = Math.round(W * DPR);
-            cv.height = Math.round(H * DPR);
-            cv.style.width = W + 'px';
-            cv.style.height = H + 'px';
-            cv._w = W; cv._h = H;
+
+        // 칸의 테두리 상자 바깥으로 T 만큼 넓게 덮는다
+        const bw = parseFloat(getComputedStyle(L.el).borderTopWidth) || 0;
+        const CW = W + T * 2, CH = H + T * 2;
+        if (cv._w !== CW || cv._h !== CH) {
+            cv.width = Math.round(CW * DPR);
+            cv.height = Math.round(CH * DPR);
+            cv.style.width = CW + 'px';
+            cv.style.height = CH + 'px';
+            cv.style.left = -(bw + T) + 'px';
+            cv.style.top = -(bw + T) + 'px';
+            cv.style.right = 'auto';
+            cv.style.bottom = 'auto';
+            cv._w = CW; cv._h = CH;
         }
 
         const bx = Math.max(2, Math.round(vw * L.f.bandX));
         const by = Math.max(2, Math.round(vh * L.f.bandY));
 
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        ctx.clearRect(0, 0, W, H);
+        ctx.clearRect(0, 0, CW, CH);
         ctx.globalCompositeOperation = 'lighter';
 
         // 위 · 아래 · 왼쪽 · 오른쪽
-        ctx.drawImage(vid, 0, 0, vw, by, 0, 0, W, T);
-        ctx.drawImage(vid, 0, vh - by, vw, by, 0, H - T, W, T);
-        ctx.drawImage(vid, 0, 0, bx, vh, 0, 0, T, H);
-        ctx.drawImage(vid, vw - bx, 0, bx, vh, W - T, 0, T, H);
+        ctx.drawImage(vid, 0, 0, vw, by, 0, 0, CW, T);
+        ctx.drawImage(vid, 0, vh - by, vw, by, 0, CH - T, CW, T);
+        ctx.drawImage(vid, 0, 0, bx, vh, 0, 0, T, CH);
+        ctx.drawImage(vid, vw - bx, 0, bx, vh, CW - T, 0, T, CH);
 
         ctx.globalCompositeOperation = 'source-over';
     });
@@ -232,13 +237,6 @@ window.fvTune2 = function (id, o) {
     const f = VIDEO_FRAMES_S.find(function (x) { return x.id === id || x.n === id; });
     if (!f) { console.warn('v02 / v03 또는 이름을 넣으세요.'); return; }
     Object.assign(f, o || {});
-    const s = document.getElementById('frame-video-css-2');
-    if (s) {
-        const re = new RegExp('(\\.fr-' + f.id + '\\.fr-wrap[^}]*?border: )\\d+(px solid transparent)', 'g');
-        s.textContent = s.textContent.replace(re, '$1' + f.ring + '$2');
-        const re2 = new RegExp('(\\.fr-' + f.id + '\\.fr-wrap \\.fv2-canvas[^}]*?inset: -)\\d+(px)', 'g');
-        s.textContent = s.textContent.replace(re2, '$1' + f.ring + '$2');
-    }
     live.forEach(function (L) { L.cv._w = -1; });
     console.log(f.n + ' — 띠 ' + f.ring + 'px · 좌우 ' + f.bandX + ' · 위아래 ' + f.bandY + ' · 진하기 ' + f.opacity);
 };
