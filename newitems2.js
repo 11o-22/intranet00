@@ -737,13 +737,13 @@ NEW.forEach(function (row) {
 
 // 은심장 — 쇼핑몰에 올리지 않는다
 ITEM_CATALOG[HEART] = {
-    price: 0, usable: false, targetable: false, effect: 'n_heart',
+    price: 0, usable: true, targetable: false, effect: 'n_heart',
     desc: '많은 사람을 구한 이의 심장을 본떠 만든 뱃지. 부서지지 않고 잃어버리지 않는다. '
         + '남을 구한 만큼 행운·회피·판정이 오르고(최대 5), 열 번을 넘기면 구출이 확정된다. '
         + '서른 번을 넘기면 어둠마다 5,000P, 쉰 번을 넘기면 기믹을 한 번 깬다. '
         + '함께 든 파티에게 행운 +1.'
 };
-if (typeof EQUIP_AFFIL !== 'undefined') EQUIP_AFFIL[HEART] = '백일몽';
+// 은심장은 소속을 묻지 않는다 — 상담사가 준 사람만 지닌다
 
 const SHOP_AFFIL = {};
 NEW.forEach(function (row) { SHOP_AFFIL[row[0]] = row[2]; });
@@ -1008,7 +1008,10 @@ const SELF = {
             if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
             currentUser.equippedWeapons.push(itemName);
             setEquipOwner(currentUser, itemName, currentUser.code);
+            // 은심장은 잃어버리지 않게 막아 두었으니, 옮길 때만 잠금을 푼다
+            window.__heartUnlock = true;
             removeItemFromInventory(currentUser, itemName, 1);
+            window.__heartUnlock = false;
             appendBadgeNoteToUser(currentUser, '[장착됨] ' + itemName);
             addHistoryLog(currentUser, '[장비 장착] ' + itemName);
             saveSelfFull(); updateUI();
