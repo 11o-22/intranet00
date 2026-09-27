@@ -7,7 +7,7 @@
 // 상담사에게 육아휴직을 신청해 허가를 받아야 쓸 수 있게 한다.
 
 // 허가가 필요한 물건 — 6회분 이상
-const LEAVE_MIN_CARE = 2;
+const LEAVE_MIN_CARE = 5;
 
 function needsLeave(itemName) {
     const it = (typeof PREG_ITEMS !== 'undefined') ? PREG_ITEMS[itemName] : null;
