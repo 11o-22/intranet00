@@ -24,8 +24,8 @@ const VIDEO_FRAMES_S = [
         ring: 14,          // 띠 두께 (px)
         bandX: 0.15,       // 영상에서 좌우 띠가 차지하는 비율
         bandY: 0.075,      // 영상에서 위아래 띠가 차지하는 비율
-        cutX: 0.20,        // 위아래 띠에서 양 끝(둥근 모서리)을 잘라 내는 비율
-        cutY: 0.10,        // 좌우 띠에서 위아래 끝을 잘라 내는 비율
+        cutX: 0,           // 영상 끝을 잘라 낼 때만 쓴다 (보통 0)
+        cutY: 0,
         over: 9,           // 칸 안쪽으로 파고드는 깊이 (px) — 검은 틀을 덮는다
         opacity: 1,
         bg: '#05030c',
@@ -234,23 +234,39 @@ function paint(now) {
         const bx = Math.max(2, Math.round(vw * L.f.bandX));
         const by = Math.max(2, Math.round(vh * L.f.bandY));
 
-        // 영상에서 잘라 낼 끝부분 — 모서리 이음새를 없앤다
         const cx = Math.round(vw * (L.f.cutX || 0));
         const cy = Math.round(vh * (L.f.cutY || 0));
         const sw = Math.max(4, vw - cx * 2);
         const sh = Math.max(4, vh - cy * 2);
-        const midH = Math.max(1, CH - T * 2);
 
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         ctx.clearRect(0, 0, CW, CH);
         ctx.globalCompositeOperation = 'lighter';
 
-        // 위 · 아래 — 칸의 가로 전체
-        ctx.drawImage(vid, cx, 0, sw, by, 0, 0, CW, T);
-        ctx.drawImage(vid, cx, vh - by, sw, by, 0, CH - T, CW, T);
-        // 왼쪽 · 오른쪽 — 위아래 띠 사이만, 겹치지 않게
-        ctx.drawImage(vid, 0, cy, bx, sh, 0, T, T, midH);
-        ctx.drawImage(vid, vw - bx, cy, bx, sh, CW - T, T, T, midH);
+        // 액자처럼 모서리를 45도로 맞물린다 —
+        // 네 변이 영상의 네 변을 통째로 받으므로 빛이 끊기지 않고,
+        // 서로 겹치지 않으므로 이음새도 생기지 않는다.
+        const edge = function (sx, sy, sW, sH, dx, dy, dW, dH, pts) {
+            ctx.save();
+            ctx.beginPath();
+            for (let i = 0; i < pts.length; i++) {
+                if (i === 0) ctx.moveTo(pts[i][0], pts[i][1]);
+                else ctx.lineTo(pts[i][0], pts[i][1]);
+            }
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(vid, sx, sy, sW, sH, dx, dy, dW, dH);
+            ctx.restore();
+        };
+
+        edge(cx, 0, sw, by, 0, 0, CW, T,
+             [[0, 0], [CW, 0], [CW - T, T], [T, T]]);                       // 위
+        edge(cx, vh - by, sw, by, 0, CH - T, CW, T,
+             [[0, CH], [CW, CH], [CW - T, CH - T], [T, CH - T]]);           // 아래
+        edge(0, cy, bx, sh, 0, 0, T, CH,
+             [[0, 0], [T, T], [T, CH - T], [0, CH]]);                       // 왼쪽
+        edge(vw - bx, cy, bx, sh, CW - T, 0, T, CH,
+             [[CW, 0], [CW - T, T], [CW - T, CH - T], [CW, CH]]);           // 오른쪽
 
         ctx.globalCompositeOperation = 'source-over';
     });
