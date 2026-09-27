@@ -2886,6 +2886,7 @@ function renderAdvanceWait(nextStep) {
             ? [currentUser.code]
             : Object.keys(p.alive || {}).filter(c => !solo[c]);
         const cnt = group.filter(c => lastGot[c]).length;
+        const need = group.length;
 
         const el = document.getElementById('adv-wait');
         if (el) el.innerText = `${cnt} / ${need}명 준비`;
