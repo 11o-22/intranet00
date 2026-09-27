@@ -1702,7 +1702,8 @@ const SELF = {
             const b = btns[i];
             if ((b.textContent || '').trim() !== '해제') continue;
             let row = b.parentElement, hops = 0, nm = null;
-            while (row && hops < 5) {
+            while (row && hops < 4) {
+                if (!looksLikeRow(row)) break;
                 const t = row.textContent || '';
                 for (let j = 0; j < EYES.length; j++) {
                     if (t.indexOf(EYES[j]) >= 0 && t.indexOf('(') < 0) { nm = EYES[j]; break; }
@@ -1728,17 +1729,32 @@ const SELF = {
         return false;
     }
 
+    // 줄 하나로 볼 수 있는 크기인지 — 큰 상자를 실수로 감추지 않기 위해
+    function looksLikeRow(el) {
+        if (!el) return false;
+        if (el === document.body || el === document.documentElement) return false;
+        const id = el.id || '';
+        if (/app-container|main-screen|login-screen|tab|modal-content|modal-overlay/.test(id)) return false;
+        const cls = (el.className || '').toString();
+        if (/\bcontainer\b|\btab\b|modal-content|modal-overlay|sub-panel/.test(cls)) return false;
+        const t = el.textContent || '';
+        if (t.length > 260) return false;
+        if (el.querySelectorAll('button').length > 3) return false;
+        return true;
+    }
+
     function hide() {
         const btns = document.querySelectorAll('button');
         for (let i = 0; i < btns.length; i++) {
             const b = btns[i];
             if ((b.textContent || '').trim() !== '해제') continue;
             let el = b.parentElement, hops = 0;
-            while (el && hops < 5) {
+            while (el && hops < 4) {
                 if (hit(el.textContent || '')) {
-                    if (el.style.display !== 'none') el.style.display = 'none';
-                    break;
+                    if (looksLikeRow(el) && el.style.display !== 'none') el.style.display = 'none';
+                    break;                       // 조건에 안 맞으면 감추지 않고 그냥 멈춘다
                 }
+                if (!looksLikeRow(el)) break;    // 큰 상자에 닿으면 더 올라가지 않는다
                 el = el.parentElement; hops++;
             }
         }
