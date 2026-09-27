@@ -1040,6 +1040,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
 
         if (!took.length) { back.remove(); return; }
         if (dayCap) daySpend(currentUser, srcName);
+        try { putSeal(target, srcName); } catch (e) { }
 
         if (movedGear) {
             noUndef(currentUser.stolenGear);
@@ -1147,6 +1148,7 @@ function returnStolen(label, quiet) {
         if (!still) {
             removeBadgeLine(t, '황룡의 눈길을 받았습니다');
             removeBadgeLine(t, '산군의 숨결이 닿았습니다');
+            liftSeal(t);
         }
         if (rec.src && !Object.keys(currentUser.stolenGear || {}).some(function (k) {
                 return currentUser.stolenGear[k] && currentUser.stolenGear[k].src === rec.src;
@@ -1689,8 +1691,42 @@ const SELF = {
                 appendBadgeNoteToUser(targetUser, '[장착됨] ' + lab);
                 addHistoryLog(targetUser, '[이동장] ' + currentUser.name + ' 사원이 채웠습니다.');
                 addHistoryLog(currentUser, '[이동장] ' + targetUser.name + ' 사원에게 채웠습니다.');
-                showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
-                    + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
+
+                // 대상 쪽을 서버에 적는다. 실패하면 물건을 되돌린다.
+                const had = (currentUser.inventory || []).filter(function (x) { return x === itemName; }).length;
+                const undo = function () {
+                    const at = targetUser.equippedWeapons.indexOf(lab);
+                    if (at >= 0) targetUser.equippedWeapons.splice(at, 1);
+                    if (targetUser.equipOwner) delete targetUser.equipOwner[lab];
+                    const now = (currentUser.inventory || []).filter(function (x) { return x === itemName; }).length;
+                    if (now < had) {
+                        currentUser.inventory = currentUser.inventory || [];
+                        currentUser.inventory.push(itemName);
+                    }
+                    saveFields({ inventory: 1 });
+                    updateUI();
+                    showCustomAlert('서버에 적지 못했습니다.\n\n' + itemName + '을(를) 되돌렸습니다.');
+                };
+
+                let p;
+                try {
+                    p = updateUserFields(targetUser.code, {
+                        equippedWeapons: targetUser.equippedWeapons,
+                        equipOwner: targetUser.equipOwner || {},
+                        badge: targetUser.badge,
+                        history: targetUser.history
+                    });
+                } catch (e) { undo(); return false; }
+
+                if (p && typeof p.then === 'function') {
+                    p.then(function () {
+                        showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
+                            + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
+                    }).catch(function (e) { console.warn('[이동장]', e); undo(); });
+                } else {
+                    showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
+                        + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
+                }
                 return true;
             }
 
@@ -1707,6 +1743,14 @@ const SELF = {
                 setEquipOwner(targetUser, label, currentUser.code);
                 appendBadgeNoteToUser(targetUser, '[장착됨] ' + label);
                 addHistoryLog(targetUser, '[진실 마스크] ' + currentUser.name + ' 사원이 채웠습니다.');
+                try {
+                    updateUserFields(targetUser.code, {
+                        equippedWeapons: targetUser.equippedWeapons,
+                        equipOwner: targetUser.equipOwner || {},
+                        badge: targetUser.badge,
+                        history: targetUser.history
+                    });
+                } catch (e) { console.warn('[진실 마스크]', e); }
                 showCustomAlert(targetUser.name + ' 사원의 얼굴에 씌웠습니다.\n\n'
                     + '이제 그 사원의 안쪽이 보입니다.');
                 return true;
@@ -1861,37 +1905,117 @@ function withBorrowed(fn, ctx, args) {
     finally { u.equippedWeapons = keep; }
 }
 
-// 손대면 안 되는 것들 — 저장·관리·해제·그리기
-const NO_TOUCH = [
-    'applyServerMe', 'saveDB', 'saveSelfFull', 'saveFields', 'updateUserFields',
-    'unequipWeapon', 'retrieveEquipFromUser', 'adminRegisterNewEmployee',
-    'adminForceUnequip', 'forceUnequipFor', 'smashWeapon', 'buildBathContext',
-    'updateUI', 'renderInventory', 'loadBadgeInfo', 'cleanEquipDupe',
-    'equipState', 'equipLockState', 'sapState', 'listDnaGot', 'stampGotDna'
+// 능력을 읽는 함수만 골라 감싼다 — 넓게 쓸면 편집·저장까지 건드린다
+const READERS = [
+    'hasEquip', 'plugActive', 'rubyActive', 'hasVaginaPlug', 'myDnaEquip',
+    'sapActive', 'isBlindfolded', 'getPollutionMultiplier', 'checkPassivePollution',
+    'facilityLuckMult', 'gearValue', 'dnaGiftOf', 'hasSureBear', 'roleFlipped'
 ];
 
 (function hookReaders() {
     let tries = 0;
     const iv = setInterval(function () {
-        let n = 0;
-        Object.keys(window).forEach(function (k) {
-            if (NO_TOUCH.indexOf(k) >= 0) return;
+        let n = 0, left = 0;
+        READERS.forEach(function (k) {
             const f = window[k];
-            if (typeof f !== 'function' || f._seeBorrowed) return;
-            let src; try { src = f.toString(); } catch (e) { return; }
-            if (src.length > 40000) return;
-            if (src.indexOf('equippedWeapons') < 0) return;
-            if (/innerHTML|insertAdjacentHTML/.test(src)) return;      // 그리는 것은 제외
+            if (typeof f !== 'function') { left++; return; }
+            if (f._seeBorrowed) { n++; return; }
             const _f = f;
             window[k] = function () { return withBorrowed(_f, this, arguments); };
             window[k]._seeBorrowed = true;
             n++;
         });
-        if (n || ++tries > 30) {
+        if (!left || ++tries > 30) {
             clearInterval(iv);
             console.log('[신규] 빌려 온 능력을 읽는 함수 ' + n + '개 연결');
         }
     }, 600);
+})();
+
+// ==========================================
+// 표적이 된 사람의 장착칸을 봉인한다
+// ==========================================
+const SEAL_WORD = {
+    '황룡의 눈': '황룡의 시선을 받았습니다.',
+    '산군의 도움': '산군의 기운에 억눌립니다.'
+};
+
+function sealOn(u) {
+    if (!u || !u.gearSeal) return null;
+    const r = u.gearSeal;
+    if (r.day && r.day !== today()) { delete u.gearSeal; return null; }
+    return r;
+}
+
+function putSeal(target, srcName) {
+    target.gearSeal = { by: currentUser.code, src: srcName, day: today() };
+    updateUserFields(target.code, { gearSeal: target.gearSeal });
+    removeBadgeLine(target, '황룡의 시선을 받았습니다');
+    removeBadgeLine(target, '산군의 기운에 억눌립니다');
+    appendBadgeNoteToUser(target, SEAL_WORD[srcName] || '봉인되었습니다.');
+}
+
+function liftSeal(t) {
+    if (!t || !t.gearSeal) return;
+    delete t.gearSeal;
+    updateUserFields(t.code, { gearSeal: null });
+    removeBadgeLine(t, '황룡의 시선을 받았습니다');
+    removeBadgeLine(t, '산군의 기운에 억눌립니다');
+}
+
+// 봉인 중에는 아무것도 차지 못한다
+(function hookSealEquip() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (useInventoryItem._gearSeal) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            const r = sealOn(currentUser);
+            const cat = ITEM_CATALOG[itemName] || {};
+            const isEquip = String(cat.effect || '').indexOf('equip_') === 0;
+            if (r && isEquip) {
+                const who = (db.users[r.by] || {}).name || r.by;
+                showCustomAlert((SEAL_WORD[r.src] || '봉인되었습니다.')
+                    + '\n\n장착칸이 묶여 있습니다.\n' + who + ' 사원이 풀 때까지 아무것도 찰 수 없습니다.');
+                return;
+            }
+            return _u.apply(this, arguments);
+        };
+        useInventoryItem._gearSeal = true;
+        window.__gearSealOn = true;
+        clearInterval(iv);
+        console.log('[신규] 장착칸 봉인 연결');
+    }, 500);
+})();
+
+// 봉인 문구를 장착칸 위에 올린다
+(function showSealBanner() {
+    function draw() {
+        const r = sealOn(currentUser);
+        const old = document.getElementById('gear-seal-line');
+        if (!r) { if (old) old.remove(); return; }
+        if (old) return;
+
+        // 「장착 중 슬롯 1」 줄을 찾아 그 앞에 끼운다
+        const all = document.querySelectorAll('div');
+        for (let i = 0; i < all.length; i++) {
+            const el = all[i];
+            const t = (el.textContent || '');
+            if (t.indexOf('[장착 중 슬롯 1]') < 0) continue;
+            if (t.length > 400) continue;                   // 큰 상자는 건너뛴다
+            const box = document.createElement('div');
+            box.id = 'gear-seal-line';
+            box.style.cssText = 'margin:8px 0;padding:9px 11px;border:1px solid #8a6b2f;'
+                + 'background:rgba(40,28,8,0.85);color:#e8c87a;font-size:12px;letter-spacing:0.3px';
+            box.textContent = (SEAL_WORD[r.src] || '봉인되었습니다.') + ' 장착칸이 묶여 있습니다.';
+            el.parentElement.insertBefore(box, el);
+            return;
+        }
+    }
+    let busy = false;
+    const run = function () { if (busy) return; busy = true; try { draw(); } catch (e) { } busy = false; };
+    new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
+    setInterval(run, 1500);
 })();
 
 // ==========================================
@@ -1975,6 +2099,7 @@ window.newItemState = function () {
     console.log('  빼앗아 둔 것:', Object.keys(u.stolenGear || {}).join(' · ') || '(없음)');
     console.log('  내가 잠긴 장비:', Object.keys(u.gearLock || {}).join(' · ') || '(없음)');
     console.log('  빌려 온 능력:', (u.borrowedGear || []).join(' · ') || '(없음)');
+    console.log('  내 장착칸 봉인:', sealOn(u) ? (SEAL_WORD[sealOn(u).src] || '봉인') : '없음');
     ['황룡의 눈', '산군의 도움'].forEach(function (n) {
         if (!hasAny(u, n)) return;
         console.log('  ' + n + ' — 장착', hasEquipped(u, n) ? 'O' : '-',
