@@ -201,15 +201,45 @@ function wornOn(u, name) {
     return hasEquipped(u, name);
 }
 
+// 특이사항 글이 담긴 칸을 찾는다.
+// badge 는 { nickname, gender, posTag, ... } 객체다. 통째로 덮으면 안 된다.
+function badgeNoteKey(u) {
+    const b = u && u.badge;
+    if (!b || typeof b !== 'object') return null;
+    const want = ['note', 'notes', 'memo', 'special', 'etc', 'desc', 'text'];
+    for (let i = 0; i < want.length; i++) {
+        if (typeof b[want[i]] === 'string') return want[i];
+    }
+    // 못 찾으면 가장 긴 글 칸
+    let best = null, len = -1;
+    Object.keys(b).forEach(function (k) {
+        if (typeof b[k] === 'string' && b[k].length > len) { best = k; len = b[k].length; }
+    });
+    return best;
+}
+
 // 특이사항에서 한 줄을 지운다
 function removeBadgeLine(u, needle) {
     if (!u || !u.badge) return;
-    const raw = String(u.badge);
-    const br = /<br\s*\/?>/i.test(raw);
-    const parts = raw.split(/<br\s*\/?>|\n/);
-    const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
-    if (keep.length === parts.length) return;
-    u.badge = keep.join(br ? '<br>' : '\n');
+
+    if (typeof u.badge === 'object') {
+        const key = badgeNoteKey(u);
+        if (!key) return;
+        const raw = String(u.badge[key] || '');
+        const br = /<br\s*\/?>/i.test(raw);
+        const parts = raw.split(/<br\s*\/?>|\n/);
+        const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
+        if (keep.length === parts.length) return;
+        u.badge[key] = keep.join(br ? '<br>' : '\n');
+    } else {
+        const raw = String(u.badge);
+        const br = /<br\s*\/?>/i.test(raw);
+        const parts = raw.split(/<br\s*\/?>|\n/);
+        const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
+        if (keep.length === parts.length) return;
+        u.badge = keep.join(br ? '<br>' : '\n');
+    }
+
     if (u.code === currentUser.code) saveFields({ badge: 1 });
     else if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge });
 }
@@ -1708,21 +1738,27 @@ const SELF = {
                     showCustomAlert('서버에 적지 못했습니다.\n\n' + itemName + '을(를) 되돌렸습니다.');
                 };
 
+                // 값이 있는 것만 담는다 — undefined 가 하나라도 있으면 Firebase 가 통째로 거부한다
+                const payload = {
+                    equippedWeapons: targetUser.equippedWeapons || [],
+                    equipOwner: targetUser.equipOwner || {}
+                };
+                if (targetUser.badge !== undefined) payload.badge = targetUser.badge;
+                if (Array.isArray(targetUser.history)) payload.history = targetUser.history;
+
                 let p;
                 try {
-                    p = updateUserFields(targetUser.code, {
-                        equippedWeapons: targetUser.equippedWeapons,
-                        equipOwner: targetUser.equipOwner || {},
-                        badge: targetUser.badge,
-                        history: targetUser.history
-                    });
-                } catch (e) { undo(); return false; }
+                    p = updateUserFields(targetUser.code, payload);
+                } catch (e) { console.warn('[이동장] 쓰기 실패:', e); undo(); return false; }
 
                 if (p && typeof p.then === 'function') {
                     p.then(function () {
                         showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
                             + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
-                    }).catch(function (e) { console.warn('[이동장]', e); undo(); });
+                    }).catch(function (e) {
+                        console.warn('[이동장] 쓰기 거부:', e && e.message ? e.message : e);
+                        undo();
+                    });
                 } else {
                     showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
                         + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
@@ -1744,12 +1780,13 @@ const SELF = {
                 appendBadgeNoteToUser(targetUser, '[장착됨] ' + label);
                 addHistoryLog(targetUser, '[진실 마스크] ' + currentUser.name + ' 사원이 채웠습니다.');
                 try {
-                    updateUserFields(targetUser.code, {
-                        equippedWeapons: targetUser.equippedWeapons,
-                        equipOwner: targetUser.equipOwner || {},
-                        badge: targetUser.badge,
-                        history: targetUser.history
-                    });
+                    const pl = {
+                        equippedWeapons: targetUser.equippedWeapons || [],
+                        equipOwner: targetUser.equipOwner || {}
+                    };
+                    if (targetUser.badge !== undefined) pl.badge = targetUser.badge;
+                    if (Array.isArray(targetUser.history)) pl.history = targetUser.history;
+                    updateUserFields(targetUser.code, pl);
                 } catch (e) { console.warn('[진실 마스크]', e); }
                 showCustomAlert(targetUser.name + ' 사원의 얼굴에 씌웠습니다.\n\n'
                     + '이제 그 사원의 안쪽이 보입니다.');
