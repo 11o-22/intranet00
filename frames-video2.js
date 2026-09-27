@@ -26,6 +26,7 @@ const VIDEO_FRAMES_S = [
         bandY: 0.075,      // 영상에서 위아래 띠가 차지하는 비율
         cutX: 0.20,        // 위아래 띠에서 양 끝(둥근 모서리)을 잘라 내는 비율
         cutY: 0.10,        // 좌우 띠에서 위아래 끝을 잘라 내는 비율
+        over: 9,           // 칸 안쪽으로 파고드는 깊이 (px) — 검은 틀을 덮는다
         opacity: 1,
         bg: '#05030c',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -38,6 +39,7 @@ const VIDEO_FRAMES_S = [
         bandY: 0.055,
         cutX: 0,
         cutY: 0,
+        over: 0,
         opacity: 1,
         bg: '#0a0509',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -212,19 +214,21 @@ function paint(now) {
 
         const cv = L.cv, ctx = L.ctx, T = L.f.ring;
 
-        // 칸의 테두리 상자 바깥으로 T 만큼 넓게 덮는다
+        // 칸을 감싼다 — over 만큼은 칸 안쪽까지 파고든다
         const bw = parseFloat(getComputedStyle(L.el).borderTopWidth) || 0;
-        const CW = W + T * 2, CH = H + T * 2;
-        if (cv._w !== CW || cv._h !== CH) {
+        const OV = Math.max(0, Math.min(T, Math.round(L.f.over || 0)));
+        const OUT = T - OV;
+        const CW = W + OUT * 2, CH = H + OUT * 2;
+        if (cv._w !== CW || cv._h !== CH || cv._ov !== OV) {
             cv.width = Math.round(CW * DPR);
             cv.height = Math.round(CH * DPR);
             cv.style.width = CW + 'px';
             cv.style.height = CH + 'px';
-            cv.style.left = -(bw + T) + 'px';
-            cv.style.top = -(bw + T) + 'px';
+            cv.style.left = -(bw + OUT) + 'px';
+            cv.style.top = -(bw + OUT) + 'px';
             cv.style.right = 'auto';
             cv.style.bottom = 'auto';
-            cv._w = CW; cv._h = CH;
+            cv._w = CW; cv._h = CH; cv._ov = OV;
         }
 
         const bx = Math.max(2, Math.round(vw * L.f.bandX));
@@ -262,7 +266,7 @@ window.videoFrameState2 = function () {
     console.table(VIDEO_FRAMES_S.map(function (f) {
         return {
             번호: f.id, 등급: f.g, 이름: f.n, 띠: f.ring + 'px',
-            좌우: f.bandX, 위아래: f.bandY, 모서리자름: (f.cutX || 0) + ' / ' + (f.cutY || 0),
+            좌우: f.bandX, 위아래: f.bandY, 모서리자름: (f.cutX || 0) + ' / ' + (f.cutY || 0), 겹침: (f.over || 0) + 'px',
             영상: f._vid ? (f._vid.paused ? '멈춤' : '재생 중') + ' ' + f._vid.videoWidth + '×' + f._vid.videoHeight : '(없음)',
             크기: Math.round(f.src.length / 1024) + ' KB'
         };
