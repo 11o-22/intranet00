@@ -211,12 +211,8 @@ function checkPregNeglect() {
             const last = (p.careAt || {})[currentUser.code] || s.at || 0;
             if (!last) return;
                         // 오늘 몫을 다 돌봤으면 방치로 세지 않는다
-            const leftToday = (function () {
-                try { const r = careLeftToday(u, currentUser.code); if (typeof r === 'number') return r; } catch (e) { }
-                try { const r = careLeftToday(u); if (typeof r === 'number') return r; } catch (e) { }
-                return 1;
-            })();
-            if (leftToday <= 0) return;
+                    
+            if (careLeftToday(p) <= 0) return;
             if (awakeMs(last, Date.now()) < NEGLECT_HOURS * 3600000) return;
             if (currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil) return;
 
