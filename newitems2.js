@@ -1716,33 +1716,59 @@ const SELF = {
         return true;
     }
 
+    // 줄을 찾는다 — 너무 크지만 않으면 받아 준다
+    function findRow(b) {
+        let row = b.parentElement, hops = 0;
+        while (row && hops < 5) {
+            const t = row.textContent || '';
+            if (t.length < 700 && row.querySelectorAll('button').length <= 4) {
+                for (let j = 0; j < EYES.length; j++) {
+                    if (t.indexOf(EYES[j]) >= 0) return { row: row, nm: EYES[j] };
+                }
+            }
+            const id = row.id || '';
+            const cls = (row.className || '').toString();
+            if (/app-container|main-screen|login-screen/.test(id)
+                || /\bcontainer\b|modal-content|modal-overlay/.test(cls)) break;
+            row = row.parentElement; hops++;
+        }
+        return null;
+    }
+
     // 장착칸의 그 줄에 「표적」 버튼을 붙인다
     function addAim() {
         const btns = document.querySelectorAll('button');
         for (let i = 0; i < btns.length; i++) {
             const b = btns[i];
             if ((b.textContent || '').trim() !== '해제') continue;
-            let row = b.parentElement, hops = 0, nm = null;
-            while (row && hops < 4) {
-                if (!looksLikeRow(row)) break;
-                const t = row.textContent || '';
-                for (let j = 0; j < EYES.length; j++) {
-                    if (t.indexOf(EYES[j]) >= 0) { nm = EYES[j]; break; }
-                }
-                if (nm) break;
-                row = row.parentElement; hops++;
-            }
-            if (!nm || !row) continue;
-            if (row.querySelector('.aim-btn')) continue;
+            if (b.parentElement && b.parentElement.querySelector('.aim-btn')) continue;
+            const found = findRow(b);
+            if (!found) continue;
             const a = document.createElement('button');
             a.className = 'aim-btn';
             a.textContent = '표적';
             a.style.cssText = 'margin-right:5px;padding:5px 11px;border:0;cursor:pointer;'
                 + 'background:#d4af37;color:#14161c;font-size:11px';
-            a.onclick = function (ev) { ev.stopPropagation(); pickTargetFor(nm); };
+            a.onclick = function (ev) { ev.stopPropagation(); pickTargetFor(found.nm); };
             b.parentElement.insertBefore(a, b);
         }
     }
+
+    // 왜 안 붙는지 보고 싶을 때
+    window.aimDebug = function () {
+        const btns = Array.from(document.querySelectorAll('button'))
+            .filter(function (b) { return (b.textContent || '').trim() === '해제'; });
+        console.log('해제 버튼 ' + btns.length + '개');
+        btns.forEach(function (b, i) {
+            const f = findRow(b);
+            const p = b.parentElement;
+            console.log((i + 1) + '. 찾음:', f ? f.nm : '✗',
+                '| 부모 글자수', (p ? (p.textContent || '').length : 0),
+                '| 부모 버튼수', p ? p.querySelectorAll('button').length : 0,
+                '| 글:', (p ? (p.textContent || '').trim().slice(0, 40) : ''));
+        });
+        console.log('붙은 표적 버튼:', document.querySelectorAll('.aim-btn').length + '개');
+    };
 
     let busy = false;
     const run = function () {
