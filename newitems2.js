@@ -700,58 +700,221 @@ function showPieceHint() {
 // ==========================================
 // 9. 버프 강탈 — 황룡의 눈 · 산군의 도움
 // ==========================================
+// ==========================================
+// 빼앗기 — 열람 → 가져온다 / 닫기
+// ==========================================
+const SEAL = '✗ ';          // 봉인 표시 — 이름이 바뀌므로 그 장비의 효과가 끊긴다
+
+function stolenBag(u) {
+    u = u || currentUser;
+    if (!u.stolenGear) u.stolenGear = {};
+    return u.stolenGear;
+}
+
+// 물약·소모품처럼 몸에 남아 있는 것들 — 이것도 가져올 수 있다
+// kind: 'time' 남은 시각 · 'num' 횟수 · 'bool' 있고 없고
+const TIMED = [
+    ['blindfoldUntil',        '눈가리개',      'time'],
+    ['butterKnifeExpireTime', '버터 나이프',   'time'],
+    ['noteGlowUntil',         '빛나는 쪽지',   'time'],
+    ['pollFreezeUntil',       '오염 동결',     'time'],
+    ['hairUntil',             '탈모약',        'time'],
+    ['dollPt',                '봉제 인형',     'time'],
+    ['buttonCall',            '통신 단추',     'time'],
+    ['lineGuard',             '낚시 줄 방어',  'num'],
+    ['gearProtect',           '등급 보호',     'bool'],
+    ['paperBoat',             '종이배',        'bool'],
+    ['hasVIP',                'VIP',           'bool']
+];
+// 상담실(quarantineUntil)은 벌이라 목록에서 뺀다
+
+function timedOf(u) {
+    const now = Date.now(), out = [];
+    TIMED.forEach(function (x) {
+        const f = x[0], nm = x[1], kind = x[2];
+        const v = u[f];
+        if (kind === 'time') {
+            if (!v || v <= now) return;
+            out.push({ f: f, kind: kind, t: nm, sub: Math.round((v - now) / 60000) + '분 남음' });
+        } else if (kind === 'num') {
+            if (!v || v <= 0) return;
+            out.push({ f: f, kind: kind, t: nm, sub: v + '회' });
+        } else {
+            if (!v) return;
+            out.push({ f: f, kind: kind, t: nm, sub: '' });
+        }
+    });
+    return out;
+}
+
 function stealPanel(target, srcName, maxPick, dayCap) {
-    const list = ibClean(target).map(function (b, i) {
-        return { i: i, t: buffName(b.k) + ' +' + b.v + (b.src ? ' · ' + b.src : '') };
-    });
-    const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
-    const own = [];
-    ['luck', 'pct', 'eva', 'bon', 'fac', 'dark', 'gim'].forEach(function (k) {
-        if (e[k]) own.push({ k: k, v: e[k], t: buffName(k) + ' +' + e[k] + ' · 본래' });
-    });
-
-    if (!list.length && !own.length) { showCustomAlert(target.name + ' 사원에게서 가져올 것이 없습니다.'); return; }
-
     const back = document.createElement('div');
     back.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.78);'
         + 'display:flex;align-items:center;justify-content:center;padding:18px';
     const box = document.createElement('div');
-    box.style.cssText = 'max-width:420px;width:100%;max-height:78vh;overflow:auto;padding:18px;'
+    box.style.cssText = 'max-width:430px;width:100%;max-height:80vh;overflow:auto;padding:18px;'
         + 'background:#14161c;border:1px solid #d4af37;color:#e8e4da;font-size:13px;line-height:1.7';
-    let html = '<div style="font-size:15px;color:#d4af37;margin-bottom:10px">' + srcName + '</div>'
-        + '<div style="margin-bottom:12px;color:#a9a49a">' + target.name
-        + ' 사원이 지닌 것입니다. 가져올 것을 고르세요. (최대 ' + maxPick + '개)<br>'
-        + '<span style="font-size:11px;color:#7d7870">자정이 지나면 모두 제자리로 돌아갑니다.'
-        + (dayCap ? ' · 오늘 남은 횟수 ' + dayLeft(currentUser, srcName, dayCap) + '회' : '')
-        + '</span></div>';
-    list.forEach(function (x) {
-        html += '<label style="display:block;margin:5px 0"><input type="checkbox" data-t="ib" data-i="'
-            + x.i + '"> ' + x.t + '</label>';
-    });
-    own.forEach(function (x) {
-        html += '<label style="display:block;margin:5px 0"><input type="checkbox" data-t="own" data-k="'
-            + x.k + '" data-v="' + x.v + '"> ' + x.t + '</label>';
-    });
-    html += '<div style="margin-top:14px;text-align:right">'
-        + '<button data-go="1" style="padding:7px 14px;background:#d4af37;border:0;color:#14161c;cursor:pointer">가져온다</button>'
-        + ' <button data-no="1" style="padding:7px 14px;background:#2a2d36;border:0;color:#a9a49a;cursor:pointer">닫기</button></div>';
-    box.innerHTML = html;
     back.appendChild(box);
     document.body.appendChild(back);
 
-    box.querySelector('[data-no]').onclick = function () { back.remove(); };
-    box.querySelector('[data-go]').onclick = function () {
+    const btn = function (t, key, main) {
+        return '<button data-' + key + '="1" style="padding:7px 14px;border:0;cursor:pointer;'
+            + (main ? 'background:#d4af37;color:#14161c' : 'background:#2a2d36;color:#a9a49a') + '">' + t + '</button>';
+    };
+
+    // ---------- 1단계 : 열람할지 묻는다 ----------
+    function askLook() {
+        box.innerHTML =
+            '<div style="font-size:15px;color:#d4af37;margin-bottom:10px">' + srcName + '</div>'
+            + '<div style="margin-bottom:16px;color:#a9a49a">표적 — <b style="color:#e8e4da">'
+            + target.name + '</b> 사원<br>'
+            + '<span style="font-size:11px;color:#7d7870">지닌 것을 들여다봅니다. 보는 것만으로는 아무 일도 일어나지 않습니다.'
+            + (dayCap ? '<br>오늘 남은 횟수 ' + dayLeft(currentUser, srcName, dayCap) + '회' : '')
+            + '</span></div>'
+            + '<div style="text-align:right">' + btn('열람', 'look', true) + ' ' + btn('닫기', 'no') + '</div>';
+        box.querySelector('[data-no]').onclick = function () { back.remove(); };
+        box.querySelector('[data-look]').onclick = showList;
+    }
+
+    // ---------- 2단계 : 지닌 것을 펼친다 ----------
+    function showList() {
+        const bag = ibClean(target);
+        const gear = (target.equippedWeapons || []).slice();
+        const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
+        const own = [];
+        ['luck', 'pct', 'eva', 'bon', 'fac', 'dark', 'gim'].forEach(function (k) {
+            if (e[k]) own.push({ k: k, v: e[k] });
+        });
+        const timed = timedOf(target);
+
+        let html = '<div style="font-size:15px;color:#d4af37;margin-bottom:4px">' + srcName + '</div>'
+            + '<div style="margin-bottom:12px;color:#a9a49a">' + target.name
+            + ' 사원이 지닌 것 <span style="font-size:11px;color:#7d7870">(최대 ' + maxPick + '개)</span></div>';
+
+        const head = function (t) {
+            return '<div style="font-size:11px;color:#d4af37;margin:12px 0 5px 0;'
+                + 'border-bottom:1px solid #333;padding-bottom:3px">' + t + '</div>';
+        };
+        const row = function (attrs, label, sub) {
+            return '<label style="display:flex;gap:8px;align-items:flex-start;margin:5px 0;cursor:pointer">'
+                + '<input type="checkbox" ' + attrs + ' style="margin-top:4px">'
+                + '<span>' + label
+                + (sub ? '<br><span style="font-size:11px;color:#7d7870">' + sub + '</span>' : '')
+                + '</span></label>';
+        };
+
+        if (gear.length) {
+            html += head('장착 중인 것 — 물건은 그대로 두고 능력만 가져옵니다');
+            gear.forEach(function (w, i) {
+                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+                const c = ITEM_CATALOG[base];
+                html += row('data-t="gear" data-i="' + i + '"', base,
+                    (c && c.desc ? c.desc.slice(0, 60) : ''));
+            });
+        }
+        if (bag.length) {
+            html += head('걸려 있는 효과');
+            bag.forEach(function (b, i) {
+                html += row('data-t="ib" data-i="' + i + '"',
+                    buffName(b.k) + ' +' + b.v, b.src || '');
+            });
+        }
+        if (own.length) {
+            html += head('본래 능력치');
+            own.forEach(function (x) {
+                html += row('data-t="own" data-k="' + x.k + '" data-v="' + x.v + '"',
+                    buffName(x.k) + ' +' + x.v, '자정까지 빼앗습니다');
+            });
+        }
+        if (timed.length) {
+            html += head('몸에 남아 있는 것');
+            timed.forEach(function (x, i) {
+                html += row('data-t="state" data-i="' + i + '"', x.t, x.sub);
+            });
+        }
+        if (!gear.length && !bag.length && !own.length && !timed.length) {
+            html += '<div style="color:#7d7870;padding:18px 0;text-align:center">가져올 것이 없습니다.</div>';
+        }
+
+        html += '<div style="margin-top:16px;text-align:right">'
+             + btn('가져온다', 'go', true) + ' ' + btn('닫기', 'no') + '</div>';
+        box.innerHTML = html;
+
+        box.querySelector('[data-no]').onclick = function () { back.remove(); };
+        box.querySelector('[data-go]').onclick = function () { doTake(gear, bag, timed); };
+    }
+
+    // ---------- 가져온다 ----------
+    function doTake(gear, bag, timed) {
         const on = Array.from(box.querySelectorAll('input:checked')).slice(0, maxPick);
         if (!on.length) { back.remove(); return; }
-        const life = msToMidnight();          // 자정에 제자리로
+
+        const life = msToMidnight();
         const took = [];
+        let movedGear = false;
+
         on.forEach(function (inp) {
-            if (inp.dataset.t === 'ib') {
-                const b = ibList(target)[parseInt(inp.dataset.i, 10)];
+            const t = inp.dataset.t;
+
+            if (t === 'gear') {
+                const w = gear[parseInt(inp.dataset.i, 10)];
+                if (!w) return;
+                const eq = target.equippedWeapons || [];
+                const at = eq.indexOf(w);
+                if (at < 0) return;
+                if ((currentUser.equippedWeapons || []).length >= 8) {
+                    showCustomAlert('내 장착칸이 가득 찼습니다.'); return;
+                }
+
+                // 물건은 상대 칸에 그대로 둔다. 이름 앞에 표를 붙여 힘만 끊는다
+                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+                eq[at] = SEAL + w;
+                if (target.equipOwner && target.equipOwner[w] != null) {
+                    target.equipOwner[SEAL + w] = target.equipOwner[w];
+                    delete target.equipOwner[w];
+                }
+
+                const label = base + ' (' + srcName + ')';
+                if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+                currentUser.equippedWeapons.push(label);
+                if (typeof setEquipOwner === 'function') setEquipOwner(currentUser, label, currentUser.code);
+                stolenBag(currentUser)[label] = { kind: 'gear', from: target.code, orig: w, day: today() };
+                took.push(base + ' 의 능력');
+                movedGear = true;
+
+            } else if (t === 'state') {
+                const x = timed[parseInt(inp.dataset.i, 10)];
+                if (!x) return;
+                const mine = currentUser[x.f];
+                const theirs = target[x.f];
+                if (x.kind === 'time') {
+                    currentUser[x.f] = Math.max(mine || 0, theirs || 0);
+                    target[x.f] = 0;
+                } else if (x.kind === 'num') {
+                    currentUser[x.f] = (mine || 0) + (theirs || 0);
+                    target[x.f] = 0;
+                } else {
+                    currentUser[x.f] = true;
+                    target[x.f] = false;
+                }
+                stolenBag(currentUser)['상태:' + x.f] = {
+                    kind: 'state', field: x.f, from: target.code,
+                    theirs: theirs, mine: mine, day: today(), t: x.t
+                };
+                const f = {}; f[x.f] = target[x.f];
+                updateUserFields(target.code, f);
+                const g = {}; g[x.f] = 1;
+                saveFields(g);
+                took.push(x.t);
+                movedGear = true;
+
+            } else if (t === 'ib') {
+                const b = bag[parseInt(inp.dataset.i, 10)];
                 if (!b) return;
                 ibAdd(currentUser, b.k, b.v, life, srcName);
-                ibAdd(target, b.k, -b.v, life, srcName + '에 빼앗김');   // 지우지 않고 상쇄 — 자정에 되살아난다
+                ibAdd(target, b.k, -b.v, life, srcName + '에 빼앗김');
                 took.push(buffName(b.k) + ' +' + b.v);
+
             } else {
                 const k = inp.dataset.k, v = parseInt(inp.dataset.v, 10);
                 ibAdd(currentUser, k, v, life, srcName);
@@ -760,7 +923,16 @@ function stealPanel(target, srcName, maxPick, dayCap) {
             }
         });
 
+        if (!took.length) { back.remove(); return; }
         if (dayCap) daySpend(currentUser, srcName);
+
+        if (movedGear) {
+            updateUserFields(target.code, {
+                equippedWeapons: target.equippedWeapons || [],
+                equipOwner: target.equipOwner || {}
+            });
+            saveFields({ stolenGear: 1 });
+        }
 
         const word = (srcName === '황룡의 눈')
             ? '황룡의 눈길을 받았습니다. 가지고 있는 버프가 일시적으로 사라집니다.'
@@ -773,9 +945,103 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         updateUI();
         back.remove();
         showCustomAlert('가져왔습니다.\n\n' + took.join('\n')
-            + '\n\n자정이 지나면 ' + target.name + ' 사원에게 돌아갑니다.');
-    };
+            + '\n\n해제하거나 자정이 지나면 ' + target.name + ' 사원에게 돌아갑니다.');
+    }
+
+    askLook();
 }
+
+// ==========================================
+// 빼앗은 장비를 돌려준다 — 해제할 때 · 자정에
+// ==========================================
+function returnStolen(label, quiet) {
+    const rec = stolenBag(currentUser)[label];
+    if (!rec) return false;
+    const t = db.users[rec.from];
+    let what = label;
+
+    if (rec.kind === 'state') {
+        what = rec.t || rec.field;
+        currentUser[rec.field] = rec.mine == null ? 0 : rec.mine;
+        const g = {}; g[rec.field] = 1;
+        saveFields(g);
+        if (t) {
+            t[rec.field] = rec.theirs;
+            const f = {}; f[rec.field] = rec.theirs;
+            updateUserFields(t.code, f);
+        }
+    } else {
+        what = rec.orig;
+        const eq = currentUser.equippedWeapons || [];
+        const at = eq.indexOf(label);
+        if (at >= 0) eq.splice(at, 1);
+        if (currentUser.equipOwner) delete currentUser.equipOwner[label];
+
+        if (t) {
+            const te = t.equippedWeapons || [];
+            const si = te.indexOf(SEAL + rec.orig);
+            if (si >= 0) {
+                te[si] = rec.orig;                      // 봉인을 푼다
+                if (t.equipOwner && t.equipOwner[SEAL + rec.orig] != null) {
+                    t.equipOwner[rec.orig] = t.equipOwner[SEAL + rec.orig];
+                    delete t.equipOwner[SEAL + rec.orig];
+                }
+            } else if (te.indexOf(rec.orig) < 0) {
+                te.push(rec.orig);
+            }
+            t.equippedWeapons = te;
+            updateUserFields(t.code, {
+                equippedWeapons: t.equippedWeapons,
+                equipOwner: t.equipOwner || {}
+            });
+        }
+    }
+
+    delete currentUser.stolenGear[label];
+    saveFields({ stolenGear: 1 });
+    if (t) addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
+    saveSelfFull();
+    updateUI();
+    if (!quiet) showCustomAlert((t ? t.name + ' 사원에게 ' : '') + what + ' 을(를) 돌려주었습니다.');
+    return true;
+}
+
+// 빼앗은 상태를 한꺼번에 돌려준다 — 장착칸에 없는 것(상태분)까지
+window.returnAllStolen = function () {
+    const bag = stolenBag(currentUser);
+    const keys = Object.keys(bag);
+    if (!keys.length) { console.log('빼앗아 둔 것이 없습니다.'); return; }
+    keys.forEach(function (k) { returnStolen(k, true); });
+    console.log('%c✓ ' + keys.length + '건을 돌려주었습니다.', 'color:#4CAF50');
+};
+
+(function hookUnequipReturn() {
+    const iv = setInterval(function () {
+        if (typeof unequipWeapon !== 'function') return;
+        if (unequipWeapon._stolenBack) { clearInterval(iv); return; }
+        const _f = unequipWeapon;
+        unequipWeapon = function (index) {
+            const w = (currentUser.equippedWeapons || [])[index];
+            if (w && stolenBag(currentUser)[w]) { returnStolen(w); return; }
+            return _f.apply(this, arguments);
+        };
+        unequipWeapon._stolenBack = true;
+        clearInterval(iv);
+        console.log('[신규] 빼앗은 장비 반환 연결');
+    }, 500);
+})();
+
+// 자정이 지나면 알아서 돌아간다
+(function watchStolen() {
+    setInterval(function () {
+        if (!currentUser || !currentUser.stolenGear) return;
+        const now = today();
+        Object.keys(currentUser.stolenGear).forEach(function (label) {
+            const rec = currentUser.stolenGear[label];
+            if (rec && rec.day !== now) returnStolen(label, true);
+        });
+    }, 60000);
+})();
 
 function buffName(k) {
     return ({ luck: '행운', pct: '행운%', eva: '회피', bon: '판정', fac: '공용시설',
