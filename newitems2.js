@@ -987,9 +987,9 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                 removeBadgeLine(target, '[장착됨] ' + base);
 
                 const label = base + ' (' + srcName + ')';
-                if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-                currentUser.equippedWeapons.push(label);
-                if (typeof setEquipOwner === 'function') setEquipOwner(currentUser, label, currentUser.code);
+                // 장착칸에는 넣지 않는다. 능력을 읽는 함수들만 따로 본다.
+                if (!Array.isArray(currentUser.borrowedGear)) currentUser.borrowedGear = [];
+                if (currentUser.borrowedGear.indexOf(label) < 0) currentUser.borrowedGear.push(label);
                 stolenBag(currentUser)[label] = { kind: 'gear', from: target.code, orig: w,
                     owner: ownerWas, day: today(), src: srcName };
                 took.push(base + ' 의 능력');
@@ -1043,6 +1043,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
 
         if (movedGear) {
             noUndef(currentUser.stolenGear);
+            saveFields({ borrowedGear: 1 });
             updateUserFields(target.code, {
                 equippedWeapons: target.equippedWeapons || [],
                 equipOwner: target.equipOwner || {},
@@ -1094,9 +1095,14 @@ function returnStolen(label, quiet) {
         }
     } else {
         what = rec.orig;
+        if (Array.isArray(currentUser.borrowedGear)) {
+            const bi = currentUser.borrowedGear.indexOf(label);
+            if (bi >= 0) currentUser.borrowedGear.splice(bi, 1);
+            saveFields({ borrowedGear: 1 });
+        }
         const eq = currentUser.equippedWeapons || [];
         const at = eq.indexOf(label);
-        if (at >= 0) eq.splice(at, 1);
+        if (at >= 0) eq.splice(at, 1);                     // 예전 판본 정리
         if (currentUser.equipOwner) delete currentUser.equipOwner[label];
 
         if (t) {
@@ -1840,41 +1846,50 @@ function gearLockedOn(u, name) {
 })();
 
 // ==========================================
-// 빼앗은 것은 장착칸에 그리지 않는다
-// (능력은 equippedWeapons 로 도니까 배열에는 두되,
-//  그리는 동안만 잠시 빼서 화면에 나오지 않게 한다.)
+// 빼앗은 것은 장착칸에 넣지 않는다
+// 능력을 읽는 함수만 잠깐 같이 보게 한다
 // ==========================================
-function withoutStolen(fn, ctx, args) {
+function withBorrowed(fn, ctx, args) {
     const u = currentUser;
-    const bag = (u && u.stolenGear) || {};
-    if (!u || !Array.isArray(u.equippedWeapons) || !Object.keys(bag).length) {
-        return fn.apply(ctx, args);
-    }
-    const keep = u.equippedWeapons.slice();
-    u.equippedWeapons = keep.filter(function (w) { return !bag[w]; });
+    const bor = (u && Array.isArray(u.borrowedGear)) ? u.borrowedGear : [];
+    if (!bor.length) return fn.apply(ctx, args);
+    const keep = (u.equippedWeapons || []).slice();
+    u.equippedWeapons = keep.concat(bor);
     try { return fn.apply(ctx, args); }
     finally { u.equippedWeapons = keep; }
 }
 
-(function hookDrawHide() {
-    const NAMES = ['renderInventory', 'renderEquipped', 'renderEquippedWeapons', 'renderGear',
-                   'loadBadgeInfo', 'renderBadge', 'buildBadgeHtml', 'renderEmpDetail'];
+// 손대면 안 되는 것들 — 저장·관리·해제·그리기
+const NO_TOUCH = [
+    'applyServerMe', 'saveDB', 'saveSelfFull', 'saveFields', 'updateUserFields',
+    'unequipWeapon', 'retrieveEquipFromUser', 'adminRegisterNewEmployee',
+    'adminForceUnequip', 'forceUnequipFor', 'smashWeapon', 'buildBathContext',
+    'updateUI', 'renderInventory', 'loadBadgeInfo', 'cleanEquipDupe',
+    'equipState', 'equipLockState', 'sapState', 'listDnaGot', 'stampGotDna'
+];
+
+(function hookReaders() {
     let tries = 0;
     const iv = setInterval(function () {
-        let done = 0;
-        NAMES.forEach(function (n) {
-            if (typeof window[n] !== 'function') return;
-            if (window[n]._hideStolen) { done++; return; }
-            const _f = window[n];
-            window[n] = function () { return withoutStolen(_f, this, arguments); };
-            window[n]._hideStolen = true;
-            done++;
+        let n = 0;
+        Object.keys(window).forEach(function (k) {
+            if (NO_TOUCH.indexOf(k) >= 0) return;
+            const f = window[k];
+            if (typeof f !== 'function' || f._seeBorrowed) return;
+            let src; try { src = f.toString(); } catch (e) { return; }
+            if (src.length > 40000) return;
+            if (src.indexOf('equippedWeapons') < 0) return;
+            if (/innerHTML|insertAdjacentHTML/.test(src)) return;      // 그리는 것은 제외
+            const _f = f;
+            window[k] = function () { return withBorrowed(_f, this, arguments); };
+            window[k]._seeBorrowed = true;
+            n++;
         });
-        if (done || ++tries > 40) {
+        if (n || ++tries > 30) {
             clearInterval(iv);
-            console.log('[신규] 빼앗은 장비는 장착칸에 그리지 않음');
+            console.log('[신규] 빌려 온 능력을 읽는 함수 ' + n + '개 연결');
         }
-    }, 500);
+    }, 600);
 })();
 
 // ==========================================
@@ -1957,6 +1972,7 @@ window.newItemState = function () {
     console.log('  은심장:', hasSilverHeart(u) ? (u.heartSaves || 0) + '회' : '없음');
     console.log('  빼앗아 둔 것:', Object.keys(u.stolenGear || {}).join(' · ') || '(없음)');
     console.log('  내가 잠긴 장비:', Object.keys(u.gearLock || {}).join(' · ') || '(없음)');
+    console.log('  빌려 온 능력:', (u.borrowedGear || []).join(' · ') || '(없음)');
     ['황룡의 눈', '산군의 도움'].forEach(function (n) {
         if (!hasAny(u, n)) return;
         console.log('  ' + n + ' — 장착', hasEquipped(u, n) ? 'O' : '-',
