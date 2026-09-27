@@ -21,9 +21,9 @@ const VIDEO_FRAMES_S = [
     {
         id: 'v02', g: 'S', n: '맥광',
         src: SRC_NEON,
-        ring: 11,          // 띠 두께 (px)
-        bandX: 0.17,       // 영상에서 좌우 띠가 차지하는 비율
-        bandY: 0.09,       // 영상에서 위아래 띠가 차지하는 비율
+        ring: 14,          // 띠 두께 (px)
+        bandX: 0.15,       // 영상에서 좌우 띠가 차지하는 비율
+        bandY: 0.075,      // 영상에서 위아래 띠가 차지하는 비율
         opacity: 1,
         bg: '#05030c',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -31,9 +31,9 @@ const VIDEO_FRAMES_S = [
     {
         id: 'v03', g: 'S', n: '화등',
         src: SRC_VINE,
-        ring: 11,
-        bandX: 0.12,
-        bandY: 0.085,
+        ring: 16,
+        bandX: 0.094,
+        bandY: 0.055,
         opacity: 1,
         bg: '#0a0509',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -115,12 +115,39 @@ ${sel} {
         + ` { opacity: ${f.opacity} !important; }\n`;
 });
 
+// 회색 구분선 제거 — 영상 테두리에는 덧선을 그리지 않는다
+(function noLine() {
+    const ids = ['v01'].concat(VIDEO_FRAMES_S.map(function (f) { return f.id; }));
+    const base = [];
+    ids.forEach(function (id) {
+        [
+            '.fr-' + id + '.fr-wrap',
+            'html body .fr-' + id + '.fr-wrap',
+            'body[data-ui-skin] .fr-' + id + '.fr-wrap',
+            '#employee-cards-container .fr-' + id + '.fr-wrap',
+            '#emp-detail-card-container .fr-' + id + '.fr-wrap',
+            '#history-list-container .fr-' + id + '.fr-wrap'
+        ].forEach(function (x) { base.push(x); });
+    });
+    css += `
+${base.join(',\n')} {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+}
+${base.map(function (x) { return x + '::before'; })
+   .concat(base.map(function (x) { return x + '::after'; })).join(',\n')} {
+    display: none !important;
+    content: none !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+}
+`;
+})();
+
 // 글자가 빛에 묻히지 않게
 css += `
-#history-list-container .fr-v02.fr-wrap, #history-list-container .fr-v03.fr-wrap,
-#employee-cards-container .fr-v02.fr-wrap, #employee-cards-container .fr-v03.fr-wrap {
-    background-clip: padding-box !important;
-}
 #history-list-container .fr-v02.fr-wrap *, #history-list-container .fr-v03.fr-wrap *,
 #employee-cards-container .fr-v02.fr-wrap *, #employee-cards-container .fr-v03.fr-wrap * {
     text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 7px rgba(0,0,0,0.85) !important;
