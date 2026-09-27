@@ -983,6 +983,9 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                 if (!target.gearLock) target.gearLock = {};
                 target.gearLock[base] = { by: currentUser.code, src: srcName, day: today() };
 
+                // 특이사항에 무엇을 빼앗겼는지 남기지 않는다
+                removeBadgeLine(target, '[장착됨] ' + base);
+
                 const label = base + ' (' + srcName + ')';
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
                 currentUser.equippedWeapons.push(label);
@@ -1055,6 +1058,10 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         addHistoryLog(currentUser, '[' + srcName + '] ' + target.name + ' 사원에게서 ' + took.join(', '));
         addHistoryLog(target, '[' + srcName + '] ' + word);
         appendBadgeNoteToUser(target, word);
+
+        // 가져온 쪽에는 무엇을 가져왔는지 적지 않는다. 썼다는 것만 한 줄.
+        removeBadgeLine(currentUser, srcName + '을(를) 썼습니다');
+        appendBadgeNoteToUser(currentUser, srcName + '을(를) 썼습니다.');
         saveSelfFull();
         updateUI();
         back.remove();
@@ -1111,6 +1118,9 @@ function returnStolen(label, quiet) {
             t.equippedWeapons = te;
             const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
             if (t.gearLock) delete t.gearLock[baseBack];
+            if (typeof appendBadgeNoteToUser === 'function') {
+                appendBadgeNoteToUser(t, '[장착됨] ' + baseBack);
+            }
             updateUserFields(t.code, {
                 equippedWeapons: t.equippedWeapons,
                 equipOwner: t.equipOwner || {},
@@ -1122,7 +1132,23 @@ function returnStolen(label, quiet) {
     delete currentUser.stolenGear[label];
     noUndef(currentUser.stolenGear);
     saveFields({ stolenGear: 1 });
-    if (t) addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
+
+    // 남은 것이 없으면 특이사항의 눈길·숨결 문구도 걷는다
+    if (t) {
+        const still = Object.keys(currentUser.stolenGear || {}).some(function (k) {
+            return currentUser.stolenGear[k] && currentUser.stolenGear[k].from === t.code;
+        });
+        if (!still) {
+            removeBadgeLine(t, '황룡의 눈길을 받았습니다');
+            removeBadgeLine(t, '산군의 숨결이 닿았습니다');
+        }
+        if (rec.src && !Object.keys(currentUser.stolenGear || {}).some(function (k) {
+                return currentUser.stolenGear[k] && currentUser.stolenGear[k].src === rec.src;
+            })) {
+            removeBadgeLine(currentUser, rec.src + '을(를) 썼습니다');
+        }
+        addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
+    }
     saveSelfFull();
     updateUI();
     if (!quiet) showCustomAlert((t ? t.name + ' 사원에게 ' : '') + what + ' 을(를) 돌려주었습니다.');
@@ -1831,7 +1857,8 @@ function withoutStolen(fn, ctx, args) {
 }
 
 (function hookDrawHide() {
-    const NAMES = ['renderInventory', 'renderEquipped', 'renderEquippedWeapons', 'renderGear'];
+    const NAMES = ['renderInventory', 'renderEquipped', 'renderEquippedWeapons', 'renderGear',
+                   'loadBadgeInfo', 'renderBadge', 'buildBadgeHtml', 'renderEmpDetail'];
     let tries = 0;
     const iv = setInterval(function () {
         let done = 0;
