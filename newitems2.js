@@ -1191,6 +1191,7 @@ window.returnAllStolen = function () {
             return _f.apply(this, arguments);
         };
         unequipWeapon._stolenBack = true;
+        window.__stolenBackOn = true;
         clearInterval(iv);
         console.log('[신규] 빼앗은 장비 반환 연결');
     }, 500);
@@ -1840,6 +1841,7 @@ function gearLockedOn(u, name) {
             return _u.apply(this, arguments);
         };
         useInventoryItem._gearLock = true;
+        window.__gearLockOn = true;
         clearInterval(iv);
         console.log('[신규] 빼앗긴 장비 잠금 연결');
     }, 500);
