@@ -350,6 +350,83 @@ function withLucky(fn, ctx, args) {
     }, 500);
 })();
 
+// epic 쪽 구출 — epicDoomRescue 는 luckReroll 로 한 번 굴린다
+(function hookEpicRescue() {
+    const iv = setInterval(function () {
+        if (typeof epicDoomRescue !== 'function' || typeof luckReroll !== 'function') return;
+        if (epicDoomRescue._newSure) { clearInterval(iv); return; }
+
+        // 깃발이 서 있을 때 딱 한 번만 20
+        const _l = luckReroll;
+        luckReroll = function () {
+            if (window.__epicSureRoll) { window.__epicSureRoll = false; return 20; }
+            return _l.apply(this, arguments);
+        };
+
+        const _e = epicDoomRescue;
+        epicDoomRescue = function () {
+            const u = currentUser;
+            const src = rescueGuarantee();
+
+            // 진실 마스크 — 양쪽 정산
+            (u.equippedWeapons || []).forEach(function (w) {
+                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+                if (base !== '진실 마스크') return;
+                const o = (typeof getEquipOwner === 'function') ? getEquipOwner(u, w) : null;
+                addDarkPt(u, 5000, '진실 마스크');
+                if (o && o !== u.code && db.users[o]) addDarkPt(db.users[o], 5000, '진실 마스크');
+            });
+
+            if (!src) {
+                u.heartSaves = (u.heartSaves || 0) + 1;
+                saveFields({ heartSaves: 1 });
+                return _e.apply(this, arguments);
+            }
+
+            window.__epicSureRoll = true;
+            setTimeout(function () { window.__epicSureRoll = false; }, 8000);   // 안전장치
+            spendGuarantee(src);
+            addHistoryLog(u, '[확정 구출] ' + src);
+            setTimeout(function () {
+                showCustomAlert(src + '이(가) 손을 대신 뻗었습니다.\n\n구출이 확정되었습니다.');
+            }, 1400);
+            return _e.apply(this, arguments);
+        };
+        epicDoomRescue._newSure = true;
+        clearInterval(iv);
+        console.log('[신규] epic 확정 구출 연결');
+    }, 500);
+})();
+
+// 끌려감 방어 — epic 쪽 저항도 같이
+(function hookMoreResist() {
+    const NAMES = ['b508Resist', 'a667Grab', 'dark087Roll'];
+    const iv = setInterval(function () {
+        let hit = 0;
+        NAMES.forEach(function (n) {
+            if (typeof window[n] !== 'function') return;
+            if (window[n]._newLine) { hit++; return; }
+            const _f = window[n];
+            window[n] = function () {
+                const u = currentUser;
+                if (!u.lineGuard || u.lineGuard <= 0) return _f.apply(this, arguments);
+                u.lineGuard--;
+                saveFields({ lineGuard: 1 });
+                window.__epicSureRoll = true;
+                setTimeout(function () { window.__epicSureRoll = false; }, 8000);
+                const out = withLucky(_f, this, arguments);
+                setTimeout(function () {
+                    showCustomAlert('낚시 줄이 손목을 붙들었습니다.\n\n남은 방어 ' + u.lineGuard + '회');
+                }, 700);
+                return out;
+            };
+            window[n]._newLine = true;
+            hit++;
+        });
+        if (hit >= 2) { clearInterval(iv); console.log('[신규] epic 끌려감 방어 연결'); }
+    }, 500);
+})();
+
 // 은색 저울 — 같이 죽을 확률을 보여 준다
 (function hookScale() {
     const iv = setInterval(function () {
