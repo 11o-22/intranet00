@@ -756,7 +756,7 @@ const NEW = [
     ['통신 단추', 5000, DREAM, 'n_button', false,
      '누군가의 단추. 어둠에서 위급할 때 세 번까지 확정 구출을 요청할 수 있다.'],
     ['연구 보고서', 700, DREAM, 'n_report', false,
-     '어둠 내역이 적힌 보고서. 다음 탐사 한 번 동안 행운 300%. (1회용)'],
+     '어둠 내역이 적힌 보고서. 세 시간 동안 행운 300%. (1회용)'],
     ['일기장', 9000, DREAM, 'n_diary', false,
      '퇴사한 사원의 일기장. 오염도가 세 시간 멈추고, 다음 어둠에 +2,000P. (1회용)'],
     ['달빛 타투 스티커', 1004, DREAM, 'n_tattoo', false,
@@ -942,10 +942,10 @@ const SELF = {
     },
 
     n_report: function (nm) {
-        ibAdd(currentUser, 'pct', 300, 0, '연구 보고서', { run: true });
-        addHistoryLog(currentUser, '[연구 보고서] 행운 300%');
+        ibAdd(currentUser, 'pct', 300, 3 * HOUR, '연구 보고서');
+        addHistoryLog(currentUser, '[연구 보고서] 행운 300% (3시간)');
         gone(nm);
-        showCustomAlert('보고서를 펼쳤습니다.\n\n다음 탐사 한 번 동안 행운 300%.');
+        showCustomAlert('보고서를 펼쳤습니다.\n\n세 시간 동안 행운 300%.');
     },
 
     n_diary: function (nm) {
