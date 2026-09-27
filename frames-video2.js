@@ -167,6 +167,35 @@ st.id = 'frame-video-css-2';
 st.textContent = css;
 document.head.appendChild(st);
 
+// ==========================================
+// 영상 테두리를 두른 칸만 속을 비운다
+// ==========================================
+const cardSt = document.createElement('style');
+cardSt.id = 'frame-video-card-2';
+document.head.appendChild(cardSt);
+
+window.fvCardBg = function (a) {
+    a = (a == null) ? 0.15 : a;
+    const ids = ['v01'].concat(VIDEO_FRAMES_S.map(function (f) { return f.id; }));
+    const sel = [];
+    ids.forEach(function (id) {
+        [
+            '#employee-cards-container .fr-' + id + '.fr-wrap',
+            'html body #employee-cards-container .fr-' + id + '.fr-wrap',
+            'body[data-ui-skin] #employee-cards-container .fr-' + id + '.fr-wrap',
+            'html body[data-ui-skin] #employee-cards-container .emp-list-card.fr-' + id + '.fr-wrap',
+            '#emp-detail-card-container .fr-' + id + '.fr-wrap',
+            'html body[data-ui-skin] #emp-detail-card-container .fr-' + id + '.fr-wrap'
+        ].forEach(function (x) { sel.push(x); });
+    });
+    cardSt.textContent = sel.join(',\n') + ` {
+    background-color: rgba(8,8,11,${a}) !important;
+    background-image: none !important;
+}`;
+    console.log('영상 테두리 칸 속 진하기 ' + a);
+};
+fvCardBg(0.15);
+
 // --- 캔버스 달기 ---
 const live = [];   // { el, cv, ctx, f }
 
