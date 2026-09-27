@@ -31,6 +31,8 @@
             const el = document.querySelector(sel);
             const before = el ? el.innerHTML : null;
             const elTop = el ? el.scrollTop : 0;
+            // 맨 밑에 있었는지 기억한다
+            const atEnd = el ? (el.scrollHeight - el.scrollTop - el.clientHeight < 6) : false;
             const winTop = window.pageYOffset || document.documentElement.scrollTop || 0;
             const docH = document.documentElement.scrollHeight;
 
@@ -42,8 +44,17 @@
             // 내용이 그대로면 손대지 않는다
             if (before !== null && el2.innerHTML === before) return r;
 
-            // 되돌려 놓는다
-            if (elTop) el2.scrollTop = elTop;
+            // 되돌려 놓는다 — 높이가 잡힌 뒤에 한 번 더
+            const putBox = function () {
+                if (atEnd) { el2.scrollTop = el2.scrollHeight; return; }
+                if (!elTop) return;
+                const max = Math.max(0, el2.scrollHeight - el2.clientHeight);
+                el2.scrollTop = Math.min(elTop, max);
+            };
+            putBox();
+            requestAnimationFrame(putBox);
+            setTimeout(putBox, 60);
+
             if (winTop) {
                 const put = function () {
                     const now = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -54,6 +65,7 @@
                 };
                 put();
                 requestAnimationFrame(put);
+                setTimeout(put, 60);
             }
             return r;
         };
@@ -71,7 +83,9 @@
         ['renderAlienShop',      '#alien-items-container',      '#shop-alien'],
         ['renderQShop',          '#qshop-body',                 '#shop-unknown'],
         ['renderHouseStorage',   '#house-storage-body',         '#house-storage'],
-        ['renderDarkLogs',       '#darkness-log-container',     '#dark-log']
+        ['renderDarkLogs',       '#darkness-log-container',     '#dark-log'],
+        ['loadBadgeInfo',        '#badge-note-display',         null],
+        ['renderBadge',          '#badge-note-display',         null]
     ];
 
     (function hookAll() {
@@ -139,6 +153,42 @@ body { overscroll-behavior-y: none; }
         tmr = setTimeout(function () { scrolling = false; }, 400);
     }, { passive: true });
 
+    // ==========================================
+    // 어느 탭이든 스크롤 자리를 지킨다
+    // ==========================================
+    function snapAll() {
+        const list = [];
+        document.querySelectorAll('div, section, ul, ol').forEach(function (el) {
+            if (el.scrollTop <= 0) return;
+            if (el.scrollHeight - el.clientHeight < 8) return;
+            list.push({
+                el: el,
+                top: el.scrollTop,
+                end: (el.scrollHeight - el.scrollTop - el.clientHeight) < 6
+            });
+        });
+        return { win: window.pageYOffset || document.documentElement.scrollTop || 0, list: list };
+    }
+
+    function restoreAll(s) {
+        if (!s) return;
+        const put = function () {
+            s.list.forEach(function (x) {
+                if (!x.el.isConnected) return;
+                const max = Math.max(0, x.el.scrollHeight - x.el.clientHeight);
+                x.el.scrollTop = x.end ? x.el.scrollHeight : Math.min(x.top, max);
+            });
+            if (s.win) {
+                const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+                const now = window.pageYOffset || document.documentElement.scrollTop || 0;
+                if (Math.abs(now - s.win) > 2) window.scrollTo(0, Math.min(s.win, max));
+            }
+        };
+        put();
+        requestAnimationFrame(put);
+        setTimeout(put, 60);
+    }
+
     (function hookUpdateUI() {
         const iv = setInterval(function () {
             if (typeof updateUI !== 'function') return;
@@ -153,10 +203,52 @@ body { overscroll-behavior-y: none; }
                     setTimeout(function () { pending = false; updateUI(); }, 500);
                     return;
                 }
-                return _u.apply(this, arguments);
+                const snap = snapAll();
+                const r = _u.apply(this, arguments);
+                restoreAll(snap);
+                return r;
             };
             updateUI._scrollHeld = true;
             clearInterval(iv);
+        }, 500);
+    })();
+
+    // ==========================================
+    // 너무 자주 다시 그리는 곳을 묶는다 — 깜빡임 방지
+    // ==========================================
+    function throttleRender(fnName, ms) {
+        if (typeof window[fnName] !== 'function') return false;
+        if (window[fnName]._throttled) return true;
+        const _f = window[fnName];
+        let lastRun = 0, timer = null;
+        window[fnName] = function () {
+            const now = Date.now();
+            const self = this, args = arguments;
+            if (now - lastRun >= ms) {
+                lastRun = now;
+                return _f.apply(self, args);
+            }
+            // 너무 이르면 한 번만 뒤로 미룬다
+            if (timer) return;
+            timer = setTimeout(function () {
+                timer = null; lastRun = Date.now();
+                _f.apply(self, args);
+            }, ms - (now - lastRun));
+        };
+        window[fnName]._throttled = true;
+        return true;
+    }
+
+    (function hookThrottle() {
+        const SLOW = [['renderAlienShop', 2500], ['renderQShop', 2500], ['renderRegularShop', 1500]];
+        let tries = 0;
+        const iv = setInterval(function () {
+            let left = 0;
+            SLOW.forEach(function (t) { if (!throttleRender(t[0], t[1])) left++; });
+            if (left === 0 || ++tries > 40) {
+                clearInterval(iv);
+                console.log('[스크롤] 다시 그리기 묶음 적용');
+            }
         }, 500);
     })();
 
