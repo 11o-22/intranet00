@@ -201,13 +201,29 @@ function wornOn(u, name) {
     return hasEquipped(u, name);
 }
 
+// 특이사항에서 한 줄을 지운다
+function removeBadgeLine(u, needle) {
+    if (!u || !u.badge) return;
+    const raw = String(u.badge);
+    const br = /<br\s*\/?>/i.test(raw);
+    const parts = raw.split(/<br\s*\/?>|\n/);
+    const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
+    if (keep.length === parts.length) return;
+    u.badge = keep.join(br ? '<br>' : '\n');
+    if (u.code === currentUser.code) saveFields({ badge: 1 });
+    else if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge });
+}
+
 function toggleWorn(name) {
     const u = currentUser;
     if (!u.wornItems) u.wornItems = {};
     const on = !u.wornItems[name];
     if (on) u.wornItems[name] = 1; else delete u.wornItems[name];
     saveFields({ wornItems: 1 });
-    appendBadgeNoteToUser(u, (on ? '[장착됨] ' : '[해제] ') + name);
+
+    if (on) appendBadgeNoteToUser(u, '[장착됨] ' + name);
+    else removeBadgeLine(u, '[장착됨] ' + name);     // 해제하면 흔적을 남기지 않는다
+
     addHistoryLog(u, (on ? '[장착] ' : '[해제] ') + name);
     saveSelfFull();
     updateUI();
@@ -1494,6 +1510,24 @@ const SELF = {
                     showCustomAlert('오늘은 더 쓸 수 없습니다.\n\n자정이 지나면 다시 열립니다.');
                     return false;
                 }
+                // 바깥(index.html)에서 소지품을 한 개 빼가므로 도로 채워 넣는다
+                const had = (currentUser.inventory || []).filter(function (x) { return x === itemName; }).length;
+                const worn = wornOn(currentUser, nm2);
+                setTimeout(function () {
+                    const now = (currentUser.inventory || []).filter(function (x) { return x === itemName; }).length;
+                    if (now < had) {
+                        currentUser.inventory.push(itemName);
+                        saveFields({ inventory: 1 });
+                        updateUI();
+                    }
+                    // 장착 표시도 지켜 준다
+                    if (worn && !wornOn(currentUser, nm2)) {
+                        if (!currentUser.wornItems) currentUser.wornItems = {};
+                        currentUser.wornItems[nm2] = 1;
+                        saveFields({ wornItems: 1 });
+                    }
+                }, 350);
+
                 stealPanel(targetUser, nm2, isDragon ? 2 : 1, cap);
                 return true;     // 아이템은 사라지지 않는다
             }
