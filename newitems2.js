@@ -39,6 +39,13 @@ function affilText(u) {
 
 function isCounsel(u) { return u && u.code === 'kario0987'; }
 
+// 오늘 자정까지 남은 시간
+function msToMidnight() {
+    const d = new Date();
+    d.setHours(24, 0, 0, 0);
+    return Math.max(60000, d.getTime() - Date.now());
+}
+
 // 이 파일이 맡는 효과인지 — n_… 과 equip_n_… 둘 다
 function isNewEff(e) {
     e = String(e || '');
@@ -671,7 +678,7 @@ function showPieceHint() {
 // ==========================================
 // 9. 버프 강탈 — 황룡의 눈 · 산군의 도움
 // ==========================================
-function stealPanel(target, srcName, maxPick) {
+function stealPanel(target, srcName, maxPick, dayCap) {
     const list = ibClean(target).map(function (b, i) {
         return { i: i, t: buffName(b.k) + ' +' + b.v + (b.src ? ' · ' + b.src : '') };
     });
@@ -691,7 +698,10 @@ function stealPanel(target, srcName, maxPick) {
         + 'background:#14161c;border:1px solid #d4af37;color:#e8e4da;font-size:13px;line-height:1.7';
     let html = '<div style="font-size:15px;color:#d4af37;margin-bottom:10px">' + srcName + '</div>'
         + '<div style="margin-bottom:12px;color:#a9a49a">' + target.name
-        + ' 사원에게서 가져올 것을 고르세요. (최대 ' + maxPick + '개)</div>';
+        + ' 사원이 지닌 것입니다. 가져올 것을 고르세요. (최대 ' + maxPick + '개)<br>'
+        + '<span style="font-size:11px;color:#7d7870">자정이 지나면 모두 제자리로 돌아갑니다.'
+        + (dayCap ? ' · 오늘 남은 횟수 ' + dayLeft(currentUser, srcName, dayCap) + '회' : '')
+        + '</span></div>';
     list.forEach(function (x) {
         html += '<label style="display:block;margin:5px 0"><input type="checkbox" data-t="ib" data-i="'
             + x.i + '"> ' + x.t + '</label>';
@@ -702,7 +712,7 @@ function stealPanel(target, srcName, maxPick) {
     });
     html += '<div style="margin-top:14px;text-align:right">'
         + '<button data-go="1" style="padding:7px 14px;background:#d4af37;border:0;color:#14161c;cursor:pointer">가져온다</button>'
-        + ' <button data-no="1" style="padding:7px 14px;background:#2a2d36;border:0;color:#a9a49a;cursor:pointer">그만</button></div>';
+        + ' <button data-no="1" style="padding:7px 14px;background:#2a2d36;border:0;color:#a9a49a;cursor:pointer">닫기</button></div>';
     box.innerHTML = html;
     back.appendChild(box);
     document.body.appendChild(back);
@@ -711,33 +721,37 @@ function stealPanel(target, srcName, maxPick) {
     box.querySelector('[data-go]').onclick = function () {
         const on = Array.from(box.querySelectorAll('input:checked')).slice(0, maxPick);
         if (!on.length) { back.remove(); return; }
+        const life = msToMidnight();          // 자정에 제자리로
         const took = [];
-        const drop = [];
         on.forEach(function (inp) {
             if (inp.dataset.t === 'ib') {
                 const b = ibList(target)[parseInt(inp.dataset.i, 10)];
                 if (!b) return;
-                drop.push(b);
-                ibAdd(currentUser, b.k, b.v, 12 * HOUR, srcName);
+                ibAdd(currentUser, b.k, b.v, life, srcName);
+                ibAdd(target, b.k, -b.v, life, srcName + '에 빼앗김');   // 지우지 않고 상쇄 — 자정에 되살아난다
                 took.push(buffName(b.k) + ' +' + b.v);
             } else {
                 const k = inp.dataset.k, v = parseInt(inp.dataset.v, 10);
-                ibAdd(currentUser, k, v, 12 * HOUR, srcName);
-                ibAdd(target, k, -v, 12 * HOUR, srcName + '에 빼앗김');
+                ibAdd(currentUser, k, v, life, srcName);
+                ibAdd(target, k, -v, life, srcName + '에 빼앗김');
                 took.push(buffName(k) + ' +' + v);
             }
         });
-        if (drop.length) {
-            target.itemBuffs = ibList(target).filter(function (b) { return drop.indexOf(b) < 0; });
-            updateUserFields(target.code, { itemBuffs: target.itemBuffs });
-        }
+
+        if (dayCap) daySpend(currentUser, srcName);
+
+        const word = (srcName === '황룡의 눈')
+            ? '황룡의 눈길을 받았습니다. 가지고 있는 버프가 일시적으로 사라집니다.'
+            : '산군의 숨결이 닿았습니다. 가지고 있는 버프가 일시적으로 사라집니다.';
+
         addHistoryLog(currentUser, '[' + srcName + '] ' + target.name + ' 사원에게서 ' + took.join(', '));
-        addHistoryLog(target, '[' + srcName + '] ' + currentUser.name + ' 사원이 ' + took.join(', ') + ' 을(를) 가져갔습니다.');
-        appendBadgeNoteToUser(target, '[빼앗김] ' + took.join(', '));
+        addHistoryLog(target, '[' + srcName + '] ' + word);
+        appendBadgeNoteToUser(target, word);
         saveSelfFull();
         updateUI();
         back.remove();
-        showCustomAlert('가져왔습니다.\n\n' + took.join('\n'));
+        showCustomAlert('가져왔습니다.\n\n' + took.join('\n')
+            + '\n\n자정이 지나면 ' + target.name + ' 사원에게 돌아갑니다.');
     };
 }
 
@@ -778,8 +792,10 @@ const NEW = [
      '한 번 찢으면 네 가지 중 하나가 무작위로 나온다. (1회용)'],
     ['장기말', 5000, DREAM, 'n_piece', false,
      '어느 연구소의 부속품. 던지면 다음 탐사에서 선택지의 무게가 보인다. 세 번 던지면 사라진다.'],
-    ['황룡의 눈', 1000000, DREAM, 'n_dragon', true,
-     '한 사람을 골라 그가 지닌 것 일부를 가져온다. 하루 두 번. 당한 쪽은 잃는다.', 3],
+    ['황룡의 눈', 1000000, DREAM, 'equip_n_dragon', true,
+     '몸에 걸고 표적을 고른다. 그 사원이 지닌 것을 보고, 원하는 것을 가져온다. '
+     + '하루 두 번. 가져간 것도 빼앗긴 것도 자정이 지나면 제자리로 돌아간다. '
+     + '본인만 걸 수 있고, 걸어도 닳지 않는다.', 3],
     ['다 헐은 공략집', 500, DREAM, 'n_guide', false,
      '오염도가 두 시간 진행되지 않는다. (1회용)'],
     ['봉제 인형 키트', 140000, DREAM, 'n_doll', false,
@@ -796,8 +812,10 @@ const NEW = [
      '장착하고 어둠에 들면 같은 팀에게 무작위 효과가 하나씩 걸린다. (장착)'],
     ['전용 자전거', 15000, DISAS, 'n_bike', false,
      '죽을 위기의 동료를 확정으로 두 번 구한다. 하루 두 번.'],
-    ['산군의 도움', 1000000, DISAS, 'n_tiger', true,
-     '타인에게 쓰면 그가 지닌 것을 가져올 수 있다.', 3],
+    ['산군의 도움', 1000000, DISAS, 'equip_n_tiger', true,
+     '몸에 걸고 표적을 고른다. 그 사원이 지닌 것 하나를 가져온다. '
+     + '하루 두 번. 가져간 것도 빼앗긴 것도 자정이 지나면 제자리로 돌아간다. '
+     + '본인만 걸 수 있고, 걸어도 닳지 않는다.', 3],
     ['주의 설명서', 500, DISAS, 'n_manual', false,
      '오염도가 두 시간 진행되지 않는다. (1회용)'],
     ['낚시 줄', 3000, DISAS, 'n_line', false,
@@ -961,7 +979,7 @@ function gone(nm) {
 const SELF = {
 
     n_dream: null, n_scale: null, n_lamp: null, n_rope: null, n_stone: null,
-    equip_n_cage: null,                                                 // 장착형
+    equip_n_cage: null, equip_n_dragon: null, equip_n_tiger: null,      // 장착형
 
     n_button: function (nm) {
         const left = 3 - ((currentUser.useCnt && currentUser.useCnt[nm]) || 0);
@@ -1168,14 +1186,24 @@ const SELF = {
                 return true;
             }
 
-            if (cat.effect === 'n_dragon' || cat.effect === 'n_tiger') {
-                const nm2 = cat.effect === 'n_dragon' ? '황룡의 눈' : '산군의 도움';
-                if (cat.effect === 'n_dragon') {
-                    if (dayLeft(currentUser, nm2, 2) <= 0) { showCustomAlert('오늘은 더 볼 수 없습니다.'); return false; }
-                    daySpend(currentUser, nm2);
+            if (cat.effect === 'equip_n_dragon' || cat.effect === 'equip_n_tiger') {
+                const isDragon = (cat.effect === 'equip_n_dragon');
+                const nm2 = isDragon ? '황룡의 눈' : '산군의 도움';
+                const cap = 2;
+
+                if (!hasEquipped(currentUser, nm2)) {
+                    showCustomAlert(nm2 + '을(를) 먼저 몸에 걸어야 합니다.'); return false;
                 }
-                stealPanel(targetUser, nm2, cat.effect === 'n_dragon' ? 2 : 1);
-                return true;
+                if (targetUser.code === currentUser.code) {
+                    showCustomAlert('자기 자신은 고를 수 없습니다.'); return false;
+                }
+                const left = dayLeft(currentUser, nm2, cap);
+                if (left <= 0) {
+                    showCustomAlert('오늘은 더 쓸 수 없습니다.\n\n자정이 지나면 다시 열립니다.');
+                    return false;
+                }
+                stealPanel(targetUser, nm2, isDragon ? 2 : 1, cap);
+                return true;     // 아이템은 사라지지 않는다
             }
 
             if (cat.effect === 'equip_n_cage') {
