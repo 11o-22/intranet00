@@ -39,6 +39,12 @@ function affilText(u) {
 
 function isCounsel(u) { return u && u.code === 'kario0987'; }
 
+// 이 파일이 맡는 효과인지 — n_… 과 equip_n_… 둘 다
+function isNewEff(e) {
+    e = String(e || '');
+    return e.indexOf('n_') === 0 || e.indexOf('equip_n_') === 0;
+}
+
 // ==========================================
 // 1. 임시 버프 — dnaGiftOf 에 얹는다
 // ==========================================
@@ -765,8 +771,9 @@ const NEW = [
      '상담실에서 곧바로 나올 수 있다. 다섯 번 쓰면 사라진다.'],
     ['은화 뱀', 15555, DREAM, 'n_snake', false,
      '하루 세 번 튕길 수 있다. 절반은 꽝, 절반은 행운·판정·공용시설 중 하나가 +3.'],
-    ['%$@& 이동장', 444444, DREAM, 'n_cage', false,
-     '어떤 것을 담기 위해 만들어졌다. 어둠마다 한 번 확정으로 남을 살리고, 살린 만큼 최대 9,000P. (장착)', 3],
+    ['%$@& 이동장', 444444, DREAM, 'equip_n_cage', true,
+     '어떤 것을 담기 위해 만들어졌다. 어둠마다 한 번 확정으로 남을 살리고, 살린 만큼 최대 9,000P. '
+     + '남에게 채울 수도 있으며, 채운 사람만 뺄 수 있다. (장착)', 3],
     ['엽서', 500, DREAM, 'n_card', false,
      '한 번 찢으면 네 가지 중 하나가 무작위로 나온다. (1회용)'],
     ['장기말', 5000, DREAM, 'n_piece', false,
@@ -953,7 +960,8 @@ function gone(nm) {
 
 const SELF = {
 
-    n_dream: null, n_scale: null, n_lamp: null, n_rope: null, n_stone: null, n_cage: null,  // 장착형
+    n_dream: null, n_scale: null, n_lamp: null, n_rope: null, n_stone: null,
+    equip_n_cage: null,                                                 // 장착형
 
     n_button: function (nm) {
         const left = 3 - ((currentUser.useCnt && currentUser.useCnt[nm]) || 0);
@@ -1100,7 +1108,7 @@ const SELF = {
         const _u = useInventoryItem;
         useInventoryItem = function (itemName) {
             const cat = ITEM_CATALOG[itemName];
-            if (!cat || String(cat.effect || '').indexOf('n_') !== 0) return _u.apply(this, arguments);
+            if (!cat || !isNewEff(cat.effect)) return _u.apply(this, arguments);
 
             if (typeof isQuarantined === 'function' && isQuarantined(currentUser)
                 && itemName !== '정갈한 문패') {
@@ -1144,7 +1152,7 @@ const SELF = {
         const _a = applyItemEffect;
         applyItemEffect = function (targetUser, itemName, isOthers) {
             const cat = ITEM_CATALOG[itemName];
-            if (!cat || String(cat.effect || '').indexOf('n_') !== 0) return _a.apply(this, arguments);
+            if (!cat || !isNewEff(cat.effect)) return _a.apply(this, arguments);
             if (!targetUser) return false;
             if (typeof canWearItem === 'function' && !canWearItem(currentUser, itemName)) {
                 showCustomAlert('소속이 맞지 않습니다.'); return false;
@@ -1167,6 +1175,25 @@ const SELF = {
                     daySpend(currentUser, nm2);
                 }
                 stealPanel(targetUser, nm2, cat.effect === 'n_dragon' ? 2 : 1);
+                return true;
+            }
+
+            if (cat.effect === 'equip_n_cage') {
+                if (!isOthers || targetUser.code === currentUser.code) {
+                    return _a.apply(this, arguments);           // 본인 장착은 기본 경로로
+                }
+                if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
+                if (targetUser.equippedWeapons.length >= 8) {
+                    showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.'); return false;
+                }
+                const lab = itemName + ' (장착자: ' + currentUser.name + ')';
+                targetUser.equippedWeapons.push(lab);
+                setEquipOwner(targetUser, lab, currentUser.code);
+                appendBadgeNoteToUser(targetUser, '[장착됨] ' + lab);
+                addHistoryLog(targetUser, '[이동장] ' + currentUser.name + ' 사원이 채웠습니다.');
+                addHistoryLog(currentUser, '[이동장] ' + targetUser.name + ' 사원에게 채웠습니다.');
+                showCustomAlert(targetUser.name + ' 사원에게 채웠습니다.\n\n'
+                    + '뺄 수 있는 사람은 채운 쪽뿐입니다.');
                 return true;
             }
 
