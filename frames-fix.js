@@ -85,12 +85,31 @@
 
 /* 덧그리는 층은 절대 클릭을 먹지 않는다 */
 .fr-wrap::before, .fr-wrap::after { pointer-events: none !important; }
+
+/* 테두리 두른 칸 — 글자가 빛에 묻히지 않게 */
+#history-list-container .history-item.fr-wrap,
+#employee-cards-container .emp-list-card.fr-wrap {
+    background-color: rgba(8,8,11,0.88) !important;
+    background-clip: padding-box !important;
+}
+#history-list-container .history-item.fr-wrap *,
+#employee-cards-container .emp-list-card.fr-wrap * {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 7px rgba(0,0,0,0.85) !important;
+}
+#history-list-container .history-item.fr-wrap .history-time {
+    color: #b8b2a6 !important;
+}
+    
 `;
+
+
 
     const st = document.createElement('style');
     st.id = 'frames-fix-css';
     st.textContent = css;
     document.head.appendChild(st);
+
+
 
     // ==========================================
     // 3. 깜빡임 점검
