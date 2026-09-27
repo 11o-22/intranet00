@@ -979,6 +979,10 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                     ? target.equipOwner[w] : null;
                 if (target.equipOwner) delete target.equipOwner[w];
 
+                // 빼앗긴 동안에는 다시 차지 못하게 잠근다
+                if (!target.gearLock) target.gearLock = {};
+                target.gearLock[base] = { by: currentUser.code, src: srcName, day: today() };
+
                 const label = base + ' (' + srcName + ')';
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
                 currentUser.equippedWeapons.push(label);
@@ -1038,7 +1042,8 @@ function stealPanel(target, srcName, maxPick, dayCap) {
             noUndef(currentUser.stolenGear);
             updateUserFields(target.code, {
                 equippedWeapons: target.equippedWeapons || [],
-                equipOwner: target.equipOwner || {}
+                equipOwner: target.equipOwner || {},
+                gearLock: target.gearLock || {}
             });
             saveFields({ stolenGear: 1 });
         }
@@ -1104,9 +1109,12 @@ function returnStolen(label, quiet) {
                 }
             }
             t.equippedWeapons = te;
+            const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
+            if (t.gearLock) delete t.gearLock[baseBack];
             updateUserFields(t.code, {
                 equippedWeapons: t.equippedWeapons,
-                equipOwner: t.equipOwner || {}
+                equipOwner: t.equipOwner || {},
+                gearLock: t.gearLock || {}
             });
         }
     }
@@ -1691,9 +1699,22 @@ const SELF = {
 // ==========================================
 // 빼앗은 장비는 장착칸에 보이지 않게 — 능력만 돈다
 // ==========================================
-(function hideStolenRows() {
-    const MARKS = ['(황룡의 눈)', '(산군의 도움)'];
+(function stolenOutOfSight() {
     const EYES = ['황룡의 눈', '산군의 도움'];
+
+    // 줄 하나로 볼 수 있는 크기인지 — 큰 상자는 건드리지 않는다
+    function looksLikeRow(el) {
+        if (!el) return false;
+        if (el === document.body || el === document.documentElement) return false;
+        const id = el.id || '';
+        if (/app-container|main-screen|login-screen|tab|modal-content|modal-overlay/.test(id)) return false;
+        const cls = (el.className || '').toString();
+        if (/\bcontainer\b|\btab\b|modal-content|modal-overlay|sub-panel/.test(cls)) return false;
+        const t = el.textContent || '';
+        if (t.length > 260) return false;
+        if (el.querySelectorAll('button').length > 3) return false;
+        return true;
+    }
 
     // 장착칸의 그 줄에 「표적」 버튼을 붙인다
     function addAim() {
@@ -1706,7 +1727,7 @@ const SELF = {
                 if (!looksLikeRow(row)) break;
                 const t = row.textContent || '';
                 for (let j = 0; j < EYES.length; j++) {
-                    if (t.indexOf(EYES[j]) >= 0 && t.indexOf('(') < 0) { nm = EYES[j]; break; }
+                    if (t.indexOf(EYES[j]) >= 0) { nm = EYES[j]; break; }
                 }
                 if (nm) break;
                 row = row.parentElement; hops++;
@@ -1723,52 +1744,84 @@ const SELF = {
         }
     }
 
-
-    function hit(t) {
-        for (let i = 0; i < MARKS.length; i++) if (t.indexOf(MARKS[i]) >= 0) return true;
-        return false;
-    }
-
-    // 줄 하나로 볼 수 있는 크기인지 — 큰 상자를 실수로 감추지 않기 위해
-    function looksLikeRow(el) {
-        if (!el) return false;
-        if (el === document.body || el === document.documentElement) return false;
-        const id = el.id || '';
-        if (/app-container|main-screen|login-screen|tab|modal-content|modal-overlay/.test(id)) return false;
-        const cls = (el.className || '').toString();
-        if (/\bcontainer\b|\btab\b|modal-content|modal-overlay|sub-panel/.test(cls)) return false;
-        const t = el.textContent || '';
-        if (t.length > 260) return false;
-        if (el.querySelectorAll('button').length > 3) return false;
-        return true;
-    }
-
-    function hide() {
-        const btns = document.querySelectorAll('button');
-        for (let i = 0; i < btns.length; i++) {
-            const b = btns[i];
-            if ((b.textContent || '').trim() !== '해제') continue;
-            let el = b.parentElement, hops = 0;
-            while (el && hops < 4) {
-                if (hit(el.textContent || '')) {
-                    if (looksLikeRow(el) && el.style.display !== 'none') el.style.display = 'none';
-                    break;                       // 조건에 안 맞으면 감추지 않고 그냥 멈춘다
-                }
-                if (!looksLikeRow(el)) break;    // 큰 상자에 닿으면 더 올라가지 않는다
-                el = el.parentElement; hops++;
-            }
-        }
-    }
-
     let busy = false;
     const run = function () {
         if (busy) return;
         busy = true;
-        try { hide(); addAim(); } catch (e) { }
+        try { addAim(); } catch (e) { }
         busy = false;
     };
     new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
     setTimeout(run, 900);
+})();
+
+// ==========================================
+// 빼앗긴 장비는 다시 차지 못한다
+// ==========================================
+function gearLockedOn(u, name) {
+    if (!u || !u.gearLock) return null;
+    const rec = u.gearLock[name];
+    if (!rec) return null;
+    if (rec.day && rec.day !== today()) { delete u.gearLock[name]; return null; }   // 자정이 지나면 풀린다
+    return rec;
+}
+
+(function hookEquipLock() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (useInventoryItem._gearLock) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            const rec = gearLockedOn(currentUser, itemName);
+            if (rec) {
+                const who = (db.users[rec.by] || {}).name || rec.by;
+                showCustomAlert(itemName + '\n\n지금은 손에 잡히지 않습니다.\n'
+                    + (rec.src || '') + ' — ' + who + ' 사원이 가져갔습니다.');
+                return;
+            }
+            return _u.apply(this, arguments);
+        };
+        useInventoryItem._gearLock = true;
+        clearInterval(iv);
+        console.log('[신규] 빼앗긴 장비 잠금 연결');
+    }, 500);
+})();
+
+// ==========================================
+// 빼앗은 것은 장착칸에 그리지 않는다
+// (능력은 equippedWeapons 로 도니까 배열에는 두되,
+//  그리는 동안만 잠시 빼서 화면에 나오지 않게 한다.)
+// ==========================================
+function withoutStolen(fn, ctx, args) {
+    const u = currentUser;
+    const bag = (u && u.stolenGear) || {};
+    if (!u || !Array.isArray(u.equippedWeapons) || !Object.keys(bag).length) {
+        return fn.apply(ctx, args);
+    }
+    const keep = u.equippedWeapons.slice();
+    u.equippedWeapons = keep.filter(function (w) { return !bag[w]; });
+    try { return fn.apply(ctx, args); }
+    finally { u.equippedWeapons = keep; }
+}
+
+(function hookDrawHide() {
+    const NAMES = ['renderInventory', 'renderEquipped', 'renderEquippedWeapons', 'renderGear'];
+    let tries = 0;
+    const iv = setInterval(function () {
+        let done = 0;
+        NAMES.forEach(function (n) {
+            if (typeof window[n] !== 'function') return;
+            if (window[n]._hideStolen) { done++; return; }
+            const _f = window[n];
+            window[n] = function () { return withoutStolen(_f, this, arguments); };
+            window[n]._hideStolen = true;
+            done++;
+        });
+        if (done || ++tries > 40) {
+            clearInterval(iv);
+            console.log('[신규] 빼앗은 장비는 장착칸에 그리지 않음');
+        }
+    }, 500);
 })();
 
 // ==========================================
@@ -1850,6 +1903,7 @@ window.newItemState = function () {
     console.log('  낚시 줄 방어:', u.lineGuard || 0);
     console.log('  은심장:', hasSilverHeart(u) ? (u.heartSaves || 0) + '회' : '없음');
     console.log('  빼앗아 둔 것:', Object.keys(u.stolenGear || {}).join(' · ') || '(없음)');
+    console.log('  내가 잠긴 장비:', Object.keys(u.gearLock || {}).join(' · ') || '(없음)');
     ['황룡의 눈', '산군의 도움'].forEach(function (n) {
         if (!hasAny(u, n)) return;
         console.log('  ' + n + ' — 장착', hasEquipped(u, n) ? 'O' : '-',
