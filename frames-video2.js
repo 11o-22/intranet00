@@ -24,6 +24,8 @@ const VIDEO_FRAMES_S = [
         ring: 14,          // 띠 두께 (px)
         bandX: 0.15,       // 영상에서 좌우 띠가 차지하는 비율
         bandY: 0.075,      // 영상에서 위아래 띠가 차지하는 비율
+        cutX: 0.20,        // 위아래 띠에서 양 끝(둥근 모서리)을 잘라 내는 비율
+        cutY: 0.10,        // 좌우 띠에서 위아래 끝을 잘라 내는 비율
         opacity: 1,
         bg: '#05030c',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -34,6 +36,8 @@ const VIDEO_FRAMES_S = [
         ring: 16,
         bandX: 0.094,
         bandY: 0.055,
+        cutX: 0,
+        cutY: 0,
         opacity: 1,
         bg: '#0a0509',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -226,15 +230,23 @@ function paint(now) {
         const bx = Math.max(2, Math.round(vw * L.f.bandX));
         const by = Math.max(2, Math.round(vh * L.f.bandY));
 
+        // 영상에서 잘라 낼 끝부분 — 모서리 이음새를 없앤다
+        const cx = Math.round(vw * (L.f.cutX || 0));
+        const cy = Math.round(vh * (L.f.cutY || 0));
+        const sw = Math.max(4, vw - cx * 2);
+        const sh = Math.max(4, vh - cy * 2);
+        const midH = Math.max(1, CH - T * 2);
+
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         ctx.clearRect(0, 0, CW, CH);
         ctx.globalCompositeOperation = 'lighter';
 
-        // 위 · 아래 · 왼쪽 · 오른쪽
-        ctx.drawImage(vid, 0, 0, vw, by, 0, 0, CW, T);
-        ctx.drawImage(vid, 0, vh - by, vw, by, 0, CH - T, CW, T);
-        ctx.drawImage(vid, 0, 0, bx, vh, 0, 0, T, CH);
-        ctx.drawImage(vid, vw - bx, 0, bx, vh, CW - T, 0, T, CH);
+        // 위 · 아래 — 칸의 가로 전체
+        ctx.drawImage(vid, cx, 0, sw, by, 0, 0, CW, T);
+        ctx.drawImage(vid, cx, vh - by, sw, by, 0, CH - T, CW, T);
+        // 왼쪽 · 오른쪽 — 위아래 띠 사이만, 겹치지 않게
+        ctx.drawImage(vid, 0, cy, bx, sh, 0, T, T, midH);
+        ctx.drawImage(vid, vw - bx, cy, bx, sh, CW - T, T, T, midH);
 
         ctx.globalCompositeOperation = 'source-over';
     });
@@ -250,7 +262,7 @@ window.videoFrameState2 = function () {
     console.table(VIDEO_FRAMES_S.map(function (f) {
         return {
             번호: f.id, 등급: f.g, 이름: f.n, 띠: f.ring + 'px',
-            좌우: f.bandX, 위아래: f.bandY,
+            좌우: f.bandX, 위아래: f.bandY, 모서리자름: (f.cutX || 0) + ' / ' + (f.cutY || 0),
             영상: f._vid ? (f._vid.paused ? '멈춤' : '재생 중') + ' ' + f._vid.videoWidth + '×' + f._vid.videoHeight : '(없음)',
             크기: Math.round(f.src.length / 1024) + ' KB'
         };
