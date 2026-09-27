@@ -10,10 +10,10 @@
 // 파손 보호권 · 재봉 도구로 막거나 되돌릴 수 있다.
 
 const GEAR_BREAK = {
-    fumble: 0.05,
-    low: 0.05,
-    death: 0.05,
-    gimmick: 0.05
+    fumble:  0.001,
+    low:     0.001,
+    death:   0.001,
+    gimmick: 0.001
 };
 
 function gearGradeList() {
