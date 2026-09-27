@@ -7708,7 +7708,10 @@ if (!useFacility(bet)) return;
         let res1, res2, res3;
         
         // 부적 장착 여부 확인
-        let hasAmulet = currentUser.equippedWeapons && currentUser.equippedWeapons.includes("누군가가 쓴 부적");
+                let hasAmulet = (currentUser.equippedWeapons || []).some(function (w) {
+            const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+            return base === '누군가가 쓴 부적' || base === '사원증 뱃지';
+        });
         
         const luckM = 1 + (facilityLuckMult(currentUser) - 1) / 10;
 
