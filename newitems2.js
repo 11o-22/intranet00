@@ -804,12 +804,13 @@ const NEW = [
 ];
 
 const RARE3 = [];
+if (!window.RARE_ALIEN_RATE) window.RARE_ALIEN_RATE = {};
 NEW.forEach(function (row) {
     const nm = row[0], price = row[1], affil = row[2], eff = row[3], tgt = row[4], desc = row[5], rare = row[6];
     ITEM_CATALOG[nm] = { price: price, usable: true, targetable: !!tgt, effect: eff, desc: desc };
     if (typeof EQUIP_AFFIL !== 'undefined') EQUIP_AFFIL[nm] = affil;
     if (typeof ALIEN_ITEMS_POOL !== 'undefined' && ALIEN_ITEMS_POOL.indexOf(nm) < 0) ALIEN_ITEMS_POOL.push(nm);
-    if (rare) RARE3.push(nm);
+    if (rare) { RARE3.push(nm); window.RARE_ALIEN_RATE[nm] = 0.03; }   // 게임이 쓰는 희귀표에 얹는다
 });
 
 // 은심장 — 쇼핑몰에 올리지 않는다
@@ -832,9 +833,7 @@ function shopAllowed(nm) {
     const need = SHOP_AFFIL[nm];
     if (!need) return true;
     if (isCounsel(currentUser)) return true;
-    if (!affilText(currentUser).includes(need)) return false;
-    if (RARE3.indexOf(nm) >= 0) return dayRoll(nm, 3);
-    return true;
+    return affilText(currentUser).includes(need);
 }
 
 function withPool(fn, ctx, args) {
@@ -847,19 +846,6 @@ function withPool(fn, ctx, args) {
     finally { ALIEN_ITEMS_POOL.length = 0; keep.forEach(function (x) { ALIEN_ITEMS_POOL.push(x); }); }
 }
 
-// 이미 굴려 둔 진열분도 가린다 — 그린 직후에만 한 번
-function sweepShop() {
-    const box = document.querySelector('#alien-items-container');
-    if (!box) return;
-    const kids = Array.from(box.children);
-    Object.keys(SHOP_AFFIL).forEach(function (nm) {
-        if (shopAllowed(nm)) return;
-        kids.forEach(function (el) {
-            if (el.textContent && el.textContent.indexOf(nm) >= 0) el.style.display = 'none';
-        });
-    });
-}
-
 (function hookShop() {
     const iv = setInterval(function () {
         let hit = 0;
@@ -867,14 +853,7 @@ function sweepShop() {
             if (typeof window[n] !== 'function') return;
             if (window[n]._newAffil) { hit++; return; }
             const _f = window[n];
-            const isShop = (n === 'renderAlienShop');
-            window[n] = function () {
-                const r = withPool(_f, this, arguments);
-                // 그린 바로 뒤에 한 번만 가린다. 주기 실행은 하지 않는다 —
-                // 주기로 돌리면 렌더와 서로 밀고 당기며 목록 높이가 출렁인다.
-                if (isShop) { try { sweepShop(); } catch (e) { } }
-                return r;
-            };
+            window[n] = function () { return withPool(_f, this, arguments); };
             window[n]._newAffil = true;
             hit++;
         });
@@ -882,6 +861,54 @@ function sweepShop() {
         clearInterval(iv);
         console.log('[신규] 우주 쇼핑몰 소속 제한 연결');
     }, 500);
+})();
+
+// ==========================================
+// 딴 품목이 소속에 안 맞으면 — 지우지 않고 바꿔 준다
+// (진열은 alienUnlockedItems 에 하루치로 쌓인다.
+//  지우면 칸이 비어 1~2개만 보이게 되므로, 같은 수를 유지한다.)
+// ==========================================
+function fixUnlocked() {
+    const u = currentUser;
+    if (!u || !Array.isArray(u.alienUnlockedItems)) return;
+    if (isCounsel(u)) return;
+
+    const bad = u.alienUnlockedItems.filter(function (nm) { return !shopAllowed(nm); });
+    if (!bad.length) return;
+
+    const pool = (typeof ALIEN_ITEMS_POOL !== 'undefined' ? ALIEN_ITEMS_POOL : [])
+        .filter(function (nm) {
+            if (!shopAllowed(nm)) return false;
+            if (u.alienUnlockedItems.indexOf(nm) >= 0) return false;
+            if (RARE3.indexOf(nm) >= 0) return false;         // 희귀는 대체품으로 주지 않는다
+            return true;
+        });
+
+    let swapped = 0;
+    u.alienUnlockedItems = u.alienUnlockedItems.map(function (nm) {
+        if (shopAllowed(nm)) return nm;
+        if (!pool.length) return nm;                           // 바꿀 게 없으면 그냥 둔다
+        const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        swapped++;
+        return pick;
+    });
+
+    if (swapped) {
+        saveFields({ alienUnlockedItems: 1 });
+        console.log('[신규] 소속이 맞지 않던 진열 ' + swapped + '개를 바꿨습니다.');
+        if (typeof renderAlienShop === 'function') renderAlienShop();
+    }
+}
+
+(function watchUnlocked() {
+    let last = '';
+    setInterval(function () {
+        if (!currentUser || !Array.isArray(currentUser.alienUnlockedItems)) return;
+        const now = currentUser.alienUnlockedItems.join('|');
+        if (now === last) return;
+        last = now;
+        try { fixUnlocked(); } catch (e) { }
+    }, 1200);
 })();
 
 // ==========================================
@@ -1190,9 +1217,10 @@ window.newItemState = function () {
     console.log('%c--- 지금 쇼핑몰에 보이는 신규분 ---', 'color:#4fc3f7');
     const show = Object.keys(SHOP_AFFIL).filter(shopAllowed);
     console.log('  ' + (show.join(' · ') || '(없음)'));
-    console.log('  3% 고정분:', RARE3.map(function (n) {
-        return n + (dayRoll(n, 3) ? ' ✓오늘' : ' ✗');
+    console.log('  3% 희귀분:', RARE3.map(function (n) {
+        return n + ' (' + ((window.RARE_ALIEN_RATE || {})[n] * 100 || 0) + '%)';
     }).join(' · '));
+    console.log('  내 진열:', (u.alienUnlockedItems || []).join(' · ') || '(없음)');
 
     console.log('%c--- 걸려 있는 버프 ---', 'color:#4fc3f7');
     const b = ibClean(u);
