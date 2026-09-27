@@ -762,6 +762,15 @@ function stolenBag(u) {
     return u.stolenGear;
 }
 
+// Firebase 는 undefined 를 거부한다 — 저장 직전에 걷어 낸다
+function noUndef(o) {
+    Object.keys(o || {}).forEach(function (k) {
+        if (o[k] === undefined) delete o[k];
+        else if (o[k] && typeof o[k] === 'object') noUndef(o[k]);
+    });
+    return o;
+}
+
 // 물약·소모품처럼 몸에 남아 있는 것들 — 이것도 가져올 수 있다
 // kind: 'time' 남은 시각 · 'num' 횟수 · 'bool' 있고 없고
 const TIMED = [
@@ -982,8 +991,10 @@ function stealPanel(target, srcName, maxPick, dayCap) {
             } else if (t === 'state') {
                 const x = timed[parseInt(inp.dataset.i, 10)];
                 if (!x) return;
-                const mine = currentUser[x.f];
-                const theirs = target[x.f];
+                // Firebase 는 undefined 를 받지 않는다 — 기본값으로 눌러 둔다
+                const zero = (x.kind === 'bool') ? false : 0;
+                const mine = (currentUser[x.f] == null) ? zero : currentUser[x.f];
+                const theirs = (target[x.f] == null) ? zero : target[x.f];
                 if (x.kind === 'time') {
                     currentUser[x.f] = Math.max(mine || 0, theirs || 0);
                     target[x.f] = 0;
@@ -996,7 +1007,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                 }
                 stolenBag(currentUser)['상태:' + x.f] = {
                     kind: 'state', field: x.f, from: target.code, src: srcName,
-                    theirs: theirs, mine: mine, day: today(), t: x.t
+                    theirs: theirs, mine: mine, day: today(), t: x.t || x.f
                 };
                 const f = {}; f[x.f] = target[x.f];
                 updateUserFields(target.code, f);
@@ -1024,6 +1035,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         if (dayCap) daySpend(currentUser, srcName);
 
         if (movedGear) {
+            noUndef(currentUser.stolenGear);
             updateUserFields(target.code, {
                 equippedWeapons: target.equippedWeapons || [],
                 equipOwner: target.equipOwner || {}
@@ -1059,12 +1071,13 @@ function returnStolen(label, quiet) {
 
     if (rec.kind === 'state') {
         what = rec.t || rec.field;
-        currentUser[rec.field] = rec.mine == null ? 0 : rec.mine;
+        currentUser[rec.field] = (rec.mine == null) ? 0 : rec.mine;
         const g = {}; g[rec.field] = 1;
         saveFields(g);
         if (t) {
-            t[rec.field] = rec.theirs;
-            const f = {}; f[rec.field] = rec.theirs;
+            const back = (rec.theirs == null) ? 0 : rec.theirs;
+            t[rec.field] = back;
+            const f = {}; f[rec.field] = back;
             updateUserFields(t.code, f);
         }
     } else {
@@ -1095,6 +1108,7 @@ function returnStolen(label, quiet) {
     }
 
     delete currentUser.stolenGear[label];
+    noUndef(currentUser.stolenGear);
     saveFields({ stolenGear: 1 });
     if (t) addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
     saveSelfFull();
