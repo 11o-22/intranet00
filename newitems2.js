@@ -770,6 +770,19 @@ function withPool(fn, ctx, args) {
     finally { ALIEN_ITEMS_POOL.length = 0; keep.forEach(function (x) { ALIEN_ITEMS_POOL.push(x); }); }
 }
 
+// 이미 굴려 둔 진열분도 가린다 — 그린 직후에만 한 번
+function sweepShop() {
+    const box = document.querySelector('#alien-items-container');
+    if (!box) return;
+    const kids = Array.from(box.children);
+    Object.keys(SHOP_AFFIL).forEach(function (nm) {
+        if (shopAllowed(nm)) return;
+        kids.forEach(function (el) {
+            if (el.textContent && el.textContent.indexOf(nm) >= 0) el.style.display = 'none';
+        });
+    });
+}
+
 (function hookShop() {
     const iv = setInterval(function () {
         let hit = 0;
@@ -777,25 +790,19 @@ function withPool(fn, ctx, args) {
             if (typeof window[n] !== 'function') return;
             if (window[n]._newAffil) { hit++; return; }
             const _f = window[n];
-            window[n] = function () { return withPool(_f, this, arguments); };
+            const isShop = (n === 'renderAlienShop');
+            window[n] = function () {
+                const r = withPool(_f, this, arguments);
+                // 그린 바로 뒤에 한 번만 가린다. 주기 실행은 하지 않는다 —
+                // 주기로 돌리면 렌더와 서로 밀고 당기며 목록 높이가 출렁인다.
+                if (isShop) { try { sweepShop(); } catch (e) { } }
+                return r;
+            };
             window[n]._newAffil = true;
             hit++;
         });
         if (hit < 2) return;
         clearInterval(iv);
-
-        // 이미 굴려 둔 진열분도 가린다
-        const sweep = function () {
-            const box = document.querySelector('#alien-items-container');
-            if (!box) return;
-            Object.keys(SHOP_AFFIL).forEach(function (nm) {
-                if (shopAllowed(nm)) return;
-                Array.from(box.children).forEach(function (el) {
-                    if (el.textContent && el.textContent.indexOf(nm) >= 0) el.style.display = 'none';
-                });
-            });
-        };
-        setInterval(sweep, 1500);
         console.log('[신규] 우주 쇼핑몰 소속 제한 연결');
     }, 500);
 })();
