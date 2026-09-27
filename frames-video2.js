@@ -27,6 +27,7 @@ const VIDEO_FRAMES_S = [
         cutX: 0,           // 영상 끝을 잘라 낼 때만 쓴다 (보통 0)
         cutY: 0,
         over: 9,           // 칸 안쪽으로 파고드는 깊이 (px) — 검은 틀을 덮는다
+        plate: 'rgba(4,4,9,0.95)',   // 띠 밑에 까는 어두운 판 (밝은 스킨 대비)
         opacity: 1,
         bg: '#05030c',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -40,6 +41,7 @@ const VIDEO_FRAMES_S = [
         cutX: 0,
         cutY: 0,
         over: 0,
+        plate: 'rgba(6,4,9,0.95)',
         opacity: 1,
         bg: '#0a0509',
         where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
@@ -100,7 +102,7 @@ let css = `
 .fv2-canvas {
     position: absolute !important;
     pointer-events: none !important;
-    mix-blend-mode: screen !important;
+    mix-blend-mode: normal !important;
     z-index: 3 !important;
     border-radius: 7px;
 }
@@ -246,6 +248,7 @@ function paint(now) {
         // 액자처럼 모서리를 45도로 맞물린다 —
         // 네 변이 영상의 네 변을 통째로 받으므로 빛이 끊기지 않고,
         // 서로 겹치지 않으므로 이음새도 생기지 않는다.
+        const plate = L.f.plate || 'rgba(4,4,9,0.95)';
         const edge = function (sx, sy, sW, sH, dx, dy, dW, dH, pts) {
             ctx.save();
             ctx.beginPath();
@@ -255,6 +258,11 @@ function paint(now) {
             }
             ctx.closePath();
             ctx.clip();
+            // 밝은 스킨에서도 빛이 묻히지 않도록 어두운 판을 먼저 깐다
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = plate;
+            ctx.fill();
+            ctx.globalCompositeOperation = 'lighter';
             ctx.drawImage(vid, sx, sy, sW, sH, dx, dy, dW, dH);
             ctx.restore();
         };
