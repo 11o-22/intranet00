@@ -971,20 +971,20 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                 const at = eq.indexOf(w);
                 if (at < 0) return;
                 // 빼앗은 것은 장착칸에 보이지 않으므로 칸 수를 세지 않는다
-
-                // 물건은 상대 칸에 그대로 둔다. 이름 앞에 표를 붙여 힘만 끊는다
+                // 이름을 바꾸면 카탈로그에 없는 이름이 되어 목록을 그리다 터진다.
+                // 그래서 상대 칸에서는 잠시 빼 두고, 돌려줄 때 그대로 되돌린다.
                 const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-                eq[at] = SEAL + w;
-                if (target.equipOwner && target.equipOwner[w] != null) {
-                    target.equipOwner[SEAL + w] = target.equipOwner[w];
-                    delete target.equipOwner[w];
-                }
+                eq.splice(at, 1);
+                const ownerWas = (target.equipOwner && target.equipOwner[w] != null)
+                    ? target.equipOwner[w] : null;
+                if (target.equipOwner) delete target.equipOwner[w];
 
                 const label = base + ' (' + srcName + ')';
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
                 currentUser.equippedWeapons.push(label);
                 if (typeof setEquipOwner === 'function') setEquipOwner(currentUser, label, currentUser.code);
-                stolenBag(currentUser)[label] = { kind: 'gear', from: target.code, orig: w, day: today(), src: srcName };
+                stolenBag(currentUser)[label] = { kind: 'gear', from: target.code, orig: w,
+                    owner: ownerWas, day: today(), src: srcName };
                 took.push(base + ' 의 능력');
                 movedGear = true;
 
@@ -1091,13 +1091,17 @@ function returnStolen(label, quiet) {
             const te = t.equippedWeapons || [];
             const si = te.indexOf(SEAL + rec.orig);
             if (si >= 0) {
-                te[si] = rec.orig;                      // 봉인을 푼다
+                te[si] = rec.orig;                      // 예전 봉인판을 푼다
                 if (t.equipOwner && t.equipOwner[SEAL + rec.orig] != null) {
                     t.equipOwner[rec.orig] = t.equipOwner[SEAL + rec.orig];
                     delete t.equipOwner[SEAL + rec.orig];
                 }
             } else if (te.indexOf(rec.orig) < 0) {
                 te.push(rec.orig);
+                if (rec.owner != null) {
+                    if (!t.equipOwner) t.equipOwner = {};
+                    t.equipOwner[rec.orig] = rec.owner;
+                }
             }
             t.equippedWeapons = te;
             updateUserFields(t.code, {
