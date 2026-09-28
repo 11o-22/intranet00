@@ -184,7 +184,6 @@ function myDnaEquip() {
         const e = cat.dnaEff || {};
         if (e.fac) {
             currentUser.dnaFacBonus = e.fac;
-            currentUser.facilityMax = (currentUser.facilityMax || 20) + e.fac;
         }
         appendBadgeNoteToUser(currentUser, '[장착됨] ' + itemName.split(' · ')[0]);
         addHistoryLog(currentUser, '[고유 장비] ' + itemName.split(' · ')[0] + ' 장착');
@@ -203,7 +202,6 @@ function myDnaEquip() {
         const isDna = cat && cat.effect === 'equip_dna';
         const r = _f.apply(this, arguments);
         if (isDna && currentUser.dnaFacBonus) {
-            currentUser.facilityMax = Math.max(20, (currentUser.facilityMax || 20) - currentUser.dnaFacBonus);
             currentUser.dnaFacBonus = 0;
             saveFields({ facilityMax: 1, dnaFacBonus: 1 });
             updateUI();

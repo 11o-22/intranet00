@@ -312,9 +312,8 @@ function rollBirthItem(parentA, parentB, fill) {
         const heal = cat.heal || (cat.effect === 'heal' ? cat.value : 0);
         if (heal) { currentUser.pollution = Math.max(0, currentUser.pollution - heal); msg.push(`오염도 -${heal}%`); }
         if (cat.point) { currentUser.points += cat.point; msg.push(`+${cat.point.toLocaleString()} P`); }
-        if (cat.ticket) {
-            if (!currentUser.facilityMax) currentUser.facilityMax = 20;
-            currentUser.facilityMax = Math.min(40, currentUser.facilityMax + cat.ticket);
+         if (cat.ticket) {
+            currentUser.birthAddedMax = Math.min(20, (currentUser.birthAddedMax || 0) + cat.ticket);
             msg.push(`공용시설 +${cat.ticket}회`);
         }
         if (cat.dark) { currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - cat.dark); msg.push(`어둠 탐사 +${cat.dark}회`); }

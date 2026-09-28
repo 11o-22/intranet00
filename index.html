@@ -1344,6 +1344,7 @@ function getTodayStr() {
         if (!users) return;
 
         for (let key in users) {
+            if (!users[key] || !users[key].name) { delete users[key]; continue; }
             if (!users[key].inventory) users[key].inventory = [];
             if (!users[key].history) users[key].history = [];
             if (!users[key].letters) users[key].letters = [];
@@ -1355,7 +1356,7 @@ function getTodayStr() {
             // 내가 저장 중이 아닐 때만, 남이 바꾼 값을 받아온다
                        _lastSrvMe = srv;   // 건너뛰더라도 최신 서버 값은 기억해 둔다
             if (pendingSaves === 0 && srv._adminStamp && srv._adminStamp !== currentUser._adminStamp) {
-                applyServerMe(srv);
+                if (!(typeof saveSelfFull === 'function' && saveSelfFull._merge)) applyServerMe(srv);
             }
 
             // 항상 내 라이브 객체로 연결 (db.users[내코드] 가 낡은 사본이 되지 않게)
@@ -1480,7 +1481,7 @@ if (database) {
         pendingSaves = Math.max(0, pendingSaves - 1);
         if (pendingSaves > 0 || !currentUser || !_lastSrvMe) return;
         if (_lastSrvMe._adminStamp && _lastSrvMe._adminStamp !== currentUser._adminStamp) {
-            applyServerMe(_lastSrvMe);
+            if (!(typeof saveSelfFull === 'function' && saveSelfFull._merge)) applyServerMe(_lastSrvMe);
             updateUI();
         }
     }
@@ -5496,7 +5497,6 @@ function startFoxRoomSequence() {
         // 1. 공용시설 이용 횟수는 '22시'를 기준으로 초기화됩니다. (포인트, 오염도는 유지)
         if (currentUser.lastFacilityDate !== cycle22h) {
             currentUser.facilityCount = 0; 
-            currentUser.facilityMax = 20;  
             currentUser.lastFacilityDate = cycle22h;
             saveDB();
         }
@@ -5505,6 +5505,8 @@ function startFoxRoomSequence() {
         if (currentUser.ticketAddedDate !== cycle22h) {
             currentUser.ticketAddedDate = cycle22h; 
             currentUser.ticketAddedCount = 0;
+            currentUser.ticketAddedMax = 0;
+            currentUser.birthAddedMax = 0;
             saveDB();
         }
 
@@ -5652,10 +5654,9 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-                if (!currentUser.facilityMax || currentUser.facilityMax < 20) {
-            currentUser.facilityMax = 20;
-            saveDB();
-        }
+                currentUser.facilityMax = 20 + (currentUser.dnaFacBonus || 0) + (currentUser.ticketAddedMax || 0) + (currentUser.birthAddedMax || 0);
+        
+
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
         document.getElementById('display-facility-max').innerText = currentUser.facilityMax;
 
@@ -6897,7 +6898,7 @@ if (cat.effect === 'couple_ring') {
         const addsFacility = ['ticket', 'radio', 'candy'].includes(cat.effect);
         if (addsFacility) {
             if (targetUser.ticketAddedDate !== getTodayStr()) {
-                targetUser.ticketAddedDate = getTodayStr(); targetUser.ticketAddedCount = 0;
+                targetUser.ticketAddedDate = getTodayStr(); targetUser.ticketAddedCount = 0; targetUser.ticketAddedMax = 0;targetUser.birthAddedMax = 0;
             }
             if (targetUser.ticketAddedCount >= 5) {
                 if(!isOthers) showCustomAlert('금일 공용시설 이용 한도 추가는 총 5회로 제한됩니다.');
@@ -6912,8 +6913,7 @@ if (cat.effect === 'couple_ring') {
         } else if (cat.effect === 'candy') {
             if (targetUser.pollution <= 0) { if(!isOthers) showCustomAlert('현재 오염도가 0%이므로 사용할 필요가 없습니다.'); return false; }
             targetUser.pollution = Math.max(0, targetUser.pollution - 60);
-            if (!targetUser.facilityMax) targetUser.facilityMax = 20; 
-            targetUser.facilityMax = Math.min(25, targetUser.facilityMax + 5);
+            targetUser.ticketAddedMax = Math.min(5, (targetUser.ticketAddedMax || 0) + 5);
             appendBadgeNoteToUser(targetUser, `노스텔지어 캔디 복용 완료`);
         } else if (cat.effect === 'blindfold' || cat.effect === 'happy_maker') {
             if (isBlindfolded(targetUser)) { if(!isOthers) showCustomAlert('이미 효과가 적용 중입니다.'); return false; }
@@ -6921,8 +6921,7 @@ if (cat.effect === 'couple_ring') {
             targetUser.blindfoldUntil = Date.now() + (h * 60 * 60 * 1000);
             appendBadgeNoteToUser(targetUser, `${itemName} 효과 발동 (${h}시간 오염 동결)`);
         } else if (cat.effect === 'ticket' || cat.effect === 'radio') {
-            if (!targetUser.facilityMax) targetUser.facilityMax = 20; 
-            targetUser.facilityMax = Math.min(25, targetUser.facilityMax + (cat.value || cat.ticket));
+            targetUser.ticketAddedMax = Math.min(5, (targetUser.ticketAddedMax || 0) + (cat.value || cat.ticket));
             if (cat.effect === 'radio' && targetUser.pollution > 0) targetUser.pollution = Math.max(0, targetUser.pollution - cat.value);
         } else if (cat.effect === 'vip_pass') {
             if (targetUser.hasVIP) { if(!isOthers) showCustomAlert('이미 2급 보안 인가(VIP)가 승인되어 있습니다.'); return false; }
@@ -7050,8 +7049,7 @@ else if (cat.effect === 'rainbow_potion') {
                 msg.push(`오염도 +${cat.pollute}%`);
             }
             if (cat.ticket) {
-                if (!targetUser.facilityMax) targetUser.facilityMax = 20;
-                targetUser.facilityMax = Math.min(25, targetUser.facilityMax + cat.ticket);
+             targetUser.ticketAddedMax = Math.min(5, (targetUser.ticketAddedMax || 0) + cat.ticket);
                 msg.push(`공용시설 +${cat.ticket}회`);
             }
             if (cat.darkTry) {
@@ -10826,7 +10824,7 @@ if (bathModal) bathModal.style.display = 'none';
         <script src="dna-gifts.js"></script>
         <script src="dna-extra.js"></script>
         <script src="dna-once.js"></script>
-        <script src="equip-lock.js"></script>
+        
         <script src="guard.js"></script>
         <script src="sapphire.js"></script>
         <script src="equip-fix.js"></script>
@@ -10834,6 +10832,8 @@ if (bathModal) bathModal.style.display = 'none';
         <script src="pregnancy2.js"></script>
         <script src="preg-dark-fix.js"></script>
         <script src="cure-fix.js"></script>
+
+        <script src="equip-lock.js"></script>
         <script src="preg-guard.js"></script>
         <script src="preg-leave.js"></script>
         <script src="preg-roster.js"></script>
