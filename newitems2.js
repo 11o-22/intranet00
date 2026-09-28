@@ -124,11 +124,13 @@ function passiveSum(u) {
         const _d = dnaGiftOf;
         dnaGiftOf = function (user) {
             const base = _d.apply(this, arguments) || {};
-            const out = Object.assign({}, base);
             const u = user || currentUser;
-            if (!u) return out;
+            if (!u) return base;
+            // 효과는 바깥이 아니라 e 안에 들어간다
+            const out = Object.assign({}, base);
+            out.e = Object.assign({}, base.e || {});
             [ibSum(u), passiveSum(u), heartBonus(u)].forEach(function (m) {
-                Object.keys(m).forEach(function (k) { out[k] = (out[k] || 0) + m[k]; });
+                Object.keys(m).forEach(function (k) { out.e[k] = (out.e[k] || 0) + m[k]; });
             });
             return out;
         };
@@ -581,7 +583,8 @@ function scaleRisk(u) {
     u = u || currentUser;
     if (!u) return 0;
     const poll = u.pollution || 0;
-    const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(u) || {}) : {};
+    const g = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(u) || {}) : {};
+    const e = g.e || {};
     const bon = (e.bon || 0) + (e.luck || 0) / 2;
     return Math.round(Math.max(5, Math.min(92, 34 + poll * 0.45 - bon * 4)));
 }
@@ -1004,7 +1007,8 @@ function stealPanel(target, srcName, maxPick, dayCap) {
     function showList() {
         const bag = ibClean(target);
         const gear = (target.equippedWeapons || []).slice();
-        const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
+        const g0 = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
+        const e = g0.e || {};
         const own = [];
         ['luck', 'pct', 'eva', 'bon', 'fac', 'dark', 'gim'].forEach(function (k) {
             if (e[k]) own.push({ k: k, v: e[k] });
