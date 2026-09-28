@@ -1406,6 +1406,14 @@ const NEW = [
      '어둠에 들면 파티 전체에 보호막이 돈다. 저항이 오르고 행운 +2. 하루 다섯 번. (장착)']
 ];
 
+// 품목별 노출 확률 — 적지 않으면 3%
+const RARE_RATE = {
+    '황룡의 눈':      0.001,
+    '산군의 도움':    0.001,
+    '％＄＠＆ 이동장': 0.001,
+    '꿈결 수집기':    0.03
+};
+
 const RARE3 = [];
 if (!window.RARE_ALIEN_RATE) window.RARE_ALIEN_RATE = {};
 NEW.forEach(function (row) {
@@ -1413,7 +1421,7 @@ NEW.forEach(function (row) {
     ITEM_CATALOG[nm] = { price: price, usable: true, targetable: !!tgt, effect: eff, desc: desc };
     if (typeof EQUIP_AFFIL !== 'undefined') EQUIP_AFFIL[nm] = affil;
     if (typeof ALIEN_ITEMS_POOL !== 'undefined' && ALIEN_ITEMS_POOL.indexOf(nm) < 0) ALIEN_ITEMS_POOL.push(nm);
-    if (rare) { RARE3.push(nm); window.RARE_ALIEN_RATE[nm] = 0.03; }   // 게임이 쓰는 희귀표에 얹는다
+    if (rare) { RARE3.push(nm); window.RARE_ALIEN_RATE[nm] = RARE_RATE[nm] || 0.03; }
 });
 
 // 은심장 — 쇼핑몰에 올리지 않는다
