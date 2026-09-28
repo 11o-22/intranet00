@@ -309,8 +309,6 @@ function checkPregBirth() {
         }
     }
 
-    mineGot.forEach(x => currentUser.inventory.push(x));
-
         // 아버지가 count 보다 많으면 뒤쪽 사람이 빈손이 된다 — 한 개씩은 챙겨 준다
     sires.forEach(function (s) {
         if (sireGot[s.code] && sireGot[s.code].length) return;
@@ -318,6 +316,9 @@ function checkPregBirth() {
         sireGot[s.code] = [plainItem(currentUser, oUser)];
     });
 
+    mineGot.forEach(x => currentUser.inventory.push(x));
+
+      
     // 특이사항 정리
     if (currentUser.badge && currentUser.badge.notes) {
         const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
