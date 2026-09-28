@@ -185,12 +185,14 @@ function unequipByName(name) {
 }
 
 function hasEquipped(u, name) {
+    if (!u) return false;
     return (u.equippedWeapons || []).some(function (w) {
         return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === name;
     });
 }
 
 function hasAny(u, name) {
+    if (!u) return false;
     return hasEquipped(u, name) || (u.inventory || []).indexOf(name) >= 0;
 }
 
@@ -577,6 +579,7 @@ function withLucky(fn, ctx, args) {
 // 은색 저울 — 같이 가라앉을 확률을 늘 보여 준다
 function scaleRisk(u) {
     u = u || currentUser;
+    if (!u) return 0;
     const poll = u.pollution || 0;
     const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(u) || {}) : {};
     const bon = (e.bon || 0) + (e.luck || 0) / 2;
@@ -587,6 +590,11 @@ function scaleRisk(u) {
     const ID = 'silver-scale-box';
 
     function draw() {
+        if (typeof currentUser === 'undefined' || !currentUser) {
+            const b0 = document.getElementById(ID);
+            if (b0) b0.remove();
+            return;
+        }
         const on = hasEquipped(currentUser, '은색 저울')
                 || (currentUser.borrowedGear || []).some(function (w) {
                        return String(w).indexOf('은색 저울') === 0;
@@ -1362,7 +1370,7 @@ const NEW = [
      '한 번 찢으면 네 가지 중 하나가 무작위로 나온다. (1회용)'],
     ['장기말', 5000, DREAM, 'n_piece', false,
      '어느 연구소의 부속품. 던지면 다음 탐사에서 선택지의 무게가 보인다. 세 번 던지면 사라진다.'],
-    ['황룡의 눈', 10000000, DREAM, 'equip_n_dragon', true,
+    ['황룡의 눈', 1000000, DREAM, 'equip_n_dragon', true,
      '몸에 걸고 표적을 고른다. 그 사원이 지닌 것을 보고, 원하는 것을 가져온다. '
      + '하루 두 번. 가져간 것도 빼앗긴 것도 자정이 지나면 제자리로 돌아간다. '
      + '본인만 걸 수 있고, 걸어도 닳지 않는다.', 3],
@@ -1932,6 +1940,7 @@ const SELF = {
     };
 
     function addCount() {
+        if (typeof currentUser === 'undefined' || !currentUser) return;
         const btns = document.querySelectorAll('button');
         for (let i = 0; i < btns.length; i++) {
             const b = btns[i];
