@@ -26,17 +26,34 @@ function stampNow() {
     return mine;
 }
 
+// 다른 기기가 썼다 — 알리지 않고 조용히 서버 자료로 맞춘다
+let syncing = false;
 function freeze(why) {
-    if (stale) return;
-    stale = true;
-    console.warn('[기기] 저장을 멈춥니다 — ' + why);
-    if (told) return;
-    told = true;
-    try {
-        showCustomAlert('다른 기기에서 이 계정을 썼습니다.\n\n'
-            + '여기서 저장하면 그쪽에서 한 일이 지워집니다.\n'
-            + '이 창은 저장을 멈췄습니다. 새로고침하고 이어서 하세요.');
-    } catch (e) { }
+    if (syncing) return;
+    syncing = true;
+    stale = true;                       // 맞추는 동안만 저장을 멈춘다
+    console.log('[기기] 다른 기기가 썼습니다 — 서버 자료로 맞춥니다 (' + why + ')');
+
+    if (!database || !code) { stale = false; syncing = false; return; }
+
+    database.ref('users/' + code).once('value').then(function (s) {
+        const v = s.val();
+        if (v) {
+            // 서버가 가진 것을 그대로 받되, 화면 전용 임시 값은 건드리지 않는다
+            Object.keys(v).forEach(function (k) {
+                if (k === '_stamp') return;
+                currentUser[k] = v[k];
+            });
+            if (db && db.users && db.users[code]) db.users[code] = currentUser;
+        }
+        stampNow();                     // 이제부터는 내가 주인
+        stale = false; syncing = false;
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        console.log('[기기] 맞췄습니다 — 소지품 ' + ((currentUser.inventory || []).length) + '개');
+    }).catch(function (e) {
+        console.warn('[기기] 맞추기 실패', e);
+        stale = false; syncing = false;
+    });
 }
 
 // ==========================================
@@ -50,7 +67,10 @@ function wrap(name, isOther) {
         if (stale) {
             // 남의 계정을 건드리는 저장은 막지 않는다
             if (!isOther || !a || a === code) {
-                console.warn('[기기] 막음: ' + name);
+                // 맞추는 동안 들어온 저장은 잠깐 미뤄 둔다
+                setTimeout(function () {
+                    if (!stale) { try { _f.apply(null, arguments); } catch (e) { } }
+                }, 800);
                 return;
             }
         }
@@ -156,6 +176,6 @@ window.reloadMine = function () {
     });
 };
 
-console.log('[기기] 덮어쓰기 방지 — deviceState() · reloadMine() · takeOverDevice()');
+console.log('[기기] 덮어쓰기 방지 (조용히 맞춤) — deviceState() · reloadMine()');
 
 })();

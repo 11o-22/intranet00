@@ -2092,20 +2092,29 @@ function gearLockedOn(u, name) {
 // 빼앗은 것은 장착칸에 넣지 않는다
 // 능력을 읽는 함수만 잠깐 같이 보게 한다
 // ==========================================
+let borrowDepth = 0;
 function withBorrowed(fn, ctx, args) {
     const u = currentUser;
     const bor = (u && Array.isArray(u.borrowedGear)) ? u.borrowedGear : [];
     if (!bor.length) return fn.apply(ctx, args);
+    if (borrowDepth > 0) return fn.apply(ctx, args);     // 이미 얹은 채로 들어왔으면 그대로
     const keep = (u.equippedWeapons || []).slice();
     u.equippedWeapons = keep.concat(bor);
-    try { return fn.apply(ctx, args); }
-    finally { u.equippedWeapons = keep; }
+    borrowDepth++;
+    try {
+        return fn.apply(ctx, args);
+    } finally {
+        borrowDepth--;
+        u.equippedWeapons = keep;                        // 반드시 되돌린다
+    }
 }
 
 // 능력을 읽는 함수만 골라 감싼다 — 넓게 쓸면 편집·저장까지 건드린다
+// 화면을 건드리는 함수는 넣지 않는다.
+// 그 안에서 다시 그리기가 돌면, 잠깐 얹어 둔 목록이 장착칸에 그대로 보인다.
 const READERS = [
     'hasEquip', 'plugActive', 'rubyActive', 'hasVaginaPlug', 'myDnaEquip',
-    'sapActive', 'isBlindfolded', 'getPollutionMultiplier', 'checkPassivePollution',
+    'sapActive', 'isBlindfolded', 'getPollutionMultiplier',
     'facilityLuckMult', 'gearValue', 'dnaGiftOf', 'hasSureBear', 'roleFlipped'
 ];
 
@@ -2169,11 +2178,15 @@ function liftSeal(t) {
         useInventoryItem = function (itemName) {
             const r = sealOn(currentUser);
             const cat = ITEM_CATALOG[itemName] || {};
-            const isEquip = String(cat.effect || '').indexOf('equip_') === 0;
-            if (r && isEquip) {
+            const eff = String(cat.effect || '');
+            const isEquip = eff.indexOf('equip_') === 0;
+            // 힘을 얹는 물건은 전부 막는다 — 물약·부적·쪽지까지
+            const isBuff = /luck|pct|eva|bon|gim|fac|dark|guard|protect|reroll|bonus|b_/.test(eff)
+                || /행운|판정|회피|기믹|공용시설|어둠 탐사|보호/.test(String(cat.desc || ''));
+            if (r && (isEquip || isBuff)) {
                 const who = (db.users[r.by] || {}).name || r.by;
                 showCustomAlert((SEAL_WORD[r.src] || '봉인되었습니다.')
-                    + '\n\n장착칸이 묶여 있습니다.\n' + who + ' 사원이 풀 때까지 아무것도 찰 수 없습니다.');
+                    + '\n\n몸이 묶여 있습니다.\n' + who + ' 사원이 풀 때까지 장착도 힘을 얹는 물건도 쓸 수 없습니다.');
                 return;
             }
             return _u.apply(this, arguments);
