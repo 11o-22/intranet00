@@ -323,9 +323,9 @@ function payDarkPt() {
         v += 5000; (u.darkPtWhy = u.darkPtWhy || []).push('은심장 +5,000P');
     }
     const cage = u.cageSaved || 0;
-    if (hasEquipped(u, '%$@& 이동장') && cage > 0) {
+    if (hasEquipped(u, '％＄＠＆ 이동장') && cage > 0) {
         const got = Math.min(9000, cage * 1500);
-        v += got; (u.darkPtWhy = u.darkPtWhy || []).push('%$@& 이동장 +' + got.toLocaleString() + 'P');
+        v += got; (u.darkPtWhy = u.darkPtWhy || []).push('％＄＠＆ 이동장 +' + got.toLocaleString() + 'P');
         u.cageSaved = 0;
     }
 
@@ -400,8 +400,8 @@ function freezePoll(h, src) {
 function rescueGuarantee() {
     const u = currentUser;
     if (hasSilverHeart(u) && (u.heartSaves || 0) >= 10) return '은심장';
-    if (hasEquipped(u, '%$@& 이동장')) {
-        if (!u.cageRun || u.cageRun !== (darkRun && darkRun.zone) + '|' + today()) return '%$@& 이동장';
+    if (hasEquipped(u, '％＄＠＆ 이동장')) {
+        if (!u.cageRun || u.cageRun !== (darkRun && darkRun.zone) + '|' + today()) return '％＄＠＆ 이동장';
     }
     if (u.paperBoat && dayLeft(u, '종이배', 4) > 0) return '종이배';
     if (hasAny(u, '전용 자전거') && dayLeft(u, '전용 자전거', 2) > 0) return '전용 자전거';
@@ -412,7 +412,7 @@ function rescueGuarantee() {
 
 function spendGuarantee(src) {
     const u = currentUser;
-    if (src === '%$@& 이동장') u.cageRun = (darkRun && darkRun.zone) + '|' + today();
+    if (src === '％＄＠＆ 이동장') u.cageRun = (darkRun && darkRun.zone) + '|' + today();
     else if (src === '종이배' || src === '전용 자전거') daySpend(u, src);
     else if (src === '통신 단추') u.buttonCall = 0;
     u.cageSaved = (u.cageSaved || 0) + 1;
@@ -1271,7 +1271,7 @@ const NEW = [
      '상담실에서 곧바로 나올 수 있다. 다섯 번 쓰면 사라진다.'],
     ['은화 뱀', 15555, DREAM, 'n_snake', false,
      '하루 세 번 튕길 수 있다. 절반은 꽝, 절반은 행운·판정·공용시설 중 하나가 +3.'],
-    ['%$@& 이동장', 444444, DREAM, 'equip_n_cage', true,
+    ['％＄＠＆ 이동장', 444444, DREAM, 'equip_n_cage', true,
      '어떤 것을 담기 위해 만들어졌다. 어둠마다 한 번 확정으로 남을 살리고, 살린 만큼 최대 9,000P. '
      + '남에게 채울 수도 있으며, 채운 사람만 뺄 수 있다. (장착)', 3],
     ['엽서', 500, DREAM, 'n_card', false,
