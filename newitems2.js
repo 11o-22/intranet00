@@ -403,21 +403,52 @@ function rescueGuarantee() {
     if (hasEquipped(u, '％＄＠＆ 이동장')) {
         if (!u.cageRun || u.cageRun !== (darkRun && darkRun.zone) + '|' + today()) return '％＄＠＆ 이동장';
     }
-    if (u.paperBoat && dayLeft(u, '종이배', 4) > 0) return '종이배';
+    if ((u.paperBoat | 0) > 0) return '종이배';
     if (hasAny(u, '전용 자전거') && dayLeft(u, '전용 자전거', 2) > 0) return '전용 자전거';
     if (hasEquipped(u, '포승줄')) return '포승줄';
-    if ((u.buttonCall || 0) > Date.now()) return '통신 단추';
+    if (hasEquipped(u, '통신 단추') && (u.buttonUses | 0) > 0) return '통신 단추';
     return null;
 }
 
 function spendGuarantee(src) {
     const u = currentUser;
-    if (src === '％＄＠＆ 이동장') u.cageRun = (darkRun && darkRun.zone) + '|' + today();
-    else if (src === '종이배' || src === '전용 자전거') daySpend(u, src);
-    else if (src === '통신 단추') u.buttonCall = 0;
+
+    if (src === '％＄＠＆ 이동장') {
+        u.cageRun = (darkRun && darkRun.zone) + '|' + today();
+
+    } else if (src === '전용 자전거') {
+        daySpend(u, src);
+
+    } else if (src === '종이배') {
+        u.paperBoat = Math.max(0, (u.paperBoat | 0) - 1);
+        if (u.paperBoat === 0) {
+            removeBadgeLine(u, '🛶 종이배');
+            setTimeout(function () { showCustomAlert('종이배가 물에 풀렸습니다.'); }, 900);
+        }
+        saveFields({ paperBoat: 1 });
+
+    } else if (src === '통신 단추') {
+        u.buttonUses = Math.max(0, (u.buttonUses | 0) - 1);
+        if (u.buttonUses === 0) {
+            const eq = u.equippedWeapons || [];
+            const at = eq.findIndex(function (w) {
+                return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === '통신 단추';
+            });
+            if (at >= 0) {
+                const full = eq[at];
+                eq.splice(at, 1);
+                if (u.equipOwner) delete u.equipOwner[full];
+            }
+            removeBadgeLine(u, '[장착됨] 통신 단추');
+            setTimeout(function () { showCustomAlert('단추가 부서졌습니다.'); }, 900);
+        }
+        saveFields({ buttonUses: 1 });
+    }
+
     u.cageSaved = (u.cageSaved || 0) + 1;
     u.heartSaves = (u.heartSaves || 0) + 1;
-    saveFields({ cageRun: 1, cageSaved: 1, heartSaves: 1, buttonCall: 1 });
+    saveFields({ cageRun: 1, cageSaved: 1, heartSaves: 1 });
+    saveSelfFull();
 }
 
 // 굴림을 한 번 확정으로 만든다
@@ -543,38 +574,48 @@ function withLucky(fn, ctx, args) {
     }, 500);
 })();
 
-// 은색 저울 — 같이 죽을 확률을 보여 준다
-(function hookScale() {
-    const iv = setInterval(function () {
-        if (typeof renderRescuePrompt !== 'function') return;
-        if (renderRescuePrompt._newScale) { clearInterval(iv); return; }
-        const _f = renderRescuePrompt;
-        renderRescuePrompt = function () {
-            const r = _f.apply(this, arguments);
-            if (!hasEquipped(currentUser, '은색 저울')) return r;
+// 은색 저울 — 같이 가라앉을 확률을 늘 보여 준다
+function scaleRisk(u) {
+    u = u || currentUser;
+    const poll = u.pollution || 0;
+    const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(u) || {}) : {};
+    const bon = (e.bon || 0) + (e.luck || 0) / 2;
+    return Math.round(Math.max(5, Math.min(92, 34 + poll * 0.45 - bon * 4)));
+}
 
-            // 오염도와 판정으로 어림한다
-            const poll = currentUser.pollution || 0;
-            const e = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(currentUser) || {}) : {};
-            const bon = (e.bon || 0) + (e.luck || 0) / 2;
-            let risk = Math.round(Math.max(5, Math.min(92, 34 + poll * 0.45 - bon * 4)));
-            currentUser._scaleRisk = risk;
+(function scaleBoard() {
+    const ID = 'silver-scale-box';
 
-            setTimeout(function () {
-                const box = document.querySelector('#darkness-content, #dark-step, #darkness-log-container');
-                if (!box || box.querySelector('.scale-risk')) return;
-                const p = document.createElement('div');
-                p.className = 'scale-risk';
-                p.style.cssText = 'margin:10px 0;padding:9px 11px;border:1px solid #6b7a8f;'
-                    + 'background:rgba(18,22,30,0.85);color:#cfd8e3;font-size:12px;letter-spacing:0.3px';
-                p.textContent = '은색 저울 — 함께 가라앉을 확률 ' + risk + '%';
-                box.insertBefore(p, box.firstChild);
-            }, 120);
-            return r;
-        };
-        renderRescuePrompt._newScale = true;
-        clearInterval(iv);
-    }, 500);
+    function draw() {
+        const on = hasEquipped(currentUser, '은색 저울')
+                || (currentUser.borrowedGear || []).some(function (w) {
+                       return String(w).indexOf('은색 저울') === 0;
+                   });
+        const inRun = (typeof darkRun !== 'undefined') && darkRun;
+        let box = document.getElementById(ID);
+
+        if (!on || !inRun) { if (box) box.remove(); return; }
+
+        const risk = scaleRisk(currentUser);
+        currentUser._scaleRisk = risk;
+
+        if (!box) {
+            box = document.createElement('div');
+            box.id = ID;
+            box.style.cssText = 'position:fixed;right:10px;bottom:84px;z-index:9998;'
+                + 'padding:8px 12px;border:1px solid #6b7a8f;border-radius:4px;'
+                + 'background:rgba(12,16,22,0.92);color:#cfd8e3;font-size:12px;'
+                + 'letter-spacing:0.3px;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,0.5)';
+            document.body.appendChild(box);
+        }
+        box.innerHTML = '은색 저울<br><b style="color:'
+            + (risk > 50 ? '#ff8f8f' : '#9fe0a6') + ';font-size:15px">'
+            + risk + '%</b> <span style="color:#8a8f98">함께 가라앉을 확률</span>';
+    }
+
+    setInterval(draw, 1200);
+    setTimeout(draw, 1500);
+    window.scaleBoardNow = draw;
 })();
 
 // 저울이 나쁘다고 했는데도 살렸다면 — 조용히 얹는다
@@ -706,7 +747,13 @@ function onDarkEnter() {
                 ibAdd(t, b.k, b.v, 6 * HOUR, '부적이 깃든 등', { run: true });
                 lines.push((t.name || c) + ' — ' + b.t);
             });
-            if (lines.length) showCustomAlert('등이 한 번 흔들렸습니다.\n\n' + lines.join('\n'));
+            if (lines.length) {
+                showCustomAlert('등이 한 번 흔들렸습니다.\n\n' + lines.join('\n'));
+                // 같은 글을 파티원 각자에게도 띄운다
+                database.ref('darkParties/' + pid + '/lampNotice').set({
+                    at: Date.now(), by: currentUser.name, lines: lines
+                });
+            }
         });
     }
 
@@ -740,6 +787,22 @@ function onDarkEnter() {
         showPieceHint();
     }
 }
+
+// epic 에 들어가도 저울을 띄운다
+(function scaleOnEpic() {
+    const iv = setInterval(function () {
+        if (typeof epicStart !== 'function') return;
+        if (epicStart._scaleShow) { clearInterval(iv); return; }
+        const _e = epicStart;
+        epicStart = function () {
+            const r = _e.apply(this, arguments);
+            setTimeout(function () { if (window.scaleBoardNow) window.scaleBoardNow(); }, 1500);
+            return r;
+        };
+        epicStart._scaleShow = true;
+        clearInterval(iv);
+    }, 500);
+})();
 
 (function hookEnter() {
     const iv = setInterval(function () {
@@ -778,6 +841,27 @@ function showPieceHint() {
     showCustomAlert('장기말이 굴렀습니다.\n\n이번 탐사에서는 선택지의 무게가 보입니다.');
 }
 
+// 등불 알림을 각자 받아 띄운다
+(function lampNotice() {
+    let seen = 0;
+    setInterval(function () {
+        if (typeof darkRun === 'undefined' || !darkRun || !darkRun.partyId) return;
+        if (!database) return;
+        database.ref('darkParties/' + darkRun.partyId + '/lampNotice').once('value').then(function (s) {
+            const v = s.val();
+            if (!v || !v.at || v.at === seen) return;
+            if (Date.now() - v.at > 5 * 60 * 1000) return;      // 오래된 것은 넘긴다
+            seen = v.at;
+            const mine = (v.lines || []).filter(function (x) {
+                return String(x).indexOf(currentUser.name) === 0;
+            });
+            showCustomAlert('부적이 깃든 등\n\n' + (v.by || '') + ' 사원의 등이 흔들렸습니다.\n\n'
+                + (v.lines || []).join('\n')
+                + (mine.length ? '\n\n— 내게 걸린 것: ' + mine[0].split('—').pop().trim() : ''));
+        });
+    }, 2500);
+})();
+
 // ==========================================
 // 9. 버프 강탈 — 황룡의 눈 · 산군의 도움
 // ==========================================
@@ -810,10 +894,10 @@ const TIMED = [
     ['pollFreezeUntil',       '오염 동결',     'time'],
     ['hairUntil',             '탈모약',        'time'],
     ['dollPt',                '봉제 인형',     'time'],
-    ['buttonCall',            '통신 단추',     'time'],
+    ['buttonUses',            '통신 단추',     'num'],
     ['lineGuard',             '낚시 줄 방어',  'num'],
     ['gearProtect',           '등급 보호',     'bool'],
-    ['paperBoat',             '종이배',        'bool'],
+    ['paperBoat',             '종이배',        'num'],
     ['hasVIP',                'VIP',           'bool']
 ];
 // 상담실(quarantineUntil)은 벌이라 목록에서 뺀다
@@ -1259,8 +1343,8 @@ const NEW = [
      '행운 100%, 공용시설 이용 +1. 어둠 탐사마다 추가 정산 +5,000P. (장착)', 3],
     ['종이배', 3000, DREAM, 'n_boat', true,
      '타인에게 접어 주면, 그 사람은 어둠에서 하루 네 번까지 확정으로 남을 구할 수 있다.'],
-    ['통신 단추', 5000, DREAM, 'n_button', false,
-     '누군가의 단추. 어둠에서 위급할 때 세 번까지 확정 구출을 요청할 수 있다.'],
+    ['통신 단추', 5000, DREAM, 'equip_n_button', false,
+     '누군가의 단추. 몸에 걸어 두면 위급할 때 세 번까지 저절로 눌린다. 세 번을 쓰면 부서진다. (장착)'],
     ['연구 보고서', 700, DREAM, 'n_report', false,
      '어둠 내역이 적힌 보고서. 세 시간 동안 행운 300%. (1회용)'],
     ['일기장', 9000, DREAM, 'n_diary', false,
@@ -1465,23 +1549,10 @@ function gone(nm) {
 const SELF = {
 
     n_dream: null, n_scale: null, n_lamp: null, n_rope: null, n_stone: null,
-    equip_n_cage: null,                                                 // 장착형
+    equip_n_cage: null, equip_n_button: null,                           // 장착형
 
     equip_n_dragon: function (nm) { toggleWorn(nm); },
     equip_n_tiger:  function (nm) { toggleWorn(nm); },
-
-    n_button: function (nm) {
-        const left = 3 - ((currentUser.useCnt && currentUser.useCnt[nm]) || 0);
-        if (!darkRun) { showCustomAlert('어둠 안에서만 누를 수 있습니다.'); return; }
-        currentUser.buttonCall = Date.now() + 10 * 60 * 1000;
-        saveFields({ buttonCall: 1 });
-        if (darkRun.partyId && typeof sendPartyChat === 'function') {
-            try { sendPartyChat(currentUser.name + ' 사원이 단추를 눌렀습니다.', true); } catch (e) { }
-        }
-        const r = totalSpend(nm, 3);
-        showCustomAlert('단추를 눌렀습니다.\n\n십 분 안의 구출이 확정됩니다.'
-            + (r.gone ? '\n\n단추가 다 떨어졌습니다.' : '\n\n남은 횟수 ' + r.left + '회'));
-    },
 
     n_report: function (nm) {
         ibAdd(currentUser, 'pct', 300, 3 * HOUR, '연구 보고서');
@@ -1634,6 +1705,10 @@ const SELF = {
             if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
             currentUser.equippedWeapons.push(itemName);
             setEquipOwner(currentUser, itemName, currentUser.code);
+            if (itemName === '통신 단추' && !(currentUser.buttonUses | 0)) {
+                currentUser.buttonUses = 3;
+                saveFields({ buttonUses: 1 });
+            }
             // 은심장은 잃어버리지 않게 막아 두었으니, 옮길 때만 잠금을 푼다
             window.__heartUnlock = true;
             removeItemFromInventory(currentUser, itemName, 1);
@@ -1666,12 +1741,13 @@ const SELF = {
             }
 
             if (cat.effect === 'n_boat') {
-                targetUser.paperBoat = true;
-                updateUserFields(targetUser.code, { paperBoat: true });
-                appendBadgeNoteToUser(targetUser, '[종이배] 하루 네 번 확정 구출');
+                targetUser.paperBoat = 4;
+                updateUserFields(targetUser.code, { paperBoat: 4 });
+                removeBadgeLine(targetUser, '🛶 종이배');
+                appendBadgeNoteToUser(targetUser, '🛶 종이배 — 확정 구출 4회 남음');
                 addHistoryLog(targetUser, '[종이배] ' + currentUser.name + ' 사원이 접어 주었습니다.');
                 addHistoryLog(currentUser, '[종이배] ' + targetUser.name + ' 사원에게');
-                showCustomAlert(targetUser.name + ' 사원의 손에 배를 띄웠습니다.\n\n하루 네 번 확정 구출.');
+                showCustomAlert(targetUser.name + ' 사원의 손에 배를 띄웠습니다.\n\n확정 구출 네 번.');
                 return true;
             }
 
@@ -1849,6 +1925,46 @@ const SELF = {
         return null;
     }
 
+    // 장착칸 줄에 숫자를 덧붙인다 — 은심장 구출 횟수 · 단추 남은 횟수 · 종이배
+    const COUNT_OF = {
+        '🩶 은심장': function (u) { return '구출 ' + (u.heartSaves || 0) + '회'; },
+        '통신 단추': function (u) { return '남은 ' + (u.buttonUses | 0) + '회'; }
+    };
+
+    function addCount() {
+        const btns = document.querySelectorAll('button');
+        for (let i = 0; i < btns.length; i++) {
+            const b = btns[i];
+            if ((b.textContent || '').trim() !== '해제') continue;
+            let row = b.parentElement, hops = 0, nm = null;
+            while (row && hops < 5) {
+                const t = row.textContent || '';
+                if (t.length < 700) {
+                    const keys = Object.keys(COUNT_OF);
+                    for (let j = 0; j < keys.length; j++) {
+                        if (t.indexOf(keys[j]) >= 0) { nm = keys[j]; break; }
+                    }
+                }
+                if (nm) break;
+                const id = row.id || '', cls = (row.className || '').toString();
+                if (/app-container|main-screen/.test(id) || /container|modal-content/.test(cls)) break;
+                row = row.parentElement; hops++;
+            }
+            if (!nm || !row) continue;
+
+            const txt = COUNT_OF[nm](currentUser);
+            let tag = row.querySelector('.cnt-tag');
+            if (!tag) {
+                tag = document.createElement('span');
+                tag.className = 'cnt-tag';
+                tag.style.cssText = 'margin-right:6px;padding:3px 8px;border-radius:3px;'
+                    + 'background:rgba(212,175,55,0.18);color:#e8c87a;font-size:11px;white-space:nowrap';
+                b.parentElement.insertBefore(tag, b);
+            }
+            if (tag.textContent !== txt) tag.textContent = txt;
+        }
+    }
+
     // 장착칸의 그 줄에 「표적」 버튼을 붙인다
     function addAim() {
         const btns = document.querySelectorAll('button');
@@ -1888,7 +2004,7 @@ const SELF = {
     const run = function () {
         if (busy) return;
         busy = true;
-        try { addAim(); } catch (e) { }
+        try { addAim(); addCount(); } catch (e) { }
         busy = false;
     };
     new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
@@ -2132,6 +2248,9 @@ window.newItemState = function () {
     console.log('  대기 정산:', (u.darkPtPend || 0).toLocaleString() + 'P', (u.darkPtWhy || []).join(' · '));
     console.log('  확정 구출권:', rescueGuarantee() || '없음');
     console.log('  낚시 줄 방어:', u.lineGuard || 0);
+    console.log('  종이배:', (u.paperBoat | 0) + '회 남음');
+    console.log('  통신 단추:', hasEquipped(u, '통신 단추') ? (u.buttonUses | 0) + '회 남음' : '장착 안 함');
+    console.log('  은색 저울 확률:', hasEquipped(u, '은색 저울') ? scaleRisk(u) + '%' : '없음');
     console.log('  은심장:', hasSilverHeart(u) ? (u.heartSaves || 0) + '회' : '없음');
     console.log('  빼앗아 둔 것:', Object.keys(u.stolenGear || {}).join(' · ') || '(없음)');
     console.log('  내가 잠긴 장비:', Object.keys(u.gearLock || {}).join(' · ') || '(없음)');
