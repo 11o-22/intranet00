@@ -1005,13 +1005,18 @@ function stealPanel(target, srcName, maxPick, dayCap) {
     let ownList = [];
 
     function showList() {
-        const bag = ibClean(target);
+        // 이미 빼앗겨 상쇄 중인 것은 가져올 대상이 아니다
+        const bag = ibClean(target).filter(function (b) {
+            return !/빼앗김/.test(String(b.src || '')) && b.v > 0;
+        });
         const gear = (target.equippedWeapons || []).slice();
         const g0 = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
         const e = g0.e || {};
+        const tmp = ibSum(target);                 // 임시로 얹힌 몫 (음수 상쇄 포함)
         const own = [];
         ['luck', 'pct', 'eva', 'bon', 'fac', 'dark', 'gim'].forEach(function (k) {
-            if (e[k]) own.push({ k: k, v: e[k] });
+            const base = (e[k] || 0) - (tmp[k] || 0);   // 순수한 제 몫
+            if (base > 0) own.push({ k: k, v: base });
         });
         ownList = own;
         const timed = timedOf(target);
