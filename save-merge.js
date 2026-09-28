@@ -44,9 +44,10 @@ function attach() {
     if (ref) { try { ref.off(); } catch (e) { } }
     ref = database.ref('users/' + code);
 
-    ref.on('value', function (s) {
+        ref.on('value', function (s) {
         const srv = s.val();
         if (!srv) return;
+        if (!currentUser || currentUser.code !== code) return;   // ← 추가
 
         if (!ready) {
             base = clone(srv) || {};
@@ -113,7 +114,8 @@ function markSaved(payload) {
         const _full = saveSelfFull;
         saveSelfFull = function () {
             if (!database || !currentUser) return Promise.resolve();
-            if (!ready) return _full.apply(this, arguments);   // 기준이 없으면 예전 방식
+            if (currentUser.code !== code) return _full.apply(this, arguments);   // ← 추가
+            if (!ready) return _full.apply(this, arguments); // 기준이 없으면 예전 방식
 
             const payload = diffPayload();
             const n = Object.keys(payload).length;
