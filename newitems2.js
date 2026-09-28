@@ -1438,12 +1438,35 @@ const SHOP_AFFIL = {};
 NEW.forEach(function (row) { SHOP_AFFIL[row[0]] = row[2]; });
 
 // ==========================================
+// 어둠 소속은 어느 소속 물건이든 찬다
+// ==========================================
+function isDark(u) {
+    return /어둠/.test(((u && u.affiliation) || '') + ' ' + ((u && u.team) || ''));
+}
+
+(function hookWear() {
+    const iv = setInterval(function () {
+        if (typeof canWearItem !== 'function') return;
+        if (canWearItem._darkFree) { clearInterval(iv); return; }
+        const _c = canWearItem;
+        canWearItem = function (user, itemName) {
+            if (isDark(user)) return true;
+            return _c.apply(this, arguments);
+        };
+        canWearItem._darkFree = true;
+        clearInterval(iv);
+        console.log('[신규] 어둠 소속 착용 제한 해제');
+    }, 500);
+})();
+
+// ==========================================
 // 11. 쇼핑몰 노출 — 소속과 확률
 // ==========================================
 function shopAllowed(nm) {
     const need = SHOP_AFFIL[nm];
     if (!need) return true;
     if (isCounsel(currentUser)) return true;
+    if (isDark(currentUser)) return true;          // 어둠 소속은 전부 본다
     return affilText(currentUser).includes(need);
 }
 
