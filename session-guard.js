@@ -75,12 +75,27 @@ function wrap(name, isOther) {
             }
         }
         const r = _f.apply(this, arguments);
-        // 내가 쓴 자리에 도장을 남긴다
-        if (!stale && (!isOther || a === code)) markStamp();
+        if (!stale) {
+            if (!isOther || a === code) markStamp();
+            // 남을 고쳤으면 그쪽에도 도장을 찍어 새로 읽게 한다
+            else if (isOther && a && a !== code) poke(a);
+        }
         return r;
     };
     window[name]._sidGuard = true;
     return true;
+}
+
+// 남의 자리에 도장을 찍는다 — 그쪽 창이 보고 새로 읽는다
+const pokeTimer = {};
+function poke(other) {
+    if (!database || !other) return;
+    clearTimeout(pokeTimer[other]);
+    pokeTimer[other] = setTimeout(function () {
+        database.ref('users/' + other + '/_stamp')
+            .set(SID + '.p' + Date.now().toString(36))
+            .catch(function () { });
+    }, 150);
 }
 
 let markTimer = null;
