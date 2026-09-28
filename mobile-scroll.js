@@ -22,6 +22,7 @@
 
         const _f = window[fnName];
         window[fnName] = function () {
+            if (typeof currentUser === 'undefined' || !currentUser) return _f.apply(this, arguments);
             // 안 보이는 탭이면 그리지 않는다
             if (tabSel) {
                 const tab = document.querySelector(tabSel);
@@ -232,7 +233,10 @@ body { overscroll-behavior-y: none; }
             if (timer) return;
             timer = setTimeout(function () {
                 timer = null; lastRun = Date.now();
-                _f.apply(self, args);
+                // 미뤄 둔 사이에 로그아웃되었을 수 있다
+                if (typeof currentUser === 'undefined' || !currentUser) return;
+                try { _f.apply(self, args); }
+                catch (e) { console.warn('[스크롤] ' + fnName + ' 건너뜀:', e && e.message ? e.message : e); }
             }, ms - (now - lastRun));
         };
         window[fnName]._throttled = true;
