@@ -6901,8 +6901,12 @@ if (cat.effect === 'couple_ring') {
                 targetUser.ticketAddedDate = get22HourCycleStr(); targetUser.ticketAddedCount = 0;
                 targetUser.ticketAddedMax = 0;
             }
-            if (targetUser.ticketAddedCount >= 5) {
+                       if (targetUser.ticketAddedCount >= 5) {
                 if(!isOthers) showCustomAlert('금일 공용시설 이용 한도 추가는 총 5회로 제한됩니다.');
+                return false;
+            }
+            if ((targetUser.ticketAddedMax || 0) >= 5) {
+                if(!isOthers) showCustomAlert('금일 추가할 수 있는 이용 횟수를 이미 다 채웠습니다.');
                 return false;
             }
             targetUser.ticketAddedCount += 1;
@@ -7049,9 +7053,11 @@ else if (cat.effect === 'rainbow_potion') {
                 applyPollutionToUser(targetUser, cat.pollute);
                 msg.push(`오염도 +${cat.pollute}%`);
             }
-            if (cat.ticket) {
-             targetUser.ticketAddedMax = Math.min(5, (targetUser.ticketAddedMax || 0) + cat.ticket);
-                msg.push(`공용시설 +${cat.ticket}회`);
+             if (cat.ticket) {
+                const before = targetUser.ticketAddedMax || 0;
+                targetUser.ticketAddedMax = Math.min(5, before + cat.ticket);
+                const got = targetUser.ticketAddedMax - before;
+                msg.push(got > 0 ? `공용시설 +${got}회` : '공용시설 한도는 이미 가득 찼습니다');
             }
             if (cat.darkTry) {
                 targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
