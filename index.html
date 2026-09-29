@@ -6642,7 +6642,7 @@ if (cat.effect === 'couple_ring') {
             if (!g) { showCustomAlert('전용 장비가 없습니다.'); return; }
             const up = GEAR_UPGRADE[g.grade];
             if (!up) { showCustomAlert('이미 최고 등급입니다.'); return; }
-            const bonus = currentUser.gearPolish || 0;
+            const bonus = (g.grade === 'S') ? 0 : (currentUser.gearPolish || 0);
             const rate = Math.min(0.99, up.rate + bonus);
             removeItemFromInventory(currentUser, itemName, 1);
             saveSelfFull();
@@ -10968,6 +10968,7 @@ if (bathModal) bathModal.style.display = 'none';
             <script src= "gear-break.js"></script>
             <script src="gear-repair.js"></script>
             <script src="death-leave.js"></script>
+            <script src="itemfix.js"></script>
             <script src="save-merge.js"></script>
 
     <div id="notice-ticker" style="display:none; position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:450px; z-index:99999; background:rgba(0,0,0,0.88); border-bottom:1px solid var(--theme-border); overflow:hidden; white-space:nowrap; height:28px;">
