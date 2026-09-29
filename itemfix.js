@@ -208,35 +208,6 @@ setInterval(function () {
 })();
 
 // ==========================================
-// 확인
-// ==========================================
-window.scaleOdds = function () {
-    console.log('%c===== 은색 저울 =====', 'color:#d4af37; font-size:13px');
-    console.log('  착용:', wearsScale() ? 'O' : '-');
-    if (typeof er === 'undefined' || !er) { console.log('  (탐사 중이 아닙니다)'); return; }
-    const H = Object.keys(er.help || {}).filter(function (c) { return c !== currentUser.code; });
-    const D = Object.keys(er.doom || {}).filter(function (c) { return c !== currentUser.code; });
-    if (!H.length && !D.length) { console.log('  위험에 빠진 동료가 없습니다.'); return; }
-    H.forEach(function (c) {
-        const x = chanceHelp(c);
-        console.log('  달려간다 ·', (er.help[c] || {}).name || c, '→', x ? (x.p + '% (보정 ' + x.bonus + ' / DC ' + x.dc + ')') : '계산 불가');
-    });
-    D.forEach(function (c) {
-        const x = chanceDoom(c);
-        console.log('  끌어낸다 ·', (er.doom[c] || {}).name || c, '→', x ? (x.p + '% (보정 ' + x.bonus + ' / DC ' + x.dc + ')') : '계산 불가');
-    });
-};
-
-window.polishState = function () {
-    console.log('%c===== 연마 보정 =====', 'color:#d4af37; font-size:13px');
-    const g = (typeof getGear === 'function') ? getGear(currentUser) : null;
-    console.log('  가진 보정:', Math.round((currentUser.gearPolish || 0) * 100) + '%');
-    console.log('  본체 등급:', g ? g.grade : '(장비 없음)');
-    if (g) console.log('  다음이 L인가:', g.grade === 'S' ? 'O — 보정이 안 들어갑니다' : '-');
-    console.log('  승급 차단 연결:', (typeof tryGearUpgrade === 'function' && tryGearUpgrade._noPolishL) ? 'O' : '-');
-};
-
-// ==========================================
 // 3. S-003 전용품
 // ==========================================
 //
@@ -573,8 +544,80 @@ function safestIndex(options) {
 })();
 
 // ==========================================
+// 4. 「공용시설 +n」 · 「어둠 탐사 +n」 은 상한과 무관하게 붙는다
+// ==========================================
+//
+// 고유 아이템(DNA) · 은화 뱀 · 꿈결 수집기처럼 숫자가 적혀 있는 것들은
+// 적힌 만큼 그대로 늘어야 한다. 티켓의 하루 +5 상한과는 별개다.
+//
+// 고유 아이템은 「차고 있는 동안만」 이므로 myDnaEquip() 으로 가른다.
+// 나머지(임시 버프·상시 장비)는 dnaGiftOf 가 합쳐 주므로, 고유 몫을 빼서 얻는다.
+window.facDarkBonus = function (u) {
+    u = u || (typeof currentUser !== 'undefined' ? currentUser : null);
+    if (!u) return { fac: 0, dark: 0 };
+
+    // 찬 고유 아이템의 몫 (안 찼으면 0)
+    let worn = {};
+    try {
+        if (typeof myDnaEquip === 'function' && u === currentUser) worn = myDnaEquip() || {};
+    } catch (e) { }
+
+    // 그 사원에게 배정된 고유 아이템이 원래 가진 몫 — 아래에서 빼낸다
+    let own = {};
+    try {
+        if (typeof dnaGiftIndex === 'function' && typeof DNA_GIFTS !== 'undefined') {
+            own = (DNA_GIFTS[dnaGiftIndex(u)] || {}).e || {};
+        }
+    } catch (e) { }
+
+    // 고유 + 임시 버프 + 상시 장비가 다 합쳐진 값
+    let all = {};
+    try {
+        if (typeof dnaGiftOf === 'function') all = (dnaGiftOf(u) || {}).e || {};
+    } catch (e) { }
+
+    return {
+        fac:  (worn.fac  || 0) + Math.max(0, (all.fac  || 0) - (own.fac  || 0)),
+        dark: (worn.dark || 0) + Math.max(0, (all.dark || 0) - (own.dark || 0))
+    };
+};
+
+// 어둠 탐사 남은 횟수에 얹는다
+(function hookDarkTries() {
+    const iv = setInterval(function () {
+        if (typeof getDarkTriesLeft !== 'function') return;
+        if (getDarkTriesLeft._facDark) { clearInterval(iv); return; }
+
+        const _g = getDarkTriesLeft;
+        getDarkTriesLeft = function () {
+            const base = _g.apply(this, arguments);
+            let add = 0;
+            try { add = window.facDarkBonus().dark || 0; } catch (e) { }
+            return base + add;
+        };
+        getDarkTriesLeft._facDark = true;
+        clearInterval(iv);
+        console.log('[보정] 어둠 탐사 +n 연결');
+    }, 500);
+})();
+
+// ==========================================
 // 확인
 // ==========================================
+window.facDarkState = function () {
+    const b = window.facDarkBonus();
+    console.log('%c===== 공용시설 · 어둠 탐사 보정 =====', 'color:#d4af37; font-size:13px');
+    console.log('  공용시설 +', b.fac, '· 어둠 탐사 +', b.dark);
+    console.log('  고유 아이템 착용:', (typeof myDnaEquip === 'function' && myDnaEquip()) ? 'O' : '-');
+    console.log('  임시 버프:', ((currentUser && currentUser.itemBuffs) || [])
+        .filter(function (x) { return x.k === 'fac' || x.k === 'dark'; })
+        .map(function (x) { return x.k + '+' + x.v + '(' + (x.src || '') + ')'; }).join(', ') || '(없음)');
+    console.log('  지금 한도:', currentUser && currentUser.facilityMax,
+                '· 쓴 횟수:', currentUser && currentUser.facilityCount);
+    console.log('  어둠 남은 횟수:', (typeof getDarkTriesLeft === 'function') ? getDarkTriesLeft() : '-');
+    console.log('  어둠 연결:', (typeof getDarkTriesLeft === 'function' && getDarkTriesLeft._facDark) ? 'O' : '-');
+};
+
 window.scaleOdds = function () {
     console.log('%c===== 은색 저울 =====', 'color:#d4af37; font-size:13px');
     console.log('  착용:', wearsScale() ? 'O' : '-');
@@ -616,6 +659,6 @@ window.s003State = function () {
     console.log('  (원래 돌던 것 — 접힌 귀퉁이 · 삼킨 마침표 · 덧쓴 이름 · 읽어 준 목소리)');
 };
 
-console.log('[아이템] scaleOdds() · polishState() · s003State()');
+console.log('[아이템] scaleOdds() · polishState() · s003State() · facDarkState()');
 
 })();

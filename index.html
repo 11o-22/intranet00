@@ -5654,7 +5654,9 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-                currentUser.facilityMax = 20 + (currentUser.dnaFacBonus || 0) + (currentUser.ticketAddedMax || 0) + (currentUser.birthAddedMax || 0);
+                      currentUser.facilityMax = 20
+            + (typeof facDarkBonus === 'function' ? facDarkBonus().fac : (currentUser.dnaFacBonus || 0))
+            + (currentUser.ticketAddedMax || 0) + (currentUser.birthAddedMax || 0);
         
 
         document.getElementById('display-facility-count').innerText = currentUser.facilityCount;
