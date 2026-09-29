@@ -1629,10 +1629,12 @@ const SELF = {
         if (!(currentUser.quarantineUntil > Date.now())) {
             showCustomAlert('상담실에 있지 않습니다.'); return;
         }
+        currentUser.pollution = currentUser.quarantineExitPollution || 0;
+        currentUser.quarantineExitPollution = 0;
         currentUser.quarantineUntil = 0;
         currentUser.quarantineDest = null;
         currentUser.quarantineHospital = null;
-        saveFields({ quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1 });
+        saveFields({ pollution: 1, quarantineExitPollution: 1, quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1 });
         const r = totalSpend(nm, 5);
         updateUI();
         showCustomAlert('문패를 내렸습니다.\n\n상담실에서 나왔습니다.'
@@ -1704,6 +1706,12 @@ const SELF = {
         if (typeof isBathUser === 'function' && !isBathUser(currentUser)) {
             showCustomAlert('선녀탕에 있지 않습니다.'); return;
         }
+        currentUser.pollution = currentUser.quarantineExitPollution || 0;
+        currentUser.quarantineExitPollution = 0;
+        currentUser.quarantineUntil = 0;
+        currentUser.quarantineDest = null;
+        currentUser.quarantineHospital = null;
+        saveFields({ pollution: 1, quarantineExitPollution: 1, quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1 });
         if (typeof closeBathRoom === 'function') closeBathRoom();
         const r = totalSpend(nm, 5);
         updateUI();
