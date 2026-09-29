@@ -6897,8 +6897,9 @@ if (cat.effect === 'couple_ring') {
         
         const addsFacility = ['ticket', 'radio', 'candy'].includes(cat.effect);
         if (addsFacility) {
-            if (targetUser.ticketAddedDate !== getTodayStr()) {
-                targetUser.ticketAddedDate = getTodayStr(); targetUser.ticketAddedCount = 0; targetUser.ticketAddedMax = 0;targetUser.birthAddedMax = 0;
+            if (targetUser.ticketAddedDate !== get22HourCycleStr()) {
+                targetUser.ticketAddedDate = get22HourCycleStr(); targetUser.ticketAddedCount = 0;
+                targetUser.ticketAddedMax = 0;
             }
             if (targetUser.ticketAddedCount >= 5) {
                 if(!isOthers) showCustomAlert('금일 공용시설 이용 한도 추가는 총 5회로 제한됩니다.');
