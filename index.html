@@ -554,11 +554,11 @@
         <div class="slot-box" id="slot-box-3">👁</div>
     </div>
     <div style="margin-top:15px;">
-                <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 1000)</div>
+                <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 5000)</div>
         <div style="display:flex; gap:6px; align-items:center; justify-content:center; margin-bottom:8px;">
     <button class="game-btn" style="flex:0 0 54px; height:46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
     <button class="game-btn" style="flex:0 0 48px; height:46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
-    <input type="number" id="slot-bet" value="5" min="1" max="10000"
+    <input type="number" id="slot-bet" value="5" min="1" max="5000"
            style="flex:0 0 90px; height:46px; text-align:center; font-size:16px; padding:0 6px; box-sizing:border-box;">
     <button class="game-btn" style="flex:0 0 48px; height:46px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
 </div>
@@ -622,7 +622,7 @@
     </div>
 
     <div id="seotda-controls-start">
-        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50000)</div>
         <div class="bet-stepper">
             <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
             <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
@@ -660,13 +660,14 @@
     <div id="bj-controls-start">
         <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
         <div class="bet-stepper">
-            <button class="step-btn wide" onclick="adjustBet('bj-bet', -10)">-10</button>
-            <button class="step-btn" onclick="adjustBet('bj-bet', -1)">&lt;</button>
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', -1000)">-1천</button>
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', -100)">-100</button>
+            <button class="step-btn" onclick="adjustBet('bj-bet', -10)">&lt;</button>
             <div class="bet-display" id="bj-bet-display">5</div>
-            <button class="step-btn" onclick="adjustBet('bj-bet', 1)">&gt;</button>
-            <button class="step-btn wide" onclick="adjustBet('bj-bet', 10)">+10</button>
+            <button class="step-btn" onclick="adjustBet('bj-bet', 10)">&gt;</button>
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', 100)">+100</button>
+            <button class="step-btn wide" onclick="adjustBet('bj-bet', 1000)">+1천</button>
             <button class="step-btn bet-max" onclick="setBetMax('bj-bet')">최대</button>
-        </div>
         <input type="hidden" id="bj-bet" value="5">
         <button class="game-btn" onclick="startBlackjack()">카드를 받는다</button>
     </div>
@@ -7643,7 +7644,7 @@ updateUI();
     const MAX_BET = 50;
     const POINT_CAP = 30000000;
     const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet', 'bj-bet'];
-    const BET_CAPS = { 'slot-bet': 1000 };
+    const BET_CAPS = { 'slot-bet': 5000, 'bj-bet': 50000 };
     
 
     function getBetValue(inputId) {
@@ -7700,7 +7701,7 @@ updateUI();
 function playSlot() {
     let bet = parseInt(document.getElementById('slot-bet').value);
 if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
-if (bet > 1000) { showCustomAlert('슬롯 최대 베팅 한도는 1000 P입니다.'); return; }
+if (bet > 1000) { showCustomAlert('슬롯 최대 베팅 한도는 5000 P입니다.'); return; }
 if (bet > currentUser.points) { showLuxuryAlert(); return; }
 if (!useFacility(bet)) return;
 
@@ -7865,8 +7866,7 @@ function bjSwap(idx) {
     if (msg) msg.innerHTML = `<span style="color:#ffd700;">딜러의 뒷장과 바꿨습니다.</span>`;
 
     if (bjScore(bjPlayer) > 21) bjFinish('bust');
-}
-        if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
+}    if (bet > (BET_CAPS['bj-bet'] || MAX_BET)) { showCustomAlert(`블랙잭 최대 베팅 한도는 ${(BET_CAPS['bj-bet'] || MAX_BET).toLocaleString()} P입니다.`); return; }
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return; }
         
 
