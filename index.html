@@ -7702,7 +7702,8 @@ updateUI();
 function playSlot() {
     let bet = parseInt(document.getElementById('slot-bet').value);
 if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
-if (bet > 5000) { showCustomAlert('슬롯 최대 베팅 한도는 5000 P입니다.'); return; }
+const slotCap = BET_CAPS['slot-bet'];
+if (bet > slotCap) { showCustomAlert('슬롯 최대 베팅 한도는 ' + slotCap.toLocaleString() + ' P입니다.'); return; }
 if (bet > currentUser.points) { showLuxuryAlert(); return; }
 if (!useFacility(bet)) return;
 
@@ -8069,7 +8070,8 @@ function bjRender(hideDealer) {
 function startBlackjack() {
     const bet = parseInt(document.getElementById('bj-bet').value);
     if (isNaN(bet) || bet <= 0) { showCustomAlert('올바른 베팅 금액을 입력해주세요.'); return; }
-    if (bet > MAX_BET) { showCustomAlert(`공용시설 최대 베팅 한도는 ${MAX_BET} P입니다.`); return; }
+        const bjCap = BET_CAPS['bj-bet'] || MAX_BET;
+    if (bet > bjCap) { showCustomAlert('블랙잭 최대 베팅 한도는 ' + bjCap.toLocaleString() + ' P입니다.'); return; }
     if (!useFacility(bet)) return;
 
     bjBet = bet;
