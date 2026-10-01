@@ -1905,7 +1905,8 @@ const EQUIP_AFFIL = {
             myPartyId = found;
 
             // 방장이 출발시켰다면 탐사 개시
-            if (found && darkParties[found].state === 'RUNNING' && !darkRun) {
+                if (found && darkParties[found].state === 'RUNNING' && !darkRun
+                && window._darkDone !== found) {
                 launchPartyRun(darkParties[found]);
                 return;
             }
@@ -4513,6 +4514,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (darkRun.partyId) partyRunCleanup(darkRun.partyId, darkRun.zone);
         else releaseZone(darkRun.zone);
 
+                window._darkDone = darkRun.partyId || null;
+
         darkRun = null;
         saveDB();
     }
@@ -4523,6 +4526,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         const me = currentUser.code;
         const aliveRef = database.ref(`darkParties/${pid}/alive/${me}`);
         try { aliveRef.onDisconnect().cancel(); } catch (e) {}
+
+                database.ref(`darkParties/${pid}/members/${me}`).remove();
 
         aliveRef.remove()
             .then(() => database.ref(`darkParties/${pid}/alive`).once('value'))
