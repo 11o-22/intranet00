@@ -158,6 +158,44 @@ function showCount(n) {
 })();
 
 // ==========================================
+// 1-나. 소지품에 「출산」 칸
+// ==========================================
+//
+// 출산으로 나오는 70종은 효과가 제각각이라 회복·기타로 흩어져 있었다.
+// 어디서 온 물건인지로 묶어 한 칸에 모은다.
+(function birthCat() {
+    const iv = setInterval(function () {
+        if (typeof INV_CATS === 'undefined' || typeof invCatOf !== 'function') return;
+        if (typeof BIRTH_ITEMS === 'undefined') return;
+        if (invCatOf._birth) { clearInterval(iv); return; }
+
+        // 이름표를 한 번만 만들어 둔다
+        const isBirth = {};
+        BIRTH_ITEMS.forEach(function (it) { if (it && it.n) isBirth[it.n] = true; });
+
+        // 칸 등록 — 물약 다음 자리에 넣는다
+        if (!INV_CATS.some(function (c) { return c.id === 'birth'; })) {
+            const at = INV_CATS.findIndex(function (c) { return c.id === 'potion'; });
+            const row = { id: 'birth', name: '출산', icon: '🤍', color: '#ff8fb1' };
+            if (at >= 0) INV_CATS.splice(at + 1, 0, row); else INV_CATS.push(row);
+        }
+
+        const _c = invCatOf;
+        invCatOf = function (name) {
+            const base = _c.apply(this, arguments);
+            // 장비·조합 재료는 원래 자리를 지킨다 (고유 아이템이 장비 칸에 남도록)
+            if (base === 'equip' || base === 'craft') return base;
+            if (isBirth[name]) return 'birth';
+            return base;
+        };
+        invCatOf._birth = true;
+
+        clearInterval(iv);
+        console.log('[소지품] 출산 칸 추가 — ' + Object.keys(isBirth).length + '종');
+    }, 500);
+})();
+
+// ==========================================
 // 2. 울림 확성기
 // ==========================================
 const HORN = '울림 확성기';
@@ -407,6 +445,16 @@ window.invSearchState = function () {
     console.log('  카드 수:', box ? box.querySelectorAll('.inv-card').length : 0);
     console.log('  확성기 등록:', (typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[HORN]) ? 'O' : '-');
     console.log('  판매소 목록 포함:', (typeof ALL_10_ITEMS !== 'undefined' && ALL_10_ITEMS.indexOf(HORN) >= 0) ? 'O' : '-');
+    console.log('  출산 칸:', (typeof invCatOf === 'function' && invCatOf._birth) ? 'O' : '-');
+    if (typeof invCatOf === 'function' && invCatOf._birth) {
+        const mine = {};
+        ((currentUser && currentUser.inventory) || []).forEach(function (n) {
+            if (invCatOf(n) === 'birth') mine[n] = (mine[n] || 0) + 1;
+        });
+        const ks = Object.keys(mine);
+        console.log('  내 출산 물건 ' + ks.length + '종:',
+            ks.map(function (k) { return k + (mine[k] > 1 ? '×' + mine[k] : ''); }).join(', ') || '없음');
+    }
 };
 
 console.log('[소지품/확성기] invSearchState() · hornTest("글")');
