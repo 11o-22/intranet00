@@ -9297,6 +9297,7 @@ function saveFields(fields) {
 // 남(또는 나)의 특정 필드만 저장
 function updateUserFields(code, fields) {
     if (!database) { saveDB(); return Promise.resolve(); }
+        Object.keys(fields).forEach(k => { if (fields[k] === undefined) delete fields[k]; });
     const stamp = Date.now();
     fields._adminStamp = stamp;
 
