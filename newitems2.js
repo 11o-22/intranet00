@@ -1702,21 +1702,40 @@ const SELF = {
         showCustomAlert('효과가 죽여줍니다.\n\n열 시간 동안 머리카락이 풍성해집니다.');
     },
 
-    n_lace: function (nm) {
-        if (typeof isBathUser === 'function' && !isBathUser(currentUser)) {
-            showCustomAlert('선녀탕에 있지 않습니다.'); return;
+        n_plate: function (nm) {
+        if (!(currentUser.quarantineUntil > Date.now())) {
+            showCustomAlert('상담실에 있지 않습니다.'); return;
         }
-        currentUser.pollution = currentUser.quarantineExitPollution || 0;
-        currentUser.quarantineExitPollution = 0;
         currentUser.quarantineUntil = 0;
         currentUser.quarantineDest = null;
         currentUser.quarantineHospital = null;
-        saveFields({ pollution: 1, quarantineExitPollution: 1, quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1 });
-        if (typeof closeBathRoom === 'function') closeBathRoom();
+
+        // ★ 정상 해제와 같게 — 오염도를 내려놓고 나온다
+        let out = currentUser.quarantineExitPollution || 0;
+        if (out >= 100) out = 99;                      // 100으로 나오면 바로 다시 들어간다
+        currentUser.pollution = out;
+        currentUser.quarantineExitPollution = 0;
+        currentUser.lastPollutionTime = Date.now();    // 오염 시계도 다시 맞춘다
+
+        // 탐사 사고 문구도 같이 거둔다
+        if (currentUser.badge && currentUser.badge.notes) {
+            const arr = currentUser.badge.notes.split(' | ').filter(function (n) {
+                return n.trim() !== ''
+                    && n.indexOf('의식 불명') < 0
+                    && n.indexOf('긴급 이송') < 0
+                    && n.indexOf('사직 반려') < 0;
+            });
+            currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+        }
+
+        saveFields({
+            quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1,
+            pollution: 1, quarantineExitPollution: 1, lastPollutionTime: 1, badge: 1
+        });
         const r = totalSpend(nm, 5);
         updateUI();
-        showCustomAlert('끈을 묶고 나왔습니다.'
-            + (r.gone ? '\n\n신발끈이 닳아 끊어졌습니다.' : '\n\n남은 횟수 ' + r.left + '회'));
+        showCustomAlert('문패를 내렸습니다.\n\n상담실에서 나왔습니다. (오염도 ' + out + '%)'
+            + (r.gone ? '\n\n문패가 닳아 없어졌습니다.' : '\n\n남은 횟수 ' + r.left + '회'));
     },
 
     n_bike: function (nm) {
