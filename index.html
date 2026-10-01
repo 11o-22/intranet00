@@ -9052,8 +9052,8 @@ function bjFinish(mode) {
             msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>`;
             if (!currentUser.alienUnlockedItems) currentUser.alienUnlockedItems = [];
             
-            const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
-            const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+            const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987' || /어둠/.test((currentUser.affiliation || "") + " " + (currentUser.team || ""));
+            const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987' || /어둠/.test((currentUser.affiliation || "") + " " + (currentUser.team || ""));
             
             const allowedRanks = ["과장", "차장", "부장", "이사", "대표", "사장"];
             const isHighRank = allowedRanks.includes(currentUser.position) || currentUser.code === 'kario0987';
@@ -9138,8 +9138,8 @@ function bjFinish(mode) {
         
         let unlocked = (currentUser && currentUser.code === 'kario0987') ? ALIEN_ITEMS_POOL : (currentUser.alienUnlockedItems || []);
         
-        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987';
-        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987';
+        const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987' || /어둠/.test((currentUser.affiliation || "") + " " + (currentUser.team || ""));
+        const isDaydreamTeam = currentUser.affiliation.includes("백일몽 주식회사") || currentUser.code === 'kario0987' || /어둠/.test((currentUser.affiliation || "") + " " + (currentUser.team || ""));
         
         unlocked = unlocked.filter(item => {
             if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return false;
@@ -11035,6 +11035,7 @@ if (bathModal) bathModal.style.display = 'none';
             <script src="death-leave.js"></script>
             <script src="itemfix.js"></script>
             <script src="inv-shout.js"></script>
+            <script src="preg-fix3.js"></script>
             <script src="save-merge.js"></script>
 
     <div id="notice-ticker" style="display:none; position:fixed; top:0; left:50%; transform:translateX(-50%); width:100%; max-width:450px; z-index:99999; background:rgba(0,0,0,0.88); border-bottom:1px solid var(--theme-border); overflow:hidden; white-space:nowrap; height:28px;">
