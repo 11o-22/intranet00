@@ -550,19 +550,24 @@ function safestIndex(options) {
 // 고유 아이템(DNA) · 은화 뱀 · 꿈결 수집기처럼 숫자가 적혀 있는 것들은
 // 적힌 만큼 그대로 늘어야 한다. 티켓의 하루 +5 상한과는 별개다.
 //
-// 고유 아이템은 「차고 있는 동안만」 이므로 myDnaEquip() 으로 가른다.
-// 나머지(임시 버프·상시 장비)는 dnaGiftOf 가 합쳐 주므로, 고유 몫을 빼서 얻는다.
-window.facDarkBonus = function (u) {
+// 고유 아이템(DNA)의 몫은 dna-gifts.js 가 이미 판정에 넣고 있다.
+//   facilityLuckMult ← pct · getDarkTriesLeft ← dark
+//   rollDarkBonus    ← bon · resetDnaCharge   ← gim·eva·luck·death
+// 전부 myDnaEquip() 을 본다. 그래서 은화 뱀처럼 「나중에 얹힌 것」은
+// dnaGiftOf 에만 합쳐지고 판정에는 한 번도 닿지 않았다.
+//
+// 아래 buffOnly() 는 「고유 몫을 뺀 나머지」 — 임시 버프와 상시 장비만 남긴다.
+// 고유 몫을 빼므로 dna-gifts 와 겹치지 않는다.
+function dnaMaps(u) {
     u = u || (typeof currentUser !== 'undefined' ? currentUser : null);
-    if (!u) return { fac: 0, dark: 0 };
+    if (!u) return { own: {}, all: {}, worn: {} };
 
-    // 찬 고유 아이템의 몫 (안 찼으면 0)
     let worn = {};
     try {
         if (typeof myDnaEquip === 'function' && u === currentUser) worn = myDnaEquip() || {};
     } catch (e) { }
 
-    // 그 사원에게 배정된 고유 아이템이 원래 가진 몫 — 아래에서 빼낸다
+    // 그 사원에게 배정된 고유 아이템이 원래 가진 몫
     let own = {};
     try {
         if (typeof dnaGiftIndex === 'function' && typeof DNA_GIFTS !== 'undefined') {
@@ -576,13 +581,30 @@ window.facDarkBonus = function (u) {
         if (typeof dnaGiftOf === 'function') all = (dnaGiftOf(u) || {}).e || {};
     } catch (e) { }
 
+    return { own: own, all: all, worn: worn };
+}
+
+// 임시 버프·상시 장비 몫만 (은화 뱀 · 꿈결 수집기 · 은심장 …)
+window.buffOnly = function (u) {
+    const m = dnaMaps(u);
+    const out = {};
+    ['fac', 'dark', 'bon', 'luck', 'eva', 'gim', 'pct', 'death'].forEach(function (k) {
+        out[k] = Math.max(0, (m.all[k] || 0) - (m.own[k] || 0));
+    });
+    return out;
+};
+
+// 공용시설 한도용 — 여기만은 고유 몫도 같이 센다 (index.html 이 이 값만 쓴다)
+window.facDarkBonus = function (u) {
+    const m = dnaMaps(u);
+    const b = window.buffOnly(u);
     return {
-        fac:  (worn.fac  || 0) + Math.max(0, (all.fac  || 0) - (own.fac  || 0)),
-        dark: (worn.dark || 0) + Math.max(0, (all.dark || 0) - (own.dark || 0))
+        fac:  (m.worn.fac || 0) + b.fac,
+        dark: b.dark            // ← 고유 몫은 dna-gifts 가 이미 더한다. 겹치면 두 번 들어간다.
     };
 };
 
-// 어둠 탐사 남은 횟수에 얹는다
+// 어둠 탐사 남은 횟수에 얹는다 (버프 몫만)
 (function hookDarkTries() {
     const iv = setInterval(function () {
         if (typeof getDarkTriesLeft !== 'function') return;
@@ -592,7 +614,7 @@ window.facDarkBonus = function (u) {
         getDarkTriesLeft = function () {
             const base = _g.apply(this, arguments);
             let add = 0;
-            try { add = window.facDarkBonus().dark || 0; } catch (e) { }
+            try { add = window.buffOnly().dark || 0; } catch (e) { }
             return base + add;
         };
         getDarkTriesLeft._facDark = true;
@@ -601,21 +623,74 @@ window.facDarkBonus = function (u) {
     }, 500);
 })();
 
+// 판정 보정 — 은화 뱀의 「판정 +3」 같은 것
+(function hookBuffBonus() {
+    const iv = setInterval(function () {
+        if (typeof rollDarkBonus !== 'function') return;
+        if (rollDarkBonus._buffBon) { clearInterval(iv); return; }
+
+        const _r = rollDarkBonus;
+        rollDarkBonus = function () {
+            let b = _r.apply(this, arguments);
+            try { b += window.buffOnly().bon || 0; } catch (e) { }
+            return b;
+        };
+        rollDarkBonus._buffBon = true;
+        clearInterval(iv);
+        console.log('[보정] 판정 +n 연결');
+    }, 500);
+})();
+
+// 탐사 시작 때 채우는 횟수 — 은화 뱀의 「행운 +3」 같은 것
+(function hookBuffCharge() {
+    const iv = setInterval(function () {
+        if (typeof resetDnaCharge !== 'function') return;
+        if (resetDnaCharge._buffChg) { clearInterval(iv); return; }
+
+        const _c = resetDnaCharge;
+        resetDnaCharge = function () {
+            const r = _c.apply(this, arguments);
+            try {
+                const b = window.buffOnly();
+                if (typeof dnaCharge === 'object' && dnaCharge) {
+                    ['gim', 'eva', 'luck', 'death'].forEach(function (k) {
+                        if (b[k]) dnaCharge[k] = (dnaCharge[k] || 0) + b[k];
+                    });
+                }
+            } catch (e) { console.warn('[보정] 횟수 얹기 건너뜀:', e && e.message); }
+            return r;
+        };
+        resetDnaCharge._buffChg = true;
+        clearInterval(iv);
+        console.log('[보정] 행운·회피·기믹 횟수 연결');
+    }, 500);
+})();
+
 // ==========================================
 // 확인
 // ==========================================
 window.facDarkState = function () {
-    const b = window.facDarkBonus();
-    console.log('%c===== 공용시설 · 어둠 탐사 보정 =====', 'color:#d4af37; font-size:13px');
-    console.log('  공용시설 +', b.fac, '· 어둠 탐사 +', b.dark);
+    const m = dnaMaps(), b = window.buffOnly();
+    console.log('%c===== 얹힌 보정 =====', 'color:#d4af37; font-size:13px');
     console.log('  고유 아이템 착용:', (typeof myDnaEquip === 'function' && myDnaEquip()) ? 'O' : '-');
-    console.log('  임시 버프:', ((currentUser && currentUser.itemBuffs) || [])
-        .filter(function (x) { return x.k === 'fac' || x.k === 'dark'; })
-        .map(function (x) { return x.k + '+' + x.v + '(' + (x.src || '') + ')'; }).join(', ') || '(없음)');
-    console.log('  지금 한도:', currentUser && currentUser.facilityMax,
+    console.log('  고유 몫 :', JSON.stringify(m.worn));
+    console.log('  합계    :', JSON.stringify(m.all));
+    console.log('  버프 몫 :', JSON.stringify(b), '← 은화 뱀·꿈결 수집기·은심장');
+
+    const bl = ((currentUser && currentUser.itemBuffs) || []);
+    console.log('  들고 있는 임시 버프 ' + bl.length + '개:');
+    bl.forEach(function (x) {
+        const left = x.until ? Math.round((x.until - Date.now()) / 60000) + '분 남음' : (x.run ? '다음 탐사 1회' : '-');
+        console.log('    ' + x.k + ' +' + x.v + ' · ' + (x.src || '') + ' · ' + left);
+    });
+
+    console.log('  공용시설 한도:', currentUser && currentUser.facilityMax,
                 '· 쓴 횟수:', currentUser && currentUser.facilityCount);
     console.log('  어둠 남은 횟수:', (typeof getDarkTriesLeft === 'function') ? getDarkTriesLeft() : '-');
-    console.log('  어둠 연결:', (typeof getDarkTriesLeft === 'function' && getDarkTriesLeft._facDark) ? 'O' : '-');
+    console.log('  탐사 중 남은 횟수:', (typeof dnaCharge !== 'undefined') ? JSON.stringify(dnaCharge) : '(탐사 전)');
+    console.log('  연결 — 어둠:', (typeof getDarkTriesLeft === 'function' && getDarkTriesLeft._facDark) ? 'O' : '✗',
+                '· 판정:', (typeof rollDarkBonus === 'function' && rollDarkBonus._buffBon) ? 'O' : '✗',
+                '· 횟수:', (typeof resetDnaCharge === 'function' && resetDnaCharge._buffChg) ? 'O' : '✗');
 };
 
 window.scaleOdds = function () {
