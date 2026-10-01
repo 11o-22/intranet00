@@ -9647,7 +9647,7 @@ function saveSelfFull() {
             u.hasVIP = !u.hasVIP;
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 제어] VIP 출입 권한이 ${u.hasVIP ? '발급' : '회수'}되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { hasVIP: u.hasVIP, history: u.history });
             (u.hasVIP ? granted : revoked).push(u.name);
         });
 
@@ -9688,7 +9688,7 @@ function saveSelfFull() {
             }
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 제어] 오염도가 조정되었습니다. (현재 ${u.pollution}%)`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { foxRoomAnswered: u.foxRoomAnswered, history: u.history, lastPollutionTime: u.lastPollutionTime, pollution: u.pollution, quarantineExitPollution: u.quarantineExitPollution, quarantineUntil: u.quarantineUntil });
             names.push(u.name);
         });
 
@@ -9955,7 +9955,7 @@ function admItemSelectNone() {
             };
             u._adminStamp = Date.now();
             addHistoryLog(u, `[전용 장비] '${name}'을(를) 지급받았습니다. 속성을 선택해야 효력이 생깁니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { history: u.history, soulGear: u.soulGear });
             names.push(u.name);
         });
 
@@ -9976,7 +9976,7 @@ function admItemSelectNone() {
             u.soulGear = null;
             u._adminStamp = Date.now();
             addHistoryLog(u, `[전용 장비] '${gname}'이(가) 회수되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { history: u.history, soulGear: u.soulGear });
             names.push(u.name);
         });
 
@@ -10192,6 +10192,9 @@ function admItemSelectNone() {
                 u.alienDailyUsed = 0;
                 u.lastAlienPlayTime = 0;
                 u.alienDate = getTodayStr();
+                // ★ 기회만 채우고 진열대를 그대로 두면, 자정 리셋 조건에도 안 걸려 영영 남는다
+                u.alienUnlockedItems = [];
+                u.alienBoughtItems = [];
             }
             if (kind === 'dark' || kind === 'all') {
                 u.darkTries = 0;
@@ -10206,7 +10209,7 @@ function admItemSelectNone() {
             }
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] ${label.join(', ')} 이용 횟수가 충전되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { alienBoughtItems: u.alienBoughtItems, alienDailyUsed: u.alienDailyUsed, alienDate: u.alienDate, alienTries: u.alienTries, alienUnlockedItems: u.alienUnlockedItems, darkDate: u.darkDate, darkTries: u.darkTries, darkTryAddDate: u.darkTryAddDate, darkTryAdded: u.darkTryAdded, facilityCount: u.facilityCount, facilityMax: u.facilityMax, history: u.history, lastAlienPlayTime: u.lastAlienPlayTime, lastFacilityDate: u.lastFacilityDate });
             names.push(u.name);
         });
 
@@ -10234,7 +10237,7 @@ function adminGiveItem() {
         });
         addHistoryLog(u, `[당국 개입] 보급품 ${items.length}종이 지급되었습니다. (${items.join(', ')})`);
         u._adminStamp = Date.now();
-        if (database) database.ref('users/' + code).set(u);
+        if (database) updateUserFields(code, { history: u.history, inventory: u.inventory });
         names.push(u.name);
     });
 
@@ -10282,7 +10285,7 @@ function adminGiveItem() {
             removeItemFromInventory(u, itemName, removeQty);
             addHistoryLog(u, `[당국 압수] '${itemName}' ${removeQty}개가 회수되었습니다.`);
             u._adminStamp = Date.now();
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { history: u.history, inventory: u.inventory });
             done.push(u.name);
         });
 
@@ -10325,7 +10328,7 @@ function adminGiveItem() {
             u.equippedWeapons = [];
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] 모든 장착 장비가 강제 회수되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { equipOwner: u.equipOwner, equippedWeapons: u.equippedWeapons, history: u.history, inventory: u.inventory });
             names.push(u.name);
         });
 
@@ -10352,7 +10355,7 @@ function adminGiveItem() {
             u.hasItemUsedOnMe = false;
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] 특이사항이 초기화되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { badge: u.badge, hasItemUsedOnMe: u.hasItemUsedOnMe, history: u.history, noteGlowUntil: u.noteGlowUntil, timedEffects: u.timedEffects });
             names.push(u.name);
         });
 
@@ -10383,7 +10386,7 @@ function adminGiveItem() {
             u.lastPollutionTime = Date.now();
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] 모든 상태이상이 소거되었습니다.`);
-            if (database) database.ref('users/' + code).set(u);
+            if (database) updateUserFields(code, { blindfoldUntil: u.blindfoldUntil, butterKnifeExpireTime: u.butterKnifeExpireTime, foxRoomAnswered: u.foxRoomAnswered, history: u.history, lastPollutionTime: u.lastPollutionTime, masterName: u.masterName, nostalgiaSender: u.nostalgiaSender, nostalgiaUntil: u.nostalgiaUntil, quarantineExitPollution: u.quarantineExitPollution, quarantineUntil: u.quarantineUntil, silverRingExpireTime: u.silverRingExpireTime, slaveUntil: u.slaveUntil, timedEffects: u.timedEffects });
             names.push(u.name);
         });
 
