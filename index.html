@@ -9076,7 +9076,24 @@ function bjFinish(mode) {
                 return true;
             });
 
-                        let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
+            let unpicked = availablePool.filter(item => !currentUser.alienUnlockedItems.includes(item));
+
+            // ★ 확률 컬링 때문에 후보가 3개 미만이 되는 일이 있다.
+            //   그러면 3종을 채웠다고 적고도 실제로는 덜 들어간다.
+            //   모자라면 확률 아이템만 빼고 평범한 후보로 메운다.
+            if (unpicked.length < 3) {
+                ALIEN_ITEMS_POOL.forEach(item => {
+                    if (RARE_ALIEN[item] !== undefined) return;
+                    if ((item === "작두" || item === "유리손포" || item === "누군가가 쓴 부적" || item === "사자탈") && !isDisasterTeam) return;
+                    if ((item === "착한 친구" || item === "보안팀 의상 세트" || item === "버터 나이프") && !isDaydreamTeam) return;
+                    if (["은반지", "빨간 리본", "고급진 술", "금고"].includes(item) && !isHighRank) return;
+                    if (item === "노스텔지어 끈" && !isSecurityTeam) return;
+                    if (item === "여우구슬" && currentUser.code !== 'kario0987') return;
+                    if (item === "금고" && currentUser.code !== 'kario0987') return;
+                    if (currentUser.alienUnlockedItems.includes(item)) return;
+                    if (!unpicked.includes(item)) unpicked.push(item);
+                });
+            }
             if (unpicked.length === 0) unpicked = [...availablePool];
             let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
 
@@ -9084,14 +9101,19 @@ function bjFinish(mode) {
             const MAX_ALIEN_SLOTS = 9;
             let room = MAX_ALIEN_SLOTS - currentUser.alienUnlockedItems.length;
             let addCount = Math.min(3, Math.max(0, room));
+
+            const beforeCount = currentUser.alienUnlockedItems.length;
             shuffled.slice(0, addCount).forEach(it => {
                 if (!currentUser.alienUnlockedItems.includes(it)) currentUser.alienUnlockedItems.push(it);
             });
+            const got = currentUser.alienUnlockedItems.length - beforeCount;   // 실제로 들어간 수
 
             if (addCount === 0) {
                 msgEl.innerHTML = `<span style="color:#ffd700; font-weight:bold;">[인증 성공] 다만 진열대가 가득 차 더 이상 입고되지 않았습니다.</span>`;
+            } else if (got < addCount) {
+                msgEl.innerHTML = `<span style="color:#ffd700; font-weight:bold;">[인증 성공] ${got}종이 입고되었습니다. 남은 물품이 모자랍니다.</span>`;
             }
-            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리 (+${addCount}종)`);
+            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리 (+${got}종)`);
         } else {
             setUFODialogue(" 좋은 물건을 산다. ");
             msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
