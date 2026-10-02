@@ -14940,7 +14940,6 @@ function s003Vote(n, target) {
                    <span style="color:#ff6b6b;">마지막 판정이 크게 불리해진다.</span>`;
         } else {
             mod = 1;
-            darkRun.modifier = (darkRun.modifier || 0) + 1;
             txt = `<b>${nm}</b> 사원을 골랐다.<br><br>
                    그쪽이 고개를 끄덕인다. 거부하지 않았다.<br>
                    거부할 수 있었는지는 모르겠다.<br><br>

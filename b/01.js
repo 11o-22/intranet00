@@ -1834,7 +1834,7 @@ mountDarkChat('normal');
         if (eBtn) eBtn.disabled = false;
 
         let pos = 0;
-        clearInterval(c119Timer);
+        clearInterval(c119Timer); if (darkRun) { clearInterval(darkRun._s010Timer); clearInterval(darkRun._defTimer); }
         c119Timer = setInterval(() => {
             pos += 1.2;
             const bar = document.getElementById('c119-bar');
@@ -11267,7 +11267,8 @@ function s010G23() {
     darkRun._s010Timer = setInterval(() => {
         t--;
         const el = document.getElementById('s010-time');
-        if (!el || !darkRun) { clearInterval(darkRun._s010Timer); return; }
+        const tm = darkRun && darkRun._s010Timer;
+if (!el || !darkRun) { clearInterval(tm); return; }
         el.innerText = t;
         if (t <= 0) {
             clearInterval(darkRun._s010Timer);
@@ -11490,7 +11491,8 @@ function renderS010Defense(n) {
     darkRun._defTimer = setInterval(() => {
         t--;
         const el = document.getElementById('s010-def-time');
-        if (!el || !darkRun) { clearInterval(darkRun._defTimer); return; }
+        const tm = darkRun && darkRun._defTimer;
+if (!el || !darkRun) { clearInterval(tm); return; }
         el.innerText = t;
         if (t <= 0) {
             clearInterval(darkRun._defTimer);
@@ -14944,7 +14946,6 @@ function s003Vote(n, target) {
                    <span style="color:#ff6b6b;">마지막 판정이 크게 불리해진다.</span>`;
         } else {
             mod = 1;
-            darkRun.modifier = (darkRun.modifier || 0) + 1;
             txt = `<b>${nm}</b> 사원을 골랐다.<br><br>
                    그쪽이 고개를 끄덕인다. 거부하지 않았다.<br>
                    거부할 수 있었는지는 모르겠다.<br><br>
