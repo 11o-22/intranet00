@@ -1337,7 +1337,7 @@ mountDarkChat('normal');
             const m = sn.val();
             if (!m || !darkRun) return;
             darkRun.soloMet = true;
-            darkRun.modifier = (darkRun.modifier || 0) + 1;
+           
             const sc = SOLO_MEET_SCENES[m.scene] || SOLO_MEET_SCENES[0];
 
             darkBodyEl().innerHTML = darkBox("조우", sc.text + `<br><br>${sc.after}`,
