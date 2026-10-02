@@ -1828,7 +1828,7 @@ mountDarkChat('normal');
         if (eBtn) eBtn.disabled = false;
 
         let pos = 0;
-        clearInterval(c119Timer);
+        clearInterval(c119Timer); if (darkRun) { clearInterval(darkRun._s010Timer); clearInterval(darkRun._defTimer); }
         c119Timer = setInterval(() => {
             pos += 1.2;
             const bar = document.getElementById('c119-bar');
@@ -11261,7 +11261,8 @@ function s010G23() {
     darkRun._s010Timer = setInterval(() => {
         t--;
         const el = document.getElementById('s010-time');
-        if (!el || !darkRun) { clearInterval(darkRun._s010Timer); return; }
+        const tm = darkRun && darkRun._s010Timer;
+if (!el || !darkRun) { clearInterval(tm); return; }
         el.innerText = t;
         if (t <= 0) {
             clearInterval(darkRun._s010Timer);
@@ -11484,7 +11485,8 @@ function renderS010Defense(n) {
     darkRun._defTimer = setInterval(() => {
         t--;
         const el = document.getElementById('s010-def-time');
-        if (!el || !darkRun) { clearInterval(darkRun._defTimer); return; }
+        const tm = darkRun && darkRun._defTimer;
+if (!el || !darkRun) { clearInterval(tm); return; }
         el.innerText = t;
         if (t <= 0) {
             clearInterval(darkRun._defTimer);
