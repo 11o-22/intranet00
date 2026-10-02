@@ -31,7 +31,8 @@ let ref = null;
 let ready = false;
 
 const shadowInv = {};     // 남의 소지품 — 서버에서 마지막으로 본 모습
-let invBusy = false;      // 소지품 트랜잭션이 도는 중
+let invBusy = false;  
+let invAgain = false;     
 let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0 };
 
 function clone(v) {
@@ -102,8 +103,10 @@ function fillArr(target, src) {
 }
 
 // 내 소지품을 서버와 맞춘다
+// 내 소지품을 서버와 맞춘다
 function flushMyInv() {
-    if (!ready || !currentUser || invBusy) return Promise.resolve(null);
+    if (!ready || !currentUser) return Promise.resolve(null);
+    if (invBusy) { invAgain = true; return Promise.resolve(null); }   // 버리지 말고 적어 둔다
     if (same(currentUser[INV], base[INV])) return Promise.resolve(null);
 
     invBusy = true;
@@ -112,12 +115,28 @@ function flushMyInv() {
 
     return mergeInv('users/' + code + '/' + INV, had, want).then(function (after) {
         invBusy = false;
-        if (after === null) { base[INV] = want; return null; }
-        fillArr(currentUser[INV], after);
-        base[INV] = clone(after);
+
+        // 날아가는 사이에 손댄 것을 지킨다 — 이게 없으면 그 사이 산 물건이 사라진다
+        const nowArr = asArr(currentUser[INV]);
+        const add = msDiff(nowArr, want);      // 사이에 들어온 것
+        const del = msDiff(want, nowArr);      // 사이에 빠진 것
+
+        if (after === null) {
+            base[INV] = want;
+        } else {
+            const next = asArr(after).slice();
+            del.forEach(function (n) { const i = next.indexOf(n); if (i >= 0) next.splice(i, 1); });
+            fillArr(currentUser[INV], next.concat(add));
+            base[INV] = clone(after);
+        }
+
+        const more = add.length || del.length || invAgain;
+        invAgain = false;
+        if (more) return flushMyInv();         // 남은 몫을 한 번 더 보낸다
         return after;
     }).catch(function (e) {
         invBusy = false;
+        invAgain = false;
         console.error('[병합] 소지품:', e);
         return null;
     });
