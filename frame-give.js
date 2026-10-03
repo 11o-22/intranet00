@@ -20,7 +20,9 @@
 //     frameGive('또류', '성운')     이름과 테두리 이름으로도 된다
 //     frameGive('v04')             사번을 빼면 나에게 단다
 //     frameGive('3079', 'v04', 'badge')   사원증 칸에 단다
-//     frameClear('3079')           떼고 돌려놓는다
+//     frameClear('3079')           떼기만 한다 (보유는 남는다)
+//     frameTake('3079', 'v04')     보유 목록에서도 지운다
+//     frameTake('3079', 'all')     그 사원의 테두리를 전부 지운다
 //
 // 남에게 거는 것은 상담사만 할 수 있다.
 
@@ -134,6 +136,52 @@ window.frameClear = function (who, slot) {
         'color:#4CAF50');
 };
 
-console.log('[테두리] frameList() · frameGive(사번, 테두리) · frameClear(사번)');
+// 보유 목록에서까지 지운다
+window.frameTake = function (who, what) {
+    // 사번을 빼고 테두리만 넣은 경우
+    if (what === undefined) { what = who; who = currentUser && currentUser.code; }
+
+    const u = findUser(who);
+    if (!u) { console.warn('그런 사원을 찾지 못했습니다.'); return; }
+
+    const isMe = currentUser && u.code === currentUser.code;
+    if (!isMe && (!currentUser || currentUser.code !== 'kario0987')) {
+        console.warn('남의 것을 지우는 것은 상담사만 할 수 있습니다.'); return;
+    }
+
+    const bag = bagOf(u);
+    const all = String(what || '').trim() === 'all';
+
+    if (all) {
+        const n = Object.keys(bag.owned).length;
+        bag.owned = {};
+        bag.list = ''; bag.badge = ''; bag.hist = '';
+        push(u);
+        console.log('%c✓ ' + (u.name || u.code) + ' — 테두리 ' + n + '종을 모두 지웠습니다.',
+            'color:#4CAF50');
+        return;
+    }
+
+    const f = findFrame(what);
+    if (!f) { console.warn('그런 테두리가 없습니다. frameList() 로 확인하세요.'); return; }
+
+    if (!bag.owned[f.id]) {
+        console.warn((u.name || u.code) + ' 사원은 [' + f.n + ']을(를) 가지고 있지 않습니다.');
+        return;
+    }
+    delete bag.owned[f.id];
+
+    // 달고 있던 자리는 비운다
+    const off = [];
+    Object.keys(SLOTS).forEach(function (s) {
+        if (bag[s] === f.id) { bag[s] = ''; off.push(SLOTS[s]); }
+    });
+    push(u);
+
+    console.log('%c✓ ' + (u.name || u.code) + ' — [' + f.n + ']을(를) 보유 목록에서 지웠습니다.'
+        + (off.length ? ' (' + off.join(' · ') + ' 칸에서도 뗌)' : ''), 'color:#4CAF50');
+};
+
+console.log('[테두리] frameList() · frameGive(사번, 테두리) · frameClear(사번) · frameTake(사번, 테두리)');
 
 })();
