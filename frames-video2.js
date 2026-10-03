@@ -30,7 +30,8 @@ const VIDEO_FRAMES_S = [
         plate: 'rgba(4,4,9,0.95)',   // 띠 밑에 까는 어두운 판 (밝은 스킨 대비)
         opacity: 1,
         bg: '#05030c',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card',
+                 '#history-list-container', '#gear-modal-body']
     },
     {
         id: 'v03', g: 'S', n: '화등',
@@ -44,7 +45,8 @@ const VIDEO_FRAMES_S = [
         plate: 'rgba(6,4,9,0.95)',
         opacity: 1,
         bg: '#0a0509',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card',
+                 '#history-list-container', '#gear-modal-body']
     }
 ];
 
@@ -243,7 +245,9 @@ function paint(now) {
         const W = Math.round(r.width), H = Math.round(r.height);
         if (W < 8 || H < 8) return;
 
-        const cv = L.cv, ctx = L.ctx, T = L.f.ring;
+               // 작은 칸(관리 화면의 34px 예시)에서는 띠를 줄인다
+        const cv = L.cv, ctx = L.ctx;
+        const T = Math.max(3, Math.min(L.f.ring, Math.round(Math.min(W, H) * 0.30)));
 
         // 칸을 감싼다 — over 만큼은 칸 안쪽까지 파고든다
         const bw = parseFloat(getComputedStyle(L.el).borderTopWidth) || 0;

@@ -23,7 +23,8 @@ const VIDEO_FRAMES = [
         cutX: 0.20, cutY: 0.26,   // 원본 모서리를 버리는 비율
         opacity: 1,
         bg: '#02080e',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card',
+                 '#history-list-container', '#gear-modal-body']
     }
 ];
 

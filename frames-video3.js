@@ -33,6 +33,22 @@ const SRC_LINE = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1w
 
 (function videoFramesL2() {
 
+// 테두리를 그릴 자리
+//
+//   #history-list-container  기록 줄        (frames.js:357 이 fr- 클래스를 붙인다)
+//   #gear-modal-body         테두리 관리 화면의 34px 예시 칸 (frames.js:310)
+//
+// scan() 이 el.matches(s) || el.closest(s) 로 보므로 바깥 상자만 적어도 된다.
+const WHERE = [
+    '#badge-photo-display',
+    '#emp-detail-card-container',
+    '.emp-list-card',
+    '#history-list-container',
+    '#gear-modal-body'
+];
+
+
+
 const VIDEO_FRAMES_3 = [
     {
         id: 'v04', g: 'L', n: '성운',
@@ -46,7 +62,7 @@ const VIDEO_FRAMES_3 = [
         plate: 'rgba(5,4,10,0.95)',
         opacity: 1,
         bg: '#07060c',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: WHERE
     },
     {
         id: 'v05', g: 'L', n: '격광',
@@ -60,7 +76,7 @@ const VIDEO_FRAMES_3 = [
         plate: 'rgba(6,4,9,0.95)',
         opacity: 1,
         bg: '#0a0509',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: WHERE
     },
     {
         id: 'v06', g: 'S', n: '자전',
@@ -74,7 +90,7 @@ const VIDEO_FRAMES_3 = [
         plate: 'rgba(6,4,12,0.95)',
         opacity: 1,
         bg: '#0a0512',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: WHERE
     },
     {
         id: 'v07', g: 'S', n: '세광',
@@ -88,7 +104,7 @@ const VIDEO_FRAMES_3 = [
         plate: 'rgba(4,4,10,0.95)',
         opacity: 1,
         bg: '#06060e',
-        where: ['#badge-photo-display', '#emp-detail-card-container', '.emp-list-card']
+        where: WHERE
     }
 ];
 
@@ -285,7 +301,10 @@ function paint(now) {
         const W = Math.round(r.width), H = Math.round(r.height);
         if (W < 8 || H < 8) return;
 
-        const cv = L.cv, ctx = L.ctx, T = L.f.ring;
+        // 작은 칸(관리 화면의 34px 예시)에서는 띠를 줄인다.
+        // 그대로 두면 속이 거의 없어져 덩어리로 보인다.
+        const cv = L.cv, ctx = L.ctx;
+        const T = Math.max(3, Math.min(L.f.ring, Math.round(Math.min(W, H) * 0.30)));
 
         const bw = parseFloat(getComputedStyle(L.el).borderTopWidth) || 0;
         const OV = Math.max(0, Math.min(T, Math.round(L.f.over || 0)));
