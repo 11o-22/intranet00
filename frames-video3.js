@@ -42,6 +42,7 @@ const VIDEO_FRAMES_3 = [
         bandY: 0.19,       // 영상에서 위아래 띠가 차지하는 비율
         cutX: 0, cutY: 0,  // 영상 끝을 잘라 낼 때만 쓴다
         over: 8,           // 칸 안쪽으로 파고드는 깊이 (px)
+        corner: true,      // 모서리를 영상 모서리에서 떠 온다 (이음새 없음)
         plate: 'rgba(5,4,10,0.95)',
         opacity: 1,
         bg: '#07060c',
@@ -55,6 +56,7 @@ const VIDEO_FRAMES_3 = [
         bandY: 0.11,
         cutX: 0, cutY: 0,
         over: 8,
+        corner: true,
         plate: 'rgba(6,4,9,0.95)',
         opacity: 1,
         bg: '#0a0509',
@@ -68,6 +70,7 @@ const VIDEO_FRAMES_3 = [
         bandY: 0.12,
         cutX: 0, cutY: 0,
         over: 8,
+        corner: true,
         plate: 'rgba(6,4,12,0.95)',
         opacity: 1,
         bg: '#0a0512',
@@ -81,6 +84,7 @@ const VIDEO_FRAMES_3 = [
         bandY: 0.07,
         cutX: 0, cutY: 0,
         over: 8,
+        corner: true,
         plate: 'rgba(4,4,10,0.95)',
         opacity: 1,
         bg: '#06060e',
@@ -309,9 +313,50 @@ function paint(now) {
 
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         ctx.clearRect(0, 0, CW, CH);
-        ctx.globalCompositeOperation = 'lighter';
 
         const plate = L.f.plate || 'rgba(4,4,9,0.95)';
+
+        // ==========================================
+        // 모서리는 영상의 모서리를 그대로 떠 온다
+        // ==========================================
+        //
+        // 네 변을 45도로 맞물리면, 변마다 색이 다른 영상에서는 그 맞물린 선이
+        // 밝기 차이로 드러난다. 「자전」처럼 위가 분홍이고 아래가 파랑이면
+        // 좁은 화면에서 특히 눈에 띈다.
+        //
+        // 그래서 모서리 네 조각은 영상의 네 모서리에서 그대로 떠 오고,
+        // 변은 그 사이만 채운다. 원본이 이미 테두리 모양이라 모서리가 그대로 맞는다.
+        if (L.f.corner !== false) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = plate;
+            ctx.fillRect(0, 0, CW, T);
+            ctx.fillRect(0, CH - T, CW, T);
+            ctx.fillRect(0, T, T, Math.max(0, CH - T * 2));
+            ctx.fillRect(CW - T, T, T, Math.max(0, CH - T * 2));
+
+            ctx.globalCompositeOperation = 'lighter';
+            const mw = Math.max(1, vw - bx * 2), mh = Math.max(1, vh - by * 2);
+            const DW = CW - T * 2, DH = CH - T * 2;
+
+            ctx.drawImage(vid, 0, 0, bx, by, 0, 0, T, T);                       // 왼쪽 위
+            ctx.drawImage(vid, vw - bx, 0, bx, by, CW - T, 0, T, T);            // 오른쪽 위
+            ctx.drawImage(vid, 0, vh - by, bx, by, 0, CH - T, T, T);            // 왼쪽 아래
+            ctx.drawImage(vid, vw - bx, vh - by, bx, by, CW - T, CH - T, T, T); // 오른쪽 아래
+
+            if (DW > 0) {
+                ctx.drawImage(vid, bx, 0, mw, by, T, 0, DW, T);                 // 위
+                ctx.drawImage(vid, bx, vh - by, mw, by, T, CH - T, DW, T);      // 아래
+            }
+            if (DH > 0) {
+                ctx.drawImage(vid, 0, by, bx, mh, 0, T, T, DH);                 // 왼쪽
+                ctx.drawImage(vid, vw - bx, by, bx, mh, CW - T, T, T, DH);      // 오른쪽
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            return;
+        }
+
+        // 예전 방식 — 네 변을 45도로 맞물린다 (corner: false 일 때)
+        ctx.globalCompositeOperation = 'lighter';
         const edge = function (sx, sy, sW, sH, dx, dy, dW, dH, pts) {
             ctx.save();
             ctx.beginPath();
