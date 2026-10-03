@@ -153,6 +153,9 @@ function alienPool() {
 }
 
 // 반대 소속 물품 — EQUIP_AFFIL 에 적힌 소속이 내 쪽이 아닌 것
+//
+// 콜렉터와 같은 이유로 극희귀품과 상담사 전용은 뺀다.
+// 하나라도 못 구하는 것이 섞이면 칭호 자체가 막힌다.
 function otherSideItems(u) {
     if (typeof EQUIP_AFFIL === 'undefined') return [];
     const where = (u.affiliation || '') + ' ' + (u.team || '');
@@ -160,6 +163,8 @@ function otherSideItems(u) {
     Object.keys(EQUIP_AFFIL).forEach(function (n) {
         const need = EQUIP_AFFIL[n];
         if (!need) return;
+        if (TOO_RARE.indexOf(n) >= 0) return;
+        if (ADMIN_ONLY.indexOf(n) >= 0) return;
         if (where.indexOf(need) < 0) out.push(n);   // 내가 못 쓰는 쪽 = 반대 소속
     });
     return out;
