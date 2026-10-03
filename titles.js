@@ -81,13 +81,13 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '뉴비', '고인물'];
+const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설'];
 
 // 상담사 칭호에 붙는 그림
 //
 // 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
 // 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
-const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑' };
+const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤' };
 
 // 이름을 바꾼 칭호 — 예전 이름으로 받아 간 사람을 새 이름으로 옮긴다
 const RENAMED = { '신입': '뉴비' };
@@ -915,10 +915,11 @@ window.adminGiveTitle = function (name) {
         if (!anchor) return;
         const row = document.createElement('div');
         row.id = 'title-admin-row';
-        row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px; align-items:center;';
+        row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px;'
+            + ' align-items:center; flex-wrap:wrap;';
         row.innerHTML = '<span style="font-size:10px; color:#888; flex-shrink:0;">칭호</span>'
             + ADMIN_TITLES.map(function (n) {
-                return '<button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;'
+                return '<button class="game-btn" style="flex:1 1 68px; margin:0; padding:9px; font-size:11px;'
                     + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
                     + ' border-color:#7a6a3a !important;" onclick="adminGiveTitle(\'' + n + '\')">'
                     + label(n) + '</button>';
