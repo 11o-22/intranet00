@@ -1,5 +1,5 @@
 // ==========================================
-// 묶음 08.js — 29개
+// 묶음 08.js — 38개
 // build.mjs 가 만든 것입니다. 여기를 고치지 말고 원본 파일을 고치세요.
 // ==========================================
 
@@ -7427,6 +7427,438 @@ console.log('[임신v2] pregV2State() · pregRefundAll() · pregFlushAll()');
 })();
 ;
 
+// ---------- care-clean.js ----------
+// ==========================================
+// ★ 돌보기 잔해 치우기
+// index.html 에서 preg-v2.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 왜 아직 떠 있나
+//
+//   preg-v2.js 는 ITEM_CATALOG 에서만 5종을 지운다. (preg-v2.js:37)
+//   그런데 사택 매점의 「🤍 돌봄 용품」 칸은 ITEM_CATALOG 를 보지 않는다.
+//   PREG_ITEMS 를 직접 읽어서 줄을 만든다. (pregnancy2.js:404)
+//   PREG_ITEMS 는 아무도 비우지 않았으므로 칸은 그대로 그려진다.
+//
+//       pregnancy2.js:398  (function hookStore() {
+//       pregnancy2.js:401     if (... document.getElementById('preg-store')) return;   ← 여기
+//       pregnancy2.js:416     <div id="preg-store" ...>🤍 돌봄 용품
+//
+//   put() 은 IIFE 안에 있어 밖에서 못 고친다.
+//   대신 같은 id 를 가진 빈 칸을 미리 넣어 둔다. 위 줄에서 스스로 돌아간다.
+//
+//   같은 이유로 남아 있는 것들
+//     · preg-roster.js 의 「여기서 바로 돌볼 수 있습니다」 명단
+//       — 돌본다 단추가 doCare 를 부르는데 그것은 이미 빈 함수다. 눌러도 아무 일이 없다.
+//     · 전에 사 둔 물건이 소지품에 그대로 남아 있다. 쓸 수도, 버릴 수도 없다.
+//
+// ■ 무엇을 하나
+//
+//   1. PREG_ITEMS 를 비운다 — 어디서 읽어도 줄이 생기지 않는다
+//   2. ITEM_CATALOG 에서 5종을 지운다 (preg-v2 가 이미 했지만 순서가 어긋날 수 있다)
+//   3. 사택 매점 칸을 빈 칸으로 막는다
+//   4. 돌봄 명단을 그리지 않게 한다
+//   5. 소지품에 남은 것을 거둔다 — 거둔 내역은 기록에 남는다
+//
+//   포인트는 돌려주지 않는다. 돌려주려면 바로 아래 줄을 true 로 고친다.
+
+// 샀던 값만큼 돌려줄지 — 파일을 올리기 전에 여기를 고친다
+if (window.CARE_REFUND === undefined) window.CARE_REFUND = false;
+
+(function careClean() {
+
+// 이름은 PREG_ITEMS 에서 가져오고, 없으면 적어 둔 것을 쓴다
+const FALLBACK = {
+    '미지근한 물수건': 400,
+    '흔들의자':       900,
+    '식지 않는 죽':   1500,
+    '두꺼운 담요':    2600,
+    '밤새 켜 둔 등':  5000
+};
+
+const PRICE = {};
+(function names() {
+    try {
+        if (typeof PREG_ITEMS !== 'undefined' && PREG_ITEMS) {
+            Object.keys(PREG_ITEMS).forEach(function (n) {
+                PRICE[n] = (PREG_ITEMS[n] && PREG_ITEMS[n].price) || FALLBACK[n] || 0;
+            });
+        }
+    } catch (e) { }
+    Object.keys(FALLBACK).forEach(function (n) {
+        if (PRICE[n] === undefined) PRICE[n] = FALLBACK[n];
+    });
+})();
+const ITEMS = Object.keys(PRICE);
+
+// ==========================================
+// 1·2. 목록에서 지운다
+// ==========================================
+(function drop() {
+    const iv = setInterval(function () {
+        let done = false;
+
+        try {
+            if (typeof PREG_ITEMS !== 'undefined' && PREG_ITEMS) {
+                Object.keys(PREG_ITEMS).forEach(function (n) { delete PREG_ITEMS[n]; });
+                done = true;
+            }
+        } catch (e) { }
+
+        if (typeof ITEM_CATALOG !== 'undefined') {
+            ITEMS.forEach(function (n) { delete ITEM_CATALOG[n]; });
+            done = true;
+        }
+
+        // 혹시 어느 상점 목록에 이름이 들어가 있으면 뺀다
+        ['ALL_10_ITEMS', 'ALIEN_ITEMS_POOL', 'NO_SELL_ITEMS'].forEach(function (k) {
+            let arr;
+            try { arr = window[k] || eval(k); } catch (e) { return; }
+            if (!Array.isArray(arr)) return;
+            ITEMS.forEach(function (n) {
+                let i;
+                while ((i = arr.indexOf(n)) >= 0) arr.splice(i, 1);
+            });
+        });
+
+        if (!done) return;
+        clearInterval(iv);
+        console.log('[돌보기] 목록에서 ' + ITEMS.length + '종 제거');
+    }, 500);
+})();
+
+// 남은 단추가 있어도 사지지 않게
+(function noBuy() {
+    const iv = setInterval(function () {
+        if (typeof buyPregItem !== 'function') return;
+        if (buyPregItem._gone) { clearInterval(iv); return; }
+        buyPregItem = function () {
+            if (typeof showCustomAlert === 'function') {
+                showCustomAlert('돌봄 용품은 없어졌습니다.');
+            }
+        };
+        buyPregItem._gone = true;
+        clearInterval(iv);
+    }, 500);
+})();
+
+// ==========================================
+// 3. 사택 매점 칸 막기
+// ==========================================
+//
+// pregnancy2.js 의 put() 은 #preg-store 가 이미 있으면 그냥 돌아간다.
+// 그러니 빈 칸을 먼저 넣어 두면 영원히 그려지지 않는다.
+// put() 은 renderHouse 뒤 90ms 에 돈다. 우리가 그보다 먼저 넣는다.
+function seal() {
+    const box = document.getElementById('house-main-body');
+    if (!box) return;
+
+    const ex = document.getElementById('preg-store');
+    if (ex) {
+        if (ex.dataset.sealed) return;      // 우리가 넣은 빈 칸이다
+        ex.remove();                        // 진짜 칸이 들어왔으면 걷어낸다
+    }
+    const ph = document.createElement('div');
+    ph.id = 'preg-store';
+    ph.dataset.sealed = '1';
+    ph.style.display = 'none';
+    box.appendChild(ph);
+}
+
+(function hookHouse() {
+    const iv = setInterval(function () {
+        if (typeof renderHouse !== 'function') return;
+        if (renderHouse._careSealed) { clearInterval(iv); return; }
+        const _r = renderHouse;
+        renderHouse = function () {
+            const r = _r.apply(this, arguments);
+            seal();                         // put() 이 예약된 직후, 돌기 전에 막는다
+            return r;
+        };
+        renderHouse._careSealed = true;
+        clearInterval(iv);
+        console.log('[돌보기] 사택 매점 칸 차단');
+    }, 500);
+})();
+setInterval(seal, 900);                     // 처음 1.5초 지연 호출까지 덮는다
+
+// ==========================================
+// 4. 돌봄 명단 치우기
+// ==========================================
+//
+// 돌본다 단추가 부르는 doCare 는 이미 빈 함수다. 눌러도 아무 일이 없으므로
+// 칸 자체를 그리지 않는다. (preg-roster.js 가 없으면 아무 일도 하지 않는다)
+(function noRoster() {
+    const iv = setInterval(function () {
+        if (typeof renderPregRoster !== 'function') return;
+        if (renderPregRoster._gone) { clearInterval(iv); return; }
+        renderPregRoster = function () {
+            const el = document.getElementById('preg-roster');
+            if (el) el.remove();
+        };
+        renderPregRoster._gone = true;
+        clearInterval(iv);
+        const el = document.getElementById('preg-roster');
+        if (el) el.remove();
+        console.log('[돌보기] 돌봄 명단 제거');
+    }, 500);
+})();
+
+// ==========================================
+// 5. 소지품에 남은 것 거두기
+// ==========================================
+let swept = false;
+function sweep() {
+    if (swept || !currentUser) return;
+    if (!Array.isArray(currentUser.inventory)) return;
+    swept = true;
+
+    const took = {};
+    let back = 0;
+    const keep = [];
+    currentUser.inventory.forEach(function (n) {
+        if (PRICE[n] === undefined) { keep.push(n); return; }
+        took[n] = (took[n] || 0) + 1;
+        back += PRICE[n];
+    });
+
+    // 장착 칸에 잘못 꽂혀 있던 것도 뺀다
+    const eq = currentUser.equippedWeapons;
+    let eqCut = 0;
+    if (Array.isArray(eq)) {
+        for (let i = eq.length - 1; i >= 0; i--) {
+            const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(eq[i]) : eq[i];
+            if (PRICE[base] !== undefined) { eq.splice(i, 1); eqCut++; }
+        }
+    }
+
+    const names = Object.keys(took);
+    if (!names.length && !eqCut) return;
+
+    if (names.length) {
+        currentUser.inventory.length = 0;
+        keep.forEach(function (n) { currentUser.inventory.push(n); });
+    }
+
+    const f = { inventory: 1, history: 1 };
+    if (eqCut) f.equippedWeapons = 1;
+
+    let line = '[돌봄 폐지] ' + names.map(function (n) {
+        return n + (took[n] > 1 ? ' ' + took[n] + '개' : '');
+    }).join(', ') + '을(를) 거두었습니다.';
+
+    if (window.CARE_REFUND && back > 0) {
+        currentUser.points = (currentUser.points || 0) + back;
+        f.points = 1;
+        line += ' (' + back.toLocaleString() + ' P 환급)';
+    }
+
+    if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, line);
+    if (typeof saveFields === 'function') {
+        try { saveFields(f); } catch (e) { console.error('[돌보기] 저장 실패:', e); }
+    }
+    if (typeof updateUI === 'function') updateUI();
+    console.log('[돌보기] 소지품에서 거둠 — ' + line);
+}
+(function waitMe() {
+    const iv = setInterval(function () {
+        if (!currentUser || !Array.isArray(currentUser.inventory)) return;
+        sweep();
+        clearInterval(iv);
+    }, 1200);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.careState = function () {
+    console.log('%c===== 돌보기 잔해 =====', 'color:#ff8fb1; font-size:13px');
+
+    let pregLeft = '없음';
+    try {
+        if (typeof PREG_ITEMS !== 'undefined' && PREG_ITEMS) {
+            const k = Object.keys(PREG_ITEMS);
+            pregLeft = k.length ? k.join(', ') : '비었음';
+        }
+    } catch (e) { pregLeft = '못 읽음'; }
+
+    const catLeft = (typeof ITEM_CATALOG !== 'undefined')
+        ? ITEMS.filter(function (n) { return !!ITEM_CATALOG[n]; }) : [];
+    const inv = (currentUser && currentUser.inventory) || [];
+    const invLeft = ITEMS.filter(function (n) { return inv.indexOf(n) >= 0; });
+
+    const store = document.getElementById('preg-store');
+    console.table([
+        { 자리: 'PREG_ITEMS',        상태: pregLeft },
+        { 자리: 'ITEM_CATALOG',      상태: catLeft.length ? catLeft.join(', ') : '비었음' },
+        { 자리: '사택 매점 칸',       상태: !store ? '없음' : (store.dataset.sealed ? '빈 칸으로 막음' : '★ 아직 떠 있음') },
+        { 자리: '돌봄 명단',          상태: document.getElementById('preg-roster') ? '★ 아직 떠 있음' : '없음' },
+        { 자리: '내 소지품',          상태: invLeft.length ? invLeft.join(', ') : '비었음' }
+    ]);
+    console.log('  환급: ' + (window.CARE_REFUND ? '켜짐' : '꺼짐')
+        + ' — 켜려면 care-clean.js 의 CARE_REFUND 줄을 true 로 고친다');
+};
+
+console.log('[돌보기] careState()');
+
+})();
+;
+
+// ---------- preg-rate.js ----------
+// ==========================================
+// ★ 임신 확률 — 최소 10% · 전원 다시 뽑기
+// bundles.json 에서 dna.js 보다 뒤, save-merge.js 보다 앞에 둔다
+// (마지막 묶음의 preg-v2.js 다음 자리면 된다)
+// ==========================================
+//
+// ■ 지금 어떻게 되어 있나  (dna.js:39~56)
+//
+//     sireRate     시키는 쪽   0.5 ~ 35%
+//     bearRate     되는 쪽     0.1 ~ 30%
+//     sireRateAlt  물약으로 역할이 뒤집혔을 때의 시키는 쪽
+//     bearRateAlt  같은 경우의 되는 쪽
+//
+//   네 값은 전부 사번을 해시해서 뽑는다. 저장되지 않고, 같은 사람은 언제나 같다.
+//
+//   실제 성공 확률은 두 값을 곱해서 쓴다. (pregnancy.js:204 · preg-v2.js:280)
+//
+//       성공 확률 = (시키는 쪽 ÷ 100) × (되는 쪽 ÷ 100) × 6
+//
+//   그래서 바닥값끼리 만나면 0.5% × 0.1% × 6 = 0.003% 였다. 평생 한 번도 안 된다.
+//
+// ■ 무엇을 바꾸나
+//
+//   1. 네 값 모두 바닥을 10% 로 올린다
+//        시키는 쪽  10 ~ 35%      되는 쪽  10 ~ 30%
+//        성공 확률  6% ~ 63%   (바닥 10×10×6 / 천장 35×30×6)
+//
+//   2. 전원 다시 뽑는다
+//        해시에 쓰는 소금(gen)을 바꾸면 모든 사번의 값이 한꺼번에 새로 나온다.
+//        저장된 값이 아니므로 데이터베이스를 건드리지 않는다.
+//        나중에 또 돌리고 싶으면 아래 gen 을 'g3' · 'g4' … 로 올리면 된다.
+//
+//   dna.js 는 손대지 않고 네 함수만 바꿔 끼운다.
+
+window.PREG_RATE = {
+    min:     10,      // 네 값 공통 바닥 (%)
+    sireMax: 35,      // 시키는 쪽 천장
+    bearMax: 30,      // 되는 쪽 천장
+    gen:     'g2'     // ★ 이 글자를 바꾸면 전원 다시 뽑힌다
+};
+
+(function pregRate() {
+
+// dna.js 의 것을 쓰고, 없으면 같은 식을 여기 둔다
+function sOf(str) {
+    if (typeof seedOf === 'function') return seedOf(str);
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+function sRand(seed, n) {
+    if (typeof seedRand === 'function') return seedRand(seed, n);
+    let x = seed + n * 2654435761;
+    x = Math.imul(x ^ (x >>> 15), 2246822507);
+    x = Math.imul(x ^ (x >>> 13), 3266489909);
+    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+// 한 칸까지만 남긴다 — 원래 식과 같다
+function pick(tag, code, n, max) {
+    const R = window.PREG_RATE;
+    const lo = R.min;
+    const hi = Math.max(lo, max);
+    const s = sOf(tag + '|' + R.gen + '|' + code);
+    return Math.round((lo + sRand(s, n) * (hi - lo)) * 10) / 10;
+}
+
+const MADE = {
+    sireRate:    function (u) { return u ? pick('sire',    u.code, 1, window.PREG_RATE.sireMax) : 0; },
+    bearRate:    function (u) { return u ? pick('bear',    u.code, 2, window.PREG_RATE.bearMax) : 0; },
+    sireRateAlt: function (u) { return u ? pick('sireAlt', u.code, 3, window.PREG_RATE.sireMax) : 0; },
+    bearRateAlt: function (u) { return u ? pick('bearAlt', u.code, 4, window.PREG_RATE.bearMax) : 0; }
+};
+
+(function swap() {
+    const iv = setInterval(function () {
+        let ready = 0;
+        Object.keys(MADE).forEach(function (n) { if (typeof window[n] === 'function') ready++; });
+        if (ready < 4) return;
+
+        Object.keys(MADE).forEach(function (n) {
+            if (window[n]._newRate) return;
+            window[n] = MADE[n];
+            window[n]._newRate = true;
+        });
+
+        clearInterval(iv);
+        const R = window.PREG_RATE;
+        console.log('[임신 확률] 바닥 ' + R.min + '% · 시키는 쪽 ~' + R.sireMax
+            + '% · 되는 쪽 ~' + R.bearMax + '% · 세대 ' + R.gen + ' — 전원 다시 뽑음');
+    }, 400);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+//
+// rateState()        내 값과 전 사원 분포
+// rateState('3079')  그 사번의 값
+window.rateState = function (code) {
+    const R = window.PREG_RATE;
+    console.log('%c===== 임신 확률 =====', 'color:#ff8fb1; font-size:13px');
+    console.log('  바닥 ' + R.min + '%  ·  시키는 쪽 ~' + R.sireMax + '%  ·  되는 쪽 ~' + R.bearMax
+        + '%  ·  세대 ' + R.gen);
+
+    const lo = (R.min / 100) * (R.min / 100) * 6 * 100;
+    const hi = (R.sireMax / 100) * (R.bearMax / 100) * 6 * 100;
+    console.log('  실제 성공 확률 ' + lo.toFixed(1) + '% ~ ' + hi.toFixed(1) + '%'
+        + '  (시키는 쪽 × 되는 쪽 × 6)');
+
+    function row(u) {
+        const s = sireRate(u), b = bearRate(u);
+        return {
+            사원: u.name || u.code, 사번: u.no || '-',
+            '시킬 확률': s + '%', '될 확률': b + '%',
+            '맞붙었을 때': ((s / 100) * (b / 100) * 6 * 100).toFixed(1) + '%',
+            '뒤집힐 때 시킬': sireRateAlt(u) + '%', '뒤집힐 때 될': bearRateAlt(u) + '%'
+        };
+    }
+
+    if (code) {
+        const u = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+        if (!u) { console.log('  그 사번을 찾지 못했습니다.'); return; }
+        console.table([row(u)]);
+        return;
+    }
+
+    if (currentUser) { console.log('  — 내 값 —'); console.table([row(currentUser)]); }
+
+    if (typeof db === 'undefined' || !db.users) return;
+    const all = Object.keys(db.users).map(function (c) { return db.users[c]; })
+        .filter(function (u) { return u && u.code; });
+    if (!all.length) return;
+
+    const sr = all.map(sireRate), br = all.map(bearRate);
+    const avg = a => (a.reduce((x, y) => x + y, 0) / a.length).toFixed(1);
+    console.log('  — 전 사원 ' + all.length + '명 —');
+    console.table([
+        { 구분: '시킬 확률', 최소: Math.min.apply(null, sr) + '%',
+          평균: avg(sr) + '%', 최대: Math.max.apply(null, sr) + '%' },
+        { 구분: '될 확률',   최소: Math.min.apply(null, br) + '%',
+          평균: avg(br) + '%', 최대: Math.max.apply(null, br) + '%' }
+    ]);
+    console.log('  다시 뽑으려면 — PREG_RATE.gen 을 \'g3\' 로 고쳐 올린다');
+};
+
+console.log('[임신 확률] rateState()');
+
+})();
+;
+
 // ---------- party-helper.js ----------
 // ==========================================
 // ★ 파티 나가기 고치기 · 헬퍼 참가
@@ -8705,6 +9137,2052 @@ window.fixPotionState = function () {
 };
 
 console.log('[투명] 고정할 효과 고르기 · fixPotionState()');
+
+})();
+;
+
+// ---------- bank-seize.js ----------
+// ==========================================
+// ★ 은행 예금 압수 — 상담사용
+// index.html 에서 bank.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// 금고 압수(adminSeizeSafe)는 users/{사번}/safeBoxes 를 비운다.
+// 은행 예금은 거기가 아니라 bank/{사번}/deposit 에 따로 있어서
+// 금고를 압수해도 그대로 남는다. 그쪽도 가져올 수 있게 한다.
+//
+// 금고 압수와 같은 줄에 버튼이 하나 더 생긴다.
+// 대상은 똑같이 체크한 사원들, 또는 사번 칸에 적은 사람이다.
+
+(function bankSeize() {
+
+function fmt(n) { return (n || 0).toLocaleString(); }
+
+// ==========================================
+// 압수
+// ==========================================
+window.adminSeizeBank = function () {
+    if (typeof getAdminTargets !== 'function') { showCustomAlert('관리 화면에서만 쓸 수 있습니다.'); return; }
+    if (!database) { showCustomAlert('서버에 닿지 못했습니다.'); return; }
+
+    const targets = getAdminTargets();
+    if (targets.length === 0) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+
+    // 먼저 얼마가 있는지 읽어서 보여 준다
+    Promise.all(targets.map(function (code) {
+        return database.ref('bank/' + code).once('value')
+            .then(function (s) { return { code: code, b: s.val() }; })
+            .catch(function () { return { code: code, b: null }; });
+    })).then(function (rows) {
+
+        const has = rows.filter(function (r) { return r.b && (r.b.deposit || 0) > 0; });
+        const none = rows.filter(function (r) { return !r.b || (r.b.deposit || 0) <= 0; });
+
+        if (has.length === 0) {
+            showCustomAlert('예금이 있는 사원이 없습니다.\n\n'
+                + none.map(function (r) {
+                    const u = db.users[r.code];
+                    return (u ? u.name : r.code) + ' — ' + (r.b ? '잔액 0' : '계좌 없음');
+                }).join('\n'));
+            return;
+        }
+
+        const total = has.reduce(function (a, r) { return a + (r.b.deposit || 0); }, 0);
+        const lines = has.map(function (r) {
+            const u = db.users[r.code];
+            const loan = (r.b.loan && r.b.loan.amount) ? '  (대출 ' + fmt(r.b.loan.amount) + ' P 남음)' : '';
+            return '  ' + (u ? u.name : r.code) + ' — ' + fmt(r.b.deposit) + ' P' + loan;
+        });
+
+        const ok = confirm('아래 사원들의 은행 예금을 압수합니다.\n\n'
+            + lines.join('\n')
+            + '\n\n합계 ' + fmt(total) + ' P\n\n되돌릴 수 없습니다. 진행할까요?');
+        if (!ok) return;
+
+        // 하나씩 비운다
+        //
+        // 트랜잭션은 첫 판을 「이 창이 들고 있는 값」으로 돌린다.
+        // 남의 계좌는 리스너가 붙어 있지 않아 그 값이 null 이고,
+        // null 에서 undefined 를 돌려주면 그 자리에서 포기해 버린다.
+        // 그래서 도는 동안만 리스너를 붙여 서버 값을 쥐여 준다.
+        Promise.all(has.map(function (r) {
+            const ref = database.ref('bank/' + r.code);
+            const hold = ref.on('value', function () { });      // 값을 붙잡아 둔다
+
+            return ref.transaction(function (b) {
+                if (b === null) return null;                     // 아직 못 읽었다 — 포기 말고 한 번 더
+                if (!(b.deposit > 0)) return;                    // 그 사이 비었으면 건드리지 않는다
+                b.seized = (b.seized || 0) + b.deposit;          // 얼마를 가져갔는지 남겨 둔다
+                b.seizedAt = Date.now();
+                b.deposit = 0;
+                return b;
+            }).then(function (res) {
+                if (res.committed) {
+                    const v = res.snapshot.val() || {};
+                    return { code: r.code, took: (v.seized || 0) - (r.b.seized || 0), ok: true };
+                }
+                // 트랜잭션이 포기했으면 읽고 바로 쓴다
+                return ref.once('value').then(function (s) {
+                    const b = s.val();
+                    if (!b || !(b.deposit > 0)) return { code: r.code, took: 0, ok: true, empty: true };
+                    const amt = b.deposit;
+                    return ref.update({
+                        deposit: 0,
+                        seized: (b.seized || 0) + amt,
+                        seizedAt: Date.now()
+                    }).then(function () {
+                        return { code: r.code, took: amt, ok: true };
+                    });
+                });
+            }).catch(function (e) {
+                console.error('[은행 압수] ' + r.code, e);
+                return { code: r.code, took: 0, ok: false, why: (e && e.message) || String(e) };
+            }).then(function (x) {
+                try { ref.off('value', hold); } catch (e) { }
+                return x;
+            });
+        })).then(function (out) {
+
+            const done = out.filter(function (x) { return x.ok && x.took > 0; });
+            const fail = out.filter(function (x) { return !x.ok; });
+
+            // 사원 기록에 남긴다
+            done.forEach(function (x) {
+                const u = db.users[x.code];
+                if (!u) return;
+                if (typeof addHistoryLog === 'function') {
+                    addHistoryLog(u, '[당국 압수] 은행 예금 ' + fmt(x.took) + ' P가 압수되었습니다.');
+                }
+                u._adminStamp = Date.now();
+                if (typeof updateUserFields === 'function') {
+                    updateUserFields(x.code, { history: u.history });
+                }
+            });
+
+            if (typeof updateUI === 'function') updateUI();
+            if (typeof renderBank === 'function') { try { renderBank(); } catch (e) { } }
+
+            const got = done.reduce(function (a, x) { return a + x.took; }, 0);
+            showCustomAlert(
+                (done.length
+                    ? '은행 예금을 압수했습니다. (합계 ' + fmt(got) + ' P)\n'
+                      + done.map(function (x) {
+                            const u = db.users[x.code];
+                            return (u ? u.name : x.code) + ' — ' + fmt(x.took) + ' P';
+                        }).join('\n')
+                    : '압수된 금액이 없습니다.')
+                + (none.length ? '\n\n예금 없음: ' + none.map(function (r) {
+                        const u = db.users[r.code]; return u ? u.name : r.code;
+                    }).join(', ') : '')
+                + (fail.length ? '\n\n실패: ' + fail.map(function (x) {
+                        const u = db.users[x.code];
+                        return (u ? u.name : x.code) + (x.why ? ' (' + x.why + ')' : '');
+                    }).join('\n') + '\n\n자세한 내용은 F12 콘솔에 찍혀 있습니다.' : '')
+            );
+        });
+    });
+};
+
+// ==========================================
+// 버튼 — 금고 압수 옆에
+// ==========================================
+(function mount() {
+    const iv = setInterval(function () {
+        if (document.getElementById('adm-seize-bank')) { clearInterval(iv); return; }
+        const safeBtn = document.querySelector('button[onclick="adminSeizeSafe()"]');
+        if (!safeBtn) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'adm-seize-bank';
+        btn.className = 'game-btn';
+        btn.style.cssText = 'flex:1; background:linear-gradient(145deg, #2a4a5a, #182f3a) !important;'
+            + ' border-color:#3a6a7a !important; margin:0;';
+        btn.innerText = '은행 압수';
+        btn.setAttribute('onclick', 'adminSeizeBank()');
+        safeBtn.parentNode.insertBefore(btn, safeBtn.nextSibling);
+
+        clearInterval(iv);
+        console.log('[은행] 예금 압수 버튼 연결');
+    }, 700);
+})();
+
+// ==========================================
+// 확인 — 누가 얼마나 넣어 뒀는지
+// ==========================================
+window.bankAll = function () {
+    if (!database) { console.warn('서버에 닿지 못했습니다.'); return; }
+    database.ref('bank').once('value').then(function (s) {
+        const all = s.val() || {};
+        const rows = Object.keys(all).map(function (c) {
+            const b = all[c] || {};
+            const u = db.users[c];
+            return {
+                사원: u ? u.name : c, 사번: u ? u.no : '-',
+                예금: (b.deposit || 0).toLocaleString(),
+                신용: b.score || 0,
+                대출: b.loan && b.loan.amount ? b.loan.amount.toLocaleString() : '-',
+                거래정지: b.blacklist ? '✗' : '-',
+                압수누적: b.seized ? b.seized.toLocaleString() : '-'
+            };
+        }).sort(function (a, b) {
+            return parseInt(b.예금.replace(/,/g, '')) - parseInt(a.예금.replace(/,/g, ''));
+        });
+        console.log('%c===== 은행 =====', 'color:#4fc3f7; font-size:13px');
+        if (rows.length) console.table(rows); else console.log('  계좌가 없습니다.');
+        const tot = Object.keys(all).reduce(function (a, c) { return a + ((all[c] || {}).deposit || 0); }, 0);
+        console.log('  예금 합계:', tot.toLocaleString(), 'P');
+    }).catch(function (e) { console.error(e); });
+};
+
+console.log('[은행] adminSeizeBank() · bankAll()');
+
+})();
+;
+
+// ---------- epic-hard.js ----------
+// ==========================================
+// ★ epic 어둠 — 난이도 올리기 · 치유 등급 재조정
+// index.html 에서 epic 파일들 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 왜 치유 L 이 긴장감을 없앴나
+//
+//   구제 판정(epicDoomRescue)의 보정은 이렇게 생겼다.
+//       rollDarkBonus + (유대면 +3) + round(gearValue('heal') * 10)
+//
+//   gearValue 는 base 0.25 에 등급 배수를 곱한다. (D 1.0 … S 4.0, L 6.0)
+//   그래서 치유 등급별 보정이 이렇게 된다.
+//
+//       D +3   C +4   B +5   A +7   S +10   L +15
+//
+//   DC 는 13 이다. S 만 돼도 자연 1 말고는 전부 성공한다.
+//   L 의 +15 는 이미 넘치고도 남아서, 올려도 아무 차이가 없었다.
+//
+//       D 65%   C 70%   B 75%   A 85%   S 95%   L 95%
+//
+//   S 와 L 이 같은 95%. 등급을 올릴 이유도, 실패할 걱정도 없었다.
+//
+// ■ 무엇을 바꾸나
+//
+//   1. 모든 판정 DC 를 올린다            (아래 dcAdd)
+//   2. 구제에서 치유 기여를 나눈다        (아래 healDiv)
+//   3. 구제 판정만 DC 를 조금 더 올린다   (아래 rescueDc)
+//   4. 손을 뻗을 수 있는 시간을 줄인다     (아래 doomTime)
+//
+//   바꾼 뒤 구제 성공률은 이렇게 된다.
+//
+//       D 45%   C 50%   B 50%   A 55%   S 60%   L 70%
+//
+//   등급 차이가 그대로 살아 있으면서, L 이라도 열 번에 세 번은 놓친다.
+//
+// ■ 숫자는 아래 EPIC_HARD 에서 바꾼다
+//   콘솔에서 바로 고쳐 시험해 볼 수도 있다.
+//       EPIC_HARD.dcAdd = 5
+//   epicHardState() 로 지금 설정과 성공률 표를 본다.
+
+window.EPIC_HARD = {
+    dcAdd:     3,     // 모든 선택지 DC 에 더한다 (0 이면 그대로)
+    healDiv:   2.5,   // 구제에서 치유 보정을 이 수로 나눈다 (1 이면 그대로)
+    rescueDc:  2,     // 구제 판정에만 더 얹는 DC
+    doomTime:  0.7    // 구제 제한시간 배수 (0.7 이면 70초 → 49초)
+};
+
+(function epicHard() {
+
+const H = window.EPIC_HARD;
+
+// ==========================================
+// 1. 선택지 DC 올리기
+// ==========================================
+//
+// 장면표는 한 번 만들어 두고 계속 쓰는 객체라, 올린 자리에 표시를 남겨
+// 같은 선택지가 두 번 올라가지 않게 한다.
+(function hookPick() {
+    const iv = setInterval(function () {
+        if (typeof epicPick !== 'function') return;
+        if (epicPick._hard) { clearInterval(iv); return; }
+
+        const _p = epicPick;
+        epicPick = function (i) {
+            try {
+                const sc = (typeof er !== 'undefined' && er) ? er._sc : null;
+                const o = sc && sc.opts && sc.opts[i];
+                if (o && !o._hardDc && H.dcAdd) {
+                    o.dc = (o.dc || 11) + H.dcAdd;
+                    o._hardDc = true;
+                }
+            } catch (e) { }
+            return _p.apply(this, arguments);
+        };
+        epicPick._hard = true;
+        clearInterval(iv);
+        console.log('[epic] 선택지 DC +' + H.dcAdd + ' 연결');
+    }, 500);
+})();
+
+// ==========================================
+// 2·3. 구제 판정 — 치유 기여를 줄이고 DC 를 얹는다
+// ==========================================
+//
+// 보정은 함수 안에서 계산돼 밖에서 못 건드린다.
+// 그래서 구제가 도는 동안만 gearValue 와 rollDarkBonus 를 눌러 둔다.
+// DC 를 올리는 대신 보정을 깎는 것이라 결과는 같다.
+let inRescue = false;
+
+(function hookGear() {
+    const iv = setInterval(function () {
+        if (typeof gearValue !== 'function') return;
+        if (gearValue._hard) { clearInterval(iv); return; }
+
+        const _g = gearValue;
+        gearValue = function (user, attr) {
+            const v = _g.apply(this, arguments);
+            if (inRescue && attr === 'heal' && H.healDiv > 1) return v / H.healDiv;
+            return v;
+        };
+        gearValue._hard = true;
+        clearInterval(iv);
+        console.log('[epic] 구제 치유 기여 ÷' + H.healDiv + ' 연결');
+    }, 500);
+})();
+
+(function hookBonus() {
+    const iv = setInterval(function () {
+        if (typeof rollDarkBonus !== 'function') return;
+        if (rollDarkBonus._hard) { clearInterval(iv); return; }
+
+        const _r = rollDarkBonus;
+        rollDarkBonus = function () {
+            const b = _r.apply(this, arguments);
+            if (inRescue && H.rescueDc) return b - H.rescueDc;   // DC 올린 것과 같다
+            return b;
+        };
+        rollDarkBonus._hard = true;
+        clearInterval(iv);
+        console.log('[epic] 구제 DC +' + H.rescueDc + ' 연결');
+    }, 500);
+})();
+
+// 구제가 도는 동안만 표시를 켠다
+(function hookRescue() {
+    const NAMES = ['epicRescue', 'epicDoomRescue'];
+    const iv = setInterval(function () {
+        let left = 0;
+        NAMES.forEach(function (n) {
+            const f = window[n];
+            if (typeof f !== 'function') { left++; return; }
+            if (f._hard) return;
+            const _o = f;
+            window[n] = function () {
+                inRescue = true;
+                try { return _o.apply(this, arguments); }
+                finally {
+                    // epicDoomRescue 는 안쪽이 once().then 이라 조금 더 열어 둔다
+                    setTimeout(function () { inRescue = false; }, 2500);
+                }
+            };
+            window[n]._hard = true;
+        });
+        if (!left) { clearInterval(iv); console.log('[epic] 구제 판정 연결'); }
+    }, 500);
+})();
+
+// ==========================================
+// 4. 손 뻗을 시간 줄이기
+// ==========================================
+(function hookDoom() {
+    const iv = setInterval(function () {
+        if (typeof epicDoom !== 'function') return;
+        if (epicDoom._hard) { clearInterval(iv); return; }
+
+        const _d = epicDoom;
+        epicDoom = function (cfg) {
+            cfg = cfg || {};
+            if (H.doomTime && H.doomTime !== 1) {
+                cfg.sec = Math.max(20, Math.round((cfg.sec || 70) * H.doomTime));
+            }
+            return _d.call(this, cfg);
+        };
+        epicDoom._hard = true;
+        clearInterval(iv);
+        console.log('[epic] 구제 제한시간 ×' + H.doomTime + ' 연결');
+    }, 500);
+})();
+
+// ==========================================
+// 확인 — 지금 설정과 성공률
+// ==========================================
+window.epicHardState = function () {
+    const MULT = { D: 1.0, C: 1.5, B: 2.0, A: 2.8, S: 4.0, L: 6.0 };
+    const BASE = 0.25;
+    const DC = 13;
+    const ETC = 2;                        // rollDarkBonus 평균치로 잡은 값
+
+    function pct(bonus, dc) {
+        const need = dc - bonus;          // 이 눈 이상이면 성공
+        const lo = Math.max(2, need);     // 자연 1 은 무조건 실패
+        return Math.max(0, Math.min(20, 21 - lo)) / 20 * 100;
+    }
+
+    const rows = Object.keys(MULT).map(function (g) {
+        const raw = BASE * MULT[g];
+        const before = Math.round(raw * 10) + ETC;
+        const after = Math.round(raw / (H.healDiv > 1 ? H.healDiv : 1) * 10) + ETC - H.rescueDc;
+        return {
+            '치유 등급': g,
+            '보정 (전)': '+' + (before - ETC),
+            '보정 (후)': '+' + Math.max(0, after - ETC + H.rescueDc) + ' − ' + H.rescueDc,
+            '성공률 (전)': pct(before, DC).toFixed(0) + '%',
+            '성공률 (후)': pct(after, DC).toFixed(0) + '%'
+        };
+    });
+
+    console.log('%c===== epic 난이도 =====', 'color:#ff6b6b; font-size:13px');
+    console.log('  설정:', JSON.stringify(H));
+    console.log('  선택지 DC: 기본값에 +' + H.dcAdd);
+    console.log('  구제 제한시간: 70초 → ' + Math.max(20, Math.round(70 * H.doomTime)) + '초');
+    console.log('');
+    console.log('  구제 판정 (DC ' + DC + ', 기타 보정 +' + ETC + ' 가정)');
+    console.table(rows);
+    console.log('  연결 — 선택지:', (typeof epicPick === 'function' && epicPick._hard) ? 'O' : '✗',
+        '· 치유:', (typeof gearValue === 'function' && gearValue._hard) ? 'O' : '✗',
+        '· 보정:', (typeof rollDarkBonus === 'function' && rollDarkBonus._hard) ? 'O' : '✗',
+        '· 구제:', (typeof epicDoomRescue === 'function' && epicDoomRescue._hard) ? 'O' : '✗',
+        '· 시간:', (typeof epicDoom === 'function' && epicDoom._hard) ? 'O' : '✗');
+    console.log('  숫자를 바꾸려면 — EPIC_HARD.dcAdd = 5  처럼 고치고 다시 보세요.');
+};
+
+console.log('[epic] 난이도 조정 — epicHardState()');
+
+})();
+;
+
+// ---------- dark-items.js ----------
+// ==========================================
+// ★ 탐사 중 소지품 열기
+// index.html 에서 fix1002.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 무엇이 문제였나
+//
+//   「읽어 준 목소리」는 이렇게 생겼다. (newitems.js:428)
+//       if (!darkRun || darkRun.zone !== 'Qtrew-S-003') {
+//           showCustomAlert('동화의 뒷면에서만 쓸 수 있습니다.'); return;
+//       }
+//   탐사 중에, 그것도 S-003 안에서만 쓸 수 있다.
+//
+//   그런데 탐사가 시작되면 #dark-run-overlay 가 화면을 통째로 덮는다.
+//   그 안에 있는 버튼은 ↻(다시 맞춤)와 🔊(소리) 둘뿐이다.
+//   소지품을 열 방법이 없다. 즉 이 아이템은 쓸 수가 없었다.
+//
+//   같은 이유로 「납작한 돌」(c_stone)과 「빵조각」(q_crumb)도 못 썼다.
+//
+// ■ 어떻게 고치나
+//
+//   탐사 화면 위쪽에 🎒 버튼을 하나 붙인다.
+//   누르면 지금 쓸 수 있는 소모품만 추려 보여 주고, 고르면 바로 쓴다.
+//   장비나 물약처럼 탐사와 상관없는 것은 올라오지 않는다.
+
+(function darkItems() {
+
+// 탐사 중에 의미가 있는 것만 추린다
+function usableNow(name) {
+    const cat = (typeof ITEM_CATALOG !== 'undefined') && ITEM_CATALOG[name];
+    if (!cat || cat.usable === false) return false;
+    const e = String(cat.effect || '');
+    if (!e || e.indexOf('equip') === 0) return false;
+    // ??? 상점 소모품과 구역 전용품
+    return cat.qShop === true
+        || /^q_/.test(e) || /^s3_/.test(e) || /^s003_/.test(e) || /^c_/.test(e);
+}
+
+// 이 구역에서 쓸 수 있는가
+function zoneOk(name) {
+    const cat = ITEM_CATALOG[name] || {};
+    if (cat.effect === 's3_voice') return darkRun && darkRun.zone === 'Qtrew-S-003';
+    return true;
+}
+
+function listMine() {
+    const inv = (currentUser && currentUser.inventory) || [];
+    const cnt = {};
+    inv.forEach(function (n) { if (usableNow(n)) cnt[n] = (cnt[n] || 0) + 1; });
+    return Object.keys(cnt).sort().map(function (n) {
+        return { name: n, n: cnt[n], ok: zoneOk(n), desc: (ITEM_CATALOG[n] || {}).desc || '' };
+    });
+}
+
+window.closeDarkItems = function () {
+    const el = document.getElementById('dark-item-overlay');
+    if (el) el.remove();
+};
+
+window.useDarkItem = function (name) {
+    closeDarkItems();
+    if (typeof useInventoryItem === 'function') useInventoryItem(name);
+};
+
+window.openDarkItems = function () {
+    if (!darkRun) { showCustomAlert('탐사 중에만 열 수 있습니다.'); return; }
+    closeDarkItems();
+
+    const rows = listMine();
+    const body = rows.length
+        ? rows.map(function (r) {
+            const dim = r.ok ? '' : ' opacity:0.4;';
+            const click = r.ok ? ' onclick="useDarkItem(\'' + r.name.replace(/'/g, "\\'") + '\')"' : '';
+            return '<div style="border:1px solid #2a2a2a; border-radius:6px; padding:11px 12px; margin-bottom:7px;'
+                + ' background:rgba(0,0,0,0.3);' + dim + (r.ok ? ' cursor:pointer;' : '') + '"' + click + '>'
+                + '<div style="font-size:12px; font-weight:bold; color:' + (r.ok ? '#4fc3f7' : '#777') + ';">'
+                + r.name + (r.n > 1 ? ' <span style="color:#888; font-size:10px;">×' + r.n + '</span>' : '') + '</div>'
+                + '<div style="font-size:10px; color:#999; margin-top:4px; line-height:1.6;">' + r.desc + '</div>'
+                + (r.ok ? '' : '<div style="font-size:10px; color:#ff8a65; margin-top:4px;">이 구역에서는 쓸 수 없습니다.</div>')
+                + '</div>';
+        }).join('')
+        : '<div style="color:#777; font-size:12px; text-align:center; padding:28px 0;">'
+          + '지금 쓸 수 있는 소모품이 없습니다.</div>';
+
+    const el = document.createElement('div');
+    el.id = 'dark-item-overlay';
+    el.style.cssText = 'position:fixed; inset:0; z-index:9999999; background:rgba(0,0,0,0.88);'
+        + ' display:flex; align-items:center; justify-content:center; padding:18px;';
+    el.innerHTML =
+        '<div style="width:100%; max-width:400px; max-height:78vh; overflow-y:auto;'
+        + ' background:#0d0d0d; border:1px solid #2f5f7f; border-radius:8px; padding:16px;">'
+        + '<div style="font-size:13px; font-weight:bold; color:#4fc3f7; margin-bottom:4px;">소지품</div>'
+        + '<div style="font-size:10px; color:#888; margin-bottom:13px; line-height:1.6;">'
+        + '탐사 중에 쓸 수 있는 것만 보입니다. 누르면 바로 씁니다.</div>'
+        + body
+        + '<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px; font-size:11px;"'
+        + ' onclick="closeDarkItems()">닫는다</button>'
+        + '</div>';
+    document.body.appendChild(el);
+};
+
+// ==========================================
+// 탐사 화면 위쪽에 버튼 붙이기
+// ==========================================
+(function mount() {
+    setInterval(function () {
+        const ov = document.getElementById('dark-run-overlay');
+        if (!ov || ov.style.display === 'none') return;
+        if (document.getElementById('dark-item-btn')) return;
+
+        const mute = document.getElementById('dark-mute-btn');
+        if (!mute) return;
+
+        const b = document.createElement('button');
+        b.id = 'dark-item-btn';
+        b.style.cssText = 'background:none; border:1px solid #333; color:#888; font-size:12px;'
+            + ' padding:4px 8px; border-radius:4px; cursor:pointer;';
+        b.innerText = '🎒';
+        b.setAttribute('onclick', 'openDarkItems()');
+        mute.parentNode.insertBefore(b, mute);
+        console.log('[어둠] 소지품 버튼 연결');
+    }, 1200);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.darkItemState = function () {
+    if (!darkRun) { console.log('탐사 중이 아닙니다.'); return; }
+    const rows = listMine();
+    console.log('%c===== 지금 쓸 수 있는 소모품 =====', 'color:#4fc3f7; font-size:13px');
+    if (!rows.length) { console.log('  없습니다.'); return; }
+    console.table(rows.map(function (r) {
+        return { 이름: r.name, 개수: r.n, '이 구역에서': r.ok ? 'O' : '✗',
+                 효과: (ITEM_CATALOG[r.name] || {}).effect };
+    }));
+};
+
+console.log('[어둠] 탐사 중 소지품 — openDarkItems() · darkItemState()');
+
+})();
+;
+
+// ---------- zone-hard.js ----------
+// ==========================================
+// ★ S-003 · S-010 난이도 올리기
+// index.html 에서 s003.js · itemfix.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 생환률이 높았던 진짜 이유
+//
+//   두 구역은 「압력계」로 사람을 몰아붙인다.
+//     S-003 이해도(lore) 80 에 닿으면 동화됨
+//     S-010 감염도(infect) 100 에 닿으면 끝
+//
+//   그런데 그 압력계를 전용 장비가 거의 무력화한다.
+//
+//   addInfect 는 이렇게 깎는다.      amount × (1 − heal × 0.6)
+//       D 85%   C 78%   B 70%   A 58%   S 40%   L 10%
+//   치유 L 이면 감염도가 10분의 1 로만 오른다. 사실상 안 오른다.
+//
+//   addLore 는 이렇게 깎는다.        amount × (1 − gaze × 0.04)
+//       D 88%   C 80%   B 76%   A 68%   S 52%   L 28%
+//   응시 L 이면 이해도가 4분의 1 로만 오른다.
+//
+//   DC 도 완만하다. s003DC = base+6, s010DC = base+5.
+//
+// ■ 무엇을 바꾸나
+//
+//   1. 두 구역의 DC 를 올린다               (s003Dc · s010Dc)
+//   2. 압력계가 차는 속도를 올린다           (loreUp · infectUp)
+//   3. 치유·응시의 감쇄를 절반으로 줄인다     (healDiv · gazeDiv)
+//
+//   기본값으로 치유 L 의 감염 흡수는 10% → 77% 가 된다. 7.7배다.
+//   장비가 없는 사원은 100% → 140% 로 1.4배. 장비가 셀수록 더 세게 맞는다.
+//
+// ■ 숫자는 아래 ZONE_HARD 에서 바꾼다
+//   콘솔에서 바로 고쳐 시험할 수 있다.   ZONE_HARD.infectUp = 2
+//   zoneHardState() 로 지금 설정과 표를 본다.
+
+window.ZONE_HARD = {
+    s003Dc:   3,    // s003DC 에 더한다 (지금 base+6 → base+9)
+    s010Dc:   3,    // s010DC 에 더한다 (지금 base+5 → base+8)
+    loreUp:   1.4,  // 이해도 상승 배수
+    infectUp: 1.4,  // 감염도 상승 배수
+    healDiv:  2,    // 감염 감쇄에 쓰이는 치유값을 이 수로 나눈다
+    gazeDiv:  2     // 이해도 감쇄에 쓰이는 응시값을 이 수로 나눈다
+};
+
+(function zoneHard() {
+
+const Z = window.ZONE_HARD;
+
+// ==========================================
+// 1. DC
+// ==========================================
+(function hookDC() {
+    const names = [['s003DC', 's003Dc'], ['s010DC', 's010Dc']];
+    const iv = setInterval(function () {
+        let left = 0;
+        names.forEach(function (p) {
+            const fn = window[p[0]];
+            if (typeof fn !== 'function') { left++; return; }
+            if (fn._hard) return;
+            const _o = fn;
+            window[p[0]] = function (base) {
+                return _o.apply(this, arguments) + (Z[p[1]] || 0);
+            };
+            window[p[0]]._hard = true;
+            console.log('[구역] ' + p[0] + ' +' + Z[p[1]] + ' 연결');
+        });
+        if (!left) clearInterval(iv);
+    }, 500);
+})();
+
+// ==========================================
+// 2·3. 압력계 — 더 빨리 차고, 장비가 덜 막는다
+// ==========================================
+//
+// 감쇄 식은 함수 안에 있어 밖에서 못 건드린다.
+// 그래서 그 함수가 도는 동안만 gearValue 를 눌러 둔다.
+//   addInfect 는 (1 − heal×0.6) 을 쓰므로 heal 을 절반으로 주면
+//   (1 − heal×0.3) 과 같아진다.
+let inInfect = false, inLore = false;
+
+(function hookGear() {
+    const iv = setInterval(function () {
+        if (typeof gearValue !== 'function') return;
+        if (gearValue._zone) { clearInterval(iv); return; }
+
+        const _g = gearValue;
+        gearValue = function (user, attr) {
+            const v = _g.apply(this, arguments);
+            if (inInfect && attr === 'heal' && Z.healDiv > 1) return v / Z.healDiv;
+            if (inLore && attr === 'gaze' && Z.gazeDiv > 1) return v / Z.gazeDiv;
+            return v;
+        };
+        gearValue._zone = true;
+        clearInterval(iv);
+        console.log('[구역] 치유 ÷' + Z.healDiv + ' · 응시 ÷' + Z.gazeDiv + ' 연결');
+    }, 500);
+})();
+
+(function hookInfect() {
+    const iv = setInterval(function () {
+        if (typeof addInfect !== 'function') return;
+        if (addInfect._zone) { clearInterval(iv); return; }
+
+        const _a = addInfect;
+        addInfect = function (amount, reason) {
+            if (amount > 0 && Z.infectUp && Z.infectUp !== 1) {
+                amount = Math.max(1, Math.round(amount * Z.infectUp));
+            }
+            inInfect = true;
+            try { return _a.call(this, amount, reason); }
+            finally { inInfect = false; }
+        };
+        addInfect._zone = true;
+        clearInterval(iv);
+        console.log('[구역] 감염도 ×' + Z.infectUp + ' 연결');
+    }, 500);
+})();
+
+(function hookLore() {
+    const iv = setInterval(function () {
+        if (typeof addLore !== 'function') return;
+        if (addLore._zone) { clearInterval(iv); return; }
+
+        const _a = addLore;
+        addLore = function (amount, reason) {
+            if (amount > 0 && Z.loreUp && Z.loreUp !== 1) {
+                amount = Math.max(1, Math.round(amount * Z.loreUp));
+            }
+            inLore = true;
+            try { return _a.call(this, amount, reason); }
+            finally { inLore = false; }
+        };
+        addLore._zone = true;
+        clearInterval(iv);
+        console.log('[구역] 이해도 ×' + Z.loreUp + ' 연결');
+    }, 500);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.zoneHardState = function () {
+    const M = { D: 1.0, C: 1.5, B: 2.0, A: 2.8, S: 4.0, L: 6.0 };
+
+    const inf = Object.keys(M).map(function (g) {
+        const h = 0.25 * M[g];
+        const before = (1 - h * 0.6);
+        const after = (1 - h * 0.6 / Z.healDiv) * Z.infectUp;
+        return {
+            '치유': g,
+            '전 — 들어가는 감염': (before * 100).toFixed(0) + '%',
+            '후 — 들어가는 감염': (after * 100).toFixed(0) + '%',
+            '배': (after / Math.max(0.01, before)).toFixed(1) + '배'
+        };
+    });
+
+    const lore = Object.keys(M).map(function (g) {
+        const v = Math.round(3 * M[g]);
+        const before = (1 - v * 0.04);
+        const after = (1 - v * 0.04 / Z.gazeDiv) * Z.loreUp;
+        return {
+            '응시': g,
+            '전 — 들어가는 이해도': (before * 100).toFixed(0) + '%',
+            '후 — 들어가는 이해도': (after * 100).toFixed(0) + '%',
+            '배': (after / Math.max(0.01, before)).toFixed(1) + '배'
+        };
+    });
+
+    console.log('%c===== S-003 · S-010 난이도 =====', 'color:#ff6b6b; font-size:13px');
+    console.log('  설정:', JSON.stringify(Z));
+    console.log('  S-003 DC: base+6 → base+' + (6 + Z.s003Dc) + '   ·   S-010 DC: base+5 → base+' + (5 + Z.s010Dc));
+    console.log('');
+    console.log('  S-010 감염도 (100 에 닿으면 끝)');
+    console.table(inf);
+    console.log('  S-003 이해도 (80 에 닿으면 동화됨)');
+    console.table(lore);
+    console.log('  연결 — s003DC:', (typeof s003DC === 'function' && s003DC._hard) ? 'O' : '✗',
+        '· s010DC:', (typeof s010DC === 'function' && s010DC._hard) ? 'O' : '✗',
+        '· 감염:', (typeof addInfect === 'function' && addInfect._zone) ? 'O' : '✗',
+        '· 이해도:', (typeof addLore === 'function' && addLore._zone) ? 'O' : '✗',
+        '· 장비:', (typeof gearValue === 'function' && gearValue._zone) ? 'O' : '✗');
+    console.log('  숫자를 바꾸려면 — ZONE_HARD.infectUp = 2  처럼 고치고 다시 보세요.');
+};
+
+console.log('[구역] S-003 · S-010 난이도 조정 — zoneHardState()');
+
+})();
+;
+
+// ---------- titles.js ----------
+// ==========================================
+// ★ 칭호 시스템
+// index.html 에서 맨 뒤(save-merge.js 앞)에 불러온다
+// ==========================================
+//
+// 칭호 15종은 조건을 채우면 저절로 붙는다. 부가 기능은 없다.
+// 상담사가 손으로 붙이는 칭호 3종은 따로 있다.
+//
+// ■ 세는 시점
+//   누적 횟수를 세는 칭호들은 「이 파일이 올라간 날」부터 센다.
+//   지난 기록은 어디에도 남아 있지 않아 거슬러 셀 수 없다.
+//   처음 들어온 사원은 그 자리에서 0 부터 시작한다.
+//
+// ■ 저장되는 자리
+//   currentUser.ti        누적 횟수 묶음
+//   currentUser.titles    저절로 얻은 칭호
+//   currentUser.titleAdmin 상담사가 붙인 칭호
+//
+// ■ 보는 곳
+//   사원증 화면 위쪽에 줄이 하나 생긴다.
+//   콘솔에서는 myTitles() · titleProgress()
+
+(function titles() {
+
+const HOUR = 3600 * 1000, DAY = 24 * HOUR;
+
+// ==========================================
+// 칭호 표
+// ==========================================
+//
+// need 는 화면에 보여 줄 조건 글이고, check 가 실제 판정이다.
+const DEFS = [
+    { id:'saint',   n:'성자',        need:'구출 200회',
+      check:(u,s)=> s.resc >= 200 },
+
+    { id:'collect', n:'콜렉터',      need:'우주 쇼핑몰 물품 전부 보유 (상담사 전용 제외)',
+      check:(u)=> poolSettled && allOwned(u, alienPool()) },
+
+    { id:'spy',     n:'스파이',      need:'반대 소속 물품 전부 보유',
+      check:(u)=> { if (!poolSettled) return false;
+                    const o = otherSideItems(u); return o.length > 0 && allOwned(u, o); } },
+
+    { id:'mola',    n:'개복치',      need:'어둠에서 50번 사망',
+      check:(u,s)=> s.dead >= 50 },
+
+    { id:'tamer',   n:'조련사',      need:'펫 전부 보유',
+      check:(u)=> petsAllOwned(u) },            // 펫 시스템이 생기면 켜진다
+
+    { id:'weapon',  n:'웨폰 마스터', need:'전용 장비 세 자리 전부 L',
+      check:(u)=> allAttrsL(u) },
+
+    { id:'virile',  n:'정력왕',      need:'임신시킨 횟수 500',
+      check:(u,s)=> s.sire >= 500 },
+
+    { id:'fertile', n:'다산왕',      need:'임신한 횟수 500',
+      check:(u,s)=> s.bear >= 500 },
+
+    { id:'lucky',   n:'럭키',        need:'주사위 15 이상 100회',
+      check:(u,s)=> s.d15 >= 100 },
+
+    { id:'breaker', n:'파괴왕',      need:'기믹 파훼 300회',
+      check:(u,s)=> s.smash >= 300 },
+
+    { id:'helper',  n:'도우미',      need:'헬퍼로 100회 동행',
+      check:(u,s)=> s.help >= 100 },
+
+    { id:'pure',    n:'순수',        need:'10일간 오염도 100 미도달',
+      check:(u,s)=> s.pureFrom > 0 && Date.now() - s.pureFrom >= 10 * DAY },
+
+    { id:'health',  n:'건강',        need:'10일간 포만도 0 미도달',
+      check:(u,s)=> s.healthFrom > 0 && Date.now() - s.healthFrom >= 10 * DAY },
+
+    { id:'exorc',   n:'퇴마',        need:'작두·버터 나이프로 파훼 250회',
+      check:(u,s)=> s.exor >= 250 },
+
+    { id:'gold',    n:'金緞',        need:'은행 VIP 승인 (2급 보안 인가와 다름)',
+      check:(u)=> isVip(u) }
+];
+
+// 상담사가 손으로 붙이는 것
+const ADMIN_TITLES = ['또류', '신입', '고인물'];
+
+// ==========================================
+// 조건 판정에 쓰는 것들
+// ==========================================
+function owned(u) {
+    const m = {};
+    (u.inventory || []).forEach(function (n) { m[n] = true; });
+    (u.equippedWeapons || []).forEach(function (w) {
+        m[(typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w] = true;
+    });
+    return m;
+}
+function allOwned(u, list) {
+    if (!list || !list.length) return false;
+    const m = owned(u);
+    return list.every(function (n) { return m[n]; });
+}
+// ==========================================
+// 콜렉터 — 상담사 전용만 뺀다
+// ==========================================
+//
+// 아무에게도 진열되지 않는 것은 두 가지뿐이다. (index.html:9076·9153)
+//     여우구슬 · 금고   →  상담사(kario0987) 에게만 나온다
+// 이 둘은 평사원이 손에 넣을 길이 없으므로 셈에서 뺀다.
+//
+// 소속·직급·팀으로 막히는 것들(작두 · 버터 나이프 · 은반지 · 노스텔지어 끈 …)은
+// 그대로 센다. 진열이 안 되더라도 선물이나 거래로 넘겨받을 수 있고,
+// 사원마다 분모가 달라지는 것도 피한다.
+//
+// ITEM_CATALOG 에 없는 이름은 진열 단계에서 그냥 지워지므로 (index.html:9165)
+// 영원히 가질 수 없다. 그것만 함께 뺀다.
+const ADMIN_ONLY = ['여우구슬', '금고'];
+
+// 진열 확률이 0.1% 라 사실상 막혀 있는 것 (newitems2.js RARE_RATE)
+const TOO_RARE = ['황룡의 눈', '산군의 도움'];
+
+// 풀은 여러 파일이 나눠서 채운다. (newitems · newitems2 · sapphire · skin …)
+// 다 차기 전에 세면 적게 세어 그냥 칭호를 줘 버리므로, 멈춘 뒤에 센다.
+let poolSettled = false;
+(function settle() {
+    let last = -1, same = 0;
+    const iv = setInterval(function () {
+        const n = (typeof ALIEN_ITEMS_POOL !== 'undefined') ? ALIEN_ITEMS_POOL.length : -1;
+        if (n === last) same++; else { last = n; same = 0; }
+        if (n > 0 && same >= 5) {            // 6초쯤 변동이 없으면 다 찬 것으로 본다
+            poolSettled = true;
+            clearInterval(iv);
+            check();
+        }
+    }, 1200);
+})();
+
+let poolCache = null, poolKey = 0;
+function alienPool() {
+    if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
+    if (poolKey === ALIEN_ITEMS_POOL.length && poolCache) return poolCache.slice();
+
+    const out = ALIEN_ITEMS_POOL.filter(function (n) {
+        if (ADMIN_ONLY.indexOf(n) >= 0) return false;
+        if (TOO_RARE.indexOf(n) >= 0) return false;
+        if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[n]) return false;
+        return true;
+    });
+
+    poolKey = ALIEN_ITEMS_POOL.length;
+    poolCache = out;
+    const cut = ALIEN_ITEMS_POOL.length - out.length;
+    console.log('[칭호] 콜렉터 — ' + out.length + '종'
+        + (cut > 0 ? ' (목록 ' + ALIEN_ITEMS_POOL.length + '종 중 상담사 전용·극희귀·진열 불가 '
+                     + cut + '종 제외)' : ''));
+    return out.slice();
+}
+
+// 반대 소속 물품 — EQUIP_AFFIL 에 적힌 소속이 내 쪽이 아닌 것
+//
+// 콜렉터와 같은 이유로 극희귀품과 상담사 전용은 뺀다.
+// 하나라도 못 구하는 것이 섞이면 칭호 자체가 막힌다.
+function otherSideItems(u) {
+    if (typeof EQUIP_AFFIL === 'undefined') return [];
+    const where = (u.affiliation || '') + ' ' + (u.team || '');
+    const out = [];
+    Object.keys(EQUIP_AFFIL).forEach(function (n) {
+        const need = EQUIP_AFFIL[n];
+        if (!need) return;
+        if (TOO_RARE.indexOf(n) >= 0) return;
+        if (ADMIN_ONLY.indexOf(n) >= 0) return;
+        if (where.indexOf(need) < 0) out.push(n);   // 내가 못 쓰는 쪽 = 반대 소속
+    });
+    return out;
+}
+
+// ==========================================
+// 웨폰 마스터 — 세 자리가 다 L 이어야 한다
+// ==========================================
+//
+// 전용 장비는 자리가 셋까지 열린다. (thirdslot.js)
+// 첫 자리의 등급은 본체 등급(g.grade)이고, 둘째·셋째는 g.attrGrades 에 따로 있다.
+// gearAttrGrade 가 그 규칙을 담고 있지만 dark.js 안쪽에 있어 밖에서 안 닿을 수도 있어서
+// 같은 식을 여기에 둔다.
+//
+// 전에는 첫 자리를 두 번 셌다. (gearAttrGrade 가 이미 본체 등급을 돌려주는데
+// 거기에 g.grade === 'L' 을 또 더했다.) 분모도 열린 자리 수에 맞춰 움직여서
+// 한 자리만 열어 둔 사람은 2/2 가 되어 그 자리에서 칭호를 받아 버렸다.
+const GEAR_SLOTS = 3;
+
+function attrGradeOf(g, attr) {
+    if (!g || !g.attrs) return 'D';
+    const i = g.attrs.indexOf(attr);
+    if (i <= 0) return g.grade;                       // 첫 자리는 본체 등급
+    return (g.attrGrades && g.attrGrades[attr]) || 'D';
+}
+
+function gearOf(u) {
+    return (u && u.soulGear) ? u.soulGear : null;
+}
+
+// 지금 L 인 자리가 몇 개인가
+function lSlots(u) {
+    const g = gearOf(u);
+    if (!g || !Array.isArray(g.attrs)) return 0;
+    return g.attrs.filter(function (a) { return attrGradeOf(g, a) === 'L'; }).length;
+}
+
+function allAttrsL(u) {
+    const g = gearOf(u);
+    if (!g || !Array.isArray(g.attrs)) return false;
+    if (g.attrs.length < GEAR_SLOTS) return false;    // 자리를 다 열지 않았으면 아직이다
+    return lSlots(u) >= GEAR_SLOTS;
+}
+
+// ==========================================
+// 金緞 — 은행 VIP
+// ==========================================
+//
+// 전에는 u.hasVIP 를 먼저 봤다. 그것은 2급 보안 인가(VIP 라운지 출입증)이고
+// 은행과 아무 상관이 없다. 당국이 손으로 발급하는 것이다. (index.html:6989)
+// 그래서 은행 등급이 1등급이든 계좌가 아예 없든 칭호가 붙었다.
+//
+// 그리고 bankGrade() 는 등급 「객체」를 돌려준다. 'VIP' 와 비교하면
+// 영원히 거짓이라 뒤의 줄은 애초에 돌지 않았다.
+//
+// 은행 VIP 는 bank/{사번}.vip 에 승인 기록이 붙은 상태다. (bank.js:663)
+// 블랙리스트에 오르면 그 자리가 지워진다. (bank.js:129)
+const vipSeen = {};        // 사번 → true / false
+
+function isVip(u) {
+    if (!u) return false;
+    try {
+        if (typeof bankState !== 'undefined' && bankState
+            && currentUser && u.code === currentUser.code) {
+            return !!(bankState.vip && !bankState.blacklist);
+        }
+    } catch (e) { }
+    return vipSeen[u.code] === true;
+}
+
+// 은행 화면을 한 번도 열지 않아도 판정이 돌게, 내 계좌를 따로 지켜본다
+(function watchBank() {
+    let key = null;
+    setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        if (!currentUser) return;
+        if (key === currentUser.code) return;
+        key = currentUser.code;
+        database.ref('bank/' + key).on('value', function (s) {
+            const b = s.val();
+            vipSeen[key] = !!(b && b.vip && !b.blacklist);
+            repair();          // 잘못 붙은 것을 떼어 낸다 (딱 한 번)
+            check();
+        });
+    }, 1500);
+})();
+
+// ==========================================
+// 잘못 붙은 칭호 회수
+// ==========================================
+//
+// 위의 두 가지는 조건이 틀려 있었으므로 이미 받아 간 사람이 있다.
+// 지금 조건으로 다시 재어 보고 아니면 뗀다.
+// 계좌를 읽은 뒤에 한 번만 돈다. 먼저 돌면 VIP 인 사람을 잘못 뗀다.
+// 누적 횟수로 받는 칭호(구출·사망 …)는 건드리지 않는다.
+let repaired = false;
+function repair() {
+    if (repaired || !currentUser) return;
+    if (!Array.isArray(currentUser.titles)) return;   // 아직 안 읽혔으면 다음 기회에
+    repaired = true;
+
+    const take = [];
+    [['gold', isVip], ['weapon', allAttrsL]].forEach(function (p) {
+        const i = currentUser.titles.indexOf(p[0]);
+        if (i < 0) return;
+        let ok = false;
+        try { ok = !!p[1](currentUser); } catch (e) { ok = false; }
+        if (!ok) { currentUser.titles.splice(i, 1); take.push(p[0]); }
+    });
+    if (!take.length) return;
+
+    const names = take.map(function (id) {
+        const d = DEFS.filter(function (x) { return x.id === id; })[0];
+        return d ? d.n : id;
+    });
+    // 떼어 낸 것을 달고 있었다면 벗긴다
+    const f = { titles:1 };
+    if (currentUser.titleOn && names.indexOf(currentUser.titleOn) >= 0) {
+        currentUser.titleOn = '';
+        f.titleOn = 1;
+    }
+    save(f);
+    paint();
+    console.log('[칭호] 조건이 맞지 않아 회수 — ' + names.join(', '));
+}
+
+// 펫 시스템이 아직 없으면 항상 거짓
+function petsAllOwned(u) {
+    if (typeof PET_SPECIES === 'undefined') return false;
+    const have = {};
+    (u.pets || []).forEach(function (p) { if (p && p.sp) have[p.sp] = true; });
+    return PET_SPECIES.length > 0 && PET_SPECIES.every(function (s) { return have[s.id || s]; });
+}
+
+// ==========================================
+// 누적 횟수 묶음
+// ==========================================
+function ti(u) {
+    u = u || currentUser;
+    if (!u) return {};
+    if (!u.ti) {
+        u.ti = { resc:0, dead:0, sire:0, bear:0, d15:0, smash:0, help:0, exor:0,
+                 pureFrom:Date.now(), healthFrom:Date.now(), _born:Date.now() };
+        save({ ti:1 });
+        console.log('[칭호] 오늘부터 셉니다.');
+    }
+    if (!u.ti.pureFrom) u.ti.pureFrom = Date.now();
+    if (!u.ti.healthFrom) u.ti.healthFrom = Date.now();
+    return u.ti;
+}
+function save(f) {
+    if (typeof saveFields === 'function') { try { saveFields(f); } catch (e) { } }
+}
+let pending = null;
+function bump(key, n) {
+    if (!currentUser) return;
+    const s = ti(currentUser);
+    s[key] = (s[key] || 0) + (n || 1);
+    // 자잘한 증가를 모아서 한 번에 저장한다
+    if (pending) clearTimeout(pending);
+    pending = setTimeout(function () { pending = null; save({ ti:1 }); check(); }, 4000);
+}
+
+// 남의 누적도 올려야 하는 경우 (임신시킨 쪽)
+function bumpOther(code, key) {
+    if (!database || !code || !db.users[code]) return;
+    const u = db.users[code];
+    if (!u.ti) u.ti = { resc:0, dead:0, sire:0, bear:0, d15:0, smash:0, help:0, exor:0,
+                        pureFrom:Date.now(), healthFrom:Date.now(), _born:Date.now() };
+    u.ti[key] = (u.ti[key] || 0) + 1;
+    if (typeof updateUserFields === 'function') updateUserFields(code, { ti: u.ti });
+}
+
+// ==========================================
+// 칭호 판정 · 지급
+// ==========================================
+let announcing = false;
+function check() {
+    if (!currentUser) return;
+    const s = ti(currentUser);
+    if (!Array.isArray(currentUser.titles)) currentUser.titles = [];
+
+    const got = [];
+    DEFS.forEach(function (d) {
+        if (currentUser.titles.indexOf(d.id) >= 0) return;
+        let ok = false;
+        try { ok = !!d.check(currentUser, s); } catch (e) { ok = false; }
+        if (ok) { currentUser.titles.push(d.id); got.push(d); }
+    });
+    if (!got.length) return;
+
+    save({ titles:1 });
+    if (typeof addHistoryLog === 'function') {
+        got.forEach(function (d) { addHistoryLog(currentUser, '[칭호] ' + d.n + ' 획득'); });
+        save({ history:1 });
+    }
+    paint();
+    announce(got);
+}
+
+function announce(list) {
+    if (announcing) { setTimeout(function () { announce(list); }, 1500); return; }
+    announcing = true;
+    const d = list[0];
+    const rest = list.slice(1);
+    setTimeout(function () {
+        showCustomAlert('[' + d.n + ']\n\n칭호를 얻었습니다.\n\n' + d.need);
+        announcing = false;
+        if (rest.length) announce(rest);
+    }, 400);
+}
+
+// ==========================================
+// 세는 자리들
+// ==========================================
+function hook(name, fn) {
+    const iv = setInterval(function () {
+        const f = window[name];
+        if (typeof f !== 'function') return;
+        if (f._ti) { clearInterval(iv); return; }
+        const _o = f;
+        window[name] = function () { return fn.call(this, _o, arguments); };
+        window[name]._ti = true;
+        clearInterval(iv);
+    }, 600);
+}
+
+// 주사위 15 이상 — 거의 모든 판정이 luckReroll 을 지난다
+hook('luckReroll', function (_o, a) {
+    const r = _o.apply(this, a);
+    if (typeof r === 'number' && r >= 15) bump('d15');
+    return r;
+});
+
+// 어둠 사망
+hook('finishDarkDeath', function (_o, a) {
+    bump('dead');
+    return _o.apply(this, a);
+});
+
+// 구출 — epic 두 가지
+['epicRescue', 'epicDoomRescue'].forEach(function (n) {
+    hook(n, function (_o, a) {
+        const before = (typeof er !== 'undefined' && er) ? (er.helped || 0) : 0;
+        const r = _o.apply(this, a);
+        setTimeout(function () {
+            const after = (typeof er !== 'undefined' && er) ? (er.helped || 0) : before;
+            if (after > before) bump('resc', after - before);
+        }, 2600);
+        return r;
+    });
+});
+
+// 구출 — 은심장·이동장이 세던 자리에 같이 얹는다
+(function watchSaves() {
+    let last = null;
+    setInterval(function () {
+        if (!currentUser) { last = null; return; }
+        const v = currentUser.heartSaves || 0;
+        if (last === null) { last = v; return; }
+        if (v > last) bump('resc', v - last);
+        last = v;
+    }, 3000);
+})();
+
+// 기믹 파훼 — 루비·사인참사검
+hook('rubySmash', function (_o, a) {
+    bump('smash');
+    return _o.apply(this, a);
+});
+
+// 기믹 파훼 — 작두·버터 나이프 (퇴마와 파괴왕 둘 다 센다)
+hook('useJakdu', function (_o, a) {
+    const r = _o.apply(this, a);
+    if (r === true) { bump('exor'); bump('smash'); }
+    return r;
+});
+
+// 헬퍼 동행 — 탐사가 출발할 때 한 번
+hook('launchPartyRun', function (_o, a) {
+    const r = _o.apply(this, a);
+    setTimeout(function () {
+        if (typeof darkRun !== 'undefined' && darkRun && darkRun.helper) bump('help');
+    }, 1500);
+    return r;
+});
+
+// 임신 — 아이를 가진 쪽과 시킨 쪽을 함께 센다
+(function watchPreg() {
+    let last = null;
+    setInterval(function () {
+        if (!currentUser) { last = null; return; }
+        const p = currentUser.preg;
+        const list = (p && p.sires) || [];
+        if (last === null) { last = list.length; return; }
+        if (list.length > last) {
+            const added = list.slice(last);
+            bump('bear', added.length);
+            added.forEach(function (x) { if (x && x.code) bumpOther(x.code, 'sire'); });
+        }
+        last = list.length;
+    }, 4000);
+})();
+
+// 순수 · 건강 — 한 번이라도 닿으면 그날부터 다시 센다
+(function watchClean() {
+    setInterval(function () {
+        if (!currentUser) return;
+        const s = ti(currentUser);
+        let moved = false;
+        if ((currentUser.pollution || 0) >= 100) { s.pureFrom = Date.now(); moved = true; }
+        if ((currentUser.satiety === undefined ? 100 : currentUser.satiety) <= 0) {
+            s.healthFrom = Date.now(); moved = true;
+        }
+        if (moved) save({ ti:1 });
+    }, 60000);
+})();
+
+// 주기 판정 — 보유형 칭호(콜렉터·스파이·웨폰 마스터·VIP)를 위해
+setInterval(function () { if (currentUser) check(); }, 30000);
+
+// ==========================================
+// 사원증에 보이기
+// ==========================================
+// 가지고 있는 칭호 전부
+function myList(u) {
+    u = u || currentUser;
+    if (!u) return [];
+    const auto = (u.titles || []).map(function (id) {
+        const d = DEFS.find(function (x) { return x.id === id; });
+        return d ? d.n : null;
+    }).filter(Boolean);
+    return (u.titleAdmin || []).concat(auto);
+}
+
+// 지금 달고 있는 칭호 하나 — 없으면 null
+//
+// 얻었다고 저절로 달리지 않는다. 가진 것 중에서 직접 고른다.
+// 달아 둔 것을 잃었거나(상담사가 회수) 하면 저절로 떨어진다.
+function worn(u) {
+    u = u || currentUser;
+    if (!u || !u.titleOn) return null;
+    return myList(u).indexOf(u.titleOn) >= 0 ? u.titleOn : null;
+}
+
+// 달기 · 떼기
+window.wearTitle = function (name) {
+    if (!currentUser) return;
+    if (name && myList(currentUser).indexOf(name) < 0) {
+        showCustomAlert('가지고 있지 않은 칭호입니다.'); return;
+    }
+    currentUser.titleOn = (currentUser.titleOn === name) ? null : (name || null);
+    save({ titleOn: 1 });
+    paint();
+    renderTitleList();
+    if (typeof updateUI === 'function') updateUI();
+};
+
+function paint() {
+    const host = document.getElementById('rec-badge');
+    if (!host || !currentUser) return;
+    let box = document.getElementById('title-row');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'title-row';
+        box.style.cssText = 'border:1px solid #2a2a2a; border-radius:6px; padding:9px 11px;'
+            + ' margin-bottom:9px; background:rgba(0,0,0,0.22);';
+        host.insertBefore(box, host.firstChild);
+    }
+    const w = worn(currentUser);
+    const own = myList(currentUser).length;
+    box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
+        + (w
+            ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
+              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
+            : '<div style="font-size:11px; color:#666;">'
+              + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
+              + '</div>')
+        + (own ? '<div style="font-size:10px; color:#777; margin-top:5px;">보유 ' + own + '개</div>' : '');
+}
+setInterval(paint, 2500);
+
+// ==========================================
+// 다른 자리에도 보이기 — 사원 목록 · 파티챗 · 정보 열람
+// ==========================================
+//
+// 세 곳 모두 innerHTML 로 통째로 다시 그린다.
+// 그려진 뒤에 칸을 찾아 붙이고, 같은 칸에 두 번 붙지 않게 표시를 남긴다.
+function tagHtml(u, size) {
+    const n = worn(u);                     // 달고 있는 하나만 보인다
+    if (!n) return '';
+    const s = size || 9;
+    return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
+        + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
+        + n + '</span>';
+}
+
+function after(name, fn) {
+    const iv = setInterval(function () {
+        const f = window[name];
+        if (typeof f !== 'function') return;
+        if (f._tiAfter) { clearInterval(iv); return; }
+        const _o = f;
+        window[name] = function () {
+            const r = _o.apply(this, arguments);
+            try { fn.apply(this, arguments); } catch (e) { }
+            return r;
+        };
+        window[name]._tiAfter = true;
+        clearInterval(iv);
+    }, 600);
+}
+
+// --- 사원 목록 ---
+after('renderEmployeeCards', function () {
+    document.querySelectorAll('.emp-list-card').forEach(function (card) {
+        const t = card.querySelector('.emp-list-title');
+        if (!t || t.dataset.ti) return;
+        const m = (card.getAttribute('onclick') || '').match(/openEmpDetailModal\('([^']+)'\)/);
+        const u = m && db.users[m[1]];
+        t.dataset.ti = '1';
+        if (!u) return;
+        const h = tagHtml(u, 9);
+        if (h) t.insertAdjacentHTML('afterbegin', h + ' ');     // 이름 왼쪽
+    });
+});
+
+// --- 파티챗 ---
+//
+// 줄과 기록이 1:1 로 대응한다 (시스템 줄도 한 칸을 쓴다).
+after('renderChatLog', function () {
+    const msgs = document.querySelectorAll('#pchat-log .pchat-msg');
+    if (!msgs.length || typeof partyChatLog === 'undefined') return;
+    partyChatLog.forEach(function (m, i) {
+        const el = msgs[i];
+        if (!el || !m || m.code === 'SYSTEM') return;
+        const nameEl = el.querySelector('.pchat-name');
+        if (!nameEl || nameEl.dataset.ti) return;
+        nameEl.dataset.ti = '1';
+        const u = db.users[m.code];
+        if (!u) return;
+        const h = tagHtml(u, 8);
+        if (h) nameEl.insertAdjacentHTML('beforebegin', h + ' ');   // 이름 왼쪽
+    });
+});
+
+// --- 정보 열람 (사원 상세) ---
+//
+// 전에는 카드 아래에 따로 상자를 붙였다. 이제 이름 왼쪽에 둔다.
+// 상자에는 보유 개수만 남긴다. 같은 화면에 두 번 쓸 일이 없다.
+after('openEmpDetailModal', function (code) {
+    const box = document.getElementById('emp-detail-card-container');
+    const u = db.users[code];
+    if (!box || !u) return;
+
+    // 이름 왼쪽
+    const nameEl = box.querySelector('.emp-name');
+    if (nameEl && !nameEl.dataset.ti) {
+        nameEl.dataset.ti = '1';
+        const h = tagHtml(u, 10);
+        if (h) nameEl.insertAdjacentHTML('afterbegin', h + ' ');
+    }
+
+    const old = document.getElementById('emp-title-row');
+    if (old) old.remove();
+    const own = myList(u).length;
+    if (!own) return;
+
+    const row = document.createElement('div');
+    row.id = 'emp-title-row';
+    row.style.cssText = 'font-size:10px; color:#777; margin:8px 0 0 0;';
+    row.innerText = '보유 칭호 ' + own + '개'
+        + (worn(u) ? '' : ' · 달고 있지 않습니다.');
+    box.appendChild(row);
+});
+
+// ==========================================
+// 칭호 목록 — 정보 열람에 서브탭 하나
+// ==========================================
+//
+// 15종을 전부 줄 세운다.
+// 얻은 것은 이름이 보이고, 못 얻은 것은 [미획득] 로만 보인다.
+// 줄을 누르면 어떻게 얻는지와 지금 얼마나 왔는지가 펼쳐진다.
+
+// 칭호별 진행도 — [지금, 목표, 꼬리말]
+function prog(d, u, s) {
+    switch (d.id) {
+        case 'saint':   return [s.resc, 200, '회'];
+        case 'mola':    return [s.dead, 50, '회'];
+        case 'virile':  return [s.sire, 500, '회'];
+        case 'fertile': return [s.bear, 500, '회'];
+        case 'lucky':   return [s.d15, 100, '회'];
+        case 'breaker': return [s.smash, 300, '회'];
+        case 'helper':  return [s.help, 100, '회'];
+        case 'exorc':   return [s.exor, 250, '회'];
+        case 'pure':    return [Math.floor((Date.now() - s.pureFrom) / DAY), 10, '일'];
+        case 'health':  return [Math.floor((Date.now() - s.healthFrom) / DAY), 10, '일'];
+        case 'collect': {
+            const pool = alienPool(), m = owned(u);
+            return [pool.filter(function (n) { return m[n]; }).length, pool.length, '종'];
+        }
+        case 'spy': {
+            const o = otherSideItems(u), m = owned(u);
+            return [o.filter(function (n) { return m[n]; }).length, o.length, '종'];
+        }
+        // 분모는 언제나 세 자리다. 자리를 덜 열었어도 목표는 줄지 않는다.
+        case 'weapon':  return [lSlots(u), GEAR_SLOTS, '자리'];
+        case 'gold':    return [isVip(u) ? 1 : 0, 1, ''];
+        case 'tamer':   return [0, 1, ''];
+        default:        return [0, 1, ''];
+    }
+}
+
+window.toggleTitleRow = function (id) {
+    const el = document.getElementById('tdet-' + id);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    document.querySelectorAll('[id^="tdet-"]').forEach(function (x) { x.style.display = 'none'; });
+    el.style.display = open ? 'none' : 'block';
+};
+
+function renderTitleList() {
+    const box = document.getElementById('rec-titles');
+    if (!box || !currentUser) return;
+    const s = ti(currentUser);
+    const have = currentUser.titles || [];
+
+    const rows = DEFS.map(function (d) {
+        const got = have.indexOf(d.id) >= 0;
+        const p = prog(d, currentUser, s);
+        const cur = Math.min(p[0], p[1]);
+        const pctv = p[1] > 0 ? Math.min(100, Math.round(cur / p[1] * 100)) : 0;
+        const dormant = (d.id === 'tamer' && typeof PET_SPECIES === 'undefined');
+        const on = got && currentUser.titleOn === d.n;
+
+        return ''
+          + '<div style="border:1px solid ' + (on ? '#d4af37' : got ? '#6a5a2a' : '#2a2a2a') + '; border-radius:6px;'
+          + ' margin-bottom:7px; background:rgba(0,0,0,' + (got ? '0.3' : '0.18') + ');">'
+          + '<div onclick="toggleTitleRow(\'' + d.id + '\')" style="padding:10px 12px; cursor:pointer;'
+          + ' display:flex; justify-content:space-between; align-items:center; gap:8px;">'
+          + '<span style="font-size:12px; font-weight:bold; color:' + (got ? '#d4af37' : '#666') + ';">['
+          + (got ? d.n : '미획득') + ']</span>'
+          + '<span style="font-size:10px; color:' + (got ? (on ? '#d4af37' : '#81c784') : '#777') + ';">'
+          + (got ? (on ? '◆ 달고 있음' : '보유') : (dormant ? '준비 중' : pctv + '%')) + '</span>'
+          + '</div>'
+          + '<div id="tdet-' + d.id + '" style="display:none; padding:0 12px 11px 12px;'
+          + ' border-top:1px dashed #2f2f2f;">'
+          + '<div style="font-size:11px; color:#bbb; margin:9px 0 7px 0; line-height:1.7;">'
+          + d.need + '</div>'
+          + (dormant
+              ? '<div style="font-size:10px; color:#888;">아직 열리지 않은 칭호입니다.</div>'
+              : '<div style="font-size:10px; color:#888;">'
+                + (got ? '이미 얻었습니다.'
+                       : '지금 ' + cur.toLocaleString() + ' / ' + p[1].toLocaleString() + (p[2] || ''))
+                + '</div>'
+                + (got ? '' :
+                   '<div style="height:5px; background:#1a1a1a; border-radius:3px; margin-top:7px; overflow:hidden;">'
+                   + '<div style="height:100%; width:' + pctv + '%; background:#6a5a2a;"></div></div>'))
+          + (got
+              ? '<button class="game-btn" style="width:100%; margin:9px 0 0 0; padding:9px; font-size:11px;'
+                + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
+                      + ' border-color:#d4af37 !important; color:#fff !important;' : '')
+                + '" onclick="wearTitle(\'' + d.n + '\')">'
+                + (on ? '뗀다' : '단다') + '</button>'
+              : '')
+          + '</div></div>';
+    }).join('');
+
+    const adm = (currentUser.titleAdmin || []);
+    const admHtml = adm.length
+        ? '<div style="margin-top:12px; padding-top:11px; border-top:1px dashed #333;">'
+          + '<div style="font-size:10px; color:#888; margin-bottom:6px;">상담사가 붙여 준 칭호</div>'
+          + adm.map(function (n) {
+                const on = currentUser.titleOn === n;
+                return '<div style="display:flex; justify-content:space-between; align-items:center;'
+                    + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
+                    + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
+                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + n + ']</span>'
+                    + '<button class="game-btn" style="margin:0; padding:6px 12px; font-size:10px;'
+                    + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
+                          + ' border-color:#d4af37 !important; color:#fff !important;' : '')
+                    + '" onclick="wearTitle(\'' + n + '\')">' + (on ? '뗀다' : '단다') + '</button>'
+                    + '</div>';
+            }).join('') + '</div>'
+        : '';
+
+    box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.7;">'
+        + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.<br>'
+        + '<span style="color:#d4af37;">달 수 있는 것은 한 번에 하나뿐입니다.</span> 지금: '
+        + (worn(currentUser) ? '<b style="color:#d4af37;">[' + worn(currentUser) + ']</b>' : '없음')
+        + '</div>'
+        + rows + admHtml;
+}
+
+(function mountTab() {
+    const iv = setInterval(function () {
+        if (document.getElementById('rec-titles')) { clearInterval(iv); return; }
+        const host = document.getElementById('tab-record');
+        const grid = host && host.querySelector('.sub-tabs-grid');
+        if (!grid) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'sub-tab';
+        btn.innerText = '칭호';
+        btn.setAttribute('onclick', "switchRecordSubTab('rec-titles', this); renderTitleList();");
+        grid.appendChild(btn);
+
+        const panel = document.createElement('div');
+        panel.id = 'rec-titles';
+        panel.className = 'sub-panel';
+        host.appendChild(panel);
+
+        clearInterval(iv);
+        console.log('[칭호] 정보 열람에 목록 탭 연결');
+    }, 800);
+})();
+window.renderTitleList = renderTitleList;
+
+// 열려 있는 동안에는 숫자를 갱신한다
+setInterval(function () {
+    const p = document.getElementById('rec-titles');
+    if (p && p.classList.contains('active')) renderTitleList();
+}, 5000);
+
+// ==========================================
+// 상담사 — 손으로 붙이기
+// ==========================================
+window.adminGiveTitle = function (name) {
+    if (typeof getAdminTargets !== 'function') return;
+    const targets = getAdminTargets();
+    if (!targets.length) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+
+    const done = [], off = [];
+    targets.forEach(function (code) {
+        const u = db.users[code];
+        if (!u) return;
+        if (!Array.isArray(u.titleAdmin)) u.titleAdmin = [];
+        const at = u.titleAdmin.indexOf(name);
+        if (at >= 0) { u.titleAdmin.splice(at, 1); off.push(u.name); }   // 다시 누르면 뗀다
+        else { u.titleAdmin.push(name); done.push(u.name); }
+        if (typeof addHistoryLog === 'function') {
+            addHistoryLog(u, '[칭호] ' + (at >= 0 ? name + ' 회수' : name + ' 부여'));
+        }
+        u._adminStamp = Date.now();
+        if (typeof updateUserFields === 'function') {
+            updateUserFields(code, { titleAdmin: u.titleAdmin, history: u.history });
+        }
+    });
+    paint();
+    if (typeof updateUI === 'function') updateUI();
+    showCustomAlert((done.length ? '[' + name + '] 부여 — ' + done.join(', ') : '')
+        + (off.length ? (done.length ? '\n\n' : '') + '[' + name + '] 회수 — ' + off.join(', ') : ''));
+};
+
+(function mountAdmin() {
+    const iv = setInterval(function () {
+        if (document.getElementById('title-admin-row')) { clearInterval(iv); return; }
+        const anchor = document.querySelector('button[onclick="adminSeizeSafe()"]');
+        if (!anchor) return;
+        const row = document.createElement('div');
+        row.id = 'title-admin-row';
+        row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px; align-items:center;';
+        row.innerHTML = '<span style="font-size:10px; color:#888; flex-shrink:0;">칭호</span>'
+            + ADMIN_TITLES.map(function (n) {
+                return '<button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;'
+                    + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
+                    + ' border-color:#7a6a3a !important;" onclick="adminGiveTitle(\'' + n + '\')">'
+                    + n + '</button>';
+            }).join('');
+        const holder = anchor.parentNode;
+        holder.parentNode.insertBefore(row, holder.nextSibling);
+        clearInterval(iv);
+        console.log('[칭호] 상담사 부여 버튼 연결 (같은 칭호를 다시 누르면 회수)');
+    }, 800);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.myTitles = function (code) {
+    const u = code ? db.users[code] : currentUser;
+    if (!u) { console.log('사원을 찾지 못했습니다.'); return; }
+    console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
+    const list = myList(u);
+    const w = worn(u);
+    console.log('  달고 있음:', w ? '[' + w + ']' : '없음');
+    console.log('  보유:', list.length ? list.map(function (n) { return '[' + n + ']'; }).join(' ') : '아직 없습니다.');
+};
+
+window.titleProgress = function () {
+    if (!currentUser) return;
+    const s = ti(currentUser);
+    const rows = DEFS.map(function (d) {
+        let ok = false;
+        try { ok = !!d.check(currentUser, s); } catch (e) { }
+        const have = (currentUser.titles || []).indexOf(d.id) >= 0;
+        // 화면의 칭호 목록과 같은 계산을 쓴다
+        let now = ok ? '충족' : '-';
+        try {
+            const pv = prog(d, currentUser, s);
+            if (pv && pv[1] > 1) now = pv[0] + ' / ' + pv[1] + (pv[2] ? ' ' + pv[2] : '');
+        } catch (e) { }
+        return {
+            칭호: '[' + d.n + ']', 조건: d.need,
+            지금: now,
+            상태: have ? '보유' : (ok ? '곧 지급' : '-')
+        };
+    });
+    console.log('%c===== 칭호 진행 =====', 'color:#d4af37; font-size:13px');
+    console.table(rows);
+    console.log('  세기 시작:', s._born ? new Date(s._born).toLocaleString() : '-');
+    if (currentUser.titleAdmin && currentUser.titleAdmin.length) {
+        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + n + ']'; }).join(' '));
+    }
+};
+
+console.log('[칭호] myTitles() · titleProgress()');
+
+})();
+;
+
+// ---------- quarantine-exit.js ----------
+// ==========================================
+// ★ 정갈한 문패 · 오색 신발끈 — 나올 때 오염도까지
+// index.html 에서 newitems2.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 지금 어떤 상태인가
+//
+//   1. 오색 신발끈(n_lace)은 처리기가 통째로 사라졌다.
+//      newitems2.js 에 아이템 설명(1394행)만 남고 SELF.n_lace 가 없다.
+//      그래서 쓰면 「장착형」으로 흘러가 장비 칸에 꽂힌다.
+//      선녀탕에서 나오지도 않고, 오염도도 그대로다.
+//
+//   2. 정갈한 문패(n_plate)는 같은 객체에 두 번 들어가 있다.
+//      뒤엣것이 이기긴 하는데, 그 saveFields 목록에 badge 가 들어 있어서
+//      badge 가 없는 계정이면 저장이 통째로 터진다.
+//      화면에는 나온 것처럼 보이고 서버에는 안 써진다. 새로고침하면 100 으로 돌아온다.
+//
+//   3. 둘 다 원래 오염도를 안 내려놓는다.
+//      정상 해제(index.html 4938행)는 이렇게 한다.
+//          user.pollution = user.quarantineExitPollution || 0;
+//          user.quarantineExitPollution = 0;
+//          user.lastPollutionTime = now;
+//      그런데 그 블록은 quarantineUntil 이 남아 있을 때만 돈다.
+//      문패가 0 으로 만들어 버리면 그 뒤로 영영 안 돈다.
+//
+// ■ 어떻게 고치나
+//
+//   두 아이템을 여기서 통째로 맡는다. newitems2.js 는 건드리지 않는다.
+//   (SELF 는 IIFE 안이라 밖에서 못 고친다. 그래서 앞에서 가로챈다.)
+//   정상 해제와 똑같이 오염도를 내려놓고, 방도 닫고, 횟수도 깎는다.
+
+(function quarantineExit() {
+
+const MAX_USE = 5;   // 둘 다 다섯 번 쓰면 사라진다
+
+// newitems2.js 의 totalSpend 와 같은 칸(useCnt)을 쓴다
+function spend(name) {
+    if (!currentUser.useCnt) currentUser.useCnt = {};
+    const n = (currentUser.useCnt[name] || 0) + 1;
+    currentUser.useCnt[name] = n;
+    if (n >= MAX_USE) {
+        delete currentUser.useCnt[name];
+        if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, name, 1);
+        // 장착 칸에 잘못 꽂혀 있었다면 같이 뺀다
+        const eq = currentUser.equippedWeapons || [];
+        const i = eq.findIndex(function (w) {
+            return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === name;
+        });
+        if (i >= 0) eq.splice(i, 1);
+        return { gone: true, left: 0 };
+    }
+    return { gone: false, left: MAX_USE - n };
+}
+
+function shut(ids) {
+    ids.forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    document.body.style.overflow = '';
+}
+
+// 정상 해제와 같은 일을 한다
+function release() {
+    let out = currentUser.quarantineExitPollution || 0;
+    if (out >= 100) out = 99;              // 100 이면 나오자마자 다시 들어간다
+
+    currentUser.quarantineUntil = 0;
+    currentUser.quarantineDest = null;
+    currentUser.quarantineHospital = null;
+    currentUser.pollution = out;
+    currentUser.quarantineExitPollution = 0;
+    currentUser.lastPollutionTime = Date.now();
+    currentUser.foxRoomAnswered = false;
+
+    // 다시 부르지 않도록 잠금도 푼다
+    try { hasShownFoxAlert = false; } catch (e) { }
+
+    // 탐사 사고 문구를 거둔다 (badge 가 있을 때만)
+    if (currentUser.badge && typeof currentUser.badge.notes === 'string') {
+        const arr = currentUser.badge.notes.split(' | ').filter(function (n) {
+            return n.trim() !== ''
+                && n.indexOf('의식 불명') < 0
+                && n.indexOf('긴급 이송') < 0
+                && n.indexOf('사직 반려') < 0;
+        });
+        currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+
+    // 값이 없는 칸은 빼고 저장한다 — 하나라도 섞이면 전부 안 써진다
+    const f = {
+        quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1,
+        pollution: 1, quarantineExitPollution: 1, lastPollutionTime: 1,
+        foxRoomAnswered: 1, useCnt: 1, inventory: 1, equippedWeapons: 1, history: 1
+    };
+    if (currentUser.badge !== undefined) f.badge = 1;
+    Object.keys(f).forEach(function (k) { if (currentUser[k] === undefined) delete f[k]; });
+
+    if (typeof saveFields === 'function') {
+        try { saveFields(f); } catch (e) { console.error('[격리 해제] 저장 실패:', e); }
+    }
+    return out;
+}
+
+function doExit(nm, kind) {
+    const inRoom = currentUser.quarantineUntil > Date.now();
+    const bath = (currentUser.quarantineDest || 'fox') === 'bath';
+
+    if (kind === 'plate') {
+        if (!inRoom || bath) { showCustomAlert('상담실에 있지 않습니다.'); return; }
+    } else {
+        if (!inRoom || !bath) { showCustomAlert('선녀탕에 있지 않습니다.'); return; }
+    }
+
+    const out = release();
+    const r = spend(nm);
+
+    shut(['fox-modal', 'bath-modal', 'fox-room-overlay',
+          'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay']);
+
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(currentUser, '[' + nm + '] ' + (kind === 'plate' ? '상담실' : '선녀탕')
+            + '에서 나왔습니다. (오염도 ' + out + '%)');
+    }
+    if (typeof updateUI === 'function') updateUI();
+
+    showCustomAlert(
+        (kind === 'plate' ? '문패를 내렸습니다.\n\n상담실에서 나왔습니다.'
+                          : '끈을 묶고 나왔습니다.\n\n선녀탕에서 나왔습니다.')
+        + '\n오염도 ' + out + '%'
+        + (r.gone ? '\n\n' + nm + '이(가) 닳아 없어졌습니다.' : '\n\n남은 횟수 ' + r.left + '회'));
+}
+
+// ==========================================
+// 가로채기 — newitems2.js 보다 먼저 받는다
+// ==========================================
+(function hook() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        if (useInventoryItem._qexit) { clearInterval(iv); return; }
+
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            const cat = ITEM_CATALOG[itemName];
+            const e = cat && cat.effect;
+            if (e !== 'n_plate' && e !== 'n_lace') return _u.apply(this, arguments);
+
+            if (!currentUser) return;
+            if ((currentUser.inventory || []).indexOf(itemName) === -1) {
+                showCustomAlert('가지고 있지 않습니다.'); return;
+            }
+            doExit(itemName, e === 'n_plate' ? 'plate' : 'lace');
+        };
+        useInventoryItem._qexit = true;
+        clearInterval(iv);
+        console.log('[격리] 문패·신발끈 연결');
+    }, 500);
+})();
+
+// ==========================================
+// 이미 갇힌 사람 풀기 — 상담사용
+// ==========================================
+window.freeStuck = function () {
+    if (!database) { console.warn('서버에 닿지 못했습니다.'); return; }
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {};
+        const rows = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            const inRoom = u.quarantineUntil && Date.now() < u.quarantineUntil;
+            if (!inRoom && (u.pollution || 0) < 100) return;
+            rows.push({
+                사원: u.name || c, 사번: u.no || '-',
+                오염도: u.pollution || 0,
+                격리: inRoom ? new Date(u.quarantineUntil).toLocaleString() : '-',
+                나올때오염도: u.quarantineExitPollution || 0,
+                어디: (u.quarantineDest || 'fox') === 'bath' ? '선녀탕' : '상담실'
+            });
+        });
+        console.log('%c===== 격리·오염 100 =====', 'color:#ff6b6b; font-size:13px');
+        if (rows.length) console.table(rows); else console.log('  해당 사원이 없습니다.');
+        console.log('  풀려면 freeStuckGo() 를 치세요. 전원 오염도 0 으로 내보냅니다.');
+    });
+};
+
+window.freeStuckGo = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (!database) return;
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {};
+        const up = {}, names = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            const inRoom = u.quarantineUntil && Date.now() < u.quarantineUntil;
+            if (!inRoom && (u.pollution || 0) < 100) return;
+            up['users/' + c + '/quarantineUntil'] = 0;
+            up['users/' + c + '/quarantineHospital'] = null;
+            up['users/' + c + '/quarantineExitPollution'] = 0;
+            up['users/' + c + '/pollution'] = 0;
+            up['users/' + c + '/lastPollutionTime'] = Date.now();
+            up['users/' + c + '/foxRoomAnswered'] = false;
+            names.push(u.name || c);
+        });
+        if (!names.length) { console.log('풀 사원이 없습니다.'); return; }
+        return database.ref().update(up).then(function () {
+            console.log('%c✓ ' + names.length + '명을 내보냈습니다: ' + names.join(', '), 'color:#4CAF50');
+        });
+    }).catch(function (e) { console.error(e); });
+};
+
+console.log('[격리] freeStuck() · freeStuckGo()');
+
+})();
+;
+
+// ---------- guarantee-fix.js ----------
+// ==========================================
+// ★ 확정 승인서 재료 개편
+// index.html 에서 epic.js · thirdslot.js 다음, save-merge.js 앞에 불러온다
+// ==========================================
+//
+// ■ 전
+//     맨발의 자국         A-214   1.5%
+//     여섯 번째 손가락     A-667   0.8%
+//     누군가의 왼쪽 신발   B-330   0.2%   ← 병목. 평균 500판
+//
+// ■ 후
+//     맨발의 자국         A-214   0.5%
+//     여섯 번째 손가락     A-667   0.8%
+//     아직 쓰이지 않은 이름  영웅 구역  살아 돌아오면 10%
+//
+//   「누군가의 왼쪽 신발」은 승인서에서 빠지고, 전리품 표에서도 뺀다.
+//   쓰이는 데가 없어지면 떨어져도 짐만 되기 때문이다.
+//   이미 가지고 있는 것은 그대로 남는다. (아래 설명 참고)
+//
+//   영웅 구역(epic)은 원래 전리품을 굴리지 않는다.
+//   정산이 끝난 뒤 따로 굴려서 준다. 쓰러졌을 때는 주지 않는다.
+
+const GUAR_MAT  = '아직 쓰이지 않은 이름';
+window.GUAR_EPIC_RATE = 0.005;   // 영웅 구역에서 살아 돌아왔을 때 나올 확률
+
+(function guaranteeFix() {
+
+// ==========================================
+// 1. 새 재료 등록
+// ==========================================
+(function reg() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        if (ITEM_CATALOG[GUAR_MAT]) { clearInterval(iv); return; }
+        ITEM_CATALOG[GUAR_MAT] = {
+            price: 2400, usable: false, darkOnly: true,
+            desc: '[조합 재료] 아치 아래에 적혀 있었다. 누구의 것도 아직 아니다.'
+        };
+        clearInterval(iv);
+        console.log('[승인서] 재료 등록 — ' + GUAR_MAT);
+    }, 500);
+})();
+
+// 소지품에서 「조합」 칸에 들어가게
+(function cat() {
+    const iv = setInterval(function () {
+        if (typeof invCatOf !== 'function') return;
+        if (invCatOf._guar) { clearInterval(iv); return; }
+        const _c = invCatOf;
+        invCatOf = function (name) {
+            if (name === GUAR_MAT) return 'craft';
+            return _c.apply(this, arguments);
+        };
+        invCatOf._guar = true;
+        clearInterval(iv);
+    }, 500);
+})();
+
+// ==========================================
+// 2. 레시피 갈아끼우기
+// ==========================================
+(function recipe() {
+    const iv = setInterval(function () {
+        if (typeof CRAFT_RECIPES === 'undefined') return;
+        const r = CRAFT_RECIPES.find(function (x) { return x.id === 'guarantee'; });
+        if (!r) { clearInterval(iv); console.warn('[승인서] 레시피를 찾지 못했습니다.'); return; }
+        if (r._guar) { clearInterval(iv); return; }
+        r.mats = ['맨발의 자국', '여섯 번째 손가락', GUAR_MAT];
+        r._guar = true;
+        clearInterval(iv);
+        console.log('[승인서] 재료 교체 — ' + r.mats.join(' · '));
+    }, 500);
+})();
+
+// ==========================================
+// 3. 전리품 표 손보기
+// ==========================================
+(function loot() {
+    const iv = setInterval(function () {
+        if (typeof DARK_LOOT_BY_ZONE === 'undefined') return;
+        if (window._guarLoot) { clearInterval(iv); return; }
+        window._guarLoot = true;
+
+        // 맨발의 자국 — 1.5% → 0.5%
+        const a214 = DARK_LOOT_BY_ZONE['Qtrew-A-214'] || [];
+        a214.forEach(function (l) {
+            if (l.name === '맨발의 자국') {
+                console.log('[승인서] 맨발의 자국 ' + (l.chance * 100).toFixed(1) + '% → 0.5%');
+                l.chance = 0.005;
+            }
+        });
+
+        // 누군가의 왼쪽 신발 — 더 쓰이지 않으므로 뺀다
+        Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
+            const arr = DARK_LOOT_BY_ZONE[z];
+            const i = arr.findIndex(function (l) { return l.name === '누군가의 왼쪽 신발'; });
+            if (i >= 0) { arr.splice(i, 1); console.log('[승인서] 누군가의 왼쪽 신발 — ' + z + ' 전리품에서 뺌'); }
+        });
+
+        clearInterval(iv);
+    }, 500);
+})();
+
+// ==========================================
+// 4. 영웅 구역에서 재료 주기
+// ==========================================
+//
+// epicSettle 은 DARK_LOOT_BY_ZONE 을 굴리지 않는다.
+// 정산이 끝난 자리에 따로 굴려서 얹는다.
+(function epicDrop() {
+    const iv = setInterval(function () {
+        if (typeof epicSettle !== 'function') return;
+        if (epicSettle._guar) { clearInterval(iv); return; }
+
+        const _s = epicSettle;
+        epicSettle = function (how, txt) {
+            const r = _s.apply(this, arguments);
+            try {
+                if (how === 'dead') return r;                       // 쓰러지면 없다
+                if (Math.random() >= window.GUAR_EPIC_RATE) return r;
+
+                if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+                currentUser.inventory.push(GUAR_MAT);
+                if (typeof addHistoryLog === 'function') {
+                    addHistoryLog(currentUser, '[영웅] ' + GUAR_MAT + '을(를) 가지고 나왔습니다.');
+                }
+                if (typeof saveFields === 'function') {
+                    try { saveFields({ inventory:1, history:1 }); } catch (e) { }
+                }
+
+                // 정산 화면에 한 줄 붙인다
+                setTimeout(function () {
+                    try {
+                        const b = darkBodyEl();
+                        if (!b || b.querySelector('#guar-got')) return;
+                        b.insertAdjacentHTML('beforeend',
+                            '<div id="guar-got" style="margin-top:10px; padding:10px 12px;'
+                            + ' border:1px solid #6a4c93; border-radius:6px; background:rgba(0,0,0,0.3);'
+                            + ' font-size:11px; color:#c9a8ff; line-height:1.7;">'
+                            + '◇ 손에 쥔 것이 있다.<br><b>' + GUAR_MAT + '</b></div>');
+                    } catch (e) { }
+                }, 300);
+            } catch (e) { console.warn('[승인서] 지급 건너뜀:', e && e.message); }
+            return r;
+        };
+        epicSettle._guar = true;
+        clearInterval(iv);
+        console.log('[승인서] 영웅 구역 지급 연결 (' + (window.GUAR_EPIC_RATE * 100).toFixed(0) + '%)');
+    }, 500);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.guarState = function () {
+    console.log('%c===== 확정 승인서 =====', 'color:#c9a8ff; font-size:13px');
+    const r = (typeof CRAFT_RECIPES !== 'undefined')
+        && CRAFT_RECIPES.find(function (x) { return x.id === 'guarantee'; });
+    console.log('  재료:', r ? r.mats.join(' · ') : '못 찾음');
+
+    const where = {};
+    if (typeof DARK_LOOT_BY_ZONE !== 'undefined') {
+        Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
+            DARK_LOOT_BY_ZONE[z].forEach(function (l) { where[l.name] = [z, l.chance]; });
+        });
+    }
+    const inv = (currentUser && currentUser.inventory) || [];
+    console.table((r ? r.mats : []).map(function (m) {
+        const w = where[m];
+        return {
+            재료: m,
+            나오는곳: m === GUAR_MAT ? '영웅 구역' : (w ? w[0] : '-'),
+            확률: m === GUAR_MAT
+                ? (window.GUAR_EPIC_RATE * 100).toFixed(0) + '% (생환 시)'
+                : (w ? (w[1] * 100).toFixed(1) + '%' : '-'),
+            보유: inv.filter(function (x) { return x === m; }).length
+        };
+    }));
+    const shoe = inv.filter(function (x) { return x === '누군가의 왼쪽 신발'; }).length;
+    if (shoe) console.log('  쓰이지 않는 「누군가의 왼쪽 신발」 ' + shoe + '개를 가지고 있습니다.');
+    console.log('  확률을 바꾸려면 — GUAR_EPIC_RATE = 0.2');
+};
+
+console.log('[승인서] guarState()');
 
 })();
 ;
