@@ -15,7 +15,9 @@
    "allamount.js",
    "frames.js",
    "frames-video.js",
-   "frames-video2.js"
+   "frames-video2.js",
+   "frames-video3.js",
+   "frame-give.js"
   ],
   [
    "frames-new.js",
