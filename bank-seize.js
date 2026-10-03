@@ -55,20 +55,47 @@ window.adminSeizeBank = function () {
             + '\n\n합계 ' + fmt(total) + ' P\n\n되돌릴 수 없습니다. 진행할까요?');
         if (!ok) return;
 
-        // 하나씩 트랜잭션으로 비운다
+        // 하나씩 비운다
+        //
+        // 트랜잭션은 첫 판을 「이 창이 들고 있는 값」으로 돌린다.
+        // 남의 계좌는 리스너가 붙어 있지 않아 그 값이 null 이고,
+        // null 에서 undefined 를 돌려주면 그 자리에서 포기해 버린다.
+        // 그래서 도는 동안만 리스너를 붙여 서버 값을 쥐여 준다.
         Promise.all(has.map(function (r) {
-            return database.ref('bank/' + r.code).transaction(function (b) {
-                if (!b || !(b.deposit > 0)) return;      // 그 사이 바뀌었으면 건드리지 않는다
-                b.seized = (b.seized || 0) + b.deposit;  // 얼마를 가져갔는지 남겨 둔다
+            const ref = database.ref('bank/' + r.code);
+            const hold = ref.on('value', function () { });      // 값을 붙잡아 둔다
+
+            return ref.transaction(function (b) {
+                if (b === null) return null;                     // 아직 못 읽었다 — 포기 말고 한 번 더
+                if (!(b.deposit > 0)) return;                    // 그 사이 비었으면 건드리지 않는다
+                b.seized = (b.seized || 0) + b.deposit;          // 얼마를 가져갔는지 남겨 둔다
                 b.seizedAt = Date.now();
                 b.deposit = 0;
                 return b;
             }).then(function (res) {
-                const took = res.committed ? (res.snapshot.val().seized - ((r.b.seized) || 0)) : 0;
-                return { code: r.code, took: took, ok: res.committed };
+                if (res.committed) {
+                    const v = res.snapshot.val() || {};
+                    return { code: r.code, took: (v.seized || 0) - (r.b.seized || 0), ok: true };
+                }
+                // 트랜잭션이 포기했으면 읽고 바로 쓴다
+                return ref.once('value').then(function (s) {
+                    const b = s.val();
+                    if (!b || !(b.deposit > 0)) return { code: r.code, took: 0, ok: true, empty: true };
+                    const amt = b.deposit;
+                    return ref.update({
+                        deposit: 0,
+                        seized: (b.seized || 0) + amt,
+                        seizedAt: Date.now()
+                    }).then(function () {
+                        return { code: r.code, took: amt, ok: true };
+                    });
+                });
             }).catch(function (e) {
-                console.error('[은행 압수]', r.code, e);
-                return { code: r.code, took: 0, ok: false };
+                console.error('[은행 압수] ' + r.code, e);
+                return { code: r.code, took: 0, ok: false, why: (e && e.message) || String(e) };
+            }).then(function (x) {
+                try { ref.off('value', hold); } catch (e) { }
+                return x;
             });
         })).then(function (out) {
 
@@ -104,8 +131,9 @@ window.adminSeizeBank = function () {
                         const u = db.users[r.code]; return u ? u.name : r.code;
                     }).join(', ') : '')
                 + (fail.length ? '\n\n실패: ' + fail.map(function (x) {
-                        const u = db.users[x.code]; return u ? u.name : x.code;
-                    }).join(', ') : '')
+                        const u = db.users[x.code];
+                        return (u ? u.name : x.code) + (x.why ? ' (' + x.why + ')' : '');
+                    }).join('\n') + '\n\n자세한 내용은 F12 콘솔에 찍혀 있습니다.' : '')
             );
         });
     });
