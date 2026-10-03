@@ -177,7 +177,7 @@ function frameBookLeft() {
     const key = getShopCycleKey();
     if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
     if (!currentUser.purchaseRecord[key]) currentUser.purchaseRecord[key] = {};
-    return Math.max(0, 5 - (currentUser.purchaseRecord[key]['frame_book'] || 0));
+    return Math.max(0, 10 - (currentUser.purchaseRecord[key]['frame_book'] || 0));
 }
 
 function buyFrameBook() {
@@ -213,7 +213,7 @@ function buyFrameBook() {
                         <div style="font-size:14px; color:#fff; font-weight:bold;">📕 테두리 견본첩</div>
                         <div style="font-size:10px; color:#aaa; margin-top:5px; line-height:1.6;">
                             사원증에 두를 테두리가 한 장 들어 있다.<br>
-                            <span style="color:#888;">금일 잔여 <b style="color:${left ? '#4CAF50' : '#f44336'}">${left}</b> / 5개</span>
+                            <span style="color:#888;">금일 잔여 <b style="color:${left ? '#4CAF50' : '#f44336'}">${left}</b> / 10개</span>
                         </div>
                     </div>
                     <button class="game-btn" style="margin:0; padding:9px 13px; font-size:12px; flex-shrink:0;" onclick="buyFrameBook()" ${left ? '' : 'disabled'}>

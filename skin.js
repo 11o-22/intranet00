@@ -9,7 +9,7 @@ ITEM_CATALOG['벽지 견본첩'] = {
     desc: '넘길 때마다 다른 방이 나온다. 사용하면 단말의 색·무늬·글꼴이 무작위로 바뀐다. 해제하면 견본첩은 사라진다.'
 };
 const SKIN_ITEM = '벽지 견본첩';
-const SKIN_DAILY = 5;   // 유쾌 판매소 하루 구매 한도
+const SKIN_DAILY = 10;   // 유쾌 판매소 하루 구매 한도
 // 우주 쇼핑몰에는 넣지 않는다 (유쾌 판매소 고정 진열)
 if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
     const i = ALIEN_ITEMS_POOL.indexOf(SKIN_ITEM);
