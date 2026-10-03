@@ -578,7 +578,7 @@ after('renderEmployeeCards', function () {
         t.dataset.ti = '1';
         if (!u) return;
         const h = tagHtml(u, 9);
-        if (h) t.insertAdjacentHTML('afterbegin', h + ' ');
+        if (h) t.insertAdjacentHTML('afterbegin', h + ' ');     // 이름 왼쪽
     });
 });
 
@@ -597,29 +597,37 @@ after('renderChatLog', function () {
         const u = db.users[m.code];
         if (!u) return;
         const h = tagHtml(u, 8);
-        if (h) nameEl.insertAdjacentHTML('beforebegin', h + ' ');
+        if (h) nameEl.insertAdjacentHTML('beforebegin', h + ' ');   // 이름 왼쪽
     });
 });
 
 // --- 정보 열람 (사원 상세) ---
+//
+// 전에는 카드 아래에 따로 상자를 붙였다. 이제 이름 왼쪽에 둔다.
+// 상자에는 보유 개수만 남긴다. 같은 화면에 두 번 쓸 일이 없다.
 after('openEmpDetailModal', function (code) {
     const box = document.getElementById('emp-detail-card-container');
     const u = db.users[code];
     if (!box || !u) return;
+
+    // 이름 왼쪽
+    const nameEl = box.querySelector('.emp-name');
+    if (nameEl && !nameEl.dataset.ti) {
+        nameEl.dataset.ti = '1';
+        const h = tagHtml(u, 10);
+        if (h) nameEl.insertAdjacentHTML('afterbegin', h + ' ');
+    }
+
     const old = document.getElementById('emp-title-row');
     if (old) old.remove();
-    const w = worn(u);
     const own = myList(u).length;
+    if (!own) return;
+
     const row = document.createElement('div');
     row.id = 'emp-title-row';
-    row.style.cssText = 'border:1px solid #2a2a2a; border-radius:6px; padding:8px 10px;'
-        + ' margin:10px 0 0 0; background:rgba(0,0,0,0.22);';
-    row.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
-        + (w
-            ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
-            : '<div style="font-size:11px; color:#666;">달고 있지 않습니다.</div>')
-        + (own ? '<div style="font-size:10px; color:#777; margin-top:5px;">보유 ' + own + '개</div>' : '');
+    row.style.cssText = 'font-size:10px; color:#777; margin:8px 0 0 0;';
+    row.innerText = '보유 칭호 ' + own + '개'
+        + (worn(u) ? '' : ' · 달고 있지 않습니다.');
     box.appendChild(row);
 });
 
