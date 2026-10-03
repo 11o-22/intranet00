@@ -193,6 +193,8 @@
    "sticker-fix.js",
    "bank-seize.js",
    "epic-hard.js",
+    "dark-items.js",
+   "zone-hard.js",
    "save-merge.js"
   ]
  ]
