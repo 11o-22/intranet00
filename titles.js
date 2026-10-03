@@ -451,6 +451,141 @@ after('openEmpDetailModal', function (code) {
 });
 
 // ==========================================
+// 칭호 목록 — 정보 열람에 서브탭 하나
+// ==========================================
+//
+// 15종을 전부 줄 세운다.
+// 얻은 것은 이름이 보이고, 못 얻은 것은 [미획득] 로만 보인다.
+// 줄을 누르면 어떻게 얻는지와 지금 얼마나 왔는지가 펼쳐진다.
+
+// 칭호별 진행도 — [지금, 목표, 꼬리말]
+function prog(d, u, s) {
+    switch (d.id) {
+        case 'saint':   return [s.resc, 200, '회'];
+        case 'mola':    return [s.dead, 50, '회'];
+        case 'virile':  return [s.sire, 500, '회'];
+        case 'fertile': return [s.bear, 500, '회'];
+        case 'lucky':   return [s.d15, 100, '회'];
+        case 'breaker': return [s.smash, 300, '회'];
+        case 'helper':  return [s.help, 100, '회'];
+        case 'exorc':   return [s.exor, 250, '회'];
+        case 'pure':    return [Math.floor((Date.now() - s.pureFrom) / DAY), 10, '일'];
+        case 'health':  return [Math.floor((Date.now() - s.healthFrom) / DAY), 10, '일'];
+        case 'collect': {
+            const pool = alienPool(), m = owned(u);
+            return [pool.filter(function (n) { return m[n]; }).length, pool.length, '종'];
+        }
+        case 'spy': {
+            const o = otherSideItems(u), m = owned(u);
+            return [o.filter(function (n) { return m[n]; }).length, o.length, '종'];
+        }
+        case 'weapon': {
+            const g = (typeof getGear === 'function') ? getGear(u) : null;
+            if (!g || !g.attrs || !g.attrs.length) return [0, 1, '속성'];
+            const n = g.attrs.filter(function (a) {
+                return typeof gearAttrGrade === 'function' && gearAttrGrade(g, a) === 'L';
+            }).length + (g.grade === 'L' ? 1 : 0);
+            return [n, g.attrs.length + 1, '자리'];
+        }
+        case 'gold':    return [isVip(u) ? 1 : 0, 1, ''];
+        case 'tamer':   return [0, 1, ''];
+        default:        return [0, 1, ''];
+    }
+}
+
+window.toggleTitleRow = function (id) {
+    const el = document.getElementById('tdet-' + id);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    document.querySelectorAll('[id^="tdet-"]').forEach(function (x) { x.style.display = 'none'; });
+    el.style.display = open ? 'none' : 'block';
+};
+
+function renderTitleList() {
+    const box = document.getElementById('rec-titles');
+    if (!box || !currentUser) return;
+    const s = ti(currentUser);
+    const have = currentUser.titles || [];
+
+    const rows = DEFS.map(function (d) {
+        const got = have.indexOf(d.id) >= 0;
+        const p = prog(d, currentUser, s);
+        const cur = Math.min(p[0], p[1]);
+        const pctv = p[1] > 0 ? Math.min(100, Math.round(cur / p[1] * 100)) : 0;
+        const dormant = (d.id === 'tamer' && typeof PET_SPECIES === 'undefined');
+
+        return ''
+          + '<div style="border:1px solid ' + (got ? '#6a5a2a' : '#2a2a2a') + '; border-radius:6px;'
+          + ' margin-bottom:7px; background:rgba(0,0,0,' + (got ? '0.3' : '0.18') + ');">'
+          + '<div onclick="toggleTitleRow(\'' + d.id + '\')" style="padding:10px 12px; cursor:pointer;'
+          + ' display:flex; justify-content:space-between; align-items:center; gap:8px;">'
+          + '<span style="font-size:12px; font-weight:bold; color:' + (got ? '#d4af37' : '#666') + ';">['
+          + (got ? d.n : '미획득') + ']</span>'
+          + '<span style="font-size:10px; color:' + (got ? '#81c784' : '#777') + ';">'
+          + (got ? '보유' : (dormant ? '준비 중' : pctv + '%')) + '</span>'
+          + '</div>'
+          + '<div id="tdet-' + d.id + '" style="display:none; padding:0 12px 11px 12px;'
+          + ' border-top:1px dashed #2f2f2f;">'
+          + '<div style="font-size:11px; color:#bbb; margin:9px 0 7px 0; line-height:1.7;">'
+          + d.need + '</div>'
+          + (dormant
+              ? '<div style="font-size:10px; color:#888;">아직 열리지 않은 칭호입니다.</div>'
+              : '<div style="font-size:10px; color:#888;">'
+                + (got ? '이미 얻었습니다.'
+                       : '지금 ' + cur.toLocaleString() + ' / ' + p[1].toLocaleString() + (p[2] || ''))
+                + '</div>'
+                + (got ? '' :
+                   '<div style="height:5px; background:#1a1a1a; border-radius:3px; margin-top:7px; overflow:hidden;">'
+                   + '<div style="height:100%; width:' + pctv + '%; background:#6a5a2a;"></div></div>'))
+          + '</div></div>';
+    }).join('');
+
+    const adm = (currentUser.titleAdmin || []);
+    const admHtml = adm.length
+        ? '<div style="margin-top:12px; padding-top:11px; border-top:1px dashed #333;">'
+          + '<div style="font-size:10px; color:#888; margin-bottom:6px;">상담사가 붙여 준 칭호</div>'
+          + '<div style="display:flex; flex-wrap:wrap; gap:5px;">' + adm.map(function (n) {
+                return '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
+                    + ' border-radius:3px; padding:2px 7px;">[' + n + ']</span>';
+            }).join('') + '</div></div>'
+        : '';
+
+    box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.7;">'
+        + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.</div>'
+        + rows + admHtml;
+}
+
+(function mountTab() {
+    const iv = setInterval(function () {
+        if (document.getElementById('rec-titles')) { clearInterval(iv); return; }
+        const host = document.getElementById('tab-record');
+        const grid = host && host.querySelector('.sub-tabs-grid');
+        if (!grid) return;
+
+        const btn = document.createElement('button');
+        btn.className = 'sub-tab';
+        btn.innerText = '칭호';
+        btn.setAttribute('onclick', "switchRecordSubTab('rec-titles', this); renderTitleList();");
+        grid.appendChild(btn);
+
+        const panel = document.createElement('div');
+        panel.id = 'rec-titles';
+        panel.className = 'sub-panel';
+        host.appendChild(panel);
+
+        clearInterval(iv);
+        console.log('[칭호] 정보 열람에 목록 탭 연결');
+    }, 800);
+})();
+window.renderTitleList = renderTitleList;
+
+// 열려 있는 동안에는 숫자를 갱신한다
+setInterval(function () {
+    const p = document.getElementById('rec-titles');
+    if (p && p.classList.contains('active')) renderTitleList();
+}, 5000);
+
+// ==========================================
 // 상담사 — 손으로 붙이기
 // ==========================================
 window.adminGiveTitle = function (name) {
