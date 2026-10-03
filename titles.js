@@ -548,7 +548,7 @@ function tagHtml(u, size) {
     if (!n) return '';
     const s = size || 9;
     return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
-        + ' border-radius:3px; padding:0 4px; margin-left:3px; white-space:nowrap;">'
+        + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
         + n + '</span>';
 }
 
@@ -578,7 +578,7 @@ after('renderEmployeeCards', function () {
         t.dataset.ti = '1';
         if (!u) return;
         const h = tagHtml(u, 9);
-        if (h) t.insertAdjacentHTML('beforeend', ' ' + h);
+        if (h) t.insertAdjacentHTML('afterbegin', h + ' ');
     });
 });
 
@@ -597,7 +597,7 @@ after('renderChatLog', function () {
         const u = db.users[m.code];
         if (!u) return;
         const h = tagHtml(u, 8);
-        if (h) nameEl.insertAdjacentHTML('afterend', h);
+        if (h) nameEl.insertAdjacentHTML('beforebegin', h + ' ');
     });
 });
 
