@@ -45,7 +45,7 @@ const DEFS = [
     { id:'tamer',   n:'조련사',      need:'펫 전부 보유',
       check:(u)=> petsAllOwned(u) },            // 펫 시스템이 생기면 켜진다
 
-    { id:'weapon',  n:'웨폰 마스터', need:'전용 장비 속성 전부 L',
+    { id:'weapon',  n:'웨폰 마스터', need:'전용 장비 세 자리 전부 L',
       check:(u)=> allAttrsL(u) },
 
     { id:'virile',  n:'정력왕',      need:'임신시킨 횟수 500',
@@ -72,7 +72,7 @@ const DEFS = [
     { id:'exorc',   n:'퇴마',        need:'작두·버터 나이프로 파훼 250회',
       check:(u,s)=> s.exor >= 250 },
 
-    { id:'gold',    n:'金緞',        need:'은행 VIP 달성',
+    { id:'gold',    n:'金緞',        need:'은행 VIP 승인 (2급 보안 인가와 다름)',
       check:(u)=> isVip(u) }
 ];
 
@@ -112,24 +112,125 @@ function otherSideItems(u) {
     return out;
 }
 
-function allAttrsL(u) {
-    const g = (typeof getGear === 'function') ? getGear(u) : (u.soulGear || null);
-    if (!g || !g.attrs || !g.attrs.length) return false;
-    if (g.grade !== 'L') return false;
-    if (typeof gearAttrGrade !== 'function') return false;
-    return g.attrs.every(function (a) { return gearAttrGrade(g, a) === 'L'; });
+// ==========================================
+// 웨폰 마스터 — 세 자리가 다 L 이어야 한다
+// ==========================================
+//
+// 전용 장비는 자리가 셋까지 열린다. (thirdslot.js)
+// 첫 자리의 등급은 본체 등급(g.grade)이고, 둘째·셋째는 g.attrGrades 에 따로 있다.
+// gearAttrGrade 가 그 규칙을 담고 있지만 dark.js 안쪽에 있어 밖에서 안 닿을 수도 있어서
+// 같은 식을 여기에 둔다.
+//
+// 전에는 첫 자리를 두 번 셌다. (gearAttrGrade 가 이미 본체 등급을 돌려주는데
+// 거기에 g.grade === 'L' 을 또 더했다.) 분모도 열린 자리 수에 맞춰 움직여서
+// 한 자리만 열어 둔 사람은 2/2 가 되어 그 자리에서 칭호를 받아 버렸다.
+const GEAR_SLOTS = 3;
+
+function attrGradeOf(g, attr) {
+    if (!g || !g.attrs) return 'D';
+    const i = g.attrs.indexOf(attr);
+    if (i <= 0) return g.grade;                       // 첫 자리는 본체 등급
+    return (g.attrGrades && g.attrGrades[attr]) || 'D';
 }
 
+function gearOf(u) {
+    return (u && u.soulGear) ? u.soulGear : null;
+}
+
+// 지금 L 인 자리가 몇 개인가
+function lSlots(u) {
+    const g = gearOf(u);
+    if (!g || !Array.isArray(g.attrs)) return 0;
+    return g.attrs.filter(function (a) { return attrGradeOf(g, a) === 'L'; }).length;
+}
+
+function allAttrsL(u) {
+    const g = gearOf(u);
+    if (!g || !Array.isArray(g.attrs)) return false;
+    if (g.attrs.length < GEAR_SLOTS) return false;    // 자리를 다 열지 않았으면 아직이다
+    return lSlots(u) >= GEAR_SLOTS;
+}
+
+// ==========================================
+// 金緞 — 은행 VIP
+// ==========================================
+//
+// 전에는 u.hasVIP 를 먼저 봤다. 그것은 2급 보안 인가(VIP 라운지 출입증)이고
+// 은행과 아무 상관이 없다. 당국이 손으로 발급하는 것이다. (index.html:6989)
+// 그래서 은행 등급이 1등급이든 계좌가 아예 없든 칭호가 붙었다.
+//
+// 그리고 bankGrade() 는 등급 「객체」를 돌려준다. 'VIP' 와 비교하면
+// 영원히 거짓이라 뒤의 줄은 애초에 돌지 않았다.
+//
+// 은행 VIP 는 bank/{사번}.vip 에 승인 기록이 붙은 상태다. (bank.js:663)
+// 블랙리스트에 오르면 그 자리가 지워진다. (bank.js:129)
+const vipSeen = {};        // 사번 → true / false
+
 function isVip(u) {
-    if (u.hasVIP) return true;
+    if (!u) return false;
     try {
-        if (typeof bankState !== 'undefined' && bankState && currentUser
-            && u.code === currentUser.code) {
-            if (bankState.vip) return true;
-            if (typeof bankGrade === 'function' && bankGrade(bankState.score) === 'VIP') return true;
+        if (typeof bankState !== 'undefined' && bankState
+            && currentUser && u.code === currentUser.code) {
+            return !!(bankState.vip && !bankState.blacklist);
         }
     } catch (e) { }
-    return false;
+    return vipSeen[u.code] === true;
+}
+
+// 은행 화면을 한 번도 열지 않아도 판정이 돌게, 내 계좌를 따로 지켜본다
+(function watchBank() {
+    let key = null;
+    setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        if (!currentUser) return;
+        if (key === currentUser.code) return;
+        key = currentUser.code;
+        database.ref('bank/' + key).on('value', function (s) {
+            const b = s.val();
+            vipSeen[key] = !!(b && b.vip && !b.blacklist);
+            repair();          // 잘못 붙은 것을 떼어 낸다 (딱 한 번)
+            check();
+        });
+    }, 1500);
+})();
+
+// ==========================================
+// 잘못 붙은 칭호 회수
+// ==========================================
+//
+// 위의 두 가지는 조건이 틀려 있었으므로 이미 받아 간 사람이 있다.
+// 지금 조건으로 다시 재어 보고 아니면 뗀다.
+// 계좌를 읽은 뒤에 한 번만 돈다. 먼저 돌면 VIP 인 사람을 잘못 뗀다.
+// 누적 횟수로 받는 칭호(구출·사망 …)는 건드리지 않는다.
+let repaired = false;
+function repair() {
+    if (repaired || !currentUser) return;
+    if (!Array.isArray(currentUser.titles)) return;   // 아직 안 읽혔으면 다음 기회에
+    repaired = true;
+
+    const take = [];
+    [['gold', isVip], ['weapon', allAttrsL]].forEach(function (p) {
+        const i = currentUser.titles.indexOf(p[0]);
+        if (i < 0) return;
+        let ok = false;
+        try { ok = !!p[1](currentUser); } catch (e) { ok = false; }
+        if (!ok) { currentUser.titles.splice(i, 1); take.push(p[0]); }
+    });
+    if (!take.length) return;
+
+    const names = take.map(function (id) {
+        const d = DEFS.filter(function (x) { return x.id === id; })[0];
+        return d ? d.n : id;
+    });
+    // 떼어 낸 것을 달고 있었다면 벗긴다
+    const f = { titles:1 };
+    if (currentUser.titleOn && names.indexOf(currentUser.titleOn) >= 0) {
+        currentUser.titleOn = '';
+        f.titleOn = 1;
+    }
+    save(f);
+    paint();
+    console.log('[칭호] 조건이 맞지 않아 회수 — ' + names.join(', '));
 }
 
 // 펫 시스템이 아직 없으면 항상 거짓
@@ -330,6 +431,7 @@ setInterval(function () { if (currentUser) check(); }, 30000);
 // ==========================================
 // 사원증에 보이기
 // ==========================================
+// 가지고 있는 칭호 전부
 function myList(u) {
     u = u || currentUser;
     if (!u) return [];
@@ -339,6 +441,29 @@ function myList(u) {
     }).filter(Boolean);
     return (u.titleAdmin || []).concat(auto);
 }
+
+// 지금 달고 있는 칭호 하나 — 없으면 null
+//
+// 얻었다고 저절로 달리지 않는다. 가진 것 중에서 직접 고른다.
+// 달아 둔 것을 잃었거나(상담사가 회수) 하면 저절로 떨어진다.
+function worn(u) {
+    u = u || currentUser;
+    if (!u || !u.titleOn) return null;
+    return myList(u).indexOf(u.titleOn) >= 0 ? u.titleOn : null;
+}
+
+// 달기 · 떼기
+window.wearTitle = function (name) {
+    if (!currentUser) return;
+    if (name && myList(currentUser).indexOf(name) < 0) {
+        showCustomAlert('가지고 있지 않은 칭호입니다.'); return;
+    }
+    currentUser.titleOn = (currentUser.titleOn === name) ? null : (name || null);
+    save({ titleOn: 1 });
+    paint();
+    renderTitleList();
+    if (typeof updateUI === 'function') updateUI();
+};
 
 function paint() {
     const host = document.getElementById('rec-badge');
@@ -351,14 +476,16 @@ function paint() {
             + ' margin-bottom:9px; background:rgba(0,0,0,0.22);';
         host.insertBefore(box, host.firstChild);
     }
-    const list = myList(currentUser);
+    const w = worn(currentUser);
+    const own = myList(currentUser).length;
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
-        + (list.length
-            ? '<div style="display:flex; flex-wrap:wrap; gap:5px;">' + list.map(function (n) {
-                  return '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-                      + ' border-radius:3px; padding:2px 7px;">[' + n + ']</span>';
-              }).join('') + '</div>'
-            : '<div style="font-size:11px; color:#666;">아직 없습니다.</div>');
+        + (w
+            ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
+              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
+            : '<div style="font-size:11px; color:#666;">'
+              + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
+              + '</div>')
+        + (own ? '<div style="font-size:10px; color:#777; margin-top:5px;">보유 ' + own + '개</div>' : '');
 }
 setInterval(paint, 2500);
 
@@ -369,14 +496,12 @@ setInterval(paint, 2500);
 // 세 곳 모두 innerHTML 로 통째로 다시 그린다.
 // 그려진 뒤에 칸을 찾아 붙이고, 같은 칸에 두 번 붙지 않게 표시를 남긴다.
 function tagHtml(u, size) {
-    const list = myList(u);
-    if (!list.length) return '';
+    const n = worn(u);                     // 달고 있는 하나만 보인다
+    if (!n) return '';
     const s = size || 9;
-    return list.map(function (n) {
-        return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
-            + ' border-radius:3px; padding:0 4px; margin-left:3px; white-space:nowrap;">'
-            + n + '</span>';
-    }).join('');
+    return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
+        + ' border-radius:3px; padding:0 4px; margin-left:3px; white-space:nowrap;">'
+        + n + '</span>';
 }
 
 function after(name, fn) {
@@ -435,18 +560,18 @@ after('openEmpDetailModal', function (code) {
     if (!box || !u) return;
     const old = document.getElementById('emp-title-row');
     if (old) old.remove();
-    const list = myList(u);
+    const w = worn(u);
+    const own = myList(u).length;
     const row = document.createElement('div');
     row.id = 'emp-title-row';
     row.style.cssText = 'border:1px solid #2a2a2a; border-radius:6px; padding:8px 10px;'
         + ' margin:10px 0 0 0; background:rgba(0,0,0,0.22);';
     row.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
-        + (list.length
-            ? '<div style="display:flex; flex-wrap:wrap; gap:4px;">' + list.map(function (n) {
-                  return '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-                      + ' border-radius:3px; padding:2px 7px;">[' + n + ']</span>';
-              }).join('') + '</div>'
-            : '<div style="font-size:11px; color:#666;">아직 없습니다.</div>');
+        + (w
+            ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
+              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
+            : '<div style="font-size:11px; color:#666;">달고 있지 않습니다.</div>')
+        + (own ? '<div style="font-size:10px; color:#777; margin-top:5px;">보유 ' + own + '개</div>' : '');
     box.appendChild(row);
 });
 
@@ -479,14 +604,8 @@ function prog(d, u, s) {
             const o = otherSideItems(u), m = owned(u);
             return [o.filter(function (n) { return m[n]; }).length, o.length, '종'];
         }
-        case 'weapon': {
-            const g = (typeof getGear === 'function') ? getGear(u) : null;
-            if (!g || !g.attrs || !g.attrs.length) return [0, 1, '속성'];
-            const n = g.attrs.filter(function (a) {
-                return typeof gearAttrGrade === 'function' && gearAttrGrade(g, a) === 'L';
-            }).length + (g.grade === 'L' ? 1 : 0);
-            return [n, g.attrs.length + 1, '자리'];
-        }
+        // 분모는 언제나 세 자리다. 자리를 덜 열었어도 목표는 줄지 않는다.
+        case 'weapon':  return [lSlots(u), GEAR_SLOTS, '자리'];
         case 'gold':    return [isVip(u) ? 1 : 0, 1, ''];
         case 'tamer':   return [0, 1, ''];
         default:        return [0, 1, ''];
@@ -513,16 +632,17 @@ function renderTitleList() {
         const cur = Math.min(p[0], p[1]);
         const pctv = p[1] > 0 ? Math.min(100, Math.round(cur / p[1] * 100)) : 0;
         const dormant = (d.id === 'tamer' && typeof PET_SPECIES === 'undefined');
+        const on = got && currentUser.titleOn === d.n;
 
         return ''
-          + '<div style="border:1px solid ' + (got ? '#6a5a2a' : '#2a2a2a') + '; border-radius:6px;'
+          + '<div style="border:1px solid ' + (on ? '#d4af37' : got ? '#6a5a2a' : '#2a2a2a') + '; border-radius:6px;'
           + ' margin-bottom:7px; background:rgba(0,0,0,' + (got ? '0.3' : '0.18') + ');">'
           + '<div onclick="toggleTitleRow(\'' + d.id + '\')" style="padding:10px 12px; cursor:pointer;'
           + ' display:flex; justify-content:space-between; align-items:center; gap:8px;">'
           + '<span style="font-size:12px; font-weight:bold; color:' + (got ? '#d4af37' : '#666') + ';">['
           + (got ? d.n : '미획득') + ']</span>'
-          + '<span style="font-size:10px; color:' + (got ? '#81c784' : '#777') + ';">'
-          + (got ? '보유' : (dormant ? '준비 중' : pctv + '%')) + '</span>'
+          + '<span style="font-size:10px; color:' + (got ? (on ? '#d4af37' : '#81c784') : '#777') + ';">'
+          + (got ? (on ? '◆ 달고 있음' : '보유') : (dormant ? '준비 중' : pctv + '%')) + '</span>'
           + '</div>'
           + '<div id="tdet-' + d.id + '" style="display:none; padding:0 12px 11px 12px;'
           + ' border-top:1px dashed #2f2f2f;">'
@@ -537,6 +657,13 @@ function renderTitleList() {
                 + (got ? '' :
                    '<div style="height:5px; background:#1a1a1a; border-radius:3px; margin-top:7px; overflow:hidden;">'
                    + '<div style="height:100%; width:' + pctv + '%; background:#6a5a2a;"></div></div>'))
+          + (got
+              ? '<button class="game-btn" style="width:100%; margin:9px 0 0 0; padding:9px; font-size:11px;'
+                + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
+                      + ' border-color:#d4af37 !important; color:#fff !important;' : '')
+                + '" onclick="wearTitle(\'' + d.n + '\')">'
+                + (on ? '뗀다' : '단다') + '</button>'
+              : '')
           + '</div></div>';
     }).join('');
 
@@ -544,14 +671,25 @@ function renderTitleList() {
     const admHtml = adm.length
         ? '<div style="margin-top:12px; padding-top:11px; border-top:1px dashed #333;">'
           + '<div style="font-size:10px; color:#888; margin-bottom:6px;">상담사가 붙여 준 칭호</div>'
-          + '<div style="display:flex; flex-wrap:wrap; gap:5px;">' + adm.map(function (n) {
-                return '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-                    + ' border-radius:3px; padding:2px 7px;">[' + n + ']</span>';
-            }).join('') + '</div></div>'
+          + adm.map(function (n) {
+                const on = currentUser.titleOn === n;
+                return '<div style="display:flex; justify-content:space-between; align-items:center;'
+                    + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
+                    + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
+                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + n + ']</span>'
+                    + '<button class="game-btn" style="margin:0; padding:6px 12px; font-size:10px;'
+                    + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
+                          + ' border-color:#d4af37 !important; color:#fff !important;' : '')
+                    + '" onclick="wearTitle(\'' + n + '\')">' + (on ? '뗀다' : '단다') + '</button>'
+                    + '</div>';
+            }).join('') + '</div>'
         : '';
 
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.7;">'
-        + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.</div>'
+        + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.<br>'
+        + '<span style="color:#d4af37;">달 수 있는 것은 한 번에 하나뿐입니다.</span> 지금: '
+        + (worn(currentUser) ? '<b style="color:#d4af37;">[' + worn(currentUser) + ']</b>' : '없음')
+        + '</div>'
         + rows + admHtml;
 }
 
@@ -645,7 +783,9 @@ window.myTitles = function (code) {
     if (!u) { console.log('사원을 찾지 못했습니다.'); return; }
     console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
     const list = myList(u);
-    console.log(list.length ? '  ' + list.map(function (n) { return '[' + n + ']'; }).join(' ') : '  아직 없습니다.');
+    const w = worn(u);
+    console.log('  달고 있음:', w ? '[' + w + ']' : '없음');
+    console.log('  보유:', list.length ? list.map(function (n) { return '[' + n + ']'; }).join(' ') : '아직 없습니다.');
 };
 
 window.titleProgress = function () {
@@ -655,13 +795,15 @@ window.titleProgress = function () {
         let ok = false;
         try { ok = !!d.check(currentUser, s); } catch (e) { }
         const have = (currentUser.titles || []).indexOf(d.id) >= 0;
-        const num = { saint:s.resc, mola:s.dead, virile:s.sire, fertile:s.bear,
-                      lucky:s.d15, breaker:s.smash, helper:s.help, exorc:s.exor }[d.id];
-        const days = d.id === 'pure' ? Math.floor((Date.now() - s.pureFrom) / DAY)
-                   : d.id === 'health' ? Math.floor((Date.now() - s.healthFrom) / DAY) : null;
+        // 화면의 칭호 목록과 같은 계산을 쓴다
+        let now = ok ? '충족' : '-';
+        try {
+            const pv = prog(d, currentUser, s);
+            if (pv && pv[1] > 1) now = pv[0] + ' / ' + pv[1] + (pv[2] ? ' ' + pv[2] : '');
+        } catch (e) { }
         return {
             칭호: '[' + d.n + ']', 조건: d.need,
-            지금: num != null ? num : (days != null ? days + '일' : (ok ? '충족' : '-')),
+            지금: now,
             상태: have ? '보유' : (ok ? '곧 지급' : '-')
         };
     });
