@@ -33,11 +33,12 @@ const DEFS = [
     { id:'saint',   n:'성자',        need:'구출 200회',
       check:(u,s)=> s.resc >= 200 },
 
-    { id:'collect', n:'콜렉터',      need:'우주 쇼핑몰 물품 전부 보유',
-      check:(u)=> allOwned(u, alienPool()) },
+    { id:'collect', n:'콜렉터',      need:'우주 쇼핑몰 물품 전부 보유 (상담사 전용 제외)',
+      check:(u)=> poolSettled && allOwned(u, alienPool()) },
 
     { id:'spy',     n:'스파이',      need:'반대 소속 물품 전부 보유',
-      check:(u)=> { const o = otherSideItems(u); return o.length > 0 && allOwned(u, o); } },
+      check:(u)=> { if (!poolSettled) return false;
+                    const o = otherSideItems(u); return o.length > 0 && allOwned(u, o); } },
 
     { id:'mola',    n:'개복치',      need:'어둠에서 50번 사망',
       check:(u,s)=> s.dead >= 50 },
@@ -95,8 +96,55 @@ function allOwned(u, list) {
     const m = owned(u);
     return list.every(function (n) { return m[n]; });
 }
+// ==========================================
+// 콜렉터 — 상담사 전용만 뺀다
+// ==========================================
+//
+// 아무에게도 진열되지 않는 것은 두 가지뿐이다. (index.html:9076·9153)
+//     여우구슬 · 금고   →  상담사(kario0987) 에게만 나온다
+// 이 둘은 평사원이 손에 넣을 길이 없으므로 셈에서 뺀다.
+//
+// 소속·직급·팀으로 막히는 것들(작두 · 버터 나이프 · 은반지 · 노스텔지어 끈 …)은
+// 그대로 센다. 진열이 안 되더라도 선물이나 거래로 넘겨받을 수 있고,
+// 사원마다 분모가 달라지는 것도 피한다.
+//
+// ITEM_CATALOG 에 없는 이름은 진열 단계에서 그냥 지워지므로 (index.html:9165)
+// 영원히 가질 수 없다. 그것만 함께 뺀다.
+const ADMIN_ONLY = ['여우구슬', '금고'];
+
+// 풀은 여러 파일이 나눠서 채운다. (newitems · newitems2 · sapphire · skin …)
+// 다 차기 전에 세면 적게 세어 그냥 칭호를 줘 버리므로, 멈춘 뒤에 센다.
+let poolSettled = false;
+(function settle() {
+    let last = -1, same = 0;
+    const iv = setInterval(function () {
+        const n = (typeof ALIEN_ITEMS_POOL !== 'undefined') ? ALIEN_ITEMS_POOL.length : -1;
+        if (n === last) same++; else { last = n; same = 0; }
+        if (n > 0 && same >= 5) {            // 6초쯤 변동이 없으면 다 찬 것으로 본다
+            poolSettled = true;
+            clearInterval(iv);
+            check();
+        }
+    }, 1200);
+})();
+
+let poolCache = null, poolKey = 0;
 function alienPool() {
-    return (typeof ALIEN_ITEMS_POOL !== 'undefined') ? ALIEN_ITEMS_POOL.slice() : [];
+    if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
+    if (poolKey === ALIEN_ITEMS_POOL.length && poolCache) return poolCache.slice();
+
+    const out = ALIEN_ITEMS_POOL.filter(function (n) {
+        if (ADMIN_ONLY.indexOf(n) >= 0) return false;
+        if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[n]) return false;
+        return true;
+    });
+
+    poolKey = ALIEN_ITEMS_POOL.length;
+    poolCache = out;
+    const cut = ALIEN_ITEMS_POOL.length - out.length;
+    console.log('[칭호] 콜렉터 — ' + out.length + '종'
+        + (cut > 0 ? ' (목록 ' + ALIEN_ITEMS_POOL.length + '종 중 상담사 전용·진열 불가 ' + cut + '종 제외)' : ''));
+    return out.slice();
 }
 
 // 반대 소속 물품 — EQUIP_AFFIL 에 적힌 소속이 내 쪽이 아닌 것
