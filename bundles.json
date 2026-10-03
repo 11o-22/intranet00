@@ -205,6 +205,7 @@
    "norepaint.js",
    "quarantine-exit.js",
    "guarantee-fix.js",
+   "smash-fix.js",
    "save-merge.js"
   ]
  ]
