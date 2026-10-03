@@ -197,6 +197,7 @@
    "zone-hard.js",
    "titles.js",
    "quarantine-exit.js",
+   "guarantee-fix.js",
    "save-merge.js"
   ]
  ]

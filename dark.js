@@ -7934,12 +7934,6 @@ function b508RequiredDocs() {
             desc: '다음 강화가 반드시 성공한다.',
             mats: ['맨발의 자국', '여섯 번째 손가락', '누군가의 왼쪽 신발']
         },
-        {
-            id: 'third_slot',
-            name: '세 번째 자리',
-            desc: '속성 슬롯을 세 번째까지 연다.',
-            mats: ['접힌 무릎', '위에서 떨어진 것', '먼저 웃은 쪽']
-        }
     ];
 
     function renderCraftPanel() {
