@@ -112,6 +112,9 @@ function allOwned(u, list) {
 // 영원히 가질 수 없다. 그것만 함께 뺀다.
 const ADMIN_ONLY = ['여우구슬', '금고'];
 
+// 진열 확률이 0.1% 라 사실상 막혀 있는 것 (newitems2.js RARE_RATE)
+const TOO_RARE = ['황룡의 눈', '산군의 도움'];
+
 // 풀은 여러 파일이 나눠서 채운다. (newitems · newitems2 · sapphire · skin …)
 // 다 차기 전에 세면 적게 세어 그냥 칭호를 줘 버리므로, 멈춘 뒤에 센다.
 let poolSettled = false;
@@ -135,6 +138,7 @@ function alienPool() {
 
     const out = ALIEN_ITEMS_POOL.filter(function (n) {
         if (ADMIN_ONLY.indexOf(n) >= 0) return false;
+        if (TOO_RARE.indexOf(n) >= 0) return false;
         if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[n]) return false;
         return true;
     });
@@ -143,7 +147,8 @@ function alienPool() {
     poolCache = out;
     const cut = ALIEN_ITEMS_POOL.length - out.length;
     console.log('[칭호] 콜렉터 — ' + out.length + '종'
-        + (cut > 0 ? ' (목록 ' + ALIEN_ITEMS_POOL.length + '종 중 상담사 전용·진열 불가 ' + cut + '종 제외)' : ''));
+        + (cut > 0 ? ' (목록 ' + ALIEN_ITEMS_POOL.length + '종 중 상담사 전용·극희귀·진열 불가 '
+                     + cut + '종 제외)' : ''));
     return out.slice();
 }
 
