@@ -81,13 +81,16 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '신입', '고인물'];
+const ADMIN_TITLES = ['또류', '뉴비', '고인물'];
 
 // 상담사 칭호에 붙는 그림
 //
 // 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
 // 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
-const ADMIN_ICON = { '또류': '🐋', '신입': '🌱', '고인물': '👑' };
+const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑' };
+
+// 이름을 바꾼 칭호 — 예전 이름으로 받아 간 사람을 새 이름으로 옮긴다
+const RENAMED = { '신입': '뉴비' };
 
 function label(n) {
     if (!n) return '';
@@ -326,6 +329,26 @@ function isVip(u) {
 // 계좌를 읽은 뒤에 한 번만 돈다. 먼저 돌면 VIP 인 사람을 잘못 뗀다.
 // 누적 횟수로 받는 칭호(구출·사망 …)는 건드리지 않는다.
 let repaired = false;
+// 예전 이름으로 받아 간 상담사 칭호를 새 이름으로 옮긴다
+(function rename() {
+    const iv = setInterval(function () {
+        if (!currentUser) return;
+        clearInterval(iv);
+        if (!Array.isArray(currentUser.titleAdmin)) return;
+        let moved = 0;
+        currentUser.titleAdmin = currentUser.titleAdmin.map(function (n) {
+            if (!RENAMED[n]) return n;
+            moved++;
+            return RENAMED[n];
+        });
+        if (RENAMED[currentUser.titleOn]) currentUser.titleOn = RENAMED[currentUser.titleOn];
+        if (!moved) return;
+        save({ titleAdmin: 1, titleOn: 1 });
+        paint();
+        console.log('[칭호] 이름이 바뀐 칭호 ' + moved + '개를 옮겼습니다.');
+    }, 1500);
+})();
+
 function repair() {
     if (repaired || !currentUser) return;
     if (!Array.isArray(currentUser.titles)) return;   // 아직 안 읽혔으면 다음 기회에
