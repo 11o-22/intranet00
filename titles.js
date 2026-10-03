@@ -36,6 +36,9 @@ const DEFS = [
     { id:'collect', n:'콜렉터',      need:'우주 쇼핑몰 물품 전부 보유 (상담사 전용 제외)',
       check:(u)=> poolSettled && allOwned(u, alienPool()) },
 
+    { id:'frame',   n:'프레임',      need:'테두리 전부 보유 (영상 테두리 포함)',
+      check:(u)=> framesAll(u) },
+
     { id:'spy',     n:'스파이',      need:'반대 소속 물품 전부 보유',
       check:(u)=> { if (!poolSettled) return false;
                     const o = otherSideItems(u); return o.length > 0 && allOwned(u, o); } },
@@ -80,6 +83,18 @@ const DEFS = [
 // 상담사가 손으로 붙이는 것
 const ADMIN_TITLES = ['또류', '신입', '고인물'];
 
+// 상담사 칭호에 붙는 그림
+//
+// 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
+// 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
+const ADMIN_ICON = { '또류': '🐋', '신입': '🌱', '고인물': '👑' };
+
+function label(n) {
+    if (!n) return '';
+    const ic = ADMIN_ICON[n];
+    return ic ? ic + ' ' + n : n;
+}
+
 // ==========================================
 // 조건 판정에 쓰는 것들
 // ==========================================
@@ -114,6 +129,56 @@ const ADMIN_ONLY = ['여우구슬', '금고'];
 
 // 진열 확률이 0.1% 라 사실상 막혀 있는 것 (newitems2.js RARE_RATE)
 const TOO_RARE = ['황룡의 눈', '산군의 도움'];
+
+// ==========================================
+// 컬렉터 — 테두리 전부
+// ==========================================
+//
+// 테두리는 견본첩 하나에서만 나온다. frDraw() 가 FRAMES 전체에서 뽑으므로
+// 영상 테두리까지 전부 뽑을 수 있다. (frames.js:154)
+//
+// 다만 등급 가중치가 이렇다. (frames.js:7)
+//     D 60  ·  C 25  ·  B 10  ·  A 4.5  ·  S 0.5  ·  L 0.05
+// 같은 등급끼리 다시 나눠 가지므로 L 한 종이 0.017%, 평균 6,000권이다.
+// 47종을 다 모으려면 중앙값 9,500권쯤 든다.
+//
+// 너무 멀면 아래에서 등급을 빼면 된다. 뺀 등급은 세지 않는다.
+//     TITLE_FRAME_SKIP = ['L']        L등급은 빼고 센다
+//     TITLE_FRAME_SKIP = ['S', 'L']   S·L 둘 다 뺀다
+if (window.TITLE_FRAME_SKIP === undefined) window.TITLE_FRAME_SKIP = [];
+
+// 테두리 표도 여러 파일이 나눠서 채운다 (frames · frames-video 1·2·3)
+let framesSettled = false;
+(function settleFrames() {
+    let last = -1, same = 0;
+    const iv = setInterval(function () {
+        const n = (typeof FRAMES !== 'undefined') ? FRAMES.length : -1;
+        if (n === last) same++; else { last = n; same = 0; }
+        if (n > 0 && same >= 5) {            // 6초쯤 변동이 없으면 다 찬 것으로 본다
+            framesSettled = true;
+            clearInterval(iv);
+            check();
+        }
+    }, 1200);
+})();
+
+function frameTargets() {
+    if (typeof FRAMES === 'undefined') return [];
+    const skip = window.TITLE_FRAME_SKIP || [];
+    return FRAMES.filter(function (f) { return skip.indexOf(f.g) < 0; });
+}
+
+function frameHave(u) {
+    const own = (u && u.frames && u.frames.owned) || {};
+    return frameTargets().filter(function (f) { return own[f.id] > 0; }).length;
+}
+
+function framesAll(u) {
+    if (!framesSettled) return false;
+    const t = frameTargets();
+    if (!t.length) return false;
+    return frameHave(u) >= t.length;
+}
 
 // 풀은 여러 파일이 나눠서 채운다. (newitems · newitems2 · sapphire · skin …)
 // 다 차기 전에 세면 적게 세어 그냥 칭호를 줘 버리므로, 멈춘 뒤에 센다.
@@ -539,7 +604,7 @@ function paint() {
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
         + (w
             ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
+              + ' border-radius:3px; padding:2px 7px;">[' + label(w) + ']</span>'
             : '<div style="font-size:11px; color:#666;">'
               + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
               + '</div>')
@@ -559,7 +624,7 @@ function tagHtml(u, size) {
     const s = size || 9;
     return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
         + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
-        + n + '</span>';
+        + label(n) + '</span>';
 }
 
 function after(name, fn) {
@@ -666,6 +731,7 @@ function prog(d, u, s) {
             const pool = alienPool(), m = owned(u);
             return [pool.filter(function (n) { return m[n]; }).length, pool.length, '종'];
         }
+        case 'frame':   return [frameHave(u), frameTargets().length, '종'];
         case 'spy': {
             const o = otherSideItems(u), m = owned(u);
             return [o.filter(function (n) { return m[n]; }).length, o.length, '종'];
@@ -742,7 +808,7 @@ function renderTitleList() {
                 return '<div style="display:flex; justify-content:space-between; align-items:center;'
                     + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
                     + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
-                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + n + ']</span>'
+                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + label(n) + ']</span>'
                     + '<button class="game-btn" style="margin:0; padding:6px 12px; font-size:10px;'
                     + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
                           + ' border-color:#d4af37 !important; color:#fff !important;' : '')
@@ -815,8 +881,8 @@ window.adminGiveTitle = function (name) {
     });
     paint();
     if (typeof updateUI === 'function') updateUI();
-    showCustomAlert((done.length ? '[' + name + '] 부여 — ' + done.join(', ') : '')
-        + (off.length ? (done.length ? '\n\n' : '') + '[' + name + '] 회수 — ' + off.join(', ') : ''));
+    showCustomAlert((done.length ? '[' + label(name) + '] 부여 — ' + done.join(', ') : '')
+        + (off.length ? (done.length ? '\n\n' : '') + '[' + label(name) + '] 회수 — ' + off.join(', ') : ''));
 };
 
 (function mountAdmin() {
@@ -832,7 +898,7 @@ window.adminGiveTitle = function (name) {
                 return '<button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;'
                     + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
                     + ' border-color:#7a6a3a !important;" onclick="adminGiveTitle(\'' + n + '\')">'
-                    + n + '</button>';
+                    + label(n) + '</button>';
             }).join('');
         const holder = anchor.parentNode;
         holder.parentNode.insertBefore(row, holder.nextSibling);
@@ -850,8 +916,8 @@ window.myTitles = function (code) {
     console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
     const list = myList(u);
     const w = worn(u);
-    console.log('  달고 있음:', w ? '[' + w + ']' : '없음');
-    console.log('  보유:', list.length ? list.map(function (n) { return '[' + n + ']'; }).join(' ') : '아직 없습니다.');
+    console.log('  달고 있음:', w ? '[' + label(w) + ']' : '없음');
+    console.log('  보유:', list.length ? list.map(function (n) { return '[' + label(n) + ']'; }).join(' ') : '아직 없습니다.');
 };
 
 window.titleProgress = function () {
@@ -877,7 +943,7 @@ window.titleProgress = function () {
     console.table(rows);
     console.log('  세기 시작:', s._born ? new Date(s._born).toLocaleString() : '-');
     if (currentUser.titleAdmin && currentUser.titleAdmin.length) {
-        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + n + ']'; }).join(' '));
+        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + label(n) + ']'; }).join(' '));
     }
 };
 
