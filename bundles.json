@@ -207,6 +207,7 @@
    "guarantee-fix.js",
    "smash-fix.js",
    "ailen-dup.js",
+   "roommate.js",
    "save-merge.js"
   ]
  ]
