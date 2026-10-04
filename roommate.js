@@ -57,22 +57,41 @@ const RM_PRICE = 2000;
 const ADMIN = 'kario0987';
 
 // ==========================================
-// 주 번호 — 월요일 00:00 이 경계
+// 주 번호 — 한국 시각 월요일 00:00 이 경계
 // ==========================================
-function weekKey(d) {
-    const t = d ? new Date(d) : new Date();
-    const day = (t.getDay() + 6) % 7;            // 월요일 = 0
-    t.setHours(0, 0, 0, 0);
-    t.setDate(t.getDate() - day);                // 그 주 월요일로
+//
+// 기기의 시계와 시간대를 보면 안 된다. 사원마다 다르다.
+// 서버 시각 하나에 +9시간을 고정으로 더하므로 어느 기기에서 봐도 같다.
+const KST = 9 * 3600 * 1000;
+let skew = 0, clockOK = false;
+
+(function watchClock() {
+    const iv = setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        clearInterval(iv);
+        database.ref('.info/serverTimeOffset').on('value', function (s) {
+            skew = s.val() || 0;
+            clockOK = true;
+        });
+    }, 500);
+})();
+
+function nowMs() { return Date.now() + skew; }
+function kst(ms) { return new Date((ms == null ? nowMs() : ms) + KST); }
+
+function weekKey(ms) {
+    const d = kst(ms);
+    const day = (d.getUTCDay() + 6) % 7;         // 월요일 = 0
+    const mon = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - day * 86400000);
     const p = function (n) { return (n < 10 ? '0' : '') + n; };
-    return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate());
+    return mon.getUTCFullYear() + '-' + p(mon.getUTCMonth() + 1) + '-' + p(mon.getUTCDate());
 }
 function isWeekend() {
-    const d = new Date().getDay();
+    const d = kst().getUTCDay();
     return d === 0 || d === 6;                   // 일 · 토
 }
 function daysLeft() {
-    return 7 - ((new Date().getDay() + 6) % 7);  // 월 7 … 토 2 · 일 1
+    return 7 - ((kst().getUTCDay() + 6) % 7);    // 월 7 … 토 2 · 일 1
 }
 
 // ==========================================
@@ -461,7 +480,8 @@ function doAssign(wk) {
                 if (rm && inPool[rm]) up['users/' + c + '/house/roomie'] = null;
             });
 
-            up['roomAssign/at'] = Date.now();
+             up['roomAssign/week'] = wk;            // ★ 배정과 한 번에 쓴다 — 반만 들어가는 일이 없다
+            up['roomAssign/at'] = nowMs();
             up['roomAssign/by'] = currentUser ? currentUser.code : '?';
             up['roomAssign/pairs'] = out.pairs.map(function (p) { return p.join('_'); });
             up['roomAssign/alone'] = out.alone || null;
@@ -470,39 +490,45 @@ function doAssign(wk) {
                 console.log('%c[룸메] ' + wk + ' 배정 완료 — ' + out.pairs.length + '쌍'
                     + (out.alone ? ' · 단독 1명' : ''), 'color:#4CAF50');
                 if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
+                return true;
             }).catch(function (e) {
                 console.error('[룸메] 배정을 쓰지 못했습니다:', e);
-                // 다른 사람(또는 상담사)이 다시 시도할 수 있게 표시를 되돌린다
-                database.ref('roomAssign/week').remove().catch(function () { });
+                return false;                      // week 을 지우지 않는다 — 자물쇠가 풀리면 다시 해 본다
             });
         });
-    }).catch(function (e) { console.error('[룸메] 배정 실패:', e); });
+    }).catch(function (e) { console.error('[룸메] 배정 실패:', e); return false; });
 }
 
 (function weekly() {
+    const LOCK_MS = 10 * 60 * 1000;      // 쓰다 말고 끊긴 사람의 자리를 10분 뒤에 놓아준다
     let tried = '';
+
     function tick() {
         if (typeof database === 'undefined' || !database || !currentUser) return;
+        if (!clockOK) return;                                // 서버 시각을 받기 전에는 아무것도 안 한다
         const wk = weekKey();
         if (tried === wk) return;
 
-        const ref = database.ref('roomAssign/week');
-        ref.once('value').then(function (s) {
-            if (s.val() === wk) { tried = wk; return; }      // 이미 누가 돌렸다
-            ref.transaction(function (cur) {
-                if (cur === wk) return;                       // 동시에 들어왔다 — 양보
-                return wk;
+        database.ref('roomAssign').once('value').then(function (s) {
+            const a = s.val() || {};
+            if (a.week === wk) { tried = wk; return; }         // 이번 주는 이미 돌았다
+            if (a.week && a.week > wk) { tried = wk; return; } // ★ 뒤로는 절대 가지 않는다
+            const lk = a.lock || {};
+            if (lk.week === wk && (nowMs() - (lk.at || 0)) < LOCK_MS) return;   // 누가 하는 중
+
+            database.ref('roomAssign/lock').transaction(function (cur) {
+                if (cur && cur.week === wk && (nowMs() - (cur.at || 0)) < LOCK_MS) return;
+                return { week: wk, at: nowMs(), by: currentUser.code };
             }, function (err, committed) {
-                tried = wk;
                 if (err || !committed) return;
-                doAssign(wk);
+                tried = wk;
+                doAssign(wk).then(function (ok) { if (!ok) tried = ''; });
             });
         }).catch(function () { });
     }
     setTimeout(tick, 4000);
-    setInterval(tick, 5 * 60 * 1000);                        // 자정을 넘겨도 잡는다
+    setInterval(tick, 5 * 60 * 1000);
 })();
-
 // ==========================================
 // 내 자리는 따로 받아 온다
 //   applyServerMe 는 _adminStamp 가 바뀔 때만 돌고, save-merge.js 가
@@ -709,7 +735,8 @@ window.roomForce = function () {
     if (typeof database === 'undefined' || !database) return;
     const wk = weekKey();
     if (!confirm(wk + ' 주 배정을 지금 돌립니까?\n전원 호실이 다시 정해집니다.')) return;
-    database.ref('roomAssign/week').set(wk).then(function () { return doAssign(wk); });
+       database.ref('roomAssign/lock').set({ week: wk, at: nowMs(), by: currentUser.code })
+        .then(function () { return doAssign(wk); });
 };
 
 // 공용 보관함을 손으로 옮긴다 — 짐이 엉켰을 때
