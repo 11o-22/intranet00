@@ -3477,7 +3477,7 @@ setInterval(() => {
         const today = getTodayStr();
        if (currentUser.darkDate !== today) return 8;
        const base = 8;
-        return Math.max(0, base - (currentUser.darkTries || 0));
+        return base - (currentUser.darkTries || 0);
     }
 
            function rollDarkBonus(kind) {
@@ -3550,7 +3550,7 @@ return b;
             saveDB();
         }
 
-        const left = getDarkTriesLeft();
+       const left = Math.max(0, getDarkTriesLeft());
         let html = `
             <div style="text-align:left;">
                 <div style="font-size:11px; color:#888; margin-bottom:12px; text-align:center; line-height:1.6;">
