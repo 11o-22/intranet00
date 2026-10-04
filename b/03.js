@@ -1177,7 +1177,7 @@ ITEM_CATALOG['벽지 견본첩'] = {
     desc: '넘길 때마다 다른 방이 나온다. 사용하면 단말의 색·무늬·글꼴이 무작위로 바뀐다. 해제하면 견본첩은 사라진다.'
 };
 const SKIN_ITEM = '벽지 견본첩';
-const SKIN_DAILY = 5;   // 유쾌 판매소 하루 구매 한도
+const SKIN_DAILY = 10;   // 유쾌 판매소 하루 구매 한도
 // 우주 쇼핑몰에는 넣지 않는다 (유쾌 판매소 고정 진열)
 if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
     const i = ALIEN_ITEMS_POOL.indexOf(SKIN_ITEM);
@@ -2705,9 +2705,15 @@ BIRTH_ITEMS.forEach(function (b) {
     ITEM_CATALOG[b.n] = {
         price: 300, usable: true, targetable: false,
         effect: b.e, value: b.v, birth: true, desc: '[출산] ' + b.d,
-        heal: b.heal, ticket: b.ticket, bonus: b.bonus, dark: b.dark,
-        point: b.point, luck: b.luck, hide: b.hide, reroll: b.reroll,
-        guard: b.guard, mult: b.mult
+       heal:   b.heal   || (b.e === 'b_heal'   ? b.v : undefined),
+ticket: b.ticket || (b.e === 'b_ticket' ? b.v : undefined),
+bonus:  b.bonus  || (b.e === 'b_bonus'  ? b.v : undefined),
+dark:   b.dark   || (b.e === 'b_dark'   ? b.v : undefined),
+point:  b.point  || (b.e === 'b_point'  ? b.v : undefined),
+luck:   b.luck,  hide:   b.hide   || (b.e === 'b_hide'   ? b.v : undefined),
+reroll: b.reroll || (b.e === 'b_reroll' ? b.v : undefined),
+guard:  b.guard  || (b.e === 'b_guard'  ? b.v : undefined),
+mult:   b.mult
     };
 });
 
@@ -3041,7 +3047,7 @@ function myDnaEquip() {
 
         if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
         if (myDnaEquip()) { showCustomAlert('고유 아이템은 하나만 찰 수 있습니다.'); return; }
-        if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
+        if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
 
         currentUser.equippedWeapons.push(itemName);
         setEquipOwner(currentUser, itemName, currentUser.code);
@@ -3827,7 +3833,7 @@ function hasSapClamp(user)   { return sapActive(user, '사파이어 젖꼭지 �
             if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장착할 수 없습니다.'); return; }
 
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 8) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
+            if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
 
             currentUser.equippedWeapons.push(itemName);
             setEquipOwner(currentUser, itemName, currentUser.code);
@@ -3849,7 +3855,7 @@ function hasSapClamp(user)   { return sapActive(user, '사파이어 젖꼭지 �
             if (!targetUser) return false;
 
             if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-            if (targetUser.equippedWeapons.length >= 8) {
+            if (targetUser.equippedWeapons.length >= 12) {
                 showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
                 return false;
             }

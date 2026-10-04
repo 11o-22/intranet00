@@ -1,5 +1,5 @@
 // ==========================================
-// 묶음 08.js — 40개
+// 묶음 08.js — 48개
 // build.mjs 가 만든 것입니다. 여기를 고치지 말고 원본 파일을 고치세요.
 // ==========================================
 
@@ -5744,7 +5744,10 @@ setInterval(function () {
             }
             currentUser.gearPolish = 0;
             try { return _try.apply(this, arguments); }
-            finally { currentUser.gearPolish = keep; }
+            finally {
+    currentUser.gearPolish = keep;
+    if (keep > 0 && typeof saveFields === 'function') saveFields({ gearPolish: 1 });
+}
         };
         tryGearUpgrade._noPolishL = true;
         clearInterval(iv);
@@ -10393,6 +10396,9 @@ const DEFS = [
     { id:'collect', n:'콜렉터',      need:'우주 쇼핑몰 물품 전부 보유 (상담사 전용 제외)',
       check:(u)=> poolSettled && allOwned(u, alienPool()) },
 
+    { id:'frame',   n:'프레임',      need:'테두리 전부 보유 (영상 테두리 포함)',
+      check:(u)=> framesAll(u) },
+
     { id:'spy',     n:'스파이',      need:'반대 소속 물품 전부 보유',
       check:(u)=> { if (!poolSettled) return false;
                     const o = otherSideItems(u); return o.length > 0 && allOwned(u, o); } },
@@ -10435,7 +10441,22 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '신입', '고인물'];
+const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설'];
+
+// 상담사 칭호에 붙는 그림
+//
+// 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
+// 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
+const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤' };
+
+// 이름을 바꾼 칭호 — 예전 이름으로 받아 간 사람을 새 이름으로 옮긴다
+const RENAMED = { '신입': '뉴비' };
+
+function label(n) {
+    if (!n) return '';
+    const ic = ADMIN_ICON[n];
+    return ic ? ic + ' ' + n : n;
+}
 
 // ==========================================
 // 조건 판정에 쓰는 것들
@@ -10471,6 +10492,56 @@ const ADMIN_ONLY = ['여우구슬', '금고'];
 
 // 진열 확률이 0.1% 라 사실상 막혀 있는 것 (newitems2.js RARE_RATE)
 const TOO_RARE = ['황룡의 눈', '산군의 도움'];
+
+// ==========================================
+// 컬렉터 — 테두리 전부
+// ==========================================
+//
+// 테두리는 견본첩 하나에서만 나온다. frDraw() 가 FRAMES 전체에서 뽑으므로
+// 영상 테두리까지 전부 뽑을 수 있다. (frames.js:154)
+//
+// 다만 등급 가중치가 이렇다. (frames.js:7)
+//     D 60  ·  C 25  ·  B 10  ·  A 4.5  ·  S 0.5  ·  L 0.05
+// 같은 등급끼리 다시 나눠 가지므로 L 한 종이 0.017%, 평균 6,000권이다.
+// 47종을 다 모으려면 중앙값 9,500권쯤 든다.
+//
+// 너무 멀면 아래에서 등급을 빼면 된다. 뺀 등급은 세지 않는다.
+//     TITLE_FRAME_SKIP = ['L']        L등급은 빼고 센다
+//     TITLE_FRAME_SKIP = ['S', 'L']   S·L 둘 다 뺀다
+if (window.TITLE_FRAME_SKIP === undefined) window.TITLE_FRAME_SKIP = [];
+
+// 테두리 표도 여러 파일이 나눠서 채운다 (frames · frames-video 1·2·3)
+let framesSettled = false;
+(function settleFrames() {
+    let last = -1, same = 0;
+    const iv = setInterval(function () {
+        const n = (typeof FRAMES !== 'undefined') ? FRAMES.length : -1;
+        if (n === last) same++; else { last = n; same = 0; }
+        if (n > 0 && same >= 5) {            // 6초쯤 변동이 없으면 다 찬 것으로 본다
+            framesSettled = true;
+            clearInterval(iv);
+            check();
+        }
+    }, 1200);
+})();
+
+function frameTargets() {
+    if (typeof FRAMES === 'undefined') return [];
+    const skip = window.TITLE_FRAME_SKIP || [];
+    return FRAMES.filter(function (f) { return skip.indexOf(f.g) < 0; });
+}
+
+function frameHave(u) {
+    const own = (u && u.frames && u.frames.owned) || {};
+    return frameTargets().filter(function (f) { return own[f.id] > 0; }).length;
+}
+
+function framesAll(u) {
+    if (!framesSettled) return false;
+    const t = frameTargets();
+    if (!t.length) return false;
+    return frameHave(u) >= t.length;
+}
 
 // 풀은 여러 파일이 나눠서 채운다. (newitems · newitems2 · sapphire · skin …)
 // 다 차기 전에 세면 적게 세어 그냥 칭호를 줘 버리므로, 멈춘 뒤에 센다.
@@ -10618,6 +10689,26 @@ function isVip(u) {
 // 계좌를 읽은 뒤에 한 번만 돈다. 먼저 돌면 VIP 인 사람을 잘못 뗀다.
 // 누적 횟수로 받는 칭호(구출·사망 …)는 건드리지 않는다.
 let repaired = false;
+// 예전 이름으로 받아 간 상담사 칭호를 새 이름으로 옮긴다
+(function rename() {
+    const iv = setInterval(function () {
+        if (!currentUser) return;
+        clearInterval(iv);
+        if (!Array.isArray(currentUser.titleAdmin)) return;
+        let moved = 0;
+        currentUser.titleAdmin = currentUser.titleAdmin.map(function (n) {
+            if (!RENAMED[n]) return n;
+            moved++;
+            return RENAMED[n];
+        });
+        if (RENAMED[currentUser.titleOn]) currentUser.titleOn = RENAMED[currentUser.titleOn];
+        if (!moved) return;
+        save({ titleAdmin: 1, titleOn: 1 });
+        paint();
+        console.log('[칭호] 이름이 바뀐 칭호 ' + moved + '개를 옮겼습니다.');
+    }, 1500);
+})();
+
 function repair() {
     if (repaired || !currentUser) return;
     if (!Array.isArray(currentUser.titles)) return;   // 아직 안 읽혔으면 다음 기회에
@@ -10896,7 +10987,7 @@ function paint() {
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
         + (w
             ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-              + ' border-radius:3px; padding:2px 7px;">[' + w + ']</span>'
+              + ' border-radius:3px; padding:2px 7px;">[' + label(w) + ']</span>'
             : '<div style="font-size:11px; color:#666;">'
               + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
               + '</div>')
@@ -10916,7 +11007,7 @@ function tagHtml(u, size) {
     const s = size || 9;
     return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
         + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
-        + n + '</span>';
+        + label(n) + '</span>';
 }
 
 function after(name, fn) {
@@ -11023,6 +11114,7 @@ function prog(d, u, s) {
             const pool = alienPool(), m = owned(u);
             return [pool.filter(function (n) { return m[n]; }).length, pool.length, '종'];
         }
+        case 'frame':   return [frameHave(u), frameTargets().length, '종'];
         case 'spy': {
             const o = otherSideItems(u), m = owned(u);
             return [o.filter(function (n) { return m[n]; }).length, o.length, '종'];
@@ -11099,7 +11191,7 @@ function renderTitleList() {
                 return '<div style="display:flex; justify-content:space-between; align-items:center;'
                     + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
                     + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
-                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + n + ']</span>'
+                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + label(n) + ']</span>'
                     + '<button class="game-btn" style="margin:0; padding:6px 12px; font-size:10px;'
                     + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
                           + ' border-color:#d4af37 !important; color:#fff !important;' : '')
@@ -11172,8 +11264,8 @@ window.adminGiveTitle = function (name) {
     });
     paint();
     if (typeof updateUI === 'function') updateUI();
-    showCustomAlert((done.length ? '[' + name + '] 부여 — ' + done.join(', ') : '')
-        + (off.length ? (done.length ? '\n\n' : '') + '[' + name + '] 회수 — ' + off.join(', ') : ''));
+    showCustomAlert((done.length ? '[' + label(name) + '] 부여 — ' + done.join(', ') : '')
+        + (off.length ? (done.length ? '\n\n' : '') + '[' + label(name) + '] 회수 — ' + off.join(', ') : ''));
 };
 
 (function mountAdmin() {
@@ -11183,13 +11275,14 @@ window.adminGiveTitle = function (name) {
         if (!anchor) return;
         const row = document.createElement('div');
         row.id = 'title-admin-row';
-        row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px; align-items:center;';
+        row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px;'
+            + ' align-items:center; flex-wrap:wrap;';
         row.innerHTML = '<span style="font-size:10px; color:#888; flex-shrink:0;">칭호</span>'
             + ADMIN_TITLES.map(function (n) {
-                return '<button class="game-btn" style="flex:1; margin:0; padding:9px; font-size:11px;'
+                return '<button class="game-btn" style="flex:1 1 68px; margin:0; padding:9px; font-size:11px;'
                     + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
                     + ' border-color:#7a6a3a !important;" onclick="adminGiveTitle(\'' + n + '\')">'
-                    + n + '</button>';
+                    + label(n) + '</button>';
             }).join('');
         const holder = anchor.parentNode;
         holder.parentNode.insertBefore(row, holder.nextSibling);
@@ -11207,8 +11300,8 @@ window.myTitles = function (code) {
     console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
     const list = myList(u);
     const w = worn(u);
-    console.log('  달고 있음:', w ? '[' + w + ']' : '없음');
-    console.log('  보유:', list.length ? list.map(function (n) { return '[' + n + ']'; }).join(' ') : '아직 없습니다.');
+    console.log('  달고 있음:', w ? '[' + label(w) + ']' : '없음');
+    console.log('  보유:', list.length ? list.map(function (n) { return '[' + label(n) + ']'; }).join(' ') : '아직 없습니다.');
 };
 
 window.titleProgress = function () {
@@ -11234,11 +11327,114 @@ window.titleProgress = function () {
     console.table(rows);
     console.log('  세기 시작:', s._born ? new Date(s._born).toLocaleString() : '-');
     if (currentUser.titleAdmin && currentUser.titleAdmin.length) {
-        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + n + ']'; }).join(' '));
+        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + label(n) + ']'; }).join(' '));
     }
 };
 
 console.log('[칭호] myTitles() · titleProgress()');
+
+})();
+;
+
+// ---------- norepaint.js ----------
+// ==========================================
+// ★ 기록 칸이 깜박이는 것
+// bundles.json 마지막 그룹 아무 데나 (frames-video3.js 보다 뒤면 더 좋다)
+// ==========================================
+//
+// ■ 왜 깜박이나
+//
+//   renderHistory 는 들어올 때마다 칸을 통째로 다시 만든다. (index.html:7542)
+//
+//       container.innerHTML = currentUser.history.map(h => `
+//           <div class="history-item">...</div>
+//       `).join('');
+//
+//   그리고 이 함수는 updateUI 안에서 돈다. (index.html:5891)
+//   updateUI 는 서버에서 내 자리가 바뀔 때마다(applyMine, index.html:1378)
+//   그리고 남이 바뀌면 3초에 한 번(touchOthers, index.html:1366) 불린다.
+//
+//   그러니 몇 초마다 줄이 전부 버려지고 새로 생긴다.
+//   줄이 버려지면 거기 붙어 있던 영상 캔버스도 같이 사라진다.
+//   다시 붙이는 일은 scan() 이 맡는데 그것은 1.2초마다 한 번만 돈다.
+//
+//       setInterval(scan, 1200);     (frames-video2.js:220)
+//
+//   그래서 다시 그려질 때마다 최대 1.2초 동안 테두리가 없다. 그게 깜박임이다.
+//
+// ■ 어떻게 고치나
+//
+//   기록 내용이 그대로면 다시 그리지 않는다.
+//   renderHistory 는 currentUser.history 만 보고 글자를 만들므로,
+//   그 내용이 같으면 결과도 같다. 줄을 그냥 두면 캔버스도 살아 있다.
+//
+//   기록이 실제로 바뀌었을 때만 다시 그린다. 그때는 어차피 한 번 깜박인다.
+
+(function noRepaint() {
+
+function sigOf() {
+    const h = (currentUser && currentUser.history) || [];
+    let s = h.length + '|';
+    for (let i = 0; i < h.length; i++) {
+        s += (h[i] && h[i].time) + '\u0001' + (h[i] && h[i].text) + '\u0002';
+    }
+    return s;
+}
+
+(function hook() {
+    const iv = setInterval(function () {
+        if (typeof renderHistory !== 'function') return;
+        if (renderHistory._noRepaint) { clearInterval(iv); return; }
+
+        const _r = renderHistory;
+        renderHistory = function () {
+            const box = document.getElementById('history-list-container');
+            if (!box || !currentUser) return _r.apply(this, arguments);
+
+            const sig = sigOf();
+            // 글자가 그대로고 줄도 멀쩡히 있으면 손대지 않는다
+            if (box._sig === sig && box.children.length) return;
+
+            const r = _r.apply(this, arguments);
+            box._sig = sig;
+            return r;
+        };
+        renderHistory._noRepaint = true;
+        clearInterval(iv);
+        console.log('[기록] 내용이 같으면 다시 그리지 않습니다');
+    }, 400);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+//
+// 켜 두면 얼마나 아꼈는지 센다.
+window.repaintState = function (sec) {
+    sec = sec || 10;
+    if (typeof renderHistory !== 'function' || !renderHistory._noRepaint) {
+        console.warn('아직 연결되지 않았습니다.'); return;
+    }
+    const box = document.getElementById('history-list-container');
+    let calls = 0, redraw = 0;
+    const _r = renderHistory;
+    renderHistory = function () {
+        calls++;
+        const before = box && box.firstElementChild;
+        const r = _r.apply(this, arguments);
+        if (box && box.firstElementChild !== before) redraw++;
+        return r;
+    };
+    console.log('%c===== 기록 칸 =====', 'color:#c9a8ff; font-size:13px');
+    console.log('  ' + sec + '초 동안 세어 봅니다…');
+    setTimeout(function () {
+        renderHistory = _r;
+        console.log('  renderHistory 호출 ' + calls + '회 · 실제로 다시 그린 것 ' + redraw + '회');
+        console.log('  나머지 ' + (calls - redraw) + '회는 줄을 그대로 두었습니다. 그만큼 안 깜박입니다.');
+    }, sec * 1000);
+};
+
+console.log('[기록] repaintState(10)');
 
 })();
 ;
@@ -11649,6 +11845,2358 @@ console.log('[승인서] guarState()');
 })();
 ;
 
+// ---------- smash-fix.js ----------
+// ==========================================
+// ★ 기믹 파훼 — null 을 휘두르며 전부 깨는 것
+// bundles.json 마지막 그룹, dna-gifts.js 보다 뒤 (맨 뒤면 된다)
+// ==========================================
+//
+// ■ 무엇이 일어나고 있나
+//
+//   dark.js 원본은 이렇게 생겼다. (dark.js:4542~4557)
+//
+//       function smashWeapon() {
+//           if (hasEquip(currentUser, '작두')) return '작두';
+//           if (hasEquip(currentUser, '버터 나이프')) return '버터 나이프';
+//           return null;
+//       }
+//       function jakduAvailable() {
+//           return darkRun && !darkRun._jakduUsed && !!smashWeapon();
+//       }
+//       function useJakdu() {
+//           if (!jakduAvailable()) return false;      ← 전역 이름으로 부른다
+//           darkRun._jakduUsed = true;
+//           return true;
+//       }
+//
+//   dna-gifts.js 가 고유 아이템으로도 깰 수 있게 셋을 감쌌다. (dna-gifts.js:339~371)
+//
+//       jakduAvailable = () => _j() || dnaCharge.gim > 0;
+//       useJakdu       = () => _u() || dnaUse('gim');
+//
+//   여기서 어긋난다. _u 는 원본 useJakdu 이고, 그 안에서 부르는 jakduAvailable 은
+//   이름으로 찾으므로 「이미 감싸진 것」이 잡힌다.
+//   그래서 작두가 없어도 고유 충전만 있으면 _u 가 참을 돌려주고,
+//   뒤의 dnaUse('gim') 은 영영 불리지 않는다.
+//
+//   결과
+//     · dnaCharge.gim 이 줄지 않는다 → 버튼이 꺼지지 않는다 → 기믹을 전부 깬다
+//     · darkRun._jakduUsed 만 true 가 되는데, jakduAvailable 이
+//       dnaCharge.gim > 0 로 또 참이 되어 소용이 없다
+//
+//   그리고 이름이 null 로 찍히는 까닭
+//
+//       jakduAvailable · useJakdu 는 dnaCharge.gim 만 보는데
+//       smashWeapon 은 myDnaEquip() 까지 본다.
+//       고유 아이템을 탐사 도중에 빼거나, 상담사가 giveDnaExtra 로 아이템을 다시 만들어
+//       장착 칸의 이름과 ITEM_CATALOG 가 어긋나면 myDnaEquip() 이 null 이 된다.
+//       그때 버튼은 뜨고 이름만 null 이 된다. 「null 을 휘둘렀습니다」가 그것이다.
+//
+// ■ 어떻게 고치나
+//
+//   셋을 같은 조건으로 다시 세운다. 서로를 이름으로 부르지 않고 각자 판단한다.
+//
+//     작두·버터 나이프  — 탐사당 1회  (원래대로)
+//     고유 아이템       — 충전이 있는 동안, 쓸 때마다 하나씩 줄어든다
+//
+//   이름이 없으면 버튼 자체가 뜨지 않는다.
+
+(function smashFix() {
+
+function eq(name) {
+    if (!currentUser || !Array.isArray(currentUser.equippedWeapons)) return false;
+    if (typeof canWearItem === 'function' && !canWearItem(currentUser, name)) return false;
+    return currentUser.equippedWeapons.some(function (w) {
+        return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === name;
+    });
+}
+
+// 진짜 돌파 무기 — 원본과 같은 판정
+function realWeapon() {
+    if (eq('작두')) return '작두';
+    if (eq('버터 나이프')) return '버터 나이프';
+    return null;
+}
+
+// 고유 아이템으로 깰 수 있는가 — 장착되어 있고 충전이 남아 있을 때만
+function dnaReady() {
+    try {
+        if (typeof myDnaEquip !== 'function' || !myDnaEquip()) return false;
+        if (typeof dnaCharge === 'undefined' || !dnaCharge) return false;
+        return (dnaCharge.gim || 0) > 0;
+    } catch (e) { return false; }
+}
+
+// 고유 아이템의 이름
+function dnaName() {
+    try {
+        const nm = (currentUser.equippedWeapons || []).find(function (x) {
+            const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(x) : x;
+            const c = ITEM_CATALOG[base] || ITEM_CATALOG[x];
+            return c && c.effect === 'equip_dna';
+        });
+        return nm ? String(nm).split(' · ')[0] : '고유의 것';
+    } catch (e) { return '고유의 것'; }
+}
+
+function jakduLeft() {
+    return !!(typeof darkRun !== 'undefined' && darkRun && !darkRun._jakduUsed && realWeapon());
+}
+
+(function swap() {
+    const iv = setInterval(function () {
+        if (typeof jakduAvailable !== 'function' || typeof useJakdu !== 'function'
+            || typeof smashWeapon !== 'function') return;
+        if (window._smashFixed) { clearInterval(iv); return; }
+        window._smashFixed = true;
+
+        smashWeapon = function () {
+            const w = realWeapon();
+            if (w) return w;
+            return dnaReady() ? dnaName() : null;
+        };
+
+        jakduAvailable = function () {
+            if (typeof darkRun === 'undefined' || !darkRun) return false;
+            return jakduLeft() || dnaReady();
+        };
+
+        useJakdu = function () {
+            if (typeof darkRun === 'undefined' || !darkRun) return false;
+
+            // 작두·버터 나이프 — 탐사당 한 번
+            if (jakduLeft()) {
+                darkRun._jakduUsed = true;
+                if (Array.isArray(darkRun.log)) darkRun.log.push('[작두] 기믹 강제 돌파');
+                return true;
+            }
+            // 고유 아이템 — 충전 하나를 쓴다
+            if (dnaReady()) {
+                dnaCharge.gim = (dnaCharge.gim || 0) - 1;
+                if (Array.isArray(darkRun.log)) darkRun.log.push('[고유] 기믹 강제 돌파');
+                return true;
+            }
+            return false;
+        };
+
+        clearInterval(iv);
+        console.log('[기믹] 파훼 판정 다시 세움 — 작두 1회 · 고유 충전만큼');
+    }, 400);
+})();
+
+// 이름이 없으면 아예 휘두르지 않는다 — 「null 을 휘둘렀습니다」 막이
+(function guardSmash() {
+    const iv = setInterval(function () {
+        if (typeof jakduSmash !== 'function') return;
+        if (jakduSmash._nullGuard) { clearInterval(iv); return; }
+        const _s = jakduSmash;
+        jakduSmash = function () {
+            const w = (typeof smashWeapon === 'function') ? smashWeapon() : null;
+            if (!w) {
+                if (typeof showCustomAlert === 'function') {
+                    showCustomAlert('지금은 부술 수 있는 것이 없습니다.');
+                }
+                console.warn('[기믹] 무기 이름이 없어 멈췄습니다.');
+                return;
+            }
+            return _s.apply(this, arguments);
+        };
+        jakduSmash._nullGuard = true;
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.smashState = function () {
+    console.log('%c===== 기믹 파훼 =====', 'color:#ff6b6b; font-size:13px');
+    console.log('  고쳐짐:', window._smashFixed ? 'O' : '✗');
+    const inRun = (typeof darkRun !== 'undefined' && darkRun);
+    console.table([{
+        '탐사 중': inRun ? darkRun.zone : '아니오',
+        '작두/나이프': realWeapon() || '없음',
+        '작두 남음': inRun ? (jakduLeft() ? 'O' : '씀') : '-',
+        '고유 장착': (typeof myDnaEquip === 'function' && myDnaEquip()) ? 'O' : '없음',
+        '고유 충전': (typeof dnaCharge !== 'undefined' && dnaCharge) ? (dnaCharge.gim || 0) : '-',
+        '버튼': (typeof jakduAvailable === 'function' && jakduAvailable()) ? '보임' : '-',
+        '이름': String((typeof smashWeapon === 'function') ? smashWeapon() : null)
+    }]);
+};
+
+console.log('[기믹] smashState()');
+
+})();
+;
+
+// ---------- ailen-dup.js ----------
+// ==========================================
+// ★ 우주 쇼핑몰 — 같은 품목이 두 줄로 뜨는 것
+// bundles.json 마지막 그룹 아무 데나
+// ==========================================
+//
+// ■ 어디를 봤나
+//
+//   진열은 두 자리에서 나온다.
+//
+//     보통 사원  currentUser.alienUnlockedItems      (index.html:9144)
+//     상담사     ALIEN_ITEMS_POOL 통째로              (index.html:9144 같은 줄)
+//
+//   쌓는 자리는 전부 중복을 막고 있다.
+//
+//     index.html:9112   if (!...includes(it)) push
+//     newitems.js:160   if (!...includes(n)) push
+//     newitems2.js:1432 if (...indexOf(nm) < 0) push
+//     sapphire.js:26    if (!...includes(n)) push
+//     newitems2.js:1525 소속이 안 맞는 것을 바꿔 끼울 때도 이미 있는 것은 뺀다
+//
+//   그러니 코드가 지금 새로 만들어 내는 것 같지는 않다.
+//   예전 판에서 들어가 저장되어 있던 것이 남아 돌고 있을 가능성이 크다.
+//
+// ■ 무엇을 하나
+//
+//   1. 두 자리 모두 그릴 때마다 겹친 이름을 걷어낸다 (앞엣것을 남긴다)
+//   2. 내 진열대가 바뀌었으면 서버에도 고쳐 쓴다
+//   3. 겹친 것이 보이면 어디서 몇 개였는지 콘솔에 적는다
+//
+//   3번이 중요하다. 이 줄이 계속 찍히면 지금도 새로 생기고 있다는 뜻이다.
+//   그 기록을 알려 주시면 만들어 내는 자리를 찾을 수 있다.
+
+(function alienDup() {
+
+function dedup(arr) {
+    const seen = {}, out = [], dup = [];
+    for (let i = 0; i < arr.length; i++) {
+        const n = arr[i];
+        if (seen[n]) { dup.push(n); continue; }
+        seen[n] = 1;
+        out.push(n);
+    }
+    return { out: out, dup: dup };
+}
+
+let told = {};
+function tell(where, dup) {
+    if (!dup.length) return;
+    const key = where + '|' + dup.sort().join(',');
+    if (told[key]) return;              // 같은 말을 되풀이하지 않는다
+    told[key] = 1;
+    console.warn('[우주] ' + where + ' 에서 겹친 품목 ' + dup.length + '개 — ' + dup.join(', '));
+}
+
+// --- 목록 자체 ---
+function cleanPool() {
+    if (typeof ALIEN_ITEMS_POOL === 'undefined' || !Array.isArray(ALIEN_ITEMS_POOL)) return;
+    const r = dedup(ALIEN_ITEMS_POOL);
+    if (!r.dup.length) return;
+    tell('ALIEN_ITEMS_POOL', r.dup.slice());
+    ALIEN_ITEMS_POOL.length = 0;
+    r.out.forEach(function (n) { ALIEN_ITEMS_POOL.push(n); });
+}
+
+// --- 내 진열대 ---
+function cleanMine() {
+    if (!currentUser || !Array.isArray(currentUser.alienUnlockedItems)) return;
+    const r = dedup(currentUser.alienUnlockedItems);
+    if (!r.dup.length) return;
+    tell('내 진열대', r.dup.slice());
+    currentUser.alienUnlockedItems = r.out;
+    if (typeof saveFields === 'function') {
+        try { saveFields({ alienUnlockedItems: 1 }); } catch (e) { }
+    }
+}
+
+(function hook() {
+    const iv = setInterval(function () {
+        if (typeof renderAlienShop !== 'function') return;
+        if (renderAlienShop._noDup) { clearInterval(iv); return; }
+        const _r = renderAlienShop;
+        renderAlienShop = function () {
+            cleanPool();
+            cleanMine();
+            return _r.apply(this, arguments);
+        };
+        renderAlienShop._noDup = true;
+        clearInterval(iv);
+        console.log('[우주] 중복 진열 정리 연결');
+    }, 400);
+})();
+
+// 입고될 때도 한 번 본다
+(function hookWin() {
+    const iv = setInterval(function () {
+        if (typeof updateUI !== 'function') return;
+        if (updateUI._alienDup) { clearInterval(iv); return; }
+        const _u = updateUI;
+        updateUI = function () {
+            const r = _u.apply(this, arguments);
+            try { cleanMine(); } catch (e) { }
+            return r;
+        };
+        updateUI._alienDup = true;
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.alienDupState = function () {
+    console.log('%c===== 우주 쇼핑몰 중복 =====', 'color:#00A2E8; font-size:13px');
+
+    const pool = (typeof ALIEN_ITEMS_POOL !== 'undefined') ? ALIEN_ITEMS_POOL : [];
+    const pr = dedup(pool);
+    console.log('  ALIEN_ITEMS_POOL ' + pool.length + '종 · 겹침 '
+        + (pr.dup.length ? pr.dup.join(', ') : '없음'));
+
+    const mine = (currentUser && currentUser.alienUnlockedItems) || [];
+    const mr = dedup(mine);
+    console.log('  내 진열대 ' + mine.length + '칸 · 겹침 '
+        + (mr.dup.length ? mr.dup.join(', ') : '없음'));
+    if (mine.length) console.log('   ', mine.join(' · '));
+
+    // 상담사면 전 사원을 훑는다
+    if (!currentUser || currentUser.code !== 'kario0987') return;
+    if (typeof database === 'undefined' || !database) return;
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {}, rows = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            if (!Array.isArray(u.alienUnlockedItems)) return;
+            const d = dedup(u.alienUnlockedItems);
+            if (!d.dup.length) return;
+            rows.push({ 사원: u.name || c, 사번: u.no || '-',
+                        칸: u.alienUnlockedItems.length, 겹침: d.dup.join(', ') });
+        });
+        console.log('  — 전 사원 —');
+        if (rows.length) { console.table(rows); console.log('  고치려면 alienDupFixAll()'); }
+        else console.log('  겹친 사원이 없습니다.');
+    });
+};
+
+// 전 사원 정리 — 상담사용
+window.alienDupFixAll = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {}, up = {}, rows = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            if (!Array.isArray(u.alienUnlockedItems)) return;
+            const d = dedup(u.alienUnlockedItems);
+            if (!d.dup.length) return;
+            up['users/' + c + '/alienUnlockedItems'] = d.out;
+            rows.push({ 사원: u.name || c, 전: u.alienUnlockedItems.length, 후: d.out.length });
+        });
+        if (!rows.length) { console.log('고칠 사원이 없습니다.'); return; }
+        return database.ref().update(up).then(function () {
+            console.table(rows);
+            console.log('%c✓ ' + rows.length + '명 정리했습니다.', 'color:#4CAF50');
+        });
+    }).catch(function (e) { console.error(e); });
+};
+
+console.log('[우주] alienDupState() · alienDupFixAll()');
+
+})();
+;
+
+// ---------- roommate.js ----------
+// ==========================================
+// ★ 사택 룸메이트 — 주간 재배정 · 찌름권 · 확정권
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 언제 바뀌나
+//
+//   일요일에서 월요일로 넘어가는 00:00 에 전원 다시 짝지어진다.
+//   서버에 정해진 시각에 도는 것이 없으므로, 월요일이 된 뒤 처음 들어온
+//   사람의 화면에서 한 번만 돈다. roomAssign/week 에 거래(transaction)를
+//   걸어 두어 여럿이 동시에 들어와도 한 번만 돌아간다.
+//
+// ■ 찌름권 · 확정권
+//
+//   유쾌 판매소에 토요일과 일요일에만 선다. 각 2,000 P, 하루 한 장씩.
+//   안 쓴 것은 소지품에 남아 다음 주에도 쓸 수 있다.
+//
+//   찌름권  원하는 사원의 사번을 적는다. 그 주의 찌름으로 기록된다.
+//   확정권  찌름이 성공한 뒤 같은 사번을 한 번 더 적으면 배정에 반영된다.
+//
+// ■ 짝이 정해지는 차례
+//
+//   1. 서로 찌른 쌍      — 확정권 없이 바로 확정. 먼저 찌른 쌍부터.
+//   2. 한쪽만 찌른 경우  — 확정권까지 쓴 사람만. 먼저 찌른 사람이 가져간다.
+//   3. 나머지            — 무작위
+//   인원이 홀수면 한 명은 단독 호실이 된다.
+//
+//   「찌름 성공」은 이렇다.
+//     · 상대도 나를 찔렀다                        → 성공
+//     · 그 사람을 찌른 사람들 중 내가 가장 빠르다  → 성공
+//     · 다만 그 사람이 다른 사람과 서로 찔렀다면   → 실패
+//
+// ■ 등급은 건드리지 않는다 · 보관함은 따라온다
+//
+//   등급
+//     houseGrade() 가 둘 중 높은 쪽을 그때그때 고른다. (dark.js:8043)
+//     그래서 옮겨 적지 않는다. house-own.js 가 지키려는 「명의 등급」도
+//     그대로 남는다. adminAssignRoom 은 hb.grade = ha.grade 로 베껴
+//     쓰는데(dark.js:8273) 그건 하지 않는다.
+//
+//   보관함
+//     공용 보관함 주인은 두 사번 중 앞서는 쪽이다. (dark.js:8346)
+//     짝만 바꾸고 짐을 그냥 두면, 새 짝의 사번이 내 앞이 되는 순간
+//     내 짐이 들어 있는 상자가 안 보이게 된다. 그래서 짝이 정해질 때
+//     두 사람의 짐을 새 주인 쪽으로 모아 둔다. 둘 다 꺼낼 수 있다.
+//
+//     다만 지난주에 내가 공용함 주인이 아니었다면 내 짐은 이미 옛 짝의
+//     상자에 섞여 있다. 누가 넣은 것인지 적어 두는 자리가 없어서
+//     가려낼 수 없다. 그 짐은 옛 짝을 따라간다.
+//     → 주말 사택 화면에 「월요일 전에 공용함을 비우세요」를 띄워 둔다.
+
+(function roommate() {
+
+const RM_POKE = '룸메 찌름권';
+const RM_LOCK = '룸메 확정권';
+const RM_PRICE = 2000;
+const ADMIN = 'kario0987';
+
+// ==========================================
+// 주 번호 — 월요일 00:00 이 경계
+// ==========================================
+function weekKey(d) {
+    const t = d ? new Date(d) : new Date();
+    const day = (t.getDay() + 6) % 7;            // 월요일 = 0
+    t.setHours(0, 0, 0, 0);
+    t.setDate(t.getDate() - day);                // 그 주 월요일로
+    const p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate());
+}
+function isWeekend() {
+    const d = new Date().getDay();
+    return d === 0 || d === 6;                   // 일 · 토
+}
+function daysLeft() {
+    return 7 - ((new Date().getDay() + 6) % 7);  // 월 7 … 토 2 · 일 1
+}
+
+// ==========================================
+// 짝 정하기 — 여기만 보면 규칙이 다 보인다
+// ==========================================
+function pokeOK(me, pokes) {
+    const p = pokes[me];
+    if (!p || !p.to || p.to === me) return false;
+    const b = p.to;
+    const pb = pokes[b];
+
+    if (pb && pb.to === me) return true;                     // 서로 찔렀다
+
+    if (pb && pb.to && pb.to !== me) {                       // 상대가 딴 데를 찔렀는데
+        const pc = pokes[pb.to];
+        if (pc && pc.to === b) return false;                 // 그쪽과 서로 찔렀다면 가망 없다
+    }
+    // 그 사람을 찌른 사람들 중 내가 가장 빠른가
+    const rivals = Object.keys(pokes).filter(function (x) { return pokes[x] && pokes[x].to === b; });
+    rivals.sort(function (x, y) { return (pokes[x].at || 0) - (pokes[y].at || 0); });
+    return rivals[0] === me;
+}
+
+function resolvePairs(codes, pokes, confirms, shuffleFn) {
+    pokes = pokes || {}; confirms = confirms || {};
+    const live = {};
+    codes.forEach(function (c) { live[c] = 1; });
+
+    const taken = {}, pairs = [];
+    function put(a, b) { taken[a] = 1; taken[b] = 1; pairs.push([a, b]); }
+
+    // 1. 서로 찌른 쌍 — 확정권이 없어도 확정
+    const mut = [];
+    codes.forEach(function (a) {
+        const pa = pokes[a];
+        if (!pa || !pa.to || pa.to === a || !live[pa.to]) return;
+        const b = pa.to, pb = pokes[b];
+        if (pb && pb.to === a && a < b) {                    // a < b 로 한 번만 담는다
+            mut.push({ a: a, b: b, at: Math.min(pa.at || 0, pb.at || 0) });
+        }
+    });
+    mut.sort(function (x, y) { return x.at - y.at; });
+    mut.forEach(function (m) { if (!taken[m.a] && !taken[m.b]) put(m.a, m.b); });
+
+    // 2. 한쪽만 찌르고 확정권까지 쓴 사람 — 먼저 찌른 순
+    const one = [];
+    codes.forEach(function (a) {
+        if (taken[a]) return;
+        const c = confirms[a], p = pokes[a];
+        if (!c || !p || !c.to || c.to !== p.to) return;       // 찌른 상대와 확정한 상대가 같아야 한다
+        if (!live[c.to] || c.to === a) return;
+        one.push({ a: a, b: c.to, at: p.at || 0 });
+    });
+    one.sort(function (x, y) { return x.at - y.at; });
+    one.forEach(function (o) { if (!taken[o.a] && !taken[o.b]) put(o.a, o.b); });
+
+    // 3. 나머지는 무작위
+    const rest = codes.filter(function (c) { return !taken[c]; });
+    (shuffleFn || function (arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+    })(rest);
+    for (let i = 0; i + 1 < rest.length; i += 2) put(rest[i], rest[i + 1]);
+
+    return { pairs: pairs, alone: (rest.length % 2) ? rest[rest.length - 1] : null };
+}
+
+window._roomRules = { weekKey: weekKey, pokeOK: pokeOK, resolvePairs: resolvePairs };
+
+// ==========================================
+// 사번 적는 칸 — 모바일에서 prompt() 가 막히는 곳이 있어 직접 만든다
+// ==========================================
+function roomAsk(title, hint, cb) {
+    const old = document.getElementById('room-ask-overlay');
+    if (old) old.remove();
+
+    const ov = document.createElement('div');
+    ov.id = 'room-ask-overlay';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.78);'
+        + ' display:flex; align-items:center; justify-content:center; padding:22px;';
+    ov.innerHTML = '<div style="background:#16121c; border:1px solid #c2185b; border-radius:9px;'
+        + ' padding:19px 17px; width:100%; max-width:310px; box-shadow:0 7px 28px rgba(0,0,0,0.6);">'
+        + '<div style="font-size:12px; color:#ff8fb1; font-weight:bold; margin-bottom:9px;">' + title + '</div>'
+        + '<div style="font-size:10px; color:#999; line-height:1.7; margin-bottom:12px;">' + hint + '</div>'
+        + '<input id="room-ask-input" type="text" inputmode="latin" autocomplete="off" placeholder="사번"'
+        + ' style="width:100%; box-sizing:border-box; background:#0c0a10; border:1px solid #4a3a55;'
+        + ' border-radius:5px; padding:11px 10px; color:#fff; font-size:13px; letter-spacing:1px;'
+        + ' text-align:center; outline:none;">'
+        + '<div style="display:flex; gap:7px; margin-top:13px;">'
+        + '<button class="game-btn" id="room-ask-no" style="flex:1; margin:0; padding:10px 0; font-size:11px;">취소</button>'
+        + '<button class="game-btn" id="room-ask-ok" style="flex:1; margin:0; padding:10px 0; font-size:11px;">적는다</button>'
+        + '</div></div>';
+    document.body.appendChild(ov);
+
+    const inp = ov.querySelector('#room-ask-input');
+    let answered = false;
+    function done(v) {
+        if (answered) return;
+        answered = true;
+        ov.remove();
+        cb(v);
+    }
+    ov.querySelector('#room-ask-no').onclick = function () { done(null); };
+    ov.querySelector('#room-ask-ok').onclick = function () { done(inp.value); };
+    inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); done(inp.value); } };
+    ov.onclick = function (e) { if (e.target === ov) done(null); };
+    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
+}
+
+// ==========================================
+// 아이템 등록
+// ==========================================
+(function reg() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        ITEM_CATALOG[RM_POKE] = {
+            price: RM_PRICE, usable: true, targetable: false, effect: 'rm_poke',
+            desc: '같이 살고 싶은 사원의 사번을 적는다. 이번 주 찌름으로 남는다. 주말에만 판다.'
+        };
+        ITEM_CATALOG[RM_LOCK] = {
+            price: RM_PRICE, usable: true, targetable: false, effect: 'rm_lock',
+            desc: '찌름이 성공했을 때 같은 사번을 한 번 더 적는다. 월요일 배정에 반영된다. 주말에만 판다.'
+        };
+        if (typeof NO_SELL_ITEMS !== 'undefined') {
+            if (NO_SELL_ITEMS.indexOf(RM_POKE) < 0) NO_SELL_ITEMS.push(RM_POKE);
+            if (NO_SELL_ITEMS.indexOf(RM_LOCK) < 0) NO_SELL_ITEMS.push(RM_LOCK);
+        }
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 상점 — 토 · 일에만, 하루 한 장씩
+// ==========================================
+function boughtToday(id) {
+    if (!currentUser) return 0;
+    const k = (typeof getShopCycleKey === 'function') ? getShopCycleKey() : '';
+    const r = (currentUser.purchaseRecord || {})[k] || {};
+    return r[id] || 0;
+}
+
+window.buyRoomTicket = function (which) {
+    if (typeof buyGuard === 'function' && !buyGuard()) return;
+    if (!currentUser) return;
+    if (!isWeekend()) { showCustomAlert('토요일과 일요일에만 팝니다.'); return; }
+    if (typeof isQuarantined === 'function' && isQuarantined(currentUser)) {
+        showCustomAlert('격리 중에는 상점을 이용할 수 없습니다.'); return;
+    }
+    const nm = (which === 'lock') ? RM_LOCK : RM_POKE;
+    const id = (which === 'lock') ? 'rm_lock' : 'rm_poke';
+    if (boughtToday(id) >= 1) { showCustomAlert(nm + '은(는) 하루 한 장까지 살 수 있습니다.'); return; }
+    if (currentUser.points < RM_PRICE) { showLuxuryAlert(); return; }
+
+    const k = getShopCycleKey();
+    if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
+    if (!currentUser.purchaseRecord[k]) currentUser.purchaseRecord[k] = {};
+    currentUser.purchaseRecord[k][id] = 1;
+    currentUser.points -= RM_PRICE;
+    if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+    currentUser.inventory.push(nm);
+    if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[상점 구매] ' + nm + ' (-' + RM_PRICE + ' P)');
+    if (typeof saveFields === 'function') saveFields({ points: 1, inventory: 1, history: 1, purchaseRecord: 1 });
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof renderRegularShop === 'function') renderRegularShop();
+};
+
+// 유쾌 판매소는 updateUI 마다 container.innerHTML 을 통째로 다시 씁니다.
+// (index.html:5892 → 7650) 그 안에 두면 저장할 때마다 지워지고 다시 생겨
+// 깜박입니다. 그래서 칸 밖, #shop-regular 에 한 번만 만들어 두고
+// 숫자만 갈아 끼웁니다. 글자가 같으면 손도 대지 않습니다.
+function ticketRow() {
+    const host = document.getElementById('shop-regular');
+    const box = document.getElementById('regular-shop-items-container');
+    let row = document.getElementById('room-ticket-row');
+
+    if (!host || !box || !currentUser || !isWeekend()) {   // 평일에는 치운다
+        if (row) row.remove();
+        return null;
+    }
+    if (row) return row;
+
+    row = document.createElement('div');
+    row.id = 'room-ticket-row';
+    row.style.cssText = 'border:1px solid #c2185b; border-radius:7px; padding:12px;'
+        + ' margin-bottom:12px; background:rgba(194,24,91,0.05);';
+    const cell = function (which, nm) {
+        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:9px;'
+            + ' background:rgba(0,0,0,0.25); border-radius:5px; padding:8px 10px; margin-top:6px;">'
+            + '<div style="flex:1; min-width:0;"><div style="font-size:11px; color:#fff;">' + nm + '</div>'
+            + '<div data-left="' + which + '" style="font-size:9px; color:#888;"></div></div>'
+            + '<button class="game-btn" data-buy="' + which + '"'
+            + ' style="margin:0; padding:7px 12px; font-size:11px; flex-shrink:0;"></button></div>';
+    };
+    row.innerHTML = '<div style="font-size:10px; color:#ff8fb1; letter-spacing:1px; margin-bottom:5px;">[주말 한정]</div>'
+        + '<div style="font-size:10px; color:#888; line-height:1.6;">'
+        + '월요일 0시에 호실이 다시 배정됩니다. 같이 살고 싶은 사원이 있으면 찌르세요.</div>'
+        + cell('poke', RM_POKE) + cell('lock', RM_LOCK);
+    box.insertAdjacentElement('beforebegin', row);        // 다시 쓰이는 칸 밖에 둔다
+
+    row.querySelector('[data-buy="poke"]').onclick = function () { buyRoomTicket('poke'); };
+    row.querySelector('[data-buy="lock"]').onclick = function () { buyRoomTicket('lock'); };
+    return row;
+}
+
+function paintTickets() {
+    const row = ticketRow();
+    if (!row) return;
+    [['poke', 'rm_poke'], ['lock', 'rm_lock']].forEach(function (x) {
+        const left = boughtToday(x[1]) ? 0 : 1;
+        const lab = row.querySelector('[data-left="' + x[0] + '"]');
+        const bt = row.querySelector('[data-buy="' + x[0] + '"]');
+        const t1 = '금일 잔여 ' + left + ' / 1장';
+        const t2 = left ? RM_PRICE.toLocaleString() + ' P' : '품절';
+        if (lab && lab.textContent !== t1) lab.textContent = t1;      // 같으면 손대지 않는다
+        if (bt) {
+            if (bt.textContent !== t2) bt.textContent = t2;
+            if (bt.disabled !== !left) bt.disabled = !left;
+        }
+    });
+}
+
+(function pinShop() {
+    const iv = setInterval(function () {
+        if (typeof renderRegularShop !== 'function') return;
+        if (renderRegularShop._roomPin) { clearInterval(iv); return; }
+        const _r = renderRegularShop;
+        renderRegularShop = function () {
+            const r = _r.apply(this, arguments);
+            try { paintTickets(); } catch (e) { }
+            return r;
+        };
+        renderRegularShop._roomPin = true;
+        clearInterval(iv);
+        setTimeout(function () { try { paintTickets(); } catch (e) { } }, 600);
+        console.log('[룸메] 주말 상점 연결');
+    }, 400);
+})();
+
+// ==========================================
+// 티켓 쓰기
+// ==========================================
+function findByNo(no) {
+    const k = String(no || '').trim();
+    if (!k || typeof db === 'undefined' || !db.users) return null;
+    const c = Object.keys(db.users).find(function (x) {
+        const u = db.users[x];
+        return u && (String(u.no) === k || x === k);
+    });
+    return c ? db.users[c] : null;
+}
+function nameOf(c) {
+    const u = (typeof db !== 'undefined' && db.users) ? db.users[c] : null;
+    return (u && u.name) || c;
+}
+
+function pokeRef() { return database.ref('roomPoke/' + weekKey()); }
+function lockRef() { return database.ref('roomConfirm/' + weekKey()); }
+
+// cb(true) 면 티켓을 쓴다
+function usePoke(cb) {
+    if (typeof database === 'undefined' || !database) { showCustomAlert('서버에 닿지 못했습니다.'); cb(false); return; }
+    roomAsk('룸메 찌름권', '같이 살고 싶은 사원의 사번을 적으세요.<br>'
+        + '상대도 당신을 찌르면 그대로 확정됩니다.<br>'
+        + '한쪽만 찌른 경우에는 확정권을 한 장 더 써야 합니다.', function (no) {
+        if (no === null) { cb(false); return; }
+        const t = findByNo(no);
+        if (!t) { showCustomAlert('그 사번을 찾지 못했습니다.'); cb(false); return; }
+        if (t.code === currentUser.code) { showCustomAlert('자기 사번은 적을 수 없습니다.'); cb(false); return; }
+
+        pokeRef().child(currentUser.code).set({ to: t.code, at: Date.now() })
+            .then(function () {
+                if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[사택] ' + t.name + ' 사원을 찔렀습니다.');
+                if (typeof saveFields === 'function') saveFields({ history: 1 });
+                showCustomAlert(t.name + ' 사원을 찔렀습니다.\n\n결과는 사택 화면에서 볼 수 있습니다.');
+                cb(true);
+            })
+            .catch(function () { showCustomAlert('적지 못했습니다. 다시 시도해 주세요.'); cb(false); });
+    });
+}
+
+function useLock(cb) {
+    if (typeof database === 'undefined' || !database) { showCustomAlert('서버에 닿지 못했습니다.'); cb(false); return; }
+    pokeRef().once('value').then(function (s) {
+        const pokes = s.val() || {};
+        const mine = pokes[currentUser.code];
+        if (!mine) { showCustomAlert('먼저 찌름권으로 사번을 적어야 합니다.'); cb(false); return; }
+        if (!pokeOK(currentUser.code, pokes)) {
+            showCustomAlert('찌름이 아직 성공하지 않았습니다.\n\n'
+                + nameOf(mine.to) + ' 사원은 다른 사원이 먼저 찔렀거나,\n'
+                + '이미 다른 사원과 서로 찌른 상태입니다.\n\n'
+                + '확정권은 그대로 남습니다.');
+            cb(false); return;
+        }
+        roomAsk('룸메 확정권', '찌른 사원의 사번을 한 번 더 적으세요.<br>'
+            + '월요일 0시 배정에 그대로 반영됩니다.', function (no) {
+            if (no === null) { cb(false); return; }
+            const t = findByNo(no);
+            if (!t || t.code !== mine.to) {
+                showCustomAlert('찌른 상대와 다릅니다.\n\n찌른 상대는 ' + nameOf(mine.to) + ' 사원입니다.');
+                cb(false); return;
+            }
+            lockRef().child(currentUser.code).set({ to: t.code, at: Date.now() })
+                .then(function () {
+                    if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[사택] ' + t.name + ' 사원과 같이 살기로 확정했습니다.');
+                    if (typeof saveFields === 'function') saveFields({ history: 1 });
+                    showCustomAlert(t.name + ' 사원과 같이 살기로 확정했습니다.\n\n월요일 0시 배정에 반영됩니다.');
+                        cb(true);
+                })
+                .catch(function () { showCustomAlert('적지 못했습니다. 다시 시도해 주세요.'); cb(false); });
+        });
+    }).catch(function () { showCustomAlert('확인하지 못했습니다.'); cb(false); });
+}
+
+(function hookUse() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
+        if (useInventoryItem._room) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            const e = (ITEM_CATALOG[itemName] || {}).effect;
+            if (e !== 'rm_poke' && e !== 'rm_lock') return _u.apply(this, arguments);
+            if (!currentUser) return;
+            if ((currentUser.inventory || []).indexOf(itemName) < 0) {
+                showCustomAlert('가지고 있지 않습니다.'); return;
+            }
+            const done = function (ok) {
+                if (!ok) return;                     // 실패하면 티켓은 남는다
+                if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
+                if (typeof saveFields === 'function') saveFields({ inventory: 1 });
+                if (typeof updateUI === 'function') updateUI();
+            };
+            if (e === 'rm_poke') usePoke(done);
+            else useLock(done);
+        };
+        useInventoryItem._room = true;
+        clearInterval(iv);
+        console.log('[룸메] 찌름권·확정권 연결');
+    }, 400);
+})();
+
+// ==========================================
+// 월요일 0시 — 다시 배정
+// ==========================================
+function doAssign(wk) {
+    return database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {};
+        const codes = Object.keys(all).filter(function (c) {
+            const u = all[c];
+            return u && u.name && c !== ADMIN;
+        });
+        if (codes.length < 2) { console.log('[룸메] 사원이 둘 미만이라 건너뜁니다.'); return; }
+        const inPool = {};
+        codes.forEach(function (c) { inPool[c] = 1; });
+
+        return Promise.all([
+            database.ref('roomPoke/' + wk).once('value'),
+            database.ref('roomConfirm/' + wk).once('value')
+        ]).then(function (r) {
+            const pokes = r[0].val() || {}, confirms = r[1].val() || {};
+            const out = resolvePairs(codes, pokes, confirms);
+
+            const up = {};
+            codes.forEach(function (c) { up['users/' + c + '/house/roomie'] = null; });
+
+            out.pairs.forEach(function (p) {
+                const a = p[0], b = p[1];
+                up['users/' + a + '/house/roomie'] = b;
+                up['users/' + b + '/house/roomie'] = a;
+
+                // 공용 보관함은 사번이 앞서는 쪽이 주인이다 — 둘의 짐을 거기로 모은다
+                const o = ([a, b].sort())[0], n = (o === a) ? b : a;
+                const so = ((all[o] || {}).house || {}).storage || [];
+                const sn = ((all[n] || {}).house || {}).storage || [];
+                if (sn.length) {
+                    up['users/' + o + '/house/storage'] = so.concat(sn);
+                    up['users/' + n + '/house/storage'] = [];
+                }
+            });
+
+            // 배정에서 빠진 사람(상담사 등)이 안쪽을 가리키고 있으면 끊는다
+            Object.keys(all).forEach(function (c) {
+                if (inPool[c]) return;
+                const rm = ((all[c] || {}).house || {}).roomie;
+                if (rm && inPool[rm]) up['users/' + c + '/house/roomie'] = null;
+            });
+
+            up['roomAssign/at'] = Date.now();
+            up['roomAssign/by'] = currentUser ? currentUser.code : '?';
+            up['roomAssign/pairs'] = out.pairs.map(function (p) { return p.join('_'); });
+            up['roomAssign/alone'] = out.alone || null;
+
+            return database.ref('/').update(up).then(function () {
+                console.log('%c[룸메] ' + wk + ' 배정 완료 — ' + out.pairs.length + '쌍'
+                    + (out.alone ? ' · 단독 1명' : ''), 'color:#4CAF50');
+                if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
+            }).catch(function (e) {
+                console.error('[룸메] 배정을 쓰지 못했습니다:', e);
+                // 다른 사람(또는 상담사)이 다시 시도할 수 있게 표시를 되돌린다
+                database.ref('roomAssign/week').remove().catch(function () { });
+            });
+        });
+    }).catch(function (e) { console.error('[룸메] 배정 실패:', e); });
+}
+
+(function weekly() {
+    let tried = '';
+    function tick() {
+        if (typeof database === 'undefined' || !database || !currentUser) return;
+        const wk = weekKey();
+        if (tried === wk) return;
+
+        const ref = database.ref('roomAssign/week');
+        ref.once('value').then(function (s) {
+            if (s.val() === wk) { tried = wk; return; }      // 이미 누가 돌렸다
+            ref.transaction(function (cur) {
+                if (cur === wk) return;                       // 동시에 들어왔다 — 양보
+                return wk;
+            }, function (err, committed) {
+                tried = wk;
+                if (err || !committed) return;
+                doAssign(wk);
+            });
+        }).catch(function () { });
+    }
+    setTimeout(tick, 4000);
+    setInterval(tick, 5 * 60 * 1000);                        // 자정을 넘겨도 잡는다
+})();
+
+// ==========================================
+// 내 자리는 따로 받아 온다
+//   applyServerMe 는 _adminStamp 가 바뀔 때만 돌고, save-merge.js 가
+//   깔려 있으면 아예 안 돈다. (index.html:1374)
+//   그래서 내 house 는 이 두 줄로 직접 맞춘다.
+// ==========================================
+(function watchMine() {
+    let bound = '';
+    function paint() {
+        if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
+        if (typeof renderHouse === 'function' && document.getElementById('house-main-body')) {
+            try { renderHouse(); } catch (e) { }
+        }
+    }
+    setInterval(function () {
+        if (!currentUser || typeof database === 'undefined' || !database) return;
+        if (bound === currentUser.code) return;
+        bound = currentUser.code;
+        const base = 'users/' + currentUser.code + '/house/';
+
+        database.ref(base + 'roomie').on('value', function (s) {
+            if (!currentUser) return;
+            const v = s.val() || null;
+            const h = (typeof getHouse === 'function') ? getHouse(currentUser)
+                : (currentUser.house = currentUser.house || {});
+            if (h.roomie === v) return;
+            h.roomie = v;
+            console.log('[룸메] 호실이 바뀌었습니다 —', v ? nameOf(v) + ' 사원' : '단독');
+            paint();
+        });
+
+        database.ref(base + 'storage').on('value', function (s) {
+            if (!currentUser) return;
+            const v = s.val() || [];
+            const h = (typeof getHouse === 'function') ? getHouse(currentUser)
+                : (currentUser.house = currentUser.house || {});
+            const before = JSON.stringify(h.storage || []);
+            if (before === JSON.stringify(v)) return;
+            h.storage = Array.isArray(v) ? v : [];
+            if (typeof renderHouseStorage === 'function'
+                && document.getElementById('house-storage-body')) {
+                try { renderHouseStorage(); } catch (e) { }
+            }
+        });
+    }, 1000);
+})();
+
+// ==========================================
+// 사택 화면에 지금 상태를 한 칸
+// ==========================================
+//
+// renderHouse 도 #house-main-body 를 통째로 다시 씁니다. (dark.js:8075)
+// 그 안에 붙이면 지워지고 다시 생기는데, 그때마다 서버를 새로 읽어
+// 「불러오는 중…」이 한 번씩 스쳐 깜박입니다.
+// 그래서 칸 밖(#house-main)에 한 번만 만들고, 찌름 자료는 귀를 달아
+// 손에 들고 있다가 바뀔 때만 글자를 갈아 끼웁니다.
+let pokeData = null, lockData = null, watchWeek = '';
+
+(function watchPokes() {
+    function tick() {
+        if (!currentUser || typeof database === 'undefined' || !database) return;
+        const wk = weekKey();
+        if (watchWeek === wk) return;
+        if (watchWeek) {                                  // 주가 넘어갔다 — 옛 귀를 뗀다
+            try { database.ref('roomPoke/' + watchWeek).off(); } catch (e) { }
+            try { database.ref('roomConfirm/' + watchWeek).off(); } catch (e) { }
+        }
+        watchWeek = wk;
+        pokeData = null; lockData = null;
+        database.ref('roomPoke/' + wk).on('value', function (s) {
+            pokeData = s.val() || {}; paintPoke();
+        });
+        database.ref('roomConfirm/' + wk).on('value', function (s) {
+            lockData = s.val() || {}; paintPoke();
+        });
+    }
+    setTimeout(tick, 1500);
+    setInterval(tick, 1000);
+})();
+
+function pokeBox() {
+    const host = document.getElementById('house-main');
+    if (!host || !currentUser) return null;
+    let el = document.getElementById('room-poke-box');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'room-poke-box';
+    el.style.cssText = 'border:1px solid #c2185b; border-radius:6px; padding:12px; margin-top:13px;'
+        + ' background:rgba(194,24,91,0.05); font-size:11px; color:#ddd; line-height:1.7;'
+        + ' display:none;';                               // 자료가 오기 전에는 비워 두지 않고 숨긴다
+    host.appendChild(el);                                 // 다시 쓰이는 칸 밖에 둔다
+    return el;
+}
+
+function paintPoke() {
+    const el = pokeBox();
+    if (!el) return;
+    if (!pokeData || !lockData) { el.style.display = 'none'; return; }
+
+    const me = currentUser.code, mine = pokeData[me], lock = lockData[me];
+    let body;
+    if (!mine) {
+        body = '<div style="color:#888;">아직 아무도 찌르지 않았습니다.<br>'
+             + '주말에 유쾌 판매소에서 찌름권을 살 수 있습니다.</div>';
+    } else {
+        const mutual = pokeData[mine.to] && pokeData[mine.to].to === me;
+        body = '<div>찌른 상대 <b style="color:#fff;">' + nameOf(mine.to) + '</b></div>';
+        if (mutual) {
+            body += '<div style="color:#81c784; margin-top:4px;">서로 찔렀습니다. 확정권 없이 확정됩니다.</div>';
+        } else if (lock && lock.to === mine.to) {
+            body += '<div style="color:#81c784; margin-top:4px;">확정권을 썼습니다. 월요일 배정에 반영됩니다.</div>';
+        } else if (pokeOK(me, pokeData)) {
+            body += '<div style="color:#ffd700; margin-top:4px;">찌름 성공. 확정권을 쓰면 확정됩니다.</div>';
+        } else {
+            body += '<div style="color:#ff8a65; margin-top:4px;">다른 사원이 먼저 찔렀거나, 상대가 다른 사원과 서로 찔렀습니다.</div>';
+        }
+    }
+
+    const d = daysLeft();
+    body += '<div style="color:#777; font-size:10px; margin-top:7px;">다음 배정까지 '
+         + (d === 1 ? '오늘 자정' : d + '일') + ' · 이번 주 찌른 사원 '
+         + Object.keys(pokeData).length + '명</div>';
+
+    if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser)) {
+        body += '<div style="color:#ffb74d; font-size:10px; margin-top:8px; border-top:1px dashed #5a3a4a; padding-top:7px;">'
+             + '월요일 전에 공용 보관함을 비워 두세요. 짝이 바뀌면 보관함은 지금 들고 있는 쪽을 따라갑니다.</div>';
+    }
+
+    const html = '<div style="font-size:11px; color:#ff8fb1; font-weight:bold; margin-bottom:7px;">🛏 다음 호실</div>' + body;
+    if (el.innerHTML !== html) el.innerHTML = html;        // 같으면 손대지 않는다 — 깜박임의 원인
+    if (el.style.display !== 'block') el.style.display = 'block';
+}
+
+(function panel() {
+    const iv = setInterval(function () {
+        if (typeof renderHouse !== 'function') return;
+        if (renderHouse._roomBox) { clearInterval(iv); return; }
+        const _r = renderHouse;
+        renderHouse = function () {
+            const r = _r.apply(this, arguments);
+            try { paintPoke(); } catch (e) { }            // 다시 만들지 않는다 — 글자만 본다
+            return r;
+        };
+        renderHouse._roomBox = true;
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 확인 · 손으로 돌리기
+// ==========================================
+window.roomState = function () {
+    if (typeof database === 'undefined' || !database) return;
+    const wk = weekKey();
+    console.log('%c===== 룸메 ' + wk + ' 주 =====', 'color:#ff8fb1; font-size:13px');
+    Promise.all([
+        database.ref('roomPoke/' + wk).once('value'),
+        database.ref('roomConfirm/' + wk).once('value'),
+        database.ref('roomAssign').once('value')
+    ]).then(function (r) {
+        const pokes = r[0].val() || {}, locks = r[1].val() || {}, asg = r[2].val() || {};
+        const rows = Object.keys(pokes).map(function (c) {
+            const mutual = pokes[pokes[c].to] && pokes[pokes[c].to].to === c;
+            return {
+                찌른사원: nameOf(c), 상대: nameOf(pokes[c].to),
+                때: new Date(pokes[c].at).toLocaleString(),
+                서로: mutual ? 'O' : '-',
+                성공: pokeOK(c, pokes) ? 'O' : '✗',
+                확정권: (locks[c] && locks[c].to === pokes[c].to) ? 'O' : '-'
+            };
+        });
+        if (rows.length) console.table(rows); else console.log('  찌른 사원이 없습니다.');
+        console.log('  마지막 배정:', asg.week || '없음',
+            asg.at ? '(' + new Date(asg.at).toLocaleString() + ')' : '');
+        const d = daysLeft();
+        console.log('  다음 배정까지:', d === 1 ? '오늘 자정' : d + '일');
+        console.log('  지금 이대로 배정하면 — roomPreview()');
+    });
+};
+
+window.roomPreview = function () {
+    if (typeof database === 'undefined' || !database) return;
+    const wk = weekKey();
+    Promise.all([
+        database.ref('roomPoke/' + wk).once('value'),
+        database.ref('roomConfirm/' + wk).once('value')
+    ]).then(function (r) {
+        const codes = Object.keys(db.users || {}).filter(function (c) {
+            return db.users[c] && db.users[c].name && c !== ADMIN;
+        });
+        const out = resolvePairs(codes, r[0].val() || {}, r[1].val() || {});
+        console.log('%c===== 이대로 배정하면 =====', 'color:#ff8fb1; font-size:13px');
+        console.table(out.pairs.map(function (p, i) {
+            return { 호실: i + 1, 가: nameOf(p[0]), 나: nameOf(p[1]) };
+        }));
+        if (out.alone) console.log('  단독 호실:', nameOf(out.alone));
+        console.log('  ※ 무작위 부분은 실제로 돌릴 때 달라집니다.');
+    });
+};
+
+// 상담사가 손으로 돌린다
+window.roomForce = function () {
+    if (!currentUser || currentUser.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    const wk = weekKey();
+    if (!confirm(wk + ' 주 배정을 지금 돌립니까?\n전원 호실이 다시 정해집니다.')) return;
+    database.ref('roomAssign/week').set(wk).then(function () { return doAssign(wk); });
+};
+
+// 공용 보관함을 손으로 옮긴다 — 짐이 엉켰을 때
+window.roomStorageMove = function (fromNo, toNo) {
+    if (!currentUser || currentUser.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const a = findByNo(fromNo), b = findByNo(toNo);
+    if (!a || !b) { console.warn('사번을 찾지 못했습니다.'); return; }
+    const sa = ((a.house || {}).storage) || [], sb = ((b.house || {}).storage) || [];
+    if (!sa.length) { console.log(a.name + ' 사원의 보관함이 비어 있습니다.'); return; }
+    const up = {};
+    up['users/' + b.code + '/house/storage'] = sb.concat(sa);
+    up['users/' + a.code + '/house/storage'] = [];
+    database.ref('/').update(up).then(function () {
+        console.log('%c✓ ' + a.name + ' → ' + b.name + ' · ' + sa.length + '개 옮겼습니다.', 'color:#4CAF50');
+    }).catch(function (e) { console.error(e); });
+};
+
+console.log('[룸메] roomState() · roomPreview() · roomForce() · roomStorageMove(from, to)');
+
+})();
+;
+
+// ---------- knife-lost.js ----------
+// ==========================================
+// ★ 버터 나이프가 사라지는 것
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// 사라질 수 있는 길이 네 군데 있었습니다. 셋은 여기서 막고,
+// 하나는 save-merge.js 를 한 줄 고쳐야 합니다(아래 ■ 넷째).
+//
+// ■ 첫째 — 장터에 올린 글이 72시간 뒤에 통째로 없어진다  ← 가장 의심스럽습니다
+//
+//   판매 글을 올리면 그 즉시 소지품에서 빠집니다. (dark.js:13448)
+//
+//       for (let i = 0; i < qty; i++) removeItemFromInventory(currentUser, item, 1);
+//       updates[`users/${currentUser.code}/inventory`] = currentUser.inventory;
+//
+//   물건은 이제 market/<글번호> 안에만 있습니다. 되돌릴 길은 「내린다」뿐인데,
+//   목록을 거를 때 72시간을 먼저 자릅니다. (dark.js:13367)
+//
+//       let list = ...filter(p => p.state === 'OPEN' && now - p.at < MARKET_TTL);
+//       if (marketTab === 'mine') list = list.filter(p => p.seller === currentUser.code);
+//
+//   「내 글」 칸에서도 안 보이게 됩니다. 72시간이 지나면 내릴 수가 없습니다.
+//   그리고 묵은 글을 치워 주는 자리가 어디에도 없습니다.
+//   MARKET_TTL 은 거르는 세 군데(13367 · 13382 · 13440)에만 쓰입니다.
+//
+//   버터 나이프가 딱 걸립니다. 9999 P 라 쉽게 안 팔리고, 4시간 뒤에는
+//   스스로 소지품으로 돌아오니 늘 올릴 수 있는 상태입니다.
+//
+//   → 내 묵은 판매 글은 소지품으로 되돌리고 글을 닫습니다.
+//     사는 글은 포인트를 미리 빼지 않으니(dark.js:13450) 되돌릴 것이 없습니다.
+//
+// ■ 둘째 — 만료 처리를 해 놓고 저장을 안 한다
+//
+//   getPollutionMultiplier 는 이름은 「가져오기」인데 실제로는 고칩니다.
+//   (index.html:4777~4783)
+//
+//       user.equippedWeapons.splice(idx, 1);
+//       user.inventory.push("버터 나이프");
+//       user.butterKnifeExpireTime = 0;
+//
+//   그런데 부르는 쪽이 저장을 다 안 합니다.
+//
+//       checkPassivePollution  saveSelfFull()      → 괜찮습니다
+//       addPollution           saveFields({pollution:1})  ← 소지품·장착을 안 씁니다
+//       applyPollutionToUser   아무것도 안 씁니다          ← 남의 것까지 고칩니다
+//
+//   addPollution 으로 만료되면, 서버에는 「장착한 채 기한이 지난」 상태가 남고
+//   내 화면에만 소지품으로 와 있습니다. 그 틈에 장착만 쓰는 코드가 돌면
+//   (equip-lock.js:80 · newitems2.js:1262 · index.html:6121) 양쪽에서 없어집니다.
+//
+//   applyPollutionToUser 는 더 나쁩니다. 남의 객체를 내 화면에서 고쳐 놓는데,
+//   그 뒤 그 사원의 장착을 내 화면 값으로 써 버리는 코드가 있습니다.
+//
+//   → 내 것이면 바뀐 즉시 제대로 저장합니다.
+//     남의 것이면 아예 손대지 않게 되돌립니다. 그 사원이 접속하면 본인 화면에서 합니다.
+//
+// ■ 셋째 — 봉인 표시가 붙은 옛 자료
+//
+//   newitems2.js:882 의 SEAL = '✗ ' 이 이름 앞에 붙던 때가 있었습니다.
+//   getEquipBaseName(index.html:1560)은 '🔮 ' 와 ' (' 만 떼고 '✗ ' 는 못 뗍니다.
+//   그래서 '✗ 버터 나이프' 는 영영 만료되지 않고, 휘두를 수도 없고,
+//   빼면 그 이름 그대로 소지품에 들어가 쓸 수 없는 것이 됩니다.
+//
+//   → knifeTrace() 로 찾고, knifeUnseal() 로 이름을 되돌립니다.
+//
+// ■ 넷째 — save-merge.js 가 기준을 잘못 갈아 끼운다  ※ 직접 고쳐 주세요
+//
+//   save-merge.js:175 는 「내가 손댄 항목은 서버 값을 받지 않는다」고 비켜섭니다.
+//   그런데 190 번 줄이 조건 없이 기준을 서버 값으로 바꿔 버립니다.
+//
+//       if (mineTouched) return;          // 175 — 서버의 K 를 안 받는다
+//       ...
+//       base = clone(srv) || {};          // 190 — 그런데 기준은 K 가 들어간 것으로
+//
+//   그 다음 소지품 병합(mergeInv:71~72)이 기준과 내 것을 견주면
+//
+//       del = msDiff(기준, 내것) = [K]    → K 를 서버에서 지웁니다
+//
+//   즉 내가 아직 안 올린 소지품 변화를 들고 있는 동안 남이 내 소지품에
+//   무언가를 넣으면, 그것이 다음 저장에서 지워집니다.
+//   장터 체결(dark.js:13581) · 상담사 지급(index.html:10246) ·
+//   타인 아이템 사용(index.html:6123) 이 모두 소지품을 통째로 씁니다.
+//
+//   버터 나이프만의 일이 아니라 아무 물건이나 먹습니다.
+//   closure 안의 base 는 밖에서 손댈 수 없어 여기서는 못 막습니다.
+//
+//   ── save-merge.js 170 번 줄 ──
+//       let took = 0;
+//   ↓ 이렇게 한 줄 더합니다
+//       let took = 0;
+//       const kept = {};                                  // 내가 손댄 항목의 기준을 지킨다
+//
+//   ── save-merge.js 175 번 줄 ──
+//           if (mineTouched) return;                        // 내가 바꾼 것은 내가 쓴다
+//   ↓
+//           if (mineTouched) { kept[k] = clone(base[k]); return; }   // 기준도 지킨다
+//
+//   ── save-merge.js 190 번 줄 ──
+//       base = clone(srv) || {};
+//   ↓
+//       base = clone(srv) || {};
+//       Object.keys(kept).forEach(function (k) { base[k] = kept[k]; });
+//
+// ■ 다섯째 — 이건 오류가 아닐 수 있습니다
+//
+//   C등급 구역에서 탈출에 실패하면 소지품 하나가 무작위로 없어집니다.
+//   (index.html:4458~4468)
+//
+//       const pool = (currentUser.inventory || []).filter(it => {
+//           const c = ITEM_CATALOG[it];
+//           return c && !NO_SELL_ITEMS.includes(it);
+//       });
+//
+//   NO_SELL_ITEMS 는 여우구슬 · 사직서 · 두 번째 자리 · 금고 · 💍 커플링 뿐이라
+//   버터 나이프도 뽑힙니다. 「장착품 제외」라고 적혀 있지만, 나이프는 4시간 뒤
+//   소지품으로 돌아오니 하루의 대부분을 뽑힐 수 있는 자리에 있습니다.
+//
+//   C등급은 C-119 와 C-176 입니다. 설계한 벌칙이라 손대지 않았습니다.
+//   빼고 싶으시면 index.html:1822 의 NO_SELL_ITEMS 에 이름을 넣으시면 됩니다.
+
+(function knifeLost() {
+
+const KNIFE = '버터 나이프';
+const SEAL = '✗ ';
+const TTL = 3 * 24 * 60 * 60 * 1000;          // dark.js:13310 과 같은 값
+const EXPIRE_KEYS = ['butterKnifeExpireTime', 'jakduExpireTime', 'silverRingExpireTime'];
+
+function baseOf(w) {
+    let s = String(w || '');
+    if (s.indexOf(SEAL) === 0) s = s.slice(SEAL.length);
+    if (s.indexOf('🔮 ') === 0) s = s.slice(2);
+    if (s.indexOf(' (') > 0) s = s.split(' (')[0];
+    return s.trim();
+}
+
+// ==========================================
+// 첫째 — 내 묵은 판매 글을 소지품으로 되돌린다
+// ==========================================
+//
+// 남의 글은 건드리지 않습니다. 각자 자기 글만 거둬 가므로
+// 권한도 필요 없고 두 사람이 같은 글을 되돌릴 일도 없습니다.
+let sweeping = false;
+
+function sweepMarket(loud) {
+    if (sweeping || !currentUser) return Promise.resolve(0);
+    if (typeof database === 'undefined' || !database) return Promise.resolve(0);
+    sweeping = true;
+
+    return database.ref('market').once('value').then(function (s) {
+        const all = s.val() || {}, now = Date.now(), mine = [];
+        Object.keys(all).forEach(function (id) {
+            const p = all[id];
+            if (!p || p.state !== 'OPEN' || p.type !== 'sell') return;
+            if (p.seller !== currentUser.code) return;
+            if (now - (p.at || 0) < TTL) return;
+            mine.push({ id: id, item: p.item, qty: Math.max(1, p.qty || 1), at: p.at });
+        });
+        if (!mine.length) {
+            sweeping = false;
+            if (loud) console.log('  되돌릴 묵은 판매 글이 없습니다.');
+            return 0;
+        }
+
+        if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+        const up = {}, said = [];
+        mine.forEach(function (m) {
+            for (let i = 0; i < m.qty; i++) currentUser.inventory.push(m.item);
+            up['market/' + m.id + '/state'] = 'EXPIRED';
+            up['market/' + m.id + '/expiredAt'] = now;
+            said.push(m.item + (m.qty > 1 ? ' ×' + m.qty : ''));
+            if (typeof addHistoryLog === 'function') {
+                addHistoryLog(currentUser, '[장터] 기한이 지난 판매 글을 내려 ' + m.item
+                    + (m.qty > 1 ? ' ' + m.qty + '개' : '') + '을(를) 돌려받았습니다.');
+            }
+        });
+
+        return database.ref('/').update(up).then(function () {
+            if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 });
+            if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
+            console.log('%c[장터] 기한이 지난 판매 글 ' + mine.length + '건을 되돌렸습니다 — '
+                + said.join(', '), 'color:#4CAF50');
+            if (typeof showCustomAlert === 'function') {
+                showCustomAlert('장터에 올린 글의 기한이 지나 물품이 돌아왔습니다.\n\n' + said.join('\n'));
+            }
+            sweeping = false;
+            return mine.length;
+        });
+    }).catch(function (e) {
+        sweeping = false;
+        console.error('[장터] 되돌리기 실패:', e);
+        return 0;
+    });
+}
+
+setTimeout(function () { sweepMarket(false); }, 6000);
+setInterval(function () { sweepMarket(false); }, 30 * 60 * 1000);
+
+// ==========================================
+// 둘째 — 만료 처리를 제대로 저장한다 / 남의 것은 손대지 않는다
+// ==========================================
+function stateOf(u) {
+    try {
+        return JSON.stringify([
+            u.equippedWeapons || [],
+            u.inventory || [],
+            EXPIRE_KEYS.map(function (k) { return u[k] || 0; })
+        ]);
+    } catch (e) { return ''; }
+}
+function restore(u, snap) {
+    try {
+        const v = JSON.parse(snap);
+        if (Array.isArray(u.equippedWeapons)) { u.equippedWeapons.length = 0; v[0].forEach(function (x) { u.equippedWeapons.push(x); }); }
+        else u.equippedWeapons = v[0];
+        if (Array.isArray(u.inventory)) { u.inventory.length = 0; v[1].forEach(function (x) { u.inventory.push(x); }); }
+        else u.inventory = v[1];
+        EXPIRE_KEYS.forEach(function (k, i) { u[k] = v[2][i]; });
+    } catch (e) { }
+}
+
+let saveSoon = null;
+function laterSave() {
+    if (saveSoon) return;
+    saveSoon = setTimeout(function () {
+        saveSoon = null;
+        if (typeof saveSelfFull === 'function') {
+            try { saveSelfFull(); } catch (e) { console.error('[회수] 저장 실패:', e); }
+        }
+        if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
+    }, 0);
+}
+
+(function guard() {
+    let inside = false;
+    const iv = setInterval(function () {
+        if (typeof getPollutionMultiplier !== 'function') return;
+        if (getPollutionMultiplier._keepGear) { clearInterval(iv); return; }
+
+        const _g = getPollutionMultiplier;
+        getPollutionMultiplier = function (user) {
+            if (inside || !user) return _g.apply(this, arguments);
+            inside = true;
+            const before = stateOf(user);
+            let r;
+            try { r = _g.apply(this, arguments); }
+            finally { inside = false; }
+
+            if (before && stateOf(user) !== before) {
+                if (currentUser && user.code === currentUser.code) {
+                    laterSave();                         // 내 것 — 장착·소지품·기한을 한꺼번에 쓴다
+                } else {
+                    restore(user, before);               // 남의 것 — 없던 일로 한다
+                }
+            }
+            return r;
+        };
+        getPollutionMultiplier._keepGear = true;
+        clearInterval(iv);
+        console.log('[회수] 만료 처리 저장 연결');
+    }, 400);
+})();
+
+// ==========================================
+// 확인 — 어느 길로 사라졌는지 가린다
+// ==========================================
+//
+// knifeTrace()         나
+// knifeTrace('4892')   그 사원 (사번 · 이름 · 코드 아무거나)
+window.knifeTrace = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다: ' + who); return; }
+
+    console.log('%c===== ' + u.name + ' · ' + KNIFE + ' =====', 'color:#4fc3f7; font-size:13px');
+
+    const eq = u.equippedWeapons || [], inv = u.inventory || [];
+    const eqHit = eq.filter(function (w) { return baseOf(w) === KNIFE; });
+    const invHit = inv.filter(function (x) { return baseOf(x) === KNIFE; });
+    console.log('  장착:', eqHit.length ? eqHit.join(' · ') : '없음');
+    console.log('  소지품:', invHit.length ? invHit.join(' · ') + ' (' + invHit.length + '개)' : '없음');
+    console.log('  butterKnifeExpireTime:', u.butterKnifeExpireTime
+        ? new Date(u.butterKnifeExpireTime).toLocaleString()
+            + (Date.now() >= u.butterKnifeExpireTime ? '  ← 기한이 지났습니다' : '')
+        : (u.butterKnifeExpireTime === 0 ? '0' : '없음'));
+
+    // 셋째 — 봉인 표시
+    const sealed = eq.filter(function (w) { return String(w).indexOf(SEAL) === 0; })
+        .concat(inv.filter(function (x) { return String(x).indexOf(SEAL) === 0; }));
+    if (sealed.length) {
+        console.warn('  ✗ 봉인 표시가 붙은 것: ' + sealed.join(' · ')
+            + '  → knifeUnseal(\'' + (u.no || u.code) + '\')');
+    }
+
+    // 둘째 — 장착한 채 기한이 0 으로 멈춘 상태
+    if (eqHit.length && !u.butterKnifeExpireTime) {
+        console.warn('  ✗ 장착한 채 기한이 0 입니다. 영영 안 돌아옵니다.');
+        console.warn('    (빼앗기로 기한만 가져간 경우거나, 상담사 상태 초기화 index.html:10390)');
+        console.warn('    → knifeKick(\'' + (u.no || u.code) + '\') 로 소지품으로 돌립니다.');
+    }
+
+    // 다섯째 — C등급 벌칙에 뽑힐 수 있는가
+    if (invHit.length && typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(KNIFE) < 0) {
+        console.log('  · C등급(C-119 · C-176) 탈출 실패 때 뽑힐 수 있는 상태입니다.');
+    }
+
+    // 기록에서 사라진 흔적을 찾는다
+    const log = (u.history || []).filter(function (h) {
+        const t = typeof h === 'string' ? h : (h && (h.text || h.msg || JSON.stringify(h)));
+        return t && t.indexOf(KNIFE) >= 0;
+    });
+    console.log('  — 기록에 남은 ' + KNIFE + ' 줄 ' + log.length + '개 —');
+    log.slice(-12).forEach(function (h) {
+        console.log('   ', typeof h === 'string' ? h : (h.text || h.msg || h));
+    });
+
+    // 첫째 — 장터에 묶여 있는가
+    if (typeof database === 'undefined' || !database) return;
+    database.ref('market').once('value').then(function (s) {
+        const posts = s.val() || {}, now = Date.now(), rows = [];
+        Object.keys(posts).forEach(function (id) {
+            const p = posts[id];
+            if (!p || p.seller !== u.code) return;
+            rows.push({
+                물품: p.item, 수량: p.qty || 1, 값: p.price,
+                낸때: new Date(p.at).toLocaleString(),
+                상태: p.state,
+                묶임: (p.state === 'OPEN' && p.type === 'sell' && now - p.at >= TTL) ? '✗ 기한 지남' : ''
+            });
+        });
+        console.log('  — 장터에 낸 글 —');
+        if (rows.length) console.table(rows); else console.log('    없음');
+        const stuck = rows.filter(function (r) { return r.묶임; }).length;
+        if (stuck) {
+            console.warn('  ✗ 기한이 지나 묶인 판매 글 ' + stuck + '건이 있습니다.');
+            console.log('    본인 화면에서 접속하면 저절로 돌아옵니다. 지금 당장이면 marketSweep()');
+        }
+    });
+};
+
+// 지금 당장 내 묵은 글을 되돌린다
+window.marketSweep = function () {
+    console.log('[장터] 묵은 판매 글을 찾습니다…');
+    sweepMarket(true);
+};
+
+// 전 사원의 묵은 판매 글을 본다 — 상담사용
+window.marketStuck = function () {
+    if (typeof database === 'undefined' || !database) return;
+    database.ref('market').once('value').then(function (s) {
+        const posts = s.val() || {}, now = Date.now(), rows = [];
+        Object.keys(posts).forEach(function (id) {
+            const p = posts[id];
+            if (!p || p.state !== 'OPEN' || p.type !== 'sell') return;
+            if (now - (p.at || 0) < TTL) return;
+            rows.push({
+                사원: p.sellerName || p.seller, 물품: p.item, 수량: p.qty || 1,
+                낸때: new Date(p.at).toLocaleString(),
+                묵은일: Math.floor((now - p.at) / 86400000) + '일'
+            });
+        });
+        console.log('%c===== 기한이 지나 묶인 판매 글 =====', 'color:#ff8a65; font-size:13px');
+        if (rows.length) {
+            console.table(rows);
+            console.log('  각 사원이 접속하면 저절로 돌아옵니다.');
+            console.log('  지금 돌려주려면 marketReturnAll() (상담사)');
+        } else console.log('  없습니다.');
+    });
+};
+
+// 전 사원에게 지금 돌려준다 — 상담사용
+window.marketReturnAll = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    Promise.all([database.ref('market').once('value'), database.ref('users').once('value')])
+    .then(function (r) {
+        const posts = r[0].val() || {}, users = r[1].val() || {}, now = Date.now();
+        const add = {}, up = {}, rows = [];
+        Object.keys(posts).forEach(function (id) {
+            const p = posts[id];
+            if (!p || p.state !== 'OPEN' || p.type !== 'sell') return;
+            if (now - (p.at || 0) < TTL) return;
+            if (!users[p.seller]) return;
+            if (!add[p.seller]) add[p.seller] = [];
+            for (let i = 0; i < Math.max(1, p.qty || 1); i++) add[p.seller].push(p.item);
+            up['market/' + id + '/state'] = 'EXPIRED';
+            up['market/' + id + '/expiredAt'] = now;
+            rows.push({ 사원: p.sellerName || p.seller, 물품: p.item, 수량: p.qty || 1 });
+        });
+        if (!rows.length) { console.log('돌려줄 글이 없습니다.'); return; }
+        Object.keys(add).forEach(function (c) {
+            const inv = Array.isArray(users[c].inventory) ? users[c].inventory.slice()
+                      : (users[c].inventory ? Object.values(users[c].inventory) : []);
+            up['users/' + c + '/inventory'] = inv.concat(add[c]);
+            up['users/' + c + '/_adminStamp'] = now;
+        });
+        return database.ref('/').update(up).then(function () {
+            console.table(rows);
+            console.log('%c✓ ' + rows.length + '건을 ' + Object.keys(add).length + '명에게 돌려줬습니다.', 'color:#4CAF50');
+        });
+    }).catch(function (e) { console.error(e); });
+};
+
+// 봉인 표시를 떼어 낸다
+window.knifeUnseal = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+
+    const eq = (u.equippedWeapons || []).map(function (w) {
+        return String(w).indexOf(SEAL) === 0 ? String(w).slice(SEAL.length) : w;
+    });
+    const inv = (u.inventory || []).map(function (x) {
+        return String(x).indexOf(SEAL) === 0 ? String(x).slice(SEAL.length) : x;
+    });
+    const n = eq.filter(function (w, i) { return w !== (u.equippedWeapons || [])[i]; }).length
+            + inv.filter(function (x, i) { return x !== (u.inventory || [])[i]; }).length;
+    if (!n) { console.log(u.name + ' 사원에게 봉인 표시가 없습니다.'); return; }
+
+    u.equippedWeapons = eq; u.inventory = inv;
+    if (typeof updateUserFields === 'function') {
+        updateUserFields(u.code, { equippedWeapons: eq, inventory: inv });
+    }
+    console.log('%c✓ ' + u.name + ' 사원의 봉인 표시 ' + n + '개를 뗐습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+// 장착한 채 기한이 멈춘 것을 소지품으로 돌린다
+window.knifeKick = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+
+    const eq = (u.equippedWeapons || []).slice();
+    const i = eq.findIndex(function (w) { return baseOf(w) === KNIFE; });
+    if (i < 0) { console.log(u.name + ' 사원은 ' + KNIFE + ' 를 차고 있지 않습니다.'); return; }
+    eq.splice(i, 1);
+    const inv = (u.inventory || []).slice();
+    inv.push(KNIFE);
+
+    u.equippedWeapons = eq; u.inventory = inv; u.butterKnifeExpireTime = 0;
+    if (typeof updateUserFields === 'function') {
+        updateUserFields(u.code, { equippedWeapons: eq, inventory: inv, butterKnifeExpireTime: 0 });
+    }
+    console.log('%c✓ ' + u.name + ' 사원의 ' + KNIFE + ' 를 소지품으로 돌렸습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+console.log('[나이프] knifeTrace(사번) · marketSweep() · marketStuck() · marketReturnAll() · knifeUnseal() · knifeKick()');
+
+})();
+;
+
+// ---------- equip-fold.js ----------
+// ==========================================
+// ★ 혈욕조 흔적 지우기 · 장착칸 접기
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 하나 — 혈욕조가 특이사항에 흔적을 남기는 것
+//
+//   시간이 다 되어 스스로 빠질 때 특이사항에 한 줄을 적습니다.
+//   (index.html:5000)
+//
+//       appendSystemBadgeNote("혈욕조 하루 이용 시간(3시간) 초과로 장착이 해제되었습니다.");
+//
+//   벌을 받은 것도 아닌데 사원증에 남아 지워지지 않습니다.
+//   여기서는 두 가지를 합니다.
+//
+//     1. 앞으로 그 줄이 안 적히게 막습니다 (기록(history)에는 그대로 남습니다)
+//     2. 이미 적혀 있는 줄을 걷어냅니다 — 내 것은 들어올 때 저절로,
+//        남의 것은 상담사가 bathWipeAll() 로
+//
+//   특이사항은 ' | ' 로 이어 붙인 한 줄입니다. (index.html:6207)
+//   그래서 토막으로 갈라 혈욕조가 든 토막만 버리고 다시 잇습니다.
+//
+// ■ 둘 — 장착칸 접기
+//
+//   renderInventory 가 장착 중인 것을 칸마다 카드 하나로 그립니다.
+//   (index.html:6228~6248) 12칸이 되면 소지품이 한참 아래로 밀립니다.
+//
+//   카드들을 접었다 펼 수 있는 자리로 옮기고, 접은 채로 둘지 기억합니다.
+//   renderInventory 가 updateUI 마다 안쪽을 통째로 다시 쓰므로
+//   (index.html:6343) 그릴 때마다 다시 옮기는데, 원본이 끝난 바로 뒤에
+//   같은 호흡에서 옮기니 펼쳐진 모습이 스쳐 보이지 않습니다.
+//
+// ■ 셋 — 칸 수는 직접 바꾸셔야 합니다
+//
+//   한도가 `equippedWeapons.length >= 8` 이라는 글자 그대로 17군데에
+//   박혀 있습니다. 밖에서 가로챌 수 있는 함수가 아니라 여기서는 못 고칩니다.
+//
+//       index.html     9곳
+//       newitems2.js   3곳
+//       newitems.js    2곳
+//       sapphire.js    2곳
+//       dna-gifts.js   1곳
+//
+//   다섯 파일에서 아래 글자를 전부 찾아 바꾸시면 됩니다. 17곳이 나와야 합니다.
+//
+//       찾기   equippedWeapons.length >= 8
+//       바꾸기 equippedWeapons.length >= 12
+//
+//   아래 EQUIP_MAX 도 같은 숫자로 맞춰 주세요. 접는 칸 머리에 적히는 숫자입니다.
+
+(function equipFold() {
+
+const EQUIP_MAX = 12;          // ↑ 위 찾아 바꾸기와 같은 숫자로
+const BATH = '혈욕조';
+const KEY = 'eqFold';
+
+// ==========================================
+// 하나 — 혈욕조 흔적
+// ==========================================
+function stripBath(notes) {
+    const s = String(notes || '');
+    if (!s || s === '특이사항 없음') return null;
+    const keep = s.split('|').map(function (x) { return x.trim(); })
+        .filter(function (x) { return x && x.indexOf(BATH) < 0; });
+    const out = keep.length ? keep.join(' | ') : '특이사항 없음';
+    return (out === s) ? null : out;          // 안 바뀌었으면 null
+}
+
+// 앞으로 안 적히게
+(function block() {
+    const iv = setInterval(function () {
+        if (typeof appendBadgeNoteToUser !== 'function') return;
+        if (appendBadgeNoteToUser._noBath) { clearInterval(iv); return; }
+        const _a = appendBadgeNoteToUser;
+        appendBadgeNoteToUser = function (user, noteMsg) {
+            if (String(noteMsg || '').indexOf(BATH) >= 0) return;   // 혈욕조 줄은 버린다
+            return _a.apply(this, arguments);
+        };
+        appendBadgeNoteToUser._noBath = true;
+        clearInterval(iv);
+        console.log('[혈욕조] 특이사항 기록 차단');
+    }, 400);
+})();
+
+// 내 것에 이미 적혀 있으면 들어올 때 한 번 걷어낸다
+(function wipeMine() {
+    let done = false;
+    const iv = setInterval(function () {
+        if (done || !currentUser || !currentUser.badge) return;
+        const out = stripBath(currentUser.badge.notes);
+        if (out === null) { done = true; clearInterval(iv); return; }
+        currentUser.badge.notes = out;
+        done = true;
+        if (typeof saveFields === 'function') { try { saveFields({ badge: 1 }); } catch (e) { } }
+        const el = document.getElementById('badge-notes-text');
+        if (el) el.innerText = out;
+        clearInterval(iv);
+        console.log('%c[혈욕조] 내 특이사항에서 흔적을 지웠습니다.', 'color:#4CAF50');
+    }, 1000);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// 전 사원 — 상담사
+window.bathWipeAll = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {}, up = {}, rows = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            if (!u.badge) return;
+            const out = stripBath(u.badge.notes);
+            if (out === null) return;
+            up['users/' + c + '/badge/notes'] = out;
+            rows.push({ 사원: u.name || c, 전: u.badge.notes, 후: out });
+            if (db.users[c] && db.users[c].badge) db.users[c].badge.notes = out;
+        });
+        if (!rows.length) { console.log('흔적이 남은 사원이 없습니다.'); return; }
+        return database.ref('/').update(up).then(function () {
+            console.table(rows);
+            console.log('%c✓ ' + rows.length + '명의 특이사항에서 지웠습니다.', 'color:#4CAF50');
+            if (typeof updateUI === 'function') updateUI();
+        });
+    }).catch(function (e) { console.error(e); });
+};
+
+window.bathCheck = function () {
+    const rows = [];
+    Object.keys(db.users || {}).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || !u.badge) return;
+        if (String(u.badge.notes || '').indexOf(BATH) < 0) return;
+        rows.push({ 사원: u.name || c, 사번: u.no || '-', 특이사항: u.badge.notes });
+    });
+    console.log('%c===== 혈욕조 흔적이 남은 사원 =====', 'color:#ff8a65; font-size:13px');
+    if (rows.length) { console.table(rows); console.log('  지우려면 bathWipeAll()'); }
+    else console.log('  없습니다.');
+};
+
+// ==========================================
+// 둘 — 장착칸 접기
+// ==========================================
+//
+// 처음엔 카드를 접는 상자로 「옮겼는데」, 소지품 칸은 renderInventory 말고도
+// 여러 파일이 손대는 자리라 옮긴 것이 어긋났습니다.
+// 그래서 옮기지 않고 제자리에서 숨깁니다. 바깥 구조를 안 건드립니다.
+let COLLAPSED = false;
+try { COLLAPSED = localStorage.getItem(KEY) === '1'; } catch (e) { }
+function remember() { try { localStorage.setItem(KEY, COLLAPSED ? '1' : '0'); } catch (e) { } }
+
+// 「[장착 중 슬롯 n]」 가 든 카드를 찾는다 — 칸의 바로 아래 자식들이다
+function findCards() {
+    const box = document.getElementById('inventory-list-container');
+    if (!box) return { box: null, cards: [] };
+    const cards = [];
+    const kids = box.children;
+    for (let i = 0; i < kids.length; i++) {
+        const el = kids[i];
+        if (el.id === 'eq-fold-head') continue;
+        if ((el.textContent || '').indexOf('[장착 중 슬롯') >= 0) cards.push(el);
+    }
+    return { box: box, cards: cards };
+}
+
+function paint(cards) {
+    cards.forEach(function (c) {
+        const want = COLLAPSED ? 'none' : '';
+        if (c.style.display !== want) c.style.display = want;
+    });
+    const m = document.getElementById('eq-fold-mark');
+    if (m) m.textContent = COLLAPSED ? '펼치기 ▼' : '접기 ▲';
+}
+
+function fold() {
+    const f = findCards();
+    if (!f.box || f.cards.length < 2) {            // 하나뿐이면 접을 것이 없다
+        const old = document.getElementById('eq-fold-head');
+        if (old) old.remove();
+        return;
+    }
+
+    let head = document.getElementById('eq-fold-head');
+    if (!head || head.parentElement !== f.box) {
+        if (head) head.remove();
+        head = document.createElement('div');
+        head.id = 'eq-fold-head';
+        head.style.cssText = 'display:flex; justify-content:space-between; align-items:center;'
+            + ' background:#241f14; border:1px solid #d4af37; border-radius:6px;'
+            + ' padding:9px 12px; margin-bottom:12px; cursor:pointer; user-select:none;';
+        head.addEventListener('click', function () {
+            COLLAPSED = !COLLAPSED;
+            remember();
+            paint(findCards().cards);
+        });
+        f.box.insertBefore(head, f.cards[0]);
+    }
+
+    const label = '장착 중 ' + f.cards.length + ' / ' + EQUIP_MAX + '칸';
+    const want = '<span style="font-size:11px; color:#d4af37; font-weight:bold;">' + label + '</span>'
+        + '<span id="eq-fold-mark" style="font-size:11px; color:#aaa;">'
+        + (COLLAPSED ? '펼치기 ▼' : '접기 ▲') + '</span>';
+    if (head.innerHTML !== want) head.innerHTML = want;
+
+    paint(f.cards);
+}
+
+(function hook() {
+    const iv = setInterval(function () {
+        if (typeof renderInventory !== 'function') return;
+        if (renderInventory._eqFold) { clearInterval(iv); return; }
+        const _r = renderInventory;
+        renderInventory = function () {
+            const r = _r.apply(this, arguments);
+            try { fold(); } catch (e) { }
+            // 다른 파일이 늦게 손대는 경우가 있어 한 번 더 덮는다
+            setTimeout(function () { try { fold(); } catch (e) { } }, 60);
+            return r;
+        };
+        renderInventory._eqFold = true;
+        clearInterval(iv);
+        try { fold(); } catch (e) { }
+        [300, 900, 2000].forEach(function (ms) {
+            setTimeout(function () { try { fold(); } catch (e) { } }, ms);
+        });
+        console.log('[장착칸] 접기 연결 — 최대 ' + EQUIP_MAX + '칸');
+    }, 400);
+})();
+
+// 왜 안 접히는지 보는 자리
+window.foldState = function () {
+    const f = findCards();
+    console.log('%c===== 장착칸 접기 =====', 'color:#d4af37; font-size:13px');
+    console.log('  소지품 칸:', f.box ? '있음' : '✗ 못 찾음 (#inventory-list-container)');
+    console.log('  찾은 장착 카드:', f.cards.length, '장  (2장부터 접힙니다)');
+    console.log('  머리글:', document.getElementById('eq-fold-head') ? '있음' : '✗ 없음');
+    console.log('  접힘 상태:', COLLAPSED);
+    let ls = '됨'; try { localStorage.setItem(KEY + 'T', '1'); localStorage.removeItem(KEY + 'T'); }
+    catch (e) { ls = '✗ 막힘 — ' + e.message; }
+    console.log('  브라우저 기억:', ls);
+    console.log('  renderInventory 연결:',
+        (typeof renderInventory === 'function' && renderInventory._eqFold) ? 'O' : '✗');
+    if (f.box && !f.cards.length) {
+        console.warn('  카드를 못 찾았습니다. 칸의 바로 아래 자식들은 이렇습니다:');
+        const out = [];
+        for (let i = 0; i < Math.min(f.box.children.length, 12); i++) {
+            out.push({ 번호: i, 태그: f.box.children[i].tagName,
+                       앞글자: (f.box.children[i].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
+        }
+        console.table(out);
+    }
+    if (f.cards.length) {
+        console.log('  첫 카드가 지금 보이나:', f.cards[0].style.display === 'none' ? '숨김' : '보임');
+    }
+};
+
+
+console.log('[장착칸] foldState() · bathCheck() · bathWipeAll()');
+
+})();
+;
+
+// ---------- satiety-hold.js ----------
+// ==========================================
+// ★ 포만도 유지 — 최음제 · 빨간 리본 · 세뇌 만년필
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 포만도가 깎이는 자리는 셋입니다
+//
+//     index.html:4980   두 시간마다 5씩      (checkPassivePollution)
+//     index.html:9223   공용시설 이용 -3     (useFacility)
+//     dark.js:12466     어둠 탐사 -10~-28    (applyDarkSatiety, 등급별)
+//
+//   「유지된다」를 글자 그대로 읽어 셋 다 막습니다.
+//   자연 감소만 막고 싶으시면 아래 HOLD_FACILITY · HOLD_DARK 를 false 로.
+//
+//   막는 방법은 셋 다 같습니다. 원래 함수를 그대로 돌리고, 돌기 전의
+//   포만도를 되돌려 놓습니다. 다만 lastSatietyTime 은 되돌리지 않습니다.
+//   그걸 되돌리면 유지가 끝나는 순간 밀린 시간이 한꺼번에 깎여
+//   (최대 12단계 = 60) 오히려 더 크게 떨어집니다.
+//
+// ■ 세 가지가 같은 자리를 봅니다
+//
+//   satHeld(user) 하나가 참이면 포만도가 안 내려갑니다.
+//
+//     1. user.satHoldUntil 이 아직 안 지났다        — 최음제
+//     2. user.ribbons 에 안 끝난 줄이 있다          — 빨간 리본
+//     3. 세뇌 만년필을 차고 있고 오염도가 50 이상   — 세뇌 만년필
+//
+// ■ 빨간 리본
+//
+//   원래 양쪽에 이름표만 붙이고 끝이었습니다 (index.html:7235).
+//   거기에 한 시간짜리 줄을 하나 답니다.
+//
+//     · 한 줄에 한 시간, 양쪽 다 유지
+//     · 한 사람이 동시에 다섯 줄까지
+//     · 한 시간이 지나면 이름표가 빠지고, 채운 사람 소지품으로 돌아갑니다
+//
+//   정리는 채운 사람 쪽에서 양쪽을 같이 합니다. 채운 사람이 접속해 있지
+//   않으면 각자 자기 이름표만 먼저 걷고, 나중에 채운 사람이 들어올 때
+//   나머지가 맞춰집니다. 어느 쪽이든 영영 남지는 않습니다.
+//
+// ■ 세뇌 만년필
+//
+//   오염도 50% 증가는 이미 들어가 있고(index.html:7290) 저장도 됩니다
+//   (index.html:6125 가 대상의 pollution 을 같이 씁니다).
+//   여기서는 「차고 있고 오염도가 50 이상인 동안」만 더합니다.
+//   오염도를 50 밑으로 낮추면 유지가 풀립니다.
+
+(function satietyHold() {
+
+const HOLD_FACILITY = true;      // 공용시설 -3 도 막을까
+const HOLD_DARK     = true;      // 어둠 탐사 감소도 막을까
+
+const DRUG = '최음제';
+const RIBBON = '빨간 리본';
+const PEN = '세뇌 만년필';
+const DRUG_MS = 2 * 3600 * 1000;
+const RIBBON_MS = 1 * 3600 * 1000;
+const RIBBON_MAX = 5;
+const PEN_POLL = 50;
+
+function now() { return Date.now(); }
+function base(w) {
+    return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+}
+function wears(u, nm) {
+    return (u && Array.isArray(u.equippedWeapons))
+        && u.equippedWeapons.some(function (w) { return base(w) === nm; });
+}
+function ribbonsOf(u) {
+    if (!u) return [];
+    if (!Array.isArray(u.ribbons)) u.ribbons = [];
+    return u.ribbons;
+}
+function liveRibbons(u) {
+    const t = now();
+    return ribbonsOf(u).filter(function (r) { return r && r.u > t; });
+}
+
+// ==========================================
+// 유지 중인가 — 여기 하나만 보면 됩니다
+// ==========================================
+function satHeld(u) {
+    if (!u) return false;
+    if ((u.satHoldUntil || 0) > now()) return true;               // 최음제
+    if (liveRibbons(u).length) return true;                       // 빨간 리본
+    if (wears(u, PEN) && (u.pollution || 0) >= PEN_POLL) return true;  // 세뇌 만년필
+    return false;
+}
+function heldWhy(u) {
+    const out = [];
+    if ((u.satHoldUntil || 0) > now()) {
+        out.push(DRUG + ' ' + Math.ceil(((u.satHoldUntil - now()) / 60000)) + '분');
+    }
+    const lr = liveRibbons(u);
+    if (lr.length) {
+        const last = Math.max.apply(null, lr.map(function (r) { return r.u; }));
+        out.push(RIBBON + ' ' + lr.length + '줄 · ' + Math.ceil((last - now()) / 60000) + '분');
+    }
+    if (wears(u, PEN) && (u.pollution || 0) >= PEN_POLL) out.push(PEN + ' (오염 ' + u.pollution + ')');
+    return out;
+}
+window.satHeld = satHeld;
+
+// ==========================================
+// 깎이는 세 자리를 막는다
+// ==========================================
+function guard(name, on) {
+    const iv = setInterval(function () {
+        const f = window[name];
+        if (typeof f !== 'function') return;          // 최상위 function 선언이라 window 로 잡힌다
+        if (f._satHold) { clearInterval(iv); return; }
+
+        const wrapped = function (a) {
+            if (!on) return f.apply(this, arguments);
+            // 첫 인자가 사원이면 그 사람, 아니면 나 (useFacility 는 금액, applyDarkSatiety 는 구역코드)
+            const u = (a && typeof a === 'object' && a.code) ? a : currentUser;
+            if (!u || !satHeld(u)) return f.apply(this, arguments);
+            const keep = u.satiety;
+            const r = f.apply(this, arguments);
+            if (u.satiety != null && keep != null && u.satiety < keep) {
+                u.satiety = keep;              // 깎인 만큼 되돌린다 (lastSatietyTime 은 그대로)
+            }
+            return r;
+        };
+        wrapped._satHold = true;
+        window[name] = wrapped;
+        clearInterval(iv);
+        console.log('[포만] ' + name + ' 막음' + (on ? '' : ' (꺼짐)'));
+    }, 400);
+}
+guard('checkPassivePollution', true);
+guard('useFacility', HOLD_FACILITY);
+guard('applyDarkSatiety', HOLD_DARK);
+
+// ==========================================
+// 최음제
+// ==========================================
+(function reg() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        ITEM_CATALOG[DRUG] = {
+            price: 4000, usable: true, targetable: false, effect: 'sat_hold',
+            desc: '마시면 두 시간 동안 포만감이 내려가지 않는다. 남은 시간에 이어 붙는다.'
+        };
+        if (typeof ALIEN_ITEMS_POOL !== 'undefined' && ALIEN_ITEMS_POOL.indexOf(DRUG) < 0) {
+            ALIEN_ITEMS_POOL.push(DRUG);
+        }
+        clearInterval(iv);
+    }, 400);
+})();
+
+(function useDrug() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
+        if (useInventoryItem._satDrug) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            const cat = ITEM_CATALOG[itemName];
+            if (!cat || cat.effect !== 'sat_hold') return _u.apply(this, arguments);
+            if (!currentUser) return;
+            if ((currentUser.inventory || []).indexOf(itemName) < 0) {
+                showCustomAlert('가지고 있지 않습니다.'); return;
+            }
+            if (typeof isQuarantined === 'function' && isQuarantined(currentUser)) {
+                showCustomAlert('격리 중에는 쓸 수 없습니다.'); return;
+            }
+            const from = Math.max(now(), currentUser.satHoldUntil || 0);
+            currentUser.satHoldUntil = from + DRUG_MS;
+            if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
+            if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[아이템 사용] ' + DRUG + ' — 포만감 유지');
+            if (typeof saveFields === 'function') saveFields({ satHoldUntil: 1, inventory: 1, history: 1 });
+            if (typeof updateUI === 'function') updateUI();
+            showCustomAlert('속이 뜨거워집니다.\n\n' + Math.round((currentUser.satHoldUntil - now()) / 60000)
+                + '분 동안 포만감이 내려가지 않습니다.');
+        };
+        useInventoryItem._satDrug = true;
+        clearInterval(iv);
+        console.log('[포만] ' + DRUG + ' 연결');
+    }, 400);
+})();
+
+// ==========================================
+// 빨간 리본 — 한 시간, 다섯 줄까지
+// ==========================================
+(function ribbon() {
+    const iv = setInterval(function () {
+        if (typeof applyItemEffect !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
+        if (applyItemEffect._satRibbon) { clearInterval(iv); return; }
+
+        const _a = applyItemEffect;
+        applyItemEffect = function (targetUser, itemName, isOthers) {
+            const cat = ITEM_CATALOG[itemName];
+            if (!cat || cat.effect !== 'equip_red_ribbon') return _a.apply(this, arguments);
+            if (!currentUser || !targetUser) return _a.apply(this, arguments);
+
+            if (liveRibbons(currentUser).length >= RIBBON_MAX) {
+                showCustomAlert(RIBBON + '은(는) 한 번에 ' + RIBBON_MAX + '줄까지입니다.'); return false;
+            }
+            if (liveRibbons(targetUser).length >= RIBBON_MAX) {
+                showCustomAlert('상대가 이미 ' + RIBBON_MAX + '줄을 묶고 있습니다.'); return false;
+            }
+
+            const r = _a.apply(this, arguments);
+            if (r === false) return r;
+
+            const until = now() + RIBBON_MS;
+            ribbonsOf(currentUser).push({ p: targetUser.code, o: currentUser.code, u: until });
+            ribbonsOf(targetUser).push({ p: currentUser.code, o: currentUser.code, u: until });
+            if (typeof saveFields === 'function') { try { saveFields({ ribbons: 1 }); } catch (e) { } }
+            if (typeof updateUserFields === 'function' && targetUser.code !== currentUser.code) {
+                try { updateUserFields(targetUser.code, { ribbons: targetUser.ribbons }); } catch (e) { }
+            }
+            setTimeout(function () {
+                showCustomAlert(targetUser.name + ' 사원과 묶였습니다.\n\n'
+                    + '한 시간 동안 두 사람의 포만감이 내려가지 않습니다.\n'
+                    + '시간이 지나면 리본은 소지품으로 돌아옵니다.');
+            }, 60);
+            return r;
+        };
+        applyItemEffect._satRibbon = true;
+        clearInterval(iv);
+        console.log('[포만] ' + RIBBON + ' 연결 — 1시간 · 최대 ' + RIBBON_MAX + '줄');
+    }, 400);
+})();
+
+// 끝난 줄을 걷는다
+function sweepRibbons() {
+    if (!currentUser) return;
+    const t = now();
+    const all = ribbonsOf(currentUser);
+    const dead = all.filter(function (r) { return r && r.u <= t; });
+    if (!dead.length) return;
+
+    currentUser.ribbons = all.filter(function (r) { return r && r.u > t; });
+
+    // 내 이름표를 끝난 줄 수만큼 뺀다 — 되도록 그 상대의 것으로
+    const eq = currentUser.equippedWeapons || [];
+    dead.forEach(function (d) {
+        const mate = (db.users[d.p] || {}).name || '';
+        let i = eq.findIndex(function (w) {
+            return base(w) === RIBBON && mate && String(w).indexOf(mate) >= 0;
+        });
+        if (i < 0) i = eq.findIndex(function (w) { return base(w) === RIBBON; });
+        if (i >= 0) {
+            const full = eq[i];
+            eq.splice(i, 1);
+            if (typeof clearEquipOwner === 'function') { try { clearEquipOwner(currentUser, full); } catch (e) { } }
+        }
+        // 내가 채운 것이면 소지품으로 돌려받는다
+        if (d.o === currentUser.code) {
+            if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+            currentUser.inventory.push(RIBBON);
+        }
+    });
+
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + dead.length + '줄)');
+    }
+    if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
+
+    // 내가 채운 쪽이면 상대도 같이 정리한다
+    dead.forEach(function (d) {
+        if (d.o !== currentUser.code) return;
+        const u = db.users[d.p];
+        if (!u || typeof updateUserFields !== 'function') return;
+        const mine = (u.ribbons || []).filter(function (r) { return r && r.u > t; });
+        const teq = (u.equippedWeapons || []).slice();
+        const myName = currentUser.name || '';
+        let i = teq.findIndex(function (w) {
+            return base(w) === RIBBON && myName && String(w).indexOf(myName) >= 0;
+        });
+        if (i < 0) i = teq.findIndex(function (w) { return base(w) === RIBBON; });
+        if (i >= 0) teq.splice(i, 1);
+        u.ribbons = mine; u.equippedWeapons = teq;
+        try { updateUserFields(d.p, { ribbons: mine, equippedWeapons: teq }); } catch (e) { }
+    });
+
+    if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+    console.log('[' + RIBBON + '] ' + dead.length + '줄이 풀렸습니다.');
+}
+setTimeout(sweepRibbons, 5000);
+setInterval(sweepRibbons, 30000);
+
+// ==========================================
+// 포만감 칸에 「유지 중」 표시
+// ==========================================
+(function mark() {
+    setInterval(function () {
+        const el = document.getElementById('satiety-text');
+        if (!el || !currentUser) return;
+        let tag = document.getElementById('sat-hold-tag');
+        if (!satHeld(currentUser)) { if (tag) tag.remove(); return; }
+        if (!tag) {
+            tag = document.createElement('span');
+            tag.id = 'sat-hold-tag';
+            tag.style.cssText = 'margin-left:6px; font-size:9px; color:#81c784;';
+            el.parentElement.appendChild(tag);
+        }
+        const t = '유지 중';
+        if (tag.textContent !== t) tag.textContent = t;
+        tag.title = heldWhy(currentUser).join(' · ');
+    }, 3000);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+window.satState = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    console.log('%c===== ' + u.name + ' · 포만감 =====', 'color:#8bc34a; font-size:13px');
+    console.log('  포만감:', u.satiety != null ? u.satiety : 100, '/100 · 오염도:', u.pollution || 0);
+    console.log('  유지 중:', satHeld(u) ? 'O — ' + heldWhy(u).join(' · ') : '아니오');
+    console.log('  ' + DRUG + ':', (u.satHoldUntil || 0) > now()
+        ? new Date(u.satHoldUntil).toLocaleString() + ' 까지' : '없음');
+    console.log('  ' + PEN + ':', wears(u, PEN) ? ('착용 중 · 오염 ' + (u.pollution || 0)
+        + ((u.pollution || 0) >= PEN_POLL ? ' → 유지됨' : ' → 50 미만이라 안 됨')) : '없음');
+    const lr = liveRibbons(u);
+    if (!lr.length) { console.log('  ' + RIBBON + ': 없음'); return; }
+    console.table(lr.map(function (r) {
+        return {
+            상대: (db.users[r.p] || {}).name || r.p,
+            채운사람: r.o === u.code ? '본인' : ((db.users[r.o] || {}).name || r.o),
+            남은시간: Math.ceil((r.u - now()) / 60000) + '분'
+        };
+    }));
+};
+
+// 상담사 — 지금 당장 묶임을 푼다
+window.ribbonClear = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    const eq = (u.equippedWeapons || []).filter(function (w) { return base(w) !== RIBBON; });
+    u.ribbons = []; u.equippedWeapons = eq;
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, { ribbons: [], equippedWeapons: eq });
+    console.log('%c✓ ' + u.name + ' 사원의 ' + RIBBON + ' 을 전부 풀었습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+console.log('[포만] satState(사번) · ribbonClear(사번) · satHeld(user)');
+
+})();
+;
+
+// ---------- legend-immune.js ----------
+// ==========================================
+// ★ [전설] 칭호 — 물약이 듣지 않는다
+// bundles.json 마지막 그룹, titles.js 보다 뒤 · save-merge.js 앞
+// ==========================================
+//
+// ■ 언제 듣는가
+//
+//   [전설] 을 「달고 있을 때」만입니다. 가지고만 있고 안 달았으면 그냥 맞습니다.
+//   titles.js 가 달린 칭호를 user.titleOn 에 적고, 진짜 가진 것인지는
+//   user.titleAdmin 으로 봅니다. 둘 다 맞아야 면역입니다.
+//
+// ■ 막는 길이 셋입니다
+//
+//   물약이 몸에 닿는 길이 세 갈래라서, 한 군데만 막으면 샙니다.
+//
+//   1. applyItemEffect — 먹이거나 마시는 보통 길
+//      무지개 물약도 여기로 옵니다 (index.html:7033 이 다른 물약 하나를 골라
+//      같은 자리로 돌립니다).
+//
+//   2. addTimedEffect — 이름표가 붙는 자리
+//      newitems.js 의 p_* 열 가지가 이쪽으로만 옵니다 (newitems.js:480~488).
+//      1번을 지나왔더라도 여기서 한 번 더 걸립니다.
+//
+//   3. 석류맛 물약 — 사원을 무작위로 골라 timedEffects 에 바로 밀어 넣습니다
+//      (index.html:7388). addTimedEffect 를 안 거쳐서 2번에 안 걸립니다.
+//      그래서 고르는 동안만 [전설] 을 단 사람을 명단에서 빼 둡니다.
+//
+// ■ 안 막는 것
+//
+//   제거약(cure_potion)   — 걸린 것을 푸는 쪽이라 막으면 손해입니다
+//   하급·중급 물약(heal)  — 오염도 회복뿐이라 상태이상이 아닙니다
+//   석류맛을 「던지는」 것 — 맞는 쪽만 막습니다. 전설도 남에게 던질 수 있습니다
+//
+//   감자맛(행운 +100)과 먹물맛(회피 +2)은 이로운 물약인데도 막습니다.
+//   「모든 물약이 안 듣는다」를 글자 그대로 둔 것입니다.
+//   통하게 하시려면 아래 BLOCK 목록에서 p_potato · p_ink 를 빼시면 됩니다.
+
+(function legendImmune() {
+
+const TITLE = '전설';
+
+// 막을 물약 — 여기서 빼면 그 물약은 전설에게도 듣습니다
+const BLOCK = {
+    grape_potion: 1, pineapple_potion: 1, clear_potion: 1, plum_potion: 1,
+    rainbow_potion: 1, milk_potion: 1, banana_potion: 1, apple_potion: 1,
+    orange_potion: 1, peach_potion: 1, cherry_potion: 1, persimmon_potion: 1,
+    p_durian: 1, p_lychee: 1, p_mango: 1, p_melon: 1, p_berry: 1,
+    p_potato: 1, p_sweet: 1, p_melon2: 1, p_ink: 1, p_blue: 1
+};
+
+// 이름표로 들어오는 물약 — addTimedEffect 쪽에서 쓴다
+function isPotionName(n) {
+    return /물약$/.test(String(n || '').trim());
+}
+
+// ==========================================
+// [전설] 을 달고 있는가
+// ==========================================
+function legend(u) {
+    if (!u) return false;
+    if (u.titleOn !== TITLE) return false;                      // 달고 있어야 한다
+    return (u.titleAdmin || []).indexOf(TITLE) >= 0;            // 진짜 가진 것이어야 한다
+}
+window.isLegend = legend;
+
+function bounced(u, what) {
+    const me = currentUser && u.code === currentUser.code;
+    if (typeof showCustomAlert === 'function') {
+        showCustomAlert(me
+            ? '[🎤 전설]\n\n' + what + '이(가) 몸에 닿지 못하고 흩어졌습니다.'
+            : u.name + ' 사원에게는 통하지 않았습니다.\n\n[🎤 전설] 칭호가 물약을 밀어냈습니다.');
+    }
+    if (typeof addHistoryLog === 'function') {
+        try { addHistoryLog(u, '[전설] ' + what + '이(가) 듣지 않았습니다.'); } catch (e) { }
+    }
+}
+
+// ==========================================
+// 1. 먹이거나 마시는 길
+// ==========================================
+(function hookApply() {
+    const iv = setInterval(function () {
+        if (typeof applyItemEffect !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
+        if (applyItemEffect._legend) { clearInterval(iv); return; }
+
+        const _a = applyItemEffect;
+        applyItemEffect = function (targetUser, itemName, isOthers) {
+            const cat = ITEM_CATALOG[itemName] || {};
+
+            // 석류맛은 던지는 것이라 막지 않는다 — 고르는 명단에서만 뺀다 (3번)
+            if (cat.effect === 'pomegranate_potion') return withoutLegends(_a, this, arguments);
+
+            if (targetUser && BLOCK[cat.effect] && legend(targetUser)) {
+                bounced(targetUser, itemName);
+                return false;                       // false 면 아이템이 소모되지 않는다
+            }
+            return _a.apply(this, arguments);
+        };
+        applyItemEffect._legend = true;
+        clearInterval(iv);
+        console.log('[전설] 물약 면역 연결');
+    }, 400);
+})();
+
+// ==========================================
+// 2. 이름표가 붙는 자리 — p_* 열 가지가 이쪽으로만 온다
+// ==========================================
+(function hookTimed() {
+    const iv = setInterval(function () {
+        if (typeof addTimedEffect !== 'function') return;
+        if (addTimedEffect._legend) { clearInterval(iv); return; }
+
+        const _t = addTimedEffect;
+        addTimedEffect = function (user, name, desc, hours) {
+            if (user && legend(user) && isPotionName(name)) {
+                bounced(user, name);
+                return;
+            }
+            return _t.apply(this, arguments);
+        };
+        addTimedEffect._legend = true;
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 3. 석류맛 — 고르는 동안만 전설을 명단에서 뺀다
+// ==========================================
+//
+// index.html:7379 가 Object.keys(db.users) 로 맞을 사람을 고릅니다.
+// 그 한 호흡 동안만 db.users 를 전설 없는 것으로 바꿔 둡니다.
+function withoutLegends(fn, self, args) {
+    if (typeof db === 'undefined' || !db || !db.users) return fn.apply(self, args);
+
+    const full = db.users;
+    const thin = {};
+    let cut = 0;
+    Object.keys(full).forEach(function (c) {
+        if (legend(full[c])) { cut++; return; }
+        thin[c] = full[c];
+    });
+
+    if (!cut) return fn.apply(self, args);
+    if (Object.keys(thin).length === 0) {            // 전부 전설이면 맞을 사람이 없다
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert('던질 곳이 없습니다.\n\n남은 사원이 전부 [🎤 전설] 입니다.');
+        }
+        return false;
+    }
+
+    db.users = thin;
+    try { return fn.apply(self, args); }
+    finally { db.users = full; }
+}
+
+// ==========================================
+// 확인
+// ==========================================
+window.legendState = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    console.log('%c===== ' + u.name + ' · 전설 면역 =====', 'color:#d4af37; font-size:13px');
+    console.log('  가진 칭호:', (u.titleAdmin || []).join(' · ') || '없음');
+    console.log('  달고 있는 것:', u.titleOn || '없음');
+    console.log('  물약 면역:', legend(u) ? 'O' : '✗'
+        + ((u.titleAdmin || []).indexOf(TITLE) >= 0 && u.titleOn !== TITLE ? '  (가지고만 있고 안 달았습니다)' : ''));
+    console.log('  막는 물약 ' + Object.keys(BLOCK).length + '종 · 안 막는 것: 제거약 · 하급/중급 물약');
+    console.log('  연결 —',
+        'applyItemEffect', (typeof applyItemEffect === 'function' && applyItemEffect._legend) ? 'O' : '✗',
+        '· addTimedEffect', (typeof addTimedEffect === 'function' && addTimedEffect._legend) ? 'O' : '✗');
+};
+
+window.legendList = function () {
+    const rows = [];
+    Object.keys(db.users || {}).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || (u.titleAdmin || []).indexOf(TITLE) < 0) return;
+        rows.push({ 사원: u.name || c, 사번: u.no || '-', 달았나: u.titleOn === TITLE ? 'O' : '-', 면역: legend(u) ? 'O' : '-' });
+    });
+    console.log('%c===== [🎤 전설] 을 가진 사원 =====', 'color:#d4af37; font-size:13px');
+    if (rows.length) console.table(rows); else console.log('  없습니다.');
+};
+
+console.log('[전설] legendState(사번) · legendList()');
+
+})();
+;
+
 // ---------- save-merge.js ----------
 // ==========================================
 // ★ 통째 쓰기를 「바뀐 것만 쓰기」로 바꾼다
@@ -11820,11 +14368,12 @@ function attach() {
 
         // 서버가 바뀌었다 — 내가 손대지 않은 항목만 받아 온다
         let took = 0;
+        const kept = {};                                    // 내가 손댄 항목은 기준도 바꾸지 않는다
         Object.keys(srv).forEach(function (k) {
             if (k === '_adminStamp' || k === '_stamp') return;
             if (same(srv[k], base[k])) return;              // 서버도 그대로면 볼 것 없다
             const mineTouched = !same(currentUser[k], base[k]);
-            if (mineTouched) return;                        // 내가 바꾼 것은 내가 쓴다
+            if (mineTouched) { kept[k] = clone(base[k]); return; }   // 내가 바꾼 것은 내가 쓴다
             if (k === INV) { fillArr(currentUser[INV], srv[k]); base[k] = clone(srv[k]); took++; return; }
             currentUser[k] = clone(srv[k]);
             took++;
@@ -11840,6 +14389,7 @@ function attach() {
         });
 
         base = clone(srv) || {};
+        Object.keys(kept).forEach(function (k) { base[k] = kept[k]; });
 
         if (took) {
             if (db && db.users && db.users[code]) db.users[code] = currentUser;

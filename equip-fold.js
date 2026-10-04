@@ -204,6 +204,23 @@ function fold() {
     paint(f.cards);
 }
 
+// 다른 파일이 소지품 칸을 다시 써도 「그려지기 전에」 끼어든다.
+// setTimeout 으로 뒤늦게 숨기면 그 사이 한 번 보였다 사라져 깜빡인다.
+// MutationObserver 의 콜백은 화면에 그려지기 전에 돌아서 깜빡임이 없다.
+let watching = false, inFold = false;
+function watchBox() {
+    if (watching) return;
+    const box = document.getElementById('inventory-list-container');
+    if (!box) { setTimeout(watchBox, 500); return; }
+    watching = true;
+    new MutationObserver(function () {
+        if (inFold) return;                      // 내가 만든 변화는 되받지 않는다
+        inFold = true;
+        try { fold(); } catch (e) { }
+        inFold = false;
+    }).observe(box, { childList: true });
+}
+
 (function hook() {
     const iv = setInterval(function () {
         if (typeof renderInventory !== 'function') return;
@@ -212,16 +229,12 @@ function fold() {
         renderInventory = function () {
             const r = _r.apply(this, arguments);
             try { fold(); } catch (e) { }
-            // 다른 파일이 늦게 손대는 경우가 있어 한 번 더 덮는다
-            setTimeout(function () { try { fold(); } catch (e) { } }, 60);
             return r;
         };
         renderInventory._eqFold = true;
         clearInterval(iv);
         try { fold(); } catch (e) { }
-        [300, 900, 2000].forEach(function (ms) {
-            setTimeout(function () { try { fold(); } catch (e) { } }, ms);
-        });
+        watchBox();
         console.log('[장착칸] 접기 연결 — 최대 ' + EQUIP_MAX + '칸');
     }, 400);
 })();
