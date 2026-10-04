@@ -140,55 +140,68 @@ window.bathCheck = function () {
 // ==========================================
 // 둘 — 장착칸 접기
 // ==========================================
-function folded() {
-    try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+//
+// 처음엔 카드를 접는 상자로 「옮겼는데」, 소지품 칸은 renderInventory 말고도
+// 여러 파일이 손대는 자리라 옮긴 것이 어긋났습니다.
+// 그래서 옮기지 않고 제자리에서 숨깁니다. 바깥 구조를 안 건드립니다.
+let COLLAPSED = false;
+try { COLLAPSED = localStorage.getItem(KEY) === '1'; } catch (e) { }
+function remember() { try { localStorage.setItem(KEY, COLLAPSED ? '1' : '0'); } catch (e) { } }
+
+// 「[장착 중 슬롯 n]」 가 든 카드를 찾는다 — 칸의 바로 아래 자식들이다
+function findCards() {
+    const box = document.getElementById('inventory-list-container');
+    if (!box) return { box: null, cards: [] };
+    const cards = [];
+    const kids = box.children;
+    for (let i = 0; i < kids.length; i++) {
+        const el = kids[i];
+        if (el.id === 'eq-fold-head') continue;
+        if ((el.textContent || '').indexOf('[장착 중 슬롯') >= 0) cards.push(el);
+    }
+    return { box: box, cards: cards };
 }
-function setFolded(v) {
-    try { localStorage.setItem(KEY, v ? '1' : '0'); } catch (e) { }
+
+function paint(cards) {
+    cards.forEach(function (c) {
+        const want = COLLAPSED ? 'none' : '';
+        if (c.style.display !== want) c.style.display = want;
+    });
+    const m = document.getElementById('eq-fold-mark');
+    if (m) m.textContent = COLLAPSED ? '펼치기 ▼' : '접기 ▲';
 }
 
 function fold() {
-    const box = document.getElementById('inventory-list-container');
-    if (!box || document.getElementById('eq-fold-wrap')) return;
+    const f = findCards();
+    if (!f.box || f.cards.length < 2) {            // 하나뿐이면 접을 것이 없다
+        const old = document.getElementById('eq-fold-head');
+        if (old) old.remove();
+        return;
+    }
 
-    // 「[장착 중 슬롯 n]」 가 든 카드를 모은다 — 전부 칸의 바로 아래 자식이다
-    const cards = [];
-    box.querySelectorAll('span').forEach(function (sp) {
-        if (sp.textContent.indexOf('[장착 중 슬롯') !== 0) return;
-        let el = sp;
-        while (el.parentElement && el.parentElement !== box) el = el.parentElement;
-        if (el.parentElement === box && cards.indexOf(el) < 0) cards.push(el);
-    });
-    if (cards.length < 2) return;            // 하나뿐이면 접을 것이 없다
+    let head = document.getElementById('eq-fold-head');
+    if (!head || head.parentElement !== f.box) {
+        if (head) head.remove();
+        head = document.createElement('div');
+        head.id = 'eq-fold-head';
+        head.style.cssText = 'display:flex; justify-content:space-between; align-items:center;'
+            + ' background:#241f14; border:1px solid #d4af37; border-radius:6px;'
+            + ' padding:9px 12px; margin-bottom:12px; cursor:pointer; user-select:none;';
+        head.addEventListener('click', function () {
+            COLLAPSED = !COLLAPSED;
+            remember();
+            paint(findCards().cards);
+        });
+        f.box.insertBefore(head, f.cards[0]);
+    }
 
-    const open = !folded();
-    const head = document.createElement('div');
-    head.id = 'eq-fold-head';
-    head.style.cssText = 'display:flex; justify-content:space-between; align-items:center;'
-        + ' background:#241f14; border:1px solid #d4af37; border-radius:6px;'
-        + ' padding:9px 12px; margin-bottom:' + (open ? '12px' : '14px') + '; cursor:pointer;'
-        + ' user-select:none;';
-    head.innerHTML = '<span style="font-size:11px; color:#d4af37; font-weight:bold;">'
-        + '장착 중 ' + cards.length + ' / ' + EQUIP_MAX + '칸</span>'
+    const label = '장착 중 ' + f.cards.length + ' / ' + EQUIP_MAX + '칸';
+    const want = '<span style="font-size:11px; color:#d4af37; font-weight:bold;">' + label + '</span>'
         + '<span id="eq-fold-mark" style="font-size:11px; color:#aaa;">'
-        + (open ? '접기 ▲' : '펼치기 ▼') + '</span>';
+        + (COLLAPSED ? '펼치기 ▼' : '접기 ▲') + '</span>';
+    if (head.innerHTML !== want) head.innerHTML = want;
 
-    const wrap = document.createElement('div');
-    wrap.id = 'eq-fold-wrap';
-    if (!open) wrap.style.display = 'none';
-
-    cards[0].parentElement.insertBefore(head, cards[0]);
-    head.parentElement.insertBefore(wrap, head.nextSibling);
-    cards.forEach(function (c) { wrap.appendChild(c); });
-
-    head.onclick = function () {
-        const now = wrap.style.display === 'none';
-        wrap.style.display = now ? '' : 'none';
-        setFolded(!now);
-        const m = document.getElementById('eq-fold-mark');
-        if (m) m.textContent = now ? '접기 ▲' : '펼치기 ▼';
-        head.style.marginBottom = now ? '12px' : '14px';
-    };
+    paint(f.cards);
 }
 
 (function hook() {
@@ -198,12 +211,13 @@ function fold() {
         const _r = renderInventory;
         renderInventory = function () {
             const r = _r.apply(this, arguments);
-            try { fold(); } catch (e) { }     // 같은 호흡에 — 펼쳐진 모습이 안 스친다
+            try { fold(); } catch (e) { }
+            // 다른 파일이 늦게 손대는 경우가 있어 한 번 더 덮는다
+            setTimeout(function () { try { fold(); } catch (e) { } }, 60);
             return r;
         };
         renderInventory._eqFold = true;
         clearInterval(iv);
-        // 이미 그려져 있을 수 있다 — 붙자마자 한 번, 그리고 늦게 그려지는 것도 잡는다
         try { fold(); } catch (e) { }
         [300, 900, 2000].forEach(function (ms) {
             setTimeout(function () { try { fold(); } catch (e) { } }, ms);
@@ -212,6 +226,34 @@ function fold() {
     }, 400);
 })();
 
-console.log('[장착칸] bathCheck() · bathWipeAll()');
+// 왜 안 접히는지 보는 자리
+window.foldState = function () {
+    const f = findCards();
+    console.log('%c===== 장착칸 접기 =====', 'color:#d4af37; font-size:13px');
+    console.log('  소지품 칸:', f.box ? '있음' : '✗ 못 찾음 (#inventory-list-container)');
+    console.log('  찾은 장착 카드:', f.cards.length, '장  (2장부터 접힙니다)');
+    console.log('  머리글:', document.getElementById('eq-fold-head') ? '있음' : '✗ 없음');
+    console.log('  접힘 상태:', COLLAPSED);
+    let ls = '됨'; try { localStorage.setItem(KEY + 'T', '1'); localStorage.removeItem(KEY + 'T'); }
+    catch (e) { ls = '✗ 막힘 — ' + e.message; }
+    console.log('  브라우저 기억:', ls);
+    console.log('  renderInventory 연결:',
+        (typeof renderInventory === 'function' && renderInventory._eqFold) ? 'O' : '✗');
+    if (f.box && !f.cards.length) {
+        console.warn('  카드를 못 찾았습니다. 칸의 바로 아래 자식들은 이렇습니다:');
+        const out = [];
+        for (let i = 0; i < Math.min(f.box.children.length, 12); i++) {
+            out.push({ 번호: i, 태그: f.box.children[i].tagName,
+                       앞글자: (f.box.children[i].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
+        }
+        console.table(out);
+    }
+    if (f.cards.length) {
+        console.log('  첫 카드가 지금 보이나:', f.cards[0].style.display === 'none' ? '숨김' : '보임');
+    }
+};
+
+
+console.log('[장착칸] foldState() · bathCheck() · bathWipeAll()');
 
 })();
