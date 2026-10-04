@@ -1,5 +1,5 @@
 // ==========================================
-// 묶음 08.js — 48개
+// 묶음 08.js — 54개
 // build.mjs 가 만든 것입니다. 여기를 고치지 말고 원본 파일을 고치세요.
 // ==========================================
 
@@ -13601,6 +13601,23 @@ function fold() {
     paint(f.cards);
 }
 
+// 다른 파일이 소지품 칸을 다시 써도 「그려지기 전에」 끼어든다.
+// setTimeout 으로 뒤늦게 숨기면 그 사이 한 번 보였다 사라져 깜빡인다.
+// MutationObserver 의 콜백은 화면에 그려지기 전에 돌아서 깜빡임이 없다.
+let watching = false, inFold = false;
+function watchBox() {
+    if (watching) return;
+    const box = document.getElementById('inventory-list-container');
+    if (!box) { setTimeout(watchBox, 500); return; }
+    watching = true;
+    new MutationObserver(function () {
+        if (inFold) return;                      // 내가 만든 변화는 되받지 않는다
+        inFold = true;
+        try { fold(); } catch (e) { }
+        inFold = false;
+    }).observe(box, { childList: true });
+}
+
 (function hook() {
     const iv = setInterval(function () {
         if (typeof renderInventory !== 'function') return;
@@ -13609,16 +13626,12 @@ function fold() {
         renderInventory = function () {
             const r = _r.apply(this, arguments);
             try { fold(); } catch (e) { }
-            // 다른 파일이 늦게 손대는 경우가 있어 한 번 더 덮는다
-            setTimeout(function () { try { fold(); } catch (e) { } }, 60);
             return r;
         };
         renderInventory._eqFold = true;
         clearInterval(iv);
         try { fold(); } catch (e) { }
-        [300, 900, 2000].forEach(function (ms) {
-            setTimeout(function () { try { fold(); } catch (e) { } }, ms);
-        });
+        watchBox();
         console.log('[장착칸] 접기 연결 — 최대 ' + EQUIP_MAX + '칸');
     }, 400);
 })();
@@ -13883,6 +13896,24 @@ guard('applyDarkSatiety', HOLD_DARK);
 })();
 
 // 끝난 줄을 걷는다
+//
+// ★ 한 줄에 한 번만 돌려준다
+//   ribbons 를 지우는 것만으로는 모자랍니다. 저장이 늦거나 서버의 묵은 값이
+//   한 번 되돌아오면 끝난 줄이 되살아나고, 30초 뒤 또 돌려주게 됩니다.
+//   그러면 리본이 30초마다 하나씩 불어납니다.
+//   그래서 「이미 돌려준 줄」을 따로 적어 두고, 적힌 것은 두 번 돌려주지 않습니다.
+function payKey(d) { return (d.o || '') + '|' + (d.p || '') + '|' + (d.u || 0); }
+function paidList() {
+    if (!Array.isArray(currentUser.ribbonPaid)) currentUser.ribbonPaid = [];
+    return currentUser.ribbonPaid;
+}
+function alreadyPaid(d) { return paidList().indexOf(payKey(d)) >= 0; }
+function markPaid(d) {
+    const l = paidList();
+    l.push(payKey(d));
+    while (l.length > 40) l.shift();          // 오래된 것부터 버린다
+}
+
 function sweepRibbons() {
     if (!currentUser) return;
     const t = now();
@@ -13894,7 +13925,10 @@ function sweepRibbons() {
 
     // 내 이름표를 끝난 줄 수만큼 뺀다 — 되도록 그 상대의 것으로
     const eq = currentUser.equippedWeapons || [];
+    let gave = 0;
     dead.forEach(function (d) {
+        if (alreadyPaid(d)) return;                 // 이미 돌려준 줄이다
+        markPaid(d);
         const mate = (db.users[d.p] || {}).name || '';
         let i = eq.findIndex(function (w) {
             return base(w) === RIBBON && mate && String(w).indexOf(mate) >= 0;
@@ -13909,11 +13943,13 @@ function sweepRibbons() {
         if (d.o === currentUser.code) {
             if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
             currentUser.inventory.push(RIBBON);
+            gave++;
         }
     });
 
-    if (typeof addHistoryLog === 'function') {
-        addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + dead.length + '줄)');
+    if (!gave && !dead.length) return;
+    if (typeof addHistoryLog === 'function' && gave) {
+        addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + gave + '개 돌려받음)');
     }
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
 
@@ -13935,7 +13971,7 @@ function sweepRibbons() {
     });
 
     if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
-    console.log('[' + RIBBON + '] ' + dead.length + '줄이 풀렸습니다.');
+    if (gave) console.log('[' + RIBBON + '] ' + gave + '개를 돌려받았습니다.');
 }
 setTimeout(sweepRibbons, 5000);
 setInterval(sweepRibbons, 30000);
@@ -14193,6 +14229,1218 @@ window.legendList = function () {
 };
 
 console.log('[전설] legendState(사번) · legendList()');
+
+})();
+;
+
+// ---------- note-fix.js ----------
+// ==========================================
+// ★ 특이사항 문구 — 한 줄만 지우기 · 사라진 것 되살리기
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 빨간 리본 셋을 걸고 하나만 회수했는데 셋 다 사라져 보이는 것
+//
+//   회수할 때 특이사항을 이렇게 걷어냅니다. (index.html:1551)
+//
+//       function stripNoteByItem(user, itemName) {
+//           const arr = user.badge.notes.split(' | ')
+//               .filter(n => n.trim() !== '' && !n.includes(itemName));
+//           user.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+//       }
+//
+//   「이름이 든 줄」을 **전부** 버립니다. 리본이 셋이면 문구도 셋인데
+//   하나를 회수하는 순간 셋이 한꺼번에 날아갑니다.
+//   장착칸에는 둘이 그대로 남아 있으니, 없어진 게 아니라 안 보이는 것입니다.
+//
+//   부르는 자리가 여섯 군데입니다.
+//     index.html:4888 · 6379 · 6396 · 6426 · 6437 · newitems.js:647
+//   전부 「하나를 뗐다」는 자리라 한 줄만 지우는 게 맞습니다.
+//
+//   → 첫 줄 하나만 지우도록 바꿉니다.
+//
+// ■ 노예 계약이 걸려 있는데 특이사항에 안 보이는 것
+//
+//   쓰는 자리는 멀쩡합니다. (index.html:7349)
+//
+//       appendBadgeNoteToUser(targetUser, `[계약] ${currentUser.name} 사원과 노예 계약 (3일)`);
+//
+//   문제는 특이사항이 ' | ' 로 이어 붙인 글자 한 줄이고, 그 한 줄을
+//   여러 군데가 제각기 자르고 붙인다는 데 있습니다.
+//   위의 「전부 지우기」 말고도 index.html:4920 · 4934 · 4952,
+//   cure-fix.js:57, sticker-fix.js:75 가 같은 줄을 건드립니다.
+//   어느 하나가 지나가면서 같이 쓸어 가면 계약은 살아 있는데 문구만 없어집니다.
+//
+//   지우는 자리를 하나하나 쫓는 대신, 반대로 맞춥니다.
+//   「있어야 할 문구가 없으면 다시 적는다」로 두면 어느 길로 사라졌든 돌아옵니다.
+//
+//     · slaveUntil 이 아직 안 지났는데 노예 계약 문구가 없으면 → 다시 적는다
+//     · 차고 있는 빨간 리본 수보다 문구가 적으면 → 모자란 만큼 다시 적는다
+//
+//   이미 있는 문구는 건드리지 않습니다. 없을 때만 더합니다.
+
+(function noteFix() {
+
+const SEP = ' | ';
+const NONE = '특이사항 없음';
+const RIBBON = '빨간 리본';
+
+function notesOf(u) {
+    if (!u) return [];
+    const s = (u.badge && u.badge.notes) || '';
+    if (!s || s === NONE) return [];
+    return s.split('|').map(function (x) { return x.trim(); }).filter(Boolean);
+}
+function setNotes(u, arr) {
+    if (!u.badge) u.badge = { photo: '', nickname: u.name, notes: NONE };
+    u.badge.notes = arr.length ? arr.join(SEP) : NONE;
+}
+function baseOf(w) {
+    return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+}
+
+// ==========================================
+// 하나 — 한 줄만 지운다
+// ==========================================
+(function onlyOne() {
+    const iv = setInterval(function () {
+        if (typeof stripNoteByItem !== 'function') return;
+        if (stripNoteByItem._oneOnly) { clearInterval(iv); return; }
+
+        const fixed = function (user, itemName) {
+            if (!user || !user.badge || !user.badge.notes) return;
+            const arr = notesOf(user);
+            const i = arr.findIndex(function (n) { return n.indexOf(itemName) >= 0; });
+            if (i < 0) return;
+            arr.splice(i, 1);                     // 첫 줄 하나만
+            setNotes(user, arr);
+        };
+        fixed._oneOnly = true;
+        stripNoteByItem = fixed;
+        clearInterval(iv);
+        console.log('[특이사항] 한 줄만 지우도록 바꿈');
+    }, 400);
+})();
+
+// ==========================================
+// 둘 — 있어야 할 문구를 되살린다
+// ==========================================
+function missing(u) {
+    if (!u) return [];
+    const arr = notesOf(u);
+    const add = [];
+
+    // 노예 계약 — 아직 기간이 남았는데 문구가 없다
+    const live = (u.slaveUntil && Date.now() < u.slaveUntil) || u.slaveFixed;
+    if (live && !arr.some(function (n) { return n.indexOf('노예 계약') >= 0; })) {
+        const who = u.masterName || '누군가';
+        add.push('[계약] ' + who + ' 사원과 노예 계약 (' + (u.slaveFixed ? '영구' : '3일') + ')');
+    }
+
+    // 빨간 리본 — 차고 있는 수보다 문구가 적다
+    const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
+    const noted = arr.filter(function (n) { return n.indexOf(RIBBON) >= 0; }).length;
+    for (let i = noted; i < worn.length; i++) add.push('[장착됨] ' + worn[i]);
+
+    return add;
+}
+
+function reconcile(u, quiet) {
+    const add = missing(u);
+    if (!add.length) return 0;
+    setNotes(u, notesOf(u).concat(add));
+    if (!quiet) console.log('[특이사항] ' + (u.name || u.code) + ' — ' + add.length + '줄 되살림: ' + add.join(' / '));
+    return add.length;
+}
+
+// 내 것은 가끔 저절로
+(function self() {
+    setInterval(function () {
+        if (!currentUser) return;
+        const n = reconcile(currentUser, true);
+        if (!n) return;
+        if (typeof saveFields === 'function') { try { saveFields({ badge: 1 }); } catch (e) { } }
+        const el = document.getElementById('badge-notes-text');
+        if (el && currentUser.badge) el.innerText = currentUser.badge.notes;
+    }, 15000);
+})();
+
+// ==========================================
+// 확인 · 손으로
+// ==========================================
+window.noteCheck = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const list = who
+        ? all.filter(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+        : all;
+    const rows = [];
+    list.forEach(function (u) {
+        if (!u || !u.name) return;
+        const add = missing(u);
+        if (!add.length) return;
+        rows.push({ 사원: u.name, 사번: u.no || '-', 빠진줄: add.length, 내용: add.join(' / ') });
+    });
+    console.log('%c===== 특이사항에서 빠진 문구 =====', 'color:#ffd700; font-size:13px');
+    if (rows.length) { console.table(rows); console.log('  되살리려면 noteFixAll()'); }
+    else console.log('  빠진 것이 없습니다.');
+};
+
+window.noteFixAll = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    const up = {}, rows = [];
+    Object.keys(db.users || {}).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || !u.name) return;
+        const n = reconcile(u, true);
+        if (!n) return;
+        up['users/' + c + '/badge'] = u.badge;
+        rows.push({ 사원: u.name, 되살린줄: n, 특이사항: u.badge.notes });
+    });
+    if (!rows.length) { console.log('되살릴 것이 없습니다.'); return; }
+    database.ref('/').update(up).then(function () {
+        console.table(rows);
+        console.log('%c✓ ' + rows.length + '명을 되살렸습니다.', 'color:#4CAF50');
+        if (typeof updateUI === 'function') updateUI();
+    }).catch(function (e) { console.error(e); });
+};
+
+window.noteShow = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    console.log('%c===== ' + u.name + ' · 특이사항 =====', 'color:#ffd700; font-size:13px');
+    const arr = notesOf(u);
+    if (arr.length) arr.forEach(function (n, i) { console.log('  ' + (i + 1) + '. ' + n); });
+    else console.log('  (없음)');
+    const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
+    console.log('  차고 있는 ' + RIBBON + ':', worn.length + '개', worn.length ? ('— ' + worn.join(' · ')) : '');
+    console.log('  노예 계약:', (u.slaveUntil && Date.now() < u.slaveUntil)
+        ? (new Date(u.slaveUntil).toLocaleString() + ' 까지 · 주인 ' + (u.masterName || '?'))
+        : (u.slaveFixed ? '영구 · 주인 ' + (u.masterName || '?') : '없음'));
+    const add = missing(u);
+    if (add.length) console.warn('  빠진 문구:', add.join(' / '));
+};
+
+console.log('[특이사항] noteShow(사번) · noteCheck() · noteFixAll()');
+
+})();
+;
+
+// ---------- ribbon-fix.js ----------
+// ==========================================
+// ★ 빨간 리본 — 겹쳐 걸면 하나밖에 못 떼는 것
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 무엇이 일어나고 있나
+//
+//   같은 사람에게 리본을 셋 걸면 이름표가 **똑같아집니다.**
+//   (index.html:7249~7250)
+//
+//       const targetLabel = `빨간 리본 (연결: ${currentUser.name} ${cPos})`;
+//       const senderLabel = `빨간 리본 (연결: ${targetUser.name} ${tPos})`;
+//
+//   그래서 equippedWeapons 에는 똑같은 글자가 셋 들어갑니다.
+//
+//       ['빨간 리본 (연결: 갑 과장)', '빨간 리본 (연결: 갑 과장)', '빨간 리본 (연결: 갑 과장)']
+//
+//   그런데 「누가 채웠나」는 그 이름표를 열쇠로 쓰는 object 입니다.
+//   (index.html:1558)
+//
+//       user.equipOwner['빨간 리본 (연결: 갑 과장)'] = '채운사람코드'
+//
+//   열쇠가 하나뿐이라 셋이 그 한 칸을 나눠 씁니다.
+//   하나를 회수하면 그 칸이 지워지고(index.html:6426 → clearEquipOwner),
+//   남은 둘은 「채운 사람이 없는 것」이 되어
+//
+//     · 회수 목록에 안 뜨고 (index.html:6389 가 owner 로 거릅니다)
+//     · 억지로 불러도 "장착 권한자가 아닙니다" 로 막힙니다
+//
+//   그래서 셋을 걸면 하나밖에 못 뗍니다.
+//
+// ■ 어떻게 고치나
+//
+//   회수하는 자리가 넷인데(index.html:6379 · 6396 · 6426 · 6437)
+//   **전부 배열에서 먼저 빼고 그 다음에** clearEquipOwner 를 부릅니다.
+//   그러니 「같은 이름표가 아직 남아 있으면 열쇠를 지우지 않는다」로 두면
+//   네 자리가 한꺼번에 고쳐집니다. 마지막 하나를 뗄 때만 지워집니다.
+//
+//   리본만의 일이 아닙니다. 똑같은 이름표가 둘 이상 생기는 장비는
+//   모두 같은 함정에 걸립니다.
+//
+// ■ 지금 묶여 있는 것
+//
+//   이미 열쇠가 지워진 리본은 위 고침만으로는 안 돌아옵니다.
+//   ribbonOff() 로 한 번에 떼시면 됩니다. 소지품으로 돌아갑니다.
+
+(function ribbonFix() {
+
+const RIBBON = '빨간 리본';
+
+function baseOf(w) {
+    return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+}
+
+// ==========================================
+// 하나 — 같은 이름표가 남았으면 열쇠를 지키자
+// ==========================================
+(function keepOwner() {
+    const iv = setInterval(function () {
+        if (typeof clearEquipOwner !== 'function') return;
+        if (clearEquipOwner._keepDup) { clearInterval(iv); return; }
+
+        const _c = clearEquipOwner;
+        clearEquipOwner = function (user, fullName) {
+            // 부르는 자리들은 전부 배열에서 뺀 뒤에 부른다.
+            // 그래서 지금 배열에 같은 글자가 남아 있으면 아직 더 차고 있다는 뜻이다.
+            if (user && Array.isArray(user.equippedWeapons)
+                && user.equippedWeapons.indexOf(fullName) >= 0) {
+                return;                       // 열쇠를 남겨 둔다
+            }
+            return _c.apply(this, arguments);
+        };
+        clearEquipOwner._keepDup = true;
+        clearInterval(iv);
+        console.log('[리본] 겹친 이름표의 장착자 기록 보호');
+    }, 400);
+})();
+
+// ==========================================
+// 둘 — 지금 묶여 있는 것을 떼어 낸다
+// ==========================================
+function strip(u, mateName) {
+    // u 에게서 리본 이름표를 전부 뺀다. 뺀 개수를 돌려준다.
+    const eq = u.equippedWeapons || [];
+    let n = 0;
+    for (let i = eq.length - 1; i >= 0; i--) {
+        if (baseOf(eq[i]) !== RIBBON) continue;
+        if (mateName && String(eq[i]).indexOf(mateName) < 0) continue;
+        const full = eq[i];
+        eq.splice(i, 1);
+        if (u.equipOwner) delete u.equipOwner[full];
+        n++;
+    }
+    if (u.badge && u.badge.notes) {
+        const keep = String(u.badge.notes).split('|').map(function (x) { return x.trim(); })
+            .filter(function (x) { return x && x.indexOf(RIBBON) < 0; });
+        u.badge.notes = keep.length ? keep.join(' | ') : '특이사항 없음';
+    }
+    if (Array.isArray(u.ribbons)) u.ribbons = [];
+    return n;
+}
+
+window.ribbonOff = function () {
+    if (!currentUser) return;
+    const n = strip(currentUser, null);
+    if (!n) { console.log('차고 있는 ' + RIBBON + ' 이 없습니다.'); return; }
+
+    if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+    for (let i = 0; i < n; i++) currentUser.inventory.push(RIBBON);
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(currentUser, '[' + RIBBON + '] ' + n + '개를 모두 떼어 소지품으로 돌렸습니다.');
+    }
+    if (typeof saveSelfFull === 'function') saveSelfFull();
+
+    // 묶여 있던 상대 쪽도 같이 푼다
+    const mine = currentUser.name;
+    let other = 0;
+    Object.keys(db.users || {}).forEach(function (c) {
+        if (c === currentUser.code) return;
+        const u = db.users[c];
+        if (!u || !Array.isArray(u.equippedWeapons)) return;
+        const k = strip(u, mine);
+        if (!k) return;
+        other += k;
+        if (typeof updateUserFields === 'function') {
+            updateUserFields(c, {
+                equippedWeapons: u.equippedWeapons, equipOwner: u.equipOwner || {},
+                badge: u.badge || {}, ribbons: []
+            });
+        }
+    });
+
+    if (typeof updateUI === 'function') updateUI();
+    console.log('%c✓ ' + RIBBON + ' ' + n + '개를 떼어 소지품으로 돌렸습니다.'
+        + (other ? ' (상대 쪽 ' + other + '개도 풀었습니다)' : ''), 'color:#4CAF50');
+};
+
+// 상담사 — 남의 것도
+window.ribbonOffFor = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const u = Object.keys(db.users || {}).map(function (c) { return db.users[c]; })
+        .find(function (x) { return x && (x.no === who || x.code === who || x.name === who); });
+    if (!u) { console.warn('사원을 못 찾았습니다: ' + who); return; }
+    const n = strip(u, null);
+    if (!n) { console.log(u.name + ' 사원은 ' + RIBBON + ' 을 차고 있지 않습니다.'); return; }
+    if (!Array.isArray(u.inventory)) u.inventory = [];
+    for (let i = 0; i < n; i++) u.inventory.push(RIBBON);
+    if (typeof updateUserFields === 'function') {
+        updateUserFields(u.code, {
+            equippedWeapons: u.equippedWeapons, equipOwner: u.equipOwner || {},
+            inventory: u.inventory, badge: u.badge || {}, ribbons: []
+        });
+    }
+    console.log('%c✓ ' + u.name + ' 사원의 ' + RIBBON + ' ' + n + '개를 떼었습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+// ==========================================
+// 확인
+// ==========================================
+window.ribbonState = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    console.log('%c===== ' + u.name + ' · ' + RIBBON + ' =====', 'color:#ff8fb1; font-size:13px');
+    const eq = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
+    if (!eq.length) { console.log('  차고 있지 않습니다.'); }
+    else {
+        console.table(eq.map(function (w, i) {
+            const o = (u.equipOwner || {})[w];
+            return {
+                번호: i, 이름표: w,
+                '채운 사람': !o ? '✗ 기록 없음 (못 뗍니다)'
+                    : (o === u.code ? '본인' : ((db.users[o] || {}).name || o))
+            };
+        }));
+        const dup = {}; let same = 0;
+        eq.forEach(function (w) { if (dup[w]) same++; dup[w] = 1; });
+        if (same) console.warn('  똑같은 이름표가 ' + (same + 1) + '개 겹쳐 있습니다 — 이것이 못 떼는 원인입니다.');
+    }
+    console.log('  보호 연결:', (typeof clearEquipOwner === 'function' && clearEquipOwner._keepDup) ? 'O' : '✗');
+    console.log('  전부 떼려면 ribbonOff()');
+};
+
+console.log('[리본] ribbonState() · ribbonOff() · ribbonOffFor(사번)');
+
+})();
+;
+
+// ---------- dupe-watch.js ----------
+// ==========================================
+// ★ 아이템이 저절로 불어나는 것 — 잡아내고 막는다
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 왜 바로 「중복 제거」를 안 하나
+//
+//   같은 물건을 여러 개 가지는 것은 정상입니다. 하급 물약 열 개도 정상입니다.
+//   그래서 겹친 것을 지우는 식으로 막으면 멀쩡한 물건까지 날립니다.
+//
+//   대신 「늘어난 까닭이 있는가」를 봅니다.
+//   이 게임은 물건이 생길 때 거의 반드시 활동 기록(history)에 한 줄을 남깁니다.
+//   상점 구매 · 어둠 보상 · 제작 · 남이 준 것 · 출산품 전부 그렇습니다.
+//
+//     소지품이 늘었는데 기록이 한 줄도 안 늘었다  →  수상하다
+//     그것이 짧은 사이에 되풀이된다               →  거의 틀림없이 되풀이 버그
+//
+//   그 두 가지가 겹칠 때만 되돌립니다. 한 번뿐인 것은 적어만 두고 둡니다.
+//
+// ■ 쓰는 법
+//
+//   dupeLog()    언제 무엇이 몇 개 늘었는지 · 기록이 같이 늘었는지
+//   dupeGuard(true/false)  되돌리기를 켜고 끈다 (처음엔 켜져 있습니다)
+//   dupeWipe()   적어 둔 것을 지운다
+//
+//   dupeLog() 를 주시면 어느 자리가 범인인지 짚어 드릴 수 있습니다.
+
+(function dupeWatch() {
+
+const TICK = 400;          // 얼마나 자주 보나
+const WINDOW = 60000;      // 「짧은 사이」의 길이
+const REPEAT = 2;          // 같은 품목이 이만큼 되풀이되면 되돌린다
+const KEEP = 200;          // 적어 둘 줄 수
+
+let ON = true;             // 되돌리기
+let last = null;           // 지난번 소지품 세어 본 것
+let lastHist = 0;          // 지난번 기록 줄 수
+const log = [];            // 적어 둔 것
+
+function counts(arr) {
+    const c = {};
+    (arr || []).forEach(function (x) { c[x] = (c[x] || 0) + 1; });
+    return c;
+}
+function histLen(u) {
+    return (u && Array.isArray(u.history)) ? u.history.length : 0;
+}
+function note(row) {
+    log.push(row);
+    while (log.length > KEEP) log.shift();
+}
+
+// 같은 품목이 최근에 몇 번이나 「까닭 없이」 늘었나
+function recentBlind(name, at) {
+    return log.filter(function (r) {
+        return r.품목 === name && !r.기록 && (at - r._t) <= WINDOW;
+    }).length;
+}
+
+function tick() {
+    if (!currentUser || !Array.isArray(currentUser.inventory)) return;
+    const now = Date.now();
+    const cur = counts(currentUser.inventory);
+    const hl = histLen(currentUser);
+
+    if (last === null) { last = cur; lastHist = hl; return; }
+
+    const grew = [];
+    Object.keys(cur).forEach(function (n) {
+        const d = cur[n] - (last[n] || 0);
+        if (d > 0) grew.push({ n: n, d: d });
+    });
+
+    if (grew.length) {
+        const hasReason = hl > lastHist;          // 기록이 같이 늘었나
+        grew.forEach(function (g) {
+            const before = recentBlind(g.n, now);
+            note({
+                _t: now,
+                때: new Date(now).toLocaleTimeString(),
+                품목: g.n,
+                늘어남: '+' + g.d,
+                지금: cur[g.n],
+                기록: hasReason,
+                되돌림: false
+            });
+
+            if (!hasReason) {
+                console.warn('[복사?] ' + g.n + ' +' + g.d + ' — 활동 기록이 늘지 않았습니다. (지금 ' + cur[g.n] + '개)');
+            }
+
+            // 까닭 없이 되풀이되면 되돌린다
+            if (ON && !hasReason && before >= REPEAT) {
+                let back = 0;
+                for (let i = 0; i < g.d; i++) {
+                    const at = currentUser.inventory.lastIndexOf(g.n);
+                    if (at < 0) break;
+                    currentUser.inventory.splice(at, 1);
+                    back++;
+                }
+                if (back) {
+                    log[log.length - 1].되돌림 = true;
+                    if (typeof saveFields === 'function') { try { saveFields({ inventory: 1 }); } catch (e) { } }
+                    if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+                    console.warn('%c[복사 차단] ' + g.n + ' ' + back + '개를 되돌렸습니다. '
+                        + '(최근 ' + (before + 1) + '번째 · 까닭 없는 증가)', 'color:#ff8a65');
+                }
+            }
+        });
+    }
+
+    last = counts(currentUser.inventory);
+    lastHist = hl;
+}
+
+setTimeout(function () { setInterval(tick, TICK); }, 4000);
+
+// ==========================================
+// 확인
+// ==========================================
+window.dupeLog = function (only) {
+    const rows = only ? log.filter(function (r) { return !r.기록; }) : log;
+    console.log('%c===== 소지품이 늘어난 기록 =====', 'color:#ff8a65; font-size:13px');
+    console.log('  되돌리기:', ON ? '켜짐' : '꺼짐',
+        '· 적어 둔 줄:', log.length, '· 까닭 없는 것:', log.filter(function (r) { return !r.기록; }).length);
+    if (!rows.length) { console.log('  아직 없습니다. (' + Math.round(TICK) + 'ms 마다 봅니다)'); return; }
+    console.table(rows.slice(-40).map(function (r) {
+        return { 때: r.때, 품목: r.품목, 늘어남: r.늘어남, 지금: r.지금,
+                 '활동 기록': r.기록 ? 'O' : '✗ 없음', 되돌림: r.되돌림 ? 'O' : '' };
+    }));
+    console.log('  「활동 기록 ✗ 없음」이 되풀이되는 품목이 범인입니다.');
+    console.log('  dupeLog(true) 로 수상한 것만 봅니다.');
+};
+
+window.dupeGuard = function (v) {
+    ON = (v !== false);
+    console.log('[복사] 되돌리기 ' + (ON ? '켰습니다' : '껐습니다'));
+};
+
+window.dupeWipe = function () { log.length = 0; last = null; console.log('[복사] 적어 둔 것을 지웠습니다.'); };
+
+// 지금 소지품을 품목별로 세어 본다
+window.invCount = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    const c = counts(u.inventory);
+    const rows = Object.keys(c).map(function (n) { return { 품목: n, 개수: c[n] }; })
+        .sort(function (a, b) { return b.개수 - a.개수; });
+    console.log('%c===== ' + u.name + ' · 소지품 ' + (u.inventory || []).length + '칸 =====', 'color:#4fc3f7; font-size:13px');
+    console.table(rows.slice(0, 40));
+    const many = rows.filter(function (r) { return r.개수 >= 10; });
+    if (many.length) console.warn('  10개가 넘는 품목:', many.map(function (r) { return r.품목 + ' ' + r.개수; }).join(' · '));
+};
+
+console.log('[복사] dupeLog() · dupeLog(true) · dupeGuard(false) · invCount(사번)');
+
+})();
+;
+
+// ---------- storage-dup.js ----------
+// ==========================================
+// ★ 사택 보관함 — 연결이 나쁠 때 넣으면 불어나는 것
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 무엇이 일어나고 있나
+//
+//   넣기는 이렇게 생겼습니다. (dark.js:8417)
+//
+//       database.ref(`users/${주인}/house/storage`).transaction(arr => {
+//           arr.push(entry);
+//           return arr;
+//       }).then(res => {
+//           ...
+//           removeItemFromInventory(currentUser, itemName, 1);   ← 여기서야 빠진다
+//       });
+//
+//   소지품에서 빠지는 것이 **서버가 답한 뒤**입니다.
+//   그래서 연결이 끊기거나 느리면 이렇게 됩니다.
+//
+//     1. 넣기를 누른다 → 거래가 떠 있는 채로 멈춘다
+//     2. 소지품에 그대로 보이니 「안 들어갔나?」 싶어 다시 누른다
+//        (buyGuard 는 0.7초만 막습니다 — index.html:7671)
+//     3. 연결이 돌아오면 **밀려 있던 거래가 전부 한꺼번에 들어간다**
+//     4. 보관함에 같은 물건이 서넛 생긴다. 소지품에서는 하나만 빠진다
+//
+//   파이어베이스 거래는 눌린 즉시 내 쪽 화면에도 먼저 반영돼서,
+//   끊긴 채로 눌러도 보관함 목록은 늘어나 보입니다. 그래서 더 누르게 됩니다.
+//
+// ■ 어떻게 고치나
+//
+//   넣기를 다시 세웁니다. 세 가지가 달라집니다.
+//
+//     1. 끊겨 있으면 아예 안 받는다
+//        .info/connected 로 지금 붙어 있는지 봅니다. (index.html:2427 과 같은 자리)
+//
+//     2. 소지품에서 **먼저** 뺀다
+//        누른 순간 목록에서 사라지니 다시 누를 까닭이 없어집니다.
+//        실패하면 도로 넣어 줍니다.
+//
+//     3. 그 물건은 답이 올 때까지 다시 못 넣는다
+//        0.7초가 아니라 「끝날 때까지」입니다.
+//
+//   거래에 applyLocally = false 를 줘서, 서버가 받아 주기 전에는
+//   내 화면의 보관함도 안 늘어나게 했습니다.
+//
+// ■ 이미 불어난 것
+//
+//   storageDup() 으로 보관함에서 겹친 것을 찾습니다.
+//   같은 물건을 같은 사람이 **같은 순간에** 넣은 것만 겹침으로 봅니다
+//   (entry 에 넣은 시각 at 이 들어 있어 가려낼 수 있습니다).
+//   storageDupFix() 로 하나만 남기고 걷어냅니다.
+
+(function storageDup() {
+
+const SLOW = '연결이 불안정합니다.\n\n연결이 돌아온 뒤에 넣어 주세요.\n(지금 넣으면 같은 물건이 여러 개 들어갈 수 있습니다)';
+
+let online = true;
+let busy = {};              // 지금 넣는 중인 물건
+
+(function watchNet() {
+    const iv = setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        clearInterval(iv);
+        database.ref('.info/connected').on('value', function (s) {
+            online = s.val() === true;
+        });
+    }, 500);
+})();
+
+(function swap() {
+    const iv = setInterval(function () {
+        if (typeof putToStorage !== 'function') return;
+        if (typeof houseStorageRef !== 'function' || typeof houseStorageMax !== 'function') return;
+        if (putToStorage._noDup) { clearInterval(iv); return; }
+
+        putToStorage = function (itemName) {
+            if (!currentUser || typeof database === 'undefined' || !database) return;
+            if (!(currentUser.inventory || []).includes(itemName)) {
+                showCustomAlert('해당 물품이 없습니다.'); return;
+            }
+            if (busy[itemName]) {
+                showCustomAlert('넣는 중입니다.\n\n잠시만 기다려 주세요.'); return;
+            }
+            if (!online) { showCustomAlert(SLOW); return; }
+            if (typeof buyGuard === 'function' && !buyGuard()) return;
+
+            const ownerCode = houseStorageRef(currentUser);
+            const entry = { name: itemName, by: currentUser.name, byCode: currentUser.code, at: Date.now() };
+
+            // ★ 먼저 뺀다 — 목록에서 사라지니 다시 누를 일이 없다
+            busy[itemName] = true;
+            if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
+            if (typeof saveFields === 'function') saveFields({ inventory: 1 });
+            if (typeof updateUI === 'function') updateUI();
+            if (typeof renderHouseStorage === 'function') renderHouseStorage();
+
+            let done = false;
+            const giveBack = function (msg) {
+                if (done) return; done = true;
+                delete busy[itemName];
+                if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+                currentUser.inventory.push(itemName);        // 도로 넣어 준다
+                if (typeof saveFields === 'function') saveFields({ inventory: 1 });
+                if (typeof updateUI === 'function') updateUI();
+                if (typeof renderHouseStorage === 'function') renderHouseStorage();
+                if (msg) showCustomAlert(msg);
+            };
+
+            database.ref('users/' + ownerCode + '/house/storage').transaction(function (arr) {
+                arr = arr ? (Array.isArray(arr) ? arr : Object.values(arr)) : [];
+                if (arr.length >= houseStorageMax(currentUser)) return;    // 가득 참
+                arr.push(entry);
+                return arr;
+            }, function (err, committed, snap) {
+                if (err) { giveBack('넣지 못했습니다.\n\n' + (err.message || '연결이 끊겼습니다.')); return; }
+                if (!committed) { giveBack('보관함이 가득 찼습니다.'); return; }
+                if (done) return; done = true;
+                delete busy[itemName];
+
+                const owner = db.users[ownerCode];
+                if (owner && typeof getHouse === 'function') getHouse(owner).storage = (snap && snap.val()) || [];
+                database.ref('users/' + ownerCode + '/_adminStamp').set(Date.now());
+
+                if (typeof addHistoryLog === 'function') {
+                    addHistoryLog(currentUser, "[사택] '" + itemName + "'을(를) 보관함에 넣었습니다.");
+                }
+                if (typeof saveFields === 'function') saveFields({ history: 1 });
+                if (typeof updateUI === 'function') updateUI();
+                if (typeof renderHouseStorage === 'function') renderHouseStorage();
+            }, false);    // ← applyLocally false : 서버가 받기 전에는 내 화면도 안 늘어난다
+
+            // 답이 너무 늦으면 알려만 준다 (되돌리지는 않는다 — 나중에 들어갈 수 있다)
+            setTimeout(function () {
+                if (done) return;
+                showCustomAlert('아직 답이 없습니다.\n\n연결이 돌아오면 저절로 들어갑니다.\n다시 누르지 마세요.');
+            }, 8000);
+        };
+        putToStorage._noDup = true;
+        clearInterval(iv);
+        console.log('[보관함] 넣기 다시 세움 — 끊기면 막고, 먼저 빼고, 끝날 때까지 잠금');
+    }, 400);
+})();
+
+// ==========================================
+// 이미 불어난 것 — 같은 사람이 같은 순간에 넣은 것만 겹침으로 본다
+// ==========================================
+function dupOf(arr) {
+    const seen = {}, dup = [];
+    (arr || []).forEach(function (s, i) {
+        if (!s || !s.name) return;
+        const k = s.name + '|' + (s.byCode || '') + '|' + (s.at || 0);
+        if (seen[k]) dup.push({ i: i, name: s.name, by: s.by || s.byCode, at: s.at });
+        else seen[k] = 1;
+    });
+    return dup;
+}
+
+window.storageDup = function () {
+    if (!currentUser || typeof getSharedStorage !== 'function') return;
+    const arr = getSharedStorage();
+    const dup = dupOf(arr);
+    console.log('%c===== 사택 보관함 =====', 'color:#4fc3f7; font-size:13px');
+    console.log('  들어 있는 것:', (arr || []).length + '칸'
+        + (typeof houseStorageMax === 'function' ? ' / ' + houseStorageMax(currentUser) : ''));
+    if (!dup.length) { console.log('  겹쳐 들어간 것이 없습니다.'); return; }
+    console.table(dup.map(function (d) {
+        return { 자리: d.i, 물건: d.name, 넣은사람: d.by, 넣은때: new Date(d.at).toLocaleString() };
+    }));
+    console.warn('  같은 사람이 같은 순간에 넣은 것 ' + dup.length + '개 — 연결이 끊겼을 때 겹쳐 들어간 것입니다.');
+    console.log('  걷어내려면 storageDupFix()');
+};
+
+window.storageDupFix = function () {
+    if (!currentUser || typeof database === 'undefined' || !database) return;
+    if (typeof houseStorageRef !== 'function') return;
+    const ownerCode = houseStorageRef(currentUser);
+
+    database.ref('users/' + ownerCode + '/house/storage').transaction(function (arr) {
+        arr = arr ? (Array.isArray(arr) ? arr : Object.values(arr)) : [];
+        const seen = {}, keep = [];
+        arr.forEach(function (s) {
+            if (!s || !s.name) return;
+            const k = s.name + '|' + (s.byCode || '') + '|' + (s.at || 0);
+            if (seen[k]) return;
+            seen[k] = 1; keep.push(s);
+        });
+        if (keep.length === arr.length) return;        // 고칠 것이 없다
+        return keep;
+    }, function (err, committed, snap) {
+        if (err) { console.error(err); return; }
+        if (!committed) { console.log('겹쳐 들어간 것이 없습니다.'); return; }
+        const owner = db.users[ownerCode];
+        if (owner && typeof getHouse === 'function') getHouse(owner).storage = (snap && snap.val()) || [];
+        console.log('%c✓ 겹친 것을 걷어냈습니다. 지금 ' + ((snap && snap.val()) || []).length + '칸',
+            'color:#4CAF50');
+        if (typeof renderHouseStorage === 'function') renderHouseStorage();
+        if (typeof updateUI === 'function') updateUI();
+    }, false);
+};
+
+window.storageState = function () {
+    console.log('%c===== 보관함 넣기 =====', 'color:#4fc3f7; font-size:13px');
+    console.log('  지금 연결:', online ? 'O' : '✗ 끊김');
+    console.log('  넣는 중:', Object.keys(busy).join(' · ') || '없음');
+    console.log('  고침 연결:', (typeof putToStorage === 'function' && putToStorage._noDup) ? 'O' : '✗');
+};
+
+console.log('[보관함] storageDup() · storageDupFix() · storageState()');
+
+})();
+;
+
+// ---------- doll-kit.js ----------
+// ==========================================
+// ★ 봉제 인형 키트 — 쓰고 나서 나흘 뒤에 다시
+// bundles.json 마지막 그룹, newitems2.js 보다 뒤 · save-merge.js 앞
+// ==========================================
+//
+// ■ 지금은 한 번 쓰면 사라집니다
+//
+//   newitems2.js:1679 의 n_doll 이 마지막에 gone(nm) 을 부릅니다.
+//
+//       n_doll: function (nm) {
+//           ... 두 가지 효과를 사흘짜리로 붙인다 ...
+//           gone(nm);                                   ← 여기서 없어진다
+//       }
+//
+//       function gone(nm) {                             // newitems2.js:1570
+//           removeItemFromInventory(currentUser, nm, 1);
+//           saveSelfFull(); updateUI();
+//       }
+//
+//   140,000 P 짜리가 한 번 쓰고 사라집니다.
+//
+// ■ 어떻게 고치나
+//
+//   효과를 짓는 부분은 그대로 두고, **없애는 그 한 번만** 막습니다.
+//   n_doll 을 베껴 쓰면 뽑기 목록(DOLL)이나 안내문이 원본과 어긋날 수 있어서,
+//   원본을 그대로 돌리고 removeItemFromInventory 를 잠깐 비켜 세웁니다.
+//
+//   그리고 나흘짜리 기다림을 둡니다. 그동안은 눌러도 남은 시간만 알려 줍니다.
+//
+//     인형의 효과   사흘  (원래대로)
+//     다시 만들기   나흘  (아래 WAIT_DAYS)
+//
+//   기다림은 사원마다 하나입니다. 키트를 둘 가지고 있어도 나흘에 한 번입니다.
+//   키트마다 따로 세려면 소지품이 글자 배열이라 가릴 수가 없습니다.
+
+(function dollKit() {
+
+const KIT = '봉제 인형 키트';
+const WAIT_DAYS = 4;
+const WAIT = WAIT_DAYS * 24 * 3600 * 1000;
+
+function leftMs() {
+    if (!currentUser) return 0;
+    return Math.max(0, (currentUser.dollKitAt || 0) - Date.now());
+}
+function human(ms) {
+    const h = Math.floor(ms / 3600000), m = Math.ceil((ms % 3600000) / 60000);
+    if (h >= 24) return Math.floor(h / 24) + '일 ' + (h % 24) + '시간';
+    return h ? (h + '시간 ' + m + '분') : (m + '분');
+}
+
+(function hook() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (typeof removeItemFromInventory !== 'function') return;
+        if (useInventoryItem._dollKeep) { clearInterval(iv); return; }
+
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            if (itemName !== KIT) return _u.apply(this, arguments);
+            if (!currentUser) return;
+
+            const left = leftMs();
+            if (left > 0) {
+                showCustomAlert('아직 바늘을 들 수 없습니다.\n\n'
+                    + human(left) + ' 뒤에 다시 지을 수 있습니다.');
+                return;
+            }
+
+            // 없애는 그 한 번만 비켜 세운다
+            const _rm = removeItemFromInventory;
+            let kept = false;
+            removeItemFromInventory = function (u, n, q) {
+                if (!kept && n === KIT && u === currentUser) { kept = true; return; }
+                return _rm.apply(this, arguments);
+            };
+
+            try { _u.apply(this, arguments); }
+            finally { removeItemFromInventory = _rm; }
+
+            // kept 가 참이면 실제로 인형을 지었다는 뜻이다
+            // (격리·소속 같은 이유로 막혔으면 gone 까지 가지 않는다)
+            if (!kept) return;
+
+            currentUser.dollKitAt = Date.now() + WAIT;
+            if (typeof addHistoryLog === 'function') {
+                addHistoryLog(currentUser, '[' + KIT + '] 키트는 남았습니다. ' + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
+            }
+            if (typeof saveFields === 'function') saveFields({ dollKitAt: 1, history: 1, inventory: 1 });
+            if (typeof updateUI === 'function') updateUI();
+            setTimeout(function () {
+                showCustomAlert('키트는 손에 남았습니다.\n\n'
+                    + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
+            }, 80);
+        };
+        useInventoryItem._dollKeep = true;
+        clearInterval(iv);
+        console.log('[인형] 키트가 남습니다 — ' + WAIT_DAYS + '일 기다림');
+    }, 400);
+})();
+
+// 설명에도 적어 둔다
+(function desc() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[KIT]) return;
+        const c = ITEM_CATALOG[KIT];
+        if (String(c.desc || '').indexOf('일 뒤') < 0) {
+            c.desc = '사용자의 DNA를 읽어 사흘짜리 인형을 짓는다. 기능은 두 가지가 붙는다. '
+                + '키트는 남으며 ' + WAIT_DAYS + '일 뒤에 다시 지을 수 있다.';
+        }
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ==========================================
+// 확인 · 손으로
+// ==========================================
+window.dollState = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    const n = (u.inventory || []).filter(function (x) { return x === KIT; }).length;
+    const l = Math.max(0, (u.dollKitAt || 0) - Date.now());
+    console.log('%c===== ' + u.name + ' · ' + KIT + ' =====', 'color:#c9a8ff; font-size:13px');
+    console.log('  가진 키트:', n + '개');
+    console.log('  다시 지을 수 있나:', l > 0 ? ('✗ ' + human(l) + ' 남음') : 'O 지금 가능');
+    console.log('  인형 효과(사흘):', (u.dollPt || 0) > Date.now()
+        ? ('어둠 정산 +3,000P · ' + human(u.dollPt - Date.now()) + ' 남음') : '추가 정산은 없음');
+    console.log('  연결:', (typeof useInventoryItem === 'function' && useInventoryItem._dollKeep) ? 'O' : '✗');
+};
+
+// 기다림을 지금 끝낸다 — 상담사
+window.dollReady = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    u.dollKitAt = 0;
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, { dollKitAt: 0 });
+    console.log('%c✓ ' + u.name + ' 사원은 지금 다시 지을 수 있습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+// 이미 없어진 키트를 돌려준다 — 상담사
+window.dollKitBack = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.find(function (x) { return x && (x.no === who || x.code === who || x.name === who); })
+                  : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    if (!Array.isArray(u.inventory)) u.inventory = [];
+    u.inventory.push(KIT);
+    if (typeof addHistoryLog === 'function') addHistoryLog(u, '[당국 개입] ' + KIT + ' 를 돌려받았습니다.');
+    if (typeof updateUserFields === 'function') {
+        updateUserFields(u.code, { inventory: u.inventory, history: u.history });
+    }
+    console.log('%c✓ ' + u.name + ' 사원에게 ' + KIT + ' 1개를 돌려줬습니다.', 'color:#4CAF50');
+    if (typeof updateUI === 'function') updateUI();
+};
+
+console.log('[인형] dollState(사번) · dollReady(사번) · dollKitBack(사번)');
+
+})();
+;
+
+// ---------- slot-curve.js ----------
+// ==========================================
+// ★ 슬롯 — 상한을 없애고 배수에 비례하게 · 착한 친구·유리손포 행운 100%
+// bundles.json 마지막 그룹, save-merge.js 앞
+// ==========================================
+//
+// ■ 지금은 배수 16에서 벽에 부딪힙니다
+//
+//   index.html:7780
+//       let failChance  = Math.max(0.22, (부적 ? 0.55 : 0.76) / luckM);
+//       let jackpotSpan = Math.min(0.18, (부적 ? 0.08 : 0.025) * luckM);
+//
+//   facilityLuckMult 가 16만 넘으면 두 값이 바닥·천장에 닿습니다.
+//   그 뒤로는 배수가 37,000 이 되든 숫자가 1도 안 움직입니다.
+//   600% 나침반을 껴도 아무 일이 안 일어나던 까닭입니다.
+//
+// ■ 새 곡선 — 벽이 없습니다
+//
+//       u    = 배수 / (배수 + K)          0 에서 1 로 천천히 오릅니다
+//       3개  = J0 + (JMAX - J0) × u       배수가 오를수록 꽝이 3개 일치로 바뀝니다
+//       2개  = TWO                        고정
+//       꽝   = 나머지
+//
+//   u 가 1 에 닿지 않으므로 배수를 한없이 올려도 JMAX 를 넘지 않습니다.
+//   벽은 없는데 끝없이 커지지도 않습니다. 올릴수록 계속 좋아지기만 합니다.
+//
+//   부적(누군가가 쓴 부적 · 사원증 뱃지)은 배수를 1.5배로 쳐 줍니다.
+//
+// ■ 돌아가는 모양 (부적 있음 · 40만 번 돌려 맞춰 봤습니다)
+//
+//     조합                      배수      꽝      3개     2개   돌려받음
+//     아무것도 없음                1    79.9%    2.1%   18.0%     88%
+//     도깨비 불만                  2    79.8%    2.2%   18.0%     89%
+//     고유 600% 하나               6    79.6%    2.5%   18.0%     91%
+//     감자맛 + 유리구슬             8    79.4%    2.6%   18.0%     92%
+//     플러그 둘 + 루비             11    79.2%    2.8%   18.0%     93%
+//     ───────────────── 본전이 되는 자리 ─────────────────
+//     거기에 고유 600%            63    77.1%    4.9%   18.0%    108%
+//     도깨비·감자맛까지           252    75.1%    6.9%   18.0%    123%
+//     유리구슬까지              1,008    74.0%    8.0%   18.0%    131%
+//     전부 (뱃지 포함)          2,318    73.7%    8.3%   18.0%    133%
+//     한없이 올려도                 ∞    73.5%    8.5%   18.0%    135%  ← 닿지는 않습니다
+//
+//   본전(100%)이 되는 자리는 배수 29쯤입니다.
+//   꽉 채워 껴도 133%, 즉 1,000P 넣으면 길게 보아 1,330P 가 돌아옵니다.
+//   지금은 374% 였습니다.
+//
+// ■ 손잡이 두 개 — 아래 상수만 고치면 됩니다
+//
+//   K      작을수록 적은 배수에서도 빨리 오릅니다
+//            120 → 본전이 배수 29쯤      300 → 본전이 배수 75쯤
+//   JMAX   꼭대기를 정합니다
+//            0.085 → 135%    0.06 → 117%    0.04 → 102%
+//
+// ■ 착한 친구 · 유리손포 — 행운 100%
+//
+//   dark.js:4487~4488 의 ×4 두 개를 여기서 되돌립니다. 파일은 안 건드립니다.
+//   곱셈은 어디서 나누어도 결과가 같으므로 순서를 걱정할 일이 없습니다.
+//
+//     꽉 채운 배수   37,094  →  2,318
+//
+//   두 아이템의 다른 효과(어둠 판정 +2 · 기믹 단서 · 회피)는 그대로 남습니다.
+//   행운은 공용시설(슬롯·블랙잭·섯다·룰렛·하이로우)에만 쓰이므로
+//   어둠 탐사 판정은 아무 영향을 받지 않습니다.
+
+(function slotCurve() {
+
+const K = 120;            // 오르는 속도
+const J0 = 0.02;          // 아무것도 없을 때 3개 일치
+const JMAX = 0.085;       // 한없이 올렸을 때 다가가는 3개 일치
+const TWO = 0.18;         // 2개 일치 — 고정
+const AMULET = 1.5;       // 부적이 배수를 쳐 주는 몫
+
+const NERF = ['착한 친구', '유리손포'];
+const NERF_DIV = 4;       // 원래 ×4 였던 것을 ×1 로
+
+function bands(mult, amulet) {
+    const eff = Math.max(1, mult) * (amulet ? AMULET : 1);
+    const u = eff / (eff + K);                      // 0 … 1 (닿지는 않는다)
+    const j = J0 + (JMAX - J0) * u;
+    const f = Math.max(0.02, 1 - TWO - j);
+    return { eff: eff, u: u, fail: f, jack: j, two: 1 - f - j };
+}
+window._slotBands = bands;
+
+// hasEquip 과 같은 것 — dark.js:4468
+function has(u, name) {
+    if (!u || !Array.isArray(u.equippedWeapons)) return false;
+    if (typeof canWearItem === 'function' && !canWearItem(u, name)) return false;
+    return u.equippedWeapons.some(function (w) {
+        return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === name;
+    });
+}
+
+// ==========================================
+// 1. 착한 친구 · 유리손포 행운을 100% 로
+// ==========================================
+(function nerf() {
+    const iv = setInterval(function () {
+        if (typeof facilityLuckMult !== 'function') return;
+        if (facilityLuckMult._nerf) { clearInterval(iv); return; }
+
+        const _f = facilityLuckMult;
+        facilityLuckMult = function (user) {
+            let m = _f.apply(this, arguments);
+            const u = user || (typeof currentUser !== 'undefined' ? currentUser : null);
+            if (!u) return m;
+            NERF.forEach(function (n) { if (has(u, n)) m /= NERF_DIV; });
+            return Math.max(1, m);
+        };
+        facilityLuckMult._nerf = true;
+        clearInterval(iv);
+        console.log('[행운] 착한 친구 · 유리손포 → 100%');
+    }, 400);
+})();
+
+// ==========================================
+// 2. 슬롯 — 상한을 없앤 곡선
+// ==========================================
+(function swap() {
+    const iv = setInterval(function () {
+        if (typeof playSlot !== 'function') return;
+        if (playSlot._curve) { clearInterval(iv); return; }
+        try {
+            if (typeof slotSymbols === 'undefined' || typeof pickSlotSymbol !== 'function') return;
+        } catch (e) { return; }
+
+        playSlot = function () {
+            let bet = parseInt(document.getElementById('slot-bet').value);
+            if (isNaN(bet) || bet <= 0) { showCustomAlert('베팅 금액을 입력해주세요.'); return; }
+            const slotCap = BET_CAPS['slot-bet'];
+            if (bet > slotCap) { showCustomAlert('슬롯 최대 베팅 한도는 ' + slotCap.toLocaleString() + ' P입니다.'); return; }
+            if (bet > currentUser.points) { showLuxuryAlert(); return; }
+            if (!useFacility(bet)) return;
+
+            const btn = document.getElementById('btn-slot');
+            btn.disabled = true;
+            const b1 = document.getElementById('slot-box-1');
+            const b2 = document.getElementById('slot-box-2');
+            const b3 = document.getElementById('slot-box-3');
+            const msg = document.getElementById('slot-msg');
+            b1.classList.add('slot-rolling'); b2.classList.add('slot-rolling'); b3.classList.add('slot-rolling');
+            msg.innerText = '릴이 회전하고 있습니다...';
+
+            const hasAmulet = (currentUser.equippedWeapons || []).some(function (w) {
+                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+                return base === '누군가가 쓴 부적' || base === '사원증 뱃지';
+            });
+
+            // ★ 여기만 달라집니다 — 벽이 없습니다
+            const B = bands(facilityLuckMult(currentUser), hasAmulet);
+
+            const rollType = Math.random();
+            let res1, res2, res3;
+            if (rollType < B.fail) {
+                // 완전 꽝 (3개 다름)
+                const shuffled = slotSymbols.slice().sort(function () { return 0.5 - Math.random(); });
+                res1 = shuffled[0]; res2 = shuffled[1]; res3 = shuffled[2];
+            } else if (rollType < B.fail + B.jack) {
+                // 대박 (3개 일치)
+                const s = pickSlotSymbol(); res1 = s; res2 = s; res3 = s;
+            } else {
+                // 본전 (2개 일치)
+                const matchSym = pickSlotSymbol();
+                let otherSym = pickSlotSymbol();
+                while (otherSym.char === matchSym.char) { otherSym = pickSlotSymbol(); }
+                const pos = Math.floor(Math.random() * 3);
+                if (pos === 0) { res1 = otherSym; res2 = matchSym; res3 = matchSym; }
+                else if (pos === 1) { res1 = matchSym; res2 = otherSym; res3 = matchSym; }
+                else { res1 = matchSym; res2 = matchSym; res3 = otherSym; }
+            }
+
+            const roll1 = setInterval(function () { b1.innerText = slotSymbols[Math.floor(Math.random() * 6)].char; }, 70);
+            const roll2 = setInterval(function () { b2.innerText = slotSymbols[Math.floor(Math.random() * 6)].char; }, 70);
+            const roll3 = setInterval(function () { b3.innerText = slotSymbols[Math.floor(Math.random() * 6)].char; }, 70);
+
+            setTimeout(function () { clearInterval(roll1); b1.classList.remove('slot-rolling'); b1.innerText = res1.char; }, 700);
+            setTimeout(function () { clearInterval(roll2); b2.classList.remove('slot-rolling'); b2.innerText = res2.char; }, 1300);
+            setTimeout(function () {
+                clearInterval(roll3); b3.classList.remove('slot-rolling'); b3.innerText = res3.char;
+                if (res1.char === res2.char && res2.char === res3.char) {
+                    const prize = bet * res1.mult; winPoints(prize);
+                    msg.innerHTML = '<span style="color:#4CAF50;">[3개 일치] ' + res1.char
+                        + ' 잭팟! ×' + res1.mult + ' 배</span>';
+                    addHistoryLog(currentUser, '[슬롯 대박] ' + res1.char + ' 3개 적중 (+' + prize + ' P)');
+                } else if (res1.char === res2.char || res2.char === res3.char || res1.char === res3.char) {
+                    const matched = (res1.char === res2.char) ? res1 : (res2.char === res3.char ? res2 : res1);
+                    const multiplier = Math.max(1, Math.round(matched.mult * 0.5));
+                    const prize = bet * multiplier; winPoints(prize);
+                    msg.innerHTML = '<span style="color:#ffd700;">[2개 일치] ' + matched.char
+                        + ' 적중! (×' + multiplier + ') 지급</span>';
+                    addHistoryLog(currentUser, '[슬롯 승리] ' + matched.char + ' 2개 적중 (+' + prize + ' P)');
+                } else {
+                    msg.innerHTML = '<span style="color:#f44336;">완전 불일치. (-' + bet + ' P)</span>';
+                    addHistoryLog(currentUser, '[슬롯 패배] 릴 불일치 (-' + bet + ' P)');
+                }
+                msg.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                btn.disabled = false;
+            }, 1900);
+        };
+        playSlot._curve = true;
+        clearInterval(iv);
+        console.log('[슬롯] 상한을 없앤 곡선 — K=' + K + ' · 꼭대기 3개 ' + (JMAX * 100).toFixed(1) + '%');
+    }, 400);
+})();
+
+// ==========================================
+// 확인
+// ==========================================
+function payouts() {
+    const SY = (typeof slotSymbols !== 'undefined') ? slotSymbols : [];
+    const tw = SY.reduce(function (a, s) { return a + s.weight; }, 0) || 1;
+    return {
+        e3: SY.reduce(function (a, s) { return a + s.weight * s.mult; }, 0) / tw,
+        e2: SY.reduce(function (a, s) { return a + s.weight * Math.max(1, Math.round(s.mult * 0.5)); }, 0) / tw
+    };
+}
+
+window.slotOdds = function (mult) {
+    const amulet = !!(currentUser && (currentUser.equippedWeapons || []).some(function (w) {
+        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+        return b === '누군가가 쓴 부적' || b === '사원증 뱃지';
+    }));
+    const L = (mult != null) ? mult
+        : ((typeof facilityLuckMult === 'function' && currentUser) ? facilityLuckMult(currentUser) : 1);
+    const B = bands(L, amulet);
+    const P = payouts();
+
+    console.log('%c===== 슬롯 =====', 'color:#ffd700; font-size:13px');
+    console.log('  행운 배수:', Math.round(L).toLocaleString(), amulet ? '· 부적 있음 (×1.5)' : '· 부적 없음');
+    console.table([{
+        '꽝': (B.fail * 100).toFixed(1) + '%',
+        '3개 일치': (B.jack * 100).toFixed(1) + '%',
+        '2개 일치': (B.two * 100).toFixed(1) + '%',
+        '돌려받는 비율': ((B.jack * P.e3 + B.two * P.e2) * 100).toFixed(0) + '%'
+    }]);
+    console.log('  한없이 올리면 3개 ' + (JMAX * 100).toFixed(1) + '% · 돌려받음 '
+        + ((JMAX * P.e3 + TWO * P.e2) * 100).toFixed(0) + '% 로 다가갑니다. (닿지는 않습니다)');
+    console.log('  slotOdds(63) 처럼 배수를 넣어 견줘 볼 수 있습니다. 표는 slotTable()');
+};
+
+window.slotTable = function () {
+    const P = payouts();
+    console.log('%c===== 배수별 슬롯 (부적 있음) =====', 'color:#ffd700; font-size:13px');
+    console.table([1, 2, 6, 8, 11, 29, 63, 252, 1008, 2318].map(function (L) {
+        const B = bands(L, true);
+        return {
+            '행운 배수': L.toLocaleString(),
+            '꽝': (B.fail * 100).toFixed(1) + '%',
+            '3개': (B.jack * 100).toFixed(1) + '%',
+            '2개': (B.two * 100).toFixed(1) + '%',
+            '돌려받음': ((B.jack * P.e3 + B.two * P.e2) * 100).toFixed(0) + '%'
+        };
+    }));
+    console.log('  본전(100%)이 되는 자리는 배수 29쯤입니다.');
+};
+
+// 내 행운 배수가 어디서 나오는지 쪼개 본다
+window.luckWhy = function () {
+    const u = currentUser;
+    if (!u) return;
+    const eff = u.timedEffects || [];
+    const rows = [
+        ['착한 친구', has(u, '착한 친구') ? '×1 (낮춤)' : '—'],
+        ['유리손포', has(u, '유리손포') ? '×1 (낮춤)' : '—'],
+        ['도깨비 불', has(u, '도깨비 불') ? '×2' : '—'],
+        ['사원증 뱃지', has(u, '사원증 뱃지') ? '×1.15 · 부적 몫도 함께' : '—'],
+        ['누군가가 쓴 부적', has(u, '누군가가 쓴 부적') ? '배수 ×1.5' : '—'],
+        ['감자맛 물약', eff.some(function (e) { return e.name === '감자맛 물약'; }) ? '×2' : '—'],
+        ['유리구슬', eff.some(function (e) { return e.name === '유리구슬'; }) ? '×4' : '—']
+    ];
+    console.log('%c===== 행운 배수 =====', 'color:#ffd700; font-size:13px');
+    console.table(rows.map(function (r) { return { 출처: r[0], 몫: r[1] }; }));
+    console.log('  합친 배수:', Math.round(facilityLuckMult(u)).toLocaleString());
+    console.log('  (다이아 플러그 · 루비 피어싱 · 아이의 운 · 고유 선물은 조건이 복잡해 빼 두었습니다)');
+};
+
+console.log('[슬롯] slotOdds() · slotOdds(배수) · slotTable() · luckWhy()');
 
 })();
 ;
