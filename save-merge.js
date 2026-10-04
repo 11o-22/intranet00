@@ -168,10 +168,11 @@ function attach() {
 
         // 서버가 바뀌었다 — 내가 손대지 않은 항목만 받아 온다
         let took = 0;
+        const kept = {};   
         Object.keys(srv).forEach(function (k) {
             if (k === '_adminStamp' || k === '_stamp') return;
             if (same(srv[k], base[k])) return;              // 서버도 그대로면 볼 것 없다
-            const mineTouched = !same(currentUser[k], base[k]);
+            if (mineTouched) { kept[k] = clone(base[k]); return; }   // 기준도 지킨다
             if (mineTouched) return;                        // 내가 바꾼 것은 내가 쓴다
             if (k === INV) { fillArr(currentUser[INV], srv[k]); base[k] = clone(srv[k]); took++; return; }
             currentUser[k] = clone(srv[k]);
@@ -188,6 +189,7 @@ function attach() {
         });
 
         base = clone(srv) || {};
+        Object.keys(kept).forEach(function (k) { base[k] = kept[k]; });
 
         if (took) {
             if (db && db.users && db.users[code]) db.users[code] = currentUser;
