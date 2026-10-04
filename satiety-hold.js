@@ -224,6 +224,24 @@ guard('applyDarkSatiety', HOLD_DARK);
 })();
 
 // 끝난 줄을 걷는다
+//
+// ★ 한 줄에 한 번만 돌려준다
+//   ribbons 를 지우는 것만으로는 모자랍니다. 저장이 늦거나 서버의 묵은 값이
+//   한 번 되돌아오면 끝난 줄이 되살아나고, 30초 뒤 또 돌려주게 됩니다.
+//   그러면 리본이 30초마다 하나씩 불어납니다.
+//   그래서 「이미 돌려준 줄」을 따로 적어 두고, 적힌 것은 두 번 돌려주지 않습니다.
+function payKey(d) { return (d.o || '') + '|' + (d.p || '') + '|' + (d.u || 0); }
+function paidList() {
+    if (!Array.isArray(currentUser.ribbonPaid)) currentUser.ribbonPaid = [];
+    return currentUser.ribbonPaid;
+}
+function alreadyPaid(d) { return paidList().indexOf(payKey(d)) >= 0; }
+function markPaid(d) {
+    const l = paidList();
+    l.push(payKey(d));
+    while (l.length > 40) l.shift();          // 오래된 것부터 버린다
+}
+
 function sweepRibbons() {
     if (!currentUser) return;
     const t = now();
@@ -235,7 +253,10 @@ function sweepRibbons() {
 
     // 내 이름표를 끝난 줄 수만큼 뺀다 — 되도록 그 상대의 것으로
     const eq = currentUser.equippedWeapons || [];
+    let gave = 0;
     dead.forEach(function (d) {
+        if (alreadyPaid(d)) return;                 // 이미 돌려준 줄이다
+        markPaid(d);
         const mate = (db.users[d.p] || {}).name || '';
         let i = eq.findIndex(function (w) {
             return base(w) === RIBBON && mate && String(w).indexOf(mate) >= 0;
@@ -250,11 +271,13 @@ function sweepRibbons() {
         if (d.o === currentUser.code) {
             if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
             currentUser.inventory.push(RIBBON);
+            gave++;
         }
     });
 
-    if (typeof addHistoryLog === 'function') {
-        addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + dead.length + '줄)');
+    if (!gave && !dead.length) return;
+    if (typeof addHistoryLog === 'function' && gave) {
+        addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + gave + '개 돌려받음)');
     }
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
 
@@ -276,7 +299,7 @@ function sweepRibbons() {
     });
 
     if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
-    console.log('[' + RIBBON + '] ' + dead.length + '줄이 풀렸습니다.');
+    if (gave) console.log('[' + RIBBON + '] ' + gave + '개를 돌려받았습니다.');
 }
 setTimeout(sweepRibbons, 5000);
 setInterval(sweepRibbons, 30000);

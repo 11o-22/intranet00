@@ -214,6 +214,7 @@
    "legend-immune.js",
    "note-fix.js",
    "ribbon-fix.js",
+   "dupe-watch.js",
    "save-merge.js"
   ]
  ]
