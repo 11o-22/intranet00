@@ -210,6 +210,8 @@
    "roommate.js",
    "knife-lost.js",
    "equip-fold.js",
+   "satiety-hold.js",
+   "legend-immune.js",
    "save-merge.js"
   ]
  ]
