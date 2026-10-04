@@ -241,6 +241,61 @@ window.buyRoomTicket = function (which) {
     if (typeof renderRegularShop === 'function') renderRegularShop();
 };
 
+// 유쾌 판매소는 updateUI 마다 container.innerHTML 을 통째로 다시 씁니다.
+// (index.html:5892 → 7650) 그 안에 두면 저장할 때마다 지워지고 다시 생겨
+// 깜박입니다. 그래서 칸 밖, #shop-regular 에 한 번만 만들어 두고
+// 숫자만 갈아 끼웁니다. 글자가 같으면 손도 대지 않습니다.
+function ticketRow() {
+    const host = document.getElementById('shop-regular');
+    const box = document.getElementById('regular-shop-items-container');
+    let row = document.getElementById('room-ticket-row');
+
+    if (!host || !box || !currentUser || !isWeekend()) {   // 평일에는 치운다
+        if (row) row.remove();
+        return null;
+    }
+    if (row) return row;
+
+    row = document.createElement('div');
+    row.id = 'room-ticket-row';
+    row.style.cssText = 'border:1px solid #c2185b; border-radius:7px; padding:12px;'
+        + ' margin-bottom:12px; background:rgba(194,24,91,0.05);';
+    const cell = function (which, nm) {
+        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:9px;'
+            + ' background:rgba(0,0,0,0.25); border-radius:5px; padding:8px 10px; margin-top:6px;">'
+            + '<div style="flex:1; min-width:0;"><div style="font-size:11px; color:#fff;">' + nm + '</div>'
+            + '<div data-left="' + which + '" style="font-size:9px; color:#888;"></div></div>'
+            + '<button class="game-btn" data-buy="' + which + '"'
+            + ' style="margin:0; padding:7px 12px; font-size:11px; flex-shrink:0;"></button></div>';
+    };
+    row.innerHTML = '<div style="font-size:10px; color:#ff8fb1; letter-spacing:1px; margin-bottom:5px;">[주말 한정]</div>'
+        + '<div style="font-size:10px; color:#888; line-height:1.6;">'
+        + '월요일 0시에 호실이 다시 배정됩니다. 같이 살고 싶은 사원이 있으면 찌르세요.</div>'
+        + cell('poke', RM_POKE) + cell('lock', RM_LOCK);
+    box.insertAdjacentElement('beforebegin', row);        // 다시 쓰이는 칸 밖에 둔다
+
+    row.querySelector('[data-buy="poke"]').onclick = function () { buyRoomTicket('poke'); };
+    row.querySelector('[data-buy="lock"]').onclick = function () { buyRoomTicket('lock'); };
+    return row;
+}
+
+function paintTickets() {
+    const row = ticketRow();
+    if (!row) return;
+    [['poke', 'rm_poke'], ['lock', 'rm_lock']].forEach(function (x) {
+        const left = boughtToday(x[1]) ? 0 : 1;
+        const lab = row.querySelector('[data-left="' + x[0] + '"]');
+        const bt = row.querySelector('[data-buy="' + x[0] + '"]');
+        const t1 = '금일 잔여 ' + left + ' / 1장';
+        const t2 = left ? RM_PRICE.toLocaleString() + ' P' : '품절';
+        if (lab && lab.textContent !== t1) lab.textContent = t1;      // 같으면 손대지 않는다
+        if (bt) {
+            if (bt.textContent !== t2) bt.textContent = t2;
+            if (bt.disabled !== !left) bt.disabled = !left;
+        }
+    });
+}
+
 (function pinShop() {
     const iv = setInterval(function () {
         if (typeof renderRegularShop !== 'function') return;
@@ -248,33 +303,12 @@ window.buyRoomTicket = function (which) {
         const _r = renderRegularShop;
         renderRegularShop = function () {
             const r = _r.apply(this, arguments);
-            try {
-                const box = document.getElementById('regular-shop-items-container');
-                if (!box || !currentUser || !isWeekend()) return r;
-                if (document.getElementById('room-ticket-row')) return r;
-                const p = boughtToday('rm_poke') ? 0 : 1;
-                const l = boughtToday('rm_lock') ? 0 : 1;
-                const btn = function (which, nm, left) {
-                    return '<div style="display:flex; justify-content:space-between; align-items:center; gap:9px;'
-                        + ' background:rgba(0,0,0,0.25); border-radius:5px; padding:8px 10px; margin-top:6px;">'
-                        + '<div style="flex:1; min-width:0;"><div style="font-size:11px; color:#fff;">' + nm + '</div>'
-                        + '<div style="font-size:9px; color:#888;">금일 잔여 ' + left + ' / 1장</div></div>'
-                        + '<button class="game-btn" style="margin:0; padding:7px 12px; font-size:11px; flex-shrink:0;"'
-                        + ' onclick="buyRoomTicket(\'' + which + '\')"' + (left ? '' : ' disabled') + '>'
-                        + (left ? RM_PRICE.toLocaleString() + ' P' : '품절') + '</button></div>';
-                };
-                box.insertAdjacentHTML('afterbegin',
-                    '<div id="room-ticket-row" style="border:1px solid #c2185b; border-radius:7px; padding:12px;'
-                    + ' margin-bottom:12px; background:rgba(194,24,91,0.05);">'
-                    + '<div style="font-size:10px; color:#ff8fb1; letter-spacing:1px; margin-bottom:5px;">[주말 한정]</div>'
-                    + '<div style="font-size:10px; color:#888; line-height:1.6;">'
-                    + '월요일 0시에 호실이 다시 배정됩니다. 같이 살고 싶은 사원이 있으면 찌르세요.</div>'
-                    + btn('poke', RM_POKE, p) + btn('lock', RM_LOCK, l) + '</div>');
-            } catch (e) { }
+            try { paintTickets(); } catch (e) { }
             return r;
         };
         renderRegularShop._roomPin = true;
         clearInterval(iv);
+        setTimeout(function () { try { paintTickets(); } catch (e) { } }, 600);
         console.log('[룸메] 주말 상점 연결');
     }, 400);
 })();
@@ -315,7 +349,6 @@ function usePoke(cb) {
                 if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[사택] ' + t.name + ' 사원을 찔렀습니다.');
                 if (typeof saveFields === 'function') saveFields({ history: 1 });
                 showCustomAlert(t.name + ' 사원을 찔렀습니다.\n\n결과는 사택 화면에서 볼 수 있습니다.');
-                setTimeout(function () { if (typeof renderHouse === 'function') renderHouse(); }, 300);
                 cb(true);
             })
             .catch(function () { showCustomAlert('적지 못했습니다. 다시 시도해 주세요.'); cb(false); });
@@ -348,8 +381,7 @@ function useLock(cb) {
                     if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[사택] ' + t.name + ' 사원과 같이 살기로 확정했습니다.');
                     if (typeof saveFields === 'function') saveFields({ history: 1 });
                     showCustomAlert(t.name + ' 사원과 같이 살기로 확정했습니다.\n\n월요일 0시 배정에 반영됩니다.');
-                    setTimeout(function () { if (typeof renderHouse === 'function') renderHouse(); }, 300);
-                    cb(true);
+                        cb(true);
                 })
                 .catch(function () { showCustomAlert('적지 못했습니다. 다시 시도해 주세요.'); cb(false); });
         });
@@ -521,60 +553,99 @@ function doAssign(wk) {
 // ==========================================
 // 사택 화면에 지금 상태를 한 칸
 // ==========================================
-(function panel() {
-    function put() {
-        const box = document.getElementById('house-main-body');
-        if (!box || !currentUser || typeof database === 'undefined' || !database) return;
-        if (box.innerHTML.length < 50) return;
-        if (document.getElementById('room-poke-box')) return;
+//
+// renderHouse 도 #house-main-body 를 통째로 다시 씁니다. (dark.js:8075)
+// 그 안에 붙이면 지워지고 다시 생기는데, 그때마다 서버를 새로 읽어
+// 「불러오는 중…」이 한 번씩 스쳐 깜박입니다.
+// 그래서 칸 밖(#house-main)에 한 번만 만들고, 찌름 자료는 귀를 달아
+// 손에 들고 있다가 바뀔 때만 글자를 갈아 끼웁니다.
+let pokeData = null, lockData = null, watchWeek = '';
 
-        const head = '<div style="font-size:11px; color:#ff8fb1; font-weight:bold; margin-bottom:7px;">🛏 다음 호실</div>';
-        const el = document.createElement('div');
-        el.id = 'room-poke-box';
-        el.style.cssText = 'border:1px solid #c2185b; border-radius:6px; padding:12px; margin-top:13px;'
-            + ' background:rgba(194,24,91,0.05); font-size:11px; color:#ddd; line-height:1.7;';
-        el.innerHTML = head + '<div style="color:#888;">불러오는 중…</div>';
-        box.appendChild(el);
-
-        Promise.all([pokeRef().once('value'), lockRef().once('value')]).then(function (r) {
-            const pokes = r[0].val() || {}, locks = r[1].val() || {};
-            const me = currentUser.code, mine = pokes[me], lock = locks[me];
-
-            let body;
-            if (!mine) {
-                body = '<div style="color:#888;">아직 아무도 찌르지 않았습니다.<br>'
-                     + '주말에 유쾌 판매소에서 찌름권을 살 수 있습니다.</div>';
-            } else {
-                const mutual = pokes[mine.to] && pokes[mine.to].to === me;
-                body = '<div>찌른 상대 <b style="color:#fff;">' + nameOf(mine.to) + '</b></div>';
-                if (mutual) {
-                    body += '<div style="color:#81c784; margin-top:4px;">서로 찔렀습니다. 확정권 없이 확정됩니다.</div>';
-                } else if (lock && lock.to === mine.to) {
-                    body += '<div style="color:#81c784; margin-top:4px;">확정권을 썼습니다. 월요일 배정에 반영됩니다.</div>';
-                } else if (pokeOK(me, pokes)) {
-                    body += '<div style="color:#ffd700; margin-top:4px;">찌름 성공. 확정권을 쓰면 확정됩니다.</div>';
-                } else {
-                    body += '<div style="color:#ff8a65; margin-top:4px;">다른 사원이 먼저 찔렀거나, 상대가 다른 사원과 서로 찔렀습니다.</div>';
-                }
-            }
-
-            const d = daysLeft();
-            body += '<div style="color:#777; font-size:10px; margin-top:7px;">다음 배정까지 '
-                 + (d === 1 ? '오늘 자정' : d + '일') + ' · 이번 주 찌른 사원 '
-                 + Object.keys(pokes).length + '명</div>';
-
-            if (isWeekend() && (typeof getRoomie === 'function') && getRoomie(currentUser)) {
-                body += '<div style="color:#ffb74d; font-size:10px; margin-top:8px; border-top:1px dashed #5a3a4a; padding-top:7px;">'
-                     + '월요일 전에 공용 보관함을 비워 두세요. 짝이 바뀌면 보관함은 지금 들고 있는 쪽을 따라갑니다.</div>';
-            }
-            el.innerHTML = head + body;
-        }).catch(function () { el.remove(); });
+(function watchPokes() {
+    function tick() {
+        if (!currentUser || typeof database === 'undefined' || !database) return;
+        const wk = weekKey();
+        if (watchWeek === wk) return;
+        if (watchWeek) {                                  // 주가 넘어갔다 — 옛 귀를 뗀다
+            try { database.ref('roomPoke/' + watchWeek).off(); } catch (e) { }
+            try { database.ref('roomConfirm/' + watchWeek).off(); } catch (e) { }
+        }
+        watchWeek = wk;
+        pokeData = null; lockData = null;
+        database.ref('roomPoke/' + wk).on('value', function (s) {
+            pokeData = s.val() || {}; paintPoke();
+        });
+        database.ref('roomConfirm/' + wk).on('value', function (s) {
+            lockData = s.val() || {}; paintPoke();
+        });
     }
+    setTimeout(tick, 1500);
+    setInterval(tick, 1000);
+})();
+
+function pokeBox() {
+    const host = document.getElementById('house-main');
+    if (!host || !currentUser) return null;
+    let el = document.getElementById('room-poke-box');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'room-poke-box';
+    el.style.cssText = 'border:1px solid #c2185b; border-radius:6px; padding:12px; margin-top:13px;'
+        + ' background:rgba(194,24,91,0.05); font-size:11px; color:#ddd; line-height:1.7;'
+        + ' display:none;';                               // 자료가 오기 전에는 비워 두지 않고 숨긴다
+    host.appendChild(el);                                 // 다시 쓰이는 칸 밖에 둔다
+    return el;
+}
+
+function paintPoke() {
+    const el = pokeBox();
+    if (!el) return;
+    if (!pokeData || !lockData) { el.style.display = 'none'; return; }
+
+    const me = currentUser.code, mine = pokeData[me], lock = lockData[me];
+    let body;
+    if (!mine) {
+        body = '<div style="color:#888;">아직 아무도 찌르지 않았습니다.<br>'
+             + '주말에 유쾌 판매소에서 찌름권을 살 수 있습니다.</div>';
+    } else {
+        const mutual = pokeData[mine.to] && pokeData[mine.to].to === me;
+        body = '<div>찌른 상대 <b style="color:#fff;">' + nameOf(mine.to) + '</b></div>';
+        if (mutual) {
+            body += '<div style="color:#81c784; margin-top:4px;">서로 찔렀습니다. 확정권 없이 확정됩니다.</div>';
+        } else if (lock && lock.to === mine.to) {
+            body += '<div style="color:#81c784; margin-top:4px;">확정권을 썼습니다. 월요일 배정에 반영됩니다.</div>';
+        } else if (pokeOK(me, pokeData)) {
+            body += '<div style="color:#ffd700; margin-top:4px;">찌름 성공. 확정권을 쓰면 확정됩니다.</div>';
+        } else {
+            body += '<div style="color:#ff8a65; margin-top:4px;">다른 사원이 먼저 찔렀거나, 상대가 다른 사원과 서로 찔렀습니다.</div>';
+        }
+    }
+
+    const d = daysLeft();
+    body += '<div style="color:#777; font-size:10px; margin-top:7px;">다음 배정까지 '
+         + (d === 1 ? '오늘 자정' : d + '일') + ' · 이번 주 찌른 사원 '
+         + Object.keys(pokeData).length + '명</div>';
+
+    if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser)) {
+        body += '<div style="color:#ffb74d; font-size:10px; margin-top:8px; border-top:1px dashed #5a3a4a; padding-top:7px;">'
+             + '월요일 전에 공용 보관함을 비워 두세요. 짝이 바뀌면 보관함은 지금 들고 있는 쪽을 따라갑니다.</div>';
+    }
+
+    const html = '<div style="font-size:11px; color:#ff8fb1; font-weight:bold; margin-bottom:7px;">🛏 다음 호실</div>' + body;
+    if (el.innerHTML !== html) el.innerHTML = html;        // 같으면 손대지 않는다 — 깜박임의 원인
+    if (el.style.display !== 'block') el.style.display = 'block';
+}
+
+(function panel() {
     const iv = setInterval(function () {
         if (typeof renderHouse !== 'function') return;
         if (renderHouse._roomBox) { clearInterval(iv); return; }
         const _r = renderHouse;
-        renderHouse = function () { const r = _r.apply(this, arguments); setTimeout(put, 160); return r; };
+        renderHouse = function () {
+            const r = _r.apply(this, arguments);
+            try { paintPoke(); } catch (e) { }            // 다시 만들지 않는다 — 글자만 본다
+            return r;
+        };
         renderHouse._roomBox = true;
         clearInterval(iv);
     }, 400);
