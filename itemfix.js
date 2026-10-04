@@ -199,7 +199,10 @@ setInterval(function () {
             }
             currentUser.gearPolish = 0;
             try { return _try.apply(this, arguments); }
-            finally { currentUser.gearPolish = keep; }
+            finally {
+    currentUser.gearPolish = keep;
+    if (keep > 0 && typeof saveFields === 'function') saveFields({ gearPolish: 1 });
+}
         };
         tryGearUpgrade._noPolishL = true;
         clearInterval(iv);
