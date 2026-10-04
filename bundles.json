@@ -215,6 +215,7 @@
    "note-fix.js",
    "ribbon-fix.js",
    "dupe-watch.js",
+   "storage-dup.js",
    "save-merge.js"
   ]
  ]
