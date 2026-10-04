@@ -223,9 +223,15 @@ BIRTH_ITEMS.forEach(function (b) {
     ITEM_CATALOG[b.n] = {
         price: 300, usable: true, targetable: false,
         effect: b.e, value: b.v, birth: true, desc: '[출산] ' + b.d,
-        heal: b.heal, ticket: b.ticket, bonus: b.bonus, dark: b.dark,
-        point: b.point, luck: b.luck, hide: b.hide, reroll: b.reroll,
-        guard: b.guard, mult: b.mult
+       heal:   b.heal   || (b.e === 'b_heal'   ? b.v : undefined),
+ticket: b.ticket || (b.e === 'b_ticket' ? b.v : undefined),
+bonus:  b.bonus  || (b.e === 'b_bonus'  ? b.v : undefined),
+dark:   b.dark   || (b.e === 'b_dark'   ? b.v : undefined),
+point:  b.point  || (b.e === 'b_point'  ? b.v : undefined),
+luck:   b.luck,  hide:   b.hide   || (b.e === 'b_hide'   ? b.v : undefined),
+reroll: b.reroll || (b.e === 'b_reroll' ? b.v : undefined),
+guard:  b.guard  || (b.e === 'b_guard'  ? b.v : undefined),
+mult:   b.mult
     };
 });
 
