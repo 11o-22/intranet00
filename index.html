@@ -7777,8 +7777,8 @@ if (!useFacility(bet)) return;
         
         const luckM = 1 + (facilityLuckMult(currentUser) - 1) / 10;
 
-        let failChance = Math.max(0.22, (hasAmulet ? 0.55 : 0.76) / luckM);
-        let jackpotSpan = Math.min(0.18, (hasAmulet ? 0.08 : 0.025) * luckM);
+        let failChance = Math.max(0.75, (hasAmulet ? 0.78 : 0.80) / luckM);
+        let jackpotSpan = Math.min(0.05, (hasAmulet ? 0.035 : 0.02) * luckM);
         if (failChance + jackpotSpan > 0.92) jackpotSpan = 0.92 - failChance;
         let jackpotChance = failChance + jackpotSpan;
         if (rollType < failChance) {
@@ -7910,10 +7910,7 @@ if (!useFacility(bet)) return;
         
 
         // ★ [수정됨] 시작 시점에는 차감하지 않고, 이용 가능한 상태인지만 체크합니다.
-        if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return; }
-        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
-        if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return; }
-        if (currentUser.points < bet) { showLuxuryAlert(); return; }
+        if (!useFacility(bet)) return;
 
         seotdaBet = bet; 
         swapsLeft = 1; 
@@ -8009,17 +8006,12 @@ if (!useFacility(bet)) return;
         }
 
  
-        // 1. 포인트 및 횟수 최종 차감
-       changePoints(-seotdaBet);
-currentUser.facilityCount += 1;
-saveFields({ facilityCount:1 });
-
         // 2. 족보 계산
         let pRes = calculateJokbo(playerHand[0], playerHand[1]); 
         let dRes = calculateJokbo(dealerHand[0], dealerHand[1]);
 
         const luckM = facilityLuckMult(currentUser);
-        if (luckM > 1 && pRes.score <= dRes.score && Math.random() < 0.18 * (luckM - 1)) {
+       if (luckM > 1 && pRes.score <= dRes.score && Math.random() < Math.min(0.30, 0.05 * (luckM - 1))) {
             let picked = pickHandByCondition(r => r.score > dRes.score);
             if (picked) { playerHand = picked.hand; pRes = picked.res; }
         }
@@ -8171,7 +8163,7 @@ function bjFinish(mode) {
     else result = 'draw';
 
     const luckM = facilityLuckMult(currentUser);
-    if (result === 'lose' && luckM > 1 && p <= 21 && Math.random() < 0.15 * (luckM - 1)) {
+        if (result === 'lose' && luckM > 1 && p <= 21 && Math.random() < Math.min(0.25, 0.04 * (luckM - 1))) {
         result = 'win';
     }
 
