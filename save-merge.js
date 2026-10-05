@@ -25,6 +25,7 @@ const SKIP = ['letters', 'hasNewLetter', 'hasNewReply', 'hasItemUsedOnMe',
 
 const INV = 'inventory';          // 배열 병합으로 다루는 항목
 const PTS = 'points';             // 돈 — 「늘어난 만큼·줄어든 만큼」으로 다루는 항목
+const EFF = 'timedEffects';       // 걸린 효과 — 이름별로 합친다
 
 let code = null;
 let base = {};            // 서버에서 마지막으로 본 모습
@@ -33,6 +34,9 @@ let ready = false;
 
 const shadowInv = {};     // 남의 소지품 — 서버에서 마지막으로 본 모습
 const shadowPts = {};     // 남의 포인트 — 같은 까닭
+const shadowEff = {};     // 남에게 걸린 효과 — 같은 까닭
+let effBusy = false, effAgain = false;
+const rootStats = {};     // 루트 통째 쓰기를 몇 번 병합으로 돌렸나
 let invBusy = false;
 let invAgain = false;
 let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0 };
@@ -159,6 +163,112 @@ function flushMyPts() {
     });
 }
 
+// ==========================================
+// 걸린 효과 — 이름별로 합친다
+// ==========================================
+//
+// 물약 효과(timedEffects)도 배열을 통째로 덮어쓰고 있었다. 물약은 대개
+// 남에게 쓰는 것이어서, 쓰는 쪽이 「상대를 once 로 읽고 → 효과를 붙이고 →
+// 배열을 통째로 덮어쓰기」를 한다. (index.html:6100~6126)
+//
+// 읽고 쓰는 사이에 상대가 받은 다른 효과, 또는 상대 화면이 저장한 것은
+// 그만큼 지워진다. 두 사람이 연달아 물약을 쓰면 하나가 사라지고, 상대가
+// 그 사이에 뭘 저장하면 방금 걸린 물약이 사라진다.
+// 「적용된 물약이 멋대로 사라진다」가 이것이다.
+//
+// 그래서 값을 덮어쓰지 않고 이름별로 합친다.
+//   · 내가 더한 효과는 넣는다
+//   · 같은 이름이 양쪽에 있으면 남은 시간이 긴 쪽을 쓴다 (고정이 가장 세다)
+//   · 내가 지운 효과는 뺀다. 다만 그 사이 누가 다시 걸었으면 두고 본다
+function effTime(e) { return (e && e.fixed) ? Infinity : ((e && e.expireAt) || 0); }
+function pickEff(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    if (a.fixed || b.fixed) {
+        const w = a.fixed ? a : b;
+        return { name: w.name, desc: b.desc || a.desc, fixed: true };
+    }
+    return (effTime(b) > effTime(a)) ? b : a;
+}
+function effMap(list) {
+    const m = {};
+    asArr(list).forEach(function (e) {
+        if (!e || !e.name) return;
+        m[e.name] = pickEff(m[e.name], e);
+    });
+    return m;
+}
+function effChanged(had, want) {
+    const a = Object.keys(had), b = Object.keys(want);
+    if (a.some(function (n) { return !(n in want); })) return true;
+    return b.some(function (n) {
+        return !(n in had) || effTime(want[n]) !== effTime(had[n])
+            || !!want[n].fixed !== !!had[n].fixed;
+    });
+}
+
+function mergeEff(path, baseList, localList) {
+    if (!database) return Promise.resolve(null);
+    const had = effMap(baseList), want = effMap(localList);
+    if (!effChanged(had, want)) return Promise.resolve(null);
+    const gone = Object.keys(had).filter(function (n) { return !(n in want); });
+
+    return database.ref(path).transaction(function (srv) {
+        const cur = effMap(srv);
+        gone.forEach(function (n) {
+            const s = cur[n];
+            if (!s) return;
+            if (effTime(s) > effTime(had[n])) return;   // 그 사이 누가 다시 걸었다
+            delete cur[n];
+        });
+        Object.keys(want).forEach(function (n) { cur[n] = pickEff(cur[n], want[n]); });
+        return Object.keys(cur).map(function (n) { return cur[n]; });
+    }, null, false).then(function (res) {               // ★ applyLocally = false
+        if (!res || !res.committed) return null;
+        return asArr(res.snapshot ? res.snapshot.val() : null);
+    }).catch(function (e) {
+        console.error('[병합] 효과 저장 실패:', e);
+        return null;
+    });
+}
+
+function flushMyEff() {
+    if (!ready || !currentUser) return Promise.resolve(null);
+    if (effBusy) { effAgain = true; return Promise.resolve(null); }
+    if (!effChanged(effMap(base[EFF]), effMap(currentUser[EFF]))) return Promise.resolve(null);
+
+    effBusy = true;
+    const want = clone(currentUser[EFF]) || [];
+    const had = clone(base[EFF]) || [];
+
+    return mergeEff('users/' + code + '/' + EFF, had, want).then(function (after) {
+        effBusy = false;
+        if (after === null) { base[EFF] = want; }
+        else {
+            // 날아가는 사이에 또 걸린 것을 지킨다
+            const extra = effMap(currentUser[EFF]);
+            const sent = effMap(want);
+            const out = effMap(after);
+            Object.keys(extra).forEach(function (n) {
+                if (!(n in sent) || effTime(extra[n]) > effTime(sent[n])) {
+                    out[n] = pickEff(out[n], extra[n]);
+                }
+            });
+            fillArr(currentUser[EFF] || (currentUser[EFF] = []),
+                    Object.keys(out).map(function (n) { return out[n]; }));
+            base[EFF] = clone(after);
+        }
+        const more = effAgain;
+        effAgain = false;
+        if (more) return flushMyEff();
+        return after;
+    }).catch(function (e) {
+        effBusy = false; effAgain = false;
+        console.error('[병합] 효과:', e);
+        return null;
+    });
+}
+
 // 배열을 그대로 두고 내용만 갈아끼운다 (다른 곳이 들고 있는 참조를 지키려고)
 function fillArr(target, src) {
     if (!Array.isArray(target)) return src;
@@ -247,7 +357,10 @@ function attach() {
                 kept[k] = clone(base[k]);                   // 아직 안 닿았다 — 내 값을 지킨다
                 return;
             }
-            if (k === INV) { fillArr(currentUser[INV], srv[k]); base[k] = clone(srv[k]); took++; return; }
+            if (k === INV || k === EFF) {
+                fillArr(currentUser[k] || (currentUser[k] = []), srv[k]);
+                base[k] = clone(srv[k]); took++; return;
+            }
             currentUser[k] = clone(srv[k]);
             took++;
         });
@@ -282,16 +395,17 @@ function attach() {
 
         const note = function (s) {
             const v = s.val();
-            if (!v) { delete shadowInv[s.key]; delete shadowPts[s.key]; return; }
+            if (!v) { delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key]; return; }
             shadowInv[s.key] = asArr(v[INV]);
             shadowPts[s.key] = Number(v[PTS]) || 0;
+            shadowEff[s.key] = asArr(v[EFF]);
         };
         database.ref('users').on('child_added', note);
         database.ref('users').on('child_changed', note);
         database.ref('users').on('child_removed', function (s) {
-            delete shadowInv[s.key]; delete shadowPts[s.key];
+            delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key];
         });
-        console.log('[병합] 남의 소지품·포인트 기준 지켜보기 시작');
+        console.log('[병합] 남의 소지품·포인트·효과 기준 지켜보기 시작');
     }, 700);
 })();
 
@@ -303,6 +417,7 @@ function diffPayload() {
     Object.keys(currentUser).forEach(function (k) {
         if (SKIP.indexOf(k) >= 0) return;
         if (k === PTS) return;                              // 돈은 더하고 빼기로 따로 보낸다
+        if (k === EFF) return;                              // 효과도 이름별로 합쳐 보낸다
         if (k === INV) return;                              // 소지품은 따로 병합한다
         if (badKey(k)) return;
         if (currentUser[k] === undefined) return;
@@ -331,16 +446,17 @@ function markSaved(payload) {
 
             const invJob = flushMyInv();                      // 소지품은 병합으로
             const ptsJob = flushMyPts();                      // 돈도 병합으로
+            const effJob = flushMyEff();                      // 걸린 효과도 병합으로
 
             const payload = diffPayload();
             const n = Object.keys(payload).length;
-            if (!n) return Promise.all([invJob, ptsJob]);
+            if (!n) return Promise.all([invJob, ptsJob, effJob]);
 
             payload._adminStamp = Date.now();
             currentUser._adminStamp = payload._adminStamp;
 
             return Promise.all([
-                invJob, ptsJob,
+                invJob, ptsJob, effJob,
                 database.ref('users/' + code).update(payload)
                     .then(function () { markSaved(payload); })
                     .catch(function (e) { console.error('[병합] 저장 실패:', e); })
@@ -355,11 +471,13 @@ function markSaved(payload) {
                 fields = fields || {};
                 const wantsInv = !!fields[INV];
                 const wantsPts = !!fields[PTS];
+                const wantsEff = !!fields[EFF];
                 const mine = (ready && currentUser && currentUser.code === code);
                 const rest = {};
                 Object.keys(fields).forEach(function (k) {
                     if (k === INV) return;
                     if (k === PTS && mine) return;              // 돈은 더하고 빼기로 보낸다
+                    if (k === EFF && mine) return;              // 효과는 이름별로 합쳐 보낸다
                     rest[k] = fields[k];
                 });
 
@@ -371,6 +489,7 @@ function markSaved(payload) {
                 if (wantsInv && mine) flushMyInv();
                 else if (wantsInv) r = _f.call(this, fields);   // 기준이 없으면 예전 방식
                 if (wantsPts && mine) flushMyPts();
+                if (wantsEff && mine) flushMyEff();
 
                 return r;
             };
@@ -435,16 +554,20 @@ function markSaved(payload) {
             // 남의 소지품·돈 — 서버에서 본 모습을 기준으로 더하고 뺀다
             const hasInv = Object.prototype.hasOwnProperty.call(fields, INV);
             const hasPts = Object.prototype.hasOwnProperty.call(fields, PTS);
+            const hasEff = Object.prototype.hasOwnProperty.call(fields, EFF);
             const hadInv = shadowInv[c];
             const hadPts = shadowPts[c];
+            const hadEff = shadowEff[c];
             const doInv = hasInv && hadInv;
             const doPts = hasPts && (hadPts !== undefined);
-            if (!doInv && !doPts) return _u.apply(this, arguments);
+            const doEff = hasEff && hadEff;
+            if (!doInv && !doPts && !doEff) return _u.apply(this, arguments);
 
             const rest = {};
             Object.keys(fields).forEach(function (k) {
                 if (doInv && k === INV) return;
                 if (doPts && k === PTS) return;
+                if (doEff && k === EFF) return;
                 rest[k] = fields[k];
             });
             rest._adminStamp = Date.now();
@@ -468,10 +591,129 @@ function markSaved(payload) {
                     return after;
                 }));
             }
+            if (doEff) {
+                jobs.push(mergeEff('users/' + c + '/' + EFF, hadEff, asArr(fields[EFF])).then(function (after) {
+                    if (after === null) return null;
+                    shadowEff[c] = after.slice();
+                    if (db && db.users && db.users[c]) fillArr(db.users[c][EFF] || (db.users[c][EFF] = []), after);
+                    return after;
+                }));
+            }
             return Promise.all(jobs);
         };
         updateUserFields._merge = true;
         clearInterval(iv);
+    }, 500);
+})();
+
+// ==========================================
+// 루트 통째 쓰기도 더하고 빼기로
+// ==========================================
+//
+// database.ref('/').update({ 'users/누구/points': 값, ... }) 꼴로 남의 자리를
+// 통째로 덮어쓰는 곳이 일곱 군데 있다. 결투·물약 사용·출산 환급·사택 재배정·
+// 칼 분실·당국 개입이다. 모두 「once 로 읽고 → 계산하고 → 덮어쓰기」라서
+// 읽고 쓰는 사이에 움직인 몫이 지워진다.
+//
+//     index.html:6126  users/{상대}/timedEffects   ← 물약이 사라지던 자리
+//     index.html:6130  users/{상대}/inventory
+//     index.html:9491  users/{상대}/points
+//     dark.js:12997    결투 — 양쪽 points
+//     dark.js:13005    결투 — 양쪽 inventory
+//     preg-v2.js:413   출산 환급 — inventory · points
+//     roommate.js:499  재배정 — 보관함 돌려주기
+//     knife-lost.js:394
+//
+// 부르는 쪽을 하나하나 고치는 대신 길목을 지킨다. 저 세 항목만 골라
+// 트랜잭션으로 돌리고, 나머지 열쇠는 원래대로 한 번에 쓴다.
+//
+// 값을 보내던 코드를 그대로 두고 받는 쪽에서 「움직인 몫」으로 바꾸므로,
+// 부르는 쪽은 아무것도 몰라도 된다.
+//
+// 다만 원래는 한 번에 쓰여 전부 되거나 전부 안 되던 것이, 이제 항목마다
+// 따로 간다. 트랜잭션은 다시 시도하므로 실패는 드물지만, 아주 드물게
+// 한쪽만 되는 일이 있을 수 있다. 돈이 사라지는 것보다는 낫다고 보았다.
+const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects)$/;
+(function hookRoot() {
+    const iv = setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        if (database._rootMerge) { clearInterval(iv); return; }
+        if (typeof database.ref !== 'function') return;
+
+        const _ref = database.ref.bind(database);
+        database.ref = function () {
+            const r = _ref.apply(null, arguments);
+            const p = String(arguments[0] == null ? '' : arguments[0]).replace(/^\/+|\/+$/g, '');
+            if (p !== '' || !r || typeof r.update !== 'function' || r._rootMerge) return r;
+
+            const _up = r.update.bind(r);
+            r.update = function (obj) {
+                if (!obj || typeof obj !== 'object') return _up(obj);
+                const rest = {};
+                const jobs = [];
+                Object.keys(obj).forEach(function (k) {
+                    const m = MERGED.exec(String(k).replace(/^\/+/, ''));
+                    if (!m) { rest[k] = obj[k]; return; }
+                    const c = m[1], f = m[2], path = 'users/' + c + '/' + f;
+                    let job = null;
+                    if (f === PTS && shadowPts[c] !== undefined) {
+                        job = mergePts(path, shadowPts[c], obj[k]);
+                    } else if (f === INV && shadowInv[c]) {
+                        job = mergeInv(path, shadowInv[c], obj[k]);
+                    } else if (f === EFF && shadowEff[c]) {
+                        job = mergeEff(path, shadowEff[c], obj[k]);
+                    }
+                    if (!job) { rest[k] = obj[k]; return; }     // 기준이 없으면 예전 방식
+                    rootStats[f] = (rootStats[f] || 0) + 1;
+                    jobs.push(job);
+                });
+                if (Object.keys(rest).length) jobs.push(_up(rest));
+                return Promise.all(jobs);
+            };
+            r._rootMerge = true;
+            return r;
+        };
+        database._rootMerge = true;
+        clearInterval(iv);
+        console.log('[병합] 루트 통째 쓰기도 더하고 빼기로 — 돈·소지품·효과');
+    }, 500);
+})();
+
+// ==========================================
+// addTimedEffect — 늘어난 쪽도 저장한다
+// ==========================================
+//
+// index.html:5183
+//     const exist = user.timedEffects.find(e => e.name === name && !e.fixed);
+//     if (exist) {
+//         exist.expireAt = base + add;      ← 늘려 놓고
+//         exist.desc = desc;                ← 저장은 하지 않는다
+//     } else {
+//         user.timedEffects.push(...);
+//         if (user.code === currentUser.code) saveFields({ timedEffects:1 });
+//     }
+//
+// 같은 물약을 또 쓰면 시간이 늘어나기만 하고 서버에는 가지 않는다. 그래서
+// 새로 고치면 늘린 몫이 없다. 그것도 「물약이 멋대로 사라진다」로 보인다.
+(function hookAdd() {
+    const iv = setInterval(function () {
+        if (typeof addTimedEffect !== 'function') return;
+        if (addTimedEffect._merge) { clearInterval(iv); return; }
+        const _a = addTimedEffect;
+        const wrapped = function (user) {
+            const r = _a.apply(this, arguments);
+            try {
+                if (user && currentUser && user.code === currentUser.code) {
+                    if (ready) flushMyEff();
+                    else if (typeof saveFields === 'function') saveFields({ timedEffects: 1 });
+                }
+            } catch (e) { }
+            return r;
+        };
+        wrapped._merge = true;
+        addTimedEffect = wrapped;
+        clearInterval(iv);
+        console.log('[병합] addTimedEffect — 늘어난 쪽도 저장하도록 바꿨습니다');
     }, 500);
 })();
 
@@ -482,6 +724,7 @@ setInterval(function () {
     if (!ready || !currentUser) return;
     if (!invBusy && !same(currentUser[INV], base[INV])) flushMyInv();
     if (!ptsBusy && (Number(currentUser[PTS]) || 0) !== (Number(base[PTS]) || 0)) flushMyPts();
+    if (!effBusy) flushMyEff();
 }, 4000);
 
 // ==========================================
@@ -525,6 +768,33 @@ window.ptsState = function () {
     console.log('  (돈은 값을 덮어쓰지 않고 「움직인 몫」만 트랜잭션으로 보냅니다)');
 };
 
+window.effState = function () {
+    console.log('%c===== 걸린 효과 병합 =====', 'color:#d4af37; font-size:13px');
+    const mine = effMap(currentUser && currentUser[EFF]);
+    const had = effMap(base[EFF]);
+    const now = Date.now();
+    console.table(Object.keys(mine).map(function (n) {
+        const e = mine[n];
+        return { 효과: n, 남은: e.fixed ? '영구'
+                   : (Math.max(0, Math.round((e.expireAt - now) / 60000)) + '분'),
+                 기준에있나: (n in had) ? 'O' : '✗ (아직 안 보냄)' };
+    }));
+    const gone = Object.keys(had).filter(function (n) { return !(n in mine); });
+    if (gone.length) console.log('  내가 지운 것(아직 안 보냄):', gone.join(', '));
+    console.log('  바뀐 것 있나:', effChanged(had, mine) ? 'O — 곧 보냅니다' : '없음');
+    console.log('  남에게 걸린 효과 기준 보유:', Object.keys(shadowEff).length + '명');
+    console.log('  addTimedEffect 교체:',
+        (typeof addTimedEffect === 'function' && addTimedEffect._merge) ? 'O' : '✗');
+};
+
+window.rootMergeState = function () {
+    console.log('%c===== 루트 통째 쓰기 =====', 'color:#d4af37; font-size:13px');
+    console.log('  갈아끼움:', (typeof database !== 'undefined' && database && database._rootMerge) ? 'O' : '✗');
+    const k = Object.keys(rootStats);
+    if (!k.length) { console.log('  아직 가로챈 것이 없습니다.'); return; }
+    console.log('  병합으로 돌린 횟수:', k.map(function (x) { return x + ' ' + rootStats[x] + '번'; }).join(' · '));
+};
+
 // 서버 자료로 강제로 맞춘다
 window.pullServer = function () {
     if (!database || !code) return;
@@ -543,6 +813,6 @@ window.pullServer = function () {
     });
 };
 
-console.log('[병합] mergeState() · invState() · ptsState() · pullServer()');
+console.log('[병합] mergeState() · invState() · ptsState() · effState() · rootMergeState() · pullServer()');
 
 })();
