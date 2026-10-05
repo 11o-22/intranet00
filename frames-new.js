@@ -270,7 +270,7 @@
     document.head.appendChild(st2);
 
     // 등급별 자리 맞추기 — 견본첩이 등급 순으로 그린다면 다시 세운다
-    const ORDER = { S: 0, A: 1, B: 2, C: 3, D: 4 };
+    const ORDER = { L: -1, S: 0, A: 1, B: 2, C: 3, D: 4 };   // L 이 빠져 있어 정렬이 어긋났다
     FRAMES.sort(function (a, b) {
         if (ORDER[a.g] !== ORDER[b.g]) return ORDER[a.g] - ORDER[b.g];
         return a.id < b.id ? -1 : 1;

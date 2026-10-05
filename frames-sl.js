@@ -8,15 +8,27 @@
 //   한 장만 나온다. 나오는 것은 S 등급과 L 등급뿐이다.
 //   L 은 훨씬 드물게 나온다.
 //
-//   지금 있는 테두리는 D 16 · C 12 · B 10 · A 9 · S 5 · L 1 종이다.
-//   그래서 이 견본첩이 뽑는 후보는 여섯 종이다.
+//   지금 있는 테두리는 D 16 · C 12 · B 10 · A 9 · S 7 · L 3 종, 모두 57종이다.
+//   테두리는 다섯 파일에서 FRAMES 에 들어간다.
+//       frames.js 40 · frames-new.js 10 · frames-video.js 1
+//       frames-video2.js 2 · frames-video3.js 4
+//   그래서 이 견본첩이 뽑는 후보는 열 종이다.
 //
-//       S  s01 · n06 · n10 · v02 · v03      각 1.000
-//       L  v01                                    0.080
+//       S  s01 ■■의 ■■■ · n06 별가루 · n10 흰 나비 · v02 맥광
+//          v03 화등 · v06 자전 · v07 세광
+//       L  v01 뇌명 · v04 성운 · v05 격광
 //
-//   L 이 나올 확률은 0.080 / 5.080 ≈ 1.6% 다.
-//   L 을 더 드물게 하려면 아래 L_WEIGHT 를 줄이면 된다.
-//       0.080 → 1.6%      0.050 → 1.0%      0.025 → 0.5%
+// ■ 확률을 세는 방식
+//
+//   「L 이 나올 몫」을 먼저 정하고 그것을 L 끼리 나눈다. 나머지를 S 끼리 나눈다.
+//   테두리를 나중에 더 넣어도 L 전체 몫이 저절로 불어나지 않는다.
+//   (처음에는 한 종씩 무게를 주었는데, L 이 세 종이라 전체 몫이 세 배가 되었다.)
+//
+//       L_SHARE = 0.015  →  L 전체 1.5%  (한 종씩 0.50%)
+//                           S 전체 98.5% (한 종씩 14.07%)
+//
+//   더 드물게 하려면 L_SHARE 를 줄이면 된다.
+//       0.015 → 1.5%      0.008 → 0.8%      0.030 → 3.0%
 //
 // ■ 상담사만 줄 수 있다
 //
@@ -30,13 +42,12 @@
 // ■ 이미 가진 것이 나오면
 //
 //   원래 견본첩과 같다. 등급에 맞는 값으로 돌려받는다. (S 60 P · L 120 P)
-//   후보가 여섯 종뿐이라 다 모으면 겹침만 나온다. 그때는 돌려받기만 한다.
+//   후보가 열 종뿐이라 다 모으면 겹침만 나온다. 그때는 돌려받기만 한다.
 
 (function framesSL() {
 
 const ITEM = '특급 테두리 견본첩';
-const L_WEIGHT = 0.080;        // S 한 종을 1.000 으로 보았을 때 L 의 무게
-const S_WEIGHT = 1.000;
+const L_SHARE = 0.015;         // L 등급이 나올 전체 확률 (0.015 = 1.5%)
 
 // ==========================================
 // 등록
@@ -79,10 +90,19 @@ function candidates() {
     return FRAMES.filter(function (f) { return f && (f.g === 'S' || f.g === 'L'); });
 }
 
+// 무게 — L 전체가 L_SHARE 를 나눠 갖고, S 전체가 나머지를 나눠 갖는다
+function weights(list) {
+    const nL = list.filter(function (f) { return f.g === 'L'; }).length;
+    const nS = list.length - nL;
+    const wL = nL ? (L_SHARE / nL) : 0;
+    const wS = nS ? ((1 - (nL ? L_SHARE : 0)) / nS) : 0;
+    return list.map(function (f) { return f.g === 'L' ? wL : wS; });
+}
+
 function draw() {
     const list = candidates();
     if (!list.length) return null;
-    const w = list.map(function (f) { return f.g === 'L' ? L_WEIGHT : S_WEIGHT; });
+    const w = weights(list);
     const total = w.reduce(function (a, b) { return a + b; }, 0);
     let r = Math.random() * total;
     for (let i = 0; i < list.length; i++) {
@@ -160,16 +180,20 @@ function draw() {
 window.slBookOdds = function (n) {
     const list = candidates();
     if (!list.length) { console.warn('S·L 테두리를 못 찾았습니다. frames.js 가 먼저 올라와야 합니다.'); return; }
-    const w = list.map(function (f) { return f.g === 'L' ? L_WEIGHT : S_WEIGHT; });
+    const w = weights(list);
     const total = w.reduce(function (a, b) { return a + b; }, 0);
 
     console.log('%c===== ' + ITEM + ' =====', 'color:#c9a8ff; font-size:13px');
-    console.table(list.map(function (f, i) {
-        return { 등급: f.g, 이름: f.n, id: f.id, 확률: (w[i] / total * 100).toFixed(2) + '%' };
-    }));
+    console.table(list.slice().sort(function (a, b) { return a.g === b.g ? 0 : (a.g === 'L' ? -1 : 1); })
+        .map(function (f) {
+            const i = list.indexOf(f);
+            return { 등급: f.g, 이름: f.n, id: f.id, 확률: (w[i] / total * 100).toFixed(2) + '%' };
+        }));
     const lw = list.reduce(function (a, f, i) { return a + (f.g === 'L' ? w[i] : 0); }, 0);
+    const nL = list.filter(function (f) { return f.g === 'L'; }).length;
+    console.log('  후보:', (list.length - nL) + '종 S · ' + nL + '종 L');
     console.log('  L 등급이 나올 확률:', (lw / total * 100).toFixed(2) + '%'
-        + '  (L_WEIGHT = ' + L_WEIGHT + ')');
+        + '  (L_SHARE = ' + L_SHARE + ')');
     console.log('  한 장만 나옵니다. 상담사 「물품 강제 꽂기」로만 줍니다.');
 
     // 실제로 돌려 본다
