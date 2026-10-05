@@ -32,9 +32,21 @@ const WINDOW = 60000;      // 「짧은 사이」의 길이
 const REPEAT = 2;          // 같은 품목이 이만큼 되풀이되면 되돌린다
 const KEEP = 200;          // 적어 둘 줄 수
 
-let ON = true;             // 되돌리기
+// ★ 되돌리기는 꺼 둔다
+//
+//   처음에는 켜 두었는데, 그 판단이 틀렸다.
+//   addHistoryLog 는 활동 기록을 10줄로 잘라낸다. (index.html:4755)
+//       user.history.unshift(...); if (user.history.length > 10) user.history.pop();
+//   그래서 기록이 10줄인 사원은 길이가 영영 안 늘고,
+//   「까닭 없는 증가」로 보여 정상 구매가 되돌려졌다.
+//   유쾌 판매소에서 2개만 들어오던 까닭이 이것이다.
+//
+//   복사 자체는 뿌리에서 막았다 (storage-dup.js · save-merge.js).
+//   그래서 여기서는 적어 두고 알리기만 한다. 되돌리기가 다시 필요하면
+//   dupeGuard(true) 로 켤 수 있다.
+let ON = false;            // 되돌리기
 let last = null;           // 지난번 소지품 세어 본 것
-let lastHist = 0;          // 지난번 기록 줄 수
+let lastHist = '';         // 지난번 기록 맨 윗줄
 const log = [];            // 적어 둔 것
 
 function counts(arr) {
@@ -42,9 +54,27 @@ function counts(arr) {
     (arr || []).forEach(function (x) { c[x] = (c[x] || 0) + 1; });
     return c;
 }
-function histLen(u) {
-    return (u && Array.isArray(u.history)) ? u.history.length : 0;
-}
+// 기록이 새로 적혔는가
+//
+//   길이로는 알 수 없다 (10줄에서 잘린다).
+//   맨 윗줄로 보는 것도 모자란다 — 시각이 초 단위라 같은 초에 같은 글이
+//   두 번 적히면 같아 보인다.
+//   그래서 적히는 횟수를 직접 센다. 이것만은 어긋나지 않는다.
+let logSeq = 0;
+(function countLogs() {
+    const iv = setInterval(function () {
+        if (typeof addHistoryLog !== 'function') return;
+        if (addHistoryLog._dupeSeq) { clearInterval(iv); return; }
+        const _a = addHistoryLog;
+        addHistoryLog = function (u, m) {
+            if (currentUser && u === currentUser) logSeq++;
+            return _a.apply(this, arguments);
+        };
+        addHistoryLog._dupeSeq = true;
+        clearInterval(iv);
+    }, 400);
+})();
+function histTop(u) { return String(logSeq); }
 function note(row) {
     log.push(row);
     while (log.length > KEEP) log.shift();
@@ -61,9 +91,9 @@ function tick() {
     if (!currentUser || !Array.isArray(currentUser.inventory)) return;
     const now = Date.now();
     const cur = counts(currentUser.inventory);
-    const hl = histLen(currentUser);
+    const hl = histTop(currentUser);
 
-    if (last === null) { last = cur; lastHist = hl; return; }
+    if (last === null) { last = cur; lastHist = hl; return; }   // 첫 바퀴는 기준만 잡는다
 
     const grew = [];
     Object.keys(cur).forEach(function (n) {
@@ -72,7 +102,7 @@ function tick() {
     });
 
     if (grew.length) {
-        const hasReason = hl > lastHist;          // 기록이 같이 늘었나
+        const hasReason = (hl !== lastHist);      // 기록이 새로 적혔나
         grew.forEach(function (g) {
             const before = recentBlind(g.n, now);
             note({
@@ -86,7 +116,7 @@ function tick() {
             });
 
             if (!hasReason) {
-                console.warn('[복사?] ' + g.n + ' +' + g.d + ' — 활동 기록이 늘지 않았습니다. (지금 ' + cur[g.n] + '개)');
+                console.warn('[복사?] ' + g.n + ' +' + g.d + ' — 활동 기록이 새로 적히지 않았습니다. (지금 ' + cur[g.n] + '개)');
             }
 
             // 까닭 없이 되풀이되면 되돌린다
@@ -133,8 +163,9 @@ window.dupeLog = function (only) {
 };
 
 window.dupeGuard = function (v) {
-    ON = (v !== false);
-    console.log('[복사] 되돌리기 ' + (ON ? '켰습니다' : '껐습니다'));
+    ON = (v === true);
+    console.log('[복사] 되돌리기 ' + (ON ? '켰습니다' : '껐습니다')
+        + (ON ? ' — 정상 구매까지 되돌릴 수 있으니 살펴보실 때만 켜 주세요.' : ''));
 };
 
 window.dupeWipe = function () { log.length = 0; last = null; console.log('[복사] 적어 둔 것을 지웠습니다.'); };
@@ -154,6 +185,6 @@ window.invCount = function (who) {
     if (many.length) console.warn('  10개가 넘는 품목:', many.map(function (r) { return r.품목 + ' ' + r.개수; }).join(' · '));
 };
 
-console.log('[복사] dupeLog() · dupeLog(true) · dupeGuard(false) · invCount(사번)');
+console.log('[복사] dupeLog() · dupeLog(true) · invCount(사번)  — 되돌리기는 꺼져 있습니다');
 
 })();
