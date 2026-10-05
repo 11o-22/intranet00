@@ -81,13 +81,13 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설'];
+const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러'];
 
 // 상담사 칭호에 붙는 그림
 //
 // 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
 // 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
-const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤' };
+const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤', '이레귤러': '⛓️‍💥' };
 
 // 이름을 바꾼 칭호 — 예전 이름으로 받아 간 사람을 새 이름으로 옮긴다
 const RENAMED = { '신입': '뉴비' };
@@ -254,8 +254,10 @@ const GEAR_SLOTS = 3;
 
 function attrGradeOf(g, attr) {
     if (!g || !g.attrs) return 'D';
+    // ⛓️‍💥 이레귤러가 올려 놓은 본체 등급은 빼고 원래 값으로 본다
+    const body = (g.gradeReal !== undefined) ? g.gradeReal : g.grade;
     const i = g.attrs.indexOf(attr);
-    if (i <= 0) return g.grade;                       // 첫 자리는 본체 등급
+    if (i <= 0) return body;                          // 첫 자리는 본체 등급
     return (g.attrGrades && g.attrGrades[attr]) || 'D';
 }
 
@@ -273,6 +275,9 @@ function lSlots(u) {
 function allAttrsL(u) {
     const g = gearOf(u);
     if (!g || !Array.isArray(g.attrs)) return false;
+    // ⛓️‍💥 이레귤러가 만든 L 은 attrGradeOf 가 걸러 낸다 (gradeReal 을 본다).
+    // 그래서 이 칭호만으로는 붙지 않고, 제 힘으로 세 자리를 L 로 만든
+    // 사람은 이 칭호를 달고 있어도 칭호를 잃지 않는다.
     if (g.attrs.length < GEAR_SLOTS) return false;    // 자리를 다 열지 않았으면 아직이다
     return lSlots(u) >= GEAR_SLOTS;
 }
@@ -487,11 +492,33 @@ hook('luckReroll', function (_o, a) {
     return r;
 });
 
-// 어둠 사망
-hook('finishDarkDeath', function (_o, a) {
-    bump('dead');
-    return _o.apply(this, a);
-});
+// 개복치 — 「입원중」이 될 때 센다
+//
+// 전에는 finishDarkDeath 하나만 보았다. 그런데 어둠에서 쓰러지는 길이
+// 여러 개라 그 함수를 지나지 않는 경우가 많고, 쓰러져도 격리로 가지 않는
+// 길도 있어서 거의 세어지지 않았다.
+//
+// 그래서 기준을 눈에 보이는 것으로 바꿨다 — 상담실이나 선녀탕에 간 뒤
+// 상태가 「입원」이 되는 경우다. (index.html:4675 getQuarantineBadge)
+//     입원  = quarantineHospital 이거나 나올 때 오염도가 40 이상
+//     상담중 · 온천욕 은 세지 않는다
+// 격리 한 번에 한 번만 센다 (quarantineUntil 값을 열쇠로 쓴다).
+(function mola() {
+    function hospital(u) {
+        return !!u.quarantineHospital || (u.quarantineExitPollution || 0) >= 40;
+    }
+    setInterval(function () {
+        if (!currentUser) return;
+        const until = currentUser.quarantineUntil || 0;
+        if (!until || Date.now() >= until) return;        // 격리 중이 아니다
+        if (!hospital(currentUser)) return;               // 상담중 · 온천욕
+        const s = ti(currentUser);
+        if (s.deadKey === until) return;                  // 이 격리는 이미 셌다
+        s.deadKey = until;
+        bump('dead');
+        console.log('[칭호] 입원 ' + (s.dead || 0) + '회');
+    }, 5000);
+})();
 
 // 구출 — epic 두 가지
 ['epicRescue', 'epicDoomRescue'].forEach(function (n) {
@@ -879,33 +906,259 @@ setInterval(function () {
 }, 5000);
 
 // ==========================================
+// ⛓️‍💥 이레귤러 — 상담사 전용
+// ==========================================
+//
+// 달고 있는 동안에만:
+//     · 전용 장비의 모든 자리가 L 로 보이고 L 로 계산된다
+//     · 속성 변경권이 없어도 자유롭게 속성을 바꿀 수 있다
+//     · 네 번째 자리가 열린다 (원래 상한은 3)
+//
+// ■ 데이터는 건드리지 않는다
+//   등급을 L 로 「써 넣지」 않는다. 읽는 함수만 가로채 L 로 답한다.
+//   그래서 칭호를 떼면 원래 등급이 그대로 돌아온다.
+//
+// ■ 웨폰 마스터가 저절로 붙지 않는 까닭
+//   웨폰 마스터는 titles.js 안의 attrGradeOf 로 재는데, 그것은
+//   g.attrGrades 와 g.grade 를 바로 읽는다. 가로챈 쪽(dark.js 의
+//   gearAttrGrade)을 쓰지 않으므로 이 칭호의 L 은 보이지 않는다.
+//   아래 allAttrsL 앞에 한 겹 더 막아 둔다.
+//
+// ■ 네 번째 자리
+//   g.slots 를 4 로 올리고 원래 값을 g.slotsReal 에 적어 둔다.
+//   칭호를 떼면 되돌린다. 5초마다 맞춰 보므로 어긋난 채로 남지 않는다.
+
+const IRR = '이레귤러';
+const IRR_SLOTS = 4;
+
+function irregular(u) {
+    u = u || currentUser;
+    return !!(u && u.titleOn === IRR && (u.titleAdmin || []).indexOf(IRR) >= 0);
+}
+window._irregular = irregular;
+
+// 지금 보고 있는 장비가 「이 칭호를 단 사람」의 것인가
+function irrGear(g) {
+    if (!g || !currentUser || !irregular(currentUser)) return false;
+    return g === currentUser.soulGear;
+}
+
+// --- 등급을 L 로 답한다 ---
+(function hookGrade() {
+    const iv = setInterval(function () {
+        if (typeof gearAttrGrade !== 'function') return;
+        if (gearAttrGrade._irr) { clearInterval(iv); return; }
+        const _g = gearAttrGrade;
+        gearAttrGrade = function (g, attr) {
+            if (irrGear(g)) return 'L';
+            return _g.apply(this, arguments);
+        };
+        gearAttrGrade._irr = true;
+        clearInterval(iv);
+        console.log('[칭호] 이레귤러 — 속성 등급 L 고정 연결');
+    }, 500);
+})();
+
+// 본체 등급도 L 로 보이게 (첫 자리는 본체 등급을 쓴다)
+// 화면이 g.grade 를 바로 읽는 곳이 있어 거기까지 맞춘다.
+(function hookBody() {
+    setInterval(function () {
+        const g = currentUser && currentUser.soulGear;
+        if (!g) return;
+        if (irregular(currentUser)) {
+            if (g.gradeReal === undefined) g.gradeReal = g.grade;
+            if (g.grade !== 'L') g.grade = 'L';
+            if (g.slotsReal === undefined) g.slotsReal = (g.slots || 1);
+            if (g.slots !== IRR_SLOTS) g.slots = IRR_SLOTS;
+        } else {
+            let back = false;
+            if (g.gradeReal !== undefined) { g.grade = g.gradeReal; delete g.gradeReal; back = true; }
+            if (g.slotsReal !== undefined) { g.slots = g.slotsReal; delete g.slotsReal; back = true; }
+            if (back) {
+                // 자리를 줄였으면 넘치는 속성은 뒤에서 덜어낸다
+                if (Array.isArray(g.attrs) && g.attrs.length > (g.slots || 1)) {
+                    const cut = g.attrs.splice(g.slots || 1);
+                    cut.forEach(function (a) { if (g.attrGrades) delete g.attrGrades[a]; });
+                    console.log('[칭호] 이레귤러를 떼어 네 번째 자리의 ' + cut.length + '개를 덜어냈습니다.');
+                }
+                save({ soulGear: 1 });
+                if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+                console.log('[칭호] 이레귤러를 떼고 원래 등급·자리로 되돌렸습니다.');
+            }
+        }
+    }, 5000);
+})();
+
+// --- 변경권 없이 속성 변경 ---
+//
+// doGearReattr(attr, itemName) 은 itemName 을 소지품에서 뺀다.
+// 이 칭호를 달고 있으면 빼는 그 한 번만 비켜 세운다.
+(function hookFree() {
+    const iv = setInterval(function () {
+        if (typeof doGearReattr !== 'function' || typeof removeItemFromInventory !== 'function') return;
+        if (doGearReattr._irr) { clearInterval(iv); return; }
+        const _do = doGearReattr;
+        doGearReattr = function (attr, itemName) {
+            if (!irregular(currentUser)) return _do.apply(this, arguments);
+            const _rm = removeItemFromInventory;
+            removeItemFromInventory = function () { };          // 변경권을 쓰지 않는다
+            try { return _do.call(this, attr, itemName || IRR); }
+            finally { removeItemFromInventory = _rm; }
+        };
+        doGearReattr._irr = true;
+
+        // 변경권을 들고 있지 않아도 창을 열 수 있게
+        if (typeof openGearReattr === 'function' && !openGearReattr._irr) {
+            const _op = openGearReattr;
+            openGearReattr = function (itemName) { return _op.call(this, itemName || IRR); };
+            openGearReattr._irr = true;
+        }
+        clearInterval(iv);
+        console.log('[칭호] 이레귤러 — 변경권 없이 속성 변경 연결');
+    }, 500);
+})();
+
+// --- 소지품 화면의 전용 장비 칸에 단추를 하나 붙인다 ---
+(function hookButton() {
+    function stick() {
+        if (!irregular(currentUser)) {
+            const old = document.getElementById('irr-reattr-btn');
+            if (old) old.remove();
+            return;
+        }
+        if (document.getElementById('irr-reattr-btn')) return;
+        const box = document.getElementById('inventory-list-container');
+        if (!box) return;
+        const card = Array.prototype.slice.call(box.children).filter(function (c) {
+            return (c.textContent || '').indexOf('[전용 장비]') >= 0;
+        })[0];
+        if (!card) return;
+        const rows = card.querySelectorAll('div');
+        let row = null;
+        for (let i = rows.length - 1; i >= 0; i--) {
+            if ((rows[i].getAttribute('style') || '').indexOf('display:flex') >= 0) { row = rows[i]; break; }
+        }
+        if (!row) return;
+        const b = document.createElement('button');
+        b.id = 'irr-reattr-btn';
+        b.className = 'inv-btn';
+        b.style.cssText = 'flex:1; min-width:78px; background:linear-gradient(145deg,#4a2c73,#2a0c43);'
+            + ' color:#fff; border-color:#8a6cb3;';
+        b.textContent = '⛓️‍💥 속성 바꾸기';
+        b.onclick = function () { if (typeof openGearReattr === 'function') openGearReattr(IRR); };
+        row.appendChild(b);
+    }
+    setInterval(stick, 1200);
+})();
+
+// ==========================================
 // 상담사 — 손으로 붙이기
 // ==========================================
-window.adminGiveTitle = function (name) {
+// 지금 「주기」인가 「떼기」인가
+//
+// 전에는 같은 단추를 다시 누르면 떼였다. 그런데 화면에 지금 상태가
+// 안 보여서, 주려고 눌렀다가 떼는 일이 생겼다.
+// 그래서 모드를 겉으로 드러낸다.
+let titleMode = 'give';          // 'give' 또는 'take'
+
+window.setTitleMode = function (m) {
+    titleMode = (m === 'take') ? 'take' : 'give';
+    const btn = document.getElementById('title-mode-btn');
+    if (btn) {
+        btn.textContent = (titleMode === 'take') ? '떼기' : '주기';
+        btn.style.background = (titleMode === 'take')
+            ? 'linear-gradient(145deg,#6a2a2a,#3a1818)' : 'linear-gradient(145deg,#2a4a2a,#183018)';
+        btn.style.borderColor = (titleMode === 'take') ? '#a04a4a' : '#4a8a4a';
+    }
+    const row = document.getElementById('title-admin-row');
+    if (row) row.setAttribute('data-mode', titleMode);
+};
+
+window.adminGiveTitle = function (name, force) {
     if (typeof getAdminTargets !== 'function') return;
     const targets = getAdminTargets();
     if (!targets.length) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
 
-    const done = [], off = [];
+    const mode = force || titleMode;                 // 'give' · 'take'
+    const done = [], off = [], skip = [];
     targets.forEach(function (code) {
         const u = db.users[code];
         if (!u) return;
         if (!Array.isArray(u.titleAdmin)) u.titleAdmin = [];
         const at = u.titleAdmin.indexOf(name);
-        if (at >= 0) { u.titleAdmin.splice(at, 1); off.push(u.name); }   // 다시 누르면 뗀다
-        else { u.titleAdmin.push(name); done.push(u.name); }
+
+        if (mode === 'take') {
+            if (at < 0) { skip.push(u.name); return; }
+            u.titleAdmin.splice(at, 1);
+            off.push(u.name);
+        } else {
+            if (at >= 0) { skip.push(u.name); return; }
+            u.titleAdmin.push(name);
+            done.push(u.name);
+        }
+
+        const f = { titleAdmin: u.titleAdmin, history: u.history };
+        // 떼었는데 그걸 달고 있었으면 벗긴다
+        if (mode === 'take' && u.titleOn === name) { u.titleOn = ''; f.titleOn = ''; }
+
         if (typeof addHistoryLog === 'function') {
-            addHistoryLog(u, '[칭호] ' + (at >= 0 ? name + ' 회수' : name + ' 부여'));
+            addHistoryLog(u, '[칭호] ' + name + (mode === 'take' ? ' 회수' : ' 부여'));
         }
         u._adminStamp = Date.now();
-        if (typeof updateUserFields === 'function') {
-            updateUserFields(code, { titleAdmin: u.titleAdmin, history: u.history });
-        }
+        if (typeof updateUserFields === 'function') updateUserFields(code, f);
     });
     paint();
     if (typeof updateUI === 'function') updateUI();
-    showCustomAlert((done.length ? '[' + label(name) + '] 부여 — ' + done.join(', ') : '')
-        + (off.length ? (done.length ? '\n\n' : '') + '[' + label(name) + '] 회수 — ' + off.join(', ') : ''));
+
+    const lines = [];
+    if (done.length) lines.push('[' + label(name) + '] 부여 — ' + done.join(', '));
+    if (off.length) lines.push('[' + label(name) + '] 회수 — ' + off.join(', '));
+    if (skip.length) lines.push((mode === 'take' ? '안 가지고 있어 건너뜀 — ' : '이미 가지고 있어 건너뜀 — ')
+        + skip.join(', '));
+    showCustomAlert(lines.join('\n\n'));
+};
+
+// 콘솔에서 — titleTake('이레귤러', 사번) · titleGive('이레귤러', 사번)
+function oneTarget(name, who, mode) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.filter(function (x) {
+        return x && (x.no === who || x.code === who || x.name === who);
+    })[0] : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    if (!Array.isArray(u.titleAdmin)) u.titleAdmin = [];
+    const at = u.titleAdmin.indexOf(name);
+    if (mode === 'take') {
+        if (at < 0) { console.log(u.name + ' 사원은 [' + label(name) + '] 을 가지고 있지 않습니다.'); return; }
+        u.titleAdmin.splice(at, 1);
+    } else {
+        if (at >= 0) { console.log(u.name + ' 사원은 이미 [' + label(name) + '] 을 가지고 있습니다.'); return; }
+        u.titleAdmin.push(name);
+    }
+    const f = { titleAdmin: u.titleAdmin };
+    if (mode === 'take' && u.titleOn === name) { u.titleOn = ''; f.titleOn = ''; }
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(u, '[칭호] ' + name + (mode === 'take' ? ' 회수' : ' 부여'));
+        f.history = u.history;
+    }
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, f);
+    paint();
+    if (typeof updateUI === 'function') updateUI();
+    console.log('%c\u2713 ' + u.name + ' 사원 [' + label(name) + '] '
+        + (mode === 'take' ? '회수' : '부여'), 'color:#4CAF50');
+}
+window.titleGive = function (name, who) { oneTarget(name, who, 'give'); };
+window.titleTake = function (name, who) { oneTarget(name, who, 'take'); };
+window.titleOf = function (who) {
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.filter(function (x) {
+        return x && (x.no === who || x.code === who || x.name === who);
+    })[0] : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
+    console.log('  달고 있는 것:', u.titleOn ? '[' + label(u.titleOn) + ']' : '없음');
+    console.log('  상담사 부여:', (u.titleAdmin || []).map(function (n) { return '[' + label(n) + ']'; }).join(' ') || '없음');
+    console.log('  저절로 얻은 것:', (u.titles || []).length + '개');
 };
 
 (function mountAdmin() {
@@ -918,6 +1171,10 @@ window.adminGiveTitle = function (name) {
         row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px;'
             + ' align-items:center; flex-wrap:wrap;';
         row.innerHTML = '<span style="font-size:10px; color:#888; flex-shrink:0;">칭호</span>'
+            + '<button id="title-mode-btn" class="game-btn" style="flex:0 0 56px; margin:0; padding:9px;'
+            + ' font-size:11px; background:linear-gradient(145deg,#2a4a2a,#183018) !important;'
+            + ' border-color:#4a8a4a !important;"'
+            + ' onclick="setTitleMode(this.textContent.trim() === \'주기\' ? \'take\' : \'give\')">주기</button>'
             + ADMIN_TITLES.map(function (n) {
                 return '<button class="game-btn" style="flex:1 1 68px; margin:0; padding:9px; font-size:11px;'
                     + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
@@ -927,7 +1184,8 @@ window.adminGiveTitle = function (name) {
         const holder = anchor.parentNode;
         holder.parentNode.insertBefore(row, holder.nextSibling);
         clearInterval(iv);
-        console.log('[칭호] 상담사 부여 버튼 연결 (같은 칭호를 다시 누르면 회수)');
+        console.log('[칭호] 상담사 단추 연결 — 왼쪽 「주기/떼기」로 바꿔 누릅니다');
+        console.log('       콘솔: titleGive(\'이레귤러\', 사번) · titleTake(\'이레귤러\', 사번) · titleOf(사번)');
     }, 800);
 })();
 
