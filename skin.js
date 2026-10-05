@@ -49,6 +49,24 @@ const SKIN_PALETTES = [
     { name:'흑단과 실버',          base:'#0d0c0b', panel:'#1a1816', accent:'#c0c7cf' },
     { name:'차콜과 로즈 골드',     base:'#121315', panel:'#1d1f22', accent:'#e0a899' },
     { name:'슬레이트와 샴페인',    base:'#0f1318', panel:'#1a2029', accent:'#e6c98f' },
+    // --- 쨍한 계열 : 짙은 바탕 · 형광처럼 튀는 강조 ---
+    { name:'전광과 코발트',        base:'#040a16', panel:'#0a1730', accent:'#2e9bff' },
+    { name:'네온 시안',            base:'#021014', panel:'#042029', accent:'#00e5ff' },
+    { name:'마젠타 섬광',          base:'#12030c', panel:'#240718', accent:'#ff2d95' },
+    { name:'라임 신호',            base:'#061003', panel:'#0d2008', accent:'#8cff1a' },
+    { name:'주황 경보',            base:'#140600', panel:'#28100a', accent:'#ff7a18' },
+    { name:'제비꽃 전압',          base:'#0a0618', panel:'#170e2e', accent:'#8f5cff' },
+    { name:'적신호',               base:'#140305', panel:'#26070c', accent:'#ff2b45' },
+    { name:'노랑 경고선',          base:'#0f0c00', panel:'#1e1a03', accent:'#ffe01a' },
+    { name:'에메랄드 방전',        base:'#02120c', panel:'#05251a', accent:'#00f0a0' },
+    { name:'분홍 형광',            base:'#0d0410', panel:'#1b0a22', accent:'#ff5ce1' },
+
+    // --- 쨍한 계열 : 바탕 자체가 진하게 물든다 ---
+    { name:'쨍한 파랑',            base:'#06224a', panel:'#0b3570', accent:'#5fc8ff', text:'#eaf6ff' },
+    { name:'쨍한 보라',            base:'#22064a', panel:'#360a70', accent:'#c79bff', text:'#f4ecff' },
+    { name:'쨍한 초록',            base:'#043b26', panel:'#07583a', accent:'#7dffc0', text:'#ecfff6' },
+    { name:'쨍한 자홍',            base:'#4a0636', panel:'#700a52', accent:'#ff9bd8', text:'#fff0f9' },
+
     // --- 밝은 계열 ---
     { name:'아이보리와 골드',      base:'#f7f1e3', panel:'#efe6d2', accent:'#9a7b2e', text:'#2b2418', light:true },
     { name:'진주와 로즈 골드',     base:'#f6efec', panel:'#ecdfd9', accent:'#a8665a', text:'#2e2220', light:true },
@@ -67,7 +85,11 @@ const SKIN_PALETTES = [
     { name:'린넨과 월넛',          base:'#f3eee6', panel:'#e7dfd2', accent:'#6b4a2e', text:'#2a2118', light:true },
     { name:'페일 골드와 흑단',     base:'#f6f0dc', panel:'#ebe2c6', accent:'#3a3226', text:'#221e16', light:true },
     { name:'그레이지와 샴페인 골드', base:'#eeebe6', panel:'#e0dbd3', accent:'#8a7442', text:'#26231e', light:true },
-    { name:'마블과 오닉스',        base:'#f2f2f0', panel:'#e4e4e1', accent:'#2a2a2a', text:'#1e1e1e', light:true }
+    { name:'마블과 오닉스',        base:'#f2f2f0', panel:'#e4e4e1', accent:'#2a2a2a', text:'#1e1e1e', light:true },
+
+    // --- 쨍한 계열 : 흰 바탕에 전광 강조 ---
+    { name:'백지와 전광 파랑',     base:'#f2f8ff', panel:'#e2eeff', accent:'#0b64d0', text:'#0b1a2e', light:true },
+    { name:'백지와 형광 분홍',     base:'#fff4fa', panel:'#ffe4f2', accent:'#c2186b', text:'#2e0f20', light:true }
 ];
 const SKIN_PATTERNS = [
     { name: '핀스트라이프', css: a => `repeating-linear-gradient(90deg, ${a}1c 0 1px, transparent 1px 14px)`, size: 'auto' },
