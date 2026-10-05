@@ -1019,28 +1019,45 @@ function irrGear(g) {
 })();
 
 // --- 소지품 화면의 전용 장비 칸에 단추를 하나 붙인다 ---
+//
+// 전에는 1.2초마다 살펴 붙였다. 그런데 renderInventory 가 칸을 통째로
+// 다시 쓰기 때문에, 다시 쓰인 뒤 붙기까지 한 번씩 비어 보였다.
+// 그래서 깜박이고, 붙는 자리도 그때그때 달라 움직여 보였다.
+//
+// 지금은 두 가지로 바꿨다.
+//   1. renderInventory 가 끝나는 그 자리에서 바로 붙인다 (화면에 그려지기 전)
+//   2. 그 밖의 파일이 칸을 고쳐도 MutationObserver 가 그려지기 전에 다시 붙인다
+// 붙는 자리는 「단추가 든 마지막 줄」로 못박아 두어 움직이지 않는다.
 (function hookButton() {
+    const BTN = 'irr-reattr-btn';
+
     function stick() {
+        const box = document.getElementById('inventory-list-container');
+        if (!box) return;
+
         if (!irregular(currentUser)) {
-            const old = document.getElementById('irr-reattr-btn');
+            const old = document.getElementById(BTN);
             if (old) old.remove();
             return;
         }
-        if (document.getElementById('irr-reattr-btn')) return;
-        const box = document.getElementById('inventory-list-container');
-        if (!box) return;
-        const card = Array.prototype.slice.call(box.children).filter(function (c) {
-            return (c.textContent || '').indexOf('[전용 장비]') >= 0;
-        })[0];
+        if (document.getElementById(BTN)) return;
+
+        let card = null;
+        for (let i = 0; i < box.children.length; i++) {
+            if ((box.children[i].textContent || '').indexOf('[전용 장비]') >= 0) { card = box.children[i]; break; }
+        }
         if (!card) return;
-        const rows = card.querySelectorAll('div');
+
+        // 단추가 들어 있는 마지막 줄 — 「속성 선택 · 강화」가 놓인 자리다
         let row = null;
-        for (let i = rows.length - 1; i >= 0; i--) {
-            if ((rows[i].getAttribute('style') || '').indexOf('display:flex') >= 0) { row = rows[i]; break; }
+        const divs = card.getElementsByTagName('div');
+        for (let i = divs.length - 1; i >= 0; i--) {
+            if (divs[i].getElementsByTagName('button').length) { row = divs[i]; break; }
         }
         if (!row) return;
+
         const b = document.createElement('button');
-        b.id = 'irr-reattr-btn';
+        b.id = BTN;
         b.className = 'inv-btn';
         b.style.cssText = 'flex:1; min-width:78px; background:linear-gradient(145deg,#4a2c73,#2a0c43);'
             + ' color:#fff; border-color:#8a6cb3;';
@@ -1048,7 +1065,45 @@ function irrGear(g) {
         b.onclick = function () { if (typeof openGearReattr === 'function') openGearReattr(IRR); };
         row.appendChild(b);
     }
-    setInterval(stick, 1200);
+
+    // 1. 다시 그린 그 자리에서 바로
+    (function wrapRender() {
+        const iv = setInterval(function () {
+            if (typeof renderInventory !== 'function') return;
+            if (renderInventory._irrBtn) { clearInterval(iv); return; }
+            const _r = renderInventory;
+            renderInventory = function () {
+                const r = _r.apply(this, arguments);
+                try { stick(); } catch (e) { }
+                return r;
+            };
+            renderInventory._irrBtn = true;
+            clearInterval(iv);
+        }, 400);
+    })();
+
+    // 2. 남이 칸을 고쳤을 때 — 그려지기 전에 다시
+    (function watch() {
+        const iv = setInterval(function () {
+            const box = document.getElementById('inventory-list-container');
+            if (!box) return;
+            clearInterval(iv);
+            try {
+                new MutationObserver(function () { try { stick(); } catch (e) { } })
+                    .observe(box, { childList: true });
+            } catch (e) { }
+            stick();
+        }, 400);
+    })();
+
+    // 3. 칭호를 달거나 뗀 순간에도 (화면을 다시 그리지 않을 수 있다)
+    let was = null;
+    setInterval(function () {
+        const on = irregular(currentUser);
+        if (on === was) return;
+        was = on;
+        try { stick(); } catch (e) { }
+    }, 1000);
 })();
 
 // ==========================================

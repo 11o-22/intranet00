@@ -4456,9 +4456,15 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
                 penaltyMsg = `<div style="color:#f44336; margin-top:6px;">탈출 실패 — 포인트가 없어 오염도 8% 추가</div>`;
             }
             // 장착품 제외, 소지품 중 무작위 1개 소실
+            //
+            // ★ 수명이 있는 장비는 빼 둔다.
+            //   버터 나이프·작두·은반지는 기한이 다하면 장착칸에서 소지품으로
+            //   돌아온다. 그 사이 여기에 뽑히면 9,999 P 짜리가 조용히 사라진다.
+            //   「장착품 제외」라고 적혀 있지만 그 순간에는 소지품에 있다.
+            const KEEP_ON_FAIL = ['버터 나이프', '작두', '은반지'];
             const pool = (currentUser.inventory || []).filter(it => {
                 const c = ITEM_CATALOG[it];
-                return c && !NO_SELL_ITEMS.includes(it);
+                return c && !NO_SELL_ITEMS.includes(it) && !KEEP_ON_FAIL.includes(it);
             });
             if (pool.length > 0) {
                 const lost = pool[Math.floor(Math.random() * pool.length)];
