@@ -1472,7 +1472,13 @@ function isDark(u) {
 // 11. 쇼핑몰 노출 — 소속과 확률
 // ==========================================
 function shopAllowed(nm) {
-    const need = SHOP_AFFIL[nm];
+    // SHOP_AFFIL 은 newitems2 의 NEW 표에서만 만들어진다. 그래서
+    // newitems.js 와 index.html 이 EQUIP_AFFIL 에 적어 둔 소속 제한
+    // (사인참사검·유리구슬·도깨비 불·사원증 뱃지·■■ 씨앗·소원권·
+    //  작두·유리손포·착한 친구·보안팀 의상 세트·버터 나이프·사자탈 ...)
+    // 은 여기에 없어서 반대 소속에게도 전부 보였다. 그쪽도 같이 본다.
+    const need = SHOP_AFFIL[nm]
+        || ((typeof EQUIP_AFFIL !== 'undefined' && EQUIP_AFFIL) ? EQUIP_AFFIL[nm] : null);
     if (!need) return true;
     if (isCounsel(currentUser)) return true;
     if (isDark(currentUser)) return true;          // 어둠 소속은 전부 본다
@@ -2317,7 +2323,10 @@ window.newItemState = function () {
     console.log('  등록:', NEW.length + 1 + '종 (뱃지 포함)');
 
     console.log('%c--- 지금 쇼핑몰에 보이는 신규분 ---', 'color:#4fc3f7');
-    const show = Object.keys(SHOP_AFFIL).filter(shopAllowed);
+    const allNames = Object.keys(SHOP_AFFIL)
+        .concat((typeof EQUIP_AFFIL !== 'undefined' && EQUIP_AFFIL) ? Object.keys(EQUIP_AFFIL) : [])
+        .filter(function (n, i, a) { return a.indexOf(n) === i; });
+    const show = allNames.filter(shopAllowed);
     console.log('  ' + (show.join(' · ') || '(없음)'));
     console.log('  3% 희귀분:', RARE3.map(function (n) {
         return n + ' (' + ((window.RARE_ALIEN_RATE || {})[n] * 100 || 0) + '%)';

@@ -456,21 +456,48 @@ function doAssign(wk) {
             const out = resolvePairs(codes, pokes, confirms);
 
             const up = {};
-            codes.forEach(function (c) { up['users/' + c + '/house/roomie'] = null; });
+            codes.forEach(function (c) {
+                up['users/' + c + '/house/roomie'] = null;
+                up['users/' + c + '/house/notes'] = null;     // 벽에 붙은 쪽지도 뗀다 — 짝이 바뀌면 남의 것이 보인다
+            });
 
             out.pairs.forEach(function (p) {
-                const a = p[0], b = p[1];
-                up['users/' + a + '/house/roomie'] = b;
-                up['users/' + b + '/house/roomie'] = a;
+                up['users/' + p[0] + '/house/roomie'] = p[1];
+                up['users/' + p[1] + '/house/roomie'] = p[0];
+            });
 
-                // 공용 보관함은 사번이 앞서는 쪽이 주인이다 — 둘의 짐을 거기로 모은다
-                const o = ([a, b].sort())[0], n = (o === a) ? b : a;
-                const so = ((all[o] || {}).house || {}).storage || [];
-                const sn = ((all[n] || {}).house || {}).storage || [];
-                if (sn.length) {
-                    up['users/' + o + '/house/storage'] = so.concat(sn);
-                    up['users/' + n + '/house/storage'] = [];
-                }
+            // ==========================================
+            // 공용 보관함 — 넣은 사람에게 돌려준다
+            // ==========================================
+            //
+            // 공용함 주인은 두 사번 중 앞서는 쪽이다. (dark.js:8344)
+            // 짝이 바뀌면 주인도 바뀌는데, 짐을 그냥 두면 지난주 짝의 물건이
+            // 새 짝에게 보이고, 모아 두면 남의 물건이 한 사람에게 쏠린다.
+            //
+            // 보관함 한 칸에는 넣은 사람 사번이 적혀 있다. (entry.byCode)
+            // 그래서 칸마다 넣은 사람의 소지품으로 돌려주고 보관함을 비운다.
+            // 소지품 배열은 지금 읽어 온 서버 모습(all)에서 만들어,
+            // 보관함 비우기와 **한 번에** 쓴다. 반만 들어가는 일이 없다.
+            const give = {};                 // 사번 → 돌려줄 물건 이름들
+            let back = 0, orphan = 0;
+            codes.forEach(function (c) {
+                const box = ((all[c] || {}).house || {}).storage;
+                const arr = Array.isArray(box) ? box : (box ? Object.keys(box).map(function (k) { return box[k]; }) : []);
+                if (!arr.length) return;
+                arr.forEach(function (e) {
+                    if (!e || !e.name) return;
+                    // 넣은 사람을 알 수 있고 아직 재직 중이면 그 사람에게
+                    const to = (e.byCode && all[e.byCode]) ? e.byCode : c;
+                    if (!e.byCode || !all[e.byCode]) orphan++;
+                    (give[to] || (give[to] = [])).push(e.name);
+                    back++;
+                });
+                up['users/' + c + '/house/storage'] = [];
+            });
+            Object.keys(give).forEach(function (c) {
+                const inv = Array.isArray((all[c] || {}).inventory) ? (all[c].inventory).slice() : [];
+                up['users/' + c + '/inventory'] = inv.concat(give[c]);
+                up['users/' + c + '/_adminStamp'] = nowMs();
             });
 
             // 배정에서 빠진 사람(상담사 등)이 안쪽을 가리키고 있으면 끊는다
@@ -489,6 +516,8 @@ function doAssign(wk) {
             return database.ref('/').update(up).then(function () {
                 console.log('%c[룸메] ' + wk + ' 배정 완료 — ' + out.pairs.length + '쌍'
                     + (out.alone ? ' · 단독 1명' : ''), 'color:#4CAF50');
+                if (back) console.log('[룸메] 보관함 ' + back + '칸을 넣은 사람에게 돌려줬습니다.'
+                    + (orphan ? ' (넣은 사람을 모르는 ' + orphan + '칸은 들고 있던 쪽으로)' : ''));
                 if (typeof updateUI === 'function') try { updateUI(); } catch (e) { }
                 return true;
             }).catch(function (e) {
@@ -654,7 +683,7 @@ function paintPoke() {
 
     if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser)) {
         body += '<div style="color:#ffb74d; font-size:10px; margin-top:8px; border-top:1px dashed #5a3a4a; padding-top:7px;">'
-             + '월요일 전에 공용 보관함을 비워 두세요. 짝이 바뀌면 보관함은 지금 들고 있는 쪽을 따라갑니다.</div>';
+             + '월요일에 짝이 바뀌면 공용 보관함은 비워지고, 넣은 물건은 넣은 사람의 소지품으로 돌아옵니다.</div>';
     }
 
     const html = '<div style="font-size:11px; color:#ff8fb1; font-weight:bold; margin-bottom:7px;">🛏 다음 호실</div>' + body;
@@ -754,6 +783,36 @@ window.roomStorageMove = function (fromNo, toNo) {
     }).catch(function (e) { console.error(e); });
 };
 
-console.log('[룸메] roomState() · roomPreview() · roomForce() · roomStorageMove(from, to)');
+// 붙어 있는 쪽지를 지운다 — 서버와 화면을 같이 치운다
+//   서버만 지우면 db.users 에 남은 옛 값 때문에 화면에는 그대로 보인다
+window.noteWipe = function (who) {
+    if (typeof database === 'undefined' || !database || !currentUser) return;
+    if (currentUser.code !== ADMIN && who) { console.warn('남의 쪽지는 상담사만 지울 수 있습니다.'); return; }
+
+    const targets = who
+        ? [ (findByNo(who) || db.users[who] || {}).code ].filter(Boolean)
+        : (currentUser.code === ADMIN ? Object.keys(db.users || {})
+                                      : [ houseStorageRef(currentUser) ]);
+    if (!targets.length) { console.warn('사원을 못 찾았습니다.'); return; }
+
+    const up = {};
+    targets.forEach(function (c) { up['users/' + c + '/house/notes'] = null; });
+
+    database.ref('/').update(up).then(function () {
+        // 화면이 보고 있는 것도 같이 비운다
+        targets.forEach(function (c) {
+            const u = db.users[c];
+            if (u && u.house) delete u.house.notes;
+            if (currentUser.code === c && currentUser.house) delete currentUser.house.notes;
+        });
+        const box = document.getElementById('house-note-box');
+        if (box) box.innerHTML = '';
+        if (typeof renderHouse === 'function') { try { renderHouse(); } catch (e) { } }
+        if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+        console.log('%c\u2713 쪽지를 지웠습니다 — ' + targets.length + '명', 'color:#4CAF50');
+    }).catch(function (e) { console.error('[쪽지] 지우지 못했습니다:', e); });
+};
+
+console.log('[룸메] roomState() · roomPreview() · roomForce() · roomStorageMove(from, to) · noteWipe()');
 
 })();

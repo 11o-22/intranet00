@@ -79,7 +79,7 @@ function mergeInv(path, baseArr, localArr) {
             if (i >= 0) cur.splice(i, 1);
         });
         return cur.concat(add);
-    }).then(function (res) {
+    }, null, false).then(function (res) {        // ★ applyLocally = false
         if (!res || !res.committed) return null;
         const after = asArr(res.snapshot ? res.snapshot.val() : null);
         invStats.merged++;
@@ -281,9 +281,8 @@ function markSaved(payload) {
 
                 let r;
                 if (Object.keys(rest).length) r = _f.call(this, rest);
-                try {
-                    Object.keys(rest).forEach(function (k) { base[k] = clone(currentUser[k]); });
-                } catch (e) { }
+                // 기준은 미리 찍지 않는다 — 서버가 받기 전에 찍으면
+                // 날아오던 옛 값이 「내가 안 바꾼 것」으로 보여 늘어난 몫을 지운다
 
                 if (wantsInv && ready && currentUser && currentUser.code === code) flushMyInv();
                 else if (wantsInv) r = _f.call(this, fields);   // 기준이 없으면 예전 방식
@@ -323,12 +322,7 @@ function markSaved(payload) {
             // 내 자리면 기존 흐름대로 (기준도 맞춰 둔다)
             if (!c || (currentUser && c === currentUser.code)) {
                 const r = _u.apply(this, arguments);
-                try {
-                    Object.keys(fields).forEach(function (k) {
-                        if (k === '_adminStamp') return;
-                        base[k] = clone(currentUser[k]);
-                    });
-                } catch (e) { }
+                // 기준은 미리 찍지 않는다 (saveFields 와 같은 까닭)
                 return r;
             }
 

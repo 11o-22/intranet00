@@ -246,54 +246,83 @@ function sweepRibbons() {
     if (!currentUser) return;
     const t = now();
     const all = ribbonsOf(currentUser);
+    const live = all.filter(function (r) { return r && r.u > t; });
     const dead = all.filter(function (r) { return r && r.u <= t; });
-    if (!dead.length) return;
 
-    currentUser.ribbons = all.filter(function (r) { return r && r.u > t; });
+    const eq = currentUser.equippedWeapons || (currentUser.equippedWeapons = []);
+    const wearing = eq.filter(function (w) { return base(w) === RIBBON; }).length;
 
-    // 내 이름표를 끝난 줄 수만큼 뺀다 — 되도록 그 상대의 것으로
-    const eq = currentUser.equippedWeapons || [];
-    let gave = 0;
-    dead.forEach(function (d) {
-        if (alreadyPaid(d)) return;                 // 이미 돌려준 줄이다
-        markPaid(d);
-        const mate = (db.users[d.p] || {}).name || '';
-        let i = eq.findIndex(function (w) {
-            return base(w) === RIBBON && mate && String(w).indexOf(mate) >= 0;
-        });
-        if (i < 0) i = eq.findIndex(function (w) { return base(w) === RIBBON; });
-        if (i >= 0) {
-            const full = eq[i];
-            eq.splice(i, 1);
-            if (typeof clearEquipOwner === 'function') { try { clearEquipOwner(currentUser, full); } catch (e) { } }
+    // ★ 떼어야 할 수를 「차고 있는 수 − 살아 있는 줄 수」로 센다
+    //
+    //   전에는 끝난 줄마다 하나씩 돌려줬다. 그래서 ribbons 나 ribbonPaid 저장이
+    //   한 번 날아가면 같은 줄이 되살아나 30초마다 또 돌려주게 되고,
+    //   리본이 끝없이 불어났다.
+    //
+    //   지금은 눈에 보이는 것(차고 있는 이름표)이 기준이다. 이름표가 이미
+    //   빠져 있으면 이 값이 0 이 되어 두 번 돌려주지 않는다.
+    //   저장이 날아가도 스스로 맞춰진다.
+    const over = Math.max(0, wearing - live.length);
+
+    if (!dead.length && !over) return;
+    currentUser.ribbons = live;
+
+    // 내가 채운 끝난 줄 — 아직 안 돌려준 것만
+    const owed = dead.filter(function (d) { return d.o === currentUser.code && !alreadyPaid(d); });
+
+    let off = 0, gave = 0;
+    for (let k = 0; k < over; k++) {
+        // 되도록 끝난 상대의 이름표를 뗀다
+        let i = -1;
+        for (let m = 0; m < dead.length && i < 0; m++) {
+            const mate = (db.users[dead[m].p] || {}).name || '';
+            if (!mate) continue;
+            i = eq.findIndex(function (w) {
+                return base(w) === RIBBON && String(w).indexOf(mate) >= 0;
+            });
         }
-        // 내가 채운 것이면 소지품으로 돌려받는다
-        if (d.o === currentUser.code) {
+        if (i < 0) i = eq.findIndex(function (w) { return base(w) === RIBBON; });
+        if (i < 0) break;
+        const full = eq[i];
+        eq.splice(i, 1);
+        off++;
+        if (typeof clearEquipOwner === 'function') { try { clearEquipOwner(currentUser, full); } catch (e) { } }
+
+        // 내가 채운 줄의 몫만 소지품으로 돌려받는다
+        if (gave < owed.length) {
+            markPaid(owed[gave]);
             if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
             currentUser.inventory.push(RIBBON);
             gave++;
         }
-    });
+    }
 
-    if (!gave && !dead.length) return;
+    // 떼지 못했어도 끝난 줄은 적어 둔다 — 다음 번에 또 세지 않게
+    dead.forEach(function (d) { if (d.o === currentUser.code) markPaid(d); });
+
+    if (!off && !dead.length) return;
     if (typeof addHistoryLog === 'function' && gave) {
         addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + gave + '개 돌려받음)');
     }
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
 
-    // 내가 채운 쪽이면 상대도 같이 정리한다
+    // 내가 채운 쪽이면 상대도 같이 정리한다 — 상대 것도 같은 식으로 센다
     dead.forEach(function (d) {
         if (d.o !== currentUser.code) return;
         const u = db.users[d.p];
         if (!u || typeof updateUserFields !== 'function') return;
         const mine = (u.ribbons || []).filter(function (r) { return r && r.u > t; });
         const teq = (u.equippedWeapons || []).slice();
+        const tw = teq.filter(function (w) { return base(w) === RIBBON; }).length;
+        let cut = Math.max(0, tw - mine.length);
         const myName = currentUser.name || '';
-        let i = teq.findIndex(function (w) {
-            return base(w) === RIBBON && myName && String(w).indexOf(myName) >= 0;
-        });
-        if (i < 0) i = teq.findIndex(function (w) { return base(w) === RIBBON; });
-        if (i >= 0) teq.splice(i, 1);
+        while (cut-- > 0) {
+            let i = myName ? teq.findIndex(function (w) {
+                return base(w) === RIBBON && String(w).indexOf(myName) >= 0;
+            }) : -1;
+            if (i < 0) i = teq.findIndex(function (w) { return base(w) === RIBBON; });
+            if (i < 0) break;
+            teq.splice(i, 1);
+        }
         u.ribbons = mine; u.equippedWeapons = teq;
         try { updateUserFields(d.p, { ribbons: mine, equippedWeapons: teq }); } catch (e) { }
     });
@@ -303,6 +332,23 @@ function sweepRibbons() {
 }
 setTimeout(sweepRibbons, 5000);
 setInterval(sweepRibbons, 30000);
+
+// 지금 어긋나 있는 것을 손으로 맞춘다 — 차고 있는 수와 줄 수를 같게
+window.ribbonSync = function () {
+    if (!currentUser) return;
+    const t = now();
+    const live = ribbonsOf(currentUser).filter(function (r) { return r && r.u > t; });
+    const eq = currentUser.equippedWeapons || [];
+    const wearing = eq.filter(function (w) { return base(w) === RIBBON; }).length;
+    const inv = (currentUser.inventory || []).filter(function (x) { return x === RIBBON; }).length;
+    console.log('%c===== ' + RIBBON + ' =====', 'color:#ff8fb1; font-size:13px');
+    console.log('  차고 있는 이름표:', wearing + '개');
+    console.log('  살아 있는 줄:', live.length + '개');
+    console.log('  소지품:', inv + '개');
+    console.log('  적어 둔 정산:', (currentUser.ribbonPaid || []).length + '줄');
+    if (wearing !== live.length) console.warn('  어긋나 있습니다 — 다음 정리(30초)에 맞춰집니다.');
+    else console.log('  맞습니다.');
+};
 
 // ==========================================
 // 포만감 칸에 「유지 중」 표시

@@ -9031,7 +9031,7 @@ function bjFinish(mode) {
 
         let win = (choice === 'HIGH' && playerCardValue > dealerCardValue) || (choice === 'LOW' && playerCardValue < dealerCardValue);
         const luckM = facilityLuckMult(currentUser);
-        if (!win && luckM > 1 && Math.random() < 0.12 * (luckM - 1)) {
+        if (!win && luckM > 1 && Math.random() < Math.min(0.30, 0.12 * (luckM - 1))) {
             win = true;
            playerCardValue = choice === 'HIGH'
     ? Math.min(99, dealerCardValue + 1 + Math.floor(Math.random() * 10))
