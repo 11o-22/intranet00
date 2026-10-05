@@ -56,6 +56,7 @@ const PEN = '세뇌 만년필';
 const DRUG_MS = 2 * 3600 * 1000;
 const RIBBON_MS = 1 * 3600 * 1000;
 const RIBBON_MAX = 5;
+const PERM_MARK = ' · 영구';     // 영구로 채운 리본의 이름표 끝에 붙는다
 const PEN_POLL = 50;
 
 function now() { return Date.now(); }
@@ -74,6 +75,15 @@ function ribbonsOf(u) {
 function liveRibbons(u) {
     const t = now();
     return ribbonsOf(u).filter(function (r) { return r && r.u > t; });
+}
+
+// 영구로 채운 리본 — 이름표 끝에 「· 영구」가 붙어 있다
+// 포만도 유지도 없고 저절로 돌아오지도 않는다. 손으로 떼야 한다.
+function permRibbons(u) {
+    if (!u || !Array.isArray(u.equippedWeapons)) return [];
+    return u.equippedWeapons.filter(function (w) {
+        return base(w) === RIBBON && String(w).indexOf(PERM_MARK) >= 0;
+    });
 }
 
 // ==========================================
@@ -182,6 +192,56 @@ guard('applyDarkSatiety', HOLD_DARK);
 // ==========================================
 // 빨간 리본 — 한 시간, 다섯 줄까지
 // ==========================================
+// ==========================================
+// 빨간 리본 — 채울 때 두 가지 중에 고른다
+// ==========================================
+//
+//   ① 영구          효과 없음. 저절로 안 돌아온다. 손으로 떼야 한다.
+//   ② 한 시간 동결   두 사람의 포만도가 한 시간 유지된다. 끝나면 소지품으로.
+//
+// applyItemEffect 는 참·거짓을 바로 돌려줘야 하는데 고르는 창은 기다려야 한다.
+// 그래서 처음 부름에는 창만 띄우고 거짓을 돌려준다. (부른 쪽은 아무것도 안 한다)
+// 고르고 나면 고른 값을 들고 다시 부른다. 리본을 소지품에서 빼는 것도 그때 한다.
+// sticker-fix.js 가 투명 물약에 쓰는 방식과 같다.
+
+let picking = null;        // 고르는 중 — { target, item, isOthers }
+let chosen = null;         // 고른 값 — 'perm' 또는 'hold'
+
+function ribbonAsk(targetName, cb) {
+    const old = document.getElementById('ribbon-pick');
+    if (old) old.remove();
+
+    const wrap = document.createElement('div');
+    wrap.id = 'ribbon-pick';
+    wrap.style.cssText = 'position:fixed; inset:0; z-index:100000; display:flex;'
+        + ' align-items:center; justify-content:center; background:rgba(0,0,0,0.72); padding:20px;';
+    wrap.innerHTML =
+        '<div style="background:linear-gradient(145deg,#1d1016,#120a0e); border:1px solid #c2185b;'
+        + ' border-radius:10px; padding:18px; max-width:340px; width:100%; box-shadow:0 6px 24px rgba(0,0,0,0.6);">'
+        + '<div style="font-size:13px; color:#ff8fb1; font-weight:bold; margin-bottom:6px;">🎀 ' + RIBBON + '</div>'
+        + '<div style="font-size:11px; color:#bbb; line-height:1.7; margin-bottom:14px;">'
+        + targetName + ' 사원에게 어떻게 묶습니까.</div>'
+        + '<button id="rb-perm" class="game-btn" style="width:100%; margin:0 0 8px 0; padding:11px; font-size:12px;'
+        + ' background:linear-gradient(145deg,#4a2c3a,#2a161e) !important; border-color:#8a5a6a !important;">'
+        + '영구로 묶는다'
+        + '<div style="font-size:10px; color:#999; margin-top:4px; font-weight:normal;">'
+        + '효과 없음 · 저절로 풀리지 않는다</div></button>'
+        + '<button id="rb-hold" class="game-btn" style="width:100%; margin:0 0 10px 0; padding:11px; font-size:12px;'
+        + ' background:linear-gradient(145deg,#6a2440,#3a1020) !important; border-color:#c2185b !important;">'
+        + '한 시간 묶는다'
+        + '<div style="font-size:10px; color:#ffb7cd; margin-top:4px; font-weight:normal;">'
+        + '두 사람의 포만도가 한 시간 유지 · 끝나면 소지품으로</div></button>'
+        + '<button id="rb-no" class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;'
+        + ' background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">그만둔다</button>'
+        + '</div>';
+    document.body.appendChild(wrap);
+
+    const close = function () { try { wrap.remove(); } catch (e) { } };
+    wrap.querySelector('#rb-perm').onclick = function () { close(); cb('perm'); };
+    wrap.querySelector('#rb-hold').onclick = function () { close(); cb('hold'); };
+    wrap.querySelector('#rb-no').onclick = function () { close(); cb(null); };
+}
+
 (function ribbon() {
     const iv = setInterval(function () {
         if (typeof applyItemEffect !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
@@ -193,16 +253,86 @@ guard('applyDarkSatiety', HOLD_DARK);
             if (!cat || cat.effect !== 'equip_red_ribbon') return _a.apply(this, arguments);
             if (!currentUser || !targetUser) return _a.apply(this, arguments);
 
-            if (liveRibbons(currentUser).length >= RIBBON_MAX) {
-                showCustomAlert(RIBBON + '은(는) 한 번에 ' + RIBBON_MAX + '줄까지입니다.'); return false;
-            }
-            if (liveRibbons(targetUser).length >= RIBBON_MAX) {
-                showCustomAlert('상대가 이미 ' + RIBBON_MAX + '줄을 묶고 있습니다.'); return false;
+            // --- 아직 안 골랐다 : 창만 띄우고 물러난다 ---
+            if (!chosen) {
+                if (picking) return false;                     // 이미 창이 떠 있다
+                picking = { t: targetUser, n: itemName, o: isOthers };
+                ribbonAsk(targetUser.name || '상대', function (mode) {
+                    const q = picking; picking = null;
+                    if (!mode || !q) return;
+                    chosen = mode;
+                    let ok = false;
+                    try { ok = applyItemEffect(q.t, q.n, q.o); }
+                    finally { chosen = null; }
+                    if (ok === false) return;
+
+                    // 부른 쪽이 거짓을 받고 지나갔으므로 여기서 치운다
+                    if (typeof removeItemFromInventory === 'function') {
+                        removeItemFromInventory(currentUser, q.n, 1);
+                    }
+                    if (typeof addHistoryLog === 'function') {
+                        addHistoryLog(currentUser, '[아이템 사용] ' + (q.t.name || '') + " 사원에게 '" + q.n + "' 사용");
+                    }
+                    if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
+                    if (typeof updateUserFields === 'function' && q.t.code !== currentUser.code) {
+                        try {
+                            updateUserFields(q.t.code, {
+                                equippedWeapons: q.t.equippedWeapons, equipOwner: q.t.equipOwner,
+                                ribbons: q.t.ribbons, badge: q.t.badge, history: q.t.history
+                            });
+                        } catch (e) { }
+                    }
+                    if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+                });
+                return false;
             }
 
+            // --- 골랐다 : 실제로 채운다 ---
+            const mode = chosen;
+
+            if (mode === 'hold') {
+                if (liveRibbons(currentUser).length >= RIBBON_MAX) {
+                    showCustomAlert(RIBBON + '은(는) 한 번에 ' + RIBBON_MAX + '줄까지입니다.'); return false;
+                }
+                if (liveRibbons(targetUser).length >= RIBBON_MAX) {
+                    showCustomAlert('상대가 이미 ' + RIBBON_MAX + '줄을 묶고 있습니다.'); return false;
+                }
+            }
+
+            const beforeMe = (currentUser.equippedWeapons || []).length;
+            const beforeYou = (targetUser.equippedWeapons || []).length;
             const r = _a.apply(this, arguments);
             if (r === false) return r;
 
+            if (mode === 'perm') {
+                // 방금 붙은 이름표 끝에 「· 영구」를 적어 둔다
+                const mark = function (u, from) {
+                    const eq = u.equippedWeapons || [];
+                    for (let i = eq.length - 1; i >= from; i--) {
+                        if (base(eq[i]) !== RIBBON || String(eq[i]).indexOf(PERM_MARK) >= 0) continue;
+                        const old = eq[i], now2 = old + PERM_MARK;
+                        eq[i] = now2;
+                        // 주인 기록과 특이사항도 새 이름으로 옮긴다
+                        if (u.equipOwner && u.equipOwner[old] !== undefined) {
+                            u.equipOwner[now2] = u.equipOwner[old];
+                            delete u.equipOwner[old];
+                        }
+                        if (u.badge && typeof u.badge.notes === 'string') {
+                            u.badge.notes = u.badge.notes.split(old).join(now2);
+                        }
+                        break;
+                    }
+                };
+                mark(targetUser, beforeYou);
+                mark(currentUser, beforeMe);
+                setTimeout(function () {
+                    showCustomAlert(targetUser.name + ' 사원과 영구로 묶였습니다.\n\n'
+                        + '포만도 효과는 없습니다.\n저절로 풀리지 않으니 뗄 때는 손으로 떼야 합니다.');
+                }, 60);
+                return r;
+            }
+
+            // 한 시간 동결
             const until = now() + RIBBON_MS;
             ribbonsOf(currentUser).push({ p: targetUser.code, o: currentUser.code, u: until });
             ribbonsOf(targetUser).push({ p: currentUser.code, o: currentUser.code, u: until });
@@ -219,7 +349,7 @@ guard('applyDarkSatiety', HOLD_DARK);
         };
         applyItemEffect._satRibbon = true;
         clearInterval(iv);
-        console.log('[포만] ' + RIBBON + ' 연결 — 1시간 · 최대 ' + RIBBON_MAX + '줄');
+        console.log('[포만] ' + RIBBON + ' — 채울 때 영구 / 한 시간 중에 고릅니다');
     }, 400);
 })();
 
@@ -250,7 +380,10 @@ function sweepRibbons() {
     const dead = all.filter(function (r) { return r && r.u <= t; });
 
     const eq = currentUser.equippedWeapons || (currentUser.equippedWeapons = []);
-    const wearing = eq.filter(function (w) { return base(w) === RIBBON; }).length;
+    // 영구로 묶은 것은 세지 않는다 — 저절로 풀리면 안 된다
+    const wearing = eq.filter(function (w) {
+        return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
+    }).length;
 
     // ★ 떼어야 할 수를 「차고 있는 수 − 살아 있는 줄 수」로 센다
     //
@@ -277,10 +410,13 @@ function sweepRibbons() {
             const mate = (db.users[dead[m].p] || {}).name || '';
             if (!mate) continue;
             i = eq.findIndex(function (w) {
-                return base(w) === RIBBON && String(w).indexOf(mate) >= 0;
+                return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0
+                    && String(w).indexOf(mate) >= 0;
             });
         }
-        if (i < 0) i = eq.findIndex(function (w) { return base(w) === RIBBON; });
+        if (i < 0) i = eq.findIndex(function (w) {
+            return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
+        });
         if (i < 0) break;
         const full = eq[i];
         eq.splice(i, 1);
@@ -312,14 +448,19 @@ function sweepRibbons() {
         if (!u || typeof updateUserFields !== 'function') return;
         const mine = (u.ribbons || []).filter(function (r) { return r && r.u > t; });
         const teq = (u.equippedWeapons || []).slice();
-        const tw = teq.filter(function (w) { return base(w) === RIBBON; }).length;
+        const tw = teq.filter(function (w) {
+            return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
+        }).length;
         let cut = Math.max(0, tw - mine.length);
         const myName = currentUser.name || '';
         while (cut-- > 0) {
             let i = myName ? teq.findIndex(function (w) {
-                return base(w) === RIBBON && String(w).indexOf(myName) >= 0;
+                return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0
+                    && String(w).indexOf(myName) >= 0;
             }) : -1;
-            if (i < 0) i = teq.findIndex(function (w) { return base(w) === RIBBON; });
+            if (i < 0) i = teq.findIndex(function (w) {
+                return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
+            });
             if (i < 0) break;
             teq.splice(i, 1);
         }
@@ -339,10 +480,13 @@ window.ribbonSync = function () {
     const t = now();
     const live = ribbonsOf(currentUser).filter(function (r) { return r && r.u > t; });
     const eq = currentUser.equippedWeapons || [];
-    const wearing = eq.filter(function (w) { return base(w) === RIBBON; }).length;
+    const wearing = eq.filter(function (w) {
+        return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
+    }).length;
     const inv = (currentUser.inventory || []).filter(function (x) { return x === RIBBON; }).length;
     console.log('%c===== ' + RIBBON + ' =====', 'color:#ff8fb1; font-size:13px');
-    console.log('  차고 있는 이름표:', wearing + '개');
+    console.log('  차고 있는 이름표:', wearing + '개 (한 시간짜리)');
+    console.log('  영구로 묶은 것:', permRibbons(currentUser).length + '개');
     console.log('  살아 있는 줄:', live.length + '개');
     console.log('  소지품:', inv + '개');
     console.log('  적어 둔 정산:', (currentUser.ribbonPaid || []).length + '줄');
