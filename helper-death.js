@@ -14,7 +14,7 @@
 //       currentUser.points = 0;                       (4124)
 //       반입품을 소지품에서 지운다                     (4126)
 //       currentUser.pollution = 100;                  (4146)
-//       currentUser.quarantineUntil = +2시간           (4147)
+//       currentUser.quarantineUntil = +4시간           (4147)
 //       currentUser.quarantineHospital = true;        (4150)
 //
 //   그리고 finishDarkDeath 끝에서 이 줄이 돈다. (index.html:4337)

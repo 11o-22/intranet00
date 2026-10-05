@@ -604,7 +604,7 @@ function epicDeath(txt) {
 
     // 상담실 · 선녀탕 이송
     currentUser.pollution = 100;
-     currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+     currentUser.quarantineUntil = Date.now() + (4 * 60 * 60 * 1000);
      currentUser.quarantineHospital = true;
     currentUser.quarantineExitPollution = 40;
     currentUser.foxRoomAnswered = true;

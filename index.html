@@ -4144,7 +4144,7 @@ return b;
             addHistoryLog(currentUser, `[다이아] 빛이 끌려가는 것을 막았습니다. (1회 한정)`);
         } else {
             currentUser.pollution = 100;
-            currentUser.quarantineUntil = Date.now() + (2 * 60 * 60 * 1000);
+            currentUser.quarantineUntil = Date.now() + (4 * 60 * 60 * 1000);
             currentUser.quarantineExitPollution = 40;
             currentUser.foxRoomAnswered = true;   // 질문 절차 생략
             currentUser.quarantineHospital = true;
