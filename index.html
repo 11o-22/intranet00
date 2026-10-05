@@ -4479,6 +4479,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
                 zoneLoot.forEach(l => {
             let c = l.chance * (darkRun.critical ? 3 : 1);
             if (gearValue(currentUser, 'luck') > 0) c *= 2;    // ★ 행운
+            if (typeof emLootMult === 'function') c *= emLootMult(currentUser);   // ★ 에메랄드 하네스
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
 
@@ -7150,7 +7151,9 @@ else if (cat.effect === 'rainbow_potion') {
                     if (isNaN(price)) price = 9999; // 가격이 '???' 같은 문자열이면 최고가 취급
 
                     // 가격의 2.5제곱에 반비례하도록 설정 (1000 포인트짜리는 10 포인트짜리보다 약 10만 배 안 나오게 됨)
-                    let weight = 10000 / Math.pow(price, 2.5);
+                    // ★ 에메랄드 목줄 — 비싼 것이 잘 나오도록 기울기를 눕힌다
+                    const emL = (typeof emBoxLuck === 'function') ? emBoxLuck(user) : 1;
+                    let weight = 10000 / Math.pow(price, 2.5 / (emL || 1));
 
                     // 3. 직급 및 소속 맞춤 조건 (확률 부스트)
                     let hasCondition = false;
