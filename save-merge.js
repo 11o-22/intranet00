@@ -24,6 +24,7 @@ const SKIP = ['letters', 'hasNewLetter', 'hasNewReply', 'hasItemUsedOnMe',
               'houseChatUnread', 'house', '_adminStamp', '_stamp'];
 
 const INV = 'inventory';          // 배열 병합으로 다루는 항목
+const PTS = 'points';             // 돈 — 「늘어난 만큼·줄어든 만큼」으로 다루는 항목
 
 let code = null;
 let base = {};            // 서버에서 마지막으로 본 모습
@@ -31,9 +32,12 @@ let ref = null;
 let ready = false;
 
 const shadowInv = {};     // 남의 소지품 — 서버에서 마지막으로 본 모습
-let invBusy = false;  
-let invAgain = false;     
+const shadowPts = {};     // 남의 포인트 — 같은 까닭
+let invBusy = false;
+let invAgain = false;
 let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0 };
+let ptsBusy = false, ptsAgain = false;
+let ptsStats = { merged: 0, moved: 0, rescued: 0 };
 
 function clone(v) {
     try { return JSON.parse(JSON.stringify(v)); } catch (e) { return undefined; }
@@ -90,6 +94,67 @@ function mergeInv(path, baseArr, localArr) {
         return after;
     }).catch(function (e) {
         console.error('[병합] 소지품 저장 실패:', e);
+        return null;
+    });
+}
+
+// ==========================================
+// 돈 — 늘어난 만큼·줄어든 만큼만 보낸다
+// ==========================================
+//
+// 포인트를 「지금 내 화면의 값」으로 덮어쓰면, 그 사이에 남이 넣어 준 돈이
+// 통째로 날아간다. 밀실 거래·경매장·결투·공용 통장이 다 남의 자리에 돈을
+// 넣는 길이라, 어느 쪽이든 받는 쪽 화면이 열려 있으면 들어온 돈이 사라졌다.
+//
+// 그래서 소지품과 똑같이, 값이 아니라 「움직인 몫」을 트랜잭션으로 보낸다.
+//     서버에 있는 값 + (내가 움직인 몫)
+// 이러면 그 사이에 누가 얼마를 넣었든 둘 다 살아남는다.
+function ptsCap() { return (typeof POINT_CAP !== 'undefined') ? POINT_CAP : Infinity; }
+function mergePts(path, had, want) {
+    if (!database) return Promise.resolve(null);
+    const d = (Number(want) || 0) - (Number(had) || 0);
+    if (!d) return Promise.resolve(null);
+    return database.ref(path).transaction(function (srv) {
+        return Math.max(0, Math.min(ptsCap(), Math.round((Number(srv) || 0) + d)));
+    }, null, false).then(function (res) {           // ★ applyLocally = false
+        if (!res || !res.committed) return null;
+        const after = Number(res.snapshot ? res.snapshot.val() : 0) || 0;
+        ptsStats.merged++;
+        ptsStats.moved += d;
+        // 내가 생각한 값과 서버 값이 다르면, 그 사이 남이 돈을 넣었다는 뜻
+        if (after !== (Number(want) || 0)) ptsStats.rescued++;
+        return after;
+    }).catch(function (e) {
+        console.error('[병합] 포인트 저장 실패:', e);
+        return null;
+    });
+}
+
+function flushMyPts() {
+    if (!ready || !currentUser) return Promise.resolve(null);
+    if (ptsBusy) { ptsAgain = true; return Promise.resolve(null); }
+    const want = Number(currentUser[PTS]) || 0;
+    const had = Number(base[PTS]) || 0;
+    if (want === had) return Promise.resolve(null);
+
+    ptsBusy = true;
+    return mergePts('users/' + code + '/' + PTS, had, want).then(function (after) {
+        ptsBusy = false;
+        // 날아가는 사이에 또 벌었거나 썼으면 그 몫을 지킨다
+        const extra = (Number(currentUser[PTS]) || 0) - want;
+        if (after === null) {
+            base[PTS] = want;
+        } else {
+            currentUser[PTS] = Math.max(0, Math.min(ptsCap(), after + extra));
+            base[PTS] = after;
+        }
+        const more = extra || ptsAgain;
+        ptsAgain = false;
+        if (more) return flushMyPts();
+        return after;
+    }).catch(function (e) {
+        ptsBusy = false; ptsAgain = false;
+        console.error('[병합] 포인트:', e);
         return null;
     });
 }
@@ -173,7 +238,15 @@ function attach() {
             if (k === '_adminStamp' || k === '_stamp') return;
             if (same(srv[k], base[k])) return;              // 서버도 그대로면 볼 것 없다
             const mineTouched = !same(currentUser[k], base[k]);
-            if (mineTouched) { kept[k] = clone(base[k]); return; }   // 내가 바꾼 것은 내가 쓴다
+            if (mineTouched) {
+                // ★ 서버 값이 내 값과 같다면 내가 쓴 글이 돌아온 것이다.
+                //   이때 기준을 되돌리면 기준이 옛 값에 영원히 멈춘다. 그러면
+                //   다음 저장마다 옛 값을 다시 밀어 넣어, 그 사이에 남이 넣어 준
+                //   것을 지운다. (들어온 돈이 사라지던 까닭이 이것이었다)
+                if (same(srv[k], currentUser[k])) return;   // 기준은 아래에서 서버로 간다
+                kept[k] = clone(base[k]);                   // 아직 안 닿았다 — 내 값을 지킨다
+                return;
+            }
             if (k === INV) { fillArr(currentUser[INV], srv[k]); base[k] = clone(srv[k]); took++; return; }
             currentUser[k] = clone(srv[k]);
             took++;
@@ -209,13 +282,16 @@ function attach() {
 
         const note = function (s) {
             const v = s.val();
-            if (!v) { delete shadowInv[s.key]; return; }
+            if (!v) { delete shadowInv[s.key]; delete shadowPts[s.key]; return; }
             shadowInv[s.key] = asArr(v[INV]);
+            shadowPts[s.key] = Number(v[PTS]) || 0;
         };
         database.ref('users').on('child_added', note);
         database.ref('users').on('child_changed', note);
-        database.ref('users').on('child_removed', function (s) { delete shadowInv[s.key]; });
-        console.log('[병합] 남의 소지품 기준 지켜보기 시작');
+        database.ref('users').on('child_removed', function (s) {
+            delete shadowInv[s.key]; delete shadowPts[s.key];
+        });
+        console.log('[병합] 남의 소지품·포인트 기준 지켜보기 시작');
     }, 700);
 })();
 
@@ -226,6 +302,7 @@ function diffPayload() {
     const out = {};
     Object.keys(currentUser).forEach(function (k) {
         if (SKIP.indexOf(k) >= 0) return;
+        if (k === PTS) return;                              // 돈은 더하고 빼기로 따로 보낸다
         if (k === INV) return;                              // 소지품은 따로 병합한다
         if (badKey(k)) return;
         if (currentUser[k] === undefined) return;
@@ -253,16 +330,17 @@ function markSaved(payload) {
             if (!ready) return _full.apply(this, arguments);   // 기준이 없으면 예전 방식
 
             const invJob = flushMyInv();                      // 소지품은 병합으로
+            const ptsJob = flushMyPts();                      // 돈도 병합으로
 
             const payload = diffPayload();
             const n = Object.keys(payload).length;
-            if (!n) return invJob;
+            if (!n) return Promise.all([invJob, ptsJob]);
 
             payload._adminStamp = Date.now();
             currentUser._adminStamp = payload._adminStamp;
 
             return Promise.all([
-                invJob,
+                invJob, ptsJob,
                 database.ref('users/' + code).update(payload)
                     .then(function () { markSaved(payload); })
                     .catch(function (e) { console.error('[병합] 저장 실패:', e); })
@@ -276,20 +354,48 @@ function markSaved(payload) {
             saveFields = function (fields) {
                 fields = fields || {};
                 const wantsInv = !!fields[INV];
+                const wantsPts = !!fields[PTS];
+                const mine = (ready && currentUser && currentUser.code === code);
                 const rest = {};
-                Object.keys(fields).forEach(function (k) { if (k !== INV) rest[k] = fields[k]; });
+                Object.keys(fields).forEach(function (k) {
+                    if (k === INV) return;
+                    if (k === PTS && mine) return;              // 돈은 더하고 빼기로 보낸다
+                    rest[k] = fields[k];
+                });
 
                 let r;
                 if (Object.keys(rest).length) r = _f.call(this, rest);
                 // 기준은 미리 찍지 않는다 — 서버가 받기 전에 찍으면
                 // 날아오던 옛 값이 「내가 안 바꾼 것」으로 보여 늘어난 몫을 지운다
 
-                if (wantsInv && ready && currentUser && currentUser.code === code) flushMyInv();
+                if (wantsInv && mine) flushMyInv();
                 else if (wantsInv) r = _f.call(this, fields);   // 기준이 없으면 예전 방식
+                if (wantsPts && mine) flushMyPts();
 
                 return r;
             };
             saveFields._merge = true;
+        }
+
+        // changePoints — 제 트랜잭션을 따로 돌린다. 그대로 두면 두 번 더해진다.
+        //   원래 코드(index.html:9231)는 currentUser.points 를 올리고
+        //   서버에도 바로 +delta 를 넣는다. 그런데 우리 쪽도 「기준과의 차이」를
+        //   보내므로, 돌아오는 메아리보다 저장이 먼저 가면 같은 delta 가 두 번
+        //   들어간다. 그래서 서버 쓰기는 우리 길 하나로 모은다.
+        if (typeof changePoints === 'function' && !changePoints._merge) {
+            const _c = changePoints;
+            const wrapped = function (delta) {
+                if (!ready || !currentUser || currentUser.code !== code) {
+                    return _c.apply(this, arguments);
+                }
+                const cap = (typeof POINT_CAP !== 'undefined') ? POINT_CAP : Infinity;
+                currentUser[PTS] = Math.max(0, Math.min(cap,
+                    (Number(currentUser[PTS]) || 0) + (Number(delta) || 0)));
+                flushMyPts();
+                if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+            };
+            wrapped._merge = true;
+            changePoints = wrapped;
         }
 
         // saveDB 도 통째로 쓴다 — 같은 방식으로 좁힌다
@@ -326,23 +432,42 @@ function markSaved(payload) {
                 return r;
             }
 
-            // 남의 소지품 — 서버에서 본 모습을 기준으로 더하고 뺀다
+            // 남의 소지품·돈 — 서버에서 본 모습을 기준으로 더하고 뺀다
             const hasInv = Object.prototype.hasOwnProperty.call(fields, INV);
-            const had = shadowInv[c];
-            if (!hasInv || !had) return _u.apply(this, arguments);
+            const hasPts = Object.prototype.hasOwnProperty.call(fields, PTS);
+            const hadInv = shadowInv[c];
+            const hadPts = shadowPts[c];
+            const doInv = hasInv && hadInv;
+            const doPts = hasPts && (hadPts !== undefined);
+            if (!doInv && !doPts) return _u.apply(this, arguments);
 
-            const want = asArr(fields[INV]);
             const rest = {};
-            Object.keys(fields).forEach(function (k) { if (k !== INV) rest[k] = fields[k]; });
+            Object.keys(fields).forEach(function (k) {
+                if (doInv && k === INV) return;
+                if (doPts && k === PTS) return;
+                rest[k] = fields[k];
+            });
             rest._adminStamp = Date.now();
 
             const jobs = [_u.call(this, c, rest)];
-            jobs.push(mergeInv('users/' + c + '/' + INV, had, want).then(function (after) {
-                if (after === null) return null;
-                shadowInv[c] = after.slice();
-                if (db && db.users && db.users[c]) fillArr(db.users[c][INV] || (db.users[c][INV] = []), after);
-                return after;
-            }));
+            if (doInv) {
+                const want = asArr(fields[INV]);
+                jobs.push(mergeInv('users/' + c + '/' + INV, hadInv, want).then(function (after) {
+                    if (after === null) return null;
+                    shadowInv[c] = after.slice();
+                    if (db && db.users && db.users[c]) fillArr(db.users[c][INV] || (db.users[c][INV] = []), after);
+                    return after;
+                }));
+            }
+            if (doPts) {
+                const wantP = Number(fields[PTS]) || 0;
+                jobs.push(mergePts('users/' + c + '/' + PTS, hadPts, wantP).then(function (after) {
+                    if (after === null) return null;
+                    shadowPts[c] = after;
+                    if (db && db.users && db.users[c]) db.users[c][PTS] = after;
+                    return after;
+                }));
+            }
             return Promise.all(jobs);
         };
         updateUserFields._merge = true;
@@ -352,11 +477,11 @@ function markSaved(payload) {
 
 setInterval(attach, 1000);
 
-// 소지품은 조금 뒤처져도 되지만, 오래 묵히지는 않는다
+// 소지품·돈은 조금 뒤처져도 되지만, 오래 묵히지는 않는다
 setInterval(function () {
-    if (!ready || !currentUser || invBusy) return;
-    if (same(currentUser[INV], base[INV])) return;
-    flushMyInv();
+    if (!ready || !currentUser) return;
+    if (!invBusy && !same(currentUser[INV], base[INV])) flushMyInv();
+    if (!ptsBusy && (Number(currentUser[PTS]) || 0) !== (Number(base[PTS]) || 0)) flushMyPts();
 }, 4000);
 
 // ==========================================
@@ -387,6 +512,19 @@ window.invState = function () {
     console.log('  남의 소지품 기준 보유:', Object.keys(shadowInv).length + '명');
 };
 
+window.ptsState = function () {
+    console.log('%c===== 포인트 병합 =====', 'color:#d4af37; font-size:13px');
+    const mine = Number(currentUser && currentUser[PTS]) || 0;
+    const had = Number(base[PTS]) || 0;
+    console.log('  내 포인트:', mine.toLocaleString() + ' P · 기준:', had.toLocaleString() + ' P');
+    console.log('  아직 안 쓴 몫:', (mine - had >= 0 ? '+' : '') + (mine - had).toLocaleString() + ' P');
+    console.log('  지금까지 병합 ' + ptsStats.merged + '회 · 움직인 합 '
+        + ptsStats.moved.toLocaleString() + ' P');
+    console.log('  남이 넣어 준 돈을 건진 적:', ptsStats.rescued + '회');
+    console.log('  남의 포인트 기준 보유:', Object.keys(shadowPts).length + '명');
+    console.log('  (돈은 값을 덮어쓰지 않고 「움직인 몫」만 트랜잭션으로 보냅니다)');
+};
+
 // 서버 자료로 강제로 맞춘다
 window.pullServer = function () {
     if (!database || !code) return;
@@ -405,6 +543,6 @@ window.pullServer = function () {
     });
 };
 
-console.log('[병합] mergeState() · invState() · pullServer()');
+console.log('[병합] mergeState() · invState() · ptsState() · pullServer()');
 
 })();
