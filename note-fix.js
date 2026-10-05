@@ -89,33 +89,74 @@ function baseOf(w) {
 // ==========================================
 // 둘 — 있어야 할 문구를 되살린다
 // ==========================================
-function missing(u) {
-    if (!u) return [];
+// 차고 있는 것과 적힌 줄 수를 맞춘다 — 모자라면 적고, 넘치면 지운다
+//
+// 전에는 모자란 것만 보태었다. 그래서 어딘가에서 줄이 두 번 적히면
+// (리본 둘을 묶었는데 넷이 남는 식으로) 영영 그대로 남았다.
+// 지금은 양쪽으로 맞춘다. 차고 있는 리본이 둘이면 줄도 반드시 둘이 된다.
+function fixNotes(u) {
+    if (!u) return null;
     const arr = notesOf(u);
-    const add = [];
+    const out = [];
+    const ribbon = [];
 
-    // 노예 계약 — 아직 기간이 남았는데 문구가 없다
-    const live = (u.slaveUntil && Date.now() < u.slaveUntil) || u.slaveFixed;
-    if (live && !arr.some(function (n) { return n.indexOf('노예 계약') >= 0; })) {
-        const who = u.masterName || '누군가';
-        add.push('[계약] ' + who + ' 사원과 노예 계약 (' + (u.slaveFixed ? '영구' : '3일') + ')');
+    arr.forEach(function (n) {
+        if (n.indexOf(RIBBON) >= 0) { ribbon.push(n); return; }
+        if (n.indexOf('노예 계약') >= 0) {
+            // 노예 계약은 한 줄까지
+            if (!out.some(function (x) { return x.indexOf('노예 계약') >= 0; })) out.push(n);
+            return;
+        }
+        out.push(n);
+    });
+
+    // --- 빨간 리본 : 차고 있는 수와 같게 ---
+    const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
+    const keep = ribbon.slice(0, worn.length);                 // 넘치는 줄은 버린다
+    for (let k = keep.length; k < worn.length; k++) {          // 모자라면 보탠다
+        keep.push('[장착됨] ' + worn[k]);
     }
 
-    // 빨간 리본 — 차고 있는 수보다 문구가 적다
-    const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
-    const noted = arr.filter(function (n) { return n.indexOf(RIBBON) >= 0; }).length;
-    for (let i = noted; i < worn.length; i++) add.push('[장착됨] ' + worn[i]);
+    // --- 노예 계약 : 기간이 남았으면 한 줄 ---
+    const live = (u.slaveUntil && Date.now() < u.slaveUntil) || u.slaveFixed;
+    const hasSlave = out.some(function (x) { return x.indexOf('노예 계약') >= 0; });
+    if (live && !hasSlave) {
+        const who = u.masterName || '누군가';
+        out.push('[계약] ' + who + ' 사원과 노예 계약 (' + (u.slaveFixed ? '영구' : '3일') + ')');
+    }
 
-    return add;
+    const next = out.concat(keep);
+    const before = arr.join(SEP), after = next.join(SEP);
+    if (before === after) return null;                         // 고칠 것이 없다
+    return { next: next, added: Math.max(0, next.length - arr.length),
+             removed: Math.max(0, arr.length - next.length) };
 }
 
 function reconcile(u, quiet) {
-    const add = missing(u);
-    if (!add.length) return 0;
-    setNotes(u, notesOf(u).concat(add));
-    if (!quiet) console.log('[특이사항] ' + (u.name || u.code) + ' — ' + add.length + '줄 되살림: ' + add.join(' / '));
-    return add.length;
+    const r = fixNotes(u);
+    if (!r) return 0;
+    setNotes(u, r.next);
+    if (!quiet) {
+        console.log('[특이사항] ' + (u.name || u.code) + ' — '
+            + (r.added ? r.added + '줄 되살림 ' : '') + (r.removed ? r.removed + '줄 걷어냄' : ''));
+    }
+    return r.added + r.removed;
 }
+
+// 남의 것도 맞춘다 — 상담사
+window.noteFixFor = function (who) {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const u = who ? all.filter(function (x) {
+        return x && (x.no === who || x.code === who || x.name === who);
+    })[0] : currentUser;
+    if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
+    const n = reconcile(u);
+    if (!n) { console.log(u.name + ' 사원은 맞게 적혀 있습니다.'); return; }
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge });
+    if (typeof updateUI === 'function') updateUI();
+    console.log('%c\u2713 ' + u.name + ' 사원의 특이사항을 맞췄습니다.', 'color:#4CAF50');
+};
 
 // 내 것은 가끔 저절로
 (function self() {
@@ -140,13 +181,14 @@ window.noteCheck = function (who) {
     const rows = [];
     list.forEach(function (u) {
         if (!u || !u.name) return;
-        const add = missing(u);
-        if (!add.length) return;
-        rows.push({ 사원: u.name, 사번: u.no || '-', 빠진줄: add.length, 내용: add.join(' / ') });
+        const r = fixNotes(u);
+        if (!r) return;
+        rows.push({ 사원: u.name, 사번: u.no || '-',
+                    보탤줄: r.added, 걷어낼줄: r.removed, '맞춘 뒤': r.next.join(' | ') });
     });
-    console.log('%c===== 특이사항에서 빠진 문구 =====', 'color:#ffd700; font-size:13px');
-    if (rows.length) { console.table(rows); console.log('  되살리려면 noteFixAll()'); }
-    else console.log('  빠진 것이 없습니다.');
+    console.log('%c===== 특이사항이 어긋난 사원 =====', 'color:#ffd700; font-size:13px');
+    if (rows.length) { console.table(rows); console.log('  맞추려면 noteFixAll()'); }
+    else console.log('  모두 맞게 적혀 있습니다.');
 };
 
 window.noteFixAll = function () {
@@ -159,12 +201,12 @@ window.noteFixAll = function () {
         const n = reconcile(u, true);
         if (!n) return;
         up['users/' + c + '/badge'] = u.badge;
-        rows.push({ 사원: u.name, 되살린줄: n, 특이사항: u.badge.notes });
+        rows.push({ 사원: u.name, 고친줄: n, 특이사항: u.badge.notes });
     });
     if (!rows.length) { console.log('되살릴 것이 없습니다.'); return; }
     database.ref('/').update(up).then(function () {
         console.table(rows);
-        console.log('%c✓ ' + rows.length + '명을 되살렸습니다.', 'color:#4CAF50');
+        console.log('%c✓ ' + rows.length + '명을 맞췄습니다.', 'color:#4CAF50');
         if (typeof updateUI === 'function') updateUI();
     }).catch(function (e) { console.error(e); });
 };
@@ -183,10 +225,14 @@ window.noteShow = function (who) {
     console.log('  노예 계약:', (u.slaveUntil && Date.now() < u.slaveUntil)
         ? (new Date(u.slaveUntil).toLocaleString() + ' 까지 · 주인 ' + (u.masterName || '?'))
         : (u.slaveFixed ? '영구 · 주인 ' + (u.masterName || '?') : '없음'));
-    const add = missing(u);
-    if (add.length) console.warn('  빠진 문구:', add.join(' / '));
+    const noted = arr.filter(function (n) { return n.indexOf(RIBBON) >= 0; }).length;
+    if (noted !== worn.length) {
+        console.warn('  어긋납니다 — 차고 있는 리본 ' + worn.length + '개인데 적힌 줄은 ' + noted + '개');
+        const r = fixNotes(u);
+        if (r) console.log('  맞추면:', r.next.join(' | '), ' (noteFixFor(사번))');
+    }
 };
 
-console.log('[특이사항] noteShow(사번) · noteCheck() · noteFixAll()');
+console.log('[특이사항] noteShow(사번) · noteCheck() · noteFixFor(사번) · noteFixAll()');
 
 })();
