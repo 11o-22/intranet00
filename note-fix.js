@@ -49,6 +49,40 @@ const SEP = ' | ';
 const NONE = '특이사항 없음';
 const RIBBON = '빨간 리본';
 
+// ==========================================
+// 기한이 있는 문구 — 기한이 지나면 지운다
+// ==========================================
+//
+// 특이사항은 글자 한 덩어리라, 적을 때 붙이고 끝이다. 기한을 재는 쪽은
+// 따로(hairUntil · dollPt …) 지나가는데, 글자를 지우는 사람이 없다.
+// 그래서 탈모약은 열 시간이 지나도 「머리카락이 풍성하다」가 남아 있었다.
+//
+// 아래 표에 「문구 조각 → 아직 살아 있는가」를 적어 둔다.
+// 살아 있지 않으면 그 줄을 걷어낸다. 새 물건이 생기면 한 줄 더 넣으면 된다.
+const EXPIRY = [
+    { mark: '[탈모약]', live: function (u) { return (u.hairUntil || 0) > Date.now(); } },
+    { mark: '[인형]',   live: function (u) { return (u.dollPt || 0) > Date.now(); } },
+    { mark: '종이배',   live: function (u) { return (u.paperBoat || 0) > 0; } },
+    // 달빛 타투는 itemBuffs 에 들어간다 — 그 묶음이 비면 지운다
+    { mark: '[달빛]',   live: function (u) {
+        const l = u.itemBuffs;
+        if (!Array.isArray(l)) return false;
+        const t = Date.now();
+        return l.some(function (b) { return b && (b.run || (b.until || 0) > t); });
+    } }
+];
+
+function expired(u, note) {
+    for (let i = 0; i < EXPIRY.length; i++) {
+        const e = EXPIRY[i];
+        if (note.indexOf(e.mark) < 0) continue;
+        let ok = false;
+        try { ok = !!e.live(u); } catch (err) { ok = true; }   // 못 재면 남겨 둔다
+        return !ok;
+    }
+    return false;
+}
+
 function notesOf(u) {
     if (!u) return [];
     const s = (u.badge && u.badge.notes) || '';
@@ -107,6 +141,7 @@ function fixNotes(u) {
             if (!out.some(function (x) { return x.indexOf('노예 계약') >= 0; })) out.push(n);
             return;
         }
+        if (expired(u, n)) return;                 // 기한이 지난 문구는 걷어낸다
         out.push(n);
     });
 
@@ -222,6 +257,11 @@ window.noteShow = function (who) {
     else console.log('  (없음)');
     const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
     console.log('  차고 있는 ' + RIBBON + ':', worn.length + '개', worn.length ? ('— ' + worn.join(' · ')) : '');
+    EXPIRY.forEach(function (e) {
+        if (!arr.some(function (n) { return n.indexOf(e.mark) >= 0; })) return;
+        let ok = false; try { ok = !!e.live(u); } catch (err) { ok = true; }
+        console.log('  ' + e.mark + ':', ok ? '아직 살아 있음' : '✗ 기한이 지났습니다 — 다음 정리에 지워집니다');
+    });
     console.log('  노예 계약:', (u.slaveUntil && Date.now() < u.slaveUntil)
         ? (new Date(u.slaveUntil).toLocaleString() + ' 까지 · 주인 ' + (u.masterName || '?'))
         : (u.slaveFixed ? '영구 · 주인 ' + (u.masterName || '?') : '없음'));
