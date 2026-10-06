@@ -119,7 +119,13 @@ function othersLabel(u, w) {
                     return;
                 }
             }
-            return _f.apply(this, arguments);
+            // 연동·연결 장비는 짝의 장착칸도 줄어든다. 그 쓰기 역시 빗장이
+            // 버리므로, 뺀 라벨만 집어 서버에서도 뺀다. (index.html:6405)
+            const before = snapOthers();
+            const r = _f.apply(this, arguments);
+            try { pullShrinks(before); }
+            catch (e) { console.warn('[장착잠금] 짝 해제 마무리 건너뜀:', e && e.message); }
+            return r;
         };
         wrapped._labelLock = true;
         unequipWeapon = wrapped;
@@ -185,6 +191,49 @@ window.gearOwnFix = function () {
 //
 // 그래서 들어올 때 한 번, 라벨이 나를 가리키는데 기록이 없는 것을 되찾는다.
 // 라벨에 내 이름이 적혀 있으니 임자는 나다. 더하기만 하고 지우지 않는다.
+// ==========================================
+// 남의 장착칸에서 **뜻한 것만** 서버에서도 뺀다
+// ==========================================
+//
+//   index.html 의 두 자리는 줄어든 배열을 통째로 보낸다.
+//       6405  내가 벗을 때 짝(연동·연결)의 것도 뺀다
+//       6453  내가 채운 것을 거둬 간다
+//   그런데 gear-move.js 의 빗장이 「남의 장착칸이 줄어드는 통째 쓰기」를
+//   막는다. 묵은 배열이 남의 장비를 통째로 지우는 사고를 막는 자리다.
+//
+//   그래서 그 쓰기는 버려지고, 상대에게는 장비가 그대로 남은 채 내 소지품에만
+//   물건이 들어온다 — **하나가 둘이 된다.**
+//
+//   빗장은 그대로 둔다. 대신 부르기 전후의 **내 화면 값을 견주어**, 그 코드가
+//   빼려던 라벨만 집어 gearPull 로 하나씩 뺀다. 묵은 배열과 달리 이것은 뜻이
+//   분명한 제거다.
+function snapOthers() {
+    const m = {};
+    if (typeof db === 'undefined' || !db.users || !currentUser) return m;
+    Object.keys(db.users).forEach(function (c) {
+        if (c === currentUser.code) return;
+        const u = db.users[c];
+        if (u && Array.isArray(u.equippedWeapons)) m[c] = u.equippedWeapons.slice();
+    });
+    return m;
+}
+function pullShrinks(before) {
+    if (typeof gearPull !== 'function' || typeof db === 'undefined' || !db.users) return 0;
+    let n = 0;
+    Object.keys(before).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || !Array.isArray(u.equippedWeapons)) return;
+        const now = u.equippedWeapons.slice();
+        const gone = [];
+        before[c].forEach(function (w) {
+            const i = now.indexOf(w);
+            if (i >= 0) now.splice(i, 1); else gone.push(w);
+        });
+        if (gone.length) { gearPull(c, gone); n += gone.length; }
+    });
+    return n;
+}
+
 function ownTxn(code, label) {
     if (typeof database === 'undefined' || !database) return Promise.resolve(false);
     return database.ref('users/' + code + '/equipOwner').transaction(function (srv) {
@@ -256,9 +305,10 @@ window.gearOwnClaim = function (quiet) {
 
         const _r = retrieveEquipFromUser;
         const wrapped = function (targetCode, idx) {
+            let t = null, w = null;
             try {
-                const t = (typeof db !== 'undefined' && db.users) ? db.users[targetCode] : null;
-                const w = t && (t.equippedWeapons || [])[idx];
+                t = (typeof db !== 'undefined' && db.users) ? db.users[targetCode] : null;
+                w = t && (t.equippedWeapons || [])[idx];
                 if (w && currentUser) {
                     const have = (typeof getEquipOwner === 'function') ? getEquipOwner(t, w) : null;
                     if (!have) {
@@ -272,7 +322,13 @@ window.gearOwnClaim = function (quiet) {
                     }
                 }
             } catch (e) { }
-            return _r.apply(this, arguments);
+
+            const before = snapOthers();
+            const r = _r.apply(this, arguments);
+            // 서버에서도 정말 빼낸다 (빗장이 통째 쓰기를 버리므로)
+            try { pullShrinks(before); }
+            catch (e) { console.warn('[장착잠금] 회수 마무리 건너뜀:', e && e.message); }
+            return r;
         };
         wrapped._label = true;
         retrieveEquipFromUser = wrapped;
