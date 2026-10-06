@@ -145,15 +145,43 @@ window.invAudit = function () {
         });
         if (dup.length) { flags++; console.log('%c■ 하나뿐이어야 하는 물건을 여럿이 지님', 'color:#ff6b6b'); console.table(dup); }
 
-        // ── 5. 한 품목을 너무 많이
+        // ── 5. 한 품목을 많이 지님 — 「이상」이 아니라 「참고」다
+        //
+        //   처음에 40개를 넘으면 이상으로 쳤다. 잘못 잡은 임계값이었다.
+        //   상비약은 하루 네 번(08·13·18·23시) 공짜로 준다(index.html:4705).
+        //   안 쓰고 두면 한 달에 120개가 된다. 생수는 5P, 익명 편지는 20P,
+        //   벽지 견본첩은 하루 5개까지 살 수 있다(skin.js:537).
+        //   그러니 활동한 사원은 전부 걸린다. 복사된 흔적이 아니다.
+        //
+        //   그래서 걸린 가지 수에는 세지 않고 표만 보여 준다. 가진 경로와
+        //   하루 한도를 같이 적어 두어, 수가 설명되는지 바로 보이게 한다.
+        const SOURCE = {
+            '상비약 (오염도 -10%)': '정기 보급 하루 4개 (08·13·18·23시)',
+            '생수': '상점 5P',
+            '익명 편지': '상점 20P',
+            '벽지 견본첩': '유쾌 판매소 하루 5개',
+            '???의 티켓': '상점',
+            '중급 물약': '상점',
+            '반창고': '어둠 회수품 · 상점',
+            '마스크': '어둠 회수품 · 상점'
+        };
         const many = [];
         codes.forEach(function (c) {
             const cc = counts(inv[c]);
             Object.keys(cc).forEach(function (k) {
-                if (cc[k] >= MANY_OK) many.push({ 사원: nameOf(c), 품목: k, 개수: cc[k] });
+                if (cc[k] >= MANY_OK) {
+                    many.push({ 사원: nameOf(c), 품목: k, 개수: cc[k],
+                                '어디서 생기나': SOURCE[k] || '—' });
+                }
             });
         });
-        if (many.length) { flags++; console.log('%c■ 한 품목을 ' + MANY_OK + '개 이상 지님', 'color:#ffcf8f'); console.table(many); }
+        if (many.length) {
+            console.log('%c□ 참고 — 한 품목을 ' + MANY_OK + '개 이상 지님 (이상이 아닙니다)', 'color:#9fd0ff');
+            console.table(many.sort(function (x, y) { return y.개수 - x.개수; }));
+            console.log('  상비약은 하루 4개 공짜로 줍니다. 한 달이면 120개입니다.'
+                + ' 생수는 5P · 익명 편지는 20P · 벽지 견본첩은 하루 5개 한도입니다.');
+            console.log('  수가 그 경로로 설명되면 정상입니다. 설명이 안 되는 줄만 알려 주십시오.');
+        }
 
         // ── 6. 꾸러미가 아예 한 사람 것처럼 똑같은 짝
         //
@@ -216,10 +244,14 @@ window.invAudit = function () {
         if (gear.length) { flags++; console.log('%c■ 장착칸이 어긋난 사원', 'color:#ffcf8f'); console.table(gear); }
 
         // ── 마무리
+        //
+        //   ■ 로 찍힌 것만 「이상」이다. 정상으로 설명되지 않는 것들이다.
+        //   □ 는 참고다 — 많이 쌓아 둔 것일 뿐이어서 걸린 가지에 세지 않는다.
         const total = codes.reduce(function (a, c) { return a + inv[c].length; }, 0);
         console.log('  소지품 모두 ' + total.toLocaleString() + '개 · 사원 ' + codes.length + '명');
-        if (!flags) console.log('%c  짚을 것이 없습니다.', 'color:#4CAF50');
-        else console.log('%c  ' + flags + '가지가 걸렸습니다. 위 표를 보시고 알려 주시면 고칠 길을 찾겠습니다.', 'color:#ff8f6b');
+        if (!flags) console.log('%c  ■ 로 찍힌 이상은 없습니다. (□ 는 참고일 뿐입니다)', 'color:#4CAF50');
+        else console.log('%c  ■ ' + flags + '가지가 걸렸습니다. 그 표를 알려 주시면 고칠 길을 찾겠습니다.'
+            + ' (□ 는 정상입니다)', 'color:#ff8f6b');
         console.log('  invSnap() 으로 지금 모습을 적어 두고, 또 사라지면 invDiff() 로 견주십시오.');
         return { 사원: codes.length, 걸린가지: flags };
     }).catch(function (e) {
