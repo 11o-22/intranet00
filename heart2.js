@@ -16,8 +16,8 @@
 //
 // ■ 둘 — 은심장을 지닌 사람이 죽으면 파티 전원에게 10,000 P
 //
-//   같은 어둠에 있는 파티원 모두가 받는다. 죽었든 살았든 상관없다.
-//   은심장을 지닌 본인도 받는다.
+//   같은 어둠에 있는 파티원 모두가 10,000 P 를 받는다. 죽었든 살았든 상관없다.
+//   쓰러진 본인은 그 두 배인 20,000 P 를 받는다.
 //
 //   한 번의 탐사에서 한 번만 준다. 토크쇼의 부활 같은 것과 겹치면
 //   한 사람이 세 번 죽어 30,000 P 씩 나가게 되므로 거기서 끊는다.
@@ -35,6 +35,7 @@
 
 const HEART = '🩶 은심장';
 const PAY = 10000;              // 사망 시 파티원 한 사람당
+const PAY_SELF = 20000;         // 쓰러진 본인 몫
 const ONCE_PER_RUN = true;      // 한 탐사에 한 번만
 const TIERS = [                 // 누적 → 하루 몇 번
     { at: 300, n: 3 },
@@ -234,23 +235,25 @@ function payParty() {
         const u = (db.users || {})[c];
         if (!u) return;
         n++;
-        if (currentUser && c === currentUser.code) {
+        const mine = !!(currentUser && c === currentUser.code);
+        const amt = mine ? PAY_SELF : PAY;          // 쓰러진 본인은 두 배
+        if (mine) {
             // 내 몫은 내 길로 — save-merge 가 「움직인 몫」으로 보낸다
-            currentUser.points = (Number(currentUser.points) || 0) + PAY;
+            currentUser.points = (Number(currentUser.points) || 0) + amt;
             if (typeof saveFields === 'function') saveFields({ points: 1 });
         } else if (typeof updateUserFields === 'function') {
-            updateUserFields(c, { points: (Number(u.points) || 0) + PAY });
+            updateUserFields(c, { points: (Number(u.points) || 0) + amt });
         }
         if (typeof addHistoryLog === 'function') {
             addHistoryLog(u, '[은심장] ' + currentUser.name + ' 사원이 쓰러졌습니다. (+'
-                + PAY.toLocaleString() + ' P)');
+                + amt.toLocaleString() + ' P)');
         }
     });
 
     if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
     setTimeout(function () {
         showCustomAlert('🩶 은심장이 식었습니다.\n\n같은 어둠에 있던 파티원 ' + n + '명에게 '
-            + PAY.toLocaleString() + ' P 가 돌아갔습니다.');
+            + PAY.toLocaleString() + ' P.\n쓰러진 본인에게는 ' + PAY_SELF.toLocaleString() + ' P.');
     }, 700);
     console.log('[은심장] 파티원 ' + n + '명에게 ' + PAY + ' P');
 }
@@ -297,7 +300,8 @@ window.heart2 = function (who) {
     const max = pullMax(u);
     console.log('  꺼내 오기:', max ? ('하루 ' + max + '번 · 오늘 ' + pullLeft(u) + '번 남음')
         : ('아직 못 씀 — ' + (TIERS[TIERS.length - 1].at - saves(u)) + '회 더 구해야 합니다'));
-    console.log('  사망 시 파티원 지급:', PAY.toLocaleString() + ' P'
+    console.log('  사망 시 파티원 지급:', PAY.toLocaleString() + ' P · 본인 '
+        + PAY_SELF.toLocaleString() + ' P'
         + (ONCE_PER_RUN ? ' (한 탐사에 한 번)' : ' (죽을 때마다)'));
     const q = all.filter(function (x) { return quarantined(x); });
     console.log('  지금 들어가 있는 사원:', q.length

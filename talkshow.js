@@ -15,6 +15,8 @@
 // ■ 여덟 가지
 //
 //   1  초대장을 받은 사람만 들어온다. 초대장은 갈색 팝업으로 뜬다.
+//      한 번 부른 사람은 파티를 나갔다 다시 와도, 그 사회자의 다음 파티에도
+//      그대로 들어올 수 있다 — 초대장의 기운이 남는다.
 //   2  사회자는 상담실·선녀탕에 매이지 않는다. 입원·온천욕·상담 중인
 //      사원도 사원당 하루 한 번 불러올 수 있다.
 //   3  초대받은 사람은 탐사 횟수를 쓰지 않는다. 초대장을 받은 사람만.
@@ -51,6 +53,7 @@ const HEAT_STEP = 0.2;          // 사망 1명마다
 const HOST_MULT = 3;            // 사회자가 죽으면
 const MAX_MULT = 4;             // 전체 뚜껑
 const ADMIN = 'kario0987';
+const GUEST_ROOT = 'talkShowGuest';     // 사회자별로 남는 초대장의 기운
 
 // 고급진 갈색 — 민무늬
 const BROWN = {
@@ -92,6 +95,33 @@ function showOf() {
 function isHost(p, code) {
     return !!(p && p.talkShow && p.talkShow.by === (code || (currentUser || {}).code));
 }
+
+// ★ 초대장의 기운 — 한 번 부른 사람은 파티를 나갔다 다시 와도 그대로다.
+//   파티 노드의 invited 는 그 파티에서만 쓰이고, 파티가 지워지면 같이 사라진다.
+//   그래서 사회자별로 따로 적어 두고 둘 중 하나라도 있으면 초대받은 것으로 본다.
+const guestOf = {};                      // { 사회자코드: { 손님코드: 때 } }
+(function watchGuests() {
+    const iv = setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        clearInterval(iv);
+        database.ref(GUEST_ROOT).on('value', function (s) {
+            const v = s.val() || {};
+            Object.keys(guestOf).forEach(function (k) { delete guestOf[k]; });
+            Object.keys(v).forEach(function (h) { guestOf[h] = v[h] || {}; });
+        });
+    }, 400);
+})();
+
+// 이 파티에 들어올 수 있나 — 이번 초대장이든, 전에 받은 기운이든
+function invitedTo(p, code) {
+    if (!p || !p.talkShow) return false;
+    code = code || (currentUser || {}).code;
+    if (!code) return false;
+    if ((p.invited || {})[code]) return true;
+    const g = guestOf[p.talkShow.by];
+    return !!(g && g[code]);
+}
+window.showInvited = invitedTo;
 
 // ==========================================
 // 등록 — 상담사만 줄 수 있고, 어디에도 안 뜬다
@@ -227,7 +257,7 @@ function withoutQuarantine(fn) {
             const p = party(pid);
             if (!p || !p.talkShow || !currentUser) return _j.apply(this, arguments);
 
-            const inv = (p.invited || {})[currentUser.code];
+            const inv = invitedTo(p);
             if (!inv && !isHost(p)) {
                 showCustomAlert('📺 심야 토크 쇼입니다.\n\n초대장을 받은 사원만 들어올 수 있습니다.');
                 return;
@@ -257,7 +287,7 @@ function withoutQuarantine(fn) {
         const _l = launchPartyRun;
         launchPartyRun = function (p) {
             const show = !!(p && p.talkShow && p.talkShow.by);
-            const invited = show && currentUser && !!((p.invited || {})[currentUser.code]);
+            const invited = show && currentUser && invitedTo(p);
             const triesWas = currentUser ? (currentUser.darkTries || 0) : 0;
             const dateWas = currentUser ? currentUser.darkDate : null;
 
@@ -380,9 +410,13 @@ window.showSendInvite = function (kind) {
         // 초대장을 받은 사람만 들어올 수 있으므로 파티에도 적어 둔다
         database.ref('darkParties/' + p.id + '/invited/' + target)
             .set({ kind: (kind === 'love') ? 'love' : 'invite', at: Date.now() });
+        // ★ 기운은 사회자 쪽에 남는다 — 파티를 나갔다 다시 와도, 다음 파티에도 그대로
+        database.ref(GUEST_ROOT + '/' + currentUser.code + '/' + target).set(Date.now());
     }
     if (!p.invited) p.invited = {};
     p.invited[target] = { kind: kind, at: Date.now() };
+    if (!guestOf[currentUser.code]) guestOf[currentUser.code] = {};
+    guestOf[currentUser.code][target] = Date.now();
 
     pickTarget = null;
     showCustomAlert(u.name + ' 사원에게 ' + (kind === 'love' ? '💕 러브레터를' : '📺 초대장을') + ' 보냈습니다.'
@@ -410,7 +444,8 @@ window.showSendInvite = function (kind) {
                         const o = sel.options[i];
                         const u = (db.users || {})[o.value];
                         if (!u) continue;
-                        const tag = whereTag(u);
+                        let tag = whereTag(u);
+                        if (invitedTo(p, o.value)) tag = (tag ? tag + ' ' : '') + '· 초대됨';
                         if (tag && o.text.indexOf(tag) < 0) o.text = o.text + ' ' + tag;
                     }
                 }
@@ -871,7 +906,9 @@ window.showState = function () {
     console.log('  지금 토크쇼에 있나:', p ? ('O — 사회자 ' + p.talkShow.name) : '✗');
     if (p) {
         console.log('  내가 사회자인가:', isHost(p) ? 'O' : '✗');
-        console.log('  초대장 받은 사원:', Object.keys(p.invited || {}).length + '명');
+        const g = guestOf[p.talkShow.by] || {};
+        console.log('  이 파티의 초대장:', Object.keys(p.invited || {}).length + '명');
+        console.log('  사회자에게 남은 기운:', Object.keys(g).length + '명 (파티를 나가도 남는다)');
         console.log('  무대 열기:', Number(p.heat || 0) + '단',
             p.hostDead ? '· 사회자 피날레' : '', '→ 보너스 ×' + multOf(p).toFixed(1));
         if (typeof darkRun !== 'undefined' && darkRun) {
