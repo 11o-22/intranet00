@@ -66,6 +66,7 @@ function hasS(u) {
     if (typeof houseGrade !== 'function') return false;
     try {
         const g = houseGrade(u);
+        if (g === 'L') return true;                      // 관사는 S 위다
         if (typeof HOUSE_GRADES === 'undefined') return g === MIN_GRADE;
         // 「S등급 이상」 — 나중에 S 위에 등급이 생겨도 같이 열린다
         return HOUSE_GRADES.indexOf(g) >= HOUSE_GRADES.indexOf(MIN_GRADE);

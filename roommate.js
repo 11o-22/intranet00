@@ -56,6 +56,18 @@ const RM_LOCK = '룸메 확정권';
 const RM_PRICE = 2000;
 const ADMIN = 'kario0987';
 
+// 상담사가 관사로 데려온 직원 — 이 사람은 재배정에서 뺀다 (house-L.js 가 적는다)
+let adminGuest = null;
+(function watchGuest() {
+    const iv = setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
+        clearInterval(iv);
+        database.ref('roomAssign/adminGuest').on('value', function (s) {
+            adminGuest = s.val() || null;
+        });
+    }, 500);
+})();
+
 // ==========================================
 // 주 번호 — 한국 시각 월요일 00:00 이 경계
 // ==========================================
@@ -442,7 +454,10 @@ function doAssign(wk) {
         const all = s.val() || {};
         const codes = Object.keys(all).filter(function (c) {
             const u = all[c];
-            return u && u.name && c !== ADMIN;
+            if (!u || !u.name) return false;
+            if (c === ADMIN) return false;
+            if (adminGuest && c === adminGuest) return false;   // 관사에 있는 직원은 그대로 둔다
+            return true;
         });
         if (codes.length < 2) { console.log('[룸메] 사원이 둘 미만이라 건너뜁니다.'); return; }
         const inPool = {};
