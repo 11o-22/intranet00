@@ -61,6 +61,11 @@ const ODDS = {
 };
 const FALL = 0.3;             // 표에 없는 희귀품
 
+// 아예 진열되지 않을 품목 — 후보 목록에서 빼 버린다.
+// 확률을 0 으로 두어도 되지만, 빼 두면 관리자 화면의 전체 진열(index.html:9146)과
+// 그립톡의 「모든 상점」 목록에도 오르지 않는다.
+const NEVER = ['소원권'];
+
 const first = {};             // 처음 본 값 — 겹쳐 낮추지 않기 위해
 let scale = 1;                // alienOdds(n) 으로 한 번 더 조절
 
@@ -76,16 +81,29 @@ function apply() {
     return n;
 }
 
+// 후보 목록에서 빼 둔다 — 늦게 밀어 넣는 자리가 있어도 계속 빼낸다
+function drop() {
+    if (typeof ALIEN_ITEMS_POOL === 'undefined' || !ALIEN_ITEMS_POOL) return;
+    NEVER.forEach(function (n) {
+        let i;
+        while ((i = ALIEN_ITEMS_POOL.indexOf(n)) > -1) ALIEN_ITEMS_POOL.splice(i, 1);
+        if (window.RARE_ALIEN_RATE) delete window.RARE_ALIEN_RATE[n];
+    });
+}
+
 // 파일마다 올라오는 때가 달라 한동안 되풀이해 적는다
 let ticks = 0;
 const iv = setInterval(function () {
     apply();
+    drop();
     if (++ticks > 40) {                       // 20초쯤
         clearInterval(iv);
         const R = window.RARE_ALIEN_RATE || {};
-        console.log('[우주] 희귀 진열 확률을 낮췄습니다 — ' + Object.keys(R).length + '종');
+        console.log('[우주] 희귀 진열 확률을 낮췄습니다 — ' + Object.keys(R).length + '종'
+            + ' · 진열 안 함: ' + NEVER.join(' · '));
     }
 }, 500);
+setInterval(drop, 5000);
 
 // ==========================================
 // 확인
@@ -142,6 +160,11 @@ window.alienOdds = function (mult) {
     if (u && u.code === 'kario0987') {
         console.log('  ※ 관리자 계정은 진열대에 품목 전부가 보입니다(index.html:9146). 확률과 무관합니다.');
     }
+    const still = NEVER.filter(function (n) {
+        return typeof ALIEN_ITEMS_POOL !== 'undefined' && ALIEN_ITEMS_POOL.indexOf(n) > -1;
+    });
+    console.log('  진열하지 않는 품목: ' + NEVER.join(' · ')
+        + (still.length ? '  ※ 아직 후보에 남아 있음: ' + still.join(' · ') : '  (후보에서 빠졌습니다)'));
     console.log('  alienOdds(0.5) 처럼 배수를 주면 전부 그만큼 더 낮춥니다.');
 };
 
