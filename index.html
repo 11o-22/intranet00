@@ -2894,6 +2894,14 @@ function renderAdvanceWait(nextStep) {
         if (darkRun.step >= nextStep) { renderDarkStep(); return; }   // 이미 넘어갔으면 화면만 다시
         darkRun.step = nextStep;
 
+        // 혼자 걷는 동안 본대가 앞서 간 자리를 적어 두었다.
+        // 다시 합류한 뒤에만 그 자리로 따라잡는다. (흐트러짐 중엔 제 길을 간다)
+        const _held = (typeof darkHoldHere === 'function') && darkHoldHere();
+        if (!_held && darkRun._pendingStep != null) {
+            if (darkRun._pendingStep > darkRun.step) darkRun.step = darkRun._pendingStep;
+            darkRun._pendingStep = null;
+        }
+
         if (!darkRun.solo) {   // 혼자 떨어진 사람은 본대를 끌고 가지 않는다
             database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
                 if (cur != null && cur >= nextStep) return;

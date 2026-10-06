@@ -2871,6 +2871,25 @@ function input119D(n) {
                               : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">동료를 기다리는 중...</div>`));
         mountDarkChat('normal');
     }
+// ★ 지금은 일행을 따라 끌려가면 안 되는 자리인가
+//
+//   본대가 앞 장으로 넘어가면 curStep 이 올라가고, 그 값을 받은 사람은
+//   무조건 그 장으로 끌려갔다. 그런데 S-003 의 흩어짐 구간은 각자 다른 장을
+//   걷는 대목이라, 선택지를 읽고 있는 중에 끌려가 버렸다.
+//   (합류에 먼저 성공한 한 사람이 curStep 을 올리면 아직 흩어져 있던 사람들이
+//    고를 새도 없이 같이 넘어갔다.)
+//   그런 자리에서는 끌려가지 않고, 올라간 번호만 적어 둔다.
+//   적어 둔 번호는 합류한 뒤 제 발로 넘어갈 때 따라잡는 데 쓴다.
+function darkHoldHere() {
+    if (!darkRun) return false;
+    if (darkRun.solo || darkRun.s003Lair || darkRun.taken) return true;
+    if (darkRun.zone === 'Qtrew-S-003' && typeof S003_STEPS !== 'undefined') {
+        const t = (S003_STEPS[darkRun.step] || {}).type;
+        if (t === 'scatter' || t === 'sscene' || t === 'regroup') return true;
+    }
+    return false;
+}
+
         function watchPartyStep() {
         if (!darkRun || !darkRun.isParty || !database) return;
         if (darkRun._stepWatching) return;
@@ -2886,8 +2905,9 @@ function input119D(n) {
             if (s == null || !darkRun) return;
             if (s > darkRun.step) {
                 if (darkRun._dead) return;
+                if (darkHoldHere()) { darkRun._pendingStep = s; return; }
                 darkRun.step = s;
-                darkRun._advTo = null;        
+                darkRun._advTo = null;
                 detachVoteListener();
                 renderDarkStep();
             }
