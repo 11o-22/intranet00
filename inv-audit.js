@@ -98,20 +98,51 @@ window.invAudit = function () {
         });
         if (shape.length) { flags++; console.log('%c■ 소지품 모양이 어긋난 사원', 'color:#ff8f6b'); console.table(shape); }
 
-        // ── 2. 목록에 없는 유령 품목
+        // ── 2. 어디에도 없는 이름
+        //
+        //   처음에 ITEM_CATALOG 만 보고 「유령 품목」이라 했다. 틀렸다.
+        //   어둠 회수품은 DARK_LOOT_BY_ZONE (dark.js:160) 에만 있고 상점 목록에는
+        //   등록되지 않는다. 그래서 「읽을 수 없는 라벨」·「영업시간 안내판」 같은
+        //   멀쩡한 회수품이 유령으로 찍혔다.
+        //
+        //   그러니 이름이 있을 수 있는 자리를 모두 모아서 본다. 그래도 못 찾은
+        //   것만 짚고, 「유령」이라 단정하지 않는다 — 내가 모르는 자리가 또
+        //   있을 수 있다.
+        const known = {};
         if (typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG) {
+            Object.keys(ITEM_CATALOG).forEach(function (k) { known[k] = '상점·물품 목록'; });
+        }
+        if (typeof DARK_LOOT_BY_ZONE !== 'undefined' && DARK_LOOT_BY_ZONE) {
+            Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
+                (DARK_LOOT_BY_ZONE[z] || []).forEach(function (l) {
+                    if (l && l.name && !known[l.name]) known[l.name] = '어둠 회수품 (' + z + ')';
+                });
+            });
+        }
+        if (Object.keys(known).length) {
             const ghost = [];
             codes.forEach(function (c) {
                 const bad = {};
                 inv[c].forEach(function (it) {
                     const base = String(it).replace(/^\[복제품\]\s*/, '');
-                    if (!ITEM_CATALOG[it] && !ITEM_CATALOG[base]) bad[it] = (bad[it] || 0) + 1;
+                    if (!known[it] && !known[base]) bad[it] = (bad[it] || 0) + 1;
                 });
                 const k = Object.keys(bad);
                 if (k.length) ghost.push({ 사원: nameOf(c),
                     품목: k.map(function (x) { return x + '×' + bad[x]; }).join(', ') });
             });
-            if (ghost.length) { flags++; console.log('%c■ 물품 목록에 없는 품목을 지닌 사원', 'color:#ff8f6b'); console.table(ghost); }
+            if (ghost.length) {
+                flags++;
+                console.log('%c■ 어디에도 없는 이름 — 상점 목록에도, 어둠 회수품 표에도 없습니다',
+                    'color:#ff8f6b');
+                console.table(ghost);
+                console.log('  (제가 모르는 자리에서 나온 것일 수도 있습니다. 짚어만 둡니다)');
+            }
+            console.log('  이름을 아는 자리: 물품 목록 '
+                + Object.keys(known).filter(function (k) { return known[k] === '상점·물품 목록'; }).length
+                + '가지 + 어둠 회수품 '
+                + Object.keys(known).filter(function (k) { return known[k] !== '상점·물품 목록'; }).length
+                + '가지');
         }
 
         // ── 3. 남의 고유 아이템(DNA)
