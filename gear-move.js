@@ -181,9 +181,17 @@ const refused = [];
                 console.warn('%c[장착칸] ' + code + ' 의 장착칸을 ' + srv.length
                     + '칸 → ' + want.length + '칸으로 덮어쓰려 해서 막았습니다.', 'color:#ff8a65');
                 if (where) console.warn('         부른 자리: ' + where);
-                // 장착칸만 빼고 나머지는 그대로 쓴다
+                // 장착칸과 **주인 기록**을 빼고 나머지는 그대로 쓴다.
+                //
+                //   주인 기록(equipOwner)은 장착칸과 한 쌍이다. 장착칸만 막고
+                //   주인 기록을 통과시키면, 물건은 남는데 주인만 사라져
+                //   「남이 채운 것을 본인이 뺄 수 있는」 상태가 된다.
+                //   (gear-own.js 에 적어 두었다)
                 const rest = {};
-                Object.keys(fields).forEach(function (k) { if (k !== EQW) rest[k] = fields[k]; });
+                Object.keys(fields).forEach(function (k) {
+                    if (k === EQW || k === OWN) return;
+                    rest[k] = fields[k];
+                });
                 if (!Object.keys(rest).length) return null;
                 return _u.call(self, code, rest);
             });
