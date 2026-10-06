@@ -7,7 +7,7 @@
 //   2. 에메랄드 목줄    20,000 P   랜덤박스 행운 100% · 탐사 판정 +3
 //        둘 다 채워져 있으면  공용시설 250% · 랜덤박스 150%
 //        둘 다 「남이 채워 줘야」 효력이 돈다 (다이아 플러그와 같은 규칙)
-//   3. 복사기          500,000 P   하루 두 개까지 복제. 복사기는 안 사라진다
+//   3. 복사기        2,000,000 P   하루 두 개까지 복제. 복사기는 안 사라진다
 //   4. 우리가 도움   9,999,999 P   ????????
 //
 //   넷 다 진열 확률 0.5% 다. (RARE_ALIEN_RATE)
@@ -85,7 +85,7 @@ const HOUR = 3600 * 1000;
                 + '하네스와 함께 채워지면 둘 다 더 세진다.'
         };
         ITEM_CATALOG[COPIER] = {
-            price: 500000, usable: true, targetable: false, effect: 'copier', noSell: true,
+            price: 2000000, usable: true, targetable: false, effect: 'copier', noSell: true,
             desc: '우주 쇼핑몰의 물품을 하루 두 개까지 베낀다. 기계는 닳지 않는다. '
                 + '베낀 것은 본래의 절반만 듣고, 장착하는 것이면 하루 만에 삭는다.'
         };
@@ -251,7 +251,8 @@ function realOf(name) {
 }
 
 // 베낄 수 있는 것 — 우주 쇼핑몰에 깔리는 것 중에서 고른다
-const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '소원권'];
+const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '소원권',
+                 '황룡의 눈', '산군의 도움'];
 function copyables() {
     if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
     return ALIEN_ITEMS_POOL.filter(function (n) {
@@ -432,8 +433,16 @@ function copierMake(real) {
                 return _rm.apply(this, arguments);
             };
 
+            // 창을 띄워 상대를 고르는 물건은 고른 뒤에 효과가 돈다. 그때는 이미
+            // 아래 finally 가 지나가 있어서 「절반」도, 「복제품을 뺀다」도 걸리지
+            // 않는다. 그래서 표를 남겨 둔다 — copy-potion.js 가 이어서 받는다.
+            window.__copyUse = { real: real, label: itemName, at: Date.now() };
+
             try { _u.call(this, real); }
             finally { addTimedEffect = _ate; removeItemFromInventory = _rm; }
+
+            // 창이 안 떴다면(바로 끝났다면) 표를 지운다
+            if (taken) window.__copyUse = null;
 
             // ③ 장착된 것이면 이름을 바꾸고 하루짜리로 만든다
             const eq = currentUser.equippedWeapons || [];
