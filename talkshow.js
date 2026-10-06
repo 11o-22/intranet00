@@ -818,6 +818,31 @@ let themeOn = false, bubbleTimer = null;
 //
 //   규칙으로 걸면 걷어 갈 inline 속성이 없다. 다시 얹을 일도 없으니
 //   깜박이지 않는다. skin.js 가 쇼가 도는 동안 손대지 않도록 눕혀 두기도 한다.
+// ★ 갈색 화면은 **벽지(skin.js)의 기계를 그대로 빌려 쓴다.**
+//
+//   처음에는 여기서 --sk-* · --theme-* 변수만 바꾸는 규칙을 넣었다. 그런데
+//   그 변수들을 읽는 자리가 없었다.
+//       index.html 에서 var(--sk-*)    0 번
+//       index.html 에서 var(--theme-*) 45 번이지만 어디에도 정의되어 있지 않다
+//   실제로 화면을 칠하는 것은 skin.js 의 injectSkinStyle() 이 넣는 규칙이고,
+//   그 규칙은 body[data-ui-skin] 안에서만 산다. 그래서 변수만 바꾸면
+//   아무 일도 일어나지 않았다 — 구역 이름만 바뀌고 색은 그대로였다.
+//
+//   그러니 벽지 한 벌을 만들어 applyUiSkin 에 그대로 넘긴다. 그러면 사원이
+//   벽지를 썼을 때와 똑같은 범위가 칠해진다.
+const BROWN_SKIN = {
+    palette: '브라운의 심야',
+    light: false,
+    base:   BROWN.base,
+    panel:  BROWN.panel,
+    accent: BROWN.accent,
+    text:   BROWN.text,
+    pattern: 2,                 // 아르데코 — 무대 조명처럼 퍼진다
+    font: 'Gowun Batang',
+    name: '브라운의 심야 토크 쇼',
+    since: 0
+};
+
 function injectCss() {
     let st = document.getElementById(CSS_ID);
     if (st) return;
@@ -874,6 +899,16 @@ function holdSkin(on) {
     }
 }
 
+// 갈색 벽지를 입힌다 — skin.js 의 applyUiSkin 에 가짜 사원을 하나 넘긴다.
+// holdSkin(true) 가 전역 applyUiSkin 을 눕혀 두었으므로 넣어 둔 원본을 쓴다.
+function wearBrown() {
+    const real = (skinHeld && skinHeld.apply) ? skinHeld.apply
+               : ((typeof applyUiSkin === 'function') ? applyUiSkin : null);
+    if (!real) { console.warn('[토크쇼] skin.js 가 없어 갈색 화면을 못 입혔습니다.'); return; }
+    try { real({ uiSkin: BROWN_SKIN }); }
+    catch (e) { console.warn('[토크쇼] 갈색 화면 입히기 건너뜀:', e && e.message); }
+}
+
 function bubbles(on) {
     let box = document.getElementById('talkshow-bubbles');
     if (!on) {
@@ -909,14 +944,15 @@ function paintTheme() {
     themeOn = on;
     if (on) {
         injectCss();
-        holdSkin(true);
+        holdSkin(true);                     // 원래 applyUiSkin 을 skinHeld 에 넣어 둔다
         document.body.classList.add('talkshow-on');
+        wearBrown();                        // 벽지 기계로 실제 색을 칠한다
         bubbles(true);
         console.log('[토크쇼] 갈색 화면을 켰습니다');
     } else {
         bubbles(false);
         document.body.classList.remove('talkshow-on');
-        holdSkin(false);
+        holdSkin(false);                    // 쓰던 벽지(또는 민낯)로 돌려놓는다
         console.log('[토크쇼] 갈색 화면을 껐습니다');
     }
 }
@@ -982,6 +1018,7 @@ window.showTheme = function (on) {
     }
     injectCss(); holdSkin(true);
     document.body.classList.add('talkshow-on');
+    wearBrown();
     bubbles(true); themeOn = true;
     console.log('[토크쇼] 눌러 봤습니다. showTheme(false) 로 되돌립니다.');
 };
