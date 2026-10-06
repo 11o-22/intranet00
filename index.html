@@ -3735,7 +3735,7 @@ return b;
         if (ov) ov.style.display = 'none';
         document.body.style.overflow = '';
         const chat = document.getElementById('dro-chat');
-        if (chat) chat.innerHTML = '';
+        if (chat) { chat.innerHTML = ''; delete chat.dataset.chatKey; }
     }
 
     function updateDarkRoleLabel() {
@@ -3764,31 +3764,31 @@ return b;
       function mountDarkChat(mode, words, wordsLeft, muted) {
     const slot = document.getElementById('dro-chat');
     if (!slot) return;
-    if (!darkRun || !darkRun.isParty) { slot.innerHTML = ''; return; }
+    if (!darkRun || !darkRun.isParty) { slot.innerHTML = ''; delete slot.dataset.chatKey; return; }
 
     const reactBar = (darkRun.zone === 'Qtrew-C-119' && c119State && darkRun.step > 0) ? buildReactBar() : '';
     const key = (mode || 'normal') + '|' + (wordsLeft || 0) + '|' + (muted ? 1 : 0) + '|' + reactBar.length;
 
     // 같은 구성이면 다시 그리지 않는다
-    if (slot.dataset.chatKey === key && document.getElementById('pchat-log')) {
+    if (slot.dataset.chatKey === key && slot.querySelector('[id="pchat-log"]')) {
         renderChatLog();
         renderReactFlash();
         return;
     }
 
     // 입력 중이던 내용 보존
-    const prev = document.getElementById('pchat-input');
+    const prev = slot.querySelector('[id="pchat-input"]');
     const keep = prev ? prev.value : '';
     const wasFocused = prev && document.activeElement === prev;
 
     slot.innerHTML = reactBar + buildChatHtml(mode || 'normal', words, wordsLeft, muted);
     slot.dataset.chatKey = key;
 
-    attachChatListener(darkRun.partyId);
+    attachChatListener(darkRun.partyId || myPartyId);
     renderChatLog();
     renderReactFlash();
 
-    const now = document.getElementById('pchat-input');
+    const now = slot.querySelector('[id="pchat-input"]');
     if (now && keep) {
         now.value = keep;
         if (wasFocused) { now.focus(); now.setSelectionRange(keep.length, keep.length); }
