@@ -208,6 +208,79 @@ function apply(target, k, count) {
     return say;
 }
 
+// ==========================================
+// 본인에게 걸었을 때 — 특이사항에 남긴다
+// ==========================================
+//
+// 타인에게 걸면 appendBadgeNoteToUser 로 상대 특이사항에 적히는데, 본인에게
+// 걸면 아무 데도 안 적혔다. 그래서 무엇이 얼마나 걸렸는지 알 수가 없었다.
+//
+// 「꼬리 n개 사용 - (버프)」 로 적는다. 같은 꼬리를 다시 쓰면 앞 줄을 지우고
+// 새로 적고, 24시간이 지난 줄은 저절로 치운다. 줄이 쌓이지 않게.
+//
+// 주의 — newitems2.js:226 의 removeBadgeLine 은 <br> 과 개행만 끊는다.
+// appendBadgeNoteToUser(index.html:5169)는 ' | ' 로 잇는다. 그래서 그것으로는
+// 지워지지 않는다. 여기서는 ' | ' 까지 끊는 것을 따로 쓴다.
+function badgeKey(u) {
+    if (!u || !u.badge || typeof u.badge !== 'object') return null;
+    if (typeof u.badge.notes === 'string') return 'notes';
+    if (typeof u.badge.note === 'string') return 'note';
+    return 'notes';
+}
+function cutLine(u, line) {
+    if (!u || !u.badge || !line) return false;
+    const obj = (typeof u.badge === 'object');
+    const key = obj ? badgeKey(u) : null;
+    const raw = String(obj ? (u.badge[key] || '') : u.badge);
+    if (raw.indexOf(line) < 0) return false;
+
+    const bar = raw.indexOf('|') >= 0;
+    const br = /<br\s*\/?>/i.test(raw);
+    const parts = raw.split(/\s*\|\s*|<br\s*\/?>|\n/);
+    const keep = parts.filter(function (x) { return x && x.indexOf(line) < 0; });
+    const joined = keep.join(bar ? ' | ' : (br ? '<br>' : '\n'));
+    const out = joined || '특이사항 없음';
+    if (obj) u.badge[key] = out; else u.badge = out;
+    return true;
+}
+
+function noteSelf(u, T, count, say) {
+    if (!u || typeof appendBadgeNoteToUser !== 'function') return;
+    if (!Array.isArray(u.foxNotes)) u.foxNotes = [];
+    const now = Date.now();
+
+    // 같은 꼬리의 지난 줄 · 기한이 지난 줄을 치운다
+    u.foxNotes = u.foxNotes.filter(function (n) {
+        if (!n || !n.line) return false;
+        if (n.k === T.k || (n.until || 0) <= now) { cutLine(u, n.line); return false; }
+        return true;
+    });
+
+    const line = '꼬리 ' + count + '개 사용 - ' + say;
+    appendBadgeNoteToUser(u, line);
+    u.foxNotes.push({ k: T.k, line: line, until: now + BUFF_MS });
+}
+
+// 기한이 지난 줄은 쓰지 않아도 치운다
+setInterval(function () {
+    try {
+        const u = currentUser;
+        if (!u || !Array.isArray(u.foxNotes) || !u.foxNotes.length) return;
+        const now = Date.now();
+        const keep = [];
+        let cut = 0;
+        u.foxNotes.forEach(function (n) {
+            if (!n || !n.line) return;
+            if ((n.until || 0) > now) { keep.push(n); return; }
+            if (cutLine(u, n.line)) cut++;
+        });
+        if (keep.length === u.foxNotes.length) return;
+        u.foxNotes = keep;
+        if (typeof saveFields === 'function') saveFields({ badge: 1, foxNotes: 1 });
+        if (cut && typeof updateUI === 'function') updateUI();
+    } catch (e) { }
+}, 60000);
+
 function useTails(target, k, count, isSelf) {
     const me = currentUser;
     if (!me || !target) return;
@@ -224,6 +297,10 @@ function useTails(target, k, count, isSelf) {
     }
 
     if (isSelf) {
+        // 본인에게 걸면 아무 데도 안 남아 무엇이 얼마나 걸렸는지 알 수가 없었다.
+        // 특이사항에 「꼬리 n개 사용 - (버프)」 로 적어 둔다. 같은 꼬리를 다시
+        // 쓰면 앞 줄을 지우고 새로 적는다. 줄이 쌓이지 않게.
+        noteSelf(me, T, count, say);
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
     } else {
         if (typeof appendBadgeNoteToUser === 'function') {
