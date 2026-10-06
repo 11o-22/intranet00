@@ -56,6 +56,7 @@ const MAX_MULT = 4;             // 전체 뚜껑
 const ADMIN = 'kario0987';
 const GUEST_ROOT = 'talkShowGuest';     // 사회자별로 남는 초대장의 기운
 const OUT_POLL = 50;                   // 꺼내 온 사람의 오염도
+const ZONE_TITLE = '브라운의 심야 토크 쇼';   // 그 방의 어둠 이름
 
 // 고급진 갈색 — 민무늬
 const BROWN = {
@@ -919,7 +920,56 @@ function paintTheme() {
         console.log('[토크쇼] 갈색 화면을 껐습니다');
     }
 }
-setInterval(function () { try { paintTheme(); } catch (e) { } }, 1500);
+// ==========================================
+// 그 방의 어둠 이름을 바꾼다
+// ==========================================
+//
+// 어둠 이름은 어디서나 DARK_ZONES[구역].name 을 읽어 쓴다 (목록·대기실·
+// 초대장·탐사 화면·기록까지 열 군데가 넘는다). 그 자리를 하나하나 고치는
+// 대신 이름 한 칸만 바꾼다. 한 구역에는 파티가 하나뿐이라(isZoneTaken)
+// 남의 방 이름이 같이 바뀔 일이 없다.
+//
+// 내용은 건드리지 않는다 — 들머리 글도, 사건도, 등급도 그대로다.
+// 착용자가 리더가 아니게 되면 이름도 돌려놓는다.
+let zoneNamed = null;                 // { code, was }
+function paintZoneName() {
+    let want = null;
+    try {
+        const p = showOf();
+        // 「착용자가 리더인 방」일 때만
+        if (p && p.talkShow && p.talkShow.by && p.leader === p.talkShow.by) want = p.zone;
+    } catch (e) { }
+
+    if (zoneNamed && zoneNamed.code !== want) {
+        if (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[zoneNamed.code]) {
+            DARK_ZONES[zoneNamed.code].name = zoneNamed.was;     // 돌려놓는다
+        }
+        zoneNamed = null;
+        nudge();
+    }
+    if (!want || zoneNamed) return;
+    if (typeof DARK_ZONES === 'undefined' || !DARK_ZONES[want]) return;
+    if (DARK_ZONES[want].name === ZONE_TITLE) return;
+    zoneNamed = { code: want, was: DARK_ZONES[want].name };
+    DARK_ZONES[want].name = ZONE_TITLE;
+    nudge();
+    console.log('[토크쇼] ' + want + ' 의 어둠 이름을 「' + ZONE_TITLE + '」로 바꿨습니다');
+}
+function nudge() {
+    try {
+        const el = document.getElementById('dark-party');
+        if (el && el.classList.contains('active') && typeof renderPartyPanel === 'function') renderPartyPanel();
+        else if (typeof renderDarkZones === 'function') renderDarkZones();
+    } catch (e) { }
+}
+window.showZoneName = function () {
+    console.log('[토크쇼] 이름 바꾼 구역:', zoneNamed ? (zoneNamed.code + ' (원래 ' + zoneNamed.was + ')') : '없음');
+};
+
+setInterval(function () {
+    try { paintTheme(); } catch (e) { }
+    try { paintZoneName(); } catch (e) { }
+}, 1500);
 
 window.showTheme = function (on) {
     if (on === false) {

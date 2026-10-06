@@ -1299,7 +1299,7 @@ function getTodayStr() {
                 code: "kario0987", name: "상담사", 
                 affiliation: "통제본부", team: "여우 상담실", position: "수석 상담사",
                 no: "0000", points: 99999, pollution: 0, lastPollutionTime: Date.now(), 
-                facilityCount: 0, facilityMax: 25, lastFacilityDate: getTodayStr(), hasVIP: true,
+                facilityCount: 0, facilityMax: 20, lastFacilityDate: getTodayStr(), hasVIP: true,
                 blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
                 alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
                 alienUnlockedItems: ["작두", "유리손포", "사과맛 물약", "제거약", "착한 친구"],
@@ -5721,7 +5721,7 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-                      currentUser.facilityMax = 25
+                      currentUser.facilityMax = 20
             + (typeof facDarkBonus === 'function' ? facDarkBonus().fac : (currentUser.dnaFacBonus || 0))
             + (currentUser.ticketAddedMax || 0) + (currentUser.birthAddedMax || 0);
         
@@ -8006,7 +8006,7 @@ if (!useFacility(bet)) return;
         return candidates[Math.floor(Math.random() * candidates.length)];
     }
    function finishSeotda() {
-        if (!currentUser.facilityMax) currentUser.facilityMax = 25; 
+        if (!currentUser.facilityMax) currentUser.facilityMax = 20; 
         
         if (currentUser.facilityCount >= currentUser.facilityMax || currentUser.points < seotdaBet) {
             showCustomAlert('이용 횟수 또는 포인트가 부족하여 승부를 진행할 수 없습니다. (대결 무효)');
@@ -9215,7 +9215,7 @@ function bjFinish(mode) {
 function useFacility(bet) {
     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 시설을 이용할 수 없습니다.'); return false; }
     if (currentUser.pollution >= 100) { showCustomAlert('오염도가 높아 시설을 이용할 수 없습니다.'); return false; }
-    if (!currentUser.facilityMax) currentUser.facilityMax = 25;
+    if (!currentUser.facilityMax) currentUser.facilityMax = 20;
     if (currentUser.facilityCount >= currentUser.facilityMax) { showCustomAlert('일일 이용 한도를 초과했습니다.'); return false; }
     if (currentUser.points < bet) { showLuxuryAlert(); return false; }
 
@@ -9402,7 +9402,7 @@ function saveSelfFull() {
             pollution: 0, 
             lastPollutionTime: Date.now(),
             facilityCount: 0, 
-            facilityMax: 25, 
+            facilityMax: 20, 
             lastFacilityDate: get22HourCycleStr(), 
             hasVIP: false,
             blindfoldUntil: 0, 
@@ -10212,7 +10212,7 @@ function admItemSelectNone() {
             }
             if (kind === 'facility' || kind === 'all') {
                 u.facilityCount = 0;
-                u.facilityMax = 25;
+                u.facilityMax = 20;
                 u.lastFacilityDate = get22HourCycleStr();
             }
             u._adminStamp = Date.now();
