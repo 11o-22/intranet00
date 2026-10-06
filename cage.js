@@ -89,7 +89,12 @@ function bankRefCode(u) {
 function caged(u) {
     u = u || currentUser;
     if (!u || !u.cage || !u.cage.by) return null;
-    if (now() >= (u.cage.until || 0)) return null;
+    // 어떤 까닭으로든 until 이 터무니없이 멀면 갇힌 사람이 영영 못 나온다.
+    // 가둔 때(at)로부터 MAX_MS 를 넘는 것은 그만큼으로 본다.
+    const at = u.cage.at || 0;
+    if (!at) return null;                  // 가둔 때가 없는 기록은 고장이다 — 안 갇힌 것으로 본다
+    let until = Math.min(u.cage.until || 0, at + MAX_MS);
+    if (now() >= until) return null;
     return u.cage;
 }
 window.isCaged = function (u) { return !!caged(u); };
@@ -152,6 +157,9 @@ function coRef(u) {
 // 짝이 바뀌면 — 풀고, 통장은 비우라고 알린다 (돈은 말없이 안 지운다)
 function pairChanged(oldKey, oldBal) {
     if (currentUser && currentUser.cage) freeUser(currentUser, '짝이 바뀌어 문이 열렸습니다.');
+    // 상담사는 직원을 데려오고 내보내는 일이 잦다. 그때마다 통장 알림이 뜨면
+    // 성가시다. 상담사에게는 띄우지 않는다.
+    if (currentUser && currentUser.code === 'kario0987') return;
     if (oldBal > 0) {
         const msg = '동거인이 바뀌었습니다.\n\n지난 공용 통장(' + oldKey + ')에 '
             + oldBal.toLocaleString() + ' P 가 남아 있습니다.\n'
@@ -414,10 +422,23 @@ window.cageOpen = function () {
 function freeUser(u, why) {
     if (!u) return;
     u.cage = null; u.cageUse = null;
-    if (typeof addHistoryLog === 'function') addHistoryLog(u, '[감금실] ' + why);
-    if (typeof updateUserFields === 'function') {
-        updateUserFields(u.code, { cage: null, cageUse: null, history: u.history, _adminStamp: now() });
+
+    // ★ 특이사항에 붙은 「[감금실] 기구」 줄을 걷어 낸다.
+    //   cageRun 이 붙이기만 하고 떼는 데가 없어서, 풀려난 뒤에도 그 줄이
+    //   영영 남아 있었다. 「풀려나도 그대로」로 보이던 까닭이 이것이다.
+    if (typeof removeBadgeLine === 'function') {
+        try { removeBadgeLine(u, '[감금실]'); } catch (e) { }
     }
+
+    if (typeof addHistoryLog === 'function') addHistoryLog(u, '[감금실] ' + why);
+
+    const mine = currentUser && u.code === currentUser.code;
+    const fields = { cage: null, cageUse: null, badge: u.badge || {}, _adminStamp: now() };
+    // 남의 기록은 통째로 쓰지 않는다. 내 화면 사본이 비어 있으면 그 사람의
+    // 기록이 날아간다. 들고 있는 것이 있을 때만 쓴다.
+    if (mine || (Array.isArray(u.history) && u.history.length > 1)) fields.history = u.history;
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, fields);
+
     if (typeof updateUI === 'function') updateUI();
     paintCage();
 }
@@ -538,7 +559,17 @@ setTimeout(function () { setInterval(tick, 60000); }, 8000);
 setInterval(function () {
     const c = currentUser && currentUser.cage;
     if (!c || !c.by) return;
-    if (now() < (c.until || 0)) return;
+
+    // 가둔 사람이 더는 동거인이 아니면(짝이 바뀌었거나 퇴사) 열어 줄 사람이
+    // 없다. 그대로 두면 영영 갇힌다.
+    const keeper = (db.users || {})[c.by];
+    const m = mate(currentUser);
+    if (!keeper || !m || m.code !== c.by) {
+        freeUser(currentUser, '가둔 사원이 없어 문이 열렸습니다.');
+        return;
+    }
+
+    if (caged(currentUser)) return;        // 아직 시간이 남았다 (뚜껑까지 셈한다)
     freeUser(currentUser, '시간이 다 되어 문이 열렸습니다.');
 }, 30000);
 
@@ -576,7 +607,12 @@ window.cageFree = function (who) {
     const u = find(who);
     if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
     freeUser(u, '당국이 문을 열었습니다.');
+    // 사본을 거치지 않고 서버에도 바로 지운다 (화면이 어긋나 있어도 확실히)
+    if (typeof database !== 'undefined' && database) {
+        database.ref('users/' + u.code).update({ cage: null, cageUse: null, _adminStamp: Date.now() });
+    }
     console.log('%c✓ ' + u.name + ' 사원을 내보냈습니다.', 'color:#4CAF50');
+    console.log('  특이사항의 [감금실] 줄도 걷어 냈습니다.');
 };
 
 console.log('[감금실] cageState(사번) · cageFree(사번) · coBank()');

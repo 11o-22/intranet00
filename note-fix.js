@@ -69,6 +69,15 @@ const EXPIRY = [
         if (!Array.isArray(l)) return false;
         const t = Date.now();
         return l.some(function (b) { return b && (b.run || (b.until || 0) > t); });
+    } },
+    // 감금실 — 풀려나면 지운다. cage.js 가 붙이기만 하던 줄이다.
+    { mark: '[감금실]', live: function (u) {
+        const c = u.cage;
+        if (!c || !c.by) return false;
+        const at = c.at || 0, cap = 12 * 3600 * 1000;
+        let until = c.until || 0;
+        if (at && until > at + cap) until = at + cap;
+        return Date.now() < until;
     } }
 ];
 
