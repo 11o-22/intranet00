@@ -155,25 +155,51 @@ window.invAudit = function () {
         });
         if (many.length) { flags++; console.log('%c■ 한 품목을 ' + MANY_OK + '개 이상 지님', 'color:#ffcf8f'); console.table(many); }
 
-        // ── 6. 남의 꾸러미가 섞인 흔적 (서로 너무 닮았다)
+        // ── 6. 꾸러미가 아예 한 사람 것처럼 똑같은 짝
+        //
+        //   처음에 「겹침 / 작은 쪽」으로 셌다가 크게 틀렸다. 작은 꾸러미가 큰
+        //   꾸러미 안에 들어 있기만 해도 97% 가 나왔다. 이 게임은 상점 품목이
+        //   정해져 있어 누구 꾸러미든 같은 이름 수십 가지로 이루어지므로,
+        //   2,000개를 쌓아 둔 사원은 남의 작은 꾸러미를 거의 자동으로 품는다.
+        //   그래서 상담사(33개)가 열세 명과 97% 로 찍히는 헛경보가 났다.
+        //
+        //   양쪽을 다 보는 값으로 바꾼다.
+        //       겹침 / (A + B − 겹침)
+        //   크기가 다른 짝은 저절로 떨어진다. 똑같이 복사된 짝만 남는다.
         const twin = [];
         for (let i = 0; i < codes.length; i++) {
             for (let j = i + 1; j < codes.length; j++) {
                 const a = inv[codes[i]], b = inv[codes[j]];
-                if (a.length < 5 || b.length < 5) continue;
+                if (a.length < 8 || b.length < 8) continue;
                 const ov = overlap(a, b);
-                const r = ov / Math.min(a.length, b.length);
+                const uni = a.length + b.length - ov;          // 둘을 합친 크기
+                const r = uni ? ov / uni : 0;
                 if (r >= 0.9 && ov >= 8) {
                     twin.push({ 사원1: nameOf(codes[i]) + ' (' + a.length + '개)',
                                 사원2: nameOf(codes[j]) + ' (' + b.length + '개)',
-                                겹침: ov + '개', 비율: Math.round(r * 100) + '%' });
+                                겹침: ov + '개', 닮은정도: Math.round(r * 100) + '%' });
                 }
             }
         }
         if (twin.length) {
             flags++;
-            console.log('%c■ 소지품이 서로 거의 같은 짝 — 통째 쓰기로 섞였을 수 있습니다', 'color:#ff6b6b');
+            console.log('%c■ 꾸러미가 아예 한 사람 것처럼 똑같은 짝', 'color:#ff6b6b');
             console.table(twin);
+        }
+
+        // ── 6-2. 꾸러미가 지나치게 큰 사원 (참고)
+        const big = codes.map(function (c) { return { c: c, n: inv[c].length }; })
+            .filter(function (x) { return x.n >= 500; })
+            .sort(function (x, y) { return y.n - x.n; });
+        if (big.length) {
+            console.log('%c□ 참고 — 소지품이 500개를 넘는 사원', 'color:#9fd0ff');
+            console.table(big.map(function (x) {
+                const cc = counts(inv[x.c]);
+                const top = Object.keys(cc).sort(function (p, q) { return cc[q] - cc[p]; })[0];
+                return { 사원: nameOf(x.c), 개수: x.n, 가장많은품목: top + '×' + cc[top],
+                         '품목 종류': Object.keys(cc).length + '가지' };
+            }));
+            console.log('  (이것만으로는 이상이라 할 수 없습니다. 쌓아 둔 것일 수도 있습니다)');
         }
 
         // ── 7. 장착 이상
