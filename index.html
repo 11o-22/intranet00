@@ -9841,6 +9841,9 @@ function admItemSelectNone() {
             const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
             const exitPoll = u.quarantineExitPollution || 0;
             const isHospital = exitPoll >= 40;
+            const bath = (u.quarantineDest || 'fox') === 'bath';
+            const where = bath ? '♨ 선녀탕' : '🦊 여우 상담실';
+            const stateTag = isHospital ? '입원중' : (bath ? '입욕중' : '상담중');
 
             return `
                 <div style="background:rgba(0,0,0,0.35); border:1px solid #5a4a2a; border-radius:6px; padding:11px; margin-bottom:9px;">
@@ -9848,7 +9851,8 @@ function admItemSelectNone() {
                         <div style="flex:1; min-width:0;">
                             <div style="font-size:12px; color:#fff; font-weight:bold;">
                                 ${u.name}
-                                <span style="font-size:10px; color:${isHospital ? '#ff6b6b' : '#d4af37'}; margin-left:5px;">${isHospital ? '입원중' : '상담중'}</span>
+                                <span style="font-size:10px; color:${bath ? '#7fd4d4' : '#d4af37'}; margin-left:5px;">${where}</span>
+                                <span style="font-size:10px; color:${isHospital ? '#ff6b6b' : '#888'}; margin-left:4px;">${stateTag}</span>
                             </div>
                             <div style="font-size:10px; color:#888; margin-top:3px;">
                                 사번 ${u.no} · ${u.team} · 오염도 ${u.pollution}%
@@ -9858,11 +9862,15 @@ function admItemSelectNone() {
                             </div>
                         </div>
                     </div>
-                    <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', false)">즉시 퇴원</button>
-                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #0288d1, #01579b) !important; border-color:#01579b !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', true)">퇴원 + 정화</button>
-                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 1)">-1시간</button>
-                        <button class="game-btn" style="flex:1; min-width:70px; margin:0; padding:7px 4px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 3)">-3시간</button>
+                    <div style="display:flex; gap:5px;">
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #388e3c, #2e7d32) !important; border-color:#1b5e20 !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', false)">즉시 퇴원</button>
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 4px; font-size:10px; background:linear-gradient(145deg, #0288d1, #01579b) !important; border-color:#01579b !important; color:#fff !important;" onclick="adminFoxDischarge('${u.code}', true)">퇴원 + 정화</button>
+                    </div>
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 2px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 1)">-1시간</button>
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 2px; font-size:10px;" onclick="adminFoxReduce('${u.code}', 3)">-3시간</button>
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 2px; font-size:10px; background:linear-gradient(145deg,#8e5a00,#5a3800) !important; border-color:#b07000 !important; color:#ffd9a0 !important;" onclick="adminFoxExtend('${u.code}', 1)">+1시간</button>
+                        <button class="game-btn" style="flex:1; min-width:0; margin:0; padding:7px 2px; font-size:10px; background:linear-gradient(145deg,#8e5a00,#5a3800) !important; border-color:#b07000 !important; color:#ffd9a0 !important;" onclick="adminFoxExtend('${u.code}', 3)">+3시간</button>
                     </div>
                 </div>`;
                 
@@ -10146,6 +10154,41 @@ function admItemSelectNone() {
 
         updateUserFields(code, fields).then(() => { renderAdminFoxRoom(); updateUI(); });
         showCustomAlert(`${u.name} 사원의 격리가 ${hours}시간 단축되었습니다. (남은 시간 ${h}시간 ${m}분)`);
+    }
+
+    // 격리를 늘린다 (상담실 · 선녀탕 둘 다)
+    const FOX_MAX_HOURS = 72;          // 남은 시간은 72시간을 넘기지 않는다
+    function adminFoxExtend(code, hours) {
+        const u = db.users[code];
+        if (!u || !u.quarantineUntil) return;
+
+        const base = Math.max(Date.now(), u.quarantineUntil);
+        const cap = Date.now() + FOX_MAX_HOURS * 3600000;
+        let newUntil = base + hours * 3600000;
+        let capped = false;
+        if (newUntil > cap) { newUntil = cap; capped = true; }
+        if (newUntil - base < 60000) {        // 1분도 못 늘리면 상한에 닿은 것이다
+            showCustomAlert(`이미 ${FOX_MAX_HOURS}시간이 차 있어 더 늘릴 수 없습니다.`);
+            return;
+        }
+
+        const added = Math.round((newUntil - base) / 360000) / 10;   // 실제로 늘어난 시간
+        const remainMs = newUntil - Date.now();
+        const h = Math.floor(remainMs / 3600000);
+        const m = Math.floor((remainMs % 3600000) / 60000);
+        const bath = (u.quarantineDest || 'fox') === 'bath';
+        const place = bath ? '선녀탕' : '여우 상담실';
+
+        const tmp = { history: (u.history || []).slice() };
+        addHistoryLog(tmp, `[당국 개입] ${place} 격리 시간이 ${added}시간 연장되었습니다.`);
+
+        const fields = { quarantineUntil: newUntil, history: tmp.history };
+        if (code === currentUser.code) Object.assign(currentUser, fields);
+
+        updateUserFields(code, fields).then(() => { renderAdminFoxRoom(); updateUI(); });
+        showCustomAlert(`${u.name} 사원의 ${place} 격리가 ${added}시간 연장되었습니다.`
+            + `\n\n남은 시간 ${h}시간 ${m}분`
+            + (capped ? `\n(상한 ${FOX_MAX_HOURS}시간에 걸렸습니다.)` : ''));
     }
     function adminSetZoneOpen(zoneCode, state) {
         if (state === null) delete darkZoneOverride[zoneCode];
