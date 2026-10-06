@@ -42,14 +42,19 @@
 //   (index.html:7258 빨간 리본 · 7501 감각 연동) 그것까지 막으면
 //   제 것도 못 빼게 된다.
 //
-//   더불어 사라진 주인 기록을 라벨에서 되살린다. 거둬 가는 쪽
-//   (retrieveEquipFromUser) 은 equipOwner 를 보기 때문이다.
+//   더불어 사라진 주인 기록을 라벨에서 되살린다. **거둬 가는 쪽도 막혀 있었다.**
+//   회수 목록(index.html:6264)과 권한 검사(6425)가 둘 다 equipOwner 만 보기
+//   때문에, 기록이 사라지면 채운 사람에게는 목록에 뜨지도 않았다. 차고 있는
+//   쪽은 라벨로 막히고 채운 쪽은 거둬 갈 수 없으니 아무도 못 뺐다.
 //
 // ■ 확인
 //
-//   gearOwnFix()    내 장착칸의 사라진 주인 기록을 되살린다
-//   gearOwnScan()   사원 전체 — 라벨엔 장착자가 있는데 기록이 없는 것
-//   gearOwnScan(true)  찾은 것을 되살린다 (상담사만)
+//   들어올 때 한 번, 아래 둘을 조용히 되살린다. 손으로도 부를 수 있다.
+//
+//   gearOwnFix()      내가 차고 있는 것의 사라진 주인 기록
+//   gearOwnClaim()    내가 남에게 채운 것의 사라진 주인 기록 (회수 목록에 뜨게)
+//   gearOwnScan()     사원 전체 — 라벨엔 장착자가 있는데 기록이 없는 것
+//   gearOwnScan(true) 찾은 것을 전부 되살린다 (상담사만)
 
 (function gearOwn() {
 
@@ -106,7 +111,10 @@ function othersLabel(u, w) {
                 const who = w ? othersLabel(currentUser, w) : null;
                 if (who) {
                     const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-                    showCustomAlert(base + '\n\n' + who + ' 사원이 채운 것입니다.\n'
+                    // 라벨에는 「이름 직급」이 적혀 있다. 사원을 찾으면 이름만 쓴다.
+                    const hit = findBy(who);
+                    const nm = (hit.length === 1) ? hit[0].name : who;
+                    showCustomAlert(base + '\n\n' + nm + ' 사원이 채운 것입니다.\n'
                         + '스스로는 뺄 수 없습니다.\n\n채운 사람이 거둬 가야 합니다.');
                     return;
                 }
@@ -161,6 +169,137 @@ window.gearOwnFix = function () {
         console.table(r.unsure);
     }
 };
+
+// ==========================================
+// 셋 — 거둬 가는 쪽도 라벨로 되찾는다
+// ==========================================
+//
+// 거둬 가기는 두 자리 모두 equipOwner 만 본다.
+//
+//     index.html:6264  회수 목록   getEquipOwner(u, w) === currentUser.code
+//     index.html:6425  권한 검사   getEquipOwner(t, full) !== currentUser.code
+//
+// 그래서 기록이 사라지면 **채운 사람에게는 목록에 뜨지도 않는다.** 차고 있는
+// 쪽은 라벨로 막히고, 채운 쪽은 거둬 갈 수가 없으니 아무도 못 뺀다.
+// 그것이 「장착시킨 사람도 제거가 안 된다」는 것이다.
+//
+// 그래서 들어올 때 한 번, 라벨이 나를 가리키는데 기록이 없는 것을 되찾는다.
+// 라벨에 내 이름이 적혀 있으니 임자는 나다. 더하기만 하고 지우지 않는다.
+function ownTxn(code, label) {
+    if (typeof database === 'undefined' || !database) return Promise.resolve(false);
+    return database.ref('users/' + code + '/equipOwner').transaction(function (srv) {
+        const o = (srv && typeof srv === 'object') ? srv : {};
+        if (o[label]) return;                       // 이미 있다 — 건드리지 않는다
+        o[label] = currentUser.code;
+        return o;
+    }, null, false).then(function (r) {
+        const ok = !!(r && r.committed);
+        // 화면 쪽도 바로 맞춘다. 회수 목록(index.html:6264)은 db.users 를 읽으므로
+        // 서버 메아리를 기다리면 눌러도 한동안 안 뜬다.
+        if (ok) {
+            try {
+                const u = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+                if (u) { if (!u.equipOwner) u.equipOwner = {}; u.equipOwner[label] = currentUser.code; }
+            } catch (e) { }
+        }
+        return ok;
+    }).catch(function (e) { console.warn('[장착잠금] 되찾기 실패:', e && e.message); return false; });
+}
+
+// 라벨이 나를 가리키는 남의 장비를 찾는다
+function minesOut() {
+    const out = [];
+    if (typeof db === 'undefined' || !db.users || !currentUser) return out;
+    Object.keys(db.users).forEach(function (c) {
+        if (c === currentUser.code) return;
+        const u = db.users[c];
+        if (!u || !Array.isArray(u.equippedWeapons)) return;
+        const own = u.equipOwner || {};
+        u.equippedWeapons.forEach(function (w) {
+            const who = labelWho(w);
+            if (!who || own[w]) return;
+            const hit = findBy(who);
+            if (hit.length === 1 && hit[0].code === currentUser.code) {
+                out.push({ code: c, name: u.name, label: w });
+            }
+        });
+    });
+    return out;
+}
+
+window.gearOwnClaim = function (quiet) {
+    const rows = minesOut();
+    if (!rows.length) {
+        if (!quiet) console.log('[장착잠금] 되찾을 것이 없습니다.');
+        return Promise.resolve(0);
+    }
+    return Promise.all(rows.map(function (r) { return ownTxn(r.code, r.label); }))
+        .then(function (res) {
+            const n = res.filter(Boolean).length;
+            if (n) {
+                console.log('%c[장착잠금] 내가 채운 장비 ' + n + '개의 주인 기록을 되찾았습니다. '
+                    + '이제 회수 목록에 뜹니다.', 'color:#4CAF50');
+                if (!quiet) console.table(rows.map(function (r) {
+                    return { 사원: r.name + '(' + r.code + ')', 장비: r.label };
+                }));
+                if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+            }
+            return n;
+        });
+};
+
+// 거둬 갈 때도 라벨을 본다 — 기록이 없으면 그 자리에서 되찾고 넘긴다
+(function hookRetrieve() {
+    const iv = setInterval(function () {
+        if (typeof retrieveEquipFromUser !== 'function') return;
+        if (retrieveEquipFromUser._label) { clearInterval(iv); return; }
+
+        const _r = retrieveEquipFromUser;
+        const wrapped = function (targetCode, idx) {
+            try {
+                const t = (typeof db !== 'undefined' && db.users) ? db.users[targetCode] : null;
+                const w = t && (t.equippedWeapons || [])[idx];
+                if (w && currentUser) {
+                    const have = (typeof getEquipOwner === 'function') ? getEquipOwner(t, w) : null;
+                    if (!have) {
+                        const who = labelWho(w);
+                        const hit = who ? findBy(who) : [];
+                        if (hit.length === 1 && hit[0].code === currentUser.code) {
+                            if (!t.equipOwner) t.equipOwner = {};
+                            t.equipOwner[w] = currentUser.code;      // 화면 쪽을 먼저 맞춘다
+                            ownTxn(targetCode, w);                    // 서버에도 적어 둔다
+                        }
+                    }
+                }
+            } catch (e) { }
+            return _r.apply(this, arguments);
+        };
+        wrapped._label = true;
+        retrieveEquipFromUser = wrapped;
+        clearInterval(iv);
+        console.log('[장착잠금] 거둬 가기도 라벨을 봅니다');
+    }, 500);
+})();
+
+// 들어올 때 한 번 — 내 것과 내가 채운 것을 조용히 되찾는다
+(function autoFix() {
+    let done = false;
+    const iv = setInterval(function () {
+        if (done) { clearInterval(iv); return; }
+        if (!currentUser || typeof db === 'undefined' || !db.users) return;
+        if (Object.keys(db.users).length < 2) return;      // 사원 표가 아직 덜 왔다
+        done = true;
+        clearInterval(iv);
+        try {
+            const r = repair(currentUser);                  // 내가 차고 있는 것
+            if (r.fixed.length) {
+                if (typeof saveFields === 'function') saveFields({ equipOwner: 1 });
+                console.log('[장착잠금] 내 장착칸의 주인 기록 ' + r.fixed.length + '개를 되살렸습니다.');
+            }
+        } catch (e) { }
+        try { window.gearOwnClaim(true); } catch (e) { }    // 내가 채운 것
+    }, 1500);
+})();
 
 window.gearOwnScan = function (doFix) {
     if (typeof db === 'undefined' || !db.users) { console.warn('사원 표가 아직 없습니다.'); return; }
