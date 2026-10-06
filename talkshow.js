@@ -261,7 +261,13 @@ function withoutQuarantine(fn) {
             const triesWas = currentUser ? (currentUser.darkTries || 0) : 0;
             const dateWas = currentUser ? currentUser.darkDate : null;
 
-            const r = _l.apply(this, arguments);
+            // 사택 감금실에 갇혀 있어도 초대받았으면 나올 수 있다.
+            // cage.js 가 launchPartyRun 을 막으므로(cage.js:94) 그동안만 비켜 둔다.
+            const cageWas = (invited && currentUser) ? currentUser.cage : undefined;
+            if (cageWas) currentUser.cage = null;
+            let r;
+            try { r = _l.apply(this, arguments); }
+            finally { if (cageWas) currentUser.cage = cageWas; }
 
             try {
                 if (!show) return r;
@@ -397,6 +403,17 @@ window.showSendInvite = function (kind) {
                 if (!p || !p.talkShow || !isHost(p)) return r;
                 const body = document.getElementById('dark-party-body');
                 if (!body) return r;
+                // 어디에 있는지 적어 준다 — 상담실·선녀탕·감금실에 있어도 부를 수 있다
+                const sel = body.querySelector('#dark-invite-target');
+                if (sel) {
+                    for (let i = 0; i < sel.options.length; i++) {
+                        const o = sel.options[i];
+                        const u = (db.users || {})[o.value];
+                        if (!u) continue;
+                        const tag = whereTag(u);
+                        if (tag && o.text.indexOf(tag) < 0) o.text = o.text + ' ' + tag;
+                    }
+                }
                 const btns = body.querySelectorAll('button');
                 for (let i = 0; i < btns.length; i++) {
                     const on = btns[i].getAttribute('onclick') || '';
@@ -479,6 +496,22 @@ window.showSendInvite = function (kind) {
         clearInterval(iv);
     }, 400);
 })();
+
+// 지금 어디에 있나 — 상담실·선녀탕·감금실에 있어도 초대할 수 있다
+function whereTag(u) {
+    if (!u) return '';
+    if (typeof isQuarantined === 'function' && isQuarantined(u)) {
+        if (u.quarantineHospital) return '· 입원 중';
+        return ((u.quarantineDest || 'fox') === 'bath') ? '· 선녀탕' : '· 상담실';
+    }
+    const c = u.cage;
+    if (c && c.by && c.at) {
+        const cap = 12 * 3600 * 1000;
+        const until = Math.min(c.until || 0, c.at + cap);
+        if (Date.now() < until) return '· 감금실';
+    }
+    return '';
+}
 
 function esc(s) {
     return String(s == null ? '' : s)
@@ -696,25 +729,24 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
 // 갈색 민무늬 화면 + 올라오는 😊 📺
 // ==========================================
 const CSS_ID = 'talkshow-style';
+let themeOn = false, bubbleTimer = null;
+
+// ★ 색은 inline 으로 얹지 않고 **스타일 규칙**으로 건다.
+//
+//   처음에는 body.style.setProperty 로 얹고, 지워지면 타이머로 다시 얹었다.
+//   그런데 skin.js 의 applyUiSkin 은 updateUI 마다 돌고, 벽지가 없으면
+//   clearUiSkin 이 body 의 inline 속성을 통째로 걷어 낸다(skin.js:441).
+//   그래서 「걷히고 → 다시 얹히고」가 되풀이되며 화면이 깜박였다.
+//   글자와 버튼 색이 변수에서 오므로, 변수가 없는 동안 글씨가 사라진 것처럼
+//   보였다.
+//
+//   규칙으로 걸면 걷어 갈 inline 속성이 없다. 다시 얹을 일도 없으니
+//   깜박이지 않는다. skin.js 가 쇼가 도는 동안 손대지 않도록 눕혀 두기도 한다.
 function injectCss() {
-    if (document.getElementById(CSS_ID)) return;
-    const st = document.createElement('style');
+    let st = document.getElementById(CSS_ID);
+    if (st) return;
+    st = document.createElement('style');
     st.id = CSS_ID;
-    st.textContent =
-        '#talkshow-bubbles{position:fixed;left:0;right:0;bottom:0;top:0;pointer-events:none;z-index:9998;overflow:hidden}'
-      + '#talkshow-bubbles span{position:absolute;bottom:-40px;font-size:20px;opacity:0;'
-      + 'animation:tsRise 9s linear forwards;will-change:transform,opacity}'
-      + '@keyframes tsRise{0%{opacity:0;transform:translateY(0) translateX(0)}'
-      + '12%{opacity:.5}70%{opacity:.35}100%{opacity:0;transform:translateY(-104vh) translateX(var(--tsx,0px))}}'
-      + 'body.talkshow-on{background-image:none !important}'
-      + 'body.talkshow-on .container{background-image:none !important}';
-    document.head.appendChild(st);
-}
-
-let themeOn = false, bubbleTimer = null, holdTimer = null;
-
-function setVars() {
-    const b = document.body;
     const v = {
         '--theme-focus': BROWN.accent, '--theme-accent': BROWN.accent,
         '--theme-border': BROWN.line, '--theme-text': BROWN.text,
@@ -729,14 +761,40 @@ function setVars() {
         '--sk-press-bot': BROWN.base, '--sk-glint': BROWN.accent + '33',
         '--sk-halo': BROWN.accent + '22', '--sk-shadow': 'rgba(0,0,0,.6)'
     };
-    Object.keys(v).forEach(function (k) { b.style.setProperty(k, v[k], 'important'); });
-    b.style.setProperty('background-color', BROWN.base, 'important');
-    b.style.setProperty('background-image', 'none', 'important');     // 민무늬
-    b.classList.add('talkshow-on');
-    const c = document.querySelector('.container');
-    if (c) {
-        c.style.setProperty('background-color', BROWN.base, 'important');
-        c.style.setProperty('background-image', 'none', 'important');
+    const vars = Object.keys(v).map(function (k) { return k + ':' + v[k] + ' !important;'; }).join('');
+    st.textContent =
+        'body.talkshow-on{' + vars
+      + 'background-color:' + BROWN.base + ' !important;background-image:none !important;}'
+      + 'body.talkshow-on .container{background-color:' + BROWN.base
+      + ' !important;background-image:none !important;}'
+      + '#talkshow-bubbles{position:fixed;left:0;right:0;bottom:0;top:0;pointer-events:none;z-index:9998;overflow:hidden}'
+      + '#talkshow-bubbles span{position:absolute;bottom:-40px;font-size:20px;opacity:0;'
+      + 'animation:tsRise 9s linear forwards;will-change:transform,opacity}'
+      + '@keyframes tsRise{0%{opacity:0;transform:translateY(0) translateX(0)}'
+      + '12%{opacity:.5}70%{opacity:.35}100%{opacity:0;transform:translateY(-104vh) translateX(var(--tsx,0px))}}';
+    document.head.appendChild(st);
+}
+
+// 쇼가 도는 동안에는 skin.js 가 body 를 건드리지 않게 눕힌다.
+// 눕히지 않으면 벽지를 쓰는 사원은 inline !important 가 규칙을 이겨 버린다.
+let skinHeld = null;
+function holdSkin(on) {
+    if (on) {
+        if (skinHeld) return;
+        skinHeld = {
+            apply: (typeof applyUiSkin === 'function') ? applyUiSkin : null,
+            clear: (typeof clearUiSkin === 'function') ? clearUiSkin : null
+        };
+        // 쓰던 벽지의 inline 속성을 한 번 걷어 낸다 — 그래야 규칙이 보인다
+        try { if (skinHeld.clear) skinHeld.clear(currentUser); } catch (e) { }
+        if (skinHeld.apply) applyUiSkin = function () { };
+        if (skinHeld.clear) clearUiSkin = function () { };
+    } else {
+        if (!skinHeld) return;
+        if (skinHeld.apply) applyUiSkin = skinHeld.apply;
+        if (skinHeld.clear) clearUiSkin = skinHeld.clear;
+        const h = skinHeld; skinHeld = null;
+        try { if (h.apply) h.apply(currentUser); else if (h.clear) h.clear(currentUser); } catch (e) { }
     }
 }
 
@@ -768,26 +826,21 @@ function bubbles(on) {
     }, 1900);
 }
 
+// 바뀔 때만 손댄다. 돌고 있는 동안에는 아무것도 다시 얹지 않는다 — 그게 깜박임이었다.
 function paintTheme() {
     const on = !!showOf();
-    if (on === themeOn) { if (on) setVars(); return; }
+    if (on === themeOn) return;
     themeOn = on;
     if (on) {
         injectCss();
-        setVars();
+        holdSkin(true);
+        document.body.classList.add('talkshow-on');
         bubbles(true);
-        if (!holdTimer) holdTimer = setInterval(function () {
-            // updateUI 가 화면을 다시 그리면 색이 날아간다 — 계속 다시 얹는다
-            if (themeOn && !document.body.classList.contains('talkshow-on')) setVars();
-        }, 700);
         console.log('[토크쇼] 갈색 화면을 켰습니다');
     } else {
         bubbles(false);
-        if (holdTimer) { clearInterval(holdTimer); holdTimer = null; }
         document.body.classList.remove('talkshow-on');
-        document.body.style.removeProperty('background-image');
-        if (typeof clearUiSkin === 'function') { try { clearUiSkin(currentUser); } catch (e) { } }
-        if (typeof applyUiSkin === 'function') { try { applyUiSkin(currentUser); } catch (e) { } }
+        holdSkin(false);
         console.log('[토크쇼] 갈색 화면을 껐습니다');
     }
 }
@@ -795,12 +848,16 @@ setInterval(function () { try { paintTheme(); } catch (e) { } }, 1500);
 
 window.showTheme = function (on) {
     if (on === false) {
-        themeOn = true;          // 켜져 있는 것으로 보고 paintTheme 이 끄게 한다
-        paintTheme();
+        bubbles(false);
+        document.body.classList.remove('talkshow-on');
+        holdSkin(false);
+        themeOn = false;
         console.log('[토크쇼] 되돌렸습니다.');
         return;
     }
-    injectCss(); setVars(); bubbles(true); themeOn = true;
+    injectCss(); holdSkin(true);
+    document.body.classList.add('talkshow-on');
+    bubbles(true); themeOn = true;
     console.log('[토크쇼] 눌러 봤습니다. showTheme(false) 로 되돌립니다.');
 };
 
