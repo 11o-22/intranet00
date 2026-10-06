@@ -10323,7 +10323,14 @@ function adminGiveItem() {
                     db.users[ownerCode].inventory.push(baseName);
                     addHistoryLog(db.users[ownerCode], `[당국 개입] ${u.name} 사원에게 장착했던 ${baseName}이(가) 반환되었습니다.`);
                     db.users[ownerCode]._adminStamp = Date.now();
-                    if (database) database.ref('users/' + ownerCode).set(db.users[ownerCode]);
+                    // ★ set 으로 통째 쓰면 그 사원의 기록이 내 화면 시점으로 되돌아간다.
+                    //   (최근에 산 것이 사라지고, 예전에 쓴 것이 되살아난다)
+                    //   바꿀 뜻이 있는 두 가지만 보낸다. save-merge 가 소지품은
+                    //   「늘어난 것·줄어든 것」으로 바꿔 준다.
+                    if (database) updateUserFields(ownerCode, {
+                        inventory: db.users[ownerCode].inventory,
+                        history: db.users[ownerCode].history
+                    });
                 } else {
                     // 장착자가 없거나 사라진 계정이면 착용자에게 남긴다
                     u.inventory.push(baseName);
