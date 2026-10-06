@@ -883,7 +883,7 @@
 
                     <div id="alien-game-section" style="background:#151515; padding:15px; border:1px solid #333; margin-bottom:15px; border-radius:6px; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);">
                         <div style="font-size:12px; color:#00A2E8; margin-bottom:4px; font-weight:bold;">
-                            [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">3</span> / 3회)
+                            [우주 주파수 채널 접속기] (남은 기회: <span id="alien-tries-left" style="font-weight:bold; color:#fff;">4</span> / 4회)
                         </div>
                         <!-- 타이머가 들어갈 깔끔한 위치 -->
                         <div id="alien-cooldown-timer" style="font-size:11px; color:#ff9800; margin-bottom:10px; font-weight:bold; display:none;"></div>
@@ -1301,7 +1301,7 @@ function getTodayStr() {
                 no: "0000", points: 99999, pollution: 0, lastPollutionTime: Date.now(), 
                 facilityCount: 0, facilityMax: 20, lastFacilityDate: getTodayStr(), hasVIP: true,
                 blindfoldUntil: 0, quarantineUntil: 0, quarantineExitPollution: 0, equippedWeapons: [], bloodBathDailyUsedMs: 0, bloodBathEquippedAt: 0,
-                alienDate: getTodayStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
+                alienDate: get22HourCycleStr(), alienTries: 0, alienBoughtItems: [], ticketAddedDate: getTodayStr(), ticketAddedCount: 5,
                 alienUnlockedItems: ["작두", "유리손포", "사과맛 물약", "제거약", "착한 친구"],
                 inventory: ["상비약 (오염도 -10%)"], receivedRations: [], history: [], letters: [], purchaseRecord: {},
                 badge: { photo: "", nickname: "총괄상담사", notes: "1급 보안 인가자 (VVIP) / 여우 상담실 책임자" },
@@ -4727,7 +4727,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (given) saveDB();
     }
 
-    function getShopCycleKey() { return getTodayStr(); }
+    function getShopCycleKey() { return get22HourCycleStr(); }   // 유쾌 판매소 — 밤 10시 기준
 
     function getToday5ShopItems() {
         if (currentUser && currentUser.code === 'kario0987') return ALL_10_ITEMS;
@@ -5535,16 +5535,16 @@ function startFoxRoomSequence() {
         const cycle22h = get22HourCycleStr(); // 22시 기준
         const f = {};
 
-        // 공용시설 이용 횟수 — 22시 기준
-        if (currentUser.lastFacilityDate !== cycle22h) {
+        // 공용시설 이용 횟수 — 자정 기준
+        if (currentUser.lastFacilityDate !== currentToday) {
             currentUser.facilityCount = 0;
-            currentUser.lastFacilityDate = cycle22h;
+            currentUser.lastFacilityDate = currentToday;
             f.facilityCount = 1; f.lastFacilityDate = 1;
         }
 
-        // 티켓으로 늘린 한도 — 22시 기준
-        if (currentUser.ticketAddedDate !== cycle22h) {
-            currentUser.ticketAddedDate = cycle22h;
+        // 티켓으로 늘린 한도 — 자정 기준 (공용시설 한도를 따라간다)
+        if (currentUser.ticketAddedDate !== currentToday) {
+            currentUser.ticketAddedDate = currentToday;
             currentUser.ticketAddedCount = 0;
             currentUser.ticketAddedMax = 0;
             currentUser.birthAddedMax = 0;
@@ -5552,16 +5552,18 @@ function startFoxRoomSequence() {
             f.ticketAddedMax = 1; f.birthAddedMax = 1;
         }
 
-        // 우주 쇼핑몰 — 자정 기준
-        if (currentUser.alienDate !== currentToday) {
-            currentUser.alienDate = currentToday;
+        // 우주 쇼핑몰 — 밤 10시 기준
+        if (currentUser.alienDate !== cycle22h) {
+            currentUser.alienDate = cycle22h;
             currentUser.alienBoughtItems = [];
             currentUser.alienUnlockedItems = [];
             currentUser.alienTries = 0;
             currentUser.alienDailyUsed = 0;
             currentUser.lastAlienPlayTime = 0;
+            currentUser.alienBout = null;
             f.alienDate = 1; f.alienBoughtItems = 1; f.alienUnlockedItems = 1;
             f.alienTries = 1; f.alienDailyUsed = 1; f.lastAlienPlayTime = 1;
+            f.alienBout = 1;
         }
 
         // 어둠 탐사 — 자정 기준
@@ -5876,14 +5878,15 @@ const isLocked = currentUser.pollution >= 100;
             document.getElementById('shop-content-box').style.display = 'block';
         }
 
-                document.getElementById('alien-tries-left').innerText = Math.max(0, 3 - (currentUser.alienDailyUsed || 0));
+                document.getElementById('alien-tries-left').innerText = Math.max(0, 4 - (currentUser.alienDailyUsed || 0));
                // ★ 남은 기회가 0이면 HIGH/LOW 버튼 잠금
         const hlH = document.getElementById('btn-hl-high');
         const hlL = document.getElementById('btn-hl-low');
         if (hlH && hlL) {
-      const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 3 - (currentUser.alienDailyUsed || 0));
-const coolDone = !currentUser.lastAlienPlayTime || (Date.now() - currentUser.lastAlienPlayTime >= 4 * 60 * 60 * 1000);
-const playable = triesLeft > 0 && coolDone;
+      const triesLeft = (currentUser.code === 'kario0987') ? 99 : Math.max(0, 4 - (currentUser.alienDailyUsed || 0));
+const coolDone = !currentUser.lastAlienPlayTime || (Date.now() - currentUser.lastAlienPlayTime >= ALIEN_COOL_MS);
+// 도전 한 묶음(세 판)이 끝나기 전에는 남은 판을 계속 칠 수 있어야 한다
+const playable = !!currentUser.alienBout || (triesLeft > 0 && coolDone);
 hlH.disabled = !playable;
 hlL.disabled = !playable;
         }
@@ -6968,8 +6971,8 @@ if (cat.effect === 'couple_ring') {
         
         const addsFacility = ['ticket', 'radio', 'candy'].includes(cat.effect);
         if (addsFacility) {
-            if (targetUser.ticketAddedDate !== get22HourCycleStr()) {
-                targetUser.ticketAddedDate = get22HourCycleStr(); targetUser.ticketAddedCount = 0;
+            if (targetUser.ticketAddedDate !== getTodayStr()) {
+                targetUser.ticketAddedDate = getTodayStr(); targetUser.ticketAddedCount = 0;
                 targetUser.ticketAddedMax = 0;
             }
                        if (targetUser.ticketAddedCount >= 5) {
@@ -8998,46 +9001,62 @@ function bjFinish(mode) {
     });
 }
   // --- 우주 쇼핑몰 ---
+   const ALIEN_DAILY_MAX = 4;                       // 하루 네 번
+   const ALIEN_COOL_MS = 3 * 60 * 60 * 1000;        // 세 시간에 한 번
+   const ALIEN_BOUT_ROUNDS = 3;                     // 한 도전은 업다운 세 판
+   const ALIEN_BOUT_WIN = 2;                        // 그 중 두 판을 이겨야 입고된다
    let dealerCardValue = 50; 
    function playHighLow(choice) {
         if (!currentUser) return;
         if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 우주 주파수에 접속할 수 없습니다.'); return; }
         
         const now = Date.now();
-        const fourHoursMs = 4 * 60 * 60 * 1000; // 4시간 (밀리초)
 
-               // 자정 리셋은 updateUI가 전담하므로 여기선 방어만
-        const todayStr = getTodayStr();
-        if (currentUser.alienDate !== todayStr) {
-            currentUser.alienDate = todayStr;
+               // 밤 10시 리셋은 updateUI가 전담하므로 여기선 방어만
+        const cycleStr = get22HourCycleStr();
+        if (currentUser.alienDate !== cycleStr) {
+            currentUser.alienDate = cycleStr;
             currentUser.alienBoughtItems = [];
             currentUser.alienUnlockedItems = [];
             currentUser.alienTries = 0;
             currentUser.alienDailyUsed = 0;
             currentUser.lastAlienPlayTime = 0;
+            currentUser.alienBout = null;
         }
 
+        // ★ 한 번의 도전은 업다운 세 판이다.
+        //   도전을 새로 시작할 때만 횟수와 시간 제한을 본다.
+        //   (판 사이에는 다시 묻지 않는다)
+        const fresh = !currentUser.alienBout;
+
         // 관리자(kario0987)는 제한 없음
-        if (currentUser.code !== 'kario0987') {
+        if (fresh && currentUser.code !== 'kario0987') {
     if (currentUser.alienDailyUsed === undefined) currentUser.alienDailyUsed = 0;
 
-    // 하루 2회 상한
-    if (currentUser.alienDailyUsed >= 3) {
-        showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 자정에 초기화됩니다.');
+    // 하루 상한
+    if (currentUser.alienDailyUsed >= ALIEN_DAILY_MAX) {
+        showCustomAlert('금일 우주 주파수 연결 기회를 모두 소진했습니다. 밤 10시에 초기화됩니다.');
         return;
     }
 
-    // 2회차는 1회차로부터 4시간 뒤에만
+    // 다음 도전은 앞 도전으로부터 세 시간 뒤에만
     if (currentUser.alienDailyUsed >= 1 && currentUser.lastAlienPlayTime) {
         const elapsed = now - currentUser.lastAlienPlayTime;
-        if (elapsed < fourHoursMs) {
-            const remainMin = Math.ceil((fourHoursMs - elapsed) / 60000);
+        if (elapsed < ALIEN_COOL_MS) {
+            const remainMin = Math.ceil((ALIEN_COOL_MS - elapsed) / 60000);
             const h = Math.floor(remainMin / 60), m = remainMin % 60;
             showCustomAlert(`다음 우주 주파수 연결까지 약 ${h > 0 ? h + '시간 ' : ''}${m}분 남았습니다.`);
             return;
         }
     }
 }
+
+        // 도전 묶음 시작 — 여기서 한 번만 횟수를 깎는다
+        if (fresh) {
+            currentUser.alienBout = { w: 0, l: 0 };
+            currentUser.alienDailyUsed = (currentUser.alienDailyUsed || 0) + 1;
+            currentUser.lastAlienPlayTime = now;
+        }
         const btnH = document.getElementById('btn-hl-high'); 
         const btnL = document.getElementById('btn-hl-low');
         btnH.disabled = true; btnL.disabled = true;
@@ -9057,14 +9076,37 @@ function bjFinish(mode) {
             document.getElementById('hl-player-card').innerText = playerCardValue;
         }
         
-        // 횟수 증가 및 마지막 플레이 시간 기록
-        
-        currentUser.alienDailyUsed = (currentUser.alienDailyUsed || 0) + 1;
-        currentUser.lastAlienPlayTime = now;
+        // 이 판의 결과를 묶음에 적는다
+        const bout = currentUser.alienBout || { w: 0, l: 0 };
+        if (win) bout.w = (bout.w || 0) + 1; else bout.l = (bout.l || 0) + 1;
+        const boutWon = bout.w >= ALIEN_BOUT_WIN;
+        const boutLost = bout.l > ALIEN_BOUT_ROUNDS - ALIEN_BOUT_WIN;
+        const played = bout.w + bout.l;
+        const tally = `<span style="color:#888; font-size:11px;"> (${bout.w}승 ${bout.l}패 · ${played}/${ALIEN_BOUT_ROUNDS}판)</span>`;
+        if (boutWon || boutLost) currentUser.alienBout = null;
 
-        if (win) {
+        if (!boutWon && !boutLost) {
+            // 아직 안 끝났다 — 다음 판으로
+            setUFODialogue(win ? "……? " : " 더 봐야겠다. ");
+            msgEl.innerHTML = (win
+                ? `<span style="color:#4CAF50; font-weight:bold;">[이번 판 승]</span>`
+                : `<span style="color:#f44336; font-weight:bold;">[이번 판 패]</span>`) + tally
+                + `<br><span style="font-size:11px; color:#aaa;">두 판을 이기면 입고됩니다.</span>`;
+            addHistoryLog(currentUser, `[우주 대결] ${played}판째 ${win ? '승' : '패'} (${bout.w}승 ${bout.l}패)`);
+            saveDB();
+            setTimeout(() => {
+                dealerCardValue = Math.floor(Math.random() * 99) + 1;
+                document.getElementById('hl-dealer-card').innerText = dealerCardValue;
+                document.getElementById('hl-player-card').innerText = "?";
+                btnH.disabled = false; btnL.disabled = false;
+                updateUI();
+            }, 1500);
+            return;
+        }
+
+        if (boutWon) {
             setUFODialogue("……. ");
-            msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>`;
+            msgEl.innerHTML = `<span style="color:#4CAF50; font-weight:bold;">[인증 성공!] 우주 물품이 입고되었습니다.</span>` + tally;
             if (!currentUser.alienUnlockedItems) currentUser.alienUnlockedItems = [];
             
             const isDisasterTeam = currentUser.affiliation.includes("재난관리국") || currentUser.team.includes("재난관리") || currentUser.code === 'kario0987' || /어둠/.test((currentUser.affiliation || "") + " " + (currentUser.team || ""));
@@ -9128,11 +9170,11 @@ function bjFinish(mode) {
             } else if (got < addCount) {
                 msgEl.innerHTML = `<span style="color:#ffd700; font-weight:bold;">[인증 성공] ${got}종이 입고되었습니다. 남은 물품이 모자랍니다.</span>`;
             }
-            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리 (+${got}종)`);
+            addHistoryLog(currentUser, `[우주 해금] 하이로우 대결 승리 ${bout.w}승 ${bout.l}패 (+${got}종)`);
         } else {
             setUFODialogue(" 좋은 물건을 산다. ");
-            msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>`;
-            addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배`);
+            msgEl.innerHTML = `<span style="color:#f44336; font-weight:bold;">[실패] 주파수가 왜곡되었습니다.</span>` + tally;
+            addHistoryLog(currentUser, `[우주 실패] 하이로우 대결 패배 (${bout.w}승 ${bout.l}패)`);
         }
         
         saveDB();
@@ -9141,7 +9183,8 @@ function bjFinish(mode) {
     document.getElementById('hl-dealer-card').innerText = dealerCardValue;
             document.getElementById('hl-player-card').innerText = "?";
                         // ★ 기회가 남아있을 때만 버튼 재활성화
-            const canPlayAgain = (currentUser.code === 'kario0987') || (currentUser.alienTries < 3);
+            const canPlayAgain = (currentUser.code === 'kario0987')
+                || (currentUser.alienDailyUsed || 0) < ALIEN_DAILY_MAX;
             btnH.disabled = !canPlayAgain;
             btnL.disabled = !canPlayAgain;
             updateUI();
@@ -9411,7 +9454,7 @@ function saveSelfFull() {
             lastPollutionTime: Date.now(),
             facilityCount: 0, 
             facilityMax: 20, 
-            lastFacilityDate: get22HourCycleStr(), 
+            lastFacilityDate: getTodayStr(), 
             hasVIP: false,
             blindfoldUntil: 0, 
             quarantineUntil: 0, 
@@ -9419,7 +9462,7 @@ function saveSelfFull() {
             equippedWeapons: [], 
             bloodBathDailyUsedMs: 0, 
             bloodBathEquippedAt: 0,
-            alienDate: getTodayStr(), 
+            alienDate: get22HourCycleStr(), 
             alienTries: 0, 
             alienBoughtItems: [], 
             ticketAddedDate: "", 
@@ -10244,14 +10287,14 @@ function admItemSelectNone() {
             if (!u) return;
             if (kind === 'facility' || kind === 'all') {
                 u.facilityCount = 0;
-                u.lastFacilityDate = get22HourCycleStr();
+                u.lastFacilityDate = getTodayStr();
             }
                  if (kind === 'alien' || kind === 'all') {
                 u.alienTries = 0;
                 u.alienDailyUsed = 0;
                 u.lastAlienPlayTime = 0;
-                u.alienDate = getTodayStr();
-                // ★ 기회만 채우고 진열대를 그대로 두면, 자정 리셋 조건에도 안 걸려 영영 남는다
+                u.alienDate = get22HourCycleStr();
+                // ★ 기회만 채우고 진열대를 그대로 두면, 밤 10시 리셋 조건에도 안 걸려 영영 남는다
                 u.alienUnlockedItems = [];
                 u.alienBoughtItems = [];
             }
@@ -10264,7 +10307,7 @@ function admItemSelectNone() {
             if (kind === 'facility' || kind === 'all') {
                 u.facilityCount = 0;
                 u.facilityMax = 20;
-                u.lastFacilityDate = get22HourCycleStr();
+                u.lastFacilityDate = getTodayStr();
             }
             u._adminStamp = Date.now();
             addHistoryLog(u, `[당국 개입] ${label.join(', ')} 이용 횟수가 충전되었습니다.`);
@@ -10832,7 +10875,7 @@ if (bathModal) bathModal.style.display = 'none';
         // 스택이 비어있으면 메인 화면이므로 브라우저가 알아서 종료(나가기)됨
     });
     // ==========================================
-    // ★ 우주 쇼핑몰 4시간 쿨타임 실시간 타이머 갱신
+    // ★ 우주 쇼핑몰 3시간 쿨타임 실시간 타이머 갱신
     // ==========================================
        setInterval(() => {
         if (!activeVipSessionId || !db.vipSessions || !db.vipSessions[activeVipSessionId]) return;
@@ -10871,15 +10914,23 @@ if (bathModal) bathModal.style.display = 'none';
     if (!el || !currentUser) return;
     if (currentUser.code === 'kario0987') { el.style.display = 'none'; return; }
 
-    const used = currentUser.alienDailyUsed || 0;
-    if (used >= 3) {
+    // 도전 중이면 남은 판을 보여 준다
+    if (currentUser.alienBout) {
+        const bt = currentUser.alienBout;
         el.style.display = 'block';
-        el.innerHTML = '금일 연결 기회를 모두 소진했습니다. (자정 초기화)';
+        el.innerHTML = `도전 중 — ${bt.w || 0}승 ${bt.l || 0}패 (${(bt.w || 0) + (bt.l || 0)}/3판 · 두 판을 이기면 입고)`;
+        return;
+    }
+
+    const used = currentUser.alienDailyUsed || 0;
+    if (used >= 4) {
+        el.style.display = 'block';
+        el.innerHTML = '금일 연결 기회를 모두 소진했습니다. (밤 10시 초기화)';
         return;
     }
     if (used < 1 || !currentUser.lastAlienPlayTime) { el.style.display = 'none'; return; }
 
-    const remain = (4 * 60 * 60 * 1000) - (Date.now() - currentUser.lastAlienPlayTime);
+    const remain = ALIEN_COOL_MS - (Date.now() - currentUser.lastAlienPlayTime);
     if (remain <= 0) { el.style.display = 'none'; return; }
 
     const h = Math.floor(remain / 3600000);
