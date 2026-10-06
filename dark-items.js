@@ -36,11 +36,22 @@ function usableNow(name) {
         || /^q_/.test(e) || /^s3_/.test(e) || /^s003_/.test(e) || /^c_/.test(e);
 }
 
+// 구역을 가리는 것들 — 어느 구역에서만 되는지 이름까지 적어 둔다.
+// (「이 구역에서는 쓸 수 없습니다」 만 뜨면 어디로 가야 하는지 알 수가 없다)
+const ZONE_ONLY = {
+    s3_voice: { zone: 'Qtrew-S-003', label: '동화의 뒷면' }
+};
+
 // 이 구역에서 쓸 수 있는가
 function zoneOk(name) {
-    const cat = ITEM_CATALOG[name] || {};
-    if (cat.effect === 's3_voice') return darkRun && darkRun.zone === 'Qtrew-S-003';
-    return true;
+    const need = ZONE_ONLY[(ITEM_CATALOG[name] || {}).effect];
+    if (!need) return true;
+    return !!(darkRun && darkRun.zone === need.zone);
+}
+
+function zoneWhy(name) {
+    const need = ZONE_ONLY[(ITEM_CATALOG[name] || {}).effect];
+    return need ? (need.label + '(' + need.zone + ')에서만 쓸 수 있습니다.') : '이 구역에서는 쓸 수 없습니다.';
 }
 
 function listMine() {
@@ -48,7 +59,8 @@ function listMine() {
     const cnt = {};
     inv.forEach(function (n) { if (usableNow(n)) cnt[n] = (cnt[n] || 0) + 1; });
     return Object.keys(cnt).sort().map(function (n) {
-        return { name: n, n: cnt[n], ok: zoneOk(n), desc: (ITEM_CATALOG[n] || {}).desc || '' };
+        return { name: n, n: cnt[n], ok: zoneOk(n), why: zoneWhy(n),
+                 desc: (ITEM_CATALOG[n] || {}).desc || '' };
     });
 }
 
@@ -69,14 +81,22 @@ window.openDarkItems = function () {
     const rows = listMine();
     const body = rows.length
         ? rows.map(function (r) {
-            const dim = r.ok ? '' : ' opacity:0.4;';
-            const click = r.ok ? ' onclick="useDarkItem(\'' + r.name.replace(/'/g, "\\'") + '\')"' : '';
+            const dim = r.ok ? '' : ' opacity:0.78;';
+            const safe = r.name.replace(/'/g, "\\'");
+            const btn = r.ok
+                ? '<button class="game-btn" style="margin:8px 0 0 0; padding:9px; width:100%; font-size:11px;'
+                  + ' background:linear-gradient(145deg,#1e5f7f,#0d3a52) !important; border-color:#2f7f9f !important;'
+                  + ' color:#dff3ff !important;" onclick="useDarkItem(\'' + safe + '\')">사용하기</button>'
+                : '<button class="game-btn" style="margin:8px 0 0 0; padding:9px; width:100%; font-size:11px;'
+                  + ' background:#161616 !important; border-color:#333 !important; color:#8a8a8a !important;'
+                  + ' cursor:default;" disabled>여기서는 못 씁니다</button>';
             return '<div style="border:1px solid #2a2a2a; border-radius:6px; padding:11px 12px; margin-bottom:7px;'
-                + ' background:rgba(0,0,0,0.3);' + dim + (r.ok ? ' cursor:pointer;' : '') + '"' + click + '>'
+                + ' background:rgba(0,0,0,0.3);' + dim + '">'
                 + '<div style="font-size:12px; font-weight:bold; color:' + (r.ok ? '#4fc3f7' : '#777') + ';">'
                 + r.name + (r.n > 1 ? ' <span style="color:#888; font-size:10px;">×' + r.n + '</span>' : '') + '</div>'
                 + '<div style="font-size:10px; color:#999; margin-top:4px; line-height:1.6;">' + r.desc + '</div>'
-                + (r.ok ? '' : '<div style="font-size:10px; color:#ff8a65; margin-top:4px;">이 구역에서는 쓸 수 없습니다.</div>')
+                + (r.ok ? '' : '<div style="font-size:10px; color:#ff8a65; margin-top:4px;">' + r.why + '</div>')
+                + btn
                 + '</div>';
         }).join('')
         : '<div style="color:#777; font-size:12px; text-align:center; padding:28px 0;">'
@@ -91,7 +111,7 @@ window.openDarkItems = function () {
         + ' background:#0d0d0d; border:1px solid #2f5f7f; border-radius:8px; padding:16px;">'
         + '<div style="font-size:13px; font-weight:bold; color:#4fc3f7; margin-bottom:4px;">소지품</div>'
         + '<div style="font-size:10px; color:#888; margin-bottom:13px; line-height:1.6;">'
-        + '탐사 중에 쓸 수 있는 것만 보입니다. 누르면 바로 씁니다.</div>'
+        + '탐사 중에 쓸 수 있는 것만 보입니다.</div>'
         + body
         + '<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px; font-size:11px;"'
         + ' onclick="closeDarkItems()">닫는다</button>'

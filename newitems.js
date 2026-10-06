@@ -82,7 +82,7 @@ const S003_ITEMS = {
     "연필 끝":          { price:800,  effect:"s3_pencil", desc:"[???] 적는 단계의 오답 1회를 없던 것으로 한다." },
     "덧쓴 이름":        { price:1300, effect:"s3_name",   desc:"[???] 이름이 불릴 때 한 번은 대답하지 않아도 된다." },
     "마지막 줄의 여백": { price:1800, effect:"s3_margin", desc:"[???] 마지막 판정에 +5." },
-    "읽어 준 목소리":   { price:2000, effect:"s3_voice",  desc:"[???] 사용 즉시 이해도가 15 내려간다. 탐사 중에만." }
+    "읽어 준 목소리":   { price:2000, effect:"s3_voice",  desc:"[???] 사용 즉시 이해도가 15 내려간다. 동화의 뒷면(Qtrew-S-003) 탐사 중에만." }
 };
 Object.keys(S003_ITEMS).forEach(n => {
     const it = S003_ITEMS[n];
