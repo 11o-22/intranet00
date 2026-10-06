@@ -81,13 +81,17 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러'];
+const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러', '페르소나'];
 
 // 상담사 칭호에 붙는 그림
 //
 // 저장되는 이름은 그대로 두고 보일 때만 앞에 붙인다.
 // 이름을 바꾸면 이미 받아 간 사람의 titleAdmin 과 어긋난다.
-const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤', '이레귤러': '⛓️‍💥' };
+const ADMIN_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤', '이레귤러': '⛓️‍💥',
+                     '페르소나': '🎭' };
+
+// 상담사 칭호에 붙는 설명 — 적지 않으면 아무것도 안 붙는다
+const ADMIN_DESC = { '페르소나': '대학교 이벤트 MVP 전용 칭호.' };
 
 // 이름을 바꾼 칭호 — 예전 이름으로 받아 간 사람을 새 이름으로 옮긴다
 const RENAMED = { '신입': '뉴비' };
@@ -858,7 +862,13 @@ function renderTitleList() {
                 return '<div style="display:flex; justify-content:space-between; align-items:center;'
                     + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
                     + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
+                    + '<div style="min-width:0;">'
                     + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + label(n) + ']</span>'
+                    + (ADMIN_DESC[n]
+                        ? '<div style="font-size:10px; color:#7d7870; margin-top:3px; line-height:1.5;">'
+                          + ADMIN_DESC[n] + '</div>'
+                        : '')
+                    + '</div>'
                     + '<button class="game-btn" style="margin:0; padding:6px 12px; font-size:10px;'
                     + (on ? ' background:linear-gradient(145deg,#6a5a2a,#3a2f18) !important;'
                           + ' border-color:#d4af37 !important; color:#fff !important;' : '')

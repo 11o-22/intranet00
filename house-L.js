@@ -86,10 +86,12 @@ function isAdmin(u) { return !!(u && u.code === ADMIN); }
     }, 400);
 })();
 
-// 이 호실이 L 인가 — 상담사 본인이거나, 상담사와 같은 방을 쓰는 사람
+// 이 호실이 L 인가 — 상담사 본인이거나, 상담사와 같은 방을 쓰는 사람,
+// 그리고 「찢어진 메모지」를 쓴 사람 (secretbox.js 가 houseL 을 적는다)
 function isL(user) {
     if (!user) return false;
     if (user.code === ADMIN) return true;
+    if (user.houseL) return true;
     const h = user.house;
     return !!(h && h.roomie === ADMIN);
 }
