@@ -1081,6 +1081,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         const life = msToMidnight();
         const took = [];
         let movedGear = false;
+        const pulledLabels = [];       // 상대에게서 실제로 뺀 라벨
 
         // 고른 것이 아니라 지닌 것을 전부 가져온다
         const on = [];
@@ -1106,6 +1107,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
                 // 그래서 상대 칸에서는 잠시 빼 두고, 돌려줄 때 그대로 되돌린다.
                 const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
                 eq.splice(at, 1);
+                pulledLabels.push(w);                       // 서버에는 이것만 뺀다고 알린다
                 const ownerWas = (target.equipOwner && target.equipOwner[w] != null)
                     ? target.equipOwner[w] : null;
                 if (target.equipOwner) delete target.equipOwner[w];
@@ -1176,11 +1178,18 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         if (movedGear) {
             noUndef(currentUser.stolenGear);
             saveFields({ borrowedGear: 1 });
-            updateUserFields(target.code, {
-                equippedWeapons: target.equippedWeapons || [],
-                equipOwner: target.equipOwner || {},
-                gearLock: target.gearLock || {}
-            });
+            // 배열을 통째로 보내면 안 된다. target 은 내 화면이 들고 있는 남의
+            // 사본이라, equippedWeapons 가 비어 있으면 상대 장착칸이 통째로
+            // 날아간다. 뺀 라벨만 보낸다. (gear-move.js)
+            if (typeof gearPull === 'function') {
+                gearPull(target.code, pulledLabels, target.gearLock || {});
+            } else {
+                updateUserFields(target.code, {
+                    equippedWeapons: target.equippedWeapons || [],
+                    equipOwner: target.equipOwner || {},
+                    gearLock: target.gearLock || {}
+                });
+            }
             saveFields({ stolenGear: 1 });
         }
 
@@ -1238,10 +1247,13 @@ function returnStolen(label, quiet) {
         if (currentUser.equipOwner) delete currentUser.equipOwner[label];
 
         if (t) {
+            const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
+
+            // 내 화면 사본도 맞춰 둔다 (보이는 것만 — 서버는 아래에서 따로)
             const te = t.equippedWeapons || [];
             const si = te.indexOf(SEAL + rec.orig);
             if (si >= 0) {
-                te[si] = rec.orig;                      // 예전 봉인판을 푼다
+                te[si] = rec.orig;
                 if (t.equipOwner && t.equipOwner[SEAL + rec.orig] != null) {
                     t.equipOwner[rec.orig] = t.equipOwner[SEAL + rec.orig];
                     delete t.equipOwner[SEAL + rec.orig];
@@ -1254,16 +1266,22 @@ function returnStolen(label, quiet) {
                 }
             }
             t.equippedWeapons = te;
-            const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
             if (t.gearLock) delete t.gearLock[baseBack];
             if (typeof appendBadgeNoteToUser === 'function') {
                 appendBadgeNoteToUser(t, '[장착됨] ' + baseBack);
             }
-            updateUserFields(t.code, {
-                equippedWeapons: t.equippedWeapons,
-                equipOwner: t.equipOwner || {},
-                gearLock: t.gearLock || {}
-            });
+
+            // ★ 서버에는 배열을 통째로 보내지 않는다. 사본이 비어 있으면
+            //   상대 장착칸이 텅 빈다. 돌려줄 하나만 보낸다. (gear-move.js)
+            if (typeof gearPush === 'function') {
+                gearPush(t.code, rec.orig, rec.owner, SEAL + rec.orig, baseBack);
+            } else {
+                updateUserFields(t.code, {
+                    equippedWeapons: t.equippedWeapons,
+                    equipOwner: t.equipOwner || {},
+                    gearLock: t.gearLock || {}
+                });
+            }
         }
     }
 
