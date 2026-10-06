@@ -22,6 +22,29 @@ const BANK_BL_WINDOW     = BANK_DAY;             // 집계 기간
 let bankState = null, bankRef = null, bankKey = null;
 
 function bankPath(code) { return 'bank/' + code; }
+
+// ==========================================
+// ★ 남의 은행 칸은 먼저 읽고 고친다
+//
+//   attachBank() 는 **내 칸**(bank/<내 코드>)에만 귀를 붙인다.
+//   그래서 남의 칸은 이 쪽 기억에 없고, transaction 의 첫 호출이 null 을 받는다.
+//   거기서 `if (!b) return;` 으로 돌아서면 파이어베이스는 그 자리에서 거래를 접고
+//   서버를 보러 가지 않는다. (committed = false)
+//   → VIP 승인을 눌러도 「이미 처리된 신청입니다」 만 뜨고 아무 일도 안 일어났다.
+//      블랙리스트 해제·신용 점수 가감(남의 것)도 같은 까닭으로 조용히 안 먹혔다.
+//
+//   먼저 읽고, 필요한 가지만 고쳐 쓴다. 칸을 통째로 되쓰지 않으니
+//   그 사이에 들어온 예금이 밀릴 일도 없다.
+// ==========================================
+function bankEdit(code, fn) {
+    if (!database || !code) return Promise.resolve(false);
+    const ref = database.ref(bankPath(code));
+    return ref.once('value').then(function (s) {
+        const fields = fn(s.val());
+        if (!fields) return false;
+        return ref.update(fields).then(function () { return true; });
+    });
+}
 function bankGrade(score) {
     return BANK_GRADES.find(x => (score || 0) >= x.min) || BANK_GRADES[BANK_GRADES.length - 1];
 }
@@ -180,12 +203,20 @@ function bankAddScore(delta, code) {
     if (!database) return;
     const c = code || (currentUser && currentUser.code);
     if (!c) return;
-    database.ref(bankPath(c)).transaction(b => {
-        if (!b) return;
-        if (b.blacklist && delta > 0) return;
-        b.score = bankClamp((b.score == null ? 500 : b.score) + delta);
-        return b;
-    });
+    if (currentUser && c === currentUser.code) {
+        database.ref(bankPath(c)).transaction(b => {
+            if (!b) return;
+            if (b.blacklist && delta > 0) return;
+            b.score = bankClamp((b.score == null ? 500 : b.score) + delta);
+            return b;
+        });
+        return;
+    }
+    bankEdit(c, function (b) {
+        if (!b) return null;
+        if (b.blacklist && delta > 0) return null;
+        return { score: bankClamp((b.score == null ? 500 : b.score) + delta) };
+    }).catch(e => console.error('[은행] 신용 점수 반영 실패:', e));
 }
 
 // --- 예금 ---
@@ -578,13 +609,10 @@ function adminBankBlacklist(on) {
         });
     } else {
         targets.forEach(code => {
-            database.ref(bankPath(code)).transaction(b => {
-                if (!b) return;
-                b.blacklist = null;
-                b.loanTimes = [];
-                b.score = Math.max(b.score || 0, 300);
-                return b;
-            });
+            bankEdit(code, function (b) {
+                if (!b) return null;
+                return { blacklist: null, loanTimes: null, score: Math.max(b.score || 0, 300) };
+            }).catch(e => console.error('[은행] 블랙리스트 해제 실패:', e));
         });
         showCustomAlert(`${targets.length}명의 블랙리스트를 해제했습니다.\n신용 300점(4등급)부터 다시 시작합니다.`);
     }
@@ -658,14 +686,19 @@ function renderAdminVipList() {
 
 function adminVipDecide(code, ok) {
     if (!database) return;
-    database.ref(bankPath(code)).transaction(b => {
-        if (!b || !b.vipRequest) return;
-        if (ok) b.vip = { at: Date.now(), by: 'admin' };
-        else b.vipRejectedAt = Date.now();
-        b.vipRequest = null;
-        return b;
-    }).then(res => {
-        if (!res.committed) { showCustomAlert('이미 처리된 신청입니다.'); renderAdminVipList(); return; }
+    let gone = false;
+    bankEdit(code, function (b) {
+        if (!b || !b.vipRequest) { gone = true; return null; }
+        const f = { vipRequest: null };
+        if (ok) f.vip = { at: Date.now(), by: 'admin' };
+        else f.vipRejectedAt = Date.now();
+        return f;
+    }).then(function (done) {
+        if (!done) {
+            showCustomAlert(gone ? '이미 처리된 신청입니다.' : '신청을 찾지 못했습니다.');
+            renderAdminVipList();
+            return;
+        }
         const u = db.users[code];
         if (u) {
             addHistoryLog(u, ok ? '[은행] VIP 심사를 통과했습니다.' : '[은행] VIP 심사에서 반려되었습니다.');
@@ -673,17 +706,19 @@ function adminVipDecide(code, ok) {
         }
         showCustomAlert(ok ? 'VIP로 승인했습니다.' : '반려했습니다.');
         renderAdminVipList();
+    }).catch(function (e) {
+        console.error('[은행] VIP 처리 실패:', e);
+        showCustomAlert('처리하지 못했습니다.\n\n' + ((e && e.message) ? e.message : e));
     });
 }
 
 function adminVipRevoke(code) {
     if (!database) return;
-    database.ref(bankPath(code)).transaction(b => {
-        if (!b || !b.vip) return;
-        b.vip = null;
-        return b;
-    }).then(res => {
-        if (!res.committed) return;
+    bankEdit(code, function (b) {
+        if (!b || !b.vip) return null;
+        return { vip: null };
+    }).then(function (done) {
+        if (!done) { showCustomAlert('이미 VIP가 아닙니다.'); renderAdminVipList(); return; }
         const u = db.users[code];
         if (u) {
             addHistoryLog(u, '[은행] VIP 자격이 박탈되었습니다.');
@@ -691,5 +726,8 @@ function adminVipRevoke(code) {
         }
         showCustomAlert('VIP 자격을 박탈했습니다.');
         renderAdminVipList();
+    }).catch(function (e) {
+        console.error('[은행] VIP 박탈 실패:', e);
+        showCustomAlert('처리하지 못했습니다.\n\n' + ((e && e.message) ? e.message : e));
     });
 }
