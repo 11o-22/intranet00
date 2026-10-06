@@ -96,6 +96,11 @@ function ui() {
     } catch (e) { }
 }
 
+// 서버에는 들어갔는데 화면 숫자가 늦게 따라오는 일이 있다. (save-merge.js 가
+// users/<사번> 을 지켜보다 내려 준다) 몇 번 더 그려 준다. currentUser 를
+// 직접 건드리지는 않는다 — 아직 안 날아간 내 변화를 지울 수 있으므로.
+function nudge() { [600, 1600, 3000].forEach(function (ms) { setTimeout(ui, ms); }); }
+
 // ==========================================
 // 출금
 // ==========================================
@@ -153,7 +158,7 @@ function withdraw() {
                         note({ 때: new Date().toLocaleTimeString(), 무엇: '출금 일부', 금액: amt,
                                사유: moved === null ? '포인트 쓰기 실패' : '포인트 상한',
                                포인트: have, 움직임: moved || 0, 되돌림: back });
-                        ui();
+                        ui(); nudge();
                     });
                 }
 
@@ -167,7 +172,7 @@ function withdraw() {
                 }
                 note({ 때: new Date().toLocaleTimeString(), 무엇: '출금', 금액: amt,
                        사유: '', 포인트: have, 움직임: take, 되돌림: 0 });
-                ui();
+                ui(); nudge();
             });
         });
     }).catch(function (e) {
@@ -220,7 +225,7 @@ function deposit() {
                     note({ 때: new Date().toLocaleTimeString(), 무엇: '입금 일부', 금액: amt,
                            사유: moved === null ? '포인트 쓰기 실패' : '포인트 부족',
                            움직임: took, 되돌림: back });
-                    ui();
+                    ui(); nudge();
                 });
             }
 
@@ -233,7 +238,7 @@ function deposit() {
                 : (put.toLocaleString() + ' P를 넣었습니다.'));
             note({ 때: new Date().toLocaleTimeString(), 무엇: '입금', 금액: amt,
                    사유: '', 움직임: put, 되돌림: 0 });
-            ui();
+            ui(); nudge();
         });
     }).catch(function (e) {
         console.error('[은행] 입금:', e);
@@ -281,6 +286,17 @@ window.bankCheck = function () {
             '· 한도', (typeof bankCap === 'function' ? bankCap(bankState) : 0).toLocaleString() + ' P');
     } else console.log('  계좌를 아직 못 읽었습니다.');
     if (cap() - have <= 0) console.log('  ※ 상한에 닿아 있어 지금은 출금해도 들어갈 자리가 없습니다.');
+
+    // 화면과 서버가 어긋나 있으면 그것이 「안 들어온 것처럼 보이는」 까닭이다
+    if (typeof database !== 'undefined' && database) {
+        database.ref('users/' + u.code + '/points').once('value').then(function (s) {
+            const srv = Number(s.val()) || 0;
+            if (srv === have) { console.log('  화면과 서버가 같습니다. (' + srv.toLocaleString() + ' P)'); return; }
+            console.log('%c  화면 ' + have.toLocaleString() + ' P ≠ 서버 ' + srv.toLocaleString() + ' P'
+                + ' — 어긋나 있습니다.', 'color:#ff8f6b');
+            console.log('    pullServer() 를 치면 서버 값으로 맞춥니다.');
+        }).catch(function () { });
+    }
 };
 
 console.log('[은행] bankLog() · bankCheck()');
