@@ -26,6 +26,7 @@ const SKIP = ['letters', 'hasNewLetter', 'hasNewReply', 'hasItemUsedOnMe',
 const INV = 'inventory';          // 배열 병합으로 다루는 항목
 const PTS = 'points';             // 돈 — 「늘어난 만큼·줄어든 만큼」으로 다루는 항목
 const EFF = 'timedEffects';       // 걸린 효과 — 이름별로 합친다
+const BUF = 'itemBuffs';          // 물건이 얹어 준 버프 — 개수까지 세어 합친다
 
 let code = null;
 let base = {};            // 서버에서 마지막으로 본 모습
@@ -35,6 +36,8 @@ let ready = false;
 const shadowInv = {};     // 남의 소지품 — 서버에서 마지막으로 본 모습
 const shadowPts = {};     // 남의 포인트 — 같은 까닭
 const shadowEff = {};     // 남에게 걸린 효과 — 같은 까닭
+const shadowBuf = {};     // 남에게 얹힌 버프 — 같은 까닭
+let bufBusy = false, bufAgain = false;
 let effBusy = false, effAgain = false;
 const rootStats = {};     // 루트 통째 쓰기를 몇 번 병합으로 돌렸나
 let invBusy = false;
@@ -269,6 +272,76 @@ function flushMyEff() {
     });
 }
 
+// ==========================================
+// 물건이 얹어 준 버프 — 봉제 인형 같은 것
+// ==========================================
+//
+// itemBuffs 도 배열인데 통째로 덮어쓰고 있었다. 봉제 인형 키트로 지은 사흘짜리
+// 효과가 사라지던 까닭이다. newitems2.js:340 이 정산 때 배열을 다시 짓고,
+// buff24.js 가 10분마다 또 다시 짓는다. 그 사이에 얹힌 것은 지워진다.
+//
+// 알맹이가 객체라 이름으로 가를 수 없고, 같은 버프를 둘 가질 수도 있다.
+// 그래서 글자로 바꿔 「개수까지」 세어 더하고 뺀다 (소지품과 같은 방식).
+function bufKeys(v) {
+    return asArr(v).filter(Boolean).map(function (x) {
+        try { return JSON.stringify(x); } catch (e) { return ''; }
+    }).filter(Boolean);
+}
+function bufBack(keys) {
+    return keys.map(function (s) { try { return JSON.parse(s); } catch (e) { return null; } })
+        .filter(Boolean);
+}
+function mergeBuf(path, baseList, localList) {
+    if (!database) return Promise.resolve(null);
+    const had = bufKeys(baseList), want = bufKeys(localList);
+    const add = msDiff(want, had), del = msDiff(had, want);
+    if (!add.length && !del.length) return Promise.resolve(null);
+
+    return database.ref(path).transaction(function (srv) {
+        const cur = bufKeys(srv);
+        del.forEach(function (k) { const i = cur.indexOf(k); if (i >= 0) cur.splice(i, 1); });
+        return bufBack(cur.concat(add));
+    }, null, false).then(function (res) {           // ★ applyLocally = false
+        if (!res || !res.committed) return null;
+        return asArr(res.snapshot ? res.snapshot.val() : null);
+    }).catch(function (e) {
+        console.error('[병합] 버프 저장 실패:', e);
+        return null;
+    });
+}
+
+function flushMyBuf() {
+    if (!ready || !currentUser) return Promise.resolve(null);
+    if (bufBusy) { bufAgain = true; return Promise.resolve(null); }
+    if (same(bufKeys(currentUser[BUF]), bufKeys(base[BUF]))) return Promise.resolve(null);
+
+    bufBusy = true;
+    const want = clone(currentUser[BUF]) || [];
+    const had = clone(base[BUF]) || [];
+
+    return mergeBuf('users/' + code + '/' + BUF, had, want).then(function (after) {
+        bufBusy = false;
+        if (after === null) { base[BUF] = want; }
+        else {
+            // 날아가는 사이에 또 얹힌 것을 지킨다
+            const nowK = bufKeys(currentUser[BUF]);
+            const extra = msDiff(nowK, bufKeys(want));
+            const gone = msDiff(bufKeys(want), nowK);
+            const next = bufKeys(after);
+            gone.forEach(function (k) { const i = next.indexOf(k); if (i >= 0) next.splice(i, 1); });
+            fillArr(currentUser[BUF] || (currentUser[BUF] = []), bufBack(next.concat(extra)));
+            base[BUF] = clone(after);
+        }
+        const more = bufAgain; bufAgain = false;
+        if (more) return flushMyBuf();
+        return after;
+    }).catch(function (e) {
+        bufBusy = false; bufAgain = false;
+        console.error('[병합] 버프:', e);
+        return null;
+    });
+}
+
 // 배열을 그대로 두고 내용만 갈아끼운다 (다른 곳이 들고 있는 참조를 지키려고)
 function fillArr(target, src) {
     if (!Array.isArray(target)) return src;
@@ -357,7 +430,7 @@ function attach() {
                 kept[k] = clone(base[k]);                   // 아직 안 닿았다 — 내 값을 지킨다
                 return;
             }
-            if (k === INV || k === EFF) {
+            if (k === INV || k === EFF || k === BUF) {
                 fillArr(currentUser[k] || (currentUser[k] = []), srv[k]);
                 base[k] = clone(srv[k]); took++; return;
             }
@@ -395,17 +468,18 @@ function attach() {
 
         const note = function (s) {
             const v = s.val();
-            if (!v) { delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key]; return; }
+            if (!v) { delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key]; delete shadowBuf[s.key]; return; }
             shadowInv[s.key] = asArr(v[INV]);
             shadowPts[s.key] = Number(v[PTS]) || 0;
             shadowEff[s.key] = asArr(v[EFF]);
+            shadowBuf[s.key] = asArr(v[BUF]);
         };
         database.ref('users').on('child_added', note);
         database.ref('users').on('child_changed', note);
         database.ref('users').on('child_removed', function (s) {
-            delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key];
+            delete shadowInv[s.key]; delete shadowPts[s.key]; delete shadowEff[s.key]; delete shadowBuf[s.key];
         });
-        console.log('[병합] 남의 소지품·포인트·효과 기준 지켜보기 시작');
+        console.log('[병합] 남의 소지품·포인트·효과·버프 기준 지켜보기 시작');
     }, 700);
 })();
 
@@ -418,6 +492,7 @@ function diffPayload() {
         if (SKIP.indexOf(k) >= 0) return;
         if (k === PTS) return;                              // 돈은 더하고 빼기로 따로 보낸다
         if (k === EFF) return;                              // 효과도 이름별로 합쳐 보낸다
+        if (k === BUF) return;                              // 버프도 개수까지 세어 보낸다
         if (k === INV) return;                              // 소지품은 따로 병합한다
         if (badKey(k)) return;
         if (currentUser[k] === undefined) return;
@@ -447,16 +522,17 @@ function markSaved(payload) {
             const invJob = flushMyInv();                      // 소지품은 병합으로
             const ptsJob = flushMyPts();                      // 돈도 병합으로
             const effJob = flushMyEff();                      // 걸린 효과도 병합으로
+            const bufJob = flushMyBuf();                      // 얹힌 버프도 병합으로
 
             const payload = diffPayload();
             const n = Object.keys(payload).length;
-            if (!n) return Promise.all([invJob, ptsJob, effJob]);
+            if (!n) return Promise.all([invJob, ptsJob, effJob, bufJob]);
 
             payload._adminStamp = Date.now();
             currentUser._adminStamp = payload._adminStamp;
 
             return Promise.all([
-                invJob, ptsJob, effJob,
+                invJob, ptsJob, effJob, bufJob,
                 database.ref('users/' + code).update(payload)
                     .then(function () { markSaved(payload); })
                     .catch(function (e) { console.error('[병합] 저장 실패:', e); })
@@ -472,12 +548,14 @@ function markSaved(payload) {
                 const wantsInv = !!fields[INV];
                 const wantsPts = !!fields[PTS];
                 const wantsEff = !!fields[EFF];
+                const wantsBuf = !!fields[BUF];
                 const mine = (ready && currentUser && currentUser.code === code);
                 const rest = {};
                 Object.keys(fields).forEach(function (k) {
                     if (k === INV) return;
                     if (k === PTS && mine) return;              // 돈은 더하고 빼기로 보낸다
                     if (k === EFF && mine) return;              // 효과는 이름별로 합쳐 보낸다
+                    if (k === BUF && mine) return;              // 버프는 개수까지 세어 보낸다
                     rest[k] = fields[k];
                 });
 
@@ -490,6 +568,7 @@ function markSaved(payload) {
                 else if (wantsInv) r = _f.call(this, fields);   // 기준이 없으면 예전 방식
                 if (wantsPts && mine) flushMyPts();
                 if (wantsEff && mine) flushMyEff();
+                if (wantsBuf && mine) flushMyBuf();
 
                 return r;
             };
@@ -555,19 +634,23 @@ function markSaved(payload) {
             const hasInv = Object.prototype.hasOwnProperty.call(fields, INV);
             const hasPts = Object.prototype.hasOwnProperty.call(fields, PTS);
             const hasEff = Object.prototype.hasOwnProperty.call(fields, EFF);
+            const hasBuf = Object.prototype.hasOwnProperty.call(fields, BUF);
             const hadInv = shadowInv[c];
             const hadPts = shadowPts[c];
             const hadEff = shadowEff[c];
+            const hadBuf = shadowBuf[c];
             const doInv = hasInv && hadInv;
             const doPts = hasPts && (hadPts !== undefined);
             const doEff = hasEff && hadEff;
-            if (!doInv && !doPts && !doEff) return _u.apply(this, arguments);
+            const doBuf = hasBuf && hadBuf;
+            if (!doInv && !doPts && !doEff && !doBuf) return _u.apply(this, arguments);
 
             const rest = {};
             Object.keys(fields).forEach(function (k) {
                 if (doInv && k === INV) return;
                 if (doPts && k === PTS) return;
                 if (doEff && k === EFF) return;
+                if (doBuf && k === BUF) return;
                 rest[k] = fields[k];
             });
             rest._adminStamp = Date.now();
@@ -588,6 +671,14 @@ function markSaved(payload) {
                     if (after === null) return null;
                     shadowPts[c] = after;
                     if (db && db.users && db.users[c]) db.users[c][PTS] = after;
+                    return after;
+                }));
+            }
+            if (doBuf) {
+                jobs.push(mergeBuf('users/' + c + '/' + BUF, hadBuf, asArr(fields[BUF])).then(function (after) {
+                    if (after === null) return null;
+                    shadowBuf[c] = after.slice();
+                    if (db && db.users && db.users[c]) fillArr(db.users[c][BUF] || (db.users[c][BUF] = []), after);
                     return after;
                 }));
             }
@@ -633,7 +724,7 @@ function markSaved(payload) {
 // 다만 원래는 한 번에 쓰여 전부 되거나 전부 안 되던 것이, 이제 항목마다
 // 따로 간다. 트랜잭션은 다시 시도하므로 실패는 드물지만, 아주 드물게
 // 한쪽만 되는 일이 있을 수 있다. 돈이 사라지는 것보다는 낫다고 보았다.
-const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects)$/;
+const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
 (function hookRoot() {
     const iv = setInterval(function () {
         if (typeof database === 'undefined' || !database) return;
@@ -662,6 +753,8 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects)$/;
                         job = mergeInv(path, shadowInv[c], obj[k]);
                     } else if (f === EFF && shadowEff[c]) {
                         job = mergeEff(path, shadowEff[c], obj[k]);
+                    } else if (f === BUF && shadowBuf[c]) {
+                        job = mergeBuf(path, shadowBuf[c], obj[k]);
                     }
                     if (!job) { rest[k] = obj[k]; return; }     // 기준이 없으면 예전 방식
                     rootStats[f] = (rootStats[f] || 0) + 1;
@@ -725,6 +818,7 @@ setInterval(function () {
     if (!invBusy && !same(currentUser[INV], base[INV])) flushMyInv();
     if (!ptsBusy && (Number(currentUser[PTS]) || 0) !== (Number(base[PTS]) || 0)) flushMyPts();
     if (!effBusy) flushMyEff();
+    if (!bufBusy) flushMyBuf();
 }, 4000);
 
 // ==========================================

@@ -18,7 +18,8 @@
 //      한 번 부른 사람은 파티를 나갔다 다시 와도, 그 사회자의 다음 파티에도
 //      그대로 들어올 수 있다 — 초대장의 기운이 남는다.
 //   2  사회자는 상담실·선녀탕에 매이지 않는다. 입원·온천욕·상담 중인
-//      사원도 사원당 하루 한 번 불러올 수 있다.
+//      사원도 사원당 하루 한 번 불러올 수 있다. 불려 나온 사원은 거기서
+//      꺼내지고 오염도가 50 으로 맞춰진다 (그대로 두면 바로 다시 들어간다).
 //   3  초대받은 사람은 탐사 횟수를 쓰지 않는다. 초대장을 받은 사람만.
 //   4  들어온 모두가 부활 2회 · 모든 판정 +1. 초대와 상관없다.
 //      다만 이 장비를 찬 사람이 파티의 주인일 때만.
@@ -54,6 +55,7 @@ const HOST_MULT = 3;            // 사회자가 죽으면
 const MAX_MULT = 4;             // 전체 뚜껑
 const ADMIN = 'kario0987';
 const GUEST_ROOT = 'talkShowGuest';     // 사회자별로 남는 초대장의 기운
+const OUT_POLL = 50;                   // 꺼내 온 사람의 오염도
 
 // 고급진 갈색 — 민무늬
 const BROWN = {
@@ -264,20 +266,58 @@ function withoutQuarantine(fn) {
             }
 
             // 초대받은 사람은 탐사 횟수를 쓰지 않고, 격리 중에도 들어온다
+            const wasLocked = (typeof isQuarantined === 'function') && isQuarantined(currentUser);
             const _q = (typeof isQuarantined === 'function') ? isQuarantined : null;
             const _t = (typeof getDarkTriesLeft === 'function') ? getDarkTriesLeft : null;
             if (_q) isQuarantined = function () { return false; };
             if (_t) getDarkTriesLeft = function () { return 99; };
-            try { return _j.apply(this, arguments); }
+            let out;
+            try { out = _j.apply(this, arguments); }
             finally {
                 if (_q) isQuarantined = _q;
                 if (_t) getDarkTriesLeft = _t;
             }
+            // 상담실·선녀탕에 있던 사람은 쇼에 들어오면서 꺼내진다.
+            // 나올 때 값(보통 100 가까이)을 그대로 두면 나오자마자 다시 들어간다.
+            if (wasLocked) pullOut();
+            return out;
         };
         joinParty._show = true;
         clearInterval(iv);
     }, 400);
 })();
+
+// 상담실·선녀탕에서 꺼낸다 — 오염도는 50 으로 둔다
+function pullOut() {
+    const u = currentUser;
+    if (!u) return;
+    u.quarantineUntil = 0;
+    u.quarantineDest = null;
+    u.quarantineHospital = null;
+    u.quarantineExitPollution = 0;
+    u.pollution = OUT_POLL;
+    u.lastPollutionTime = Date.now();
+    u.foxRoomAnswered = false;
+    if (u.badge && typeof u.badge.notes === 'string') {
+        const arr = u.badge.notes.split(' | ').filter(function (n) {
+            return n.trim() !== '' && n.indexOf('의식 불명') < 0
+                && n.indexOf('긴급 이송') < 0 && n.indexOf('사직 반려') < 0;
+        });
+        u.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+    }
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(u, '[토크쇼] 무대로 불려 나왔습니다. (오염도 ' + OUT_POLL + '%)');
+    }
+    const f = { quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1,
+                quarantineExitPollution: 1, pollution: 1, lastPollutionTime: 1,
+                foxRoomAnswered: 1, history: 1 };
+    if (u.badge !== undefined) f.badge = 1;
+    if (typeof saveFields === 'function') { try { saveFields(f); } catch (e) { } }
+    if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+    setTimeout(function () {
+        showCustomAlert('📺 무대로 불려 나왔습니다.\n\n오염도 ' + OUT_POLL + '% 로 맞춰졌습니다.');
+    }, 600);
+}
 
 // 출발할 때 — 초대받은 사람의 탐사 횟수를 돌려준다
 (function hookLaunch() {

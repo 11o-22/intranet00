@@ -488,14 +488,22 @@ window.foxOpen = step1;
         b.onclick = function () {
             if (!currentUser || (currentUser.foxEscape || 0) <= 0) return;
             currentUser.foxEscape -= 1;
+            // 나올 때의 값(보통 100 가까이)을 그대로 두면 나오자마자 다시 들어간다.
+            // 꺼내 온 사람은 오염도 50 으로 둔다.
             currentUser.quarantineUntil = 0;
+            currentUser.quarantineDest = null;
+            currentUser.quarantineHospital = null;
+            currentUser.quarantineExitPollution = 0;
+            currentUser.pollution = 50;
+            currentUser.lastPollutionTime = Date.now();
+            currentUser.foxRoomAnswered = false;
             if (typeof addHistoryLog === 'function') {
-                addHistoryLog(currentUser, '[' + FOX + '] 꼬리로 금제를 풀고 나왔습니다.');
+                addHistoryLog(currentUser, '[' + FOX + '] 꼬리로 금제를 풀고 나왔습니다. (오염도 50%)');
             }
             if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
             if (typeof updateUI === 'function') updateUI();
             b.remove();
-            showCustomAlert('꼬리가 하나 풀렸습니다.\n\n나왔습니다. 남은 탈출 '
+            showCustomAlert('꼬리가 하나 풀렸습니다.\n\n나왔습니다. (오염도 50%)\n남은 탈출 '
                 + (currentUser.foxEscape || 0) + '회');
         };
         document.body.appendChild(b);

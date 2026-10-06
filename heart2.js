@@ -11,7 +11,8 @@
 //
 //   소지품 화면에 은심장 칸이 생기고, 지금 상담실·선녀탕에 있는 사원이
 //   줄줄이 뜬다. 눌러서 꺼낸다. 정상 해제와 똑같이 처리한다 —
-//   오염도를 나올 때 값으로 되돌리고, 이송 문구도 거둔다.
+//   꺼내 온 사원의 오염도는 50 으로 둔다. 나올 때 값(보통 100 가까이)을
+//   그대로 돌려주면 나오자마자 다시 들어가 버린다.
 //   (quarantine-exit.js:65 의 release() 와 같은 일이다)
 //
 // ■ 둘 — 은심장을 지닌 사람이 죽으면 파티 전원에게 10,000 P
@@ -36,6 +37,7 @@
 const HEART = '🩶 은심장';
 const PAY = 10000;              // 사망 시 파티원 한 사람당
 const PAY_SELF = 20000;         // 쓰러진 본인 몫
+const OUT_POLL = 50;            // 꺼내 온 사람의 오염도
 const ONCE_PER_RUN = true;      // 한 탐사에 한 번만
 const TIERS = [                 // 누적 → 하루 몇 번
     { at: 300, n: 3 },
@@ -106,9 +108,9 @@ window.heartPull = function (who) {
     if (t.code === me.code) { showCustomAlert('본인은 꺼낼 수 없습니다.'); return; }
     if (!quarantined(t)) { showCustomAlert(t.name + ' 사원은 지금 나와 있습니다.'); return; }
 
-    // --- 정상 해제와 같게 ---
-    let out = Number(t.quarantineExitPollution) || 0;
-    if (out >= 100) out = 99;              // 100 이면 나오자마자 다시 들어간다
+    // --- 꺼내 온 사람은 오염도 50 으로 둔다 ---
+    // 나올 때 값을 그대로 돌려주면 100 가까이라 나오자마자 다시 들어간다.
+    const out = OUT_POLL;
 
     t.quarantineUntil = 0;
     t.quarantineDest = null;
@@ -152,7 +154,8 @@ window.heartPull = function (who) {
 
     if (typeof updateUI === 'function') updateUI();
     paintBox();
-    showCustomAlert('🩶 ' + t.name + ' 사원을 꺼내 왔습니다.\n\n오늘 남은 횟수 ' + pullLeft(me) + '번');
+    showCustomAlert('🩶 ' + t.name + ' 사원을 꺼내 왔습니다. (오염도 ' + OUT_POLL + '%)\n\n'
+        + '오늘 남은 횟수 ' + pullLeft(me) + '번');
 };
 
 // ==========================================

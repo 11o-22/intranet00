@@ -261,13 +261,23 @@ function ribbonAsk(targetName, cb) {
                     const q = picking; picking = null;
                     if (!mode || !q) return;
                     chosen = mode;
+                    // ★ 빼기 전에 개수를 세어 둔다.
+                    //   equip-fix.js:50 이 장착물에 대해 「아래에서 안 뺐으면 내가 뺀다」를
+                    //   하고 있다. 그걸 모르고 여기서 또 빼면 한 번 쓰고 두 개가 사라진다.
+                    const inv = currentUser.inventory || [];
+                    let before = 0;
+                    for (let i = 0; i < inv.length; i++) if (inv[i] === q.n) before++;
+
                     let ok = false;
                     try { ok = applyItemEffect(q.t, q.n, q.o); }
                     finally { chosen = null; }
                     if (ok === false) return;
 
-                    // 부른 쪽이 거짓을 받고 지나갔으므로 여기서 치운다
-                    if (typeof removeItemFromInventory === 'function') {
+                    // 부른 쪽이 거짓을 받고 지나갔으므로, 아무도 안 뺐을 때만 여기서 치운다
+                    const inv2 = currentUser.inventory || [];
+                    let after = 0;
+                    for (let i = 0; i < inv2.length; i++) if (inv2[i] === q.n) after++;
+                    if (after === before && before > 0 && typeof removeItemFromInventory === 'function') {
                         removeItemFromInventory(currentUser, q.n, 1);
                     }
                     if (typeof addHistoryLog === 'function') {
