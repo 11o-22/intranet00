@@ -214,7 +214,12 @@ function mergeEff(path, baseList, localList) {
     if (!database) return Promise.resolve(null);
     const had = effMap(baseList), want = effMap(localList);
     if (!effChanged(had, want)) return Promise.resolve(null);
-    const gone = Object.keys(had).filter(function (n) { return !(n in want); });
+
+    // ★ 내 쪽이 통째로 비어 있다고 서버 것을 다 지우지는 않는다.
+    //   잠깐 비어 있는 목록(막 들어온 자리, 덮어쓴 자리)이 올라가면
+    //   걸려 있던 것이 한꺼번에 날아간다. 하나씩 빠지는 것은 그대로 둔다.
+    const wipe = Object.keys(want).length === 0 && Object.keys(had).length > 1;
+    const gone = wipe ? [] : Object.keys(had).filter(function (n) { return !(n in want); });
 
     return database.ref(path).transaction(function (srv) {
         const cur = effMap(srv);
@@ -439,9 +444,16 @@ function attach() {
         });
 
         // 서버에서 사라진 항목도 따라 지운다 (내가 손대지 않았을 때만)
+        //
+        //   ★ 걸린 효과와 버프는 지우지 않는다.
+        //     누가 내 자리를 통째로 쓰거나(그 바람에 키가 빠지거나), 잠깐
+        //     비어 있는 목록이 올라가면 서버에서 timedEffects 키가 없어진다.
+        //     그때 여기서 지워 버리면 **걸려 있던 물약이 한꺼번에 증발한다.**
+        //     소지품을 지키는 것과 같은 까닭이다. 시간이 다한 것은
+        //     checkPassivePollution 이 알아서 떼어 낸다.
         Object.keys(base).forEach(function (k) {
             if (k in srv) return;
-            if (k === INV) return;                          // 소지품은 지우지 않는다
+            if (k === INV || k === EFF || k === BUF) return;   // 소지품·효과·버프는 지키다
             if (!same(currentUser[k], base[k])) return;
             delete currentUser[k];
             took++;
