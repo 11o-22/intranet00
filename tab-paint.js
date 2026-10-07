@@ -42,7 +42,8 @@
         // 상점 탭 — switchShopPanel 이 ??? 상점·장터만 그려 주고 나머지는 빠져 있었다
         'shop-regular':  ['renderRegularShop'],
         'shop-alien':    ['renderAlienShop'],
-        'shop-p2p':      ['renderP2PSelectBoxes', 'renderP2PLists']
+        'shop-p2p':      ['renderP2PSelectBoxes', 'renderP2PLists'],
+        'shop-food':     ['renderFood']
     };
 
     // 큰 탭마다 — 그 안에서 열려 있는 칸을 찾는다

@@ -77,7 +77,10 @@ const DEFS = [
       check:(u,s)=> s.exor >= 250 },
 
     { id:'gold',    n:'金緞',        need:'은행 VIP 승인 (2급 보안 인가와 다름)',
-      check:(u)=> isVip(u) }
+      check:(u)=> isVip(u) },
+
+    { id:'cook',    n:'요리사',      need:'A 등급 이상 요리 50번 성공',
+      check:(u)=> ((u.cookStat && u.cookStat.hi) || 0) >= 50 }
 ];
 
 // 상담사가 손으로 붙이는 것
