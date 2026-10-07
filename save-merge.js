@@ -23,6 +23,7 @@
 const SKIP = ['letters', 'hasNewLetter', 'hasNewReply', 'hasItemUsedOnMe',
               'houseChatUnread', 'house', '_adminStamp', '_stamp'];
 
+const CLR = 'effClearAt';       // 효과를 일부러 다 비웠다는 도장
 const INV = 'inventory';          // 배열 병합으로 다루는 항목
 const PTS = 'points';             // 돈 — 「늘어난 만큼·줄어든 만큼」으로 다루는 항목
 const EFF = 'timedEffects';       // 걸린 효과 — 이름별로 합친다
@@ -48,6 +49,7 @@ let effBusy = false, effAgain = false;
 //   서버에 있는 것은 남이 방금 걸어 준 것이므로 건드리지 않는다.
 let effHeld = false, bufHeld = false;
 const rootStats = {};     // 루트 통째 쓰기를 몇 번 병합으로 돌렸나
+let invFail = false, ptsFail = false;   // 방금 저장이 실패로 끝났나 (「할 일 없음」과 구분)
 let invBusy = false;
 let invAgain = false;
 let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0 };
@@ -128,7 +130,7 @@ function mergeInv(path, baseArr, localArr) {
         });
         return cur.concat(add);
     }, null, false).then(function (res) {        // ★ applyLocally = false
-        if (!res || !res.committed) return null;
+        if (!res || !res.committed) { invFail = true; return null; }
         const after = asArr(res.snapshot ? res.snapshot.val() : null);
         invStats.merged++;
         invStats.added += add.length;
@@ -137,6 +139,7 @@ function mergeInv(path, baseArr, localArr) {
         if (after.length !== asArr(localArr).length) invStats.conflicts++;
         return after;
     }).catch(function (e) {
+        invFail = true;
         console.error('[병합] 소지품 저장 실패:', e);
         return null;
     });
@@ -161,7 +164,7 @@ function mergePts(path, had, want) {
     return database.ref(path).transaction(function (srv) {
         return Math.max(0, Math.min(ptsCap(), Math.round((Number(srv) || 0) + d)));
     }, null, false).then(function (res) {           // ★ applyLocally = false
-        if (!res || !res.committed) return null;
+        if (!res || !res.committed) { ptsFail = true; return null; }
         const after = Number(res.snapshot ? res.snapshot.val() : 0) || 0;
         ptsStats.merged++;
         ptsStats.moved += d;
@@ -169,6 +172,7 @@ function mergePts(path, had, want) {
         if (after !== (Number(want) || 0)) ptsStats.rescued++;
         return after;
     }).catch(function (e) {
+        ptsFail = true;
         console.error('[병합] 포인트 저장 실패:', e);
         return null;
     });
@@ -182,8 +186,14 @@ function flushMyPts() {
     if (want === had) return Promise.resolve(null);
 
     ptsBusy = true;
+    ptsFail = false;
     return mergePts('users/' + code + '/' + PTS, had, want).then(function (after) {
         ptsBusy = false;
+        if (after === null && ptsFail) {            // 실패는 「보냈다」가 아니다 (소지품과 같다)
+            ptsFail = false; ptsAgain = false;
+            console.warn('[병합] 포인트 저장이 실패했습니다 — 잠시 뒤 다시 보냅니다');
+            return null;
+        }
         // 날아가는 사이에 또 벌었거나 썼으면 그 몫을 지킨다
         const extra = (Number(currentUser[PTS]) || 0) - want;
         if (after === null) {
@@ -238,7 +248,9 @@ function noteRead(c, v) {
     if (!c) return;
     // 읽은 모습을 그대로 베껴 둔다. 부르는 쪽이 읽은 객체를 그 자리에서 고치므로
     // 베끼지 않으면 「읽은 모습」도 같이 바뀌어 버린다.
-    lastRead[c] = { eff: asArr(v && v[EFF]), all: clone(v) || {}, at: Date.now() };
+    // ★ eff 도 깊이 베껴야 한다. 얕게 베끼면 투명 물약처럼 「알맹이를 그 자리에서 고치는」
+    //   물건(e.fixed = true)이 읽은 모습까지 같이 바꿔, 바뀐 것이 없다고 보고 안 보낸다.
+    lastRead[c] = { eff: clone(asArr(v && v[EFF])) || [], all: clone(v) || {}, at: Date.now() };
 }
 // 읽은 뒤 손대지 않은 열쇠인가 — 그런 열쇠는 보내지 않는다
 function untouched(c, k, v) {
@@ -311,7 +323,18 @@ function mergeEff(path, baseList, localList, noWipe) {
         return Object.keys(cur).map(function (n) { return cur[n]; });
     }, null, false).then(function (res) {               // ★ applyLocally = false
         if (!res || !res.committed) return null;
-        return asArr(res.snapshot ? res.snapshot.val() : null);
+        const after = asArr(res.snapshot ? res.snapshot.val() : null);
+        // ★ 마지막 하나를 떼어 내 목록이 비면, 파이어베이스는 열쇠째 지운다.
+        //   받는 쪽은 「열쇠가 사라진 것」을 사고로 보고 자기 것을 지키므로,
+        //   제거약으로 마지막 물약을 풀어도 상대 화면이 도로 올려 보냈다.
+        //   그래서 「일부러 비웠다」는 도장을 따로 찍는다.
+        if (!after.length && gone.length) {
+            try {
+                const m = /^users\/([^/]+)\//.exec(path);
+                if (m) database.ref('users/' + m[1] + '/' + CLR).set(Date.now());
+            } catch (e) { }
+        }
+        return after;
     }).catch(function (e) {
         console.error('[병합] 효과 저장 실패:', e);
         return null;
@@ -445,11 +468,23 @@ function flushMyInv() {
     if (same(currentUser[INV], base[INV])) return Promise.resolve(null);
 
     invBusy = true;
+    invFail = false;
     const want = clone(currentUser[INV]) || [];
     const had = clone(base[INV]) || [];
 
     return mergeInv('users/' + code + '/' + INV, had, want).then(function (after) {
         invBusy = false;
+
+        // ★ 저장이 실패했다면 「보냈다」고 적어 두면 안 된다.
+        //   예전에는 실패도 「보낼 것 없음」과 같이 null 로 와서 기준을 내 값으로
+        //   옮겼고, 서버에는 안 간 채로 잊혔다. 그러면 다음에 서버 값이 들어올 때
+        //   산 물건은 사라지고 쓴 물건은 되살아난다. 기준을 그대로 두면 다음
+        //   차례(4초 뒤)에 다시 보낸다.
+        if (after === null && invFail) {
+            invFail = false; invAgain = false;
+            console.warn('[병합] 소지품 저장이 실패했습니다 — 잠시 뒤 다시 보냅니다');
+            return null;
+        }
 
         // 날아가는 사이에 손댄 것을 지킨다 — 이게 없으면 그 사이 산 물건이 사라진다
         const nowArr = asArr(currentUser[INV]);
@@ -547,6 +582,8 @@ function attach() {
         // 서버가 바뀌었다 — 내가 손대지 않은 항목만 받아 온다
         let took = 0;
         const kept = {};                                    // 내가 손댄 항목은 기준도 바꾸지 않는다
+        // 누가 내 효과를 일부러 다 비웠나 (제거약 등) — 도장이 새로 찍혔는지로 안다
+        const clearedNow = !!srv[CLR] && srv[CLR] !== base[CLR];
         Object.keys(srv).forEach(function (k) {
             if (k === '_adminStamp' || k === '_stamp') return;
             if (sameAs(k, srv[k], base[k])) return;         // 서버도 그대로면 볼 것 없다
@@ -581,6 +618,12 @@ function attach() {
         //     checkPassivePollution 이 알아서 떼어 낸다.
         Object.keys(base).forEach(function (k) {
             if (k in srv) return;
+            if (k === EFF && clearedNow && sameAs(k, currentUser[k], base[k])) {
+                // 일부러 비운 것이다 — 내가 그 사이 더한 것이 없을 때만 따라 비운다
+                fillArr(currentUser[k] || (currentUser[k] = []), []);
+                took++;
+                return;
+            }
             if (k === INV || k === EFF || k === BUF) return;   // 소지품·효과·버프는 지키다
             if (!sameAs(k, currentUser[k], base[k])) return;
             delete currentUser[k];
@@ -878,6 +921,15 @@ function markSaved(payload) {
 // 다만 원래는 한 번에 쓰여 전부 되거나 전부 안 되던 것이, 이제 항목마다
 // 따로 간다. 트랜잭션은 다시 시도하므로 실패는 드물지만, 아주 드물게
 // 한쪽만 되는 일이 있을 수 있다. 돈이 사라지는 것보다는 낫다고 보았다.
+// 부른 쪽이 보낸 값이 지금 내 화면의 값과 같은가 (같으면 내 저장 길로 돌려도 된다)
+function isMine(f, v) {
+    if (!currentUser) return false;
+    if (f === INV) return same(asArr(v), asArr(currentUser[INV]));
+    if (f === PTS) return (Number(v) || 0) === (Number(currentUser[PTS]) || 0);
+    if (f === EFF) return same(effMap(v), effMap(currentUser[EFF]));
+    if (f === BUF) return same(bufKeys(v), bufKeys(currentUser[BUF]));
+    return false;
+}
 const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
 (function hookRoot() {
     const iv = setInterval(function () {
@@ -914,6 +966,7 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                 if (!obj || typeof obj !== 'object') return _up(obj);
                 const rest = {};
                 const jobs = [];
+                const ownFlush = {};
                 Object.keys(obj).forEach(function (k) {
                     const m = MERGED.exec(String(k).replace(/^\/+/, ''));
                     if (!m) {
@@ -925,6 +978,19 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                     }
                     const c = m[1], f = m[2], path = 'users/' + c + '/' + f;
                     let job = null;
+
+                    // ★ 내 자리를 쓰는 것은 내 저장 길(flushMy…)로 보낸다.
+                    //
+                    //   여기서 shadow(서버에서 가장 최근에 본 모습)를 기준으로 몫을 세어 보내면,
+                    //   같은 변화를 flushMy… 가 base 기준으로 또 보낸다. 서버 응답이 늦을수록
+                    //   shadow 가 묵어서 두 번 겹친다 — 쓴 물건이 두 개씩 빠지고, 산 물건이
+                    //   두 개씩 들어오고, 돈이 두 번 빠진다. 「소지품이 계속 사라진다」가 이것이다.
+                    //   (내 화면은 이미 고쳐져 있으므로 보낼 몫은 flush 가 알고 있다)
+                    if (ready && currentUser && c === currentUser.code && c === code && isMine(f, obj[k])) {
+                        ownFlush[f] = true;
+                        return;
+                    }
+
                     if (f === PTS && shadowPts[c] !== undefined) {
                         job = mergePts(path, shadowPts[c], obj[k]);
                     } else if (f === INV && shadowInv[c]) {
@@ -939,6 +1005,10 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                     jobs.push(job);
                 });
                 if (Object.keys(rest).length) jobs.push(_up(rest));
+                if (ownFlush[INV]) jobs.push(flushMyInv());
+                if (ownFlush[PTS]) jobs.push(flushMyPts());
+                if (ownFlush[EFF]) jobs.push(flushMyEff());
+                if (ownFlush[BUF]) jobs.push(flushMyBuf());
                 return Promise.all(jobs);
             };
             r._rootMerge = true;
