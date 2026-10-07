@@ -3512,14 +3512,22 @@ setInterval(() => {
         if (hasEquip(currentUser, '실리카겔') && darkRun && ['Qtrew-B-508','Qtrew-C-119'].includes(darkRun.zone)) b += 2;
         if (hasEquip(currentUser, '은박 담요') && darkRun && darkRun.zone === 'Qtrew-B-508') b += 2;
 
-                // ★ ??? 소모품 보정
-        if (qFlag('dark_light')) b += 2;
-        if (qFlag('next_plus')) { b += 1; consumeQFlag('next_plus'); }
-        if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) b += 4;
-        if (qFlag('chant_bonus') && kind === 'hide') b += 5;
-        if (qFlag('meal_bonus1')) b += 1;
-        if (qFlag('meal_bonus2')) b += 2;
-        if (qFlag('meal_bonus3')) b += 3;
+                // ★ ??? 소모품 보정 — 따로 모은다
+        //
+        //   아래 「고등급 구역은 보정이 덜 먹힌다」가 b 를 뭉갠다.
+        //   S 구역에서는 4를 넘는 몫이 1/3 로 줄어드는데, 장비만으로도 이미
+        //   4를 넘기 때문에 +2 짜리를 써도 값이 **그대로**였다.
+        //     예) 보정 7 → 5.  불씨(+2)를 써서 9 → 그래도 5.
+        //   쓴 물건이 아무 일도 안 하는 것처럼 보이던 까닭이 이것이다.
+        //   그래서 소모품 몫은 깎은 뒤에 더한다. 쓴 만큼 그대로 들어간다.
+        let qb = 0;
+        if (qFlag('dark_light')) qb += 2;
+        if (qFlag('next_plus')) { qb += 1; consumeQFlag('next_plus'); }
+        if (kind === 'rejoin' && consumeQFlag('rejoin_boost')) qb += 4;
+        if (qFlag('chant_bonus') && kind === 'hide') qb += 5;
+        if (qFlag('meal_bonus1')) qb += 1;
+        if (qFlag('meal_bonus2')) qb += 2;
+        if (qFlag('meal_bonus3')) qb += 3;
 
         b += infectBonus(kind);
 
@@ -3534,6 +3542,8 @@ if (darkRun) {
         if (b > 6) b = 6 + Math.floor((b - 6) * 2 / 3);
     }
 }
+
+b += qb;          // 쓴 소모품 몫은 깎지 않는다
 
 return b;
     }

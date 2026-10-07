@@ -20,20 +20,40 @@
 // ■ 어떻게 고치나
 //
 //   탐사 화면 위쪽에 🎒 버튼을 하나 붙인다.
-//   누르면 지금 쓸 수 있는 소모품만 추려 보여 주고, 고르면 바로 쓴다.
-//   장비나 물약처럼 탐사와 상관없는 것은 올라오지 않는다.
+//   누르면 **들어갈 때 반입한 소모품만** 보여 주고, 고르면 바로 쓴다.
+//
+//   처음에는 소지품 전부를 보여 줬는데, 그러면 들어가기 전에 셋을 고르는
+//   의미가 없어진다. 들고 들어간 것만 쓸 수 있어야 한다.
+//   그래서 darkRun.carryItems 만 본다. 쓰면 그 목록에서도 한 장 뺀다.
+//   (rollDarkBonus 가 「반입품이 남아 있으면 +1」을 보므로 수가 맞아야 한다)
 
 (function darkItems() {
 
-// 탐사 중에 의미가 있는 것만 추린다
+// 반입한 것 중에 실제로 쓸 수 있는 것
 function usableNow(name) {
     const cat = (typeof ITEM_CATALOG !== 'undefined') && ITEM_CATALOG[name];
-    if (!cat || cat.usable === false) return false;
+    if (!cat || cat.usable === false) return false;      // 사직서처럼 따로 쓰는 것은 뺀다
     const e = String(cat.effect || '');
-    if (!e || e.indexOf('equip') === 0) return false;
-    // ??? 상점 소모품과 구역 전용품
-    return cat.qShop === true
-        || /^q_/.test(e) || /^s3_/.test(e) || /^s003_/.test(e) || /^c_/.test(e);
+    if (!e || e.indexOf('equip') === 0) return false;    // 장비는 여기서 못 찬다
+    return true;
+}
+
+// 들어갈 때 반입한 소모품 — 이것이 전부다
+function carryCount() {
+    const cnt = {};
+    ((typeof darkRun !== 'undefined' && darkRun && darkRun.carryItems) || []).forEach(function (n) {
+        if (!n || !usableNow(n)) return;
+        cnt[n] = (cnt[n] || 0) + 1;
+    });
+    return cnt;
+}
+
+// 쓴 만큼 반입 목록에서도 뺀다
+function dropCarry(name) {
+    if (typeof darkRun === 'undefined' || !darkRun || !darkRun.carryItems) return;
+    const i = darkRun.carryItems.indexOf(name);
+    if (i >= 0) darkRun.carryItems.splice(i, 1);
+    if (typeof saveDarkRunState === 'function') { try { saveDarkRunState(); } catch (e) { } }
 }
 
 // 구역을 가리는 것들 — 어느 구역에서만 되는지 이름까지 적어 둔다.
@@ -55,9 +75,7 @@ function zoneWhy(name) {
 }
 
 function listMine() {
-    const inv = (currentUser && currentUser.inventory) || [];
-    const cnt = {};
-    inv.forEach(function (n) { if (usableNow(n)) cnt[n] = (cnt[n] || 0) + 1; });
+    const cnt = carryCount();
     return Object.keys(cnt).sort().map(function (n) {
         return { name: n, n: cnt[n], ok: zoneOk(n), why: zoneWhy(n),
                  desc: (ITEM_CATALOG[n] || {}).desc || '' };
@@ -71,7 +89,17 @@ window.closeDarkItems = function () {
 
 window.useDarkItem = function (name) {
     closeDarkItems();
-    if (typeof useInventoryItem === 'function') useInventoryItem(name);
+    if (typeof useInventoryItem !== 'function') return;
+
+    // 소지품에서 실제로 빠졌을 때만 반입 목록에서도 뺀다
+    const before = ((currentUser && currentUser.inventory) || []).filter(function (x) {
+        return x === name;
+    }).length;
+    useInventoryItem(name);
+    const after = ((currentUser && currentUser.inventory) || []).filter(function (x) {
+        return x === name;
+    }).length;
+    if (after < before) dropCarry(name);
 };
 
 window.openDarkItems = function () {
@@ -100,7 +128,8 @@ window.openDarkItems = function () {
                 + '</div>';
         }).join('')
         : '<div style="color:#777; font-size:12px; text-align:center; padding:28px 0;">'
-          + '지금 쓸 수 있는 소모품이 없습니다.</div>';
+          + '반입한 소모품이 없습니다.<br><span style="font-size:10px;">'
+          + '들어가기 전에 고른 것만 쓸 수 있습니다.</span></div>';
 
     const el = document.createElement('div');
     el.id = 'dark-item-overlay';
@@ -111,7 +140,7 @@ window.openDarkItems = function () {
         + ' background:#0d0d0d; border:1px solid #2f5f7f; border-radius:8px; padding:16px;">'
         + '<div style="font-size:13px; font-weight:bold; color:#4fc3f7; margin-bottom:4px;">소지품</div>'
         + '<div style="font-size:10px; color:#888; margin-bottom:13px; line-height:1.6;">'
-        + '탐사 중에 쓸 수 있는 것만 보입니다.</div>'
+        + '들어올 때 반입한 소모품입니다. 밖에 둔 것은 쓸 수 없습니다.</div>'
         + body
         + '<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px; font-size:11px;"'
         + ' onclick="closeDarkItems()">닫는다</button>'
@@ -148,8 +177,10 @@ window.openDarkItems = function () {
 window.darkItemState = function () {
     if (!darkRun) { console.log('탐사 중이 아닙니다.'); return; }
     const rows = listMine();
-    console.log('%c===== 지금 쓸 수 있는 소모품 =====', 'color:#4fc3f7; font-size:13px');
-    if (!rows.length) { console.log('  없습니다.'); return; }
+    console.log('%c===== 반입한 소모품 =====', 'color:#4fc3f7; font-size:13px');
+    console.log('  반입 목록:', JSON.stringify(darkRun.carryItems || []));
+    console.log('  반입 장비:', JSON.stringify(darkRun.carryEquips || []));
+    if (!rows.length) { console.log('  쓸 수 있는 것이 없습니다.'); return; }
     console.table(rows.map(function (r) {
         return { 이름: r.name, 개수: r.n, '이 구역에서': r.ok ? 'O' : '✗',
                  효과: (ITEM_CATALOG[r.name] || {}).effect };
