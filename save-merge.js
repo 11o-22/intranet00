@@ -202,6 +202,34 @@ function flushMyPts() {
 //   · 내가 더한 효과는 넣는다
 //   · 같은 이름이 양쪽에 있으면 남은 시간이 긴 쪽을 쓴다 (고정이 가장 세다)
 //   · 내가 지운 효과는 뺀다. 다만 그 사이 누가 다시 걸었으면 두고 본다
+//
+// ★ 「지운 것」을 재는 기준은 **쓰는 쪽이 읽은 그 모습**이어야 한다.
+//
+//   남에게 물약을 쓰는 길은 모두 「users/사번 을 once 로 읽고 → 고치고 → 쓰기」다.
+//   그런데 기준으로 shadow(서버에서 가장 최근에 본 모습)를 쓰고 있었다.
+//   shadow 는 자식 사건으로 계속 갱신되므로, 읽고 쓰는 그 사이에 상대가
+//   새로 받은 효과까지 들어가 있다. 그러면 쓰는 쪽의 묵은 목록에는 없으니
+//   「상대가 지운 것」으로 보여 **방금 걸린 물약이 날아간다.**
+//
+//   그래서 읽은 모습을 적어 두고 그것을 기준으로 쓴다. 쓰는 쪽이 자기가 읽은
+//   것에서 뺀 것만 지워지고, 그 사이에 들어온 것은 건드리지 않는다.
+const lastRead = {};              // 사번 → { eff:[], at:읽은 시각 }
+const READ_LIFE = 120000;         // 이보다 묵은 읽기는 안 믿는다
+
+function noteRead(c, v) {
+    if (!c) return;
+    lastRead[c] = { eff: asArr(v && v[EFF]), at: Date.now() };
+}
+function readEff(c) {
+    const r = lastRead[c];
+    if (r && (Date.now() - r.at) <= READ_LIFE) return r.eff;
+    return undefined;             // 읽은 기록이 없으면 shadow 로 돌아간다
+}
+function effBase(c) {
+    const r = readEff(c);
+    return (r !== undefined) ? r : shadowEff[c];
+}
+
 function effTime(e) { return (e && e.fixed) ? Infinity : ((e && e.expireAt) || 0); }
 function pickEff(a, b) {
     if (!a) return b;
@@ -423,6 +451,31 @@ function flushMyInv() {
 }
 
 // ==========================================
+// 들어올 때 — 서버에 있는 것을 내 쪽에 합친다
+// ==========================================
+//
+// 기준(base)은 서버 모습 그대로 둔다. 내 쪽이 그보다 많아지므로
+// 다음 저장에서 「지운 것」은 없고 「더한 것」만 올라간다.
+function soakEff(srv) {
+    if (!currentUser || !asArr(srv[EFF]).length) return;
+    const out = effMap(currentUser[EFF]);
+    const add = effMap(srv[EFF]);
+    Object.keys(add).forEach(function (n) { out[n] = pickEff(out[n], add[n]); });
+    fillArr(currentUser[EFF] || (currentUser[EFF] = []),
+            Object.keys(out).map(function (n) { return out[n]; }));
+    if (asArr(currentUser[EFF]).length) effHeld = true;
+}
+
+function soakBuf(srv) {
+    if (!currentUser || !asArr(srv[BUF]).length) return;
+    const mineK = bufKeys(currentUser[BUF]);
+    const miss = msDiff(bufKeys(srv[BUF]), mineK);         // 서버에만 있는 몫
+    if (!miss.length) { if (mineK.length) bufHeld = true; return; }
+    fillArr(currentUser[BUF] || (currentUser[BUF] = []), bufBack(mineK.concat(miss)));
+    bufHeld = true;
+}
+
+// ==========================================
 // 기준을 세우고 지켜본다
 // ==========================================
 function attach() {
@@ -446,16 +499,19 @@ function attach() {
             // 들어올 때 이미 들고 있었다면, 떼어 내는 것도 할 수 있어야 한다
             effHeld = asArr(currentUser[EFF]).length > 0;
             bufHeld = asArr(currentUser[BUF]).length > 0;
-            // ★ 서버에는 걸려 있는데 내 쪽이 비어 있으면 받아 둔다.
-            //   들어오는 그 순간에 남이 걸어 준 것이 이 모양이 된다. 기준만
-            //   세우고 지나가면 화면에는 끝까지 안 뜨고, 다음 저장 때
-            //   「내가 지운 것」으로 서버에서도 지워진다.
-            [EFF, BUF].forEach(function (k) {
-                if (!asArr(srv[k]).length) return;
-                if (asArr(currentUser[k]).length) return;
-                fillArr(currentUser[k] || (currentUser[k] = []), srv[k]);
-                if (k === EFF) effHeld = true; else bufHeld = true;
-            });
+            // ★ 서버에 걸려 있는 것을 내 쪽에 **합쳐 둔다.**
+            //
+            //   로그인이 내 모습을 읽은 뒤, 기준이 서기까지 한 호흡이 있다.
+            //   그 사이에 남이 걸어 준 효과는 서버에만 있고 내 화면에는 없다.
+            //   예전에는 내 쪽이 비어 있을 때만 받아 왔는데, 이미 하나 걸려
+            //   있으면 그냥 지나쳐서 — 기준은 둘, 내 화면은 하나가 되고 —
+            //   다음 저장이 그 하나를 「내가 지운 것」으로 보고 **서버에서
+            //   지워 버렸다.** 붙었다가 사라지던 까닭이 이것이다.
+            //
+            //   그래서 비어 있든 아니든 이름별로 합친다. 들어오는 사이에
+            //   내가 마신 것도 남고, 남이 걸어 준 것도 남는다.
+            soakEff(srv);
+            soakBuf(srv);
             ready = true;
             console.log('[병합] 기준을 세웠습니다.');
             return;
@@ -694,7 +750,7 @@ function markSaved(payload) {
             const hasBuf = Object.prototype.hasOwnProperty.call(fields, BUF);
             const hadInv = shadowInv[c];
             const hadPts = shadowPts[c];
-            const hadEff = shadowEff[c];
+            const hadEff = effBase(c);          // 쓰는 쪽이 읽은 모습 (없으면 shadow)
             const hadBuf = shadowBuf[c];
             const doInv = hasInv && hadInv;
             const doPts = hasPts && (hadPts !== undefined);
@@ -792,6 +848,24 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
         database.ref = function () {
             const r = _ref.apply(null, arguments);
             const p = String(arguments[0] == null ? '' : arguments[0]).replace(/^\/+|\/+$/g, '');
+
+            // ★ users/사번 을 읽으면 그 모습을 적어 둔다 (위 lastRead)
+            const who = /^users\/([^/]+)$/.exec(p);
+            if (who && r && typeof r.once === 'function' && !r._readNote) {
+                const _once = r.once.bind(r);
+                r.once = function () {
+                    const out = _once.apply(null, arguments);
+                    if (out && typeof out.then === 'function') {
+                        return out.then(function (s) {
+                            try { noteRead(who[1], (s && s.val) ? s.val() : null); } catch (e) { }
+                            return s;
+                        });
+                    }
+                    return out;
+                };
+                r._readNote = true;
+            }
+
             if (p !== '' || !r || typeof r.update !== 'function' || r._rootMerge) return r;
 
             const _up = r.update.bind(r);
@@ -808,8 +882,8 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                         job = mergePts(path, shadowPts[c], obj[k]);
                     } else if (f === INV && shadowInv[c]) {
                         job = mergeInv(path, shadowInv[c], obj[k]);
-                    } else if (f === EFF && shadowEff[c]) {
-                        job = mergeEff(path, shadowEff[c], obj[k]);
+                    } else if (f === EFF && effBase(c)) {
+                        job = mergeEff(path, effBase(c), obj[k]);
                     } else if (f === BUF && shadowBuf[c]) {
                         job = mergeBuf(path, shadowBuf[c], obj[k]);
                     }
