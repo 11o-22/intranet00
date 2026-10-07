@@ -6,6 +6,20 @@
 const PREG_HOURS = 48;            // 이틀 뒤 출산
 const PREG_CARE_DAILY = 5;        // 하루 돌봄 횟수
 const PREG_MAX_SIRES = 5;         // 한 명이 받을 수 있는 최대 인원
+const PREG_MAX_LYCHEE = 10;       // 리치맛 물약을 마신 사람은 열 명까지
+
+// 리치맛 물약 — **받는 쪽**에만 걸린다. 임신시키는 쪽은 아무 상관이 없다.
+function hasLychee(u) {
+    if (!u) return false;
+    const now = Date.now();
+    return (u.timedEffects || []).some(function (e) {
+        if (!e || e.name !== '리치맛 물약') return false;
+        return !!e.fixed || !e.expireAt || e.expireAt > now;
+    });
+}
+function maxSires(u) {
+    return hasLychee(u) ? PREG_MAX_LYCHEE : PREG_MAX_SIRES;
+}
 const PREG_COST_MAX = 3000;       // 포인트로 낼 때 상한
 
 // 사택 비치 전용 아이템 5종
@@ -150,7 +164,14 @@ function addPregBtn(code) {
         </div>`;
     }
 
-    if (meSire && tBear && sireCount(t) < PREG_MAX_SIRES && !isMySire(t)) {
+    if (hasLychee(t)) {
+        html += `<div style="font-size:10px; color:#c9a8ff; margin-top:8px; line-height:1.6;">
+            리치맛 물약 — 한 번에 <b>${PREG_MAX_LYCHEE}명</b>까지 받을 수 있습니다.
+            <span style="color:#888;">(지금 ${sireCount(t)}명)</span>
+        </div>`;
+    }
+
+    if (meSire && tBear && sireCount(t) < maxSires(t) && !isMySire(t)) {
         const near = isPartner(currentUser, t);
         html += `<button id="preg-do-btn" class="game-btn" style="width:100%; margin-top:8px; padding:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="tryPregnancy('${code}')">
             임신시키기 ${near ? '' : '<span style="font-size:10px; color:#ffd76a;">(동의 필요)</span>'}
@@ -174,7 +195,7 @@ function tryPregnancy(code) {
         showCustomAlert('상대가 다이아 보지 플러그를 차고 있습니다.\n\n빼야 할 수 있습니다.');
         return;
     }
-    if (sireCount(t) >= PREG_MAX_SIRES) { showCustomAlert(`이미 ${PREG_MAX_SIRES}명이 있습니다.`); return; }
+    if (sireCount(t) >= maxSires(t)) { showCustomAlert(`이미 ${maxSires(t)}명이 있습니다.`); return; }
     if (isMySire(t)) { showCustomAlert('이미 당신의 아이를 가지고 있습니다.'); return; }
 
     if (isPartner(currentUser, t)) { doPregnancy(code); return; }
@@ -197,6 +218,8 @@ function doPregnancy(code) {
         return;
     }
     if (!canBear(t)) { showCustomAlert('상대가 받을 수 있는 상태가 아닙니다.'); return; }
+    if (sireCount(t) >= maxSires(t)) { showCustomAlert(`이미 ${maxSires(t)}명이 있습니다.`); return; }
+    if (isMySire(t)) { showCustomAlert('이미 당신의 아이를 가지고 있습니다.'); return; }
 
     const sure = hasSureBear(t);                   // 딸기맛 물약 — 한 번에 된다
     const myR = roleFlipped(currentUser) ? sireRateAlt(currentUser) : sireRate(currentUser);

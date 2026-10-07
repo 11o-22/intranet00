@@ -162,11 +162,19 @@ function fixDue(t) {
 // ==========================================
 //
 // 기존 임신시키기와 섞이지 않도록 따로 된 길(milkAsk · milkGo)로 간다.
+//
+// 받을 수 있는 인원은 pregnancy.js 의 maxSires 가 센다.
+// 리치맛 물약을 마신 쪽은 열 명까지다. (없으면 여기 MAX_SIRES 로 돈다)
+function bearCap(u) {
+    if (typeof maxSires === 'function') { try { return maxSires(u); } catch (e) { } }
+    return MAX_SIRES;
+}
+
 function canMilk(t) {
     if (!currentUser || !t || t.code === currentUser.code) return false;
     if (typeof canBearNow === 'function' && !canBearNow(currentUser)) return false;
     if (typeof canSire === 'function' && !canSire(t)) return false;
-    if (typeof sireCount === 'function' && sireCount(currentUser) >= MAX_SIRES) return false;
+    if (typeof sireCount === 'function' && sireCount(currentUser) >= bearCap(currentUser)) return false;
     if (typeof isMySire === 'function') {
         const p = (typeof pregOf === 'function') ? pregOf(currentUser) : null;
         if (p && p.sires && p.sires.some(function (s) { return s.code === t.code; })) return false;
@@ -455,6 +463,10 @@ window.pregFlushAll = function () {
 window.pregV2State = function () {
     console.log('%c===== 임신 v2 =====', 'color:#ff8fb1; font-size:13px');
     console.log('  기간:', PREG_H + '시간 · 아버지 최대', MAX_SIRES, '· 동시에 임신시키기 최대', MAX_LOAD);
+    if (currentUser) {
+        console.log('  내가 받을 수 있는 인원:', bearCap(currentUser) + '명',
+            (typeof hasLychee === 'function' && hasLychee(currentUser)) ? '(리치맛 물약)' : '');
+    }
     console.log('  돌보기 아이템 남아 있나:',
         Object.keys(CARE_ITEMS).filter(function (n) { return ITEM_CATALOG[n]; }).join(', ') || '없음 (정상)');
     console.log('  careFill 고정:', (typeof careFill === 'function' && careFill._v2) ? 'O' : '✗');
