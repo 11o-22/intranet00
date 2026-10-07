@@ -67,8 +67,26 @@ function same(a, b) {
 //   다 끝난 사원은 서버에 timedEffects 가 아예 없고, 화면에는 [] 가 남는다.
 //   이 둘을 다르다고 세면 아래 지켜보기에서 「내가 손댄 항목」으로 잘못 걸려,
 //   남이 걸어 준 효과를 받지 않는다. (리치맛 물약이 안 붙던 까닭이다)
+//
+// ★ 목록만이 아니다. 「없는 열쇠」와 「0」도 같은 것으로 봐야 한다.
+//
+//   파이어베이스는 0 도 값으로 두지만, 한 번도 받아 본 적이 없는 사원에게는
+//   그 열쇠가 아예 없다. 반대로 화면 쪽 사본에는 0 으로 깔려 있는 일이 많다.
+//   (slaveUntil · blindfoldUntil · pollFreezeUntil · nostalgiaUntil …)
+//
+//   이 둘을 다르다고 세면 그 열쇠는 **영영 「내가 손댄 것」**이 된다. 그래서
+//     · 남이 걸어 준 노예 계약·안대·오염 동결이 내 화면에 안 붙고
+//     · 다음 저장이 내 묵은 0 을 서버에 밀어 넣어 **때 전에 풀린다.**
+//   물약이 사라지던 것과 같은 까닭이고, 값이 배열이 아니라 숫자일 뿐이다.
+function blank(v) {
+    if (v === undefined || v === null || v === 0 || v === '' || v === false) return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === 'object') return Object.keys(v).length === 0;
+    return false;
+}
 function sameAs(k, a, b) {
     if (k === INV || k === EFF || k === BUF) return same(asArr(a), asArr(b));
+    if (blank(a) && blank(b)) return true;
     return same(a, b);
 }
 function badKey(k) { return /[.#$\[\]\/]/.test(k); }
@@ -218,7 +236,16 @@ const READ_LIFE = 120000;         // 이보다 묵은 읽기는 안 믿는다
 
 function noteRead(c, v) {
     if (!c) return;
-    lastRead[c] = { eff: asArr(v && v[EFF]), at: Date.now() };
+    // 읽은 모습을 그대로 베껴 둔다. 부르는 쪽이 읽은 객체를 그 자리에서 고치므로
+    // 베끼지 않으면 「읽은 모습」도 같이 바뀌어 버린다.
+    lastRead[c] = { eff: asArr(v && v[EFF]), all: clone(v) || {}, at: Date.now() };
+}
+// 읽은 뒤 손대지 않은 열쇠인가 — 그런 열쇠는 보내지 않는다
+function untouched(c, k, v) {
+    if (k === '_adminStamp' || k === '_stamp') return false;
+    const r = lastRead[c];
+    if (!r || (Date.now() - r.at) > READ_LIFE) return false;
+    return sameAs(k, v, r.all[k]);
 }
 function readEff(c) {
     const r = lastRead[c];
@@ -555,7 +582,7 @@ function attach() {
         Object.keys(base).forEach(function (k) {
             if (k in srv) return;
             if (k === INV || k === EFF || k === BUF) return;   // 소지품·효과·버프는 지키다
-            if (!same(currentUser[k], base[k])) return;
+            if (!sameAs(k, currentUser[k], base[k])) return;
             delete currentUser[k];
             took++;
         });
@@ -609,7 +636,8 @@ function diffPayload() {
         if (k === INV) return;                              // 소지품은 따로 병합한다
         if (badKey(k)) return;
         if (currentUser[k] === undefined) return;
-        if (same(currentUser[k], base[k])) return;          // 안 바뀐 것은 건너뛴다
+        if (sameAs(k, currentUser[k], base[k])) return;      // 안 바뀐 것은 건너뛴다
+        // (없는 열쇠와 0 은 같은 것으로 본다 — 묵은 0 을 밀어 넣지 않는다)
         const v = clone(currentUser[k]);
         if (v === undefined) return;
         out[k] = v;
@@ -756,16 +784,29 @@ function markSaved(payload) {
             const doPts = hasPts && (hadPts !== undefined);
             const doEff = hasEff && hadEff;
             const doBuf = hasBuf && hadBuf;
-            if (!doInv && !doPts && !doEff && !doBuf) return _u.apply(this, arguments);
 
+            // ★ 읽은 뒤 손대지 않은 열쇠는 보내지 않는다.
+            //
+            //   남에게 아이템을 쓰는 길(index.html:6124~6142)은 열두 가지 열쇠를
+            //   한꺼번에 덮어쓴다. 바꾼 것은 보통 하나뿐인데, 읽은 지 한참 지난
+            //   모습으로 나머지 열한 개를 다시 쓴다. 고르는 창에 글자를 적는
+            //   동안(체리맛·곶감맛·투명 물약·빨간 리본) 그 사이가 길어지면,
+            //   그동안 그 사람이 받은 노예 계약·안대·오염 동결이 묵은 값으로
+            //   덮여 **때 전에 풀린다.**
+            //   손대지 않은 열쇠를 빼면 그런 일이 없다.
             const rest = {};
+            let dropped = 0;
             Object.keys(fields).forEach(function (k) {
                 if (doInv && k === INV) return;
                 if (doPts && k === PTS) return;
                 if (doEff && k === EFF) return;
                 if (doBuf && k === BUF) return;
+                if (untouched(c, k, fields[k])) { dropped++; return; }
                 rest[k] = fields[k];
             });
+            if (!doInv && !doPts && !doEff && !doBuf && !dropped) {
+                return _u.apply(this, arguments);           // 손댈 것이 없다 — 원래대로
+            }
             rest._adminStamp = Date.now();
 
             const jobs = [_u.call(this, c, rest)];
@@ -875,7 +916,13 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                 const jobs = [];
                 Object.keys(obj).forEach(function (k) {
                     const m = MERGED.exec(String(k).replace(/^\/+/, ''));
-                    if (!m) { rest[k] = obj[k]; return; }
+                    if (!m) {
+                        // 읽은 뒤 손대지 않은 열쇠는 보내지 않는다 (위 untouched 의 까닭)
+                        const w = /^users\/([^/]+)\/([^/]+)$/.exec(String(k).replace(/^\/+/, ''));
+                        if (w && (!currentUser || w[1] !== currentUser.code)
+                            && untouched(w[1], w[2], obj[k])) return;
+                        rest[k] = obj[k]; return;
+                    }
                     const c = m[1], f = m[2], path = 'users/' + c + '/' + f;
                     let job = null;
                     if (f === PTS && shadowPts[c] !== undefined) {
