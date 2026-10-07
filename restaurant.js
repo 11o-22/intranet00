@@ -577,7 +577,10 @@ function dishCard(d, showBtn) {
         + '<span style="font-size:12px; font-weight:bold; color:' + GCOLOR[d.grade] + ';">' + d.name + '</span>'
         + '<span style="font-size:10px; color:#888;">' + d.grade + '등급'
         + (made ? ' · 만든 횟수 ' + made : '') + '</span></div>'
-        + '<div style="font-size:10px; color:#9fd0ff; margin:5px 0 6px 0;">' + effText(d) + '</div>'
+        + (made
+            ? '<div style="font-size:10px; color:#9fd0ff; margin:5px 0 6px 0;">' + effText(d) + '</div>'
+            : '<div style="font-size:10px; color:#666; margin:5px 0 6px 0;">'
+              + '??? <span style="font-size:9px;">— 한 번 만들어 보면 알 수 있습니다.</span></div>')
         + '<div style="font-size:10px; line-height:1.7;">'
         + d.mats.map(function (m) {
             const h = countOf(m) > 0;
@@ -628,16 +631,28 @@ window.renderFood = function () {
                         + GCOLOR[g] + ' !important;' : '')
                     + '" onclick="foodGradeTab(\'' + g + '\')">' + g + '</button>';
             }).join('') + '</div>';
-        const list = DISHES.filter(function (d) { return d.grade === foodGrade; });
+        // 만들어 본 것을 위로 올린다 (많이 만든 순, 그다음은 본래 차례)
+        const bk0 = book();
+        const list = DISHES.filter(function (d) { return d.grade === foodGrade; })
+            .slice().sort(function (a, b) {
+                const ma = bk0[a.id] || 0, mb = bk0[b.id] || 0;
+                if (ma !== mb) return mb - ma;
+                return a.id - b.id;
+            });
         if (foodTab === 'book') {
-            const bk = book();
-            const madeN = list.filter(function (d) { return bk[d.id]; }).length;
+            const madeN = list.filter(function (d) { return bk0[d.id]; }).length;
             body = gtabs
                 + '<div style="font-size:10px; color:#888; margin-bottom:9px;">'
                 + foodGrade + '등급 ' + madeN + ' / ' + list.length + '가지를 만들어 봤습니다.</div>'
                 + list.map(function (d) { return dishCard(d, false); }).join('');
         } else {
-            body = gtabs + list.map(function (d) { return dishCard(d, true); }).join('');
+            const madeN = list.filter(function (d) { return bk0[d.id]; }).length;
+            body = gtabs
+                + '<div style="font-size:10px; color:#888; margin-bottom:9px; line-height:1.6;">'
+                + (madeN ? '만들어 본 ' + madeN + '가지를 위에 두었습니다. ' : '')
+                + '효과는 한 번 만들어 보면 알 수 있습니다. <span style="color:#666;">'
+                + '(레시피 북에서도 볼 수 있습니다)</span></div>'
+                + list.map(function (d) { return dishCard(d, true); }).join('');
         }
     }
 
