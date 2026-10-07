@@ -4845,6 +4845,12 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (user.timedEffects) {
             for (let i = user.timedEffects.length - 1; i >= 0; i--) {
     if (user.timedEffects[i].fixed) continue;
+    // ★ 끝 시각이 빠진 칸 — 비교가 NaN 이 되어 영영 안 끝났다. 하루로 메운다.
+    if (!user.timedEffects[i].expireAt || isNaN(user.timedEffects[i].expireAt)) {
+        user.timedEffects[i].expireAt = now + 24 * 60 * 60 * 1000;
+        changed = true;
+        continue;
+    }
     if (now >= user.timedEffects[i].expireAt) {
                     addHistoryLog(user, `[상태 해제] ${user.timedEffects[i].name} 효과가 종료되었습니다.`);
                     user.timedEffects.splice(i, 1);
@@ -5194,6 +5200,13 @@ if (user.code === 'kario0987') {
     user.timedEffects.forEach(eff => {
         if (eff.fixed) {
            activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#4fc3f7; font-weight:bold;">(영구)</span>`);
+            return;
+        }
+        // ★ 끝 시각이 없는 칸을 조용히 숨기지 않는다.
+        //   숨기면 데이터에는 남아 있는데 화면에는 없어서 「물약이 안 먹힌다」로 보인다.
+        //   (checkPassivePollution 이 24시간으로 메워 주지만, 그 전에도 보여야 한다)
+        if (!eff.expireAt || isNaN(eff.expireAt)) {
+            activeTexts.push(`[${eff.name}] ${eff.desc} <span style="color:#ff9800; font-weight:bold;">(남은 시간 확인 중)</span>`);
             return;
         }
         let remainH = Math.ceil((eff.expireAt - now) / (1000 * 60 * 60));
