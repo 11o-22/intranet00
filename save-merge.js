@@ -39,6 +39,14 @@ const shadowEff = {};     // 남에게 걸린 효과 — 같은 까닭
 const shadowBuf = {};     // 남에게 얹힌 버프 — 같은 까닭
 let bufBusy = false, bufAgain = false;
 let effBusy = false, effAgain = false;
+
+// ★ 이번 판에 한 번이라도 내 손에 있었나
+//
+//   「내 쪽이 비어 있다」만 보고 서버 것을 지우면 안 된다. 제거약으로 떼어 낸
+//   것과, 애초에 받아 본 적이 없는 것을 가를 수 없기 때문이다.
+//   한 번이라도 들고 있었던 뒤에 비었을 때만 지운다. 들어 본 적이 없으면
+//   서버에 있는 것은 남이 방금 걸어 준 것이므로 건드리지 않는다.
+let effHeld = false, bufHeld = false;
 const rootStats = {};     // 루트 통째 쓰기를 몇 번 병합으로 돌렸나
 let invBusy = false;
 let invAgain = false;
@@ -51,6 +59,17 @@ function clone(v) {
 }
 function same(a, b) {
     try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+}
+
+// ★ 목록(소지품·효과·버프)은 「빈 배열」과 「열쇠가 없음」을 같은 것으로 본다.
+//
+//   파이어베이스는 빈 배열을 값으로 두지 않고 열쇠째 지운다. 그래서 걸린 것이
+//   다 끝난 사원은 서버에 timedEffects 가 아예 없고, 화면에는 [] 가 남는다.
+//   이 둘을 다르다고 세면 아래 지켜보기에서 「내가 손댄 항목」으로 잘못 걸려,
+//   남이 걸어 준 효과를 받지 않는다. (리치맛 물약이 안 붙던 까닭이다)
+function sameAs(k, a, b) {
+    if (k === INV || k === EFF || k === BUF) return same(asArr(a), asArr(b));
+    return same(a, b);
 }
 function badKey(k) { return /[.#$\[\]\/]/.test(k); }
 function asArr(v) {
@@ -210,10 +229,14 @@ function effChanged(had, want) {
     });
 }
 
-function mergeEff(path, baseList, localList) {
+function mergeEff(path, baseList, localList, noWipe) {
     if (!database) return Promise.resolve(null);
     const had = effMap(baseList), want = effMap(localList);
     if (!effChanged(had, want)) return Promise.resolve(null);
+
+    // ★ 들어 본 적이 없으면 비웠다고 보지 않는다 — 보낼 것이 없으니 그냥 물러난다.
+    //   (받아 본 적이 없는데 서버에 있다면 남이 방금 걸어 준 것이다)
+    if (noWipe && Object.keys(want).length === 0) return Promise.resolve(null);
 
     // ★ 내 쪽이 통째로 비어 있다고 서버 것을 다 지우지는 않는다.
     //   잠깐 비어 있는 목록(막 들어온 자리, 덮어쓴 자리)이 올라가면
@@ -242,6 +265,7 @@ function mergeEff(path, baseList, localList) {
 
 function flushMyEff() {
     if (!ready || !currentUser) return Promise.resolve(null);
+    if (asArr(currentUser[EFF]).length) effHeld = true;      // 한 번이라도 들고 있었다
     if (effBusy) { effAgain = true; return Promise.resolve(null); }
     if (!effChanged(effMap(base[EFF]), effMap(currentUser[EFF]))) return Promise.resolve(null);
 
@@ -249,7 +273,7 @@ function flushMyEff() {
     const want = clone(currentUser[EFF]) || [];
     const had = clone(base[EFF]) || [];
 
-    return mergeEff('users/' + code + '/' + EFF, had, want).then(function (after) {
+    return mergeEff('users/' + code + '/' + EFF, had, want, !effHeld).then(function (after) {
         effBusy = false;
         if (after === null) { base[EFF] = want; }
         else {
@@ -296,11 +320,13 @@ function bufBack(keys) {
     return keys.map(function (s) { try { return JSON.parse(s); } catch (e) { return null; } })
         .filter(Boolean);
 }
-function mergeBuf(path, baseList, localList) {
+function mergeBuf(path, baseList, localList, noWipe) {
     if (!database) return Promise.resolve(null);
     const had = bufKeys(baseList), want = bufKeys(localList);
     const add = msDiff(want, had), del = msDiff(had, want);
     if (!add.length && !del.length) return Promise.resolve(null);
+    // 들어 본 적이 없으면 비웠다고 보지 않는다 (효과와 같은 까닭)
+    if (noWipe && !want.length) return Promise.resolve(null);
 
     return database.ref(path).transaction(function (srv) {
         const cur = bufKeys(srv);
@@ -317,6 +343,7 @@ function mergeBuf(path, baseList, localList) {
 
 function flushMyBuf() {
     if (!ready || !currentUser) return Promise.resolve(null);
+    if (asArr(currentUser[BUF]).length) bufHeld = true;      // 한 번이라도 얹혀 있었다
     if (bufBusy) { bufAgain = true; return Promise.resolve(null); }
     if (same(bufKeys(currentUser[BUF]), bufKeys(base[BUF]))) return Promise.resolve(null);
 
@@ -324,7 +351,7 @@ function flushMyBuf() {
     const want = clone(currentUser[BUF]) || [];
     const had = clone(base[BUF]) || [];
 
-    return mergeBuf('users/' + code + '/' + BUF, had, want).then(function (after) {
+    return mergeBuf('users/' + code + '/' + BUF, had, want, !bufHeld).then(function (after) {
         bufBusy = false;
         if (after === null) { base[BUF] = want; }
         else {
@@ -406,6 +433,8 @@ function attach() {
 
     if (ref) { try { ref.off(); } catch (e) { } }
     ref = database.ref('users/' + code);
+    effHeld = false;
+    bufHeld = false;
 
     ref.on('value', function (s) {
         const srv = s.val();
@@ -414,6 +443,19 @@ function attach() {
 
         if (!ready) {
             base = clone(srv) || {};
+            // 들어올 때 이미 들고 있었다면, 떼어 내는 것도 할 수 있어야 한다
+            effHeld = asArr(currentUser[EFF]).length > 0;
+            bufHeld = asArr(currentUser[BUF]).length > 0;
+            // ★ 서버에는 걸려 있는데 내 쪽이 비어 있으면 받아 둔다.
+            //   들어오는 그 순간에 남이 걸어 준 것이 이 모양이 된다. 기준만
+            //   세우고 지나가면 화면에는 끝까지 안 뜨고, 다음 저장 때
+            //   「내가 지운 것」으로 서버에서도 지워진다.
+            [EFF, BUF].forEach(function (k) {
+                if (!asArr(srv[k]).length) return;
+                if (asArr(currentUser[k]).length) return;
+                fillArr(currentUser[k] || (currentUser[k] = []), srv[k]);
+                if (k === EFF) effHeld = true; else bufHeld = true;
+            });
             ready = true;
             console.log('[병합] 기준을 세웠습니다.');
             return;
@@ -424,20 +466,23 @@ function attach() {
         const kept = {};                                    // 내가 손댄 항목은 기준도 바꾸지 않는다
         Object.keys(srv).forEach(function (k) {
             if (k === '_adminStamp' || k === '_stamp') return;
-            if (same(srv[k], base[k])) return;              // 서버도 그대로면 볼 것 없다
-            const mineTouched = !same(currentUser[k], base[k]);
+            if (sameAs(k, srv[k], base[k])) return;         // 서버도 그대로면 볼 것 없다
+            const mineTouched = !sameAs(k, currentUser[k], base[k]);
             if (mineTouched) {
                 // ★ 서버 값이 내 값과 같다면 내가 쓴 글이 돌아온 것이다.
                 //   이때 기준을 되돌리면 기준이 옛 값에 영원히 멈춘다. 그러면
                 //   다음 저장마다 옛 값을 다시 밀어 넣어, 그 사이에 남이 넣어 준
                 //   것을 지운다. (들어온 돈이 사라지던 까닭이 이것이었다)
-                if (same(srv[k], currentUser[k])) return;   // 기준은 아래에서 서버로 간다
+                if (sameAs(k, srv[k], currentUser[k])) return;   // 기준은 아래에서 서버로 간다
                 kept[k] = clone(base[k]);                   // 아직 안 닿았다 — 내 값을 지킨다
                 return;
             }
             if (k === INV || k === EFF || k === BUF) {
                 fillArr(currentUser[k] || (currentUser[k] = []), srv[k]);
-                base[k] = clone(srv[k]); took++; return;
+                base[k] = clone(srv[k]); took++;
+                // 받아 쥔 것은 나중에 떼어 낼 수도 있어야 한다
+                if (asArr(srv[k]).length) { if (k === EFF) effHeld = true; if (k === BUF) bufHeld = true; }
+                return;
             }
             currentUser[k] = clone(srv[k]);
             took++;

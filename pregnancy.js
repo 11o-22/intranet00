@@ -57,6 +57,22 @@ function isMySire(user) {
     if (!p || !p.sires) return false;
     return p.sires.some(s => s.code === currentUser.code);
 }
+
+// 내가 그 사람에게 몇 번 해 두었나 · 몇 번까지 할 수 있나
+//   리치맛 물약을 마신 쪽은 같은 사람이 두 번까지 할 수 있다.
+const PREG_MINE_MAX = 1;
+const PREG_MINE_LYCHEE = 2;
+function mySireCount(user) {
+    const p = pregOf(user);
+    if (!p || !p.sires || !currentUser) return 0;
+    return p.sires.filter(s => s && s.code === currentUser.code).length;
+}
+function mySireMax(user) {
+    return hasLychee(user) ? PREG_MINE_LYCHEE : PREG_MINE_MAX;
+}
+function mySireFull(user) {
+    return mySireCount(user) >= mySireMax(user);
+}
 function isPartner(a, b) {
     if (!a || !b) return false;
     if (a.couple && a.couple.partner === b.code) return true;
@@ -167,11 +183,13 @@ function addPregBtn(code) {
     if (hasLychee(t)) {
         html += `<div style="font-size:10px; color:#c9a8ff; margin-top:8px; line-height:1.6;">
             리치맛 물약 — 한 번에 <b>${PREG_MAX_LYCHEE}명</b>까지 받을 수 있습니다.
-            <span style="color:#888;">(지금 ${sireCount(t)}명)</span>
+            <span style="color:#888;">(지금 ${sireCount(t)}명)</span><br>
+            한 사람이 <b>${PREG_MINE_LYCHEE}번</b>까지 할 수 있습니다.
+            <span style="color:#888;">(당신 ${mySireCount(t)}번)</span>
         </div>`;
     }
 
-    if (meSire && tBear && sireCount(t) < maxSires(t) && !isMySire(t)) {
+    if (meSire && tBear && sireCount(t) < maxSires(t) && !mySireFull(t)) {
         const near = isPartner(currentUser, t);
         html += `<button id="preg-do-btn" class="game-btn" style="width:100%; margin-top:8px; padding:11px; background:linear-gradient(145deg,#6a4c93,#4a2c73) !important; border-color:#8a6cb3 !important; color:#fff !important;" onclick="tryPregnancy('${code}')">
             임신시키기 ${near ? '' : '<span style="font-size:10px; color:#ffd76a;">(동의 필요)</span>'}
@@ -196,7 +214,12 @@ function tryPregnancy(code) {
         return;
     }
     if (sireCount(t) >= maxSires(t)) { showCustomAlert(`이미 ${maxSires(t)}명이 있습니다.`); return; }
-    if (isMySire(t)) { showCustomAlert('이미 당신의 아이를 가지고 있습니다.'); return; }
+    if (mySireFull(t)) {
+        showCustomAlert(mySireMax(t) > 1
+            ? `이미 당신의 아이를 ${mySireMax(t)}번 가지고 있습니다.`
+            : '이미 당신의 아이를 가지고 있습니다.');
+        return;
+    }
 
     if (isPartner(currentUser, t)) { doPregnancy(code); return; }
 
@@ -219,7 +242,12 @@ function doPregnancy(code) {
     }
     if (!canBear(t)) { showCustomAlert('상대가 받을 수 있는 상태가 아닙니다.'); return; }
     if (sireCount(t) >= maxSires(t)) { showCustomAlert(`이미 ${maxSires(t)}명이 있습니다.`); return; }
-    if (isMySire(t)) { showCustomAlert('이미 당신의 아이를 가지고 있습니다.'); return; }
+    if (mySireFull(t)) {
+        showCustomAlert(mySireMax(t) > 1
+            ? `이미 당신의 아이를 ${mySireMax(t)}번 가지고 있습니다.`
+            : '이미 당신의 아이를 가지고 있습니다.');
+        return;
+    }
 
     const sure = hasSureBear(t);                   // 딸기맛 물약 — 한 번에 된다
     const myR = roleFlipped(currentUser) ? sireRateAlt(currentUser) : sireRate(currentUser);

@@ -175,9 +175,14 @@ function canMilk(t) {
     if (typeof canBearNow === 'function' && !canBearNow(currentUser)) return false;
     if (typeof canSire === 'function' && !canSire(t)) return false;
     if (typeof sireCount === 'function' && sireCount(currentUser) >= bearCap(currentUser)) return false;
-    if (typeof isMySire === 'function') {
+    // 같은 사람에게서 몇 번까지 받을 수 있나 — 리치맛 물약을 마셨으면 두 번
+    {
         const p = (typeof pregOf === 'function') ? pregOf(currentUser) : null;
-        if (p && p.sires && p.sires.some(function (s) { return s.code === t.code; })) return false;
+        const n = (p && p.sires) ? p.sires.filter(function (s) {
+            return s && s.code === t.code;
+        }).length : 0;
+        const cap = (typeof mySireMax === 'function') ? mySireMax(currentUser) : 1;
+        if (n >= cap) return false;
     }
     if (sireLoad(t.code) >= MAX_LOAD) return false;
     return true;
