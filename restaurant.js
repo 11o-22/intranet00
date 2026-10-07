@@ -534,21 +534,48 @@ let foodGrade = 'D';
 window.foodSwitch = function (t) { foodTab = t; renderFood(); };
 window.foodGradeTab = function (g) { foodGrade = g; renderFood(); };
 
-window.foodBuyMat = function (name) {
+const MAT_MAX = 99;            // 한 번에 살 수 있는 수
+
+// 적어 넣은 수를 추린다
+function readQty(qid) {
+    const el = qid && document.getElementById(qid);
+    let q = el ? parseInt(el.value, 10) : 1;
+    if (!isFinite(q) || q < 1) q = 1;
+    if (q > MAT_MAX) q = MAT_MAX;
+    return q;
+}
+
+// 적는 동안 값과 단추 글씨를 맞춰 준다
+window.foodQty = function (qid, name) {
+    const el = document.getElementById(qid);
+    if (!el) return;
+    let q = parseInt(el.value, 10);
+    if (el.value !== '' && (!isFinite(q) || q < 1)) { el.value = 1; q = 1; }
+    if (q > MAT_MAX) { el.value = MAT_MAX; q = MAT_MAX; }
+    const b = document.getElementById(qid + '-b');
+    if (b) b.innerText = ((MAT_PRICE[name] || 0) * (q || 1)).toLocaleString() + ' P';
+};
+
+window.foodBuyMat = function (name, qid) {
     if (typeof buyGuard === 'function' && !buyGuard()) return;
     const price = MAT_PRICE[name];
     if (!price || !currentUser) return;
     if (typeof isQuarantined === 'function' && isQuarantined(currentUser)) {
         showCustomAlert('격리 중에는 살 수 없습니다.'); return;
     }
-    if ((currentUser.points || 0) < price) {
-        if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
-        else showCustomAlert('포인트가 모자랍니다.');
+    const qty = readQty(qid);
+    const cost = price * qty;
+    if ((currentUser.points || 0) < cost) {
+        const can = Math.floor((currentUser.points || 0) / price);
+        showCustomAlert('포인트가 모자랍니다.\n\n'
+            + name + ' ' + qty + '개 = ' + cost.toLocaleString() + ' P\n'
+            + '지금 가진 것으로는 ' + can + '개까지 살 수 있습니다.');
         return;
     }
-    currentUser.points -= price;
-    currentUser.inventory.push(name);
-    addHistoryLog(currentUser, '[식당] ' + name + ' 구입 (-' + price + ' P)');
+    currentUser.points -= cost;
+    for (let i = 0; i < qty; i++) currentUser.inventory.push(name);
+    addHistoryLog(currentUser, '[식당] ' + name + ' ' + qty + '개 구입 (-'
+        + cost.toLocaleString() + ' P)');
     save({ points: 1, inventory: 1, history: 1 });
     if (typeof saveSelfFull === 'function') saveSelfFull();
     if (typeof updateUI === 'function') updateUI();
@@ -560,16 +587,23 @@ function countOf(name) {
 }
 
 function matRows(list, odd) {
-    return list.map(function (x) {
+    const tag = odd ? 'o' : 'p';
+    return list.map(function (x, i) {
         const n = x[0], p = x[1], have = countOf(n);
-        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;'
-            + ' padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05);">'
+        const qid = 'fm-' + tag + i;
+        return '<div style="display:flex; justify-content:space-between; align-items:center; gap:7px;'
+            + ' padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);">'
             + '<div style="flex:1; min-width:0;">'
             + '<span style="font-size:11px; color:' + (odd ? '#c9a8ff' : '#ddd') + ';">' + n + '</span>'
             + (have ? '<span style="font-size:10px; color:#ff9800; margin-left:5px;">보유 ' + have + '</span>' : '')
+            + '<div style="font-size:9px; color:#666; margin-top:2px;">개당 ' + p.toLocaleString() + ' P</div>'
             + '</div>'
-            + '<button class="inv-btn inv-btn-use" style="flex-shrink:0;" onclick="foodBuyMat(\'' + n + '\')">'
-            + p + ' P</button></div>';
+            + '<input type="number" id="' + qid + '" value="1" min="1" max="' + MAT_MAX + '"'
+            + ' oninput="foodQty(\'' + qid + '\',\'' + n + '\')"'
+            + ' style="flex:0 0 50px; width:50px; font-size:12px; text-align:center; padding:5px 2px;">'
+            + '<button class="inv-btn inv-btn-use" id="' + qid + '-b" style="flex:0 0 auto; min-width:66px;"'
+            + ' onclick="foodBuyMat(\'' + n + '\',\'' + qid + '\')">'
+            + p.toLocaleString() + ' P</button></div>';
     }).join('');
 }
 
@@ -626,7 +660,10 @@ window.renderFood = function () {
 
     let body = '';
     if (foodTab === 'mat') {
-        body = '<div style="font-size:10px; color:#d4af37; font-weight:bold; margin:4px 0 6px 0;">평범한 재료</div>'
+        body = '<div style="font-size:10px; color:#888; margin-bottom:9px; line-height:1.6;">'
+            + '숫자 칸에 개수를 적고 값을 누르면 그만큼 삽니다. (한 번에 '
+            + MAT_MAX + '개까지)</div>'
+            + '<div style="font-size:10px; color:#d4af37; font-weight:bold; margin:4px 0 6px 0;">평범한 재료</div>'
             + matRows(PLAIN, false)
             + '<div style="font-size:10px; color:#c9a8ff; font-weight:bold; margin:14px 0 6px 0;">괴상한 재료</div>'
             + '<div style="font-size:10px; color:#777; margin-bottom:4px; line-height:1.6;">'
