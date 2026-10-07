@@ -394,7 +394,7 @@ function finishCook(d, ok) {
         made = FAIL_ITEM;
         addHistoryLog(currentUser, '[식당] ' + d.name + ' 실패');
     } else {
-        const star = (d.grade === 'S' && Math.random() < 0.01);
+        const star = (d.grade === 'S' && Math.random() < 0.5);
         made = star ? (d.name + ' ★') : d.name;
         const s = stat();
         s.ok = (s.ok || 0) + 1;
