@@ -4143,6 +4143,7 @@ return b;
             currentUser.quarantineExitPollution = 40;
             currentUser.foxRoomAnswered = true;   // 질문 절차 생략
             currentUser.quarantineHospital = true;
+            currentUser.quarantineDest = isDisasterAgent(currentUser) ? 'bath' : 'fox';   // 입원은 소속대로
         }
 
         // 파티 동료에게 알림
@@ -4678,7 +4679,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
     const h = Math.floor(remainMs / (1000 * 60 * 60));
     const m = Math.floor((remainMs % (1000 * 60 * 60)) / (1000 * 60));
     const isHospital = !!user.quarantineHospital || (user.quarantineExitPollution || 0) >= 40;
-    const agent = isDisasterAgent(user);
+    // 고른 곳(또는 입원 때 정해진 곳)이 있으면 그대로, 없으면 소속으로
+    const agent = user.quarantineDest ? (user.quarantineDest === 'bath') : isDisasterAgent(user);
 
     return {
     label: agent ? '온천욕' : (isHospital ? '입원중' : '상담중'),
