@@ -58,7 +58,15 @@ function bearRateAlt(user) {
 // 역할 판정
 // ==========================================
 function hasPotion(user, name) {
-    return (user.timedEffects || []).some(e => e.name === name);
+    // ★ 시간이 다 된 것은 세지 않는다.
+    //   원래는 이름만 보고 있었다. 걸린 것을 치우는 쪽(checkPassivePollution)이
+    //   돌기 전까지는 끝난 물약이 그대로 힘을 쓴다 — 접속을 안 한 사이에
+    //   끝난 우유맛·포도맛이 역할을 계속 뒤집어 놓았다.
+    const now = Date.now();
+    return (user.timedEffects || []).some(function (e) {
+        if (!e || e.name !== name) return false;
+        return !!e.fixed || !e.expireAt || e.expireAt > now;   // 고정은 영구
+    });
 }
 function genderOf(user) {
     return (user.badge && user.badge.gender) || '';
