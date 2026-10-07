@@ -99,6 +99,52 @@ function asArr(v) {
 }
 
 // ==========================================
+// 트랜잭션이 maxretry 로 떨어질 때 — 물러나지 않는다
+// ==========================================
+//
+// 파이어베이스의 transaction 은 스물다섯 번 안에 서버와 합의가 안 되면
+// Error: maxretry 로 끝난다. 사람이 여럿 붙어 같은 자리를 건드리면 난다.
+//
+//     효과 저장 실패: Error: maxretry   ← 남에게 물약을 쓰다가 난 것
+//       mergeEff ← r.update ← confirmItemTarget
+//
+// 예전에는 여기서 그냥 물러났다. 그러면 **걸어 준 물약이 통째로 사라진다.**
+// 쓴 쪽은 물건만 없어지고, 받는 쪽에는 아무 일도 안 일어난다.
+// 「물약을 썼는데 적용이 안 된다」가 이것이다.
+//
+// 그래서 세 걸음으로 버틴다.
+//     ① 조금 쉬었다가 다시 건다 (쉬는 시간을 늘려 가며 네 번)
+//     ② 그래도 안 되면 읽고-고쳐-쓰기로 마지막 한 번을 보낸다
+//     ③ 그것마저 안 되면 그때 알린다
+//
+// 고치는 함수(fn)는 서버 값만 보고 같은 답을 내므로, 몇 번을 다시 걸어도
+// 결과가 달라지지 않는다. 그래서 ②가 안전하다.
+const TX_TRIES = 4;
+function txSoft(e) { return /maxretry|disconnect|network|timeout|unavailable/i.test(String((e && e.message) || e)); }
+
+function txRetry(path, fn, n) {
+    n = n || 0;
+    return database.ref(path).transaction(fn, null, false).catch(function (e) {
+        if (txSoft(e) && n < TX_TRIES) {
+            const wait = 150 * Math.pow(2, n) + Math.floor(Math.random() * 250);
+            console.warn('[병합] ' + path + ' — 서로 겹쳐 밀렸습니다. ' + wait + 'ms 뒤에 다시 겁니다 ('
+                + (n + 1) + '/' + TX_TRIES + ')');
+            return new Promise(function (r) { setTimeout(r, wait); })
+                .then(function () { return txRetry(path, fn, n + 1); });
+        }
+        // 마지막 수단 — 읽고 고쳐 쓴다
+        console.warn('[병합] ' + path + ' — 트랜잭션을 포기하고 읽고-고쳐-쓰기로 보냅니다.');
+        return database.ref(path).once('value').then(function (s) {
+            const out = fn(s.val());
+            if (out === undefined) return { committed: false, snapshot: s };
+            return database.ref(path).set(out).then(function () {
+                return { committed: true, snapshot: { val: function () { return out; } } };
+            });
+        });
+    });
+}
+
+// ==========================================
 // 소지품 — 늘어난 것·줄어든 것만 센다
 // ==========================================
 //
@@ -122,14 +168,14 @@ function mergeInv(path, baseArr, localArr) {
     const del = msDiff(baseArr, localArr);
     if (!add.length && !del.length) return Promise.resolve(null);
 
-    return database.ref(path).transaction(function (srv) {
+    return txRetry(path, function (srv) {
         const cur = asArr(srv);
         del.forEach(function (n) {
             const i = cur.indexOf(n);
             if (i >= 0) cur.splice(i, 1);
         });
         return cur.concat(add);
-    }, null, false).then(function (res) {        // ★ applyLocally = false
+    }).then(function (res) {        // ★ applyLocally = false
         if (!res || !res.committed) { invFail = true; return null; }
         const after = asArr(res.snapshot ? res.snapshot.val() : null);
         invStats.merged++;
@@ -161,9 +207,9 @@ function mergePts(path, had, want) {
     if (!database) return Promise.resolve(null);
     const d = (Number(want) || 0) - (Number(had) || 0);
     if (!d) return Promise.resolve(null);
-    return database.ref(path).transaction(function (srv) {
+    return txRetry(path, function (srv) {
         return Math.max(0, Math.min(ptsCap(), Math.round((Number(srv) || 0) + d)));
-    }, null, false).then(function (res) {           // ★ applyLocally = false
+    }).then(function (res) {           // ★ applyLocally = false
         if (!res || !res.committed) { ptsFail = true; return null; }
         const after = Number(res.snapshot ? res.snapshot.val() : 0) || 0;
         ptsStats.merged++;
@@ -311,7 +357,7 @@ function mergeEff(path, baseList, localList, noWipe) {
     const wipe = Object.keys(want).length === 0 && Object.keys(had).length > 1;
     const gone = wipe ? [] : Object.keys(had).filter(function (n) { return !(n in want); });
 
-    return database.ref(path).transaction(function (srv) {
+    return txRetry(path, function (srv) {
         const cur = effMap(srv);
         gone.forEach(function (n) {
             const s = cur[n];
@@ -321,7 +367,7 @@ function mergeEff(path, baseList, localList, noWipe) {
         });
         Object.keys(want).forEach(function (n) { cur[n] = pickEff(cur[n], want[n]); });
         return Object.keys(cur).map(function (n) { return cur[n]; });
-    }, null, false).then(function (res) {               // ★ applyLocally = false
+    }).then(function (res) {               // ★ applyLocally = false
         if (!res || !res.committed) return null;
         const after = asArr(res.snapshot ? res.snapshot.val() : null);
         // ★ 마지막 하나를 떼어 내 목록이 비면, 파이어베이스는 열쇠째 지운다.
@@ -406,11 +452,11 @@ function mergeBuf(path, baseList, localList, noWipe) {
     // 들어 본 적이 없으면 비웠다고 보지 않는다 (효과와 같은 까닭)
     if (noWipe && !want.length) return Promise.resolve(null);
 
-    return database.ref(path).transaction(function (srv) {
+    return txRetry(path, function (srv) {
         const cur = bufKeys(srv);
         del.forEach(function (k) { const i = cur.indexOf(k); if (i >= 0) cur.splice(i, 1); });
         return bufBack(cur.concat(add));
-    }, null, false).then(function (res) {           // ★ applyLocally = false
+    }).then(function (res) {           // ★ applyLocally = false
         if (!res || !res.committed) return null;
         return asArr(res.snapshot ? res.snapshot.val() : null);
     }).catch(function (e) {
@@ -850,7 +896,14 @@ function markSaved(payload) {
             if (!doInv && !doPts && !doEff && !doBuf && !dropped) {
                 return _u.apply(this, arguments);           // 손댈 것이 없다 — 원래대로
             }
-            rest._adminStamp = Date.now();
+            // ★ rest 의 열쇠는 'users/사번/칸' 꼴의 전체 경로다.
+            //   여기에 바로 _adminStamp 를 넣으면 **데이터베이스 맨 위**에
+            //   /_adminStamp 라는 엉뚱한 칸이 생긴다. 사람마다 찍어 준다.
+            const stamp = Date.now();
+            Object.keys(rest).forEach(function (k) {
+                const w2 = /^users\/([^/]+)\//.exec(String(k).replace(/^\/+/, ''));
+                if (w2) rest['users/' + w2[1] + '/_adminStamp'] = stamp;
+            });
 
             const jobs = [_u.call(this, c, rest)];
             if (doInv) {
