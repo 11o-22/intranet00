@@ -32,6 +32,9 @@ const GRADES = ['D', 'C', 'B', 'A', 'S'];
 const MATS_BY_GRADE = { D: 2, C: 3, B: 4, A: 5, S: 6 };
 const GCOLOR = { D: '#8d8d8d', C: '#6fa8dc', B: '#8bc34a', A: '#d4af37', S: '#ff8a65' };
 const COOK_TITLE = '요리사';
+// titles.js 는 칭호를 **이름이 아니라 번호**로 적어 둔다. (titles.js:452)
+// 같은 자리를 써야 칭호 목록·진도와 어긋나지 않는다.
+const COOK_ID = 'cook';
 const HI_NEED = 50;            // A 등급 이상 50번이면 요리사
 
 // ==========================================
@@ -223,8 +226,12 @@ function isCook(u) {
     u = u || currentUser;
     if (!u) return false;
     if (u.code === 'kario0987') return true;
-    return (u.titles || []).indexOf(COOK_TITLE) >= 0
-        || (u.titleAdmin === COOK_TITLE);
+    const t = u.titles || [];
+    if (t.indexOf(COOK_ID) >= 0) return true;
+    if (t.indexOf(COOK_TITLE) >= 0) return true;          // 예전 묶음이 이름으로 적어 둔 것
+    const a = u.titleAdmin;
+    if (a === COOK_TITLE || (Array.isArray(a) && a.indexOf(COOK_TITLE) >= 0)) return true;
+    return false;
 }
 function save(f) {
     if (typeof saveFields === 'function') { try { saveFields(f); } catch (e) { } }
@@ -506,11 +513,13 @@ function eatFail() {
 // ==========================================
 function checkCookTitle() {
     if (!currentUser) return;
-    if (isCook(currentUser)) return;
     if ((stat().hi || 0) < HI_NEED) return;
     if (!Array.isArray(currentUser.titles)) currentUser.titles = [];
-    if (currentUser.titles.indexOf(COOK_TITLE) >= 0) return;
-    currentUser.titles.push(COOK_TITLE);
+    if (currentUser.titles.indexOf(COOK_ID) >= 0) return;
+    // 예전 묶음이 이름으로 적어 둔 것은 번호로 옮긴다
+    const old = currentUser.titles.indexOf(COOK_TITLE);
+    if (old >= 0) currentUser.titles.splice(old, 1);
+    currentUser.titles.push(COOK_ID);
     addHistoryLog(currentUser, '[칭호] ' + COOK_TITLE + ' 획득');
     save({ titles: 1, history: 1 });
     showCustomAlert('[' + COOK_TITLE + '] 칭호를 얻었습니다.\n\n이제 S 등급을 만들 수 있습니다.');

@@ -796,6 +796,7 @@ function prog(d, u, s) {
         // 분모는 언제나 세 자리다. 자리를 덜 열었어도 목표는 줄지 않는다.
         case 'weapon':  return [lSlots(u), GEAR_SLOTS, '자리'];
         case 'gold':    return [isVip(u) ? 1 : 0, 1, ''];
+        case 'cook':    return [(u.cookStat && u.cookStat.hi) || 0, 50, '회'];
         case 'tamer':   return [0, 1, ''];
         default:        return [0, 1, ''];
     }
