@@ -9195,7 +9195,9 @@ function bjFinish(mode) {
             if (item === "금고" && currentUser.code !== 'kario0987') return false;
             return true;
         });
-        if (currentUser.code !== 'kario0987') unlocked = unlocked.slice(0, 9);
+        // 진열칸은 하루에 이길 수 있는 만큼 — 네 번 × 3종 = 12칸.
+        // 9로 잘라 두어서 네 번을 다 이겨도 아홉 개만 보였다.
+        if (currentUser.code !== 'kario0987') unlocked = unlocked.slice(0, ALIEN_DAILY_MAX * 3);
         if (unlocked.length === 0) {
             container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
             return;

@@ -419,8 +419,21 @@ window.cageOpen = function () {
     showCustomAlert(m.name + ' 사원을 내보냈습니다.');
 };
 
-function freeUser(u, why) {
+function freeUser(u, why, then) {
     if (!u) return;
+
+    // ★ 지우기 전에 정산한다.
+    //   문을 여는 자리는 넷(시간 만료 · 손으로 열기 · 갇힌 쪽 스스로 · 상담사)
+    //   이고, 어디로 열리든 cageUse 가 지워진다. 지워진 뒤에는 셀 것이 없다.
+    //   그래서 서버 쪽 지우기는 정산이 끝난 뒤에 한다.
+    //   (화면은 아래에서 바로 연다 — 기다리게 하지 않는다)
+    const after = function () {
+        const fields = { cage: null, cageUse: null, badge: u.badge || {}, _adminStamp: now() };
+        const mine = currentUser && u.code === currentUser.code;
+        if (mine || (Array.isArray(u.history) && u.history.length > 1)) fields.history = u.history;
+        if (typeof updateUserFields === 'function') updateUserFields(u.code, fields);
+        if (typeof then === 'function') { try { then(); } catch (e) { } }
+    };
     u.cage = null; u.cageUse = null;
 
     // ★ 특이사항에 붙은 「[감금실] 기구」 줄을 걷어 낸다.
@@ -432,12 +445,7 @@ function freeUser(u, why) {
 
     if (typeof addHistoryLog === 'function') addHistoryLog(u, '[감금실] ' + why);
 
-    const mine = currentUser && u.code === currentUser.code;
-    const fields = { cage: null, cageUse: null, badge: u.badge || {}, _adminStamp: now() };
-    // 남의 기록은 통째로 쓰지 않는다. 내 화면 사본이 비어 있으면 그 사람의
-    // 기록이 날아간다. 들고 있는 것이 있을 때만 쓴다.
-    if (mine || (Array.isArray(u.history) && u.history.length > 1)) fields.history = u.history;
-    if (typeof updateUserFields === 'function') updateUserFields(u.code, fields);
+    settle(u, after);          // 정산을 마친 뒤에 서버에서 지운다
 
     if (typeof updateUI === 'function') updateUI();
     paintCage();
@@ -491,11 +499,94 @@ window.cageRun = function (k) {
 };
 
 // ==========================================
-// 셈하기 — 가둔 쪽의 화면에서만 돈다
+// 정산 — 어느 쪽 화면에서 불러도 한 번만 들어간다
 // ==========================================
 //
-// 두 쪽이 같이 세면 두 배로 들어간다. 그래서 가둔 사람만 센다.
-// 이미 준 몫은 paid·cut·done 에 적어 두어 두 번 주지 않는다.
+// ■ 왜 안 들어왔나
+//
+//   셈하기(tick)는 **가둔 쪽 화면에서만** 60초마다 돌았다. 그런데 문이
+//   열리는 자리는 갇힌 쪽에도 있다 — 갇힌 쪽은 30초마다 보고, 시간이
+//   다 되면 스스로 나온다. 그쪽이 먼저 freeUser 를 부르면 cageUse 가
+//   지워지고, 뒤늦게 돈 가둔 쪽의 tick 은 셀 것을 못 찾는다.
+//
+//   30초가 60초보다 빠르니 거의 항상 갇힌 쪽이 먼저였다.
+//   착유 머신은 「다섯 시간을 채우면」 주는 것이라 그 한 번을 놓치면
+//   영영 안 들어온다. 족갑도 마지막 토막이, 가둔 쪽이 꺼 두었으면
+//   모든 토막이 날아갔다.
+//
+// ■ 어떻게 고치나
+//
+//   아직 안 준 몫을 **서버의 cageUse 를 트랜잭션으로 집어** 「내가 준다」고
+//   못 박고 그만큼만 넣는다. 못 박는 것과 넣는 것이 한 묶음이라 양쪽에서
+//   같이 불려도 두 번 들어가지 않는다.
+//   그래서 문을 여는 모든 자리에서 먼저 정산하고 지운다.
+//
+//   트랜잭션 함수는 **절대 undefined 를 돌려주지 않는다.** 돌려주면 서버에
+//   닿지도 못하고 그 자리에서 멈춘다 (아직 안 받아 본 자리는 처음 읽을 때
+//   null 로 보인다). 줄 것이 없으면 읽은 것을 그대로 돌려준다.
+function settle(m, cb) {
+    const done = function () { if (typeof cb === 'function') cb(); };
+    if (!m || !m.code || typeof database === 'undefined' || !database) { done(); return; }
+
+    let amt = 0, why = '', byCode = '';
+    database.ref('users/' + m.code + '/cageUse').transaction(function (u) {
+        amt = 0; why = ''; byCode = (u && u.by) || '';
+        if (!u || !GEAR[u.k]) return u || null;          // 줄 것이 없다 — 그대로
+        const g = GEAR[u.k];
+        const end = Math.min(now(), u.until || 0);
+        const run = Math.min(g.ms, Math.max(0, end - (u.at || 0)));
+
+        if (u.k === 'cuff') {
+            const blocks = Math.floor(run / CUFF_BLOCK);
+            const owe = blocks - (u.paid || 0);
+            if (owe > 0) {
+                for (let i = 0; i < owe; i++) {
+                    amt += CUFF_MIN + Math.floor(Math.random() * (CUFF_MAX - CUFF_MIN + 1));
+                }
+                why = g.n;
+                u.paid = blocks;
+            }
+        } else if (u.k === 'milk') {
+            if (!u.done && now() >= (u.until || 0)) { amt = MILK_PAY; why = g.n; u.done = true; }
+        }
+        return u;
+    }, function (err, ok, snap) {
+        // 서버에 적힌 몫을 내 화면 사본에도 옮겨 둔다.
+        // 안 옮기면 묵은 사본이 나중에 서버를 덮어써서 같은 몫을 또 준다.
+        try {
+            const v = snap && snap.val ? snap.val() : null;
+            if (v && m.cageUse) { m.cageUse.paid = v.paid; m.cageUse.done = v.done; m.cageUse.cut = v.cut; }
+        } catch (e) { }
+
+        if (!err && ok && amt > 0) {
+            // ★ 통장 자리는 **갇힌 쪽의 짝**으로 센다.
+            //   부르는 사람(상담사일 수도 있다) 기준으로 세면 엉뚱한 자리에 들어간다.
+            coAdd(m, amt, why);
+            if (typeof addHistoryLog === 'function') {
+                const line = '[감금실] ' + why + ' — 공용 통장 +' + amt.toLocaleString() + ' P';
+                try { addHistoryLog(m, line); } catch (e) { }
+                const keeper = byCode && (db.users || {})[byCode];
+                if (keeper && keeper !== m) { try { addHistoryLog(keeper, line); } catch (e) { } }
+            }
+            const amIn = currentUser && (currentUser.code === m.code || currentUser.code === byCode);
+            if (amIn && typeof showCustomAlert === 'function') {
+                showCustomAlert(why + ' 정산\n\n공용 통장에 ' + amt.toLocaleString() + ' P 가 들어왔습니다.');
+            }
+        }
+        done();
+    }, false);
+}
+window.cageSettle = function (who) {                     // 손으로 정산 (살펴볼 때)
+    const u = who ? find(who) : mate(currentUser);
+    settle(u, function () { console.log('[감금실] 정산을 마쳤습니다.'); });
+};
+
+// ==========================================
+// 셈하기 — 가둔 쪽의 화면에서 돈다
+// ==========================================
+//
+// 돈 계산은 settle 이 트랜잭션으로 하므로 여기서는 부르기만 한다.
+// 출산 앞당기기(퍼킹 머신)만 이 자리에서 센다.
 function tick() {
     const me = currentUser;
     if (!me) return;
@@ -508,26 +599,15 @@ function tick() {
     const u = m.cageUse;
     let changed = false;
 
+    // 돈은 트랜잭션으로 — 양쪽에서 불려도 한 번만 들어간다
+    if (u && (u.k === 'cuff' || u.k === 'milk')) settle(m);
+
     if (u && GEAR[u.k]) {
         const end = Math.min(now(), u.until || 0);
         // 기구가 정해 둔 시간을 넘겨 세지 않는다 (시계가 어긋나도)
         const run = Math.min(GEAR[u.k].ms, Math.max(0, end - (u.at || 0)));
 
-        if (u.k === 'cuff') {
-            const blocks = Math.floor(run / CUFF_BLOCK);
-            while ((u.paid || 0) < blocks) {
-                const amt = CUFF_MIN + Math.floor(Math.random() * (CUFF_MAX - CUFF_MIN + 1));
-                coAdd(me, amt, '족갑');
-                u.paid = (u.paid || 0) + 1;
-                changed = true;
-            }
-        } else if (u.k === 'milk') {
-            if (!u.done && now() >= (u.until || 0)) {
-                coAdd(me, MILK_PAY, '착유 머신');
-                u.done = true;
-                changed = true;
-            }
-        } else if (u.k === 'fuck') {
+        if (u.k === 'fuck') {
             // 묶여 있던 만큼 출산을 앞당긴다 — 이미 당긴 몫(cut)은 빼고 센다
             const add = run - (u.cut || 0);
             const preg = (typeof isPregnant === 'function') ? isPregnant(m)
@@ -606,11 +686,13 @@ window.cageFree = function (who) {
     if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
     const u = find(who);
     if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
-    freeUser(u, '당국이 문을 열었습니다.');
     // 사본을 거치지 않고 서버에도 바로 지운다 (화면이 어긋나 있어도 확실히)
-    if (typeof database !== 'undefined' && database) {
-        database.ref('users/' + u.code).update({ cage: null, cageUse: null, _adminStamp: Date.now() });
-    }
+    //   정산이 끝난 뒤에 지운다 — 먼저 지우면 셀 것이 없어진다
+    freeUser(u, '당국이 문을 열었습니다.', function () {
+        if (typeof database !== 'undefined' && database) {
+            database.ref('users/' + u.code).update({ cage: null, cageUse: null, _adminStamp: Date.now() });
+        }
+    });
     console.log('%c✓ ' + u.name + ' 사원을 내보냈습니다.', 'color:#4CAF50');
     console.log('  특이사항의 [감금실] 줄도 걷어 냈습니다.');
 };
