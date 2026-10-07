@@ -678,7 +678,41 @@ window.renderFood = function () {
 };
 
 // ==========================================
-// 11. 확인
+// 11. 소지품 분류에 [행복 식당] 칸을 만든다
+//
+//   invcat.js 가 소지품 카드를 칸별로 나눈다. 거기에 칸 하나를 더 끼우고,
+//   식당에서 나온 것(요리 · ★ · 실패한 요리)을 그쪽으로 보낸다.
+//   재료는 「음식」 칸에 그대로 둔다.
+// ==========================================
+const INV_CAT = { id: 'food_shop', name: '행복 식당', icon: '🍳', color: '#ffb74d' };
+
+(function invTab() {
+    const iv = setInterval(function () {
+        if (typeof INV_CATS === 'undefined' || typeof invCatOf !== 'function') return;
+        if (invCatOf._foodShop) { clearInterval(iv); return; }
+
+        // 「기타」 바로 앞에 끼운다
+        if (!INV_CATS.some(function (c) { return c.id === INV_CAT.id; })) {
+            let at = -1;
+            INV_CATS.forEach(function (c, i) { if (c.id === 'etc' && at < 0) at = i; });
+            if (at >= 0) INV_CATS.splice(at, 0, INV_CAT); else INV_CATS.push(INV_CAT);
+        }
+
+        const _c = invCatOf;
+        invCatOf = function (name) {
+            const cat = (typeof ITEM_CATALOG !== 'undefined') && ITEM_CATALOG[name];
+            if (cat && cat.foodDish) return INV_CAT.id;
+            return _c.apply(this, arguments);
+        };
+        invCatOf._foodShop = true;
+        clearInterval(iv);
+        if (typeof renderInventory === 'function') { try { renderInventory(); } catch (e) { } }
+        console.log('[식당] 소지품에 [행복 식당] 칸을 만들었습니다.');
+    }, 400);
+})();
+
+// ==========================================
+// 12. 확인
 // ==========================================
 window.foodState = function () {
     console.log('%c===== 행복 식당 =====', 'color:#d4af37; font-size:13px');
