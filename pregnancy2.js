@@ -8,6 +8,9 @@ const CARE_GRACE = 30 * 60000;     // 30분 유예
 const NEGLECT_HOURS = 8;           // 이만큼 안 돌보면 방치 (밤 시간 제외)
 const NIGHT_END_HOUR = 10;         // 자정~이 시각까지는 안 센다
 
+// 한 번에 나올 수 있는 최대 개수 — 아버지 열 명(리치맛 물약) + 플러그 두 개
+const BIRTH_COUNT_CAP = 12;
+
 // 오늘 돌본 횟수 / 남은 횟수
 function careDayKey() {
     const d = new Date();
@@ -247,10 +250,14 @@ function checkPregBirth() {
 
     const sires = p.sires || [];
     const n = sires.length;
-    let count = n >= 5 ? 5 : n >= 2 ? Math.min(n, 4) : (1 + Math.floor(Math.random() * 3));
+    // 아버지가 둘 이상이면 **아버지 수만큼** 나온다.
+    //   예전에는 다섯에서 끊겼다 (n >= 5 ? 5). 아버지가 다섯까지였을 때 쓰던
+    //   식인데, 리치맛 물약을 마시면 열 명까지 받을 수 있게 된 뒤로
+    //   열 명이 들어가도 다섯 개만 나왔다. (maxSires — pregnancy.js:20)
+    let count = n >= 2 ? n : (1 + Math.floor(Math.random() * 3));
     // 사파이어 요도 플러그 — 남이 채워 준 경우에만
     if (typeof sapCountBonus === 'function') count += sapCountBonus(currentUser);
-    count = Math.min(8, count);
+    count = Math.min(BIRTH_COUNT_CAP, count);   // 리치맛 10명 + 플러그 2
 
     const fill = (typeof careFill === 'function') ? careFill(p) : 0;
 
