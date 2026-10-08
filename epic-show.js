@@ -115,6 +115,13 @@ function inEpic() {
                 if (typeof talkShowBumpHeat === 'function') talkShowBumpHeat(p, host);
             } catch (e) { }
 
+            // 표가 없으면 그 자리에서 채운다 (보통 어둠과 같은 까닭 — talkshow.js 참고)
+            if (darkRun._showRevives == null) {
+                darkRun._show = true;
+                darkRun._showRevives = (typeof TALK_SHOW_REVIVES !== 'undefined') ? TALK_SHOW_REVIVES : 2;
+                console.warn('[epic·토크쇼] 부활 표가 없어 다시 채웠습니다 — ' + darkRun._showRevives + '회');
+            }
+
             const left = Number(darkRun._showRevives || 0);
             if (left <= 0) return _d.apply(this, arguments);
             darkRun._showRevives = left - 1;

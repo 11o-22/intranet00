@@ -345,6 +345,7 @@ function pullOut() {
                 if (typeof darkRun !== 'undefined' && darkRun) {
                     darkRun._showRevives = REVIVES;      // 기능 4 — 부활 2회
                     darkRun._show = true;
+                    keepRevives();                       // 이어하기에서도 남게 적어 둔다
                 }
                 if (invited && currentUser) {            // 기능 3 — 횟수를 쓰지 않는다
                     currentUser.darkTries = triesWas;
@@ -624,6 +625,91 @@ function restoreModal() {
 }
 
 // ==========================================
+// 부활 횟수를 이어하기 너머로 들고 간다
+// ==========================================
+//
+// ■ 무엇이 어긋나 있었나
+//
+//   부활 횟수는 darkRun._showRevives 에만 들어 있다. 그런데 이 값은
+//   **화면 안에만 있는 것**이라, 탐사 기록을 저장하는 자리(index.html:1905)
+//   에는 빠져 있다.
+//
+//   그래서 새로고침하거나 연결이 끊겼다가 「이어하기」로 돌아오면
+//   darkRun 이 저장된 칸만으로 다시 지어지고 — **부활 두 번이 사라진다.**
+//   돌아온 뒤 처음 죽는 자리에서 그대로 끝났다. 「부활이 안 된다」가 이것이다.
+//
+//   (재현: 출발 직후 2회 → 새로고침 → 이어하기 → 표 없음 → 첫 죽음에 사망)
+//
+// ■ 어떻게 고치나
+//
+//   남은 횟수를 탐사 기록 옆에 같이 적어 두고, 이어하기 때 도로 얹는다.
+//   원래 저장 자리를 건드리지 않고 같은 칸에 두 글자만 더 적는다.
+//
+//   혹시 그마저도 비어 있으면 죽는 자리에서 다시 채운다 (위 darkDeath).
+//   받을 몫을 못 받는 것보다는 낫다고 보았다.
+let lastKept = null;
+
+function runPath() {
+    if (typeof database === 'undefined' || !database) return null;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.code) return null;
+    return 'darkRuns/' + currentUser.code;
+}
+
+function keepRevives() {
+    try {
+        if (typeof darkRun === 'undefined' || !darkRun || !darkRun._show) return;
+        const path = runPath();
+        if (!path) return;
+        const n = Number(darkRun._showRevives || 0);
+        if (lastKept === n) return;             // 바뀐 것이 없으면 쓰지 않는다
+        lastKept = n;
+        database.ref(path).update({ showRevives: n, show: true });
+    } catch (e) { console.warn('[토크쇼] 부활 횟수 적기 건너뜀:', e && e.message); }
+}
+
+// 저장할 때마다 같이 적는다 (원래 저장이 통째 set 이라 뒤에 덧붙인다)
+(function hookSave() {
+    const iv = setInterval(function () {
+        if (typeof saveDarkRunState !== 'function') return;
+        if (saveDarkRunState._show) { clearInterval(iv); return; }
+        const _s = saveDarkRunState;
+        saveDarkRunState = function () {
+            const r = _s.apply(this, arguments);
+            lastKept = null;                    // 통째로 덮였으니 다시 적는다
+            keepRevives();
+            return r;
+        };
+        saveDarkRunState._show = true;
+        clearInterval(iv);
+    }, 500);
+})();
+
+// 이어하기 — 원본이 _pendingResume 을 비우기 전에 챙겨 둔다
+(function hookResume() {
+    const iv = setInterval(function () {
+        if (typeof acceptDarkResume !== 'function') return;
+        if (acceptDarkResume._show) { clearInterval(iv); return; }
+        const _a = acceptDarkResume;
+        acceptDarkResume = function () {
+            const s = window._pendingResume;
+            const r = _a.apply(this, arguments);
+            try {
+                if (!s || typeof darkRun === 'undefined' || !darkRun) return r;
+                if (!s.show && !showOf()) return r;          // 토크쇼가 아니었다
+                darkRun._show = true;
+                darkRun._showRevives = (s.showRevives == null) ? REVIVES : Number(s.showRevives);
+                lastKept = null;
+                console.log('[토크쇼] 이어하기 — 남은 부활 ' + darkRun._showRevives + '회를 되살렸습니다.');
+            } catch (e) { console.warn('[토크쇼] 이어하기 건너뜀:', e && e.message); }
+            return r;
+        };
+        acceptDarkResume._show = true;
+        clearInterval(iv);
+        console.log('[토크쇼] 이어하기 연결 — 부활 횟수를 들고 간다');
+    }, 500);
+})();
+
+// ==========================================
 // 기능 4 — 판정 +1
 // ==========================================
 (function hookRoll() {
@@ -687,9 +773,20 @@ function bumpHeat(p, iAmHost) {
             // 기능 5 — 무대 열기는 죽을 때마다 쌓인다 (부활해도 쌓인다)
             try { bumpHeat(p, isHost(p)); } catch (e) { }
 
+            // ★ 표가 아예 없으면 그 자리에서 채운다.
+            //   darkRun 을 새로 짓는 길이 여럿이라(이어하기·epic·합류) 출발 때
+            //   얹어 둔 표가 없어진 채로 여기 닿는 일이 있었다. 토크쇼 파티에
+            //   있는 것이 분명하면 받을 몫은 받아야 한다.
+            if (darkRun._showRevives == null) {
+                darkRun._show = true;
+                darkRun._showRevives = REVIVES;
+                console.warn('[토크쇼] 부활 표가 없어 다시 채웠습니다 — ' + REVIVES + '회');
+            }
+
             const left = Number(darkRun._showRevives || 0);
             if (left <= 0) return _d.apply(this, arguments);
             darkRun._showRevives = left - 1;
+            keepRevives();                      // 남은 횟수를 적어 둔다
 
             // 기능 4·7 — 일어선다
             darkRun._dead = false;
