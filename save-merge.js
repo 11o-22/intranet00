@@ -122,27 +122,31 @@ function asArr(v) {
 const TX_TRIES = 4;
 function txSoft(e) { return /maxretry|disconnect|network|timeout|unavailable/i.test(String((e && e.message) || e)); }
 
-function txRetry(path, fn, n) {
-    n = n || 0;
-    return database.ref(path).transaction(fn, null, false).catch(function (e) {
-        if (txSoft(e) && n < TX_TRIES) {
-            const wait = 150 * Math.pow(2, n) + Math.floor(Math.random() * 250);
-            console.warn('[병합] ' + path + ' — 서로 겹쳐 밀렸습니다. ' + wait + 'ms 뒤에 다시 겁니다 ('
-                + (n + 1) + '/' + TX_TRIES + ')');
-            return new Promise(function (r) { setTimeout(r, wait); })
-                .then(function () { return txRetry(path, fn, n + 1); });
-        }
-        // 마지막 수단 — 읽고 고쳐 쓴다
-        console.warn('[병합] ' + path + ' — 트랜잭션을 포기하고 읽고-고쳐-쓰기로 보냅니다.');
-        return database.ref(path).once('value').then(function (s) {
-            const out = fn(s.val());
-            if (out === undefined) return { committed: false, snapshot: s };
-            return database.ref(path).set(out).then(function () {
-                return { committed: true, snapshot: { val: function () { return out; } } };
+function txRetry(path, fn, applyLocally) {
+    const local = (applyLocally === true);
+    function go(n) {
+        return database.ref(path).transaction(fn, null, local).catch(function (e) {
+            if (txSoft(e) && n < TX_TRIES) {
+                const wait = 150 * Math.pow(2, n) + Math.floor(Math.random() * 250);
+                console.warn('[병합] ' + path + ' — 서로 겹쳐 밀렸습니다. ' + wait + 'ms 뒤에 다시 겁니다 ('
+                    + (n + 1) + '/' + TX_TRIES + ')');
+                return new Promise(function (r) { setTimeout(r, wait); }).then(function () { return go(n + 1); });
+            }
+            // 마지막 수단 — 읽고 고쳐 쓴다
+            console.warn('[병합] ' + path + ' — 트랜잭션을 포기하고 읽고-고쳐-쓰기로 보냅니다.');
+            return database.ref(path).once('value').then(function (s) {
+                const out = fn(s.val());
+                if (out === undefined) return { committed: false, snapshot: s };
+                return database.ref(path).set(out).then(function () {
+                    return { committed: true, snapshot: { val: function () { return out; } } };
+                });
             });
         });
-    });
+    }
+    return go(0);
 }
+// 은행처럼 바깥에서도 쓴다 — maxretry 로 돈이 한쪽에만 남지 않도록
+window.txRetry = txRetry;
 
 // ==========================================
 // 소지품 — 늘어난 것·줄어든 것만 센다

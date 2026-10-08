@@ -23,6 +23,21 @@ let bankState = null, bankRef = null, bankKey = null;
 
 function bankPath(code) { return 'bank/' + code; }
 
+// 트랜잭션을 걸되, maxretry 로 떨어져도 물러나지 않는다.
+//
+//   파이어베이스는 스물다섯 번 안에 서버와 합의가 안 되면 maxretry 로 끝낸다.
+//   은행 일은 「은행 칸을 고치고 → 포인트를 움직인다」 두 걸음이라, 어느 한쪽이
+//   이렇게 끝나면 돈이 한쪽에만 남는다. 입·출금·상환을 되풀이할 때 포인트가
+//   사라지던 까닭이다.
+//
+//   save-merge.js 가 올려 둔 txRetry 를 쓴다 — 쉬었다 네 번 다시 걸고, 그래도
+//   안 되면 읽고-고쳐-쓰기로 마지막 한 번을 보낸다. 없으면 예전대로 간다.
+function bankTx(path, fn) {
+    if (typeof txRetry === 'function') return txRetry(path, fn, true);
+    return database.ref(path).transaction(fn);
+}
+
+
 // ==========================================
 // ★ 남의 은행 칸은 먼저 읽고 고친다
 //
@@ -99,7 +114,7 @@ function bankSettle() {
     const now = Date.now();
     const initScore = me.code === 'kario0987' ? 1000 : (me.hasVIP ? 700 : 500);
 
-    database.ref(bankPath(me.code)).transaction(b => {
+    bankTx(bankPath(me.code), b => {
         if (!b) b = {};
         if (b.createdAt == null) {
             b.deposit = b.deposit || 0;
@@ -164,7 +179,7 @@ function bankSettle() {
 
         if (b.loan && b.loan.seize && currentUser.points > 0) {
             const take = Math.min(currentUser.points, b.loan.owe);
-            database.ref(bankPath(me.code)).transaction(x => {
+            bankTx(bankPath(me.code), x => {
                 if (!x || !x.loan) return;
                 x.loan.owe -= take;
                 x.loan.seize = false;
@@ -182,7 +197,7 @@ function bankSettle() {
         if (safes.length > 0 && !currentUser.safeMigrated) {
             const total = safes.reduce((a, s) => a + (s.amount || 0), 0);
             const bonus = safes.length * 50000;
-            database.ref(bankPath(me.code)).transaction(x => {
+            bankTx(bankPath(me.code), x => {
                 if (!x) return;
                 x.deposit = (x.deposit || 0) + total;
                 x.capBonus = (x.capBonus || 0) + bonus;
@@ -204,7 +219,7 @@ function bankAddScore(delta, code) {
     const c = code || (currentUser && currentUser.code);
     if (!c) return;
     if (currentUser && c === currentUser.code) {
-        database.ref(bankPath(c)).transaction(b => {
+        bankTx(bankPath(c), b => {
             if (!b) return;
             if (b.blacklist && delta > 0) return;
             b.score = bankClamp((b.score == null ? 500 : b.score) + delta);
@@ -228,7 +243,7 @@ function bankDeposit() {
     if (!amt) return;
     if (amt > currentUser.points) { showLuxuryAlert(); return; }
 
-    database.ref(bankPath(currentUser.code)).transaction(b => {
+    bankTx(bankPath(currentUser.code), b => {
         if (!b || b.blacklist) return;
         const room = bankCap(b) - (b.deposit || 0);
         if (room <= 0) return;
@@ -255,7 +270,7 @@ function bankWithdraw() {
     const amt = bankReadAmt('bank-dep-amt');
     if (!amt) return;
 
-    database.ref(bankPath(currentUser.code)).transaction(b => {
+    bankTx(bankPath(currentUser.code), b => {
         if (!b || (b.deposit || 0) < amt) return;
         b.deposit -= amt;
         return b;
@@ -283,7 +298,7 @@ function bankBorrow() {
     const now = Date.now();
     const owe = Math.ceil(amt * (1 + gr.fee));
 
-    database.ref(bankPath(currentUser.code)).transaction(b => {
+    bankTx(bankPath(currentUser.code), b => {
         if (!b || b.loan || b.blacklist) return;
 
         const recent = (b.loanTimes || []).filter(t => now - t < BANK_BL_WINDOW);
@@ -334,7 +349,7 @@ function bankRepay(all) {
     if (amt > currentUser.points) { showLuxuryAlert(); return; }
 
     const now = Date.now();
-    database.ref(bankPath(currentUser.code)).transaction(b => {
+    bankTx(bankPath(currentUser.code), b => {
         if (!b || !b.loan) return;
         const pay = Math.min(amt, b.loan.owe);
         b.loan.owe -= pay;
@@ -396,7 +411,7 @@ function bankUseVipPass(itemName) {
 function bankAddSafeCap(itemName) {
     if (!database) return;
     removeItemFromInventory(currentUser, itemName, 1);
-    database.ref(bankPath(currentUser.code) + '/capBonus').transaction(c => (c || 0) + 50000);
+    bankTx(bankPath(currentUser.code) + '/capBonus', c => (c || 0) + 50000);
     addHistoryLog(currentUser, `[은행] 금고를 설치했습니다. (예금 한도 +50,000 P)`);
     saveFields({ inventory: 1, history: 1 });
     updateUI();
@@ -596,7 +611,7 @@ function adminBankBlacklist(on) {
     if (on) {
         openTextInput('블랙리스트 등록', '사유를 적어 주세요.', '예: 대출 반복 악용', reason => {
             targets.forEach(code => {
-                database.ref(bankPath(code)).transaction(b => {
+                bankTx(bankPath(code), b => {
                     b = b || {};
                     b.blacklist = { at: Date.now(), reason: reason, by: 'admin' };
                     b.score = 0;

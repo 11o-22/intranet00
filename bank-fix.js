@@ -52,9 +52,24 @@ function cap() { return (typeof POINT_CAP !== 'undefined') ? POINT_CAP : Infinit
 function path(c) { return 'bank/' + c; }
 function note(row) { LOG.unshift(row); if (LOG.length > KEEP) LOG.pop(); }
 
+// 트랜잭션을 걸되, maxretry 로 떨어져도 물러나지 않는다.
+//
+//   파이어베이스는 스물다섯 번 안에 서버와 합의가 안 되면 maxretry 로 끝낸다.
+//   입·출금은 「예금을 움직이고 → 포인트를 움직인다」 두 걸음이라, 둘째 걸음이
+//   이렇게 끝나면 **예금만 줄고 포인트는 안 들어온다.** 되돌리기도 트랜잭션이라
+//   같이 떨어지면 그 돈은 어디에도 없게 된다. 입출금을 되풀이할 때 돈이
+//   사라지던 까닭이 이것이다.
+//
+//   save-merge.js 가 올려 둔 txRetry 를 쓴다 — 쉬었다 네 번 다시 걸고,
+//   그래도 안 되면 읽고-고쳐-쓰기로 마지막 한 번을 보낸다.
+function tx(p, fn, local) {
+    if (typeof txRetry === 'function') return txRetry(p, fn, local === true);
+    return database.ref(p).transaction(fn, null, local === true);
+}
+
 // 예금을 움직인다. 되돌릴 때도 이것을 쓴다.
 function moveDeposit(c, delta, needRoom) {
-    return database.ref(path(c)).transaction(function (b) {
+    return tx(path(c), function (b) {
         if (!b) return;
         const dep = Number(b.deposit) || 0;
         if (delta < 0 && dep < -delta) return;                  // 잔액이 모자라다
@@ -68,24 +83,47 @@ function moveDeposit(c, delta, needRoom) {
         b.deposit = dep + delta;
         b.lastOp = Math.abs(delta);
         return b;
-    }, null, false);
+    }).catch(function (e) {
+        // 되돌리기까지 못 하면 돈이 어디에도 없게 된다 — 기록을 남긴다
+        console.error('[은행] 예금 쓰기 실패:', e);
+        note({ 때: new Date().toLocaleTimeString(), 무엇: '예금 쓰기 실패',
+               금액: delta, 사유: String((e && e.message) || e), 움직임: 0 });
+        return null;
+    });
 }
 
 // 서버 포인트에 더한다(또는 뺀다). **실제로 움직인 몫**을 돌려준다.
 function movePoints(c, delta) {
     let moved = 0;
-    return database.ref('users/' + c + '/points').transaction(function (p) {
+    return tx('users/' + c + '/points', function (p) {
         const now = Number(p) || 0;
         const next = Math.max(0, Math.min(cap(), now + delta));
         moved = next - now;
         return next;
-    }, null, false).then(function (res) {
+    }).then(function (res) {
         if (!res || !res.committed) return 0;
         return moved;
     }).catch(function (e) {
         console.error('[은행] 포인트 쓰기 실패:', e);
         return null;                                            // 아예 못 썼다
     });
+}
+
+// 되돌리기마저 못 했다 — 돈이 어느 쪽에도 없다. 숨기지 않고 알린다.
+function lost(amt, what) {
+    note({ 때: new Date().toLocaleTimeString(), 무엇: what + ' 되돌리기 실패',
+           금액: amt, 사유: '서버에 닿지 못함', 움직임: 0, 되돌림: 0 });
+    try {
+        if (typeof addHistoryLog === 'function' && typeof currentUser !== 'undefined' && currentUser) {
+            addHistoryLog(currentUser, '[은행] ' + what + ' 처리가 끝까지 가지 못했습니다. ('
+                + amt.toLocaleString() + ' P — 상담사 확인 필요)');
+            if (typeof saveFields === 'function') saveFields({ history: 1 });
+        }
+    } catch (e) { }
+    showCustomAlert('은행 처리가 끝까지 가지 못했습니다.\n\n'
+        + amt.toLocaleString() + ' P가 어느 쪽에도 들어가지 않았습니다.\n'
+        + '기록에 남겨 두었으니 상담사에게 알려 주세요.\n(bankLog() 로도 볼 수 있습니다)');
+    ui(); nudge();
 }
 
 function ui() {
@@ -145,7 +183,8 @@ function withdraw() {
                 if (moved === null || moved < take) {
                     // 4. 안 들어간 몫을 예금에 되돌린다
                     const back = take - (moved || 0);
-                    return moveDeposit(me, back, false).then(function () {
+                    return moveDeposit(me, back, false).then(function (rb) {
+                        if (!rb || !rb.committed) return lost(back, '출금');
                         if (moved) {
                             if (typeof addHistoryLog === 'function')
                                 addHistoryLog(currentUser, '[은행 출금] ' + moved.toLocaleString() + ' P');
@@ -212,7 +251,8 @@ function deposit() {
             const took = (moved === null) ? 0 : -moved;             // 실제로 빠진 몫
             if (took < put) {
                 const back = put - took;                            // 예금에 넣었는데 못 낸 몫
-                return moveDeposit(me, -back, false).then(function () {
+                return moveDeposit(me, -back, false).then(function (rb) {
+                        if (!rb || !rb.committed) return lost(back, '입금');
                     if (took) {
                         if (typeof addHistoryLog === 'function')
                             addHistoryLog(currentUser, '[은행 입금] ' + took.toLocaleString() + ' P');
