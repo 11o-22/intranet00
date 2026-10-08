@@ -24,7 +24,7 @@ function checkMiscarriage() {
     // 특이사항 정리
     if (currentUser.badge && currentUser.badge.notes) {
         const arr = currentUser.badge.notes.split(' | ')
-            .filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
+            .filter(x => x.trim() && !/임신했습니다/.test(x));   // 착정 쪽 「받아 임신했습니다」도 같이
         currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
     }
 

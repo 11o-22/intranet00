@@ -328,7 +328,9 @@ function checkPregBirth() {
       
     // 특이사항 정리
     if (currentUser.badge && currentUser.badge.notes) {
-        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
+        // ★ 「…아이를 임신했습니다」와 착정 쪽 「…받아 임신했습니다」 둘 다 지운다.
+        //   예전에는 앞의 것만 지워서, 착정으로 가진 사원은 낳고 나서도 줄이 남았다.
+        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/임신했습니다/.test(x));
         currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
     }
     currentUser.preg = null;
@@ -378,7 +380,9 @@ function checkPregPotion() {
 
     currentUser.preg = null;
     if (currentUser.badge && currentUser.badge.notes) {
-        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/아이를 임신했습니다/.test(x));
+        // ★ 「…아이를 임신했습니다」와 착정 쪽 「…받아 임신했습니다」 둘 다 지운다.
+        //   예전에는 앞의 것만 지워서, 착정으로 가진 사원은 낳고 나서도 줄이 남았다.
+        const arr = currentUser.badge.notes.split(' | ').filter(x => x.trim() && !/임신했습니다/.test(x));
         currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
     }
     addHistoryLog(currentUser, `[임신 해제] 물약의 효과가 끝나 임신 상태가 사라졌습니다.`);

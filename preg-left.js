@@ -194,6 +194,73 @@ function mineBox(code) {
 })();
 
 // ==========================================
+// ㅁ. 임신이 끝났는데 특이사항에 남은 줄을 치운다
+// ==========================================
+//
+// 특이사항에 적히는 줄은 두 가지다.
+//
+//     임신시키기   [OO 사원의 아이를 임신했습니다]        pregnancy.js:274
+//     착정         [OO 사원에게서 받아 임신했습니다]      preg-v2.js:311
+//
+// 그런데 낳거나 풀릴 때 지우는 자리가 「아이를 임신했습니다」만 찾았다.
+// (pregnancy2.js · preg-dark-fix.js) 그래서 **착정으로 가진 사원은 낳고
+// 나서도 줄이 영영 남았다.** 지우는 쪽을 「임신했습니다」로 넓혔고,
+// 이미 남아 있는 줄은 아래에서 치운다.
+//
+// 임신 중인 사람은 건드리지 않는다 — 지금 임신 중이라는 표시는 맞는 말이다.
+const PREG_NOTE = /임신했습니다/;
+
+function cutPregNote(u) {
+    if (!u || !u.badge) return 0;
+    if (bearing(u)) return 0;                       // 아직 임신 중이다 — 맞는 줄이다
+    const obj = (typeof u.badge === 'object');
+    const key = obj ? (typeof u.badge.notes === 'string' ? 'notes'
+                     : (typeof u.badge.note === 'string' ? 'note' : 'notes')) : null;
+    const raw = String(obj ? (u.badge[key] || '') : u.badge);
+    if (!PREG_NOTE.test(raw)) return 0;
+
+    const parts = raw.split(/\s*\|\s*|<br\s*\/?>|\n/);
+    const keep = parts.filter(function (x) { return x && x.trim() && !PREG_NOTE.test(x); });
+    const cut = parts.filter(function (x) { return x && PREG_NOTE.test(x); }).length;
+    const out = keep.join(' | ') || '특이사항 없음';
+    if (obj) u.badge[key] = out; else u.badge = out;
+    return cut;
+}
+
+function sweepMine() {
+    try {
+        if (typeof currentUser === 'undefined' || !currentUser) return;
+        const cut = cutPregNote(currentUser);
+        if (!cut) return;
+        if (typeof saveFields === 'function') saveFields({ badge: 1 });
+        if (typeof updateUI === 'function') updateUI();
+        console.log('[임신] 끝난 임신 줄 ' + cut + '개를 특이사항에서 치웠습니다.');
+    } catch (e) { console.warn('[임신] 특이사항 치우기 건너뜀:', e && e.message); }
+}
+setTimeout(sweepMine, 7000);
+setInterval(sweepMine, 60000);
+
+// 상담사 — 전원 것을 한 번에
+window.pregNoteClean = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof db === 'undefined' || !db.users) { console.warn('사원 목록을 못 읽었습니다.'); return; }
+    const rows = [];
+    Object.keys(db.users).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || !u.code) return;
+        const cut = cutPregNote(u);
+        if (!cut) return;
+        rows.push({ 사원: u.name, 치운줄: cut });
+        if (typeof updateUserFields === 'function') {
+            try { updateUserFields(u.code, { badge: u.badge }); } catch (e) { }
+        }
+    });
+    if (!rows.length) { console.log('치울 줄이 없습니다.'); return; }
+    console.log('%c✓ ' + rows.length + '명의 특이사항을 치웠습니다.', 'color:#4CAF50');
+    console.table(rows);
+};
+
+// ==========================================
 // 확인
 // ==========================================
 window.pregLeft = function () {
