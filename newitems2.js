@@ -941,7 +941,7 @@ function pickTargetFor(srcName) {
     if (left <= 0) { showCustomAlert('오늘은 더 쓸 수 없습니다.\n\n자정이 지나면 다시 열립니다.'); return; }
 
     const list = Object.keys(db.users).map(function (c) { return db.users[c]; })
-        .filter(function (u) { return u && u.code && u.name && u.code !== currentUser.code; })
+        .filter(function (u) { return u && u.code && u.name && u.code !== currentUser.code && !isCounsel(u); })
         .sort(function (a, b) { return String(a.no || '').localeCompare(String(b.no || '')); });
 
     const back = document.createElement('div');
@@ -973,6 +973,15 @@ function pickTargetFor(srcName) {
 }
 
 function stealPanel(target, srcName, maxPick, dayCap) {
+    // ★ 상담사는 표적이 되지 않는다 — 들여다보는 것도, 가져가는 것도 안 된다.
+    //   목록에서 빼 두었지만(pickTargetFor), 대상 지정 창 같은 다른 길로도 들어오므로
+    //   창을 여는 자리에서 한 번 더 막는다.
+    if (isCounsel(target)) {
+        showCustomAlert(srcName + '\n\n'
+            + (target.name || '상담사') + ' 사원에게는 통하지 않습니다.\n'
+            + '지닌 것을 들여다볼 수도, 가져올 수도 없습니다.');
+        return;
+    }
     const back = document.createElement('div');
     back.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.78);'
         + 'display:flex;align-items:center;justify-content:center;padding:18px';
