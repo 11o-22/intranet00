@@ -261,25 +261,116 @@ function noteSelf(u, T, count, say) {
     u.foxNotes.push({ k: T.k, line: line, until: now + BUFF_MS });
 }
 
-// 기한이 지난 줄은 쓰지 않아도 치운다
-setInterval(function () {
-    try {
-        const u = currentUser;
-        if (!u || !Array.isArray(u.foxNotes) || !u.foxNotes.length) return;
-        const now = Date.now();
-        const keep = [];
-        let cut = 0;
-        u.foxNotes.forEach(function (n) {
-            if (!n || !n.line) return;
-            if ((n.until || 0) > now) { keep.push(n); return; }
-            if (cutLine(u, n.line)) cut++;
+// ==========================================
+// 특이사항에서 치우기 — 24시간이 지나면 지운다
+// ==========================================
+//
+// ■ 무엇이 안 지워졌나
+//
+//   남에게 걸면 상대 특이사항에 한 줄이 적힌다.
+//
+//       여우의 금제가 걸렸습니다 (행운 +3 (24시간))
+//
+//   그런데 **적기만 하고 지우는 자리가 없었다.** 기한을 적어 두는 자리
+//   (foxNotes)도 본인에게 걸 때만 쌓았다. 그래서 힘은 24시간 뒤에 끝나는데
+//   줄은 영영 남았다.
+//
+//   본인 쪽 줄도, 이 기록이 생기기 전에 적힌 것은 기한이 없어 안 치워졌다.
+//
+// ■ 어떻게 고치나
+//
+//   1. 남에게 걸 때도 상대 자리에 기한을 같이 적는다 (아래 useTails)
+//   2. 기한이 지난 줄을 치운다 (예전과 같다)
+//   3. **기한이 안 적힌 묵은 줄**은, 걸려 있던 힘이 다 끝났으면 치운다
+//
+//   3번은 전에 적힌 줄을 위한 것이다. 새로 적는 줄은 전부 기한이 붙으므로
+//   여기 걸리지 않는다.
+//
+//   치우는 것은 제 자리뿐이다 — 각자 접속하면 1분 안에 치워진다.
+//   한꺼번에 치우려면 상담사가 foxNoteClean() 을 쓴다.
+const FOX_LINE = /^\s*(꼬리 \d+개 사용 -|여우의 금제가 걸렸습니다)/;
+
+// 아직 걸려 있는 힘이 있나 (시간으로 도는 것만 본다)
+function foxLive(u) {
+    if (!u) return false;
+    const now = Date.now();
+    if (Array.isArray(u.foxBuffs) && u.foxBuffs.some(function (b) { return b && (b.until || 0) > now; })) return true;
+    if ((u.pollFreezeUntil || 0) > now) return true;
+    if ((u.satHoldUntil || 0) > now) return true;
+    return false;
+}
+
+function badgeLines(u) {
+    const obj = (u && u.badge && typeof u.badge === 'object');
+    const key = obj ? badgeKey(u) : null;
+    const raw = String(obj ? (u.badge[key] || '') : ((u && u.badge) || ''));
+    return raw.split(/\s*\|\s*|<br\s*\/?>|\n/).filter(function (x) { return x && x.trim(); });
+}
+
+// 한 사람의 묵은 줄을 치운다 — 치운 줄 수를 돌려준다
+function sweepNotes(u) {
+    if (!u) return 0;
+    const now = Date.now();
+    const notes = Array.isArray(u.foxNotes) ? u.foxNotes : [];
+    const keep = [];
+    let cut = 0;
+
+    // ① 기한이 적힌 줄 — 때가 지났으면 치운다
+    notes.forEach(function (n) {
+        if (!n || !n.line) return;
+        if ((n.until || 0) > now) { keep.push(n); return; }
+        if (cutLine(u, n.line)) cut++;
+    });
+
+    // ② 기한이 안 적힌 묵은 줄 — 걸린 힘이 다 끝났으면 치운다
+    if (!foxLive(u)) {
+        badgeLines(u).forEach(function (line) {
+            if (!FOX_LINE.test(line)) return;
+            if (keep.some(function (n) { return n.line === line; })) return;
+            if (cutLine(u, line)) cut++;
         });
-        if (keep.length === u.foxNotes.length) return;
-        u.foxNotes = keep;
+    }
+
+    if (keep.length !== notes.length) u.foxNotes = keep;
+    return cut;
+}
+
+function sweepMine() {
+    try {
+        const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+        if (!u) return;
+        const before = Array.isArray(u.foxNotes) ? u.foxNotes.length : 0;
+        const cut = sweepNotes(u);
+        const after = Array.isArray(u.foxNotes) ? u.foxNotes.length : 0;
+        if (!cut && before === after) return;
         if (typeof saveFields === 'function') saveFields({ badge: 1, foxNotes: 1 });
         if (cut && typeof updateUI === 'function') updateUI();
-    } catch (e) { }
-}, 60000);
+        if (cut) console.log('[여우] 기한이 지난 특이사항 ' + cut + '줄을 치웠습니다.');
+    } catch (e) { console.warn('[여우] 특이사항 치우기 건너뜀:', e && e.message); }
+}
+
+setInterval(sweepMine, 60000);
+setTimeout(sweepMine, 6000);          // 들어오자마자 한 번
+
+// 상담사 — 전원 것을 한 번에 치운다 (예전에 쌓인 줄 정리용)
+window.foxNoteClean = function () {
+    if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof db === 'undefined' || !db.users) { console.warn('사원 목록을 못 읽었습니다.'); return; }
+    const rows = [];
+    Object.keys(db.users).forEach(function (c) {
+        const u = db.users[c];
+        if (!u || !u.code) return;
+        const cut = sweepNotes(u);
+        if (!cut) return;
+        rows.push({ 사원: u.name, 치운줄: cut });
+        if (typeof updateUserFields === 'function') {
+            try { updateUserFields(u.code, { badge: u.badge, foxNotes: u.foxNotes || [] }); } catch (e) { }
+        }
+    });
+    if (!rows.length) { console.log('치울 줄이 없습니다.'); return; }
+    console.log('%c✓ ' + rows.length + '명의 특이사항을 치웠습니다.', 'color:#4CAF50');
+    console.table(rows);
+};
 
 function useTails(target, k, count, isSelf) {
     const me = currentUser;
@@ -303,8 +394,19 @@ function useTails(target, k, count, isSelf) {
         noteSelf(me, T, count, say);
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
     } else {
+        // 상대 자리에도 **기한을 같이 적는다.** 이것이 없어서 24시간이 지나도
+        // 특이사항에서 안 지워졌다. (위 sweepNotes 참고)
         if (typeof appendBadgeNoteToUser === 'function') {
-            appendBadgeNoteToUser(target, '여우의 금제가 걸렸습니다 (' + say + ')');
+            const line = '여우의 금제가 걸렸습니다 (' + say + ')';
+            if (!Array.isArray(target.foxNotes)) target.foxNotes = [];
+            // 같은 꼬리로 다시 걸면 앞 줄은 지우고 새로 적는다
+            target.foxNotes = target.foxNotes.filter(function (n) {
+                if (!n || !n.line) return false;
+                if (n.k === T.k || (n.until || 0) <= Date.now()) { cutLine(target, n.line); return false; }
+                return true;
+            });
+            appendBadgeNoteToUser(target, line);
+            target.foxNotes.push({ k: T.k, line: line, until: Date.now() + BUFF_MS });
         }
         if (typeof addHistoryLog === 'function') {
             addHistoryLog(target, '[' + FOX + '] ' + me.name + ' 사원이 여우의 금제를 걸었습니다 — ' + say);
@@ -316,7 +418,8 @@ function useTails(target, k, count, isSelf) {
                     foxBuffs: target.foxBuffs || [], foxEscape: target.foxEscape || 0,
                     pollFreezeUntil: target.pollFreezeUntil || 0, satHoldUntil: target.satHoldUntil || 0,
                     darkTries: target.darkTries || 0, facilityCount: target.facilityCount || 0,
-                    badge: target.badge, history: target.history, hasItemUsedOnMe: true
+                    badge: target.badge, foxNotes: target.foxNotes || [],
+                    history: target.history, hasItemUsedOnMe: true
                 });
             } catch (e) { }
         }
