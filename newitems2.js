@@ -414,6 +414,9 @@ function rescueGuarantee() {
     return null;
 }
 
+// epic 쪽에서도 「확정권이 있나」를 물어본다 (epic-grim.js)
+window.rescueGuarantee = rescueGuarantee;
+
 function spendGuarantee(src) {
     const u = currentUser;
 

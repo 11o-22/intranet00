@@ -1024,6 +1024,20 @@ window.showTheme = function (on) {
 };
 
 // ==========================================
+// epic 쪽에서도 쓸 수 있게 창구를 연다 (epic-show.js)
+// ==========================================
+//
+// epic 어둠은 제 darkRun 을 따로 짓고 제 사망·정산을 쓴다. 그래서 여기서
+// 해 둔 것들이 그쪽에는 닿지 않는다. 같은 셈을 두 번 적지 않도록
+// 쓰던 것을 그대로 내어 준다.
+window.talkShowOf = showOf;
+window.talkShowMult = multOf;
+window.talkShowIsHost = isHost;
+window.talkShowBumpHeat = bumpHeat;
+window.talkShowSnap = snap;
+window.TALK_SHOW_REVIVES = REVIVES;
+
+// ==========================================
 // 확인 · 지급
 // ==========================================
 window.showState = function () {
