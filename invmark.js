@@ -39,7 +39,7 @@ function toggleLock(n) {
 (function injectConfirm() {
     if (document.getElementById('inv-confirm-overlay')) return;
     document.body.insertAdjacentHTML('beforeend', `
-        <div id="inv-confirm-overlay" class="modal-overlay" style="display:none; z-index:10006;">
+        <div id="inv-confirm-overlay" class="modal-overlay" style="display:none; z-index:9999999;">
             <div class="modal-content" style="max-width:340px; text-align:center;">
                 <div id="inv-confirm-icon" style="font-size:30px; margin-bottom:11px;">📦</div>
                 <div id="inv-confirm-text" style="font-size:13px; color:#eee; line-height:1.8; margin-bottom:9px;"></div>

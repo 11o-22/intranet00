@@ -91,11 +91,25 @@ window.useDarkItem = function (name) {
     closeDarkItems();
     if (typeof useInventoryItem !== 'function') return;
 
+    // ★ 여기서는 「쓰시겠습니까」를 다시 묻지 않는다.
+    //
+    //   invmark.js 가 소지품 쓰기에 확인 창을 끼워 넣는다. 그런데 그 창은
+    //   z-index 가 어둠 화면(9999998)보다 낮아서, 탐사 중에는 **화면 뒤에
+    //   깔려 보이지도 눌리지도 않았다.** 「사용하기」를 눌러도 아무 일이
+    //   없던 까닭이 이것이다. (읽어 준 목소리 · 납작한 돌 …)
+    //
+    //   창은 따로 올려 두었지만, 여기서는 이미 목록에서 골라 「사용하기」를
+    //   누른 참이라 한 번 더 묻는 것이 군더더기다. 그리고 창을 거치면
+    //   물건이 나중에 빠져서, 아래 before/after 셈이 어긋나 반입 목록이
+    //   줄지 않는다. (같은 것을 몇 번이고 다시 쓸 수 있었다)
+    window._invOk = name;
+
     // 소지품에서 실제로 빠졌을 때만 반입 목록에서도 뺀다
     const before = ((currentUser && currentUser.inventory) || []).filter(function (x) {
         return x === name;
     }).length;
     useInventoryItem(name);
+    window._invOk = null;
     const after = ((currentUser && currentUser.inventory) || []).filter(function (x) {
         return x === name;
     }).length;
