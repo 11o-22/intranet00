@@ -149,6 +149,48 @@ window.gearPush = function (code, label, owner, sealed, unlockBase) {
 // 쓰려 할 때, 서버에 있는 것보다 **줄어들면** 그 쓰기를 버리고 콘솔에
 // 어디서 불렀는지 남긴다. 늘어나는 쓰기는 그대로 둔다.
 const refused = [];
+
+// ==========================================
+// 일부러 빼는 것과 묵은 덮어쓰기를 가른다
+// ==========================================
+//
+// 빗장이 「줄어드는 쓰기」를 전부 버리는 바람에, **상담사의 장비 회수까지
+// 막혔다.** 돌려주는 물건은 들어가는데 장착칸은 그대로 남아서, 풀리지 않고
+// 하나 더 생긴 것처럼 보였다. (index.html:10445 adminForceUnequip)
+//
+// 묵은 덮어쓰기는 남의 자리를 **통째로** 되쓴다 — 사원증·오염도·포인트까지
+// 한 꾸러미로 온다. 일부러 빼는 쪽은 바꿀 칸 두어 개만 보낸다.
+// 그 차이로 가른다.
+//
+//     좁은 쓰기 (칸 몇 개뿐)        일부러 빼는 것으로 보고 통과
+//     넓은 쓰기 (몸 전체가 딸려 옴)  예전처럼 막는다
+//
+// 애매하면 gearShrinkOk(사번) 으로 한 번만 열어 줄 수도 있다.
+const WIDE = ['badge', 'pollution', 'points', 'satiety', 'darkLogs', 'preg',
+              'quarantineUntil', 'affiliation', 'team', 'position', 'no', 'name'];
+const NARROW_MAX = 6;          // 이 수보다 많으면 통째 쓰기로 본다
+
+function narrowWrite(fields) {
+    const keys = Object.keys(fields || {}).filter(function (k) {
+        return k !== '_adminStamp' && k !== '_stamp';
+    });
+    if (keys.length > NARROW_MAX) return false;
+    return !keys.some(function (k) { return WIDE.indexOf(k) >= 0; });
+}
+
+// 한 번만 열어 두는 문 — 부르는 쪽이 「일부러 빼는 것」이라고 알릴 때
+const allow = {};
+window.gearShrinkOk = function (code, ms) {
+    if (!code) return;
+    allow[code] = Date.now() + (Number(ms) || 5000);
+};
+function allowed(code) {
+    const t = allow[code];
+    if (!t || Date.now() > t) return false;
+    delete allow[code];                    // 한 번 쓰면 닫는다
+    return true;
+}
+
 (function guard() {
     const iv = setInterval(function () {
         if (typeof updateUserFields !== 'function') return;
@@ -167,7 +209,16 @@ const refused = [];
             return database.ref('users/' + code + '/' + EQW).once('value').then(function (s) {
                 const srv = arr(s.val());
                 if (want.length >= srv.length) return _u.apply(self, args);
-                // 줄어든다 — 버린다
+
+                // 줄어든다 — 일부러 빼는 것이면 통과시킨다
+                if (allowed(code) || narrowWrite(fields)) {
+                    stats.shrink = (stats.shrink || 0) + 1;
+                    console.log('[장착칸] ' + code + ' 의 장착칸 ' + srv.length + '칸 → '
+                        + want.length + '칸 — 일부러 빼는 것으로 보고 통과시켰습니다.');
+                    return _u.apply(self, args);
+                }
+
+                // 통째로 되쓰려는 것이다 — 버린다
                 let where = '';
                 try {
                     where = ((new Error()).stack || '').split('\n').slice(2, 5)
