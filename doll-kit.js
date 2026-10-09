@@ -32,6 +32,26 @@
 //
 //   기다림은 사원마다 하나입니다. 키트를 둘 가지고 있어도 나흘에 한 번입니다.
 //   키트마다 따로 세려면 소지품이 글자 배열이라 가릴 수가 없습니다.
+//
+// ■ 한 번 고쳤는데도 사라지던 까닭 — 감싸는 차례
+//
+//   소지품 쓰는 길(useInventoryItem)은 열 겹 넘게 감싸여 있습니다.
+//   그 가운데 newitems2.js 가 n_doll 을 가로채 **자기 선에서 끝냅니다.**
+//   (newitems2.js:1843 — fn(itemName); return;)
+//
+//   그러니 이 파일은 newitems2 **바깥**에 있어야 손이 닿습니다.
+//   그런데 둘 다 setInterval 로 끼어드는데 기다리는 때가 다릅니다.
+//
+//       newitems2   500ms   (묶음 2에서 시작)
+//       여기        400ms   (묶음 8에서 시작)
+//
+//   묶음이 거의 동시에 내려오면 400ms 쪽이 먼저 끼어듭니다. 그러면
+//   newitems2 가 그 위를 덮어 **바깥이 되고**, 여기는 영영 안 불립니다.
+//   서비스 워커가 묶음을 들고 있으면 늘 그 차례가 되어, 늘 사라졌습니다.
+//
+//   기다리는 때를 늘려 피하는 것은 또 어긋날 수 있으니, 차례에 기대지
+//   않게 바꿉니다. **내가 맨 바깥이 아니면 다시 감쌉니다.** 누가 나중에
+//   덮어도 1.5초 안에 도로 바깥으로 올라옵니다.
 
 (function dollKit() {
 
@@ -50,53 +70,64 @@ function human(ms) {
 }
 
 (function hook() {
-    const iv = setInterval(function () {
+    let inside = false;          // 겹쳐 감싸여도 한 번만 처리한다
+    let layers = 0;
+
+    function wrap() {
         if (typeof useInventoryItem !== 'function') return;
         if (typeof removeItemFromInventory !== 'function') return;
-        if (useInventoryItem._dollKeep) { clearInterval(iv); return; }
+        if (useInventoryItem._dollKeep) return;          // 내가 이미 맨 바깥이다
 
         const _u = useInventoryItem;
-        useInventoryItem = function (itemName) {
-            if (itemName !== KIT) return _u.apply(this, arguments);
-            if (!currentUser) return;
+        const mine = function (itemName) {
+            // 안쪽에 묵은 내 껍질이 또 있으면 그냥 지나친다
+            if (itemName !== KIT || inside || !currentUser) return _u.apply(this, arguments);
+            inside = true;
+            try {
+                const left = leftMs();
+                if (left > 0) {
+                    showCustomAlert('아직 바늘을 들 수 없습니다.\n\n'
+                        + human(left) + ' 뒤에 다시 지을 수 있습니다.');
+                    return;
+                }
 
-            const left = leftMs();
-            if (left > 0) {
-                showCustomAlert('아직 바늘을 들 수 없습니다.\n\n'
-                    + human(left) + ' 뒤에 다시 지을 수 있습니다.');
-                return;
-            }
+                // 없애는 그 한 번만 비켜 세운다
+                const _rm = removeItemFromInventory;
+                let kept = false;
+                removeItemFromInventory = function (u, n, q) {
+                    if (!kept && n === KIT && u === currentUser) { kept = true; return; }
+                    return _rm.apply(this, arguments);
+                };
 
-            // 없애는 그 한 번만 비켜 세운다
-            const _rm = removeItemFromInventory;
-            let kept = false;
-            removeItemFromInventory = function (u, n, q) {
-                if (!kept && n === KIT && u === currentUser) { kept = true; return; }
-                return _rm.apply(this, arguments);
-            };
+                try { _u.apply(this, arguments); }
+                finally { removeItemFromInventory = _rm; }
 
-            try { _u.apply(this, arguments); }
-            finally { removeItemFromInventory = _rm; }
+                // kept 가 참이면 실제로 인형을 지었다는 뜻이다
+                // (격리·소속 같은 이유로 막혔으면 gone 까지 가지 않는다)
+                if (!kept) return;
 
-            // kept 가 참이면 실제로 인형을 지었다는 뜻이다
-            // (격리·소속 같은 이유로 막혔으면 gone 까지 가지 않는다)
-            if (!kept) return;
-
-            currentUser.dollKitAt = Date.now() + WAIT;
-            if (typeof addHistoryLog === 'function') {
-                addHistoryLog(currentUser, '[' + KIT + '] 키트는 남았습니다. ' + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
-            }
-            if (typeof saveFields === 'function') saveFields({ dollKitAt: 1, history: 1, inventory: 1 });
-            if (typeof updateUI === 'function') updateUI();
-            setTimeout(function () {
-                showCustomAlert('키트는 손에 남았습니다.\n\n'
-                    + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
-            }, 80);
+                currentUser.dollKitAt = Date.now() + WAIT;
+                if (typeof addHistoryLog === 'function') {
+                    addHistoryLog(currentUser, '[' + KIT + '] 키트는 남았습니다. ' + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
+                }
+                if (typeof saveFields === 'function') saveFields({ dollKitAt: 1, history: 1, inventory: 1 });
+                if (typeof updateUI === 'function') updateUI();
+                setTimeout(function () {
+                    showCustomAlert('키트는 손에 남았습니다.\n\n'
+                        + WAIT_DAYS + '일 뒤에 다시 지을 수 있습니다.');
+                }, 80);
+            } finally { inside = false; }
         };
-        useInventoryItem._dollKeep = true;
-        clearInterval(iv);
-        console.log('[인형] 키트가 남습니다 — ' + WAIT_DAYS + '일 기다림');
-    }, 400);
+        mine._dollKeep = true;
+        useInventoryItem = mine;
+        layers++;
+        if (layers === 1) console.log('[인형] 키트가 남습니다 — ' + WAIT_DAYS + '일 기다림');
+        else console.log('[인형] 누가 위를 덮어서 다시 맨 바깥으로 올라왔습니다 (' + layers + '겹째)');
+    }
+
+    wrap();
+    // 차례에 기대지 않는다 — 누가 위를 덮으면 도로 바깥으로 올라온다
+    setInterval(function () { try { wrap(); } catch (e) { } }, 1500);
 })();
 
 // 설명에도 적어 둔다
