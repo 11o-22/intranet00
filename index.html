@@ -5765,7 +5765,10 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
             statusEl.style.border = `1px solid ${statusInfo.color}`;
         }
         
-                      currentUser.facilityMax = 20
+                      // 천장은 count-cap.js 가 센다 (공용 최대 30회 · 은화 뱀·고유 아이템은 천장 밖)
+                      currentUser.facilityMax = (typeof capFacMax === 'function')
+            ? capFacMax(currentUser)
+            : 20
             + (typeof facDarkBonus === 'function' ? facDarkBonus().fac : (currentUser.dnaFacBonus || 0))
             + (currentUser.ticketAddedMax || 0) + (currentUser.birthAddedMax || 0);
         

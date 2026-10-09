@@ -469,14 +469,29 @@ function rareBonus() {
     const got = [];
     for (let i = 0; i < howMany && pool.length; i++) {
         const k = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-        let v, word;
-        if (k === 'fac') { v = 1 + Math.floor(Math.random() * 2); word = '공용시설 +' + v + '회'; }
-        else if (k === 'dark') { v = 1 + Math.floor(Math.random() * 2); word = '어둠 탐사 +' + v + '회'; }
-        else { v = 50 + Math.floor(Math.random() * 51); word = '행운 +' + v + '%'; }
-        if (typeof ibAdd === 'function') ibAdd(currentUser, k, v, 24 * HOUR, '식당 ★');
-        got.push(word);
+
+        if (k === 'pct') {
+            const v = 50 + Math.floor(Math.random() * 51);
+            if (typeof ibAdd === 'function') ibAdd(currentUser, k, v, 24 * HOUR, '식당 ★');
+            got.push('행운 +' + v + '% (24시간)');
+            continue;
+        }
+
+        // 공용시설 · 어둠 탐사 — 요리로는 하루 CAP_COOK_DAY(5)회까지만 더한다.
+        //   ???의 티켓 · 무전기의 하루 +5 와는 따로 센다.
+        //   수명은 24시간이 아니라 자정까지다 — 안 쓰면 사라진다. (count-cap.js)
+        const label = (k === 'fac') ? '공용시설' : '어둠 탐사';
+        const roll  = 1 + Math.floor(Math.random() * 2);
+        const room  = (typeof capCookRoom === 'function') ? capCookRoom(currentUser, k) : roll;
+        const give  = Math.max(0, Math.min(roll, room));
+
+        if (!give) { got.push(label + ' — 금일 한도를 다 썼다'); continue; }
+
+        const life = (typeof capMidnightMs === 'function') ? capMidnightMs() : 24 * HOUR;
+        if (typeof ibAdd === 'function') ibAdd(currentUser, k, give, life, '식당 ★');
+        got.push(label + ' +' + give + '회 (자정까지)');
     }
-    return '★ ' + got.join(' · ') + ' (24시간)';
+    return '★ ' + got.join(' · ');
 }
 
 function eatFail() {
