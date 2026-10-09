@@ -2882,6 +2882,11 @@ function input119D(n) {
 //   적어 둔 번호는 합류한 뒤 제 발로 넘어갈 때 따라잡는 데 쓴다.
 function darkHoldHere() {
     if (!darkRun) return false;
+    // A-214 는 갈라져도 걸음 수는 방 하나로 센다.
+    // 여기서 제 걸음을 따로 세게 두면, 합류에 한 번 실패한 사람이
+    // curStep 을 쓰지도 않고 따르지도 않아 영영 제 길을 걷는다.
+    // 그러면 남들이 투표를 하는 자리에서 혼자 다른 기믹을 밟는다.
+    if (darkRun.zone === 'Qtrew-A-214') return false;
     if (darkRun.solo || darkRun.s003Lair || darkRun.taken) return true;
     if (darkRun.zone === 'Qtrew-S-003' && typeof S003_STEPS !== 'undefined') {
         const t = (S003_STEPS[darkRun.step] || {}).type;
@@ -5247,8 +5252,13 @@ function b508RequiredDocs() {
         a214Key = darkRun.partyId;
         a214Ref = database.ref(a214Path());
         a214Ref.on('value', snap => {
+            const had = !!a214State;
             a214State = snap.val();
             if (!a214State || !darkRun) return;
+            // 방이 막 도착했다. 그 전까지 화면은 "내려가는 중..." 이었다.
+            // 여기서 다시 그려 주지 않으면, 1.2초·3초 재시도를 놓친 사람은
+            // 선임이 출발한 뒤에도 입구에 남아 혼자 뒤처진다.
+            if (!had) { renderA214Bar(); renderStepA214(); return; }
             renderA214Bar();
                         const def = A214_STEPS[darkRun.step];
             if (def && def.type === 'vote' && !darkRun[`_a214v${def.n}Shown`]) renderA214Vote(def.n);
@@ -5950,10 +5960,14 @@ function b508RequiredDocs() {
         database.ref(`${a214Path()}/split${n}/${currentUser.code}`).set({
             pick: v, name: currentUser.name, at: Date.now()
         });
-        database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).set({
-            name: currentUser.name, at: Date.now(), split: n
-        });
-        darkRun.solo = true;
+        // 여기서 darkRun.solo 를 켜지 않는다.
+        //   solo 는 "제 걸음을 따로 센다"는 뜻이다. A-214 에서는 갈림길도
+        //   합류도 방 전체의 한 걸음이라, 켜 두면 아무도 curStep 을 쓰지
+        //   않게 되고 (go() 가 건너뛴다) 각자 제 번호를 들고 흩어진다.
+        //   흩어진 기분만 남기고 싶으니 보여 주기용 깃발을 따로 쓴다.
+        database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+        darkRun.solo = false;
+        darkRun._a214Scattered = true;
         darkRun.splitPick = v;
         darkRun.log.push(`[갈림 ${n}] ${v}`);
 
@@ -6070,34 +6084,83 @@ function b508RequiredDocs() {
             a214BarHtml() + `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">서로를 찾는 중...</div>`);
         renderA214Bar();
 
-        setTimeout(() => a214ResolveRejoin(n, v), 2500);
+        setTimeout(() => a214ResolveRejoin(n, v), 1200);
+    }
+
+    const A214_MISS = { name:'엇갈림', mod:-1, ok:false,
+        txt:`한참을 돌았다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.` };
+
+    // 아직 서 있는 사람 — 죽은 사람은 기다리지 않는다
+    function a214Standing() {
+        const p = (typeof darkParties !== 'undefined' && darkParties[darkRun.partyId]) || {};
+        const kills = (a214State && a214State.kills) || {};
+        let base = Object.keys(p.alive || {});
+        if (!base.length) base = Object.keys(p.members || {});
+        if (!base.length) base = [currentUser.code];
+        return base.filter(c => !kills[c]);
+    }
+
+    // 짝을 짓는다.
+    //   사번 순서로 돌면서 제일 좋은 짝부터 묶는다. 입력(모두의 선택)이
+    //   같으면 어느 화면에서 돌려도 같은 답이 나온다 — 그래야 "나는 만났는데
+    //   저쪽은 못 만났다" 가 안 생긴다.
+    function a214PairUp(picks) {
+        const codes = Object.keys(picks).sort();
+        const used = {}, out = {};
+        function look(x, y) {
+            const i = A214_REJOIN_TABLE.findIndex(r =>
+                (r.a === x && r.b === y) || (r.a === y && r.b === x));
+            return i;
+        }
+        codes.forEach(c => {
+            if (used[c]) return;
+            let best = -1e9, mate = null, idx = -1;
+            codes.forEach(o => {
+                if (o === c || used[o]) return;
+                const i = look((picks[c] || {}).pick, (picks[o] || {}).pick);
+                const r = i >= 0 ? A214_REJOIN_TABLE[i] : null;
+                const s = r ? ((r.ok ? 100 : 0) + r.mod) : -999;
+                if (s > best) { best = s; mate = o; idx = i; }
+            });
+            if (mate == null) { out[c] = { i: -1, w: '' }; used[c] = true; return; }
+            used[c] = true; used[mate] = true;
+            out[c]    = { i: idx, w: mate };
+            out[mate] = { i: idx, w: c };
+        });
+        return out;
     }
 
     function a214ResolveRejoin(n, myPick) {
         if (!database || !darkRun) return;
-        database.ref(`${a214Path()}/rejoin${n}`).once('value').then(snap => {
-            const picks = snap.val() || {};
-            const others = Object.keys(picks).filter(c => c !== currentUser.code).map(c => picks[c].pick);
+        if (darkRun._a214RjRun === n) return;        // 한 번에 하나만
+        darkRun._a214RjRun = n;
 
-            let found = null;
-            for (const other of others) {
-                found = A214_REJOIN_TABLE.find(r =>
-                    (r.a === myPick && r.b === other) || (r.a === other && r.b === myPick));
-                if (found) break;
-            }
-            if (!found) {
-                found = { name:'엇갈림', mod:-1, ok:false,
-                    txt:`한참을 돌았다.<br><br>지나간 자리는 있는데 사람이 없다.<br>같은 통로를 반대로 돌고 있었던 것 같다.` };
-            }
+        const pickRef = database.ref(`${a214Path()}/rejoin${n}`);
+        const resRef  = database.ref(`${a214Path()}/rejoinRes${n}`);
+        let waited = 0;                              // 내 시계로만 센다
+
+        const show = (res) => {
+            if (!darkRun) return;
+            darkRun._a214RjRun = null;
+            if (darkRun._a214RjDone === n) return;
+            darkRun._a214RjDone = n;
+
+            const mine  = (res && res[currentUser.code]) || { i: -1, w: '' };
+            const found = (mine.i != null && mine.i >= 0 && A214_REJOIN_TABLE[mine.i])
+                            ? A214_REJOIN_TABLE[mine.i] : A214_MISS;
 
             darkRun.modifier = (darkRun.modifier || 0) + found.mod;
             darkRun.log.push(`[합류 ${n}차] ${found.name}`);
 
             if (found.ok) {
                 darkRun.solo = false;
+                darkRun._a214Scattered = false;
                 database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
                 sendPartyChat(`${currentUser.name} 사원이 합류했습니다. (${found.name})`, true);
             } else {
+                // 못 만났어도 걸음은 방과 같이 센다. 보정만 깎인다.
+                darkRun.solo = false;
+                database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
                 sendPartyChat(`${currentUser.name} 사원이 길을 잃었습니다.`, true);
             }
 
@@ -6109,7 +6172,31 @@ function b508RequiredDocs() {
                 darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
             renderA214Bar();
             mountDarkChat('normal');
-        });
+        };
+
+        const spin = () => {
+            if (!darkRun || darkRun._dead || darkRun._a214RjDone === n) return;
+            resRef.once('value').then(rs => {
+                if (rs.val()) { show(rs.val()); return null; }
+                return pickRef.once('value').then(ps => {
+                    const picks = ps.val() || {};
+                    const need  = a214Standing();
+                    const all   = need.length && need.every(c => picks[c]);
+                    waited++;
+                    // 20회 × 1.2초 = 24초까지 기다린다. 아무도 안 고르면 그냥 판정한다.
+                    if (!all && waited < 20) { setTimeout(spin, 1200); return null; }
+                    const pairs = a214PairUp(picks);
+                    // 제일 먼저 도착한 사람이 적는다. 그 뒤로는 적힌 것을 읽는다.
+                    return resRef.transaction(cur => (cur ? undefined : pairs))
+                        .then(() => resRef.once('value'))
+                        .then(r2 => { show(r2.val() || pairs); });
+                });
+            }).catch(() => {
+                if (waited++ < 24) setTimeout(spin, 1500);
+                else show(null);
+            });
+        };
+        spin();
     }
 
         // ==========================================

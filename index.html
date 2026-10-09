@@ -2554,7 +2554,8 @@ const EQUIP_AFFIL = {
         if (!darkRun) return 1;
         const p = darkParties[darkRun.partyId];
         if (!p || !p.alive) return getPartyMemberCount();
-        const solo = p.solo || {};
+        // A-214 의 지목은 흩어져 있어도 방 전체가 한다
+        const solo = (darkRun.zone === 'Qtrew-A-214') ? {} : (p.solo || {});
         return Math.max(1, Object.keys(p.alive).filter(c => !solo[c]).length);
     }
 
@@ -2745,7 +2746,8 @@ const EQUIP_AFFIL = {
         }
 
         // ★ 함께 있는가
-        const together = darkRun.isParty && !darkRun.solo && !darkRun.taken;
+        const together = darkRun.isParty && !darkRun.solo && !darkRun.taken
+                         && !darkRun._a214Scattered;
 
         const zoneBar = darkRun.zone === 'Qtrew-S-010' ? infectBarHtml()
                       : darkRun.zone === 'Qtrew-S-003' ? loreBarHtml() : '';
@@ -2891,7 +2893,10 @@ function renderAdvanceWait(nextStep) {
             darkRun._pendingStep = null;
         }
 
-        if (!darkRun.solo) {   // 혼자 떨어진 사람은 본대를 끌고 가지 않는다
+        // 제 걸음을 따로 세는 자리(흐트러짐·끌려감)에서만 본대를 끌고 가지 않는다.
+        // A-214 처럼 갈라져도 걸음은 하나로 세는 구역은 반드시 적어야 한다 —
+        // 아무도 안 적으면 방의 curStep 이 멈춘 채 각자 제 번호로 흩어진다.
+        if (!(typeof darkHoldHere === 'function' ? darkHoldHere() : darkRun.solo)) {
             database.ref(`darkParties/${pid}/curStep`).transaction(cur => {
                 if (cur != null && cur >= nextStep) return;
                 return nextStep;
@@ -2904,8 +2909,9 @@ function renderAdvanceWait(nextStep) {
     const check = () => {
         if (finished || !darkRun) return;
         const p = darkParties[pid] || {};
-        const solo = p.solo || {};
-              const iAmSolo = darkRun.solo || !!solo[currentUser.code];
+        const solo = (darkRun.zone === 'Qtrew-A-214') ? {} : (p.solo || {});
+              const iAmSolo = (darkRun.zone === 'Qtrew-A-214')
+                  ? false : (darkRun.solo || !!solo[currentUser.code]);
         const group = iAmSolo
             ? [currentUser.code]
             : Object.keys(p.alive || {}).filter(c => !solo[c]);
@@ -2920,19 +2926,29 @@ function renderAdvanceWait(nextStep) {
                 .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
             wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
         }
-        if (cnt >= need) go();
+        // need 가 0 이면 방 정보가 아직 안 왔다는 뜻이다.
+        // 그대로 두면 0 >= 0 이 되어 혼자 먼저 넘어간다.
+        if (need > 0 && cnt >= need) go();
     };
 
     ref.on('value', snap => { lastGot = snap.val() || {}; check(); });
     poll = setInterval(check, 3000);   // 누가 끊겨 인원이 줄어도 다시 센다
 
-           if (!darkRun.solo && !darkRun.taken) {
+           // A-214 는 흩어져도 걸음을 따로 세지 않으니, 남아 있는 흩어짐
+           // 표시를 읽어 solo 를 켜지 않는다. (옛 판에서 남은 것도 무시한다)
+           if (!darkRun.solo && !darkRun.taken && darkRun.zone !== 'Qtrew-A-214') {
         database.ref(`darkParties/${pid}/solo/${currentUser.code}`).once('value').then(sn => {
             if (sn.val()) { darkRun.solo = true; return; }
             return database.ref(`darkParties/${pid}/curStep`).once('value').then(s2 => {
                 const cur = s2.val();
                 if (cur != null && cur > nextStep) go();
             });
+        });
+    } else if (darkRun.zone === 'Qtrew-A-214') {
+        // A-214 도 방이 이미 앞서 갔으면 바로 따라붙는다
+        database.ref(`darkParties/${pid}/curStep`).once('value').then(s2 => {
+            const cur = s2.val();
+            if (cur != null && cur > nextStep) go();
         });
     }
 
@@ -4574,7 +4590,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
                 finishDarkRun();
                 return;
             }
-            if (!darkRun.solo && p.curStep != null && p.curStep > darkRun.step) darkRun.step = p.curStep;
+            const _hold = (typeof darkHoldHere === 'function') ? darkHoldHere() : darkRun.solo;
+            if (!_hold && p.curStep != null && p.curStep > darkRun.step) darkRun.step = p.curStep;
             renderDarkStep();
         });
     }
