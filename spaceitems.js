@@ -524,6 +524,11 @@ function giftUse(itemName) {
         g.slots = next;
     }
 
+    // 이 자리는 L 로 시작하고 속성을 바꿔도 L 로 남는다 (gift-slot.js 가 지킨다)
+    if (!Array.isArray(g.giftSlots)) g.giftSlots = [];
+    if (g.giftSlots.indexOf(next - 1) < 0) g.giftSlots.push(next - 1);
+    if (typeof window.giftSlotPin === 'function') { try { window.giftSlotPin(); } catch (e) { } }
+
     if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
     if (typeof addHistoryLog === 'function') {
         addHistoryLog(currentUser, '[' + GIFT + '] 자리 ' + next + '개째 …');
