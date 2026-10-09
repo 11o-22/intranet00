@@ -39,7 +39,19 @@ const GAP_MS = 8000;                // 줄과 줄 사이
 const PER_MIN = 6;                  // 1분에 올릴 수 있는 줄
 const QUEUE_MAX = 3;                // 쌓아 둘 줄
 
-const seen = {};                    // 다듬은 글 → 마지막으로 올린 때
+// ★ 새로고침해도 기억한다
+//   예전에는 이 표가 머릿속에만 있어서, 새로고침할 때마다 비워졌다.
+//   그러면 서버에 남아 있는 그 줄이 또 뜬다 — 「새로 들어가면 또 떠 있다」.
+const BOX = 'noticeSeen';
+function load() {
+    try {
+        const v = JSON.parse(localStorage.getItem(BOX) || '{}');
+        return (v && typeof v === 'object') ? v : {};
+    } catch (e) { return {}; }
+}
+function keep(o) { try { localStorage.setItem(BOX, JSON.stringify(o)); } catch (e) { } }
+
+const seen = load();                // 다듬은 글 → 마지막으로 올린 때
 let lastAt = 0;
 let recent = [];                    // 최근 1분에 올린 때들
 let dropped = 0, passed = 0;
@@ -59,13 +71,15 @@ function allow(text) {
     const k = key(text);
     if (!k) return false;
 
-    if (seen[k] && t - seen[k] < SAME_MS) { lastDrop = '같은 글 (' + k + ')'; return false; }
+    // 남의 시계가 앞서 있으면 「올린 때」가 앞날일 수 있다 — 어느 쪽으로 벌어졌든 센다
+    if (seen[k] && Math.abs(t - seen[k]) < SAME_MS) { lastDrop = '같은 글 (' + k + ')'; return false; }
     if (t - lastAt < GAP_MS) { lastDrop = '너무 잦음 (' + k + ')'; return false; }
     recent = recent.filter(function (x) { return t - x < 60000; });
     if (recent.length >= PER_MIN) { lastDrop = '1분에 ' + PER_MIN + '줄까지 (' + k + ')'; return false; }
 
     seen[k] = t; lastAt = t; recent.push(t);
-    Object.keys(seen).forEach(function (x) { if (t - seen[x] > SAME_MS * 3) delete seen[x]; });
+    Object.keys(seen).forEach(function (x) { if (Math.abs(t - seen[x]) > SAME_MS * 3) delete seen[x]; });
+    keep(seen);
     return true;
 }
 
@@ -98,6 +112,56 @@ function allow(text) {
 })();
 
 // ==========================================
+// 5. 올리는 쪽에도 문을 단다 — 서버에 기억시킨다
+// ==========================================
+//
+// 위의 막기는 **보는 쪽** 둑이다. 올리는 사람 창에서는 여전히 1분마다
+// 새 줄이 올라가고, 그걸 처음 보는 사람(갓 들어온 사람)에게는 새 소식이다.
+// 그래서 올리는 자리에도 문을 단다. 문은 서버에 둔다 — 누구 창에서
+// 올리든, 새로고침을 하든 같은 문이 걸린다.
+//
+// 열쇠는 글자를 다듬어 숫자로 접은 것이다. 이름이 들어가므로 사람마다 다르다.
+function hash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(36);
+}
+
+function gate(text) {
+    if (typeof database === 'undefined' || !database) return Promise.resolve(true);
+    const ref = database.ref('noticeGate/' + hash(key(text)));
+    return ref.once('value').then(function (s) {
+        const v = s.val(), t = Date.now();
+        // 남의 시계가 앞서 있으면 앞날로 적힐 수 있다 — 어느 쪽으로 벌어졌든 센다
+        if (v && v.at && Math.abs(t - v.at) < SAME_MS) return false;
+        return ref.set({ at: t, by: (currentUser && currentUser.name) || '' }).then(function () { return true; });
+    }).catch(function () { return true; });          // 문을 못 열어도 소식은 막지 않는다
+}
+
+(function hookSend() {
+    const iv = setInterval(function () {
+        if (typeof pregBroadcast !== 'function') return;
+        if (pregBroadcast._gate) { clearInterval(iv); return; }
+        const _b = pregBroadcast;
+        pregBroadcast = function (text) {
+            const self = this, args = arguments;
+            gate(text).then(function (ok) {
+                if (!ok) {
+                    console.warn('[알림띠] 방금 올라간 소식이라 안 올립니다 — '
+                        + String(text).replace(/<[^>]*>/g, ''));
+                    return;
+                }
+                try { _b.apply(self, args); } catch (e) { console.warn('[알림띠]', e); }
+            });
+        };
+        pregBroadcast._gate = true;
+        clearInterval(iv);
+        console.log('[알림띠] 올리는 쪽 문 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 30000);
+})();
+
+// ==========================================
 // 확인 · 치우기
 // ==========================================
 window.noticeState = function () {
@@ -117,6 +181,8 @@ window.noticeState = function () {
 window.noticeClear = function () {
     if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
     if (typeof database === 'undefined' || !database) return;
+    try { localStorage.removeItem(BOX); } catch (e) { }
+    Object.keys(seen).forEach(function (k) { delete seen[k]; });
     database.ref('notices').set(null).then(function () {
         try { if (typeof noticeQueue !== 'undefined') noticeQueue.length = 0; } catch (e) { }
         if (typeof window.tickerFold === 'function') window.tickerFold();
