@@ -6216,6 +6216,13 @@ if (bcEl) {
                         const hasMats3 = typeof hasThirdMats === 'function' && hasThirdMats();
             const hasSlot3 = (currentUser.inventory || []).includes('세 번째 자리');
             const canMake3 = hasMats3 && !hasSlot3 && (myGear.slots || 1) === 2;
+                        // 확정 승인서 — 재료는 guarantee-fix.js 가 갈아끼울 수 있으니
+                        // 레시피에서 읽는다. 소모품이라 이미 가지고 있어도 또 만들 수 있다.
+            const guarR = (typeof CRAFT_RECIPES !== 'undefined')
+                ? CRAFT_RECIPES.find(x => x.id === 'guarantee') : null;
+            const guarMats = (guarR && guarR.mats) || [];
+            const canGuar = guarMats.length > 0
+                && guarMats.every(m => (currentUser.inventory || []).includes(m));
 
             html += `
                 <div style="background:linear-gradient(145deg,#1d1730,#120e1f); border:1px solid #6a4c93; padding:13px; margin-bottom:14px; border-radius:8px; box-shadow:0 3px 10px rgba(106,76,147,0.25);">
@@ -6239,6 +6246,7 @@ if (bcEl) {
                         
                         ${hasAllMats && !hasSlotItem && (myGear.slots || 1) === 1 ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#6a4c93,#4a2c73); color:#fff;" onclick="combineSecondSlot()">두 번째 자리 조합</button>` : ''}
                         ${canMake3 ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#8a3c93,#5a1c73); color:#fff;" onclick="combineThirdSlot()">세 번째 자리 조합</button>` : ''}
+                        ${canGuar ? `<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#4c5a93,#2c2c73); color:#fff;" onclick="doCraft('guarantee')">확정 승인서 조합</button>` : ''}
                     </div>
                 </div>
                 
