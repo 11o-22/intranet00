@@ -216,7 +216,10 @@ window.mjJoinUI = function (id) {
     busy('앉는 중');
     try {
         window.mjJoin(id).then(function (ok) {
-            if (!ok) { showCustomAlert('그 자리에는 앉을 수 없습니다.'); lobby(); return; }
+            if (!ok) {
+                showCustomAlert(window._mjJoinWhy || '그 자리에는 앉을 수 없습니다.\n\n잠시 뒤에 다시 해 주세요.');
+                lobby(); return;
+            }
             waitAndPaint('앉았습니다.');
         }).catch(function (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); });
     } catch (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); }

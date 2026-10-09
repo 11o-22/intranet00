@@ -66,9 +66,26 @@ const WINDS = [27, 28, 29, 30];      // 동 남 서 북
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function now() { return Date.now(); }
+// ★ 트랜잭션에 걸기 전에 **서버 값을 한 번 읽어 둔다.**
+//
+//   파이어베이스는 트랜잭션 함수를 먼저 **내 쪽에 남아 있는 값**으로 한 번
+//   돌려 본다. 그 자리를 한 번도 읽어 본 적이 없으면 그 값은 null 이다.
+//   아래 함수들은 하나같이 `if (!t) return;` 으로 시작하는데, undefined 를
+//   돌려주면 그것은 「그만둔다」는 뜻이다. 서버에 닿아 보지도 못하고 끝난다.
+//
+//   남이 만든 자리에 앉으려 할 때 그 자리를 읽은 적이 없으니 늘 null 이었다.
+//   그래서 「그 자리에는 앉을 수 없습니다」가 떴다. 패를 가져오고 버리는
+//   것도 같은 길을 쓰므로 판에 붙기 전에는 전부 같은 꼴이었다.
+//
+//   먼저 once('value') 로 읽어 두면 그 값이 내 쪽에 남아, 트랜잭션의
+//   첫 굴림부터 진짜 자료를 본다. (cage.js 가 같은 데 걸렸던 적이 있다)
 function tx(path, fn) {
-    if (typeof txRetry === 'function') return txRetry(path, fn);
-    return db_().ref(path).transaction(fn);
+    const d = db_();
+    if (!d) return Promise.resolve({ committed: false, snapshot: null });
+    return d.ref(path).once('value').catch(function () { return null; }).then(function () {
+        if (typeof txRetry === 'function') return txRetry(path, fn);
+        return d.ref(path).transaction(fn, null, false);
+    });
 }
 function clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
 function arr(v) {
@@ -137,12 +154,14 @@ window.mjMake = makeTable;
 function joinTable(id) {
     const u = me();
     if (!u || !db_()) return Promise.resolve(false);
+    window._mjJoinWhy = '';
     return tx(ROOT + '/' + id, function (t) {
-        if (!t) return;
-        if (t.state !== 'WAIT') return;
+        if (!t) { window._mjJoinWhy = '그 자리가 없어졌습니다.'; return; }
+        if (t.state !== 'WAIT') { window._mjJoinWhy = '벌써 시작한 판입니다.'; return; }
         const s = arr(t.seats);
-        if (s.some(function (x) { return x && x.code === u.code; })) return t;      // 이미 앉아 있다
-        if (s.length >= t.players) return;
+        if (s.some(function (x) { return x && x.code === u.code; })) { window._mjJoinWhy = ''; return t; }
+        if (s.length >= t.players) { window._mjJoinWhy = '자리가 다 찼습니다.'; return; }
+        window._mjJoinWhy = '';
         s.push({ code: u.code, name: u.name });
         t.seats = s;
         t.scores = t.scores || {};
