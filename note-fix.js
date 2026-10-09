@@ -227,6 +227,11 @@ function reconcile(u, quiet) {
     return r.added + r.removed;
 }
 
+// 한 사람 것만 맞춘다 — 밖(caretaker.js)에서 쓴다. 고친 줄 수를 돌려준다.
+window.noteReconcileOne = function (u) {
+    try { return reconcile(u, true); } catch (e) { return 0; }
+};
+
 // 남의 것도 맞춘다 — 상담사
 window.noteFixFor = function (who) {
     if (!currentUser || currentUser.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
