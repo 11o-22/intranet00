@@ -59,16 +59,40 @@ const RIBBON = '빨간 리본';
 //
 // 아래 표에 「문구 조각 → 아직 살아 있는가」를 적어 둔다.
 // 살아 있지 않으면 그 줄을 걷어낸다. 새 물건이 생기면 한 줄 더 넣으면 된다.
+// 줄이 없으면 버프에서 되살릴 물건들
+const BUFF_NOTE = ['달빛', '은화 뱀'];
+const EFF_NAME = { luck: '행운', bon: '판정', eva: '회피', fac: '공용시설 이용', gim: '기믹 파훼' };
+
+// itemBuffs 안에 그 물건(src)이 아직 살아 있나 — 효과 종류(k)까지 맞춰 볼 수 있다
+function liveBuff(u, src, k) {
+    const l = u && u.itemBuffs;
+    if (!Array.isArray(l)) return false;
+    const t = Date.now();
+    return l.some(function (b) {
+        if (!b || b.src !== src) return false;
+        if (k && b.k !== k) return false;
+        return b.run || (b.until || 0) > t;
+    });
+}
+
 const EXPIRY = [
     { mark: '[탈모약]', live: function (u) { return (u.hairUntil || 0) > Date.now(); } },
     { mark: '[인형]',   live: function (u) { return (u.dollPt || 0) > Date.now(); } },
     { mark: '종이배',   live: function (u) { return (u.paperBoat || 0) > 0; } },
-    // 달빛 타투는 itemBuffs 에 들어간다 — 그 묶음이 비면 지운다
-    { mark: '[달빛]',   live: function (u) {
-        const l = u.itemBuffs;
-        if (!Array.isArray(l)) return false;
-        const t = Date.now();
-        return l.some(function (b) { return b && (b.run || (b.until || 0) > t); });
+    // 달빛 타투 — 세 가지가 들어가는 칸이 서로 다르다.
+    //   행운 +300 · 기믹 파훼 1회   itemBuffs (src '달빛')
+    //   다음 탐사 +10,000P          darkPtPend (다음 정산 때 빠진다)
+    // 예전에는 itemBuffs 에 「아무거나」 살아 있으면 산 것으로 봤다.
+    // 그래서 ① 10,000P 를 뽑은 사람은 버프가 없어 바로 지워지고,
+    //       ② 다른 물건 버프가 있는 사람은 달빛이 끝나도 안 지워졌다.
+    { mark: '[달빛]',   live: function (u, note) {
+        if (/탐사/.test(note || '')) return (u.darkPtPend || 0) > 0;
+        return liveBuff(u, '달빛');
+    } },
+    // 은화 뱀 — 24시간. 어느 효과가 걸렸는지는 글줄로 가른다.
+    { mark: '[은화 뱀]', live: function (u, note) {
+        const want = /행운/.test(note) ? 'luck' : /판정/.test(note) ? 'bon' : /공용시설/.test(note) ? 'fac' : null;
+        return liveBuff(u, '은화 뱀', want);
     } },
     // 감금실 — 풀려나면 지운다. cage.js 가 붙이기만 하던 줄이다.
     { mark: '[감금실]', live: function (u) {
@@ -86,7 +110,7 @@ function expired(u, note) {
         const e = EXPIRY[i];
         if (note.indexOf(e.mark) < 0) continue;
         let ok = false;
-        try { ok = !!e.live(u); } catch (err) { ok = true; }   // 못 재면 남겨 둔다
+        try { ok = !!e.live(u, note); } catch (err) { ok = true; }   // 못 재면 남겨 둔다
         return !ok;
     }
     return false;
@@ -160,6 +184,22 @@ function fixNotes(u) {
     for (let k = keep.length; k < worn.length; k++) {          // 모자라면 보탠다
         keep.push('[장착됨] ' + worn[k]);
     }
+
+    // --- 달빛 타투 · 은화 뱀 : 살아 있는 버프에 줄이 없으면 적는다 ---
+    //     예전에 쓴 사람들은 줄이 아예 안 적혔다. 버프는 살아 있으니 거기서 되살린다.
+    BUFF_NOTE.forEach(function (src) {
+        const t = Date.now();
+        (Array.isArray(u.itemBuffs) ? u.itemBuffs : []).forEach(function (b) {
+            if (!b || b.src !== src) return;
+            if (!(b.run || (b.until || 0) > t)) return;
+            const label = EFF_NAME[b.k];
+            if (!label) return;
+            const head = '[' + src + '] ' + label;
+            // 적는 쪽 글귀가 「기믹 파훼 1회」처럼 다를 수 있다 — 머리만 맞으면 있는 것으로 본다
+            if (out.some(function (x) { return x.indexOf(head) === 0; })) return;
+            out.push(head + ' +' + b.v);
+        });
+    });
 
     // --- 노예 계약 : 기간이 남았으면 한 줄 ---
     const live = (u.slaveUntil && Date.now() < u.slaveUntil) || u.slaveFixed;

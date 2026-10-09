@@ -434,6 +434,17 @@ function spendGuarantee(src) {
         }
         saveFields({ paperBoat: 1 });
 
+    } else if (src === '포승줄') {
+        // 열 번 쓰면 끊어진다 — totalSpend 가 물품칸·장착칸까지 비워 준다
+        const r = totalSpend('포승줄', 10);
+        if (r.gone) {
+            if (typeof stripNoteByItem === 'function') stripNoteByItem(u, '포승줄');
+            removeBadgeLine(u, '포승줄');
+            setTimeout(function () { showCustomAlert('포승줄이 끊어졌습니다.'); }, 900);
+        } else {
+            setTimeout(function () { showCustomAlert('포승줄이 한 가닥 풀렸습니다.\n\n남은 횟수 ' + r.left + '회'); }, 900);
+        }
+
     } else if (src === '통신 단추') {
         u.buttonUses = Math.max(0, (u.buttonUses | 0) - 1);
         if (u.buttonUses === 0) {
@@ -1688,6 +1699,10 @@ const SELF = {
         }
         const p = SNAKE[Math.floor(Math.random() * SNAKE.length)];
         ibAdd(currentUser, p.k, p.v, 24 * HOUR, '은화 뱀');
+        // 같은 효과는 한 줄만 — 특이사항은 ' | ' 로 잇는다 (removeBadgeLine 은 <br>·줄바꿈용)
+        if (typeof stripNoteByItem === 'function') stripNoteByItem(currentUser, '[은화 뱀] ' + p.t);
+        appendBadgeNoteToUser(currentUser, '[은화 뱀] ' + p.t);
+        saveSelfFull();
         addHistoryLog(currentUser, '[은화 뱀] ' + p.t);
         showCustomAlert('비늘이 한 번 울었습니다.\n\n' + p.t + '\n\n남은 횟수 '
             + dayLeft(currentUser, nm, 3) + '회');
