@@ -136,6 +136,15 @@ function paintBtn() {
 
 // 격리 칸은 updateUI 가 다시 그린다 — 그때마다 도로 붙인다
 setInterval(function () { try { paintBtn(); } catch (e) { } }, 900);
+// 울까 말까 하는 동안 남은 초를 적어 준다 (판 전체를 다시 그리지는 않는다)
+setInterval(function () {
+    try {
+        const el = document.getElementById('mj-left');
+        if (!el || typeof window.mjClaimLeft !== 'function') return;
+        const n = String(window.mjClaimLeft());
+        if (el.textContent !== n) el.textContent = n;
+    } catch (e) { }
+}, 1000);
 setInterval(function () {
     if (!inside() || !window.mjListTables) return;
     window.mjListTables().then(function (l) {
@@ -257,6 +266,8 @@ function ui() {
     border:1px solid #2f7d5c; flex:none;
 }
 .mj-plate.mj-turn .mj-wd { background:#5a4512; color:#ffd76a; border-color:#ffd76a; }
+/* 친(장) — 이 국의 선. 동1국이면 처음 만든 자리가 친이다 */
+.mj-plate .mj-wd.mj-oya { background:#6b2a2a; color:#ffb4a2; border-color:#d4664f; }
 .mj-plate .mj-ri { color:#ff8a65; font-weight:700; }
 
 /* 이름표는 눕히지 않는다 — 상 네 귀에 바로 세워 둔다 */
@@ -298,11 +309,21 @@ function ui() {
     flex:none; background:rgba(0,0,0,0.33); border-top:1px solid rgba(255,255,255,0.09);
     padding:7px 7px 9px;
 }
-#mj-mine-c { flex:1; min-width:0; }
+/* 손패 줄 — 왼쪽에 손패, 오른쪽에 후로.
+   후로를 손패 위에 두면 버린 패와 헷갈린다. */
+.mj-row2 { display:flex; align-items:flex-end; gap:8px; }
+#mj-mine-c { flex:1 1 auto; min-width:0; }
+.mj-mymelds { flex:none; }
+.mj-mymelds .mjt { width:15px; height:20px; border-radius:2px; }
+.mj-mymelds .mj-melds { gap:5px; }
 #mj-hand { display:flex; justify-content:center; align-items:flex-end; gap:2px; flex-wrap:nowrap; }
+/* 리치를 걸려고 고르는 중 — 못 버리는 패는 죽이고, 버릴 수 있는 패만 살린다 */
+#mj-hand .mj-h.mj-off { opacity:0.28; filter:grayscale(1); }
+#mj-hand .mj-h.mj-pick .mjt { box-shadow:0 0 0 2px #ff8a65, 0 2px 4px rgba(0,0,0,0.5); }
 /* 손패는 열넉 장이 한 줄에 들어가야 한다 — 판 너비에 맞춰 줄인다.
    --mj-w 는 눕혔을 때까지 셈해서 넣어 준다 (100vw 는 눕히면 틀린 값이다) */
-#mj-hand .mjt { width:clamp(19px, calc((var(--mj-w, 100vw) - 34px) / 14.7), 34px); height:auto; aspect-ratio:36/48; }
+#mj-hand .mjt { width:clamp(17px, calc((var(--mj-w, 100vw) - 34px - var(--mj-mw, 0px)) / 14.7), 34px);
+               height:auto; aspect-ratio:36/48; }
 #mj-hand .mj-h {
     background:none; border:0; padding:0; margin:0; cursor:pointer; line-height:0;
     transition:transform 0.08s;
@@ -327,12 +348,13 @@ function ui() {
 /* 세로보다 키가 많이 낮다. 가운데 알림판은 머리띠로 올리고,
    버린 패를 한 치수 줄이고, 아래칸을 한 줄로 눕힌다. */
 .mj-wide #mj-mine { display:flex; align-items:flex-end; gap:10px; padding:5px 9px 7px; }
-.mj-wide #mj-mine .mj-mymelds { margin:0 0 3px 0; }
+.mj-wide .mj-row2 { flex:1 1 auto; min-width:0; }
+.mj-wide #mj-acts { flex:none; }
 .mj-wide #mj-acts { margin-top:0; max-width:46%; justify-content:flex-end; }
 .mj-wide #mj-acts button { padding:7px 11px; font-size:11px; }
 .mj-wide #mj-hint { margin-top:3px; }
 .mj-wide #mj-hand .mjt {
-    width:clamp(19px, calc((var(--mj-w, 100vw) - 330px) / 14.7), 40px);
+    width:clamp(18px, calc((var(--mj-w, 100vw) - 372px - var(--mj-mw, 0px)) / 14.7), 38px);
 }
 
 /* --- 글 칸 --- */
@@ -631,7 +653,8 @@ function face(code) {
 function plate(x, score, wind, turn, riichi, where, cnt) {
     return '<div class="mj-plate' + (turn ? ' mj-turn' : '') + ' ' + (PL[where] || '') + '">'
         + face(x.code)
-        + '<span class="mj-wd">' + wind + '</span>'
+        + '<span class="mj-wd' + (wind === '東' ? ' mj-oya' : '') + '"'
+        + (wind === '東' ? ' title="친(장) — 이 국의 선"' : '') + '>' + wind + '</span>'
         + '<span class="mj-nm">' + esc(x.name) + '</span>'
         + '<span class="mj-sc">' + (Number(score) || 0).toLocaleString() + '</span>'
         + (cnt ? '<span class="mj-cnt">🀫' + cnt + '</span>' : '')
@@ -663,6 +686,8 @@ function midHTML(t, h, mySeat, n) {
     return '<div class="mj-mid3">'
         + '<div class="mj-r1">동 ' + t.kyoku + '국</div>'
         + '<div class="mj-r2">' + ((t.honba || 0) ? t.honba + '본장 · ' : '') + left + '장'
+        + '<br>장풍 <b style="color:#ffd76a;">東</b>'
+        + ' · 내 자풍 <b style="color:#ffd76a;">' + windOf(mySeat, t.kyoku, n) + '</b>'
         + ((t.sticks || 0) ? '<br>리치봉 ' + t.sticks : '') + '</div>'
         + (di.length ? '<div class="mj-dora">' + di.map(function (x) {
             return T(window.mjDoraOf(x), 's');
@@ -768,20 +793,37 @@ function mineHTML(t, h, s, u) {
     }
     hand.sort(function (a, b) { return a - b; });
 
-    let o = '<div id="mj-mine">';
-    const melds = meldsHTML(s.melds, 'm');
-    if (melds) o += '<div class="mj-mymelds" style="margin-bottom:6px;">' + melds + '</div>';
+    // 리치를 걸려고 고르는 중이면, **텐파이가 남는 패만** 누를 수 있다.
+    // 예전에는 아무 패나 눌렸고, 텐파이가 안 남으면 서버가 말없이 물렸다.
+    const arming = !!window._mjRiichiArm;
+    const okForRiichi = function (tile) {
+        const a = (drawn != null ? hand.concat([drawn]) : hand.slice());
+        const i = a.indexOf(tile); if (i < 0) return false;
+        a.splice(i, 1);
+        return window.mjShanten(a, s.melds.length) === 0;
+    };
 
-    o += '<div id="mj-mine-c"><div id="mj-hand">';
+    // 후로는 손패 **오른쪽**에 붙인다 (위에 두면 버린 패로 보인다).
+    // 손패 너비는 후로가 먹는 자리를 빼고 셈한다.
+    const meldTiles = s.melds.reduce(function (a, m) { return a + arr(m.tiles).length; }, 0);
+    const meldW = meldTiles ? (meldTiles * 15 + s.melds.length * 6 + 8) : 0;
+
+    let o = '<div id="mj-mine"><div class="mj-row2">';
+    o += '<div id="mj-mine-c"><div id="mj-hand"'
+        + (meldW ? ' style="--mj-mw:' + meldW + 'px;"' : '') + '>';
     hand.forEach(function (tile) {
-        o += '<button class="mj-h"' + (canDiscard ? '' : ' disabled')
-            + (canDiscard ? ' onclick="mjDiscardUI(' + tile + ')"' : '')
+        const no = arming && !okForRiichi(tile);
+        o += '<button class="mj-h' + (arming ? (no ? ' mj-off' : ' mj-pick') : '') + '"'
+            + ((canDiscard && !no) ? '' : ' disabled')
+            + ((canDiscard && !no) ? ' onclick="mjDiscardUI(' + tile + ')"' : '')
             + '>' + T(tile, 'l') + '</button>';
     });
     if (drawn != null) {
+        const no = arming && !okForRiichi(drawn);
         o += '<span class="mj-gap"></span>'
-            + '<button class="mj-h"' + (canDiscard ? '' : ' disabled')
-            + (canDiscard ? ' onclick="mjDiscardUI(' + drawn + ')"' : '')
+            + '<button class="mj-h' + (arming ? (no ? ' mj-off' : ' mj-pick') : '') + '"'
+            + ((canDiscard && !no) ? '' : ' disabled')
+            + ((canDiscard && !no) ? ' onclick="mjDiscardUI(' + drawn + ')"' : '')
             + '>' + T(drawn, 'l', 'mjt-new') + '</button>';
     }
     o += '</div>';
@@ -798,6 +840,11 @@ function mineHTML(t, h, s, u) {
             : (sh + '샨텐'))
         + '</div></div>';
 
+    // 후로 — 손패 오른쪽
+    const melds = meldsHTML(s.melds, 'm');
+    if (melds) o += '<div class="mj-mymelds">' + melds + '</div>';
+    o += '</div>';                      // .mj-row2 닫기
+
     // 단추
     const acts = [];
     if (s.mine && s.phase === 'DRAW') acts.push(['패를 가져온다', 'mjDraw()', 'mj-go', '']);
@@ -812,29 +859,30 @@ function mineHTML(t, h, s, u) {
                 return window.mjShanten(a, 0) === 0;
             });
             if (can && ((t.scores || {})[u.code] || 0) >= 1000) {
-                acts.push([window._mjRiichiArm ? '리치 취소' : '리치',
-                    window._mjRiichiArm ? 'mjRiichiArm(0)' : 'mjRiichiArm()', 'mj-ri',
-                    window._mjRiichiArm ? '' : '버릴 패를 고릅니다']);
+                acts.push([arming ? '리치 취소' : '리치',
+                    arming ? 'mjRiichiArm(0)' : 'mjRiichiArm()', 'mj-ri',
+                    arming ? '' : '가져온 패를 버립니다']);
             }
         }
     }
     const cl = window.mjCanClaim();
     if (cl) {
+        const left = (typeof window.mjClaimLeft === 'function') ? window.mjClaimLeft() : 0;
         if (cl.ron) acts.push(['론', 'mjRonUI()', 'mj-go', cl.ron.han + '판 ' + (cl.ron.name || cl.ron.points)]);
         if (cl.kan) acts.push(['깡', "mjClaim('kan')", 'mj-cl', '']);
         if (cl.pon) acts.push(['폰', "mjClaim('pon')", 'mj-cl', '']);
         if (cl.chi) cl.chi.forEach(function (p, i) {
             acts.push(['치', 'mjChiUI(' + i + ')', 'mj-cl',
-                window.mjTileName(p[0]) + ' ' + window.mjTileName(p[1])]);
+                esc(window.mjTileName(p[0]) + ' ' + window.mjTileName(p[1]))]);
         });
-        acts.push(['넘긴다', 'mjPass()', 'mj-no', '']);
+        acts.push(['넘긴다', 'mjPass()', 'mj-no', '<span id="mj-left">' + left + '</span>초']);
     }
     if (t.last) acts.push(['지난 국', 'mjLastUI()', 'mj-no', '']);
     acts.push(['자리를 뜬다', 'mjLeaveUI()', 'mj-no', '']);
 
     o += '<div id="mj-acts">' + acts.map(function (a) {
         return '<button class="' + a[2] + '" onclick="' + a[1] + '">' + a[0]
-            + (a[3] ? '<span class="mj-sub">' + esc(a[3]) + '</span>' : '') + '</button>';
+            + (a[3] ? '<span class="mj-sub">' + a[3] + '</span>' : '') + '</button>';
     }).join('') + '</div>';
 
     o += '</div>';
@@ -890,7 +938,27 @@ window.mjDiscardUI = function (tile) {
     if (window._mjRiichiArm) { window._mjRiichiArm = false; window.mjRiichi(tile); return; }
     window.mjDiscard(tile);
 };
-window.mjRiichiArm = function (v) { window._mjRiichiArm = (v === 0) ? false : true; repaint(); };
+// ★ 리치 — 보통은 **가져온 패를 그대로** 버린다 (쯔모기리 리치).
+//   그 패를 버려도 텐파이가 남을 때만 곧장 건다. 안 남으면 그때만
+//   고르게 하되, **텐파이가 남는 패만** 누를 수 있다. (예전에는 아무
+//   패나 눌렸고, 텐파이가 깨지면 서버가 말없이 물렸다)
+window.mjRiichiArm = function (v) {
+    if (v === 0) { window._mjRiichiArm = false; repaint(); return; }
+    const s = window.mjMy && window.mjMy();
+    const h = s && s.h;
+    if (s && h && s.mine && s.phase === 'DISCARD' && h.drawn != null
+        && s.hand.indexOf(h.drawn) >= 0 && !s.melds.length) {
+        const a = s.hand.slice();
+        a.splice(a.indexOf(h.drawn), 1);
+        if (window.mjShanten(a, 0) === 0) {          // 가져온 패를 버려도 텐파이
+            window._mjRiichiArm = false;
+            window.mjRiichi(h.drawn);
+            return;
+        }
+    }
+    window._mjRiichiArm = true;
+    repaint();
+};
 window.mjTsumoUI = function () { window.mjTsumo(); };
 window.mjRonUI = function () { window.mjClaim('ron'); };
 window.mjChiUI = function (i) {

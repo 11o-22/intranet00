@@ -52,7 +52,7 @@
 window.MJ_PLAY = {
     start: 25000,           // 시작 점수
     turnSec: 25,            // 한 차례에 주는 시간
-    claimSec: 6,            // 후로를 기다리는 시간
+    claimSec: 15,           // 후로(폰·치·깡·론)를 기다려 주는 시간
     graceSec: 4,            // 이 시간이 더 지나면 아무나 떠밀 수 있다
     payout: 'diff'          // 'diff' 최종점수 − 시작점수를 포인트로 / 'none' 안 줌
 };
@@ -287,6 +287,13 @@ function fire() {
     catch (e) { window._mjLastError = String((e && e.message) || e); console.error('[마작] 화면 그리기', e); }
 }
 
+// tick 은 자료가 바뀔 때만 돌았다. 그래서 「아무도 아무것도 안 하면」
+// 기다림이 영영 안 끝났다. 앉아 있는 동안 1초에 한 번 떠민다.
+setInterval(function () {
+    if (!cur || !cur.t) return;
+    try { tick(); } catch (e) { }
+}, 1000);
+
 // 들어오면 내가 앉아 있던 자리를 찾아 붙는다
 (function rejoin() {
     const iv = setInterval(function () {
@@ -455,29 +462,29 @@ function claim(kind, tiles) {
 window.mjClaim = claim;
 window.mjPass = function () { return claim('pass'); };
 
-// 내가 지금 할 수 있는 후로
-function claimable() {
-    const s = myState();
-    if (!s || !s.h || s.h.phase !== 'CLAIM' || !s.h.last) return null;
-    const t = s.t, h = s.h, u = me();
-    if (h.last.by === s.seat) return null;
-    if (h.claims && h.claims[u.code]) return null;
+// 어느 자리가 지금 버린 패로 할 수 있는 후로 — 자리 번호로 묻는다.
+// 내 것만 보던 것을 **아무 자리나** 볼 수 있게 바꿨다. 기다릴 사람이
+// 정말 있는지 tick 이 알아야 하기 때문이다. (아래 claim 창 설명 참고)
+function claimsFor(t, h, seat) {
+    if (!h || h.phase !== 'CLAIM' || !h.last) return null;
+    const code = codeAt(t, seat);
+    if (!code || seat === h.last.by) return null;
     const tile = h.last.tile;
-    const hand = s.hand;
+    const hand = arr(h.hands && h.hands[code]);
+    const melds = arr(h.melds && h.melds[code]);
     const c = {};
     const cnt = hand.filter(function (x) { return x === tile; }).length;
 
     // 론
-    if (window.mjShanten(hand.concat([tile]), s.melds.length) === -1 && !furiten(t, h, u.code, hand, s.melds)) {
-        const r = window.mjScore(winArgs(t, h, u.code, tile, false));
+    if (window.mjShanten(hand.concat([tile]), melds.length) === -1 && !furiten(t, h, code, hand, melds)) {
+        const r = window.mjScore(winArgs(t, h, code, tile, false));
         if (r && r.ok) c.ron = r;
     }
-    if (!(h.riichi && h.riichi[u.code])) {
+    if (!(h.riichi && h.riichi[code])) {
         if (cnt >= 2) c.pon = [tile, tile];
         if (cnt >= 3) c.kan = [tile, tile, tile];
-        if (canChi(t) && ((s.seat - h.last.by + t.players) % t.players) === 1 && !window.mjTileName(tile).match(/[동남서북백발중]/)) {
+        if (canChi(t) && ((seat - h.last.by + t.players) % t.players) === 1 && tile < 27) {
             const opts = [];
-            const r = tile % 9;
             [[-2, -1], [-1, 1], [1, 2]].forEach(function (d) {
                 const a = tile + d[0], b = tile + d[1];
                 if (Math.floor(a / 9) !== Math.floor(tile / 9) || Math.floor(b / 9) !== Math.floor(tile / 9)) return;
@@ -488,6 +495,15 @@ function claimable() {
         }
     }
     return Object.keys(c).length ? c : null;
+}
+
+// 내가 지금 할 수 있는 후로
+function claimable() {
+    const s = myState();
+    if (!s || !s.h) return null;
+    const u = me();
+    if (s.h.claims && s.h.claims[u.code]) return null;
+    return claimsFor(s.t, s.h, s.seat);
 }
 window.mjCanClaim = claimable;
 
@@ -533,16 +549,48 @@ window.mjTsumo = tsumoWin;
 // ==========================================
 // 진행 — 차례마다 한 번씩 돈다
 // ==========================================
+// 울기 창이 열린 것을 **내가 처음 본 때** (기기 시계 차이를 타지 않게)
+const claimSeen = { key: '', at: 0 };
+window.mjClaimLeft = function () {
+    const t = cur && cur.t, h = t && t.h;
+    if (!h || h.phase !== 'CLAIM' || !h.last) return 0;
+    const key = h.last.by + '|' + h.last.tile + '|' + (h.last.at || 0);
+    if (claimSeen.key !== key) return P.claimSec;
+    return Math.max(0, Math.ceil((P.claimSec * 1000 - (now() - claimSeen.at)) / 1000));
+};
+
 function tick() {
     const u = me(); if (!u || !cur || !cur.t) return;
     const t = cur.t, h = t.h;
     if (t.state !== 'PLAY' || !h) return;
 
     if (h.phase === 'CLAIM') {
-        const age = now() - (h.turnAt || 0);
-        const others = arr(t.seats).filter(function (s, i) { return i !== h.last.by; });
-        const answered = others.every(function (s) { return h.claims && h.claims[s.code]; });
-        if (answered || age > P.claimSec * 1000) resolveClaims();
+        // ★ 「폰이 안 뜬다」의 자리였다.
+        //
+        //   예전에는 기다리는 시간을 now() − h.turnAt 으로 쟀다.
+        //   h.turnAt 은 **버린 사람의 시계**로 적힌 때다. 내 기기 시계가
+        //   몇 초만 앞서 있어도 창이 열리자마자 다 지난 것으로 보여
+        //   그 자리에서 닫혔다. 그러면 폰 단추는 한 번도 안 뜬다.
+        //
+        //   그리고 아무도 울 수 없는 평범한 버림에도 claimSec 만큼
+        //   멍하니 기다렸다. 그래서 두 가지를 바꿨다.
+        //
+        //     · 울 수 있는 사람이 하나도 없으면 **바로** 넘긴다 (빠르다)
+        //     · 울 수 있는 사람이 있으면, 기다린 시간을 **내 시계로만**
+        //       잰다 — 창이 열린 것을 내가 처음 본 때부터
+        let waiting = 0;
+        for (let i = 0; i < t.players; i++) {
+            if (i === h.last.by) continue;
+            const code = codeAt(t, i);
+            if (!code) continue;
+            if (h.claims && h.claims[code]) continue;       // 이미 답했다
+            try { if (claimsFor(t, h, i)) waiting++; } catch (e) { waiting++; }
+        }
+        if (!waiting) { resolveClaims(); return; }
+
+        const key = h.last.by + '|' + h.last.tile + '|' + (h.last.at || 0);
+        if (claimSeen.key !== key) { claimSeen.key = key; claimSeen.at = now(); }
+        if (now() - claimSeen.at > P.claimSec * 1000) resolveClaims();
         return;
     }
     // 차례인 사람이 굳었다 — 아무나 떠민다
@@ -796,6 +844,23 @@ window.mjState = function () {
 
 // 왜 자리가 안 만들어지나 — 처음부터 끝까지 한 번 해 보고 걸리는 데를 짚는다
 const OK = 'color:#4CAF50', NO = 'color:#f44336';
+// 자풍이 왜 그렇게 나오나 — 자리와 친을 적어 준다
+window.mjWinds = function () {
+    const t = cur && cur.t;
+    if (!t) { console.log('앉은 판이 없습니다.'); return; }
+    const n = t.players, W = ['東', '南', '西', '北'];
+    console.log('%c===== 자리와 바람 =====', 'color:#d4af37; font-size:13px');
+    console.log('  ' + t.kyoku + '국 · 장풍 東 · 친(선)은 ' + nameAt(t, dealerSeat(t)) + ' 입니다.');
+    console.table(arr(t.seats).map(function (s, i) {
+        return { 자리: i, 이름: s.name,
+                 자풍: W[((i - (t.kyoku - 1)) % n + n) % n],
+                 친: i === dealerSeat(t) ? 'O' : '',
+                 차례: t.h && t.h.turn === i ? '◀' : '' };
+    }));
+    console.log('  자풍은 국마다 한 자리씩 돕니다. 1국의 첫 자리가 東이고,'
+        + ' 2국이 되면 그 자리가 北으로 갑니다.');
+};
+
 window.mjWhy = function () {
     console.log('%c===== 🀄 마작이 되는지 =====', 'color:#ffd700; font-size:13px');
     console.log('  채점기:', typeof window.mjScore === 'function' ? 'O' : '✗',
