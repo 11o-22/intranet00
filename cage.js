@@ -173,10 +173,26 @@ function pairChanged(oldKey, oldBal) {
     }
 }
 
+// 트랜잭션 — 서로 겹쳐 밀리면(maxretry) 다시 걸고, 그래도 안 되면 읽고-고쳐-쓴다.
+// save-merge.js 의 txRetry 가 그 일을 한다. 없으면 맨 트랜잭션으로 돈다.
+// 어느 쪽이든 **약속(Promise)** 을 돌려주고, 터지면 committed:false 로 받는다.
+function tx(path, fn) {
+    if (typeof txRetry === 'function') {
+        return txRetry(path, fn).catch(function (e) {
+            console.warn('[감금실] ' + path + ' — 못 썼습니다', e);
+            return { committed: false, snapshot: null };
+        });
+    }
+    return database.ref(path).transaction(fn, null, false).catch(function (e) {
+        console.warn('[감금실] ' + path + ' — 못 썼습니다', e);
+        return { committed: false, snapshot: null };
+    });
+}
+
 function coAdd(u, amt, why, done) {
     const r = coRef(u);
-    if (!r || !amt) { if (done) done(false); return; }
-    r.transaction(function (cur) {
+    if (!r || !amt) { if (done) done(false); return Promise.resolve(false); }
+    return tx('houseBank/' + bankRefCode(u || currentUser), function (cur) {
         cur = cur || { bal: 0, log: [] };
         cur.bal = (cur.bal || 0) + amt;
         const log = Array.isArray(cur.log) ? cur.log : [];
@@ -184,7 +200,11 @@ function coAdd(u, amt, why, done) {
         while (log.length > 30) log.pop();
         cur.log = log;
         return cur;
-    }, function (err, ok) { if (done) done(!err && ok); }, false);
+    }).then(function (res) {
+        const ok = !!(res && res.committed);
+        if (done) done(ok);
+        return ok;
+    });
 }
 
 window.coBank = function () {
@@ -527,10 +547,12 @@ window.cageRun = function (k) {
 function settle(m, cb) {
     const done = function () { if (typeof cb === 'function') cb(); };
     if (!m || !m.code || typeof database === 'undefined' || !database) { done(); return; }
+    const path = 'users/' + m.code + '/cageUse';
 
-    let amt = 0, why = '', byCode = '';
-    database.ref('users/' + m.code + '/cageUse').transaction(function (u) {
-        amt = 0; why = ''; byCode = (u && u.by) || '';
+    let amt = 0, why = '', byCode = '', back = null;
+
+    tx(path, function (u) {
+        amt = 0; why = ''; byCode = (u && u.by) || ''; back = null;
         if (!u || !GEAR[u.k]) return u || null;          // 줄 것이 없다 — 그대로
         const g = GEAR[u.k];
         const end = Math.min(now(), u.until || 0);
@@ -544,37 +566,61 @@ function settle(m, cb) {
                     amt += CUFF_MIN + Math.floor(Math.random() * (CUFF_MAX - CUFF_MIN + 1));
                 }
                 why = g.n;
+                back = { k: 'paid', v: u.paid || 0 };        // 통장에 못 넣으면 되돌릴 값
                 u.paid = blocks;
             }
         } else if (u.k === 'milk') {
-            if (!u.done && now() >= (u.until || 0)) { amt = MILK_PAY; why = g.n; u.done = true; }
+            if (!u.done && now() >= (u.until || 0)) {
+                amt = MILK_PAY; why = g.n;
+                back = { k: 'done', v: false };
+                u.done = true;
+            }
         }
         return u;
-    }, function (err, ok, snap) {
+    }).then(function (res) {
         // 서버에 적힌 몫을 내 화면 사본에도 옮겨 둔다.
         // 안 옮기면 묵은 사본이 나중에 서버를 덮어써서 같은 몫을 또 준다.
         try {
-            const v = snap && snap.val ? snap.val() : null;
+            const v = res && res.snapshot && res.snapshot.val ? res.snapshot.val() : null;
             if (v && m.cageUse) { m.cageUse.paid = v.paid; m.cageUse.done = v.done; m.cageUse.cut = v.cut; }
         } catch (e) { }
 
-        if (!err && ok && amt > 0) {
-            // ★ 통장 자리는 **갇힌 쪽의 짝**으로 센다.
-            //   부르는 사람(상담사일 수도 있다) 기준으로 세면 엉뚱한 자리에 들어간다.
-            coAdd(m, amt, why);
+        if (!res || !res.committed || amt <= 0) { done(); return; }
+
+        // ★ 통장 자리는 **갇힌 쪽의 짝**으로 센다.
+        //   부르는 사람(상담사일 수도 있다) 기준으로 세면 엉뚱한 자리에 들어간다.
+        const cash = amt, note = why, keeperCode = byCode, undo = back;
+        return coAdd(m, cash, note).then(function (ok) {
+            if (!ok) {
+                // ★ 넣지 못했으면 「주었다」는 표를 도로 지운다.
+                //   안 지우면 그 몫은 영영 안 들어온다. 다음 셈에서 다시 준다.
+                console.warn('[감금실] 공용 통장에 못 넣어 ' + cash.toLocaleString() + ' P 를 되돌립니다.');
+                if (!undo) { done(); return; }
+                return tx(path, function (u) {
+                    if (!u) return u || null;
+                    u[undo.k] = undo.v;
+                    return u;
+                }).then(function () {
+                    if (m.cageUse) m.cageUse[undo.k] = undo.v;
+                    done();
+                });
+            }
             if (typeof addHistoryLog === 'function') {
-                const line = '[감금실] ' + why + ' — 공용 통장 +' + amt.toLocaleString() + ' P';
+                const line = '[감금실] ' + note + ' — 공용 통장 +' + cash.toLocaleString() + ' P';
                 try { addHistoryLog(m, line); } catch (e) { }
-                const keeper = byCode && (db.users || {})[byCode];
+                const keeper = keeperCode && (db.users || {})[keeperCode];
                 if (keeper && keeper !== m) { try { addHistoryLog(keeper, line); } catch (e) { } }
             }
-            const amIn = currentUser && (currentUser.code === m.code || currentUser.code === byCode);
+            const amIn = currentUser && (currentUser.code === m.code || currentUser.code === keeperCode);
             if (amIn && typeof showCustomAlert === 'function') {
-                showCustomAlert(why + ' 정산\n\n공용 통장에 ' + amt.toLocaleString() + ' P 가 들어왔습니다.');
+                showCustomAlert(note + ' 정산\n\n공용 통장에 ' + cash.toLocaleString() + ' P 가 들어왔습니다.');
             }
-        }
+            done();
+        });
+    }).catch(function (e) {
+        console.warn('[감금실] 정산이 막혔습니다', e);
         done();
-    }, false);
+    });
 }
 window.cageSettle = function (who) {                     // 손으로 정산 (살펴볼 때)
     const u = who ? find(who) : mate(currentUser);
