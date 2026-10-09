@@ -66,7 +66,7 @@ const WINDS = [27, 28, 29, 30];      // 동 남 서 북
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function now() { return Date.now(); }
-// ★ 트랜잭션에 걸기 전에 **서버 값을 한 번 읽어 둔다.**
+// ★ 트랜잭션을 거는 동안 그 자리를 **지켜보고 있어야 한다.**
 //
 //   파이어베이스는 트랜잭션 함수를 먼저 **내 쪽에 남아 있는 값**으로 한 번
 //   돌려 본다. 그 자리를 한 번도 읽어 본 적이 없으면 그 값은 null 이다.
@@ -77,15 +77,36 @@ function now() { return Date.now(); }
 //   그래서 「그 자리에는 앉을 수 없습니다」가 떴다. 패를 가져오고 버리는
 //   것도 같은 길을 쓰므로 판에 붙기 전에는 전부 같은 꼴이었다.
 //
-//   먼저 once('value') 로 읽어 두면 그 값이 내 쪽에 남아, 트랜잭션의
-//   첫 굴림부터 진짜 자료를 본다. (cage.js 가 같은 데 걸렸던 적이 있다)
+//   ★ once('value') 로는 모자란다. once 는 읽고 **바로 떼기** 때문에 그 값이
+//     내 쪽에 남지 않는다. 파이어베이스는 지켜보기가 붙어 있는 동안만 값을
+//     들고 있다. 그래서 once 로 읽어도 트랜잭션은 여전히 null 로 시작했다.
+//
+//     그래서 트랜잭션을 거는 동안만 **살아 있는 지켜보기**를 하나 붙여 둔다.
+//     첫 소식이 온 뒤에 걸고, 끝나면 뗀다. 그동안은 값이 내 쪽에 남아 있으므로
+//     첫 굴림부터 진짜 자료를 본다. (판에 붙은 뒤로는 watch 가 그 일을 한다.
+//      앉기 전에는 아무도 안 보고 있어서 앉기만 늘 실패했다.)
 function tx(path, fn) {
     const d = db_();
     if (!d) return Promise.resolve({ committed: false, snapshot: null });
-    return d.ref(path).once('value').catch(function () { return null; }).then(function () {
+    const ref = d.ref(path);
+    const run = function () {
         if (typeof txRetry === 'function') return txRetry(path, fn);
-        return d.ref(path).transaction(fn, null, false);
-    });
+        return ref.transaction(fn, null, false);
+    };
+    // 이미 그 자리를 지켜보고 있으면(판에 앉은 뒤) 값이 내 쪽에 있다 — 바로 건다
+    if (watchRef && cur && cur.id && path === ROOT + '/' + cur.id) return run();
+
+    let held = false, fired = false, go = null;
+    // 뗄 때 같은 함수를 넘겨야 떨어진다 — 그래서 하나로 둔다
+    const keep = function () { if (fired || !go) return; fired = true; go(); };
+    const drop = function () { if (!held) return; held = false; try { ref.off('value', keep); } catch (e) { } };
+
+    return new Promise(function (resolve) {
+        go = resolve;
+        try { ref.on('value', keep, keep); held = true; } catch (e) { keep(); }
+        setTimeout(keep, 4000);             // 소식이 안 와도 마냥 기다리지 않는다
+    }).then(run).then(function (r) { drop(); return r; },
+            function (e) { drop(); throw e; });
 }
 function clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
 function arr(v) {
@@ -603,7 +624,7 @@ function resolveClaims() {
         return t;
     }).then(function (r) {
         const t = r && r.snapshot && r.snapshot.val();
-        if (t && t.h && t.h._ron) doRon(t.h._ron, t);
+        if (t && t.h && t.h._ron) return doRon(t.h._ron, t);   // 약속을 돌려줘야 뒤가 기다린다
     });
 }
 
