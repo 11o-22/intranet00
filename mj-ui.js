@@ -30,6 +30,8 @@ const BTN = 'mj-enter-btn';
 const OV = 'mj-overlay';
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
+// 파이어베이스가 지운 빈 칸 — 없어도 그냥 빈 것으로 본다
+function bag(o, k) { return (o && typeof o === 'object' && o[k]) ? o[k] : null; }
 function arr(v) {
     if (Array.isArray(v)) return v.slice();
     if (v && typeof v === 'object') return Object.keys(v).map(function (k) { return v[k]; });
@@ -282,7 +284,7 @@ function paint(t) {
             + ' border:1px solid ' + (turn ? c : '#333') + ';">'
             + '<div style="font-size:10px; color:' + (turn ? c : '#ccc') + '; font-weight:bold; overflow:hidden; text-overflow:ellipsis;">'
             + (turn ? '▶' : '') + esc(x.name) + '</div>'
-            + '<div style="font-size:11px; color:#fff;">' + (t.scores[x.code] || 0) + '</div>'
+            + '<div style="font-size:11px; color:#fff;">' + ((t.scores || {})[x.code] || 0) + '</div>'
             + (ri ? '<div style="font-size:9px; color:#ff8a65;">리치</div>' : '')
             + '</div>';
     });
@@ -305,7 +307,7 @@ function paint(t) {
     // 남들이 버린 패
     arr(t.seats).forEach(function (x) {
         if (x.code === u.code) return;
-        const p = arr(h.pond[x.code]);
+        const p = arr(bag(h.pond, x.code));
         if (!p.length) return;
         o += '<div style="font-size:9px; color:#777; margin-bottom:2px;">' + esc(x.name) + '</div>'
             + '<div style="font-size:19px; line-height:1.25; margin-bottom:7px; word-break:break-all;">'
@@ -313,7 +315,7 @@ function paint(t) {
     });
 
     // 내가 버린 패
-    const mp = arr(h.pond[u.code]);
+    const mp = arr(bag(h.pond, u.code));
     if (mp.length) {
         o += '<div style="font-size:9px; color:' + c + '; margin-bottom:2px;">내가 버린 것</div>'
             + '<div style="font-size:19px; line-height:1.25; margin-bottom:9px; word-break:break-all;">'
@@ -361,7 +363,7 @@ function paint(t) {
                 const a = s.hand.slice(); a.splice(a.indexOf(x), 1);
                 return window.mjShanten(a, 0) === 0;
             });
-            if (can && (t.scores[u.code] || 0) >= 1000) acts.push(['리치 — 버릴 패를 고르세요', 'mjRiichiArm()', '#ff8a65']);
+            if (can && ((t.scores || {})[u.code] || 0) >= 1000) acts.push(['리치 — 버릴 패를 고르세요', 'mjRiichiArm()', '#ff8a65']);
         }
     }
     const cl = window.mjCanClaim();

@@ -89,9 +89,11 @@ function tx(path, fn) {
     const d = db_();
     if (!d) return Promise.resolve({ committed: false, snapshot: null });
     const ref = d.ref(path);
+    // 지워진 빈 칸을 세워서 넘긴다 — 안쪽 함수들이 h.pond 같은 것을 그냥 쓴다
+    const F = function (v) { return fn(norm(v)); };
     const run = function () {
-        if (typeof txRetry === 'function') return txRetry(path, fn);
-        return ref.transaction(fn, null, false);
+        if (typeof txRetry === 'function') return txRetry(path, F);
+        return ref.transaction(F, null, false);
     };
     // 이미 그 자리를 지켜보고 있으면(판에 앉은 뒤) 값이 내 쪽에 있다 — 바로 건다
     if (watchRef && cur && cur.id && path === ROOT + '/' + cur.id) return run();
@@ -108,6 +110,36 @@ function tx(path, fn) {
     }).then(run).then(function (r) { drop(); return r; },
             function (e) { drop(); throw e; });
 }
+// ★ 파이어베이스는 **빈 칸을 지운다.**
+//
+//   패를 돌리면 h.melds · h.pond · h.riichi · h.ippatsu 는 모두 빈 채로
+//   시작한다. 빈 배열은 지워지고, 그래서 그 묶음 자체도 통째로 없어진다.
+//   돌아온 자료에는 pond 라는 칸이 아예 없다. 그 뒤로
+//
+//       arr(h.pond[x.code])        ← h.pond 가 undefined
+//
+//   가 터진다. 「판을 그리다 터졌습니다」가 이것이었다.
+//
+//   지워진 빈 칸을 도로 세운다. 읽는 자리(watch)와 쓰는 자리(tx) 양쪽에서
+//   한 번씩 거치므로, 그 뒤로는 어디서든 그냥 써도 된다.
+function norm(t) {
+    if (!t || typeof t !== 'object') return t;
+    if (!t.scores) t.scores = {};
+    if (!t.seats) t.seats = [];
+    else if (!Array.isArray(t.seats)) t.seats = arr(t.seats);
+    const h = t.h;
+    if (h) {
+        ['hands', 'melds', 'pond', 'riichi', 'ippatsu', 'claims'].forEach(function (k) {
+            if (k === 'claims') return;                 // claims 는 없을 수 있다 (울음 창이 없을 때)
+            if (!h[k] || typeof h[k] !== 'object') h[k] = {};
+        });
+        ['wall', 'dead', 'doraInd', 'uraInd'].forEach(function (k) {
+            if (!Array.isArray(h[k])) h[k] = arr(h[k]);
+        });
+    }
+    return t;
+}
+
 function clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
 function arr(v) {
     if (Array.isArray(v)) return v.slice();
@@ -235,7 +267,7 @@ function watch(id) {
     cur = { id: id, t: null };
     watchRef = db_().ref(ROOT + '/' + id);
     watchRef.on('value', function (s) {
-        const t = s.val();
+        const t = norm(s.val());
         if (!t) { unwatch(); fire(); return; }
         cur.t = t;
         fire();
