@@ -46,6 +46,12 @@ function isIOS() {
     // 아이패드는 요즘 맥인 척한다
     return /Macintosh/.test(ua) && typeof document.ontouchend !== 'undefined';
 }
+// 손안의 것인가 — 글귀를 거기에 맞춘다
+function handheld() {
+    const ua = navigator.userAgent || '';
+    if (isIOS()) return true;
+    return /Android|Mobile|iPhone|iPad/.test(ua);
+}
 function isSafari() {
     const ua = navigator.userAgent || '';
     return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
@@ -136,8 +142,9 @@ function paintBtn() {
         '<div id="pwa-btn" style="margin-top:10px; text-align:center;">'
         + '<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;'
         + ' border-color:#4a5160 !important; color:#aaa !important;" onclick="pwaInstall()">'
-        + '홈 화면에 올리기</button>'
-        + '<div style="font-size:9px; color:#666; margin-top:4px;">주소창 없이 앱처럼 열립니다</div>'
+        + (handheld() ? '홈 화면에 올리기' : '앱으로 설치하기') + '</button>'
+        + '<div style="font-size:9px; color:#666; margin-top:4px;">'
+        + (handheld() ? '주소창 없이 앱처럼 열립니다' : '주소창 없는 제 창으로 열립니다') + '</div>'
         + '</div>');
 }
 setInterval(function () { try { paintBtn(); } catch (e) { } }, 1500);
@@ -152,13 +159,16 @@ function showHint(force) {
     }
     try { localStorage.setItem(HINT_KEY, '1'); } catch (e) { }
 
-    const ios = isIOS();
-    const msg = ios
+    const msg = isIOS()
         ? ('홈 화면에 올려 두면 앱처럼 쓸 수 있습니다.\n\n'
             + (isSafari() ? '' : '※ 먼저 사파리로 열어 주세요.\n\n')
             + '아래쪽 공유 단추 → 「홈 화면에 추가」')
-        : ('홈 화면에 올려 두면 앱처럼 쓸 수 있습니다.\n\n'
-            + '브라우저 메뉴(⋮) → 「앱 설치」 또는 「홈 화면에 추가」');
+        : handheld()
+        ? ('홈 화면에 올려 두면 앱처럼 쓸 수 있습니다.\n\n'
+            + '브라우저 메뉴(⋮) → 「앱 설치」 또는 「홈 화면에 추가」')
+        : ('앱으로 설치해 두면 주소창 없는 제 창으로 열립니다.\n\n'
+            + '주소창 오른쪽의 설치 아이콘(⊕), 또는\n'
+            + '브라우저 메뉴(⋮) → 「설치」');
     setTimeout(function () {
         try { showCustomAlert(msg); } catch (e) { }
     }, 2500);
@@ -185,7 +195,8 @@ function showHint(force) {
 window.pwaState = function () {
     console.log('%c===== 앱처럼 쓰기 =====', 'color:#d4af37; font-size:13px');
     console.log('  꽉 찬 화면으로 열림:', standalone() ? 'O' : '✗ (브라우저로 열려 있습니다)');
-    console.log('  기기:', isIOS() ? ('아이폰·아이패드' + (isSafari() ? ' · 사파리' : ' · 사파리가 아님')) : '그 밖');
+    console.log('  기기:', isIOS() ? ('아이폰·아이패드' + (isSafari() ? ' · 사파리' : ' · 사파리가 아님'))
+        : handheld() ? '안드로이드 등 손안의 것' : '피시');
     console.log('  설치 물어볼 수 있나:', waiting ? 'O — pwaInstall()' : '✗ (이미 올렸거나 브라우저가 안 물어봅니다)');
     if (!('serviceWorker' in navigator)) { console.log('  서비스 워커: 쓸 수 없는 브라우저'); return; }
     navigator.serviceWorker.getRegistrations().then(function (rs) {
