@@ -184,9 +184,20 @@ function fold() {
         if (head) head.remove();
         head = document.createElement('div');
         head.id = 'eq-fold-head';
-        head.style.cssText = 'display:flex; justify-content:space-between; align-items:center;'
-            + ' background:#241f14; border:1px solid #d4af37; border-radius:6px;'
-            + ' padding:9px 12px; margin-bottom:12px; cursor:pointer; user-select:none;';
+        // 밝은 벽지·밝은 테마에서 글씨가 안 보이던 자리다. 두 가지를 바꿨다.
+        //
+        //  1. style.cssText 가 아니라 setAttribute 로 넣는다.
+        //     cssText 로 넣으면 브라우저가 속성 글자를 rgb(...) 로 다시 적어서,
+        //     밝은 벽지가 어두운 바탕을 찾을 때 쓰는 [style*="background:#2"] 가
+        //     못 맞춘다. 그러면 바탕만 어둡게 남고 글씨는 벽지가 어둡게 바꿔
+        //     아무것도 안 보였다. (skin.js 의 SK_DARK_BG)
+        //
+        //  2. 글씨 색을 박아 둔다. 밝은 테마는 벽지와 달리 어두운 바탕을
+        //     밝히지 않고 글씨만 어둡게 바꾼다. 장착 중인 장비 카드처럼
+        //     색을 직접 적어 두면 어느 테마에서나 어두운 바탕에 밝은 글씨다.
+        head.setAttribute('style', 'display:flex; justify-content:space-between; align-items:center;'
+            + ' background:#241f14; border:1px solid #d4af37; border-radius:6px; color:#f3ead8;'
+            + ' padding:9px 12px; margin-bottom:12px; cursor:pointer; user-select:none;');
         head.addEventListener('click', function () {
             COLLAPSED = !COLLAPSED;
             remember();

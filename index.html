@@ -346,7 +346,7 @@
                     <span>PHOTO</span>
                 </div>
                 <div class="id-info-details">
-                    <div class="serial-row">SERIAL NO. <span id="display-no" style="font-weight:bold; color:inherit;">0000</span></div>
+                    <div class="serial-row"><span id="gift-slot"></span><span class="serial-text">SERIAL NO. <span id="display-no" style="font-weight:bold; color:inherit;">0000</span></span></div>
                     <div class="emp-name"><span id="display-name">사원이름</span> <span class="emp-role-tag" id="display-position">사원</span></div>
                    <div class="emp-meta"><span id="display-affiliation">본사</span> · <span id="display-team">기획 2팀</span><span id="display-gp"></span></div>
                    <div id="display-couple" style="display:none; font-size:11px; margin-top:4px;"></div>
@@ -5303,7 +5303,7 @@ if (user.code === 'kario0987') {
                 <div class="id-card-body">
                     <div class="id-avatar-mini">${photoSrc}</div>
                     <div class="id-info-details">
-                        <div class="serial-row">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></div>
+                        <div class="serial-row"><span class="serial-text">SERIAL NO. <span style="font-weight:bold;">${u.no}</span></span></div>
                         <div class="emp-name" style="color:#fff;">${u.name}${u.couple ? `<span style="color:${u.couple.hex}; margin-left:4px;">${u.couple.emoji}</span>` : ''} <span class="emp-role-tag">${u.position || '사원'}</span></div>
                          ${qb2 ? `<div style="font-size:10px; color:${qb2.color}; background:${qb2.bg}; border:1px solid ${qb2.color}; border-radius:3px; padding:3px 7px; font-weight:bold; margin-top:5px; display:inline-block;">${qb2.icon} ${qb2.label} · 약 ${qb2.remain} 남음</div>` : ''}
                         <div class="emp-meta">${u.affiliation || '본사'} · ${u.team}</div>

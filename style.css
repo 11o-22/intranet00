@@ -324,7 +324,10 @@
         .id-info-details .serial-row {
             font-size: 11px; font-family: monospace; color: #aaa; margin-bottom: 4px; text-align: right;
             border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px;
+            display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 20px;
         }
+        .id-info-details .serial-row .serial-text { white-space: nowrap; }
+        .id-info-details .serial-row #gift-slot { margin-right: auto; display: flex; align-items: center; }
         .id-info-details .emp-name { font-size: 20px; font-weight: bold; color: inherit; margin-bottom: 2px; }
         .id-info-details .emp-meta { font-size: 12px; color: #888; }
         .emp-role-tag { font-size: 11px; color: #ffd700; background: rgba(255, 215, 0, 0.12); padding: 2px 6px; border-radius: 3px; border: 1px solid rgba(255, 215, 0, 0.3); margin-left: 4px; display: inline-block;}

@@ -13,6 +13,15 @@
 //   물품 없이 **글만** 보낼 수도 있다. 공지·안내용이다.
 //   둘을 같이 보낼 수도 있다 (물품에 쪽지를 붙이는 셈).
 //
+// ■ 어디서 여나
+//
+//   사원증의 **SERIAL NO. 왼쪽**에 선물 상자 단추 하나가 늘 붙어 있다.
+//   누르면 선물함이 제 창으로 열린다. 받을 것이 있으면 단추에 숫자가 뜬다.
+//
+//   예전에는 소지품 탭 맨 위에 칸으로 붙였는데, 받을 것이 없으면 아예
+//   안 그려서 「선물함이 어디 있는지」 알 수가 없었다. 단추는 비어 있어도
+//   늘 보인다.
+//
 // ■ 어디에 쌓이나
 //
 //       gifts/<사번>/<번호> = {
@@ -38,6 +47,7 @@
 //   giftState(사번)        상담사 — 남의 선물함
 //   giftSend(사번, '제목', '내용')     글만 보내기
 //   giftSendItem(사번, '물품', 개수)   물품 보내기
+//   openGiftBox()          선물함 창 열기 (단추가 안 보일 때)
 
 (function giftBox() {
 
@@ -170,7 +180,7 @@ function findCode(who) {
                 clearAdminText();
                 showCustomAlert(n + '명의 선물함으로 보냈습니다.\n\n'
                     + picked.join(', ') + ' 각 ' + qty + '개\n\n'
-                    + '사원이 소지품 탭에서 받아야 들어갑니다.\n(' + names.join(', ') + ')');
+                    + '사원이 사원증의 🎁 단추에서 받아야 들어갑니다.\n(' + names.join(', ') + ')');
             });
         };
         adminGiveItem._gift = true;
@@ -205,7 +215,8 @@ function paintAdmin() {
         + '<div style="font-size:11px; color:#a5d6a7; font-weight:bold; margin-bottom:7px;">🎁 선물함 쪽지 · 공지</div>'
         + '<div style="font-size:10px; color:#888; line-height:1.7; margin-bottom:8px;">'
         + '물품과 함께 보내려면 적어 두고 위의 <b>물품 강제 꽂기</b>를 누르십시오.<br>'
-        + '글만 보내려면 아래 <b>글만 보내기</b>를 누르십시오.</div>'
+        + '글만 보내려면 아래 <b>글만 보내기</b>를 누르십시오.<br>'
+        + '사원은 사원증의 <b>🎁</b> 단추에서 받습니다.</div>'
         + '<input type="text" id="gift-admin-title" placeholder="제목 (없어도 됩니다)"'
         + ' style="width:100%; margin-bottom:6px; font-size:11px;">'
         + '<textarea id="gift-admin-text" placeholder="내용" rows="3"'
@@ -244,12 +255,13 @@ window.giftAdminSend = function () {
 };
 
 // ==========================================
-// 4. 사원 화면 — 선물함
+// 4. 사원 화면 — 사원증의 선물 상자 단추
 // ==========================================
-const BOX = 'gift-box';
+const BTN = 'gift-btn';
 let mine = {};              // 번호 → 내용
 let watching = '';
 let known = null;           // 처음 받아 온 뒤부터 새것을 알린다
+let opened = false;         // 선물함 창이 열려 있나 (받은 뒤 다시 그리려고)
 
 let wRef = null, wCb = null;        // 뗄 때 같은 것을 넘겨야 확실히 떨어진다
 
@@ -271,8 +283,8 @@ let wRef = null, wCb = null;        // 뗄 때 같은 것을 넘겨야 확실히
             }
             known = ids;
             mine = v;
-            paintBox();
-            paintDot();
+            paintBtn();
+            if (opened) paintList();            // 열어 둔 채로 새것이 오면 바로 보인다
         };
         wRef = d.ref(ROOT + '/' + u.code);
         wRef.on('value', wCb);
@@ -288,68 +300,96 @@ function tell(g, n) {
             showCustomAlert('🎁 선물함에 ' + what + '이(가) 도착했습니다.\n\n'
                 + who + ' 쪽에서 보냈습니다.'
                 + (n > 1 ? '\n(모두 ' + n + '건)' : '')
-                + '\n\n소지품 탭에서 받으실 수 있습니다.');
+                + '\n\n사원증의 🎁 단추에서 받으실 수 있습니다.');
         } catch (e) { }
     }, 900);
 }
 
 function count() { return Object.keys(mine || {}).length; }
 
-function paintDot() {
-    const tab = document.querySelector('[onclick*="rec-inventory"]');
-    if (!tab) return;
-    if (count()) tab.classList.add('notify-dot');
-    else tab.classList.remove('notify-dot');
+// --- 단추 — 사원증 SERIAL NO. 왼쪽. 비어 있어도 늘 보인다 ---
+function paintBtn() {
+    const slot = document.getElementById('gift-slot');
+    if (!slot) return;
+    if (!me()) { slot.innerHTML = ''; return; }
+    const n = count();
+    const want = '<button id="' + BTN + '" onclick="openGiftBox()" title="선물함"'
+        + ' style="position:relative; margin:0; padding:0; width:27px; height:23px; line-height:1;'
+        + ' font-size:13px; font-family:inherit; border:1px solid #d4af37; border-radius:5px;'
+        + ' background:rgba(212,175,55,0.10); color:#d4af37; cursor:pointer;'
+        + ' display:flex; align-items:center; justify-content:center;">🎁'
+        + (n ? '<span style="position:absolute; top:-6px; right:-6px; min-width:14px; height:14px;'
+            + ' padding:0 3px; box-sizing:border-box; border-radius:7px; background:#e53935;'
+            + ' color:#fff; font-size:9px; font-weight:bold; line-height:14px; text-align:center;'
+            + ' box-shadow:0 0 0 1px rgba(0,0,0,0.5);">' + (n > 9 ? '9+' : n) + '</span>' : '')
+        + '</button>';
+    if (slot.innerHTML !== want) slot.innerHTML = want;
 }
+setInterval(function () { try { paintBtn(); } catch (e) { } }, 1200);
 
-function paintBox() {
-    const panel = document.getElementById('rec-inventory');
-    const old = document.getElementById(BOX);
-    if (!panel) return;
-    if (!count()) { if (old) old.remove(); return; }
-
-    const ids = Object.keys(mine).sort(function (a, b) {
+// --- 창 ---
+function listHtml() {
+    const ids = Object.keys(mine || {}).sort(function (a, b) {
         return (mine[a].at || 0) - (mine[b].at || 0);
     });
+    if (!ids.length) {
+        return '<div style="font-size:11px; color:#888; line-height:1.8; padding:18px 2px; text-align:center;">'
+            + '선물함이 비어 있습니다.<br>상담사가 보낸 물품과 전할 말이 여기에 쌓입니다.</div>';
+    }
 
-    let h = '<div id="' + BOX + '" style="border:1px solid #d4af37; border-radius:7px; padding:12px;'
-        + ' background:rgba(212,175,55,0.07); margin-bottom:14px;">'
-        + '<div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:9px;">'
-        + '🎁 선물함 <span style="font-size:10px; color:#ffd76a;">' + ids.length + '건</span></div>';
+    let h = '<div style="font-size:11px; color:#aaa; line-height:1.7; margin-bottom:11px;">'
+        + '받을 것 <b style="color:#d4af37;">' + ids.length + '</b>건. 받으면 소지품으로 들어가고'
+        + ' 내용은 기록에 남습니다.</div>';
 
     ids.forEach(function (id) {
         const g = mine[id] || {};
         const pairs = itemPairs(g);
-        h += '<div style="background:rgba(0,0,0,0.3); border-radius:6px; padding:10px; margin-bottom:7px;">'
-            + '<div style="font-size:9px; color:#888; margin-bottom:5px;">'
+        h += '<div style="border:1px solid #d4af37; border-radius:6px; padding:11px; margin-bottom:8px;'
+            + ' background:rgba(212,175,55,0.06);">'
+            + '<div style="font-size:9px; color:#888; margin-bottom:6px;">'
             + esc(g.byName || '당국') + ' · ' + when(g.at) + '</div>';
         if (g.title) {
-            h += '<div style="font-size:12px; color:#fff; font-weight:bold; margin-bottom:5px;">'
+            h += '<div style="font-size:13px; color:#fff; font-weight:bold; margin-bottom:6px;">'
                 + esc(g.title) + '</div>';
         }
         if (g.text) {
-            h += '<div style="font-size:11px; color:#ddd; line-height:1.8; margin-bottom:7px;'
+            h += '<div style="font-size:11px; color:#ddd; line-height:1.8; margin-bottom:8px;'
                 + ' white-space:pre-wrap; word-break:break-word;">' + esc(g.text) + '</div>';
         }
         if (pairs.length) {
-            h += '<div style="font-size:11px; color:#a5d6a7; line-height:1.8; margin-bottom:7px;">'
+            h += '<div style="font-size:11px; color:#a5d6a7; line-height:1.8; margin-bottom:8px;">'
                 + pairs.map(function (p) {
                     return '• ' + esc(p[0]) + (p[1] > 1 ? ' <b>×' + p[1] + '</b>' : '');
                 }).join('<br>') + '</div>';
         }
-        h += '<button class="game-btn" style="width:100%; margin:0; padding:8px; font-size:11px;'
-            + ' border-color:#d4af37 !important; color:#d4af37 !important;"'
+        h += '<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;"'
             + ' onclick="giftTake(\'' + id + '\')">'
             + (pairs.length ? '받는다' : '확인했다') + '</button></div>';
     });
-
-    h += '</div>';
-
-    if (old) old.outerHTML = h;
-    else panel.insertAdjacentHTML('afterbegin', h);
+    return h;
 }
-// 소지품 칸은 updateUI 가 다시 그린다 — 그때마다 도로 붙인다
-setInterval(function () { try { paintBox(); paintDot(); } catch (e) { } }, 1000);
+
+const TITLE = '🎁 선물함';
+function paintList() {
+    const body = document.getElementById('gear-modal-body');
+    const box = document.getElementById('gear-modal');
+    const ttl = document.getElementById('gear-modal-title');
+    if (!body || !box || box.style.display === 'none') { opened = false; return; }
+    // 같은 창을 장비·금고 쪽에서도 쓴다 — 선물함이 아니면 손대지 않는다
+    if (!ttl || ttl.innerText !== TITLE) { opened = false; return; }
+    const h = listHtml();
+    if (body.innerHTML !== h) body.innerHTML = h;
+}
+
+window.openGiftBox = function () {
+    if (typeof openGearModal === 'function') {
+        openGearModal(TITLE, listHtml());
+        opened = true;
+        return;
+    }
+    // 창을 쓸 수 없으면 적어도 글로는 보여 준다
+    showCustomAlert('선물함 — ' + count() + '건\n\n' + (count() ? '잠시 뒤에 다시 열어 주세요.' : '비어 있습니다.'));
+};
 
 // ==========================================
 // 5. 받기 — 먼저 지운 쪽만 가져간다
@@ -381,6 +421,9 @@ window.giftTake = function (id) {
         if (typeof addHistoryLog === 'function') addHistoryLog(u, line);
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
         if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+
+        delete mine[id];                       // 지켜보기가 알려 주기 전에 먼저 지운다
+        try { paintBtn(); if (opened) paintList(); } catch (e) { }
 
         showCustomAlert(pairs.length
             ? ('받았습니다.\n\n' + pairs.map(function (p) { return p[0] + (p[1] > 1 ? ' ×' + p[1] : ''); }).join('\n'))
@@ -424,6 +467,6 @@ window.giftState = function (who) {
     });
 };
 
-console.log('[선물함] giftState(사번) · giftSend(사번,제목,내용) · giftSendItem(사번,물품,개수)');
+console.log('[선물함] 사원증 🎁 단추 — openGiftBox() · giftState(사번) · giftSend(사번,제목,내용) · giftSendItem(사번,물품,개수)');
 
 })();
