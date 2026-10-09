@@ -4,7 +4,7 @@
 // ==========================================
 //
 // 이 파일에는 화면이 없다. 자리를 만들고, 패를 돌리고, 차례를 넘기고,
-// 울음을 가리고, 점수를 옮기는 일만 한다. 그리는 것은 mj-ui.js 가 한다.
+// 후로를 가리고, 점수를 옮기는 일만 한다. 그리는 것은 mj-ui.js 가 한다.
 //
 // ■ 어디에 적히나
 //
@@ -21,7 +21,7 @@
 //   h (지금 국)
 //       wall, dead, doraInd, uraInd   산 · 왕패 · 도라
 //       hands   { 사번: [패…] }
-//       melds   { 사번: [울음…] }
+//       melds   { 사번: [후로…] }
 //       pond    { 사번: [버린패…] }
 //       riichi  { 사번: 버린 순번 }
 //       turn    자리 번호 · turnAt 차례가 된 때
@@ -52,7 +52,7 @@
 window.MJ_PLAY = {
     start: 25000,           // 시작 점수
     turnSec: 25,            // 한 차례에 주는 시간
-    claimSec: 6,            // 울음을 기다리는 시간
+    claimSec: 6,            // 후로를 기다리는 시간
     graceSec: 4,            // 이 시간이 더 지나면 아무나 떠밀 수 있다
     payout: 'diff'          // 'diff' 최종점수 − 시작점수를 포인트로 / 'none' 안 줌
 };
@@ -130,7 +130,7 @@ function norm(t) {
     const h = t.h;
     if (h) {
         ['hands', 'melds', 'pond', 'riichi', 'ippatsu', 'claims'].forEach(function (k) {
-            if (k === 'claims') return;                 // claims 는 없을 수 있다 (울음 창이 없을 때)
+            if (k === 'claims') return;                 // claims 는 없을 수 있다 (후로 창이 없을 때)
             if (!h[k] || typeof h[k] !== 'object') h[k] = {};
         });
         ['wall', 'dead', 'doraInd', 'uraInd'].forEach(function (k) {
@@ -437,7 +437,7 @@ function riichiDiscard(tile) {
 window.mjRiichi = riichiDiscard;
 
 // ==========================================
-// 울음 — 폰 · 치 · 깡 · 론 · 넘김
+// 후로 — 폰 · 치 · 깡 · 론 · 넘김
 // ==========================================
 function claim(kind, tiles) {
     const u = me(); if (!u || !cur) return;
@@ -455,7 +455,7 @@ function claim(kind, tiles) {
 window.mjClaim = claim;
 window.mjPass = function () { return claim('pass'); };
 
-// 내가 지금 할 수 있는 울음
+// 내가 지금 할 수 있는 후로
 function claimable() {
     const s = myState();
     if (!s || !s.h || s.h.phase !== 'CLAIM' || !s.h.last) return null;
@@ -588,7 +588,7 @@ function forceTurn() {
 window.mjForce = forceTurn;
 window.mjTick = tick;              // 화면과 검사에서 직접 떠민다
 
-// 울음을 가린다 — 론 > 폰·깡 > 치
+// 후로를 가린다 — 론 > 폰·깡 > 치
 function resolveClaims() {
     const id = cur && cur.id; if (!id) return;
     return tx(ROOT + '/' + id, function (t) {
@@ -609,7 +609,7 @@ function resolveClaims() {
 
         if (win.c.kind === 'ron') { h._ron = win.code; h.phase = 'END'; return t; }
 
-        // 울어서 가져온다
+        // 후로로 가져온다
         const code = win.code, tile = h.last.tile;
         const hand = arr(h.hands[code]);
         const take = [];
@@ -651,7 +651,7 @@ function resolveClaims() {
             h.drawn = extra; h.rinshan = true; h.phase = 'DISCARD';
         } else {
             h.rinshan = false;
-            h.phase = 'DISCARD';           // 울었으면 바로 버린다
+            h.phase = 'DISCARD';           // 후로를 했으면 바로 버린다
         }
         return t;
     }).then(function (r) {
@@ -787,7 +787,7 @@ window.mjState = function () {
     }).join('  '));
     if (!s.h) { console.log('  아직 안 시작했습니다.'); return; }
     console.log('  내 패:', s.hand.map(window.mjTileName).join(' '),
-        s.melds.length ? ('· 울음 ' + s.melds.length) : '');
+        s.melds.length ? ('· 후로 ' + s.melds.length) : '');
     console.log('  단계:', s.phase, '· 내 차례:', s.mine ? 'O' : '✗',
         '· 남은 산:', arr(s.h.wall).length, '장');
     console.log('  샨텐:', window.mjShanten(s.hand, s.melds.length),
@@ -843,7 +843,7 @@ window.mjWhy = function () {
     });
 };
 
-// 바뀐 것이 없어도 시간은 흐른다 — 울음 창과 굳은 차례를 여기서 본다
+// 바뀐 것이 없어도 시간은 흐른다 — 후로 창과 굳은 차례를 여기서 본다
 setInterval(function () { try { tick(); } catch (e) { } }, 1000);
 
 console.log('[마작] 판 진행 — mjTables() · mjState() · mjWhy()');

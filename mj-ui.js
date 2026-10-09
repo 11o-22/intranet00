@@ -322,9 +322,9 @@ function paint(t) {
             + mp.map(G).join('') + '</div>';
     }
 
-    // 내 울음
+    // 내 후로
     if (s.melds.length) {
-        o += '<div style="font-size:9px; color:#aaa; margin-bottom:2px;">울음</div>'
+        o += '<div style="font-size:9px; color:#aaa; margin-bottom:2px;">후로</div>'
             + '<div style="font-size:20px; margin-bottom:7px;">'
             + s.melds.map(function (m) { return arr(m.tiles).map(G).join(''); }).join(' &nbsp; ') + '</div>';
     }
