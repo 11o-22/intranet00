@@ -141,7 +141,7 @@ ITEM_CATALOG["유리구슬"] = { price:700, usable:true, targetable:false, effec
     desc:"사용 시 다섯 시간 동안 행운이 300% 늘어난다." };
 ITEM_CATALOG["■■ 씨앗"] = { price:400, usable:true, targetable:false, effect:"black_seed",
     desc:"■■■를 넣지 마세요." };
-ITEM_CATALOG["소원권"] = { price:5000000, usable:true, targetable:false, effect:"wish_ticket", noSell:true,
+ITEM_CATALOG["🫙 소원권"] = { price:15000000, usable:true, targetable:false, effect:"wish_ticket", noSell:true,
     desc:"사용 시 ??? 에게 소원을 적어 보낼 수 있다." };
 ITEM_CATALOG["도깨비 불"] = { price:1234567, usable:true, targetable:false, effect:"equip_dokkaebi",
     desc:"착용 시 도깨비 불을 부릴 수 있다. 행운 100% 상승, 상태이상 면역, 어둠의 갈림길에서 유리한 쪽이 드러난다." };
@@ -151,15 +151,15 @@ EQUIP_AFFIL["유리구슬"]    = "재난관리";
 EQUIP_AFFIL["도깨비 불"]   = "재난관리";
 EQUIP_AFFIL["사원증 뱃지"] = "백일몽";
 EQUIP_AFFIL["■■ 씨앗"]    = "백일몽";
-EQUIP_AFFIL["소원권"]      = "백일몽";
+EQUIP_AFFIL["🫙 소원권"]   = "백일몽";
 
 ["루비 클리 피어싱","루비 유두 피어싱","사인참사검","사원증 뱃지","가터밸트",
- "??? 안경","유리구슬","■■ 씨앗","소원권","도깨비 불"]
+ "??? 안경","유리구슬","■■ 씨앗","🫙 소원권","도깨비 불"]
  .concat(Object.keys(NEW_POTIONS))
  .forEach(n => {
     if (!ALIEN_ITEMS_POOL.includes(n)) ALIEN_ITEMS_POOL.push(n);
 });
-if (typeof NO_SELL_ITEMS !== 'undefined') NO_SELL_ITEMS.push("소원권");
+if (typeof NO_SELL_ITEMS !== 'undefined') NO_SELL_ITEMS.push("🫙 소원권");
 
 window.RARE_ALIEN_RATE = {
     "다이아 애널 플러그": 0.01,
@@ -167,7 +167,7 @@ window.RARE_ALIEN_RATE = {
     "루비 클리 피어싱": 0.005,
     "루비 유두 피어싱": 0.005,
     "사인참사검": 0.005,
-    "소원권": 0.0001,          // 0.01% — 진열 후보에 오를 확률
+    "🫙 소원권": 0.0001,       // 0.01% — 진열 후보에 오를 확률 (rare-odds.js 가 다시 적는다)
     "도깨비 불": 0.01
 };
 
@@ -382,7 +382,7 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
         }
 
         if (cat.effect === 'wish_ticket') {
-            openTextInput('소원권',
+            openTextInput('🫙 소원권',
                 `소원을 적어 주세요.<br><span style="color:#888; font-size:10px;">적은 내용은 ??? 에게 전해집니다. 되돌릴 수 없습니다.</span>`,
                 '소원 내용',
                 function (wish) {
@@ -391,12 +391,12 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
                     db.suggestions.unshift({
                         id: Date.now(), code: currentUser.code, author: currentUser.name, no: currentUser.no,
                         date: new Date().toLocaleString(),
-                        title: `[소원권] ${currentUser.name} 사원의 소원`,
+                        title: `[🫙 소원권] ${currentUser.name} 사원의 소원`,
                         content: wish, status: 'PENDING', reply: ''
                     });
                     if (database) database.ref('suggestions').set(db.suggestions);
                     removeItemFromInventory(currentUser, itemName, 1);
-                    addHistoryLog(currentUser, `[소원권] 소원을 적어 보냈습니다.`);
+                    addHistoryLog(currentUser, `[🫙 소원권] 소원을 적어 보냈습니다.`);
                     saveSelfFull(); updateUI();
                     showCustomAlert('종이가 손에서 사라졌습니다.\n\n누가 읽었는지는 알 수 없습니다.');
                 });

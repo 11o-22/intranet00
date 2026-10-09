@@ -251,7 +251,7 @@ function realOf(name) {
 }
 
 // 베낄 수 있는 것 — 우주 쇼핑몰에 깔리는 것 중에서 고른다
-const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '소원권',
+const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '🫙 소원권', '소원권',
                  '황룡의 눈', '산군의 도움'];
 function copyables() {
     if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
