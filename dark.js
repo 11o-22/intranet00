@@ -5274,8 +5274,15 @@ function b508RequiredDocs() {
     // 방장이 신도와 미션을 배정
          function initA214() {
         if (!darkRun || !darkRun.isLeader || !database) return;
-        database.ref(`darkParties/${darkRun.partyId}`).once('value').then(snap => {
+        if (darkRun._a214Init) return;            // 한 판에 한 번만 굴린다
+        darkRun._a214Init = true;
+        const pid = darkRun.partyId;
+        Promise.all([
+            database.ref(`darkParties/${pid}`).once('value'),
+            database.ref('a214Cult/log').once('value')
+        ]).then(([snap, lsnap]) => {
             const room = snap.val() || {};
+            if (room.a214) return;                // 이미 정해져 있다
             let members = room.members;
 
             if (!members || Object.keys(members).length === 0) {
@@ -5286,9 +5293,13 @@ function b508RequiredDocs() {
                 });
             }
             const codes = Object.keys(members);
-            if (codes.length === 0) { console.warn('A214: 인원을 찾을 수 없음'); return; }
+            if (codes.length === 0) {
+                console.warn('A214: 인원을 찾을 수 없음');
+                darkRun._a214Init = false;
+                return;
+            }
 
-            const traitor = codes[Math.floor(Math.random() * codes.length)];
+            const traitor = a214PickCult(codes, lsnap.val());
             const picked = A214_MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
             const others = codes.filter(c => c !== traitor);
 
@@ -5298,16 +5309,60 @@ function b508RequiredDocs() {
                     ? others[Math.floor(Math.random() * others.length)] : null
             }));
 
-            database.ref(a214Path()).set({
-                traitor: traitor,
-                traitorName: members[traitor].name,
-                missions: missions,
-                startedAt: Date.now(),
-                votes: {},
-                exposed: 0,
-                watched: false,
-                converted: false
-            });
+            // set() 이 아니라 트랜잭션이다. 선임이 두 번 굴려 덮어쓰면
+            // 이미 "당신은 신도입니다" 를 본 사람이 신도가 아니게 된다.
+            database.ref(`darkParties/${pid}/a214`).transaction(cur => {
+                if (cur) return;                  // 먼저 적힌 것이 이긴다
+                return {
+                    traitor: traitor,
+                    traitorName: members[traitor].name,
+                    missions: missions,
+                    startedAt: Date.now(),
+                    votes: {},
+                    exposed: 0,
+                    watched: false,
+                    converted: false
+                };
+            }).then(r => {
+                if (r && r.committed) a214LogCult(traitor);
+                else if (r && !(r.snapshot && r.snapshot.val())) darkRun._a214Init = false;
+            }).catch(() => { if (darkRun) darkRun._a214Init = false; });
+        }).catch(() => { if (darkRun) darkRun._a214Init = false; });
+    }
+
+    // 최근에 신도였던 사람은 뽑힐 몫을 줄인다.
+    //   아예 빼지는 않는다 — 빼 버리면 "지난 판에 신도였으니 저 사람은 아니다"
+    //   가 확정되어 추리가 망가진다. 바로 다음 판에 또 걸릴 수도 있다. 드물다.
+    //   (사람별 몫 = (지난 지 몇 판 / 인원수)의 제곱, 최소 0.02)
+    function a214CultLog(raw) {
+        if (Array.isArray(raw)) return raw.filter(x => x);
+        if (raw && typeof raw === 'object') {
+            return Object.keys(raw).sort((a, b) => a - b).map(k => raw[k]).filter(x => x);
+        }
+        return [];
+    }
+
+    function a214PickCult(codes, raw) {
+        const log = a214CultLog(raw);
+        const n = codes.length;
+        const w = codes.map(c => {
+            const i = log.lastIndexOf(c);
+            if (i < 0) return 1;                       // 한 번도 안 걸린 사람
+            const ago = log.length - i;                // 몇 판 전이었나
+            return Math.max(0.02, Math.pow(Math.min(1, ago / n), 2));
+        });
+        const sum = w.reduce((a, b) => a + b, 0);
+        let r = Math.random() * sum;
+        for (let i = 0; i < n; i++) { r -= w[i]; if (r <= 0) return codes[i]; }
+        return codes[n - 1];
+    }
+
+    function a214LogCult(code) {
+        if (!database || !code) return;
+        database.ref('a214Cult/log').transaction(raw => {
+            const a = a214CultLog(raw);
+            a.push(code);
+            return a.slice(-20);
         });
     }
     function isTraitor() {
