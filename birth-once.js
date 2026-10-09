@@ -138,7 +138,8 @@ window.pregSweepServer = function () { sweepServer(u_()); };
         const _b = pregBroadcast;
         const said = {};
         pregBroadcast = function (text) {
-            const k = String(text || '');
+            // 숫자는 빼고 견준다 — 「3개」와 「2개」는 같은 소식으로 본다
+            const k = String(text || '').replace(/<[^>]*>/g, '').replace(/[0-9０-９,]+/g, '#').trim();
             const t = Date.now();
             if (said[k] && t - said[k] < SAY_GAP) {
                 console.warn('[출산] 방금 올린 알림이라 넘깁니다 — ' + k.replace(/<[^>]*>/g, ''));
