@@ -446,6 +446,7 @@ function check() {
     if (!currentUser) return;
     const s = ti(currentUser);
     if (!Array.isArray(currentUser.titles)) currentUser.titles = [];
+    seedSaid(currentUser.titles);          // 손대기 전의 목록으로 깐다 (한 번만)
 
     const got = [];
     DEFS.forEach(function (d) {
@@ -465,11 +466,55 @@ function check() {
     announce(got);
 }
 
+// ★ 한 칭호는 평생 한 번만 알린다
+//
+//   얻었다는 팝업이 되풀이해서 떴다. 붙었다 떨어졌다 하는 칭호가 있어서다.
+//   repair() 는 金緞(은행 VIP)과 웨폰 마스터 둘만 떼어 내는데, 떼어 낸 뒤에
+//   조건이 다시 맞으면 check() 가 도로 붙이고 그때마다 알렸다.
+//   (金緞 은 은행 칸을 읽기 전에는 조건이 거짓이라 특히 자주 걸린다)
+//
+//   그래서 알린 것을 따로 적어 두고, 적혀 있으면 두 번 다시 안 띄운다.
+//   이미 들고 있는 칭호는 처음 한 번에 통째로 적어 둔다 — 그래야 이 고침이
+//   올라간 날 쓰던 사람에게 팝업이 우르르 뜨지 않는다.
+//   ★ 적어 두는 자리는 **얻기 전**의 목록으로 깔아야 한다. 얻은 뒤에 깔면
+//     방금 얻은 것까지 「이미 알렸다」가 되어 첫 팝업이 안 뜬다.
+//     그래서 check() 가 손대기 전의 목록을 넘겨 준다.
+function seedSaid(before) {
+    if (!currentUser) return [];
+    if (!Array.isArray(currentUser.titleSaid)) {
+        currentUser.titleSaid = (before || []).slice();
+        save({ titleSaid: 1 });
+        console.log('[칭호] 이미 들고 있던 ' + currentUser.titleSaid.length + '개는 알린 것으로 둡니다.');
+    }
+    return currentUser.titleSaid;
+}
+function said() {
+    return (currentUser && Array.isArray(currentUser.titleSaid)) ? currentUser.titleSaid : [];
+}
+function markSaid(id) {
+    const s = said();
+    if (!s || s.indexOf(id) >= 0) return false;
+    s.push(id);
+    save({ titleSaid: 1 });
+    return true;
+}
+
 function announce(list) {
-    if (announcing) { setTimeout(function () { announce(list); }, 1500); return; }
+    // 전에 알린 것은 뺀다
+    const fresh = (list || []).filter(function (d) { return d && said().indexOf(d.id) < 0; });
+    if (!fresh.length) {
+        const skipped = (list || []).filter(function (d) { return d; });
+        if (skipped.length) {
+            console.log('[칭호] 전에 알린 칭호라 팝업을 띄우지 않습니다 — '
+                + skipped.map(function (d) { return d.n; }).join(', '));
+        }
+        return;
+    }
+    if (announcing) { setTimeout(function () { announce(fresh); }, 1500); return; }
     announcing = true;
-    const d = list[0];
-    const rest = list.slice(1);
+    const d = fresh[0];
+    const rest = fresh.slice(1);
+    markSaid(d.id);
     setTimeout(function () {
         showCustomAlert('[' + d.n + ']\n\n칭호를 얻었습니다.\n\n' + d.need);
         announcing = false;
