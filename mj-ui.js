@@ -165,6 +165,17 @@ function ui() {
     background:rgba(5,18,12,0.93); align-items:center; justify-content:center; padding:16px;
 }
 #mj-overlay.mj-is-table > #mj-root { flex:1; display:flex; flex-direction:column; min-height:0; }
+
+/* --- 가로로 눕히기 ---
+   기기를 가로로 돌려 주면(또는 안드로이드에서 잠가 주면) 그대로 쓰고,
+   세로로 남으면 판 전체를 90도 돌려 가로처럼 보이게 한다. (아이폰은 잠글 수 없다) */
+#mj-overlay.mj-turn90 { overflow:hidden; }
+#mj-overlay.mj-turn90 > #mj-root {
+    position:absolute; top:50%; left:50%;
+    width:var(--mj-w); height:var(--mj-h);
+    transform:translate(-50%,-50%) rotate(90deg);
+    transform-origin:50% 50%;
+}
 #mj-overlay.mj-is-card > #mj-root {
     width:100%; max-width:420px; max-height:86vh; overflow:auto; text-align:left;
     background:linear-gradient(180deg,#17251e,#101a15); border:1px solid #2f6b4e;
@@ -178,10 +189,13 @@ function ui() {
     font-size:11px; color:#cfc9b8;
 }
 #mj-bar .mj-kyoku { color:#ffd76a; font-weight:700; font-size:12px; }
-#mj-bar .mj-x {
-    margin-left:auto; background:none; border:1px solid rgba(255,255,255,0.22); color:#cfc9b8;
-    width:26px; height:24px; border-radius:5px; font-size:13px; line-height:1; cursor:pointer; padding:0;
+#mj-bar .mj-x, #mj-bar .mj-turn {
+    background:none; border:1px solid rgba(255,255,255,0.22); color:#cfc9b8;
+    width:26px; height:24px; border-radius:5px; font-size:13px; line-height:1; cursor:pointer;
+    padding:0; flex:none; font-family:inherit;
 }
+#mj-bar .mj-turn { margin-left:auto; }
+#mj-bar .mj-turn.on { border-color:#ffd76a; color:#ffd76a; }
 
 /* --- 판 --- */
 #mj-felt { flex:1; position:relative; min-height:0; overflow:hidden; }
@@ -259,9 +273,11 @@ function ui() {
     flex:none; background:rgba(0,0,0,0.33); border-top:1px solid rgba(255,255,255,0.09);
     padding:7px 7px 9px;
 }
+#mj-mine-c { flex:1; min-width:0; }
 #mj-hand { display:flex; justify-content:center; align-items:flex-end; gap:2px; flex-wrap:nowrap; }
-/* 손패는 열넉 장이 한 줄에 들어가야 한다 — 화면 너비에 맞춰 줄인다 */
-#mj-hand .mjt { width:clamp(19px, calc((100vw - 34px) / 14.7), 34px); height:auto; aspect-ratio:36/48; }
+/* 손패는 열넉 장이 한 줄에 들어가야 한다 — 판 너비에 맞춰 줄인다.
+   --mj-w 는 눕혔을 때까지 셈해서 넣어 준다 (100vw 는 눕히면 틀린 값이다) */
+#mj-hand .mjt { width:clamp(19px, calc((var(--mj-w, 100vw) - 34px) / 14.7), 34px); height:auto; aspect-ratio:36/48; }
 #mj-hand .mj-h {
     background:none; border:0; padding:0; margin:0; cursor:pointer; line-height:0;
     transition:transform 0.08s;
@@ -282,6 +298,37 @@ function ui() {
 #mj-acts button.mj-no { background:linear-gradient(180deg,#2a2a2a,#171717); border-color:#555; color:#bbb; }
 #mj-acts button .mj-sub { display:block; font-size:9px; font-weight:400; opacity:0.85; margin-top:1px; }
 
+/* --- 가로로 누웠을 때 --- */
+/* 세로보다 키가 많이 낮다. 가운데 알림판은 머리띠로 올리고,
+   버린 패를 한 치수 줄이고, 아래칸을 한 줄로 눕힌다. */
+.mj-wide .mj-blk-top { top:2px; }
+.mj-wide .mj-blk-me { bottom:26px; }
+.mj-wide .mj-plates { bottom:3px; }
+.mj-wide .mj-pond .mjt, .mj-wide .mj-backs .mjt, .mj-wide .mj-melds .mjt {
+    width:14px; height:19px; border-radius:2px;
+}
+/* 넓어도 판은 가운데에 모아 둔다 — 양쪽으로 벌어지면 판이 아니라 띠가 된다 */
+.mj-wide .mj-side-left  { left:calc(50% - 215px); }
+.mj-wide .mj-side-right { right:calc(50% - 215px); }
+/* 가운데 알림판은 한 줄로 눕히고, 위아래 패 사이의 빈 띠에 끼운다 */
+.mj-wide #mj-mid {
+    top:auto; bottom:92px; transform:translateX(-50%);
+    padding:5px 12px; max-width:none; white-space:nowrap;
+}
+.mj-wide #mj-mid .mj-r1, .mj-wide #mj-mid .mj-r2,
+.mj-wide #mj-mid .mj-r3, .mj-wide #mj-mid .mj-dora {
+    display:inline-flex; align-items:center; vertical-align:middle; margin:0 0 0 9px;
+}
+.mj-wide #mj-mid .mj-r1 { margin-left:0; }
+.mj-wide #mj-mine { display:flex; align-items:flex-end; gap:10px; padding:5px 9px 7px; }
+.mj-wide #mj-mine .mj-mymelds { margin:0 0 3px 0; }
+.mj-wide #mj-acts { margin-top:0; max-width:46%; justify-content:flex-end; }
+.mj-wide #mj-acts button { padding:7px 11px; font-size:11px; }
+.mj-wide #mj-hint { margin-top:3px; }
+.mj-wide #mj-hand .mjt {
+    width:clamp(19px, calc((var(--mj-w, 100vw) - 330px) / 14.7), 40px);
+}
+
 /* --- 글 칸 --- */
 .mj-h2 { font-size:15px; font-weight:700; margin-bottom:5px; }
 .mj-note { font-size:10px; color:#8aa89a; line-height:1.75; }
@@ -299,6 +346,92 @@ function ui() {
     document.head.appendChild(st);
 }
 
+// ==========================================
+// 가로로 눕히기
+// ==========================================
+//
+// 마작판은 가로가 맞다. 세로로 보면 버린 패가 위아래로 길게 늘어져
+// 한눈에 안 들어온다. 그래서 판을 열 때 **가로로 돌린다.**
+//
+//   1. 전체화면으로 들어가 가로로 잠근다 (안드로이드 크롬에서 된다)
+//      전체화면은 사람이 누른 그 순간에만 걸 수 있어서, 단추를 누른
+//      자리(mjOpen·mjMakeUI·mjJoinUI)에서 건다.
+//      잠그는 것은 문서 전체(documentElement)에 건다. 창 하나에만 걸면
+//      그 바깥에 있는 알림창(showCustomAlert)이 안 보인다.
+//
+//   2. 그래도 세로로 남으면(아이폰은 잠글 수 없다) **판을 90도 돌린다.**
+//      기기를 손으로 돌리면 가로가 되므로, 그때는 돌리기를 거둔다.
+//
+//   머리띠의 ⟳ 로 끌 수 있고, 끈 것은 기억해 둔다.
+const TURN_KEY = 'mjTurn';
+let wantTurn = true;
+try { wantTurn = localStorage.getItem(TURN_KEY) !== '0'; } catch (e) { }
+
+function phone() { return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''); }
+
+function tryFull() {
+    if (!wantTurn || !phone()) return;
+    const el = document.documentElement;
+    try {
+        const f = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+        if (f && !(document.fullscreenElement || document.webkitFullscreenElement)) {
+            const r = f.call(el);
+            if (r && r.then) r.then(lockWide, function () { });
+            else lockWide();
+        } else lockWide();
+    } catch (e) { }
+}
+function lockWide() {
+    try {
+        if (screen.orientation && screen.orientation.lock) {
+            const r = screen.orientation.lock('landscape');
+            if (r && r.catch) r.catch(function () { });
+        }
+    } catch (e) { }
+    setTimeout(fitWide, 350);
+}
+function unFull() {
+    try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { }
+    try {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            const x = document.exitFullscreen || document.webkitExitFullscreen;
+            if (x) x.call(document);
+        }
+    } catch (e) { }
+}
+
+// 판이 쓸 수 있는 너비·높이를 재서 세로면 눕힌다
+function fitWide() {
+    const el = document.getElementById(OV);
+    if (!el || el.style.display === 'none') return;
+    const root = document.getElementById('mj-root');
+    if (!root) return;
+    const table = el.classList.contains('mj-is-table');
+    const W = window.innerWidth, H = window.innerHeight;
+    // 눕힐까 — 판 화면이고, 돌리기를 켰고, 세로로 길고, 손안의 것일 때만
+    const turn = table && wantTurn && phone() && H > W;
+    el.classList.toggle('mj-turn90', turn);
+    const w = turn ? H : (el.clientWidth || W);
+    const h = turn ? W : (el.clientHeight || H);
+    root.style.setProperty('--mj-w', w + 'px');
+    root.style.setProperty('--mj-h', h + 'px');
+    // 가로로 누운 꼴이면 낮은 키에 맞춘 차림새로 바꾼다
+    el.classList.toggle('mj-wide', table && w > h && h < 560);
+}
+['resize', 'orientationchange'].forEach(function (n) {
+    window.addEventListener(n, function () { setTimeout(fitWide, 60); });
+});
+document.addEventListener('fullscreenchange', function () { setTimeout(fitWide, 60); });
+document.addEventListener('webkitfullscreenchange', function () { setTimeout(fitWide, 60); });
+
+window.mjTurnToggle = function () {
+    wantTurn = !wantTurn;
+    try { localStorage.setItem(TURN_KEY, wantTurn ? '1' : '0'); } catch (e) { }
+    if (wantTurn) tryFull(); else unFull();
+    fitWide();
+    repaint();
+};
+
 function shell(inner, tableMode) {
     ui();
     if (typeof window.mjTileSheet === 'function') window.mjTileSheet();
@@ -310,16 +443,19 @@ function shell(inner, tableMode) {
     el.className = tableMode ? 'mj-is-table' : 'mj-is-card';
     document.getElementById('mj-root').innerHTML = inner;
     el.style.display = 'flex';
+    fitWide();
 }
 window.mjClose = function () {
     const el = document.getElementById(OV);
-    if (el) el.style.display = 'none';
+    if (el) { el.style.display = 'none'; el.classList.remove('mj-turn90', 'mj-wide'); }
+    unFull();
 };
 window.mjOpen = function () {
     // 앉아 있던 판은 격리가 풀린 뒤에도 연다 — 1위는 끝나자마자 풀리기 때문이다
     const seated = window.mjCur && window.mjCur();
-    if (seated && seated.t) { safePaint(seated.t); return; }
+    if (seated && seated.t) { tryFull(); safePaint(seated.t); return; }
     if (!inside()) { showCustomAlert('상담실·선녀탕 안에서만 둘 수 있습니다.'); return; }
+    tryFull();
     lobby();
 };
 
@@ -418,6 +554,7 @@ function busy(msg) {
 }
 
 window.mjMakeUI = function (n) {
+    tryFull();
     busy('자리를 만드는 중');
     try {
         const p = window.mjMake(n);
@@ -429,6 +566,7 @@ window.mjMakeUI = function (n) {
     } catch (e) { whine(e, '자리를 만들지 못했습니다.'); lobby(); }
 };
 window.mjJoinUI = function (id) {
+    tryFull();
     busy('앉는 중');
     try {
         window.mjJoin(id).then(function (ok) {
@@ -489,7 +627,7 @@ function midHTML(t, h, mySeat, n) {
         + (di.length ? '<div class="mj-dora">' + di.map(function (x) {
             return T(window.mjDoraOf(x), 's');
         }).join('') + '</div>' : '')
-        + '<div class="mj-r3">내 자풍 <b style="color:#ffd76a;">'
+        + '<div class="mj-r3">자풍 <b style="color:#ffd76a;">'
         + windOf(mySeat, t.kyoku, n) + '</b>'
         + ((t.sticks || 0) ? ' · 리치봉 ' + t.sticks : '') + '</div>'
         + '</div>';
@@ -592,8 +730,9 @@ function paint(t) {
     const bar = '<div id="mj-bar">'
         + '<span class="mj-kyoku">동 ' + t.kyoku + '국</span>'
         + '<span>' + n + '인</span>'
-        + '<span>남은 ' + arr(h.wall).length + '장</span>'
         + (window._mjRiichiArm ? '<span style="color:#ff8a65;">리치 — 버릴 패를 누르세요</span>' : '')
+        + '<button class="mj-turn' + (wantTurn ? ' on' : '') + '" onclick="mjTurnToggle()"'
+        + ' title="가로로 눕히기">⟳</button>'
         + '<button class="mj-x" onclick="mjClose()">✕</button></div>';
 
     shell(bar + '<div id="mj-felt">' + felt + '</div>' + mineHTML(t, h, s, u), true);
@@ -616,9 +755,9 @@ function mineHTML(t, h, s, u) {
 
     let o = '<div id="mj-mine">';
     const melds = meldsHTML(s.melds, 'm');
-    if (melds) o += '<div style="margin-bottom:6px;">' + melds + '</div>';
+    if (melds) o += '<div class="mj-mymelds" style="margin-bottom:6px;">' + melds + '</div>';
 
-    o += '<div id="mj-hand">';
+    o += '<div id="mj-mine-c"><div id="mj-hand">';
     hand.forEach(function (tile) {
         o += '<button class="mj-h"' + (canDiscard ? '' : ' disabled')
             + (canDiscard ? ' onclick="mjDiscardUI(' + tile + ')"' : '')
@@ -642,7 +781,7 @@ function mineHTML(t, h, s, u) {
                 + '<span style="display:inline-flex; gap:2px; vertical-align:middle; margin-left:3px;">'
                 + w.map(function (x) { return T(x, 's'); }).join('') + '</span>')
             : (sh + '샨텐'))
-        + '</div>';
+        + '</div></div>';
 
     // 단추
     const acts = [];
