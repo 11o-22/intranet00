@@ -70,6 +70,21 @@ CFG.groups.forEach((group, i) => {
         + (Buffer.byteLength(body) / 1024).toFixed(1) + ' KB');
 });
 
+// ==========================================
+// 서비스 워커에 새 번호를 찍는다
+// ==========================================
+//
+// 묶음이 바뀌었는데 휴대폰이 묵은 것을 들고 있으면, 파일 여덟 개가
+// 서로 안 맞아 「조용히 안 되는」 고장이 난다. 올릴 때마다 번호를
+// 바꿔 두면 서비스 워커가 들고 있던 것을 통째로 버린다.
+try {
+    const swPath = 'sw.js';
+    let sw = readFileSync(swPath, 'utf8');
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const next = sw.replace(/const BUILD = '[^']*';/, "const BUILD = '" + stamp + "';");
+    if (next !== sw) { writeFileSync(swPath, next); console.log('  sw.js 번호: ' + stamp); }
+} catch (e) { console.warn('sw.js 번호를 못 찍었습니다:', e.message); }
+
 console.log('묶음 ' + CFG.groups.length + '개 · 원본 ' + files + '개 · '
     + (bytes / 1048576).toFixed(2) + ' MB');
 lines.forEach(l => console.log(l));
