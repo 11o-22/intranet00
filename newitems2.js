@@ -469,6 +469,37 @@ function spendGuarantee(src) {
     saveSelfFull();
 }
 
+// 진실 마스크 — 쓰고 있는 사람이 스스로를 구하면 양쪽에 5,000P.
+// 다섯 번이면 부서진다. (적힌 대로 닳는 셈이 아예 없어서 영영 안 부서졌다)
+const MASK = '진실 마스크';
+const MASK_USES = 5;
+
+function maskPay(u) {
+    if (!u) return;
+    const worn = (u.equippedWeapons || []).filter(function (w) {
+        return ((typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w) === MASK;
+    });
+    if (!worn.length) return;
+
+    worn.forEach(function (w) {
+        const o = (typeof getEquipOwner === 'function') ? getEquipOwner(u, w) : null;
+        addDarkPt(u, 5000, MASK);
+        if (o && o !== u.code && db.users[o]) addDarkPt(db.users[o], 5000, MASK);
+    });
+
+    if (!currentUser || u.code !== currentUser.code) return;   // 세는 칸은 내 것뿐이다
+    const r = totalSpend(MASK, MASK_USES);                     // 물품칸·장착칸까지 비워 준다
+    if (r.gone) {
+        if (typeof stripNoteByItem === 'function') stripNoteByItem(u, MASK);
+        if (typeof removeBadgeLine === 'function') removeBadgeLine(u, MASK);
+        addHistoryLog(u, '[' + MASK + '] 다섯 번을 채우고 부서졌습니다.');
+        setTimeout(function () { showCustomAlert(MASK + '가 부서졌습니다.'); }, 1200);
+    } else {
+        addHistoryLog(u, '[' + MASK + '] 남은 횟수 ' + r.left + '회');
+    }
+    if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
+}
+
 // 굴림을 한 번 확정으로 만든다
 function withLucky(fn, ctx, args) {
     const _r = Math.random;
@@ -486,14 +517,7 @@ function withLucky(fn, ctx, args) {
             const src = rescueGuarantee();
             const u = currentUser;
 
-            // 진실 마스크 — 채워 준 쪽과 채운 쪽 모두 정산
-            (u.equippedWeapons || []).forEach(function (w) {
-                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-                if (base !== '진실 마스크') return;
-                const o = (typeof getEquipOwner === 'function') ? getEquipOwner(u, w) : null;
-                addDarkPt(u, 5000, '진실 마스크');
-                if (o && o !== u.code && db.users[o]) addDarkPt(db.users[o], 5000, '진실 마스크');
-            });
+            maskPay(u);                       // 진실 마스크 — 양쪽 정산 · 다섯 번이면 부서진다
 
             if (!src) {
                 u.heartSaves = (u.heartSaves || 0) + 1;
@@ -533,14 +557,7 @@ function withLucky(fn, ctx, args) {
             const u = currentUser;
             const src = rescueGuarantee();
 
-            // 진실 마스크 — 양쪽 정산
-            (u.equippedWeapons || []).forEach(function (w) {
-                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-                if (base !== '진실 마스크') return;
-                const o = (typeof getEquipOwner === 'function') ? getEquipOwner(u, w) : null;
-                addDarkPt(u, 5000, '진실 마스크');
-                if (o && o !== u.code && db.users[o]) addDarkPt(db.users[o], 5000, '진실 마스크');
-            });
+            maskPay(u);                       // 진실 마스크 — 양쪽 정산 · 다섯 번이면 부서진다
 
             if (!src) {
                 u.heartSaves = (u.heartSaves || 0) + 1;
