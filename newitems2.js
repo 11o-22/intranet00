@@ -141,6 +141,30 @@ function passiveSum(u) {
 })();
 
 // ==========================================
+// ★ 바깥에서도 쓸 수 있게 내어 둔다
+// ==========================================
+//
+// 이 파일은 통째로 하나의 (function(){ … })() 안에 들어 있다.
+// 그래서 여기서 만든 것은 **다른 파일에서 안 보인다.**
+// 그런데 바깥에서 이렇게 부르고 있었다.
+//
+//     if (typeof ibAdd === 'function') ibAdd(...)      ← restaurant.js
+//     try { if (ibSum(u).noPoll) … } catch (e) { }     ← poll-freeze.js
+//
+// typeof 가 늘 'undefined' 라 **말없이 건너뛰었고**, try/catch 쪽은
+// 던져진 것을 삼켰다. 식당 S등급의 「공용시설 +n회 · 어둠 탐사 +n회」는
+// 알림에는 뜨는데 실제로는 아무것도 안 붙던 까닭이 이것이다.
+//
+// 함수 선언은 이 울타리 맨 위로 끌어올려지므로, 아래에 적힌 것이라도
+// 여기서 내어 둘 수 있다.
+window.ibAdd = ibAdd;                      // 임시 버프 붙이기 (식당 ★ 등)
+window.ibSum = ibSum;                      // 붙어 있는 임시 버프 합
+window.ibList = ibList;
+window.ibClean = ibClean;
+window.hasSilverHeart = hasSilverHeart;    // heart2.js
+window.removeBadgeLine = removeBadgeLine;  // cage.js
+
+// ==========================================
 // 2. 사용 횟수 — 하루 제한 · 총 횟수
 // ==========================================
 function dayLeft(u, name, max) {
