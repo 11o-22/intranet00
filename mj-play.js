@@ -125,13 +125,23 @@ function canChi(t) { return t.players === 4; }
 // ==========================================
 // 자리 만들기 · 들어가기
 // ==========================================
+// ★ 앉을 때 쓰는 이름은 **적힌 id 가 아니라 자리 이름(열쇠)** 이다.
+//   둘이 어긋나면 목록에는 보이는데 앉으려 하면 없는 자리를 더듬는다.
+//   («그 자리가 없어졌습니다»)
 function listTables() {
     if (!db_()) return Promise.resolve([]);
     return db_().ref(ROOT).once('value').then(function (s) {
         const v = s.val() || {};
-        return Object.keys(v).map(function (k) { return v[k]; })
-            .filter(function (t) { return t && t.state !== 'DONE' && now() - (t.made || 0) < 3 * 3600000; })
-            .sort(function (a, b) { return (a.made || 0) - (b.made || 0); });
+        return Object.keys(v).map(function (k) {
+            let t = v[k];
+            if (!t || typeof t !== 'object') return null;
+            if (t.id !== k) t = Object.assign({}, t, { id: k });   // 열쇠를 믿는다
+            return t;
+        }).filter(function (t) {
+            if (!t || !t.id) return false;
+            if (!t.players || !t.seats) return false;              // 자리 모양이 아니면 거른다
+            return t.state !== 'DONE' && now() - (t.made || 0) < 3 * 3600000;
+        }).sort(function (a, b) { return (a.made || 0) - (b.made || 0); });
     });
 }
 window.mjListTables = listTables;
@@ -170,7 +180,14 @@ function joinTable(id) {
         return t;
     }).then(function (r) {
         if (r && r.committed) { watch(id); return true; }
-        return false;
+        // 왜 안 됐는지 콘솔에 자리 이름과 서버에 정말 있는지까지 남긴다
+        return db_().ref(ROOT + '/' + id).once('value').then(function (s) {
+            const v = s.val();
+            console.warn('[마작] 앉지 못했습니다 — 자리 "' + id + '" · 까닭: '
+                + (window._mjJoinWhy || '(없음)') + ' · 서버에 있나: ' + (v ? 'O' : '✗'));
+            if (v) console.warn('   서버 쪽 모습:', JSON.stringify(v).slice(0, 300));
+            return false;
+        }).catch(function () { return false; });
     });
 }
 window.mjJoin = joinTable;

@@ -123,9 +123,25 @@ window.mjOpen = function () {
     lobby();
 };
 
-function lobby() {
-    shell('<div style="text-align:center; padding:20px; color:#888; font-size:12px;">자리를 찾는 중…</div>');
+// 로비가 떠 있는 동안 5초마다 목록을 새로 받는다.
+// 안 그러면 남이 치운 자리를 그대로 들고 있다가 「그 자리가 없어졌습니다」가 뜬다.
+let atLobby = false;
+setInterval(function () {
+    try {
+        if (!atLobby) return;
+        const el = document.getElementById(OV);
+        if (!el || el.style.display === 'none') { atLobby = false; return; }
+        const s = window.mjCur && window.mjCur();
+        if (s && s.t) { atLobby = false; return; }
+        lobby(true);
+    } catch (e) { }
+}, 5000);
+
+function lobby(quiet) {
+    atLobby = true;
+    if (!quiet) shell('<div style="text-align:center; padding:20px; color:#888; font-size:12px;">자리를 찾는 중…</div>');
     window.mjListTables().then(function (list) {
+        if (!atLobby) return;
         const c = hue();
         const open = list.filter(function (t) { return t.state === 'WAIT'; });
         let h = '<div style="font-size:15px; color:' + c + '; font-weight:bold; margin-bottom:4px;">🀄 마작</div>'
@@ -173,6 +189,7 @@ function whine(e, what) {
 // mjOnChange 하나만 믿지 않는다 — 그 길이 막히면 화면이 로비인 채로 남는다.
 // 그리다 터져도 빈 화면으로 두지 않는다 — 까닭을 창에 적는다
 function safePaint(t) {
+    atLobby = false;
     try { paint(t); return true; }
     catch (e) {
         window._mjLastError = String((e && e.message) || e);
@@ -198,6 +215,7 @@ function waitAndPaint(what, tries) {
 }
 
 function busy(msg) {
+    atLobby = false;
     shell('<div style="text-align:center; padding:26px 10px; color:#aaa; font-size:12px;">' + esc(msg) + '…</div>');
 }
 
