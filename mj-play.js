@@ -1,0 +1,711 @@
+// ==========================================
+// ★ 🀄 마작 — 판 진행 (2·3·4인 실시간 동풍전)
+// bundles.json 마지막 묶음, mj-core.js 보다 뒤 · save-merge.js 앞
+// ==========================================
+//
+// 이 파일에는 화면이 없다. 자리를 만들고, 패를 돌리고, 차례를 넘기고,
+// 울음을 가리고, 점수를 옮기는 일만 한다. 그리는 것은 mj-ui.js 가 한다.
+//
+// ■ 어디에 적히나
+//
+//   mjTables/<판>
+//       state   WAIT | PLAY | DONE
+//       seats   [{code,name}…]        차례 = 동 남 서 북
+//       players 2 | 3 | 4
+//       kyoku   1..players            동풍전 — 사람 수만큼 한다
+//       honba, sticks                 본장 · 리치봉
+//       scores  { 사번: 점수 }
+//       h       지금 국 (아래)
+//       result  끝난 뒤 순위
+//
+//   h (지금 국)
+//       wall, dead, doraInd, uraInd   산 · 왕패 · 도라
+//       hands   { 사번: [패…] }
+//       melds   { 사번: [울음…] }
+//       pond    { 사번: [버린패…] }
+//       riichi  { 사번: 버린 순번 }
+//       turn    자리 번호 · turnAt 차례가 된 때
+//       phase   DRAW | DISCARD | CLAIM | END
+//       last    { by, tile, at }      마지막으로 버린 패
+//       claims  { 사번: {kind, tiles} }
+//
+// ■ 누가 셈하나
+//
+//   따로 심판을 두지 않는다. **모든 손질이 트랜잭션 한 번**이고, 손질마다
+//   지금 상태가 맞는지 다시 본다. 그래서 누가 끊겨도 판이 멈추지 않는다.
+//   차례인 사람이 시간을 넘기면 **아무나** 쯔모기리를 대신 눌러 줄 수 있다.
+//
+// ■ 2·3인 규칙
+//
+//   2인·3인은 북과 만수 2~8 을 뺀다. 치(吃)는 없다. 동풍전은 사람 수만큼.
+//
+// ■ 숨김에 대하여
+//
+//   파이어베이스를 그대로 쓰므로, 콘솔을 열면 남의 손패를 볼 수 있다.
+//   이 게임의 다른 자료도 전부 그렇다. 막으려면 서버가 따로 있어야 한다.
+//
+// ■ 콘솔
+//   mjTables()        지금 열린 자리
+//   mjState()         내가 앉은 판의 속
+//   mjForce()         차례인 사람이 굳었을 때 떠밀기
+
+window.MJ_PLAY = {
+    start: 25000,           // 시작 점수
+    turnSec: 25,            // 한 차례에 주는 시간
+    claimSec: 6,            // 울음을 기다리는 시간
+    graceSec: 4,            // 이 시간이 더 지나면 아무나 떠밀 수 있다
+    payout: 'diff'          // 'diff' 최종점수 − 시작점수를 포인트로 / 'none' 안 줌
+};
+
+(function mjPlay() {
+
+const P = window.MJ_PLAY;
+const ROOT = 'mjTables';
+const WINDS = [27, 28, 29, 30];      // 동 남 서 북
+
+function db_() { return (typeof database !== 'undefined') ? database : null; }
+function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
+function now() { return Date.now(); }
+function tx(path, fn) {
+    if (typeof txRetry === 'function') return txRetry(path, fn);
+    return db_().ref(path).transaction(fn);
+}
+function clone(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
+function arr(v) {
+    if (Array.isArray(v)) return v.slice();
+    if (v && typeof v === 'object') return Object.keys(v).map(function (k) { return v[k]; });
+    return [];
+}
+function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+}
+
+// 지금 내가 앉은 판
+let cur = null;             // { id, t }
+let watchRef = null;
+window.mjCur = function () { return cur; };
+
+function seatOf(t, code) {
+    const s = arr(t.seats);
+    for (let i = 0; i < s.length; i++) if (s[i] && s[i].code === code) return i;
+    return -1;
+}
+function codeAt(t, i) { const s = arr(t.seats)[i]; return s ? s.code : null; }
+function nameAt(t, i) { const s = arr(t.seats)[i]; return s ? s.name : '?'; }
+// 자풍 — 국마다 한 자리씩 돈다
+function windOf(t, seat) {
+    const n = t.players;
+    const d = ((seat - (t.kyoku - 1)) % n + n) % n;
+    return WINDS[d];
+}
+function dealerSeat(t) { return (t.kyoku - 1) % t.players; }
+function canChi(t) { return t.players === 4; }
+
+// ==========================================
+// 자리 만들기 · 들어가기
+// ==========================================
+function listTables() {
+    if (!db_()) return Promise.resolve([]);
+    return db_().ref(ROOT).once('value').then(function (s) {
+        const v = s.val() || {};
+        return Object.keys(v).map(function (k) { return v[k]; })
+            .filter(function (t) { return t && t.state !== 'DONE' && now() - (t.made || 0) < 3 * 3600000; })
+            .sort(function (a, b) { return (a.made || 0) - (b.made || 0); });
+    });
+}
+window.mjListTables = listTables;
+
+function makeTable(players) {
+    const u = me();
+    if (!u || !db_()) return Promise.resolve(null);
+    const n = Math.max(2, Math.min(4, Number(players) || 4));
+    const id = 'mj' + now().toString(36) + Math.floor(Math.random() * 1000);
+    const t = {
+        id: id, host: u.code, made: now(), state: 'WAIT', players: n,
+        seats: [{ code: u.code, name: u.name }],
+        kyoku: 1, honba: 0, sticks: 0,
+        scores: (function () { const o = {}; o[u.code] = P.start; return o; })()
+    };
+    return db_().ref(ROOT + '/' + id).set(t).then(function () { watch(id); return id; });
+}
+window.mjMake = makeTable;
+
+function joinTable(id) {
+    const u = me();
+    if (!u || !db_()) return Promise.resolve(false);
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t) return;
+        if (t.state !== 'WAIT') return;
+        const s = arr(t.seats);
+        if (s.some(function (x) { return x && x.code === u.code; })) return t;      // 이미 앉아 있다
+        if (s.length >= t.players) return;
+        s.push({ code: u.code, name: u.name });
+        t.seats = s;
+        t.scores = t.scores || {};
+        t.scores[u.code] = P.start;
+        if (s.length === t.players) { t.state = 'PLAY'; deal(t); }
+        return t;
+    }).then(function (r) {
+        if (r && r.committed) { watch(id); return true; }
+        return false;
+    });
+}
+window.mjJoin = joinTable;
+
+function leaveTable() {
+    const u = me();
+    if (!u || !cur || !db_()) return Promise.resolve();
+    const id = cur.id;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t) return;
+        const s = arr(t.seats).filter(function (x) { return x && x.code !== u.code; });
+        if (t.state === 'PLAY') { t.state = 'DONE'; t.result = { aborted: true, by: u.code }; return t; }
+        if (!s.length) return null;                 // 아무도 없으면 자리를 치운다
+        t.seats = s;
+        if (t.host === u.code) t.host = s[0].code;
+        return t;
+    }).then(function () { unwatch(); });
+}
+window.mjLeave = leaveTable;
+
+function watch(id) {
+    if (!db_()) return;
+    unwatch();
+    cur = { id: id, t: null };
+    watchRef = db_().ref(ROOT + '/' + id);
+    watchRef.on('value', function (s) {
+        const t = s.val();
+        if (!t) { unwatch(); fire(); return; }
+        cur.t = t;
+        fire();
+        try { tick(); } catch (e) { console.warn('[마작]', e); }
+    });
+}
+function unwatch() {
+    if (watchRef) { try { watchRef.off(); } catch (e) { } watchRef = null; }
+    cur = null;
+}
+window.mjWatch = watch;
+window.mjUnwatch = unwatch;
+
+function fire() {
+    try { if (typeof window.mjOnChange === 'function') window.mjOnChange(cur && cur.t); } catch (e) { }
+}
+
+// 들어오면 내가 앉아 있던 자리를 찾아 붙는다
+(function rejoin() {
+    const iv = setInterval(function () {
+        if (!db_() || !me() || cur) return;
+        db_().ref(ROOT).once('value').then(function (s) {
+            if (cur) return;
+            const v = s.val() || {};
+            const mine = Object.keys(v).map(function (k) { return v[k]; }).filter(function (t) {
+                return t && t.state !== 'DONE' && seatOf(t, me().code) >= 0;
+            })[0];
+            if (mine) watch(mine.id);
+        }).catch(function () { });
+    }, 4000);
+    setTimeout(function () { clearInterval(iv); }, 10 * 60000);
+})();
+
+// ==========================================
+// 국 시작 — 패를 돌린다
+// ==========================================
+function deal(t) {
+    const wall = shuffle(window.mjBuildWall(t.players));
+    const dead = wall.splice(0, 14);                 // 왕패
+    const h = {
+        wall: wall, dead: dead,
+        doraInd: [dead[0]], uraInd: [dead[1]],
+        hands: {}, melds: {}, pond: {}, riichi: {},
+        turn: dealerSeat(t), turnAt: now(), phase: 'DRAW',
+        last: null, claims: null, drawn: null, kans: 0, firstGo: true
+    };
+    arr(t.seats).forEach(function (s) {
+        h.hands[s.code] = wall.splice(0, 13).sort(function (a, b) { return a - b; });
+        h.melds[s.code] = [];
+        h.pond[s.code] = [];
+    });
+    t.h = h;
+    return t;
+}
+
+// ==========================================
+// 내 차례인가 · 내 패
+// ==========================================
+function myState() {
+    const u = me();
+    if (!cur || !cur.t || !u) return null;
+    const t = cur.t, h = t.h;
+    if (!h) return { t: t, seat: seatOf(t, u.code), h: null };
+    const seat = seatOf(t, u.code);
+    return {
+        t: t, h: h, seat: seat,
+        hand: arr(h.hands && h.hands[u.code]),
+        melds: arr(h.melds && h.melds[u.code]),
+        mine: (h.turn === seat),
+        phase: h.phase,
+        riichi: !!(h.riichi && h.riichi[u.code])
+    };
+}
+window.mjMy = myState;
+
+// ==========================================
+// 뽑기
+// ==========================================
+function draw() {
+    const u = me(); if (!u || !cur) return;
+    const id = cur.id;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        const seat = seatOf(t, u.code);
+        if (h.turn !== seat || h.phase !== 'DRAW') return;
+        const wall = arr(h.wall);
+        if (!wall.length) { endDraw(t); return t; }
+        const tile = wall.shift();
+        h.wall = wall;
+        h.drawn = tile;
+        const hand = arr(h.hands[u.code]); hand.push(tile);
+        h.hands[u.code] = hand;
+        h.phase = 'DISCARD';
+        h.turnAt = now();
+        return t;
+    });
+}
+window.mjDraw = draw;
+
+// ==========================================
+// 버리기
+// ==========================================
+function discard(tile) {
+    const u = me(); if (!u || !cur) return;
+    const id = cur.id;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        const seat = seatOf(t, u.code);
+        if (h.turn !== seat || h.phase !== 'DISCARD') return;
+        const hand = arr(h.hands[u.code]);
+        const i = hand.indexOf(tile);
+        if (i < 0) return;
+        hand.splice(i, 1);
+        h.hands[u.code] = hand.sort(function (a, b) { return a - b; });
+        const pond = arr(h.pond[u.code]); pond.push(tile);
+        h.pond[u.code] = pond;
+        h.drawn = null;
+        h.last = { by: seat, tile: tile, at: now() };
+        h.claims = {};
+        h.phase = 'CLAIM';
+        h.turnAt = now();
+        return t;
+    });
+}
+window.mjDiscard = discard;
+
+// 리치를 걸고 버린다
+function riichiDiscard(tile) {
+    const u = me(); if (!u || !cur) return;
+    const id = cur.id;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        const seat = seatOf(t, u.code);
+        if (h.turn !== seat || h.phase !== 'DISCARD') return;
+        if (h.riichi && h.riichi[u.code]) return;
+        if (arr(h.melds[u.code]).length) return;                    // 문전이어야 한다
+        if ((t.scores[u.code] || 0) < 1000) return;
+        const hand = arr(h.hands[u.code]);
+        const i = hand.indexOf(tile);
+        if (i < 0) return;
+        const after = hand.slice(); after.splice(i, 1);
+        if (window.mjShanten(after, 0) !== 0) return;                // 텐파이여야 한다
+
+        hand.splice(i, 1);
+        h.hands[u.code] = hand.sort(function (a, b) { return a - b; });
+        const pond = arr(h.pond[u.code]); pond.push(tile);
+        h.pond[u.code] = pond;
+        h.riichi = h.riichi || {};
+        h.riichi[u.code] = pond.length;                              // 몇 번째로 버렸나
+        h.ippatsu = h.ippatsu || {};
+        h.ippatsu[u.code] = true;
+        t.scores[u.code] = (t.scores[u.code] || 0) - 1000;
+        t.sticks = (t.sticks || 0) + 1;
+        h.drawn = null;
+        h.last = { by: seat, tile: tile, at: now(), riichi: true };
+        h.claims = {};
+        h.phase = 'CLAIM';
+        h.turnAt = now();
+        return t;
+    });
+}
+window.mjRiichi = riichiDiscard;
+
+// ==========================================
+// 울음 — 폰 · 치 · 깡 · 론 · 넘김
+// ==========================================
+function claim(kind, tiles) {
+    const u = me(); if (!u || !cur) return;
+    const id = cur.id;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        if (h.phase !== 'CLAIM' || !h.last) return;
+        if (seatOf(t, u.code) === h.last.by) return;
+        h.claims = h.claims || {};
+        h.claims[u.code] = { kind: kind, tiles: tiles || null, at: now() };
+        return t;
+    }).then(function () { setTimeout(function () { try { tick(); } catch (e) { } }, 60); });
+}
+window.mjClaim = claim;
+window.mjPass = function () { return claim('pass'); };
+
+// 내가 지금 할 수 있는 울음
+function claimable() {
+    const s = myState();
+    if (!s || !s.h || s.h.phase !== 'CLAIM' || !s.h.last) return null;
+    const t = s.t, h = s.h, u = me();
+    if (h.last.by === s.seat) return null;
+    if (h.claims && h.claims[u.code]) return null;
+    const tile = h.last.tile;
+    const hand = s.hand;
+    const c = {};
+    const cnt = hand.filter(function (x) { return x === tile; }).length;
+
+    // 론
+    if (window.mjShanten(hand.concat([tile]), s.melds.length) === -1 && !furiten(t, h, u.code, hand, s.melds)) {
+        const r = window.mjScore(winArgs(t, h, u.code, tile, false));
+        if (r && r.ok) c.ron = r;
+    }
+    if (!(h.riichi && h.riichi[u.code])) {
+        if (cnt >= 2) c.pon = [tile, tile];
+        if (cnt >= 3) c.kan = [tile, tile, tile];
+        if (canChi(t) && ((s.seat - h.last.by + t.players) % t.players) === 1 && !window.mjTileName(tile).match(/[동남서북백발중]/)) {
+            const opts = [];
+            const r = tile % 9;
+            [[-2, -1], [-1, 1], [1, 2]].forEach(function (d) {
+                const a = tile + d[0], b = tile + d[1];
+                if (Math.floor(a / 9) !== Math.floor(tile / 9) || Math.floor(b / 9) !== Math.floor(tile / 9)) return;
+                if (a < 0 || b > 26) return;
+                if (hand.indexOf(a) >= 0 && hand.indexOf(b) >= 0) opts.push([a, b]);
+            });
+            if (opts.length) c.chi = opts;
+        }
+    }
+    return Object.keys(c).length ? c : null;
+}
+window.mjCanClaim = claimable;
+
+// 후리텐 — 내가 기다리는 패를 내가 이미 버렸나
+function furiten(t, h, code, hand, melds) {
+    const w = window.mjWaits(hand, (melds || []).length);
+    const mine = arr(h.pond && h.pond[code]);
+    return w.some(function (x) { return mine.indexOf(x) >= 0; });
+}
+
+function winArgs(t, h, code, tile, tsumo) {
+    const seat = seatOf(t, code);
+    const melds = arr(h.melds[code]).map(function (m) {
+        return { type: m.type, tiles: arr(m.tiles) };
+    });
+    const hand = arr(h.hands[code]).slice();
+    if (tsumo) { const i = hand.indexOf(tile); if (i >= 0) hand.splice(i, 1); }
+    const riichi = !!(h.riichi && h.riichi[code]);
+    return {
+        hand: hand, melds: melds, win: tile, tsumo: !!tsumo,
+        seat: windOf(t, seat), round: 27,
+        riichi: riichi, ippatsu: riichi && !!(h.ippatsu && h.ippatsu[code]),
+        doubleRiichi: riichi && (h.riichi[code] === 1),
+        rinshan: !!h.rinshan, haitei: tsumo && arr(h.wall).length === 0,
+        houtei: !tsumo && arr(h.wall).length === 0,
+        doraInd: arr(h.doraInd), uraInd: riichi ? arr(h.uraInd) : [],
+        aka: 0, players: t.players
+    };
+}
+window.mjWinArgs = winArgs;
+
+// 쯔모 화료
+function tsumoWin() {
+    const u = me(); if (!u || !cur) return;
+    const t = cur.t, h = t && t.h;
+    if (!h || h.phase !== 'DISCARD' || h.turn !== seatOf(t, u.code)) return;
+    const r = window.mjScore(winArgs(t, h, u.code, h.drawn, true));
+    if (!r || !r.ok) { if (typeof showCustomAlert === 'function') showCustomAlert('역이 없습니다.'); return; }
+    return settleWin(u.code, null, r);
+}
+window.mjTsumo = tsumoWin;
+
+// ==========================================
+// 진행 — 차례마다 한 번씩 돈다
+// ==========================================
+function tick() {
+    const u = me(); if (!u || !cur || !cur.t) return;
+    const t = cur.t, h = t.h;
+    if (t.state !== 'PLAY' || !h) return;
+
+    if (h.phase === 'CLAIM') {
+        const age = now() - (h.turnAt || 0);
+        const others = arr(t.seats).filter(function (s, i) { return i !== h.last.by; });
+        const answered = others.every(function (s) { return h.claims && h.claims[s.code]; });
+        if (answered || age > P.claimSec * 1000) resolveClaims();
+        return;
+    }
+    // 차례인 사람이 굳었다 — 아무나 떠민다
+    const limit = (P.turnSec + P.graceSec) * 1000;
+    if (now() - (h.turnAt || 0) > limit) forceTurn();
+}
+
+function forceTurn() {
+    const id = cur && cur.id; if (!id) return;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        if (now() - (h.turnAt || 0) <= (P.turnSec + P.graceSec) * 1000) return;
+        const code = codeAt(t, h.turn);
+        if (!code) return;
+        if (h.phase === 'DRAW') {
+            const wall = arr(h.wall);
+            if (!wall.length) { endDraw(t); return t; }
+            const tile = wall.shift();
+            h.wall = wall; h.drawn = tile;
+            const hand = arr(h.hands[code]); hand.push(tile);
+            h.hands[code] = hand;
+            h.phase = 'DISCARD'; h.turnAt = now();
+            return t;
+        }
+        if (h.phase === 'DISCARD') {
+            // 쯔모기리 — 뽑은 것을 그대로 버린다
+            const hand = arr(h.hands[code]);
+            const tile = (h.drawn != null) ? h.drawn : hand[hand.length - 1];
+            const i = hand.indexOf(tile);
+            if (i >= 0) hand.splice(i, 1);
+            h.hands[code] = hand.sort(function (a, b) { return a - b; });
+            const pond = arr(h.pond[code]); pond.push(tile);
+            h.pond[code] = pond;
+            h.drawn = null;
+            h.last = { by: h.turn, tile: tile, at: now(), auto: true };
+            h.claims = {}; h.phase = 'CLAIM'; h.turnAt = now();
+            return t;
+        }
+        return;
+    });
+}
+window.mjForce = forceTurn;
+window.mjTick = tick;              // 화면과 검사에서 직접 떠민다
+
+// 울음을 가린다 — 론 > 폰·깡 > 치
+function resolveClaims() {
+    const id = cur && cur.id; if (!id) return;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        if (h.phase !== 'CLAIM' || !h.last) return;
+        const cl = h.claims || {};
+        const byPri = function (k) { return k === 'ron' ? 3 : (k === 'pon' || k === 'kan') ? 2 : k === 'chi' ? 1 : 0; };
+
+        let win = null;
+        Object.keys(cl).forEach(function (code) {
+            const c = cl[code];
+            if (!c || byPri(c.kind) === 0) return;
+            if (!win || byPri(c.kind) > byPri(win.c.kind)) win = { code: code, c: c };
+        });
+
+        if (!win) { nextTurn(t); return t; }
+
+        if (win.c.kind === 'ron') { h._ron = win.code; h.phase = 'END'; return t; }
+
+        // 울어서 가져온다
+        const code = win.code, tile = h.last.tile;
+        const hand = arr(h.hands[code]);
+        const take = [];
+        if (win.c.kind === 'chi') take.push.apply(take, arr(win.c.tiles));
+        else if (win.c.kind === 'pon') take.push(tile, tile);
+        else take.push(tile, tile, tile);
+        let ok = true;
+        take.forEach(function (x) {
+            const i = hand.indexOf(x);
+            if (i < 0) { ok = false; return; }
+            hand.splice(i, 1);
+        });
+        if (!ok) { nextTurn(t); return t; }
+
+        h.hands[code] = hand.sort(function (a, b) { return a - b; });
+        const melds = arr(h.melds[code]);
+        melds.push({ type: win.c.kind === 'chi' ? 'chi' : win.c.kind === 'pon' ? 'pon' : 'minkan',
+                     tiles: take.concat([tile]).sort(function (a, b) { return a - b; }), from: h.last.by });
+        h.melds[code] = melds;
+
+        // 울면 일발이 끊긴다
+        h.ippatsu = {};
+        h.firstGo = false;
+        h.turn = seatOf(t, code);
+        h.turnAt = now();
+        h.claims = null;
+        h.last = null;
+
+        if (win.c.kind === 'kan') {
+            // 깡 — 왕패에서 한 장 더, 도라도 한 장 더
+            const dead = arr(h.dead);
+            const extra = dead.pop();
+            h.dead = dead;
+            h.kans = (h.kans || 0) + 1;
+            const di = arr(h.doraInd); di.push(dead[2 + h.kans] != null ? dead[2 + h.kans] : dead[0]);
+            h.doraInd = di;
+            const hh = arr(h.hands[code]); hh.push(extra);
+            h.hands[code] = hh;
+            h.drawn = extra; h.rinshan = true; h.phase = 'DISCARD';
+        } else {
+            h.rinshan = false;
+            h.phase = 'DISCARD';           // 울었으면 바로 버린다
+        }
+        return t;
+    }).then(function (r) {
+        const t = r && r.snapshot && r.snapshot.val();
+        if (t && t.h && t.h._ron) doRon(t.h._ron, t);
+    });
+}
+
+function nextTurn(t) {
+    const h = t.h;
+    h.claims = null;
+    h.phase = 'DRAW';
+    h.turn = (h.turn + 1) % t.players;
+    h.turnAt = now();
+    h.rinshan = false;
+    h.last = h.last;                 // 버린 패는 남겨 둔다 (화면에 쓴다)
+    if (!arr(h.wall).length) endDraw(t);
+}
+
+function doRon(code, tbl) {
+    const t = tbl || (cur && cur.t); if (!t || !t.h) return;
+    const h = t.h;
+    const r = window.mjScore(winArgs(t, h, code, h.last.tile, false));
+    if (!r || !r.ok) { return tx(ROOT + '/' + cur.id, function (x) { if (x && x.h) { delete x.h._ron; nextTurn(x); } return x; }); }
+    return settleWin(code, codeAt(t, h.last.by), r);
+}
+
+// ==========================================
+// 국이 끝났다
+// ==========================================
+function settleWin(winner, loser, r) {
+    const id = cur && cur.id; if (!id) return;
+    return tx(ROOT + '/' + id, function (t) {
+        if (!t || t.state !== 'PLAY' || !t.h) return;
+        const h = t.h;
+        if (h.done) return;
+        h.done = true;
+        const sc = t.scores || {};
+        const dealer = (seatOf(t, winner) === dealerSeat(t));
+        const honba = (t.honba || 0) * 300;
+
+        if (loser) {
+            sc[winner] = (sc[winner] || 0) + r.points + honba;
+            sc[loser] = (sc[loser] || 0) - r.points - honba;
+        } else {
+            let got = 0;
+            arr(t.seats).forEach(function (s) {
+                if (s.code === winner) return;
+                const isOya = (seatOf(t, s.code) === dealerSeat(t));
+                const pay = dealer ? r.pay.each : (isOya ? r.pay.oya : r.pay.ko);
+                const add = pay + (honba / Math.max(1, t.players - 1));
+                sc[s.code] = (sc[s.code] || 0) - Math.round(add);
+                got += Math.round(add);
+            });
+            sc[winner] = (sc[winner] || 0) + got;
+        }
+        sc[winner] = (sc[winner] || 0) + (t.sticks || 0) * 1000;
+        t.sticks = 0;
+        t.scores = sc;
+        t.last = {
+            kind: 'win', winner: winner, loser: loser || null,
+            yaku: r.yaku, han: r.han, fu: r.fu, points: r.points, name: r.name,
+            uraInd: arr(h.uraInd), at: now()
+        };
+        advance(t, dealer);
+        return t;
+    });
+}
+
+function endDraw(t) {
+    const h = t.h;
+    if (h.done) return;
+    h.done = true;
+    // 텐파이 · 노텐
+    const ten = [], noten = [];
+    arr(t.seats).forEach(function (s) {
+        const hand = arr(h.hands[s.code]);
+        const ms = arr(h.melds[s.code]).length;
+        (window.mjShanten(hand, ms) === 0 ? ten : noten).push(s.code);
+    });
+    if (ten.length && noten.length) {
+        const pot = 3000, give = Math.round(pot / noten.length), take = Math.round(pot / ten.length);
+        noten.forEach(function (c) { t.scores[c] = (t.scores[c] || 0) - give; });
+        ten.forEach(function (c) { t.scores[c] = (t.scores[c] || 0) + take; });
+    }
+    t.last = { kind: 'draw', ten: ten, at: now() };
+    const dealerTen = ten.indexOf(codeAt(t, dealerSeat(t))) >= 0;
+    advance(t, dealerTen);
+}
+
+// 다음 국 · 또는 끝
+function advance(t, keepDealer) {
+    if (keepDealer) {
+        t.honba = (t.honba || 0) + 1;
+    } else {
+        t.honba = 0;
+        t.kyoku = (t.kyoku || 1) + 1;
+    }
+    if (t.kyoku > t.players) { finish(t); return; }
+    deal(t);
+}
+
+function finish(t) {
+    t.state = 'DONE';
+    const rank = arr(t.seats).map(function (s) {
+        return { code: s.code, name: s.name, score: t.scores[s.code] || 0 };
+    }).sort(function (a, b) { return b.score - a.score; });
+    t.result = { rank: rank, at: now(), start: P.start };
+    t.h = null;
+}
+
+// ==========================================
+// 확인
+// ==========================================
+window.mjTables = function () {
+    listTables().then(function (list) {
+        console.log('%c===== 🀄 열린 자리 =====', 'color:#4CAF50; font-size:13px');
+        if (!list.length) { console.log('  없습니다.'); return; }
+        console.table(list.map(function (t) {
+            return { 판: t.id, 인원: arr(t.seats).length + '/' + t.players, 상태: t.state,
+                     국: t.kyoku + '국', 사람: arr(t.seats).map(function (s) { return s.name; }).join(', ') };
+        }));
+    });
+};
+window.mjState = function () {
+    const s = myState();
+    console.log('%c===== 🀄 내 판 =====', 'color:#4CAF50; font-size:13px');
+    if (!s) { console.log('  앉은 자리가 없습니다.'); return; }
+    const t = s.t;
+    console.log('  판:', t.id, '· 상태:', t.state, '· ' + t.kyoku + '국 ' + (t.honba || 0) + '본장');
+    console.log('  자리:', arr(t.seats).map(function (x, i) {
+        return (i === (s.h ? s.h.turn : -1) ? '▶' : ' ') + x.name + '(' + (t.scores[x.code] || 0) + ')';
+    }).join('  '));
+    if (!s.h) { console.log('  아직 안 시작했습니다.'); return; }
+    console.log('  내 패:', s.hand.map(window.mjTileName).join(' '),
+        s.melds.length ? ('· 울음 ' + s.melds.length) : '');
+    console.log('  단계:', s.phase, '· 내 차례:', s.mine ? 'O' : '✗',
+        '· 남은 산:', arr(s.h.wall).length, '장');
+    console.log('  샨텐:', window.mjShanten(s.hand, s.melds.length),
+        '· 기다리는 패:', window.mjWaits(s.hand, s.melds.length).map(window.mjTileName).join(' ') || '-');
+};
+
+// 바뀐 것이 없어도 시간은 흐른다 — 울음 창과 굳은 차례를 여기서 본다
+setInterval(function () { try { tick(); } catch (e) { } }, 1000);
+
+console.log('[마작] 판 진행 — mjTables() · mjState()');
+
+})();

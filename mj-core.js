@@ -123,7 +123,7 @@ window.mjDoraOf = doraOf;
 function tileSet(players) {
     const out = [];
     for (let t = 0; t < 34; t++) {
-        if (players === 3) {
+        if (players === 2 || players === 3) {
             if (t === NORTH) continue;
             if (t > MAN && t < MAN + 8) continue;      // 2m~8m
         }
@@ -253,9 +253,14 @@ function shantenStd(c, melds) {
     go(0, 0, 0, false);
     return best;
 }
+// 같은 손패를 거듭 묻는 일이 많다 (버릴 패 고르기·기다리는 패). 적어 둔다.
+const shCache = {};
+let shKeys = 0;
 function shanten(list, melds) {
     const c = toCounts(list);
     const m = melds || 0;
+    const key = c.join('') + '|' + m;
+    if (shCache[key] !== undefined) return shCache[key];
     let best = shantenStd(c.slice(), m);
     if (m === 0) {
         // 치토이츠
@@ -267,6 +272,8 @@ function shanten(list, melds) {
         KOKUSHI.forEach(function (t) { if (c[t] >= 1) have++; if (c[t] >= 2) hasPair = true; });
         best = Math.min(best, 13 - have - (hasPair ? 1 : 0));
     }
+    if (shKeys > 40000) { for (const k in shCache) delete shCache[k]; shKeys = 0; }
+    shCache[key] = best; shKeys++;
     return best;
 }
 window.mjShanten = shanten;
