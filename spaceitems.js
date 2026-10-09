@@ -8,7 +8,7 @@
 //        둘 다 채워져 있으면  공용시설 250% · 랜덤박스 150%
 //        둘 다 「남이 채워 줘야」 효력이 돈다 (다이아 플러그와 같은 규칙)
 //   3. 복사기        2,000,000 P   하루 두 개까지 복제. 복사기는 안 사라진다
-//   4. 우리가 도움   9,999,999 P   ????????
+//   4. 우리가 도움   9,999,999 P   ???????? (전용 장비의 다음 속성 자리 하나 · 최대 5)
 //
 //   넷 다 진열 확률 0.5% 다. (RARE_ALIEN_RATE)
 //
@@ -498,6 +498,10 @@ setInterval(function () {
 // ==========================================
 // 4. 우리가 도움
 // ==========================================
+// 자리는 다섯까지 — 네 번째로 못 박지 않고, 지금 있는 자리의 「다음」을 연다
+const GIFT_MAX = 5;
+window.GEAR_SLOT_MAX = GIFT_MAX;
+
 function giftUse(itemName) {
     if (!currentUser) return;
     if ((currentUser.inventory || []).indexOf(itemName) < 0) {
@@ -505,14 +509,29 @@ function giftUse(itemName) {
     }
     const g = (typeof getGear === 'function') ? getGear(currentUser) : null;
     if (!g) { showCustomAlert('받을 자리가 없습니다.'); return; }
-    if ((g.slots || 1) >= 4) { showCustomAlert('이미 다 열려 있습니다.'); return; }
 
-    g.slots = 4;
+    // 이레귤러 칭호가 자리를 올려 둔 동안에는 원래 자리 수를 센다
+    const real = (g.slotsReal !== undefined) ? (g.slotsReal || 1) : (g.slots || 1);
+    if (real >= GIFT_MAX) {
+        showCustomAlert('이미 ' + GIFT_MAX + '자리가 모두 열려 있습니다.'); return;
+    }
+
+    const next = real + 1;
+    if (g.slotsReal !== undefined) {
+        g.slotsReal = next;                       // 칭호를 떼면 이 수로 돌아간다
+        if ((g.slots || 1) < next) g.slots = next;
+    } else {
+        g.slots = next;
+    }
+
     if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
-    if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[' + GIFT + '] ……');
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(currentUser, '[' + GIFT + '] 자리 ' + next + '개째 …');
+    }
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
     if (typeof updateUI === 'function') updateUI();
-    showCustomAlert('…… 들렸습니다.\n\n무언가 하나가 더 들어갈 자리가 생겼습니다.');
+    showCustomAlert('…… 들렸습니다.\n\n무언가 하나가 더 들어갈 자리가 생겼습니다.'
+        + '\n\n속성 자리 ' + next + ' / ' + GIFT_MAX);
 }
 
 // ==========================================

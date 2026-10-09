@@ -986,6 +986,7 @@ setInterval(function () {
 // ■ 네 번째 자리
 //   g.slots 를 4 로 올리고 원래 값을 g.slotsReal 에 적어 둔다.
 //   칭호를 떼면 되돌린다. 5초마다 맞춰 보므로 어긋난 채로 남지 않는다.
+//   「우리가 도움」으로 이미 넷을 넘긴 사람은 그대로 둔다 (올리기만 한다).
 
 const IRR = '이레귤러';
 const IRR_SLOTS = 4;
@@ -1028,7 +1029,9 @@ function irrGear(g) {
             if (g.gradeReal === undefined) g.gradeReal = g.grade;
             if (g.grade !== 'L') g.grade = 'L';
             if (g.slotsReal === undefined) g.slotsReal = (g.slots || 1);
-            if (g.slots !== IRR_SLOTS) g.slots = IRR_SLOTS;
+            // 「우리가 도움」으로 넷을 넘겨 둔 사람은 깎지 않는다 — 올리기만 한다
+            const want = Math.max(IRR_SLOTS, g.slotsReal || 1);
+            if (g.slots !== want) g.slots = want;
         } else {
             let back = false;
             if (g.gradeReal !== undefined) { g.grade = g.gradeReal; delete g.gradeReal; back = true; }
