@@ -703,7 +703,8 @@ window.mjState = function () {
         '· 기다리는 패:', window.mjWaits(s.hand, s.melds.length).map(window.mjTileName).join(' ') || '-');
 };
 
-// 왜 자리가 안 만들어지나 — 서버에 한 번 써 보고 그대로 알려 준다
+// 왜 자리가 안 만들어지나 — 처음부터 끝까지 한 번 해 보고 걸리는 데를 짚는다
+const OK = 'color:#4CAF50', NO = 'color:#f44336';
 window.mjWhy = function () {
     console.log('%c===== 🀄 마작이 되는지 =====', 'color:#ffd700; font-size:13px');
     console.log('  채점기:', typeof window.mjScore === 'function' ? 'O' : '✗',
@@ -711,17 +712,43 @@ window.mjWhy = function () {
         '· 화면:', typeof window.mjOpen === 'function' ? 'O' : '✗');
     console.log('  나:', me() ? (me().name + ' (' + me().code + ')') : '✗ 없음',
         '· 서버 연결:', db_() ? 'O' : '✗ 없음');
+    console.log('  격리 중인가(단추가 뜨는 조건):',
+        (typeof isQuarantined === 'function' && me() && isQuarantined(me())) ? 'O' : '✗ — 단추는 상담실·선녀탕 안에서만 뜹니다');
+    console.log('  이미 앉아 있는 자리:', cur ? (cur.id + ' · ' + ((cur.t && cur.t.state) || '?')) : '없음');
     if (window._mjLastError) console.log('  지난 오류:', window._mjLastError);
     if (!db_()) return;
-    const p = ROOT + '/_test/' + (me() ? me().code : 'x');
-    db_().ref(p).set({ at: now() }).then(function () {
-        console.log('%c  ✓ mjTables 에 쓸 수 있습니다. 규칙 문제는 아닙니다.', 'color:#4CAF50');
-        return db_().ref(p).remove();
+    if (cur) { console.log('  ※ 이미 앉아 있어 새로 만들어 보지는 않습니다. 나가려면 mjLeave()'); return; }
+
+    console.log('  — 실제로 한 번 만들어 봅니다 —');
+    let made = null;
+    makeTable(2).then(function (id) {
+        made = id;
+        if (!id) { console.log('%c  ✗ mjMake 가 빈손으로 돌아왔습니다 (나 또는 서버 연결 없음)', NO); return null; }
+        console.log('%c  ✓ 만들었습니다 — ' + id, OK);
+        return db_().ref(ROOT + '/' + id).once('value');
+    }).then(function (s) {
+        if (!s) return;
+        const v = s.val();
+        if (!v) { console.log('%c  ✗ 썼는데 서버에서 다시 읽히지 않습니다 (규칙이 읽기를 막음)', NO); return; }
+        console.log('%c  ✓ 서버에서 다시 읽힙니다 — ' + v.players + '인 · ' + v.state, OK);
+        console.log('%c    내 자리: ' + (cur ? 'O 붙었습니다' : '✗ 안 붙었습니다 (watch 가 실패했습니다)'), cur ? OK : NO);
+        return listTables();
+    }).then(function (l) {
+        if (l) console.log('%c  ✓ 열린 자리 목록에 ' + l.length + '개 보입니다', OK);
     }).catch(function (e) {
-        console.log('%c  ✗ mjTables 에 못 씁니다 — ' + (e && e.message), 'color:#f44336');
-        console.log('    데이터베이스 규칙에서 mjTables 쓰기가 막혀 있습니다.');
-        console.log('    Firebase 콘솔 → Realtime Database → 규칙 에 아래를 넣어 주세요.');
-        console.log('      { "rules": { ".read": true, ".write": true } }');
+        const msg = (e && (e.message || e.code)) || e;
+        console.log('%c  ✗ 막혔습니다 — ' + msg, NO);
+        if (/permission|denied/i.test(String(msg))) {
+            console.log('    데이터베이스 규칙에서 mjTables 쓰기가 막혀 있습니다.');
+            console.log('    Firebase 콘솔 → Realtime Database → 규칙 에 아래를 넣어 주세요.');
+            console.log('      { "rules": { ".read": true, ".write": true } }');
+        }
+    }).then(function () {
+        if (!made) return;
+        unwatch();
+        return db_().ref(ROOT + '/' + made).set(null).then(function () {
+            console.log('  (시험으로 만든 자리는 치웠습니다)');
+        }).catch(function () { });
     });
 };
 
