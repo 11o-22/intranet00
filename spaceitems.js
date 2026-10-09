@@ -510,19 +510,21 @@ function giftUse(itemName) {
     const g = (typeof getGear === 'function') ? getGear(currentUser) : null;
     if (!g) { showCustomAlert('받을 자리가 없습니다.'); return; }
 
-    // 이레귤러 칭호가 자리를 올려 둔 동안에는 원래 자리 수를 센다
-    const real = (g.slotsReal !== undefined) ? (g.slotsReal || 1) : (g.slots || 1);
-    if (real >= GIFT_MAX) {
+    // ★ 「지금 열려 있는 자리」의 다음을 연다.
+    //
+    //   ⛓️‍💥 이레귤러 칭호는 자리를 넷으로 올려 둔다. 예전에는 원래 수
+    //   (slotsReal)를 세어서, 세 자리인 사람이 쓰면 원래 수만 넷이 되고
+    //   보이는 자리는 넷 그대로였다 — 쓰고도 아무 일이 없어 보였다.
+    //   이제 보이는 수를 세므로 그 자리에서 다섯째가 열린다.
+    //   얻은 자리는 slotsReal 에도 적으므로 칭호를 떼도 남는다.
+    const open = Math.max(g.slots || 1, g.slotsReal || 0);
+    if (open >= GIFT_MAX) {
         showCustomAlert('이미 ' + GIFT_MAX + '자리가 모두 열려 있습니다.'); return;
     }
 
-    const next = real + 1;
-    if (g.slotsReal !== undefined) {
-        g.slotsReal = next;                       // 칭호를 떼면 이 수로 돌아간다
-        if ((g.slots || 1) < next) g.slots = next;
-    } else {
-        g.slots = next;
-    }
+    const next = open + 1;
+    g.slots = next;
+    if (g.slotsReal !== undefined) g.slotsReal = next;   // 칭호를 떼도 이 수로 남는다
 
     // 이 자리는 L 로 시작하고 속성을 바꿔도 L 로 남는다 (gift-slot.js 가 지킨다)
     if (!Array.isArray(g.giftSlots)) g.giftSlots = [];
