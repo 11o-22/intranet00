@@ -4372,6 +4372,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
                 else if (broke) bonus += 350;
             }
             if (a214State && (a214State.exposed || 0) > 0) bonus += 150 * a214State.exposed;
+            // ★ 살아서 나온 사원 — 신도가 몇을 죽였느냐에 따라 최대 5,000 P (a214-kill.js)
+            if (darkRun.a214Survived) bonus += (darkRun.a214SurviveBonus || 0);
         }
 
                 if (darkRun.zone === 'Qtrew-A-667') {
@@ -4486,6 +4488,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         const zoneLoot = DARK_LOOT_BY_ZONE[darkRun.zone] || [];
                 zoneLoot.forEach(l => {
             let c = l.chance * (darkRun.critical ? 3 : 1);
+            if (darkRun.a214Purge) c *= 3;                     // ★ A-214 전원 처리한 신도 — 확률 200% 상승
             if (gearValue(currentUser, 'luck') > 0) c *= 2;    // ★ 행운
             if (typeof emLootMult === 'function') c *= emLootMult(currentUser);   // ★ 에메랄드 하네스
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
