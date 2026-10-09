@@ -159,9 +159,51 @@ function lobby() {
         shell(h);
     });
 }
-window.mjMakeUI = function (n) { window.mjMake(n).then(function () { }); };
+// 왜 안 되는지 말해 준다 — 말없이 떨어지면 「눌러도 아무 일이 없다」로 보인다
+function whine(e, what) {
+    const msg = (e && (e.message || e.code)) ? String(e.message || e.code) : '알 수 없는 까닭';
+    console.error('[마작] ' + what, e);
+    window._mjLastError = msg;
+    const perm = /permission|denied/i.test(msg);
+    showCustomAlert(what + '\n\n' + msg
+        + (perm ? '\n\n데이터베이스 규칙이 mjTables 쓰기를 막고 있습니다.\n상담사에게 알려 주세요.' : ''));
+}
+
+window.mjMakeUI = function (n) {
+    const btns = document.querySelectorAll('#mj-body button');
+    btns.forEach(function (b) { b.disabled = true; });
+    let answered = false;
+    const wake = function () { if (!answered) { answered = true; lobby(); } };
+    setTimeout(function () {                      // 서버가 묵묵부답일 때
+        if (answered || (window.mjCur && window.mjCur())) return;
+        answered = true;
+        showCustomAlert('자리를 만들지 못했습니다.\n\n서버가 응답하지 않습니다. 잠시 뒤에 다시 해 주세요.');
+        lobby();
+    }, 8000);
+    try {
+        const p = window.mjMake(n);
+        if (!p || typeof p.then !== 'function') { wake(); return; }
+        p.then(function (id) {
+            answered = true;
+            if (!id) { showCustomAlert('자리를 만들지 못했습니다.'); lobby(); }
+            // 들어갔으면 mjOnChange 가 그려 준다. 혹시 안 왔으면 손으로 한 번 더
+            setTimeout(function () {
+                const s = window.mjCur && window.mjCur();
+                if (s && s.t) paint(s.t);
+            }, 400);
+        }).catch(function (e) { answered = true; whine(e, '자리를 만들지 못했습니다.'); lobby(); });
+    } catch (e) { answered = true; whine(e, '자리를 만들지 못했습니다.'); lobby(); }
+};
 window.mjJoinUI = function (id) {
-    window.mjJoin(id).then(function (ok) { if (!ok) { showCustomAlert('그 자리에는 앉을 수 없습니다.'); lobby(); } });
+    try {
+        window.mjJoin(id).then(function (ok) {
+            if (!ok) { showCustomAlert('그 자리에는 앉을 수 없습니다.'); lobby(); return; }
+            setTimeout(function () {
+                const s = window.mjCur && window.mjCur();
+                if (s && s.t) paint(s.t);
+            }, 400);
+        }).catch(function (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); });
+    } catch (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); }
 };
 
 // ==========================================

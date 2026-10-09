@@ -703,9 +703,31 @@ window.mjState = function () {
         '· 기다리는 패:', window.mjWaits(s.hand, s.melds.length).map(window.mjTileName).join(' ') || '-');
 };
 
+// 왜 자리가 안 만들어지나 — 서버에 한 번 써 보고 그대로 알려 준다
+window.mjWhy = function () {
+    console.log('%c===== 🀄 마작이 되는지 =====', 'color:#ffd700; font-size:13px');
+    console.log('  채점기:', typeof window.mjScore === 'function' ? 'O' : '✗',
+        '· 판 진행:', typeof window.mjMake === 'function' ? 'O' : '✗',
+        '· 화면:', typeof window.mjOpen === 'function' ? 'O' : '✗');
+    console.log('  나:', me() ? (me().name + ' (' + me().code + ')') : '✗ 없음',
+        '· 서버 연결:', db_() ? 'O' : '✗ 없음');
+    if (window._mjLastError) console.log('  지난 오류:', window._mjLastError);
+    if (!db_()) return;
+    const p = ROOT + '/_test/' + (me() ? me().code : 'x');
+    db_().ref(p).set({ at: now() }).then(function () {
+        console.log('%c  ✓ mjTables 에 쓸 수 있습니다. 규칙 문제는 아닙니다.', 'color:#4CAF50');
+        return db_().ref(p).remove();
+    }).catch(function (e) {
+        console.log('%c  ✗ mjTables 에 못 씁니다 — ' + (e && e.message), 'color:#f44336');
+        console.log('    데이터베이스 규칙에서 mjTables 쓰기가 막혀 있습니다.');
+        console.log('    Firebase 콘솔 → Realtime Database → 규칙 에 아래를 넣어 주세요.');
+        console.log('      { "rules": { ".read": true, ".write": true } }');
+    });
+};
+
 // 바뀐 것이 없어도 시간은 흐른다 — 울음 창과 굳은 차례를 여기서 본다
 setInterval(function () { try { tick(); } catch (e) { } }, 1000);
 
-console.log('[마작] 판 진행 — mjTables() · mjState()');
+console.log('[마작] 판 진행 — mjTables() · mjState() · mjWhy()');
 
 })();
