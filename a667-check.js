@@ -8,6 +8,7 @@
 //   a667.next()    다음 단계로
 //   a667.prev()    앞 단계로
 //   a667.go(n)     n 단계로
+//   a667.end()     결산(99 단계)으로 한 번에 (부르면 탐사가 끝난다)
 //   a667.list()    단계 표 전체 (0~32 · 99)
 //   a667.hold()    인간성·깊이를 묶고 붙잡힘·표류를 끈다 (점검 중 안 죽게)
 //   a667.free()    묶은 것을 푼다
@@ -112,6 +113,41 @@ function show() {
         + '개 · 글자 ' + b.innerText.replace(/\s+/g, ' ').trim().length + '자');
 }
 
+// ── 결산으로 한 번에 ──────────────────────────
+//
+// 99 단계(result)로 바로 간다. 중간 단계를 밟지 않으므로 성공·실패·인간성은
+// 지금 값 그대로 들어간다. 점수를 보고 싶으면 부르기 전에 손으로 올린다.
+//     darkRun.success = 12; darkRun.fail = 1; darkRun.humanity = 55; a667.end()
+//     darkRun.hiddenRoute = 'rescue';   // truth · rescue · coexist
+//
+// 결산이 돌면 탐사가 끝난다 (darkRun 이 비워진다). 한 판에 한 번뿐이고,
+// 다시 보려면 구역에 새로 들어가야 한다. 포인트와 회수품은 그대로 들어간다.
+function end() {
+    if (!ready()) return;
+    if (darkRun._dead) { console.warn('이미 쓰러졌습니다. 결산이 열리지 않습니다.'); return; }
+    if (darkRun._settled) { console.warn('이미 결산했습니다. 다시 보려면 새로 들어가야 합니다.'); return; }
+
+    darkRun.driftIdx = null;        // 표류 중이면 빠져나온다
+    darkRun.rejoined = false;       // 복귀 화면이 먼저 가로채지 않게
+    darkRun.step = 99;
+    darkRun._advTo = null;
+    window._rdsLock = false;
+
+    console.log('%c결산으로', 'color:#4fc3f7; font-size:13px; font-weight:bold');
+    console.log('  성공 ' + (darkRun.success || 0) + ' / 실패 ' + (darkRun.fail || 0)
+        + ' · 인간성 ' + (darkRun.humanity != null ? darkRun.humanity : '-')
+        + ' · 깊이 ' + (darkRun.depth || 0)
+        + ' · 보정 ' + (darkRun.modifier || 0)
+        + (darkRun.hiddenRoute ? ' · 숨은 길 ' + darkRun.hiddenRoute : ''));
+
+    try { renderDarkStep(); } catch (e) { console.error('결산에서 터졌습니다:', e); return; }
+
+    const b = body();
+    if (b) console.log('  버튼 ' + b.querySelectorAll('button').length
+        + '개 · 글자 ' + b.innerText.replace(/\s+/g, ' ').trim().length + '자');
+    if (kept) console.log('  ※ 아직 묶여 있습니다. a667.free() 로 푸십시오.');
+}
+
 // ── 전부 한 번씩 그려 보기 ────────────────────
 function scan() {
     if (!ready()) return;
@@ -166,6 +202,7 @@ window.a667 = function () { show(); };
 window.a667.go    = go;
 window.a667.next  = next;
 window.a667.prev  = prev;
+window.a667.end   = end;
 window.a667.hold  = hold;
 window.a667.free  = free;
 window.a667.scan  = scan;
@@ -179,6 +216,7 @@ window.a667.list  = function () {
 
 console.log('%cA-667 점검 콘솔 준비됨', 'color:#4fc3f7; font-size:13px; font-weight:bold');
 console.log('  a667()  a667.next()  a667.prev()  a667.go(n)  a667.list()');
+console.log('  a667.end()  — 결산으로 한 번에');
 console.log('  a667.hold()  a667.free()  a667.scan()');
 
 })();
