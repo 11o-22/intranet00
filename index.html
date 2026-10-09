@@ -369,7 +369,7 @@
                 </div>
                 <div class="status-item">
                     <div class="status-label">공용시설 이용</div>
-                    <div class="status-value"><span id="display-facility-count">0</span> / <span id="display-facility-max">15</span>회</div>
+                    <div class="status-value"><span id="display-facility-count">0</span> / <span id="display-facility-max">20</span>회</div>
                 </div>
                 <div class="status-item">
                     <div class="status-label">신용 등급</div>
@@ -622,7 +622,7 @@
     </div>
 
     <div id="seotda-controls-start">
-        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50)</div>
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 10000)</div>
         <div class="bet-stepper">
             <button class="step-btn wide" onclick="adjustBet('seotda-bet', -10)">-10</button>
             <button class="step-btn" onclick="adjustBet('seotda-bet', -1)">&lt;</button>
@@ -658,7 +658,7 @@
     </div>
 
     <div id="bj-controls-start">
-        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 50000)</div>
+        <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 10000)</div>
         <div class="bet-stepper">
             <button class="step-btn wide" onclick="adjustBet('bj-bet', -1000)">-1천</button>
             <button class="step-btn wide" onclick="adjustBet('bj-bet', -100)">-100</button>
@@ -7714,7 +7714,7 @@ updateUI();
         saveFields({ points:1, inventory:1, history:1, purchaseRecord:1 }); updateUI();
     }
     // ==========================================
-    // ★ 베팅 스테퍼 (섯다만 50 P 상한)
+    // ★ 베팅 스테퍼 — 한도는 BET_CAPS 가 정한다 (적어 둔 것과 어긋나지 않게)
     // ==========================================
     const MAX_BET = 50;
     const POINT_CAP = 30000000;
