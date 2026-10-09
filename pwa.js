@@ -88,13 +88,49 @@ let reg = null;
 // ==========================================
 (function safeArea() {
     if (!standalone()) return;
+    const T = 'env(safe-area-inset-top)', B = 'env(safe-area-inset-bottom)',
+          L = 'env(safe-area-inset-left)', R = 'env(safe-area-inset-right)';
+
+    // 꽉 찬 화면 오버레이는 body 의 여백을 받지 않는다. position:fixed 는
+    // body 가 아니라 화면에 붙기 때문이다. 그래서 제 안쪽으로 따로 밀어 준다.
+    // 안 밀면 어둠 탐사 머리칸의 ↻ · 🔊 가 아이폰 상태 표시줄(시계·배터리·
+    // 다이내믹 아일랜드) 밑에 깔려 손가락이 닿지 않는다.
+    //
+    // 안쪽 칸은 inline 으로 height:100dvh 가 박혀 있다. 그대로 두면 밀어 낸
+    // 만큼 아래로 넘쳐서 채팅칸이 홈 바에 잘린다. 그래서 100% 로 바꾼다.
+    // inline 을 이기려면 !important 가 있어야 한다.
+    const pad = function (sel, extra) {
+        return sel + '{box-sizing:border-box !important;'
+            + 'padding-top:' + (extra ? 'calc(' + extra + ' + ' + T + ')' : T) + ' !important;'
+            + 'padding-bottom:' + (extra ? 'calc(' + extra + ' + ' + B + ')' : B) + ' !important;'
+            + 'padding-left:' + (extra ? 'calc(' + extra + ' + ' + L + ')' : L) + ' !important;'
+            + 'padding-right:' + (extra ? 'calc(' + extra + ' + ' + R + ')' : R) + ' !important;}';
+    };
+
     const st = document.createElement('style');
     st.textContent =
-        'body{padding-top:env(safe-area-inset-top);'
-        + 'padding-bottom:env(safe-area-inset-bottom);'
-        + 'padding-left:env(safe-area-inset-left);'
-        + 'padding-right:env(safe-area-inset-right);}'
-        + '#notice-ticker{top:env(safe-area-inset-top) !important;}';
+        'body{padding-top:' + T + ';'
+        + 'padding-bottom:' + B + ';'
+        + 'padding-left:' + L + ';'
+        + 'padding-right:' + R + ';}'
+        + '#notice-ticker{top:' + T + ' !important;}'
+
+        // 어둠 탐사 — 머리칸(구역 번호 · ↻ · 🔊)과 바닥 채팅칸
+        + pad('#dark-run-overlay')
+        + '#dark-run-overlay{height:100dvh !important;}'
+        + '#dark-run-overlay > div{height:100% !important; max-height:100% !important;}'
+
+        // 테트리스 — 원래 있던 16px 위에 얹는다
+        + pad('#tetris-overlay', '16px')
+
+        // 가운데 뜨는 창들 — 길어졌을 때 위아래로 넘치지 않게
+        + pad('.modal-overlay')
+        + pad('#custom-alert-overlay')
+        + pad('#quarantine-pick-overlay')
+        + pad('#dark-resume-overlay')
+        + pad('#dark-invite-overlay')
+        + pad('#auto-login-overlay')
+        + pad('#maintenance-overlay');
     document.head.appendChild(st);
     document.documentElement.classList.add('pwa-standalone');
 })();
