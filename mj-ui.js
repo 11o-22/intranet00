@@ -197,25 +197,50 @@ function ui() {
 #mj-bar .mj-turn { margin-left:auto; }
 #mj-bar .mj-turn.on { border-color:#ffd76a; color:#ffd76a; }
 
-/* --- 판 --- */
+/* --- 판 —— 비스듬히 내려다보는 마작상 ---
+   판(.mj-board)을 x축으로 기울여 상처럼 눕히고, 그 위에 네 자리를
+   제자리 돌림(0·-90·180·90도)으로 얹는다. 그러면 자리마다 쌓는 차례
+   (산 → 후로 → 버린 패 → 가운데)를 한 가지로만 적어도 네 방향이
+   저절로 가운데를 보게 된다. */
 #mj-felt { flex:1; position:relative; min-height:0; overflow:hidden; }
+.mj-stage { position:absolute; inset:0; perspective:950px; perspective-origin:50% 32%; }
+.mj-board {
+    position:absolute; left:50%; top:46%;
+    width:var(--s,340px); height:var(--s,340px);
+    margin:calc(var(--s,340px) / -2) 0 0 calc(var(--s,340px) / -2);
+    transform:rotateX(48deg);
+    transform-style:preserve-3d;
+    border-radius:16px;
+    background:radial-gradient(ellipse at 50% 46%, #1f6e52 0%, #14543e 54%, #0c3627 100%);
+    box-shadow:0 0 0 9px #3d2c1b, 0 0 0 12px #241a10,
+               0 26px 44px rgba(0,0,0,0.55), inset 0 0 70px rgba(0,0,0,0.42);
+}
+.mj-board::after {                       /* 가운데 네모 금 */
+    content:''; position:absolute; inset:19%; border-radius:7px;
+    border:1px solid rgba(255,255,255,0.07);
+}
+.mj-seatg { position:absolute; inset:0; }
+.mj-seatg > * { position:absolute; left:50%; transform:translateX(-50%); }
+.mj-wall { bottom:2.5%; display:flex; }
+.mj-wall .mjt { width:11px; height:15px; margin-right:-1px; border-radius:2px; }
+.mj-seatg .mj-melds { bottom:10.5%; gap:5px; }
+.mj-seatg .mj-melds .mjt { width:15px; height:20px; border-radius:2px; }
+.mj-seatg .mj-pond { bottom:19%; }
+.mj-seatg .mj-pond { grid-template-columns:repeat(8, auto); }
+.mj-seatg .mj-pond .mjt { width:17px; height:23px; border-radius:2px; }
 
-.mj-blk { position:absolute; display:flex; flex-direction:column; align-items:center; gap:3px; }
-/* 키 큰 화면에서 위아래가 멀어지지 않게 가운데 쪽으로 당긴다.
-   좁은 화면에서는 max() 가 가장자리로 되돌려 준다. */
-.mj-blk-top { top:max(4px, calc(50% - 212px)); left:50%; transform:translateX(-50%); }
-.mj-blk-me  { bottom:max(30px, calc(50% - 150px)); left:50%; transform:translateX(-50%); }
-
-/* 옆자리 — 눕혀서 가운데를 보게 한다.
-   바깥은 자리만 잡고(너비 0), 안쪽을 돌린다. 그래야 돌린 뒤의 크기를
-   셈하지 않아도 된다. transform-origin 을 모서리에 두고 가운데로 당긴다. */
-.mj-side { position:absolute; top:50%; width:0; height:0; }
-.mj-side-left  { left:72px; }
-.mj-side-right { right:72px; }
-.mj-rot { position:absolute; left:0; top:0; width:max-content; transform-origin:0 0; }
-.mj-side-left  .mj-rot { transform:rotate(-90deg) translate(-50%,-50%); }
-.mj-side-right .mj-rot { transform:rotate(90deg) translate(-50%,-50%); }
-.mj-side .mj-blk { position:static; transform:none; }
+/* 가운데 알림판 — 상 위에 같이 누워 있다. 눌려 보이므로 글씨를 키운다. */
+.mj-mid3 {
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:linear-gradient(180deg,rgba(14,18,16,0.92),rgba(6,10,8,0.95));
+    border:1px solid rgba(255,255,255,0.16); border-radius:9px;
+    padding:6px 9px; text-align:center; white-space:nowrap; line-height:1.35;
+    box-shadow:0 3px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+.mj-mid3 .mj-r1 { font-size:14px; font-weight:700; color:#ffd76a; letter-spacing:0.02em; }
+.mj-mid3 .mj-r2 { font-size:11px; color:#9fbfae; margin-top:2px; }
+.mj-mid3 .mj-dora { display:flex; gap:3px; justify-content:center; margin-top:4px; }
+.mj-mid3 .mj-dora .mjt { width:15px; height:20px; border-radius:2px; }
 
 /* --- 이름표 --- */
 .mj-plate {
@@ -234,39 +259,39 @@ function ui() {
 .mj-plate.mj-turn .mj-wd { background:#5a4512; color:#ffd76a; border-color:#ffd76a; }
 .mj-plate .mj-ri { color:#ff8a65; font-weight:700; }
 
-/* 이름표는 눕히지 않는다 — 아래에 한 줄로 세워 둔다 (왼쪽 · 나 · 오른쪽) */
-.mj-plates {
-    position:absolute; left:4px; right:4px; bottom:4px; z-index:3;
-    display:flex; align-items:center; justify-content:space-between; gap:5px;
-}
-.mj-plates.mj-one { justify-content:center; }
-.mj-plates .mj-plate { flex:0 1 auto; min-width:0; }
-.mj-plates .mj-plate-side { font-size:9px; padding:3px 6px; }
-.mj-plates .mj-plate-side .mj-nm { max-width:40px; }
+/* 이름표는 눕히지 않는다 — 상 네 귀에 바로 세워 둔다 */
+.mj-plate { position:absolute; z-index:3; }
+.mj-pl-me { left:5px;  bottom:5px; }
+.mj-pl-t  { left:50%;  top:3px; transform:translateX(-50%); }
+.mj-pl-l  { left:5px;  top:34%; }
+.mj-pl-r  { right:5px; top:34%; }
 .mj-plate .mj-cnt { color:#8aa89a; }
-
-/* --- 엎은 패 줄 --- */
-.mj-backs { display:flex; }
-.mj-backs .mjt { margin-right:-5px; }
-.mj-backs .mjt:last-child { margin-right:0; }
-
-/* --- 버린 패 --- */
-.mj-pond { display:grid; grid-template-columns:repeat(6, auto); gap:2px; justify-content:center; }
-.mj-pond-me { grid-template-columns:repeat(8, auto); }
-.mj-melds { display:flex; gap:7px; flex-wrap:wrap; justify-content:center; }
-.mj-meld { display:flex; gap:1px; }
-
-/* --- 가운데 --- */
-#mj-mid {
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:rgba(0,0,0,0.46); border:1px solid rgba(255,255,255,0.14); border-radius:9px;
-    padding:7px 9px; text-align:center; min-width:104px; max-width:160px;
-    box-shadow:inset 0 0 22px rgba(0,0,0,0.5);
+.mj-plate .mj-face {
+    width:20px; height:25px; border-radius:3px; flex:none; overflow:hidden;
+    background:#2b2b2b; border:1px solid rgba(255,255,255,0.2);
 }
-#mj-mid .mj-r1 { font-size:13px; font-weight:700; color:#ffd76a; letter-spacing:0.02em; }
-#mj-mid .mj-r2 { font-size:10px; color:#9fbfae; margin-top:2px; }
-#mj-mid .mj-dora { display:flex; gap:2px; justify-content:center; margin-top:5px; }
-#mj-mid .mj-r3 { font-size:9px; color:#8aa89a; margin-top:4px; line-height:1.5; }
+.mj-plate .mj-face img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* 세로로 볼 때는 상이 너비를 다 쓰므로, 옆자리 이름표를 아래 한 줄로 내린다 */
+#mj-overlay:not(.mj-wide) .mj-pl-l,
+#mj-overlay:not(.mj-wide) .mj-pl-r,
+#mj-overlay:not(.mj-wide) .mj-pl-me { top:auto; bottom:5px; }
+#mj-overlay:not(.mj-wide) .mj-pl-l  { left:5px; right:auto; }
+#mj-overlay:not(.mj-wide) .mj-pl-r  { right:5px; left:auto; }
+#mj-overlay:not(.mj-wide) .mj-pl-me { left:50%; transform:translateX(-50%); }
+#mj-overlay:not(.mj-wide) .mj-pl-l,
+#mj-overlay:not(.mj-wide) .mj-pl-r { font-size:9px; padding:3px 6px; }
+#mj-overlay:not(.mj-wide) .mj-pl-l .mj-nm,
+#mj-overlay:not(.mj-wide) .mj-pl-r .mj-nm { max-width:40px; }
+#mj-overlay:not(.mj-wide) .mj-pl-l .mj-face,
+#mj-overlay:not(.mj-wide) .mj-pl-r .mj-face,
+#mj-overlay:not(.mj-wide) .mj-pl-l .mj-cnt,
+#mj-overlay:not(.mj-wide) .mj-pl-r .mj-cnt { display:none; }
+
+/* --- 버린 패 · 후로 --- */
+.mj-pond { display:grid; grid-template-columns:repeat(6, auto); gap:2px; justify-content:center; }
+.mj-melds { display:flex; gap:7px; flex-wrap:nowrap; justify-content:center; }
+.mj-meld { display:flex; gap:1px; }
 
 /* --- 내 자리 --- */
 #mj-mine {
@@ -301,25 +326,6 @@ function ui() {
 /* --- 가로로 누웠을 때 --- */
 /* 세로보다 키가 많이 낮다. 가운데 알림판은 머리띠로 올리고,
    버린 패를 한 치수 줄이고, 아래칸을 한 줄로 눕힌다. */
-.mj-wide .mj-blk-top { top:2px; }
-.mj-wide .mj-blk-me { bottom:26px; }
-.mj-wide .mj-plates { bottom:3px; }
-.mj-wide .mj-pond .mjt, .mj-wide .mj-backs .mjt, .mj-wide .mj-melds .mjt {
-    width:14px; height:19px; border-radius:2px;
-}
-/* 넓어도 판은 가운데에 모아 둔다 — 양쪽으로 벌어지면 판이 아니라 띠가 된다 */
-.mj-wide .mj-side-left  { left:calc(50% - 215px); }
-.mj-wide .mj-side-right { right:calc(50% - 215px); }
-/* 가운데 알림판은 한 줄로 눕히고, 위아래 패 사이의 빈 띠에 끼운다 */
-.mj-wide #mj-mid {
-    top:auto; bottom:92px; transform:translateX(-50%);
-    padding:5px 12px; max-width:none; white-space:nowrap;
-}
-.mj-wide #mj-mid .mj-r1, .mj-wide #mj-mid .mj-r2,
-.mj-wide #mj-mid .mj-r3, .mj-wide #mj-mid .mj-dora {
-    display:inline-flex; align-items:center; vertical-align:middle; margin:0 0 0 9px;
-}
-.mj-wide #mj-mid .mj-r1 { margin-left:0; }
 .mj-wide #mj-mine { display:flex; align-items:flex-end; gap:10px; padding:5px 9px 7px; }
 .mj-wide #mj-mine .mj-mymelds { margin:0 0 3px 0; }
 .mj-wide #mj-acts { margin-top:0; max-width:46%; justify-content:flex-end; }
@@ -417,6 +423,26 @@ function fitWide() {
     root.style.setProperty('--mj-h', h + 'px');
     // 가로로 누운 꼴이면 낮은 키에 맞춘 차림새로 바꾼다
     el.classList.toggle('mj-wide', table && w > h && h < 560);
+    fitBoard();
+}
+
+// 상 크기 — 기울이면 높이가 줄고(코사인) 앞쪽이 원근으로 커진다.
+// 재서 맞추는 대신 넉넉한 어림수(0.86)로 잡고, 양옆은 이름표 자리를 남긴다.
+function fitBoard() {
+    const f = document.getElementById('mj-felt');
+    if (!f) return;
+    const b = f.querySelector('.mj-board');
+    if (!b) return;
+    const w = f.clientWidth, h = f.clientHeight;
+    if (!w || !h) return;
+    // 가로로 보면 양옆에 이름표가 서므로 그만큼 비우고, 세로로 보면
+    // 이름표가 아래로 내려가므로 너비를 거의 다 쓴다
+    const wide = f.parentNode && f.parentNode.classList.contains('mj-wide');
+    const side = wide ? 110 : 16;
+    const foot = wide ? 8 : 34;
+    // 앞쪽 변은 원근으로 더 넓고 더 아래로 뻗는다 — 가로 1.18, 세로 0.78 로 어림한다
+    const s = Math.max(190, Math.min((w - side) / 1.18, (h - foot) / 0.78));
+    b.style.setProperty('--s', Math.round(s) + 'px');
 }
 ['resize', 'orientationchange'].forEach(function (n) {
     window.addEventListener(n, function () { setTimeout(fitWide, 60); });
@@ -582,16 +608,29 @@ window.mjJoinUI = function (id) {
 // ==========================================
 // 마작판
 // ==========================================
-// 내 자리를 늘 아래에 두고 돌린다. 차례는 오른쪽으로 돈다.
+// 내 자리를 늘 아래에 두고 상을 돌린다. 차례는 오른쪽으로 돈다.
+//   2인 — 나 · 건너편
+//   3인 — 나 · 오른쪽 · 왼쪽
+//   4인 — 나 · 오른쪽 · 건너편 · 왼쪽
+// 상 위에서는 제자리 돌림만 하면 되고(아래 SPIN), 이름표는 상 밖에 세운다.
 const SPOTS = {
     2: { 1: 'top' },
     3: { 1: 'right', 2: 'left' },
     4: { 1: 'right', 2: 'top', 3: 'left' }
 };
+const SPIN = { me: 0, right: -90, top: 180, left: 90 };
+const PL = { me: 'mj-pl-me', right: 'mj-pl-r', top: 'mj-pl-t', left: 'mj-pl-l' };
+
+function face(code) {
+    const u = (typeof db !== 'undefined' && db.users && db.users[code]) || null;
+    const p = u && u.badge && u.badge.photo;
+    if (!p) return '';
+    return '<span class="mj-face"><img src="' + esc(p) + '" alt=""></span>';
+}
 
 function plate(x, score, wind, turn, riichi, where, cnt) {
-    const cls = where === 'me' ? ' mj-plate-mine' : where ? ' mj-plate-side mj-' + where : '';
-    return '<div class="mj-plate' + (turn ? ' mj-turn' : '') + cls + '">'
+    return '<div class="mj-plate' + (turn ? ' mj-turn' : '') + ' ' + (PL[where] || '') + '">'
+        + face(x.code)
         + '<span class="mj-wd">' + wind + '</span>'
         + '<span class="mj-nm">' + esc(x.name) + '</span>'
         + '<span class="mj-sc">' + (Number(score) || 0).toLocaleString() + '</span>'
@@ -600,9 +639,9 @@ function plate(x, score, wind, turn, riichi, where, cnt) {
         + '</div>';
 }
 
-function pondHTML(list, hotIdx, mine) {
+function pondHTML(list, hotIdx) {
     if (!list.length) return '';
-    return '<div class="mj-pond' + (mine ? ' mj-pond-me' : '') + '">'
+    return '<div class="mj-pond">'
         + list.map(function (t, i) { return T(t, 's', i === hotIdx ? 'mjt-hot' : ''); }).join('')
         + '</div>';
 }
@@ -621,50 +660,30 @@ function meldsHTML(melds, size) {
 function midHTML(t, h, mySeat, n) {
     const di = arr(h.doraInd);
     const left = arr(h.wall).length;
-    return '<div id="mj-mid">'
+    return '<div class="mj-mid3">'
         + '<div class="mj-r1">동 ' + t.kyoku + '국</div>'
-        + '<div class="mj-r2">' + ((t.honba || 0) ? t.honba + '본장 · ' : '') + left + '장 남음</div>'
+        + '<div class="mj-r2">' + ((t.honba || 0) ? t.honba + '본장 · ' : '') + left + '장'
+        + ((t.sticks || 0) ? '<br>리치봉 ' + t.sticks : '') + '</div>'
         + (di.length ? '<div class="mj-dora">' + di.map(function (x) {
             return T(window.mjDoraOf(x), 's');
         }).join('') + '</div>' : '')
-        + '<div class="mj-r3">자풍 <b style="color:#ffd76a;">'
-        + windOf(mySeat, t.kyoku, n) + '</b>'
-        + ((t.sticks || 0) ? ' · 리치봉 ' + t.sticks : '') + '</div>'
         + '</div>';
 }
 
-function otherHTML(t, h, x, i, spot, n) {
-    const turn = (h.turn === i);
-    const ri = !!(h.riichi && h.riichi[x.code]);
-    const score = (t.scores || {})[x.code] || 0;
-    const wind = windOf(i, t.kyoku, n);
-    const cnt = arr(bag(h.hands, x.code)).length;
+// 상 위의 한 자리 — 바깥에서 안으로 산 · 후로 · 버린 패
+function seatHTML(t, h, x, i, spot, n, wallN) {
     const melds = arr(bag(h.melds, x.code));
     const pond = arr(bag(h.pond, x.code));
     const hot = (h.last && h.last.by === i) ? pond.length - 1 : -1;
 
-    let backs = '';
-    for (let k = 0; k < cnt; k++) backs += B('s');
+    let wall = '';
+    for (let k = 0; k < wallN; k++) wall += B('s');
 
-    if (spot === 'top') {
-        return {
-            felt: '<div class="mj-blk mj-blk-top">'
-                + '<div class="mj-backs">' + backs + '</div>'
-                + plate(x, score, wind, turn, ri, '', cnt)
-                + meldsHTML(melds, 's')
-                + pondHTML(pond, hot)
-                + '</div>',
-            plate: ''
-        };
-    }
-    // 옆자리 — 패는 눕히고, 이름표는 아래 줄에 바로 세워 따로 돌려준다
-    return {
-        felt: '<div class="mj-side mj-side-' + spot + '"><div class="mj-rot"><div class="mj-blk">'
-            + meldsHTML(melds, 's')
-            + pondHTML(pond, hot)
-            + '</div></div></div>',
-        plate: plate(x, score, wind, turn, ri, (spot === 'left') ? 'l' : 'r')
-    };
+    return '<div class="mj-seatg" style="transform:rotate(' + (SPIN[spot] || 0) + 'deg);">'
+        + (wall ? '<div class="mj-wall">' + wall + '</div>' : '')
+        + (spot === 'me' ? '' : meldsHTML(melds, 's'))
+        + pondHTML(pond, hot)
+        + '</div>';
 }
 
 function paintWait(t) {
@@ -702,29 +721,25 @@ function paint(t) {
     const mySeat = s.seat;
     const spot = SPOTS[n] || SPOTS[4];
 
-    // --- 판 위 ---
-    let felt = midHTML(t, h, mySeat, n);
-    let lp = '', rp = '';
+    // 남은 산을 네 자리에 고루 늘어놓는다 — 줄어드는 것이 눈에 보인다
+    const wallLeft = arr(h.wall).length;
+    const per = Math.min(17, Math.ceil(wallLeft / n));
+
+    let board = '', plates = '';
+    let slot = 0;
     seats.forEach(function (x, i) {
-        if (i === mySeat) return;
         const rel = ((i - mySeat) % n + n) % n;
-        if (!spot[rel]) return;
-        const got = otherHTML(t, h, x, i, spot[rel], n);
-        felt += got.felt;
-        if (spot[rel] === 'left') lp = got.plate;
-        if (spot[rel] === 'right') rp = got.plate;
+        const where = (rel === 0) ? 'me' : spot[rel];
+        if (!where) return;
+        const wn = Math.max(0, Math.min(per, wallLeft - slot * per)); slot++;
+        board += seatHTML(t, h, x, i, where, n, wn);
+        plates += plate(x, (t.scores || {})[x.code] || 0, windOf(i, t.kyoku, n),
+            h.turn === i, !!(h.riichi && h.riichi[x.code]), where,
+            (rel === 0) ? 0 : arr(bag(h.hands, x.code)).length);
     });
+    board += midHTML(t, h, mySeat, n);
 
-    // --- 내 버린 패 ---
-    const myPond = arr(bag(h.pond, u.code));
-    const myHot = (h.last && h.last.by === mySeat) ? myPond.length - 1 : -1;
-    felt += '<div class="mj-blk mj-blk-me">' + pondHTML(myPond, myHot, true) + '</div>';
-
-    // --- 아래 이름표 줄 (왼쪽 · 나 · 오른쪽) ---
-    const myPlate = plate({ name: u.name }, (t.scores || {})[u.code] || 0,
-        windOf(mySeat, t.kyoku, n), h.turn === mySeat, s.riichi);
-    felt += '<div class="mj-plates' + ((lp || rp) ? '' : ' mj-one') + '">'
-        + lp + myPlate + rp + '</div>';
+    const felt = '<div class="mj-stage"><div class="mj-board">' + board + '</div></div>' + plates;
 
     // --- 머리띠 ---
     const bar = '<div id="mj-bar">'
