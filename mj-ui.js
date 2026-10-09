@@ -118,7 +118,7 @@ window.mjClose = function () {
 window.mjOpen = function () {
     // 앉아 있던 판은 격리가 풀린 뒤에도 연다 — 1위는 끝나자마자 풀리기 때문이다
     const seated = window.mjCur && window.mjCur();
-    if (seated && seated.t) { paint(seated.t); return; }
+    if (seated && seated.t) { safePaint(seated.t); return; }
     if (!inside()) { showCustomAlert('상담실·선녀탕 안에서만 둘 수 있습니다.'); return; }
     lobby();
 };
@@ -169,39 +169,55 @@ function whine(e, what) {
         + (perm ? '\n\n데이터베이스 규칙이 mjTables 쓰기를 막고 있습니다.\n상담사에게 알려 주세요.' : ''));
 }
 
+// 앉은 판이 손에 들어올 때까지 기다렸다가 그린다.
+// mjOnChange 하나만 믿지 않는다 — 그 길이 막히면 화면이 로비인 채로 남는다.
+// 그리다 터져도 빈 화면으로 두지 않는다 — 까닭을 창에 적는다
+function safePaint(t) {
+    try { paint(t); return true; }
+    catch (e) {
+        window._mjLastError = String((e && e.message) || e);
+        console.error('[마작] 판을 그리다 터졌습니다', e);
+        shell('<div style="font-size:13px; color:#ff8a80; font-weight:bold; margin-bottom:8px;">🀄 판을 그리지 못했습니다</div>'
+            + '<div style="font-size:11px; color:#aaa; line-height:1.7; margin-bottom:12px;">'
+            + esc(window._mjLastError) + '</div>'
+            + btns([['자리를 뜬다', 'mjLeaveUI()', '#444'], ['닫는다', 'mjClose()', '#444']]));
+        return false;
+    }
+}
+
+function waitAndPaint(what, tries) {
+    tries = tries || 0;
+    const s = window.mjCur && window.mjCur();
+    if (s && s.t) { safePaint(s.t); return; }
+    if (tries >= 30) {                                   // 3초
+        showCustomAlert(what + '\n\n판을 불러오지 못했습니다. 다시 한 번 눌러 주세요.'
+            + (window._mjLastError ? '\n\n(' + window._mjLastError + ')' : ''));
+        lobby(); return;
+    }
+    setTimeout(function () { waitAndPaint(what, tries + 1); }, 100);
+}
+
+function busy(msg) {
+    shell('<div style="text-align:center; padding:26px 10px; color:#aaa; font-size:12px;">' + esc(msg) + '…</div>');
+}
+
 window.mjMakeUI = function (n) {
-    const btns = document.querySelectorAll('#mj-body button');
-    btns.forEach(function (b) { b.disabled = true; });
-    let answered = false;
-    const wake = function () { if (!answered) { answered = true; lobby(); } };
-    setTimeout(function () {                      // 서버가 묵묵부답일 때
-        if (answered || (window.mjCur && window.mjCur())) return;
-        answered = true;
-        showCustomAlert('자리를 만들지 못했습니다.\n\n서버가 응답하지 않습니다. 잠시 뒤에 다시 해 주세요.');
-        lobby();
-    }, 8000);
+    busy('자리를 만드는 중');
     try {
         const p = window.mjMake(n);
-        if (!p || typeof p.then !== 'function') { wake(); return; }
+        if (!p || typeof p.then !== 'function') { waitAndPaint('자리를 만들었습니다.'); return; }
         p.then(function (id) {
-            answered = true;
-            if (!id) { showCustomAlert('자리를 만들지 못했습니다.'); lobby(); }
-            // 들어갔으면 mjOnChange 가 그려 준다. 혹시 안 왔으면 손으로 한 번 더
-            setTimeout(function () {
-                const s = window.mjCur && window.mjCur();
-                if (s && s.t) paint(s.t);
-            }, 400);
-        }).catch(function (e) { answered = true; whine(e, '자리를 만들지 못했습니다.'); lobby(); });
-    } catch (e) { answered = true; whine(e, '자리를 만들지 못했습니다.'); lobby(); }
+            if (!id) { showCustomAlert('자리를 만들지 못했습니다.\n\n잠시 뒤에 다시 해 주세요.'); lobby(); return; }
+            waitAndPaint('자리를 만들었습니다.');
+        }).catch(function (e) { whine(e, '자리를 만들지 못했습니다.'); lobby(); });
+    } catch (e) { whine(e, '자리를 만들지 못했습니다.'); lobby(); }
 };
 window.mjJoinUI = function (id) {
+    busy('앉는 중');
     try {
         window.mjJoin(id).then(function (ok) {
             if (!ok) { showCustomAlert('그 자리에는 앉을 수 없습니다.'); lobby(); return; }
-            setTimeout(function () {
-                const s = window.mjCur && window.mjCur();
-                if (s && s.t) paint(s.t);
-            }, 400);
+            waitAndPaint('앉았습니다.');
         }).catch(function (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); });
     } catch (e) { whine(e, '자리에 앉지 못했습니다.'); lobby(); }
 };
@@ -418,14 +434,14 @@ window.mjChiUI = function (i) {
 function repaint() {
     const s = window.mjCur && window.mjCur();
     const el = document.getElementById(OV);
-    if (el && el.style.display !== 'none') paint(s && s.t);
+    if (el && el.style.display !== 'none') safePaint(s && s.t);
 }
 let shownEnd = '';
 window.mjOnChange = function (t) {
     try {
         paintBtn();
         const el = document.getElementById(OV);
-        if (el && el.style.display !== 'none') paint(t);
+        if (el && el.style.display !== 'none') safePaint(t);
         if (!t || t.state !== 'DONE') { shownEnd = ''; return; }
         // 끝난 판은 창이 닫혀 있어도 한 번 띄운다 (정산보다 먼저 — 1위는 곧 격리가 풀린다)
         if (shownEnd !== t.id && arr(t.result && t.result.rank).length) { shownEnd = t.id; paintEnd(t); }

@@ -193,7 +193,9 @@ window.mjWatch = watch;
 window.mjUnwatch = unwatch;
 
 function fire() {
-    try { if (typeof window.mjOnChange === 'function') window.mjOnChange(cur && cur.t); } catch (e) { }
+    // 삼키면 「눌러도 아무 일이 없다」가 된다 — 터진 것은 남긴다
+    try { if (typeof window.mjOnChange === 'function') window.mjOnChange(cur && cur.t); }
+    catch (e) { window._mjLastError = String((e && e.message) || e); console.error('[마작] 화면 그리기', e); }
 }
 
 // 들어오면 내가 앉아 있던 자리를 찾아 붙는다
