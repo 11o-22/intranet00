@@ -37,6 +37,13 @@
 //   손상으로 자리가 닫혀 번호가 열린 자리 수를 넘으면 그 번호는 쉰다.
 //   (다시 열리면 그대로 되살아난다.)
 //
+//   번호가 안 적혀 있어도 **네 번째 자리부터는 선물 자리**로 친다.
+//   조합으로 열 수 있는 것은 세 자리까지이고(두 번째 자리·세 번째 자리),
+//   그 위는 「우리가 도움」밖에 길이 없기 때문이다.
+//   이 파일이 생기기 전에 이미 네 번째를 연 사람도 이 길로 L 이 된다.
+//   ⛓️‍💥 이레귤러가 임시로 올려 둔 네 번째는 제 힘으로 연 것이 아니므로
+//   원래 자리 수(slotsReal)로 세어 제외한다.
+//
 // ■ 콘솔
 //   giftSlotState()   어느 자리가 선물 자리인지 · 지금 등급
 //   giftSlotPin()     손으로 한 번 맞추기
@@ -52,16 +59,35 @@ function gear(u) {
     return u.soulGear || null;
 }
 
+// 칭호가 올려 둔 몫을 뺀, 제 힘으로 열려 있는 자리 수
+function realOpen(g) {
+    if (!g) return 1;
+    return (g.slotsReal !== undefined) ? (g.slotsReal || 1) : (g.slots || 1);
+}
+
 // 지금 살아 있는 선물 자리 번호 — 열린 자리 안쪽만
+//
+// ① g.giftSlots 에 적어 둔 번호 (이 파일이 생긴 뒤에 연 자리)
+// ② 번호가 안 적혀 있어도 네 번째부터는 선물 자리다.
+//    조합으로는 세 자리까지만 열리고(두 번째 자리·세 번째 자리),
+//    그 위는 「우리가 도움」밖에 길이 없다. 이 파일이 생기기 전에
+//    연 자리도 이 길로 되짚는다.
+//    ⛓️‍💥 이레귤러가 올려 둔 네 번째는 제 힘으로 연 것이 아니므로
+//    realOpen(원래 자리 수)으로 센다.
+const BY_ITEM_FROM = 3;          // 0부터 세어 네 번째 자리
+
 function giftIdx(g) {
-    if (!g || !Array.isArray(g.giftSlots)) return [];
-    const open = Math.max(g.slots || 1, (g.slotsReal || 0));
+    if (!g) return [];
+    const open = realOpen(g);
     const out = [];
-    g.giftSlots.forEach(function (i) {
-        const n = Number(i);
+    const add = function (n) {
+        n = Number(n);
         if (!(n >= 1) || n >= open) return;          // 0번(본체)과 닫힌 자리는 뺀다
         if (out.indexOf(n) < 0) out.push(n);
-    });
+    };
+    if (Array.isArray(g.giftSlots)) g.giftSlots.forEach(add);
+    for (let i = BY_ITEM_FROM; i < open; i++) add(i);
+    out.sort(function (a, b) { return a - b; });
     return out;
 }
 window.giftSlotIdx = giftIdx;
