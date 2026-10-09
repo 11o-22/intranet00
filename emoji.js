@@ -83,18 +83,21 @@ function panel(onPick) {
     d.id = PID;
     d.style.cssText = 'position:fixed; left:50%; transform:translateX(-50%); bottom:0;'
         + ' width:100%; max-width:450px; max-height:46dvh; overflow-y:auto; z-index:9999999;'
-        + ' background:#141414; border-top:1px solid #444; border-radius:10px 10px 0 0;'
+        + ' background:var(--sk-panel, #141414); border-top:1px solid var(--sk-line, #444);'
+        + ' border-radius:10px 10px 0 0;'
         + ' box-shadow:0 -6px 20px rgba(0,0,0,0.8); padding:10px 10px calc(10px + env(safe-area-inset-bottom)) 10px;'
         + ' -webkit-overflow-scrolling:touch;';
     d.innerHTML =
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
-        + '<span style="font-size:11px; color:#aaa; font-weight:bold;">사내 이모티콘</span>'
-        + '<button id="emo-close" style="background:none; border:1px solid #333; color:#888;'
+        + '<span style="font-size:11px; color:var(--sk-text-dim, #aaa); font-weight:bold;">사내 이모티콘</span>'
+        + '<button id="emo-close" style="background:none; border:1px solid var(--sk-line, #333);'
+        + ' color:var(--sk-text-dim, #888);'
         + ' font-size:11px; padding:3px 9px; border-radius:4px; cursor:pointer;">닫기</button></div>'
         + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">'
         + EMO_LIST.map(function (e) {
             return '<button data-emo="' + e.i + '" title="' + e.n + '"'
-                + ' style="background:rgba(255,255,255,0.04); border:1px solid #2e2e2e; border-radius:7px;'
+                + ' style="background:var(--sk-well, rgba(255,255,255,0.04));'
+                + ' border:1px solid var(--sk-line, #2e2e2e); border-radius:7px;'
                 + ' padding:5px; cursor:pointer; display:flex; align-items:center; justify-content:center;'
                 + ' min-height:74px;">'
                 + '<img src="' + e.d + '" alt="' + e.n + '" style="max-width:100%; max-height:66px;'
@@ -167,8 +170,8 @@ function stickBtn(rowSel, id, onPick) {
     b.type = 'button';
     b.textContent = '☺';
     b.style.cssText = 'margin:0; padding:0 11px; font-size:17px; line-height:1; flex-shrink:0;'
-        + ' background:rgba(255,255,255,0.05); border:1px solid #333; border-radius:5px;'
-        + ' color:#d4af37; cursor:pointer;';
+        + ' background:var(--sk-tab, rgba(255,255,255,0.05)); border:1px solid var(--sk-line, #333);'
+        + ' border-radius:5px; color:var(--sk-accent-text, #d4af37); cursor:pointer;';
     b.onclick = function () { window.emoOpen(id, onPick); };
     row.insertBefore(b, row.firstChild);
 }
@@ -248,8 +251,8 @@ after('renderHouseChatLog', function () {
     b.type = 'button';
     b.textContent = '☺';
     b.style.cssText = 'margin:0; padding:0 11px; font-size:17px; line-height:1; flex-shrink:0;'
-        + ' background:rgba(255,255,255,0.05); border:1px solid #333; border-radius:5px;'
-        + ' color:#d4af37; cursor:pointer;';
+        + ' background:var(--sk-tab, rgba(255,255,255,0.05)); border:1px solid var(--sk-line, #333);'
+        + ' border-radius:5px; color:var(--sk-accent-text, #d4af37); cursor:pointer;';
     b.onclick = function () { window.emoOpen('emo-btn-house', window.emoSendHouse); };
     inp.parentElement.insertBefore(b, inp);
 }, '_emoBtn');
