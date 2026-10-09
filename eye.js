@@ -11,7 +11,7 @@
 //
 //   1. 행운 300% · 회수품 확률 300%
 //   2. 탐사에서 최대 네 명에게 버프를 건다. 그 뒤가 길다 (아래)
-//   3. 장착한 채로 상점을 보면 일부 품목이 3분의 1 값으로 보인다
+//   3. 장착한 채로 우주 쇼핑몰·[???] 을 보면 일부 품목이 3분의 1 값으로 보인다
 //   4. 우주 쇼핑몰에서 두 판을 이겨 입고될 때, 목록을 보고 되돌릴 수 있다 (하루 2회)
 //   5. 상담실·선녀탕에서 포인트를 내고 바로 나온다. 다음에 갇히면 세 배로 돌아온다
 //   6. 탐사 횟수를 다 쓰면 그날 번 것 중 하나를 한 번 더 받는다
@@ -61,8 +61,8 @@ const EYE = {
     W_BUFF_DEAD: 1.5,        // 버프 받은 사람이 죽었을 때 장착자 배수
     W_ALL_ALIVE: 3,          // 전원 생존 시 장착자 배수
     B_ALL_ALIVE: 2,          // 전원 생존 시 버프 받은 사람 배수
-    SHOP_OFF:    3,          // 상점 할인 — 3분의 1
-    SHOP_PICK:   3,          // 하루에 몇 종이 싸게 보이나 (진열 8종 중)
+    SHOP_OFF:    3,          // 할인 — 3분의 1 (우주 쇼핑몰 · [???] 만)
+    SHOP_PICK:   3,          // 한 가게에서 몇 종이 싸게 보이나
     ALIEN_WINS:  2,          // 한 묶음을 끝내는 승수 (index.html 의 ALIEN_BOUT_WIN 과 같다 · 참고용)
     ALIEN_BACK:  2,          // 되돌리기 하루 횟수
     OUT_COST:    50000,      // 상담실·선녀탕에서 바로 나오는 값
@@ -125,7 +125,7 @@ window.wearsEye = wears;
             price: 0, usable: true, targetable: false, effect: 'eye_equip', noSell: true,
             desc: '위험한 것을 감지하는 눈. 또한 사용자에게 이득이 되는 것이라면 무엇이든 알 수 있다. '
                 + '행운 300% · 회수품 확률 300% 상승. 탐사에서 최대 네 명에게 버프를 건다. '
-                + '상점의 일부 품목이 3분의 1 값으로 보이고, 우주 쇼핑몰에서 두 번 이기면 '
+                + '우주 쇼핑몰과 [???] 의 일부 품목이 3분의 1 값으로 보이고, 우주 쇼핑몰에서 두 번 이기면 '
                 + '입고될 목록을 먼저 보고 되돌릴 수 있다. 갇혔을 때 값을 치르고 나올 수 있다.'
         };
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME);
@@ -595,90 +595,145 @@ function settleMult() {
 })();
 
 // ==========================================
-// 능력 3 — 상점 일부가 3분의 1 값
+// 능력 3 — 우주 쇼핑몰 · ??? 의 일부가 3분의 1 값
 // ==========================================
 //
-// 「일부」는 그날·그 사람마다 다르게 고정한다. 다시 그릴 때마다 바뀌면
-// 눌러 보는 사이에 값이 달라진다.
+// 일반 상점에는 안 걸린다. 걸리는 곳은 두 군데다.
+//
+//     우주 쇼핑몰   #alien-items-container · buyAlienItem
+//     [???]         #qshop-body            · buyQShopItem
+//
+// 「일부」는 그날·그 사람·그 가게마다 따로 고정한다. 다시 그릴 때마다
+// 바뀌면 눌러 보는 사이에 값이 달라진다. 진열에 걸린 이름을 그대로
+// 줄 세워 앞의 몇 개를 고르므로, 진열이 안 바뀌는 한 값도 안 바뀐다.
+//
+// 값은 화면만 고치는 게 아니라 사는 함수에서 다시 센다. 눌린 단추에
+// 적힌 값을 믿지 않는다.
+
+const SHOPS = [
+    { key: 'alien', box: 'alien-items-container', fn: 'buyAlienItem', quote: true  },
+    { key: 'q',     box: 'qshop-body',            fn: 'buyQShopItem', quote: false }
+];
+
 function hash(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return h;
 }
-function cheapSet() {
+
+// 지금 그 가게에 걸려 있는 이름들 — 품절까지 같이 센다.
+// (팔려 나갈 때마다 싼 품목이 옮겨 다니면 안 되므로)
+function shelfOf(sh) {
+    const box = document.getElementById(sh.box);
+    if (!box) return [];
+    const re = new RegExp(sh.fn + "\\('([^']*)'");
+    const out = [], seen = {};
+    box.querySelectorAll('button[onclick*="' + sh.fn + '"]').forEach(function (b) {
+        const m = (b.getAttribute('onclick') || '').match(re);
+        if (!m || seen[m[1]]) return;
+        seen[m[1]] = 1;
+        out.push(m[1]);
+    });
+    return out;
+}
+
+function cheapSet(sh) {
     const me = u_();
     if (!me || !wears(me)) return {};
-    let list = [];
-    try { if (typeof getToday5ShopItems === 'function') list = getToday5ShopItems() || []; } catch (e) { }
+    const list = shelfOf(sh);
     if (!list.length) return {};
-    const seed = today() + '|' + me.code;
+    const seed = today() + '|' + me.code + '|' + sh.key;
     const sorted = list.slice().sort(function (a, b) { return hash(seed + a) - hash(seed + b); });
     const out = {};
     sorted.slice(0, EYE.SHOP_PICK).forEach(function (n) { out[n] = 1; });
     return out;
 }
-window.eyePrice = function (itemName) {
+
+window.eyePrice = function (itemName, key) {
     const cat = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[itemName] : null;
     const base = cat ? Number(cat.price) : NaN;
-    if (!isFinite(base)) return base;
-    return cheapSet()[itemName] ? Math.max(1, Math.floor(base / EYE.SHOP_OFF)) : base;
+    if (!isFinite(base)) return base;                 // 「???」 같은 값은 건드리지 않는다
+    const list = key ? SHOPS.filter(function (s) { return s.key === key; }) : SHOPS;
+    for (let i = 0; i < list.length; i++) {
+        if (cheapSet(list[i])[itemName]) return Math.max(1, Math.floor(base / EYE.SHOP_OFF));
+    }
+    return base;
 };
 
 (function shop() {
+    // 다른 파일이 그 위를 또 감싸면 표식이 안 보인다 (newitems2.js 의 withPool 처럼).
+    // 그래서 표식이 아니라 「내가 감쌌는가」를 여기에 따로 적어 둔다.
+    const done = {};
     const iv = setInterval(function () {
-        if (typeof renderRegularShop !== 'function' || typeof buyRegularShopItem !== 'function') return;
-        if (renderRegularShop._eye) { clearInterval(iv); return; }
-
-        // --- 보이는 값 ---
-        const _r = renderRegularShop;
-        const rs = function () {
-            const out = _r.apply(this, arguments);
-            try { repaint(); } catch (e) { }
-            return out;
-        };
-        rs._eye = true;
-        renderRegularShop = rs;
+        let hit = 0;
 
         // --- 내는 값 — 넘어온 price 를 믿지 않고 다시 센다 ---
-        const _b = buyRegularShopItem;
-        const bs = function (itemId, itemName, price) {
-            let p = price;
-            try {
-                const real = window.eyePrice(itemName);
-                if (isFinite(real)) p = real;
-            } catch (e) { }
-            return _b.call(this, itemId, itemName, p);
-        };
-        bs._eye = true;
-        buyRegularShopItem = bs;
+        SHOPS.forEach(function (sh) {
+            const f = window[sh.fn];
+            if (typeof f !== 'function') return;
+            if (done[sh.fn] || f._eyeBuy) { hit++; return; }
+            done[sh.fn] = 1;
+            const _b = f;
+            const w = function (nm, price) {
+                let p = price;
+                try {
+                    const real = window.eyePrice(nm, sh.key);
+                    if (isFinite(real)) p = sh.quote ? String(real) : real;
+                } catch (e) { }
+                return _b.call(this, nm, p);
+            };
+            w._eyeBuy = true;
+            window[sh.fn] = w;
+            hit++;
+        });
 
+        // --- 보이는 값 ---
+        ['renderAlienShop', 'renderQShop'].forEach(function (n) {
+            const f = window[n];
+            if (typeof f !== 'function' || done[n] || f._eyeDraw) return;
+            done[n] = 1;
+            const _r = f;
+            const w = function () {
+                const out = _r.apply(this, arguments);
+                try { repaint(); } catch (e) { }
+                return out;
+            };
+            w._eyeDraw = true;
+            window[n] = w;
+        });
+
+        if (hit < SHOPS.length) return;
         clearInterval(iv);
-        console.log('[눈] 상점 ' + EYE.SHOP_OFF + '분의 1 연결');
+        console.log('[눈] 우주 쇼핑몰 · ??? ' + EYE.SHOP_OFF + '분의 1 연결');
     }, 400);
 })();
 
 function repaint() {
-    const set = cheapSet();
-    if (!Object.keys(set).length) return;
-    const box = document.getElementById('shop-regular') || document;
-    box.querySelectorAll('button[onclick*="buyRegularShopItem"]').forEach(function (b) {
-        const m = (b.getAttribute('onclick') || '').match(/buyRegularShopItem\('([^']*)',\s*'([^']*)'/);
-        if (!m) return;
-        const nm = m[2];
-        if (!set[nm]) return;
-        if (b.getAttribute('data-eye') === nm) return;
-        const p = window.eyePrice(nm);
-        if (!isFinite(p)) return;
-        b.setAttribute('data-eye', nm);
-        b.setAttribute('onclick', "buyRegularShopItem('" + m[1] + "', '" + nm + "', " + p + ")");
-        if (!b.disabled) {
-            b.innerHTML = '<span style="color:#4fc3f7; font-weight:bold;">' + p + ' P</span>'
-                + ' <span style="font-size:9px; color:#777; text-decoration:line-through;">'
-                + (ITEM_CATALOG[nm] ? ITEM_CATALOG[nm].price : '') + '</span>';
-        }
+    SHOPS.forEach(function (sh) {
+        const box = document.getElementById(sh.box);
+        if (!box) return;
+        const set = cheapSet(sh);
+        if (!Object.keys(set).length) return;
+        const re = new RegExp(sh.fn + "\\('([^']*)'");
+        box.querySelectorAll('button[onclick*="' + sh.fn + '"]').forEach(function (b) {
+            const m = (b.getAttribute('onclick') || '').match(re);
+            if (!m) return;
+            const nm = m[1];
+            if (!set[nm]) return;
+            if (b.getAttribute('data-eye') === nm) return;
+            const p = window.eyePrice(nm, sh.key);
+            if (!isFinite(p)) return;
+            b.setAttribute('data-eye', nm);
+            b.setAttribute('onclick', sh.fn + "('" + nm + "', " + (sh.quote ? "'" + p + "'" : p) + ")");
+            if (!b.disabled) {
+                b.innerHTML = '<span style="color:#4fc3f7; font-weight:bold;">' + p + ' P</span>'
+                    + ' <span style="font-size:9px; color:#777; text-decoration:line-through;">'
+                    + (ITEM_CATALOG[nm] ? ITEM_CATALOG[nm].price : '') + '</span>';
+            }
+        });
     });
 }
-// 다른 파일이 상점을 다시 그려도 따라붙는다
+// 다른 파일이 가게를 다시 그려도 따라붙는다
 setInterval(function () { try { if (u_() && wears(u_())) repaint(); } catch (e) { } }, 1500);
 
 // ==========================================
@@ -799,9 +854,18 @@ window.eyeRewind = function () {
     } catch (e) { }
     log_(me, '[' + NAME + '] 우주 쇼핑몰 — 승부를 되돌렸습니다.');
     window.eyeKeep();
-    try { if (typeof renderAlienShop === 'function') renderAlienShop(); } catch (e) { }
-    try { if (typeof renderAlienTimer === 'function') renderAlienTimer(); } catch (e) { }
-    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+
+    // renderAlienShop 은 mobile-scroll.js 가 2.5초에 한 번으로 묶어 두었다.
+    //   그냥 부르면 최대 2.5초 동안 옛 진열이 그대로 남는다. 그 사이에
+    //   「없던 일이 되었습니다」가 떠서, 닫고 보면 그대로인 것처럼 보인다.
+    //   그래서 이 한 번만 묶음을 건너뛴다.
+    window.renderNow = 1;
+    try {
+        try { if (typeof renderAlienShop === 'function') renderAlienShop(); } catch (e) { }
+        try { if (typeof renderAlienTimer === 'function') renderAlienTimer(); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    } finally { window.renderNow = 0; }
+
     alert_('없던 일이 되었습니다.\n\n남은 되돌리기 ' + window.eyeAlienLeft() + '회');
 };
 
@@ -985,7 +1049,11 @@ window.eyeState = function () {
     console.log('%c===== ' + NAME + ' =====', 'color:#4fc3f7; font-size:13px');
     console.log('  차고 있나        :', wears(me) ? 'O' : '✗');
     console.log('  행운 · 회수품    : ×' + EYE.LUCK + ' · ×' + EYE.LOOT);
-    console.log('  싸게 보이는 품목 :', Object.keys(cheapSet()).join(' · ') || '-');
+    SHOPS.forEach(function (sh) {
+        const nm = (sh.key === 'alien') ? '우주 쇼핑몰' : '[???]      ';
+        console.log('  싸게 보이는 품목 (' + nm + ') :',
+            Object.keys(cheapSet(sh)).join(' · ') || '- (그 가게를 열어 두어야 보입니다)');
+    });
     console.log('  우주 이긴 횟수   :', (me.eyeAlienWins || 0)
         + ' · 되돌리기 남음 ' + window.eyeAlienLeft() + '회');
     console.log('  돌려받을 값      :', (Number(me.eyeOwed) || 0).toLocaleString() + ' P');

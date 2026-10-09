@@ -225,7 +225,10 @@ body { overscroll-behavior-y: none; }
         window[fnName] = function () {
             const now = Date.now();
             const self = this, args = arguments;
-            if (now - lastRun >= ms) {
+            // window.renderNow 가 켜져 있으면 묶지 않고 바로 그린다.
+            //   무언가를 되돌리거나 지운 직후처럼, 2.5초를 기다리면
+            //   「눌렀는데 그대로」로 보이는 자리에서 쓴다.
+            if (window.renderNow || now - lastRun >= ms) {
                 lastRun = now;
                 return _f.apply(self, args);
             }
