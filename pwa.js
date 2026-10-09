@@ -87,7 +87,10 @@ let reg = null;
 // 2. 안전 구역 — 꽉 찬 화면일 때만
 // ==========================================
 (function safeArea() {
-    if (!standalone()) return;
+    // 꽉 찬 화면인지 가리지 않는다.
+    //   아이폰에서 홈 화면 앱으로 띄워도 display-mode 와 navigator.standalone
+    //   둘 다 못 잡는 자리가 있었다. env() 는 노치가 없으면 0 이므로
+    //   늘 걸어 두어도 다른 기기에서는 아무 일도 일어나지 않는다.
     const T = 'env(safe-area-inset-top)', B = 'env(safe-area-inset-bottom)',
           L = 'env(safe-area-inset-left)', R = 'env(safe-area-inset-right)';
 
@@ -132,7 +135,80 @@ let reg = null;
         + pad('#auto-login-overlay')
         + pad('#maintenance-overlay');
     document.head.appendChild(st);
-    document.documentElement.classList.add('pwa-standalone');
+    if (standalone()) document.documentElement.classList.add('pwa-standalone');
+})();
+
+// ==========================================
+// 2-1. 안전 구역을 손으로도 한 번 더 박는다
+// ==========================================
+//
+//   위의 규칙만으로 안 걸리는 자리를 한 번 겪었다. 묶음이 묵었거나,
+//   다른 파일이 더 센 규칙을 뒤에 깔았거나, 화면을 다시 그리면서 inline
+//   style 을 새로 박았거나 — 어느 쪽이든 결과는 같다. 머리칸의 ↻ · 🔊 가
+//   상태 표시줄 밑에 깔려 손가락이 안 닿는다.
+//
+//   그래서 실제 여백을 재서 요소에 직접 박는다. CSS 보다 뒤에 오고
+//   inline 끼리 겨루므로 이쪽이 이긴다.
+(function stickSafe() {
+    let rule = null;
+    function inset() {
+        // env() 를 재는 작은 자 — 값이 바뀌면(돌리면) 다시 잰다
+        if (!rule) {
+            rule = document.createElement('div');
+            rule.id = 'safe-ruler';
+            rule.setAttribute('aria-hidden', 'true');
+            rule.style.cssText = 'position:fixed; left:0; top:0; width:0; pointer-events:none;'
+                + ' visibility:hidden; z-index:-1;'
+                + ' padding-top:env(safe-area-inset-top);'
+                + ' padding-bottom:env(safe-area-inset-bottom);'
+                + ' padding-left:env(safe-area-inset-left);'
+                + ' padding-right:env(safe-area-inset-right);';
+            (document.body || document.documentElement).appendChild(rule);
+        }
+        const c = getComputedStyle(rule);
+        return { t: parseFloat(c.paddingTop) || 0, b: parseFloat(c.paddingBottom) || 0,
+                 l: parseFloat(c.paddingLeft) || 0, r: parseFloat(c.paddingRight) || 0 };
+    }
+
+    function stamp() {
+        const ov = document.getElementById('dark-run-overlay');
+        if (!ov || ov.style.display === 'none' || !ov.style.display) return;   // 안 떠 있다
+        const i = inset();
+        if (!i.t && !i.b && !i.l && !i.r) return;          // 노치가 없는 기기
+        const tag = i.t + '/' + i.b + '/' + i.l + '/' + i.r;
+        if (ov.getAttribute('data-safe') === tag) return;
+        ov.setAttribute('data-safe', tag);
+        // important 로 박는다. 위 2번이 깐 규칙도 important 라, 그냥 inline 으로는
+        // 진다. inline 의 important 만이 그것을 넘는다.
+        const set = function (el, k, v) { try { el.style.setProperty(k, v, 'important'); } catch (e) { el.style[k] = v; } };
+        set(ov, 'box-sizing', 'border-box');
+        set(ov, 'height', '100dvh');
+        set(ov, 'padding-top', i.t + 'px');
+        set(ov, 'padding-bottom', i.b + 'px');
+        set(ov, 'padding-left', i.l + 'px');
+        set(ov, 'padding-right', i.r + 'px');
+        const inner = ov.firstElementChild;
+        if (inner) { set(inner, 'height', '100%'); set(inner, 'max-height', '100%'); }
+    }
+
+    function start() { setInterval(function () { try { stamp(); } catch (e) { } }, 1000); }
+    if (document.body) start();
+    else document.addEventListener('DOMContentLoaded', start);
+
+    // 기기에서 실제로 얼마가 잡히는지 보는 자리.
+    //   안전 구역이 0 으로 잡히면 아무리 밀어도 안 밀린다. 그때는
+    //   viewport-fit=cover 가 안 먹고 있다는 뜻이라 여기서 바로 드러난다.
+    window.safeState = function () {
+        const i = inset();
+        const ov = document.getElementById('dark-run-overlay');
+        console.log('%c===== 안전 구역 =====', 'color:#4fc3f7; font-size:13px');
+        console.log('  잰 값     : 위 ' + i.t + ' · 아래 ' + i.b + ' · 왼 ' + i.l + ' · 오른 ' + i.r);
+        console.log('  꽉 찬 화면: ' + (standalone() ? 'O' : '✗ (주소창이 있는 창으로 보입니다)'));
+        console.log('  화면 크기 : innerHeight ' + window.innerHeight + ' / screen ' + (screen && screen.height));
+        console.log('  어둠 오버레이에 박힌 값: ' + (ov ? (ov.getAttribute('data-safe') || '아직 없음') : '요소 없음'));
+        if (!i.t) console.log('%c  위가 0 입니다 — viewport-fit=cover 가 안 먹고 있을 수 있습니다.', 'color:#ff9800');
+        return i;
+    };
 })();
 
 // ==========================================
