@@ -59,8 +59,11 @@
 
 const ZONE = 'Qtrew-A-214';
 const DUEL_SEC = 20;          // 사원이 반격을 고를 수 있는 시간
-const FORCE_MAX = 2;          // 한 탐사에 억지로 떼어 놓는 횟수
-const SPLITS = 3;             // 갈림길 수 (A214_SPLIT)
+const SPLITS = 5;             // 갈림길 수 (A214_SPLIT)
+// 억지로 떼어 놓는 횟수 — 마지막 한 사람은 남겨 둔다.
+// 그 한 사람은 단둘이 남아 주사위로 겨루게 된다. 거기까지 쓸어 담아
+// 주면 반격할 자리가 없어진다.
+function forceMax() { return Math.max(2, roster().length - 2); }
 const AMBUSH = 2;             // 신도의 기습 보정
 const BOX = 'a214-kill-box';
 
@@ -200,13 +203,22 @@ function loadHunt(n, tries) {
         //   채팅으로 말을 맞춰 뭉쳐 다니면 신도가 할 수 있는 게 없어서다.
         //   남은 갈림으로 모자라면, 누가 혼자든 말든 이번에 쓴다.
         const sv = a214() || {};
-        const already = Object.keys(sv.forced || {}).length;
+        const fmap = sv.forced || {};
+        const already = Object.keys(fmap).length;
+        const cap = forceMax();
         const leftSplits = SPLITS - n;
-        const wantForce = already < FORCE_MAX
-            && (!natural.length || (FORCE_MAX - already) > leftSplits);
+        const wantForce = already < cap
+            && (!natural.length || (cap - already) > leftSplits);
 
-        if (wantForce && !(sv.forced || {})[n]) {
-            const cand = Object.keys(picks).filter(function (c) {
+        if (wantForce && !fmap[n]) {
+            // 아직 한 번도 안 떨어져 본 사람을 먼저 고른다 — 같은 사람만
+            // 두 번 떼어 놓으면 기회 한 번을 버리는 셈이다
+            const was = Object.keys(fmap).map(function (x) { return (fmap[x] || {}).code; });
+            const free = Object.keys(picks).filter(function (c) {
+                return c !== currentUser.code && k.indexOf(c) < 0
+                    && natural.indexOf(c) < 0 && was.indexOf(c) < 0;
+            });
+            const cand = free.length ? free : Object.keys(picks).filter(function (c) {
                 return c !== currentUser.code && k.indexOf(c) < 0 && natural.indexOf(c) < 0;
             });
             const pool = cand.length ? cand : natural;
