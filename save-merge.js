@@ -1129,6 +1129,9 @@ setInterval(function () {
 // ==========================================
 // 확인
 // ==========================================
+// 기준이 섰는가 — 바깥(points-safe.js)에서 본다
+window.mergeReady = function () { return !!ready; };
+
 window.mergeState = function () {
     console.log('%c===== 저장 병합 =====', 'color:#d4af37; font-size:13px');
     console.log('  계정:', code || '(없음)', '· 기준 준비:', ready ? 'O' : '-');
