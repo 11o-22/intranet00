@@ -22,12 +22,20 @@
 //        같거나 낮으면 사원이 죽는다. 가만히 있으면 그냥 죽는다.
 //        (대략 열에 넷쯤 사원이 이긴다)
 //
-//   3. 살아서 나온 사원
-//        포인트를 더 받는다. 신도가 몇을 죽였느냐에 따라 **최대 5,000 P.**
-//            아무도 안 죽음 2,000 · 하나 3,500 · 둘 이상 5,000
+//   3. 갈림길에서 아무도 안 갈라질 때
+//        채팅으로 말을 맞춰 뭉쳐 다니면 신도가 할 수 있는 게 없다.
+//        그래서 한 탐사에 **두 번**은 무작위로 한 사람이 떨어져 나간다.
+//        떨어진 사람에게도 알려 주고, 신도에게도 알려 준다.
 //
-//   4. 전부 죽인 신도
-//        회수품 확률이 **200% 오른다** (세 배).
+//   4. 끝까지 간 사람
+//        · 전부 죽인 신도        +5,000 P · 회수품 확률 200% 상승(세 배)
+//        · 혼자 살아 나온 사원   같음
+//        · 그 밖의 생존 사원     신도가 죽인 수에 따라 2,000 / 3,500 / 5,000
+//
+//   5. 신도에게 죽은 사원
+//        상담실로 끌려가지 않는다. 포인트도 반입품도 그대로다.
+//        **오염도만 50% 오른다.** 이것은 동결 장비·버프를 무시한다.
+//        회수품은 **기본 확률로** 굴린다. 거기까지는 갔으니까.
 //
 // ■ 어떻게 전하나
 //
@@ -51,6 +59,8 @@
 
 const ZONE = 'Qtrew-A-214';
 const DUEL_SEC = 20;          // 사원이 반격을 고를 수 있는 시간
+const FORCE_MAX = 2;          // 한 탐사에 억지로 떼어 놓는 횟수
+const SPLITS = 3;             // 갈림길 수 (A214_SPLIT)
 const AMBUSH = 2;             // 신도의 기습 보정
 const BOX = 'a214-kill-box';
 
@@ -181,10 +191,42 @@ function loadHunt(n, tries) {
         });
         const k = killed();
         huntFor = n;
-        huntList = Object.keys(picks).filter(function (c) {
+        const natural = Object.keys(picks).filter(function (c) {
             return c !== currentUser.code && k.indexOf(c) < 0
                 && cnt[(picks[c] || {}).pick] === 1;
-        }).map(function (c) { return { code: c, name: (picks[c] || {}).name || nameOf(c) }; });
+        });
+
+        // ★ 아무도 안 갈라졌을 때 — 한 탐사에 두 번까지 억지로 떼어 놓는다.
+        //   채팅으로 말을 맞춰 뭉쳐 다니면 신도가 할 수 있는 게 없어서다.
+        //   남은 갈림으로 모자라면, 누가 혼자든 말든 이번에 쓴다.
+        const sv = a214() || {};
+        const already = Object.keys(sv.forced || {}).length;
+        const leftSplits = SPLITS - n;
+        const wantForce = already < FORCE_MAX
+            && (!natural.length || (FORCE_MAX - already) > leftSplits);
+
+        if (wantForce && !(sv.forced || {})[n]) {
+            const cand = Object.keys(picks).filter(function (c) {
+                return c !== currentUser.code && k.indexOf(c) < 0 && natural.indexOf(c) < 0;
+            });
+            const pool = cand.length ? cand : natural;
+            if (pool.length) {
+                const pick = pool[Math.floor(Math.random() * pool.length)];
+                db_().ref(path() + '/forced/' + n).set({
+                    code: pick, name: (picks[pick] || {}).name || nameOf(pick), at: Date.now()
+                });
+                if (natural.indexOf(pick) < 0) natural.push(pick);
+            }
+        } else if ((sv.forced || {})[n]) {
+            const f = sv.forced[n];
+            if (f && f.code && f.code !== currentUser.code
+                && k.indexOf(f.code) < 0 && natural.indexOf(f.code) < 0) natural.push(f.code);
+        }
+
+        huntList = natural.map(function (c) {
+            return { code: c, name: (picks[c] || {}).name || nameOf(c),
+                     forced: ((sv.forced || {})[n] || {}).code === c };
+        });
         try { paint(); } catch (e) { }
     }).catch(function () { });
 }
@@ -276,10 +318,87 @@ let diedFor = '';
 let duelShown = '';
 const seen = { key: '', at: 0 };      // 반격 시간은 내 시계로만 센다
 
-function die(why, text) {
+// ★ 신도에게 죽은 사원 — 상담실로 끌려가지 않는다.
+//
+//   darkDeath 는 A등급에서 포인트를 전액 날리고 오염도 100%로 상담실
+//   4시간을 보낸다. 여기서는 그러지 않는다. 포인트도 반입품도 그대로
+//   두고, **오염도만 50%** 올린다. 그 50%는 동결 장비·버프를 무시한다
+//   (applyPollutionToUser 를 거치지 않고 바로 적는다).
+//   거기까지 걸어간 값은 쳐 주므로 회수품은 **기본 확률로** 굴린다.
+function fallen(text) {
+    const r = run();
+    if (!r || r._dead) return;
+    r._dead = true;
+    r.fail += 2;
+    r.failedRun = true;
+
+    const z = (typeof DARK_ZONES !== 'undefined') ? DARK_ZONES[ZONE] : null;
+
+    // 오염도 — 동결을 타지 않는다
+    const was = Number(currentUser.pollution) || 0;
+    currentUser.pollution = Math.min(100, was + 50);
+    currentUser.lastPollutionTime = Date.now();
+
+    // 회수품 — 더 얹지 않은 기본 확률
+    const gained = [];
+    try {
+        const loot = (typeof DARK_LOOT_BY_ZONE !== 'undefined' && DARK_LOOT_BY_ZONE[ZONE]) || [];
+        if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+        loot.forEach(function (l) {
+            if (Math.random() < l.chance) { currentUser.inventory.push(l.name); gained.push(l.name); }
+        });
+    } catch (e) { }
+
+    try { addHistoryLog(currentUser, '[어둠] ' + ZONE + ' — 신도에게 당했습니다. (오염도 +50%)'
+        + (gained.length ? ' 회수품 ' + gained.join(', ') : '')); } catch (e) { }
+
+    try {
+        if (!currentUser.darkLogs) currentUser.darkLogs = [];
+        currentUser.darkLogs.unshift({
+            date: new Date().toLocaleString(), zone: ZONE, zoneName: (z && z.name) || '',
+            reward: 0, success: r.success, fail: r.fail,
+            loot: gained, lost: [], detail: r.log, died: true, party: true
+        });
+        if (currentUser.darkLogs.length > 15) currentUser.darkLogs.pop();
+    } catch (e) { }
+
+    // 파티에서 뺀다
+    try {
+        if (db_() && r.partyId) {
+            db_().ref('darkParties/' + r.partyId + '/alive/' + currentUser.code).remove();
+            if (typeof sendPartyChat === 'function')
+                sendPartyChat(currentUser.name + ' 사원의 신호가 끊겼습니다.', true);
+        }
+    } catch (e) { }
+
+    try {
+        darkBodyEl().innerHTML = darkBox('쓰러짐', text,
+            '<div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:6px;'
+            + ' padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">'
+            + '<div style="font-weight:bold; color:#ff6b6b; margin-bottom:8px;'
+            + ' border-bottom:1px dashed #7f0000; padding-bottom:6px;">[사고 보고서]</div>'
+            + '<span style="color:#aaa;">끌려가지는 않았습니다. 누군가 끌어내 주었습니다.</span><br>'
+            + '오염도 <b style="color:#ff9800;">' + was + '% → ' + currentUser.pollution + '%</b>'
+            + ' <span style="font-size:10px; color:#888;">(동결 무시)</span><br>'
+            + '포인트·반입품 <b style="color:#4CAF50;">그대로</b><br>'
+            + (gained.length
+                ? '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000;'
+                  + ' color:#4CAF50; font-weight:bold;">✦ 회수품: ' + esc(gained.join(', ')) + '</div>'
+                : '<div style="margin-top:6px; font-size:10px; color:#888;">회수품은 없었습니다.</div>')
+            + '</div>'
+            + darkChoiceBtn('숨을 고른다.', 'finishDarkDeath()'));
+    } catch (e) { }
+
+    try { darkAmbienceStop(); } catch (e) { }
+    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+    try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
+}
+
+function die(why, text, soft) {
     const r = run();
     if (!r || r._dead || diedFor === why) return;
     diedFor = why;
+    if (soft) { fallen(text); return; }
     r.fail += 2;
     r.failedRun = true;
     try { if (typeof darkDeath === 'function') darkDeath(text); } catch (e) { }
@@ -313,7 +432,8 @@ function paint() {
                    아는 발소리라고 생각했다. 그래서 돌아보지 않았다.<br>
                    그게 마지막 판단이었다.<br><br>
                    <span style="color:#ff6b6b;">혼자 간 쪽에는 아무도 없다.</span><br>
-                   그게 이 구역의 규칙이었다는 걸 이제 안다.`);
+                   그게 이 구역의 규칙이었다는 걸 이제 안다.`,
+            mine.how !== 'fight');          // 신도에게 당한 것만 부드럽게
         return;
     }
 
@@ -386,8 +506,28 @@ function paint() {
         return;
     }
 
+    // --- 억지로 떨어진 사람에게도 알려 준다 ---
+    if (!amCult()) {
+        const f = s.forced || {};
+        let mineAt = 0;
+        Object.keys(f).forEach(function (k) {
+            if (f[k] && f[k].code === currentUser.code) mineAt = Math.max(mineAt, f[k].at || 0);
+        });
+        // 방금 일어난 일일 때만 띄운다 (한참 지난 것을 계속 붙들지 않는다)
+        if (mineAt && Math.abs(Date.now() - mineAt) < 70000) {
+            put(wrap(
+                '<div style="font-size:11px; color:#ffb74d; font-weight:bold; margin-bottom:5px;">◉ 일행과 떨어졌습니다</div>'
+                + '<div style="font-size:10px; color:#ccc; line-height:1.8;">'
+                + '같이 간다고 생각했는데 아니었다.<br>'
+                + '돌아보니 복도가 한 갈래뿐이고, 발소리는 내 것만 들린다.<br>'
+                + '<span style="color:#888;">혼자입니다. 뒤를 조심하십시오.</span></div>', '#7a5200'));
+            return;
+        }
+        clear();
+        return;
+    }
+
     // --- 평소: 사냥감 · 덮치기 단추 ---
-    if (!amCult()) { clear(); return; }
 
     const left = standing().filter(function (c) { return c !== currentUser.code; });
     if (left.length === 1 && !(s.kills || {})[left[0]]) {
@@ -411,7 +551,9 @@ function paint() {
             + huntList.map(function (x) {
                 return '<button class="game-btn" style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px;'
                     + ' border-color:#ff6b6b !important; color:#ff6b6b !important;"'
-                    + ' onclick="a214Hunt(\'' + x.code + '\')">' + esc(x.name) + ' 사원을 따라간다</button>';
+                    + ' onclick="a214Hunt(\'' + x.code + '\')">' + esc(x.name) + ' 사원을 따라간다'
+                    + (x.forced ? ' <span style="font-size:10px; color:#ffb74d;">(길이 갈렸습니다)</span>' : '')
+                    + '</button>';
             }).join('')));
         return;
     }
@@ -471,16 +613,26 @@ function mark() {
 
     if (s.traitor === currentUser.code) {
         const others = Math.max(0, roster().length - 1);
-        // 나 말고 전부 — 회수품 확률 세 배 (200% 상승)
+        // 나 말고 전부 — 회수품 세 배 + 5,000 P
         if (others > 0 && byCult.length >= others) {
             r.a214Purge = true;
+            r.a214Survived = true;
+            r.a214SurviveBonus = 5000;
             r.log.push('[신도] 전원 처리');
         }
         return;
     }
     // 살아서 나온 사원
     r.a214Survived = true;
-    r.a214SurviveBonus = Math.min(5000, 2000 + 1500 * byCult.length);
+    // 사원 가운데 나 혼자 남았으면 신도와 같은 몫
+    const live = standing().filter(function (c) { return c !== (s.traitor || cultCode()); });
+    if (live.length === 1 && live[0] === currentUser.code) {
+        r.a214Purge = true;
+        r.a214SurviveBonus = 5000;
+        r.log.push('[생존] 마지막 한 사람');
+    } else {
+        r.a214SurviveBonus = Math.min(5000, 2000 + 1500 * byCult.length);
+    }
 }
 
 // ==========================================
