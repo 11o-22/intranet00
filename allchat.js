@@ -114,6 +114,24 @@ function detach() {
 // ==========================================
 // 바닥 단추 — 랭킹 칸 자리를 쓴다
 // ==========================================
+
+// 초록 불 — 글이 올라와 있으면 켜진다
+function lampCss() {
+    if (document.getElementById('allchat-lamp-css')) return;
+    const s = document.createElement('style');
+    s.id = 'allchat-lamp-css';
+    s.textContent =
+        '@keyframes allchatLamp {'
+        + '  0%,100% { box-shadow:0 0 5px rgba(47,191,90,0.75), 0 0 1px rgba(47,191,90,0.9); }'
+        + '  50%     { box-shadow:0 0 13px rgba(47,191,90,1), 0 0 4px rgba(47,191,90,1); }'
+        + '}'
+        + '.allchat-lamp { animation: allchatLamp 1.6s ease-in-out infinite; }'
+        + '@media (prefers-reduced-motion: reduce) {'
+        + '  .allchat-lamp { animation:none; box-shadow:0 0 8px rgba(47,191,90,0.9); }'
+        + '}';
+    (document.head || document.documentElement).appendChild(s);
+}
+
 function paintBtn() {
     const bar = document.getElementById('ranking-bottom-bar');
     if (!bar) return;
@@ -126,16 +144,18 @@ function paintBtn() {
             + ' display:inline-flex; gap:7px; align-items:center; position:relative;">'
             + '<span>💬 사내 채팅</span>'
             + '<span id="allchat-dot" style="display:none; min-width:16px; height:16px; padding:0 4px;'
-            + ' border-radius:8px; background:#e53935; color:#fff; font-size:9px; line-height:16px;'
+            + ' border-radius:8px; background:#2fbf5a; color:#06260f; font-size:9px; line-height:16px;'
             + ' text-align:center; font-weight:bold;"></span></button>'
             + '<span id="allchat-online" style="font-size:10px; color:#666; margin-left:auto;"></span>'
             + '</div>';
     }
+    lampCss();
     const dot = document.getElementById('allchat-dot');
     const n = unread();
     if (dot) {
         dot.style.display = n ? 'inline-block' : 'none';
         dot.textContent = n > 99 ? '99+' : String(n);
+        dot.className = n ? 'allchat-lamp' : '';
     }
     const on = document.getElementById('allchat-online');
     if (on) on.textContent = '접속 ' + onlineCount() + '명';
@@ -234,15 +254,18 @@ function paintLog(force) {
             ? emoTag(m.st, 86)
             : '<span style="font-size:12px; color:#ddd; line-height:1.6; word-break:break-word;">'
               + esc(m.text) + '</span>';
+        // 내 글은 오른쪽에서 나온다 — 사진도 이름줄도 글도 통째로 뒤집는다
+        const head = '<div style="font-size:10px; margin-bottom:2px; display:flex; gap:5px;'
+            + ' align-items:baseline; min-width:0;' + (mine ? ' flex-direction:row-reverse;' : '') + '">'
+            + '<b style="color:' + (mine ? '#d4af37' : '#9fd8ef') + '; flex-shrink:0;">' + esc(m.name) + '</b>'
+            + (m.team ? '<span style="color:#555; flex-shrink:0;">' + esc(m.team) + '</span>' : '')
+            + '<span style="color:#444; flex-shrink:0;">' + time + '</span></div>';
         return sep
-            + '<div style="display:flex; gap:8px; margin-bottom:9px; align-items:flex-start;">'
+            + '<div style="display:flex; gap:8px; margin-bottom:9px; align-items:flex-start;'
+            + (mine ? ' flex-direction:row-reverse;' : '') + '">'
             + avatar(m.code, 30)
-            + '<div style="min-width:0; flex:1;">'
-            + '<div style="font-size:10px; margin-bottom:2px;">'
-            + '<b style="color:' + (mine ? '#d4af37' : '#9fd8ef') + ';">' + esc(m.name) + '</b>'
-            + (m.team ? '<span style="color:#555; margin-left:5px;">' + esc(m.team) + '</span>' : '')
-            + '<span style="color:#444; margin-left:6px;">' + time + '</span></div>'
-            + '<div>' + body + '</div></div></div>';
+            + '<div style="min-width:0; flex:1;' + (mine ? ' text-align:right;' : '') + '">'
+            + head + '<div>' + body + '</div></div></div>';
     }).join('');
     if (force || atBottom) box.scrollTop = box.scrollHeight;
 }
