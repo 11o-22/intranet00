@@ -2910,7 +2910,10 @@ function darkHoldHere() {
             if (s == null || !darkRun) return;
             if (s > darkRun.step) {
                 if (darkRun._dead) return;
-                if (darkHoldHere()) { darkRun._pendingStep = s; return; }
+                // 결산(99)은 붙잡지 않는다. 모든 구역이 99 를 결산으로 쓴다.
+                // 흩어진 사람을 여기서 붙잡아 두면, 본대가 정산하고 나간 뒤에
+                // 혼자 어둠에 남아 복귀 시간이 다 가도록 갇힌다.
+                if (s < 99 && darkHoldHere()) { darkRun._pendingStep = s; return; }
                 darkRun.step = s;
                 darkRun._advTo = null;
                 detachVoteListener();

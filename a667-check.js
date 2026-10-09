@@ -8,7 +8,8 @@
 //   a667.next()    다음 단계로
 //   a667.prev()    앞 단계로
 //   a667.go(n)     n 단계로
-//   a667.end()     결산(99 단계)으로 한 번에 (부르면 탐사가 끝난다)
+//   a667.end()     결산(99 단계)으로 한 번에 — 파티원도 같이 나간다
+//                  (부르면 탐사가 끝난다)
 //   a667.list()    단계 표 전체 (0~32 · 99)
 //   a667.hold()    인간성·깊이를 묶고 붙잡힘·표류를 끈다 (점검 중 안 죽게)
 //   a667.free()    묶은 것을 푼다
@@ -120,6 +121,10 @@ function show() {
 //     darkRun.success = 12; darkRun.fail = 1; darkRun.humanity = 55; a667.end()
 //     darkRun.hiddenRoute = 'rescue';   // truth · rescue · coexist
 //
+// 파티면 darkParties/<방>/curStep 에 99 를 적는다. 동료 화면은 watchPartyStep
+// 이 그것을 보고 같이 결산으로 넘어간다. 각자 제 화면에서 정산하므로
+// 포인트·회수품은 각자 제 몫으로 들어간다.
+//
 // 결산이 돌면 탐사가 끝난다 (darkRun 이 비워진다). 한 판에 한 번뿐이고,
 // 다시 보려면 구역에 새로 들어가야 한다. 포인트와 회수품은 그대로 들어간다.
 function end() {
@@ -132,6 +137,20 @@ function end() {
     darkRun.step = 99;
     darkRun._advTo = null;
     window._rdsLock = false;
+
+    // 파티면 방에도 적는다 — 동료 화면도 watchPartyStep 을 타고 결산으로 간다.
+    // renderDarkResult 가 돌면 darkRun 이 비워지므로, 그리기 전에 적어야 한다.
+    const pid = darkRun.isParty ? darkRun.partyId : null;
+    if (pid && typeof database !== 'undefined' && database) {
+        try {
+            database.ref('darkParties/' + pid + '/curStep').set(99);
+            console.log('  방에 99 를 적었습니다 — 동료들도 같이 나갑니다.');
+        } catch (e) {
+            console.warn('  방에 적지 못했습니다:', (e && e.message) || e);
+        }
+    } else if (darkRun.isParty) {
+        console.warn('  방 번호나 서버가 없어 나만 나갑니다.');
+    }
 
     console.log('%c결산으로', 'color:#4fc3f7; font-size:13px; font-weight:bold');
     console.log('  성공 ' + (darkRun.success || 0) + ' / 실패 ' + (darkRun.fail || 0)
@@ -216,7 +235,7 @@ window.a667.list  = function () {
 
 console.log('%cA-667 점검 콘솔 준비됨', 'color:#4fc3f7; font-size:13px; font-weight:bold');
 console.log('  a667()  a667.next()  a667.prev()  a667.go(n)  a667.list()');
-console.log('  a667.end()  — 결산으로 한 번에');
+console.log('  a667.end()  — 결산으로 한 번에 (파티원도 같이)');
 console.log('  a667.hold()  a667.free()  a667.scan()');
 
 })();
