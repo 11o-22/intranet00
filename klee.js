@@ -29,6 +29,17 @@
 //   으로 들어간다. 테두리·다이나믹 아일랜드·옆 단추까지 그려진다.
 //   방장이 누구인지는 방(darkParties)에서 읽으므로 따로 적지 않는다.
 //
+// ■ 특이사항에 적힌다 — 📲
+//
+//   24시간 가는 버프만 적는다. ①(두 배) · ④(예약 문자) · ⑤(구매 행운)
+//   세 가지다. ②(신호)는 그 탐사 한 번이고 ③(식사는?)은 그 자리에서
+//   끝나므로 적을 것이 없다. 24시간이 지나면 note-fix.js 가 걷어낸다.
+//
+// ■ EPIC 에서도 듣는다
+//
+//   EPIC 은 끝나는 길이 따로다 (epicDeath · epicSettle). 아래쪽
+//   「EPIC」 칸에서 그 두 자리에 ②·④ 를 붙였다.
+//
 // ■ 콘솔
 //   kleeGive(사번)     상담사가 하나 준다
 //   kleeState(사번)    오늘 남은 횟수 · 걸린 것
@@ -353,6 +364,44 @@ function open_(id) {
 }
 
 // ==========================================
+// 특이사항에 적는다 — 📲
+// ==========================================
+//
+//   24시간짜리 버프만 적는다. ② 신호(한 탐사)와 ③ 식사는?(그 자리에서
+//   끝나는 것)은 적지 않는다. 적을 것이 없기 때문이다.
+//
+//   지우는 쪽은 note-fix.js 가 맡는다. 거기 EXPIRY 표에
+//       { mark: '[📲]', live: window.kleeNoteLive }
+//   를 한 줄 넣어 두었다. 15초마다 돌면서 버프가 끝난 줄을 걷어낸다.
+//   그래서 여기서는 적기만 하고, 24시간 뒤를 따로 재지 않는다.
+const NOTE = '[📲]';
+const KEY_OF = {
+    '행운': 'luck', '판정': 'bon', '회피': 'eva', '기믹 파훼': 'gim',
+    '공용시설 횟수': 'fac', '어둠 탐사 횟수': 'dark',
+    '공용시설 행운': 'pct', '회수품 확률': 'kleeLoot'
+};
+
+function noteAdd(u, text) {
+    try {
+        if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(u, NOTE + ' ' + text);
+    } catch (e) { }
+}
+
+// 그 줄이 아직 살아 있나 — note-fix.js 가 물어본다
+window.kleeNoteLive = function (u, note) {
+    try {
+        if (!u) return false;
+        const t = String(note || '');
+        if (/구매 행운/.test(t)) return (u.kleeShop || 0) > Date.now();
+        const nm = Object.keys(KEY_OF).filter(function (n) { return t.indexOf(n) >= 0; })
+            .sort(function (a, b) { return b.length - a.length; })[0];   // 「공용시설 행운」이 「행운」보다 먼저
+        if (!nm) return (liveBuffs(u).some(function (b) { return b.src === KLEE.WHO; }));
+        const k = KEY_OF[nm];
+        return liveBuffs(u).some(function (b) { return b.src === KLEE.WHO && b.k === k; });
+    } catch (e) { return true; }      // 못 재면 남겨 둔다
+};
+
+// ==========================================
 // ① 이름 많이 들었어요 — 사원 셋의 버프를 두 배로
 // ==========================================
 const BK = {
@@ -452,11 +501,13 @@ function m1Do(codes, sel) {
     sel.forEach(function (p) {
         // 나 — 두 배로 가져온다
         try { window.ibAdd(u, p.k, p.v * 2, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
+        noteAdd(u, bname(p.k) + ' +' + (p.v * 2) + bunit(p.k) + ' (24시간)');
         mine.push(bname(p.k) + ' +' + (p.v * 2) + bunit(p.k));
         // 상대 — 원래 것은 그대로 두고 같은 몫을 한 번 더 얹어 두 배로
         const t = db.users[p.code];
         if (t) {
             try { window.ibAdd(t, p.k, p.v, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
+            noteAdd(t, bname(p.k) + ' +' + (p.v * 2) + bunit(p.k) + ' (24시간)');
             (theirs[t.name] = theirs[t.name] || []).push(bname(p.k) + ' ×2');
         }
     });
@@ -467,7 +518,7 @@ function m1Do(codes, sel) {
         log_(t, '[' + KLEE.WHO + '] ' + u.name + ' 사원의 문자 — 걸려 있던 버프가 두 배가 되었습니다.');
         try {
             if (c !== u.code && typeof updateUserFields === 'function') {
-                updateUserFields(c, { itemBuffs: t.itemBuffs, history: t.history, hasItemUsedOnMe: true });
+                updateUserFields(c, { itemBuffs: t.itemBuffs, badge: t.badge, history: t.history, hasItemUsedOnMe: true });
             }
         } catch (e) { }
     });
@@ -890,8 +941,9 @@ function kleeEscape(text, booked) {
         if (got[key]) return;
         got[key] = 1;
         try { window.ibAdd(u, m.k, m.v, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
+        noteAdd(u, m.n + ' +' + m.v + (m.unit || '') + ' (24시간)');
         log_(u, '[' + KLEE.WHO + '] 수고해요 후배님 ㅋㅋ — ' + m.n + ' +' + m.v + (m.unit || ''));
-        try { if (typeof saveFields === 'function') saveFields({ itemBuffs: 1, history: 1 }); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ itemBuffs: 1, badge: 1, history: 1 }); } catch (e) { }
         mailPop(m);
     }, 1200);
 
@@ -948,15 +1000,18 @@ function m5Do(code) {
     if (left(u, 'm5') <= 0) { alert_('오늘은 더 보낼 수 없습니다.'); return; }
     const until = Date.now() + KLEE.BUFF_MS;
 
+    const SHOP_LINE = '구매 행운 — 공용시설 200%↑ · 랜덤박스 150%↑ (24시간)';
     t.kleeShop = until;
+    noteAdd(t, SHOP_LINE);
     log_(t, '[' + KLEE.WHO + '] 혹시 뭐 살 거 있으신가? — 공용시설 행운 200%↑ · 랜덤박스 행운 150%↑ (24시간)');
     try {
         if (typeof updateUserFields === 'function') {
-            updateUserFields(code, { kleeShop: until, history: t.history, hasItemUsedOnMe: true });
+            updateUserFields(code, { kleeShop: until, badge: t.badge, history: t.history, hasItemUsedOnMe: true });
         }
     } catch (e) { }
 
     u.kleeShop = until;
+    noteAdd(u, SHOP_LINE);
     spend(u, 'm5');
     log_(u, '[' + KLEE.WHO + '] 혹시 뭐 살 거 있으신가? → ' + t.name);
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
@@ -1218,6 +1273,187 @@ window.kleePhone = function (on) {
 };
 
 // ==========================================
+// EPIC — Qtrew-???-■■■ 에서도 듣게 한다
+// ==========================================
+//
+// ■ 왜 따로 붙여야 했나
+//
+//   EPIC 은 보통 어둠과 **다른 길**로 끝난다. epic.js 가 제 것을 쓴다.
+//
+//       보통 어둠          EPIC
+//       ─────────────      ─────────────
+//       darkDeath          epicDeath          ← ④ 예약 탈출이 안 걸렸다
+//       renderDarkResult   epicSettle         ← ② 포인트 배율이 안 걸렸다
+//
+//   그래서 EPIC 에 들어가면 ② 와 ④ 가 **아무 일도 하지 않았다.**
+//   ①·③·⑤ 는 탐사와 무관하므로 전부터 잘 들었고, 방장 전화기 테두리도
+//   방(darkParties)에서 방장을 읽으니 EPIC 파티에서 그대로 나온다.
+//
+// ■ 붙인 것
+//
+//   1. epicSettle — 지급한 몫을 재서 ② 신호 배율만큼 더 얹는다.
+//      (epic-show.js 의 무대 열기와 같은 자리·같은 방식. 둘 다 걸리면
+//       차례로 곱해진다.)
+//   2. epicDeath — ④ 예약을 보내 두었으면 끌려가지 않는다.
+//      · 오염 50% · 격리 없음 · 포인트와 반입품을 **그대로 들고 나온다**
+//        (원래 EPIC 사망은 전액 소실 + 4시간 입원이다)
+//      · 예약한 둘에게 문자와 버프가 나간다
+//      · 정산은 EPIC 제 것(epicSettle)을 그대로 쓴다 — 0.35배 몫과
+//        「단말로 복귀한다」 단추까지. 정산서의 「🦊 상담실로 긴급 이송」
+//        칸만 K.LEE 칸으로 갈아 끼운다.
+//
+// ■ 못 하는 것 — ② 와 ④ 의 회수품 배율
+//
+//   EPIC 의 회수품은 er.found 에 장면이 직접 밀어 넣는다. emLootMult 를
+//   거치지 않는다. 배율을 걸 자리가 **없다.** (epic-show.js 도 같은 것을
+//   적어 두었다) 그래서 EPIC 에서는 포인트 배율만 걸린다.
+const EC = (typeof EPIC_CODE !== 'undefined') ? EPIC_CODE : 'Qtrew-???-■■■';
+function inEpic() {
+    const r = run();
+    return !!(r && (r.epic || r.zone === EC));
+}
+
+// 1. 지급에 ② 신호 배율
+(function hookEpicSettle() {
+    const iv = setInterval(function () {
+        if (typeof epicSettle !== 'function') return;
+        if (epicSettle._klee) { clearInterval(iv); return; }
+        const _s = epicSettle;
+        const wrapped = function () {
+            let s = null, before = 0;
+            try { s = signMult(); before = (me() || {}).points || 0; } catch (e) { }
+            const out = _s.apply(this, arguments);
+            try {
+                if (!s) return out;
+                const u = me();
+                const got = (u.points || 0) - before;
+                if (got <= 0) return out;
+                const add = Math.round(got * (s.pt - 1));
+                if (add <= 0) return out;
+                u.points += add;
+                log_(u, '[' + KLEE.WHO + '] 신호 — 포인트 ' + s.pt + '배 (+' + add + ' P)');
+                try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
+                const b = document.getElementById('dro-body') || document.getElementById('darkness-body');
+                if (b) {
+                    const d = document.createElement('div');
+                    d.style.cssText = 'margin:0 0 12px 0; padding:9px 11px; border-radius:6px; font-size:11px;'
+                        + ' background:rgba(47,111,159,0.14); border:1px solid #2f6f9f; color:#bcdcf2;';
+                    d.innerHTML = '📱 <b>' + esc(KLEE.WHO) + '</b> 의 신호 — 포인트 <b>' + s.pt
+                        + '배</b> (+' + add + ' P)'
+                        + '<br><span style="font-size:10px; color:#8ab4cf;">'
+                        + '회수품 배율은 ' + esc(EC) + ' 에서 걸 자리가 없습니다.</span>';
+                    b.insertBefore(d, b.firstChild);
+                }
+            } catch (e) { }
+            return out;
+        };
+        wrapped._klee = true;
+        epicSettle = wrapped;
+        window.epicSettle = wrapped;
+        clearInterval(iv);
+        console.log('[K.LEE] EPIC 포인트 배율 연결');
+    }, 500);
+})();
+
+// 2. ④ 예약을 보내 두었으면 끌려가지 않는다
+(function hookEpicDeath() {
+    const iv = setInterval(function () {
+        if (typeof epicDeath !== 'function') return;
+        if (epicDeath._klee) { clearInterval(iv); return; }
+        const _d = epicDeath;
+        const wrapped = function (txt) {
+            const r = run(), u = me();
+            let booked = [];
+            try { booked = (r && Array.isArray(r.kleeBooked)) ? r.kleeBooked : []; } catch (e) { }
+            if (!r || !u || !booked.length || !inEpic()) return _d.apply(this, arguments);
+            if (typeof er === 'undefined' || !er || er.dead || r._dead) return _d.apply(this, arguments);
+            try { epicEscape(txt, booked); }
+            catch (e) { console.warn('[K.LEE]', e); return _d.apply(this, arguments); }
+        };
+        wrapped._klee = true;
+        epicDeath = wrapped;
+        window.epicDeath = wrapped;
+        clearInterval(iv);
+        console.log('[K.LEE] EPIC 예약 탈출 연결');
+    }, 500);
+})();
+
+function epicEscape(txt, booked) {
+    const u = me(), r = run();
+    er.dead = true;             // 두 번 쓰러지지 않게
+    er._calledHelp = false;
+    er.danger = null;
+    r._dead = true;
+    r.kleeOut = true;
+    r.fail = (r.fail || 0) + 2;
+
+    // 받을 두 사람에게 문자와 버프를 적어 둔다 — 각자 제 화면에서 제 몸에 건다
+    if (db_()) {
+        const up = {};
+        booked.forEach(function (c) {
+            const g = rollGift();
+            up[kleePath('mail') + '/' + c] = {
+                by: u.code, name: u.name, k: g.k, n: g.n, v: g.v, unit: g.unit, at: Date.now()
+            };
+        });
+        db_().ref('/').update(up).catch(function () { });
+    }
+
+    // 나 — 오염 50%만. 포인트도 반입품도 그대로 둔다
+    const was = Number(u.pollution) || 0;
+    u.pollution = 50;
+    u.lastPollutionTime = Date.now();
+    er.lostPoints = 0;
+    er.lostItems = [];
+    er.kleeOut = true;
+
+    log_(u, '[' + KLEE.WHO + '] 예약 문자 — ' + EC
+        + ' 에서 빠져나왔습니다. (오염 50% · 포인트·반입품 보존)');
+
+    try {
+        if (db_() && r.partyId) {
+            db_().ref('darkParties/' + r.partyId + '/epicHelp/' + u.code).remove();
+            db_().ref('darkParties/' + r.partyId + '/alive/' + u.code).remove();
+            if (typeof sendPartyChat === 'function') sendPartyChat(u.name + ' 사원의 전화기가 꺼졌습니다.', true);
+        }
+    } catch (e) { }
+
+    ring();
+    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+
+    // 정산은 EPIC 제 것을 그대로 쓴다 (0.35배 · 「단말로 복귀한다」 단추)
+    epicSettle('dead', txt);
+    try { swapDeadBox(was, booked.length); } catch (e) { }
+}
+
+// 정산서의 「전액 소실 · 🦊 상담실로 긴급 이송」 칸을 갈아 끼운다
+function swapDeadBox(was, n) {
+    const b = document.getElementById('dro-body') || document.getElementById('darkness-body');
+    if (!b) return false;
+    // 사망 칸만 테두리에 #7f0000 을 쓴다 — 그것으로 집는다
+    let hit = b.querySelector('div[style*="7f0000"]');
+    if (!hit) {
+        const list = Array.prototype.filter.call(b.querySelectorAll('div'), function (d) {
+            return /전액 소실|긴급 이송/.test(d.innerText || '');
+        });
+        hit = list.length ? list[list.length - 1] : null;
+    }
+    if (!hit) return false;
+    hit.setAttribute('style', 'margin-top:6px; padding-top:6px;'
+        + ' border-top:1px dashed #2f6f9f; color:#bcdcf2;');
+    hit.innerHTML = '<div style="font-weight:bold; color:#7fb6dd;">[예약 전송 완료]</div>'
+        + '화면이 꺼지기 직전에 예약해 둔 문자가 나갔다.<br>'
+        + '<span style="color:#aaa; font-size:10px;">받는 사람 ' + (n || 0)
+        + '명 — 누가 받았는지는 적혀 있지 않다.</span><br>'
+        + '보유 포인트 <b style="color:#4CAF50;">그대로</b> · '
+        + '반입품 <b style="color:#4CAF50;">그대로</b><br>'
+        + '오염도 <b style="color:#ff9800;">' + was + '% → 50%</b> '
+        + '<span style="font-size:10px; color:#888;">(동결 무시)</span><br>'
+        + '<span style="color:#aaa;">상담실로 끌려가지 않습니다.</span>';
+    return true;
+}
+
+// ==========================================
 // 상담사 · 확인
 // ==========================================
 window.kleeGive = function (who, n) {
@@ -1253,9 +1489,24 @@ window.kleeState = function (who) {
         ? b.map(function (x) { return bname(x.k) + ' +' + x.v + bunit(x.k); }).join(' · ') : '없음');
     const r = run();
     if (r && r.zone) {
-        console.log('  이번 탐사   : 신호', signMult() ? '있음' : '없음',
-            '· 예약', (r.kleeBooked || []).length + '명');
+        console.log('  이번 탐사   :', r.zone, '· 신호', signMult() ? '있음' : '없음',
+            '· 예약', (r.kleeBooked || []).length + '명',
+            inEpic() ? '(EPIC — 회수품 배율은 걸 자리가 없습니다)' : '');
     }
+    // 적힌 📲 줄
+    const notes = ((u.badge && u.badge.notes) || '').split('|')
+        .map(function (x) { return x.trim(); })
+        .filter(function (x) { return x.indexOf(NOTE) >= 0; });
+    console.log('  특이사항 📲 :', notes.length ? notes.join(' / ') : '없음');
+    notes.forEach(function (n) {
+        console.log('     ' + n + ' →', window.kleeNoteLive(u, n)
+            ? '살아 있음' : '✗ 끝남 — 다음 정리에 지워집니다');
+    });
+    console.log('  연결        :',
+        '보통 죽음', (typeof darkDeath === 'function' && darkDeath._klee) ? 'O' : '✗',
+        '· 보통 정산', (typeof renderDarkResult === 'function' && renderDarkResult._klee) ? 'O' : '✗',
+        '· EPIC 죽음', (typeof epicDeath === 'function' && epicDeath._klee) ? 'O' : '✗',
+        '· EPIC 정산', (typeof epicSettle === 'function' && epicSettle._klee) ? 'O' : '✗');
 };
 
 console.log('[K.LEE] kleeGive(사번) · kleeState(사번) · kleePhone(1/0)');

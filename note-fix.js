@@ -102,6 +102,12 @@ const EXPIRY = [
         let until = c.until || 0;
         if (at && until > at + cap) until = at + cap;
         return Date.now() < until;
+    } },
+    // 📲 K·LEE — 24시간짜리 버프만 적힌다. 어느 버프인지는 글줄로 가른다.
+    // 재는 쪽은 klee.js 의 kleeNoteLive 가 맡는다 (버프 열쇠를 거기서 안다).
+    { mark: '[📲]', live: function (u, note) {
+        try { return window.kleeNoteLive ? window.kleeNoteLive(u, note) : true; }
+        catch (e) { return true; }
     } }
 ];
 
