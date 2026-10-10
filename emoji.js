@@ -66,7 +66,7 @@ const EMO_LIST = [
     { i: 'e29', n: '친구… 나를 잊었나요?',  d: 'emo/e29.webp' },
     { i: 'e30', n: '나만 믿어!',        d: 'emo/e30.webp' },
     { i: 'e31', n: '기다리다 지쳤어…',     d: 'emo/e31.webp' },
-    { i: 'e32', n: '숩비망!',          d: 'emo/e32.webp' }
+    { i: 'e32', n: '쇼비맙!',          d: 'emo/e32.webp' }
 ];
 
 (function emoticons() {

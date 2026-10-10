@@ -343,7 +343,10 @@ function dnaUse(key) {
         const _j = jakduAvailable;
         jakduAvailable = function () {
             if (_j.apply(this, arguments)) return true;
-            return dnaCharge.gim > 0;
+            // 충전만 보고 참을 돌려주면, 고유 아이템을 안 차고 있을 때도
+            // 단추가 선다. 그런데 smashWeapon 은 차고 있는지까지 보므로
+            // 이름을 못 찾아 「null 로 박살낸다」가 뜬다. 둘을 같은 잣대로.
+            return !!(myDnaEquip() && dnaCharge.gim > 0);
         };
         jakduAvailable._dnaHooked = true;
 

@@ -159,6 +159,35 @@ function jakduLeft() {
 })();
 
 // ==========================================
+// 두 판정이 어긋나면 다시 세운다
+// ==========================================
+//
+//   「단추는 서는데 이름이 없다」가 곧 두 판정이 어긋났다는 뜻이다.
+//   dna-gifts.js 가 400ms 와 500ms 사이 어느 틈에 이 파일 위를 다시
+//   감싸면 그 꼴이 된다. 틈을 막는 대신, 어긋난 것이 보이면 바로
+//   우리 둘을 다시 얹는다. 누가 언제 감싸든 「null 로 박살낸다」는 안 뜬다.
+(function keep() {
+    setInterval(function () {
+        try {
+            if (typeof jakduAvailable !== 'function' || typeof smashWeapon !== 'function') return;
+            if (typeof darkRun === 'undefined' || !darkRun) return;
+            if (!jakduAvailable()) return;
+            if (smashWeapon()) return;                 // 둘이 맞다
+            smashWeapon = function () {
+                const w = realWeapon();
+                if (w) return w;
+                return dnaReady() ? dnaName() : null;
+            };
+            jakduAvailable = function () {
+                if (typeof darkRun === 'undefined' || !darkRun) return false;
+                return jakduLeft() || dnaReady();
+            };
+            console.warn('[기믹] 단추는 서는데 이름이 없었습니다 — 판정을 다시 세웠습니다');
+        } catch (e) { }
+    }, 1500);
+})();
+
+// ==========================================
 // 확인
 // ==========================================
 window.smashState = function () {

@@ -280,14 +280,29 @@ function miniTravel() {
 }
 
 // 지금 바늘이 몇 % 에 있나 (0~100)
-function miniPos() {
+//
+//   애니메이션에게 currentTime 을 물어보면 **화면보다 뒤처진 값**이 온다.
+//   그림은 그림 담당이 따로 돌리는데, currentTime 은 본 줄기가 마지막으로
+//   화면을 매만진 때를 기준으로 하기 때문이다. 영상으로 재 보니 20px,
+//   S등급 기준으로 39ms 가량 뒤처져 있었다. 눈으로는 초록칸 바깥에 섰는데
+//   성공으로 처리되던 까닭이 이것이다.
+//
+//   그래서 애니메이션에게 묻지 않고, 걸어 둔 때(t0)와 지금 시각으로 직접
+//   센다. 그림 담당도 같은 시계를 쓰므로 어긋나지 않는다.
+//
+//   at 을 주면 그때를 기준으로 센다. 누름은 손이 닿은 때(event.timeStamp)를
+//   넘겨서, 눌린 것이 처리되기까지 걸린 시간만큼 더 가 있지 않게 한다.
+function miniFrac(at) {
     if (!mini) return 0;
-    if (!mini.anim) return mini.pos;
+    if (!mini.anim) return Math.max(0, Math.min(1, mini.pos / 100));
     const T = mini.period;
-    let t = Number(mini.anim.currentTime) || 0;
+    const now = (typeof at === 'number' && isFinite(at)) ? at : performance.now();
+    let t = (mini.pausedAt != null ? mini.pausedAt : now) - mini.t0;
+    if (!isFinite(t)) t = 0;
     t = ((t % (2 * T)) + 2 * T) % (2 * T);
-    return (t <= T ? t / T : 2 - t / T) * 100;
+    return t <= T ? t / T : 2 - t / T;
 }
+function miniPos(at) { return miniFrac(at) * 100; }
 
 function miniStartAnim(from) {
     const pin = document.getElementById('cook-pin');
@@ -301,13 +316,28 @@ function miniStartAnim(from) {
         { duration: mini.period, direction: 'alternate', iterations: Infinity, easing: 'linear' }
     );
     mini.anim.currentTime = from || 0;
+    mini.t0 = performance.now() - (from || 0);     // 우리 시계의 0 점 (임시)
+    mini.pausedAt = null;
+    // 브라우저가 실제로 돌리기 시작한 때로 0 점을 다시 맞춘다.
+    //   pin.animate() 를 부른 때와 실제 시작 사이에 한 프레임쯤 틈이 생긴다.
+    //   그만큼 우리 시계가 앞서 있으면 판정이 그 거리만큼 어긋난다.
+    try {
+        const a0 = mini.anim;
+        a0.ready.then(function () {
+            if (!mini || mini.anim !== a0) return;
+            const st = Number(a0.startTime);
+            if (isFinite(st)) mini.t0 = st;
+        }).catch(function () { });
+    } catch (e) { }
     return true;
 }
 
 // 화면 폭이 바뀌면 거리도 바뀐다 — 가 있던 자리를 지키며 다시 건다
 function miniResize() {
     if (!mini || mini.over || !mini.anim) return;
-    const t = Number(mini.anim.currentTime) || 0;
+    const T = mini.period;
+    let t = performance.now() - mini.t0;           // 우리 시계로 센다
+    t = ((t % (2 * T)) + 2 * T) % (2 * T);
     miniStartAnim(t);
 }
 
@@ -352,11 +382,12 @@ function miniOpen(d, done) {
     document.body.appendChild(el);
 
     mini = { d: d, cfg: cfg, round: 0, pos: 0, dir: 1, raf: null, anim: null,
-             period: miniPeriod(cfg), done: done, over: false };
+             period: miniPeriod(cfg), t0: performance.now(), pausedAt: null,
+             done: done, over: false };
     try { window.addEventListener('resize', miniResize); } catch (e) { }
     nextRound();
 
-    document.getElementById('cook-stop').onclick = function () { miniHit(); };
+    document.getElementById('cook-stop').onclick = function (e) { miniHit(e); };
 }
 
 function nextRound() {
@@ -390,11 +421,44 @@ function tick() {
     mini.raf = requestAnimationFrame(tick);
 }
 
-function miniHit() {
+// 바늘이 가는 거리와 초록칸의 자는 서로 다르다.
+//   바늘은 transform 으로 (바 너비 - 바늘 너비) 만큼만 가고,
+//   초록칸은 바 너비의 몇 % 로 깔린다. 같은 숫자로 견주면 끝에서
+//   바늘 너비만큼 어긋난다. 그래서 둘 다 픽셀로 바꿔 견준다.
+//   바늘은 **가운데 선**으로 친다 — 눈으로 겨누는 자리가 거기다.
+function miniInZone(at) {
+    const bar = document.getElementById('cook-bar');
+    const pin = document.getElementById('cook-pin');
+    if (!bar || !pin) return false;
+    const W = bar.clientWidth, pw = pin.offsetWidth || 3;
+    const mid = miniFrac(at) * Math.max(0, W - pw) + pw / 2;
+    const a = mini.zoneA / 100 * W;
+    const b = (mini.zoneA + mini.cfg.zone) / 100 * W;
+    return mid >= a && mid <= b;
+}
+
+function miniHit(ev) {
     if (!mini || mini.over) return;
-    const pos = miniPos();
+    // 손이 닿은 때를 쓴다. 눌린 것이 여기까지 오는 데 걸린 만큼 더 가 있지 않게.
+    let at = (ev && typeof ev.timeStamp === 'number' && ev.timeStamp > 0) ? ev.timeStamp : performance.now();
+    if (at > performance.now() + 50) at = performance.now();     // 시계가 다른 브라우저 대비
+    const pos = miniPos(at);
     mini.pos = pos;
-    const inZone = pos >= mini.zoneA && pos <= mini.zoneA + mini.cfg.zone;
+    mini.pausedAt = at;                     // 여기서 멈춘 것으로 친다
+    const inZone = miniInZone(at);
+    // 판정한 그 자리에 바늘을 세운다.
+    //   그냥 pause() 하면 애니메이션이 가 있던 자리에 서므로, 판정한 곳과
+    //   눈에 보이는 곳이 어긋난다. 영상에서 「바깥에 섰는데 성공」으로
+    //   보이던 것이 그 어긋남이다. 세워 두면 판정과 그림이 늘 같다.
+    if (mini.anim) {
+        try {
+            const T2 = 2 * mini.period;
+            let ta = (at - mini.t0) % T2;
+            if (ta < 0) ta += T2;
+            mini.anim.currentTime = ta;
+            mini.anim.pause();
+        } catch (e) { }
+    }
     if (!inZone) {
         mini.over = true;
         if (mini.raf) cancelAnimationFrame(mini.raf);
@@ -405,6 +469,7 @@ function miniHit() {
         setTimeout(function () { miniClose(); fn(false); }, 450);
         return;
     }
+    // 맞은 뒤에도 바늘은 멈춘 자리에 둔다 (다음 판을 걸면 miniStartAnim 이 푼다)
     if (mini.round >= mini.cfg.rounds) {
         mini.over = true;
         if (mini.raf) cancelAnimationFrame(mini.raf);
