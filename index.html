@@ -7049,7 +7049,37 @@ if (cat.effect === 'couple_ring') {
     }
     function applyItemEffect(targetUser, itemName, isOthers = false) {
         const cat = ITEM_CATALOG[itemName];
-        
+
+        // ──────────────────────────────────────────
+        // ★ 처리할 곳이 없는데 「썼다」고 하지 않는다
+        //
+        //   n_… · equip_n_… 로 시작하는 효과는 전부 newitems2.js 가 맡는다.
+        //   이 함수는 그 이름을 하나도 모른다. 그런데 맨 끝이 return true 라서,
+        //   여기까지 흘러들어 오면 부르는 쪽(useInventoryItem)이 「성공했다」고
+        //   보고 물건을 빼 버린다. **알림도 효과도 없이 그냥 사라진다.**
+        //   봉제 인형 키트·다 헐은 공략집이 쓰자마자 없어지던 까닭이다.
+        //
+        //   여기까지 왔다는 것은 소지품 쓰는 길에서 newitems2 의 손이 빠졌다는
+        //   뜻이다 (그 길은 열 겹 넘게 감싸여 있어 한 겹만 어긋나도 지나친다).
+        //   그러면 제자리 처리기를 직접 불러 주고, 그것도 못 찾으면 물건을
+        //   그대로 두고 말해 준다. 조용히 없어지는 길만은 막는다.
+        // ──────────────────────────────────────────
+        if (cat && /^(n_|equip_n_)/.test(String(cat.effect || ''))) {
+            const selfTbl = window.__newItemSelf;
+            const fn = (!isOthers && selfTbl) ? selfTbl[cat.effect] : null;
+            if (fn && targetUser === currentUser) {
+                try { fn(itemName); } catch (e) { console.error('[물품] ' + itemName, e); }
+                return false;                 // 처리기가 알아서 뺀다 — 여기서 또 빼지 않는다
+            }
+            console.warn('[물품] 처리할 곳을 못 찾았습니다 — ' + itemName + ' (' + cat.effect + ')');
+            if (!isOthers) {
+                showCustomAlert('이 물품을 다루는 부분이 아직 올라오지 않았습니다.\n\n'
+                    + '잠시 뒤에 다시 눌러 주세요. 물품은 그대로 있습니다.');
+            }
+            return false;                     // 물건은 그대로 둔다
+        }
+        if (!cat) return false;
+
         const addsFacility = ['ticket', 'radio', 'candy'].includes(cat.effect);
         if (addsFacility) {
             if (targetUser.ticketAddedDate !== getTodayStr()) {

@@ -1846,6 +1846,11 @@ const SELF = {
     }
 };
 
+// ★ 소지품 쓰는 길에서 이 파일의 손이 빠졌을 때, index.html 의
+//   applyItemEffect 가 여기로 되돌아와 제자리 처리기를 부른다.
+//   (그 길은 열 겹 넘게 감싸여 있어 한 겹만 어긋나도 그냥 지나친다)
+window.__newItemSelf = SELF;
+
 (function hookSelf() {
     const iv = setInterval(function () {
         if (typeof useInventoryItem !== 'function') return;
