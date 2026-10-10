@@ -172,6 +172,10 @@ function skSel(list) {
     const parts = (Array.isArray(list) ? list : list.split(',')).map(x => x.trim()).filter(Boolean);
     return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin] ${a} ${x}`)).join(',\n');
 }
+function skDark(list) {
+    const parts = (Array.isArray(list) ? list : list.split(',')).map(x => x.trim()).filter(Boolean);
+    return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin-tone="dark"] ${a} ${x}`)).join(',\n');
+}
 function skLight(list) {
     const parts = (Array.isArray(list) ? list : list.split(',')).map(x => x.trim()).filter(Boolean);
     return SK_AREAS.flatMap(a => parts.map(x => `body[data-ui-skin-tone="light"] ${a} ${x}`)).join(',\n');
@@ -186,6 +190,46 @@ const SK_DARK_BG = [
     '[style*="background:rgba(0"]', '[style*="background: rgba(0"]', '[style*="background-color:rgba(0"]',
     '[style*="background:linear-gradient(145deg"]', '[style*="background: linear-gradient(145deg"]',
     '[style*="background:linear-gradient(160deg"]', '[style*="background:linear-gradient(180deg"]'
+];
+
+// 코드 곳곳에 직접 박혀 있는 흐린 회색 글씨 (어두운 벽지에서 되살린다)
+//
+//   #333 ~ #aaa 는 거의 검은 바탕에서는 읽힌다. 그러나 바탕이 진하게
+//   물든 벽지에서는 이렇게까지 떨어진다 —
+//
+//       바탕                #555   #666   #777   #888   #999   #aaa
+//       쨍한 보라 #360a70   1.96   2.55   3.27   4.13   5.14   6.30
+//       쨍한 초록 #07583a   1.14   1.48   1.90   2.40   2.99   3.67
+//
+//   4.5 아래는 안 읽힌다. 그래서 어두운 벽지일 때만 --sk-text-dim 으로
+//   끌어올린다. 그 값은 벽지마다 다시 계산되므로, 거의 검은 벽지에서는
+//   지금과 비슷한 회색이 되고 물든 벽지에서만 밝아진다.
+//
+//   background-color:#888 은 color:#888 을 품고 있어 같이 걸린다.
+//   :not() 으로 그것만 뺀다.
+//   두 층으로 나눈다. 더 깜깜하던 것일수록 더 흐린 쪽으로 — 그래야
+//   「흐린 설명」과 「조금 덜 중요한 글」의 층이 뭉개지지 않는다.
+function skDimSel(hexes) {
+    const out = [];
+    hexes.forEach(function (h) {
+        ['color:#', 'color: #'].forEach(function (pre) {
+            out.push('[style*="' + pre + h + '" i]:not([style*="background-' + pre + h + '" i])');
+        });
+    });
+    return out;
+}
+const SK_DIM_TEXT = skDimSel(['333', '444', '555', '666']);      // 거의 안 보이던 것 → 가장 흐린 선
+const SK_MID_TEXT = skDimSel(['777', '888', '999', 'aaa', 'bbb']); // 조금 보이던 것 → 그 중간
+// style.css 안에서 이름으로 걸려 있는 것들
+const SK_DIM_CLASS = [
+    '.id-avatar-mini', '.id-info-details .serial-row', '.pollution-header',
+    '.badge-photo-placeholder', '.history-time', '.emp-list-avatar',
+    '.seotda-row-label', '.pchat-time'
+];
+const SK_MID_CLASS = [
+    '.header-info', '.panel-title', '.status-label', '.status-value span',
+    '.id-info-details .emp-meta', '.inv-card-desc', '.inv-desc-more',
+    '.emp-list-sub', '.suggestion-meta', '.pchat-sys', '.react-btn'
 ];
 
 const SKIN_CSS = `
@@ -320,6 +364,16 @@ ${skSel('.custom-alert-box, .luxury-alert-box, .modal-content')} {
     color: ${V('text')} !important;
 }
 
+/* 어두운 벽지 — 박혀 있는 흐린 회색 글씨를 읽히는 선까지 끌어올린다 */
+${skDark(SK_DIM_TEXT)},
+${skDark(SK_DIM_CLASS)} {
+    color: ${V('text-dim')} !important;
+}
+${skDark(SK_MID_TEXT)},
+${skDark(SK_MID_CLASS)} {
+    color: ${V('text-mid')} !important;
+}
+
 body[data-ui-skin] #app-container *::-webkit-scrollbar-thumb { background: ${V('edge')} !important; }
 body[data-ui-skin] #app-container *::-webkit-scrollbar-track { background: transparent !important; }
 `;
@@ -363,6 +417,23 @@ function skinReadable(accent, bg) {
     return c;
 }
 
+// 흐린 글씨 — 바탕에서 읽히는 선을 넘지 않는 만큼만 흐려진다.
+//   예전에는 글씨색에 투명도 b3 을 붙였다. 바탕이 거의 검을 때는 그걸로
+//   충분했지만, 「쨍한 보라」처럼 바탕 자체가 진하게 물든 벽지에서는
+//   대비가 4.3 까지 떨어져 글씨가 잠겼다. 이제는 두 바탕(base·panel)
+//   모두에서 4.6 을 넘는 선까지만 흐리게 만든다.
+function skinDim(text, bgA, bgB, min) {
+    const need = min || 4.6;
+    let best = text;
+    for (let t = 0.06; t <= 0.80; t += 0.06) {
+        const c = skinBlend(text, bgA, t);
+        if (skinContrast(c, bgA) < need) break;
+        if (skinContrast(c, bgB) < need) break;
+        best = c;
+    }
+    return best;
+}
+
 function skinVars(s) {
     const L = !!s.light;
     return {
@@ -372,7 +443,8 @@ function skinVars(s) {
         'base': s.base,
         'panel': s.panel,
         'text': s.text,
-        'text-dim': s.text + (L ? 'a6' : 'b3'),
+        'text-dim': skinDim(s.text, s.base, s.panel),
+        'text-mid': skinBlend(skinDim(s.text, s.base, s.panel), s.text, 0.5),
         'accent-deep': L ? skinBlend(s.accent, '#000000', 0.25) : skinBlend(s.accent, s.base, 0.3),
         'card': skinBlend(s.panel, s.accent, L ? 0.04 : 0.07),
         'well': L ? skinBlend(s.base, '#ffffff', 0.35) : skinBlend(s.base, s.accent, 0.05),
@@ -390,7 +462,7 @@ function skinVars(s) {
 }
 
 // --- 적용 / 해제 ---
-const SKIN_VAR_NAMES = ['accent','accent-text','accent-on-base','base','panel','text','text-dim','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo','shadow'];
+const SKIN_VAR_NAMES = ['accent','accent-text','accent-on-base','base','panel','text','text-dim','text-mid','accent-deep','card','well','tab','btn-top','press-top','press-bot','edge','edge-soft','line','glint','halo','shadow'];
 const SKIN_BODY_PROPS = SKIN_VAR_NAMES.map(n => '--sk-' + n).concat(['--theme-focus', '--theme-accent', '--theme-border', '--theme-text', '--theme-sub', '--theme-bg-grad', 'background-color', 'font-family']);
 
 function applyUiSkin(user) {
