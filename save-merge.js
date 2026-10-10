@@ -30,6 +30,7 @@ const EFF = 'timedEffects';       // 걸린 효과 — 이름별로 합친다
 const BUF = 'itemBuffs';          // 물건이 얹어 준 버프 — 개수까지 세어 합친다
 
 let code = null;
+let who = null;           // 기준을 세워 둔 바로 그 currentUser 덩어리
 let base = {};            // 서버에서 마지막으로 본 모습
 let ref = null;
 let ready = false;
@@ -590,10 +591,49 @@ function soakBuf(srv) {
 // ==========================================
 // 기준을 세우고 지켜본다
 // ==========================================
+// ★ 기준을 놓는다 — 로그아웃하거나, 같은 사번으로 **다시** 들어왔을 때
+//
+//   여기가 「다른 기기에서 하다 오면 물건이 복사되던」 자리다.
+//
+//   base 는 「서버에서 마지막으로 본 내 모습」이고, 저장은 base 와 지금의
+//   차이만큼을 **더하고 뺀다** (mergeInv). 그래서 base 가 틀리면 그 차이가
+//   통째로 틀린다.
+//
+//   전에는 attach 가 `code === currentUser.code` 면 그냥 돌아섰고,
+//   로그아웃할 때 code·base·ready 를 되돌리는 데가 없었다. 그래서 —
+//
+//     1. PC 창에서 로그인 → 그때 모습이 base 로 굳는다
+//     2. 휴대폰으로 같은 계정 → claimSession 이 PC 를 쫓아낸다
+//        (index.html:1230) · PC 의 base 는 **그 시점에 얼어붙는다**
+//     3. 휴대폰에서 한참 논다 — 서버 소지품이 앞서 나간다
+//     4. PC 창에서 다시 로그인 → currentUser 는 **새 서버 값**인데
+//        code 가 같아서 attach 가 돌아선다. base 는 1번 시점 그대로.
+//     5. 4초마다 도는 자동 보내기가 「base 에 없는 것 = 내가 새로 얻은 것」
+//        으로 보고 **서버에 한 벌 더 붙인다.** 포인트도 같은 길로 더해진다.
+//
+//   사번만으로는 못 가린다. 다시 들어오면 사번은 같아도 currentUser 는
+//   **다른 덩어리**가 되므로(index.html:10754 가 서버에서 새로 읽어 꽂는다)
+//   그 덩어리까지 같이 본다.
+function release(why) {
+    if (ref) { try { ref.off(); } catch (e) { } }
+    ref = null;
+    code = null; who = null; base = {}; ready = false;
+    effHeld = false; bufHeld = false;
+    invBusy = false; ptsBusy = false; effBusy = false; bufBusy = false;
+    console.log('[병합] 기준을 놓았습니다 — ' + why);
+}
+
 function attach() {
-    if (!database || !currentUser || !currentUser.code) return;
-    if (code === currentUser.code) return;
+    if (!database) return;
+    if (!currentUser || !currentUser.code) {
+        if (code !== null) release('로그아웃');
+        return;
+    }
+    if (code === currentUser.code && who === currentUser) return;
+    if (code !== null) release('다시 들어옴');
+
     code = currentUser.code;
+    who = currentUser;
     ready = false;
 
     if (ref) { try { ref.off(); } catch (e) { } }
@@ -601,8 +641,26 @@ function attach() {
     effHeld = false;
     bufHeld = false;
 
-    ref.on('value', function (s) {
-        const srv = s.val();
+    ref.on('value', function (s) { mergeOnSrv(s.val()); });
+}
+
+// ==========================================
+// 서버에서 내 모습이 내려왔다
+// ==========================================
+//
+//   처음이면 기준을 세우고, 그 뒤에는 「내가 손대지 않은 것」만 받아 온다.
+//
+//   ★ 깨어날 때도 이 길을 쓴다 (아래 wake).
+//
+//     창이 잠든 사이에 다른 기기가 앞서 나가는 일이 바로 「휴대폰으로 하다가
+//     PC 로 오면 물건이 복사되던」 자리다. 파이어베이스가 다시 붙을 때
+//     value 를 늘 다시 보내 주지는 않는다. 그러면 기준은 잠들기 전 모습에
+//     멈춰 있는데 자동 보내기는 4초마다 돌아서, 다른 기기에서 얻은 것을
+//     「내가 새로 얻은 것」으로 보고 서버에 한 벌 더 붙인다.
+//
+//     그래서 깨어나면 한 번 읽어서 이 길로 흘려 준다. 받아 올 것만 받고
+//     내가 손댄 것은 그대로 두므로, 잠들기 전에 못 보낸 것이 있어도 안 잃는다.
+function mergeOnSrv(srv) {
         if (!srv) return;
         if (!currentUser || currentUser.code !== code) return;   // 계정이 어긋났다
 
@@ -690,8 +748,26 @@ function attach() {
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
             console.log('[병합] 서버에서 ' + took + '개 항목을 받아 왔습니다.');
         }
-    });
 }
+
+// 깨어나면 서버와 한 번 맞춰 본다 (위 mergeOnSrv 의 까닭)
+(function wake() {
+    let hid = 0;
+    try {
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) { if (!hid) hid = Date.now(); return; }
+            if (!hid) return;
+            const slept = Date.now() - hid;
+            hid = 0;
+            if (slept < 15000) return;                       // 잠깐 가린 것은 넘어간다
+            if (!ref || !ready || !currentUser || currentUser.code !== code) return;
+            ref.once('value').then(function (s) {
+                console.log('[병합] ' + Math.round(slept / 1000) + '초 만에 깨어났습니다 — 서버와 맞춰 봅니다');
+                mergeOnSrv(s.val());
+            }).catch(function () { });
+        });
+    } catch (e) { }
+})();
 
 // 남의 소지품도 서버에서 본 모습을 적어 둔다 (물건을 줄 때 기준이 된다)
 (function watchOthers() {
