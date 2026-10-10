@@ -270,9 +270,12 @@ function regOne(real) {
     if (!src) return;
     const nm = COPY_TAG + real;
     if (ITEM_CATALOG[nm]) return;
+    const wornLike = String(src.effect || '').indexOf('equip') === 0 || !!src.equipKind;
     ITEM_CATALOG[nm] = {
         price: 0, usable: !!src.usable, targetable: !!src.targetable,
         effect: 'copy_of', copyOf: real, noSell: true,
+        equipKind: wornLike,                       // 장비 칸으로 세어지게 (equip-kind.js)
+        restrictDept: src.restrictDept, restrictRank: src.restrictRank,
         desc: '베껴 낸 것. 본래의 절반만 듣는다.'
             + (String(src.effect || '').indexOf('equip') === 0 ? ' 채운 지 하루가 지나면 삭는다.' : '')
             + '\n\n— ' + (src.desc || '')
@@ -438,8 +441,15 @@ function copierMake(real) {
             // 않는다. 그래서 표를 남겨 둔다 — copy-potion.js 가 이어서 받는다.
             window.__copyUse = { real: real, label: itemName, at: Date.now() };
 
+            // invmark.js 가 「쓰시겠습니까?」를 한 번 묻고, 승낙하면 window._invOk 에
+            //   그 이름을 적어 두고 다시 부른다. 그 표는 한 번 쓰면 지워진다.
+            //   여기서 원본 이름으로 다시 들어가면 표가 안 맞아 확인창이 **또** 뜬다.
+            //   그 둘째 창을 승낙해도 아래 finally 가 이미 지나간 뒤라 「절반」도,
+            //   「원본 대신 복제품을 뺀다」도 안 걸린다. 그래서 아무 일도 안 났다.
+            window._invOk = real;
+
             try { _u.call(this, real); }
-            finally { addTimedEffect = _ate; removeItemFromInventory = _rm; }
+            finally { addTimedEffect = _ate; removeItemFromInventory = _rm; window._invOk = null; }
 
             // 창이 안 떴다면(바로 끝났다면) 표를 지운다
             if (taken) window.__copyUse = null;
@@ -468,6 +478,64 @@ function copierMake(real) {
         useInventoryItem._copier = true;
         clearInterval(iv);
         console.log('[우주] 복사기 · 복제품 연결');
+    }, 400);
+})();
+
+// --- 남에게 채우기 ---
+//
+//   「타인」을 누르면 confirmItemTarget → applyItemEffect(상대, 이름, true) 로 간다.
+//   그런데 복제품의 effect 는 copy_of 라 어느 갈래에도 안 걸려서, 상대에게는
+//   아무것도 안 꽂히고 복제품만 소지품에서 사라졌다.
+//
+//   그래서 여기서도 원본 이름으로 바꿔 돌린 뒤, 상대 장착칸에 꽂힌 것에
+//   복제품 표를 붙이고 하루짜리로 만든다. 본인 장착 때와 같은 모양이다.
+(function copyToOthers() {
+    const iv = setInterval(function () {
+        if (typeof applyItemEffect !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
+        if (typeof addTimedEffect !== 'function') return;
+        if (applyItemEffect._copier) { clearInterval(iv); return; }
+
+        const _a = applyItemEffect;
+        applyItemEffect = function (target, itemName, isOthers) {
+            const cat = ITEM_CATALOG[itemName];
+            const real = (cat && cat.copyOf) ? cat.copyOf : realOf(itemName);
+            if (!real || !ITEM_CATALOG[real] || !target) return _a.apply(this, arguments);
+
+            const before = (target.equippedWeapons || []).length;
+
+            const _ate = addTimedEffect;
+            addTimedEffect = function (u, n, d, h) {
+                return _ate.call(this, u, COPY_TAG + n, (d || '') + ' (절반)', Math.max(0.5, (h || 0) / 2));
+            };
+            let out;
+            try { out = _a.call(this, target, real, isOthers); }
+            finally { addTimedEffect = _ate; }
+            if (out === false) return false;
+
+            // 상대에게 꽂힌 것에 표를 붙인다
+            const eq = target.equippedWeapons || [];
+            for (let i = eq.length - 1; i >= before; i--) {
+                const was = eq[i];
+                const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(was) : was;
+                if (b !== real) continue;
+                const become = COPY_TAG + was;
+                eq[i] = become;
+                if (target.equipOwner && target.equipOwner[was] !== undefined) {
+                    target.equipOwner[become] = target.equipOwner[was];
+                    delete target.equipOwner[was];
+                }
+                if (target.badge && typeof target.badge.notes === 'string') {
+                    target.badge.notes = target.badge.notes.split(was).join(become);
+                }
+                if (!target.copyExpire) target.copyExpire = {};
+                target.copyExpire[become] = Date.now() + COPY_EQUIP_MS;
+                break;
+            }
+            return out;
+        };
+        applyItemEffect._copier = true;
+        clearInterval(iv);
+        console.log('[우주] 복제품 — 남에게 채우기 연결');
     }, 400);
 })();
 
