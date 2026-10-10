@@ -26,7 +26,7 @@
 //   파이어베이스·구글 등 **다른 곳으로 가는 요청**은 손대지 않는다.
 //   받아 오기(GET)가 아닌 것도 손대지 않는다.
 
-const BUILD = '20261010102526';
+const BUILD = '20261010103426';
 const CACHE = 'corp-' + BUILD;
 const TIMEOUT = 3000;
 
@@ -93,7 +93,7 @@ self.addEventListener('fetch', function (e) {
     // 이모티콘 그림은 들고 있던 것을 먼저 준다.
     //   묶음 파일과 달리 서로 맞물리지 않고, 꾸러미 이름에 BUILD 가 들어 있어
     //   새로 올리면 어차피 통째로 버려진다. 그러니 묵을 걱정이 없다.
-    //   이모티콘 칸을 열 때 서른두 장을 매번 다시 받지 않게 해 준다.
+    //   이모티콘 칸을 열 때 서른아홉 장을 매번 다시 받지 않게 해 준다.
     if (url.pathname.indexOf('/emo/') >= 0) {
         e.respondWith(
             caches.match(req, { ignoreSearch: true }).then(function (hit) {
