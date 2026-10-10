@@ -131,6 +131,63 @@ function desc(kind, value, qty) {
 }
 
 // ==========================================
+// 여러 개를 한 번에 — 제물·대가를 묶음으로 다룬다
+// ==========================================
+//
+//   예전 제안서는 한 가지만 담았다 (offerType·offerValue·offerQty).
+//   이제 offerList / demandList 에 [{k,v,q}, …] 로 여러 개를 담는다.
+//   옛 제안서와 옛 화면이 섞여 있어도 되도록, 목록이 없으면 예전
+//   세 칸을 읽어 한 칸짜리 묶음으로 만든다.
+function bundle(deal, side) {
+    const out = [];
+    const list = asArr(deal[side + 'List']);
+    if (list.length) {
+        list.forEach(function (x) {
+            if (!x) return;
+            if (x.k === 'point') { if (Number(x.v) > 0) out.push({ k: 'point', v: Number(x.v), q: 1 }); }
+            else if (x.v) out.push({ k: 'item', v: String(x.v), q: Math.max(1, parseInt(x.q, 10) || 1) });
+        });
+        return out;
+    }
+    const t = deal[side + 'Type'], v = deal[side + 'Value'], q = deal[side + 'Qty'];
+    if (t == null || v == null) return out;
+    if (t === 'point') { if (Number(v) > 0) out.push({ k: 'point', v: Number(v), q: 1 }); }
+    else out.push({ k: 'item', v: String(v), q: Math.max(1, parseInt(q, 10) || 1) });
+    return out;
+}
+
+// 하나라도 못 빼면 이미 뺀 것을 전부 도로 넣고 그만둔다.
+// 빼기만 실패할 수 있고, 그때는 아직 아무것도 건네지 않았다.
+async function takeAll(side, bu) {
+    const done = [];
+    for (let i = 0; i < bu.length; i++) {
+        const ok = await take(side, bu[i].k, bu[i].v, bu[i].q);
+        note('빼기', ok, side + ' ← ' + desc(bu[i].k, bu[i].v, bu[i].q));
+        if (!ok) {
+            for (let j = done.length - 1; j >= 0; j--) {
+                await give(side, done[j].k, done[j].v, done[j].q);
+                note('되돌림', true, side + ' → ' + desc(done[j].k, done[j].v, done[j].q));
+            }
+            return { ok: false, at: bu[i] };
+        }
+        done.push(bu[i]);
+    }
+    return { ok: true };
+}
+async function giveAll(side, bu) {
+    for (let i = 0; i < bu.length; i++) {
+        await give(side, bu[i].k, bu[i].v, bu[i].q);
+        note('넣기', true, side + ' → ' + desc(bu[i].k, bu[i].v, bu[i].q));
+    }
+}
+function descAll(bu) {
+    if (!bu || !bu.length) return '(없음)';
+    return bu.map(function (x) { return desc(x.k, x.v, x.q); }).join(' · ');
+}
+window.p2pBundle = bundle;
+window.p2pDescAll = descAll;
+
+// ==========================================
 // 수락 — 통째로 다시 쓴다
 // ==========================================
 function install() {
@@ -138,6 +195,7 @@ function install() {
     if (acceptP2PDeal._txn) return true;
 
     acceptP2PDeal = async function (dealId) {
+        let settled = false;       // 주고받기가 끝났나 (끝난 뒤에는 되돌리지 않는다)
         if (typeof buyGuard === 'function' && !buyGuard()) return;
         if (typeof isQuarantined === 'function' && isQuarantined(currentUser)) {
             showCustomAlert('여우 상담실 격리 중에는 거래를 수락할 수 없습니다.'); return;
@@ -178,45 +236,41 @@ function install() {
             }
 
             const me = currentUser.code, him = deal.fromCode;
-            const oKind = (deal.offerType === 'point') ? 'point' : 'item';
-            const oVal = deal.offerValue, oQty = deal.offerQty || 1;
             const trade = (deal.mode === 'trade');
-            const dKind = (deal.demandType === 'point') ? 'point' : 'item';
-            const dVal = deal.demandValue, dQty = deal.demandQty || 1;
+            const oBu = bundle(deal, 'offer');
+            const dBu = trade ? bundle(deal, 'demand') : [];
 
-            if (trade && dKind === 'point' && !(Number(dVal) > 0)) {
+            if (!oBu.length || (trade && !dBu.length)) {
                 await database.ref('p2pDeals/' + idx + '/status').set('EXPIRED');
-                showCustomAlert('제안서의 요구 내용이 잘못되어 있습니다.\n\n거래를 파기했습니다.');
+                showCustomAlert('제안서의 내용이 잘못되어 있습니다.\n\n거래를 파기했습니다.');
                 if (typeof renderP2PLists === 'function') renderP2PLists();
                 return;
             }
 
-            // --- 2) 보낸 쪽에서 제물을 뺀다 ---
-            const gotOffer = await take(him, oKind, oVal, oQty);
-            note('제물 빼기', gotOffer, deal.fromName + ' ← ' + desc(oKind, oVal, oQty));
-            if (!gotOffer) {
+            // --- 2) 보낸 쪽에서 제물을 뺀다 (여러 개면 하나라도 모자랄 때 전부 되돌린다) ---
+            const got = await takeAll(him, oBu);
+            if (!got.ok) {
                 await database.ref('p2pDeals/' + idx + '/status').set('EXPIRED');
-                showCustomAlert(oKind === 'point'
+                showCustomAlert(got.at.k === 'point'
                     ? (deal.fromName + ' 사원의 포인트가 부족하여 거래가 무산되었습니다.')
-                    : (deal.fromName + ' 사원이 해당 물품을 더 이상 보유하고 있지 않습니다.'));
+                    : (deal.fromName + " 사원이 '" + got.at.v + "' 을(를) 더 이상 "
+                       + got.at.q + '개 가지고 있지 않습니다.'));
                 if (typeof renderP2PLists === 'function') renderP2PLists();
                 return;
             }
 
             // --- 3) 받는 쪽에서 대가를 뺀다 ---
             if (trade) {
-                const paid = await take(me, dKind, dVal, dQty);
-                note('대가 빼기', paid, '나 ← ' + desc(dKind, dVal, dQty));
-                if (!paid) {
+                const paid = await takeAll(me, dBu);
+                if (!paid.ok) {
                     // 아직 아무것도 주지 않았다 — 2번을 그대로 돌려놓는다
-                    const back = await give(him, oKind, oVal, oQty);
-                    note('제물 돌려놓기', back, deal.fromName);
+                    await giveAll(him, oBu);
                     await database.ref('p2pDeals/' + idx + '/status').set('PENDING');
-                    if (dKind === 'point') {
+                    if (paid.at.k === 'point') {
                         if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
                         else showCustomAlert('포인트가 부족합니다.');
                     } else {
-                        showCustomAlert("요구하신 물품 '" + dVal + "' " + dQty + '개가 부족합니다.');
+                        showCustomAlert("요구하신 물품 '" + paid.at.v + "' " + paid.at.q + '개가 부족합니다.');
                     }
                     if (typeof renderP2PLists === 'function') renderP2PLists();
                     return;
@@ -224,21 +278,22 @@ function install() {
             }
 
             // --- 4·5) 넣는다. 여기부터는 실패하지 않는다 ---
-            await give(me, oKind, oVal, oQty);
-            note('제물 넣기', true, '나 → ' + desc(oKind, oVal, oQty));
-            if (trade) {
-                await give(him, dKind, dVal, dQty);
-                note('대가 넣기', true, deal.fromName + ' → ' + desc(dKind, dVal, dQty));
-            }
+            await giveAll(me, oBu);
+            if (trade) await giveAll(him, dBu);
 
             await database.ref('p2pDeals/' + idx + '/status').set('COMPLETED');
+            settled = true;        // 여기부터는 무슨 일이 나도 되돌리면 안 된다
 
             // --- 기록 ---
+            // 기록과 화면은 거래와 별개다. 여기서 터져도 물건은 이미 옮겨졌으므로
+            // 바깥 catch 로 떨어뜨리지 않는다. (떨어뜨리면 status 가 PENDING 으로
+            // 돌아가 같은 제안서를 또 수락할 수 있게 된다 — 두 번 옮겨진다)
+            try {
             // currentUser 를 손으로 갈아끼우지 않는다 — 병합이 서버에서 받아 온다
             const line = trade
-                ? ('[밀실 성사] ' + deal.fromName + ' 사원과 교환 — 받음 ' + desc(oKind, oVal, oQty)
-                   + ' · 건넴 ' + desc(dKind, dVal, dQty))
-                : ('[밀실 성사] ' + deal.fromName + ' 사원에게서 ' + desc(oKind, oVal, oQty) + ' 받음');
+                ? ('[밀실 성사] ' + deal.fromName + ' 사원과 교환 — 받음 ' + descAll(oBu)
+                   + ' · 건넴 ' + descAll(dBu))
+                : ('[밀실 성사] ' + deal.fromName + ' 사원에게서 ' + descAll(oBu) + ' 받음');
             if (typeof addHistoryLog === 'function') {
                 addHistoryLog(currentUser, line);
                 await database.ref('users/' + me + '/history').set(currentUser.history);
@@ -246,8 +301,8 @@ function install() {
                 if (sender) {
                     addHistoryLog(sender, trade
                         ? ('[밀실 성사] ' + currentUser.name + ' 사원과 교환 — 건넴 '
-                           + desc(oKind, oVal, oQty) + ' · 받음 ' + desc(dKind, dVal, dQty))
-                        : ('[밀실 성사] ' + currentUser.name + ' 사원에게 ' + desc(oKind, oVal, oQty) + ' 건넴'));
+                           + descAll(oBu) + ' · 받음 ' + descAll(dBu))
+                        : ('[밀실 성사] ' + currentUser.name + ' 사원에게 ' + descAll(oBu) + ' 건넴'));
                     await database.ref('users/' + him + '/history').set(sender.history);
                 }
             }
@@ -258,12 +313,22 @@ function install() {
             if (typeof renderP2PLists === 'function') renderP2PLists();
             showCustomAlert('거래가 성공적으로 체결되었습니다.\n\n' + line.replace('[밀실 성사] ', ''));
             setTimeout(function () { if (typeof updateUI === 'function') updateUI(); }, 1200);
+            } catch (e2) {
+                console.warn('[밀실] 거래는 끝났고 기록·화면만 실패했습니다:', e2 && e2.message);
+                note('기록', false, e2 && e2.message);
+                try { showCustomAlert('거래가 체결되었습니다.'); } catch (x) { }
+                try { if (typeof renderP2PLists === 'function') renderP2PLists(); } catch (x) { }
+            }
 
         } catch (e) {
             console.error('[밀실] 거래 실패:', e);
             note('오류', false, e && e.message);
-            if (idx >= 0) { try { await database.ref('p2pDeals/' + idx + '/status').set('PENDING'); } catch (x) { } }
-            showCustomAlert('거래 처리 중 오류가 발생했습니다.\n\n거래는 되돌렸습니다.');
+            if (idx >= 0 && !settled) {
+                try { await database.ref('p2pDeals/' + idx + '/status').set('PENDING'); } catch (x) { }
+            }
+            showCustomAlert(settled
+                ? '거래는 체결되었으나 뒷정리 중 오류가 났습니다.\n\n물품은 이미 옮겨졌습니다.'
+                : '거래 처리 중 오류가 발생했습니다.\n\n거래는 되돌렸습니다.');
             if (typeof renderP2PLists === 'function') renderP2PLists();
         }
     };
