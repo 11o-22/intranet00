@@ -323,14 +323,38 @@
 
 <div class="container" id="app-container">
     <div id="login-screen">
-        <h2>사내 시스템 접속</h2>
-        <div class="login-input-group">
-            <input type="text" id="nickname-input" placeholder="사원명 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
+        <!-- 낡은 수상기 한 대. 뼈대는 전부 CSS 로 그린다 (style.css 맨 끝). -->
+        <div class="crt-set">
+            <div class="crt-wood">
+                <div class="crt-face">
+                    <div class="crt-bezel">
+                        <div class="crt-tube">
+                            <div class="crt-content">
+                                <h2>사내 시스템 접속</h2>
+                                <div class="login-input-group">
+                                    <input type="text" id="nickname-input" placeholder="사원명 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
+                                </div>
+                                <div class="login-input-group">
+                                    <input type="password" id="code-input" placeholder="인가 코드 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
+                                </div>
+                                <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
+                            </div>
+                            <div class="crt-scan" aria-hidden="true"></div>
+                            <div class="crt-glare" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                    <div class="crt-side" aria-hidden="true">
+                        <div class="crt-plate"></div>
+                        <div class="crt-knob"></div>
+                        <div class="crt-knob crt-knob2"></div>
+                        <div class="crt-grille"></div>
+                        <div class="crt-screw"></div>
+                        <div class="crt-screw"></div>
+                        <div class="crt-screw"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="login-input-group">
-            <input type="password" id="code-input" placeholder="인가 코드 입력" onkeypress="if(event.key === 'Enter') attemptLogin()">
-        </div>
-        <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
     </div>
 
     <div id="main-screen">
