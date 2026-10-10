@@ -4593,6 +4593,9 @@ function b508RequiredDocs() {
         return true;
     }
 
+    // 한 진열에서 같은 물품을 몇 개까지 가져갈 수 있나
+    const QSHOP_CAP = 5;
+
        function qshopSlotKey() {
         const now = new Date();
         const slot = Math.floor(now.getHours() / 4);
@@ -4647,18 +4650,18 @@ function b508RequiredDocs() {
                 클리어를 바랍니다.
             </div>
             <div style="font-size:10px; color:#666; text-align:center; margin-bottom:14px;">
-                진열은 ${Math.floor(remainMin / 60)}시간 ${remainMin % 60}분 뒤에 바뀝니다. · 항목당 2개 한정
+                진열은 ${Math.floor(remainMin / 60)}시간 ${remainMin % 60}분 뒤에 바뀝니다. · 항목당 ${QSHOP_CAP}개 한정
             </div>
             ${items.map(name => {
                 const it = ITEM_CATALOG[name];
                 const bought = rec[name] || 0;
-                const left = currentUser.code === 'kario0987' ? 99 : Math.max(0, 2 - bought);
+                const left = currentUser.code === 'kario0987' ? 99 : Math.max(0, QSHOP_CAP - bought);
                 const soldOut = left === 0;
                 return `
                     <div class="shop-item ${soldOut ? 'sold-out' : ''}" style="border-color:#3a3a3a;">
                         <div style="flex:1; min-width:0;">
                             <span style="font-weight:bold; font-size:12px;">${name}</span>
-                            <span style="font-size:10px; color:#666; margin-left:5px;">${left === 99 ? '' : `(${left}/2)`}</span><br>
+                            <span style="font-size:10px; color:#666; margin-left:5px;">${left === 99 ? '' : `(${left}/${QSHOP_CAP})`}</span><br>
                             <span style="font-size:10px; color:#888; line-height:1.5;">${it.desc.replace('[???] ', '')}</span>
                         </div>
                         <button ${soldOut ? 'disabled' : ''} onclick="buyQShopItem('${name}', ${it.price})" style="flex-shrink:0;">
@@ -4679,7 +4682,7 @@ function b508RequiredDocs() {
         if (!currentUser.qshopRecord[cycleKey]) currentUser.qshopRecord[cycleKey] = {};
         const bought = currentUser.qshopRecord[cycleKey][name] || 0;
 
-        if (currentUser.code !== 'kario0987' && bought >= 2) { showCustomAlert('이 진열에서는 더 가져갈 수 없습니다.'); return; }
+        if (currentUser.code !== 'kario0987' && bought >= QSHOP_CAP) { showCustomAlert('이 진열에서는 더 가져갈 수 없습니다.'); return; }
         if (currentUser.points < price) { showLuxuryAlert(); return; }
 
         currentUser.points -= price;

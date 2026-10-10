@@ -131,6 +131,47 @@ function baseOf(w) {
 }
 
 // ==========================================
+// 노예 계약 주인 — 「누군가 사원과 노예 계약」 이 되던 것
+// ==========================================
+//
+//   아래 되살리기는 주인 이름을 user.masterName 한 칸에서만 읽었다.
+//   그런데 그 칸은 쉽게 빈다 —
+//
+//       · 계약 만료 처리가 masterName 을 null 로 지운다 (index.html:5087)
+//         영구 계약은 slaveUntil 이 안 끝나므로 줄은 살아 있는데 이름만 없다
+//       · 제거약·상태이상 소거도 같은 칸을 지운다
+//       · 남의 자리에 쓰는 길은 묵은 모습을 덮어쓰다 이 칸을 흘린다
+//
+//   그러면 여기가 「누군가」로 적고, 그 글자가 그대로 굳었다.
+//   (투명 물약으로 고정하면 「누군가 사원과 노예 계약 (영구)」가 된다)
+//
+//   이름 대신 **사번**을 같이 적어 두면 (index.html 의 slaveMaster) 이름은
+//   언제든 다시 찾을 수 있고 주인이 개명해도 따라간다. 사번이 없는 옛
+//   기록은 체결 기록에서 이름을 캐낸다. 그래도 못 찾으면 이름을 빼고
+//   적는다 — 틀린 이름보다 없는 편이 낫다.
+const NOBODY = /^\[계약\]\s*(누군가\s*사원과\s*)?노예 계약/;
+
+function masterOf(u) {
+    if (!u) return '';
+    if (u.masterName && u.masterName !== '누군가') return u.masterName;
+    try {
+        const m = u.slaveMaster && typeof db !== 'undefined' && db.users && db.users[u.slaveMaster];
+        if (m && m.name) return m.name;
+    } catch (e) { }
+    // 옛 기록에는 사번이 없다 — 「… 사원과 노예 계약이 체결되었습니다」 에서 캐낸다
+    try {
+        const h = Array.isArray(u.history) ? u.history : [];
+        for (let i = 0; i < h.length; i++) {
+            const t = String((h[i] && (h[i].text != null ? h[i].text : h[i])) || '');
+            const g = /\[계약\]\s*(.+?)\s*사원과 노예 계약이 체결/.exec(t);
+            if (g && g[1] && g[1] !== '누군가') return g[1];
+        }
+    } catch (e) { }
+    return '';
+}
+window.noteMasterOf = masterOf;
+
+// ==========================================
 // 하나 — 한 줄만 지운다
 // ==========================================
 (function onlyOne() {
@@ -166,12 +207,13 @@ function fixNotes(u) {
     const arr = notesOf(u);
     const out = [];
     const ribbon = [];
+    const slave = [];
 
     arr.forEach(function (n) {
         if (n.indexOf(RIBBON) >= 0) { ribbon.push(n); return; }
         if (n.indexOf('노예 계약') >= 0) {
-            // 노예 계약은 한 줄까지
-            if (!out.some(function (x) { return x.indexOf('노예 계약') >= 0; })) out.push(n);
+            // 노예 계약은 한 줄까지 — 남길지는 아래에서 정한다
+            if (!slave.length) slave.push(n);
             return;
         }
         if (expired(u, n)) return;                 // 기한이 지난 문구는 걷어낸다
@@ -202,12 +244,28 @@ function fixNotes(u) {
     });
 
     // --- 노예 계약 : 기간이 남았으면 한 줄 ---
+    //
+    //   ★ 「풀렸는데 남은 계약」을 가려낸다.
+    //     제거약은 slaveUntil 을 0 으로, slaveFixed 를 false 로 돌린다.
+    //     그런데 남에게 쓸 때 서버로 보내는 칸 목록에 slaveFixed 가 빠져
+    //     있어서, 서버에는 slaveUntil 0 · slaveFixed true 가 남았다.
+    //     여기서 slaveFixed 만 보고 되살리니 풀린 계약이 영영 돌아왔다.
+    //     고정된 계약은 slaveUntil 을 MAX_SAFE_INTEGER 로 둔다 — 그러므로
+    //     slaveUntil 이 비어 있으면 그것은 계약이 아니라 찌꺼기다.
+    if (u.slaveFixed && !u.slaveUntil) u.slaveFixed = false;
     const live = (u.slaveUntil && Date.now() < u.slaveUntil) || u.slaveFixed;
-    const hasSlave = out.some(function (x) { return x.indexOf('노예 계약') >= 0; });
-    if (live && !hasSlave) {
-        const who = u.masterName || '누군가';
-        out.push('[계약] ' + who + ' 사원과 노예 계약 (' + (u.slaveFixed ? '영구' : '3일') + ')');
+    if (live) {
+        const who = masterOf(u);
+        const term = u.slaveFixed ? '영구' : '3일';
+        const line = who ? ('[계약] ' + who + ' 사원과 노예 계약 (' + term + ')')
+                         : ('[계약] 노예 계약 (' + term + ')');
+        // 줄이 없으면 적고, 「누군가」로 굳어 있으면 고쳐 적는다.
+        // 이름을 못 찾았으면 이름 없이 적는다 — 틀린 이름보다 없는 편이 낫다.
+        if (!slave.length) out.push(line);
+        else if (who && NOBODY.test(slave[0])) out.push(line);
+        else out.push(slave[0]);
     }
+    // live 가 아니면 적힌 줄을 버린다 (풀린 계약이 남아 있던 자리)
 
     const next = out.concat(keep);
     const before = arr.join(SEP), after = next.join(SEP);
@@ -242,7 +300,7 @@ window.noteFixFor = function (who) {
     if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
     const n = reconcile(u);
     if (!n) { console.log(u.name + ' 사원은 맞게 적혀 있습니다.'); return; }
-    if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge });
+    if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge, slaveFixed: !!u.slaveFixed });
     if (typeof updateUI === 'function') updateUI();
     console.log('%c\u2713 ' + u.name + ' 사원의 특이사항을 맞췄습니다.', 'color:#4CAF50');
 };
@@ -253,7 +311,8 @@ window.noteFixFor = function (who) {
         if (!currentUser) return;
         const n = reconcile(currentUser, true);
         if (!n) return;
-        if (typeof saveFields === 'function') { try { saveFields({ badge: 1 }); } catch (e) { } }
+        // slaveFixed 도 같이 보낸다 — 「풀렸는데 남은 계약」을 여기서 꺼 두므로
+        if (typeof saveFields === 'function') { try { saveFields({ badge: 1, slaveFixed: 1 }); } catch (e) { } }
         const el = document.getElementById('badge-notes-text');
         if (el && currentUser.badge) el.innerText = currentUser.badge.notes;
     }, 15000);
@@ -290,6 +349,7 @@ window.noteFixAll = function () {
         const n = reconcile(u, true);
         if (!n) return;
         up['users/' + c + '/badge'] = u.badge;
+        up['users/' + c + '/slaveFixed'] = !!u.slaveFixed;
         rows.push({ 사원: u.name, 고친줄: n, 특이사항: u.badge.notes });
     });
     if (!rows.length) { console.log('되살릴 것이 없습니다.'); return; }

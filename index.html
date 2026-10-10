@@ -5085,6 +5085,7 @@ if (user.code === 'kario0987') {
         if (user.slaveUntil && !user.slaveFixed && now >= user.slaveUntil) {
     user.slaveUntil = 0;
     user.masterName = null;
+    user.slaveMaster = null;
             appendBadgeNoteToUser(user, `[계약 만료] 노예 계약 기간이 종료되어 해방되었습니다.`);
             addHistoryLog(user, `[계약 해제] 노예 계약 만료`);
             changed = true;
@@ -6183,6 +6184,11 @@ if (bcEl) {
             updates[`users/${targetCode}/_adminStamp`] = stamp;
             updates[`users/${targetCode}/slaveUntil`] = targetUser.slaveUntil || 0;
             updates[`users/${targetCode}/masterName`] = targetUser.masterName || null;
+            updates[`users/${targetCode}/slaveMaster`] = targetUser.slaveMaster || null;
+            // ★ slaveFixed 가 빠져 있었다. 제거약으로 계약을 풀어도 이 칸만
+            //   서버에 true 로 남아, 특이사항이 「누군가 사원과 노예 계약 (영구)」
+            //   로 되살아났다. 투명 물약의 고정도 같은 까닭으로 안 건너갔다.
+            updates[`users/${targetCode}/slaveFixed`] = !!targetUser.slaveFixed;
             updates[`users/${targetCode}/nostalgiaUntil`] = targetUser.nostalgiaUntil || 0;
             updates[`users/${targetCode}/nostalgiaSender`] = targetUser.nostalgiaSender || null;
             updates[`users/${targetCode}/blindfoldUntil`] = targetUser.blindfoldUntil || 0;
@@ -7165,6 +7171,7 @@ else if (cat.effect === 'rainbow_potion') {
         targetUser.slaveUntil = 0;
         targetUser.slaveFixed = false;
         targetUser.masterName = null;
+        targetUser.slaveMaster = null;
     }
 
     if (targetUser.badge && targetUser.badge.notes) {
@@ -7437,6 +7444,10 @@ else if (cat.effect === 'slave_contract') {
     }
     targetUser.slaveUntil = Date.now() + (3 * 24 * 60 * 60 * 1000);
     targetUser.masterName = currentUser.name;
+    // ★ 이름만 적어 두면 그 칸 하나가 비는 순간 「누군가」가 된다.
+    //   사번을 같이 적어 두면 이름은 언제든 다시 찾을 수 있고, 주인이
+    //   개명해도 따라간다.
+    targetUser.slaveMaster = currentUser.code;
     appendBadgeNoteToUser(targetUser, `[계약] ${currentUser.name} 사원과 노예 계약 (3일)`);
     addHistoryLog(targetUser, `[계약] ${currentUser.name} 사원과 노예 계약이 체결되었습니다.`);
     showCustomAlert(`${targetUser.name} 사원과 3일간의 계약을 체결했습니다.`);
