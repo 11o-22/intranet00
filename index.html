@@ -2877,6 +2877,7 @@ function renderAdvanceWait(nextStep) {
     const go = () => {
         if (finished) return;
         finished = true;
+        window._advWait = null;
         clearInterval(poll);
         try { ref.off(); } catch (e) {}
         if (!darkRun) return;
@@ -2918,14 +2919,17 @@ function renderAdvanceWait(nextStep) {
         const cnt = group.filter(c => lastGot[c]).length;
         const need = group.length;
 
+        const waitFor = group.filter(c => !lastGot[c])
+            .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
+        // ★ 셈한 것을 바깥에도 둔다. 기다리는 사이에 화면을 다시 그리면
+        //   「준비 중」 표시가 통째로 지워지는데, dark-wait.js 가 이것을 보고
+        //   되살린다. (지워진 줄 모르고 또 누르면 _advTo 에 막혀 아무 일도 없었다)
+        window._advWait = { step: nextStep, cnt: cnt, need: need, names: waitFor, at: Date.now() };
+
         const el = document.getElementById('adv-wait');
         if (el) el.innerText = `${cnt} / ${need}명 준비`;
         const wl = document.getElementById('adv-wait-list');
-        if (wl) {
-            const waitFor = group.filter(c => !lastGot[c])
-                .map(c => (p.members && p.members[c] && p.members[c].name) || safeName(c));
-            wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
-        }
+        if (wl) wl.innerText = waitFor.length ? `기다리는 중 — ${waitFor.join(', ')}` : '';
         // need 가 0 이면 방 정보가 아직 안 왔다는 뜻이다.
         // 그대로 두면 0 >= 0 이 되어 혼자 먼저 넘어간다.
         if (need > 0 && cnt >= need) go();
