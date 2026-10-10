@@ -37,7 +37,7 @@
 const KLEE = {
     NAME: '📱 K.LEE',
     WHO:  'K.LEE',
-    DAY:  { m1: 1, m3: 3, m4: 3, m5: 2 },   // 하루 쓸 수 있는 횟수
+    DAY:  { m3: 3, m4: 3, m5: 2 },           // 하루 쓸 수 있는 횟수 (① ② 는 제한 없음)
     PICK: 3,                                 // ① 고르는 사원 수
     BOOK: 2,                                 // ④ 한 번에 예약하는 사람 수
     BUFF_MS: 24 * 3600 * 1000,
@@ -351,7 +351,6 @@ function liveBuffs(u) {
 
 function m1Pick() {
     const u = me();
-    if (left(u, 'm1') <= 0) { alert_('오늘은 더 보낼 수 없습니다.'); return; }
     shut();
     // 버프를 들고 있는 사원만 보여 준다 — 없는 사람을 고르면 가져올 것이 없다
     const list = users().filter(function (x) { return x.code !== u.code; })
@@ -427,7 +426,6 @@ function m1Buffs(codes) {
 
 function m1Do(codes, sel) {
     const u = me();
-    if (left(u, 'm1') <= 0) { alert_('오늘은 더 보낼 수 없습니다.'); return; }
     shut();
     const mine = [], theirs = {};
 
@@ -454,15 +452,13 @@ function m1Do(codes, sel) {
         } catch (e) { }
     });
 
-    spend(u, 'm1');
     log_(u, '[' + KLEE.WHO + '] 이름 많이 들었어요 — ' + mine.join(', '));
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     ring();
     alert_('[' + KLEE.WHO + ' : 이름 많이 들었어요.]\n\n'
         + '가져온 것 — ' + mine.join(' · ') + '\n\n'
-        + Object.keys(theirs).map(function (n) { return n + ' : ' + theirs[n].join(' · '); }).join('\n')
-        + '\n\n오늘 남은 횟수 ' + left(u, 'm1') + ' / ' + KLEE.DAY.m1);
+        + Object.keys(theirs).map(function (n) { return n + ' : ' + theirs[n].join(' · '); }).join('\n'));
 }
 
 // ==========================================
@@ -483,11 +479,9 @@ function m2Send() {
     const u = me(), r = run();
     shut();
     if (!r || !r.isParty || !r.partyId) { alert_('어둠 탐사 중에, 파티로 들어갔을 때만 보낼 수 있습니다.'); return; }
-    if (r.kleeSignSent) { alert_('이번 탐사에서는 이미 보냈습니다.'); return; }
     const p = party();
     const n = p && p.members ? Object.keys(p.members).length : (r.memberCount || 1);
 
-    r.kleeSignSent = true;
     const pay = { by: u.code, name: u.name, at: Date.now() };
     const path = signPath();
     if (db_() && path) db_().ref(path).set(pay).catch(function () { });
