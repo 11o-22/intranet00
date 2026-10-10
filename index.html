@@ -8636,53 +8636,113 @@ function bjFinish(mode) {
         }
     }, 500);
     // --- 1:1 밀실 거래 ---
+    // ──────────────────────────────────────────
+    // 밀실 제안 만료 — 서버의 **진짜 열쇠**로 적는다
+    //
+    //   p2pDeals 는 가운데가 지워지면 배열이 아니라 띄엄띄엄한 객체가 된다
+    //   (열쇠가 0,3,7 같은 꼴). 그런데 예전 코드는 Object.values() 로 늘어놓은
+    //   **자리 번호**를 그대로 열쇠로 써서 `p2pDeals/<자리>/status` 에 적었다.
+    //   그래서 엉뚱한 칸에 EXPIRED 가 적히고 정작 그 제안은 PENDING 인 채로
+    //   서버에 남았다. 들어올 때마다 다시 만료로 보여 「자동 파기되었습니다」
+    //   가 끝없이 쌓인 까닭이다.
+    //
+    //   또 하나 — 만료를 로컬 목록(db.p2pDeals)에서 골라 적었는데, 바로 위에서
+    //   「끝난 거래는 다섯 건만 남긴다」고 잘라 내므로 방금 만료된 것이 잘려
+    //   나가면 서버에는 영영 안 적혔다.
+    //
+    //   이제 서버 노드를 그대로 읽어 **열쇠를 돌면서** 한 번에 적는다.
+    //   활동 기록은 서버에 적힌 뒤에만 남긴다. 이 함수는 1초마다 불리므로
+    //   서버를 읽는 것은 1분에 한 번으로 묶어 둔다.
+    // ──────────────────────────────────────────
+    const P2P_EXPIRY_MS = 24 * 60 * 60 * 1000;
+    let _p2pSweepAt = 0;
+    let _p2pSweepBusy = false;
+
+    // 띄엄띄엄한 객체든 구멍 난 배열이든 **실제 열쇠**만 뽑아 준다
+    function p2pDealKeys(raw) {
+        if (!raw) return [];
+        if (Array.isArray(raw)) {
+            const out = [];
+            for (let i = 0; i < raw.length; i++) if (raw[i]) out.push(String(i));
+            return out;
+        }
+        return Object.keys(raw);
+    }
+
+    // 다음에 쓸 빈 열쇠 — 있는 것을 덮지 않는다
+    function p2pNextKey(raw) {
+        let next = 0;
+        p2pDealKeys(raw).forEach(k => {
+            const n = parseInt(k, 10);
+            if (isFinite(n) && n >= next) next = n + 1;
+        });
+        return next;
+    }
+
+    function sweepExpiredDeals(force) {
+        if (!database) return;
+        if (_p2pSweepBusy) return;
+        const now = Date.now();
+        if (!force && now - _p2pSweepAt < 60000) return;
+        _p2pSweepAt = now;
+        _p2pSweepBusy = true;
+        if (!window._p2pExpLogged) window._p2pExpLogged = {};
+
+        database.ref('p2pDeals').once('value').then(snap => {
+            const raw = snap.val();
+            const up = {};
+            const mine = [];
+            p2pDealKeys(raw).forEach(k => {
+                const d = raw[k];
+                if (!d || typeof d !== 'object') return;
+                // 예전 자리 번호 버그가 남긴 빈 껍데기 — 치운다
+                if (!d.id && !d.createdAt && !d.fromCode) { up['p2pDeals/' + k] = null; return; }
+                if (d.status !== 'PENDING' || !d.createdAt) return;
+                if (Date.now() - d.createdAt < P2P_EXPIRY_MS) return;
+                up['p2pDeals/' + k + '/status'] = 'EXPIRED';
+                if (currentUser && d.fromCode === currentUser.code) mine.push(d);
+            });
+            if (!Object.keys(up).length) return;
+            return database.ref('/').update(up).then(() => {
+                let wrote = false;
+                mine.forEach(d => {
+                    const key = String(d.id || (d.fromCode + '|' + d.createdAt));
+                    if (window._p2pExpLogged[key]) return;
+                    window._p2pExpLogged[key] = 1;
+                    addHistoryLog(currentUser, `[밀실 만료] ${d.toName} 대상 제안이 자동 파기되었습니다.`);
+                    wrote = true;
+                });
+                if (wrote) { try { saveFields({ history: 1 }); } catch (e) { } }
+            });
+        }).catch(e => {
+            console.error('[밀실] 만료 정리 실패:', e);
+        }).then(() => { _p2pSweepBusy = false; });
+    }
+
     function checkP2PExpiration() {
         if (!db.p2pDeals) db.p2pDeals = [];
         const now = Date.now();
-        const EXPIRY_MS = 24 * 60 * 60 * 1000;
         let changed = false;
-               // ★ 한 제안에 한 줄만 적는다.
-        //   이 함수는 세션 시계에서 **1초마다** 돈다 (아래 setInterval).
-        //   서버에 EXPIRED 가 적히기 전에 다시 돌거나, 서버에서 내려온
-        //   p2pDeals 가 로컬의 EXPIRED 를 PENDING 으로 되돌리면 같은 줄이
-        //   끝없이 쌓였다. 적은 것을 기억해 두고, 남의 기록에는 적지 않는다
-        //   (어차피 저장되지 않는 남의 사본이었다).
-        if (!window._p2pExpLogged) window._p2pExpLogged = {};
+
+        // 화면에 보이는 것만 먼저 만료로 바꾼다. 기록은 서버에 적힌 뒤에 남긴다.
         db.p2pDeals.forEach(deal => {
-            if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
-                deal.status = 'EXPIRED'; changed = true;
-                const key = String(deal.id || (deal.fromCode + '|' + deal.createdAt));
-                if (window._p2pExpLogged[key]) return;
-                window._p2pExpLogged[key] = 1;
-                if (currentUser && deal.fromCode === currentUser.code) {
-                    addHistoryLog(currentUser, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되었습니다.`);
-                    try { saveFields({ history: 1 }); } catch (e) {}
-                }
+            if (deal.status === 'PENDING' && deal.createdAt
+                && (now - deal.createdAt >= P2P_EXPIRY_MS)) {
+                deal.status = 'EXPIRED';
+                changed = true;
             }
         });
-                // ★ 완료/거절/취소/만료된 거래는 목록에서 제거 (최근 5건만 보관)
+
+        // ★ 완료/거절/취소/만료된 거래는 목록에서 제거 (최근 5건만 보관)
         const done = db.p2pDeals.filter(d => d.status !== 'PENDING');
         if (done.length > 5) {
             const keep = done.slice(0, 5);
             db.p2pDeals = db.p2pDeals.filter(d => d.status === 'PENDING' || keep.includes(d));
-           
         }
 
-              if (changed && database) {
-            const expired = db.p2pDeals.filter(d => d && d.status === 'EXPIRED');
-            if (expired.length) {
-                database.ref('p2pDeals').once('value').then(snap => {
-                    const v = snap.val() || [];
-                    const arr = Array.isArray(v) ? v : Object.values(v);
-                    expired.forEach(e => {
-                        const idx = arr.findIndex(d => d && d.id === e.id);
-                        if (idx >= 0) database.ref(`p2pDeals/${idx}/status`).set('EXPIRED');
-                    });
-                });
-            }
-        }
+        sweepExpiredDeals(changed);
     }
-    
+
     function toggleP2PDealMode() {
         const mode = document.getElementById('p2p-deal-mode').value;
         document.getElementById('p2p-demand-wrapper').style.display = (mode === 'trade') ? 'block' : 'none';
@@ -8842,9 +8902,10 @@ function bjFinish(mode) {
          if (database) {
         // 서버의 실제 길이를 확인해 그 자리에만 기록
         database.ref('p2pDeals').once('value').then(snap => {
-            const v = snap.val() || [];
-            const len = Array.isArray(v) ? v.length : Object.keys(v).length;
-            return database.ref(`p2pDeals/${len}`).set(newDeal);
+            // ★ 열쇠 개수가 아니라 **가장 큰 열쇠 다음**에 적는다.
+            //   가운데가 지워져 띄엄띄엄해지면 개수가 이미 쓰인 열쇠와
+            //   겹쳐서, 남의 제안을 통째로 덮어쓰고 있었다.
+            return database.ref('p2pDeals/' + p2pNextKey(snap.val())).set(newDeal);
         }).then(() => {
             updateUI();
             renderP2PLists();
@@ -9049,10 +9110,13 @@ function bjFinish(mode) {
     if (!database) return;
 
     database.ref('p2pDeals').once('value').then(snap => {
-        const v = snap.val() || [];
-        const arr = Array.isArray(v) ? v : Object.values(v);
-        const idx = arr.findIndex(d => d && d.id === dealId);
-        if (idx < 0 || arr[idx].status !== 'PENDING') { renderP2PLists(); return; }
+        // ★ 자리 번호가 아니라 **진짜 열쇠**를 찾아 쓴다
+        const raw = snap.val();
+        const keys = p2pDealKeys(raw);
+        const idx = keys.filter(k => raw[k] && raw[k].id === dealId)[0];
+        if (idx === undefined) { renderP2PLists(); return; }
+        const arr = raw;
+        if (arr[idx].status !== 'PENDING') { renderP2PLists(); return; }
         if (arr[idx].toCode !== currentUser.code) return;
 
        return database.ref(`p2pDeals/${idx}/status`).set('REJECTED').then(() => {
@@ -9078,10 +9142,14 @@ function bjFinish(mode) {
     }
 
     database.ref('p2pDeals').once('value').then(snap => {
-        const v = snap.val() || [];
-        const arr = Array.isArray(v) ? v : Object.values(v);
-        const idx = arr.findIndex(d => d && d.id === dealId);
-        if (idx < 0) { showCustomAlert('이미 처리된 제안입니다.'); renderP2PLists(); return; }
+        // ★ 자리 번호가 아니라 **진짜 열쇠**를 찾아 쓴다.
+        //   철회가 서버에 안 박히고 그대로 남아 있다가 하루 뒤 「자동 파기」
+        //   로 다시 뜨던 까닭이 이것이다.
+        const raw = snap.val();
+        const keys = p2pDealKeys(raw);
+        const idx = keys.filter(k => raw[k] && raw[k].id === dealId)[0];
+        const arr = raw;
+        if (idx === undefined) { showCustomAlert('이미 처리된 제안입니다.'); renderP2PLists(); return; }
         if (arr[idx].status !== 'PENDING') { showCustomAlert('이미 처리된 제안입니다.'); renderP2PLists(); return; }
         if (arr[idx].fromCode !== currentUser.code) { showCustomAlert('본인이 보낸 제안이 아닙니다.'); return; }
 
