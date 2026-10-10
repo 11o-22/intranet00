@@ -356,19 +356,14 @@ window.sendAllChat = function () {
     if (!v) return;
     const u = me();
     if (!u) return;
-    if (typeof isQuarantined === 'function' && isQuarantined(u)) {
-        showCustomAlert('격리 중에는 사내 채팅을 쓸 수 없습니다.'); return;
-    }
+    // 격리 중에도 쓸 수 있다 — 상담실·선녀탕 안에서는 시설이 막힐 뿐,
+    // 말까지 막을 까닭은 없다. (전에는 여기서 돌려보냈다)
     if (push({ text: v.slice(0, ALLCHAT.MAX) })) { inp.value = ''; markRead(); }
 };
 
 window.emoSendAll = function (id) {
     const e = (typeof emoById === 'function') ? emoById(id) : null;
     if (!e) return;
-    const u = me();
-    if (u && typeof isQuarantined === 'function' && isQuarantined(u)) {
-        showCustomAlert('격리 중에는 사내 채팅을 쓸 수 없습니다.'); return;
-    }
     if (push({ text: '[이모티콘] ' + e.n, st: id })) markRead();
 };
 

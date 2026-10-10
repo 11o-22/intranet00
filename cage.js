@@ -743,6 +743,20 @@ window.cageFree = function (who) {
     console.log('  특이사항의 [감금실] 줄도 걷어 냈습니다.');
 };
 
+// ==========================================
+// 바깥으로 내어 주는 것
+// ==========================================
+//
+//   cage-plus.js (주사위 역전 · 쇠지렛대) 가 쓴다. 12시간 뚜껑을 재는
+//   셈과 문을 여는 절차를 거기서 또 적으면 숫자가 어긋나므로, 여기 것을
+//   그대로 쓰게 한다.
+window.cageFreeUser = freeUser;        // (사원, 까닭[, 끝난 뒤]) — 정산까지 한다
+window.cagePaint    = paintCage;
+window.cageMateOf   = mate;
+window.cageKeyOf    = bankRefCode;     // 두 사람이 같이 보는 자리 열쇠
+window.cageHasS     = hasS;
+window.cageMaxMs    = MAX_MS;
+
 console.log('[감금실] cageState(사번) · cageFree(사번) · coBank()');
 
 })();

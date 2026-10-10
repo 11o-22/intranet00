@@ -6,6 +6,7 @@
 // ■ 무엇인가
 //
 //   Qtrew-A-214 「빛을 찾아서」 에서만, **0.001%** 로 나온다.
+//   배율을 겹치면 오르지만 **다 겹쳐도 0.072%** 까지다.
 //   그리고 **한 번 나오면 다시는 안 나온다.** 누군가 가져간 뒤로는
 //   아무리 굴려도 걸리지 않는다.
 //
@@ -16,16 +17,17 @@
 //   하는 일은 단순하다 — **한 시간마다 10,000 P 가 통장에 쌓인다.**
 //   통장이 가득 차면 넘친 몫은 보유 포인트로 들어온다.
 //
-// ■ 배율을 안 타게 따로 굴린다
+// ■ 배율은 타되 뚜껑을 덮는다
 //
 //   정산(renderDarkResult)은 구역 회수품표를 굴리면서 배율을 먹인다 —
 //   대성공 ×3, 신도 전원 처리 ×3, 행운 ×2, 에메랄드·감지하는 눈·
 //   토크쇼·K.LEE 까지 겹치면 **최대 720배**다. 0.001% 를 그 표에 그냥
-//   얹으면 최악의 경우 0.72% 가 된다.
+//   얹으면 0.72% 가 되는데, 그만큼 흔하면 하나뿐인 값이 없다.
 //
 //   그래서 표에 넣되, 정산이 돌기 **직전에 표에서 빼 두었다가** 끝난 뒤
-//   따로 0.001% 로 한 번 굴린다. 신도에게 당해 쓰러질 때 도는 쪽
-//   (a214-kill.js 의 fallen) 은 배율을 안 먹이므로 표에 그대로 둔다.
+//   따로 굴린다. 배율은 똑같이 재서 곱하고, 끝에 **0.072% 로 자른다.**
+//   신도에게 당해 쓰러질 때 도는 쪽(a214-kill.js 의 fallen)은 배율을
+//   안 먹이므로 표에 그대로 둔다 — 그쪽은 늘 0.001% 다.
 //
 // ■ 하나뿐인 것을 어떻게 못 박나
 //
@@ -46,7 +48,8 @@
 
 const NAME = '🎻 신성의 바이올린';
 const ZONE = 'Qtrew-A-214';
-const RATE = 0.00001;                 // 0.001%
+const RATE = 0.00001;                 // 0.001% — 아무것도 안 걸렸을 때
+const RATE_CAP = 0.00072;             // 0.072% — 배율을 다 겹쳐도 여기까지
 const OWNER = 'violinOwner';          // 최상위 자리
 const PAY = 10000;                    // 한 토막에 쌓이는 몫
 const BLOCK = 60 * 60 * 1000;         // 한 시간
@@ -151,6 +154,8 @@ function claim() {
         const _r = renderDarkResult;
         const w = function () {
             const inZone = (typeof darkRun !== 'undefined') && darkRun && darkRun.zone === ZONE;
+            // 정산이 끝나면 darkRun 이 null 이 된다 — 배율은 **미리** 재 둔다
+            const rate = inZone ? rollRate(me()) : 0;
             let pulled = null;
             // 표에서 잠시 뺀다 — 안 그러면 배율을 먹는다
             try {
@@ -165,7 +170,7 @@ function claim() {
             finally {
                 try { if (pulled) DARK_LOOT_BY_ZONE[ZONE].push(pulled); } catch (e) { }
             }
-            if (inZone) { try { tryRoll(); } catch (e) { console.warn('[🎻]', e); } }
+            if (inZone) { try { tryRoll(rate); } catch (e) { console.warn('[🎻]', e); } }
             return out;
         };
         w._violin = true;
@@ -177,12 +182,33 @@ function claim() {
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
 
-function tryRoll() {
+// 배율은 그대로 태우되, 끝에 뚜껑을 덮는다.
+//
+//   대성공 ×3 · 신도 전원 처리 ×3 · 행운 ×2 · 에메랄드·감지하는 눈·
+//   토크쇼·K.LEE 까지 겹치면 720배가 된다. 0.001% 가 0.72% 가 되는데,
+//   그만큼 흔하면 하나뿐인 값이 없다. 다 겹쳐도 **0.072%** 까지만.
+function lootMult(u) {
+    let m = 1;
+    try {
+        const r = (typeof darkRun !== 'undefined') ? darkRun : null;
+        if (r && r.critical) m *= 3;
+        if (r && r.a214Purge) m *= 3;
+        if (typeof gearValue === 'function' && gearValue(u, 'luck') > 0) m *= 2;
+        if (typeof emLootMult === 'function') m *= (emLootMult(u) || 1);
+    } catch (e) { }
+    return (m > 0 && isFinite(m)) ? m : 1;
+}
+function rollRate(u) {
+    return Math.min(RATE_CAP, RATE * lootMult(u));
+}
+
+function tryRoll(rate) {
     const u = me();
     if (!u) return;
+    if (!(rate > 0)) rate = RATE;
     readOwner(true).then(function (o) {
         if (o && o.code) return;                     // 이미 세상에 나왔다
-        if (Math.random() >= RATE) return;
+        if (Math.random() >= rate) return;
         return claim().then(function (ok) {
             if (!ok) return;                         // 같은 순간에 누가 먼저 적었다
             if (!Array.isArray(u.inventory)) u.inventory = [];

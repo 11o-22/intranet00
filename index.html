@@ -8641,12 +8641,22 @@ function bjFinish(mode) {
         const now = Date.now();
         const EXPIRY_MS = 24 * 60 * 60 * 1000;
         let changed = false;
-               db.p2pDeals.forEach(deal => {
+               // ★ 한 제안에 한 줄만 적는다.
+        //   이 함수는 세션 시계에서 **1초마다** 돈다 (아래 setInterval).
+        //   서버에 EXPIRED 가 적히기 전에 다시 돌거나, 서버에서 내려온
+        //   p2pDeals 가 로컬의 EXPIRED 를 PENDING 으로 되돌리면 같은 줄이
+        //   끝없이 쌓였다. 적은 것을 기억해 두고, 남의 기록에는 적지 않는다
+        //   (어차피 저장되지 않는 남의 사본이었다).
+        if (!window._p2pExpLogged) window._p2pExpLogged = {};
+        db.p2pDeals.forEach(deal => {
             if (deal.status === 'PENDING' && (now - deal.createdAt >= EXPIRY_MS)) {
                 deal.status = 'EXPIRED'; changed = true;
-                const sender = db.users[deal.fromCode];
-                if (sender) {
-                    addHistoryLog(sender, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되었습니다.`);
+                const key = String(deal.id || (deal.fromCode + '|' + deal.createdAt));
+                if (window._p2pExpLogged[key]) return;
+                window._p2pExpLogged[key] = 1;
+                if (currentUser && deal.fromCode === currentUser.code) {
+                    addHistoryLog(currentUser, `[밀실 만료] ${deal.toName} 대상 제안이 자동 파기되었습니다.`);
+                    try { saveFields({ history: 1 }); } catch (e) {}
                 }
             }
         });
