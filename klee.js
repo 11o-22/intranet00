@@ -192,6 +192,29 @@ function ring() {
 }
 window.kleeRing = ring;
 
+// ■ 아이폰은 손가락이 닿기 전에는 소리를 못 낸다
+//
+//   문자는 내가 누르지 않아도 온다 — 남이 보낸 신호, 쓰러진 사람이
+//   남긴 예약 문자. 그때는 손가락이 닿은 순간이 아니라서 사파리가
+//   소리를 막는다. 팝업은 떴는데 「띠링」만 안 나던 까닭이다.
+//   그래서 **처음 아무 데나 한 번 닿을 때** 자물쇠를 미리 풀어 둔다.
+//   (무음 한 조각을 흘려보내는 것으로 풀린다)
+(function wake() {
+    const KEYS = ['touchend', 'pointerdown', 'click', 'keydown'];
+    function pop() {
+        try {
+            const c = ctx();
+            if (!c) return;
+            if (c.state === 'suspended') c.resume();
+            const b = c.createBuffer(1, 1, 22050);
+            const s = c.createBufferSource();
+            s.buffer = b; s.connect(c.destination); s.start(0);
+        } catch (e) { }
+        KEYS.forEach(function (k) { document.removeEventListener(k, pop, true); });
+    }
+    KEYS.forEach(function (k) { document.addEventListener(k, pop, true); });
+})();
+
 // ==========================================
 // 등록 — 어디에도 안 깔린다
 // ==========================================
@@ -553,18 +576,53 @@ function m2Send() {
     const p = party();
     const n = p && p.members ? Object.keys(p.members).length : (r.memberCount || 1);
 
-    const pay = { by: u.code, name: u.name, at: Date.now() };
+    const pay = { by: u.code, name: u.name, n: n, at: Date.now() };
     const path = signPath();
     if (db_() && path) db_().ref(path).set(pay).catch(function () { });
+    // 서버가 돌아오기를 기다리지 않고 내 쪽에도 바로 적는다 — 아래 지켜보기가
+    // 이것을 보고 나에게도 똑같이 팝업을 띄운다 (전원이 같은 화면을 본다)
+    try { if (p) { p.klee = p.klee || {}; p.klee.sign = pay; } } catch (e) { }
     try { if (typeof sendPartyChat === 'function') sendPartyChat(u.name + ' 사원의 전화기가 한 번 울렸습니다.', true); } catch (e) { }
     log_(u, '[' + KLEE.WHO + '] 아차차, 내가 말이 많았네 — 파티 ' + n + '명에게 신호');
     try { if (typeof saveDarkRunState === 'function') saveDarkRunState(); } catch (e) { }
-    ring();
-    alert_('[' + KLEE.WHO + ' : 아차차, 내가 말이 많았네.]\n\n'
-        + '파티 ' + n + '명에게 신호를 남겼습니다.\n\n'
-        + '· 받은 사원  포인트 1.5배 · 회수품 2배\n'
-        + '· 보낸 사원  포인트 2배 · 회수품 2.5배');
 }
+
+// 신호가 왔다 — 파티 전원이 띠링 소리와 함께 같은 팝업을 본다
+(function signWatch() {
+    const seen = {};
+    setInterval(function () {
+        const u = me(), p = party();
+        if (!u || !p) return;
+        const s = (p.klee && p.klee.sign) || null;
+        if (!s || !s.by) return;
+        const key = s.by + '|' + (s.at || 0);
+        if (seen[key]) return;
+        seen[key] = 1;
+        // 지난 탐사에 남아 있던 신호가 들어올 때가 있다 (방이 치워지기 전)
+        if (Date.now() - (s.at || 0) > 10 * 60000) return;
+        try { signPop(s); } catch (e) { }
+    }, 1000);
+
+    function signPop(s) {
+        const u = me();
+        const mine = (s.by === u.code) ? KLEE.SIGN.host : KLEE.SIGN.mate;
+        const head = (s.by === u.code)
+            ? '내가 남긴 신호입니다.'
+            : esc(s.name || '누군가') + ' 사원이 신호를 남겼습니다.';
+        ring();
+        const w = box(bubble('아차차, 내가 말이 많았네.', KLEE.WHO)
+            + '<div style="margin:2px 0 12px 0; padding:11px 12px; border-radius:8px;'
+            + ' background:rgba(47,111,159,0.14); border:1px solid #2f6f9f; text-align:center;">'
+            + '<div style="font-size:10px; color:#7fb6dd;">' + head + '</div>'
+            + '<div style="font-size:15px; color:#ffd700; font-weight:bold; margin-top:6px;">'
+            + '포인트 ' + mine.pt + '배 · 회수품 확률 ' + mine.loot + '배</div>'
+            + '<div style="font-size:10px; color:#8a8a8a; margin-top:5px;">이번 탐사가 끝날 때까지</div>'
+            + '</div>'
+            + '<button id="klee-x" class="game-btn" style="' + BTN + ' text-align:center;">확인</button>',
+            100003);
+        w.querySelector('#klee-x').onclick = shut;
+    }
+})();
 
 // 내 몫 — 신호가 남아 있나
 function signMult() {
@@ -844,6 +902,23 @@ function m4Send() {
         + '오늘 남은 횟수 ' + left(u, 'm4') + ' / ' + KLEE.DAY.m4);
 }
 
+// 누구에게 예약해 두었나
+//
+//   darkRun.kleeBooked 는 내 화면에만 있다. 탐사 상태를 저장할 때 적는
+//   칸 목록에 들어 있지 않아서, 새로고침하거나 끊겼다 들어오면 통째로
+//   사라진다. 그러면 쓰러질 때 ④ 가 아무 일도 안 한다.
+//   방에 적어 둔 예약(klee/book)에서도 같이 읽어 메운다.
+function bookedOf(u, r) {
+    const list = (r && Array.isArray(r.kleeBooked)) ? r.kleeBooked.slice() : [];
+    try {
+        const bk = ((party() || {}).klee || {}).book || {};
+        Object.keys(bk).forEach(function (c) {
+            if (bk[c] && bk[c].by === u.code && list.indexOf(c) < 0) list.push(c);
+        });
+    } catch (e) { }
+    return list;
+}
+
 // 죽음 — 예약을 보내 두었으면 끌려가지 않는다
 (function hookDeath() {
     const iv = setInterval(function () {
@@ -853,7 +928,7 @@ function m4Send() {
         const wrapped = function (text) {
             const r = run(), u = me();
             let booked = [];
-            try { booked = (r && Array.isArray(r.kleeBooked)) ? r.kleeBooked : []; } catch (e) { }
+            try { booked = (r && u) ? bookedOf(u, r) : []; } catch (e) { }
             if (!r || r._dead || !u || !booked.length) return _d.apply(this, arguments);
             try { kleeEscape(text, booked); } catch (e) { console.warn('[K.LEE]', e); return _d.apply(this, arguments); }
         };
@@ -940,6 +1015,9 @@ function kleeEscape(text, booked) {
         const key = m.by + '|' + m.at;
         if (got[key]) return;
         got[key] = 1;
+        // 지난 탐사에 남아 있던 문자가 들어올 때가 있다 (방이 치워지기 전).
+        // 새로고침할 때마다 버프가 또 걸리지 않게 묵은 것은 흘려 보낸다.
+        if (Date.now() - (m.at || 0) > 10 * 60000) return;
         try { window.ibAdd(u, m.k, m.v, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
         noteAdd(u, m.n + ' +' + m.v + (m.unit || '') + ' (24시간)');
         log_(u, '[' + KLEE.WHO + '] 수고해요 후배님 ㅋㅋ — ' + m.n + ' +' + m.v + (m.unit || ''));
@@ -1364,7 +1442,7 @@ function inEpic() {
         const wrapped = function (txt) {
             const r = run(), u = me();
             let booked = [];
-            try { booked = (r && Array.isArray(r.kleeBooked)) ? r.kleeBooked : []; } catch (e) { }
+            try { booked = (r && u) ? bookedOf(u, r) : []; } catch (e) { }
             if (!r || !u || !booked.length || !inEpic()) return _d.apply(this, arguments);
             if (typeof er === 'undefined' || !er || er.dead || r._dead) return _d.apply(this, arguments);
             try { epicEscape(txt, booked); }

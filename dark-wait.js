@@ -59,10 +59,39 @@ function body() {
     try { return (typeof darkBodyEl === 'function') ? darkBodyEl() : null; } catch (e) { return null; }
 }
 
+// ★ 끝난 화면에는 손대지 않는다
+//
+//   되살리기는 **지금 그려져 있는 단추를 손봐서** 한다. 그런데 쓰러짐·
+//   정산 화면에도 단추가 하나 서 있다 (「숨을 고른다」 · 「퇴근한다」 ·
+//   「단말로 복귀한다」). 끝난 뒤에도 되살리기가 돌면 그 단추의 글씨가
+//   「3 / 3명 준비」로 바뀌고 잠긴다. **나갈 수가 없어진다.**
+//
+//   내가 죽어도 남은 사람들은 계속 준비를 적는다. 그래서 셈이 묵지 않고
+//   계속 새것이라, 「멎었으면 풀어 준다」는 지켜보기에도 안 걸린다.
+//   그대로 굳는다. (A-214 에서 쓰러진 뒤 멈추던 것이 이것이다)
+//
+//   그래서 끝났는지를 두 겹으로 본다 —
+//     · darkRun 의 표 (_dead · _settled · kleeOut · step 99) 와 epic 의 er
+//     · 화면에 「나가는 단추」가 서 있는지 (어느 파일이 그렸든 걸린다)
+const EXIT_SEL = 'button[onclick*="finishDarkDeath"],button[onclick*="epicFinish"],'
+    + 'button[onclick*="closeDarkOverlay"],button[onclick*="renderDarkness"]';
+function over() {
+    const r = run();
+    if (!r) return true;
+    if (r._dead || r._settled || r.kleeOut || (r.step || 0) >= 99) return true;
+    try { if (typeof er !== 'undefined' && er && (er.dead || er._settled)) return true; } catch (e) { }
+    try {
+        const b = body();
+        if (b && b.querySelector(EXIT_SEL)) return true;
+    } catch (e) { }
+    return false;
+}
+
 // 기다리는 중인가 — 셈이 살아 있을 때만 그렇다고 본다
 function waiting() {
     const r = run();
     if (!r || !r.isParty) return null;
+    if (over()) return null;
     if (r._advTo == null) return null;
     if (r.step >= r._advTo) return null;
     const w = window._advWait;
@@ -76,6 +105,7 @@ function waiting() {
 
 // 「준비 중」을 다시 올린다
 function paint() {
+    if (over()) return;             // 쓰러짐·정산 화면에는 절대 손대지 않는다
     const w = waiting();
     const b = body();
     if (!b) return;
@@ -184,6 +214,15 @@ setInterval(function () {
     const r = run();
     if (!r) return;
     try {
+        // 끝났으면 적어 둔 것만 거둔다 — 화면은 손대지 않는다.
+        // (여기서 renderDarkStep 을 부르면 쓰러짐 화면이 통째로 날아간다)
+        if (over()) {
+            if (r._advTo != null) r._advTo = null;
+            if (window._advWait) window._advWait = null;
+            const w0 = document.getElementById('adv-wait-list');
+            if (w0) w0.remove();
+            return;
+        }
         if (waiting()) { paint(); return; }
         if (r._advTo == null) return;
         const w = window._advWait;
@@ -215,6 +254,7 @@ window.darkWaitState = function () {
         : '없음');
     console.log('  기다리는 사람:', (w && w.names && w.names.length) ? w.names.join(', ') : '없음');
     console.log('  되살린 횟수  :', restored + '번 (다시 그려져 지워졌던 표시)');
+    console.log('  끝난 화면인가:', over() ? 'O — 손대지 않습니다' : '아니오');
     console.log('  연결         :',
         (typeof renderDarkStep === 'function' && renderDarkStep._wait ? '그리기 O' : '그리기 ✗'),
         (typeof partyAdvance === 'function' && partyAdvance._wait ? '· 누름 O' : '· 누름 ✗'));
