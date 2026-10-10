@@ -720,11 +720,12 @@ setInterval(paint, 2500);
 //
 // 세 곳 모두 innerHTML 로 통째로 다시 그린다.
 // 그려진 뒤에 칸을 찾아 붙이고, 같은 칸에 두 번 붙지 않게 표시를 남긴다.
-function tagHtml(u, size) {
+function tagHtml(u, size, color) {
     const n = worn(u);                     // 달고 있는 하나만 보인다
     if (!n) return '';
     const s = size || 9;
-    return '<span style="font-size:' + s + 'px; color:#d4af37; border:1px solid #6a5a2a;'
+    return '<span style="font-size:' + s + 'px; color:' + (color || '#d4af37')
+        + '; border:1px solid #6a5a2a;'
         + ' border-radius:3px; padding:0 4px; margin-right:3px; white-space:nowrap;">'
         + label(n) + '</span>';
 }
@@ -777,6 +778,49 @@ after('renderChatLog', function () {
         if (h) nameEl.insertAdjacentHTML('beforebegin', h + ' ');   // 이름 왼쪽
     });
 });
+
+// --- 사내 채팅 ---
+//
+// 여기는 다른 셋과 달리 감쌀 함수가 없다. 사내 채팅을 그리는 paintLog 는
+// allchat.js 의 속(IIFE)에 있어 바깥에서 잡히지 않는다. 그래서 **그려진 뒤의
+// 칸**을 본다. 이름 칸에 누구인지 적어 두었으므로(allchat.js 의 data-ac-code)
+// 그것만 보고 붙일 수 있다.
+//
+// 칸이 통째로 다시 그려지는 것을 MutationObserver 로 알아채고, 못 잡는
+// 경우를 위해 느린 시계도 하나 둔다. 같은 칸에 두 번 붙지 않게 표시를 남긴다.
+//
+// 빛깔은 채팅방 살가죽(스킨)을 따른다 — 사원 목록·파티챗은 늘 어두운 바탕
+// 위에 있지만 채팅방은 살가죽마다 바탕이 다르다.
+(function allChatTag() {
+    function stick() {
+        const box = document.getElementById('allchat-log');
+        if (!box) return;
+        box.querySelectorAll('b[data-ac-code]').forEach(function (b) {
+            if (b.dataset.ti) return;
+            b.dataset.ti = '1';
+            const c = b.dataset.acCode;
+            const u = (c && typeof db !== 'undefined' && db.users) ? db.users[c] : null;
+            if (!u) return;
+            const h = tagHtml(u, 8, 'var(--sk-accent-on-base, #d4af37)');
+            if (h) b.insertAdjacentHTML('afterbegin', h + ' ');     // 이름 바로 왼쪽
+        });
+    }
+
+    let watching = null;
+    setInterval(function () {
+        const box = document.getElementById('allchat-log');
+        if (!box) { watching = null; return; }
+        if (watching !== box) {
+            watching = box;
+            try {
+                // 붙이는 것은 <b> 의 속이라 box 의 자식은 늘지 않는다 — 되돌지 않는다
+                new MutationObserver(function () { try { stick(); } catch (e) { } })
+                    .observe(box, { childList: true });
+            } catch (e) { }
+        }
+        stick();
+    }, 1200);
+})();
 
 // --- 정보 열람 (사원 상세) ---
 //

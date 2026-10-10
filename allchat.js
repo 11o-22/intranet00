@@ -322,7 +322,9 @@ function paintLog(force) {
         // 내 글은 오른쪽에서 나온다 — 사진도 이름줄도 글도 통째로 뒤집는다
         const head = '<div style="font-size:10px; margin-bottom:2px; display:flex; gap:5px;'
             + ' align-items:baseline; min-width:0;' + (mine ? ' flex-direction:row-reverse;' : '') + '">'
-            + '<b style="color:' + (mine ? 'var(--sk-accent-on-base, #d4af37)' : 'var(--sk-text, #9fd8ef)')
+            // data-ac-code — 칭호를 붙일 자리를 알려 준다 (titles.js 의 「사내 채팅」)
+            + '<b data-ac-code="' + esc(m.code || '') + '"'
+            + ' style="color:' + (mine ? 'var(--sk-accent-on-base, #d4af37)' : 'var(--sk-text, #9fd8ef)')
             + '; flex-shrink:0;">' + esc(m.name) + '</b>'
             + (m.team ? '<span style="color:var(--sk-text-dim, #555); flex-shrink:0;">'
                 + esc(m.team) + '</span>' : '')
