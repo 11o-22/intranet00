@@ -668,8 +668,10 @@ function attach() {
         //     checkPassivePollution 이 알아서 떼어 낸다.
         Object.keys(base).forEach(function (k) {
             if (k in srv) return;
-            if (k === EFF && clearedNow && sameAs(k, currentUser[k], base[k])) {
+            if ((k === EFF || k === BUF) && clearedNow && sameAs(k, currentUser[k], base[k])) {
                 // 일부러 비운 것이다 — 내가 그 사이 더한 것이 없을 때만 따라 비운다
+                //   버프(itemBuffs)도 같이 본다. 효과만 비우면 당국이 소거한 뒤에도
+                //   달빛·은화 뱀이 내 화면에 남아, 다음 저장이 서버에 되돌려 놓았다.
                 fillArr(currentUser[k] || (currentUser[k] = []), []);
                 took++;
                 return;

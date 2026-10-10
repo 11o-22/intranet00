@@ -6203,6 +6203,31 @@ if (bcEl) {
             showCustomAlert('서버 저장 중 오류가 발생했습니다.');
         }
     }
+        // ★ 소지품 — 가나다 순으로 세운다.
+        //   앞에 붙은 그림글자(💍 커플링 · 📝 사원명 변경권 …)는 셈에서 뺀다.
+        //   그러지 않으면 그림글자가 붙은 것들끼리만 따로 몰린다.
+        //   칸(음식·물약·장비…)으로 나누는 것은 invcat.js 가 그린 뒤에 하므로,
+        //   여기서 세워 두면 각 칸 안에서 가나다 순이 된다.
+        const INV_COLL = (function () {
+            try { return new Intl.Collator('ko', { numeric: true, sensitivity: 'base' }); }
+            catch (e) { return null; }
+        })();
+        function invSortKey(s) {
+            const t = String(s == null ? '' : s)
+                .replace(/^[^\uAC00-\uD7A3\u3131-\u318E0-9A-Za-z]+/, '').trim();
+            return t || String(s == null ? '' : s);
+        }
+        function invCmp(a, b) {
+            const ka = invSortKey(a), kb = invSortKey(b);
+            if (INV_COLL) { const r = INV_COLL.compare(ka, kb); return r || INV_COLL.compare(String(a), String(b)); }
+            if (ka !== kb) return ka < kb ? -1 : 1;
+            return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+        }
+        function invSortNames(list) {
+            try { return (list || []).slice().sort(invCmp); } catch (e) { return list || []; }
+        }
+        window.invSortNames = invSortNames;
+
           function renderInventory() {
         const container = document.getElementById('inventory-list-container');
         let html = '';
@@ -6347,7 +6372,7 @@ if (bcEl) {
         if (currentUser.inventory) {
             currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
         }
-        let uniqueItems = Object.keys(counts);
+        let uniqueItems = invSortNames(Object.keys(counts));
 
         if (uniqueItems.length === 0) {
             html += '<div style="color:#666; font-size:12px; padding:15px 0;">소지품이 비어 있습니다.</div>';
@@ -8681,7 +8706,7 @@ function bjFinish(mode) {
         if (offerItemSelect && currentUser && currentUser.inventory) {
             let counts = {};
             currentUser.inventory.forEach(it => { counts[it] = (counts[it] || 0) + 1; });
-            let uniqueItems = Object.keys(counts);
+            let uniqueItems = invSortNames(Object.keys(counts));
             let offerOpts = (uniqueItems.length === 0)
                 ? '<option value="">(보유 소지품 없음)</option>'
                 : uniqueItems.map(item => `<option value="${item}">${item} (보유:${counts[item]})</option>`).join('');

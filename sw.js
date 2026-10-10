@@ -26,7 +26,7 @@
 //   파이어베이스·구글 등 **다른 곳으로 가는 요청**은 손대지 않는다.
 //   받아 오기(GET)가 아닌 것도 손대지 않는다.
 
-const BUILD = '20261010053156';
+const BUILD = '20261010054449';
 const CACHE = 'corp-' + BUILD;
 const TIMEOUT = 3000;
 
