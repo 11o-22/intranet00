@@ -6315,8 +6315,18 @@ function b508RequiredDocs() {
             darkRun._a214RjDone = n;
 
             const mine  = (res && res[currentUser.code]) || { i: -1, w: '' };
-            const found = (mine.i != null && mine.i >= 0 && A214_REJOIN_TABLE[mine.i])
+            let found = (mine.i != null && mine.i >= 0 && A214_REJOIN_TABLE[mine.i])
                             ? A214_REJOIN_TABLE[mine.i] : A214_MISS;
+
+            // ★ 문지기 — 한 판에 한 번은 저절로 합류한다.
+            //   자리 안내문에 적혀 있는데 그동안 아무 데서도 쓰이지 않았다.
+            //   (자리를 나눠 주는 쪽은 a214-plus.js 다)
+            if (!found.ok && typeof a214GateUse === 'function' && a214GateUse()) {
+                found = { name: '문지기', mod: 1, ok: true,
+                    txt: `길이 끊겼다고 생각한 자리에서 문이 하나 더 열린다.<br><br>` +
+                         `열어 둔 사람이 있었다. 표시를 해 두는 버릇이 있는 사람.<br>` +
+                         `따라 들어가니 일행의 등이 보인다.` };
+            }
 
             darkRun.modifier = (darkRun.modifier || 0) + found.mod;
             darkRun.log.push(`[합류 ${n}차] ${found.name}`);
@@ -6325,10 +6335,18 @@ function b508RequiredDocs() {
                 darkRun.solo = false;
                 darkRun._a214Scattered = false;
                 database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
+                try { if (typeof a214JoinOk === 'function') a214JoinOk(n); } catch (e) { }
                 sendPartyChat(`${currentUser.name} 사원이 합류했습니다. (${found.name})`, true);
             } else {
                 // 못 만났어도 걸음은 방과 같이 센다. 보정만 깎인다.
                 darkRun.solo = false;
+                // ★ 흩어짐 깃발도 같이 내린다.
+                //   예전에는 성공했을 때만 내렸다. 그러면 합류에 실패한 사람은
+                //   그 뒤로 **혼자만 투표판 없이** 선택지를 누르게 된다
+                //   (index.html 의 together 가 이 깃발을 본다). 남들은 ①을
+                //   가결했는데 그 사람만 ④를 눌러 다른 결과를 보게 된다.
+                //   길을 잃은 벌은 보정 −이지, 판에서 떨어져 나가는 것이 아니다.
+                darkRun._a214Scattered = false;
                 database.ref(`darkParties/${darkRun.partyId}/solo/${currentUser.code}`).remove();
                 sendPartyChat(`${currentUser.name} 사원이 길을 잃었습니다.`, true);
             }

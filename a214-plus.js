@@ -539,17 +539,36 @@ function buildPlan() {
 }
 
 let applied = '';
-function applyPlan(plan) {
+let appliedFor = '';          // 이 걸음표가 **어느 판**의 것인가
+let BASE_STEPS = null;        // dark.js 가 깔아 둔 본래 표 — 되돌릴 때 쓴다
+
+// 본래 표를 한 번 떠 둔다 (덮어쓰기 전에만 뜬다)
+function snapBase() {
+    if (BASE_STEPS || typeof A214_STEPS === 'undefined') return;
+    BASE_STEPS = {};
+    Object.keys(A214_STEPS).forEach(function (k) { BASE_STEPS[k] = A214_STEPS[k]; });
+}
+function restoreBase() {
+    if (!BASE_STEPS || typeof A214_STEPS === 'undefined') return;
+    Object.keys(A214_STEPS).forEach(function (k) { delete A214_STEPS[k]; });
+    Object.keys(BASE_STEPS).forEach(function (k) { A214_STEPS[k] = BASE_STEPS[k]; });
+    applied = ''; appliedFor = '';
+    console.log('[A-214] 지난 판의 걸음표를 내려놓았습니다 — 새 표를 기다립니다.');
+}
+
+function applyPlan(plan, pid) {
     if (!Array.isArray(plan) || !plan.length) return false;
     const key = plan.map(function (x) { return x.t + (x.n || ''); }).join(',');
-    if (applied === key) return true;
+    if (applied === key && appliedFor === pid) return true;
     if (typeof A214_STEPS === 'undefined') return false;
+    snapBase();
     Object.keys(A214_STEPS).forEach(function (k) { delete A214_STEPS[k]; });
     plan.forEach(function (x, i) {
         A214_STEPS[i] = (x.n == null) ? { type: x.t } : { type: x.t, n: x.n };
     });
     A214_STEPS[99] = { type: 'result' };
     applied = key;
+    appliedFor = pid || '';
     console.log('[A-214] 걸음표 ' + plan.length + '칸을 받았습니다.');
     return true;
 }
@@ -558,7 +577,21 @@ let planning = false;
 function ensurePlan() {
     const r = run(), s = st(), p = path();
     if (!here() || !r || !s || !p || !db_()) return;
-    if (Array.isArray(s.plan) && s.plan.length) { applyPlan(s.plan); return; }
+    snapBase();
+
+    // ★ 판이 바뀌었는데 새 걸음표가 아직 안 왔다.
+    //
+    //   A214_STEPS 는 전역 객체 하나를 통째로 갈아 끼우는 자리다. 한 세션에서
+    //   A-214 를 두 번 하면, 두 번째 판의 표가 올라오기 전까지 **지난 판의 표**가
+    //   그대로 남아 있다. 선임은 새 표로, 나는 지난 표로 걸음 3을 그리므로
+    //   같은 걸음에서 사람마다 다른 기믹이 뜨고, 같은 투표 자리에 서로 다른
+    //   선택지를 적어 먼저 적은 쪽이 이긴다. 조용히 어긋나는 종류다.
+    //
+    //   그래서 판이 바뀌면 본래 표로 되돌려 두고 새 표를 기다린다.
+    const pid = r.partyId || '';
+    if (appliedFor && appliedFor !== pid) restoreBase();
+
+    if (Array.isArray(s.plan) && s.plan.length) { applyPlan(s.plan, pid); return; }
     if (!r.isLeader || planning) return;
     planning = true;
     const mk = buildPlan();
@@ -567,7 +600,7 @@ function ensurePlan() {
     }, null, false).then(function (res) {
         planning = false;
         const v = res && res.snapshot && res.snapshot.val();
-        if (v) applyPlan(v);
+        if (v) applyPlan(v, pid);
     }).catch(function () { planning = false; });
 }
 
@@ -654,6 +687,37 @@ function addTime(ms, why) {
                 + (why ? ' (' + why + ')' : ''));
         }
     } catch (e) { }
+}
+
+// ★ 한 걸음에 한 번만 시계를 움직인다
+//
+//   timeBonus 는 방 공용 칸인데, 파티 기믹의 결과 함수는 **사람 수만큼**
+//   각자의 화면에서 돈다 (runVotedAction). 그래서 넷이면 성공 한 번에
+//   25초가 아니라 100초가 붙고, 실패 한 번에 −12초가 −48초가 됐다.
+//   시계가 널뛰던 까닭이다.
+//
+//   걸음마다 자리를 하나 잡아 두고, 그 자리를 먼저 차지한 화면만 시계를
+//   움직인다. 등불지기가 1.5배를 받는 자리라, 등불지기가 아니면 잠깐
+//   늦게 손을 든다 — 그래야 1.5배가 운에 걸리지 않는다.
+function addTimeOnce(tag, ms, why) {
+    const p = path();
+    if (!p || !db_() || !ms) return;
+    const go = function () {
+        db_().ref(p + '/timeLog/' + tag).transaction(function (cur) {
+            return cur ? undefined : Date.now();        // 이미 누가 잡았다
+        }, null, false).then(function (res) {
+            if (res && res.committed) addTime(ms, why);
+        }).catch(function () { });
+    };
+    if (ms > 0 && roleOf() !== 'lamp' && lampHere()) setTimeout(go, 700);
+    else go();
+}
+
+// 이 방에 등불지기가 있나
+function lampHere() {
+    const s = st();
+    const rs = (s && s.roles) || {};
+    return Object.keys(rs).some(function (c) { return rs[c] === 'lamp'; });
 }
 
 window.a214Burn = function () {
@@ -800,6 +864,17 @@ function mine() {
     MINE[def.n]();
 }
 
+// 이번 판에 뽑힌 과업이고 아직 안 찼나 — a214Progress 가 실제로 움직일지
+// 미리 똑같이 따져 본다 (dark.js 의 a214Progress 와 같은 조건)
+function willMove(id) {
+    const s = st();
+    const ms = (s && s.missions) || [];
+    const list = Array.isArray(ms) ? ms : Object.keys(ms).map(function (k) { return ms[k]; });
+    const m = list.filter(function (x) { return x && x.id === id; })[0];
+    if (!m) return false;                                   // 이번 판에 없는 과업
+    return (Number(m.done) || 0) < (Number(m.goal) || 0);   // 이미 다 찼다
+}
+
 // ── 과업 — 흔적을 남기고, 못 깨던 둘을 배선한다 ──
 (function hookProgress() {
     const iv = setInterval(function () {
@@ -807,8 +882,15 @@ function mine() {
         if (a214Progress._a214p) { clearInterval(iv); return; }
         const _p = a214Progress;
         const w = function (id, amt) {
+            // ★ 과업이 **실제로 움직였을 때만** 흔적을 떨군다.
+            //   a214Progress 는 ① 그 과업이 이번 판에 안 뽑혔거나
+            //   ② 이미 다 찼으면 조용히 돌아선다. 그런데 예전에는 결과를
+            //   보지 않고 흔적을 올려서, 이번 판에 있지도 않은 과업의
+            //   단서가 방에 쌓였다. 사원은 그 단서를 읽고 엉뚱한 사람을
+            //   지목했고, 단서 개당 정산도 부풀었다.
+            const moves = willMove(id);
             const out = _p.apply(this, arguments);
-            try { if (amCult() && TRACE_BY[id]) traceDrop(TRACE_BY[id]); } catch (e) { }
+            try { if (moves && amCult() && TRACE_BY[id]) traceDrop(TRACE_BY[id]); } catch (e) { }
             return out;
         };
         w._a214p = true;
@@ -979,22 +1061,29 @@ function voteClues(n) {
 }
 
 // ── 합류 — 문지기와 세기 ──
-(function hookRejoin() {
-    const iv = setInterval(function () {
-        if (typeof renderA214Rejoin !== 'function') return;
-        if (renderA214Rejoin._a214p) { clearInterval(iv); return; }
-        const _j = renderA214Rejoin;
-        const w = function () {
-            const out = _j.apply(this, arguments);
-            try { roleTick('join'); } catch (e) { }
-            return out;
-        };
-        w._a214p = true;
-        renderA214Rejoin = w;
-        window.renderA214Rejoin = w;
-        clearInterval(iv);
-    }, 400);
-})();
+//
+//   예전에는 **고르는 화면**(renderA214Rejoin)에 숙제를 얹었다. 그래서
+//   합류에 실패해도 올라갔고, 리스너나 선임 교체로 그 화면이 다시 그려질
+//   때마다 또 올라갔다. 합류 화면을 두 번 보기만 하면 4,000 P 가 들어왔다.
+//   이제 dark.js 가 **합류에 성공했을 때** 아래를 부른다. 차수마다 한 번만 센다.
+window.a214JoinOk = function (n) {
+    const r = run();
+    if (!r) return;
+    if (!r._a214JoinSeen) r._a214JoinSeen = {};
+    if (r._a214JoinSeen[n]) return;
+    r._a214JoinSeen[n] = 1;
+    try { roleTick('join'); } catch (e) { }
+};
+
+// 문지기 — 한 판에 한 번, 못 만났어도 만난 것으로 해 준다.
+// dark.js 의 합류 판정이 실패했을 때 물어 온다.
+window.a214GateUse = function () {
+    const r = run();
+    if (!r || !here() || roleOf() !== 'gate' || r._a214GateUsed) return false;
+    r._a214GateUsed = true;
+    try { if (typeof showDarkToast === 'function') showDarkToast('🔒 문지기 — 열어 둔 문이 있었다'); } catch (e) { }
+    return true;
+};
 
 // ── 시계 아래 칸 — 자리 · 단서 · 남은 사람 · 태우기 ──
 (function hookBar() {
@@ -1222,8 +1311,9 @@ function pay(plan, before) {
         if (lastKey !== key) { lastKey = key; sOk = r.success || 0; sBad = r.fail || 0; return; }
         const ok = r.success || 0, bad = r.fail || 0;
         if (sOk == null) { sOk = ok; sBad = bad; return; }
-        if (ok > sOk) { addTime(BONUS_OK * (ok - sOk), '성공'); roleTick('gim', ok - sOk); }
-        if (bad > sBad) addTime(BONUS_BAD * Math.min(2, bad - sBad), '실패');
+        const at = 's' + (r.step || 0);
+        if (ok > sOk) { addTimeOnce(at + '-ok', BONUS_OK * (ok - sOk), '성공'); roleTick('gim', ok - sOk); }
+        if (bad > sBad) addTimeOnce(at + '-bad', BONUS_BAD * Math.min(2, bad - sBad), '실패');
         sOk = ok; sBad = bad;
     }, 1500);
 })();

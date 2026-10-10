@@ -116,28 +116,79 @@ function a214() { return (room && room.a214) || null; }
 function amCult() { const s = a214(); return !!(s && s.traitor === currentUser.code); }
 function cultCode() { const s = a214(); return s ? s.traitor : null; }
 
-// 처음 들어온 사람 목록 — 중간에 빠져도 줄지 않게 한 번 적어 둔다
-function roster() {
-    const s = a214() || {};
-    let list = s.roster;
-    if (list && !Array.isArray(list)) list = Object.keys(list).map(function (k) { return list[k]; });
-    if (!Array.isArray(list) || !list.length) {
-        list = Object.keys((room && room.members) || (room && room.alive) || {});
-    }
-    return list;
-}
-function killed() { return Object.keys(((a214() || {}).kills) || {}); }
-function standing() {
-    const k = killed();
-    return roster().filter(function (c) { return k.indexOf(c) < 0; });
+function listOf(v) {
+    if (Array.isArray(v)) return v.slice();
+    if (v && typeof v === 'object') return Object.keys(v).map(function (k) { return v[k]; });
+    return [];
 }
 
-// 방장이 한 번만 적는다
+// 지금 방에 올라와 있는 사람 — members 와 alive 를 **둘 다** 본다.
+//   `members || alive` 로 쓰면 members 가 빈 객체일 때 그 빈 객체가
+//   참이라 alive 를 못 본다.
+function nowIn() {
+    const out = [];
+    [(room && room.members) || {}, (room && room.alive) || {}].forEach(function (m) {
+        Object.keys(m).forEach(function (c) { if (out.indexOf(c) < 0) out.push(c); });
+    });
+    return out;
+}
+
+// 이 판에 들어온 사람 전부 — 중간에 빠져도 줄지 않게 쌓아 둔다
+function roster() {
+    const out = listOf((a214() || {}).roster);
+    nowIn().forEach(function (c) { if (out.indexOf(c) < 0) out.push(c); });
+    return out;
+}
+
+function killed() { return Object.keys(((a214() || {}).kills) || {}); }
+
+// 신도 손이 아닌 죽음 — 기믹·시간 초과·지목 적중 (아래 hookDeath 가 적는다)
+function downed() { return Object.keys(((a214() || {}).down) || {}); }
+
+// ★ 아직 서 있는 사람
+//
+//   예전에는 roster 에서 kills 만 뺐다. 두 군데가 어긋났다.
+//
+//   ① 다 들어오기 전에 굳은 roster
+//      keepRoster 가 「한 번만」 적었는데, 그때 방에 아직 둘만 올라와
+//      있으면 그 둘이 끝까지 전부가 된다. 넷이 멀쩡히 걷고 있는데도
+//      신도 화면에는 「단둘이 남았습니다 · 덮친다」가 뜨고, 덮친 상대는
+//      「혼자 간 쪽에는 아무도 없다」며 죽는다.
+//      **혼자가 아닌데 혼자라고 죽는 것이 이것이다.**
+//
+//   ② 신도가 죽인 것만 kills 에 적힌다
+//      기믹 사망·시간 초과·지목 적중으로 죽은 사람은 kills 에 안 들어간다.
+//      그래서 반대로, 정말 단둘이 남았는데도 덮치기 단추가 끝내 안 뜨고
+//      혼자 살아 나온 몫(5,000 P)도 안 나간다.
+//      → 아래 hookDeath 가 그런 죽음도 a214/down 에 적게 했다.
+//
+//   방의 alive 로 거르지는 않는다. 정산 때는 먼저 나간 사람이 이미 alive 에서
+//   빠져 있어서, 살아 나간 사람을 죽은 것으로 세어 버린다. (onDisconnect 로도 빠진다)
+function standing() {
+    const gone = killed().concat(downed());
+    return roster().filter(function (c) { return gone.indexOf(c) < 0; });
+}
+
+function aliveCodes() {
+    return (room && room.alive) ? Object.keys(room.alive) : [];
+}
+
+// 정말로 단둘만 남았나 — 내 셈과 방의 alive 가 **둘 다** 그렇다고 할 때만 덮칠 수 있다.
+// alive 를 아직 못 받았으면(0) 아니라고 본다. 늦게 뜨는 것이 잘못 뜨는 것보다 낫다.
+// (탐사 도중이라 alive 를 믿을 수 있다. 정산 때 쓰는 standing() 은 이 셈을 쓰지 않는다)
+function onlyTwoLeft(left) {
+    return left.length === 1 && aliveCodes().length === 2 && roster().length >= 2;
+}
+
+// 방장이 적어 둔다 — 늦게 들어온 사람도 더한다 (한 번만 적으면 모자란다)
 function keepRoster() {
     const r = run();
-    if (!r || !r.isLeader || !a214() || (a214().roster || []).length) return;
-    const codes = Object.keys((room && room.members) || (room && room.alive) || {});
-    if (codes.length) db_().ref(path() + '/roster').set(codes);
+    if (!r || !r.isLeader || !a214()) return;
+    const was = listOf(a214().roster);
+    const all = was.slice();
+    nowIn().forEach(function (c) { if (all.indexOf(c) < 0) all.push(c); });
+    if (!all.length || all.length === was.length) return;
+    db_().ref(path() + '/roster').set(all);
 }
 
 // ==========================================
@@ -278,7 +329,7 @@ window.a214Hunt = function (code) {
 window.a214Pounce = function () {
     if (!on() || !amCult()) return;
     const left = standing().filter(function (c) { return c !== currentUser.code; });
-    if (left.length !== 1) { showCustomAlert('아직 단둘이 아닙니다.'); return; }
+    if (!onlyTwoLeft(left)) { showCustomAlert('아직 단둘이 아닙니다.'); return; }
     const target = left[0];
     const atk = d20() + bonus() + AMBUSH;
     clear();
@@ -542,7 +593,7 @@ function paint() {
     // --- 평소: 사냥감 · 덮치기 단추 ---
 
     const left = standing().filter(function (c) { return c !== currentUser.code; });
-    if (left.length === 1 && !(s.kills || {})[left[0]]) {
+    if (onlyTwoLeft(left) && !(s.kills || {})[left[0]]) {
         put(wrap(
             '<div style="font-size:11px; color:#ff6b6b; font-weight:bold; margin-bottom:5px;">◉ 단둘이 남았습니다</div>'
             + '<div style="font-size:10px; color:#aaa; line-height:1.7; margin-bottom:8px;">'
@@ -573,6 +624,39 @@ function paint() {
 }
 
 setInterval(function () { try { watch(); paint(); } catch (e) { } }, 1200);
+
+// ==========================================
+// 3-1. 신도 손이 아닌 죽음도 방에 적는다
+// ==========================================
+//
+//   기믹 사망·시간 초과·지목 적중으로 죽으면 alive 에서만 빠지고 방의
+//   a214 에는 아무 자취가 안 남았다. 그래서 standing() 이 그 사람을
+//   계속 살아 있다고 세어, 정말 단둘이 남아도 덮치기 단추가 안 떴고
+//   「혼자 살아 나온 사원」 몫도 안 나갔다.
+//
+//   alive 로 대신 세면 안 된다 — 먼저 나간 사람도 alive 에서 빠지므로
+//   살아 나간 사람을 죽은 것으로 센다. 그래서 죽을 때 한 번 적어 둔다.
+(function hookDeath() {
+    const iv = setInterval(function () {
+        if (typeof darkDeath !== 'function') return;
+        if (darkDeath._a214down) { clearInterval(iv); return; }
+        const _d = darkDeath;
+        darkDeath = function () {
+            try {
+                if (on() && currentUser && db_()) {
+                    db_().ref(path() + '/down/' + currentUser.code)
+                        .set({ name: currentUser.name, at: Date.now() });
+                }
+            } catch (e) { }
+            return _d.apply(this, arguments);
+        };
+        darkDeath._a214down = true;
+        window.darkDeath = darkDeath;
+        clearInterval(iv);
+        console.log('[A-214] 죽음 기록 연결');
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 
 // ==========================================
 // 4. 갈림길이 끝나면 사냥감을 찾는다
@@ -659,8 +743,19 @@ window.a214KillState = function () {
     console.log('  죽은 사람:', killed().map(function (c) {
         const k = s.kills[c]; return nameOf(c) + '(' + (k.how || '?') + ')';
     }).join(', ') || '없음');
+    console.log('  쓰러진 사람:', downed().map(nameOf).join(', ') || '없음');
     console.log('  남은 사람:', standing().map(nameOf).join(', '));
+    console.log('  방의 alive:', aliveCodes().map(nameOf).join(', ') || '(아직 못 받음)');
+    console.log('  덮칠 수 있나:',
+        onlyTwoLeft(standing().filter(function (c) { return c !== currentUser.code; })) ? 'O' : '✗');
     console.log('  결투:', s.duel ? JSON.stringify(s.duel) : '없음');
+};
+
+// 살펴볼 때만 — 셈을 바깥에서 들여다본다
+window.__a214Count = function () {
+    return { roster: roster(), killed: killed(), downed: downed(),
+             standing: standing(), alive: aliveCodes(),
+             canPounce: onlyTwoLeft(standing().filter(function (c) { return c !== currentUser.code; })) };
 };
 
 console.log('[A-214] 신도의 칼 — a214KillState()');
