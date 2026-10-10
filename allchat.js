@@ -168,6 +168,38 @@ function paintBtn() {
 // ==========================================
 const OV = 'allchat-overlay';
 
+// ==========================================
+// 뒤로가기로 닫기 — 갤럭시 등의 기기 뒤로가기·쓸기
+// ==========================================
+//
+//   index.html 에도 뒤로가기 처리가 있지만, 거기 목록은 코드 안에
+//   박혀 있어 밖에서 한 칸 보탤 수가 없다. 그래서 우리 것은 따로 단다.
+//   열 때 히스토리를 한 칸 밀어 넣고, 뒤로가기가 오면 그 칸을 쓴다.
+//   닫기 단추로 닫을 때는 밀어 넣은 칸을 우리가 도로 빼므로, 그 뒤에
+//   한 번 더 뒤로가면 평소대로 앱 밖으로 나간다.
+let histOn = false;      // 내가 밀어 넣은 칸이 남아 있나
+let histSelf = false;    // 내가 history.back() 을 불러 생긴 것인가
+
+function histPush() {
+    if (histOn) return;
+    try { history.pushState({ allChat: 1 }, '', ''); histOn = true; } catch (e) { }
+}
+function histPop() {
+    if (!histOn) return;
+    histOn = false;
+    histSelf = true;
+    try { history.back(); } catch (e) { histSelf = false; }
+    setTimeout(function () { histSelf = false; }, 400);
+}
+try {
+    window.addEventListener('popstate', function () {
+        if (histSelf) { histSelf = false; return; }   // 닫기 단추가 부른 것
+        if (!open_ || !histOn) return;
+        histOn = false;                               // 칸은 이미 빠졌다
+        window.closeAllChat(true);
+    });
+} catch (e) { }
+
 // 벽지를 쓰고 있으면 바깥 어둠도 벽지 색으로 — 안 쓰면 원래대로 검다.
 // 안쪽 색들은 inline 에 var(--sk-…) 로 박아 뒀으니 벽지를 갈아 끼우면 저절로 따라온다.
 function paintSkin(el) {
@@ -239,6 +271,7 @@ window.openAllChat = function () {
     }
     el.style.display = 'flex';
     paintSkin(el);
+    histPush();
     markRead();
     paintLog(true);
     paintBtn();
@@ -246,11 +279,13 @@ window.openAllChat = function () {
     if (sub) sub.textContent = '접속 ' + onlineCount() + '명 · 최근 ' + ALLCHAT.KEEP + '줄';
 };
 
-window.closeAllChat = function () {
+// fromBack 이 참이면 뒤로가기가 이미 칸을 뺀 뒤라 history 는 안 건드린다
+window.closeAllChat = function (fromBack) {
     open_ = false;
     const el = document.getElementById(OV);
     if (el) el.style.display = 'none';
     try { if (typeof emoClose === 'function') emoClose(); } catch (e) { }
+    if (fromBack !== true) histPop();
     markRead();
     paintBtn();
 };
