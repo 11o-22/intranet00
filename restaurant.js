@@ -252,8 +252,69 @@ const MINI = {
 
 let mini = null;
 
+// 바늘을 왜 CSS 쪽에 넘겼나
+//
+//   예전에는 매 프레임 left 를 % 로 다시 썼다. left 는 자리를 다시 재고
+//   다시 칠해야 하는 값이라, 그 사이에 다른 일(목록 다시 그리기, 2.5초마다
+//   도는 것들…)이 한 번 끼면 그 프레임이 통째로 밀린다. 시간으로 거리를
+//   세고 있었으므로 밀린 만큼 다음 프레임에 건너뛰었고, 그게 「툭툭」으로
+//   보였다.
+//
+//   이제 바늘은 transform 으로만 움직인다. 자리를 다시 재지 않아도 되는
+//   값이라 그림 담당이 따로 돌린다. 본 줄기가 잠깐 바빠도 바늘은 안 멈춘다.
+//   멈출 때 어디 있었는지는 애니메이션에게 직접 물어본다(currentTime).
+//
+//   Element.animate 가 없는 낡은 화면에서는 예전 방식으로 돌아간다.
+
+const CAN_WAAPI = (typeof Element !== 'undefined')
+    && typeof Element.prototype.animate === 'function';
+
+// speed 는 「16.67ms 에 몇 %」였다. 끝에서 끝까지 걸리는 시간으로 바꾼다.
+function miniPeriod(cfg) { return 100 * 16.67 / (cfg.speed * 0.9); }
+
+function miniTravel() {
+    const bar = document.getElementById('cook-bar');
+    const pin = document.getElementById('cook-pin');
+    if (!bar || !pin) return 0;
+    return Math.max(0, bar.clientWidth - (pin.offsetWidth || 3));
+}
+
+// 지금 바늘이 몇 % 에 있나 (0~100)
+function miniPos() {
+    if (!mini) return 0;
+    if (!mini.anim) return mini.pos;
+    const T = mini.period;
+    let t = Number(mini.anim.currentTime) || 0;
+    t = ((t % (2 * T)) + 2 * T) % (2 * T);
+    return (t <= T ? t / T : 2 - t / T) * 100;
+}
+
+function miniStartAnim(from) {
+    const pin = document.getElementById('cook-pin');
+    if (!pin || !CAN_WAAPI) return false;
+    if (mini.anim) { try { mini.anim.cancel(); } catch (e) { } mini.anim = null; }
+    const travel = miniTravel();
+    if (travel <= 0) return false;
+    mini.period = miniPeriod(mini.cfg);
+    mini.anim = pin.animate(
+        [{ transform: 'translateX(0px)' }, { transform: 'translateX(' + travel + 'px)' }],
+        { duration: mini.period, direction: 'alternate', iterations: Infinity, easing: 'linear' }
+    );
+    mini.anim.currentTime = from || 0;
+    return true;
+}
+
+// 화면 폭이 바뀌면 거리도 바뀐다 — 가 있던 자리를 지키며 다시 건다
+function miniResize() {
+    if (!mini || mini.over || !mini.anim) return;
+    const t = Number(mini.anim.currentTime) || 0;
+    miniStartAnim(t);
+}
+
 function miniClose() {
     if (mini && mini.raf) cancelAnimationFrame(mini.raf);
+    if (mini && mini.anim) { try { mini.anim.cancel(); } catch (e) { } }
+    try { window.removeEventListener('resize', miniResize); } catch (e) { }
     mini = null;
     const el = document.getElementById('cook-mini');
     if (el) el.remove();
@@ -276,8 +337,9 @@ function miniOpen(d, done) {
         + ' border:1px solid #333; border-radius:5px; overflow:hidden;">'
         + '<div id="cook-zone" style="position:absolute; top:0; bottom:0; background:rgba(76,175,80,0.30);'
         + ' border-left:1px solid #4CAF50; border-right:1px solid #4CAF50;"></div>'
-        + '<div id="cook-pin" style="position:absolute; top:0; bottom:0; width:3px; background:#ffd700;'
-        + ' box-shadow:0 0 6px rgba(255,215,0,0.8);"></div>'
+        + '<div id="cook-pin" style="position:absolute; top:0; bottom:0; left:0; width:3px;'
+        + ' background:#ffd700; box-shadow:0 0 6px rgba(255,215,0,0.8);'
+        + ' will-change:transform; transform:translateX(0px);"></div>'
         + '</div>'
         + '<div style="font-size:10px; color:#777; margin-top:9px; line-height:1.6;">'
         + '바늘이 초록 칸에 있을 때 멈추세요.</div>'
@@ -289,7 +351,9 @@ function miniOpen(d, done) {
         + '</div>';
     document.body.appendChild(el);
 
-    mini = { d: d, cfg: cfg, round: 0, pos: 0, dir: 1, raf: null, done: done, over: false };
+    mini = { d: d, cfg: cfg, round: 0, pos: 0, dir: 1, raf: null, anim: null,
+             period: miniPeriod(cfg), done: done, over: false };
+    try { window.addEventListener('resize', miniResize); } catch (e) { }
     nextRound();
 
     document.getElementById('cook-stop').onclick = function () { miniHit(); };
@@ -305,7 +369,8 @@ function nextRound() {
     if (zo) { zo.style.left = mini.zoneA + '%'; zo.style.width = z + '%'; }
     const rr = document.getElementById('cook-round');
     if (rr) rr.innerText = mini.round + ' / ' + mini.cfg.rounds + ' 번째';
-    mini.last = performance.now();
+    if (miniStartAnim(0)) return;          // 그림 담당에게 맡긴다
+    mini.last = performance.now();         // 안 되는 화면만 예전 방식
     tick();
 }
 
@@ -318,16 +383,22 @@ function tick() {
     if (mini.pos >= 100) { mini.pos = 100; mini.dir = -1; }
     if (mini.pos <= 0) { mini.pos = 0; mini.dir = 1; }
     const pin = document.getElementById('cook-pin');
-    if (pin) pin.style.left = mini.pos + '%';
+    if (pin) {
+        const travel = miniTravel();
+        pin.style.transform = 'translateX(' + (mini.pos / 100 * travel) + 'px)';
+    }
     mini.raf = requestAnimationFrame(tick);
 }
 
 function miniHit() {
     if (!mini || mini.over) return;
-    const inZone = mini.pos >= mini.zoneA && mini.pos <= mini.zoneA + mini.cfg.zone;
+    const pos = miniPos();
+    mini.pos = pos;
+    const inZone = pos >= mini.zoneA && pos <= mini.zoneA + mini.cfg.zone;
     if (!inZone) {
         mini.over = true;
         if (mini.raf) cancelAnimationFrame(mini.raf);
+        if (mini.anim) { try { mini.anim.pause(); } catch (e) { } }
         const fn = mini.done;
         const pin = document.getElementById('cook-pin');
         if (pin) pin.style.background = '#f44336';
@@ -337,6 +408,7 @@ function miniHit() {
     if (mini.round >= mini.cfg.rounds) {
         mini.over = true;
         if (mini.raf) cancelAnimationFrame(mini.raf);
+        if (mini.anim) { try { mini.anim.pause(); } catch (e) { } }
         const fn = mini.done;
         setTimeout(function () { miniClose(); fn(true); }, 250);
         return;
