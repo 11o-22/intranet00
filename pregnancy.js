@@ -88,23 +88,70 @@ function pregBroadcast(text) {
     database.ref('notices').push({ text: text, at: Date.now(), kind: 'preg' });
 }
 
+// ★ 「들어갈 때마다 낳았습니다 띠가 또 뜬다」
+//
+//   limitToLast(1).on('child_added') 는 **붙는 순간 이미 있던 맨 끝 줄을
+//   한 번 틀어 준다.** 그래서 들어갈 때마다 서버에 남아 있는 마지막 소식이
+//   다시 흐른다. 늘 같은 사원의 것만 뜨는 까닭이 이것이다 — 그 줄이 맨
+//   끝에 눌러앉아 있기 때문이다.
+//
+//   막아 두기는 했었다.
+//
+//       if (!v || Date.now() - v.at > 20000) return;
+//
+//   그런데 이 셈은 두 가지에 무너진다.
+//
+//       at 이 없다        Date.now() - undefined = NaN → NaN > 20000 은 거짓
+//                         → 그냥 통과한다
+//       at 이 앞날이다    올린 사람 시계가 앞서면 빼기가 **음수**가 된다
+//                         → 역시 통과한다. 영영 묵지 않는다.
+//
+//   시계를 믿지 않는 쪽으로 바꾼다. **붙자마자 들어온 줄은 이미 있던 줄**
+//   이다 (확성기 inv-shout.js 가 쓰는 것과 같은 수). 들어온 때로 가르므로
+//   남의 시계가 어떻든 상관없다. 열쇠로 한 번 더 걸러, 끊겼다 이어져도
+//   같은 줄을 두 번 틀지 않는다.
 (function watchNotice() {
     if (!database) return;
+
+    let ready = false;                       // 붙는 순간 쏟아지는 묵은 줄을 건너뛴다
+    setTimeout(function () { ready = true; }, 1500);
+    const bornAt = Date.now();
+    const seen = {};
+
     database.ref('notices').limitToLast(1).on('child_added', function (snap) {
         const v = snap.val();
-        if (!v || Date.now() - v.at > 20000) return;
+        if (!v || !v.text) return;
+        if (seen[snap.key]) return;
+        seen[snap.key] = true;
+        if (!ready) return;                  // 들어오기 전에 적혀 있던 줄
+        const at = Number(v.at);
+        if (isFinite(at) && at > 0 && at < bornAt - 60000) return;   // 확실히 묵은 줄
         if (typeof pushNotice === 'function') { pushNotice(v.text); return; }
         showPregTicker(v.text);
     });
-    setInterval(function () {
+
+    // 치우기 — 2분 지난 줄은 지운다.
+    //   들어오자마자 한 번 쓸고, 그 뒤로 2분마다 쓴다. 예전에는 첫 2분을
+    //   기다리기만 해서, 잠깐 들렀다 나가면 묵은 줄이 그대로 남았다.
+    function sweep() {
         if (!database || !currentUser || currentUser.code !== 'kario0987') return;
         database.ref('notices').once('value').then(function (s) {
             const v = s.val() || {};
             const del = {};
-            Object.keys(v).forEach(function (k) { if (Date.now() - (v[k].at || 0) > 120000) del[k] = null; });
-            if (Object.keys(del).length) database.ref('notices').update(del);
+            Object.keys(v).forEach(function (k) {
+                const at = Number(v[k] && v[k].at);
+                // 때를 모르는 줄과 앞날로 적힌 줄도 같이 치운다 — 안 그러면 영영 남는다
+                if (!isFinite(at) || at <= 0 || Math.abs(Date.now() - at) > 120000) del[k] = null;
+            });
+            if (Object.keys(del).length) {
+                database.ref('notices').update(del);
+                console.log('[알림띠] 묵은 소식 ' + Object.keys(del).length + '줄을 치웠습니다.');
+            }
         });
-    }, 120000);
+    }
+    setTimeout(sweep, 6000);
+    setInterval(sweep, 120000);
+    window.noticeSweep = sweep;
 })();
 
 function showPregTicker(text) {
