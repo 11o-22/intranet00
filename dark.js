@@ -64,7 +64,7 @@ const DARK_ZONES = {
             code:"Qtrew-A-214", grade:"A", name:"빛을 찾아서",
             brief:"(여기 사람들은 전부 같은 것을 보고 있습니다.)",
             danger:"상", survival:"3%", min:4, max:6, reward:[1000,1500], ready:true,
-            voteMode:true, timeLimit:25, hasTraitor:true,
+            voteMode:true, timeLimit:15, hasTraitor:true,
             intro:"복도가 길다.<br><br>양쪽 벽에 문이 늘어서 있고, 전부 조금씩 열려 있다.<br>안쪽에서 빛이 샌다. 전부 같은 색이다.<br><br>사람 소리가 난다. 여럿이 같은 문장을 동시에 말하는 소리.<br>박자가 정확해서 노래 같기도 하다.<br><br>복도 끝에 계단이 있다. 아래로 내려간다.<br>빛은 그쪽에서 온다.<br><br><span style=\"color:#d4af37;\">\"빛을 찾으셨습니까.\"</span><br><br>누가 말했는지 모르겠다.<br>일행 중 하나가 대답할 뻔했다가 입을 다물었다.",
             outro:"계단을 올라온다.<br><br>복도의 문들이 전부 닫혀 있다. 빛도 소리도 없다.<br>원래 비어 있던 건물처럼 보인다.<br><br>눈을 뜨니 현관 앞이다.<br>귓속에서 아직 그 박자가 울린다.<br>며칠은 갈 것 같다.",
             images: {
@@ -5228,7 +5228,7 @@ function b508RequiredDocs() {
         // ==========================================
     // ★ Qtrew-A-214 「빛을 찾아서」
     // ==========================================
-       const A214_TIME = 35 * 60 * 1000;
+       const A214_TIME = 15 * 60 * 1000;
 
     const A214_MISSIONS = [
         { id:'m01', name:'홀로 두기',   desc:'특정 사원이 혼자 남는 상황을 2회 만든다.',        goal:2 },
@@ -5258,6 +5258,8 @@ function b508RequiredDocs() {
             const had = !!a214State;
             a214State = snap.val();
             if (!a214State || !darkRun) return;
+            a214Heal();                       // 반쪽만 적힌 방이면 메운다
+            if (!a214Timer) startA214Timer(); // 시계가 멎어 있으면 다시 돌린다
             // 방이 막 도착했다. 그 전까지 화면은 "내려가는 중..." 이었다.
             // 여기서 다시 그려 주지 않으면, 1.2초·3초 재시도를 놓친 사람은
             // 선임이 출발한 뒤에도 입구에 남아 혼자 뒤처진다.
@@ -5271,7 +5273,83 @@ function b508RequiredDocs() {
     function detachA214Listener() {
         if (a214Ref) { try { a214Ref.off(); } catch(e) {} }
         a214Ref = null; a214Key = null; a214State = null;
-        clearInterval(a214Timer);
+        clearInterval(a214Timer); a214Timer = null;
+    }
+
+    // ==========================================
+    // ★ 방이 반쪽만 적혀 있을 때 — 메운다
+    // ==========================================
+    //
+    //   darkParties/{방}/a214 는 선임의 트랜잭션 한 번으로 통째로 적힌다.
+    //   그런데 그보다 먼저 누가 a214 **아래쪽 한 칸**을 적어 버리면
+    //   (votes · split · roster 같은 것) 그 순간 a214 가 "이미 있는 방"이
+    //   되어, 선임의 트랜잭션은 `if (cur) return;` 에서 그대로 돌아선다.
+    //
+    //   그러면 신도도 과업도 시작 시각도 없는 방이 남는다. 화면에서는
+    //       · 결산의 「신도 정체」 가 undefined
+    //       · startedAt 이 없어 남은 시간이 늘 처음 값 — 시계가 안 간다
+    //   로 보인다. 둘 다 같은 원인이다.
+    //
+    //   빠진 칸만 골라 메운다. 이미 적힌 것은 건드리지 않는다 —
+    //   덮어쓰면 "당신은 신도입니다" 를 본 사람이 신도가 아니게 된다.
+    function a214Lacks(s) {
+        return !!s && (!s.traitor || !s.traitorName || !s.startedAt
+            || !s.missions || !Object.keys(s.missions).length);
+    }
+
+    function a214Heal() {
+        if (!database || !darkRun || !darkRun.isLeader) return;
+        if (!a214Lacks(a214State)) return;
+        if (darkRun._a214Healing) return;
+        darkRun._a214Healing = true;
+        const pid = darkRun.partyId;
+        database.ref(`darkParties/${pid}`).once('value').then(snap => {
+            const room = snap.val() || {};
+            const cur = room.a214;
+            if (!cur || !a214Lacks(cur)) { if (darkRun) darkRun._a214Healing = false; return; }
+
+            let members = room.members;
+            if (!members || Object.keys(members).length === 0) {
+                members = {};
+                Object.keys(room.alive || {}).forEach(c => { members[c] = { code: c, name: safeName(c) }; });
+            }
+            const codes = Object.keys(members);
+            if (!codes.length) { if (darkRun) darkRun._a214Healing = false; return; }
+
+            const who = (cur.traitor && codes.indexOf(cur.traitor) >= 0)
+                ? cur.traitor : codes[Math.floor(Math.random() * codes.length)];
+            const others = codes.filter(c => c !== who);
+
+            const fix = {};
+            if (cur.traitor !== who) fix.traitor = who;
+            if (!cur.traitorName) fix.traitorName = (members[who] && members[who].name) || safeName(who);
+            if (!cur.startedAt) fix.startedAt = Date.now();
+            if (!cur.missions || !Object.keys(cur.missions).length) {
+                fix.missions = A214_MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(m => ({
+                    id: m.id, name: m.name, desc: m.desc, goal: m.goal, done: 0,
+                    target: ((m.id === 'm01' || m.id === 'm04') && others.length)
+                        ? others[Math.floor(Math.random() * others.length)] : null
+                }));
+            }
+            database.ref(`darkParties/${pid}/a214`).update(fix).then(() => {
+                if (fix.traitor) a214LogCult(who);
+                if (darkRun) darkRun._a214Healing = false;
+            }).catch(() => { if (darkRun) darkRun._a214Healing = false; });
+        }).catch(() => { if (darkRun) darkRun._a214Healing = false; });
+    }
+
+    // 신도 이름 — 어디서 읽어도 undefined 가 나오지 않게 한 자리로 모은다
+    function a214TraitorName() {
+        const s = a214State;
+        if (!s) return '알 수 없음';
+        if (s.traitorName) return s.traitorName;
+        if (!s.traitor) return '밝혀지지 않음';
+        try {
+            const p = (typeof darkParties !== 'undefined' && darkRun) ? darkParties[darkRun.partyId] : null;
+            if (p && p.members && p.members[s.traitor] && p.members[s.traitor].name) return p.members[s.traitor].name;
+        } catch (e) { }
+        try { return safeName(s.traitor); } catch (e) { }
+        return '알 수 없음';
     }
 
     // 방장이 신도와 미션을 배정
@@ -5285,7 +5363,7 @@ function b508RequiredDocs() {
             database.ref('a214Cult/log').once('value')
         ]).then(([snap, lsnap]) => {
             const room = snap.val() || {};
-            if (room.a214) return;                // 이미 정해져 있다
+            if (room.a214 && !a214Lacks(room.a214)) return;   // 온전히 적혀 있으면 그대로
             let members = room.members;
 
             if (!members || Object.keys(members).length === 0) {
@@ -5302,32 +5380,42 @@ function b508RequiredDocs() {
                 return;
             }
 
-            const traitor = a214PickCult(codes, lsnap.val());
             const picked = A214_MISSIONS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
-            const others = codes.filter(c => c !== traitor);
-
-            const missions = picked.map(m => ({
-                id: m.id, name: m.name, desc: m.desc, goal: m.goal, done: 0,
-                target: ((m.id === 'm01' || m.id === 'm04') && others.length)
-                    ? others[Math.floor(Math.random() * others.length)] : null
-            }));
+            const roll = (who) => {
+                const others = codes.filter(c => c !== who);
+                return picked.map(m => ({
+                    id: m.id, name: m.name, desc: m.desc, goal: m.goal, done: 0,
+                    target: ((m.id === 'm01' || m.id === 'm04') && others.length)
+                        ? others[Math.floor(Math.random() * others.length)] : null
+                }));
+            };
 
             // set() 이 아니라 트랜잭션이다. 선임이 두 번 굴려 덮어쓰면
             // 이미 "당신은 신도입니다" 를 본 사람이 신도가 아니게 된다.
+            //
+            //   먼저 적힌 것이 이긴다 — 단, **온전할 때만** 이긴다.
+            //   누가 a214 아래 한 칸(votes·roster 따위)을 먼저 적어 두면
+            //   여기가 그대로 돌아서, 신도도 시작 시각도 없는 방이 남았다.
+            //   빠진 칸만 채우고 적혀 있는 칸은 그대로 둔다.
+            let chosen = null;
             database.ref(`darkParties/${pid}/a214`).transaction(cur => {
-                if (cur) return;                  // 먼저 적힌 것이 이긴다
-                return {
-                    traitor: traitor,
-                    traitorName: members[traitor].name,
-                    missions: missions,
-                    startedAt: Date.now(),
-                    votes: {},
-                    exposed: 0,
-                    watched: false,
-                    converted: false
-                };
+                if (cur && !a214Lacks(cur)) return;       // 온전하다 — 손대지 않는다
+                const was = cur || {};
+                const who = (was.traitor && codes.indexOf(was.traitor) >= 0)
+                    ? was.traitor : a214PickCult(codes, lsnap.val());
+                chosen = who;
+                return Object.assign({}, was, {
+                    traitor: who,
+                    traitorName: was.traitorName || (members[who] && members[who].name) || safeName(who),
+                    missions: (was.missions && Object.keys(was.missions).length) ? was.missions : roll(who),
+                    startedAt: was.startedAt || Date.now(),
+                    votes: was.votes || {},
+                    exposed: was.exposed || 0,
+                    watched: !!was.watched,
+                    converted: !!was.converted
+                });
             }).then(r => {
-                if (r && r.committed) a214LogCult(traitor);
+                if (r && r.committed && chosen) a214LogCult(chosen);
                 else if (r && !(r.snapshot && r.snapshot.val())) darkRun._a214Init = false;
             }).catch(() => { if (darkRun) darkRun._a214Init = false; });
         }).catch(() => { if (darkRun) darkRun._a214Init = false; });
@@ -5372,10 +5460,27 @@ function b508RequiredDocs() {
         return a214State && a214State.traitor === currentUser.code;
     }
 
+    // 시작 시각 — 방에 안 적혀 있으면 내 시계로라도 센다.
+    //   (적혀 있지 않다고 해서 시간이 멎어 있으면 안 된다)
+    function a214Start() {
+        if (a214State && a214State.startedAt) return a214State.startedAt;
+        if (darkRun) {
+            if (!darkRun._a214T0) darkRun._a214T0 = Date.now();
+            return darkRun._a214T0;
+        }
+        return Date.now();
+    }
+
+    // 행운 장비는 시간을 조금 더 준다 (D +18초 ~ L +3분 36초).
+    //   15분 기준에 맞춘 값이다. 여기서 터지면 시계가 멎으므로 감싸 둔다.
+    function a214Total() {
+        let bonus = 0;
+        try { bonus = Math.round(gearValue(currentUser, 'luck') * 2 * 60000); } catch (e) { bonus = 0; }
+        return A214_TIME + (bonus > 0 ? bonus : 0);
+    }
+
        function a214Remain() {
-        if (!a214State || !a214State.startedAt) return A214_TIME;
-        const bonus = Math.round(gearValue(currentUser, 'luck') * 5 * 60000);
-        return Math.max(0, (A214_TIME + bonus) - (Date.now() - a214State.startedAt));
+        return Math.max(0, a214Total() - (Date.now() - a214Start()));
     }
 
         function a214BarHtml() {
@@ -5389,8 +5494,8 @@ function b508RequiredDocs() {
         const remain = a214Remain();
         const m = Math.floor(remain / 60000);
         const s = Math.floor((remain % 60000) / 1000);
-        const color = remain < 5 * 60000 ? '#f44336' : remain < 12 * 60000 ? '#ff9800' : '#4CAF50';
-        const pct = (remain / A214_TIME) * 100;
+        const color = remain < 3 * 60000 ? '#f44336' : remain < 7 * 60000 ? '#ff9800' : '#4CAF50';
+        const pct = Math.max(0, Math.min(100, (remain / a214Total()) * 100));
 
         let roleHtml = '';
         if (isTraitor()) {
@@ -5422,13 +5527,16 @@ function b508RequiredDocs() {
     function startA214Timer() {
         clearInterval(a214Timer);
         a214Timer = setInterval(() => {
-            if (!darkRun || darkRun.zone !== 'Qtrew-A-214') { clearInterval(a214Timer); return; }
-            renderA214Bar();
-            if (a214Remain() <= 0 && !darkRun._a214Over) {
-                darkRun._a214Over = true;
-                clearInterval(a214Timer);
-                a214TimeOut();
-            }
+            if (!darkRun || darkRun.zone !== 'Qtrew-A-214') { clearInterval(a214Timer); a214Timer = null; return; }
+            // 그리다 터져도 초는 계속 가야 한다 — 감싸 둔다
+            try { renderA214Bar(); } catch (e) { }
+            try {
+                if (a214Remain() <= 0 && !darkRun._a214Over) {
+                    darkRun._a214Over = true;
+                    clearInterval(a214Timer); a214Timer = null;
+                    a214TimeOut();
+                }
+            } catch (e) { }
         }, 1000);
     }
 
@@ -5672,10 +5780,10 @@ function b508RequiredDocs() {
             return;
         }
 
-        if (!darkRun._a214Started) {
-            darkRun._a214Started = true;
-            startA214Timer();
-        }
+        // 한 번 켜고 마는 것이 아니라, 멎어 있으면 다시 켠다.
+        // (새로고침·복귀·화면 전환 뒤에 시계가 안 가던 자리)
+        darkRun._a214Started = true;
+        if (!a214Timer) startA214Timer();
 
         const def = A214_STEPS[darkRun.step];
         if (!def) { renderDarkResult(); return; }
