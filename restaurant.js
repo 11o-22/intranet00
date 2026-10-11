@@ -7,7 +7,7 @@
 //   재료를 사서 섞어 요리를 만든다. 만들 때마다 눈금 맞추기를 한 번 거친다.
 //
 //   재료  평범 20가지 · 괴상 10가지 (전부 포인트로 산다)
-//   요리  100가지 · D~S 다섯 등급
+//   요리  110가지 · D~S 다섯 등급 (그 가운데 S 등급 디저트 10가지)
 //         D 두 가지 · C 세 가지 · B 네 가지 · A 다섯 가지 · S 여섯 가지를 섞는다
 //
 //   평범끼리만  포만감이 오르거나(5~60) 오염도가 내린다(10~40)
@@ -15,6 +15,9 @@
 //   섞으면      등급에 따라 좋은 것과 나쁜 것이 함께 나온다
 //   S 등급      50% 로 공용시설 +1~2 · 어둠 탐사 +1~2 · 행운 50~100% 중
 //               한둘이 더 붙는다 (이름 끝에 ★ 가 붙는다)
+//   S 디저트    평범한 재료만 쓰는 단것 열 가지. 포만감도 오염도도 안 건드리고
+//               **정해진 버프 하나만** 준다. 운에 맡기지 않는다 — 늘 같은 것이
+//               같은 만큼 붙는다. 그래서 ★ 는 안 붙는다 (두 번 받지 않게)
 //
 //   눈금을 놓치면 「실패한 요리」가 나온다. 먹으면 오염도가 5% 오른다.
 //   S 등급은 [요리사] 칭호가 있어야 만들 수 있다. (A 등급 이상 50번 성공)
@@ -53,6 +56,9 @@ const ODD = [
     ['녹지 않는 얼음', 1200]
 ];
 const PLAIN_N = PLAIN.map(function (x) { return x[0]; });
+// 디저트에 쓰는 재료 — 평범한 것 가운데 단것에 어울리는 것만 고른다
+const SWEET_N = ['쌀 한 되', '햇감자', '당근', '달걀 한 판', '버터',
+                 '굵은 소금', '흑설탕', '우유', '밀가루', '두부 한 모'];
 const ODD_N = ODD.map(function (x) { return x[0]; });
 const MAT_PRICE = {};
 PLAIN.concat(ODD).forEach(function (x) { MAT_PRICE[x[0]] = x[1]; });
@@ -96,8 +102,45 @@ const NAMES = {
         B: ['뼈만 남은 탕', '눈알이 뜨는 전골', '숨 쉬는 반죽 튀김', '얼어붙은 손'],
         A: ['어제의 어제', '돌아오지 않는 맛', '먹으면 안 되는 것'],
         S: ['식당의 바닥', '아무도 못 먹은 것']
+    },
+    // ★ S 등급 디저트 — 평범한 재료만 쓰는 단것. 버프 하나만 준다.
+    sweet: {
+        S: ['과일 모찌', '딸기 생크림 케이크', '흑임자 단팥죽', '우유 푸딩', '약과 한 접시',
+            '쑥 인절미', '버터 스콘', '소금빵', '흑설탕 호떡', '달걀 카스텔라']
     }
 };
+
+// 디저트가 주는 버프 — 이름마다 못박아 둔다. 운에 맡기지 않는다.
+//
+//   열쇠는 itemBuffs 가 쓰는 것과 같다 (buff24.js 의 KEYS).
+//     pct 행운 배수 · bon 판정 · eva 회피 · gim 기믹 파훼 · resist 저항 · noPoll 오염 동결
+//
+//   공용시설(fac)·어둠 탐사(dark)는 일부러 뺐다. 그 둘은 count-cap.js 가
+//   「요리로 하루 다섯까지」로 묶어 두는데, 그 셈은 출처가 '식당 ★' 인 것만
+//   본다. 디저트로 주면 천장 밖에서 끝없이 쌓인다.
+const SWEET_BUFF = {
+    '과일 모찌':           [['pct', 120]],
+    '딸기 생크림 케이크':   [['bon', 2]],
+    '흑임자 단팥죽':        [['resist', 2]],
+    '우유 푸딩':           [['eva', 2]],
+    '약과 한 접시':         [['gim', 1]],
+    '쑥 인절미':           [['noPoll', 1]],
+    '버터 스콘':           [['pct', 80]],
+    '소금빵':              [['bon', 1], ['eva', 1]],
+    '흑설탕 호떡':          [['pct', 60], ['gim', 1]],
+    '달걀 카스텔라':        [['bon', 2], ['pct', 50]]
+};
+const BUFF_NAME = {
+    pct: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼',
+    resist: '저항', noPoll: '오염 동결'
+};
+function buffUnit(k) { return k === 'pct' ? '%' : ''; }
+function buffText(list) {
+    return (list || []).map(function (b) {
+        if (b[0] === 'noPoll') return '오염 동결';
+        return BUFF_NAME[b[0]] + ' +' + b[1] + buffUnit(b[0]);
+    }).join(' · ');
+}
 
 // ==========================================
 // 3. 요리 100가지를 짠다
@@ -132,12 +175,13 @@ const DISHES = [];
 (function build() {
     let id = 0;
     GRADES.forEach(function (g) {
-        ['good', 'mix', 'bad'].forEach(function (kind) {
+        ['good', 'mix', 'bad', 'sweet'].forEach(function (kind) {
             (NAMES[kind][g] || []).forEach(function (name) {
                 const r = rng(0x9E3779B9 ^ (id * 2654435761));
                 const need = MATS_BY_GRADE[g];
                 let mats;
                 if (kind === 'good') mats = pickSome(PLAIN_N, need, r);
+                else if (kind === 'sweet') mats = pickSome(SWEET_N, need, r);
                 else if (kind === 'bad') mats = pickSome(ODD_N, need, r);
                 else {
                     const odd = Math.max(1, Math.floor(need / 2));
@@ -145,7 +189,10 @@ const DISHES = [];
                 }
 
                 const eff = {};
-                if (kind === 'good') {
+                if (kind === 'sweet') {
+                    // 디저트 — 포만감도 오염도도 안 건드린다. 버프 하나만.
+                    eff.buff = SWEET_BUFF[name] || [['pct', 50]];
+                } else if (kind === 'good') {
                     // 반은 포만감, 반은 오염도
                     if (id % 2 === 0) eff.sat = band(5, 60, g, r);
                     else eff.cure = band(10, 40, g, r);
@@ -175,6 +222,7 @@ function dishByName(n) {
 }
 function effText(d) {
     const e = d.eff, out = [];
+    if (e.buff) out.push(buffText(e.buff) + ' (24시간)');
     if (e.sat) out.push('포만감 +' + e.sat);
     if (e.cure) out.push('오염도 -' + e.cure + '%');
     if (e.poll) out.push('오염도 +' + e.poll + '%');
@@ -198,8 +246,9 @@ function effText(d) {
         d.price = worth;
         ITEM_CATALOG[d.name] = { price: worth, usable: true, targetable: false,
             effect: 'food_dish', dish: d.id, foodDish: true,
-            desc: '[' + d.grade + '등급 요리] ' + effText(d) };
-        if (d.grade === 'S') {
+            desc: (d.kind === 'sweet' ? '[S등급 디저트] ' : '[' + d.grade + '등급 요리] ') + effText(d)
+                + (d.kind === 'sweet' ? ' — 늘 같은 것이 붙는다.' : '') };
+        if (d.grade === 'S' && d.kind !== 'sweet') {
             ITEM_CATALOG[d.name + ' ★'] = { price: worth, usable: true, targetable: false,
                 effect: 'food_dish', dish: d.id, foodDish: true, star: true,
                 desc: '[S등급 요리 ★] ' + effText(d) + ' · 그 밖에 무언가가 더 붙어 있다.' };
@@ -531,7 +580,8 @@ function finishCook(d, ok) {
         made = FAIL_ITEM;
         addHistoryLog(currentUser, '[식당] ' + d.name + ' 실패');
     } else {
-        const star = (d.grade === 'S' && Math.random() < 0.5);
+        // 디저트는 ★ 를 안 굴린다 — 버프가 이미 못박혀 있어 두 번 받는 꼴이 된다
+        const star = (d.grade === 'S' && d.kind !== 'sweet' && Math.random() < 0.5);
         made = star ? (d.name + ' ★') : d.name;
         const s = stat();
         s.ok = (s.ok || 0) + 1;
@@ -587,6 +637,7 @@ function eatDish(itemName) {
         msg.push('오염도 +' + e.poll + '%');
     }
 
+    if (e.buff) msg.push(eatBuff(e.buff));
     if (star) msg.push(rareBonus());
 
     if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, itemName, 1);
@@ -596,6 +647,29 @@ function eatDish(itemName) {
     if (typeof updateUI === 'function') updateUI();
     showCustomAlert(itemName + '\n\n' + msg.filter(Boolean).join('\n'));
     return true;
+}
+
+// 디저트 — 못박아 둔 버프를 그대로 건다 (24시간)
+//
+//   buff24.js 가 ibAdd 를 가로채 이 열쇠들을 24시간으로 맞춘다.
+//   출처를 '식당 디저트' 로 두어 ★ 몫(식당 ★)과 따로 센다 — 요리 천장은
+//   그쪽만 보므로 섞이면 셈이 틀린다.
+function eatBuff(list) {
+    const HOUR = 3600 * 1000;
+    const got = [];
+    (list || []).forEach(function (b) {
+        try {
+            if (typeof ibAdd === 'function') ibAdd(currentUser, b[0], b[1], 24 * HOUR, '식당 디저트');
+        } catch (e) { }
+        got.push(b[0] === 'noPoll' ? '오염 동결' : (BUFF_NAME[b[0]] + ' +' + b[1] + buffUnit(b[0])));
+    });
+    try {
+        if (typeof appendBadgeNoteToUser === 'function') {
+            appendBadgeNoteToUser(currentUser, '[디저트] ' + got.join(' · ') + ' (24시간)');
+        }
+    } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ itemBuffs: 1, badge: 1 }); } catch (e) { }
+    return '🍰 ' + got.join(' · ') + ' (24시간)';
 }
 
 // S 등급 ★ — 공용시설 · 어둠 탐사 · 행운 중 한둘
@@ -917,6 +991,7 @@ window.foodState = function () {
     console.table(GRADES.map(function (g) {
         return { 등급: g, 재료수: MATS_BY_GRADE[g],
             평범만: by[g + '/good'] || 0, 섞음: by[g + '/mix'] || 0, 괴상만: by[g + '/bad'] || 0,
+            디저트: by[g + '/sweet'] || 0,
             눈금: MINI[g].zone + '% · ' + MINI[g].rounds + '번' };
     }));
     if (!currentUser) return;
@@ -941,7 +1016,7 @@ window.foodDish = function (id) {
     console.log('%c' + d.name + ' (' + d.grade + '등급)', 'color:' + GCOLOR[d.grade] + '; font-size:13px');
     console.log('  재료:', d.mats.join(' · '));
     console.log('  효과:', effText(d));
-    console.log('  유형:', { good: '평범만', mix: '섞음', bad: '괴상만' }[d.kind]);
+    console.log('  유형:', { good: '평범만', mix: '섞음', bad: '괴상만', sweet: '디저트' }[d.kind]);
 };
 window.FOOD_DISHES = DISHES;
 
