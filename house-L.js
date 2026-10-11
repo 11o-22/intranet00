@@ -146,20 +146,54 @@ function ghost(u) {
     const rh = r.house || {};
     return rh.roomie !== u.code;               // 상대는 나를 안 가리킨다
 }
+// ★ 남의 기록을 **내 화면의 사본**으로 판단하면 안 된다.
+//
+//   ghost() 는 db.users[상대] 를 본다. 그런데 db.users 는
+//     · 들어온 뒤 몇 초에 걸쳐 한 사람씩 차오르고 (child_added),
+//     · 바뀔 때도 한 사람씩 들어온다 (child_changed).
+//   그래서
+//     · 막 들어와 상대 기록이 아직 안 온 동안   → r 이 없어 「유령」으로 보이고
+//     · 월요일 0시 재배정 직후 두 쪽 갱신 사이  → 짝이 어긋나 보였다.
+//   (doAssign 은 두 사람을 한 번에 쓰므로 서버는 멀쩡한데, 내 화면만 묵은 것이다)
+//
+//   그 6초 시계가 그 틈에 걸리면 **방금 정해진 짝을 제 손으로 지웠다.**
+//   룸메가 자정과 상관없는 때에 혼자 없어지던 까닭이다.
+//
+//   그래서 치우기 전에 **서버에 한 번 물어본다.** 들어온 지 얼마 안 됐으면
+//   아예 보지 않는다.
+const BOOT_AT = Date.now();
+const SETTLE = 30000;          // 들어온 뒤 30초는 건드리지 않는다
+let asking = false;
+
 function wipeGhost() {
-    if (!currentUser || !currentUser.house) return;
+    if (!currentUser || !currentUser.house || !currentUser.house.roomie) return;
+    if (Date.now() - BOOT_AT < SETTLE) return;
+    if (asking) return;
     if (!ghost(currentUser)) return;
     // 상담사가 일부러 데려온 사람이면 지우지 않는다
     if (isAdmin(currentUser) && currentUser.house.roomie === guestCode) return;
+    if (typeof database === 'undefined' || !database) return;
 
     const was = currentUser.house.roomie;
-    currentUser.house.roomie = null;
-    wiped++;
-    console.log('[사택] 한쪽만 남은 동거인(' + was + ')을 치웠습니다.');
-    if (typeof database !== 'undefined' && database) {
-        database.ref('users/' + currentUser.code + '/house/roomie').set(null);
-    }
-    if (typeof renderHouse === 'function') { try { renderHouse(); } catch (e) { } }
+    const me = currentUser.code;
+    asking = true;
+    database.ref('users/' + was + '/house/roomie').once('value').then(function (s) {
+        asking = false;
+        if (!currentUser || currentUser.code !== me) return;
+        if (currentUser.house.roomie !== was) return;      // 그 사이에 바뀌었다
+        if (s.val() === me) {                              // 서버에서는 멀쩡하다
+            if ((db.users || {})[was]) {                   // 내 사본만 묵었던 것 — 맞춰 둔다
+                db.users[was].house = db.users[was].house || {};
+                db.users[was].house.roomie = me;
+            }
+            return;
+        }
+        currentUser.house.roomie = null;
+        wiped++;
+        console.log('[사택] 한쪽만 남은 동거인(' + was + ')을 치웠습니다. (서버로 확인함)');
+        database.ref('users/' + me + '/house/roomie').set(null);
+        if (typeof renderHouse === 'function') { try { renderHouse(); } catch (e) { } }
+    }).catch(function () { asking = false; });
 }
 setInterval(function () { try { wipeGhost(); } catch (e) { } }, 6000);
 

@@ -98,6 +98,25 @@ function weekKey(ms) {
     const p = function (n) { return (n < 10 ? '0' : '') + n; };
     return mon.getUTCFullYear() + '-' + p(mon.getUTCMonth() + 1) + '-' + p(mon.getUTCDate());
 }
+// ★ 찌름·확정이 **쓰이는** 주 — 다가오는 월요일
+//
+//   찌름권·확정권은 주말에만 판다. 그런데 찌름을 적을 때는 weekKey() 를 썼다.
+//   토·일은 **이번 주**(지난 월요일) 열쇠다. 그 찌름을 쓰는 배정은 월요일 0시에
+//   돌면서 그날의 weekKey() — 곧 **다음 월요일** 열쇠로 읽는다.
+//
+//       토요일에 찌름  →  roomPoke/2026-10-05 에 적힘
+//       월요일 0시 배정 →  roomPoke/2026-10-12 를 읽음   ← 비어 있다
+//
+//   그래서 **모든 찌름과 확정이 통째로 무시되고** 짝이 아무렇게나 정해졌다.
+//   「월요일 0시 배정에 반영됩니다」라고 알려 주면서 반영되지 않았다.
+//   적을 때도 읽을 때와 같은 열쇠를 쓰게 한다.
+function nextMonKey() {
+    const d = kst();
+    const day = (d.getUTCDay() + 6) % 7;         // 월요일 = 0
+    const toMon = (7 - day) % 7 || 7;            // 다가오는 월요일까지 (월요일이면 다음 주)
+    return weekKey(nowMs() + toMon * 86400000);
+}
+
 function isWeekend() {
     const d = kst().getUTCDay();
     return d === 0 || d === 6;                   // 일 · 토
@@ -173,7 +192,10 @@ function resolvePairs(codes, pokes, confirms, shuffleFn) {
     return { pairs: pairs, alone: (rest.length % 2) ? rest[rest.length - 1] : null };
 }
 
-window._roomRules = { weekKey: weekKey, pokeOK: pokeOK, resolvePairs: resolvePairs };
+window._roomRules = { weekKey: weekKey, nextMonKey: nextMonKey, pokeOK: pokeOK,
+                      resolvePairs: resolvePairs,
+                      pokePath: function () { return 'roomPoke/' + nextMonKey(); },
+                      assign: function (wk) { return doAssign(wk || weekKey()); } };
 
 // ==========================================
 // 사번 적는 칸 — 모바일에서 prompt() 가 막히는 곳이 있어 직접 만든다
@@ -361,8 +383,9 @@ function nameOf(c) {
     return (u && u.name) || c;
 }
 
-function pokeRef() { return database.ref('roomPoke/' + weekKey()); }
-function lockRef() { return database.ref('roomConfirm/' + weekKey()); }
+// 적는 자리 = 읽는 자리 = 다가오는 월요일 (위 nextMonKey 의 까닭)
+function pokeRef() { return database.ref('roomPoke/' + nextMonKey()); }
+function lockRef() { return database.ref('roomConfirm/' + nextMonKey()); }
 
 // cb(true) 면 티켓을 쓴다
 function usePoke(cb) {
@@ -634,7 +657,7 @@ let pokeData = null, lockData = null, watchWeek = '';
 (function watchPokes() {
     function tick() {
         if (!currentUser || typeof database === 'undefined' || !database) return;
-        const wk = weekKey();
+        const wk = nextMonKey();            // 보여 주는 것도 쓰일 주로
         if (watchWeek === wk) return;
         if (watchWeek) {                                  // 주가 넘어갔다 — 옛 귀를 뗀다
             try { database.ref('roomPoke/' + watchWeek).off(); } catch (e) { }
@@ -693,7 +716,7 @@ function paintPoke() {
 
     const d = daysLeft();
     body += '<div style="color:#777; font-size:10px; margin-top:7px;">다음 배정까지 '
-         + (d === 1 ? '오늘 자정' : d + '일') + ' · 이번 주 찌른 사원 '
+         + (d === 1 ? '오늘 자정' : d + '일') + ' · 그 배정에 찌른 사원 '
          + Object.keys(pokeData).length + '명</div>';
 
     if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser)) {
@@ -726,8 +749,9 @@ function paintPoke() {
 // ==========================================
 window.roomState = function () {
     if (typeof database === 'undefined' || !database) return;
-    const wk = weekKey();
-    console.log('%c===== 룸메 ' + wk + ' 주 =====', 'color:#ff8fb1; font-size:13px');
+    const wk = nextMonKey();
+    console.log('%c===== 룸메 — ' + wk + ' 월요일 배정에 쓰일 것 =====', 'color:#ff8fb1; font-size:13px');
+    console.log('  (지금 주 열쇠는 ' + weekKey() + ' 입니다)');
     Promise.all([
         database.ref('roomPoke/' + wk).once('value'),
         database.ref('roomConfirm/' + wk).once('value'),
@@ -755,7 +779,7 @@ window.roomState = function () {
 
 window.roomPreview = function () {
     if (typeof database === 'undefined' || !database) return;
-    const wk = weekKey();
+    const wk = nextMonKey();
     Promise.all([
         database.ref('roomPoke/' + wk).once('value'),
         database.ref('roomConfirm/' + wk).once('value')
