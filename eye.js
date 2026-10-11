@@ -266,12 +266,31 @@ let chosen = {};
 function body_() {
     try { return (typeof darkBodyEl === 'function') ? darkBodyEl() : null; } catch (e) { return null; }
 }
+// ★ 같은 내용이면 손대지 않는다
+//
+//   예전에는 data-h 를 **읽기만 하고 쓰지는 않아서** 늘 어긋났다. 그래서
+//   1.2초마다 이 칸을 통째로 갈아 끼웠는데, index.html 이 #dro-body 의
+//   자식이 바뀔 때마다 0.6초 동안 버튼 누름을 삼키게 해 두었다.
+//   결과 — 눈을 차고 어둠에 들어가면 선택지를 여러 번 눌러야 했다.
+//   이제는 내용이 같으면 아예 건드리지 않는다.
+function sig_(s) {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) | 0;
+    return String(h >>> 0);
+}
 function put(html) {
     const b = body_();
     if (!b) return;
+    const h = sig_(html);
+    const tagged = html.replace('<div id="' + BOX + '"', '<div id="' + BOX + '" data-h="' + h + '"');
     const old = document.getElementById(BOX);
-    if (old) { if (old.getAttribute('data-h') === html) return; old.outerHTML = html; }
-    else b.insertAdjacentHTML('beforeend', html);
+    if (old) {
+        if (old.getAttribute('data-h') === h) return;       // 그대로다
+        if (old.parentNode !== b) { old.remove(); b.insertAdjacentHTML('beforeend', tagged); return; }
+        old.outerHTML = tagged;
+        return;
+    }
+    b.insertAdjacentHTML('beforeend', tagged);
 }
 function clearBox() { const o = document.getElementById(BOX); if (o) o.remove(); }
 function wrap(inner) {

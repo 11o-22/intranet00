@@ -11180,12 +11180,43 @@ if (bathModal) bathModal.style.display = 'none';
     }
 
         // ★ 어둠 탐사 화면 — 화면이 바뀐 직후 0.6초간 버튼 입력 무시 (연타·겹쳐 누르기 방지)
+    //
+    //   예전에는 #dro-body 의 자식이 바뀌기만 하면 무조건 0.6초를 걸었다.
+    //   곁칸(눈·바이올린·K.LEE 같은 것)이 제 시계로 제 칸을 다시 그릴 때마다
+    //   그 0.6초가 새로 걸려서, 선택지를 여러 번 눌러야 하는 일이 생겼다.
+    //   이제는 **선택지 자체가 바뀌었을 때만** 건다.
     (function () {
         const dro = document.getElementById('dro-body');
         if (!dro) return;
         let lockUntil = 0;
-        new MutationObserver(() => { lockUntil = Date.now() + 600; })
-            .observe(dro, { childList: true });
+        let sig = null;
+        let queued = false;
+
+        function btnSig() {
+            const bs = dro.querySelectorAll('button');
+            let out = dro.children.length + '|';
+            for (let i = 0; i < bs.length; i++) {
+                out += (bs[i].getAttribute('onclick') || '') + '\u0001'
+                     + (bs[i].textContent || '') + '\u0002';
+            }
+            return out;
+        }
+        function look() {
+            queued = false;
+            let now;
+            try { now = btnSig(); } catch (e) { return; }
+            if (sig === null) { sig = now; return; }   // 처음 본 것
+            if (now === sig) return;                   // 곁칸만 바뀌었다 — 안 막는다
+            sig = now;
+            lockUntil = Date.now() + 600;
+        }
+
+        new MutationObserver(() => {
+            if (queued) return;
+            queued = true;
+            Promise.resolve().then(look);
+        }).observe(dro, { childList: true, subtree: true });
+
         dro.addEventListener('click', e => {
             if (Date.now() < lockUntil && e.target.closest('button')) {
                 e.stopPropagation();
