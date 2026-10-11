@@ -1526,6 +1526,62 @@ function renderS003Vote(n) {
     mountDarkChat('normal');
 }
 
+// ==========================================
+// 마지막 장 — 보정과 DC
+// ==========================================
+//
+//   ★ 여기만 다른 판정과 셈이 달랐다.
+//
+//   이 구역의 다른 판정은 전부 s003KindBonus(kind) 를 쓴다. 그 안에
+//   전용 장비의 속성(응시·회피·돌파·행운)이 들어 있다. 그런데 마지막
+//   장만 rollDarkBonus('sense') 를 바로 불러서 **응시가 통째로 빠졌다.**
+//   거기에 이해도 몫(최대 −6)까지 혼자 더 깎는다.
+//
+//   그래서 보정이 쉽게 0 아래로 내려갔고, 주사위는 스물까지밖에 없으니
+//       ① 적힌 대로  DC 20 → 보정이 0 미만이면 **아무 눈도 안 통한다**
+//       ② 빈칸       DC 24 → 보정 4 미만이면 아무 눈도 안 통한다
+//   가 되었다. 「무엇을 골라도 죽는다」는 말이 이것이다.
+//
+//   그리고 DC 가 이 구역의 다른 판정과 견주어 너무 높았다.
+//
+//     구역 안의 다른 판정   s003DC(base) = base + 6, zone-hard.js 가 +3 → base + 9
+//                           끌려간 장 base 10~12 → DC 19~21
+//                           **빗나가도 안 죽는다** (이해도·오염만 오른다)
+//     마지막 장             DC 20 / 24 / 18
+//                           **빗나가면 죽는다.** 동료 보정(+8)도 없다.
+//
+//   유일하게 죽는 판정인데 DC 가 안 죽는 판정과 같았다. 그래서 더한 몫을
+//   6 에서 3 으로 내렸다 (DC 17 / 21 / 15). s003DC 를 안 거치므로
+//   zone-hard.js 의 +3 은 여기에 안 붙는다.
+//
+//   고친 것 —
+//     · 다른 판정과 같이 s003KindBonus('sense') 를 쓴다 (응시가 들어간다)
+//     · 이해도 몫은 −5 에서 멈춘다
+//     · 더하는 몫 +6 → +3 (DC 17 / 21 / 15)
+//     · 20 이 뜨면 언제나 통한다 — 어떤 자리에서도 길이 아주 막히지는 않는다
+//     · ③ 이 빗나가면 ① 의 죽는 글이 나왔다 — 밑으로 흘러서다. 제 글을 준다.
+//     · 눈·보정·DC·대략의 확률을 고르기 전에 단추에 적는다
+const S003_END_DC = { written: 14, blank: 18, true: 12 };
+const S003_END_ADD = 3;
+
+function s003EndBonus() {
+    const lore = getLore();
+    const pages = (darkRun.talePages || []).length;
+    let b = s003KindBonus('sense') - Math.min(5, Math.floor(lore / 12)) + pages;
+    if (darkRun.s003Stayed) b -= 8;
+    if (darkRun.s003Ending && darkRun.s003Ending === darkRun.taleRole) b += 3;
+    return b;
+}
+function s003EndDC(pick) { return S003_END_DC[pick] + S003_END_ADD; }
+
+// 스물 가운데 몇 눈이 통하나 (1 은 언제나 실패, 20 은 언제나 성공)
+function s003EndOdds(pick) {
+    const need = s003EndDC(pick) - s003EndBonus();
+    let n = 0;
+    for (let r = 2; r <= 19; r++) if (r >= need) n++;
+    return Math.round((n + 1) / 20 * 100);
+}
+
 function renderS003Ending() {
     // 결말 장에서는 흩어진 상태를 푼다
     if (darkRun.solo && !darkRun.s003Lair) s003SetSolo(false);
@@ -1545,33 +1601,54 @@ function renderS003Ending() {
             찢어진 장 <b style="color:${trueEnd ? '#d4af37' : '#888'};">${pages}</b> / ${S003_PAGE_TOTAL}
             ${trueEnd ? '<br><span style="color:#d4af37;">— 다른 결말이 열려 있다.</span>' : ''}
          </div>`,
-        loreBarHtml() +
-        darkChoiceBtn("① 적힌 대로 끝낸다.", "s003EndPick('written')") +
-        darkChoiceBtn("② 빈칸으로 걸어 들어간다.", "s003EndPick('blank')") +
-        (trueEnd ? darkChoiceBtn("③ 찢어진 장을 끼워 넣는다.", "s003EndPick('true')") : ''));
+        loreBarHtml() + s003EndBtn('written', '① 적힌 대로 끝낸다.')
+        + s003EndBtn('blank', '② 빈칸으로 걸어 들어간다.')
+        + (trueEnd ? s003EndBtn('true', '③ 찢어진 장을 끼워 넣는다.') : ''));
     renderLoreBar();
     mountDarkChat('normal');
 }
 
-function s003EndPick(pick) {
-    const lore = getLore();
-    const pages = (darkRun.talePages || []).length;
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
-    // 장 수가 두 배가 되었으므로 장당 보정은 절반 (기존과 같은 최대치)
-    let bonus = rollDarkBonus('sense') - Math.floor(lore / 12) + pages;
-    if (darkRun.s003Stayed) bonus -= 8;
-    if (darkRun.s003Ending && darkRun.s003Ending === darkRun.taleRole) bonus += 3;
+// 고르는 단추 — 눈·보정·DC 와 대강의 확률을 적어 둔다
+function s003EndBtn(pick, label) {
+    const b = s003EndBonus(), dc = s003EndDC(pick), odds = s003EndOdds(pick);
+    const col = odds >= 40 ? '#9fd0a6' : odds >= 20 ? '#ffb74d' : '#ff6b6b';
+    return '<button class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px;'
+        + ' text-align:left; font-size:12px; font-weight:normal;"'
+        + ' onclick="s003EndPick(\'' + pick + '\')">' + label
+        + '<div style="font-size:10px; color:#888; margin-top:4px;">'
+        + 'DC ' + dc + ' · 보정 ' + (b >= 0 ? '+' : '') + b
+        + ' · <span style="color:' + col + ';">대략 ' + odds + '%</span></div></button>';
+}
 
-    const DC = { written: 14, blank: 18, true: 12 }[pick] + 6;
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+function s003EndPick(pick) {
+    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const bonus = s003EndBonus();
+    const DC = s003EndDC(pick);
+    // 20 은 언제나 통한다 — 어떤 자리에서도 길이 아주 막히지는 않게
+    const ok = roll !== 1 && (roll === 20 || (roll + bonus) >= DC);
+    darkRun.log.push('[마지막 장] ' + pick + ' d20 ' + roll + '(' + (bonus >= 0 ? '+' : '') + bonus
+        + ') vs DC' + DC + ' — ' + (ok ? '나감' : '남음'));
 
     darkRun.s003Route = pick;
+
+    // ★ 전에는 ③ 이 실패하면 ①(적힌 대로)의 죽는 글이 나왔다 — 밑으로 흘러서다
+    if (pick === 'true' && !ok) {
+        darkDeath(
+            s003Dice(roll, bonus, DC, false) +
+            `찢어진 장을 제자리에 끼우려는데, 자리가 맞지 않는다.<br><br>` +
+            `한 장을 밀어 넣으면 다른 장이 밀려 나온다.<br>` +
+            `열 장이 들어갈 자리는 아홉 장뿐이었다.<br><br>` +
+            `모자란 한 장을 책이 어디서 채웠는지,<br>` +
+            `<span style="color:#d4af37;">덮인 책의 마지막 장에 적혀 있었다.</span>`
+        );
+        return;
+    }
 
     if (pick === 'true' && ok) {
         darkRun.success += 5;
         darkRun.critical = true;
         darkBodyEl().innerHTML = darkBox("— 끼워 넣음",
-            `<div style="text-align:center; font-size:26px; font-weight:bold; color:#d4af37; margin-bottom:12px;">🎲 ${roll}</div>
+            `${s003Dice(roll, bonus, DC, true)}
              찢어진 장을 제자리에 끼운다.<br><br>
              열 장이 맞물리자 문장이 다시 읽힌다.<br>
              원래 이야기가 아니다. 원래 이야기였던 것이다.<br><br>
@@ -1589,7 +1666,7 @@ function s003EndPick(pick) {
         if (ok) {
             darkRun.success += 3;
             darkBodyEl().innerHTML = darkBox("— 빈칸",
-                `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll}</div>
+                `${s003Dice(roll, bonus, DC, true)}
                  색이 없는 쪽으로 걸었다.<br><br>
                  몇 걸음 만에 발소리가 안 난다. 소리가 적히지 않는 곳이라서다.<br>
                  계속 걷는다. 걷는다는 말도 여기서는 안 맞는다.<br><br>
@@ -1599,6 +1676,7 @@ function s003EndPick(pick) {
             mountDarkChat('normal');
         } else {
             darkDeath(
+                s003Dice(roll, bonus, DC, false) +
                 `색이 없는 쪽으로 걸었다.<br><br>` +
                 `몇 걸음 만에 발소리가 멎고, 그다음에 발이 멎는다.<br>` +
                 `적히지 않은 곳에서는 움직임도 적히지 않는다.<br><br>` +
@@ -1612,7 +1690,7 @@ function s003EndPick(pick) {
     if (ok) {
         darkRun.success += 2;
         darkBodyEl().innerHTML = darkBox("— 끝",
-            `<div style="text-align:center; font-size:26px; font-weight:bold; color:#4CAF50; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>
+            `${s003Dice(roll, bonus, DC, true)}
              적힌 대로 끝냈다.<br><br>
              마지막 문장이 완성되고, 그 뒤에 마침표가 찍힌다.<br>
              마침표가 찍히는 순간 주변이 접힌다.<br><br>
@@ -1621,6 +1699,7 @@ function s003EndPick(pick) {
         mountDarkChat('normal');
     } else {
         darkDeath(
+            s003Dice(roll, bonus, DC, false) +
             `적힌 대로 끝내려는데, 적힌 것이 바뀐다.<br><br>` +
             `읽을 때마다 다르다. 따라가려니 따라갈 수가 없다.<br><br>` +
             `마침표가 엉뚱한 자리에 찍혔다.<br>` +
