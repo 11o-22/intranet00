@@ -105,7 +105,7 @@ const NAMES = {
     },
     // ★ S 등급 디저트 — 평범한 재료만 쓰는 단것. 버프 하나만 준다.
     sweet: {
-        S: ['과일 모찌', '딸기 생크림 케이크', '흑임자 단팥죽', '우유 푸딩', '약과 한 접시',
+        S: ['과일 모찌', '딸기 생크림 케이크', '흑임자 단팥죽', '커스터드 푸딩', '약과 한 접시',
             '쑥 인절미', '버터 스콘', '소금빵', '흑설탕 호떡', '달걀 카스텔라']
     }
 };
@@ -122,7 +122,7 @@ const SWEET_BUFF = {
     '과일 모찌':           [['pct', 120]],
     '딸기 생크림 케이크':   [['bon', 2]],
     '흑임자 단팥죽':        [['resist', 2]],
-    '우유 푸딩':           [['eva', 2]],
+    '커스터드 푸딩':        [['eva', 2]],
     '약과 한 접시':         [['gim', 1]],
     '쑥 인절미':           [['noPoll', 1]],
     '버터 스콘':           [['pct', 80]],
@@ -241,6 +241,15 @@ function effText(d) {
             desc: '[재료] 행복 식당에서 요리에 쓴다.' };
     });
     DISHES.forEach(function (d) {
+        // ★ 이미 있는 물품을 덮지 않는다
+        //   예전에 '우유 푸딩' 이 상점 물품과 이름이 같아, 상점에서 산 것까지
+        //   디저트 효과로 바뀌어 버렸다. 같은 이름이 보이면 등록하지 않고
+        //   콘솔에 적어 둔다 — 조용히 바뀌는 것이 제일 나쁘다.
+        if (ITEM_CATALOG[d.name] && !ITEM_CATALOG[d.name].foodDish) {
+            console.warn('[식당] 이름이 이미 쓰이고 있어 건너뜁니다 —', d.name);
+            d.clash = true;
+            return;
+        }
         // 값은 들어간 재료의 6할 — 팔 수도 있게 해 둔다
         const worth = Math.round(d.mats.reduce(function (a, m) { return a + (MAT_PRICE[m] || 0); }, 0) * 0.6);
         d.price = worth;
@@ -271,6 +280,16 @@ function stat() {
     if (!currentUser.cookStat) currentUser.cookStat = { ok: 0, hi: 0 };
     return currentUser.cookStat;
 }
+// 디저트는 하루 하나 — 실패해도 하루를 쓴 것으로 친다 (재료가 이미 들어갔다)
+function today_() {
+    try { if (typeof getTodayStr === 'function') return getTodayStr(); } catch (e) { }
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+        + '-' + String(d.getDate()).padStart(2, '0');
+}
+function sweetLeft() { return stat().sweetDay !== today_(); }
+function sweetUse() { stat().sweetDay = today_(); }
+
 function isCook(u) {
     u = u || currentUser;
     if (!u) return false;
@@ -564,12 +583,18 @@ window.foodCook = function (id) {
             + 'A 등급 이상을 ' + HI_NEED + '번 성공하면 받습니다. (지금 ' + (stat().hi || 0) + '번)');
         return;
     }
+    if (d.clash) { showCustomAlert('이 이름은 다른 물품이 쓰고 있습니다.'); return; }
+    if (d.kind === 'sweet' && !sweetLeft()) {
+        showCustomAlert('디저트는 하루에 하나만 만들 수 있습니다.\n\n자정이 지나면 다시 됩니다.');
+        return;
+    }
     if (!haveAll(d)) { showCustomAlert('재료가 모자랍니다.'); return; }
 
     miniOpen(d, function (ok) { finishCook(d, ok); });
 };
 
 function finishCook(d, ok) {
+    if (d.kind === 'sweet') sweetUse();          // 실패해도 하루를 쓴다
     // 재료는 성공하든 실패하든 들어간다
     d.mats.forEach(function (m) {
         if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, m, 1);
@@ -838,7 +863,8 @@ function dishCard(d, showBtn) {
     const made = bk[d.id] || 0;
     const ok = haveAll(d);
     const locked = (d.grade === 'S' && !isCook(currentUser));
-    const can = ok && !locked;
+    const noSweet = (d.kind === 'sweet' && !sweetLeft());
+    const can = ok && !locked && !noSweet && !d.clash;
     return '<div style="border:1px solid ' + (can ? GCOLOR[d.grade] + '66' : '#2a2a2a') + ';'
         + ' border-left:3px solid ' + GCOLOR[d.grade] + '; border-radius:6px; padding:11px;'
         + ' margin-bottom:8px; background:rgba(0,0,0,0.25);' + (can ? '' : ' opacity:0.72;') + '">'
@@ -860,6 +886,8 @@ function dishCard(d, showBtn) {
         + '</div>'
         + (locked ? '<div style="font-size:10px; color:#ff8a65; margin-top:6px;">['
             + COOK_TITLE + '] 칭호가 있어야 만들 수 있습니다.</div>' : '')
+        + (noSweet ? '<div style="font-size:10px; color:#c9a227; margin-top:6px;">'
+            + '디저트는 하루에 하나입니다. 자정이 지나면 다시 됩니다.</div>' : '')
         + (showBtn ? (can
             ? '<button class="game-btn" style="width:100%; margin:9px 0 0 0; padding:9px; font-size:11px;'
               + ' background:linear-gradient(145deg,#7f5a00,#4a3300) !important;'
@@ -867,7 +895,11 @@ function dishCard(d, showBtn) {
               + ' onclick="foodCook(' + d.id + ')">만든다</button>'
             : '<button class="game-btn" style="width:100%; margin:9px 0 0 0; padding:9px; font-size:11px;'
               + ' background:#161616 !important; border-color:#333 !important; color:#8a8a8a !important;'
-              + ' cursor:default;" disabled>' + (locked ? '칭호가 필요합니다' : '재료가 모자랍니다')
+              + ' cursor:default;" disabled>'
+              + (locked ? '칭호가 필요합니다'
+                 : noSweet ? '오늘은 다 만들었습니다'
+                 : d.clash ? '이름이 겹칩니다'
+                 : '재료가 모자랍니다')
               + '</button>') : '')
         + '</div>';
 }
