@@ -184,7 +184,9 @@ function oneView(id) {
         + line('등급', g + ' <span style="color:#6f685e;">(최고 S)</span>')
         + line('능력치', gi >= 2
             ? esc(P().statText(p.st))
-            : '<span style="color:#8d8578;">— B 등급부터 생깁니다</span>')
+            : '<span style="color:#8d8578;">없음</span>'
+              + ' <span style="color:#5f594f;">(B 등급이 되면 '
+              + esc(P().statText(p.st)) + ')</span>')
         + line('주의 문구', esc(P().WARN[p.w].n))
         + line('교감', P().bond(id, me) + ' / ' + P().BOND_MAX
             + (P().bondFull(id, me)

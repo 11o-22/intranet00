@@ -265,7 +265,8 @@ function reveal(p) {
         + '<div style="font-size:10px; color:#8d8578; line-height:1.7; border-top:1px solid #2a241c;'
         + ' border-bottom:1px solid #2a241c; padding:8px 0; margin-bottom:12px;">'
         + 'D 등급으로 깨어났습니다 (최고 S)<br>'
-        + '능력치는 B 등급부터 생깁니다 — ' + esc(P().statText(p.st)) + '</div>'
+        + '<span style="color:#6f685e;">지금은 능력치가 없습니다</span> — '
+        + 'B 등급이 되면 붙습니다 (' + esc(P().statText(p.st)) + ')</div>'
 
         + '<div style="font-size:11px; color:#e8d7b4; margin-bottom:5px;">이름을 붙여 주시겠습니까</div>'
         + '<input id="ph-in" type="text" maxlength="' + max + '" inputmode="text"'
