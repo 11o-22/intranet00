@@ -2917,7 +2917,16 @@ function renderAdvanceWait(nextStep) {
     const check = () => {
         if (finished || !darkRun) return;
         const p = darkParties[pid] || {};
-        const solo = (darkRun.zone === 'Qtrew-A-214') ? {} : (p.solo || {});
+        let solo = (darkRun.zone === 'Qtrew-A-214') ? {} : (p.solo || {});
+        // ★ B-330 에서 바닥 아래로 떨어진 사람은 renderSoloStep 으로 아예 다른
+        //   길을 걷는다. partyAdvance 를 부르지 않으므로 세고 있으면 걸음마다
+        //   제한 시간(90초)을 꽉 채우고 넘어간다. 그 쪽 화면이 solo 를 적기
+        //   전이어도 누가 떨어졌는지는 collapse 에 이미 적혀 있으므로 같이 뺀다.
+        if (darkRun.zone === 'Qtrew-B-330' && p.collapse && p.collapse.victim
+            && Date.now() - Number(p.collapse.at || 0) < 60000) {   // 합류한 뒤까지 빼지 않게
+            solo = Object.assign({}, solo);
+            solo[p.collapse.victim] = true;
+        }
               const iAmSolo = (darkRun.zone === 'Qtrew-A-214')
                   ? false : (darkRun.solo || !!solo[currentUser.code]);
         const group = iAmSolo

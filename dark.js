@@ -995,10 +995,19 @@ function renderStepB330() {
     const body = darkBodyEl();
     if (!body || !darkRun) return;
     if (darkRun.isParty) watchDyingMembers();
-    if (darkRun.solo) { renderSoloStep(); return; }
 
     const def = B330_STEPS[darkRun.step];
-    if (!def) { renderDarkResult(); return; }
+
+    // ★ 끝난 판은 혼자든 아니든 결과로 간다.
+    //
+    //   전에는 단독 쪽으로 **먼저** 보냈다. 그래서 바닥이 꺼져 떨어진 사람은
+    //   기믹 7 을 넘기고 「빠져나간다」를 눌러 step 을 99 로 올려도
+    //       renderStepB330 → darkRun.solo → renderSoloStep → step>=21 → b330Gimmick7
+    //   로 되돌아가, 마지막 기믹을 영영 되풀이하며 끝낼 수가 없었다.
+    //   떨어지는 사람은 판마다 반드시 한 명 나오므로 매번 생겼다.
+    if (!def || def.type === 'result') { renderDarkResult(); return; }
+
+    if (darkRun.solo) { renderSoloStep(); return; }
 
     if (def.type === 'rescue') { (def.n === 1 ? b330Rescue1() : b330Rescue2()); return; }
 
@@ -1202,10 +1211,16 @@ function renderStepB330() {
 
         // 합류 지점에 도달했으면 합류 시도
         const def = B330_STEPS[darkRun.step];
-        if (def && def.type === 'rejoinpoint') { renderB330Rejoin(); return; }
+        if (!def || def.type === 'result') { renderDarkResult(); return; }   // ★ 끝났다
+        if (def.type === 'rejoinpoint') { renderB330Rejoin(); return; }
 
         if (darkRun.step >= 21) {
-            darkRun.modifier = (darkRun.modifier || 0) - 2;   // 혼자라 불리
+            // ★ 불리한 몫은 한 번만 깎는다.
+            //   화면이 다시 그려질 때마다 깎여서 끝 판정이 점점 불가능해졌다.
+            if (!darkRun._soloLast) {
+                darkRun._soloLast = true;
+                darkRun.modifier = (darkRun.modifier || 0) - 2;   // 혼자라 불리
+            }
             b330Gimmick7();
             return;
         }
@@ -1253,7 +1268,21 @@ const isRejoin = def && def.type === 'rejoinpoint';
 
 const pp = darkParties[darkRun.partyId];
 const partyStep = (pp && pp.curStep) || 0;
-const capped = Math.min(nextStep, Math.max(partyStep, darkRun.step));
+
+// ★ 혼자 걷는 사람은 제 걸음으로 나아간다. 본대가 앞서 있으면 그 자리까지 당긴다.
+//
+//   전에는 Math.min(nextStep, Math.max(partyStep, darkRun.step)) 로 본대보다
+//   앞서지 못하게 막았다. 그런데 본대가 curStep 을 못 올리는 자리가 흔하다 —
+//     · 혼자 들어온 판 (curStep 을 쓰는 쪽이 아예 없다)
+//     · 남아 있던 사람이 다 죽은 판
+//     · 남아 있던 사람도 떨어져 나간 판
+//   그러면 capped === darkRun.step 이 되어 「더 갈 곳이 없다. 벽에 기대
+//   기다린다」만 되풀이하며 한 걸음도 못 갔다. 거기서 멎은 채 굶다가
+//   단독 점수가 깎여 죽는 것이 유일한 끝이었다.
+//
+//   본대를 기다리는 자리는 합류 지점이고 거기에는 시간 제한이 있으니,
+//   걸음 자체를 막을 까닭이 없다.
+const capped = Math.max(nextStep, Math.min(partyStep, 21));
 
 darkBodyEl().innerHTML = darkBox("단독 — 결과", txt,
     (capped > darkRun.step
@@ -2207,7 +2236,7 @@ function input119D(n) {
         if (done) {
             body.innerHTML = darkBox("기억",
                 `${data.q}<br><br><span style="color:${done === 'ok' ? '#4CAF50' : '#f44336'};">${done === 'ok' ? '기억하고 있었다.' : '기억나지 않았다.'}</span>`,
-                (darkRun.isLeader
+                ((darkRun.isLeader || !darkRun.isParty)    // ★ 혼자면 기다릴 선임이 없다
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
                                         : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
                          선임의 신호를 기다리는 중...<br>
@@ -2312,33 +2341,78 @@ function input119D(n) {
         }, 2200);
     }
 
+    // ★ 여기서 미로가 영영 멎었다 (단계 7)
+    //
+    //   ① 혼자 들어온 판에는 방이 없다. darkRun.isLeader 가 없으니 희생자를
+    //      적는 쪽을 건너뛰고, 그 다음 줄에서 darkParties/undefined/collapse 를
+    //      한 번 읽어 null 을 받는다. showCollapseResult(null) 은 맨 앞에서
+    //      그냥 돌아가므로 「발소리만 계속된다」 화면에 단추 하나 없이 남는다.
+    //   ② 파티에서도 났다. once('value') 는 **한 번만** 읽는다. 방장이 쓰기
+    //      전에 읽은 동료는 null 을 받고 그대로 멎는다. 다시 읽지 않는다.
+    //   ③ 방장이 그 사이 떨어져 나가거나 끊기면 아무도 쓰지 않는다.
+    //
+    //   그래서 — 혼자면 방을 거치지 않고 바로 나에게 일어나게 하고,
+    //   파티면 들어올 때까지 귀를 달아 두고, 스물다섯 초가 지나면 스스로 정한다.
     function triggerFloorCollapse() {
         const body = darkBodyEl();
         if (!body || !darkRun) return;
 
+        body.innerHTML = darkBox("—",
+            `<div style="text-align:center; font-size:26px; color:#666; letter-spacing:10px; padding:40px 0;">… … … … …</div>`,
+            `<div style="text-align:center; font-size:11px; color:#555;">발소리만 계속된다.</div>`);
+
+        // 혼자 걷는 판 — 떨어질 사람은 나 하나다
+        if (!darkRun.isParty || !database || !darkRun.partyId) {
+            setTimeout(function () {
+                showCollapseResult({ victim: currentUser.code, name: currentUser.name, at: Date.now() });
+            }, 700);
+            return;
+        }
+
+        const ref = database.ref(`darkParties/${darkRun.partyId}/collapse`);
+        const t0 = Date.now();
+
         // 방장이 희생자를 정한다
-        if (darkRun.isLeader && database) {
+        if (darkRun.isLeader) {
             const p = darkParties[darkRun.partyId];
             const alive = p && p.alive ? Object.keys(p.alive) : [currentUser.code];
-            const victim = alive[Math.floor(Math.random() * alive.length)];
-            database.ref(`darkParties/${darkRun.partyId}/collapse`).set({
+            const victim = alive[Math.floor(Math.random() * alive.length)] || currentUser.code;
+            ref.set({
                 victim: victim,
                 name: (p && p.members && p.members[victim]) ? p.members[victim].name : '누군가',
                 at: Date.now()
             });
         }
 
-        // 결과 대기
-        if (database) {
-            database.ref(`darkParties/${darkRun.partyId}/collapse`).once('value').then(sn => {
-                const c = sn.val();
-                setTimeout(() => showCollapseResult(c), 700);
-            });
-        }
+        let done = false, tm = null;
+        const fin = function (c) {
+            if (done) return;
+            done = true;
+            try { ref.off(); } catch (e) { }
+            clearTimeout(tm);
+            setTimeout(function () { showCollapseResult(c); }, 700);
+        };
 
-        body.innerHTML = darkBox("—",
-            `<div style="text-align:center; font-size:26px; color:#666; letter-spacing:10px; padding:40px 0;">… … … … …</div>`,
-            `<div style="text-align:center; font-size:11px; color:#555;">발소리만 계속된다.</div>`);
+        // 지난 판에 남아 있던 쪽지를 집지 않게 — 이 화면에 들어온 뒤의 것만 받는다
+        ref.on('value', function (sn) {
+            const c = sn.val();
+            if (c && c.victim && Number(c.at || 0) > t0 - 150000) fin(c);
+        });
+
+        // 아무도 안 썼다 — 내가 정한다
+        tm = setTimeout(function () {
+            if (done || !darkRun) return;
+            const p = darkParties[darkRun.partyId];
+            const alive = p && p.alive ? Object.keys(p.alive) : [currentUser.code];
+            const victim = alive[Math.floor(Math.random() * alive.length)] || currentUser.code;
+            const c = {
+                victim: victim,
+                name: (p && p.members && p.members[victim]) ? p.members[victim].name : '누군가',
+                at: Date.now()
+            };
+            try { ref.set(c); } catch (e) { }
+            fin(c);
+        }, 25000);
     }
 
     function showCollapseResult(c) {
@@ -2358,7 +2432,7 @@ function input119D(n) {
         } else {
             body.innerHTML = darkBox("추락",
                 `<b style="color:#ff6b6b;">${c.name}</b> 사원이 사라졌다.<br><br>소리도 없었다. 옆에 있다가 그냥 없어졌다.<br>돌아보니 바닥에 네모난 구멍이 있다.<br>아래는 보이지 않는다.<br><br>부르면 대답이 올 것 같지만, 부르지 않기로 한다.<br>여기서 소리를 내면 안 된다는 걸 다들 알고 있다.`,
-                (darkRun.isLeader
+                ((darkRun.isLeader || !darkRun.isParty)
                     ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
                                         : `<div style="text-align:center; font-size:11px; color:#888; padding:12px;">
                          선임의 신호를 기다리는 중...<br>
@@ -9718,29 +9792,74 @@ const reply = await callFox(msgs);
     }
     
     // --- 구출 A: 벽에 끼인 사람 ---
+    // ★ 지금 같이 걷고 있는 사람 — 살아 있고, 떨어져 나가지도 쓰러지지도 않은
+    //
+    //   구출 장면이 대상을 alive 에서 뽑던 것이 문제였다. alive 에는 단계 7 에서
+    //   바닥 아래로 떨어진 사람(solo)도 들어 있다. 그 사람은 renderSoloStep 을
+    //   보고 있어서 구출 화면을 아예 띄우지 않는다. 그런데 끼인 쪽 화면에는
+    //   단추가 하나도 없고 마흔다섯 초 뒤에 죽는다.
+    //   둘이 들어온 방은 단계 7 에서 반드시 한 명이 떨어지므로, 남은 한 명이
+    //   대상으로 뽑히면 **아무도 구할 수 없는 확정 사망**이었다.
+    //   solo/<사번> 은 **떨어진 본인의 화면이** 적는다. 그 쪽이 느리거나 끊기면
+    //   아직 안 적혀 있다. 그런데 바닥이 꺼졌을 때 누가 떨어졌는지는 collapse 에
+    //   이미 적혀 있으므로, 그것도 같이 보고 빼낸다.
+    //   collapse 는 한 판에 한 번 적히고 지워지지 않으므로, 떨어진 바로 다음
+    //   장면(구출 A, 단계 8)에서만 본다. 그 뒤로는 solo 가 제대로 적혀 있고,
+    //   합류해서 돌아온 사람을 영영 빼 버리면 안 된다.
+    function b330Present(p, useCollapse) {
+        p = p || darkParties[darkRun.partyId] || {};
+        const base = p.alive ? Object.keys(p.alive)
+                   : (p.members ? Object.keys(p.members) : [currentUser.code]);
+        const solo = p.solo || {}, dying = p.dying || {};
+        const fell = (useCollapse && p.collapse) ? p.collapse.victim : null;
+        return base.filter(function (c) { return !solo[c] && !dying[c] && c !== fell; });
+    }
+
+    // 구할 사람이 아무도 없으면 장면을 건너뛴다고 적는다
+    function b330PickRescue(key) {
+        database.ref(`darkParties/${darkRun.partyId}`).once('value').then(sn => {
+            if (!darkRun) return;
+            const here = b330Present(sn.val() || {}, key === 'rescue1');
+            const ref = database.ref(`darkParties/${darkRun.partyId}/${key}`);
+            if (here.length < 2) { ref.set({ skip: true, at: Date.now() }); return; }
+            const pick = here[Math.floor(Math.random() * here.length)];
+            ref.set({
+                target: pick,
+                name: (db.users[pick] ? db.users[pick].name : '동료'),
+                at: Date.now()
+            });
+        });
+    }
+
     function b330Rescue1() {
         if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
 
         if (darkRun.isLeader && database && !darkRun._r1Set) {
             darkRun._r1Set = true;
-            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
-                const alive = Object.keys(sn.val() || {});
-                if (alive.length === 0) return;
-                const pick = alive[Math.floor(Math.random() * alive.length)];
-                database.ref(`darkParties/${darkRun.partyId}/rescue1`).set({
-                    target: pick,
-                    name: (db.users[pick] ? db.users[pick].name : '동료'),
-                    at: Date.now()
-                });
-            });
+            b330PickRescue('rescue1');
         }
 
         if (!database) { partyAdvance(darkRun.step + 1); return; }
 
         database.ref(`darkParties/${darkRun.partyId}/rescue1`).on('value', sn => {
             const r = sn.val();
-            if (!r || !darkRun || darkRun._r1Shown) return;
-            if (r.saved) { partyAdvance(darkRun.step + 1); return; }
+            if (!r || !darkRun) return;
+
+            // ★ 구해졌다 · 구할 사람이 없다 — 화면을 띄웠는지보다 **먼저** 본다.
+            //
+            //   전에는 _r1Shown 을 먼저 보고 돌아갔다. 그래서 동료가 빼내 주어도
+            //   끼인 사람 화면은 「동료를 기다리는 중...」 그대로였고, 마흔다섯 초
+            //   뒤에 그냥 쓰러졌다. 죽는 시계를 멈추는 _r1Saved 를 **어디서도
+            //   적지 않았기 때문**이다. 구해져도 죽는 자리였다.
+            if (r.skip || r.saved) {
+                darkRun._r1Saved = true;
+                if (darkRun._r1Done) return;
+                if (darkRun._r1Acted) return;      // 내가 빼낸 사람 — 제 결과를 읽고 누른다
+                darkRun._r1Done = true;
+                partyAdvance(darkRun.step + 1);
+                return;
+            }
+            if (darkRun._r1Shown) return;
             darkRun._r1Shown = true;
             const isMe = r.target === currentUser.code;
 
@@ -9753,7 +9872,17 @@ const reply = await callFox(msgs);
                     `<div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:5px; padding:11px; font-size:11px; color:#ff6b6b; text-align:center;">
                         동료를 기다리는 중...<br>
                         <span style="font-size:10px; color:#888;">아무도 오지 않으면 여기서 끝납니다.</span>
-                     </div>`);
+                     </div>
+                     <div id="r1-self" style="margin-top:9px;"></div>`);
+                // ★ 스무 초가 지나면 혼자 힘으로라도 해 볼 수 있게 — 동료가
+                //   끊기거나 떨어져 나가면 손쓸 데 없이 죽기만 했다
+                setTimeout(() => {
+                    if (!darkRun || !darkRun._r1Shown || darkRun._r1Saved) return;
+                    const box = document.getElementById('r1-self');
+                    if (box && !box.innerHTML) {
+                        box.innerHTML = darkChoiceBtn("혼자 힘으로 빼낸다.", "b330SelfRescue('r1')");
+                    }
+                }, 20000);
                 setTimeout(() => {
                     if (darkRun && darkRun._r1Shown && !darkRun._r1Saved) {
                         darkRun.fail++;
@@ -9789,6 +9918,7 @@ const reply = await callFox(msgs);
         if (ok) {
             darkRun.success += 2;
             darkRun.modifier = (darkRun.modifier || 0) + 2;
+            darkRun._r1Acted = true;        // ★ 내 결과 화면을 덮어쓰지 않게
             if (database) database.ref(`darkParties/${darkRun.partyId}/rescue1/saved`).set(true);
             txt = kind === 'pull' ? `팔을 잡고 당긴다.<br><br>어깨가 빠질 것 같은 소리가 났지만 빠져나왔다.<br>둘 다 바닥에 주저앉는다.`
                 : kind === 'brace' ? `벽을 밀어 버틴다. 실제로 밀린다.<br><br>그 틈에 빠져나온다. 손을 놓자 벽이 다시 붙었다.`
@@ -9809,30 +9939,76 @@ const reply = await callFox(msgs);
         mountDarkChat('normal');
     }
 
+    // ★ 혼자 힘으로 — 올 사람이 아무도 없을 때의 마지막 길
+    //
+    //   끼인 쪽·숨이 멎은 쪽 화면에는 단추가 하나도 없었다. 동료가 끊기거나
+    //   그 사이 떨어져 나가면 손쓸 데 없이 마흔다섯 초를 세다 쓰러졌다.
+    //   그래서 스무 초가 지나면 이 단추가 뜬다. DC 가 높고 빗나가면 오염만 오른다.
+    function b330SelfRescue(which) {
+        if (!darkRun) return;
+        const r1 = (which === 'r1');
+        if (r1 ? darkRun._r1Saved : darkRun._r2Saved) return;
+
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+        const bonus = rollDarkBonus();
+        const healVal = gearValue(currentUser, 'heal');
+        let DC = (r1 ? 18 : 17) - Math.round(healVal * 12);
+        if (DC < 5) DC = 5;
+        const ok = roll !== 1 && (roll === 20 || (roll + bonus) >= DC);
+
+        let txt;
+        if (ok) {
+            if (r1) { darkRun._r1Saved = true; darkRun._r1Shown = false; }
+            else    { darkRun._r2Saved = true; darkRun._r2Shown = false; }
+            darkRun.success++;
+            darkRun.modifier = (darkRun.modifier || 0) + 1;
+            if (database && darkRun.partyId) {
+                database.ref(`darkParties/${darkRun.partyId}/${r1 ? 'rescue1' : 'rescue2'}/saved`).set(true);
+            }
+            txt = r1
+                ? `숨을 다 뱉고 몸을 비튼다.<br><br>갈비뼈가 비명을 지르지만 어깨가 먼저 빠져나왔다.<br>나머지는 쉬웠다.`
+                : `들이마시는 것을 그만둔다.<br><br>대신 끝까지 내뱉는다. 비운 자리로 공기가 저절로 들어왔다.<br>몸이 잊은 것을 다시 가르쳤다.`;
+        } else {
+            darkRun.fail++;
+            applyPollutionToUser(currentUser, 6);
+            txt = r1
+                ? `힘을 준다. 벽이 그만큼 더 조인다.<br><br>아직 빠지지 않았다.`
+                : `숨을 쥐어 보지만 손에 아무것도 안 잡힌다.<br><br>시야가 한 겹 더 좁아진다.`;
+        }
+        darkRun.log.push(`[혼자 ${r1 ? '빼냄' : '숨'}] d20 ${roll}(${bonus >= 0 ? '+' : ''}${bonus}) vs DC${DC} — ${ok ? '성공' : '실패'}`);
+
+        darkBodyEl().innerHTML = darkBox("혼자 힘으로",
+            `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus >= 0 ? '+' : ''}${bonus} / DC ${DC})</span></div>${txt}`,
+            ok
+                ? darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`)
+                : darkChoiceBtn("다시 해 본다.", `b330SelfRescue('${which}')`));
+        mountDarkChat('normal');
+    }
+
         // --- 구출 B: 숨이 멎은 사람 ---
     function b330Rescue2() {
         if (!darkRun.isParty) { partyAdvance(darkRun.step + 1); return; }
 
         if (darkRun.isLeader && database && !darkRun._r2Set) {
             darkRun._r2Set = true;
-            database.ref(`darkParties/${darkRun.partyId}/alive`).once('value').then(sn => {
-                const alive = Object.keys(sn.val() || {});
-                if (alive.length === 0) return;
-                const pick = alive[Math.floor(Math.random() * alive.length)];
-                database.ref(`darkParties/${darkRun.partyId}/rescue2`).set({
-                    target: pick,
-                    name: (db.users[pick] ? db.users[pick].name : '동료'),
-                    at: Date.now()
-                });
-            });
+            b330PickRescue('rescue2');
         }
 
         if (!database) { partyAdvance(darkRun.step + 1); return; }
 
         database.ref(`darkParties/${darkRun.partyId}/rescue2`).on('value', sn => {
             const r = sn.val();
-            if (!r || !darkRun || darkRun._r2Shown) return;
-            if (r.saved) { partyAdvance(darkRun.step + 1); return; }
+            if (!r || !darkRun) return;
+            // ★ 구출 A 와 같은 고장 — 구해져도 죽었다 (위 설명 참고)
+            if (r.skip || r.saved) {
+                darkRun._r2Saved = true;
+                if (darkRun._r2Done) return;
+                if (darkRun._r2Acted) return;
+                darkRun._r2Done = true;
+                partyAdvance(darkRun.step + 1);
+                return;
+            }
+            if (darkRun._r2Shown) return;
             darkRun._r2Shown = true;
             const isMe = r.target === currentUser.code;
 
@@ -9844,7 +10020,15 @@ const reply = await callFox(msgs);
                      누가 뭐라고 말하는 소리가 멀리서 들린다.`,
                     `<div style="background:rgba(127,0,0,0.15); border:1px solid #7f0000; border-radius:5px; padding:11px; font-size:11px; color:#ff6b6b; text-align:center;">
                         의식이 흐려지는 중...
-                     </div>`);
+                     </div>
+                     <div id="r2-self" style="margin-top:9px;"></div>`);
+                setTimeout(() => {
+                    if (!darkRun || !darkRun._r2Shown || darkRun._r2Saved) return;
+                    const box = document.getElementById('r2-self');
+                    if (box && !box.innerHTML) {
+                        box.innerHTML = darkChoiceBtn("스스로 숨을 되찾는다.", "b330SelfRescue('r2')");
+                    }
+                }, 20000);
                 setTimeout(() => {
                     if (darkRun && darkRun._r2Shown && !darkRun._r2Saved) {
                         darkRun.fail++;
@@ -9880,6 +10064,7 @@ const reply = await callFox(msgs);
         if (ok) {
             darkRun.success += 2;
             darkRun.modifier = (darkRun.modifier || 0) + 2;
+            darkRun._r2Acted = true;        // ★ 내 결과 화면을 덮어쓰지 않게
             if (database) database.ref(`darkParties/${darkRun.partyId}/rescue2/saved`).set(true);
             txt = kind === 'back' ? `등을 세게 두드린다.<br><br>뭔가 뱉어 낸다. 밀가루 같기도 하고 아닌 것 같기도 하다.<br>숨이 돌아온다.`
                 : kind === 'call' ? `이름을 부른다. 계속 부른다.<br><br>세 번째쯤에 눈이 이쪽을 향한다.<br>그리고 크게 숨을 들이마신다.<br><br>이름을 아는 게 도움이 됐다.`
