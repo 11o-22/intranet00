@@ -96,7 +96,9 @@ function sireNames(code) {
 function fixDue(t) {
     if (!t || !t.preg || !t.preg.sires || !t.preg.sires.length) return false;
     const start = t.preg.sires[0].at || Date.now();
-    const want = start + PREG_H * 3600000;
+    // ★ 📱 K·LEE 의 ⑥ 「오, 실물이 더 나으시네.」를 받았으면 절반으로 센다.
+    //   안 그러면 여기서 「처음 시각 + 24시간」으로 도로 늘려 놓는다.
+    const want = start + PREG_H * 3600000 - (t.preg.kleeHalf ? PREG_H * 1800000 : 0);
     if (Math.abs((t.preg.due || 0) - want) <= 60000) return false;
     t.preg.due = want;
     return true;

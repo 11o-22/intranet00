@@ -63,7 +63,7 @@
 const KLEE = {
     NAME: '📱 K·LEE',
     WHO:  'K.LEE',
-    DAY:  { m3: 3, m4: 3, m5: 2 },           // 하루 쓸 수 있는 횟수 (① ② 는 제한 없음)
+    DAY:  { m3: 3, m4: 3, m5: 2 },           // 하루 쓸 수 있는 횟수 (① ② ⑥ 은 제한 없음)
     PICK: 3,                                 // ① 고르는 사원 수
     BOOK: 2,                                 // ④ 한 번에 예약하는 사람 수
     BUFF_MS: 24 * 3600 * 1000,
@@ -345,7 +345,9 @@ const MSG = [
     { id: 'm4', t: '④ 수고해요 후배님 ㅋㅋ',
       s: '어둠에서 파티원 둘에게 예약 전송. 내가 죽으면 그 둘이 문자와 버프를 받고, 나는 오염 50%로 빠져나온다.' },
     { id: 'm5', t: '⑤ 혹시 뭐 살 거 있으신가?',
-      s: '받은 사원과 나 모두 24시간 동안 공용시설 행운 200%·랜덤박스 행운 150% 상승.' }
+      s: '받은 사원과 나 모두 24시간 동안 공용시설 행운 200%·랜덤박스 행운 150% 상승.' },
+    { id: 'm6', t: '⑥ 오, 실물이 더 나으시네.',
+      s: '내가 임신시킨 사원에게만 보낼 수 있다. 받은 사원의 출산 시간이 절반으로 줄어든다.' }
 ];
 
 function menu() {
@@ -384,6 +386,7 @@ function open_(id) {
     if (id === 'm3') return m3Open();
     if (id === 'm4') return m4Send();
     if (id === 'm5') return m5Pick();
+    if (id === 'm6') return m6Pick();
 }
 
 // ==========================================
@@ -416,6 +419,10 @@ window.kleeNoteLive = function (u, note) {
         if (!u) return false;
         const t = String(note || '');
         if (/구매 행운/.test(t)) return (u.kleeShop || 0) > Date.now();
+        // ⑥ 출산 시간 절반 — 낳을 때까지 남긴다
+        if (t.indexOf('출산 시간 절반') >= 0) {
+            return !!(u.preg && u.preg.sires && u.preg.sires.length);
+        }
         // ② 신호 — 이번 탐사 동안만. 탐사가 끝나면 걷어 간다.
         if (t.indexOf('어둠 신호') >= 0) {
             try { return !!(typeof darkRun !== 'undefined' && darkRun && signMult()); }
@@ -1126,6 +1133,103 @@ function m5Do(code) {
         + t.name + ' 사원과 나 모두 24시간 동안\n'
         + '· 공용시설 행운 200% 상승\n· 랜덤박스 행운 150% 상승\n\n'
         + '오늘 남은 횟수 ' + left(u, 'm5') + ' / ' + KLEE.DAY.m5);
+}
+
+// ==========================================
+// ⑥ 오, 실물이 더 나으시네. — 출산 시간을 절반으로
+// ==========================================
+//
+//   내가 임신시킨 사원에게만 보낼 수 있다. 그 사원의 preg.sires 에
+//   내 사번이 들어 있는지로 가린다 (preg-v2.js 가 여럿을 받아 둔다).
+//
+//   줄이는 방법 — preg.due 를 당기기만 하면 preg-v2.js 의 fixDue 가
+//   「sires[0].at + 24시간」으로 도로 늘려 놓는다. 그래서 preg.kleeHalf 를
+//   같이 적고, fixDue 쪽에서 그 표를 보게 해 두었다.
+//   한 번 받은 사람에게는 다시 안 걸린다 (두 번 접으면 바로 낳는다).
+const PREG_FULL_H = 24;                                  // preg-v2.js 의 PREG_H 와 같아야 한다
+
+function pregOf(u) { return (u && u.preg && u.preg.sires && u.preg.sires.length) ? u.preg : null; }
+function minePreg(t) {
+    const u = me(), p = pregOf(t);
+    if (!u || !p) return false;
+    return p.sires.some(function (s) { return s && s.code === u.code; });
+}
+function dueNow(p) {
+    const d = Number(p.due);
+    if (isFinite(d) && d > 0) return d;
+    const at = Number(p.sires[0] && p.sires[0].at) || Date.now();
+    return at + PREG_FULL_H * 3600000;
+}
+
+// 하루 횟수는 두지 않는다 — 「한 사람의 한 임신에 한 번」이 이미 막는다.
+// (임신시킬 수 있는 사람 수도 preg-v2.js 가 다섯으로 묶어 두었다)
+function m6Pick() {
+    const u = me();
+    shut();
+
+    const list = users().filter(function (x) {
+        return x.code !== u.code && minePreg(x) && dueNow(x.preg) > Date.now();
+    });
+    if (!list.length) {
+        alert_('보낼 사람이 없습니다.\n\n내가 임신시킨 사원 가운데\n아직 낳지 않은 사람에게만 보낼 수 있습니다.');
+        return;
+    }
+
+    const rows = list.map(function (x) {
+        const half = !!x.preg.kleeHalf;
+        const leftMs = Math.max(0, dueNow(x.preg) - Date.now());
+        const h = Math.floor(leftMs / 3600000), m = Math.ceil((leftMs % 3600000) / 60000);
+        return '<button class="klee-p6 game-btn" data-c="' + x.code + '"' + (half ? ' disabled' : '')
+            + ' style="' + BTN + (half ? GREY : '') + '">'
+            + '<div style="font-size:12px; color:' + (half ? '#777' : '#cfe6f6') + ';">'
+            + esc(x.name) + ' <span style="color:#8a8a8a;">NO.' + esc(x.no || '') + '</span></div>'
+            + '<div style="font-size:10px; color:#8a8a8a; margin-top:3px;">'
+            + (half ? '이미 접어 둔 사원입니다'
+                    : '출산까지 ' + (h ? h + '시간 ' : '') + m + '분')
+            + '</div></button>';
+    }).join('');
+
+    const w = box(bubble('오, 실물이 더 나으시네.')
+        + '<div style="font-size:11px; color:#9fb8c8; margin-bottom:8px;">'
+        + '내가 임신시킨 사원에게만 갑니다. 출산 시간이 절반으로 줄어듭니다.</div>'
+        + '<div style="' + SCROLL + '">' + rows + '</div>'
+        + '<button id="klee-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">그만둔다</button>');
+    w.querySelector('#klee-x').onclick = shut;
+    Array.prototype.forEach.call(w.querySelectorAll('.klee-p6'), function (b) {
+        b.onclick = function () { m6Do(b.dataset.c); };
+    });
+}
+
+function m6Do(code) {
+    const u = me(), t = db.users[code];
+    shut();
+    if (!t) { alert_('사원을 찾지 못했습니다.'); return; }
+    if (!minePreg(t)) { alert_('내가 임신시킨 사원이 아닙니다.'); return; }
+    if (t.preg.kleeHalf) { alert_('이미 접어 둔 사원입니다.'); return; }
+
+    const was = dueNow(t.preg);
+    const cut = PREG_FULL_H * 1800000;                   // 스물네 시간의 절반
+    t.preg.due = Math.max(Date.now() + 60000, was - cut); // 적어도 1분은 남긴다
+    t.preg.kleeHalf = 1;
+
+    const line = '출산 시간 절반 (' + KLEE.WHO + ')';
+    noteAdd(t, line);
+    log_(t, '[' + KLEE.WHO + '] 오, 실물이 더 나으시네. — ' + u.name + ' 사원의 문자. 출산 시간이 절반으로 줄었습니다.');
+    try {
+        if (typeof updateUserFields === 'function') {
+            updateUserFields(code, { preg: t.preg, badge: t.badge, history: t.history, hasItemUsedOnMe: true });
+        }
+    } catch (e) { }
+
+    log_(u, '[' + KLEE.WHO + '] 오, 실물이 더 나으시네. → ' + t.name);
+    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    ring();
+    const leftMs = Math.max(0, t.preg.due - Date.now());
+    alert_('[' + KLEE.WHO + ' : 오, 실물이 더 나으시네.]\n\n'
+        + t.name + ' 사원의 출산 시간이 절반으로 줄었습니다.\n'
+        + '남은 시간 ' + Math.max(1, Math.round(leftMs / 60000)) + '분\n\n'
+        + '한 사람의 한 임신에 한 번만 보낼 수 있습니다.');
 }
 
 // 공용시설 행운

@@ -108,6 +108,11 @@ const EXPIRY = [
     { mark: '[📲]', live: function (u, note) {
         try { return window.kleeNoteLive ? window.kleeNoteLive(u, note) : true; }
         catch (e) { return true; }
+    } },
+    // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
+    { mark: '⛓️‍💥', live: function (u, note) {
+        try { return window.irrNoteLive ? window.irrNoteLive(u, note) : true; }
+        catch (e) { return true; }
     } }
 ];
 
