@@ -324,6 +324,94 @@ window.petGiveEgg = function (who, warn) {
     }).join(' · '));
 };
 
+// ==========================================
+// 제어 콘솔 — 🥚 환몽알 지급 칸
+// ==========================================
+//
+//   당국 화면(#admin-screen)에 칸을 하나 붙인다. 위쪽에서 고른 사원
+//   (또는 적어 넣은 사번)에게 알을 하나 넣어 준다 — 다른 지급 칸들과
+//   같은 getAdminTargets() 를 쓴다.
+//
+//   주의 문구는 고르거나 무작위로 둘 수 있다. 이미 알을 품고 있는
+//   사원은 건너뛰고 누구를 건너뛰었는지 알려 준다.
+const EGG_BOX = 'adm-pet-egg-box';
+
+window.adminGiveEgg = function () {
+    const targets = (typeof getAdminTargets === 'function') ? getAdminTargets() : [];
+    if (!targets.length) { alert_('대상을 고르거나 사번을 적어 주십시오.'); return; }
+    const sel = document.getElementById('adm-pet-warn');
+    const want = sel ? String(sel.value || '') : '';
+    if (want && !P().WARN[want]) { alert_('주의 문구가 잘못되었습니다.'); return; }
+
+    const ok = [], skip = [];
+    targets.forEach(function (code) {
+        const t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+        if (!t) return;
+        if (t.petEgg && t.petEgg.warn) {
+            skip.push(t.name + (t.petEgg.ruin ? ' (상한 알)' : ' (품고 있음)'));
+            return;
+        }
+        const egg = P().make(want);
+        t.petEgg = egg;
+        t._adminStamp = Date.now();
+        try {
+            if (typeof addHistoryLog === 'function')
+                addHistoryLog(t, '[당국 개입] ' + P().EGG_NAME + ' 지급 — 「'
+                    + P().WARN[egg.warn].n + '」');
+        } catch (e) { }
+        try {
+            if (typeof updateUserFields === 'function')
+                updateUserFields(code, { petEgg: egg, history: t.history });
+            else if (typeof database !== 'undefined' && database)
+                database.ref('users/' + code + '/petEgg').set(egg);
+        } catch (e) { console.warn('[펫] 저장 실패', e); }
+        ok.push(t.name + ' — 「' + P().WARN[egg.warn].n + '」');
+    });
+
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    render();
+    alert_((ok.length ? (P().EGG_NAME + ' ' + ok.length + '개를 넣었습니다.\n\n' + ok.join('\n')) : '넣은 알이 없습니다.')
+        + (skip.length ? ('\n\n건너뜀 — 이미 알을 품고 있습니다.\n' + skip.join('\n')) : ''));
+};
+
+(function adminBox() {
+    function mount() {
+        const scr = document.getElementById('admin-screen');
+        if (!scr || document.getElementById(EGG_BOX)) return;
+        const boxes = scr.querySelectorAll('.admin-panel-box');
+        if (!boxes.length) return;
+
+        const opts = '<option value="">주의 문구 — 무작위</option>'
+            + P().WARN_KEYS.map(function (k) {
+                return '<option value="' + k + '">' + esc(P().TAGS[P().WARN[k].bad])
+                    + ' 금지 — ' + esc(P().WARN[k].n) + '</option>';
+            }).join('');
+
+        const el = document.createElement('div');
+        el.id = EGG_BOX;
+        el.className = 'admin-panel-box';
+        el.style.cssText = 'border-color:#c08a3e; background-color:#1a1409;';
+        el.innerHTML =
+            '<h4 style="color:#ffcf8f;">🥚 ' + esc(P().EGG_NAME) + ' 지급</h4>'
+            + '<div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.6;">'
+            + '위에서 고른 사원(또는 적어 넣은 사번)에게 알을 하나 넣습니다.<br>'
+            + '하루 하나 제한을 쓰지 않습니다. 이미 알을 품고 있으면 건너뜁니다.<br>'
+            + '<span style="color:#888;">깨어나는 자리는 사택입니다. 돌봄 물품은 망상 홈쇼핑에서 삽니다.</span>'
+            + '</div>'
+            + '<select id="adm-pet-warn" style="width:100%; font-size:11px; margin-bottom:7px;">'
+            + opts + '</select>'
+            + '<button class="game-btn" style="width:100%; margin:0; padding:10px;'
+            + ' background:linear-gradient(145deg,#8a6a2a,#4a3410) !important;'
+            + ' border-color:#c08a3e !important; color:#ffe9bd !important;"'
+            + ' onclick="adminGiveEgg()">' + esc(P().EGG_NAME) + ' 지급</button>';
+
+        boxes[boxes.length - 1].insertAdjacentElement('afterend', el);
+        try { if (typeof initAdminAccordion === 'function') initAdminAccordion(); } catch (e) { }
+        console.log('[펫] 제어 콘솔에 ' + P().EGG_NAME + ' 지급 칸을 붙였습니다');
+    }
+    setInterval(function () { try { mount(); } catch (e) { } }, 1000);
+})();
+
 window.petGiveBag = function (name, n) {
     if (!P().CARE_BY[name]) { console.warn('그런 돌봄 물품이 없습니다 —', name); return; }
     const v = P().bagAdd(name, Math.max(1, Number(n) || 1));
