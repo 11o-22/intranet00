@@ -12,7 +12,9 @@
 //   한 번 나가면 한두 시간, 돌아오면 포인트를 물어 온다. 다녀온 펫은
 //   두 시간 쉰다 — 먹이를 주면 그 시간이 준다 (pet-food.js).
 //
-//   펫이 다치거나 죽는 일은 없다. 물어 오는 것만 다르다.
+//   **제 등급보다 높은 구역에 보내면 돌아오지 못한다.** 전부 D 로
+//   깨어나므로 지금은 D 구역만 안전하다. 구역 고르는 창에서 붉게 띄우고
+//   두 번 눌러야 가게 해 두었다.
 //
 // ■ 얼마를 물어 오나
 //
@@ -97,6 +99,14 @@ function stateOf(s) {
     return { k: 'idle', t: '대기', c: '#8d8578' };
 }
 
+// 펫 등급보다 높은 구역인가 — 그러면 돌아오지 못한다
+function overGrade(s, zoneGrade) {
+    const G = P().GRADES;
+    const mine = G.indexOf((s && s.g) || 'D');
+    const there = G.indexOf(zoneGrade);
+    return (there >= 0 && mine >= 0 && there > mine);
+}
+
 function payOf(zone, hours, s) {
     const z = zones()[zone];
     if (!z) return 0;
@@ -126,26 +136,131 @@ window.petSend = function (id, zone) {
 
     const hours = HOURS[Math.floor(Math.random() * HOURS.length)];
     const now = P().now();
+    const doom = overGrade(s, z.grade);           // 제 등급보다 높은 곳
     const out = {
         zone: zone, name: z.name, grade: z.grade,
         till: now + hours * 3600 * 1000, hours: hours,
-        pay: payOf(zone, hours, s)
+        pay: doom ? 0 : payOf(zone, hours, s)
     };
+    if (doom) out.doom = 1;
     P().patch(key, { out: out });
 
     const nick = P().nick(id, u);
-    log_('[펫 탐사] ' + nick + P().josa(nick, '을') + ' ' + z.name + '에 보냈습니다. (' + hours + '시간)');
+    log_('[펫 탐사] ' + nick + P().josa(nick, '을') + ' ' + z.name + '에 보냈습니다. ('
+        + hours + '시간' + (doom ? ' · ' + z.grade + '등급 — 제 등급 밖' : '') + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     shut();
     paint();
     alert_(nick + P().josa(nick, '이') + ' ' + z.name + P().josa(z.name, '로')
         + ' 들어갔습니다.\n\n'
-        + hours + '시간 뒤에 돌아옵니다.');
+        + (doom
+            ? (z.grade + ' 등급입니다. ' + nick + P().josa(nick, '은') + ' '
+               + ((s.g || 'D')) + ' 등급입니다.\n돌아오지 못합니다.')
+            : (hours + '시간 뒤에 돌아옵니다.')));
 };
 
 // ==========================================
 // 데려온다
 // ==========================================
+//
+//   돌아온 펫은 **어디에 있든 저절로 들어온다.** 어둠 칸을 열어 두고
+//   단추를 눌러야만 들어오게 해 두었더니, 그 칸을 안 보고 있으면 몇 시간이
+//   지나도 그대로 나가 있어서 「안 돌아온다」가 되었다.
+//   아래 시계가 1분마다 훑고, 들어온 것들을 한 번에 알려 준다.
+function collect(key) {
+    const u = u_();
+    const s = P().pets(u)[String(key)];
+    if (!s || !s.out || !s.out.till) return null;
+    const now = P().now();
+    if (s.out.till > now) return null;
+
+    const z = s.out.name || s.out.zone;
+    const nick = P().nick(key, u);
+    const sp = (P().BY[key] || {}).n || '';
+
+    // 제 등급보다 높은 곳에 보낸 펫은 돌아오지 않는다
+    if (s.out.doom) {
+        delete P().pets(u)[String(key)];
+        if (Number(u.petWith) === Number(key)) u.petWith = null;
+        let wrote = false;
+        try {
+            if (typeof database !== 'undefined' && database && u.code) {
+                const up = {};
+                up['pets/' + key] = null;
+                if (u.petWith === null) up.petWith = null;
+                database.ref('users/' + u.code).update(up)
+                    .catch(function (e) { console.warn('[펫] 저장 실패', e); });
+                wrote = true;
+            }
+        } catch (e) { }
+        if (!wrote) { try { if (typeof saveFields === 'function') saveFields({ pets: 1, petWith: 1 }); } catch (e) { } }
+        log_('[펫 탐사] ' + nick + '(' + sp + ')' + P().josa(nick, '이') + ' ' + z
+            + '에서 돌아오지 못했습니다. (' + (s.out.grade || '?') + '등급)');
+        return { nick: nick, sp: sp, zone: z, pay: 0, dead: true, grade: s.out.grade || '?' };
+    }
+
+    const got = Math.max(0, Number(s.out.pay) || 0);
+    u.points = Math.max(0, Math.min(cap(), (Number(u.points) || 0) + got));
+    P().patch(key, { out: null, fed: null, rest: now + P().REST });
+    log_('[펫 탐사] ' + nick + P().josa(nick, '이') + ' ' + z + '에서 돌아왔습니다. (+'
+        + got.toLocaleString() + ' P)');
+    return { nick: nick, sp: sp, zone: z, pay: got };
+}
+
+// 돌아온 것들을 한 번에 들인다 — 알림은 한 장만
+let told = 0;
+function sweep(quiet) {
+    const u = u_();
+    if (!u || !P()) return [];
+    const ps = P().pets(u);
+    const back = [];
+    Object.keys(ps).forEach(function (k) {
+        if (!P().BY[k]) return;
+        const r = collect(k);
+        if (r) back.push(r);
+    });
+    if (!back.length) return back;
+
+    const live = back.filter(function (x) { return !x.dead; });
+    const gone = back.filter(function (x) { return x.dead; });
+    const sum = live.reduce(function (a, x) { return a + x.pay; }, 0);
+    try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
+    if (sum) { try { if (typeof showPointGainEffect === 'function') showPointGainEffect(sum); } catch (e) { } }
+    ui();
+    paint();
+    if (quiet) return back;
+    const now = Date.now();
+    if (now - told < 4000) return back;
+    told = now;
+
+    const lines = [];
+    live.forEach(function (x) {
+        lines.push(x.nick + P().josa(x.nick, '이') + ' ' + x.zone + '에서 돌아왔습니다.'
+            + ' (+' + x.pay.toLocaleString() + ' P)');
+    });
+    if (live.length > 1) lines.push('', '모두 +' + sum.toLocaleString() + ' P');
+    if (live.length) lines.push('', '두 시간 쉽니다.');
+    if (gone.length) {
+        if (lines.length) lines.push('');
+        gone.forEach(function (x) {
+            lines.push('✗ ' + x.nick + '(' + x.sp + ')' + P().josa(x.nick, '은') + ' '
+                + x.zone + '에서 돌아오지 못했습니다.');
+        });
+        lines.push('', x_grade(gone));
+    }
+    alert_(lines.join('\n'));
+    return back;
+}
+function x_grade(gone) {
+    const g = gone.map(function (x) { return x.grade; }).filter(Boolean);
+    const one = g.length && g.every(function (x) { return x === g[0]; }) ? g[0] : null;
+    return one
+        ? (one + ' 등급은 그 펫의 등급 밖이었습니다.')
+        : '제 등급보다 높은 어둠에서는 돌아오지 못합니다.';
+}
+
+window.petCollect = function () { return sweep(false); };
+
 window.petBack = function (id) {
     const u = u_();
     if (!u) return;
@@ -157,22 +272,8 @@ window.petBack = function (id) {
         alert_('아직 안 돌아왔습니다.\n\n' + left(s.out.till - now) + ' 남았습니다.');
         return;
     }
-
-    const got = Math.max(0, Number(s.out.pay) || 0);
-    const z = s.out.name || s.out.zone;
-    u.points = Math.max(0, Math.min(cap(), (Number(u.points) || 0) + got));
-    P().patch(key, { out: null, fed: null, rest: now + P().REST });
-
-    const nick = P().nick(id, u);
-    log_('[펫 탐사] ' + nick + P().josa(nick, '이') + ' ' + z + '에서 돌아왔습니다. (+'
-        + got.toLocaleString() + ' P)');
-    try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
-    try { if (typeof showPointGainEffect === 'function') showPointGainEffect(got); } catch (e) { }
-    ui();
     shut();
-    paint();
-    alert_(nick + P().josa(nick, '이') + ' ' + z + '에서 돌아왔습니다.\n\n'
-        + '+' + got.toLocaleString() + ' P\n\n두 시간 쉽니다.');
+    sweep(false);
 };
 
 // ==========================================
@@ -193,12 +294,17 @@ window.petPickZone = function (id) {
         const r = PAY[z.grade] || PAY.D;
         const lo = Math.round(r[0] * 1 * g * up / 10) * 10;
         const hi = Math.round(r[1] * 2 * g * up / 10) * 10;
-        return '<button class="game-btn pd-go" data-k="' + esc(k) + '"'
-            + ' style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px; text-align:left;">'
-            + '<span style="color:#ffcf8f; font-weight:bold;">[' + esc(z.grade) + '] '
-            + esc(z.name) + '</span>'
-            + '<div style="font-size:10px; color:#aaa; margin-top:3px; font-weight:normal;">'
-            + esc(k) + ' · 한두 시간 · ' + lo.toLocaleString() + ' ~ ' + hi.toLocaleString() + ' P'
+        const over = overGrade(s, z.grade);
+        return '<button class="game-btn pd-go" data-k="' + esc(k) + '" data-over="' + (over ? 1 : 0) + '"'
+            + ' style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px; text-align:left;'
+            + (over ? ' border-color:#8a3b2a !important; opacity:.8;' : '') + '">'
+            + '<span style="color:' + (over ? '#e07a5f' : '#ffcf8f') + '; font-weight:bold;">['
+            + esc(z.grade) + '] ' + esc(z.name) + '</span>'
+            + '<div class="pd-sub" style="font-size:10px; color:' + (over ? '#e07a5f' : '#aaa')
+            + '; margin-top:3px; font-weight:normal;">'
+            + (over
+                ? (esc(k) + ' · 제 등급 밖입니다 — <b>돌아오지 못합니다</b>')
+                : (esc(k) + ' · 한두 시간 · ' + lo.toLocaleString() + ' ~ ' + hi.toLocaleString() + ' P'))
             + '</div></button>';
     }).join('');
 
@@ -206,7 +312,9 @@ window.petPickZone = function (id) {
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold;">'
         + esc(nick) + P().josa(nick, '을') + ' 어디로</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin:4px 0 11px 0; line-height:1.6;">'
-        + '사원 본인의 탐사 횟수는 쓰지 않습니다. 펫은 다치지 않습니다.'
+        + '사원 본인의 탐사 횟수는 쓰지 않습니다.<br>'
+        + '<span style="color:#e07a5f;">제 등급(' + esc(s.g || 'D')
+        + ')보다 높은 구역에 보내면 돌아오지 못합니다.</span>'
         + (s.fed ? '<br><span style="color:#c9a227;">먹인 것이 남아 있습니다 — +'
             + Math.round(s.fed * 100) + '%</span>' : '') + '</div>'
         + rows
@@ -214,7 +322,30 @@ window.petPickZone = function (id) {
 
     w.querySelector('#pd-x').onclick = shut;
     Array.prototype.forEach.call(w.querySelectorAll('.pd-go'), function (b) {
-        b.onclick = function () { window.petSend(id, b.getAttribute('data-k')); };
+        b.onclick = function () {
+            // 제 등급 밖은 두 번 눌러야 간다 — 한 번은 되묻는 자리다
+            if (b.getAttribute('data-over') === '1' && b.getAttribute('data-arm') !== '1') {
+                b.setAttribute('data-arm', '1');
+                const sub = b.querySelector('.pd-sub');
+                if (sub) sub.innerHTML = '<b style="color:#ff8f7a;">한 번 더 누르면 보냅니다. '
+                    + '그 펫은 사라집니다.</b>';
+                b.style.setProperty('background', 'linear-gradient(145deg,#7f2a1a,#3a1208)', 'important');
+                b.style.setProperty('border-color', '#e07a5f', 'important');
+                b.style.setProperty('opacity', '1', 'important');
+                setTimeout(function () {
+                    if (!b.isConnected) return;
+                    b.removeAttribute('data-arm');
+                    b.style.removeProperty('background');
+                    b.style.setProperty('border-color', '#8a3b2a', 'important');
+                    b.style.setProperty('opacity', '.8', 'important');
+                    const s2 = b.querySelector('.pd-sub');
+                    if (s2) s2.innerHTML = esc(b.getAttribute('data-k'))
+                        + ' · 제 등급 밖입니다 — <b>돌아오지 못합니다</b>';
+                }, 5000);
+                return;
+            }
+            window.petSend(id, b.getAttribute('data-k'));
+        };
     });
 };
 
@@ -266,8 +397,9 @@ function html() {
     const head = '<div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
         + '🐶 펫 탐사</div>'
         + '<div style="font-size:9.5px; color:#777; margin-bottom:10px; line-height:1.6;">'
-        + '펫은 혼자 들어갑니다. 사원 본인의 탐사 횟수는 쓰지 않고, 다치지도 않습니다.'
-        + ' 한두 시간 뒤에 포인트를 물어 옵니다.</div>';
+        + '펫은 혼자 들어갑니다. 사원 본인의 탐사 횟수는 쓰지 않습니다.'
+        + ' 한두 시간 뒤에 포인트를 물어 옵니다.<br>'
+        + '<span style="color:#e07a5f;">제 등급보다 높은 구역에 보내면 돌아오지 못합니다.</span></div>';
 
     if (!keys.length) {
         return head + '<div style="font-size:11px; color:#666; padding:6px 0;">'
@@ -352,6 +484,10 @@ setInterval(function () {
         paint();
     } catch (e) { }
 }, 5000);
+
+// 돌아온 펫 들이기 — 어느 칸을 보고 있든 돈다
+setTimeout(function () { try { sweep(false); } catch (e) { } }, 7000);
+setInterval(function () { try { sweep(false); } catch (e) { } }, 60000);
 
 // ==========================================
 // 확인

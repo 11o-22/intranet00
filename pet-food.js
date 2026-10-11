@@ -55,7 +55,14 @@ function ui() { try { if (typeof updateUI === 'function') updateUI(); } catch (e
 function bag(u) {
     u = u || u_();
     if (!u) return {};
-    if (!u.petFood || typeof u.petFood !== 'object' || Array.isArray(u.petFood)) u.petFood = {};
+    const v = u.petFood;
+    if (Array.isArray(v)) {                       // 파이어베이스가 배열로 돌려준 것
+        const o = {};
+        for (let i = 0; i < v.length; i++) if (v[i]) o[String(i)] = v[i];
+        u.petFood = o;
+    } else if (!v || typeof v !== 'object') {
+        u.petFood = {};
+    }
     return u.petFood;
 }
 function have(name, u) { return Number(bag(u)[name]) || 0; }

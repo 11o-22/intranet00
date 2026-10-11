@@ -266,6 +266,64 @@ setInterval(function () {
 // ==========================================
 // 상담사 · 확인
 // ==========================================
+const ADMIN = 'kario0987';
+
+function find(who) {
+    if (typeof db === 'undefined' || !db.users) return null;
+    const key = String(who == null ? '' : who).trim();
+    if (!key) return null;
+    const all = Object.keys(db.users).map(function (c) { return db.users[c]; }).filter(Boolean);
+    return all.filter(function (x) {
+        return x.code === key || String(x.no) === key || x.name === key;
+    })[0] || null;
+}
+
+// 상담사가 환몽알을 하나 넣어 준다
+//
+//   petGiveEgg('0012')          주의 문구는 무작위
+//   petGiveEgg('0012', 'wet')   주의 문구를 지정 (wet heat cold noise scent)
+//
+//   하루 하나 제한은 쓰지 않는다 — 받은 사람은 오늘 가게에서 또 사지는
+//   못한다(품에 알이 있으므로). 이미 알을 품고 있으면 넣지 않는다.
+window.petGiveEgg = function (who, warn) {
+    const me = u_();
+    if (!me || me.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const t = find(who);
+    if (!t) { console.warn('사원을 못 찾았습니다 —', who); return; }
+    if (warn && !P().WARN[warn]) {
+        console.warn('주의 문구는 ' + P().WARN_KEYS.join(' · ') + ' 가운데 하나입니다.');
+        return;
+    }
+    if (t.petEgg && t.petEgg.warn) {
+        console.warn(t.name + ' 사원은 이미 알을 품고 있습니다 — 「'
+            + P().WARN[t.petEgg.warn].n + '」' + (t.petEgg.ruin ? ' (상함)' : ''));
+        return;
+    }
+
+    const egg = P().make(warn);
+    t.petEgg = egg;
+    try {
+        if (t.code === me.code) { P().eggSave(); }
+        else if (typeof updateUserFields === 'function') updateUserFields(t.code, { petEgg: egg });
+        else if (typeof database !== 'undefined' && database)
+            database.ref('users/' + t.code + '/petEgg').set(egg);
+    } catch (e) { console.warn('[펫] 저장 실패', e); }
+    try {
+        if (typeof addHistoryLog === 'function') {
+            addHistoryLog(t, '[당국 개입] ' + P().EGG_NAME + ' 지급 — 「' + P().WARN[egg.warn].n + '」');
+            if (t.code !== me.code && typeof updateUserFields === 'function')
+                updateUserFields(t.code, { history: t.history });
+            else P().save({ history: 1 });
+        }
+    } catch (e) { }
+    render();
+    console.log('%c✓ ' + t.name + ' 사원에게 ' + P().EGG_NAME + ' 하나 — 「'
+        + P().WARN[egg.warn].n + '」', 'color:#4CAF50');
+    console.log('   쓸 것:', Object.keys(egg.need).map(function (k) {
+        return k + ' ×' + egg.need[k];
+    }).join(' · '));
+};
+
 window.petGiveBag = function (name, n) {
     if (!P().CARE_BY[name]) { console.warn('그런 돌봄 물품이 없습니다 —', name); return; }
     const v = P().bagAdd(name, Math.max(1, Number(n) || 1));
@@ -285,6 +343,6 @@ window.dreamShop = function () {
     console.log('  돌봄 주머니 :', k.length ? k.map(function (x) { return x + '×' + bag[x]; }).join(', ') : '비었음');
 };
 
-console.log('[펫] dreamShop() · petGiveBag()');
+console.log('[펫] dreamShop() · petGiveBag() · petGiveEgg(사번[, 주의])');
 
 })();

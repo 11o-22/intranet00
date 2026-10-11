@@ -15,8 +15,8 @@
 //
 //   pet/p01~p20.webp   깨어날 때 뜨는 본 그림 (긴 쪽 220)
 //   pet/s01~s20.webp   목록에 뜨는 작은 것 (긴 쪽 64)
-//                      데포르메가 아직 없는 다섯(사자·백호·치와와·송골매·
-//                      부엉이)은 본 그림을 줄여서 쓴다
+//                      데포르메가 아직 없는 것은 백호 하나뿐이다 —
+//                      그것만 본 그림을 줄여서 쓴다
 //   pet/egg0~egg3.webp 알 — 금이 번지는 차례
 //
 // ■ 사원 기록에 적히는 자리
@@ -64,7 +64,7 @@ const PET_WARN_KEYS = ['wet', 'heat', 'cold', 'noise', 'scent'];
 const PET_LIST = [
     { i: 1,  n: '고양이',   w: 'wet',   deform: true,  st: { luck: 60 },  d: '좁은 데를 좋아한다. 부르면 안 온다.' },
     { i: 2,  n: '리트리버', w: 'scent', deform: true,  st: { bon: 2 },    d: '언제나 기쁘다. 까닭은 모른다.' },
-    { i: 3,  n: '사자',     w: 'scent', deform: false, st: { bon: 3 },    d: '아직 작다. 목소리는 벌써 크다.' },
+    { i: 3,  n: '사자',     w: 'scent', deform: true , st: { bon: 3 },    d: '아직 작다. 목소리는 벌써 크다.' },
     { i: 4,  n: '뱁새',     w: 'heat',  deform: true,  st: { eva: 2 },    d: '둥글다. 거의 전부가 깃털이다.' },
     { i: 5,  n: '담비',     w: 'noise', deform: true,  st: { eva: 3 },    d: '소리 없이 지나간다. 뭔가 없어진다.' },
     { i: 6,  n: '도마뱀',   w: 'cold',  deform: true,  st: { resist: 2 }, d: '햇볕이 드는 자리를 귀신같이 안다.' },
@@ -78,10 +78,10 @@ const PET_LIST = [
     { i: 14, n: '토끼',     w: 'cold',  deform: true,  st: { eva: 4 },    d: '귀가 길다. 다 듣고 있다.' },
     { i: 15, n: '수달',     w: 'heat',  deform: true,  st: { luck: 80 },  d: '돌 하나를 평생 들고 다닌다.' },
     { i: 16, n: '병아리',   w: 'wet',   deform: true,  st: { luck: 40 },  d: '아직 아무것도 모른다. 그래서 겁이 없다.' },
-    { i: 17, n: '치와와',   w: 'scent', deform: false, st: { bon: 2, eva: 2 }, d: '작고 화가 나 있다. 늘.' },
-    { i: 18, n: '송골매',   w: 'noise', deform: false, st: { bon: 4 },    d: '내려올 때는 소리가 안 난다.' },
+    { i: 17, n: '치와와',   w: 'scent', deform: true , st: { bon: 2, eva: 2 }, d: '작고 화가 나 있다. 늘.' },
+    { i: 18, n: '송골매',   w: 'noise', deform: true , st: { bon: 4 },    d: '내려올 때는 소리가 안 난다.' },
     { i: 19, n: '돌고래',   w: 'heat',  deform: true,  st: { gim: 2 },    d: '웃는 얼굴로 태어났다. 기분과는 무관하다.' },
-    { i: 20, n: '부엉이',   w: 'wet',   deform: false, st: { gim: 1, luck: 60 }, d: '밤에만 눈이 커진다.' }
+    { i: 20, n: '부엉이',   w: 'wet',   deform: true , st: { gim: 1, luck: 60 }, d: '밤에만 눈이 커진다.' }
 ];
 
 const PET_BY_ID = {};
@@ -207,13 +207,32 @@ function petToday() {
 function petsOf(u) {
     u = u || petMe();
     if (!u) return {};
-    if (!u.pets || typeof u.pets !== 'object' || Array.isArray(u.pets)) u.pets = {};
+    u.pets = petObj(u.pets);
     return u.pets;
 }
+
+// ★ 파이어베이스가 돌려준 것을 「이름표가 붙은 것」으로 되돌린다
+//
+//   펫은 번호를 열쇠로 쓴다 ({ '1': …, '2': … }). 그런데 파이어베이스는
+//   열쇠가 전부 숫자이고 0 부터 최댓값 사이의 절반 넘게 차 있으면 **배열로
+//   돌려준다.** 펫 1·2 두 마리만 있어도 [null, {...}, {...}] 가 온다.
+//
+//   예전에는 배열이면 그냥 {} 로 **비워 버렸다.** 그래서 새로 고치거나
+//   서버 값이 내려오는 순간 펫이 통째로 사라졌고, 탐사 보낸 펫도 같이
+//   없어져 「안 돌아온다」로 보였다. 이제는 자리번호를 열쇠로 되돌린다.
+function petObj(v) {
+    if (Array.isArray(v)) {
+        const o = {};
+        for (let i = 0; i < v.length; i++) if (v[i]) o[String(i)] = v[i];
+        return o;
+    }
+    return (v && typeof v === 'object') ? v : {};
+}
+
 function petBag(u) {
     u = u || petMe();
     if (!u) return {};
-    if (!u.petBag || typeof u.petBag !== 'object' || Array.isArray(u.petBag)) u.petBag = {};
+    u.petBag = petObj(u.petBag);
     return u.petBag;
 }
 function petEgg(u) {
@@ -473,8 +492,10 @@ function petRename(id, name) {
 //   쓸 것은 **그 알이 싫어하는 표식이 아닌 것** 가운데서 고른다. 안 그러면
 //   어떻게 해도 못 깨운다. 가짓수는 둘~넷, 가짓수마다 두세 번씩,
 //   통틀어 다섯~열 번이 되게 맞춘다.
-function petMakeEgg() {
-    const warn = PET_WARN_KEYS[Math.floor(Math.random() * PET_WARN_KEYS.length)];
+//   want 을 주면 그 주의 문구로 만든다 (상담사가 지정해 줄 때)
+function petMakeEgg(want) {
+    const warn = (want && PET_WARN[want]) ? want
+        : PET_WARN_KEYS[Math.floor(Math.random() * PET_WARN_KEYS.length)];
     const bad = PET_WARN[warn].bad;
     const safe = PET_CARE.filter(function (x) { return x[1] !== bad; }).map(function (x) { return x[0]; });
 
