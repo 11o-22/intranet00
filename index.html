@@ -789,6 +789,7 @@
                     <button class="sub-tab" onclick="switchShopPanel('shop-food', this)">행복 식당</button>
                     <button class="sub-tab" onclick="switchShopPanel('shop-unknown', this)">???</button>
                     <button class="sub-tab" onclick="switchShopPanel('shop-alien', this)">우주 쇼핑몰</button>
+                    <button class="sub-tab" onclick="switchShopPanel('shop-dream', this)">망상 홈쇼핑</button>
                 </div>
 
                 <!-- 유쾌 판매소 -->
@@ -851,6 +852,12 @@
                 <div id="shop-food" class="sub-panel" style="text-align:left;">
                     <div class="panel-title">[행복 식당]</div>
                     <div id="food-body"></div>
+                </div>
+
+                <!-- 망상 홈쇼핑 -->
+                <div id="shop-dream" class="sub-panel" style="text-align:left;">
+                    <div class="panel-title">[망상 홈쇼핑]</div>
+                    <div id="dream-body"></div>
                 </div>
 
                 <!-- ??? -->
@@ -5998,6 +6005,7 @@ hlL.disabled = !playable;
         if (panelId === 'shop-alien') { setUFODialogue("물건을 본다 👌🏻"); renderAlienTimer(); }
         if (panelId === 'shop-unknown') renderQShop();
         if (panelId === 'shop-food') renderFood();
+        if (panelId === 'shop-dream' && typeof renderDream === 'function') renderDream();
     }
     function switchDarknessPanel(panelId, btnEl) {
         document.querySelectorAll('#tab-darkness .sub-tab').forEach(b => b.classList.remove('active'));
