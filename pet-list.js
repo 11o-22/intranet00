@@ -101,11 +101,15 @@ function cell(p) {
 
     const st = statusOf(s);
     const nick = P().nick(p.i, me);
+    const inRoom = P().showHas(p.i, me);
     return '<div class="pet-cell" data-i="' + p.i + '" style="text-align:center; padding:4px 2px;'
         + ' cursor:pointer;">'
         + '<div style="position:relative; width:100%; aspect-ratio:1/1; display:flex;'
-        + ' align-items:center; justify-content:center; border:1px solid #4a3a26;'
-        + ' border-radius:7px; background:rgba(60,44,22,0.22);">'
+        + ' align-items:center; justify-content:center; border:1px solid '
+        + (inRoom ? '#c9a227' : '#4a3a26') + ';'
+        + ' border-radius:7px; background:rgba(60,44,22,' + (inRoom ? '0.34' : '0.22') + ');">'
+        + (inRoom ? '<span style="position:absolute; top:-4px; left:-3px; font-size:9px;'
+            + ' line-height:1;">🏠</span>' : '')
         + '<img src="' + img + '" alt="" style="max-width:88%; max-height:88%;'
         + ' image-rendering:pixelated;">'
         + '<span style="position:absolute; top:-3px; right:-3px; font-size:8px; font-weight:bold;'
@@ -133,8 +137,9 @@ function listView() {
         + '<span style="font-size:13px; color:#ffcf8f; font-weight:bold;">🐶 펫</span>'
         + '<span style="font-size:10px; color:#8d8578;">' + have + ' / ' + L.length + '마리</span>'
         + '</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px;">'
-        + '가진 펫을 누르면 이름을 붙일 수 있습니다.</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
+        + '가진 펫을 누르면 이름을 붙이고, 사택 방에 내놓을 펫을 고를 수 있습니다.<br>'
+        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다.</div>'
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 
@@ -188,6 +193,9 @@ function oneView(id) {
               + ' <span style="color:#5f594f;">(B 등급이 되면 '
               + esc(P().statText(p.st)) + ')</span>')
         + line('주의 문구', esc(P().WARN[p.w].n))
+        + line('내 방', P().showHas(id, me)
+            ? '<span style="color:#d4af37;">내놓는 중</span>'
+            : '<span style="color:#8d8578;">아니오</span>')
         + line('교감', P().bond(id, me) + ' / ' + P().BOND_MAX
             + (P().bondFull(id, me)
                 ? ' <span style="color:#d4af37;">— 대신 간다</span>' : ''))
@@ -202,11 +210,27 @@ function oneView(id) {
         })())
         + (st ? line('지금', '<span style="color:' + st.c + ';">' + st.t + '</span>') : '')
 
-        + '<button id="pet-care" class="game-btn" style="' + BTN + ' margin-top:12px;">쓰다듬고 먹인다</button>'
+        + '<button id="pet-room" class="game-btn" style="' + BTN + ' margin-top:12px;'
+        + (P().showHas(id, me) ? GREY : '') + '">'
+        + (P().showHas(id, me) ? '방에서 내린다' : '방에 내놓는다') + '</button>'
+        + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
 
     w.querySelector('#pet-back').onclick = listView;
+    w.querySelector('#pet-room').onclick = function () {
+        const r = P().showToggle(id);
+        try { if (typeof window.petRoomPaint === 'function') window.petRoomPaint(); } catch (e2) { }
+        const nm = P().nick(id, me);
+        if (r.on) {
+            alert_(nm + P().josa(nm, '을') + ' 방에 내놓았습니다.'
+                + (r.out ? ('\n\n' + P().nick(r.out, me) + P().josa(P().nick(r.out, me), '은')
+                    + ' 자리를 비켰습니다.') : ''));
+        } else {
+            alert_(nm + P().josa(nm, '을') + ' 방에서 내렸습니다.');
+        }
+        oneView(id);
+    };
     w.querySelector('#pet-care').onclick = function () {
         if (typeof window.petBondOpen === 'function') { shut(); window.petBondOpen(id); }
     };

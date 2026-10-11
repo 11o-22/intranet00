@@ -288,6 +288,67 @@ function petStarveLeft(id, u) {
 }
 
 // 굶어 죽은 펫을 걷어 간다 — 치운 펫 목록을 돌려준다
+// ==========================================
+// 방에 내놓을 펫 — 두 마리까지
+// ==========================================
+//
+//   u.petShow = [번호, 번호]. 안 정했으면 번호가 빠른 둘을 쓴다.
+//   죽었거나 없는 번호는 걸러 낸다.
+const PET_SHOW_MAX = 2;
+
+function petShowList(u) {
+    u = u || petMe();
+    if (!u) return [];
+    const ps = petsOf(u);
+    const raw = Array.isArray(u.petShow) ? u.petShow : [];
+    const out = [];
+    raw.forEach(function (x) {
+        const k = String(x);
+        if (ps[k] && PET_BY_ID[k] && out.indexOf(k) < 0) out.push(k);
+    });
+    if (out.length >= PET_SHOW_MAX) return out.slice(0, PET_SHOW_MAX);
+    // 모자라면 번호가 빠른 것으로 채운다
+    Object.keys(ps).filter(function (k) { return PET_BY_ID[k]; })
+        .sort(function (a2, b2) { return Number(a2) - Number(b2); })
+        .forEach(function (k) {
+            if (out.length < PET_SHOW_MAX && out.indexOf(k) < 0) out.push(k);
+        });
+    return out;
+}
+function petShowHas(id, u) { return petShowList(u).indexOf(String(id)) >= 0; }
+
+function petShowSave(list) {
+    const u = petMe();
+    if (!u) return;
+    u.petShow = list.map(Number);
+    try {
+        if (typeof database !== 'undefined' && database && u.code) {
+            database.ref('users/' + u.code + '/petShow').set(u.petShow)
+                .catch(function (e) { console.warn('[펫] 방 저장 실패', e); });
+            return;
+        }
+    } catch (e) { }
+    petSave({ petShow: 1 });
+}
+
+// 내놓거나 내린다 — { on, out } 을 돌려준다 (out 은 밀려난 펫 번호)
+function petShowToggle(id) {
+    const u = petMe();
+    const key = String(id);
+    if (!u || !petsOf(u)[key]) return { on: false, out: null };
+    const cur = petShowList(u).slice();
+    const i = cur.indexOf(key);
+    let out = null;
+    if (i >= 0) {
+        cur.splice(i, 1);
+    } else {
+        cur.push(key);
+        while (cur.length > PET_SHOW_MAX) out = cur.shift();
+    }
+    petShowSave(cur);
+    return { on: cur.indexOf(key) >= 0, out: out };
+}
+
 function petStarveSweep() {
     const u = petMe();
     if (!u) return [];
@@ -513,6 +574,8 @@ window.PET = {
     PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,
     bond: petBond, bondFull: petBondFull, bondRoom: petBondRoom, bondUp: petBondUp,
     starveLeft: petStarveLeft, sweep: petStarveSweep,
+    SHOW_MAX: PET_SHOW_MAX,
+    show: petShowList, showHas: petShowHas, showToggle: petShowToggle,
     pets: petsOf, bag: petBag, egg: petEgg, has: petHas, save: petSave, patch: petPatch,
     now: petNow, today: petToday,
     bagAdd: petBagAdd, bagHas: petBagHas, eggSave: petEggSave,

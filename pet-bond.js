@@ -68,7 +68,23 @@ function style() {
     s.textContent =
         '@keyframes petBob { 0%,100% { transform: translateY(0); }'
         + ' 50% { transform: translateY(-7px); } }'
-        + '.pet-bob { animation: petBob 2.2s ease-in-out infinite; will-change: transform; }'
+        + '@keyframes petDash { 0%,100% { transform: translate(0,0); }'
+        + ' 25% { transform: translate(-6px,-5px); } 75% { transform: translate(6px,-5px); } }'
+        + '@keyframes petSleep { 0%,100% { transform: translateY(0) scale(1); }'
+        + ' 50% { transform: translateY(-2px) scale(1.02); } }'
+        + '@keyframes petFight { 0%,100% { transform: translate(0,0) rotate(0); }'
+        + ' 20% { transform: translate(-3px,-3px) rotate(-6deg); }'
+        + ' 60% { transform: translate(3px,-3px) rotate(6deg); } }'
+        + '@keyframes petLean { 0%,100% { transform: translateY(0) rotate(0); }'
+        + ' 50% { transform: translateY(-3px) rotate(3deg); } }'
+        + '.pet-bob   { animation: petBob 2.2s ease-in-out infinite; will-change: transform; }'
+        + '.pet-dash  { animation: petDash 0.9s ease-in-out infinite; will-change: transform; }'
+        + '.pet-sleep { animation: petSleep 4.2s ease-in-out infinite; will-change: transform; }'
+        + '.pet-fight { animation: petFight 0.35s ease-in-out infinite; will-change: transform; }'
+        + '.pet-lean  { animation: petLean 3.0s ease-in-out infinite; will-change: transform; }'
+        + '.pet-still { animation: none; }'
+        + '.pet-scene { font-size:9.5px; color:#b8ac97; text-align:center; line-height:1.6;'
+        + ' padding:7px 6px 0 6px; min-height:17px; }'
         + '.pet-floor { position:relative; display:flex; flex-wrap:wrap; gap:4px;'
         + ' align-items:flex-end; justify-content:center; min-height:72px;'
         + ' padding:10px 6px 8px 6px; border-radius:6px;'
@@ -77,8 +93,78 @@ function style() {
         + '.pet-floor::after { content:""; position:absolute; left:8px; right:8px; bottom:6px;'
         + ' height:1px; background:linear-gradient(90deg, transparent, #5a4a2a, transparent); }'
         + '.pet-stand { width:52px; text-align:center; cursor:pointer; position:relative; z-index:1; }'
-        + '@media (prefers-reduced-motion: reduce) { .pet-bob { animation: none; } }';
+        + '@media (prefers-reduced-motion: reduce) {'
+        + ' .pet-bob, .pet-dash, .pet-sleep, .pet-fight, .pet-lean { animation: none; } }';
     document.head.appendChild(s);
+}
+
+// ==========================================
+// 둘이 같이 있을 때 — 스무 가지
+// ==========================================
+//
+//   t   한 줄. $1 $2 는 두 펫의 이름으로 바뀐다.
+//   a   그때 두 마리가 어떻게 움직이나 [왼쪽, 오른쪽]
+//   c   글자 색
+const SCENES = [
+    { t: '$1{와} $2{이} 서로 쫓아다닙니다.',               a: ['dash',  'dash'],  c: '#9fd8ef' },
+    { t: '$1{와} $2{이} 한 덩어리로 뭉쳐 잡니다.',          a: ['sleep', 'sleep'], c: '#8d8578' },
+    { t: '$1{와} $2{이} 등을 맞대고 앉아 있습니다.',        a: ['lean',  'lean'],  c: '#b8ac97' },
+    { t: '$1{와} $2{이} 좋은 자리를 두고 다툽니다.',        a: ['fight', 'fight'], c: '#e07a5f' },
+    { t: '$1{이} $2{의} 꼬리를 뭅니다. $2{은} 모르는 척합니다.',
+                                                        a: ['dash',  'still'], c: '#e0b05f' },
+    { t: '$1{와} $2{이} 서로 털을 골라 줍니다.',            a: ['lean',  'lean'],  c: '#9fd0a6' },
+    { t: '빈 그릇 앞에서 $1{와} $2{이} 눈치를 봅니다.',      a: ['still', 'still'], c: '#b8ac97' },
+    { t: '$1{와} $2{이} 번갈아 한 번씩 웁니다.',            a: ['bob',   'bob'],   c: '#b8ac97' },
+    { t: '$1{와} $2{이} 같은 곳을 한참 봅니다. 거기엔 아무것도 없습니다.',
+                                                        a: ['still', 'still'], c: '#8d8578' },
+    { t: '$1{이} $2{의} 등에 올라탔습니다. 내려올 생각이 없습니다.',
+                                                        a: ['still', 'lean'],  c: '#e0b05f' },
+    { t: '$1{와} $2{이} 서로 모르는 척 지나갑니다.',        a: ['dash',  'dash'],  c: '#8d8578' },
+    { t: '$1{와} $2{이} 코를 맞댑니다.',                   a: ['lean',  'lean'],  c: '#ffb3c7' },
+    { t: '$1{와} $2{이} 구석에서 같이 숨어 있습니다.',      a: ['still', 'still'], c: '#8d8578' },
+    { t: '$1{은} 자고, $2{은} 그 옆을 지킵니다.',           a: ['sleep', 'still'], c: '#9fd0a6' },
+    { t: '$1{와} $2{이} 서로 밀어냅니다. 둘 다 안 물러섭니다.',
+                                                        a: ['fight', 'fight'], c: '#e07a5f' },
+    { t: '$1{와} $2{이} 같은 자리를 빙빙 돕니다.',          a: ['dash',  'dash'],  c: '#9fd8ef' },
+    { t: '$1{이} 물어 온 것을 $2{에게} 밀어 줍니다.',       a: ['lean',  'bob'],   c: '#9fd0a6' },
+    { t: '$1{와} $2{이} 소리 없이 서로를 노려봅니다.',      a: ['still', 'still'], c: '#e07a5f' },
+    { t: '$1{와} $2{이} 겹쳐 누워 숨을 맞춥니다.',          a: ['sleep', 'sleep'], c: '#8d8578' },
+    { t: '$1{와} $2{이} 갑자기 둘 다 멈췄습니다. 무언가 들은 모양입니다.',
+                                                        a: ['still', 'still'], c: '#c9a227' }
+];
+const SOLO = [
+    { t: '$1{이} 방을 한 바퀴 돌고 제자리에 앉습니다.', a: ['dash'],  c: '#9fd8ef' },
+    { t: '$1{이} 창 쪽을 보고 있습니다.',               a: ['still'], c: '#8d8578' },
+    { t: '$1{이} 혼자 잡니다.',                        a: ['sleep'], c: '#8d8578' },
+    { t: '$1{이} 아무것도 없는 바닥을 긁습니다.',       a: ['bob'],   c: '#b8ac97' },
+    { t: '$1{이} 이쪽을 봅니다.',                      a: ['lean'],  c: '#b8ac97' }
+];
+const SCENE_MS = 20000;                 // 한 장면이 머무는 시간
+
+let sceneIdx = -1, sceneAt = 0, sceneFor = '';
+
+// 지금 장면 — 같은 짝으로는 20초마다 하나씩 바뀐다
+function sceneNow(keys) {
+    const tag = keys.join(',');
+    const now = Date.now();
+    const pool = (keys.length >= 2) ? SCENES : SOLO;
+    if (tag !== sceneFor || sceneIdx < 0 || now - sceneAt > SCENE_MS) {
+        let i = Math.floor(Math.random() * pool.length);
+        if (tag === sceneFor && pool.length > 1 && i === sceneIdx) i = (i + 1) % pool.length;
+        sceneIdx = i; sceneAt = now; sceneFor = tag;
+    }
+    return pool[Math.min(sceneIdx, pool.length - 1)];
+}
+// $1{와} 처럼 적어 두면 이름 뒤에 맞는 조사를 붙여 준다.
+//   「삐약가」 같은 말이 나오지 않게 하려고 둔 것이다.
+//   {의} {에게} 처럼 안 바뀌는 것은 그대로 붙인다.
+function sceneText(sc, keys, u) {
+    const n = [P().nick(keys[0], u), keys[1] ? P().nick(keys[1], u) : ''];
+    return sc.t.replace(/\$([12])\{([^}]*)\}/g, function (_, i, j) {
+        const name = n[Number(i) - 1];
+        const k = P().josa(name, j);
+        return name + (k || j);
+    });
 }
 
 // ==========================================
@@ -267,18 +353,20 @@ window.petBondOpen = function (id) {
 function html() {
     const u = u_();
     const ps = P().pets(u);
-    const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; })
-        .sort(function (a, b) { return Number(a) - Number(b); });
+    const all = Object.keys(ps).filter(function (k) { return P().BY[k]; });
 
     const head = '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
         + '🏠 내 방</div>';
 
-    if (!keys.length) {
+    if (!all.length) {
         return head + '<div style="font-size:11px; color:#666; padding:4px 0;">'
             + '방이 비었습니다. 환몽알이 깨어나면 여기에 섭니다.</div>';
     }
 
-    const hungry = keys.filter(function (k) {
+    const keys = P().show(u);                 // 내놓기로 한 둘
+    const rest = all.length - keys.length;
+
+    const hungry = all.filter(function (k) {
         return P().starveLeft(k, u) < 24 * 3600 * 1000;
     });
 
@@ -291,25 +379,71 @@ function html() {
                   return esc(P().nick(k, u)) + ' ' + span(Math.max(0, P().starveLeft(k, u)));
               }).join(' · ') + ' 뒤에 굶습니다</div>'
             : '')
-        + '<div class="pet-floor">'
-        + keys.map(function (k, i) {
+        + '<div class="pet-floor" style="gap:14px;">'
+        + keys.map(function (k) {
             const s = ps[k];
             const b = P().bond(k, u);
             const away = !!(s.out && s.out.till) || !!s['with'];
-            const dur = (1.9 + (Number(k) % 5) * 0.22).toFixed(2);
-            const del = ((Number(k) % 7) * 0.17).toFixed(2);
-            return '<div class="pet-stand" onclick="petBondOpen(' + k + ')" title="' + esc(P().nick(k, u)) + '">'
+            return '<div class="pet-stand" id="pet-st-' + k + '" style="width:62px;"'
+                + ' onclick="petBondOpen(' + k + ')" title="' + esc(P().nick(k, u)) + '">'
                 + '<img class="pet-bob" src="' + P().icon(k) + '" alt=""'
-                + ' style="width:42px; image-rendering:pixelated;'
-                + ' animation-duration:' + dur + 's; animation-delay:' + del + 's;'
+                + ' style="width:50px; image-rendering:pixelated;'
                 + (away ? ' opacity:.32; filter:grayscale(.7);' : '') + '">'
-                + '<div style="font-size:8px; color:#9d9488; margin-top:1px; overflow:hidden;'
+                + '<div style="font-size:8.5px; color:#9d9488; margin-top:1px; overflow:hidden;'
                 + ' text-overflow:ellipsis; white-space:nowrap;">' + esc(P().nick(k, u)) + '</div>'
                 + '<div style="font-size:7.5px; color:' + (b >= P().BOND_MAX ? '#d4af37' : '#5f594f') + ';">'
                 + (away ? '자리 비움' : ('♥ ' + b)) + '</div>'
                 + '</div>';
         }).join('')
+        + '</div>'
+        + '<div class="pet-scene" id="pet-scene-line"></div>'
+        + '<div style="font-size:9px; color:#5f594f; margin-top:6px; text-align:center;">'
+        + '방에는 ' + P().SHOW_MAX + '마리까지 — [🐶 펫] 칸에서 고릅니다'
+        + (rest > 0 ? ' <span style="color:#4a443c;">· 나머지 ' + rest + '마리는 쉬는 중</span>' : '')
         + '</div>';
+}
+
+// ==========================================
+// 장면 — 틀은 그대로 두고 글과 움직임만 갈아 끼운다
+// ==========================================
+function playScene() {
+    const u = u_();
+    const line = document.getElementById('pet-scene-line');
+    if (!u || !line) return;
+    const ps = P().pets(u);
+    const keys = P().show(u).filter(function (k) { return ps[k]; });
+    if (!keys.length) { line.textContent = ''; return; }
+
+    const away = keys.filter(function (k) {
+        const s = ps[k];
+        return !!(s.out && s.out.till) || !!s['with'];
+    });
+    const here = keys.filter(function (k) { return away.indexOf(k) < 0; });
+
+    // 나가 있는 펫이 있으면 장면 없이 그것만 알린다
+    if (away.length) {
+        const n = away.map(function (k) { return P().nick(k, u); }).join('와 ');
+        line.textContent = n + P().josa(n, '은') + ' 나가 있습니다.';
+        line.style.color = '#8d8578';
+        here.forEach(function (k) { setMove(k, 'bob'); });
+        away.forEach(function (k) { setMove(k, 'still'); });
+        sceneFor = '';                        // 돌아오면 새 장면으로
+        return;
+    }
+
+    const sc = sceneNow(here);
+    line.textContent = sceneText(sc, here, u);
+    line.style.color = sc.c;
+    here.forEach(function (k, i) { setMove(k, sc.a[i] || 'bob'); });
+}
+
+function setMove(k, kind) {
+    const el = document.getElementById('pet-st-' + k);
+    const img = el && el.querySelector('img');
+    if (!img) return;
+    const cls = 'pet-' + kind;
+    if (img.className === cls) return;        // 같으면 두어야 움직임이 안 끊긴다
+    img.className = cls;
 }
 
 function paint() {
@@ -325,8 +459,20 @@ function paint() {
         host.appendChild(el);
     }
     const h = html();
-    if (el.innerHTML !== h) el.innerHTML = h;
+    // 글 자체를 재 둔다 — 장면이 class 를 바꾸므로 innerHTML 로 재면 늘 어긋난다
+    if (el._petH !== h) { el._petH = h; el.innerHTML = h; }
+    try { playScene(); } catch (e) { }
 }
+
+// 장면은 제 시계로 돈다
+setInterval(function () {
+    try {
+        const panel = document.getElementById('house-main');
+        if (!panel || !panel.classList.contains('active')) return;
+        if (!document.getElementById('pet-scene-line')) return;
+        playScene();
+    } catch (e) { }
+}, 2000);
 
 window.petRoomPaint = paint;
 
@@ -363,9 +509,13 @@ window.petRoom = function () {
     const ps = P().pets(u);
     const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; });
     if (!keys.length) { console.log('  방이 비었습니다.'); return; }
+    console.log('  방에 내놓은 펫:', P().show(u).map(function (k) {
+        return P().nick(k, u);
+    }).join(' · ') || '-', '(최대 ' + P().SHOW_MAX + '마리 · [🐶 펫] 칸에서 고릅니다)');
     console.table(keys.map(function (k) {
         const s = ps[k];
-        return { 번호: k, 이름: P().nick(k, u), 교감: P().bond(k, u) + ' / ' + P().BOND_MAX,
+        return { 번호: k, 이름: P().nick(k, u), 방: P().showHas(k, u) ? '🏠' : '',
+                 교감: P().bond(k, u) + ' / ' + P().BOND_MAX,
                  오늘남은몫: P().bondRoom(k, u),
                  배고픔: span(Math.max(0, P().starveLeft(k, u))) + ' 뒤',
                  대신죽기: P().bondFull(k, u) ? ('O (' + Math.round(P().SAVE_ODDS * 100) + '%)') : '✗',
