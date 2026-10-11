@@ -15,8 +15,8 @@
 //
 //   pet/p01~p20.webp   깨어날 때 뜨는 본 그림 (긴 쪽 220)
 //   pet/s01~s20.webp   목록에 뜨는 작은 것 (긴 쪽 64)
-//                      데포르메가 아직 없는 것은 백호 하나뿐이다 —
-//                      그것만 본 그림을 줄여서 쓴다
+//                      스무 마리 모두 데포르메가 있다. 160×128 시트를
+//                      32×32 칸으로 잘라, 빈 자리를 떼고 두 배로 키운 것이다.
 //   pet/egg0~egg3.webp 알 — 금이 번지는 차례
 //
 // ■ 사원 기록에 적히는 자리
@@ -71,7 +71,7 @@ const PET_LIST = [
     { i: 7,  n: '거북이',   w: 'cold',  deform: true,  st: { resist: 3 }, d: '느리다. 그래도 어디든 간다.' },
     { i: 8,  n: '참새',     w: 'noise', deform: true,  st: { luck: 50 },  d: '늘 셋 이상이다. 혼자인 걸 본 적이 없다.' },
     { i: 9,  n: '햄스터',   w: 'wet',   deform: true,  st: { luck: 70 },  d: '볼에 하루치를 넣고 다닌다.' },
-    { i: 10, n: '백호',     w: 'heat',  deform: false, st: { bon: 3, eva: 1 }, d: '흰 줄무늬. 눈을 마주치면 진다.' },
+    { i: 10, n: '백호',     w: 'heat',  deform: true,  st: { bon: 3, eva: 1 }, d: '흰 줄무늬. 눈을 마주치면 진다.' },
     { i: 11, n: '곰',       w: 'scent', deform: true,  st: { resist: 4 }, d: '봉제 인형처럼 생겼다. 아니다.' },
     { i: 12, n: '뱀',       w: 'cold',  deform: true,  st: { gim: 1 },    d: '감아 오는 것이 인사다.' },
     { i: 13, n: '여우',     w: 'noise', deform: true,  st: { luck: 90 },  d: '웃고 있다. 웃는 게 아닐 수도 있다.' },
