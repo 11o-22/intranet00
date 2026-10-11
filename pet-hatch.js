@@ -187,7 +187,8 @@ function hatch(e) {
     const u = u_();
     const p = P().pick(e.warn, u);
     const key = String(p.i);
-    const rec = { g: 'D', at: P().now() };
+    const now = P().now();
+    const rec = { g: 'D', at: now, fedAt: now, bond: 0 };
 
     P().pets(u)[key] = rec;
     u.petEgg = null;

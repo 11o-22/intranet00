@@ -119,12 +119,15 @@ function feed(id, name) {
 
     const now = P().now();
     const rest = Math.max(0, (Number(s.rest) || 0) - now);
-    if (!rest && !f.up) return { ok: false, why: '지금은 쉬고 있지 않습니다.' };
 
     add(name, -1);
 
-    const patch = {};
+    const patch = { fedAt: now };               // 굶주림 시계를 되돌린다
     let said = [];
+    const up = P().bondUp(id, patch);           // 교감도
+    if (up) said.push('교감 +' + up + ' (' + (patch.bond) + ' / ' + P().BOND_MAX + ')');
+    else if (P().bond(id, u) >= P().BOND_MAX) said.push('교감은 이미 가득합니다.');
+    else said.push('오늘 교감은 더 오르지 않습니다.');
     if (rest) {
         const left = (f.cut < 0) ? 0 : Math.max(0, rest - f.cut);
         patch.rest = left ? (now + left) : null;
@@ -177,8 +180,9 @@ function html() {
     return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
         + '🍖 펫 먹이</div>'
         + '<div style="font-size:9.5px; color:#777; margin-bottom:6px; line-height:1.6;">'
-        + '탐사를 다녀온 펫은 두 시간 쉽니다. 먹이는 그 시간을 줄입니다.'
-        + ' 주는 것은 어둠 칸의 펫 탐사에서 합니다.</div>'
+        + '먹이면 교감이 오르고, 탐사를 다녀와 쉬는 시간도 줄어듭니다.'
+        + ' <span style="color:#e07a5f;">사흘 동안 안 주면 펫이 죽습니다.</span><br>'
+        + '주는 것은 내 방에서 합니다.</div>'
         + rows;
 }
 

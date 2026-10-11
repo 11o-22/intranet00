@@ -21,7 +21,8 @@
 //
 // ■ 사원 기록에 적히는 자리
 //
-//   u.pets      { 펫번호: { g:'D', nick, at, fed, rest, out } }
+//   u.pets      { 펫번호: { g:'D', nick, at, fed, fedAt, rest, out,
+//                            bond, bd:{d,v}, pat, play, with } }
 //               nick 은 따로 붙여 준 이름. 비어 있으면 종 이름으로 부른다.
 //   u.petEgg    { warn, need:{물품:수}, done:{물품:수}, last, ruin }
 //   u.petEggAt  알을 산 날 (하루 하나)
@@ -169,6 +170,23 @@ const PET_RUIN = {
 };
 
 // ==========================================
+// 교감 · 굶주림
+// ==========================================
+//
+//   교감도는 0 에서 100 까지. 쓰다듬기 · 놀아주기 · 먹이주기로 한 번에
+//   둘~셋씩 오른다. 하루에 오르는 몫은 열까지다.
+//
+//   먹이를 사흘 동안 안 주면 펫이 죽는다. 죽은 펫은 목록에서 사라지고
+//   그 자리는 다시 「입양 전」이 된다.
+const PET_BOND_MAX = 100;
+const PET_BOND_DAY = 10;                      // 하루에 오르는 몫
+const PET_BOND_STEP = [2, 3];                 // 한 번에 둘~셋
+const PET_PAT_GAP = 10 * 60 * 1000;           // 쓰다듬기 사이
+const PET_PLAY_GAP = 20 * 60 * 1000;          // 놀아주기 사이
+const PET_STARVE = 3 * 24 * 3600 * 1000;      // 사흘
+const PET_SAVE_ODDS = 0.5;                    // 교감 100 — 대신 죽어 줄 확률
+
+// ==========================================
 // 사원 기록
 // ==========================================
 function petMe() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -221,6 +239,95 @@ function petBagAdd(name, n) {
     return v;
 }
 function petBagHas(name, u) { return Number(petBag(u)[name]) || 0; }
+
+// ==========================================
+// 교감도
+// ==========================================
+function petBond(id, u) {
+    const s = petsOf(u)[String(id)];
+    return Math.max(0, Math.min(PET_BOND_MAX, Number(s && s.bond) || 0));
+}
+function petBondFull(id, u) { return petBond(id, u) >= PET_BOND_MAX; }
+
+// 오늘 더 올릴 수 있는 몫
+function petBondRoom(id, u) {
+    const s = petsOf(u)[String(id)];
+    if (!s) return 0;
+    const cap = PET_BOND_MAX - petBond(id, u);
+    if (cap <= 0) return 0;
+    const bd = s.bd;
+    const used = (bd && bd.d === petToday()) ? (Number(bd.v) || 0) : 0;
+    return Math.max(0, Math.min(cap, PET_BOND_DAY - used));
+}
+
+// 올린다 — 올린 만큼 돌려준다 (patch 에 얹을 것도 같이 채워 준다)
+function petBondUp(id, patch) {
+    const u = petMe();
+    const s = petsOf(u)[String(id)];
+    if (!s) return 0;
+    const room = petBondRoom(id, u);
+    if (room <= 0) return 0;
+    const lo = PET_BOND_STEP[0], hi = PET_BOND_STEP[1];
+    const got = Math.min(room, lo + Math.floor(Math.random() * (hi - lo + 1)));
+    const bd = (s.bd && s.bd.d === petToday()) ? s.bd : { d: petToday(), v: 0 };
+    patch.bond = petBond(id, u) + got;
+    patch.bd = { d: bd.d, v: (Number(bd.v) || 0) + got };
+    return got;
+}
+
+// ==========================================
+// 굶주림 — 마지막으로 먹인 때로부터 사흘
+// ==========================================
+function petStarveLeft(id, u) {
+    const s = petsOf(u)[String(id)];
+    if (!s) return 0;
+    const at = Number(s.fedAt) || 0;
+    if (!at) return PET_STARVE;          // 아직 시계가 안 붙은 펫은 굶지 않는다
+    return (at + PET_STARVE) - petNow();
+}
+
+// 굶어 죽은 펫을 걷어 간다 — 치운 펫 목록을 돌려준다
+function petStarveSweep() {
+    const u = petMe();
+    if (!u) return [];
+    const ps = petsOf(u);
+    const now = petNow();
+
+    // 굶주림 시계가 없는 펫(예전에 깨어난 것)에게는 지금부터 사흘을 준다
+    const stamp = {};
+    Object.keys(ps).forEach(function (k) {
+        if (!PET_BY_ID[k] || !ps[k] || ps[k].fedAt) return;
+        ps[k].fedAt = now;
+        stamp['pets/' + k + '/fedAt'] = now;
+    });
+    if (Object.keys(stamp).length) {
+        try {
+            if (typeof database !== 'undefined' && database && u.code) {
+                database.ref('users/' + u.code).update(stamp).catch(function () { });
+            } else petSave({ pets: 1 });
+        } catch (e) { }
+    }
+
+    const gone = [];
+    Object.keys(ps).forEach(function (k) {
+        if (!PET_BY_ID[k]) return;
+        if (petStarveLeft(k, u) > 0) return;
+        gone.push({ i: k, n: petNick(k, u), sp: (PET_BY_ID[k] || {}).n });
+        delete ps[k];
+    });
+    if (!gone.length) return gone;
+    try {
+        if (typeof database !== 'undefined' && database && u.code) {
+            const up = {};
+            gone.forEach(function (g) { up['pets/' + g.i] = null; });
+            database.ref('users/' + u.code).update(up)
+                .catch(function (e) { console.warn('[펫] 굶주림 저장 실패', e); });
+            return gone;
+        }
+    } catch (e) { }
+    petSave({ pets: 1 });
+    return gone;
+}
 
 // 알 쪽 기록 — 통째로 쓴다 (알은 한 번에 하나뿐이라 겹칠 일이 없다)
 function petEggSave() {
@@ -400,6 +507,10 @@ window.PET = {
     CARE: PET_CARE, CARE_BY: PET_CARE_BY, TAGS: PET_TAGS, GRADES: PET_GRADES,
     RUIN: PET_RUIN, EGG_NAME: PET_EGG_NAME, EGG_PRICE: PET_EGG_PRICE,
     GAP: PET_CARE_GAP, REST: PET_REST_MS, NICK_MAX: PET_NICK_MAX,
+    BOND_MAX: PET_BOND_MAX, BOND_DAY: PET_BOND_DAY, PAT_GAP: PET_PAT_GAP,
+    PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,
+    bond: petBond, bondFull: petBondFull, bondRoom: petBondRoom, bondUp: petBondUp,
+    starveLeft: petStarveLeft, sweep: petStarveSweep,
     pets: petsOf, bag: petBag, egg: petEgg, has: petHas, save: petSave, patch: petPatch,
     now: petNow, today: petToday,
     bagAdd: petBagAdd, bagHas: petBagHas, eggSave: petEggSave,

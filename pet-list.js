@@ -70,6 +70,7 @@ const GREY = ' background:#2a2a2a !important; border-color:#444 !important; colo
 // ==========================================
 function statusOf(s) {
     const now = P().now();
+    if (s && s['with']) return { t: '동행 중', c: '#d4af37' };
     if (s && s.out && s.out.till)
         return (s.out.till > now)
             ? { t: '탐사 중', c: '#9fd8ef' }
@@ -185,12 +186,28 @@ function oneView(id) {
             ? esc(P().statText(p.st))
             : '<span style="color:#8d8578;">— B 등급부터 생깁니다</span>')
         + line('주의 문구', esc(P().WARN[p.w].n))
+        + line('교감', P().bond(id, me) + ' / ' + P().BOND_MAX
+            + (P().bondFull(id, me)
+                ? ' <span style="color:#d4af37;">— 대신 간다</span>' : ''))
+        + line('배고픔', (function () {
+            const h = P().starveLeft(id, me);
+            if (h <= 0) return '<span style="color:#e07a5f;">굶었습니다</span>';
+            const m = Math.ceil(h / 60000), hh = Math.floor(m / 60);
+            const t = hh >= 24 ? (Math.floor(hh / 24) + '일 ' + (hh % 24) + '시간')
+                   : hh >= 1 ? (hh + '시간 ' + (m % 60) + '분') : (m + '분');
+            return '<span style="color:' + (h < 24 * 3600 * 1000 ? '#e07a5f' : '#e8d7b4')
+                + ';">' + t + ' 뒤</span>';
+        })())
         + (st ? line('지금', '<span style="color:' + st.c + ';">' + st.t + '</span>') : '')
 
-        + '<button id="pet-nick" class="game-btn" style="' + BTN + ' margin-top:12px;">이름 붙이기</button>'
+        + '<button id="pet-care" class="game-btn" style="' + BTN + ' margin-top:12px;">쓰다듬고 먹인다</button>'
+        + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
 
     w.querySelector('#pet-back').onclick = listView;
+    w.querySelector('#pet-care').onclick = function () {
+        if (typeof window.petBondOpen === 'function') { shut(); window.petBondOpen(id); }
+    };
     w.querySelector('#pet-nick').onclick = function () { nickView(id); };
 }
 

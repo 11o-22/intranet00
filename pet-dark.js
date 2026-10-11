@@ -86,6 +86,7 @@ const GREY = ' background:#2a2a2a !important; border-color:#444 !important; colo
 // ==========================================
 function stateOf(s) {
     const now = P().now();
+    if (s && s['with']) return { k: 'with', t: '같이 들어가 있습니다', c: '#d4af37' };
     if (s && s.out && s.out.till) {
         return (s.out.till > now)
             ? { k: 'out',  t: esc(s.out.name || s.out.zone) + ' · ' + left(s.out.till - now) + ' 남음', c: '#9fd8ef' }
@@ -118,6 +119,7 @@ window.petSend = function (id, zone) {
     const s = P().pets(u)[key];
     if (!s) { alert_('아직 없는 펫입니다.'); return; }
     const st = stateOf(s);
+    if (st.k === 'with') { alert_('주인과 같이 어둠에 들어가 있습니다.'); return; }
     if (st.k === 'out')  { alert_('이미 나가 있습니다.'); return; }
     if (st.k === 'done') { alert_('먼저 데려오십시오.'); return; }
     if (st.k === 'rest') { alert_('쉬는 중입니다.\n\n' + st.t + '\n사택에서 먹이를 사 두면 줄일 수 있습니다.'); return; }
@@ -284,6 +286,8 @@ function html() {
         else if (st.k === 'rest')
             btn = '<button class="game-btn" onclick="petFeedPick(' + k + ')"'
                 + ' style="margin:0; padding:7px 12px; font-size:11px;' + GREY + '">먹인다</button>';
+        else if (st.k === 'with')
+            btn = '<span style="font-size:10px; color:#8d8578;">동행 중</span>';
         else
             btn = '<span style="font-size:10px; color:#555;">탐사 중</span>';
 
