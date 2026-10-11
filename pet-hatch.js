@@ -188,6 +188,10 @@ function hatch(e) {
     const p = P().pick(e.warn, u);
     const key = String(p.i);
     const now = P().now();
+
+    // 그 묶음 넷을 다 가지고 있으면 겹쳐서 나온다 — 그때는 값을 돌려준다
+    if (P().has(p.i, u)) { dup(p); return; }
+
     const rec = { g: 'D', at: now, fedAt: now, bond: 0 };
 
     P().pets(u)[key] = rec;
@@ -210,6 +214,41 @@ function hatch(e) {
     ui();
     paint();
     reveal(p);
+}
+
+// 이미 있는 펫이 또 나왔다 — 데려가지 않고 값을 돌려준다
+function dup(p) {
+    const u = u_();
+    const back = P().DUP_BACK;
+    const cap = (typeof POINT_CAP !== 'undefined') ? POINT_CAP : 30000000;
+
+    u.petEgg = null;
+    u.points = Math.max(0, Math.min(cap, (Number(u.points) || 0) + back));
+
+    log_('[환몽알] ' + p.n + P().josa(p.n, '이') + ' 또 나왔습니다 — 돌려받음 (+'
+        + back.toLocaleString() + ' P)');
+    P().save({ points: 1, history: 1 });
+    P().eggSave();
+    try { if (typeof showPointGainEffect === 'function') showPointGainEffect(back); } catch (e) { }
+    ui();
+    paint();
+
+    const nick = P().nick(p.i, u);
+    box('<div style="font-size:10px; color:#8d8578; text-align:center;">껍질이 갈라집니다</div>'
+        + '<div style="font-size:15px; color:#9fd8ef; font-weight:bold; text-align:center;'
+        + ' margin:4px 0 11px 0;">' + esc(p.n) + '</div>'
+        + '<div style="text-align:center; background:rgba(0,0,0,0.42); border:1px solid #3a3025;'
+        + ' border-radius:8px; padding:12px; margin-bottom:11px;">'
+        + '<img src="' + P().img(p.i) + '" alt="" style="max-width:100%; max-height:190px;'
+        + ' filter:grayscale(0.55) brightness(0.8);"></div>'
+        + '<div style="font-size:11px; color:#b8ac97; line-height:1.6; margin-bottom:11px;">'
+        + '같은 것이 또 나왔습니다. 방에 이미 '
+        + (P().named(p.i, u) ? ('「' + esc(nick) + '」') : esc(p.n)) + P().josa(P().named(p.i, u) ? nick : p.n, '이')
+        + ' 있습니다.<br>데려가지 않기로 하고, 값의 일부를 돌려받았습니다.</div>'
+        + '<div style="font-size:11px; color:#d4af37; text-align:center; border-top:1px solid #2a241c;'
+        + ' padding-top:10px; margin-bottom:12px;">+ ' + back.toLocaleString() + ' P</div>'
+        + '<button id="ph-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>', true)
+        .querySelector('#ph-x').onclick = shut;
 }
 
 function reveal(p) {

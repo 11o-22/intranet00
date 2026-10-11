@@ -141,6 +141,7 @@ PET_CARE.forEach(function (x) { PET_CARE_BY[x[0]] = { tag: x[1], price: x[2] }; 
 // ==========================================
 const PET_EGG_NAME = '환몽알';
 const PET_EGG_PRICE = 500000;
+const PET_DUP_BACK = 300000;              // 이미 있는 펫이 또 나왔을 때 돌려주는 값
 const PET_CARE_GAP = 10 * 60 * 1000;      // 한 번 쓰고 다음까지
 const PET_REST_MS = 2 * 3600 * 1000;      // 탐사 뒤 쉬는 시간
 
@@ -506,6 +507,7 @@ window.PET = {
     LIST: PET_LIST, BY: PET_BY_ID, WARN: PET_WARN, WARN_KEYS: PET_WARN_KEYS,
     CARE: PET_CARE, CARE_BY: PET_CARE_BY, TAGS: PET_TAGS, GRADES: PET_GRADES,
     RUIN: PET_RUIN, EGG_NAME: PET_EGG_NAME, EGG_PRICE: PET_EGG_PRICE,
+    DUP_BACK: PET_DUP_BACK,
     GAP: PET_CARE_GAP, REST: PET_REST_MS, NICK_MAX: PET_NICK_MAX,
     BOND_MAX: PET_BOND_MAX, BOND_DAY: PET_BOND_DAY, PAT_GAP: PET_PAT_GAP,
     PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,

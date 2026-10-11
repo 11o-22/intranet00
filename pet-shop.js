@@ -170,6 +170,8 @@ function eggBox() {
         + '<div style="font-size:10px; color:#8d8578; line-height:1.55; margin-bottom:7px;">'
         + '안에서 무엇이 자라는지는 깨어나 봐야 압니다. 알마다 아래 가운데'
         + ' <b style="color:#b8ac97;">한 줄</b>이 적혀 있고, 그 줄을 어기면 그 자리에서 상합니다.'
+        + '<br>이미 있는 펫이 또 나오면 데려가지 않고 '
+        + '<b style="color:#c9a227;">' + P().DUP_BACK.toLocaleString() + ' P</b>를 돌려받습니다.'
         + '</div>'
         + '<div style="border-top:1px solid #2a241c; border-bottom:1px solid #2a241c;'
         + ' padding:5px 0; margin-bottom:9px;">' + warns + '</div>'
