@@ -188,13 +188,22 @@ function apply(target, k, count) {
         target.satHoldUntil = Math.max(Date.now(), target.satHoldUntil || 0) + add;
         say = '오염도·포만도 동결 ' + count + '시간';
 
+    // ★ 횟수는 「쓴 것을 깎는」 대신 **한도 위에 얹는다**
+    //
+    //   전에는 darkTries · facilityCount 를 되돌렸다. 그러면 —
+    //     · 아직 한 번도 안 썼으면 0 에서 막혀 아무것도 안 들어가고
+    //     · 들어가도 그날 한도(공용 20 · 어둠 8) 위로는 못 올라간다
+    //   꼬리를 썼는데 횟수가 안 느는 일이 그래서 생겼다.
+    //
+    //   이제 24시간짜리 몫으로 얹는다. count-cap.js 의 FREE_SRC 에
+    //   호사수구가 들어 있어 천장(공용 30 · 어둠 12) **밖**에서 더해진다.
     } else if (k === 'dark') {
-        target.darkTries = Math.max(0, (target.darkTries || 0) - count);
-        say = '어둠 탐사 ' + count + '회';
+        try { window.ibAdd(target, 'dark', count, BUFF_MS, FOX); } catch (e) { }
+        say = '어둠 탐사 +' + count + '회 (24시간)';
 
     } else if (k === 'fcnt') {
-        target.facilityCount = Math.max(0, (target.facilityCount || 0) - count);
-        say = '공용시설 ' + count + '회';
+        try { window.ibAdd(target, 'fac', count, BUFF_MS, FOX); } catch (e) { }
+        say = '공용시설 +' + count + '회 (24시간)';
 
     } else if (k === 'out') {
         target.foxEscape = (target.foxEscape || 0) + count;
@@ -417,7 +426,11 @@ function useTails(target, k, count, isSelf) {
                 updateUserFields(target.code, {
                     foxBuffs: target.foxBuffs || [], foxEscape: target.foxEscape || 0,
                     pollFreezeUntil: target.pollFreezeUntil || 0, satHoldUntil: target.satHoldUntil || 0,
-                    darkTries: target.darkTries || 0, facilityCount: target.facilityCount || 0,
+                    // 횟수는 이제 itemBuffs 로 얹는다 (위 apply 참고).
+                    //   darkTries · facilityCount 는 더 이상 손대지 않으므로 보내지 않는다 —
+                    //   내 화면에 캐시된 묵은 값을 그대로 밀어 넣어 상대의 진짜 값을
+                    //   덮어쓸 수 있다.
+                    itemBuffs: target.itemBuffs || [],
                     badge: target.badge, foxNotes: target.foxNotes || [],
                     history: target.history, hasItemUsedOnMe: true
                 });

@@ -416,6 +416,11 @@ window.kleeNoteLive = function (u, note) {
         if (!u) return false;
         const t = String(note || '');
         if (/구매 행운/.test(t)) return (u.kleeShop || 0) > Date.now();
+        // ② 신호 — 이번 탐사 동안만. 탐사가 끝나면 걷어 간다.
+        if (t.indexOf('어둠 신호') >= 0) {
+            try { return !!(typeof darkRun !== 'undefined' && darkRun && signMult()); }
+            catch (e) { return false; }
+        }
         const nm = Object.keys(KEY_OF).filter(function (n) { return t.indexOf(n) >= 0; })
             .sort(function (a, b) { return b.length - a.length; })[0];   // 「공용시설 행운」이 「행운」보다 먼저
         if (!nm) return (liveBuffs(u).some(function (b) { return b.src === KLEE.WHO; }));
@@ -609,6 +614,13 @@ function m2Send() {
         const head = (s.by === u.code)
             ? '내가 남긴 신호입니다.'
             : esc(s.name || '누군가') + ' 사원이 신호를 남겼습니다.';
+        // ★ 내 특이사항에도 남긴다
+        //
+        //   ①·④·⑤ 는 24시간짜리라 전부터 적혔는데, ② 신호만 「탐사 한 번짜리라
+        //   적을 것이 없다」고 빼 두었다. 그런데 이것이 ① 과 함께 횟수 제한이
+        //   없는 두 가지라 제일 많이 쓰인다. 보는 사람 쪽에서는 걸려 있는데
+        //   아무 데도 안 보이는 셈이었다. 탐사가 끝나면 note-fix 가 걷어 간다.
+        signNote(mine);
         ring();
         const w = box(bubble('아차차, 내가 말이 많았네.', KLEE.WHO)
             + '<div style="margin:2px 0 12px 0; padding:11px 12px; border-radius:8px;'
@@ -623,6 +635,21 @@ function m2Send() {
         w.querySelector('#klee-x').onclick = shut;
     }
 })();
+
+// ② 신호 — 내 특이사항 한 줄. 탐사가 끝나면 사라진다.
+const SIGN_MARK = '어둠 신호';
+function signNote(mine) {
+    const u = me();
+    if (!u || !mine) return;
+    try {
+        // 같은 줄이 두 번 붙지 않게 먼저 걷어낸다
+        if (typeof stripNoteByItem === 'function') stripNoteByItem(u, NOTE + ' ' + SIGN_MARK);
+    } catch (e) { }
+    const t = (u.badge && u.badge.notes) || '';
+    if (t.indexOf(SIGN_MARK) >= 0) return;
+    noteAdd(u, SIGN_MARK + ' — 포인트 ' + mine.pt + '배 · 회수품 ' + mine.loot + '배 (이번 탐사)');
+    try { if (typeof saveFields === 'function') saveFields({ badge: 1 }); } catch (e) { }
+}
 
 // 내 몫 — 신호가 남아 있나
 function signMult() {

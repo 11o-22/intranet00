@@ -1210,6 +1210,33 @@ setInterval(function () {
 // 기준이 섰는가 — 바깥(points-safe.js)에서 본다
 window.mergeReady = function () { return !!ready; };
 
+// ==========================================
+// ★ 서버 포인트를 밖에서 직접 옮겼을 때 — 기준도 같이 옮긴다
+// ==========================================
+//
+//   은행 출금·입금은 users/<사번>/points 를 **서버에서 바로** 트랜잭션으로
+//   움직인다 (bank-fix.js). 그러면 내 화면 값도 기준도 그대로 남는다.
+//
+//   그 상태에서 기준이 서면 (또는 리스너가 늦게 오면) 기준은 **뽑은 뒤**의
+//   서버 값이 되고 내 화면은 **뽑기 전** 값에 멈춘다. 다음 저장이 그 차이를
+//   「내가 쓴 돈」으로 보고 서버에서 도로 빼 간다 — 뽑은 돈이 사라진다.
+//
+//   그래서 밖에서 서버를 옮겼으면 이쪽으로 알려 준다. 화면과 기준을
+//   **같은 몫만큼** 옮기므로 보낼 차이가 0 이 되어, 어느 쪽이 먼저
+//   도착하든 어긋나지 않는다. 값을 덮어쓰지 않으니 그 사이 들어온 돈도
+//   안 지운다.
+window.mergePtsMoved = function (delta) {
+    const d = Number(delta) || 0;
+    if (!d || !currentUser) return false;
+    const cap = ptsCap();
+    currentUser[PTS] = Math.max(0, Math.min(cap, (Number(currentUser[PTS]) || 0) + d));
+    if (ready && base) {
+        base[PTS] = Math.max(0, Math.min(cap, (Number(base[PTS]) || 0) + d));
+    }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    return true;
+};
+
 window.mergeState = function () {
     console.log('%c===== 저장 병합 =====', 'color:#d4af37; font-size:13px');
     console.log('  계정:', code || '(없음)', '· 기준 준비:', ready ? 'O' : '-');

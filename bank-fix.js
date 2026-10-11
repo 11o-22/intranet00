@@ -102,11 +102,37 @@ function movePoints(c, delta) {
         return next;
     }).then(function (res) {
         if (!res || !res.committed) return 0;
+        bumpMine(moved);                 // 내 화면 값과 기준도 같은 몫만큼 옮긴다
         return moved;
     }).catch(function (e) {
         console.error('[은행] 포인트 쓰기 실패:', e);
         return null;                                            // 아예 못 썼다
     });
+}
+
+// ★ 서버 포인트를 움직였으면 내 화면 값도 그만큼 옮긴다
+//
+//   예전에는 「save-merge 가 서버에서 받아 내려 준다」고 보고 손대지 않았다.
+//   그런데 기준(base)이 아직 안 섰거나 기준이 서는 그 순간에 겹치면 —
+//   기준은 서버에서 받은 **뽑은 뒤**의 값이 되고 내 화면은 **뽑기 전** 값에
+//   멈춘다. 그러면 다음 저장이 그 차이를 「내가 쓴 돈」으로 보고 서버에서
+//   도로 빼 간다. 뽑은 돈이 사라지던 까닭이 이것이다.
+//   (들어오자마자 연달아 뽑으면 반드시 걸렸다 — 기준은 로그인 뒤 몇 초 걸린다)
+//
+//   값을 덮어쓰지 않고 **움직인 몫만** 더하므로, 그 사이 남이 보내 준 돈도
+//   지우지 않는다. 기준도 같이 옮겨서 보낼 차이가 0 이 되게 한다.
+function bumpMine(delta) {
+    const d = Number(delta) || 0;
+    if (!d) return;
+    try {
+        if (typeof window.mergePtsMoved === 'function') { window.mergePtsMoved(d); return; }
+    } catch (e) { }
+    // 병합이 없는 자리 — 화면 값만 옮긴다
+    try {
+        if (typeof currentUser !== 'undefined' && currentUser) {
+            currentUser.points = Math.max(0, Math.min(cap(), (Number(currentUser.points) || 0) + d));
+        }
+    } catch (e) { }
 }
 
 // 되돌리기마저 못 했다 — 돈이 어느 쪽에도 없다. 숨기지 않고 알린다.
