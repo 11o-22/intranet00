@@ -88,13 +88,58 @@ function myParty() {
     return null;
 }
 // 지금 내가 토크쇼에 있나 (대기실이든 탐사 중이든)
+// ★ 방 쪽지가 사라져도 배수를 잃지 않게 — darkRun 에 베껴 둔다
+//
+//   무대 열기(heat) · 사회자 피날레(hostDead) · 쇼 표시(talkShow) 는 전부
+//   방 쪽지(darkParties/<방>)에 적힌다. 그런데 정산은 판이 끝난 **뒤에** 돈다.
+//   그 사이에
+//     · 죽은 사람은 death-leave.js 가 방에서 빼고,
+//     · 마지막 사람이 빠지면 방 쪽지가 통째로 없어지고,
+//     · heat 를 올린 쓰기(transaction, applyLocally:false)가 아직 안 돌아왔을
+//       수도 있다.
+//   그러면 showOf() 가 null 이거나 heat 가 0 으로 보여 배수가 1 이 된다.
+//   「배수가 안 붙는다」가 이것이다. 오래 끄는 판일수록 잘 난다 — S-010 처럼.
+//
+//   그래서 쇼가 도는 동안 값을 darkRun 에 계속 베껴 두고, 정산 때는 둘 가운데
+//   큰 쪽을 쓴다.
+function mirror(p) {
+    if (typeof darkRun === 'undefined' || !darkRun) return;
+    if (!p || !p.talkShow || !p.talkShow.by) return;
+    darkRun._showOn = { id: p.id, by: p.talkShow.by, name: p.talkShow.name || '' };
+    const h = Number(p.heat || 0);
+    if (h > (darkRun._showHeat || 0)) darkRun._showHeat = h;
+    if (p.hostDead) darkRun._showHostDead = true;
+}
+
 function showOf() {
     const inRun = (typeof darkRun !== 'undefined' && darkRun && darkRun.partyId)
         ? party(darkRun.partyId) : null;
     const p = inRun || myParty();
-    if (p && p.talkShow && p.talkShow.by) return p;
+    if (p && p.talkShow && p.talkShow.by) { mirror(p); return p; }
+
+    // 방이 없어졌어도 이 판이 쇼였던 것은 남는다
+    if (typeof darkRun !== 'undefined' && darkRun && darkRun._showOn) {
+        const live = party(darkRun._showOn.id) || {};
+        return {
+            id: darkRun._showOn.id,
+            talkShow: { by: darkRun._showOn.by, name: darkRun._showOn.name },
+            heat: Math.max(Number(live.heat || 0), Number(darkRun._showHeat || 0)),
+            hostDead: !!(live.hostDead || darkRun._showHostDead),
+            alive: live.alive || {},
+            members: live.members || {},
+            _ghost: true
+        };
+    }
     return null;
 }
+
+// 쇼가 도는 동안 방 쪽지를 계속 베껴 둔다
+setInterval(function () {
+    try {
+        if (typeof darkRun === 'undefined' || !darkRun || !darkRun.partyId) return;
+        mirror(party(darkRun.partyId));
+    } catch (e) { }
+}, 2000);
 function isHost(p, code) {
     return !!(p && p.talkShow && p.talkShow.by === (code || (currentUser || {}).code));
 }
@@ -771,7 +816,15 @@ function bumpHeat(p, iAmHost) {
             if (!p || typeof darkRun === 'undefined' || !darkRun) return _d.apply(this, arguments);
 
             // 기능 5 — 무대 열기는 죽을 때마다 쌓인다 (부활해도 쌓인다)
-            try { bumpHeat(p, isHost(p)); } catch (e) { }
+            try {
+                bumpHeat(p, isHost(p));
+                // ★ 서버 메아리를 기다리지 않는다. transaction 을 applyLocally:false
+                //   로 보내므로, 돌아오기 전에 판이 끝나면 heat 가 0 으로 보였다.
+                darkRun._showHeat = Math.max(Number(darkRun._showHeat || 0),
+                                             Number(p.heat || 0)) + 1;
+                if (isHost(p)) darkRun._showHostDead = true;
+                mirror(p);
+            } catch (e) { }
 
             // ★ 표가 아예 없으면 그 자리에서 채운다.
             //   darkRun 을 새로 짓는 길이 여럿이라(이어하기·epic·합류) 출발 때
@@ -811,6 +864,7 @@ function bumpHeat(p, iAmHost) {
             return;
         };
         darkDeath._show = true;
+        HOOKED.death = true;
         clearInterval(iv);
         console.log('[토크쇼] 부활 연결');
     }, 400);
@@ -819,11 +873,27 @@ function bumpHeat(p, iAmHost) {
 // ==========================================
 // 기능 5·6 — 보너스 포인트 · 회수품 2배
 // ==========================================
+// ★ 감싼 표는 **뒤에 감싸는 쪽이 지운다.** darkDeath · renderDarkResult 는
+//   뒤로도 여러 파일이 감싸므로 fn._show 가 금방 사라진다. 그래서 연결 여부는
+//   여기 따로 적어 둔다 — 안 그러면 showState() 가 「연결 안 됨」으로 거짓말한다.
+const HOOKED = {};
+
+// 마지막 정산에서 무슨 수로 셈했는지 적어 둔다 (showWhy)
+let lastCalc = null;
+
 function multOf(p) {
     if (!p) return 1;
-    const heat = Number(p.heat || 0);
+    // 방 쪽지와 베껴 둔 것 가운데 **큰 쪽**을 쓴다 (위 mirror 의 까닭)
+    let heat = Number(p.heat || 0);
+    let hostDead = !!p.hostDead;
+    try {
+        if (typeof darkRun !== 'undefined' && darkRun) {
+            if (Number(darkRun._showHeat || 0) > heat) heat = Number(darkRun._showHeat);
+            if (darkRun._showHostDead) hostDead = true;
+        }
+    } catch (e) { }
     let m = 1 + HEAT_STEP * heat;
-    if (p.hostDead) m *= HOST_MULT;
+    if (hostDead) m *= HOST_MULT;
     return Math.min(MAX_MULT, m);
 }
 
@@ -865,26 +935,49 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
             lootBoost = !!(p && hostAlive && mine);
             const before = currentUser ? (currentUser.points || 0) : 0;
             lootBoostWas = lootBoost;
+
+            // ★ 배수를 **미리** 셈해 둔다.
+            //
+            //   전에는 안쪽 정산이 끝난 뒤에 multOf(p) 를 불렀다. 그런데 그 사이에
+            //   darkRun 이 **사라진다** (정산이 판을 접는다). multOf 도 showOf 도
+            //   베껴 둔 값을 darkRun 에서 읽으므로, 그때는 전부 0 으로 보인다.
+            //   그래서 열기가 쌓여 있어도 배수가 늘 1 이었다 —
+            //   「배수가 안 먹힌다」가 이것이다. 죽음이 끼어 있을수록 잘 났다.
+            const m = multOf(p);
+            const heatNow = p
+                ? Math.max(Number(p.heat || 0),
+                           Number((typeof darkRun !== 'undefined' && darkRun) ? (darkRun._showHeat || 0) : 0))
+                : 0;
+            const hostDeadNow = !!(p && p.hostDead)
+                || !!(typeof darkRun !== 'undefined' && darkRun && darkRun._showHostDead);
+            const zoneNow = (typeof darkRun !== 'undefined' && darkRun) ? darkRun.zone : '-';
+            const deadNow = !!(typeof darkRun !== 'undefined' && darkRun && darkRun._dead);
+            const howNow = p ? (p._ghost ? '베껴 둔 것으로' : '방 쪽지로') : '못 찾음';
+
             let r;
             try { r = _r.apply(this, arguments); }
             finally { lootBoost = false; }
 
             try {
+                const got = (currentUser ? (currentUser.points || 0) : 0) - before;
+                lastCalc = {
+                    때: new Date().toLocaleTimeString(), 구역: zoneNow, 쇼: howNow,
+                    무대열기: heatNow, 사회자피날레: hostDeadNow,
+                    배수: m.toFixed(1), 받은포인트: got, 죽은채: deadNow
+                };
                 if (!p || !currentUser) return r;
-                const m = multOf(p);
-                const got = (currentUser.points || 0) - before;
                 if (m > 1 && got > 0) {
                     const extra = Math.round(got * (m - 1));
                     currentUser.points += extra;
                     if (typeof addHistoryLog === 'function') {
-                        addHistoryLog(currentUser, '[토크쇼] 무대 열기 ' + Number(p.heat || 0) + '단'
-                            + (p.hostDead ? ' · 사회자 피날레' : '')
+                        addHistoryLog(currentUser, '[토크쇼] 무대 열기 ' + heatNow + '단'
+                            + (hostDeadNow ? ' · 사회자 피날레' : '')
                             + ' — 보너스 ×' + m.toFixed(1) + ' (+' + extra.toLocaleString() + ' P)');
                     }
                     if (typeof saveSelfFull === 'function') saveSelfFull();
                     setTimeout(function () {
-                        showCustomAlert('📺 무대 열기 ' + Number(p.heat || 0) + '단'
-                            + (p.hostDead ? '\n사회자가 피날레를 장식했습니다.' : '')
+                        showCustomAlert('📺 무대 열기 ' + heatNow + '단'
+                            + (hostDeadNow ? '\n사회자가 피날레를 장식했습니다.' : '')
                             + '\n\n보너스 ×' + m.toFixed(1) + '\n+' + extra.toLocaleString() + ' P'
                             + (lootBoostWas ? '\n\n회수품 확률 2배가 걸렸습니다.' : ''));
                     }, 900);
@@ -893,6 +986,7 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
             return r;
         };
         renderDarkResult._show = true;
+        HOOKED.result = true;
         clearInterval(iv);
         console.log('[토크쇼] 보너스·회수품 연결');
     }, 400);
@@ -1157,9 +1251,9 @@ window.showState = function () {
         createParty: typeof createParty === 'function' && !!createParty._show,
         joinParty: typeof joinParty === 'function' && !!joinParty._show,
         launchPartyRun: typeof launchPartyRun === 'function' && !!launchPartyRun._show,
-        darkDeath: typeof darkDeath === 'function' && !!darkDeath._show,
+        darkDeath: !!HOOKED.death,
         rollDarkBonus: typeof rollDarkBonus === 'function' && !!rollDarkBonus._show,
-        renderDarkResult: typeof renderDarkResult === 'function' && !!renderDarkResult._show,
+        renderDarkResult: !!HOOKED.result,
         marketSellable: typeof marketSellable === 'function' && !!marketSellable._showHide,
         초대화면: typeof openInviteSelect === 'function' && !!openInviteSelect._show,
         초대팝업: typeof showDarkInviteModal === 'function' && !!showDarkInviteModal._show
@@ -1168,6 +1262,32 @@ window.showState = function () {
         Object.keys(hooks).filter(function (k) { return !hooks[k]; }).join(', ') || '없음 (전부 연결)');
     console.log('  부활', REVIVES + '회 · 판정 +1 · 열기 1단마다 +'
         + (HEAT_STEP * 100) + '% · 사회자 사망 ×' + HOST_MULT + ' · 뚜껑 ×' + MAX_MULT);
+};
+
+// 배수가 왜 그렇게 나왔나 — 마지막 정산의 셈을 그대로 보여 준다
+window.showWhy = function () {
+    console.log('%c===== 📺 무대 열기 배수 =====', 'color:#c79a5b; font-size:13px');
+    if (typeof darkRun !== 'undefined' && darkRun) {
+        const p = showOf();
+        console.log('  탐사 중 —', darkRun.zone);
+        console.log('    쇼 :', p ? (p._ghost ? '베껴 둔 것으로 찾음' : '방 쪽지로 찾음') : '못 찾음');
+        console.log('    무대 열기 :', p ? Number(p.heat || 0) : 0,
+            '· 베껴 둔 것', Number(darkRun._showHeat || 0),
+            '· 사회자 피날레', (!!(p && p.hostDead) || !!darkRun._showHostDead) ? 'O' : '✗');
+        console.log('    지금 배수 :', '×' + multOf(p).toFixed(1));
+    }
+    if (!lastCalc) { console.log('  마지막 정산 기록이 없습니다.'); return; }
+    console.log('  마지막 정산');
+    console.table([lastCalc]);
+    if (lastCalc.배수 === '1.0') {
+        console.log('  %c배수가 1 인 까닭 — 무대 열기도 0 이고 사회자도 안 죽었습니다.',
+            'color:#ffb74d');
+        console.log('  (무대 열기는 쇼 파티에서 **누가 죽을 때마다** 1단씩 오릅니다)');
+    }
+    if (lastCalc.받은포인트 <= 0) {
+        console.log('  %c받은 포인트가 0 이라 배수를 걸 데가 없었습니다 (죽은 채로 끝남).',
+            'color:#ffb74d');
+    }
 };
 
 window.showGive = function (who, n) {
