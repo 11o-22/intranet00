@@ -301,10 +301,21 @@ setInterval(function () {
 // ==========================================
 // 창
 // ==========================================
+// 어둠 덮개(#dark-run-overlay)는 z-index 9999998 이다. 창이 100001 이라
+// 탐사 중에는 **덮개 뒤에 깔려서 아무것도 안 보였다.** ②·④ 와 받는 쪽
+// 팝업이 전부 여기로 뜬다 — 덮개가 올라와 있으면 그 위로 올린다.
+// (알림창 custom-alert-overlay 는 99999999 라 그보다는 아래에 둔다)
+function topZ() {
+    try {
+        const ov = document.getElementById('dark-run-overlay');
+        if (ov && ov.style.display !== 'none') return 10000000;
+    } catch (e) { }
+    return 100001;
+}
 function box(html, z) {
     const w = document.createElement('div');
     w.className = 'klee-modal';
-    w.style.cssText = 'position:fixed; inset:0; z-index:' + (z || 100001) + '; display:flex;'
+    w.style.cssText = 'position:fixed; inset:0; z-index:' + (z || topZ()) + '; display:flex;'
         + ' align-items:center; justify-content:center; background:rgba(0,0,0,0.78); padding:18px;';
     w.innerHTML = '<div style="background:linear-gradient(160deg,#101418,#070a0d); border:1px solid #2f6f9f;'
         + ' border-radius:14px; padding:15px; max-width:390px; width:100%; max-height:84vh;'
@@ -638,7 +649,7 @@ function m2Send() {
             + '<div style="font-size:10px; color:#8a8a8a; margin-top:5px;">이번 탐사가 끝날 때까지</div>'
             + '</div>'
             + '<button id="klee-x" class="game-btn" style="' + BTN + ' text-align:center;">확인</button>',
-            100003);
+            topZ() + 2);
         w.querySelector('#klee-x').onclick = shut;
     }
 })();
@@ -854,7 +865,7 @@ function m3Sos() {
         const w = box(bubble('식사는?<br>' + esc(v.name) + ' 사원이 아직 안에 있어요.<br>'
             + '확인만 눌러 줘도 한 시간 빨리 나와요.', KLEE.WHO)
             + '<button id="klee-ok" class="game-btn" style="' + BTN + ' text-align:center;">확인 — 1시간 줄여 준다</button>'
-            + '<button id="klee-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">나중에</button>', 100002);
+            + '<button id="klee-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">나중에</button>', topZ() + 1);
         w.querySelector('#klee-x').onclick = shut;
         w.querySelector('#klee-ok').onclick = function () {
             shut();
@@ -1069,7 +1080,7 @@ function kleeEscape(text, booked) {
             + esc(m.n) + ' +' + esc(m.v) + esc(m.unit || '') + '</div>'
             + '<div style="font-size:10px; color:#8a8a8a; margin-top:5px;">24시간</div></div>'
             + '<button id="klee-x" class="game-btn" style="' + BTN + ' text-align:center;">답장하지 않는다</button>',
-            100003);
+            topZ() + 2);
         w.querySelector('#klee-x').onclick = shut;
     }
 })();
@@ -1314,6 +1325,41 @@ function m6Do(code) {
         }, 400);
     })();
     setInterval(function () { try { stick(); } catch (e) { } }, 2500);
+})();
+
+// ==========================================
+// 어둠 화면 머리의 [📲] 단추
+// ==========================================
+//
+//   ② 와 ④ 는 **파티로 어둠에 들어가 있을 때만** 보낼 수 있다.
+//   그런데 문자를 고르는 자리는 소지품 칸의 [📲 목록] 하나뿐이었고,
+//   탐사 중에는 어둠 덮개가 화면을 통째로 가려 소지품에 갈 수가 없다.
+//   둘을 보낼 길이 아예 없었다는 뜻이다.
+//
+//   그래서 덮개 머리(↻ 🔊 옆)에 [📲] 를 하나 더 둔다.
+//   차고 있고 탐사 중일 때만 뜬다.
+(function droBtn() {
+    const ID = 'klee-dro-btn';
+    function stick() {
+        const ov = document.getElementById('dark-run-overlay');
+        const old = document.getElementById(ID);
+        const on = !!(ov && ov.style.display !== 'none' && run() && wears(me()));
+        if (!on) { if (old) old.remove(); return; }
+        if (old && old.isConnected) return;
+        const mute = document.getElementById('dark-mute-btn');
+        const row = mute && mute.parentNode;
+        if (!row) return;
+        const b = document.createElement('button');
+        b.id = ID;
+        b.type = 'button';
+        b.textContent = '📲';
+        b.title = KLEE.WHO;
+        b.style.cssText = 'background:none; border:1px solid #2f6f9f; color:#7fb6dd;'
+            + ' font-size:12px; padding:4px 8px; border-radius:4px; cursor:pointer;';
+        b.onclick = function (e) { e.stopPropagation(); menu(); };
+        row.insertBefore(b, mute);
+    }
+    setInterval(function () { try { stick(); } catch (e) { } }, 1000);
 })();
 
 // ==========================================
