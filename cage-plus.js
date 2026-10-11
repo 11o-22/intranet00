@@ -16,8 +16,9 @@
 //      굴린다. 이기면 문이 열리고 **가둔 사람이 대신 들어간다.**
 //      지면 그걸로 끝이다 — 한 번 갇히는 동안 한 번뿐이다.
 //
-//   ② 🔩 쇠지렛대 — 사택 테트리스에서 스무 줄 넘게 지우면 하루에 하나
-//      받는다. 이미 하나 가지고 있으면 더 주지 않는다. 그것으로 문을
+//   ② 🔩 쇠지렛대 — 사택 테트리스에서 스무 줄 넘게 지우면 **하루 딱 하나**
+//      받는다. 오늘 몫은 서버에서 한 번만 집으므로 기기를 바꿔도 하나다.
+//      이미 하나 가지고 있으면 더 주지 않는다. 그것으로 문을
 //      부수고 나올 수 있고, **부서진 감금실은 두 시간 동안 못 쓴다.**
 //      그 두 시간은 가둔 쪽에게도 똑같이 걸린다.
 //
@@ -139,7 +140,8 @@ function hasCrow(u) { return crowCount(u) > 0; }
             price: 0, usable: false, targetable: false, noSell: true,
             desc: '사택 창고 구석에 있던 쇠지렛대. 끝이 닳아 반들거린다. '
                 + '감금실 문틈에 걸고 체중을 실으면 걸쇠가 먼저 진다. '
-                + '감금실 칸에서 쓴다 — 쓰고 나면 그 감금실은 두 시간 동안 못 쓴다.'
+                + '감금실 칸에서 쓴다 — 쓰고 나면 그 감금실은 두 시간 동안 못 쓴다. '
+                + '사택 테트리스 20줄로 하루 하나만 받을 수 있다.'
         };
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(CROW) < 0) {
             NO_SELL_ITEMS.push(CROW);
@@ -170,6 +172,18 @@ function hasCrow(u) { return crowCount(u) > 0; }
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
 
+// ★ 오늘 몫은 **서버에서 한 번만** 집는다
+//
+//   내 화면의 crowDate 만 보면 하루에 둘이 나올 수 있다.
+//     · 두 기기에서 동시에 돌리면 각자 「오늘 아직 안 받았다」고 본다
+//     · crowDate 는 병합이 지키는 네 칸 밖이라, 묵은 값이 덮으면 되살아난다
+//     · 하나 쥔 채로 돌리면 그때는 날짜를 안 집었는데, 그걸 쓰고 다시
+//       돌리면 그날 몫이 그대로 남아 있다
+//
+//   그래서 날짜 칸을 트랜잭션으로 집는다. 먼저 집은 쪽만 받는다.
+//   서버에 닿지 못하면 전처럼 내 화면 값으로만 판단한다 (못 받는 것보다 낫다).
+let crowBusy = false;
+
 function giveCrow(lines) {
     const u = me();
     if (!u || lines < LINES) return;
@@ -178,27 +192,46 @@ function giveCrow(lines) {
     const tail = function (html) {
         if (msg) msg.insertAdjacentHTML('beforeend', '<br>' + html);
     };
+    const nope = function (t) {
+        tail('<span style="font-size:11px; color:#8a7a4a;">🔩 ' + t + '</span>');
+    };
 
-    // 이미 하나 가지고 있으면 더 주지 않는다 (오늘 몫은 쓰지 않는다)
-    if (hasCrow(u)) {
-        tail('<span style="font-size:11px; color:#8a7a4a;">🔩 쇠지렛대는 이미 가지고 있습니다.</span>');
-        return;
-    }
-    if (u.crowDate === today) {
-        tail('<span style="font-size:11px; color:#8a7a4a;">🔩 오늘 몫은 이미 받았습니다.</span>');
-        return;
-    }
-    u.crowDate = today;
-    if (!Array.isArray(u.inventory)) u.inventory = [];
-    u.inventory.push(CROW);
-    try { if (typeof addHistoryLog === 'function')
-        addHistoryLog(u, '[사택] 테트리스 ' + lines + '줄 — ' + CROW + ' 를 챙겼습니다.'); } catch (e) { }
-    try { if (typeof saveFields === 'function')
-        saveFields({ inventory: 1, crowDate: 1, history: 1 }); } catch (e) { }
-    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    tail('<span style="font-size:11px; color:#d4af37; font-weight:bold;">🔩 쇠지렛대를 하나 챙겼습니다.</span>'
-       + '<br><span style="font-size:10px; color:#888;">감금실 칸에서 쓸 수 있습니다. (하루 하나)</span>');
-    paint();
+    if (crowBusy) return;
+    if (u.crowDate === today) { nope('오늘 몫은 이미 받았습니다. (하루 하나)'); return; }
+    // 두 개를 쥘 수는 없다. 이때는 오늘 몫을 집지 않고 그냥 돌아선다 —
+    // 어제 것을 쥔 채 돌렸다가 그것을 쓰면, 오늘 몫은 그대로 한 개 남는다.
+    if (hasCrow(u)) { nope('쇠지렛대는 이미 가지고 있습니다.'); return; }
+
+    const hand = function () {
+        u.crowDate = today;
+        if (!Array.isArray(u.inventory)) u.inventory = [];
+        u.inventory.push(CROW);
+        try { if (typeof addHistoryLog === 'function')
+            addHistoryLog(u, '[사택] 테트리스 ' + lines + '줄 — ' + CROW + ' 를 챙겼습니다. (하루 하나)'); } catch (e) { }
+        try { if (typeof saveFields === 'function')
+            saveFields({ inventory: 1, crowDate: 1, history: 1 }); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        tail('<span style="font-size:11px; color:#d4af37; font-weight:bold;">🔩 쇠지렛대를 하나 챙겼습니다.</span>'
+           + '<br><span style="font-size:10px; color:#888;">감금실 칸에서 쓸 수 있습니다. (하루 하나)</span>');
+        paint();
+    };
+
+    if (!db_()) { hand(); return; }                 // 서버가 없는 자리 — 전처럼
+
+    crowBusy = true;
+    db_().ref('users/' + u.code + '/crowDate').transaction(function (cur) {
+        if (cur === today) return;                  // 이미 집혔다 — 그만둔다
+        return today;
+    }, null, false).then(function (res) {
+        crowBusy = false;
+        if (res && res.committed) { hand(); return; }
+        u.crowDate = today;                         // 내 화면도 맞춰 둔다
+        nope('오늘 몫은 이미 받았습니다. (하루 하나)');
+    }).catch(function (e) {
+        crowBusy = false;
+        console.warn('[감금실] 오늘 몫 집기 실패:', e);
+        nope('지금은 받을 수 없습니다. 잠시 뒤에 다시 돌려 주세요.');
+    });
 }
 
 // ==========================================
