@@ -143,7 +143,17 @@ function doExit(nm, kind) {
         const _u = useInventoryItem;
         useInventoryItem = function (itemName) {
             const cat = ITEM_CATALOG[itemName];
-            const e = cat && cat.effect;
+            let e = cat && cat.effect;
+            // ★ 복제품이면 원본의 갈래로 본다.
+            //   복제품의 effect 는 copy_of 라 여기를 그냥 지나갔다. 그러면
+            //   spaceitems.js 가 원본 이름으로 다시 부르는데, 그 사이 끼어 있는
+            //   newitems2.js 의 「격리 중에는 쓸 수 없습니다」에 막혔다.
+            //   어느 쪽이 바깥인지는 감싸는 차례에 따라 달라져서 될 때도 있고
+            //   안 될 때도 있었다. 여기서 바로 알아보면 차례를 안 탄다.
+            if (e === 'copy_of' && cat.copyOf) {
+                const src = ITEM_CATALOG[cat.copyOf];
+                e = src && src.effect;
+            }
             if (e !== 'n_plate' && e !== 'n_lace') return _u.apply(this, arguments);
 
             if (!currentUser) return;

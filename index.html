@@ -1556,6 +1556,9 @@ if (database) {
 
     function getEquipBaseName(fullName) {
         let base = String(fullName || "");
+        // ★ 복제품 표도 떨어낸다. 이것을 안 떼어서 「[복제품] 꿈결 수집기」를
+        //   차도 hasEquipped(u, '꿈결 수집기') 가 거짓이라 효과가 하나도 안 붙었다.
+        if (base.startsWith("[복제품] ")) base = base.slice(6);
         if (base.startsWith("🔮 ")) base = base.replace("🔮 ", "");
         if (base.includes(" (")) base = base.split(" (")[0];
         return base.trim();

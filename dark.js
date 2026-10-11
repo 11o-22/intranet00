@@ -10254,6 +10254,8 @@ function renderMaintenanceState() {
 // ★ Qtrew-S-010 감염 시스템
 // ==========================================
 const INFECT_TURN = 60;     // 전향 기준선
+// 죽음을 넘기고 다시 일어섰을 때 감염도를 여기까지 내린다 (s010CheckWipe)
+const INFECT_RELIEF = 80;
 const INFECT_SYMPTOM = 30;  // 증상 시작
 
 function getInfect() {
@@ -12713,6 +12715,18 @@ function s010CheckWipe(reason) {
             `동료들이 어디 있는지 알겠다.<br><br>` +
             `<span style="color:#ff6b6b;">그 상태로 얼마나 있었는지는 기억나지 않는다.</span>`
         );
+        // ★ 살아남았으면 감염도를 한계 아래로 내려 준다.
+        //
+        //   토크쇼의 부활(talkshow.js)이나 보호 장비로 darkDeath 를 넘기면
+        //   darkRun._dead 가 false 로 돌아온다. 그런데 감염도는 100 그대로라,
+        //   **바로 다음 한 점에 또 죽었다.** 부활 두 번이 두 박자에 사라지니
+        //   「부활이 안 먹힌다」로 보였다.
+        //   S-003 쪽(taleAssimilate)은 이미 같은 식으로 이해도를 내려 둔다.
+        if (darkRun && !darkRun._dead) {
+            darkRun.infect = Math.min(getInfect(), INFECT_RELIEF);
+            darkRun.log.push(`[감염] 다시 일어섰다 — ${darkRun.infect} 로 내려감`);
+            try { renderInfectBar(); syncInfect(); } catch (e) { }
+        }
         return true;
     }
 
@@ -12728,6 +12742,11 @@ function s010CheckWipe(reason) {
             `복도 양쪽에서 동시에 온다.<br>` +
             `막을 것이 없다. 막을 힘도 없다.`
         );
+        // ★ 같은 까닭 — 실패 수도 한계 아래로 내려 준다
+        if (darkRun && !darkRun._dead) {
+            darkRun.fail = Math.min(darkRun.fail, limit - 3);
+            darkRun.log.push(`[전멸] 다시 일어섰다 — 실패 ${darkRun.fail} 로 내려감`);
+        }
         return true;
     }
 

@@ -1860,8 +1860,12 @@ window.__newItemSelf = SELF;
             const cat = ITEM_CATALOG[itemName];
             if (!cat || !isNewEff(cat.effect)) return _u.apply(this, arguments);
 
+            // ★ 나오는 물건은 격리 중에 써야 뜻이 있다. 오색 신발끈(선녀탕)이
+            //   빠져 있었고, 복제품은 이름 앞에 표가 붙어 둘 다 안 걸렸다.
+            const _base = (typeof getEquipBaseName === 'function')
+                ? getEquipBaseName(itemName) : itemName;
             if (typeof isQuarantined === 'function' && isQuarantined(currentUser)
-                && itemName !== '정갈한 문패') {
+                && _base !== '정갈한 문패' && _base !== '오색 신발끈') {
                 showCustomAlert('격리 중에는 쓸 수 없습니다.'); return;
             }
             if (typeof canWearItem === 'function' && !canWearItem(currentUser, itemName)) {

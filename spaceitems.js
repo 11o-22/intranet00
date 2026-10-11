@@ -285,9 +285,13 @@ function regOne(real) {
 function regCopies() {
     if (!currentUser) return;
     const seen = {};
+    // ★ getEquipBaseName 이 이제 「[복제품] 」까지 떨어낸다. 그러니 밑이름을
+    //   먼저 뽑고 realOf 로 보면 표가 이미 없어 늘 null 이 된다.
+    //   적힌 그대로 보고 표가 있으면, 그때 밑이름을 뽑는다
+    //   (「[복제품] 무엇 (누구 것)」 처럼 뒤에 꼬리가 붙어 있을 수 있다).
     (currentUser.inventory || []).concat(currentUser.equippedWeapons || []).forEach(function (x) {
-        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(x) : x;
-        const r = realOf(b);
+        if (String(x || '').indexOf(COPY_TAG) !== 0) return;
+        const r = (typeof getEquipBaseName === 'function') ? getEquipBaseName(x) : realOf(x);
         if (r && !seen[r]) { seen[r] = 1; regOne(r); }
     });
 }
@@ -420,6 +424,23 @@ function copierMake(real) {
 
             const eqBefore = (currentUser.equippedWeapons || []).length;
 
+            // ★ 아래에서 원본 이름으로 다시 들어가는데, 그 길에 걸린 처리기들이
+            //   하나같이 **제 이름으로 다시 가졌는지 본다.**
+            //
+            //       if ((currentUser.inventory || []).indexOf(itemName) < 0) {
+            //           showCustomAlert('가지고 있지 않습니다.'); return; }
+            //
+            //   소지품에는 「[복제품] 정갈한 문패」가 들어 있으니 「정갈한 문패」를
+            //   찾으면 없다. 그래서 복제품을 쓰면 「가지고 있지 않습니다」만 뜨고
+            //   아무 일도 안 났다 (정갈한 문패 · 오색 신발끈 · 그 밖에 열 군데 넘는다).
+            //
+            //   그래서 그 자리만 잠깐 원본 이름으로 바꿔 둔다. 쓰이면 그 자리가
+            //   그대로 빠지고, 안 쓰였으면 이름을 되돌린다.
+            const inv0 = currentUser.inventory || (currentUser.inventory = []);
+            const slot = inv0.indexOf(itemName);
+            const renamed = (slot >= 0);
+            if (renamed) inv0[slot] = real;
+
             // ① 시간 효과를 절반으로
             const _ate = addTimedEffect;
             addTimedEffect = function (u, n, d, h) {
@@ -431,9 +452,20 @@ function copierMake(real) {
             removeItemFromInventory = function (u, n, q) {
                 if (!taken && u === currentUser && n === real) {
                     taken = true;
+                    // 이름을 바꿔 둔 자리를 집어서 뺀다 — 원본을 같이 들고 있어도
+                    // 그쪽이 먼저 빠지는 일이 없게 자리번호로 집는다
+                    if (renamed && (u.inventory || [])[slot] === real) {
+                        u.inventory.splice(slot, 1);
+                        return;
+                    }
                     return _rm.call(this, u, itemName, 1);
                 }
                 return _rm.apply(this, arguments);
+            };
+            const back = function () {
+                if (!renamed || taken) return;
+                const cur = currentUser && currentUser.inventory;
+                if (cur && cur[slot] === real) cur[slot] = itemName;   // 안 쓰였다
             };
 
             // 창을 띄워 상대를 고르는 물건은 고른 뒤에 효과가 돈다. 그때는 이미
@@ -449,7 +481,7 @@ function copierMake(real) {
             window._invOk = real;
 
             try { _u.call(this, real); }
-            finally { addTimedEffect = _ate; removeItemFromInventory = _rm; window._invOk = null; }
+            finally { back(); addTimedEffect = _ate; removeItemFromInventory = _rm; window._invOk = null; }
 
             // 창이 안 떴다면(바로 끝났다면) 표를 지운다
             if (taken) window.__copyUse = null;
