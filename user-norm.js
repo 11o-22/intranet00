@@ -44,7 +44,7 @@
 
 // 비면 서버가 지우는 칸들 — 줄 세운 것
 const ARR = [
-    'inventory', 'equippedWeapons', 'history', 'letters',
+    'inventory', 'equippedWeapons', 'history', 'letters', 'keptLetters', 'sentLetters',
     'titles', 'titleAdmin', 'titleSaid',
     'alienUnlockedItems', 'alienBoughtItems', 'receivedRations',
     'timedEffects', 'itemBuffs', 'foxBuffs', 'foxNotes',

@@ -534,7 +534,7 @@
                     <button class="game-btn" style="width:100%; margin:0; background:var(--theme-focus); color:#111; font-weight:bold; border:none; padding:12px; border-radius:4px; letter-spacing: 1px; transition: all 0.2s ease;" onclick="sendAnonymousLetter()">서신 발송 (편지지 1장 소모)</button>
                 </div>
 
-                <div style="font-size:11px; color:#888; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom:6px; font-weight:bold;">수신된 익명 편지 (최대 3개 보관)</div>
+                <div style="font-size:11px; color:#888; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom:6px; font-weight:bold;">수신된 익명 편지 (최대 8개 보관)</div>
                 <div id="received-letters-container" style="max-height: 200px; overflow-y: auto;"></div>
             </div>
         </div>
@@ -7699,6 +7699,9 @@ updateUI();
         updateSelectOptions(select, options);
     }
 
+   // 받은 편지를 몇 장까지 남기나 (넘치면 오래된 것부터 밀려난다)
+   const LETTER_KEEP = 8;
+
    async function sendAnonymousLetter() {
     if (isQuarantined(currentUser)) { showCustomAlert('여우 상담실 격리 중에는 서신을 보낼 수 없습니다.'); return; }
     const letterIdx = currentUser.inventory.indexOf("익명 편지");
@@ -7712,7 +7715,7 @@ updateUI();
         if (!t) return;
         if (!t.letters) t.letters = [];
         t.letters.unshift({ id:Date.now(), date:new Date().toLocaleString(), content, fromCode:currentUser.code, fromName:currentUser.name });
-        if (t.letters.length > 3) t.letters.pop();
+        while (t.letters.length > LETTER_KEEP) t.letters.pop();
         t.hasNewLetter = true;
         currentUser.inventory.splice(letterIdx, 1);
         addHistoryLog(currentUser, `[익명 편지] 사번 ${t.no} 대상 서신 전송 (편지지 소모)`);
@@ -7732,7 +7735,7 @@ updateUI();
             fromCode: currentUser.code,
             fromName: currentUser.name
         });
-        if (letters.length > 3) letters.pop();
+        while (letters.length > LETTER_KEEP) letters.pop();
 
         currentUser.inventory.splice(letterIdx, 1);
         const noSnap = await database.ref(`users/${targetCode}/no`).once('value');
