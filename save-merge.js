@@ -53,7 +53,7 @@ const rootStats = {};     // 루트 통째 쓰기를 몇 번 병합으로 돌렸
 let invFail = false, ptsFail = false;   // 방금 저장이 실패로 끝났나 (「할 일 없음」과 구분)
 let invBusy = false;
 let invAgain = false;
-let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0 };
+let invStats = { merged: 0, added: 0, removed: 0, conflicts: 0, blocked: 0, lastBlock: '' };
 let ptsBusy = false, ptsAgain = false;
 let ptsStats = { merged: 0, moved: 0, rescued: 0 };
 
@@ -166,21 +166,79 @@ function msDiff(a, b) {
     return out;
 }
 
+function cntOf(arr) {
+    const c = {};
+    asArr(arr).forEach(function (n) { c[n] = (c[n] || 0) + 1; });
+    return c;
+}
+
 // 서버 배열에 add 를 붙이고 del 을 뺀다 — 그 사이 남이 넣은 것은 그대로 둔다
+//
+// ■ ★ 복제를 뿌리에서 막는 울타리
+//
+//   더할 몫은 「지금 내 것 − 기준」이다. 그래서 **기준이 묵으면 그만큼이
+//   통째로 틀린다.** 서버가 이미 앞서 나갔는데 내 기준만 옛 모습이면,
+//   서버에 이미 있는 물건이 「내가 새로 얻은 것」으로 보여 한 벌 더 붙는다.
+//   이것이 아이템 복제다. 기준이 묵는 길은 여럿이고(다시 로그인 · 잠들었다
+//   깨어남 · 남이 내 자리를 통째로 쓰기 · 밀실 거래 옛 길 …) 하나씩 막아도
+//   또 생긴다. 그래서 **보내는 길목에서** 막는다.
+//
+//   서버가 기준보다 앞서 나간 몫(서버 개수 − 기준 개수)은 **내가 얻은 것이
+//   아니다.** 이미 서버에 있는 것이다. 그만큼은 더할 몫에서 깎아 낸다.
+//
+//       기준 0 · 내 것 1 · 서버 1   →  더할 1, 서버가 앞선 1  →  0 (복제 막음)
+//       기준 1 · 내 것 2 · 서버 1   →  더할 1, 서버가 앞선 0  →  1 (평소 구매 그대로)
+//
+//   기준이 멀쩡하면 서버와 기준이 같아 아무것도 안 깎인다. 평소 저장은
+//   조금도 달라지지 않는다. 깎인 일이 있으면 콘솔에 남긴다 — 기준이 묵었다는
+//   신호이므로, 어느 길이 또 묵히는지 invState() 로 볼 수 있다.
+//
+//   하나 내주는 것 — 내가 물건 X 를 얻는 **바로 그 순간** 남이 나에게 같은
+//   X 를 주면, 둘을 가릴 길이 없어 한 개만 들어간다. 눈에 보이는 개수는
+//   맞고(서버가 이미 하나 늘어 있다), 끝없이 불어나는 쪽을 막는 편이 낫다.
 function mergeInv(path, baseArr, localArr) {
     if (!database) return Promise.resolve(null);
     const add = msDiff(localArr, baseArr);
     const del = msDiff(baseArr, localArr);
     if (!add.length && !del.length) return Promise.resolve(null);
 
+    let cutLast = [];
     return txRetry(path, function (srv) {
         const cur = asArr(srv);
+
+        // ① 서버가 기준보다 앞서 나간 몫 — 내가 얻은 것이 아니다
+        const b = cntOf(baseArr), s = cntOf(cur);
+        const lead = {};
+        Object.keys(s).forEach(function (n) {
+            const over = s[n] - (b[n] || 0);
+            if (over > 0) lead[n] = over;
+        });
+
+        // ② 더할 몫에서 그만큼 깎는다
+        const put = [];
+        const cut = [];
+        add.forEach(function (n) {
+            if (lead[n] > 0) { lead[n]--; cut.push(n); return; }
+            put.push(n);
+        });
+        cutLast = cut;
+
+        // ③ 뺄 몫은 그대로 (서버에 없으면 저절로 넘어간다)
         del.forEach(function (n) {
             const i = cur.indexOf(n);
             if (i >= 0) cur.splice(i, 1);
         });
-        return cur.concat(add);
+        return cur.concat(put);
     }).then(function (res) {        // ★ applyLocally = false
+        if (cutLast.length) {
+            invStats.blocked = (invStats.blocked || 0) + cutLast.length;
+            invStats.lastBlock = cutLast.slice(0, 8).join(', ')
+                + (cutLast.length > 8 ? ' 외 ' + (cutLast.length - 8) + '개' : '');
+            console.warn('[병합] 복제가 될 뻔한 ' + cutLast.length + '개를 막았습니다 — '
+                + invStats.lastBlock + ' (기준이 묵었습니다)');
+        }
+        return res;
+    }).then(function (res) {
         if (!res || !res.committed) { invFail = true; return null; }
         const after = asArr(res.snapshot ? res.snapshot.val() : null);
         invStats.merged++;
@@ -1259,6 +1317,9 @@ window.invState = function () {
     console.log('                  줄어듦:', del.join(', ') || '없음');
     console.log('  지금까지 병합 ' + invStats.merged + '회 · 더함 ' + invStats.added
         + ' · 뺌 ' + invStats.removed + ' · 남과 겹친 적 ' + invStats.conflicts + '회');
+    console.log('  복제를 막은 횟수:', invStats.blocked + '개'
+        + (invStats.lastBlock ? ' · 마지막 — ' + invStats.lastBlock : '')
+        + (invStats.blocked ? '   ← 기준이 묵는 길이 있습니다' : ''));
     console.log('  남의 소지품 기준 보유:', Object.keys(shadowInv).length + '명');
 };
 
