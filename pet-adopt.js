@@ -33,10 +33,12 @@
 //   이름은 **한 번만** 붙인다.
 //     · 깨어났을 때 한 번
 //     · 입양으로 받았을 때 한 번 (받은 사람이 새로 붙인다)
-//   그 뒤에 바꾸려면 상담사가 주는 「펫 이름 개명권」이 있어야 한다.
+//   그 뒤에 바꾸려면 상담사가 주는 「🐾 펫 이름 개명권」이 있어야 한다.
+//   개명권은 **소지품 물품**이다 (📝 사원명 변경권과 같은 꼴 — rename.js).
+//   소지품에서 쓰면 펫을 고르는 창이 뜨고, 쓰면 한 장 사라진다.
 //
-//       petNameTicket('2542')      상담사 — 개명권 한 장
-//       petNameTicket('2542', 3)   세 장
+//       petRenameGive('2542')      상담사 — 개명권 한 장
+//       petRenameGive('2542', 3)   세 장
 //
 //   펫 한 마리의 상태는 pets[번호].nameOk 로 적는다 (1 이면 붙일 수 있다).
 //   예전부터 있던 펫은 이름이 없으면 한 번 붙일 수 있는 것으로 본다.
@@ -50,7 +52,7 @@
 //       stage  wait 승낙 기다림 · appeal 어필 중 · done 됨 · no 틀어짐
 //
 //   u.petGaveAt        마지막으로 보낸 때
-//   u.petNameTicket    개명권 장수
+//   u.inventory        개명권은 여기에 「🐾 펫 이름 개명권」으로 들어 있다
 //   u.petAdoptCool     { 펫열쇠: 다시 해 볼 수 있는 때 } ← 쓰지 않는다 (아래 참고)
 //
 //   ★ 열쇠에 펫 번호만 쓴다. 이름을 열쇠로 쓰면 파이어베이스가 꾸러미째
@@ -58,7 +60,8 @@
 //
 // ■ 콘솔
 //   petAdoptState()          지금 걸려 있는 입양
-//   petNameTicket(사번, 수)   상담사 — 개명권 주기
+//   petRenameGive(사번, 수)   상담사 — 개명권 주기
+//   petTicketUse()           소지품에서 개명권을 쓸 때 뜨는 창
 //   petAdoptClear()          상담사 — 묵은 입양 글 치우기
 
 (function petAdopt() {
@@ -69,6 +72,9 @@ const SAY_MAX = 5;                     // 말은 다섯 번까지
 const RETRY = 24 * 3600 * 1000;        // 틀어진 뒤 그 펫에게 다시 해 볼 때까지
 const LIVE = 6 * 3600 * 1000;          // 이보다 묵은 글은 치운다
 const MOD = 'pet-adopt-modal';
+
+const TICKET = '🐾 펫 이름 개명권';
+const ADMIN = 'kario0987';
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function P() { return window.PET; }
@@ -152,7 +158,10 @@ function canName(u, key) {
     if (!s) return false;
     if (Number(s.nameOk) === 1) return true;
     if (s.nameOk === undefined && !(typeof s.nick === 'string' && s.nick.trim())) return true;
-    return (Number(u && u.petNameTicket) || 0) > 0;
+    return ticketCount(u) > 0;
+}
+function ticketCount(u) {
+    return ((u && u.inventory) || []).filter(function (x) { return x === TICKET; }).length;
 }
 function useName(u, key) {
     const s = petOf(u, key);
@@ -161,8 +170,11 @@ function useName(u, key) {
         try { P().patch(String(key), { nameOk: 0 }); } catch (e) { s.nameOk = 0; }
         return;
     }
-    u.petNameTicket = Math.max(0, (Number(u.petNameTicket) || 0) - 1);
-    try { if (typeof saveFields === 'function') saveFields({ petNameTicket: 1 }); } catch (e) { }
+    // 소지품에서 개명권 한 장을 뗀다
+    const inv = u.inventory || (u.inventory = []);
+    const i = inv.indexOf(TICKET);
+    if (i >= 0) inv.splice(i, 1);
+    try { if (typeof saveFields === 'function') saveFields({ inventory: 1 }); } catch (e) { }
 }
 
 // 이름 붙이기를 한 번으로 묶는다 — pet-list 의 「이름 붙이기」도 이 길을 지난다
@@ -177,7 +189,7 @@ function useName(u, key) {
             if (!canName(me, id)) {
                 return { ok: false, why: '이름은 한 번만 붙일 수 있습니다.\n\n'
                     + '깨어났을 때 한 번, 입양으로 받았을 때 한 번입니다.\n'
-                    + '바꾸려면 상담사에게 펫 이름 개명권을 받아야 합니다.' };
+                    + '바꾸려면 상담사에게 ' + TICKET + '을 받아야 합니다.' };
             }
             const out = _r.apply(this, arguments);
             if (out && out.ok) useName(me, id);
@@ -704,7 +716,10 @@ window.petAdoptState = function () {
     const l = giveLeft(me);
     console.log('  보내기 : ' + (l > 0 ? (leftText(l) + ' 뒤에 됩니다') : '지금 됩니다')
         + ' (사흘에 한 번)');
-    console.log('  개명권 : ' + (Number(me.petNameTicket) || 0) + '장');
+    console.log('  ' + TICKET + ' : ' + ticketCount(me) + '장'
+        + ' (물품 등록 ' + ((typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[TICKET]) ? 'O' : '✗')
+        + ' · 쓰기 연결 '
+        + ((typeof useInventoryItem === 'function' && useInventoryItem._petTicket) ? 'O' : '✗') + ')');
     const rows = [];
     Object.keys(live).forEach(function (k) {
         const o = live[k];
@@ -722,20 +737,128 @@ window.petAdoptState = function () {
     if (mine2.length) console.table(mine2);
 };
 
-window.petNameTicket = function (who, n) {
+// ==========================================
+// 🐾 펫 이름 개명권 — 사원명 변경권과 같은 꼴
+// ==========================================
+(function regTicket() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        clearInterval(iv);
+        ITEM_CATALOG[TICKET] = {
+            price: 0, usable: true, targetable: false, effect: 'pet_rename_ticket', noSell: true,
+            desc: '펫 이름을 한 번 다시 붙인다. 쓰면 펫을 고르는 창이 뜬다. 쓰면 사라진다.'
+        };
+        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(TICKET) < 0) {
+            NO_SELL_ITEMS.push(TICKET);
+        }
+        console.log('[입양] ' + TICKET + ' 등록 — 상담사 지급 전용');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 40000);
+})();
+
+// 소지품에서 쓰면 — 펫을 고르고 이름을 다시 붙인다
+window.petTicketUse = function () {
     const me = u_();
-    if (!me || me.code !== 'kario0987') { console.warn('상담사만 줄 수 있습니다.'); return; }
-    const all = users();
-    const t = Object.keys(all).map(function (c) { return all[c]; })
-        .filter(function (x) { return x && (x.no === who || x.code === who || x.name === who); })[0];
-    if (!t) { console.warn('사원을 못 찾았습니다.'); return; }
-    const add = Math.max(1, Number(n) || 1);
-    const was = Number(t.petNameTicket) || 0;
-    t.petNameTicket = was + add;
-    if (typeof updateUserFields === 'function') updateUserFields(t.code, { petNameTicket: t.petNameTicket });
-    console.log('%c✓ ' + t.name + ' 사원에게 펫 이름 개명권 ' + add + '장 (모두 '
-        + t.petNameTicket + '장)', 'color:#4CAF50');
+    if (!me) return;
+    if (ticketCount(me) <= 0) { alert_('해당 물품이 없습니다.'); return; }
+    const ps = (function () { try { return P().pets(me) || {}; } catch (e) { return {}; } })();
+    const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; });
+    if (!keys.length) { alert_('이름을 붙일 펫이 없습니다.'); return; }
+
+    const w = box(head('펫 이름 개명권',
+        '이름을 다시 붙일 펫을 고르십시오. 쓰면 개명권 한 장이 사라집니다.<br>'
+        + '가진 개명권 <b style="color:#ffcf8f;">' + ticketCount(me) + '장</b>')
+        + '<div style="max-height:40dvh; overflow-y:auto; margin-bottom:9px;">'
+        + keys.map(function (k) {
+            return '<button class="game-btn pt-one" data-k="' + esc(k) + '"'
+                + ' style="width:100%; margin:0 0 5px 0; padding:9px; font-size:11px;'
+                + ' text-align:left; display:flex; align-items:center; gap:8px;">'
+                + '<img src="' + P().icon(k) + '" alt="" style="width:26px; height:26px;'
+                + ' object-fit:contain; image-rendering:pixelated;">'
+                + esc(nickOf(me, k)) + '</button>';
+        }).join('')
+        + '</div>'
+        + '<button id="pt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
+    w.querySelector('#pt-no').onclick = shut;
+    Array.prototype.forEach.call(w.querySelectorAll('.pt-one'), function (btn) {
+        btn.onclick = function () { ticketName(btn.dataset.k); };
+    });
 };
+
+function ticketName(key) {
+    const me = u_();
+    if (!me) return;
+    const now = nickOf(me, key);
+    const w = box(head('이름을 다시 붙입니다',
+        esc((P().BY[key] || {}).n || '') + ' · ' + P().NICK_MAX + '자까지.<br>'
+        + '비워 두면 종 이름으로 돌아갑니다.')
+        + '<input id="pt-in" type="text" maxlength="' + P().NICK_MAX + '"'
+        + ' value="' + esc(now) + '" placeholder="' + esc((P().BY[key] || {}).n || '') + '"'
+        + ' style="width:100%; padding:10px; font-size:13px; margin-bottom:9px; box-sizing:border-box;">'
+        + '<button id="pt-ok" class="game-btn" style="' + BTN + '">붙인다</button>'
+        + '<button id="pt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
+    const f = w.querySelector('#pt-in');
+    setTimeout(function () { try { f.focus(); } catch (e) { } }, 90);
+    const go = function () {
+        const r = P().rename(key, f.value);        // 여기서 개명권이 한 장 빠진다
+        if (!r || !r.ok) { alert_((r && r.why) || '붙이지 못했습니다.'); return; }
+        shut();
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        alert_('이제 ' + r.name + '입니다.');
+    };
+    w.querySelector('#pt-ok').onclick = go;
+    w.querySelector('#pt-no').onclick = shut;
+    f.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+}
+
+(function hookUse() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (useInventoryItem._petTicket) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        useInventoryItem = function (itemName) {
+            if (itemName !== TICKET) return _u.apply(this, arguments);
+            // 확인 창을 먼저 거친다 (사원명 변경권과 같은 길)
+            if (window._invOk !== TICKET) return _u.apply(this, arguments);
+            window._invOk = null;
+            const me = u_();
+            if (!me) return;
+            if (typeof isQuarantined === 'function' && isQuarantined(me)) {
+                alert_('여우 상담실 격리 중에는 소지품을 사용할 수 없습니다.'); return;
+            }
+            window.petTicketUse();
+        };
+        useInventoryItem._petTicket = true;
+        clearInterval(iv);
+        console.log('[입양] ' + TICKET + ' 쓰기 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 40000);
+})();
+
+// 상담사 — 꽂아 준다 (renameGive 와 같은 꼴)
+window.petRenameGive = function (who, n) {
+    const me = u_();
+    if (!me || me.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = users();
+    const t = who ? Object.keys(all).map(function (c) { return all[c]; })
+        .filter(function (x) { return x && (x.no === who || x.code === who || x.name === who); })[0]
+        : me;
+    if (!t) { console.warn('사원을 못 찾았습니다.'); return; }
+    const q = Math.max(1, Math.min(5, Number(n) || 1));
+    if (!Array.isArray(t.inventory)) t.inventory = [];
+    for (let i = 0; i < q; i++) t.inventory.push(TICKET);
+    if (typeof addHistoryLog === 'function') {
+        addHistoryLog(t, '[당국 개입] ' + TICKET + ' ' + q + '장 지급');
+    }
+    if (typeof updateUserFields === 'function') {
+        updateUserFields(t.code, { inventory: t.inventory, history: t.history });
+    }
+    if (typeof updateUI === 'function') updateUI();
+    console.log('%c✓ ' + t.name + ' 사원에게 ' + TICKET + ' ' + q + '장을 줬습니다.',
+        'color:#4CAF50');
+};
+// 예전 이름 — 쓰던 사람이 있을 수 있어 남겨 둔다
+window.petNameTicket = function (who, n) { return window.petRenameGive(who, n); };
 
 window.petAdoptClear = function () {
     const me = u_();
@@ -745,6 +868,6 @@ window.petAdoptClear = function () {
     console.log('입양 글을 전부 치웠습니다.');
 };
 
-console.log('[입양] petAdoptState() · petNameTicket(사번) · petAdoptClear()');
+console.log('[입양] petAdoptState() · petRenameGive(사번, 장수) · petAdoptClear()');
 
 })();
