@@ -360,9 +360,11 @@
         .sub-tab { flex: 1; padding: 8px 0; background: #222; border: 1px solid #444; color: #888; cursor: pointer; font-size: 11px; font-weight: bold; border-radius: 3px; transition: all 0.2s; position:relative; }
         .sub-tab.active { background: #333; color: #fff; border-color: #777; }
 
-        /* 상점 — 칸이 여섯이라 두 줄로 나눈다 */
-        #tab-shop .sub-tabs-grid { flex-wrap: wrap; row-gap: 4px; }
-        #tab-shop .sub-tab { flex: 1 1 30%; }
+        /* 상점·사택 — 칸이 여섯이라 세 개씩 두 줄로 나눈다 */
+        #tab-shop .sub-tabs-grid,
+        #tab-house .sub-tabs-grid { flex-wrap: wrap; row-gap: 4px; }
+        #tab-shop .sub-tab,
+        #tab-house .sub-tab { flex: 1 1 30%; }
 
         .sub-panel { display: none; background: #1a1a1a; padding: 12px 10px; border: 1px solid #333; border-radius: 4px; text-align: left; }
         .sub-panel.active { display: block; }
