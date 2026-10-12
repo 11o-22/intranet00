@@ -77,7 +77,14 @@ function liveBuff(u, src, k) {
 
 const EXPIRY = [
     { mark: '[탈모약]', live: function (u) { return (u.hairUntil || 0) > Date.now(); } },
-    { mark: '[인형]',   live: function (u) { return (u.dollPt || 0) > Date.now(); } },
+    // ★ 봉제 인형은 **두 가지**를 뽑는다. dollPt 는 그 가운데 포인트가
+    //   뽑혔을 때만 찍힌다 (newitems2.js:1778). dollPt 만 보고 재면,
+    //   포인트가 안 뽑힌 조합(다섯 중 넷)은 줄이 **15초 만에 지워졌다.**
+    //   「봉제 인형 키트 기록이 계속 사라진다」가 이것이다.
+    //   나머지는 itemBuffs 에 src '봉제 인형' 으로 들어가므로 같이 본다.
+    { mark: '[인형]',   live: function (u) {
+        return (u.dollPt || 0) > Date.now() || liveBuff(u, '봉제 인형');
+    } },
     { mark: '종이배',   live: function (u) { return (u.paperBoat || 0) > 0; } },
     // 달빛 타투 — 세 가지가 들어가는 칸이 서로 다르다.
     //   행운 +300 · 기믹 파훼 1회   itemBuffs (src '달빛')
@@ -288,9 +295,20 @@ function fixNotes(u) {
 }
 
 function reconcile(u, quiet) {
+    const was = notesOf(u).slice();
     const r = fixNotes(u);
     if (!r) return 0;
     setNotes(u, r.next);
+    // ★ 걷어낸 줄은 조용할 때도 콘솔에 남긴다.
+    //   EXPIRY 의 live 가 한 군데만 틀려도 멀쩡한 줄이 15초마다 사라지는데,
+    //   아무 말도 없으면 「뭘 해도 기록이 안 남는다」로만 보인다.
+    if (r.removed) {
+        const gone = was.filter(function (x) { return r.next.indexOf(x) < 0; });
+        if (gone.length) {
+            console.warn('[특이사항] 기한이 지났다고 보고 걷어냅니다 — ' + gone.join(' / ')
+                + '   (살아 있어야 할 줄이면 note-fix.js 의 EXPIRY 를 보십시오)');
+        }
+    }
     if (!quiet) {
         console.log('[특이사항] ' + (u.name || u.code) + ' — '
             + (r.added ? r.added + '줄 되살림 ' : '') + (r.removed ? r.removed + '줄 걷어냄' : ''));
