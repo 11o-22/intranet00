@@ -457,6 +457,28 @@ const BK = {
 function bname(k) { return BK[k] || k; }
 function bunit(k) { return (k === 'pct' || k === 'kleeLoot') ? '%' : ''; }
 
+// ★ 가져온 「행운」이 슬롯에 안 먹히던 것
+//
+//   이 게임에는 행운이 **두 가지**다.
+//
+//       luck  어둠 탐사의 회수품·재굴림 판정에 더해지는 낱값
+//       pct   공용시설 행운 — 슬롯·블랙잭·섯다·하이로우의 **배수**
+//
+//   공용시설 쪽은 facilityLuckMult 하나가 셈하는데 거기에는 pct 만
+//   들어간다 (luck-all.js). 그래서 ① 로 「행운」을 가져와도 슬롯은
+//   꿈쩍도 하지 않았다 — 가져온 것은 luck 이었기 때문이다.
+//
+//   가져왔으면 가져온 자리에서 느껴져야 한다. 그래서 luck 을 가져올 때
+//   같은 몫을 **공용시설 행운으로도** 얹는다. 환산은 이 게임이 이미 쓰는
+//   값을 따른다 — 호사수구의 꼬리 하나가 행운 +1 이고 공용시설 행운
+//   +50% 다 (foxtail.js TAILS). 그러므로 행운 1 = 50%.
+//
+//       행운 +5 를 가져오면 → 내게 행운 +10 · 공용시설 행운 +500%
+//
+//   슬롯은 하루 상한(100만)이 따로 있으므로 이것으로 끝없이 벌리지는
+//   않는다 (slot-curve.js DAY_CAP).
+const LUCK_TO_PCT = 50;
+
 function liveBuffs(u) {
     const t = Date.now();
     return (Array.isArray(u.itemBuffs) ? u.itemBuffs : []).filter(function (b) {
@@ -521,7 +543,11 @@ function m1Buffs(codes) {
             + '<div style="flex:1; min-width:0; font-size:12px; color:#e6eef4;">'
             + esc(p.name) + ' <span style="color:#6fa8cf;">' + bname(p.k) + ' +' + p.v + bunit(p.k) + '</span>'
             + '<div style="font-size:10px; color:#8a8a8a; margin-top:2px;">나 +' + (p.v * 2) + bunit(p.k)
-            + ' · ' + esc(p.name) + ' +' + (p.v * 2) + bunit(p.k) + ' (원래 것은 그대로)</div>'
+            + ' · ' + esc(p.name) + ' +' + (p.v * 2) + bunit(p.k) + ' (원래 것은 그대로)'
+            + (p.k === 'luck'
+                ? '<br><span style="color:#6fa8cf;">공용시설 행운 +' + (p.v * 2 * LUCK_TO_PCT)
+                  + '% 도 같이 — 슬롯·블랙잭·섯다·하이로우에 듣습니다</span>' : '')
+            + '</div>'
             + '</div></label>';
     }).join('');
 
@@ -549,12 +575,25 @@ function m1Do(codes, sel) {
         try { window.ibAdd(u, p.k, p.v * 2, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
         noteAdd(u, bname(p.k) + ' +' + (p.v * 2) + bunit(p.k) + ' (24시간)');
         mine.push(bname(p.k) + ' +' + (p.v * 2) + bunit(p.k));
+        // 행운은 공용시설(슬롯·블랙잭·섯다·하이로우)에도 닿게 같이 얹는다
+        if (p.k === 'luck') {
+            const pc = p.v * 2 * LUCK_TO_PCT;
+            try { window.ibAdd(u, 'pct', pc, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
+            noteAdd(u, bname('pct') + ' +' + pc + '% (24시간)');
+            mine.push(bname('pct') + ' +' + pc + '%');
+        }
         // 상대 — 원래 것은 그대로 두고 같은 몫을 한 번 더 얹어 두 배로
         const t = db.users[p.code];
         if (t) {
             try { window.ibAdd(t, p.k, p.v, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
             noteAdd(t, bname(p.k) + ' +' + (p.v * 2) + bunit(p.k) + ' (24시간)');
             (theirs[t.name] = theirs[t.name] || []).push(bname(p.k) + ' ×2');
+            if (p.k === 'luck') {
+                const pc2 = p.v * LUCK_TO_PCT;
+                try { window.ibAdd(t, 'pct', pc2, KLEE.BUFF_MS, KLEE.WHO); } catch (e) { }
+                noteAdd(t, bname('pct') + ' +' + pc2 + '% (24시간)');
+                (theirs[t.name] = theirs[t.name] || []).push(bname('pct') + ' +' + pc2 + '%');
+            }
         }
     });
 

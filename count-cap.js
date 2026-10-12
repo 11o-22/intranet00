@@ -20,6 +20,20 @@
 //   천장 밖 — 은화 뱀과 고유 아이템(DNA)의 몫은 천장 위에 그대로 얹는다.
 //   적혀 있는 숫자는 적힌 대로 들어가야 한다.
 //
+// ■ 그 위에 끝 한계를 하나 더 둔다 — 공용 50 · 어둠 15
+//
+//   천장 밖이 **한없이** 열려 있었다. K.LEE 의 ①(이름 많이 들었어요)은
+//   상대의 횟수 버프를 두 배로 가져오고, 호사수구는 꼬리마다 얹는다.
+//   둘 다 FREE_SRC 라 천장 위에 그대로 쌓였으므로, 여러 번 돌리면
+//   공용시설 70회 · 어둠 28회처럼 끝없이 불어났다.
+//
+//       공용시설   무엇을 얹어도 50회까지
+//       어둠 탐사  무엇을 얹어도 15회까지
+//
+//   천장(30 · 12)은 그대로다. 그 안에 들어가는 몫과 천장 밖 몫을 더한
+//   값에 이 한계를 씌운다. 그래서 가져온 몫은 **천장 위로는 얹히지만
+//   끝 한계 위로는 못 간다.**
+//
 //   남은 몫은 쌓이지 않는다. 요리 버프는 24시간이 아니라 자정에 끝난다.
 //   그래서 다 안 쓰고 자면 그만큼 사라진다. (공용시설 이용 횟수와
 //   어둠 탐사 횟수가 자정에 초기화되는 것과 같은 시계다)
@@ -27,8 +41,10 @@
 // ■ 콘솔
 //   capState()    지금 한도가 어떻게 쌓여 있나
 
-window.CAP_FAC_MAX   = 30;      // 공용시설 한도의 천장
+window.CAP_FAC_MAX   = 30;      // 공용시설 한도의 천장 (천장 밖 몫은 이 위에 얹힌다)
 window.CAP_DARK_MAX  = 12;      // 어둠 탐사 한도의 천장
+window.CAP_FAC_HARD  = 50;      // 공용시설 — 천장 밖까지 더해도 여기까지
+window.CAP_DARK_HARD = 15;      // 어둠 탐사 — 천장 밖까지 더해도 여기까지
 window.CAP_COOK_DAY  = 5;       // 요리로 하루에 더할 수 있는 몫 (종류별)
 window.CAP_DARK_BASE = 8;       // index.html 의 getDarkTriesLeft 기본값과 같아야 한다
 
@@ -128,7 +144,8 @@ window.capFacMax = function (u) {
         + Math.min(5,  u.ticketAddedMax || 0)
         + Math.min(20, u.birthAddedMax  || 0)
         + p.capped.fac;
-    return Math.min(window.CAP_FAC_MAX, inner) + p.free.fac;
+    // 천장 안 + 천장 밖, 그리고 그 위에 끝 한계
+    return Math.min(window.CAP_FAC_HARD, Math.min(window.CAP_FAC_MAX, inner) + p.free.fac);
 };
 
 // ==========================================
@@ -143,8 +160,12 @@ function darkOver(u) {
     u = u || me();
     if (!u) return 0;
     const added = (u.darkTryAddDate === today()) ? Math.min(2, u.darkTryAdded || 0) : 0;
-    const total = window.CAP_DARK_BASE + added + window.capParts(u).capped.dark;
-    return Math.max(0, total - window.CAP_DARK_MAX);
+    const p = window.capParts(u);
+    const inner = window.CAP_DARK_BASE + added + p.capped.dark;
+    const over = Math.max(0, inner - window.CAP_DARK_MAX);          // 천장을 넘은 몫
+    // 천장 밖 몫(호사수구 · K.LEE · 고유)까지 더한 한도에 끝 한계를 씌운다
+    const max = Math.min(window.CAP_DARK_MAX, inner) + p.free.dark;
+    return over + Math.max(0, max - window.CAP_DARK_HARD);
 }
 window.capDarkOver = darkOver;
 
@@ -187,6 +208,7 @@ window.capState = function () {
           '요리·장비':p.capped.fac,
           천장:window.CAP_FAC_MAX,
           '천장 밖':p.free.fac,
+          '끝 한계':window.CAP_FAC_HARD,
           한도:window.capFacMax(u),
           사용:u.facilityCount || 0 },
         { 항목:'어둠 탐사', 기본:window.CAP_DARK_BASE,
@@ -195,6 +217,7 @@ window.capState = function () {
           '요리·장비':p.capped.dark,
           천장:window.CAP_DARK_MAX,
           '천장 밖':p.free.dark,
+          '끝 한계':window.CAP_DARK_HARD,
           한도:(window.CAP_DARK_BASE
                 + ((u.darkTryAddDate === today()) ? Math.min(2, u.darkTryAdded || 0) : 0)
                 + p.capped.dark - darkOver()) + p.free.dark,
