@@ -116,6 +116,12 @@ const EXPIRY = [
         try { return window.kleeNoteLive ? window.kleeNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
+    // 🐾 아기 여우 분신 — 거둬 가거나 소멸하면 줄도 걷는다.
+    // 재는 쪽은 babyfox.js 의 kitNoteLive (u.kitOn 에 그 분신이 있나).
+    { mark: '[🐾 ', live: function (u, note) {
+        try { return window.kitNoteLive ? window.kitNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
     // 🍰 식당 디저트 — 24시간짜리 버프. 버프가 끝나면 줄도 걷는다.
     { mark: '[디저트]', live: function (u) { return liveBuff(u, '식당 디저트'); } },
     // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
