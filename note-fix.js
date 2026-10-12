@@ -151,6 +151,41 @@ function baseOf(w) {
 }
 
 // ==========================================
+// 벗은 고유 아이템(출산품) 줄을 걷어낸다
+// ==========================================
+//
+//   고유 아이템을 차면 「[장착됨] 눈을 감은 나침반」 이 적힌다
+//   (dna-gifts.js). 벗는 자리에서 지우도록 고쳐 두었지만, 그 전에 이미
+//   적힌 줄은 그대로 남아 있다. **남의 출산 고유 아이템을 빌려 차고
+//   돌려줘도 특이사항이 남던** 것이 이것이다.
+//
+//   물품 이름은 「선물 이름 · 사원 지문」 꼴이고 (dna-gifts.js
+//   dnaItemName), 적히는 줄은 앞머리만 쓴다. 그래서 앞머리로 맞춰 본다.
+const WORN_MARK = '[장착됨] ';
+function dnaHeads() {
+    const out = [];
+    try {
+        if (typeof DNA_GIFTS !== 'undefined' && Array.isArray(DNA_GIFTS)) {
+            DNA_GIFTS.forEach(function (g) { if (g && g.n) out.push(String(g.n)); });
+        }
+    } catch (e) { }
+    return out;
+}
+function headOf(w) { return String(baseOf(w) || '').split(' · ')[0].trim(); }
+
+// 고유 아이템 줄인데 지금 차고 있지 않으면 참
+function dnaGone(u, note) {
+    if (String(note).indexOf(WORN_MARK) !== 0) return false;
+    const head = String(note).slice(WORN_MARK.length).trim();
+    if (!head) return false;
+    if (dnaHeads().indexOf(head) < 0) return false;          // 고유 아이템 줄이 아니다
+    const worn = ((u && u.equippedWeapons) || []).some(function (w) {
+        return headOf(w) === head;
+    });
+    return !worn;
+}
+
+// ==========================================
 // 노예 계약 주인 — 「누군가 사원과 노예 계약」 이 되던 것
 // ==========================================
 //
@@ -236,6 +271,7 @@ function fixNotes(u) {
             if (!slave.length) slave.push(n);
             return;
         }
+        if (dnaGone(u, n)) return;                 // 벗은(돌려준) 고유 아이템 줄
         if (expired(u, n)) return;                 // 기한이 지난 문구는 걷어낸다
         out.push(n);
     });

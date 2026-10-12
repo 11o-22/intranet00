@@ -193,6 +193,38 @@ function myDnaEquip() {
     };
 })();
 
+// ★ 벗으면 특이사항 줄도 같이 걷어낸다
+//
+//   차면 위에서 「[장착됨] 눈을 감은 나침반」 을 적는데, 벗는 자리에서는
+//   아무것도 지우지 않았다. 그래서 **남의 출산 고유 아이템을 빌려 차고
+//   돌려줘도 그 줄이 영영 남았다.**
+//
+//   특이사항은 appendBadgeNoteToUser 가 ' | ' 로 이어 붙인다
+//   (index.html:5169). newitems2.js 의 removeBadgeLine 은 <br> 과 개행만
+//   끊으므로 그것으로는 안 지워진다. 그래서 ' | ' 까지 끊는 것을 따로 쓴다
+//   (foxtail.js 와 같은 사정이다).
+function dnaBadgeKey(u) {
+    if (!u || !u.badge || typeof u.badge !== 'object') return 'notes';
+    if (typeof u.badge.notes === 'string') return 'notes';
+    if (typeof u.badge.note === 'string') return 'note';
+    return 'notes';
+}
+function dnaCutNote(u, line) {
+    if (!u || !u.badge || !line) return false;
+    const obj = (typeof u.badge === 'object');
+    const key = obj ? dnaBadgeKey(u) : null;
+    const raw = String(obj ? (u.badge[key] || '') : u.badge);
+    if (raw.indexOf(line) < 0) return false;
+    const bar = raw.indexOf('|') >= 0;
+    const br = /<br\s*\/?>/i.test(raw);
+    const keep = raw.split(/\s*\|\s*|<br\s*\/?>|\n/)
+        .filter(function (x) { return x && x.indexOf(line) < 0; });
+    const out = keep.join(bar ? ' | ' : (br ? '<br>' : '\n')) || '특이사항 없음';
+    if (obj) u.badge[key] = out; else u.badge = out;
+    return true;
+}
+window.dnaCutWornNote = dnaCutNote;
+
 (function hookUnequip() {
     if (typeof unequipWeapon !== 'function') return;
     const _f = unequipWeapon;
@@ -200,11 +232,16 @@ function myDnaEquip() {
         const w = currentUser.equippedWeapons && currentUser.equippedWeapons[index];
         const cat = w ? (ITEM_CATALOG[getEquipBaseName(w)] || ITEM_CATALOG[w]) : null;
         const isDna = cat && cat.effect === 'equip_dna';
+        const head = isDna ? ('[장착됨] ' + String(getEquipBaseName(w) || w).split(' · ')[0]) : '';
         const r = _f.apply(this, arguments);
         if (isDna && currentUser.dnaFacBonus) {
             currentUser.dnaFacBonus = 0;
             saveFields({ facilityMax: 1, dnaFacBonus: 1 });
             updateUI();
+        }
+        if (isDna && head && dnaCutNote(currentUser, head)) {
+            try { if (typeof saveFields === 'function') saveFields({ badge: 1 }); } catch (e) { }
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
         }
         return r;
     };
