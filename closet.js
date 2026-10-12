@@ -30,18 +30,25 @@
 //       body-brown.png  브라운 전용 몸  ← h-brown 과 반드시 짝
 //       coat.png        옛 코트 (몸까지 한 장에 그려진 것 — 지금은 안 쓴다)
 //
+//   ★ h05 는 h09 와 같은 얼굴인데 **안대가 반대쪽**이다. 움직일 때 좌우를
+//     가르려고 두 벌 그려 두신 것인데, 이 게임은 옆모습 한 방향만 쓰므로
+//     안대가 왼쪽 눈을 가린 h09 만 쓴다. h05.png 는 지우지 않고 남겨 둔다.
+//
 //   브라운은 몸이 따로 있다. 머리를 브라운으로 고르면 몸도 같이 바뀌고,
 //   옷은 못 갈아입는다. 어느 쪽으로 어긋나게 적혀 있어도 look() 이
 //   **보이는 모습을 늘 말이 되게** 맞춰 준다.
 //
 // ■ 칸(슬롯)마다 따로 고른다
 //
-//       옷    사원복(상의+하의) · 정장          ← 정장은 상담사만
+//       상의  없음 · 잠옷 상의
+//       하의  없음 · 잠옷 하의
+//       겉옷  없음 · 정장                        ← 상담사만
 //       구두  없음 · 구두                        ← 상담사만
 //       망토  없음 · 망토                        ← 상담사만
 //
-//   사원은 사원복 하나뿐이라 화살표가 잠긴다. 옷을 더 그려 주시면
-//   아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
+//   상·하의는 따로 입고 벗는다. 겉옷·구두·망토 줄은 상담사 옷장에만 보인다.
+//   옷을 더 그려 주시면 아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
+//   def 가 붙은 것이 「아직 한 번도 안 골랐을 때」 입고 있는 것이다.
 //
 // ■ 움직임 — 한 숫자로 같이 돌리면 안 된다
 //
@@ -79,7 +86,7 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pants', 'shoes', 'shirt', 'suit', 'cape'],
+    Z: ['pj-bottom', 'shoes', 'pj-top', 'suit', 'cape'],
     // 서 있을 때 0·2·4 로 나부끼는 장
     FLAPS: ['suit', 'cape'],
 };
@@ -91,11 +98,10 @@ const DOT_HEADS = [
     { i: 'h02', n: '연보라 · 붉은 눈' },      // 2
     { i: 'h03', n: '검은머리 · 푸른 눈' },    // 3
     { i: 'h04', n: '갈색 긴머리' },           // 4
-    { i: 'h05', n: '갈색 · 선글라스' },       // 5
     { i: 'h06', n: '갈색 · 푸른 눈' },        // 8
     { i: 'h07', n: '검은머리 · 안경' },       // 9
     { i: 'h08', n: '남색 올림머리' },         // 10
-    { i: 'h09', n: '갈색 · 선글라스 2' },     // 11
+    { i: 'h09', n: '갈색 · 안대' },           // 11  (h05 는 안대가 오른쪽인 짝 — 안 씀)
     { i: 'h10', n: '금발 · 주황 눈' },        // 12
     { i: 'h11', n: '보라 묶음머리' },         // 13
     { i: 'h12', n: '검은머리 · 붉은 눈' },    // 15
@@ -110,8 +116,20 @@ const DOT_HEADS = [
 // 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
 const DOT_SLOTS = [
     {
-        k: 'wear', n: '옷', items: [
-            { i: 'uniform', n: '사원복', over: ['shirt', 'pants'] },
+        k: 'top', n: '상의', items: [
+            { i: '', n: '없음', over: [] },
+            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true }
+        ]
+    },
+    {
+        k: 'bottom', n: '하의', items: [
+            { i: '', n: '없음', over: [] },
+            { i: 'pj', n: '잠옷 하의', over: ['pj-bottom'], def: true }
+        ]
+    },
+    {
+        k: 'outer', n: '겉옷', items: [
+            { i: '', n: '없음', over: [] },
             { i: 'suit', n: '정장', over: ['suit'], admin: true }
         ]
     },
@@ -160,8 +178,15 @@ function look(user, override) {
     const over = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = items(s, u);
-        let it = list.filter(function (x) { return x.i === (d[s.k] || ''); })[0];
-        if (!it) it = list[0];                       // 없는 것·못 쓰는 것이 적혀 있으면 첫 번째로
+        let it;
+        if (Object.prototype.hasOwnProperty.call(d, s.k)) {
+            // 한 번이라도 고른 적이 있으면 그 뜻을 지킨다 (「없음」도 고른 것이다)
+            it = list.filter(function (x) { return x.i === (d[s.k] || ''); })[0];
+        } else {
+            // 아직 안 골랐으면 기본으로 입혀 둔다
+            it = list.filter(function (x) { return x.def; })[0];
+        }
+        if (!it) it = list.filter(function (x) { return x.def; })[0] || list[0];
         pick[s.k] = it.i;
         (it.over || []).forEach(function (o) { over.push(o); });
     });
@@ -324,7 +349,7 @@ function paint() {
         note.innerText = solo
             ? '브라운은 몸이 따로라 옷을 갈아입지 못합니다.'
             : (isAdm(u) ? '고르는 대로 저장됩니다.'
-                : '고르는 대로 저장됩니다. 지금은 사원복 한 벌뿐입니다.');
+                : '고르는 대로 저장됩니다. 지금은 잠옷 한 벌뿐입니다.');
     }
 }
 
@@ -373,7 +398,7 @@ function render() {
         + '  <button class="game-btn closet-arrow" onclick="closetStep(\'head\',1)">▶</button>'
         + '</div>';
     DOT_SLOTS.forEach(function (s) {
-        if (items(s, u).length < 2 && s.k !== 'wear') return;   // 고를 것이 없으면 줄을 안 만든다
+        if (items(s, u).length < 2) return;   // 고를 것이 하나뿐이면 줄을 안 만든다
         rows += rowHtml(s.k, s.n);
     });
     body.innerHTML =
