@@ -18,7 +18,11 @@
 //
 // ■ 겹치는 차례 — 이 순서가 아니면 모양이 틀어진다
 //
-//       몸 → 하의 → 신발 → 상의 → 겉옷 → 망토 → 머리
+//       몸 → 하의 → 신발 → 상의 → 겉옷 → 망토 → 머리 → 악세
+//
+//   ★ 악세(고양이 귀)만은 **머리 위**다. 머리 아래에 깔면 귀가 머리카락에
+//     가려져 아예 안 보인다. 그래서 칸에 over 가 아니라 top 을 적으면
+//     머리보다 뒤에(위에) 붙는다.
 //
 //   ★ 「구두 → 정장 → 망토」는 눈대중이 아니라 재서 찾은 차례다.
 //     여섯 가지 차례를 다 겹쳐 보고 주신 「다 입은 모양」과 견주었더니
@@ -43,6 +47,7 @@
 //
 // ■ 칸(슬롯)마다 따로 고른다
 //
+//       악세  없음 · 고양이                      ← 머리 **위**에 얹는다
 //       상의  없음 · 잠옷 상의
 //       하의  없음 · 잠옷 하의
 //       겉옷  없음 · 정장                        ← 상담사만
@@ -70,7 +75,7 @@
 //
 // ■ 밖에서 쓰는 것 (광장이 이걸 그대로 쓴다)
 //
-//       dotLook(u)              고른 것을 풀어 준다 {head, body, layers[]}
+//       dotLook(u)              고른 것을 풀어 준다 {head, body, layers[], tops[]}
 //       dotSprite(u, 설정)      그 모습이 든 칸을 만들어 준다
 //         설정 = { pose:'stand'|'walk', scale:1, live:true }
 //       dotStop(칸)             움직임을 멈춘다 (칸을 지우기 전에)
@@ -148,6 +153,14 @@ const DOT_SLOTS = [
             { i: '', n: '없음', over: [] },
             { i: 'cape', n: '망토', over: ['cape'], admin: true }
         ]
+    },
+    {
+        // ★ 악세는 **머리 위**에 얹는다 (over 가 아니라 top).
+        //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
+        k: 'acc', n: '악세', items: [
+            { i: '', n: '없음', top: [] },
+            { i: 'cat', n: '고양이', top: ['cat'] }
+        ]
     }
 ];
 
@@ -177,9 +190,9 @@ function look(user, override) {
     const d = override || u.dot || {};
     const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
     if (head === D.BROWN_HEAD) {
-        return { head: head, body: D.BROWN_BODY, layers: [], solo: true, pick: {} };
+        return { head: head, body: D.BROWN_BODY, layers: [], tops: [], solo: true, pick: {} };
     }
-    const over = [], pick = {};
+    const over = [], tops = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = items(s, u);
         let it;
@@ -193,9 +206,10 @@ function look(user, override) {
         if (!it) it = list.filter(function (x) { return x.def; })[0] || list[0];
         pick[s.k] = it.i;
         (it.over || []).forEach(function (o) { over.push(o); });
+        (it.top || []).forEach(function (o) { tops.push(o); });
     });
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
-    return { head: head, body: D.BODY, layers: over, solo: false, pick: pick };
+    return { head: head, body: D.BODY, layers: over, tops: tops, solo: false, pick: pick };
 }
 window.dotLook = look;
 
@@ -222,7 +236,8 @@ function sprite(user, opt) {
     box.style.width = (D.W * k) + 'px';
     box.style.height = (D.H * k) + 'px';
 
-    const sheets = [L.body].concat(L.layers).concat([L.head]);
+    const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
+    const headAt = 1 + L.layers.length;                 // 머리가 몇 번째 층인가
     const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
 
     const row = (pose === 'walk') ? 0 : 1;
@@ -251,7 +266,7 @@ function sprite(user, opt) {
                 flaps.forEach(function (e) { put(e, g * 2); });
             }, D.FLAP));
         }
-        const head = els[els.length - 1];
+        const head = els[headAt];
         let f = 0;
         const blink = function () {
             put(head, f);
@@ -288,9 +303,9 @@ function actor(user, opt) {
     box.style.width = (D.W * k) + 'px';
     box.style.height = (D.H * k) + 'px';
 
-    const sheets = [L.body].concat(L.layers).concat([L.head]);
+    const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
     const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
-    const head = els[els.length - 1];
+    const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = els.filter(function (e, i) { return D.FLAPS.indexOf(sheets[i]) >= 0; });
 
     let walking = false, dir = 1, timers = [];
