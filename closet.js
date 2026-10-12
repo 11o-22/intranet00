@@ -11,38 +11,56 @@
 //       윗줄   걷기 여섯 칸 (광장에서 쓴다)
 //       아랫줄 서기 여섯 칸 (옷장 마네킹에서 쓴다)
 //
-//   원래 받은 그림은 한 칸이 144 였는데, 코트 자락이 칸 밖으로 여덟 도트
-//   삐져나가 **다음 칸에 남의 자락이 묻어 보였다.** 그래서 스물한 장을
-//   모두 208 로 다시 깔았다. 그림은 한 점도 안 고치고 칸 안에서 똑같이
-//   여섯 도트씩 밀기만 했으므로, 겹쳐도 그대로 맞물린다.
+//   받은 그림은 한 칸이 144 였는데 코트 자락이 칸 밖으로 여덟 도트 삐져나가
+//   **다음 칸에 남의 자락이 묻어 보였다.** 그래서 전부 208 로 다시 깔았다.
+//   그림은 한 점도 안 고치고 칸 안에서 똑같이 여섯 도트씩 밀기만 했으므로,
+//   겹쳐도 그대로 맞물린다. (한 장은 216x128 도트 1:1 로 와서 네 배로 키웠다)
 //
-// ■ 겹치는 차례 — 몸 다음에 머리
+// ■ 겹치는 차례 — 이 순서가 아니면 모양이 틀어진다
 //
-//   ★ 「옷」은 덧입히는 것이 아니라 **몸을 통째로 바꾸는 것**이다.
-//     coat.png 안에 몸까지 함께 그려져 있기 때문이다. 그래서 옷을 고르면
-//     몸판 자체가 바뀐다. 머리만 그 위에 얹는다.
+//       몸 → 하의 → 신발 → 상의 → 겉옷 → 망토 → 머리
 //
-//       맨몸   body.png        + 머리
-//       코트   coat.png        + 머리
-//       브라운 body-brown.png  + h-brown   ← 이 둘은 반드시 짝이다
+//   ★ 「구두 → 정장 → 망토」는 눈대중이 아니라 재서 찾은 차례다.
+//     여섯 가지 차례를 다 겹쳐 보고 주신 「다 입은 모양」과 견주었더니
+//     이 차례만 **한 도트도 안 틀렸다**. (다른 차례는 688~689 도트가 어긋난다)
+//
+// ■ 몸판은 셋뿐이다
+//
+//       body.png        보통 몸
+//       body-brown.png  브라운 전용 몸  ← h-brown 과 반드시 짝
+//       coat.png        옛 코트 (몸까지 한 장에 그려진 것 — 지금은 안 쓴다)
 //
 //   브라운은 몸이 따로 있다. 머리를 브라운으로 고르면 몸도 같이 바뀌고,
-//   브라운이 아닌 머리를 고르면 몸도 같이 돌아온다. 옷은 못 갈아입는다.
+//   옷은 못 갈아입는다. 어느 쪽으로 어긋나게 적혀 있어도 look() 이
+//   **보이는 모습을 늘 말이 되게** 맞춰 준다.
 //
-// ■ 움직임
+// ■ 칸(슬롯)마다 따로 고른다
 //
-//   세 가지가 따로 돈다. 한 숫자로 같이 돌리면 안 된다.
+//       옷    사원복(상의+하의) · 정장          ← 정장은 상담사만
+//       구두  없음 · 구두                        ← 상담사만
+//       망토  없음 · 망토                        ← 상담사만
+//
+//   사원은 사원복 하나뿐이라 화살표가 잠긴다. 옷을 더 그려 주시면
+//   아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
+//
+// ■ 움직임 — 한 숫자로 같이 돌리면 안 된다
 //
 //     머리  여섯 칸이 눈 깜빡임이다 (0=1=5 뜸 · 2=4 반 · 3 감음).
 //           오래 뜨고 잠깐 감게 칸마다 머무는 시간을 달리 둔다.
 //     몸    서기 여섯 칸이 전부 같은 그림이라 0 에 세워 둔다.
-//     코트  서기 줄의 **짝수 칸(0·2·4)만** 코트가 있다. 홀수 칸에는
-//           코트가 아예 없어서, 같이 돌리면 코트가 깜빡 사라진다.
-//           그래서 짝수 칸만 돌린다.
+//     옷    서기 줄에서 **짝수 칸(0·2·4)만** 알맹이가 있다. 홀수 칸은
+//           비어 있어서 같이 돌리면 옷이 깜빡 사라진다. 그래서 flap 이
+//           붙은 장만 0·2·4 를 돈다. 나머지(상의·하의·구두)는 서 있을 때
+//           움직이지 않으므로 0 에 세워 둔다.
+//
+//   ★ 걷기 줄의 **5·6번째 칸은 3·2번째와 같다** — 그린 이의 규칙이다.
+//     상의·하의는 실제로 픽셀 하나 안 틀리고 같았다. 정장·망토·구두는
+//     그 두 칸이 비어 온 것을 이 규칙대로 채워 넣었다. 채운 뒤 몸 위에
+//     겹쳐 옛 코트 장과 견주니 칸마다 80픽셀(5도트)밖에 안 달랐다.
 //
 // ■ 밖에서 쓰는 것 (광장이 이걸 그대로 쓴다)
 //
-//       dotLook(u)              고른 것을 풀어 준다 {head, wear, body}
+//       dotLook(u)              고른 것을 풀어 준다 {head, body, layers[]}
 //       dotSprite(u, 설정)      그 모습이 든 칸을 만들어 준다
 //         설정 = { pose:'stand'|'walk', scale:1, live:true }
 //       dotStop(칸)             움직임을 멈춘다 (칸을 지우기 전에)
@@ -53,40 +71,62 @@
 
 const DOT = {
     DIR: 'dot/',
-    W: 208, H: 256,            // 한 칸
+    W: 208, H: 256,
     SHEET_W: 1248, SHEET_H: 512,
     BODY: 'body', BROWN_BODY: 'body-brown', BROWN_HEAD: 'h-brown',
+    ADMIN: 'kario0987',
     BLINK: [1900, 110, 110, 110, 110, 110],   // 머리 칸마다 머무는 시간
-    FLAP: 260,                                 // 코트 나부끼는 빠르기
-    WALK: 120                                  // 걷는 빠르기 (광장에서 쓴다)
+    FLAP: 300,                                 // 옷자락 나부끼는 빠르기
+    WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
+    // 겹치는 차례 — 앞에 있는 것이 아래로 간다
+    Z: ['pants', 'shoes', 'shirt', 'suit', 'cape'],
+    // 서 있을 때 0·2·4 로 나부끼는 장
+    FLAPS: ['suit', 'cape'],
 };
 
-// 머리 — 이름은 제가 보고 붙인 것이라 마음에 안 드시면 여기만 고치면 됩니다
+// 머리 — 이름은 제가 보고 붙인 것입니다. 파일명이 제 쪽으로 안 와서,
+//        올리신 차례대로 번호를 매겨 두었습니다. 여기만 고치면 됩니다.
 const DOT_HEADS = [
-    { i: 'h01', n: '은발 · 노란 눈' },
-    { i: 'h02', n: '연보라 · 붉은 눈' },
-    { i: 'h03', n: '검은머리 · 푸른 눈' },
-    { i: 'h04', n: '갈색 긴머리' },
-    { i: 'h05', n: '갈색 · 선글라스' },
-    { i: 'h06', n: '갈색 · 푸른 눈' },
-    { i: 'h07', n: '검은머리 · 안경' },
-    { i: 'h08', n: '남색 올림머리' },
-    { i: 'h09', n: '갈색 · 선글라스 2' },
-    { i: 'h10', n: '금발 · 주황 눈' },
-    { i: 'h11', n: '보라 묶음머리' },
-    { i: 'h12', n: '검은머리 · 붉은 눈' },
-    { i: 'h13', n: '검은 긴머리' },
-    { i: 'h14', n: '검은 긴머리 · 안경' },
-    { i: 'h15', n: '남보라 · 청록 눈' },
-    { i: 'h16', n: '검은머리 · 노란 눈' },
-    { i: 'h17', n: '회청 땋은머리' },
-    { i: 'h-brown', n: '브라운', solo: true }   // solo — 전용 몸과 짝, 옷을 못 입는다
+    { i: 'h01', n: '은발 · 노란 눈' },        // 올리신 차례 1
+    { i: 'h02', n: '연보라 · 붉은 눈' },      // 2
+    { i: 'h03', n: '검은머리 · 푸른 눈' },    // 3
+    { i: 'h04', n: '갈색 긴머리' },           // 4
+    { i: 'h05', n: '갈색 · 선글라스' },       // 5
+    { i: 'h06', n: '갈색 · 푸른 눈' },        // 8
+    { i: 'h07', n: '검은머리 · 안경' },       // 9
+    { i: 'h08', n: '남색 올림머리' },         // 10
+    { i: 'h09', n: '갈색 · 선글라스 2' },     // 11
+    { i: 'h10', n: '금발 · 주황 눈' },        // 12
+    { i: 'h11', n: '보라 묶음머리' },         // 13
+    { i: 'h12', n: '검은머리 · 붉은 눈' },    // 15
+    { i: 'h13', n: '검은 긴머리' },           // 16
+    { i: 'h14', n: '검은 긴머리 · 안경' },    // 17
+    { i: 'h15', n: '남보라 · 청록 눈' },      // 18
+    { i: 'h16', n: '검은머리 · 노란 눈' },    // 19
+    { i: 'h17', n: '회청 땋은머리' },         // 20
+    { i: 'h-brown', n: '브라운', solo: true } // 6 — 전용 몸과 짝, 옷을 못 입는다
 ];
 
-// 옷 = 몸판
-const DOT_WEARS = [
-    { i: '', n: '맨몸', body: 'body' },
-    { i: 'coat', n: '코트', body: 'coat' }
+// 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
+const DOT_SLOTS = [
+    {
+        k: 'wear', n: '옷', items: [
+            { i: 'uniform', n: '사원복', over: ['shirt', 'pants'] },
+            { i: 'suit', n: '정장', over: ['suit'], admin: true }
+        ]
+    },
+    {
+        k: 'shoes', n: '구두', items: [
+            { i: '', n: '없음', over: [] },
+            { i: 'shoes', n: '구두', over: ['shoes'], admin: true }
+        ]
+    },
+    {
+        k: 'cape', n: '망토', items: [
+            { i: '', n: '없음', over: [] },
+            { i: 'cape', n: '망토', over: ['cape'], admin: true }
+        ]
+    }
 ];
 
 (function closet() {
@@ -95,35 +135,50 @@ const D = DOT;
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function save(f) { try { if (typeof saveFields === 'function') saveFields(f); } catch (e) { } }
-function headAt(i) { return DOT_HEADS[((i % DOT_HEADS.length) + DOT_HEADS.length) % DOT_HEADS.length]; }
-function wearAt(i) { return DOT_WEARS[((i % DOT_WEARS.length) + DOT_WEARS.length) % DOT_WEARS.length]; }
+function isAdm(user) {
+    const u = user || u_();
+    return !!(u && u.code === D.ADMIN);
+}
+// 이 사람 옷장에 보이는 것만 추린다
+function items(slot, user) {
+    return slot.items.filter(function (it) { return !it.admin || isAdm(user); });
+}
+function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
+function wrap(n, len) { return ((n % len) + len) % len; }
 function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i === id; }); return k < 0 ? 0 : k; }
-function wearIdx(id) { const k = DOT_WEARS.findIndex(function (w) { return w.i === (id || ''); }); return k < 0 ? 0 : k; }
 
 // ==========================================
 // 고른 것을 풀어 준다
 // ==========================================
-//
-//   브라운은 몸이 따로다. 머리가 브라운이면 옷은 무시하고 전용 몸을 쓴다.
-//   거꾸로 브라운이 아닌데 전용 몸이 적혀 있으면 그것도 무시한다.
-//   어느 쪽으로 어긋나 있어도 **보이는 모습은 늘 말이 되게** 맞춰 준다.
-function look(user) {
+function look(user, override) {
     const u = user || u_() || {};
-    const d = u.dot || {};
+    const d = override || u.dot || {};
     const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
-    if (head === D.BROWN_HEAD) return { head: head, wear: '', body: D.BROWN_BODY, solo: true };
-    const w = DOT_WEARS[wearIdx(d.wear)];
-    return { head: head, wear: w.i, body: w.body, solo: false };
+    if (head === D.BROWN_HEAD) {
+        return { head: head, body: D.BROWN_BODY, layers: [], solo: true, pick: {} };
+    }
+    const over = [], pick = {};
+    DOT_SLOTS.forEach(function (s) {
+        const list = items(s, u);
+        let it = list.filter(function (x) { return x.i === (d[s.k] || ''); })[0];
+        if (!it) it = list[0];                       // 없는 것·못 쓰는 것이 적혀 있으면 첫 번째로
+        pick[s.k] = it.i;
+        (it.over || []).forEach(function (o) { over.push(o); });
+    });
+    over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
+    return { head: head, body: D.BODY, layers: over, solo: false, pick: pick };
 }
 window.dotLook = look;
 
 // ==========================================
 // 모습이 든 칸을 만든다
 // ==========================================
-function layer(sheet) {
+function layer(sheet, k) {
     const el = document.createElement('div');
     el.className = 'dot-layer';
+    el.dataset.sheet = sheet;
     el.style.backgroundImage = 'url("' + D.DIR + sheet + '.png")';
+    el.style.backgroundSize = (D.SHEET_W * k) + 'px ' + (D.SHEET_H * k) + 'px';
     return el;
 }
 
@@ -131,36 +186,43 @@ function sprite(user, opt) {
     const o = opt || {};
     const k = o.scale || 1;
     const pose = o.pose === 'walk' ? 'walk' : 'stand';
-    const L = look(user);
+    const L = look(user, o.dot);
 
     const box = document.createElement('div');
     box.className = 'dot-box';
     box.style.width = (D.W * k) + 'px';
     box.style.height = (D.H * k) + 'px';
 
-    const body = layer(L.body), head = layer(L.head);
-    box.appendChild(body); box.appendChild(head);
-    [body, head].forEach(function (el) {
-        el.style.backgroundSize = (D.SHEET_W * k) + 'px ' + (D.SHEET_H * k) + 'px';
-    });
+    const sheets = [L.body].concat(L.layers).concat([L.head]);
+    const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
 
     const row = (pose === 'walk') ? 0 : 1;
     const put = function (el, col) {
         el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
     };
-    put(body, 0); put(head, 0);
+    els.forEach(function (e) { put(e, 0); });
 
-    box._dot = { body: body, head: head, row: row, k: k, L: L, timers: [] };
+    box._dot = { els: els, sheets: sheets, timers: [] };
     if (o.live === false) return box;
 
     if (pose === 'walk') {
-        // 걷기 — 몸과 머리가 같은 칸으로 간다
+        // 걷기 — 여섯 칸을 다 같이 돈다
         let f = 0;
         box._dot.timers.push(setInterval(function () {
-            f = (f + 1) % 6; put(body, f); put(head, f);
+            f = (f + 1) % 6;
+            els.forEach(function (e) { put(e, f); });
         }, D.WALK));
     } else {
-        // 서기 — 몸은 세워 두고, 머리는 깜빡이고, 코트만 나부낀다
+        // 서기 — 몸·신발은 세워 두고, 옷자락은 0·2·4 로 나부끼고, 머리는 깜빡인다
+        let g = 0;
+        const flaps = els.filter(function (e, i) { return D.FLAPS.indexOf(sheets[i]) >= 0; });
+        if (flaps.length) {
+            box._dot.timers.push(setInterval(function () {
+                g = (g + 1) % 3;
+                flaps.forEach(function (e) { put(e, g * 2); });
+            }, D.FLAP));
+        }
+        const head = els[els.length - 1];
         let f = 0;
         const blink = function () {
             put(head, f);
@@ -169,12 +231,6 @@ function sprite(user, opt) {
             box._dot.timers.push(setTimeout(blink, ms));
         };
         blink();
-        if (L.body === 'coat') {
-            let g = 0;
-            box._dot.timers.push(setInterval(function () {
-                g = (g + 1) % 3; put(body, g * 2);     // 0 · 2 · 4 — 코트가 있는 칸만
-            }, D.FLAP));
-        }
     }
     return box;
 }
@@ -219,13 +275,17 @@ window.dotStop = stop;
 // ==========================================
 // 옷장 화면
 // ==========================================
-let pick = null;            // 지금 고르는 중인 것 {head, wear}
-let stage = null;           // 마네킹 칸
+let pick = null;
+let stage = null;
 let saveT = null;
 
 function cur() {
-    const u = u_(); if (!u) return { head: DOT_HEADS[0].i, wear: '' };
-    if (!pick) { const L = look(u); pick = { head: L.head, wear: L.wear }; }
+    const u = u_();
+    if (!pick) {
+        const L = look(u);
+        pick = { head: L.head };
+        DOT_SLOTS.forEach(function (s) { pick[s.k] = L.pick[s.k] || ''; });
+    }
     return pick;
 }
 
@@ -233,76 +293,97 @@ function paint() {
     const host = document.getElementById('closet-stage');
     if (!host) return;
     if (stage) { stop(stage); stage.remove(); stage = null; }
-    const p = cur();
-    stage = sprite({ dot: p }, { pose: 'stand', scale: 1 });
+    const u = u_(), p = cur();
+    stage = sprite(u, { pose: 'stand', scale: 1, dot: p });
     host.insertBefore(stage, host.firstChild);
 
-    const h = headAt(headIdx(p.head)), hi = headIdx(p.head);
+    const hi = headIdx(p.head), h = DOT_HEADS[hi];
     const solo = !!h.solo;
-    const wi = wearIdx(p.wear), w = wearAt(wi);
     const set = function (id, text, n, of) {
         const el = document.getElementById(id);
         if (el) el.innerHTML = text + '<span class="num">' + n + ' / ' + of + '</span>';
     };
     set('closet-head-name', h.n, hi + 1, DOT_HEADS.length);
-    set('closet-wear-name', solo ? '브라운 전용 몸' : w.n, solo ? 1 : wi + 1, solo ? 1 : DOT_WEARS.length);
-    ['closet-wear-l', 'closet-wear-r'].forEach(function (id) {
-        const b = document.getElementById(id); if (b) b.disabled = solo;
+
+    DOT_SLOTS.forEach(function (s) {
+        const list = items(s, u);
+        const row = document.getElementById('closet-row-' + s.k);
+        if (row) row.style.display = (list.length > 1 || !solo) ? 'flex' : 'flex';
+        let k = list.findIndex(function (x) { return x.i === p[s.k]; });
+        if (k < 0) k = 0;
+        const lock = solo || list.length < 2;
+        set('closet-' + s.k + '-name', solo ? '—' : list[k].n, solo ? 1 : k + 1, solo ? 1 : list.length);
+        ['l', 'r'].forEach(function (d) {
+            const b = document.getElementById('closet-' + s.k + '-' + d);
+            if (b) b.disabled = lock;
+        });
     });
+
     const note = document.getElementById('closet-note');
     if (note) {
         note.innerText = solo
             ? '브라운은 몸이 따로라 옷을 갈아입지 못합니다.'
-            : '고르는 대로 저장됩니다.';
+            : (isAdm(u) ? '고르는 대로 저장됩니다.'
+                : '고르는 대로 저장됩니다. 지금은 사원복 한 벌뿐입니다.');
     }
 }
 
 function step(what, d) {
-    const p = cur();
+    const u = u_(), p = cur();
     if (what === 'head') {
-        p.head = headAt(headIdx(p.head) + d).i;
-        if (headAt(headIdx(p.head)).solo) p.wear = '';
+        p.head = DOT_HEADS[wrap(headIdx(p.head) + d, DOT_HEADS.length)].i;
     } else {
-        if (headAt(headIdx(p.head)).solo) return;
-        p.wear = wearAt(wearIdx(p.wear) + d).i;
+        if (DOT_HEADS[headIdx(p.head)].solo) return;
+        const s = slotOf(what); if (!s) return;
+        const list = items(s, u); if (list.length < 2) return;
+        let k = list.findIndex(function (x) { return x.i === p[what]; });
+        if (k < 0) k = 0;
+        p[what] = list[wrap(k + d, list.length)].i;
     }
     paint();
-    // 누를 때마다 쓰지 않고 잠깐 모았다가 한 번에 적는다
     clearTimeout(saveT);
     saveT = setTimeout(function () {
-        const u = u_(); if (!u) return;
-        u.dot = { head: p.head, wear: p.wear };
+        const me = u_(); if (!me) return;
+        const out = { head: p.head };
+        DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
+        me.dot = out;
         save({ dot: 1 });
     }, 600);
 }
 window.closetStep = step;
+
+function rowHtml(k, n) {
+    return '<div class="closet-row" id="closet-row-' + k + '">'
+        + '  <span class="lab">' + n + '</span>'
+        + '  <button class="game-btn closet-arrow" id="closet-' + k + '-l" onclick="closetStep(\'' + k + '\',-1)">◀</button>'
+        + '  <span class="mid" id="closet-' + k + '-name"></span>'
+        + '  <button class="game-btn closet-arrow" id="closet-' + k + '-r" onclick="closetStep(\'' + k + '\',1)">▶</button>'
+        + '</div>';
+}
 
 function render() {
     const body = document.getElementById('house-closet-body');
     if (!body) return;
     const u = u_(); if (!u) return;
     pick = null;
-    body.innerHTML =
-        '<div class="panel-title">[사택 옷장]</div>'
-        + '<div id="closet-stage"><div id="closet-floor"></div></div>'
-        + '<div class="closet-row">'
+    let rows = '<div class="closet-row">'
         + '  <span class="lab">머리</span>'
         + '  <button class="game-btn closet-arrow" onclick="closetStep(\'head\',-1)">◀</button>'
         + '  <span class="mid" id="closet-head-name"></span>'
         + '  <button class="game-btn closet-arrow" onclick="closetStep(\'head\',1)">▶</button>'
-        + '</div>'
-        + '<div class="closet-row">'
-        + '  <span class="lab">옷</span>'
-        + '  <button class="game-btn closet-arrow" id="closet-wear-l" onclick="closetStep(\'wear\',-1)">◀</button>'
-        + '  <span class="mid" id="closet-wear-name"></span>'
-        + '  <button class="game-btn closet-arrow" id="closet-wear-r" onclick="closetStep(\'wear\',1)">▶</button>'
-        + '</div>'
-        + '<div id="closet-note"></div>';
+        + '</div>';
+    DOT_SLOTS.forEach(function (s) {
+        if (items(s, u).length < 2 && s.k !== 'wear') return;   // 고를 것이 없으면 줄을 안 만든다
+        rows += rowHtml(s.k, s.n);
+    });
+    body.innerHTML =
+        '<div class="panel-title">[사택 옷장]</div>'
+        + '<div id="closet-stage"><div id="closet-floor"></div></div>'
+        + rows + '<div id="closet-note"></div>';
     paint();
 }
 window.renderCloset = render;
 
-// 다른 칸으로 넘어가면 움직임을 멈춘다 (안 멈추면 뒤에서 계속 돈다)
 setInterval(function () {
     const p = document.getElementById('house-closet');
     if (stage && p && !p.classList.contains('active')) { stop(stage); stage.remove(); stage = null; }
@@ -342,37 +423,37 @@ window.closetState = function () {
     const u = u_(); if (!u) { console.log('로그인 먼저'); return; }
     const L = look(u);
     console.log('%c===== 사택 옷장 =====', 'color:#e8c27a; font-size:13px');
-    console.log('  적힌 것 :', JSON.stringify(u.dot || {}));
-    console.log('  보이는 것 : 머리', L.head, '· 옷', L.wear || '맨몸', '· 몸판', L.body);
-    console.log('  머리', DOT_HEADS.length, '종 · 옷', DOT_WEARS.length, '종');
+    console.log('  적힌 것   :', JSON.stringify(u.dot || {}));
+    console.log('  보이는 것 : 몸', L.body, '· 겹침', L.layers.join(' → ') || '없음', '· 머리', L.head);
+    console.log('  상담사인가:', isAdm(u) ? 'O' : '✗');
+    DOT_SLOTS.forEach(function (s) {
+        console.log('  ' + s.n + ' :', items(s, u).map(function (x) { return x.n; }).join(' · '));
+    });
 };
 
 window.closetAll = function () {
+    const u = u_();
     const box = document.createElement('div');
     box.style.cssText = 'position:fixed;inset:0;z-index:9999999;background:#0d0d0d;overflow:auto;padding:14px;';
     box.onclick = function () { box.querySelectorAll('.dot-box').forEach(stop); box.remove(); };
     const grid = document.createElement('div');
     grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;';
-    DOT_HEADS.forEach(function (h) {
-        DOT_WEARS.forEach(function (w) {
-            if (h.solo && w.i) return;
-            const c = document.createElement('div');
-            c.style.cssText = 'text-align:center;';
-            const s = sprite({ dot: { head: h.i, wear: w.i } }, { pose: 'stand', scale: 0.5 });
-            c.appendChild(s);
-            const t = document.createElement('div');
-            t.style.cssText = 'font-size:9px;color:#9a948a;';
-            t.innerText = h.n + (w.i ? ' · ' + w.n : '');
-            c.appendChild(t);
-            grid.appendChild(c);
-        });
+    DOT_HEADS.forEach(function (h, k) {
+        const c = document.createElement('div');
+        c.style.cssText = 'text-align:center;';
+        c.appendChild(sprite(u, { pose: 'stand', scale: 0.5, dot: { head: h.i, wear: 'uniform' } }));
+        const t = document.createElement('div');
+        t.style.cssText = 'font-size:9px;color:#9a948a;';
+        t.innerText = (k + 1) + '. ' + h.n;
+        c.appendChild(t);
+        grid.appendChild(c);
     });
     box.appendChild(grid);
     document.body.appendChild(box);
     console.log('아무 데나 누르면 닫힙니다.');
 };
 
-console.log('[옷장] 머리 ' + DOT_HEADS.length + '종 · 옷 ' + DOT_WEARS.length
-    + '종 — closetState() · closetAll()');
+console.log('[옷장] 머리 ' + DOT_HEADS.length + '종 · 칸 ' + DOT_SLOTS.length
+    + '개 — closetState() · closetAll()');
 
 })();
