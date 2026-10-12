@@ -5,8 +5,8 @@
 //
 // ■ 물건
 //   이름     뿅망치 (상담사가 지급해야만 생긴다 — 상점·우주 쇼핑몰에는 없다)
-//   설명     탄원이 서린 망치. Mu만 사용이 가능하다.
-//   장착     Mu 만 장착할 수 있다. 장착하면 장착 중 슬롯의 [해제] 옆에 [목표] 버튼이 생긴다.
+//   설명     탄원이 서린 망치. 뿅망치 2대 주인. S만 사용이 가능하다.
+//   장착     S 만 장착할 수 있다. 장착하면 장착 중 슬롯의 [해제] 옆에 [목표] 버튼이 생긴다.
 //
 // ■ 때리기
 //   · [목표] → 사원을 한 명 고른다 → 그 사람이 「맞은 사람」 줄에 선다.
@@ -34,14 +34,14 @@
 const NAME = '뿅망치';
 const DAILY = 5;
 const SPARE_POLL = 0;                  // 대신 들어가게 되면 장착자의 오염도는 0 으로 둔다
-const OWNER_NAME = 'Mu';               // 쓸 수 있는 사람 (이름·별명·사번 어느 쪽이든, 대소문자 무시)
+const OWNER_NAME = 'S';                // 쓸 수 있는 사람 (이름·별명·사번 어느 쪽이든, 대소문자 무시)
 
 // ------------------------------------------
 // 물건 등록
 // ------------------------------------------
 ITEM_CATALOG[NAME] = {
     price: '???', usable: true, targetable: false, effect: 'equip_ppyong', adminOnly: true,
-    desc: '탄원이 서린 망치. Mu만 사용이 가능하다.'
+    desc: '탄원이 서린 망치. 뿅망치 2대 주인. S만 사용이 가능하다.'
 };
 try { if (Array.isArray(NO_SELL_ITEMS) && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME); } catch (e) { }
 
@@ -88,7 +88,7 @@ function whyNot(me, t) {
 }
 
 // ==========================================
-// 1. 착용 조건 — Mu 만
+// 1. 착용 조건 — S 만
 // ==========================================
 (function hookWear() {
     const iv = setInterval(function () {
@@ -395,13 +395,13 @@ window.ppyongState = function () {
 };
 
 window.ppyongTest = function () {
-    const mu = { code: 'zz1', name: 'Mu', badge: {}, equippedWeapons: [NAME], ppyongQueue: [] };
+    const mu = { code: 'zz1', name: 'S', badge: {}, equippedWeapons: [NAME], ppyongQueue: [] };
     const other = { code: 'zz2', name: '다른사원', badge: {}, equippedWeapons: [] };
     const a = { code: 'zz3', name: '맞을사원', badge: {}, ppyongTookDay: today() };
     const b = { code: 'zz4', name: '새사원', badge: {} };
     const rows = [
-        ['Mu 만 착용', isOwner(mu) && !isOwner(other)],
-        ['canWearItem — Mu', canWearItem(mu, NAME) === true],
+        ['S 만 착용', isOwner(mu) && !isOwner(other)],
+        ['canWearItem — S', canWearItem(mu, NAME) === true],
         ['canWearItem — 다른 사원', canWearItem(other, NAME) === false],
         ['오늘 대신 들어간 사람은 못 때림', !!whyNot(mu, a)],
         ['새 사람은 때릴 수 있음', !whyNot(mu, b)],
@@ -412,6 +412,6 @@ window.ppyongTest = function () {
     rows.forEach(function (r) { console.log('  ' + (r[1] ? 'O ' : '✗ ') + r[0]); });
 };
 
-console.log('[뿅망치] 상담사 지급 · Mu 전용 — ppyongState() · ppyongTest()');
+console.log('[뿅망치] 상담사 지급 · S 전용 — ppyongState() · ppyongTest()');
 
 })();
