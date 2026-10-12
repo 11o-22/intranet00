@@ -116,6 +116,15 @@ const EXPIRY = [
         try { return window.kleeNoteLive ? window.kleeNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
+    // 🏷 지산의 복 — 황금 막대를 놓으면(자정) 줄도 걷는다.
+    { mark: '[🏷 ', live: function (u, note) {
+        try { return window.jisanNoteLive ? window.jisanNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
+    { mark: '[성내고 욕하는 것은', live: function (u, note) {
+        try { return window.jisanNoteLive ? window.jisanNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
     // 🐾 아기 여우 분신 — 거둬 가거나 소멸하면 줄도 걷는다.
     // 재는 쪽은 babyfox.js 의 kitNoteLive (u.kitOn 에 그 분신이 있나).
     { mark: '[🐾 ', live: function (u, note) {
