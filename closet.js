@@ -74,6 +74,7 @@
 //       dotSprite(u, 설정)      그 모습이 든 칸을 만들어 준다
 //         설정 = { pose:'stand'|'walk', scale:1, live:true }
 //       dotStop(칸)             움직임을 멈춘다 (칸을 지우기 전에)
+//       dotActor(u, 설정)       걷다 멈췄다 하는 사람 — 광장이 쓴다
 //
 // ■ 콘솔
 //       closetState()   지금 고른 것
@@ -263,6 +264,81 @@ function sprite(user, opt) {
     return box;
 }
 window.dotSprite = sprite;
+
+// ==========================================
+// 광장에서 돌아다닐 때 쓰는 손잡이
+// ==========================================
+//
+//   옷장 마네킹은 가만히 서 있기만 하면 되지만, 돌아다니는 사람은
+//   걷다 멈췄다 하고 좌우를 바꾼다. 그래서 「서기/걷기」를 밖에서
+//   켜고 끌 수 있는 것을 따로 둔다.
+//
+//       const a = dotActor(user, { scale: 0.75 });
+//       a.el                 칸 (화면에 붙인다)
+//       a.moving(true)       걷는 모습으로
+//       a.face(-1)           오른쪽을 보게 (그림은 왼쪽을 보고 그려져 있다)
+//       a.stop()             움직임을 멈춘다 (칸을 지우기 전에)
+function actor(user, opt) {
+    const o = opt || {};
+    const k = o.scale || 1;
+    const L = look(user, o.dot);
+
+    const box = document.createElement('div');
+    box.className = 'dot-box';
+    box.style.width = (D.W * k) + 'px';
+    box.style.height = (D.H * k) + 'px';
+
+    const sheets = [L.body].concat(L.layers).concat([L.head]);
+    const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
+    const head = els[els.length - 1];
+    const flaps = els.filter(function (e, i) { return D.FLAPS.indexOf(sheets[i]) >= 0; });
+
+    let walking = false, dir = 1, timers = [];
+    const put = function (el, col, row) {
+        el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
+    };
+    const clear = function () { timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = []; };
+
+    const start = function () {
+        clear();
+        if (walking) {
+            let f = 0;
+            els.forEach(function (e) { put(e, 0, 0); });
+            timers.push(setInterval(function () {
+                f = (f + 1) % 6;
+                els.forEach(function (e) { put(e, f, 0); });
+            }, D.WALK));
+        } else {
+            els.forEach(function (e) { put(e, 0, 1); });
+            if (flaps.length) {
+                let g = 0;
+                timers.push(setInterval(function () {
+                    g = (g + 1) % 3;
+                    flaps.forEach(function (e) { put(e, g * 2, 1); });
+                }, D.FLAP));
+            }
+            let f = 0;
+            const blink = function () {
+                put(head, f, 1);
+                const ms = D.BLINK[f];
+                f = (f + 1) % 6;
+                timers.push(setTimeout(blink, ms));
+            };
+            blink();
+        }
+    };
+    start();
+
+    return {
+        el: box,
+        moving: function (on) { on = !!on; if (on === walking) return; walking = on; start(); },
+        // 그림은 **왼쪽을 보고** 그려져 있다. 오른쪽을 보게 하려면 뒤집는다.
+        face: function (d) { if (d === dir) return; dir = d; box.style.transform = (d < 0 ? 'scaleX(-1)' : ''); },
+        facing: function () { return dir; },
+        stop: clear
+    };
+}
+window.dotActor = actor;
 
 function stop(box) {
     if (!box || !box._dot) return;
