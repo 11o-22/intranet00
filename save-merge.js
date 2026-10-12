@@ -81,16 +81,60 @@ function same(a, b) {
 //     · 남이 걸어 준 노예 계약·안대·오염 동결이 내 화면에 안 붙고
 //     · 다음 저장이 내 묵은 0 을 서버에 밀어 넣어 **때 전에 풀린다.**
 //   물약이 사라지던 것과 같은 까닭이고, 값이 배열이 아니라 숫자일 뿐이다.
+// ★ 속이 전부 빈 것도 「빈 것」이다.
+//
+//   파이어베이스는 빈 알맹이를 **지운다.** { '2026-10-12-s2': {} } 를 쓰면
+//   안쪽이 비어 열쇠째 없어지고, 서버에는 그 칸이 아예 안 생긴다. 그런데
+//   화면 쪽에는 그 모습이 그대로 남아 있다. 겉만 보면 「열쇠가 하나 있는
+//   객체」와 「없는 칸」이라 늘 다르게 세어, 그 칸이 영영 「내가 손댄 것」이
+//   된다 (qshopRecord 가 그랬다). 속까지 들어가 센다.
 function blank(v) {
     if (v === undefined || v === null || v === 0 || v === '' || v === false) return true;
-    if (Array.isArray(v)) return v.length === 0;
-    if (typeof v === 'object') return Object.keys(v).length === 0;
+    if (Array.isArray(v)) return v.every(blank);
+    if (typeof v === 'object') return Object.keys(v).every(function (k) { return blank(v[k]); });
     return false;
+}
+// ★ 「없는 열쇠」와 「빈 값」을 같게 보는 눈은 **알맹이 속까지** 들어가야 한다.
+//
+//   위 blank 는 값 통째가 비었을 때만 본다. 그런데 자료가 어긋나는 자리는
+//   대개 **객체 안의 한 칸**이다.
+//
+//       내 화면 badge : { gender:'여성', nickname:'가', notes:'…', photo:'' }
+//       서버   badge : { gender:'여성', nickname:'가', notes:'…' }
+//                                                      ~~~~~~~~~ 열쇠가 아예 없다
+//
+//   파이어베이스는 빈 글자를 값으로 두기도 하고, 한 번도 넣어 본 적이 없으면
+//   열쇠가 아예 없다. 그런데 화면 쪽은 사원증 칸을 그릴 때 photo:'' 를 깔아
+//   둔다 (index.html:6045 · loadBadgeInfo). 글자로 견주면 이 둘이 다르다.
+//
+//   다르다고 세면 badge 는 **영영 「내가 손댄 항목」**이 된다. 그러면
+//     · 남이 적어 준 특이사항이 내 화면에 안 들어오고 (mergeOnSrv 가 건너뛴다)
+//     · 다음 저장이 내 묵은 badge 를 서버에 밀어 넣어 **그 줄을 지운다.**
+//   「특이사항이 계속 사라진다」가 이것이다. 임신(preg.careAt)·사택(house)·
+//   액자(frames) 처럼 알맹이가 객체인 칸은 모두 같은 길로 굳는다.
+//
+//   그래서 객체·배열은 열쇠를 합쳐 놓고 칸마다 들어가 견준다. 어느 한쪽에만
+//   있는 칸이 비어 있으면 같은 것으로 본다.
+function sameDeep(a, b) {
+    if (a === b) return true;
+    if (blank(a) && blank(b)) return true;
+    const ao = (a !== null && typeof a === 'object');
+    const bo = (b !== null && typeof b === 'object');
+    if (!ao || !bo) return same(a, b);
+    if (Array.isArray(a) !== Array.isArray(b)) return same(a, b);
+    if (Array.isArray(a)) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) { if (!sameDeep(a[i], b[i])) return false; }
+        return true;
+    }
+    const keys = {};
+    Object.keys(a).forEach(function (k) { keys[k] = 1; });
+    Object.keys(b).forEach(function (k) { keys[k] = 1; });
+    return Object.keys(keys).every(function (k) { return sameDeep(a[k], b[k]); });
 }
 function sameAs(k, a, b) {
     if (k === INV || k === EFF || k === BUF) return same(asArr(a), asArr(b));
-    if (blank(a) && blank(b)) return true;
-    return same(a, b);
+    return sameDeep(a, b);
 }
 function badKey(k) { return /[.#$\[\]\/]/.test(k); }
 function asArr(v) {
