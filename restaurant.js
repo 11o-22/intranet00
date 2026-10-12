@@ -308,14 +308,48 @@ function save(f) {
 // ==========================================
 // 6. 눈금 맞추기
 //
-//   등급이 오를수록 눈금은 좁아지고 빨라지고 횟수가 는다.
+//   등급이 오를수록 눈금은 좁아지고 횟수가 는다.
+//
+// ★ 어려움은 「초록칸이 몇 밀리초짜리냐」로 재야 한다.
+//
+//   zone 과 speed 를 따로 보면 얼마나 어려운지 알 수 없다. 사람이 겨누는
+//   것은 거리가 아니라 **때**이기 때문이다. 바늘이 초록칸을 지나가는 데
+//   걸리는 시간이 곧 손을 댈 수 있는 틈이다.
+//
+//       틈(ms) = zone × 18.52 / speed
+//
+//   예전 값은 이랬다.
+//
+//       D 535ms · C 296ms · B 170ms · A 93ms · S 48ms
+//
+//   S 는 48밀리초다. 화면이 한 번 그려지는 데 16밀리초가 걸리니 **세 프레임**
+//   이다. 눈으로 초록칸을 보고 손가락을 대는 그 사이에 이미 지나가 있다.
+//   기계로 「그려진 바늘이 초록칸에 든 바로 그 프레임」에 눌러 보아도 여덟
+//   번에 다섯 번밖에 못 맞혔다. 사람 손 흔들림을 ±60밀리초로 잡고 재 보니
+//   한 번 맞출 확률 31% — 세 판을 이어야 하니 한 그릇에 **3%** 였다.
+//   「초록칸 안에서 눌렀는데 실패」는 판정이 틀려서가 아니라, 눌렀다고
+//   생각한 그 순간에 바늘이 이미 칸 밖이었기 때문이다.
+//   (판정과 그림이 어긋나는지도 따로 재 보았다 — 1픽셀 안쪽으로 맞는다)
+//
+//   그래서 **틈을 먼저 정하고** zone 과 speed 를 거기에 맞춘다. 바늘 빠르기는
+//   비슷하게 두고 초록칸 너비와 판수로 어려움을 준다 — 눈에 보이는 것이
+//   곧 어려움이 되게.
+//
+//       등급   초록칸    바늘      틈      판수   한 그릇 성공(±60ms)
+//        D      26%    0.90    535ms     1번        100%
+//        C      20%    1.25    296ms     1번         99%
+//        B      16%    1.40    212ms     2번         89%
+//        A      13%    1.45    166ms     2번         67%
+//        S      11%    1.45    141ms     3번         47%
+//
+//   cookOdds() 로 언제든 다시 재 볼 수 있다.
 // ==========================================
 const MINI = {
     D: { zone: 26, speed: 0.90, rounds: 1 },
     C: { zone: 20, speed: 1.25, rounds: 1 },
-    B: { zone: 15, speed: 1.65, rounds: 2 },
-    A: { zone: 10.5, speed: 2.10, rounds: 2 },
-    S: { zone: 7, speed: 2.70, rounds: 3 }
+    B: { zone: 16, speed: 1.40, rounds: 2 },
+    A: { zone: 13, speed: 1.45, rounds: 2 },
+    S: { zone: 11, speed: 1.45, rounds: 3 }
 };
 
 let mini = null;
@@ -580,6 +614,32 @@ function miniHit(ev) {
     if (mini.raf) cancelAnimationFrame(mini.raf);
     nextRound();
 }
+
+// 초록칸이 몇 밀리초짜리인지 — 손잡이를 고친 뒤 여기만 보면 된다.
+//   p 는 「한가운데를 겨누되 손이 ±σ 밀리초 흔들릴 때」 한 번 맞출 확률이고,
+//   한 그릇은 그것을 판수만큼 이어야 하므로 p 의 거듭제곱이다.
+window.cookOdds = function (sigma) {
+    const s = Number(sigma) || 60;
+    // 정규분포 — 오차함수를 급수로 민다
+    const erf = function (x) {
+        const t = 1 / (1 + 0.3275911 * Math.abs(x));
+        const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t
+            + 0.254829592) * t * Math.exp(-x * x);
+        return x >= 0 ? y : -y;
+    };
+    console.log('%c===== 요리 눈금 =====', 'color:#e8c27a; font-size:13px');
+    console.log('  손 흔들림 ±' + s + 'ms 로 잡고 셉니다');
+    console.log('  등급  초록칸  바늘    틈      판수   한 번    한 그릇');
+    ['D', 'C', 'B', 'A', 'S'].forEach(function (g) {
+        const c = MINI[g];
+        const ms = c.zone / 100 * miniPeriod(c);
+        const p = erf(ms / 2 / (s * Math.SQRT2));
+        console.log('   ' + g + '     ' + String(c.zone + '%').padStart(5) + '  ' + String(c.speed).padStart(4)
+            + '  ' + String(ms.toFixed(0) + 'ms').padStart(6) + '   ' + c.rounds + '번   '
+            + (p * 100).toFixed(0).padStart(4) + '%   ' + (Math.pow(p, c.rounds) * 100).toFixed(0).padStart(4) + '%');
+    });
+    console.log('  ※ 틈 = 바늘이 초록칸을 지나가는 데 걸리는 시간. 화면 한 프레임이 16ms 입니다.');
+};
 
 // 들여다보기 — 눈금이 그려진 자리와 판정이 맞는지 밖에서 재 볼 수 있게
 window._cookMini = function () { return mini; };
