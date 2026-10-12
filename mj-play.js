@@ -91,9 +91,21 @@ function tx(path, fn) {
     const ref = d.ref(path);
     // 지워진 빈 칸을 세워서 넘긴다 — 안쪽 함수들이 h.pond 같은 것을 그냥 쓴다
     const F = function (v) { return fn(norm(v)); };
+    // ★ 돌려받는 것도 세워서 준다.
+    //
+    //   들어가는 값만 norm 을 거치고 **나오는 값은 날것 그대로**였다.
+    //   그래서 돌려받은 자료에는 빈 칸(h.melds 같은)이 그대로 없었다.
+    //   그것을 받아 쓰던 자리에서 「melds 가 undefined」로 터졌고,
+    //   터진 곳이 약속(promise) 안이라 아무 말 없이 조용히 멎었다.
+    //   (론 — 「쳤는데 안 끝나고 점수도 안 따진다」가 이것이었다.)
+    const fix = function (r) {
+        if (!r || !r.snapshot) return r;
+        const s = r.snapshot;
+        return { committed: r.committed, snapshot: { val: function () { return norm(s.val()); } } };
+    };
     const run = function () {
-        if (typeof txRetry === 'function') return txRetry(path, F);
-        return ref.transaction(F, null, false);
+        if (typeof txRetry === 'function') return txRetry(path, F).then(fix);
+        return ref.transaction(F, null, false).then(fix);
     };
     // 이미 그 자리를 지켜보고 있으면(판에 앉은 뒤) 값이 내 쪽에 있다 — 바로 건다
     if (watchRef && cur && cur.id && path === ROOT + '/' + cur.id) return run();
@@ -516,10 +528,11 @@ function furiten(t, h, code, hand, melds) {
 
 function winArgs(t, h, code, tile, tsumo) {
     const seat = seatOf(t, code);
-    const melds = arr(h.melds[code]).map(function (m) {
+    // 빈 칸은 파이어베이스가 지운다 — h.riichi 처럼 여기도 받쳐 둔다
+    const melds = arr(h.melds && h.melds[code]).map(function (m) {
         return { type: m.type, tiles: arr(m.tiles) };
     });
-    const hand = arr(h.hands[code]).slice();
+    const hand = arr(h.hands && h.hands[code]).slice();
     if (tsumo) { const i = hand.indexOf(tile); if (i >= 0) hand.splice(i, 1); }
     const riichi = !!(h.riichi && h.riichi[code]);
     return {
@@ -563,6 +576,18 @@ function tick() {
     const u = me(); if (!u || !cur || !cur.t) return;
     const t = cur.t, h = t.h;
     if (t.state !== 'PLAY' || !h) return;
+
+    // ★ 론을 쳐 놓고 멎은 국을 **아무나** 마저 끝낸다.
+    //
+    //   론은 두 걸음이다. ① 후로를 가려 h._ron 에 이긴 사람을 적고
+    //   ② 그 사람 몫을 셈한다. 여태 ②는 ①을 적은 **그 기기에서만**
+    //   돌았다. 그 사이에 끊기거나 ②가 터지면 판은 END 에 선 채로
+    //   영영 멎었다 — 아무도 패를 못 가져가고 점수도 안 옮겨졌다.
+    //
+    //   이긴 사람은 판에 적혀 있으니 누가 봐도 셈이 같다. 그러니
+    //   먼저 본 사람이 마저 끝낸다. 셈은 _ron 을 집으면서 한 번에
+    //   하므로(settleWin), 여럿이 동시에 눌러도 한 번만 들어간다.
+    if (h.phase === 'END' && h._ron && !h.done) { doRon(h._ron, t); return; }
 
     if (h.phase === 'CLAIM') {
         // ★ 「폰이 안 뜬다」의 자리였다.
@@ -722,20 +747,35 @@ function nextTurn(t) {
 function doRon(code, tbl) {
     const t = tbl || (cur && cur.t); if (!t || !t.h) return;
     const h = t.h;
+    if (!h.last) return;
     const r = window.mjScore(winArgs(t, h, code, h.last.tile, false));
-    if (!r || !r.ok) { return tx(ROOT + '/' + cur.id, function (x) { if (x && x.h) { delete x.h._ron; nextTurn(x); } return x; }); }
-    return settleWin(code, codeAt(t, h.last.by), r);
+    // 역이 없었다 — 물리고 차례를 넘긴다.
+    //   이것도 _ron 이 아직 그 사람일 때만 한다. 안 그러면 여럿이
+    //   한꺼번에 물려서 차례가 두 번 세 번 넘어간다.
+    if (!r || !r.ok) {
+        const id = (cur && cur.id); if (!id) return;
+        return tx(ROOT + '/' + id, function (x) {
+            if (!x || !x.h || x.h._ron !== code) return;
+            delete x.h._ron; nextTurn(x); return x;
+        });
+    }
+    return settleWin(code, codeAt(t, h.last.by), r, code);
 }
 
 // ==========================================
 // 국이 끝났다
 // ==========================================
-function settleWin(winner, loser, r) {
+// needRon 이 있으면 「판에 적힌 론이 아직 그 사람일 때만」 셈한다.
+// 집는 것과 셈하는 것이 한 트랜잭션이라, 여럿이 동시에 끝내려 해도
+// 먼저 집은 하나만 들어간다. (쯔모는 needRon 없이 부른다.)
+function settleWin(winner, loser, r, needRon) {
     const id = cur && cur.id; if (!id) return;
     return tx(ROOT + '/' + id, function (t) {
         if (!t || t.state !== 'PLAY' || !t.h) return;
         const h = t.h;
         if (h.done) return;
+        if (needRon && h._ron !== needRon) return;
+        delete h._ron;
         h.done = true;
         const sc = t.scores || {};
         const dealer = (seatOf(t, winner) === dealerSeat(t));
