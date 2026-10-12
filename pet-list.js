@@ -214,6 +214,8 @@ function oneView(id) {
         + (P().showHas(id, me) ? '방에서 내린다' : '방에 내놓는다') + '</button>'
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
+        + (typeof window.petAdoptSend === 'function'
+            ? '<button id="pet-adopt" class="game-btn" style="' + BTN + '">입양 보내기</button>' : '')
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
 
     w.querySelector('#pet-back').onclick = listView;
@@ -234,6 +236,8 @@ function oneView(id) {
         if (typeof window.petBondOpen === 'function') { shut(); window.petBondOpen(id); }
     };
     w.querySelector('#pet-nick').onclick = function () { nickView(id); };
+    const ad = w.querySelector('#pet-adopt');          // pet-adopt.js 가 있을 때만 붙는다
+    if (ad) ad.onclick = function () { shut(); window.petAdoptSend(id); };
 }
 
 // ==========================================
