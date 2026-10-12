@@ -13,6 +13,9 @@
 //   2. 탐사에서 최대 네 명에게 버프를 건다. 그 뒤가 길다 (아래)
 //   3. 장착한 채로 우주 쇼핑몰·[???] 을 보면 일부 품목이 3분의 1 값으로 보인다
 //   4. 우주 쇼핑몰에서 두 판을 이겨 입고될 때, 목록을 보고 되돌릴 수 있다 (하루 2회)
+//      ★ 되돌릴 자리는 사람 글(u.eyeAlienSnap)에 적는다. 전에는 창 안에만
+//        있어서, 판 사이에 앱을 다시 열면 칸은 뜨는데 눌러도 아무 일도
+//        없었다 (아래 「승부 이전」 자리 참고).
 //   5. 상담실·선녀탕에서 포인트를 내고 바로 나온다. 다음에 갇히면 세 배로 돌아온다
 //   6. 탐사 횟수를 다 쓰면 그날 번 것 중 하나를 한 번 더 받는다
 //
@@ -763,6 +766,7 @@ function alienDay(me) {
         me.eyeAlienDay = cycle22();
         me.eyeAlienWins = 0;
         me.eyeAlienBack = 0;
+        me.eyeAlienSnap = null;          // 어제 자리로는 되돌리지 않는다
     }
 }
 window.eyeAlienLeft = function () {
@@ -772,7 +776,54 @@ window.eyeAlienLeft = function () {
     return Math.max(0, EYE.ALIEN_BACK - (me.eyeAlienBack || 0));
 };
 
-let snap = null;
+// ==========================================
+// 「승부 이전」 자리는 사람 글에 적는다
+// ==========================================
+//
+// ★ 전에는 이 자리가 **창 안에만** 있었다 (let snap).
+//
+//     한 묶음은 세 판 중 두 판이다. 판 사이에는 1.5초 잠금이 있고, 그
+//     사이에 앱을 내리거나 새로 고치는 일이 흔하다. 묶음은 서버에 적히므로
+//     (alienBout) 다시 들어오면 「두 판을 이기면 입고됩니다」가 그대로
+//     이어지는데, 눈이 들고 있던 승부 이전 자리는 창과 함께 사라져 있었다.
+//
+//     그러면 두 번째 판을 이겨 칸은 뜨는데, 「되돌린다」를 눌러도
+//     **아무 일도 아무 말도 없이** 끝났다. 그것이 「되돌리는 게 안 먹힌다」다.
+//
+//   그래서 글에 적는다. 다시 들어와도, 다른 기기에서도 그대로 있다.
+//
+//       u.eyeAlienSnap = { bout, used, last, unlocked, date, at, part }
+//
+//   part 가 1 이면 묶음 시작이 아니라 **입고된 자리에서 되짚어 만든 것**이다
+//   (묶음 도중에 눈을 찬 때처럼 시작을 못 본 경우). 그때는 세 시간 시계를
+//   되돌리지 않는다 — 돌릴 자리를 모르기 때문이다. 칸에도 그렇게 적는다.
+//
+//   ★ 파이어베이스는 null 과 빈 배열을 적지 않고 지운다. 그래서 읽을 때
+//     없는 칸을 메워 준다. bout 이 없으면 묶음 밖(null)이 맞다.
+function snapRead(me) {
+    const s = me && me.eyeAlienSnap;
+    if (!s || typeof s !== 'object') return null;
+    if (s.date && s.date !== cycle22()) return null;        // 어제 것은 안 쓴다
+    return {
+        bout: s.bout || null,
+        used: Number(s.used) || 0,
+        last: Number(s.last) || 0,
+        unlocked: Array.isArray(s.unlocked) ? s.unlocked.slice()
+            : (s.unlocked && typeof s.unlocked === 'object'
+                ? Object.keys(s.unlocked).map(function (k) { return s.unlocked[k]; }) : []),
+        date: s.date || cycle22(),
+        part: !!s.part
+    };
+}
+function snapSave(me, s) {
+    if (!me) return;
+    me.eyeAlienSnap = s;
+    try { if (typeof saveFields === 'function') saveFields({ eyeAlienSnap: 1 }); } catch (e) { }
+}
+function snapClear(me) {
+    if (!me || !me.eyeAlienSnap) return;
+    snapSave(me, null);
+}
 
 (function alien() {
     const iv = setInterval(function () {
@@ -797,12 +848,14 @@ let snap = null;
                 used: me.alienDailyUsed || 0,
                 last: me.lastAlienPlayTime || 0,
                 unlocked: (me.alienUnlockedItems || []).slice(),
-                date: me.alienDate
+                date: cycle22(),
+                at: Date.now(),
+                part: 0
             } : null;
             const beforeN = (me.alienUnlockedItems || []).length;
 
             const out = _p.apply(this, arguments);
-            if (freshBefore && me.alienBout) snap = cand;
+            if (freshBefore && me.alienBout) snapSave(me, cand);
 
             try {
                 const after = (me.alienUnlockedItems || []).length;
@@ -813,6 +866,23 @@ let snap = null;
                 me.eyeAlienWins = (me.eyeAlienWins || 0) + 1;
                 const got = (me.alienUnlockedItems || []).slice(beforeN);
                 try { if (typeof saveFields === 'function') saveFields({ eyeAlienWins: 1, eyeAlienDay: 1 }); } catch (e) { }
+
+                // ★ 자리가 없으면 **여기서 되짚어 만든다.**
+                //   묶음 도중에 눈을 찼거나, 자리를 적기 전에 쓰던 글이라
+                //   없을 수 있다. 들어온 것을 알고 있으니 그만큼 덜어내면
+                //   승부 이전과 같다. 다만 세 시간 시계는 돌릴 자리를 모르니
+                //   그대로 둔다 (part = 1).
+                if (!snapRead(me)) {
+                    snapSave(me, {
+                        bout: null,
+                        used: Math.max(0, (me.alienDailyUsed || 0) - 1),
+                        last: me.lastAlienPlayTime || 0,
+                        unlocked: (me.alienUnlockedItems || []).slice(0, beforeN),
+                        date: cycle22(),
+                        at: Date.now(),
+                        part: 1
+                    });
+                }
 
                 if (window.eyeAlienLeft() <= 0) return out;
                 setTimeout(function () { offer(got); }, 400);
@@ -826,19 +896,29 @@ let snap = null;
     }, 400);
 })();
 
+const BACK_ID = 'eye-alien-back';
+
 function offer(got) {
-    const ID = 'eye-alien-back';
-    if (document.getElementById(ID)) return;
-    const host = document.getElementById('alien-items-container') || document.body;
+    const me = u_();
+    // ★ 하네스가 없는 칸을 지어 주므로 getElementById 로는 「이미 떴나」를
+    //   못 가린다 (b330 page.html). querySelector 는 진짜 화면과 똑같다.
+    if (document.querySelector('#' + BACK_ID)) return;
+    const s = snapRead(me);
+    if (!s) return;                     // 되돌릴 자리가 없으면 아예 묻지 않는다
+    const host = document.getElementById('alien-items-container');
+    if (!host || !host.parentNode) return;
     host.insertAdjacentHTML('beforebegin',
-        '<div id="' + ID + '" style="margin:10px 0; padding:11px 12px; border-radius:6px;'
+        '<div id="' + BACK_ID + '" style="margin:10px 0; padding:11px 12px; border-radius:6px;'
         + ' background:rgba(0,150,200,0.12); border:1px solid #2a7a9a;">'
         + '<div style="font-size:12px; color:#4fc3f7; font-weight:bold; margin-bottom:6px;">🔎 눈이 먼저 보았다</div>'
         + '<div style="font-size:11px; color:#cfe9f5; line-height:1.8;">'
         + got.map(function (n) { return '· ' + esc(n); }).join('<br>') + '</div>'
         + '<div style="font-size:10px; color:#8aa; margin:8px 0 9px 0;">'
         + '마음에 들지 않으면 승부 이전으로 되돌립니다. 남은 횟수 '
-        + window.eyeAlienLeft() + '회</div>'
+        + window.eyeAlienLeft() + '회'
+        + (s.part ? '<br><span style="color:#d9b26a;">묶음 시작을 못 보았습니다 — 횟수는 돌려받지만'
+                  + ' 세 시간 시계는 그대로입니다.</span>' : '')
+        + '</div>'
         + '<button onclick="eyeRewind()" style="width:100%; padding:9px; font-size:11px; border-radius:5px;'
         + ' cursor:pointer; background:linear-gradient(145deg,#1f5f7a,#0d3448); border:1px solid #4fc3f7;'
         + ' color:#dff3ff; font-weight:bold;">되돌린다</button>'
@@ -847,28 +927,38 @@ function offer(got) {
         + ' color:#999;">그대로 둔다</button></div>');
 }
 window.eyeKeep = function () {
-    const o = document.getElementById('eye-alien-back');
+    const o = document.querySelector('#' + BACK_ID);
     if (o) o.remove();
-    snap = null;
+    snapClear(u_());
 };
 window.eyeRewind = function () {
     const me = u_();
-    if (!me || !snap) { window.eyeKeep(); return; }
+    const s = snapRead(me);
+    // ★ 전에는 자리가 없으면 아무 말도 없이 창만 닫았다. 눌렀는데 아무
+    //   일도 안 일어나는 것으로 보였다. 이제는 왜 안 되는지 말한다.
+    if (!me) return;
+    if (!s) {
+        alert_('되돌릴 자리를 찾지 못했습니다.\n\n'
+            + '승부 이전으로 되돌릴 수 있는 것은 이번 묶음까지입니다.');
+        window.eyeKeep();
+        return;
+    }
     if (window.eyeAlienLeft() <= 0) { alert_('오늘 되돌릴 몫을 다 썼습니다.'); window.eyeKeep(); return; }
 
-    me.alienBout = snap.bout;
-    me.alienDailyUsed = snap.used;
-    me.lastAlienPlayTime = snap.last;
-    me.alienUnlockedItems = snap.unlocked;
-    me.alienDate = snap.date;
+    me.alienBout = s.bout;
+    me.alienDailyUsed = s.used;
+    if (!s.part) me.lastAlienPlayTime = s.last;    // 되짚어 만든 자리는 시계를 안 돌린다
+    me.alienUnlockedItems = s.unlocked;
+    me.alienDate = s.date;
     me.eyeAlienBack = (me.eyeAlienBack || 0) + 1;
     me.eyeAlienWins = Math.max(0, (me.eyeAlienWins || 0) - 1);
-    snap = null;
+    me.eyeAlienSnap = null;
 
     try {
         if (typeof saveFields === 'function') {
             saveFields({ alienBout: 1, alienDailyUsed: 1, lastAlienPlayTime: 1,
-                         alienUnlockedItems: 1, alienDate: 1, eyeAlienBack: 1, eyeAlienWins: 1 });
+                         alienUnlockedItems: 1, alienDate: 1, eyeAlienBack: 1,
+                         eyeAlienWins: 1, eyeAlienSnap: 1 });
         }
     } catch (e) { }
     log_(me, '[' + NAME + '] 우주 쇼핑몰 — 승부를 되돌렸습니다.');
@@ -1075,6 +1165,10 @@ window.eyeState = function () {
     });
     console.log('  우주 이긴 횟수   :', (me.eyeAlienWins || 0)
         + ' · 되돌리기 남음 ' + window.eyeAlienLeft() + '회');
+    const sp = snapRead(me);
+    console.log('  되돌릴 자리      :', sp
+        ? ('있음 — 진열 ' + sp.unlocked.length + '종 · 쓴 횟수 ' + sp.used
+           + (sp.part ? ' (되짚어 만든 자리 · 세 시간 시계는 그대로)' : '')) : '없음');
     console.log('  돌려받을 값      :', (Number(me.eyeOwed) || 0).toLocaleString() + ' P');
     console.log('  오늘 번 것       :', b.got.join(' · ') || '-',
         '· 한 번 더 ' + window.eyeAgainLeft() + '회');
