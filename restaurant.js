@@ -455,7 +455,38 @@ function miniOpen(d, done) {
     try { window.addEventListener('resize', miniResize); } catch (e) { }
     nextRound();
 
-    document.getElementById('cook-stop').onclick = function (e) { miniHit(e); };
+    // ★ 누르는 **그 순간**에 재야 한다.
+    //
+    //   click 은 손을 **뗄 때** 난다. 눈으로 초록칸을 보고 손가락을 댄 뒤
+    //   떼기까지 휴대폰에서는 쉽게 오십~백 밀리초가 걸리는데, S 등급은
+    //   바늘이 1밀리초에 0.5픽셀을 간다. 그 사이에 이삼십 픽셀을 지나가
+    //   버리니 **초록칸 안에서 눌러도 실패**가 났다. 초록칸이 좁을수록
+    //   (A·S) 더 자주 그랬다.
+    //
+    //   그래서 pointerdown 으로 옮긴다. 그 이벤트의 timeStamp 가 손이
+    //   닿은 때이므로, 판정도 눈으로 본 그 자리에서 난다.
+    //   pointerdown 이 없는 화면만 touchstart · mousedown 으로 받는다.
+    //   한 번 누른 것이 두 번 들어오지 않게 0.35초를 둔다.
+    (function bindStop() {
+        const stop = document.getElementById('cook-stop');
+        if (!stop) return;
+        let last = 0;
+        const press = function (e) {
+            const t = performance.now();
+            if (t - last < 350) return;
+            last = t;
+            miniHit(e);
+        };
+        if (typeof window.PointerEvent === 'function') {
+            stop.addEventListener('pointerdown', press);
+        } else {
+            stop.addEventListener('touchstart', press, { passive: true });
+            stop.addEventListener('mousedown', press);
+        }
+        stop.onclick = function (e) {        // 뗄 때는 아무 일도 안 한다
+            if (e && e.preventDefault) e.preventDefault();
+        };
+    })();
 }
 
 function nextRound() {
@@ -549,6 +580,13 @@ function miniHit(ev) {
     if (mini.raf) cancelAnimationFrame(mini.raf);
     nextRound();
 }
+
+// 들여다보기 — 눈금이 그려진 자리와 판정이 맞는지 밖에서 재 볼 수 있게
+window._cookMini = function () { return mini; };
+window._cookMiniOpen = miniOpen;
+window._cookMiniClose = miniClose;
+window._cookInZone = function (at) { return miniInZone(at); };
+window._cookFrac = function (at) { return miniFrac(at); };
 
 window.cookCancel = function () {
     if (!mini) return;
