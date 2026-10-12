@@ -134,6 +134,19 @@ window.petSend = function (id, zone) {
     if (st.k === 'done') { alert_('먼저 데려오십시오.'); return; }
     if (st.k === 'rest') { alert_('쉬는 중입니다.\n\n' + st.t + '\n사택에서 먹이를 사 두면 줄일 수 있습니다.'); return; }
 
+    // ★ 한 번에 두 마리까지 — 몰래 따라가는 쪽(pet-sneak)과 같은 수다
+    const OUT_MAX = 2;
+    const nowOut = Object.keys(P().pets(u)).filter(function (k2) {
+        const x = P().pets(u)[k2];
+        return x && x.out && String(k2) !== key;
+    });
+    if (nowOut.length >= OUT_MAX) {
+        alert_('한 번에 두 마리까지만 내보낼 수 있습니다.\n\n'
+            + '지금 나가 있는 펫 : '
+            + nowOut.map(function (k2) { return P().nick(k2, u); }).join(' · '));
+        return;
+    }
+
     const hours = HOURS[Math.floor(Math.random() * HOURS.length)];
     const now = P().now();
     const doom = overGrade(s, z.grade);           // 제 등급보다 높은 곳
