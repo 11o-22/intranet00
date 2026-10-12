@@ -41,7 +41,21 @@
 //
 //   cageState(사번)   갇혔는지 · 기구가 돌고 있는지
 //   cageFree(사번)    상담사가 푼다
+//   cageSelfCheck()   저절로 풀릴 때가 되었는지 지금 바로 재 본다
 //   coBank()          공용 통장 잔액과 기록
+//
+// ■ 계정을 바꿔 들어오는 것은 짝이 바뀐 것이 아니다
+//
+//   로그아웃은 글을 다시 읽지 않는다 (index.html — currentUser 만 비운다).
+//   그래서 이 파일의 coWatch 같은 값은 계정이 바뀌어도 남아 있다. 예전에는
+//   통장 열쇠가 달라진 것만 보고 「짝이 바뀌었다」며 감금을 풀었으므로,
+//   갇힌 사람이 **다른 계정으로 들어갔다 돌아오면 그때마다 풀렸다.**
+//   이제 열쇠와 **사번을 함께** 본다.
+//
+//   저절로 풀리는 자리도 남의 글(db.users)에 기대지 않는다. 로그인 직후에는
+//   남의 글이 비어 있는 것이 정상인데, 그것을 「가둔 사람이 없다」고 읽어
+//   문을 열었다. 이제 내 글의 house.roomie 를 보고, 퇴사 여부는 내 글이
+//   꾸러미에 들어와 있을 때만 따진다.
 
 (function cage() {
 
@@ -76,6 +90,14 @@ function mate(u) {
     if (typeof getRoomie === 'function') { try { return getRoomie(u); } catch (e) { } }
     const h = (u && u.house) || {};
     return h.roomie ? (db.users || {})[h.roomie] : null;
+}
+// ★ 남의 이름은 없을 수 있다. db.users 가 아직 안 왔을 때 여기서 터지면
+//   막는 자리가 **그대로 통과**해 버린다 (아래 BLOCK). 터지지 않게 둔다.
+function nameOf(code) {
+    try {
+        const u = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+        return (u && u.name) || '룸메이트';
+    } catch (e) { return '룸메이트'; }
 }
 function bankRefCode(u) {
     if (typeof houseStorageRef === 'function') { try { return houseStorageRef(u); } catch (e) { } }
@@ -112,11 +134,13 @@ BLOCK.forEach(function (name) {
         window[name] = function () {
             const c = caged(currentUser);
             if (c) {
-                const who = (db.users[c.by] || {}).name || '룸메이트';
-                const left = Math.max(0, Math.round((c.until - now()) / 60000));
-                showCustomAlert('감금실 안입니다.\n\n' + who + ' 사원이 열어 주어야 나갈 수 있습니다.\n'
-                    + '(늦어도 ' + Math.ceil(left / 60) + '시간 뒤에는 저절로 열립니다)');
-                return false;
+                try {
+                    const who = nameOf(c.by);
+                    const left = Math.max(0, Math.round((c.until - now()) / 60000));
+                    showCustomAlert('감금실 안입니다.\n\n' + who + ' 사원이 열어 주어야 나갈 수 있습니다.\n'
+                        + '(늦어도 ' + Math.ceil(left / 60) + '시간 뒤에는 저절로 열립니다)');
+                } catch (e) { }
+                return false;        // ★ 알림이 터져도 막는 것은 막는다
             }
             return _o.apply(this, arguments);
         };
@@ -128,7 +152,7 @@ BLOCK.forEach(function (name) {
 // ==========================================
 // 공용 통장
 // ==========================================
-let coBal = 0, coLog = [], coWatch = '';
+let coBal = 0, coLog = [], coWatch = '', coWho = '';
 function coRef(u) {
     if (typeof database === 'undefined' || !database) return null;
     return database.ref('houseBank/' + bankRefCode(u || currentUser));
@@ -137,20 +161,31 @@ function coRef(u) {
     setInterval(function () {
         if (!currentUser || typeof database === 'undefined' || !database) return;
         const code = bankRefCode(currentUser);
-        if (coWatch === code) return;
+        const who = currentUser.code;
+        if (coWatch === code && coWho === who) return;
 
         // 통장 자리가 바뀌었다 = 짝이 바뀌었다.
         // 바꾸기 전에 지난 잔액을 손에 들고 있어야 한다 — 바꾼 뒤에는 0 으로 보인다.
-        const oldKey = coWatch, oldBal = coBal;
+        const oldKey = coWatch, oldBal = coBal, oldWho = coWho;
         if (oldKey) { try { database.ref('houseBank/' + oldKey).off(); } catch (e) { } }
-        coWatch = code; coBal = 0; coLog = [];
+        coWatch = code; coWho = who; coBal = 0; coLog = [];
         database.ref('houseBank/' + code).on('value', function (s) {
             const v = s.val() || {};
             coBal = v.bal || 0;
             coLog = Array.isArray(v.log) ? v.log : [];
             paintBank();
         });
-        if (oldKey) pairChanged(oldKey, oldBal);
+
+        // ★ 로그아웃은 글을 다시 읽지 않는다 (index.html:10984 — currentUser 만
+        //   비운다). 그래서 이 coWatch 는 **계정이 바뀌어도 그대로 남는다.**
+        //   예전에는 열쇠만 보고 「짝이 바뀌었다」고 판단했으므로,
+        //
+        //       갇힌 계정 → 다른 계정 → 갇힌 계정
+        //
+        //   으로 들어오면 열쇠가 달라져 있어 감금이 풀렸다. 「갇힌 사람이
+        //   다른 계정으로 로그인하면 계속 나와진다」가 이것이다.
+        //   짝이 바뀐 것은 **같은 사람의** 열쇠가 바뀐 때뿐이다.
+        if (oldKey && oldWho === who) pairChanged(oldKey, oldBal);
     }, 1500);
 })();
 
@@ -328,7 +363,7 @@ function paintCage() {
     let body;
 
     if (myCage) {
-        const who = (db.users[myCage.by] || {}).name || '룸메이트';
+        const who = nameOf(myCage.by);
         const left = Math.max(0, myCage.until - now());
         const use = me.cageUse && now() < (me.cageUse.until || 0) ? me.cageUse : null;
         body = '<div style="color:#ff8a8a; font-weight:bold;">문이 잠겨 있습니다.</div>'
@@ -682,22 +717,66 @@ window.cageTick = tick;        // 지금 바로 셈하게 한다 (살펴볼 때)
 setTimeout(function () { setInterval(tick, 60000); }, 8000);
 
 // 갇힌 쪽도 시간이 지나면 스스로 나온다 (가둔 쪽이 안 들어올 때)
-setInterval(function () {
+//
+//   ★ 남의 자료가 아직 안 들어왔다고 문을 열어서는 안 된다.
+//
+//     예전에는 db.users[가둔 사람] 과 mate() 로 「동거인인가」를 재고,
+//     한쪽이라도 비면 바로 열었다. 그런데 그 둘은 전부 **남의 글**이다.
+//     로그인 직후나 글이 갈리는 사이에는 비어 있는 것이 정상이고,
+//     그때마다 감금이 풀렸다.
+//
+//     그래서 내 글에 적힌 house.roomie 만 본다. 이것은 나와 함께 들어오니
+//     비어 있을 틈이 없다. 가둔 사람이 정말 없어졌는지는 **내 글이
+//     db.users 에 들어와 있을 때만** (= 꾸러미가 왔을 때만) 따진다.
+function selfCheck() {
     const c = currentUser && currentUser.cage;
     if (!c || !c.by) return;
 
-    // 가둔 사람이 더는 동거인이 아니면(짝이 바뀌었거나 퇴사) 열어 줄 사람이
-    // 없다. 그대로 두면 영영 갇힌다.
-    const keeper = (db.users || {})[c.by];
-    const m = mate(currentUser);
-    if (!keeper || !m || m.code !== c.by) {
+    const h = (typeof getHouse === 'function')
+        ? (function () { try { return getHouse(currentUser) || {}; } catch (e) { return currentUser.house || {}; } })()
+        : (currentUser.house || {});
+
+    if (h.roomie !== c.by) {
+        // 내 글이 가리키는 동거인이 가둔 사람이 아니다 — 짝이 정말 바뀌었다
         freeUser(currentUser, '가둔 사원이 없어 문이 열렸습니다.');
         return;
     }
 
+    // 가둔 사람이 퇴사했는가 — 이것은 **서버에 물어서만** 가린다.
+    //
+    //   db.users 는 child_added 로 한 사람씩 들어온다 (index.html:1388). 게다가
+    //   빠른 자동 로그인은 사원 꾸러미를 기다리지 않고 내 글만 집어 바로
+    //   들여보낸다. 그러니 「내 글은 있는데 가둔 사람 글이 없다」는 것은
+    //   로그인 직후의 **예사로운 모습**이고, 퇴사와 가릴 수 없다.
+    //   여기서 그것을 퇴사로 읽어 문을 열어 버린 것이 그 오류였다.
+    const all = (typeof db !== 'undefined' && db.users) ? db.users : null;
+    if (!all || !all[c.by]) { askKeeper(c.by); return; }
+
     if (caged(currentUser)) return;        // 아직 시간이 남았다 (뚜껑까지 셈한다)
     freeUser(currentUser, '시간이 다 되어 문이 열렸습니다.');
-}, 30000);
+}
+
+// 서버에 한 번 물어본다 — 이름이 없는 글은 이 게임이 「없는 사원」으로 센다
+// (index.html:1348 normUser). 물어보는 사이에는 또 묻지 않는다.
+let asking = false;
+function askKeeper(code) {
+    if (asking) return;
+    if (typeof database === 'undefined' || !database) return;   // 서버가 없으면 가리지 않는다
+    asking = true;
+    const me = currentUser && currentUser.code;
+    database.ref('users/' + code + '/name').once('value').then(function (s) {
+        asking = false;
+        const v = s ? s.val() : undefined;
+        if (v !== null && v !== undefined) return;              // 있다 — 글만 아직 안 왔던 것이다
+        // 묻는 사이에 계정이 바뀌었으면 손대지 않는다
+        if (!currentUser || currentUser.code !== me) return;
+        const c = currentUser.cage;
+        if (!c || c.by !== code) return;
+        freeUser(currentUser, '가둔 사원이 없어 문이 열렸습니다.');
+    }).catch(function () { asking = false; });
+}
+setInterval(selfCheck, 30000);
+window.cageSelfCheck = selfCheck;      // 지금 바로 재게 한다 (살펴볼 때)
 
 // ==========================================
 // 확인 · 상담사
@@ -757,6 +836,6 @@ window.cageKeyOf    = bankRefCode;     // 두 사람이 같이 보는 자리 열
 window.cageHasS     = hasS;
 window.cageMaxMs    = MAX_MS;
 
-console.log('[감금실] cageState(사번) · cageFree(사번) · coBank()');
+console.log('[감금실] cageState(사번) · cageFree(사번) · cageSelfCheck() · coBank()');
 
 })();
