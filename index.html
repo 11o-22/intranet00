@@ -566,11 +566,11 @@
         <div class="slot-box" id="slot-box-3">👁</div>
     </div>
     <div style="margin-top:15px;">
-                <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 5000)</div>
+                <div style="font-size:11px; color:#888; margin-bottom:6px;">베팅 포인트 (최대 20,000)</div>
         <div style="display:flex; gap:6px; align-items:center; justify-content:center; margin-bottom:8px;">
     <button class="game-btn" style="flex:0 0 54px; height:46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 100)">+100</button>
     <button class="game-btn" style="flex:0 0 48px; height:46px; margin:0; padding:0; font-size:12px;" onclick="adjustBet('slot-bet', 10)">+10</button>
-    <input type="number" id="slot-bet" value="5" min="1" max="5000"
+    <input type="number" id="slot-bet" value="5" min="1" max="20000"
            style="flex:0 0 90px; height:46px; text-align:center; font-size:16px; padding:0 6px; box-sizing:border-box;">
     <button class="game-btn" style="flex:0 0 48px; height:46px; margin:0; padding:0; font-size:12px;" onclick="setBetMax('slot-bet')">최대</button>
 </div>
@@ -7856,7 +7856,7 @@ updateUI();
     const MAX_BET = 50;
     const POINT_CAP = 30000000;
     const LIMITED_BETS = ['seotda-bet', 'roulette-bet', 'slot-bet', 'bj-bet'];
-    const BET_CAPS = { 'slot-bet': 5000, 'bj-bet': 10000, 'seotda-bet': 10000 };
+    const BET_CAPS = { 'slot-bet': 20000, 'bj-bet': 10000, 'seotda-bet': 10000 };
     
 
     function getBetValue(inputId) {
