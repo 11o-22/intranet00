@@ -26,6 +26,20 @@
 //
 // ■ 복제품
 //
+//   ★ 기한은 **배열**로 적는다 (u.copyExpire = [{ n: 이름, at: 때 }]).
+//
+//     전에는 { '[복제품] 은반지': 때 } 꼴이었다. 그런데 파이어베이스는
+//     열쇠에 . # $ [ ] 를 못 쓴다. 복제품 이름에는 대괄호가 들어 있으니
+//     **그 꾸러미가 통째로 거절된다.**
+//
+//         Invalid key in users/…/copyExpire: "[복제품] 은반지"
+//
+//     update 는 전부 되거나 전부 안 되므로, 같이 실려 가던 것이 모두 날아갔다 —
+//     이름을 바꾼 장착칸도, 소지품에서 뺀 것도, 절반이 된 효과도. 다시 들어오면
+//     서버에 남아 있던 **원본 이름**이 돌아온다. 「복제품이 완전 원본이 되고
+//     하루가 지나도 안 삭는다」가 이것이었다. 게다가 copyExpire 가 한 번
+//     끼면 그 사원의 저장이 그 뒤로 계속 실패한다.
+//
 //   이름 앞에 「[복제품] 」이 붙는다. 쓰면 원래 물건의 효과가 돌지만
 //       · 시간 효과는 절반    (24시간짜리 물약 → 12시간)
 //       · 장착형은 24시간 뒤 사라진다
@@ -60,6 +74,34 @@ const EM = {
 };
 const COPY_PER_DAY = 2;
 const COPY_EQUIP_MS = 24 * 3600 * 1000;
+
+// --- 복제 장비의 기한 — 이름을 열쇠로 쓰지 않는다 ---
+//
+//   [{ n: '[복제품] 은반지', at: 1760000000000 }, …]
+//   묵은 자료({ 이름: 때 })도 읽어서 배열로 갈아 준다.
+function expList(u) {
+    if (!u) return [];
+    const v = u.copyExpire;
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === 'object') {                 // 묵은 꼴 — 갈아 준다
+        u.copyExpire = Object.keys(v).map(function (k) { return { n: k, at: Number(v[k]) || 0 }; });
+        return u.copyExpire;
+    }
+    u.copyExpire = [];
+    return u.copyExpire;
+}
+function expSet(u, label, at) {
+    const a = expList(u);
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] && a[i].n === label) { a[i].at = at; return; }
+    }
+    a.push({ n: label, at: at });
+}
+function expAt(u, label) {
+    const a = expList(u);
+    for (let i = 0; i < a.length; i++) { if (a[i] && a[i].n === label) return a[i].at; }
+    return 0;
+}
 const RATE = 0.005;    // 진열 확률 0.5%
 
 const HOUR = 3600 * 1000;
@@ -493,15 +535,16 @@ function copierMake(real) {
                 if (b !== real) continue;
                 const was = eq[i], become = COPY_TAG + was;
                 eq[i] = become;
-                if (currentUser.equipOwner && currentUser.equipOwner[was] !== undefined) {
-                    currentUser.equipOwner[become] = currentUser.equipOwner[was];
-                    delete currentUser.equipOwner[was];
-                }
+                // ★ 임자 표는 **옮기지 않고 떼기만** 한다.
+                //   equipOwner 는 물건 이름을 열쇠로 쓰는데, 복제품 이름에는
+                //   대괄호가 들어 있어 파이어베이스가 그 꾸러미를 거절한다
+                //   (copyExpire 와 같은 까닭 — 위 머리말). 하루 만에 삭는 제
+                //   복제품에 임자 표는 없어도 된다.
+                if (currentUser.equipOwner) delete currentUser.equipOwner[was];
                 if (currentUser.badge && typeof currentUser.badge.notes === 'string') {
                     currentUser.badge.notes = currentUser.badge.notes.split(was).join(become);
                 }
-                if (!currentUser.copyExpire) currentUser.copyExpire = {};
-                currentUser.copyExpire[become] = Date.now() + COPY_EQUIP_MS;
+                expSet(currentUser, become, Date.now() + COPY_EQUIP_MS);
                 break;
             }
             if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
@@ -552,15 +595,11 @@ function copierMake(real) {
                 if (b !== real) continue;
                 const become = COPY_TAG + was;
                 eq[i] = become;
-                if (target.equipOwner && target.equipOwner[was] !== undefined) {
-                    target.equipOwner[become] = target.equipOwner[was];
-                    delete target.equipOwner[was];
-                }
+                if (target.equipOwner) delete target.equipOwner[was];   // 위와 같은 까닭
                 if (target.badge && typeof target.badge.notes === 'string') {
                     target.badge.notes = target.badge.notes.split(was).join(become);
                 }
-                if (!target.copyExpire) target.copyExpire = {};
-                target.copyExpire[become] = Date.now() + COPY_EQUIP_MS;
+                expSet(target, become, Date.now() + COPY_EQUIP_MS);
                 break;
             }
             return out;
@@ -573,11 +612,16 @@ function copierMake(real) {
 
 // --- 하루가 지난 복제 장비를 걷는다 ---
 setInterval(function () {
-    if (!currentUser || !currentUser.copyExpire) return;
+    if (!currentUser) return;
+    const a = expList(currentUser);
+    if (!a.length) return;
     const t = Date.now();
     let changed = 0;
-    Object.keys(currentUser.copyExpire).forEach(function (label) {
-        if (currentUser.copyExpire[label] > t) return;
+    const keep = [];
+    a.forEach(function (x) {
+        if (!x || !x.n) { changed++; return; }
+        if (Number(x.at) > t) { keep.push(x); return; }
+        const label = x.n;
         const eq = currentUser.equippedWeapons || [];
         const i = eq.indexOf(label);
         if (i >= 0) {
@@ -586,10 +630,10 @@ setInterval(function () {
             if (typeof stripNoteByItem === 'function') { try { stripNoteByItem(currentUser, label); } catch (e) { } }
             if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[복제품] ' + label + ' 이(가) 삭았습니다.');
         }
-        delete currentUser.copyExpire[label];
         changed++;
     });
     if (changed) {
+        currentUser.copyExpire = keep;
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
         if (typeof updateUI === 'function') updateUI();
     }
@@ -679,7 +723,7 @@ window.copyState = function () {
     console.log('  소지품의 복제품:', inv.length ? inv.join(' · ') : '없음');
     if (eq.length) {
         console.table(eq.map(function (l) {
-            const t = (currentUser.copyExpire || {})[l];
+            const t = expAt(currentUser, l);
             return { 복제품: l, 남은시간: t ? Math.max(0, Math.round((t - Date.now()) / 60000)) + '분' : '?' };
         }));
     } else console.log('  차고 있는 복제품: 없음');

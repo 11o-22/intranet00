@@ -1,5 +1,6 @@
 // ==========================================
-// ★ 빈 객체를 통째 저장에 실어 보내지 않는다
+// ★ 통째 저장을 통째로 죽이는 것들을 걸러 낸다
+//   ① 빈 객체   ② 파이어베이스가 못 받는 열쇠
 // bundles.json 마지막 묶음, node-set.js 보다 뒤
 // ==========================================
 //
@@ -40,6 +41,22 @@
 //   users/<사번> 쓰기와 루트 통째 쓰기 둘 다 거른다. saveDB · saveSelfFull ·
 //   updateUserFields · node-set.js 의 safeWrite 가 전부 이 둘을 지난다.
 //
+// ■ ② 파이어베이스가 못 받는 열쇠
+//
+//   열쇠에는 . # $ [ ] / 를 못 쓴다. 하나라도 섞이면 **그 꾸러미가 통째로
+//   거절된다** — update 는 전부 되거나 전부 안 되기 때문이다.
+//
+//       Invalid key in users/…/copyExpire: "[복제품] 은반지"
+//
+//   복제품 이름에 대괄호가 들어 있어서, 이름을 열쇠로 쓰는 칸(copyExpire ·
+//   equipOwner)에 복제품이 한 번 들어가면 그 사원의 저장이 **그 뒤로 계속**
+//   실패했다. 복제품이 원본인 채로 남고, 하루가 지나도 안 삭고, 절반이 된
+//   효과도 서버에 안 들어가던 까닭이다. (spaceitems.js:29)
+//
+//   부르는 쪽을 하나하나 고쳐도 또 생긴다. 그러니 길목에서 그 열쇠만 빼고
+//   보낸다 — 한 칸을 잃을지언정 저장 전체가 죽지는 않게. 뺀 자리는 콘솔에
+//   남으므로 어디서 또 새는지 바로 보인다.
+//
 // ■ 콘솔
 //   emptyNullLog()   빼고 보낸 자리
 
@@ -49,6 +66,33 @@ const USERNODE = /^users\/[^/]+$/;
 const LOG = [];
 const KEEP = 40;
 let cut = 0;
+
+// 파이어베이스가 못 받는 열쇠
+//
+//   ★ 「/」는 자리에 따라 다르다. update() 의 **맨 위 열쇠는 어디서나 경로**다.
+//
+//         database.ref('/').update({ 'users/c1/points': 10 })
+//         database.ref('users/c1').update({ 'pets/3': {…} })
+//
+//     거기서 「/」를 막으면 통째 저장이 통째로 사라진다. 맨 위 한 켜만
+//     「/」를 봐주고, 그 아래로는 막는다.
+function badKey(k, path) {
+    const s = String(k);
+    if (/[\x00-\x1f\x7f]/.test(s)) return true;
+    return path ? /[.#$\[\]]/.test(s) : /[.#$\[\]\/]/.test(s);
+}
+
+// 알맹이 속까지 들어가 못 쓰는 열쇠를 뺀다
+function scrub(v, at, gone, path) {
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(function (x) { return scrub(x, at, gone, false); });
+    const out = {};
+    Object.keys(v).forEach(function (k) {
+        if (badKey(k, path)) { gone.push((at ? at + '/' : '') + k); return; }
+        out[k] = scrub(v[k], (at ? at + '/' : '') + k, gone, false);
+    });
+    return out;
+}
 
 function emptyObj(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -97,7 +141,21 @@ const iv = setInterval(function () {
         const _up = r.update.bind(r);
         r.update = function (obj, done) {
             if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return _up(obj, done);
-            return _up(strip(obj, p), done);
+            let o = strip(obj, p);
+            // ② 못 쓰는 열쇠는 빼고 보낸다 — 하나 때문에 전부 죽지 않게
+            const gone = [];
+            const cleaned = scrub(o, p || '', gone, true);   // 맨 위 한 켜는 경로다
+            if (gone.length) {
+                cut += gone.length;
+                LOG.unshift({ 때: new Date().toLocaleTimeString(), 자리: p || '/',
+                              '빼고 보낸 것': gone.slice(0, 6).join(', '), '부른 곳': where() });
+                if (LOG.length > KEEP) LOG.pop();
+                console.warn('[빈칸] 파이어베이스가 못 받는 열쇠 ' + gone.length
+                    + '개를 빼고 보냅니다 — ' + gone.slice(0, 4).join(', ')
+                    + '   (. # $ [ ] / 는 열쇠로 쓸 수 없습니다)');
+                o = cleaned;
+            }
+            return _up(o, done);
         };
         r._emptyNull = true;
         return r;

@@ -49,14 +49,17 @@ const ARR = [
     'alienUnlockedItems', 'alienBoughtItems', 'receivedRations',
     'timedEffects', 'itemBuffs', 'foxBuffs', 'foxNotes',
     'darkLogs', 'foxLogs', 'bathLogs',
-    'borrowedGear', 'safeBoxes'
+    'borrowedGear', 'safeBoxes',
+    // ★ copyExpire 는 배열이다. 이름이 열쇠로 들어가면 파이어베이스가
+    //   꾸러미째 거절한다 (복제품 이름에 대괄호가 들어 있다 — spaceitems.js:29)
+    'copyExpire'
 ];
 // 비면 서버가 지우는 칸들 — 이름표가 붙은 것
 const OBJ = [
     'equipOwner', 'purchaseRecord', 'qshopRecord',
     'useCnt', 'dayUse', 'gearFull', 'gearLock',
     'nFlags', 'nPending', 'qPending',
-    'copyExpire', 'cageGear', 'invFold', 'stolenGear'
+    'cageGear', 'invFold', 'stolenGear'
 ];
 // 전용 장비 속 칸
 const GEAR_ARR = ['attrs', 'giftSlots'];
