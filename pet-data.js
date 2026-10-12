@@ -5,18 +5,22 @@
 //
 // ■ 무엇이 있나
 //
-//   펫 20종. 다섯 가지 「주의 문구」로 네 마리씩 나뉜다. 알을 살 때 주의
-//   문구 하나가 정해지고, 그 묶음의 네 마리 가운데 하나가 깨어난다.
+//   펫 24종. 다섯 가지 「주의 문구」로 나뉜다 (향 묶음만 넷, 나머지는 다섯).
+//   알을 살 때 주의 문구 하나가 정해지고, 그 묶음 가운데 하나가 깨어난다.
 //
 //   등급은 D → C → B → A → S. 전부 D 로 태어난다. 능력치는 B 부터
 //   생긴다 (등급을 올리는 길은 아직 안 넣었다 — 자리만 잡아 둔다).
 //
 // ■ 그림
 //
-//   pet/p01~p20.webp   깨어날 때 뜨는 본 그림 (긴 쪽 220)
-//   pet/s01~s20.webp   목록에 뜨는 작은 것 (긴 쪽 64)
-//                      스무 마리 모두 데포르메가 있다. 160×128 시트를
-//                      32×32 칸으로 잘라, 빈 자리를 떼고 두 배로 키운 것이다.
+//   pet/p01~p24.webp   깨어날 때 뜨는 본 그림 (긴 쪽 220)
+//   pet/s01~s24.webp   목록에 뜨는 작은 것 (긴 쪽 64)
+//                      1~20 은 데포르메다. 160×128 시트를 32×32 칸으로 잘라,
+//                      빈 자리를 떼고 두 배로 키운 것이다.
+//                      21~24 (염소·늑대·양·나비) 는 데포르메가 아직 없어
+//                      본 그림을 줄여 쓴다 (deform: false). 늑대는 작은 것에서
+//                      달을 빼고 늑대만 남겼다 — 64칸에 달까지 넣으면 늑대가
+//                      안 보인다.
 //   pet/egg0~egg3.webp 알 — 금이 번지는 차례
 //
 // ■ 사원 기록에 적히는 자리
@@ -34,7 +38,7 @@
 //
 // ■ 콘솔
 //   petState()   내 펫과 알
-//   petAll()     펫 20종 표
+//   petAll()     펫 24종 표
 
 const PET_GRADES = ['D', 'C', 'B', 'A', 'S'];
 
@@ -54,7 +58,7 @@ const PET_WARN = {
 const PET_WARN_KEYS = ['wet', 'heat', 'cold', 'noise', 'scent'];
 
 // ==========================================
-// 펫 20종
+// 펫 24종
 // ==========================================
 //
 //   i      그림 번호 (pet/p○○.webp · pet/s○○.webp)
@@ -81,7 +85,11 @@ const PET_LIST = [
     { i: 17, n: '치와와',   w: 'scent', deform: true , st: { bon: 2, eva: 2 }, d: '작고 화가 나 있다. 늘.' },
     { i: 18, n: '송골매',   w: 'noise', deform: true , st: { bon: 4 },    d: '내려올 때는 소리가 안 난다.' },
     { i: 19, n: '돌고래',   w: 'heat',  deform: true,  st: { gim: 2 },    d: '웃는 얼굴로 태어났다. 기분과는 무관하다.' },
-    { i: 20, n: '부엉이',   w: 'wet',   deform: true , st: { gim: 1, luck: 60 }, d: '밤에만 눈이 커진다.' }
+    { i: 20, n: '부엉이',   w: 'wet',   deform: true , st: { gim: 1, luck: 60 }, d: '밤에만 눈이 커진다.' },
+    { i: 21, n: '염소',     w: 'scent', deform: false, st: { resist: 3 }, d: '적어 둔 것을 먹는다. 중요한 것부터 먹는다.' },
+    { i: 22, n: '늑대',     w: 'noise', deform: false, st: { bon: 4, eva: 1 }, d: '밤마다 운다. 달이 없는 날에도 운다.' },
+    { i: 23, n: '양',       w: 'cold',  deform: false, st: { resist: 2, luck: 50 }, d: '세고 있으면 잠이 온다. 세 마리째에서 진다.' },
+    { i: 24, n: '나비',     w: 'wet',   deform: false, st: { eva: 5 },    d: '손에 앉았다가, 손을 보면 없다.' }
 ];
 
 const PET_BY_ID = {};
@@ -643,7 +651,7 @@ window.petState = function () {
 };
 
 window.petAll = function () {
-    console.log('%c===== 펫 20종 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 펫 ' + PET_LIST.length + '종 =====', 'color:#ffb74d; font-size:13px');
     PET_WARN_KEYS.forEach(function (w) {
         console.log('%c' + PET_WARN[w].n, 'color:#9fd8ef');
         PET_LIST.filter(function (p) { return p.w === w; }).forEach(function (p) {
