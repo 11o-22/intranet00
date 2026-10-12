@@ -48,13 +48,15 @@
 // ■ 칸(슬롯)마다 따로 고른다
 //
 //       악세  없음 · 고양이                      ← 머리 **위**에 얹는다
+//                                                  상담사와 사번 9013·8634·8449 만
 //       상의  없음 · 잠옷 상의
 //       하의  없음 · 잠옷 하의
 //       겉옷  없음 · 정장                        ← 상담사만
 //       구두  없음 · 구두                        ← 상담사만
 //       망토  없음 · 망토                        ← 상담사만
 //
-//   상·하의는 따로 입고 벗는다. 겉옷·구두·망토 줄은 상담사 옷장에만 보인다.
+//   상·하의는 따로 입고 벗는다. 겉옷·구두·망토 줄은 상담사 옷장에만 보이고,
+//   악세는 상담사와 적어 둔 사번에게만 보인다 (nos).
 //   옷을 더 그려 주시면 아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
 //   def 가 붙은 것이 「아직 한 번도 안 골랐을 때」 입고 있는 것이다.
 //
@@ -159,7 +161,7 @@ const DOT_SLOTS = [
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
         k: 'acc', n: '악세', items: [
             { i: '', n: '없음', top: [] },
-            { i: 'cat', n: '고양이', top: ['cat'] }
+            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] }
         ]
     }
 ];
@@ -174,9 +176,28 @@ function isAdm(user) {
     const u = user || u_();
     return !!(u && u.code === D.ADMIN);
 }
+// ★ 누구 옷장에 보이나
+//
+//   admin: true        상담사만
+//   nos: ['9013',…]    상담사 + 적어 둔 **사번**(u.no)만
+//   아무것도 없으면     모두
+//
+//   사번은 u.code(계정 열쇠)가 아니라 u.no 다. 앞에 0 이 붙는 사번이
+//   있으므로 글자로 견주고, 네 자리로 채워서도 한 번 더 본다.
+function noOf(u) { return (u && u.no != null) ? String(u.no).trim() : ''; }
+function hasNo(it, u) {
+    const n = noOf(u); if (!n) return false;
+    const p = n.length < 4 ? ('0000' + n).slice(-4) : n;
+    return it.nos.some(function (x) { return x === n || x === p; });
+}
+function allowed(it, user) {
+    if (it.admin) return isAdm(user);
+    if (it.nos) return isAdm(user) || hasNo(it, user);
+    return true;
+}
 // 이 사람 옷장에 보이는 것만 추린다
 function items(slot, user) {
-    return slot.items.filter(function (it) { return !it.admin || isAdm(user); });
+    return slot.items.filter(function (it) { return allowed(it, user); });
 }
 function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
 function wrap(n, len) { return ((n % len) + len) % len; }
@@ -544,7 +565,7 @@ window.closetState = function () {
     console.log('%c===== 사택 옷장 =====', 'color:#e8c27a; font-size:13px');
     console.log('  적힌 것   :', JSON.stringify(u.dot || {}));
     console.log('  보이는 것 : 몸', L.body, '· 겹침', L.layers.join(' → ') || '없음', '· 머리', L.head);
-    console.log('  상담사인가:', isAdm(u) ? 'O' : '✗');
+    console.log('  상담사인가:', isAdm(u) ? 'O' : '✗', '· 사번', noOf(u) || '(없음)');
     DOT_SLOTS.forEach(function (s) {
         console.log('  ' + s.n + ' :', items(s, u).map(function (x) { return x.n; }).join(' · '));
     });

@@ -30,7 +30,9 @@
 //
 // ■ 남이 같이 보이는 얼개
 //
-//   plazaRoom/room1/<사번> 에 { 이름, x, y, 보는쪽, 걷나, 옷차림, 때 } 를 적는다.
+//   plazaRoom/room1/<계정> 에 { 이름, 사번, x, y, 보는쪽, 걷나, 옷차림, 때 } 를 적는다.
+//   사번까지 보내는 까닭은, 옷 가운데 **사번으로 걸린 것**(악세)이 있어서다.
+//   안 보내면 남의 화면에서만 그 옷이 벗겨져 보인다.
 //
 //   ★ 매 그림마다 적으면 안 된다. 1초에 예순 번씩 쓰면 서버가 못 버틴다.
 //     그래서 **4분의 1초에 한 번**만, 그것도 **자리나 상태가 달라졌을 때만**
@@ -237,7 +239,10 @@ function send(moving) {
     try {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
-            f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null), at: t
+            f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null),
+            // ★ 사번도 같이 보낸다. 옷 가운데에는 사번으로 걸린 것이 있어서,
+            //   이게 없으면 남의 화면에서만 그 옷이 벗겨져 보인다.
+            no: (u.no != null ? String(u.no) : ''), at: t
         });
     } catch (e) { }
 }
@@ -257,10 +262,10 @@ function onPeers(snap) {
         if (!v.at || now() - v.at > P.STALE_MS) return;     // 유령은 안 보인다
         live[code] = true;
         let q = run.peers[code];
-        const key = JSON.stringify(v.d || {});
+        const key = JSON.stringify([v.d || {}, v.no || '']);
         if (q && q.key !== key) { dropPeer(code); q = null; }   // 옷을 갈아입었으면 다시 만든다
         if (!q) {
-            const one = makeOne({ code: code, dot: v.d || {} }, v.n || code);
+            const one = makeOne({ code: code, no: v.no, dot: v.d || {} }, v.n || code);
             run.room.appendChild(one.wrap);
             q = run.peers[code] = { one: one, key: key, x: v.x, y: v.y, tx: v.x, ty: v.y,
                                     face: v.f || 1, moving: !!v.m, seen: now() };
