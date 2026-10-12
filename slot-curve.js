@@ -30,71 +30,75 @@
 //   「눈을 감은 나침반」 같은 고유 600% 아이템이 없으면 **구조적으로 영원히
 //   마이너스**였습니다. 행운을 많이 올려도 마이너스만 나오던 까닭입니다.
 //
-// ■ 고친 곡선 — 맨몸은 딱 본전, 풀 행운은 하루 100만
+// ■ 고친 곡선 — 맨몸은 딱 본전, 위는 하루 상한으로 묶는다
 //
 //       u    = 배수 / (배수 + K)          0 에서 1 로 오릅니다 (닿지는 않습니다)
 //       3개  = J0   + (JMAX   - J0)   × u
 //       2개  = TWO0 + (TWOMAX - TWO0) × u     ← 이쪽도 같이 오릅니다
 //       꽝   = 나머지
 //
-//   잡은 자리가 두 군데입니다.
+//   ★ 곡선만으로는 「하루 최대 얼마」를 못 묶습니다. 두 가지가 걸립니다.
 //
-//       맨몸(배수 1)     돌려받음 **딱 100%**  — 본전만 찾습니다
-//       풀 행운(배수 ∞)  돌려받음 **350%**    — 하루 **+1,000,000 P** 입니다
+//     ① 판수가 사람마다 다릅니다. 공용시설 한도는 천장이 30회인데 고유
+//        아이템과 은화 뱀 몫은 **천장 밖**이라(count-cap.js:123) 꽉 채운
+//        사원은 쉰 판 넘게 돌립니다. 하루 20판으로 셈해 두면 어긋납니다.
+//     ② 한 판에 🫀 세 개가 뜨면 20,000P × 40 = 800,000P 입니다. 기대값이
+//        얼마든 운이 좋은 날은 훌쩍 넘습니다.
 //
-//   하루 벌이는 베팅 한도와 이용 횟수가 정합니다.
+//     그래서 **하루에 번 몫을 따로 세어 DAY_CAP 에서 끊습니다.** 곡선은
+//     「길게 보면 얼마」를 정하고, 상한은 「하루에 최대 얼마」를 못 박습니다.
 //
-//       하루 오가는 몫 = 20,000P × 20번 = 400,000P
-//       하루 벌이      = 400,000P × (돌려받음 − 1)
+//   잡은 자리가 세 군데입니다.
 //
-//   그래서 한도나 횟수를 고치면 꼭대기 벌이도 같이 움직입니다.
-//   100만을 지키려면 TWOMAX 를 다시 풀어야 합니다.
+//       맨몸(배수 1)     돌려받음 **딱 100%**   — 본전만 찾습니다
+//       풀 행운(배수 ∞)  돌려받음 **160%**
+//       하루 상한        **1,000,000 P**       — 판수·운과 무관합니다
 //
-//       TWOMAX = (1 + 1,000,000 / 400,000 − JMAX × 7.28) / 3.14
+//   TWO0 와 TWOMAX 는 손으로 고른 값이 아니라 풀어 낸 값입니다.
 //
-//   TWO0 역시 손으로 고른 값이 아니라 **맨몸이 100% 가 되게 풀어 낸 값**입니다.
+//       TWOMAX = (1.60 − JMAX × 7.28) / 3.14      ← 꼭대기 돌려받음
+//       TWO0   : 100% = j(1) × 7.28 + t(1) × 3.14 ← 맨몸이 본전
 //
-//       100% = j(1) × 7.28 + t(1) × 3.14
-//
-//   두 상수는 서로 물려 있으니, 다른 손잡이를 고치면 둘을 같이 풀어 넣고
-//   slotOdds() 로 배수 1 이 100% · 배수 ∞ 가 350% 인지 보면 됩니다.
+//   고친 뒤 slotOdds() 로 배수 1 이 100% · 배수 ∞ 가 160% 인지 보면 됩니다.
 //
 //       기호         🫀    🫁    👁   🦵🏼   🖐🏻   👂🏻
 //       3개 일치    ×40   ×25   ×15   ×8    ×5    ×3     ← 적어 둔 표 그대로입니다
 //       2개 일치    ×18   ×11    ×7   ×4    ×2    ×1     ← TWO_PAY 0.45 (평균 ×3.14)
 //
-//   한 판에 가장 크게 터지는 몫은 🫀 3개 — 20,000P × 40 = **800,000 P** 입니다.
-//   배당표와 베팅 한도가 정하는 값이라 행운과는 무관합니다. 행운이 바꾸는 것은
-//   **얼마나 자주 터지나** 뿐입니다.
-//
 //   부적(누군가가 쓴 부적 · 사원증 뱃지)은 배수를 1.5배로 쳐 줍니다.
 //
-// ■ 돌아가는 모양 (부적 없음 · 한 판 20,000P · 하루 20번)
+// ■ 돌아가는 모양 (부적 없음 · 한 판 20,000P)
 //
-//     조합                      배수      꽝      3개     2개    당첨   돌려받음        하루
-//     아무것도 없음                1   71.9%   2.83%   25.3%   28.1%    100%          ±0
-//     도깨비 불만                  2   70.2%   3.60%   26.2%   29.8%    108%     +33,333
-//     고유 600% 하나               6   64.7%   6.24%   29.1%   35.3%    137%    +147,059
-//     플러그 둘 + 루비             11   59.3%   8.77%   31.9%   40.7%    164%    +256,410
-//     거기에 도깨비·감자맛          16   55.2%  10.73%   34.1%   44.8%    185%    +340,909
-//     고유 600% 하나 더            30   47.3%  14.41%   38.2%   52.7%    225%    +500,000
-//     둘 더                       63   38.5%  18.62%   42.9%   61.5%    270%    +681,319
-//     유리구슬까지                252   27.9%  23.60%   48.5%   72.1%    324%    +896,429
-//     전부 (뱃지 포함)          2,318   23.4%  25.71%   50.9%   76.6%    347%    +987,639
-//     한없이 올려도                 ∞   22.8%  26.00%   51.2%   77.2%    350%  +1,000,000
+//     조합                      배수      꽝      3개     2개    당첨   돌려받음    20판      50판
+//     아무것도 없음                1   71.0%   2.17%   26.8%   29.0%    100%       ±0        ±0
+//     고유 600% 하나               6   69.1%   2.88%   28.0%   30.9%    109%  +35,294   +88,235
+//     플러그 둘 + 루비             11   67.7%   3.41%   28.8%   32.3%    115%  +61,538  +153,846
+//     거기에 도깨비·감자맛          16   66.7%   3.82%   29.5%   33.3%    120%  +81,818  +204,545
+//     고유 600% 하나 더            30   64.6%   4.59%   30.8%   35.4%    130% +120,000  +300,000
+//     둘 더                       63   62.3%   5.46%   32.2%   37.7%    141% +163,516  +408,791
+//     유리구슬까지                252   59.6%   6.50%   33.9%   40.4%    154% +215,143  +537,857
+//     전부 (뱃지 포함)          2,318   58.4%   6.94%   34.6%   41.6%    159% +237,033  +592,583
+//     한없이 올려도                 ∞   58.3%   7.00%   34.7%   41.7%    160% +240,000  +600,000
 //
-//   맨몸은 길게 보아 본전입니다 — 재미로 당겨도 돈이 녹지 않습니다.
-//   꼭대기에서는 네 번에 한 번이 3개 일치고 꽝이 넷에 하나입니다.
-//   거기까지 가려면 고유 600% 둘에 플러그·물약·유리구슬을 다 껴야 합니다.
+//   꽉 채워 쉰 판을 돌려도 길게 보아 하루 60만입니다. 운이 아주 좋은 날이
+//   그 위로 치솟던 것을 상한이 100만에서 끊습니다.
 //
-// ■ 손잡이 여섯 — 아래 상수만 고치면 됩니다
+// ■ 하루 상한이 도는 모양
+//
+//   하루에 **번 몫**(건 돈을 뺀 순이익)을 u.slotNet 에 세어 둡니다.
+//   진 판은 음수로 더하므로, 잃고 나면 그만큼 천장이 다시 열립니다.
+//   천장에 닿은 판도 **건 돈은 돌려줍니다** — 당첨인데 손해를 보는 것은
+//   말이 안 되기 때문입니다. 깎인 몫은 화면과 기록에 적습니다.
+//   날짜가 바뀌면 0 에서 다시 셉니다.
+//
+// ■ 손잡이 일곱 — 아래 상수만 고치면 됩니다
 //
 //   K        작을수록 적은 배수에서도 빨리 오릅니다 (28 · 맨 처음에는 120)
-//              키우면 꼭대기 벌이는 그대로 두고 **거기까지 가는 길만** 멀어집니다
 //   J0       맨몸 3개 일치 · JMAX    꼭대기 3개 일치
-//   TWO0     맨몸 2개 일치 — 맨몸을 본전에 세우는 값 (손으로 고르지 않습니다)
-//   TWOMAX   꼭대기 2개 일치 — 꼭대기 하루 벌이를 정하는 값 (위 식으로 풉니다)
+//   TWO0     맨몸 2개 일치 — 맨몸을 본전에 세우는 값 (풀어서 넣습니다)
+//   TWOMAX   꼭대기 2개 일치 — 꼭대기 돌려받음을 정하는 값 (풀어서 넣습니다)
 //   TWO_PAY  2개 일치 배당
+//   DAY_CAP  하루에 벌 수 있는 몫 — 여기만 고치면 천장이 바뀝니다
 //
 //   돌려받는 몫 = 3개 × 7.28 + 2개 × (TWO_PAY 로 셈한 평균)
 //     7.28 은 기호 가중치로 센 3개 일치 평균 배수입니다. TWO_PAY 0.5 → 평균
@@ -115,9 +119,10 @@
 
 const K = 28;             // 오르는 속도 — 작을수록 적은 배수에서 빨리 오른다
 const J0 = 0.02;          // 아무것도 없을 때 3개 일치
-const JMAX = 0.26;        // 한없이 올렸을 때 다가가는 3개 일치
-const TWO0 = 0.2437;      // 아무것도 없을 때 2개 일치 — 맨몸이 딱 본전이 되는 값
-const TWOMAX = 0.5118;    // 한없이 올렸을 때 다가가는 2개 일치 — 꼭대기 하루 벌이를 정한다
+const JMAX = 0.07;        // 한없이 올렸을 때 다가가는 3개 일치
+const TWO0 = 0.2653;      // 아무것도 없을 때 2개 일치 — 맨몸이 딱 본전이 되는 값
+const TWOMAX = 0.3473;    // 한없이 올렸을 때 다가가는 2개 일치 — 꼭대기 돌려받음을 정한다
+const DAY_CAP = 1000000;  // 하루에 슬롯으로 벌 수 있는 몫 (판수·운과 무관한 천장)
 const TWO_PAY = 0.45;     // 2개 일치 배당 — 기호 배수의 이만큼 (반올림, 적어도 1)
 const AMULET = 1.5;       // 부적이 배수를 쳐 주는 몫
 
@@ -136,6 +141,48 @@ window._slotBands = bands;
 // 손잡이와 셈을 밖에서도 본다 — 검사와 콘솔이 같은 값을 쓰게
 window._slotTune = { K: K, J0: J0, JMAX: JMAX, TWO0: TWO0, TWOMAX: TWOMAX,
                      TWO_PAY: TWO_PAY, AMULET: AMULET, bands: bands };
+
+// ==========================================
+// 하루 상한 — 판수와 운에 기대지 않는 천장
+// ==========================================
+//
+//   곡선만으로는 「최대 얼마」를 못 묶는다. 두 가지가 걸린다.
+//
+//     ① 판수가 사람마다 다르다. 공용시설 한도는 천장이 30회인데
+//        고유 아이템과 은화 뱀 몫은 **천장 밖**이라(count-cap.js:123)
+//        꽉 채운 사원은 쉰 판 넘게 돌린다.
+//     ② 한 판에 🫀 세 개가 뜨면 20,000P × 40 = 800,000P 다. 기대값이
+//        얼마든 운이 좋은 날은 훌쩍 넘는다.
+//
+//   그래서 하루에 슬롯으로 **번 몫**을 세어 두고, 천장에 닿으면 그 위로는
+//   주지 않는다. 진 몫은 도로 빼 주므로(진 만큼 천장이 열린다) 잃고 나서
+//   다시 벌 수는 있다. 천장에 닿은 판도 건 돈은 돌려준다 — 당첨인데
+//   손해를 보는 것은 말이 안 된다.
+//
+//   날짜가 바뀌면 0 에서 다시 센다. u.slotDay · u.slotNet 에 적힌다.
+function today() {
+    try { if (typeof getTodayStr === 'function') return getTodayStr(); } catch (e) { }
+    return new Date().toISOString().slice(0, 10);
+}
+function dayNet(u) {
+    if (!u || u.slotDay !== today()) return 0;
+    return Number(u.slotNet) || 0;
+}
+function addNet(u, d) {
+    if (!u || !d) return;
+    if (u.slotDay !== today()) { u.slotDay = today(); u.slotNet = 0; }
+    u.slotNet = (Number(u.slotNet) || 0) + d;
+    try { if (typeof saveFields === 'function') saveFields({ slotDay: 1, slotNet: 1 }); } catch (e) { }
+}
+// 이 판에 줄 수 있는 몫 — 천장에 걸리면 깎는다
+function capPrize(u, bet, prize) {
+    const want = prize - bet;                       // 이 판에서 번 몫
+    if (want <= 0) return { prize: prize, cut: 0 };
+    const room = Math.max(0, DAY_CAP - dayNet(u));
+    if (want <= room) return { prize: prize, cut: 0 };
+    return { prize: bet + room, cut: want - room };
+}
+window._slotDayNet = dayNet;
 
 // hasEquip 과 같은 것 — dark.js:4468
 function has(u, name) {
@@ -232,19 +279,30 @@ function has(u, name) {
             setTimeout(function () { clearInterval(roll2); b2.classList.remove('slot-rolling'); b2.innerText = res2.char; }, 1300);
             setTimeout(function () {
                 clearInterval(roll3); b3.classList.remove('slot-rolling'); b3.innerText = res3.char;
+                const capNote = function (cut) {
+                    if (!cut) return '';
+                    return '<div style="font-size:10px; color:#8d8578; margin-top:3px;">'
+                        + '오늘 치 상한(' + DAY_CAP.toLocaleString() + ' P)에 닿아 '
+                        + cut.toLocaleString() + ' P 는 들어오지 않았습니다.</div>';
+                };
                 if (res1.char === res2.char && res2.char === res3.char) {
-                    const prize = bet * res1.mult; winPoints(prize);
+                    const c = capPrize(currentUser, bet, bet * res1.mult);
+                    winPoints(c.prize); addNet(currentUser, c.prize - bet);
                     msg.innerHTML = '<span style="color:#4CAF50;">[3개 일치] ' + res1.char
-                        + ' 잭팟! ×' + res1.mult + ' 배</span>';
-                    addHistoryLog(currentUser, '[슬롯 대박] ' + res1.char + ' 3개 적중 (+' + prize + ' P)');
+                        + ' 잭팟! ×' + res1.mult + ' 배</span>' + capNote(c.cut);
+                    addHistoryLog(currentUser, '[슬롯 대박] ' + res1.char + ' 3개 적중 (+' + c.prize + ' P)'
+                        + (c.cut ? ' · 상한으로 ' + c.cut + ' P 깎임' : ''));
                 } else if (res1.char === res2.char || res2.char === res3.char || res1.char === res3.char) {
                     const matched = (res1.char === res2.char) ? res1 : (res2.char === res3.char ? res2 : res1);
                     const multiplier = Math.max(1, Math.round(matched.mult * TWO_PAY));
-                    const prize = bet * multiplier; winPoints(prize);
+                    const c = capPrize(currentUser, bet, bet * multiplier);
+                    winPoints(c.prize); addNet(currentUser, c.prize - bet);
                     msg.innerHTML = '<span style="color:#ffd700;">[2개 일치] ' + matched.char
-                        + ' 적중! (×' + multiplier + ') 지급</span>';
-                    addHistoryLog(currentUser, '[슬롯 승리] ' + matched.char + ' 2개 적중 (+' + prize + ' P)');
+                        + ' 적중! (×' + multiplier + ') 지급</span>' + capNote(c.cut);
+                    addHistoryLog(currentUser, '[슬롯 승리] ' + matched.char + ' 2개 적중 (+' + c.prize + ' P)'
+                        + (c.cut ? ' · 상한으로 ' + c.cut + ' P 깎임' : ''));
                 } else {
+                    addNet(currentUser, -bet);          // 진 만큼 천장이 다시 열린다
                     msg.innerHTML = '<span style="color:#f44336;">완전 불일치. (-' + bet + ' P)</span>';
                     addHistoryLog(currentUser, '[슬롯 패배] 릴 불일치 (-' + bet + ' P)');
                 }
@@ -255,7 +313,8 @@ function has(u, name) {
         playSlot._curve = true;
         clearInterval(iv);
         console.log('[슬롯] 행운이 손에 잡히는 곡선 — K=' + K
-            + ' · 꼭대기 3개 ' + (JMAX * 100).toFixed(1) + '% · 2개 ' + (TWOMAX * 100).toFixed(1) + '%');
+            + ' · 꼭대기 3개 ' + (JMAX * 100).toFixed(1) + '% · 2개 ' + (TWOMAX * 100).toFixed(1) + '%'
+            + ' · 하루 상한 ' + DAY_CAP.toLocaleString() + 'P');
     }, 400);
 })();
 
@@ -316,6 +375,10 @@ window.slotOdds = function (mult) {
         + (TWOMAX * 100).toFixed(1) + '% · 돌려받음 '
         + ((JMAX * P.e3 + TWOMAX * P.e2) * 100).toFixed(0) + '% 로 다가갑니다. (닿지는 않습니다)');
     console.log('  ' + beText(breakEven(amulet), amulet));
+    const me = (typeof currentUser !== 'undefined') ? currentUser : null;
+    console.log('  하루 상한 ' + DAY_CAP.toLocaleString() + ' P · 오늘 번 몫 '
+        + dayNet(me).toLocaleString() + ' P · 남은 자리 '
+        + Math.max(0, DAY_CAP - dayNet(me)).toLocaleString() + ' P');
     console.log('  slotOdds(63) 처럼 배수를 넣어 견줘 볼 수 있습니다. 표는 slotTable()');
 };
 

@@ -4808,32 +4808,49 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
     }
 
     function isBlindfolded(user) {
-        if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) return true;
+        if (wornHas(user, "혈욕조")) return true;
         return user.blindfoldUntil && Date.now() < user.blindfoldUntil;
         
     }
+    // ★ 장착칸에서 물건을 찾을 때는 **본 이름**으로 견준다
+    //
+    //   복사기로 뜬 것은 「[복제품] 은반지」, 여우 구슬은 「🔮 …」, 임자가
+    //   붙은 것은 「… (아무개)」 꼴로 장착칸에 들어간다. 그래서
+    //   equippedWeapons.includes("은반지") 는 거짓이 되고,
+    //   **복제한 은반지·버터 나이프·작두의 오염 차단이 통째로 안 걸렸다.**
+    //   꺼진 가로등 전구와 방진복 안감도 같은 길로 빠졌다.
+    function wornIdx(user, name) {
+        const a = (user && user.equippedWeapons) || [];
+        for (let i = 0; i < a.length; i++) {
+            const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(a[i]) : a[i];
+            if (b === name) return i;
+        }
+        return -1;
+    }
+    function wornHas(user, name) { return wornIdx(user, name) >= 0; }
+
     // ★ [추가] 은반지 및 버터 나이프 장착 여부 및 만료 체크 함수
     function getPollutionMultiplier(user) {
         if (!user.equippedWeapons) return 1;
         
         // 은반지 착용 중이고 아직 120시간이 안 지났다면 오염도 증가율 0 (완전 차단)
-        if (user.equippedWeapons.includes("은반지")) {
+        if (wornHas(user, "은반지")) {
             if (user.silverRingExpireTime && Date.now() < user.silverRingExpireTime) {
                 return 0; 
             } else if (user.silverRingExpireTime && Date.now() >= user.silverRingExpireTime) {
                 // 시간이 다 되면 은반지 파괴 및 인벤토리/장착에서 제거
-                let idx = user.equippedWeapons.indexOf("은반지");
+                let idx = wornIdx(user, "은반지");
                 if (idx > -1) user.equippedWeapons.splice(idx, 1);
                 addHistoryLog(user, `[장비 파괴] 은반지의 수명(120시간)이 다 되어 부서져 사라졌습니다.`);
             }
         }
         
                 // 버터 나이프 — 작두와 동일: 4시간 오염 차단, 만료 시 소지품으로 회수
-        if (user.equippedWeapons.includes("버터 나이프")) {
+        if (wornHas(user, "버터 나이프")) {
             if (user.butterKnifeExpireTime && Date.now() < user.butterKnifeExpireTime) {
                 return 0;
             } else if (user.butterKnifeExpireTime && Date.now() >= user.butterKnifeExpireTime) {
-                let idx = user.equippedWeapons.indexOf("버터 나이프");
+                let idx = wornIdx(user, "버터 나이프");
                 if (idx > -1) {
                     user.equippedWeapons.splice(idx, 1);
                     user.inventory.push("버터 나이프");
@@ -4844,14 +4861,14 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
     
         }
 
-                if (user.equippedWeapons.includes("꺼진 가로등 전구")) return 0.9;
+                if (wornHas(user, "꺼진 가로등 전구")) return 0.9;
 
                         // 작두 착용 중이면 오염 완전 차단, 4시간 후 자동 회수
-        if (user.equippedWeapons.includes("작두")) {
+        if (wornHas(user, "작두")) {
             if (user.jakduExpireTime && Date.now() < user.jakduExpireTime) {
                 return 0;
             } else if (user.jakduExpireTime && Date.now() >= user.jakduExpireTime) {
-                let idx = user.equippedWeapons.indexOf("작두");
+                let idx = wornIdx(user, "작두");
                 if (idx > -1) {
                     user.equippedWeapons.splice(idx, 1);
                     user.inventory.push("작두");
@@ -4861,7 +4878,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             }
         }
 
-             if (user.equippedWeapons.includes("방진복 안감")) return 0.8;
+             if (wornHas(user, "방진복 안감")) return 0.8;
         
         return 1;
     }
@@ -4917,7 +4934,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         }
 
                 // ★ 보안팀 의상 세트 — 오염 80% 이상이면 1시간 동안 10분마다 3% 정화
-        if (user.equippedWeapons && (user.equippedWeapons.includes("보안팀 의상 세트") || user.equippedWeapons.includes("사자탈"))) {
+        if (wornHas(user, "보안팀 의상 세트") || wornHas(user, "사자탈")) {
             if (user.pollution >= 80 && !user.securityPurgeUntil) {
                 user.securityPurgeUntil = now + (60 * 60 * 1000);
                 user.securityPurgeLast = now;
@@ -5051,12 +5068,12 @@ if (user.code === 'kario0987') {
         const threeHoursMs = 3 * 60 * 60 * 1000;
         if (user.satiety === undefined) user.satiety = 100;
 
-        if (user.equippedWeapons && user.equippedWeapons.includes("혈욕조")) {
+        if (wornHas(user, "혈욕조")) {
             if(!user.bloodBathDailyUsedMs) user.bloodBathDailyUsedMs = 0;
             if(user.bloodBathEquippedAt) {
                 let equippedDuration = now - user.bloodBathEquippedAt;
                 if(user.bloodBathDailyUsedMs + equippedDuration >= threeHoursMs) {
-                    let idx = user.equippedWeapons.indexOf("혈욕조");
+                    let idx = wornIdx(user, "혈욕조");
                     if(idx > -1) {
                         user.equippedWeapons.splice(idx, 1);
                         user.inventory.push("혈욕조");
@@ -5635,8 +5652,7 @@ function startFoxRoomSequence() {
         }
 
         // 혈욕조 — 자정 기준
-        if (currentUser.bloodBathEquippedAt && currentUser.equippedWeapons
-            && currentUser.equippedWeapons.includes("혈욕조")) {
+        if (currentUser.bloodBathEquippedAt && wornHas(currentUser, "혈욕조")) {
             const worn = new Date(currentUser.bloodBathEquippedAt).toLocaleDateString();
             if (worn !== new Date().toLocaleDateString()) {
                 currentUser.bloodBathDailyUsedMs = 0;
