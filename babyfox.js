@@ -498,12 +498,18 @@ function one(k) {
         esc(x.d) + '<br>등급 <b style="color:#6fa8cf;">' + gradeOf(me, k) + '</b>'
         + (s.to ? ' · 지금 ' + esc(nameOf(s.to)) + ' 사원과 함께 있습니다.' : ''))
         + '<button id="kit-nick" class="game-btn" style="' + BTN + ' text-align:center;">이름을 짓는다</button>'
+        + (k === 'luck' && !s.to
+            ? '<button id="kit-spin" class="game-btn" style="' + BTN + ' text-align:center;">'
+              + '공용시설 — 대신 돌린다</button>'
+            : '')
         + (s.to
             ? '<button id="kit-back" class="game-btn" style="' + BTN + ' text-align:center;">거둬 온다</button>'
             : '<button id="kit-send" class="game-btn" style="' + BTN + ' text-align:center;">사원에게 붙인다</button>')
         + '<button id="kit-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#kit-x').onclick = window.kitMenu;
     w.querySelector('#kit-nick').onclick = function () { nickAsk(k); };
+    const spinB = w.querySelector('#kit-spin');
+    if (spinB) spinB.onclick = function () { window.kitSpinAuto(); };
     const sendB = w.querySelector('#kit-send');
     if (sendB) sendB.onclick = function () { pickWho(k); };
     const backB = w.querySelector('#kit-back');
@@ -1125,6 +1131,7 @@ function lootRoll() {
 //   똑같이 붙는다. 판을 안 벌이고 배수만 들여다보는 것으로는 안 닳는다.
 let spinOn = false;        // 켜 두었다
 let spinArm = false;       // 켜 둔 채로 한 판이 시작됐다 — 행운을 읽을 때 쓴다
+let facTick = 0;           // 판돈이 걷힌 횟수 — 「판이 섰나」는 이것으로 센다
 
 window.kitSpin = function (on) {
     const x = usable('luck');
@@ -1139,7 +1146,7 @@ window.kitSpin = function (on) {
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return spinOn;
 };
-window.kitSpinOn = function () { return spinOn || spinArm; };
+window.kitSpinOn = function () { return spinOn || spinArm || autoOn; };
 
 (function hookFacLuck() {
     const iv = setInterval(function () {
@@ -1149,6 +1156,11 @@ window.kitSpinOn = function () { return spinOn || spinArm; };
         const w = function (user) {
             let m = _f.apply(this, arguments);
             try {
+                // 분신이 대신 돌리는 동안은 판마다 그대로 얹는다 (안 닳는다)
+                if (autoOn) {
+                    const a = usable('luck');
+                    return a ? m * (1 + (BFOX.SPIN[a.grade] || 100) / 100) : m;
+                }
                 if (!spinOn && !spinArm) return m;
                 const x = usable('luck');
                 if (!x) return m;
@@ -1182,6 +1194,7 @@ window.kitSpinOn = function () { return spinOn || spinArm; };
         const w = function () {
             const was = spinOn;
             const r = _u.apply(this, arguments);
+            try { if (r !== false) facTick++; } catch (e) { }
             try { if (was && r !== false) spinArm = true; } catch (e) { }
             return r;
         };
@@ -1192,6 +1205,327 @@ window.kitSpinOn = function () { return spinOn || spinArm; };
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
+
+// ==========================================
+// 대신 돌리기 ② — 남은 횟수를 네 곳에 나눠 끝까지 돌린다
+// ==========================================
+//
+//   [🐾 아기 여우] → ✺ 행운 분신 → [공용시설 — 대신 돌린다]
+//
+//   오늘 남은 공용시설 횟수를 슬롯 · 룰렛 · 섯다 · 블랙잭에 고루 나누고,
+//   분신이 한 판씩 돌린다. 다 돌리면 딴·잃은 몫을 한 장에 띄운다.
+//   판돈은 장착자의 포인트에서 나가고, 모자라면 **은행 예금에서** 그만큼
+//   꺼내 온다. 돌리는 동안에는 등급만큼 행운이 얹힌다.
+//
+// ■ 왜 확률을 베끼지 않고 본 게임을 그대로 누르나
+//
+//   배당도 행운도 하루 상한도 slot-curve · bj-luck · seotda-luck 이 저마다
+//   고쳐 놓았다. 여기에 또 한 벌 베껴 두면 본 게임이 바뀔 때마다 조용히
+//   어긋난다. 그래서 playSlot · playRoulette · startSeotda/finishSeotda ·
+//   startBlackjack/bjHit/bjStand 를 그대로 부른다. 횟수·판돈·오염도·포만감도
+//   useFacility 가 여느 때처럼 걷는다.
+//
+// ■ 섯다는 두 판 몫을 쥐고 들어간다
+//
+//   finishSeotda 는 판돈을 걷은 **뒤에** 「횟수와 포인트가 남았나」를 다시
+//   본다 (index.html:8177). 그래서 마지막 한 판이거나 판돈만큼만 남은 돈으로
+//   섯다를 걸면 그 자리에서 승부가 무효가 되고 판돈만 날아간다. 남은 횟수가
+//   둘 이상이고 포인트가 판돈의 두 배일 때만 섯다를 돌린다.
+//
+// ■ 시간
+//
+//   한 판 길이가 게임마다 다르고(슬롯 1.9초 · 룰렛 3.6초 · 섯다·블랙잭은
+//   고를 때마다) 판 사이도 0.3~1.1초로 들쭉날쭉하다. 몇 판을 어디에 돌리느냐에
+//   따라 끝나는 때가 달라진다.
+const FG = {
+    slot: { n: '슬롯' }, roul: { n: '룰렛' }, seot: { n: '섯다' }, bj: { n: '블랙잭' }
+};
+const FKEYS = ['slot', 'roul', 'seot', 'bj'];
+let autoOn = false;                     // 분신이 돌리는 중 — 행운을 얹는다
+
+function nap(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function pts() { const me = u_(); return Number(me && me.points) || 0; }
+function putVal(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.value = v;
+    const d = document.getElementById(id + '-display');
+    if (d) { try { d.innerText = Number(v).toLocaleString(); } catch (e) { } }
+}
+function facLeft() {
+    const me = u_();
+    if (!me) return 0;
+    const max = Number(me.facilityMax) || 20;
+    return Math.max(0, max - (Number(me.facilityCount) || 0));
+}
+function betCap() {
+    try {
+        if (typeof BET_CAPS !== 'undefined' && BET_CAPS) {
+            return Math.min(Number(BET_CAPS['seotda-bet']) || 10000,
+                            Number(BET_CAPS['bj-bet']) || 10000);
+        }
+    } catch (e) { }
+    return 10000;
+}
+// 공용시설에 아직 안 끝난 판이 있나 (섯다·블랙잭은 두 걸음이다)
+function midGame() {
+    const on = function (id) {
+        const el = document.getElementById(id);
+        const d = el && el.style && el.style.display;
+        return !!(d && d !== 'none');
+    };
+    return on('seotda-controls-play') || on('bj-controls-play');
+}
+
+// 은행 예금 — 읽기 · 꺼내 오기
+function depRead() {
+    const d = db_(), me = u_();
+    if (!d || !me) return Promise.resolve(0);
+    try {
+        return d.ref('bank/' + me.code + '/deposit').once('value').then(function (s) {
+            return Number(s.val()) || 0;
+        }).catch(function () { return 0; });
+    } catch (e) { return Promise.resolve(0); }
+}
+function depPull(want) {
+    const d = db_(), me = u_();
+    if (!d || !me || want <= 0) return Promise.resolve(0);
+    const cap = (typeof POINT_CAP !== 'undefined') ? POINT_CAP : Infinity;
+    const ask = Math.min(want, Math.max(0, cap - pts()));
+    if (ask <= 0) return Promise.resolve(0);
+    let got = 0;
+    try {
+        return d.ref('bank/' + me.code).transaction(function (b) {
+            if (!b) return;
+            const dep = Number(b.deposit) || 0;
+            got = Math.min(ask, dep);
+            if (got <= 0) return;
+            b.deposit = dep - got;
+            b.lastOp = got;
+            return b;
+        }).then(function (res) {
+            if (!res || !res.committed || got <= 0) return 0;
+            try { changePoints(got); }
+            catch (e) { me.points = pts() + got; }
+            log_(me, '[은행 출금] ' + got.toLocaleString() + ' P — ' + NAME + ' 대신 돌리기');
+            return got;
+        }).catch(function () { return 0; });
+    } catch (e) { return Promise.resolve(0); }
+}
+
+// 남은 횟수를 네 곳에 고루 나눈다
+function share(n) {
+    const out = [];
+    for (let i = 0; out.length < n; i++) out.push(FKEYS[i % FKEYS.length]);
+    for (let j = out.length - 1; j > 0; j--) {
+        const k = Math.floor(Math.random() * (j + 1));
+        const t = out[j]; out[j] = out[k]; out[k] = t;
+    }
+    // 마지막 한 판은 섯다를 피한다 — 판돈을 걷은 뒤에 횟수를 다시 보므로
+    if (out.length > 1 && out[out.length - 1] === 'seot') {
+        for (let j = out.length - 2; j >= 0; j--) {
+            if (out[j] !== 'seot') {
+                out[out.length - 1] = out[j]; out[j] = 'seot'; break;
+            }
+        }
+    }
+    return out;
+}
+
+// 한 판 — 본 게임 함수를 그대로 누르고 끝날 때까지 기다린다
+function playOne(g, bet) {
+    return new Promise(function (done) {
+        try {
+            if (g === 'slot') {
+                putVal('slot-bet', bet);
+                playSlot();
+                setTimeout(done, 2150);
+                return;
+            }
+            if (g === 'roul') {
+                putVal('roulette-bet', bet);
+                putVal('roulette-target', rnd(1, 25));
+                playRoulette();
+                setTimeout(done, 3850);
+                return;
+            }
+            if (g === 'seot') {
+                putVal('seotda-bet', bet);
+                startSeotda();
+                setTimeout(function () {
+                    try { finishSeotda(); } catch (e) { }
+                    setTimeout(done, 240);
+                }, rnd(500, 1000));
+                return;
+            }
+            putVal('bj-bet', bet);
+            startBlackjack();
+            (function step() {
+                setTimeout(function () {
+                    const on = document.getElementById('bj-controls-play');
+                    const d = on && on.style && on.style.display;
+                    if (!d || d === 'none') { done(); return; }   // 판이 끝났다
+                    let sc = 21;
+                    try { sc = bjScore(bjPlayer); } catch (e) { }
+                    try {
+                        if (sc < 17) bjHit(); else bjStand();
+                    } catch (e) { done(); return; }
+                    step();
+                }, rnd(260, 620));
+            })();
+        } catch (e) { done(); }
+    });
+}
+
+// 돌린다
+function spinAll(x, bet, plan) {
+    const me = u_();
+    const got = { slot: 0, roul: 0, seot: 0, bj: 0 };
+    const keep = ['slot-bet', 'roulette-bet', 'roulette-target', 'seotda-bet', 'bj-bet']
+        .map(function (id) {
+            const el = document.getElementById(id);
+            return { id: id, v: el ? el.value : null };
+        });
+    const lines = [];
+    let net = 0, pulled = 0, stop = '', i = 0;
+    autoOn = true;
+
+    box(head('✺ ' + nickOf(x) + '이(가) 대신 돌립니다',
+        '한 판 판돈 ' + bet.toLocaleString() + ' P · 모두 ' + plan.length + '판<br>'
+        + '끝날 때까지 이 창을 두십시오.')
+        + '<div id="kit-run" style="' + SCROLL + ' font-size:11px; color:#cfc4b4;'
+        + ' line-height:1.9; min-height:90px;"></div>'
+        + '<div id="kit-sum" style="font-size:12px; color:#ffcf8f; text-align:center;'
+        + ' padding:4px 0 2px 0;">돌리는 중…</div>');
+
+    const say = function (t) {
+        lines.push(t);
+        const el = document.getElementById('kit-run');
+        if (el) { el.innerHTML = lines.join('<br>'); el.scrollTop = el.scrollHeight; }
+        const s = document.getElementById('kit-sum');
+        if (s) {
+            s.innerHTML = '지금까지 <b style="color:' + (net >= 0 ? '#8fd18f' : '#d98f8f') + ';">'
+                + (net >= 0 ? '+' : '−') + Math.abs(net).toLocaleString() + ' P</b>';
+        }
+    };
+
+    const over = function () {
+        autoOn = false;
+        keep.forEach(function (k) { if (k.v !== null) putVal(k.id, k.v); });
+        const tot = got.slot + got.roul + got.seot + got.bj;
+        if (tot) {
+            log_(me, '[' + NAME + '] ✺ 공용시설 ' + tot + '판을 대신 돌렸습니다 ('
+                + (net >= 0 ? '+' : '−') + Math.abs(net).toLocaleString() + ' P)');
+            try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+        }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        const w = box(head('✺ 대신 돌리기 — ' + tot + '판',
+            '슬롯 ' + got.slot + ' · 룰렛 ' + got.roul + ' · 섯다 ' + got.seot
+            + ' · 블랙잭 ' + got.bj + '<br>'
+            + '한 판 판돈 ' + bet.toLocaleString() + ' P'
+            + (pulled ? '<br>예금에서 꺼내 온 돈 ' + pulled.toLocaleString() + ' P' : '')
+            + (stop ? '<br><span style="color:#d09a9a;">' + esc(stop) + '</span>' : ''))
+            + '<div style="text-align:center; padding:6px 0 14px 0; font-size:19px;'
+            + ' font-weight:bold; color:' + (net >= 0 ? '#8fd18f' : '#d98f8f') + ';">'
+            + (net >= 0 ? '+' : '−') + Math.abs(net).toLocaleString() + ' P</div>'
+            + '<div style="font-size:10px; color:#6b6257; text-align:center; margin-bottom:9px;">'
+            + '남은 공용시설 횟수 ' + facLeft() + '회</div>'
+            + '<button id="kit-x" class="game-btn" style="' + BTN + ' text-align:center;">닫는다</button>');
+        w.querySelector('#kit-x').onclick = shut;
+    };
+
+    const step = function () {
+        if (i >= plan.length) { over(); return; }
+        if (facLeft() <= 0) { stop = '오늘 횟수를 다 썼습니다.'; over(); return; }
+        if ((Number(me.pollution) || 0) >= 100) { stop = '오염도가 100 에 닿았습니다.'; over(); return; }
+
+        let g = plan[i];
+        if (g === 'seot' && facLeft() < 2) g = 'slot';          // 마지막 한 판은 섯다를 안 돌린다
+        const need = (g === 'seot') ? bet * 2 : bet;
+
+        const money = (pts() >= need) ? Promise.resolve(0) : depPull(need - pts());
+        money.then(function (n) {
+            pulled += n;
+            if (pts() < need) {
+                if (g === 'seot' && pts() >= bet) { g = 'slot'; }   // 한 판 몫은 있다
+                else { stop = '포인트도 예금도 다 떨어졌습니다.'; over(); return; }
+            }
+            // 「판이 섰나」는 useFacility 가 판돈을 걷었나로 센다.
+            //   facilityCount 로 세면 자정이 지나 횟수가 0 으로 돌아간 자리에서
+            //   판을 벌이고도 안 벌인 것으로 읽는다 (index.html dailyRollover).
+            const t0 = facTick;
+            const p0 = pts();
+            playOne(g, bet).then(function () {
+                if (facTick === t0) {                              // 판이 안 섰다
+                    stop = FG[g].n + ' 판을 벌이지 못했습니다.';
+                    over(); return;
+                }
+                const d = pts() - p0;
+                net += d;
+                got[g]++;
+                say('<span style="color:#9fb8c8;">' + FG[g].n + '</span> '
+                    + '<span style="color:' + (d >= 0 ? '#8fd18f' : '#a08a8a') + ';">'
+                    + (d >= 0 ? '+' : '−') + Math.abs(d).toLocaleString() + ' P</span>');
+                i++;
+                nap(rnd(300, 1100)).then(step);
+            });
+        });
+    };
+    step();
+}
+
+// 판돈을 묻는다
+function spinAsk(x, n, dep) {
+    const cap = betCap();
+    const have = pts() + dep;
+    const def = Math.max(1, Math.min(1000, Math.floor(have / Math.max(1, n)) || 1));
+    const w = box(head('✺ 공용시설 — ' + nickOf(x) + '이(가) 대신 돌린다',
+        '오늘 남은 <b style="color:#ffcf8f;">' + n + '회</b>를 슬롯 · 룰렛 · 섯다 · 블랙잭에'
+        + ' 나눠 돌립니다.<br>'
+        + '판돈은 포인트에서 나가고, 모자라면 예금에서 꺼내 옵니다.<br>'
+        + '돌리는 동안 행운이 <b style="color:#6fa8cf;">+'
+        + (BFOX.SPIN[x.grade] || 100) + '%</b> 얹힙니다.')
+        + '<div style="font-size:11px; color:#9a9086; margin-bottom:8px;">'
+        + '포인트 ' + pts().toLocaleString() + ' P · 예금 ' + dep.toLocaleString() + ' P</div>'
+        + '<input id="kit-bet" type="number" min="1" max="' + cap + '" value="' + def + '"'
+        + ' style="width:100%; padding:10px; font-size:13px; margin-bottom:4px;'
+        + ' box-sizing:border-box;">'
+        + '<div style="font-size:9.5px; color:#6b6257; margin-bottom:9px;">'
+        + '한 판 판돈 — ' + cap.toLocaleString() + ' P 까지</div>'
+        + '<button id="kit-go" class="game-btn" style="' + BTN + ' text-align:center;">돌린다</button>'
+        + '<button id="kit-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">그만둔다</button>');
+    const f = w.querySelector('#kit-bet');
+    w.querySelector('#kit-x').onclick = function () { one('luck'); };
+    w.querySelector('#kit-go').onclick = function () {
+        let bet = Math.floor(Number(f.value) || 0);
+        if (!(bet > 0)) { alert_('판돈을 적어 주십시오.'); return; }
+        if (bet > cap) { alert_('한 판 판돈은 ' + cap.toLocaleString() + ' P 까지입니다.'); return; }
+        if (bet > have) { alert_('포인트와 예금을 합쳐도 모자랍니다.'); return; }
+        spinAll(x, bet, share(n));
+    };
+}
+
+window.kitSpinAuto = function () {
+    const me = u_();
+    const x = usable('luck');
+    if (!x) { alert_('행운 분신이 없습니다.'); return; }
+    if (autoOn) { alert_('이미 돌리는 중입니다.'); return; }
+    try {
+        if (typeof isQuarantined === 'function' && isQuarantined(me)) {
+            alert_('격리 중에는 공용시설을 쓸 수 없습니다.'); return;
+        }
+    } catch (e) { }
+    if ((Number(me.pollution) || 0) >= 100) {
+        alert_('오염도가 높아 공용시설을 쓸 수 없습니다.'); return;
+    }
+    if (midGame()) {
+        alert_('공용시설에 아직 안 끝난 판이 있습니다.\n\n그 판을 끝내고 다시 불러 주십시오.');
+        return;
+    }
+    const n = facLeft();
+    if (n <= 0) { alert_('오늘 공용시설 횟수가 남지 않았습니다.'); return; }
+    depRead().then(function (dep) { spinAsk(x, n, dep); });
+};
 
 // ==========================================
 // ⑥ 파괴 — 어떤 기믹이든 연다
