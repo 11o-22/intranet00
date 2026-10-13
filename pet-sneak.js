@@ -471,6 +471,40 @@ const MED = [
 const MED_BY = {};
 MED.forEach(function (x) { MED_BY[x[0]] = { heal: x[1], price: x[2] }; });
 
+let qty = 1;                          // 망상 홈쇼핑에서 한 번에 살 개수
+
+// ==========================================
+// 깊이 N 을 0 까지 내리는 **가장 싼 조합**
+// ==========================================
+//
+//   깊이가 100 을 넘지 않고 물품이 열 가지뿐이라 그냥 다 세어 본다.
+//   dp[d] = 깊이 d 를 0 까지 내리는 최소 값. 한 칸씩 올려 가며 채운다.
+//
+//   한 점당 값이 가장 싼 것은 소독 솜(900 / 12 = 75)이라 대개 그것이
+//   잔뜩 나온다. 마지막 모자란 몫만 다른 것으로 메운다.
+function cheapest(deep) {
+    const d0 = Math.max(0, Math.ceil(Number(deep) || 0));
+    if (!d0) return { cost: 0, list: {} };
+    const dp = new Array(d0 + 1).fill(Infinity);
+    const via = new Array(d0 + 1).fill(null);
+    dp[0] = 0;
+    for (let d = 1; d <= d0; d++) {
+        for (let i = 0; i < MED.length; i++) {
+            const rest = Math.max(0, d - MED[i][1]);
+            const c = MED[i][2] + dp[rest];
+            if (c < dp[d]) { dp[d] = c; via[d] = i; }
+        }
+    }
+    const list = {};
+    let d = d0;
+    while (d > 0 && via[d] != null) {
+        const i = via[d];
+        list[MED[i][0]] = (list[MED[i][0]] || 0) + 1;
+        d = Math.max(0, d - MED[i][1]);
+    }
+    return { cost: dp[d0], list: list };
+}
+
 // ==========================================
 // 바탕 셈
 // ==========================================
@@ -576,7 +610,8 @@ function end() {
                 : (nm + ' (깊이 ' + r.deep + ')\n' + pick(HURT, kindOf(r.k)));
         }).join('\n\n')
         + (hurtRows.length ? '\n\n두 시간 안에 **완전히** 고치지 않으면 죽습니다.\n'
-            + '치료 물품은 망상 홈쇼핑에 있습니다.' : ''));
+            + '사택 맨 위 · 망상 홈쇼핑 맨 위의 「한 번에 낫게」를 누르면'
+            + ' 모자란 몫만 사서 바로 낫습니다.' : ''));
     }, 1200);
 }
 
@@ -687,6 +722,7 @@ window.petMedBuy = function (name, qty) {
     log_('[망상 홈쇼핑] ' + name + ' ' + n + '개 구입 (-' + cost.toLocaleString() + ' P)');
     alert_(name + ' ' + n + '개를 샀습니다.');
     try { if (typeof window.petMedPaint === 'function') window.petMedPaint(); } catch (e) { }
+    try { if (typeof window.petHurtPaint === 'function') window.petHurtPaint(); } catch (e) { }
 };
 
 window.petMedUse = function (key, name) {
@@ -711,19 +747,221 @@ window.petMedUse = function (key, name) {
         alert_(name + '을(를) 썼습니다.\n\n' + nm + ' — 남은 깊이 ' + h.deep);
     }
     try { if (typeof window.petMedPaint === 'function') window.petMedPaint(); } catch (e) { }
+    try { if (typeof window.petHurtPaint === 'function') window.petHurtPaint(); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
 };
 
+// ==========================================
+// 한 번 눌러 낫게 한다
+// ==========================================
+//
+//   깊이 100 짜리 상처는 소독 솜 아홉 개가 가장 싸다. 예전에는 아홉 번 사고
+//   아홉 번 쓰는 열여덟 번을 눌러야 했다. 두 시간 안에 그걸 하는 것이
+//   치료의 전부였다. 그래서 두 단추로 줄인다.
+//
+//     petHealFast  가진 것으로 되는 데까지
+//     petHealBuy   모자란 몫을 가장 싼 조합으로 사서 끝까지
+//
+//   낭비를 줄이려고 **깊이를 덮는 가장 작은 것**을 먼저 찾는다. 없으면
+//   가진 것 가운데 가장 큰 것을 쓴다.
+function ownedSorted(u) {
+    const b = medBag(u);
+    return MED.filter(function (x) { return Number(b[x[0]]) > 0; })
+              .map(function (x) { return { n: x[0], h: x[1], p: x[2], c: Number(b[x[0]]) }; });
+}
+
+// 가진 것만으로 깊이를 깎는다 — 돌려주는 값 { used:{이름:수}, left: 남은 깊이 }
+function spend(u, deep) {
+    const have = ownedSorted(u).map(function (x) {
+        return { n: x.n, h: x.h, c: x.c };
+    });
+    const used = {};
+    let d = Math.max(0, Number(deep) || 0);
+    while (d > 0) {
+        // ① 한 번에 끝낼 수 있는 가장 작은 것
+        let pickIdx = -1;
+        for (let i = 0; i < have.length; i++) {
+            if (!have[i].c || have[i].h < d) continue;
+            if (pickIdx < 0 || have[i].h < have[pickIdx].h) pickIdx = i;
+        }
+        // ② 없으면 가진 것 가운데 가장 큰 것
+        if (pickIdx < 0) {
+            for (let i = 0; i < have.length; i++) {
+                if (!have[i].c) continue;
+                if (pickIdx < 0 || have[i].h > have[pickIdx].h) pickIdx = i;
+            }
+        }
+        if (pickIdx < 0) break;                       // 가진 것이 없다
+        have[pickIdx].c--;
+        used[have[pickIdx].n] = (used[have[pickIdx].n] || 0) + 1;
+        d = Math.max(0, d - have[pickIdx].h);
+    }
+    return { used: used, left: d };
+}
+
+function applyUsed(key, used, u) {
+    let heal = 0;
+    Object.keys(used).forEach(function (n) {
+        medAdd(n, -used[n]);
+        heal += MED_BY[n].heal * used[n];
+    });
+    const s = pets(u)[String(key)];
+    if (!s || !s.hurt) return 0;
+    const h = s.hurt;
+    h.deep = Math.max(0, Number(h.deep) - heal);
+    if (h.deep <= 0) patch(key, { hurt: null });
+    else patch(key, { hurt: h });
+    return h.deep;
+}
+
+function usedText(used) {
+    return MED.filter(function (x) { return used[x[0]]; })
+              .map(function (x) { return x[0] + ' ×' + used[x[0]]; }).join(' · ');
+}
+
+function done(key, u) {
+    const nm = nick(key, u);
+    log_('[펫] ' + nm + ' — 다 나았습니다.');
+    try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+    return nm + josa(nm, '이') + ' 다 나았습니다.\n\n일어나 한 바퀴 돌아 보입니다.';
+}
+
+function repaint() {
+    try { if (typeof window.petMedPaint === 'function') window.petMedPaint(); } catch (e) { }
+    try { if (typeof window.petHurtPaint === 'function') window.petHurtPaint(); } catch (e) { }
+    try { if (typeof window.petHurtPaint === 'function') window.petHurtPaint(); } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    const m = document.getElementById('pet-hurt-modal');
+    if (m) { m.remove(); if (anyHurt(u_()).length) window.petHurtOpen(); }
+}
+
+window.petHealFast = function (key) {
+    const u = u_();
+    if (!u) return;
+    const s = pets(u)[String(key)];
+    if (!s || !s.hurt) { alert_('다친 펫이 아닙니다.'); return; }
+    const deep = Math.max(0, Number(s.hurt.deep) || 0);
+    const r = spend(u, deep);
+    if (!Object.keys(r.used).length) {
+        alert_('쓸 치료 물품이 없습니다.\n\n망상 홈쇼핑에서 사십시오.');
+        return;
+    }
+    const rest = applyUsed(key, r.used, u);
+    const msg = '썼습니다 — ' + usedText(r.used);
+    if (rest <= 0) alert_(done(key, u) + '\n\n' + msg);
+    else {
+        const c = cheapest(rest);
+        alert_(nick(key, u) + ' — 남은 깊이 ' + rest + '\n\n' + msg
+            + '\n\n가진 것이 모자랍니다. 모자란 몫은 ' + c.cost.toLocaleString() + ' P 입니다.');
+    }
+    repaint();
+};
+
+window.petHealBuy = function (key) {
+    const u = u_();
+    if (!u) return;
+    const s = pets(u)[String(key)];
+    if (!s || !s.hurt) { alert_('다친 펫이 아닙니다.'); return; }
+    const deep = Math.max(0, Number(s.hurt.deep) || 0);
+    const mine = spend(u, deep);                       // 가진 것으로 되는 데까지
+    const buy = cheapest(mine.left);                   // 모자란 몫
+    if (buy.cost > (Number(u.points) || 0)) {
+        alert_('포인트가 모자랍니다.\n\n모자란 몫 ' + buy.cost.toLocaleString() + ' P'
+            + '\n가진 포인트 ' + (Number(u.points) || 0).toLocaleString() + ' P');
+        return;
+    }
+    if (buy.cost) {
+        if (typeof changePoints === 'function') changePoints(-buy.cost);
+        else u.points = (Number(u.points) || 0) - buy.cost;
+        log_('[망상 홈쇼핑] 치료 물품 ' + usedText(buy.list)
+            + ' 구입 (-' + buy.cost.toLocaleString() + ' P)');
+    }
+    const all = {};
+    [mine.used, buy.list].forEach(function (o) {
+        Object.keys(o).forEach(function (n) { all[n] = (all[n] || 0) + o[n]; });
+    });
+    // 산 몫을 먼저 주머니에 넣는다 — applyUsed 가 거기서 빼 간다
+    Object.keys(buy.list).forEach(function (n) { medAdd(n, buy.list[n]); });
+    const rest = applyUsed(key, all, u);
+    try { if (typeof saveFields === 'function') saveFields({ points: 1, petMed: 1, history: 1 }); } catch (e) { }
+    alert_((rest <= 0 ? done(key, u) : (nick(key, u) + ' — 남은 깊이 ' + rest))
+        + '\n\n썼습니다 — ' + usedText(all)
+        + (buy.cost ? '\n산 것 ' + buy.cost.toLocaleString() + ' P' : '\n가진 것으로 됐습니다.'));
+    repaint();
+};
+
 // 망상 홈쇼핑에 칸을 붙인다
+window.petMedQty = function (n) {
+    qty = Math.max(1, Number(n) || 1);
+    try { window.petMedPaint(); } catch (e) { }
+};
+
+// 다친 펫 띠 — 사택과 망상 홈쇼핑 맨 위에 같은 것을 띄운다
+function hurtBanner() {
+    const u = u_();
+    const keys = anyHurt(u);
+    if (!keys.length) return '';
+    const ps = pets(u);
+    return '<div style="background:rgba(224,122,95,0.12); border:1px solid #e07a5f;'
+        + ' border-radius:7px; padding:11px; margin-bottom:12px;">'
+        + '<div style="font-size:11px; color:#e07a5f; font-weight:bold; margin-bottom:7px;">'
+        + '🩹 다친 펫 ' + keys.length + '마리</div>'
+        + keys.map(function (k) {
+            const h = ps[k].hurt;
+            const c = cheapest(Math.max(0, Number(h.deep) || 0));
+            const live = h.calm ? '<span style="color:#7fd4d4;">곁에서 낫는 중</span>'
+                : '<span style="color:#e07a5f;">'
+                  + Math.max(0, Math.ceil((Number(h.at) + DIE_MS - Date.now()) / 60000))
+                  + '분 뒤에 죽습니다</span>';
+            return '<div style="display:flex; align-items:center; gap:8px; padding:5px 0;">'
+                + '<img src="' + P().icon(k) + '" alt="" style="width:26px; height:26px;'
+                + ' object-fit:contain; image-rendering:pixelated;">'
+                + '<div style="flex:1; min-width:0;">'
+                + '<div style="font-size:11px; color:#e8d7b4;">' + esc(nick(k, u))
+                + ' <span style="color:#6f685e;">깊이 ' + h.deep + '</span></div>'
+                + '<div style="font-size:9.5px;">' + live + '</div></div>'
+                + '<button class="game-btn" style="flex:0 0 auto; margin:0; padding:7px 10px;'
+                + ' font-size:10px; background:linear-gradient(145deg,#8a3a28,#4a1d12) !important;'
+                + ' border-color:#e07a5f !important; color:#ffd9cd !important;"'
+                + ' onclick="petHealBuy(\'' + esc(k) + '\')">'
+                + '한 번에 낫게 — ' + c.cost.toLocaleString() + ' P</button>'
+                + '</div>';
+        }).join('')
+        + '<div style="font-size:9px; color:#8d8578; margin-top:5px; line-height:1.6;">'
+        + '단추를 누르면 가진 치료 물품을 먼저 쓰고, 모자란 몫만 가장 싼 조합으로 사서'
+        + ' 깊이 0 까지 내립니다. 적힌 값은 지금 모자란 몫입니다.</div>'
+        + '<button class="game-btn" style="width:100%; margin:7px 0 0 0; padding:8px;'
+        + ' font-size:10px; background:#2a2a2a !important; border-color:#444 !important;'
+        + ' color:#aaa !important;" onclick="petHurtOpen()">하나씩 골라 쓴다</button>'
+        + '</div>';
+}
+
 function shopHtml() {
     const u = u_();
     const b = medBag(u);
-    return '<div style="font-size:11px; color:#e07a5f; font-weight:bold; margin:14px 0 4px;">'
-        + '🩹 치료 물품</div>'
+    const mine = MED.reduce(function (a, x) { return a + (Number(b[x[0]]) || 0); }, 0);
+    return hurtBanner()
+        + '<div style="font-size:12px; color:#e07a5f; font-weight:bold; margin:0 0 4px;">'
+        + '🩹 치료 물품' + (mine ? ' <span style="color:#9fd8ef; font-size:10px;'
+            + ' font-weight:normal;">· 가진 것 ' + mine + '개</span>' : '') + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:7px; line-height:1.6;">'
         + '어둠을 따라갔다 다친 펫에게 씁니다. 깊이를 0 까지 내려야 삽니다.<br>'
         + '다친 채로 두 시간이 지나면 죽습니다 — 다만 주인이 상담실·선녀탕에 있으면'
-        + ' 곁에서 같이 낫습니다.</div>'
+        + ' 곁에서 같이 낫습니다.<br>'
+        + '<span style="color:#8d8578;">깊이 100 짜리 상처는 하나로 안 낫습니다.'
+        + ' 아래에서 개수를 골라 한 번에 사십시오.</span></div>'
+        + '<div style="display:flex; gap:5px; margin-bottom:6px;">'
+        + [1, 5, 10].map(function (n) {
+            const on = (qty === n);
+            return '<button class="game-btn" style="flex:1; margin:0; padding:6px;'
+                + ' font-size:10px;' + (on
+                    ? ' background:linear-gradient(145deg,#8a3a28,#4a1d12) !important;'
+                      + ' border-color:#e07a5f !important; color:#ffd9cd !important;'
+                    : ' background:#2a2a2a !important; border-color:#444 !important;'
+                      + ' color:#aaa !important;')
+                + '" onclick="petMedQty(' + n + ')">×' + n + '</button>';
+        }).join('')
+        + '</div>'
         + MED.map(function (x) {
             const have = Number(b[x[0]]) || 0;
             return '<div style="display:flex; align-items:center; gap:6px; padding:4px 0;'
@@ -732,22 +970,76 @@ function shopHtml() {
                 + esc(x[0]) + ' <span style="color:#6f685e;">깊이 −' + x[1] + '</span>'
                 + (have ? ' <span style="color:#9fd8ef;">·' + have + '개</span>' : '') + '</div>'
                 + '<button class="game-btn" style="flex:0 0 auto; margin:0; padding:6px 9px;'
-                + ' font-size:10px;" onclick="petMedBuy(\'' + esc(x[0]) + '\',1)">'
-                + x[2].toLocaleString() + ' P</button></div>';
+                + ' font-size:10px;" onclick="petMedBuy(\'' + esc(x[0]) + '\',' + qty + ')">'
+                + (qty > 1 ? '×' + qty + ' · ' : '')
+                + (x[2] * qty).toLocaleString() + ' P</button></div>';
         }).join('');
 }
 
+// ★ 맨 위에 붙인다
+//
+//   전에는 host.appendChild 였다. 망상 홈쇼핑은 환몽알 칸 + 돌봄 물품
+//   마흔 가지(여섯 묶음 아코디언)로 되어 있어서, 치료 물품은 그 밑에
+//   깔려 있었다. 다친 펫은 두 시간 안에 **완전히** 나아야 하는데 그걸
+//   찾으러 끝까지 내려가야 했다. 그래서 맨 앞으로 올린다.
 window.petMedPaint = function () {
     const host = document.querySelector('#dream-body') || document.querySelector('#pet-shop-body');
-    if (!host) return;
+    if (!host || !u_()) return;
     let el = document.querySelector('#pet-med-box');
-    if (!el) {
+    if (!el || el.parentNode !== host) {
+        if (el) try { el.remove(); } catch (e) { }
         el = document.createElement('div');
         el.id = 'pet-med-box';
-        host.appendChild(el);
+        el.style.cssText = 'margin-bottom:14px;';
     }
-    el.innerHTML = shopHtml();
+    if (el.parentNode !== host || host.firstChild !== el) {
+        host.insertBefore(el, host.firstChild);
+    }
+    const h = shopHtml();
+    if (el.innerHTML !== h) el.innerHTML = h;
 };
+
+// 돌봄 물품 칸이 다시 그려지면 우리 칸이 지워진다 (pet-shop 의 render 가
+// dream-body 를 통째로 쓴다). 그 안쪽 부름까지 다 잡을 수가 없으므로,
+// 상점이 열려 있는 동안 스스로 되돌려 놓는다. 띠의 남은 시간도 여기서 돈다.
+setInterval(function () {
+    try {
+        const panel = document.getElementById('shop-dream');
+        if (!panel || !panel.classList.contains('active')) return;
+        window.petMedPaint();
+    } catch (e) { }
+}, 1000);
+
+// ==========================================
+// 사택 맨 위의 다친 펫 띠
+// ==========================================
+//
+//   전에는 다친 펫으로 가는 길이 「내 방」 아래 한 줄짜리 기분 묘사 안에
+//   있는 작은 단추 하나뿐이었다. 그 줄은 방에 내놓은 펫이 있어야 뜨고,
+//   25초에 한 번만 다시 그려졌다. 두 시간짜리 상처를 그렇게 다룰 수는 없다.
+//   그래서 사택 첫 칸 **맨 위에** 같은 띠를 띄운다.
+window.petHurtPaint = function () {
+    const host = document.getElementById('house-main-body');
+    if (!host || !u_()) return;
+    const h = hurtBanner();
+    let el = document.getElementById('pet-hurt-top');
+    if (!h) { if (el) el.remove(); return; }
+    if (!el || el.parentNode !== host) {
+        if (el) try { el.remove(); } catch (e) { }
+        el = document.createElement('div');
+        el.id = 'pet-hurt-top';
+    }
+    if (host.firstChild !== el) host.insertBefore(el, host.firstChild);
+    if (el.innerHTML !== h) el.innerHTML = h;
+};
+
+setInterval(function () {
+    try {
+        const panel = document.getElementById('house-main');
+        if (!panel || !panel.classList.contains('active')) return;
+        window.petHurtPaint();
+    } catch (e) { }
+}, 1000);
 
 (function hookShop() {
     const iv = setInterval(function () {
@@ -791,8 +1083,21 @@ window.petHurtOpen = function () {
             + '<div style="font-size:11px; color:#e8d7b4;">' + esc(nick(k, u)) + '</div>'
             + '<div style="font-size:9.5px; color:' + (h.calm ? '#7fd4d4' : '#e07a5f') + ';">'
             + '깊이 ' + h.deep + ' · ' + left + '</div></div></div>'
+            + '<button class="game-btn" style="width:100%; margin:7px 0 0 0; padding:10px;'
+            + ' font-size:11px; background:linear-gradient(145deg,#8a3a28,#4a1d12) !important;'
+            + ' border-color:#e07a5f !important; color:#ffd9cd !important;"'
+            + ' onclick="petHealBuy(\'' + esc(k) + '\')">한 번에 낫게 한다'
+            + '<div style="font-size:9.5px; color:#ffb7a5; margin-top:3px; font-weight:normal;">'
+            + '가진 것을 먼저 쓰고, 모자란 몫만 '
+            + cheapest(Math.max(0, Number(h.deep) || 0)).cost.toLocaleString()
+            + ' P 에 사서 깊이 0 까지</div></button>'
             + (have.length
-                ? '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">'
+                ? '<button class="game-btn" style="width:100%; margin:5px 0 0 0; padding:8px;'
+                  + ' font-size:10px;" onclick="petHealFast(\'' + esc(k) + '\')">'
+                  + '가진 것으로만 낫게 한다</button>'
+                  + '<div style="font-size:9.5px; color:#8d8578; margin:7px 0 3px 0;">'
+                  + '하나씩 골라 쓴다</div>'
+                  + '<div style="display:flex; flex-wrap:wrap; gap:4px;">'
                   + have.map(function (x) {
                         return '<button class="game-btn" style="margin:0; padding:6px 8px;'
                             + ' font-size:10px;" onclick="petMedUse(\'' + esc(k) + '\',\''
@@ -800,7 +1105,7 @@ window.petHurtOpen = function () {
                     }).join('')
                   + '</div>'
                 : '<div style="font-size:10px; color:#8d8578; margin-top:6px;">'
-                  + '치료 물품이 없습니다. 망상 홈쇼핑에서 사십시오.</div>')
+                  + '가진 치료 물품이 없습니다. 위 단추를 누르면 사서 바로 씁니다.</div>')
             + '</div>';
     }).join('');
 
@@ -904,12 +1209,10 @@ window.petMoodPaint = function () {
         if (room && room.parentNode === host) host.insertBefore(el, room.nextSibling);
         else host.appendChild(el);
     }
-    const hurt = anyHurt(u_()).length;
+    // 다친 펫으로 가는 단추는 사택 맨 위의 띠(petHurtPaint)로 옮겼다.
+    // 25초에 한 번 그려지는 이 줄에 두 시간짜리 상처를 매달아 둘 수는 없다.
     el.innerHTML = '<b style="color:#9fd8ef;">' + esc(nick(m.id)) + '</b> — ' + esc(m.t)
-        + ' <span style="color:#5f594f;">(' + esc(m.why) + ')</span>'
-        + (hurt ? '<div style="margin-top:6px;"><button class="game-btn"'
-            + ' style="margin:0; padding:6px 10px; font-size:10px;"'
-            + ' onclick="petHurtOpen()">🩹 다친 펫 ' + hurt + '마리</button></div>' : '');
+        + ' <span style="color:#5f594f;">(' + esc(m.why) + ')</span>';
 };
 
 let lastMood = 0;
@@ -955,11 +1258,20 @@ window.petHurt = function () {
 };
 
 window.petMedShop = function () {
+    const b = medBag(u_());
     console.log('%c===== 펫 치료 물품 =====', 'color:#e07a5f; font-size:13px');
     console.table(MED.map(function (x) {
-        return { 물품: x[0], '깎는 깊이': x[1], 값: x[2].toLocaleString() + ' P' };
+        return { 물품: x[0], '깎는 깊이': x[1], 값: x[2].toLocaleString() + ' P',
+                 '한 점당': Math.round(x[2] / x[1]) + ' P',
+                 가진것: Number(b[x[0]]) || 0 };
     }));
     console.log('  깊이 100 짜리 상처는 하나로 안 낫습니다. 0 까지 내려야 삽니다.');
+    console.log('%c  깊이별 가장 싼 조합', 'color:#e07a5f');
+    console.table([40, 60, 80, 100].map(function (d) {
+        const c = cheapest(d);
+        return { 깊이: d, 값: c.cost.toLocaleString() + ' P', 조합: usedText(c.list) };
+    }));
+    console.log('  「한 번에 낫게」 단추가 이 조합을 그대로 씁니다.');
 };
 
 window.petHealAll = function () {
