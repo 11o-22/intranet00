@@ -113,8 +113,12 @@ const DOT = {
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
-    // 서 있을 때 0·2·4 로 나부끼는 장
+    // 서 있을 때 나부끼는 장 — 서 있기 줄의 0·2·4 칸을 돌아가며 쓴다
     FLAPS: ['suit', 'cape'],
+    // ★ 칸 수가 다른 장은 여기에 **쓸 칸을 적어** 둔다.
+    //   장옷은 서 있기 줄에 두 칸만 그려져 있어 0·2·4 로 돌리면
+    //   빈 칸에서 옷이 사라졌다 — 그래서 0·1 로 돈다.
+    FLAP_COLS: { robe: [0, 1] },
 };
 
 // 머리 — 이름은 제가 보고 붙인 것입니다. 파일명이 제 쪽으로 안 와서,
@@ -157,11 +161,7 @@ const DOT_SLOTS = [
         k: 'outer', n: '겉옷', items: [
             { i: '', n: '없음', over: [] },
             { i: 'suit', n: '정장', over: ['suit'], admin: true },
-            // ★ 서 있을 때 나부끼지 않습니다 — FLAPS 에 안 넣었습니다.
-            //   나부끼는 장은 서 있기 줄의 0·2·4 칸을 돌아가며 쓰는데
-            //   (아래 sprite 의 flaps), 이 옷은 서 있기 줄에 두 칸만
-            //   그려져 있어 2·4 칸이 비어 있습니다. 넣으면 깜빡입니다.
-            //   지금은 0번 칸에 가만히 서 있습니다.
+            // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '장옷', over: ['robe'], admin: true }
         ]
     },
@@ -221,6 +221,25 @@ function items(slot, user) {
     return slot.items.filter(function (it) { return allowed(it, user); });
 }
 function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
+
+// 서 있을 때 나부끼는 장 — 장마다 **쓸 칸이 다를 수 있다**
+//
+//   정장·망토는 서 있기 줄에 0·2·4 세 칸이 그려져 있다. 장옷은 두 칸뿐이라
+//   0·2·4 로 돌리면 2·4 에서 옷이 사라졌다. 그래서 장마다 제 칸 목록을 들고
+//   따로 돈다 (칸 수가 달라 한 시계로는 못 돌린다).
+function standCols(sheet) {
+    if (D.FLAP_COLS && D.FLAP_COLS[sheet]) return D.FLAP_COLS[sheet];
+    if (D.FLAPS.indexOf(sheet) >= 0) return [0, 2, 4];
+    return null;
+}
+function flapsOf(els, sheets) {
+    const out = [];
+    els.forEach(function (e, i) {
+        const c = standCols(sheets[i]);
+        if (c && c.length > 1) out.push({ el: e, cols: c, g: 0 });
+    });
+    return out;
+}
 function wrap(n, len) { return ((n % len) + len) % len; }
 function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i === id; }); return k < 0 ? 0 : k; }
 
@@ -300,15 +319,13 @@ function sprite(user, opt) {
             els.forEach(function (e) { put(e, f); });
         }, D.WALK));
     } else {
-        // 서기 — 몸·신발은 세워 두고, 옷자락은 0·2·4 로 나부끼고, 머리는 깜빡인다
-        let g = 0;
-        const flaps = els.filter(function (e, i) { return D.FLAPS.indexOf(sheets[i]) >= 0; });
-        if (flaps.length) {
+        // 서기 — 몸·신발은 세워 두고, 옷자락은 제 칸을 돌고, 머리는 깜빡인다
+        flapsOf(els, sheets).forEach(function (f) {
             box._dot.timers.push(setInterval(function () {
-                g = (g + 1) % 3;
-                flaps.forEach(function (e) { put(e, g * 2); });
+                f.g = (f.g + 1) % f.cols.length;
+                put(f.el, f.cols[f.g]);
             }, D.FLAP));
-        }
+        });
         const head = els[headAt];
         let f = 0;
         const blink = function () {
@@ -352,7 +369,7 @@ function actor(user, opt) {
     const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
     const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
-    const flaps = els.filter(function (e, i) { return D.FLAPS.indexOf(sheets[i]) >= 0; });
+    const flaps = flapsOf(els, sheets);
 
     let walking = false, dir = 1, timers = [];
     const put = function (el, col, row) {
@@ -371,13 +388,12 @@ function actor(user, opt) {
             }, D.WALK));
         } else {
             els.forEach(function (e) { put(e, 0, 1); });
-            if (flaps.length) {
-                let g = 0;
+            flaps.forEach(function (f) {
                 timers.push(setInterval(function () {
-                    g = (g + 1) % 3;
-                    flaps.forEach(function (e) { put(e, g * 2, 1); });
+                    f.g = (f.g + 1) % f.cols.length;
+                    put(f.el, f.cols[f.g], 1);
                 }, D.FLAP));
-            }
+            });
             let f = 0;
             const blink = function () {
                 put(head, f, 1);
