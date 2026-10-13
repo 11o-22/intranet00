@@ -123,14 +123,34 @@ function ruin(e, name) {
     e.ruin = R.n;
     e.last = P().now();
 
+    // ★ 오염도·포만도는 **큰길로** 올리고 내린다
+    //
+    //   전에는 u.pollution 을 여기서 바로 썼다. 그래서 상한 알만은
+    //   상담사 면제(kario0987) · 안대 · 오염 동결 · 오염 배수를 전부
+    //   건너뛰고 올랐다. 「탐사를 안 갔는데도 오염도가 올라가 있다」가
+    //   이 자리였다 — 동결을 걸어 두고 알을 상하게 하면 그대로 올랐다.
+    //
+    //   applyPollutionToUser 는 올리기만 하고 저장은 부른 쪽이 한다.
+    //   그래서 f.pollution 은 그대로 둔다. (poll-freeze.js 가 이 함수를
+    //   감싸고 있으므로 동결도 여기서 같이 걸린다)
     const f = { petEgg: 1 };
+    let pollUp = 0, satDown = 0;
     if (R.poll) {
-        u.pollution = Math.min(100, (Number(u.pollution) || 0) + R.poll);
-        f.pollution = 1;
+        const was = Number(u.pollution) || 0;
+        if (typeof applyPollutionToUser === 'function') applyPollutionToUser(u, R.poll);
+        else u.pollution = Math.min(100, was + R.poll);
+        pollUp = (Number(u.pollution) || 0) - was;
+        if (pollUp) f.pollution = 1;
     }
     if (R.sat) {
-        u.satiety = Math.max(0, (u.satiety != null ? Number(u.satiety) : 100) - R.sat);
-        f.satiety = 1;
+        // 포만도 유지 중(최음제 · 빨간 리본 · 세뇌 만년필)이면 안 깎인다
+        const held = (typeof satHeld === 'function') && satHeld(u);
+        if (!held) {
+            const was = (u.satiety != null ? Number(u.satiety) : 100);
+            u.satiety = Math.max(0, was - R.sat);
+            satDown = was - u.satiety;
+            if (satDown) f.satiety = 1;
+        }
     }
     try {
         if (typeof addTimedEffect === 'function') addTimedEffect(u, R.eff[0], R.eff[1], R.hrs);
@@ -160,8 +180,11 @@ function ruin(e, name) {
         + '<div style="font-size:10px; color:#e07a5f; line-height:1.7; border-top:1px solid #2a241c;'
         + ' padding-top:9px; margin-bottom:11px;">'
         + '[' + esc(R.eff[0]) + '] ' + esc(R.eff[1]) + ' (' + R.hrs + '시간)'
-        + (R.poll ? '<br>오염도 +' + R.poll + '%' : '')
-        + (R.sat ? '<br>포만감 −' + R.sat : '')
+        + (R.poll ? (pollUp ? '<br>오염도 +' + pollUp + '%'
+                            : '<br><span style="color:#81c784;">오염도는 막혔습니다 ('
+                              + '안대 · 동결 · 면제)</span>') : '')
+        + (R.sat ? (satDown ? '<br>포만도 −' + satDown
+                            : '<br><span style="color:#81c784;">포만도는 유지 중입니다</span>') : '')
         + '</div>'
         + '<button id="ph-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>')
         .querySelector('#ph-x').onclick = shut;
