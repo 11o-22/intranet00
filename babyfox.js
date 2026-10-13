@@ -675,16 +675,55 @@ function myParty() {
 //   방장 몫으로 읽어 준다. 두 꼴이 섞여 있어도(배포 직전에 만든 방) 둘 다
 //   읽는다.
 function kitsBy(p) {
-    const raw = (p && p.kits && typeof p.kits === 'object' && !Array.isArray(p.kits)) ? p.kits : {};
+    const raw = (p && p.kits && typeof p.kits === 'object') ? p.kits : {};
     const out = {}, old = {};
     Object.keys(raw).forEach(function (x) {
         if (BY_K[x]) { old[x] = raw[x]; return; }        // 예전 꼴 — 속성이 바로 왔다
-        if (raw[x] && typeof raw[x] === 'object') out[x] = raw[x];
+        const v = raw[x];
+        if (!v || typeof v !== 'object') return;
+        // ★ 파이어베이스는 열쇠가 전부 숫자면 **배열로** 돌려준다. 그때는 열쇠가
+        //   사번이 아니므로, 적어 둔 by 에서 사번을 되찾는다.
+        let code = x;
+        if (Array.isArray(raw)) {
+            const one = Object.keys(v).map(function (k) { return v[k]; })
+                .filter(function (z) { return z && z.by; })[0];
+            if (!one) return;
+            code = one.by;
+        }
+        out[code] = v;
     });
     if (Object.keys(old).length && p && p.leader) {
         out[p.leader] = Object.assign({}, old, out[p.leader] || {});
     }
     return out;
+}
+
+// ==========================================
+// ★ 방 화면을 그리면서 서버에 쓰지 않는다
+// ==========================================
+//
+//   index.html:1893 의 darkParties 는 **글이 한 자만 바뀌어도** 방 화면을
+//   다시 그린다. 그래서 그리는 김에 서버에 쓰면
+//
+//       그린다 → 쓴다 → 소식이 온다 → 다시 그린다 → 또 쓴다 → …
+//
+//   가 되어 멈추지 않는다. 방에 있는 **모두의** 화면이 같이 깜빡인다
+//   (분신 칸이 떴다 사라졌다 하고 글이 위아래로 튄다).
+//
+//   그래서 쓰기는 **내 쪽이 달라졌을 때만** 한다. 서버에 적힌 것과 견주지
+//   않는다 — 견주면 그 결과가 다시 쓰기를 부르기 때문이다. 내가 고르거나,
+//   차거나 벗거나, 방을 옮겼을 때만 한 번 쓴다.
+let syncSig = '';
+function mySig(p) {
+    const me = u_();
+    if (!me || !p || !p.id) return '';
+    return p.id + '|' + (wears(me) ? '1' : '0') + '|' + roomPicked(me).slice().sort().join(',');
+}
+function syncRoomKits(p) {
+    const s = mySig(p);
+    if (!s || s === syncSig) return;
+    syncSig = s;
+    setTimeout(function () { try { pushRoomKits(); } catch (e) { } }, 0);
 }
 
 function pushRoomKits() {
@@ -708,6 +747,7 @@ function pushRoomKits() {
     const all = kitsBy(p);
     if (n) all[me.code] = out; else delete all[me.code];
     p.kits = all;
+    syncSig = mySig(p);              // 올렸으니 다시 안 올린다
     return n;
 }
 window.kitPushRoom = pushRoomKits;
@@ -726,7 +766,9 @@ function roomKitList(p, me) {
     const mem = (p.members && typeof p.members === 'object') ? p.members : {};
     const all = kitsBy(p);
     const out = [];
-    if (me && mem[me.code] && wears(me)) {
+    // ★ 내 줄을 보이는 조건과 서버에 올리는 조건을 **똑같이** 둔다 (차고 있나).
+    //   둘이 어긋나면 「보이는 것」과 「적힌 것」이 영영 안 맞아 쓰기가 반복된다.
+    if (me && wears(me)) {
         roomPicked(me).forEach(function (k) {
             out.push({ k: k, nick: st(me, k).nick || BY_K[k].n, g: gradeOf(me, k),
                        by: me.code, byName: me.name, mine: true });
@@ -1554,6 +1596,7 @@ function openZoneList(body) {
                     const all = kitsBy(p);
                     delete all[me.code];
                     p.kits = all;
+                    syncSig = '';            // 다음에 들어가면 다시 올린다
                 }
             } catch (e) { }
             return _l.apply(this, arguments);
@@ -1725,28 +1768,27 @@ let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그�
                 if (me && p && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
                     z = DARK_ZONES[p.zone];
                     list = roomKitList(p, me);
-                    // 내 화면이 그릴 때, 방에 적힌 **내 몫**이 어긋나 있으면 다시 적는다
-                    // (방장만이 아니다 — 들어간 사람도 제 분신을 데려간다)
-                    {
-                        const a = list.filter(function (x) { return x.mine; })
-                                      .map(function (x) { return x.k; }).sort().join(',');
-                        const b = Object.keys(kitsBy(p)[me.code] || {}).sort().join(',');
-                        if (a !== b) pushRoomKits();
-                    }
+                    // 내 쪽이 달라졌을 때만 한 박자 뒤에 올린다 (그리면서 쓰지 않는다)
+                    syncRoomKits(p);
                     min0 = z.min;
                     low = Math.max(1, min0 - list.length);
                     show = !!(list.length || wears(me));
                     // ★ 여기서 최소 인원을 낮춘다 — canStart 가 이 값을 본다
                     //   (index.html:3365) 그래서 진입 단추가 열린다
                     if (list.length) z.min = low;
-                    if (show) drawing = { p: p, me: me, min0: min0, low: low, list: list };
                 }
             } catch (e) { }
 
             let out;
+            // ★ 그리는 도중에 또 그려도 안 어긋나게 — 앞의 것을 덮지 말고 되돌린다.
+            //   (방 화면이 그려지는 사이에 서버 소식이 들어와 다시 그려지면,
+            //    안쪽 그리기가 끝나며 drawing 을 비워 버려 바깥 그리기가 분신
+            //    칸을 빠뜨렸다. 깜빡임의 절반이 이것이었다.)
+            const prev = drawing;
+            if (show) drawing = { p: p, me: me, min0: min0, low: low, list: list };
             try { out = _r.apply(this, arguments); }
             finally {
-                drawing = null;
+                drawing = prev;
                 if (z && min0 != null) z.min = min0;
             }
 
