@@ -121,7 +121,8 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pj-bottom', 'shoes', 'pj-top', 'suit', 'robe', 'cape'],
+    Z: ['pj-bottom', 'shoes', 'han-shoes', 'pj-top', 'han-inner',
+        'suit', 'robe', 'han-duru', 'cape'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -163,7 +164,8 @@ const DOT_SLOTS = [
     {
         k: 'top', n: '상의', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true }
+            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true },
+            { i: 'han', n: '내의', over: ['han-inner'], admin: true }
         ]
     },
     {
@@ -177,13 +179,15 @@ const DOT_SLOTS = [
             { i: '', n: '없음', over: [] },
             { i: 'suit', n: '정장', over: ['suit'], admin: true },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
-            { i: 'robe', n: '장옷', over: ['robe'], admin: true }
+            { i: 'robe', n: '장옷', over: ['robe'], admin: true },
+            { i: 'duru', n: '두루마기', over: ['han-duru'], admin: true }
         ]
     },
     {
         k: 'shoes', n: '구두', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'shoes', n: '구두', over: ['shoes'], admin: true }
+            { i: 'shoes', n: '구두', over: ['shoes'], admin: true },
+            { i: 'han', n: '신', over: ['han-shoes'], admin: true }
         ]
     },
     {
@@ -197,7 +201,9 @@ const DOT_SLOTS = [
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
         k: 'acc', n: '악세', items: [
             { i: '', n: '없음', top: [] },
-            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] }
+            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] },
+            // 갓 — 머리 위에 얹는다. 걸을 때 갓끈이 흔들린다 (두 장을 번갈아 쓴다)
+            { i: 'gat', n: '갓', top: ['han-gat'], admin: true }
         ]
     }
 ];
