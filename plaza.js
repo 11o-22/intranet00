@@ -5,16 +5,19 @@
 //
 // ■ 어떻게 생겼나
 //
-//   단말 종료 옆 「🚶 광장」을 누르면 **따로 뜨는 세로 창**이 화면을 덮는다.
+//   단말 종료 옆 「🚶 광장」을 누르면 **화면을 통째로 덮는 세로 창**이 뜬다.
 //   탭 안이 아니라 덮개(오버레이)로 둔 까닭은, 걸어 다니는 동안 사내 화면이
-//   끼어들지 않게 하기 위해서다. 창은 위에서부터
+//   끼어들지 않게 하기 위해서다.
 //
-//       머리띠 (어디인지 · 닫기)
-//       방 화면  ← 카메라가 사람을 따라다닌다 (가로·세로 둘 다)
-//       걷기 단추 (← ↑ → ↓)
-//       주고받은 말  ← 안에서 바로 친다
+//   방 그림이 화면을 꽉 채우고(검은 띠 없음), 나머지는 그 **위에 떠 있다.**
 //
-//   로 쌓인다.
+//       위   📍 어디인지 · ☰ 메뉴 · ✕ 나간다   ← 아이폰 상태막대만큼 내려 앉는다
+//       가운데                                  ← 손가락으로 아무 데나 짚어 끌면 걷는다
+//       아래 🎒 가방 · 채팅 바                   ← 바를 누르면 말 창이 올라온다
+//
+//   방마다 시설 입구(어둠 탐사 · 우주 쇼핑몰 · 유쾌 판매소 …)가 서 있고,
+//   누르면 그 시설로 들어간다. 어느 방에 무엇을 둘지는 아래 ROOMS 의
+//   spots 에, ☰ 에 무엇을 넣을지는 MENU 에 적는다.
 //
 // ■ 방 여섯과 길
 //
@@ -90,25 +93,59 @@ const PLAZA = {
 
     // 방 — w·h 는 그림 크기, floor 는 발이 닿을 수 있는 y 띠, k 는 사람 배율
     //      up 은 올라가는 자리 { to, x: [왼, 오] }
+    //      spots 는 그 방에 선 시설 입구 { x, n, i, tab, sub } 또는 { x, n, i, fn }
     ROOMS: {
         oskari: { n: '이소-오스카리', img: 'oskari.webp', w: 1690, h: 1135,
                   floor: [960, 1120], k: 0.75,
-                  right: 'street', up: { to: 'stop', x: [1420, 1660] } },
+                  right: 'street', up: { to: 'stop', x: [1420, 1660] },
+                  spots: [ { x: 430,  n: '공용시설',   i: '🎲', tab: 'tab-public' },
+                           { x: 980,  n: '장기 은행',  i: '🏦', tab: 'tab-vip' } ] },
         street: { n: '아이스크림 거리', img: 'street.webp', w: 735, h: 537,
                   floor: [470, 525], k: 0.75,
-                  left: 'oskari', right: 'hunter' },
+                  left: 'oskari', right: 'hunter',
+                  spots: [ { x: 190, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' },
+                           { x: 545, n: '행복 식당',   i: '🍚', tab: 'tab-shop', sub: 'shop-food' } ] },
         hunter: { n: '헌터 상점가', img: 'hunter.webp', w: 735, h: 430,
                   floor: [372, 424], k: 0.75,
-                  left: 'street', right: 'cross' },
+                  left: 'street', right: 'cross',
+                  spots: [ { x: 165, n: '우주 쇼핑몰', i: '🛸', tab: 'tab-shop', sub: 'shop-alien' },
+                           { x: 400, n: '밀실 거래',   i: '🤝', tab: 'tab-shop', sub: 'shop-p2p' },
+                           { x: 630, n: '???',         i: '❓', tab: 'tab-shop', sub: 'shop-unknown' } ] },
         cross:  { n: '횡단보도', img: 'cross.webp', w: 736, h: 736,
                   floor: [600, 726], k: 0.75,
-                  left: 'hunter', up: { to: 'stairs', x: [300, 460] } },
+                  left: 'hunter', up: { to: 'stairs', x: [300, 460] },
+                  spots: [ { x: 600, n: '어둠 탐사', i: '🌑', tab: 'tab-darkness', sub: 'dark-main' } ] },
         stop:   { n: '숲 정류장', img: 'stop.webp', w: 735, h: 490,
-                  floor: [440, 480], k: 0.75 },
+                  floor: [440, 480], k: 0.75,
+                  spots: [ { x: 360, n: '사택',  i: '🏠', tab: 'tab-house', sub: 'house-main' },
+                           { x: 580, n: '펫 돌보기', i: '🐾', fn: 'petOpen' } ] },
         stairs: { n: '하늘 계단', img: 'stairs.webp', w: 735, h: 856,
-                  floor: [770, 848], k: 0.75 }
+                  floor: [770, 848], k: 0.75,
+                  spots: [ { x: 380, n: '망상 홈쇼핑', i: '📺', tab: 'tab-shop', sub: 'shop-dream' } ] }
     },
-    START: 'street'
+    START: 'street',
+
+    // ── 오른쪽 위 ☰ 에 들어가는 것들. 없는 것은 저절로 빠진다.
+    MENU: [
+        { n: '사원증',     i: '🪪', tab: 'tab-record',   sub: 'rec-badge' },
+        { n: '소지품',     i: '🎒', tab: 'tab-record',   sub: 'rec-inventory' },
+        { n: '기록',       i: '📄', tab: 'tab-record',   sub: 'rec-history' },
+        { n: '익명 편지',  i: '✉️', tab: 'tab-record',   sub: 'rec-letters' },
+        { n: '칭호',       i: '🏅', tab: 'tab-record',   sub: 'rec-titles' },
+        { n: '선물함',     i: '🎁', fn: 'openGiftBox' },
+        { n: '공용시설',   i: '🎲', tab: 'tab-public' },
+        { n: '장기 은행',  i: '🏦', tab: 'tab-vip' },
+        { n: '유쾌 판매소', i: '🛒', tab: 'tab-shop',    sub: 'shop-regular' },
+        { n: '밀실 거래',  i: '🤝', tab: 'tab-shop',     sub: 'shop-p2p' },
+        { n: '우주 쇼핑몰', i: '🛸', tab: 'tab-shop',    sub: 'shop-alien' },
+        { n: '망상 홈쇼핑', i: '📺', tab: 'tab-shop',    sub: 'shop-dream' },
+        { n: '어둠 탐사',  i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
+        { n: '파티',       i: '🚩', tab: 'tab-darkness', sub: 'dark-party' },
+        { n: '사택',       i: '🏠', tab: 'tab-house',    sub: 'house-main' },
+        { n: '옷장',       i: '👔', tab: 'tab-house',    sub: 'house-closet' },
+        { n: '펫 돌보기',  i: '🐾', fn: 'petOpen' },
+        { n: '전체 대화',  i: '💬', fn: 'openAllChat' }
+    ]
 };
 
 (function plaza() {
@@ -145,6 +182,39 @@ let run = null;          // 지금 돌고 있는 광장
 let chatRef = null;
 
 // ==========================================
+// 아이폰 — 시계·배터리 밑에 안 깔리게
+// ==========================================
+//
+//   홈 화면 앱으로 띄우면 화면이 **상태 표시줄 밑까지** 올라온다
+//   (index.html 의 viewport-fit=cover · black-translucent). 그래서 위 띠를
+//   그만큼 내려 앉혀야 「나간다」가 배터리에 안 가린다.
+//
+//   env() 를 CSS 에 바로 쓰면 안 걸리는 자리를 이 저장소가 이미 한 번
+//   겪었다 (pwa.js 의 stickSafe 참고). 그래서 **재서 값으로 박는다** —
+//   작은 자를 하나 두고 그 여백을 읽어 변수에 넣는다.
+function safeIns() {
+    let r = document.getElementById('plaza-ruler');
+    if (!r) {
+        r = document.createElement('div');
+        r.id = 'plaza-ruler';
+        r.setAttribute('aria-hidden', 'true');
+        r.style.cssText = 'position:fixed;left:0;top:0;width:0;visibility:hidden;'
+            + 'pointer-events:none;z-index:-1;'
+            + 'padding-top:env(safe-area-inset-top);'
+            + 'padding-bottom:env(safe-area-inset-bottom);';
+        (document.body || document.documentElement).appendChild(r);
+    }
+    const c = getComputedStyle(r);
+    return { t: parseFloat(c.paddingTop) || 0, b: parseFloat(c.paddingBottom) || 0 };
+}
+function stampSafe(ov) {
+    if (!ov) return;
+    const s = safeIns();
+    ov.style.setProperty('--plaza-safe-top', s.t + 'px');
+    ov.style.setProperty('--plaza-safe-bot', s.b + 'px');
+}
+
+// ==========================================
 // 모양새
 // ==========================================
 (function css() {
@@ -152,19 +222,36 @@ let chatRef = null;
     const s = document.createElement('style');
     s.id = 'plaza-css';
     s.textContent = [
-        '#plaza-ov{position:fixed;inset:0;z-index:999995;display:flex;flex-direction:column;',
+        // ── 틀 : 방 화면이 **화면을 통째로** 쓴다. 나머지는 그 위에 띄운다.
+        '#plaza-ov{position:fixed;inset:0;z-index:999995;overflow:hidden;',
         '  background:#07070a;color:#e8e2d6;font-family:inherit;}',
-        '#plaza-top{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 11px;',
-        '  background:linear-gradient(180deg,#14141b,#0d0d12);border-bottom:1px solid #2a2a36;}',
-        '#plaza-top .ttl{flex:1;min-width:0;font-size:12px;font-weight:bold;color:#cfc6b4;',
-        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-        '#plaza-top .x{flex:0 0 auto;padding:7px 12px;font-size:12px;border-radius:6px;',
-        '  background:#2a2a33;border:1px solid #44444f;color:#ddd;cursor:pointer;}',
-        '#plaza-view{flex:1 1 auto;position:relative;overflow:hidden;background:#0b0b0d;',
-        '  touch-action:manipulation;user-select:none;-webkit-user-select:none;cursor:crosshair;',
-        '  min-height:180px;}',
+        // ★ z-index 를 박아 **쌓임 칸**을 만든다. 안 그러면 사람에게 매긴
+        //   높은 z-index(아래에 선 사람이 앞)가 밖으로 새어 나와, 아래에서
+        //   올라오는 창 위로 사람이 비친다.
+        '#plaza-view{position:absolute;inset:0;overflow:hidden;background:#07070a;z-index:1;',
+        '  touch-action:none;user-select:none;-webkit-user-select:none;}',
         '#plaza-room{position:absolute;left:0;top:0;image-rendering:pixelated;',
         '  image-rendering:crisp-edges;background-repeat:no-repeat;}',
+        // ── 위 띠 : 아이폰 상태막대를 피해 내려 앉힌다 (safe-area)
+        '#plaza-top{position:absolute;left:0;right:0;top:0;z-index:20;display:flex;',
+        '  align-items:flex-start;gap:8px;pointer-events:none;',
+        '  padding:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 10px) 12px 26px 12px;',
+        '  background:linear-gradient(180deg,rgba(6,6,10,.82),rgba(6,6,10,.35) 55%,rgba(6,6,10,0));}',
+        '#plaza-top > *{pointer-events:auto;}',
+        '#plaza-where{min-width:0;max-width:58%;display:flex;align-items:center;gap:6px;',
+        '  padding:8px 13px;border-radius:999px;font-size:12.5px;font-weight:bold;color:#f1e7d6;',
+        '  background:rgba(14,14,20,.62);border:1px solid rgba(190,170,120,.3);',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);',
+        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '#plaza-top .sp{flex:1;}',
+        '.plaza-ico{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:1px solid rgba(190,170,120,.3);',
+        '  background:rgba(14,14,20,.62);color:#f1e7d6;font-size:17px;line-height:1;cursor:pointer;',
+        '  display:flex;align-items:center;justify-content:center;',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
+        '.plaza-ico:active{background:rgba(40,36,28,.85);}',
+        '#plaza-who{position:absolute;left:12px;right:12px;z-index:19;text-align:center;',
+        '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 60px);',
+        '  font-size:10.5px;color:#b9b0a0;text-shadow:0 1px 3px #000;pointer-events:none;}',
         '.plaza-one{position:absolute;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
         '.plaza-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;',
@@ -179,39 +266,93 @@ let chatRef = null;
         '.plaza-say:after{content:"";position:absolute;left:50%;top:100%;margin-left:-5px;',
         '  border:5px solid transparent;border-top-color:#f4efe2;}',
         // 나가는 길 표시
-        '.plaza-exit{position:absolute;pointer-events:none;color:#ffe9b0;font-size:15px;',
+        '.plaza-exit{position:absolute;pointer-events:none;color:#ffe9b0;font-size:17px;',
         '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s infinite;}',
         '@keyframes plazaBob{0%,100%{opacity:.45}50%{opacity:1}}',
-        // 걷기 단추 (손가락이 아닌 자리 — 자판이 있는 쪽)
-        '#plaza-pad{flex:0 0 auto;display:flex;gap:6px;justify-content:center;padding:8px 10px;',
-        '  background:#0d0d12;border-top:1px solid #23232e;}',
-        '#plaza-pad button{width:52px;padding:11px 0;font-size:15px;border-radius:7px;',
-        '  background:#22222c;border:1px solid #3c3c48;color:#ded7c8;cursor:pointer;}',
-        '#plaza-pad button:active{background:#33333f;}',
-        // 조이스틱 — 손가락으로 쥐는 자리. 방 위에 겹쳐 띄워 화면을 안 갉아먹는다.
-        '#plaza-stick{position:absolute;left:16px;bottom:16px;width:104px;height:104px;',
-        '  border-radius:50%;z-index:6;touch-action:none;opacity:.6;',
-        '  transition:opacity .14s;-webkit-tap-highlight-color:transparent;',
-        '  background:radial-gradient(circle at 50% 42%,rgba(26,26,36,.62),rgba(8,8,12,.78));',
-        '  border:1px solid rgba(170,158,126,.45);box-shadow:0 2px 12px rgba(0,0,0,.55);}',
-        '#plaza-stick.on{opacity:.95;}',
-        '#plaza-stick .ring{position:absolute;inset:15px;border-radius:50%;',
-        '  border:1px dashed rgba(190,178,146,.2);pointer-events:none;}',
-        '#plaza-knob{position:absolute;left:50%;top:50%;width:46px;height:46px;',
-        '  margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;',
-        '  background:radial-gradient(circle at 36% 32%,#7b7160,#2e2c36);',
-        '  border:1px solid rgba(226,214,180,.55);box-shadow:0 2px 7px rgba(0,0,0,.6);}',
-        // 말
-        '#plaza-chat{flex:0 0 auto;background:#0b0b10;border-top:1px solid #23232e;}',
-        '#plaza-log{height:92px;overflow-y:auto;padding:7px 10px;font-size:11px;line-height:1.65;}',
+        // ── 시설 입구
+        '.plaza-spot{position:absolute;z-index:300;transform:translate(-50%,-100%);',
+        '  display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}',
+        '.plaza-spot .b{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;',
+        '  justify-content:center;font-size:21px;background:rgba(18,14,10,.72);',
+        '  border:1px solid rgba(217,160,90,.65);box-shadow:0 3px 12px rgba(0,0,0,.55),',
+        '  inset 0 0 12px rgba(217,160,90,.16);animation:plazaFloat 2.6s ease-in-out infinite;}',
+        '.plaza-spot .t{font-size:10px;font-weight:bold;color:#ffe9bd;white-space:nowrap;',
+        '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
+        '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
+        '@keyframes plazaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
+        // 걷기 단추 (자판이 있는 기계에서만 — 손가락 쪽은 화면을 끌어 걷는다)
+        '#plaza-pad{position:absolute;left:0;right:0;z-index:20;display:flex;gap:6px;',
+        '  justify-content:center;bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
+        '#plaza-pad button{width:50px;padding:10px 0;font-size:15px;border-radius:10px;',
+        '  background:rgba(18,18,26,.66);border:1px solid rgba(170,158,126,.3);color:#ded7c8;',
+        '  cursor:pointer;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}',
+        '#plaza-pad button:active{background:rgba(52,46,34,.9);}',
+        // ── 아래 띠 : 가방 · 채팅 바
+        '#plaza-bottom{position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;',
+        '  align-items:center;gap:9px;pointer-events:none;',
+        '  padding:30px 12px calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 12px) 12px;',
+        '  background:linear-gradient(0deg,rgba(6,6,10,.85),rgba(6,6,10,.3) 60%,rgba(6,6,10,0));}',
+        '#plaza-bottom > *{pointer-events:auto;}',
+        '#plaza-bar{flex:1;min-width:0;display:flex;align-items:center;gap:8px;cursor:pointer;',
+        '  padding:12px 15px;border-radius:999px;font-size:12.5px;color:#9a9284;',
+        '  background:rgba(14,14,20,.68);border:1px solid rgba(190,170,120,.26);',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);',
+        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '#plaza-bar:active{background:rgba(30,28,22,.85);}',
+        '#plaza-bar .last{color:#d8cfbe;}',
+        '#plaza-bar .dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#ff7b6b;',
+        '  box-shadow:0 0 7px #ff7b6b;display:none;}',
+        '#plaza-bar.new .dot{display:block;}',
+        // ── 시트 (아래에서 올라오는 창)
+        '#plaza-sheet{position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;',
+        '  justify-content:flex-end;background:rgba(4,4,8,.6);}',
+        '.plaza-card{background:linear-gradient(180deg,#15151f,#0a0a10);',
+        '  border:1px solid #2b2b38;border-bottom:0;border-radius:20px 20px 0 0;',
+        '  padding:12px 14px calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 14px) 14px;',
+        '  max-height:82dvh;display:flex;flex-direction:column;',
+        '  box-shadow:0 -10px 34px rgba(0,0,0,.6);animation:plazaUp .18s ease-out;}',
+        '@keyframes plazaUp{from{transform:translateY(16px);opacity:.4}to{transform:none;opacity:1}}',
+        '.plaza-card .grip{width:38px;height:4px;border-radius:2px;background:#39394a;',
+        '  margin:0 auto 10px auto;flex:0 0 auto;}',
+        '.plaza-card h4{margin:0 0 10px 0;font-size:12.5px;color:#e8dcc6;font-weight:bold;}',
+        // 메뉴 격자
+        '.plaza-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;overflow-y:auto;}',
+        '.plaza-grid button{display:flex;flex-direction:column;align-items:center;gap:5px;',
+        '  padding:12px 4px;border-radius:13px;background:rgba(255,255,255,.035);',
+        '  border:1px solid #2b2b38;color:#ded5c4;font-size:10.5px;font-family:inherit;cursor:pointer;}',
+        '.plaza-grid button:active{background:rgba(217,160,90,.14);border-color:#8a6a2a;}',
+        '.plaza-grid .e{font-size:21px;line-height:1;}',
+        // 말 창
+        '#plaza-log{flex:1 1 auto;min-height:120px;max-height:46dvh;overflow-y:auto;padding:2px 2px 8px 2px;',
+        '  font-size:12px;line-height:1.7;}',
         '#plaza-log .who{color:#9fd8ef;font-weight:bold;}',
-        '#plaza-log .sys{color:#8d8578;}',
-        '#plaza-send{display:flex;gap:6px;padding:7px 10px 10px 10px;}',
-        '#plaza-in{flex:1;min-width:0;padding:10px;font-size:13px;border-radius:7px;',
-        '  background:#17171e;border:1px solid #3a3a46;color:#e8e2d6;}',
-        '#plaza-send button{flex:0 0 auto;padding:10px 14px;font-size:12px;border-radius:7px;',
-        '  background:#3a2f1c;border:1px solid #8a6a2a;color:#ffe9bd;cursor:pointer;}',
-        '#plaza-who{font-size:10px;color:#8d8578;padding:0 11px 7px 11px;text-align:center;}'
+        '#plaza-log .sys{color:#7d7568;}',
+        '#plaza-send{display:flex;gap:7px;padding-top:8px;flex:0 0 auto;}',
+        '#plaza-in{flex:1;min-width:0;padding:12px;font-size:13px;border-radius:11px;',
+        '  background:#16161f;border:1px solid #33333f;color:#e8e2d6;}',
+        '#plaza-send button{flex:0 0 auto;padding:12px 16px;font-size:12px;border-radius:11px;',
+        '  background:linear-gradient(145deg,#4a3a1e,#2a2112);border:1px solid #8a6a2a;',
+        '  color:#ffe9bd;cursor:pointer;font-family:inherit;}',
+        // 가방
+        '.plaza-tabs{display:flex;gap:6px;flex:0 0 auto;margin-bottom:10px;}',
+        '.plaza-tabs button{flex:1;padding:9px 0;font-size:11.5px;border-radius:10px;cursor:pointer;',
+        '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#a79e8f;font-family:inherit;}',
+        '.plaza-tabs button.on{background:rgba(217,160,90,.16);border-color:#8a6a2a;color:#ffe9bd;}',
+        '#plaza-bagbody{overflow-y:auto;}',
+        '.plaza-stage{display:flex;justify-content:center;padding:4px 0 10px 0;',
+        '  background:radial-gradient(ellipse at 50% 92%,rgba(217,160,90,.13),rgba(0,0,0,0) 62%);}',
+        '.plaza-row{display:flex;align-items:center;gap:8px;margin-top:7px;}',
+        '.plaza-row .lab{flex:0 0 42px;font-size:10.5px;color:#8d8578;}',
+        '.plaza-row .pick{flex:1;display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}',
+        '.plaza-row .pick button{flex:0 0 auto;padding:8px 12px;font-size:11px;border-radius:9px;',
+        '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#b5ab9a;',
+        '  white-space:nowrap;cursor:pointer;font-family:inherit;}',
+        '.plaza-row .pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
+        '.plaza-inv{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}',
+        '.plaza-inv div{padding:10px 11px;border-radius:10px;font-size:11.5px;color:#ded5c4;',
+        '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
+        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
@@ -238,10 +379,14 @@ function makeOne(user, label, k) {
     return { wrap: wrap, actor: a, tag: tag, w: w, h: h, bub: null };
 }
 
+// 방 안의 자리(x·y)는 **그림 원래 크기**로 센다. 화면에 놓을 때만 배로 늘린다.
+function zz() { return (run && run.z) || 1; }
+
 function putOne(one, x, y) {
-    one.wrap.style.left = Math.round(x - one.w / 2) + 'px';
-    one.wrap.style.top = Math.round(y - one.h) + 'px';     // 칸 아래끝이 발이다
-    one.wrap.style.zIndex = String(100 + Math.round(y));   // 아래에 있는 사람이 앞
+    const z = zz();
+    one.wrap.style.left = Math.round(x * z - one.w / 2) + 'px';
+    one.wrap.style.top = Math.round(y * z - one.h) + 'px';   // 칸 아래끝이 발이다
+    one.wrap.style.zIndex = String(100 + Math.round(y));     // 아래에 있는 사람이 앞
 }
 
 function bubble(one, text) {
@@ -259,35 +404,108 @@ function bubble(one, text) {
 // ==========================================
 function roomOf() { return R[run.room]; }
 
+// 방 그림을 **화면에 꽉 차게** 늘린다.
+//
+//   전에는 그림을 원래 크기로 두어, 세로가 짧은 방은 위아래에 검은 띠가 남았다.
+//   화면을 덮을 만큼(cover) 늘리되 **4분의 1 단위로 끊어** 도트가 덜 뭉개지게 한다.
+//   사람 크기는 그대로 둔다 — 배경만 가까워지는 셈이다.
+function zoomOf(r) {
+    const v = run && run.view;
+    const vw = (v && v.clientWidth) || 430;
+    const vh = (v && v.clientHeight) || 760;
+    const need = Math.max(vw / r.w, vh / r.h);
+    return Math.max(1, Math.ceil(need * 4) / 4);
+}
+
 function paintRoom() {
     const r = roomOf();
-    run.el.style.width = r.w + 'px';
-    run.el.style.height = r.h + 'px';
+    run.z = zoomOf(r);
+    const w = Math.round(r.w * run.z), h = Math.round(r.h * run.z);
+    run.el.style.width = w + 'px';
+    run.el.style.height = h + 'px';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
-    run.el.style.backgroundSize = r.w + 'px ' + r.h + 'px';
-    const t = document.getElementById('plaza-title');
-    if (t) t.innerText = '🚶 광장 — ' + r.n;
+    run.el.style.backgroundSize = w + 'px ' + h + 'px';
+    const t = document.getElementById('plaza-where');
+    if (t) t.innerHTML = '<span style="opacity:.8">📍</span> ' + esc(r.n);
     paintExits();
+    paintSpots();
 }
 
 // 나갈 수 있는 쪽에 화살표를 띄운다
 function paintExits() {
-    const r = roomOf();
+    const r = roomOf(), z = zz();
     Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-exit'),
         function (e) { e.remove(); });
-    const mk = function (txt, css) {
+    const mk = function (txt, x, y) {
         const e = document.createElement('div');
         e.className = 'plaza-exit';
         e.innerText = txt;
-        e.style.cssText = css;
+        e.style.left = Math.round(x) + 'px';
+        e.style.top = Math.round(y) + 'px';
         run.el.appendChild(e);
     };
-    const fy = (r.floor[0] + r.floor[1]) / 2;
-    if (r.left)  mk('◀', 'left:6px;top:' + Math.round(fy - 60) + 'px;');
-    if (r.right) mk('▶', 'left:' + (r.w - 20) + 'px;top:' + Math.round(fy - 60) + 'px;');
-    if (r.up)    mk('▲', 'left:' + Math.round((r.up.x[0] + r.up.x[1]) / 2 - 7) + 'px;top:'
-                        + Math.round(r.floor[0] - 86) + 'px;');
-    if (r.down)  mk('▼', 'left:10px;top:' + Math.round(r.floor[1] - 18) + 'px;');
+    const fy = (r.floor[0] + r.floor[1]) / 2 * z;
+    if (r.left)  mk('◀', 8, fy - 70);
+    if (r.right) mk('▶', r.w * z - 24, fy - 70);
+    if (r.up)    mk('▲', (r.up.x[0] + r.up.x[1]) / 2 * z - 8, r.floor[0] * z - 96);
+    if (r.down)  mk('▼', 12, r.floor[1] * z - 22);
+}
+
+// ==========================================
+// 시설 입구 — 방마다 선 자리
+// ==========================================
+//
+//   누르면 그 시설로 들어간다 (광장은 닫힌다). 없는 시설은 아예 안 세운다.
+function spotOk(s) {
+    if (s.fn) return typeof window[s.fn] === 'function';
+    if (s.tab && !document.getElementById(s.tab)) return false;
+    if (s.sub && !document.getElementById(s.sub)) return false;
+    return true;
+}
+
+function paintSpots() {
+    const r = roomOf(), z = zz();
+    Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-spot'),
+        function (e) { e.remove(); });
+    (r.spots || []).forEach(function (s) {
+        if (!spotOk(s)) return;
+        const e = document.createElement('div');
+        e.className = 'plaza-spot';
+        e.style.left = Math.round(s.x * z) + 'px';
+        e.style.top = Math.round((s.y != null ? s.y : r.floor[0] - 10) * z) + 'px';
+        e.innerHTML = '<div class="b">' + s.i + '</div><div class="t">' + esc(s.n) + '</div>';
+        e.addEventListener('pointerdown', function (ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            goApp(s);
+        });
+        run.el.appendChild(e);
+    });
+}
+
+// 시설·메뉴로 건너간다 — 광장을 닫고 그 탭을 누른 것과 같게 한다
+function goApp(s) {
+    try {
+        shut();
+        if (s.fn) {
+            const f = window[s.fn];
+            if (typeof f === 'function') setTimeout(function () { try { f(); } catch (e) { } }, 40);
+            return;
+        }
+        const hit = function (sel, key) {
+            return Array.prototype.filter.call(document.querySelectorAll(sel), function (e) {
+                return (e.getAttribute('onclick') || '').indexOf("'" + key + "'") >= 0;
+            })[0];
+        };
+        const t = s.tab && hit('.tabs-grid .tab', s.tab);
+        if (t) t.click();
+        else if (s.tab && typeof switchTabById === 'function') switchTabById(s.tab);
+        if (s.sub) {
+            setTimeout(function () {
+                const b = hit('.sub-tab', s.sub);
+                if (b) b.click();
+            }, 40);
+        }
+    } catch (e) { }
 }
 
 // 방을 옮긴다 — way 는 **내가 걸어간 쪽** ('left'|'right'|'up'|'down'|null)
@@ -327,13 +545,15 @@ function goRoom(key, way) {
     run.tx = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
 
+    // ★ 방을 먼저 그린다 — 그래야 늘린 배(run.z)가 정해져 사람이 제자리에 선다
+    paintRoom();
+
     // 사람을 다시 만든다 (배율이 방마다 다르다)
     const u = u_();
     run.me = makeOne(u, nameOf(u), run.k);
     run.el.appendChild(run.me.wrap);
     putOne(run.me, run.x, run.y);
 
-    paintRoom();
     watchRoom();
     watchChat();
     run.sx = run.sy = -9999; run.sent = 0;
@@ -442,13 +662,14 @@ function tick(ts) {
 
 // 카메라 — 방이 창보다 크면 사람을 따라 가로·세로로 민다
 function camera(snap) {
-    const r = roomOf();
-    const vw = run.view.clientWidth || r.w;
-    const vh = run.view.clientHeight || r.h;
+    const r = roomOf(), z = zz();
+    const rw = r.w * z, rh = r.h * z;
+    const vw = run.view.clientWidth || rw;
+    const vh = run.view.clientHeight || rh;
     // 방이 창보다 작으면 **가운데로** 둔다 (왼위로 붙여 두면 검은 띠가 남는다)
-    let cx = -(vw - r.w) / 2, cy = -(vh - r.h) / 2;
-    if (r.w > vw) cx = Math.max(0, Math.min(r.w - vw, run.x - vw / 2));
-    if (r.h > vh) cy = Math.max(0, Math.min(r.h - vh, run.y - vh * 0.62));
+    let cx = -(vw - rw) / 2, cy = -(vh - rh) / 2;
+    if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
+    if (rh > vh) cy = Math.max(0, Math.min(rh - vh, run.y * z - vh * 0.62));
     if (snap) { run.cx = cx; run.cy = cy; }
     else {
         run.cx += (cx - run.cx) * 0.18;      // 조금 늦게 따라와 부드럽다
@@ -570,25 +791,44 @@ function watchChat() {
     });
 }
 
-function addLine(who, text, code) {
-    const log = document.getElementById('plaza-log'); if (!log) return;
-    const u = u_();
-    const d = document.createElement('div');
-    d.innerHTML = '<span class="who">' + esc(who) + '</span> ' + esc(text);
-    log.appendChild(d);
-    while (log.children.length > P.CHAT_KEEP + 10) log.removeChild(log.firstChild);
+// 글줄은 **들고 있다가** 창을 열 때 그린다 (창이 닫혀 있어도 안 잃는다)
+function pushLine(o) {
+    if (!run) return;
+    if (!run.lines) run.lines = [];
+    run.lines.push(o);
+    while (run.lines.length > P.CHAT_KEEP + 10) run.lines.shift();
+    paintLog();
+    paintBar(o);
+}
+
+function paintLog() {
+    const log = document.getElementById('plaza-log');
+    if (!log || !run) return;
+    log.innerHTML = (run.lines || []).map(function (o) {
+        return o.sys ? '<div class="sys">· ' + esc(o.t) + '</div>'
+                     : '<div><span class="who">' + esc(o.n) + '</span> ' + esc(o.t) + '</div>';
+    }).join('');
     log.scrollTop = log.scrollHeight;
-    // 내 말은 보낼 때 이미 띄웠다
-    if (u && code === u.code) return;
+}
+
+// 아래 채팅 바에 마지막 말을 비춘다 — 창을 안 열어도 뭐가 오가는지 보인다
+function paintBar(o) {
+    const bar = document.getElementById('plaza-bar');
+    if (!bar || !o) return;
+    const t = bar.querySelector('.txt');
+    if (t) {
+        t.innerHTML = o.sys ? '<span style="opacity:.65">· ' + esc(o.t) + '</span>'
+            : '<span class="last"><b style="color:#9fd8ef">' + esc(o.n) + '</b> ' + esc(o.t) + '</span>';
+    }
+    if (!o.sys && !sheetOpen('chat')) bar.classList.add('new');     // 사람 말에만 빨간 점
+}
+
+function addLine(who, text, code) {
+    pushLine({ n: who, t: text, c: code });
 }
 
 function sysLine(text) {
-    const log = document.getElementById('plaza-log'); if (!log) return;
-    const d = document.createElement('div');
-    d.className = 'sys';
-    d.innerText = '· ' + text;
-    log.appendChild(d);
-    log.scrollTop = log.scrollHeight;
+    pushLine({ sys: 1, t: text });
 }
 
 function say(text) {
@@ -608,6 +848,195 @@ function say(text) {
 window.plazaSay = say;
 
 // ==========================================
+// 아래에서 올라오는 창 (메뉴 · 가방 · 말)
+// ==========================================
+function sheetOpen(kind) {
+    const s = document.getElementById('plaza-sheet');
+    if (!s) return false;
+    return kind ? (s.dataset.kind === kind) : true;
+}
+
+function closeSheet() {
+    const s = document.getElementById('plaza-sheet');
+    if (s) s.remove();
+    if (run) { run.ax = 0; run.ay = 0; run.keys = {}; }
+}
+
+//   바깥(어두운 자리)을 누르면 닫힌다. 안쪽을 눌러도 안 닫힌다.
+function sheet(kind, title, inner) {
+    closeSheet();
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return null;
+    const s = document.createElement('div');
+    s.id = 'plaza-sheet';
+    s.dataset.kind = kind;
+    s.innerHTML = '<div class="plaza-card"><div class="grip"></div>'
+        + (title ? '<h4>' + esc(title) + '</h4>' : '') + inner + '</div>';
+    s.addEventListener('pointerdown', function (e) {
+        if (e.target === s) closeSheet();
+        e.stopPropagation();
+    });
+    ov.appendChild(s);
+    return s;
+}
+
+// ── ☰ 메뉴
+function menuSheet() {
+    const list = P.MENU.filter(spotOk);
+    const html = '<div class="plaza-grid">' + list.map(function (m, i) {
+        return '<button data-i="' + i + '"><span class="e">' + m.i + '</span>'
+            + esc(m.n) + '</button>';
+    }).join('') + '</div>';
+    const s = sheet('menu', '어디로 갑니까', html);
+    if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button'), function (b) {
+        b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
+    });
+}
+
+// ── 💬 말
+function sendSay() {
+    const el = document.getElementById('plaza-in');
+    if (!el) return;
+    say(el.value);
+    el.value = '';
+}
+
+function chatSheet() {
+    const bar = document.getElementById('plaza-bar');
+    if (bar) bar.classList.remove('new');
+    const s = sheet('chat', '', '<div id="plaza-log"></div>'
+        + '<div id="plaza-send">'
+        + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" placeholder="여기에 적으면 머리 위에 뜹니다">'
+        + '<button id="plaza-go">말한다</button></div>');
+    if (!s) return;
+    paintLog();
+    s.querySelector('#plaza-go').onclick = sendSay;
+    const inp = s.querySelector('#plaza-in');
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendSay(); });
+    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
+}
+
+// ── 🎒 가방 — 소지품 · 악세 · 의상
+//
+//   옷장(closet.js)이 쓰는 표를 그대로 읽는다. 고르면 바로 적히고
+//   가운데 선 사람이 그 자리에서 갈아입는다.
+function allowedIt(it, u) {
+    try {
+        if (it.admin) return !!(u && u.code === P.ADMIN);
+        if (it.nos) {
+            if (u && u.code === P.ADMIN) return true;
+            const n = (u && u.no != null) ? String(u.no).trim() : '';
+            if (!n) return false;
+            const p4 = n.length < 4 ? ('0000' + n).slice(-4) : n;
+            return it.nos.some(function (x) { return x === n || x === p4; });
+        }
+    } catch (e) { }
+    return true;
+}
+
+function dotOf(u) {
+    if (!u.dot || typeof u.dot !== 'object') u.dot = {};
+    return u.dot;
+}
+
+function saveDot() {
+    try { if (typeof saveFields === 'function') saveFields({ dot: 1 }); } catch (e) { }
+    // 광장에 선 내 모습도 바로 갈아입힌다
+    try {
+        if (run && run.me) {
+            run.me.actor.stop();
+            run.me.wrap.remove();
+            const u = u_();
+            run.me = makeOne(u, nameOf(u), run.k);
+            run.el.appendChild(run.me.wrap);
+            putOne(run.me, run.x, run.y);
+            run.sx = -9999; run.sent = 0;         // 남에게도 다시 알린다
+        }
+    } catch (e) { }
+}
+
+let bagTab = 'wear';
+
+function bagSheet(which) {
+    const u = u_(); if (!u) return;
+    if (which) bagTab = which;
+    const tabs = [['bag', '소지품'], ['acc', '악세'], ['wear', '의상']];
+    const body = (bagTab === 'bag') ? bagInv(u) : bagWear(u, bagTab === 'acc');
+    const s = sheet('bag', '', '<div class="plaza-tabs">'
+        + tabs.map(function (t) {
+            return '<button data-t="' + t[0] + '"' + (bagTab === t[0] ? ' class="on"' : '') + '>'
+                + t[1] + '</button>';
+        }).join('') + '</div><div id="plaza-bagbody">' + body + '</div>');
+    if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('.plaza-tabs button'), function (b) {
+        b.onclick = function () { bagSheet(b.dataset.t); };
+    });
+    bagStage(s);
+    Array.prototype.forEach.call(s.querySelectorAll('.pick button'), function (b) {
+        b.onclick = function () {
+            const d = dotOf(u_());
+            d[b.dataset.k] = b.dataset.v;
+            saveDot();
+            bagSheet();
+        };
+    });
+}
+
+// 가운데 선 사람 — 고를 때마다 다시 그린다
+function bagStage(s) {
+    const host = s.querySelector('.plaza-stage');
+    if (!host || typeof window.dotSprite !== 'function') return;
+    try {
+        const el = window.dotSprite(u_(), { pose: 'stand', scale: 1 });
+        host.appendChild(el);
+    } catch (e) { }
+}
+
+function bagInv(u) {
+    const inv = Array.isArray(u.inventory) ? u.inventory : [];
+    if (!inv.length) return '<div class="plaza-none">가진 것이 없습니다.</div>';
+    const cnt = {};
+    inv.forEach(function (x) { const n = String(x); cnt[n] = (cnt[n] || 0) + 1; });
+    return '<div class="plaza-inv">' + Object.keys(cnt).map(function (n) {
+        return '<div>' + esc(n) + (cnt[n] > 1 ? ' <b style="color:#d9a05a">×' + cnt[n] + '</b>' : '') + '</div>';
+    }).join('') + '</div>';
+}
+
+function bagWear(u, accOnly) {
+    if (typeof DOT_SLOTS === 'undefined' || typeof DOT_HEADS === 'undefined') {
+        return '<div class="plaza-none">옷장이 아직 안 올라왔습니다.</div>';
+    }
+    const d = dotOf(u);
+    const row = function (lab, k, list, nowV) {
+        const on = list.filter(function (x) { return allowedIt(x, u); });
+        if (on.length < 2) return '';
+        return '<div class="plaza-row"><span class="lab">' + lab + '</span><div class="pick">'
+            + on.map(function (x) {
+                return '<button data-k="' + k + '" data-v="' + esc(x.i) + '"'
+                    + (x.i === nowV ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
+            }).join('') + '</div></div>';
+    };
+    let rows = '';
+    if (accOnly) {
+        DOT_SLOTS.forEach(function (s) {
+            if (s.k !== 'acc') return;
+            rows += row(s.n, s.k, s.items, d[s.k] || '');
+        });
+        if (!rows) rows = '<div class="plaza-none">가진 악세가 없습니다.</div>';
+    } else {
+        const nowHead = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
+        rows += row('머리', 'head', DOT_HEADS, nowHead);
+        DOT_SLOTS.forEach(function (s) {
+            if (s.k === 'acc') return;
+            rows += row(s.n, s.k, s.items, d[s.k] || '');
+        });
+        if (!rows) rows = '<div class="plaza-none">갈아입을 것이 없습니다.</div>';
+    }
+    return '<div class="plaza-stage"></div>' + rows;
+}
+
+// ==========================================
 // 창
 // ==========================================
 function shut() {
@@ -621,6 +1050,7 @@ function shut() {
         window.removeEventListener('keydown', run.onKey);
         window.removeEventListener('keyup', run.onKeyUp);
     }
+    if (run.onSize) window.removeEventListener('resize', run.onSize);
     const ov = document.getElementById('plaza-ov');
     if (ov) ov.remove();
     run = null;
@@ -638,22 +1068,20 @@ function open() {
     }
     if (run) return;
 
-    // 손가락으로 만지는 기계인가 — 그러면 조이스틱, 아니면 방향 단추.
-    //
-    //   조이스틱은 방 위에 겹쳐 띄운다. 아래에 한 칸을 더 두면 그만큼
-    //   방이 좁아지는데, 좁은 화면에서는 그 한 칸이 아깝다.
+    // 손가락으로 만지는 기계인가 — 자판이 있는 쪽에만 방향 단추를 둔다
     const touch = !!(('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
 
     const ov = document.createElement('div');
     ov.id = 'plaza-ov';
     ov.innerHTML =
-        '<div id="plaza-top">'
-        + '<div class="ttl" id="plaza-title">🚶 광장</div>'
-        + '<div class="x" id="plaza-x">나간다</div>'
+        '<div id="plaza-view"><div id="plaza-room"></div></div>'
+        + '<div id="plaza-top">'
+        + '<div id="plaza-where">🚶 광장</div>'
+        + '<div class="sp"></div>'
+        + '<button class="plaza-ico" id="plaza-menu">☰</button>'
+        + '<button class="plaza-ico" id="plaza-x">✕</button>'
         + '</div>'
-        + '<div id="plaza-view"><div id="plaza-room"></div>'
-        + (touch ? '<div id="plaza-stick"><div class="ring"></div><div id="plaza-knob"></div></div>' : '')
-        + '</div>'
+        + '<div id="plaza-who"></div>'
         + (touch ? '' :
             '<div id="plaza-pad">'
             + '<button data-k="left">◀</button>'
@@ -661,95 +1089,85 @@ function open() {
             + '<button data-k="down">▼</button>'
             + '<button data-k="right">▶</button>'
             + '</div>')
-        + '<div id="plaza-who"></div>'
-        + '<div id="plaza-chat">'
-        + '<div id="plaza-log"></div>'
-        + '<div id="plaza-send">'
-        + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" placeholder="여기에 적으면 머리 위에 뜹니다">'
-        + '<button id="plaza-go">말한다</button>'
-        + '</div></div>';
+        + '<div id="plaza-bottom">'
+        + '<button class="plaza-ico" id="plaza-bag">🎒</button>'
+        + '<div id="plaza-bar"><span class="dot"></span>'
+        + '<span class="txt">여기에 적으면 머리 위에 뜹니다</span></div>'
+        + '</div>';
     document.body.appendChild(ov);
+    stampSafe(ov);
 
     run = {
         room: null, el: document.getElementById('plaza-room'),
         view: document.getElementById('plaza-view'),
         peers: {}, keys: {}, ax: 0, ay: 0, x: 0, y: 0, tx: null, ty: null,
-        cx: 0, cy: 0, last: performance.now(), raf: 0,
+        cx: 0, cy: 0, last: performance.now(), raf: 0, z: 1,
         sx: -9999, sy: -9999, sent: 0, sMoving: false, sFace: 1,
         say: '', sayAt: 0, sSayAt: 0, k: 0.75, ref: null, me: null
     };
 
-    // 바닥을 누르면 그 자리로 간다
-    run.view.addEventListener('pointerdown', function (e) {
-        if (!run) return;
-        // 조이스틱을 쥔 것은 바닥을 누른 것이 아니다
-        try { if (e.target && e.target.closest && e.target.closest('#plaza-stick')) return; } catch (x) { }
-        const r = roomOf();
-        const b = run.view.getBoundingClientRect();
-        const x = e.clientX - b.left + run.cx;
-        const y = e.clientY - b.top + run.cy;
-        run.tx = Math.max(P.EDGE, Math.min(r.w - P.EDGE, x));
-        run.ty = Math.max(r.floor[0], Math.min(r.floor[1], y));
-    });
-
-    // ─ 조이스틱 — 쥔 쪽으로, 민 만큼 걷는다
+    // ─ 안 보이는 조이스틱 — 화면 아무 데나 짚어 끌면 그쪽으로 걷는다
     //
-    //   테두리 안쪽 어디를 눌러도 쥐어진다 (손가락이 손잡이를 정확히
-    //   짚지 않아도 된다). 쥐는 순간 그 손가락을 붙잡아 두므로
-    //   (setPointerCapture) 테두리 밖으로 끌고 나가도 끊기지 않는다.
+    //   짚은 **그 자리**가 조이스틱 한가운데가 된다. 그래서 손잡이를 찾아
+    //   짚을 것도 없고, 화면에 아무것도 안 띄워도 된다.
+    //   끌지 않고 톡 치기만 하면 전처럼 **그 자리로 걸어간다.**
     (function stick() {
-        const st = ov.querySelector('#plaza-stick');
-        if (!st) return;
-        const knob = st.querySelector('#plaza-knob');
-        const DEAD = 0.18;            // 이만큼 안 밀면 안 움직인다 (손 떨림 몫)
-        const REACH = 0.62;           // 손잡이가 테두리까지 다 안 나가게
-        let id = null;
+        const DEAD = 12;              // 이만큼 끌어야 걷기로 본다 (손 떨림 몫)
+        const REACH = 64;             // 이만큼 끌면 가장 빠르다
+        const TAP_MS = 320;
+        let id = null, ox = 0, oy = 0, at = 0, drag = false;
 
-        const put = function (x, y) {
-            knob.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
-        };
-        const read = function (e) {
+        const stop_ = function () { if (run) { run.ax = 0; run.ay = 0; } };
+        run.view.addEventListener('pointerdown', function (e) {
             if (!run) return;
-            const b = st.getBoundingClientRect();
-            const max = b.width / 2 || 52;
-            let x = e.clientX - (b.left + max);
-            let y = e.clientY - (b.top + b.height / 2);
-            const d = Math.hypot(x, y);
-            if (d > max) { x = x / d * max; y = y / d * max; }
-            put(x * REACH, y * REACH);
-            let m = Math.min(1, d / max);
-            if (m < DEAD) { run.ax = 0; run.ay = 0; return; }
-            m = (m - DEAD) / (1 - DEAD);            // 턱을 넘은 만큼을 0~1 로 펴 준다
-            const n = Math.hypot(x, y) || 1;
-            run.ax = x / n * m;
-            run.ay = y / n * m;
-            run.tx = null;                           // 쥐면 눌러 둔 자리는 버린다
-        };
-        const off = function (e) {
+            if (e.target && e.target.closest && e.target.closest('.plaza-spot')) return;
+            id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now(); drag = false;
+            try { run.view.setPointerCapture(id); } catch (x) { }
+        });
+        run.view.addEventListener('pointermove', function (e) {
+            if (!run || id === null || e.pointerId !== id) return;
+            const dx = e.clientX - ox, dy = e.clientY - oy;
+            const d = Math.hypot(dx, dy);
+            if (!drag && d < DEAD) return;
+            drag = true;
+            e.preventDefault();
+            const m = Math.min(1, (d - DEAD) / (REACH - DEAD));
+            run.ax = dx / d * m;
+            run.ay = dy / d * m;
+            run.tx = null;                        // 끌면 눌러 둔 자리는 버린다
+        });
+        const up = function (e) {
             if (id === null || (e && e.pointerId !== undefined && e.pointerId !== id)) return;
             id = null;
-            st.classList.remove('on');
-            put(0, 0);
-            if (run) { run.ax = 0; run.ay = 0; }
+            stop_();
+            // 끌지 않고 톡 쳤으면 그 자리로 걸어간다
+            if (!drag && now() - at < TAP_MS && run) {
+                const r = roomOf(), z = zz();
+                const b = run.view.getBoundingClientRect();
+                const x = (e.clientX - b.left + run.cx) / z;
+                const y = (e.clientY - b.top + run.cy) / z;
+                run.tx = Math.max(P.EDGE, Math.min(r.w - P.EDGE, x));
+                run.ty = Math.max(r.floor[0], Math.min(r.floor[1], y));
+            }
+            drag = false;
         };
-        st.addEventListener('pointerdown', function (e) {
-            if (!run) return;
-            e.preventDefault();
-            e.stopPropagation();
-            id = e.pointerId;
-            st.classList.add('on');
-            try { st.setPointerCapture(id); } catch (x) { }
-            read(e);
-        });
-        st.addEventListener('pointermove', function (e) {
-            if (id === null || e.pointerId !== id) return;
-            e.preventDefault();
-            read(e);
-        });
-        st.addEventListener('pointerup', off);
-        st.addEventListener('pointercancel', off);
-        st.addEventListener('lostpointercapture', off);
+        run.view.addEventListener('pointerup', up);
+        run.view.addEventListener('pointercancel', up);
+        run.view.addEventListener('lostpointercapture', up);
     })();
+
+    // 창 크기가 바뀌면 (화면을 돌리거나 자판이 올라오면) 다시 맞춘다
+    run.onSize = function () {
+        if (!run || !run.room) return;
+        stampSafe(ov);
+        paintRoom();
+        Object.keys(run.peers).forEach(function (c) {
+            const q = run.peers[c]; putOne(q.one, q.x, q.y);
+        });
+        putOne(run.me, run.x, run.y);
+        camera(true);
+    };
+    window.addEventListener('resize', run.onSize);
 
     // 단추 — 누르는 동안 걷는다
     Array.prototype.forEach.call(ov.querySelectorAll('#plaza-pad button'), function (b) {
@@ -768,25 +1186,21 @@ function open() {
     run.onKey = function (e) {
         if (!run) return;
         if (document.activeElement && document.activeElement.id === 'plaza-in') {
-            if (e.key === 'Enter') { go(); }
+            if (e.key === 'Enter') sendSay();
             return;
         }
         const k = KEY[e.key];
         if (k) { run.keys[k] = true; run.tx = null; e.preventDefault(); }
-        if (e.key === 'Escape') shut();
+        if (e.key === 'Escape') { if (sheetOpen()) closeSheet(); else shut(); }
     };
     run.onKeyUp = function (e) { const k = KEY[e.key]; if (k && run) run.keys[k] = false; };
     window.addEventListener('keydown', run.onKey);
     window.addEventListener('keyup', run.onKeyUp);
 
-    const go = function () {
-        const el = document.getElementById('plaza-in');
-        if (!el) return;
-        say(el.value);
-        el.value = '';
-    };
-    document.getElementById('plaza-go').onclick = go;
     document.getElementById('plaza-x').onclick = shut;
+    document.getElementById('plaza-menu').onclick = menuSheet;
+    document.getElementById('plaza-bag').onclick = bagSheet;
+    document.getElementById('plaza-bar').onclick = chatSheet;
 
     goRoom(P.START, null);
     run.last = performance.now();
