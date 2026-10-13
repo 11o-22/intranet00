@@ -33,6 +33,17 @@
 //       body.png        보통 몸
 //       body-brown.png  브라운 전용 몸  ← h-brown 과 반드시 짝 (겉모양은 보통 몸과 같다)
 //       coat.png        옛 코트 (몸까지 한 장에 그려진 것 — 지금은 안 쓴다)
+//       none.png        아무것도 없는 몸 (속이 다 비친다)
+//
+//   ★ 머리 한 장에 **한 벌이 통째로** 그려진 것이 있다 ([브라운 특전] —
+//     상자 머리에 갈색 양복까지 한 그림이다). 그런 것은
+//
+//         body: 'none'   몸판을 비워 두고 (맨몸이 비어져 나오지 않게)
+//         solo: true     옷을 안 겹친다 (잠옷이 기본이라 그냥 두면 삐져나온다)
+//
+//     로 적는다. 그러면 그 한 장만 그려지고, 서 있을 때의 잔동작도
+//     머리 층이 그대로 돌려 준다. 두 장으로 겹쳐 그리면 멈춘 칸이 뒤에
+//     남아 유령처럼 비친다 — 그래서 한 장으로만 그린다.
 //
 //   ★ h05 와 h09 는 같은 얼굴(백사헌)인데 **안대가 반대쪽**이다. 뒤집은
 //     그림이 아니라(머리와 얼굴 자국은 같은 방향, 겉모양 96% 겹침) 안대와
@@ -142,7 +153,9 @@ const DOT_HEADS = [
     { i: 'h16', n: 'B조 조장' },          // 15
     { i: 'h17', n: '이성해' },            // 16
     { i: 'h18', n: '곽제강' },            // 17
-    { i: 'h-brown', n: '브라운', body: 'body-brown' }   // 18 — 전용 몸과 짝 (옷은 그대로 입는다)
+    { i: 'h-brown', n: '브라운', body: 'body-brown' },  // 18 — 전용 몸과 짝 (옷은 그대로 입는다)
+    // 19 — 한 벌이 통째로 그려진 것. 몸판은 비우고 옷은 안 겹친다.
+    { i: 'h-brown-tv', n: '[브라운 특전]', body: 'none', solo: true }
 ];
 
 // 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
@@ -273,6 +286,8 @@ function look(user, override) {
         (it.top || []).forEach(function (o) { tops.push(o); });
     });
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
+    // 한 벌로 그려진 머리는 옷을 안 겹친다 — 고른 것은 그대로 두되 안 그린다
+    if (hd.solo) over.length = 0;
     return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick };
 }
 window.dotLook = look;
