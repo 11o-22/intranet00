@@ -109,7 +109,7 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pj-bottom', 'shoes', 'pj-top', 'suit', 'cape'],
+    Z: ['pj-bottom', 'shoes', 'pj-top', 'suit', 'robe', 'cape'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -156,7 +156,13 @@ const DOT_SLOTS = [
     {
         k: 'outer', n: '겉옷', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'suit', n: '정장', over: ['suit'], admin: true }
+            { i: 'suit', n: '정장', over: ['suit'], admin: true },
+            // ★ 서 있을 때 나부끼지 않습니다 — FLAPS 에 안 넣었습니다.
+            //   나부끼는 장은 서 있기 줄의 0·2·4 칸을 돌아가며 쓰는데
+            //   (아래 sprite 의 flaps), 이 옷은 서 있기 줄에 두 칸만
+            //   그려져 있어 2·4 칸이 비어 있습니다. 넣으면 깜빡입니다.
+            //   지금은 0번 칸에 가만히 서 있습니다.
+            { i: 'robe', n: '장옷', over: ['robe'], admin: true }
         ]
     },
     {
