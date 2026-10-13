@@ -486,6 +486,31 @@ function fallen(m) {
 //   하나 있다 — safe_hint 가 options[0] 에 ◈ 를 붙인다
 //   (index.html:2748). 글쓴이 약속으로 **0번이 가장 안전한 쪽**이다.
 //   그러므로 나머지가 죽을 길이다. 그쪽에 ☠ 를 붙여 보여 준다.
+//
+// ■ 투표판에서는 선택지에 **손대지 않는다** (중복 투표로 보이던 것)
+//
+//   파티로 함께 가는 자리에서는 선택지가 내 화면에만 있는 게 아니다.
+//   먼저 도착한 사람의 선택지가 **투표판에 통째로 올라가** 모두의 화면이
+//   그것을 쓴다 (index.html:2494 openVote · 2679 renderVoteState).
+//
+//   예전에는 여기서 선택지를 통째로 갈아 끼웠다.
+//
+//       { label:'☠ …', fn:'jisanGo', arg:'1' }      ← id 가 빠졌다
+//
+//   id 가 빠지면 투표판이 이렇게 된다.
+//
+//       · 표를 세는 칸이 tally[o.id] 인데 셋 다 tally[undefined] 가 되어
+//         **한 바구니를 같이 쓴다.** 그래서 세 사람이 각각 다른 쪽에 넣어도
+//         선택지마다 ●●● 3 이 찍힌다 — 중복 투표로 보이던 것이 이것이다.
+//       · 단추도 castVote('undefined') 라 어느 쪽을 눌러도 같은 표가 된다.
+//       · 마감 뒤 runVotedAction 이 모두의 화면에서 window[fn](arg) 를 부르는데,
+//         jisanGo 가 보는 _jisanOpt 는 **내 화면에만** 있다. 남의 화면은
+//         그 자리에 멎고, 내 쪽만 다음 칸으로 가서 투표가 또 열렸다.
+//
+//   그래서 투표판에 올라가는 선택지는 **원래 것을 그대로** 둔다. ☠ 는 내
+//   화면의 단추에만 덧붙이고 (hookVoteView), 죽을 길을 잡았는지는 마감된
+//   투표에서 센다 (hookVoted). 혼자 가는 자리는 선택지가 밖으로 안 나가므로
+//   전처럼 jisanGo 로 받는다.
 window._jisanOpt = [];
 window.jisanGo = function (i) {
     const o = window._jisanOpt[Number(i)];
@@ -514,7 +539,11 @@ window.jisanGo = function (i) {
                     options = options.map(function (o, i) {
                         const bad = (i > 0);
                         window._jisanOpt.push({ fn: o.fn, arg: o.arg, bad: bad });
-                        return { label: (bad ? '☠ ' : '') + o.label, fn: 'jisanGo', arg: String(i) };
+                        // ★ 함께 투표하는 자리면 **원래 선택지 그대로** 올린다
+                        //   (id 를 잃으면 표가 한 바구니로 몰린다)
+                        if (shared()) return o;
+                        return { id: o.id, label: (bad ? '☠ ' : '') + o.label,
+                                 fn: 'jisanGo', arg: String(i) };
                     });
                     text = String(text || '')
                         + '<br><br><span style="color:#d9a05a;">— 통 속에서 소리가 난다.'
@@ -527,6 +556,65 @@ window.jisanGo = function (i) {
         renderChoiceStep = w; window.renderChoiceStep = w;
         clearInterval(iv);
         console.log('[지산] 죽을 길 보이기 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// 함께 투표하는 자리인가 — index.html:2759 의 together 와 같은 셈
+function shared() {
+    const r = run();
+    return !!(r && r.isParty && !r.solo && !r.taken && !r._a214Scattered);
+}
+
+// 투표판 — ☠ 는 **내 화면의 단추에만** 덧붙인다 (투표판 글은 안 건드린다)
+(function hookVoteView() {
+    const iv = setInterval(function () {
+        if (typeof renderVoteState !== 'function') return;
+        if (renderVoteState._jisan) { clearInterval(iv); return; }
+        const _v = renderVoteState;
+        const w = function () {
+            const out = _v.apply(this, arguments);
+            try {
+                const me = u_();
+                if (!me || !wears(me)) return out;
+                const area = document.getElementById('vote-area');
+                if (!area) return out;
+                const bs = area.querySelectorAll('button[onclick^="castVote"]');
+                for (let i = 1; i < bs.length; i++) {             // 0번은 안전한 쪽
+                    if (bs[i].innerHTML.indexOf('☠') >= 0) continue;
+                    bs[i].insertAdjacentHTML('afterbegin', '☠ ');
+                }
+            } catch (e) { }
+            return out;
+        };
+        w._jisan = true;
+        renderVoteState = w; window.renderVoteState = w;
+        clearInterval(iv);
+        console.log('[지산] 투표판 죽을 길 표시 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// 투표가 끝났다 — 일행이 고른 쪽이 죽을 길이었나 (내 화면에서만 센다)
+(function hookVoted() {
+    const iv = setInterval(function () {
+        if (typeof runVotedAction !== 'function') return;
+        if (runVotedAction._jisan) { clearInterval(iv); return; }
+        const _r = runVotedAction;
+        const w = function (opt, vote) {
+            try {
+                const me = u_(), r = run();
+                if (me && r && wears(me) && opt && vote && Array.isArray(vote.options)) {
+                    const i = vote.options.findIndex(function (o) { return o && o.id === opt.id; });
+                    if (i > 0) { r._jisanTruth = true; toast('☠ 그 길로 간다'); }
+                }
+            } catch (e) { }
+            return _r.apply(this, arguments);
+        };
+        w._jisan = true;
+        runVotedAction = w; window.runVotedAction = w;
+        clearInterval(iv);
+        console.log('[지산] 투표 결과 — 죽을 길 셈 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
