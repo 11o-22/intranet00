@@ -22,12 +22,14 @@
 //      걸린 사람에게는 [ 오셨구나, 지산의 복! ] 이 뜨고, 30초 동안
 //      화면 위아래로 띠 문구가 흐른다.
 //
-//      ★ 누가 대신 갈지는 **막대를 건네서 정한다.** ③ 의 황금 막대를
-//        남에게 쥐여 주면 그 사람이 대리자가 된다 (u.jisanMark).
-//        받는 쪽 화면에는 **늘 하던 막대 이야기만** 뜬다 — 제가 지목된
-//        줄은 모른다. 그쪽 기록에도 지목은 한 글자도 안 적는다.
-//        제게 주면 지목이 풀린다. 지목이 없거나 그 사람이 이 방에 없으면
-//        전처럼 무작위로 돌아간다.
+//      ★ 누가 대신 갈지는 **죽는 그 자리에서 고른다.** 죽음이 닿는 순간
+//        장착자 화면에만 창이 뜨고, 그 방에 살아 있는 사람이 줄지어
+//        나온다. 하나를 누르면 그 사람이 간다. 고르기 전에는 아무것도
+//        일어나지 않으므로 창에는 닫는 단추가 없다.
+//        고른 사람 쪽에는 **늘 하던 [ 오셨구나, 지산의 복! ] 만** 뜬다 —
+//        제가 지목된 줄은 모르고, 그쪽 기록에도 지목은 한 글자도 안 적는다.
+//        (예전에는 ③ 의 황금 막대를 건넨 사람이 대리자였다. 막대는 이제
+//        공용시설 행운 쪽 일만 한다.)
 //
 //   ② 세상 진리로부터 해방되게 하소서
 //      탐사 선택지에서 **죽을 길이 보인다** (☠ 가 붙는다). 그 길을 잡고도
@@ -60,8 +62,9 @@
 //   u.jisanDay      하루가 바뀌었나
 //   u.jisanRod      { by, byName, at, miss, safe }   받은 황금 막대
 //   u.jisanRodGave  오늘 막대를 몇 번 주었나
-//   u.jisanMark     { code, name, at }               ① 에서 대신 갈 사람
-//                   ★ 내 기록에만 적는다. 그쪽에는 아무것도 안 적는다.
+//                   ★ ① 에서 대신 갈 사람은 어디에도 안 적는다 — 죽는 그
+//                     자리에서 고르고, 고른 결과는 방 쪽(darkParties)에만
+//                     남는다. (예전의 u.jisanMark 는 더 쓰지 않는다.)
 //   u.jisanSac      { 사번: { at, paid } }           찍어 둔 제물과 받은 몫
 //   u.jisanTruth    이번 탐사에서 죽을 길을 잡았나
 //   darkParties/<방>/jisan/<사번> = { by, byName, at, zone }
@@ -371,6 +374,60 @@ function aliveMates() {
     });
 }
 
+// 대신 갈 사람을 고른다 — 죽음이 닿은 그 자리에서
+//
+//   ★ 닫는 단추를 두지 않는다. 이 창이 뜬 때는 죽음을 이미 멈춰 세운
+//     뒤라서(r._dead = false · 원본 darkDeath 를 안 부른다), 고르지 않고
+//     빠져나가면 아무도 안 가고 장착자도 안 죽는 어정쩡한 자리가 된다.
+function askWho(mates, zone, r, me) {
+    const rows = mates.map(function (c) {
+        return '<button class="game-btn js-pick" data-c="' + esc(c) + '" style="' + BTN + '">'
+            + '<div style="font-size:12px; color:#e6ddd0;">' + esc(nameOf(c)) + ' 사원</div>'
+            + '<div style="font-size:9px; color:#6b6257; margin-top:2px;">'
+            + '통이 이 사람 쪽으로 돌아앉습니다.</div></button>';
+    }).join('');
+    const w = box(head('[ 오셨구나, 지산의 복! ]',
+        '통이 흔들립니다. 당신이 갈 자리입니다.<br>'
+        + '<b style="color:#ffcf8f;">대신 갈 사람을 고르십시오.</b><br>'
+        + '고른 사람은 제가 지목된 줄 모릅니다.')
+        + '<div style="' + SCROLL + '">' + rows + '</div>');
+    Array.prototype.forEach.call(w.querySelectorAll('.js-pick'), function (b) {
+        b.onclick = function () {
+            shut();
+            try { goSub(b.dataset.c, zone, r, me); }
+            catch (e) { console.warn('[지산] 대신 보내기:', e && e.message); }
+        };
+    });
+}
+
+// 고른 사람을 보낸다 — 방에 적고, 장착자는 몫을 받고 걸어 나온다
+function goSub(pick, zone, r, me) {
+    const d = db_();
+    try {
+        if (d && r && r.partyId) d.ref('darkParties/' + r.partyId + '/jisan/' + pick).set({
+            by: me.code, byName: me.name, at: Date.now(), zone: zone
+        });
+    } catch (e) { }
+    const g = zonePay(zone);
+    try { if (typeof changePoints === 'function') changePoints(g.pay); }
+    catch (e) { me.points = (me.points || 0) + g.pay; }
+    log_(me, '[' + NAME + '] ' + nameOf(pick) + ' 사원이 대신 갔습니다 (+'
+        + g.pay.toLocaleString() + ' P)');
+    try {
+        if (r.isParty && typeof sendPartyChat === 'function') {
+            sendPartyChat('통이 흔들렸습니다. 무언가가 굴러 나왔습니다.', true);
+        }
+    } catch (e) { }
+    r._dead = false;
+    alert_('[ 오셨구나, 지산의 복! ]\n\n'
+        + nameOf(pick) + ' 사원이 대신 갔습니다.\n'
+        + '당신은 그대로 걸어 나옵니다.\n\n'
+        + '+' + g.pay.toLocaleString() + ' P ('
+        + g.k.toFixed(2) + '배)');
+    window.jisanBand();
+    try { if (typeof finishDarkRun === 'function') finishDarkRun(); } catch (e) { }
+}
+
 (function hookDeath() {
     const iv = setInterval(function () {
         if (typeof darkDeath !== 'function') return;
@@ -384,34 +441,10 @@ function aliveMates() {
                     const zone = r.zone;
                     const mates = aliveMates();
                     if (mates.length) {
-                        // 누군가가 대신 간다 — 지목해 둔 사람이 먼저다
+                        // 죽음은 여기서 멈추고, 대신 갈 사람은 지금 고른다
                         r._jisanUsed = true;
-                        const pick = markedMate(mates)
-                            || mates[Math.floor(Math.random() * mates.length)];
-                        const d = db_();
-                        try {
-                            if (d) d.ref('darkParties/' + r.partyId + '/jisan/' + pick).set({
-                                by: me.code, byName: me.name, at: Date.now(), zone: zone
-                            });
-                        } catch (e) { }
-                        const g = zonePay(zone);
-                        try { if (typeof changePoints === 'function') changePoints(g.pay); }
-                        catch (e) { me.points = (me.points || 0) + g.pay; }
-                        log_(me, '[' + NAME + '] ' + nameOf(pick) + ' 사원이 대신 갔습니다 (+'
-                            + g.pay.toLocaleString() + ' P)');
-                        try {
-                            if (r.isParty && typeof sendPartyChat === 'function') {
-                                sendPartyChat('통이 흔들렸습니다. 무언가가 굴러 나왔습니다.', true);
-                            }
-                        } catch (e) { }
                         r._dead = false;
-                        alert_('[ 오셨구나, 지산의 복! ]\n\n'
-                            + nameOf(pick) + ' 사원이 대신 갔습니다.\n'
-                            + '당신은 그대로 걸어 나옵니다.\n\n'
-                            + '+' + g.pay.toLocaleString() + ' P ('
-                            + g.k.toFixed(2) + '배)');
-                        window.jisanBand();
-                        try { if (typeof finishDarkRun === 'function') finishDarkRun(); } catch (e) { }
+                        askWho(mates, zone, r, me);
                         return;
                     }
                     // 혼자 들어왔다 — 회수품만 전부 받고 죽음은 그대로
@@ -700,7 +733,6 @@ window.jisanRod = function (who) {
         me.jisanRod = rod;
         addNote(me, JISAN.ROD_NOTE);
         addNote(me, JISAN.POLL_NOTE);
-        me.jisanMark = null;                       // 제게 주면 지목이 풀린다
     } else {
         t.jisanRod = rod;
         patch(t.code, 'jisanRod', rod);
@@ -714,33 +746,17 @@ window.jisanRod = function (who) {
             }
         } catch (e) { }
     }
-    // ★ 막대를 건넨 것이 ① 의 지목이다 — **내 기록에만** 적는다.
-    //   그쪽 화면에는 늘 하던 막대 이야기만 뜬다. 제가 지목된 줄은 모른다.
-    if (t.code !== me.code) {
-        me.jisanMark = { code: t.code, name: t.name, at: Date.now() };
-    }
+    // ★ 막대는 공용시설 행운 쪽 일만 한다. ① 에서 대신 갈 사람은 죽는 그
+    //   자리에서 고르므로, 여기에는 아무것도 적지 않는다.
     me.jisanRodGave = (Number(me.jisanRodGave) || 0) + 1;
     log_(me, '[' + NAME + '] 황금 막대 → ' + t.name + ' 사원');
-    save({ jisanRodGave: 1, jisanRod: 1, jisanMark: 1, badge: 1, history: 1 });
+    save({ jisanRodGave: 1, jisanRod: 1, badge: 1, history: 1 });
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     alert_('🏷 황금 막대가 ' + t.name + ' 사원에게 갔습니다.\n\n'
         + '공용시설 행운이 크게 오릅니다.\n'
         + '대신 한 판마다 오염도가 ' + JISAN.ROD_POLL + ' 오릅니다 — 동결과 무관하게.\n\n'
-        + (t.code === me.code
-            ? '대신 갈 사람 지목을 풀었습니다.\n\n'
-            : '— 통이 돌아앉았습니다.\n'
-              + t.name + ' 사원이 대신 갈 사람이 되었습니다. 그쪽은 모릅니다.\n\n')
         + '오늘 남은 막대 ' + (JISAN.ROD_DAY - me.jisanRodGave) + '개');
 };
-
-// ① 에서 대신 갈 사람 — 지목해 둔 사람이 이 방에 살아 있으면 그 사람
-function markedMate(mates) {
-    const me = u_();
-    const m = me && me.jisanMark;
-    if (!m || !m.code) return '';
-    if (m.code === (me && me.code)) return '';
-    return (mates.indexOf(m.code) >= 0) ? m.code : '';
-}
 
 // 공용시설 행운 — 막대를 쥔 사람
 (function hookFacLuck() {
@@ -966,17 +982,14 @@ window.jisanMenu = function () {
     dayRoll(me);
     const rodLeft = JISAN.ROD_DAY - (Number(me.jisanRodGave) || 0);
     const s = sacOf(me);
-    const mk = me.jisanMark;
     const w = box(head('🧧 지산의 복 : 대리자',
         '통을 흔들면 안에서 무언가가 굴러다닙니다.<br>'
         + '오늘 황금 막대 <b style="color:#ffcf8f;">' + rodLeft + '</b>개 · '
         + '제물 <b style="color:#ffcf8f;">' + Object.keys(s).length + ' / '
         + JISAN.SAC_DAY + '</b>명 · 받은 몫 '
         + sacPaid(me).toLocaleString() + ' / ' + JISAN.SAC_CAP.toLocaleString() + ' P<br>'
-        // ① 에서 대신 갈 사람 — 막대를 건넨 그 사람이다
-        + '대신 갈 사람 <b style="color:#ffcf8f;">'
-        + (mk && mk.code ? esc(mk.name || nameOf(mk.code)) + ' 사원' : '정하지 않음 (무작위)')
-        + '</b>')
+        // ① 에서 대신 갈 사람 — 죽는 그 자리에서 고른다
+        + '대신 갈 사람은 <b style="color:#ffcf8f;">죽는 그 자리에서</b> 고릅니다.')
         + '<button id="js-sac" class="game-btn" style="' + BTN + ' text-align:center;">제물을 찍는다</button>'
         + '<button id="js-rod" class="game-btn" style="' + BTN + ' text-align:center;">황금 막대를 쥐여 준다</button>'
         + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');
@@ -1031,18 +1044,13 @@ function pickRod() {
     const me = u_();
     const left = JISAN.ROD_DAY - (Number(me.jisanRodGave) || 0);
     if (left <= 0) { alert_('오늘 황금 막대는 다 나갔습니다.'); return; }
-    const mk = me.jisanMark || {};
     const list = [me].concat(users().filter(function (x) { return x.code !== me.code; }));
     const rows = list.map(function (t) {
         const on = hasRod(t);
-        const now_ = (t.code !== me.code && t.code === mk.code);
         return '<button class="game-btn js-rd" data-c="' + esc(t.code) + '"' + (on ? ' disabled' : '')
             + ' style="' + BTN + (on ? GREY : '') + '">'
             + (t.code === me.code ? '나 — ' : '') + esc(t.name)
             + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
-            + (now_ ? '<div style="font-size:9px; color:#d9a05a; margin-top:2px;">지금 대신 갈 사람</div>' : '')
-            + (t.code === me.code && mk.code
-                ? '<div style="font-size:9px; color:#8d8578; margin-top:2px;">나에게 주면 지목이 풀립니다</div>' : '')
             + (on ? '<div style="font-size:9px; color:#a07070; margin-top:2px;">이미 쥐고 있습니다</div>' : '')
             + '</button>';
     }).join('');
@@ -1198,9 +1206,7 @@ window.jisanState = function (who) {
            + (Number(t.jisanRod.miss) || 0) + ' · 꽝 없는 판 ' + (Number(t.jisanRod.safe) || 0) + ')')
         : '없음');
     console.log('  오늘 준 막대:', (Number(t.jisanRodGave) || 0) + ' / ' + JISAN.ROD_DAY);
-    console.log('  대신 갈 사람:', (t.jisanMark && t.jisanMark.code)
-        ? ((t.jisanMark.name || nameOf(t.jisanMark.code)) + ' (' + t.jisanMark.code + ')')
-        : '정하지 않음 — 무작위');
+    console.log('  대신 갈 사람:', '죽는 그 자리에서 고른다');
     const s = t.jisanSac || {};
     console.log('  제물        :', Object.keys(s).map(nameOf).join(' · ') || '없음',
         '· 받은 몫 ' + sacPaid(t).toLocaleString() + ' / ' + JISAN.SAC_CAP.toLocaleString() + ' P');
