@@ -198,14 +198,16 @@ function oneView(id) {
         + line('교감', P().bond(id, me) + ' / ' + P().BOND_MAX
             + (P().bondFull(id, me)
                 ? ' <span style="color:#d4af37;">— 대신 간다</span>' : ''))
-        + line('배고픔', (function () {
+        + line('포만도', (function () {
             const h = P().starveLeft(id, me);
-            if (h <= 0) return '<span style="color:#e07a5f;">굶었습니다</span>';
+            if (h <= 0) return '<span style="color:#e07a5f;">0 / 100 — 굶었습니다</span>';
             const m = Math.ceil(h / 60000), hh = Math.floor(m / 60);
             const t = hh >= 24 ? (Math.floor(hh / 24) + '일 ' + (hh % 24) + '시간')
                    : hh >= 1 ? (hh + '시간 ' + (m % 60) + '분') : (m + '분');
+            const f = P().full(id, me);
             return '<span style="color:' + (h < 24 * 3600 * 1000 ? '#e07a5f' : '#e8d7b4')
-                + ';">' + t + ' 뒤</span>';
+                + ';">' + f + ' / 100</span>'
+                + ' <span style="color:#6f685e;">· ' + t + ' 뒤에 굶습니다</span>';
         })())
         + (st ? line('지금', '<span style="color:' + st.c + ';">' + st.t + '</span>') : '')
 

@@ -314,6 +314,35 @@ function petStarveLeft(id, u) {
     return (at + PET_STARVE) - petNow();
 }
 
+// 포만도 — 0 에서 100 까지
+//
+//   따로 적어 두는 값이 아니다. 굶주림 시계(fedAt)를 그대로 백분율로
+//   읽은 것이다. 그래서 어긋날 자리가 없고, 옛 펫에게도 그냥 붙는다.
+//
+//       100 = 방금 먹었다        0 = 굶었다
+//
+//   사흘이 꽉 찬 100 이므로, 하루 지나면 67 · 이틀 지나면 33 이 된다.
+function petFull(id, u) {
+    const left = petStarveLeft(id, u);
+    if (left <= 0) return 0;
+    return Math.max(0, Math.min(100, Math.round(left / PET_STARVE * 100)));
+}
+
+// 포만도를 frac(0~1) 만큼 올린다 — 돌려주는 값은 { fedAt, was, now }
+//
+//   굶주림 시계를 거꾸로 셈해서 민다. frac 이 1 이면 fedAt 이 지금이 되어
+//   예전 먹이기와 **글자 하나까지 같은 결과**가 된다. 1 보다 작으면
+//   남은 시간에 그만큼을 더해 주되 사흘을 넘기지 않는다.
+function petFillAt(id, u, frac) {
+    const now = petNow();
+    const was = petFull(id, u);
+    const f = Math.max(0, Math.min(1, Number(frac) == null ? 1 : Number(frac)));
+    const left = Math.max(0, petStarveLeft(id, u));
+    const next = Math.min(PET_STARVE, left + f * PET_STARVE);
+    return { fedAt: now - (PET_STARVE - next), was: was,
+             now: Math.max(0, Math.min(100, Math.round(next / PET_STARVE * 100))) };
+}
+
 // 굶어 죽은 펫을 걷어 간다 — 치운 펫 목록을 돌려준다
 // ==========================================
 // 방에 내놓을 펫 — 두 마리까지
@@ -603,6 +632,7 @@ window.PET = {
     PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,
     bond: petBond, bondFull: petBondFull, bondRoom: petBondRoom, bondUp: petBondUp,
     starveLeft: petStarveLeft, sweep: petStarveSweep,
+    full: petFull, fillAt: petFillAt,
     SHOW_MAX: PET_SHOW_MAX,
     show: petShowList, showHas: petShowHas, showToggle: petShowToggle,
     pets: petsOf, bag: petBag, egg: petEgg, has: petHas, save: petSave, patch: petPatch,

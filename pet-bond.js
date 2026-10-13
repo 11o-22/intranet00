@@ -271,6 +271,7 @@ window.petBondOpen = function (id) {
     const full = b >= P().BOND_MAX;
     const room = P().bondRoom(id, u);
     const hunger = P().starveLeft(id, u);
+    const sat = P().full(id, u);
     const soon = hunger < 24 * 3600 * 1000;
     const patLeft  = Math.max(0, (Number(s.pat) || 0) + P().PAT_GAP - now);
     const playLeft = Math.max(0, (Number(s.play) || 0) + P().PLAY_GAP - now);
@@ -304,12 +305,20 @@ window.petBondOpen = function (id) {
             : ('오늘 더 오를 몫 ' + room + ' <span style="color:#555;">/ 하루 ' + P().BOND_DAY + '</span>'))
         + '</div>'
 
-        + '<div style="font-size:10px; padding:7px 0; border-top:1px solid #241f19;'
-        + ' border-bottom:1px solid #241f19; margin-bottom:11px; color:'
-        + (soon ? '#e07a5f' : '#8d8578') + ';">'
-        + '배고픔 — ' + (hunger <= 0 ? '굶었습니다' : (span(hunger) + ' 뒤에 굶습니다'))
-        + (soon ? '<br><span style="font-size:9.5px;">먹이를 주지 않으면 죽습니다.</span>' : '')
-        + '</div>'
+        + '<div style="padding:7px 0; border-top:1px solid #241f19;'
+        + ' border-bottom:1px solid #241f19; margin-bottom:11px;">'
+        + '<div style="font-size:10px; color:#8d8578; display:flex;'
+        + ' justify-content:space-between;">'
+        + '<span>포만도</span><span style="color:' + (soon ? '#e07a5f' : '#e8d7b4') + ';">'
+        + sat + ' / 100</span></div>'
+        + '<div style="height:7px; background:#241f19; border-radius:4px; margin:5px 0 4px 0;">'
+        + '<div style="height:100%; width:' + sat + '%;'
+        + ' background:linear-gradient(90deg,' + (soon ? '#7a2f1f,#e07a5f' : '#4a6a2a,#8bc34a') + ');'
+        + ' border-radius:4px;"></div></div>'
+        + '<div style="font-size:9.5px; color:' + (soon ? '#e07a5f' : '#6f685e') + ';">'
+        + (hunger <= 0 ? '굶었습니다' : (span(hunger) + ' 뒤에 굶습니다'))
+        + (soon ? ' — 먹이를 주지 않으면 죽습니다.' : '')
+        + '</div></div>'
 
         + '<button id="pb-pat" class="game-btn" ' + ((out || patLeft > 0) ? 'disabled ' : '')
         + 'style="' + BTN + ((out || patLeft > 0) ? ' opacity:.45;' : '') + '">'
@@ -325,7 +334,12 @@ window.petBondOpen = function (id) {
                     + (out ? ' disabled' : '')
                     + ' style="' + BTN + ' text-align:left;' + (out ? ' opacity:.45;' : '') + '">'
                     + esc(f.n) + '<span style="font-size:10px; color:#888; font-weight:normal;'
-                    + ' margin-left:6px;">×' + F.have(f.n, u) + '</span></button>';
+                    + ' margin-left:6px;">×' + F.have(f.n, u) + '</span>'
+                    + '<span style="font-size:9.5px; color:#8bc34a; font-weight:normal;'
+                    + ' margin-left:6px;">'
+                    + (f.fill == null || f.fill >= 1 ? '포만도 가득'
+                                                     : '포만도 +' + Math.round(f.fill * 100))
+                    + '</span></button>';
             }).join('')
             : '<div style="font-size:10px; color:#666; padding:4px 0 8px 0;">'
               + '가진 먹이가 없습니다. 사택에서 사 오십시오.</div>')
@@ -517,7 +531,8 @@ window.petRoom = function () {
         return { 번호: k, 이름: P().nick(k, u), 방: P().showHas(k, u) ? '🏠' : '',
                  교감: P().bond(k, u) + ' / ' + P().BOND_MAX,
                  오늘남은몫: P().bondRoom(k, u),
-                 배고픔: span(Math.max(0, P().starveLeft(k, u))) + ' 뒤',
+                 포만도: P().full(k, u) + ' / 100',
+                 굶기까지: span(Math.max(0, P().starveLeft(k, u))),
                  대신죽기: P().bondFull(k, u) ? ('O (' + Math.round(P().SAVE_ODDS * 100) + '%)') : '✗',
                  지금: (s.out && s.out.till) ? '탐사 중' : (s['with'] ? '동행 중' : '방') };
     }));

@@ -5,12 +5,23 @@
 //
 // ■ 무엇에 쓰나
 //
-//   탐사를 다녀온 펫은 두 시간 쉰다. 먹이는 그 쉬는 시간을 줄인다.
-//   좋은 것일수록 많이 줄이고, 다음 탐사에 더 받아 온다.
+//   먹이는 **포만도**를 채운다. 포만도는 따로 적어 두는 값이 아니라
+//   굶주림 시계(fedAt)를 백분율로 읽은 것이다 — 사흘이 100 이다.
+//   포만도가 0 이 되면 펫이 죽는다.
 //
-//     마른 사료    1,000 P   쉬는 시간 30분
-//     고기 통조림  3,000 P   쉬는 시간 전부 · 다음 탐사 +20%
-//     특제 도시락  8,000 P   쉬는 시간 전부 · 다음 탐사 +60%
+//   탐사를 다녀온 펫은 두 시간 쉰다. 비싼 먹이는 그 쉬는 시간도 줄이고
+//   다음 탐사에 더 받아 오게 한다.
+//
+//     물 만 밥       150 P   포만도 +33        (하루치)
+//     마른 멸치      400 P   포만도 +67        (이틀치)
+//     마른 사료    1,000 P   포만도 가득 · 쉬는 시간 30분
+//     고기 통조림  3,000 P   포만도 가득 · 쉬는 시간 전부 · 다음 탐사 +20%
+//     특제 도시락  8,000 P   포만도 가득 · 쉬는 시간 전부 · 다음 탐사 +60%
+//
+//   앞의 둘은 **포만도만** 채우는 값싼 것이다. 하루치가 150 P 이므로
+//   사흘에 450 P — 마른 사료(1,000 P) 보다 싸지만 그만큼 자주 와야 한다.
+//   뒤의 셋은 예전과 글자 하나까지 똑같다 (fill 이 1 이면 fedAt 을 지금으로
+//   미는 것과 같은 셈이 된다).
 //
 //   사택 첫 칸에서 산다. 돌봄 물품과 마찬가지로 소지품에 섞이지 않는다
 //   (u.petFood).
@@ -23,12 +34,17 @@
 
 const BOX = 'pet-food-box';
 
+// fill — 포만도를 얼마나 채우나 (1 이면 가득)
 const FOOD = [
-    { n: '마른 사료',   p: 1000, cut: 30 * 60 * 1000, up: 0,
+    { n: '물 만 밥',    p:  150, cut: 0,              up: 0,   fill: 1 / 3, bond: false,
+      d: '먹을 것이라기보다 물이다. 그래도 하루는 간다.' },
+    { n: '마른 멸치',   p:  400, cut: 0,              up: 0,   fill: 2 / 3, bond: false,
+      d: '짜다. 먹고 나면 물그릇을 비운다.' },
+    { n: '마른 사료',   p: 1000, cut: 30 * 60 * 1000, up: 0,   fill: 1,
       d: '눅눅하다. 그래도 먹는다.' },
-    { n: '고기 통조림', p: 3000, cut: -1,             up: 0.2,
+    { n: '고기 통조림', p: 3000, cut: -1,             up: 0.2, fill: 1,
       d: '따는 소리에 어디선가 달려온다.' },
-    { n: '특제 도시락', p: 8000, cut: -1,             up: 0.6,
+    { n: '특제 도시락', p: 8000, cut: -1,             up: 0.6, fill: 1,
       d: '사람 것보다 낫다는 말이 돈다.' }
 ];
 const FOOD_BY = {};
@@ -127,14 +143,29 @@ function feed(id, name) {
     const now = P().now();
     const rest = Math.max(0, (Number(s.rest) || 0) - now);
 
+    // ★ 포만도가 이미 가득한데 포만도밖에 못 채우는 먹이라면 돌려보낸다.
+    //   값싼 둘(물 만 밥 · 마른 멸치)이 여기 걸린다. 비싼 셋은 쉬는 시간이나
+    //   탐사 몫이 있어 가득해도 줄 까닭이 있으므로 그대로 받는다.
+    const fillOnly = !f.cut && !f.up && f.bond === false;
+    if (fillOnly && P().full(id, u) >= 100) {
+        return { ok: false, why: P().nick(id, u) + ' — 포만도가 이미 가득합니다.\n\n'
+            + name + P().josa(name, '은') + ' 아껴 두십시오.' };
+    }
+
     add(name, -1);
 
-    const patch = { fedAt: now };               // 굶주림 시계를 되돌린다
-    let said = [];
-    const up = P().bondUp(id, patch);           // 교감도
-    if (up) said.push('교감 +' + up + ' (' + (patch.bond) + ' / ' + P().BOND_MAX + ')');
-    else if (P().bond(id, u) >= P().BOND_MAX) said.push('교감은 이미 가득합니다.');
-    else said.push('오늘 교감은 더 오르지 않습니다.');
+    // 포만도를 채운다 — fill 이 1 이면 예전처럼 fedAt 이 지금이 된다
+    const fl = P().fillAt(id, u, f.fill == null ? 1 : f.fill);
+    const patch = { fedAt: fl.fedAt };
+    let said = ['포만도 ' + fl.was + ' → ' + fl.now + (fl.now >= 100 ? ' (가득)' : '')];
+    if (f.bond === false) {
+        said.push('교감은 오르지 않습니다.');
+    } else {
+        const up = P().bondUp(id, patch);           // 교감도
+        if (up) said.push('교감 +' + up + ' (' + (patch.bond) + ' / ' + P().BOND_MAX + ')');
+        else if (P().bond(id, u) >= P().BOND_MAX) said.push('교감은 이미 가득합니다.');
+        else said.push('오늘 교감은 더 오르지 않습니다.');
+    }
     if (rest) {
         const left = (f.cut < 0) ? 0 : Math.max(0, rest - f.cut);
         patch.rest = left ? (now + left) : null;
@@ -175,8 +206,13 @@ function html() {
             + '<span style="font-size:11px; color:#ddd;">' + esc(f.n) + '</span>'
             + (n ? '<span style="font-size:10px; color:#ff9800; margin-left:5px;">보유 ' + n + '</span>' : '')
             + '<div style="font-size:9px; color:#666; margin-top:2px;">'
-            + (f.cut < 0 ? '쉬는 시간 전부' : '쉬는 시간 ' + Math.round(f.cut / 60000) + '분')
+            + '<span style="color:#8bc34a;">'
+            + (f.fill == null || f.fill >= 1 ? '포만도 가득'
+                                             : '포만도 +' + Math.round(f.fill * 100)) + '</span>'
+            + (f.cut < 0 ? ' · 쉬는 시간 전부'
+                         : f.cut ? ' · 쉬는 시간 ' + Math.round(f.cut / 60000) + '분' : '')
             + (f.up ? ' · 다음 탐사 +' + Math.round(f.up * 100) + '%' : '')
+            + (f.bond === false ? ' · 교감 없음' : '')
             + ' <span style="color:#555;">· ' + esc(f.d) + '</span></div>'
             + '</div>'
             + '<button class="inv-btn inv-btn-use" style="flex:0 0 auto; min-width:66px;"'
@@ -187,8 +223,9 @@ function html() {
     return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
         + '🍖 펫 먹이</div>'
         + '<div style="font-size:9.5px; color:#777; margin-bottom:6px; line-height:1.6;">'
-        + '먹이면 교감이 오르고, 탐사를 다녀와 쉬는 시간도 줄어듭니다.'
-        + ' <span style="color:#e07a5f;">사흘 동안 안 주면 펫이 죽습니다.</span><br>'
+        + '먹이면 포만도가 찹니다. 사흘치가 포만도 100 입니다.'
+        + ' <span style="color:#e07a5f;">포만도가 0 이 되면 펫이 죽습니다.</span><br>'
+        + '값싼 둘은 포만도만 채웁니다. 1,000 P 이상은 교감도 오르고 쉬는 시간도 줄어듭니다.<br>'
         + '주는 것은 내 방에서 합니다.</div>'
         + rows;
 }
