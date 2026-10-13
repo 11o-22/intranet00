@@ -1009,12 +1009,43 @@ function lootRoll() {
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
+// ==========================================
 // 대신 돌리기 — 켜 두면 다음 한 판에 등급만큼 행운이 더 붙는다
-let spinOn = false;
+// ==========================================
+//
+// ■ 안 붙던 까닭
+//
+//   공용시설은 **판돈을 먼저 걷고 뒤에 행운을 읽는다.**
+//
+//       slot-curve.js:229   if (!useFacility(bet)) return;
+//       slot-curve.js:260   const B = bands(facilityLuckMult(currentUser), …)
+//
+//   그런데 예전에는 useFacility 안에서 spinOn 을 껐다. 그래서 바로 뒤에
+//   읽는 facilityLuckMult 는 **이미 꺼진 것**을 보았다. 켜 두고 콘솔에서
+//   배수만 읽어 보면 2배가 나오는데, 실제로 한 판 돌리면 1배였다.
+//   횟수와 판돈은 나가고 분신 몫만 사라졌다.
+//
+//   슬롯만이 아니다. 룰렛(index.html:8020)·섯다(8189)·블랙잭(8341)·
+//   하이로우(9303) 는 행운을 **한 박자 뒤에** 읽으므로 더 확실히 놓쳤다.
+//
+// ■ 어떻게 고치나
+//
+//   끄는 자리를 「판돈을 걷을 때」에서 「행운을 읽을 때」로 옮긴다.
+//
+//     useFacility        켜져 있으면 spinArm 을 세운다 (spinOn 은 그대로)
+//     facilityLuckMult   spinOn 이나 spinArm 이면 몫을 얹는다.
+//                        spinArm 이었으면 그때 끈다 — 한 판에 한 번.
+//
+//   이러면 바로 읽든(슬롯) 한 박자 뒤에 읽든(룰렛·섯다·블랙잭·하이로우)
+//   똑같이 붙는다. 판을 안 벌이고 배수만 들여다보는 것으로는 안 닳는다.
+let spinOn = false;        // 켜 두었다
+let spinArm = false;       // 켜 둔 채로 한 판이 시작됐다 — 행운을 읽을 때 쓴다
+
 window.kitSpin = function (on) {
     const x = usable('luck');
     if (!x) { alert_('행운 분신이 없습니다.'); return false; }
     spinOn = (on === undefined) ? !spinOn : !!on;
+    if (!spinOn) spinArm = false;
     const pct = BFOX.SPIN[x.grade] || 100;
     alert_(spinOn
         ? ('🐾 ' + nickOf(x) + '이(가) 대신 돌립니다.\n\n다음 공용시설 한 판에 행운 +' + pct + '%\n'
@@ -1023,7 +1054,7 @@ window.kitSpin = function (on) {
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     return spinOn;
 };
-window.kitSpinOn = function () { return spinOn; };
+window.kitSpinOn = function () { return spinOn || spinArm; };
 
 (function hookFacLuck() {
     const iv = setInterval(function () {
@@ -1033,8 +1064,18 @@ window.kitSpinOn = function () { return spinOn; };
         const w = function (user) {
             let m = _f.apply(this, arguments);
             try {
+                if (!spinOn && !spinArm) return m;
                 const x = usable('luck');
-                if (spinOn && x) m *= (1 + (BFOX.SPIN[x.grade] || 100) / 100);
+                if (!x) return m;
+                m *= (1 + (BFOX.SPIN[x.grade] || 100) / 100);
+                // ★ 한 판이 시작된 뒤에 읽은 것이면 여기서 끈다.
+                //   판 없이 배수만 들여다본 것은 안 닳는다.
+                if (spinArm) {
+                    spinOn = false;
+                    spinArm = false;
+                    toast('🐾 ' + nickOf(x) + '이(가) 대신 돌렸다 (행운 +'
+                        + (BFOX.SPIN[x.grade] || 100) + '%)');
+                }
             } catch (e) { }
             return m;
         };
@@ -1047,7 +1088,7 @@ window.kitSpinOn = function () { return spinOn; };
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-// 한 판을 쓰면 꺼진다 (한 번에 한 판만 대신 돌린다)
+// 판돈이 걷히면 「한 판이 시작됐다」고 세워 둔다 (끄지는 않는다)
 (function hookFacUse() {
     const iv = setInterval(function () {
         if (typeof useFacility !== 'function') return;
@@ -1056,13 +1097,7 @@ window.kitSpinOn = function () { return spinOn; };
         const w = function () {
             const was = spinOn;
             const r = _u.apply(this, arguments);
-            try {
-                if (was && r !== false) {
-                    spinOn = false;
-                    const x = usable('luck');
-                    if (x) toast('🐾 ' + nickOf(x) + '이(가) 대신 돌렸다');
-                }
-            } catch (e) { }
+            try { if (was && r !== false) spinArm = true; } catch (e) { }
             return r;
         };
         w._kit = true;
