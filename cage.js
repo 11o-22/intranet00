@@ -99,10 +99,54 @@ function nameOf(code) {
         return (u && u.name) || '룸메이트';
     } catch (e) { return '룸메이트'; }
 }
+// ==========================================
+// 공용 통장 자리 — **양쪽이 같은 열쇠를 봐야 한다**
+// ==========================================
+//
+// ■ 무엇이 문제였나
+//
+//   예전에는 houseStorageRef(dark.js:8797) 에 맡겼다. 그것은
+//   getHouse(user).roomie **한 방향만** 본다.
+//
+//       houseStorageRef(u) = u.house.roomie 가 없으면 u.code
+//                            있으면 [u.code, roomie] 중 작은 쪽
+//
+//   그런데 돈을 넣는 쪽은 **갇힌 사람**을 들고 부른다 (settle → coAdd(m,…)),
+//   보는 쪽은 **나**로 센다 (watchCo). 룸메 연결이 한쪽만 걸려 있으면
+//   (이 저장소가 이미 아는 고장 — house-L.js:143 ghostRoomie) 두 사람이
+//   **서로 다른 열쇠**를 보게 되고, 감금으로 번 돈이 아무도 안 보는 자리로
+//   들어갔다. 「룸메 감금 시켜도 공용통장 돈이 안 늘어난다」가 이것이다.
+//
+//   더 나쁜 점 — 열쇠가 틀려도 트랜잭션은 성공하므로 settle 이 u.paid 를
+//   그대로 박는다. 되돌리는 자리는 쓰기가 **실패**했을 때만 도니까
+//   (coAdd 의 done(false)) 그 토막은 영영 다시 안 들어온다.
+//
+// ■ 어떻게 고치나
+//
+//   짝을 **양쪽으로** 찾는다. 내 쪽에 안 적혀 있으면, 나를 룸메로 적어 둔
+//   사람을 거꾸로 찾는다. 그러면 A 와 B 가 늘 같은 열쇠(두 사번 중 작은
+//   쪽)를 보게 된다. 제대로 걸린 짝은 전과 똑같은 열쇠가 나오므로
+//   이미 쌓인 잔액은 그대로 보인다.
+function mateCode(u) {
+    if (!u || !u.code) return '';
+    const h = u.house || {};
+    if (h.roomie) return String(h.roomie);
+    try {
+        const all = (typeof db !== 'undefined' && db.users) ? db.users : {};
+        const keys = Object.keys(all);
+        for (let i = 0; i < keys.length; i++) {
+            const o = all[keys[i]];
+            if (o && o.house && o.house.roomie
+                && String(o.house.roomie) === String(u.code)) return keys[i];
+        }
+    } catch (e) { }
+    return '';
+}
 function bankRefCode(u) {
-    if (typeof houseStorageRef === 'function') { try { return houseStorageRef(u); } catch (e) { } }
-    const m = mate(u);
-    return m ? [u.code, m.code].sort()[0] : u.code;
+    const who = u || (typeof currentUser !== 'undefined' ? currentUser : null);
+    if (!who || !who.code) return '';
+    const c = mateCode(who);
+    return c ? [String(who.code), c].sort()[0] : String(who.code);
 }
 
 // ==========================================
@@ -245,6 +289,37 @@ function coAdd(u, amt, why, done) {
 window.coBank = function () {
     console.log('%c===== 공용 통장 =====', 'color:#7fd4d4; font-size:13px');
     console.log('  잔액:', coBal.toLocaleString() + ' P', '· 통장 자리:', bankRefCode(currentUser));
+
+    // 짝과 열쇠가 양쪽에서 같은지 — 어긋나면 돈이 아무도 안 보는 자리로 간다
+    const mc = mateCode(currentUser);
+    const m = mc ? (db.users || {})[mc] : null;
+    console.log('  룸메:', mc ? (nameOf(mc) + ' (' + mc + ')') : '없음');
+    if (mc) {
+        const fwd = !!((currentUser.house || {}).roomie);
+        const bwd = !!(m && m.house && String(m.house.roomie) === String(currentUser.code));
+        console.log('  연결:', (fwd ? '내 쪽 O' : '내 쪽 ✗'), '·', (bwd ? '상대 쪽 O' : '상대 쪽 ✗'));
+        if (!fwd || !bwd) {
+            console.warn('  한쪽만 걸려 있습니다 — roomieCheck() 로 맞추십시오.');
+            console.warn('  (통장 열쇠는 이제 양쪽에서 같게 셉니다. 다만 한쪽만 걸린 동안'
+                + ' 벌어 둔 돈은 예전 열쇠에 남아 있을 수 있습니다.)');
+        }
+        if (m) {
+            const mine = bankRefCode(currentUser), his = bankRefCode(m);
+            console.log('  열쇠 — 나:', mine, '· 상대:', his, mine === his ? '(같습니다)' : '(★ 어긋납니다)');
+            // 예전 방식(한 방향만 보는 것)으로는 어디에 들어갔을까
+            if (typeof houseStorageRef === 'function') {
+                try {
+                    const o1 = houseStorageRef(currentUser), o2 = houseStorageRef(m);
+                    if (o1 !== mine || o2 !== mine) {
+                        console.warn('  예전 열쇠 — 나:', o1, '· 상대:', o2,
+                            '— 여기에 남은 돈이 있으면 상담사께 말씀해 주십시오.');
+                    }
+                } catch (e) { }
+            }
+        }
+    }
+    console.log('  돈이 들어오는 길은 족갑(3시간마다)과 착유 머신(5시간 채울 때)뿐입니다.'
+        + ' 가두기만 해서는 안 들어옵니다.');
     if (!coLog.length) { console.log('  기록이 없습니다.'); return; }
     console.table(coLog.slice(0, 20).map(function (x) {
         return { 때: new Date(x.t).toLocaleString(), 금액: (x.a > 0 ? '+' : '') + x.a.toLocaleString(),
