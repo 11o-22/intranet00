@@ -164,8 +164,7 @@ const DOT_SLOTS = [
     {
         k: 'top', n: '상의', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true },
-            { i: 'han', n: '내의', over: ['han-inner'], admin: true }
+            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true }
         ]
     },
     {
@@ -180,7 +179,7 @@ const DOT_SLOTS = [
             { i: 'suit', n: '정장', over: ['suit'], admin: true },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '장옷', over: ['robe'], admin: true },
-            { i: 'duru', n: '두루마기', over: ['han-duru'], admin: true }
+            { i: 'han', n: '내의', over: ['han-inner'], admin: true }
         ]
     },
     {
@@ -193,7 +192,8 @@ const DOT_SLOTS = [
     {
         k: 'cape', n: '망토', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'cape', n: '망토', over: ['cape'], admin: true }
+            { i: 'cape', n: '망토', over: ['cape'], admin: true },
+            { i: 'duru', n: '두루마기', over: ['han-duru'], admin: true }
         ]
     },
     {
