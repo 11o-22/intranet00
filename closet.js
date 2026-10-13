@@ -31,7 +31,7 @@
 // ■ 몸판은 셋뿐이다
 //
 //       body.png        보통 몸
-//       body-brown.png  브라운 전용 몸  ← h-brown 과 반드시 짝
+//       body-brown.png  브라운 전용 몸  ← h-brown 과 반드시 짝 (겉모양은 보통 몸과 같다)
 //       coat.png        옛 코트 (몸까지 한 장에 그려진 것 — 지금은 안 쓴다)
 //
 //   ★ h05 와 h09 는 같은 얼굴(백사헌)인데 **안대가 반대쪽**이다. 뒤집은
@@ -48,9 +48,12 @@
 //   ★ 이름 옆 번호는 **주신 차례**다. 파일 이름(h01…)과는 어긋나 있는데,
 //     파일 이름은 저장된 값이라 그대로 두고 보이는 차례만 맞춘 것이다.
 //
-//   브라운은 몸이 따로 있다. 머리를 브라운으로 고르면 몸도 같이 바뀌고,
-//   옷은 못 갈아입는다. 어느 쪽으로 어긋나게 적혀 있어도 look() 이
-//   **보이는 모습을 늘 말이 되게** 맞춰 준다.
+//   브라운은 몸이 따로 있다. 머리를 브라운으로 고르면 몸도 같이 바뀐다.
+//   ★ 몸 겉모양이 보통 몸과 **100% 같아서** 옷은 그대로 다 맞는다 —
+//     그래서 브라운도 남들처럼 갈아입는다. 전용 몸은 머리 목록의
+//     body 칸에 적어 둔다 (DOT_HEADS 의 h-brown).
+//   어느 쪽으로 어긋나게 적혀 있어도 look() 이 **보이는 모습을 늘
+//   말이 되게** 맞춰 준다.
 //
 // ■ 칸(슬롯)마다 따로 고른다
 //
@@ -133,7 +136,7 @@ const DOT_HEADS = [
     { i: 'h15', n: '은하제' },            // 14
     { i: 'h16', n: 'B조 조장' },          // 15
     { i: 'h17', n: '이성해' },            // 16
-    { i: 'h-brown', n: '브라운', solo: true }   // 17 — 전용 몸과 짝, 옷을 못 입는다
+    { i: 'h-brown', n: '브라운', body: 'body-brown' }   // 17 — 전용 몸과 짝 (옷은 그대로 입는다)
 ];
 
 // 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
@@ -222,9 +225,10 @@ function look(user, override) {
     const u = user || u_() || {};
     const d = override || u.dot || {};
     const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
-    if (head === D.BROWN_HEAD) {
-        return { head: head, body: D.BROWN_BODY, layers: [], tops: [], solo: true, pick: {} };
-    }
+    // ★ 머리가 전용 몸을 들고 있으면 그것을 쓴다 (브라운).
+    //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
+    const hd = DOT_HEADS[headIdx(head)];
+    const bodySheet = hd.body || D.BODY;
     const over = [], tops = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = items(s, u);
@@ -242,7 +246,7 @@ function look(user, override) {
         (it.top || []).forEach(function (o) { tops.push(o); });
     });
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
-    return { head: head, body: D.BODY, layers: over, tops: tops, solo: false, pick: pick };
+    return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick };
 }
 window.dotLook = look;
 
@@ -466,7 +470,6 @@ function paint() {
     host.insertBefore(stage, host.firstChild);
 
     const hi = headIdx(p.head), h = DOT_HEADS[hi];
-    const solo = !!h.solo;
     const set = function (id, text, n, of) {
         const el = document.getElementById(id);
         if (el) el.innerHTML = text + '<span class="num">' + n + ' / ' + of + '</span>';
@@ -475,24 +478,19 @@ function paint() {
 
     DOT_SLOTS.forEach(function (s) {
         const list = items(s, u);
-        const row = document.getElementById('closet-row-' + s.k);
-        if (row) row.style.display = (list.length > 1 || !solo) ? 'flex' : 'flex';
         let k = list.findIndex(function (x) { return x.i === p[s.k]; });
         if (k < 0) k = 0;
-        const lock = solo || list.length < 2;
-        set('closet-' + s.k + '-name', solo ? '—' : list[k].n, solo ? 1 : k + 1, solo ? 1 : list.length);
+        set('closet-' + s.k + '-name', list[k].n, k + 1, list.length);
         ['l', 'r'].forEach(function (d) {
             const b = document.getElementById('closet-' + s.k + '-' + d);
-            if (b) b.disabled = lock;
+            if (b) b.disabled = (list.length < 2);
         });
     });
 
     const note = document.getElementById('closet-note');
     if (note) {
-        note.innerText = solo
-            ? '브라운은 몸이 따로라 옷을 갈아입지 못합니다.'
-            : (isAdm(u) ? '고르는 대로 저장됩니다.'
-                : '고르는 대로 저장됩니다. 지금은 잠옷 한 벌뿐입니다.');
+        note.innerText = isAdm(u) ? '고르는 대로 저장됩니다.'
+            : '고르는 대로 저장됩니다. 지금은 잠옷 한 벌뿐입니다.';
     }
 }
 
@@ -501,7 +499,6 @@ function step(what, d) {
     if (what === 'head') {
         p.head = DOT_HEADS[wrap(headIdx(p.head) + d, DOT_HEADS.length)].i;
     } else {
-        if (DOT_HEADS[headIdx(p.head)].solo) return;
         const s = slotOf(what); if (!s) return;
         const list = items(s, u); if (list.length < 2) return;
         let k = list.findIndex(function (x) { return x.i === p[what]; });
