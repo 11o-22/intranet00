@@ -478,10 +478,37 @@ function copierMake(real) {
             //
             //   그래서 그 자리만 잠깐 원본 이름으로 바꿔 둔다. 쓰이면 그 자리가
             //   그대로 빠지고, 안 쓰였으면 이름을 되돌린다.
+            //   ★ 자리번호(index)를 들고 있지 않는다 — 들고 있으면 엉뚱한 물건을
+            //     건드린다.
+            //
+            //   전에는 slot 에 자리번호를 적어 두고, 아래 세 군데가 그 번호로
+            //   소지품을 건드렸다. 그런데 그 사이에 _u.call(this, real) 이
+            //   소지품 흐름 전체를 돌린다 — 창을 띄우는 물건이면 최대 3분까지
+            //   (copy-potion.js:36) 벌어진다. 그동안 배열이 밀리거나 참조가
+            //   갈리는 자리가 여럿이다.
+            //
+            //       save-merge.js:650   fillArr(…, next.concat(add))  서버 순서로 재구성
+            //       save-merge.js:811   fillArr(…, srv[k])            서버 값이 내려올 때
+            //       user-norm.js:90     toArr(u[k])                   2초마다 · 빈 칸을 떼며 참조 교체
+            //       index.html:9161     currentUser.inventory = me.inventory
+            //
+            //   한 번 어긋나면 inv0[slot] = real 이 **엉뚱한 물건 위에 덮어씌워져**
+            //   그 물건이 사라지고 그 자리에 원본 이름이 하나 생겼다.
+            //   「보유하던 물품 중 무작위 하나가 증식」이 이것이다.
+            //
+            //   그래서 자리번호를 버리고 **이름과 개수**로만 센다. 바꿔 둔 칸과
+            //   원래 들고 있던 원본은 글자가 똑같으므로, 어느 칸을 집어도 결과가
+            //   같다 — 가려야 하는 것은 개수뿐이다.
             const inv0 = currentUser.inventory || (currentUser.inventory = []);
-            const slot = inv0.indexOf(itemName);
-            const renamed = (slot >= 0);
-            if (renamed) inv0[slot] = real;
+            const countOf = function (arr, n) {
+                let c = 0;
+                for (let i = 0; i < (arr || []).length; i++) if (arr[i] === n) c++;
+                return c;
+            };
+            const realBefore = countOf(inv0, real);     // 원래 들고 있던 원본 수
+            const at = inv0.indexOf(itemName);
+            const renamed = (at >= 0);
+            if (renamed) inv0[at] = real;
 
             // ① 시간 효과를 절반으로
             const _ate = addTimedEffect;
@@ -494,20 +521,26 @@ function copierMake(real) {
             removeItemFromInventory = function (u, n, q) {
                 if (!taken && u === currentUser && n === real) {
                     taken = true;
-                    // 이름을 바꿔 둔 자리를 집어서 뺀다 — 원본을 같이 들고 있어도
-                    // 그쪽이 먼저 빠지는 일이 없게 자리번호로 집는다
-                    if (renamed && (u.inventory || [])[slot] === real) {
-                        u.inventory.splice(slot, 1);
-                        return;
+                    // 이름이 똑같은 칸 하나를 뺀다. 원본을 같이 들고 있어도
+                    // 글자가 같으므로 어느 쪽이 빠져도 남는 개수는 같다.
+                    const inv = u.inventory || [];
+                    if (renamed) {
+                        const i = inv.lastIndexOf(real);
+                        if (i >= 0) { inv.splice(i, 1); return; }
                     }
                     return _rm.call(this, u, itemName, 1);
                 }
                 return _rm.apply(this, arguments);
             };
             const back = function () {
-                if (!renamed || taken) return;
+                if (!renamed || taken) return;                  // 쓰였으면 되돌릴 것이 없다
                 const cur = currentUser && currentUser.inventory;
-                if (cur && cur[slot] === real) cur[slot] = itemName;   // 안 쓰였다
+                if (!cur) return;
+                // 바꿔 둔 한 칸만 되돌린다 — 개수로 가린다.
+                // 원래 수보다 많지 않으면 이미 빠졌거나 사라진 것이므로 손대지 않는다.
+                if (countOf(cur, real) <= realBefore) return;
+                const i = cur.lastIndexOf(real);
+                if (i >= 0) cur[i] = itemName;
             };
 
             // 창을 띄워 상대를 고르는 물건은 고른 뒤에 효과가 돈다. 그때는 이미
