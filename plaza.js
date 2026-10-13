@@ -182,12 +182,25 @@ let chatRef = null;
         '.plaza-exit{position:absolute;pointer-events:none;color:#ffe9b0;font-size:15px;',
         '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s infinite;}',
         '@keyframes plazaBob{0%,100%{opacity:.45}50%{opacity:1}}',
-        // 걷기 단추
+        // 걷기 단추 (손가락이 아닌 자리 — 자판이 있는 쪽)
         '#plaza-pad{flex:0 0 auto;display:flex;gap:6px;justify-content:center;padding:8px 10px;',
         '  background:#0d0d12;border-top:1px solid #23232e;}',
         '#plaza-pad button{width:52px;padding:11px 0;font-size:15px;border-radius:7px;',
         '  background:#22222c;border:1px solid #3c3c48;color:#ded7c8;cursor:pointer;}',
         '#plaza-pad button:active{background:#33333f;}',
+        // 조이스틱 — 손가락으로 쥐는 자리. 방 위에 겹쳐 띄워 화면을 안 갉아먹는다.
+        '#plaza-stick{position:absolute;left:16px;bottom:16px;width:104px;height:104px;',
+        '  border-radius:50%;z-index:6;touch-action:none;opacity:.6;',
+        '  transition:opacity .14s;-webkit-tap-highlight-color:transparent;',
+        '  background:radial-gradient(circle at 50% 42%,rgba(26,26,36,.62),rgba(8,8,12,.78));',
+        '  border:1px solid rgba(170,158,126,.45);box-shadow:0 2px 12px rgba(0,0,0,.55);}',
+        '#plaza-stick.on{opacity:.95;}',
+        '#plaza-stick .ring{position:absolute;inset:15px;border-radius:50%;',
+        '  border:1px dashed rgba(190,178,146,.2);pointer-events:none;}',
+        '#plaza-knob{position:absolute;left:50%;top:50%;width:46px;height:46px;',
+        '  margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;',
+        '  background:radial-gradient(circle at 36% 32%,#7b7160,#2e2c36);',
+        '  border:1px solid rgba(226,214,180,.55);box-shadow:0 2px 7px rgba(0,0,0,.6);}',
         // 말
         '#plaza-chat{flex:0 0 auto;background:#0b0b10;border-top:1px solid #23232e;}',
         '#plaza-log{height:92px;overflow-y:auto;padding:7px 10px;font-size:11px;line-height:1.65;}',
@@ -357,6 +370,9 @@ function tick(ts) {
     if (k.up) dy -= 1;
     if (k.down) dy += 1;
 
+    // ─ 조이스틱이 먼저다. 민 만큼만 걷는다 (살짝 밀면 느리게).
+    if (run.ax || run.ay) { dx = run.ax; dy = run.ay; }
+
     if (dx || dy) run.tx = null;
     else if (run.tx != null) {
         const ax = run.tx - run.x, ay = run.ty - run.y;
@@ -365,11 +381,15 @@ function tick(ts) {
         else { dx = ax / d; dy = ay / d; }
     }
 
-    const moving = !!(dx || dy);
+    // 대각선이 더 빠르지 않게 1 로 자른다. 1 보다 작은 것은 그대로 둔다
+    // — 자판은 늘 1 이고, 조이스틱만 그 사이 값이 온다.
+    let mag = Math.hypot(dx, dy);
+    if (mag > 1) { dx /= mag; dy /= mag; mag = 1; }
+
+    const moving = mag > 0.001;
     if (moving) {
-        const n = Math.hypot(dx, dy) || 1;
-        run.x += (dx / n) * P.SPEED * dt;
-        run.y += (dy / n) * P.SPEED * dt;
+        run.x += dx * P.SPEED * dt;
+        run.y += dy * P.SPEED * dt;
 
         // ─ 넘어간 직후에는 쉬어 간다 (두 방을 끝없이 오가지 않게)
         if (now() - (run.warp || 0) > P.WARP_MS) {
@@ -384,8 +404,9 @@ function tick(ts) {
 
         run.x = Math.max(P.EDGE, Math.min(r.w - P.EDGE, run.x));
         run.y = Math.max(r.floor[0], Math.min(r.floor[1], run.y));
-        if (dx < -0.01) run.me.actor.face(1);
-        else if (dx > 0.01) run.me.actor.face(-1);
+        // 거의 위아래로만 밀었을 때 좌우가 깜빡이지 않게 턱을 조금 둔다
+        if (dx < -0.08) run.me.actor.face(1);
+        else if (dx > 0.08) run.me.actor.face(-1);
     }
     run.me.actor.moving(moving);
     putOne(run.me, run.x, run.y);
@@ -617,6 +638,12 @@ function open() {
     }
     if (run) return;
 
+    // 손가락으로 만지는 기계인가 — 그러면 조이스틱, 아니면 방향 단추.
+    //
+    //   조이스틱은 방 위에 겹쳐 띄운다. 아래에 한 칸을 더 두면 그만큼
+    //   방이 좁아지는데, 좁은 화면에서는 그 한 칸이 아깝다.
+    const touch = !!(('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
+
     const ov = document.createElement('div');
     ov.id = 'plaza-ov';
     ov.innerHTML =
@@ -624,13 +651,16 @@ function open() {
         + '<div class="ttl" id="plaza-title">🚶 광장</div>'
         + '<div class="x" id="plaza-x">나간다</div>'
         + '</div>'
-        + '<div id="plaza-view"><div id="plaza-room"></div></div>'
-        + '<div id="plaza-pad">'
-        + '<button data-k="left">◀</button>'
-        + '<button data-k="up">▲</button>'
-        + '<button data-k="down">▼</button>'
-        + '<button data-k="right">▶</button>'
+        + '<div id="plaza-view"><div id="plaza-room"></div>'
+        + (touch ? '<div id="plaza-stick"><div class="ring"></div><div id="plaza-knob"></div></div>' : '')
         + '</div>'
+        + (touch ? '' :
+            '<div id="plaza-pad">'
+            + '<button data-k="left">◀</button>'
+            + '<button data-k="up">▲</button>'
+            + '<button data-k="down">▼</button>'
+            + '<button data-k="right">▶</button>'
+            + '</div>')
         + '<div id="plaza-who"></div>'
         + '<div id="plaza-chat">'
         + '<div id="plaza-log"></div>'
@@ -643,7 +673,7 @@ function open() {
     run = {
         room: null, el: document.getElementById('plaza-room'),
         view: document.getElementById('plaza-view'),
-        peers: {}, keys: {}, x: 0, y: 0, tx: null, ty: null,
+        peers: {}, keys: {}, ax: 0, ay: 0, x: 0, y: 0, tx: null, ty: null,
         cx: 0, cy: 0, last: performance.now(), raf: 0,
         sx: -9999, sy: -9999, sent: 0, sMoving: false, sFace: 1,
         say: '', sayAt: 0, sSayAt: 0, k: 0.75, ref: null, me: null
@@ -652,6 +682,8 @@ function open() {
     // 바닥을 누르면 그 자리로 간다
     run.view.addEventListener('pointerdown', function (e) {
         if (!run) return;
+        // 조이스틱을 쥔 것은 바닥을 누른 것이 아니다
+        try { if (e.target && e.target.closest && e.target.closest('#plaza-stick')) return; } catch (x) { }
         const r = roomOf();
         const b = run.view.getBoundingClientRect();
         const x = e.clientX - b.left + run.cx;
@@ -659,6 +691,65 @@ function open() {
         run.tx = Math.max(P.EDGE, Math.min(r.w - P.EDGE, x));
         run.ty = Math.max(r.floor[0], Math.min(r.floor[1], y));
     });
+
+    // ─ 조이스틱 — 쥔 쪽으로, 민 만큼 걷는다
+    //
+    //   테두리 안쪽 어디를 눌러도 쥐어진다 (손가락이 손잡이를 정확히
+    //   짚지 않아도 된다). 쥐는 순간 그 손가락을 붙잡아 두므로
+    //   (setPointerCapture) 테두리 밖으로 끌고 나가도 끊기지 않는다.
+    (function stick() {
+        const st = ov.querySelector('#plaza-stick');
+        if (!st) return;
+        const knob = st.querySelector('#plaza-knob');
+        const DEAD = 0.18;            // 이만큼 안 밀면 안 움직인다 (손 떨림 몫)
+        const REACH = 0.62;           // 손잡이가 테두리까지 다 안 나가게
+        let id = null;
+
+        const put = function (x, y) {
+            knob.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+        };
+        const read = function (e) {
+            if (!run) return;
+            const b = st.getBoundingClientRect();
+            const max = b.width / 2 || 52;
+            let x = e.clientX - (b.left + max);
+            let y = e.clientY - (b.top + b.height / 2);
+            const d = Math.hypot(x, y);
+            if (d > max) { x = x / d * max; y = y / d * max; }
+            put(x * REACH, y * REACH);
+            let m = Math.min(1, d / max);
+            if (m < DEAD) { run.ax = 0; run.ay = 0; return; }
+            m = (m - DEAD) / (1 - DEAD);            // 턱을 넘은 만큼을 0~1 로 펴 준다
+            const n = Math.hypot(x, y) || 1;
+            run.ax = x / n * m;
+            run.ay = y / n * m;
+            run.tx = null;                           // 쥐면 눌러 둔 자리는 버린다
+        };
+        const off = function (e) {
+            if (id === null || (e && e.pointerId !== undefined && e.pointerId !== id)) return;
+            id = null;
+            st.classList.remove('on');
+            put(0, 0);
+            if (run) { run.ax = 0; run.ay = 0; }
+        };
+        st.addEventListener('pointerdown', function (e) {
+            if (!run) return;
+            e.preventDefault();
+            e.stopPropagation();
+            id = e.pointerId;
+            st.classList.add('on');
+            try { st.setPointerCapture(id); } catch (x) { }
+            read(e);
+        });
+        st.addEventListener('pointermove', function (e) {
+            if (id === null || e.pointerId !== id) return;
+            e.preventDefault();
+            read(e);
+        });
+        st.addEventListener('pointerup', off);
+        st.addEventListener('pointercancel', off);
+        st.addEventListener('lostpointercapture', off);
+    })();
 
     // 단추 — 누르는 동안 걷는다
     Array.prototype.forEach.call(ov.querySelectorAll('#plaza-pad button'), function (b) {
