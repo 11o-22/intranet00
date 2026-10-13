@@ -544,6 +544,8 @@ function goRoom(key, way) {
     run.y = Math.max(r.floor[0], Math.min(r.floor[1], run.y));
     run.tx = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
+    run.lines = [];                         // 방이 바뀌면 말도 새로 시작한다
+    run._swept = false;                     // 새 방에서 한 번 쓸어 낸다
 
     // ★ 방을 먼저 그린다 — 그래야 늘린 배(run.z)가 정해져 사람이 제자리에 선다
     paintRoom();
@@ -751,6 +753,23 @@ function onPeers(snap) {
 
     Object.keys(run.peers).forEach(function (code) { if (!live[code]) dropPeer(code); });
     showWho();
+
+    // ★ 들어와 보니 아무도 없으면, 전에 누가 남기고 간 말을 치운다.
+    //
+    //   나갈 때 지우는 것만으로는 모자라다 — 창을 그냥 닫거나 끊기면 지울
+    //   틈이 없다. 그래서 들어온 쪽에서도 한 번 쓸어 낸다. 사람이 있으면
+    //   이야기가 이어지는 중이므로 손대지 않는다.
+    if (!run._swept) {
+        run._swept = true;
+        if (!Object.keys(run.peers).length) {
+            try { const d = db_(); if (d) d.ref(P.CHAT + '/' + run.room).remove(); } catch (e) { }
+            setTimeout(function () {
+                if (!run) return;
+                run.lines = (run.lines || []).filter(function (o) { return o.sys; });
+                paintLog();
+            }, 600);
+        }
+    }
 }
 
 function dropPeer(code) {
@@ -763,6 +782,17 @@ function dropPeer(code) {
 function leaveRoom() {
     const u = u_();
     if (!run || !run.ref || !u) return;
+    // ★ 광장에서 한 말은 안 남긴다 — **마지막 사람이 나가면 그 방의 말을 지운다.**
+    //
+    //   들어올 때마다 지우면 안 된다. 남이 아직 안에서 이야기하는 중일 수
+    //   있기 때문이다. 그래서 나가는 사람이 「나 말고 아무도 없다」일 때만
+    //   지운다. 다음에 들어오면 빈 채로 시작한다.
+    try {
+        if (!Object.keys(run.peers || {}).length) {
+            const d = db_();
+            if (d) d.ref(P.CHAT + '/' + run.room).remove();
+        }
+    } catch (e) { }
     try { run.ref.child(u.code).onDisconnect().cancel(); } catch (e) { }
     try { run.ref.child(u.code).remove(); } catch (e) { }
     try { run.ref.off('value', run.onRoom); } catch (e) { }
