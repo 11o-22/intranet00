@@ -979,7 +979,17 @@ window.mjOnChange = function (t) {
         if (el && el.style.display !== 'none') safePaint(t);
         if (!t || t.state !== 'DONE') { shownEnd = ''; return; }
         // 끝난 판은 창이 닫혀 있어도 한 번 띄운다 (정산보다 먼저 — 1위는 곧 격리가 풀린다)
-        if (shownEnd !== t.id && arr(t.result && t.result.rank).length) { shownEnd = t.id; paintEnd(t); }
+        //
+        // ★ 그림 그리기를 따로 감싼다.
+        //   전에는 paintEnd 와 settle 이 한 try 안에 있었다. 그래서 끝 화면을
+        //   그리다 어디서든 터지면 **정산이 아예 안 불렸다** — 포인트도 안
+        //   옮겨지고 1위 격리도 안 풀렸다. 격리 해제가 그림 그리기에
+        //   매달려 있을 까닭이 없다.
+        try {
+            if (shownEnd !== t.id && arr(t.result && t.result.rank).length) {
+                shownEnd = t.id; paintEnd(t);
+            }
+        } catch (e) { console.warn('[마작] 끝 화면', e); }
         settle(t);
     } catch (e) { console.warn('[마작] 화면', e); }
 };

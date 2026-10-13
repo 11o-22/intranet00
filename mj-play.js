@@ -301,9 +301,28 @@ function fire() {
 
 // tick 은 자료가 바뀔 때만 돌았다. 그래서 「아무도 아무것도 안 하면」
 // 기다림이 영영 안 끝났다. 앉아 있는 동안 1초에 한 번 떠민다.
+// ★ 1초 tick 이 터지면 **조용히** 멎던 것
+//
+//   END 되살리기(:590 의 doRon → settleWin)로 가는 길목이 이 두 tick 뿐이다.
+//   그런데 둘 다 catch 가 비어 있어서, 론 정산이 터지면 1초마다 조용히
+//   터지기만 하고 아무 흔적이 없었다. 「론을 쳤는데 안 끝난다」를 쫓을 때
+//   볼 것이 하나도 없던 까닭이다.
+//
+//   같은 말을 1초마다 쏟으면 콘솔이 묻히므로 30초에 한 번만 적는다.
+let tickWarnAt = 0;
+function tickSafe(where) {
+    try { tick(); }
+    catch (e) {
+        if (now() - tickWarnAt < 30000) return;
+        tickWarnAt = now();
+        console.warn('[마작] ' + where + ' 에서 걸렸습니다 —', e && (e.stack || e.message || e));
+        console.warn('[마작] mjWhy() 로 판 상태를 보실 수 있습니다.');
+    }
+}
+
 setInterval(function () {
     if (!cur || !cur.t) return;
-    try { tick(); } catch (e) { }
+    tickSafe('앉아 있는 동안의 1초 진행');
 }, 1000);
 
 // 들어오면 내가 앉아 있던 자리를 찾아 붙는다
@@ -461,15 +480,53 @@ window.mjRiichi = riichiDiscard;
 function claim(kind, tiles) {
     const u = me(); if (!u || !cur) return;
     const id = cur.id;
+    let why = '';
     return tx(ROOT + '/' + id, function (t) {
-        if (!t || t.state !== 'PLAY' || !t.h) return;
+        why = '';
+        if (!t || t.state !== 'PLAY' || !t.h) { why = '판이 끝났습니다.'; return; }
         const h = t.h;
-        if (h.phase !== 'CLAIM' || !h.last) return;
-        if (seatOf(t, u.code) === h.last.by) return;
+        if (!h.last) { why = '버린 패가 없습니다.'; return; }
+        if (seatOf(t, u.code) === h.last.by) { why = '제가 버린 패입니다.'; return; }
+
+        // ★ 늦은 론을 받아 준다
+        //
+        //   후로 창을 닫는 셈은 **기기마다 따로** 돈다 (claimSeen, 아래 566줄).
+        //   그래서 화면이 꺼지거나 탭이 뒤로 가서 내 setInterval 이 멈춘 사이,
+        //   남의 기기가 15초를 먼저 세고 resolveClaims → nextTurn(:736) 을 질러
+        //   phase 를 CLAIM → DRAW 로 넘겨 버린다. 그 뒤에 누른 론은 예전에는
+        //   여기서 **말없이 포기**됐다 — 창도 안 뜨고 콘솔에도 안 남았다.
+        //   「론을 외쳐도 판이 안 끝난다」가 이 자리다.
+        //
+        //   d95c2b2 가 고친 것은 h._ron 을 적은 **뒤**의 길이다. 이것은 적기
+        //   **전**에 끊기므로 그 END 되살리기(:590)가 손쓸 데가 없었다.
+        //
+        //   버림(h.last)이 그대로이고 **아직 아무도 패를 안 가져갔으면**
+        //   (nextTurn 은 phase 만 넘기고 패는 안 뽑는다 — h.drawn 은 버릴 때
+        //   null 이 되고 뽑을 때(:382) 비로소 들어간다) 그 론은 여전히 옳다.
+        //   늦었을 뿐이다. 그래서 받아 주고 창을 CLAIM 으로 되돌려
+        //   resolveClaims 가 평소대로 가리게 한다.
+        const late = (kind === 'ron' && h.phase === 'DRAW' && h.drawn == null);
+        if (h.phase !== 'CLAIM' && !late) {
+            why = (kind === 'pass') ? '' : '후로 창이 이미 닫혔습니다.';
+            return;
+        }
+        if (late) h.phase = 'CLAIM';
         h.claims = h.claims || {};
         h.claims[u.code] = { kind: kind, tiles: tiles || null, at: now() };
         return t;
-    }).then(function () { setTimeout(function () { try { tick(); } catch (e) { } }, 60); });
+    }).then(function (r) {
+        setTimeout(function () {
+            try { tick(); } catch (e) { console.warn('[마작] 후로 뒤 진행', e); }
+        }, 60);
+        // ★ 포기됐으면 **말을 해 준다.** 전에는 결과를 통째로 버려서
+        //   아무 일도 안 난 것과 구분이 안 됐다.
+        if (r && r.committed) return r;
+        if (why) {
+            if (typeof showCustomAlert === 'function') showCustomAlert(why);
+            else console.warn('[마작] ' + why);
+        }
+        return r;
+    });
 }
 window.mjClaim = claim;
 window.mjPass = function () { return claim('pass'); };
@@ -949,7 +1006,7 @@ window.mjWhy = function () {
 };
 
 // 바뀐 것이 없어도 시간은 흐른다 — 후로 창과 굳은 차례를 여기서 본다
-setInterval(function () { try { tick(); } catch (e) { } }, 1000);
+setInterval(function () { tickSafe('1초 진행'); }, 1000);
 
 console.log('[마작] 판 진행 — mjTables() · mjState() · mjWhy()');
 
