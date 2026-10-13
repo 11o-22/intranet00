@@ -660,19 +660,46 @@ function myParty() {
 function pushRoomKits() {
     const me = u_();
     const p = myParty();
-    if (!me || !p || !p.id) return;
+    if (!me || !p || !p.id) return 0;
+    if (p.leader !== me.code) return 0;      // 방을 만든 사람만 분신을 데려간다
     const d = db_();
     const out = {};
-    roomPicked(me).forEach(function (k) {
-        out[k] = { by: me.code, byName: me.name, nick: st(me, k).nick || BY_K[k].n };
-    });
-    if (p.leader !== me.code) return;        // 방을 만든 사람만 분신을 데려간다
+    // ★ 차고 있어야 센다. 벗으면 데려갈 수 없는데 방에는 적힌 채로 남아
+    //   남의 화면에만 분신이 보이던 것을 여기서 막는다.
+    if (wears(me)) {
+        roomPicked(me).forEach(function (k) {
+            out[k] = { by: me.code, byName: me.name, nick: st(me, k).nick || BY_K[k].n };
+        });
+    }
+    const n = Object.keys(out).length;
     try {
-        if (d) d.ref('darkParties/' + p.id + '/kits').set(Object.keys(out).length ? out : null);
+        if (d) d.ref('darkParties/' + p.id + '/kits').set(n ? out : null);
     } catch (e) { }
     p.kits = out;
+    return n;
 }
 window.kitPushRoom = pushRoomKits;
+
+// ==========================================
+// 방에 들어간 분신 — 방 안의 **모두**가 같은 것을 본다
+// ==========================================
+//
+//   방장은 제 기록(kitRoom)이 바로 반영되고, 나머지 사원은 방에 적힌
+//   것(p.kits)을 본다. 방장이 벗거나 분신이 소멸하면 어긋나므로,
+//   방장 화면이 그릴 때마다 어긋난 것을 다시 적는다.
+function roomKitList(p, me) {
+    if (!p) return [];
+    if (me && p.leader === me.code) {
+        if (!wears(me)) return [];
+        return roomPicked(me).map(function (k) {
+            return { k: k, nick: st(me, k).nick || BY_K[k].n, g: gradeOf(me, k) };
+        });
+    }
+    const kits = (p.kits && typeof p.kits === 'object' && !Array.isArray(p.kits)) ? p.kits : {};
+    return Object.keys(kits).filter(function (k) { return BY_K[k]; }).map(function (k) {
+        return { k: k, nick: (kits[k] && kits[k].nick) || BY_K[k].n, g: '' };
+    });
+}
 
 // ==========================================
 // 응시 — 띄울 물품 정하기
@@ -1337,7 +1364,8 @@ let bypass = false;
                 const p = myParty();
                 if (me && wears(me) && p && p.leader === me.code
                     && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
-                    const n = roomPicked(me).length;
+                    // 방 화면이 보여 준 것과 **같은 수**를 쓴다
+                    const n = roomKitList(p, me).length;
                     if (n > 0) {
                         z = DARK_ZONES[p.zone];
                         min0 = z.min;
@@ -1363,31 +1391,168 @@ let bypass = false;
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-// 방 화면에 [🐾 분신] 단추 — 들어가 있는 방에도 더할 수 있다
-(function partyBtn() {
-    const ID = 'kit-party-btn';
-    setInterval(function () {
-        try {
+// ==========================================
+// 방 화면 — 분신을 **보이게** 하고 진입 단추를 열어 준다
+// ==========================================
+//
+// ■ 무엇이 안 됐나
+//
+//   분신을 골라 두면 방에도 서버에도 제대로 적혔다 (darkParties/<방>/kits).
+//   그런데 **아무도 그것을 읽지 않았다.** 그래서
+//
+//     · 방 화면에 분신이 한 마리도 안 보였고
+//     · 진입 단추가 꺼진 채였다
+//
+//   꺼져 있던 까닭은 관문이 다른 곳에 있었기 때문이다.
+//
+//       index.html:3365   canStart = members.length >= z.min && 전원 준비
+//       index.html:3416   canStart 가 거짓이면 단추에 disabled
+//
+//   아래 hookLaunch 가 launchParty 안에서 z.min 을 낮추고는 있었지만,
+//   단추가 꺼져 있어서 **그 함수에 손으로 닿을 수가 없었다.** 콘솔에서
+//   launchParty() 를 직접 부르면 출발했다 — 훅은 처음부터 제대로 돌고
+//   있었고, 막혀 있던 것은 그 앞의 단추였다.
+//
+// ■ 어떻게 고치나
+//
+//   방 화면을 그리는 동안만 z.min 을 분신 수만큼 낮춘다. launchParty 에
+//   쓰던 것과 똑같은 방식이다. 그러면 canStart 가 참이 되어 단추가 열리고,
+//   열린 단추가 부르는 launchParty 에는 이미 훅이 걸려 있다.
+//
+//   낮춘 값이 「정원 1~5인」처럼 새어 나가는 한 줄만 원래 값으로 되돌리고,
+//   참가자 목록 아래에 분신 칸을 끼워 넣는다. 방 안의 모두가 같은 것을
+//   본다 — 방장은 제 기록으로, 나머지는 방에 적힌 것으로.
+//
+//   [🐾 데려갈 분신 고르기] 단추도 그 칸 안으로 들어왔다. 전에는 2초마다
+//   도는 시계가 방 화면 밑에 붙였다 떼었다 했다 — 다시 그릴 때마다
+//   지워지고 2초 뒤에 돌아오느라 깜빡였다.
+function kitRoomBox(p, me, min0, low, list) {
+    const mine = !!(me && p.leader === me.code);
+    const rows = list.map(function (x) {
+        return '<div style="display:flex; align-items:center; gap:7px; padding:5px 0;">'
+            + '<div style="flex:1; min-width:0; font-size:11.5px; color:#e6ddd0;">'
+            + '<span style="color:#ffcf8f;">' + (BY_K[x.k] ? BY_K[x.k].icon : '🐾') + '</span> '
+            + esc(x.nick)
+            + ' <span style="font-size:9px; color:#8d8578;">' + esc(BY_K[x.k].n) + ' 분신'
+            + (x.g ? ' · ' + esc(x.g) : '') + '</span></div></div>';
+    }).join('');
+
+    return '<div id="kit-room-box" style="background:rgba(217,160,90,0.07);'
+        + ' border:1px solid #8a5a2a; border-radius:6px; padding:11px; margin:12px 0;">'
+        + '<div style="font-size:11px; color:#d9a05a; font-weight:bold; margin-bottom:5px;">'
+        + '🐾 데려가는 분신 ' + list.length + '마리</div>'
+        + (list.length
+            ? rows + '<div style="font-size:9.5px; color:#8d8578; margin-top:5px;'
+                   + ' border-top:1px solid #3a3027; padding-top:6px; line-height:1.6;">'
+                   + (min0 > low
+                        ? '최소 인원 <b style="color:#d9a05a;">' + min0 + '인 → ' + low + '인</b>'
+                          + ' — 분신이 빈자리를 채웁니다.'
+                        : '최소 인원이 이미 ' + min0 + '인이라 더 낮출 것이 없습니다.')
+                   + '<br>분신은 사람 수에는 안 들어갑니다 (보상·난이도는 사람 수로 셉니다).'
+                   + '</div>'
+            : '<div style="font-size:10px; color:#8d8578; line-height:1.6;">'
+              + (mine ? '아직 아무도 안 골랐습니다. 아래에서 고르면 최소 인원을 채웁니다.'
+                      : '방장이 데려가는 분신이 없습니다.') + '</div>')
+        + (mine && wears(me)
+            ? '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:9px;'
+              + ' font-size:11px; background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
+              + ' border-color:#d9a05a !important;" onclick="kitRoomPick()">'
+              + '🐾 데려갈 분신 고르기</button>'
+            : '')
+        + '</div>';
+}
+
+// ★ 다 그린 뒤에 innerHTML 을 다시 쓰지 않는다
+//
+//   renderPartyRoom 은 맨 끝에서 파티 대화창에 쓰던 글과 커서를 되돌려
+//   놓는다 (index.html:3442). 다 그린 뒤에 innerHTML 을 손대면 그게
+//   날아가서, 대화를 치는 중에 방이 다시 그려질 때마다 글이 지워진다.
+//   그래서 **그리는 동안** 끼워 넣는다 — 방 화면이 제 틀 안에서 부르는
+//   buildChatHtml 의 앞에 붙인다. 그 뒤에 대화창 되돌리기가 돌므로
+//   글도 커서도 그대로다.
+let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그리는 중
+
+(function hookChatSlot() {
+    const iv = setInterval(function () {
+        if (typeof buildChatHtml !== 'function') return;
+        if (buildChatHtml._kit) { clearInterval(iv); return; }
+        const _b = buildChatHtml;
+        const w = function () {
+            const out = _b.apply(this, arguments);
+            if (!drawing) return out;              // 방 화면 밖에서는 건드리지 않는다
+            try {
+                const r = drawing;
+                return kitRoomBox(r.p, r.me, r.min0, r.low, r.list) + out;
+            } catch (e) { return out; }
+        };
+        w._kit = true;
+        buildChatHtml = w;
+        window.buildChatHtml = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+(function hookRoomRender() {
+    const iv = setInterval(function () {
+        if (typeof renderPartyRoom !== 'function') return;
+        if (renderPartyRoom._kit) { clearInterval(iv); return; }
+        const _r = renderPartyRoom;
+        const w = function (p, body) {
             const me = u_();
-            const old = document.querySelector('#' + ID);
-            const p = myParty();
-            if (!me || !wears(me) || !p) { if (old) old.remove(); return; }
-            if (old && old.isConnected) return;
-            const host = document.getElementById('party-detail')
-                || document.getElementById('party-room')
-                || document.getElementById('dark-party-body');
-            if (!host) return;
-            const b = document.createElement('button');
-            b.id = ID;
-            b.className = 'game-btn';
-            b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:10px; font-size:11.5px;'
-                + ' background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
-                + ' border-color:#d9a05a !important;';
-            b.textContent = '🐾 데려갈 분신 고르기';
-            b.onclick = window.kitRoomPick;
-            host.appendChild(b);
-        } catch (e) { }
-    }, 2000);
+            let z = null, min0 = null, low = null, list = [], show = false;
+
+            try {
+                if (me && p && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
+                    z = DARK_ZONES[p.zone];
+                    list = roomKitList(p, me);
+                    // 방장 화면이 그릴 때, 방에 적힌 것이 어긋나 있으면 다시 적는다
+                    if (p.leader === me.code) {
+                        const a = list.map(function (x) { return x.k; }).sort().join(',');
+                        const b = Object.keys((p.kits && typeof p.kits === 'object'
+                            && !Array.isArray(p.kits)) ? p.kits : {}).sort().join(',');
+                        if (a !== b) pushRoomKits();
+                    }
+                    min0 = z.min;
+                    low = Math.max(1, min0 - list.length);
+                    show = !!(list.length || (wears(me) && p.leader === me.code));
+                    // ★ 여기서 최소 인원을 낮춘다 — canStart 가 이 값을 본다
+                    //   (index.html:3365) 그래서 진입 단추가 열린다
+                    if (list.length) z.min = low;
+                    if (show) drawing = { p: p, me: me, min0: min0, low: low, list: list };
+                }
+            } catch (e) { }
+
+            let out;
+            try { out = _r.apply(this, arguments); }
+            finally {
+                drawing = null;
+                if (z && min0 != null) z.min = min0;
+            }
+
+            // 대화창 틀을 못 찾았을 때만 — 맨 끝에 따로 붙인다.
+            // appendChild 는 이미 있는 것을 건드리지 않으므로 대화 글이 안 날아간다.
+            try {
+                // 먼저 지난번에 붙인 것을 걷는다. 보통은 innerHTML 이 다시 쓰이면서
+                // 같이 지워지지만, 안 지워지는 길로 들어와도 늘어나지 않게 한다.
+                const stale = document.getElementById('kit-room-fallback');
+                if (stale) stale.remove();
+                if (show && body && String(body.innerHTML || '').indexOf('kit-room-box') < 0) {
+                    const el = document.createElement('div');
+                    el.id = 'kit-room-fallback';
+                    el.innerHTML = kitRoomBox(p, me, min0, low, list);
+                    body.appendChild(el);
+                }
+            } catch (e) { }
+            return out;
+        };
+        w._kit = true;
+        renderPartyRoom = w;
+        window.renderPartyRoom = w;
+        clearInterval(iv);
+        console.log('[아기 여우] 방 화면 — 분신 칸과 진입 단추 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
 // ==========================================
