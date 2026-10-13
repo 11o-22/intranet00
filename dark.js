@@ -3121,8 +3121,42 @@ const GEAR_UPGRADE = {
         gaze:  3       // 기억 판정 보정
     };
 
+    // ★ attrs 를 읽기 전에 **배열로 되돌린다**
+    //
+    //   전용 장비의 속성은 u.soulGear.attrs 배열에 적힌다. 그런데 파이어베이스는
+    //   열쇠가 전부 숫자인 것을 **배열로 돌려주고, 빈 것과 중간 구멍은 지운다.**
+    //   그래서 서버에서 돌아온 attrs 가 { "0":"heal", "2":"luck" } 꼴의
+    //   **객체**일 수 있다. 그러면 아래 셋이 한꺼번에 어긋났다.
+    //
+    //     gearValue   g.attrs.includes(attr)  → includes 가 함수가 아니다 →
+    //                 TypeError 가 DC 셈 한가운데(dark.js:2147 · 2899 · 3989 ·
+    //                 4092 · 4151)에서 try 없이 튀어 장면이 멎는다
+    //     gearLabel   g.attrs.length          → undefined > 0 이라 속성을
+    //                 새겼는데도 「속성 미지정」으로 보인다
+    //     gearAttrGrade  indexOf 가 없어 등급도 못 읽는다
+    //
+    //   「전용 무기 안 먹힘」이 이것이다. user-norm.js:108 이 2초마다 쓸어
+    //   담아 주지만, 로그인 직후와 서버 꾸러미가 내려온 직후에는 창이 열려
+    //   있었다. 읽는 자리에서 막는 쪽이 확실하다 — 세 함수가 모두 이 하나를
+    //   거쳐 간다.
+    function gearArr(v) {
+        if (Array.isArray(v)) return v.filter(function (x) { return x != null; });
+        if (v && typeof v === 'object') {
+            return Object.keys(v).sort(function (a, b) { return Number(a) - Number(b); })
+                .map(function (k) { return v[k]; })
+                .filter(function (x) { return x != null; });
+        }
+        return [];
+    }
+
     function getGear(user) {
-        return (user && user.soulGear) ? user.soulGear : null;
+        const g = (user && user.soulGear) ? user.soulGear : null;
+        if (!g) return null;
+        if (!Array.isArray(g.attrs)) g.attrs = gearArr(g.attrs);
+        if (g.giftSlots !== undefined && !Array.isArray(g.giftSlots)) {
+            g.giftSlots = gearArr(g.giftSlots);
+        }
+        return g;
     }
 
     function gearHas(user, attr) {
@@ -3133,6 +3167,9 @@ const GEAR_UPGRADE = {
         // 속성별 등급 — 첫 속성은 본체 등급, 나머지는 각자 등급 (없으면 D)
     function gearAttrGrade(g, attr) {
         if (!g || !g.attrs) return 'D';
+        // 여기는 getGear 를 안 거치고 soulGear 를 바로 받는 자리가 있다
+        // (gear-break.js:33 · index.html:10310 · awaken.js:28) — 같이 받친다
+        if (!Array.isArray(g.attrs)) g.attrs = gearArr(g.attrs);
         const idx = g.attrs.indexOf(attr);
         if (idx <= 0) return g.grade;
         return (g.attrGrades && g.attrGrades[attr]) || 'D';
