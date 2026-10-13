@@ -56,10 +56,14 @@
 //
 // ■ 방
 //
-//   장착자는 **구역이 차 있어도** 방을 만들 수 있고, 모자란 최소 인원을
-//   분신으로 채운다. 데려갈 분신은 방을 만들 때 고르고, 이미 만든 방에도
-//   더 넣을 수 있다. **남에게 붙여 준 분신은 데려갈 수 없다** — 그쪽
-//   사람 곁에 있기 때문이다.
+//   장착자는 **구역이 차 있어도** 방을 만들 수 있다. 다른 팀이 이미
+//   편성해 두었거나 탐사 중인 구역에도 모집 단추가 열린다.
+//
+//   데려갈 분신은 방을 만들 때 고르고, 이미 만든 방에도 더 넣을 수 있다.
+//   **남의 방에 들어가서도 데려간다** — 방장만의 몫이 아니다. 방 안의
+//   누구든 제 분신을 부르고, 모자란 최소 인원은 그 모두를 합한 수로
+//   채운다. **남에게 붙여 준 분신은 데려갈 수 없다** — 그쪽 사람 곁에
+//   있기 때문이다.
 //
 // ■ 적히는 자리
 //
@@ -68,7 +72,9 @@
 //   u.kitDay = 'YYYY-MM-DD'                                 자정 되살림 기준
 //   u.kitRoom= { evade:1, … }                               방에 데려갈 분신
 //   u.kitWish= { q:'<??? 물품>', r:'<유쾌 판매소 물품>' }    응시가 띄울 것
-//   darkParties/<방>/kits = { evade:{ by, byName, nick }, … }
+//   darkParties/<방>/kits/<사번> = { evade:{ by, byName, nick }, … }
+//                                   사람마다 따로 적는다 (예전에는 방장
+//                                   몫만 통째로 적었다 — 그 꼴도 읽는다)
 //
 //   ★ 남의 글을 통째로 덮어쓰지 않는다. 분신 한 마리를 건드릴 때는
 //     users/<사번>/kits/<속성> 처럼 **자식 길**로만 쓴다. 통째 쓰기는
@@ -559,7 +565,11 @@ function sendTo(k, code) {
 
     kitPatch(me.code, k, { to: code, toName: t.name });
     // 방에 데려가기로 해 두었다면 뺀다 — 남에게 간 분신은 데려갈 수 없다
-    if (me.kitRoom && me.kitRoom[k]) { delete me.kitRoom[k]; roomSave(me); }
+    if (me.kitRoom && me.kitRoom[k]) {
+        delete me.kitRoom[k];
+        roomSave(me);
+        try { pushRoomKits(); } catch (e) { }       // 들어가 있는 방에서도 뺀다
+    }
     onPatch(code, k, { by: me.code, byName: me.name, nick: nick, grade: gradeOf(me, k) });
     addNote(t, k);
     log_(t, '[' + NAME + '] ' + me.name + ' 사원의 ' + nick + '이(가) 함께합니다.');
@@ -631,7 +641,8 @@ window.kitRoomPick = function () {
             + '</div></label>';
     }).join('');
     const w = box(head('방에 데려갈 분신',
-        '방을 만들 때 최소 인원을 이 분신들로 채웁니다.<br>'
+        '방을 만들 때도, 남의 방에 들어가서도 이 분신들을 데려갑니다.<br>'
+        + '모자란 최소 인원은 방 안의 모두가 데려온 분신으로 채웁니다.<br>'
         + '남에게 붙여 준 분신은 데려갈 수 없습니다.')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="kit-ok" class="game-btn" style="' + BTN + ' text-align:center;">정한다</button>'
@@ -657,11 +668,29 @@ function myParty() {
     } catch (e) { }
     return null;
 }
+// 방에 적힌 분신을 **사람별로** 펴 놓는다
+//
+//   이제 darkParties/<방>/kits/<사번> 으로 적는다. 예전에는 방장 몫만
+//   darkParties/<방>/kits 에 통째로 적었으므로, 속성 이름이 바로 오는 꼴은
+//   방장 몫으로 읽어 준다. 두 꼴이 섞여 있어도(배포 직전에 만든 방) 둘 다
+//   읽는다.
+function kitsBy(p) {
+    const raw = (p && p.kits && typeof p.kits === 'object' && !Array.isArray(p.kits)) ? p.kits : {};
+    const out = {}, old = {};
+    Object.keys(raw).forEach(function (x) {
+        if (BY_K[x]) { old[x] = raw[x]; return; }        // 예전 꼴 — 속성이 바로 왔다
+        if (raw[x] && typeof raw[x] === 'object') out[x] = raw[x];
+    });
+    if (Object.keys(old).length && p && p.leader) {
+        out[p.leader] = Object.assign({}, old, out[p.leader] || {});
+    }
+    return out;
+}
+
 function pushRoomKits() {
     const me = u_();
     const p = myParty();
     if (!me || !p || !p.id) return 0;
-    if (p.leader !== me.code) return 0;      // 방을 만든 사람만 분신을 데려간다
     const d = db_();
     const out = {};
     // ★ 차고 있어야 센다. 벗으면 데려갈 수 없는데 방에는 적힌 채로 남아
@@ -673,9 +702,12 @@ function pushRoomKits() {
     }
     const n = Object.keys(out).length;
     try {
-        if (d) d.ref('darkParties/' + p.id + '/kits').set(n ? out : null);
+        // ★ 내 몫만 쓴다 — 같은 방의 남이 데려온 분신을 지우지 않는다
+        if (d) d.ref('darkParties/' + p.id + '/kits/' + me.code).set(n ? out : null);
     } catch (e) { }
-    p.kits = out;
+    const all = kitsBy(p);
+    if (n) all[me.code] = out; else delete all[me.code];
+    p.kits = all;
     return n;
 }
 window.kitPushRoom = pushRoomKits;
@@ -684,21 +716,32 @@ window.kitPushRoom = pushRoomKits;
 // 방에 들어간 분신 — 방 안의 **모두**가 같은 것을 본다
 // ==========================================
 //
-//   방장은 제 기록(kitRoom)이 바로 반영되고, 나머지 사원은 방에 적힌
-//   것(p.kits)을 본다. 방장이 벗거나 분신이 소멸하면 어긋나므로,
-//   방장 화면이 그릴 때마다 어긋난 것을 다시 적는다.
+//   내 몫은 제 기록(kitRoom)이 바로 반영되고, 남의 몫은 방에 적힌
+//   것(p.kits/<사번>)을 본다. 벗거나 분신이 소멸하면 어긋나므로,
+//   제 화면이 그릴 때마다 제 것이 어긋나 있으면 다시 적는다.
+//
+//   방을 나간 사람의 묵은 글은 안 센다 — 명단에 없으면 건너뛴다.
 function roomKitList(p, me) {
     if (!p) return [];
-    if (me && p.leader === me.code) {
-        if (!wears(me)) return [];
-        return roomPicked(me).map(function (k) {
-            return { k: k, nick: st(me, k).nick || BY_K[k].n, g: gradeOf(me, k) };
+    const mem = (p.members && typeof p.members === 'object') ? p.members : {};
+    const all = kitsBy(p);
+    const out = [];
+    if (me && mem[me.code] && wears(me)) {
+        roomPicked(me).forEach(function (k) {
+            out.push({ k: k, nick: st(me, k).nick || BY_K[k].n, g: gradeOf(me, k),
+                       by: me.code, byName: me.name, mine: true });
         });
     }
-    const kits = (p.kits && typeof p.kits === 'object' && !Array.isArray(p.kits)) ? p.kits : {};
-    return Object.keys(kits).filter(function (k) { return BY_K[k]; }).map(function (k) {
-        return { k: k, nick: (kits[k] && kits[k].nick) || BY_K[k].n, g: '' };
+    Object.keys(all).forEach(function (code) {
+        if (me && code === me.code) return;            // 내 몫은 위에서 넣었다
+        if (!mem[code]) return;                        // 나간 사람의 묵은 글
+        const one = all[code] || {};
+        Object.keys(one).filter(function (k) { return BY_K[k]; }).forEach(function (k) {
+            out.push({ k: k, nick: (one[k] && one[k].nick) || BY_K[k].n, g: '',
+                       by: code, byName: (one[k] && one[k].byName) || nameOf(code), mine: false });
+        });
     });
+    return out;
 }
 
 // ==========================================
@@ -1363,6 +1406,81 @@ let bypass = false;
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
+// ==========================================
+// 구역 목록 — 차 있는 구역에도 모집 단추를 열어 준다
+// ==========================================
+//
+// ■ 또 같은 자리였다
+//
+//   createParty 는 처음부터 열려 있었다. 아래 hookCreate 가 isZoneTaken 을
+//   건너뛰므로 콘솔에서 createParty('Qtrew-A-0xx') 를 부르면 방이 생겼다.
+//   그런데 **그 함수를 부르는 단추가 없었다.**
+//
+//       index.html:3625   isOccupied   → ⛔ 탐사 진행 중
+//       index.html:3631   isZoneTaken  → ⛔ 파티 편성됨
+//
+//   구역 목록이 두 값을 직접 읽어 단추 자리에 ⛔ 를 박는다. 방 화면의
+//   canStart 와 똑같은 꼴이다 — 손질한 자리는 맞았고 막혀 있던 것은
+//   그 앞의 단추였다.
+//
+// ■ 어떻게 고치나
+//
+//   다 그린 뒤에 ⛔ 가 박힌 자리만 모집 단추로 바꿔 끼운다. 글귀
+//   (「현재 ○○ 사원 팀이 탐사 중입니다」)와 테두리는 그대로 둔다 —
+//   차 있다는 것은 알고 들어가는 것이 맞다.
+function zoneCards(body) {
+    const out = [];
+    if (!body) return out;
+    Array.prototype.forEach.call(body.querySelectorAll('div'), function (d) {
+        const f = (d.style && d.style.fontFamily) || '';
+        if (f.indexOf('monospace') < 0) return;
+        const code = String(d.textContent || '').trim();
+        if (typeof DARK_ZONES === 'undefined' || !DARK_ZONES[code]) return;
+        const left = d.parentElement;
+        const row = left && left.parentElement;
+        const right = row && row.lastElementChild;
+        if (right && right !== left) out.push({ code: code, right: right });
+    });
+    return out;
+}
+
+function openZoneList(body) {
+    const me = u_();
+    if (!me || !wears(me)) return 0;
+    let n = 0;
+    zoneCards(body).forEach(function (c) {
+        const z = DARK_ZONES[c.code];
+        if (!z || !(z.max > 1)) return;                       // 1인 구역은 그냥 진입이다
+        if (String(c.right.textContent || '').indexOf('⛔') < 0) return;
+        try { if (typeof isZoneOpen === 'function' && !isZoneOpen(c.code)) return; } catch (e) { }
+        c.right.innerHTML = '<button class="game-btn" style="margin:0; padding:8px 12px;'
+            + ' font-size:11px; background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
+            + ' border-color:#d9a05a !important;" onclick="createParty(\'' + esc(c.code) + '\')">'
+            + '🐾 파티<br>모집</button>';
+        n++;
+    });
+    return n;
+}
+
+(function hookZoneList() {
+    const iv = setInterval(function () {
+        if (typeof renderDarkness !== 'function') return;
+        if (renderDarkness._kit) { clearInterval(iv); return; }
+        const _d = renderDarkness;
+        const w = function () {
+            const out = _d.apply(this, arguments);
+            try { openZoneList(document.getElementById('darkness-body')); } catch (e) { }
+            return out;
+        };
+        w._kit = true;
+        renderDarkness = w;
+        window.renderDarkness = w;
+        clearInterval(iv);
+        console.log('[아기 여우] 구역 목록 — 모집 단추 열기 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 (function hookCreate() {
     const iv = setInterval(function () {
         if (typeof createParty !== 'function') return;
@@ -1387,6 +1505,67 @@ let bypass = false;
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
+// 남의 방에 들어가서도 — 들어가자마자 내 분신을 방에 적는다
+//
+//   joinParty 는 명단을 서버에 쓰고 끝난다. 명단이 돌아오기 전에는
+//   pushRoomKits 가 나를 못 찾으므로 두 번 걸러 부른다. 그래도 놓치면
+//   방 화면이 그릴 때 어긋난 것을 다시 적는다.
+(function hookJoin() {
+    const iv = setInterval(function () {
+        if (typeof joinParty !== 'function') return;
+        if (joinParty._kit) { clearInterval(iv); return; }
+        const _j = joinParty;
+        const w = function () {
+            const out = _j.apply(this, arguments);
+            try {
+                const me = u_();
+                if (me && wears(me)) {
+                    setTimeout(function () { try { pushRoomKits(); } catch (e) { } }, 500);
+                    setTimeout(function () { try { pushRoomKits(); } catch (e) { } }, 1800);
+                }
+            } catch (e) { }
+            return out;
+        };
+        w._kit = true;
+        joinParty = w;
+        window.joinParty = w;
+        clearInterval(iv);
+        console.log('[아기 여우] 방 — 들어가서 분신 부르기 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// 방을 나가면 내 분신 글도 걷는다 (나가고 나면 방을 못 찾으므로 먼저 걷는다)
+(function hookLeave() {
+    const iv = setInterval(function () {
+        if (typeof leaveParty !== 'function') return;
+        if (leaveParty._kit) { clearInterval(iv); return; }
+        const _l = leaveParty;
+        const w = function () {
+            try {
+                const me = u_();
+                const p = myParty();
+                if (me && p && p.id) {
+                    const d = db_();
+                    if (d) {
+                        d.ref('darkParties/' + p.id + '/kits/' + me.code)
+                            .remove().catch(function () { });
+                    }
+                    const all = kitsBy(p);
+                    delete all[me.code];
+                    p.kits = all;
+                }
+            } catch (e) { }
+            return _l.apply(this, arguments);
+        };
+        w._kit = true;
+        leaveParty = w;
+        window.leaveParty = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 (function hookLaunch() {
     const iv = setInterval(function () {
         if (typeof launchParty !== 'function') return;
@@ -1397,7 +1576,9 @@ let bypass = false;
             let z = null, min0 = null;
             try {
                 const p = myParty();
-                if (me && wears(me) && p && p.leader === me.code
+                // ★ 출발 단추는 방장이 누른다. 방장이 안 차고 있어도
+                //   들어온 사람이 데려온 분신은 그대로 센다.
+                if (me && p && p.leader === me.code
                     && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
                     // 방 화면이 보여 준 것과 **같은 수**를 쓴다
                     const n = roomKitList(p, me).length;
@@ -1462,14 +1643,17 @@ let bypass = false;
 //   도는 시계가 방 화면 밑에 붙였다 떼었다 했다 — 다시 그릴 때마다
 //   지워지고 2초 뒤에 돌아오느라 깜빡였다.
 function kitRoomBox(p, me, min0, low, list) {
-    const mine = !!(me && p.leader === me.code);
+    const mine = !!(me && wears(me));              // 차고 있으면 누구든 고를 수 있다
     const rows = list.map(function (x) {
         return '<div style="display:flex; align-items:center; gap:7px; padding:5px 0;">'
             + '<div style="flex:1; min-width:0; font-size:11.5px; color:#e6ddd0;">'
             + '<span style="color:#ffcf8f;">' + (BY_K[x.k] ? BY_K[x.k].icon : '🐾') + '</span> '
             + esc(x.nick)
             + ' <span style="font-size:9px; color:#8d8578;">' + esc(BY_K[x.k].n) + ' 분신'
-            + (x.g ? ' · ' + esc(x.g) : '') + '</span></div></div>';
+            + (x.g ? ' · ' + esc(x.g) : '') + '</span>'
+            + '<div style="font-size:9px; color:' + (x.mine ? '#8fd18f' : '#8d8578') + '; margin-top:2px;">'
+            + (x.mine ? '당신이 데려갑니다' : esc(x.byName || nameOf(x.by)) + ' 사원이 데려갑니다')
+            + '</div></div></div>';
     }).join('');
 
     return '<div id="kit-room-box" style="background:rgba(217,160,90,0.07);'
@@ -1487,8 +1671,8 @@ function kitRoomBox(p, me, min0, low, list) {
                    + '</div>'
             : '<div style="font-size:10px; color:#8d8578; line-height:1.6;">'
               + (mine ? '아직 아무도 안 골랐습니다. 아래에서 고르면 최소 인원을 채웁니다.'
-                      : '방장이 데려가는 분신이 없습니다.') + '</div>')
-        + (mine && wears(me)
+                      : '이 방에 데려온 분신이 없습니다.') + '</div>')
+        + (mine
             ? '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:9px;'
               + ' font-size:11px; background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
               + ' border-color:#d9a05a !important;" onclick="kitRoomPick()">'
@@ -1541,16 +1725,17 @@ let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그�
                 if (me && p && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
                     z = DARK_ZONES[p.zone];
                     list = roomKitList(p, me);
-                    // 방장 화면이 그릴 때, 방에 적힌 것이 어긋나 있으면 다시 적는다
-                    if (p.leader === me.code) {
-                        const a = list.map(function (x) { return x.k; }).sort().join(',');
-                        const b = Object.keys((p.kits && typeof p.kits === 'object'
-                            && !Array.isArray(p.kits)) ? p.kits : {}).sort().join(',');
+                    // 내 화면이 그릴 때, 방에 적힌 **내 몫**이 어긋나 있으면 다시 적는다
+                    // (방장만이 아니다 — 들어간 사람도 제 분신을 데려간다)
+                    {
+                        const a = list.filter(function (x) { return x.mine; })
+                                      .map(function (x) { return x.k; }).sort().join(',');
+                        const b = Object.keys(kitsBy(p)[me.code] || {}).sort().join(',');
                         if (a !== b) pushRoomKits();
                     }
                     min0 = z.min;
                     low = Math.max(1, min0 - list.length);
-                    show = !!(list.length || (wears(me) && p.leader === me.code));
+                    show = !!(list.length || wears(me));
                     // ★ 여기서 최소 인원을 낮춘다 — canStart 가 이 값을 본다
                     //   (index.html:3365) 그래서 진입 단추가 열린다
                     if (list.length) z.min = low;
