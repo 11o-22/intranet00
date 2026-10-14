@@ -63,7 +63,16 @@ let openTab = null;
         // 광장이 바탕일 때 — 맨 아래로 내린다 (위 설명 참고)
         '#plaza-ov.plaza-base{z-index:1;}',
         // 칸 하나만 띄운 꼴
-        '#main-screen.solo{position:fixed;inset:0;z-index:999990;width:100%;max-width:none;',
+        //
+        // ★ z-index 를 **2** 로 둔다 (한때 999990 이었다).
+        //
+        //   사내 창(모달)들은 10000·10003·99999 로 떠 있다. 칸을 999990 에
+        //   두면 그 위를 칸이 덮어, 칸 안에서 연 것이 **안 보인다.** 사택
+        //   오락실 테트리스(10003)가 그래서 상담사만 되고 사원은 안 됐다 —
+        //   상담사는 칸이 그냥 흐름 속에 있어(auto) 창이 제대로 떴다.
+        //   광장을 1 로 깔아 두었으니 칸은 2 면 충분하고, 그러면 창들은
+        //   상담사 쪽과 똑같이 그 위로 뜬다. (머리 띠는 3)
+        '#main-screen.solo{position:fixed;inset:0;z-index:2;width:100%;max-width:none;',
         '  margin:0;overflow-y:auto;-webkit-overflow-scrolling:touch;',
         '  background:linear-gradient(180deg,#0c0c12,#08080c);',
         '  padding:calc(var(--shell-top,0px) + 56px) 14px calc(var(--shell-bot,0px) + 18px) 14px;}',
@@ -80,7 +89,7 @@ let openTab = null;
         '#main-screen.solo #tab-record > .sub-tabs-grid,',
         '#main-screen.solo #tab-shop .sub-tabs-grid{display:none !important;}',
         // 띄운 칸의 머리 — 이름과 닫는 단추
-        '#shell-top{position:fixed;left:0;right:0;top:0;z-index:999991;display:none;',
+        '#shell-top{position:fixed;left:0;right:0;top:0;z-index:3;display:none;',
         '  align-items:center;gap:10px;pointer-events:none;',
         '  padding:calc(var(--shell-top,0px) + 9px) 12px 14px 12px;',
         '  background:linear-gradient(180deg,rgba(8,8,12,.96),rgba(8,8,12,.72) 62%,rgba(8,8,12,0));}',
@@ -124,6 +133,11 @@ function openPanel(tab, sub, title) {
 
     m.classList.add('solo');
     m.style.display = 'flex';
+    // 광장은 반드시 바탕(z-index 1)이어야 한다 — 칸이 2 라서 그렇다.
+    //   로그인할 때 한 번 붙이지만, 광장을 닫았다 다시 열면 새로 만들어져
+    //   표가 사라진다. 칸을 열 때마다 한 번 더 붙여 둔다.
+    const pov = el('plaza-ov');
+    if (pov) pov.classList.add('plaza-base');
     openTab = tab;
     const top = el('shell-top');
     if (top) {
@@ -131,6 +145,7 @@ function openPanel(tab, sub, title) {
         top.querySelector('.nm').innerHTML = title || nameOfTab(tab);
     }
     try { m.scrollTop = 0; } catch (e) { }
+    if (tab === 'tab-public') setTimeout(facLine, 40);   // 남은 횟수 한 줄
     return true;
 }
 
@@ -223,6 +238,65 @@ function toPlaza() {
     };
     if (document.body) make();
     else document.addEventListener('DOMContentLoaded', make);
+})();
+
+// ==========================================
+// ★ 공용시설 — 남은 횟수를 칸 안에 보여 준다
+// ==========================================
+//
+//   하루 몇 번 쓸 수 있는지는 위 띠(.header-info)의 「공용시설 이용 n / 20회」
+//   한 곳에만 적혀 있었다. 사원 화면은 그 띠를 감추므로, 사원은 몇 번
+//   남았는지 볼 길이 아예 없었다. 그래서 칸 맨 위에 한 줄 얹는다.
+//
+//   한도에 닿으면 원래 있던 빨간 안내가 뜨므로, 여기서는 수만 알린다.
+function facLine() {
+    if (!solo) return;
+    const box = document.querySelector('#public-content-box');
+    const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+    if (!box || !u) return;
+    let e = document.querySelector('#shell-fac');
+    if (!e) {
+        e = document.createElement('div');
+        e.id = 'shell-fac';
+        box.insertBefore(e, box.firstChild);
+    }
+    const max = u.facilityMax || 20;
+    const used = Math.max(0, u.facilityCount || 0);
+    const left = Math.max(0, max - used);
+    e.innerHTML = '오늘 이용 <b>' + used + '</b> / ' + max + '회'
+        + '<span class="sp">·</span>남은 횟수 <b class="' + (left ? 'ok' : 'no') + '">'
+        + left + '회</b>';
+}
+
+(function facCss() {
+    if (document.getElementById('shell-fac-css')) return;
+    const s = document.createElement('style');
+    s.id = 'shell-fac-css';
+    s.textContent = [
+        '#shell-fac{margin:0 0 11px 0;padding:9px 12px;border-radius:9px;font-size:12px;',
+        '  text-align:center;color:#b5ab9a;background:rgba(255,255,255,.04);',
+        '  border:1px solid #2b2b38;}',
+        '#shell-fac b{color:#ffe9bd;}',
+        '#shell-fac b.no{color:#ff8b7b;}',
+        '#shell-fac .sp{opacity:.4;margin:0 7px;}'
+    ].join('\n');
+    document.head.appendChild(s);
+})();
+
+// 한 번 쓸 때마다 수가 줄어든다 — 그릴 때마다 같이 고쳐 준다
+(function hookUI() {
+    const iv = setInterval(function () {
+        if (typeof window.updateUI !== 'function') return;
+        if (window.updateUI._fac) { clearInterval(iv); return; }
+        const old = window.updateUI;
+        window.updateUI = function () {
+            const r = old.apply(this, arguments);
+            try { facLine(); } catch (e) { }
+            return r;
+        };
+        window.updateUI._fac = true;
+        clearInterval(iv);
+    }, 500);
 })();
 
 // 물리 뒤로가기로도 닫히게 — 칸이 떠 있으면 그것부터 닫는다

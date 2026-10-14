@@ -440,7 +440,7 @@ function stampSafe(ov) {
         '#plaza-feed .who{color:#9fd8ef;font-weight:bold;}',
         '#plaza-feed .sys{color:#8d8578;}',
         // 서버 채팅으로 온 줄에는 표를 붙인다 (맵 채팅은 표가 없다)
-        '.sv{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
+        '#plaza-ov .sv{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
         '  background:rgba(217,160,90,.22);color:#ffd79a;vertical-align:1px;}',
         // ── 서버 / 맵 고르기 : 글줄 바로 아래 · 적는 칸 바로 위
         '#plaza-ch{position:absolute;left:12px;z-index:19;display:flex;gap:5px;',
