@@ -256,6 +256,7 @@
       "birth-end.js",
       "cage.js",
       "p2p-fix.js",
+      "p2p-wear.js",
       "p2p-multi.js",
       "find-item.js",
       "giftbox.js",

@@ -56,7 +56,7 @@
 
 (function p2pFix() {
 
-const INV = 'inventory', PTS = 'points';
+const INV = 'inventory', PTS = 'points', WARD = 'wardrobe';
 const log = [];
 
 function asArr(v) {
@@ -117,18 +117,48 @@ function giveItems(c, name, qty) {
     });
 }
 
+// ★ 의상·악세 (kind: 'wear') — users/<열쇠>/wardrobe/<옷열쇠> 를 옮긴다.
+//
+//   소지품처럼 개수가 있는 것이 아니라 **있다·없다** 뿐이라 늘 한 벌이다.
+//   그래서 수량(q)은 쳐다보지 않는다.
+//   ★ 받는 쪽이 **이미 가진 옷**은 주고받으면 안 된다 — 주는 쪽에서는
+//     없어지는데 받는 쪽에는 더 생길 것이 없어 그냥 사라진다. 그것은
+//     제안을 넣을 때와 수락할 때 p2p-wear.js 가 미리 막는다.
+//   무엇이라 부르는 옷인지(이름표)는 p2p-wear.js 가 들고 있다.
+function takeWear(c, key) {
+    return txn('users/' + c + '/' + WARD + '/' + key, function (srv) {
+        if (!srv) return;                 // 안 가지고 있다 — 그만둔다 (undefined 는 그만두기)
+        return null;                      // null 은 「지운다」
+    });
+}
+function giveWear(c, key) {
+    return txn('users/' + c + '/' + WARD + '/' + key, function (srv) {
+        return srv || Date.now();         // 이미 있으면 그대로 둔다
+    });
+}
+function wearName(key) {
+    try {
+        if (typeof window.p2pWearName === 'function') return window.p2pWearName(key);
+    } catch (e) { }
+    return String(key);
+}
+
 // 제물·대가를 한 덩어리로 다룬다
 function take(side, kind, value, qty) {
+    if (kind === 'wear') return takeWear(side, value);
     return (kind === 'point') ? takePts(side, value) : takeItems(side, value, qty);
 }
 function give(side, kind, value, qty) {
+    if (kind === 'wear') return giveWear(side, value);
     return (kind === 'point') ? givePts(side, value) : giveItems(side, value, qty);
 }
 function desc(kind, value, qty) {
+    if (kind === 'wear') return wearName(value);
     return (kind === 'point')
         ? ((Number(value) || 0).toLocaleString() + ' P')
         : (value + ' ' + (qty || 1) + '개');
 }
+window.p2pDesc = desc;
 
 // ==========================================
 // 여러 개를 한 번에 — 제물·대가를 묶음으로 다룬다
@@ -145,6 +175,7 @@ function bundle(deal, side) {
         list.forEach(function (x) {
             if (!x) return;
             if (x.k === 'point') { if (Number(x.v) > 0) out.push({ k: 'point', v: Number(x.v), q: 1 }); }
+            else if (x.k === 'wear') { if (x.v) out.push({ k: 'wear', v: String(x.v), q: 1 }); }
             else if (x.v) out.push({ k: 'item', v: String(x.v), q: Math.max(1, parseInt(x.q, 10) || 1) });
         });
         return out;
@@ -152,6 +183,7 @@ function bundle(deal, side) {
     const t = deal[side + 'Type'], v = deal[side + 'Value'], q = deal[side + 'Qty'];
     if (t == null || v == null) return out;
     if (t === 'point') { if (Number(v) > 0) out.push({ k: 'point', v: Number(v), q: 1 }); }
+    else if (t === 'wear') out.push({ k: 'wear', v: String(v), q: 1 });
     else out.push({ k: 'item', v: String(v), q: Math.max(1, parseInt(q, 10) || 1) });
     return out;
 }
@@ -247,12 +279,37 @@ function install() {
                 return;
             }
 
+            // --- ★ 의상·악세는 **이미 가진 것이면 막는다** ---
+            //
+            //   옷장은 개수가 없고 있다·없다 뿐이다. 이미 가진 옷을 또 받으면
+            //   늘지 않는데 준 쪽에서는 없어진다 — 한 벌이 그냥 사라진다.
+            //   그래서 양쪽 옷장을 먼저 본다 (내 것은 손에 있고, 상대 것은
+            //   서버에서 한 번 읽는다). 잠가 둔 거래는 PENDING 으로 풀어 둔다.
+            if (oBu.concat(dBu).some(function (x) { return x.k === 'wear'; })) {
+                const myW = (currentUser && currentUser.wardrobe) || {};
+                let hisW = {};
+                try { hisW = (await database.ref('users/' + him + '/' + WARD).once('value')).val() || {}; }
+                catch (e) { }
+                const dup = oBu.filter(function (x) { return x.k === 'wear' && myW[x.v]; })
+                    .concat(dBu.filter(function (x) { return x.k === 'wear' && hisW[x.v]; }));
+                if (dup.length) {
+                    await database.ref('p2pDeals/' + idx + '/status').set('PENDING');
+                    note('이미 가진 옷', false, dup.map(function (x) { return x.v; }).join(','));
+                    showCustomAlert('이미 가지고 있는 ' + dup.map(function (x) { return wearName(x.v); }).join(' · ')
+                        + ' 입니다.\n\n받아도 늘지 않고 준 쪽 것만 없어지므로 거래를 멈췄습니다.');
+                    if (typeof renderP2PLists === 'function') renderP2PLists();
+                    return;
+                }
+            }
+
             // --- 2) 보낸 쪽에서 제물을 뺀다 (여러 개면 하나라도 모자랄 때 전부 되돌린다) ---
             const got = await takeAll(him, oBu);
             if (!got.ok) {
                 await database.ref('p2pDeals/' + idx + '/status').set('EXPIRED');
                 showCustomAlert(got.at.k === 'point'
                     ? (deal.fromName + ' 사원의 포인트가 부족하여 거래가 무산되었습니다.')
+                    : got.at.k === 'wear'
+                    ? (deal.fromName + " 사원이 '" + wearName(got.at.v) + "' 을(를) 더 이상 가지고 있지 않습니다.")
                     : (deal.fromName + " 사원이 '" + got.at.v + "' 을(를) 더 이상 "
                        + got.at.q + '개 가지고 있지 않습니다.'));
                 if (typeof renderP2PLists === 'function') renderP2PLists();
@@ -269,6 +326,8 @@ function install() {
                     if (paid.at.k === 'point') {
                         if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
                         else showCustomAlert('포인트가 부족합니다.');
+                    } else if (paid.at.k === 'wear') {
+                        showCustomAlert("요구하신 '" + wearName(paid.at.v) + "' 을(를) 가지고 계시지 않습니다.");
                     } else {
                         showCustomAlert("요구하신 물품 '" + paid.at.v + "' " + paid.at.q + '개가 부족합니다.');
                     }

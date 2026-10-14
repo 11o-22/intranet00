@@ -45,6 +45,10 @@ function el(id) { return document.getElementById(id); }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 
 function descOne(x) {
+    // 의상·악세는 개수가 없다 — 이름만 적는다 (이름표는 p2p-wear.js 가 든다)
+    if (x.k === 'wear') {
+        return (typeof window.p2pWearName === 'function') ? window.p2pWearName(x.v) : String(x.v);
+    }
     return (x.k === 'point')
         ? ((Number(x.v) || 0).toLocaleString() + ' P')
         : (x.v + ' ' + x.q + '개');
@@ -66,6 +70,11 @@ function add(side, x) {
     if (x.k === 'point') {
         const i = bag.findIndex(function (y) { return y.k === 'point'; });
         if (i >= 0) { bag[i].v = Number(bag[i].v) + Number(x.v); return true; }
+    } else if (x.k === 'wear') {
+        // 옷장은 있다·없다 뿐이라 같은 것을 두 벌 담을 수 없다
+        if (bag.some(function (y) { return y.k === 'wear' && y.v === x.v; })) {
+            alert_('이미 담아 두었습니다.'); return false;
+        }
     } else {
         const i = bag.findIndex(function (y) { return y.k === 'item' && y.v === x.v; });
         if (i >= 0) { bag[i].q += x.q; return true; }
@@ -145,6 +154,18 @@ window.p2pMount = mount;
 // 지금 고른 것을 바구니에 담는다
 function pick(side) {
     const type = (el('p2p-' + side + '-type') || {}).value;
+    if (type === 'wear') {
+        const k = (el('p2p-' + side + '-wear') || {}).value;
+        if (!k) { alert_('의상·악세를 골라 주십시오.'); return; }
+        // 건넬 쪽은 **정말 가진 것**만 담긴다 (요구할 쪽은 안 따진다)
+        if (side === 'offer' && typeof window.p2pWearHas === 'function'
+            && !window.p2pWearHas(currentUser, k)) {
+            alert_('가지고 있지 않은 의상·악세입니다.'); return;
+        }
+        add(side, { k: 'wear', v: k, q: 1 });
+        paintBag();
+        return;
+    }
     if (type === 'point') {
         const n = parseInt((el('p2p-' + side + '-points') || {}).value, 10);
         if (isNaN(n) || n <= 0) { alert_('포인트를 올바르게 입력해 주십시오.'); return; }
@@ -179,6 +200,10 @@ function pick(side) {
 function bagOrPick(side) {
     if (BAG[side].length) return BAG[side].slice();
     const type = (el('p2p-' + side + '-type') || {}).value;
+    if (type === 'wear') {
+        const k = (el('p2p-' + side + '-wear') || {}).value;
+        return k ? [{ k: 'wear', v: k, q: 1 }] : [];
+    }
     if (type === 'point') {
         const n = parseInt((el('p2p-' + side + '-points') || {}).value, 10);
         return (isNaN(n) || n <= 0) ? [] : [{ k: 'point', v: n, q: 1 }];
@@ -195,6 +220,15 @@ function canPay(bu) {
     for (let i = 0; i < bu.length; i++) {
         const x = bu[i];
         if (x.k === 'point') { pts += Number(x.v) || 0; continue; }
+        if (x.k === 'wear') {
+            const ok = (typeof window.p2pWearHas !== 'function')
+                || window.p2pWearHas(currentUser, x.v);
+            if (!ok) {
+                const nm = (typeof window.p2pWearName === 'function') ? window.p2pWearName(x.v) : x.v;
+                return { ok: false, why: "'" + nm + "' 을(를) 가지고 있지 않습니다." };
+            }
+            continue;
+        }
         const have = inv.filter(function (y) { return y === x.v; }).length;
         if (have < x.q) return { ok: false, why: "'" + x.v + "' 이(가) 모자랍니다. (가진 것 " + have + '개)' };
     }
@@ -236,6 +270,12 @@ function install() {
         if (mode === 'trade') {
             demand = bagOrPick('demand');
             if (!demand.length) { alert_('요구할 것을 담아 주십시오.'); return; }
+        }
+
+        // ★ 의상·악세는 **이미 가진 것이면 사라진다** — 미리 막는다 (p2p-wear.js)
+        if (typeof window.p2pWearCheck === 'function') {
+            const why = window.p2pWearCheck(offer, demand, target);
+            if (why) { alert_(why); return; }
         }
 
         const first = function (bu) {
@@ -334,7 +374,11 @@ function relabel() {
             const deal = byId[m[1]];
             if (!deal) return;
             const oBu = bundleOf(deal, 'offer');
-            if (oBu.length < 2 && (deal.mode !== 'trade' || bundleOf(deal, 'demand').length < 2)) return;
+            const dBu = (deal.mode === 'trade') ? bundleOf(deal, 'demand') : [];
+            // ★ 의상·악세는 한 가지뿐이어도 갈아 끼워야 한다 — 안 그러면
+            //   'veil x1' 처럼 **열쇠가 날것으로** 보인다.
+            const wear = oBu.concat(dBu).some(function (x) { return x.k === 'wear'; });
+            if (!wear && oBu.length < 2 && dBu.length < 2) return;
 
             const lines = row.querySelectorAll('span');
             if (boxId === 'p2p-received-list') {
