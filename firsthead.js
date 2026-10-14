@@ -147,7 +147,8 @@ window.headPick = open;
         '  background:radial-gradient(ellipse at 50% 92%,rgba(217,160,90,.13),rgba(0,0,0,0) 62%);}',
         '.fh-stage .dot-box{margin-top:-32px;margin-bottom:-13px;}',
         '.fh-pick{display:flex;flex-wrap:wrap;gap:6px;max-height:34dvh;overflow-y:auto;}',
-        '.fh-pick button{padding:8px 11px;font-size:11px;border-radius:9px;cursor:pointer;',
+        // 손가락으로 누르는 자리라 높이를 44픽셀로 올렸다 (8px 일 때 33px 이었다)
+        '.fh-pick button{padding:13px 13px;font-size:11px;border-radius:9px;cursor:pointer;',
         '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#b5ab9a;font-family:inherit;}',
         '.fh-pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
         '.fh-go{padding:13px 0;border-radius:12px;font-size:12.5px;cursor:pointer;font-family:inherit;',

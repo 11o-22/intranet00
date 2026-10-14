@@ -99,6 +99,12 @@ const PLAZA = {
     //   채팅과 미니맵이 앉는 어두운 자리가 된다. 사람도 한 눈금 커진다.
     CUT: 720,
     TAP_STOP: 3,
+    // ★ 민 쪽으로 **붙고 떨어지는 데 걸리는 시간**(초).
+    //   전에는 손가락이 가리키는 쪽을 그 칸에서 그대로 썼다. 손전화는
+    //   손가락이 늘 조금씩 떨려서, 사람이 그때마다 홱홱 꺾이고 좌우보기가
+    //   깜빡였다. 이만큼에 걸쳐 따라가게 하면 떨림은 묻히고 꺾는 맛은 남는다.
+    //   0.085 는 네댓 칸(60fps)이면 다 붙는 빠르기다 — 더 크면 굼떠 보인다.
+    EASE: 0.085,
     EDGE: 20,                   // 좌우 끝에서 이만큼 남기고 넘어간다
     // ★ 넘어간 방에서 **문턱 안쪽으로** 들여 세운다.
     //   안 그러면 올라가자마자 아래쪽 끝에 서게 되어 그 자리에서 도로
@@ -453,6 +459,17 @@ function stampSafe(ov) {
         //   이 줄은 left:0 right:0 으로 **화면을 가로질러** 있어서, 가운데
         //   네 단추 말고 양옆 빈 자리까지 누름을 먹었다. 그 아래 깔린 글줄이
         //   눌리지 않아 PC 에서 「클릭이 잘 안 먹는」 꼴이 됐다.
+        // ── 보이는 조이스틱 — 짚은 자리에 뜬다 (걷는 동안만)
+        //   사람(z 100~1400)은 #plaza-view(z 1) 안이라 이것이 늘 위로 온다.
+        '#plaza-stick{position:absolute;z-index:15;width:124px;height:124px;',
+        '  margin:-62px 0 0 -62px;border-radius:50%;pointer-events:none;',
+        '  border:2px solid rgba(232,226,214,.20);background:rgba(10,10,14,.16);',
+        '  opacity:0;transition:opacity .13s;}',
+        '#plaza-stick.on{opacity:1;}',
+        '#plaza-stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;',
+        '  margin:-23px 0 0 -23px;border-radius:50%;',
+        '  background:rgba(232,226,214,.28);border:1px solid rgba(232,226,214,.42);',
+        '  box-shadow:0 2px 10px rgba(0,0,0,.45);}',
         '#plaza-pad{position:absolute;left:0;right:0;z-index:20;display:flex;gap:6px;',
         '  pointer-events:none;',
         '  justify-content:center;bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
@@ -472,6 +489,8 @@ function stampSafe(ov) {
         '  padding:6px 8px;margin:-6px -8px;border-radius:10px;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '#plaza-feed:active{background:rgba(14,14,20,.6);}',
+        // 끌면 걷게 하려면 브라우저가 먼저 고르기·밀기를 집어가면 안 된다
+        '#plaza-feed,#plaza-map{touch-action:none;user-select:none;-webkit-user-select:none;}',
         '#plaza-feed:empty{display:none;}',
         // ★ 긴 말은 잘라서 「…」 로 두지 않고 **줄을 바꿔 이어** 보여 준다
         '#plaza-feed div{color:#ded5c4;white-space:normal;word-break:break-word;}',
@@ -579,10 +598,6 @@ function stampSafe(ov) {
         '.plaza-row .pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
         // 악세 몇 개 달렸나 (3개까지)
         '.plaza-row .pick .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
-        '.plaza-inv{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}',
-        '.plaza-inv div{padding:10px 11px;border-radius:10px;font-size:11.5px;color:#ded5c4;',
-        '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
-        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
         '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}',
         // 엘리베이터 판 — 그림 위에 손 닿는 자리만 덮어 둔다
         '#plaza-lift{position:relative;width:min(260px,66vw);margin:4px auto 8px auto;}',
@@ -1131,22 +1146,40 @@ function tick(ts) {
     const dt = Math.min(0.05, (ts - run.last) / 1000);
     run.last = ts;
 
-    let dx = 0, dy = 0;
+    // ─ 손이 미는 쪽 (자판 · 조이스틱)
+    let ix = 0, iy = 0;
     const k = run.keys;
-    if (k.left) dx -= 1;
-    if (k.right) dx += 1;
-    if (k.up) dy -= 1;
-    if (k.down) dy += 1;
+    if (k.left) ix -= 1;
+    if (k.right) ix += 1;
+    if (k.up) iy -= 1;
+    if (k.down) iy += 1;
 
     // ─ 조이스틱이 먼저다. 민 만큼만 걷는다 (살짝 밀면 느리게).
-    if (run.ax || run.ay) { dx = run.ax; dy = run.ay; }
+    if (run.ax || run.ay) { ix = run.ax; iy = run.ay; }
 
-    if (dx || dy) run.tx = null;
+    // ★ 민 쪽으로 **천천히 붙고 천천히 떨어진다** (P.EASE).
+    //   손이 떨려도 사람이 안 꺾이고, 손을 떼도 뚝 서지 않고 한 발 더 간다.
+    //   dt 를 넣어 셈하므로 화면이 느린 기계에서도 같은 빠르기로 붙는다.
+    const ea = 1 - Math.exp(-dt / P.EASE);
+    run.vx += (ix - run.vx) * ea;
+    run.vy += (iy - run.vy) * ea;
+    // 거의 0 이면 0 으로 떨군다 — 안 그러면 영영 조금씩 미끄러진다
+    if (!ix && Math.abs(run.vx) < 0.012) run.vx = 0;
+    if (!iy && Math.abs(run.vy) < 0.012) run.vy = 0;
+
+    let dx = run.vx, dy = run.vy;
+
+    if (ix || iy) run.tx = null;
     else if (run.tx != null) {
         const ax = run.tx - run.x, ay = run.ty - run.y;
         const d = Math.hypot(ax, ay);
-        if (d <= P.TAP_STOP) run.tx = null;
-        else { dx = ax / d; dy = ay / d; }
+        // ★ 한 칸에 갈 만큼 가까우면 **그 자리에 붙인다.**
+        //   전에는 3픽셀 안에 들 때까지 걸었는데, 한 칸에 3.5픽셀씩 가므로
+        //   목표를 넘었다 돌아왔다 하며 떨었다 (느린 기계일수록 심했다).
+        if (d <= Math.max(P.TAP_STOP, P.SPEED * dt)) {
+            run.x = run.tx; run.y = run.ty;
+            run.tx = null; dx = dy = 0; run.vx = run.vy = 0;
+        } else { dx = ax / d; dy = ay / d; }
     }
 
     // 대각선이 더 빠르지 않게 1 로 자른다. 1 보다 작은 것은 그대로 둔다
@@ -2000,8 +2033,12 @@ let bagTab = 'wear';
 function bagSheet(which) {
     const u = u_(); if (!u) return;
     if (which) bagTab = which;
-    const tabs = [['bag', '소지품'], ['acc', '악세'], ['wear', '의상']];
-    const body = (bagTab === 'bag') ? bagInv(u) : bagWear(u, bagTab === 'acc');
+    // ★ 소지품 줄은 뺐다 — 보여 주기만 하고 **아무것도 못 하는 장식**이었다.
+    //   물건을 쓰는 곳은 사원 화면의 소지품 칸이다. 묵은 'bag' 이 적혀 있으면
+    //   의상으로 돌린다 (전에 소지품을 보던 사람이 빈 칸을 보지 않게).
+    if (bagTab === 'bag') bagTab = 'wear';
+    const tabs = [['acc', '악세'], ['wear', '의상']];
+    const body = bagWear(u, bagTab === 'acc');
     const s = sheet('bag', '', '<div class="plaza-tabs">'
         + tabs.map(function (t) {
             return '<button data-t="' + t[0] + '"' + (bagTab === t[0] ? ' class="on"' : '') + '>'
@@ -2044,16 +2081,6 @@ function bagStage(s) {
         const el = window.dotSprite(u_(), { pose: 'stand', scale: 1 });
         host.appendChild(el);
     } catch (e) { }
-}
-
-function bagInv(u) {
-    const inv = Array.isArray(u.inventory) ? u.inventory : [];
-    if (!inv.length) return '<div class="plaza-none">가진 것이 없습니다.</div>';
-    const cnt = {};
-    inv.forEach(function (x) { const n = String(x); cnt[n] = (cnt[n] || 0) + 1; });
-    return '<div class="plaza-inv">' + Object.keys(cnt).map(function (n) {
-        return '<div>' + esc(n) + (cnt[n] > 1 ? ' <b style="color:#d9a05a">×' + cnt[n] + '</b>' : '') + '</div>';
-    }).join('') + '</div>';
 }
 
 // 악세를 가르는 칸 — 이 차례대로 줄이 선다. 여기 없는 것은 「그 밖」으로 모인다.
@@ -2193,8 +2220,10 @@ function open() {
             + '<button data-k="down">▼</button>'
             + '<button data-k="right">▶</button>'
             + '</div>')
-        + '<div id="plaza-feed" class="plaza-keep"></div>'
-        + '<div id="plaza-map" class="plaza-keep"><div class="mp-n"></div><div class="mp-g"></div></div>'
+        // ★ plaza-keep 을 뗐다 — 엄지가 닿는 자리라 여기서도 끌어 걸을 수
+        //   있어야 한다. 끌지 않고 톡 친 것만 열린다 (stick 참고).
+        + '<div id="plaza-feed"></div>'
+        + '<div id="plaza-map"><div class="mp-n"></div><div class="mp-g"></div></div>'
         + '<div id="plaza-bottom">'
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
         + '<div id="plaza-bar" class="plaza-keep"><span class="dot"></span>'
@@ -2208,7 +2237,7 @@ function open() {
     run = {
         room: null, el: document.getElementById('plaza-room'),
         view: document.getElementById('plaza-view'),
-        peers: {}, keys: {}, ax: 0, ay: 0, x: 0, y: 0, tx: null, ty: null,
+        peers: {}, keys: {}, ax: 0, ay: 0, vx: 0, vy: 0, x: 0, y: 0, tx: null, ty: null,
         cx: 0, cy: 0, last: performance.now(), raf: 0, z: 1,
         sx: -9999, sy: -9999, sent: 0, sMoving: false, sFace: 1,
         say: '', sayAt: 0, sSayAt: 0, k: 1, ref: null, me: null, lv: 0
@@ -2220,12 +2249,40 @@ function open() {
     //   짚을 것도 없고, 화면에 아무것도 안 띄워도 된다.
     //   끌지 않고 톡 치기만 하면 전처럼 **그 자리로 걸어간다.**
     (function stick() {
-        const DEAD = 12;              // 이만큼 끌어야 걷기로 본다 (손 떨림 몫)
-        const REACH = 64;             // 이만큼 끌면 가장 빠르다
-        const TAP_MS = 320;
-        let id = null, ox = 0, oy = 0, at = 0, drag = false;
+        const DEAD = 14;              // 이만큼 끌어야 걷기로 본다 (손 떨림 몫)
+        const REACH = 62;             // 이만큼 끌면 가장 빠르다
+        const TAP_MS = 360;           // 이 안에 떼면 톡 친 것
+        const TAP_SLOP = 22;          // 이만큼 안 벗어났으면 톡 친 것으로 본다
+        // ★ 조이스틱을 받는 자리 — 방 화면과 **왼쪽 아래 글줄 · 오른쪽 아래
+        //   미니맵**까지다. 손전화에서 엄지가 닿는 곳이 거기인데, 전에는
+        //   글줄과 미니맵이 손가락을 통째로 먹어 **엄지 자리에서 아예 못
+        //   걸었다.** 이제 끌면 걷고, 끌지 않고 톡 치면 전처럼 열린다.
+        const GRAB = '#plaza-view, #plaza-feed, #plaza-map';
+        let id = null, ox = 0, oy = 0, at = 0, drag = false, far = 0, hit = null;
 
         const stop_ = function () { if (run) { run.ax = 0; run.ay = 0; } };
+        // ★ 보이는 손잡이 — 짚은 자리에 동그라미, 민 쪽에 알맹이.
+        //   안 보이는 채로 두니 「지금 끄는 중인지 톡 친 건지」를 알 수 없어
+        //   조작이 막연했다. 걷는 동안에만 옅게 뜬다.
+        const stick = document.createElement('div');
+        stick.id = 'plaza-stick';
+        stick.innerHTML = '<i></i>';
+        ov.appendChild(stick);
+        const draw = function (dx, dy, d) {
+            stick.style.left = ox + 'px'; stick.style.top = oy + 'px';
+            const m = d ? Math.min(1, d / REACH) : 0;
+            const kx = d ? dx / d * REACH * m : 0, ky = d ? dy / d * REACH * m : 0;
+            stick.firstChild.style.transform = 'translate(' + Math.round(kx) + 'px,' + Math.round(ky) + 'px)';
+            stick.classList.add('on');
+        };
+        const hide = function () { stick.classList.remove('on'); };
+        // 끌고 나서 손을 떼면 짚었던 것 위로 click 이 한 번 더 난다 —
+        // 걸으려고 끈 것뿐인데 채팅 칸이 열리던 것을 한 번만 삼킨다.
+        const eatClick = function () {
+            const kill = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+            window.addEventListener('click', kill, true);
+            setTimeout(function () { window.removeEventListener('click', kill, true); }, 350);
+        };
         // ★ 얹어 둔 것들 위에서는 걷지 않는다.
         //
         //   짚은 자리가 목적지로 쓰이는 게 아니라서, 아래쪽 빈 검은 자리를
@@ -2235,30 +2292,52 @@ function open() {
         //   아예 상관없이 **그 자리가 조이스틱 한가운데**가 된다.
         //   그래서 미니맵·단추·채팅 바는 .plaza-keep 으로 빼낸다.
         //   (채팅 내역은 글자뿐이라 pointer-events:none 으로 그냥 통과시킨다)
-        run.view.addEventListener('pointerdown', function (e) {
+        ov.addEventListener('pointerdown', function (e) {
             if (!run) return;
-            if (e.target && e.target.closest && e.target.closest('.plaza-spot, .plaza-keep')) return;
-            id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now(); drag = false;
-            try { run.view.setPointerCapture(id); } catch (x) { }
+            const t = e.target;
+            if (!t || !t.closest) return;
+            if (!t.closest(GRAB)) return;                        // 단추·창 위에서는 안 걷는다
+            if (t.closest('.plaza-spot, .plaza-keep')) return;   // 시설 표·얹어 둔 것
+            id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now();
+            drag = false; far = 0; hit = t;
         });
-        run.view.addEventListener('pointermove', function (e) {
+        ov.addEventListener('pointermove', function (e) {
             if (!run || id === null || e.pointerId !== id) return;
-            const dx = e.clientX - ox, dy = e.clientY - oy;
-            const d = Math.hypot(dx, dy);
+            let dx = e.clientX - ox, dy = e.clientY - oy;
+            let d = Math.hypot(dx, dy);
+            if (d > far) far = d;
             if (!drag && d < DEAD) return;
-            drag = true;
+            if (!drag) { drag = true; try { ov.setPointerCapture(id); } catch (x) { } }
             e.preventDefault();
+            // ★ 끝까지 민 뒤에는 **한가운데가 손가락을 따라온다.**
+            //   안 그러면 반대로 가려 할 때 민 만큼 되돌아와야 해서 늦게 돈다
+            //   (끝까지 민 채로 손목만 돌리면 한참을 그대로 걸어갔다).
+            if (d > REACH) {
+                ox += dx * (d - REACH) / d;
+                oy += dy * (d - REACH) / d;
+                dx = e.clientX - ox; dy = e.clientY - oy; d = REACH;
+            }
             const m = Math.min(1, (d - DEAD) / (REACH - DEAD));
             run.ax = dx / d * m;
             run.ay = dy / d * m;
             run.tx = null;                        // 끌면 눌러 둔 자리는 버린다
+            draw(dx, dy, d);
         });
         const up = function (e) {
             if (id === null || (e && e.pointerId !== undefined && e.pointerId !== id)) return;
             id = null;
             stop_();
-            // 끌지 않고 톡 쳤으면 그 자리로 걸어간다
-            if (!drag && now() - at < TAP_MS && run) {
+            hide();
+            // ★ 손가락이 조금 미끄러져도(TAP_SLOP 안에서 짧게) 톡 친 것으로 본다.
+            //   전에는 DEAD(14픽셀)만 넘으면 끈 것으로 쳐서, 15픽셀 미끄러진
+            //   톡 치기는 **한 칸 걷다 멈추고 그대로 버려졌다.** 손전화에서
+            //   가만히 톡 치기가 어려워 이것이 「안 눌린다」로 느껴졌다.
+            const tap = (now() - at < TAP_MS) && far < TAP_SLOP;
+            if (!tap && drag) eatClick();
+            // 톡 쳤으면 그 자리로 걸어간다.
+            // ★ 글줄·미니맵을 톡 친 것은 **그 칸을 여는 것**이지 걷는 게 아니다.
+            if (tap && run
+                && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))) {
                 const r = roomOf(), z = zz();
                 const b = run.view.getBoundingClientRect();
                 const x = (e.clientX - b.left + run.cx) / z;
@@ -2285,11 +2364,11 @@ function open() {
                 run.tx = tx;
                 run.ty = Math.max(yr[0], Math.min(yr[1], y));
             }
-            drag = false;
+            drag = false; far = 0; hit = null;
         };
-        run.view.addEventListener('pointerup', up);
-        run.view.addEventListener('pointercancel', up);
-        run.view.addEventListener('lostpointercapture', up);
+        ov.addEventListener('pointerup', up);
+        ov.addEventListener('pointercancel', up);
+        ov.addEventListener('lostpointercapture', up);
     })();
 
     // 창 크기가 바뀌면 (화면을 돌리거나 자판이 올라오면) 다시 맞춘다
