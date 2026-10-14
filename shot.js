@@ -25,8 +25,16 @@
 //   화면에 뜬 단추·채팅은 일부러 안 넣는다 — 사진에 남기고 싶은 것은
 //   방과 사람이지 단추가 아니다.
 //
+// ■ 당겨 찍기
+//
+//   찍은 것을 보는 창에 「전체 · ×1.5 · ×2 · ×3」이 있다. 고르면 **나를
+//   가운데 두고** 그만큼 당겨 다시 그린다. 사진 크기는 그대로고 담기는
+//   넓이만 좁아진다. 방 밖(검은 데)이 들어오지 않게 가장자리에서 멈춘다.
+//   글씨·말풍선은 배로 나눠 두어, 당겨도 글자만 커지지 않는다.
+//
 // ■ 콘솔
-//       shotNow()   지금 바로 한 장 찍는다
+//       shotNow()     지금 바로 한 장 (전체)
+//       shotNow(2)    두 배로 당겨서
 
 (function shotCam() {
 
@@ -51,20 +59,27 @@ function load(src) {
 }
 
 // 말풍선 바탕 — 네모와 아래 꼬리
-function bubble(g, x, y, w, h, tipX) {
+function bubble(g, x, y, w, h, tipX, u) {
+    u = u || 1;
     g.fillStyle = '#f4efe2';
-    if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, 8); g.fill(); }
+    if (g.roundRect) { g.beginPath(); g.roundRect(x, y, w, h, 8 * u); g.fill(); }
     else g.fillRect(x, y, w, h);
-    const t = Math.max(x + 9, Math.min(x + w - 9, tipX));
+    const t = Math.max(x + 9 * u, Math.min(x + w - 9 * u, tipX));
     g.beginPath();
-    g.moveTo(t - 5, y + h); g.lineTo(t + 5, y + h); g.lineTo(t, y + h + 6);
+    g.moveTo(t - 5 * u, y + h); g.lineTo(t + 5 * u, y + h); g.lineTo(t, y + h + 6 * u);
     g.closePath(); g.fill();
 }
 
 // ── 한 장 그린다
-async function draw() {
+//
+//   ★ 당겨 찍기(zoom) — **나를 가운데 두고** 그만큼 크게 그린다.
+//     사진 크기(창 크기)는 그대로 두고 담기는 넓이만 좁아진다.
+//     글씨·말풍선은 배로 나눠 두어 당겨도 글자가 커지지 않는다.
+async function draw(zoom) {
     const d = look();
     if (!d) throw new Error('광장이 아닙니다');
+    const Z = Math.max(1, Math.min(4, Number(zoom) || 1));
+    const u = 1 / Z;                                 // 화면 한 칸 = 밑그림 u 칸
     const W = Math.round(d.vw), H = Math.round(d.vh);
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
@@ -73,12 +88,32 @@ async function draw() {
     g.fillStyle = '#07070a';
     g.fillRect(0, 0, W, H);
 
-    // 1) 방 그림 — 카메라가 민 만큼 잘라 깐다
+    // 가운데에 둘 것
+    //   ★ 「전체」(배 1)는 **보이던 그대로**다 — 가운데를 옮기지 않는다.
+    //     화면과 똑같아야 하므로 여기서 사람 쪽으로 당기면 안 된다.
+    const rx0 = -d.cx, ry0 = -d.cy;
+    const rx1 = rx0 + d.room.w, ry1 = ry0 + d.room.h;
+    let fx = W / 2, fy = H / 2;
+    if (Z > 1) {
+        const me = d.folk[0];
+        fx = me ? me.x + me.w / 2 : W / 2;
+        fy = me ? me.y + me.h / 2 : H / 2;
+        // 방 밖(검은 데)이 들어오지 않게 가장자리에서 멈춘다
+        const halfW = W * u / 2, halfH = H * u / 2;
+        if (d.room.w >= W * u) fx = Math.max(rx0 + halfW, Math.min(rx1 - halfW, fx));
+        else fx = (rx0 + rx1) / 2;
+        if (d.room.h >= H * u) fy = Math.max(ry0 + halfH, Math.min(ry1 - halfH, fy));
+        else fy = (ry0 + ry1) / 2;
+    }
+
+    g.save();
+    g.translate(W / 2, H / 2);
+    g.scale(Z, Z);
+    g.translate(-fx, -fy);
+
+    // 1) 방 그림 — 화면에 깔린 그 자리·그 크기로 통째로 깐다
     const room = await load(d.room.img);
-    const z = d.room.w / room.naturalWidth;          // 늘린 배 (가로 기준)
-    g.drawImage(room,
-        d.cx / z, d.cy / z, W / z, H / z,            // 원본에서 떠 올 네모
-        0, 0, W, H);
+    g.drawImage(room, rx0, ry0, d.room.w, d.room.h);
 
     // 2) 사람 — 보이는 그 칸을 옷 장마다 겹친다
     g.imageSmoothingEnabled = false;                // 도트는 또렷하게
@@ -99,43 +134,47 @@ async function draw() {
             g.drawImage(sheet, L.col * cw, L.row * ch, cw, ch, 0, 0, f.w, f.h);
             g.restore();
         }
+        g.imageSmoothingEnabled = true;
         // 이름표
         if (f.name) {
-            g.font = 'bold 11px -apple-system, system-ui, sans-serif';
+            g.font = 'bold ' + (11 * u) + 'px -apple-system, system-ui, sans-serif';
             g.textAlign = 'center';
-            g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.85)';
+            g.lineWidth = 3 * u; g.strokeStyle = 'rgba(0,0,0,.85)';
             g.strokeText(f.name, f.x + f.w / 2, f.y + f.tagY);
             g.fillStyle = '#efe6d8';
             g.fillText(f.name, f.x + f.w / 2, f.y + f.tagY);
         }
         // 말풍선 — 글
         if (f.say) {
-            const pad = 7, fs = 11;
+            const pad = 7 * u, fs = 11 * u;
             g.font = fs + 'px -apple-system, system-ui, sans-serif';
-            const tw = Math.min(g.measureText(f.say).width, W * 0.6);
+            const tw = Math.min(g.measureText(f.say).width, W * u * 0.6);
             const bw = tw + pad * 2, bh = fs + pad * 2;
-            const bx = Math.max(4, Math.min(W - bw - 4, f.x + f.w / 2 - bw / 2));
-            const by = f.y - bh - 10;
-            bubble(g, bx, by, bw, bh, f.x + f.w / 2);
+            const bx = f.x + f.w / 2 - bw / 2;
+            const by = f.y - bh - 10 * u;
+            bubble(g, bx, by, bw, bh, f.x + f.w / 2, u);
             g.fillStyle = '#1a1a1a'; g.textAlign = 'center';
-            g.fillText(f.say, bx + bw / 2, by + pad + fs - 2, tw);
+            g.fillText(f.say, bx + bw / 2, by + pad + fs - 2 * u, tw);
         }
         // 말풍선 — 이모티콘
         if (f.emo) {
             let im = null;
             try { im = await load(f.emo); } catch (e) { }
             if (im) {
-                const pad = 4;
-                const iw = Math.min(im.naturalWidth, 96);
-                const ih = Math.round(im.naturalHeight * (iw / im.naturalWidth));
+                const pad = 4 * u;
+                const iw = Math.min(im.naturalWidth, 96) * u;
+                const ih = im.naturalHeight * (iw / im.naturalWidth);
                 const bw = iw + pad * 2, bh = ih + pad * 2;
-                const bx = Math.max(4, Math.min(W - bw - 4, f.x + f.w / 2 - bw / 2));
-                const by = f.y - bh - 10;
-                bubble(g, bx, by, bw, bh, f.x + f.w / 2);
+                const bx = f.x + f.w / 2 - bw / 2;
+                const by = f.y - bh - 10 * u;
+                bubble(g, bx, by, bw, bh, f.x + f.w / 2, u);
                 g.drawImage(im, bx + pad, by + pad, iw, ih);
             }
         }
+        g.imageSmoothingEnabled = false;
     }
+    g.restore();
+    g.imageSmoothingEnabled = true;
 
     // 3) 어디에서 찍었는지 한 줄
     g.font = 'bold 11px -apple-system, system-ui, sans-serif';
@@ -148,13 +187,23 @@ async function draw() {
 }
 
 // ── 찍은 것을 보여 준다
-function show(cv, name) {
+//
+//   당긴 배를 고르면 **그 자리에서 다시 그린다.** 광장의 값은 찍을 때
+//   한 번만 읽으므로(zoom 은 그림만 다시 그린다), 사람이 움직여도 같은
+//   한 장을 배만 바꿔 다시 볼 수 있다.
+const ZOOMS = [1, 1.5, 2, 3];
+
+function show(cv, name, z) {
     const old = el('shot-ov'); if (old) old.remove();
     const url = cv.toDataURL('image/png');
     const d = document.createElement('div');
     d.id = 'shot-ov';
     d.innerHTML = '<div class="sh-card">'
         + '<img src="' + url + '" alt="찍은 사진">'
+        + '<div class="sh-zoom">' + ZOOMS.map(function (x) {
+            return '<button data-z="' + x + '"' + (x === z ? ' class="on"' : '') + '>'
+                + (x === 1 ? '전체' : '×' + x) + '</button>';
+        }).join('') + '</div>'
         + '<div class="sh-row">'
         + '<a class="sh-btn go" download="' + name + '" href="' + url + '">저장</a>'
         + '<button class="sh-btn" id="shot-x">닫는다</button>'
@@ -164,17 +213,22 @@ function show(cv, name) {
     document.body.appendChild(d);
     d.addEventListener('pointerdown', function (e) { if (e.target === d) d.remove(); });
     d.querySelector('#shot-x').onclick = function () { d.remove(); };
+    Array.prototype.forEach.call(d.querySelectorAll('.sh-zoom button'), function (b) {
+        b.onclick = function () { take(Number(b.dataset.z)); };
+    });
 }
 
-async function take() {
+async function take(zoom) {
     if (busy) return;
     busy = true;
+    const z = Number(zoom) || 1;
     try {
-        const cv = await draw();
+        const cv = await draw(z);
         const t = new Date();
         const p = function (n) { return (n < 10 ? '0' : '') + n; };
         show(cv, '사내시스템_' + t.getFullYear() + p(t.getMonth() + 1) + p(t.getDate())
-            + '_' + p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds()) + '.png');
+            + '_' + p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds())
+            + (z > 1 ? '_x' + z : '') + '.png', z);
     } catch (e) {
         if (typeof showCustomAlert === 'function') showCustomAlert('사진을 찍지 못했습니다. ' + (e && e.message || ''));
         else console.warn('[사진] ' + (e && e.message));
@@ -202,6 +256,11 @@ window.shotNow = take;
         '.sh-card{max-width:min(92vw,430px);display:flex;flex-direction:column;gap:10px;}',
         '.sh-card img{width:100%;height:auto;border-radius:10px;border:1px solid #3a3a48;',
         '  box-shadow:0 8px 30px rgba(0,0,0,.6);}',
+        // 당겨 찍기 — 전체 · ×1.5 · ×2 · ×3
+        '.sh-zoom{display:flex;gap:6px;}',
+        '.sh-zoom button{flex:1;padding:9px 0;border-radius:10px;font-size:11.5px;cursor:pointer;',
+        '  font-family:inherit;background:rgba(255,255,255,.05);border:1px solid #2b2b38;color:#b5ab9a;}',
+        '.sh-zoom button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
         '.sh-row{display:flex;gap:8px;}',
         '.sh-btn{flex:1;text-align:center;padding:12px 0;border-radius:11px;font-size:12.5px;',
         '  font-family:inherit;cursor:pointer;text-decoration:none;',
@@ -222,7 +281,7 @@ window.shotNow = take;
         b.className = 'plaza-keep';
         b.title = '사진을 찍는다';
         b.innerHTML = '<span class="pico" style="--ic:url(\'ico/camera.png\')"></span>';
-        b.onclick = take;
+        b.onclick = function () { take(1); };
         ov.appendChild(b);
     };
     const _open = window.plazaOpen;
