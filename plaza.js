@@ -2170,6 +2170,7 @@ function shut() {
         window.removeEventListener('keyup', run.onKeyUp);
     }
     if (run.onSize) window.removeEventListener('resize', run.onSize);
+    if (run.onStick) run.onStick();
     const ov = document.getElementById('plaza-ov');
     if (ov) ov.remove();
     run = null;
@@ -2301,13 +2302,25 @@ function open() {
             id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now();
             drag = false; far = 0; hit = t;
         });
-        ov.addEventListener('pointermove', function (e) {
+        // ★ 끌기는 **창 전체**에서 듣는다. 붙잡기(setPointerCapture)는 안 쓴다.
+        //
+        //   ✗ 전에는 끌기 시작할 때 ov 로 손가락을 붙잡아 두었다. 그런데
+        //     손가락은 누르는 순간 **눌린 칸에 저절로 붙잡힌다**(암묵적 붙잡기).
+        //     거기서 ov 로 옮기면 눌렸던 칸에서 lostpointercapture 가 나고,
+        //     그것이 **위로 타고 올라와 ov 까지 와서** 손 뗀 것으로 읽혔다.
+        //     그래서 손전화에서는 끌기가 **한 칸 만에 죽고** 톡 치기만 됐다.
+        //     마우스에는 암묵적 붙잡기가 없어 PC 에서는 멀쩡해 보였다.
+        //
+        //   붙잡지 않아도 샐 일이 없다. 광장 창(ov)은 화면을 통째로 덮으므로
+        //   손가락이 어디로 가든 그 안이고, 창 밖으로 나가 손을 떼는 것은
+        //   window 에서 듣는 pointerup 이 받는다.
+        const onMove = function (e) {
             if (!run || id === null || e.pointerId !== id) return;
             let dx = e.clientX - ox, dy = e.clientY - oy;
             let d = Math.hypot(dx, dy);
             if (d > far) far = d;
             if (!drag && d < DEAD) return;
-            if (!drag) { drag = true; try { ov.setPointerCapture(id); } catch (x) { } }
+            drag = true;
             e.preventDefault();
             // ★ 끝까지 민 뒤에는 **한가운데가 손가락을 따라온다.**
             //   안 그러면 반대로 가려 할 때 민 만큼 되돌아와야 해서 늦게 돈다
@@ -2322,7 +2335,7 @@ function open() {
             run.ay = dy / d * m;
             run.tx = null;                        // 끌면 눌러 둔 자리는 버린다
             draw(dx, dy, d);
-        });
+        };
         const up = function (e) {
             if (id === null || (e && e.pointerId !== undefined && e.pointerId !== id)) return;
             id = null;
@@ -2366,9 +2379,15 @@ function open() {
             }
             drag = false; far = 0; hit = null;
         };
-        ov.addEventListener('pointerup', up);
-        ov.addEventListener('pointercancel', up);
-        ov.addEventListener('lostpointercapture', up);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+        // 광장을 닫을 때 떼어 낸다 — 창에 건 것은 창이 없어져도 안 지워진다
+        run.onStick = function () {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', up);
+        };
     })();
 
     // 창 크기가 바뀌면 (화면을 돌리거나 자판이 올라오면) 다시 맞춘다
