@@ -142,7 +142,7 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'dream-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
+        'dress', 'tuxedo', 'suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -204,6 +204,8 @@ const DOT_SLOTS = [
             //   자리는 요원복과 같은 가로 +102 · 세로 +100 — 옮기고 나니 테두리가
             //   몸(126~225 · 116~351)과 딱 맞았다.
             { i: 'dsuit', n: '백일몽 정장', over: ['dream-suit'], own: 'dream-suit' },
+            // 브라운 정장 — 요원복과 같은 ¼ 규격(216x128)으로 주셔서 같은 길로 넣었다
+            { i: 'bsuit', n: '브라운 정장', over: ['brown-suit'], own: 'brown-suit' },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '검은 장포', over: ['robe'], own: 'robe' },
             { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },

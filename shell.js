@@ -186,7 +186,7 @@ function openPanel(tab, sub, title) {
         top.querySelector('.nm').innerHTML = title || nameOfTab(tab);
     }
     try { m.scrollTop = 0; } catch (e) { }
-    if (tab === 'tab-public') setTimeout(facLine, 40);   // 남은 횟수 한 줄
+    setTimeout(facLine, 40);     // 포인트 · 포만감 · 오염도 (공용시설이면 남은 횟수도)
     return true;
 }
 
@@ -206,6 +206,7 @@ function nameOfTab(tab) {
 }
 
 function closePanel() {
+    try { const f = document.querySelector('#shell-fac'); if (f) f.remove(); } catch (e) { }
     const m = el(MS);
     if (m) { m.classList.remove('solo'); m.style.display = 'none'; }
     const top = el('shell-top');
@@ -292,21 +293,45 @@ function toPlaza() {
 //   한도에 닿으면 원래 있던 빨간 안내가 뜨므로, 여기서는 수만 알린다.
 function facLine() {
     if (!solo) return;
-    const box = document.querySelector('#public-content-box');
     const u = (typeof currentUser !== 'undefined') ? currentUser : null;
-    if (!box || !u) return;
+    if (!u) return;
+    // 띄운 칸 맨 위에 붙인다 — 칸마다 담는 그릇이 다르다.
+    //   ★ #public-content-box 는 **늘 문서에 있다** (안 보일 뿐이다). 그래서
+    //     그것부터 찾으면 소지품을 열어도 공용시설 안에 붙어 안 보였다.
+    //     지금 띄운 칸(openTab)으로 가른다.
+    if (!openTab) return;
+    const pub = (openTab === 'tab-public');
+    const box = (pub && document.querySelector('#public-content-box'))
+             || document.getElementById(openTab);
+    if (!box) return;
     let e = document.querySelector('#shell-fac');
     if (!e) {
         e = document.createElement('div');
         e.id = 'shell-fac';
-        box.insertBefore(e, box.firstChild);
     }
-    const max = u.facilityMax || 20;
-    const used = Math.max(0, u.facilityCount || 0);
-    const left = Math.max(0, max - used);
-    e.innerHTML = '오늘 이용 <b>' + used + '</b> / ' + max + '회'
-        + '<span class="sp">·</span>남은 횟수 <b class="' + (left ? 'ok' : 'no') + '">'
-        + left + '회</b>';
+    if (e.parentNode !== box) box.insertBefore(e, box.firstChild);
+
+    const cut = function (v) { return Math.max(0, Math.min(100, Math.round(Number(v) || 0))); };
+    const sat = (u.satiety === undefined) ? 100 : cut(u.satiety);
+    const pol = cut(u.pollution);
+    const pt = Number(u.points || 0).toLocaleString('ko-KR');
+    // 공용시설에서만 남은 횟수를 같이 적는다
+    let html = '<div class="row"><span>포인트 <b>' + pt + ' P</b></span>';
+    if (pub) {
+        const max = u.facilityMax || 20;
+        const used = Math.max(0, u.facilityCount || 0);
+        const left = Math.max(0, max - used);
+        html += '<span class="sp">·</span><span>남은 횟수 <b class="' + (left ? '' : 'no') + '">'
+             + left + '</b> / ' + max + '회</span>';
+    }
+    html += '</div>'
+        + '<div class="bars">'
+        + '<span class="lab">포만감</span><span class="bar sat"><i style="width:' + sat + '%"></i></span>'
+        + '<b>' + sat + '</b>'
+        + '<span class="lab">오염도</span><span class="bar pol"><i style="width:' + pol + '%"></i></span>'
+        + '<b class="' + (pol >= 80 ? 'no' : '') + '">' + pol + '</b>'
+        + '</div>';
+    e.innerHTML = html;
 }
 
 (function facCss() {
@@ -314,12 +339,22 @@ function facLine() {
     const s = document.createElement('style');
     s.id = 'shell-fac-css';
     s.textContent = [
-        '#shell-fac{margin:0 0 11px 0;padding:9px 12px;border-radius:9px;font-size:12px;',
-        '  text-align:center;color:#b5ab9a;background:rgba(255,255,255,.04);',
-        '  border:1px solid #2b2b38;}',
+        '#shell-fac{margin:0 0 11px 0;padding:9px 12px;border-radius:9px;font-size:11.5px;',
+        '  color:#b5ab9a;background:rgba(255,255,255,.04);border:1px solid #2b2b38;',
+        '  display:flex;flex-direction:column;gap:7px;}',
+        '#shell-fac .row{display:flex;justify-content:center;align-items:center;}',
         '#shell-fac b{color:#ffe9bd;}',
         '#shell-fac b.no{color:#ff8b7b;}',
-        '#shell-fac .sp{opacity:.4;margin:0 7px;}'
+        '#shell-fac .sp{opacity:.4;margin:0 7px;}',
+        '#shell-fac .bars{display:grid;grid-template-columns:auto 1fr 28px auto 1fr 28px;',
+        '  align-items:center;gap:5px 7px;font-size:10.5px;}',
+        '#shell-fac .lab{color:#8d8578;white-space:nowrap;}',
+        '#shell-fac .bar{height:7px;border-radius:999px;overflow:hidden;',
+        '  background:rgba(8,8,12,.6);border:1px solid #2b2b38;}',
+        '#shell-fac .bar i{display:block;height:100%;border-radius:999px;transition:width .3s;}',
+        '#shell-fac .sat i{background:linear-gradient(90deg,#f44336,#ff9800,#8bc34a);}',
+        '#shell-fac .pol i{background:linear-gradient(90deg,#4caf50,#ff9800,#f44336);}',
+        '#shell-fac .bars b{text-align:right;font-size:10.5px;}'
     ].join('\n');
     document.head.appendChild(s);
 })();

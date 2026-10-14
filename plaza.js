@@ -449,8 +449,14 @@ function stampSafe(ov) {
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
         '@keyframes plazaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
         // 걷기 단추 (자판이 있는 기계에서만 — 손가락 쪽은 화면을 끌어 걷는다)
+        // ★ 줄 자체는 누름을 안 받는다 — 단추만 받는다.
+        //   이 줄은 left:0 right:0 으로 **화면을 가로질러** 있어서, 가운데
+        //   네 단추 말고 양옆 빈 자리까지 누름을 먹었다. 그 아래 깔린 글줄이
+        //   눌리지 않아 PC 에서 「클릭이 잘 안 먹는」 꼴이 됐다.
         '#plaza-pad{position:absolute;left:0;right:0;z-index:20;display:flex;gap:6px;',
+        '  pointer-events:none;',
         '  justify-content:center;bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
+        '#plaza-pad button{pointer-events:auto;}',
         '#plaza-pad button{width:50px;padding:10px 0;font-size:15px;border-radius:10px;',
         '  background:rgba(18,18,26,.66);border:1px solid rgba(170,158,126,.3);color:#ded7c8;',
         '  cursor:pointer;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}',
@@ -1858,8 +1864,18 @@ function liftSheet(floor) {
                 + (h[0] * 100).toFixed(2) + '%;height:' + ((h[1] - h[0]) * 100).toFixed(2) + '%"></button>';
         }).join('') + '</div>');
     if (!s) return;
+    // ★ 연 그 손가락이 그대로 층을 누르는 것(유령 누름)을 막는다.
+    //
+    //   입구는 pointerdown 에서 열린다. 그러면 손을 떼는 순간 같은 자리에서
+    //   click 이 한 번 더 나는데, 그 자리에 이제 막 뜬 층 단추가 있다.
+    //   그래서 엘리베이터를 누르면 **2층이 같이 눌려** 사택이 바로 열렸다.
+    //   창이 뜨고 0.4초 안에 오는 누름은 받지 않는다.
+    const at = now();
     Array.prototype.forEach.call(s.querySelectorAll('#plaza-lift button'), function (b) {
-        b.onclick = function () { liftSheet(b.dataset.f); };
+        b.onclick = function () {
+            if (now() - at < 400) return;
+            liftSheet(b.dataset.f);
+        };
     });
 }
 
