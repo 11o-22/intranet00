@@ -326,7 +326,8 @@
       "jisan.js",
       "closet.js",
       "plaza.js",
-      "shell.js"
+      "shell.js",
+      "skip.js"
     ]
   ]
 }

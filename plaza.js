@@ -85,7 +85,7 @@ const PLAZA = {
     PATH: 'plazaRoom',          // 서버에 자리를 적는 자리
     CHAT: 'plazaChat',          // 서버에 말을 적는 자리
 
-    SPEED: 180,                 // 1초에 몇 픽셀 걷나 (방이 1880px 로 넓어져 올렸다)
+    SPEED: 210,                 // 1초에 몇 픽셀 걷나 (방이 넓어지고 「조금 빠르게」 하여 올렸다)
     // ★ 그림 아래쪽 **밋밋한 벽**을 빼고 창에 맞춘다.
     //   2차 그림(1880x2556)은 볼 것이 y 1320 에서 끝나고 그 아래 1236픽셀이
     //   한 가지 색 벽이다. 통째로 창에 맞추면 화면 절반이 비어 보이고
@@ -828,6 +828,31 @@ function paintSpots() {
     });
 }
 
+// ★ 이 시설이 **어느 방 어디에** 서 있나 — 방 표에서 찾아낸다.
+//   목록에서 고르면 바로 열지 않고 그 방으로 보내는 데 쓴다.
+function placeOf(m) {
+    if (!m || (!m.tab && !m.fn)) return null;
+    const keys = Object.keys(R);
+    for (let i = 0; i < keys.length; i++) {
+        const r = R[keys[i]];
+        const list = (r.spots || []).concat(r.lift ? [].concat(r.lift.f2 || [], r.lift.b1 || []) : []);
+        for (let j = 0; j < list.length; j++) {
+            const s = list[j];
+            if (m.fn ? (s.fn === m.fn) : (s.tab === m.tab && (s.sub || '') === (m.sub || ''))) {
+                return { room: keys[i], spot: s };
+            }
+        }
+    }
+    return null;
+}
+
+// ★ 스킵권 — 한 번은 걸어가지 않고 바로 들어간다.
+//   표를 **고르는 순간** 거둔다 (목록만 열어 두고 안 고르면 안 쓴다).
+let skipTake = null;
+window.plazaSkipArm = function (take) { skipTake = take || function () { return true; }; };
+window.plazaSkipOn = function () { return !!skipTake; };
+window.plazaMenu = function () { if (run) menuSheet(); };
+
 // 시설·메뉴로 건너간다
 //
 //   사원 쪽에서는 **광장을 닫지 않는다.** 광장이 집이라 돌아올 데가
@@ -932,6 +957,7 @@ function goRoom(key, way, lv) {
     run.el.appendChild(run.me.wrap);
     putOne(run.me, run.x, run.y);
 
+    try { localStorage.setItem('plazaRoom', key); } catch (e) { }
     watchRoom();
     watchChat();
     run.sx = run.sy = -9999; run.sent = 0;
@@ -1518,7 +1544,7 @@ function menuSheet() {
     const s = sheet('menu', '목록', html);
     if (!s) return;
     Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
-        b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
+        b.onclick = function () { pickMenu(list[Number(b.dataset.i)]); };
     });
     s.querySelector('#plaza-out').onclick = function () {
         // 사원은 광장이 집이라 「나가기」가 갈 데가 없다 — 단말을 끈다.
@@ -1568,6 +1594,29 @@ function liftSheet(floor) {
     Array.prototype.forEach.call(s.querySelectorAll('#plaza-lift button'), function (b) {
         b.onclick = function () { liftSheet(b.dataset.f); };
     });
+}
+
+// ★ 목록에서 골랐을 때 — **걸어가서 들어간다.**
+//
+//   광장이 집이 된 뒤로 걸음이 곧 놀이라, 목록은 문을 바로 열지 않고
+//   그 시설이 선 **방까지만** 데려다 준다. 거기서 걸어가 입구를 누르면
+//   들어간다. 사원증·소지품처럼 **자리가 없는 것**은 전처럼 바로 연다.
+//
+//   스킵권(🎟️)을 쓴 다음 한 번은 걸음을 건너뛰고 그 자리에서 들어간다.
+function pickMenu(m) {
+    if (skipTake) {
+        const take = skipTake;
+        skipTake = null;
+        let ok = false;
+        try { ok = take(); } catch (e) { }
+        if (ok) { goApp(m); return; }        // 표를 거뒀다 — 바로 들어간다
+    }
+    const at = placeOf(m);
+    if (!at) { goApp(m); return; }           // 자리가 없는 것은 바로 연다
+    closeSheet();
+    if (at.room !== run.room) goRoom(at.room, null, at.spot.lv);
+    else if (at.spot.lv != null && at.spot.lv !== run.lv) goRoom(at.room, null, at.spot.lv);
+    sysLine(R[at.room].n + ' 입니다. ' + m.n + ' 앞으로 걸어가 주십시오.');
 }
 
 // ── 💬 말
@@ -1938,7 +1987,14 @@ function open() {
     paintMe();
     watchNotice();
 
-    goRoom(P.START, null);
+    // ★ 지난번에 서 있던 방에서 다시 시작한다 — 들어갔다 나오면 광장이
+    //   아니라 **그 자리**여야 한다. 없어진 방이면 광장으로 돌아간다.
+    let start = P.START;
+    try {
+        const last = localStorage.getItem('plazaRoom');
+        if (last && R[last]) start = last;
+    } catch (e) { }
+    goRoom(start, null);
     run.last = performance.now();
     run.raf = requestAnimationFrame(tick);
 }
