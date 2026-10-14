@@ -431,6 +431,31 @@ function makeOne(user, label, k) {
     return { wrap: wrap, actor: a, tag: tag, w: w, h: h, bub: null };
 }
 
+// ★ 배(run.k)가 바뀌면 서 있는 사람들을 그 배로 다시 만든다.
+//   화면을 돌리거나 자판이 올라오면 창 높이가 달라져 z 가 바뀐다. 그때
+//   배경만 다시 그리면 사람만 옛 배로 남아 혼자 크거나 작아 보인다.
+function remakeFolk() {
+    if (!run) return;
+    if (run.me) {
+        try { run.me.actor.stop(); } catch (e) { }
+        run.me.wrap.remove();
+        const u = u_();
+        run.me = makeOne(u, nameOf(u), run.k);
+        run.el.appendChild(run.me.wrap);
+    }
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        let d = {};
+        try { d = JSON.parse(q.key) || {}; } catch (e) { }
+        const lab = q.one.tag.innerText;
+        try { q.one.actor.stop(); } catch (e) { }
+        q.one.wrap.remove();
+        q.one = makeOne({ code: c, dot: d }, lab, run.k);
+        q.one.actor.face(q.face || 1);
+        run.el.appendChild(q.one.wrap);
+    });
+}
+
 // 방 안의 자리(x·y)는 **그림 원래 크기**로 센다. 화면에 놓을 때만 배로 늘린다.
 function zz() { return (run && run.z) || 1; }
 
@@ -514,25 +539,36 @@ function lvAt(r, y) {
     return y >= mid ? 1 : 0;
 }
 
-// 방 그림을 **화면에 꽉 차게** 늘린다.
+// 방 그림을 **세로로 화면에 꼭 맞춘다.**
 //
-//   전에는 그림을 원래 크기로 두어, 세로가 짧은 방은 위아래에 검은 띠가 남았다.
-//   화면을 덮을 만큼(cover) 늘리되 **4분의 1 단위로 끊어** 도트가 덜 뭉개지게 한다.
-//   사람 크기는 그대로 둔다 — 배경만 가까워지는 셈이다.
+//   전에는 화면을 덮을 만큼(cover) 늘려서, 그림이 창보다 위아래로도 컸다.
+//   그래서 걸을 때마다 카메라가 위아래로 따라 움직여, 분수 윗머리나 지하가
+//   번갈아 잘려 보였다. 주신 그림은 **한 장에 길과 지하가 같이** 그려져
+//   있으므로 세로는 통째로 보여야 그림이 그림대로 보인다.
+//
+//       z = 창 높이 ÷ 그림 높이      ← 세로가 딱 맞는다 (위아래로 안 움직인다)
+//
+//   가로는 1880 × z 가 창보다 넓어 여전히 **좌우로만** 민다.
+//   (393×852 짜리 화면이면 z 는 0.51, 방은 958px 폭이 된다 — 565px 를 민다)
+//
+//   ★ 4분의 1 단위로 끊던 것을 그만두었다. 끊으면 세로가 딱 안 맞아
+//     위아래로 또 움직이게 된다. 대신 줄여 그릴 때는 nearest 를 끈다.
 function zoomOf(r) {
     const v = run && run.view;
-    const vw = (v && v.clientWidth) || 430;
     const vh = (v && v.clientHeight) || 760;
-    const need = Math.max(vw / r.w, vh / r.h);
-    return Math.max(1, Math.ceil(need * 4) / 4);
+    return vh / r.h;
 }
 
 function paintRoom() {
     const r = roomOf();
     run.z = zoomOf(r);
+    // ★ 사람도 같은 배로 줄인다. 안 그러면 배경만 멀어지고 사람만 커 보인다.
+    run.k = r.k * run.z;
     const w = Math.round(r.w * run.z), h = Math.round(r.h * run.z);
     run.el.style.width = w + 'px';
     run.el.style.height = h + 'px';
+    // 줄여 그릴 때 nearest(pixelated) 로 찍으면 도트가 깨져 어른거린다
+    run.el.style.imageRendering = (run.z < 1) ? 'auto' : 'pixelated';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
     run.el.style.backgroundSize = w + 'px ' + h + 'px';
     const t = document.getElementById('plaza-where');
@@ -649,7 +685,7 @@ function goRoom(key, way) {
     //   때마다 쌓인다. 방을 몇 번 오가면 시계가 수십 개가 되어 화면이 무거워진다.
     if (run.me) { try { run.me.actor.stop(); } catch (e) { } }
     run.el.innerHTML = '';
-    run.k = r.k;
+    run.k = r.k;            // 임시 — 아래 paintRoom() 이 늘린 배까지 셈해 다시 적는다
 
     // ★ 층 — 좌우로 넘어갈 때는 있던 층 그대로 간다 (지하도 이어져 있다).
     //   건물 안팎을 드나들 때(up·down)는 그 방의 바닥으로 내려 세운다.
@@ -798,21 +834,22 @@ function tick(ts) {
     run.raf = requestAnimationFrame(tick);
 }
 
-// 카메라 — 방이 창보다 크면 사람을 따라 가로·세로로 민다
+// 카메라 — **좌우로만** 민다.
+//
+//   세로는 zoomOf 가 창에 꼭 맞춰 두었으므로 움직일 일이 없다. 전에는
+//   사람을 세로로도 따라가서, 길에서 지하로 내려설 때 화면이 쑥 내려갔다.
 function camera(snap) {
     const r = roomOf(), z = zz();
     const rw = r.w * z, rh = r.h * z;
     const vw = run.view.clientWidth || rw;
     const vh = run.view.clientHeight || rh;
-    // 방이 창보다 작으면 **가운데로** 둔다 (왼위로 붙여 두면 검은 띠가 남는다)
-    let cx = -(vw - rw) / 2, cy = -(vh - rh) / 2;
+    // 방이 창보다 좁으면 **가운데로** 둔다 (왼쪽에 붙이면 한쪽만 검다)
+    let cx = -(vw - rw) / 2;
     if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
-    if (rh > vh) cy = Math.max(0, Math.min(rh - vh, run.y * z - vh * 0.62));
-    if (snap) { run.cx = cx; run.cy = cy; }
-    else {
-        run.cx += (cx - run.cx) * 0.18;      // 조금 늦게 따라와 부드럽다
-        run.cy += (cy - run.cy) * 0.18;
-    }
+    if (snap) run.cx = cx;
+    else      run.cx += (cx - run.cx) * 0.18;   // 조금 늦게 따라와 부드럽다
+    // 세로는 반올림으로 한두 픽셀 남는 것만 가운데로 맞춘다 — 따라오지 않는다
+    run.cy = (rh - vh) / 2;
     run.el.style.left = (-Math.round(run.cx)) + 'px';
     run.el.style.top = (-Math.round(run.cy)) + 'px';
 }
@@ -1345,7 +1382,10 @@ function open() {
     run.onSize = function () {
         if (!run || !run.room) return;
         stampSafe(ov);
+        const was = run.z || 0;
         paintRoom();
+        // 창 높이가 달라지면 늘린 배도 달라진다 — 사람도 그 배로 다시 만든다
+        if (Math.abs((run.z || 0) - was) > 0.0005) remakeFolk();
         Object.keys(run.peers).forEach(function (c) {
             const q = run.peers[c]; putOne(q.one, q.x, q.y);
         });
