@@ -327,7 +327,9 @@
       "closet.js",
       "plaza.js",
       "shell.js",
-      "skip.js"
+      "skip.js",
+      "shot.js",
+      "firsthead.js"
     ]
   ]
 }

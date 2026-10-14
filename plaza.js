@@ -459,6 +459,10 @@ function stampSafe(ov) {
         '#plaza-bar .dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:#ff7b6b;',
         '  box-shadow:0 0 7px #ff7b6b;display:none;}',
         '#plaza-bar.new .dot{display:block;}',
+        // 적는 중에는 바가 그 자리에서 입력칸이 된다 (창을 안 띄운다)
+        '#plaza-bar.typing{padding:6px 10px;background:rgba(10,10,16,.94);border-color:#8a6a2a;}',
+        '#plaza-bar input{width:100%;min-width:0;padding:7px 6px;font-size:13px;font-family:inherit;',
+        '  background:none;border:0;outline:none;color:#e8e2d6;}',
         // ── 시트 (아래에서 올라오는 창)
         '#plaza-sheet{position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;',
         '  justify-content:flex-end;background:rgba(4,4,8,.6);}',
@@ -852,6 +856,72 @@ let skipTake = null;
 window.plazaSkipArm = function (take) { skipTake = take || function () { return true; }; };
 window.plazaSkipOn = function () { return !!skipTake; };
 window.plazaMenu = function () { if (run) menuSheet(); };
+
+// ★ 옷이나 얼굴이 바뀌었을 때 — 서 있는 사람을 그 자리에서 갈아입힌다.
+//   방을 다시 열지 않는다 (자리·카메라를 그대로 두고 모습만 다시 만든다).
+window.plazaRedress = function () {
+    if (!run || !run.room) return false;
+    remakeFolk();
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c]; putOne(q.one, q.x, q.y);
+    });
+    if (run.me) putOne(run.me, run.x, run.y);
+    return true;
+};
+
+// ★ 사진(shot.js)이 **다시 그릴 수 있게** 지금 보이는 것을 그대로 내어 준다.
+//   화면을 뜨는 길이 손전화에 없어서, 무엇으로 되어 있는지 아는 쪽이
+//   직접 그린다. 방 그림 한 장과 사람들의 옷 장 — 그게 전부다.
+//
+//   ★ 장 이름은 dataset.sheet 가 아니라 **지금 깔린 그림 주소**에서 읽는다.
+//     오른쪽을 볼 때 머리 장은 짝(h05 → h09)으로 갈리는데, dataset 은
+//     만들 때 적힌 채라 안 바뀐다. 그대로 쓰면 사진에서 안대가 건너간다.
+window.plazaShotData = function () {
+    if (!run || !run.room) return null;
+    const r = roomOf(), z = zz();
+    const v = run.view.getBoundingClientRect();
+    const one = function (o, label) {
+        const b = o.wrap.getBoundingClientRect();
+        const box = o.wrap.querySelector('.dot-box');
+        const layers = [];
+        Array.prototype.forEach.call((box ? box.querySelectorAll('.dot-layer') : []), function (e) {
+            const u = /url\(["']?(.*?)["']?\)/.exec(e.style.backgroundImage || '');
+            const src = u ? u[1] : ('dot/' + (e.dataset.sheet || '') + '.png');
+            // 칸 크기 = 사람 칸 크기와 같다 (옷 장 한 칸이 곧 사람 한 칸)
+            const p = (e.style.backgroundPosition || '').match(/-?[\d.]+/g) || [];
+            layers.push({
+                src: src,
+                col: b.width ? Math.round(Math.abs(parseFloat(p[0]) || 0) / b.width) : 0,
+                row: b.height ? Math.round(Math.abs(parseFloat(p[1]) || 0) / b.height) : 0
+            });
+        });
+        // 이름표가 붙은 높이 — 글자 밑선까지
+        let tagY = Math.round(b.height * 0.22) + 9;
+        if (o.tag) { const t = o.tag.getBoundingClientRect();
+                     tagY = Math.round(t.bottom - b.top - t.height * 0.22); }
+        // 말풍선 — 글이든 이모티콘이든 지금 떠 있는 것을 그대로 본다
+        const bub = o.wrap.querySelector('.plaza-say');
+        const img = bub && bub.querySelector('img');
+        return { x: b.left - v.left, y: b.top - v.top, w: b.width, h: b.height,
+                 flip: /scaleX\(-1\)/.test((box && box.style.transform) || ''),
+                 tagY: tagY, name: label,
+                 say: (bub && !img) ? bub.innerText : '',
+                 emo: img ? img.src : '',
+                 layers: layers };
+    };
+    const folk = [];
+    if (run.me) folk.push(one(run.me, run.me.tag.innerText));
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        folk.push(one(q.one, q.one.tag.innerText));
+    });
+    return {
+        vw: run.view.clientWidth, vh: run.view.clientHeight,
+        cx: run.cx, cy: run.cy,
+        room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z },
+        folk: folk
+    };
+};
 
 // 시설·메뉴로 건너간다
 //
@@ -1335,6 +1405,9 @@ function pushLine(o) {
     paintBar(o);
 }
 
+// ★ 지금은 #plaza-log 를 띄우는 데가 없다 — 채팅 창을 걷고 바 자리에서
+//   바로 적게 했기 때문이다(chatSheet). 칸이 없으면 조용히 돌아가므로
+//   그대로 두었다. 긴 글줄이 다시 필요해지면 이것을 쓰면 된다.
 function paintLog() {
     const log = document.getElementById('plaza-log');
     if (!log || !run) return;
@@ -1627,26 +1700,40 @@ function sendSay() {
     el.value = '';
 }
 
+// ★ 채팅은 **창을 안 띄운다.**
+//
+//   아래에서 창이 올라오면 자판까지 겹쳐 화면이 통째로 가렸다. 오고 간
+//   말은 이미 왼쪽 아래 글줄(plaza-feed)에 늘 떠 있으므로 창까지 띄울
+//   까닭이 없다. 그래서 **아래 바가 그 자리에서 입력칸이 된다.**
+//   방도 사람도 그대로 보이고, 자판 위로 한 줄만 올라온다.
+//
+//   지난 글줄을 길게 보고 싶으면 목록의 「전체 대화」를 쓴다.
 function chatSheet() {
     const bar = document.getElementById('plaza-bar');
-    if (bar) bar.classList.remove('new');
-    // ★ 「말한다」 단추를 뺐다 — 자판의 보내기(엔터)로 친다.
-    //   손전화에서는 단추가 자판에 가리기 일쑤라, 적고 바로 보내는 쪽이 낫다.
-    const s = sheet('chat', '', '<div id="plaza-log"></div>'
-        + '<div id="plaza-send">'
-        + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send"'
-        + ' placeholder="여기에 적으면 머리 위에 뜹니다"></div>');
-    if (!s) return;
-    // ★ 반드시 sheet() **뒤**에 접는다 — sheet() 가 closeSheet() 를 먼저
-    //   부르고, 그 안에서 미니맵을 도로 켜 놓기 때문이다.
-    mapShow(false);                 // 주신 그림대로 — 채팅을 누르면 미니맵은 비킨다
-    paintLog();
-    const inp = s.querySelector('#plaza-in');
+    if (!bar || bar.classList.contains('typing')) return;
+    bar.classList.remove('new');
+    bar.classList.add('typing');
+    const keep = bar.innerHTML;
+    bar.innerHTML = '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send"'
+        + ' placeholder="여기에 적으면 머리 위에 뜹니다">';
+    const inp = bar.querySelector('#plaza-in');
+    const back = function () {
+        if (!bar.classList.contains('typing')) return;
+        bar.classList.remove('typing');
+        bar.innerHTML = keep;
+        paintBar((run && run.lines || []).slice(-1)[0]);
+    };
     inp.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); sendSay(); }
+        if (e.key === 'Enter') { e.preventDefault(); sendSay(); inp.value = ''; }
+        else if (e.key === 'Escape') { e.preventDefault(); back(); }
     });
-    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
+    // 적다 만 글이 없을 때만 접는다 (자판이 닫혔다고 글을 버리지 않는다)
+    inp.addEventListener('blur', function () {
+        setTimeout(function () { if (!inp.value.trim()) back(); }, 150);
+    });
+    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 40);
 }
+
 
 // ── 🎒 가방 — 소지품 · 악세 · 의상
 //
@@ -1756,8 +1843,8 @@ function bagWear(u, accOnly) {
         });
         if (!rows) rows = '<div class="plaza-none">가진 악세가 없습니다.</div>';
     } else {
-        const nowHead = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
-        rows += row('머리', 'head', DOT_HEADS, nowHead);
+        // ★ 머리는 여기서 안 고른다 — 사택 옷장에서 고른다.
+        //   (처음 들어온 사원만 한 번 고르게 해 준다 — firsthead.js)
         DOT_SLOTS.forEach(function (s) {
             if (s.k === 'acc') return;
             rows += row(s.n, s.k, s.items, d[s.k] || '');
