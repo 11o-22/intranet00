@@ -195,9 +195,13 @@ function alienAllowed(u, it) {
     return true;
 }
 
+// 그립톡에는 안 올리는 품목 — 값이 매겨져 있어도 뺀다
+const NEVER = ['🫙 소원권', '소원권'];
+
 // 살 수 있는 품목인가 — 값이 매겨져 있고, 고유 아이템이 아니고, 우리 셋이 아니다
 function buyable(nm) {
     if (!nm || [BOX, GRIP, MEMO].indexOf(nm) >= 0) return false;
+    if (NEVER.indexOf(nm) >= 0) return false;
     const cat = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[nm] : null;
     if (!cat) return false;
     if (cat.dnaOwner) return false;                       // 남의 고유 아이템
