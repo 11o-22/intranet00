@@ -94,6 +94,9 @@
 //
 //   상·하의는 따로 입고 벗는다. 겉옷·구두·망토 줄은 상담사 옷장에만 보이고,
 //   악세는 상담사와 적어 둔 사번에게만 보인다 (nos).
+//   ★ 악세만 **세 개까지 겹쳐 단다** (칸에 max:3). 옷장에서는 「악세 1·2·3」
+//     세 줄로, 광장 가방에서는 눌러서 달고 다시 눌러 벗는 식이다.
+//     적힐 때는 쉼표로 이은 한 줄 — 'cat,veil,gat'.
 //   옷을 더 그려 주시면 아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
 //   def 가 붙은 것이 「아직 한 번도 안 골랐을 때」 입고 있는 것이다.
 //
@@ -251,7 +254,12 @@ const DOT_SLOTS = [
     {
         // ★ 악세는 **머리 위**에 얹는다 (over 가 아니라 top).
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
-        k: 'acc', n: '악세', items: [
+        //
+        // ★ max — 이 칸만 **세 개까지 겹쳐 단다.**
+        //   적힐 때는 쉼표로 이은 한 줄이다 ('cat,veil,gat'). 'cat' 하나만
+        //   적힌 묵은 자료도 그대로 읽힌다 (accSplit 참고). 겹침 차례는
+        //   적힌 차례 그대로다 — 먼저 적힌 것이 아래로 간다.
+        k: 'acc', n: '악세', max: 3, items: [
             { i: '', n: '없음', top: [] },
             { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'], cat: '머리' },
             // ★ 베일은 일부러 **덜 비치게** 그려 주셨다 (알파 163).
@@ -321,6 +329,24 @@ function items(slot, user) {
 }
 function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
 
+// ★ 여러 개 겹쳐 다는 칸(악세) — 적힌 한 줄을 목록으로 푼다
+//
+//   'cat'          → ['cat']        (하나만 달던 묵은 자료)
+//   'cat,veil'     → ['cat','veil']
+//   ''             → []             (아무것도 안 단 것)
+//   혹시 배열로 적혀 있어도(묶음 파일을 거치며 그리 될 수 있다) 읽어 준다.
+//   같은 것을 두 번 적어 두면 한 번만 센다 — 겹쳐 그려 봐야 똑같다.
+function accSplit(v) {
+    if (Array.isArray(v)) v = v.join(',');
+    return String(v == null ? '' : v).split(',')
+        .map(function (x) { return x.trim(); })
+        .filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+}
+function accJoin(a, max) { return a.filter(Boolean).slice(0, max || 3).join(','); }
+// 밖(광장 가방)에서도 몇 개까지인지 알아야 한다
+window.dotAccMax = function () { const s = slotOf('acc'); return (s && s.max) || 1; };
+window.dotAccList = accSplit;
+
 // 서 있을 때 나부끼는 장 — 장마다 **쓸 칸이 다를 수 있다**
 //
 //   정장·망토는 서 있기 줄에 0·2·4 세 칸이 그려져 있다. 장옷은 두 칸뿐이라
@@ -359,6 +385,23 @@ function look(user, override, all) {
     const over = [], tops = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
+        // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
+        if (s.max) {
+            let ids;
+            if (Object.prototype.hasOwnProperty.call(d, s.k)) ids = accSplit(d[s.k]);
+            else ids = list.filter(function (x) { return x.def; }).map(function (x) { return x.i; });
+            const got = [];
+            ids.forEach(function (id) {
+                if (got.length >= s.max) return;
+                const x = list.filter(function (y) { return y.i === id; })[0];
+                if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
+                got.push(x.i);
+                (x.over || []).forEach(function (o) { over.push(o); });
+                (x.top || []).forEach(function (o) { tops.push(o); });
+            });
+            pick[s.k] = got.join(',');
+            return;
+        }
         let it;
         if (Object.prototype.hasOwnProperty.call(d, s.k)) {
             // 한 번이라도 고른 적이 있으면 그 뜻을 지킨다 (「없음」도 고른 것이다)
@@ -578,7 +621,8 @@ window.dotStop = stop;
         '#closet-floor{height:16px;margin-top:-8px;align-self:stretch;',
         '  background:radial-gradient(ellipse at 50% 0,rgba(0,0,0,0.55),rgba(0,0,0,0) 70%);}',
         '.closet-row{display:flex;align-items:center;gap:8px;margin-top:10px;}',
-        '.closet-row .lab{width:38px;font-size:10px;color:#9a948a;text-align:left;flex:none;}',
+        // 「악세 1」처럼 줄 이름이 길어져 38 → 48 로 넓혔다
+        '.closet-row .lab{width:48px;font-size:10px;color:#9a948a;text-align:left;flex:none;}',
         '.closet-row .mid{flex:1;text-align:center;font-size:12px;color:var(--theme-text,#e8e4da);',
         '  background:rgba(0,0,0,0.25);border:1px solid var(--theme-border,#4a5160);',
         '  border-radius:5px;padding:9px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
@@ -624,12 +668,18 @@ function paint() {
 
     DOT_SLOTS.forEach(function (s) {
         const list = items(s, u);
-        let k = list.findIndex(function (x) { return x.i === p[s.k]; });
-        if (k < 0) k = 0;
-        set('closet-' + s.k + '-name', list[k].n, k + 1, list.length);
-        ['l', 'r'].forEach(function (d) {
-            const b = document.getElementById('closet-' + s.k + '-' + d);
-            if (b) b.disabled = (list.length < 2);
+        // 겹쳐 다는 칸은 줄이 여러 개다 (악세 1 · 악세 2 · 악세 3)
+        const ns = s.max ? [] : [''];
+        if (s.max) { const sel = accSplit(p[s.k]); for (let i = 0; i < s.max; i++) ns.push(i); }
+        ns.forEach(function (n) {
+            const now = (n === '') ? p[s.k] : (accSplit(p[s.k])[n] || '');
+            let k = list.findIndex(function (x) { return x.i === now; });
+            if (k < 0) k = 0;
+            set('closet-' + s.k + n + '-name', list[k].n, k + 1, list.length);
+            ['l', 'r'].forEach(function (d) {
+                const b = document.getElementById('closet-' + s.k + n + '-' + d);
+                if (b) b.disabled = (list.length < 2);
+            });
         });
     });
 
@@ -641,16 +691,31 @@ function paint() {
     }
 }
 
-function step(what, d) {
+function step(what, d, n) {
     const u = u_(), p = cur();
     if (what === 'head') {
         p.head = DOT_HEADS[wrap(headIdx(p.head) + d, DOT_HEADS.length)].i;
     } else {
         const s = slotOf(what); if (!s) return;
         const list = items(s, u); if (list.length < 2) return;
-        let k = list.findIndex(function (x) { return x.i === p[what]; });
-        if (k < 0) k = 0;
-        p[what] = list[wrap(k + d, list.length)].i;
+        if (s.max) {
+            // ★ 겹쳐 다는 칸 — 줄마다 따로 돌린다.
+            //   이미 다른 줄에 단 것은 **건너뛴다** (같은 것을 두 번 달 수 없다).
+            const sel = accSplit(p[s.k]);
+            const used = sel.filter(function (x, i) { return i !== n; });
+            let k = list.findIndex(function (x) { return x.i === (sel[n] || ''); });
+            if (k < 0) k = 0;
+            let t = k, g = 0;
+            do { t = wrap(t + d, list.length); g++; }
+            while (g < list.length && list[t].i && used.indexOf(list[t].i) >= 0);
+            sel[n] = list[t].i;
+            // 빈 줄은 앞으로 당겨 적는다 — 적힌 차례가 곧 겹치는 차례다
+            p[s.k] = accJoin(sel, s.max);
+        } else {
+            let k = list.findIndex(function (x) { return x.i === p[what]; });
+            if (k < 0) k = 0;
+            p[what] = list[wrap(k + d, list.length)].i;
+        }
     }
     paint();
     clearTimeout(saveT);
@@ -664,12 +729,17 @@ function step(what, d) {
 }
 window.closetStep = step;
 
-function rowHtml(k, n) {
-    return '<div class="closet-row" id="closet-row-' + k + '">'
+// idx 가 있으면 겹쳐 다는 칸의 몇 번째 줄인가 (악세 1 · 2 · 3)
+function rowHtml(k, n, idx) {
+    const id = k + (idx == null ? '' : idx);
+    const a = function (d) {
+        return 'closetStep(\'' + k + '\',' + d + (idx == null ? '' : ',' + idx) + ')';
+    };
+    return '<div class="closet-row" id="closet-row-' + id + '">'
         + '  <span class="lab">' + n + '</span>'
-        + '  <button class="game-btn closet-arrow" id="closet-' + k + '-l" onclick="closetStep(\'' + k + '\',-1)">◀</button>'
-        + '  <span class="mid" id="closet-' + k + '-name"></span>'
-        + '  <button class="game-btn closet-arrow" id="closet-' + k + '-r" onclick="closetStep(\'' + k + '\',1)">▶</button>'
+        + '  <button class="game-btn closet-arrow" id="closet-' + id + '-l" onclick="' + a(-1) + '">◀</button>'
+        + '  <span class="mid" id="closet-' + id + '-name"></span>'
+        + '  <button class="game-btn closet-arrow" id="closet-' + id + '-r" onclick="' + a(1) + '">▶</button>'
         + '</div>';
 }
 
@@ -686,6 +756,11 @@ function render() {
         + '</div>';
     DOT_SLOTS.forEach(function (s) {
         if (items(s, u).length < 2) return;   // 고를 것이 하나뿐이면 줄을 안 만든다
+        if (s.max) {
+            // 겹쳐 다는 칸은 줄을 max 개 만든다 — 악세 1 · 악세 2 · 악세 3
+            for (let i = 0; i < s.max; i++) rows += rowHtml(s.k, s.n + ' ' + (i + 1), i);
+            return;
+        }
         rows += rowHtml(s.k, s.n);
     });
     body.innerHTML =
@@ -737,6 +812,8 @@ window.closetState = function () {
     console.log('%c===== 사택 옷장 =====', 'color:#e8c27a; font-size:13px');
     console.log('  적힌 것   :', JSON.stringify(u.dot || {}));
     console.log('  보이는 것 : 몸', L.body, '· 겹침', L.layers.join(' → ') || '없음', '· 머리', L.head);
+    console.log('  악세      :', (L.tops || []).join(' → ') || '없음',
+        '(' + (L.tops || []).length + ' / ' + window.dotAccMax() + ')');
     console.log('  상담사인가:', isAdm(u) ? 'O' : '✗', '· 사번', noOf(u) || '(없음)');
     DOT_SLOTS.forEach(function (s) {
         console.log('  ' + s.n + ' :', items(s, u).map(function (x) { return x.n; }).join(' · '));

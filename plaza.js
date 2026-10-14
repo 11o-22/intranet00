@@ -577,6 +577,8 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#b5ab9a;',
         '  white-space:nowrap;cursor:pointer;font-family:inherit;}',
         '.plaza-row .pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
+        // 악세 몇 개 달렸나 (3개까지)
+        '.plaza-row .pick .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
         '.plaza-inv{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}',
         '.plaza-inv div{padding:10px 11px;border-radius:10px;font-size:11.5px;color:#ded5c4;',
         '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
@@ -2013,7 +2015,21 @@ function bagSheet(which) {
     Array.prototype.forEach.call(s.querySelectorAll('.pick button'), function (b) {
         b.onclick = function () {
             const d = dotOf(u_());
-            d[b.dataset.k] = b.dataset.v;
+            // ★ 악세(data-multi)는 **세 개까지 겹쳐 단다** — 누르면 달고,
+            //   달린 것을 다시 누르면 벗는다. 「없음」은 전부 벗는다.
+            //   적힐 때는 쉼표로 이은 한 줄이다 (옷장 accSplit 과 같은 규칙).
+            if (b.dataset.multi) {
+                const max = (typeof window.dotAccMax === 'function') ? window.dotAccMax() : 3;
+                let sel = accSel(d[b.dataset.k]);
+                const v = b.dataset.v;
+                if (!v) sel = [];
+                else if (sel.indexOf(v) >= 0) sel = sel.filter(function (x) { return x !== v; });
+                else if (sel.length >= max) { sysLine('악세는 ' + max + '개까지 답니다.'); return; }
+                else sel.push(v);
+                d[b.dataset.k] = sel.join(',');
+            } else {
+                d[b.dataset.k] = b.dataset.v;
+            }
             saveDot();
             bagSheet();
         };
@@ -2043,6 +2059,15 @@ function bagInv(u) {
 // 악세를 가르는 칸 — 이 차례대로 줄이 선다. 여기 없는 것은 「그 밖」으로 모인다.
 const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '그 밖'];
 
+// 적힌 한 줄을 목록으로 — 옷장(closet.js)의 accSplit 과 같은 규칙이다.
+// 옷장이 아직 안 올라왔을 때를 대비해 여기에도 같은 길을 둔다.
+function accSel(v) {
+    if (typeof window.dotAccList === 'function') return window.dotAccList(v);
+    if (Array.isArray(v)) v = v.join(',');
+    return String(v == null ? '' : v).split(',')
+        .map(function (x) { return x.trim(); }).filter(Boolean);
+}
+
 function bagWear(u, accOnly) {
     if (typeof DOT_SLOTS === 'undefined' || typeof DOT_HEADS === 'undefined') {
         return '<div class="plaza-none">옷장이 아직 안 올라왔습니다.</div>';
@@ -2064,21 +2089,26 @@ function bagWear(u, accOnly) {
         //   「없음」은 어느 칸에서 눌러도 벗는 것이라 맨 위에 따로 둔다.
         const s = DOT_SLOTS.filter(function (x) { return x.k === 'acc'; })[0];
         if (s) {
-            const now = d[s.k] || '';
+            // ★ 세 개까지 겹쳐 단다 — 지금 달린 것들을 목록으로 들고 견준다
+            const max = (s.max || (typeof window.dotAccMax === 'function' ? window.dotAccMax() : 3));
+            const sel = accSel(d[s.k]);
             const on = s.items.filter(function (x) { return allowedIt(x, u); });
             const none = on.filter(function (x) { return !x.i; });
             const wear = on.filter(function (x) { return x.i; });
             if (wear.length) {
                 rows += '<div class="plaza-row"><span class="lab">벗기</span><div class="pick">'
-                    + '<button data-k="' + s.k + '" data-v=""' + (now === '' ? ' class="on"' : '')
-                    + '>' + esc((none[0] && none[0].n) || '없음') + '</button></div></div>';
+                    + '<button data-k="' + s.k + '" data-multi="1" data-v=""'
+                    + (sel.length === 0 ? ' class="on"' : '')
+                    + '>' + esc((none[0] && none[0].n) || '없음') + '</button>'
+                    + '<span class="cnt">' + sel.length + ' / ' + max + '</span>'
+                    + '</div></div>';
                 ACC_CATS.forEach(function (c) {
                     const list = wear.filter(function (x) { return (x.cat || '그 밖') === c; });
                     if (!list.length) return;
                     rows += '<div class="plaza-row"><span class="lab">' + esc(c) + '</span><div class="pick">'
                         + list.map(function (x) {
-                            return '<button data-k="' + s.k + '" data-v="' + esc(x.i) + '"'
-                                + (x.i === now ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
+                            return '<button data-k="' + s.k + '" data-multi="1" data-v="' + esc(x.i) + '"'
+                                + (sel.indexOf(x.i) >= 0 ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
                         }).join('') + '</div></div>';
                 });
             }

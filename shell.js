@@ -321,8 +321,11 @@ function facLine() {
         const max = u.facilityMax || 20;
         const used = Math.max(0, u.facilityCount || 0);
         const left = Math.max(0, max - used);
-        html += '<span class="sp">·</span><span>남은 횟수 <b class="' + (left ? '' : 'no') + '">'
-             + left + '</b> / ' + max + '회</span>';
+        // 쓴 수와 남은 수를 **둘 다** 적는다 — 몇 번 썼는지만 보여서는
+        // 「얼마나 남았는지」를 머리로 빼야 한다. 다 쓰면 0회가 붉어진다.
+        html += '<span class="sp">·</span><span>쓴 횟수 <b>' + used + '</b> / ' + max + '회</span>'
+             + '<span class="sp">·</span><span>남은 횟수 <b class="' + (left ? '' : 'no') + '">'
+             + left + '회</b></span>';
     }
     html += '</div>'
         + '<div class="bars">'
@@ -342,7 +345,9 @@ function facLine() {
         '#shell-fac{margin:0 0 11px 0;padding:9px 12px;border-radius:9px;font-size:11.5px;',
         '  color:#b5ab9a;background:rgba(255,255,255,.04);border:1px solid #2b2b38;',
         '  display:flex;flex-direction:column;gap:7px;}',
-        '#shell-fac .row{display:flex;justify-content:center;align-items:center;}',
+        // 공용시설은 적을 것이 셋이라 좁은 화면에서 넘친다 — 줄바꿈을 허락한다
+        '#shell-fac .row{display:flex;justify-content:center;align-items:center;',
+        '  flex-wrap:wrap;row-gap:4px;}',
         '#shell-fac b{color:#ffe9bd;}',
         '#shell-fac b.no{color:#ff8b7b;}',
         '#shell-fac .sp{opacity:.4;margin:0 7px;}',
