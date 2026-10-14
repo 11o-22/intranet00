@@ -136,47 +136,80 @@ const PLAZA = {
     //     좌우는 화면 끝까지 걸어가면 넘어간다. 건물 안으로는 문 앞에서만
     //     올라가고, 지하는 **그 방의 계단**으로만 오르내린다.
     ROOMS: {
-        dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 1672,
-                  floor: [600, 725], k: 1,
+        // ■ 길 (주신 지도대로)
+        //
+        //      [백일몽]                                        [재관국]
+        //         ↑                                               ↑
+        //  [백일몽앞] ↔ [카지노] ↔ [광장] ↔ [우체국] ↔ [재관국앞]
+        //      B1 ???                                        B1 → 망상홈쇼핑
+        //
+        // ★ 그림이 2차로 다시 와서 1880x2556 으로 커졌다. 바닥 띠와 계단은
+        //   **전경 그림 한 장**이 여섯 방에서 똑같아서(그림을 떠서 확인했다)
+        //   그 여섯은 같은 값을 쓴다. 광장과 카지노만 제 전경이 따로다.
+        dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
                   right: 'casino', up: { to: 'dream', x: [760, 1130] },
-                  spots: [ { x: 300, n: '??? (지하)', i: '❓', ic: 'unknown', tab: 'tab-shop', sub: 'shop-unknown' } ] },
+                  spots: [ { x: 940, n: '???', i: '❓', ic: 'unknown', lv: 1,
+                             tab: 'tab-shop', sub: 'shop-unknown' } ] },
 
-        dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 1672,
-                  floor: [1015, 1105], k: 1,
-                  down: 'dfront',
+        dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  down: { to: 'dfront', x: [760, 1130] },
                   spots: [ { x: 540,  n: '사택',        i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '어둠 탐사',   i: '🌑', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
-                           { x: 1340, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' } ] },
+                           { x: 940,  n: '어둠 탐사',   i: '🌑', ic: 'dark',  lv: 1, tab: 'tab-darkness', sub: 'dark-main' },
+                           { x: 1340, n: '유쾌 판매소', i: '🛒', lv: 1, tab: 'tab-shop', sub: 'shop-regular' } ] },
 
-        casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 1672,
-                  floor: [625, 725], k: 1,
+        casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
                   left: 'dfront', right: 'plaza',
                   spots: [ { x: 940, n: '공용시설', i: '🎲', ic: 'public', tab: 'tab-public' } ] },
 
-        plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 1672,
-                  floor: [615, 710], floor2: [1040, 1112], x2: [340, 1540], k: 1,
-                  stairs: [ { x: [150, 340],   y0: [700, 1040], y1: [762, 1112] },
-                            { x: [1540, 1730], y0: [1040, 700], y1: [1112, 762] } ],
-                  left: 'casino', right: 'gate',
-                  spots: [ { x: 470,  n: '행복 식당',   i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
-                           { x: 1400, n: '장기 은행',   i: '🏦', ic: 'bank', tab: 'tab-vip' },
-                           { x: 1650, n: '펫 돌보기',   i: '🐾', ic: 'pet', fn: 'petOpen' },
-                           { x: 700,  n: '밀실 거래',   i: '🤝', ic: 'p2p', lv: 1, tab: 'tab-shop', sub: 'shop-p2p' },
-                           { x: 1180, n: '우주 쇼핑몰', i: '🛸', ic: 'alien', lv: 1, tab: 'tab-shop', sub: 'shop-alien' } ] },
+        // ★ 광장은 행복 식당과 장기 은행 둘만 둔다 (주신 대로).
+        plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  left: 'casino', right: 'post',
+                  spots: [ { x: 470,  n: '행복 식당', i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
+                           { x: 1400, n: '장기 은행', i: '🏦', ic: 'bank', tab: 'tab-vip' } ] },
 
-        gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 1672,
-                  floor: [630, 730], floor2: [1030, 1105], x2: [630, 1280], k: 1,
-                  stairs: [ { x: [430, 630],   y0: [690, 1030], y1: [752, 1105] },
-                            { x: [1280, 1480], y0: [1030, 690], y1: [1105, 752] } ],
-                  left: 'plaza', up: { to: 'bureau', x: [780, 1120] },
-                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, tab: 'tab-shop', sub: 'shop-dream' } ] },
+        post:   { n: '우체국', img: 'post.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  left: 'plaza', right: 'gate',
+                  spots: [ { x: 940, n: '밀실 거래', i: '🤝', ic: 'p2p', tab: 'tab-shop', sub: 'shop-p2p' } ] },
 
-        bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 1672,
-                  floor: [1000, 1078], k: 1,
-                  down: 'gate',
-                  spots: [ { x: 630,  n: '사택',      i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '재난 탐사', i: '🌑', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
-                           { x: 1230, n: '파티',      i: '🚩', tab: 'tab-darkness', sub: 'dark-party' } ] }
+        gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  left: 'post', up: { to: 'bureau', x: [780, 1120] },
+                  // 지하 가게로는 **그 자리에서 들어간다** (go 가 붙은 입구)
+                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, go: 'dshop' } ] },
+
+        bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  down: { to: 'gate', x: [780, 1120] },
+                  spots: [ { x: 540,  n: '사택',      i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
+                           { x: 940,  n: '재난 탐사', i: '🌑', ic: 'dark',  lv: 1, tab: 'tab-darkness', sub: 'dark-main' },
+                           { x: 1340, n: '파티',                            lv: 1, tab: 'tab-darkness', sub: 'dark-party' } ] },
+
+        dshop:  { n: '망상 홈쇼핑', img: 'dshop.webp', w: 1880, h: 2556, k: 1,
+                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
+                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
+                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  spots: [ { x: 940,  n: '망상 홈쇼핑', i: '📺', ic: 'dream', tab: 'tab-shop', sub: 'shop-dream' },
+                           // 들어온 자리가 재관국 앞 **지하**라, 나갈 때도 그 층으로 돌려보낸다
+                           { x: 1600, n: '나간다', ic: 'out', go: 'gate', golv: 1 } ] },
     },
     START: 'plaza',
 
@@ -201,7 +234,7 @@ const PLAZA = {
         { n: '망상 홈쇼핑', i: '📺', ic: 'dream',   tab: 'tab-shop',    sub: 'shop-dream' },
         { n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
         { n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
-        { n: '파티',       i: '🚩',                tab: 'tab-darkness', sub: 'dark-party' },
+        { n: '파티',                                tab: 'tab-darkness', sub: 'dark-party' },
         { n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
         { n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
@@ -223,7 +256,7 @@ const R = P.ROOMS;
         const r = R[a];
         if (r.left && R[r.left] && !R[r.left].right) R[r.left].right = a;
         if (r.right && R[r.right] && !R[r.right].left) R[r.right].left = a;
-        if (r.up && R[r.up.to] && !R[r.up.to].down) R[r.up.to].down = a;
+        if (r.up && R[r.up.to] && !R[r.up.to].down) R[r.up.to].down = { to: a, x: r.up.x };
     });
 })();
 
@@ -630,6 +663,14 @@ function xRange(r, lv) {
     }
     return [P.EDGE, r.w - P.EDGE];
 }
+// ★ 내려가는 자리 — 글자 하나만 적으면 **바닥 끝 어디서나** 내려간다.
+//   그러면 건물 안에 지하가 생긴 뒤로는 계단 쪽으로 걸어 내려가다가
+//   그 전에 밖으로 튕겨 나간다. 그래서 { to, x } 로 **문 자리**를 적는다.
+function downOf(r) {
+    if (!r || !r.down) return null;
+    return (typeof r.down === 'string') ? { to: r.down, x: null } : r.down;
+}
+
 function lvAt(r, y) {
     if (!r.floor2) return 0;
     const mid = (r.floor[1] + r.floor2[0]) / 2;
@@ -700,7 +741,8 @@ function paintExits() {
         if (r.right) mk('▶', r.w * z - 24, fy - 70);
     });
     if (r.up)    mk('▲', (r.up.x[0] + r.up.x[1]) / 2 * z - 8, r.floor[0] * z - 96);
-    if (r.down)  mk('▼', 12, r.floor[1] * z - 22);
+    const dn0 = downOf(r);
+    if (dn0) mk('▼', (dn0.x ? (dn0.x[0] + dn0.x[1]) / 2 : 24) * z - 8, r.floor[1] * z - 22);
     // 계단 — 내려가고 올라가는 자리
     (r.stairs || []).forEach(function (s) {
         if (!r.floor2) return;
@@ -716,6 +758,7 @@ function paintExits() {
 //   누르면 그 시설로 들어간다 (광장은 닫힌다). 없는 시설은 아예 안 세운다.
 // 그림 아이콘 한 칸. ic 가 없으면 전처럼 글자 그림(i)을 쓴다.
 function ico(o, cls) {
+    if (!o || (!o.ic && !o.i)) return '';      // 그림도 글자도 없으면 아예 안 그린다
     if (o && o.ic) {
         return '<span class="pico ' + (cls || '')
             + '" style="--ic:url(\'ico/' + o.ic + '.png\')"></span>';
@@ -759,6 +802,8 @@ function paintSpots() {
 function goApp(s) {
     const solo = !!(typeof window.plazaSolo === 'function' && window.plazaSolo());
     try {
+        // 방으로 들어가는 입구 — 광장을 닫지 않고 그 방으로 건너간다
+        if (s.go) { closeSheet(); goRoom(s.go, null, s.golv); return; }
         if (s.fn) {
             // 창(모달)은 광장 위에 뜬다 — 사원 쪽은 광장을 바탕으로 깔아 두었다
             if (!solo) shut();
@@ -794,7 +839,7 @@ function goApp(s) {
 //   ★ 걸어간 쪽의 **반대편**에 선다. 오른쪽으로 걸어 들어갔으면 새 방의
 //     왼쪽 끝에 서야 한다. 전에는 이것이 거꾸로 되어 있어서, 오른쪽으로
 //     들어가자마자 또 오른쪽 끝에 서고 그대로 다음 방으로 밀려 갔다.
-function goRoom(key, way) {
+function goRoom(key, way, lv) {
     if (!run || !R[key]) return;
     const r = R[key];
 
@@ -818,6 +863,7 @@ function goRoom(key, way) {
     } else {
         run.lv = 0;
     }
+    if (lv != null) run.lv = (lv === 1 && r.floor2) ? 1 : 0;   // 집어서 보낸 층
     const bnd = bandOf(r, run.lv);
 
     // 걸어간 쪽의 **반대편**에, 문턱 안쪽으로 들여 선다
@@ -913,8 +959,12 @@ function tick(ts) {
             // 위로 가는 자리에서 위쪽 끝에 닿으면 올라간다 (위층에서만)
             if (r.up && run.lv !== 1 && run.y <= r.floor[0] + 1
                 && run.x >= r.up.x[0] && run.x <= r.up.x[1]) { goRoom(r.up.to, 'up'); return; }
-            // 올라온 방에서 아래쪽 끝이면 내려간다
-            if (r.down && run.y >= bandOf(r, run.lv)[1] - 1) { goRoom(r.down, 'down'); return; }
+            // 올라온 방에서 아래쪽 끝이면 내려간다 — **위층에서만** 본다.
+            //   지하에도 바닥 끝이 있어서, 안 막으면 지하 끝에 서는 순간
+            //   건물 밖으로 튕겨 나간다.
+            const dn = downOf(r);
+            if (dn && run.lv !== 1 && run.y >= r.floor[1] - 1
+                && (!dn.x || (run.x >= dn.x[0] && run.x <= dn.x[1]))) { goRoom(dn.to, 'down'); return; }
         }
 
         // ─ 바닥 — 계단 위에서는 띠가 x 를 따라 기울어 내려간다
@@ -1853,7 +1903,7 @@ window.plazaRooms = function () {
                  바닥: r.floor.join('~'), 사람배율: r.k,
                  왼쪽: r.left || '-', 오른쪽: r.right || '-',
                  위: r.up ? (r.up.to + ' (x ' + r.up.x.join('~') + ')') : '-',
-                 아래: r.down || '-' };
+                 아래: (downOf(r) ? downOf(r).to : '-') };
     }));
 };
 
