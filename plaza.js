@@ -293,12 +293,27 @@ function stampSafe(ov) {
         '  padding:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 10px) 12px 26px 12px;',
         '  background:linear-gradient(180deg,rgba(6,6,10,.82),rgba(6,6,10,.35) 55%,rgba(6,6,10,0));}',
         '#plaza-top > *{pointer-events:auto;}',
-        '#plaza-where{min-width:0;max-width:58%;display:flex;align-items:center;gap:6px;',
-        '  padding:8px 13px;border-radius:999px;font-size:12.5px;font-weight:bold;color:#f1e7d6;',
+        // 사원증 칸 — 사진 · 닉네임 · 사번(작게)
+        '#plaza-me{min-width:0;max-width:58%;display:flex;align-items:center;gap:8px;',
+        '  padding:6px 13px 6px 6px;border-radius:999px;cursor:pointer;font-family:inherit;',
         '  background:rgba(14,14,20,.62);border:1px solid rgba(190,170,120,.3);',
-        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);',
-        '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
+        '#plaza-me:active{background:rgba(40,36,28,.85);}',
+        '#plaza-me .pm-pic{flex:0 0 auto;width:32px;height:32px;border-radius:50%;overflow:hidden;',
+        '  background:rgba(255,255,255,.07);border:1px solid rgba(190,170,120,.28);',
+        '  display:flex;align-items:center;justify-content:center;font-size:8px;color:#6f685c;}',
+        '#plaza-me .pm-pic img{width:100%;height:100%;object-fit:cover;}',
+        '#plaza-me .pm-txt{min-width:0;display:flex;flex-direction:column;align-items:flex-start;',
+        '  gap:1px;line-height:1.15;text-align:left;}',
+        '#plaza-me .pm-n{font-size:12.5px;font-weight:bold;color:#f1e7d6;',
+        '  max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '#plaza-me .pm-no{font-size:9.5px;font-style:normal;color:#9a9284;letter-spacing:.3px;}',
         '#plaza-top .sp{flex:1;}',
+        // 안 읽은 공지가 있으면 붙는 점
+        '#plaza-notice{position:relative;}',
+        '#plaza-notice .nd{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;',
+        '  background:#ff7b6b;box-shadow:0 0 7px #ff7b6b;display:none;}',
+        '#plaza-notice.new .nd{display:block;}',
         '.plaza-ico{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:1px solid rgba(190,170,120,.3);',
         '  background:rgba(14,14,20,.62);color:#f1e7d6;font-size:17px;line-height:1;cursor:pointer;',
         '  display:flex;align-items:center;justify-content:center;',
@@ -320,6 +335,7 @@ function stampSafe(ov) {
         '  text-align:center;}',
         '.plaza-say:after{content:"";position:absolute;left:50%;top:100%;margin-left:-5px;',
         '  border:5px solid transparent;border-top-color:#f4efe2;}',
+        '.plaza-say.emo{padding:4px;line-height:0;max-width:none;}',
         // 나가는 길 표시
         '.plaza-exit{position:absolute;pointer-events:none;color:#ffe9b0;font-size:17px;',
         '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s infinite;}',
@@ -342,7 +358,35 @@ function stampSafe(ov) {
         '  background:rgba(18,18,26,.66);border:1px solid rgba(170,158,126,.3);color:#ded7c8;',
         '  cursor:pointer;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}',
         '#plaza-pad button:active{background:rgba(52,46,34,.9);}',
-        // ── 아래 띠 : 가방 · 채팅 바
+        // ── 채팅 내역 : 왼쪽 아래에 **늘 깔려 있다** (창을 안 열어도 보인다)
+        //   그림 아래쪽 어두운 자리에 얹히므로 방이 가려지지 않는다.
+        '#plaza-feed{position:absolute;left:12px;z-index:18;max-width:62%;',
+        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);',
+        '  display:flex;flex-direction:column;justify-content:flex-end;gap:2px;',
+        '  font-size:11px;line-height:1.55;pointer-events:none;',
+        '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
+        '#plaza-feed div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ded5c4;}',
+        '#plaza-feed .who{color:#9fd8ef;font-weight:bold;}',
+        '#plaza-feed .sys{color:#8d8578;}',
+        // ── 미니맵 : 오른쪽 아래. 채팅 창을 열면 사라진다.
+        '#plaza-map{position:absolute;right:12px;z-index:19;width:116px;',
+        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);',
+        '  padding:7px 8px 8px 8px;border-radius:13px;',
+        '  background:rgba(12,12,18,.62);border:1px solid rgba(190,170,120,.26);',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
+        '#plaza-map.off{display:none;}',
+        '#plaza-map .mp-n{font-size:10px;font-weight:bold;color:#ffe9bd;margin-bottom:5px;',
+        '  text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '#plaza-map .mp-g{display:grid;gap:3px;}',
+        '#plaza-map .mp-c{height:15px;border-radius:4px;background:rgba(255,255,255,.055);',
+        '  border:1px solid rgba(255,255,255,.1);position:relative;}',
+        '#plaza-map .mp-c.none{background:none;border-color:transparent;}',
+        '#plaza-map .mp-c.on{background:rgba(217,160,90,.4);border-color:#d9a05a;',
+        '  box-shadow:0 0 7px rgba(217,160,90,.5);}',
+        // 위아래로 이어진 자리에 잇는 금
+        '#plaza-map .mp-c.up:after{content:"";position:absolute;left:50%;top:-4px;',
+        '  width:1px;height:4px;background:rgba(190,170,120,.45);}',
+        // ── 아래 띠 : 이모티콘 · 채팅 바 · 가방
         '#plaza-bottom{position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;',
         '  align-items:center;gap:9px;pointer-events:none;',
         '  padding:30px 12px calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 12px) 12px;',
@@ -407,7 +451,16 @@ function stampSafe(ov) {
         '.plaza-inv div{padding:10px 11px;border-radius:10px;font-size:11.5px;color:#ded5c4;',
         '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
         '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-        '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}'
+        '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}',
+        // 공지판
+        '#plaza-nb{overflow-y:auto;max-height:58dvh;display:flex;flex-direction:column;gap:8px;}',
+        '.nb-i{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);',
+        '  border:1px solid #2b2b38;}',
+        '.nb-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;color:#8d8578;}',
+        '.nb-h span:first-child{color:#ffe9bd;font-weight:bold;}',
+        '.nb-h .nb-x{margin-left:auto;padding:4px 9px;font-size:10px;border-radius:7px;cursor:pointer;',
+        '  background:rgba(255,120,110,.12);border:1px solid #6e3630;color:#ffb3ab;font-family:inherit;}',
+        '.nb-t{font-size:12px;line-height:1.65;color:#ded5c4;word-break:break-word;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
@@ -469,12 +522,24 @@ function putOne(one, x, y) {
     one.wrap.style.zIndex = String(100 + Math.round(y));     // 아래에 있는 사람이 앞
 }
 
+// ★ 이모티콘은 말풍선 길을 그대로 탄다.
+//   자리 기록에 싣는 글자가 [emo:e01] 꼴이면 글 대신 그림을 띄운다.
+//   따로 길을 내지 않은 까닭은, 말풍선이 뜨고 지는 셈(SAY_MS·st)을
+//   두 벌로 만들면 어긋나기 때문이다.
+const EMO_RE = /^\[emo:([A-Za-z0-9_-]{1,12})\]$/;
 function bubble(one, text) {
     if (one.bub) { one.bub.remove(); one.bub = null; }
     if (!text) return;
     const b = document.createElement('div');
     b.className = 'plaza-say';
-    b.innerText = text;
+    const m = EMO_RE.exec(String(text));
+    if (m && typeof window.emoTag === 'function' && typeof window.emoById === 'function'
+        && window.emoById(m[1])) {
+        b.classList.add('emo');
+        b.innerHTML = window.emoTag(m[1], 64);
+    } else {
+        b.innerText = text;
+    }
     one.wrap.appendChild(b);
     one.bub = b;
 }
@@ -580,8 +645,7 @@ function paintRoom() {
     run.el.style.imageRendering = (run.z < 1) ? 'auto' : 'pixelated';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
     run.el.style.backgroundSize = w + 'px ' + h + 'px';
-    const t = document.getElementById('plaza-where');
-    if (t) t.innerHTML = '<span style="opacity:.8">📍</span> ' + esc(r.n);
+    paintMap();                     // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
     paintExits();
     paintSpots();
 }
@@ -722,6 +786,7 @@ function goRoom(key, way) {
     run.tx = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
     run.lines = [];                         // 방이 바뀌면 말도 새로 시작한다
+    paintFeed();
     run._swept = false;                     // 새 방에서 한 번 쓸어 낸다
 
     // ★ 방을 먼저 그린다 — 그래야 늘린 배(run.z)가 정해져 사람이 제자리에 선다
@@ -993,6 +1058,9 @@ function showWho() {
 function watchChat() {
     const d = db_(); if (!d || !run) return;
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
+    // ★ 공지(nbRef)는 여기서 끄지 않는다. 이 함수는 **방을 옮길 때마다**
+    //   도는데, 공지는 방과 상관없이 광장에 있는 내내 보고 있어야 한다.
+    //   (끄는 자리는 shut() 한 곳뿐이다)
     const log = document.getElementById('plaza-log');
     if (log) log.innerHTML = '';
     chatRef = d.ref(P.CHAT + '/' + run.room).limitToLast(P.CHAT_KEEP);
@@ -1003,6 +1071,94 @@ function watchChat() {
     });
 }
 
+// ==========================================
+// ★ 사원증 칸 — 사진 · 닉네임 · 사번
+// ==========================================
+function paintMe() {
+    const el = document.getElementById('plaza-me');
+    const u = u_();
+    if (!el || !u) return;
+    const p = u.badge && u.badge.photo;
+    el.querySelector('.pm-pic').innerHTML = p ? '<img src="' + esc(p) + '" alt="사진">' : 'PHOTO';
+    el.querySelector('.pm-n').innerText = nameOf(u);
+    const no = (u.no != null && String(u.no).trim()) ? String(u.no).trim() : (u.code || '');
+    el.querySelector('.pm-no').innerText = no ? ('사번 ' + no) : '';
+}
+
+// ==========================================
+// ★ 미니맵 — 방 표(ROOMS)에서 바로 그려 낸다
+//
+//   자리를 손으로 잡지 않는다. 가장 왼쪽 방부터 right 를 따라가며 칸을
+//   매기고, up 으로 이어진 방은 **그 위 줄**에 같은 칸으로 얹는다.
+//   그래서 방을 더 만들어도 여기는 고칠 것이 없다.
+//
+//       [백일몽]                 [재난관리국]      ← 윗줄 (건물 안)
+//      [백일몽앞][카지노][광장][재난관리국앞]      ← 아랫줄 (길)
+// ==========================================
+let mapPlan = null;
+function mapOf() {
+    if (mapPlan) return mapPlan;
+    let head = P.START, guard = 0;
+    while (R[head] && R[head].left && ++guard < 40) head = R[head].left;   // 왼쪽 끝까지
+    const col = {}, up = {};
+    let c = 0, k = head;
+    guard = 0;
+    while (k && R[k] && ++guard < 40) {
+        col[k] = c++;
+        if (R[k].up && R[k].up.to) up[R[k].up.to] = col[k];
+        k = R[k].right;
+    }
+    Object.keys(up).forEach(function (t) { col[t] = up[t]; });
+    mapPlan = { col: col, up: up, w: Math.max(1, c) };
+    return mapPlan;
+}
+
+function paintMap() {
+    const el = document.getElementById('plaza-map');
+    if (!el || !run) return;
+    const m = mapOf(), r = roomOf();
+    el.querySelector('.mp-n').innerText = r.n;
+    const g = el.querySelector('.mp-g');
+    g.style.gridTemplateColumns = 'repeat(' + m.w + ',1fr)';
+    const keys = Object.keys(m.col);
+    const out = [];
+    for (let row = 0; row < 2; row++) {
+        for (let x = 0; x < m.w; x++) {
+            const key = keys.filter(function (q) {
+                return m.col[q] === x && ((m.up[q] != null) === (row === 0));
+            })[0];
+            out.push('<div class="mp-c'
+                + (key ? '' : ' none')
+                + (key && key === run.room ? ' on' : '')
+                + (key && R[key].up ? ' up' : '') + '"'
+                + (key ? ' title="' + esc(R[key].n) + '"' : '') + '></div>');
+        }
+    }
+    g.innerHTML = out.join('');
+}
+
+// 채팅 창을 열면 미니맵을 접는다 (그림을 가리지 않게)
+function mapShow(on) {
+    const el = document.getElementById('plaza-map');
+    if (el) el.classList.toggle('off', !on);
+}
+
+// ==========================================
+// ★ 채팅 내역 — 왼쪽 아래에 늘 깔려 있다
+// ==========================================
+const FEED_KEEP = 5;
+function paintFeed() {
+    const el = document.getElementById('plaza-feed');
+    if (!el || !run) return;
+    const rows = (run.lines || []).slice(-FEED_KEEP);
+    el.innerHTML = rows.map(function (o, i) {
+        const dim = (0.45 + 0.55 * ((i + 1) / rows.length)).toFixed(2);   // 묵은 줄은 옅게
+        return '<div style="opacity:' + dim + '">' + (o.sys
+            ? '<span class="sys">· ' + esc(o.t) + '</span>'
+            : '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
+    }).join('');
+}
+
 // 글줄은 **들고 있다가** 창을 열 때 그린다 (창이 닫혀 있어도 안 잃는다)
 function pushLine(o) {
     if (!run) return;
@@ -1010,6 +1166,7 @@ function pushLine(o) {
     run.lines.push(o);
     while (run.lines.length > P.CHAT_KEEP + 10) run.lines.shift();
     paintLog();
+    paintFeed();
     paintBar(o);
 }
 
@@ -1059,6 +1216,122 @@ function say(text) {
 }
 window.plazaSay = say;
 
+// 🙂 이모티콘 — 고르면 바로 머리 위에 뜬다 (말과 같은 길)
+function sayEmo(id) {
+    const u = u_();
+    if (!run || !u) return;
+    const e = (typeof window.emoById === 'function') ? window.emoById(id) : null;
+    if (!e) return;
+    try { if (typeof window.emoClose === 'function') window.emoClose(); } catch (x) { }
+    run.say = '[emo:' + id + ']';
+    run.sayAt = now();
+    bubble(run.me, run.say);
+    send(false);                              // 말풍선을 바로 알린다
+    const d = db_();
+    if (d) {
+        try {
+            d.ref(P.CHAT + '/' + run.room).push({
+                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: now() });
+        } catch (x) { }
+    }
+}
+
+// ==========================================
+// ★ 📢 공지판 — 상담사가 쓰고 사원이 읽는다
+//
+//   서버의 notices 는 출산·결투처럼 **떴다 사라지는** 소식 자리라
+//   쌓이지 않는다. 그래서 읽을 공지는 여기 따로 둔다.
+//
+//       noticeBoard/<열쇠>  { t: 글, at: 때, by: 쓴 이 }
+//
+//   안 읽은 것이 있으면 단추에 점이 붙는다. 어디까지 읽었는지는
+//   이 기계에만 적는다(localStorage) — 서버에 사람마다 적을 것까지는
+//   아니고, 기계를 바꾸면 한 번 더 뜨는 정도는 괜찮다.
+// ==========================================
+const NB = 'noticeBoard';
+const NB_SEEN = 'plazaNoticeSeen';
+const NB_KEEP = 30;
+let nbRef = null, nbList = [];
+
+function nbSeen() { try { return +(localStorage.getItem(NB_SEEN) || 0) || 0; } catch (e) { return 0; } }
+function nbMark(t) { try { localStorage.setItem(NB_SEEN, String(t || now())); } catch (e) { } }
+
+function watchNotice() {
+    const d = db_();
+    if (!d) return;
+    try { nbRef = d.ref(NB).limitToLast(NB_KEEP); } catch (e) { return; }
+    nbRef.on('value', function (s) {
+        const v = s.val() || {};
+        nbList = Object.keys(v).map(function (k) {
+            const o = v[k] || {};
+            return { k: k, t: String(o.t || ''), at: +o.at || 0, by: String(o.by || '') };
+        }).sort(function (a, b) { return b.at - a.at; });
+        paintNoticeDot();
+        if (sheetOpen('notice')) noticeSheet();      // 열어 둔 채로 새 글이 오면 같이 바뀐다
+    });
+}
+
+function paintNoticeDot() {
+    const b = document.getElementById('plaza-notice');
+    if (!b) return;
+    b.classList.toggle('new', (nbList.length ? nbList[0].at : 0) > nbSeen());
+}
+
+function nbWrite() {
+    const el = document.getElementById('plaza-nbin');
+    const d = db_();
+    if (!el || !d) return;
+    const t = String(el.value || '').trim().slice(0, 300);
+    if (!t) return;
+    const u = u_();
+    try {
+        d.ref(NB).push({ t: t, at: now(), by: nameOf(u) });
+        el.value = '';
+    } catch (e) { }
+}
+
+function nbDrop(key) {
+    const d = db_();
+    if (!d || !key) return;
+    try { d.ref(NB + '/' + key).set(null); } catch (e) { }
+}
+
+function noticeSheet() {
+    const u = u_();
+    const boss = !!(u && u.code === P.ADMIN);
+    const body = nbList.length
+        ? '<div id="plaza-nb">' + nbList.map(function (o) {
+            return '<div class="nb-i"><div class="nb-h">'
+                + '<span>' + esc(o.by || '상담사') + '</span>'
+                + '<span>' + esc(when(o.at)) + '</span>'
+                + (boss ? '<button class="nb-x" data-k="' + esc(o.k) + '">지움</button>' : '')
+                + '</div><div class="nb-t">' + esc(o.t).replace(/\n/g, '<br>') + '</div></div>';
+        }).join('') + '</div>'
+        : '<div class="plaza-none">아직 올라온 공지가 없습니다.</div>';
+    const write = boss
+        ? '<div id="plaza-send"><input id="plaza-nbin" maxlength="300" placeholder="사원들에게 알릴 것">'
+          + '<button id="plaza-nbgo">올린다</button></div>'
+        : '';
+    const s = sheet('notice', '📢 공지사항', body + write);
+    if (!s) return;
+    nbMark(nbList.length ? nbList[0].at : now());
+    paintNoticeDot();
+    if (boss) {
+        s.querySelector('#plaza-nbgo').onclick = nbWrite;
+        const inp = s.querySelector('#plaza-nbin');
+        inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') nbWrite(); });
+        Array.prototype.forEach.call(s.querySelectorAll('.nb-x'), function (b) {
+            b.onclick = function () { nbDrop(b.dataset.k); };
+        });
+    }
+}
+
+function when(t) {
+    if (!t) return '';
+    const d = new Date(t), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
 // ==========================================
 // 아래에서 올라오는 창 (메뉴 · 가방 · 말)
 // ==========================================
@@ -1071,6 +1344,7 @@ function sheetOpen(kind) {
 function closeSheet() {
     const s = document.getElementById('plaza-sheet');
     if (s) s.remove();
+    mapShow(true);
     if (run) { run.ax = 0; run.ay = 0; run.keys = {}; }
 }
 
@@ -1095,15 +1369,19 @@ function sheet(kind, title, inner) {
 // ── ☰ 메뉴
 function menuSheet() {
     const list = P.MENU.filter(spotOk);
+    // ★ 나가기(✕)가 위 띠에서 빠졌다 — 위 오른쪽이 공지·선물함·메뉴 셋으로
+    //   찼기 때문이다. 그래서 메뉴 맨 끝에 둔다.
     const html = '<div class="plaza-grid">' + list.map(function (m, i) {
         return '<button data-i="' + i + '"><span class="e">' + m.i + '</span>'
             + esc(m.n) + '</button>';
-    }).join('') + '</div>';
+    }).join('')
+        + '<button id="plaza-out"><span class="e">🚪</span>광장 나가기</button></div>';
     const s = sheet('menu', '어디로 갑니까', html);
     if (!s) return;
-    Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button'), function (b) {
+    Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
         b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
     });
+    s.querySelector('#plaza-out').onclick = shut;
 }
 
 // ── 💬 말
@@ -1122,6 +1400,9 @@ function chatSheet() {
         + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" placeholder="여기에 적으면 머리 위에 뜹니다">'
         + '<button id="plaza-go">말한다</button></div>');
     if (!s) return;
+    // ★ 반드시 sheet() **뒤**에 접는다 — sheet() 가 closeSheet() 를 먼저
+    //   부르고, 그 안에서 미니맵을 도로 켜 놓기 때문이다.
+    mapShow(false);                 // 주신 그림대로 — 채팅을 누르면 미니맵은 비킨다
     paintLog();
     s.querySelector('#plaza-go').onclick = sendSay;
     const inp = s.querySelector('#plaza-in');
@@ -1256,6 +1537,7 @@ function shut() {
     try { cancelAnimationFrame(run.raf); } catch (e) { }
     leaveRoom();
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
+    if (nbRef) { try { nbRef.off(); } catch (e) { } nbRef = null; }
     Object.keys(run.peers).forEach(dropPeer);
     try { run.me.actor.stop(); } catch (e) { }
     if (run.onKey) {
@@ -1288,23 +1570,30 @@ function open() {
     ov.innerHTML =
         '<div id="plaza-view"><div id="plaza-room"></div></div>'
         + '<div id="plaza-top">'
-        + '<div id="plaza-where">🚶 광장</div>'
+        + '<button id="plaza-me" class="plaza-keep">'
+        +   '<span class="pm-pic"></span>'
+        +   '<span class="pm-txt"><b class="pm-n">·</b><i class="pm-no"></i></span>'
+        + '</button>'
         + '<div class="sp"></div>'
-        + '<button class="plaza-ico" id="plaza-menu">☰</button>'
-        + '<button class="plaza-ico" id="plaza-x">✕</button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-notice">📢<i class="nd"></i></button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-gift">🎁</button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-menu">☰</button>'
         + '</div>'
         + '<div id="plaza-who"></div>'
         + (touch ? '' :
-            '<div id="plaza-pad">'
+            '<div id="plaza-pad" class="plaza-keep">'
             + '<button data-k="left">◀</button>'
             + '<button data-k="up">▲</button>'
             + '<button data-k="down">▼</button>'
             + '<button data-k="right">▶</button>'
             + '</div>')
+        + '<div id="plaza-feed" class="plaza-keep"></div>'
+        + '<div id="plaza-map" class="plaza-keep"><div class="mp-n"></div><div class="mp-g"></div></div>'
         + '<div id="plaza-bottom">'
-        + '<button class="plaza-ico" id="plaza-bag">🎒</button>'
-        + '<div id="plaza-bar"><span class="dot"></span>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
+        + '<div id="plaza-bar" class="plaza-keep"><span class="dot"></span>'
         + '<span class="txt">여기에 적으면 머리 위에 뜹니다</span></div>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-bag">🎒</button>'
         + '</div>';
     document.body.appendChild(ov);
     stampSafe(ov);
@@ -1330,9 +1619,18 @@ function open() {
         let id = null, ox = 0, oy = 0, at = 0, drag = false;
 
         const stop_ = function () { if (run) { run.ax = 0; run.ay = 0; } };
+        // ★ 얹어 둔 것들 위에서는 걷지 않는다.
+        //
+        //   짚은 자리가 목적지로 쓰이는 게 아니라서, 아래쪽 빈 검은 자리를
+        //   짚어도 가만히 있지 않는다. 톡 치면 세로는 바닥 띠 안으로 잘리고
+        //   **가로만** 받아 옆으로 걸어가고(게다가 아래쪽을 짚은 것을
+        //   「지하로 가겠다」로 읽어 계단으로 내려간다), 끌면 짚은 자리가
+        //   아예 상관없이 **그 자리가 조이스틱 한가운데**가 된다.
+        //   그래서 미니맵·단추·채팅 바는 .plaza-keep 으로 빼낸다.
+        //   (채팅 내역은 글자뿐이라 pointer-events:none 으로 그냥 통과시킨다)
         run.view.addEventListener('pointerdown', function (e) {
             if (!run) return;
-            if (e.target && e.target.closest && e.target.closest('.plaza-spot')) return;
+            if (e.target && e.target.closest && e.target.closest('.plaza-spot, .plaza-keep')) return;
             id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now(); drag = false;
             try { run.view.setPointerCapture(id); } catch (x) { }
         });
@@ -1431,10 +1729,22 @@ function open() {
     window.addEventListener('keydown', run.onKey);
     window.addEventListener('keyup', run.onKeyUp);
 
-    document.getElementById('plaza-x').onclick = shut;
+    document.getElementById('plaza-me').onclick = function () {
+        goApp({ tab: 'tab-record', sub: 'rec-badge' });
+    };
+    document.getElementById('plaza-notice').onclick = noticeSheet;
+    document.getElementById('plaza-gift').onclick = function () {
+        if (typeof window.openGiftBox === 'function') goApp({ fn: 'openGiftBox' });
+    };
     document.getElementById('plaza-menu').onclick = menuSheet;
+    document.getElementById('plaza-emo').onclick = function () {
+        if (typeof window.emoOpen === 'function') window.emoOpen('plaza', sayEmo);
+    };
     document.getElementById('plaza-bag').onclick = bagSheet;
     document.getElementById('plaza-bar').onclick = chatSheet;
+
+    paintMe();
+    watchNotice();
 
     goRoom(P.START, null);
     run.last = performance.now();
