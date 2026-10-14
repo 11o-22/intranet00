@@ -408,7 +408,9 @@ function stampSafe(ov) {
         '#plaza-who{position:absolute;left:12px;right:12px;z-index:19;text-align:center;',
         '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 96px);',
         '  font-size:10.5px;color:#b9b0a0;text-shadow:0 1px 3px #000;pointer-events:none;}',
-        '.plaza-one{position:absolute;}',
+        // ★ 사람은 **누름을 안 받는다.** 칸이 176x192 나 되는데 거의 투명해서,
+        //   그 위를 짚으면 시설 단추도 못 누르고 걷기도 엉뚱해졌다.
+        '.plaza-one{position:absolute;pointer-events:none;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
         '.plaza-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;',
         '  font-size:10px;font-weight:bold;color:#efe6d8;text-shadow:0 1px 2px #000,0 0 4px #000;',
@@ -431,7 +433,12 @@ function stampSafe(ov) {
         '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s infinite;}',
         '@keyframes plazaBob{0%,100%{opacity:.45}50%{opacity:1}}',
         // ── 시설 입구
-        '.plaza-spot{position:absolute;z-index:300;transform:translate(-50%,-100%);',
+        // ★ z-index 를 사람보다 **위**로 올린다 (300 → 2000).
+        //   사람에게는 선 자리(y)로 z-index 를 매긴다 — 아래에 선 사람이 앞에
+        //   오게 하려고 100+y 로, 많게는 1400 까지 간다. 그래서 시설 단추가
+        //   사람 **밑에** 깔렸고, 사람 칸(176x192 · 거의 투명)이 단추를 덮어
+        //   눌러도 안 눌리고 그 자리로 걸어가기만 했다.
+        '.plaza-spot{position:absolute;z-index:2000;transform:translate(-50%,-100%);',
         '  display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}',
         '.plaza-spot .b{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;',
         '  justify-content:center;font-size:21px;background:rgba(18,14,10,.72);',

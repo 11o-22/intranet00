@@ -119,9 +119,50 @@ function stampSafe() {
 // ==========================================
 // ★ 칸 하나만 띄운다
 // ==========================================
+// ==========================================
+// ★ 못 들어가는 칸 — 왜 못 들어가는지 **말해 준다**
+// ==========================================
+//
+//   옛 화면에는 「굶으면 시설이 잠긴다」는 규칙이 있다. 포만감이 0 이면
+//   공용시설·은행·상점·어둠 탐사가 잠기고, 열려 있던 칸은 updateUI 가
+//   돌 때 **사택으로 밀어낸다** (사택 주방에서 먹으라는 뜻이다).
+//
+//   그런데 사원 화면은 칸 하나만 띄우는 꼴이라, 그 밀어내기가 일어나면
+//   머리말은 「장기 은행」인데 안은 사택인 괴상한 모양이 됐다.
+//   은행을 눌렀더니 은행이 떴다가 사택이 되는 일이 그래서 생겼다.
+//
+//   그래서 **들어가기 전에 막고 까닭을 알린다.** 이미 들어가 있다가
+//   굶게 되면 칸을 닫고 알린다.
+const LOCK_STARVE = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
+const LOCK_QUAR = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
+
+function lockedWhy(tab) {
+    const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+    if (!u || !tab) return '';
+    try {
+        if (typeof isQuarantined === 'function' && isQuarantined(u)
+            && LOCK_QUAR.indexOf(tab) >= 0) {
+            return '여우 상담실 격리 중에는 들어갈 수 없습니다.';
+        }
+    } catch (e) { }
+    if ((u.satiety || 0) <= 0 && LOCK_STARVE.indexOf(tab) >= 0) {
+        return '포만감이 0 입니다.\n사택 주방에서 무엇이든 먹어야 다른 곳에 갈 수 있습니다.';
+    }
+    return '';
+}
+function say_(t) {
+    try { if (typeof showCustomAlert === 'function') { showCustomAlert(t); return; } } catch (e) { }
+    console.warn(t);
+}
+
 function openPanel(tab, sub, title) {
     const m = el(MS);
     if (!m || !tab) return false;
+    // ★ 못 들어가는 칸이면 열지 않고 까닭만 알린다.
+    //   그래도 **참을 돌려준다** — 거짓을 주면 광장이 「내가 못 맡았구나」
+    //   하고 광장을 닫은 뒤 옛 화면을 띄운다.
+    const why = lockedWhy(tab);
+    if (why) { say_(why); return true; }
     stampSafe();
     try { if (typeof switchTabById === 'function') switchTabById(tab); } catch (e) { }
     // 칸을 열 때 하던 일 — switchTab 안에 박혀 있어 여기서 한 번 더 부른다
@@ -292,6 +333,13 @@ function facLine() {
         window.updateUI = function () {
             const r = old.apply(this, arguments);
             try { facLine(); } catch (e) { }
+            // 들어가 있는 사이에 굶거나 격리되면 — 밀려나기 전에 닫고 알린다
+            try {
+                if (solo && openTab) {
+                    const why = lockedWhy(openTab);
+                    if (why) { closePanel(); say_(why); }
+                }
+            } catch (e) { }
             return r;
         };
         window.updateUI._fac = true;
