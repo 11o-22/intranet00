@@ -316,9 +316,15 @@
 </div>
 
     <!-- 자동 로그인 진행 중 표시 -->
-<div id="auto-login-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#121212; z-index:99999999; justify-content:center; align-items:center; flex-direction:column;">
-    <div style="width:42px; height:42px; border:3px solid #333; border-top-color:#888; border-radius:50%; animation: autoLoginSpin 0.8s linear infinite;"></div>
-    <div style="color:#888; font-size:13px; margin-top:20px; letter-spacing:2px;">단말 인증 중...</div>
+<div id="auto-login-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0b0c0f; z-index:99999999; justify-content:center; align-items:center; flex-direction:column; overflow:hidden;">
+    <div class="gl-scan"></div>
+    <div class="gl-wrap">
+        <div class="gl-title" data-t="■■주 ■사">■■주 ■사</div>
+        <div class="gl-rule"></div>
+        <div class="gl-sub" data-t="보안 인트라넷">보안 인트라넷</div>
+        <div class="gl-bar"><i></i></div>
+        <div class="gl-msg">단말 인증 중<span class="gl-dots">...</span></div>
+    </div>
 </div>
 
 <div class="container" id="app-container">
@@ -1428,9 +1434,25 @@ function getTodayStr() {
         // ★ 빠른 자동 로그인: 전체 DB를 기다리지 않고 내 계정 노드만 즉시 조회
     let autoLoginTried = false;
 
+    // ★ 띄웠으면 적어도 이만큼은 둔다 — 인증이 빨리 끝나면 글리치가 한 번도
+    //   안 보이고 화면만 깜빡이고 만다. (글리치 한 바퀴가 2.4초다)
+    let _glShownAt = 0, _glHideTimer = 0;
+    const GL_MIN = 1200;
+
     function showAutoLoginOverlay(show) {
         const el = document.getElementById('auto-login-overlay');
-        if (el) el.style.display = show ? 'flex' : 'none';
+        if (!el) return;
+        if (_glHideTimer) { clearTimeout(_glHideTimer); _glHideTimer = 0; }
+        if (show) { _glShownAt = Date.now(); el.style.display = 'flex'; return; }
+        const left = GL_MIN - (Date.now() - (_glShownAt || 0));
+        if (_glShownAt && left > 0) {
+            _glHideTimer = setTimeout(function () {
+                _glHideTimer = 0;
+                el.style.display = 'none';
+            }, left);
+            return;
+        }
+        el.style.display = 'none';
     }
 
         let testerList = {};
