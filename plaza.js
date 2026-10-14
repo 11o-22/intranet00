@@ -86,6 +86,13 @@ const PLAZA = {
     CHAT: 'plazaChat',          // 서버에 말을 적는 자리
 
     SPEED: 180,                 // 1초에 몇 픽셀 걷나 (방이 1880px 로 넓어져 올렸다)
+    // ★ 그림 아래쪽 **밋밋한 벽**을 빼고 창에 맞춘다.
+    //   2차 그림(1880x2556)은 볼 것이 y 1320 에서 끝나고 그 아래 1236픽셀이
+    //   한 가지 색 벽이다. 통째로 창에 맞추면 화면 절반이 비어 보이고
+    //   사람도 그만큼 작아진다. 그래서 아래 720 을 빼고 맞춘다 —
+    //   그림이 내려와 앉고(볼 것이 화면의 72%까지 내려온다), 남은 28% 가
+    //   채팅과 미니맵이 앉는 어두운 자리가 된다. 사람도 한 눈금 커진다.
+    CUT: 720,
     TAP_STOP: 3,
     EDGE: 20,                   // 좌우 끝에서 이만큼 남기고 넘어간다
     // ★ 넘어간 방에서 **문턱 안쪽으로** 들여 세운다.
@@ -159,9 +166,11 @@ const PLAZA = {
                   stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
                             { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
                   down: { to: 'dfront', x: [760, 1130] },
-                  spots: [ { x: 540,  n: '사택',        i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '어둠 탐사',   i: '🌑', ic: 'dark',  lv: 1, tab: 'tab-darkness', sub: 'dark-main' },
-                           { x: 1340, n: '유쾌 판매소', i: '🛒', lv: 1, tab: 'tab-shop', sub: 'shop-regular' } ] },
+                  // 주신 지도대로 — 2F 사택 · 1F 로비 · B1 어둠 탐사·유쾌 판매소
+                  lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
+                          b1: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
+                                { n: '유쾌 판매소', ic: 'shop', tab: 'tab-shop',     sub: 'shop-regular' } ] },
+                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true } ] },
 
         casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 2556, k: 1,
                   floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
@@ -199,9 +208,11 @@ const PLAZA = {
                   stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
                             { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
                   down: { to: 'gate', x: [780, 1120] },
-                  spots: [ { x: 540,  n: '사택',      i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '재난 탐사', i: '🌑', ic: 'dark',  lv: 1, tab: 'tab-darkness', sub: 'dark-main' },
-                           { x: 1340, n: '파티',                            lv: 1, tab: 'tab-darkness', sub: 'dark-party' } ] },
+                  // 2F 사택 · 1F 로비 · B1 재난 탐사 로비
+                  lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
+                          b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
+                                { n: '파티',                  tab: 'tab-darkness', sub: 'dark-party' } ] },
+                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true } ] },
 
         dshop:  { n: '망상 홈쇼핑', img: 'dshop.webp', w: 1880, h: 2556, k: 1,
                   floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
@@ -227,14 +238,14 @@ const PLAZA = {
         { n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
         { n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
         { n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
-        { n: '유쾌 판매소', i: '🛒',                tab: 'tab-shop',    sub: 'shop-regular' },
+        { n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',    sub: 'shop-regular' },
         { n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p' },
         { n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
         { n: '우주 쇼핑몰', i: '🛸', ic: 'alien',   tab: 'tab-shop',    sub: 'shop-alien' },
         { n: '망상 홈쇼핑', i: '📺', ic: 'dream',   tab: 'tab-shop',    sub: 'shop-dream' },
         { n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
         { n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
-        { n: '파티',                                tab: 'tab-darkness', sub: 'dark-party' },
+        // 파티는 목록에서 뺐다 — 재난관리국 B1 엘리베이터로 들어간다.
         { n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
         { n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
@@ -370,8 +381,12 @@ function stampSafe(ov) {
         '  font-size:10px;font-weight:bold;color:#efe6d8;text-shadow:0 1px 2px #000,0 0 4px #000;',
         '  pointer-events:none;}',
         // 말풍선
+        // ★ 사람 칸이 좁아(가로 100~170px) 말이 석 자씩 끊겼다.
+        //   절대 자리 잡은 칸은 **담은 칸 너비까지만** 늘어나기 때문이다.
+        //   width:max-content 로 글만큼 벌리고, 화면 폭으로만 잘라 준다.
         '.plaza-say{position:absolute;left:50%;transform:translateX(-50%);bottom:100%;',
-        '  margin-bottom:16px;max-width:190px;padding:6px 9px;border-radius:9px;',
+        '  width:max-content;max-width:min(62vw,230px);',
+        '  margin-bottom:12px;padding:6px 9px;border-radius:9px;',
         '  background:#f4efe2;color:#1a1a1a;font-size:11px;line-height:1.5;',
         '  box-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none;word-break:break-word;',
         '  text-align:center;}',
@@ -498,6 +513,12 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
         '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
         '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}',
+        // 엘리베이터 판 — 그림 위에 손 닿는 자리만 덮어 둔다
+        '#plaza-lift{position:relative;width:min(260px,66vw);margin:4px auto 8px auto;}',
+        '#plaza-lift img{display:block;width:100%;height:auto;image-rendering:pixelated;}',
+        '#plaza-lift button{position:absolute;left:14%;width:72%;border:0;padding:0;cursor:pointer;',
+        '  background:rgba(255,233,189,0);border-radius:6px;}',
+        '#plaza-lift button:active{background:rgba(255,233,189,.28);}',
         // 공지판
         '#plaza-nb{overflow-y:auto;max-height:58dvh;display:flex;flex-direction:column;gap:8px;}',
         '.nb-i{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);',
@@ -691,23 +712,37 @@ function lvAt(r, y) {
 //
 //   ★ 4분의 1 단위로 끊던 것을 그만두었다. 끊으면 세로가 딱 안 맞아
 //     위아래로 또 움직이게 된다. 대신 줄여 그릴 때는 nearest 를 끈다.
+// 사람 배를 끊는 눈금 — 도트가 고르게 찍히는 자리들
+const K_STEP = [1/4, 1/3, 1/2, 2/3, 3/4, 1];
+function snapK(v) {
+    let best = K_STEP[0];
+    for (let i = 1; i < K_STEP.length; i++) {
+        if (Math.abs(K_STEP[i] - v) < Math.abs(best - v)) best = K_STEP[i];
+    }
+    return best;
+}
+
 function zoomOf(r) {
     const v = run && run.view;
     const vh = (v && v.clientHeight) || 760;
-    return vh / r.h;
+    const cut = (r.cut != null) ? r.cut : (P.CUT || 0);
+    return vh / Math.max(200, r.h - cut);
 }
 
 function paintRoom() {
     const r = roomOf();
     run.z = zoomOf(r);
-    // ★ 사람도 같은 배로 줄이되, **4분의 1 단위로 끊는다.**
+    // ★ 사람도 같은 배로 줄이되, **정해진 눈금으로 끊는다.**
     //
     //   사람 그림은 도트 한 칸이 4픽셀이다. 배를 끊지 않으면 (0.38 같은 값)
     //   한 칸이 1.5픽셀처럼 어중간해져서, 찍을 때 어떤 줄만 한 픽셀 더
     //   들어간다 — 눈이 뭉개지고 테두리가 울퉁불퉁해진다.
-    //   4분의 1로 끊으면 한 칸이 1·2·3·4 픽셀로 딱 떨어져 어느 화면에서나
-    //   고르게 찍힌다. (방 그림은 도트 그림이 아니라 끊지 않고 부드럽게 둔다)
-    run.k = Math.max(0.25, Math.round(r.k * run.z * 4) / 4);
+    //
+    //   눈금을 4분의 1로만 두었더니 0.25 다음이 0.5 라 **두 배씩** 뛰었다.
+    //   그래서 3분의 1 자리를 끼워 넣었다. 방 그림이 1880x2556 으로 커진
+    //   뒤로는 이 자리에 떨어진다 (키 96 → 128px).
+    //   3분의 1 은 아이폰(dpr 3)에서 한 도트가 딱 4픽셀로 떨어진다.
+    run.k = snapK(r.k * run.z);
     const w = Math.round(r.w * run.z), h = Math.round(r.h * run.z);
     run.el.style.width = w + 'px';
     run.el.style.height = h + 'px';
@@ -802,6 +837,8 @@ function paintSpots() {
 function goApp(s) {
     const solo = !!(typeof window.plazaSolo === 'function' && window.plazaSolo());
     try {
+        // 엘리베이터 — 층을 고르는 판을 띄운다
+        if (s.lift) { liftSheet(); return; }
         // 방으로 들어가는 입구 — 광장을 닫지 않고 그 방으로 건너간다
         if (s.go) { closeSheet(); goRoom(s.go, null, s.golv); return; }
         if (s.fn) {
@@ -1023,8 +1060,9 @@ function camera(snap) {
     if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
     if (snap) run.cx = cx;
     else      run.cx += (cx - run.cx) * 0.18;   // 조금 늦게 따라와 부드럽다
-    // 세로는 반올림으로 한두 픽셀 남는 것만 가운데로 맞춘다 — 따라오지 않는다
-    run.cy = (rh - vh) / 2;
+    // ★ 세로는 **맨 위에 붙여** 둔다. 아래로 넘치는 몫(빼 둔 벽)은 창 밖으로
+    //   나가고, 그만큼 그림이 내려와 앉는다. 걸어도 세로는 안 움직인다.
+    run.cy = 0;
     run.el.style.left = (-Math.round(run.cx)) + 'px';
     run.el.style.top = (-Math.round(run.cy)) + 'px';
 }
@@ -1487,6 +1525,49 @@ function menuSheet() {
         if (!isAdm() && typeof window.logout === 'function') { window.logout(); return; }
         shut();
     };
+}
+
+// ==========================================
+// ★ 🛗 엘리베이터 — 층을 눌러 고른다
+//
+//   건물 안(백일몽·재난관리국)은 한 장에 **로비만** 그려져 있고,
+//   2F 사택과 B1 탐사는 그림이 따로 없다. 그래서 층을 **판으로** 고른다.
+//   주신 「엘레베이터 버튼」 그림을 그대로 쓰고, 2F·1F·B1 세 자리에만
+//   손이 닿게 덮어 둔다 (그림 안의 단추 자리에 맞춰 둔 비율이다).
+//
+//   층에 든 것이 하나면 바로 들어가고, 둘이면 그 층의 것만 다시 묻는다.
+//   1F 는 지금 서 있는 데라 그냥 닫는다.
+// ==========================================
+const LIFT_HIT = { f2: [0.255, 0.415], f1: [0.445, 0.605], b1: [0.635, 0.795] };
+
+function liftSheet(floor) {
+    const r = roomOf();
+    const L = r.lift;
+    if (!L) return;
+    if (floor) {
+        const list = (L[floor] || []).filter(spotOk);
+        if (!list.length) { closeSheet(); return; }       // 1F — 여기가 로비다
+        if (list.length === 1) { goApp(list[0]); return; }
+        const html = '<div class="plaza-grid">' + list.map(function (m, i) {
+            return '<button data-i="' + i + '">' + ico(m, 'e') + esc(m.n) + '</button>';
+        }).join('') + '</div>';
+        const s2 = sheet('lift', floor.toUpperCase().replace('F', 'F').replace('B1', 'B1'), html);
+        if (!s2) return;
+        Array.prototype.forEach.call(s2.querySelectorAll('.plaza-grid button'), function (b) {
+            b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
+        });
+        return;
+    }
+    const s = sheet('lift', '', '<div id="plaza-lift"><img src="' + P.DIR + 'lift.png" alt="엘리베이터">'
+        + Object.keys(LIFT_HIT).map(function (k) {
+            const h = LIFT_HIT[k];
+            return '<button data-f="' + k + '" title="' + k.toUpperCase() + '" style="top:'
+                + (h[0] * 100).toFixed(2) + '%;height:' + ((h[1] - h[0]) * 100).toFixed(2) + '%"></button>';
+        }).join('') + '</div>');
+    if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('#plaza-lift button'), function (b) {
+        b.onclick = function () { liftSheet(b.dataset.f); };
+    });
 }
 
 // ── 💬 말
