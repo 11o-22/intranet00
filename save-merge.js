@@ -240,10 +240,77 @@ function cntOf(arr) {
 //   하나 내주는 것 — 내가 물건 X 를 얻는 **바로 그 순간** 남이 나에게 같은
 //   X 를 주면, 둘을 가릴 길이 없어 한 개만 들어간다. 눈에 보이는 개수는
 //   맞고(서버가 이미 하나 늘어 있다), 끝없이 불어나는 쪽을 막는 편이 낫다.
-function mergeInv(path, baseArr, localArr) {
+// ■ ★ 남의 소지품은 「빼라고 한 것」만 뺀다
+//
+//   남의 자리에 쓰는 꾸러미는 늘 **그 사람 기록의 사본**이다. 그 사본이
+//   조금이라도 묵으면, 그 사이에 그 사람이 얻은 것이 「이 사람이 쓴 것」으로
+//   보여 서버에서 지워진다. 소지품이 증발하던 가장 굵은 길이다.
+//
+//   그래서 남의 것을 뺄 때는 **뺀다고 적어 둔 것만** 뺀다 (delWant).
+//   적는 자리는 removeItemFromInventory 하나와, 손으로 splice 하는 몇 군데다.
+//   안 적힌 것은 안 뺀다 — 잘못 지우는 것보다 남아 있는 쪽이 되돌릴 수 있다.
+//   내 자리는 이 빗장을 두지 않는다 (okDel 없이 부른다).
+const delWant = {};
+const DEL_LIFE = 180000;            // 적어 둔 뜻은 3분까지 믿는다
+function wantDel(c, name, qty) {
+    if (!c || !name) return;
+    const m = delWant[c] || (delWant[c] = { at: 0, n: {} });
+    m.at = Date.now();
+    m.n[name] = (m.n[name] || 0) + (Number(qty) || 1);
+}
+function takeDel(c, name) {
+    const m = delWant[c];
+    if (!m) return false;
+    if (Date.now() - m.at > DEL_LIFE) { delete delWant[c]; return false; }
+    if (!m.n[name]) return false;
+    m.n[name]--;
+    if (m.n[name] <= 0) delete m.n[name];
+    return true;
+}
+window.invDelIntent = wantDel;      // 손으로 빼는 자리에서 적어 준다
+function okDelOf(c) {
+    if (!c || (currentUser && c === currentUser.code)) return null;   // 내 자리는 그대로
+    return function (name) { return takeDel(c, name); };
+}
+
+// (removeItemFromInventory 로 빼면 저절로 적힌다)
+(function hookRemove() {
+    const iv = setInterval(function () {
+        if (typeof removeItemFromInventory !== 'function') return;
+        if (removeItemFromInventory._merge) { clearInterval(iv); return; }
+        const _r = removeItemFromInventory;
+        removeItemFromInventory = function (user, name, qty) {
+            const before = (user && Array.isArray(user.inventory)) ? user.inventory.length : 0;
+            const r = _r.apply(this, arguments);
+            try {
+                const after = (user && Array.isArray(user.inventory)) ? user.inventory.length : 0;
+                const gone = Math.max(0, before - after);
+                if (gone && user && user.code) wantDel(user.code, name, gone);
+            } catch (e) { }
+            return r;
+        };
+        removeItemFromInventory._merge = true;
+        clearInterval(iv);
+        console.log('[병합] 소지품 빼기에 「뺀다고 적어 두기」를 걸었습니다');
+    }, 500);
+})();
+
+function mergeInv(path, baseArr, localArr, okDel) {
     if (!database) return Promise.resolve(null);
     const add = msDiff(localArr, baseArr);
-    const del = msDiff(baseArr, localArr);
+    let del = msDiff(baseArr, localArr);
+    if (okDel && del.length) {
+        const keep = [], skip = [];
+        del.forEach(function (n) { (okDel(n) ? keep : skip).push(n); });
+        if (skip.length) {
+            invStats.kept = (invStats.kept || 0) + skip.length;
+            invStats.lastKeep = skip.slice(0, 8).join(', ')
+                + (skip.length > 8 ? ' 외 ' + (skip.length - 8) + '개' : '');
+            console.warn('[병합] 빼라고 하지 않은 ' + skip.length + '개는 그대로 둡니다 — '
+                + invStats.lastKeep + ' (' + path + ')');
+        }
+        del = keep;
+    }
     if (!add.length && !del.length) return Promise.resolve(null);
 
     let cutLast = [];
@@ -671,6 +738,64 @@ function flushMyInv() {
 //
 // 기준(base)은 서버 모습 그대로 둔다. 내 쪽이 그보다 많아지므로
 // 다음 저장에서 「지운 것」은 없고 「더한 것」만 올라간다.
+// ★ 기준을 세울 때 — 내 쪽이 서버보다 묵었으면 **서버 쪽으로 맞춘다**
+//
+//   기준(base)은 서버 모습이고, 첫 저장은 「기준과 지금의 차이」를 보낸다.
+//   그래서 기준을 세우는 그 순간 내 화면이 서버보다 묵어 있으면, 그 차이가
+//   통째로 「내가 쓴 것 · 내가 잃은 것」으로 읽혀 **서버가 옛 모습으로 되돌아간다.**
+//   들어오자마자 소지품·돈·장비·펫이 예전 것으로 돌아가 있던 자리다.
+//
+//   그래서 기준을 세울 때 한 번 맞춘다.
+//     소지품  — 서버에 있는 만큼은 내 쪽에도 있게 한다 (개수로 합친다).
+//               내 쪽에만 있는 것은 그대로 둔다 — 아직 못 보낸 것일 수 있다.
+//     돈      — 서버가 많으면 서버 쪽으로 올린다. 깎는 쪽으로는 안 맞춘다.
+//     나머지  — 서버 도장(_adminStamp)이 내 것과 다르면 서버가 앞선 것이므로
+//               그 칸들을 서버 값으로 받는다. 같으면 내 값이 곧 서버 값이다.
+function soakInv(srv) {
+    if (!currentUser) return;
+    const mine = asArr(currentUser[INV]);
+    const them = asArr(srv[INV]);
+    if (!them.length) return;
+    const m = cntOf(mine), s = cntOf(them);
+    const add = [];
+    Object.keys(s).forEach(function (n) {
+        const over = s[n] - (m[n] || 0);
+        for (let i = 0; i < over; i++) add.push(n);
+    });
+    if (!add.length) return;
+    fillArr(currentUser[INV] || (currentUser[INV] = []), mine.concat(add));
+    console.log('[병합] 서버에 있던 소지품 ' + add.length + '개를 내 쪽에 맞췄습니다 — '
+        + add.slice(0, 6).join(', ') + (add.length > 6 ? ' 외' : ''));
+}
+function soakPts(srv) {
+    if (!currentUser) return;
+    const mine = Number(currentUser[PTS]) || 0;
+    const them = Number(srv[PTS]) || 0;
+    if (them <= mine) return;
+    currentUser[PTS] = them;
+    console.log('[병합] 서버 쪽 돈이 많아 ' + mine.toLocaleString() + ' → '
+        + them.toLocaleString() + ' P 로 맞췄습니다.');
+}
+function soakRest(srv) {
+    if (!currentUser) return;
+    // 도장이 같으면 내 값이 곧 서버에서 읽어 온 값이다 — 건드리지 않는다
+    if (!srv._adminStamp || srv._adminStamp === currentUser._adminStamp) return;
+    let n = 0;
+    Object.keys(srv).forEach(function (k) {
+        if (k === INV || k === PTS || k === EFF || k === BUF) return;   // 위에서 따로 맞췄다
+        if (k === '_adminStamp' || k === '_stamp') return;
+        if (SKIP.indexOf(k) >= 0) return;
+        if (sameAs(k, currentUser[k], srv[k])) return;
+        const v = clone(srv[k]);
+        if (v === undefined) return;
+        if (Array.isArray(currentUser[k]) && Array.isArray(v)) fillArr(currentUser[k], v);
+        else currentUser[k] = v;
+        n++;
+    });
+    currentUser._adminStamp = srv._adminStamp;
+    if (n) console.log('[병합] 들어올 때 서버가 앞서 있어 ' + n + '칸을 서버 값으로 받았습니다.');
+}
+
 function soakEff(srv) {
     if (!currentUser || !asArr(srv[EFF]).length) return;
     const out = effMap(currentUser[EFF]);
@@ -725,6 +850,73 @@ function release(why) {
     console.log('[병합] 기준을 놓았습니다 — ' + why);
 }
 
+// ==========================================
+// ★ 기준이 서기 전의 저장은 붙들어 둔다
+// ==========================================
+//
+//   들어온 직후 한 호흡 동안은 base 가 없다 (ready = false). 예전에는 그때
+//   들어온 저장을 **예전 방식 그대로** 보냈다 — 즉 users/<사번> 에
+//   inventory · points · timedEffects · equippedWeapons · pets · history 까지
+//   **내 화면에 있는 값 통째로** 썼다.
+//
+//   들어오는 그 몇 초 사이에 서버가 앞서 있으면(다른 기기에서 논 뒤 · 자는
+//   동안 남이 준 것 · 은행 이자) 그 값이 전부 묵은 것으로 덮인다.
+//   「로그인하자마자 되돌아가 있다」가 이것이다.
+//
+//   그래서 통째로 쓰지 않고 **붙들었다가**, 기준이 서면 그때 보낸다.
+//   기준은 서버를 읽어 세우므로, 보낼 때는 바뀐 것만 · 소지품은 더하고
+//   빼기로 나간다. 기준이 끝내 안 서면(연결이 끊김) 안 보낸 채로 둔다 —
+//   화면에는 그대로 남아 있다가 붙는 순간 나간다. 묵은 값을 밀어 넣는
+//   것보다 늦게 가는 쪽이 낫다.
+//   ★ 다만 영영 붙들고만 있지는 않는다. 20초가 지나도 기준이 안 서면
+//     (병합이 못 올라왔거나 서버를 못 읽는 자리다) 예전 길로 한 번 보낸다.
+//     묵은 값을 미는 것보다 아예 못 쓰는 쪽이 더 나쁘다.
+let held = 0;                 // 붙들어 둔 저장이 있나
+let heldAt = 0;
+let heldIv = 0;
+let rawSelf = null;           // 예전 길 (hookSave 가 꽂아 준다)
+const HOLD_GIVE_UP = 20000;
+let heldFields = null;        // 붙들어 둔 saveFields 의 칸들 (letters 처럼 병합이 안 다루는 칸)
+function holdSave(why, fields) {
+    held++;
+    if (fields) {
+        heldFields = heldFields || {};
+        Object.keys(fields).forEach(function (k) { heldFields[k] = 1; });
+    }
+    if (!heldAt) heldAt = Date.now();
+    try { attach(); } catch (e) { }                     // 기준을 바로 세우러 간다
+    if (!heldIv) {
+        heldIv = setInterval(function () {
+            if (ready) { runHeld(); return; }
+            try { attach(); } catch (e) { }
+            if (Date.now() - heldAt > HOLD_GIVE_UP) {
+                // 기준이 끝내 안 선다 — 예전 길로라도 보낸다
+                console.warn('[병합] 기준이 ' + Math.round(HOLD_GIVE_UP / 1000)
+                    + '초째 안 섭니다 — 붙들어 둔 저장 ' + held + '건을 예전 길로 보냅니다.');
+                clearInterval(heldIv); heldIv = 0;
+                held = 0; heldAt = 0; heldFields = null;
+                try { if (rawSelf) rawSelf.call(null); } catch (e) { console.error('[병합]', e); }
+            }
+        }, 400);
+    }
+    if (held === 1) console.log('[병합] 기준이 서기 전입니다 — 저장을 붙들어 둡니다 (' + why + ')');
+    return Promise.resolve();
+}
+function runHeld() {
+    if (heldIv) { clearInterval(heldIv); heldIv = 0; }
+    if (!held) return;
+    const n = held;
+    const f = heldFields;
+    held = 0; heldAt = 0; heldFields = null;
+    console.log('[병합] 붙들어 둔 저장 ' + n + '건을 이제 보냅니다.');
+    try {
+        // 병합이 안 다루는 칸(letters 등)은 saveFields 로, 나머지는 기준과의 차이로
+        if (f && typeof saveFields === 'function') saveFields(f);
+        if (typeof saveSelfFull === 'function') saveSelfFull();
+    } catch (e) { console.error('[병합] 붙들어 둔 저장:', e); }
+}
+window.mergeHeld = function () { return held; };
+
 function attach() {
     if (!database) return;
     if (!currentUser || !currentUser.code) {
@@ -763,7 +955,19 @@ function attach() {
 //     그래서 깨어나면 한 번 읽어서 이 길로 흘려 준다. 받아 올 것만 받고
 //     내가 손댄 것은 그대로 두므로, 잠들기 전에 못 보낸 것이 있어도 안 잃는다.
 function mergeOnSrv(srv) {
-        if (!srv) return;
+        if (!srv) {
+            // ★ 서버에 내 자리가 아직 없다 (갓 들어온 사원). 빈 기준으로 세운다.
+            //   비어 있으니 지울 것이 없고 더하는 쪽만 올라간다. 이것을 안 해 두면
+            //   기준이 영영 안 서서, 아래 「기준이 설 때까지 붙든다」가 영영 붙들고
+            //   있게 된다.
+            if (!ready && currentUser && currentUser.code === code) {
+                base = {};
+                ready = true;
+                console.log('[병합] 서버에 아직 기록이 없습니다 — 빈 기준으로 시작합니다.');
+                runHeld();
+            }
+            return;
+        }
         if (!currentUser || currentUser.code !== code) return;   // 계정이 어긋났다
 
         if (!ready) {
@@ -784,8 +988,12 @@ function mergeOnSrv(srv) {
             //   내가 마신 것도 남고, 남이 걸어 준 것도 남는다.
             soakEff(srv);
             soakBuf(srv);
+            soakInv(srv);                                   // 서버에 있던 소지품을 내 쪽에 맞춘다
+            soakPts(srv);                                   // 서버 쪽 돈이 많으면 그쪽으로
+            soakRest(srv);                                  // 서버가 앞서 있으면 나머지 칸도
             ready = true;
             console.log('[병합] 기준을 세웠습니다.');
+            runHeld();                                      // 붙들어 둔 저장을 이제 보낸다
             return;
         }
 
@@ -928,10 +1136,11 @@ function markSaved(payload) {
         if (saveSelfFull._merge) { clearInterval(iv); return; }
 
         const _full = saveSelfFull;
+        rawSelf = _full;                                  // 기준이 끝내 안 설 때 쓸 예전 길
         saveSelfFull = function () {
             if (!database || !currentUser) return Promise.resolve();
-            if (currentUser.code !== code) return _full.apply(this, arguments);   // 계정이 어긋났다
-            if (!ready) return _full.apply(this, arguments);   // 기준이 없으면 예전 방식
+            // 기준이 없으면 통째로 쓰지 않고 붙들어 둔다 (위 holdSave 머리말)
+            if (currentUser.code !== code || !ready) return holdSave('saveSelfFull');
 
             const invJob = flushMyInv();                      // 소지품은 병합으로
             const ptsJob = flushMyPts();                      // 돈도 병합으로
@@ -964,6 +1173,8 @@ function markSaved(payload) {
                 const wantsEff = !!fields[EFF];
                 const wantsBuf = !!fields[BUF];
                 const mine = (ready && currentUser && currentUser.code === code);
+                // 기준이 서기 전에는 통째로 쓰지 않고 붙들어 둔다 (holdSave 머리말)
+                if (!mine && currentUser && database) return holdSave('saveFields', fields);
                 const rest = {};
                 Object.keys(fields).forEach(function (k) {
                     if (k === INV) return;
@@ -1014,7 +1225,11 @@ function markSaved(payload) {
         if (typeof saveDB === 'function' && !saveDB._merge) {
             const _d = saveDB;
             saveDB = function () {
-                if (!ready) return _d.apply(this, arguments);
+                // 기준이 없으면 통째로 쓰지 않고 붙들어 둔다 (holdSave 머리말)
+                if (!ready) {
+                    if (currentUser && database) return holdSave('saveDB');
+                    return _d.apply(this, arguments);
+                }
                 return saveSelfFull();
             };
             saveDB._merge = true;
@@ -1034,14 +1249,57 @@ function markSaved(payload) {
         if (updateUserFields._merge) { clearInterval(iv); return; }
         const _u = updateUserFields;
 
+        // ★ 남의 기준(그림자)이 아직 없으면 **통째로 쓰지 않는다.**
+        //
+        //   그림자는 users 지켜보기(child_added)가 세운다. 들어온 직후에는 아직
+        //   안 온 사람이 있고, 그 사이에 그 사람에게 물건·돈을 쓰면 기준이 없어
+        //   병합을 못 하고 **값 통째로** 덮어썼다. 그 사람이 그 사이에 얻은 것이
+        //   그 자리에서 사라진다. 그래서 한 번 읽어 기준을 세우고 간다.
+        const seedTried = {};
+        function seed(c) {
+            if (!database) return Promise.resolve(false);
+            return database.ref('users/' + c).once('value').then(function (s) {
+                const v = s.val();
+                if (!v) return false;
+                if (!shadowInv[c]) shadowInv[c] = asArr(v[INV]);
+                if (shadowPts[c] === undefined) shadowPts[c] = Number(v[PTS]) || 0;
+                if (!shadowEff[c]) shadowEff[c] = asArr(v[EFF]);
+                if (!shadowBuf[c]) shadowBuf[c] = asArr(v[BUF]);
+                console.log('[병합] ' + c + ' 의 기준이 없어 서버에서 한 번 읽었습니다.');
+                return true;
+            }).catch(function () { return false; });
+        }
+
         updateUserFields = function (c, fields) {
             fields = fields || {};
 
+            // ★ 보낼 꾸러미는 **부르는 그 자리에서 베껴 둔다.**
+            //   남의 기록은 이제 덩어리를 그대로 두고 속만 갈므로
+            //   (index.html putUser), 보내는 사이에 그 사람 쪽 알림이 오면
+            //   배열 속이 서버 값으로 갈려 **방금 담은 물건이 빠진 채로** 나갔다.
+            const snap = {};
+            Object.keys(fields).forEach(function (k) {
+                snap[k] = Array.isArray(fields[k]) ? fields[k].slice() : fields[k];
+            });
+            fields = snap;
+
             // 내 자리면 기존 흐름대로 (기준도 맞춰 둔다)
             if (!c || (currentUser && c === currentUser.code)) {
-                const r = _u.apply(this, arguments);
+                const r = _u.call(this, c, fields);
                 // 기준은 미리 찍지 않는다 (saveFields 와 같은 까닭)
                 return r;
+            }
+
+            // 기준이 없는 칸이 끼어 있으면 먼저 읽어 세운다
+            const need = (Object.prototype.hasOwnProperty.call(fields, INV) && !shadowInv[c])
+                || (Object.prototype.hasOwnProperty.call(fields, PTS) && shadowPts[c] === undefined)
+                || (Object.prototype.hasOwnProperty.call(fields, EFF) && !effBase(c))
+                || (Object.prototype.hasOwnProperty.call(fields, BUF) && !shadowBuf[c]);
+            // (한 번만 읽는다 — 읽고도 기준이 안 서면 그대로 간다. 10초 뒤에 다시 읽는다)
+            if (need && database && (Date.now() - (seedTried[c] || 0) > 10000)) {
+                seedTried[c] = Date.now();
+                const self_ = this, args = fields;
+                return seed(c).then(function () { return updateUserFields.call(self_, c, args); });
             }
 
             // 남의 소지품·돈 — 서버에서 본 모습을 기준으로 더하고 뺀다
@@ -1092,7 +1350,7 @@ function markSaved(payload) {
             const jobs = [_u.call(this, c, rest)];
             if (doInv) {
                 const want = asArr(fields[INV]);
-                jobs.push(mergeInv('users/' + c + '/' + INV, hadInv, want).then(function (after) {
+                jobs.push(mergeInv('users/' + c + '/' + INV, hadInv, want, okDelOf(c)).then(function (after) {
                     if (after === null) return null;
                     shadowInv[c] = after.slice();
                     if (db && db.users && db.users[c]) fillArr(db.users[c][INV] || (db.users[c][INV] = []), after);
@@ -1231,7 +1489,7 @@ const MERGED = /^users\/([^/]+)\/(points|inventory|timedEffects|itemBuffs)$/;
                     if (f === PTS && shadowPts[c] !== undefined) {
                         job = mergePts(path, shadowPts[c], obj[k]);
                     } else if (f === INV && shadowInv[c]) {
-                        job = mergeInv(path, shadowInv[c], obj[k]);
+                        job = mergeInv(path, shadowInv[c], obj[k], okDelOf(c));
                     } else if (f === EFF && effBase(c)) {
                         job = mergeEff(path, effBase(c), obj[k]);
                     } else if (f === BUF && shadowBuf[c]) {
@@ -1342,6 +1600,8 @@ window.mergePtsMoved = function (delta) {
 window.mergeState = function () {
     console.log('%c===== 저장 병합 =====', 'color:#d4af37; font-size:13px');
     console.log('  계정:', code || '(없음)', '· 기준 준비:', ready ? 'O' : '-');
+    console.log('  붙들어 둔 저장:', held + '건'
+        + (held ? ' (기준이 서면 보냅니다 — ' + Math.round((Date.now() - heldAt) / 1000) + '초째)' : ''));
     if (!ready) return;
     const d = diffPayload();
     const keys = Object.keys(d);
@@ -1365,6 +1625,12 @@ window.invState = function () {
         + (invStats.lastBlock ? ' · 마지막 — ' + invStats.lastBlock : '')
         + (invStats.blocked ? '   ← 기준이 묵는 길이 있습니다' : ''));
     console.log('  남의 소지품 기준 보유:', Object.keys(shadowInv).length + '명');
+    console.log('  남의 것을 안 지운 횟수:', (invStats.kept || 0) + '개'
+        + (invStats.lastKeep ? ' · 마지막 — ' + invStats.lastKeep : '')
+        + (invStats.kept ? '   ← 빼라고 안 한 것이라 그대로 두었습니다' : ''));
+    const wait = Object.keys(delWant);
+    if (wait.length) console.log('  빼겠다고 적어 둔 것:',
+        wait.map(function (c) { return c + ' ' + JSON.stringify(delWant[c].n); }).join(' · '));
 };
 
 window.ptsState = function () {

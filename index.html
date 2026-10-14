@@ -1376,11 +1376,42 @@ function getTodayStr() {
         try { checkVipMultiplayerState(); } catch (e) { }
     }
 
+    // ★ 남의 기록은 **덩어리를 바꾸지 않고 속만 갈아 끼운다.**
+    //
+    //   예전에는 child_changed 가 올 때마다 db.users[사번] 에 **새 객체**를
+    //   꽂았다. 그런데 남에게 무엇을 하는 길은 거의 다 이렇게 생겼다.
+    //
+    //       const t = db.users[코드];        // ← 이때의 덩어리를 쥔다
+    //       ... 고르는 창 · 글자 입력 ...    // ← 그 사이에 child_changed 가 온다
+    //       t.inventory.push('무엇');         // ← t 는 이미 떨어져 나온 옛 덩어리
+    //       updateUserFields(코드, { inventory: t.inventory, ... });
+    //
+    //   그 사이에 그 사람이 받은 물건·돈은 t 에 없다. 그래서 보내는 꾸러미가
+    //   **옛 모습**이 되고, 병합(save-merge)은 그것을 「이 사람이 쓴 것」으로
+    //   읽어 서버에서 지운다. 소지품이 증발하고 돈이 되돌아가던 자리다.
+    //   (node-set.js 머리말이 적어 둔 그 함정인데, 그쪽은 통째 set 만 막았다)
+    //
+    //   덩어리를 그대로 두고 속만 갈면 쥐고 있던 참조가 늘 **지금 값**이다.
+    //   배열도 자리를 지키고 속만 간다 — t.inventory 를 따로 쥔 코드까지 산다.
+    function fillSame(oldArr, newArr) {
+        oldArr.length = 0;
+        for (let i = 0; i < newArr.length; i++) oldArr.push(newArr[i]);
+        return oldArr;
+    }
     function putUser(key, raw) {
         const u = normUser(raw);
         if (!u) { if (db.users[key]) { delete db.users[key]; touchOthers(); } return; }
         if (currentUser && key === currentUser.code) { applyMine(u); return; }
-        db.users[key] = u;
+        const old = db.users[key];
+        if (old && typeof old === 'object' && !Array.isArray(old)) {
+            Object.keys(old).forEach(k => { if (!(k in u)) delete old[k]; });
+            Object.keys(u).forEach(k => {
+                if (Array.isArray(u[k]) && Array.isArray(old[k])) fillSame(old[k], u[k]);
+                else old[k] = u[k];
+            });
+        } else {
+            db.users[key] = u;
+        }
         touchOthers();
     }
 
@@ -9128,6 +9159,10 @@ function bjFinish(mode) {
                     if (p > -1) sender.inventory.splice(p, 1);
                     me.inventory.push(deal.offerValue);
                 }
+                // 남의 소지품에서 빼는 것은 **빼겠다고 적어 두어야** 서버에서도 빠진다
+                // (save-merge.js 의 「빼라고 한 것만 뺀다」)
+                try { if (typeof invDelIntent === 'function')
+                    invDelIntent(sender.code, deal.offerValue, offerQty); } catch (e) { }
             }
 
             if (deal.mode === 'trade') {

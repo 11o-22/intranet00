@@ -742,7 +742,13 @@ window.jisanRod = function (who) {
         t.hasItemUsedOnMe = true;
         try {
             if (typeof updateUserFields === 'function') {
-                updateUserFields(t.code, { badge: t.badge, history: t.history, hasItemUsedOnMe: true });
+                // ★ jisanDay 도 같이 보낸다.
+                //   dayRoll 은 「오늘 치를 아직 안 돌렸다」 싶으면 막대를 거둔다.
+                //   그 도장은 여태 **준 사람 화면에만** 찍혀서, 받은 쪽 기록이
+                //   서버에서 내려올 때마다 도장이 없어 다시 거둬졌다 —
+                //   「받자마자 막대가 사라진다」가 이것이다.
+                updateUserFields(t.code, { badge: t.badge, history: t.history,
+                                           jisanDay: t.jisanDay || today(), hasItemUsedOnMe: true });
             }
         } catch (e) { }
     }
