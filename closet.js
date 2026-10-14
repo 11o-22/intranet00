@@ -142,7 +142,7 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
+        'dress', 'tuxedo', 'suit', 'dream-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -196,7 +196,14 @@ const DOT_SLOTS = [
     {
         k: 'outer', n: '겉옷', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'suit', n: '정장', over: ['suit'], own: 'suit' },
+            // ★ 노란 정장은 **상담사 전용**이다 — 뽑기에 안 넣는다
+            { i: 'suit', n: '정장', over: ['suit'], admin: true },
+            // ★ 백일몽 정장 — 주신 그림은 머리·손·발까지 그려진 **통짜**였다.
+            //   그대로 겹치면 민머리가 얼굴을 덮으므로, 몸 그림과 **자리·색이
+            //   똑같은 칸을 빼서** 옷만 남겼다 (7만 5천 칸이 몸과 같았다).
+            //   자리는 요원복과 같은 가로 +102 · 세로 +100 — 옮기고 나니 테두리가
+            //   몸(126~225 · 116~351)과 딱 맞았다.
+            { i: 'dsuit', n: '백일몽 정장', over: ['dream-suit'], own: 'dream-suit' },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '검은 장포', over: ['robe'], own: 'robe' },
             { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },
