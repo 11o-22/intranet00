@@ -84,6 +84,11 @@ const PLAZA = {
     ADMIN_ONLY: false,          // 상담사만 들이려면 true
     PATH: 'plazaRoom',          // 서버에 자리를 적는 자리
     CHAT: 'plazaChat',          // 서버에 말을 적는 자리
+    // ★ 말하는 자리가 둘이다.
+    //     맵 채팅   plazaChat/<방>   — 같은 방 사람끼리. 마지막 사람이 나가면 지워진다.
+    //     서버 채팅 plazaChat/all    — 어느 방에 있든 다 보인다. 안 지워지고 남는다.
+    //   방 열쇠에 'all' 은 없으므로 서로 섞이지 않는다.
+    ALL: 'all',
 
     SPEED: 210,                 // 1초에 몇 픽셀 걷나 (방이 넓어지고 「조금 빠르게」 하여 올렸다)
     // ★ 그림 아래쪽 **밋밋한 벽**을 빼고 창에 맞춘다.
@@ -287,7 +292,15 @@ function esc(s) {
 }
 
 let run = null;          // 지금 돌고 있는 광장
-let chatRef = null;
+let chatRef = null;      // 맵 채팅 (방이 바뀌면 다시 건다)
+let allRef = null;       // 서버 채팅 (광장에 있는 내내 한 번만 건다)
+let allFrom = 0;         // 이때까지 온 줄은 「묵은 것」 — 빨간 점을 안 붙인다
+
+// 서버/맵 어느 쪽에 적을 것인가. 이 기계에만 적어 둔다.
+const CH_KEY = 'plazaChatCh';
+let chatCh = 'map';
+try { if (localStorage.getItem(CH_KEY) === 'all') chatCh = 'all'; } catch (e) { }
+function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (run && run.room)); }
 
 // ==========================================
 // 아이폰 — 시계·배터리 밑에 안 깔리게
@@ -409,7 +422,8 @@ function stampSafe(ov) {
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
         '@keyframes plazaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
         // 걷기 단추 (자판이 있는 기계에서만 — 손가락 쪽은 화면을 끌어 걷는다)
-        '#plaza-pad{position:absolute;left:0;right:0;z-index:20;display:flex;gap:6px;',
+        // 왼쪽 120px 은 비워 둔다 — 거기에 「서버 · 맵」이 앉는다 (손전화에는 이 칸이 없다)
+        '#plaza-pad{position:absolute;left:120px;right:0;z-index:20;display:flex;gap:6px;',
         '  justify-content:center;bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
         '#plaza-pad button{width:50px;padding:10px 0;font-size:15px;border-radius:10px;',
         '  background:rgba(18,18,26,.66);border:1px solid rgba(170,158,126,.3);color:#ded7c8;',
@@ -418,13 +432,25 @@ function stampSafe(ov) {
         // ── 채팅 내역 : 왼쪽 아래에 **늘 깔려 있다** (창을 안 열어도 보인다)
         //   그림 아래쪽 어두운 자리에 얹히므로 방이 가려지지 않는다.
         '#plaza-feed{position:absolute;left:12px;z-index:18;max-width:62%;',
-        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);',
+        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 104px);',
         '  display:flex;flex-direction:column;justify-content:flex-end;gap:2px;',
         '  font-size:11px;line-height:1.55;pointer-events:none;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '#plaza-feed div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ded5c4;}',
         '#plaza-feed .who{color:#9fd8ef;font-weight:bold;}',
         '#plaza-feed .sys{color:#8d8578;}',
+        // 서버 채팅으로 온 줄에는 표를 붙인다 (맵 채팅은 표가 없다)
+        '.sv{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
+        '  background:rgba(217,160,90,.22);color:#ffd79a;vertical-align:1px;}',
+        // ── 서버 / 맵 고르기 : 글줄 바로 아래 · 적는 칸 바로 위
+        '#plaza-ch{position:absolute;left:12px;z-index:19;display:flex;gap:5px;',
+        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
+        '#plaza-ch button{padding:4px 11px;border-radius:999px;font-size:10.5px;cursor:pointer;',
+        '  font-family:inherit;background:rgba(12,12,18,.66);color:#8d8578;',
+        '  border:1px solid rgba(190,170,120,.22);',
+        '  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}',
+        '#plaza-ch button.on{background:rgba(217,160,90,.2);border-color:#8a6a2a;color:#ffe9bd;',
+        '  font-weight:bold;}',
         // ── 미니맵 : 오른쪽 아래. 채팅 창을 열면 사라진다.
         '#plaza-map{position:absolute;right:12px;z-index:19;width:116px;',
         '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);',
@@ -1014,7 +1040,9 @@ function goRoom(key, way, lv) {
     run.y = Math.max(bnd[0], Math.min(bnd[1], run.y));
     run.tx = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
-    run.lines = [];                         // 방이 바뀌면 말도 새로 시작한다
+    // 방이 바뀌면 그 방 말은 새로 시작한다. **서버 채팅은 남긴다** —
+    // 어느 방에 있든 이어지는 자리라 방을 옮겼다고 끊기면 안 된다.
+    run.lines = (run.lines || []).filter(function (o) { return o.sv; });
     paintFeed();
     run._swept = false;                     // 새 방에서 한 번 쓸어 낸다
 
@@ -1247,8 +1275,10 @@ function onPeers(snap) {
             try { const d = db_(); if (d) d.ref(P.CHAT + '/' + run.room).remove(); } catch (e) { }
             setTimeout(function () {
                 if (!run) return;
-                run.lines = (run.lines || []).filter(function (o) { return o.sys; });
+                // 쓸어 내는 것은 **그 방의 말**이다 — 알림줄과 서버 채팅은 남긴다
+                run.lines = (run.lines || []).filter(function (o) { return o.sys || o.sv; });
                 paintLog();
+                paintFeed();
             }, 600);
         }
     }
@@ -1305,6 +1335,57 @@ function watchChat() {
         addLine(v.n || '?', v.t, v.c);
     });
 }
+
+// ★ 서버 채팅 — 방과 상관없이 **광장에 있는 내내** 한 번만 건다.
+//   watchChat() 은 방을 옮길 때마다 도는데, 여기까지 거기에 넣으면
+//   방을 옮길 때마다 지난 서른 줄이 다시 쏟아진다. (공지와 같은 까닭)
+function watchAll() {
+    const d = db_(); if (!d || !run) return;
+    if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
+    allFrom = now() + 1500;        // 걸자마자 오는 지난 줄은 조용히 받는다
+    allRef = d.ref(P.CHAT + '/' + P.ALL).limitToLast(P.CHAT_KEEP);
+    allRef.on('child_added', function (s) {
+        const v = s.val() || {};
+        if (!v.t) return;
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, quiet: now() < allFrom });
+    });
+}
+
+// 서버 채팅은 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다.
+//   (맵 채팅은 마지막 사람이 나갈 때 통째로 지워진다 — leaveRoom)
+function trimAll() {
+    const d = db_(); if (!d) return;
+    if (Math.random() > 0.25) return;            // 다섯 번에 한 번쯤만
+    try {
+        d.ref(P.CHAT + '/' + P.ALL).once('value', function (s) {
+            const v = s.val(); if (!v) return;
+            const keys = Object.keys(v).sort();   // push 열쇠는 때 순서대로 선다
+            const over = keys.length - P.CHAT_KEEP * 2;
+            if (over <= 0) return;
+            const up = {};
+            keys.slice(0, over).forEach(function (k) { up[k] = null; });
+            d.ref(P.CHAT + '/' + P.ALL).update(up);
+        });
+    } catch (e) { }
+}
+
+// ── 서버/맵 고르기
+function chSet(c) {
+    chatCh = (c === 'all') ? 'all' : 'map';
+    try { localStorage.setItem(CH_KEY, chatCh); } catch (e) { }
+    chPaint();
+}
+function chPaint() {
+    const box = document.getElementById('plaza-ch');
+    if (box) Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+        b.classList.toggle('on', b.dataset.c === chatCh);
+    });
+    const inp = document.getElementById('plaza-in');
+    if (inp) inp.placeholder = chatCh === 'all'
+        ? '서버 — 모든 사원에게 들립니다'
+        : '맵 — 이 방에 있는 사람에게만';
+}
+window.plazaChat = function (c) { if (c) chSet(c); return chatCh; };
 
 // ==========================================
 // ★ 사원증 칸 — 사진 · 닉네임 · 사번
@@ -1390,7 +1471,8 @@ function paintFeed() {
         const dim = (0.45 + 0.55 * ((i + 1) / rows.length)).toFixed(2);   // 묵은 줄은 옅게
         return '<div style="opacity:' + dim + '">' + (o.sys
             ? '<span class="sys">· ' + esc(o.t) + '</span>'
-            : '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
+            : (o.sv ? '<span class="sv">서버</span> ' : '')
+              + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
     }).join('');
 }
 
@@ -1425,9 +1507,11 @@ function paintBar(o) {
     const t = bar.querySelector('.txt');
     if (t) {
         t.innerHTML = o.sys ? '<span style="opacity:.65">· ' + esc(o.t) + '</span>'
-            : '<span class="last"><b style="color:#9fd8ef">' + esc(o.n) + '</b> ' + esc(o.t) + '</span>';
+            : '<span class="last">' + (o.sv ? '<span class="sv">서버</span> ' : '')
+              + '<b style="color:#9fd8ef">' + esc(o.n) + '</b> ' + esc(o.t) + '</span>';
     }
-    if (!o.sys && !sheetOpen('chat')) bar.classList.add('new');     // 사람 말에만 빨간 점
+    // 사람 말에만 빨간 점. 들어오자마자 쏟아지는 서버 지난 줄(quiet)은 뺀다.
+    if (!o.sys && !o.quiet && !bar.classList.contains('typing')) bar.classList.add('new');
 }
 
 function addLine(who, text, code) {
@@ -1448,7 +1532,8 @@ function say(text) {
     const d = db_();
     if (d) {
         try {
-            d.ref(P.CHAT + '/' + run.room).push({ n: nameOf(u), c: u.code, t: t, at: now() });
+            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: now() });
+            if (chatCh === 'all') trimAll();
         } catch (e) { }
     }
 }
@@ -1468,8 +1553,9 @@ function sayEmo(id) {
     const d = db_();
     if (d) {
         try {
-            d.ref(P.CHAT + '/' + run.room).push({
+            d.ref(chPath()).push({
                 n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: now() });
+            if (chatCh === 'all') trimAll();
         } catch (x) { }
     }
 }
@@ -1708,15 +1794,19 @@ function sendSay() {
 //   방도 사람도 그대로 보이고, 자판 위로 한 줄만 올라온다.
 //
 //   지난 글줄을 길게 보고 싶으면 목록의 「전체 대화」를 쓴다.
+//
+//   ★ 적는 칸 바로 위에 「서버 · 맵」이 있다. 서버로 두면 어느 방에 있든
+//     모든 사원에게 들리고, 맵으로 두면 같은 방 사람에게만 들린다.
+//     서버로 온 줄에는 글줄에 「서버」 표가 붙는다.
 function chatSheet() {
     const bar = document.getElementById('plaza-bar');
     if (!bar || bar.classList.contains('typing')) return;
     bar.classList.remove('new');
     bar.classList.add('typing');
     const keep = bar.innerHTML;
-    bar.innerHTML = '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send"'
-        + ' placeholder="여기에 적으면 머리 위에 뜹니다">';
+    bar.innerHTML = '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send">';
     const inp = bar.querySelector('#plaza-in');
+    chPaint();                      // 적는 칸에 「서버/맵」 어느 쪽인지 적어 준다
     const back = function () {
         if (!bar.classList.contains('typing')) return;
         bar.classList.remove('typing');
@@ -1862,6 +1952,7 @@ function shut() {
     try { cancelAnimationFrame(run.raf); } catch (e) { }
     leaveRoom();
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
+    if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
     if (nbRef) { try { nbRef.off(); } catch (e) { } nbRef = null; }
     Object.keys(run.peers).forEach(dropPeer);
     try { run.me.actor.stop(); } catch (e) { }
@@ -1915,6 +2006,9 @@ function open() {
             + '<button data-k="right">▶</button>'
             + '</div>')
         + '<div id="plaza-feed" class="plaza-keep"></div>'
+        + '<div id="plaza-ch" class="plaza-keep">'
+        +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
+        + '</div>'
         + '<div id="plaza-map" class="plaza-keep"><div class="mp-n"></div><div class="mp-g"></div></div>'
         + '<div id="plaza-bottom">'
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
@@ -2070,9 +2164,14 @@ function open() {
     };
     document.getElementById('plaza-bag').onclick = bagSheet;
     document.getElementById('plaza-bar').onclick = chatSheet;
+    Array.prototype.forEach.call(document.querySelectorAll('#plaza-ch button'), function (b) {
+        b.onclick = function (e) { e.stopPropagation(); chSet(b.dataset.c); };
+    });
+    chPaint();
 
     paintMe();
     watchNotice();
+    watchAll();
 
     // ★ 지난번에 서 있던 방에서 다시 시작한다 — 들어갔다 나오면 광장이
     //   아니라 **그 자리**여야 한다. 없어진 방이면 광장으로 돌아간다.
