@@ -553,13 +553,22 @@ window.dotStop = stop;
         '.dot-box{position:relative;margin:0 auto;}',
         '.dot-layer{position:absolute;inset:0;background-repeat:no-repeat;',
         '  image-rendering:pixelated;image-rendering:crisp-edges;}',
+        // ★ 사람을 **가운데** 세운다.
+        //   칸이 352 라 좁은 화면(340 쯤)에서는 칸이 넘친다. 그때 margin:0 auto
+        //   는 0 으로 떨어져 칸이 왼쪽에 붙고, 사람이 오른쪽으로 치우쳐 보였다.
+        //   flex 로 가운데 모으면 넘치는 몫이 양쪽으로 똑같이 나뉘어 가운데 선다.
         '#closet-stage{position:relative;padding:14px 0 0 0;text-align:center;',
+        '  display:flex;flex-direction:column;align-items:center;',
         '  background:linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.12));',
         '  border:1px solid var(--theme-border,#4a5160);border-radius:8px;overflow:hidden;}',
         // ★ 칸이 384 로 커져 위아래에 빈 자리가 생겼다. 위는 걷어 내고,
         //   아래는 발바닥(FOOT)만큼 당겨 그림자가 발에 붙게 한다.
-        '#closet-stage .dot-box{margin-top:-64px;margin-bottom:-26px;}',
-        '#closet-floor{height:16px;margin-top:-8px;',
+        // ★ margin:0 auto 를 여기서 **0 으로 덮는다.**
+        //   flex 칸에서 auto 여백은 남는 자리를 먹는데, 칸이 넘칠 때는 둘 다
+        //   0 으로 떨어져 **왼쪽에 붙는다** (align-items 보다 세다). 그래서
+        //   사람이 오른쪽으로 치우쳐 보였다 — 가운데에서 17픽셀.
+        '#closet-stage .dot-box{margin:-64px 0 -26px 0;}',
+        '#closet-floor{height:16px;margin-top:-8px;align-self:stretch;',
         '  background:radial-gradient(ellipse at 50% 0,rgba(0,0,0,0.55),rgba(0,0,0,0) 70%);}',
         '.closet-row{display:flex;align-items:center;gap:8px;margin-top:10px;}',
         '.closet-row .lab{width:38px;font-size:10px;color:#9a948a;text-align:left;flex:none;}',
@@ -619,8 +628,9 @@ function paint() {
 
     const note = document.getElementById('closet-note');
     if (note) {
+        // ★ 「잠옷 한 벌뿐」이 아니게 됐다 — 뽑기로 늘린다
         note.innerText = isAdm(u) ? '고르는 대로 저장됩니다.'
-            : '고르는 대로 저장됩니다. 지금은 잠옷 한 벌뿐입니다.';
+            : '고르는 대로 저장됩니다. 옷과 악세는 망상 홈쇼핑 뽑기에서 늘립니다.';
     }
 }
 
