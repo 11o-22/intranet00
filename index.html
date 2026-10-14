@@ -1439,20 +1439,132 @@ function getTodayStr() {
     let _glShownAt = 0, _glHideTimer = 0;
     const GL_MIN = 1200;
 
+    // ======================================================================
+    // ★ 로딩 소리 — 로딩 화면이 떠 있는 **동안만** 돈다
+    //
+    //   화면 길이를 소리에 맞추지 않았다 (GL_MIN 은 1200 그대로다).
+    //     빠르면  거기서 접는다 — 0.25초에 걸쳐 줄이며 끈다 (뚝 끊지 않는다)
+    //     느리면  네 초짜리 한 바퀴를 **계속 돈다**
+    //
+    //   ■ 음원을 왜 손봤나
+    //     주신 것은 8초인데 실제로 들리는 건 앞 3.7초뿐이고 나머지는 잔향
+    //     꼬리였다. 그대로 돌리면 네 초 넘게 조용했다가 다시 시작한다.
+    //     그래서 **꼬리를 머리에 겹쳐** 4.0초로 접었다 — 앞 바퀴의 울림이
+    //     다음 바퀴 첫머리에 이미 깔려 있어서 이은 자리가 들리지 않는다.
+    //
+    //   ■ 왜 <audio> 가 아니라 Web Audio 인가
+    //     mp3 는 인코더가 앞뒤에 무음을 덧댄다. <audio loop> 로 돌리면
+    //     그 무음 때문에 한 바퀴마다 미세하게 끊긴다. 한 번 풀어서
+    //     (decodeAudioData) AudioBufferSourceNode 로 돌리면 틈이 없다.
+    //     덧댄 꼬리는 loopEnd 로 잘라 낸다.
+    //
+    //   ■ 안 울리는 자리가 있다 — 그래도 로딩은 멀쩡히 돈다
+    //     브라우저는 **아직 아무 데도 안 누른 상태**의 소리를 막는다. 자동
+    //     로그인 화면이 바로 그 자리라, 특히 아이폰(사파리·홈 화면 PWA)에서는
+    //     소리가 안 난다. 막히면 조용히 넘어가고 화면만 돈다.
+    //     ※ 아이폰은 측면 무음 스위치가 켜져 있어도 안 들린다.
+    //
+    //   ■ 막혔다 뒤늦게 풀렸을 때 튀어나오지 않게
+    //     풀어 달라고 청한 뒤 **그래도 막혀 있으면 이번 판은 접는다.**
+    //     안 그러면 로딩이 끝나고 한참 뒤에 소리가 혼자 울린다.
+    // ======================================================================
+    const LOAD_SND = { url: 'snd/loading.mp3', len: 4.0, vol: 0.55, fade: 0.25 };
+    let _lsCtx = null, _lsBuf = null, _lsSrc = null, _lsGain = null, _lsWant = false;
+
+    function _lsCtxGet() {
+        if (_lsCtx) return _lsCtx;
+        const C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        try { _lsCtx = new C(); } catch (e) { return null; }
+        return _lsCtx;
+    }
+
+    // 한 번만 받아 풀어 둔다. 못 받으면 false 로 적어 두고 다시 안 건드린다.
+    function _lsLoad() {
+        if (_lsBuf) return Promise.resolve(_lsBuf);
+        if (_lsBuf === false) return Promise.resolve(null);
+        const ctx = _lsCtxGet();
+        if (!ctx) { _lsBuf = false; return Promise.resolve(null); }
+        return fetch(LOAD_SND.url)
+            .then(function (r) { return r.arrayBuffer(); })
+            .then(function (ab) {
+                return new Promise(function (ok, no) { ctx.decodeAudioData(ab, ok, no); });
+            })
+            .then(function (buf) { _lsBuf = buf; return buf; })
+            .catch(function () { _lsBuf = false; return null; });
+    }
+
+    function loadSndStart() {
+        _lsWant = true;
+        _lsLoad().then(function (buf) {
+            if (!buf || !_lsWant || _lsSrc) return;
+            const ctx = _lsCtx;
+            const go = function () {
+                if (!_lsWant || _lsSrc) return;
+                if (ctx.state !== 'running') return;   // 아직 막혔다 — 이번 판은 접는다
+                try {
+                    const g = ctx.createGain();
+                    g.gain.value = LOAD_SND.vol;
+                    g.connect(ctx.destination);
+                    const s = ctx.createBufferSource();
+                    s.buffer = buf;
+                    s.loop = true;
+                    s.loopStart = 0;
+                    s.loopEnd = Math.min(LOAD_SND.len, buf.duration);  // 덧댄 꼬리를 뺀다
+                    s.connect(g);
+                    s.start(0);
+                    _lsSrc = s; _lsGain = g;
+                } catch (e) { }
+            };
+            if (ctx.state === 'running') { go(); return; }
+            try {
+                const p = ctx.resume();
+                if (p && p.then) p.then(go, function () { }); else go();
+            } catch (e) { }
+        });
+    }
+
+    function loadSndStop() {
+        _lsWant = false;
+        const s = _lsSrc, g = _lsGain, ctx = _lsCtx;
+        _lsSrc = null; _lsGain = null;
+        if (!s || !ctx) return;
+        try {
+            const t = ctx.currentTime, f = LOAD_SND.fade;
+            g.gain.cancelScheduledValues(t);
+            g.gain.setValueAtTime(g.gain.value, t);
+            g.gain.linearRampToValueAtTime(0.0001, t + f);   // 줄이며 끈다
+            s.stop(t + f + 0.02);
+        } catch (e) { try { s.stop(); } catch (e2) { } }
+    }
+
+    // 화면을 한 번이라도 누르면 그 뒤로는 소리가 풀린다 — 그때 깨워 둔다.
+    // (다음 번 로딩부터는 울린다. 새로 고치면 다시 처음으로 돌아간다.)
+    (function lsUnlock() {
+        const go = function () {
+            if (_lsCtx && _lsCtx.state === 'suspended') { try { _lsCtx.resume(); } catch (e) { } }
+        };
+        ['pointerdown', 'touchend', 'keydown'].forEach(function (ev) {
+            document.addEventListener(ev, go, { passive: true });
+        });
+    })();
+
     function showAutoLoginOverlay(show) {
         const el = document.getElementById('auto-login-overlay');
         if (!el) return;
         if (_glHideTimer) { clearTimeout(_glHideTimer); _glHideTimer = 0; }
-        if (show) { _glShownAt = Date.now(); el.style.display = 'flex'; return; }
+        if (show) { _glShownAt = Date.now(); el.style.display = 'flex'; loadSndStart(); return; }
         const left = GL_MIN - (Date.now() - (_glShownAt || 0));
         if (_glShownAt && left > 0) {
             _glHideTimer = setTimeout(function () {
                 _glHideTimer = 0;
                 el.style.display = 'none';
+                loadSndStop();
             }, left);
             return;
         }
         el.style.display = 'none';
+        loadSndStop();
     }
 
         let testerList = {};

@@ -38,6 +38,7 @@ const SHELL = [
     './manifest.json',
     './icons/icon-192.png',
     './icons/apple-touch-icon.png',
+    './snd/loading.mp3',
     './b/01.js', './b/02.js', './b/03.js', './b/04.js',
     './b/05.js', './b/06.js', './b/07.js', './b/08.js'
 ];
@@ -94,7 +95,10 @@ self.addEventListener('fetch', function (e) {
     //   묶음 파일과 달리 서로 맞물리지 않고, 꾸러미 이름에 BUILD 가 들어 있어
     //   새로 올리면 어차피 통째로 버려진다. 그러니 묵을 걱정이 없다.
     //   이모티콘 칸을 열 때 서른아홉 장을 매번 다시 받지 않게 해 준다.
-    if (url.pathname.indexOf('/emo/') >= 0) {
+    //
+    //   소리(/snd/)도 같은 쪽이다. 로딩 소리는 **로딩이 시작되는 그 순간**
+    //   있어야 하는데, 네트워크부터 보면 다 받기 전에 로딩이 끝나 버린다.
+    if (url.pathname.indexOf('/emo/') >= 0 || url.pathname.indexOf('/snd/') >= 0) {
         e.respondWith(
             caches.match(req, { ignoreSearch: true }).then(function (hit) {
                 if (hit) return hit;
