@@ -385,8 +385,28 @@ function stampSafe(ov) {
         '  display:flex;align-items:center;justify-content:center;',
         '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
         '.plaza-ico:active{background:rgba(40,36,28,.85);}',
+        // ── 포인트 · 포만감 · 오염도
+        //
+        //   옛 화면 위 띠에만 있던 것들이다. 사원 화면은 그 띠를 감추므로
+        //   광장에서는 볼 길이 없었다. 사진 단추 **오른쪽**에, 사원증 칸
+        //   바로 아래로 나란히 놓는다 (포인트 → 포만감 → 오염도).
+        '#plaza-hud{position:absolute;left:60px;z-index:21;width:88px;',
+        '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 58px);',
+        '  display:flex;flex-direction:column;gap:3px;pointer-events:none;}',
+        '#plaza-hud .pt{font-size:11px;color:#d8cfbe;line-height:1.2;',
+        '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
+        '#plaza-hud .pt b{color:#ffe9bd;font-size:12.5px;}',
+        '#plaza-hud .bar{height:6px;border-radius:999px;overflow:hidden;',
+        '  background:rgba(8,8,12,.66);border:1px solid rgba(190,170,120,.25);}',
+        '#plaza-hud .bar i{display:block;height:100%;width:0;border-radius:999px;',
+        '  transition:width .3s;}',
+        // 포만감은 찰수록 좋고, 오염도는 찰수록 나쁘다 — 색을 뒤집어 둔다
+        '#plaza-hud .sat i{background:linear-gradient(90deg,#f44336,#ff9800,#8bc34a);}',
+        '#plaza-hud .pol i{background:linear-gradient(90deg,#4caf50,#ff9800,#f44336);}',
+        // 「같이 있는 사람」 줄 — 포인트·바가 들어오면서 한 칸 내려 앉았다
+        // (긴 이름이 여럿이면 왼쪽 바와 겹쳤다)
         '#plaza-who{position:absolute;left:12px;right:12px;z-index:19;text-align:center;',
-        '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 60px);',
+        '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 96px);',
         '  font-size:10.5px;color:#b9b0a0;text-shadow:0 1px 3px #000;pointer-events:none;}',
         '.plaza-one{position:absolute;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
@@ -422,8 +442,7 @@ function stampSafe(ov) {
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
         '@keyframes plazaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
         // 걷기 단추 (자판이 있는 기계에서만 — 손가락 쪽은 화면을 끌어 걷는다)
-        // 왼쪽 120px 은 비워 둔다 — 거기에 「서버 · 맵」이 앉는다 (손전화에는 이 칸이 없다)
-        '#plaza-pad{position:absolute;left:120px;right:0;z-index:20;display:flex;gap:6px;',
+        '#plaza-pad{position:absolute;left:0;right:0;z-index:20;display:flex;gap:6px;',
         '  justify-content:center;bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
         '#plaza-pad button{width:50px;padding:10px 0;font-size:15px;border-radius:10px;',
         '  background:rgba(18,18,26,.66);border:1px solid rgba(170,158,126,.3);color:#ded7c8;',
@@ -431,29 +450,30 @@ function stampSafe(ov) {
         '#plaza-pad button:active{background:rgba(52,46,34,.9);}',
         // ── 채팅 내역 : 왼쪽 아래에 **늘 깔려 있다** (창을 안 열어도 보인다)
         //   그림 아래쪽 어두운 자리에 얹히므로 방이 가려지지 않는다.
-        // ★ 글줄을 누르면 지난 이야기가 쭉 뜬다 — 그래서 누르는 것을 받는다
+        // ★ 글줄을 누르면 채팅 칸이 뜬다 — 그래서 누르는 것을 받는다
         //   (walk 입력은 .plaza-keep 이 막아 준다)
         '#plaza-feed{position:absolute;left:12px;z-index:18;max-width:62%;',
-        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 104px);',
+        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);',
         '  display:flex;flex-direction:column;justify-content:flex-end;gap:2px;',
         '  font-size:11px;line-height:1.55;cursor:pointer;',
         '  padding:6px 8px;margin:-6px -8px;border-radius:10px;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '#plaza-feed:active{background:rgba(14,14,20,.6);}',
         '#plaza-feed:empty{display:none;}',
-        '#plaza-feed div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ded5c4;}',
+        // ★ 긴 말은 잘라서 「…」 로 두지 않고 **줄을 바꿔 이어** 보여 준다
+        '#plaza-feed div{color:#ded5c4;white-space:normal;word-break:break-word;}',
         '#plaza-feed .who{color:#9fd8ef;font-weight:bold;}',
         '#plaza-feed .sys{color:#8d8578;}',
         // 서버 채팅으로 온 줄에는 표를 붙인다 (맵 채팅은 표가 없다)
         '#plaza-ov .sv{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
         '  background:rgba(217,160,90,.22);color:#ffd79a;vertical-align:1px;}',
-        // ── 서버 / 맵 고르기 : 글줄 바로 아래 · 적는 칸 바로 위
-        '#plaza-ch{position:absolute;left:12px;z-index:19;display:flex;gap:5px;',
-        '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 74px);}',
-        '#plaza-ch button{padding:4px 11px;border-radius:999px;font-size:10.5px;cursor:pointer;',
-        '  font-family:inherit;background:rgba(12,12,18,.66);color:#8d8578;',
-        '  border:1px solid rgba(190,170,120,.22);',
-        '  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);}',
+        // ── 채팅 칸 머리 : 왼쪽 위에 「서버 · 맵」
+        '.plaza-chh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex:0 0 auto;}',
+        '.plaza-chh .t{margin-left:auto;font-size:12.5px;color:#e8dcc6;}',
+        '#plaza-ch{display:flex;gap:5px;}',
+        '#plaza-ch button{padding:5px 13px;border-radius:999px;font-size:11px;cursor:pointer;',
+        '  font-family:inherit;background:rgba(255,255,255,.04);color:#8d8578;',
+        '  border:1px solid #2b2b38;}',
         '#plaza-ch button.on{background:rgba(217,160,90,.2);border-color:#8a6a2a;color:#ffe9bd;',
         '  font-weight:bold;}',
         // ── 미니맵 : 오른쪽 아래. 채팅 창을 열면 사라진다.
@@ -514,12 +534,13 @@ function stampSafe(ov) {
         '.plaza-grid button:active{background:rgba(217,160,90,.14);border-color:#8a6a2a;}',
         '.plaza-grid .e{font-size:21px;line-height:1;}',
         // 말 창
-        '#plaza-log{flex:1 1 auto;min-height:120px;max-height:46dvh;overflow-y:auto;padding:2px 2px 8px 2px;',
+        '#plaza-log{flex:1 1 auto;min-height:190px;max-height:52dvh;overflow-y:auto;padding:2px 2px 8px 2px;',
         '  font-size:12px;line-height:1.7;}',
         '#plaza-log .who{color:#9fd8ef;font-weight:bold;}',
         '#plaza-log .sys{color:#7d7568;}',
         '#plaza-send{display:flex;gap:7px;padding-top:8px;flex:0 0 auto;}',
-        '#plaza-in{flex:1;min-width:0;padding:12px;font-size:13px;border-radius:11px;',
+        '#plaza-send input{flex:1;min-width:0;padding:12px;font-size:13px;border-radius:11px;',
+        '  font-family:inherit;outline:none;',
         '  background:#16161f;border:1px solid #33333f;color:#e8e2d6;}',
         '#plaza-send button{flex:0 0 auto;padding:12px 16px;font-size:12px;border-radius:11px;',
         '  background:linear-gradient(145deg,#4a3a1e,#2a2112);border:1px solid #8a6a2a;',
@@ -580,7 +601,12 @@ function spec() {
     return { W: 288, H: 384, FOOT: 32 };
 }
 
-function makeOne(user, label, k) {
+// ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
+//
+//   남의 모습은 방 칸에 적힌 dot 한 덩이로만 온다. 소지 목록(wardrobe)은
+//   이쪽에 없어서, 평소처럼 「가진 것만」으로 거르면 남이 입은 옷·악세가
+//   통째로 안 보인다. 실제로 그랬다 — 남은 늘 맨몸으로 보였다.
+function makeOne(user, label, k, other) {
     const wrap = document.createElement('div');
     wrap.className = 'plaza-one';
     const sp = spec();
@@ -588,7 +614,7 @@ function makeOne(user, label, k) {
     wrap.style.width = w + 'px';
     wrap.style.height = h + 'px';
 
-    const a = window.dotActor(user, { scale: k });
+    const a = window.dotActor(user, { scale: k, all: !!other });
     wrap.appendChild(a.el);
 
     const tag = document.createElement('div');
@@ -622,7 +648,7 @@ function remakeFolk() {
         const lab = q.one.tag.innerText;
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
-        q.one = makeOne({ code: c, dot: d }, lab, run.k);
+        q.one = makeOne({ code: c, dot: d }, lab, run.k, true);
         q.one.actor.face(q.face || 1);
         run.el.appendChild(q.one.wrap);
     });
@@ -1249,7 +1275,7 @@ function onPeers(snap) {
         const key = JSON.stringify(v.d || {});
         if (q && q.key !== key) { dropPeer(code); q = null; }
         if (!q) {
-            const one = makeOne({ code: code, dot: v.d || {} }, v.n || code, run.k);
+            const one = makeOne({ code: code, dot: v.d || {} }, v.n || code, run.k, true);
             run.el.appendChild(one.wrap);
             q = run.peers[code] = { one: one, key: key, x: v.x, y: v.y, tx: v.x, ty: v.y,
                                     face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
@@ -1385,10 +1411,12 @@ function chPaint() {
     if (box) Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
         b.classList.toggle('on', b.dataset.c === chatCh);
     });
-    const inp = document.getElementById('plaza-in');
-    if (inp) inp.placeholder = chatCh === 'all'
-        ? '서버 — 모든 사원에게 들립니다'
-        : '맵 — 이 방에 있는 사람에게만';
+    const ph = chatCh === 'all' ? '서버 — 모든 사원에게 들립니다'
+                                : '맵 — 이 방에 있는 사람에게만';
+    ['plaza-in', 'plaza-in2'].forEach(function (id) {
+        const e = document.getElementById(id);
+        if (e) e.placeholder = ph;
+    });
 }
 window.plazaChat = function (c) { if (c) chSet(c); return chatCh; };
 
@@ -1404,7 +1432,41 @@ function paintMe() {
     el.querySelector('.pm-n').innerText = nameOf(u);
     const no = (u.no != null && String(u.no).trim()) ? String(u.no).trim() : (u.code || '');
     el.querySelector('.pm-no').innerText = no ? ('사번 ' + no) : '';
+    paintHud();
 }
+
+// ── 포인트 · 포만감 · 오염도
+//
+//   값은 옛 화면과 같은 자리를 그대로 읽는다 (points · satiety · pollution).
+//   updateUI 가 돌 때마다 같이 고쳐 두어, 쓰거나 벌면 바로 바뀐다.
+function paintHud() {
+    const el = document.getElementById('plaza-hud'), u = u_();
+    if (!el || !u) return;
+    const cut = function (v) { return Math.max(0, Math.min(100, Math.round(Number(v) || 0))); };
+    const sat = (u.satiety === undefined) ? 100 : cut(u.satiety);
+    const pol = cut(u.pollution);
+    el.querySelector('.pt b').innerText = Number(u.points || 0).toLocaleString('ko-KR');
+    el.querySelector('.sat i').style.width = sat + '%';
+    el.querySelector('.pol i').style.width = pol + '%';
+    el.querySelector('.sat').title = '포만감 ' + sat + ' / 100';
+    el.querySelector('.pol').title = '오염도 ' + pol + ' / 100';
+}
+
+// 포인트·포만감·오염도가 바뀌면 같이 고친다 (updateUI 에 이어 붙인다)
+(function hudHook() {
+    const iv = setInterval(function () {
+        if (typeof window.updateUI !== 'function') return;
+        if (window.updateUI._hud) { clearInterval(iv); return; }
+        const old = window.updateUI;
+        window.updateUI = function () {
+            const r = old.apply(this, arguments);
+            try { paintHud(); } catch (e) { }
+            return r;
+        };
+        window.updateUI._hud = true;
+        clearInterval(iv);
+    }, 500);
+})();
 
 // ==========================================
 // ★ 미니맵 — 방 표(ROOMS)에서 바로 그려 낸다
@@ -1504,16 +1566,39 @@ function paintLog() {
     log.scrollTop = log.scrollHeight;
 }
 
-// ── 💬 지난 이야기 — 왼쪽 아래 글줄을 누르면 쭉 뜬다
+// ── 💬 채팅 칸 — 왼쪽 아래 글줄을 누르면 뜬다
 //
-//   바에서 바로 적게 한 뒤로 긴 글줄을 볼 데가 없었다. 글줄 자리를
-//   누르면 그 자리에서 여기까지 온 말을 다 보여 준다 (서버 · 맵 섞어서,
-//   온 차례대로). 창을 닫으면 그대로 광장이다.
-function logSheet() {
-    if (sheetOpen('log')) { closeSheet(); return; }
-    const s = sheet('log', '지난 이야기', '<div id="plaza-log"></div>');
+//   사내 채팅처럼 **읽고 바로 적는** 칸이다. 오고 간 말이 쭉 쌓이고,
+//   아래 적는 줄로 보낸다. 왼쪽 위에 「서버 · 맵」이 있어 어느 쪽으로
+//   말할지 거기서 고른다.
+//
+//   아래 바(한 줄짜리)는 그대로 둔다 — 자판이 화면을 덜 가려서,
+//   짧게 한마디 할 때는 그쪽이 낫다. 둘 다 같은 자리로 간다.
+function chatBox() {
+    if (sheetOpen('chat')) { closeSheet(); return; }
+    const s = sheet('chat', '',
+        '<div class="plaza-chh">'
+        + '<div id="plaza-ch">'
+        +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
+        + '</div>'
+        + '<b class="t">채팅</b></div>'
+        + '<div id="plaza-log"></div>'
+        + '<div id="plaza-send">'
+        +   '<input id="plaza-in2" maxlength="' + P.SAY_MAX + '" enterkeyhint="send">'
+        +   '<button id="plaza-go">보낸다</button></div>');
     if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('#plaza-ch button'), function (b) {
+        b.onclick = function (e) { e.stopPropagation(); chSet(b.dataset.c); };
+    });
+    const inp = s.querySelector('#plaza-in2');
+    const go = function () { say(inp.value); inp.value = ''; };
+    inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); go(); }
+    });
+    s.querySelector('#plaza-go').onclick = go;
+    chPaint();
     paintLog();
+    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
 }
 
 // 아래 채팅 바에 마지막 말을 비춘다 — 창을 안 열어도 뭐가 오가는지 보인다
@@ -1932,6 +2017,9 @@ function bagInv(u) {
     }).join('') + '</div>';
 }
 
+// 악세를 가르는 칸 — 이 차례대로 줄이 선다. 여기 없는 것은 「그 밖」으로 모인다.
+const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '그 밖'];
+
 function bagWear(u, accOnly) {
     if (typeof DOT_SLOTS === 'undefined' || typeof DOT_HEADS === 'undefined') {
         return '<div class="plaza-none">옷장이 아직 안 올라왔습니다.</div>';
@@ -1948,10 +2036,30 @@ function bagWear(u, accOnly) {
     };
     let rows = '';
     if (accOnly) {
-        DOT_SLOTS.forEach(function (s) {
-            if (s.k !== 'acc') return;
-            rows += row(s.n, s.k, s.items, d[s.k] || '');
-        });
+        // ★ 악세는 가짓수가 많아 **어디에 다는 것인가**로 갈라 보여 준다
+        //   (머리 · 귀 · 얼굴 · 목 · 손 · 등). 칸이 안 적힌 것은 「그 밖」.
+        //   「없음」은 어느 칸에서 눌러도 벗는 것이라 맨 위에 따로 둔다.
+        const s = DOT_SLOTS.filter(function (x) { return x.k === 'acc'; })[0];
+        if (s) {
+            const now = d[s.k] || '';
+            const on = s.items.filter(function (x) { return allowedIt(x, u); });
+            const none = on.filter(function (x) { return !x.i; });
+            const wear = on.filter(function (x) { return x.i; });
+            if (wear.length) {
+                rows += '<div class="plaza-row"><span class="lab">벗기</span><div class="pick">'
+                    + '<button data-k="' + s.k + '" data-v=""' + (now === '' ? ' class="on"' : '')
+                    + '>' + esc((none[0] && none[0].n) || '없음') + '</button></div></div>';
+                ACC_CATS.forEach(function (c) {
+                    const list = wear.filter(function (x) { return (x.cat || '그 밖') === c; });
+                    if (!list.length) return;
+                    rows += '<div class="plaza-row"><span class="lab">' + esc(c) + '</span><div class="pick">'
+                        + list.map(function (x) {
+                            return '<button data-k="' + s.k + '" data-v="' + esc(x.i) + '"'
+                                + (x.i === now ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
+                        }).join('') + '</div></div>';
+                });
+            }
+        }
         if (!rows) rows = '<div class="plaza-none">가진 악세가 없습니다.</div>';
     } else {
         // ★ 머리는 여기서 안 고른다 — 사택 옷장에서 고른다.
@@ -2019,6 +2127,12 @@ function open() {
         + '<button class="plaza-ico plaza-keep" id="plaza-menu">☰</button>'
         + '</div>'
         + '<div id="plaza-who"></div>'
+        // 사원증 칸 아래 · 사진 단추 오른쪽 — 포인트 · 포만감 · 오염도
+        + '<div id="plaza-hud" class="plaza-keep">'
+        +   '<div class="pt"><b>0</b> P</div>'
+        +   '<div class="bar sat" title="포만감"><i></i></div>'
+        +   '<div class="bar pol" title="오염도"><i></i></div>'
+        + '</div>'
         + (touch ? '' :
             '<div id="plaza-pad" class="plaza-keep">'
             + '<button data-k="left">◀</button>'
@@ -2027,9 +2141,6 @@ function open() {
             + '<button data-k="right">▶</button>'
             + '</div>')
         + '<div id="plaza-feed" class="plaza-keep"></div>'
-        + '<div id="plaza-ch" class="plaza-keep">'
-        +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
-        + '</div>'
         + '<div id="plaza-map" class="plaza-keep"><div class="mp-n"></div><div class="mp-g"></div></div>'
         + '<div id="plaza-bottom">'
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
@@ -2185,12 +2296,7 @@ function open() {
     };
     document.getElementById('plaza-bag').onclick = bagSheet;
     document.getElementById('plaza-bar').onclick = chatSheet;
-    document.getElementById('plaza-feed').onclick = logSheet;
-    Array.prototype.forEach.call(document.querySelectorAll('#plaza-ch button'), function (b) {
-        b.onclick = function (e) { e.stopPropagation(); chSet(b.dataset.c); };
-    });
-    chPaint();
-
+    document.getElementById('plaza-feed').onclick = chatBox;
     paintMe();
     watchNotice();
     watchAll();

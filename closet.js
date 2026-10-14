@@ -203,9 +203,16 @@ const DOT_SLOTS = [
             { i: 'dress', n: '드레스', over: ['dress'], own: 'dress' },
             { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' },
             // ★ 요원복 — 한 벌이 통째로 그려져 있다 (웃옷·바지·신까지).
+            //
             //   주신 그림은 216x128 (칸 36x64) 로, 쓰던 악세 규격(144x256)의
-            //   **네 배 작은** 것이었다. 네 배로 늘린 뒤 같은 자리(+104·+106)에
-            //   옮겼다. 도트 한 칸이 그대로 4픽셀이 된다.
+            //   **네 배 작은** 것이었다. 네 배로 늘려(도트 한 칸이 그대로 4픽셀)
+            //   **신발 밑바닥을 몸 발바닥에 맞춰** 옮겼다 — 가로 +102 · 세로 +100.
+            //     맨 아랫줄 x 146~213 (몸 발바닥과 같다) · 밑바닥 y 351 (몸과 같다)
+            //
+            //   ✗ 악세와 같은 +104·+106 으로 놓았더니 어긋났다. 악세는 칸 자리를
+            //     그대로 옮기면 되지만, 이것은 **몸에 신겨야 하는 옷**이라 발이
+            //     기준이다. 그때는 신이 여섯 픽셀 밑으로 빠지고 두 칸 오른쪽으로
+            //     밀려, 손이 옷 밖으로 비어져 나왔다.
             { i: 'agent1', n: '요원복 1', over: ['agent1'], own: 'agent1' },
             { i: 'agent2', n: '요원복 2', over: ['agent2'], own: 'agent2' }
         ]
@@ -237,10 +244,10 @@ const DOT_SLOTS = [
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
         k: 'acc', n: '악세', items: [
             { i: '', n: '없음', top: [] },
-            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] },
+            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'], cat: '머리' },
             // ★ 베일은 일부러 **덜 비치게** 그려 주셨다 (알파 163).
             //   그림을 그대로 쓴다 — 코드에서 투명도를 건드리지 않는다.
-            { i: 'veil', n: '면사포', top: ['veil'], own: 'veil' },
+            { i: 'veil', n: '면사포', top: ['veil'], own: 'veil', cat: '머리' },
             // ★ 갓 — 새로 주신 그림(2026-10-14)으로 다시 넣었다. 상담사 옷장에만 보인다.
             //
             //   받은 그림은 864x512 에 두 모양이 288 간격으로 그려져 있었다.
@@ -253,7 +260,7 @@ const DOT_SLOTS = [
             //     더 높아서, 그러면 챙이 그만큼 내려와 눈을 가린다.
             //   칸 채우기는 쓰던 갓과 같은 규칙 — 걷기 줄은 두 모양을 번갈아,
             //   서기 줄은 한 모양으로.
-            { i: 'gat', n: '갓', top: ['han-gat'], admin: true }
+            { i: 'gat', n: '갓', top: ['han-gat'], admin: true, cat: '머리' }
         ]
     }
 ];
@@ -324,7 +331,10 @@ function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i =
 // ==========================================
 // 고른 것을 풀어 준다
 // ==========================================
-function look(user, override) {
+// all 이 참이면 **가진 것을 따지지 않는다.**
+//   남이 입은 모습을 그릴 때 쓴다 — 남의 소지 목록은 이쪽에 없으므로
+//   따지면 남의 옷이 통째로 안 보인다 (옷장에서 고를 때만 따지면 된다).
+function look(user, override, all) {
     const u = user || u_() || {};
     const d = override || u.dot || {};
     const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
@@ -334,7 +344,7 @@ function look(user, override) {
     const bodySheet = hd.body || D.BODY;
     const over = [], tops = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
-        const list = items(s, u);
+        const list = all ? s.items.slice() : items(s, u);
         let it;
         if (Object.prototype.hasOwnProperty.call(d, s.k)) {
             // 한 번이라도 고른 적이 있으면 그 뜻을 지킨다 (「없음」도 고른 것이다)
@@ -373,7 +383,7 @@ function sprite(user, opt) {
     const o = opt || {};
     const k = o.scale || 1;
     const pose = o.pose === 'walk' ? 'walk' : 'stand';
-    const L = look(user, o.dot);
+    const L = look(user, o.dot, o.all);
 
     const box = document.createElement('div');
     box.className = 'dot-box';
@@ -441,7 +451,7 @@ window.dotSprite = sprite;
 function actor(user, opt) {
     const o = opt || {};
     const k = o.scale || 1;
-    const L = look(user, o.dot);
+    const L = look(user, o.dot, o.all);
 
     const box = document.createElement('div');
     box.className = 'dot-box';
