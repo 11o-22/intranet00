@@ -329,7 +329,8 @@
       "shell.js",
       "skip.js",
       "shot.js",
-      "firsthead.js"
+      "firsthead.js",
+      "gacha.js"
     ]
   ]
 }

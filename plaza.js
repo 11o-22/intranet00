@@ -431,11 +431,16 @@ function stampSafe(ov) {
         '#plaza-pad button:active{background:rgba(52,46,34,.9);}',
         // ── 채팅 내역 : 왼쪽 아래에 **늘 깔려 있다** (창을 안 열어도 보인다)
         //   그림 아래쪽 어두운 자리에 얹히므로 방이 가려지지 않는다.
+        // ★ 글줄을 누르면 지난 이야기가 쭉 뜬다 — 그래서 누르는 것을 받는다
+        //   (walk 입력은 .plaza-keep 이 막아 준다)
         '#plaza-feed{position:absolute;left:12px;z-index:18;max-width:62%;',
         '  bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 104px);',
         '  display:flex;flex-direction:column;justify-content:flex-end;gap:2px;',
-        '  font-size:11px;line-height:1.55;pointer-events:none;',
+        '  font-size:11px;line-height:1.55;cursor:pointer;',
+        '  padding:6px 8px;margin:-6px -8px;border-radius:10px;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
+        '#plaza-feed:active{background:rgba(14,14,20,.6);}',
+        '#plaza-feed:empty{display:none;}',
         '#plaza-feed div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ded5c4;}',
         '#plaza-feed .who{color:#9fd8ef;font-weight:bold;}',
         '#plaza-feed .sys{color:#8d8578;}',
@@ -1487,17 +1492,28 @@ function pushLine(o) {
     paintBar(o);
 }
 
-// ★ 지금은 #plaza-log 를 띄우는 데가 없다 — 채팅 창을 걷고 바 자리에서
-//   바로 적게 했기 때문이다(chatSheet). 칸이 없으면 조용히 돌아가므로
-//   그대로 두었다. 긴 글줄이 다시 필요해지면 이것을 쓰면 된다.
+// 지난 이야기를 길게 — 왼쪽 아래 글줄을 누르면 뜬다 (logSheet)
 function paintLog() {
     const log = document.getElementById('plaza-log');
     if (!log || !run) return;
     log.innerHTML = (run.lines || []).map(function (o) {
         return o.sys ? '<div class="sys">· ' + esc(o.t) + '</div>'
-                     : '<div><span class="who">' + esc(o.n) + '</span> ' + esc(o.t) + '</div>';
-    }).join('');
+                     : '<div>' + (o.sv ? '<span class="sv">서버</span> ' : '')
+                       + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t) + '</div>';
+    }).join('') || '<div class="sys">아직 오간 말이 없습니다.</div>';
     log.scrollTop = log.scrollHeight;
+}
+
+// ── 💬 지난 이야기 — 왼쪽 아래 글줄을 누르면 쭉 뜬다
+//
+//   바에서 바로 적게 한 뒤로 긴 글줄을 볼 데가 없었다. 글줄 자리를
+//   누르면 그 자리에서 여기까지 온 말을 다 보여 준다 (서버 · 맵 섞어서,
+//   온 차례대로). 창을 닫으면 그대로 광장이다.
+function logSheet() {
+    if (sheetOpen('log')) { closeSheet(); return; }
+    const s = sheet('log', '지난 이야기', '<div id="plaza-log"></div>');
+    if (!s) return;
+    paintLog();
 }
 
 // 아래 채팅 바에 마지막 말을 비춘다 — 창을 안 열어도 뭐가 오가는지 보인다
@@ -1839,6 +1855,11 @@ function allowedIt(it, u) {
             const p4 = n.length < 4 ? ('0000' + n).slice(-4) : n;
             return it.nos.some(function (x) { return x === n || x === p4; });
         }
+        // ★ 뽑기(gacha.js)로 뽑은 사람만 — 옷장 쪽과 같은 규칙
+        if (it.own) {
+            if (u && u.code === P.ADMIN) return true;
+            return !!(u && u.wardrobe && u.wardrobe[it.own]);
+        }
     } catch (e) { }
     return true;
 }
@@ -2164,6 +2185,7 @@ function open() {
     };
     document.getElementById('plaza-bag').onclick = bagSheet;
     document.getElementById('plaza-bar').onclick = chatSheet;
+    document.getElementById('plaza-feed').onclick = logSheet;
     Array.prototype.forEach.call(document.querySelectorAll('#plaza-ch button'), function (b) {
         b.onclick = function (e) { e.stopPropagation(); chSet(b.dataset.c); };
     });

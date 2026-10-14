@@ -196,34 +196,34 @@ const DOT_SLOTS = [
     {
         k: 'outer', n: '겉옷', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'suit', n: '정장', over: ['suit'], admin: true },
+            { i: 'suit', n: '정장', over: ['suit'], own: 'suit' },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
-            { i: 'robe', n: '장옷', over: ['robe'], admin: true },
-            { i: 'han', n: '내의', over: ['han-inner'], admin: true },
-            { i: 'dress', n: '드레스', over: ['dress'], admin: true },
-            { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], admin: true }
+            { i: 'robe', n: '검은 장포', over: ['robe'], own: 'robe' },
+            { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },
+            { i: 'dress', n: '드레스', over: ['dress'], own: 'dress' },
+            { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' }
         ]
     },
     {
         k: 'shoes', n: '구두', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'shoes', n: '구두', over: ['shoes'], admin: true },
-            { i: 'han', n: '신', over: ['han-shoes'], admin: true },
-            { i: 'black', n: '검은 구두', over: ['shoes-black'], admin: true }
+            { i: 'shoes', n: '구두', over: ['shoes'], own: 'shoes' },
+            { i: 'han', n: '신', over: ['han-shoes'], own: 'han-shoes' },
+            { i: 'black', n: '검은 구두', over: ['shoes-black'], own: 'shoes-black' }
         ]
     },
     {
         // ★ 장갑은 **맨 위**다 (Z 의 끝). 손이 옷소매 위로 나와야 한다.
         k: 'glove', n: '장갑', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'black', n: '검은 장갑', over: ['glove'], admin: true }
+            { i: 'black', n: '검은 장갑', over: ['glove'], own: 'glove' }
         ]
     },
     {
         k: 'cape', n: '망토', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'cape', n: '망토', over: ['cape'], admin: true },
-            { i: 'duru', n: '두루마기', over: ['han-duru'], admin: true }
+            { i: 'cape', n: '하얀 망토', over: ['cape'], own: 'cape' },
+            { i: 'duru', n: '두루마기', over: ['han-duru'], own: 'han-duru' }
         ]
     },
     {
@@ -234,7 +234,7 @@ const DOT_SLOTS = [
             { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] },
             // ★ 베일은 일부러 **덜 비치게** 그려 주셨다 (알파 163).
             //   그림을 그대로 쓴다 — 코드에서 투명도를 건드리지 않는다.
-            { i: 'veil', n: '베일', top: ['veil'], admin: true },
+            { i: 'veil', n: '면사포', top: ['veil'], own: 'veil' },
             // ★ 갓 — 새로 주신 그림(2026-10-14)으로 다시 넣었다. 상담사 옷장에만 보인다.
             //
             //   받은 그림은 864x512 에 두 모양이 288 간격으로 그려져 있었다.
@@ -276,9 +276,16 @@ function hasNo(it, u) {
     const p = n.length < 4 ? ('0000' + n).slice(-4) : n;
     return it.nos.some(function (x) { return x === n || x === p; });
 }
+// ★ own: '<열쇠>'  뽑기(gacha.js)로 **뽑은 사람만**
+//   u.wardrobe 에 그 열쇠가 적혀 있으면 보인다. 상담사는 전처럼 다 보인다.
+function hasOwn(it, user) {
+    const u = user || u_();
+    try { return !!(u && u.wardrobe && u.wardrobe[it.own]); } catch (e) { return false; }
+}
 function allowed(it, user) {
     if (it.admin) return isAdm(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
+    if (it.own) return isAdm(user) || hasOwn(it, user);
     return true;
 }
 // 이 사람 옷장에 보이는 것만 추린다
