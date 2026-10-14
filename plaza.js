@@ -1427,7 +1427,7 @@ function menuSheet() {
     }).join('')
         + '<button id="plaza-out">' + ico({ ic: 'out' }, 'e')
         + (isAdm() ? '광장 나가기' : '단말 종료') + '</button></div>';
-    const s = sheet('menu', '어디로 갑니까', html);
+    const s = sheet('menu', '목록', html);
     if (!s) return;
     Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
         b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
@@ -1450,18 +1450,21 @@ function sendSay() {
 function chatSheet() {
     const bar = document.getElementById('plaza-bar');
     if (bar) bar.classList.remove('new');
+    // ★ 「말한다」 단추를 뺐다 — 자판의 보내기(엔터)로 친다.
+    //   손전화에서는 단추가 자판에 가리기 일쑤라, 적고 바로 보내는 쪽이 낫다.
     const s = sheet('chat', '', '<div id="plaza-log"></div>'
         + '<div id="plaza-send">'
-        + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" placeholder="여기에 적으면 머리 위에 뜹니다">'
-        + '<button id="plaza-go">말한다</button></div>');
+        + '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send"'
+        + ' placeholder="여기에 적으면 머리 위에 뜹니다"></div>');
     if (!s) return;
     // ★ 반드시 sheet() **뒤**에 접는다 — sheet() 가 closeSheet() 를 먼저
     //   부르고, 그 안에서 미니맵을 도로 켜 놓기 때문이다.
     mapShow(false);                 // 주신 그림대로 — 채팅을 누르면 미니맵은 비킨다
     paintLog();
-    s.querySelector('#plaza-go').onclick = sendSay;
     const inp = s.querySelector('#plaza-in');
-    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendSay(); });
+    inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); sendSay(); }
+    });
     setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
 }
 

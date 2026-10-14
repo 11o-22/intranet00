@@ -71,6 +71,14 @@ let openTab = null;
         '#main-screen.solo > .header-info,',
         '#main-screen.solo > .id-card-badge,',
         '#main-screen.solo > .tabs-grid{display:none !important;}',
+        // ★ 칸 안의 **위 고르는 줄**도 없앤다 — 거기 있는 것은 이미 목록에서
+        //   바로 고를 수 있어서, 두 번 고르게 되는 꼴이었다.
+        //   다만 **목록에 없는 것**이 든 줄(공용시설의 슬롯·룰렛…, 사택의
+        //   대화·보관함…, 어둠 탐사의 기록 소실·탐사 기록)은 남겨 둔다.
+        //   없애면 그 안으로 들어갈 길이 사라진다.
+        //   (상점 쪽은 한 겹 더 들어가 있어 > 가 아니라 자손으로 집는다)
+        '#main-screen.solo #tab-record > .sub-tabs-grid,',
+        '#main-screen.solo #tab-shop .sub-tabs-grid{display:none !important;}',
         // 띄운 칸의 머리 — 이름과 닫는 단추
         '#shell-top{position:fixed;left:0;right:0;top:0;z-index:999991;display:none;',
         '  align-items:center;gap:10px;pointer-events:none;',

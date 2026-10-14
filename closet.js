@@ -141,8 +141,8 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pj-bottom', 'shoes', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'suit', 'robe', 'han-duru', 'cape'],
+    Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
+        'dress', 'tuxedo', 'suit', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -200,14 +200,23 @@ const DOT_SLOTS = [
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '장옷', over: ['robe'], admin: true },
             { i: 'han', n: '내의', over: ['han-inner'], admin: true },
-            { i: 'dress', n: '드레스', over: ['dress'], admin: true }
+            { i: 'dress', n: '드레스', over: ['dress'], admin: true },
+            { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], admin: true }
         ]
     },
     {
         k: 'shoes', n: '구두', items: [
             { i: '', n: '없음', over: [] },
             { i: 'shoes', n: '구두', over: ['shoes'], admin: true },
-            { i: 'han', n: '신', over: ['han-shoes'], admin: true }
+            { i: 'han', n: '신', over: ['han-shoes'], admin: true },
+            { i: 'black', n: '검은 구두', over: ['shoes-black'], admin: true }
+        ]
+    },
+    {
+        // ★ 장갑은 **맨 위**다 (Z 의 끝). 손이 옷소매 위로 나와야 한다.
+        k: 'glove', n: '장갑', items: [
+            { i: '', n: '없음', over: [] },
+            { i: 'black', n: '검은 장갑', over: ['glove'], admin: true }
         ]
     },
     {
