@@ -40,10 +40,13 @@
 //
 // ■ 크기를 어떻게 맞췄나
 //
-//   방 그림은 1880×1672 그대로 쓴다 (줄이면 도트가 뭉개진다). 사람은
-//   0.75배(키 192px) — 주신 가이드라인의 사람 크기에 맞췄다. 화면에는
-//   그림의 일부만 보이고 카메라가 사람을 따라간다. 그림 아래쪽 어두운
-//   자리는 **채팅이 덮는 여백**이라 일부러 비워 두었다.
+//   방 그림(1880×1672)은 **세로가 창에 꼭 맞게** 줄여 쓴다. 그래서 한 장이
+//   통째로 보이고, 카메라는 좌우로만 민다. 그림 아래쪽 어두운 자리는
+//   **채팅이 덮는 여백**이라 일부러 비워 두었다.
+//
+//   사람은 방의 k 에 그 줄인 배를 곱하되 **4분의 1 단위로 끊는다.**
+//   흔한 손전화(세로 700~1000)에서는 0.5배(키 128px)로 떨어진다.
+//   끊는 까닭은 paintRoom 에 적어 두었다 — 안 끊으면 도트가 울퉁불퉁해진다.
 //
 // ■ 남이 같이 보이는 얼개 (지난 시범과 같다)
 //
@@ -134,24 +137,24 @@ const PLAZA = {
     //     올라가고, 지하는 **그 방의 계단**으로만 오르내린다.
     ROOMS: {
         dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 1672,
-                  floor: [600, 725], k: 0.75,
+                  floor: [600, 725], k: 1,
                   right: 'casino', up: { to: 'dream', x: [760, 1130] },
                   spots: [ { x: 300, n: '??? (지하)', i: '❓', tab: 'tab-shop', sub: 'shop-unknown' } ] },
 
         dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 1672,
-                  floor: [1015, 1105], k: 0.75,
+                  floor: [1015, 1105], k: 1,
                   down: 'dfront',
                   spots: [ { x: 540,  n: '사택',        i: '🏠', tab: 'tab-house', sub: 'house-main' },
                            { x: 940,  n: '어둠 탐사',   i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
                            { x: 1340, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' } ] },
 
         casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 1672,
-                  floor: [625, 725], k: 0.75,
+                  floor: [625, 725], k: 1,
                   left: 'dfront', right: 'plaza',
                   spots: [ { x: 940, n: '공용시설', i: '🎲', tab: 'tab-public' } ] },
 
         plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 1672,
-                  floor: [615, 710], floor2: [1040, 1112], x2: [340, 1540], k: 0.75,
+                  floor: [615, 710], floor2: [1040, 1112], x2: [340, 1540], k: 1,
                   stairs: [ { x: [150, 340],   y0: [700, 1040], y1: [762, 1112] },
                             { x: [1540, 1730], y0: [1040, 700], y1: [1112, 762] } ],
                   left: 'casino', right: 'gate',
@@ -162,14 +165,14 @@ const PLAZA = {
                            { x: 1180, n: '우주 쇼핑몰', i: '🛸', lv: 1, tab: 'tab-shop', sub: 'shop-alien' } ] },
 
         gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 1672,
-                  floor: [630, 730], floor2: [1030, 1105], x2: [630, 1280], k: 0.75,
+                  floor: [630, 730], floor2: [1030, 1105], x2: [630, 1280], k: 1,
                   stairs: [ { x: [430, 630],   y0: [690, 1030], y1: [752, 1105] },
                             { x: [1280, 1480], y0: [1030, 690], y1: [1105, 752] } ],
                   left: 'plaza', up: { to: 'bureau', x: [780, 1120] },
                   spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', lv: 1, tab: 'tab-shop', sub: 'shop-dream' } ] },
 
         bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 1672,
-                  floor: [1000, 1078], k: 0.75,
+                  floor: [1000, 1078], k: 1,
                   down: 'gate',
                   spots: [ { x: 630,  n: '사택',      i: '🏠', tab: 'tab-house', sub: 'house-main' },
                            { x: 940,  n: '재난 탐사', i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
@@ -562,8 +565,14 @@ function zoomOf(r) {
 function paintRoom() {
     const r = roomOf();
     run.z = zoomOf(r);
-    // ★ 사람도 같은 배로 줄인다. 안 그러면 배경만 멀어지고 사람만 커 보인다.
-    run.k = r.k * run.z;
+    // ★ 사람도 같은 배로 줄이되, **4분의 1 단위로 끊는다.**
+    //
+    //   사람 그림은 도트 한 칸이 4픽셀이다. 배를 끊지 않으면 (0.38 같은 값)
+    //   한 칸이 1.5픽셀처럼 어중간해져서, 찍을 때 어떤 줄만 한 픽셀 더
+    //   들어간다 — 눈이 뭉개지고 테두리가 울퉁불퉁해진다.
+    //   4분의 1로 끊으면 한 칸이 1·2·3·4 픽셀로 딱 떨어져 어느 화면에서나
+    //   고르게 찍힌다. (방 그림은 도트 그림이 아니라 끊지 않고 부드럽게 둔다)
+    run.k = Math.max(0.25, Math.round(r.k * run.z * 4) / 4);
     const w = Math.round(r.w * run.z), h = Math.round(r.h * run.z);
     run.el.style.width = w + 'px';
     run.el.style.height = h + 'px';
@@ -1306,7 +1315,7 @@ function open() {
         peers: {}, keys: {}, ax: 0, ay: 0, x: 0, y: 0, tx: null, ty: null,
         cx: 0, cy: 0, last: performance.now(), raf: 0, z: 1,
         sx: -9999, sy: -9999, sent: 0, sMoving: false, sFace: 1,
-        say: '', sayAt: 0, sSayAt: 0, k: 0.75, ref: null, me: null, lv: 0
+        say: '', sayAt: 0, sSayAt: 0, k: 1, ref: null, me: null, lv: 0
     };
 
     // ─ 안 보이는 조이스틱 — 화면 아무 데나 짚어 끌면 그쪽으로 걷는다
