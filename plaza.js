@@ -438,8 +438,12 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#a79e8f;font-family:inherit;}',
         '.plaza-tabs button.on{background:rgba(217,160,90,.16);border-color:#8a6a2a;color:#ffe9bd;}',
         '#plaza-bagbody{overflow-y:auto;}',
-        '.plaza-stage{display:flex;justify-content:center;padding:4px 0 10px 0;',
+        '.plaza-stage{display:flex;justify-content:center;padding:4px 0 10px 0;overflow:hidden;',
         '  background:radial-gradient(ellipse at 50% 92%,rgba(217,160,90,.13),rgba(0,0,0,0) 62%);}',
+        // ★ 칸이 384 로 커지며 머리 위가 29도트까지 넓어졌다. 마네킹은
+        //   그만큼 비어 보이므로 위를 걷어 낸다 (모자·베일 자리는 남긴다).
+        //   아래는 발밑 빈 몫(FOOT)만큼 당겨 발이 바닥에 서게 한다.
+        '.plaza-stage .dot-box{margin-top:-64px;margin-bottom:-26px;}',
         '.plaza-row{display:flex;align-items:center;gap:8px;margin-top:7px;}',
         '.plaza-row .lab{flex:0 0 42px;font-size:10.5px;color:#8d8578;}',
         '.plaza-row .pick{flex:1;display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}',
@@ -468,10 +472,21 @@ function stampSafe(ov) {
 // ==========================================
 // 사람 하나 — 나든 남이든 같은 것을 쓴다
 // ==========================================
+// ★ 칸 크기를 여기에 베껴 적지 않는다 — 옷장(closet.js)에 물어본다.
+//   예전에는 208·256 을 그대로 적어 두어서, 옷 그림 규격이 288·384 로
+//   바뀌었을 때 옷장은 멀쩡한데 광장에서만 어긋났다.
+function spec() {
+    try {
+        if (typeof window.dotSpec === 'function') return window.dotSpec();
+    } catch (e) { }
+    return { W: 288, H: 384, FOOT: 32 };
+}
+
 function makeOne(user, label, k) {
     const wrap = document.createElement('div');
     wrap.className = 'plaza-one';
-    const w = 208 * k, h = 256 * k;
+    const sp = spec();
+    const w = sp.W * k, h = sp.H * k;
     wrap.style.width = w + 'px';
     wrap.style.height = h + 'px';
 
@@ -480,11 +495,14 @@ function makeOne(user, label, k) {
 
     const tag = document.createElement('div');
     tag.className = 'plaza-tag';
-    tag.style.top = '-2px';
+    //   칸 위쪽 여백이 4도트에서 29도트로 늘어, 꼭대기에 붙이면 머리에서
+    //   한참 떠 버린다. 머리 언저리(빈 몫의 절반쯤)로 내려 붙인다.
+    tag.style.top = Math.round(sp.H * k * 0.22) + 'px';
     tag.innerText = label || '';
     wrap.appendChild(tag);
 
-    return { wrap: wrap, actor: a, tag: tag, w: w, h: h, bub: null };
+    // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
+    return { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null };
 }
 
 // ★ 배(run.k)가 바뀌면 서 있는 사람들을 그 배로 다시 만든다.
@@ -518,7 +536,9 @@ function zz() { return (run && run.z) || 1; }
 function putOne(one, x, y) {
     const z = zz();
     one.wrap.style.left = Math.round(x * z - one.w / 2) + 'px';
-    one.wrap.style.top = Math.round(y * z - one.h) + 'px';   // 칸 아래끝이 발이다
+    // ★ 칸 아래끝이 곧 발이 아니다 — 새 규격은 발밑이 여덟 도트 비어 있다.
+    //   그만큼(foot) 도로 내려 놓아야 땅에 선다.
+    one.wrap.style.top = Math.round(y * z - (one.h - (one.foot || 0))) + 'px';
     one.wrap.style.zIndex = String(100 + Math.round(y));     // 아래에 있는 사람이 앞
 }
 

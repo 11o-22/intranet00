@@ -5,8 +5,16 @@
 //
 // ■ 그림이 어떻게 생겼나
 //
-//   dot/ 안의 장들은 모두 **1248 x 512 픽셀** 한 장이고, 한 칸이
-//   **208 x 256 픽셀**로 6칸 x 2줄이다. 도트 한 칸은 4픽셀이다.
+//   dot/ 안의 장들은 모두 **1728 x 768 픽셀** 한 장이고, 한 칸이
+//   **288 x 384 픽셀**로 6칸 x 2줄이다. 도트 한 칸은 4픽셀이다.
+//
+//   ★ 전에는 칸이 208 x 256 이었다. 그 칸은 머리 위가 4도트뿐이라
+//     갓이 칸 맨 윗줄에 닿아 잘렸고, 드레스처럼 자락이 긴 옷은 아예
+//     안 들어갔다. 그래서 그린 이가 준 새 규격(72 x 96 도트)으로
+//     서른다섯 장을 통째로 옮겼다 — 칸마다 (48, 100) 픽셀씩 밀어
+//     넣기만 했고 **그림은 한 점도 안 고쳤다.** 겹치는 자리도 그대로다.
+//
+//         여백(도트)   위  4 → 29 · 아래 1 → 8 · 왼 12 → 24 · 오 15 → 23
 //
 //       윗줄   걷기 여섯 칸 (광장에서 쓴다)
 //       아랫줄 서기 여섯 칸 (옷장 마네킹에서 쓴다)
@@ -113,8 +121,13 @@
 
 const DOT = {
     DIR: 'dot/',
-    W: 208, H: 256,
-    SHEET_W: 1248, SHEET_H: 512,
+    W: 288, H: 384,
+    SHEET_W: 1728, SHEET_H: 768,
+    // ★ 칸 **아래끝에서 발바닥까지** 비어 있는 몫.
+    //   옛 칸(256)은 1도트밖에 안 비어서 「칸 아래끝 = 발」로 놓아도
+    //   맞았는데, 새 칸(384)은 8도트가 빈다. 그대로 두면 사람이
+    //   땅에서 32px 떠 보인다. 광장과 옷장 둘 다 이만큼 내려 놓는다.
+    FOOT: 32,
     BODY: 'body', BROWN_BODY: 'body-brown', BROWN_HEAD: 'h-brown',
     ADMIN: 'kario0987',
     BLINK: [1900, 110, 110, 110, 110, 110],   // 머리 칸마다 머무는 시간
@@ -122,7 +135,7 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'han-shoes', 'pj-top', 'han-inner',
-        'suit', 'robe', 'han-duru', 'cape'],
+        'dress', 'suit', 'robe', 'han-duru', 'cape'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -179,7 +192,8 @@ const DOT_SLOTS = [
             { i: 'suit', n: '정장', over: ['suit'], admin: true },
             // 서 있을 때 두 칸(0·1)으로 나부낀다 — FLAP_COLS 참고
             { i: 'robe', n: '장옷', over: ['robe'], admin: true },
-            { i: 'han', n: '내의', over: ['han-inner'], admin: true }
+            { i: 'han', n: '내의', over: ['han-inner'], admin: true },
+            { i: 'dress', n: '드레스', over: ['dress'], admin: true }
         ]
     },
     {
@@ -201,7 +215,10 @@ const DOT_SLOTS = [
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
         k: 'acc', n: '악세', items: [
             { i: '', n: '없음', top: [] },
-            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] }
+            { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'] },
+            // ★ 베일은 일부러 **덜 비치게** 그려 주셨다 (알파 163).
+            //   그림을 그대로 쓴다 — 코드에서 투명도를 건드리지 않는다.
+            { i: 'veil', n: '베일', top: ['veil'], admin: true }
             // 갓은 뺐다. 그림(dot/han-gat.png)은 그대로 두었으니, 다시 넣으려면
             //   { i: 'gat', n: '갓', top: ['han-gat'], admin: true }
             // 한 줄만 되살리면 된다.
@@ -298,6 +315,8 @@ function look(user, override) {
     return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick };
 }
 window.dotLook = look;
+// 칸 크기를 밖에서도 쓴다 (광장이 베껴 적지 않게)
+window.dotSpec = function () { return { W: D.W, H: D.H, FOOT: D.FOOT }; };
 
 // ==========================================
 // 모습이 든 칸을 만든다
@@ -481,7 +500,10 @@ window.dotStop = stop;
         '#closet-stage{position:relative;padding:14px 0 0 0;text-align:center;',
         '  background:linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.12));',
         '  border:1px solid var(--theme-border,#4a5160);border-radius:8px;overflow:hidden;}',
-        '#closet-floor{height:12px;margin-top:-6px;',
+        // ★ 칸이 384 로 커져 위아래에 빈 자리가 생겼다. 위는 걷어 내고,
+        //   아래는 발바닥(FOOT)만큼 당겨 그림자가 발에 붙게 한다.
+        '#closet-stage .dot-box{margin-top:-64px;margin-bottom:-26px;}',
+        '#closet-floor{height:16px;margin-top:-8px;',
         '  background:radial-gradient(ellipse at 50% 0,rgba(0,0,0,0.55),rgba(0,0,0,0) 70%);}',
         '.closet-row{display:flex;align-items:center;gap:8px;margin-top:10px;}',
         '.closet-row .lab{width:38px;font-size:10px;color:#9a948a;text-align:left;flex:none;}',
