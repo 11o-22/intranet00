@@ -19,25 +19,31 @@
 //   누르면 그 시설로 들어간다. 어느 방에 무엇을 둘지는 아래 ROOMS 의
 //   spots 에, ☰ 에 무엇을 넣을지는 MENU 에 적는다.
 //
-// ■ 방 여섯과 길
+// ■ 방 여섯과 길 (주신 지도대로)
 //
-//       [숲 정류장]                       [하늘 계단]
-//            ↑                                 ↑
-//   [이소-오스카리] ↔ [아이스크림 거리] ↔ [헌터 상점가] ↔ [횡단보도]
+//       [백일몽]                                     [재난관리국]
+//          ↑                                              ↑
+//     [백일몽 앞] ↔ [카지노] ↔ [광장] ↔ [재난관리국 앞]
 //
-//   좌우는 화면 끝까지 걸어가면 넘어간다. 위는 **정해진 자리**에서만 올라간다
-//   (횡단보도의 계단 입구, 오스카리의 안내판 쪽). 올라간 곳에서는 아래로
-//   내려오면 돌아온다 — 되돌아오는 길은 적지 않아도 저절로 생긴다.
+//   좌우는 화면 끝까지 걸어가면 넘어간다. 건물 안으로는 **문 앞에서만**
+//   올라가고, 안에서 아래로 내려오면 도로 나온다.
+//
+// ■ 두 층 — 길과 지하
+//
+//   주신 그림은 한 장에 **길(위층)과 지하(B1)**가 같이 그려져 있다.
+//   그래서 방마다 바닥 띠를 둘 둔다 (floor · floor2).
+//
+//   광장과 재난관리국 앞에는 **비스듬한 계단**이 있다 (stairs). 계단 자리는
+//   x 를 따라 바닥선이 같이 기울어서, 앞으로 내려선 뒤 옆으로 걸으면 그대로
+//   오르내린다 — 순간이동이 없다. 계단이 없는 방은 한 층만 쓴다.
+//   지하에서는 옆 방으로 넘어가지 않는다. 그 방 계단으로만 오르내린다.
 //
 // ■ 크기를 어떻게 맞췄나
 //
-//   방 그림은 손대지 않았다. 줄이면 도트가 뭉개지기 때문이다. 대신 방마다
-//   **사람 배율**을 둔다. 사람 도트는 한 칸이 4픽셀이라 배율은 4분의 1 단위로
-//   떨어지는 값(0.5 · 0.75 · 1.0 …)만 쓴다. 0.65 같은 값은 도트 경계가
-//   어긋나 뭉개진다.
-//
-//   여섯 방을 다 재어 보니 0.75 배(사람 키 183px)가 문·벤치·간판과 두루
-//   어울렸다. 방마다 다르게 두고 싶으면 아래 ROOMS 의 k 를 고치면 된다.
+//   방 그림은 1880×1672 그대로 쓴다 (줄이면 도트가 뭉개진다). 사람은
+//   0.75배(키 192px) — 주신 가이드라인의 사람 크기에 맞췄다. 화면에는
+//   그림의 일부만 보이고 카메라가 사람을 따라간다. 그림 아래쪽 어두운
+//   자리는 **채팅이 덮는 여백**이라 일부러 비워 두었다.
 //
 // ■ 남이 같이 보이는 얼개 (지난 시범과 같다)
 //
@@ -61,12 +67,13 @@
 //   제때 뜨게 하기 위해서다. 둘은 따로 돈다.
 //
 // ■ 콘솔
-//       plazaGo('cross')   그 방으로 건너뛴다
+//       plazaGo('plaza')   그 방으로 건너뛴다
 //       plazaState()       지금 어디에 누구와 있나
 //       plazaRooms()       방과 길
 //
-// ※ 방 그림은 plaza/*.webp 입니다. 바꾸시려면 같은 이름으로 덮으시고,
-//   크기가 달라지면 아래 ROOMS 의 w·h·floor 를 같이 고쳐 주십시오.
+// ※ 방 그림은 plaza/*.webp 입니다 (원경·중경·전경 세 장을 한 장으로 합쳤습니다).
+//   바꾸시려면 같은 이름으로 덮으시고, 크기가 달라지면 아래 ROOMS 의
+//   w·h·floor·floor2·stairs 를 같이 고쳐 주십시오.
 
 const PLAZA = {
     DIR: 'plaza/',
@@ -75,7 +82,7 @@ const PLAZA = {
     PATH: 'plazaRoom',          // 서버에 자리를 적는 자리
     CHAT: 'plazaChat',          // 서버에 말을 적는 자리
 
-    SPEED: 105,                 // 1초에 몇 픽셀 걷나
+    SPEED: 180,                 // 1초에 몇 픽셀 걷나 (방이 1880px 로 넓어져 올렸다)
     TAP_STOP: 3,
     EDGE: 20,                   // 좌우 끝에서 이만큼 남기고 넘어간다
     // ★ 넘어간 방에서 **문턱 안쪽으로** 들여 세운다.
@@ -94,36 +101,81 @@ const PLAZA = {
     // 방 — w·h 는 그림 크기, floor 는 발이 닿을 수 있는 y 띠, k 는 사람 배율
     //      up 은 올라가는 자리 { to, x: [왼, 오] }
     //      spots 는 그 방에 선 시설 입구 { x, n, i, tab, sub } 또는 { x, n, i, fn }
+    // 방 — w·h 는 그림 크기, floor 는 **위층** 발이 닿는 y 띠,
+    //      floor2 는 **지하(B1)** 띠, stairs 는 두 층을 잇는 계단의 x 자리.
+    //      k 는 사람 배율, up/down 은 건물 안팎을 드나드는 자리,
+    //      spots 는 시설 입구 { x, n, i, tab, sub | fn, lv } (lv:1 이면 지하).
+    //
+    //   ■ 길 (주신 지도대로)
+    //
+    //       [백일몽]                                   [재관국]
+    //          ↑                                          ↑
+    //     [백일몽 앞] ↔ [카지노] ↔ [광장] ↔ [재관국 앞]
+    //
+    //     좌우는 화면 끝까지 걸어가면 넘어가고, **지하도 좌우로 이어진다** —
+    //     지하에서 옆 방으로 가면 그쪽 지하로 나온다.
+    //     위(건물 안)로는 정해진 자리에서만 올라간다.
+    // 방 — w·h 는 그림 크기, floor 는 **위층** 발이 닿는 y 띠,
+    //      floor2 는 **지하(B1)** 띠 (x2 는 지하에서 다닐 수 있는 x 폭),
+    //      stairs 는 두 층을 잇는 **비스듬한 계단**
+    //        { x:[왼,오], y0:[왼쪽 끝 윗선, 오른쪽 끝 윗선], y1:[…아랫선…] }
+    //        x 를 따라 윗선·아랫선이 같이 내려가므로, 계단에서는 옆으로
+    //        걸으면 저절로 오르내린다.
+    //      k 는 사람 배율, up/down 은 건물을 드나드는 자리,
+    //      spots 는 시설 입구 { x, n, i, tab, sub | fn, lv } (lv:1 이면 지하).
+    //
+    //   ■ 길 (주신 지도대로)
+    //
+    //       [백일몽]                                   [재난관리국]
+    //          ↑                                            ↑
+    //     [백일몽 앞] ↔ [카지노] ↔ [광장] ↔ [재난관리국 앞]
+    //
+    //     좌우는 화면 끝까지 걸어가면 넘어간다. 건물 안으로는 문 앞에서만
+    //     올라가고, 지하는 **그 방의 계단**으로만 오르내린다.
     ROOMS: {
-        oskari: { n: '이소-오스카리', img: 'oskari.webp', w: 1690, h: 1135,
-                  floor: [960, 1120], k: 0.75,
-                  right: 'street', up: { to: 'stop', x: [1420, 1660] },
-                  spots: [ { x: 430,  n: '공용시설',   i: '🎲', tab: 'tab-public' },
-                           { x: 980,  n: '장기 은행',  i: '🏦', tab: 'tab-vip' } ] },
-        street: { n: '아이스크림 거리', img: 'street.webp', w: 735, h: 537,
-                  floor: [470, 525], k: 0.75,
-                  left: 'oskari', right: 'hunter',
-                  spots: [ { x: 190, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' },
-                           { x: 545, n: '행복 식당',   i: '🍚', tab: 'tab-shop', sub: 'shop-food' } ] },
-        hunter: { n: '헌터 상점가', img: 'hunter.webp', w: 735, h: 430,
-                  floor: [372, 424], k: 0.75,
-                  left: 'street', right: 'cross',
-                  spots: [ { x: 165, n: '우주 쇼핑몰', i: '🛸', tab: 'tab-shop', sub: 'shop-alien' },
-                           { x: 400, n: '밀실 거래',   i: '🤝', tab: 'tab-shop', sub: 'shop-p2p' },
-                           { x: 630, n: '???',         i: '❓', tab: 'tab-shop', sub: 'shop-unknown' } ] },
-        cross:  { n: '횡단보도', img: 'cross.webp', w: 736, h: 736,
-                  floor: [600, 726], k: 0.75,
-                  left: 'hunter', up: { to: 'stairs', x: [300, 460] },
-                  spots: [ { x: 600, n: '어둠 탐사', i: '🌑', tab: 'tab-darkness', sub: 'dark-main' } ] },
-        stop:   { n: '숲 정류장', img: 'stop.webp', w: 735, h: 490,
-                  floor: [440, 480], k: 0.75,
-                  spots: [ { x: 360, n: '사택',  i: '🏠', tab: 'tab-house', sub: 'house-main' },
-                           { x: 580, n: '펫 돌보기', i: '🐾', fn: 'petOpen' } ] },
-        stairs: { n: '하늘 계단', img: 'stairs.webp', w: 735, h: 856,
-                  floor: [770, 848], k: 0.75,
-                  spots: [ { x: 380, n: '망상 홈쇼핑', i: '📺', tab: 'tab-shop', sub: 'shop-dream' } ] }
+        dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 1672,
+                  floor: [600, 725], k: 0.75,
+                  right: 'casino', up: { to: 'dream', x: [760, 1130] },
+                  spots: [ { x: 300, n: '??? (지하)', i: '❓', tab: 'tab-shop', sub: 'shop-unknown' } ] },
+
+        dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 1672,
+                  floor: [1015, 1105], k: 0.75,
+                  down: 'dfront',
+                  spots: [ { x: 540,  n: '사택',        i: '🏠', tab: 'tab-house', sub: 'house-main' },
+                           { x: 940,  n: '어둠 탐사',   i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
+                           { x: 1340, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' } ] },
+
+        casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 1672,
+                  floor: [625, 725], k: 0.75,
+                  left: 'dfront', right: 'plaza',
+                  spots: [ { x: 940, n: '공용시설', i: '🎲', tab: 'tab-public' } ] },
+
+        plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 1672,
+                  floor: [615, 710], floor2: [1040, 1112], x2: [340, 1540], k: 0.75,
+                  stairs: [ { x: [150, 340],   y0: [700, 1040], y1: [762, 1112] },
+                            { x: [1540, 1730], y0: [1040, 700], y1: [1112, 762] } ],
+                  left: 'casino', right: 'gate',
+                  spots: [ { x: 470,  n: '행복 식당',   i: '🍚', tab: 'tab-shop', sub: 'shop-food' },
+                           { x: 1400, n: '장기 은행',   i: '🏦', tab: 'tab-vip' },
+                           { x: 1650, n: '펫 돌보기',   i: '🐾', fn: 'petOpen' },
+                           { x: 700,  n: '밀실 거래',   i: '🤝', lv: 1, tab: 'tab-shop', sub: 'shop-p2p' },
+                           { x: 1180, n: '우주 쇼핑몰', i: '🛸', lv: 1, tab: 'tab-shop', sub: 'shop-alien' } ] },
+
+        gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 1672,
+                  floor: [630, 730], floor2: [1030, 1105], x2: [630, 1280], k: 0.75,
+                  stairs: [ { x: [430, 630],   y0: [690, 1030], y1: [752, 1105] },
+                            { x: [1280, 1480], y0: [1030, 690], y1: [1105, 752] } ],
+                  left: 'plaza', up: { to: 'bureau', x: [780, 1120] },
+                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', lv: 1, tab: 'tab-shop', sub: 'shop-dream' } ] },
+
+        bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 1672,
+                  floor: [1000, 1078], k: 0.75,
+                  down: 'gate',
+                  spots: [ { x: 630,  n: '사택',      i: '🏠', tab: 'tab-house', sub: 'house-main' },
+                           { x: 940,  n: '재난 탐사', i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
+                           { x: 1230, n: '파티',      i: '🚩', tab: 'tab-darkness', sub: 'dark-party' } ] }
     },
-    START: 'street',
+    START: 'plaza',
 
     // ── 오른쪽 위 ☰ 에 들어가는 것들. 없는 것은 저절로 빠진다.
     MENU: [
@@ -404,6 +456,64 @@ function bubble(one, text) {
 // ==========================================
 function roomOf() { return R[run.room]; }
 
+// ==========================================
+// ★ 층 — 한 방에 위층과 지하가 같이 있다
+// ==========================================
+//
+//   주신 그림은 한 장에 **위층(길)과 지하(B1)**가 같이 그려져 있고, 계단이
+//   둘을 잇는다. 그래서 방마다 바닥 띠를 둘 둔다 (floor · floor2).
+//
+//   · 계단 자리(stairs)의 x 안에서는 두 띠 사이가 **뚫려 있다.** 그 안에서는
+//     y 가 위층 꼭대기부터 지하 바닥까지 그대로 움직인다 — 계단을 걸어
+//     내려가는 것으로 보인다. 순간이동이 없다.
+//   · 계단 밖에서는 지금 있는 층의 띠 안에만 머문다.
+//   · 옆 방으로 넘어갈 때는 **있던 층 그대로** 간다. 지하에서 옆으로 가면
+//     그쪽 지하로 나온다 (지하도 좌우로 이어져 있다).
+function bandOf(r, lv) {
+    return (lv === 1 && r.floor2) ? r.floor2 : r.floor;
+}
+function stairAt(r, x) {
+    const st = r.stairs;
+    if (!st || !st.length || !r.floor2) return null;
+    for (let i = 0; i < st.length; i++) {
+        if (x >= st[i].x[0] && x <= st[i].x[1]) return st[i];
+    }
+    return null;
+}
+// 계단 위 — x 를 따라 윗선·아랫선이 같이 기운다
+function stairBand(s, x) {
+    const t = Math.max(0, Math.min(1, (x - s.x[0]) / Math.max(1, s.x[1] - s.x[0])));
+    return [s.y0[0] + (s.y0[1] - s.y0[0]) * t, s.y1[0] + (s.y1[1] - s.y1[0]) * t];
+}
+// 지금 x 에서 발이 닿을 수 있는 y 범위
+//
+//   ★ 계단은 **길 앞쪽으로** 내려간다. 그래서 위층에 서 있을 때는 길(위층 띠)과
+//     계단이 **둘 다** 열려 있어야 한다 — 안 그러면 계단 x 를 지나는 순간
+//     끌려 내려가서, 그 너머(옆 방으로 가는 길)로는 영영 못 간다.
+function yRange(r, x, lv) {
+    const s = stairAt(r, x);
+    if (!s) return bandOf(r, lv);
+    const b = stairBand(s, x);
+    if (lv === 1) return b;                       // 지하 쪽에서는 계단만
+    return [r.floor[0], b[1]];                    // 위층에서는 길 + 계단 아래까지
+}
+// 지금 x 에서 걸어 다닐 수 있는 가로 폭 (지하는 좁을 수 있다)
+function xRange(r, lv) {
+    if (lv === 1 && r.x2) {
+        let lo = r.x2[0], hi = r.x2[1];
+        (r.stairs || []).forEach(function (s) {          // 계단 자리까지는 갈 수 있어야 한다
+            lo = Math.min(lo, s.x[0]); hi = Math.max(hi, s.x[1]);
+        });
+        return [lo, hi];
+    }
+    return [P.EDGE, r.w - P.EDGE];
+}
+function lvAt(r, y) {
+    if (!r.floor2) return 0;
+    const mid = (r.floor[1] + r.floor2[0]) / 2;
+    return y >= mid ? 1 : 0;
+}
+
 // 방 그림을 **화면에 꽉 차게** 늘린다.
 //
 //   전에는 그림을 원래 크기로 두어, 세로가 짧은 방은 위아래에 검은 띠가 남았다.
@@ -444,11 +554,21 @@ function paintExits() {
         e.style.top = Math.round(y) + 'px';
         run.el.appendChild(e);
     };
-    const fy = (r.floor[0] + r.floor[1]) / 2 * z;
-    if (r.left)  mk('◀', 8, fy - 70);
-    if (r.right) mk('▶', r.w * z - 24, fy - 70);
+    // 층마다 좌우 화살표를 둔다 (지하도 옆 방으로 이어지므로)
+    const bands = [r.floor].concat(r.floor2 ? [r.floor2] : []);
+    bands.forEach(function (b) {
+        const fy = (b[0] + b[1]) / 2 * z;
+        if (r.left)  mk('◀', 8, fy - 70);
+        if (r.right) mk('▶', r.w * z - 24, fy - 70);
+    });
     if (r.up)    mk('▲', (r.up.x[0] + r.up.x[1]) / 2 * z - 8, r.floor[0] * z - 96);
     if (r.down)  mk('▼', 12, r.floor[1] * z - 22);
+    // 계단 — 내려가고 올라가는 자리
+    (r.stairs || []).forEach(function (s) {
+        if (!r.floor2) return;
+        const t = (s.y0[0] < s.y0[1]) ? 0 : 1;            // 위쪽 끝이 어느 쪽인가
+        mk('⇵', (t ? s.x[1] : s.x[0]) * z - 8, (r.floor[1] - 4) * z);
+    });
 }
 
 // ==========================================
@@ -471,8 +591,9 @@ function paintSpots() {
         if (!spotOk(s)) return;
         const e = document.createElement('div');
         e.className = 'plaza-spot';
+        const b = bandOf(r, s.lv || 0);
         e.style.left = Math.round(s.x * z) + 'px';
-        e.style.top = Math.round((s.y != null ? s.y : r.floor[0] - 10) * z) + 'px';
+        e.style.top = Math.round((s.y != null ? s.y : b[0] - 10) * z) + 'px';
         e.innerHTML = '<div class="b">' + s.i + '</div><div class="t">' + esc(s.n) + '</div>';
         e.addEventListener('pointerdown', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
@@ -530,18 +651,29 @@ function goRoom(key, way) {
     run.el.innerHTML = '';
     run.k = r.k;
 
+    // ★ 층 — 좌우로 넘어갈 때는 있던 층 그대로 간다 (지하도 이어져 있다).
+    //   건물 안팎을 드나들 때(up·down)는 그 방의 바닥으로 내려 세운다.
+    if (way === 'left' || way === 'right') {
+        if (run.lv === 1 && !r.floor2) run.lv = 0;          // 그쪽에 지하가 없으면 위층으로
+    } else {
+        run.lv = 0;
+    }
+    const bnd = bandOf(r, run.lv);
+
     // 걸어간 쪽의 **반대편**에, 문턱 안쪽으로 들여 선다
-    const mid = (r.floor[0] + r.floor[1]) / 2;
-    const band = r.floor[1] - r.floor[0];
+    const mid = (bnd[0] + bnd[1]) / 2;
+    const band = bnd[1] - bnd[0];
     const inY = Math.min(P.INSET, Math.max(2, band / 3));   // 바닥이 좁으면 그만큼만
     if (way === 'right')      { run.x = P.EDGE + P.INSET;       run.y = mid; }   // → 로 왔으니 왼쪽에
     else if (way === 'left')  { run.x = r.w - P.EDGE - P.INSET; run.y = mid; }   // ← 로 왔으니 오른쪽에
-    else if (way === 'up')    { run.x = r.w / 2;  run.y = r.floor[1] - inY; }    // ↑ 로 왔으니 아래쪽에
-    else if (way === 'down')  { run.x = r.w / 2;  run.y = r.floor[0] + inY; }    // ↓ 로 왔으니 위쪽에
+    else if (way === 'up')    { run.x = r.w / 2;  run.y = bnd[1] - inY; }        // ↑ 로 왔으니 아래쪽에
+    else if (way === 'down')  { run.x = (r.up && r.up.x) ? (r.up.x[0] + r.up.x[1]) / 2 : r.w / 2;
+                                run.y = bnd[0] + inY; }                           // ↓ 로 왔으니 문 앞에
     else                      { run.x = r.w / 2;  run.y = mid; }
 
-    run.x = Math.max(P.EDGE, Math.min(r.w - P.EDGE, run.x));
-    run.y = Math.max(r.floor[0], Math.min(r.floor[1], run.y));
+    const xr0 = xRange(r, run.lv);
+    run.x = Math.max(Math.max(P.EDGE, xr0[0]), Math.min(Math.min(r.w - P.EDGE, xr0[1]), run.x));
+    run.y = Math.max(bnd[0], Math.min(bnd[1], run.y));
     run.tx = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
     run.lines = [];                         // 방이 바뀌면 말도 새로 시작한다
@@ -617,15 +749,19 @@ function tick(ts) {
         if (now() - (run.warp || 0) > P.WARP_MS) {
             if (r.left && run.x <= P.EDGE) { goRoom(r.left, 'left'); return; }
             if (r.right && run.x >= r.w - P.EDGE) { goRoom(r.right, 'right'); return; }
-            // 위로 가는 자리에서 위쪽 끝에 닿으면 올라간다
-            if (r.up && run.y <= r.floor[0] + 1
+            // 위로 가는 자리에서 위쪽 끝에 닿으면 올라간다 (위층에서만)
+            if (r.up && run.lv !== 1 && run.y <= r.floor[0] + 1
                 && run.x >= r.up.x[0] && run.x <= r.up.x[1]) { goRoom(r.up.to, 'up'); return; }
             // 올라온 방에서 아래쪽 끝이면 내려간다
-            if (r.down && run.y >= r.floor[1] - 1) { goRoom(r.down, 'down'); return; }
+            if (r.down && run.y >= bandOf(r, run.lv)[1] - 1) { goRoom(r.down, 'down'); return; }
         }
 
-        run.x = Math.max(P.EDGE, Math.min(r.w - P.EDGE, run.x));
-        run.y = Math.max(r.floor[0], Math.min(r.floor[1], run.y));
+        // ─ 바닥 — 계단 위에서는 띠가 x 를 따라 기울어 내려간다
+        const xr = xRange(r, run.lv);
+        run.x = Math.max(xr[0], Math.min(xr[1], run.x));
+        const yr = yRange(r, run.x, run.lv);
+        run.y = Math.max(yr[0], Math.min(yr[1], run.y));
+        if (stairAt(r, run.x)) run.lv = lvAt(r, run.y);   // 계단 위에서는 높이로 층을 센다
         // 거의 위아래로만 밀었을 때 좌우가 깜빡이지 않게 턱을 조금 둔다
         if (dx < -0.08) run.me.actor.face(1);
         else if (dx > 0.08) run.me.actor.face(-1);
@@ -1133,7 +1269,7 @@ function open() {
         peers: {}, keys: {}, ax: 0, ay: 0, x: 0, y: 0, tx: null, ty: null,
         cx: 0, cy: 0, last: performance.now(), raf: 0, z: 1,
         sx: -9999, sy: -9999, sent: 0, sMoving: false, sFace: 1,
-        say: '', sayAt: 0, sSayAt: 0, k: 0.75, ref: null, me: null
+        say: '', sayAt: 0, sSayAt: 0, k: 0.75, ref: null, me: null, lv: 0
     };
 
     // ─ 안 보이는 조이스틱 — 화면 아무 데나 짚어 끌면 그쪽으로 걷는다
@@ -1176,8 +1312,27 @@ function open() {
                 const b = run.view.getBoundingClientRect();
                 const x = (e.clientX - b.left + run.cx) / z;
                 const y = (e.clientY - b.top + run.cy) / z;
-                run.tx = Math.max(P.EDGE, Math.min(r.w - P.EDGE, x));
-                run.ty = Math.max(r.floor[0], Math.min(r.floor[1], y));
+                // ★ 다른 층을 짚었으면 가까운 계단부터 간다.
+                //   계단 x 안에서는 두 층이 뚫려 있으므로, 그리로 걸어가면
+                //   저절로 오르내린다. 계단이 없는 방이면 제 층 안으로 자른다.
+                const want = r.floor2 ? lvAt(r, y) : 0;
+                let tx = x, lv = run.lv;
+                if (want !== run.lv && r.stairs && r.stairs.length) {
+                    // 다른 층을 짚었다 — 가까운 계단의 **그 층 쪽 끝**으로 먼저 간다
+                    let best = null, bd = 1e9;
+                    r.stairs.forEach(function (s) {
+                        const down = (s.y0[0] < s.y0[1]);      // 오른쪽으로 갈수록 내려가나
+                        const end = (want === 1) === down ? s.x[1] : s.x[0];
+                        const d = Math.abs(end - run.x);
+                        if (d < bd) { bd = d; best = end; }
+                    });
+                    if (best != null) { tx = best; lv = want; }
+                }
+                const xr = xRange(r, lv);
+                tx = Math.max(Math.max(P.EDGE, xr[0]), Math.min(Math.min(r.w - P.EDGE, xr[1]), tx));
+                const yr = yRange(r, tx, lv);
+                run.tx = tx;
+                run.ty = Math.max(yr[0], Math.min(yr[1], y));
             }
             drag = false;
         };
@@ -1288,7 +1443,8 @@ window.plazaState = function () {
     const r = roomOf();
     console.log('  지금 :', r.n, '(' + run.room + ')');
     console.log('  자리 :', Math.round(run.x) + ', ' + Math.round(run.y),
-        '· 바닥 ' + r.floor.join('~') + ' · 사람 ' + run.k + '배');
+        '· ' + (run.lv === 1 ? '지하' : '길') + ' 바닥 ' + bandOf(r, run.lv).join('~')
+        + (stairAt(r, run.x) ? ' · 계단 위' : '') + ' · 사람 ' + run.k + '배');
     const ns = Object.keys(run.peers);
     console.log('  같이 :', ns.length ? ns.map(function (c) {
         return run.peers[c].one.tag.innerText + '(' + c + ')'; }).join(', ') : '혼자');
