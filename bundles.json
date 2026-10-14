@@ -325,7 +325,8 @@
       "babyfox.js",
       "jisan.js",
       "closet.js",
-      "plaza.js"
+      "plaza.js",
+      "shell.js"
     ]
   ]
 }

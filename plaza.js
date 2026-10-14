@@ -139,67 +139,76 @@ const PLAZA = {
         dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 1672,
                   floor: [600, 725], k: 1,
                   right: 'casino', up: { to: 'dream', x: [760, 1130] },
-                  spots: [ { x: 300, n: '??? (지하)', i: '❓', tab: 'tab-shop', sub: 'shop-unknown' } ] },
+                  spots: [ { x: 300, n: '??? (지하)', i: '❓', ic: 'unknown', tab: 'tab-shop', sub: 'shop-unknown' } ] },
 
         dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 1672,
                   floor: [1015, 1105], k: 1,
                   down: 'dfront',
-                  spots: [ { x: 540,  n: '사택',        i: '🏠', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '어둠 탐사',   i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
+                  spots: [ { x: 540,  n: '사택',        i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
+                           { x: 940,  n: '어둠 탐사',   i: '🌑', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
                            { x: 1340, n: '유쾌 판매소', i: '🛒', tab: 'tab-shop', sub: 'shop-regular' } ] },
 
         casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 1672,
                   floor: [625, 725], k: 1,
                   left: 'dfront', right: 'plaza',
-                  spots: [ { x: 940, n: '공용시설', i: '🎲', tab: 'tab-public' } ] },
+                  spots: [ { x: 940, n: '공용시설', i: '🎲', ic: 'public', tab: 'tab-public' } ] },
 
         plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 1672,
                   floor: [615, 710], floor2: [1040, 1112], x2: [340, 1540], k: 1,
                   stairs: [ { x: [150, 340],   y0: [700, 1040], y1: [762, 1112] },
                             { x: [1540, 1730], y0: [1040, 700], y1: [1112, 762] } ],
                   left: 'casino', right: 'gate',
-                  spots: [ { x: 470,  n: '행복 식당',   i: '🍚', tab: 'tab-shop', sub: 'shop-food' },
-                           { x: 1400, n: '장기 은행',   i: '🏦', tab: 'tab-vip' },
-                           { x: 1650, n: '펫 돌보기',   i: '🐾', fn: 'petOpen' },
-                           { x: 700,  n: '밀실 거래',   i: '🤝', lv: 1, tab: 'tab-shop', sub: 'shop-p2p' },
-                           { x: 1180, n: '우주 쇼핑몰', i: '🛸', lv: 1, tab: 'tab-shop', sub: 'shop-alien' } ] },
+                  spots: [ { x: 470,  n: '행복 식당',   i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
+                           { x: 1400, n: '장기 은행',   i: '🏦', ic: 'bank', tab: 'tab-vip' },
+                           { x: 1650, n: '펫 돌보기',   i: '🐾', ic: 'pet', fn: 'petOpen' },
+                           { x: 700,  n: '밀실 거래',   i: '🤝', ic: 'p2p', lv: 1, tab: 'tab-shop', sub: 'shop-p2p' },
+                           { x: 1180, n: '우주 쇼핑몰', i: '🛸', ic: 'alien', lv: 1, tab: 'tab-shop', sub: 'shop-alien' } ] },
 
         gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 1672,
                   floor: [630, 730], floor2: [1030, 1105], x2: [630, 1280], k: 1,
                   stairs: [ { x: [430, 630],   y0: [690, 1030], y1: [752, 1105] },
                             { x: [1280, 1480], y0: [1030, 690], y1: [1105, 752] } ],
                   left: 'plaza', up: { to: 'bureau', x: [780, 1120] },
-                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', lv: 1, tab: 'tab-shop', sub: 'shop-dream' } ] },
+                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, tab: 'tab-shop', sub: 'shop-dream' } ] },
 
         bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 1672,
                   floor: [1000, 1078], k: 1,
                   down: 'gate',
-                  spots: [ { x: 630,  n: '사택',      i: '🏠', tab: 'tab-house', sub: 'house-main' },
-                           { x: 940,  n: '재난 탐사', i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
+                  spots: [ { x: 630,  n: '사택',      i: '🏠', ic: 'house', tab: 'tab-house', sub: 'house-main' },
+                           { x: 940,  n: '재난 탐사', i: '🌑', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
                            { x: 1230, n: '파티',      i: '🚩', tab: 'tab-darkness', sub: 'dark-party' } ] }
     },
     START: 'plaza',
 
     // ── 오른쪽 위 ☰ 에 들어가는 것들. 없는 것은 저절로 빠진다.
+    //
+    //   ic 는 ico/ 안의 그림 이름이다. 흰 그림을 **마스크**로 써서 글자색을
+    //   그대로 입으므로, 테마가 바뀌어도 아이콘이 따라 바뀐다.
+    //   ic 가 없는 줄은 전처럼 i(글자 그림)로 그린다.
     MENU: [
-        { n: '사원증',     i: '🪪', tab: 'tab-record',   sub: 'rec-badge' },
-        { n: '소지품',     i: '🎒', tab: 'tab-record',   sub: 'rec-inventory' },
-        { n: '기록',       i: '📄', tab: 'tab-record',   sub: 'rec-history' },
-        { n: '익명 편지',  i: '✉️', tab: 'tab-record',   sub: 'rec-letters' },
-        { n: '칭호',       i: '🏅', tab: 'tab-record',   sub: 'rec-titles' },
-        { n: '선물함',     i: '🎁', fn: 'openGiftBox' },
-        { n: '공용시설',   i: '🎲', tab: 'tab-public' },
-        { n: '장기 은행',  i: '🏦', tab: 'tab-vip' },
-        { n: '유쾌 판매소', i: '🛒', tab: 'tab-shop',    sub: 'shop-regular' },
-        { n: '밀실 거래',  i: '🤝', tab: 'tab-shop',     sub: 'shop-p2p' },
-        { n: '우주 쇼핑몰', i: '🛸', tab: 'tab-shop',    sub: 'shop-alien' },
-        { n: '망상 홈쇼핑', i: '📺', tab: 'tab-shop',    sub: 'shop-dream' },
-        { n: '어둠 탐사',  i: '🌑', tab: 'tab-darkness', sub: 'dark-main' },
-        { n: '파티',       i: '🚩', tab: 'tab-darkness', sub: 'dark-party' },
-        { n: '사택',       i: '🏠', tab: 'tab-house',    sub: 'house-main' },
-        { n: '옷장',       i: '👔', tab: 'tab-house',    sub: 'house-closet' },
-        { n: '펫 돌보기',  i: '🐾', fn: 'petOpen' },
-        { n: '전체 대화',  i: '💬', fn: 'openAllChat' }
+        { n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
+        { n: '소지품',     i: '🎒', ic: 'bag',     tab: 'tab-record',   sub: 'rec-inventory' },
+        { n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
+        { n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters' },
+        { n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
+        { n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
+        { n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
+        { n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
+        { n: '유쾌 판매소', i: '🛒',                tab: 'tab-shop',    sub: 'shop-regular' },
+        { n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p' },
+        { n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
+        { n: '우주 쇼핑몰', i: '🛸', ic: 'alien',   tab: 'tab-shop',    sub: 'shop-alien' },
+        { n: '망상 홈쇼핑', i: '📺', ic: 'dream',   tab: 'tab-shop',    sub: 'shop-dream' },
+        { n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
+        { n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
+        { n: '파티',       i: '🚩',                tab: 'tab-darkness', sub: 'dark-party' },
+        { n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
+        { n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
+        { n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
+        { n: '전체 대화',  i: '💬',                fn: 'openAllChat' },
+        // ── 옛 메인 화면 사원증 띠에 있던 단추들. 이제 여기로 들어온다.
+        { n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
+        { n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' }
     ]
 };
 
@@ -705,6 +714,15 @@ function paintExits() {
 // ==========================================
 //
 //   누르면 그 시설로 들어간다 (광장은 닫힌다). 없는 시설은 아예 안 세운다.
+// 그림 아이콘 한 칸. ic 가 없으면 전처럼 글자 그림(i)을 쓴다.
+function ico(o, cls) {
+    if (o && o.ic) {
+        return '<span class="pico ' + (cls || '')
+            + '" style="--ic:url(\'ico/' + o.ic + '.png\')"></span>';
+    }
+    return '<span class="' + (cls || '') + '">' + esc((o && o.i) || '') + '</span>';
+}
+
 function spotOk(s) {
     if (s.fn) return typeof window[s.fn] === 'function';
     if (s.tab && !document.getElementById(s.tab)) return false;
@@ -723,7 +741,7 @@ function paintSpots() {
         const b = bandOf(r, s.lv || 0);
         e.style.left = Math.round(s.x * z) + 'px';
         e.style.top = Math.round((s.y != null ? s.y : b[0] - 10) * z) + 'px';
-        e.innerHTML = '<div class="b">' + s.i + '</div><div class="t">' + esc(s.n) + '</div>';
+        e.innerHTML = '<div class="b">' + ico(s) + '</div><div class="t">' + esc(s.n) + '</div>';
         e.addEventListener('pointerdown', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
             goApp(s);
@@ -732,15 +750,28 @@ function paintSpots() {
     });
 }
 
-// 시설·메뉴로 건너간다 — 광장을 닫고 그 탭을 누른 것과 같게 한다
+// 시설·메뉴로 건너간다
+//
+//   사원 쪽에서는 **광장을 닫지 않는다.** 광장이 집이라 돌아올 데가
+//   거기뿐이다. 그 칸만 광장 위에 띄우고(shell.js 의 plazaPanel),
+//   닫으면 그대로 광장이 남아 있다.
+//   상담사 쪽은 전처럼 광장을 닫고 옛 화면의 그 탭을 누른다.
 function goApp(s) {
+    const solo = !!(typeof window.plazaSolo === 'function' && window.plazaSolo());
     try {
-        shut();
         if (s.fn) {
+            // 창(모달)은 광장 위에 뜬다 — 사원 쪽은 광장을 바탕으로 깔아 두었다
+            if (!solo) shut();
+            closeSheet();
             const f = window[s.fn];
             if (typeof f === 'function') setTimeout(function () { try { f(); } catch (e) { } }, 40);
             return;
         }
+        if (solo) {
+            closeSheet();
+            if (window.plazaPanel(s.tab, s.sub, esc(s.n || ''))) return;
+        }
+        shut();
         const hit = function (sel, key) {
             return Array.prototype.filter.call(document.querySelectorAll(sel), function (e) {
                 return (e.getAttribute('onclick') || '').indexOf("'" + key + "'") >= 0;
@@ -1392,16 +1423,20 @@ function menuSheet() {
     // ★ 나가기(✕)가 위 띠에서 빠졌다 — 위 오른쪽이 공지·선물함·메뉴 셋으로
     //   찼기 때문이다. 그래서 메뉴 맨 끝에 둔다.
     const html = '<div class="plaza-grid">' + list.map(function (m, i) {
-        return '<button data-i="' + i + '"><span class="e">' + m.i + '</span>'
-            + esc(m.n) + '</button>';
+        return '<button data-i="' + i + '">' + ico(m, 'e') + esc(m.n) + '</button>';
     }).join('')
-        + '<button id="plaza-out"><span class="e">🚪</span>광장 나가기</button></div>';
+        + '<button id="plaza-out">' + ico({ ic: 'out' }, 'e')
+        + (isAdm() ? '광장 나가기' : '단말 종료') + '</button></div>';
     const s = sheet('menu', '어디로 갑니까', html);
     if (!s) return;
     Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
         b.onclick = function () { goApp(list[Number(b.dataset.i)]); };
     });
-    s.querySelector('#plaza-out').onclick = shut;
+    s.querySelector('#plaza-out').onclick = function () {
+        // 사원은 광장이 집이라 「나가기」가 갈 데가 없다 — 단말을 끈다.
+        if (!isAdm() && typeof window.logout === 'function') { window.logout(); return; }
+        shut();
+    };
 }
 
 // ── 💬 말
@@ -1595,8 +1630,10 @@ function open() {
         +   '<span class="pm-txt"><b class="pm-n">·</b><i class="pm-no"></i></span>'
         + '</button>'
         + '<div class="sp"></div>'
-        + '<button class="plaza-ico plaza-keep" id="plaza-notice">📢<i class="nd"></i></button>'
-        + '<button class="plaza-ico plaza-keep" id="plaza-gift">🎁</button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-notice">'
+        +   '<span class="pico" style="--ic:url(\'ico/notice.png\')"></span><i class="nd"></i></button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-gift">'
+        +   '<span class="pico" style="--ic:url(\'ico/gift.png\')"></span></button>'
         + '<button class="plaza-ico plaza-keep" id="plaza-menu">☰</button>'
         + '</div>'
         + '<div id="plaza-who"></div>'
@@ -1613,7 +1650,8 @@ function open() {
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
         + '<div id="plaza-bar" class="plaza-keep"><span class="dot"></span>'
         + '<span class="txt">여기에 적으면 머리 위에 뜹니다</span></div>'
-        + '<button class="plaza-ico plaza-keep" id="plaza-bag">🎒</button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-bag">'
+        +   '<span class="pico" style="--ic:url(\'ico/bag.png\')"></span></button>'
         + '</div>';
     document.body.appendChild(ov);
     stampSafe(ov);
