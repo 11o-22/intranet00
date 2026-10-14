@@ -76,6 +76,9 @@ const GACHA_WEAR = [
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
     { k: 'han-inner',   n: '내의',       g: 'A', s: ['han-inner'] },
     { k: 'suit',        n: '정장',       g: 'B', s: ['suit'] },
+    // 요원복 두 벌 — 등급은 말씀이 없으셔서 B 로 두었습니다 (고치셔도 됩니다)
+    { k: 'agent1',      n: '요원복 1',   g: 'B', s: ['agent1'] },
+    { k: 'agent2',      n: '요원복 2',   g: 'B', s: ['agent2'] },
     { k: 'han-duru',    n: '두루마기',   g: 'B', s: ['han-duru'] },
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },

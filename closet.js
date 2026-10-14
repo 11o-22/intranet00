@@ -142,7 +142,7 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'robe', 'han-duru', 'cape', 'glove'],
+        'dress', 'tuxedo', 'suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     FACE_PAIR: { h05: 'h09' },
@@ -201,7 +201,13 @@ const DOT_SLOTS = [
             { i: 'robe', n: '검은 장포', over: ['robe'], own: 'robe' },
             { i: 'han', n: '내의', over: ['han-inner'], own: 'han-inner' },
             { i: 'dress', n: '드레스', over: ['dress'], own: 'dress' },
-            { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' }
+            { i: 'tuxedo', n: '턱시도', over: ['tuxedo'], own: 'tuxedo' },
+            // ★ 요원복 — 한 벌이 통째로 그려져 있다 (웃옷·바지·신까지).
+            //   주신 그림은 216x128 (칸 36x64) 로, 쓰던 악세 규격(144x256)의
+            //   **네 배 작은** 것이었다. 네 배로 늘린 뒤 같은 자리(+104·+106)에
+            //   옮겼다. 도트 한 칸이 그대로 4픽셀이 된다.
+            { i: 'agent1', n: '요원복 1', over: ['agent1'], own: 'agent1' },
+            { i: 'agent2', n: '요원복 2', over: ['agent2'], own: 'agent2' }
         ]
     },
     {
