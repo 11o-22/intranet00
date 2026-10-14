@@ -347,8 +347,43 @@ function facLine() {
     }, 500);
 })();
 
-// 물리 뒤로가기로도 닫히게 — 칸이 떠 있으면 그것부터 닫는다
-window.addEventListener('popstate', function () { if (openTab) closePanel(); });
+// ==========================================
+// ★ 물리 뒤로가기로도 닫히게 — 다만 **창이 닫히며 생긴 것**은 빼고
+// ==========================================
+//
+//   index.html 은 창(모달)을 열 때 히스토리를 한 칸 밀어 넣고, 창을 닫을 때
+//   history.back() 으로 그 칸을 뺀다 (물리 뒤로가기로 창을 닫게 하려고).
+//   그런데 그 back() 도 popstate 를 일으킨다. 그래서 소지품에서 물건을
+//   쓰고 「사용했습니다」 알림의 확인을 누르면, 알림이 빠지며 생긴 popstate
+//   가 **칸까지 닫아** 소지품에서 그대로 튕겨 나왔다.
+//
+//   창이 스스로 뺀 것인지 가려내야 하는데, 그 표(isSystemAction·modalStack)는
+//   index.html 안에만 있다. 그래서 **닫는 함수들을 감싸** 그때를 적어 두고,
+//   그 직후에 온 popstate 는 넘긴다.
+let backAt = 0;
+(function modalBack() {
+    const names = ['closeCustomAlert', 'closeLuxuryAlert', 'closeItemTargetModal',
+                   'closeEmployeeListModal', 'closeEmpDetailModal', 'closeSuggestionModal',
+                   'closeAdminScreen', 'closeVipGameOverlay'];
+    const iv = setInterval(function () {
+        let left = 0;
+        names.forEach(function (n) {
+            const f = window[n];
+            if (typeof f !== 'function') { left++; return; }
+            if (f._shellBack) return;
+            const old = f;
+            window[n] = function () { backAt = Date.now(); return old.apply(this, arguments); };
+            window[n]._shellBack = true;
+        });
+        if (!left) clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 20000);
+})();
+
+window.addEventListener('popstate', function () {
+    if (Date.now() - backAt < 600) return;     // 창이 닫히며 빠진 칸이다
+    if (openTab) closePanel();
+});
 
 window.shellState = function () {
     console.log('%c===== 🏠 사원 화면 =====', 'color:#ffcf8f; font-size:13px');
