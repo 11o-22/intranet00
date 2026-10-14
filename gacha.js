@@ -95,6 +95,10 @@ const GACHA_ACC = [
     { k: 'ac39', n: '작두',                   g: 'S' , c: '손' },
     { k: 'ac13', n: '등불',                   g: 'S' , c: '손' },
     { k: 'ac01', n: '가나디',                 g: 'A' , c: '귀' },
+    // ★ 갓만 열쇠가 ac** 가 아니다 — 악세 쉰 가지보다 먼저 들어와 있던
+    //   상담사 전용 물건이라 장 이름이 han-gat 이다. 옷장 쪽 줄은 i:'gat'
+    //   그대로 두고 own 만 달았으므로, 아래 fillSlots 는 own 으로도 견준다.
+    { k: 'han-gat', n: '갓',                  g: 'A' , c: '머리' },
     { k: 'ac07', n: '냐냐냥 머리띠',          g: 'A' , c: '머리' },
     { k: 'ac11', n: '돌고래 꼬리',            g: 'A' , c: '등' },
     { k: 'ac14', n: '롭이어 토끼',            g: 'A' , c: '머리' },
@@ -418,7 +422,10 @@ window.accShopOpen = function () { open('acc'); };
     const acc = DOT_SLOTS.filter(function (s) { return s.k === 'acc'; })[0];
     if (!acc) return;
     GACHA_ACC.forEach(function (x) {
-        if (acc.items.some(function (y) { return y.i === x.k; })) return;
+        // ★ **열쇠(i)와 가진 표(own) 둘 다** 견준다.
+        //   갓은 옷장에 이미 i:'gat' 으로 들어 있고 own 만 'han-gat' 이다.
+        //   i 만 보면 못 알아보고 똑같은 줄을 하나 더 밀어 넣는다.
+        if (acc.items.some(function (y) { return y.i === x.k || y.own === x.k; })) return;
         // cat 은 가방에서 「머리 · 귀 · 얼굴 · 목 · 손 · 등」으로 갈라 보일 때 쓴다
         acc.items.push({ i: x.k, n: x.n, top: [x.k], own: x.k, cat: x.c });
     });
