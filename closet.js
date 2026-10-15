@@ -177,9 +177,10 @@ const DOT_HEADS = [
     { i: 'h16', n: 'B조 조장' },          // 15
     { i: 'h17', n: '이성해' },            // 16
     { i: 'h18', n: '곽제강' },            // 17
-    { i: 'h-brown', n: '브라운', body: 'body-brown' },  // 18 — 전용 몸과 짝 (옷은 그대로 입는다)
+    // ★ 브라운 셋(브라운 · 브라운 특전 · 토끼)은 **어둠 소속만** 고른다.
+    { i: 'h-brown', n: '브라운', body: 'body-brown', dark: true },  // 18 — 전용 몸과 짝 (옷은 그대로 입는다)
     // 19 — 한 벌이 통째로 그려진 것. 몸판은 비우고 옷은 안 겹친다.
-    { i: 'h-brown-tv', n: '[브라운 특전]', body: 'none', solo: true },
+    { i: 'h-brown-tv', n: '[브라운 특전]', body: 'none', solo: true, dark: true },
     // 20 — 토끼. 브라운 특전과 같은 특수체형이다 (몸판 없음 · 옷 안 겹침).
     //
     //   주신 그림은 1728x768 — 칸이 **288** 이었다 (지난 규격). 지금 칸은
@@ -194,7 +195,7 @@ const DOT_HEADS = [
     //   세로는 안 건드렸다. 받은 그림의 발바닥이 이미 351 로, 사람 발바닥과
     //   같았다 (걷기 세 번째 칸만 355 까지 내려간다 — 뛰는 그림이라 그대로 둔다).
     //   bare — 악세도 안 얹는다. 머리가 한참 아래라 갓이 허공에 뜬다 (look 참고).
-    { i: 'h-rabbit', n: '[토끼]', body: 'none', solo: true, bare: true }
+    { i: 'h-rabbit', n: '[토끼]', body: 'none', solo: true, bare: true, dark: true }
 ];
 
 // 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
@@ -318,6 +319,7 @@ function isAdm(user) {
 // ★ 누구 옷장에 보이나
 //
 //   admin: true        상담사만
+//   dark: true         상담사 + **어둠 소속**만
 //   nos: ['9013',…]    상담사 + 적어 둔 **사번**(u.no)만
 //   아무것도 없으면     모두
 //
@@ -335,8 +337,16 @@ function hasOwn(it, user) {
     const u = user || u_();
     try { return !!(u && u.wardrobe && u.wardrobe[it.own]); } catch (e) { return false; }
 }
+// ★ 어둠 소속 — 소속이나 팀 이름에 「어둠」이 들어 있으면 어둠이다.
+//   newitems2.js 의 isDark 와 같은 잣대를 쓴다 (칸 이름이 제각각이라
+//   소속·팀을 붙여 놓고 본다).
+function isDark(user) {
+    const u = user || u_();
+    return /어둠/.test(((u && u.affiliation) || '') + ' ' + ((u && u.team) || ''));
+}
 function allowed(it, user) {
     if (it.admin) return isAdm(user);
+    if (it.dark) return isAdm(user) || isDark(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
     if (it.own) return isAdm(user) || hasOwn(it, user);
     return true;
@@ -815,7 +825,13 @@ function buildRows(u) {
 
     // ① 얼굴
     html += '<div class="cl-h">얼굴</div>'
-        + rowOf('머리', DOT_HEADS.map(function (h) {
+        // ★ 어둠 전용 머리는 어둠 소속에게만 보인다.
+        //   다만 **지금 쓰고 있는 머리**는 소속이 바뀌었더라도 그대로 보여
+        //   준다 — 안 그러면 제 얼굴이 목록에서 사라져 아무것도 눌린 데가
+        //   없어 보인다.
+        + rowOf('머리', DOT_HEADS.filter(function (h) {
+            return allowed(h, u) || h.i === p.head;
+        }).map(function (h) {
             return btn('head', 'head', h.i, h.n, h.i === p.head);
         }).join(''));
 
@@ -948,7 +964,16 @@ function tap(kind, k, v) {
         if (typeof window.dotPalette === 'function') window.dotPalette(k);
         return;
     }
-    if (kind === 'head') { p.head = v; }
+    if (kind === 'head') {
+        // ★ 목록에 없는 머리는 눌러도 안 바뀐다 (어둠 전용 · 상담사 전용)
+        const hd = DOT_HEADS.filter(function (h) { return h.i === v; })[0];
+        if (hd && !allowed(hd, u_()) && v !== p.head) {
+            const n = document.getElementById('closet-note');
+            if (n) { n.innerText = '어둠 소속만 고를 수 있습니다.'; setTimeout(note_, 1800); }
+            return;
+        }
+        p.head = v;
+    }
     else if (kind === 'acc') {
         const s = slotOf('acc'); if (!s) return;
         const max = s.max || 1;
