@@ -28,6 +28,9 @@
 //   보내는 쪽은 사흘에 한 번만 보낼 수 있다 (u.petGaveAt). 신청을 승낙하는
 //   것도 보내는 것이므로 같이 센다. 받는 쪽에는 제한이 없다.
 //
+//   ★ 상담사는 날짜 제한이 없다 (noGap). 입양을 굴리는 쪽이라 줄곧 보내고
+//     받아야 하는데, 사흘에 묶이면 사원 쪽 입양이 상담사를 기다리느라 멈춘다.
+//
 // ■ 이름
 //
 //   이름은 **한 번만** 붙인다.
@@ -137,9 +140,19 @@ function bondOf(u, key) {
 // ==========================================
 // 사흘에 한 번
 // ==========================================
+// ★ 상담사는 날짜 제한이 없다.
+//   입양을 굴리는 쪽이라 줄곧 보내고 받아야 하는데, 사흘에 한 번에 묶이면
+//   사원 쪽 입양이 상담사를 기다리느라 멈춘다. 받는 쪽은 본래 제한이 없다.
+function noGap(u) { return !!(u && u.code === ADMIN); }
 function giveLeft(u) {
+    if (noGap(u)) return 0;
     const t = Number(u && u.petGaveAt) || 0;
     return Math.max(0, t + GAP - Date.now());
+}
+// 안내 글 — 상담사에게는 사흘 이야기를 안 한다
+function gapLine(u, tail) {
+    return noGap(u) ? '상담사는 <b>날짜 제한 없이</b> 보낼 수 있습니다.'
+        : ('보내기는 <b>사흘에 한 번</b>입니다' + (tail || '') + '.');
 }
 function leftText(ms) {
     const h = Math.ceil(ms / 3600000);
@@ -310,7 +323,7 @@ function confirmSend(key, to) {
         '<b style="color:#ffcf8f;">' + esc(t.name) + '</b> 사원에게 <b style="color:#ffcf8f;">'
         + esc(nm) + '</b>' + josa(nm, '을') + ' 보냅니다.<br>'
         + '그 사원이 ' + esc(nm) + '의 마음을 얻어야 갑니다. 얻지 못하면 그대로 남습니다.<br><br>'
-        + '보내기는 <b>사흘에 한 번</b>입니다.')
+        + gapLine(me))
         + '<button id="adp-ok" class="game-btn" style="' + BTN + '">보낸다</button>'
         + '<button id="adp-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
     w.querySelector('#adp-no').onclick = shut;
@@ -452,7 +465,7 @@ function askView(o) {
         + esc(nm) + '</b>' + josa(nm, '을') + ' 입양하려고 합니다.<br><br>'
         + '승낙하면 그 사원이 ' + esc(nm) + '에게 어필합니다. ' + esc(nm)
         + josa(nm, '이') + ' 마음을 주어야 갑니다.<br>'
-        + '보내기는 <b>사흘에 한 번</b>이며, 승낙도 보내는 것으로 셉니다.')
+        + gapLine(me, '이며, 승낙도 보내는 것으로 셉니다'))
         + '<button id="adp-ok" class="game-btn" style="' + BTN + '">승낙한다</button>'
         + '<button id="adp-no" class="game-btn" style="' + BTN + GREY + '">거절한다</button>');
 
@@ -715,7 +728,7 @@ window.petAdoptState = function () {
     if (!me) { console.log('  로그인 후에 쓰세요.'); return; }
     const l = giveLeft(me);
     console.log('  보내기 : ' + (l > 0 ? (leftText(l) + ' 뒤에 됩니다') : '지금 됩니다')
-        + ' (사흘에 한 번)');
+        + (noGap(me) ? ' (상담사 — 날짜 제한 없음)' : ' (사흘에 한 번)'));
     console.log('  ' + TICKET + ' : ' + ticketCount(me) + '장'
         + ' (물품 등록 ' + ((typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[TICKET]) ? 'O' : '✗')
         + ' · 쓰기 연결 '
