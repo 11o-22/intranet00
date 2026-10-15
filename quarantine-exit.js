@@ -60,7 +60,33 @@ function shut(ids) {
     document.body.style.overflow = '';
 }
 
-// 정상 해제와 같은 일을 한다
+// ★ 서버에 적는 일은 **다 바꾼 뒤에 한 번만** 한다.
+//
+//   ✗ 전에는 release() 가 제 끝에서 저장했다. 그런데 doExit 는
+//     release() → spend() → 기록 차례로 돈다. 그래서 **쓴 횟수도,
+//     닳아 없어진 것도, 기록도 서버에 안 갔다.** 화면에만 그렇게
+//     보이고 서버에는 쓰기 전 모습이 그대로 남았다 (재 봄 — 다섯 번째에
+//     화면은 「닳아 없어졌습니다」인데 서버에는 문패가 그대로 있고
+//     useCnt 도 4 였다).
+//
+//     그 어긋남이 쌓이면 이런 일이 난다 — 서버가 다시 내려올 때 문패가
+//     되살아나고, 늘어난 까닭(기록)은 없으니 dupe-watch 가 「까닭 없는
+//     증가」로 보고 되돌려 버린다. 그러면 정말로 없어진다.
+function saveNow() {
+    // 값이 없는 칸은 빼고 저장한다 — 하나라도 섞이면 전부 안 써진다
+    const f = {
+        quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1,
+        pollution: 1, quarantineExitPollution: 1, lastPollutionTime: 1,
+        foxRoomAnswered: 1, useCnt: 1, inventory: 1, equippedWeapons: 1, history: 1
+    };
+    if (currentUser.badge !== undefined) f.badge = 1;
+    Object.keys(f).forEach(function (k) { if (currentUser[k] === undefined) delete f[k]; });
+    if (typeof saveFields === 'function') {
+        try { saveFields(f); } catch (e) { console.error('[격리 해제] 저장 실패:', e); }
+    }
+}
+
+// 정상 해제와 같은 일을 한다 (값만 바꾼다 — 저장은 saveNow 가 한다)
 function release() {
     let out = currentUser.quarantineExitPollution || 0;
     if (out >= 100) out = 99;              // 100 이면 나오자마자 다시 들어간다
@@ -87,18 +113,6 @@ function release() {
         currentUser.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
     }
 
-    // 값이 없는 칸은 빼고 저장한다 — 하나라도 섞이면 전부 안 써진다
-    const f = {
-        quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1,
-        pollution: 1, quarantineExitPollution: 1, lastPollutionTime: 1,
-        foxRoomAnswered: 1, useCnt: 1, inventory: 1, equippedWeapons: 1, history: 1
-    };
-    if (currentUser.badge !== undefined) f.badge = 1;
-    Object.keys(f).forEach(function (k) { if (currentUser[k] === undefined) delete f[k]; });
-
-    if (typeof saveFields === 'function') {
-        try { saveFields(f); } catch (e) { console.error('[격리 해제] 저장 실패:', e); }
-    }
     return out;
 }
 
@@ -120,8 +134,9 @@ function doExit(nm, kind) {
 
     if (typeof addHistoryLog === 'function') {
         addHistoryLog(currentUser, '[' + nm + '] ' + (kind === 'plate' ? '상담실' : '선녀탕')
-            + '에서 나왔습니다. (오염도 ' + out + '%)');
+            + '에서 나왔습니다. (오염도 ' + out + '%' + (r.gone ? ' · 다 썼습니다' : ' · 남은 횟수 ' + r.left + '회') + ')');
     }
+    saveNow();                       // ★ 다 바꾼 뒤에 한 번만
     if (typeof updateUI === 'function') updateUI();
 
     showCustomAlert(
