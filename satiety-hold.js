@@ -429,13 +429,34 @@ function sweepRibbons() {
         });
         if (i < 0) break;
         const full = eq[i];
+
+        // ★ 이 이름표를 **누가 채웠나** — 채운 사람이 값을 치렀으므로
+        //   돌려받을 사람도 그 사람이다. 묶을 때 양쪽 모두에게
+        //   채운 사람의 사번을 적어 둔다 (index.html 의 setEquipOwner).
+        let owner = null;
+        if (typeof getEquipOwner === 'function') {
+            try { owner = getEquipOwner(currentUser, full); } catch (e) { owner = null; }
+        }
+
         eq.splice(i, 1);
         off++;
         if (typeof clearEquipOwner === 'function') { try { clearEquipOwner(currentUser, full); } catch (e) { } }
 
-        // 내가 채운 줄의 몫만 소지품으로 돌려받는다
-        if (gave < owed.length) {
-            markPaid(owed[gave]);
+        // ★ 이름표를 뗐으면 **반드시 값을 치른 사람에게 돌려준다.**
+        //
+        //   ✗ 전에는 끝난 줄(owed)이 있을 때만 돌려줬다. 그런데 이름표를
+        //     떼는 기준은 「차고 있는 수 − 살아 있는 줄 수」라, **줄(ribbons)이
+        //     없는데 이름표만 있는** 때도 뗀다. 저장이 한 번 날아갔거나
+        //     묵은 값이 되돌아온 때가 그렇다. 그러면 끝난 줄이 하나도 없어
+        //     owed 가 비고, **이름표만 뜯긴 채 소지품으로도 안 돌아왔다** —
+        //     리본이 그냥 없어졌다. (1,000 P 짜리가 흔적도 없이 사라졌다)
+        //
+        //   이름표는 한 번 떼면 다시 세지 않으므로(차고 있는 수가 줄어든다)
+        //   이렇게 해도 30초마다 불어나지 않는다.
+        const mine = owner ? (owner === currentUser.code)
+                           : (gave < owed.length);     // 주인 기록이 없는 묵은 것
+        if (mine) {
+            if (gave < owed.length) markPaid(owed[gave]);
             if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
             currentUser.inventory.push(RIBBON);
             gave++;
@@ -483,6 +504,8 @@ function sweepRibbons() {
 }
 setTimeout(sweepRibbons, 5000);
 setInterval(sweepRibbons, 30000);
+// 손으로 한 번 돌리고 싶을 때 (ribbonSync 로 어긋난 것을 본 뒤)
+window.ribbonSweep = sweepRibbons;
 
 // 지금 어긋나 있는 것을 손으로 맞춘다 — 차고 있는 수와 줄 수를 같게
 window.ribbonSync = function () {
