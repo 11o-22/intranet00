@@ -841,11 +841,19 @@ function putOne(one, x, y) {
 //   따로 길을 내지 않은 까닭은, 말풍선이 뜨고 지는 셈(SAY_MS·st)을
 //   두 벌로 만들면 어긋나기 때문이다.
 const EMO_RE = /^\[emo:([A-Za-z0-9_-]{1,12})\]$/;
-function bubble(one, text) {
+// ★ 말풍선 **모양**은 바깥(bubbles.js)에서 고른다.
+//   여기서는 고른 이름을 sb-○○ 라는 갈래 이름으로 붙이기만 한다.
+//   bubbles.js 가 없으면 아무것도 안 붙어 전처럼 보인다.
+function sbMine() {
+    try { return (typeof window.sbOf === 'function') ? (window.sbOf(u_()) || '') : ''; }
+    catch (e) { return ''; }
+}
+function bubble(one, text, sty) {
     if (one.bub) { one.bub.remove(); one.bub = null; }
     if (!text) return;
     const b = document.createElement('div');
     b.className = 'plaza-say';
+    if (sty && /^[a-z0-9]{1,12}$/.test(String(sty))) b.classList.add('sb-' + sty);
     const m = EMO_RE.exec(String(text));
     if (m && typeof window.emoTag === 'function' && typeof window.emoById === 'function'
         && window.emoById(m[1])) {
@@ -1536,7 +1544,7 @@ function send(moving) {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
             f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null),
-            s: run.say || null, st: run.sayAt || 0, at: t
+            s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t
         });
     } catch (e) { }
 }
@@ -1582,7 +1590,7 @@ function onPeers(snap) {
         // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
         if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
             q.sayAt = v.st;
-            bubble(q.one, v.s || '');
+            bubble(q.one, v.s || '', v.b || '');
         }
     });
 
@@ -2033,7 +2041,7 @@ function say(text) {
     }
 
     run.say = t; run.sayAt = now();
-    bubble(run.me, t);
+    bubble(run.me, t, sbMine());
     send(false);                              // 말풍선을 바로 알린다
     const d = db_();
     if (d) {
@@ -2054,7 +2062,7 @@ function sayEmo(id) {
     try { if (typeof window.emoClose === 'function') window.emoClose(); } catch (x) { }
     run.say = '[emo:' + id + ']';
     run.sayAt = now();
-    bubble(run.me, run.say);
+    bubble(run.me, run.say, sbMine());
     send(false);                              // 말풍선을 바로 알린다
     const d = db_();
     if (d) {
