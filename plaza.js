@@ -853,7 +853,14 @@ function bubble(one, text, sty) {
     if (!text) return;
     const b = document.createElement('div');
     b.className = 'plaza-say';
-    if (sty && /^[a-z0-9]{1,12}$/.test(String(sty))) b.classList.add('sb-' + sty);
+    // 고른 모양이 있으면 **얹을 자리**도 같이 만들어 둔다 (bubbles.js 가 그림을 깐다).
+    //   ✗ :before 로 못 한다 — 꼬리 테두리가 이미 쓰고 있다.
+    let sbi = null;
+    if (sty && /^[a-z0-9]{1,12}$/.test(String(sty))) {
+        b.classList.add('sb-' + sty);
+        sbi = document.createElement('i');
+        sbi.className = 'sbi';
+    }
     const m = EMO_RE.exec(String(text));
     if (m && typeof window.emoTag === 'function' && typeof window.emoById === 'function'
         && window.emoById(m[1])) {
@@ -862,6 +869,7 @@ function bubble(one, text, sty) {
     } else {
         b.innerText = text;
     }
+    if (sbi) b.appendChild(sbi);
     one.wrap.appendChild(b);
     one.bub = b;
 }

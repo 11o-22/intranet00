@@ -13,10 +13,15 @@
 //   테두리는 넷 다 연필로 그은 듯한 잿빛 한 줄(#8c8c88)이고,
 //   꼬리에도 같은 줄이 둘러진다.
 //
-//   ※ 보여 주신 그림은 카카오톡 테마였습니다. 거기 얹힌 **그림 인물**은
-//     남의 것이라 옮길 수 없어, **빛깔 네 가지와 연필 테두리**만 재서
-//     새로 그렸습니다. 말풍선에 붙어 있던 수레 모양 꼬리 장식도 빼고
-//     여느 말풍선 꼬리로 두었습니다.
+//   빛깔 네 가지는 보여 주신 테마 그림에서 안쪽 색을 집어 와 썼다.
+//   (테마에 얹혀 있던 그림 인물은 남의 것이라 가져오지 않았다.)
+//
+//   말풍선 위에는 **이 게임에 이미 있는 사내 이모티콘**을 하나씩 얹는다.
+//   emo/e34·e42·e28·e30 에서 **글씨만 걷어 내고** 작게 줄인 것이다
+//   (emo/bub-*.webp). 어느 것에서 떴는지는 아래 SB 의 em 에 적어 두었다.
+//
+//       아이보리 ← e34 처리하겠습니다   연노랑 ← e42 힘내요~
+//       하늘     ← e28 배째여~         풀빛   ← e30 나만 믿어!
 //
 // ■ 지금은 상담사만 쓴다
 //
@@ -40,15 +45,25 @@
 const ADMIN = 'kario0987';
 const ONLY_ADMIN = true;        // ★ 전 사원에게 열 때 false 로
 
-// 그림에서 안쪽 빛깔을 집어 와 그대로 쓴다
+// 그림에서 안쪽 빛깔을 집어 와 그대로 쓴다.
+//
+//   ★ 말풍선 위에 **사내 이모티콘**을 하나씩 얹는다 (emo/ 에 이미 있는 것).
+//     글씨만 걷어 내고 쓴다 — 어느 것에서 떴는지는 em 에 적어 둔다.
+//     w 는 높이 TOP 일 때의 가로 (그림의 가로세로비 그대로).
 const SB = [
-    { id: 'ivory', n: '아이보리', bg: '#fbf3f1', fg: '#3a3433' },
-    { id: 'lemon', n: '연노랑',   bg: '#fffae4', fg: '#3c3a2c' },
-    { id: 'sky',   n: '하늘',     bg: '#e6eff4', fg: '#2c3338' },
-    { id: 'grass', n: '풀빛',     bg: '#e9efe5', fg: '#303630' },
+    // 아이보리 ← e34 「처리하겠습니다」 분홍 토끼
+    { id: 'ivory', n: '아이보리', bg: '#fbf3f1', fg: '#3a3433', em: 'e34', w: 25 },
+    // 연노랑 ← e42 「힘내요~」 노랑 고양이
+    { id: 'lemon', n: '연노랑',   bg: '#fffae4', fg: '#3c3a2c', em: 'e42', w: 32 },
+    // 하늘 ← e28 「배째여~」 늘어진 하양
+    { id: 'sky',   n: '하늘',     bg: '#e6eff4', fg: '#2c3338', em: 'e28', w: 39 },
+    // 풀빛 ← e30 「나만 믿어!」 식칼 든 갈색머리
+    { id: 'grass', n: '풀빛',     bg: '#e9efe5', fg: '#303630', em: 'e30', w: 30 },
 ];
 const LINE = '#8c8c88';         // 연필로 그은 듯한 테두리
 const TAIL = 6;                 // 꼬리 크기 (px)
+const TOP  = 31;                // 얹는 그림 높이 (px)
+const DIP  = 9;                 // 말풍선 윗선에 걸치는 깊이 (px)
 
 // ==========================================
 // 모양
@@ -70,7 +85,15 @@ const TAIL = 6;                 // 꼬리 크기 (px)
         // 속살 세모 — 테두리 세모 위에 얹힌다
         L.push(k + ':after{margin-left:-' + TAIL + 'px;border-width:' + TAIL + 'px;'
                  + 'border-top-color:' + s.bg + ';}');
+        // 위에 얹는 그림 — 말풍선 왼쪽 어깨에 걸터앉는다
+        L.push(k + ' .sbi{width:' + s.w + 'px;'
+                 + 'background-image:url(emo/bub-' + s.id + '.webp);}');
     });
+    // 얹는 자리 — 네 가지가 똑같다
+    L.push('.plaza-say .sbi{position:absolute;left:1px;bottom:calc(100% - ' + DIP + 'px);'
+         + 'height:' + TOP + 'px;background-repeat:no-repeat;'
+         + 'background-position:bottom center;background-size:contain;'
+         + 'pointer-events:none;}');
     // 테두리 세모 — 네 빛깔이 똑같아 한 번만 적는다
     L.push('.plaza-say[class*="sb-"]:before{content:"";position:absolute;left:50%;top:100%;'
          + 'margin-left:-' + (TAIL + 2) + 'px;margin-top:-1px;'
@@ -110,11 +133,11 @@ window.sbSet = sbSet;
 function sample(s, on) {
     const cls = s ? ' sb-' + s.id : '';
     const bg = s ? s.bg : '#f4efe2';
-    return `<div style="position:relative; height:46px;">
-        <div class="plaza-say${cls}" style="position:absolute; left:50%; top:4px; bottom:auto;
+    return `<div style="position:relative; height:70px;">
+        <div class="plaza-say${cls}" style="position:absolute; left:50%; top:30px; bottom:auto;
              transform:translateX(-50%); margin:0; width:max-content;
              ${s ? '' : 'background:' + bg + ';color:#1a1a1a;'}">
-            ${on ? '지금 이걸 쓰는 중' : '안녕하세요'}
+            ${on ? '지금 이걸 쓰는 중' : '안녕하세요'}${s ? '<i class="sbi"></i>' : ''}
         </div>
     </div>`;
 }
