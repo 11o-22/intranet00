@@ -242,7 +242,6 @@ const PLAZA = {
     //   ic 가 없는 줄은 전처럼 i(글자 그림)로 그린다.
     // ★ g 는 **갈래**다 — 목록(☰)이 이 차례대로 묶어 그린다 (GROUPS 참고).
     //   g 가 없는 줄은 맨 끝 「그 밖」으로 모인다.
-    //   ★ 소지품은 여기 없다 — 오른쪽 아래 **가방 단추**가 소지품이다.
     //   ★ 의상숍·악세서리숍도 없다 — 망상 홈쇼핑 안에 서 있다 (gacha.js).
     GROUPS: [
         { g: 'in',    n: '사내' },
@@ -261,6 +260,8 @@ const PLAZA = {
         //   채팅 칸이 열린다. 목록에까지 두면 가는 길이 둘이 된다.
         // ② 내 정보
         { g: 'me',    n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
+        // 오른쪽 아래 가방 단추와 가는 데가 같다 — 목록에서도 찾을 수 있게 둔다
+        { g: 'me',    n: '소지품',     i: '🎒', ic: 'bag',     tab: 'tab-record',   sub: 'rec-inventory' },
         { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
         { g: 'me',    n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters' },
         { g: 'me',    n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
