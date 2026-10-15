@@ -124,17 +124,21 @@ function curHue(sheet) {
         '#pal-num{text-align:center;font-size:12px;letter-spacing:.08em;color:#9a948a;',
         '  margin:9px 0 3px 0;font-weight:bold;}',
         // RGB 막대 — 깔개가 그 칸을 0→255 로 움직인 모습이라 눈으로 고르기 쉽다
+        //
+        // ★ <input type="range"> 를 안 쓴다. 손잡이를 브라우저가 그리고 값도
+        //   브라우저가 쥐고 있어서, 기기마다 다르게 움직인다 (휴대폰에서 셋이
+        //   한 자리로 붙어 버렸다는 말씀). 색고리와 같은 길로 **직접** 그린다.
         '#pal-rgb{margin:7px 2px 3px 2px;}',
-        '#pal-rgb .row{display:flex;align-items:center;gap:8px;margin-top:6px;}',
-        '#pal-rgb .row b{flex:0 0 11px;font-size:10px;color:#9a948a;font-weight:normal;}',
-        '#pal-rgb .row i{flex:0 0 26px;font-style:normal;font-size:10px;color:#9a948a;text-align:right;}',
-        '#pal-rgb input{flex:1;min-width:0;margin:0;height:14px;border-radius:7px;background:#333;',
-        '  -webkit-appearance:none;appearance:none;outline:none;touch-action:none;',
-        '  border:1px solid rgba(255,255,255,.18);}',
-        '#pal-rgb input::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;',
-        '  border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.55);cursor:pointer;}',
-        '#pal-rgb input::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;',
-        '  border:1px solid rgba(0,0,0,.55);cursor:pointer;}',
+        '#pal-rgb .row{display:flex;align-items:center;gap:10px;margin-top:7px;}',
+        '#pal-rgb .row>b{flex:0 0 11px;font-size:10px;color:#9a948a;font-weight:normal;}',
+        '#pal-rgb .row>u{flex:0 0 26px;text-decoration:none;font-size:10px;color:#9a948a;',
+        '  text-align:right;font-variant-numeric:tabular-nums;}',
+        '#pal-rgb .bar{flex:1;min-width:0;position:relative;height:15px;border-radius:8px;',
+        '  background:#333;border:1px solid rgba(255,255,255,.18);cursor:pointer;',
+        '  touch-action:none;margin:0 2px;}',
+        '#pal-rgb .kn{position:absolute;top:50%;width:17px;height:17px;border-radius:50%;',
+        '  background:#fff;border:1px solid rgba(0,0,0,.55);pointer-events:none;',
+        '  transform:translate(-50%,-50%);box-shadow:0 1px 3px rgba(0,0,0,.5);}',
         '#pal-keep{text-align:center;font-size:10px;color:#8d8578;min-height:14px;margin-top:5px;}',
         '#pal-btns{display:flex;gap:7px;margin-top:11px;}',
         '#pal-btns button{flex:1;padding:11px 4px;font-size:11px;border-radius:9px;cursor:pointer;',
@@ -304,11 +308,21 @@ function paintBars() {
         const num = document.getElementById('pal-' + k + 'n');
         if (num) num.innerText = c[i];
         if (!el) return;
-        if (document.activeElement !== el) el.value = c[i];   // 끌고 있는 막대는 안 건드린다
         const lo = c.slice(), hi = c.slice();
         lo[i] = 0; hi[i] = 255;
         el.style.background = 'linear-gradient(90deg,rgb(' + lo.join(',') + '),rgb(' + hi.join(',') + '))';
+        const kn = el.querySelector('.kn');
+        if (kn) kn.style.left = (c[i] / 255 * 100) + '%';
     });
+}
+
+// 막대를 누른 자리 → 0~255
+function barAt(el, ev) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) return 0;
+    let t = (ev.clientX - r.left) / r.width;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    return Math.round(t * 255);
 }
 
 // 적힌 색(묵은 것 포함)을 색판 자리로 되돌린다
@@ -428,8 +442,8 @@ function open(sheet) {
         + '<div id="pal-rgb">'
         + ['r', 'g', 'b'].map(function (k, i) {
             return '<div class="row"><b>' + 'RGB'.charAt(i) + '</b>'
-                + '<input type="range" min="0" max="255" id="pal-' + k + '">'
-                + '<i id="pal-' + k + 'n"></i></div>';
+                + '<div class="bar" id="pal-' + k + '" data-ch="' + i + '"><i class="kn"></i></div>'
+                + '<u id="pal-' + k + 'n"></u></div>';
         }).join('')
         + '</div>'
         + '<div id="pal-keep"></div>'
@@ -443,17 +457,34 @@ function open(sheet) {
 
     const cv = ov.querySelector('#pal-wheel');
     // ★ 끌기는 **누른 자리로 갈린다.** 고리에서 시작했으면 끝까지 색조만,
-    //   네모에서 시작했으면 끝까지 진하기·밝기만 바뀐다. 안 그러면 손가락이
-    //   경계를 넘나들 때 고른 색이 튄다.
-    let mode = '';
+    //   네모에서 시작했으면 진하기·밝기만, 막대에서 시작했으면 그 한 칸만.
+    //   안 그러면 손가락이 경계를 넘나들 때 고른 색이 튄다.
+    //   mode 는 'ring' · 'sq' · 막대 번호(0·1·2) 다.
+    let mode = null;
+    const bars = ['r', 'g', 'b'].map(function (k) { return ov.querySelector('#pal-' + k); });
+
     cv.addEventListener('pointerdown', function (e) {
         mode = where(cv, e); pickAt(cv, e, mode); e.preventDefault();
     });
-    // ★ 손가락을 색판 밖으로 끌어도 따라오게 window 에 건다.
+    bars.forEach(function (el, i) {
+        el.addEventListener('pointerdown', function (e) {
+            mode = i; dragBar(i, e); e.preventDefault();
+        });
+    });
+    function dragBar(i, e) {
+        const v = run.rgb.slice();
+        v[i] = barAt(bars[i], e);
+        setRgb(v[0], v[1], v[2]);
+    }
+    // ★ 손가락을 색판·막대 밖으로 끌어도 따라오게 window 에 건다.
     //   ✗ setPointerCapture 는 쓰지 않는다 — 조이스틱에서 lostpointercapture 가
     //     거품처럼 올라와 떼어진 것으로 읽혔던 적이 있다 (plaza.js 참고).
-    const mv = function (e) { if (mode) { pickAt(cv, e, mode); e.preventDefault(); } };
-    const up = function () { mode = ''; };
+    const mv = function (e) {
+        if (mode == null) return;
+        if (typeof mode === 'number') dragBar(mode, e); else pickAt(cv, e, mode);
+        e.preventDefault();
+    };
+    const up = function () { mode = null; };
     window.addEventListener('pointermove', mv, { passive: false });
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -463,13 +494,6 @@ function open(sheet) {
         window.removeEventListener('pointercancel', up);
     };
 
-    ['r', 'g', 'b'].forEach(function (k) {
-        ov.querySelector('#pal-' + k).oninput = function () {
-            setRgb(ov.querySelector('#pal-r').value,
-                   ov.querySelector('#pal-g').value,
-                   ov.querySelector('#pal-b').value);
-        };
-    });
     ov.querySelector('#pal-x').onclick = shut;
     ov.querySelector('#pal-off').onclick = wipe;
     ov.querySelector('#pal-go').onclick = apply;
