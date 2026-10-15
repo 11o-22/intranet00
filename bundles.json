@@ -326,10 +326,12 @@
       "pet-act.js",
       "babyfox.js",
       "jisan.js",
+      "recolor.js",
       "closet.js",
       "plaza.js",
       "shell.js",
       "skip.js",
+      "palette.js",
       "shot.js",
       "firsthead.js",
       "gacha.js"

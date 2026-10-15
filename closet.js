@@ -421,22 +421,95 @@ function look(user, override, all) {
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
     // 한 벌로 그려진 머리는 옷을 안 겹친다 — 고른 것은 그대로 두되 안 그린다
     if (hd.solo) over.length = 0;
-    return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick };
+    // ★ 장마다 물들인 색 — { 장이름: 0~359 }. 광장이 dot 을 통째로 주고받으므로
+    //   남의 화면에서도 같은 색으로 보인다 (따로 보낼 것이 없다).
+    const col = (d.col && typeof d.col === 'object') ? d.col : {};
+    return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick, col: col };
 }
 window.dotLook = look;
 // 칸 크기를 밖에서도 쓴다 (광장이 베껴 적지 않게)
 window.dotSpec = function () { return { W: D.W, H: D.H, FOOT: D.FOOT }; };
 
 // ==========================================
+// 물들일 수 있는 자리 — 지금 입고 있는 옷·악세의 장 목록
+// ==========================================
+//   컬러 팔레트(palette.js)와 옷장이 같이 쓴다. 몸과 머리는 뺀다 —
+//   살갗과 얼굴까지 물들면 사람이 아니게 된다.
+function wornParts(user) {
+    const u = user || u_();
+    const L = look(u);
+    const order = (L.layers || []).concat(L.tops || []);
+    const seen = {}, out = [];
+    DOT_SLOTS.forEach(function (s) {
+        s.items.forEach(function (x) {
+            (x.over || []).concat(x.top || []).forEach(function (sh) {
+                if (order.indexOf(sh) < 0 || seen[sh]) return;
+                seen[sh] = 1;
+                out.push({
+                    sheet: sh, slot: s.n, name: x.n,
+                    keep: (typeof window.dotTintKeep === 'function' && window.dotTintKeep(sh)) || '',
+                    hue: (L.col || {})[sh]
+                });
+            });
+        });
+    });
+    out.sort(function (a, b) { return order.indexOf(a.sheet) - order.indexOf(b.sheet); });
+    return out;
+}
+window.dotWornParts = wornParts;
+
+// ★ 한 장에 색을 적는다 (팔레트가 부르는 문).
+//   hue 가 비면 물든 것을 지운다. 적자마자 옷장 마네킹과 광장 사람을
+//   그 자리에서 갈아입힌다.
+window.dotSetCol = function (sheet, hue) {
+    const me = u_();
+    if (!me || !sheet) return false;
+    // 아직 한 번도 안 고른 사람이면 지금 보이는 대로 적어 둔다
+    if (!me.dot || typeof me.dot !== 'object') {
+        const L = look(me);
+        const d = { head: L.head };
+        DOT_SLOTS.forEach(function (s) { d[s.k] = L.pick[s.k] || ''; });
+        me.dot = d;
+    }
+    const col = (me.dot.col && typeof me.dot.col === 'object') ? me.dot.col : {};
+    if (hue == null || hue === '') delete col[sheet];
+    else col[sheet] = ((Math.round(Number(hue)) % 360) + 360) % 360;
+    me.dot.col = col;
+    if (pick) pick.col = Object.assign({}, col);     // 옷장이 열려 있으면 같이 맞춘다
+    save({ dot: 1 });
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    try { if (document.getElementById('closet-stage')) { paintDoll(); markOn(); } } catch (e) { }
+    return true;
+};
+
+// ==========================================
 // 모습이 든 칸을 만든다
 // ==========================================
-function layer(sheet, k) {
+// ★ hue 가 있으면 **색을 갈아 끼운 그림**을 깐다 (recolor.js).
+//   아직 안 만들어졌으면 원래 그림을 깔아 두고, 다 되면 갈아 끼운다
+//   (아래 dotTintOn). 그래서 기다리는 빈 칸이 안 보인다.
+function layer(sheet, k, hue) {
     const el = document.createElement('div');
     el.className = 'dot-layer';
     el.dataset.sheet = sheet;
-    el.style.backgroundImage = 'url("' + D.DIR + sheet + '.png")';
+    let src = D.DIR + sheet + '.png';
+    if (hue != null && hue !== '' && typeof window.dotTint === 'function') {
+        el.dataset.hue = hue;
+        const t = window.dotTint(sheet, hue);
+        if (t) src = t;
+    }
+    el.style.backgroundImage = 'url("' + src + '")';
     el.style.backgroundSize = (D.SHEET_W * k) + 'px ' + (D.SHEET_H * k) + 'px';
     return el;
+}
+// 색을 다 칠하면 지금 떠 있는 칸들을 갈아 끼운다
+if (typeof window.dotTintOn === 'function') {
+    window.dotTintOn(function (sheet, hue, url) {
+        const sel = '.dot-layer[data-sheet="' + sheet + '"][data-hue="' + hue + '"]';
+        Array.prototype.forEach.call(document.querySelectorAll(sel), function (e) {
+            e.style.backgroundImage = 'url("' + url + '")';
+        });
+    });
 }
 
 function sprite(user, opt) {
@@ -452,7 +525,10 @@ function sprite(user, opt) {
 
     const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
     const headAt = 1 + L.layers.length;                 // 머리가 몇 번째 층인가
-    const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
+    const col = L.col || {};
+    const els = sheets.map(function (s) {
+        const e = layer(s, k, col[s]); box.appendChild(e); return e;
+    });
 
     const row = (pose === 'walk') ? 0 : 1;
     const put = function (el, col) {
@@ -519,7 +595,10 @@ function actor(user, opt) {
     box.style.height = (D.H * k) + 'px';
 
     const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
-    const els = sheets.map(function (s) { const e = layer(s, k); box.appendChild(e); return e; });
+    const col = L.col || {};
+    const els = sheets.map(function (s) {
+        const e = layer(s, k, col[s]); box.appendChild(e); return e;
+    });
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = flapsOf(els, sheets);
 
@@ -644,6 +723,10 @@ window.dotStop = stop;
         '.cl-b.on{background:rgba(217,160,90,.28);border-color:#8a6a2a;border-width:2px;',
         '  padding:8px 12px;color:var(--theme-text,#ffe9bd);font-weight:bold;}',
         '.cl-row .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
+        // 색 알 — 왼쪽 동그라미가 지금 물든 색이다 (안 물들었으면 비어 있다)
+        '.cl-b .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;',
+        '  border:1px solid rgba(255,255,255,.4);vertical-align:middle;background:transparent;}',
+        '.cl-b .ou{font-style:normal;font-size:9px;color:#9a948a;margin-left:5px;}',
         '.cl-none{font-size:11px;color:#7d7568;padding:8px 2px;}',
         '#closet-note{font-size:10px;color:#8d8578;margin-top:12px;line-height:1.6;}'
     ].join('\n');
@@ -661,7 +744,7 @@ function cur() {
     const u = u_();
     if (!pick) {
         const L = look(u);
-        pick = { head: L.head };
+        pick = { head: L.head, col: Object.assign({}, L.col) };
         DOT_SLOTS.forEach(function (s) { pick[s.k] = L.pick[s.k] || ''; });
     }
     return pick;
@@ -752,7 +835,35 @@ function buildRows(u) {
         html += '<div class="cl-h">악세 <i>세 개까지</i></div>'
             + (acc || '<div class="cl-none">가진 악세가 없습니다.</div>');
     }
+
+    // ④ 색 — 지금 입은 것마다 한 알씩. 누르면 색고리가 뜬다 (palette.js)
+    //    ★ 물들이는 데에는 [ 🎨 컬러 팔레트 ] 가 한 개 든다. 되돌리는 것은 공짜다.
+    if (typeof window.dotPalette === 'function') {
+        html += '<div class="cl-h">색 <i>🎨 컬러 팔레트 한 개</i></div>'
+            + '<div id="closet-cols">' + colHtml() + '</div>';
+    }
     return html;
+}
+
+// 색 알 — 갈아입을 때마다 **이 줄만** 다시 그린다 (다른 줄의 민 자리는 지킨다)
+// ★ 지금 고르는 중인 것(pick)으로 본다 — me.dot 은 0.6초 뒤에야 적힌다
+function colHtml() {
+    const parts = wornParts(Object.assign({}, u_() || {}, { dot: cur() }));
+    if (!parts.length) return '<div class="cl-none">입은 것이 없습니다.</div>';
+    return rowOf('물들이기', parts.map(function (x) {
+        return '<button class="cl-b cl-col" data-kind="col" data-k="' + esc_(x.sheet)
+            + '" data-v=""><i class="sw"></i>' + esc_(x.name)
+            + (x.keep ? '<i class="ou">겉만</i>' : '') + '</button>';
+    }).join(''));
+}
+
+function paintCols() {
+    const box = document.getElementById('closet-cols');
+    if (!box) return;
+    box.innerHTML = colHtml();
+    Array.prototype.forEach.call(box.querySelectorAll('.cl-b'), function (b) {
+        b.onclick = function () { tap(b.dataset.kind, b.dataset.k, b.dataset.v); };
+    });
 }
 
 // 켜짐 표시만 갈아 끼운다 — 칸은 그대로 두어 밀어 둔 자리를 지킨다
@@ -762,8 +873,19 @@ function markOn() {
     const p = cur();
     const s = slotOf('acc');
     const sel = s ? accSplit(p[s.k]) : [];
+    const col = p.col || {};
     Array.prototype.forEach.call(body.querySelectorAll('.cl-b'), function (b) {
         const kind = b.dataset.kind, k = b.dataset.k, v = b.dataset.v;
+        // ★ 색 알은 고르는 단추가 아니다 — 물든 색만 보여 준다.
+        //   ✗ 아래 일반 셈에 섞으면 ('' === '') 이라 전부 켜진 것으로 보인다.
+        if (kind === 'col') {
+            const h = col[k];
+            const got = (h != null && h !== '');
+            const sw = b.querySelector('.sw');
+            if (sw) sw.style.background = got ? 'hsl(' + h + ',72%,55%)' : 'transparent';
+            b.classList.toggle('on', got);
+            return;
+        }
         let on;
         if (kind === 'head') on = (p.head === v);
         else if (kind === 'acc') on = v ? (sel.indexOf(v) >= 0) : (sel.length === 0);
@@ -781,6 +903,8 @@ function saveSoon() {
         const p = cur();
         const out = { head: p.head };
         DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
+        // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
+        out.col = Object.assign({}, p.col || {});
         me.dot = out;
         save({ dot: 1 });
         // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
@@ -794,6 +918,11 @@ function saveSoon() {
 
 function tap(kind, k, v) {
     const p = cur();
+    // 색 알 — 고르는 것이 아니라 색고리를 띄운다
+    if (kind === 'col') {
+        if (typeof window.dotPalette === 'function') window.dotPalette(k);
+        return;
+    }
     if (kind === 'head') { p.head = v; }
     else if (kind === 'acc') {
         const s = slotOf('acc'); if (!s) return;
@@ -809,6 +938,7 @@ function tap(kind, k, v) {
         p[s.k] = accJoin(sel, max);
     } else { p[k] = v; }
     markOn();
+    paintCols();      // 갈아입었으니 물들일 거리도 달라진다
     paintDoll();
     saveSoon();
 }
