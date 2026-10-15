@@ -492,8 +492,9 @@ window.dotSetCol = function (sheet, hue) {
         me.dot = d;
     }
     const col = (me.dot.col && typeof me.dot.col === 'object') ? me.dot.col : {};
-    if (hue == null || hue === '') delete col[sheet];
-    else col[sheet] = ((Math.round(Number(hue)) % 360) + 360) % 360;
+    // 0~359 아니면 'w'(흰색) — 가리는 것은 recolor.js 한 곳에서만 한다
+    const h = (typeof window.dotHue === 'function') ? window.dotHue(hue) : hue;
+    if (h == null) delete col[sheet]; else col[sheet] = h;
     me.dot.col = col;
     if (pick) pick.col = Object.assign({}, col);     // 옷장이 열려 있으면 같이 맞춘다
     save({ dot: 1 });
@@ -870,10 +871,15 @@ function buildRows(u) {
 function colHtml() {
     const parts = wornParts(Object.assign({}, u_() || {}, { dot: cur() }));
     if (!parts.length) return '<div class="cl-none">입은 것이 없습니다.</div>';
+    // ★ 물든 표시(동그라미·켜짐)를 **여기서 같이** 박는다.
+    //   ✗ markOn 에만 맡겼더니 render() 는 markOn 을 안 불러서, 옷장을 열자마자는
+    //     이미 물든 옷도 빈 동그라미로 떴다.
     return rowOf('물들이기', parts.map(function (x) {
-        return '<button class="cl-b cl-col" data-kind="col" data-k="' + esc_(x.sheet)
-            + '" data-v=""><i class="sw"></i>' + esc_(x.name)
-            + (x.keep ? '<i class="ou">겉만</i>' : '') + '</button>';
+        const h = (typeof window.dotHue === 'function') ? window.dotHue(x.hue) : null;
+        const bg = (h == null) ? 'transparent' : (h === 'w' ? '#f3f3f3' : 'hsl(' + h + ',72%,55%)');
+        return '<button class="cl-b cl-col' + (h == null ? '' : ' on') + '" data-kind="col" data-k="'
+            + esc_(x.sheet) + '" data-v=""><i class="sw" style="background:' + bg + '"></i>'
+            + esc_(x.name) + (x.keep ? '<i class="ou">겉만</i>' : '') + '</button>';
     }).join(''));
 }
 
@@ -899,11 +905,11 @@ function markOn() {
         // ★ 색 알은 고르는 단추가 아니다 — 물든 색만 보여 준다.
         //   ✗ 아래 일반 셈에 섞으면 ('' === '') 이라 전부 켜진 것으로 보인다.
         if (kind === 'col') {
-            const h = col[k];
-            const got = (h != null && h !== '');
+            const h = (typeof window.dotHue === 'function') ? window.dotHue(col[k]) : col[k];
             const sw = b.querySelector('.sw');
-            if (sw) sw.style.background = got ? 'hsl(' + h + ',72%,55%)' : 'transparent';
-            b.classList.toggle('on', got);
+            if (sw) sw.style.background = (h == null) ? 'transparent'
+                : (h === 'w' ? '#f3f3f3' : 'hsl(' + h + ',72%,55%)');
+            b.classList.toggle('on', h != null);
             return;
         }
         let on;

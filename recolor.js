@@ -51,8 +51,10 @@
 //       dotTint(장이름, 색)        쟁여 둔 그림 주소. 아직 없으면 null 을
 //                                  주고 뒤에서 만든다 (다 되면 알려 준다)
 //       dotTintOn(알림)            한 장 다 될 때마다 부른다
-//       u.dot.col = { dress: 210 } 장 이름마다 색(0~359). 광장이 dot 을
-//                                  통째로 주고받으므로 남의 화면에도 간다
+//       dotHue(적힌것)             제 꼴로 — 0~359 · 'w'(흰색) · null
+//       u.dot.col = { dress: 210 } 장 이름마다 색. 0~359 아니면 'w'(흰색).
+//                                  광장이 dot 을 통째로 주고받으므로
+//                                  남의 화면에도 간다
 //
 //   한 장 칠하는 데 70ms 쯤 걸린다(2112x768 · 재 봄). 한 번 만들어 쟁여 두고,
 //   LRU 로 MAX 장까지만 들고 있는다.
@@ -72,6 +74,13 @@ const HI_CAP = 0.74;         // 물든 칸 중 가장 밝은 것을 여기까지
 const HI_MIN = 0.34;         // 너무 캄캄하면 여기까지 올린다
 const MIN_SPAN = 0.26;       // 그늘 차이가 이보다 좁으면 벌린다
 const LO_CAP = 0.06;         // 가장 어두운 칸은 여기보다 안 내린다
+
+// ★ 흰색 — 색고리에는 자리가 없다 (색상이라는 것이 없으므로). 따로 'w' 로 적는다.
+//   채도를 0 으로 내리고 밝기를 위쪽으로 올린다. 그늘 차이는 그대로 들고 가야
+//   도트가 안 뭉갠다 — 통째로 하얗게 칠하면 옷 모양이 사라진다.
+//   쓰던 하얀 망토(0.83~0.93)와 비슷한 자리에 놓았다.
+const WHITE = 'w';
+const W_HI = 0.93;           // 흰색일 때 가장 밝은 칸
 
 // 장마다 안 바꿀 자리 (위 머리말 참고)
 const KEEP = {
@@ -130,7 +139,8 @@ function paint(img, sheet, hue) {
     catch (e) { console.warn('[색] 캔버스가 막혔습니다 —', sheet, e && e.message); return null; }
 
     const keep = KEEP[sheet] || '';
-    const H = ((Number(hue) % 360) + 360) % 360 / 360;
+    const white = (hue === WHITE);
+    const H = white ? 0 : ((Number(hue) % 360) + 360) % 360 / 360;
     const a = d.data;
 
     // ① 먼저 「물들 칸」만 골라 밝기를 세어 둔다.
@@ -158,8 +168,8 @@ function paint(img, sheet, hue) {
     for (let i = BINS - 1; i >= 0; i--) { run += tally[i]; if (run >= want) { hi = i / 100; break; } }
     if (hi < lo) hi = lo;
 
-    // ③ 색이 보이는 자리로 옮긴다
-    const hi2 = Math.min(HI_CAP, Math.max(HI_MIN, hi));
+    // ③ 색이 보이는 자리로 옮긴다 (흰색은 위쪽으로 올린다)
+    const hi2 = white ? W_HI : Math.min(HI_CAP, Math.max(HI_MIN, hi));
     const lo2 = Math.max(LO_CAP, hi2 - Math.max(hi - lo, MIN_SPAN));
     const span = hi - lo;
     const k = span > 0.001 ? (hi2 - lo2) / span : 0;
@@ -177,7 +187,8 @@ function paint(img, sheet, hue) {
         if (keep === 'grey' && ch <= FLAT) continue;
         let L = k ? lo2 + (hls[1] - lo) * k : mid;
         if (L < 0) L = 0; else if (L > 1) L = 1;
-        const out = hls2rgb(H, L, ch > FLAT ? hls[2] : SAT);
+        // 흰색은 채도를 0 으로 — 원래 색이 있던 옷(브라운 정장)도 말끔히 희어진다
+        const out = hls2rgb(H, L, white ? 0 : (ch > FLAT ? hls[2] : SAT));
         a[i] = out[0]; a[i + 1] = out[1]; a[i + 2] = out[2];
     }
     x.putImageData(d, 0, 0);
@@ -209,13 +220,27 @@ function make(sheet, hue) {
 // ★ 쟁여 둔 것이 있으면 바로 주고, 없으면 null 을 주고 뒤에서 만든다.
 //   그리는 쪽은 null 이면 원래 그림을 깔아 두었다가, 알림이 오면 갈아 끼운다.
 window.dotTint = function (sheet, hue) {
-    if (!sheet || hue == null || hue === '') return null;
-    const h = ((Math.round(Number(hue)) % 360) + 360) % 360;
-    if (!isFinite(h)) return null;
+    if (!sheet) return null;
+    const h = window.dotHue(hue);
+    if (h == null) return null;
     const k = key(sheet, h);
     if (cache.has(k)) { hit++; return cache.get(k); }
     miss++; make(sheet, h);
     return null;
+};
+// ★ 적힌 색을 제 꼴로 — 숫자 0~359 아니면 흰색('w'). 아니면 null (안 물듦).
+//   적는 쪽(옷장·팔레트)과 그리는 쪽이 이 하나만 보고 판단한다.
+window.dotHue = function (v) {
+    if (v == null || v === '') return null;
+    if (v === WHITE || v === 'white' || v === '흰색') return WHITE;
+    const h = Math.round(Number(v));
+    if (!isFinite(h)) return null;
+    return ((h % 360) + 360) % 360;
+};
+window.dotHueWhite = WHITE;
+window.dotHueName = function (v) {
+    const h = window.dotHue(v);
+    return h == null ? '' : (h === WHITE ? '흰색' : h + '°');
 };
 window.dotTintOn = function (fn) { if (typeof fn === 'function') hands.push(fn); };
 window.dotTintKeep = function (sheet) { return KEEP[sheet] || ''; };

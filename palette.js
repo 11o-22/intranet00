@@ -11,6 +11,9 @@
 //   색고리를 돌려 360가지 중 아무 색이나 고른다. 지금 입고 있는
 //   옷·악세는 전부 물들일 수 있다 (몸과 얼굴은 뺀다).
 //
+//   ★ 흰색은 고리 **밖**에 따로 단추로 둔다. 흰색에는 색상이라는 것이
+//     없어서 고리 위에 설 자리가 없기 때문이다 (적힐 때는 'w').
+//
 //   ★ 정장처럼 **안쪽이 하얀 셔츠**인 옷은 겉만 물든다. 어느 자리를
 //     남길지는 recolor.js 의 KEEP 이 쥐고 있다 (알 옆에 「겉만」이 붙는다).
 //
@@ -67,6 +70,7 @@ if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
 (function palette() {
 
 const Z = 99999990;         // 알림창(99999999)보다는 아래
+const WHITE = (typeof window.dotHueWhite === 'string') ? window.dotHueWhite : 'w';
 let ov = null;              // 떠 있는 창
 let run = null;             // { sheet, hue, prev, paintT }
 
@@ -88,8 +92,7 @@ function parts() {
 function curHue(sheet) {
     const u = me_();
     const c = (u && u.dot && u.dot.col) || {};
-    const v = c[sheet];
-    return (v == null || v === '') ? null : Number(v);
+    return window.dotHue(c[sheet]);
 }
 
 // ==========================================
@@ -119,6 +122,11 @@ function curHue(sheet) {
         '#pal-prev{flex:0 0 auto;width:118px;height:150px;position:relative;overflow:hidden;}',
         '#pal-prev .dot-box{position:absolute;left:-22px;top:-22px;}',
         '#pal-num{text-align:center;font-size:11px;color:#9a948a;margin:8px 0 2px 0;}',
+        '#pal-extra{display:flex;justify-content:center;margin:6px 0 4px 0;}',
+        '#pal-extra button{padding:7px 18px;font-size:11px;border-radius:8px;cursor:pointer;',
+        '  background:rgba(255,255,255,.04);border:1px solid #4a5160;color:#ded5c4;font-family:inherit;}',
+        '#pal-extra button.on{background:rgba(240,240,240,.9);border-color:#cfcfcf;',
+        '  border-width:2px;padding:6px 17px;color:#1b1b1f;font-weight:bold;}',
         '#pal-keep{text-align:center;font-size:10px;color:#8d8578;min-height:14px;}',
         '#pal-btns{display:flex;gap:7px;margin-top:11px;}',
         '#pal-btns button{flex:1;padding:11px 4px;font-size:11px;border-radius:9px;cursor:pointer;',
@@ -155,8 +163,10 @@ function drawWheel(cv, hue) {
     }
     // 가운데 — 고른 색
     x.beginPath(); x.arc(c, c, R_IN - 7, 0, Math.PI * 2);
-    x.fillStyle = 'hsl(' + hue + ',72%,55%)'; x.fill();
+    x.fillStyle = (hue === WHITE) ? '#f3f3f3' : 'hsl(' + hue + ',72%,55%)'; x.fill();
     x.lineWidth = 2; x.strokeStyle = 'rgba(0,0,0,.45)'; x.stroke();
+    // ★ 흰색일 때는 손잡이를 안 그린다 — 고리 위에 흰색 자리가 없기 때문이다
+    if (hue === WHITE) return;
     // 손잡이
     const a = (hue - 90) * Math.PI / 180;
     const r = (R_OUT + R_IN) / 2;
@@ -181,11 +191,14 @@ function previewSoon() {
 }
 
 function setHue(h) {
-    run.hue = ((Math.round(h) % 360) + 360) % 360;
+    const v = window.dotHue(h);
+    run.hue = (v == null) ? 0 : v;
     const cv = document.getElementById('pal-wheel');
     if (cv) drawWheel(cv, run.hue);
     const n = document.getElementById('pal-num');
-    if (n) n.innerText = '색 ' + run.hue + '°';
+    if (n) n.innerText = (run.hue === WHITE) ? '흰색' : ('색 ' + run.hue + '°');
+    const w = document.getElementById('pal-w');
+    if (w) w.classList.toggle('on', run.hue === WHITE);
     const go = document.getElementById('pal-go');
     if (go) {
         const same = (curHue(run.sheet) === run.hue);
@@ -282,6 +295,8 @@ function open(sheet) {
         + '<div id="pal-who"></div>'
         + '<div id="pal-mid"><canvas id="pal-wheel"></canvas><div id="pal-prev"></div></div>'
         + '<div id="pal-num"></div>'
+        // ★ 흰색은 색고리에 자리가 없다 (색상이라는 것이 없으므로) — 따로 둔다
+        + '<div id="pal-extra"><button id="pal-w">흰색</button></div>'
         + '<div id="pal-keep"></div>'
         + '<div id="pal-btns">'
         + '<button id="pal-off">원래대로</button>'
@@ -308,6 +323,7 @@ function open(sheet) {
         window.removeEventListener('pointercancel', up);
     };
 
+    ov.querySelector('#pal-w').onclick = function () { setHue(WHITE); };
     ov.querySelector('#pal-x').onclick = shut;
     ov.querySelector('#pal-off').onclick = wipe;
     ov.querySelector('#pal-go').onclick = apply;
@@ -341,7 +357,8 @@ function apply() {
     u.inventory.splice(i, 1);
     const p = parts().filter(function (x) { return x.sheet === run.sheet; })[0] || {};
     window.dotSetCol(run.sheet, run.hue);
-    addHistoryLog(u, '[컬러 팔레트] ' + (p.name || run.sheet) + ' 을(를) ' + run.hue + '° 로 물들였습니다.');
+    addHistoryLog(u, '[컬러 팔레트] ' + (p.name || run.sheet) + ' 을(를) '
+        + window.dotHueName(run.hue) + ' 로 물들였습니다.');
     saveFields({ inventory: 1, history: 1 });
     try { updateUI(); } catch (e) { }
     cnt();
