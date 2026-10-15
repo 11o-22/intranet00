@@ -441,15 +441,10 @@ window.accShopOpen = function () { open('acc'); };
         { n: '의상숍',     i: '👗', ic: 'wearshop', fn: 'wearShopOpen' },
         { n: '악세서리숍', i: '💍', ic: 'accshop',  fn: 'accShopOpen' }
     ];
-    // ── 목록(☰) — 망상 홈쇼핑 바로 뒤에, 적어 둔 차례대로
-    const put = rows.filter(function (x) {
-        return !M.some(function (m) { return m.fn === x.fn; });
-    });
-    if (put.length) {
-        const at = M.findIndex(function (m) { return m.sub === 'shop-dream'; });
-        if (at < 0) Array.prototype.push.apply(M, put);
-        else M.splice.apply(M, [at + 1, 0].concat(put));
-    }
+    // ★ 목록(☰)에는 **안 넣는다.** 두 가게는 망상 홈쇼핑 안에 서 있으므로
+    //   목록에까지 두면 같은 데로 가는 줄이 셋이 된다.
+    //   ✗ 전에는 망상 홈쇼핑 바로 뒤에 두 줄을 끼워 넣었다.
+    const put = rows.slice();
     // ── 망상 홈쇼핑 안 — 홈쇼핑 · 의상숍 · 악세서리숍 세 자리가 한 줄에 선다
     const r = R && R.dshop;
     if (!r) return;

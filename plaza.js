@@ -240,30 +240,45 @@ const PLAZA = {
     //   ic 는 ico/ 안의 그림 이름이다. 흰 그림을 **마스크**로 써서 글자색을
     //   그대로 입으므로, 테마가 바뀌어도 아이콘이 따라 바뀐다.
     //   ic 가 없는 줄은 전처럼 i(글자 그림)로 그린다.
+    // ★ g 는 **갈래**다 — 목록(☰)이 이 차례대로 묶어 그린다 (GROUPS 참고).
+    //   g 가 없는 줄은 맨 끝 「그 밖」으로 모인다.
+    //   ★ 소지품은 여기 없다 — 오른쪽 아래 **가방 단추**가 소지품이다.
+    //   ★ 의상숍·악세서리숍도 없다 — 망상 홈쇼핑 안에 서 있다 (gacha.js).
+    GROUPS: [
+        { g: 'in',    n: '사내' },
+        { g: 'me',    n: '내 정보' },
+        { g: 'point', n: '포인트' },
+        { g: 'dark',  n: '탐사' },
+        { g: 'life',  n: '생활' },
+        { g: 'shop',  n: '상점' }
+    ],
     MENU: [
-        { n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
-        { n: '소지품',     i: '🎒', ic: 'bag',     tab: 'tab-record',   sub: 'rec-inventory' },
-        { n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
-        { n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters' },
-        { n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
-        { n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
-        { n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
-        { n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
-        { n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',    sub: 'shop-regular' },
-        { n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p' },
-        { n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
-        { n: '우주 쇼핑몰', i: '🛸', ic: 'alien',   tab: 'tab-shop',    sub: 'shop-alien' },
-        { n: '망상 홈쇼핑', i: '📺', ic: 'dream',   tab: 'tab-shop',    sub: 'shop-dream' },
-        { n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
-        { n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
-        // 파티는 목록에서 뺐다 — 재난관리국 B1 엘리베이터로 들어간다.
-        { n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
-        { n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
-        { n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
-        { n: '전체 대화',  i: '💬',                fn: 'openAllChat' },
-        // ── 옛 메인 화면 사원증 띠에 있던 단추들. 이제 여기로 들어온다.
-        { n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
-        { n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' }
+        // ① 사내
+        { g: 'in',    n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
+        { g: 'in',    n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' },
+        { g: 'in',    n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
+        { g: 'in',    n: '전체 대화',  i: '💬',                fn: 'openAllChat' },
+        // ② 내 정보
+        { g: 'me',    n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
+        { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
+        { g: 'me',    n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters' },
+        { g: 'me',    n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
+        // ③ 포인트
+        { g: 'point', n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
+        { g: 'point', n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
+        { g: 'point', n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p' },
+        // ④ 탐사 — 파티는 목록에서 뺐다. 재난관리국 B1 엘리베이터로 들어간다.
+        { g: 'dark',  n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
+        // ⑤ 생활
+        { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
+        { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
+        { g: 'life',  n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
+        // ⑥ 상점
+        { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
+        { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
+        { g: 'shop',  n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
+        { g: 'shop',  n: '우주 쇼핑몰', i: '🛸', ic: 'alien',  tab: 'tab-shop',     sub: 'shop-alien' },
+        { g: 'shop',  n: '망상 홈쇼핑', i: '📺', ic: 'dream',  tab: 'tab-shop',     sub: 'shop-dream' }
     ]
 };
 
@@ -561,7 +576,13 @@ function stampSafe(ov) {
         '  margin:0 auto 10px auto;flex:0 0 auto;}',
         '.plaza-card h4{margin:0 0 10px 0;font-size:12.5px;color:#e8dcc6;font-weight:bold;}',
         // 메뉴 격자
-        '.plaza-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;overflow-y:auto;}',
+        '.plaza-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}',
+        // 갈래 이름 — 줄 위에 작게 얹는다 (목록 · 가방 · 옷장이 같이 쓴다)
+        '.plaza-gh{font-size:10px;color:#8d8578;letter-spacing:.06em;',
+        '  margin:13px 2px 6px 2px;display:flex;align-items:center;gap:7px;}',
+        '.plaza-gh:first-child{margin-top:0;}',
+        '.plaza-gh:after{content:"";flex:1;height:1px;background:#2b2b38;}',
+        '.plaza-gout{margin-top:15px;}',
         '.plaza-grid button{display:flex;flex-direction:column;align-items:center;gap:5px;',
         '  padding:12px 4px;border-radius:13px;background:rgba(255,255,255,.035);',
         '  border:1px solid #2b2b38;color:#ded5c4;font-size:10.5px;font-family:inherit;cursor:pointer;}',
@@ -600,6 +621,26 @@ function stampSafe(ov) {
         '.plaza-row .pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
         // 악세 몇 개 달렸나 (3개까지)
         '.plaza-row .pick .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
+        // ── 가방(소지품) — 갈래마다 벌여 놓고, 누르면 그 밑에 한 칸이 펴진다
+        '.bag-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}',
+        '.bag-it{display:flex;align-items:center;gap:6px;padding:10px 11px;border-radius:10px;',
+        '  background:rgba(255,255,255,.035);border:1px solid #2b2b38;color:#ded5c4;',
+        '  font-size:11.5px;font-family:inherit;cursor:pointer;text-align:left;}',
+        '.bag-it .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.bag-it b{flex:0 0 auto;color:#d9a05a;font-size:10.5px;}',
+        '.bag-it.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
+        '.bag-card{margin:8px 0 2px 0;padding:11px 12px;border-radius:11px;',
+        '  background:rgba(217,160,90,.07);border:1px solid #6a5a2a;}',
+        '.bag-card .t{font-size:12.5px;color:#ffe9bd;font-weight:bold;}',
+        '.bag-card .t b{color:#d9a05a;font-size:11px;}',
+        '.bag-card .d{font-size:11px;color:#b5ab9a;line-height:1.7;margin:6px 0 9px 0;}',
+        '.bag-card .b{display:flex;flex-wrap:wrap;gap:6px;}',
+        '.bag-card .non{font-size:10.5px;color:#7d7568;}',
+        '.bag-do{padding:8px 13px;border-radius:9px;font-size:11px;font-family:inherit;cursor:pointer;',
+        '  background:rgba(255,255,255,.05);border:1px solid #4a5160;color:#ded5c4;}',
+        '.bag-do:active{background:rgba(217,160,90,.2);}',
+        '.bag-do.sell{color:#8fc7ef;border-color:#2a4a5a;}',
+        '.bag-do.off{opacity:.45;cursor:default;}',
         '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}',
         // 엘리베이터 판 — 그림 위에 손 닿는 자리만 덮어 둔다
         '#plaza-lift{position:relative;width:min(260px,66vw);margin:4px auto 8px auto;}',
@@ -1884,12 +1925,28 @@ function sheet(kind, title, inner) {
 // ── ☰ 메뉴
 function menuSheet() {
     const list = P.MENU.filter(spotOk);
+    // ★ 갈래(GROUPS)대로 묶어 그린다 — 스무 칸이 한 덩어리로 깔려 있으면
+    //   무엇이 어디 있는지 눈으로 못 찾는다.
+    //   갈래가 없거나 적어 둔 갈래에 안 드는 줄은 맨 끝 「그 밖」으로 모은다.
+    const gs = (P.GROUPS || []).concat([{ g: '', n: '그 밖' }]);
+    let html = '';
+    const done = {};
+    gs.forEach(function (grp) {
+        const rows = list.filter(function (m, i) {
+            const mine = grp.g ? (m.g === grp.g)
+                : !(P.GROUPS || []).some(function (x) { return x.g === m.g; });
+            if (mine) done[i] = 1;
+            return mine;
+        });
+        if (!rows.length) return;
+        html += '<div class="plaza-gh">' + esc(grp.n) + '</div>'
+            + '<div class="plaza-grid">' + rows.map(function (m) {
+                return '<button data-i="' + list.indexOf(m) + '">' + ico(m, 'e') + esc(m.n) + '</button>';
+            }).join('') + '</div>';
+    });
     // ★ 나가기(✕)가 위 띠에서 빠졌다 — 위 오른쪽이 공지·선물함·메뉴 셋으로
-    //   찼기 때문이다. 그래서 메뉴 맨 끝에 둔다.
-    const html = '<div class="plaza-grid">' + list.map(function (m, i) {
-        return '<button data-i="' + i + '">' + ico(m, 'e') + esc(m.n) + '</button>';
-    }).join('')
-        + '<button id="plaza-out">' + ico({ ic: 'out' }, 'e')
+    //   찼기 때문이다. 그래서 메뉴 맨 끝에 혼자 둔다.
+    html += '<div class="plaza-grid plaza-gout"><button id="plaza-out">' + ico({ ic: 'out' }, 'e')
         + (isAdm() ? '광장 나가기' : '단말 종료') + '</button></div>';
     const s = sheet('menu', '목록', html);
     if (!s) return;
@@ -2070,129 +2127,152 @@ function saveDot() {
     } catch (e) { }
 }
 
-let bagTab = 'wear';
+// ── 🎒 가방 — **소지품**
+//
+//   ★ 전에는 여기에 의상·악세가 들어 있었다. 옷 갈아입기는 **사택 옷장**으로
+//     옮겼고(closet.js), 가방은 소지품만 든다. 손에 닿는 자리에 늘 있어야
+//     하는 것은 「쓰는 물건」이지 옷이 아니다.
+//
+//   누르면 그 자리에서 펴지며 설명과 단추(사용·장착·본인/타인·판매)가 뜬다.
+//   단추가 하는 일은 사원 화면 소지품 칸과 **같은 것을 그대로 부른다**
+//   (useInventoryItem · openItemTargetModal · sellInventoryItem).
 
-function bagSheet(which) {
+// 소지품을 가르는 갈래 — **위에서부터 먼저 맞는 것**으로 든다.
+//   물건 표(ITEM_CATALOG)에 갈래 칸이 없어서 effect 로 가른다.
+const BAG_CATS = [
+    { n: '장착품',   is: function (e) { return /^equip/.test(e); } },
+    { n: '물약',     is: function (e) { return /_potion$/.test(e) || e === 'heal'; } },
+    { n: '먹을 것',  is: function (e) { return e === 'food' || e === 'candy' || e === 'drink_wine'; } },
+    { n: '공용시설', is: function (e) { return /^q_/.test(e); } },
+    { n: '탐사',     is: function (e) { return /^(s\d+_|a\d+_|dark_|maze_)/.test(e)
+                                            || e === 'third_word' || e === 'bus_ticket'; } },
+    { n: '쓰는 것',  is: function (e, c) { return !!(c && c.usable); } },
+    { n: '그 밖',    is: function () { return true; } }
+];
+function itemCat(name) {
+    let c = null;
+    try { c = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[name] : null; } catch (x) { }
+    const e = String((c && c.effect) || '');
+    for (let i = 0; i < BAG_CATS.length; i++) if (BAG_CATS[i].is(e, c)) return BAG_CATS[i].n;
+    return '그 밖';
+}
+function itemInfo(name) {
+    try { return (typeof ITEM_CATALOG !== 'undefined') ? (ITEM_CATALOG[name] || null) : null; }
+    catch (x) { return null; }
+}
+
+let bagOpenItem = '';          // 펴 둔 물건 (다시 그려도 그대로 펴 둔다)
+
+function bagSheet() {
     const u = u_(); if (!u) return;
-    if (which) bagTab = which;
-    // ★ 소지품 줄은 뺐다 — 보여 주기만 하고 **아무것도 못 하는 장식**이었다.
-    //   물건을 쓰는 곳은 사원 화면의 소지품 칸이다. 묵은 'bag' 이 적혀 있으면
-    //   의상으로 돌린다 (전에 소지품을 보던 사람이 빈 칸을 보지 않게).
-    if (bagTab === 'bag') bagTab = 'wear';
-    const tabs = [['acc', '악세'], ['wear', '의상']];
-    const body = bagWear(u, bagTab === 'acc');
-    const s = sheet('bag', '', '<div class="plaza-tabs">'
-        + tabs.map(function (t) {
-            return '<button data-t="' + t[0] + '"' + (bagTab === t[0] ? ' class="on"' : '') + '>'
-                + t[1] + '</button>';
-        }).join('') + '</div><div id="plaza-bagbody">' + body + '</div>');
+    const s = sheet('bag', '소지품', '<div id="plaza-bagbody">' + bagInv(u) + '</div>');
     if (!s) return;
-    Array.prototype.forEach.call(s.querySelectorAll('.plaza-tabs button'), function (b) {
-        b.onclick = function () { bagSheet(b.dataset.t); };
-    });
-    bagStage(s);
-    Array.prototype.forEach.call(s.querySelectorAll('.pick button'), function (b) {
+    bagWire(s);
+}
+// 다시 그릴 때는 **속만** 갈아 끼운다 — 창을 새로 띄우면 내려 둔 자리가 풀린다
+function bagRepaint() {
+    const box = document.getElementById('plaza-bagbody');
+    if (!box) return;
+    const top = box.scrollTop;
+    box.innerHTML = bagInv(u_());
+    box.scrollTop = top;
+    const s = document.getElementById('plaza-sheet');
+    if (s) bagWire(s);
+}
+function bagWire(s) {
+    Array.prototype.forEach.call(s.querySelectorAll('.bag-it'), function (b) {
         b.onclick = function () {
-            const d = dotOf(u_());
-            // ★ 악세(data-multi)는 **세 개까지 겹쳐 단다** — 누르면 달고,
-            //   달린 것을 다시 누르면 벗는다. 「없음」은 전부 벗는다.
-            //   적힐 때는 쉼표로 이은 한 줄이다 (옷장 accSplit 과 같은 규칙).
-            if (b.dataset.multi) {
-                const max = (typeof window.dotAccMax === 'function') ? window.dotAccMax() : 3;
-                let sel = accSel(d[b.dataset.k]);
-                const v = b.dataset.v;
-                if (!v) sel = [];
-                else if (sel.indexOf(v) >= 0) sel = sel.filter(function (x) { return x !== v; });
-                else if (sel.length >= max) { sysLine('악세는 ' + max + '개까지 답니다.'); return; }
-                else sel.push(v);
-                d[b.dataset.k] = sel.join(',');
-            } else {
-                d[b.dataset.k] = b.dataset.v;
-            }
-            saveDot();
-            bagSheet();
+            bagOpenItem = (bagOpenItem === b.dataset.n) ? '' : b.dataset.n;
+            bagRepaint();
+        };
+    });
+    Array.prototype.forEach.call(s.querySelectorAll('.bag-do'), function (b) {
+        b.onclick = function () {
+            const n = b.dataset.n, how = b.dataset.do;
+            try {
+                if (how === 'use' && typeof useInventoryItem === 'function') useInventoryItem(n);
+                else if (how === 'me' && typeof useInventoryItem === 'function') useInventoryItem(n);
+                else if (how === 'you' && typeof openItemTargetModal === 'function') openItemTargetModal(n, true);
+                else if (how === 'pick' && typeof openItemTargetModal === 'function') openItemTargetModal(n, false);
+                else if (how === 'sell' && typeof sellInventoryItem === 'function') sellInventoryItem(n);
+            } catch (e) { console.warn('[가방]', n, e); }
+            // 수가 줄었을 수 있다 — 조금 뒤에 다시 그린다 (창은 그대로 둔다)
+            setTimeout(bagRepaint, 420);
         };
     });
 }
 
-// 가운데 선 사람 — 고를 때마다 다시 그린다
-function bagStage(s) {
-    const host = s.querySelector('.plaza-stage');
-    if (!host || typeof window.dotSprite !== 'function') return;
-    try {
-        const el = window.dotSprite(u_(), { pose: 'stand', scale: 1 });
-        host.appendChild(el);
-    } catch (e) { }
+function bagInv(u) {
+    const inv = Array.isArray(u.inventory) ? u.inventory : [];
+    if (!inv.length) return '<div class="plaza-none">가진 것이 없습니다.</div>';
+    const cnt = {};
+    inv.forEach(function (x) { const n = String(x); cnt[n] = (cnt[n] || 0) + 1; });
+    let names = Object.keys(cnt);
+    try { if (typeof invSortNames === 'function') names = invSortNames(names); } catch (e) { }
+
+    let html = '';
+    BAG_CATS.forEach(function (g) {
+        const rows = names.filter(function (n) { return itemCat(n) === g.n; });
+        if (!rows.length) return;
+        html += '<div class="plaza-gh">' + esc(g.n) + '</div><div class="bag-grid">'
+            + rows.map(function (n) {
+                return '<button class="bag-it' + (bagOpenItem === n ? ' on' : '') + '" data-n="' + esc(n) + '">'
+                    + '<span class="nm">' + esc(n) + '</span>'
+                    + (cnt[n] > 1 ? '<b>×' + cnt[n] + '</b>' : '') + '</button>';
+            }).join('') + '</div>';
+        if (rows.indexOf(bagOpenItem) >= 0) html += bagCard(bagOpenItem, cnt[bagOpenItem]);
+    });
+    return html || '<div class="plaza-none">가진 것이 없습니다.</div>';
 }
 
-// 악세를 가르는 칸 — 이 차례대로 줄이 선다. 여기 없는 것은 「그 밖」으로 모인다.
-const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '그 밖'];
+// 펴 둔 물건 한 칸 — 설명과 단추
+function bagCard(n, qty) {
+    const c = itemInfo(n);
+    const e = String((c && c.effect) || '');
+    const noSell = (function () {
+        try { return (typeof NO_SELL_ITEMS !== 'undefined') && NO_SELL_ITEMS.indexOf(n) >= 0; }
+        catch (x) { return true; }
+    })();
+    let sell = 0;
+    try { if (typeof getSellPrice === 'function') sell = getSellPrice(n); } catch (x) { }
 
-// 적힌 한 줄을 목록으로 — 옷장(closet.js)의 accSplit 과 같은 규칙이다.
-// 옷장이 아직 안 올라왔을 때를 대비해 여기에도 같은 길을 둔다.
-function accSel(v) {
-    if (typeof window.dotAccList === 'function') return window.dotAccList(v);
-    if (Array.isArray(v)) v = v.join(',');
-    return String(v == null ? '' : v).split(',')
-        .map(function (x) { return x.trim(); }).filter(Boolean);
-}
-
-function bagWear(u, accOnly) {
-    if (typeof DOT_SLOTS === 'undefined' || typeof DOT_HEADS === 'undefined') {
-        return '<div class="plaza-none">옷장이 아직 안 올라왔습니다.</div>';
-    }
-    const d = dotOf(u);
-    const row = function (lab, k, list, nowV) {
-        const on = list.filter(function (x) { return allowedIt(x, u); });
-        if (on.length < 2) return '';
-        return '<div class="plaza-row"><span class="lab">' + lab + '</span><div class="pick">'
-            + on.map(function (x) {
-                return '<button data-k="' + k + '" data-v="' + esc(x.i) + '"'
-                    + (x.i === nowV ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
-            }).join('') + '</div></div>';
+    // ★ 어떤 단추가 뜨나 — 사원 화면 소지품 칸과 같은 규칙이다
+    let btn = '';
+    const one = function (how, label, cls) {
+        return '<button class="bag-do ' + (cls || '') + '" data-do="' + how + '" data-n="' + esc(n) + '">'
+            + esc(label) + '</button>';
     };
-    let rows = '';
-    if (accOnly) {
-        // ★ 악세는 가짓수가 많아 **어디에 다는 것인가**로 갈라 보여 준다
-        //   (머리 · 귀 · 얼굴 · 목 · 손 · 등). 칸이 안 적힌 것은 「그 밖」.
-        //   「없음」은 어느 칸에서 눌러도 벗는 것이라 맨 위에 따로 둔다.
-        const s = DOT_SLOTS.filter(function (x) { return x.k === 'acc'; })[0];
-        if (s) {
-            // ★ 세 개까지 겹쳐 단다 — 지금 달린 것들을 목록으로 들고 견준다
-            const max = (s.max || (typeof window.dotAccMax === 'function' ? window.dotAccMax() : 3));
-            const sel = accSel(d[s.k]);
-            const on = s.items.filter(function (x) { return allowedIt(x, u); });
-            const none = on.filter(function (x) { return !x.i; });
-            const wear = on.filter(function (x) { return x.i; });
-            if (wear.length) {
-                rows += '<div class="plaza-row"><span class="lab">벗기</span><div class="pick">'
-                    + '<button data-k="' + s.k + '" data-multi="1" data-v=""'
-                    + (sel.length === 0 ? ' class="on"' : '')
-                    + '>' + esc((none[0] && none[0].n) || '없음') + '</button>'
-                    + '<span class="cnt">' + sel.length + ' / ' + max + '</span>'
-                    + '</div></div>';
-                ACC_CATS.forEach(function (c) {
-                    const list = wear.filter(function (x) { return (x.cat || '그 밖') === c; });
-                    if (!list.length) return;
-                    rows += '<div class="plaza-row"><span class="lab">' + esc(c) + '</span><div class="pick">'
-                        + list.map(function (x) {
-                            return '<button data-k="' + s.k + '" data-multi="1" data-v="' + esc(x.i) + '"'
-                                + (sel.indexOf(x.i) >= 0 ? ' class="on"' : '') + '>' + esc(x.n) + '</button>';
-                        }).join('') + '</div></div>';
-                });
-            }
+    if (c && c.usable) {
+        // ★ 차례와 글귀를 **사원 화면 소지품 칸과 똑같이** 맞춘다.
+        //   ✗ 「effect 가 equip 으로 시작하면 장착」으로 뭉뚱그렸더니 빨간 리본
+        //     (equip_red_ribbon)이 「대상 지정」이 아니라 「장착」으로 떴다.
+        //     사원 화면은 **적어 둔 열한 가지만** 장착으로 치고 나머지는
+        //     「장착 본인 / 장착 타인」으로 간다.
+        const EQUIP_SELF = ['equip', 'equip_bloodbath', 'equip_fox_bead', 'equip_amulet',
+            'equip_silver_ring', 'equip_butter_knife', 'equip_dead_bulb', 'equip_rabbit',
+            'equip_security', 'equip_jakdu', 'equip_lion'];
+        const eq = /^equip/.test(e) ? '장착 ' : '';
+        if (n === '💍 커플링') {
+            btn += (u_() && u_().couple) ? '<button class="bag-do off" disabled>사용 중</button>' : one('use', '사용');
+        } else if (EQUIP_SELF.indexOf(e) >= 0) {
+            btn += one('use', '장착');
+        } else if (n === '빨간 리본' || n === '노예 계약서') {
+            btn += one('pick', '대상 지정');
+        } else if (e === 'target_sticker') {
+            btn += one('use', '타인 부착');
+        } else if (c.targetable) {
+            btn += one('me', eq + '본인') + one('you', eq + '타인');
+        } else {
+            btn += one('use', '사용');
         }
-        if (!rows) rows = '<div class="plaza-none">가진 악세가 없습니다.</div>';
-    } else {
-        // ★ 머리는 여기서 안 고른다 — 사택 옷장에서 고른다.
-        //   (처음 들어온 사원만 한 번 고르게 해 준다 — firsthead.js)
-        DOT_SLOTS.forEach(function (s) {
-            if (s.k === 'acc') return;
-            rows += row(s.n, s.k, s.items, d[s.k] || '');
-        });
-        if (!rows) rows = '<div class="plaza-none">갈아입을 것이 없습니다.</div>';
     }
-    return '<div class="plaza-stage"></div>' + rows;
+    if (!noSell) btn += one('sell', '판매 +' + sell, 'sell');
+    if (!btn) btn = '<span class="non">쓸 수 없는 물건입니다.</span>';
+
+    return '<div class="bag-card">'
+        + '<div class="t">' + esc(n) + (qty > 1 ? ' <b>×' + qty + '</b>' : '') + '</div>'
+        + '<div class="d">' + esc((c && c.desc) || '알 수 없는 물품입니다.') + '</div>'
+        + '<div class="b">' + btn + '</div></div>';
 }
 
 // ==========================================
