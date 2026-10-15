@@ -214,6 +214,7 @@
       "epic-nokill.js",
       "poll-freeze.js",
       "poll-why.js",
+      "poll-pop.js",
       "mango-both.js",
       "dokkaebi-fix.js",
       "equip-kind.js",
