@@ -274,6 +274,8 @@
       "mj-core.js",
       "mj-play.js",
       "mj-ui.js",
+      "draw-core.js",
+      "draw-ui.js",
       "restaurant.js",
       "reattr-off.js",
       "reattr-free.js",
