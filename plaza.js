@@ -421,6 +421,8 @@ function stampSafe(ov) {
         '.plaza-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;',
         '  font-size:10px;font-weight:bold;color:#efe6d8;text-shadow:0 1px 2px #000,0 0 4px #000;',
         '  pointer-events:none;}',
+        // 칭호 표 — 밝은 방에서도 읽히게 바탕을 조금 깔아 준다
+        '.plaza-tag span{background:rgba(10,10,14,.55);vertical-align:1px;}',
         // 말풍선
         // ★ 사람 칸이 좁아(가로 100~170px) 말이 석 자씩 끊겼다.
         //   절대 자리 잡은 칸은 **담은 칸 너비까지만** 늘어나기 때문이다.
@@ -652,11 +654,48 @@ function makeOne(user, label, k, other) {
     //   칸 위쪽 여백이 4도트에서 29도트로 늘어, 꼭대기에 붙이면 머리에서
     //   한참 떠 버린다. 머리 언저리(빈 몫의 절반쯤)로 내려 붙인다.
     tag.style.top = Math.round(sp.H * k * 0.22) + 'px';
-    tag.innerText = label || '';
     wrap.appendChild(tag);
 
     // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
-    return { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null };
+    const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null };
+    setTag(one, (user && user.code) || '', label || '');
+    return one;
+}
+
+// ── 🏷 닉네임 옆 칭호
+//
+//   칭호 글은 titles.js 가 만들어 준다 (window.titleTag). 남의 칭호도
+//   **내 화면의 사원 명부(db.users)** 에서 바로 읽는다 — 광장으로 주고받는
+//   것에는 칭호가 안 실려 있고, 실을 까닭도 없다.
+//
+//   ★ 이름은 one.name 에 **따로 적어 둔다.** 표를 붙이면 tag.innerText 에
+//     칭호까지 섞여, 그것을 이름으로 읽던 자리들(사진 찍기 · 누가 있나 ·
+//     배를 다시 만들 때)이 「[칭호] 이름」을 이름으로 쓰게 된다.
+function tagHtmlOf(code, name) {
+    let t = '';
+    try {
+        const u = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+        if (u && typeof window.titleTag === 'function') t = window.titleTag(u, 9) || '';
+    } catch (e) { }
+    return t + esc(name || '');
+}
+function setTag(one, code, name) {
+    if (!one || !one.tag) return;
+    one.name = name || '';
+    one.code = code || '';
+    const h = tagHtmlOf(one.code, one.name);
+    if (one.tag._h === h) return;          // 그대로면 안 건드린다 (칸이 깜빡인다)
+    one.tag.innerHTML = h;
+    one.tag._h = h;
+}
+// 칭호를 바꿔 달면 그 자리에서 따라 바뀐다 (느리게 한 번씩 본다)
+function refreshTags() {
+    if (!run) return;
+    if (run.me) setTag(run.me, run.me.code, run.me.name);
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        if (q && q.one) setTag(q.one, c, q.one.name);
+    });
 }
 
 // ★ 배(run.k)가 바뀌면 서 있는 사람들을 그 배로 다시 만든다.
@@ -675,7 +714,7 @@ function remakeFolk() {
         const q = run.peers[c];
         let d = {};
         try { d = JSON.parse(q.key) || {}; } catch (e) { }
-        const lab = q.one.tag.innerText;
+        const lab = q.one.name || '';            // 칭호 말고 **이름만**
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
         q.one = makeOne({ code: c, dot: d }, lab, run.k, true);
@@ -997,10 +1036,10 @@ window.plazaShotData = function () {
                  layers: layers };
     };
     const folk = [];
-    if (run.me) folk.push(one(run.me, run.me.tag.innerText));
+    if (run.me) folk.push(one(run.me, run.me.name || ''));
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
-        folk.push(one(q.one, q.one.tag.innerText));
+        folk.push(one(q.one, q.one.name || ''));
     });
     return {
         vw: run.view.clientWidth, vh: run.view.clientHeight,
@@ -1135,6 +1174,9 @@ function goRoom(key, way, lv) {
     try { cancelAnimationFrame(run.raf); } catch (e) { }
     run.last = performance.now();
     run.raf = requestAnimationFrame(tick);
+
+    // 칭호는 자주 바뀌지 않는다 — 삼 초에 한 번만 본다
+    if (!run.tagIv) run.tagIv = setInterval(refreshTags, 3000);
 }
 
 // ==========================================
@@ -1332,7 +1374,7 @@ function onPeers(snap) {
         }
         if (q.tx !== v.x || q.ty !== v.y || q.moving !== !!v.m) q.seen = now();
         q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
-        q.one.tag.innerText = v.n || code;
+        setTag(q.one, code, v.n || code);
         // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
         if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
             q.sayAt = v.st;
@@ -1392,7 +1434,7 @@ function leaveRoom() {
 
 function showWho() {
     const el = document.getElementById('plaza-who'); if (!el || !run) return;
-    const ns = Object.keys(run.peers).map(function (c) { return run.peers[c].one.tag.innerText; });
+    const ns = Object.keys(run.peers).map(function (c) { return run.peers[c].one.name || c; });
     el.innerText = ns.length ? ('같이 있는 사람 — ' + ns.join(' · ')) : '지금은 혼자 있습니다.';
 }
 
@@ -2171,6 +2213,7 @@ function shut() {
     }
     if (run.onSize) window.removeEventListener('resize', run.onSize);
     if (run.onStick) run.onStick();
+    if (run.tagIv) { clearInterval(run.tagIv); run.tagIv = 0; }
     const ov = document.getElementById('plaza-ov');
     if (ov) ov.remove();
     run = null;
@@ -2519,7 +2562,7 @@ window.plazaState = function () {
         + (stairAt(r, run.x) ? ' · 계단 위' : '') + ' · 사람 ' + run.k + '배');
     const ns = Object.keys(run.peers);
     console.log('  같이 :', ns.length ? ns.map(function (c) {
-        return run.peers[c].one.tag.innerText + '(' + c + ')'; }).join(', ') : '혼자');
+        return (run.peers[c].one.name || c) + '(' + c + ')'; }).join(', ') : '혼자');
 };
 
 console.log('[광장] plazaOpen() · plazaGo(방) · plazaRooms() · plazaState()');

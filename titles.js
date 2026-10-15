@@ -730,6 +730,12 @@ function tagHtml(u, size, color) {
         + label(n) + '</span>';
 }
 
+// ★ 밖에서도 칭호 표를 붙일 수 있게 내어 준다 (광장이 닉네임 옆에 쓴다).
+//   사원 목록·파티챗·채팅방처럼 **그려진 뒤에 찾아 붙이는** 길이 안 통하는
+//   곳 — 광장은 칸을 직접 만들어 쓰므로 글을 받아 가는 쪽이 깔끔하다.
+window.titleTag = function (u, size, color) { return tagHtml(u, size, color); };
+window.titleWorn = function (u) { return worn(u); };
+
 function after(name, fn) {
     const iv = setInterval(function () {
         const f = window[name];
