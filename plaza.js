@@ -1360,9 +1360,12 @@ function goRoom(key, way, lv) {
     segStep(r, 0);
     run.tx = null; run.tseg = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
-    // 방이 바뀌면 그 방 말은 새로 시작한다. **서버 채팅은 남긴다** —
-    // 어느 방에 있든 이어지는 자리라 방을 옮겼다고 끊기면 안 된다.
-    run.lines = (run.lines || []).filter(function (o) { return o.sv; });
+    // ★ 방을 옮겨도 **오간 말을 안 지운다.**
+    //
+    //   ✗ 전에는 서버 채팅만 남기고 맵 말과 귓속말을 다 털었다. 그런데
+    //     귓속말은 방과 아무 상관이 없고(사람 앞으로 오는 것이다), 맵 말도
+    //     옆 방으로 한 발 옮겼다고 하던 얘기가 통째로 사라지면 끊긴다.
+    //     이제 지우지 않는다 — 같은 줄이 두 번 서는 것은 열쇠(k)로 막는다.
     paintFeed();
     run._swept = false;                     // 새 방에서 한 번 쓸어 낸다
 
@@ -1613,14 +1616,10 @@ function onPeers(snap) {
     if (!run._swept) {
         run._swept = true;
         if (!Object.keys(run.peers).length) {
+            // ★ 지우는 것은 **서버에 남은 그 방의 말**뿐이다.
+            //   ✗ 전에는 내 화면의 글줄까지 같이 털었다. 그래서 방금 내가
+            //     한 말도 빈 방에 들어서는 순간 사라졌다. 화면은 그대로 둔다.
             try { const d = db_(); if (d) d.ref(P.CHAT + '/' + run.room).remove(); } catch (e) { }
-            setTimeout(function () {
-                if (!run) return;
-                // 쓸어 내는 것은 **그 방의 말**이다 — 알림줄과 서버 채팅은 남긴다
-                run.lines = (run.lines || []).filter(function (o) { return o.sys || o.sv; });
-                paintLog();
-                paintFeed();
-            }, 600);
         }
     }
 }
@@ -1667,14 +1666,15 @@ function watchChat() {
     // ★ 공지(nbRef)는 여기서 끄지 않는다. 이 함수는 **방을 옮길 때마다**
     //   도는데, 공지는 방과 상관없이 광장에 있는 내내 보고 있어야 한다.
     //   (끄는 자리는 shut() 한 곳뿐이다)
-    const log = document.getElementById('plaza-log');
-    if (log) log.innerHTML = '';
+    // ✗ 글줄칸을 비우지 않는다 — 방을 옮겨도 하던 얘기는 그대로 둔다.
+    //   (전에는 여기서 innerHTML 을 털고 새 방 줄로 다시 채웠다)
     chatRef = d.ref(P.CHAT + '/' + run.room).limitToLast(P.CHAT_KEEP);
     chatRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        addLine(v.n || '?', v.t, v.c);
+        addLine(v.n || '?', v.t, v.c, s.key);
     });
+    paintLog();
 }
 
 // ★ 서버 채팅 — 방과 상관없이 **광장에 있는 내내** 한 번만 건다.
@@ -1688,7 +1688,7 @@ function watchAll() {
     allRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, quiet: now() < allFrom });
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, k: s.key, quiet: now() < allFrom });
     });
 }
 
@@ -1793,7 +1793,7 @@ function watchWhisper() {
     whRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', quiet: now() < whFrom });
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', k: s.key, quiet: now() < whFrom });
     });
 }
 
@@ -1940,6 +1940,11 @@ function paintFeed() {
 function pushLine(o) {
     if (!run) return;
     if (!run.lines) run.lines = [];
+    // ★ 같은 줄을 두 번 세우지 않는다.
+    //   방을 옮겨도 글줄을 안 지우게 되면서, 갔던 방에 **다시 들어오면**
+    //   그 방 말이 child_added 로 처음부터 또 쏟아진다. 서버가 준 열쇠(k)
+    //   가 같으면 이미 선 줄이다.
+    if (o.k && run.lines.some(function (q) { return q.k === o.k; })) return;
     run.lines.push(o);
     while (run.lines.length > P.CHAT_KEEP + 10) run.lines.shift();
     paintLog();
@@ -2021,8 +2026,8 @@ function whHead(o) {
     return o.sv ? '<span class="sv">서버</span> ' : '';
 }
 
-function addLine(who, text, code) {
-    pushLine({ n: who, t: text, c: code });
+function addLine(who, text, code, key) {
+    pushLine({ n: who, t: text, c: code, k: key });
 }
 
 function sysLine(text) {
