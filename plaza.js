@@ -257,7 +257,8 @@ const PLAZA = {
         { g: 'in',    n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
         { g: 'in',    n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' },
         { g: 'in',    n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
-        { g: 'in',    n: '전체 대화',  i: '💬',                fn: 'openAllChat' },
+        // ✗ 전체 대화는 뺐다 — 광장 아래 띠에서 바로 말하고, 글줄을 톡 치면
+        //   채팅 칸이 열린다. 목록에까지 두면 가는 길이 둘이 된다.
         // ② 내 정보
         { g: 'me',    n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
         { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
@@ -584,6 +585,7 @@ function stampSafe(ov) {
         '.plaza-gh{font-size:10px;color:#8d8578;letter-spacing:.06em;',
         '  margin:13px 2px 6px 2px;display:flex;align-items:center;gap:7px;}',
         '.plaza-gh:first-child{margin-top:0;}',
+        '.plaza-gh .n{font-style:normal;color:#6f6a60;font-size:9.5px;}',
         '.plaza-gh:after{content:"";flex:1;height:1px;background:#2b2b38;}',
         '.plaza-gout{margin-top:15px;}',
         '.plaza-grid button{display:flex;flex-direction:column;align-items:center;gap:5px;',
@@ -1036,6 +1038,9 @@ window.plazaRedress = function () {
         const q = run.peers[c]; putOne(q.one, q.x, q.y);
     });
     if (run.me) putOne(run.me, run.x, run.y);
+    // ★ **남에게도 다시 알린다.** 안 그러면 나만 갈아입은 것으로 보이고,
+    //   남의 화면에서는 옛 옷 그대로다 (자리가 안 바뀌면 안 보내기 때문).
+    run.sx = -9999; run.sy = -9999; run.sent = 0;
     return true;
 };
 
@@ -2059,7 +2064,7 @@ function sendSay() {
 //   까닭이 없다. 그래서 **아래 바가 그 자리에서 입력칸이 된다.**
 //   방도 사람도 그대로 보이고, 자판 위로 한 줄만 올라온다.
 //
-//   지난 글줄을 길게 보고 싶으면 목록의 「전체 대화」를 쓴다.
+//   지난 글줄을 길게 보고 싶으면 **글줄을 톡 치면** 채팅 칸이 열린다.
 //
 //   ★ 적는 칸 바로 위에 「서버 · 맵」이 있다. 서버로 두면 어느 방에 있든
 //     모든 사원에게 들리고, 맵으로 두면 같은 방 사람에게만 들린다.
@@ -2145,24 +2150,19 @@ function saveDot() {
 //   단추가 하는 일은 사원 화면 소지품 칸과 **같은 것을 그대로 부른다**
 //   (useInventoryItem · openItemTargetModal · sellInventoryItem).
 
-// 소지품을 가르는 갈래 — **위에서부터 먼저 맞는 것**으로 든다.
-//   물건 표(ITEM_CATALOG)에 갈래 칸이 없어서 effect 로 가른다.
-const BAG_CATS = [
-    { n: '장착품',   is: function (e) { return /^equip/.test(e); } },
-    { n: '물약',     is: function (e) { return /_potion$/.test(e) || e === 'heal'; } },
-    { n: '먹을 것',  is: function (e) { return e === 'food' || e === 'candy' || e === 'drink_wine'; } },
-    { n: '공용시설', is: function (e) { return /^q_/.test(e); } },
-    { n: '탐사',     is: function (e) { return /^(s\d+_|a\d+_|dark_|maze_)/.test(e)
-                                            || e === 'third_word' || e === 'bus_ticket'; } },
-    { n: '쓰는 것',  is: function (e, c) { return !!(c && c.usable); } },
-    { n: '그 밖',    is: function () { return true; } }
-];
+// ★ 갈래는 **사원 화면 소지품 칸과 같은 것을 그대로 쓴다** (invcat.js).
+//   음식 · 회복 · 물약 · 장비 · 어둠 회수품 · ??? · 우주 쇼핑몰 · 조합 재료 ·
+//   행복 식당(restaurant.js) · 출산(inv-shout.js) · 기타 …
+//   ✗ 전에는 effect 를 보고 여기서 따로 갈랐다. 같은 물건이 두 화면에서
+//     다른 칸에 들어가고, 다른 파일이 새로 더한 칸(행복 식당·출산)은
+//     아예 안 보였다. 갈래는 한 군데서만 정한다.
+function bagCats() {
+    if (typeof INV_CATS !== 'undefined' && INV_CATS.length) return INV_CATS;
+    return [{ id: 'etc', name: '소지품', icon: '📦', color: '#888' }];
+}
 function itemCat(name) {
-    let c = null;
-    try { c = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG[name] : null; } catch (x) { }
-    const e = String((c && c.effect) || '');
-    for (let i = 0; i < BAG_CATS.length; i++) if (BAG_CATS[i].is(e, c)) return BAG_CATS[i].n;
-    return '그 밖';
+    try { if (typeof invCatOf === 'function') return invCatOf(name); } catch (e) { }
+    return 'etc';
 }
 function itemInfo(name) {
     try { return (typeof ITEM_CATALOG !== 'undefined') ? (ITEM_CATALOG[name] || null) : null; }
@@ -2218,11 +2218,19 @@ function bagInv(u) {
     let names = Object.keys(cnt);
     try { if (typeof invSortNames === 'function') names = invSortNames(names); } catch (e) { }
 
+    const cats = bagCats();
+    const mine = {};
+    names.forEach(function (n) {
+        let id = itemCat(n);
+        if (!cats.some(function (c) { return c.id === id; })) id = 'etc';
+        (mine[id] = mine[id] || []).push(n);
+    });
     let html = '';
-    BAG_CATS.forEach(function (g) {
-        const rows = names.filter(function (n) { return itemCat(n) === g.n; });
+    cats.forEach(function (g) {
+        const rows = mine[g.id] || [];
         if (!rows.length) return;
-        html += '<div class="plaza-gh">' + esc(g.n) + '</div><div class="bag-grid">'
+        html += '<div class="plaza-gh">' + (g.icon ? esc(g.icon) + ' ' : '') + esc(g.name)
+            + '<i class="n">' + rows.length + '</i></div><div class="bag-grid">'
             + rows.map(function (n) {
                 return '<button class="bag-it' + (bagOpenItem === n ? ' on' : '') + '" data-n="' + esc(n) + '">'
                     + '<span class="nm">' + esc(n) + '</span>'

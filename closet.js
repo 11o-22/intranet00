@@ -783,6 +783,12 @@ function saveSoon() {
         DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
         me.dot = out;
         save({ dot: 1 });
+        // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
+        //   ✗ 안 부르면 옷장에서는 갈아입었는데 **광장 사람은 옛 옷 그대로**다.
+        //     (광장은 칸 뒤에 열린 채 깔려 있고, 사람을 만든 뒤로는 다시 안 만든다)
+        //     전에는 광장 가방에서 갈아입어 saveDot 이 해 주던 일이다 —
+        //     옷을 옷장으로 옮기면서 그 길이 끊겼다.
+        try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
     }, 600);
 }
 
