@@ -382,8 +382,22 @@ function paintShop() {
         + ' P</b> 를 돌려 드립니다.<br>등급 확률 — S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
         + '% · B ' + GACHA.ODDS.B + '% · C ' + GACHA.ODDS.C + '%</div>'
         + '<div class="gc-list">' + listHtml(shopKind) + '</div>';
+    // ★ **그 단추 위에서 눌렀다 뗀 것**만 뽑기로 친다.
+    //
+    //   한 장에 30,000 P 가 나가는 단추다. 다른 데서 눌린 손가락이
+    //   흘러들어 눌리는 일이 없게, 눌림(pointerdown)이 이 단추에서
+    //   시작했을 때만 받는다. (광장 입구를 누르자마자 그 밑에 가게가
+    //   깔리면서 「1회」가 저절로 눌리던 일이 있었다 — plaza.js 쪽도
+    //   손을 뗄 때 열도록 고쳤고, 여기는 두 번째 자물쇠다.)
     Array.prototype.forEach.call(box.querySelectorAll('.gc-buy button'), function (b) {
-        b.onclick = function () {
+        let mine = false;
+        b.addEventListener('pointerdown', function () { mine = true; });
+        b.addEventListener('pointercancel', function () { mine = false; });
+        b.onclick = function (ev) {
+            // 손가락·마우스로 누른 것이 아니면(자판 등) 눌림이 없다 — 그건 받는다
+            if (ev && ev.pointerType !== undefined && !mine) return;
+            if (ev && ev.detail > 0 && !mine) return;
+            mine = false;
             if (typeof buyGuard === 'function' && !buyGuard()) return;
             const out = roll(shopKind, Number(b.dataset.n));
             if (out) result(shopKind, out);

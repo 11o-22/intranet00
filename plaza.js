@@ -1194,7 +1194,20 @@ function paintSpots() {
         e.style.left = Math.round(s.x * z) + 'px';
         e.style.top = Math.round((s.y != null ? s.y : b[0] - 10) * z) + 'px';
         e.innerHTML = '<div class="b">' + ico(s) + '</div><div class="t">' + esc(s.n) + '</div>';
+        // ★ **손가락을 뗄 때(click)** 연다 — 누르는 순간이 아니다.
+        //
+        //   ✗ 전에는 pointerdown 에서 바로 열었다. 그러면 손가락이 아직
+        //     화면에 있는 채로 창이 그 밑에 깔리고, 손을 뗄 때 click 이
+        //     **새로 깔린 창의 단추**로 들어갔다. 의상숍 입구를 눌렀을
+        //     뿐인데 「1회 30,000 P」가 그대로 눌려 한 장이 뽑혔다.
+        //     (click 은 pointerdown 을 막아도 그대로 나간다 — 규격이 그렇다)
+        //
+        //   pointerdown 은 **조이스틱에 안 뺏기려고** 그대로 둔다
+        //   (광장 창이 #plaza-view 안의 누름을 다 걷어 가므로).
         e.addEventListener('pointerdown', function (ev) {
+            ev.preventDefault(); ev.stopPropagation();
+        });
+        e.addEventListener('click', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
             goApp(s);
         });
