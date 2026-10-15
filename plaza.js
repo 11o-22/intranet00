@@ -164,71 +164,89 @@ const PLAZA = {
         // ★ 그림이 2차로 다시 와서 1880x2556 으로 커졌다. 바닥 띠와 계단은
         //   **전경 그림 한 장**이 여섯 방에서 똑같아서(그림을 떠서 확인했다)
         //   그 여섯은 같은 값을 쓴다. 광장과 카지노만 제 전경이 따로다.
+        //
+        // ★ 계단 자리를 **그림에 대고 다시 쟀다** (2026-10-15).
+        //   전에는 x [150,650] · y 860→1240 이었는데, 그렸던 계단보다
+        //   완만해서 사람이 **층계 위에 떠 있었다**(찍어 보았다).
+        //   네 방(광장·카지노·재관국앞·백일몽앞) 그림에 선을 얹어 견주니
+        //   그려진 층계는 (155,945) 에서 (565,1270) 으로 내려간다 — 기울기
+        //   0.793. 그 선을 **길(860)까지 거슬러 늘리면 x 50** 에서 만난다.
+        //   그래서 계단을 x [50,565] · 860→1270 으로 둔다. 길과 계단이
+        //   y 가 이어져 **갈아탈 때 턱이 없고**, 155 에서 944 를 지나
+        //   그려진 층계를 그대로 밟는다.
+        //   아랫단(x2)도 다시 쟀다 — 565~1315 (전 650~1230 은 층계 끝과
+        //   어긋나 있었다).
         dfront: { n: '백일몽 건물 앞', img: 'dfront.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   right: 'casino', up: { to: 'dream', x: [760, 1130] },
-                  spots: [ { x: 940, n: '???', i: '❓', ic: 'unknown', lv: 1,
+                  // ★ 건물 안으로는 **입구를 눌러야** 들어간다 (걸어서는 안 넘어간다)
+                  spots: [ { x: 940, n: '백일몽 주식회사', i: '🏢', go: 'dream' },
+                           { x: 940, n: '???', i: '❓', ic: 'unknown', lv: 1,
                              tab: 'tab-shop', sub: 'shop-unknown' } ] },
 
         dream:  { n: '백일몽 주식회사', img: 'dream.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   down: { to: 'dfront', x: [760, 1130] },
                   // 주신 지도대로 — 2F 사택 · 1F 로비 · B1 어둠 탐사·유쾌 판매소
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           b1: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
                                 { n: '유쾌 판매소', ic: 'shop', tab: 'tab-shop',     sub: 'shop-regular' } ] },
-                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true } ] },
+                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
+                           { x: 1600, n: '나간다', ic: 'out', go: 'dfront' } ] },
 
         casino: { n: '카지노 거리', img: 'casino.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   left: 'dfront', right: 'plaza',
                   spots: [ { x: 940, n: '공용시설', i: '🎲', ic: 'public', tab: 'tab-public' } ] },
 
         // ★ 광장은 행복 식당과 장기 은행 둘만 둔다 (주신 대로).
         plaza:  { n: '광장', img: 'plaza.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   left: 'casino', right: 'post',
                   spots: [ { x: 470,  n: '행복 식당', i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
                            { x: 1400, n: '장기 은행', i: '🏦', ic: 'bank', tab: 'tab-vip' } ] },
 
         post:   { n: '우체국', img: 'post.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   left: 'plaza', right: 'gate',
                   spots: [ { x: 940, n: '밀실 거래', i: '🤝', ic: 'p2p', tab: 'tab-shop', sub: 'shop-p2p' } ] },
 
         gate:   { n: '재난관리국 앞', img: 'gate.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   left: 'post', up: { to: 'bureau', x: [780, 1120] },
                   // 지하 가게로는 **그 자리에서 들어간다** (go 가 붙은 입구)
-                  spots: [ { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, go: 'dshop' } ] },
+                  // ★ 건물 안으로도 **입구를 눌러야** 들어간다 (걸어서는 안 넘어간다)
+                  spots: [ { x: 940,  n: '재난관리국', i: '🏛', go: 'bureau' },
+                           { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, go: 'dshop' } ] },
 
         bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   down: { to: 'gate', x: [780, 1120] },
                   // 2F 사택 · 1F 로비 · B1 재난 탐사 로비
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
                                 { n: '파티',                  tab: 'tab-darkness', sub: 'dark-party' } ] },
-                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true } ] },
+                  spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
+                           { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
         dshop:  { n: '망상 홈쇼핑', img: 'dshop.webp', w: 1880, h: 2556, k: 1,
-                  floor: [820, 900], floor2: [1240, 1300], x2: [650, 1230],
-                  stairs: [ { x: [150, 650],   y0: [860, 1240], y1: [905, 1300] },
-                            { x: [1230, 1730], y0: [1240, 860], y1: [1300, 905] } ],
+                  floor: [820, 900], floor2: [1240, 1300], x2: [565, 1315],
+                  stairs: [ { x: [50, 565],    y0: [845, 1255], y1: [875, 1285] },
+                            { x: [1315, 1830], y0: [1255, 845], y1: [1285, 875] } ],
                   spots: [ { x: 940,  n: '망상 홈쇼핑', i: '📺', ic: 'dream', tab: 'tab-shop', sub: 'shop-dream' },
                            // 들어온 자리가 재관국 앞 **지하**라, 나갈 때도 그 층으로 돌려보낸다
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate', golv: 1 } ] },
@@ -874,29 +892,8 @@ function stairBand(s, x) {
     const t = Math.max(0, Math.min(1, (x - s.x[0]) / Math.max(1, s.x[1] - s.x[0])));
     return [s.y0[0] + (s.y0[1] - s.y0[0]) * t, s.y1[0] + (s.y1[1] - s.y1[0]) * t];
 }
-// 지금 x 에서 발이 닿을 수 있는 y 범위
-//
-//   ★ 계단은 **길 앞쪽으로** 내려간다. 그래서 위층에 서 있을 때는 길(위층 띠)과
-//     계단이 **둘 다** 열려 있어야 한다 — 안 그러면 계단 x 를 지나는 순간
-//     끌려 내려가서, 그 너머(옆 방으로 가는 길)로는 영영 못 간다.
-function yRange(r, x, lv) {
-    const s = stairAt(r, x);
-    if (!s) return bandOf(r, lv);
-    const b = stairBand(s, x);
-    if (lv === 1) return b;                       // 지하 쪽에서는 계단만
-    return [r.floor[0], b[1]];                    // 위층에서는 길 + 계단 아래까지
-}
-// 지금 x 에서 걸어 다닐 수 있는 가로 폭 (지하는 좁을 수 있다)
-function xRange(r, lv) {
-    if (lv === 1 && r.x2) {
-        let lo = r.x2[0], hi = r.x2[1];
-        (r.stairs || []).forEach(function (s) {          // 계단 자리까지는 갈 수 있어야 한다
-            lo = Math.min(lo, s.x[0]); hi = Math.max(hi, s.x[1]);
-        });
-        return [lo, hi];
-    }
-    return [P.EDGE, r.w - P.EDGE];
-}
+// ※ 다닐 수 있는 자리는 이제 **띠가 아니라 선**이다 (아래 segX · segY).
+//   띠로 자르던 yRange · xRange 는 쓰지 않는다.
 // ★ 내려가는 자리 — 글자 하나만 적으면 **바닥 끝 어디서나** 내려간다.
 //   그러면 건물 안에 지하가 생긴 뒤로는 계단 쪽으로 걸어 내려가다가
 //   그 전에 밖으로 튕겨 나간다. 그래서 { to, x } 로 **문 자리**를 적는다.
@@ -909,6 +906,128 @@ function lvAt(r, y) {
     if (!r.floor2) return 0;
     const mid = (r.floor[1] + r.floor2[0]) / 2;
     return y >= mid ? 1 : 0;
+}
+
+// ==========================================
+// ★ 선 — 다닐 수 있는 자리는 **띠가 아니라 선**이다
+// ==========================================
+//
+//   전에는 바닥 띠(floor 820~900) 안을 위아래로 헤엄쳤다. 평평한 길
+//   위에서 사람이 둥둥 떠다니는 꼴이라, 다니는 자리를 **선 하나**로 묶었다.
+//
+//       '길'      윗층 — 방 끝에서 끝까지 (y 는 floor 한가운데)
+//       '지하'    아랫층 — x2 안에서만 (y 는 floor2 한가운데)
+//       0 · 1     계단 — x 를 따라 비스듬히 내려가는 선
+//
+//   세 선은 **고리**로 이어진다 (주신 그림의 빨간 테두리 그대로).
+//
+//       길 ─────────────────────────────
+//        ╲                             ╱     ← 계단
+//         ╲── 지하 ────────────────────╱
+//
+//   · 계단 **아랫끝**은 지하 선과 y 가 똑같다 — 그냥 걸어가면 이어진다.
+//   · 계단 **윗끝**은 길 바로 밑이다. 거기서만 위아래로 밀어 갈아탄다
+//     (⇵ 표가 그 자리에 서 있다).
+//     ✗ x 만 보고 저절로 내려가게 하면, 계단 x 를 지나는 순간 끌려
+//       내려가서 그 너머(옆 방으로 가는 길)로는 영영 못 간다.
+const JOIN_X = 120;         // 계단 입구로 보는 거리 (화면에서 60px 쯤)
+
+function midY(b) { return (b[0] + b[1]) / 2; }
+function stairTopX(s) { return (s.y0[0] < s.y0[1]) ? s.x[0] : s.x[1]; }
+function segList(r) {
+    const out = ['up'];
+    if (r.floor2 && r.x2) out.push('dn');
+    (r.stairs || []).forEach(function (_, i) { if (r.floor2) out.push(i); });
+    return out;
+}
+function segY(r, seg, x) {
+    if (seg === 'dn') return midY(r.floor2);
+    if (typeof seg === 'number') return midY(stairBand(r.stairs[seg], x));
+    return midY(r.floor);
+}
+function segX(r, seg) {
+    if (seg === 'dn') return [r.x2[0], r.x2[1]];
+    if (typeof seg === 'number') return [r.stairs[seg].x[0], r.stairs[seg].x[1]];
+    return [P.EDGE, r.w - P.EDGE];
+}
+// 깊이 — 길 0 · 계단 1 · 지하 2 (어느 쪽으로 갈아타야 하는지 셀 때)
+function segDeep(seg) { return seg === 'up' ? 0 : (seg === 'dn' ? 2 : 1); }
+
+// 선 끝에서 **y 가 맞닿는** 다른 선 (계단 아랫끝 ↔ 지하처럼)
+function nextSeg(r, seg, x) {
+    const y = segY(r, seg, x);
+    let best = null, bd = 60;
+    segList(r).forEach(function (o) {
+        if (o === seg) return;
+        const xr = segX(r, o);
+        if (x < xr[0] - 1 || x > xr[1] + 1) return;
+        const d = Math.abs(segY(r, o, Math.max(xr[0], Math.min(xr[1], x))) - y);
+        if (d < bd) { bd = d; best = o; }
+    });
+    return best;
+}
+
+// 지금 선에서 저 선으로 가려면 어느 x 로 걸어가야 하나
+function wayX(r, seg, want) {
+    if (seg === want) return null;
+    const st = r.stairs || [];
+    if (seg === 'up') {                       // 길 → 계단·지하 : 가까운 계단 윗끝
+        if (typeof want === 'number') return stairTopX(st[want]);
+        let bx = null, bd = 1e9;
+        st.forEach(function (s) {
+            const d = Math.abs(stairTopX(s) - run.x);
+            if (d < bd) { bd = d; bx = stairTopX(s); }
+        });
+        return bx;
+    }
+    if (seg === 'dn') {                       // 지하 → 계단·길 : 가까운 계단 아랫끝
+        const xr = segX(r, 'dn');
+        return (Math.abs(run.x - xr[0]) <= Math.abs(run.x - xr[1])) ? xr[0] : xr[1];
+    }
+    const s = st[seg];                        // 계단 → 위면 윗끝, 아래면 아랫끝
+    const top = stairTopX(s);
+    return (segDeep(want) < 1) ? top : (top === s.x[0] ? s.x[1] : s.x[0]);
+}
+
+// 한 칸 움직인 뒤 — 선을 갈아타고, x 를 자르고, y 를 선 위에 얹는다
+function segStep(r, vdir) {
+    if (!r.floor2 || !(r.stairs || []).length) {       // 층이 하나인 방
+        run.seg = 'up'; run.lv = 0;
+        const xr0 = segX(r, 'up');
+        run.x = Math.max(xr0[0], Math.min(xr0[1], run.x));
+        run.y = midY(r.floor);
+        return;
+    }
+    if (run.seg == null || (typeof run.seg === 'number' && !r.stairs[run.seg])) {
+        run.seg = (run.lv === 1) ? 'dn' : 'up';
+    }
+
+    // ① 위아래로 밀었다 — 계단 윗끝에서만 갈아탄다
+    if (vdir > 0 && run.seg === 'up') {
+        for (let i = 0; i < r.stairs.length; i++) {
+            const tx = stairTopX(r.stairs[i]);
+            if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = i; run.x = tx; break; }
+        }
+    } else if (vdir < 0 && typeof run.seg === 'number') {
+        const tx = stairTopX(r.stairs[run.seg]);
+        if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = 'up'; run.x = tx; }
+    }
+
+    // ② 선 끝을 넘었다 — 맞닿은 선으로 건너간다 (계단 아랫끝 ↔ 지하)
+    for (let n = 0; n < 4; n++) {
+        const xr = segX(r, run.seg);
+        if (run.x >= xr[0] && run.x <= xr[1]) break;
+        const edge = (run.x < xr[0]) ? xr[0] : xr[1];
+        const nx = nextSeg(r, run.seg, edge);
+        if (nx == null) { run.x = edge; break; }
+        run.seg = nx;
+    }
+
+    // ③ 선 위에 얹는다
+    const xr2 = segX(r, run.seg);
+    run.x = Math.max(xr2[0], Math.min(xr2[1], run.x));
+    run.y = segY(r, run.seg, run.x);
+    run.lv = (run.seg === 'dn') ? 1 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0);
 }
 
 // 방 그림을 **세로로 화면에 꼭 맞춘다.**
@@ -988,9 +1107,8 @@ function paintExits() {
         if (r.left)  mk('◀', 8, fy - 70);
         if (r.right) mk('▶', r.w * z - 24, fy - 70);
     });
-    if (r.up)    mk('▲', (r.up.x[0] + r.up.x[1]) / 2 * z - 8, r.floor[0] * z - 96);
-    const dn0 = downOf(r);
-    if (dn0) mk('▼', (dn0.x ? (dn0.x[0] + dn0.x[1]) / 2 : 24) * z - 8, r.floor[1] * z - 22);
+    // ★ ▲ ▼ 는 안 세운다 — 건물 안팎은 이제 **입구를 눌러야** 드나든다.
+    //   화살표만 남으면 걸어가면 넘어가는 줄 알고 바닥 끝을 더듬게 된다.
     // 계단 — 내려가고 올라가는 자리
     (r.stairs || []).forEach(function (s) {
         if (!r.floor2) return;
@@ -1221,10 +1339,10 @@ function goRoom(key, way, lv) {
                                 run.y = bnd[0] + inY; }                           // ↓ 로 왔으니 문 앞에
     else                      { run.x = r.w / 2;  run.y = mid; }
 
-    const xr0 = xRange(r, run.lv);
-    run.x = Math.max(Math.max(P.EDGE, xr0[0]), Math.min(Math.min(r.w - P.EDGE, xr0[1]), run.x));
-    run.y = Math.max(bnd[0], Math.min(bnd[1], run.y));
-    run.tx = null;
+    // ★ 선 위에 세운다 — 들어온 층의 선에 얹고, 그 선의 x 폭 안으로 자른다
+    run.seg = (run.lv === 1 && r.floor2 && r.x2) ? 'dn' : 'up';
+    segStep(r, 0);
+    run.tx = null; run.tseg = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
     // 방이 바뀌면 그 방 말은 새로 시작한다. **서버 채팅은 남긴다** —
     // 어느 방에 있든 이어지는 자리라 방을 옮겼다고 끊기면 안 된다.
@@ -1297,17 +1415,22 @@ function tick(ts) {
 
     let dx = run.vx, dy = run.vy;
 
-    if (ix || iy) run.tx = null;
+    if (ix || iy) { run.tx = null; run.tseg = null; }
     else if (run.tx != null) {
-        const ax = run.tx - run.x, ay = run.ty - run.y;
-        const d = Math.hypot(ax, ay);
+        // ★ 짚어서 갈 때도 **선을 따라** 간다. 다른 선을 짚었으면 그리로
+        //   가는 계단 끝까지 먼저 걷고, 거기서 갈아탄 뒤 이어 간다.
+        const onSeg = (run.tseg == null || run.tseg === run.seg);
+        const gx = onSeg ? run.tx : wayX(r, run.seg, run.tseg);
+        const ax = (gx == null ? run.tx : gx) - run.x;
         // ★ 한 칸에 갈 만큼 가까우면 **그 자리에 붙인다.**
         //   전에는 3픽셀 안에 들 때까지 걸었는데, 한 칸에 3.5픽셀씩 가므로
         //   목표를 넘었다 돌아왔다 하며 떨었다 (느린 기계일수록 심했다).
-        if (d <= Math.max(P.TAP_STOP, P.SPEED * dt)) {
-            run.x = run.tx; run.y = run.ty;
-            run.tx = null; dx = dy = 0; run.vx = run.vy = 0;
-        } else { dx = ax / d; dy = ay / d; }
+        if (Math.abs(ax) <= Math.max(P.TAP_STOP, P.SPEED * dt)) {
+            run.x += ax;
+            if (onSeg) { run.tx = null; run.tseg = null; dx = dy = 0; run.vx = run.vy = 0; }
+            else dx = 0;
+        } else { dx = ax / Math.abs(ax); }
+        dy = 0;
     }
 
     // 대각선이 더 빠르지 않게 1 로 자른다. 1 보다 작은 것은 그대로 둔다
@@ -1318,29 +1441,24 @@ function tick(ts) {
     const moving = mag > 0.001;
     if (moving) {
         run.x += dx * P.SPEED * dt;
-        run.y += dy * P.SPEED * dt;
+        // ★ 세로는 **선을 갈아타는 데에만** 쓴다 (segStep). 여기서 run.y 를
+        //   같이 밀면 바닥 띠 안을 위아래로 헤엄치게 된다.
 
         // ─ 넘어간 직후에는 쉬어 간다 (두 방을 끝없이 오가지 않게)
         if (now() - (run.warp || 0) > P.WARP_MS) {
             if (r.left && run.x <= P.EDGE) { goRoom(r.left, 'left'); return; }
             if (r.right && run.x >= r.w - P.EDGE) { goRoom(r.right, 'right'); return; }
-            // 위로 가는 자리에서 위쪽 끝에 닿으면 올라간다 (위층에서만)
-            if (r.up && run.lv !== 1 && run.y <= r.floor[0] + 1
-                && run.x >= r.up.x[0] && run.x <= r.up.x[1]) { goRoom(r.up.to, 'up'); return; }
-            // 올라온 방에서 아래쪽 끝이면 내려간다 — **위층에서만** 본다.
-            //   지하에도 바닥 끝이 있어서, 안 막으면 지하 끝에 서는 순간
-            //   건물 밖으로 튕겨 나간다.
-            const dn = downOf(r);
-            if (dn && run.lv !== 1 && run.y >= r.floor[1] - 1
-                && (!dn.x || (run.x >= dn.x[0] && run.x <= dn.x[1]))) { goRoom(dn.to, 'down'); return; }
         }
+        // ★ 건물 안팎(재관국앞↔재관국 · 백일몽앞↔백일몽)은 **걸어서 안 넘어간다.**
+        //   입구를 눌러야 들어가고 나간다 (ROOMS 의 go 입구). 전에는 바닥 띠
+        //   위아래 끝에 닿기만 해도 넘어가서, 길을 걷다 실수로 빨려 들어갔다.
 
-        // ─ 바닥 — 계단 위에서는 띠가 x 를 따라 기울어 내려간다
-        const xr = xRange(r, run.lv);
-        run.x = Math.max(xr[0], Math.min(xr[1], run.x));
-        const yr = yRange(r, run.x, run.lv);
-        run.y = Math.max(yr[0], Math.min(yr[1], run.y));
-        if (stairAt(r, run.x)) run.lv = lvAt(r, run.y);   // 계단 위에서는 높이로 층을 센다
+        // ─ 선 위로 — 갈아타기 · x 자르기 · y 얹기
+        let vdir = (dy > 0.35) ? 1 : (dy < -0.35 ? -1 : 0);
+        if (run.tx != null && run.tseg != null && run.tseg !== run.seg) {
+            vdir = (segDeep(run.tseg) > segDeep(run.seg)) ? 1 : -1;
+        }
+        segStep(r, vdir);
         // 거의 위아래로만 밀었을 때 좌우가 깜빡이지 않게 턱을 조금 둔다
         if (dx < -0.08) run.me.actor.face(1);
         else if (dx > 0.08) run.me.actor.face(-1);
@@ -2643,27 +2761,19 @@ function open() {
                 const b = run.view.getBoundingClientRect();
                 const x = (e.clientX - b.left + run.cx) / z;
                 const y = (e.clientY - b.top + run.cy) / z;
-                // ★ 다른 층을 짚었으면 가까운 계단부터 간다.
-                //   계단 x 안에서는 두 층이 뚫려 있으므로, 그리로 걸어가면
-                //   저절로 오르내린다. 계단이 없는 방이면 제 층 안으로 자른다.
-                const want = r.floor2 ? lvAt(r, y) : 0;
-                let tx = x, lv = run.lv;
-                if (want !== run.lv && r.stairs && r.stairs.length) {
-                    // 다른 층을 짚었다 — 가까운 계단의 **그 층 쪽 끝**으로 먼저 간다
-                    let best = null, bd = 1e9;
-                    r.stairs.forEach(function (s) {
-                        const down = (s.y0[0] < s.y0[1]);      // 오른쪽으로 갈수록 내려가나
-                        const end = (want === 1) === down ? s.x[1] : s.x[0];
-                        const d = Math.abs(end - run.x);
-                        if (d < bd) { bd = d; best = end; }
-                    });
-                    if (best != null) { tx = best; lv = want; }
-                }
-                const xr = xRange(r, lv);
-                tx = Math.max(Math.max(P.EDGE, xr[0]), Math.min(Math.min(r.w - P.EDGE, xr[1]), tx));
-                const yr = yRange(r, tx, lv);
-                run.tx = tx;
-                run.ty = Math.max(yr[0], Math.min(yr[1], y));
+                // ★ 짚은 자리에서 **가장 가까운 선**을 고른다. 다른 선이면
+                //   그 선까지 가는 길(계단)은 걸으면서 저절로 잡힌다 (wayX).
+                let best = 'up', bd = 1e9;
+                segList(r).forEach(function (o) {
+                    const xr = segX(r, o);
+                    const cx = Math.max(xr[0], Math.min(xr[1], x));
+                    const d = Math.hypot(cx - x, segY(r, o, cx) - y);
+                    if (d < bd) { bd = d; best = o; }
+                });
+                const xr2 = segX(r, best);
+                run.tseg = best;
+                run.tx = Math.max(xr2[0], Math.min(xr2[1], x));
+                run.ty = segY(r, best, run.tx);
             }
             drag = false; far = 0; hit = null;
         };
@@ -2811,6 +2921,13 @@ window.plazaState = function () {
         return (run.peers[c].one.name || c) + '(' + c + ')'; }).join(', ') : '혼자');
 };
 
-console.log('[광장] plazaOpen() · plazaGo(방) · plazaRooms() · plazaState()');
+// 지금 선 자리 — 시험과 콘솔에서 들여다본다
+window.plazaWhere = function () {
+    if (!run) return null;
+    return { room: run.room, x: Math.round(run.x), y: Math.round(run.y),
+             seg: run.seg, lv: run.lv };
+};
+
+console.log('[광장] plazaOpen() · plazaGo(방) · plazaRooms() · plazaState() · plazaWhere()');
 
 })();
