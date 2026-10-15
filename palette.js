@@ -123,7 +123,19 @@ function curHue(sheet) {
         '#pal-prev .dot-box{position:absolute;left:-25px;top:-18px;}',
         '#pal-num{text-align:center;font-size:12px;letter-spacing:.08em;color:#9a948a;',
         '  margin:9px 0 3px 0;font-weight:bold;}',
-        '#pal-keep{text-align:center;font-size:10px;color:#8d8578;min-height:14px;}',
+        // RGB 막대 — 깔개가 그 칸을 0→255 로 움직인 모습이라 눈으로 고르기 쉽다
+        '#pal-rgb{margin:7px 2px 3px 2px;}',
+        '#pal-rgb .row{display:flex;align-items:center;gap:8px;margin-top:6px;}',
+        '#pal-rgb .row b{flex:0 0 11px;font-size:10px;color:#9a948a;font-weight:normal;}',
+        '#pal-rgb .row i{flex:0 0 26px;font-style:normal;font-size:10px;color:#9a948a;text-align:right;}',
+        '#pal-rgb input{flex:1;min-width:0;margin:0;height:14px;border-radius:7px;background:#333;',
+        '  -webkit-appearance:none;appearance:none;outline:none;touch-action:none;',
+        '  border:1px solid rgba(255,255,255,.18);}',
+        '#pal-rgb input::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;',
+        '  border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.55);cursor:pointer;}',
+        '#pal-rgb input::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:#fff;',
+        '  border:1px solid rgba(0,0,0,.55);cursor:pointer;}',
+        '#pal-keep{text-align:center;font-size:10px;color:#8d8578;min-height:14px;margin-top:5px;}',
         '#pal-btns{display:flex;gap:7px;margin-top:11px;}',
         '#pal-btns button{flex:1;padding:11px 4px;font-size:11px;border-radius:9px;cursor:pointer;',
         '  background:rgba(255,255,255,.05);border:1px solid #4a5160;color:#ded5c4;font-family:inherit;}',
@@ -241,11 +253,32 @@ function previewSoon() {
     }, 120);
 }
 
+// 색판(고리·네모)에서 고를 때
 function setCol(h, s, v) {
     run.h = ((h % 1) + 1) % 1;
     run.s = s < 0 ? 0 : (s > 1 ? 1 : s);
     run.v = v < 0 ? 0 : (v > 1 ? 1 : v);
     run.hue = hexOf(run.h, run.s, run.v);
+    run.rgb = hsv2rgb(run.h, run.s, run.v);
+    paintPick();
+}
+
+// ★ 막대(RGB)에서 고를 때 — 숫자를 **그대로** 쓴다.
+//   ✗ RGB → HSV → 다시 RGB 로 돌려 쓰면 1씩 어긋난다. 빨강 막대만
+//     밀었는데 초록·파랑이 따라 흔들렸다. 색은 막대 숫자가 임자이고,
+//     HSV 는 색판 손잡이를 어디에 둘지 정하는 데에만 쓴다.
+function setRgb(r, g, b) {
+    const cl = function (n) { n = Math.round(Number(n) || 0); return n < 0 ? 0 : (n > 255 ? 255 : n); };
+    run.rgb = [cl(r), cl(g), cl(b)];
+    run.hue = '#' + hex2(run.rgb[0]) + hex2(run.rgb[1]) + hex2(run.rgb[2]);
+    const c = rgb2hsv(run.rgb[0], run.rgb[1], run.rgb[2]);
+    // 무채색이면 색조를 그대로 둔다 — 안 그러면 막대를 내릴 때 고리가 빨강으로 튄다
+    if (c[1] > 0.001) run.h = c[0];
+    run.s = c[1]; run.v = c[2];
+    paintPick();
+}
+
+function paintPick() {
     const cv = document.getElementById('pal-wheel');
     if (cv) drawPick(cv, run.h, run.s, run.v);
     const n = document.getElementById('pal-num');
@@ -253,6 +286,7 @@ function setCol(h, s, v) {
         n.innerText = run.hue.toUpperCase();
         n.style.color = (run.v > 0.35) ? run.hue : '#cfcabf';
     }
+    paintBars();
     const go = document.getElementById('pal-go');
     if (go) {
         const same = (curHue(run.sheet) === run.hue);
@@ -260,6 +294,21 @@ function setCol(h, s, v) {
         go.innerText = same ? '이미 그 색' : (have() < 1 ? '팔레트 없음' : '물들이기 (1개)');
     }
     previewSoon();
+}
+
+// 막대 셋 — 깔개는 **그 칸만 0→255 로 움직인 모습**이다 (나머지 둘은 지금 값)
+function paintBars() {
+    const c = run.rgb;
+    ['r', 'g', 'b'].forEach(function (k, i) {
+        const el = document.getElementById('pal-' + k);
+        const num = document.getElementById('pal-' + k + 'n');
+        if (num) num.innerText = c[i];
+        if (!el) return;
+        if (document.activeElement !== el) el.value = c[i];   // 끌고 있는 막대는 안 건드린다
+        const lo = c.slice(), hi = c.slice();
+        lo[i] = 0; hi[i] = 255;
+        el.style.background = 'linear-gradient(90deg,rgb(' + lo.join(',') + '),rgb(' + hi.join(',') + '))';
+    });
 }
 
 // 적힌 색(묵은 것 포함)을 색판 자리로 되돌린다
@@ -364,7 +413,8 @@ function open(sheet) {
     }
     if (!list.some(function (x) { return x.sheet === sheet; })) sheet = list[0].sheet;
     shut();
-    run = { sheet: sheet, h: 0, s: 0.85, v: 0.85, hue: hexOf(0, 0.85, 0.85), paintT: null };
+    run = { sheet: sheet, h: 0, s: 0.85, v: 0.85, hue: hexOf(0, 0.85, 0.85),
+            rgb: hsv2rgb(0, 0.85, 0.85), paintT: null };
 
     ov = document.createElement('div');
     ov.id = 'pal-ov';
@@ -375,6 +425,13 @@ function open(sheet) {
         + '<div id="pal-who"></div>'
         + '<div id="pal-mid"><canvas id="pal-wheel"></canvas><div id="pal-prev"></div></div>'
         + '<div id="pal-num"></div>'
+        + '<div id="pal-rgb">'
+        + ['r', 'g', 'b'].map(function (k, i) {
+            return '<div class="row"><b>' + 'RGB'.charAt(i) + '</b>'
+                + '<input type="range" min="0" max="255" id="pal-' + k + '">'
+                + '<i id="pal-' + k + 'n"></i></div>';
+        }).join('')
+        + '</div>'
         + '<div id="pal-keep"></div>'
         + '<div id="pal-btns">'
         + '<button id="pal-off">원래대로</button>'
@@ -406,6 +463,13 @@ function open(sheet) {
         window.removeEventListener('pointercancel', up);
     };
 
+    ['r', 'g', 'b'].forEach(function (k) {
+        ov.querySelector('#pal-' + k).oninput = function () {
+            setRgb(ov.querySelector('#pal-r').value,
+                   ov.querySelector('#pal-g').value,
+                   ov.querySelector('#pal-b').value);
+        };
+    });
     ov.querySelector('#pal-x').onclick = shut;
     ov.querySelector('#pal-off').onclick = wipe;
     ov.querySelector('#pal-go').onclick = apply;
@@ -425,7 +489,7 @@ function wipe() {
     window.dotSetCol(run.sheet, '');
     const off = document.getElementById('pal-off');
     if (off) off.disabled = true;
-    setCol(run.h, run.s, run.v);
+    paintPick();
     paintPrev();
 }
 
@@ -446,7 +510,7 @@ function apply() {
     cnt();
     const off = document.getElementById('pal-off');
     if (off) off.disabled = false;
-    setCol(run.h, run.s, run.v);
+    paintPick();
     paintPrev();
 }
 
