@@ -876,7 +876,7 @@ function colHtml() {
     //     이미 물든 옷도 빈 동그라미로 떴다.
     return rowOf('물들이기', parts.map(function (x) {
         const h = (typeof window.dotHue === 'function') ? window.dotHue(x.hue) : null;
-        const bg = (h == null) ? 'transparent' : (h === 'w' ? '#f3f3f3' : 'hsl(' + h + ',72%,55%)');
+        const bg = (h == null) ? 'transparent' : window.dotHueCss(x.hue);
         return '<button class="cl-b cl-col' + (h == null ? '' : ' on') + '" data-kind="col" data-k="'
             + esc_(x.sheet) + '" data-v=""><i class="sw" style="background:' + bg + '"></i>'
             + esc_(x.name) + (x.keep ? '<i class="ou">겉만</i>' : '') + '</button>';
@@ -907,8 +907,7 @@ function markOn() {
         if (kind === 'col') {
             const h = (typeof window.dotHue === 'function') ? window.dotHue(col[k]) : col[k];
             const sw = b.querySelector('.sw');
-            if (sw) sw.style.background = (h == null) ? 'transparent'
-                : (h === 'w' ? '#f3f3f3' : 'hsl(' + h + ',72%,55%)');
+            if (sw) sw.style.background = (h == null) ? 'transparent' : window.dotHueCss(col[k]);
             b.classList.toggle('on', h != null);
             return;
         }

@@ -51,10 +51,10 @@
 //       dotTint(장이름, 색)        쟁여 둔 그림 주소. 아직 없으면 null 을
 //                                  주고 뒤에서 만든다 (다 되면 알려 준다)
 //       dotTintOn(알림)            한 장 다 될 때마다 부른다
-//       dotHue(적힌것)             제 꼴로 — 0~359 · 'w'(흰색) · null
-//       u.dot.col = { dress: 210 } 장 이름마다 색. 0~359 아니면 'w'(흰색).
-//                                  광장이 dot 을 통째로 주고받으므로
-//                                  남의 화면에도 간다
+//       dotHue(적힌것)             제 꼴로 — '#rrggbb' · 0~359 · 'w' · null
+//       u.dot.col = { dress: '#6c3b3b' }
+//                                  장 이름마다 색. 광장이 dot 을 통째로
+//                                  주고받으므로 남의 화면에도 간다
 //
 //   한 장 칠하는 데 70ms 쯤 걸린다(2112x768 · 재 봄). 한 번 만들어 쟁여 두고,
 //   LRU 로 MAX 장까지만 들고 있는다.
@@ -75,12 +75,17 @@ const HI_MIN = 0.34;         // 너무 캄캄하면 여기까지 올린다
 const MIN_SPAN = 0.26;       // 그늘 차이가 이보다 좁으면 벌린다
 const LO_CAP = 0.06;         // 가장 어두운 칸은 여기보다 안 내린다
 
-// ★ 흰색 — 색고리에는 자리가 없다 (색상이라는 것이 없으므로). 따로 'w' 로 적는다.
-//   채도를 0 으로 내리고 밝기를 위쪽으로 올린다. 그늘 차이는 그대로 들고 가야
-//   도트가 안 뭉갠다 — 통째로 하얗게 칠하면 옷 모양이 사라진다.
-//   쓰던 하얀 망토(0.83~0.93)와 비슷한 자리에 놓았다.
+// ★ 흰색 — 묵은 적음('w'). 색고리만 있던 때에는 흰색에 설 자리가 없어 따로
+//   적었다. 지금은 색판에서 그냥 고르면 '#ffffff' 로 적힌다. 'w' 로 적힌
+//   것이 이미 있으므로 읽는 길은 남겨 둔다.
 const WHITE = 'w';
 const W_HI = 0.93;           // 흰색일 때 가장 밝은 칸
+
+// ★ 색을 통째로 고를 때 ('#rrggbb') — 고른 색을 **옷의 평균 자리**로 삼는다.
+//   고른 색이 색조·채도·밝기를 다 정하고, 옷의 그늘 차이는 그 둘레로 퍼진다.
+//   그늘을 안 남기면 옷이 색종이가 된다.
+const L_FLOOR = 0.04;        // 아무리 어두운 색을 골라도 여기까지만
+const L_CEIL = 0.96;         // 아무리 밝은 색을 골라도 여기까지만
 
 // 장마다 안 바꿀 자리 (위 머리말 참고)
 const KEEP = {
@@ -139,8 +144,12 @@ function paint(img, sheet, hue) {
     catch (e) { console.warn('[색] 캔버스가 막혔습니다 —', sheet, e && e.message); return null; }
 
     const keep = KEEP[sheet] || '';
+    // 고른 것이 색 하나('#rrggbb')인가, 색조뿐(0~359)인가, 묵은 흰색('w')인가
+    const full = (typeof hue === 'string' && hue.charAt(0) === '#') ? rgb2hls(
+        parseInt(hue.substr(1, 2), 16), parseInt(hue.substr(3, 2), 16), parseInt(hue.substr(5, 2), 16)
+    ) : null;
     const white = (hue === WHITE);
-    const H = white ? 0 : ((Number(hue) % 360) + 360) % 360 / 360;
+    const H = full ? full[0] : (white ? 0 : ((Number(hue) % 360) + 360) % 360 / 360);
     const a = d.data;
 
     // ① 먼저 「물들 칸」만 골라 밝기를 세어 둔다.
@@ -168,9 +177,19 @@ function paint(img, sheet, hue) {
     for (let i = BINS - 1; i >= 0; i--) { run += tally[i]; if (run >= want) { hi = i / 100; break; } }
     if (hi < lo) hi = lo;
 
-    // ③ 색이 보이는 자리로 옮긴다 (흰색은 위쪽으로 올린다)
-    const hi2 = white ? W_HI : Math.min(HI_CAP, Math.max(HI_MIN, hi));
-    const lo2 = Math.max(LO_CAP, hi2 - Math.max(hi - lo, MIN_SPAN));
+    // ③ 색이 보이는 자리로 옮긴다
+    let hi2, lo2;
+    if (full) {
+        // 고른 색의 밝기를 **한가운데**에 놓고 그늘을 위아래로 편다
+        const w = Math.max(hi - lo, MIN_SPAN);
+        lo2 = full[1] - w / 2; hi2 = full[1] + w / 2;
+        if (lo2 < L_FLOOR) { hi2 += L_FLOOR - lo2; lo2 = L_FLOOR; }
+        if (hi2 > L_CEIL) { lo2 -= hi2 - L_CEIL; hi2 = L_CEIL; }
+        if (lo2 < L_FLOOR) lo2 = L_FLOOR;        // 폭이 쓸 자리보다 넓을 때
+    } else {
+        hi2 = white ? W_HI : Math.min(HI_CAP, Math.max(HI_MIN, hi));
+        lo2 = Math.max(LO_CAP, hi2 - Math.max(hi - lo, MIN_SPAN));
+    }
     const span = hi - lo;
     const k = span > 0.001 ? (hi2 - lo2) / span : 0;
     const mid = (lo2 + hi2) / 2;
@@ -187,8 +206,9 @@ function paint(img, sheet, hue) {
         if (keep === 'grey' && ch <= FLAT) continue;
         let L = k ? lo2 + (hls[1] - lo) * k : mid;
         if (L < 0) L = 0; else if (L > 1) L = 1;
-        // 흰색은 채도를 0 으로 — 원래 색이 있던 옷(브라운 정장)도 말끔히 희어진다
-        const out = hls2rgb(H, L, white ? 0 : (ch > FLAT ? hls[2] : SAT));
+        // 색을 통째로 골랐으면 그 채도를 그대로 쓴다 (0 이면 흰·검·잿빛이 된다).
+        // 흰색('w')은 0. 색조만 골랐을 때는 옷이 본래 가진 채도를 살린다.
+        const out = hls2rgb(H, L, full ? full[2] : (white ? 0 : (ch > FLAT ? hls[2] : SAT)));
         a[i] = out[0]; a[i + 1] = out[1]; a[i + 2] = out[2];
     }
     x.putImageData(d, 0, 0);
@@ -228,11 +248,26 @@ window.dotTint = function (sheet, hue) {
     miss++; make(sheet, h);
     return null;
 };
-// ★ 적힌 색을 제 꼴로 — 숫자 0~359 아니면 흰색('w'). 아니면 null (안 물듦).
-//   적는 쪽(옷장·팔레트)과 그리는 쪽이 이 하나만 보고 판단한다.
+// ★ 적힌 색을 제 꼴로. 적는 쪽(옷장·팔레트)과 그리는 쪽이 이 하나만 본다.
+//
+//       '#rrggbb'   색판에서 고른 색 (지금 쓰는 것)
+//       0~359       색조만 고르던 때의 묵은 적음
+//       'w'         흰색만 따로 두던 때의 묵은 적음
+//       null        안 물듦
+//
+//   ★ 묵은 두 가지를 숫자로 바꿔 치우지 않는다. 그리는 결이 달라서
+//     이미 물들여 둔 분들의 옷 색이 바뀌어 버린다.
 window.dotHue = function (v) {
     if (v == null || v === '') return null;
     if (v === WHITE || v === 'white' || v === '흰색') return WHITE;
+    if (typeof v === 'string') {
+        const m = v.trim().toLowerCase().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/);
+        if (m) {
+            const s = m[1];
+            return '#' + (s.length === 3
+                ? s.charAt(0) + s.charAt(0) + s.charAt(1) + s.charAt(1) + s.charAt(2) + s.charAt(2) : s);
+        }
+    }
     const h = Math.round(Number(v));
     if (!isFinite(h)) return null;
     return ((h % 360) + 360) % 360;
@@ -240,7 +275,16 @@ window.dotHue = function (v) {
 window.dotHueWhite = WHITE;
 window.dotHueName = function (v) {
     const h = window.dotHue(v);
-    return h == null ? '' : (h === WHITE ? '흰색' : h + '°');
+    if (h == null) return '';
+    if (h === WHITE) return '흰색';
+    return (typeof h === 'string') ? h.toUpperCase() : (h + '°');
+};
+// 단추에 찍는 동그라미 색 — 옷장·팔레트가 같이 쓴다
+window.dotHueCss = function (v) {
+    const h = window.dotHue(v);
+    if (h == null) return '';
+    if (h === WHITE) return '#f3f3f3';
+    return (typeof h === 'string') ? h : ('hsl(' + h + ',72%,55%)');
 };
 window.dotTintOn = function (fn) { if (typeof fn === 'function') hands.push(fn); };
 window.dotTintKeep = function (sheet) { return KEEP[sheet] || ''; };

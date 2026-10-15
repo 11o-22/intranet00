@@ -105,7 +105,7 @@ function curHue(sheet) {
     s.textContent = [
         '#pal-ov{position:fixed;inset:0;z-index:' + Z + ';background:rgba(0,0,0,.72);',
         '  display:flex;align-items:center;justify-content:center;padding:14px;}',
-        '#pal-box{width:100%;max-width:330px;max-height:92vh;overflow-y:auto;',
+        '#pal-box{width:100%;max-width:356px;max-height:92vh;overflow-y:auto;',
         '  background:#16161b;border:1px solid #4a4336;border-radius:12px;padding:14px;',
         '  box-shadow:0 10px 40px rgba(0,0,0,.6);}',
         '#pal-box .t{font-size:13px;color:#e8c27a;text-align:center;margin-bottom:3px;}',
@@ -117,16 +117,12 @@ function curHue(sheet) {
         '  white-space:nowrap;cursor:pointer;font-family:inherit;}',
         '#pal-who button.on{background:rgba(217,160,90,.28);border-color:#8a6a2a;',
         '  border-width:2px;padding:6px 10px;font-weight:bold;}',
-        '#pal-mid{display:flex;align-items:center;justify-content:center;gap:12px;}',
+        '#pal-mid{display:flex;align-items:center;justify-content:center;gap:8px;}',
         '#pal-wheel{touch-action:none;cursor:pointer;flex:0 0 auto;}',
-        '#pal-prev{flex:0 0 auto;width:118px;height:150px;position:relative;overflow:hidden;}',
-        '#pal-prev .dot-box{position:absolute;left:-22px;top:-22px;}',
-        '#pal-num{text-align:center;font-size:11px;color:#9a948a;margin:8px 0 2px 0;}',
-        '#pal-extra{display:flex;justify-content:center;margin:6px 0 4px 0;}',
-        '#pal-extra button{padding:7px 18px;font-size:11px;border-radius:8px;cursor:pointer;',
-        '  background:rgba(255,255,255,.04);border:1px solid #4a5160;color:#ded5c4;font-family:inherit;}',
-        '#pal-extra button.on{background:rgba(240,240,240,.9);border-color:#cfcfcf;',
-        '  border-width:2px;padding:6px 17px;color:#1b1b1f;font-weight:bold;}',
+        '#pal-prev{flex:0 0 auto;width:112px;height:158px;position:relative;overflow:hidden;}',
+        '#pal-prev .dot-box{position:absolute;left:-25px;top:-18px;}',
+        '#pal-num{text-align:center;font-size:12px;letter-spacing:.08em;color:#9a948a;',
+        '  margin:9px 0 3px 0;font-weight:bold;}',
         '#pal-keep{text-align:center;font-size:10px;color:#8d8578;min-height:14px;}',
         '#pal-btns{display:flex;gap:7px;margin-top:11px;}',
         '#pal-btns button{flex:1;padding:11px 4px;font-size:11px;border-radius:9px;cursor:pointer;',
@@ -138,11 +134,54 @@ function curHue(sheet) {
 })();
 
 // ==========================================
-// 색고리
+// 색판 — 바깥 고리로 색조, 안쪽 네모로 진하기와 밝기
 // ==========================================
-const R_OUT = 76, R_IN = 46, CV = 168;
+//
+//   고리만 있을 때는 또렷한 360색뿐이었다. 안쪽 네모가 생기면서
+//   흐린 색 · 어두운 색 · 흰색 · 검정 · 잿빛까지 다 고른다.
+//
+//       가로 ←→   진하기 (왼쪽 끝이 무채색)
+//       세로 ↑↓   밝기 (위가 밝고 아래가 검다)
+//
+//   ★ 네모는 고리 **안에 그냥 네모로** 넣었다. 마름모(45° 돌린 네모)로
+//     하면 같은 자리에 들어가지만, 손끝으로는 모서리 쪽이 잘 안 잡힌다.
+//
+//   적힐 때는 '#rrggbb' 한 줄이다 (recolor.js 의 dotHue 참고).
+const CV = 180, R_OUT = 84, R_IN = 60, SQ = 82;
+const SQ0 = (CV - SQ) / 2;              // 네모 왼쪽·위 끝
 
-function drawWheel(cv, hue) {
+function hsv2rgb(h, s, v) {
+    const i = Math.floor(h * 6), f = h * 6 - i;
+    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    let r, g, b;
+    switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        default: r = v; g = p; b = q;
+    }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+function rgb2hsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d) {
+        if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (mx === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+    }
+    return [h, mx ? d / mx : 0, mx];
+}
+function hex2(n) { return (n < 16 ? '0' : '') + n.toString(16); }
+function hexOf(h, s, v) {
+    const c = hsv2rgb(h, s, v);
+    return '#' + hex2(c[0]) + hex2(c[1]) + hex2(c[2]);
+}
+
+function drawPick(cv, h, s, v) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = CV * dpr; cv.height = CV * dpr;
     cv.style.width = CV + 'px'; cv.style.height = CV + 'px';
@@ -150,7 +189,8 @@ function drawWheel(cv, hue) {
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
     x.clearRect(0, 0, CV, CV);
     const c = CV / 2;
-    // 고리 — 1도씩 부채꼴로 채운다 (가장자리가 안 벌어지게 1.5도씩 겹친다)
+
+    // ① 바깥 고리 — 1도씩 부채꼴로 (가장자리가 안 벌어지게 1.5도씩 겹친다)
     for (let d = 0; d < 360; d++) {
         const a0 = (d - 90 - 0.75) * Math.PI / 180;
         const a1 = (d - 90 + 0.75) * Math.PI / 180;
@@ -161,18 +201,29 @@ function drawWheel(cv, hue) {
         x.fillStyle = 'hsl(' + d + ',85%,52%)';
         x.fill();
     }
-    // 가운데 — 고른 색
-    x.beginPath(); x.arc(c, c, R_IN - 7, 0, Math.PI * 2);
-    x.fillStyle = (hue === WHITE) ? '#f3f3f3' : 'hsl(' + hue + ',72%,55%)'; x.fill();
-    x.lineWidth = 2; x.strokeStyle = 'rgba(0,0,0,.45)'; x.stroke();
-    // ★ 흰색일 때는 손잡이를 안 그린다 — 고리 위에 흰색 자리가 없기 때문이다
-    if (hue === WHITE) return;
-    // 손잡이
-    const a = (hue - 90) * Math.PI / 180;
-    const r = (R_OUT + R_IN) / 2;
-    x.beginPath(); x.arc(c + Math.cos(a) * r, c + Math.sin(a) * r, 9, 0, Math.PI * 2);
+    // 고리 손잡이
+    const a = (h * 360 - 90) * Math.PI / 180;
+    const rr = (R_OUT + R_IN) / 2;
+    x.beginPath(); x.arc(c + Math.cos(a) * rr, c + Math.sin(a) * rr, 9, 0, Math.PI * 2);
     x.lineWidth = 3; x.strokeStyle = '#fff'; x.stroke();
     x.lineWidth = 1.5; x.strokeStyle = 'rgba(0,0,0,.6)'; x.stroke();
+
+    // ② 안쪽 네모 — 흰→고른 색조를 가로로, 그 위에 검정을 세로로 덮는다
+    const pure = hexOf(h, 1, 1);
+    let g = x.createLinearGradient(SQ0, 0, SQ0 + SQ, 0);
+    g.addColorStop(0, '#fff'); g.addColorStop(1, pure);
+    x.fillStyle = g; x.fillRect(SQ0, SQ0, SQ, SQ);
+    g = x.createLinearGradient(0, SQ0, 0, SQ0 + SQ);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, '#000');
+    x.fillStyle = g; x.fillRect(SQ0, SQ0, SQ, SQ);
+    x.lineWidth = 1; x.strokeStyle = 'rgba(255,255,255,.25)';
+    x.strokeRect(SQ0 + .5, SQ0 + .5, SQ - 1, SQ - 1);
+
+    // 네모 손잡이 — 밝은 자리에서는 검은 테가 보여야 한다
+    const px = SQ0 + s * SQ, py = SQ0 + (1 - v) * SQ;
+    x.beginPath(); x.arc(px, py, 7, 0, Math.PI * 2);
+    x.lineWidth = 2.5; x.strokeStyle = (v > 0.6 && s < 0.5) ? 'rgba(0,0,0,.75)' : '#fff'; x.stroke();
+    x.lineWidth = 1; x.strokeStyle = 'rgba(0,0,0,.55)'; x.stroke();
 }
 
 // 그림은 돌리는 동안 쉬었다 칠한다 (한 장 70ms)
@@ -190,15 +241,18 @@ function previewSoon() {
     }, 120);
 }
 
-function setHue(h) {
-    const v = window.dotHue(h);
-    run.hue = (v == null) ? 0 : v;
+function setCol(h, s, v) {
+    run.h = ((h % 1) + 1) % 1;
+    run.s = s < 0 ? 0 : (s > 1 ? 1 : s);
+    run.v = v < 0 ? 0 : (v > 1 ? 1 : v);
+    run.hue = hexOf(run.h, run.s, run.v);
     const cv = document.getElementById('pal-wheel');
-    if (cv) drawWheel(cv, run.hue);
+    if (cv) drawPick(cv, run.h, run.s, run.v);
     const n = document.getElementById('pal-num');
-    if (n) n.innerText = (run.hue === WHITE) ? '흰색' : ('색 ' + run.hue + '°');
-    const w = document.getElementById('pal-w');
-    if (w) w.classList.toggle('on', run.hue === WHITE);
+    if (n) {
+        n.innerText = run.hue.toUpperCase();
+        n.style.color = (run.v > 0.35) ? run.hue : '#cfcabf';
+    }
     const go = document.getElementById('pal-go');
     if (go) {
         const same = (curHue(run.sheet) === run.hue);
@@ -208,13 +262,39 @@ function setHue(h) {
     previewSoon();
 }
 
-function wheelHit(cv, ev) {
-    const r = cv.getBoundingClientRect();
-    const dx = ev.clientX - (r.left + r.width / 2);
-    const dy = ev.clientY - (r.top + r.height / 2);
-    if (!dx && !dy) return;
-    setHue(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+// 적힌 색(묵은 것 포함)을 색판 자리로 되돌린다
+function toHsv(v) {
+    const c = window.dotHue(v);
+    if (c == null) return [0, 0.85, 0.85];                 // 아직 안 물든 것 — 그냥 빨강
+    if (c === WHITE) return [0, 0, 1];
+    if (typeof c === 'number') return [c / 360, 1, 1];     // 색조만 골랐던 묵은 것
+    return rgb2hsv(parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16));
 }
+
+// 누른 자리가 고리인가 네모인가 — 끌기 시작할 때 한 번만 가른다
+function where(cv, ev) {
+    const r = cv.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * CV / r.width;
+    const py = (ev.clientY - r.top) * CV / r.height;
+    const dx = px - CV / 2, dy = py - CV / 2;
+    return (Math.sqrt(dx * dx + dy * dy) >= R_IN - 2) ? 'ring' : 'sq';
+}
+function pickAt(cv, ev, mode) {
+    const r = cv.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * CV / r.width;
+    const py = (ev.clientY - r.top) * CV / r.height;
+    if (mode === 'ring') {
+        const dx = px - CV / 2, dy = py - CV / 2;
+        if (!dx && !dy) return;
+        setCol((Math.atan2(dy, dx) * 180 / Math.PI + 90) / 360, run.s, run.v);
+    } else {
+        // ★ 가장자리는 붙여 준다. 순백·순흑은 네모의 딱 끝 한 줄인데,
+        //   손끝으로는 거기에 못 댄다 — 1픽셀 안쪽만 눌러도 #FAFCF9 가
+        //   나왔다. 3% 안쪽이면 끝으로 당긴다.
+        setCol(run.h, snap((px - SQ0) / SQ), snap(1 - (py - SQ0) / SQ));
+    }
+}
+function snap(t) { return t < 0.03 ? 0 : (t > 0.97 ? 1 : t); }
 
 // ==========================================
 // 창
@@ -265,15 +345,15 @@ function paintWho() {
 function pickPart(sheet) {
     run.sheet = sheet;
     const now = curHue(sheet);
-    run.hue = (now == null) ? 0 : now;
+    const c = toHsv(now);
     const p = parts().filter(function (x) { return x.sheet === sheet; })[0] || {};
     const k = document.getElementById('pal-keep');
     if (k) k.innerText = p.keep ? '안쪽 하얀 셔츠는 그대로 둡니다 — 겉만 물듭니다.' : '';
     const off = document.getElementById('pal-off');
     if (off) off.disabled = (now == null);
     paintWho();
+    setCol(c[0], c[1], c[2]);
     paintPrev();
-    setHue(run.hue);
 }
 
 function open(sheet) {
@@ -284,7 +364,7 @@ function open(sheet) {
     }
     if (!list.some(function (x) { return x.sheet === sheet; })) sheet = list[0].sheet;
     shut();
-    run = { sheet: sheet, hue: 0, paintT: null };
+    run = { sheet: sheet, h: 0, s: 0.85, v: 0.85, hue: hexOf(0, 0.85, 0.85), paintT: null };
 
     ov = document.createElement('div');
     ov.id = 'pal-ov';
@@ -295,8 +375,6 @@ function open(sheet) {
         + '<div id="pal-who"></div>'
         + '<div id="pal-mid"><canvas id="pal-wheel"></canvas><div id="pal-prev"></div></div>'
         + '<div id="pal-num"></div>'
-        // ★ 흰색은 색고리에 자리가 없다 (색상이라는 것이 없으므로) — 따로 둔다
-        + '<div id="pal-extra"><button id="pal-w">흰색</button></div>'
         + '<div id="pal-keep"></div>'
         + '<div id="pal-btns">'
         + '<button id="pal-off">원래대로</button>'
@@ -307,13 +385,18 @@ function open(sheet) {
     ov.onclick = function (e) { if (e.target === ov) shut(); };
 
     const cv = ov.querySelector('#pal-wheel');
-    let down = false;
-    cv.addEventListener('pointerdown', function (e) { down = true; wheelHit(cv, e); e.preventDefault(); });
-    // ★ 손가락을 고리 밖으로 끌어도 따라오게 window 에 건다.
+    // ★ 끌기는 **누른 자리로 갈린다.** 고리에서 시작했으면 끝까지 색조만,
+    //   네모에서 시작했으면 끝까지 진하기·밝기만 바뀐다. 안 그러면 손가락이
+    //   경계를 넘나들 때 고른 색이 튄다.
+    let mode = '';
+    cv.addEventListener('pointerdown', function (e) {
+        mode = where(cv, e); pickAt(cv, e, mode); e.preventDefault();
+    });
+    // ★ 손가락을 색판 밖으로 끌어도 따라오게 window 에 건다.
     //   ✗ setPointerCapture 는 쓰지 않는다 — 조이스틱에서 lostpointercapture 가
     //     거품처럼 올라와 떼어진 것으로 읽혔던 적이 있다 (plaza.js 참고).
-    const mv = function (e) { if (down) { wheelHit(cv, e); e.preventDefault(); } };
-    const up = function () { down = false; };
+    const mv = function (e) { if (mode) { pickAt(cv, e, mode); e.preventDefault(); } };
+    const up = function () { mode = ''; };
     window.addEventListener('pointermove', mv, { passive: false });
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
@@ -323,7 +406,6 @@ function open(sheet) {
         window.removeEventListener('pointercancel', up);
     };
 
-    ov.querySelector('#pal-w').onclick = function () { setHue(WHITE); };
     ov.querySelector('#pal-x').onclick = shut;
     ov.querySelector('#pal-off').onclick = wipe;
     ov.querySelector('#pal-go').onclick = apply;
@@ -343,7 +425,7 @@ function wipe() {
     window.dotSetCol(run.sheet, '');
     const off = document.getElementById('pal-off');
     if (off) off.disabled = true;
-    setHue(run.hue);
+    setCol(run.h, run.s, run.v);
     paintPrev();
 }
 
@@ -364,7 +446,7 @@ function apply() {
     cnt();
     const off = document.getElementById('pal-off');
     if (off) off.disabled = false;
-    setHue(run.hue);
+    setCol(run.h, run.s, run.v);
     paintPrev();
 }
 
