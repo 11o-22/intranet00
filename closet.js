@@ -636,7 +636,13 @@ window.dotStop = stop;
         '.cl-b{flex:0 0 auto;padding:9px 13px;font-size:11px;border-radius:9px;cursor:pointer;',
         '  background:rgba(255,255,255,.04);border:1px solid var(--theme-border,#4a5160);',
         '  color:var(--theme-text,#ded5c4);white-space:nowrap;font-family:inherit;}',
-        '.cl-b.on{background:rgba(217,160,90,.2);border-color:#8a6a2a;color:#ffe9bd;font-weight:bold;}',
+        // ★ 고른 단추 — 글씨색을 **박아 두면 안 된다.**
+        //   ✗ color:#ffe9bd 로 두었더니 밝은 살가죽(흰 바탕)에서 글씨가
+        //     바탕에 묻혀 안 보였다. 살가죽마다 바탕색이 다르므로 글씨는
+        //     그 살가죽의 글씨색(--theme-text)을 그대로 쓰고, **금테와
+        //     진하기**로만 골랐다는 것을 보인다.
+        '.cl-b.on{background:rgba(217,160,90,.28);border-color:#8a6a2a;border-width:2px;',
+        '  padding:8px 12px;color:var(--theme-text,#ffe9bd);font-weight:bold;}',
         '.cl-row .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
         '.cl-none{font-size:11px;color:#7d7568;padding:8px 2px;}',
         '#closet-note{font-size:10px;color:#8d8578;margin-top:12px;line-height:1.6;}'

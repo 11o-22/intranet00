@@ -575,6 +575,9 @@ function stampSafe(ov) {
         '.plaza-card .grip{width:38px;height:4px;border-radius:2px;background:#39394a;',
         '  margin:0 auto 10px auto;flex:0 0 auto;}',
         '.plaza-card h4{margin:0 0 10px 0;font-size:12.5px;color:#e8dcc6;font-weight:bold;}',
+        // 카드 속 — 넘치면 여기서 흐른다 (채팅칸처럼 속에서 늘어나는 것도 있어 flex 로 둔다)
+        '.plaza-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;',
+        '  display:flex;flex-direction:column;}',
         // 메뉴 격자
         '.plaza-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}',
         // 갈래 이름 — 줄 위에 작게 얹는다 (목록 · 가방 · 옷장이 같이 쓴다)
@@ -1912,8 +1915,13 @@ function sheet(kind, title, inner) {
     const s = document.createElement('div');
     s.id = 'plaza-sheet';
     s.dataset.kind = kind;
+    // ★ 속은 **따로 흐르는 칸**에 담는다.
+    //   ✗ 전에는 .plaza-grid 하나에 overflow-y:auto 를 걸어 그것이 흘렀다.
+    //     목록을 갈래로 나누면서 격자가 여럿이 되자 흐를 칸이 없어져,
+    //     카드(82dvh)를 넘긴 아래쪽(상점 · 단말 종료)에 손이 안 닿았다.
     s.innerHTML = '<div class="plaza-card"><div class="grip"></div>'
-        + (title ? '<h4>' + esc(title) + '</h4>' : '') + inner + '</div>';
+        + (title ? '<h4>' + esc(title) + '</h4>' : '')
+        + '<div class="plaza-body">' + inner + '</div></div>';
     s.addEventListener('pointerdown', function (e) {
         if (e.target === s) closeSheet();
         e.stopPropagation();
