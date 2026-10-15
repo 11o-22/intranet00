@@ -319,11 +319,31 @@ let chatRef = null;      // 맵 채팅 (방이 바뀌면 다시 건다)
 let allRef = null;       // 서버 채팅 (광장에 있는 내내 한 번만 건다)
 let allFrom = 0;         // 이때까지 온 줄은 「묵은 것」 — 빨간 점을 안 붙인다
 
-// 서버/맵 어느 쪽에 적을 것인가. 이 기계에만 적어 둔다.
+// 서버/맵/귓속말 어디에 적을 것인가. 이 기계에만 적어 둔다.
 const CH_KEY = 'plazaChatCh';
 let chatCh = 'map';
 try { if (localStorage.getItem(CH_KEY) === 'all') chatCh = 'all'; } catch (e) { }
 function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (run && run.room)); }
+
+// ==========================================
+// ★ 🤫 귓속말 — 고른 한 사람에게만
+// ==========================================
+//
+//   서버·맵 줄은 모두가 보는 자리에 적히므로 귓속말을 거기 적을 수 없다.
+//   **받는 사람 앞으로만** 적는다.
+//
+//       plazaWhisper/<받는이 사번>/<열쇠>  { n, c, t, at }
+//
+//   ★ 말풍선은 안 띄운다. 말풍선은 **내 자리 기록(s/st)에 실려** 같은
+//     방 사람 모두에게 가므로, 귓속말을 거기 실으면 다 들린다.
+//     그래서 귓속말은 글줄로만 간다.
+//
+//   ★ 보낸 줄은 **내 화면에만** 세운다 (서버에 내 몫까지 적지 않는다).
+//     적으면 지웠다 썼다 할 자리가 둘이 되고, 한 줄이 두 번 뜬다.
+const WH = 'plazaWhisper';
+const WH_KEEP = 40;
+let whTo = '', whName = '';      // 지금 귓속말할 상대
+let whRef = null, whFrom = 0;
 
 // ==========================================
 // 아이폰 — 시계·배터리 밑에 안 깔리게
@@ -518,6 +538,22 @@ function stampSafe(ov) {
         // 서버 채팅으로 온 줄에는 표를 붙인다 (맵 채팅은 표가 없다)
         '#plaza-ov .sv{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
         '  background:rgba(217,160,90,.22);color:#ffd79a;vertical-align:1px;}',
+        // ── 🤫 귓속말 — 글줄 색을 따로 둔다 (분홍보라)
+        '#plaza-ov .wht{display:inline-block;padding:0 4px;border-radius:4px;font-size:9px;font-weight:bold;',
+        '  background:rgba(214,120,200,.26);color:#f4b8ea;vertical-align:1px;}',
+        '#plaza-ov .wha{color:#f0a8e0;}',
+        '#plaza-feed div.wh,#plaza-log div.wh{color:#f3c9ec;}',
+        '#plaza-feed div.wh .who,#plaza-log div.wh .who{color:#f0a8e0;}',
+        '#plaza-whto{font-size:11px;color:#c9a8c0;margin:-3px 0 8px 2px;flex:0 0 auto;cursor:pointer;}',
+        '#plaza-whto b{color:#f0a8e0;}',
+        '#plaza-whto i{font-style:normal;color:#8d8578;margin-left:5px;text-decoration:underline;}',
+        '#plaza-whlist{display:flex;flex-direction:column;gap:6px;max-height:48vh;overflow-y:auto;}',
+        '#plaza-whlist button{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:9px;',
+        '  background:rgba(255,255,255,.05);border:1px solid #4a5160;color:#ded5c4;cursor:pointer;',
+        '  font-family:inherit;font-size:12px;text-align:left;}',
+        '#plaza-whlist button b{color:#f0a8e0;}',
+        '#plaza-whlist button i{font-style:normal;margin-left:auto;font-size:10.5px;color:#8d8578;}',
+        '#plaza-ov .plaza-none{font-size:11.5px;color:#8d8578;padding:14px 2px;}',
         // ── 채팅 칸 머리 : 왼쪽 위에 「서버 · 맵」
         '.plaza-chh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex:0 0 auto;}',
         '.plaza-chh .t{margin-left:auto;font-size:12.5px;color:#e8dcc6;}',
@@ -1540,25 +1576,109 @@ function trimAll() {
     } catch (e) { }
 }
 
-// ── 서버/맵 고르기
+// ── 서버/맵/귓속말 고르기
 function chSet(c) {
-    chatCh = (c === 'all') ? 'all' : 'map';
-    try { localStorage.setItem(CH_KEY, chatCh); } catch (e) { }
+    chatCh = (c === 'all') ? 'all' : (c === 'wh' ? 'wh' : 'map');
+    // 귓속말은 기억해 두지 않는다 — 다음에 들어왔을 때 엉뚱한 사람에게 간다
+    try { localStorage.setItem(CH_KEY, chatCh === 'wh' ? 'map' : chatCh); } catch (e) { }
     chPaint();
+    if (chatCh === 'wh' && !whTo) whoPick();
 }
 function chPaint() {
     const box = document.getElementById('plaza-ch');
     if (box) Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
         b.classList.toggle('on', b.dataset.c === chatCh);
     });
+    const who = document.getElementById('plaza-whto');
+    if (who) {
+        who.style.display = (chatCh === 'wh') ? '' : 'none';
+        who.innerHTML = whTo
+            ? '<b>' + esc(whName || whTo) + '</b> 사원에게만 <i>바꾸기</i>'
+            : '<i>누구에게 할지 고르세요</i>';
+    }
     const ph = chatCh === 'all' ? '서버 — 모든 사원에게 들립니다'
-                                : '맵 — 이 방에 있는 사람에게만';
+        : chatCh === 'wh' ? ('귓속말 — ' + (whTo ? (whName || whTo) + ' 사원만 듣습니다' : '대상을 고르세요'))
+        : '맵 — 이 방에 있는 사람에게만';
     ['plaza-in', 'plaza-in2'].forEach(function (id) {
         const e = document.getElementById(id);
         if (e) e.placeholder = ph;
     });
 }
 window.plazaChat = function (c) { if (c) chSet(c); return chatCh; };
+
+// ── 귓속말 상대 고르기 — 지금 광장에 있는 사람을 늘어놓는다
+function whoPick() {
+    const d = db_(), u = u_();
+    if (!d || !u) return;
+    // ★ once 는 **약속(promise)** 꼴로 받는다 — 되부름 꼴은 안 돌아가는
+    //   자리가 있다 (시험틀에서 목록이 통째로 비었다).
+    d.ref(P.PATH).once('value').then(function (s) {
+        const all = s.val() || {};
+        const rows = [];
+        Object.keys(all).forEach(function (rm) {
+            const node = all[rm] || {};
+            Object.keys(node).forEach(function (c) {
+                const v = node[c] || {};
+                if (c === u.code) return;
+                if (!v.at || now() - v.at > P.STALE_MS) return;
+                rows.push({ c: c, n: v.n || c, rm: (R[rm] || {}).n || rm });
+            });
+        });
+        rows.sort(function (a, b) { return a.n < b.n ? -1 : 1; });
+        const body = rows.length
+            ? '<div id="plaza-whlist">' + rows.map(function (x) {
+                return '<button data-c="' + esc(x.c) + '" data-n="' + esc(x.n) + '">'
+                    + '<b>' + esc(x.n) + '</b><i>' + esc(x.rm) + '</i></button>';
+            }).join('') + '</div>'
+            : '<div class="plaza-none">지금 광장에 다른 사원이 없습니다.</div>';
+        const sh = sheet('whis', '🤫 귓속말 — 누구에게', body);
+        if (!sh) return;
+        Array.prototype.forEach.call(sh.querySelectorAll('#plaza-whlist button'), function (b) {
+            b.onclick = function () {
+                whTo = b.dataset.c; whName = b.dataset.n;
+                chatCh = 'wh';
+                closeSheet();
+                chPaint();
+                sysLine(whName + ' 사원에게 귓속말합니다. 그 사원에게만 들립니다.');
+            };
+        });
+    });
+}
+window.plazaWhisperTo = function (code, name) {
+    whTo = String(code || ''); whName = String(name || code || '');
+    chatCh = 'wh'; chPaint();
+};
+
+// ── 나에게 온 귓속말을 듣는다 (광장에 있는 내내 한 번만 건다)
+function watchWhisper() {
+    const d = db_(), u = u_();
+    if (!d || !u || !run) return;
+    if (whRef) { try { whRef.off(); } catch (e) { } whRef = null; }
+    whFrom = now() + 1500;              // 걸자마자 오는 묵은 줄은 조용히 받는다
+    whRef = d.ref(WH + '/' + u.code).limitToLast(WH_KEEP);
+    whRef.on('child_added', function (s) {
+        const v = s.val() || {};
+        if (!v.t) return;
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', quiet: now() < whFrom });
+    });
+}
+
+// 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다 (서버 채팅과 같은 길)
+function whTrim(code) {
+    const d = db_(); if (!d) return;
+    if (Math.random() > 0.2) return;
+    try {
+        d.ref(WH + '/' + code).once('value').then(function (s) {
+            const v = s.val(); if (!v) return;
+            const keys = Object.keys(v).sort();
+            const over = keys.length - WH_KEEP * 2;
+            if (over <= 0) return;
+            const up = {};
+            keys.slice(0, over).forEach(function (k) { up[k] = null; });
+            d.ref(WH + '/' + code).update(up);
+        });
+    } catch (e) { }
+}
 
 // ==========================================
 // ★ 사원증 칸 — 사진 · 닉네임 · 사번
@@ -1676,10 +1796,9 @@ function paintFeed() {
     const rows = (run.lines || []).slice(-FEED_KEEP);
     el.innerHTML = rows.map(function (o, i) {
         const dim = (0.45 + 0.55 * ((i + 1) / rows.length)).toFixed(2);   // 묵은 줄은 옅게
-        return '<div style="opacity:' + dim + '">' + (o.sys
+        return '<div class="' + (o.w ? 'wh' : '') + '" style="opacity:' + dim + '">' + (o.sys
             ? '<span class="sys">· ' + esc(o.t) + '</span>'
-            : (o.sv ? '<span class="sv">서버</span> ' : '')
-              + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
+            : whHead(o) + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
     }).join('');
 }
 
@@ -1700,7 +1819,7 @@ function paintLog() {
     if (!log || !run) return;
     log.innerHTML = (run.lines || []).map(function (o) {
         return o.sys ? '<div class="sys">· ' + esc(o.t) + '</div>'
-                     : '<div>' + (o.sv ? '<span class="sv">서버</span> ' : '')
+                     : '<div class="' + (o.w ? 'wh' : '') + '">' + whHead(o)
                        + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t) + '</div>';
     }).join('') || '<div class="sys">아직 오간 말이 없습니다.</div>';
     log.scrollTop = log.scrollHeight;
@@ -1720,8 +1839,10 @@ function chatBox() {
         '<div class="plaza-chh">'
         + '<div id="plaza-ch">'
         +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
+        +   '<button data-c="wh">귓속말</button>'
         + '</div>'
         + '<b class="t">채팅</b></div>'
+        + '<div id="plaza-whto" style="display:none"></div>'
         + '<div id="plaza-log"></div>'
         + '<div id="plaza-send">'
         +   '<input id="plaza-in2" maxlength="' + P.SAY_MAX + '" enterkeyhint="send">'
@@ -1730,6 +1851,8 @@ function chatBox() {
     Array.prototype.forEach.call(s.querySelectorAll('#plaza-ch button'), function (b) {
         b.onclick = function (e) { e.stopPropagation(); chSet(b.dataset.c); };
     });
+    const wt = s.querySelector('#plaza-whto');
+    if (wt) wt.onclick = function (e) { e.stopPropagation(); whoPick(); };
     const inp = s.querySelector('#plaza-in2');
     const go = function () { say(inp.value); inp.value = ''; };
     inp.addEventListener('keydown', function (e) {
@@ -1748,11 +1871,20 @@ function paintBar(o) {
     const t = bar.querySelector('.txt');
     if (t) {
         t.innerHTML = o.sys ? '<span style="opacity:.65">· ' + esc(o.t) + '</span>'
-            : '<span class="last">' + (o.sv ? '<span class="sv">서버</span> ' : '')
-              + '<b style="color:#9fd8ef">' + esc(o.n) + '</b> ' + esc(o.t) + '</span>';
+            : '<span class="last' + (o.w ? ' wh' : '') + '">' + whHead(o)
+              + '<b style="color:' + (o.w ? '#f0a8e0' : '#9fd8ef') + '">' + esc(o.n) + '</b> '
+              + esc(o.t) + '</span>';
     }
     // 사람 말에만 빨간 점. 들어오자마자 쏟아지는 서버 지난 줄(quiet)은 뺀다.
     if (!o.sys && !o.quiet && !bar.classList.contains('typing')) bar.classList.add('new');
+}
+
+// 글줄 앞에 붙는 표 — 「서버」 또는 「귓」
+//   귓속말은 받은 것(in)과 보낸 것(out)을 화살표로 가른다.
+function whHead(o) {
+    if (o.w === 'in') return '<span class="wht">귓</span> ';
+    if (o.w === 'out') return '<span class="wht">귓</span> <span class="wha">→</span> ';
+    return o.sv ? '<span class="sv">서버</span> ' : '';
 }
 
 function addLine(who, text, code) {
@@ -1767,6 +1899,21 @@ function say(text) {
     const u = u_(); if (!run || !u) return;
     const t = String(text || '').trim().slice(0, P.SAY_MAX);
     if (!t) return;
+
+    // ── 🤫 귓속말 — 받는 사람 앞으로만 적는다 (말풍선 없음)
+    if (chatCh === 'wh') {
+        if (!whTo) { sysLine('귓속말할 사원을 먼저 고르세요.'); whoPick(); return; }
+        const d0 = db_();
+        if (d0) {
+            try {
+                d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: now() });
+                whTrim(whTo);
+            } catch (e) { }
+        }
+        pushLine({ n: whName || whTo, t: t, c: whTo, w: 'out' });   // 보낸 줄은 내 화면에만
+        return;
+    }
+
     run.say = t; run.sayAt = now();
     bubble(run.me, t);
     send(false);                              // 말풍선을 바로 알린다
@@ -2301,6 +2448,7 @@ function shut() {
     leaveRoom();
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
     if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
+    if (whRef) { try { whRef.off(); } catch (e) { } whRef = null; }
     if (nbRef) { try { nbRef.off(); } catch (e) { } nbRef = null; }
     Object.keys(run.peers).forEach(dropPeer);
     try { run.me.actor.stop(); } catch (e) { }
@@ -2591,6 +2739,7 @@ function open() {
     paintMe();
     watchNotice();
     watchAll();
+    watchWhisper();
 
     // ★ 지난번에 서 있던 방에서 다시 시작한다 — 들어갔다 나오면 광장이
     //   아니라 **그 자리**여야 한다. 없어진 방이면 광장으로 돌아간다.
