@@ -69,11 +69,23 @@ function when(t) {
     return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 '
         + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
+// ★ 물품은 두 꼴로 온다.
+//     새 꼴  items: [ { n: 물품이름, q: 개수 }, … ]   ← 지금 보내는 꼴
+//     옛 꼴  items: { 물품이름: 개수 }
+//
+//   ✗ 옛 꼴은 **물품 이름을 열쇠로 쓴다.** 파이어베이스 열쇠에는 . # $ / [ ] 를
+//     못 쓴다. 「[ 💭 말풍선 선택권 ]」처럼 대괄호가 든 이름은 empty-null.js 가
+//     보내기 직전에 그 열쇠만 **말없이 빼고** 보냈다. 그래서 선물은 도착하는데
+//     물품이 비어, 받아도 아무것도 안 들어왔다.
+//     이름을 **값**에 두면 무엇이든 담긴다. 이미 쌓인 옛 꼴도 그대로 읽는다.
 function itemPairs(g) {
     const it = (g && g.items) || {};
     if (typeof it !== 'object') return [];
-    return Object.keys(it).map(function (k) { return [k, Number(it[k]) || 0]; })
-        .filter(function (p) { return p[1] > 0; });
+    return Object.keys(it).map(function (k) {
+        const v = it[k];
+        if (v && typeof v === 'object') return [String(v.n || ''), Number(v.q) || 0];   // 새 꼴
+        return [k, Number(v) || 0];                                                     // 옛 꼴
+    }).filter(function (p) { return p[0] && p[1] > 0; });
 }
 
 // 트랜잭션 — 거는 동안 그 자리를 지켜본다 (안 그러면 첫 굴림이 null 이다)
@@ -119,7 +131,10 @@ function send(codes, opt) {
                    byName: String((opt && opt.byName) || u.name || '') };
     if (title) base.title = title;
     if (text) base.text = text;
-    if (Object.keys(items).length) base.items = items;      // 빈 것은 넣지 않는다 (서버가 지운다)
+    // 빈 것은 넣지 않는다 (서버가 지운다). 이름은 열쇠가 아니라 값에 담는다 (itemPairs 참고)
+    if (Object.keys(items).length) {
+        base.items = Object.keys(items).map(function (k) { return { n: k, q: items[k] }; });
+    }
     if (pts) base.pts = pts;
 
     const up = {};
