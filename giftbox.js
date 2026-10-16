@@ -306,6 +306,8 @@ function tell(g, n) {
 }
 
 function count() { return Object.keys(mine || {}).length; }
+// 밖에서도 몇 건인지 볼 수 있게 — 광장 목록이 알림 불빛에 쓴다
+window.giftCount = count;
 
 // --- 단추 — 사원증 SERIAL NO. 왼쪽. 비어 있어도 늘 보인다 ---
 function paintBtn() {

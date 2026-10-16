@@ -258,6 +258,8 @@ const PLAZA = {
     //   ic 는 ico/ 안의 그림 이름이다. 흰 그림을 **마스크**로 써서 글자색을
     //   그대로 입으므로, 테마가 바뀌어도 아이콘이 따라 바뀐다.
     //   ic 가 없는 줄은 전처럼 i(글자 그림)로 그린다.
+    // ★ nw 는 **알림 거리**다 — 올 것이 와 있으면 그 칸에 초록 불빛이 붙는다
+    //   (hasNew 참고). ☰ 단추에도 같이 붙어, 열어 보지 않아도 안다.
     // ★ g 는 **갈래**다 — 목록(☰)이 이 차례대로 묶어 그린다 (GROUPS 참고).
     //   g 가 없는 줄은 맨 끝 「그 밖」으로 모인다.
     //   ★ 의상숍·악세서리숍도 없다 — 망상 홈쇼핑 안에 서 있다 (gacha.js).
@@ -271,7 +273,7 @@ const PLAZA = {
     ],
     MENU: [
         // ① 사내
-        { g: 'in',    n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox' },
+        { g: 'in',    n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox', nw: 'gift' },
         { g: 'in',    n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' },
         { g: 'in',    n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
         // ✗ 전체 대화는 뺐다 — 광장 아래 띠에서 바로 말하고, 글줄을 톡 치면
@@ -281,12 +283,12 @@ const PLAZA = {
         // 오른쪽 아래 가방 단추와 가는 데가 같다 — 목록에서도 찾을 수 있게 둔다
         { g: 'me',    n: '소지품',     i: '🎒', ic: 'bag',     tab: 'tab-record',   sub: 'rec-inventory' },
         { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
-        { g: 'me',    n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters' },
+        { g: 'me',    n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters', nw: 'letter' },
         { g: 'me',    n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
         // ③ 포인트
         { g: 'point', n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
         { g: 'point', n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
-        { g: 'point', n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p' },
+        { g: 'point', n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p', nw: 'p2p' },
         // ④ 탐사 — 파티는 목록에서 뺐다. 재난관리국 B1 엘리베이터로 들어간다.
         { g: 'dark',  n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
         // ⑤ 생활
@@ -648,6 +650,9 @@ function stampSafe(ov) {
         '  border:1px solid #2b2b38;color:#ded5c4;font-size:10.5px;font-family:inherit;cursor:pointer;}',
         '.plaza-grid button:active{background:rgba(217,160,90,.14);border-color:#8a6a2a;}',
         '.plaza-grid .e{font-size:21px;line-height:1;}',
+        // 알림 불빛 — 바탕 화면과 같은 초록 점(.notify-dot, style.css).
+        //   칸이 커서 모서리 **안쪽**에 둔다 (밖에 두면 칸 사이에 떠 보인다).
+        '.plaza-grid button.notify-dot:after{top:7px;right:7px;}',
         // 말 창
         '#plaza-log{flex:1 1 auto;min-height:190px;max-height:52dvh;overflow-y:auto;padding:2px 2px 8px 2px;',
         '  font-size:12px;line-height:1.7;}',
@@ -2274,6 +2279,47 @@ function sheet(kind, title, inner) {
     return s;
 }
 
+// ==========================================
+// ★ 알림 불빛 — 올 것이 와 있나
+// ==========================================
+//
+//   목록(☰)의 칸과 ☰ 단추에 **초록 점**을 붙인다. 바탕 화면이 쓰는
+//   .notify-dot 을 그대로 쓴다 (style.css — 초록·깜박임).
+//
+//       gift    선물함에 안 받은 것이 있다 (giftbox.js 의 giftCount)
+//       letter  안 읽은 익명 편지가 있다 (hasNewLetter — 편지 칸을 열면 꺼진다)
+//       p2p     나에게 온 **기다리는** 밀실 거래 제안이 있다
+//
+//   셋 다 이미 있는 값만 본다 — 새로 적는 칸은 없다.
+function hasNew(key) {
+    const u = u_(); if (!u) return false;
+    try {
+        if (key === 'gift') {
+            return (typeof window.giftCount === 'function') && window.giftCount() > 0;
+        }
+        if (key === 'letter') return !!u.hasNewLetter;
+        if (key === 'p2p') {
+            const ds = (typeof db !== 'undefined' && db && db.p2pDeals) || [];
+            return ds.some(function (d) {
+                return d && d.toCode === u.code && d.status === 'PENDING';
+            });
+        }
+    } catch (e) { }
+    return false;
+}
+function anyNew() {
+    return P.MENU.some(function (m) { return m.nw && hasNew(m.nw); });
+}
+// ☰ 단추 — 열어 보지 않아도 알게 한다.
+//   ✗ 목록 안에만 붙이면 **열어야 보이는 알림**이 된다.
+(function menuDot() {
+    setInterval(function () {
+        const b = document.getElementById('plaza-menu');
+        if (!b || !run) return;
+        b.classList.toggle('notify-dot', anyNew());
+    }, 1500);
+})();
+
 // ── ☰ 메뉴
 function menuSheet() {
     const list = P.MENU.filter(spotOk);
@@ -2293,7 +2339,10 @@ function menuSheet() {
         if (!rows.length) return;
         html += '<div class="plaza-gh">' + esc(grp.n) + '</div>'
             + '<div class="plaza-grid">' + rows.map(function (m) {
-                return '<button data-i="' + list.indexOf(m) + '">' + ico(m, 'e') + esc(m.n) + '</button>';
+                return '<button data-i="' + list.indexOf(m) + '"'
+                    + (m.nw ? ' data-nw="' + m.nw + '"' : '')
+                    + (m.nw && hasNew(m.nw) ? ' class="notify-dot"' : '') + '>'
+                    + ico(m, 'e') + esc(m.n) + '</button>';
             }).join('') + '</div>';
     });
     // ★ 나가기(✕)가 위 띠에서 빠졌다 — 위 오른쪽이 공지·선물함·메뉴 셋으로
@@ -2305,6 +2354,13 @@ function menuSheet() {
     Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-i]'), function (b) {
         b.onclick = function () { pickMenu(list[Number(b.dataset.i)]); };
     });
+    // 열어 둔 사이에 와도 바로 켜진다 (창이 닫히면 저절로 그친다)
+    const dotIv = setInterval(function () {
+        if (!s.isConnected) { clearInterval(dotIv); return; }
+        Array.prototype.forEach.call(s.querySelectorAll('.plaza-grid button[data-nw]'), function (b) {
+            b.classList.toggle('notify-dot', hasNew(b.dataset.nw));
+        });
+    }, 1500);
     s.querySelector('#plaza-out').onclick = function () {
         // 사원은 광장이 집이라 「나가기」가 갈 데가 없다 — 단말을 끈다.
         if (!isAdm() && typeof window.logout === 'function') { window.logout(); return; }
