@@ -262,6 +262,7 @@
       "p2p-multi.js",
       "find-item.js",
       "giftbox.js",
+      "board.js",
       "attr2.js",
       "welcome.js",
       "buy-guard.js",

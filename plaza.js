@@ -212,7 +212,9 @@ const PLAZA = {
                             { x: [1325, 1775], y0: [1247, 890], y1: [1277, 920] } ],
                   left: 'casino', right: 'post',
                   spots: [ { x: 470,  n: '행복 식당', i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
-                           { x: 1400, n: '장기 은행', i: '🏦', ic: 'bank', tab: 'tab-vip' } ] },
+                           { x: 1400, n: '장기 은행', i: '🏦', ic: 'bank', tab: 'tab-vip' },
+                           // ★ 사내 게시판 — 분수대 그림 앞에 세운다 (board.js)
+                           { x: 940, y: 892, n: '사내 게시판', fn: 'plazaBoardOpen', board: 1, bw: 170, bh: 205 } ] },
 
         post:   { n: '우체국', img: 'post.webp', w: 1880, h: 2556, k: 1,
                   floor: [845, 905], floor2: [1262, 1288], x2: [555, 1325],
@@ -520,6 +522,12 @@ function stampSafe(ov) {
         '.plaza-spot .t{font-size:10px;font-weight:bold;color:#ffe9bd;white-space:nowrap;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
+        '.plaza-board{gap:1px;animation:none;}',
+        '.plaza-board .bd{position:relative;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55));}',
+        '.plaza-board .bd svg{display:block;width:100%;height:100%;}',
+        '.plaza-board .nd{position:absolute;right:2px;top:2px;width:11px;height:11px;border-radius:50%;',
+        '  background:#4CAF50;box-shadow:0 0 6px #4CAF50;display:none;animation:plaza-gdot 1.5s infinite;}',
+        '.plaza-board.new .nd{display:block;}',
         '@keyframes plazaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
         // 걷기 단추 (자판이 있는 기계에서만 — 손가락 쪽은 화면을 끌어 걷는다)
         // ★ 줄 자체는 누름을 안 받는다 — 단추만 받는다.
@@ -1244,6 +1252,15 @@ function paintSpots() {
         e.style.left = Math.round(s.x * z) + 'px';
         e.style.top = Math.round((s.y != null ? s.y : b[0] - 10) * z) + 'px';
         e.innerHTML = '<div class="b">' + ico(s) + '</div><div class="t">' + esc(s.n) + '</div>';
+        // ★ 게시판 — 단추가 아니라 **세워 둔 판**으로 그린다 (board.js 가 그림을 준다).
+        //   사람처럼 선 자리(y)로 앞뒤를 가린다 — 판 뒤를 지나가는 사람은 가려진다.
+        if (s.board && typeof window.plazaBoardArt === 'function') {
+            e.className = 'plaza-spot plaza-board';
+            e.style.zIndex = String(100 + Math.round(s.y != null ? s.y : b[0]));
+            e.innerHTML = '<div class="bd" style="width:' + Math.round(s.bw * z) + 'px;height:'
+                + Math.round(s.bh * z) + 'px">' + window.plazaBoardArt() + '<i class="nd"></i></div>'
+                + '<div class="t">' + esc(s.n) + '</div>';
+        }
         // ★ **손가락을 뗄 때(click)** 연다 — 누르는 순간이 아니다.
         //
         //   ✗ 전에는 pointerdown 에서 바로 열었다. 그러면 손가락이 아직
@@ -3066,6 +3083,9 @@ function open() {
             if (e.key === 'Enter') sendSay();
             return;
         }
+        // ★ 게시판 같은 다른 창에서 글을 치는 중에는 안 걷는다 (a·d·w·s 가 글자다)
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
         const k = KEY[e.key];
         if (k) { run.keys[k] = true; run.tx = null; e.preventDefault(); }
         if (e.key === 'Escape') { if (sheetOpen()) closeSheet(); else shut(); }
