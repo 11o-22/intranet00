@@ -150,12 +150,12 @@ const GACHA_ACC = [
 //   토끼 전용 악세 둘. 토끼(h-rabbit)가 어둠 소속만 고를 수 있는 머리라,
 //   이 둘도 **어둠 소속에게만** 보이고 팔린다. 값은 둘 다 5만 P.
 //   뽑기 표(GACHA_ACC)와 따로 두어야 뽑기에 안 섞인다.
+//   ★ 움직이는 쪽(rab-friend)은 **여기에 없다.** 팔지 않고 사번 3764
+//     한 사람에게만 보인다 (closet.js 의 nos).
 const GACHA_BUY = {
     acc: [
-        { k: 'rab-friend',   n: '친구 리본',        p: 50000, dark: true,
-          d: '토끼 전용. 반짝이며 「친구!」가 뜬다.' },
-        { k: 'rab-friend-q', n: '친구 리본 (조용)', p: 50000, dark: true,
-          d: '토끼 전용. 반짝임도 글자도 없다.' }
+        { k: 'rab-friend-q', n: '친구 리본', p: 50000, dark: true,
+          d: '토끼 전용. 품에 안고 다닌다.' }
     ]
 };
 

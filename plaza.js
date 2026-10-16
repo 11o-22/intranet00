@@ -573,6 +573,8 @@ function stampSafe(ov) {
         '  font-family:inherit;font-size:12px;text-align:left;}',
         '#plaza-whlist button b{color:#f0a8e0;}',
         '#plaza-whlist button i{font-style:normal;margin-left:auto;font-size:10.5px;color:#8d8578;}',
+        '#plaza-whlist button i.on{color:#81c784;}',
+        '#plaza-whlist button i.off{color:#7d7568;}',
         '#plaza-ov .plaza-none{font-size:11.5px;color:#8d8578;padding:14px 2px;}',
         // ── 채팅 칸 머리 : 왼쪽 위에 「서버 · 맵」
         '.plaza-chh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex:0 0 auto;}',
@@ -1798,41 +1800,58 @@ function chPaint() {
 window.plazaChat = function (c) { if (c) chSet(c); return chatCh; };
 
 // ── 귓속말 상대 고르기 — 지금 광장에 있는 사람을 늘어놓는다
+// ★ 지금 접속해 있나 — 바탕 화면이 늘 들고 있는 접속자 표를 본다.
+//   (index.html 의 onlineUsersMap — 서버 presence 에서 내려온다)
+function onAir(code) {
+    try {
+        return !!(typeof onlineUsersMap !== 'undefined' && onlineUsersMap && onlineUsersMap[code]);
+    } catch (e) { return false; }
+}
+
+// ★ 귓속말 상대 고르기 — **사원 명부 전체**에서 고른다.
+//
+//   ✗ 전에는 지금 광장에 서 있는 사람만 보여 줬다. 그래서 자리를 비운
+//     사원에게는 아예 보낼 수가 없었다. 귓속말은 쌓이는 자리
+//     (plazaWhisper/<사번>)라 **없는 동안 보내 두면 돌아와서 받는다** —
+//     굳이 막을 까닭이 없었다.
+//
+//   이름 뒤에 (접속) · (부재) 를 적고, 접속한 사람을 위로 세운다.
 function whoPick() {
-    const d = db_(), u = u_();
-    if (!d || !u) return;
-    // ★ once 는 **약속(promise)** 꼴로 받는다 — 되부름 꼴은 안 돌아가는
-    //   자리가 있다 (시험틀에서 목록이 통째로 비었다).
-    d.ref(P.PATH).once('value').then(function (s) {
-        const all = s.val() || {};
-        const rows = [];
-        Object.keys(all).forEach(function (rm) {
-            const node = all[rm] || {};
-            Object.keys(node).forEach(function (c) {
-                const v = node[c] || {};
-                if (c === u.code) return;
-                if (!v.at || now() - v.at > P.STALE_MS) return;
-                rows.push({ c: c, n: v.n || c, rm: (R[rm] || {}).n || rm });
-            });
-        });
-        rows.sort(function (a, b) { return a.n < b.n ? -1 : 1; });
-        const body = rows.length
-            ? '<div id="plaza-whlist">' + rows.map(function (x) {
-                return '<button data-c="' + esc(x.c) + '" data-n="' + esc(x.n) + '">'
-                    + '<b>' + esc(x.n) + '</b><i>' + esc(x.rm) + '</i></button>';
-            }).join('') + '</div>'
-            : '<div class="plaza-none">지금 광장에 다른 사원이 없습니다.</div>';
-        const sh = sheet('whis', '🤫 귓속말 — 누구에게', body);
-        if (!sh) return;
-        Array.prototype.forEach.call(sh.querySelectorAll('#plaza-whlist button'), function (b) {
-            b.onclick = function () {
-                whTo = b.dataset.c; whName = b.dataset.n;
-                chatCh = 'wh';
-                closeSheet();
-                chPaint();
-                sysLine(whName + ' 사원에게 귓속말합니다. 그 사원에게만 들립니다.');
-            };
-        });
+    const u = u_();
+    if (!u) return;
+    const book = (typeof db !== 'undefined' && db && db.users) ? db.users : {};
+    const rows = [];
+    Object.keys(book).forEach(function (c) {
+        const x = book[c] || {};
+        if (c === u.code) return;
+        if (!x.code || !x.name) return;          // 껍데기 (guard.js 가 보는 것과 같은 잣대)
+        if (x.name === '기본사원') return;
+        rows.push({ c: c, n: x.name, on: onAir(c) });
+    });
+    // 접속한 사람 먼저, 그 안에서 가나다 순
+    rows.sort(function (a, b2) {
+        if (a.on !== b2.on) return a.on ? -1 : 1;
+        return a.n < b2.n ? -1 : 1;
+    });
+    const body = rows.length
+        ? '<div id="plaza-whlist">' + rows.map(function (x) {
+            return '<button data-c="' + esc(x.c) + '" data-n="' + esc(x.n) + '">'
+                + '<b>' + esc(x.n) + '</b>'
+                + '<i class="' + (x.on ? 'on' : 'off') + '">(' + (x.on ? '접속' : '부재') + ')</i>'
+                + '</button>';
+        }).join('') + '</div>'
+        : '<div class="plaza-none">명부에 다른 사원이 없습니다.</div>';
+    const sh = sheet('whis', '🤫 귓속말 — 누구에게', body);
+    if (!sh) return;
+    Array.prototype.forEach.call(sh.querySelectorAll('#plaza-whlist button'), function (b) {
+        b.onclick = function () {
+            whTo = b.dataset.c; whName = b.dataset.n;
+            chatCh = 'wh';
+            closeSheet();
+            chPaint();
+            sysLine(whName + ' 사원에게 귓속말합니다. 그 사원에게만 들립니다.'
+                + (onAir(whTo) ? '' : ' (지금은 부재중 — 돌아오면 받습니다)'));
+        };
     });
 }
 window.plazaWhisperTo = function (code, name) {
