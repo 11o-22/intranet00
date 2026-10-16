@@ -48,7 +48,7 @@ const K_VER = '1';                    // 내용 파일을 새로 받게 하려�
 const ADMIN = 'kario0987';
 const GRADES = ['D', 'C', 'B', 'A', 'S'];
 const GATE = { D: 1, C: 20, B: 50, A: 70, S: 90 };
-const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음으로 가는 데 드는 각성 점수
+const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음으로 가는 데 드는 각성 점수 (다음 등급 던전의 갈림길에서만 쌓인다)
 const MAX_TEAMS = 4;
 // ★ 꿈결 — 한 번 얻을 때 던전 등급마다 이만큼 (단위 D)
 const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150] };
@@ -172,10 +172,21 @@ const DUNS = {
     D3: { g: 'D', n: '『물이 빠진 저수지』', ready: true },
     D4: { g: 'D', n: '『눈 덮인 산장』', ready: true },
     D5: { g: 'D', n: '『무너진 지하 시장』', ready: true },
-    C1: { g: 'C' }, C2: { g: 'C' }, C3: { g: 'C' }, C4: { g: 'C' },
-    B1: { g: 'B' }, B2: { g: 'B' }, B3: { g: 'B' },
-    A1: { g: 'A' }, A2: { g: 'A' },
-    S1: { g: 'S' }, S2: { g: 'S' }
+    // C — 기괴 · 몬스터 사냥
+    C1: { g: 'C', n: '『살이 자라는 도축장』', ready: false },
+    C2: { g: 'C', n: '『이빨 난 인형 공방』', ready: false },
+    C3: { g: 'C', n: '『거꾸로 선 성당』', ready: false },
+    C4: { g: 'C', n: '『포자 온실』', ready: false },
+    // B — 탈출 · 스릴러 · 느와르 (S-003 보다 어렵게)
+    B1: { g: 'B', n: '『비 내리는 항구 창고』', ready: false },
+    B2: { g: 'B', n: '『폐쇄 병동 7층』', ready: false },
+    B3: { g: 'B', n: '『멈추지 않는 야간열차』', ready: false },
+    // A — 호러
+    A1: { g: 'A', n: '『어린이 방송국』', ready: false },
+    A2: { g: 'A', n: '『물에 잠긴 기숙학교』', ready: false },
+    // S — 에일리언 · 공룡
+    S1: { g: 'S', n: '『표본실 — 착륙 이후』', ready: false },
+    S2: { g: 'S', n: '『백악기 정원』', ready: false }
 };
 
 // ── 던전 물건
@@ -755,8 +766,12 @@ function decide(codes) {
     const w = ok.map(function (g, i) { return i === ok.length - 1 ? 4 : (i === ok.length - 2 ? 2 : 1); });
     let grade = 'D', t = Math.random() * w.reduce(function (a, b) { return a + b; }, 0);
     for (let i = 0; i < ok.length; i++) { t -= w[i]; if (t <= 0) { grade = ok[i]; break; } }
-    let pool = Object.keys(DUNS).filter(function (id) { return DUNS[id].g === grade && DUNS[id].ready; });
-    if (!pool.length) { grade = 'D'; pool = Object.keys(DUNS).filter(function (id) { return DUNS[id].g === 'D' && DUNS[id].ready; }); }
+    // 그 등급 던전이 아직 없으면 한 등급씩 내려가며 찾는다
+    let pool = [];
+    for (let gx = gi(grade); gx >= 0 && !pool.length; gx--) {
+        grade = GRADES[gx];
+        pool = Object.keys(DUNS).filter(function (id) { return DUNS[id].g === grade && DUNS[id].ready; });
+    }
     return Promise.resolve({ id: pick(pool), lv: dl, avg: Math.round(avg) });
 }
 
@@ -998,9 +1013,18 @@ function wakeUp() {
     const k = prof();
     const g = k.grade;
     if (!WAKE_NEED[g]) return '';
-    // 지금 등급의 갈림길에서만 쌓인다 (D 던전 갈림길은 D→C)
-    if (DUNS[kr.dun].g !== g && !(g === 'A' && DUNS[kr.dun].g === 'S')) {
-        return `<div style="font-size:11px; color:#888; margin-top:6px;">◇ 이미 지나온 등급의 갈림길이다. 각성에는 보태지지 않는다.</div>`;
+    // ★ 각성은 **올라갈 등급의 던전**에서만 한다 — 점수도 그 던전의 갈림길에서만 쌓인다.
+    //   D → C 는 C 던전 · C → B 는 B 던전 · B → A 는 A 던전 · A → S 는 S 던전.
+    //   (사용자가 정함. 그 밖의 던전 갈림길은 성공 보상만 받는다)
+    const next = GRADES[gi(g) + 1];
+    const dg = DUNS[kr.dun].g;
+    // 올라갈 등급의 던전이 아직 하나도 안 열렸으면 (내용을 넣는 동안) 예전처럼 지금 등급 던전에서 쌓는다
+    const nextOpen = Object.keys(DUNS).some(function (id) { return DUNS[id].g === next && DUNS[id].ready; });
+    if (!nextOpen && dg === g) { /* 예전 규칙 — 아래로 이어서 센다 */ }
+    else if (dg !== next) {
+        return `<div style="font-size:11px; color:#888; margin-top:6px;">◇ ${gi(dg) <= gi(g)
+            ? '이 등급의 갈림길은 각성에 보태지지 않는다 — ' + next + ' 등급 던전에서 각성한다.'
+            : '먼저 ' + next + ' 등급 던전에서 각성해야 한다.'}</div>`;
     }
     k.wake[g] = (k.wake[g] || 0) + 1;
     const need = WAKE_NEED[g];
@@ -1928,7 +1952,7 @@ function settle(how, txt) {
         `<div style="background:rgba(0,0,0,0.35); border:1px solid #23343b; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
             <div style="font-weight:bold; color:#7fd3e6; margin-bottom:8px; border-bottom:1px dashed #2f4a55; padding-bottom:6px;">[정산]</div>
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
-            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ')</span>' : '') + '<br>' : ''}
+            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ' · ' + GRADES[gi(k.grade) + 1] + ' 던전에서)</span>' : '') + '<br>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
