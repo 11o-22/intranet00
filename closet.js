@@ -148,7 +148,10 @@ const DOT = {
         'dress', 'tuxedo', 'suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
-    FACE_PAIR: { h05: 'h09' },
+    //   h05 ↔ h09   백사헌 — 안대가 반대쪽
+    //   rab-friend ↔ rab-friend-r   친구 리본 — 서 있을 때 뜨는 글씨가 반대쪽
+    //     (걷는 줄은 글씨가 없어 두 장이 똑같다 — 서 있는 줄만 다르다)
+    FACE_PAIR: { h05: 'h09', 'rab-friend': 'rab-friend-r' },
     // 서 있을 때 나부끼는 장 — 서 있기 줄의 0·2·4 칸을 돌아가며 쓴다
     FLAPS: ['suit', 'cape'],
     // ★ 칸 수가 다른 장은 여기에 **쓸 칸을 적어** 둔다.
@@ -715,13 +718,29 @@ function actor(user, opt) {
         //     **머리가 안 돌고** 안대만 반대 눈으로 건너가서, 오른쪽으로 걸어도
         //     얼굴이 왼쪽을 본 채였다. 재어 보면 초록 눈이 h05 는 머리 왼쪽
         //     28%, 「뒤집은 h09」 는 43% — 같은 쪽이다. 되돌리면 57% 로 건너간다.
+        //   ★ 머리뿐 아니라 **어느 층이든** 짝이 있을 수 있다.
+        //     친구 리본(rab-friend)은 서 있을 때 작은 글씨가 뜨는데, 통째로
+        //     뒤집으면 그 글씨도 뒤집혀 읽을 수 없다. 그래서 **글씨만 미리
+        //     뒤집어 그린 짝**(rab-friend-r)을 두고, 오른쪽을 볼 때 그것으로
+        //     바꿔 단다 — h09 와 똑같은 방식이다.
         face: function (d) {
             if (d === dir) return;
             dir = d;
             box.style.transform = (d < 0 ? 'scaleX(-1)' : '');
-            const pair = D.FACE_PAIR[L.head];
-            if (!pair) return;
-            head.style.backgroundImage = 'url("' + D.DIR + (d < 0 ? pair : L.head) + '.png")';
+            // 짝이 적힌 층은 그림만 짝으로 바꾼다 (뒤집기는 몸과 함께 한 번뿐)
+            sheets.forEach(function (nm, i) {
+                const pair = D.FACE_PAIR[nm];
+                if (!pair || !els[i]) return;
+                const use = (d < 0) ? pair : nm;
+                let src = D.DIR + use + '.png';
+                // 물들인 층이면 짝도 같은 빛깔로 물들여 쓴다
+                const hue = els[i].dataset.hue;
+                if (hue != null && hue !== '' && typeof window.dotTint === 'function') {
+                    const t = window.dotTint(use, hue);
+                    if (t) src = t;
+                }
+                els[i].style.backgroundImage = 'url("' + src + '")';
+            });
         },
         facing: function () { return dir; },
         stop: clear
