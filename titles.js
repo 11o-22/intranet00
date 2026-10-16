@@ -84,7 +84,11 @@ const DEFS = [
 ];
 
 // 상담사가 손으로 붙이는 것
-const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러', '페르소나'];
+// ★ [69] · [세] · [T] · [아기] 는 이름 자체에 꺾쇠가 들어 있다 —
+//   그림(ADMIN_ICON)도 안 붙이고, 보일 때 꺾쇠를 또 두르지도 않는다
+//   (tag 참고). 넷 다 상담사만 주고 뗀다.
+const ADMIN_TITLES = ['또류', '뉴비', '고인물', '전설', '이레귤러', '페르소나',
+                      '[69]', '[세]', '[T]', '[아기]'];
 
 // 상담사 칭호에 붙는 그림
 //
@@ -103,6 +107,14 @@ function label(n) {
     if (!n) return '';
     const ic = ADMIN_ICON[n];
     return ic ? ic + ' ' + n : n;
+}
+// ★ 꺾쇠를 두른 꼴 — 「[이레귤러]」
+//   ✗ 이름 자체가 이미 꺾쇠로 싸여 있으면([69]) 또 두르지 않는다.
+//     그대로 두르면 [[69]] 가 된다.
+function tag(n) {
+    const t = label(n);
+    if (!t) return '';
+    return (/^\[.*\]$/.test(t)) ? t : '[' + t + ']';
 }
 
 // ==========================================
@@ -706,7 +718,7 @@ function paint() {
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:5px;">칭호</div>'
         + (w
             ? '<span style="font-size:11px; color:#d4af37; border:1px solid #6a5a2a;'
-              + ' border-radius:3px; padding:2px 7px;">[' + label(w) + ']</span>'
+              + ' border-radius:3px; padding:2px 7px;">' + tag(w) + '</span>'
             : '<div style="font-size:11px; color:#666;">'
               + (own ? '달고 있지 않습니다. 칭호 탭에서 하나 고르세요.' : '아직 없습니다.')
               + '</div>')
@@ -962,7 +974,7 @@ function renderTitleList() {
                     + ' gap:8px; border:1px solid ' + (on ? '#d4af37' : '#6a5a2a') + '; border-radius:6px;'
                     + ' padding:8px 11px; margin-bottom:6px; background:rgba(0,0,0,0.3);">'
                     + '<div style="min-width:0;">'
-                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">[' + label(n) + ']</span>'
+                    + '<span style="font-size:12px; font-weight:bold; color:#d4af37;">' + tag(n) + '</span>'
                     + (ADMIN_DESC[n]
                         ? '<div style="font-size:10px; color:#7d7870; margin-top:3px; line-height:1.5;">'
                           + ADMIN_DESC[n] + '</div>'
@@ -979,7 +991,7 @@ function renderTitleList() {
     box.innerHTML = '<div style="font-size:10px; color:#888; margin-bottom:10px; line-height:1.7;">'
         + '얻은 칭호 ' + have.length + ' / ' + DEFS.length + '종. 줄을 누르면 얻는 방법이 보입니다.<br>'
         + '<span style="color:#d4af37;">달 수 있는 것은 한 번에 하나뿐입니다.</span> 지금: '
-        + (worn(currentUser) ? '<b style="color:#d4af37;">[' + worn(currentUser) + ']</b>' : '없음')
+        + (worn(currentUser) ? '<b style="color:#d4af37;">' + tag(worn(currentUser)) + '</b>' : '없음')
         + '</div>'
         + rows + admHtml;
 }
@@ -1241,7 +1253,17 @@ window.setTitleMode = function (m) {
     if (row) row.setAttribute('data-mode', titleMode);
 };
 
+// ★ 칭호를 주고 떼는 것은 **상담사만** 한다.
+//   통제 콘솔 자체가 상담사에게만 열리지만, 그것은 **단추를 감춘 것**일 뿐
+//   콘솔에서 손으로 부르면 그대로 먹혔다. 들머리에서 한 번 막는다.
+//   (adminGiveTitle · titleGive · titleTake 가 모두 여기를 지난다)
+const ADMIN = 'kario0987';
+function amAdmin() {
+    return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === ADMIN);
+}
+
 window.adminGiveTitle = function (name, force) {
+    if (!amAdmin()) { console.warn('칭호는 상담사만 주고 뗍니다.'); return; }
     if (typeof getAdminTargets !== 'function') return;
     const targets = getAdminTargets();
     if (!targets.length) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
@@ -1278,8 +1300,8 @@ window.adminGiveTitle = function (name, force) {
     if (typeof updateUI === 'function') updateUI();
 
     const lines = [];
-    if (done.length) lines.push('[' + label(name) + '] 부여 — ' + done.join(', '));
-    if (off.length) lines.push('[' + label(name) + '] 회수 — ' + off.join(', '));
+    if (done.length) lines.push(tag(name) + ' 부여 — ' + done.join(', '));
+    if (off.length) lines.push(tag(name) + ' 회수 — ' + off.join(', '));
     if (skip.length) lines.push((mode === 'take' ? '안 가지고 있어 건너뜀 — ' : '이미 가지고 있어 건너뜀 — ')
         + skip.join(', '));
     showCustomAlert(lines.join('\n\n'));
@@ -1296,10 +1318,10 @@ function oneTarget(name, who, mode) {
     if (!Array.isArray(u.titleAdmin)) u.titleAdmin = [];
     const at = u.titleAdmin.indexOf(name);
     if (mode === 'take') {
-        if (at < 0) { console.log(u.name + ' 사원은 [' + label(name) + '] 을 가지고 있지 않습니다.'); return; }
+        if (at < 0) { console.log(u.name + ' 사원은 ' + tag(name) + ' 을 가지고 있지 않습니다.'); return; }
         u.titleAdmin.splice(at, 1);
     } else {
-        if (at >= 0) { console.log(u.name + ' 사원은 이미 [' + label(name) + '] 을 가지고 있습니다.'); return; }
+        if (at >= 0) { console.log(u.name + ' 사원은 이미 ' + tag(name) + ' 을 가지고 있습니다.'); return; }
         u.titleAdmin.push(name);
     }
     const f = { titleAdmin: u.titleAdmin };
@@ -1311,11 +1333,17 @@ function oneTarget(name, who, mode) {
     if (typeof updateUserFields === 'function') updateUserFields(u.code, f);
     paint();
     if (typeof updateUI === 'function') updateUI();
-    console.log('%c\u2713 ' + u.name + ' 사원 [' + label(name) + '] '
+    console.log('%c\u2713 ' + u.name + ' 사원 ' + tag(name) + ' '
         + (mode === 'take' ? '회수' : '부여'), 'color:#4CAF50');
 }
-window.titleGive = function (name, who) { oneTarget(name, who, 'give'); };
-window.titleTake = function (name, who) { oneTarget(name, who, 'take'); };
+window.titleGive = function (name, who) {
+    if (!amAdmin()) { console.warn('칭호는 상담사만 주고 뗍니다.'); return; }
+    oneTarget(name, who, 'give');
+};
+window.titleTake = function (name, who) {
+    if (!amAdmin()) { console.warn('칭호는 상담사만 주고 뗍니다.'); return; }
+    oneTarget(name, who, 'take');
+};
 window.titleOf = function (who) {
     const all = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
     const u = who ? all.filter(function (x) {
@@ -1323,8 +1351,8 @@ window.titleOf = function (who) {
     })[0] : currentUser;
     if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
     console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
-    console.log('  달고 있는 것:', u.titleOn ? '[' + label(u.titleOn) + ']' : '없음');
-    console.log('  상담사 부여:', (u.titleAdmin || []).map(function (n) { return '[' + label(n) + ']'; }).join(' ') || '없음');
+    console.log('  달고 있는 것:', u.titleOn ? tag(u.titleOn) : '없음');
+    console.log('  상담사 부여:', (u.titleAdmin || []).map(function (n) { return tag(n); }).join(' ') || '없음');
     console.log('  저절로 얻은 것:', (u.titles || []).length + '개');
 };
 
@@ -1365,8 +1393,8 @@ window.myTitles = function (code) {
     console.log('%c===== ' + u.name + ' 사원의 칭호 =====', 'color:#d4af37; font-size:13px');
     const list = myList(u);
     const w = worn(u);
-    console.log('  달고 있음:', w ? '[' + label(w) + ']' : '없음');
-    console.log('  보유:', list.length ? list.map(function (n) { return '[' + label(n) + ']'; }).join(' ') : '아직 없습니다.');
+    console.log('  달고 있음:', w ? tag(w) : '없음');
+    console.log('  보유:', list.length ? list.map(function (n) { return tag(n); }).join(' ') : '아직 없습니다.');
 };
 
 window.titleProgress = function () {
@@ -1392,7 +1420,7 @@ window.titleProgress = function () {
     console.table(rows);
     console.log('  세기 시작:', s._born ? new Date(s._born).toLocaleString() : '-');
     if (currentUser.titleAdmin && currentUser.titleAdmin.length) {
-        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return '[' + label(n) + ']'; }).join(' '));
+        console.log('  상담사 부여:', currentUser.titleAdmin.map(function (n) { return tag(n); }).join(' '));
     }
 };
 
