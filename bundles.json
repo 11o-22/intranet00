@@ -237,6 +237,7 @@
       "epic-show.js",
       "epic-grim.js",
       "epic-nokill.js",
+      "kroom-core.js",
       "poll-freeze.js",
       "poll-why.js",
       "poll-pop.js",
