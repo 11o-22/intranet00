@@ -3,7 +3,8 @@
 // index.html 에서 solo-s003.js 다음에 불러온다
 // ==========================================
 //
-// 직업 24종 · 속성 8종 × 3 · 지도 이동 · 개인 목표 · 동료 구조
+// 직업 30종 · 속성 10종 × 3 · 지도 이동 · 개인 목표 · 동료 구조
+// (보정 · 굳건 여섯 자리는 epic-fix-steady.js 에서 더한다)
 // 정해진 결말 없음. 목표를 이루면 그 자리에서 정산하고 빠져나온다.
 // 장소별 본편은 2차 파일에서 채운다.
 
@@ -16,7 +17,7 @@ DARK_ZONES[EPIC_CODE] = {
     code: EPIC_CODE, grade: '?', name: '■■의 ■■■',
     brief: '(기록이 오래되어 대부분 읽히지 않습니다.)',
     warn: '장시간 탐사 — 중도 이탈 가능',
-    danger: '가늠 불가', survival: '??%', min: 1, max: 24,
+    danger: '가늠 불가', survival: '??%', min: 1, max: 30,   // 자리 30종 — 한 사람에 한 자리
     reward: [300, 25000], ready: false, epic: true,
     intro: `문이 아니다. 문이 있던 자리다.<br><br>
         돌이 무너져 아치만 남았고, 그 너머가 밝다.<br>
@@ -750,7 +751,7 @@ function epicFinish() {
                 <div style="font-family:monospace; font-size:11px; color:#d4af37; font-weight:bold;">${EPIC_CODE}</div>
                 <div style="font-size:15px; color:#fff; font-weight:bold; margin:4px 0;">${DARK_ZONES[EPIC_CODE].name}</div>
                 <div style="font-size:10px; color:#999; line-height:1.6;">${DARK_ZONES[EPIC_CODE].brief}</div>
-                <div style="font-size:10px; color:#777; margin-top:6px;">1~24인 · 자리 24종 · 보상 300~25,000 P</div>
+                <div style="font-size:10px; color:#777; margin-top:6px;">1~30인 · 자리 30종 · 보상 300~25,000 P</div>
                 <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트 전액과 반입품이 소멸하고 상담실로 이송됩니다.</div>
                 <div style="display:flex; gap:6px; margin-top:11px;">
                     <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:11px;" onclick="epicSoloEnter()">혼자 들어간다</button>
