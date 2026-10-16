@@ -270,55 +270,9 @@ function pregLeaveDecide(code, uses) {
 }
 
 // 통제 콘솔에 칸을 끼워 넣는다
-(function injectAdminPanel() {
-    function make() {
-        const scr = document.getElementById('admin-screen');
-        if (!scr || document.getElementById('admin-leave-box')) return true;
-
-        const anchor = scr.querySelector('.action-buttons');
-        const html = `
-            <div class="admin-panel-box" id="admin-leave-box" style="border-color:#c2185b; background-color:#1f1015;">
-                <h4 style="color:#ff8fb1;">🍼 육아휴직 심사</h4>
-                <div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.5;">
-                    여러 회분 물건('밤새 켜 둔 등')을 쓰려면 허가가 필요합니다.<br>
-                    승인 횟수만큼 쓸 수 있고, 다 쓰면 다시 신청해야 합니다.
-                </div>
-                <button class="game-btn" style="width:100%; margin:0 0 9px 0; padding:9px;" onclick="renderPregLeaveList()">새로고침</button>
-                <div id="admin-leave-list"></div>
-            </div>`;
-
-        if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
-        else scr.insertAdjacentHTML('beforeend', html);
-        return true;
-    }
-
-    if (typeof openAdminScreen === 'function') {
-        const _o = openAdminScreen;
-        openAdminScreen = function () {
-            const r = _o.apply(this, arguments);
-            setTimeout(function () { make(); renderPregLeaveList(); }, 120);
-            return r;
-        };
-    }
-
-    // 신청이 들어오면 콘솔 버튼에 점을 찍는다
-    if (database) {
-        const iv = setInterval(function () {
-            if (!currentUser) return;
-            if (currentUser.code !== 'kario0987') { clearInterval(iv); return; }
-            clearInterval(iv);
-            database.ref('pregLeave').on('value', function (s) {
-                const all = s.val() || {};
-                const n = Object.keys(all).filter(c => all[c] && all[c].state === 'PENDING').length;
-                const btn = document.getElementById('btn-admin-console');
-                if (!btn) return;
-                if (n > 0) btn.classList.add('notify-dot');
-                const box = document.getElementById('admin-leave-list');
-                if (box) renderPregLeaveList();
-            });
-        }, 1500);
-    }
-})();
+// ✗ 상담사 콘솔의 「🍼 육아휴직 심사」 칸은 뺐다 (2026-10-16, 주신 대로).
+//   신청이 들어와도 콘솔 단추에 점을 찍지 않는다 — 볼 자리가 없으므로.
+//   심사는 브라우저 콘솔에서 pregLeaveDecide(사번, 횟수) 로 할 수 있다 (0 이면 반려).
 
 // 확인용
 function leaveState() {
