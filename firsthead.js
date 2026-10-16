@@ -30,10 +30,15 @@ function me() { return (typeof currentUser !== 'undefined') ? currentUser : null
 function heads() {
     try {
         return (typeof DOT_HEADS !== 'undefined' ? DOT_HEADS : []).filter(function (h) {
-            // 한 벌이 통째로 그려진 특전(브라운 특전)은 여기서 안 고른다 —
+            // 한 벌이 통째로 그려진 특전(브라운 특전·토끼)은 여기서 안 고른다 —
             // 옷을 안 겹치는 것이라 처음 고르는 자리에 둘 것이 아니다.
             // 사택 옷장에서는 그대로 고를 수 있다.
             if (h.solo) return false;
+            // ★ 옷장과 **같은 걸름망**을 쓴다 — 어둠 전용(브라운)·상담사 전용은
+            //   여기에도 안 나온다.
+            //   ✗ solo 만 보고 있었다. 브라운(h-brown)은 solo 가 아니라서
+            //     어둠이 아닌 새 사원에게도 처음 창에 그대로 떴다.
+            if (typeof window.dotHeadAllowed === 'function' && !window.dotHeadAllowed(h.i, me())) return false;
             return true;
         });
     } catch (e) { return []; }

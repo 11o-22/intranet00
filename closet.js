@@ -372,6 +372,12 @@ function allowed(it, user) {
     return true;
 }
 // 이 사람 옷장에 보이는 것만 추린다
+// 밖(처음 얼굴 고르기 — firsthead.js)에서도 같은 걸름망을 쓰게 내어 준다
+window.dotHeadAllowed = function (id, user) {
+    const h = DOT_HEADS.filter(function (x) { return x.i === id; })[0];
+    return h ? allowed(h, user) : false;
+};
+
 function items(slot, user) {
     return slot.items.filter(function (it) { return allowed(it, user); });
 }
