@@ -296,7 +296,7 @@ DARK_ZONES[K_CODE] = {
     code: K_CODE, grade: '?', name: '『 K 의 방 』',
     brief: '문을 열 때마다 다른 방이 나온다. 방마다 주인이 다르다.',
     warn: '레벨제 던전 — 네 팀까지 동시 진입', danger: '던전마다 다름', survival: '??%',
-    min: 1, max: 5, reward: [500, 6000], ready: false, kroom: true,     // ★ 직업 갈림길이 다 들어오면 연다
+    min: 1, max: 5, reward: [500, 6000], ready: true, kroom: true,
     intro: '', outro: ''
 };
 
