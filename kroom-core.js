@@ -50,6 +50,8 @@ const GRADES = ['D', 'C', 'B', 'A', 'S'];
 const GATE = { D: 1, C: 20, B: 50, A: 70, S: 90 };
 const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음으로 가는 데 드는 각성 점수
 const MAX_TEAMS = 4;
+// ★ 꿈결 — 한 번 얻을 때 던전 등급마다 이만큼 (단위 D)
+const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150] };
 const LV_MAX = 100;
 
 const ATTR = {
@@ -131,6 +133,24 @@ const JOBS = {
 };
 // L — 서버에 한 명만. 얻는 조건은 나중에 정한다 (아직 카드에 안 나온다)
 const L_JOBS = ['정령사', '네크로맨서', '군주', '성녀', '테이머', '천마', '거너', '마스터', '드루이드', '방랑자'];
+
+// ── 전용 장비 — 이 방에서는 속성마다 「몇 번」 쓰는 능력이 된다
+//   횟수 = 1 + ⌊(장비 그 속성 등급 + 직업 등급) / 2⌋  (최대 5)
+//     장비 D0 C1 B2 A3 S4 L5 · 직업 D0 C1 B2 A3 S4
+//     예) 파괴 L · 직업 S → 5회   파괴 D · 직업 D → 1회   파괴 L · 직업 D → 3회
+const GEAR_K = {
+    break:  { n: '기믹 파훼',  d: '파괴로 푸는 선택지를 그대로 성공시킨다' },
+    sense:  { n: '길 찾기',    d: '감각으로 푸는 선택지를 그대로 성공시킨다' },
+    hide:   { n: '숨어 지나기', d: '은신으로 푸는 선택지를 그대로 성공시킨다' },
+    gaze:   { n: '꿰뚫어 보기', d: '응시로 푸는 선택지를 그대로 성공시킨다' },
+    evade:  { n: '즉사 회피',  d: '즉사 기믹에 걸려도 한 번 빠져나온다' },
+    luck:   { n: '다시 굴림',  d: '실패한 주사위를 한 번 더 굴린다' },
+    fix:    { n: '주사위 보정', d: '5 이하로 모자란 실패를 성공으로 바꾼다' },
+    steady: { n: '맞아 주기',  d: '체력이 깎일 것을 한 번 막는다' },
+    bond:   { n: '확실한 구조', d: '동료를 끌어낼 때 그대로 성공한다' },
+    heal:   { n: '더 돌보기',  d: '층마다 두 번인 돌봄을 더 쓴다' }
+};
+const GEAR_T = { D: 0, C: 1, B: 2, A: 3, S: 4, L: 5 };
 
 // ── 던전 15 — 내용 파일이 있는 것만 ready
 const DUNS = {
@@ -220,6 +240,54 @@ function loadFor(dunId, jobKey) {
     if (jobKey && JOBS[jobKey]) list.push('kroom/j' + g + '-' + JOBS[jobKey][0] + '.js');
     return Promise.all(list.map(loadOne));
 }
+
+// ==========================================
+// ★ 꿈결 — 포인트 오른쪽에 「D」로 늘 보인다
+// ==========================================
+//   바탕 화면(보유 포인트 칸)과 광장 위 띠(포인트 줄) 두 곳.
+//   updateUI 가 포인트를 다시 적을 때마다 같이 고친다.
+function paintDream() {
+    const u = me(); if (!u) return;
+    const v = ((u.kroom && u.kroom.dream) || 0).toLocaleString('ko-KR');
+    const a = document.getElementById('display-points');
+    if (a) {
+        let d = document.getElementById('display-dream');
+        if (!d) {
+            d = document.createElement('span');
+            d.id = 'display-dream';
+            d.style.cssText = 'margin-left:6px; font-size:0.8em; color:#c9a8ff; white-space:nowrap;';
+            a.insertAdjacentElement('afterend', d);
+            a.style.display = 'inline';
+        }
+        const t = v + ' D';
+        if (d.textContent !== t) d.textContent = t;
+    }
+    const pt = document.querySelector('#plaza-hud .pt');
+    if (pt) {
+        let d = pt.querySelector('.dm');
+        if (!d) {
+            pt.style.whiteSpace = 'nowrap';
+            d = document.createElement('span');
+            d.className = 'dm';
+            d.style.cssText = 'margin-left:5px; color:#c9a8ff;';
+            pt.appendChild(d);
+        }
+        const t = v + ' D';
+        if (d.textContent !== t) d.textContent = t;
+    }
+}
+window.kroomPaintDream = paintDream;
+(function hookDream() {
+    const iv = setInterval(function () {
+        if (typeof updateUI !== 'function') return;
+        if (updateUI._kd) { clearInterval(iv); return; }
+        const _u = updateUI;
+        updateUI = function () { const r = _u.apply(this, arguments); try { paintDream(); } catch (e) { } return r; };
+        updateUI._kd = true;
+        clearInterval(iv);
+    }, 400);
+    setInterval(function () { try { paintDream(); } catch (e) { } }, 3000);   // 광장 띠는 따로 그려진다
+})();
 
 // ==========================================
 // 구역 등록
@@ -317,7 +385,7 @@ function paintEntry() {
             <div style="font-size:10px; color:#777; margin-top:6px;">1~5인 · 네 팀까지 동시 진입 (지금 ${live}팀) · 던전 등급은 팀 평균 Lv 로 정해짐</div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:7px;">
                 Lv <b>${k.lv}</b> · ${k.job ? esc(jobName(k.job, k.grade)) + ' <span style="color:#7fd3e6;">' + k.grade + '</span>' : '<span style="color:#888;">직업 없음 — 처음 들어가면 고른다</span>'}
-                · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()}</b>
+                · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
             </div>
             <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트와 반입품을 잃고 상담실로 이송됩니다.</div>
             <div style="display:flex; gap:6px; margin-top:11px;">
@@ -472,8 +540,9 @@ function bar() {
             <span>Lv ${k.lv} · ${kr.job ? ATTR[JOBS[kr.job][0]].i + ' ' + esc(jobName(kr.job, k.grade)) + ' ' + k.grade : ''}</span>
             <span>${d ? esc(d.n || kr.dun) + (kr.floor ? ' · ' + kr.floor + '층' : '') : ''}</span>
         </div>${rows}
+        ${kr.gear && Object.keys(kr.gear).length ? '<div style="font-size:10px; color:#b9a3e0; margin-top:4px;">' + Object.keys(kr.gear).map(function (a) { return ATTR[a].i + ' ' + GEAR_K[a].n + ' ' + kr.gear[a].left + '/' + kr.gear[a].n; }).join(' · ') + '</div>' : ''}
         <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-top:4px;">
-            <span>경험치 +${kr.exp}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream}</span></div>
+            <span>경험치 +${kr.exp}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream} D</span></div>
     </div>`;
 }
 
@@ -612,7 +681,35 @@ function afterJob() {
     Object.keys(kr.max).forEach(function (s) { kr.max[s] += 5 * gi(k.grade); });   // 각성할수록 그릇이 커진다
     kr.stats = Object.assign({}, kr.max);
     kr._shown = null;
+    kr.gear = gearPower();
     if (darkRun.isParty) waitDungeon(); else decide([me().code]).then(enterDungeon);
+}
+
+// 전용 장비 속성마다 이번 판에 쓸 수 있는 횟수
+function gearPower() {
+    const u = me(), out = {};
+    const g = (typeof getGear === 'function') ? getGear(u) : (u && u.soulGear);
+    const attrs = g && Array.isArray(g.attrs) ? g.attrs : [];
+    const jt = gi(prof().grade);
+    attrs.forEach(function (a) {
+        if (!GEAR_K[a]) return;
+        let gg = 'D';
+        try { gg = (typeof gearAttrGrade === 'function') ? gearAttrGrade(g, a) : (g.grade || 'D'); } catch (e) { }
+        const n = Math.min(5, 1 + Math.floor(((GEAR_T[gg] || 0) + jt) / 2));
+        out[a] = { n: n, left: n, g: gg };
+    });
+    return out;
+}
+function gearUse(a) {
+    const x = kr && kr.gear && kr.gear[a];
+    if (!x || x.left <= 0) return false;
+    x.left--;
+    return true;
+}
+function gearLine(a, extra) {
+    const x = kr.gear[a];
+    return `<div style="font-size:11px; color:#d4bbff; margin:0 0 8px 0; padding:7px 9px; border:1px solid #4a3a6a; border-radius:5px; background:rgba(106,76,147,.12);">
+        ${ATTR[a].i} 전용 장비 — <b>${GEAR_K[a].n}</b> ${extra || ''} <span style="color:#888;">(남은 ${x.left} / ${x.n})</span></div>`;
 }
 
 function decide(codes) {
@@ -762,14 +859,30 @@ const PASS = { l: '이를 악물고 지나간다.', dc: 12,
     ng: '지나가긴 했다.<br><br>지나가는 동안 몇 번 부딪혔다. 몸이 기억한다.', lose: { hp: -8, mind: -6 } };
 window.kroomPick = function (i) {
     if (!kr || !kr.cur || kr._picking) return;
-    const it = kr.cur, o = (i === -1) ? Object.assign({ k: JOBS[kr.job][0] }, PASS) : it.sc.o[i]; if (!o) return;
+    const it = kr.cur;
+    let o = (i === -1) ? Object.assign({ k: JOBS[kr.job][0] }, PASS) : it.sc.o[i]; if (!o) return;
     kr._picking = true; setTimeout(function () { if (kr) kr._picking = false; }, 400);
     if (o.cost) { const c = Object.keys(o.cost)[0]; addStat(c, -o.cost[c]); }
     if (kr._panic && kr.stats.spirit <= 0) setStat('spirit', 20);       // 폭주 한 번 뒤에 조금 돌아온다
     kr._panic = false;
     const R = roll(o.k);
     const dc = o.dc || 13;
-    const ok = R.r !== 1 && (R.r + R.b) >= dc;
+    let ok = R.r !== 1 && (R.r + R.b) >= dc;
+    let gl = '';                                            // 전용 장비가 한 일
+    // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
+    if (!ok && ['break', 'sense', 'hide', 'gaze'].indexOf(o.k) >= 0 && gearUse(o.k)) {
+        ok = true; gl += gearLine(o.k, '— 손보다 장비가 먼저 움직였다.');
+    }
+    // 행운 — 다시 굴림
+    if (!ok && gearUse('luck')) {
+        const R2 = roll(o.k);
+        ok = R2.r !== 1 && (R2.r + R2.b) >= dc;
+        gl += gearLine('luck', '— 다시 굴렸다: 🎲 ' + R2.r + (ok ? ' 성공' : ' 이번에도 실패'));
+    }
+    // 보정 — 5 이하로 모자라면 맞춰 준다
+    if (!ok && R.r !== 1 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
+        ok = true; gl += gearLine('fix', '— 모자란 ' + (dc - (R.r + R.b)) + '을(를) 메웠다.');
+    }
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
     const dice = `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
@@ -778,14 +891,27 @@ window.kroomPick = function (i) {
         const got = reward(o.win, it.kind);
         let tail = got;
         if (o.wake && it.kind === 'j') tail += wakeUp();
-        show(it.sc.t + ' — 결과', dice + o.ok + tail, darkChoiceBtn('계속한다.', 'kroomNext()'));
+        show(it.sc.t + ' — 결과', dice + gl + o.ok + tail, darkChoiceBtn('계속한다.', 'kroomNext()'));
     } else {
         darkRun.fail++;
+        // 회피 — 즉사에 걸려도 한 번 빠져나온다
+        if (o.doom && gearUse('evade')) {
+            addStat('mind', -6);
+            show(it.sc.t + ' — 결과', dice + gearLine('evade', '— 반 발짝. 그 반 발짝이 전부였다.')
+                + (o.doom.text || '') + '<br><br><span style="color:#d4bbff;">— 몸이 먼저 빠져나왔다.</span>',
+                darkChoiceBtn('계속한다.', 'kroomNext()'));
+            return;
+        }
         if (o.doom) { doom(o.doom); return; }
+        // 굳건 — 체력이 깎일 것을 한 번 막는다
+        if (o.lose && o.lose.hp < 0 && gearUse('steady')) {
+            o = Object.assign({}, o, { lose: Object.assign({}, o.lose, { hp: 0 }) });
+            gl += gearLine('steady', '— 맞을 자리에 장비를 댔다.');
+        }
         hurt(o.lose);
         try { applyPollutionToUser(me(), 2); } catch (e) { }
         if (kr.stats.hp <= 0) { fall('쓰러졌다.'); return; }
-        show(it.sc.t + ' — 결과', dice + (o.ng || '') + lossLine(o.lose), darkChoiceBtn('계속한다.', 'kroomNext()'));
+        show(it.sc.t + ' — 결과', dice + gl + (o.ng || '') + lossLine(o.lose), darkChoiceBtn('계속한다.', 'kroomNext()'));
     }
 };
 
@@ -796,15 +922,20 @@ function reward(win, kind) {
     const g = DUNS[kr.dun].g;
     const mult = { D: 1, C: 1.6, B: 2.4, A: 3.4, S: 5 }[g] || 1;
     let exp = Math.round((win.exp || 12) * mult);
-    let dream = win.dream || 0;
-    if (kind === 'boss') { exp += Math.round(30 * mult); dream += 2; }
-    if (dream || Math.random() < 0.25) {
-        if (a === 'luck') dream = Math.ceil((dream || 1) * 1.5);
-        if (teamCount('luck') > 0) dream += 1;
+    // 꿈결 — 내용 파일이 「꿈결을 준다」고 적은 자리(win.dream)와 층 끝(보스)에서 한 번씩 얻는다.
+    //   얻는 양은 내용의 숫자가 아니라 던전 등급의 범위에서 굴린다.
+    let times = (win.dream ? 1 : 0) + (kind === 'boss' ? 1 : 0);
+    if (!times && a === 'luck' && Math.random() < 0.25) times = 1;     // 행운 — 안 주는 자리에서도 가끔
+    let dream = 0;
+    for (let t = 0; t < times; t++) dream += dreamRoll();
+    if (dream) {
+        if (a === 'luck') dream = Math.round(dream * 1.5);
+        if (teamCount('luck') > 0) dream = Math.round(dream * 1.1);
     }
+    if (kind === 'boss') exp += Math.round(30 * mult);
     kr.exp += exp; kr.dream += dream;
     const parts = ['경험치 +' + exp];
-    if (dream) parts.push('<span style="color:#c9a8ff;">꿈결 +' + dream + '</span>');
+    if (dream) parts.push('<span style="color:#c9a8ff;">꿈결 +' + dream + ' D</span>');
     ['hp', 'mind', 'spirit', 'mana', 'might', 'qi'].forEach(function (s) {
         if (win[s] && kr.stats[s] != null) { const d = addStat(s, win[s]); if (d) parts.push(STATN[s] + ' +' + d); }
     });
@@ -815,6 +946,10 @@ function reward(win, kind) {
         parts.push('<span style="color:#d4af37;">' + esc(win.item) + (n > 1 ? ' ×' + n : '') + '</span>');
     }
     return `<div style="font-size:11px; color:#8fb8c4; margin-top:10px; padding-top:8px; border-top:1px dashed #2f4a55;">${parts.join(' · ')}</div>`;
+}
+function dreamRoll() {
+    const r = DREAM[(kr && kr.dun && DUNS[kr.dun]) ? DUNS[kr.dun].g : 'D'] || DREAM.D;
+    return rnd(r[0], r[1]);
 }
 function lossLine(lose) {
     if (!lose) return '';
@@ -923,19 +1058,20 @@ window.kroomCook = function () {
 // ==========================================
 //   치유 → 체력 (무조건 성공)   응시 → 정신력   보정 → 마력
 //   굳건 → 제 무력             연결 → 내공     요리사 → 국을 건넨다
-//   층마다 두 번. 보정이 팀에 있으면 채우는 양이 늘어난다.
+//   층마다 두 번 (치유 장비가 있으면 그 횟수만큼 더). 보정이 팀에 있으면 채우는 양이 늘어난다.
 const CARE = { heal: 'hp', gaze: 'spirit', fix: 'mana', bond: 'qi', steady: 'might' };
+function careMax() { return 2 + ((kr.gear && kr.gear.heal) ? kr.gear.heal.n : 0); }
 function careAmt() { return Math.round(25 * (1 + 0.2 * Math.min(2, teamCount('fix'))) * (1 + 0.1 * gi(prof().grade))); }
 function supportBtn() {
     const a = JOBS[kr.job][0];
     if (!CARE[a] && kr.job !== 'cook') return '';
-    return `<button class="game-btn" style="width:100%; margin:4px 0 8px 0; padding:9px; font-size:11px; background:linear-gradient(145deg,#1f3a2a,#13261b) !important; border-color:#2f6a45 !important;" onclick="kroomCare()">🤝 동료를 돌본다 <span style="font-size:10px; color:#8fb8c4;">(${STATN[CARE[a]] || '국'} · 남은 ${2 - (kr.uses.care || 0)}번)</span></button>`;
+    return `<button class="game-btn" style="width:100%; margin:4px 0 8px 0; padding:9px; font-size:11px; background:linear-gradient(145deg,#1f3a2a,#13261b) !important; border-color:#2f6a45 !important;" onclick="kroomCare()">🤝 동료를 돌본다 <span style="font-size:10px; color:#8fb8c4;">(${STATN[CARE[a]] || '국'} · 남은 ${careMax() - (kr.uses.care || 0)}번)</span></button>`;
 }
 window.kroomCare = function () {
     if (!kr) return;
     const a = JOBS[kr.job][0];
     const stat = CARE[a];
-    const left = 2 - (kr.uses.care || 0);
+    const left = careMax() - (kr.uses.care || 0);
     const mates = teamStats();
     const rows = mates.map(function (m) {
         const self = m.code === me().code;
@@ -960,7 +1096,7 @@ window.kroomBack = function () {
     else { kr.idx = Math.max(0, kr.idx); kroomNext(); }
 };
 window.kroomCareGo = function (code) {
-    if (!kr || (kr.uses.care || 0) >= 2) return;
+    if (!kr || (kr.uses.care || 0) >= careMax()) return;
     const a = JOBS[kr.job][0];
     const stat = CARE[a];
     if (kr.job === 'cook' && !stat) {
@@ -1091,7 +1227,7 @@ function encounter(o) {
         여기서는 서로가 유일하게 사람이다.`,
         darkChoiceBtn('① 인사를 나눈다. <span style="font-size:10px; color:#888;">(정신력 · 심력이 조금 돌아온다)</span>', 'kroomMeet(1)') +
         (Object.keys(kr.items).some(function (n) { return kr.items[n] > 0 && ITEMS[n] && ITEMS[n].food; })
-            ? darkChoiceBtn('② 먹을 것을 하나 건넨다. <span style="font-size:10px; color:#888;">(저쪽 팀에 간다 · 꿈결 +2)</span>', 'kroomMeet(2)') : '') +
+            ? darkChoiceBtn('② 먹을 것을 하나 건넨다. <span style="font-size:10px; color:#888;">(저쪽 팀에 간다 · 꿈결을 얻는다)</span>', 'kroomMeet(2)') : '') +
         (a === 'bond' ? darkChoiceBtn('③ 길을 맞춰 본다. ⊙ <span style="font-size:10px; color:#888;">(연결 — 서로 지나온 길을 나눈다)</span>', 'kroomMeet(3)') : '') +
         darkChoiceBtn('경계하며 지나간다.', 'kroomMeet(0)'));
 }
@@ -1104,13 +1240,13 @@ window.kroomMeet = function (n) {
     if (n === 2) {
         const f = Object.keys(kr.items).filter(function (x) { return kr.items[x] > 0 && ITEMS[x] && ITEMS[x].food; })[0];
         if (f) {
-            kr.items[f]--; kr.dream += 2;
+            kr.items[f]--; kr.dream += dreamRoll();
             if (d) d.ref('kroomGift/' + o.id).push({ item: f, from: me().name, at: now() });
             t = esc(f) + '을(를) 건넸다.<br><br>저쪽이 받아 들고 잠깐 멍하니 있다.<br>여기서 뭔가를 받아 본 게 오랜만인 얼굴이다.';
         }
     }
     if (n === 3) {
-        addStat('spirit', 8); kr.exp += 20; kr.dream += 1;
+        addStat('spirit', 8); kr.exp += 20;
         t = '지나온 길을 서로 그려 보였다.<br><br>저쪽 길에는 이쪽에 없던 갈림이 있었다. 같은 방인데 다른 방이다.<br>그래도 맞춰 보니 출구 쪽은 같았다.';
     }
     if (n === 0) t = '눈을 떼지 않고 비켜 섰다.<br><br>저쪽도 그렇게 했다. 등을 보이지 않고 멀어진다.';
@@ -1224,7 +1360,8 @@ window.kroomRescue = function (code) {
         if (JOBS[kr.job][0] === 'bond') b += 3;
         b += Math.min(3, teamCount('fix'));
         const r = luckReroll(Math.floor(Math.random() * 20) + 1);
-        const ok = r !== 1 && r + b >= (v.dc || 13);
+        let ok = r !== 1 && r + b >= (v.dc || 13);
+        if (!ok && gearUse('bond')) ok = true;                // 연결 장비 — 확실한 구조
         if (ok) {
             ref.remove(); kr.exp += 40;
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 끌어냈습니다.', true);
@@ -1246,7 +1383,7 @@ function clear() {
     const D = DATA.dun[kr.dun];
     const g = DUNS[kr.dun].g;
     kr.exp += Math.round(120 * ({ D: 1, C: 1.6, B: 2.4, A: 3.4, S: 5 }[g] || 1));
-    kr.dream += 5;
+    kr.dream += dreamRoll();                                   // 돌파 — 한 번 더 얻는다
     settle('clear', D.outro);
 }
 window.kroomDie = function () {
@@ -1308,6 +1445,7 @@ function settle(how, txt) {
         died: how === 'dead', party: !!darkRun.isParty });
     if (u.darkLogs.length > 15) u.darkLogs.pop();
     try { saveFields({ kroom: 1, history: 1, darkLogs: 1, points: 1 }); } catch (e) { }
+    try { paintDream(); } catch (e) { }
     const up = k.lv - lv0;
     darkBodyEl().innerHTML = darkBox(how === 'dead' ? '종료' : (how === 'clear' ? '돌파' : '귀환'),
         (txt ? txt + '<br><br>' : '') + (how === 'clear' ? '' : ''),
@@ -1317,7 +1455,7 @@ function settle(how, txt) {
             ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ')</span>' : '') + '<br>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'leave' ? '절반' : '35%') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
-            꿈결 <b style="color:#c9a8ff;">+${dream}</b> <span style="color:#888;">(모두 ${k.dream})</span><br>
+            꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
             ${how === 'dead' ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7f0000; color:#f44336;">
                 보유 포인트 <b>-${(kr.lostPts || 0).toLocaleString()} P</b><br>
                 ${(kr.lostItems || []).length ? '반입품 <b>' + kr.lostItems.map(esc).join(', ') + '</b> 소실<br>' : ''}
