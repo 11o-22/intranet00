@@ -113,6 +113,16 @@ const PLAZA = {
     WARP_MS: 450,               // 넘어간 직후 이만큼은 또 안 넘어간다
     SEND_MS: 250,
     STALE_MS: 25000,
+    // ★ 가만히 서 있어도 이만큼마다 한 번 자리를 다시 적는다.
+    //   ✗ 전에는 움직일 때만 적어서, 25초 넘게 서 있으면 남의 화면에서
+    //     **사라졌다** (STALE_MS 를 넘긴 자리는 끊긴 사람으로 친다).
+    //     방 정원을 세려면 서 있는 사람도 세어져야 한다.
+    BEAT_MS: 10000,
+    // ★ 한 방 정원 — 같은 장소에 이만큼 차면 그 장소의 2번 방으로 간다.
+    //   사람마다 그리는 값이 커서, 한 화면에 사람이 많으면 끊긴다 (재 봤다:
+    //   1명 38장/초 · 20명 24장 · 40명 18장). 그리는 사람 수를 여기서 묶는다.
+    //   방이 달라도 「서버」 채팅은 다 같이 본다. 「맵」 채팅은 같은 방끼리.
+    CAP: 10,
     CATCH: 1.35,
     HOLD_MS: 1200,
     SAY_MS: 6000,               // 말풍선이 떠 있는 시간
@@ -279,6 +289,8 @@ const PLAZA = {
         //   가는 길이 둘이면 알림 불도 둘이 된다. 불은 위 띠 단추 하나에만 붙인다.
         { g: 'in',    n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' },
         { g: 'in',    n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
+        // 방이 나뉘어도 같이 있을 수 있게 — 누가 어느 장소 몇 번 방에 있나, 누르면 그리로 간다
+        { g: 'in',    n: '동료 목록',  i: '🧭', ic: 'mates',   sheet: 'mates' },
         // ✗ 전체 대화는 뺐다 — 광장 아래 띠에서 바로 말하고, 글줄을 톡 치면
         //   채팅 칸이 열린다. 목록에까지 두면 가는 길이 둘이 된다.
         // ② 내 정보
@@ -346,7 +358,7 @@ let allFrom = 0;         // 이때까지 온 줄은 「묵은 것」 — 빨간 
 const CH_KEY = 'plazaChatCh';
 let chatCh = 'map';
 try { if (localStorage.getItem(CH_KEY) === 'all') chatCh = 'all'; } catch (e) { }
-function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (run && run.room)); }
+function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (run && seatKey(run.room, run.inst))); }
 
 // ==========================================
 // ★ 🤫 귓속말 — 고른 한 사람에게만
@@ -417,7 +429,7 @@ function stampSafe(ov) {
         //   올라오는 창 위로 사람이 비친다.
         '#plaza-view{position:absolute;inset:0;overflow:hidden;background:#07070a;z-index:1;',
         '  touch-action:none;user-select:none;-webkit-user-select:none;}',
-        '#plaza-room{position:absolute;left:0;top:0;image-rendering:pixelated;',
+        '#plaza-room{position:absolute;left:0;top:0;image-rendering:pixelated;will-change:transform;',
         '  image-rendering:crisp-edges;background-repeat:no-repeat;}',
         // ── 위 띠 : 아이폰 상태막대를 피해 내려 앉힌다 (safe-area)
         '#plaza-top{position:absolute;left:0;right:0;top:0;z-index:20;display:flex;',
@@ -483,7 +495,10 @@ function stampSafe(ov) {
         '  font-size:10.5px;color:#b9b0a0;text-shadow:0 1px 3px #000;pointer-events:none;}',
         // ★ 사람은 **누름을 안 받는다.** 칸이 176x192 나 되는데 거의 투명해서,
         //   그 위를 짚으면 시설 단추도 못 누르고 걷기도 엉뚱해졌다.
-        '.plaza-one{position:absolute;pointer-events:none;}',
+        // ★ 사람마다 **제 층**으로 띄운다 (will-change). 그래야 누가 걷거나
+        //   발을 바꿔 디뎌도 그 사람 칸만 다시 그리고, 뒤의 큰 방 그림까지
+        //   다시 칠하지 않는다.
+        '.plaza-one{position:absolute;pointer-events:none;will-change:transform;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
         '.plaza-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;',
         '  font-size:10px;font-weight:bold;color:#efe6d8;text-shadow:0 1px 2px #000,0 0 4px #000;',
@@ -522,6 +537,18 @@ function stampSafe(ov) {
         '.plaza-spot .t{font-size:10px;font-weight:bold;color:#ffe9bd;white-space:nowrap;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
+        // ── 동료 목록
+        '.plaza-mates .mt-head{font-size:11px;color:#8d8578;margin:0 2px 9px;}',
+        '.plaza-mates .mt-empty{font-size:12px;color:#8d8578;text-align:center;padding:26px 0;}',
+        '.plaza-mates .mt-row{display:flex;align-items:center;gap:10px;padding:10px 11px;margin-bottom:7px;',
+        '  border-radius:12px;background:rgba(255,255,255,.04);border:1px solid #2b2b38;}',
+        '.plaza-mates .mt-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}',
+        '.plaza-mates .mt-who b{font-size:13px;color:#ffe9bd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.plaza-mates .mt-who span{font-size:11px;color:#a79e8f;}',
+        '.plaza-mates .mt-who i{font-style:normal;color:#6f685c;margin-left:4px;}',
+        '.plaza-mates button{flex:0 0 auto;padding:8px 12px;border-radius:10px;font-family:inherit;font-size:12px;',
+        '  cursor:pointer;background:rgba(217,160,90,.16);border:1px solid #8a6a2a;color:#ffe9bd;}',
+        '.plaza-mates button:disabled{background:rgba(255,255,255,.03);border-color:#2b2b38;color:#6f685c;cursor:default;}',
         '.plaza-board{gap:1px;animation:none;}',
         '.plaza-board .bd{position:relative;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55));}',
         '.plaza-board .bd svg{display:block;width:100%;height:100%;}',
@@ -770,7 +797,8 @@ function makeOne(user, label, k, other) {
     wrap.style.width = w + 'px';
     wrap.style.height = h + 'px';
 
-    const a = window.dotActor(user, { scale: k, all: !!other });
+    // 남(other)은 서 있을 때 눈 깜빡임·펄럭임을 안 돌린다 (calm) — 그리는 값을 줄인다
+    const a = window.dotActor(user, { scale: k, all: !!other, calm: !!other });
     wrap.appendChild(a.el);
 
     const tag = document.createElement('div');
@@ -842,6 +870,7 @@ function remakeFolk() {
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
         q.one = makeOne({ code: c, dot: d }, lab, run.k, true);
+        q.hid = false;                         // 새 칸은 보이는 채로 시작한다 (tick 이 다시 가린다)
         q.one.actor.face(q.face || 1);
         run.el.appendChild(q.one.wrap);
     });
@@ -1486,8 +1515,16 @@ function goRoom(key, way, lv) {
     putOne(run.me, run.x, run.y);
 
     try { localStorage.setItem('plazaRoom', key); } catch (e) { }
-    watchRoom();
-    watchChat();
+    // ★ 몇 번 방에 들지 먼저 정한다 — 정해지기 전에는 자리를 안 적는다 (run.ref 가 없다).
+    //   **자리가 남은 가장 앞 번호**로 든다. 있던 번호를 고집하면, 한 번 2번
+    //   방으로 밀린 사람은 어디를 가도 2번에 남아 1번에 있는 사람과 영영
+    //   못 만난다 (사람이 적을 때도 갈라진다). 앞 번호부터 채우면 모인다.
+    //   동료 목록으로 찾아갈 때만 그 방 번호로 바로 든다 (forceInst).
+    run.hops = 0;
+    const force = !!run.forceInst;
+    const want = run.forceInst || null;
+    run.forceInst = 0;
+    joinInst(want, force);
     run.sx = run.sy = -9999; run.sent = 0;
     sysLine(r.n + ' 에 들어왔습니다.');
     camera(true);
@@ -1609,6 +1646,11 @@ function tick(ts) {
     send(moving);
 
     // ─ 남 — 받은 자리로 미끄러져 간다
+    // ★ 화면 밖에 있는 사람은 **안 그린다** (display:none · 걸음 시계도 멈춤).
+    //   방은 화면보다 두 배 넘게 넓어서, 사람 절반은 대개 화면 밖이다.
+    //   자리는 계속 따라가 두었다가 화면에 들어오는 순간 그 자리에 세운다.
+    const zv = zz(), vbx = viewBox(), vwid = vbx.w || 0;
+    const seeL = run.cx - 140, seeR = run.cx + vwid + 140;
     Object.keys(run.peers).forEach(function (code) {
         const q = run.peers[code];
         const ax = q.tx - q.x, ay = q.ty - q.y;
@@ -1626,7 +1668,14 @@ function tick(ts) {
             q.one.actor.moving(!!q.moving && !held);
             q.one.actor.face(q.face || 1);
         }
-        putOne(q.one, q.x, q.y);
+        const sxp = q.x * zv;
+        const vis = !vwid || (sxp + q.one.w / 2 >= seeL && sxp - q.one.w / 2 <= seeR);
+        if (vis === !!q.hid) {
+            q.hid = !vis;
+            q.one.wrap.style.display = vis ? '' : 'none';
+            q.one.actor.hold(!vis);
+        }
+        if (vis) putOne(q.one, q.x, q.y);
         if (q.sayAt && now() - q.sayAt > P.SAY_MS) { bubble(q.one, ''); q.sayAt = 0; }
     });
 
@@ -1667,7 +1716,8 @@ function send(moving) {
         || moving !== run.sMoving || run.me.actor.facing() !== run.sFace
         || run.sayAt !== run.sSayAt;
     const stopping = (!moving && run.sMoving);
-    if (!stopping && (!changed || t - run.sent < P.SEND_MS)) return;
+    const beat = t - run.sent > P.BEAT_MS;           // 가만히 있어도 살아 있다고 알린다
+    if (!stopping && !beat && (!changed || t - run.sent < P.SEND_MS)) return;
     run.sent = t;
     run.sx = run.x; run.sy = run.y;
     run.sMoving = moving; run.sFace = run.me.actor.facing();
@@ -1677,9 +1727,212 @@ function send(moving) {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
             f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null),
-            s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t
+            s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
+            j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
     } catch (e) { }
+}
+
+// ==========================================
+// ★ 방 나누기 — 한 장소에 CAP(10)명까지
+// ==========================================
+//
+//   같은 장소(광장 · 카지노 거리 …)라도 방이 여럿일 수 있다.
+//       plazaRoom/plaza       1번 방   ← 예전 자리 그대로 (옛 판도 여기로 온다)
+//       plazaRoom/plaza~2     2번 방
+//       plazaRoom/plaza~3     3번 방 …
+//   맵 채팅도 같은 꼴로 나뉜다 (plazaChat/plaza~2). 서버 채팅은 하나다.
+//
+//   ■ 들어갈 방 고르기
+//     장소에 들어설 때 서버의 자리 표를 **한 번** 읽어(census) 방마다 몇 명인지
+//     센다. 있던 방 번호에 자리가 있으면 그대로, 없으면 빈자리가 있는 가장
+//     앞 번호로 간다. 고르기 전에는 자리를 적지 않는다.
+//
+//   ■ 동시에 들어와 넘쳤을 때
+//     둘이 같은 때 마지막 한 자리를 보고 들어오면 열하나가 된다. 그때는
+//     **늦게 들어온 쪽**(j — 방에 든 때)이 다음 방으로 옮긴다 (overCheck).
+function seatKey(room, inst) { return (inst > 1) ? room + '~' + inst : room; }
+function keyRoom(k) { const i = String(k).indexOf('~'); return i < 0 ? k : k.slice(0, i); }
+function keyInst(k) { const i = String(k).indexOf('~'); return i < 0 ? 1 : (parseInt(k.slice(i + 1), 10) || 1); }
+function liveSeat(v) { return !!(v && v.at && now() - v.at <= P.STALE_MS); }
+
+// 서버에 앉은 자리를 한 번 읽는다 → { 장소: { 방번호: { 사번: 자리 } } }
+function census() {
+    const d = db_();
+    if (!d) return Promise.resolve({});
+    return d.ref(P.PATH).once('value').then(function (s) {
+        const all = s.val() || {}, out = {};
+        Object.keys(all).forEach(function (k) {
+            const room = keyRoom(k), inst = keyInst(k);
+            if (!R[room]) return;
+            const seats = all[k] || {};
+            Object.keys(seats).forEach(function (c) {
+                if (!liveSeat(seats[c])) return;
+                const a = out[room] = out[room] || {};
+                (a[inst] = a[inst] || {})[c] = seats[c];
+            });
+        });
+        return out;
+    }).catch(function () { return {}; });
+}
+function headcount(cs, room, inst, skip) {
+    const m = (cs[room] || {})[inst] || {};
+    return Object.keys(m).filter(function (c) { return c !== skip; }).length;
+}
+function pickInst(cs, room, want, skip) {
+    if (want && headcount(cs, room, want, skip) < P.CAP) return want;
+    for (let i = 1; i < 500; i++) if (headcount(cs, room, i, skip) < P.CAP) return i;
+    return 1;
+}
+
+// 장소에 들어선 뒤 — 방을 골라 듣기 시작한다
+function joinInst(want, force) {
+    if (!run) return;
+    const tok = run.joinTok = (run.joinTok || 0) + 1;
+    const room = run.room, u = u_();
+    census().then(function (cs) {
+        if (!run || run.joinTok !== tok || run.room !== room) return;   // 그 사이 또 옮겼다
+        enterInst(force ? want : pickInst(cs, room, want, u && u.code));
+    });
+}
+function enterInst(inst) {
+    if (!run) return;
+    run.inst = inst;
+    run.joinAt = now();
+    watchRoom();
+    watchChat();
+    run.sx = run.sy = -9999; run.sent = 0;          // 곧바로 내 자리를 알린다
+    paintMap();
+    if (inst > 1) sysLine(roomOf().n + ' ' + inst + '번 방입니다. (한 방에 ' + P.CAP + '명까지)');
+}
+// 같은 장소 안에서 방만 바꾼다 (서 있던 자리는 그대로)
+function hopInst(inst) {
+    if (!run || inst === run.inst) return;
+    leaveRoom();
+    Object.keys(run.peers).forEach(dropPeer);
+    showWho();
+    run.joinTok = (run.joinTok || 0) + 1;            // 고르던 것이 있으면 버린다
+    enterInst(inst);
+}
+
+// 넘쳤나 — 사람이 새로 보일 때 조금 기다렸다가 한 번 본다
+let overT = 0;
+function overSoon() {
+    if (overT) return;
+    overT = setTimeout(function () { overT = 0; overCheck(); }, 1500);
+}
+function overCheck() {
+    const u = u_();
+    if (!run || !run.ref || !u) return;
+    const codes = Object.keys(run.peers).filter(function (c) {
+        const q = run.peers[c]; return q && q.at && now() - q.at <= P.STALE_MS;
+    });
+    if (codes.length < P.CAP) return;
+    const order = codes.map(function (c) { return { c: c, j: run.peers[c].j || 0 }; })
+        .concat([{ c: u.code, j: run.joinAt || 0 }])
+        .sort(function (a, b) { return (a.j - b.j) || (a.c < b.c ? -1 : 1); });
+    const rank = order.map(function (o) { return o.c; }).indexOf(u.code);
+    if (rank < P.CAP) return;                         // 먼저 온 열 명 안이다
+    if ((run.hops || 0) >= 3) return;                 // 이리저리 튀지 않게
+    run.hops = (run.hops || 0) + 1;
+    const room = run.room;
+    census().then(function (cs) {
+        if (!run || run.room !== room) return;
+        const inst = pickInst(cs, room, null, u.code);
+        if (inst === run.inst) return;
+        hopInst(inst);
+        sysLine('방이 가득 차 ' + inst + '번 방으로 옮겼습니다.');
+    });
+}
+
+// ==========================================
+// ★ 동료 목록 — 누가 어디 있나, 누르면 그리로 간다
+// ==========================================
+//
+//   방이 나뉘면 같이 있고 싶은 사람과 갈라질 수 있다. 목록(☰)의 「동료 목록」
+//   에서 지금 광장에 있는 사원과 그 장소 · 방 번호를 보여 주고, 누르면
+//   **같은 장소 · 같은 방**으로 가서 그 사람 곁에 선다. 그 방이 가득 찼으면
+//   못 간다고 알린다.
+function matesSheet() {
+    const s = sheet('mates', '동료 목록', '<div class="plaza-mates"><div class="mt-empty">불러오는 중…</div></div>');
+    if (!s) return;
+    const u = u_();
+    census().then(function (cs) {
+        if (!sheetOpen('mates') || !run) return;
+        const box = s.querySelector('.plaza-mates');
+        if (!box) return;
+        const rows = [];
+        Object.keys(cs).forEach(function (room) {
+            Object.keys(cs[room]).forEach(function (ik) {
+                const inst = Number(ik), seats = cs[room][ik];
+                const n = Object.keys(seats).length;
+                Object.keys(seats).forEach(function (c) {
+                    if (u && c === u.code) return;
+                    const v = seats[c] || {};
+                    rows.push({ c: c, name: v.n || c, room: room, inst: inst, n: n, x: v.x, y: v.y });
+                });
+            });
+        });
+        if (!rows.length) {
+            box.innerHTML = '<div class="mt-empty">지금 광장에 나와 있는 동료가 없습니다.</div>';
+            return;
+        }
+        // 같은 방 → 같은 장소 → 나머지, 그 안에서는 이름 순
+        const rank = function (r) { return (r.room === run.room ? (r.inst === run.inst ? 0 : 1) : 2); };
+        rows.sort(function (a, b) { return (rank(a) - rank(b)) || String(a.name).localeCompare(String(b.name), 'ko'); });
+        box.innerHTML = '<div class="mt-head">지금 나와 있는 동료 ' + rows.length + '명 · 한 방에 ' + P.CAP + '명까지</div>'
+            + rows.map(function (r, i) {
+                const here = (r.room === run.room && r.inst === run.inst);
+                const full = !here && r.n >= P.CAP;
+                const t = here ? '같은 방' : (full ? '가득 참' : '같은 장소로');
+                return '<div class="mt-row">'
+                    + '<div class="mt-who"><b>' + esc(r.name) + '</b>'
+                    + '<span>' + esc(R[r.room].n) + ' · ' + r.inst + '번 방 <i>' + r.n + '/' + P.CAP + '</i></span></div>'
+                    + '<button data-i="' + i + '"' + ((here || full) ? ' disabled' : '') + '>' + t + '</button></div>';
+            }).join('');
+        Array.prototype.forEach.call(box.querySelectorAll('button[data-i]'), function (b) {
+            b.onclick = function () { goMate(rows[Number(b.dataset.i)]); };
+        });
+    });
+}
+
+function goMate(r) {
+    const u = u_();
+    if (!run || !r || !R[r.room]) return;
+    closeSheet();
+    census().then(function (cs) {
+        if (!run) return;
+        // 그 사이 옮겼을 수 있다 — 지금 자리를 다시 찾는다
+        let room = r.room, inst = r.inst, at = null;
+        Object.keys(cs).forEach(function (rm) {
+            Object.keys(cs[rm]).forEach(function (ik) {
+                if (cs[rm][ik][r.c]) { room = rm; inst = Number(ik); at = cs[rm][ik][r.c]; }
+            });
+        });
+        if (!at) { sysLine(r.name + ' 님이 지금은 광장에 없습니다.'); return; }
+        if (room === run.room && inst === run.inst) { sysLine(r.name + ' 님과 이미 같은 방입니다.'); return; }
+        if (headcount(cs, room, inst, u && u.code) >= P.CAP) {
+            sysLine(R[room].n + ' ' + inst + '번 방이 가득 찼습니다. (' + P.CAP + '명)');
+            return;
+        }
+        const rr = R[room];
+        if (room !== run.room) {
+            const lv = (rr.floor2 && at.y > (rr.floor[1] + rr.floor2[0]) / 2) ? 1 : 0;
+            run.forceInst = inst;
+            goRoom(room, null, lv);
+        } else {
+            hopInst(inst);
+        }
+        // 그 사람 곁에 선다
+        if (typeof at.x === 'number' && typeof at.y === 'number') {
+            run.x = Math.max(P.EDGE + P.INSET, Math.min(rr.w - P.EDGE - P.INSET, at.x + 60));
+            run.y = at.y;
+            try { segStep(rr, 0); } catch (e) { }
+            putOne(run.me, run.x, run.y);
+            camera(true);
+        }
+        sysLine(r.name + ' 님이 있는 ' + rr.n + ' ' + inst + '번 방으로 왔습니다.');
+    });
 }
 
 // ==========================================
@@ -1705,7 +1958,7 @@ function watchRoom() {
     const d = db_(), u = u_();
     if (!d || !u) return;
     offRoom();
-    run.ref = d.ref(P.PATH + '/' + run.room);
+    run.ref = d.ref(P.PATH + '/' + seatKey(run.room, run.inst));
     run.onAdd = function (s) { onSeat(s.key, s.val(), true); };
     run.onChg = function (s) { onSeat(s.key, s.val(), false); };
     run.onDel = function (s) { if (run.peers[s.key]) { dropPeer(s.key); showWho(); } };
@@ -1718,16 +1971,16 @@ function watchRoom() {
     //   (전에는 첫 value 가 이 일을 했다 — 이제 한 번만 따로 묻는다)
     if (!run._swept) {
         run._swept = true;
-        const room = run.room;
+        const room = run.room, ckey = seatKey(run.room, run.inst);
         run.ref.once('value').then(function (s) {
-            if (!run || run.room !== room) return;
+            if (!run || run.room !== room || seatKey(run.room, run.inst) !== ckey) return;
             const all = s.val() || {};
             const other = Object.keys(all).filter(function (c) {
                 const v = all[c] || {};
                 return c !== u.code && v.at && now() - v.at <= P.STALE_MS;
             });
             if (other.length) return;
-            try { d.ref(P.CHAT + '/' + room).remove(); } catch (e) { }
+            try { d.ref(P.CHAT + '/' + ckey).remove(); } catch (e) { }
         }).catch(function () { });
     }
 }
@@ -1764,6 +2017,7 @@ function onSeat(code, v, fresh) {
     if (q.tx !== v.x || q.ty !== v.y || q.moving !== !!v.m) q.seen = now();
     q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
     q.at = v.at;
+    q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     setTag(q.one, code, v.n || code);
     // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
     if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
@@ -1772,7 +2026,7 @@ function onSeat(code, v, fresh) {
         //   b 칸은 보내는 사람이 적는 값이라, 손으로 적어 보낼 수 있다.
         bubble(q.one, v.s || '', sbOkOf(code, v.b || '') ? (v.b || '') : '');
     }
-    if (isNew) showWho();
+    if (isNew) { showWho(); overSoon(); }
 }
 
 // ★ 끊긴 사람 걷기 — child_removed 가 안 오는 때가 있다 (창을 그냥 닫거나
@@ -1807,7 +2061,7 @@ function leaveRoom() {
     try {
         if (!Object.keys(run.peers || {}).length) {
             const d = db_();
-            if (d) d.ref(P.CHAT + '/' + run.room).remove();
+            if (d) d.ref(P.CHAT + '/' + seatKey(run.room, run.inst)).remove();
         }
     } catch (e) { }
     try { run.ref.child(u.code).onDisconnect().cancel(); } catch (e) { }
@@ -1833,7 +2087,7 @@ function watchChat() {
     //   (끄는 자리는 shut() 한 곳뿐이다)
     // ✗ 글줄칸을 비우지 않는다 — 방을 옮겨도 하던 얘기는 그대로 둔다.
     //   (전에는 여기서 innerHTML 을 털고 새 방 줄로 다시 채웠다)
-    chatRef = d.ref(P.CHAT + '/' + run.room).limitToLast(P.CHAT_KEEP);
+    chatRef = d.ref(P.CHAT + '/' + seatKey(run.room, run.inst)).limitToLast(P.CHAT_KEEP);
     chatRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
@@ -2076,7 +2330,7 @@ function paintMap() {
     const el = document.getElementById('plaza-map');
     if (!el || !run) return;
     const m = mapOf(), r = roomOf();
-    el.querySelector('.mp-n').innerText = r.n;
+    el.querySelector('.mp-n').innerText = r.n + (run.inst ? ' · ' + run.inst + '번 방' : '');
     const g = el.querySelector('.mp-g');
     g.style.gridTemplateColumns = 'repeat(' + m.w + ',1fr)';
     const keys = Object.keys(m.col);
@@ -2557,6 +2811,7 @@ function liftSheet(floor) {
 //
 //   스킵권(🎟️)을 쓴 다음 한 번은 걸음을 건너뛰고 그 자리에서 들어간다.
 function pickMenu(m) {
+    if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (skipTake) {
         const take = skipTake;
         skipTake = null;
@@ -3186,7 +3441,7 @@ window.plazaState = function () {
 // 지금 선 자리 — 시험과 콘솔에서 들여다본다
 window.plazaWhere = function () {
     if (!run) return null;
-    return { room: run.room, x: Math.round(run.x), y: Math.round(run.y),
+    return { room: run.room, inst: run.inst || 0, x: Math.round(run.x), y: Math.round(run.y),
              seg: run.seg, lv: run.lv };
 };
 

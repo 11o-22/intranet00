@@ -667,6 +667,12 @@ function actor(user, opt) {
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = flapsOf(els, sheets);
 
+    // ★ calm — 서 있을 때 눈 깜빡임 · 악세 펄럭임을 **안 돌린다** (첫 장에 멈춰 둔다).
+    //   광장의 남들에게 쓴다. 사람마다 시계가 서너 개씩 돌며 그림을 바꿔 칠하면
+    //   열 명만 돼도 화면 전체를 다시 그리느라 끊긴다 (plaza.js 머리말 참고).
+    // ★ held — 화면 밖에 나간 사람은 **걷는 것까지** 멈춘다 (hold).
+    const calm = !!o.calm;
+    let held = false;
     let walking = false, dir = 1, timers = [];
     const put = function (el, col, row) {
         el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
@@ -675,6 +681,7 @@ function actor(user, opt) {
 
     const start = function () {
         clear();
+        if (held) return;                                   // 안 보이는 동안은 그대로 둔다
         if (walking) {
             let f = 0;
             els.forEach(function (e) { put(e, 0, 0); });
@@ -684,6 +691,7 @@ function actor(user, opt) {
             }, D.WALK));
         } else {
             els.forEach(function (e) { put(e, 0, 1); });
+            if (calm) return;                               // 서 있는 남은 첫 장 그대로
             flaps.forEach(function (f) {
                 timers.push(setInterval(function () {
                     f.g = (f.g + 1) % f.cols.length;
@@ -705,6 +713,8 @@ function actor(user, opt) {
     return {
         el: box,
         moving: function (on) { on = !!on; if (on === walking) return; walking = on; start(); },
+        // 화면 밖이면 시계를 멈추고, 다시 들어오면 그때 모습으로 다시 돌린다
+        hold: function (on) { on = !!on; if (on === held) return; held = on; start(); },
         // 그림은 **왼쪽을 보고** 그려져 있다. 오른쪽을 보게 하려면 뒤집는다.
         //
         // ★ 머리 가운데에는 **좌우를 따로 그려 둔 것**이 있다 (백사헌 — 안대).
