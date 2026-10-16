@@ -46,6 +46,8 @@ const VIDEO_FRAMES = [
     // --- 영상은 하나만 받아서 모두가 나눠 쓴다 ---
     const vid = document.createElement('video');
     vid.src = LIGHTNING_SRC;
+    // ★ 이 영상을 쓰는 테두리 — video-saver.js 가 보고 **보일 때만** 튼다
+    vid.dataset.fv = VIDEO_FRAMES.map(function (f) { return f.id; }).join(' ');
     vid.loop = true; vid.muted = true; vid.defaultMuted = true;
     vid.autoplay = true; vid.playsInline = true; vid.preload = 'auto';
     vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
@@ -161,7 +163,9 @@ html body .fr-${f.id}.fr-wrap {
     let last = 0;
 
     function paint(now) {
-        requestAnimationFrame(paint);
+        // ★ 영상이 멈춰 있으면(아무 데도 안 보이면) 반 초에 한 번만 깬다 (배터리)
+        if (vid.paused) { setTimeout(function () { requestAnimationFrame(paint); }, 500); }
+        else requestAnimationFrame(paint);
         if (now - last < 50) return;          // 20fps
         last = now;
         if (vid.readyState < 2) return;

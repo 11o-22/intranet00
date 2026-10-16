@@ -147,6 +147,7 @@ VIDEO_FRAMES_5.forEach(function (f) {
 VIDEO_FRAMES_5.forEach(function (f) {
     const vid = document.createElement('video');
     vid.src = f.src;
+    vid.dataset.fv = f.id;              // ★ video-saver.js 가 보고 **보일 때만** 튼다
     vid.loop = true; vid.muted = true; vid.defaultMuted = true;
     vid.autoplay = true; vid.playsInline = true; vid.preload = 'auto';
     vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
@@ -313,7 +314,10 @@ const DPR = Math.min(window.devicePixelRatio || 1, 2);
 let last = 0;
 
 function paint(now) {
-    requestAnimationFrame(paint);
+    // ★ 이 묶음 영상이 모두 멈춰 있으면(아무 데도 안 보이면) 반 초에 한 번만 깬다 (배터리)
+    if (!VIDEO_FRAMES_5.some(function (f) { return f._vid && !f._vid.paused; })) {
+        setTimeout(function () { requestAnimationFrame(paint); }, 500);
+    } else requestAnimationFrame(paint);
     if (now - last < 50) return;          // 20fps
     last = now;
     if (document.hidden) return;

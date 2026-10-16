@@ -118,6 +118,7 @@ const PLAZA = {
     //     **사라졌다** (STALE_MS 를 넘긴 자리는 끊긴 사람으로 친다).
     //     방 정원을 세려면 서 있는 사람도 세어져야 한다.
     BEAT_MS: 10000,
+    IDLE_MS: 250,               // 아무것도 안 움직일 때 이만큼마다 한 번만 깬다 (배터리)
     // ★ 한 방 정원 — 같은 장소에 이만큼 차면 그 장소의 2번 방으로 간다.
     //   사람마다 그리는 값이 커서, 한 화면에 사람이 많으면 끊긴다 (재 봤다:
     //   1명 38장/초 · 20명 24장 · 40명 18장). 그리는 사람 수를 여기서 묶는다.
@@ -520,7 +521,7 @@ function stampSafe(ov) {
         '.plaza-say.emo{padding:4px;line-height:0;max-width:none;}',
         // 나가는 길 표시
         '.plaza-exit{position:absolute;pointer-events:none;color:#ffe9b0;font-size:17px;',
-        '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s infinite;}',
+        '  text-shadow:0 1px 3px #000,0 0 6px #000;opacity:.85;animation:plazaBob 1.4s 4;}',
         '@keyframes plazaBob{0%,100%{opacity:.45}50%{opacity:1}}',
         // ── 시설 입구
         // ★ z-index 를 사람보다 **위**로 올린다 (300 → 2000).
@@ -533,7 +534,10 @@ function stampSafe(ov) {
         '.plaza-spot .b{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;',
         '  justify-content:center;font-size:21px;background:rgba(18,14,10,.72);',
         '  border:1px solid rgba(217,160,90,.65);box-shadow:0 3px 12px rgba(0,0,0,.55),',
-        '  inset 0 0 12px rgba(217,160,90,.16);animation:plazaFloat 2.6s ease-in-out infinite;}',
+        // ★ 둥실거림 · 깜빡임은 **몇 번만** 하고 멈춘다 (배터리).
+        //   끝없이 돌면 아무것도 안 바뀌어도 화면을 1초에 수십 번 다시 그린다.
+        //   방에 들어설 때마다 단추를 새로 세우므로, 들어올 때 몇 번 움직여 눈에 띄고 그친다.
+        '  inset 0 0 12px rgba(217,160,90,.16);animation:plazaFloat 2.6s ease-in-out 3;}',
         '.plaza-spot .t{font-size:10px;font-weight:bold;color:#ffe9bd;white-space:nowrap;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
@@ -1539,6 +1543,8 @@ function goRoom(key, way, lv) {
     //   밖에서 부를 때(plazaOpen · plazaGo)는 이미 걸려 있을 수 있으므로
     //   걸린 것을 끊고 다시 건다.
     try { cancelAnimationFrame(run.raf); } catch (e) { }
+    if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
+    run.idle = false;
     run.last = performance.now();
     run.raf = requestAnimationFrame(tick);
 
@@ -1645,6 +1651,7 @@ function tick(ts) {
     camera();
     send(moving);
 
+    let busy = moving || wantSeg || run.tx != null;
     // ─ 남 — 받은 자리로 미끄러져 간다
     // ★ 화면 밖에 있는 사람은 **안 그린다** (display:none · 걸음 시계도 멈춤).
     //   방은 화면보다 두 배 넘게 넓어서, 사람 절반은 대개 화면 밖이다.
@@ -1656,6 +1663,7 @@ function tick(ts) {
         const ax = q.tx - q.x, ay = q.ty - q.y;
         const d = Math.hypot(ax, ay);
         if (d > 1) {
+            busy = true;
             const step = Math.min(d, P.SPEED * P.CATCH * dt);
             q.x += (ax / d) * step;
             q.y += (ay / d) * step;
@@ -1681,6 +1689,31 @@ function tick(ts) {
 
     if (run.sayAt && now() - run.sayAt > P.SAY_MS) { bubble(run.me, ''); run.sayAt = 0; }
 
+    // ★ 아무것도 안 움직이면 **쉰다** (배터리).
+    //   전에는 서 있기만 해도 1초에 60번 이 고리를 돌렸다. 이제 나도 남도
+    //   안 움직이고 카메라도 멈췄으면 0.25초에 한 번만 깨어 본다 — 말풍선을
+    //   거두고, 서 있다는 것을 알리는(BEAT_MS) 일은 그것으로 넉넉하다.
+    //   손을 대거나(누름 · 자판) 남이 움직이기 시작하면 wake() 가 바로 깨운다.
+    if (busy || run.camBusy) {
+        run.idle = false;
+        run.raf = requestAnimationFrame(tick);
+    } else {
+        run.idle = true;
+        run.idleT = setTimeout(function () {
+            if (!run) return;
+            run.idleT = 0;
+            run.raf = requestAnimationFrame(tick);
+        }, P.IDLE_MS);
+    }
+}
+
+// 쉬고 있으면 바로 깨운다 — 손짓 · 남의 움직임 · 말
+function wake() {
+    if (!run || !run.idle) return;
+    run.idle = false;
+    if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
+    try { cancelAnimationFrame(run.raf); } catch (e) { }
+    run.last = performance.now();
     run.raf = requestAnimationFrame(tick);
 }
 
@@ -1699,11 +1732,14 @@ function camera(snap) {
     if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
     if (snap) run.cx = cx;
     else      run.cx += (cx - run.cx) * 0.18;   // 조금 늦게 따라와 부드럽다
+    run.camBusy = Math.abs(cx - run.cx) > 0.5;  // 아직 따라가는 중이면 쉬지 않는다
     // ★ 세로는 **맨 위에 붙여** 둔다. 아래로 넘치는 몫(빼 둔 벽)은 창 밖으로
     //   나가고, 그만큼 그림이 내려와 앉는다. 걸어도 세로는 안 움직인다.
     run.cy = 0;
-    run.el.style.left = (-Math.round(run.cx)) + 'px';
-    run.el.style.top = (-Math.round(run.cy)) + 'px';
+    // ★ 같은 값이면 안 적는다 — 적기만 해도 브라우저가 매번 다시 잰다
+    const L = (-Math.round(run.cx)) + 'px', T = (-Math.round(run.cy)) + 'px';
+    if (run._camL !== L || run.el.style.left !== L) { run.el.style.left = L; run._camL = L; }
+    if (run._camT !== T || run.el.style.top !== T) { run.el.style.top = T; run._camT = T; }
 }
 
 // ==========================================
@@ -2018,6 +2054,7 @@ function onSeat(code, v, fresh) {
     q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
     q.at = v.at;
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
+    wake();                                // 쉬고 있었으면 바로 따라 그린다
     setTag(q.one, code, v.n || code);
     // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
     if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
@@ -3075,6 +3112,12 @@ function bagCard(n, qty) {
 function shut() {
     if (!run) return;
     try { cancelAnimationFrame(run.raf); } catch (e) { }
+    if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
+    if (run.onWake) {
+        window.removeEventListener('keydown', run.onWake, true);
+        window.removeEventListener('pointerdown', run.onWake, true);
+        window.removeEventListener('pointermove', run.onWake, true);
+    }
     leaveRoom();
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
     if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
@@ -3332,6 +3375,11 @@ function open() {
     // 방향키 — 글을 치는 중에는 안 걷는다
     const KEY = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
                   a: 'left', d: 'right', w: 'up', s: 'down' };
+    // ★ 쉬는 고리를 깨운다 — 누르기 · 끌기 · 자판 (조이스틱은 누른 채 움직이므로 끌기도 본다)
+    run.onWake = function () { wake(); };
+    window.addEventListener('keydown', run.onWake, true);
+    window.addEventListener('pointerdown', run.onWake, true);
+    window.addEventListener('pointermove', run.onWake, true);
     run.onKey = function (e) {
         if (!run) return;
         if (document.activeElement && document.activeElement.id === 'plaza-in') {
