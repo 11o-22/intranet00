@@ -192,6 +192,13 @@ function css() {
         '#bd-ov textarea,#bd-ov input[type=text]{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid #33333f;',
         '  background:#101018;color:#e8e2d6;font-family:inherit;font-size:13px;padding:9px 10px;outline:none;}',
         '#bd-ov textarea{min-height:130px;resize:none;line-height:1.5;}',
+        // ★ 테마가 입력칸·안내 글씨 색을 !important 로 덮는다 (style.css — ::placeholder 가
+        //   --theme-text 를 쓴다). 밝은 테마에서는 그 색이 짙은 남색이라 이 어두운 칸에서
+        //   안 보였다. 이 창 안에서는 테마와 상관없이 같은 색으로 박는다.
+        '#bd-ov textarea,#bd-ov input[type=text]{background:#101018 !important;color:#e8e2d6 !important;',
+        '  border:1px solid #33333f !important;-webkit-text-fill-color:#e8e2d6;}',
+        '#bd-ov textarea::placeholder,#bd-ov input[type=text]::placeholder{color:#8d8578 !important;',
+        '  opacity:1 !important;-webkit-text-fill-color:#8d8578;}',
         '#bd-ov .row{display:flex;gap:6px;margin-bottom:8px;}',
         '#bd-ov .row button{flex:1;padding:8px 4px;border-radius:10px;border:1px solid #2b2b38;background:rgba(255,255,255,.04);',
         '  color:#a79e8f;font-size:12px;}',
