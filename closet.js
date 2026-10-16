@@ -301,7 +301,21 @@ const DOT_SLOTS = [
             // ★ 상담사 전용이었다가 **악세 뽑기(A)** 로 돌렸다.
             //   줄 이름(i)은 'gat' 그대로다 — 이미 고른 분의 적힌 것이 틀어진다.
             //   가진 표(own)만 장 이름과 같은 'han-gat' 이다 (gacha.js 참고).
-            { i: 'gat', n: '갓', top: ['han-gat'], own: 'han-gat', cat: '머리' }
+            { i: 'gat', n: '갓', top: ['han-gat'], own: 'han-gat', cat: '머리' },
+            // ★ 토끼 전용 둘 — 악세 뽑기에 **안 넣는다**. 악세서리숍에서
+            //   어둠 소속이 5만 P 에 산다 (gacha.js 의 BUY).
+            //
+            //   받은 그림은 1728x768 — 토끼와 같은 **지난 규격(칸 288)** 이라,
+            //   토끼와 똑같이 칸마다 가로로 22 밀어 352 칸에 넣었다
+            //   (도트 눈금이 x ≡ 2 (mod 4) 라 4의 배수로는 못 민다).
+            //   세로는 안 건드렸다 — 받은 그림이 이미 맞았다.
+            //
+            //   rab — **토끼에게만** 얹는다. 사람 몸에 올리면 가슴 한참
+            //   아래 허공에 뜬다 (토끼 자리에 맞춰 그려져 있다). look 참고.
+            { i: 'rab-friend',   n: '친구 리본',        top: ['rab-friend'],
+              own: 'rab-friend',   cat: '손', rab: true },
+            { i: 'rab-friend-q', n: '친구 리본 (조용)', top: ['rab-friend-q'],
+              own: 'rab-friend-q', cat: '손', rab: true }
         ]
     }
 ];
@@ -410,7 +424,7 @@ function look(user, override, all) {
     //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
     const hd = DOT_HEADS[headIdx(head)];
     const bodySheet = hd.body || D.BODY;
-    const over = [], tops = [], pick = {};
+    const over = [], tops = [], rabTops = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -425,7 +439,7 @@ function look(user, override, all) {
                 if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
                 got.push(x.i);
                 (x.over || []).forEach(function (o) { over.push(o); });
-                (x.top || []).forEach(function (o) { tops.push(o); });
+                (x.top || []).forEach(function (o) { (x.rab ? rabTops : tops).push(o); });
             });
             pick[s.k] = got.join(',');
             return;
@@ -450,7 +464,12 @@ function look(user, override, all) {
     //   악세는 **사람 머리 자리**에 맞춰 그려져 있다. 토끼는 머리가 한참
     //   아래라, 갓도 고양이 귀도 허공에 둥둥 떴다 (재 봄). 브라운 특전은
     //   사람 키라 그대로 맞으므로 solo 와 따로 둔다.
-    if (hd.bare) tops.length = 0;
+    //   ★ 토끼 자리에 맞춰 그린 악세(rab)는 그 반대다 — **토끼에게만** 얹는다.
+    //     사람 몸에 올리면 가슴 한참 아래 허공에 뜬다.
+    if (hd.bare) {
+        tops.length = 0;
+        rabTops.forEach(function (o) { tops.push(o); });
+    }
     // ★ 장마다 물들인 색 — { 장이름: 0~359 }. 광장이 dot 을 통째로 주고받으므로
     //   남의 화면에서도 같은 색으로 보인다 (따로 보낼 것이 없다).
     const col = (d.col && typeof d.col === 'object') ? d.col : {};

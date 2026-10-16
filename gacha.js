@@ -145,6 +145,20 @@ const GACHA_ACC = [
     { k: 'ac50', n: '흉터',                   g: 'C' , c: '얼굴' }
 ];
 
+// ── 뽑기에 **안 들어가는** 것 — 악세서리숍에서 바로 산다
+//
+//   토끼 전용 악세 둘. 토끼(h-rabbit)가 어둠 소속만 고를 수 있는 머리라,
+//   이 둘도 **어둠 소속에게만** 보이고 팔린다. 값은 둘 다 5만 P.
+//   뽑기 표(GACHA_ACC)와 따로 두어야 뽑기에 안 섞인다.
+const GACHA_BUY = {
+    acc: [
+        { k: 'rab-friend',   n: '친구 리본',        p: 50000, dark: true,
+          d: '토끼 전용. 반짝이며 「친구!」가 뜬다.' },
+        { k: 'rab-friend-q', n: '친구 리본 (조용)', p: 50000, dark: true,
+          d: '토끼 전용. 반짝임도 글자도 없다.' }
+    ]
+};
+
 (function gacha() {
 
 const POOL = { wear: GACHA_WEAR, acc: GACHA_ACC };
@@ -157,6 +171,19 @@ function esc(s) {
     });
 }
 function won(n) { return Number(n).toLocaleString('ko-KR'); }
+// 어둠 소속 — 소속이나 팀 이름에 「어둠」이 들어 있으면 어둠이다
+// (newitems2.js · closet.js 와 같은 잣대)
+function isDark(u) {
+    const x = u || u_();
+    return /어둠/.test(((x && x.affiliation) || '') + ' ' + ((x && x.team) || ''));
+}
+// 이 사람에게 보이는 「사는 물건」
+function buyList(kind) {
+    const u = u_();
+    return (GACHA_BUY[kind] || []).filter(function (x) {
+        return !x.dark || isAdm(u) || isDark(u);
+    });
+}
 
 // ── 가진 것
 function bag(u) {
@@ -358,6 +385,54 @@ function listHtml(kind) {
     }).join('');
 }
 
+// ==========================================
+// ★ 바로 사는 것 — 뽑기 말고 값을 치르고 가져간다
+// ==========================================
+//
+//   토끼 전용 악세 둘뿐이다. 어둠 소속이 아니면 **줄 자체가 안 그려진다** —
+//   토끼를 못 고르는 사람에게 보여 줄 까닭이 없다.
+function buyHtml(kind) {
+    const list = buyList(kind);
+    if (!list.length) return '';
+    const u = u_();
+    return '<div class="gc-cp" style="margin-bottom:9px;">🌑 어둠 소속 전용 — 뽑기에는 안 나옵니다.</div>'
+        + list.map(function (x) {
+            const has = !!bag(u)[x.k];
+            return '<div style="border:1px solid #3a3a3a; border-radius:6px; padding:9px 11px; margin-bottom:6px;">'
+                + '<div style="font-size:12px; color:#fff; font-weight:bold;">' + esc(x.n) + '</div>'
+                + '<div style="font-size:10px; color:#999; margin:4px 0 7px 0; line-height:1.6;">'
+                + esc(x.d || '') + '</div>'
+                + (has
+                    ? '<button class="game-btn" style="width:100%; margin:0; padding:7px; font-size:11px;" disabled>이미 가지고 있습니다</button>'
+                    : '<button class="game-btn gc-get" data-k="' + esc(x.k) + '"'
+                      + ' style="width:100%; margin:0; padding:7px; font-size:11px;">'
+                      + won(x.p) + ' P 에 산다</button>')
+                + '</div>';
+        }).join('');
+}
+
+function buyOne(kind, key) {
+    const u = u_(); if (!u) return;
+    const x = buyList(kind).filter(function (y) { return y.k === key; })[0];
+    if (!x) { showCustomAlert('살 수 없는 물건입니다.'); return; }
+    const w = bag(u);
+    if (w[x.k]) { showCustomAlert('이미 가지고 있습니다.'); return; }
+    if ((u.points || 0) < x.p) {
+        if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
+        else showCustomAlert('포인트가 모자랍니다.');
+        return;
+    }
+    u.points -= x.p;
+    w[x.k] = Date.now();
+    try {
+        addHistoryLog(u, '[' + GACHA[kind].n + '] ' + x.n + ' 구입 (-' + won(x.p) + ' P)');
+        saveFields({ points: 1, wardrobe: 1, history: 1 });
+        updateUI();
+    } catch (e) { }
+    paintShop();
+    showCustomAlert(x.n + '을(를) 샀습니다.\n\n옷장 — 악세 칸에서 답니다.\n토끼일 때만 보입니다.');
+}
+
 function paintShop() {
     const box = document.getElementById('gc-body');
     if (!box || !shopKind) return;
@@ -381,6 +456,7 @@ function paintShop() {
         + '<div class="gc-note">같은 것이 또 나오면 <b>' + won(Math.floor(g.one / GACHA.BACK))
         + ' P</b> 를 돌려 드립니다.<br>등급 확률 — S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
         + '% · B ' + GACHA.ODDS.B + '% · C ' + GACHA.ODDS.C + '%</div>'
+        + buyHtml(shopKind)
         + '<div class="gc-list">' + listHtml(shopKind) + '</div>';
     // ★ **그 단추 위에서 눌렀다 뗀 것**만 뽑기로 친다.
     //
@@ -389,6 +465,19 @@ function paintShop() {
     //   시작했을 때만 받는다. (광장 입구를 누르자마자 그 밑에 가게가
     //   깔리면서 「1회」가 저절로 눌리던 일이 있었다 — plaza.js 쪽도
     //   손을 뗄 때 열도록 고쳤고, 여기는 두 번째 자물쇠다.)
+    // 바로 사는 것 — 뽑기와 같은 자물쇠를 건다 (눌림이 그 단추에서 시작해야 한다)
+    Array.prototype.forEach.call(box.querySelectorAll('.gc-get'), function (b) {
+        let mine = false;
+        b.addEventListener('pointerdown', function () { mine = true; });
+        b.addEventListener('pointercancel', function () { mine = false; });
+        b.onclick = function (ev) {
+            if (ev && ev.pointerType !== undefined && !mine) return;
+            if (ev && ev.detail > 0 && !mine) return;
+            mine = false;
+            if (typeof buyGuard === 'function' && !buyGuard()) return;
+            buyOne(shopKind, b.dataset.k);
+        };
+    });
     Array.prototype.forEach.call(box.querySelectorAll('.gc-buy button'), function (b) {
         let mine = false;
         b.addEventListener('pointerdown', function () { mine = true; });
