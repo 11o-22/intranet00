@@ -114,10 +114,57 @@ const DIP  = 9;                 // 말풍선 윗선에 걸치는 깊이 (px)
 // ==========================================
 function sbById(id) { return SB.find(function (s) { return s.id === id; }) || null; }
 
+// 이 사람이 말풍선을 쓸 수 있나
+function sbAllowed(u) { return !ONLY_ADMIN || (!!u && u.code === ADMIN); }
+
 // plaza.js 가 이것을 부른다 — 없는 이름이면 빈 글자(전처럼)
+//
+// ★ 쓸 수 없는 사원이 **전에 골라 둔 것**은 안 쳐 준다.
+//   하루쯤 전 사원에게 열어 두었던 적이 있어, 그때 고른 사람의 sbub 가
+//   칸에 남아 있다. 단추를 닫기만 하면 그 사람은 **풀 수도 없이** 그
+//   말풍선을 영영 쓰게 된다. 여기서 막으면 제 화면에서도, 남의 화면에서도
+//   (자리 기록의 b 는 보내는 쪽이 적는다) 바로 보통 말풍선으로 돌아간다.
 window.sbOf = function (u) {
+    if (!sbAllowed(u)) return '';
     const id = u && u.sbub;
     return (id && sbById(id)) ? id : '';
+};
+
+// ★ 남아 있는 칸도 치운다 — 들어올 때 한 번.
+//   화면에서는 위에서 이미 막았고, 이것은 **적힌 값**을 지우는 일이다.
+//   ★ 한 번만 보고 그만두면 안 된다 — 사원 칸은 **나중에 서버에서 한 번 더
+//     내려온다.** 그때 sbub 가 되살아나므로, 들어온 뒤 한동안 거듭 본다.
+(function sweepMine() {
+    let left = 15;                                   // 2초마다 열다섯 번 (30초)
+    const iv = setInterval(function () {
+        if (--left < 0) { clearInterval(iv); return; }
+        if (typeof currentUser === 'undefined' || !currentUser) return;
+        if (!currentUser.sbub || sbAllowed(currentUser)) return;
+        currentUser.sbub = null;
+        if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
+        console.log('[말풍선] 고른 것을 거뒀습니다 (지금은 상담사만 씁니다)');
+    }, 2000);
+})();
+
+// ★ 한 번에 거두기 — 상담사 전용 (들어오기를 기다리지 않는다)
+window.sbubClearAll = function () {
+    if (!currentUser || currentUser.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    if (typeof database === 'undefined' || !database) { console.warn('서버에 닿지 못했습니다.'); return; }
+    database.ref('users').once('value').then(function (s) {
+        const all = s.val() || {};
+        const up = {}, who = [];
+        Object.keys(all).forEach(function (c) {
+            const u = all[c] || {};
+            if (!u.sbub) return;
+            if (sbAllowed(u)) return;                 // 상담사 것은 둔다
+            up['users/' + c + '/sbub'] = null;
+            who.push((u.name || c) + ' (' + u.sbub + ')');
+        });
+        if (!who.length) { console.log('거둘 것이 없습니다.'); return; }
+        return database.ref().update(up).then(function () {
+            console.log('%c✓ ' + who.length + '명에게서 거뒀습니다: ' + who.join(', '), 'color:#4CAF50');
+        });
+    }).catch(function (e) { console.error(e); });
 };
 
 function sbSet(id) {
