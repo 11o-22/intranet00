@@ -649,6 +649,25 @@ window.dotSprite = sprite;
 //       a.moving(true)       걷는 모습으로
 //       a.face(-1)           오른쪽을 보게 (그림은 왼쪽을 보고 그려져 있다)
 //       a.stop()             움직임을 멈춘다 (칸을 지우기 전에)
+// 서 있는 남들의 시계 — 하나로 모든 사람을 한 번에 바꿔 칠한다 (깜빡임 한 칸 0.11초)
+const BLINK_SUM = D.BLINK.reduce(function (a, b) { return a + b; }, 0);
+const crowd = new Set();
+let crowdT = 0;
+function crowdTick() {
+    if (document.hidden) return;                          // 창이 뒤로 가면 칠하지 않는다
+    const t = Date.now();
+    crowd.forEach(function (m) { m.paint(t); });
+}
+function crowdIn(m) {
+    crowd.add(m);
+    if (!crowdT) crowdT = setInterval(crowdTick, Math.min.apply(null, D.BLINK));
+}
+function crowdOut(m) {
+    crowd.delete(m);
+    if (!crowd.size && crowdT) { clearInterval(crowdT); crowdT = 0; }
+}
+window.dotCrowd = function () { return crowd.size; };
+
 function actor(user, opt) {
     const o = opt || {};
     const k = o.scale || 1;
@@ -667,9 +686,12 @@ function actor(user, opt) {
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = flapsOf(els, sheets);
 
-    // ★ calm — 서 있을 때 눈 깜빡임 · 악세 펄럭임을 **안 돌린다** (첫 장에 멈춰 둔다).
-    //   광장의 남들에게 쓴다. 사람마다 시계가 서너 개씩 돌며 그림을 바꿔 칠하면
-    //   열 명만 돼도 화면 전체를 다시 그리느라 끊긴다 (plaza.js 머리말 참고).
+    // ★ calm — 서 있을 때의 눈 깜빡임 · 악세 펄럭임을 사람마다 따로 돌리지 않고
+    //   **시계 하나(crowd)에 묶는다.** 광장의 남들에게 쓴다.
+    //   사람마다 시계가 서너 개씩 돌며 제각각 그림을 바꿔 칠하면 열 명만 돼도
+    //   1초에 수십 번 화면을 다시 그리느라 끊긴다 (plaza.js 머리말 참고).
+    //   한때는 아예 첫 장에 멈춰 두었는데, 다들 굳어 서 있으니 어색했다.
+    //   이제 한 시계가 모두를 한 번에 바꿔 칠한다 — 깜빡이는 때는 사람마다 어긋나게.
     // ★ held — 화면 밖에 나간 사람은 **걷는 것까지** 멈춘다 (hold).
     const calm = !!o.calm;
     let held = false;
@@ -677,7 +699,26 @@ function actor(user, opt) {
     const put = function (el, col, row) {
         el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
     };
-    const clear = function () { timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = []; };
+    // 시계 하나에 묶인 몫 — 지금 몇 번째 칸인지 보고, 바뀌었을 때만 칠한다
+    const ph = Math.floor(Math.random() * BLINK_SUM);           // 깜빡이는 때를 사람마다 흩는다
+    let headF = 0, seen = false;
+    const member = {
+        paint: function (t) {
+            if (box.isConnected) seen = true;
+            else if (seen) { crowdOut(member); return; }      // 지워진 칸 — 알아서 빠진다
+            let m = (t + ph) % BLINK_SUM, f = 0;
+            while (f < D.BLINK.length - 1 && m >= D.BLINK[f]) { m -= D.BLINK[f]; f++; }
+            if (f !== headF) { headF = f; put(head, f, 1); }
+            flaps.forEach(function (fl) {
+                const g = Math.floor((t + ph) / D.FLAP) % fl.cols.length;
+                if (g !== fl.g) { fl.g = g; put(fl.el, fl.cols[g], 1); }
+            });
+        }
+    };
+    const clear = function () {
+        timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = [];
+        crowdOut(member);
+    };
 
     const start = function () {
         clear();
@@ -691,7 +732,11 @@ function actor(user, opt) {
             }, D.WALK));
         } else {
             els.forEach(function (e) { put(e, 0, 1); });
-            if (calm) return;                               // 서 있는 남은 첫 장 그대로
+            if (calm) {                                     // 서 있는 남은 시계 하나에 묶는다
+                headF = 0; flaps.forEach(function (fl) { fl.g = 0; });
+                crowdIn(member);
+                return;
+            }
             flaps.forEach(function (f) {
                 timers.push(setInterval(function () {
                     f.g = (f.g + 1) % f.cols.length;

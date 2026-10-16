@@ -801,7 +801,7 @@ function makeOne(user, label, k, other) {
     wrap.style.width = w + 'px';
     wrap.style.height = h + 'px';
 
-    // 남(other)은 서 있을 때 눈 깜빡임·펄럭임을 안 돌린다 (calm) — 그리는 값을 줄인다
+    // 남(other)은 서 있을 때 눈 깜빡임·펄럭임을 시계 하나에 묶어 돌린다 (calm) — 그리는 값을 줄인다
     const a = window.dotActor(user, { scale: k, all: !!other, calm: !!other });
     wrap.appendChild(a.el);
 
