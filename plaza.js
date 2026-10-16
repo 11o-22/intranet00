@@ -238,8 +238,8 @@ const PLAZA = {
                   down: { to: 'gate', x: [780, 1120] },
                   // 2F 사택 · 1F 로비 · B1 재난 탐사 로비
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
-                          b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
-                                { n: '파티',                  tab: 'tab-darkness', sub: 'dark-party' } ] },
+                          // ✗ 「파티」는 뺐다 (2026-10-16)
+                          b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
@@ -273,7 +273,8 @@ const PLAZA = {
     ],
     MENU: [
         // ① 사내
-        { g: 'in',    n: '선물함',     i: '🎁', ic: 'gift',    fn: 'openGiftBox', nw: 'gift' },
+        // ✗ 선물함은 목록에서 뺐다 — 위 띠 오른쪽에 선물함 단추가 이미 있다.
+        //   가는 길이 둘이면 알림 불도 둘이 된다. 불은 위 띠 단추 하나에만 붙인다.
         { g: 'in',    n: '건의함',     i: '🗳️', ic: 'suggest', fn: 'openSuggestionModal' },
         { g: 'in',    n: '사원 열람',  i: '👥', ic: 'people',  fn: 'openEmployeeListModal' },
         // ✗ 전체 대화는 뺐다 — 광장 아래 띠에서 바로 말하고, 글줄을 톡 치면
@@ -443,6 +444,13 @@ function stampSafe(ov) {
         '#plaza-notice .nd{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;',
         '  background:#ff7b6b;box-shadow:0 0 7px #ff7b6b;display:none;}',
         '#plaza-notice.new .nd{display:block;}',
+        // 안 받은 선물이 있으면 붙는 **초록** 불 (바탕 화면 .notify-dot 과 같은 빛깔)
+        '#plaza-gift{position:relative;}',
+        '#plaza-gift .nd{position:absolute;top:5px;right:6px;width:9px;height:9px;border-radius:50%;',
+        '  background:#4CAF50;display:none;animation:plaza-gdot 1.5s infinite;}',
+        '#plaza-gift.new .nd{display:block;}',
+        '@keyframes plaza-gdot{0%{box-shadow:0 0 0 0 rgba(76,175,80,.7);}',
+        '  70%{box-shadow:0 0 0 6px rgba(76,175,80,0);}100%{box-shadow:0 0 0 0 rgba(76,175,80,0);}}',
         '.plaza-ico{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:1px solid rgba(190,170,120,.3);',
         '  background:rgba(14,14,20,.62);color:#f1e7d6;font-size:17px;line-height:1;cursor:pointer;',
         '  display:flex;align-items:center;justify-content:center;',
@@ -2399,9 +2407,12 @@ function anyNew() {
 //   ✗ 목록 안에만 붙이면 **열어야 보이는 알림**이 된다.
 (function menuDot() {
     setInterval(function () {
+        if (!run) return;
         const b = document.getElementById('plaza-menu');
-        if (!b || !run) return;
-        b.classList.toggle('notify-dot', anyNew());
+        if (b) b.classList.toggle('notify-dot', anyNew());
+        // 선물함은 목록에 없다 — 위 띠 단추에 바로 붙인다
+        const g = document.getElementById('plaza-gift');
+        if (g) g.classList.toggle('new', hasNew('gift'));
     }, 1500);
 })();
 
@@ -2825,7 +2836,7 @@ function open() {
         + '<button class="plaza-ico plaza-keep" id="plaza-notice">'
         +   '<span class="pico" style="--ic:url(\'ico/notice.png\')"></span><i class="nd"></i></button>'
         + '<button class="plaza-ico plaza-keep" id="plaza-gift">'
-        +   '<span class="pico" style="--ic:url(\'ico/gift.png\')"></span></button>'
+        +   '<span class="pico" style="--ic:url(\'ico/gift.png\')"></span><i class="nd"></i></button>'
         + '<button class="plaza-ico plaza-keep" id="plaza-menu">☰</button>'
         + '</div>'
         + '<div id="plaza-who"></div>'
