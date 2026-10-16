@@ -111,12 +111,16 @@ function send(codes, opt) {
         const n = Number(opt.items[k]) || 0;
         if (k && n > 0) items[k] = n;
     });
-    if (!title && !text && !Object.keys(items).length) return Promise.resolve(0);
+    // ★ 포인트도 같이 보낼 수 있다 (웰컴 패키지 팩 — welcome.js)
+    const pts = Math.max(0, Math.floor(Number((opt && opt.pts) || 0)));
+    if (!title && !text && !Object.keys(items).length && !pts) return Promise.resolve(0);
 
-    const base = { at: Date.now(), by: u.code, byName: u.name || '' };
+    const base = { at: Date.now(), by: u.code,
+                   byName: String((opt && opt.byName) || u.name || '') };
     if (title) base.title = title;
     if (text) base.text = text;
     if (Object.keys(items).length) base.items = items;      // 빈 것은 넣지 않는다 (서버가 지운다)
+    if (pts) base.pts = pts;
 
     const up = {};
     list.forEach(function (c) {
@@ -364,9 +368,14 @@ function listHtml() {
                     return '• ' + esc(p[0]) + (p[1] > 1 ? ' <b>×' + p[1] + '</b>' : '');
                 }).join('<br>') + '</div>';
         }
+        const gp = Number(g.pts) || 0;
+        if (gp) {
+            h += '<div style="font-size:11px; color:#ffd479; line-height:1.8; margin-bottom:8px;">'
+                + '• <b>' + gp.toLocaleString('ko-KR') + ' P</b></div>';
+        }
         h += '<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;"'
             + ' onclick="giftTake(\'' + id + '\')">'
-            + (pairs.length ? '받는다' : '확인했다') + '</button></div>';
+            + ((pairs.length || gp) ? '받는다' : '확인했다') + '</button></div>';
     });
     return h;
 }
@@ -408,6 +417,7 @@ window.giftTake = function (id) {
     }).then(function (r) {
         if (!r || !r.committed || !got) return;
         const pairs = itemPairs(got);
+        const pts = Math.max(0, Math.floor(Number(got.pts) || 0));
 
         if (pairs.length) {
             if (!Array.isArray(u.inventory)) u.inventory = [];
@@ -415,21 +425,36 @@ window.giftTake = function (id) {
                 for (let i = 0; i < p[1]; i++) u.inventory.push(p[0]);
             });
         }
-        const line = pairs.length
+        // ★ 포인트도 같이 올 수 있다 (웰컴 패키지 팩)
+        if (pts) u.points = (Number(u.points) || 0) + pts;
+
+        const what = pairs.map(function (p) { return p[0] + (p[1] > 1 ? '×' + p[1] : ''); })
+            .concat(pts ? [pts.toLocaleString('ko-KR') + ' P'] : []);
+        const line = what.length
             ? ('[선물함] ' + (got.byName || '당국') + ' 쪽에서 '
-                + pairs.map(function (p) { return p[0] + (p[1] > 1 ? '×' + p[1] : ''); }).join(', ') + ' 을(를) 받았습니다.')
+                + what.join(', ') + ' 을(를) 받았습니다.')
             : ('[선물함] ' + (got.byName || '당국') + ' 쪽의 전언 — '
                 + (got.title ? got.title + ' : ' : '') + String(got.text || '').replace(/\s+/g, ' ').slice(0, 200));
         if (typeof addHistoryLog === 'function') addHistoryLog(u, line);
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
         if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+        if (pts && typeof showPointGainEffect === 'function') {
+            try { showPointGainEffect(pts); } catch (e) { }
+        }
 
         delete mine[id];                       // 지켜보기가 알려 주기 전에 먼저 지운다
         try { paintBtn(); if (opened) paintList(); } catch (e) { }
 
-        showCustomAlert(pairs.length
-            ? ('받았습니다.\n\n' + pairs.map(function (p) { return p[0] + (p[1] > 1 ? ' ×' + p[1] : ''); }).join('\n'))
-            : '확인했습니다.\n\n내용은 기록에 남았습니다.');
+        // ★ 무엇이 들어왔는지 한 창에 모아 보여 준다 (제목 · 물품 · 포인트)
+        if (what.length) {
+            const head = got.title ? (got.title + '\n\n') : '';
+            const body = pairs.map(function (p) { return '· ' + p[0] + (p[1] > 1 ? ' ×' + p[1] : ''); })
+                .concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : []).join('\n');
+            showCustomAlert(head + '받았습니다.\n\n' + body
+                + (pairs.length ? '\n\n물품은 소지품에 들어왔습니다.' : ''));
+        } else {
+            showCustomAlert('확인했습니다.\n\n내용은 기록에 남았습니다.');
+        }
     }).catch(function (e) {
         console.error('[선물함] 받지 못했습니다', e);
         showCustomAlert('받지 못했습니다.\n\n잠시 뒤에 다시 해 주세요.');
