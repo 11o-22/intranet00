@@ -46,6 +46,7 @@
 const ARR = [
     'inventory', 'equippedWeapons', 'history', 'letters', 'keptLetters', 'sentLetters',
     'titles', 'titleAdmin', 'titleSaid',
+    'sbubOwn',                    // 표를 내고 얻은 말풍선 (bubbles.js)
     'alienUnlockedItems', 'alienBoughtItems', 'receivedRations',
     'timedEffects', 'itemBuffs', 'foxBuffs', 'foxNotes',
     'darkLogs', 'foxLogs', 'bathLogs',

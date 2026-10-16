@@ -25,8 +25,9 @@
 //
 // ■ 누가 쓰나
 //
-//   **상담사(kario0987)만** 쓴다 (ONLY_ADMIN = true). 단추도 상담사
-//   사원증 칸에만 선다. 전 사원에게 열 때는 false 로만 바꾸면 된다.
+//   단추는 **전 사원**에게 선다. 처음에는 「기본」 하나뿐이고, 나머지는
+//   [ 💭 말풍선 선택권 ] 한 장으로 하나씩 얻는다 (얻은 것은 sbubOwn).
+//   표는 상담사만 준다. 상담사는 표 없이 다 쓴다.
 //
 //   고른 빛깔은 자리 기록의 b 칸에 실려 **같은 방 사람 화면에도** 그대로
 //   보인다 — 그 길은 열려 있으니, 상담사가 고른 말풍선은 남들 눈에도
@@ -46,9 +47,15 @@
 (function speechBubbles() {
 
 const ADMIN = 'kario0987';
-// ★ 2026-10-16 — 다시 **상담사만** 쓰도록 닫았다.
-//   (10-15 에 전 사원에게 열었다가 되돌렸다)
-const ONLY_ADMIN = true;        // false 로 두면 전 사원이 쓴다
+// ★ 2026-10-16 (저녁) — **표를 가진 사람만** 으로 바꿨다.
+//
+//   단추(💬 말풍선 관리)는 전 사원에게 선다. 다만 처음에는 **「기본」 하나뿐**
+//   이고, 나머지는 [ 💭 말풍선 선택권 ] 한 장으로 하나씩 얻는다.
+//   표는 **상담사만** 준다 (통제 콘솔의 「물품 강제 꽂기」).
+//
+//   얻은 것은 currentUser.sbubOwn 에 쌓인다. 한 번 얻으면 그 뒤로는
+//   표 없이 골랐다 풀었다 할 수 있다. 상담사는 표 없이 다 쓴다.
+const TICKET = '[ 💭 말풍선 선택권 ]';
 
 // 그림에서 안쪽 빛깔을 집어 와 그대로 쓴다.
 //
@@ -230,8 +237,25 @@ window.sbParts = function (id) {
     return (s && s.p) ? s.p.length : 1;
 };
 
-// 이 사람이 말풍선을 쓸 수 있나
-function sbAllowed(u) { return !ONLY_ADMIN || (!!u && u.code === ADMIN); }
+// ==========================================
+// 가진 것
+// ==========================================
+function isAdm(u) { return !!(u && u.code === ADMIN); }
+function ownList(u) {
+    const a = u && u.sbubOwn;
+    return Array.isArray(a) ? a : [];
+}
+// 이 사람이 **이 말풍선**을 쓸 수 있나 (상담사는 다 쓴다)
+function sbHas(u, id) {
+    if (!id) return true;                         // 기본은 누구나
+    if (!sbById(id)) return false;
+    if (isAdm(u)) return true;
+    return ownList(u).indexOf(id) >= 0;
+}
+// 가진 표가 몇 장인가
+function tickets(u) {
+    return ((u && u.inventory) || []).filter(function (n) { return n === TICKET; }).length;
+}
 
 // plaza.js 가 이것을 부른다 — 없는 이름이면 빈 글자(전처럼)
 //
@@ -241,9 +265,9 @@ function sbAllowed(u) { return !ONLY_ADMIN || (!!u && u.code === ADMIN); }
 //   말풍선을 영영 쓰게 된다. 여기서 막으면 제 화면에서도, 남의 화면에서도
 //   (자리 기록의 b 는 보내는 쪽이 적는다) 바로 보통 말풍선으로 돌아간다.
 window.sbOf = function (u) {
-    if (!sbAllowed(u)) return '';
     const id = u && u.sbub;
-    return (id && sbById(id)) ? id : '';
+    if (!id || !sbById(id)) return '';
+    return sbHas(u, id) ? id : '';            // 안 가진 것은 안 쳐 준다
 };
 
 // ★ 남이 고른 것도 **받는 쪽에서 한 번 더 본다.**
@@ -251,9 +275,15 @@ window.sbOf = function (u) {
 //   걸렀지만(sbOf), 칸을 손으로 적어 보내면 남들 화면에 뜰 수 있다.
 //   그래서 plaza.js 가 남의 말풍선을 띄우기 전에 이것을 묻는다 —
 //   그 사번이 상담사가 아니면 빛깔을 안 입힌다.
-window.sbAllowedCode = function (code) {
-    if (!ONLY_ADMIN) return true;
-    return String(code || '') === ADMIN;
+//   그 사번이 **그 말풍선을 가졌는지** 사원 칸을 보고 가린다.
+window.sbAllowedCode = function (code, id) {
+    const c = String(code || '');
+    if (c === ADMIN) return true;
+    if (!id) return true;                                  // 기본은 누구나
+    let u = null;
+    try { u = (typeof db !== 'undefined' && db.users) ? db.users[c] : null; } catch (e) { }
+    if (!u) return false;                                  // 모르는 사람이면 안 입힌다
+    return sbHas(u, id);
 };
 
 // ★ 남아 있는 칸도 치운다 — 들어올 때 한 번.
@@ -265,10 +295,11 @@ window.sbAllowedCode = function (code) {
     const iv = setInterval(function () {
         if (--left < 0) { clearInterval(iv); return; }
         if (typeof currentUser === 'undefined' || !currentUser) return;
-        if (!currentUser.sbub || sbAllowed(currentUser)) return;
+        if (!currentUser.sbub) return;
+        if (sbHas(currentUser, currentUser.sbub)) return;   // 가진 것은 둔다
         currentUser.sbub = null;
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
-        console.log('[말풍선] 고른 것을 거뒀습니다 (지금은 상담사만 씁니다)');
+        console.log('[말풍선] 안 가진 말풍선이라 풀었습니다.');
     }, 2000);
 })();
 
@@ -282,7 +313,7 @@ window.sbubClearAll = function () {
         Object.keys(all).forEach(function (c) {
             const u = all[c] || {};
             if (!u.sbub) return;
-            if (sbAllowed(u)) return;                 // 상담사 것은 둔다
+            if (sbHas(u, u.sbub)) return;             // 가진 사람 것은 둔다
             up['users/' + c + '/sbub'] = null;
             who.push((u.name || c) + ' (' + u.sbub + ')');
         });
@@ -295,14 +326,54 @@ window.sbubClearAll = function () {
 
 function sbSet(id) {
     if (!currentUser) return;
-    // ★ 상담사만 — 콘솔에서 불러도 안 먹힌다 (단추는 본디 안 서지만, 막아 둔다)
-    if (!sbAllowed(currentUser)) { console.warn('말풍선은 상담사만 고릅니다.'); return; }
+    // ★ 안 가진 것은 못 고른다 — 콘솔에서 불러도 안 먹힌다
+    if (id && !sbHas(currentUser, id)) {
+        console.warn('가지고 있지 않은 말풍선입니다. ' + TICKET + ' 으로 먼저 얻으십시오.');
+        return;
+    }
     if (id && !sbById(id)) return;
     currentUser.sbub = id || null;
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
     openBubblePanel();
 }
 window.sbSet = sbSet;
+
+// ★ 표 한 장을 내고 하나 얻는다
+//
+//   ✗ 「쓴다」와 한 단추로 묶지 않았다. 표가 사라지는 일이라 **묻고 나서**
+//     거둔다. 얻고 나면 그 뒤로는 표 없이 골랐다 풀었다 할 수 있다.
+function sbBuy(id) {
+    const u = currentUser;
+    if (!u || !id || !sbById(id)) return;
+    if (sbHas(u, id)) { sbSet(id); return; }                 // 이미 가졌다
+    if (tickets(u) < 1) {
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert(TICKET + ' 이 없습니다.\n\n상담사에게 받아야 얻을 수 있습니다.');
+        }
+        return;
+    }
+    const s = sbById(id);
+    const go = function () {
+        const i = (u.inventory || []).indexOf(TICKET);
+        if (i < 0) return;                                   // 그 사이에 없어졌다
+        u.inventory.splice(i, 1);
+        if (!Array.isArray(u.sbubOwn)) u.sbubOwn = [];
+        if (u.sbubOwn.indexOf(id) < 0) u.sbubOwn.push(id);
+        u.sbub = id;                                         // 얻자마자 달아 준다
+        if (typeof addHistoryLog === 'function') {
+            try { addHistoryLog(u, '[말풍선] ' + s.n + ' 을(를) 얻었습니다.'); } catch (e) { }
+        }
+        if (typeof saveFields === 'function') {
+            try { saveFields({ inventory: 1, sbubOwn: 1, sbub: 1, history: 1 }); } catch (e) { }
+        } else if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
+        try { updateUI(); } catch (e) { }
+        openBubblePanel();
+    };
+    if (!confirm(TICKET + ' 한 장으로 「' + s.n + '」 말풍선을 얻습니다.\n'
+        + '가진 표 ' + tickets(u) + '장. 쓰면 돌려받지 못합니다.\n\n얻을까요?')) return;
+    go();
+}
+window.sbBuy = sbBuy;
 
 // ==========================================
 // 관리 화면
@@ -326,25 +397,43 @@ function sample(s, on) {
 }
 
 function openBubblePanel() {
-    const cur = (currentUser && currentUser.sbub) || '';
+    const u = currentUser || {};
+    const cur = u.sbub || '';
+    const tk = tickets(u);
     const row = function (s) {
         const id = s ? s.id : '';
         const on = (cur === id);
-        return `<div style="border:1px solid ${on ? '#8a6cb3' : '#3a3a3a'}; border-radius:6px;
-                     padding:9px 11px; margin-bottom:7px; background:${on ? 'rgba(106,76,147,.18)' : 'transparent'};">
+        const got = sbHas(u, id);
+        // 단추 — 쓰는 중 / 이걸로 쓴다 / 표를 내고 얻는다
+        const btn = on
+            ? `<button class="game-btn" style="width:100%; margin:4px 0 0 0; padding:7px; font-size:11px;"
+                    disabled>고른 것</button>`
+            : got
+            ? `<button class="game-btn" style="width:100%; margin:4px 0 0 0; padding:7px; font-size:11px;"
+                    onclick="sbSet('${id}')">이걸로 쓴다</button>`
+            : `<button class="game-btn" style="width:100%; margin:4px 0 0 0; padding:7px; font-size:11px;
+                    ${tk ? 'background:linear-gradient(145deg,#4c6a93,#2c4a73) !important; border-color:#6c8ab3 !important;'
+                         : 'opacity:.55;'}"
+                    onclick="sbBuy('${id}')">${tk ? '선택권 1장으로 얻는다' : '선택권이 있어야 얻습니다'}</button>`;
+        return `<div style="border:1px solid ${on ? '#8a6cb3' : (got ? '#3a3a3a' : '#2a2a2a')}; border-radius:6px;
+                     padding:9px 11px; margin-bottom:7px; background:${on ? 'rgba(106,76,147,.18)' : 'transparent'};
+                     ${got ? '' : 'opacity:.82;'}">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
                 <span style="font-size:12px; color:#fff; font-weight:bold;">${s ? s.n : '기본'}</span>
-                <span style="font-size:10px; color:${on ? '#c9a8ff' : '#666'};">${on ? '쓰는 중' : ''}</span>
+                <span style="font-size:10px; color:${on ? '#c9a8ff' : (got ? '#666' : '#7d7568')};">
+                    ${on ? '쓰는 중' : (got ? '' : '아직 안 가짐')}</span>
             </div>
             ${sample(s, on)}
-            <button class="game-btn" style="width:100%; margin:4px 0 0 0; padding:7px; font-size:11px;"
-                    onclick="sbSet('${id}')" ${on ? 'disabled' : ''}>${on ? '고른 것' : '이걸로 쓴다'}</button>
+            ${btn}
         </div>`;
     };
     const html = `
         <div style="font-size:11px; color:#aaa; line-height:1.7; margin-bottom:11px;">
             광장에서 말할 때 머리 위에 뜨는 말풍선입니다.<br>
-            고른 빛깔은 <b style="color:#c9a8ff;">같은 방 사람에게도</b> 그대로 보입니다.
+            고른 빛깔은 <b style="color:#c9a8ff;">같은 방 사람에게도</b> 그대로 보입니다.<br>
+            「기본」 말고는 <b style="color:#c9a8ff;">${TICKET}</b> 한 장으로 하나씩 얻습니다.
+            <span style="color:#7d7568;">(상담사에게 받습니다)</span><br>
+            지금 가진 선택권 <b style="color:${tk ? '#4CAF50' : '#7d7568'};">${tk}장</b>
         </div>
         <div style="max-height:52vh; overflow-y:auto; padding-right:4px;">
             ${[null].concat(sbAll()).map(row).join('')}
@@ -359,7 +448,7 @@ window.openBubblePanel = openBubblePanel;
 (function addBtn() {
     function put() {
         if (!currentUser) return;
-        if (ONLY_ADMIN && currentUser.code !== ADMIN) return;
+        // 단추는 **전 사원**에게 선다 — 안에서 가진 것만 고를 수 있다
         if (document.getElementById('bub-open-btn')) return;
         const fb = document.getElementById('frame-open-btn');
         if (!fb) return;
@@ -400,6 +489,73 @@ window.openBubblePanel = openBubblePanel;
     });
 })();
 
-console.log('[말풍선] ' + (SB.length + SB2.length) + '종 — ' + (ONLY_ADMIN ? '상담사만' : '전 사원'));
+// ==========================================
+// [ 💭 말풍선 선택권 ] — 상담사 지급 전용
+// ==========================================
+//
+//   통제 콘솔의 「물품 강제 꽂기」로 준다. 어디에도 안 깔리고 안 팔린다.
+//   소지품에서 **쓰는 물건이 아니다** (usable:false) — 말풍선 관리 창에서
+//   하나를 고를 때 거둬 간다. 그래야 「썼는데 아무 일도 안 일어났다」가
+//   없다.
+(function regTicket() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        clearInterval(iv);
+        ITEM_CATALOG[TICKET] = {
+            price: 0, usable: false, noSell: true,
+            desc: '광장 말풍선 하나를 얻는다. 사원증 칸의 「💬 말풍선 관리」 에서 쓴다. '
+                + '한 장에 하나이며, 한 번 얻은 말풍선은 그 뒤로 마음대로 골라 쓴다.'
+        };
+        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(TICKET) < 0) {
+            NO_SELL_ITEMS.push(TICKET);
+        }
+        console.log('[말풍선] ' + TICKET + ' 등록 — 상담사 지급 전용');
+    }, 400);
+})();
+
+// 우주 쇼핑몰 후보에 들어가도 계속 빼 둔다 (개명권과 같은 수)
+setInterval(function () {
+    if (typeof ALIEN_ITEMS_POOL === 'undefined') return;
+    const i = ALIEN_ITEMS_POOL.indexOf(TICKET);
+    if (i > -1) ALIEN_ITEMS_POOL.splice(i, 1);
+}, 5000);
+
+// 장터(팝니다·구합니다)에서 가린다
+(function hideMarket() {
+    const iv = setInterval(function () {
+        if (typeof marketSellable !== 'function') return;
+        if (marketSellable._sbub) { clearInterval(iv); return; }
+        const _m = marketSellable;
+        marketSellable = function () {
+            const pool = _m.apply(this, arguments);
+            try { pool.delete(TICKET); } catch (e) { }
+            return pool;
+        };
+        marketSellable._sbub = true;
+        clearInterval(iv);
+    }, 400);
+})();
+
+// ★ 콘솔 — 상담사가 손으로 한 장 준다
+window.sbubTicket = function (who, n) {
+    if (!currentUser || currentUser.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const book = (typeof db !== 'undefined' && db.users) ? db.users : {};
+    const code = Object.keys(book).filter(function (c) {
+        const x = book[c] || {};
+        return c === who || String(x.no) === String(who) || x.name === who;
+    })[0];
+    if (!code) { console.warn('사원을 못 찾았습니다.'); return; }
+    const cnt = Math.max(1, Number(n) || 1);
+    const u = book[code];
+    if (!Array.isArray(u.inventory)) u.inventory = [];
+    for (let i = 0; i < cnt; i++) u.inventory.push(TICKET);
+    u._adminStamp = Date.now();
+    if (typeof database !== 'undefined' && database) {
+        database.ref('users/' + code + '/inventory').set(u.inventory);
+    }
+    console.log('%c✓ ' + (u.name || code) + ' 사원에게 ' + TICKET + ' ' + cnt + '장', 'color:#4CAF50');
+};
+
+console.log('[말풍선] ' + (SB.length + SB2.length) + '종 — 기본은 누구나, 나머지는 ' + TICKET);
 
 })();

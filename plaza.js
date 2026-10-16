@@ -866,9 +866,9 @@ const EMO_RE = /^\[emo:([A-Za-z0-9_-]{1,12})\]$/;
 // ★ 말풍선 **모양**은 바깥(bubbles.js)에서 고른다.
 //   여기서는 고른 이름을 sb-○○ 라는 갈래 이름으로 붙이기만 한다.
 //   bubbles.js 가 없으면 아무것도 안 붙어 전처럼 보인다.
-// 저 사번이 말풍선을 쓸 수 있나 (bubbles.js 가 답한다 — 없으면 안 쓴다)
-function sbOkOf(code) {
-    try { return (typeof window.sbAllowedCode === 'function') ? !!window.sbAllowedCode(code) : false; }
+// 저 사번이 **그 말풍선**을 가졌나 (bubbles.js 가 답한다 — 없으면 안 쓴다)
+function sbOkOf(code, id) {
+    try { return (typeof window.sbAllowedCode === 'function') ? !!window.sbAllowedCode(code, id) : false; }
     catch (e) { return false; }
 }
 function sbMine() {
@@ -1753,7 +1753,7 @@ function onSeat(code, v, fresh) {
         q.sayAt = v.st;
         // ★ 말풍선 빛깔은 **그 사람이 쓸 수 있는지 받는 쪽에서도 본다.**
         //   b 칸은 보내는 사람이 적는 값이라, 손으로 적어 보낼 수 있다.
-        bubble(q.one, v.s || '', sbOkOf(code) ? (v.b || '') : '');
+        bubble(q.one, v.s || '', sbOkOf(code, v.b || '') ? (v.b || '') : '');
     }
     if (isNew) showWho();
 }
