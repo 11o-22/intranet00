@@ -65,6 +65,89 @@ const SB = [
     // 풀빛 ← e30 「나만 믿어!」 식칼 든 갈색머리
     { id: 'grass', n: '풀빛',     bg: '#e9efe5', fg: '#303630', em: 'e30', w: 30 },
 ];
+// ==========================================
+// ★ 그려 주신 말풍선 스물일곱 가지 (2026-10-16)
+// ==========================================
+//
+//   보내 주신 그림 석 장에서 떠 왔다. 한 칸마다
+//     · 막대 **속빛**(bg) 과 **테두리빛**(ln) 을 그림에서 집어 오고,
+//     · 막대 윗선 **위쪽에 얹힌 그림**(머리·장식)만 오려 emo/sb/ 에 넣었다.
+//
+//   ✗ 막대 자체를 그림으로 쓰지 않았다. 말은 길이가 그때그때 달라서
+//     말풍선이 늘었다 줄었다 해야 하는데, 그려진 막대를 늘리면 **기울기가
+//     무너지고 글이 테두리를 넘는다.** 그래서 막대는 전처럼 CSS 로 그리고
+//     (빛깔은 그림 것 그대로), 얹힌 그림만 올린다.
+//     그림의 **살짝 기울어진 멋**은 그래서 못 살렸다.
+//
+//   한 가지에 조각이 여럿일 수 있다 (도깨비불+술, 안테나 둘+토끼, 여우 귀
+//   양쪽+코). s 는 어느 쪽에 붙나(L 왼 · R 오른), o 는 그쪽 끝에서 몇 칸
+//   떨어지나 — 그림에서 잰 값 그대로다. bh 는 그림 속 막대 높이로,
+//   얹는 그림을 **그 막대에 견준 비율**로 줄일 때 쓴다.
+//
+//   ✗ 여우(03) 의 **아래로 늘어진 꼬리**는 못 넣었다. 말풍선 밑으로는
+//     꼬리(세모)가 이미 나가 있어 자리가 겹친다.
+const SB2 = [
+    { id: 'b01', n: '01 하늘', bg: '#dce1ff', ln: '#2f3a82', fg: '#252b53', bh: 87,
+      p: [{f:'b01-1.webp',w:72,h:83,s:'L',o:-14},{f:'b01-2.webp',w:70,h:34,s:'R',o:-3}] },
+    { id: 'b02', n: '02 잿빛', bg: '#d2d2d2', ln: '#000000', fg: '#0b0b0b', bh: 104,
+      p: [{f:'b02-1.webp',w:33,h:42,s:'C',o:300},{f:'b02-2.webp',w:52,h:38,s:'C',o:637},{f:'b02-3.webp',w:53,h:71,s:'R',o:2}] },
+    { id: 'b03', n: '03 주황', bg: '#ffebd7', ln: '#2b1500', fg: '#23170b', bh: 88,
+      p: [{f:'b03-1.webp',w:63,h:48,s:'L',o:-1},{f:'b03-2.webp',w:60,h:34,s:'C',o:501},{f:'b03-3.webp',w:61,h:41,s:'R',o:-2}] },
+    { id: 'b04', n: '04 분홍', bg: '#ffe7e9', ln: '#f00012', fg: '#8f0b15', bh: 86,
+      p: [{f:'b04-1.webp',w:164,h:136,s:'L',o:-27}] },
+    { id: 'b05', n: '05 붉은', bg: '#c78d7c', ln: '#410f00', fg: '#2f130b', bh: 79,
+      p: [{f:'b05-1.webp',w:153,h:121,s:'L',o:-43}] },
+    { id: 'b06', n: '06 하늘', bg: '#f2faff', ln: '#2fa7ff', fg: '#3a3634', bh: 88,
+      p: [{f:'b06-1.webp',w:182,h:92,s:'L',o:-27}] },
+    { id: 'b07', n: '07 하늘', bg: '#e8ebf6', ln: '#303d6b', fg: '#262d46', bh: 88,
+      p: [{f:'b07-1.webp',w:133,h:104,s:'L',o:-26}] },
+    { id: 'b08', n: '08 붉은', bg: '#ffefef', ln: '#b12b2a', fg: '#6d2322', bh: 91,
+      p: [{f:'b08-1.webp',w:139,h:113,s:'L',o:-31}] },
+    { id: 'b09', n: '09 보라', bg: '#fff1fb', ln: '#ffd1f2', fg: '#3a3634', bh: 88,
+      p: [{f:'b09-1.webp',w:125,h:118,s:'L',o:-14}] },
+    { id: 'b10', n: '10 노랑', bg: '#ffffd8', ln: '#feff9a', fg: '#3a3634', bh: 91,
+      p: [{f:'b10-1.webp',w:191,h:135,s:'L',o:-30}] },
+    { id: 'b11', n: '11 주황', bg: '#fff2ec', ln: '#461d0c', fg: '#321b12', bh: 84,
+      p: [{f:'b11-1.webp',w:153,h:127,s:'L',o:-15}] },
+    { id: 'b12', n: '12 노랑', bg: '#fff1cc', ln: '#fdb700', fg: '#3a3634', bh: 81,
+      p: [{f:'b12-1.webp',w:162,h:136,s:'L',o:-18}] },
+    { id: 'b13', n: '13 잿빛', bg: '#ededed', ln: '#3f3f3f', fg: '#2e2e2e', bh: 86,
+      p: [{f:'b13-1.webp',w:125,h:112,s:'L',o:-23}] },
+    { id: 'b14', n: '14 잿빛', bg: '#f1f1f1', ln: '#838383', fg: '#3a3634', bh: 85,
+      p: [{f:'b14-1.webp',w:133,h:110,s:'L',o:-25}] },
+    { id: 'b15', n: '15 흰빛', bg: '#eaeaea', ln: '#dadada', fg: '#3a3634', bh: 84,
+      p: [{f:'b15-1.webp',w:144,h:119,s:'L',o:-33}] },
+    { id: 'b16', n: '16 흰빛', bg: '#eaeaea', ln: '#ffd3cd', fg: '#3a3634', bh: 87,
+      p: [{f:'b16-1.webp',w:131,h:119,s:'L',o:-23}] },
+    { id: 'b17', n: '17 하늘', bg: '#edf9ff', ln: '#4bacdf', fg: '#3a3634', bh: 90,
+      p: [{f:'b17-1.webp',w:195,h:117,s:'L',o:-10}] },
+    { id: 'b18', n: '18 주황', bg: '#fff4e9', ln: '#d96b00', fg: '#83460b', bh: 89,
+      p: [{f:'b18-1.webp',w:150,h:115,s:'L',o:-36}] },
+    { id: 'b19', n: '19 붉은', bg: '#e7dcda', ln: '#6d0000', fg: '#470b0b', bh: 92,
+      p: [{f:'b19-1.webp',w:187,h:124,s:'L',o:-59}] },
+    { id: 'b20', n: '20 남보라', bg: '#d2c4d6', ln: '#750e8f', fg: '#4c135a', bh: 91,
+      p: [{f:'b20-1.webp',w:118,h:97,s:'L',o:-2}] },
+    { id: 'b21', n: '21 풀빛', bg: '#e8ffed', ln: '#3abb56', fg: '#3a3634', bh: 91,
+      p: [{f:'b21-1.webp',w:145,h:98,s:'L',o:-36}] },
+    { id: 'b22', n: '22 주황', bg: '#fff4ea', ln: '#ffa14a', fg: '#3a3634', bh: 88,
+      p: [{f:'b22-1.webp',w:180,h:78,s:'L',o:-14}] },
+    { id: 'b23', n: '23 주황', bg: '#fff8ee', ln: '#ffb553', fg: '#3a3634', bh: 89,
+      p: [{f:'b23-1.webp',w:173,h:117,s:'L',o:-46}] },
+    { id: 'b24', n: '24 남보라', bg: '#e3e1ff', ln: '#24164f', fg: '#1f1737', bh: 83,
+      p: [{f:'b24-1.webp',w:194,h:136,s:'L',o:-19}] },
+    { id: 'b25', n: '25 남보라', bg: '#fbf2ff', ln: '#450069', fg: '#310b45', bh: 87,
+      p: [{f:'b25-1.webp',w:149,h:132,s:'L',o:-9}] },
+    { id: 'b26', n: '26 청록', bg: '#eefcff', ln: '#74e4ff', fg: '#3a3634', bh: 85,
+      p: [{f:'b26-1.webp',w:154,h:140,s:'L',o:2}] },
+    { id: 'b27', n: '27 하늘', bg: '#edf0ff', ln: '#6375c5', fg: '#424c78', bh: 89,
+      p: [{f:'b27-1.webp',w:139,h:98,s:'L',o:-18}] },
+];
+const SBDIR = 'emo/sb/';
+// 얹는 그림 크기 — 그림 속 막대 높이를 이만큼으로 친다 (px).
+//   말풍선 한 줄 높이가 28px 쯤이라, 그보다 조금 작게 잡아야 머리가
+//   사람보다 커 보이지 않는다.
+const SB2_BAR = 24;
+
 const LINE = '#8c8c88';         // 연필로 그은 듯한 테두리
 const TAIL = 6;                 // 꼬리 크기 (px)
 const TOP  = 31;                // 얹는 그림 높이 (px)
@@ -94,6 +177,32 @@ const DIP  = 9;                 // 말풍선 윗선에 걸치는 깊이 (px)
         L.push(k + ' .sbi{width:' + s.w + 'px;'
                  + 'background-image:url(emo/bub-' + s.id + '.webp);}');
     });
+    // ★ 그려 주신 스물일곱 가지
+    SB2.forEach(function (s) {
+        const k = '.plaza-say.sb-' + s.id;
+        const z = SB2_BAR / s.bh;                 // 그림 → 화면 줄임비
+        L.push(k + '{background:' + s.bg + ';color:' + s.fg + ';'
+                 + 'box-shadow:0 0 0 1.6px ' + s.ln + ',0 2px 7px rgba(0,0,0,.45);'
+                 + 'border-radius:4px;}');        // 그려진 막대는 모서리가 각지다
+        L.push(k + ':after{margin-left:-' + TAIL + 'px;border-width:' + TAIL + 'px;'
+                 + 'border-top-color:' + s.bg + ';}');
+        L.push(k + ':before{border-top-color:' + s.ln + ';}');
+        s.p.forEach(function (p, i) {
+            const w = Math.round(p.w * z), h = Math.round(p.h * z);
+            const o = (p.s === 'C') ? p.o : Math.round(p.o * z);
+            // 왼쪽에 붙는 것은 left, 오른쪽에 붙는 것은 right 로 잡는다 —
+            //   말풍선이 길어져도 **제 끝에 붙어 있어야** 그림이 안 어긋난다.
+            // L·R 은 그 끝에서 몇 px, C 는 **가로 비율 자리**(천분율)다.
+            //   끝에 붙은 것은 말풍선이 길어져도 제 끝을 붙들고, 가운데
+            //   것(안테나·여우 코)은 늘어난 만큼 같이 벌어진다.
+            const put = (p.s === 'L') ? 'left:' + o + 'px;right:auto;'
+                      : (p.s === 'R') ? 'right:' + o + 'px;left:auto;'
+                      : 'left:' + (p.o / 10) + '%;right:auto;transform:translateX(-50%);';
+            L.push(k + ' .sbi.p' + (i + 1) + '{width:' + w + 'px;height:' + h + 'px;'
+                     + put + 'bottom:calc(100% - 2px);'
+                     + 'background-image:url(' + SBDIR + p.f + ');}');
+        });
+    });
     // 얹는 자리 — 네 가지가 똑같다
     L.push('.plaza-say .sbi{position:absolute;left:1px;bottom:calc(100% - ' + DIP + 'px);'
          + 'height:' + TOP + 'px;background-repeat:no-repeat;'
@@ -112,7 +221,14 @@ const DIP  = 9;                 // 말풍선 윗선에 걸치는 깊이 (px)
 // ==========================================
 // 고른 것
 // ==========================================
-function sbById(id) { return SB.find(function (s) { return s.id === id; }) || null; }
+function sbAll() { return SB.concat(SB2); }
+function sbById(id) { return sbAll().find(function (s) { return s.id === id; }) || null; }
+
+// plaza.js 가 묻는다 — 이 말풍선은 얹는 그림이 몇 조각인가
+window.sbParts = function (id) {
+    const s = sbById(id);
+    return (s && s.p) ? s.p.length : 1;
+};
 
 // 이 사람이 말풍선을 쓸 수 있나
 function sbAllowed(u) { return !ONLY_ADMIN || (!!u && u.code === ADMIN); }
@@ -128,6 +244,16 @@ window.sbOf = function (u) {
     if (!sbAllowed(u)) return '';
     const id = u && u.sbub;
     return (id && sbById(id)) ? id : '';
+};
+
+// ★ 남이 고른 것도 **받는 쪽에서 한 번 더 본다.**
+//   자리 기록의 b 칸은 **보내는 사람이 적는다.** 보내는 쪽에서 이미
+//   걸렀지만(sbOf), 칸을 손으로 적어 보내면 남들 화면에 뜰 수 있다.
+//   그래서 plaza.js 가 남의 말풍선을 띄우기 전에 이것을 묻는다 —
+//   그 사번이 상담사가 아니면 빛깔을 안 입힌다.
+window.sbAllowedCode = function (code) {
+    if (!ONLY_ADMIN) return true;
+    return String(code || '') === ADMIN;
 };
 
 // ★ 남아 있는 칸도 치운다 — 들어올 때 한 번.
@@ -169,6 +295,8 @@ window.sbubClearAll = function () {
 
 function sbSet(id) {
     if (!currentUser) return;
+    // ★ 상담사만 — 콘솔에서 불러도 안 먹힌다 (단추는 본디 안 서지만, 막아 둔다)
+    if (!sbAllowed(currentUser)) { console.warn('말풍선은 상담사만 고릅니다.'); return; }
     if (id && !sbById(id)) return;
     currentUser.sbub = id || null;
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
@@ -185,11 +313,14 @@ window.sbSet = sbSet;
 function sample(s, on) {
     const cls = s ? ' sb-' + s.id : '';
     const bg = s ? s.bg : '#f4efe2';
+    // 조각이 여럿인 것은 그만큼 얹는다 (광장과 같은 모양으로 보여 준다)
+    const ii = s ? Array.from({ length: (s.p ? s.p.length : 1) },
+        function (_, i) { return '<i class="sbi p' + (i + 1) + '"></i>'; }).join('') : '';
     return `<div style="position:relative; height:70px;">
         <div class="plaza-say${cls}" style="position:absolute; left:50%; top:30px; bottom:auto;
              transform:translateX(-50%); margin:0; width:max-content;
              ${s ? '' : 'background:' + bg + ';color:#1a1a1a;'}">
-            ${on ? '지금 이걸 쓰는 중' : '안녕하세요'}${s ? '<i class="sbi"></i>' : ''}
+            ${on ? '지금 이걸 쓰는 중' : '안녕하세요'}${ii}
         </div>
     </div>`;
 }
@@ -216,7 +347,7 @@ function openBubblePanel() {
             고른 빛깔은 <b style="color:#c9a8ff;">같은 방 사람에게도</b> 그대로 보입니다.
         </div>
         <div style="max-height:52vh; overflow-y:auto; padding-right:4px;">
-            ${[null].concat(SB).map(row).join('')}
+            ${[null].concat(sbAll()).map(row).join('')}
         </div>`;
     openGearModal('말풍선', html);
 }
@@ -269,6 +400,6 @@ window.openBubblePanel = openBubblePanel;
     });
 })();
 
-console.log('[말풍선] ' + SB.length + '종 — ' + (ONLY_ADMIN ? '상담사만' : '전 사원'));
+console.log('[말풍선] ' + (SB.length + SB2.length) + '종 — ' + (ONLY_ADMIN ? '상담사만' : '전 사원'));
 
 })();

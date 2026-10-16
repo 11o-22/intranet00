@@ -866,6 +866,11 @@ const EMO_RE = /^\[emo:([A-Za-z0-9_-]{1,12})\]$/;
 // ★ 말풍선 **모양**은 바깥(bubbles.js)에서 고른다.
 //   여기서는 고른 이름을 sb-○○ 라는 갈래 이름으로 붙이기만 한다.
 //   bubbles.js 가 없으면 아무것도 안 붙어 전처럼 보인다.
+// 저 사번이 말풍선을 쓸 수 있나 (bubbles.js 가 답한다 — 없으면 안 쓴다)
+function sbOkOf(code) {
+    try { return (typeof window.sbAllowedCode === 'function') ? !!window.sbAllowedCode(code) : false; }
+    catch (e) { return false; }
+}
 function sbMine() {
     try { return (typeof window.sbOf === 'function') ? (window.sbOf(u_()) || '') : ''; }
     catch (e) { return ''; }
@@ -877,11 +882,19 @@ function bubble(one, text, sty) {
     b.className = 'plaza-say';
     // 고른 모양이 있으면 **얹을 자리**도 같이 만들어 둔다 (bubbles.js 가 그림을 깐다).
     //   ✗ :before 로 못 한다 — 꼬리 테두리가 이미 쓰고 있다.
-    let sbi = null;
+    // ★ 얹는 그림이 **여러 조각**일 수 있다 (도깨비불+술, 여우 귀 양쪽 따위).
+    //   몇 조각인지는 bubbles.js 가 안다 — 없으면 전처럼 한 조각이다.
+    let sbis = [];
     if (sty && /^[a-z0-9]{1,12}$/.test(String(sty))) {
         b.classList.add('sb-' + sty);
-        sbi = document.createElement('i');
-        sbi.className = 'sbi';
+        let np = 1;
+        try { if (typeof window.sbParts === 'function') np = window.sbParts(sty) || 1; }
+        catch (e) { np = 1; }
+        for (let i = 1; i <= np; i++) {
+            const el = document.createElement('i');
+            el.className = 'sbi p' + i;
+            sbis.push(el);
+        }
     }
     const m = EMO_RE.exec(String(text));
     if (m && typeof window.emoTag === 'function' && typeof window.emoById === 'function'
@@ -891,7 +904,7 @@ function bubble(one, text, sty) {
     } else {
         b.innerText = text;
     }
-    if (sbi) b.appendChild(sbi);
+    sbis.forEach(function (el) { b.appendChild(el); });
     one.wrap.appendChild(b);
     one.bub = b;
 }
@@ -1738,7 +1751,9 @@ function onSeat(code, v, fresh) {
     // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
     if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
         q.sayAt = v.st;
-        bubble(q.one, v.s || '', v.b || '');
+        // ★ 말풍선 빛깔은 **그 사람이 쓸 수 있는지 받는 쪽에서도 본다.**
+        //   b 칸은 보내는 사람이 적는 값이라, 손으로 적어 보낼 수 있다.
+        bubble(q.one, v.s || '', sbOkOf(code) ? (v.b || '') : '');
     }
     if (isNew) showWho();
 }
