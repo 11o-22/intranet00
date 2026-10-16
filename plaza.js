@@ -836,11 +836,18 @@ function zz() { return (run && run.z) || 1; }
 
 function putOne(one, x, y) {
     const z = zz();
-    one.wrap.style.left = Math.round(x * z - one.w / 2) + 'px';
+    const L = Math.round(x * z - one.w / 2);
+    const T = Math.round(y * z - (one.h - (one.foot || 0)));
     // ★ 칸 아래끝이 곧 발이 아니다 — 새 규격은 발밑이 여덟 도트 비어 있다.
     //   그만큼(foot) 도로 내려 놓아야 땅에 선다.
-    one.wrap.style.top = Math.round(y * z - (one.h - (one.foot || 0))) + 'px';
-    one.wrap.style.zIndex = String(100 + Math.round(y));     // 아래에 있는 사람이 앞
+    //
+    //   ★ 그 자리 그대로면 **안 적는다.** style 에 적으면 같은 값이어도
+    //     브라우저가 다시 재 본다. 사람이 스물다섯이면 한 틀에 일흔다섯 번,
+    //     초당 사천 번이다. 서 있는 사람은 대개 자리가 안 바뀐다.
+    if (one._L !== L) { one.wrap.style.left = L + 'px'; one._L = L; }
+    if (one._T !== T) { one.wrap.style.top = T + 'px'; one._T = T; }
+    const Z = 100 + Math.round(y);                           // 아래에 있는 사람이 앞
+    if (one._Z !== Z) { one.wrap.style.zIndex = String(Z); one._Z = Z; }
 }
 
 // ★ 이모티콘은 말풍선 길을 그대로 탄다.
@@ -1104,9 +1111,24 @@ function snapK(v) {
     return best;
 }
 
+// ★ 창 크기는 **떠 둔다.**
+//
+//   clientWidth·clientHeight 를 읽으면 브라우저가 그 자리에서 판을 다시
+//   잰다(forced layout). 틀마다 읽으면, 사람들이 걸어서 판이 어수선한
+//   동안 **매 틀마다 판을 통째로 다시 재게 된다.** 재 보니 틀 시간의
+//   5% 가 이 한 줄에서 나갔다. 창 크기는 창을 돌리거나 자판이 올라올 때만
+//   바뀌고, 그때는 onSize 가 떠 둔 값을 버린다.
+function viewBox() {
+    const v = run && run.view;
+    if (!v) return { w: 0, h: 760 };
+    if (!run._vb) run._vb = { w: v.clientWidth, h: v.clientHeight };
+    return run._vb;
+}
+function viewForget() { if (run) run._vb = null; }
+
 function zoomOf(r) {
     const v = run && run.view;
-    const vh = (v && v.clientHeight) || 760;
+    const vh = (v && viewBox().h) || 760;
     const cut = (r.cut != null) ? r.cut : (P.CUT || 0);
     return vh / Math.max(200, r.h - cut);
 }
@@ -1309,7 +1331,7 @@ window.plazaShotData = function () {
         folk.push(one(q.one, q.one.name || ''));
     });
     return {
-        vw: run.view.clientWidth, vh: run.view.clientHeight,
+        vw: viewBox().w, vh: viewBox().h,
         cx: run.cx, cy: run.cy,
         room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z },
         folk: folk
@@ -1447,6 +1469,8 @@ function goRoom(key, way, lv) {
 
     // 칭호는 자주 바뀌지 않는다 — 삼 초에 한 번만 본다
     if (!run.tagIv) run.tagIv = setInterval(refreshTags, 3000);
+    // 끊긴 사람 걷기 — 오 초에 한 번 (child_removed 가 안 올 때를 위한 그물)
+    if (!run.swpIv) run.swpIv = setInterval(sweepPeers, 5000);
 }
 
 // ==========================================
@@ -1580,8 +1604,9 @@ function tick(ts) {
 function camera(snap) {
     const r = roomOf(), z = zz();
     const rw = r.w * z, rh = r.h * z;
-    const vw = run.view.clientWidth || rw;
-    const vh = run.view.clientHeight || rh;
+    const vb = viewBox();
+    const vw = vb.w || rw;
+    const vh = vb.h || rh;
     // 방이 창보다 좁으면 **가운데로** 둔다 (왼쪽에 붙이면 한쪽만 검다)
     let cx = -(vw - rw) / 2;
     if (rw > vw) cx = Math.max(0, Math.min(rw - vw, run.x * z - vw / 2));
@@ -1622,65 +1647,106 @@ function send(moving) {
 // ==========================================
 // 같은 방 사람
 // ==========================================
+// ==========================================
+// ★ 같은 방 사람 — **한 사람씩** 듣는다
+// ==========================================
+//
+//   ✗ 전에는 방 전체에 on('value') 하나를 걸었다. 그러면 **누가 한 발
+//     움직일 때마다** 방에 있는 사람을 전부 다시 훑는다. 스물다섯 명이
+//     0.25초마다 자리를 적으면 1초에 백 번 × 스물다섯 사람 = 2,500 번이다.
+//     재 봤다 — 스물다섯 명이 가만히 서 있을 때는 한 틀에 20ms 인데,
+//     움직이기 시작하면 **444ms** 로 치솟았다 (그리는 값은 그대로였다.
+//     버거운 것은 그리기가 아니라 **받아서 추리는 쪽**이었다).
+//
+//   이제 child_added · child_changed · child_removed 로 듣는다.
+//   한 번에 한 사람만 본다 — 백 번이면 백 사람 몫이다 (2,500 → 100).
+//
+//   사람이 드나들 때만 showWho 를 다시 적는다. 걸음마다 적으면 그것만으로
+//   한 틀이 밀린다 (innerText 는 자리를 다시 재게 만든다).
 function watchRoom() {
     const d = db_(), u = u_();
     if (!d || !u) return;
-    if (run.ref) { try { run.ref.off('value', run.onRoom); } catch (e) { } }
+    offRoom();
     run.ref = d.ref(P.PATH + '/' + run.room);
-    run.onRoom = function (snap) { onPeers(snap); };
-    run.ref.on('value', run.onRoom);
+    run.onAdd = function (s) { onSeat(s.key, s.val(), true); };
+    run.onChg = function (s) { onSeat(s.key, s.val(), false); };
+    run.onDel = function (s) { if (run.peers[s.key]) { dropPeer(s.key); showWho(); } };
+    run.ref.on('child_added', run.onAdd);
+    run.ref.on('child_changed', run.onChg);
+    run.ref.on('child_removed', run.onDel);
     try { run.ref.child(u.code).onDisconnect().remove(); } catch (e) { }
-}
 
-function onPeers(snap) {
-    if (!run) return;
-    const all = snap.val() || {};
-    const u = u_(); const mine = u && u.code;
-    const live = {};
-
-    Object.keys(all).forEach(function (code) {
-        if (code === mine) return;
-        const v = all[code] || {};
-        if (!v.at || now() - v.at > P.STALE_MS) return;
-        live[code] = true;
-        let q = run.peers[code];
-        const key = JSON.stringify(v.d || {});
-        if (q && q.key !== key) { dropPeer(code); q = null; }
-        if (!q) {
-            const one = makeOne({ code: code, dot: v.d || {} }, v.n || code, run.k, true);
-            run.el.appendChild(one.wrap);
-            q = run.peers[code] = { one: one, key: key, x: v.x, y: v.y, tx: v.x, ty: v.y,
-                                    face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
-            one.actor.face(v.f || 1);
-            putOne(one, q.x, q.y);
-        }
-        if (q.tx !== v.x || q.ty !== v.y || q.moving !== !!v.m) q.seen = now();
-        q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
-        setTag(q.one, code, v.n || code);
-        // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
-        if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
-            q.sayAt = v.st;
-            bubble(q.one, v.s || '', v.b || '');
-        }
-    });
-
-    Object.keys(run.peers).forEach(function (code) { if (!live[code]) dropPeer(code); });
-    showWho();
-
-    // ★ 들어와 보니 아무도 없으면, 전에 누가 남기고 간 말을 치운다.
-    //
-    //   나갈 때 지우는 것만으로는 모자라다 — 창을 그냥 닫거나 끊기면 지울
-    //   틈이 없다. 그래서 들어온 쪽에서도 한 번 쓸어 낸다. 사람이 있으면
-    //   이야기가 이어지는 중이므로 손대지 않는다.
+    // 들어와 보니 아무도 없으면, 전에 누가 남기고 간 말을 치운다.
+    //   (전에는 첫 value 가 이 일을 했다 — 이제 한 번만 따로 묻는다)
     if (!run._swept) {
         run._swept = true;
-        if (!Object.keys(run.peers).length) {
-            // ★ 지우는 것은 **서버에 남은 그 방의 말**뿐이다.
-            //   ✗ 전에는 내 화면의 글줄까지 같이 털었다. 그래서 방금 내가
-            //     한 말도 빈 방에 들어서는 순간 사라졌다. 화면은 그대로 둔다.
-            try { const d = db_(); if (d) d.ref(P.CHAT + '/' + run.room).remove(); } catch (e) { }
-        }
+        const room = run.room;
+        run.ref.once('value').then(function (s) {
+            if (!run || run.room !== room) return;
+            const all = s.val() || {};
+            const other = Object.keys(all).filter(function (c) {
+                const v = all[c] || {};
+                return c !== u.code && v.at && now() - v.at <= P.STALE_MS;
+            });
+            if (other.length) return;
+            try { d.ref(P.CHAT + '/' + room).remove(); } catch (e) { }
+        }).catch(function () { });
     }
+}
+
+function offRoom() {
+    if (!run || !run.ref) return;
+    try { run.ref.off('child_added', run.onAdd); } catch (e) { }
+    try { run.ref.off('child_changed', run.onChg); } catch (e) { }
+    try { run.ref.off('child_removed', run.onDel); } catch (e) { }
+    try { run.ref.off('value', run.onRoom); } catch (e) { }   // 묵은 판에서 넘어올 때
+    run.onAdd = run.onChg = run.onDel = run.onRoom = null;
+}
+
+// 한 사람의 자리 한 줄
+function onSeat(code, v, fresh) {
+    if (!run || !code) return;
+    const u = u_();
+    if (!u || code === u.code) return;
+    v = v || {};
+    if (!v.at || now() - v.at > P.STALE_MS) { if (run.peers[code]) { dropPeer(code); showWho(); } return; }
+
+    let q = run.peers[code];
+    const key = JSON.stringify(v.d || {});
+    if (q && q.key !== key) { dropPeer(code); q = null; }     // 옷이 바뀌었다 — 다시 만든다
+    const isNew = !q;
+    if (!q) {
+        const one = makeOne({ code: code, dot: v.d || {} }, v.n || code, run.k, true);
+        run.el.appendChild(one.wrap);
+        q = run.peers[code] = { one: one, key: key, x: v.x, y: v.y, tx: v.x, ty: v.y,
+                                face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
+        one.actor.face(v.f || 1);
+        putOne(one, q.x, q.y);
+    }
+    if (q.tx !== v.x || q.ty !== v.y || q.moving !== !!v.m) q.seen = now();
+    q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
+    q.at = v.at;
+    setTag(q.one, code, v.n || code);
+    // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
+    if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
+        q.sayAt = v.st;
+        bubble(q.one, v.s || '', v.b || '');
+    }
+    if (isNew) showWho();
+}
+
+// ★ 끊긴 사람 걷기 — child_removed 가 안 오는 때가 있다 (창을 그냥 닫거나
+//   끊기면 onDisconnect 가 늦다). 느리게 한 번씩만 훑는다.
+function sweepPeers() {
+    if (!run || !run.peers) return;
+    const t = now();
+    let gone = 0;
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        if (!q) return;
+        if (q.at && t - q.at > P.STALE_MS) { dropPeer(c); gone++; }
+    });
+    if (gone) showWho();
 }
 
 function dropPeer(code) {
@@ -1706,7 +1772,7 @@ function leaveRoom() {
     } catch (e) { }
     try { run.ref.child(u.code).onDisconnect().cancel(); } catch (e) { }
     try { run.ref.child(u.code).remove(); } catch (e) { }
-    try { run.ref.off('value', run.onRoom); } catch (e) { }
+    offRoom();
     run.ref = null;
 }
 
@@ -2725,6 +2791,7 @@ function shut() {
     if (run.onSize) window.removeEventListener('resize', run.onSize);
     if (run.onStick) run.onStick();
     if (run.tagIv) { clearInterval(run.tagIv); run.tagIv = 0; }
+    if (run.swpIv) { clearInterval(run.swpIv); run.swpIv = 0; }
     const ov = document.getElementById('plaza-ov');
     if (ov) ov.remove();
     run = null;
@@ -2939,6 +3006,7 @@ function open() {
     // 창 크기가 바뀌면 (화면을 돌리거나 자판이 올라오면) 다시 맞춘다
     run.onSize = function () {
         if (!run || !run.room) return;
+        viewForget();                       // 떠 둔 창 크기를 버린다
         stampSafe(ov);
         const was = run.z || 0;
         paintRoom();
