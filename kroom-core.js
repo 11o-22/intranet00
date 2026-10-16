@@ -52,6 +52,19 @@ const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음�
 const MAX_TEAMS = 4;
 // ★ 꿈결 — 한 번 얻을 때 던전 등급마다 이만큼 (단위 D)
 const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150] };
+// ★ D · C 는 혼자서는 거의 못 나온다 — 둘 이상이어야 산다
+//   판정 DC 를 올리고 실패해서 잃는 값을 키운다. 동료가 끌어내는 DC(즉사 기믹 · 쓰러짐)는 그대로 둔다 —
+//   같이 가는 것이 답이 되게. 쉼터도 혼자면 못 쉰다 (rest).
+//   D 던전 다섯 장 · 직업 50 · 엔진 규칙을 옮긴 모형으로 2만 판씩 굴려 본 값 (한 사람이 살아 나올 확률):
+//                       혼자    둘    셋
+//     안전한 쪽만 고르면   13%   63%   76%      (전: 72% · 75% · 79%)
+//     아무거나 고르면       2%   16%   31%      (전: 15% · 14% · 15%)
+//   전에는 둘이 가도 혼자와 거의 같았다 — 끌어내다 놓치면 손을 뻗은 쪽이 같이 죽었기 때문이다.
+//   이제 놓치면 손을 뻗은 쪽은 다치기만 하고(MISS), 끌려가는 쪽은 다른 동료를 기다린다 (한 사람에 한 번).
+const HARD = { D: { dc: 2, lose: 1.6 }, C: { dc: 3, lose: 1.8 } };
+const REST_PARTY = { hp: 25, mind: 15, spirit: 10 };   // 번갈아 망을 본다
+const REST_SOLO = { mind: -5, spirit: -10 };            // 혼자서는 눈을 못 붙인다
+const MISS = { hp: -20, mind: -10, spirit: -10 };       // 끌어내다 놓쳤을 때 손을 뻗은 쪽
 const LV_MAX = 100;
 
 const ATTR = {
@@ -563,19 +576,27 @@ function setStat(s, v, why) {
 function addStat(s, dv) { if (!kr || !kr.stats || kr.stats[s] == null) return 0; return setStat(s, kr.stats[s] + dv); }
 
 // 맞는 값 — 속성이 줄여 준다
+function hard() {
+    const g = (kr && kr.dun && DUNS[kr.dun]) ? DUNS[kr.dun].g : 'D';
+    return HARD[g] || { dc: 0, lose: 1 };
+}
 function hurt(lose) {
-    if (!lose) return;
+    const got = {};
+    if (!lose) return got;
     const a = JOBS[kr.job][0];
+    const mul = hard().lose;
     Object.keys(lose).forEach(function (s) {
-        let v = lose[s];
+        let v = lose[s] * mul;
         if (v >= 0 || kr.stats[s] == null) return;
         if (s === 'hp' && a === 'steady') v *= 0.7;
         if (s === 'hp' && a === 'evade') v *= 0.8;
         if (s === 'mind' && a === 'steady') v *= 0.8;
         if (s === 'spirit' && a === 'gaze') v *= 0.8;
         v *= (1 - 0.04 * gi(prof().grade));          // 각성할수록 덜 다친다
-        addStat(s, Math.round(v));
+        const d = addStat(s, Math.round(v));
+        if (d) got[s] = d;
     });
+    return got;
 }
 
 // ==========================================
@@ -877,7 +898,7 @@ window.kroomPick = function (i) {
     if (kr._panic && kr.stats.spirit <= 0) setStat('spirit', 20);       // 폭주 한 번 뒤에 조금 돌아온다
     kr._panic = false;
     const R = roll(o.k);
-    const dc = o.dc || 13;
+    const dc = (o.dc || 13) + hard().dc;
     let ok = R.r !== 1 && (R.r + R.b) >= dc;
     let gl = '';                                            // 전용 장비가 한 일
     // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
@@ -922,10 +943,10 @@ window.kroomPick = function (i) {
             o = Object.assign({}, o, { lose: Object.assign({}, o.lose, { hp: 0 }) });
             gl += gearLine('steady', '— 맞을 자리에 장비를 댔다.');
         }
-        hurt(o.lose);
+        const lost = hurt(o.lose);
         try { kv(applyPollutionToUser, null, [me(), 2]); } catch (e) { }
         if (kr.stats.hp <= 0) { fall('쓰러졌다.'); return; }
-        show(it.sc.t + ' — 결과', dice + gl + (o.ng || '') + lossLine(o.lose), darkChoiceBtn('계속한다.', 'kroomNext()'));
+        show(it.sc.t + ' — 결과', dice + gl + (o.ng || '') + lossLine(lost), darkChoiceBtn('계속한다.', 'kroomNext()'));
     }
 };
 
@@ -1010,12 +1031,21 @@ function rest() {
     // 쉬면 조금 돌아온다
     addStat('mind', 10);
     ['mana', 'might', 'qi'].forEach(function (s) { if (kr.stats[s] != null) addStat(s, 5); });
+    // 같이 온 사람이 있으면 번갈아 망을 보며 눈을 붙인다. 혼자면 못 잔다.
+    const mates = darkRun.isParty && teamStats().some(function (m) { return m.code !== me().code && !m.dead; });
+    const R = mates ? REST_PARTY : REST_SOLO;
+    const got = Object.keys(R).map(function (s) { const d = addStat(s, R[s]); return d ? STATN[s] + ' ' + (d > 0 ? '+' : '') + d : ''; }).filter(Boolean);
     kr.uses = {};                                  // 돌봄 횟수는 층마다
     if (last) { clear(); return; }
     const others = otherTeams();
-    show('쉼터 — ' + kr.floor + '층 끝', `계단참에 바람이 안 든다.<br><br>
-        여기까지는 아무것도 따라오지 않았다. 그렇게 믿기로 한다.<br>
-        <span style="font-size:11px; color:#888;">쉬면서 심력 +10 · 마력/무력/내공 +5</span>`,
+    show('쉼터 — ' + kr.floor + '층 끝', (mates
+        ? `계단참에 바람이 안 든다.<br><br>
+        한 사람이 망을 보는 동안 한 사람이 눈을 붙인다. 번갈아 가며.<br>
+        여기까지는 아무것도 따라오지 않았다. 그렇게 믿기로 한다.`
+        : `계단참에 바람이 안 든다.<br><br>
+        눈을 감으면 무언가 올 것 같아서 감을 수가 없다.<br>
+        망을 봐 줄 사람이 없다. 벽에 등을 붙이고 앉아 날이 새기만 기다린다.`) + `<br>
+        <span style="font-size:11px; color:#888;">쉬면서 심력 +10 · 마력/무력/내공 +5${got.length ? ' · ' + (mates ? '번갈아 잠: ' : '혼자: ') + got.join(' · ') : ''}</span>`,
         restPanel() + others +
         darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()') +
         darkChoiceBtn('여기서 돌아간다. <span style="font-size:10px; color:#888;">(얻은 것의 절반만 들고 나온다)</span>', 'kroomLeave()'));
@@ -1360,10 +1390,12 @@ function banner() {
         const v = kr.doomAll[c];
         const left = Math.max(0, Math.round((v.until - now()) / 1000));
         const heal = JOBS[kr.job][0] === 'heal' && /쓰러/.test(v.what);
+        const tried = !heal && v.tried && v.tried[me().code];
         return `<div style="background:rgba(127,0,0,0.3); border:2px solid #ff1744; border-radius:6px; padding:11px; margin-bottom:9px;">
             <div style="font-size:12px; color:#ff1744; font-weight:bold;">⚠⚠ ${esc(v.name)} — ${esc(v.what)}</div>
-            <div style="font-size:10px; color:#ddd; margin:4px 0 7px 0;">${v.floor || '?'}층 · 남은 ${left}초 ${heal ? '· <span style="color:#4CAF50;">치유는 무조건 일으켜 세운다</span>' : '· 실패하면 이쪽도 끌려간다'}</div>
-            <button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg,#b71c1c,#7f0000) !important; border-color:#ff1744 !important; color:#fff !important;" onclick="kroomRescue('${c}')">${heal ? '치유로 일으킨다' : '끌어낸다'}</button></div>`;
+            <div style="font-size:10px; color:#ddd; margin:4px 0 7px 0;">${v.floor || '?'}층 · 남은 ${left}초 ${heal ? '· <span style="color:#4CAF50;">치유는 무조건 일으켜 세운다</span>' : '· 한 사람에 한 번 · 놓치면 이쪽이 다친다'}</div>
+            ${tried ? '<div style="font-size:11px; color:#aaa; text-align:center; padding:6px;">한 번 손을 뻗었다. 다른 동료를 기다린다.</div>'
+                    : `<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg,#b71c1c,#7f0000) !important; border-color:#ff1744 !important; color:#fff !important;" onclick="kroomRescue('${c}')">${heal ? '치유로 일으킨다' : '끌어낸다'}</button>`}</div>`;
     }).join('') + '</div>';
 }
 window.kroomRescue = function (code) {
@@ -1380,6 +1412,8 @@ window.kroomRescue = function (code) {
             show('구제', `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
             return;
         }
+        if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 뻗었다.'); return; }   // 한 사람은 한 번만
+        ref.child('tried/' + me().code).set(true);
         let b = 0; try { b += kv(rollDarkBonus, null, ['bond']) || 0; } catch (e) { }
         if (JOBS[kr.job][0] === 'bond') b += 3;
         b += Math.min(3, teamCount('fix'));
@@ -1397,10 +1431,14 @@ window.kroomRescue = function (code) {
                 + (sure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(sure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
                 + `팔을 잡았다. 끌어냈다. 둘 다 바닥에 넘어졌다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
         } else {
-            ref.remove();
-            sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원에게 닿지 못했습니다.', true);
-            show('구제', `<div style="text-align:center; font-size:24px; color:#f44336;">🎲 ${r} (+${b} / DC ${v.dc})</div>손이 닿았다. 닿았는데 놓지 않는다.<br><br>끌어내려는 쪽과 끌려가는 쪽의 힘이 비슷하면, 둘 다 안쪽으로 간다.`,
-                darkChoiceBtn('—', 'kroomDie()'));
+            // 놓쳤다 — 손을 뻗은 쪽은 다치고, 끌려가는 쪽은 아직 기다린다 (다른 동료가 손을 뻗을 수 있다)
+            sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 놓쳤습니다.', true);
+            const lost = {};
+            Object.keys(MISS).forEach(function (st) { const d = addStat(st, MISS[st]); if (d) lost[st] = d; });
+            if (kr.stats.hp <= 0) { fall('손을 놓쳤다. 끌려 들어가던 것이 팔을 긁고 갔다.'); return; }
+            show('구제', `<div style="text-align:center; font-size:24px; color:#f44336;">🎲 ${r} (+${b} / DC ${v.dc})</div>손이 닿았다. 닿았는데 놓지 않는다.<br><br>
+                끌어내려는 쪽과 끌려가는 쪽의 힘이 비슷했다. 손이 미끄러졌다.<br>끌려 들어가던 것이 팔을 긁고 갔다.` + lossLine(lost),
+                darkChoiceBtn('계속한다.', 'kroomBack()'));
         }
     });
 };
