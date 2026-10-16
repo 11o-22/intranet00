@@ -439,6 +439,8 @@ let kr = null;
 
 function start(isParty, pid) {
     const u = me();
+    hookItems();
+    const old = (typeof darkRun !== 'undefined') ? darkRun : null;
     darkRun = {
         zone: K_CODE, step: 0, modifier: 0, success: 0, fail: 0,
         carryEquips: (typeof darkRun !== 'undefined' && darkRun && darkRun.carryEquips) || [],
@@ -446,6 +448,10 @@ function start(isParty, pid) {
         lostItems: [], log: [], isParty: !!isParty, partyId: pid || null,
         isLeader: false, counted: true, kroom: true
     };
+    // 일행 출발 때 다른 파일이 얹어 둔 것 — 📺 토크 쇼 부활 · 📱 K·LEE 예약
+    if (old && isParty) ['_show', '_showRevives', '_showOn', '_showHeat', '_showHostDead', 'kleeBooked'].forEach(function (f) {
+        if (old[f] != null) darkRun[f] = old[f];
+    });
     if (!isParty) {
         u.darkDate = getTodayStr();
         u.darkTries = (u.darkTries || 0) + 1;
@@ -455,6 +461,7 @@ function start(isParty, pid) {
     kr = { team: isParty ? pid : ('solo_' + u.code), dun: null, floor: 0, idx: 0, step: 'job',
            exp: 0, dream: 0, items: {}, log: [], started: now(), met: {}, seenJ: {},
            uses: {}, stats: null, wakeNow: 0, pts: 0, flags: {} };
+    try { kv(resetDnaCharge); } catch (e) { }                  // 회피·행운·기믹 횟수 — 쇼핑몰 것은 빼고
     try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { }
     darkAmbienceStart(K_CODE);
     openDarkOverlay();
@@ -590,13 +597,14 @@ function teamCount(attr) { return members().filter(function (c) { return attrOf(
 function roll(kind) {
     const k = prof();
     let b = 0;
-    try { b += rollDarkBonus(kind); } catch (e) { }
+    try { b += kv(rollDarkBonus, null, [kind]) || 0; } catch (e) { }       // 쇼핑몰 것은 빼고 센다
     if (kind && JOBS[kr.job] && JOBS[kr.job][0] === kind) b += 3;
     b += gi(k.grade);
     b += Math.min(3, teamCount('fix'));
     if (kr.stats && kr.stats.mind <= 0) b -= 3;
     if (kr.stats && kr.stats.spirit <= 20) b -= 2;
-    const r = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const r = kv(luckReroll, null, [Math.floor(Math.random() * 20) + 1]);
+    afterDice();
     return { r: r, b: b };
 }
 
@@ -830,14 +838,17 @@ window.kroomNext = function () {
     const head = (kr.idx === 0 ? `<div style="font-size:10px; color:#8fb8c4; margin-bottom:6px;">${esc(D.floors[kr.floor - 1].name)}</div>` : '');
     const tag = it.kind === 'j' ? '<span style="font-size:10px; color:#d4af37;">◇ ' + esc(jobName(kr.job, prof().grade)) + '만의 갈림길</span><br><br>'
               : it.kind === 'boss' ? '<span style="font-size:10px; color:#ff6b6b;">◆ 이 층의 끝</span><br><br>' : '';
-    const vis = visible(it.sc.o);
-    show(it.sc.t, head + tag + it.sc.x,
+    let vis = visible(it.sc.o);
+    const fs = foxSense(vis);                                 // 🐾 감각 분신 — 즉사 기믹 쪽을 가린다
+    if (fs) vis = fs.vis;
+    const skull = jisanOn();                                  // 🧧 즉사 기믹에 ☠
+    show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;
             const cost = o.cost ? Object.keys(o.cost)[0] : null;
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
-            const lab = o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
+            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">☠</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');
             return can ? darkChoiceBtn(lab, 'kroomPick(' + v.i + ')')
                        : `<button class="game-btn" disabled style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; opacity:.4;">${lab}</button>`;
@@ -883,6 +894,9 @@ window.kroomPick = function (i) {
     if (!ok && R.r !== 1 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
         ok = true; gl += gearLine('fix', '— 모자란 ' + (dc - (R.r + R.b)) + '을(를) 메웠다.');
     }
+    // 특수 물건 — 즉사 기믹은 부순다
+    if (!ok && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
+    if (o.doom && jisanOn()) kr.truth = true;               // 🧧 죽을 길을 잡았다
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
     const dice = `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
@@ -909,7 +923,7 @@ window.kroomPick = function (i) {
             gl += gearLine('steady', '— 맞을 자리에 장비를 댔다.');
         }
         hurt(o.lose);
-        try { applyPollutionToUser(me(), 2); } catch (e) { }
+        try { kv(applyPollutionToUser, null, [me(), 2]); } catch (e) { }
         if (kr.stats.hp <= 0) { fall('쓰러졌다.'); return; }
         show(it.sc.t + ' — 결과', dice + gl + (o.ng || '') + lossLine(o.lose), darkChoiceBtn('계속한다.', 'kroomNext()'));
     }
@@ -1167,7 +1181,7 @@ function pubStat() {
         const d = db_(); if (!d || !kr) return;
         const res = JOBS[kr.job] ? JOBS[kr.job][1] : null;
         const v = { n: me().name, job: kr.job, hp: kr.stats.hp, mind: kr.stats.mind, spirit: kr.stats.spirit,
-                    res: res || null, floor: kr.floor, down: !!kr.down, at: now() };
+                    res: res || null, floor: kr.floor, down: !!kr.down, dead: !!kr.dead, at: now() };
         if (res) { v[res] = kr.stats[res]; v['max_' + res] = kr.max[res]; }
         v.max_hp = kr.max.hp; v.max_spirit = kr.max.spirit;
         d.ref('darkParties/' + darkRun.partyId + '/kStat/' + me().code).set(v);
@@ -1270,6 +1284,16 @@ function watchGift() {
 // ==========================================
 function doom(cfg) {
     kr._doomCfg = cfg;
+    // 🐾 아기 여우(연결) — 내게 붙은 분신이 알아서 끌어낸다 (한 번)
+    const bx = foxBond();
+    if (bx) {
+        foxBondSpend(bx);
+        if (kr.down) { kr.down = false; if (kr.stats.hp <= 0) setStat('hp', 20); }
+        pubStat();
+        show(cfg.title || '—', (cfg.text || '') + '<br><br><span style="color:#ffd9a0;">— ' + esc(foxNick(bx)) + '이(가) 옷자락을 물고 끌어냈다.</span>',
+            darkChoiceBtn('일어선다.', 'kroomNext()'));
+        return;
+    }
     const d = db_();
     const alive = darkRun.isParty ? teamStats().filter(function (m) { return m.code !== me().code && !m.down; }).length : 0;
     if (!d || !darkRun.isParty || !alive) {
@@ -1356,16 +1380,22 @@ window.kroomRescue = function (code) {
             show('구제', `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
             return;
         }
-        let b = 0; try { b += rollDarkBonus('bond'); } catch (e) { }
+        let b = 0; try { b += kv(rollDarkBonus, null, ['bond']) || 0; } catch (e) { }
         if (JOBS[kr.job][0] === 'bond') b += 3;
         b += Math.min(3, teamCount('fix'));
-        const r = luckReroll(Math.floor(Math.random() * 20) + 1);
+        const r = kv(luckReroll, null, [Math.floor(Math.random() * 20) + 1]);
+        afterDice();
         let ok = r !== 1 && r + b >= (v.dc || 13);
+        let sure = '';
+        if (!ok) { sure = sureRescue(); if (sure) ok = true; }  // 🩶 은심장(열 번) · 🐾 아기 여우(연결)
+        heartCount();                                         // 구하러 갈 때마다 하나 센다
         if (!ok && gearUse('bond')) ok = true;                // 연결 장비 — 확실한 구조
         if (ok) {
             ref.remove(); kr.exp += 40;
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 끌어냈습니다.', true);
-            show('구제', `<div style="text-align:center; font-size:24px; color:#4CAF50;">🎲 ${r} (+${b} / DC ${v.dc})</div>팔을 잡았다. 끌어냈다. 둘 다 바닥에 넘어졌다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
+            show('구제', `<div style="text-align:center; font-size:24px; color:#4CAF50;">🎲 ${r} (+${b} / DC ${v.dc})</div>`
+                + (sure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(sure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
+                + `팔을 잡았다. 끌어냈다. 둘 다 바닥에 넘어졌다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
         } else {
             ref.remove();
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원에게 닿지 못했습니다.', true);
@@ -1374,6 +1404,382 @@ window.kroomRescue = function (code) {
         }
     });
 };
+
+// ==========================================
+// 7½. 특수 물건 — 우주 쇼핑몰 것은 안 먹고, 상담사가 준 것은 먹는다
+// ==========================================
+//
+// ■ 안 먹는 것 — 우주 쇼핑몰에서 파는 것
+//   작두 · 버터 나이프 · 은반지 · 착한 친구 · 유리손포 · 루비 · 사인참사검 · 다이아 플러그 ·
+//   에메랄드 목줄 · 포승줄 · 공기 누름돌 · 이동장 · 종이배 · 황룡의 눈 · 은화 뱀 · 물약 …
+//   (쇼핑몰 목록 ALIEN_ITEMS_POOL 전부 + 진열에서 빠졌어도 아직 지닌 사람이 있는 것)
+//
+//   물건 효과는 대개 「장착칸에 그 이름이 있나」를 보고 붙는다. 보는 자리가 수십 군데라
+//   하나하나 막지 않는다. **이 던전 안에서 셀 때만** 아래 네 칸에서 쇼핑몰 것을 잠깐 빼고
+//   세고, 센 뒤 바로 되돌린다 (kv).
+//       장착칸 equippedWeapons · 빌린 장비 borrowedGear (황룡의 눈 · 산군의 도움의 힘)
+//       물약 timedEffects · 임시 버프 itemBuffs (버프마다 건 물건 이름 src 가 적혀 있다)
+//   빼고 세는 자리 — 판정 보정 rollDarkBonus · 재굴림 luckReroll · 오염 applyPollutionToUser ·
+//                    행운 gearValue · 회피·행운·기믹 횟수 resetDnaCharge · 기믹 파훼 smashLeft
+//   그 사이에 저장이 불려도 되돌린 다음 저장한다 — 장착칸이 줄어든 채 저장되는 일은 없다.
+//
+// ■ 먹는 것 — 상담사가 주는 것 (어느 상점에도 안 깔린다)
+//   굴림에 붙는 몫(판정 · 회피 · 행운 · 굴림 +)은 위 계산을 그대로 탄다. 원래 어둠에서
+//   죽음 · 구출 · 정산 자리에 붙던 것은 이 던전이 그 자리를 따로 그리므로 여기서 잇는다.
+//     🩶 은심장       열 번 넘게 구했으면 구출 확정 · 구하러 갈 때마다 한 번 센다 /
+//                    서른 번 +5,000P / 쉰 번 즉사 기믹 파훼 / 쓰러지면 파티원 10,000P · 본인 20,000P
+//     🦊 호사수구     꼬리 — 판정 · 회피 · 행운 · 기믹(즉사 기믹 파훼) · 오염 동결 · 격리 탈출
+//     🐾 아기 여우    회피·치유 — 죽음을 한 번 받아 낸다 / 연결 — 끌려갈 때 끌어낸다 · 남을 확정으로 구한다 /
+//                    감각 — 즉사 기믹 쪽을 가린다 / 응시 — 굴림 + / 파괴 — 즉사 기믹 파훼 /
+//                    은신 — 격리를 막는다 / 행운 — 꿈결 1.5~3배
+//     🧧 지산의 복    쓰러질 때 파티원 하나가 대신 간다 (장착자는 걸어 나온다 · 구역 몫 1.5~2.5배) /
+//                    즉사 기믹에 ☠ 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배
+//     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 꿈결 두 배
+//     🔎 감지하는 눈  파티 버프 / 버프 받은 사람과 생사가 엮인다 / 정산 배수
+//     📱 K·LEE       버프 / 예약 문자 — 쓰러져도 끌려가지 않는다
+//     ⛓️‍💥 이레귤러   전용 장비 L / 처음 두 굴림 확정 / 부활 하나 / 사망 판정 / 연속 실패 → 즉사 기믹 파훼
+//   사원 고유 DNA 물건 · 식당 · 전용 장비 · [???] 소모품은 원래대로 먹는다.
+//
+// ■ 즉사 기믹 파훼 — 즉사 기믹 선택지에 실패하면 저절로 쓰인다 (전용 장비 회피보다 먼저)
+// ■ 쓰러질 때 — 이레귤러 부활 → 토크 쇼 부활 → 아기 여우 → 품 안의 것(DNA·은심장·눈의 회피)
+//               → 지산의 복 → K·LEE → 이레귤러 사망 판정 → 그래도 안 되면 쓰러진다
+
+const KEEP = ['🩶 은심장', '🦊 호사수구', '🐾 아기 여우', '🧧 지산의 복 : 대리자',
+              '📺 브라운의 심야 토크 쇼', '🔎 감지하는 눈', '📱 K·LEE'];
+const SHOP_MORE = ['작두', '버터 나이프', '은반지', '유리손포', '착한 친구', '보안팀 의상 세트', '사자탈',
+    '다이아 애널 플러그', '다이아 보지 플러그', '루비 클리 피어싱', '루비 유두 피어싱', '사인참사검', '??? 안경',
+    '에메랄드 목줄', '에메랄드 하네스', '포승줄', '공기 누름돌', '꿈결 수집기', '부적이 깃든 등',
+    '먹물맛 물약', '석류맛 물약', '곶감맛 물약'];
+let shopSet = null;
+const srcMemo = {};
+function shop() {
+    if (shopSet) return shopSet;
+    shopSet = new Set(SHOP_MORE);
+    try { if (typeof ALIEN_ITEMS_POOL !== 'undefined') ALIEN_ITEMS_POOL.forEach(function (n) { shopSet.add(n); }); } catch (e) { }
+    KEEP.forEach(function (n) { shopSet.delete(n); });
+    return shopSet;
+}
+function bname(w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w; } catch (e) { return w; } }
+function shopItem(n) { return !!n && shop().has(n); }
+// 임시 버프를 건 것 — '엽서' · '달빛'(달빛 타투 스티커) · '황룡의 눈에 빼앗김' 처럼 적혀 있다
+function shopSrc(src) {
+    src = String(src || '').replace(/에 빼앗김$/, '');
+    if (!src) return false;
+    if (src in srcMemo) return srcMemo[src];
+    let hit = shop().has(src);
+    if (!hit && src.length >= 2) shop().forEach(function (n) { if (!hit && n.indexOf(src) === 0) hit = true; });
+    return (srcMemo[src] = hit);
+}
+
+const KV_F = ['equippedWeapons', 'borrowedGear', 'timedEffects', 'itemBuffs'];
+function kvOut(f, x) {
+    if (f === 'equippedWeapons') return shopItem(bname(x));
+    if (f === 'borrowedGear') return true;
+    if (f === 'timedEffects') return !!x && shopItem(x.name);
+    if (f === 'itemBuffs') return !!x && shopSrc(x.src);
+    return false;
+}
+let kvHid = null, kvDepth = 0;
+function kvHide(u) {
+    const h = {};
+    KV_F.forEach(function (f) {
+        const a = u[f];
+        if (!Array.isArray(a) || !a.length) return;
+        const out = a.filter(function (x) { return kvOut(f, x); });
+        if (!out.length) return;
+        const view = a.filter(function (x) { return out.indexOf(x) < 0; });
+        h[f] = { orig: a, out: out, view: view, n: view.length };
+        u[f] = view;
+    });
+    return h;
+}
+function kvShow(u, h) {
+    Object.keys(h || {}).forEach(function (f) {
+        const x = h[f], cur = u[f];
+        if (cur === x.view && cur.length === x.n) { u[f] = x.orig; return; }
+        // 세는 사이에 바뀌었다 (다 된 것이 빠지거나 새 버프가 붙음) — 바뀐 것은 살리고 빼 둔 것은 제자리에
+        const c = Array.isArray(cur) ? cur : [];
+        u[f] = x.orig.filter(function (y) { return x.out.indexOf(y) >= 0 || c.indexOf(y) >= 0; })
+            .concat(c.filter(function (y) { return x.orig.indexOf(y) < 0; }));
+    });
+}
+// 쇼핑몰 것을 뺀 눈으로 fn 을 부른다
+function kv(fn, self, args) {
+    const u = me();
+    if (typeof fn !== 'function') return undefined;
+    if (!u || kvDepth) return fn.apply(self, args || []);
+    kvDepth = 1; kvHid = kvHide(u);
+    try { return fn.apply(self, args || []); }
+    finally { const h = kvHid; kvHid = null; kvDepth = 0; kvShow(u, h); }
+}
+function kIn() { return !!(kr && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === K_CODE); }
+function kOn() { return kIn() && !kr.dead && !kr._settled; }
+window.kroomOn = kOn;
+
+// 한 번만 건다 — 던전에 처음 들어설 때 (다른 파일이 다 걸고 난 뒤라 맨 바깥이 된다)
+let itemHooked = false;
+function copyFlags(from, to) { Object.keys(from).forEach(function (k) { try { to[k] = from[k]; } catch (e) { } }); }
+function hookItems() {
+    if (itemHooked) return;
+    itemHooked = true;
+    // 회피·행운·기믹 횟수 — 출발 0.2초 뒤(dna-gifts) · 눈 버프 때 다시 센다. 그때도 쇼핑몰 것은 빼고.
+    try {
+        if (typeof resetDnaCharge === 'function') {
+            const _r = resetDnaCharge;
+            const w = function () { return kIn() ? kv(_r, this, arguments) : _r.apply(this, arguments); };
+            copyFlags(_r, w); w._kroom = true;
+            resetDnaCharge = w;
+        }
+    } catch (e) { console.warn('[K 의 방] resetDnaCharge 못 걸었다', e); }
+    // 원래 어둠의 죽음 — 이 던전 안이면 이쪽 길로 (지산의 복에 걸린 사람 · 그 밖에 darkDeath 를 부르는 것)
+    try {
+        if (typeof darkDeath === 'function') {
+            const _d = darkDeath;
+            const w = function (t) {
+                if (kIn()) { if (!kr.dead && !kr._settled) kroomDie(t); return; }
+                return _d.apply(this, arguments);
+            };
+            copyFlags(_d, w); w._kroom = true;
+            darkDeath = w; window.darkDeath = w;
+        }
+    } catch (e) { console.warn('[K 의 방] darkDeath 못 걸었다', e); }
+    // 세는 사이에 저장이 불리면 — 되돌리고 저장한 다음 다시 뺀다
+    ['saveFields', 'saveSelfFull'].forEach(function (name) {
+        const f = window[name];
+        if (typeof f !== 'function' || f._kv) return;
+        const w = function () {
+            if (!kvHid) return f.apply(this, arguments);
+            const u = me();
+            kvShow(u, kvHid);
+            try { return f.apply(this, arguments); }
+            finally { kvHid = kvHide(u); }
+        };
+        copyFlags(f, w); w._kv = true;
+        window[name] = w;
+    });
+}
+
+// 굴린 뒤 — 이레귤러 ③ 「다음 기믹을 부순다」는 단추 대신 이쪽 몫으로 (단추는 원래 어둠 화면 것이다)
+function afterDice() {
+    if (darkRun && darkRun._irrSmash) { darkRun._irrSmash = 0; kr.irrSmash = (kr.irrSmash || 0) + 1; }
+}
+
+function fox() { return window.KITFOX || null; }
+function foxNick(x) {
+    const K = fox();
+    return (x && x.nick) || ((K && K.BY_K && x && K.BY_K[x.k]) ? K.BY_K[x.k].n + ' 분신' : '분신');
+}
+function foxBond() {                     // 연결 분신 — 확정 구출이 아직 남았나
+    const K = fox(); if (!K) return null;
+    const x = K.usable('bond');
+    if (!x) return null;
+    return (Number(K.st(x.owner, 'bond').r) || 0) < K.BFOX.BOND_SAVE ? x : null;
+}
+function foxBondSpend(x) {
+    const K = fox();
+    K.bump('bond', 'r', 1e9);
+    const s = K.st(x.owner, 'bond');
+    if ((Number(s.j) || 0) >= K.BFOX.BOND_JOIN && (Number(s.r) || 0) >= K.BFOX.BOND_SAVE) {
+        K.kill('bond', '합류 셋과 구출 하나를 다 하고 소멸했습니다.');
+    }
+}
+function jisanOn() { return !!(window.JISANFOX && window.JISANFOX.wears(me())); }
+function showP() { try { return (typeof talkShowOf === 'function') ? talkShowOf() : null; } catch (e) { return null; } }
+function heartSaves() { return Number(me().heartSaves) || 0; }
+function hasHeart() { try { return typeof hasSilverHeart === 'function' && hasSilverHeart(me()); } catch (e) { return false; } }
+
+// 즉사 기믹을 부수는 것 — 있으면 하나 쓰고 무엇이 했는지 돌려준다
+function itemSmash() {
+    const u = me();
+    if (kr.irrSmash > 0) {
+        kr.irrSmash--;
+        return { n: '⛓️‍💥 이레귤러', t: '사슬이 끊어지는 소리가 앞에서 났다. 막고 있던 것이 통째로 접힌다.' };
+    }
+    if (typeof dnaCharge !== 'undefined' && dnaCharge && dnaCharge.gim > 0) {           // 고유 DNA · 은심장(쉰 번)
+        dnaCharge.gim--;
+        return { n: hasHeart() && heartSaves() >= 50 ? '🩶 은심장' : '품 안의 것', t: '품 안의 것이 먼저 반응했다. 막고 있던 것이 금이 가 무너진다.' };
+    }
+    try {
+        if (typeof smashLeft === 'function' && kv(smashLeft) > 0) {                       // 고유 DNA · 호사수구 꼬리 (하루 몫)
+            const day = getTodayStr();
+            if (u.smashDate !== day) { u.smashDate = day; u.smashUsed = 0; }
+            u.smashUsed = (u.smashUsed || 0) + 1;
+            try { saveFields({ smashDate: 1, smashUsed: 1 }); } catch (e) { }
+            const tail = (typeof window._foxSum === 'function' && window._foxSum(u, 'gim') > 0);
+            return { n: tail ? '🦊 호사수구' : '품 안의 것', t: '꼬리 하나가 앞을 쓸고 지나갔다. 막고 있던 것이 없다.' };
+        }
+    } catch (e) { }
+    const K = fox();
+    const x = K && K.usable('break');
+    if (x) {
+        K.bump('break', 'n', K.BFOX.BREAK_MAX, '세 번을 다 부수고 소멸했습니다.');
+        return { n: '🐾 ' + foxNick(x), t: '작은 것이 먼저 뛰어들어 그것을 부쉈다.' };
+    }
+    return null;
+}
+function itemLine(g) {
+    return `<div style="font-size:11px; color:#ffd9a0; margin:0 0 8px 0; padding:7px 9px; border:1px solid #6a4c2a; border-radius:5px; background:rgba(147,106,46,.12);">
+        ${esc(g.n)} — <b>즉사 기믹 파훼</b> <span style="color:#bbb;">${g.t}</span></div>`;
+}
+
+// 남을 구할 때 — 확정이 있나 (은심장 열 번 · 아기 여우 연결)
+function sureRescue() {
+    if (hasHeart() && heartSaves() >= 10) return '🩶 은심장';
+    const x = foxBond();
+    if (x) { foxBondSpend(x); return '🐾 ' + foxNick(x); }
+    return '';
+}
+function heartCount() {                  // 구하러 갈 때마다 하나 (원래 어둠과 같다)
+    const u = me();
+    u.heartSaves = (Number(u.heartSaves) || 0) + 1;
+    try { saveFields({ heartSaves: 1 }); } catch (e) { }
+}
+
+// 감각 분신 — 즉사 기믹 쪽을 가린다 (안 가린 길이 하나라도 남을 때만)
+function foxSense(vis) {
+    const K = fox();
+    const x = K && K.usable('sense');
+    if (!x) return null;
+    const safe = vis.filter(function (v) { return !v.o.doom; });
+    if (!safe.length || safe.length === vis.length) return null;
+    return { vis: safe, line: '— ' + esc(foxNick(x)) + '이(가) 한쪽을 보고 있다. 다른 길은 보이지 않는다.' };
+}
+
+// 쓰러지는 순간 — 마지막으로 붙잡는 것들. 붙잡았으면 참.
+function standUp(why, line, color) {
+    kr.down = false;
+    if (kr.stats.hp <= 0) setStat('hp', Math.max(20, Math.round(kr.max.hp * 0.3)));
+    darkRun.fail = Math.max(0, (darkRun.fail || 0) - 1);
+    pubStat();
+    show('—', why + `<br><br><span style="color:${color || '#c9a8ff'};">${line}</span>`, darkChoiceBtn('숨을 고른다.', 'kroomNext()'));
+    return true;
+}
+function lastChance(why) {
+    const u = me(), r = darkRun;
+    const IR = window.IRR_K;
+    // ⛓️‍💥 이레귤러 ① — 얻어 둔 부활
+    if (r._irrRevive && IR && IR.on()) {
+        r._irrRevive = 0;
+        kv(applyPollutionToUser, null, [u, 6]);
+        try { stripNoteByItem(u, IR.reviveNote); } catch (e) { }
+        addHistoryLog(u, '[' + IR.MARK + '] 부활 — 『 K 의 방 』 에서 한 번 더 일어섰습니다.');
+        try { saveFields({ history: 1, badge: 1 }); } catch (e) { }
+        return standUp(why, '— 끊어진 자리가 다시 이어진다.<br>원래 이렇게 되는 것이 아니라는 걸 안다. 알면서도 일어선다.');
+    }
+    // 📺 토크 쇼 — 쓰러질 때마다 무대가 달아오르고, 두 번은 일어선다
+    const p = showP();
+    if (p) {
+        try { talkShowBumpHeat(p, talkShowIsHost(p)); } catch (e) { }
+        r._showHeat = Math.max(Number(r._showHeat || 0), Number(p.heat || 0)) + 1;
+        try { if (talkShowIsHost(p)) r._showHostDead = true; } catch (e) { }
+        if (r._showRevives == null) { r._show = true; r._showRevives = (typeof TALK_SHOW_REVIVES !== 'undefined') ? TALK_SHOW_REVIVES : 2; }
+        if (r._showRevives > 0) {
+            r._showRevives--;
+            try { talkShowSnap(); } catch (e) { }
+            return standUp(why, '— 박수 소리가 난다. 어디서 나는지는 모른다.<br>조명이 다시 이쪽을 비춘다. 아직 방송 중이다. (남은 부활 ' + r._showRevives + ')', '#ffcc80');
+        }
+    }
+    // 🐾 아기 여우 — 회피 · 치유 분신
+    const K = fox();
+    if (K) {
+        const ev = K.usable('evade');
+        if (ev) {
+            K.kill('evade', '죽음을 대신 받았습니다.');
+            return standUp(why, '— 작은 것이 앞으로 나섰다.<br>' + esc(foxNick(ev)) + '이(가) 당신 대신 그것을 받았다.<br>털 한 줌이 남고, 그마저 곧 보이지 않는다.', '#ffd9a0');
+        }
+        const he = K.usable('heal');
+        if (he) {
+            K.kill('heal', '한 번 살리고 소멸했습니다.');
+            return standUp(why, '[ 치유의 기운이 깃듭니다. ]<br>' + esc(foxNick(he)) + '이(가) 당신에게 이마를 대었다.<br>숨이 돌아온다. 그 자리에 아무것도 남지 않았다.', '#9fe6b0');
+        }
+    }
+    // 품 안의 것 — 고유 DNA · 은심장 · 눈의 「회피」 횟수
+    if (typeof dnaCharge !== 'undefined' && dnaCharge && ((dnaCharge.death || 0) > 0 || (dnaCharge.eva || 0) > 0)) {
+        if (dnaCharge.death > 0) dnaCharge.death--; else dnaCharge.eva--;
+        kv(applyPollutionToUser, null, [u, 4]);
+        return standUp(why, '— 품 안의 것이 먼저 반응했다.<br>빛이 한 번 일렁이고, 그것으로 끝이었다.', '#8fd4ff');
+    }
+    // 🧧 지산의 복 ① — 파티원 하나가 대신 간다
+    if (jisanOn() && !r._jisanUsed && r.isParty) {
+        const mates = teamStats().filter(function (m) { return m.code !== u.code && !m.down && !m.dead; });
+        if (mates.length) { r._jisanUsed = true; jisanAsk(mates, why); return true; }
+    }
+    // 📱 K·LEE ④ — 예약 문자를 보내 두었으면 끌려가지 않는다
+    if (typeof window.kleeKroom === 'function') {
+        const o = window.kleeKroom();
+        if (o) {
+            return outNow(why + `<br><br><span style="color:#7fb6dd;">— 화면이 꺼지기 직전에 예약해 둔 문자가 나갔다. (받는 사람 ${o.n}명)</span>
+                <div style="font-size:11px; color:#aaa; margin-top:8px;">오염도 ${o.was}% → 50% · +${o.got} P · 상담실로 끌려가지 않는다.</div>`);
+        }
+    }
+    // ⛓️‍💥 이레귤러 ② — 사망 판정 (한 탐사에 한 번)
+    if (IR && IR.on() && !r._irrDeathRolled) {
+        r._irrDeathRolled = 1;
+        const d = Math.floor(Math.random() * 20) + 1;
+        r.log.push('[' + IR.MARK + '] 사망 판정 ' + d + ' / ' + IR.DEATH_AT);
+        if (d >= IR.DEATH_AT) {
+            const was = Number(u.points) || 0;
+            const got = Math.max(0, Math.min(IR.cap(), was * IR.OUT_MULT));
+            u.points = got; u.pollution = IR.OUT_POLL;
+            u.quarantineUntil = 0; u.quarantineExitPollution = 0; u.quarantineHospital = false; u.quarantineDest = null;
+            u.foxRoomAnswered = true;
+            addHistoryLog(u, '[' + IR.MARK + '] 사망 판정 ' + d + ' — 『 K 의 방 』 에서 끌려가지 않았습니다. (오염도 ' + IR.OUT_POLL + '% · 포인트 '
+                + was.toLocaleString() + ' → ' + got.toLocaleString() + ' P)');
+            try { saveSelfFull(); } catch (e) { }
+            return outNow(why + `<br><br><span style="color:#c9a8ff;">— 여기서 끝나는 것이 규칙인데, 규칙 쪽이 먼저 접힌다.<br>문이 열리는 소리도 없이 밖이다.<br><br>주머니가 무겁다. 들어갈 때보다 두 배로.</span>
+                <div style="font-size:11px; color:#aaa; margin-top:8px;">사망 판정 ${d} / ${IR.DEATH_AT} · 오염도 ${IR.OUT_POLL}% · 포인트 ${was.toLocaleString()} → ${got.toLocaleString()} P</div>`);
+        }
+        toast(IR.MARK + ' 사망 판정 ' + d + ' — 모자랐다');
+    }
+    return false;
+}
+
+// 지산의 복 ① — 대신 갈 사람을 그 자리에서 고른다 (닫는 단추는 없다)
+function jisanAsk(mates, why) {
+    kr._jisanWhy = why;
+    show('[ 오셨구나, 지산의 복! ]', why + `<br><br>통이 흔들린다. 당신이 갈 자리다.<br><b style="color:#ffcf8f;">대신 갈 사람을 고른다.</b><br>
+        <span style="font-size:11px; color:#888;">고른 사람은 제가 지목된 줄 모른다.</span>`,
+        mates.map(function (m) { return darkChoiceBtn(esc(m.n) + ' 사원', "kroomJisan('" + m.code + "')"); }).join(''));
+}
+window.kroomJisan = function (code) {
+    if (!kr || kr.dead || kr._settled || !kr._jisanWhy) return;
+    const u = me(), d = db_(), J = window.JISANFOX;
+    const why = kr._jisanWhy; kr._jisanWhy = null;
+    try { if (d && darkRun.partyId) d.ref('darkParties/' + darkRun.partyId + '/jisan/' + code).set({ by: u.code, byName: u.name, at: now(), zone: K_CODE }); } catch (e) { }
+    const g = J ? J.zonePay(K_CODE) : { pay: 0, k: 1 };
+    try { changePoints(g.pay); } catch (e) { u.points = (u.points || 0) + g.pay; }
+    const nm = (teamStats().filter(function (m) { return m.code === code; })[0] || {}).n || code;
+    addHistoryLog(u, '[🧧 지산의 복 : 대리자] ' + nm + ' 사원이 대신 갔습니다 (+' + g.pay.toLocaleString() + ' P)');
+    try { sendPartyChat('통이 흔들렸습니다. 무언가가 굴러 나왔습니다.', true); } catch (e) { }
+    try { if (typeof jisanBand === 'function') jisanBand(); } catch (e) { }
+    outNow(why + `<br><br><span style="color:#ffd9a0;">— ${esc(nm)} 사원이 대신 갔다. 당신은 그대로 걸어 나온다.</span>
+        <div style="font-size:11px; color:#aaa; margin-top:8px;">+${g.pay.toLocaleString()} P (${g.k.toFixed(2)}배)</div>`);
+};
+
+// 쓰러지지 않고 빠져나왔다 — 경험치 · 꿈결은 절반, 반입품 · 포인트는 그대로
+function outNow(text) {
+    kr.dead = true;
+    statDead();
+    settle('out', text);
+    return true;
+}
+window.kroomOut = function (kind, text) {           // 감지하는 눈 — 장착자가 쓰러져 같이 감겼다
+    if (!kr || kr.dead || kr._settled) return;
+    if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; }
+    dropDoom();
+    outNow(text || '');
+};
+function statDead() {
+    const d = db_();
+    if (d && darkRun && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/kStat/' + me().code + '/dead').set(true); } catch (e) { } }
+}
+function dropDoom() {
+    const d = db_();
+    if (!d || !darkRun || !darkRun.isParty) return;
+    const ref = d.ref('darkParties/' + darkRun.partyId + '/kDoom/' + me().code);
+    if (kr && kr._doomCb) { try { ref.off('value', kr._doomCb); } catch (e) { } kr._doomCb = null; }   // 내가 지우는 것을 「구해졌다」로 읽지 않게
+    try { ref.remove(); } catch (e) { }
+}
 
 // ==========================================
 // 8. 끝 — 귀환 · 쓰러짐 · 정산
@@ -1386,15 +1792,23 @@ function clear() {
     kr.dream += dreamRoll();                                   // 돌파 — 한 번 더 얻는다
     settle('clear', D.outro);
 }
-window.kroomDie = function () {
-    if (!kr || kr.dead) return;
-    if (kr._doomT) clearInterval(kr._doomT);
+window.kroomDie = function (text) {
+    if (!kr || kr.dead || kr._settled) return;
+    if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; }
+    dropDoom();
+    const why = (typeof text === 'string' && text) || (kr._doomCfg && kr._doomCfg.dieText) || '거기서 끝났다.';
+    let held = false;
+    try { held = lastChance(why); } catch (e) { console.warn('[K 의 방] 특수 물건 건너뜀', e); }
+    if (held) return;
+    hardDeath(why);
+};
+function hardDeath(why) {
     const d = db_();
-    if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/kDoom/' + me().code).remove(); } catch (e) { } }
     kr.dead = true;
+    statDead();
     const u = me();
-    // 행운(전용 장비) — 일부를 지킨다
-    const luckRate = (typeof gearValue === 'function') ? gearValue(u, 'luck') : 0;
+    // 행운(전용 장비 · 호사수구 꼬리) — 일부를 지킨다
+    const luckRate = (typeof gearValue === 'function') ? (kv(gearValue, null, [u, 'luck']) || 0) : 0;
     const saved = luckRate > 0 && Math.random() < luckRate;
     let lost = 0;
     if (saved) { const kept = Math.floor(u.points * (0.30 + Math.random() * 0.15)); lost = u.points - kept; u.points = kept; }
@@ -1412,16 +1826,29 @@ window.kroomDie = function () {
     addHistoryLog(u, '[' + K_CODE + '] 쓰러짐. 포인트 ' + lost.toLocaleString() + ' P 소실' + (items.length ? ' · 반입품 ' + items.join(', ') + ' 소실' : ''));
     try { saveSelfFull(); } catch (e) { }
     if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
-    settle('dead', (kr._doomCfg && kr._doomCfg.dieText) || '거기서 끝났다.');
-};
+    darkRun._dead = true;
+    try { if (typeof window.heartPayParty === 'function') window.heartPayParty(); } catch (e) { }   // 🩶 은심장
+    try { if (window.eyeKroom) window.eyeKroom.dead(); } catch (e) { }                            // 🔎 감지하는 눈
+    settle('dead', why);
+}
 
 function settle(how, txt) {
     if (!kr || kr._settled) return;
     kr._settled = true;
+    if (darkRun) darkRun._settled = true;
     const u = me(), k = prof(u);
+    const alive = (how === 'clear' || how === 'leave');
     let exp = kr.exp, dream = kr.dream;
-    if (how === 'leave') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
+    if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = Math.floor(dream * 0.35); }
+    const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
+    // 꿈결 — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)
+    if (alive && dream > 0) {
+        const K = fox(), lx = K && K.usable('luck');
+        if (lx) { const m = K.lootRoll(); dream = Math.round(dream * m); extra.push('🐾 ' + esc(foxNick(lx)) + ' — 꿈결 ×' + m.toFixed(2)); }
+        const p = showP();
+        if (p && p.talkShow && (p.alive || {})[p.talkShow.by]) { dream *= 2; extra.push('📺 사회자와 끝까지 — 꿈결 ×2'); }
+    }
     // 레벨
     const lv0 = k.lv;
     k.exp = (k.exp || 0) + exp;
@@ -1435,27 +1862,39 @@ function settle(how, txt) {
     if (how === 'clear') pts = rnd(1500, 4000) * ({ D: 1, C: 1.5, B: 2.2, A: 3, S: 4 }[g] || 1);
     if (how === 'leave') pts = rnd(400, 1200);
     pts = Math.round(pts);
+    if (alive) {
+        if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
+        if (kr.truth && jisanOn()) { pts *= 3; extra.push('🧧 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
+        const p = showP();
+        if (p) { let m = 1; try { m = talkShowMult(p); } catch (e) { } if (m > 1) { pts = Math.round(pts * m); extra.push('📺 무대 열기 — 포인트 ×' + m.toFixed(2)); } }
+        if (window.eyeKroom) { let m = 1; try { m = window.eyeKroom.mult(); } catch (e) { } if (m !== 1) { pts = Math.round(pts * m); extra.push('🔎 눈의 몫 — 포인트 ×' + m); } }
+    }
     if (pts) { try { changePoints(pts); } catch (e) { } }
+    if (pts > 0 && window.eyeKroom) { try { window.eyeKroom.rec(pts); } catch (e) { } }
+    // 이번 탐사 한 번짜리 버프 — 여기서 쓴 것만 걷는다 (쇼핑몰 물건이 건 것은 여기서 안 먹었으니 다음 어둠까지 남긴다)
+    try { if (Array.isArray(u.itemBuffs)) u.itemBuffs = u.itemBuffs.filter(function (b) { return !b || !b.run || shopSrc(b.src); }); } catch (e) { }
+    const HOW = { clear: '돌파', leave: '귀환', dead: '쓰러짐', out: '빠져나옴' };
     addHistoryLog(u, '[' + K_CODE + '] ' + (kr.dun ? DUNS[kr.dun].n : '') + ' — '
-        + ({ clear: '돌파', leave: '귀환', dead: '쓰러짐' }[how]) + ' · 경험치 +' + exp + ' · 꿈결 +' + dream + (pts ? ' · +' + pts.toLocaleString() + ' P' : ''));
-    try { bankAddScore(how === 'dead' ? -5 : (how === 'clear' ? 12 : 4)); } catch (e) { }
+        + HOW[how] + ' · 경험치 +' + exp + ' · 꿈결 +' + dream + (pts ? ' · +' + pts.toLocaleString() + ' P' : ''));
+    try { bankAddScore(how === 'dead' ? -5 : (how === 'clear' ? 12 : (how === 'out' ? 2 : 4))); } catch (e) { }
     if (!u.darkLogs) u.darkLogs = [];
     u.darkLogs.unshift({ date: new Date().toLocaleString(), zone: K_CODE, zoneName: '『 K 의 방 』 ' + (kr.dun ? DUNS[kr.dun].n : ''),
         reward: pts, success: darkRun.success, fail: darkRun.fail, loot: [], lost: [], detail: darkRun.log.slice(-20),
         died: how === 'dead', party: !!darkRun.isParty });
     if (u.darkLogs.length > 15) u.darkLogs.pop();
-    try { saveFields({ kroom: 1, history: 1, darkLogs: 1, points: 1 }); } catch (e) { }
+    try { saveFields({ kroom: 1, history: 1, darkLogs: 1, points: 1, itemBuffs: 1 }); } catch (e) { }
     try { paintDream(); } catch (e) { }
     const up = k.lv - lv0;
-    darkBodyEl().innerHTML = darkBox(how === 'dead' ? '종료' : (how === 'clear' ? '돌파' : '귀환'),
-        (txt ? txt + '<br><br>' : '') + (how === 'clear' ? '' : ''),
+    darkBodyEl().innerHTML = darkBox({ dead: '종료', clear: '돌파', out: '탈출' }[how] || '귀환',
+        (txt ? txt + '<br><br>' : ''),
         `<div style="background:rgba(0,0,0,0.35); border:1px solid #23343b; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
             <div style="font-weight:bold; color:#7fd3e6; margin-bottom:8px; border-bottom:1px dashed #2f4a55; padding-bottom:6px;">[정산]</div>
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
             ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ')</span>' : '') + '<br>' : ''}
-            경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'leave' ? '절반' : '35%') + ')</span>' : ''}<br>
+            경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
+            ${extra.length ? '<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #4a3a6a; color:#d4bbff; font-size:11px;">' + extra.join('<br>') + '</div>' : ''}
             ${how === 'dead' ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7f0000; color:#f44336;">
                 보유 포인트 <b>-${(kr.lostPts || 0).toLocaleString()} P</b><br>
                 ${(kr.lostItems || []).length ? '반입품 <b>' + kr.lostItems.map(esc).join(', ') + '</b> 소실<br>' : ''}
@@ -1544,7 +1983,8 @@ window.kroomGive = function (who, field, val) {
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
-window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, state: function () { return kr; } };
+window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+    kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
 console.log('[K 의 방] ' + K_CODE + ' — 직업 ' + Object.keys(JOBS).length + ' · 던전 ' + Object.keys(DUNS).length + ' (준비 ' + Object.keys(DUNS).filter(function (d) { return DUNS[d].ready; }).length + ') — kroomState()');
 

@@ -1026,6 +1026,48 @@ function bookedOf(u, r) {
 
 function kleeEscape(text, booked) {
     const u = me(), r = run();
+    const o = escapeData(booked);
+    const was = o.was, got = o.got;
+
+    ring();
+    try {
+        darkBodyEl().innerHTML = darkBox('끊김', text || '여기까지였다.',
+            '<div style="background:rgba(47,111,159,0.12); border:1px solid #2f6f9f; border-radius:8px;'
+            + ' padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">'
+            + '<div style="font-weight:bold; color:#7fb6dd; margin-bottom:8px; border-bottom:1px dashed #2f6f9f;'
+            + ' padding-bottom:6px;">[예약 전송 완료]</div>'
+            + '화면이 꺼지기 직전에 예약해 둔 문자가 나갔다.<br>'
+            + '<span style="color:#aaa; font-size:10px;">받는 사람 ' + booked.length + '명 — 누가 받았는지는 적혀 있지 않다.</span><br><br>'
+            + '오염도 <b style="color:#ff9800;">' + was + '% → 50%</b> '
+            + '<span style="font-size:10px; color:#888;">(동결 무시)</span><br>'
+            + '포인트 <b style="color:#ffd700;">+' + got + ' P</b> '
+            + '<span style="font-size:10px; color:#888;">(걸어간 몫)</span><br>'
+            + '<span style="color:#aaa;">상담실로 끌려가지 않습니다.</span>'
+            + '</div>'
+            + darkChoiceBtn('전화를 끊는다.', 'finishDarkDeath()'));
+    } catch (e) { }
+    try { if (typeof darkAmbienceStop === 'function') darkAmbienceStop(); } catch (e) { }
+    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+    try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
+}
+
+// 『 K 의 방 』 은 화면을 스스로 그린다 — 예약 문자 · 오염 · 포인트만 하고 알려 준다
+// (kroom-core.js 가 쓰러질 때 부른다. 예약이 없으면 null)
+window.kleeKroom = function () {
+    const u = me(), r = run();
+    if (!u || !r || r._dead) return null;
+    let booked = [];
+    try { booked = bookedOf(u, r); } catch (e) { }
+    if (!booked.length) return null;
+    const o = escapeData(booked);
+    o.n = booked.length;
+    ring();
+    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+    return o;
+};
+
+function escapeData(booked) {
+    const u = me(), r = run();
     r._dead = true;
     r.kleeOut = true;
 
@@ -1065,27 +1107,7 @@ function kleeEscape(text, booked) {
             if (typeof sendPartyChat === 'function') sendPartyChat(u.name + ' 사원의 전화기가 꺼졌습니다.', true);
         }
     } catch (e) { }
-
-    ring();
-    try {
-        darkBodyEl().innerHTML = darkBox('끊김', text || '여기까지였다.',
-            '<div style="background:rgba(47,111,159,0.12); border:1px solid #2f6f9f; border-radius:8px;'
-            + ' padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">'
-            + '<div style="font-weight:bold; color:#7fb6dd; margin-bottom:8px; border-bottom:1px dashed #2f6f9f;'
-            + ' padding-bottom:6px;">[예약 전송 완료]</div>'
-            + '화면이 꺼지기 직전에 예약해 둔 문자가 나갔다.<br>'
-            + '<span style="color:#aaa; font-size:10px;">받는 사람 ' + booked.length + '명 — 누가 받았는지는 적혀 있지 않다.</span><br><br>'
-            + '오염도 <b style="color:#ff9800;">' + was + '% → 50%</b> '
-            + '<span style="font-size:10px; color:#888;">(동결 무시)</span><br>'
-            + '포인트 <b style="color:#ffd700;">+' + got + ' P</b> '
-            + '<span style="font-size:10px; color:#888;">(걸어간 몫)</span><br>'
-            + '<span style="color:#aaa;">상담실로 끌려가지 않습니다.</span>'
-            + '</div>'
-            + darkChoiceBtn('전화를 끊는다.', 'finishDarkDeath()'));
-    } catch (e) { }
-    try { if (typeof darkAmbienceStop === 'function') darkAmbienceStop(); } catch (e) { }
-    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
-    try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
+    return { was: was, got: got };
 }
 
 // 받는 쪽 — 문자와 버프

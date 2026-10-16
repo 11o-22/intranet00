@@ -261,6 +261,9 @@ function payParty() {
     console.log('[은심장] 파티원 ' + n + '명에게 ' + PAY + ' P');
 }
 
+// 『 K 의 방 』 은 darkDeath 를 거치지 않고 제 길로 쓰러진다 — 거기서 부른다
+window.heartPayParty = function () { if (currentUser && hasHeart(currentUser)) payParty(); };
+
 (function hookDeath() {
     const iv = setInterval(function () {
         if (typeof darkDeath !== 'function') return;

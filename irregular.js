@@ -534,6 +534,14 @@ window.irrReset = function (who) {
     console.log('%c✓ ' + u.name + ' 사원의 카피 횟수를 되돌렸습니다.', 'color:#4CAF50');
 };
 
+// 『 K 의 방 』 은 darkDeath 를 거치지 않는다 — ①의 부활 · ②의 사망 판정을 그쪽이 쓴다
+window.IRR_K = {
+    on: function () { return irr(); },
+    MARK: MARK, DEATH_AT: DEATH_AT, OUT_POLL: OUT_POLL, OUT_MULT: OUT_MULT,
+    cap: cap,
+    reviveNote: MARK + ' 부활 하나 (이번 탐사)'
+};
+
 console.log('[이레귤러] irrState() · irrReset(사번)');
 
 })();

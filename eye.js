@@ -116,6 +116,12 @@ function wears(user) {
     });
 }
 window.wearsEye = wears;
+// 『 K 의 방 』 은 darkDeath · renderDarkResult 를 거치지 않는다 — 그쪽에서 부른다
+window.eyeKroom = {
+    dead: function () { markDead(); owedPay(); },     // 내가 쓰러졌다
+    mult: function () { return settleMult(); },        // 정산 배수
+    rec: function (n) { if (wears(u_())) rec(n); }     // 능력 6 — 오늘 번 것
+};
 
 // ==========================================
 // 등록 — 어느 상점에도 안 깔리고 장터에도 안 뜬다
@@ -460,6 +466,13 @@ function fallen() {
             if (!a) return; a.dead = a.dead || {}; a.dead[me.code] = true; return a;
         });
     } catch (e) { }
+
+    // 『 K 의 방 』 — 화면은 그쪽이 그린다 (몫과 표시는 위에서 다 했다)
+    if (typeof window.kroomOn === 'function' && window.kroomOn() && typeof window.kroomOut === 'function') {
+        window.kroomOut('eye', '눈을 가진 사람이 감겼다.<br><br>그 순간 네 것도 같이 감긴다. 보고 있던 것이 무엇이었는지<br>이제 와서 알 것 같다.<br><br>'
+            + '<span style="color:#4fc3f7;">거기까지는 갔으니 ' + EYE.DEAD_PAY.toLocaleString() + ' P 는 들어온다.</span>');
+        return;
+    }
 
     try {
         const b = body_();
