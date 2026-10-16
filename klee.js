@@ -112,11 +112,24 @@ function find(who) {
 // ==========================================
 // 하루 횟수
 // ==========================================
+//
+// ★ 날짜는 횟수 주머니 **안에** 적는다 (kleeUse.day).
+//
+//   전에는 날짜(kleeDay)와 횟수(kleeUse)를 따로 두고, 날이 바뀌면 kleeUse 를
+//   빈 객체 {} 로 비웠다. 그런데 파이어베이스에는 빈 객체가 없어서 저장할 때
+//   {} 는 빠지고(empty-null.js) **날짜만 오늘로 바뀌어** 올라간다. 서버에는
+//   「오늘 날짜 + 어제 쓴 횟수」가 남고, 서버 쪽이 한 번 바뀌어 내려오거나
+//   다시 들어오면 그것을 받아 ⑤ 가 안 쓰고도 「오늘 0 / 2회」로 막혔다.
+//   (③ ④ 도 같았다.) 날짜를 안에 두면 주머니가 비는 일이 없고, 어제 것은
+//   날짜가 달라 바로 알아본다.
 function uses(u) {
     u = u || me();
     if (!u) return {};
-    if (u.kleeDay !== today()) { u.kleeDay = today(); u.kleeUse = {}; }
-    if (!u.kleeUse) u.kleeUse = {};
+    const d = today();
+    if (!u.kleeUse || typeof u.kleeUse !== 'object' || u.kleeUse.day !== d) {
+        u.kleeUse = { day: d };
+        u.kleeDay = d;
+    }
     return u.kleeUse;
 }
 function left(u, k) {
