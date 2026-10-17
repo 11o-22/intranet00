@@ -187,8 +187,8 @@ const DUNS = {
     B2: { g: 'B', n: '『폐쇄 병동 7층』', ready: true },
     B3: { g: 'B', n: '『멈추지 않는 야간열차』', ready: true },
     // A — 호러
-    A1: { g: 'A', n: '『어린이 방송국』', ready: false },
-    A2: { g: 'A', n: '『물에 잠긴 기숙학교』', ready: false },
+    A1: { g: 'A', n: '『어린이 방송국』', ready: true },
+    A2: { g: 'A', n: '『물에 잠긴 기숙학교』', ready: true },
     // S — 에일리언 · 공룡
     S1: { g: 'S', n: '『표본실 — 착륙 이후』', ready: false },
     S2: { g: 'S', n: '『백악기 정원』', ready: false }
