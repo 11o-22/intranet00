@@ -9,8 +9,10 @@
 //   · 처음 들어오면 **직업**을 고른다 — 전용 장비 첫 속성의 다섯 직업이
 //     뒤집힌 카드로 깔린다. 하나를 넘기면 그 한 장만 보이고, 정하거나
 //     다시 고른다(다시는 딱 한 번).
-//   · 한 팀(1~5명)이 들어가면 **팀 평균 Lv**로 던전 등급이 정해진다.
+//   · 한 팀(1~5명)이 들어가면 **팀 평균 Lv**과 **직업 등급**으로 던전 등급이 정해진다.
 //       D 전체 · C Lv20+ · B 50+ · A 70+ · S 90+   (팀원끼리 Lv 차이가 20 넘으면 한 단계 낮게)
+//       그리고 그 등급으로 각성한 사람이 팀의 절반 이상이어야 한다 (혼자면 나 자신).
+//       각성은 **지금 등급의 던전**에서 한다 — D 던전에서 C 를 만들어야 C 던전이 열린다.
 //   · 다른 어둠은 한 팀이 들어가면 막히지만, 여기는 **네 팀**까지 동시에 든다.
 //     같은 던전에 든 팀끼리는 같은 층에서 **만난다**.
 //   · 스탯 — 체력 · 심력 · 정신력(모두) + 마력/무력/내공(직업 계열에 따라 하나 또는 없음).
@@ -48,7 +50,7 @@ const K_VER = '1';                    // 내용 파일을 새로 받게 하려�
 const ADMIN = 'kario0987';
 const GRADES = ['D', 'C', 'B', 'A', 'S'];
 const GATE = { D: 1, C: 20, B: 50, A: 70, S: 90 };
-const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음으로 가는 데 드는 각성 점수 (다음 등급 던전의 갈림길에서만 쌓인다)
+const WAKE_NEED = { D: 3, C: 4, B: 5, A: 6 };       // 그 등급에서 다음으로 가는 데 드는 각성 점수 (제 등급 이상 던전의 갈림길에서 쌓인다)
 const MAX_TEAMS = 4;
 // ★ 꿈결 — 한 번 얻을 때 던전 등급마다 이만큼 (단위 D)
 const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150] };
@@ -445,7 +447,7 @@ function paintEntry() {
             <div style="font-family:monospace; font-size:11px; color:#7fd3e6; font-weight:bold;">${K_CODE}</div>
             <div style="font-size:15px; color:#fff; font-weight:bold; margin:4px 0;">『 K 의 방 』</div>
             <div style="font-size:10px; color:#999; line-height:1.6;">${DARK_ZONES[K_CODE].brief}</div>
-            <div style="font-size:10px; color:#777; margin-top:6px;">1~5인 · 네 팀까지 동시 진입 (지금 ${live}팀) · 던전 등급은 팀 평균 Lv 로 정해짐</div>
+            <div style="font-size:10px; color:#777; margin-top:6px;">1~5인 · 네 팀까지 동시 진입 (지금 ${live}팀) · 던전 등급은 팀 평균 Lv 과 직업 등급으로 정해짐</div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:7px;">
                 Lv <b>${k.lv}</b> · ${k.job ? esc(jobName(k.job, k.grade)) + ' <span style="color:#7fd3e6;">' + k.grade + '</span>' : '<span style="color:#888;">직업 없음 — 처음 들어가면 고른다</span>'}
                 · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
@@ -749,7 +751,7 @@ window.kroomCardOk = function () {
 };
 
 // ==========================================
-// 2. 던전 정하기 — 팀 평균 Lv
+// 2. 던전 정하기 — 팀 평균 Lv · 직업 등급
 // ==========================================
 function afterJob() {
     const k = prof();
@@ -791,18 +793,30 @@ function gearLine(a, extra) {
         ${ATTR[a].i} 전용 장비 — <b>${GEAR_K[a].n}</b> ${extra || ''} <span style="color:#888;">(남은 ${x.left} / ${x.n})</span></div>`;
 }
 
+// 직업 등급 — 아직 처음으로 안 돌아간 기록(stale)은 D 로 본다
+function gradeOf(u) { const k = u && u.kroom; return (k && !stale(k) && GRADES.indexOf(k.grade) >= 0) ? k.grade : 'D'; }
+
 // avoid — 바로 전에 들어갔던 던전. 그 등급에 다른 던전이 있으면 그것은 빼고 고른다.
+//
+// ★ 등급 문은 둘이다 (2026-10-17 정함)
+//     ① 팀 평균 Lv 이 GATE 이상          (C 20 · B 50 · A 70 · S 90)
+//     ② 그 등급으로 각성한 사람이 **절반 이상**   (혼자면 내가 그 등급이어야)
+//   각성은 제 등급 던전에서 하므로, D 던전에서 C 를 만들어야 C 던전이 열린다.
 function decide(codes, avoid) {
-    const lvs = codes.map(function (c) {
-        const u = (c === me().code) ? me() : ((typeof db !== 'undefined' && db.users) ? db.users[c] : null);
-        return lvOf(u);
+    const users = codes.map(function (c) {
+        return (c === me().code) ? me() : ((typeof db !== 'undefined' && db.users) ? db.users[c] : null);
     });
+    const lvs = users.map(lvOf);
+    const gis = users.map(function (u) { return gi(gradeOf(u)); });
     const avg = lvs.reduce(function (a, b) { return a + b; }, 0) / Math.max(1, lvs.length);
     let dl = Math.round(avg) + rnd(-3, 3);
     if (Math.max.apply(null, lvs) - Math.min.apply(null, lvs) > 20) dl -= 10;   // 밸런스
     dl = clamp(dl, 1, LV_MAX);
     // 들어갈 수 있는 등급 — 높은 쪽에 무게를 더 준다
-    const ok = GRADES.filter(function (g) { return dl >= GATE[g]; });
+    const ok = GRADES.filter(function (g) {
+        const woke = gis.filter(function (x) { return x >= gi(g); }).length;
+        return dl >= GATE[g] && woke * 2 >= gis.length;
+    });
     const w = ok.map(function (g, i) { return i === ok.length - 1 ? 4 : (i === ok.length - 2 ? 2 : 1); });
     let grade = 'D', t = Math.random() * w.reduce(function (a, b) { return a + b; }, 0);
     for (let i = 0; i < ok.length; i++) { t -= w[i]; if (t <= 0) { grade = ok[i]; break; } }
@@ -1071,18 +1085,12 @@ function wakeUp() {
     const k = prof();
     const g = k.grade;
     if (!WAKE_NEED[g]) return '';
-    // ★ 각성은 **올라갈 등급의 던전**에서만 한다 — 점수도 그 던전의 갈림길에서만 쌓인다.
-    //   D → C 는 C 던전 · C → B 는 B 던전 · B → A 는 A 던전 · A → S 는 S 던전.
-    //   (사용자가 정함. 그 밖의 던전 갈림길은 성공 보상만 받는다)
-    const next = GRADES[gi(g) + 1];
+    // ★ 각성은 **지금 등급의 던전**에서 한다 — D 던전에서 C 를 만들어야 C 던전이 열린다.
+    //   (2026-10-17 사용자가 바꿈. 전에는 올라갈 등급의 던전에서만 했다)
+    //   일행에 끼어 더 높은 등급 던전에 들었으면 거기서도 쌓인다. 낮은 등급 던전은 안 쌓인다.
     const dg = DUNS[kr.dun].g;
-    // 올라갈 등급의 던전이 아직 하나도 안 열렸으면 (내용을 넣는 동안) 예전처럼 지금 등급 던전에서 쌓는다
-    const nextOpen = Object.keys(DUNS).some(function (id) { return DUNS[id].g === next && DUNS[id].ready; });
-    if (!nextOpen && dg === g) { /* 예전 규칙 — 아래로 이어서 센다 */ }
-    else if (dg !== next) {
-        return `<div style="font-size:11px; color:#888; margin-top:6px;">◇ ${gi(dg) <= gi(g)
-            ? '이 등급의 갈림길은 각성에 보태지지 않는다 — ' + next + ' 등급 던전에서 각성한다.'
-            : '먼저 ' + next + ' 등급 던전에서 각성해야 한다.'}</div>`;
+    if (gi(dg) < gi(g)) {
+        return `<div style="font-size:11px; color:#888; margin-top:6px;">◇ 낮은 등급의 갈림길은 각성에 보태지지 않는다 — ${g} 등급 던전에서 각성한다.</div>`;
     }
     k.wake[g] = (k.wake[g] || 0) + 1;
     const need = WAKE_NEED[g];
@@ -2010,7 +2018,7 @@ function settle(how, txt) {
         `<div style="background:rgba(0,0,0,0.35); border:1px solid #23343b; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
             <div style="font-weight:bold; color:#7fd3e6; margin-bottom:8px; border-bottom:1px dashed #2f4a55; padding-bottom:6px;">[정산]</div>
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
-            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ' · ' + GRADES[gi(k.grade) + 1] + ' 던전에서)</span>' : '') + '<br>' : ''}
+            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ' · ' + k.grade + ' 던전에서)</span>' : '') + '<br>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
@@ -2104,6 +2112,7 @@ window.kroomGive = function (who, field, val) {
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
 window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+    decide: function (c, a) { return decide(c, a); },
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
 console.log('[K 의 방] ' + K_CODE + ' — 직업 ' + Object.keys(JOBS).length + ' · 던전 ' + Object.keys(DUNS).length + ' (준비 ' + Object.keys(DUNS).filter(function (d) { return DUNS[d].ready; }).length + ') — kroomState()');
