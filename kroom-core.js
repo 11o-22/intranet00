@@ -259,7 +259,18 @@ function freshen() {
     if (had) try { addHistoryLog(u, '[K 의 방] Lv · 직업 초기화 — 처음 들어가면 카드를 다시 고른다'); } catch (e) { }
     saveProf();
 }
-function needExp(lv) { return 40 + 12 * lv + lv * lv; }
+// ★ 경험치 통 — 1~9 는 빠르게 · 10~19 는 조금 더디게 · 20 부터는 크게 (한 Lv 마다 3% 씩 커진다)
+//   돌파 한 번에 받는 경험치 (내용 숫자로 셈 · 70% 성공)  D ≈ 380 · C ≈ 850 · B ≈ 1,520 · A ≈ 2,840
+//   그 등급 던전만 돌파한다고 칠 때 몇 번 만에 오르나 (2026-10-17):
+//                Lv 10   Lv 20   Lv 30   Lv 50   Lv 70   Lv 90    30번이면
+//       전          4      15      26      76     133     185     Lv 32
+//       지금        4      19      43     120     197     272     Lv 25
+//   Lv 20 통 680 → 1,800 · Lv 50 3,140 → 4,369 · Lv 90 9,220 → 14,252
+function needExp(lv) {
+    if (lv < 10) return 40 + 12 * lv + lv * lv;
+    if (lv < 20) return 300 + 60 * (lv - 10);
+    return Math.round(1800 * Math.pow(1.03, lv - 20));
+}
 function mainAttr(u) {
     const g = u && u.soulGear;
     const a = g && g.attrs;
