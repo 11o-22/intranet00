@@ -71,6 +71,12 @@ const REST_PARTY = { hp: 25, mind: 15, spirit: 10 };   // 번갈아 망을 본�
 const REST_SOLO = { mind: -5, spirit: -10 };            // 혼자서는 눈을 못 붙인다
 const MISS = { hp: -20, mind: -10, spirit: -10 };       // 끌어내다 놓쳤을 때 손을 뻗은 쪽
 const LV_MAX = 100;
+// ★ 다 같이 처음부터 — 숫자를 올리면 모든 사원의 Lv · 직업이 처음으로 돌아간다
+//   (경험치 · 각성 · 넘겨 둔 카드 · 다시 고를 기회 · 본 갈림길까지. 꿈결 · 들어간 수는 남는다)
+//   새 판을 받은 사원이 화면을 처음 띄울 때 한 번 (paintDream). 아직 안 띄운 사원은
+//   팀 평균 Lv · 동료 속성을 셀 때 처음 상태로 본다 (lvOf · attrOf).
+//   1 — 2026-10-17  D · C · B · A 던전이 다 열려서 다시 뽑는다
+const K_RESET = 1;
 
 const ATTR = {
     evade:  { n: '회피', i: '✦', role: '함정·공격을 피하고 앞길을 살핀다' },
@@ -223,11 +229,18 @@ function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
+function stale(k) { return !!k && typeof k === 'object' && (Number(k.reset) || 0) < K_RESET; }
+function wipe(k) {
+    k.lv = 1; k.exp = 0; k.job = null; k.grade = 'D'; k.wake = {};
+    k.peek = null; k.rerolled = false; k.seen = {};
+    k.reset = K_RESET;
+}
 function prof(u) {
     u = u || me();
     if (!u) return null;
     if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {};
     const k = u.kroom;
+    if (stale(k)) wipe(k);
     if (!k.lv) k.lv = 1;
     if (k.exp == null) k.exp = 0;
     if (!k.grade) k.grade = 'D';
@@ -236,7 +249,16 @@ function prof(u) {
     return k;
 }
 function saveProf() { try { saveFields({ kroom: 1, history: 1 }); } catch (e) { } }
-function lvOf(u) { const k = u && u.kroom; return (k && k.lv) || 1; }
+function lvOf(u) { const k = u && u.kroom; return (k && !stale(k) && k.lv) || 1; }
+// 내 것 — 새 판을 처음 띄우면 한 번 비우고 적어 둔다
+function freshen() {
+    const u = me(); if (!u || !u.code || !stale(u.kroom)) return;
+    const k = u.kroom;
+    const had = (k.lv || 1) > 1 || !!k.job;
+    wipe(k);
+    if (had) try { addHistoryLog(u, '[K 의 방] Lv · 직업 초기화 — 처음 들어가면 카드를 다시 고른다'); } catch (e) { }
+    saveProf();
+}
 function needExp(lv) { return 40 + 12 * lv + lv * lv; }
 function mainAttr(u) {
     const g = u && u.soulGear;
@@ -277,6 +299,7 @@ function loadFor(dunId, jobKey) {
 //   updateUI 가 포인트를 다시 적을 때마다 같이 고친다.
 function paintDream() {
     const u = me(); if (!u) return;
+    try { freshen(); } catch (e) { }
     const v = ((u.kroom && u.kroom.dream) || 0).toLocaleString('ko-KR');
     const a = document.getElementById('display-points');
     if (a) {
@@ -626,7 +649,7 @@ function members() {
 function attrOf(code) {
     const u = (code === me().code) ? me() : ((typeof db !== 'undefined' && db.users) ? db.users[code] : null);
     const k = u && u.kroom;
-    return (k && k.job && JOBS[k.job]) ? JOBS[k.job][0] : null;
+    return (k && !stale(k) && k.job && JOBS[k.job]) ? JOBS[k.job][0] : null;
 }
 function teamCount(attr) { return members().filter(function (c) { return attrOf(c) === attr; }).length; }
 
