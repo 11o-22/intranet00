@@ -178,10 +178,10 @@ const DUNS = {
     D4: { g: 'D', n: '『눈 덮인 산장』', ready: true },
     D5: { g: 'D', n: '『무너진 지하 시장』', ready: true },
     // C — 기괴 · 몬스터 사냥
-    C1: { g: 'C', n: '『살이 자라는 도축장』', ready: false },
-    C2: { g: 'C', n: '『이빨 난 인형 공방』', ready: false },
-    C3: { g: 'C', n: '『거꾸로 선 성당』', ready: false },
-    C4: { g: 'C', n: '『포자 온실』', ready: false },
+    C1: { g: 'C', n: '『살이 자라는 도축장』', ready: true },
+    C2: { g: 'C', n: '『이빨 난 인형 공방』', ready: true },
+    C3: { g: 'C', n: '『거꾸로 선 성당』', ready: true },
+    C4: { g: 'C', n: '『포자 온실』', ready: true },
     // B — 탈출 · 스릴러 · 느와르 (S-003 보다 어렵게)
     B1: { g: 'B', n: '『비 내리는 항구 창고』', ready: false },
     B2: { g: 'B', n: '『폐쇄 병동 7층』', ready: false },
