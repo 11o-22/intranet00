@@ -761,7 +761,7 @@ function afterJob() {
     kr.stats = Object.assign({}, kr.max);
     kr._shown = null;
     kr.gear = gearPower();
-    if (darkRun.isParty) waitDungeon(); else decide([me().code]).then(enterDungeon);
+    if (darkRun.isParty) waitDungeon(); else decide([me().code], [k.lastDun]).then(enterDungeon);
 }
 
 // 전용 장비 속성마다 이번 판에 쓸 수 있는 횟수
@@ -791,7 +791,8 @@ function gearLine(a, extra) {
         ${ATTR[a].i} 전용 장비 — <b>${GEAR_K[a].n}</b> ${extra || ''} <span style="color:#888;">(남은 ${x.left} / ${x.n})</span></div>`;
 }
 
-function decide(codes) {
+// avoid — 바로 전에 들어갔던 던전. 그 등급에 다른 던전이 있으면 그것은 빼고 고른다.
+function decide(codes, avoid) {
     const lvs = codes.map(function (c) {
         const u = (c === me().code) ? me() : ((typeof db !== 'undefined' && db.users) ? db.users[c] : null);
         return lvOf(u);
@@ -811,20 +812,30 @@ function decide(codes) {
         grade = GRADES[gx];
         pool = Object.keys(DUNS).filter(function (id) { return DUNS[id].g === grade && DUNS[id].ready; });
     }
+    const fresh = pool.filter(function (id) { return (avoid || []).indexOf(id) < 0; });
+    if (fresh.length) pool = fresh;
     return Promise.resolve({ id: pick(pool), lv: dl, avg: Math.round(avg) });
 }
 
 // 일행이면 팀장이 정하고 모두 그것을 읽는다
+//
+//   ★ 정한 던전에 **이번 출발 표(run)**를 붙인다 — 팀의 startedAt.
+//     ✗ 전에는 kDun 을 한 번 적고 안 지웠다. 일행은 판이 끝나도 그대로 남아
+//       다시 출발하므로, 다음 판에 들어서자마자 **지난 판의 kDun** 이 읽혀
+//       늘 같은 던전에 들어갔다 (팀장도 제가 새로 정하기 전에 그것을 읽었다).
+//     이제 이번 출발 표가 맞는 것만 받는다. 정할 때는 지난 판 던전을 뺀다.
 function waitDungeon() {
     const d = db_(); const pid = darkRun.partyId;
     const p = darkParties[pid];
     const lead = p && p.leader === me().code;
+    const run = (p && p.startedAt) || 0;
+    const mine = function (v) { return !!(v && v.id && (run ? v.run === run : (v.at || 0) > kr.started - 20000)); };
     show('—', `팀이 모이기를 기다린다.<br><br>문 앞에 선 사람 수만큼 문고리가 차가워진다.`,
         `<div style="font-size:11px; color:#888; text-align:center; padding:10px;">팀장이 문을 여는 중…</div>`);
     const ref = d.ref('darkParties/' + pid + '/kDun');
     const take = function (s) {
         const v = s.val();
-        if (!v || !v.id || !kr || kr.dun) return;
+        if (!mine(v) || !kr || kr.dun) return;
         ref.off('value', take);
         enterDungeon(v);
     };
@@ -833,18 +844,25 @@ function waitDungeon() {
         // 팀원이 카드를 고르는 동안 조금 기다렸다가 정한다 (Lv 은 직업과 상관없다)
         setTimeout(function () {
             if (!kr || kr.dun) return;
-            decide(members()).then(function (v) { v.at = now(); ref.set(v); });
+            ref.once('value').then(function (s) {
+                const old = s.val();
+                return decide(members(), [old && old.id, prof().lastDun]);
+            }).then(function (v) { v.at = now(); v.run = run; ref.set(v); });
         }, 1500);
     }
     setTimeout(function () {                                 // 팀장이 끊겼으면 내가 정한다
         if (!kr || kr.dun) return;
-        decide(members()).then(function (v) { v.at = now(); ref.transaction(function (cur) { return cur || v; }); });
+        decide(members(), [prof().lastDun]).then(function (v) {
+            v.at = now(); v.run = run;
+            ref.transaction(function (cur) { return mine(cur) ? cur : v; });
+        });
     }, 15000);
 }
 
 function enterDungeon(v) {
     if (!kr) return;
     kr.dun = v.id; kr.dunLv = v.lv;
+    try { prof().lastDun = v.id; } catch (e) { }              // 다음 판에는 이것을 빼고 고른다 (정산 때 같이 적힌다)
     show('—', `문이 열린다.<br><br>문 너머가 방이 아니다.`, `<div style="font-size:11px; color:#888; text-align:center; padding:10px;">방을 불러오는 중…</div>`);
     loadFor(kr.dun, kr.job).then(function () {
         const D = DATA.dun[kr.dun];
