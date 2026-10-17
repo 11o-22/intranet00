@@ -214,10 +214,14 @@ const ITEMS = {
 };
 
 // ── 내용 받는 자리 (내용 파일이 부른다)
-const DATA = { dun: {}, job: {} };
+const DATA = { dun: {}, job: {}, opt: {} };
 window.kDungeon = function (id, d) { DATA.dun[id] = d; };
 window.kJob = function (key, grade, arr) {
     (DATA.job[key] = DATA.job[key] || {})[grade] = arr || [];
+};
+// ★ 직업 선택지 — 장면마다 그 직업만 보는 선택지 하나 (kroom/o<등급>-<속성>.js)
+window.kOpt = function (key, grade, arr) {
+    (DATA.opt[key] = DATA.opt[key] || {})[grade] = arr || [];
 };
 
 // ==========================================
@@ -302,6 +306,7 @@ function loadFor(dunId, jobKey) {
     const g = DUNS[dunId].g.toLowerCase();
     const list = ['kroom/' + dunId.toLowerCase() + '.js'];
     if (jobKey && JOBS[jobKey]) list.push('kroom/j' + g + '-' + JOBS[jobKey][0] + '.js');
+    if (jobKey && JOBS[jobKey]) list.push('kroom/o' + g + '-' + JOBS[jobKey][0] + '.js');   // 없으면 그냥 넘어간다
     return Promise.all(list.map(loadOne));
 }
 
@@ -904,9 +909,19 @@ function plan() {
     // 아직 안 본 갈림길부터 (저장해 둔 본 목록)
     const seen = (prof().seen = prof().seen || {});
     pool.sort(function (a, b) { return (seen[a.t] ? 1 : 0) - (seen[b.t] ? 1 : 0) || (Math.random() - 0.5); });
+    // ★ 직업 선택지 — 보통 장면마다 하나씩 붙인다 (이 판 안에서는 겹치지 않게 섞어 차례로)
+    //   장면 원본은 건드리지 않는다 — 이 판의 몫만 얕게 베껴 선택지를 하나 더 단다.
+    const ops = (((DATA.opt[kr.job] || {})[DUNS[kr.dun].g]) || []).slice()
+        .sort(function () { return Math.random() - 0.5; });
+    let on = 0;
+    const withJob = function (sc) {
+        if (!ops.length) return sc;
+        const o = Object.assign({ job: 1 }, ops[on++ % ops.length]);
+        return Object.assign({}, sc, { o: (sc.o || []).concat([o]) });
+    };
     const out = [];
     D.floors.forEach(function (fl, fi) {
-        const list = fl.scenes.map(function (sc) { return { sc: sc, kind: 'c' }; });
+        const list = fl.scenes.map(function (sc) { return { sc: withJob(sc), kind: 'c' }; });
         const jb = pool.shift();
         if (jb) list.splice(rnd(1, list.length), 0, { sc: jb, kind: 'j' });
         if (fl.boss) list.push({ sc: fl.boss, kind: 'boss' });
@@ -955,7 +970,8 @@ window.kroomNext = function () {
             const o = v.o;
             const cost = o.cost ? Object.keys(o.cost)[0] : null;
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
-            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">☠</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
+            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">☠</span> ' : '')
+                + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');
             return can ? darkChoiceBtn(lab, 'kroomPick(' + v.i + ')')
                        : `<button class="game-btn" disabled style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; opacity:.4;">${lab}</button>`;
