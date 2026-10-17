@@ -1440,6 +1440,7 @@ window.plazaShotData = function () {
         const box = o.wrap.querySelector('.dot-box');
         const layers = [];
         Array.prototype.forEach.call((box ? box.querySelectorAll('.dot-layer') : []), function (e) {
+            if (e.style.display === 'none') return;          // 가만히 서 있는 동작이 갈아 끼운 층은 빼고
             const u = /url\(["']?(.*?)["']?\)/.exec(e.style.backgroundImage || '');
             const src = u ? u[1] : ('dot/' + (e.dataset.sheet || '') + '.png');
             // 칸 크기 = 사람 칸 크기와 같다 (옷 장 한 칸이 곧 사람 한 칸)

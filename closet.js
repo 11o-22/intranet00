@@ -145,7 +145,7 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -161,6 +161,20 @@ const DOT = {
     //     반짝임과 「친구!」가 차례로 그려져 있다. 여섯 칸을 다 돈다.
     //     (가만히 있으면 0번 칸만 보여 리본만 덩그러니 있었다)
     FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5] },
+    // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
+    //
+    //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
+    //   호유원 머리(h10)에 검은 정장. 윗줄은 그네로 가서 앉는 여섯 칸,
+    //   아랫줄은 앉아서 흔들거리는 여섯 칸이다.
+    //   그래서 그 모습(머리 h10 + 검은 정장)일 때만 튼다 — 다른 옷·머리인데
+    //   틀면 앉는 순간 다른 사람으로 바뀐다.
+    //
+    //   after  이만큼 가만히 서 있으면 시작한다
+    //   sit    윗줄(앉기) 한 칸에 머무는 시간 — 한 번만 지나간다
+    //   loop   아랫줄(앉아 있기) 한 칸에 머무는 시간 — 계속 돈다
+    //   움직이면 바로 원래 모습으로 돌아온다.
+    IDLE: { sheet: 'sit-swing', head: 'h10', outer: 'ksuit', nos: ['0000', '8449'],
+            after: 10000, sit: 170, loop: 300 },
 };
 
 // 머리 — 이름은 제가 보고 붙인 것입니다. 파일명이 제 쪽으로 안 와서,
@@ -223,6 +237,11 @@ const DOT_SLOTS = [
             { i: '', n: '없음', over: [] },
             // ★ 노란 정장은 **상담사 전용**이다 — 뽑기에 안 넣는다
             { i: 'suit', n: '정장', over: ['suit'], admin: true },
+            // ★ 검은 정장 — 사번 0000 · 8449 두 사람만 (2026-10-17).
+            //   주신 그림은 1728x768 (칸 288 — 지난 규격)이라 칸마다 가로로 30 밀어
+            //   352 칸에 넣었다. 그러면 몸통 왼끝이 몸판(126)과 같아지고 도트
+            //   눈금(x ≡ 2 mod 4)도 맞는다. 세로는 발바닥이 이미 352 라 그대로다.
+            { i: 'ksuit', n: '검은 정장', over: ['black-suit'], nos: ['0000', '8449'] },
             // ★ 백일몽 정장 — 주신 그림은 머리·손·발까지 그려진 **통짜**였다.
             //   그대로 겹치면 민머리가 얼굴을 덮으므로, 몸 그림과 **자리·색이
             //   똑같은 칸을 빼서** 옷만 남겼다 (7만 5천 칸이 몸과 같았다).
@@ -423,6 +442,23 @@ function flapsOf(els, sheets) {
     return out;
 }
 function wrap(n, len) { return ((n % len) + len) % len; }
+
+// ★ 가만히 서 있을 때 틀 동작 — 없으면 null
+//   남(광장의 다른 사람)은 자리 기록에 사번이 안 실려 오므로 사원 명부(db.users)에서 찾는다.
+function idleOf(user, L) {
+    const I = D.IDLE;
+    if (!I || !user || !L) return null;
+    let no = noOf(user);
+    if (!no && user.code) {
+        try { const x = (typeof db !== 'undefined' && db.users) ? db.users[user.code] : null; no = noOf(x); } catch (e) { }
+    }
+    if (!no) return null;
+    const p = no.length < 4 ? ('0000' + no).slice(-4) : no;
+    if (I.nos.indexOf(no) < 0 && I.nos.indexOf(p) < 0) return null;
+    if (L.head !== I.head || (L.pick || {}).outer !== I.outer) return null;
+    return I.sheet;
+}
+window.dotIdleOf = function (user) { return idleOf(user, look(user, null, true)); };
 function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i === id; }); return k < 0 ? 0 : k; }
 
 // ==========================================
@@ -686,6 +722,44 @@ function actor(user, opt) {
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = flapsOf(els, sheets);
 
+    // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLE) — 해당하는 사람만 한 장을 더 깔아 둔다
+    const idleSheet = (o.idle === false) ? null : idleOf(user, L);
+    let idleEl = null, idleOn = false, idleWait = 0, idleT = 0;
+    if (idleSheet) {
+        idleEl = layer(idleSheet, k);
+        idleEl.dataset.idle = '1';
+        idleEl.style.display = 'none';
+        box.appendChild(idleEl);
+    }
+    const idleOff = function () {
+        if (idleWait) { clearTimeout(idleWait); idleWait = 0; }
+        if (idleT) { clearInterval(idleT); idleT = 0; }
+        if (!idleOn) return;
+        idleOn = false;
+        idleEl.style.display = 'none';
+        els.forEach(function (e) { e.style.display = ''; });
+    };
+    const idleGo = function () {
+        idleWait = 0;
+        if (!idleEl || walking || held) return;
+        // 서 있는 동안 돌던 것(깜빡임·펄럭임)은 멈춘다 — 안 보이는 층을 칠할 까닭이 없다
+        timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = [];
+        crowdOut(member);
+        idleOn = true;
+        els.forEach(function (e) { e.style.display = 'none'; });
+        idleEl.style.display = '';
+        let f = 0, row = 0;
+        put(idleEl, 0, 0);
+        const I = D.IDLE;
+        const step = function () {
+            f++;
+            if (row === 0 && f > 5) { row = 1; f = 0; clearInterval(idleT); idleT = setInterval(step, I.loop); }
+            else if (row === 1) f = f % 6;
+            put(idleEl, f, row);
+        };
+        idleT = setInterval(step, I.sit);
+    };
+
     // ★ calm — 서 있을 때의 눈 깜빡임 · 악세 펄럭임을 사람마다 따로 돌리지 않고
     //   **시계 하나(crowd)에 묶는다.** 광장의 남들에게 쓴다.
     //   사람마다 시계가 서너 개씩 돌며 제각각 그림을 바꿔 칠하면 열 명만 돼도
@@ -718,11 +792,13 @@ function actor(user, opt) {
     const clear = function () {
         timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = [];
         crowdOut(member);
+        if (idleEl) idleOff();
     };
 
     const start = function () {
         clear();
         if (held) return;                                   // 안 보이는 동안은 그대로 둔다
+        if (idleEl && !walking) idleWait = setTimeout(idleGo, D.IDLE.after);
         if (walking) {
             let f = 0;
             els.forEach(function (e) { put(e, 0, 0); });
