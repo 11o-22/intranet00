@@ -65,7 +65,7 @@ const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150
 //                       혼자    둘    셋    다섯   (C 던전 · D 직업으로 들어올 때)
 //     안전한 쪽만 고르면    5%   27%   42%   68%
 //   B · A 는 더하지 않는다 — 내용의 숫자가 그대로다 (B 는 S-003 보다 DC 가 높다: 19~22 · S-003 17~19).
-//     B (C 직업)  둘 6% · 셋 13% · 다섯 30%      A (B 직업)  셋 6% · 다섯 14%
+//     B (C 직업)  둘 5% · 셋 12% · 다섯 28%      A (B 직업)  셋 6% · 다섯 14%   (주사위 20 은 늘 성공으로 다시 잼)
 const HARD = { D: { dc: 2, lose: 1.6 }, C: { dc: 1, lose: 1.2 } };
 const REST_PARTY = { hp: 25, mind: 15, spirit: 10 };   // 번갈아 망을 본다
 const REST_SOLO = { mind: -5, spirit: -10 };            // 혼자서는 눈을 못 붙인다
@@ -183,9 +183,9 @@ const DUNS = {
     C3: { g: 'C', n: '『거꾸로 선 성당』', ready: true },
     C4: { g: 'C', n: '『포자 온실』', ready: true },
     // B — 탈출 · 스릴러 · 느와르 (S-003 보다 어렵게)
-    B1: { g: 'B', n: '『비 내리는 항구 창고』', ready: false },
-    B2: { g: 'B', n: '『폐쇄 병동 7층』', ready: false },
-    B3: { g: 'B', n: '『멈추지 않는 야간열차』', ready: false },
+    B1: { g: 'B', n: '『비 내리는 항구 창고』', ready: true },
+    B2: { g: 'B', n: '『폐쇄 병동 7층』', ready: true },
+    B3: { g: 'B', n: '『멈추지 않는 야간열차』', ready: true },
     // A — 호러
     A1: { g: 'A', n: '『어린이 방송국』', ready: false },
     A2: { g: 'A', n: '『물에 잠긴 기숙학교』', ready: false },
@@ -919,7 +919,8 @@ window.kroomPick = function (i) {
     kr._panic = false;
     const R = roll(o.k);
     const dc = (o.dc || 13) + hard().dc;
-    let ok = R.r !== 1 && (R.r + R.b) >= dc;
+    // 1 은 늘 실패, 20 은 늘 성공 — B 이상은 DC 가 20 을 넘어 보정이 낮으면 아예 못 넘는 자리가 생긴다
+    let ok = R.r !== 1 && (R.r === 20 || (R.r + R.b) >= dc);
     let gl = '';                                            // 전용 장비가 한 일
     // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
     if (!ok && ['break', 'sense', 'hide', 'gaze'].indexOf(o.k) >= 0 && gearUse(o.k)) {
@@ -928,7 +929,7 @@ window.kroomPick = function (i) {
     // 행운 — 다시 굴림
     if (!ok && gearUse('luck')) {
         const R2 = roll(o.k);
-        ok = R2.r !== 1 && (R2.r + R2.b) >= dc;
+        ok = R2.r !== 1 && (R2.r === 20 || (R2.r + R2.b) >= dc);
         gl += gearLine('luck', '— 다시 굴렸다: 🎲 ' + R2.r + (ok ? ' 성공' : ' 이번에도 실패'));
     }
     // 보정 — 5 이하로 모자라면 맞춰 준다
@@ -1448,7 +1449,7 @@ window.kroomRescue = function (code) {
         b += Math.min(3, teamCount('fix'));
         const r = kv(luckReroll, null, [Math.floor(Math.random() * 20) + 1]);
         afterDice();
-        let ok = r !== 1 && r + b >= (v.dc || 13);
+        let ok = r !== 1 && (r === 20 || r + b >= (v.dc || 13));
         let sure = '';
         if (!ok) { sure = sureRescue(); if (sure) ok = true; }  // 🩶 은심장(열 번) · 🐾 아기 여우(연결)
         heartCount();                                         // 구하러 갈 때마다 하나 센다
