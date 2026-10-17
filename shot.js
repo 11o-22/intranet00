@@ -113,6 +113,7 @@ async function draw(zoom) {
 
     // 1) 방 그림 — 화면에 깔린 그 자리·그 크기로 통째로 깐다
     const room = await load(d.room.img);
+    g.imageSmoothingEnabled = !d.room.pix;          // 포토존은 도트 그림이라 흐리게 늘리지 않는다
     g.drawImage(room, rx0, ry0, d.room.w, d.room.h);
 
     // 2) 사람 — 보이는 그 칸을 옷 장마다 겹친다

@@ -266,6 +266,26 @@ const PLAZA = {
     },
     START: 'plaza',
 
+    // ── 📸 포토존 — 장소마다 방이 둘 (목록 ☰ 「포토존」에서 고른다)
+    //
+    //   주신 그림(4800x2556)은 **도트 한 칸이 6픽셀**인 도트 그림이다. 그래서
+    //   한 칸을 한 점으로 되돌린 800x426 을 파일로 두고(pz-*.webp · 무손실),
+    //   방 크기는 그 두 배인 1600x852 로 적는다 — 사람 한 명이 방 그림 안에서
+    //   광장 방과 같은 몫(키 236)이 되는 크기다. 그래서 걸음 빠르기·끝자리
+    //   (SPEED · EDGE · INSET)를 따로 고치지 않아도 사람 몸에 맞는다.
+    //   파일보다 크게 그리므로 늘 또렷하게(pixelated) 깐다 (pix).
+    //
+    //   그림 아래쪽 28%(y 1850~2556 / 3)가 무대 밑 어두운 기둥이라, 광장처럼
+    //   채팅과 미니맵이 그 자리에 앉는다. 그래서 잘라 내지 않는다 (cut 0).
+    //
+    //   바닥 띠는 그림에 대고 쟀다 — 무대 앞 끝(검은 테두리)에서 조금 들이고,
+    //   뒤로는 소품 발치까지. 4800 그림의 y 를 3 으로 나눈 값이다.
+    //       기본 1815~1850 · 룩키마트 1720~1830 · 토크쇼 1680~1775
+    //       여우 상담실 1630~1765 · 리조트 1705~1780 · 핼러윈 1830~1895 · 행맨 1715~1805
+    //
+    //   max 2 — 한 장소에 방은 둘. 둘 다 차면(한 방 CAP 명) 못 들어간다.
+    PHOTO: ['pz_base', 'pz_hangman', 'pz_fox', 'pz_looky', 'pz_flower', 'pz_halloween', 'pz_brown'],
+
     // ── 오른쪽 위 ☰ 에 들어가는 것들. 없는 것은 저절로 빠진다.
     //
     //   ic 는 ico/ 안의 그림 이름이다. 흰 그림을 **마스크**로 써서 글자색을
@@ -311,6 +331,8 @@ const PLAZA = {
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
         { g: 'life',  n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
+        // 📸 포토존 — 장소 목록 → 1번 · 2번 방 (안에 있는 사람까지) → 누르면 그 방으로
+        { g: 'life',  n: '포토존',     i: '📸', ic: 'camera',  sheet: 'photo' },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
@@ -324,6 +346,22 @@ const PLAZA = {
 
 const P = PLAZA;
 const R = P.ROOMS;
+
+// 📸 포토존 방 — 위 PHOTO 의 차례대로
+(function photoRooms() {
+    const pz = function (key, pn, file, fl) {
+        R[key] = { n: '포토존 · ' + pn, pn: pn, img: 'pz-' + file + '.webp', thumb: 'pz-' + file + '-t.webp',
+                   w: 1600, h: 852, cut: 0, k: 1, floor: fl, photo: 1, pix: 1, max: 2,
+                   spots: [ { x: 1520, n: '광장으로', ic: 'out', go: P.START } ] };
+    };
+    pz('pz_base',      '기본',                'base',      [605, 617]);
+    pz('pz_hangman',   '헝그리 행맨',          'hangman',   [572, 602]);
+    pz('pz_fox',       '여우 상담실',          'fox',       [543, 588]);
+    pz('pz_looky',     '룩키마트',             'looky',     [573, 610]);
+    pz('pz_flower',    '플라워 골든 리조트',    'flower',    [568, 593]);
+    pz('pz_halloween', '핼러윈',               'halloween', [610, 632]);
+    pz('pz_brown',     '브라운의 심야 토크쇼',  'brown',     [560, 592]);
+})();
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
 (function link() {
@@ -553,6 +591,36 @@ function stampSafe(ov) {
         '.plaza-mates button{flex:0 0 auto;padding:8px 12px;border-radius:10px;font-family:inherit;font-size:12px;',
         '  cursor:pointer;background:rgba(217,160,90,.16);border:1px solid #8a6a2a;color:#ffe9bd;}',
         '.plaza-mates button:disabled{background:rgba(255,255,255,.03);border-color:#2b2b38;color:#6f685c;cursor:default;}',
+        // ── 📸 포토존
+        '.plaza-pz .mt-empty{font-size:12px;color:#8d8578;text-align:center;padding:26px 0;}',
+        '.plaza-pz .pz-head{font-size:11px;color:#8d8578;margin:0 2px 9px;}',
+        '.plaza-pz .pz-zone{display:flex;align-items:center;gap:11px;width:100%;padding:8px;margin-bottom:7px;',
+        '  border-radius:12px;background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:inherit;',
+        '  font-family:inherit;text-align:left;cursor:pointer;}',
+        '.plaza-pz .pz-zone.on{border-color:#8a6a2a;background:rgba(217,160,90,.09);}',
+        '.plaza-pz .pz-th{flex:0 0 auto;width:96px;height:51px;border-radius:7px;background:#000 center/cover no-repeat;}',
+        '.plaza-pz .pz-zn{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}',
+        '.plaza-pz .pz-zn b{font-size:13px;color:#ffe9bd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.plaza-pz .pz-zn i{font-style:normal;font-size:11px;color:#a79e8f;}',
+        '.plaza-pz .pz-zn i em{font-style:normal;color:#ffcf8f;}',
+        '.plaza-pz .pz-back{border:none;background:none;color:#a79e8f;font-family:inherit;font-size:12px;',
+        '  padding:0 2px 9px;cursor:pointer;}',
+        '.plaza-pz .pz-pic{width:100%;aspect-ratio:400/213;border-radius:10px;margin-bottom:9px;',
+        '  background:#000 center/cover no-repeat;}',
+        '.plaza-pz .pz-room{padding:10px 11px;margin-bottom:7px;border-radius:12px;',
+        '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;}',
+        '.plaza-pz .pz-room.on{border-color:#8a6a2a;}',
+        '.plaza-pz .pz-rh{display:flex;align-items:center;gap:8px;}',
+        '.plaza-pz .pz-rh b{font-size:13px;color:#ffe9bd;}',
+        '.plaza-pz .pz-rh i{flex:1;font-style:normal;font-size:11px;color:#6f685c;}',
+        '.plaza-pz .pz-rh button{flex:0 0 auto;padding:8px 12px;border-radius:10px;font-family:inherit;font-size:12px;',
+        '  cursor:pointer;background:rgba(217,160,90,.16);border:1px solid #8a6a2a;color:#ffe9bd;}',
+        '.plaza-pz .pz-rh button:disabled{background:rgba(255,255,255,.03);border-color:#2b2b38;color:#6f685c;cursor:default;}',
+        '.plaza-pz .pz-who{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}',
+        '.plaza-pz .pz-who span{font-size:11px;color:#e8dcc6;padding:3px 8px;border-radius:9px;',
+        '  background:rgba(255,255,255,.06);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.plaza-pz .pz-who span.me{background:rgba(217,160,90,.22);color:#ffe9bd;}',
+        '.plaza-pz .pz-none{font-size:11px;color:#6f685c;margin-top:7px;}',
         '.plaza-board{gap:1px;animation:none;}',
         '.plaza-board .bd{position:relative;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55));}',
         '.plaza-board .bd svg{display:block;width:100%;height:100%;}',
@@ -1213,7 +1281,8 @@ function paintRoom() {
     run.el.style.width = w + 'px';
     run.el.style.height = h + 'px';
     // 줄여 그릴 때 nearest(pixelated) 로 찍으면 도트가 깨져 어른거린다
-    run.el.style.imageRendering = (run.z < 1) ? 'auto' : 'pixelated';
+    //   포토존(pix)은 파일이 제 크기(도트 한 칸 = 한 점)라 늘 키워 그린다 — 늘 또렷하게.
+    run.el.style.imageRendering = (r.pix || run.z >= 1) ? 'pixelated' : 'auto';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
     run.el.style.backgroundSize = w + 'px ' + h + 'px';
     paintMap();                     // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
@@ -1404,7 +1473,7 @@ window.plazaShotData = function () {
     return {
         vw: viewBox().w, vh: viewBox().h,
         cx: run.cx, cy: run.cy,
-        room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z },
+        room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z, pix: !!r.pix },
         folk: folk
     };
 };
@@ -1815,10 +1884,12 @@ function headcount(cs, room, inst, skip) {
     const m = (cs[room] || {})[inst] || {};
     return Object.keys(m).filter(function (c) { return c !== skip; }).length;
 }
+// ★ 방이 몇 개까지인가 — 포토존은 둘(max). 다 차면 0 (못 든다).
 function pickInst(cs, room, want, skip) {
-    if (want && headcount(cs, room, want, skip) < P.CAP) return want;
-    for (let i = 1; i < 500; i++) if (headcount(cs, room, i, skip) < P.CAP) return i;
-    return 1;
+    const max = (R[room] && R[room].max) || 500;
+    if (want && want <= max && headcount(cs, room, want, skip) < P.CAP) return want;
+    for (let i = 1; i <= max; i++) if (headcount(cs, room, i, skip) < P.CAP) return i;
+    return (R[room] && R[room].max) ? 0 : 1;
 }
 
 // 장소에 들어선 뒤 — 방을 골라 듣기 시작한다
@@ -1828,7 +1899,13 @@ function joinInst(want, force) {
     const room = run.room, u = u_();
     census().then(function (cs) {
         if (!run || run.joinTok !== tok || run.room !== room) return;   // 그 사이 또 옮겼다
-        enterInst(force ? want : pickInst(cs, room, want, u && u.code));
+        const inst = force ? want : pickInst(cs, room, want, u && u.code);
+        if (!inst) {                                                     // 포토존 두 방이 다 찼다
+            sysLine(R[room].n + ' — 두 방이 다 찼습니다. (한 방에 ' + P.CAP + '명)');
+            goRoom(P.START, null);
+            return;
+        }
+        enterInst(inst);
     });
 }
 function enterInst(inst) {
@@ -1875,7 +1952,7 @@ function overCheck() {
     census().then(function (cs) {
         if (!run || run.room !== room) return;
         const inst = pickInst(cs, room, null, u.code);
-        if (inst === run.inst) return;
+        if (!inst || inst === run.inst) return;                          // 포토존 — 옮길 방이 없다
         hopInst(inst);
         sysLine('방이 가득 차 ' + inst + '번 방으로 옮겼습니다.');
     });
@@ -1970,6 +2047,107 @@ function goMate(r) {
         sysLine(r.name + ' 님이 있는 ' + rr.n + ' ' + inst + '번 방으로 왔습니다.');
     });
 }
+
+// ==========================================
+// ★ 📸 포토존 — 장소 목록 → 1번 · 2번 방 → 그 방으로
+// ==========================================
+//
+//   목록(☰) 「포토존」을 누르면 장소 일곱이 그림과 함께 뜬다 (방마다 몇 명).
+//   하나를 누르면 그 장소의 **1번 방 · 2번 방**이 뜨고, 방마다 지금 안에 있는
+//   사람 이름이 붙는다. 「들어가기」를 누르면 그 장소 그 번호 방으로 바로 든다.
+//   한 방에 CAP 명 — 가득 찬 방은 못 누른다.
+//
+//   창을 열어 둔 동안 4초마다 다시 센다 (드나드는 사람이 보이게). 바뀐 것이
+//   없으면 다시 적지 않는다 — 누르려는 순간 칸이 갈리지 않게.
+let pzIv = 0;
+function pzZones() { return (P.PHOTO || []).filter(function (k) { return R[k] && R[k].photo; }); }
+function pzSeats(cs, zone, inst) {
+    const m = (cs[zone] || {})[inst] || {};
+    return Object.keys(m).map(function (c) { return { c: c, n: (m[c] && m[c].n) || c }; })
+        .sort(function (a, b) { return String(a.n).localeCompare(String(b.n), 'ko'); });
+}
+function pzListHtml(cs) {
+    return '<div class="pz-head">장소를 고르면 1번 · 2번 방이 뜹니다 · 한 방에 ' + P.CAP + '명까지</div>'
+        + pzZones().map(function (k) {
+            const r = R[k];
+            const a = pzSeats(cs, k, 1).length, b = pzSeats(cs, k, 2).length;
+            const cnt = function (n) { return n ? '<em>' + n + '명</em>' : '0명'; };
+            return '<button class="pz-zone' + (run && run.room === k ? ' on' : '') + '" data-z="' + k + '">'
+                + '<span class="pz-th" style="background-image:url(\'' + P.DIR + r.thumb + '\')"></span>'
+                + '<span class="pz-zn"><b>' + esc(r.pn) + '</b>'
+                + '<i>1번 방 ' + cnt(a) + ' · 2번 방 ' + cnt(b) + (run && run.room === k ? ' · 지금 ' + run.inst + '번 방' : '') + '</i></span>'
+                + '</button>';
+        }).join('');
+}
+function pzRoomsHtml(cs, zone) {
+    const r = R[zone], u = u_();
+    let html = '<button class="pz-back">‹ 포토존 목록</button>'
+        + '<div class="pz-pic" style="background-image:url(\'' + P.DIR + r.thumb + '\')"></div>';
+    for (let i = 1; i <= (r.max || 2); i++) {
+        const who = pzSeats(cs, zone, i);
+        const here = !!(run && run.room === zone && run.inst === i);
+        if (here && u && !who.some(function (w) { return w.c === u.code; })) who.unshift({ c: u.code, n: nameOf(u) });
+        const full = !here && who.length >= P.CAP;
+        html += '<div class="pz-room' + (here ? ' on' : '') + '">'
+            + '<div class="pz-rh"><b>' + i + '번 방</b><i>' + who.length + ' / ' + P.CAP + '</i>'
+            + '<button data-i="' + i + '"' + ((here || full) ? ' disabled' : '') + '>'
+            + (here ? '지금 여기' : (full ? '가득 참' : '들어가기')) + '</button></div>'
+            + (who.length
+                ? '<div class="pz-who">' + who.map(function (w) {
+                    return '<span' + (u && w.c === u.code ? ' class="me"' : '') + '>' + esc(w.n) + '</span>';
+                }).join('') + '</div>'
+                : '<div class="pz-none">비어 있습니다</div>')
+            + '</div>';
+    }
+    return html;
+}
+function photoSheet(zone) {
+    if (pzIv) { clearInterval(pzIv); pzIv = 0; }
+    const z = (zone && R[zone] && R[zone].photo) ? zone : null;
+    const s = sheet('photo', z ? '📸 ' + R[z].pn : '📸 포토존',
+        '<div class="plaza-pz"><div class="mt-empty">불러오는 중…</div></div>');
+    if (!s) return;
+    let last = '';
+    const paint = function () {
+        if (!s.isConnected || !run) { if (pzIv) { clearInterval(pzIv); pzIv = 0; } return; }
+        census().then(function (cs) {
+            if (!s.isConnected || !run) return;
+            const box = s.querySelector('.plaza-pz');
+            if (!box) return;
+            const html = z ? pzRoomsHtml(cs, z) : pzListHtml(cs);
+            if (html === last) return;
+            last = html;
+            box.innerHTML = html;
+            Array.prototype.forEach.call(box.querySelectorAll('.pz-zone'), function (b) {
+                b.onclick = function () { photoSheet(b.dataset.z); };
+            });
+            const back = box.querySelector('.pz-back');
+            if (back) back.onclick = function () { photoSheet(); };
+            Array.prototype.forEach.call(box.querySelectorAll('.pz-rh button[data-i]'), function (b) {
+                b.onclick = function () { goPhoto(z, Number(b.dataset.i)); };
+            });
+        });
+    };
+    paint();
+    pzIv = setInterval(paint, 4000);
+}
+function goPhoto(zone, inst) {
+    const u = u_();
+    if (!run || !R[zone]) return;
+    census().then(function (cs) {
+        if (!run) return;
+        if (zone === run.room && inst === run.inst) { closeSheet(); return; }
+        if (headcount(cs, zone, inst, u && u.code) >= P.CAP) {
+            sysLine(R[zone].n + ' ' + inst + '번 방이 가득 찼습니다. (' + P.CAP + '명)');
+            photoSheet(zone);
+            return;
+        }
+        closeSheet();
+        if (zone !== run.room) { run.forceInst = inst; goRoom(zone, null, 0); }
+        else { hopInst(inst); sysLine(R[zone].n + ' ' + inst + '번 방으로 옮겼습니다.'); }
+    });
+}
+window.plazaPhoto = function (zone) { if (run) photoSheet(zone); };
 
 // ==========================================
 // 같은 방 사람
@@ -2369,6 +2547,7 @@ function paintMap() {
     const m = mapOf(), r = roomOf();
     el.querySelector('.mp-n').innerText = r.n + (run.inst ? ' · ' + run.inst + '번 방' : '');
     const g = el.querySelector('.mp-g');
+    g.style.display = r.photo ? 'none' : '';
     g.style.gridTemplateColumns = 'repeat(' + m.w + ',1fr)';
     const keys = Object.keys(m.col);
     const out = [];
@@ -2849,6 +3028,7 @@ function liftSheet(floor) {
 //   스킵권(🎟️)을 쓴 다음 한 번은 걸음을 건너뛰고 그 자리에서 들어간다.
 function pickMenu(m) {
     if (m && m.sheet === 'mates') { matesSheet(); return; }
+    if (m && m.sheet === 'photo') { photoSheet(); return; }
     if (skipTake) {
         const take = skipTake;
         skipTake = null;
