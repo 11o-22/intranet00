@@ -472,6 +472,20 @@ function noteRead(c, v) {
     //   물건(e.fixed = true)이 읽은 모습까지 같이 바꿔, 바뀐 것이 없다고 보고 안 보낸다.
     lastRead[c] = { eff: clone(asArr(v && v[EFF])) || [], all: clone(v) || {}, at: Date.now() };
 }
+// 내가 쓴 것은 「읽은 모습」에도 반영한다 (2026-10-18)
+//
+//   읽은 모습은 120초 동안 믿는다. 그런데 그 사이 **내가 써 넣은 값**은 거기에
+//   안 들어갔다. 그래서 주었다가(→ ['이레귤러']) 곧바로 떼면(→ []) 떼는 값이
+//   처음 읽은 모습([])과 같아 「손대지 않은 열쇠」로 보여 빠졌다 — 칭호가 안
+//   떼지고, 격리·오염도를 0 으로 되돌리는 것도 같은 길로 빠질 수 있었다.
+function noteWrote(c, obj) {
+    const r = lastRead[c];
+    if (!r || !obj) return;
+    Object.keys(obj).forEach(function (k) {
+        if (k === '_adminStamp' || k === '_stamp' || k.indexOf('/') >= 0) return;
+        try { r.all[k] = clone(obj[k]); } catch (e) { }
+    });
+}
 // 읽은 뒤 손대지 않은 열쇠인가 — 그런 열쇠는 보내지 않는다
 function untouched(c, k, v) {
     if (k === '_adminStamp' || k === '_stamp') return false;
@@ -1336,6 +1350,7 @@ function markSaved(payload) {
                 rest[k] = fields[k];
             });
             if (!doInv && !doPts && !doEff && !doBuf && !dropped) {
+                noteWrote(c, fields);
                 return _u.apply(this, arguments);           // 손댈 것이 없다 — 원래대로
             }
             // ★ rest 의 열쇠는 'users/사번/칸' 꼴의 전체 경로다.
@@ -1347,6 +1362,7 @@ function markSaved(payload) {
                 if (w2) rest['users/' + w2[1] + '/_adminStamp'] = stamp;
             });
 
+            noteWrote(c, rest);
             const jobs = [_u.call(this, c, rest)];
             if (doInv) {
                 const want = asArr(fields[INV]);

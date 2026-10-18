@@ -1371,6 +1371,14 @@ window.titleOf = function (who) {
     console.log('  저절로 얻은 것:', (u.titles || []).length + '개');
 };
 
+// 고르는 칸에서 고른 칭호를 주거나 뗀다
+window.adminTitlePick = function (mode) {
+    const sel = document.getElementById('title-admin-pick');
+    const name = sel && sel.value;
+    if (!name) return;
+    window.adminGiveTitle(name, mode === 'take' ? 'take' : 'give');
+};
+
 (function mountAdmin() {
     const iv = setInterval(function () {
         if (document.getElementById('title-admin-row')) { clearInterval(iv); return; }
@@ -1380,21 +1388,26 @@ window.titleOf = function (who) {
         row.id = 'title-admin-row';
         row.style.cssText = 'font-size:12px; margin:10px 0; display:flex; gap:6px;'
             + ' align-items:center; flex-wrap:wrap;';
+        // ★ 한 줄로 — 고르는 칸 하나에 [주기] [떼기] (2026-10-18)
+        //   예전에는 칭호마다 단추가 하나씩이고 왼쪽 「주기/떼기」를 바꿔 가며 눌러서
+        //   번잡했다. 이제 칸에서 고르고 바로 옆 단추로 주거나 뗀다.
         row.innerHTML = '<span style="font-size:10px; color:#888; flex-shrink:0;">칭호</span>'
-            + '<button id="title-mode-btn" class="game-btn" style="flex:0 0 56px; margin:0; padding:9px;'
-            + ' font-size:11px; background:linear-gradient(145deg,#2a4a2a,#183018) !important;'
-            + ' border-color:#4a8a4a !important;"'
-            + ' onclick="setTitleMode(this.textContent.trim() === \'주기\' ? \'take\' : \'give\')">주기</button>'
+            + '<select id="title-admin-pick" style="flex:1 1 140px; min-width:0; margin:0; padding:9px;'
+            + ' font-size:12px;">'
             + ADMIN_TITLES.map(function (n) {
-                return '<button class="game-btn" style="flex:1 1 68px; margin:0; padding:9px; font-size:11px;'
-                    + ' background:linear-gradient(145deg,#5a4a2a,#3a2f18) !important;'
-                    + ' border-color:#7a6a3a !important;" onclick="adminGiveTitle(\'' + n + '\')">'
-                    + label(n) + '</button>';
-            }).join('');
+                return '<option value="' + n.replace(/"/g, '&quot;') + '">' + label(n) + '</option>';
+            }).join('')
+            + '</select>'
+            + '<button class="game-btn" style="flex:0 0 58px; margin:0; padding:9px; font-size:11px;'
+            + ' background:linear-gradient(145deg,#2a4a2a,#183018) !important; border-color:#4a8a4a !important;"'
+            + ' onclick="adminTitlePick(\'give\')">주기</button>'
+            + '<button class="game-btn" style="flex:0 0 58px; margin:0; padding:9px; font-size:11px;'
+            + ' background:linear-gradient(145deg,#6a2a2a,#3a1818) !important; border-color:#a04a4a !important;"'
+            + ' onclick="adminTitlePick(\'take\')">떼기</button>';
         const holder = anchor.parentNode;
         holder.parentNode.insertBefore(row, holder.nextSibling);
         clearInterval(iv);
-        console.log('[칭호] 상담사 단추 연결 — 왼쪽 「주기/떼기」로 바꿔 누릅니다');
+        console.log('[칭호] 상담사 칸 연결 — 칭호를 고르고 [주기] · [떼기]');
         console.log('       콘솔: titleGive(\'이레귤러\', 사번) · titleTake(\'이레귤러\', 사번) · titleOf(사번)');
     }, 800);
 })();
