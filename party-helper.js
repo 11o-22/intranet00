@@ -18,6 +18,22 @@
 //    탐사 횟수를 쓰지 않는다. 횟수가 0이어도 들어갈 수 있다.
 //    포인트 · 은행 점수 · 회수품을 받지 않는다. 대신 소지품도 잃지 않는다.
 //    (오염도와 포만감은 그대로 — 몸으로 치르는 값은 남겨 두었다)
+//
+// ■ 헬퍼인데 포인트가 들어오던 것 (2026-10-18)
+//
+//   막는 자리가 어둠의 정산(renderDarkResult) 하나뿐이었다.
+//     · K 의 방(settle) · ■■의 ■■■(epicSettle) 은 정산을 따로 해서 그대로 받았다.
+//     · 탐사 도중에 들어온 포인트 · 물건도 그대로 남았다.
+//     · 정산을 바깥에서 감싼 것들(지산의 복 · 토크 쇼 · 달빛 문신 …)은
+//       되돌린 **뒤에** 또 얹었다.
+//     · 되돌리는 방법도 「화면의 값을 그때 값으로 덮기」였다. 포인트는
+//       서버에 더하고 빼기로 가는데(save-merge), 화면 값만 덮으면 메아리가
+//       돌아오며 되살아나는 때가 있었다.
+//   그래서 아래 6 에서 **탐사 하나를 통째로** 본다. 헬퍼로 출발하는 순간의
+//   포인트 · 소지품을 적어 두고, 탐사가 끝나 정산이 다 지나간 뒤 그때 모습으로
+//   되돌린다 — 포인트는 changePoints 로 차이만큼, 소지품은 늘어난 것을 빼고
+//   잃은 것을 돌려 준다. 갈래(어둠 · K 의 방 · ■■의 ■■■)를 가리지 않는다.
+//   은행 점수는 헬퍼 탐사 동안 bankAddScore 를 통째로 막는다.
 
 (function partyHelper() {
 
@@ -287,17 +303,134 @@ function withTriesOpen(fn) {
                 if (typeof saveFields === 'function') { try { saveFields(f); } catch (e) { } }
             }
 
-            setTimeout(function () {
-                showCustomAlert('헬퍼로 들어온 탐사입니다.\n\n'
-                    + '포인트 · 은행 점수 · 회수품을 받지 않습니다.\n'
-                    + '대신 소지품도 잃지 않았고, 탐사 횟수도 줄지 않았습니다.');
-            }, 900);
+            // 알림은 아래 6 이 탐사가 다 끝난 뒤 한 번만 띄운다
             return out;
         };
         renderDarkResult._helper = true;
         clearInterval(iv);
         console.log('[파티] 헬퍼 보상 면제 연결');
     }, 500);
+})();
+
+// ==========================================
+// 6. 헬퍼 탐사 하나를 통째로 — 끝나면 들어갈 때 모습으로
+// ==========================================
+const HK = 'helperRun_';
+let H = null;                  // { k, code, pts, inv, at }
+let hEnd = 0;                  // 끝난 뒤 정산이 다 지나갈 때까지 은행 점수를 막는다
+const H_SETTLE_MS = 2500;      // 탐사가 끝난 뒤 이만큼 기다렸다가 맞춘다
+const H_BOOT = Date.now();
+
+function hKey(r) { return String(r.zone || '') + '|' + String(r.partyId || ''); }
+function hSave() {
+    try {
+        if (!currentUser) return;
+        if (H) localStorage.setItem(HK + currentUser.code, JSON.stringify(H));
+        else localStorage.removeItem(HK + currentUser.code);
+    } catch (e) { }
+}
+function hLoad(code) { try { return JSON.parse(localStorage.getItem(HK + code) || 'null'); } catch (e) { return null; } }
+function helperGuard() { return !!H || Date.now() < hEnd; }
+window.helperGuardOn = helperGuard;
+
+function countOf(list) {
+    const m = {};
+    (Array.isArray(list) ? list : []).forEach(function (x) { if (x != null) m[x] = (m[x] || 0) + 1; });
+    return m;
+}
+
+// 들어갈 때 모습으로 되돌린다
+function hSettle(h) {
+    const u = currentUser;
+    if (!u || u.code !== h.code) return;
+    const dp = (Number(h.pts) || 0) - (Number(u.points) || 0);
+    if (dp) { try { changePoints(dp); } catch (e) { u.points = Number(h.pts) || 0; } }
+
+    if (!Array.isArray(u.inventory)) u.inventory = [];
+    const now = countOf(u.inventory), was = countOf(h.inv);
+    const took = [], back = [];
+    Object.keys(now).forEach(function (n) {
+        const extra = now[n] - (was[n] || 0);
+        if (extra > 0) {
+            if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, n, extra);
+            for (let i = 0; i < extra; i++) took.push(n);
+        }
+    });
+    Object.keys(was).forEach(function (n) {
+        const miss = was[n] - (now[n] || 0);
+        for (let i = 0; i < miss; i++) { u.inventory.push(n); back.push(n); }
+    });
+    const lines = [];
+    if (dp < 0) lines.push('포인트 ' + (-dp).toLocaleString() + ' P 를 되돌렸습니다.');
+    if (dp > 0) lines.push('잃은 포인트 ' + dp.toLocaleString() + ' P 를 돌려받았습니다.');
+    if (took.length) lines.push('회수품 ' + took.length + '개를 되돌렸습니다. (' + took.slice(0, 6).join(', ') + (took.length > 6 ? ' …' : '') + ')');
+    if (back.length) lines.push('잃은 소지품 ' + back.length + '개를 돌려받았습니다.');
+    if (took.length || back.length || dp) {
+        try { addHistoryLog(u, '[헬퍼] 탐사에서 받은 것 · 잃은 것을 되돌렸습니다.'); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    }
+    console.log('[파티] 헬퍼 탐사 끝 — 포인트 ' + (dp || 0) + ' · 되돌린 물건 ' + took.length + ' · 돌려준 물건 ' + back.length);
+    showCustomAlert('헬퍼로 들어온 탐사입니다.\n\n'
+        + '포인트 · 은행 점수 · 회수품을 받지 않습니다.\n'
+        + '대신 소지품도 잃지 않았고, 탐사 횟수도 줄지 않았습니다.'
+        + (lines.length ? '\n\n' + lines.join('\n') : ''));
+}
+
+setInterval(function () {
+    try {
+        if (!currentUser) return;
+        const r = (typeof darkRun !== 'undefined') ? darkRun : null;
+        if (r && r.zone) {
+            const k = hKey(r);
+            if (H && H.k !== k) { H = null; hSave(); }
+            if (!H) {
+                // 새로고침 뒤 — 같은 탐사면 적어 둔 것을 이어 쓴다
+                const old = hLoad(currentUser.code);
+                if (old && old.k === k && old.code === currentUser.code && Date.now() - (old.at || 0) < 6 * 3600000) {
+                    H = old;
+                } else if (iAmHelper()) {
+                    H = { k: k, code: currentUser.code, pts: Number(currentUser.points) || 0,
+                          inv: (currentUser.inventory || []).slice(), at: Date.now() };
+                    hSave();
+                }
+            }
+            return;
+        }
+        if (H) {
+            const h = H;
+            H = null; hSave();
+            hEnd = Date.now() + H_SETTLE_MS + 1500;
+            setTimeout(function () { try { hSettle(h); } catch (e) { console.warn('[파티] 헬퍼 되돌리기:', e); } }, H_SETTLE_MS);
+            return;
+        }
+        // 새로고침했는데 탐사가 이미 끝나 있다 — 적어 둔 것이 있으면 맞춘다
+        if (Date.now() - H_BOOT > 12000) {
+            const old = hLoad(currentUser.code);
+            if (old && old.code === currentUser.code) {
+                try { localStorage.removeItem(HK + currentUser.code); } catch (e) { }
+                if (Date.now() - (old.at || 0) < 6 * 3600000) hSettle(old);
+            }
+        }
+    } catch (e) { }
+}, 300);
+
+// 은행 점수 — 헬퍼 탐사 동안은 통째로 막는다 (어둠 · K 의 방 · ■■의 ■■■ 모두)
+(function hookBank() {
+    setInterval(function () {
+        const f = window.bankAddScore;
+        if (typeof f !== 'function' || f._helperGuard) return;
+        const w = function (delta, code) {
+            try {
+                const mine = !code || (currentUser && code === currentUser.code);
+                if (mine && helperGuard()) return;
+            } catch (e) { }
+            return f.apply(this, arguments);
+        };
+        Object.keys(f).forEach(function (k) { try { w[k] = f[k]; } catch (e) { } });
+        w._helperGuard = true;
+        window.bankAddScore = w;
+    }, 1500);
 })();
 
 // ==========================================

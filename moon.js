@@ -28,7 +28,7 @@
 //                         에 들었다가 살아난 것도, 물건으로 버틴 것도 한 번이다.
 //                         내가 그렇게 되면 쌓인 배수는 일행에게 가고 나는 그 탐사의
 //                         포인트를 못 받는다.
-//   ③ 흉내장이            고른 사원의 예금(bank/<사번>.deposit) 10% 를 받는다. 하루 한 번.
+//   ③ 흉내장이            고른 사원의 예금(bank/<사번>.deposit) 5% 를 받는다. 하루 한 번.
 //                         그쪽 통장은 그대로다. 예금이 0 이면 안 쓴 것으로 친다.
 //   ④ 토크쇼 방송인        **꺼낸 뒤 딱 5시간 동안** 포만감이 안 줄고(1 밑으로 안 내려간다),
 //                         탐사 횟수가 30 ~ 60 회 가운데 하나로 바뀐다 (원래 남은 것보다
@@ -77,7 +77,7 @@ const MOON = {
     T1_BONUS:   3,             // ① 판정
     T2_STEP:    1.5,           // ② 한 번 죽을 때마다
     T2_MAX:     4,             // (2026-10-18 · 6 → 4)
-    T3_RATE:    0.10,          // ③ 예금의 몇 할
+    T3_RATE:    0.05,          // ③ 예금의 몇 할 (2026-10-18 · 10% → 5%)
     T4_LO:      30,            // ④ 오늘 탐사 횟수
     T4_HI:      60,
     T4_MS:      5 * 3600000,   // ④ 꺼낸 뒤 딱 5시간
@@ -101,7 +101,7 @@ const MOON_TATS = [
        + '(아이템, 남의 도움 등으로 죽을 고비에서 부활하는 것도 죽음에 포함)',
       q: '1학년 5반에서 사망사고가 일어났습니다.' },
     { id: 't3', n: '흉내장이',
-      d: '사원 중 한 명을 모방하여 해당 사원의 예금 통장 내 포인트 총액 10%를 지급 받는다. '
+      d: '사원 중 한 명을 모방하여 해당 사원의 예금 통장 내 포인트 총액 5%를 지급 받는다. '
        + '대상이 된 사원의 포인트 변동은 없다.',
       q: '너희는 이름님을 믿니?' },
     { id: 't4', n: '토크쇼 방송인',
@@ -619,6 +619,7 @@ function finish() {
     T = null; tLive = false; tSave(); unlisten();
     lastSelf = 0; closedAt = 0;
     if (!t || !u) return;
+    if (t.hp) return;                                      // 헬퍼 — 포인트를 받지 않는다
     const gained = (Number(u.points) || 0) - (Number(t.s) || 0);
     const two = on(u, 't2'), six = on(u, 't6');
     const lines = [];
@@ -669,6 +670,8 @@ setInterval(function () {
             tLive = true;
             const pid = (r.isParty && r.partyId) ? r.partyId : '';
             if (T.pid !== pid) { T.pid = pid; dirty = true; }
+            // 헬퍼로 들어온 탐사는 받지 않는다 (party-helper.js)
+            if (!T.hp) { try { if (typeof iAmHelper === 'function' && iAmHelper()) { T.hp = 1; dirty = true; } } catch (e) { } }
             if (dirty) tSave();
             listen(T.pid);
             return;
@@ -685,7 +688,7 @@ setInterval(function () {
 }, 500);
 
 // ==========================================
-// ③ 흉내장이 — 예금의 10%
+// ③ 흉내장이 — 예금의 5%
 // ==========================================
 function copyPick() {
     const me = u_();

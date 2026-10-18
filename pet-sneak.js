@@ -686,7 +686,9 @@ setInterval(function () {
         }
     });
     if (changed) {
-        try { if (typeof saveFields === 'function') saveFields({ pets: 1 }); } catch (e) { }
+        // ★ 고친 자리는 위에서 펫 하나씩(patch · set) 이미 썼다. 펫 칸을 통째로 다시
+        //   올리면 다른 기기에서 먹인 것(fedAt)을 묵은 값으로 덮는다 — 서버가 없을 때만.
+        try { if ((typeof database === 'undefined' || !database) && typeof saveFields === 'function') saveFields({ pets: 1 }); } catch (e) { }
         try { if (typeof window.petRoomPaint === 'function') window.petRoomPaint(); } catch (e) { }
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     }

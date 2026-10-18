@@ -306,10 +306,77 @@ function petBondUp(id, patch) {
 // ==========================================
 // 굶주림 — 마지막으로 먹인 때로부터 사흘
 // ==========================================
+//
+// ■ 먹였는데 굶어 죽던 까닭 (2026-10-18)
+//
+//   먹인 때(fedAt)는 펫 칸(users/<사번>/pets) 안에만 있었다. 그런데 그 칸은
+//   여러 길이 **통째로** 쓴다 — saveFields({ pets:1 }) · saveDB · 병합 저장
+//   (save-merge 는 pets 를 한 덩어리로 보고 바뀌면 통째로 보낸다).
+//   다른 기기에 켜 둔 화면이 묵은 펫 칸을 한 번 올리면 **휴대폰에서 먹인
+//   것이 옛 시각으로 되돌아갔다.** 또 잠들었다 깬 화면은 서버 소식이
+//   내려오기 전에 굶주림 시계(아래 sweep)가 먼저 돌아, 묵은 fedAt 을 보고
+//   펫을 지워 버렸다. 둘 다 「먹였는데 굶어 죽었다」로 보인다.
+//
+// ■ 어떻게 막나
+//
+//   1. 먹인 때를 펫 칸 **밖에도** 적는다 — petFed/<사번>/<번호> = { b, f }
+//      (b 는 그 펫이 태어난 때 at, f 는 먹인 때). 통째 저장은 users/<사번>
+//      아래만 쓰므로 여기는 안 건드린다. 같은 자리에 새 펫이 오면 b 가
+//      달라서 옛 기록을 안 쓴다. 굶주림은 둘 중 늦은 쪽으로 센다.
+//   2. 굶어 죽었다고 지울 때는 **서버에서 확인하고** 지운다. 펫 칸을
+//      트랜잭션으로 고친다 — 내 화면이 묵었으면 서버가 받아 주지 않고
+//      서버의 지금 모습으로 다시 셈하게 된다. 서버 쪽 먹인 때가 아직
+//      사흘 안이면 살려 두고, 펫 칸의 fedAt 이 덮여 있었으면 되살려 쓴다.
+const petFedMark = {};          // 번호 → { b, f }  (서버 petFed/<사번> 를 듣고 채운다)
+let petFedBound = '';
+let petFedRef = null;
+function petFedBind() {
+    const u = petMe();
+    if (!u || !u.code || typeof database === 'undefined' || !database) return;
+    if (petFedBound === u.code) return;
+    try { if (petFedRef) petFedRef.off(); } catch (e) { }
+    Object.keys(petFedMark).forEach(function (k) { delete petFedMark[k]; });
+    petFedBound = u.code;
+    try {
+        petFedRef = database.ref('petFed/' + u.code);
+        petFedRef.on('value', function (sn) {
+            const v = petObj(sn.val());
+            Object.keys(petFedMark).forEach(function (k) { delete petFedMark[k]; });
+            Object.keys(v).forEach(function (k) { if (v[k]) petFedMark[k] = v[k]; });
+        });
+    } catch (e) { }
+}
+setInterval(function () { try { petFedBind(); } catch (e) { } }, 1500);
+
+// 펫 칸 밖에 적어 둔 먹인 때 (태어난 때가 같을 때만)
+function petFedOf(k, s, mark) {
+    const m = mark || petFedMark[String(k)];
+    if (!m || !s) return 0;
+    if (Number(m.b) !== (Number(s.at) || 0)) return 0;
+    return Number(m.f) || 0;
+}
+// 먹인 때를 펫 칸 밖에도 적는다 — 늦은 쪽만 남긴다
+function petFedNote(k, s, fedAt) {
+    const u = petMe();
+    fedAt = Number(fedAt) || 0;
+    if (!u || !u.code || !s || !fedAt) return;
+    const b = Number(s.at) || 0;
+    const key = String(k);
+    const cur = petFedMark[key];
+    if (!cur || Number(cur.b) !== b || (Number(cur.f) || 0) < fedAt) petFedMark[key] = { b: b, f: fedAt };
+    try {
+        if (typeof database === 'undefined' || !database) return;
+        database.ref('petFed/' + u.code + '/' + key).transaction(function (c) {
+            if (c && Number(c.b) === b && (Number(c.f) || 0) >= fedAt) return;     // 이미 더 늦다
+            return { b: b, f: fedAt };
+        }).catch(function (e) { console.warn('[펫] 먹인 때 적기 실패', e); });
+    } catch (e) { }
+}
+
 function petStarveLeft(id, u) {
     const s = petsOf(u)[String(id)];
     if (!s) return 0;
-    const at = Number(s.fedAt) || 0;
+    const at = Math.max(Number(s.fedAt) || 0, petFedOf(id, s));
     if (!at) return PET_STARVE;          // 아직 시계가 안 붙은 펫은 굶지 않는다
     return (at + PET_STARVE) - petNow();
 }
@@ -405,7 +472,10 @@ function petShowToggle(id) {
     return { on: cur.indexOf(key) >= 0, out: out };
 }
 
-function petStarveSweep() {
+//   cb(gone) — 서버에서 확인하고 지운 펫을 나중에 알려 준다.
+//   돌려주는 값은 그 자리에서 지운 것(서버가 없을 때)뿐이다.
+const petStarveBusy = {};
+function petStarveSweep(cb) {
     const u = petMe();
     if (!u) return [];
     const ps = petsOf(u);
@@ -414,9 +484,19 @@ function petStarveSweep() {
     // 굶주림 시계가 없는 펫(예전에 깨어난 것)에게는 지금부터 사흘을 준다
     const stamp = {};
     Object.keys(ps).forEach(function (k) {
-        if (!PET_BY_ID[k] || !ps[k] || ps[k].fedAt) return;
-        ps[k].fedAt = now;
-        stamp['pets/' + k + '/fedAt'] = now;
+        if (!PET_BY_ID[k] || !ps[k]) return;
+        if (!ps[k].fedAt) {
+            ps[k].fedAt = now;
+            stamp['pets/' + k + '/fedAt'] = now;
+            petFedNote(k, ps[k], now);
+            return;
+        }
+        // 펫 칸의 먹인 때가 묵은 값으로 덮여 있으면 칸 밖 기록으로 되살린다
+        const hi = petFedOf(k, ps[k]);
+        if (hi > (Number(ps[k].fedAt) || 0)) {
+            ps[k].fedAt = hi;
+            stamp['pets/' + k + '/fedAt'] = hi;
+        }
     });
     if (Object.keys(stamp).length) {
         try {
@@ -426,25 +506,76 @@ function petStarveSweep() {
         } catch (e) { }
     }
 
-    const gone = [];
-    Object.keys(ps).forEach(function (k) {
-        if (!PET_BY_ID[k]) return;
-        if (petStarveLeft(k, u) > 0) return;
-        gone.push({ i: k, n: petNick(k, u), sp: (PET_BY_ID[k] || {}).n });
-        delete ps[k];
+    const cand = Object.keys(ps).filter(function (k) {
+        return PET_BY_ID[k] && petStarveLeft(k, u) <= 0;
     });
-    if (!gone.length) return gone;
-    try {
-        if (typeof database !== 'undefined' && database && u.code) {
-            const up = {};
-            gone.forEach(function (g) { up['pets/' + g.i] = null; });
-            database.ref('users/' + u.code).update(up)
-                .catch(function (e) { console.warn('[펫] 굶주림 저장 실패', e); });
-            return gone;
-        }
-    } catch (e) { }
-    petSave({ pets: 1 });
-    return gone;
+    if (!cand.length) return [];
+
+    // 서버가 없으면 예전처럼 그 자리에서 지운다
+    if (typeof database === 'undefined' || !database || !u.code) {
+        const gone = cand.map(function (k) {
+            const g = { i: k, n: petNick(k, u), sp: (PET_BY_ID[k] || {}).n };
+            delete ps[k];
+            return g;
+        });
+        petSave({ pets: 1 });
+        return gone;
+    }
+    cand.forEach(function (k) { petStarveCheck(u, k, cb); });
+    return [];
+}
+
+// 서버에서 확인하고 지운다
+function petStarveCheck(u, k, cb) {
+    const code = u.code;
+    if (petStarveBusy[code + '/' + k]) return;
+    petStarveBusy[code + '/' + k] = 1;
+    const nm = petNick(k, u), sp = (PET_BY_ID[k] || {}).n;
+    const done = function () { delete petStarveBusy[code + '/' + k]; };
+
+    // 펫 칸 밖의 먹인 때 — 같은 값을 다시 쓰는 트랜잭션으로 읽어 **서버 값**을 받는다
+    const readMark = function () {
+        try {
+            return database.ref('petFed/' + code + '/' + k)
+                .transaction(function (c) { return c === null ? null : c; })
+                .then(function (r) { return (r && r.snapshot) ? r.snapshot.val() : null; })
+                .catch(function () { return petFedMark[String(k)] || null; });
+        } catch (e) { return Promise.resolve(petFedMark[String(k)] || null); }
+    };
+    readMark().then(function (mark) {
+        let killed = false;
+        return database.ref('users/' + code + '/pets/' + k).transaction(function (cur) {
+            killed = false;
+            if (cur === null) return null;            // 비어 보이면 서버와 견주게 한다
+            const own = Number(cur.fedAt) || 0;
+            const fed = Math.max(own, petFedOf(k, cur, mark));
+            if (!fed) return;                          // 시계가 없는 펫은 건드리지 않는다
+            if (fed + PET_STARVE > petNow()) {
+                if (fed > own) { cur.fedAt = fed; return cur; }   // 덮여 있던 먹인 때를 되살린다
+                return;                                // 살아 있다
+            }
+            killed = true;
+            return null;
+        }).then(function (r) {
+            done();
+            const me = petMe();
+            if (!me || me.code !== code) return;
+            const v = (r && r.snapshot) ? r.snapshot.val() : null;
+            const mine = petsOf(me);
+            if (r && r.committed && killed && v === null) {
+                delete mine[String(k)];
+                if (typeof cb === 'function') cb([{ i: String(k), n: nm, sp: sp }]);
+                return;
+            }
+            if (v) {
+                mine[String(k)] = v;                       // 서버 모습으로 맞춘다
+                if (mark) petFedMark[String(k)] = mark;
+                console.log('[펫] ' + nm + ' — 서버에서는 굶지 않았습니다. 살려 둡니다.');
+            } else if (r && r.committed) {
+                delete mine[String(k)];                    // 서버에 이미 없다 (다른 화면이 치웠다)
+            }
+        });
+    }).catch(function (e) { done(); console.warn('[펫] 굶주림 확인 실패', e); });
 }
 
 // 알 쪽 기록 — 통째로 쓴다 (알은 한 번에 하나뿐이라 겹칠 일이 없다)
@@ -476,6 +607,7 @@ function petPatch(id, patch) {
     Object.keys(patch).forEach(function (k) {
         if (patch[k] === null) delete s[k]; else s[k] = patch[k];
     });
+    if (patch.fedAt) petFedNote(key, s, patch.fedAt);      // 통째 저장에 덮이지 않게 칸 밖에도
     try {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code + '/pets/' + key).update(patch)
@@ -631,7 +763,7 @@ window.PET = {
     BOND_MAX: PET_BOND_MAX, BOND_DAY: PET_BOND_DAY, PAT_GAP: PET_PAT_GAP,
     PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,
     bond: petBond, bondFull: petBondFull, bondRoom: petBondRoom, bondUp: petBondUp,
-    starveLeft: petStarveLeft, sweep: petStarveSweep,
+    starveLeft: petStarveLeft, sweep: petStarveSweep, fedMark: petFedMark, fedNote: petFedNote,
     full: petFull, fillAt: petFillAt,
     SHOW_MAX: PET_SHOW_MAX,
     show: petShowList, showHas: petShowHas, showToggle: petShowToggle,

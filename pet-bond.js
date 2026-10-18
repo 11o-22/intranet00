@@ -196,8 +196,12 @@ let told = 0;
 function sweep(quiet) {
     const u = u_();
     if (!u || !P()) return;
-    const gone = P().sweep();
-    if (!gone.length) return;
+    // ★ 서버에서 확인한 뒤에야 지우므로, 죽은 펫은 대개 나중에 cb 로 온다
+    const gone = P().sweep(function (late) { buried(late, quiet); });
+    buried(gone, quiet);
+}
+function buried(gone, quiet) {
+    if (!gone || !gone.length) return;
     gone.forEach(function (g) {
         log_('[펫] ' + g.n + P().josa(g.n, '이') + ' 굶어 죽었습니다. (' + g.sp + ')');
     });
