@@ -198,8 +198,8 @@ const DUNS = {
     A1: { g: 'A', n: '『어린이 방송국』', ready: true },
     A2: { g: 'A', n: '『물에 잠긴 기숙학교』', ready: true },
     // S — 에일리언 · 공룡
-    S1: { g: 'S', n: '『표본실 — 착륙 이후』', ready: false },
-    S2: { g: 'S', n: '『백악기 정원』', ready: false }
+    S1: { g: 'S', n: '『표본실 — 착륙 이후』', ready: true },
+    S2: { g: 'S', n: '『백악기 정원』', ready: true }
 };
 
 // ── 던전 물건
