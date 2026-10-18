@@ -34,6 +34,13 @@
 //   되돌린다 — 포인트는 changePoints 로 차이만큼, 소지품은 늘어난 것을 빼고
 //   잃은 것을 돌려 준다. 갈래(어둠 · K 의 방 · ■■의 ■■■)를 가리지 않는다.
 //   은행 점수는 헬퍼 탐사 동안 bankAddScore 를 통째로 막는다.
+//
+// ■ K 의 방 (2026-10-18)
+//
+//   「혼자 들어간다」도 이 창의 헬퍼 스위치를 본다. 경험치 · 꿈결 · 각성 점수는
+//   K 의 방 정산(kroom-core.js settle)이 헬퍼면 아예 안 준다 — 끝나고 되돌릴
+//   수가 없는 값이라서다. 탐사 하나를 통째로 지키는 6 은 K 의 방에도 그대로 돈다
+//   (kroom-core.js 가 darkRun.helper 를 적어 둔다).
 
 (function partyHelper() {
 
@@ -371,6 +378,9 @@ function hSettle(h) {
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     }
     console.log('[파티] 헬퍼 탐사 끝 — 포인트 ' + (dp || 0) + ' · 되돌린 물건 ' + took.length + ' · 돌려준 물건 ' + back.length);
+    // K 의 방은 정산 화면이 이미 헬퍼라고 말한다 — 되돌린 것이 없으면 또 띄우지 않는다
+    const kz = (typeof K_CODE !== 'undefined') ? K_CODE : 'Qtrew-???-999';
+    if (!lines.length && String(h.k || '').indexOf(kz + '|') === 0) return;
     showCustomAlert('헬퍼로 들어온 탐사입니다.\n\n'
         + '포인트 · 은행 점수 · 회수품을 받지 않습니다.\n'
         + '대신 소지품도 잃지 않았고, 탐사 횟수도 줄지 않았습니다.'

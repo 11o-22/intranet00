@@ -255,6 +255,25 @@ function prof(u) {
     return k;
 }
 function saveProf() { try { saveFields({ kroom: 1, history: 1 }); } catch (e) { } }
+
+// ★ 헬퍼 (party-helper.js 의 「헬퍼로 참가」) — 2026-10-18
+//   혼자 들어갈 때는 이 창의 스위치를, 일행으로 들어갈 때는 일행 명단의 헬퍼 표시를 본다.
+//   헬퍼는 탐사 횟수를 쓰지 않고(0 이어도 들어간다), 경험치 · 꿈결 · 각성 점수 · 포인트 ·
+//   은행 점수를 받지 않는다. 쓰러져도 포인트 · 반입품을 잃지 않고 상담실로 가지 않는다.
+//   (포만감은 그대로 — 어둠의 헬퍼와 같다)
+//   ✗ 전에는 「혼자 들어간다」가 스위치를 아예 안 봐서, 켜 두고 들어가도 보통 탐사였다.
+//     일행으로 들어간 헬퍼도 포인트만 끝나고 되돌렸지(party-helper.js 6) 경험치 · 꿈결 ·
+//     각성은 그대로 쌓였다.
+function helperSwitch() {
+    try { return localStorage.getItem('darkHelperMode') === '1'; } catch (e) { return !!window._helperMode; }
+}
+function helperIn(pid) {
+    const u = me(); if (!u) return false;
+    const p = (pid && typeof darkParties !== 'undefined' && darkParties) ? darkParties[pid] : null;
+    const m = p && p.members && p.members[u.code];
+    return !!(m && m.helper);
+}
+function isHelper() { return !!(kr && kr.helper); }
 function lvOf(u) { const k = u && u.kroom; return (k && !stale(k) && k.lv) || 1; }
 // 내 것 — 새 판을 처음 띄우면 한 번 비우고 적어 둔다
 function freshen() {
@@ -439,6 +458,13 @@ function liveTeams(skip) {
         clearInterval(iv);
     }, 400);
 })();
+// 헬퍼 스위치를 켜고 끄면 입구 안내도 따라간다
+setInterval(function () {
+    const n = document.getElementById('kroom-helper-note');
+    if (!n) return;
+    const v = helperSwitch() ? 'block' : 'none';
+    if (n.style.display !== v) n.style.display = v;
+}, 1000);
 function paintEntry() {
     const body = document.getElementById('darkness-body');
     if (!body || (typeof darkRun !== 'undefined' && darkRun)) return;
@@ -458,6 +484,7 @@ function paintEntry() {
                 · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
             </div>
             <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트와 반입품을 잃고 상담실로 이송됩니다.</div>
+            <div id="kroom-helper-note" style="display:${helperSwitch() ? 'block' : 'none'}; font-size:10px; color:#81c784; margin-top:4px;">✚ 헬퍼로 들어갑니다 — 횟수를 쓰지 않고, 경험치 · 꿈결 · 포인트를 받지 않으며, 쓰러져도 잃지 않습니다. (파티 편성 칸에서 끕니다)</div>
             <div style="display:flex; gap:6px; margin-top:11px;">
                 <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:11px;" onclick="kroomSolo()">혼자 들어간다</button>
                 <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:11px;" onclick="createParty('${K_CODE}')">일행을 모은다</button>
@@ -472,7 +499,7 @@ function canEnter(silent) {
     const u = me(); if (!u) return false;
     const say = function (t) { if (!silent) showCustomAlert(t); return false; };
     if (!mainAttr(u)) return say('전용 장비가 없어 들어갈 수 없습니다.\n\n이곳의 직업은 전용 장비의 첫 번째 속성을 따라갑니다.');
-    if (getDarkTriesLeft() <= 0) return say('금일 탐사 횟수를 모두 소진했습니다.');
+    if (getDarkTriesLeft() <= 0 && !helperSwitch()) return say('금일 탐사 횟수를 모두 소진했습니다.');
     if (isQuarantined(u)) return say('격리 중에는 들어갈 수 없습니다.');
     if (u.pollution >= 100) return say('오염도가 한계치라 들어갈 수 없습니다.');
     return true;
@@ -511,6 +538,7 @@ function start(isParty, pid) {
     const u = me();
     hookItems();
     const old = (typeof darkRun !== 'undefined') ? darkRun : null;
+    const helper = isParty ? (helperIn(pid) || !!(old && old.helper)) : helperSwitch();
     darkRun = {
         zone: K_CODE, step: 0, modifier: 0, success: 0, fail: 0,
         carryEquips: (typeof darkRun !== 'undefined' && darkRun && darkRun.carryEquips) || [],
@@ -518,19 +546,26 @@ function start(isParty, pid) {
         lostItems: [], log: [], isParty: !!isParty, partyId: pid || null,
         isLeader: false, counted: true, kroom: true
     };
+    if (helper) darkRun.helper = true;          // party-helper.js 가 탐사 하나를 통째로 지킨다 (iAmHelper)
     // 일행 출발 때 다른 파일이 얹어 둔 것 — 📺 토크 쇼 부활 · 📱 K·LEE 예약
     if (old && isParty) ['_show', '_showRevives', '_showOn', '_showHeat', '_showHostDead', 'kleeBooked'].forEach(function (f) {
         if (old[f] != null) darkRun[f] = old[f];
     });
     if (!isParty) {
-        u.darkDate = getTodayStr();
-        u.darkTries = (u.darkTries || 0) + 1;
+        if (!helper) {                                       // 헬퍼는 횟수를 쓰지 않는다
+            u.darkDate = getTodayStr();
+            u.darkTries = (u.darkTries || 0) + 1;
+        }
         applyDarkSatiety(K_CODE);
-        try { saveFields({ darkDate: 1, darkTries: 1, satiety: 1 }); } catch (e) { }
+        try { saveFields(helper ? { satiety: 1 } : { darkDate: 1, darkTries: 1, satiety: 1 }); } catch (e) { }
     }
     kr = { team: isParty ? pid : ('solo_' + u.code), dun: null, floor: 0, idx: 0, step: 'job',
            exp: 0, dream: 0, items: {}, log: [], started: now(), met: {}, seenJ: {},
-           uses: {}, stats: null, wakeNow: 0, pts: 0, flags: {} };
+           uses: {}, stats: null, wakeNow: 0, pts: 0, flags: {}, helper: helper };
+    if (helper) {
+        addHistoryLog(u, '[' + K_CODE + '] 헬퍼로 들어갔습니다. (보상 없음 · 횟수 차감 없음)');
+        setTimeout(function () { toast('헬퍼로 들어왔습니다 — 경험치 · 꿈결 · 포인트를 받지 않고, 횟수도 줄지 않습니다.'); }, 900);
+    }
     try { kv(resetDnaCharge); } catch (e) { }                  // 회피·행운·기믹 횟수 — 쇼핑몰 것은 빼고
     try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { }
     darkAmbienceStart(K_CODE);
@@ -1153,6 +1188,7 @@ function wakeUp() {
     const k = prof();
     const g = k.grade;
     if (!WAKE_NEED[g]) return '';
+    if (isHelper()) return `<div style="font-size:11px; color:#81c784; margin-top:6px;">◇ 헬퍼 — 각성 점수는 쌓이지 않는다.</div>`;
     // ★ 각성은 **지금 등급의 던전**에서 한다 — D 던전에서 C 를 만들어야 C 던전이 열린다.
     //   (2026-10-17 사용자가 바꿈. 전에는 올라갈 등급의 던전에서만 했다)
     //   일행에 끼어 더 높은 등급 던전에 들었으면 거기서도 쌓인다. 낮은 등급 던전은 안 쌓인다.
@@ -2003,6 +2039,17 @@ function hardDeath(why) {
     kr.dead = true;
     statDead();
     const u = me();
+    if (isHelper()) {
+        // ★ 헬퍼 — 포인트 · 반입품을 잃지 않고, 오염도도 안 올라가며, 상담실로 가지 않는다
+        kr.lostPts = 0; kr.lostItems = []; kr.luckSaved = false;
+        addHistoryLog(u, '[' + K_CODE + '] 쓰러짐 (헬퍼 — 잃은 것 없음)');
+        try { saveFields({ history: 1 }); } catch (e) { }
+        if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
+        darkRun._dead = true;
+        try { if (window.eyeKroom) window.eyeKroom.dead(); } catch (e) { }
+        settle('dead', why);
+        return;
+    }
     // 행운(전용 장비 · 호사수구 꼬리) — 일부를 지킨다
     const luckRate = (typeof gearValue === 'function') ? (kv(gearValue, null, [u, 'luck']) || 0) : 0;
     const saved = luckRate > 0 && Math.random() < luckRate;
@@ -2034,9 +2081,11 @@ function settle(how, txt) {
     if (darkRun) darkRun._settled = true;
     const u = me(), k = prof(u);
     const alive = (how === 'clear' || how === 'leave');
+    const helper = isHelper();
     let exp = kr.exp, dream = kr.dream;
     if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = Math.floor(dream * 0.35); }
+    if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
     // 꿈결 — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)
     if (alive && dream > 0) {
@@ -2047,18 +2096,21 @@ function settle(how, txt) {
     }
     // 레벨
     const lv0 = k.lv;
-    k.exp = (k.exp || 0) + exp;
-    while (k.lv < LV_MAX && k.exp >= needExp(k.lv)) { k.exp -= needExp(k.lv); k.lv++; }
-    if (k.lv >= LV_MAX) k.exp = 0;
-    k.dream = (k.dream || 0) + dream;
-    k.runs = (k.runs || 0) + 1;
+    if (!helper) {
+        k.exp = (k.exp || 0) + exp;
+        while (k.lv < LV_MAX && k.exp >= needExp(k.lv)) { k.exp -= needExp(k.lv); k.lv++; }
+        if (k.lv >= LV_MAX) k.exp = 0;
+        k.dream = (k.dream || 0) + dream;
+        k.runs = (k.runs || 0) + 1;
+    }
     // 포인트 — 다른 어둠처럼 조금
     const g = kr.dun ? DUNS[kr.dun].g : 'D';
     let pts = 0;
     if (how === 'clear') pts = rnd(1500, 4000) * ({ D: 1, C: 1.5, B: 2.2, A: 3, S: 4 }[g] || 1);
     if (how === 'leave') pts = rnd(400, 1200);
     pts = Math.round(pts);
-    if (alive) {
+    if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
+    if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
         if (kr.truth && jisanOn()) { pts *= 3; extra.push('🧧 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
         const p = showP();
@@ -2071,12 +2123,12 @@ function settle(how, txt) {
     try { if (Array.isArray(u.itemBuffs)) u.itemBuffs = u.itemBuffs.filter(function (b) { return !b || !b.run || shopSrc(b.src); }); } catch (e) { }
     const HOW = { clear: '돌파', leave: '귀환', dead: '쓰러짐', out: '빠져나옴' };
     addHistoryLog(u, '[' + K_CODE + '] ' + (kr.dun ? DUNS[kr.dun].n : '') + ' — '
-        + HOW[how] + ' · 경험치 +' + exp + ' · 꿈결 +' + dream + (pts ? ' · +' + pts.toLocaleString() + ' P' : ''));
-    try { bankAddScore(how === 'dead' ? -5 : (how === 'clear' ? 12 : (how === 'out' ? 2 : 4))); } catch (e) { }
+        + HOW[how] + (helper ? ' · 헬퍼 (보상 없음)' : ' · 경험치 +' + exp + ' · 꿈결 +' + dream + (pts ? ' · +' + pts.toLocaleString() + ' P' : '')));
+    if (!helper) { try { bankAddScore(how === 'dead' ? -5 : (how === 'clear' ? 12 : (how === 'out' ? 2 : 4))); } catch (e) { } }
     if (!u.darkLogs) u.darkLogs = [];
     u.darkLogs.unshift({ date: new Date().toLocaleString(), zone: K_CODE, zoneName: '『 K 의 방 』 ' + (kr.dun ? DUNS[kr.dun].n : ''),
         reward: pts, success: darkRun.success, fail: darkRun.fail, loot: [], lost: [], detail: darkRun.log.slice(-20),
-        died: how === 'dead', party: !!darkRun.isParty });
+        died: how === 'dead', party: !!darkRun.isParty, helper: helper || undefined });
     if (u.darkLogs.length > 15) u.darkLogs.pop();
     try { saveFields({ kroom: 1, history: 1, darkLogs: 1, points: 1, itemBuffs: 1 }); } catch (e) { }
     try { paintDream(); } catch (e) { }
@@ -2087,11 +2139,14 @@ function settle(how, txt) {
             <div style="font-weight:bold; color:#7fd3e6; margin-bottom:8px; border-bottom:1px dashed #2f4a55; padding-bottom:6px;">[정산]</div>
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
             ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ' · ' + k.grade + ' 던전에서)</span>' : '') + '<br>' : ''}
-            경험치 <b>+${exp}</b>${how !== 'clear' ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
+            ${helper ? '<div style="color:#81c784; margin-bottom:6px;">헬퍼로 들어온 탐사입니다 — 경험치 · 꿈결 · 각성 점수 · 포인트를 받지 않고, 탐사 횟수도 줄지 않았습니다.</div>' : ''}
+            경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
             ${extra.length ? '<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #4a3a6a; color:#d4bbff; font-size:11px;">' + extra.join('<br>') + '</div>' : ''}
-            ${how === 'dead' ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7f0000; color:#f44336;">
+            ${how === 'dead' && helper ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #2e7d32; color:#81c784;">
+                헬퍼 — 포인트와 반입품을 잃지 않았고, 상담실로 가지 않습니다.</div>` : ''}
+            ${how === 'dead' && !helper ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7f0000; color:#f44336;">
                 보유 포인트 <b>-${(kr.lostPts || 0).toLocaleString()} P</b><br>
                 ${(kr.lostItems || []).length ? '반입품 <b>' + kr.lostItems.map(esc).join(', ') + '</b> 소실<br>' : ''}
                 ${kr.luckSaved ? '<span style="color:#4CAF50;">✺ 행운 — 일부를 지켜냈습니다.</span><br>' : ''}
