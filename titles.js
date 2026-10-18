@@ -46,8 +46,8 @@ const DEFS = [
     { id:'mola',    n:'개복치',      need:'어둠에서 50번 사망',
       check:(u,s)=> s.dead >= 50 },
 
-    { id:'tamer',   n:'조련사',      need:'펫 전부 보유',
-      check:(u)=> petsAllOwned(u) },            // 펫 시스템이 생기면 켜진다
+    { id:'tamer',   n:'조련사',      need:'펫 전부 보유 (지금 데리고 있는 펫 기준)',
+      check:(u)=> petsAllOwned(u) },            // 펫 24종을 한꺼번에 가지고 있으면 (2026-10-18 켬)
 
     { id:'weapon',  n:'웨폰 마스터', need:'전용 장비 세 자리 전부 L',
       check:(u)=> allAttrsL(u) },
@@ -404,11 +404,26 @@ function repair() {
 }
 
 // 펫 시스템이 아직 없으면 항상 거짓
+// ★ 펫 — 조련사
+//   펫은 종 번호를 열쇠로 하나씩 들어 있다 (pet-data.js · u.pets = { '1': {…}, … }).
+//   파이어베이스가 배열로 돌려줄 때도 있어 자리번호를 열쇠로 되돌려 센다.
+//   굶어 죽거나 떠난 펫은 빠지므로, **지금** 스물네 종을 다 데리고 있어야 한다.
+//   한 번 얻은 칭호는 펫이 줄어도 떼지 않는다 (다른 칭호와 같다).
+function petList() {
+    const P = window.PET;
+    return (P && Array.isArray(P.LIST)) ? P.LIST : [];
+}
+function petsReady() { return petList().length > 0; }
+function petsHave(u) {
+    const v = u && u.pets;
+    const o = {};
+    if (Array.isArray(v)) v.forEach(function (x, i) { if (x) o[String(i)] = x; });
+    else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { if (v[k]) o[k] = v[k]; });
+    return petList().filter(function (sp) { return !!o[String(sp.i)]; }).length;
+}
 function petsAllOwned(u) {
-    if (typeof PET_SPECIES === 'undefined') return false;
-    const have = {};
-    (u.pets || []).forEach(function (p) { if (p && p.sp) have[p.sp] = true; });
-    return PET_SPECIES.length > 0 && PET_SPECIES.every(function (s) { return have[s.id || s]; });
+    const all = petList().length;
+    return all > 0 && petsHave(u) >= all;
 }
 
 // ==========================================
@@ -904,7 +919,7 @@ function prog(d, u, s) {
         case 'weapon':  return [lSlots(u), GEAR_SLOTS, '자리'];
         case 'gold':    return [isVip(u) ? 1 : 0, 1, ''];
         case 'cook':    return [(u.cookStat && u.cookStat.hi) || 0, 50, '회'];
-        case 'tamer':   return [0, 1, ''];
+        case 'tamer':   return [petsHave(u), petList().length || 1, '종'];
         default:        return [0, 1, ''];
     }
 }
@@ -928,7 +943,7 @@ function renderTitleList() {
         const p = prog(d, currentUser, s);
         const cur = Math.min(p[0], p[1]);
         const pctv = p[1] > 0 ? Math.min(100, Math.round(cur / p[1] * 100)) : 0;
-        const dormant = (d.id === 'tamer' && typeof PET_SPECIES === 'undefined');
+        const dormant = (d.id === 'tamer' && !petsReady());
         const on = got && currentUser.titleOn === d.n;
 
         return ''
