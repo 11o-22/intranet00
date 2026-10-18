@@ -20,8 +20,7 @@
 // ■ 일곱 문신
 //
 //   ① 유치원 선생님      판정 +3 (rollDarkBonus 를 지나는 모든 탐사 — 어둠 · K 의 방 ·
-//                         ■■의 ■■■). 상담실 · 선녀탕 입원 한 번을 없던 일로 한다
-//                         (들어가는 순간 꺼낸다 · 이미 들어가 있을 때 꺼내도 바로 나온다).
+//                         ■■의 ■■■). (2026-10-18 · 입원 무효는 뺐다)
 //   ② 세광공업고등학교 학생
 //                         함께 간 사람이 한 번 죽을 때마다 ×1.5 씩 쌓인다
 //                         (한 번 1.5 · 두 번 3 · 세 번부터 4).
@@ -31,17 +30,18 @@
 //                         포인트를 못 받는다.
 //   ③ 흉내장이            고른 사원의 예금(bank/<사번>.deposit) 10% 를 받는다. 하루 한 번.
 //                         그쪽 통장은 그대로다. 예금이 0 이면 안 쓴 것으로 친다.
-//   ④ 토크쇼 방송인        포만감이 안 줄고(1 밑으로 안 내려간다), 오늘 탐사 횟수가
-//                         30 ~ 60 회 가운데 하나로 바뀐다 (원래 남은 것보다 적어지지는 않는다).
-//   ⑤ 룩키마트 직원        유쾌 판매소 · ??? · 우주 쇼핑몰을 각각 하루 두 번 리셋한다.
-//                         유쾌 판매소 · ??? 는 이번 진열의 구매 수를 비운다(재입고).
-//                         우주 쇼핑몰은 남은 주파수를 2 로 맞추고(2 보다 많이 남았으면 그대로),
-//                         기다리는 시간을 없애고, 품절된 칸을 비운다 — 안 산 물건은 그대로 둔다.
-//   ⑥ 검은 고양이          탐사가 끝날 때마다 +3,000 P, 이번 탐사에서 남을 구한 횟수마다 +1,000 P.
+//   ④ 토크쇼 방송인        **꺼낸 뒤 딱 5시간 동안** 포만감이 안 줄고(1 밑으로 안 내려간다),
+//                         탐사 횟수가 30 ~ 60 회 가운데 하나로 바뀐다 (원래 남은 것보다
+//                         적어지지는 않는다). 5시간이 지나면 원래 횟수로 돌아간다.
+//   ⑤ 룩키마트 직원        **우주 쇼핑몰만** 하루 두 번 리셋한다. 남은 주파수를 2 로 맞추고
+//                         (2 보다 많이 남았으면 그대로), 기다리는 시간을 없애고,
+//                         품절된 칸을 비운다 — 안 산 물건은 그대로 둔다.
+//   ⑥ 검은 고양이          탐사가 끝날 때마다 +3,000 P, 이번 탐사에서 남을 구한 횟수마다
+//                         +1,000 P — **도운 것은 한 탐사에 3번까지만 센다.**
 //                         (붙잡았습니다 · 되살렸습니다 · 끌어냈습니다 · 치유로 일으켰습니다 ·
 //                          ■■의 ■■■ 의 붙잡은 동료 수)
 //   ⑦ 골든 마스코트        상담실 · 선녀탕에 있는 사원에게 계약서를 보내 오염도 0 으로 꺼낸다.
-//                         한 장에 1만 ~ 10만 P. 하루 3 ~ 5 장 (꺼낼 때 정한다).
+//                         **한 장에 1만 P · 하루 3장.**
 //
 // ■ ② · ⑥ 은 탐사 하나를 통째로 본다
 //
@@ -60,9 +60,9 @@
 // ■ 적히는 자리 (users/<사번>)
 //
 //   moonDay    하루가 바뀌었나          moonOut   오늘 꺼낸 문신 ['t1', …]
-//   moonQ      ① 입원 무효를 썼나       moonCopy  ③ { c, n, got, at }
+//   moonCopy   ③ { c, n, got, at }      moonT4At  ④ 꺼낸 때 (5시간)
 //   moonTries  ④ 오늘 탐사 횟수         moonSat   ④ 지키는 포만감
-//   moonShop   ⑤ { reg, q, alien }     moonDeal  ⑦ { max, used, got }
+//   moonShop   ⑤ { alien }             moonDeal  ⑦ { max, used, got }
 //   moonFreed  ⑦ 계약서로 나온 쪽 { by, byName, at } · moonFreedSeen 본 것
 //
 // ■ 콘솔
@@ -80,20 +80,20 @@ const MOON = {
     T3_RATE:    0.10,          // ③ 예금의 몇 할
     T4_LO:      30,            // ④ 오늘 탐사 횟수
     T4_HI:      60,
+    T4_MS:      5 * 3600000,   // ④ 꺼낸 뒤 딱 5시간
     T5_TIMES:   2,             // ⑤ 상점마다 하루 몇 번
     T5_ALIEN:   2,             // ⑤ 우주 쇼핑몰 — 리셋하면 남는 주파수
     T6_BASE:    3000,          // ⑥ 탐사마다
     T6_HELP:    1000,          // ⑥ 도울 때마다
-    T7_LO:      3,             // ⑦ 하루 계약서
-    T7_HI:      5,
-    T7_PAY_LO:  10000,         // ⑦ 한 장에
-    T7_PAY_HI:  100000
+    T6_HELP_MAX: 3,            // ⑥ 도운 것은 한 탐사에 몇 번까지 세나
+    T7_MAX:     3,             // ⑦ 하루 계약서
+    T7_PAY:     10000          // ⑦ 한 장에
 };
 
 // 설명은 적어 준 그대로 둔다
 const MOON_TATS = [
     { id: 't1', n: '유치원 선생님',
-      d: '모든 탐사에서 판정에 +3, 상담실 입원 1회 무효 처리.',
+      d: '모든 탐사에서 판정에 +3.',
       q: '■■■ 선생님, 들어보세요. 나는 교육서를 다 읽었어요!' },
     { id: 't2', n: '세광공업고등학교 학생',
       d: '함께 탐사하는 인원이 한 번 죽을 때마다 자신에게 포인트 1.5배. 최대 4배까지 누적 가능하다. '
@@ -106,20 +106,20 @@ const MOON_TATS = [
       q: '너희는 이름님을 믿니?' },
     { id: 't4', n: '토크쇼 방송인',
       d: '먹고 자지 않아도 생명에 지장이 생기지 않는다. 포만감이 줄지 않으며, '
-       + '탐사 횟수가 크게 늘어난다(30~60회).',
+       + '탐사 횟수가 크게 늘어난다(30~60회). 꺼낸 뒤 딱 5시간 동안만 간다.',
       q: '나는 이직에 성공했다.' },
     { id: 't5', n: '룩키마트 직원',
-      d: '모든 상점(유쾌 판매소, ???, 우주 쇼핑몰)에서 각각 최대 2회씩 리셋이 가능하다. '
-       + '우주 쇼핑몰은 주파수 4회를 모두 맞춘 후 리셋할 시 횟수 2회가 남은 것으로 리셋된다.',
+      d: '우주 쇼핑몰에서 최대 2회 리셋이 가능하다. '
+       + '주파수 4회를 모두 맞춘 후 리셋할 시 횟수 2회가 남은 것으로 리셋된다.',
       q: '룩 키 마트에 어 서오 세 요!' },
     { id: 't6', n: '검은 고양이',
       d: '기본적으로 3천 포인트 추가 정산을 받는다. 탐사에서 남을 구출하거나 끌려간 것을 '
        + '잡아 주는 등 타 사원을 돕는 행위를 할 경우 성공 횟수 만큼 추가 정산 포인트 양이 '
-       + '늘어난다. (1회 1천 포인트)',
+       + '늘어난다. (1회 1천 포인트, 최대 3회)',
       q: '이쪽.' },
     { id: 't7', n: '골든 마스코트',
       d: '완전히 오염되거나 죽어서 상담실/선녀탕에 있는 사원에게 계약서를 보내 멀끔한 상태로 '
-       + '즉시 꺼내 주며, 포인트를 얻는다. (계약서 일일 한도 3~5장, 1장 당 1만~10만 포인트 랜덤 획득)',
+       + '즉시 꺼내 주며, 포인트를 얻는다. (계약서 일일 한도 3장, 1장 당 1만 포인트)',
       q: '' }
 ];
 
@@ -203,14 +203,14 @@ function dayRoll(u) {
     if (!u || u.moonDay === today()) return false;
     u.moonDay = today();
     u.moonOut = [];
-    u.moonQ = 0;
     u.moonCopy = null;
     u.moonTries = 0;
+    u.moonT4At = 0;
     u.moonSat = null;
-    u.moonShop = { reg: 0, q: 0, alien: 0 };
+    u.moonShop = { alien: 0 };
     u.moonDeal = null;
     if (u === u_()) {
-        save({ moonDay: 1, moonOut: 1, moonQ: 1, moonCopy: 1, moonTries: 1,
+        save({ moonDay: 1, moonOut: 1, moonCopy: 1, moonTries: 1, moonT4At: 1,
                moonSat: 1, moonShop: 1, moonDeal: 1 });
     }
     return true;
@@ -230,13 +230,21 @@ function tat(id) { return MOON_TATS.filter(function (t) { return t.id === id; })
 function shopOf(u) {
     dayRoll(u);
     const s = (u.moonShop && typeof u.moonShop === 'object') ? u.moonShop : {};
-    return { reg: Number(s.reg) || 0, q: Number(s.q) || 0, alien: Number(s.alien) || 0 };
+    return { alien: Number(s.alien) || 0 };
 }
 function dealOf(u) {
     dayRoll(u);
     const d = (u.moonDeal && typeof u.moonDeal === 'object') ? u.moonDeal : null;
-    return d ? { max: Number(d.max) || MOON.T7_LO, used: Number(d.used) || 0, got: Number(d.got) || 0 } : null;
+    return d ? { max: MOON.T7_MAX, used: Number(d.used) || 0, got: Number(d.got) || 0 } : null;
 }
+// ④ — 꺼낸 뒤 5시간 동안만
+function t4Live(u) {
+    if (!on(u, 't4')) return false;
+    let at = Number(u.moonT4At) || 0;
+    if (!at && u === u_()) { at = u.moonT4At = Date.now(); save({ moonT4At: 1 }); }   // 때가 안 적힌 것은 지금부터
+    return Date.now() < at + MOON.T4_MS;
+}
+function t4Left(u) { return Math.max(0, (Number(u.moonT4At) || 0) + MOON.T4_MS - Date.now()); }
 function mult(d) { return d > 0 ? Math.min(MOON.T2_MAX, MOON.T2_STEP * d) : 1; }
 
 // ==========================================
@@ -358,13 +366,14 @@ function takeOut(id) {
     const more = [];
     if (id === 't4') {
         me.moonTries = rnd(MOON.T4_LO, MOON.T4_HI);
+        me.moonT4At = Date.now();
         me.moonSat = Math.max(1, Number(me.satiety != null ? me.satiety : 100) || 0);
         me.satiety = me.moonSat;
-        f.moonTries = 1; f.moonSat = 1; f.satiety = 1;
-        more.push('오늘 탐사 ' + me.moonTries + '회 · 포만감이 줄지 않습니다.');
+        f.moonTries = 1; f.moonT4At = 1; f.moonSat = 1; f.satiety = 1;
+        more.push('지금부터 딱 5시간 — 탐사 ' + me.moonTries + '회 · 포만감이 줄지 않습니다.');
     }
     if (id === 't7') {
-        me.moonDeal = { max: rnd(MOON.T7_LO, MOON.T7_HI), used: 0, got: 0 };
+        me.moonDeal = { max: MOON.T7_MAX, used: 0, got: 0 };
         f.moonDeal = 1;
         more.push('오늘 계약서 ' + me.moonDeal.max + '장.');
     }
@@ -379,7 +388,6 @@ function takeOut(id) {
     log_(me, '[' + NAME + '] ' + t.n + ' 을(를) 꺼냈습니다. (' + o.length + ' / ' + MOON.DAY_MAX + ')');
     save(f);
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    if (id === 't1') setTimeout(qWatch, 300);           // 이미 들어가 있으면 바로 나온다
     alert_('[ ' + t.n + ' ]\n\n'
         + (t.q ? t.q + '\n\n' : '')
         + (more.length ? more.join('\n') + '\n\n' : '')
@@ -402,7 +410,7 @@ setInterval(function () {
 }, 1500);
 
 // ==========================================
-// ① 유치원 선생님 — 판정 +3 · 입원 한 번 무효
+// ① 유치원 선생님 — 판정 +3
 // ==========================================
 let bonusDepth = 0;
 hookFn('rollDarkBonus', function (_r) {
@@ -439,35 +447,6 @@ function cleanBadge(u) {
     return false;
 }
 
-function qWatch() {
-    const me = u_();
-    if (!me || !on(me, 't1') || me.moonQ || !inQ(me)) return;
-    const bath = (me.quarantineDest || 'fox') === 'bath';
-    let out = Number(me.quarantineExitPollution) || 0;
-    if (out >= 100) out = 99;
-    if (fixed(me)) out = Math.max(out, MOON.FIX_POLL);
-    me.quarantineUntil = 0;
-    me.quarantineDest = null;
-    me.quarantineHospital = false;
-    me.pollution = out;
-    me.quarantineExitPollution = 0;
-    me.lastPollutionTime = Date.now();
-    me.foxRoomAnswered = false;
-    me.moonQ = 1;
-    const f = { quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1, pollution: 1,
-                quarantineExitPollution: 1, lastPollutionTime: 1, foxRoomAnswered: 1, moonQ: 1, history: 1 };
-    if (cleanBadge(me)) f.badge = 1;
-    log_(me, '[' + NAME + ' · 유치원 선생님] ' + (bath ? '선녀탕' : '상담실') + ' 입원을 없던 일로 했습니다.');
-    save(f);
-    shutRooms();
-    // 상담이 끝나면 방이 1.2초 뒤에 열린다 — 늦게 열린 것도 닫는다
-    setTimeout(function () { if (!inQ(me)) shutRooms(); }, 1600);
-    setTimeout(function () { if (!inQ(me)) shutRooms(); }, 3200);
-    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    alert_('[ 유치원 선생님 ]\n\n' + MOON_TATS[0].q + '\n\n'
-        + (bath ? '선녀탕' : '상담실') + ' 입원이 없던 일이 되었습니다.\n오염도 ' + out + '%');
-}
-setInterval(function () { try { qWatch(); } catch (e) { } }, 1500);
 
 // ==========================================
 // ② · ⑥ — 탐사 한 판을 본다
@@ -625,7 +604,7 @@ hookFn('sendPartyChat', function (_s) {
                 if (u && T && typeof text === 'string' && text.indexOf(u.name + ' 사원이 ') === 0 && HELP_RE.test(text)) {
                     T.h = (T.h || 0) + 1;
                     tSave();
-                    if (on(u, 't6')) toast('🐈‍⬛ 이쪽. (+' + won(MOON.T6_HELP) + ')');
+                    if (on(u, 't6') && T.h <= MOON.T6_HELP_MAX) toast('🐈‍⬛ 이쪽. (+' + won(MOON.T6_HELP) + ')');
                 }
             } catch (e) { }
         }
@@ -659,7 +638,7 @@ function finish() {
                 + '\n' + won(gained) + ' → ' + won(gained + add));
         }
         if (six) {
-            const h = Number(t.h) || 0;
+            const h = Math.min(MOON.T6_HELP_MAX, Number(t.h) || 0);     // 한 탐사에 3번까지
             const add = MOON.T6_BASE + MOON.T6_HELP * h;
             pay(add); net += add;
             lines.push('[ 검은 고양이 ]\n이쪽. — 추가 정산 +' + won(add)
@@ -761,7 +740,7 @@ function copyGo(code) {
 setInterval(function () {
     try {
         const me = u_();
-        if (!me || !on(me, 't4')) return;
+        if (!me || !t4Live(me)) return;
         const s = Number(me.satiety != null ? me.satiety : 100) || 0;
         let keep = Math.max(1, Number(me.moonSat) || 0);
         if (s > keep) { me.moonSat = s; save({ moonSat: 1 }); return; }
@@ -785,7 +764,7 @@ let triesDepth = 0;
             try { n = _g.apply(this, arguments); } finally { triesDepth--; }
             try {
                 const u = u_();
-                if (u && on(u, 't4') && Number(u.moonTries) > 0) {
+                if (u && t4Live(u) && Number(u.moonTries) > 0) {
                     const used = (u.darkDate === today()) ? (Number(u.darkTries) || 0) : 0;
                     return Math.max(Number(n) || 0, Number(u.moonTries) - used);
                 }
@@ -809,42 +788,19 @@ let triesDepth = 0;
 // ==========================================
 // ⑤ 룩키마트 직원 — 상점 리셋
 // ==========================================
-const SHOP_NAME = { reg: '유쾌 판매소', q: '???', alien: '우주 쇼핑몰' };
-function anyIn(o) { return !!(o && typeof o === 'object' && Object.keys(o).some(function (k) { return Number(o[k]) > 0; })); }
-function qKey() {
-    try { if (typeof qshopSlotKey === 'function') return qshopSlotKey(); } catch (e) { }
-    return today() + '-s' + Math.floor(new Date().getHours() / 4);
-}
+const SHOP_NAME = { alien: '우주 쇼핑몰' };
 function alienMax() {
     try { if (typeof ALIEN_DAILY_MAX !== 'undefined') return ALIEN_DAILY_MAX; } catch (e) { }
     return 4;
 }
 function shopReset(kind) {
+    kind = 'alien';                     // ⑤ 는 우주 쇼핑몰만 (2026-10-18)
     const me = u_();
     if (!me || !on(me, 't5')) { alert_('룩키마트 직원을 꺼내야 합니다.'); return; }
     const s = shopOf(me);
     if (s[kind] >= MOON.T5_TIMES) { alert_('오늘 ' + SHOP_NAME[kind] + ' 리셋은 다 썼습니다.'); return; }
     let note = '';
-    if (kind === 'reg') {
-        let key = '';
-        try { key = getShopCycleKey(); } catch (e) { }
-        const rec = me.purchaseRecord || {};
-        if (!key || !anyIn(rec[key])) { alert_('유쾌 판매소에서 아직 산 것이 없습니다.\n리셋할 것이 없습니다.'); return; }
-        delete rec[key];
-        me.purchaseRecord = rec;
-        save({ purchaseRecord: 1 });
-        note = '이번 진열의 물건이 다시 들어왔습니다.';
-        try { if (typeof renderRegularShop === 'function') renderRegularShop(); } catch (e) { }
-    } else if (kind === 'q') {
-        const key = qKey();
-        const rec = me.qshopRecord || {};
-        if (!anyIn(rec[key])) { alert_('??? 에서 아직 가져간 것이 없습니다.\n리셋할 것이 없습니다.'); return; }
-        delete rec[key];
-        me.qshopRecord = rec;
-        save({ qshopRecord: 1 });
-        note = '이번 진열의 물건이 다시 들어왔습니다.';
-        try { if (typeof renderQShop === 'function') renderQShop(); } catch (e) { }
-    } else if (kind === 'alien') {
+    if (kind === 'alien') {
         let cyc = '';
         try { cyc = get22HourCycleStr(); } catch (e) { }
         const max = alienMax();
@@ -897,7 +853,7 @@ function dealPick() {
     }).join('');
     const w = box(head('골든 마스코트 — 계약서 ' + (d.max - d.used) + ' / ' + d.max + '장',
         '상담실 · 선녀탕에 있는 사원에게 계약서를 보내 멀끔한 상태(오염도 0)로 바로 꺼냅니다.<br>'
-        + '한 장에 ' + won(MOON.T7_PAY_LO) + ' ~ ' + won(MOON.T7_PAY_HI) + ' 를 받습니다.')
+        + '한 장에 ' + won(MOON.T7_PAY) + ' 를 받습니다.')
         + '<div style="' + SCROLL + '">' + (rows || '<div style="font-size:11px; color:#7c87a8; padding:14px 4px; text-align:center;">지금 상담실 · 선녀탕에 있는 사원이 없습니다.</div>') + '</div>'
         + '<button id="mn-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#mn-x').onclick = window.moonMenu;
@@ -944,7 +900,7 @@ function dealGo(code) {
         if (local) Object.keys(f).forEach(function (k) { local[k] = f[k]; });
         try { if (typeof updateUserFields === 'function') updateUserFields(code, Object.assign({}, f)); } catch (e) { }
 
-        const got = Math.round(rnd(MOON.T7_PAY_LO, MOON.T7_PAY_HI) / 100) * 100;
+        const got = MOON.T7_PAY;
         pay(got); notRun(got);
         d.used++; d.got += got;
         me.moonDeal = d;
@@ -1015,7 +971,7 @@ function smallBtn(id, label, dis) {
 
 function state(u, id) {
     const T_ = T;
-    if (id === 't1') return '판정 +' + MOON.T1_BONUS + ' · 입원 무효 ' + (u.moonQ ? '<b style="color:#9aa0ad;">썼음</b>' : '<b style="color:#bfe3c4;">1회 남음</b>');
+    if (id === 't1') return '판정 +' + MOON.T1_BONUS;
     if (id === 't2') {
         if (!T_) return '탐사 중이 아닙니다. 함께 간 사람이 죽을 때마다 ×' + MOON.T2_STEP + ' (최대 ×' + MOON.T2_MAX + ')';
         if (T_.sd) return '<b style="color:#e08a8a;">이번 탐사에서 죽었습니다 — 포인트 없음</b>';
@@ -1025,13 +981,15 @@ function state(u, id) {
         ? '오늘 ' + esc(u.moonCopy.n || nameOf(u.moonCopy.c)) + ' 사원을 흉내 냈습니다 (+' + won(u.moonCopy.got) + ')'
         : '아직 아무도 흉내 내지 않았습니다.';
     if (id === 't4') {
+        if (!t4Live(u)) return '<b style="color:#9aa0ad;">5시간이 지났습니다 — 탐사 횟수 · 포만감이 원래대로 돌아갔습니다.</b>';
+        const ms = t4Left(u), hh = Math.floor(ms / 3600000), mm = Math.floor((ms % 3600000) / 60000);
         let left = '';
         try { left = ' · 남은 ' + getDarkTriesLeft() + '회'; } catch (e) { }
-        return '오늘 탐사 ' + (Number(u.moonTries) || 0) + '회' + left + ' · 포만감 유지';
+        return '탐사 ' + (Number(u.moonTries) || 0) + '회' + left + ' · 포만감 유지 · <b style="color:#e3eaff;">' + hh + '시간 ' + mm + '분 남음</b>';
     }
-    if (id === 't5') { const s = shopOf(u); return '리셋 — 유쾌 판매소 ' + s.reg + ' · ??? ' + s.q + ' · 우주 쇼핑몰 ' + s.alien + ' (각 ' + MOON.T5_TIMES + '회)'; }
-    if (id === 't6') return '탐사마다 +' + won(MOON.T6_BASE) + ' · 도울 때마다 +' + won(MOON.T6_HELP)
-        + (T_ ? ' · 이번 탐사 도운 것 ' + (T_.h || 0) + '번' : '');
+    if (id === 't5') { const s = shopOf(u); return '우주 쇼핑몰 리셋 ' + s.alien + ' / ' + MOON.T5_TIMES + '회'; }
+    if (id === 't6') return '탐사마다 +' + won(MOON.T6_BASE) + ' · 도울 때마다 +' + won(MOON.T6_HELP) + ' (한 탐사에 ' + MOON.T6_HELP_MAX + '번까지)'
+        + (T_ ? ' · 이번 탐사 도운 것 ' + Math.min(MOON.T6_HELP_MAX, T_.h || 0) + '번' : '');
     if (id === 't7') { const d = dealOf(u); return d ? '계약서 ' + (d.max - d.used) + ' / ' + d.max + '장 · 오늘 받은 몫 ' + won(d.got) : ''; }
     return '';
 }
@@ -1039,7 +997,7 @@ function actions(u, id) {
     if (id === 't3') return smallBtn('copy', '흉내 낼 사원을 고른다', !!(u.moonCopy && u.moonCopy.c));
     if (id === 't5') {
         const s = shopOf(u);
-        return ['reg', 'q', 'alien'].map(function (k) {
+        return ['alien'].map(function (k) {
             return smallBtn('shop-' + k, SHOP_NAME[k] + ' 리셋 (' + (MOON.T5_TIMES - s[k]) + '회 남음)', s[k] >= MOON.T5_TIMES);
         }).join('');
     }
@@ -1180,11 +1138,10 @@ window.moonState = function (who) {
     console.log('  새겨져 있나 :', wears(t) ? 'O' : '✗');
     console.log('  꺼낸 문신   :', o.map(function (id) { return tat(id).n; }).join(' · ') || '없음',
         '(' + o.length + ' / ' + MOON.DAY_MAX + ')' + (o.length >= MOON.DAY_MAX ? ' · 오염도 50 고정' : ''));
-    console.log('  ① 입원 무효 :', t.moonQ ? '썼음' : '남음');
     console.log('  ③ 흉내      :', t.moonCopy && t.moonCopy.c ? (t.moonCopy.n + ' +' + won(t.moonCopy.got)) : '-');
     console.log('  ④ 탐사 횟수 :', t.moonTries || '-', '· 포만감', t.moonSat == null ? '-' : t.moonSat);
     const s = shopOf(t);
-    console.log('  ⑤ 리셋      : 유쾌 ' + s.reg + ' · ??? ' + s.q + ' · 우주 ' + s.alien);
+    console.log('  ⑤ 리셋      : 우주 쇼핑몰 ' + s.alien + ' / ' + MOON.T5_TIMES);
     const d = dealOf(t);
     console.log('  ⑦ 계약서    :', d ? (d.used + ' / ' + d.max + ' · ' + won(d.got)) : '-');
     if (t === u_()) console.log('  이번 탐사   :', T ? JSON.stringify({ 죽음: T.d, 도움: T.h, 내죽음: !!T.sd, 넘겨받은배수: T.g, 시작포인트: T.s }) : '밖');
@@ -1192,7 +1149,7 @@ window.moonState = function (who) {
 
 window.MOONTAT = { MOON: MOON, TATS: MOON_TATS, wears: wears, on: on, outs: outs, dayRoll: dayRoll,
                    fixed: fixed, mult: mult, finish: finish, selfEvent: selfEvent,
-                   run: function () { return T; }, qWatch: qWatch, shopReset: shopReset,
+                   run: function () { return T; }, t4Live: t4Live, shopReset: shopReset,
                    dealGo: dealGo, copyGo: copyGo };
 
 console.log('[달빛] moonGive(사번) · moonState(사번) · moonMenu()');
