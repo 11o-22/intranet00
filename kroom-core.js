@@ -274,6 +274,115 @@ function helperIn(pid) {
     return !!(m && m.helper);
 }
 function isHelper() { return !!(kr && kr.helper); }
+
+// ==========================================
+// ★ K 의 방 탐사 횟수 — 일반 어둠과 **따로** 센다 (2026-10-18)
+// ==========================================
+//
+//   하루 50회. 「어둠 탐사 +n」으로 한도를 올리는 것(요리 · 장비 · 🦊 호사수구 · K.LEE ·
+//   은화 뱀)도 얹히지만, 다 더해도 **55회까지**다. 출산 고유 아이템(유전자 고유 아이템 —
+//   차고 있는 동안 어둠 탐사 +n)의 몫만 55 위에 그대로 얹힌다.
+//   K 의 방에 들어가도 일반 어둠 탐사 횟수(8회)는 줄지 않는다.
+//
+//   쓴 횟수는 kroomUse/<사번> = { d: 날짜, n: 쓴 횟수 } 하나에 트랜잭션으로만 더한다
+//   (사원 기록 밖 — 통째 저장이 덮지 못한다. dark-count.js 와 같은 까닭).
+//   한도를 올리는 몫은 쓴 횟수를 깎는 것이 아니라 그날 그때 한도에 얹힌다.
+//   (소지품을 써서 쓴 횟수를 하나 깎아 주는 것 — 밤샘 신청서 · 엽서 · 출산품 — 은
+//    일반 어둠 쪽 횟수만 돌려준다)
+//   당국이 어둠 탐사 횟수를 충전하면 K 의 방 횟수도 같이 0 으로 돌린다.
+const K_TRY_BASE = 50;
+const K_TRY_HARD = 55;
+const K_USE = 'kroomUse';
+const KC = { code: '', ref: null, synced: null, ready: false, pend: 0, busy: false };
+function kToday() { try { return getTodayStr(); } catch (e) { return ''; } }
+function kView(v) { const t = kToday(); return (v && v.d === t) ? Math.max(0, Number(v.n) || 0) : 0; }
+function kCache(v) { try { localStorage.setItem(K_USE + '_' + KC.code, JSON.stringify(v || {})); } catch (e) { } }
+function kCached(code) { try { return JSON.parse(localStorage.getItem(K_USE + '_' + code) || 'null'); } catch (e) { return null; } }
+function kBind() {
+    const u = me(), d = db_();
+    if (!u || !u.code || !d) return;
+    if (KC.code === u.code) return;
+    try { if (KC.ref) KC.ref.off(); } catch (e) { }
+    KC.code = u.code; KC.synced = kCached(u.code); KC.ready = false; KC.pend = 0; KC.busy = false;
+    KC.ref = d.ref(K_USE + '/' + u.code);
+    KC.ref.on('value', function (snap) {
+        KC.synced = snap.val() || null;
+        KC.ready = true;
+        kCache(KC.synced);
+    });
+}
+setInterval(function () { try { kBind(); } catch (e) { } }, 1000);
+function kUsed() { return kView(KC.synced) + KC.pend; }
+// 한도 — 50 + 얹는 몫(55 까지) + 출산 고유 아이템 몫
+function kAdds(u) {
+    let capped = 0, free = 0, dna = 0;
+    try { if (typeof window.capParts === 'function') { const p = window.capParts(u); capped = Number(p.capped.dark) || 0; free = Number(p.free.dark) || 0; } } catch (e) { }
+    try { const e = (typeof myDnaEquip === 'function' && u === me()) ? myDnaEquip() : null; dna = (e && Number(e.dark)) || 0; } catch (e) { }
+    return { add: Math.max(0, capped + Math.max(0, free - dna)), dna: dna };
+}
+function kLimit(u) {
+    u = u || me();
+    const a = kAdds(u);
+    return Math.min(K_TRY_HARD, K_TRY_BASE + a.add) + a.dna;
+}
+function kLeft() { return Math.max(0, kLimit() - kUsed()); }
+// 한 번 쓴다 — 차이만큼 트랜잭션
+function kFlush() {
+    if (KC.busy || !KC.pend || !KC.ref) return;
+    const delta = KC.pend, t = kToday();
+    KC.busy = true;
+    KC.ref.transaction(function (cur) {
+        const base = (cur && cur.d === t) ? Math.max(0, Number(cur.n) || 0) : 0;
+        return { d: t, n: Math.max(0, base + delta) };
+    }).then(function (r) {
+        KC.busy = false;
+        KC.pend -= delta;
+        if (r && r.snapshot) { KC.synced = r.snapshot.val(); kCache(KC.synced); }
+        if (KC.pend) kFlush();
+    }).catch(function (e) {
+        KC.busy = false;
+        console.warn('[K 의 방] 횟수 보내기 실패 — 다시 보냅니다', e && e.message);
+        setTimeout(kFlush, 3000);
+    });
+}
+function kUse(n) {
+    kBind();
+    KC.pend += (n || 1);
+    kFlush();
+}
+window.kroomTriesLeft = kLeft;
+window.kroomTryLimit = function () { return kLimit(); };
+window.kroomTriesUsed = kUsed;
+// 일행을 모으거나 들 때 — 그 자리의 「남은 횟수」를 K 의 방 것으로 본다 (헬퍼는 0 이어도 들어간다)
+function withKTries(fn) {
+    if (typeof getDarkTriesLeft !== 'function') return fn();
+    const _g = getDarkTriesLeft;
+    getDarkTriesLeft = function () { return helperSwitch() ? Math.max(1, kLeft()) : kLeft(); };
+    try { return fn(); }
+    finally { getDarkTriesLeft = _g; }
+}
+// 당국의 「어둠 탐사 횟수 충전」 — K 의 방 것도 같이 0 으로
+(function hookCharge() {
+    setInterval(function () {
+        if (typeof updateUserFields !== 'function' || updateUserFields._kUse) return;
+        const _u = updateUserFields;
+        const w = function (c, fields) {
+            try {
+                const d = db_();
+                if (d && c && fields && fields.darkTries === 0
+                    && Object.prototype.hasOwnProperty.call(fields, 'darkTryAdded') && fields.darkTryAdded === 0) {
+                    d.ref(K_USE + '/' + c).set({ d: kToday(), n: 0 }).catch(function () { });
+                    if (c === KC.code) KC.pend = 0;
+                }
+            } catch (e) { }
+            return _u.apply(this, arguments);
+        };
+        Object.keys(_u).forEach(function (k) { try { w[k] = _u[k]; } catch (e) { } });
+        w._kUse = true;
+        updateUserFields = w;
+        try { window.updateUserFields = w; } catch (e) { }
+    }, 1500);
+})();
 function lvOf(u) { const k = u && u.kroom; return (k && !stale(k) && k.lv) || 1; }
 // 내 것 — 새 판을 처음 띄우면 한 번 비우고 적어 둔다
 function freshen() {
@@ -460,6 +569,8 @@ function liveTeams(skip) {
 })();
 // 헬퍼 스위치를 켜고 끄면 입구 안내도 따라간다
 setInterval(function () {
+    const left = document.getElementById('kroom-left');
+    if (left) { const t = kLeft() + ' / ' + kLimit(); if (left.textContent !== t) left.textContent = t; }
     const n = document.getElementById('kroom-helper-note');
     if (!n) return;
     const v = helperSwitch() ? 'block' : 'none';
@@ -483,6 +594,7 @@ function paintEntry() {
                 Lv <b>${k.lv}</b> · ${k.job ? esc(jobName(k.job, k.grade)) + ' <span style="color:#7fd3e6;">' + k.grade + '</span>' : '<span style="color:#888;">직업 없음 — 처음 들어가면 고른다</span>'}
                 · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
             </div>
+            <div style="font-size:11px; color:#cfe9f0; margin-top:5px;">오늘 남은 횟수 <b id="kroom-left" style="color:#7fd3e6;">${kLeft()} / ${kLimit()}</b>회 <span style="font-size:10px; color:#777;">(일반 어둠과 따로 · 자정 초기화)</span></div>
             <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트와 반입품을 잃고 상담실로 이송됩니다.</div>
             <div id="kroom-helper-note" style="display:${helperSwitch() ? 'block' : 'none'}; font-size:10px; color:#81c784; margin-top:4px;">✚ 헬퍼로 들어갑니다 — 횟수를 쓰지 않고, 경험치 · 꿈결 · 포인트를 받지 않으며, 쓰러져도 잃지 않습니다. (파티 편성 칸에서 끕니다)</div>
             <div style="display:flex; gap:6px; margin-top:11px;">
@@ -499,7 +611,7 @@ function canEnter(silent) {
     const u = me(); if (!u) return false;
     const say = function (t) { if (!silent) showCustomAlert(t); return false; };
     if (!mainAttr(u)) return say('전용 장비가 없어 들어갈 수 없습니다.\n\n이곳의 직업은 전용 장비의 첫 번째 속성을 따라갑니다.');
-    if (getDarkTriesLeft() <= 0 && !helperSwitch()) return say('금일 탐사 횟수를 모두 소진했습니다.');
+    if (kLeft() <= 0 && !helperSwitch()) return say('금일 『 K 의 방 』 탐사 횟수(' + kLimit() + '회)를 모두 소진했습니다.\n\n자정에 초기화됩니다. 일반 어둠 탐사 횟수와는 따로 셉니다.');
     if (isQuarantined(u)) return say('격리 중에는 들어갈 수 없습니다.');
     if (u.pollution >= 100) return say('오염도가 한계치라 들어갈 수 없습니다.');
     return true;
@@ -517,12 +629,16 @@ window.kroomSolo = function () {
         const _c = createParty, _j = joinParty;
         createParty = function (zone) {
             if (zone === K_CODE && !mainAttr(me())) { canEnter(); return; }
-            return _c.apply(this, arguments);
+            if (zone !== K_CODE) return _c.apply(this, arguments);
+            const self = this, args = arguments;
+            return withKTries(function () { return _c.apply(self, args); });
         };
         joinParty = function (pid) {
             const p = (typeof darkParties !== 'undefined') ? darkParties[pid] : null;
             if (p && p.zone === K_CODE && !mainAttr(me())) { canEnter(); return; }
-            return _j.apply(this, arguments);
+            if (!(p && p.zone === K_CODE)) return _j.apply(this, arguments);
+            const self = this, args = arguments;
+            return withKTries(function () { return _j.apply(self, args); });
         };
         createParty._k = true;
         clearInterval(iv);
@@ -551,13 +667,15 @@ function start(isParty, pid) {
     if (old && isParty) ['_show', '_showRevives', '_showOn', '_showHeat', '_showHostDead', 'kleeBooked'].forEach(function (f) {
         if (old[f] != null) darkRun[f] = old[f];
     });
+    // ★ 횟수는 K 의 방 칸(kroomUse)에서 쓴다 — 일반 어둠 횟수(darkTries)는 건드리지 않는다
     if (!isParty) {
-        if (!helper) {                                       // 헬퍼는 횟수를 쓰지 않는다
-            u.darkDate = getTodayStr();
-            u.darkTries = (u.darkTries || 0) + 1;
-        }
+        if (!helper) kUse(1);                                // 헬퍼는 횟수를 쓰지 않는다
         applyDarkSatiety(K_CODE);
-        try { saveFields(helper ? { satiety: 1 } : { darkDate: 1, darkTries: 1, satiety: 1 }); } catch (e) { }
+        try { saveFields({ satiety: 1 }); } catch (e) { }
+    } else {
+        // 일행 출발(launchPartyRun)은 어느 어둠이든 darkTries 를 하나 올리고 바로 여기로 온다 — 되돌린다
+        u.darkTries = Math.max(0, (Number(u.darkTries) || 0) - 1);
+        if (!helper) kUse(1);
     }
     kr = { team: isParty ? pid : ('solo_' + u.code), dun: null, floor: 0, idx: 0, step: 'job',
            exp: 0, dream: 0, items: {}, log: [], started: now(), met: {}, seenJ: {},
@@ -2217,7 +2335,11 @@ window.kroomState = function () {
     console.log('  Lv ' + k.lv + ' (' + k.exp + ' / ' + needExp(k.lv) + ') · 꿈결 ' + k.dream + ' · 들어간 수 ' + (k.runs || 0));
     console.log('  직업 ' + (k.job ? jobName(k.job, k.grade) + ' ' + k.grade + ' — 각성 ' + JSON.stringify(k.wake) : '없음') + (k.rerolled ? ' · 다시 고르기 씀' : ''));
     console.log('  지금 든 팀 ' + liveTeams().length + ' / ' + MAX_TEAMS);
+    const a = kAdds(u_kc());
+    console.log('  오늘 횟수 — 쓴 ' + kUsed() + ' · 한도 ' + kLimit() + ' (기본 ' + K_TRY_BASE + ' + 얹는 몫 ' + a.add + ' → 최대 ' + K_TRY_HARD
+        + (a.dna ? ' · 출산 고유 아이템 +' + a.dna : '') + ') · 남은 ' + kLeft() + (KC.ready ? '' : ' (서버 값 받는 중)'));
 };
+function u_kc() { return me(); }
 window.kroomGive = function (who, field, val) {
     const u = me(); if (!u || u.code !== ADMIN) { console.warn('상담사만 쓸 수 있습니다.'); return; }
     const book = (typeof db !== 'undefined' && db.users) || {};
