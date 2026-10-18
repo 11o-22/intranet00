@@ -488,7 +488,7 @@ window.giftTake = function (id) {
             }).concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : []).join('\n');
             showCustomAlert(head + '받았습니다.\n\n' + body
                 + (toInv ? '\n\n물품은 소지품에 들어왔습니다.' : '')
-                + (worn.length ? '\n\n옷장이나 광장 가방에서 달 수 있습니다.' : ''));
+                + (worn.length ? '\n\n옷장이나 광장 가방에서 입거나 달 수 있습니다.' : ''));
         } else {
             showCustomAlert('확인했습니다.\n\n내용은 기록에 남았습니다.');
         }

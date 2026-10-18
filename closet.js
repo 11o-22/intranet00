@@ -144,8 +144,9 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'robe', 'han-duru', 'cape', 'glove'],
+    Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit',
+        'robe', 'han-duru', 'cape', 'maker-outer-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -161,7 +162,10 @@ const DOT = {
     //     반짝임과 「친구!」가 차례로 그려져 있다. 여섯 칸을 다 돈다.
     //     (가만히 있으면 0번 칸만 보여 리본만 덩그러니 있었다)
     //   ★ 유리 펜도 서기 줄 여섯 칸이 다 다른 그림이다 (펜이 손 옆에서 떠 논다).
-    FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5] },
+    //   ★ 제작자 겉옷(바깥 · 안쪽)은 서기 줄 여섯 칸에 꼬리가 흔들린다 — 두 장이 같이 돈다.
+    //   ★ 뉴비 새싹은 서기 줄 두 칸(하트가 바뀐다).
+    FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5],
+                 'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -268,7 +272,15 @@ const DOT_SLOTS = [
             //     기준이다. 그때는 신이 여섯 픽셀 밑으로 빠지고 두 칸 오른쪽으로
             //     밀려, 손이 옷 밖으로 비어져 나왔다.
             { i: 'agent1', n: '요원복 1', over: ['agent1'], own: 'agent1' },
-            { i: 'agent2', n: '요원복 2', over: ['agent2'], own: 'agent2' }
+            { i: 'agent2', n: '요원복 2', over: ['agent2'], own: 'agent2' },
+            // ★ 제작자 세트 (2026-10-19) — **상담사가 선물함으로 보내 준 사람만** 가진다.
+            //   물품 「제작자 의상 · 겉옷 · 신발」을 선물함에서 받는 순간 옷장으로 들어간다
+            //   (wear-gift.js). noTrade — 밀실 거래로 주고받지 않는다.
+            //   받은 그림은 1728x768 (칸 288 — 지난 규격)이라 칸마다 가로로 30 밀어 352 칸에 넣었다
+            //   (검은 정장 · 유리 펜과 같다). 꼬리가 옆 칸으로 몇 픽셀 넘어가 있어 칸마다 288 폭을
+            //   40 늦게 떠서 옮겼다. 걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다.
+            //   의상과 겉옷은 따로 입는다 — 의상은 이 칸(겉옷), 겉옷은 망토 칸.
+            { i: 'maker', n: '제작자 의상', over: ['maker-outfit'], own: 'maker-outfit', noTrade: true }
         ]
     },
     {
@@ -276,7 +288,8 @@ const DOT_SLOTS = [
             { i: '', n: '없음', over: [] },
             { i: 'shoes', n: '구두', over: ['shoes'], own: 'shoes' },
             { i: 'han', n: '신', over: ['han-shoes'], own: 'han-shoes' },
-            { i: 'black', n: '검은 구두', over: ['shoes-black'], own: 'shoes-black' }
+            { i: 'black', n: '검은 구두', over: ['shoes-black'], own: 'shoes-black' },
+            { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes', noTrade: true }
         ]
     },
     {
@@ -290,7 +303,13 @@ const DOT_SLOTS = [
         k: 'cape', n: '망토', items: [
             { i: '', n: '없음', over: [] },
             { i: 'cape', n: '하얀 망토', over: ['cape'], own: 'cape' },
-            { i: 'duru', n: '두루마기', over: ['han-duru'], own: 'han-duru' }
+            { i: 'duru', n: '두루마기', over: ['han-duru'], own: 'han-duru' },
+            // ★ 제작자 겉옷 — 두 장이다.
+            //   바깥(maker-outer)은 **머리 위**(top)에 얹는다 — 얼굴을 두르는 모자라 머리카락
+            //   가장자리를 덮어야 한다. 안쪽 채색(maker-outer-in)은 **무조건 머리카락 뒤**
+            //   (over — 머리보다 먼저 그린다). 한 장으로 주면 안쪽 색이 머리카락을 묻혀서 그린
+            //   이가 따로 주었다.
+            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer', noTrade: true }
         ]
     },
     {
@@ -356,7 +375,10 @@ const DOT_SLOTS = [
             //   펜이 몸 오른손 옆에 온다. 세로는 그대로 맞았다.
             //   걷기 줄은 네 칸만 그려져 있어 **5·6번째 칸을 3·2번째로** 채웠다
             //   (그린 이의 규칙) — 펜이 흩어졌다가 거꾸로 다시 모인다.
-            { i: 'glass-pen', n: '유리 펜', top: ['glass-pen'], own: 'glass-pen', noTrade: true, cat: '손' }
+            { i: 'glass-pen', n: '유리 펜', top: ['glass-pen'], own: 'glass-pen', noTrade: true, cat: '손' },
+            // ★ 뉴비 새싹 (2026-10-19) — 상담사가 선물함으로 보내 준 사람만. 머리 위 새싹 + 하트.
+            //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
+            { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' }
         ]
     }
 ];

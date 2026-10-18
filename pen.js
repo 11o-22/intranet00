@@ -82,7 +82,7 @@ function worn() {
 //   소지품에 들어오면 「사용」으로 옷장에 넣는다.
 const ITEM = '유리 펜';
 window.GIFT_WEAR = window.GIFT_WEAR || {};
-window.GIFT_WEAR[ITEM] = { k: PEN.ID, slot: '악세' };
+window.GIFT_WEAR[ITEM] = { k: PEN.ID, slot: '악세 칸' };
 
 function copyFlags(from, to) {
     Object.keys(from).forEach(function (k) { try { to[k] = from[k]; } catch (e) { } });
