@@ -434,10 +434,24 @@ window.giftTake = function (id) {
         const pairs = itemPairs(got);
         const pts = Math.max(0, Math.floor(Number(got.pts) || 0));
 
+        // ★ 옷장으로 가는 물품 — 받는 순간 소지품이 아니라 **옷장**에 넣는다.
+        //   window.GIFT_WEAR[물품이름] = { k: 옷장 열쇠, slot: '악세' } (유리 펜 — pen.js)
+        //   옷장은 있다·없다 뿐이라 여러 개가 와도 하나로 친다.
+        const WEAR = window.GIFT_WEAR || {};
+        const worn = [], had = [];
+        let toInv = 0;
         if (pairs.length) {
             if (!Array.isArray(u.inventory)) u.inventory = [];
             pairs.forEach(function (p) {
+                const w = WEAR[p[0]];
+                if (w && w.k) {
+                    if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
+                    if (u.wardrobe[w.k]) had.push(p[0]);
+                    else { u.wardrobe[w.k] = 1; worn.push(p[0]); }
+                    return;
+                }
                 for (let i = 0; i < p[1]; i++) u.inventory.push(p[0]);
+                toInv++;
             });
         }
         // ★ 포인트도 같이 올 수 있다 (웰컴 패키지 팩)
@@ -463,10 +477,18 @@ window.giftTake = function (id) {
         // ★ 무엇이 들어왔는지 한 창에 모아 보여 준다 (제목 · 물품 · 포인트)
         if (what.length) {
             const head = got.title ? (got.title + '\n\n') : '';
-            const body = pairs.map(function (p) { return '· ' + p[0] + (p[1] > 1 ? ' ×' + p[1] : ''); })
-                .concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : []).join('\n');
+            const body = pairs.map(function (p) {
+                const w = WEAR[p[0]];
+                if (w && w.k) {
+                    return '· ' + p[0] + (had.indexOf(p[0]) >= 0
+                        ? ' — 이미 옷장에 있습니다'
+                        : ' — 옷장 ' + (w.slot || '') + '에 들어왔습니다');
+                }
+                return '· ' + p[0] + (p[1] > 1 ? ' ×' + p[1] : '');
+            }).concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : []).join('\n');
             showCustomAlert(head + '받았습니다.\n\n' + body
-                + (pairs.length ? '\n\n물품은 소지품에 들어왔습니다.' : ''));
+                + (toInv ? '\n\n물품은 소지품에 들어왔습니다.' : '')
+                + (worn.length ? '\n\n옷장이나 광장 가방에서 달 수 있습니다.' : ''));
         } else {
             showCustomAlert('확인했습니다.\n\n내용은 기록에 남았습니다.');
         }

@@ -69,6 +69,7 @@ function build() {
     DOT_SLOTS.forEach(function (s) {
         s.items.forEach(function (it) {
             if (!it.own) return;
+            if (it.noTrade) return;          // 상담사가 선물로만 주는 것 (유리 펜)
             out.push({ k: it.own, n: it.n, slot: s.n });
         });
     });

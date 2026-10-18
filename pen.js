@@ -5,7 +5,8 @@
 //
 // ■ 무엇인가
 //
-//   옷장 악세 「유리 펜」(closet.js — 지금은 상담사 옷장에만)을 달고
+//   옷장 악세 「유리 펜」(closet.js — 상담사, 그리고 상담사가 선물함으로
+//   보내 준 사람만 가진다)을 달고
 //   광장에 들어가면 **오른쪽 아래(미니맵 위)에 펜 단추**가 뜬다.
 //   누르면 그림판이 열리고, 화면에 그은 것이 **지금 선 방의 바닥 그림 위**에
 //   그려진다. 같은 방(같은 번호 방)에 있는 사람은 모두 본다 —
@@ -70,6 +71,67 @@ function worn() {
         return !!(L && L.tops && L.tops.indexOf(PEN.ID) >= 0);
     } catch (e) { return false; }
 }
+
+// ==========================================
+// 상담사가 선물함으로 준다
+// ==========================================
+//   물품 「유리 펜」을 물품 표(ITEM_CATALOG)에 올려 둔다 → 상담사 화면
+//   「물품 강제 꽂기」 목록에 뜬다. 보내면 선물함으로 가고, 사원이 받는 순간
+//   소지품이 아니라 **옷장(악세)** 으로 들어간다 (giftbox.js 의 GIFT_WEAR).
+//   팔 수 없다 (장터는 가게 물품만 받아 원래 안 나온다). 소지품에 남는 일은 없지만, 혹시 다른 길로
+//   소지품에 들어오면 「사용」으로 옷장에 넣는다.
+const ITEM = '유리 펜';
+window.GIFT_WEAR = window.GIFT_WEAR || {};
+window.GIFT_WEAR[ITEM] = { k: PEN.ID, slot: '악세' };
+
+function copyFlags(from, to) {
+    Object.keys(from).forEach(function (k) { try { to[k] = from[k]; } catch (e) { } });
+}
+function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); } catch (e) { } }
+
+(function reg() {
+    const iv = setInterval(function () {
+        if (typeof ITEM_CATALOG === 'undefined') return;
+        if (!ITEM_CATALOG[ITEM]) {
+            ITEM_CATALOG[ITEM] = {
+                price: 0, usable: true, targetable: false,
+                effect: 'wear_glass_pen', noSell: true,
+                desc: '[악세] 유리로 빚은 펜. 옷장 악세에 넣어 달 수 있다. '
+                    + '달고 광장에 서면 바닥에 글씨나 그림을 그릴 수 있고, 그린 것은 10초 뒤에 사라진다.'
+            };
+        }
+        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(ITEM) < 0) NO_SELL_ITEMS.push(ITEM);
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 40000);
+})();
+
+// 소지품에 들어와 있는 유리 펜 → 옷장으로
+(function hookUse() {
+    const iv = setInterval(function () {
+        if (typeof useInventoryItem !== 'function') return;
+        if (useInventoryItem._pen) { clearInterval(iv); return; }
+        const _u = useInventoryItem;
+        const w = function (itemName) {
+            if (itemName !== ITEM) return _u.apply(this, arguments);
+            const u = u_();
+            if (!u || !Array.isArray(u.inventory) || u.inventory.indexOf(ITEM) < 0) return;
+            if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
+            if (u.wardrobe[PEN.ID]) { alert_('유리 펜은 이미 옷장에 있습니다.'); return; }
+            u.wardrobe[PEN.ID] = 1;
+            try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, ITEM, 1); } catch (e) { }
+            try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[' + ITEM + '] 옷장 악세에 넣었습니다.'); } catch (e) { }
+            try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+            alert_(ITEM + '\n\n옷장 악세에 들어왔습니다.\n옷장이나 광장 가방에서 달 수 있습니다.');
+        };
+        copyFlags(_u, w);
+        w._pen = true;
+        useInventoryItem = w; window.useInventoryItem = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 40000);
+})();
 
 // ==========================================
 // 모양
