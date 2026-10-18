@@ -1240,20 +1240,128 @@
 
     const SESSION_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+// ★ 한 계정은 한 창에서만 (2026-10-19 고침)
+//
+//   sessions/<사번> = { s: 이 창 번호, d: 이 기기 번호, k: 「iPhone · 홈 화면 앱」 같은 이름, at }
+//   (예전 판은 창 번호 글자 하나만 적었다 — 그것도 그대로 읽는다)
+//
+//   ✗ 전에는 밀려난 창이 logout() 을 불렀다. logout 은 **서버에** 손을 댄다 —
+//     online 표시를 지우고, 파티에서 나가고(leaveParty), 구역을 풀고, 광장 자리를 지운다.
+//     같은 계정이라 그 칸들이 **지금 쓰고 있는 창의 것**이다. 게다가 밀려난 창이 걸어 둔
+//     onDisconnect(파티 · 광장 · online)가 그 창을 닫을 때 또 지웠다.
+//     그래서 이제 밀려난 창은 서버에 걸어 둔 onDisconnect 를 모두 거두고 **연결을 끊고**
+//     (goOffline) 화면만 덮는다. 다시 쓰려면 단추로 새로 연다.
+//   ✗ 한 기기 안의 다른 창(탭 · 새로 연 창)도 「다른 곳」으로 떴다. 이제 기기 번호
+//     (이 브라우저의 localStorage)가 같으면 조용히 쉬게 하고, 이 창을 다시 보는 순간
+//     저절로 새로 열린다. 다른 기기면 어디서 열렸는지(기기 · 앱/브라우저)를 같이 알려 준다.
+//   밀려날 때마다 sessionKicks/<사번> 에 남긴다 (최근 10개 — 콘솔 sessionKickLog(사번)).
+const DEVICE_ID = (function () {
+    try {
+        let d = localStorage.getItem('corp_device');
+        if (!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); localStorage.setItem('corp_device', d); }
+        return d;
+    } catch (e) { return 'n' + SESSION_ID; }
+})();
+function sessionKind() {
+    const ua = navigator.userAgent || '';
+    let dev = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+        : /Windows/.test(ua) ? 'Windows PC' : /Macintosh/.test(ua) ? ((typeof document.ontouchend !== 'undefined') ? 'iPad' : 'Mac')
+        : /Linux|CrOS/.test(ua) ? 'PC' : '기기';
+    let app = '브라우저';
+    try {
+        if ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone) app = '홈 화면 앱';
+        else if (/KAKAOTALK/i.test(ua)) app = '카카오톡 안';
+        else if (/Instagram|FBAN|FBAV|Line\/|NAVER\(inapp/i.test(ua)) app = '다른 앱 안';
+        else if (/SamsungBrowser/.test(ua)) app = '삼성 인터넷';
+        else if (/Whale/.test(ua)) app = '웨일';
+        else if (/Edg/.test(ua)) app = '엣지';
+        else if (/CriOS|Chrome/.test(ua)) app = '크롬';
+        else if (/FxiOS|Firefox/.test(ua)) app = '파이어폭스';
+        else if (/Safari/.test(ua)) app = '사파리';
+    } catch (e) { }
+    return dev + ' · ' + app;
+}
+let sessionRef = null;
 function claimSession(code) {
     if (!database) return;
+    if (sessionRef) { try { sessionRef.off(); } catch (e) { } }
     const ref = database.ref('sessions/' + code);
-    ref.set(SESSION_ID);
+    sessionRef = ref;
+    ref.set({ s: SESSION_ID, d: DEVICE_ID, k: sessionKind(), at: Date.now() });
     ref.on('value', s => {
         if (!currentUser || currentUser.code !== code) { ref.off(); return; }
         const v = s.val();
-        if (v && v !== SESSION_ID) {
-            ref.off();
-            showCustomAlert('다른 곳에서 같은 계정으로 접속했습니다.\n이 창은 종료됩니다.');
-            setTimeout(() => logout(), 300);
-        }
+        if (!v) return;
+        const sid = (typeof v === 'object') ? v.s : v;
+        if (!sid || sid === SESSION_ID) return;
+        ref.off();
+        sessionKicked(code, v);
     });
 }
+function sessionKicked(code, v) {
+    const same = !!(v && typeof v === 'object' && v.d === DEVICE_ID);
+    const where = (v && typeof v === 'object' && v.k) ? v.k : '';
+    // 기록 — 연결을 끊기 전에
+    let job = Promise.resolve();
+    try {
+        const log = database.ref('sessionKicks/' + code);
+        job = log.push({ at: Date.now(), same: same, me: sessionKind(), other: where || '(예전 판)' })
+            .then(function () {
+                return log.once('value').then(function (s) {
+                    const ks = Object.keys(s.val() || {});
+                    const del = {};
+                    ks.slice(0, Math.max(0, ks.length - 10)).forEach(function (k) { del[k] = null; });
+                    if (Object.keys(del).length) return log.update(del);
+                });
+            }).catch(function () { });
+    } catch (e) { }
+    // 이 창이 서버에 걸어 둔 「끊기면 지워라」를 모두 거두고, 연결을 끊는다
+    try { job = job.then(function () { return database.ref().onDisconnect().cancel(); }).catch(function () { }); } catch (e) { }
+    const off = function () { try { database.goOffline(); } catch (e) { } };
+    Promise.race([job, new Promise(function (r) { setTimeout(r, 2500); })]).then(off, off);
+    try { clearInterval(sessionTimer); } catch (e) { }
+    sessionCover(same, where);
+}
+function sessionCover(same, where) {
+    let el = document.getElementById('session-cover');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'session-cover';
+        el.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;'
+            + 'background:rgba(0,0,0,.86);padding:20px;';
+        document.body.appendChild(el);
+    }
+    const msg = same
+        ? '이 기기의 다른 창에서 같은 계정이 열렸습니다.<br>이 창은 잠시 쉽니다.<br><span style="font-size:11px;color:#999;">이 창을 다시 보면 저절로 이어집니다.</span>'
+        : '다른 곳에서 같은 계정으로 접속했습니다.'
+            + (where ? '<br><span style="font-size:12px;color:#ffb4b4;">(' + String(where).replace(/[<>&"]/g, '') + ')</span>' : '')
+            + '<br>이 창은 멈췄습니다.';
+    el.innerHTML = '<div style="max-width:340px;width:100%;background:#151515;border:1px solid #7f1d1d;border-radius:10px;'
+        + 'box-shadow:0 0 40px rgba(180,0,0,.45);padding:24px 18px;text-align:center;color:#f3d6d6;font-size:14px;line-height:1.8;">'
+        + msg
+        + '<button class="game-btn" style="margin:18px auto 0;display:block;padding:11px 22px;background:#7f1d1d !important;'
+        + 'border-color:#b91c1c !important;color:#fff !important;" onclick="location.reload()">여기서 다시 열기</button></div>';
+    el.style.display = 'flex';
+    if (same) {
+        // 같은 기기 — 이 창을 다시 보는 순간 새로 연다 (그 창이 쉬러 간다)
+        let wasHidden = (document.visibilityState === 'hidden');
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') { wasHidden = true; return; }
+            if (wasHidden) location.reload();
+        });
+    }
+}
+window.sessionKickLog = function (who) {
+    const code = who || (currentUser && currentUser.code);
+    if (!code || !database) return;
+    database.ref('sessionKicks/' + code).once('value').then(function (s) {
+        const v = s.val() || {};
+        console.table(Object.keys(v).map(function (k) {
+            const x = v[k];
+            return { 때: new Date(x.at).toLocaleString(), 같은기기: x.same ? 'O' : '-', 밀려난창: x.me, 새로연곳: x.other };
+        }));
+    });
+};
 
     let sessionSeconds = 0;
     let sessionTimer;
