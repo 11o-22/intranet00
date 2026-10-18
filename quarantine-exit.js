@@ -39,7 +39,8 @@ function spend(name) {
     const n = (currentUser.useCnt[name] || 0) + 1;
     currentUser.useCnt[name] = n;
     if (n >= MAX_USE) {
-        delete currentUser.useCnt[name];
+        // ★ 지우지 않고 0 으로 둔다 — 아래 「묵은 횟수」 참고
+        currentUser.useCnt[name] = 0;
         if (typeof removeItemFromInventory === 'function') removeItemFromInventory(currentUser, name, 1);
         // 장착 칸에 잘못 꽂혀 있었다면 같이 뺀다
         const eq = currentUser.equippedWeapons || [];
@@ -181,6 +182,49 @@ function doExit(nm, kind) {
         clearInterval(iv);
         console.log('[격리] 문패·신발끈 연결');
     }, 500);
+})();
+
+// ==========================================
+// 묵은 횟수 — 한 번 쓰고도 사라지던 것 (2026-10-18)
+// ==========================================
+//
+//   다섯 번째에 횟수 칸을 지웠다(delete). 그 칸이 useCnt 의 하나뿐인 칸이면
+//   useCnt 가 {} 가 되고, 빈 객체는 저장에서 빠진다(empty-null.js). 그래서
+//   서버에는 **4 가 그대로** 남았다. 다시 들어오면 그 4 를 읽어 오고, 새로
+//   산 문패를 한 번 쓰면 5 가 되어 바로 닳아 없어졌다.
+//   이제는 0 으로 둔다(위 spend · newitems2.js totalSpend). 이미 서버에 남은
+//   묵은 값은 사원마다 한 번 바로잡는다 —
+//     · 그 물건을 하나도 안 가지고 있으면 횟수는 뜻이 없다 → 0
+//     · 「다 쓰기 한 번 전」 값(문패 4 · 포승줄 9 …)은 남는 자리가 바로 그 값이다 → 0
+//       (정말로 네 번 쓴 사람도 0 이 되지만, 그쪽이 덜 억울하다)
+(function repairUseCnt() {
+    const MAX = { '정갈한 문패': 5, '오색 신발끈': 5, '포승줄': 10, '진실 마스크': 5,
+                  '장기말': 3, '낚시 줄': 5 };
+    const MARK = 'uc-1018';
+    const BOOT = Date.now();
+    function base(w) {
+        return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+    }
+    setInterval(function () {
+        try {
+            const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+            if (!u || !u.code || u.useCntFix === MARK) return;
+            if (Date.now() - BOOT < 8000) return;           // 서버 모습이 다 내려온 뒤에
+            const c = (u.useCnt && typeof u.useCnt === 'object') ? u.useCnt : {};
+            const fixed = [];
+            Object.keys(MAX).forEach(function (name) {
+                const v = Number(c[name]) || 0;
+                if (!v) return;
+                const held = (u.inventory || []).filter(function (x) { return base(x) === name; }).length
+                    + (u.equippedWeapons || []).filter(function (x) { return base(x) === name; }).length;
+                if (!held || v >= MAX[name] - 1) { c[name] = 0; fixed.push(name + ' ' + v); }
+            });
+            u.useCntFix = MARK;
+            const f = { useCntFix: 1 };
+            if (fixed.length) { u.useCnt = c; f.useCnt = 1; console.log('[격리] 묵은 사용 횟수를 바로잡았습니다 — ' + fixed.join(' · ')); }
+            if (typeof saveFields === 'function') saveFields(f);
+        } catch (e) { }
+    }, 2000);
 })();
 
 // ==========================================

@@ -187,7 +187,11 @@ function totalSpend(name, max) {
     const n = (currentUser.useCnt[name] || 0) + 1;
     currentUser.useCnt[name] = n;
     if (n >= max) {
-        delete currentUser.useCnt[name];
+        // ★ 지우지 않고 0 으로 둔다 (2026-10-18).
+        //   이 칸 하나뿐일 때 지우면 useCnt 가 {} 가 되는데, 빈 객체는 저장에서
+        //   빠진다(empty-null.js). 그래서 서버에는 마지막 직전 값(max-1)이 그대로
+        //   남았고, 다시 들어온 뒤 새로 산 것을 **한 번 쓰자마자** 다 쓴 것으로 셌다.
+        currentUser.useCnt[name] = 0;
         removeItemFromInventory(currentUser, name, 1);
         unequipByName(name);
         saveFields({ useCnt: 1 });
