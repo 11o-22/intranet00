@@ -1689,11 +1689,35 @@ function getTodayStr() {
         return code === 'kario0987' || !!testerList[code];
     }
 
+    // ★ 안 보이는 채로는 저절로 들어가지 않는다 (2026-10-19)
+    //   휴대폰은 뒤에 깔린 탭 · 앱을 **보이지 않는 채로 다시 띄우곤 한다**
+    //   (메모리를 비웠다 되살릴 때, 사파리가 주소창 첫 결과를 미리 띄울 때 등).
+    //   그 창이 저절로 들어가 계정을 차지하면, 지금 보고 있는 창이 「다른 곳에서
+    //   같은 계정으로 접속했습니다」로 밀려났다 — 기기 하나만 쓰는데도.
+    //   이제 화면에 보일 때까지 기다렸다가 들어간다.
+    let autoLoginWait = false;
+    function autoLoginHidden() {
+        try { return document.visibilityState === 'hidden' || !!document.prerendering; } catch (e) { return false; }
+    }
     function tryAutoLogin() {
         if (maintenanceMode) return;
         if (autoLoginTried || currentUser || !database) return;
         const savedCode = localStorage.getItem('corp_logged_code');
         if (!savedCode) return;
+        if (autoLoginHidden()) {
+            if (autoLoginWait) return;
+            autoLoginWait = true;
+            const go = function () {
+                if (autoLoginHidden()) return;
+                document.removeEventListener('visibilitychange', go);
+                document.removeEventListener('prerenderingchange', go);
+                autoLoginWait = false;
+                tryAutoLogin();
+            };
+            document.addEventListener('visibilitychange', go);
+            document.addEventListener('prerenderingchange', go);
+            return;
+        }
         autoLoginTried = true;
 
         showAutoLoginOverlay(true); // ★ 인증 화면 표시
