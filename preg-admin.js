@@ -27,6 +27,9 @@
 //
 // ■ 콘솔
 //   pregAdminState()
+//
+// ■ 위 알림띠 (2026-10-18)
+//   상담사가 낀 임신 · 착정 · 출산 · 유산 소식은 알림띠(notices)에 올리지 않는다 — 아래 4.
 
 (function pregAdmin() {
 
@@ -86,7 +89,11 @@ keepOuter('tryPregnancy', '_pregAdmin', function (f) {
 keepOuter('doPregnancy', '_pregAdmin', function (f) {
     return function (code) {
         if (isAdm(u_()) && !sameRoom(code)) { alert_(NOTE + '\n\n진행되지 않았습니다.'); return; }
-        return f.apply(this, arguments);
+        // 알림띠 — 상담사가 시키거나 상담사가 받으면 안 띄운다 (아래 4)
+        const was = forced;
+        forced = (isAdm(u_()) || code === ADMIN) ? 'quiet' : 'loud';
+        try { return f.apply(this, arguments); }
+        finally { forced = was; }
     };
 });
 keepOuter('addPregBtn', '_pregAdmin', function (f) {
@@ -162,6 +169,45 @@ setInterval(function () {
     } catch (e) { }
 }, 3000);
 
+// ==========================================
+// 4. 위 알림띠 — 상담사가 낀 임신은 띄우지 않는다
+// ==========================================
+//
+//   pregBroadcast 하나가 notices 로 올려 모두의 화면 위에 흐른다. 상담사가 낀 것은
+//   거기로 안 보낸다 (기록 · 특이사항 · 본인 알림창은 그대로).
+//     · 임신시키기      상담사가 시켰거나, 상담사가 받았다     (doPregnancy 를 감싸 그때만 본다)
+//     · 착정 · 출산 · 유산  상담사의 몸이거나, 아버지 중에 상담사가 있다
+//       — 출산 · 유산은 알림을 올리기 직전에 임신 기록을 지우므로, 바로 전까지 본
+//         아버지 명단을 잠깐 들고 있다가 본다.
+let forced = null;              // 'quiet' | 'loud' | null — 임신시키기 도중에만
+let lastSires = null, lastAt = 0;
+function adminIn(list) {
+    return Array.isArray(list) && list.some(function (s) { return s && s.code === ADMIN; });
+}
+setInterval(function () {
+    try {
+        const me = u_();
+        const p = me && me.preg;
+        if (p && Array.isArray(p.sires) && p.sires.length) { lastSires = p.sires.slice(); lastAt = Date.now(); }
+    } catch (e) { }
+}, 500);
+function quietNow() {
+    if (forced === 'quiet') return true;
+    if (forced === 'loud') return false;
+    const me = u_();
+    if (isAdm(me)) return true;
+    if (me && me.preg && adminIn(me.preg.sires)) return true;
+    if (lastSires && Date.now() - lastAt < 20000 && adminIn(lastSires)) return true;
+    return false;
+}
+let hushed = 0;
+keepOuter('pregBroadcast', '_pregAdmin', function (f) {
+    return function () {
+        try { if (quietNow()) { hushed++; console.log('[임신] 상담사가 낀 소식 — 알림띠에 올리지 않았습니다.'); return; } } catch (e) { }
+        return f.apply(this, arguments);
+    };
+});
+
 window.pregAdminState = function () {
     const me = u_();
     const a = users()[ADMIN] || (isAdm(me) ? me : null);
@@ -170,6 +216,7 @@ window.pregAdminState = function () {
     console.log('  시킬 수 있나 :', (typeof canSire === 'function' && a) ? (canSire(a) ? 'O' : '✗') : '-');
     const nm = a ? giftName(a) : '';
     console.log('  고유 아이템  :', nm || '-', nm && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[nm] ? '— ' + GIFT.d : '');
+    console.log('  알림띠에서 뺀 소식 :', hushed + '번 (이 화면)');
 };
 
 })();
