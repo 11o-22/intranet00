@@ -44,8 +44,9 @@
 //
 //   ④ 잊은 자야 사라져라
 //      장착칸의 [제물] 에서 하루 세 사람까지 미리 찍어 둔다. 찍힌 사람이
-//      상담실이나 선녀탕에 들어가 있는 동안, 그 시간만큼 장착자에게
-//      포인트가 들어온다 (다 합쳐 5만까지).
+//      상담실에 들어가 있는 동안, 그 시간만큼 장착자에게 포인트가 들어온다
+//      — **한 사람에 시간당 20,000 P** (3분마다 1,000 P 씩 · 다 합쳐 5만까지).
+//      (2026-10-18 · 전에는 10분마다 600 P — 시간당 3,600 P 였다)
 //
 //   ⑤ 지산의 복이시여 대리자여
 //      ■■의 ■■■ 탐사에는 한 번에 25,000 P 라는 천장이 있다 (epic.js).
@@ -94,7 +95,8 @@ const JISAN = {
     ROD_SAFE:   10,            // ③ 그 뒤 몇 판을 꽝 없이 가나
     SAC_DAY:    3,             // ④ 하루에 찍을 제물 수
     SAC_CAP:    50000,         // ④ 제물에게서 받을 수 있는 몫의 천장
-    SAC_PER:    600,           // ④ 10분마다 들어오는 포인트
+    SAC_HOUR:   20000,         // ④ 제물 한 사람이 상담실에 있는 한 시간마다
+    SAC_STEP:   3,             // ④ 몇 분마다 한 번 주나 (20,000 ÷ 60 × 3 = 1,000 P)
     EPIC_CAP:   25000,         // ⑤ epic.js:655 의 천장
     // ① 에서 뺄 회수품 — 빛 부속성으로 치는 것들. 자료에 속성 칸이
     //    생기기 전까지는 여기에 이름으로 적어 둔다.
@@ -932,11 +934,11 @@ setInterval(function () {
             if (!inRoom) { rec.at = 0; return; }
             if (!rec.at) { rec.at = now; return; }
             const mins = (now - rec.at) / 60000;
-            if (mins < 10) return;
-            const step = Math.floor(mins / 10);
-            let pay = Math.min(left, step * JISAN.SAC_PER);
+            if (mins < JISAN.SAC_STEP) return;
+            const step = Math.floor(mins / JISAN.SAC_STEP);
+            let pay = Math.min(left, Math.round(step * JISAN.SAC_HOUR * JISAN.SAC_STEP / 60));
             if (pay <= 0) return;
-            rec.at = rec.at + step * 600000;
+            rec.at = rec.at + step * JISAN.SAC_STEP * 60000;
             rec.paid = (Number(rec.paid) || 0) + pay;
             left -= pay; got += pay;
         });
@@ -1023,8 +1025,8 @@ function pickSac() {
             + '</div></label>';
     }).join('');
     const w = box(head('제물을 찍습니다',
-        '하루 ' + JISAN.SAC_DAY + '사람까지입니다. 찍힌 사원이 상담실이나 선녀탕에 '
-        + '들어가 있는 동안 그 시간만큼 포인트가 들어옵니다 (다 합쳐 '
+        '하루 ' + JISAN.SAC_DAY + '사람까지입니다. 찍힌 사원이 상담실에 '
+        + '들어가 있는 동안 한 사람에 시간당 ' + JISAN.SAC_HOUR.toLocaleString() + ' P 가 들어옵니다 (다 합쳐 '
         + JISAN.SAC_CAP.toLocaleString() + ' P 까지).')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="js-ok" class="game-btn" style="' + BTN + ' text-align:center;">찍는다</button>'
