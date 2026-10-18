@@ -370,7 +370,8 @@
       "shot.js",
       "firsthead.js",
       "gacha.js",
-      "pen.js"
+      "pen.js",
+      "preg-admin.js"
     ]
   ]
 }
