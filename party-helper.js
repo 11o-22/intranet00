@@ -391,7 +391,8 @@ setInterval(function () {
                     H = old;
                 } else if (iAmHelper()) {
                     H = { k: k, code: currentUser.code, pts: Number(currentUser.points) || 0,
-                          inv: (currentUser.inventory || []).slice(), at: Date.now() };
+                          inv: (currentUser.inventory || []).slice(), at: Date.now(),
+                          poll: Math.min(99, Number(currentUser.pollution) || 0) };
                     hSave();
                 }
             }
@@ -401,6 +402,7 @@ setInterval(function () {
             const h = H;
             H = null; hSave();
             hEnd = Date.now() + H_SETTLE_MS + 1500;
+            hQuar = { code: h.code, poll: h.poll, until: Date.now() + H_QUAR_MS };
             setTimeout(function () { try { hSettle(h); } catch (e) { console.warn('[파티] 헬퍼 되돌리기:', e); } }, H_SETTLE_MS);
             return;
         }
@@ -412,6 +414,56 @@ setInterval(function () {
                 if (Date.now() - (old.at || 0) < 6 * 3600000) hSettle(old);
             }
         }
+    } catch (e) { }
+}, 300);
+
+// 상담실 · 선녀탕 — 헬퍼는 가지 않는다 (2026-10-18)
+//
+//   헬퍼 탐사 중에(그리고 끝난 뒤 잠깐) 상담실 · 선녀탕에 들어가게 되면 그 자리에서
+//   꺼낸다 — 어둠 사망 · K 의 방 쓰러짐 · ■■의 ■■■ 쓰러짐 모두 같은 칸
+//   (quarantineUntil)에 적히므로 그것만 본다. 오염도는 출발할 때 값으로 돌린다
+//   (100 으로 두면 나오자마자 다시 들어간다). 잃은 포인트 · 반입품은 위 hSettle 이
+//   탐사가 끝난 뒤 돌려준다.
+const H_QUAR_MS = 60000;       // 끝난 뒤 이만큼은 더 지킨다 (죽은 뒤 이송 화면이 늦게 뜰 수 있다)
+let hQuar = null;              // { code, poll, until }
+function hInQ(u) {
+    try { if (typeof isQuarantined === 'function') return !!isQuarantined(u); } catch (e) { }
+    return !!(u && u.quarantineUntil && Date.now() < u.quarantineUntil);
+}
+setInterval(function () {
+    try {
+        const u = currentUser;
+        if (!u) return;
+        let poll = null;
+        if (H && H.code === u.code) poll = H.poll;
+        else if (hQuar && hQuar.code === u.code && Date.now() < hQuar.until) poll = hQuar.poll;
+        if (poll == null || !hInQ(u)) return;
+        u.quarantineUntil = 0;
+        u.quarantineDest = null;
+        u.quarantineHospital = false;
+        u.quarantineExitPollution = 0;
+        u.pollution = Math.min(99, Number(poll) || 0);
+        u.lastPollutionTime = Date.now();
+        u.foxRoomAnswered = false;
+        const f = { quarantineUntil: 1, quarantineDest: 1, quarantineHospital: 1, quarantineExitPollution: 1,
+                    pollution: 1, lastPollutionTime: 1, foxRoomAnswered: 1, history: 1 };
+        if (u.badge && typeof u.badge.notes === 'string') {
+            const arr = u.badge.notes.split(' | ').filter(function (n) {
+                return n.trim() !== '' && n.indexOf('의식 불명') < 0 && n.indexOf('긴급 이송') < 0 && n.indexOf('사직 반려') < 0;
+            });
+            u.badge.notes = arr.length ? arr.join(' | ') : '특이사항 없음';
+            f.badge = 1;
+        }
+        try { addHistoryLog(u, '[헬퍼] 상담실 · 선녀탕에 가지 않습니다.'); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields(f); } catch (e) { }
+        ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay',
+         'quarantine-pick-overlay', 'fox-loading-overlay'].forEach(function (id) {
+            const el = document.getElementById(id); if (el) el.style.display = 'none';
+        });
+        try { hasShownFoxAlert = false; } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        try { if (typeof showDarkToast === 'function') showDarkToast('헬퍼는 상담실 · 선녀탕에 가지 않습니다.'); } catch (e) { }
+        console.log('[파티] 헬퍼 — 상담실 · 선녀탕에서 꺼냈습니다 (오염도 ' + u.pollution + ')');
     } catch (e) { }
 }, 300);
 
