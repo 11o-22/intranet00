@@ -369,7 +369,8 @@
       "palette.js",
       "shot.js",
       "firsthead.js",
-      "gacha.js"
+      "gacha.js",
+      "pen.js"
     ]
   ]
 }

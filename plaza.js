@@ -3674,6 +3674,16 @@ window.plazaWhere = function () {
              seg: run.seg, lv: run.lv };
 };
 
+// 지금 방 그림 — 유리 펜(pen.js)이 방 바닥 그림 위에 그린다
+//   seat 는 몇 번 방에 들지 정해진 뒤에만 있다 (그 전에는 null).
+window.plazaStage = function () {
+    if (!run || !run.el || !run.room || !R[run.room]) return null;
+    const r = roomOf();
+    return { el: run.el, view: run.view, ov: document.getElementById('plaza-ov'),
+             z: zz(), w: r.w, h: r.h, room: run.room,
+             seat: run.inst ? seatKey(run.room, run.inst) : null };
+};
+
 console.log('[광장] plazaOpen() · plazaGo(방) · plazaRooms() · plazaState() · plazaWhere()');
 
 })();
