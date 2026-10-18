@@ -932,10 +932,36 @@ setInterval(function () {
         save({ moonFreedSeen: 1 });
         shutRooms();
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-        alert_('[ 골든 마스코트 ]\n\n' + (me.moonFreed.byName || nameOf(me.moonFreed.by))
-            + ' 사원이 계약서를 보냈습니다.\n멀끔한 상태로 나왔습니다.');
+        wakePop();
     } catch (e) { }
 }, 2000);
+
+// 계약서를 받은 쪽에 뜨는 창 — 노란 글씨 두 줄
+function wakePop() {
+    const ID = 'moon-wake-pop';
+    const old = document.getElementById(ID);
+    if (old) old.remove();
+    if (!document.getElementById('moon-wake-css')) {
+        const st = document.createElement('style');
+        st.id = 'moon-wake-css';
+        st.textContent = '@keyframes moonWakeIn{from{opacity:0;transform:scale(0.92);}to{opacity:1;transform:scale(1);}}'
+            + '#moon-wake-pop .mw-l{display:block;font-size:40px;font-weight:900;color:#ffd400;'
+            + 'letter-spacing:0.12em;line-height:1.5;text-shadow:0 0 14px rgba(255,212,0,0.55),0 2px 0 #4a3a00;}';
+        document.head.appendChild(st);
+    }
+    const w = document.createElement('div');
+    w.id = ID;
+    w.style.cssText = 'position:fixed; inset:0; z-index:99999990; display:flex; flex-direction:column;'
+        + ' align-items:center; justify-content:center; background:rgba(0,0,0,0.88); padding:16px;'
+        + ' text-align:center; animation:moonWakeIn .35s ease-out;';
+    w.innerHTML = '<div><span class="mw-l">일 어 나</span><span class="mw-l">일 하 자</span></div>'
+        + '<button class="game-btn" style="margin:28px 0 0 0; padding:10px 34px; font-size:12px;'
+        + ' background:linear-gradient(145deg,#6a5400,#2e2400) !important; border-color:#ffd400 !important;'
+        + ' color:#ffe680 !important;">확인</button>';
+    w.querySelector('button').onclick = function () { w.remove(); };
+    document.body.appendChild(w);
+}
+window.moonWakePop = wakePop;
 
 // ==========================================
 // [문신] 창
