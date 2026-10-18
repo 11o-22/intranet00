@@ -768,7 +768,7 @@ function afterJob() {
     kr.stats = Object.assign({}, kr.max);
     kr._shown = null;
     kr.gear = gearPower();
-    if (darkRun.isParty) waitDungeon(); else decide([me().code], [k.lastDun]).then(enterDungeon);
+    if (darkRun.isParty) waitDungeon(); else pickDun([me().code], enterDungeon);
 }
 
 // 전용 장비 속성마다 이번 판에 쓸 수 있는 횟수
@@ -800,6 +800,58 @@ function gearLine(a, extra) {
 
 // 직업 등급 — 아직 처음으로 안 돌아간 기록(stale)은 D 로 본다
 function gradeOf(u) { const k = u && u.kroom; return (k && !stale(k) && GRADES.indexOf(k.grade) >= 0) ? k.grade : 'D'; }
+
+// ★ 고를 수 있는 등급 — decide 와 같은 문(Lv · 각성 절반)이되 Lv 에 흔들기(±3)를 안 넣는다.
+//   방장이 고르는 판(pickDun)이 쓴다. 들어갈 수 있는지 보는 것이라 늘 같은 답이어야 한다.
+function gateOf(codes) {
+    const users = codes.map(function (c) {
+        return (c === me().code) ? me() : ((typeof db !== 'undefined' && db.users) ? db.users[c] : null);
+    });
+    const lvs = users.map(lvOf);
+    const gis = users.map(function (u) { return gi(gradeOf(u)); });
+    const avg = lvs.reduce(function (a, b) { return a + b; }, 0) / Math.max(1, lvs.length);
+    let dl = Math.round(avg);
+    if (Math.max.apply(null, lvs) - Math.min.apply(null, lvs) > 20) dl -= 10;   // 밸런스 (decide 와 같다)
+    dl = clamp(dl, 1, LV_MAX);
+    const ok = GRADES.filter(function (g) {
+        const woke = gis.filter(function (x) { return x >= gi(g); }).length;
+        return dl >= GATE[g] && woke * 2 >= gis.length
+            && Object.keys(DUNS).some(function (id) { return DUNS[id].g === g && DUNS[id].ready; });
+    });
+    if (!ok.length) ok.push('D');
+    return { ok: ok, dl: dl, avg: Math.round(avg) };
+}
+
+// ★ 방장이 던전을 고른다 (2026-10-18)
+//   들어갈 수 있는 등급(Lv · 각성)마다 그 등급의 던전이 줄줄이 선다. 혼자면 나, 일행이면 방장이 고른다.
+//   「아무 데나」를 누르면 전처럼 높은 등급에 무게를 둔 제비뽑기(decide)로 정한다.
+//   바로 전에 들어갔던 던전에는 「지난번」 표시만 붙인다 — 골라도 된다.
+function pickDun(codes, done) {
+    const G = gateOf(codes);
+    const last = prof().lastDun;
+    kr._pickDun = function (id) {
+        kr._pickDun = null;
+        if (id) done({ id: id, lv: G.dl, avg: G.avg, pick: 1 });
+        else decide(codes, [last]).then(done);
+    };
+    const party = codes.length > 1;
+    const rows = G.ok.slice().reverse().map(function (g) {
+        const ids = Object.keys(DUNS).filter(function (id) { return DUNS[id].g === g && DUNS[id].ready; });
+        return `<div style="font-size:11px; color:#7fd3e6; margin:12px 0 6px 0;">${g} 등급 <span style="color:#777;">· Lv ${GATE[g]}+</span></div>`
+            + ids.map(function (id) {
+                return darkChoiceBtn(esc(DUNS[id].n) + (id === last ? ' <span style="font-size:10px; color:#888;">(지난번)</span>' : ''),
+                    'kroomDunPick(\'' + id + '\')');
+            }).join('');
+    }).join('');
+    show('문', `문이 여러 개다.<br><br>손잡이마다 다른 냄새가 난다. ${party ? '팀을 데려갈' : '들어갈'} 문을 고른다.<br>
+        <span style="font-size:11px; color:#888;">${party ? '팀 평균' : ''} Lv ${G.dl} · 들어갈 수 있는 등급 ${G.ok.join(' · ')}</span>`,
+        rows + `<div style="margin-top:12px;">${darkChoiceBtn('아무 문이나 연다. <span style="font-size:10px; color:#888;">(무작위)</span>', 'kroomDunPick(\'\')')}</div>`);
+}
+window.kroomDunPick = function (id) {
+    if (!kr || kr.dun || typeof kr._pickDun !== 'function') return;
+    if (id && !(DUNS[id] && DUNS[id].ready)) return;
+    kr._pickDun(id || null);
+};
 
 // avoid — 바로 전에 들어갔던 던전. 그 등급에 다른 던전이 있으면 그것은 빼고 고른다.
 //
@@ -860,22 +912,22 @@ function waitDungeon() {
     };
     ref.on('value', take);
     if (lead) {
-        // 팀원이 카드를 고르는 동안 조금 기다렸다가 정한다 (Lv 은 직업과 상관없다)
+        // 팀원이 카드를 고르는 동안 조금 기다렸다가 고르는 판을 띄운다 (각성 등급이 다 적히게)
         setTimeout(function () {
             if (!kr || kr.dun) return;
-            ref.once('value').then(function (s) {
-                const old = s.val();
-                return decide(members(), [old && old.id, prof().lastDun]);
-            }).then(function (v) { v.at = now(); v.run = run; ref.set(v); });
+            pickDun(members(), function (v) { v.at = now(); v.run = run; ref.set(v); });
         }, 1500);
+    } else {
+        show('—', `팀이 모이기를 기다린다.<br><br>방장이 문 앞에 서서 손잡이를 하나씩 쥐어 본다.`,
+            `<div style="font-size:11px; color:#888; text-align:center; padding:10px;">방장이 던전을 고르는 중…</div>`);
     }
-    setTimeout(function () {                                 // 팀장이 끊겼으면 내가 정한다
+    setTimeout(function () {                                 // 방장이 끊겼으면(3분) 내가 정한다
         if (!kr || kr.dun) return;
         decide(members(), [prof().lastDun]).then(function (v) {
             v.at = now(); v.run = run;
             ref.transaction(function (cur) { return mine(cur) ? cur : v; });
         });
-    }, 15000);
+    }, 180000);
 }
 
 function enterDungeon(v) {
