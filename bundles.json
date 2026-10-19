@@ -372,7 +372,8 @@
       "gacha.js",
       "pen.js",
       "preg-admin.js",
-      "wear-gift.js"
+      "wear-gift.js",
+      "shop-bulk.js"
     ]
   ]
 }
