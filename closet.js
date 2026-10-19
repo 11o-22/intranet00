@@ -275,12 +275,12 @@ const DOT_SLOTS = [
             { i: 'agent2', n: '요원복 2', over: ['agent2'], own: 'agent2' },
             // ★ 제작자 세트 (2026-10-19) — **상담사가 선물함으로 보내 준 사람만** 가진다.
             //   물품 「제작자 의상 · 겉옷 · 신발」을 선물함에서 받는 순간 옷장으로 들어간다
-            //   (wear-gift.js). noTrade — 밀실 거래로 주고받지 않는다.
+            //   (wear-gift.js). 밀실 거래로는 주고받을 수 있다 (2026-10-19).
             //   받은 그림은 1728x768 (칸 288 — 지난 규격)이라 칸마다 가로로 30 밀어 352 칸에 넣었다
             //   (검은 정장 · 유리 펜과 같다). 꼬리가 옆 칸으로 몇 픽셀 넘어가 있어 칸마다 288 폭을
             //   40 늦게 떠서 옮겼다. 걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다.
             //   의상과 겉옷은 따로 입는다 — 의상은 이 칸(겉옷), 겉옷은 망토 칸.
-            { i: 'maker', n: '제작자 의상', over: ['maker-outfit'], own: 'maker-outfit', noTrade: true }
+            { i: 'maker', n: '제작자 의상', over: ['maker-outfit'], own: 'maker-outfit' }
         ]
     },
     {
@@ -289,7 +289,7 @@ const DOT_SLOTS = [
             { i: 'shoes', n: '구두', over: ['shoes'], own: 'shoes' },
             { i: 'han', n: '신', over: ['han-shoes'], own: 'han-shoes' },
             { i: 'black', n: '검은 구두', over: ['shoes-black'], own: 'shoes-black' },
-            { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes', noTrade: true }
+            { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes' }
         ]
     },
     {
@@ -309,7 +309,7 @@ const DOT_SLOTS = [
             //   가장자리를 덮어야 한다. 안쪽 채색(maker-outer-in)은 **무조건 머리카락 뒤**
             //   (over — 머리보다 먼저 그린다). 한 장으로 주면 안쪽 색이 머리카락을 묻혀서 그린
             //   이가 따로 주었다.
-            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer', noTrade: true }
+            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' }
         ]
     },
     {
@@ -368,14 +368,14 @@ const DOT_SLOTS = [
             //   누르면 방 바닥 그림 위에 그린다 (pen.js).
             //   **상담사가 선물함으로 보내 준 사람만** 가진다 — 물품 「유리 펜」을
             //   선물함에서 받는 순간 옷장(u.wardrobe['glass-pen'])으로 들어간다.
-            //   noTrade — 밀실 거래로 주고받지 않는다 (p2p-wear.js 가 뺀다).
+            //   밀실 거래로는 주고받을 수 있다 (2026-10-19). 처음 주는 것만 상담사다.
             //
             //   받은 그림은 1728x768 — 지난 규격(칸 288)이다. 칸마다 가로로 70
             //   밀어 352 칸에 넣었다 (도트 눈금 x ≡ 2 mod 4 를 지킨다). 그래야
             //   펜이 몸 오른손 옆에 온다. 세로는 그대로 맞았다.
             //   걷기 줄은 네 칸만 그려져 있어 **5·6번째 칸을 3·2번째로** 채웠다
             //   (그린 이의 규칙) — 펜이 흩어졌다가 거꾸로 다시 모인다.
-            { i: 'glass-pen', n: '유리 펜', top: ['glass-pen'], own: 'glass-pen', noTrade: true, cat: '손' },
+            { i: 'glass-pen', n: '유리 펜', top: ['glass-pen'], own: 'glass-pen', cat: '손' },
             // ★ 뉴비 새싹 (2026-10-19) — 상담사가 선물함으로 보내 준 사람만. 머리 위 새싹 + 하트.
             //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
             { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' }
