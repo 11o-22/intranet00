@@ -49,6 +49,9 @@ function esc(s) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
 }
+// 🖍 반짝 크레용 (crayon.js) — 장착한 사람의 이름 · 글 색. 없으면 그대로
+function cyN(c, h) { try { return (typeof window.crayonName === 'function') ? window.crayonName(c, h) : h; } catch (e) { return h; } }
+function cyS(c, h) { try { return (typeof window.crayonSay === 'function') ? window.crayonSay(c, h) : h; } catch (e) { return h; } }
 function readAt() {
     try { return Number(localStorage.getItem(KEY)) || 0; } catch (e) { return lastSeen; }
 }
@@ -318,14 +321,14 @@ function paintLog(force) {
             ? emoTag(m.st, 86)
             : '<span style="font-size:12px; color:var(--sk-text, #ddd); line-height:1.6;'
               + ' word-break:break-word;">'
-              + esc(m.text) + '</span>';
+              + cyS(m.code, esc(m.text)) + '</span>';
         // 내 글은 오른쪽에서 나온다 — 사진도 이름줄도 글도 통째로 뒤집는다
         const head = '<div style="font-size:10px; margin-bottom:2px; display:flex; gap:5px;'
             + ' align-items:baseline; min-width:0;' + (mine ? ' flex-direction:row-reverse;' : '') + '">'
             // data-ac-code — 칭호를 붙일 자리를 알려 준다 (titles.js 의 「사내 채팅」)
             + '<b data-ac-code="' + esc(m.code || '') + '"'
             + ' style="color:' + (mine ? 'var(--sk-accent-on-base, #d4af37)' : 'var(--sk-text, #9fd8ef)')
-            + '; flex-shrink:0;">' + esc(m.name) + '</b>'
+            + '; flex-shrink:0;">' + cyN(m.code, esc(m.name)) + '</b>'
             + (m.team ? '<span style="color:var(--sk-text-dim, #555); flex-shrink:0;">'
                 + esc(m.team) + '</span>' : '')
             + '<span style="color:var(--sk-text-dim, #444); flex-shrink:0;">' + time + '</span></div>';
@@ -388,6 +391,7 @@ setInterval(function () {
 // ==========================================
 // 확인
 // ==========================================
+window.allChatRepaint = function () { try { paintLog(false); } catch (e) { } };
 window.allChatState = function () {
     console.log('%c===== 사내 채팅 =====', 'color:#d4af37; font-size:13px');
     console.log('  받아 둔 줄 :', log.length + ' (최근 ' + ALLCHAT.KEEP + '줄만 내려옵니다)');

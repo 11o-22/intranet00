@@ -895,13 +895,18 @@ function makeOne(user, label, k, other) {
 //   ★ 이름은 one.name 에 **따로 적어 둔다.** 표를 붙이면 tag.innerText 에
 //     칭호까지 섞여, 그것을 이름으로 읽던 자리들(사진 찍기 · 누가 있나 ·
 //     배를 다시 만들 때)이 「[칭호] 이름」을 이름으로 쓰게 된다.
+// 🖍 반짝 크레용 (crayon.js) — 장착한 사람의 이름 · 글 색. 없으면 그대로
+function cyN(c, h) { try { return (typeof window.crayonName === 'function') ? window.crayonName(c, h) : h; } catch (e) { return h; } }
+function cyS(c, h) { try { return (typeof window.crayonSay === 'function') ? window.crayonSay(c, h) : h; } catch (e) { return h; } }
+// 글줄의 말을 쓴 사람 — 내가 보낸 귓속말 줄은 이름 자리가 받는 사람이고 말은 내 것이다
+function sayer(o) { return o.w === 'out' ? ((u_() || {}).code || '') : o.c; }
 function tagHtmlOf(code, name) {
     let t = '';
     try {
         const u = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
         if (u && typeof window.titleTag === 'function') t = window.titleTag(u, 9) || '';
     } catch (e) { }
-    return t + esc(name || '');
+    return t + cyN(code, esc(name || ''));
 }
 function setTag(one, code, name) {
     if (!one || !one.tag) return;
@@ -1012,6 +1017,11 @@ function bubble(one, text, sty) {
         b.innerHTML = window.emoTag(m[1], 64);
     } else {
         b.innerText = text;
+        // 🖍 반짝 크레용 — 말풍선 글자 색 (바탕이 밝아 옅은 색은 어두운 테를 두른다)
+        try {
+            const cc = (typeof window.crayonBubbleCss === 'function') ? window.crayonBubbleCss(one.code) : '';
+            if (cc) b.style.cssText += ';' + cc;
+        } catch (e) { }
     }
     sbis.forEach(function (el) { b.appendChild(el); });
     one.wrap.appendChild(b);
@@ -2374,6 +2384,8 @@ function chPaint() {
     });
 }
 window.plazaChat = function (c) { if (c) chSet(c); return chatCh; };
+// 🖍 반짝 크레용 — 색을 바꾸면 이름표 · 글줄을 그 자리에서 다시 그린다 (crayon.js)
+window.plazaRepaintChat = function () { try { refreshTags(); paintLog(); paintFeed(); } catch (e) { } };
 
 // ── 귓속말 상대 고르기 — 지금 광장에 있는 사람을 늘어놓는다
 // ★ 지금 접속해 있나 — 바탕 화면이 늘 들고 있는 접속자 표를 본다.
@@ -2585,7 +2597,7 @@ function paintFeed() {
         const dim = (0.45 + 0.55 * ((i + 1) / rows.length)).toFixed(2);   // 묵은 줄은 옅게
         return '<div class="' + (o.w ? 'wh' : '') + '" style="opacity:' + dim + '">' + (o.sys
             ? '<span class="sys">· ' + esc(o.t) + '</span>'
-            : whHead(o) + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t)) + '</div>';
+            : whHead(o) + '<span class="who">' + cyN(o.c, esc(o.n)) + '</span> ' + cyS(sayer(o), esc(o.t))) + '</div>';
     }).join('');
 }
 
@@ -2612,7 +2624,7 @@ function paintLog() {
     log.innerHTML = (run.lines || []).map(function (o) {
         return o.sys ? '<div class="sys">· ' + esc(o.t) + '</div>'
                      : '<div class="' + (o.w ? 'wh' : '') + '">' + whHead(o)
-                       + '<span class="who">' + esc(o.n) + '</span> ' + esc(o.t) + '</div>';
+                       + '<span class="who">' + cyN(o.c, esc(o.n)) + '</span> ' + cyS(sayer(o), esc(o.t)) + '</div>';
     }).join('') || '<div class="sys">아직 오간 말이 없습니다.</div>';
     log.scrollTop = log.scrollHeight;
 }
@@ -2664,8 +2676,8 @@ function paintBar(o) {
     if (t) {
         t.innerHTML = o.sys ? '<span style="opacity:.65">· ' + esc(o.t) + '</span>'
             : '<span class="last' + (o.w ? ' wh' : '') + '">' + whHead(o)
-              + '<b style="color:' + (o.w ? '#f0a8e0' : '#9fd8ef') + '">' + esc(o.n) + '</b> '
-              + esc(o.t) + '</span>';
+              + '<b style="color:' + (o.w ? '#f0a8e0' : '#9fd8ef') + '">' + cyN(o.c, esc(o.n)) + '</b> '
+              + cyS(sayer(o), esc(o.t)) + '</span>';
     }
     // 사람 말에만 빨간 점. 들어오자마자 쏟아지는 서버 지난 줄(quiet)은 뺀다.
     if (!o.sys && !o.quiet && !bar.classList.contains('typing')) bar.classList.add('new');

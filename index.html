@@ -3391,7 +3391,10 @@ function renderAdvanceWait(nextStep) {
                 return `<div class="pchat-msg pchat-sys">— ${m.text}<span class="pchat-time">${ts}</span></div>`;
             }
             const mine = m.code === currentUser.code;
-             return `<div class="pchat-msg ${mine ? 'pchat-me' : ''}"><span class="pchat-name" style="${m.spec ? 'color:#7fd4d4;' : ''}">${m.spec ? '👁 ' : ''}${m.name}</span> ${m.text}<span class="pchat-time">${ts}</span></div>`;
+             // 🖍 반짝 크레용 (crayon.js) — 장착한 사람의 이름 · 글 색
+             const _cyN = (typeof window.crayonName === 'function') ? window.crayonName(m.code, m.name) : m.name;
+             const _cyS = (typeof window.crayonSay === 'function') ? window.crayonSay(m.code, m.text) : m.text;
+             return `<div class="pchat-msg ${mine ? 'pchat-me' : ''}"><span class="pchat-name" style="${m.spec ? 'color:#7fd4d4;' : ''}">${m.spec ? '👁 ' : ''}${_cyN}</span> ${_cyS}<span class="pchat-time">${ts}</span></div>`;
         }).join('');
         if (atBottom || partyChatOpen) scrollChatBottom();
     } 
