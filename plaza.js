@@ -977,7 +977,15 @@ function putOne(one, x, y) {
     //     초당 사천 번이다. 서 있는 사람은 대개 자리가 안 바뀐다.
     if (one._L !== L) { one.wrap.style.left = L + 'px'; one._L = L; }
     if (one._T !== T) { one.wrap.style.top = T + 'px'; one._T = T; }
-    const Z = 100 + Math.round(y);                           // 아래에 있는 사람이 앞
+    let Z = 100 + Math.round(y);                             // 아래에 있는 사람이 앞
+    // 🔒 가두리 — 갇힌 사람만 창살 뒤로. 나머지는 가두리 앞을 지나는 것처럼 늘 창살 앞에 그린다
+    //   (뒤로 지나가면 안에 든 것처럼 보였다)
+    const cgr = run && R[run.room] && R[run.room].cage;
+    if (cgr && Math.abs(x - cgr.x) < cgr.w / 2 + 60) {
+        let inside = false;
+        try { inside = !!(one.code && typeof window.gaduriOf === 'function' && window.gaduriOf(one.code) === run.room); } catch (e) { }
+        if (!inside) Z = Math.max(Z, 101 + Math.round(cgr.zy));
+    }
     if (one._Z !== Z) { one.wrap.style.zIndex = String(Z); one._Z = Z; }
 }
 

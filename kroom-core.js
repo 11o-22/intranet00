@@ -70,6 +70,10 @@ const DREAM = { D: [1, 20], C: [25, 50], B: [55, 70], A: [75, 100], S: [110, 150
 //   B · A 는 더하지 않는다 — 내용의 숫자가 그대로다 (B 는 S-003 보다 DC 가 높다: 19~22 · S-003 17~19).
 //     B (C 직업)  둘 5% · 셋 12% · 다섯 28%      A (B 직업)  셋 6% · 다섯 14%   (주사위 20 은 늘 성공으로 다시 잼)
 const HARD = { D: { dc: 2, lose: 1.6 }, C: { dc: 1, lose: 1.2 } };
+// ★ 혼자 가면 (2026-10-19) — A · S 만 더 혹독하다. 일행이면 그대로.
+//   A  DC +7 · 잃는 값 ×2.2 — 살아 나올 확률이 0.001% 언저리가 되게 (20 도 늘 성공이 아니다)
+//   S  살아 나오지 못한다 — 판정이 전부 실패하고(장비 · 행운도 안 통한다), 잃는 값 ×3, 돌아가는 길이 없다
+const SOLO_HARD = { A: { dc: 7, lose: 2.2, no20: true }, S: { dc: 99, lose: 3, no20: true, doom: true } };
 const REST_PARTY = { hp: 25, mind: 15, spirit: 10 };   // 번갈아 망을 본다
 const REST_SOLO = { mind: -5, spirit: -10 };            // 혼자서는 눈을 못 붙인다
 const MISS = { hp: -20, mind: -10, spirit: -10 };       // 끌어내다 놓쳤을 때 손을 뻗은 쪽
@@ -644,6 +648,7 @@ function paintEntry() {
             </div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:5px;">오늘 남은 횟수 <b id="kroom-left" style="color:#7fd3e6;">${kLeft()} / ${kLimit()}</b>회 <span style="font-size:10px; color:#777;">(일반 어둠과 따로 · 자정 초기화)</span></div>
             <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트 · 꿈결과 반입품을 잃고 상담실로 이송됩니다.</div>
+            <div style="font-size:10px; color:#ff8a80; margin-top:3px;">※ 혼자 들어가면 A 던전은 거의 살아 나오지 못하고, S 던전은 돌아오지 못합니다.</div>
             <div id="kroom-helper-note" style="display:${helperSwitch() ? 'block' : 'none'}; font-size:10px; color:#81c784; margin-top:4px;">✚ 헬퍼로 들어갑니다 — 횟수를 쓰지 않고, 경험치 · 꿈결 · 포인트를 받지 않으며, 쓰러져도 잃지 않습니다. (파티 편성 칸에서 끕니다)</div>
             <div style="display:flex; gap:6px; margin-top:11px;">
                 <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:11px;" onclick="kroomSolo()">혼자 들어간다</button>
@@ -838,8 +843,17 @@ function addStat(s, dv) { if (!kr || !kr.stats || kr.stats[s] == null) return 0;
 // 맞는 값 — 속성이 줄여 준다
 function hard() {
     const g = (kr && kr.dun && DUNS[kr.dun]) ? DUNS[kr.dun].g : 'D';
-    return HARD[g] || { dc: 0, lose: 1 };
+    const h = HARD[g] || { dc: 0, lose: 1 };
+    const sh = soloHard(g);
+    return sh ? { dc: h.dc + sh.dc, lose: h.lose * sh.lose, no20: !!sh.no20, doom: !!sh.doom } : h;
 }
+// 혼자인가 — 일행으로 들어왔어도 한 사람뿐이면 혼자다
+function alone() {
+    if (!darkRun) return true;
+    if (!darkRun.isParty) return true;
+    try { return members().length <= 1; } catch (e) { return true; }
+}
+function soloHard(g) { return alone() ? (SOLO_HARD[g] || null) : null; }
 function hurt(lose) {
     const got = {};
     if (!lose) return got;
@@ -1261,26 +1275,29 @@ window.kroomPick = function (i) {
     if (kr._panic && kr.stats.spirit <= 0) setStat('spirit', 20);       // 폭주 한 번 뒤에 조금 돌아온다
     kr._panic = false;
     const R = roll(o.k);
-    const dc = (o.dc || 13) + hard().dc;
+    const H = hard();
+    const dc = (o.dc || 13) + H.dc;
     // 1 은 늘 실패, 20 은 늘 성공 — B 이상은 DC 가 20 을 넘어 보정이 낮으면 아예 못 넘는 자리가 생긴다
-    let ok = R.r !== 1 && (R.r === 20 || (R.r + R.b) >= dc);
+    //   ★ 혼자 A · S 에서는 20 도 늘 성공이 아니다 (SOLO_HARD.no20)
+    let ok = R.r !== 1 && ((R.r === 20 && !H.no20) || (R.r + R.b) >= dc);
     let gl = '';                                            // 전용 장비가 한 일
+    if (H.doom) ok = false;                                 // ★ 혼자 S — 아무것도 안 통한다
     // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
-    if (!ok && ['break', 'sense', 'hide', 'gaze'].indexOf(o.k) >= 0 && gearUse(o.k)) {
+    if (!ok && !H.doom && ['break', 'sense', 'hide', 'gaze'].indexOf(o.k) >= 0 && gearUse(o.k)) {
         ok = true; gl += gearLine(o.k, '— 손보다 장비가 먼저 움직였다.');
     }
     // 행운 — 다시 굴림
-    if (!ok && gearUse('luck')) {
+    if (!ok && !H.doom && gearUse('luck')) {
         const R2 = roll(o.k);
         ok = R2.r !== 1 && (R2.r === 20 || (R2.r + R2.b) >= dc);
         gl += gearLine('luck', '— 다시 굴렸다: 🎲 ' + R2.r + (ok ? ' 성공' : ' 이번에도 실패'));
     }
     // 보정 — 5 이하로 모자라면 맞춰 준다
-    if (!ok && R.r !== 1 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
+    if (!ok && !H.doom && R.r !== 1 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
         ok = true; gl += gearLine('fix', '— 모자란 ' + (dc - (R.r + R.b)) + '을(를) 메웠다.');
     }
     // 특수 물건 — 즉사 기믹은 부순다
-    if (!ok && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
+    if (!ok && !H.doom && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
     if (o.doom && jisanOn()) kr.truth = true;               // 🧧 죽을 길을 잡았다
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
@@ -1309,7 +1326,7 @@ window.kroomPick = function (i) {
     } else {
         darkRun.fail++;
         // 회피 — 즉사에 걸려도 한 번 빠져나온다
-        if (o.doom && gearUse('evade')) {
+        if (o.doom && !H.doom && gearUse('evade')) {
             addStat('mind', -6);
             show(it.sc.t + ' — 결과', dice + gearLine('evade', '— 반 발짝. 그 반 발짝이 전부였다.')
                 + (o.doom.text || '') + '<br><br><span style="color:#d4bbff;">— 몸이 먼저 빠져나왔다.</span>',
@@ -1318,7 +1335,7 @@ window.kroomPick = function (i) {
         }
         if (o.doom) { doom(o.doom); return; }
         // 굳건 — 체력이 깎일 것을 한 번 막는다
-        if (o.lose && o.lose.hp < 0 && gearUse('steady')) {
+        if (o.lose && o.lose.hp < 0 && !H.doom && gearUse('steady')) {
             o = Object.assign({}, o, { lose: Object.assign({}, o.lose, { hp: 0 }) });
             gl += gearLine('steady', '— 맞을 자리에 장비를 댔다.');
         }
@@ -1432,7 +1449,8 @@ function rest() {
         <span style="font-size:11px; color:#888;">쉬면서 심력 +10 · 마력/무력/내공 +5${got.length ? ' · ' + (mates ? '번갈아 잠: ' : '혼자: ') + got.join(' · ') : ''}</span>`,
         restPanel() + others +
         darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()') +
-        darkChoiceBtn('여기서 돌아간다. <span style="font-size:10px; color:#888;">(얻은 것의 절반만 들고 나온다)</span>', 'kroomLeave()'));
+        (hard().doom ? '<div style="font-size:11px; color:#ff6b6b; margin-top:8px;">올라온 길이 없다. 돌아갈 수 없다.</div>'
+                     : darkChoiceBtn('여기서 돌아간다. <span style="font-size:10px; color:#888;">(얻은 것의 절반만 들고 나온다)</span>', 'kroomLeave()')));
 }
 window.kroomDown = function () {
     if (!kr) return;
@@ -2206,7 +2224,10 @@ function dropDoom() {
 // ==========================================
 // 8. 끝 — 귀환 · 쓰러짐 · 정산
 // ==========================================
-window.kroomLeave = function () { settle('leave'); };
+window.kroomLeave = function () {
+    if (kr && !kr.dead && !kr._settled && hard().doom) { try { showDarkToast('올라온 길이 없다.'); } catch (e) { } return; }   // ★ 혼자 S — 돌아갈 수 없다
+    settle('leave');
+};
 function clear() {
     const D = DATA.dun[kr.dun];
     const g = DUNS[kr.dun].g;
@@ -2757,7 +2778,7 @@ window.kroomGive = function (who, field, val) {
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
-window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+window.KROOM = { hard: function () { return hard(); }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
