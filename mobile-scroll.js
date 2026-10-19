@@ -19,6 +19,14 @@
     function keepScroll(fnName, sel, tabSel) {
         if (typeof window[fnName] !== 'function') return false;
         if (window[fnName]._scrollKept) return true;
+        // ★ norepaint2.js 가 내 겹 위를 감쌌으면 이미 된 것이다 (2026-10-19)
+        //   ✗ 전에는 맨 바깥만 봤다. 그쪽은 「맨 바깥에 있어야」 하고 나는 「맨 바깥에 내가
+        //     있나」만 봐서, 0.5초마다 서로 위를 덮었다 (renderBadge 가 없어 나는 20초를 다 돈다).
+        //     norepaint2 는 덮을 때마다 새 겹이라 지난번 모습을 몰라 **바뀐 게 없어도 다시 그렸다** —
+        //     그 20초 동안 소지품 · 상점 · 서신 칸이 updateUI 마다 깜박였다. 겹도 수십 장 쌓였다.
+        for (let f = window[fnName]._inner, n = 0; f && n < 60; f = f._inner, n++) {
+            if (f._scrollKept) return true;
+        }
 
         const _f = window[fnName];
         window[fnName] = function () {
