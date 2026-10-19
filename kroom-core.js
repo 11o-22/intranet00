@@ -2348,11 +2348,18 @@ function settle(how, txt) {
         + HOW[how] + (helper ? ' · 헬퍼 (보상 없음)' : ' · 경험치 +' + exp + ' · 꿈결 +' + dream + (pts ? ' · +' + pts.toLocaleString() + ' P' : '')));
     if (!helper) { try { bankAddScore(how === 'dead' ? -5 : (how === 'clear' ? 12 : (how === 'out' ? 2 : 4))); } catch (e) { } }
     if (!u.darkLogs) u.darkLogs = [];
-    u.darkLogs.unshift({ date: new Date().toLocaleString(), zone: K_CODE, zoneName: '『 K 의 방 』 ' + (kr.dun ? DUNS[kr.dun].n : ''),
+    const logRow = { date: new Date().toLocaleString(), zone: K_CODE, zoneName: '『 K 의 방 』 ' + (kr.dun ? DUNS[kr.dun].n : ''),
         reward: pts, success: darkRun.success, fail: darkRun.fail, loot: [], lost: [], detail: darkRun.log.slice(-20),
-        died: how === 'dead', party: !!darkRun.isParty, helper: helper || undefined });
+        died: how === 'dead', party: !!darkRun.isParty };
+    if (helper) logRow.helper = true;
+    u.darkLogs.unshift(logRow);
     if (u.darkLogs.length > 15) u.darkLogs.pop();
-    try { saveFields({ kroom: 1, history: 1, darkLogs: 1, points: 1, itemBuffs: 1 }); } catch (e) { }
+    // ★ (2026-10-19) 서버는 값이 undefined · NaN 인 칸이 하나라도 있으면 **저장 전체를 거절한다.**
+    //   전에는 기록 한 줄에 helper: undefined 가 실려, 같이 보내던 kroom(경험치 · Lv · 꿈결)까지
+    //   통째로 안 올라가 정산 직후 되돌아갔다. 기록은 한 번 씻어 두고, kroom 은 따로 먼저 보낸다.
+    try { u.darkLogs = JSON.parse(JSON.stringify(u.darkLogs)); } catch (e) { }
+    try { saveFields({ kroom: 1 }); } catch (e) { console.warn('[K 의 방] kroom 저장 실패', e && e.message); }
+    try { saveFields({ history: 1, darkLogs: 1, points: 1, itemBuffs: 1 }); } catch (e) { console.warn('[K 의 방] 정산 저장 실패', e && e.message); }
     try { paintDream(); } catch (e) { }
     const up = k.lv - lv0;
     darkBodyEl().innerHTML = darkBox({ dead: '종료', clear: '돌파', out: '탈출' }[how] || '귀환',
