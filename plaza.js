@@ -382,6 +382,23 @@ function db_() { return (typeof database !== 'undefined') ? database : null; }
 function now() { return Date.now(); }
 function isAdm(u) { const x = u || u_(); return !!(x && x.code === P.ADMIN); }
 function canEnter() { return P.ADMIN_ONLY ? isAdm() : !!u_(); }
+
+// ★ 상담사(0000)는 광장에서 **8169 선염에게만** 보인다 (2026-10-19)
+//   다른 사원 화면에서는 상담사의 모습 · 이름표 · 말풍선 · 맵 채팅 줄이 안 뜨고,
+//   동료 목록 · 포토존 명단 · 방 인원 수에서도 빠진다.
+//   (서버 채팅 · 귓속말은 광장 밖 이야기라 그대로 둔다)
+//   상담사 본인 화면은 그대로 — 모두가 보인다.
+const SEE_ADMIN = ['8169'];
+function noOf(u) {
+    const n = (u && u.no != null) ? String(u.no).trim() : '';
+    return (n && n.length < 4) ? ('0000' + n).slice(-4) : n;
+}
+function hidPeer(code) {
+    if (!code || code !== P.ADMIN) return false;
+    const u = u_();
+    if (!u || u.code === P.ADMIN) return false;
+    return SEE_ADMIN.indexOf(noOf(u)) < 0;
+}
 function nameOf(u) {
     if (!u) return '?';
     return (u.badge && u.badge.nickname) || u.name || u.code || '?';
@@ -2004,6 +2021,7 @@ function census() {
             const seats = all[k] || {};
             Object.keys(seats).forEach(function (c) {
                 if (!liveSeat(seats[c])) return;
+                if (hidPeer(c)) return;                 // 상담사 — 선염 말고는 명단 · 인원에서 뺀다
                 const a = out[room] = out[room] || {};
                 (a[inst] = a[inst] || {})[c] = seats[c];
             });
@@ -2308,7 +2326,11 @@ function watchRoom() {
     run.ref = d.ref(P.PATH + '/' + seatKey(run.room, run.inst));
     run.onAdd = function (s) { onSeat(s.key, s.val(), true); };
     run.onChg = function (s) { onSeat(s.key, s.val(), false); };
-    run.onDel = function (s) { if (run.peers[s.key]) { dropPeer(s.key); showWho(); } };
+    run.onDel = function (s) {
+        if (run.hidden) delete run.hidden[s.key];
+        if (run.peers[s.key]) { dropPeer(s.key); showWho(); }
+    };
+    run.hidden = {};                       // 안 그리지만 방에 있는 사람 (상담사) — 나갈 때 말을 지울지 볼 때 센다
     run.ref.on('child_added', run.onAdd);
     run.ref.on('child_changed', run.onChg);
     run.ref.on('child_removed', run.onDel);
@@ -2347,6 +2369,12 @@ function onSeat(code, v, fresh) {
     const u = u_();
     if (!u || code === u.code) return;
     v = v || {};
+    if (hidPeer(code)) {                   // 상담사 — 선염 말고는 안 그린다 (말풍선도 여기서 같이 막힌다)
+        if (run.peers[code]) { dropPeer(code); showWho(); }
+        run.hidden = run.hidden || {};
+        run.hidden[code] = v.at || 0;
+        return;
+    }
     if (!v.at || now() - v.at > P.STALE_MS) { if (run.peers[code]) { dropPeer(code); showWho(); } return; }
 
     let q = run.peers[code];
@@ -2407,7 +2435,10 @@ function leaveRoom() {
     //   있기 때문이다. 그래서 나가는 사람이 「나 말고 아무도 없다」일 때만
     //   지운다. 다음에 들어오면 빈 채로 시작한다.
     try {
-        if (!Object.keys(run.peers || {}).length) {
+        const hid = Object.keys(run.hidden || {}).some(function (c) {
+            const at = run.hidden[c]; return at && now() - at <= P.STALE_MS;
+        });
+        if (!Object.keys(run.peers || {}).length && !hid) {
             const d = db_();
             if (d) d.ref(P.CHAT + '/' + seatKey(run.room, run.inst)).remove();
         }
@@ -2439,6 +2470,7 @@ function watchChat() {
     chatRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
+        if (hidPeer(v.c)) return;          // 상담사의 맵 채팅 — 선염 말고는 안 보인다
         addLine(v.n || '?', v.t, v.c, s.key);
     });
     paintLog();
