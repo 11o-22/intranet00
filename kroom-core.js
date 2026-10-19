@@ -370,10 +370,14 @@ function kAdds(u) {
     try { const e = (typeof myDnaEquip === 'function' && u === me()) ? myDnaEquip() : null; dna = (e && Number(e.dark)) || 0; } catch (e) { }
     return { add: Math.max(0, capped + Math.max(0, free - dna)), dna: dna };
 }
+// ★ 끝 한계 (2026-10-19) — 무엇이 얹혀도 70 을 넘지 않는다 (K.LEE 로 가져온 몫까지 얹혀 119 가 뜬 적이 있다)
+const K_TRY_ABS = 70;
+function kNum(v) { v = Number(v); return isFinite(v) && v > 0 ? v : 0; }
 function kLimit(u) {
     u = u || me();
     const a = kAdds(u);
-    return Math.min(K_TRY_HARD, K_TRY_BASE + a.add) + a.dna;
+    // 기본 50 + 얹는 몫(요리 · 장비 · 호사수구 · K.LEE …)은 55 까지, 출산 고유 몫은 그 위에 — 모두 합쳐 70 까지
+    return Math.min(K_TRY_ABS, Math.min(K_TRY_HARD, K_TRY_BASE + kNum(a.add)) + kNum(a.dna));
 }
 function kLeft() { return Math.max(0, kLimit() - kUsed()); }
 // 한 번 쓴다 — 차이만큼 트랜잭션
