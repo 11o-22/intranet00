@@ -190,11 +190,19 @@ function canMilk(t) {
     return true;
 }
 
+// 같이 사는 사이인가 — pregnancy.js 의 isPartner (커플 · 내 house.roomie 가 상대)
+function milkNear(t) {
+    try { return !!(typeof isPartner === 'function' && isPartner(currentUser, t)); } catch (e) { return false; }
+}
+
 window.tryMilk = function (code) {
     if (typeof buyGuard === 'function' && !buyGuard()) return;
     const t = db.users[code];
     if (!t) return;
     if (!canMilk(t)) { showCustomAlert('지금은 할 수 없습니다.'); return; }
+    // ★ 동거인(룸메이트) · 커플은 동의 없이 바로 판정한다 — 임신시키기와 같은 규칙 (2026-10-20)
+    //   ✗ 전에는 착정만 늘 상대 동의를 받았다.
+    if (milkNear(t)) { doMilk(code); return; }
     if (!database) { showCustomAlert('서버 연결이 필요합니다.'); return; }
 
     const id = 'mk_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
@@ -373,7 +381,7 @@ function reshape(code) {
             '<button id="milk-do-btn" class="game-btn" style="width:100%; margin-top:8px; padding:11px;'
             + ' background:linear-gradient(145deg,#4a2c73,#2d1a47) !important; border-color:#8a6cb3 !important;'
             + ' color:#fff !important;" onclick="tryMilk(\'' + code + '\')">'
-            + '착정한다 <span style="font-size:10px; color:#ffd76a;">(동의 필요)</span></button>');
+            + '착정한다' + (milkNear(t) ? '' : ' <span style="font-size:10px; color:#ffd76a;">(동의 필요)</span>') + '</button>');
     }
 }
 
