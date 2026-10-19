@@ -388,6 +388,8 @@ function canEnter() { return P.ADMIN_ONLY ? isAdm() : !!u_(); }
 //   동료 목록 · 포토존 명단 · 방 인원 수에서도 빠진다.
 //   (서버 채팅 · 귓속말은 광장 밖 이야기라 그대로 둔다)
 //   상담사 본인 화면은 그대로 — 모두가 보인다.
+//   ★ 상담사에게는 「같이 가기」(동료 목록 → 같은 장소로)가 없다 — 선염 화면에서도
+//     동료 목록에 상담사가 안 뜬다. (보이는 것과 따라가는 것은 따로다)
 const SEE_ADMIN = ['8169'];
 function noOf(u) {
     const n = (u && u.no != null) ? String(u.no).trim() : '';
@@ -2130,6 +2132,7 @@ function matesSheet() {
                 const n = Object.keys(seats).length;
                 Object.keys(seats).forEach(function (c) {
                     if (u && c === u.code) return;
+                    if (c === P.ADMIN && !isAdm(u)) return;     // 상담사에게는 같이 가기 없음 (선염도)
                     const v = seats[c] || {};
                     rows.push({ c: c, name: v.n || c, room: room, inst: inst, n: n, x: v.x, y: v.y });
                 });
@@ -2161,6 +2164,7 @@ function matesSheet() {
 function goMate(r) {
     const u = u_();
     if (!run || !r || !R[r.room]) return;
+    if (r.c === P.ADMIN && !isAdm(u)) { closeSheet(); return; }          // 상담사에게는 같이 가기 없음
     if (cageMine()) { closeSheet(); sysLine('🔒 가두리에 갇혀 있어 다른 곳으로 갈 수 없습니다.'); return; }
     closeSheet();
     census().then(function (cs) {
