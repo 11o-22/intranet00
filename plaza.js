@@ -1103,6 +1103,20 @@ function paintCage() {
     e.style.zIndex = String(100 + Math.round(c.zy));
     e.innerHTML = '<img src="' + P.DIR + 'gaduri.png" alt=""><div class="t">가두리</div>';
     run.el.appendChild(e);
+    // 🍖 먹이 던지기 — 가두리 위에 (갇힌 사람에게는 안 보인다 · gaduri.js 가 고르는 창을 띄운다)
+    const f = document.createElement('div');
+    f.className = 'plaza-spot plaza-feed-btn';
+    f.style.left = Math.round(c.x * z) + 'px';
+    f.style.top = Math.round((c.base - c.h - 8) * z) + 'px';
+    f.style.display = cageMine() ? 'none' : '';
+    f.innerHTML = '<div class="b" style="width:38px;height:38px;font-size:18px;">🍖</div><div class="t">먹이 던지기</div>';
+    f.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); });
+    f.addEventListener('click', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        if (cageMine()) return;
+        if (typeof window.gaduriFeedOpen === 'function') window.gaduriFeedOpen(run.room);
+    });
+    run.el.appendChild(f);
 }
 // 갇히거나 풀리면 그 자리에서 — 다른 방이면 데려가고, 같은 방이면 안으로 세운다
 let cageWas = '';
@@ -1112,6 +1126,8 @@ setInterval(function () {
     if (k === cageWas) return;
     const before = cageWas;
     cageWas = k;
+    const fb = run.el && run.el.querySelector('.plaza-feed-btn');       // 갇히면 먹이 단추를 감춘다
+    if (fb) fb.style.display = k ? 'none' : '';
     if (k) {
         if (run.room !== k) { goRoom(k, null, 0); }
         else {

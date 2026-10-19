@@ -12,7 +12,18 @@
 //   이 파일은 누가 어디 갇혔는지 적고 읽는 것과 상담사 칸을 맡는다.
 //
 // ■ 서버 자리
-//   gaduri/<방>/<사번> = { at, by, name }          방은 plaza · dream
+//   gaduri/<방>/<사번> = { at, by, name, auto?, until?, fed: { 던진사번: 횟수 } }   방은 plaza · dream
+//   gaduriFood/<받는사번>/<번호> = { from, fromName, room, at }
+//
+// ■ 상담실 · 선녀탕 (2026-10-19)
+//   격리 중인 사원은 제 화면이 스스로 광장 → 백일몽 차례로 빈 가두리에 들어간다 (auto).
+//   둘 다 찼으면 밖에 둔다. 격리가 끝나면 스스로 나온다 (접속하지 않았으면 다른 사람의 화면이 치운다).
+//   상담사가 가둔 사람은 그대로다.
+//
+// ■ 🍖 먹이 던지기
+//   가두리 위 [먹이 던지기] (plaza.js) → 그 가두리에 갇힌 사원 고르기 → 개당 50,000 P.
+//   던지는 사람마다 갇힌 사원 한 명에게 두 번까지 (갇혀 있는 동안). 갇힌 사람은 못 던진다.
+//   받은 사원에게 「먹는다 / 안 먹는다」가 뜬다. 먹으면 포만감 +30. 안 먹으면 버려진다 (포인트는 돌아가지 않는다).
 //
 // ■ 콘솔
 //   gaduriState()
@@ -77,7 +88,9 @@ setInterval(function () {
     if (now === mineWas.room) return;
     const was = mineWas.room;
     mineWas.room = now;
-    if (now) alert_('🔒 가두리\n\n상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
+    const auto = now && ((all[now] || {})[me.code] || {}).auto;
+    if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.' : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
+        + '\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
     else if (was) alert_('🔓 가두리\n\n' + NAME[was] + ' 가두리에서 풀려났습니다.');
 }, 1000);
 
@@ -158,6 +171,7 @@ function paintAdmin() {
                     return '<div style="display:flex; align-items:center; gap:8px; padding:7px 9px; margin-bottom:5px; border:1px solid #3a3446; border-radius:6px; background:rgba(255,255,255,.03);">'
                         + '<span style="font-size:12px; color:#fff;">' + esc((u && u.name) || v.name || c) + '</span>'
                         + '<span style="font-size:10px; color:#777;">' + esc((u && u.no) || '') + '</span>'
+                        + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중 (저절로)</span>' : '')
                         + '<button class="game-btn" style="margin:0 0 0 auto; padding:5px 10px; font-size:10px;" onclick="gaduriFree(\'' + esc(c) + '\')">풀어 준다</button></div>';
                 }).join('') : '<div style="font-size:10px; color:#666;">비어 있습니다.</div>')
                 + '</div>';
@@ -202,6 +216,168 @@ function paintAdmin() {
 })();
 // 사원이 늘거나 이름이 바뀌면 고르는 칸도 따라간다
 setInterval(function () { try { const me = u_(); if (me && me.code === ADMIN) paintAdmin(); } catch (e) { } }, 4000);
+
+// ==========================================
+// 3. 상담실 · 선녀탕 — 스스로 가두리로
+// ==========================================
+function quar(u) { try { return !!(u && typeof isQuarantined === 'function' && isQuarantined(u)); } catch (e) { return false; } }
+let autoTry = 0;
+setInterval(function () {
+    const me = u_(), d = db_();
+    if (!me || !d || !loaded || me.code === ADMIN) return;
+    const at = roomOf(me.code);
+    const ent = at ? (all[at] || {})[me.code] : null;
+    if (quar(me)) {
+        if (at) {                                                       // 격리가 늘었으면 끝 시각을 따라간다
+            if (ent && ent.auto && ent.until !== me.quarantineUntil) d.ref(NODE + '/' + at + '/' + me.code + '/until').set(me.quarantineUntil || 0);
+            return;
+        }
+        if (Date.now() - autoTry < 30000) return;                       // 찼으면 한동안 다시 안 본다
+        autoTry = Date.now();
+        const put = function (i) {
+            if (i >= ROOMS.length) return;                              // 둘 다 찼다 — 밖에 둔다
+            const k = ROOMS[i].k;
+            d.ref(NODE + '/' + k).transaction(function (box) {
+                box = box || {};
+                if (box[me.code]) return box;
+                if (Object.keys(box).length >= MAX) return;
+                box[me.code] = { at: Date.now(), by: 'auto', auto: true, until: me.quarantineUntil || 0, name: me.name || me.code };
+                return box;
+            }).then(function (res) { if (!res || !res.committed) put(i + 1); }).catch(function () { });
+        };
+        put(0);
+    } else if (ent && ent.auto) {
+        d.ref(NODE + '/' + at + '/' + me.code).remove();               // 격리가 끝났다
+    }
+}, 4000);
+// 접속하지 않은 채 격리가 끝난 사람 — 누구의 화면이든 치운다
+setInterval(function () {
+    const d = db_();
+    if (!d || !loaded) return;
+    ROOMS.forEach(function (r) {
+        Object.keys(all[r.k] || {}).forEach(function (c) {
+            const v = all[r.k][c] || {};
+            if (!v.auto) return;
+            const u = users()[c];
+            const end = Math.max(Number(v.until) || 0, Number(u && u.quarantineUntil) || 0);
+            if (end && Date.now() > end + 60000) d.ref(NODE + '/' + r.k + '/' + c).remove();
+        });
+    });
+}, 20000);
+
+// ==========================================
+// 4. 🍖 먹이 던지기
+// ==========================================
+const FEED_PRICE = 50000, FEED_MAX = 2, FEED_GAIN = 30;
+function fedBy(room, target, from) {
+    const v = (all[room] || {})[target];
+    return (v && v.fed && Number(v.fed[from])) || 0;
+}
+function closeFeed() { const o = document.getElementById('gd-feed-ov'); if (o) o.remove(); }
+window.gaduriFeedOpen = function (room) {
+    const me = u_();
+    if (!me || !NAME[room]) return;
+    if (roomOf(me.code)) { alert_('가두리 안에서는 던질 수 없습니다.'); return; }
+    const codes = Object.keys(all[room] || {}).filter(function (c) { return c !== me.code; });
+    closeFeed();
+    const book = users();
+    const rows = codes.length ? codes.map(function (c) {
+        const u = book[c], v = (all[room] || {})[c] || {};
+        const left = FEED_MAX - fedBy(room, c, me.code);
+        return '<button type="button" data-c="' + esc(c) + '" ' + (left <= 0 ? 'disabled' : '')
+            + ' style="display:flex; align-items:center; gap:8px; width:100%; padding:11px 12px; margin-bottom:7px; border-radius:7px; cursor:pointer;'
+            + ' background:#221e28; border:1px solid #4a4058; color:#eee; font-family:inherit; text-align:left;' + (left <= 0 ? ' opacity:.4; cursor:default;' : '') + '">'
+            + '<span style="font-size:13px; font-weight:bold;">' + esc((u && u.name) || v.name || c) + '</span>'
+            + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중</span>' : '')
+            + '<span style="margin-left:auto; font-size:10px; color:#b9a8d8;">' + (left > 0 ? '남은 ' + left + '번' : '다 던짐') + '</span></button>';
+    }).join('') : '<div style="font-size:12px; color:#888; text-align:center; padding:18px 0;">가두리에 아무도 없습니다.</div>';
+    const ov = document.createElement('div');
+    ov.id = 'gd-feed-ov';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:100060; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:16px;';
+    ov.innerHTML = '<div style="width:100%; max-width:340px; background:#17151c; border:1px solid #4a4058; border-radius:10px; padding:16px 14px 14px; color:#ddd;">'
+        + '<div style="font-size:14px; font-weight:bold; text-align:center; margin-bottom:6px;">🍖 먹이 던지기 — ' + NAME[room] + ' 가두리</div>'
+        + '<div style="font-size:11px; color:#999; text-align:center; line-height:1.7; margin-bottom:12px;">개당 ' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 한 사람에게 ' + FEED_MAX + '번까지<br>받은 사원이 먹을지 말지 정합니다.</div>'
+        + rows
+        + '<button type="button" id="gd-feed-no" style="width:100%; margin-top:4px; padding:10px; border-radius:6px; background:#2a2730; color:#bbb; border:1px solid #444; font-family:inherit; cursor:pointer;">그만둔다</button></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#gd-feed-no').onclick = closeFeed;
+    ov.addEventListener('click', function (e) { if (e.target === ov) closeFeed(); });
+    ov.querySelectorAll('button[data-c]').forEach(function (b) {
+        b.onclick = function () { if (b.disabled) return; closeFeed(); throwFood(room, b.getAttribute('data-c')); };
+    });
+};
+let throwing = false;
+function throwFood(room, target) {
+    const me = u_(), d = db_();
+    if (!me || !d || throwing) return;
+    const t = users()[target];
+    if ((Number(me.points) || 0) < FEED_PRICE) { if (typeof showLuxuryAlert === 'function') showLuxuryAlert(); else alert_('포인트가 모자랍니다.'); return; }
+    throwing = true;
+    // 두 번까지 — 트랜잭션으로 센다. 그 사이 풀려났으면 그만둔다
+    d.ref(NODE + '/' + room + '/' + target).transaction(function (v) {
+        if (!v) return;
+        v.fed = v.fed || {};
+        const n = Number(v.fed[me.code]) || 0;
+        if (n >= FEED_MAX) return;
+        v.fed[me.code] = n + 1;
+        return v;
+    }).then(function (res) {
+        throwing = false;
+        if (!res || !res.committed) { alert_(roomOf(target) === room ? '이 사원에게는 더 던질 수 없습니다. (' + FEED_MAX + '번까지)' : '그 사이 가두리에서 나갔습니다.'); return; }
+        try { changePoints(-FEED_PRICE); } catch (e) { me.points = (Number(me.points) || 0) - FEED_PRICE; try { saveFields({ points: 1 }); } catch (x) { } }
+        d.ref('gaduriFood/' + target).push({ from: me.code, fromName: me.name || me.code, room: room, at: Date.now() });
+        try { addHistoryLog(me, '[먹이 던지기] ' + ((t && t.name) || target) + ' 사원에게 (-' + FEED_PRICE.toLocaleString('ko-KR') + ' P)'); saveFields({ history: 1 }); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        alert_('🍖 ' + ((t && t.name) || target) + ' 사원에게 먹이를 던졌습니다.\n(-' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 남은 ' + (FEED_MAX - fedBy(room, target, me.code)) + '번)');
+    }).catch(function (e) { throwing = false; alert_('던지지 못했습니다.\n\n' + (e && e.message)); });
+}
+// 받는 쪽 — 하나씩 묻는다
+let foodRef = null, foodFor = '', asking = '';
+setInterval(function () {
+    const me = u_(), d = db_();
+    if (!me || !d) return;
+    if (foodFor === me.code) return;
+    if (foodRef) { try { foodRef.off(); } catch (e) { } }
+    foodFor = me.code;
+    foodRef = d.ref('gaduriFood/' + me.code);
+    foodRef.on('value', function (snap) {
+        const v = snap.val() || {};
+        const keys = Object.keys(v).sort();
+        if (!keys.length || asking) return;
+        askFood(keys[0], v[keys[0]] || {});
+    });
+}, 1500);
+function askFood(key, f) {
+    const me = u_(), d = db_();
+    if (!me || !d) return;
+    asking = key;
+    const old = document.getElementById('gd-eat-ov'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'gd-eat-ov';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:100070; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:16px;';
+    ov.innerHTML = '<div style="width:100%; max-width:320px; background:#17151c; border:1px solid #6a5a3a; border-radius:10px; padding:18px 14px 14px; color:#ddd; text-align:center;">'
+        + '<div style="font-size:30px; margin-bottom:6px;">🍖</div>'
+        + '<div style="font-size:13px; line-height:1.8; margin-bottom:14px;"><b style="color:#ffcf8f;">' + esc(f.fromName || '누군가') + '</b> 사원이<br>가두리 안으로 먹이를 던졌습니다.<br>'
+        + '<span style="font-size:11px; color:#999;">먹으면 포만감 +' + FEED_GAIN + '</span></div>'
+        + '<div style="display:flex; gap:8px;"><button type="button" id="gd-eat-no" style="flex:1; padding:11px; border-radius:6px; background:#2a2730; color:#bbb; border:1px solid #444; font-family:inherit; cursor:pointer;">안 먹는다</button>'
+        + '<button type="button" id="gd-eat-yes" style="flex:1; padding:11px; border-radius:6px; background:linear-gradient(145deg,#a0642a,#6a3e14); color:#fff; border:1px solid #d49a5a; font-weight:bold; font-family:inherit; cursor:pointer;">먹는다</button></div></div>';
+    document.body.appendChild(ov);
+    const done = function (eat) {
+        ov.remove();
+        d.ref('gaduriFood/' + me.code + '/' + key).remove().then(function () { asking = ''; foodFor = ''; });   // 다음 것을 다시 묻게
+        if (eat) {
+            const was = Number(me.satiety) || 0;
+            me.satiety = Math.min(100, was + FEED_GAIN);
+            try { addHistoryLog(me, '[먹이] ' + (f.fromName || '누군가') + ' 사원이 던진 먹이를 먹었습니다. (포만감 +' + (me.satiety - was) + ')'); } catch (e) { }
+            try { saveFields({ satiety: 1, history: 1 }); } catch (e) { }
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        } else {
+            try { addHistoryLog(me, '[먹이] ' + (f.fromName || '누군가') + ' 사원이 던진 먹이를 먹지 않았습니다.'); saveFields({ history: 1 }); } catch (e) { }
+        }
+    };
+    ov.querySelector('#gd-eat-yes').onclick = function () { done(true); };
+    ov.querySelector('#gd-eat-no').onclick = function () { done(false); };
+}
 
 window.gaduriState = function () {
     console.log('%c===== 🔒 가두리 =====', 'color:#d9d4e0; font-size:13px');
