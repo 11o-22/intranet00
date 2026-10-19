@@ -591,8 +591,21 @@ function dnaMaps(u) {
 window.buffOnly = function (u) {
     const m = dnaMaps(u);
     const out = {};
+    // ★ 상담사가 얹어 준 몫(dnaExtra)도 고유 아이템의 것이다 — 찼을 때 dna-gifts 가 더한다 (2026-10-19)
+    //   ✗ 전에는 all(고유 + 얹은 몫 + 버프) 에서 원래 몫만 뺐다. 그래서 얹은 몫이 「버프」로도 한 번,
+    //     고유 아이템으로도 한 번 — 두 번 들어갔다. (dna-extra.js 는 원래 몫이 있을 때만 얹으므로
+    //     원래 몫이 있을 때만 뺀다)
+    const uu = u || (typeof currentUser !== 'undefined' ? currentUser : null);
+    // 상담사는 dnaGiftOf 가 상담사 고유(GIFT)를 통째로 돌려준다 (preg-admin.js — 바깥에서 바로 돌려줘서
+    //   버프는 원래부터 안 실렸다). 원래 몫(own)이 비어 있어 GIFT 가 「버프」로 세어지고, 고유를
+    //   차면 또 더해졌다 → 상담사는 버프 몫을 0 으로 둔다. 고유 몫은 찼을 때만 dna-gifts 가 더한다.
+    if (uu && uu.code === 'kario0987') {
+        ['fac', 'dark', 'bon', 'luck', 'eva', 'gim', 'pct', 'death'].forEach(function (k) { out[k] = 0; });
+        return out;
+    }
+    const ex = (uu && uu.dnaExtra && Object.keys(m.own || {}).length) ? uu.dnaExtra : {};
     ['fac', 'dark', 'bon', 'luck', 'eva', 'gim', 'pct', 'death'].forEach(function (k) {
-        out[k] = Math.max(0, (m.all[k] || 0) - (m.own[k] || 0));
+        out[k] = Math.max(0, (m.all[k] || 0) - (m.own[k] || 0) - (Number(ex[k]) || 0));
     });
     return out;
 };

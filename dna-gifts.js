@@ -136,9 +136,14 @@ function ensureDnaItem(user) {
     if (!nm) return null;
     if (ITEM_CATALOG[nm]) return nm;
 
+    // ★ dnaEff 는 「원래 몫 + 상담사가 얹은 몫」만 (2026-10-19)
+    //   ✗ 전에는 g.e 를 그대로 구웠다. 그런데 dnaGiftOf 는 newitems2.js 가 감싸서 그 사원의
+    //     임시 버프(은화 뱀 · 식당 …) · 상시 장비(포승줄 · 꿈결 수집기) · 은심장 몫까지 얹어 돌려준다.
+    //     그 값이 고유 아이템 성능으로 **구워졌고**, 판정 때는 itemfix.js 의 buffOnly() 가
+    //     같은 버프를 **한 번 더** 더했다. 고유 아이템을 찬 사원만 버프가 두 번 들어간 까닭이다.
     ITEM_CATALOG[nm] = {
         price: 30000, usable: true, targetable: false,
-        effect: 'equip_dna', dnaOwner: user.code, dnaEff: g.e,
+        effect: 'equip_dna', dnaOwner: user.code, dnaEff: dnaBaseEff(user) || g.e,
         desc: '[고유] ' + user.name + ' 사원의 것. 장착하면 ' + g.d + '.'
     };
     if (typeof NO_SELL_ITEMS !== 'undefined' && !NO_SELL_ITEMS.includes(nm)) NO_SELL_ITEMS.push(nm);
@@ -155,12 +160,29 @@ function buildAllDnaItems() {
 // ==========================================
 // 장착
 // ==========================================
+// 고유 아이템 성능 = 그 주인의 원래 몫(DNA_GIFTS) + 상담사가 얹은 몫(dnaExtra). 버프는 안 넣는다.
+//   (버프는 buffOnly() 가 사람 몫으로 따로 한 번 더한다)
+function dnaBaseEff(owner) {
+    if (!owner || owner.code === 'kario0987' || owner.dnaGift === undefined || owner.dnaGift === null) return null;
+    const g = DNA_GIFTS[owner.dnaGift];
+    if (!g || !g.e) return null;
+    const e = Object.assign({}, g.e);
+    const ex = owner.dnaExtra || {};
+    Object.keys(ex).forEach(function (k) { e[k] = (e[k] || 0) + (Number(ex[k]) || 0); });
+    return e;
+}
+// 찬 고유 아이템의 성능 — 표에 구워 둔 값 말고 지금 주인 기록으로 센다 (상담사 고유처럼 표에 없는 것은 구운 값)
+function dnaEffOf(cat) {
+    if (!cat) return null;
+    const o = cat.dnaOwner && (typeof db !== 'undefined' && db.users) ? db.users[cat.dnaOwner] : null;
+    return dnaBaseEff(o) || cat.dnaEff || null;
+}
 function myDnaEquip() {
     if (!currentUser || !currentUser.equippedWeapons) return null;
     for (let i = 0; i < currentUser.equippedWeapons.length; i++) {
         const w = currentUser.equippedWeapons[i];
         const cat = ITEM_CATALOG[getEquipBaseName(w)] || ITEM_CATALOG[w];
-        if (cat && cat.effect === 'equip_dna') return cat.dnaEff || null;
+        if (cat && cat.effect === 'equip_dna') return dnaEffOf(cat);
     }
     return null;
 }
@@ -181,7 +203,7 @@ function myDnaEquip() {
         setEquipOwner(currentUser, itemName, currentUser.code);
         removeItemFromInventory(currentUser, itemName, 1);
 
-        const e = cat.dnaEff || {};
+        const e = dnaEffOf(cat) || {};
         if (e.fac) {
             currentUser.dnaFacBonus = e.fac;
         }

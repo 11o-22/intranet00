@@ -380,7 +380,8 @@
       "dream-bank.js",
       "playtime.js",
       "disaster.js",
-      "s3-period.js"
+      "s3-period.js",
+      "bonus-audit.js"
     ]
   ]
 }
