@@ -202,6 +202,8 @@ const PLAZA = {
                   stairs: [ { x: [105, 555],   y0: [890, 1247], y1: [920, 1277] },
                             { x: [1325, 1775], y0: [1247, 890], y1: [1277, 920] } ],
                   down: { to: 'dfront', x: [760, 1130] },
+                  // 🔒 가두리 — 안내 데스크와 정문 사이 (gaduri.js · 아래 「가두리」)
+                  cage: { x: 640, w: 360, h: 400, base: 915, zy: 880 },
                   // 주신 지도대로 — 2F 사택 · 1F 로비 · B1 어둠 탐사·유쾌 판매소
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           b1: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
@@ -222,6 +224,8 @@ const PLAZA = {
                   stairs: [ { x: [105, 555],   y0: [890, 1247], y1: [920, 1277] },
                             { x: [1325, 1775], y0: [1247, 890], y1: [1277, 920] } ],
                   left: 'casino', right: 'post',
+                  // 🔒 가두리 — 행복 식당과 게시판 사이, 분수대 왼쪽 앞 (gaduri.js · 아래 「가두리」)
+                  cage: { x: 690, w: 360, h: 400, base: 915, zy: 880 },
                   spots: [ { x: 470,  n: '행복 식당', i: '🍚', ic: 'food', tab: 'tab-shop', sub: 'shop-food' },
                            { x: 1400, n: '장기 은행', i: '🏦', ic: 'bank', tab: 'tab-vip' },
                            // ★ 사내 게시판 — 분수대 그림 앞에 세운다 (board.js)
@@ -579,6 +583,11 @@ function stampSafe(ov) {
         '.plaza-spot .t{font-size:10px;font-weight:bold;color:#ffe9bd;white-space:nowrap;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;}',
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
+        // 🔒 가두리 — 사람처럼 선 자리(zy)로 앞뒤를 가린다. 누름은 받지 않는다
+        '.plaza-cage{position:absolute;pointer-events:none;}',
+        '.plaza-cage img{display:block;width:100%;height:100%;filter:drop-shadow(0 4px 5px rgba(0,0,0,.5));}',
+        '.plaza-cage .t{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:2px;font-size:10px;',
+        '  font-weight:bold;color:#d9d4e0;white-space:nowrap;text-shadow:0 1px 3px #000,0 0 5px #000;}',
         // ── 동료 목록
         '.plaza-mates .mt-head{font-size:11px;color:#8d8578;margin:0 2px 9px;}',
         '.plaza-mates .mt-empty{font-size:12px;color:#8d8578;text-align:center;padding:26px 0;}',
@@ -1034,6 +1043,80 @@ function bubble(one, text, sty) {
 function roomOf() { return R[run.room]; }
 
 // ==========================================
+// 🔒 가두리 — 상담사가 가둔 사원 (gaduri.js 가 누가 어디 갇혔는지 안다)
+// ==========================================
+//
+//   광장 · 백일몽 로비에 하나씩 서 있다 (방 표의 cage). 갇힌 사원은
+//     · 광장에 들어오면 그 방으로 가고, 가두리 안에서만 움직인다 (x · y 를 안쪽으로 자른다)
+//     · 다른 방으로 못 간다 (좌우 끝 · 입구 · 목록 · 동료 찾아가기 · 포토존이 다 막힌다)
+//     · 방 안 시설 입구도 못 누른다
+//   같은 장소의 몇 번 방이든 가두리는 다 있다. 자리는 제 화면이 자르므로 남에게도 안에 보인다.
+function cageMine() {
+    try {
+        const u = u_();
+        const k = (u && typeof window.gaduriOf === 'function') ? (window.gaduriOf(u.code) || '') : '';
+        return (k && R[k] && R[k].cage) ? k : '';
+    } catch (e) { return ''; }
+}
+// 사람이 설 수 있는 안쪽 — 바깥 기둥 안으로 들이고, 앞뒤는 가두리 앞면(zy)보다 뒤
+function cageBox(r) {
+    const c = r && r.cage;
+    if (!c) return null;
+    const pad = 58;
+    return { x0: c.x - c.w / 2 + pad, x1: c.x + c.w / 2 - pad,
+             y0: r.floor[0] + 3, y1: Math.min(r.floor[1] - 2, c.zy - 8) };
+}
+function cageMid(r) { const b = cageBox(r); return b ? { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 } : null; }
+// 한 걸음마다 — 갇혔으면 안쪽으로 잘라 둔다
+function cageHold(r) {
+    if (!run || !cageMine() || run.room !== cageMine()) return false;
+    const b = cageBox(r);
+    if (!b) return false;
+    run.lv = 0; run.seg = 'up';
+    run.x = Math.max(b.x0, Math.min(b.x1, run.x));
+    run.y = Math.max(b.y0, Math.min(b.y1, run.y));
+    if (run.tx != null) {
+        run.tx = Math.max(b.x0, Math.min(b.x1, run.tx));
+        if (run.ty != null) run.ty = Math.max(b.y0, Math.min(b.y1, run.ty));
+        run.tseg = null;
+    }
+    return true;
+}
+function paintCage() {
+    Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-cage'), function (e) { e.remove(); });
+    const r = roomOf(), c = r && r.cage, z = zz();
+    if (!c) return;
+    const e = document.createElement('div');
+    e.className = 'plaza-cage';
+    e.style.left = Math.round((c.x - c.w / 2) * z) + 'px';
+    e.style.top = Math.round((c.base - c.h) * z) + 'px';
+    e.style.width = Math.round(c.w * z) + 'px';
+    e.style.height = Math.round(c.h * z) + 'px';
+    e.style.zIndex = String(100 + Math.round(c.zy));
+    e.innerHTML = '<img src="' + P.DIR + 'gaduri.png" alt=""><div class="t">가두리</div>';
+    run.el.appendChild(e);
+}
+// 갇히거나 풀리면 그 자리에서 — 다른 방이면 데려가고, 같은 방이면 안으로 세운다
+let cageWas = '';
+setInterval(function () {
+    if (!run || !run.me) return;
+    const k = cageMine();
+    if (k === cageWas) return;
+    const before = cageWas;
+    cageWas = k;
+    if (k) {
+        if (run.room !== k) { goRoom(k, null, 0); }
+        else {
+            const m = cageMid(roomOf());
+            if (m) { run.x = m.x; run.y = m.y; run.lv = 0; run.seg = 'up'; run.tx = null; run.tseg = null; putOne(run.me, run.x, run.y); camera(true); wake(); }
+        }
+        sysLine('🔒 ' + R[k].n + ' 가두리에 갇혔습니다.');
+    } else if (before) {
+        sysLine('🔓 가두리에서 풀려났습니다.');
+    }
+}, 800);
+
+// ==========================================
 // ★ 층 — 한 방에 위층과 지하가 같이 있다
 // ==========================================
 //
@@ -1298,6 +1381,7 @@ function paintRoom() {
     paintMap();                     // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
     paintExits();
     paintSpots();
+    paintCage();                    // 🔒 가두리 (그 방에 있으면)
 }
 
 // 나갈 수 있는 쪽에 화살표를 띄운다
@@ -1388,6 +1472,7 @@ function paintSpots() {
         });
         e.addEventListener('click', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
+            if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
             goApp(s);
         });
         run.el.appendChild(e);
@@ -1539,6 +1624,12 @@ function goApp(s) {
 //     들어가자마자 또 오른쪽 끝에 서고 그대로 다음 방으로 밀려 갔다.
 function goRoom(key, way, lv) {
     if (!run || !R[key]) return;
+    // 🔒 갇혔으면 가두리 방 밖으로는 못 간다 — 이미 거기 있으면 그대로, 밖이면 그리로 데려간다
+    const cg = cageMine();
+    if (cg && key !== cg) {
+        if (run.room === cg && run.me) { sysLine('🔒 가두리에 갇혀 있어 나갈 수 없습니다.'); return; }
+        key = cg; way = null; lv = 0;
+    }
     const r = R[key];
 
     // 있던 방에서 내 자리를 지운다 (유령이 남지 않게)
@@ -1574,6 +1665,10 @@ function goRoom(key, way, lv) {
     else if (way === 'down')  { run.x = (r.up && r.up.x) ? (r.up.x[0] + r.up.x[1]) / 2 : r.w / 2;
                                 run.y = bnd[0] + inY; }                           // ↓ 로 왔으니 문 앞에
     else                      { run.x = r.w / 2;  run.y = mid; }
+    if (cg && key === cg) {                                     // 🔒 가두리 안에 선다
+        const m = cageMid(r);
+        if (m) { run.lv = 0; run.x = m.x; run.y = m.y; }
+    }
 
     // ★ 선 위에 세운다 — 들어온 층의 선에 얹고, 그 선의 x 폭 안으로 자른다
     run.seg = (run.lv === 1 && r.floor2 && r.x2) ? 'dn' : 'up';
@@ -1708,7 +1803,7 @@ function tick(ts) {
         if (segBand(r, run.seg)) run.y += dy * P.SPEED * dt;
 
         // ─ 넘어간 직후에는 쉬어 간다 (두 방을 끝없이 오가지 않게)
-        if (now() - (run.warp || 0) > P.WARP_MS) {
+        if (!cageMine() && now() - (run.warp || 0) > P.WARP_MS) {
             if (r.left && run.x <= P.EDGE) { goRoom(r.left, 'left'); return; }
             if (r.right && run.x >= r.w - P.EDGE) { goRoom(r.right, 'right'); return; }
         }
@@ -1726,6 +1821,7 @@ function tick(ts) {
         if (dx < -0.08) run.me.actor.face(1);
         else if (dx > 0.08) run.me.actor.face(-1);
     }
+    cageHold(r);                            // 🔒 갇혔으면 가두리 안쪽으로
     run.me.actor.moving(moving);
     putOne(run.me, run.x, run.y);
     camera();

@@ -30,6 +30,12 @@
 //
 // ■ 위 알림띠 (2026-10-18)
 //   상담사가 낀 임신 · 착정 · 출산 · 유산 소식은 알림띠(notices)에 올리지 않는다 — 아래 4.
+//
+// ■ 동거인이 상담사를 임신시킨다 (2026-10-19) — 아래 5
+//   상담사는 성별 · 물약과 상관없이 「받는 쪽」도 된다 (canBear). 다이아 보지 플러그는 그대로 막는다.
+//   단 **상담사와 같은 방을 쓰는 동거인**만 — 다른 사원은 상담사를 임신시킬 수 없다.
+//   동거인의 사택 화면 「동거인」 칸에 [🤍 임신시키기] 가 생긴다 (상담사가 동거인이면).
+//   동거인이라 동의 없이 바로 판정한다. 상담사가 임신 중이고 내가 아버지면 [🤍 돌본다] 도 생긴다.
 
 (function pregAdmin() {
 
@@ -51,6 +57,14 @@ function sameRoom(code) {
     return !!(isAdm(me) && code && roomieOf(me) === code);
 }
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); } catch (e) { } }
+// 나는 상담사의 동거인인가 — 내 쪽이 상담사를 가리키고, 상담사 쪽도 나를 가리켜야 한다 (유령 동거인 막기)
+function adminRoomie(me) {
+    if (!me || isAdm(me)) return false;
+    if (roomieOf(me) !== ADMIN) return false;
+    const a = users()[ADMIN];
+    return !a || !a.house || !a.house.roomie || a.house.roomie === me.code;
+}
+const NOTE_IN = '상담사는 같은 방(관사)을 쓰는 동거인만 임신시킬 수 있습니다.';
 
 // 늘 맨 바깥에 있게 감싼다 — 다른 파일이 나중에 또 감싸면 다시 바깥으로
 function keepOuter(name, flag, make) {
@@ -83,12 +97,14 @@ const NOTE = '상담사는 같은 방(관사)을 쓰는 직원만 임신시킬 �
 keepOuter('tryPregnancy', '_pregAdmin', function (f) {
     return function (code) {
         if (isAdm(u_()) && !sameRoom(code)) { alert_(NOTE); return; }
+        if (code === ADMIN && !isAdm(u_()) && !adminRoomie(u_())) { alert_(NOTE_IN); return; }
         return f.apply(this, arguments);
     };
 });
 keepOuter('doPregnancy', '_pregAdmin', function (f) {
     return function (code) {
         if (isAdm(u_()) && !sameRoom(code)) { alert_(NOTE + '\n\n진행되지 않았습니다.'); return; }
+        if (code === ADMIN && !isAdm(u_()) && !adminRoomie(u_())) { alert_(NOTE_IN + '\n\n진행되지 않았습니다.'); return; }
         // 알림띠 — 상담사가 시키거나 상담사가 받으면 안 띄운다 (아래 4)
         const was = forced;
         forced = (isAdm(u_()) || code === ADMIN) ? 'quiet' : 'loud';
@@ -101,6 +117,12 @@ keepOuter('addPregBtn', '_pregAdmin', function (f) {
         const r = f.apply(this, arguments);
         try {
             const me = u_();
+            // 상담사 카드 — 동거인이 아니면 임신시키기를 뺀다
+            if (code === ADMIN && !isAdm(me) && !adminRoomie(me)) {
+                const b = document.getElementById('preg-do-btn');
+                if (b) b.remove();
+                return r;
+            }
             if (!isAdm(me) || sameRoom(code)) return r;
             const box = document.getElementById('preg-btn-box');
             if (!box) return r;
@@ -207,6 +229,53 @@ keepOuter('pregBroadcast', '_pregAdmin', function (f) {
         return f.apply(this, arguments);
     };
 });
+
+// ==========================================
+// 5. 동거인이 상담사를 — 상담사도 받는 쪽이 된다
+// ==========================================
+keepOuter('canBear', '_pregAdmin', function (f) {
+    return function (user) {
+        if (isAdm(user)) return true;
+        return f.apply(this, arguments);
+    };
+});
+// 동거인의 사택 화면 — 「동거인」 칸 단추 줄에 붙인다
+function houseBtns() {
+    const me = u_();
+    if (!adminRoomie(me)) return;
+    const box = document.getElementById('house-main-body');
+    if (!box || box.querySelector('#preg-admin-house')) return;
+    const treat = box.querySelector('button[onclick="houseTreat()"]');
+    const row = treat && treat.parentNode;
+    if (!row) return;
+    const a = users()[ADMIN];
+    if (!a) return;
+    const preg = (typeof isPregnant === 'function') && isPregnant(a);
+    const mine = preg && (typeof isMySire === 'function') && isMySire(a);
+    let full = false;
+    try { full = preg && ((sireCount(a) >= maxSires(a)) || mySireFull(a)); } catch (e) { }
+    const wrap = document.createElement('div');
+    wrap.id = 'preg-admin-house';
+    wrap.style.cssText = 'display:flex; gap:5px; width:100%; flex-basis:100%;';
+    let h = '';
+    if (!full) {
+        h += '<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#6a4c93,#4a2c73); color:#fff; border-color:#8a6cb3;" onclick="tryPregnancy(\'' + ADMIN + '\')">🤍 임신시키기</button>';
+    }
+    if (mine) {
+        h += '<button class="inv-btn" style="flex:1; min-width:78px; background:linear-gradient(145deg,#c2185b,#880e4f); color:#fff; border-color:#e91e63;" onclick="openCarePanel(\'' + ADMIN + '\')">🤍 돌본다</button>';
+    }
+    if (!h) return;
+    wrap.innerHTML = h;
+    row.appendChild(wrap);
+}
+keepOuter('renderHouse', '_pregAdminHouse', function (f) {
+    return function () {
+        const r = f.apply(this, arguments);
+        try { houseBtns(); } catch (e) { }
+        return r;
+    };
+});
+setInterval(function () { try { houseBtns(); } catch (e) { } }, 2000);
 
 window.pregAdminState = function () {
     const me = u_();
