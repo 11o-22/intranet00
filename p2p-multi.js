@@ -44,11 +44,17 @@ function esc(s) {
 function el(id) { return document.getElementById(id); }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 
+// 꿈결 — K 의 방 전용 재화 (users/<열쇠>/kroom/dream)
+function myDream() {
+    try { return Math.max(0, Math.floor(Number(currentUser.kroom && currentUser.kroom.dream) || 0)); } catch (e) { return 0; }
+}
+
 function descOne(x) {
     // 의상·악세는 개수가 없다 — 이름만 적는다 (이름표는 p2p-wear.js 가 든다)
     if (x.k === 'wear') {
         return (typeof window.p2pWearName === 'function') ? window.p2pWearName(x.v) : String(x.v);
     }
+    if (x.k === 'dream') return '꿈결 ' + (Number(x.v) || 0).toLocaleString() + ' D';
     return (x.k === 'point')
         ? ((Number(x.v) || 0).toLocaleString() + ' P')
         : (x.v + ' ' + x.q + '개');
@@ -67,8 +73,8 @@ window.p2pBagClear = function () { BAG.offer = []; BAG.demand = []; paintBag(); 
 // 같은 물건은 한 줄로 합친다. 포인트도 한 줄로.
 function add(side, x) {
     const bag = BAG[side];
-    if (x.k === 'point') {
-        const i = bag.findIndex(function (y) { return y.k === 'point'; });
+    if (x.k === 'point' || x.k === 'dream') {
+        const i = bag.findIndex(function (y) { return y.k === x.k; });
         if (i >= 0) { bag[i].v = Number(bag[i].v) + Number(x.v); return true; }
     } else if (x.k === 'wear') {
         // 옷장은 있다·없다 뿐이라 같은 것을 두 벌 담을 수 없다
@@ -166,6 +172,24 @@ function pick(side) {
         paintBag();
         return;
     }
+    if (type === 'dream') {
+        const n = parseInt((el('p2p-' + side + '-dream') || {}).value, 10);
+        if (isNaN(n) || n <= 0) { alert_('꿈결을 올바르게 입력해 주십시오.'); return; }
+        if (side === 'offer') {
+            const already = BAG.offer.filter(function (x) { return x.k === 'dream'; })
+                .reduce(function (a, x) { return a + (Number(x.v) || 0); }, 0);
+            if (already + n > myDream()) {
+                alert_('꿈결은 ' + myDream().toLocaleString() + ' D 가지고 있습니다.'
+                    + (already ? '\n이미 ' + already.toLocaleString() + ' D 담아 두었습니다.' : ''));
+                return;
+            }
+        }
+        if (add(side, { k: 'dream', v: n, q: 1 })) {
+            const e = el('p2p-' + side + '-dream'); if (e) e.value = '';
+        }
+        paintBag();
+        return;
+    }
     if (type === 'point') {
         const n = parseInt((el('p2p-' + side + '-points') || {}).value, 10);
         if (isNaN(n) || n <= 0) { alert_('포인트를 올바르게 입력해 주십시오.'); return; }
@@ -204,6 +228,10 @@ function bagOrPick(side) {
         const k = (el('p2p-' + side + '-wear') || {}).value;
         return k ? [{ k: 'wear', v: k, q: 1 }] : [];
     }
+    if (type === 'dream') {
+        const n = parseInt((el('p2p-' + side + '-dream') || {}).value, 10);
+        return (isNaN(n) || n <= 0) ? [] : [{ k: 'dream', v: n, q: 1 }];
+    }
     if (type === 'point') {
         const n = parseInt((el('p2p-' + side + '-points') || {}).value, 10);
         return (isNaN(n) || n <= 0) ? [] : [{ k: 'point', v: n, q: 1 }];
@@ -216,10 +244,11 @@ function bagOrPick(side) {
 // 내가 정말 다 가지고 있나
 function canPay(bu) {
     const inv = (currentUser.inventory || []);
-    let pts = 0;
+    let pts = 0, drm = 0;
     for (let i = 0; i < bu.length; i++) {
         const x = bu[i];
         if (x.k === 'point') { pts += Number(x.v) || 0; continue; }
+        if (x.k === 'dream') { drm += Number(x.v) || 0; continue; }
         if (x.k === 'wear') {
             const ok = (typeof window.p2pWearHas !== 'function')
                 || window.p2pWearHas(currentUser, x.v);
@@ -233,6 +262,7 @@ function canPay(bu) {
         if (have < x.q) return { ok: false, why: "'" + x.v + "' 이(가) 모자랍니다. (가진 것 " + have + '개)' };
     }
     if (pts > (Number(currentUser.points) || 0)) return { ok: false, why: 'point' };
+    if (drm > myDream()) return { ok: false, why: '꿈결이 모자랍니다. (가진 것 ' + myDream().toLocaleString() + ' D)' };
     return { ok: true };
 }
 
@@ -377,7 +407,8 @@ function relabel() {
             const dBu = (deal.mode === 'trade') ? bundleOf(deal, 'demand') : [];
             // ★ 의상·악세는 한 가지뿐이어도 갈아 끼워야 한다 — 안 그러면
             //   'veil x1' 처럼 **열쇠가 날것으로** 보인다.
-            const wear = oBu.concat(dBu).some(function (x) { return x.k === 'wear'; });
+            // 꿈결도 같다 — 옛 화면은 'dream' 을 모르고 「12 x1」 처럼 적는다
+            const wear = oBu.concat(dBu).some(function (x) { return x.k === 'wear' || x.k === 'dream'; });
             if (!wear && oBu.length < 2 && dBu.length < 2) return;
 
             const lines = row.querySelectorAll('span');

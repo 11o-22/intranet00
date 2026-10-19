@@ -136,6 +136,24 @@ function giveWear(c, key) {
         return srv || Date.now();         // 이미 있으면 그대로 둔다
     });
 }
+// ★ 꿈결 (kind: 'dream', 2026-10-19) — users/<열쇠>/kroom/dream 에서 빼고 더한다.
+//   포인트와 같은 길. 덮어쓰지 않고 서버 값에서 빼고 더한다 (모자라면 그만둔다).
+function takeDream(c, amt) {
+    amt = Math.max(0, Math.floor(Number(amt) || 0));
+    if (!amt) return Promise.resolve(true);
+    return txn('users/' + c + '/kroom/dream', function (srv) {
+        const v = Math.max(0, Math.floor(Number(srv) || 0));
+        if (v < amt) return;                      // 모자라다 — 그만둔다
+        return v - amt;
+    });
+}
+function giveDream(c, amt) {
+    amt = Math.max(0, Math.floor(Number(amt) || 0));
+    if (!amt) return Promise.resolve(true);
+    return txn('users/' + c + '/kroom/dream', function (srv) {
+        return Math.max(0, Math.floor(Number(srv) || 0)) + amt;
+    });
+}
 function wearName(key) {
     try {
         if (typeof window.p2pWearName === 'function') return window.p2pWearName(key);
@@ -146,14 +164,17 @@ function wearName(key) {
 // 제물·대가를 한 덩어리로 다룬다
 function take(side, kind, value, qty) {
     if (kind === 'wear') return takeWear(side, value);
+    if (kind === 'dream') return takeDream(side, value);
     return (kind === 'point') ? takePts(side, value) : takeItems(side, value, qty);
 }
 function give(side, kind, value, qty) {
     if (kind === 'wear') return giveWear(side, value);
+    if (kind === 'dream') return giveDream(side, value);
     return (kind === 'point') ? givePts(side, value) : giveItems(side, value, qty);
 }
 function desc(kind, value, qty) {
     if (kind === 'wear') return wearName(value);
+    if (kind === 'dream') return '꿈결 ' + (Number(value) || 0).toLocaleString() + ' D';
     return (kind === 'point')
         ? ((Number(value) || 0).toLocaleString() + ' P')
         : (value + ' ' + (qty || 1) + '개');
@@ -176,6 +197,7 @@ function bundle(deal, side) {
             if (!x) return;
             if (x.k === 'point') { if (Number(x.v) > 0) out.push({ k: 'point', v: Number(x.v), q: 1 }); }
             else if (x.k === 'wear') { if (x.v) out.push({ k: 'wear', v: String(x.v), q: 1 }); }
+            else if (x.k === 'dream') { if (Math.floor(Number(x.v)) > 0) out.push({ k: 'dream', v: Math.floor(Number(x.v)), q: 1 }); }
             else if (x.v) out.push({ k: 'item', v: String(x.v), q: Math.max(1, parseInt(x.q, 10) || 1) });
         });
         return out;
@@ -184,6 +206,7 @@ function bundle(deal, side) {
     if (t == null || v == null) return out;
     if (t === 'point') { if (Number(v) > 0) out.push({ k: 'point', v: Number(v), q: 1 }); }
     else if (t === 'wear') out.push({ k: 'wear', v: String(v), q: 1 });
+    else if (t === 'dream') { if (Math.floor(Number(v)) > 0) out.push({ k: 'dream', v: Math.floor(Number(v)), q: 1 }); }
     else out.push({ k: 'item', v: String(v), q: Math.max(1, parseInt(q, 10) || 1) });
     return out;
 }
@@ -308,6 +331,8 @@ function install() {
                 await database.ref('p2pDeals/' + idx + '/status').set('EXPIRED');
                 showCustomAlert(got.at.k === 'point'
                     ? (deal.fromName + ' 사원의 포인트가 부족하여 거래가 무산되었습니다.')
+                    : got.at.k === 'dream'
+                    ? (deal.fromName + ' 사원의 꿈결이 부족하여 거래가 무산되었습니다.')
                     : got.at.k === 'wear'
                     ? (deal.fromName + " 사원이 '" + wearName(got.at.v) + "' 을(를) 더 이상 가지고 있지 않습니다.")
                     : (deal.fromName + " 사원이 '" + got.at.v + "' 을(를) 더 이상 "
@@ -326,6 +351,8 @@ function install() {
                     if (paid.at.k === 'point') {
                         if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
                         else showCustomAlert('포인트가 부족합니다.');
+                    } else if (paid.at.k === 'dream') {
+                        showCustomAlert('꿈결이 부족합니다. (요구 ' + (Number(paid.at.v) || 0).toLocaleString() + ' D)');
                     } else if (paid.at.k === 'wear') {
                         showCustomAlert("요구하신 '" + wearName(paid.at.v) + "' 을(를) 가지고 계시지 않습니다.");
                     } else {

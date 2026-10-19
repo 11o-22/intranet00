@@ -19,7 +19,8 @@
 //     떨어지는 것이 막대로 보인다.
 //   · 회복 — 던전 음식 · 치유(체력, 무조건 성공) · 요리사의 요리(체력) ·
 //            응시(정신력) · 보정(마력) · 굳건(제 무력) · 연결(내공).
-//   · 전용 재화 「꿈결」.
+//   · 전용 재화 「꿈결」. 쓰러지면 포인트처럼 가진 꿈결을 잃는다 (행운이 지키면 30~45% 남음 · 2026-10-19).
+//     밀실 거래로 주고받는다 (p2p-fix.js · p2p-multi.js · p2p-dream.js).
 //   · 각성 — 직업 갈림길에서 각성 점수(wake)를 모은다. 등급마다 정해진 만큼 모이면
 //            다음 이름으로 각성한다 (D→C→B→A→S).
 //
@@ -642,7 +643,7 @@ function paintEntry() {
                 · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
             </div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:5px;">오늘 남은 횟수 <b id="kroom-left" style="color:#7fd3e6;">${kLeft()} / ${kLimit()}</b>회 <span style="font-size:10px; color:#777;">(일반 어둠과 따로 · 자정 초기화)</span></div>
-            <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트와 반입품을 잃고 상담실로 이송됩니다.</div>
+            <div style="font-size:10px; color:#ff6b6b; margin-top:4px;">※ 쓰러지면 보유 포인트 · 꿈결과 반입품을 잃고 상담실로 이송됩니다.</div>
             <div id="kroom-helper-note" style="display:${helperSwitch() ? 'block' : 'none'}; font-size:10px; color:#81c784; margin-top:4px;">✚ 헬퍼로 들어갑니다 — 횟수를 쓰지 않고, 경험치 · 꿈결 · 포인트를 받지 않으며, 쓰러져도 잃지 않습니다. (파티 편성 칸에서 끕니다)</div>
             <div style="display:flex; gap:6px; margin-top:11px;">
                 <button class="game-btn" style="flex:1; margin:0; padding:11px; font-size:11px;" onclick="kroomSolo()">혼자 들어간다</button>
@@ -2230,7 +2231,7 @@ function hardDeath(why) {
     const u = me();
     if (isHelper()) {
         // ★ 헬퍼 — 포인트 · 반입품을 잃지 않고, 오염도도 안 올라가며, 상담실로 가지 않는다
-        kr.lostPts = 0; kr.lostItems = []; kr.luckSaved = false;
+        kr.lostPts = 0; kr.lostItems = []; kr.luckSaved = false; kr.lostDream = 0;
         addHistoryLog(u, '[' + K_CODE + '] 쓰러짐 (헬퍼 — 잃은 것 없음)');
         try { saveFields({ history: 1 }); } catch (e) { }
         if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
@@ -2245,6 +2246,13 @@ function hardDeath(why) {
     let lost = 0;
     if (saved) { const kept = Math.floor(u.points * (0.30 + Math.random() * 0.15)); lost = u.points - kept; u.points = kept; }
     else { lost = u.points; u.points = 0; }
+    // ★ 꿈결도 포인트처럼 잃는다 (2026-10-19) — 행운이 지켜 주면 같은 몫만 남는다
+    const kp = prof(u);
+    const d0 = Math.max(0, Math.floor(Number(kp.dream) || 0));
+    let dLost = 0;
+    if (saved) { const keptD = Math.floor(d0 * (0.30 + Math.random() * 0.15)); dLost = d0 - keptD; kp.dream = keptD; }
+    else { dLost = d0; kp.dream = 0; }
+    kr.lostDream = dLost;
     const items = [];
     [].concat(darkRun.carryEquips || [], darkRun.carryItems || []).forEach(function (it) { removeItemFromInventory(u, it, 1); items.push(it); });
     kr.lostPts = lost; kr.lostItems = items; kr.luckSaved = saved;
@@ -2255,7 +2263,7 @@ function hardDeath(why) {
     u.quarantineExitPollution = 40;
     u.foxRoomAnswered = true;
     try { appendBadgeNoteToUser(u, '[' + K_CODE + '] 던전에서 의식 불명 — 긴급 이송됨'); } catch (e) { }
-    addHistoryLog(u, '[' + K_CODE + '] 쓰러짐. 포인트 ' + lost.toLocaleString() + ' P 소실' + (items.length ? ' · 반입품 ' + items.join(', ') + ' 소실' : ''));
+    addHistoryLog(u, '[' + K_CODE + '] 쓰러짐. 포인트 ' + lost.toLocaleString() + ' P 소실' + (dLost ? ' · 꿈결 ' + dLost.toLocaleString() + ' D 소실' : '') + (items.length ? ' · 반입품 ' + items.join(', ') + ' 소실' : ''));
     try { saveSelfFull(); } catch (e) { }
     if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
     darkRun._dead = true;
@@ -2273,7 +2281,7 @@ function settle(how, txt) {
     const helper = isHelper();
     let exp = kr.exp, dream = kr.dream;
     if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
-    if (how === 'dead') { exp = Math.round(exp * 0.35); dream = Math.floor(dream * 0.35); }
+    if (how === 'dead') { exp = Math.round(exp * 0.35); dream = 0; }   // ★ 쓰러지면 이번에 얻은 꿈결도 없다 (가진 것은 hardDeath 가 걷는다)
     if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
     // 꿈결 — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)
@@ -2331,12 +2339,13 @@ function settle(how, txt) {
             ${helper ? '<div style="color:#81c784; margin-bottom:6px;">헬퍼로 들어온 탐사입니다 — 경험치 · 꿈결 · 각성 점수 · 포인트를 받지 않고, 탐사 횟수도 줄지 않았습니다.</div>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
-            꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(모두 ${k.dream.toLocaleString()} D)</span><br>
+            꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(${how === 'dead' && !helper ? '쓰러짐 — 이번에 얻은 것 없음 · ' : ''}모두 ${k.dream.toLocaleString()} D)</span><br>
             ${extra.length ? '<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #4a3a6a; color:#d4bbff; font-size:11px;">' + extra.join('<br>') + '</div>' : ''}
             ${how === 'dead' && helper ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #2e7d32; color:#81c784;">
                 헬퍼 — 포인트와 반입품을 잃지 않았고, 상담실로 가지 않습니다.</div>` : ''}
             ${how === 'dead' && !helper ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #7f0000; color:#f44336;">
                 보유 포인트 <b>-${(kr.lostPts || 0).toLocaleString()} P</b><br>
+                ${kr.lostDream ? '보유 꿈결 <b>-' + kr.lostDream.toLocaleString() + ' D</b><br>' : ''}
                 ${(kr.lostItems || []).length ? '반입품 <b>' + kr.lostItems.map(esc).join(', ') + '</b> 소실<br>' : ''}
                 ${kr.luckSaved ? '<span style="color:#4CAF50;">✺ 행운 — 일부를 지켜냈습니다.</span><br>' : ''}
                 오염도 <span style="color:#ff9800;">100%</span> — 🦊 상담실로 긴급 이송됩니다.</div>` : ''}
