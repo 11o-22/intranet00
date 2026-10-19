@@ -22,8 +22,9 @@
 //
 // ■ 🍖 먹이 던지기
 //   가두리 위 [먹이 던지기] (plaza.js) → 그 가두리에 갇힌 사원 고르기 → 개당 50,000 P.
-//   던지는 사람마다 갇힌 사원 한 명에게 두 번까지 (갇혀 있는 동안). 갇힌 사람은 못 던진다.
-//   받은 사원에게 「먹는다 / 안 먹는다」가 뜬다. 먹으면 포만감 +30. 안 먹으면 버려진다 (포인트는 돌아가지 않는다).
+//   던지는 사람마다 **하루 통틀어 두 번** (누구에게 던지든 · 자정에 새로 · users/<사번>/gdFeed). 갇힌 사람은 못 던진다.
+//   받은 사원에게 「먹는다 / 안 먹는다」가 뜬다. 먹으면 격리(상담실 · 선녀탕) 시간이 15분 준다.
+//   안 먹으면 버려진다 (포인트는 돌아가지 않는다).
 //
 // ■ 콘솔
 //   gaduriState()
@@ -268,42 +269,43 @@ setInterval(function () {
 // ==========================================
 // 4. 🍖 먹이 던지기
 // ==========================================
-const FEED_PRICE = 50000, FEED_MAX = 2, FEED_GAIN = 30;
-function fedBy(room, target, from) {
-    const v = (all[room] || {})[target];
-    return (v && v.fed && Number(v.fed[from])) || 0;
-}
+const FEED_PRICE = 50000, FEED_MAX = 2, FEED_CUT = 15 * 60 * 1000;
+function today_() { try { return getTodayStr(); } catch (e) { return new Date().toDateString(); } }
+// 오늘 던진 수 — 누구에게 던졌든 통틀어
+function usedToday(me) { const g = me && me.gdFeed; return (g && g.day === today_()) ? (Number(g.n) || 0) : 0; }
 function closeFeed() { const o = document.getElementById('gd-feed-ov'); if (o) o.remove(); }
 window.gaduriFeedOpen = function (room) {
     const me = u_();
     if (!me || !NAME[room]) return;
     if (roomOf(me.code)) { alert_('가두리 안에서는 던질 수 없습니다.'); return; }
     const codes = Object.keys(all[room] || {}).filter(function (c) { return c !== me.code; });
+    const left = FEED_MAX - usedToday(me);
+    if (left <= 0) { alert_('오늘은 먹이를 다 던졌습니다. (하루 ' + FEED_MAX + '번)'); return; }
     closeFeed();
     const book = users();
     const rows = codes.length ? codes.map(function (c) {
         const u = book[c], v = (all[room] || {})[c] || {};
-        const left = FEED_MAX - fedBy(room, c, me.code);
-        return '<button type="button" data-c="' + esc(c) + '" ' + (left <= 0 ? 'disabled' : '')
+        const q = u && typeof isQuarantined === 'function' && isQuarantined(u);
+        return '<button type="button" data-c="' + esc(c) + '"'
             + ' style="display:flex; align-items:center; gap:8px; width:100%; padding:11px 12px; margin-bottom:7px; border-radius:7px; cursor:pointer;'
-            + ' background:#221e28; border:1px solid #4a4058; color:#eee; font-family:inherit; text-align:left;' + (left <= 0 ? ' opacity:.4; cursor:default;' : '') + '">'
+            + ' background:#221e28; border:1px solid #4a4058; color:#eee; font-family:inherit; text-align:left;">'
             + '<span style="font-size:13px; font-weight:bold;">' + esc((u && u.name) || v.name || c) + '</span>'
-            + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중</span>' : '')
-            + '<span style="margin-left:auto; font-size:10px; color:#b9a8d8;">' + (left > 0 ? '남은 ' + left + '번' : '다 던짐') + '</span></button>';
+            + (q ? '<span style="font-size:10px; color:#ff9f80;">격리 ' + Math.max(1, Math.ceil((u.quarantineUntil - Date.now()) / 60000)) + '분 남음</span>' : '')
+            + '</button>';
     }).join('') : '<div style="font-size:12px; color:#888; text-align:center; padding:18px 0;">가두리에 아무도 없습니다.</div>';
     const ov = document.createElement('div');
     ov.id = 'gd-feed-ov';
     ov.style.cssText = 'position:fixed; inset:0; z-index:100060; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:16px;';
     ov.innerHTML = '<div style="width:100%; max-width:340px; background:#17151c; border:1px solid #4a4058; border-radius:10px; padding:16px 14px 14px; color:#ddd;">'
         + '<div style="font-size:14px; font-weight:bold; text-align:center; margin-bottom:6px;">🍖 먹이 던지기 — ' + NAME[room] + ' 가두리</div>'
-        + '<div style="font-size:11px; color:#999; text-align:center; line-height:1.7; margin-bottom:12px;">개당 ' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 한 사람에게 ' + FEED_MAX + '번까지<br>받은 사원이 먹을지 말지 정합니다.</div>'
+        + '<div style="font-size:11px; color:#999; text-align:center; line-height:1.7; margin-bottom:12px;">개당 ' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 하루 ' + FEED_MAX + '번 (오늘 남은 ' + left + '번)<br>받은 사원이 먹으면 격리 시간이 15분 줍니다.</div>'
         + rows
         + '<button type="button" id="gd-feed-no" style="width:100%; margin-top:4px; padding:10px; border-radius:6px; background:#2a2730; color:#bbb; border:1px solid #444; font-family:inherit; cursor:pointer;">그만둔다</button></div>';
     document.body.appendChild(ov);
     ov.querySelector('#gd-feed-no').onclick = closeFeed;
     ov.addEventListener('click', function (e) { if (e.target === ov) closeFeed(); });
     ov.querySelectorAll('button[data-c]').forEach(function (b) {
-        b.onclick = function () { if (b.disabled) return; closeFeed(); throwFood(room, b.getAttribute('data-c')); };
+        b.onclick = function () { closeFeed(); throwFood(room, b.getAttribute('data-c')); };
     });
 };
 let throwing = false;
@@ -311,24 +313,26 @@ function throwFood(room, target) {
     const me = u_(), d = db_();
     if (!me || !d || throwing) return;
     const t = users()[target];
+    if (roomOf(target) !== room) { alert_('그 사이 가두리에서 나갔습니다.'); return; }
+    if (usedToday(me) >= FEED_MAX) { alert_('오늘은 먹이를 다 던졌습니다. (하루 ' + FEED_MAX + '번)'); return; }
     if ((Number(me.points) || 0) < FEED_PRICE) { if (typeof showLuxuryAlert === 'function') showLuxuryAlert(); else alert_('포인트가 모자랍니다.'); return; }
     throwing = true;
-    // 두 번까지 — 트랜잭션으로 센다. 그 사이 풀려났으면 그만둔다
-    d.ref(NODE + '/' + room + '/' + target).transaction(function (v) {
-        if (!v) return;
-        v.fed = v.fed || {};
-        const n = Number(v.fed[me.code]) || 0;
-        if (n >= FEED_MAX) return;
-        v.fed[me.code] = n + 1;
-        return v;
+    // 하루 두 번 — 내 기록에서 트랜잭션으로 센다 (두 창에서 눌러도 넘지 않게)
+    d.ref('users/' + me.code + '/gdFeed').transaction(function (g) {
+        const day = today_();
+        if (!g || g.day !== day) g = { day: day, n: 0 };
+        if ((Number(g.n) || 0) >= FEED_MAX) return;
+        g.n = (Number(g.n) || 0) + 1;
+        return g;
     }).then(function (res) {
         throwing = false;
-        if (!res || !res.committed) { alert_(roomOf(target) === room ? '이 사원에게는 더 던질 수 없습니다. (' + FEED_MAX + '번까지)' : '그 사이 가두리에서 나갔습니다.'); return; }
+        if (!res || !res.committed) { alert_('오늘은 먹이를 다 던졌습니다. (하루 ' + FEED_MAX + '번)'); return; }
+        try { me.gdFeed = res.snapshot.val(); } catch (e) { }
         try { changePoints(-FEED_PRICE); } catch (e) { me.points = (Number(me.points) || 0) - FEED_PRICE; try { saveFields({ points: 1 }); } catch (x) { } }
         d.ref('gaduriFood/' + target).push({ from: me.code, fromName: me.name || me.code, room: room, at: Date.now() });
         try { addHistoryLog(me, '[먹이 던지기] ' + ((t && t.name) || target) + ' 사원에게 (-' + FEED_PRICE.toLocaleString('ko-KR') + ' P)'); saveFields({ history: 1 }); } catch (e) { }
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-        alert_('🍖 ' + ((t && t.name) || target) + ' 사원에게 먹이를 던졌습니다.\n(-' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 남은 ' + (FEED_MAX - fedBy(room, target, me.code)) + '번)');
+        alert_('🍖 ' + ((t && t.name) || target) + ' 사원에게 먹이를 던졌습니다.\n(-' + FEED_PRICE.toLocaleString('ko-KR') + ' P · 오늘 남은 ' + (FEED_MAX - usedToday(me)) + '번)');
     }).catch(function (e) { throwing = false; alert_('던지지 못했습니다.\n\n' + (e && e.message)); });
 }
 // 받는 쪽 — 하나씩 묻는다
@@ -358,7 +362,7 @@ function askFood(key, f) {
     ov.innerHTML = '<div style="width:100%; max-width:320px; background:#17151c; border:1px solid #6a5a3a; border-radius:10px; padding:18px 14px 14px; color:#ddd; text-align:center;">'
         + '<div style="font-size:30px; margin-bottom:6px;">🍖</div>'
         + '<div style="font-size:13px; line-height:1.8; margin-bottom:14px;"><b style="color:#ffcf8f;">' + esc(f.fromName || '누군가') + '</b> 사원이<br>가두리 안으로 먹이를 던졌습니다.<br>'
-        + '<span style="font-size:11px; color:#999;">먹으면 포만감 +' + FEED_GAIN + '</span></div>'
+        + '<span style="font-size:11px; color:#999;">먹으면 격리 시간이 15분 줍니다.</span></div>'
         + '<div style="display:flex; gap:8px;"><button type="button" id="gd-eat-no" style="flex:1; padding:11px; border-radius:6px; background:#2a2730; color:#bbb; border:1px solid #444; font-family:inherit; cursor:pointer;">안 먹는다</button>'
         + '<button type="button" id="gd-eat-yes" style="flex:1; padding:11px; border-radius:6px; background:linear-gradient(145deg,#a0642a,#6a3e14); color:#fff; border:1px solid #d49a5a; font-weight:bold; font-family:inherit; cursor:pointer;">먹는다</button></div></div>';
     document.body.appendChild(ov);
@@ -366,11 +370,12 @@ function askFood(key, f) {
         ov.remove();
         d.ref('gaduriFood/' + me.code + '/' + key).remove().then(function () { asking = ''; foodFor = ''; });   // 다음 것을 다시 묻게
         if (eat) {
-            const was = Number(me.satiety) || 0;
-            me.satiety = Math.min(100, was + FEED_GAIN);
-            try { addHistoryLog(me, '[먹이] ' + (f.fromName || '누군가') + ' 사원이 던진 먹이를 먹었습니다. (포만감 +' + (me.satiety - was) + ')'); } catch (e) { }
-            try { saveFields({ satiety: 1, history: 1 }); } catch (e) { }
+            const q = (typeof isQuarantined === 'function') && isQuarantined(me);
+            if (q) me.quarantineUntil = Math.max(Date.now(), Number(me.quarantineUntil) - FEED_CUT);
+            try { addHistoryLog(me, '[먹이] ' + (f.fromName || '누군가') + ' 사원이 던진 먹이를 먹었습니다.' + (q ? ' (격리 15분 줄어듦)' : '')); } catch (e) { }
+            try { saveFields(q ? { quarantineUntil: 1, history: 1 } : { history: 1 }); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+            if (q) alert_('먹이를 먹었습니다.\n\n격리 시간이 15분 줄었습니다.');
         } else {
             try { addHistoryLog(me, '[먹이] ' + (f.fromName || '누군가') + ' 사원이 던진 먹이를 먹지 않았습니다.'); saveFields({ history: 1 }); } catch (e) { }
         }
