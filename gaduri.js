@@ -77,7 +77,36 @@ let mineWas = null;
             try { paintAdmin(); } catch (e) { }
         });
     }, 500);
-    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// ★ 단말을 껐다 켜도 갇혀 있게 (2026-10-19)
+//   · 갇힌 사원이 들어와 있는데 광장이 안 열려 있으면 연다 (plaza.js 의 goRoom 이 가두리 방으로 보낸다)
+//   · 갇힌 동안 광장은 닫히지 않는다 (plaza.js shut) — 단말 종료(logout)만 닫는다
+(function keepIn() {
+    setInterval(function () {
+        const me = u_();
+        if (!me || me.code === ADMIN || !loaded || !roomOf(me.code)) return;
+        if (document.getElementById('plaza-ov') || typeof window.plazaOpen !== 'function') return;
+        const ms = document.getElementById('main-screen');
+        if (!ms) return;
+        try { window.plazaOpen(); } catch (e) { return; }
+        try {
+            const ov = document.getElementById('plaza-ov');
+            if (ov && typeof window.plazaSolo === 'function' && window.plazaSolo()) ov.classList.add('plaza-base');
+        } catch (e) { }
+    }, 2000);
+    const iv = setInterval(function () {
+        if (typeof window.logout !== 'function' || window.logout._gaduri) { if (window.logout && window.logout._gaduri) clearInterval(iv); return; }
+        const _l = window.logout;
+        const w = function () {
+            window._plazaForceShut = true;
+            try { return _l.apply(this, arguments); }
+            finally { window._plazaForceShut = false; }
+        };
+        Object.keys(_l).forEach(function (k) { try { w[k] = _l[k]; } catch (e) { } });
+        w._gaduri = true;
+        window.logout = w;
+        try { logout = w; } catch (e) { }
+    }, 700);
 })();
 // 갇힌 사람에게 — 들어와서 처음 볼 때는 말없이, 그 뒤로 바뀌면 알린다
 setInterval(function () {

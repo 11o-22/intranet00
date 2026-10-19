@@ -3430,6 +3430,8 @@ function bagCard(n, qty) {
 // ==========================================
 function shut() {
     if (!run) return;
+    // 🔒 갇힌 사원은 광장을 닫지 못한다 — 단말을 끌 때(logout)만 닫힌다 (gaduri.js 가 표를 세운다)
+    if (cageMine() && !window._plazaForceShut) { sysLine('🔒 가두리에 갇혀 있어 광장을 떠날 수 없습니다.'); return; }
     try { cancelAnimationFrame(run.raf); } catch (e) { }
     if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
     if (run.onWake) {
