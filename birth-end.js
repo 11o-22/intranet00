@@ -177,7 +177,20 @@ function keepFlags() {
         if (!currentUser) return;
         if (!currentUser.nFlags) currentUser.nFlags = {};
         if (!currentUser.nPending) currentUser.nPending = {};
-        if (typeof saveFields === 'function') saveFields({ nFlags: 1, nPending: 1 });
+        // ★ 다 쓰면 {} 가 된다. 그런데 **빈 객체는 서버에 안 간다** (empty-null.js 가 빼고 보낸다 —
+        //   파이어베이스에서 {} 는 「지움」이 아니라 「아무것도 아님」이다). 그래서 마지막 한 번을 쓰고
+        //   나면 서버에는 그 한 번이 그대로 남아, 새로고침하거나 다음 탐사가 시작될 때 **되살아났다.**
+        //   삼킨 마침표가 한 번이 아니라 계속 버티던 까닭이 이것이다 (2026-10-19).
+        //   → 0 이 된 칸은 빼고, 다 비었으면 그 칸째 null 로 지운다.
+        const up = {};
+        ['nFlags', 'nPending'].forEach(function (k) {
+            const v = currentUser[k] || {}, live = {};
+            Object.keys(v).forEach(function (x) { if (Number(v[x]) > 0) live[x] = Number(v[x]); });
+            up[k] = Object.keys(live).length ? live : null;
+        });
+        if (typeof database !== 'undefined' && database && currentUser.code) {
+            database.ref('users/' + currentUser.code).update(up);
+        } else if (typeof saveFields === 'function') saveFields({ nFlags: 1, nPending: 1 });
     } catch (e) { console.warn('[출산품] 횟수 적기 건너뜀:', e && e.message); }
 }
 

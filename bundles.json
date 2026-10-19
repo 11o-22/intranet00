@@ -379,7 +379,8 @@
       "gaduri.js",
       "dream-bank.js",
       "playtime.js",
-      "disaster.js"
+      "disaster.js",
+      "s3-period.js"
     ]
   ]
 }
