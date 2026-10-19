@@ -803,9 +803,27 @@ setTimeout(function () { setInterval(tick, 60000); }, 8000);
 //     그래서 내 글에 적힌 house.roomie 만 본다. 이것은 나와 함께 들어오니
 //     비어 있을 틈이 없다. 가둔 사람이 정말 없어졌는지는 **내 글이
 //     db.users 에 들어와 있을 때만** (= 꾸러미가 왔을 때만) 따진다.
+// 아직 안 준 몫이 있나 — settle 이 줄 것과 같은 셈
+function owed(u) {
+    if (!u || !GEAR[u.k]) return false;
+    if (u.k === 'milk') return !u.done && now() >= (u.until || 0);
+    if (u.k === 'cuff') {
+        const run = Math.min(GEAR.cuff.ms, Math.max(0, Math.min(now(), u.until || 0) - (u.at || 0)));
+        return Math.floor(run / CUFF_BLOCK) > (u.paid || 0);
+    }
+    return false;
+}
 function selfCheck() {
     const c = currentUser && currentUser.cage;
     if (!c || !c.by) return;
+
+    // ★ 갇힌 쪽 화면에서도 정산한다 (2026-10-20)
+    //   ✗ 전에는 돈을 넣는 셈(tick)이 **가둔 쪽 화면에서만** 돌았다. 갇힌 쪽은 문이 열릴 때만
+    //     정산했는데, 착유 머신은 5시간에 끝나도 문은 가둔 때로부터 12시간까지 잠겨 있다.
+    //     그래서 다섯 시간이 됐을 때 가둔 사람이 접속해 있지 않으면 **10만 P 가 안 들어왔다**
+    //     (문이 열리는 12시간 뒤, 또는 가둔 사람이 다시 들어올 때까지 밀렸다). 족갑 토막도 같다.
+    //   settle 은 서버 cageUse 를 트랜잭션으로 집어 「줬다」를 박으므로 양쪽에서 불려도 한 번만 들어간다.
+    if (owed(currentUser.cageUse)) settle(currentUser);
 
     const h = (typeof getHouse === 'function')
         ? (function () { try { return getHouse(currentUser) || {}; } catch (e) { return currentUser.house || {}; } })()
