@@ -157,8 +157,52 @@ const JOBS = {
     ironbody:  ['steady', 'qi',   ['외공 수련생', '철포삼', '금종조', '금강불괴', '불괴의 무신'], '몸이 곧 벽이 될 때까지.'],
     miner:     ['steady', null,   ['광부', '갱도 반장', '심층 광부', '지저의 굴착왕', '대지를 뚫는 자'], '어둠 속에서 오래 버티는 법은 땅이 가르쳐 줬다.']
 };
-// L — 서버에 한 명만. 얻는 조건은 나중에 정한다 (아직 카드에 안 나온다)
-const L_JOBS = ['정령사', '네크로맨서', '군주', '성녀', '테이머', '천마', '거너', '마스터', '드루이드', '방랑자'];
+// ==========================================
+// ★ 히든 직업 (L) — 속성마다 하나 (2026-10-19)
+// ==========================================
+//
+//   회피 거너 · 치유 드루이드 · 행운 성녀(남성이면 성자) · 연결 정령사 · 파괴 천마 ·
+//   은신 테이머 · 응시 네크로맨서 · 감각 방랑자 · 보정 마스터 · 굳건 군주
+//
+//   ■ 조건 — 넷이 다 차면 상담사에게 알림이 간다 (kroomHidden/<사번>, state 'ready')
+//       Lv 80 이상 · 지금 직업이 S 등급
+//       D · C · B · A 등급 던전에서 갈림길(◇ ○○만의 갈림길)을 등급마다 90번 이상 겪음  (k.jx)
+//       그 속성 직업의 임무(장면마다 붙는 ◇ 직업 선택지)를 100번 이상 해냄               (k.hq[속성])
+//       — 헬퍼로 들어간 판은 세지 않는다. 세기 시작한 것은 2026-10-19 부터다.
+//   ■ 상담사가 통제 콘솔 「히든 직업 관리」에서 지정하면(state 'offered') 그 사원이 다음에
+//     K 의 방에 들어설 때 금빛 카드가 뜬다 — 『 선택받은 자여 전직하겠습니까? 』
+//     전직하면 직업 등급은 D 부터 다시 (Lv 은 그대로). 거절하면 'declined'.
+//   ■ 등급 올리기는 극악 — 각성 점수 D 30 · C 40 · B 50 · A 60 · S 100 (보통 직업의 열 배, S → L 은 백)
+//   ■ L 이 되면 kroomHidden 에 'L' 을 적고 상담사에게 알린다 — 그에 맞는 물건은 추후 정한다.
+//   ■ 내용 — 히든 직업만의 갈림길 · 선택지는 아직 없어서, **같은 속성 다섯 직업의 것**을 함께 쓴다.
+const HIDDEN = {
+    L_gunner:   ['evade',  'might', '거너',       '거리는 숨을 고르는 시간이다. 방아쇠는 그 끝에 있다.'],
+    L_druid:    ['heal',   'mana',  '드루이드',   '숲은 상처를 덮는 법을 안다. 그 손을 빌릴 뿐이다.'],
+    L_saintess: ['luck',   'mana',  '성녀',       '빌지 않아도 닿는 것이 있다. 그것을 운이라 부르지 않을 뿐.'],
+    L_saint:    ['luck',   'mana',  '성자',       '빌지 않아도 닿는 것이 있다. 그것을 운이라 부르지 않을 뿐.'],
+    L_spirit:   ['bond',   'mana',  '정령사',     '보이지 않는 것들과 맺었다. 부르면 온다.'],
+    L_heavenly: ['break',  'qi',    '천마',       '하늘 아래 마(魔)라 불린 것은 늘 하나였다.'],
+    L_tamer:    ['hide',   'might', '테이머',     '물지 않는 짐승은 없다. 물지 않게 하는 사람이 있을 뿐.'],
+    L_necro:    ['gaze',   'mana',  '네크로맨서', '끝난 것들에게 한 번 더 일을 시킨다.'],
+    L_wanderer: ['sense',  'qi',    '방랑자',     '지도는 지나온 길로만 그려진다.'],
+    L_master:   ['fix',    'qi',    '마스터',     '모든 수를 다 써 본 사람만이 하나를 고른다.'],
+    L_lord:     ['steady', 'might', '군주',       '무너지지 않는 것은 성벽이 아니라 그 앞에 선 사람이다.']
+};
+Object.keys(HIDDEN).forEach(function (k) {
+    const h = HIDDEN[k];
+    JOBS[k] = [h[0], h[1], [h[2], h[2], h[2], h[2], h[2], h[2]], h[3]];   // 이름은 등급마다 같다 (D … S · L)
+});
+function isHiddenJob(key) { return !!(key && HIDDEN[key]); }
+// 속성 → 히든 직업 열쇠 (행운은 성별로 가른다)
+function hiddenKeyFor(attr, u) {
+    if (attr === 'luck') return (u && u.badge && u.badge.gender === '남성') ? 'L_saint' : 'L_saintess';
+    const k = Object.keys(HIDDEN).filter(function (x) { return HIDDEN[x][0] === attr; })[0];
+    return k || null;
+}
+const L_JOBS = ['거너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
+const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 90, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
+const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
+const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
 // ── 전용 장비 — 이 방에서는 속성마다 「몇 번」 쓰는 능력이 된다
 //   횟수 = 1 + ⌊(장비 그 속성 등급 + 직업 등급) / 2⌋  (최대 5)
@@ -239,6 +283,7 @@ function stale(k) { return !!k && typeof k === 'object' && (Number(k.reset) || 0
 function wipe(k) {
     k.lv = 1; k.exp = 0; k.job = null; k.grade = 'D'; k.wake = {};
     k.peek = null; k.rerolled = false; k.seen = {};
+    k.jx = {}; k.hq = {}; k.hiddenAsk = null;
     k.reset = K_RESET;
 }
 function prof(u) {
@@ -413,9 +458,11 @@ function mainAttr(u) {
 }
 function jobName(key, grade) {
     const j = JOBS[key]; if (!j) return '?';
-    return j[2][Math.max(0, GRADES.indexOf(grade || 'D'))];
+    return j[2][Math.min(j[2].length - 1, gi(grade))];
 }
-function gi(grade) { return Math.max(0, GRADES.indexOf(grade || 'D')); }
+// L 은 S 다음 (히든 직업만 오른다)
+function gi(grade) { return grade === 'L' ? 5 : Math.max(0, GRADES.indexOf(grade || 'D')); }
+function wakeNeed(k) { return k ? (isHiddenJob(k.job) ? HIDDEN_WAKE[k.grade] : WAKE_NEED[k.grade]) : 0; }
 
 // 내용 파일 받기 — 한 번 받은 것은 다시 안 받는다
 const loaded = {};
@@ -690,7 +737,9 @@ function start(isParty, pid) {
     openDarkOverlay();
     const el = document.getElementById('dro-code'); if (el) el.innerText = K_CODE;
     teamUp();
-    if (!prof(u).job) cardPick(); else afterJob();
+    const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
+    if (hiddenOffered()) { hiddenPopup(goOn); return; }
+    goOn();
 }
 
 // 팀 자리 — 네 팀 세는 데 쓴다
@@ -847,7 +896,7 @@ function cardPick() {
     const a = mainAttr(u);
     if (!a) { show('—', '새겨진 것이 없는 자에게는 방이 열리지 않는다.', darkChoiceBtn('돌아간다.', 'kroomFinish()')); return; }
     if (!kr.deck) {
-        kr.deck = Object.keys(JOBS).filter(function (j) { return JOBS[j][0] === a; })
+        kr.deck = Object.keys(JOBS).filter(function (j) { return JOBS[j][0] === a && !isHiddenJob(j); })
             .sort(function () { return Math.random() - 0.5; });
     }
     // 넘겨 둔 것이 있으면(다시 들어와도) 그대로 보여 준다
@@ -952,7 +1001,7 @@ function gearLine(a, extra) {
 }
 
 // 직업 등급 — 아직 처음으로 안 돌아간 기록(stale)은 D 로 본다
-function gradeOf(u) { const k = u && u.kroom; return (k && !stale(k) && GRADES.indexOf(k.grade) >= 0) ? k.grade : 'D'; }
+function gradeOf(u) { const k = u && u.kroom; return (k && !stale(k) && (GRADES.indexOf(k.grade) >= 0 || k.grade === 'L')) ? k.grade : 'D'; }
 
 // ★ 고를 수 있는 등급 — decide 와 같은 문(Lv · 각성 절반)이되 Lv 에 흔들기(±3)를 안 넣는다.
 //   방장이 고르는 판(pickDun)이 쓴다. 들어갈 수 있는지 보는 것이라 늘 같은 답이어야 한다.
@@ -1106,9 +1155,15 @@ function enterDungeon(v) {
 }
 
 // 층마다 볼 것 — 공용 장면 4 + 직업 갈림길 1 (+ 마지막 층 끝에 보스)
+function kinOf(job) {
+    if (!isHiddenJob(job)) return [job];
+    const a = JOBS[job][0];
+    return Object.keys(JOBS).filter(function (j) { return JOBS[j][0] === a && !isHiddenJob(j); });
+}
 function plan() {
     const D = DATA.dun[kr.dun];
-    const pool = ((DATA.job[kr.job] || {})[DUNS[kr.dun].g] || []).filter(function (b) {
+    const gD = DUNS[kr.dun].g;
+    const pool = [].concat.apply([], kinOf(kr.job).map(function (j) { return ((DATA.job[j] || {})[gD] || []); })).filter(function (b) {
         return b.at === kr.dun || b.at === DUNS[kr.dun].g;
     });
     // 아직 안 본 갈림길부터 (저장해 둔 본 목록)
@@ -1116,7 +1171,7 @@ function plan() {
     pool.sort(function (a, b) { return (seen[a.t] ? 1 : 0) - (seen[b.t] ? 1 : 0) || (Math.random() - 0.5); });
     // ★ 직업 선택지 — 보통 장면마다 하나씩 붙인다 (이 판 안에서는 겹치지 않게 섞어 차례로)
     //   장면 원본은 건드리지 않는다 — 이 판의 몫만 얕게 베껴 선택지를 하나 더 단다.
-    const ops = (((DATA.opt[kr.job] || {})[DUNS[kr.dun].g]) || []).slice()
+    const ops = [].concat.apply([], kinOf(kr.job).map(function (j) { return ((DATA.opt[j] || {})[gD]) || []; }))
         .sort(function () { return Math.random() - 0.5; });
     let on = 0;
     const withJob = function (sc) {
@@ -1228,9 +1283,24 @@ window.kroomPick = function (i) {
     if (o.doom && jisanOn()) kr.truth = true;               // 🧧 죽을 길을 잡았다
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
+    // ★ 히든 직업 조건 — 갈림길을 겪은 수 (던전 등급마다) · 헬퍼 판은 안 센다
+    if (it.kind === 'j' && !isHelper()) {
+        const k = prof(); k.jx = k.jx || {};
+        const gD = DUNS[kr.dun].g;
+        k.jx[gD] = (k.jx[gD] || 0) + 1;
+        saveProf();
+    }
     const dice = `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
     if (ok) {
         darkRun.success++;
+        // ★ 히든 직업 조건 — 그 속성 직업의 임무(◇ 직업 선택지)를 해낸 수
+        if (o.job && !isHelper()) {
+            const k = prof(); k.hq = k.hq || {};
+            const a = JOBS[kr.job][0];
+            k.hq[a] = (k.hq[a] || 0) + 1;
+            saveProf();
+        }
+        try { hiddenCheck(); } catch (e) { }
         const got = reward(o.win, it.kind);
         let tail = got;
         if (o.wake && it.kind === 'j') tail += wakeUp();
@@ -1305,7 +1375,7 @@ function lossLine(lose) {
 function wakeUp() {
     const k = prof();
     const g = k.grade;
-    if (!WAKE_NEED[g]) return '';
+    if (!wakeNeed(k)) return '';
     if (isHelper()) return `<div style="font-size:11px; color:#81c784; margin-top:6px;">◇ 헬퍼 — 각성 점수는 쌓이지 않는다.</div>`;
     // ★ 각성은 **지금 등급의 던전**에서 한다 — D 던전에서 C 를 만들어야 C 던전이 열린다.
     //   (2026-10-17 사용자가 바꿈. 전에는 올라갈 등급의 던전에서만 했다)
@@ -1315,13 +1385,14 @@ function wakeUp() {
         return `<div style="font-size:11px; color:#888; margin-top:6px;">◇ 낮은 등급의 갈림길은 각성에 보태지지 않는다 — ${g} 등급 던전에서 각성한다.</div>`;
     }
     k.wake[g] = (k.wake[g] || 0) + 1;
-    const need = WAKE_NEED[g];
+    const need = wakeNeed(k);
     if (k.wake[g] < need) {
         saveProf();
         return `<div style="font-size:11px; color:#d4af37; margin-top:6px;">◇ 각성 ${k.wake[g]} / ${need}</div>`;
     }
     const from = jobName(k.job, g);
-    k.grade = GRADES[gi(g) + 1];
+    k.grade = NEXT_GRADE[g];
+    if (k.grade === 'L') { try { hiddenReachL(k); } catch (e) { } }
     const to = jobName(k.job, k.grade);
     addHistoryLog(me(), '[K 의 방] 각성 — ' + from + ' → ' + to + ' (' + k.grade + ')');
     saveProf();
@@ -2256,7 +2327,7 @@ function settle(how, txt) {
         `<div style="background:rgba(0,0,0,0.35); border:1px solid #23343b; border-radius:6px; padding:14px; font-size:12px; line-height:1.9; margin-bottom:14px;">
             <div style="font-weight:bold; color:#7fd3e6; margin-bottom:8px; border-bottom:1px dashed #2f4a55; padding-bottom:6px;">[정산]</div>
             ${kr.dun ? '던전 <b>' + esc(DUNS[kr.dun].n) + '</b> · Lv ' + kr.dunLv + '<br>' : ''}
-            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (WAKE_NEED[k.grade] ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + WAKE_NEED[k.grade] + ' · ' + k.grade + ' 던전에서)</span>' : '') + '<br>' : ''}
+            ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (wakeNeed(k) ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + wakeNeed(k) + ' · ' + (k.grade === 'S' && isHiddenJob(k.job) ? 'S' : k.grade) + ' 던전에서)</span>' : '') + '<br>' : ''}
             ${helper ? '<div style="color:#81c784; margin-bottom:6px;">헬퍼로 들어온 탐사입니다 — 경험치 · 꿈결 · 각성 점수 · 포인트를 받지 않고, 탐사 횟수도 줄지 않았습니다.</div>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
             Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
@@ -2327,6 +2398,323 @@ window.kroomFinish = function () {
 function show2(title, text, extra) { darkBodyEl().innerHTML = darkBox(title, text, extra || ''); }
 
 // ==========================================
+// 10. 히든 직업 — 조건 · 상담사 알림 · 금빛 카드 · L
+// ==========================================
+//   kroomHidden/<사번> = { state, code, name, no, attr, key, job, from, lv, jx, hq, at,
+//                          offeredAt, answeredAt, lAt }
+//     state  ready     조건을 다 채웠다 — 상담사에게 알림
+//            offered   상담사가 지정했다 — 다음에 K 의 방에 들어설 때 금빛 카드
+//            accepted  전직했다 (D 부터)          declined  사원이 거절했다
+//            denied    상담사가 주지 않기로 했다    L         히든 직업이 L 이 되었다
+const H_NODE = 'kroomHidden';
+let hMine = null, hMineRef = null, hMineCode = '';
+let hAll = {}, hAllOn = false;
+function hiddenProgress(k) {
+    k = k || prof();
+    const jx = k.jx || {}, hq = k.hq || {};
+    const a = (k.job && JOBS[k.job]) ? JOBS[k.job][0] : null;
+    return {
+        lv: k.lv || 1, grade: k.grade, attr: a,
+        jx: HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + (jx[g] || 0); }).join(' · '),
+        hq: a ? (hq[a] || 0) : 0,
+        ok: !!(k.job && !isHiddenJob(k.job) && (k.lv || 1) >= HIDDEN_NEED.lv && k.grade === HIDDEN_NEED.grade
+            && HIDDEN_NEED.jxGrades.every(function (g) { return (jx[g] || 0) >= HIDDEN_NEED.jx; })
+            && a && (hq[a] || 0) >= HIDDEN_NEED.hq)
+    };
+}
+// 조건을 다 채웠으면 한 번만 상담사에게 알린다
+function hiddenCheck() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code === ADMIN) return;
+    const k = prof(u);
+    if (k.hiddenAsk || !hiddenProgress(k).ok) return;
+    k.hiddenAsk = now();
+    saveProf();
+    const a = JOBS[k.job][0], key = hiddenKeyFor(a, u);
+    const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), attr: a, key: key,
+                    job: JOBS[key][2][0], from: jobName(k.job, k.grade), lv: k.lv, at: now(),
+                    jx: Object.assign({}, k.jx || {}), hq: (k.hq || {})[a] || 0 };
+    d.ref(H_NODE + '/' + u.code).transaction(function (cur) {
+        if (cur && cur.state) return;                 // 이미 적혀 있으면(거절 · 미지정 포함) 그대로
+        return entry;
+    }).catch(function () { });
+    addHistoryLog(u, '[K 의 방] 무언가가 당신을 지켜보기 시작했다.');
+    try { saveFields({ history: 1 }); } catch (e) { }
+}
+setInterval(function () { try { if (me() && !kr) hiddenCheck(); } catch (e) { } }, 20000);
+
+// 내 것 — 지정받았는지
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d) return;
+    if (hMineCode === u.code) return;
+    try { if (hMineRef) hMineRef.off(); } catch (e) { }
+    hMineCode = u.code; hMine = null;
+    hMineRef = d.ref(H_NODE + '/' + u.code);
+    hMineRef.on('value', function (s) { hMine = s.val() || null; });
+}, 1500);
+function hiddenOffered() {
+    const k = prof();
+    return !!(hMine && hMine.state === 'offered' && k && k.job && !isHiddenJob(k.job));
+}
+
+// 금빛 카드 — 『 선택받은 자여 전직하겠습니까? 』
+function hiddenCss() {
+    if (document.getElementById('khid-css')) return;
+    const st = document.createElement('style');
+    st.id = 'khid-css';
+    st.textContent = [
+        '#khid-ov{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;',
+        '  padding:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,rgba(58,40,8,.94) 0%,rgba(14,10,4,.97) 45%,rgba(3,2,8,.99) 80%);',
+        '  animation:khidFade 1.2s ease both;}',
+        '#khid-ov .khid-dust{position:absolute;bottom:-10px;width:3px;height:3px;border-radius:50%;background:#ffe9a8;',
+        '  box-shadow:0 0 6px #ffd76a,0 0 12px rgba(255,200,90,.6);opacity:0;animation:khidRise linear infinite;pointer-events:none;}',
+        '#khid-ov .khid-ring{position:absolute;width:330px;height:330px;border-radius:50%;top:50%;left:50%;margin:-215px 0 0 -165px;',
+        '  border:1px solid rgba(255,215,120,.18);box-shadow:0 0 60px rgba(255,200,80,.12) inset;animation:khidSpin 40s linear infinite;pointer-events:none;}',
+        '#khid-ov .khid-ring:after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px dashed rgba(255,215,120,.14);}',
+        '#khid-ov .khid-card{position:relative;width:168px;aspect-ratio:2/3;border-radius:14px;display:flex;flex-direction:column;',
+        '  align-items:center;justify-content:center;background:linear-gradient(155deg,#3d2c08 0%,#1b1304 52%,#2e2006 100%);',
+        '  border:2px solid #f5d27a;box-shadow:0 0 18px rgba(255,215,110,.75),0 0 60px rgba(255,200,80,.35),inset 0 0 24px rgba(255,220,140,.28);',
+        '  animation:khidIn 1.7s cubic-bezier(.2,.8,.2,1) both,khidGlow 2.8s ease-in-out 1.7s infinite;}',
+        '#khid-ov .khid-card:before{content:"";position:absolute;inset:7px;border-radius:9px;border:1px solid rgba(255,225,150,.38);}',
+        '#khid-ov .khid-card:after{content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;',
+        '  background:linear-gradient(115deg,transparent 32%,rgba(255,244,200,.42) 50%,transparent 68%);background-size:260% 100%;',
+        '  animation:khidSheen 3.6s ease-in-out 1.7s infinite;}',
+        '#khid-ov .khid-tag{position:absolute;top:16px;font-size:9px;letter-spacing:6px;color:#e3c172;}',
+        '#khid-ov .khid-ico{font-size:44px;color:#ffe7a3;text-shadow:0 0 14px #ffcf5a,0 0 30px rgba(255,190,60,.6);}',
+        '#khid-ov .khid-nm{margin-top:12px;font-size:20px;letter-spacing:5px;color:#fff3cf;text-shadow:0 0 10px rgba(255,210,100,.85);',
+        '  font-family:"Nanum Myeongjo","Noto Serif KR",serif;font-weight:bold;}',
+        '#khid-ov .khid-at{position:absolute;bottom:16px;font-size:10px;letter-spacing:3px;color:#cdaa5c;}',
+        '#khid-ov .khid-q{margin-top:30px;font-size:17px;letter-spacing:3px;color:#ffe9b0;text-align:center;line-height:1.7;',
+        '  text-shadow:0 0 12px rgba(255,200,90,.75);font-family:"Nanum Myeongjo","Noto Serif KR",serif;animation:khidFade 1.4s ease 1.3s both;}',
+        '#khid-ov .khid-note{margin-top:10px;font-size:11px;color:#b9a47b;text-align:center;line-height:1.7;animation:khidFade 1.4s ease 1.8s both;}',
+        '#khid-ov .khid-btns{display:flex;gap:10px;margin-top:22px;animation:khidFade 1.4s ease 2.2s both;}',
+        '#khid-ov .khid-btns button{padding:11px 22px;border-radius:999px;font-size:13px;cursor:pointer;font-family:inherit;}',
+        '#khid-ov .khid-yes{background:linear-gradient(145deg,#d8b252,#8f6c1e);color:#1d1404;font-weight:bold;border:1px solid #ffe08a;',
+        '  box-shadow:0 0 16px rgba(255,210,100,.55);}',
+        '#khid-ov .khid-no{background:rgba(0,0,0,.25);color:#a8977a;border:1px solid #5a4a2a;}',
+        '#khid-ov.done .khid-card{animation:khidBurst 1.2s ease both;}',
+        '@keyframes khidFade{from{opacity:0}to{opacity:1}}',
+        '@keyframes khidIn{0%{transform:translateY(40px) rotateY(180deg) scale(.55);opacity:0;filter:brightness(3)}',
+        '  55%{opacity:1}100%{transform:none;opacity:1;filter:none}}',
+        '@keyframes khidGlow{0%,100%{box-shadow:0 0 18px rgba(255,215,110,.75),0 0 60px rgba(255,200,80,.35),inset 0 0 24px rgba(255,220,140,.28)}',
+        '  50%{box-shadow:0 0 30px rgba(255,225,140,.95),0 0 100px rgba(255,205,90,.55),inset 0 0 34px rgba(255,230,160,.42)}}',
+        '@keyframes khidSheen{0%{background-position:160% 0}100%{background-position:-60% 0}}',
+        '@keyframes khidRise{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.95}100%{transform:translateY(-112vh) translateX(24px);opacity:0}}',
+        '@keyframes khidSpin{to{transform:rotate(360deg)}}',
+        '@keyframes khidBurst{0%{filter:brightness(1)}35%{filter:brightness(2.6);transform:scale(1.08)}100%{filter:brightness(1.2);transform:scale(1)}}'
+    ].join('\n');
+    document.head.appendChild(st);
+}
+function hiddenPopup(cont) {
+    const u = me(), k = prof(u);
+    const a = JOBS[k.job][0];
+    const key = hiddenKeyFor(a, u);
+    const H = JOBS[key];
+    hiddenCss();
+    const old = document.getElementById('khid-ov'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'khid-ov';
+    let dust = '';
+    for (let i = 0; i < 34; i++) {
+        dust += '<i class="khid-dust" style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-duration:'
+            + (6 + Math.random() * 9).toFixed(1) + 's;animation-delay:' + (Math.random() * 8).toFixed(1) + 's;"></i>';
+    }
+    ov.innerHTML = dust + '<div class="khid-ring"></div>'
+        + '<div class="khid-card"><div class="khid-tag">HIDDEN</div>'
+        + '<div class="khid-ico">' + ATTR[a].i + '</div>'
+        + '<div class="khid-nm">' + esc(H[2][0]) + '</div>'
+        + '<div class="khid-at">' + esc(ATTR[a].n) + '</div></div>'
+        + '<div class="khid-q">『 선택받은 자여 전직하겠습니까? 』</div>'
+        + '<div class="khid-note">전직하면 지금 직업(' + esc(jobName(k.job, k.grade)) + ' ' + k.grade + ')을 내려놓고<br>'
+        + esc(H[2][0]) + ' D 부터 다시 시작합니다. Lv 은 그대로입니다.</div>'
+        + '<div class="khid-btns"><button class="khid-no">거절한다</button><button class="khid-yes">전직한다</button></div>';
+    document.body.appendChild(ov);
+    let done = false;
+    const close = function () { setTimeout(function () { ov.remove(); if (typeof cont === 'function') cont(); }, 1900); };
+    ov.querySelector('.khid-yes').onclick = function () {
+        if (done) return; done = true;
+        const from = jobName(k.job, k.grade) + ' ' + k.grade;
+        k.job = key; k.grade = 'D'; k.wake = {}; k.peek = null;
+        k.hidden = { attr: a, at: now(), from: from };
+        saveProf();
+        addHistoryLog(u, '[K 의 방] ✦ 선택받았다 — ' + from + ' → ' + H[2][0] + ' D (히든 직업)');
+        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+        try { db_().ref(H_NODE + '/' + u.code).update({ state: 'accepted', answeredAt: now(), key: key, job: H[2][0] }); } catch (e) { }
+        if (hMine) hMine.state = 'accepted';
+        ov.classList.add('done');
+        ov.querySelector('.khid-q').innerHTML = '✦ ' + esc(H[2][0]) + ' D ✦';
+        ov.querySelector('.khid-note').innerHTML = '빛이 가라앉는다. 이름이 바뀌었다.';
+        ov.querySelector('.khid-btns').remove();
+        close();
+    };
+    ov.querySelector('.khid-no').onclick = function () {
+        if (done) return; done = true;
+        try { db_().ref(H_NODE + '/' + u.code).update({ state: 'declined', answeredAt: now() }); } catch (e) { }
+        if (hMine) hMine.state = 'declined';
+        addHistoryLog(u, '[K 의 방] 금빛 카드를 덮었다.');
+        try { saveFields({ history: 1 }); } catch (e) { }
+        ov.querySelector('.khid-card').style.transition = 'opacity 1.2s, transform 1.2s';
+        ov.querySelector('.khid-card').style.opacity = '0';
+        ov.querySelector('.khid-card').style.transform = 'rotateY(180deg) scale(.7)';
+        ov.querySelector('.khid-q').innerHTML = '카드가 빛을 거둔다.';
+        ov.querySelector('.khid-note').innerHTML = '';
+        ov.querySelector('.khid-btns').remove();
+        close();
+    };
+}
+window.kroomHiddenPreview = function () { hiddenPopup(null); };     // 상담사 — 카드 모양 보기 (아무것도 안 바뀐다 · 누르면 바뀐다)
+
+// L — 그에 맞는 물건은 추후
+function hiddenReachL(k) {
+    const u = me(), d = db_();
+    if (!u) return;
+    addHistoryLog(u, '[K 의 방] ✦ ' + jobName(k.job, 'L') + ' — L 에 닿았다.');
+    try { if (d) d.ref(H_NODE + '/' + u.code).update({ state: 'L', lAt: now(), key: k.job, job: jobName(k.job, 'L') }); } catch (e) { }
+}
+
+// ==========================================
+// 상담사 — 알림 · 통제 콘솔 「히든 직업 관리」
+// ==========================================
+function hSeen() { try { return JSON.parse(localStorage.getItem('kHiddenSeen') || '{}'); } catch (e) { return {}; } }
+function hSeenPut(m) { try { localStorage.setItem('kHiddenSeen', JSON.stringify(m)); } catch (e) { } }
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN || hAllOn) return;
+    hAllOn = true;
+    d.ref(H_NODE).on('value', function (s) {
+        hAll = s.val() || {};
+        const seen = hSeen(), news = [];
+        Object.keys(hAll).forEach(function (c) {
+            const v = hAll[c] || {};
+            if (v.state !== 'ready' && v.state !== 'L') return;
+            const id = c + ':' + v.state + (v.state === 'L' ? '' : ':' + v.at);   // L 은 한 사람에 한 번
+            if (seen[id]) return;
+            seen[id] = 1; news.push(v);
+        });
+        if (news.length) {
+            hSeenPut(seen);
+            const lines = news.map(function (v) {
+                return v.state === 'L'
+                    ? '✦ ' + v.name + ' 사원 — ' + v.job + ' L 달성 (그에 맞는 물건은 추후)'
+                    : '✦ ' + v.name + ' 사원' + (v.no ? ' (' + v.no + ')' : '') + ' — ' + (ATTR[v.attr] ? ATTR[v.attr].n : v.attr) + ' → ' + v.job;
+            });
+            try { showCustomAlert('히든 직업\n\n' + lines.join('\n') + '\n\n통제 콘솔 「히든 직업 관리」에서 정할 수 있습니다.'); } catch (e) { }
+        }
+        const wait = Object.keys(hAll).filter(function (c) { return (hAll[c] || {}).state === 'ready'; }).length;
+        const btn = document.getElementById('btn-admin-console');
+        if (btn && wait > 0) btn.classList.add('notify-dot');
+        try { hiddenPaint(); } catch (e) { }
+    });
+}, 1500);
+
+const H_STATE = {
+    ready: ['조건 달성 — 정해 주세요', '#ffd76a'], offered: ['지정함 — K 의 방에 들어서면 금빛 카드', '#c9a8ff'],
+    accepted: ['전직함', '#4CAF50'], declined: ['사원이 거절함', '#ff8a80'], denied: ['주지 않기로 함', '#888'], L: ['L 달성', '#ffe08a']
+};
+function hiddenPaint() {
+    const box = document.getElementById('admin-hidden-list');
+    if (!box) return;
+    const order = { ready: 0, L: 1, offered: 2, declined: 3, denied: 4, accepted: 5 };
+    const codes = Object.keys(hAll).sort(function (a, b) {
+        return (order[(hAll[a] || {}).state] || 9) - (order[(hAll[b] || {}).state] || 9) || ((hAll[b] || {}).at || 0) - ((hAll[a] || {}).at || 0);
+    });
+    if (!codes.length) {
+        box.innerHTML = '<div style="font-size:11px; color:#777; padding:8px 0;">아직 조건을 채운 사원이 없습니다.</div>';
+        return;
+    }
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    box.innerHTML = codes.map(function (c) {
+        const v = hAll[c] || {};
+        const st = H_STATE[v.state] || [v.state, '#aaa'];
+        const now_ = book[c] && book[c].kroom ? book[c].kroom : null;
+        const holders = Object.keys(hAll).filter(function (x) {
+            const w = hAll[x] || {}; return x !== c && w.key === v.key && (w.state === 'accepted' || w.state === 'L');
+        }).map(function (x) { return (hAll[x] || {}).name || x; });
+        let btns = '';
+        if (v.state === 'ready' || v.state === 'denied' || v.state === 'declined') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#c9a24a,#8a6a1e) !important; color:#1a1204 !important; border-color:#ffe08a !important;" onclick="kroomHiddenAct(\'' + c + '\',\'offer\')">'
+                + (v.state === 'ready' ? '지정한다' : '다시 지정한다') + '</button>';
+            if (v.state === 'ready') btns += '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomHiddenAct(\'' + c + '\',\'deny\')">주지 않는다</button>';
+        } else if (v.state === 'offered') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomHiddenAct(\'' + c + '\',\'withdraw\')">지정을 거둔다</button>';
+        }
+        return '<div style="border:1px solid #4a3a1a; border-radius:6px; padding:10px; margin-bottom:8px; background:rgba(255,215,110,.04);">'
+            + '<div style="display:flex; align-items:center; gap:6px; font-size:12px;"><b style="color:#fff;">' + esc(v.name || c) + '</b>'
+            + '<span style="font-size:10px; color:#888;">' + esc(v.no || c) + '</span>'
+            + '<span style="margin-left:auto; font-size:10px; color:' + st[1] + ';">' + esc(st[0]) + '</span></div>'
+            + '<div style="font-size:11px; color:#e3c172; margin-top:5px;">' + (ATTR[v.attr] ? ATTR[v.attr].i + ' ' + ATTR[v.attr].n : '') + ' → <b>' + esc(v.job || '') + '</b>'
+            + (v.from ? ' <span style="color:#888;">(지금 ' + esc(v.from) + ')</span>' : '') + '</div>'
+            + '<div style="font-size:10px; color:#999; margin-top:4px; line-height:1.6;">조건 당시 Lv ' + (v.lv || '-') + ' · 갈림길 '
+            + HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + ((v.jx || {})[g] || 0); }).join(' · ') + ' · 임무 ' + (v.hq || 0)
+            + (now_ && (v.state === 'accepted' || v.state === 'L') ? '<br>지금 ' + esc(jobName(now_.job, now_.grade)) + ' ' + esc(now_.grade || '') + ' · Lv ' + (now_.lv || '-') : '')
+            + (v.state === 'L' ? '<br><span style="color:#ffe08a;">L 에 맞는 물건은 아직 정하지 않았습니다.</span>' : '')
+            + (holders.length ? '<br><span style="color:#ff8a80;">이미 ' + holders.map(esc).join(', ') + ' 사원이 이 직업입니다.</span>' : '')
+            + '</div>'
+            + (btns ? '<div style="display:flex; gap:6px; margin-top:8px;">' + btns + '</div>' : '')
+            + '</div>';
+    }).join('');
+}
+window.kroomHiddenAct = function (code, act) {
+    const u = me(), d = db_();
+    if (!u || u.code !== ADMIN || !d) return;
+    const v = hAll[code]; if (!v) return;
+    let up = null;
+    if (act === 'offer') up = { state: 'offered', offeredAt: now(), offeredBy: u.code };
+    else if (act === 'deny') up = { state: 'denied', answeredAt: now() };
+    else if (act === 'withdraw') up = { state: 'ready', offeredAt: null };
+    if (!up) return;
+    d.ref(H_NODE + '/' + code).update(up).then(function () {
+        try {
+            showCustomAlert(act === 'offer' ? (v.name + ' 사원에게 ' + v.job + ' 을(를) 지정했습니다.\n\n다음에 K 의 방에 들어설 때 금빛 카드가 뜹니다.')
+                : act === 'deny' ? (v.name + ' 사원에게는 주지 않기로 했습니다.') : '지정을 거두었습니다.');
+        } catch (e) { }
+    }).catch(function (e) { try { showCustomAlert('적지 못했습니다.\n\n' + (e && e.message)); } catch (x) { } });
+};
+// 통제 콘솔에 칸을 끼워 넣는다
+(function hiddenPanel() {
+    function make() {
+        const scr = document.getElementById('admin-screen');
+        if (!scr || document.getElementById('admin-hidden-box')) return;
+        const anchor = scr.querySelector('.action-buttons');
+        const html = '<div class="admin-panel-box" id="admin-hidden-box" style="border-color:#c9a24a; background-color:#1a1406;">'
+            + '<h4 style="color:#ffe08a;">✦ 히든 직업 관리 (K 의 방)</h4>'
+            + '<div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.6;">'
+            + '조건 — Lv ' + HIDDEN_NEED.lv + ' · 직업 S · D~A 등급 던전마다 갈림길 ' + HIDDEN_NEED.jx + '번 · 그 속성 직업의 임무 ' + HIDDEN_NEED.hq + '번.<br>'
+            + '채운 사원이 여기에 뜹니다. 지정하면 그 사원이 K 의 방에 들어설 때 금빛 카드가 뜨고, 전직하면 D 부터 다시 시작합니다.'
+            + '</div><div id="admin-hidden-list"></div></div>';
+        if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
+        else scr.insertAdjacentHTML('beforeend', html);
+    }
+    const iv = setInterval(function () {
+        if (typeof openAdminScreen !== 'function') return;
+        if (openAdminScreen._kHidden) { clearInterval(iv); return; }
+        const _o = openAdminScreen;
+        const w = function () {
+            const r = _o.apply(this, arguments);
+            setTimeout(function () { make(); hiddenPaint(); }, 160);
+            return r;
+        };
+        Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
+        w._kHidden = true;
+        openAdminScreen = w; window.openAdminScreen = w;
+        clearInterval(iv);
+    }, 500);
+})();
+window.kroomHiddenState = function (who) {
+    const u = me(); if (!u) return;
+    if (!who) {
+        const p = hiddenProgress();
+        console.log('%c===== ✦ 히든 직업 — 내 조건 =====', 'color:#ffe08a; font-size:13px');
+        console.log('  Lv ' + p.lv + ' / ' + HIDDEN_NEED.lv + ' · 등급 ' + p.grade + ' / S · 갈림길 ' + p.jx + ' (각 ' + HIDDEN_NEED.jx + ') · 임무 ' + p.hq + ' / ' + HIDDEN_NEED.hq
+            + (p.ok ? ' — 다 채움' : ''));
+        console.log('  상태 :', hMine ? hMine.state : '없음');
+        return;
+    }
+    console.table(Object.keys(hAll).map(function (c) { const v = hAll[c]; return { 사원: v.name, 사번: v.no, 속성: v.attr, 직업: v.job, 상태: v.state }; }));
+};
+
+// ==========================================
 // 콘솔
 // ==========================================
 window.kroomState = function () {
@@ -2335,6 +2723,7 @@ window.kroomState = function () {
     console.log('  Lv ' + k.lv + ' (' + k.exp + ' / ' + needExp(k.lv) + ') · 꿈결 ' + k.dream + ' · 들어간 수 ' + (k.runs || 0));
     console.log('  직업 ' + (k.job ? jobName(k.job, k.grade) + ' ' + k.grade + ' — 각성 ' + JSON.stringify(k.wake) : '없음') + (k.rerolled ? ' · 다시 고르기 씀' : ''));
     console.log('  지금 든 팀 ' + liveTeams().length + ' / ' + MAX_TEAMS);
+    try { const hp = hiddenProgress(k); console.log('  히든 직업 조건 — Lv ' + hp.lv + '/' + HIDDEN_NEED.lv + ' · ' + hp.grade + '/S · 갈림길 ' + hp.jx + ' · 임무 ' + hp.hq + '/' + HIDDEN_NEED.hq + (hp.ok ? ' (다 채움)' : '')); } catch (e) { }
     const a = kAdds(u_kc());
     console.log('  오늘 횟수 — 쓴 ' + kUsed() + ' · 한도 ' + kLimit() + ' (기본 ' + K_TRY_BASE + ' + 얹는 몫 ' + a.add + ' → 최대 ' + K_TRY_HARD
         + (a.dna ? ' · 출산 고유 아이템 +' + a.dna : '') + ') · 남은 ' + kLeft() + (KC.ready ? '' : ' (서버 값 받는 중)'));
@@ -2350,13 +2739,16 @@ window.kroomGive = function (who, field, val) {
     else if (field === 'exp') k.exp = Math.max(0, Number(val) || 0);
     else if (field === 'dream') k.dream = Math.max(0, Number(val) || 0);
     else if (field === 'job') { if (val && !JOBS[val]) { console.warn('없는 직업 —', Object.keys(JOBS).join(' ')); return; } k.job = val || null; k.grade = 'D'; k.wake = {}; k.peek = null; }
-    else if (field === 'grade') { if (GRADES.indexOf(val) < 0) return; k.grade = val; }
+    else if (field === 'grade') { if (GRADES.indexOf(val) < 0 && !(val === 'L' && isHiddenJob(k.job))) return; k.grade = val; }
     else if (field === 'reroll') { k.rerolled = false; k.peek = null; }
-    else { console.warn('lv · exp · dream · job · grade · reroll'); return; }
+    else if (field === 'jx') { k.jx = k.jx || {}; HIDDEN_NEED.jxGrades.forEach(function (g) { k.jx[g] = Math.max(0, Number(val) || 0); }); }
+    else if (field === 'hq') { const a = (k.job && JOBS[k.job]) ? JOBS[k.job][0] : null; if (!a) { console.warn('직업이 없습니다.'); return; } k.hq = k.hq || {}; k.hq[a] = Math.max(0, Number(val) || 0); }
+    else if (field === 'hiddenAsk') { k.hiddenAsk = null; }
+    else { console.warn('lv · exp · dream · job · grade · reroll · jx · hq · hiddenAsk'); return; }
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
-window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+window.KROOM = { JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
