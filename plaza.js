@@ -2127,6 +2127,7 @@ function matesSheet() {
 function goMate(r) {
     const u = u_();
     if (!run || !r || !R[r.room]) return;
+    if (cageMine()) { closeSheet(); sysLine('🔒 가두리에 갇혀 있어 다른 곳으로 갈 수 없습니다.'); return; }
     closeSheet();
     census().then(function (cs) {
         if (!run) return;
@@ -2249,6 +2250,7 @@ function photoSheet(zone) {
 function goPhoto(zone, inst) {
     const u = u_();
     if (!run || !R[zone]) return;
+    if (cageMine()) { closeSheet(); sysLine('🔒 가두리에 갇혀 있어 다른 곳으로 갈 수 없습니다.'); return; }
     census().then(function (cs) {
         if (!run) return;
         if (zone === run.room && inst === run.inst) { closeSheet(); return; }
@@ -3155,6 +3157,10 @@ function pickMenu(m) {
     }
     const at = placeOf(m);
     if (!at) { goApp(m); return; }           // 자리가 없는 것은 바로 연다
+    // 🔒 갇혔으면 다른 방 · 다른 층의 시설로는 못 간다
+    if (cageMine() && (at.room !== run.room || (at.spot.lv || 0) !== (run.lv || 0))) {
+        closeSheet(); sysLine('🔒 가두리에 갇혀 있어 ' + m.n + '(으)로 갈 수 없습니다.'); return;
+    }
     closeSheet();
     if (at.room !== run.room) goRoom(at.room, null, at.spot.lv);
     else if (at.spot.lv != null && at.spot.lv !== run.lv) goRoom(at.room, null, at.spot.lv);
