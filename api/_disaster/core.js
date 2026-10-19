@@ -12,6 +12,7 @@
 // ■ 가드 — 탐사 중인 사원만 부를 수 있다
 //   · 그 재난의 사원(members)으로 들어와 있는 사번만
 //   · 시작은 방장만, 대기실 상태일 때만
+//   · 상담사가 닫아 둔 재난(disasterCfg/<재난>/open 이 아님)은 상담사가 방장일 때만 시작
 //   · 🎫 기록 소실 티켓 — 시작하는 순간 사원마다 한 장씩 서버가 직접 확인하고 뗀다
 //     (한 사람이라도 없으면 시작 못 함 · 진행자 부르기에 실패하면 돌려준다 · 상담사는 없어도 됨)
 //   · 장면마다 한 번만 (잠금 — 먼저 잡은 한 사람만 진행, 나머지는 409)
@@ -236,6 +237,8 @@ async function start(b, deps, db) {
     const codes = Object.keys(mem);
     if (!codes.length || codes.length > CFG.MAX_MEMBERS) throw new Fail(400, '사원 수가 맞지 않습니다.');
     if (!mem[b.code]) throw new Fail(403, '이 재난에 들어와 있는 사원만 부를 수 있습니다.');
+    const cfg = await db.get('disasterCfg/' + run.kind);
+    if (!(cfg && cfg.open === true) && run.leader !== CFG.ADMIN) throw new Fail(403, '지금은 닫혀 있는 재난입니다.');
     if (!(await takeLock(db, b.run, 0, now))) throw new Fail(409, '다른 사원이 이미 시작하는 중입니다.');
 
     let took = null;

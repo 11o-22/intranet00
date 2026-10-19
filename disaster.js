@@ -4,7 +4,14 @@
 // ==========================================
 //
 // ■ 어디서 들어가나
-//   어둠 탐사 → 「기록 소실」 칸 → [들어간다]   (🎫 기록 소실 티켓을 「사용」해도 열린다)
+//   광장 재난관리국 엘리베이터 → B2 「기록 소실」 (2026-10-19)
+//   🎫 기록 소실 티켓이 없으면 **아예 못 들어간다** (대기실 목록도 안 보인다).
+//   이미 들어가 있는 판(티켓을 뗀 뒤)은 티켓 없이도 다시 들어간다.
+//
+// ■ 상담사가 열고 닫는다
+//   상담사 콘솔 「📡 기록 소실」 칸 — disasterCfg/<재난>/open
+//   닫혀 있으면 상담사 말고는 못 들어간다 (서버도 시작을 막는다). 이미 진행 중인 판은 끝까지 간다.
+//   상담사는 닫혀 있어도 들어가 시험할 수 있고, 상담사가 연 방에는 다른 사원도 들어올 수 있다.
 //
 // ■ 한 판
 //   1. 대기실 — 한 사람이 방을 열고(방장) 최대 4명이 들어온다. 방장이 [시작한다].
@@ -36,6 +43,7 @@ const MAX_MEMBERS = 4, MAX_ROUNDS = 8;
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
 const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 이만큼 기다렸다가 (방장이 없을 때를 대비)
 const Z = 99999980;          // 알림창(99999999) · 팔레트(99999990)보다 아래
+const ADMIN = 'kario0987';
 const ST = { ok: '멀쩡', hurt: '다침', lost: '실종' };
 const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81' };
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
@@ -78,7 +86,10 @@ function now() { return Date.now() + off; }
         if (useInventoryItem._dz) { clearInterval(iv); return; }
         const _u = useInventoryItem;
         const w = function (itemName) {
-            if (itemName === DZ_TICKET) { open(); return; }            // 쓰는 것은 시작할 때 — 여기서는 안 뗀다
+            if (itemName === DZ_TICKET) {                                 // 쓰는 것은 시작할 때 — 여기서는 안 뗀다
+                alert_(DZ_TICKET + '\n\n재난관리국 지하 2층 「기록 소실」에서 씁니다.\n재난이 시작되는 순간 한 장이 사라집니다.');
+                return;
+            }
             return _u.apply(this, arguments);
         };
         Object.keys(_u).forEach(function (k) { try { w[k] = _u[k]; } catch (e) { } });
@@ -97,8 +108,6 @@ function now() { return Date.now() + off; }
     const s = document.createElement('style');
     s.id = 'dz-css';
     s.textContent = [
-        '#dz-panel{padding:18px 6px 10px;}',
-        '#dz-panel .dz-glitch{font-family:monospace;font-size:11px;color:#3a4a4a;letter-spacing:2px;text-align:center;line-height:2;margin-bottom:14px;}',
         '.dz-card{border:1px solid #2f5f60;border-radius:10px;background:linear-gradient(160deg,#0c1718,#0a0d10);padding:14px;}',
         '.dz-card-h{font-size:14px;color:#9fe3e3;font-weight:bold;margin-bottom:6px;letter-spacing:1px;}',
         '.dz-card-t{font-size:12px;color:#c9d6d6;line-height:1.8;margin-bottom:10px;}',
@@ -157,8 +166,27 @@ function now() { return Date.now() + off; }
 })();
 
 // ==========================================
-// 3. 기록 소실 칸
+// 3. 들어가는 문 — 열림 · 티켓
 // ==========================================
+let cfg = {};
+(function watchCfg() {
+    const iv = setInterval(function () {
+        const d = db_(); if (!d) return;
+        clearInterval(iv);
+        d.ref('disasterCfg').on('value', function (s) { cfg = s.val() || {}; if (ov) { lastInfo = ''; paint(); } paintAdmin(); });
+    }, 500);
+})();
+function isOpen() { return !!(cfg[KIND] && cfg[KIND].open); }
+function isAdm(u) { return !!(u && u.code === ADMIN); }
+// 들어갈 수 있나 — 상담사 · 이미 들어가 있는 판 · (열림 + 티켓)
+function gate(u, list) {
+    if (!u) return { ok: false, why: '' };
+    if (isAdm(u)) return { ok: true };
+    if (list && activeOf(list, u.code)) return { ok: true };
+    if (!isOpen()) return { ok: false, why: '기록 소실 — 지금은 열려 있는 재난이 없습니다.' };
+    if (!tickets(u)) return { ok: false, why: DZ_TICKET + '이 없으면 들어갈 수 없습니다.' };
+    return { ok: true };
+}
 function activeOf(all, code) {
     const ids = Object.keys(all || {}).filter(function (id) {
         const r = all[id];
@@ -169,50 +197,6 @@ function activeOf(all, code) {
     ids.sort(function (a, b) { return (all[b].createdAt || 0) - (all[a].createdAt || 0); });
     return ids[0] || null;
 }
-function paintPanel() {
-    const box = document.getElementById('dark-lost');
-    const u = me();
-    if (!box || !u) return;
-    let p = document.getElementById('dz-panel');
-    if (!p) {
-        const old = box.children[1];
-        p = document.createElement('div');
-        p.id = 'dz-panel';
-        if (old) box.replaceChild(p, old); else box.appendChild(p);
-    }
-    const n = tickets(u);
-    const draw = function (mine) {
-        p.innerHTML = '<div class="dz-glitch">■■■■■■■■■■<br>■■■&nbsp;&nbsp;복&nbsp;원&nbsp;&nbsp;■■■<br>■■■■■■■■■■</div>'
-            + '<div class="dz-card">'
-            + '<div class="dz-card-h">📡 ' + NAME + '</div>'
-            + '<div class="dz-card-t">새벽 3시 33분. 오래된 아파트 단지의 모든 스피커에서 같은 파형이 흘러나온다.<br>끝까지 들은 사람은 조금씩 박자에 맞춰진다.</div>'
-            + '<div class="dz-card-m">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장 · 시작할 때 사원마다 한 장<br>'
-            + '최대 ' + MAX_MEMBERS + '명 · 선택지 없이 대화로 진행 · 장면마다 90초 · 최대 ' + MAX_ROUNDS + '장면</div>'
-            + '<button class="dz-btn" onclick="disasterOpen()">' + (mine ? '이어서 들어간다' : '들어간다') + '</button>'
-            + '</div>';
-    };
-    draw(false);
-    const d = db_();
-    if (d) d.ref(ROOT).once('value').then(function (s) { if (activeOf(s.val() || {}, u.code)) draw(true); }).catch(function () { });
-}
-(function hookPanel() {
-    const iv = setInterval(function () {
-        if (typeof switchDarknessPanel !== 'function') return;
-        if (switchDarknessPanel._dz) { clearInterval(iv); return; }
-        const _s = switchDarknessPanel;
-        const w = function (panelId) {
-            const r = _s.apply(this, arguments);
-            if (panelId === 'dark-lost') { try { paintPanel(); } catch (e) { } }
-            return r;
-        };
-        Object.keys(_s).forEach(function (k) { try { w[k] = _s[k]; } catch (e) { } });
-        w._dz = true;
-        switchDarknessPanel = w; window.switchDarknessPanel = w;
-        clearInterval(iv);
-    }, 400);
-    setTimeout(function () { clearInterval(iv); }, 40000);
-})();
-
 // ==========================================
 // 4. 창
 // ==========================================
@@ -225,6 +209,7 @@ function open() {
     const u = me(), d = db_();
     if (!u || !d) return;
     if (ov) return;
+    lastInfo = ''; lastR = -1; msg = '';                       // 새 창 — 지난번 그린 것을 잊는다
     ov = document.createElement('div');
     ov.id = 'dz-ov';
     ov.innerHTML = '<div id="dz-head"><span class="t">📡 ' + NAME + '</span><span class="n" id="dz-n"></span>'
@@ -245,7 +230,18 @@ function open() {
     tick = setInterval(onTick, 1000);
     paint();
 }
-window.disasterOpen = open;
+// 엘리베이터 B2 · 콘솔 — 문을 지나서 연다
+function enter() {
+    const u = me(), d = db_();
+    if (!u || !d) return;
+    d.ref(ROOT).once('value').then(function (s) {
+        const g = gate(u, s.val() || {});
+        if (!g.ok) { alert_('🔒 ' + g.why); return; }
+        open();
+    }).catch(function () { alert_('기록을 불러오지 못했습니다.'); });
+}
+window.disasterLost = enter;
+window.disasterOpen = enter;
 
 function close() {
     const u = me(), r = curId && all[curId];
@@ -259,7 +255,6 @@ function close() {
     clearInterval(tick); tick = 0;
     if (ov) ov.remove();
     ov = null; curId = null; chatLines = []; msg = '';
-    try { if (document.getElementById('dark-lost')) paintPanel(); } catch (e) { }
 }
 
 // 오래된 판 치우기 (누가 열든 같이 치운다)
@@ -368,13 +363,19 @@ function paint() {
 
 function lobbyList(u) {
     const t = now();
+    const g = gate(u, all);
+    if (!g.ok) return '<div class="dz-err" style="margin-top:20px;">🔒 ' + esc(g.why) + '</div>';
+    const shut = !isOpen();
     const ids = Object.keys(all).filter(function (id) {
         const r = all[id];
-        return r && r.kind === KIND && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL;
+        return r && r.kind === KIND && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL
+            && (!shut || free || r.leader === ADMIN);
     }).sort(function (a, b) { return (all[a].createdAt || 0) - (all[b].createdAt || 0); });
     const n = tickets(u);
+    const free = isAdm(u);                                   // 상담사는 티켓 없이 · 닫혀 있어도
     let h = '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
-        + (n ? '' : ' — 티켓이 있어야 방을 열거나 들어갈 수 있습니다.') + '</div>';
+        + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '') + '</div>';
+    if (shut) h += '<div class="dz-err">🔒 닫혀 있습니다 — 상담사만 들어가 시험할 수 있습니다. (상담사가 연 방에는 다른 사원도 들어옵니다)</div>';
     h += '<div class="dz-sec">열려 있는 방</div>';
     if (!ids.length) h += '<div class="dz-card-m">열려 있는 방이 없습니다.</div>';
     ids.forEach(function (id) {
@@ -382,9 +383,9 @@ function lobbyList(u) {
         const full = cs.length >= MAX_MEMBERS;
         h += '<div class="dz-row"><div class="w">' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + cs.length + ' / ' + MAX_MEMBERS + '</i><br>'
             + '<i>' + cs.map(function (c) { return esc(m[c].n || c); }).join(' · ') + '</i></div>'
-            + '<button data-join="' + esc(id) + '"' + ((full || !n || busy) ? ' disabled' : '') + '>' + (full ? '가득 참' : '들어간다') + '</button></div>';
+            + '<button data-join="' + esc(id) + '"' + ((full || (!n && !free) || busy) ? ' disabled' : '') + '>' + (full ? '가득 참' : '들어간다') + '</button></div>';
     });
-    h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + ((!n || busy) ? ' disabled' : '') + '>새로 연다</button></div>';
+    h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + (((!n && !free) || busy) ? ' disabled' : '') + '>새로 연다</button></div>';
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
     return h;
 }
@@ -489,19 +490,21 @@ function prof(u) {
 function make() {
     const u = me(), d = db_();
     if (!u || !d || busy) return;
-    if (!tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
+    if (!isAdm(u) && !tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
+    if (!isAdm(u) && !isOpen()) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
     if (activeOf(all, u.code)) return;
     busy = true;
     const ref = d.ref(ROOT).push();
     const m = {}; m[u.code] = prof(u);
     ref.set({ kind: KIND, state: 'LOBBY', leader: u.code, createdAt: now(), members: m })
-        .then(function () { busy = false; msg = ''; })
+        .then(function () { busy = false; msg = ''; lastInfo = ''; paint(); })
         .catch(function () { busy = false; msg = '방을 열지 못했습니다.'; lastInfo = ''; paint(); });
 }
 function join(id) {
     const u = me(), d = db_();
     if (!u || !d || busy || !id) return;
-    if (!tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
+    if (!isAdm(u) && !tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
+    if (!isAdm(u) && !isOpen() && (all[id] || {}).leader !== ADMIN) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
     busy = true;
     const p = prof(u);
     d.ref(ROOT + '/' + id).transaction(function (r) {
@@ -513,8 +516,9 @@ function join(id) {
         return r;
     }).then(function (res) {
         busy = false;
-        if (!res || !res.committed) { msg = '들어가지 못했습니다. (가득 찼거나 이미 시작한 방)'; lastInfo = ''; paint(); }
+        if (!res || !res.committed) msg = '들어가지 못했습니다. (가득 찼거나 이미 시작한 방)';
         else msg = '';
+        lastInfo = ''; paint();
     }).catch(function () { busy = false; msg = '들어가지 못했습니다.'; lastInfo = ''; paint(); });
 }
 function leave() {
@@ -530,7 +534,8 @@ function leave() {
         if (r.leader === u.code) r.leader = left[0];
         r.members = m;
         return r;
-    }).then(function () { busy = false; msg = ''; }).catch(function () { busy = false; });
+    }).then(function () { busy = false; msg = ''; lastInfo = ''; paint(); })
+      .catch(function () { busy = false; lastInfo = ''; paint(); });
 }
 
 function post(body) {
@@ -602,6 +607,54 @@ function onTick() {
     });
 }
 
+// ==========================================
+// 8. 상담사 콘솔 — 📡 기록 소실 (열고 닫기)
+// ==========================================
+const BOX = 'admin-disaster-box';
+function paintAdmin() {
+    const box = document.getElementById(BOX);
+    if (!box) return;
+    const o = isOpen(), c = cfg[KIND] || {};
+    const at = c.at ? new Date(c.at) : null;
+    const h = '<div style="display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid #24393a; border-radius:7px; background:rgba(255,255,255,.03);">'
+        + '<span style="font-size:12px; color:#bff0f0;">📡 ' + NAME + '</span>'
+        + '<span style="font-size:11px; color:' + (o ? '#9fd8a4' : '#ff9aa8') + ';">' + (o ? '열림' : '닫힘') + '</span>'
+        + (at ? '<span style="font-size:9px; color:#667;">' + (at.getMonth() + 1) + '/' + at.getDate() + ' ' + String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0') + '</span>' : '')
+        + '<button class="game-btn" style="margin:0 0 0 auto; padding:6px 12px; font-size:11px;" onclick="disasterToggle(\'' + KIND + '\')">' + (o ? '닫는다' : '연다') + '</button></div>'
+        + '<div style="font-size:10px; color:#888; margin-top:8px; line-height:1.6;">닫혀 있으면 상담사 말고는 못 들어갑니다. 진행 중인 판은 끝까지 갑니다.</div>';
+    const body = box.querySelector('.dz-adm');
+    if (body && body._h !== h) { body.innerHTML = h; body._h = h; }
+}
+window.disasterToggle = function (kind) {
+    const u = me(), d = db_();
+    if (!isAdm(u) || !d) return;
+    const o = !!(cfg[kind] && cfg[kind].open);
+    d.ref('disasterCfg/' + kind).set({ open: !o, at: Date.now(), by: u.code });
+};
+function makeAdmin() {
+    if (!isAdm(me())) return;
+    const scr = document.getElementById('admin-screen');
+    if (!scr || document.getElementById(BOX)) return;
+    const anchor = scr.querySelector('.action-buttons');
+    const html = '<div class="admin-panel-box" id="' + BOX + '" style="border-color:#2f5f60; background-color:#0b1516;">'
+        + '<h4 style="color:#9fe3e3;">📡 기록 소실 — 재난</h4><div class="dz-adm"></div></div>';
+    if (anchor) anchor.insertAdjacentHTML('beforebegin', html); else scr.insertAdjacentHTML('beforeend', html);
+    paintAdmin();
+}
+(function hookAdmin() {
+    const iv = setInterval(function () {
+        if (typeof openAdminScreen !== 'function') return;
+        if (openAdminScreen._dz) { clearInterval(iv); return; }
+        const _o = openAdminScreen;
+        const w = function () { const r = _o.apply(this, arguments); setTimeout(makeAdmin, 220); return r; };
+        Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
+        w._dz = true;
+        openAdminScreen = w; window.openAdminScreen = w;
+        clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 window.disasterState = function () {
     const r = curId && all[curId];
     console.log('%c===== 📡 재난 =====', 'color:#9fe3e3; font-size:13px');
@@ -612,6 +665,6 @@ window.disasterState = function () {
     console.log('  내 티켓:', tickets(me()));
 };
 
-console.log('[재난] 기록 소실 · 📡 ' + NAME + ' — disasterOpen() · disasterState()');
+console.log('[재난] 재난관리국 B2 기록 소실 · 📡 ' + NAME + ' — disasterOpen() · disasterState() · 상담사 disasterToggle(\'wave\')');
 
 })();

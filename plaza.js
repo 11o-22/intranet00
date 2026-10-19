@@ -253,10 +253,11 @@ const PLAZA = {
                   stairs: [ { x: [105, 555],   y0: [890, 1247], y1: [920, 1277] },
                             { x: [1325, 1775], y0: [1247, 890], y1: [1277, 920] } ],
                   down: { to: 'gate', x: [780, 1120] },
-                  // 2F 사택 · 1F 로비 · B1 재난 탐사 로비
+                  // 2F 사택 · 1F 로비 · B1 재난 탐사 로비 · B2 기록 소실 (disaster.js — 티켓이 있어야 들어간다)
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           // ✗ 「파티」는 뺐다 (2026-10-16)
-                          b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ] },
+                          b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ],
+                          b2: [ { n: '기록 소실', ic: 'dark', fn: 'disasterLost' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
@@ -3148,7 +3149,8 @@ function menuSheet() {
 //   층에 든 것이 하나면 바로 들어가고, 둘이면 그 층의 것만 다시 묻는다.
 //   1F 는 지금 서 있는 데라 그냥 닫는다.
 // ==========================================
-const LIFT_HIT = { f2: [0.255, 0.415], f1: [0.445, 0.605], b1: [0.635, 0.795] };
+// ★ 2026-10-19 — 그림에 B2 단추를 하나 더 그려 넣어 키가 676 → 801 로 늘었다. 칸 자리도 그에 맞춰 다시 쟀다.
+const LIFT_HIT = { f2: [0.215, 0.350], f1: [0.376, 0.511], b1: [0.536, 0.671], b2: [0.692, 0.827] };
 
 function liftSheet(floor) {
     const r = roomOf();
