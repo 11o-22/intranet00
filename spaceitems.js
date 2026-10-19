@@ -45,6 +45,14 @@
 //       · 장착형은 24시간 뒤 사라진다
 //   원본은 그대로 남는다. 복사기도 안 없어진다.
 //
+//   ★ 소속은 묻지 않는다 (2026-10-19)
+//     복사기의 조건은 「우주 쇼핑몰 물품을 하루 두 개 · 절반 · 장착형은 하루」뿐이고,
+//     고르는 목록도 소속을 가리지 않고 우주 쇼핑몰 것을 전부 보여 준다. 그런데 쓰는
+//     자리에서는 원본의 소속 제한(canWearItem — 꿈결 수집기는 백일몽)이 그대로 걸려,
+//     다른 소속이 베낀 꿈결 수집기는 「소속이 맞지 않습니다」로 끝내 못 찼다.
+//     그래서 복제품을 쓰는 동안(본인 · 남에게)만 소속 제한을 건너뛴다.
+//     성별 · 물약 같은 몸의 조건은 그대로 본다.
+//
 //   효과를 절반으로 만드는 방법은 addTimedEffect 의 시간을 반으로 줄이는
 //   것이다. 그래서 「시간으로 재는 효과」는 전부 절반이 되지만, 시간이
 //   아닌 것(한 번 쓰고 끝나는 포인트 지급 같은 것)은 원본과 같이 돈다.
@@ -432,6 +440,18 @@ function copierMake(real) {
         + copyLeft(currentUser) + ' / ' + COPY_PER_DAY);
 }
 
+// 복제품을 쓰는 동안만 — 소속 제한을 건너뛴다 (위 머리말)
+function copyFree(real, label, fn) {
+    if (typeof canWearItem !== 'function') return fn();
+    const _cw = canWearItem;
+    canWearItem = function (u, n) {
+        if (n === real || n === label) return true;
+        return _cw.apply(this, arguments);
+    };
+    try { return fn(); }
+    finally { canWearItem = _cw; }
+}
+
 // --- 복사기와 복제품 쓰기 ---
 (function useCopy() {
     const iv = setInterval(function () {
@@ -555,7 +575,8 @@ function copierMake(real) {
             //   「원본 대신 복제품을 뺀다」도 안 걸린다. 그래서 아무 일도 안 났다.
             window._invOk = real;
 
-            try { _u.call(this, real); }
+            const self = this;
+            try { copyFree(real, itemName, function () { return _u.call(self, real); }); }
             finally { back(); addTimedEffect = _ate; removeItemFromInventory = _rm; window._invOk = null; }
 
             // 창이 안 떴다면(바로 끝났다면) 표를 지운다
@@ -616,7 +637,8 @@ function copierMake(real) {
                 return _ate.call(this, u, COPY_TAG + n, (d || '') + ' (절반)', Math.max(0.5, (h || 0) / 2));
             };
             let out;
-            try { out = _a.call(this, target, real, isOthers); }
+            const self = this;
+            try { out = copyFree(real, itemName, function () { return _a.call(self, target, real, isOthers); }); }
             finally { addTimedEffect = _ate; }
             if (out === false) return false;
 
