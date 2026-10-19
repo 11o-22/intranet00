@@ -178,8 +178,23 @@ const DOT = {
     //   sit    윗줄(앉기) 한 칸에 머무는 시간 — 한 번만 지나간다
     //   loop   아랫줄(앉아 있기) 한 칸에 머무는 시간 — 계속 돈다
     //   움직이면 바로 원래 모습으로 돌아온다.
-    IDLE: { sheet: 'sit-swing', head: 'h10', outer: 'ksuit', nos: ['0000', '8449'],
-            after: 10000, sit: 170, loop: 300 },
+    //
+    // ★ 대기모션 2 — 드레스 (2026-10-19). 같은 두 사람 · 같은 얼굴(h10) · 겉옷이 드레스일 때.
+    //   주신 그림은 여섯 장으로 나뉘어 있다 (아래부터 몸 · 드레스 · 그네 · 면사포 · 손 · 반짝이).
+    //   칸 288 → 352 로 넓히며 가로 +30 (다른 옛 규격 그림과 같다 · 얼굴이 h10 서기와 딱 겹친다).
+    //   물들이기 — 드레스 장은 **입은 드레스 색**을 그대로 따른다.
+    //              그네 · 면사포는 대기 동작 몫으로 따로 물들인다 (옷장 · 팔레트에 「대기 동작」 알로 뜬다).
+    //              면사포는 따로 안 물들였으면 쓰고 있는 면사포 악세 색을 따른다.
+    //   sheets 의 줄마다 [장, 색 열쇠…] — 색 열쇠를 앞에서부터 보고 처음 적힌 색을 쓴다.
+    IDLES: [
+        { id: 'swing', sheets: [['sit-swing']], head: 'h10', outer: 'ksuit', nos: ['0000', '8449'],
+          after: 10000, sit: 170, loop: 300 },
+        { id: 'swing-dress', head: 'h10', outer: 'dress', nos: ['0000', '8449'],
+          sheets: [['idle2-body'], ['idle2-dress', 'dress'], ['idle2-swing', 'idle2-swing'],
+                   ['idle2-veil', 'idle2-veil', 'veil'], ['idle2-hand'], ['idle2-fx']],
+          dye: [{ sheet: 'idle2-swing', name: '그네' }, { sheet: 'idle2-veil', name: '면사포' }],
+          after: 10000, sit: 170, loop: 300 }
+    ],
 };
 
 // 머리 — 이름은 제가 보고 붙인 것입니다. 파일명이 제 쪽으로 안 와서,
@@ -480,20 +495,33 @@ function wrap(n, len) { return ((n % len) + len) % len; }
 
 // ★ 가만히 서 있을 때 틀 동작 — 없으면 null
 //   남(광장의 다른 사람)은 자리 기록에 사번이 안 실려 오므로 사원 명부(db.users)에서 찾는다.
+//   돌려주는 것 — { m: 그 동작(D.IDLES 한 줄), layers: [{ s: 장, hue: 색 }] }
 function idleOf(user, L) {
-    const I = D.IDLE;
-    if (!I || !user || !L) return null;
+    const list = D.IDLES || [];
+    if (!list.length || !user || !L) return null;
     let no = noOf(user);
     if (!no && user.code) {
         try { const x = (typeof db !== 'undefined' && db.users) ? db.users[user.code] : null; no = noOf(x); } catch (e) { }
     }
     if (!no) return null;
     const p = no.length < 4 ? ('0000' + no).slice(-4) : no;
-    if (I.nos.indexOf(no) < 0 && I.nos.indexOf(p) < 0) return null;
-    if (L.head !== I.head || (L.pick || {}).outer !== I.outer) return null;
-    return I.sheet;
+    const col = L.col || {};
+    for (let i = 0; i < list.length; i++) {
+        const I = list[i];
+        if (I.nos.indexOf(no) < 0 && I.nos.indexOf(p) < 0) continue;
+        if (L.head !== I.head || (L.pick || {}).outer !== I.outer) continue;
+        return {
+            m: I,
+            layers: I.sheets.map(function (row) {
+                let hue = null;
+                for (let j = 1; j < row.length; j++) { if (col[row[j]] != null && col[row[j]] !== '') { hue = col[row[j]]; break; } }
+                return { s: row[0], hue: hue };
+            })
+        };
+    }
+    return null;
 }
-window.dotIdleOf = function (user) { return idleOf(user, look(user, null, true)); };
+window.dotIdleOf = function (user) { const r = idleOf(user, look(user, null, true)); return r ? r.m.id : null; };
 function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i === id; }); return k < 0 ? 0 : k; }
 
 // ==========================================
@@ -589,6 +617,15 @@ function wornParts(user) {
         });
     });
     out.sort(function (a, b) { return order.indexOf(a.sheet) - order.indexOf(b.sheet); });
+    // ★ 대기 동작에만 나오는 장(그네 · 면사포) — 그 동작이 나오는 사람에게만 알을 더 붙인다
+    try {
+        const idl = idleOf(u, L);
+        ((idl && idl.m.dye) || []).forEach(function (x) {
+            if (seen[x.sheet]) return;
+            seen[x.sheet] = 1;
+            out.push({ sheet: x.sheet, slot: '대기 동작', name: x.name + ' (대기 동작)', keep: '', hue: (L.col || {})[x.sheet] });
+        });
+    } catch (e) { }
     return out;
 }
 window.dotWornParts = wornParts;
@@ -757,21 +794,27 @@ function actor(user, opt) {
     const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
     const flaps = flapsOf(els, sheets);
 
-    // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLE) — 해당하는 사람만 한 장을 더 깔아 둔다
-    const idleSheet = (o.idle === false) ? null : idleOf(user, L);
-    let idleEl = null, idleOn = false, idleWait = 0, idleT = 0;
-    if (idleSheet) {
-        idleEl = layer(idleSheet, k);
-        idleEl.dataset.idle = '1';
-        idleEl.style.display = 'none';
-        box.appendChild(idleEl);
+    // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다
+    //   (한 장짜리도, 여러 장을 겹친 것도 있다 — 아래 장부터 차례로 깐다)
+    const idl = (o.idle === false) ? null : idleOf(user, L);
+    const IM = idl ? idl.m : null;
+    let idleEl = null, idleEls = [], idleOn = false, idleWait = 0, idleT = 0;
+    if (idl) {
+        idleEls = idl.layers.map(function (x) {
+            const e = layer(x.s, k, x.hue);
+            e.dataset.idle = '1';
+            e.style.display = 'none';
+            box.appendChild(e);
+            return e;
+        });
+        idleEl = idleEls[0];
     }
     const idleOff = function () {
         if (idleWait) { clearTimeout(idleWait); idleWait = 0; }
         if (idleT) { clearInterval(idleT); idleT = 0; }
         if (!idleOn) return;
         idleOn = false;
-        idleEl.style.display = 'none';
+        idleEls.forEach(function (e) { e.style.display = 'none'; });
         els.forEach(function (e) { e.style.display = ''; });
     };
     const idleGo = function () {
@@ -782,15 +825,14 @@ function actor(user, opt) {
         crowdOut(member);
         idleOn = true;
         els.forEach(function (e) { e.style.display = 'none'; });
-        idleEl.style.display = '';
+        idleEls.forEach(function (e) { e.style.display = ''; put(e, 0, 0); });
         let f = 0, row = 0;
-        put(idleEl, 0, 0);
-        const I = D.IDLE;
+        const I = IM;
         const step = function () {
             f++;
             if (row === 0 && f > 5) { row = 1; f = 0; clearInterval(idleT); idleT = setInterval(step, I.loop); }
             else if (row === 1) f = f % 6;
-            put(idleEl, f, row);
+            idleEls.forEach(function (e) { put(e, f, row); });
         };
         idleT = setInterval(step, I.sit);
     };
@@ -833,7 +875,7 @@ function actor(user, opt) {
     const start = function () {
         clear();
         if (held) return;                                   // 안 보이는 동안은 그대로 둔다
-        if (idleEl && !walking) idleWait = setTimeout(idleGo, D.IDLE.after);
+        if (idleEl && !walking) idleWait = setTimeout(idleGo, IM.after);
         if (walking) {
             let f = 0;
             els.forEach(function (e) { put(e, 0, 0); });
