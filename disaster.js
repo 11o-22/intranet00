@@ -52,6 +52,7 @@ const ROOT = 'disaster', CHAT = 'disasterChat';
 const KIND = 'wave', GRADE = '파형(破刑)', NAME = '『 3시 33분 방송국 』';
 const SURVIVE = 1, GEAR_MAX = 3;
 const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
+const HOST_NOTE = '심야 토크쇼의 사회자가 없으면 <b style="color:#ff9aa8;">1장면부터</b> 죽을 수 있고 판정이 더 어려워집니다.';
 const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 <b style="color:#e8c27a;">300,000 P</b> · 선생님 · 이사팀 <b style="color:#e8c27a;">150,000 P</b> · '
     + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">150,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
@@ -448,7 +449,7 @@ function intro() {
         + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + SURVIVE + '%</b>'
         + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)'
         + ' · ' + MAX_ROUNDS + '장면</div>'
-        + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + REWARD + '</div></div>';
+        + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + REWARD + '<br>' + HOST_NOTE + '</div></div>';
 }
 
 // 들고 갈 수 있는 장비 — 장착 중 · 소지품의 장비 · 전용 장비 (성적인 것 빼고)
@@ -548,6 +549,10 @@ function play(r, u) {
     }
     if (r.last && Number(r.last.n) === n - 1 && r.last.surge) {
         h += '<div class="dz-card-m" style="color:#ff9aa8;">귀빈이 빠진 자리 — 방송국이 사나워졌습니다. 남은 사람의 판정 난이도 +' + r.last.surge + '</div>';
+    }
+    if (r.last && Number(r.last.n) === n - 1 && r.last.nohost) {
+        h += '<div class="dz-card-m" style="color:#ff9aa8;">심야 토크쇼의 사회자가 없습니다 — 방송국이 처음부터 사람을 먹습니다.'
+            + (r.last.nohost > 1 ? ' (판정 난이도 +' + r.last.nohost + ')' : '') + '</div>';
     }
     const x = (r.members || {})[u.code] || {}, st = x.st || 'ok';
     if (st === 'out') {

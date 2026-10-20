@@ -33,6 +33,7 @@
 //   · 장면 수 d.rounds · d.safe 장면까지는 아무도 죽지 않는다(다침이 끝) · 그 뒤로는 행동에 따라 죽는다
 //     d.min 장면 전에는 끝나지 않는다 (모두 죽거나 나가면 끝) · 그 뒤로는 위험 판정이 없던 사람에게도
 //     방송국이 덮친다 (d.final — 귀빈 · 예외 · 관리자 빼고)
+//   · 심야 토크쇼의 사회자가 판에 없으면 (처음부터 · 나감 · 죽음) d.noHost — 안 죽는 장면을 줄이고 난이도를 올린다
 //   · 죽는 방식 — 진행자가 사람마다 한 줄 (fates → members/<사번>/fate)
 //   · 끝나면 disasterPay/<사번>/<판> 에 몫을 적는다 — 살아남은 사람 포인트(payOf) · 죽은 사람 이송. 화면(disaster.js)이 한 번만 받는다
 //   · 표식 — 특별한 커스텀 장비를 찬 사람은 괴담이 노리거나 · 끌어들이려 하거나 · 경외한다 (lore.js SIGILS · 기능은 못 씀)
@@ -514,7 +515,7 @@ export function judge(acts, mem, rand, opt) {
 function checkLine(c, d) {
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)';
     let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
-        + (c.plus ? ' — 귀빈이 빠져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → '
+        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
@@ -591,12 +592,16 @@ async function round(b, deps, db) {
 
         // ② 판정 — 코드가 정한다
         const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
-        const SAFE = Number(D.safe) || 0;                           // 이 장면까지는 아무도 죽지 않는다
+        // 심야 토크쇼의 사회자가 판에 있나 (홀로 나갔거나 죽었으면 없는 것)
+        const hostHere = Object.keys(memNow).some((c) => memNow[c].host && !gone(memNow[c].st || 'ok'));
+        const NH = (!hostHere && D.noHost) ? D.noHost : null;
+        const SAFE = NH ? (Number(NH.safe) || 0) : (Number(D.safe) || 0);   // 이 장면까지는 아무도 죽지 않는다
+        const nhPlus = NH ? (Number(NH.plus) || 0) : 0;
         const MIN = Number(D.min) || 0;                             // 이 장면 전에는 끝나지 않는다
         const safeNow = n <= SAFE;
         const finalNow = !!(D.final && MIN && n > MIN);             // 그 뒤로는 방송국이 덮친다
         const J = judge(acts, memNow, deps.rand, {
-            dc: D.dc, plus: (c) => (surge && surgeHits(memNow[c].role) ? surge : 0), safe: safeNow,
+            dc: D.dc, plus: (c) => (surgeHits(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow,
             forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => surgeHits(memNow[c].role)) }, D.final) : null });
         const lostNew = Object.keys(J.st).filter((c) => J.st[c] === 'lost' && (memNow[c].st || 'ok') !== 'lost');   // 이번에 죽은 사람
         const active = Object.keys(J.st).filter((c) => !gone(J.st[c]) && memNow[c].role !== 'admin');   // 아직 재난 안에서 움직이는 사람 (관리자 빼고)
@@ -621,6 +626,8 @@ async function round(b, deps, db) {
                     + ' — 귀빈실을 거쳐 방송국을 빠져나간다. 그 자리가 빈 순간부터 방송국이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
                 ...(surge ? ['[방송국의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
                 '[이번 장면 ' + n + '/' + ROUNDS + '] ' + (scene.title || ''), scene.text || '', '',
+                ...(NH ? ['[사회자가 없다] 이 판에는 심야 토크쇼의 사회자가 없다 — 방송국을 붙잡아 둘 사람이 없어 처음부터 끝까지 사람을 먹는다.'
+                    + (nhPlus ? ' (남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + nhPlus + ')' : ''), ''] : []),
                 ...((SAFE || MIN) ? [safeNow
                     ? '[흐름] ' + SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓으며 판을 깐다.'
                     : (finalNow
@@ -666,7 +673,7 @@ async function round(b, deps, db) {
 
         const up = { err: null,
                      last: { n: n, title: clip(scene.title, 80), result: clip(out.result, 1500), checks: J.checks,
-                             out: outNow.length ? outNow : null, surge: surge || null } };
+                             out: outNow.length ? outNow : null, surge: surge || null, nohost: NH ? (nhPlus || 1) : null } };
         up['history/' + n] = { title: clip(scene.title, 80), text: clip(scene.text, 1500), result: clip(out.result, 1500) };
         Object.keys(J.st).forEach((c) => { up['members/' + c + '/st'] = J.st[c]; });
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
