@@ -58,7 +58,8 @@ const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백�
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 const ROLE_N = { admin: '관리자', vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
-const MAX_MEMBERS = 4, MAX_ROUNDS = 10;           // 『 3시 33분 방송국 』 — 10장면 (1~2장면은 안 죽음 · 8장면 전에는 안 끝남 · 서버)
+const MAX_MEMBERS = 4;
+// ★ 몇 장면인지는 화면에 알리지 않는다 (2026-10-20) — 장면 수는 서버(lore.js rounds)만 안다
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
 const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 이만큼 기다렸다가 (방장이 없을 때를 대비)
 const Z = 99999980;          // 알림창(99999999) · 팔레트(99999990)보다 아래
@@ -356,7 +357,7 @@ function paint() {
         mem.innerHTML = memberChips(r, u);
         bar.style.display = 'none';
         const n = Number(r.round) || 0;
-        nEl.textContent = '· 관전 · ' + (r.state === 'PLAY' ? '장면 ' + n + ' / ' + MAX_ROUNDS : (r.state === 'END' ? '끝' : '대기실'));
+        nEl.textContent = '· 관전 · ' + (r.state === 'PLAY' ? '장면 ' + n : (r.state === 'END' ? '끝' : '대기실'));
         html = '<div class="dz-row" style="border-color:#5a4a2a;"><div class="w" style="color:#e8c27a;">👁 관전 중 — '
             + esc(((r.members || {})[r.leader] || {}).n || '?') + '의 방 <i>말과 확정은 할 수 없습니다</i></div>'
             + '<button data-unwatch="1">목록으로</button></div>'
@@ -373,7 +374,7 @@ function paint() {
             ov.querySelector('#dz-send').disabled = false;
         } else if (r.state === 'PLAY') {
             const n = Number(r.round) || 0;
-            nEl.textContent = '· 장면 ' + n + ' / ' + MAX_ROUNDS;
+            nEl.textContent = '· 장면 ' + n;
             html = play(r, u);
             const mySt = (r.members[u.code] || {}).st || 'ok';
             const lost = mySt === 'lost', out = mySt === 'out';
@@ -430,7 +431,7 @@ function lobbyList(u) {
         if (!live.length) h += '<div class="dz-card-m">진행 중인 판이 없습니다.</div>';
         live.forEach(function (id) {
             const r = all[id], m = r.members || {}, cs = Object.keys(m);
-            const where = r.state === 'PLAY' ? '장면 ' + (Number(r.round) || 0) + ' / ' + MAX_ROUNDS : '끝 — ' + ((END_N[(r.outcome || {}).kind] || END_N.escape)[0]);
+            const where = r.state === 'PLAY' ? '장면 ' + (Number(r.round) || 0) : '끝 — ' + ((END_N[(r.outcome || {}).kind] || END_N.escape)[0]);
             h += '<div class="dz-row"><div class="w">' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
                 + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + ST[m[c].st || 'ok']; }).join(' · ') + '</i></div>'
                 + '<button data-watch="' + esc(id) + '">본다</button></div>';
@@ -447,8 +448,7 @@ function intro() {
         + '<div class="dz-card-h">' + NAME + '</div>'
         + '<div class="dz-card-t" style="margin-bottom:8px;">' + esc(BRIEF) + '</div>'
         + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + SURVIVE + '%</b>'
-        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)'
-        + ' · ' + MAX_ROUNDS + '장면</div>'
+        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)</div>'
         + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + REWARD + '<br>' + HOST_NOTE + '</div></div>';
 }
 
