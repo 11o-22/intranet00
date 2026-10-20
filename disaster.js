@@ -56,6 +56,8 @@ const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백�
     + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">150,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
+// 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다
+const SIGIL_ITEMS = ['🔎 감지하는 눈', '📱 K·LEE', '🩶 은심장', '🦊 호사수구', '🧧 지산의 복 : 대리자', '🐾 아기 여우', '🌙 달빛 문신', '📺 브라운의 심야 토크 쇼'];
 const ROLE_N = { admin: '관리자', vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 8;                             // 한 방 최대 인원 (2026-10-20 — 4 → 8 · 서버 core.js 와 같이)
 // ★ 몇 장면인지는 화면에 알리지 않는다 (2026-10-20) — 장면 수는 서버(lore.js rounds)만 안다
@@ -460,7 +462,7 @@ function gearPool(u) {
     const out = [], seen = {};
     const put = function (nm, tag) {
         nm = String(nm || '').trim();
-        if (!nm || seen[nm] || NO_GEAR.test(nm) || nm === DZ_TICKET) return;
+        if (!nm || seen[nm] || NO_GEAR.test(nm) || nm === DZ_TICKET || SIGIL_ITEMS.indexOf(nm) >= 0) return;
         seen[nm] = 1; out.push({ n: nm, tag: tag });
     };
     (u.equippedWeapons || []).forEach(function (w) { put(baseOf(w), '장착 중'); });

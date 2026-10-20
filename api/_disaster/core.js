@@ -36,7 +36,8 @@
 //   · 심야 토크쇼의 사회자가 판에 없으면 (처음부터 · 나감 · 죽음) d.noHost — 안 죽는 장면을 줄이고 난이도를 올린다
 //   · 죽는 방식 — 진행자가 사람마다 한 줄 (fates → members/<사번>/fate)
 //   · 끝나면 disasterPay/<사번>/<판> 에 몫을 적는다 — 살아남은 사람 포인트(payOf) · 죽은 사람 이송. 화면(disaster.js)이 한 번만 받는다
-//   · 표식 — 특별한 커스텀 장비를 찬 사람은 괴담이 노리거나 · 끌어들이려 하거나 · 경외한다 (lore.js SIGILS · 기능은 못 씀)
+//   · 표식 — 특별한 커스텀 장비를 지닌 사람은 (챙기지 않아도 · 차든 소지품이든) 괴담이 노리거나 · 끌어들이려 하거나 ·
+//     경외한다 (lore.js SIGILS · 기능은 못 씀 · 지참 장비 3칸에서는 빠짐)
 //   · 커플링 — 시작할 때 사원마다 users/<사번>/couple 을 읽어 진행자에게 「누구와 연인 · 같이 들어왔나」를 알린다 (어느 재난이든)
 //
 // ■ 서버에 적는 자리 (파이어베이스 REST)
@@ -280,7 +281,7 @@ function memberLines(mem, d) {
             + ' · 팀: ' + (m.team || '없음') + ' · 직급: ' + (m.pos || '없음')
             + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
-            + (Array.isArray(m.marks) && m.marks.length ? ' — 표식: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
+            + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
             + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
                 + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
             + ' — 지금 상태: ' + stName(d, m.st);
@@ -323,23 +324,22 @@ export function gearOf(want, p, n) {
     const out = [];
     (Array.isArray(want) ? want : []).forEach((x) => {
         const b = clip(baseName(x), 40);
-        if (!b || !have[b] || NO_GEAR.test(b) || out.indexOf(b) >= 0 || out.length >= n) return;
+        if (!b || !have[b] || NO_GEAR.test(b) || SIGIL_ITEM[b] || out.indexOf(b) >= 0 || out.length >= n) return;   // 커스텀 장비는 챙기지 않아도 지닌다
         out.push(b);
     });
     return out;
 }
-// 표식 — 찬 장비 가운데 SIGILS 에 든 것 (은심장은 소지품에 지녀도)
+// 표식 — 지닌 커스텀 장비 (차고 있든 소지품에 있든 · 챙기지 않아도) 가운데 SIGILS 에 든 것
 export function marksOf(p) {
-    const worn = {}; (p.eq || []).forEach((w) => { worn[baseName(w)] = 1; });
-    const held = {}; (p.inv || []).forEach((w) => { held[baseName(w)] = 1; });
+    const have = {};
+    (p.eq || []).concat(p.inv || []).forEach((w) => { have[baseName(w)] = 1; });
     const out = [];
     Object.keys(SIGILS).forEach((k) => {
-        SIGILS[k].items.forEach((nm) => {
-            if (worn[nm] || (nm === '🩶 은심장' && held[nm])) out.push({ n: nm, k: k });
-        });
+        SIGILS[k].items.forEach((nm) => { if (have[nm]) out.push({ n: nm, k: k }); });
     });
     return out;
 }
+const SIGIL_ITEM = {}; Object.keys(SIGILS).forEach((k) => SIGILS[k].items.forEach((nm) => { SIGIL_ITEM[nm] = 1; }));
 async function profiles(db, codes) {
     const one = async (c) => {
         const [aff, team, pos, eq, inv, soul, cp] = await Promise.all([
