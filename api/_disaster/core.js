@@ -420,7 +420,8 @@ function withBody(m, b) { return b ? Object.assign(m, { g: b.g, flip: b.flip, ch
 //     users/<사번>/kits/<속성>  { gone, nick, to, toName }   kitDay — 그날 (babyfox.js)
 //     users/<사번>/kitOn/<속성> { by, byName, nick }
 //   판에는 disaster/<판>/foxes/<주인_속성> = { k, o(주인), on(곁에 있는 사람), nick, oN, gone(사라진 장면) }
-//   ★ 사라지는 것은 이 판 안에서만이다 — 게임 속 여우(kits)는 건드리지 않는다 (기록 소실에서만)
+//   ★ 대신 소멸한 아이는 게임 속 여우 자리(kits)에도 소멸로 적는다 — 그날은 어둠에서도 못 데려간다, 자정이 지나야 (2026-10-20 · foxKitGone)
+//     (판정 실패로 다친 것은 이 판 안에서만이다)
 const BABY = '🐾 아기 여우';
 const FOX_ORDER = ['evade', 'heal', 'hide', 'sense', 'bond', 'gaze', 'break', 'luck'];
 // picks — 사번 → 주인이 고른 여우 ('evade,heal' · '-' 는 하나도 안 데려감 · 없으면 전부) (2026-10-20)
@@ -496,7 +497,7 @@ export function foxSave(J, memNow, foxes) {
 //   성공 — 치유: 다친 사람(없으면 다친 여우)을 되돌린다 · 연결: 맞춰진 사람을 끌어낸다 (사원의 치유 · 연결과 같다)
 //   위험한 행동에 실패 — 여우가 다친다. ✗ 판정에 실패해서는 소멸하지 않는다 (2026-10-20)
 //     여우가 사라지는 것은 곁의 사람이 죽을 자리에 놓였을 때 대신 소멸하는 것뿐이다 (foxSave)
-//   여우의 다침 · 소멸은 이 판 안에서만이다 (disaster/<판>/foxes/<여우>/st · gone)
+//   여우의 다침은 이 판 안에서만이다 (disaster/<판>/foxes/<여우>/st) · 대신 소멸은 foxKitGone 이 게임 속 자리에도 적는다
 const FOX_DO = { evade: '곁의 사람과 함께 위험을 피한다', sense: '귀를 세우고 주변을 살핀다', heal: '다친 곳을 살펴 준다',
                  hide: '곁의 사람과 함께 몸을 숨긴다', luck: '행운을 빈다', break: '앞을 막는 것을 부순다',
                  bond: '흩어진 일행을 잇는다', gaze: '괴담의 눈을 속인다' };
@@ -540,6 +541,35 @@ export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
         J.checks.push(row);
     });
     return { st: fst, fell: fell };
+}
+
+// ★ 재난에서 대신 소멸한 아기 여우 — 그날은 어둠에서도 동행 못 한다 · 자정이 지나야 (2026-10-20)
+//   babyfox.js kill() 과 같은 꼴로 users/<주인>/kits/<속성>/gone = 1 (자식 길로만 · 통째로 덮지 않는다)
+//   kitDay 가 오늘이 아니면 babyfox.js dayRoll 처럼 여덟을 먼저 되살려 두고 오늘로 적는다 (어제 소멸이 남지 않게)
+//   남에게 붙여 준 아이였으면 붙임도 걷는다 — 주인 kits/<속성>/to · toName, 붙은 사람 kitOn/<속성> (특이사항 줄은 note-fix.js 가 치운다)
+async function foxKitGone(db, FX, ids, now) {
+    const day = kstDay(now);
+    const byOwner = {};
+    ids.forEach((id) => { const f = FX[id]; if (f && FOXES[f.k] && okCode(String(f.o))) (byOwner[f.o] = byOwner[f.o] || []).push(f); });
+    for (const o of Object.keys(byOwner)) {
+        const [kday, kits, name] = await Promise.all([db.get('users/' + o + '/kitDay'), db.get('users/' + o + '/kits'), db.get('users/' + o + '/name')]);
+        if (kday == null && kits == null && name == null) continue;            // 없는 사원 — 새로 만들지 않는다
+        const up = {};
+        if (kday !== day) {
+            up.kitDay = day;
+            FOX_ORDER.forEach((k) => { ['gone', 'n', 'j', 'r'].forEach((x) => { up['kits/' + k + '/' + x] = 0; }); });
+        }
+        for (const f of byOwner[o]) {
+            up['kits/' + f.k + '/gone'] = 1;
+            const s = (kits && typeof kits === 'object' && kits[f.k] && typeof kits[f.k] === 'object') ? kits[f.k] : {};
+            if (f.on !== o && String(s.to || '') === String(f.on)) {
+                up['kits/' + f.k + '/to'] = null; up['kits/' + f.k + '/toName'] = null;
+                const p = {}; p[f.k] = null;
+                await db.patch('users/' + f.on + '/kitOn', p);
+            }
+        }
+        await db.patch('users/' + o, up);
+    }
 }
 
 // ── 🐾 아기 여우의 말을 채팅에 올린다 (disasterChat/<판>/<열쇠> { c:'fox_<여우>', n:'🐾 이름', t, at, r, fox, o })
@@ -1123,6 +1153,8 @@ async function round(b, deps, db) {
         }
         await db.patch('disaster/' + b.run, up);
         if (pays && Object.keys(pays).length) await db.patch('disasterPay', pays);
+        // 🐾 대신 소멸한 아기 여우 — 그날은 어둠에서도 못 데려간다 (자정이 지나야)
+        try { if (foxGone.length) await foxKitGone(db, FX, foxGone, now); } catch (e) { }
         // 🐾 아기 여우 — 장면이 넘어간 직후 채팅에 (끝났으면 이 장면에)
         try { if (foxTalkers.length) await postFox(db, b.run, FXa, out.fox_lines, ended ? n : n + 1, deps.now(), foxTalkers); } catch (e) { }
         const su = { notes: clip(out.notes, 1200), readN: n, readKey: readKey || null }; su['sums/' + n] = n + '. ' + clip(out.summary, 120);

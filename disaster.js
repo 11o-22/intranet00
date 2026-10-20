@@ -592,7 +592,7 @@ function room(r, u) {
 function checkChips(list) {
     return '<div class="dz-chk">' + (list || []).map(function (c) {
         if (c.kind === 'none') return '<span' + (c.kick ? ' class="no"' : '') + '>' + esc(c.name) + ' · ' + esc(c.did) + (c.kick ? ' → 모셔짐' : '') + '</span>';
-        // 🐾 아기 여우의 판정 — 옅은 주황 (다침 · 소멸은 이 판 안에서만)
+        // 🐾 아기 여우의 판정 — 옅은 주황 (다침은 이 판 안에서만 · 대신 소멸은 그날 어둠에서도 못 부름)
         if (c.fx) {
             let f = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
                 + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '') + (c.plus ? ' (+' + c.plus + ')' : '');
