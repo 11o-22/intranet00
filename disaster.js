@@ -80,7 +80,12 @@ function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-function br(s) { return esc(s).replace(/\n/g, '<br>'); }
+// 진행자 글 — 줄바꿈 · 아기 여우의 말(<f>…</f> 로 감싼 대사)은 옅은 주황색으로 (2026-10-20)
+//   짝이 안 맞는 표(글이 잘려 남은 것)는 지운다
+function br(s) {
+    return esc(s).replace(/&lt;f&gt;([\s\S]*?)&lt;\/f&gt;/g, '<span class="dz-fox">$1</span>')
+        .replace(/&lt;\/?f&gt;/g, '').replace(/\n/g, '<br>');
+}
 function alert_(m) { try { showCustomAlert(m); } catch (e) { } }
 function tickets(u) { return ((u && u.inventory) || []).filter(function (x) { return x === DZ_TICKET; }).length; }
 let off = 0;                 // 서버 시계와의 차이
@@ -163,6 +168,7 @@ function now() { return Date.now() + off; }
         '.dz-chk span{font-size:10px;padding:3px 7px;border-radius:5px;background:rgba(0,0,0,.35);border:1px solid #2a3a3b;color:#b8c4c4;}',
         '.dz-chk span.ok{border-color:#2f6b4a;color:#9fd8a4;} .dz-chk span.no{border-color:#6b2f3a;color:#ff9aa8;}',
         '#dz-chat .ln{font-size:12px;line-height:1.7;padding:2px 0;word-break:break-word;}',
+        '.dz-fox{color:#ffc38a;}',                     // 🐾 아기 여우의 말 — 옅은 주황
         '#dz-chat .ln b{color:#9fe3e3;font-weight:normal;margin-right:6px;}',
         '#dz-chat .ln.me b{color:#e8c27a;}',
         '#dz-chat .ln.echo{color:#7a8f8f;font-style:italic;}',
