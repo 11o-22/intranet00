@@ -30,8 +30,9 @@
 //   · 귀빈은 홀로 나갈 수 있다 (members/<사번>/leave = 장면 번호) → 그 장면 끝에 상태 out
 //     나간 귀빈 n 명 → 남은 재난관리국 · 백일몽 · 그 밖 쪽 난이도 + d.surge × (2ⁿ − 1) (20 이 끝)
 //   · 난이도 표 d.dc · 실종을 부르는 말 d.lost · 잔혹 묘사 d.gore
-//   · 장면 수 d.rounds · d.safe 장면까지는 아무도 죽지 않고(다침이 끝) 끝나지도 않는다 ·
-//     그 뒤로는 위험 판정이 없던 사람에게도 방송국이 덮친다 (d.final — 귀빈 · 예외 · 관리자 빼고)
+//   · 장면 수 d.rounds · d.safe 장면까지는 아무도 죽지 않는다(다침이 끝) · 그 뒤로는 행동에 따라 죽는다
+//     d.min 장면 전에는 끝나지 않는다 (모두 죽거나 나가면 끝) · 그 뒤로는 위험 판정이 없던 사람에게도
+//     방송국이 덮친다 (d.final — 귀빈 · 예외 · 관리자 빼고)
 //   · 죽는 방식 — 진행자가 사람마다 한 줄 (fates → members/<사번>/fate)
 //   · 끝나면 disasterPay/<사번>/<판> 에 몫을 적는다 — 살아남은 사람 포인트(payOf) · 죽은 사람 이송. 화면(disaster.js)이 한 번만 받는다
 //   · 표식 — 특별한 커스텀 장비를 찬 사람은 괴담이 노리거나 · 끌어들이려 하거나 · 경외한다 (lore.js SIGILS · 기능은 못 씀)
@@ -590,9 +591,10 @@ async function round(b, deps, db) {
 
         // ② 판정 — 코드가 정한다
         const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
-        const SAFE = Number(D.safe) || 0;
-        const safeNow = n <= SAFE;                                  // 이 장면까지는 아무도 죽지 않는다
-        const finalNow = !!(D.final && SAFE && n > SAFE);           // 그 뒤로는 방송국이 덮친다
+        const SAFE = Number(D.safe) || 0;                           // 이 장면까지는 아무도 죽지 않는다
+        const MIN = Number(D.min) || 0;                             // 이 장면 전에는 끝나지 않는다
+        const safeNow = n <= SAFE;
+        const finalNow = !!(D.final && MIN && n > MIN);             // 그 뒤로는 방송국이 덮친다
         const J = judge(acts, memNow, deps.rand, {
             dc: D.dc, plus: (c) => (surge && surgeHits(memNow[c].role) ? surge : 0), safe: safeNow,
             forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => surgeHits(memNow[c].role)) }, D.final) : null });
@@ -619,16 +621,18 @@ async function round(b, deps, db) {
                     + ' — 귀빈실을 거쳐 방송국을 빠져나간다. 그 자리가 빈 순간부터 방송국이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
                 ...(surge ? ['[방송국의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
                 '[이번 장면 ' + n + '/' + ROUNDS + '] ' + (scene.title || ''), scene.text || '', '',
-                ...(SAFE ? [safeNow
-                    ? '[흐름] ' + SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓고 조여 온다.'
-                    : '[흐름] ' + (SAFE + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.', ''] : []),
+                ...((SAFE || MIN) ? [safeNow
+                    ? '[흐름] ' + SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓으며 판을 깐다.'
+                    : (finalNow
+                        ? '[흐름] ' + (MIN + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.'
+                        : '[흐름] 이제 행동에 따라 죽는다. 판정 결과대로 — 함정에 걸리거나 속임수를 믿고 움직인 사람이 먹힌다.'), ''] : []),
                 '[이번 장면에서 나눈 대화]', talk, '',
                 '[판정 결과 — 바꾸지 말 것]', J.checks.map((c) => checkLine(c, D)).join('\n') || '(판정할 행동이 없었다 — 머뭇거린 사이 상황이 조금 나빠진다)', '',
                 wiped ? (lostAfter.length
                         ? '[반드시] 재난 안에 남은 사람이 없다 (남은 사람은 모두 ' + stName(D, 'lost') + (aliveAfter.length ? ', 귀빈은 홀로 나갔다' : '') + '). ended=true, end_kind=fail 로 이 재난을 끝낸다.'
                         : '[반드시] 모두 방송국을 빠져나갔다. ended=true, end_kind=escape 로 이 재난을 끝낸다.')
                     : (lastOne ? '[반드시] 이번이 마지막 장면이다. ended=true 로 끝낸다. 근원을 지웠으면 clear, 아니면 escape.'
-                        : (n < SAFE ? '[반드시] 아직 끝내지 않는다 (' + SAFE + '장면 전). ended=false, end_kind=none 으로 다음 장면을 연다.'
+                        : (n < MIN ? '[반드시] 아직 끝내지 않는다 (' + MIN + '장면 전). ended=false, end_kind=none 으로 다음 장면을 연다.'
                             : '[끝내는 때] 근원을 지웠거나(clear) 모두 빠져나왔으면(escape) ended=true. 아니면 ended=false 로 다음 장면을 연다. 살아 있는 사람이 있으면 fail 은 쓰지 않는다.')),
                 ...(lostNew.length ? ['', '[이번 장면에 죽은 사람 — fates 에 코드로] ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
                 '',
@@ -648,9 +652,9 @@ async function round(b, deps, db) {
         else if (lastOne) ended = true;
         if (ended && (kind === 'none' || !kind)) kind = wiped ? 'fail' : 'escape';
         if (ended && kind === 'fail' && !wiped) kind = 'escape';
-        if (!wiped && !lastOne && n < SAFE) { ended = false; kind = 'none'; }        // 정한 장면 전에는 끝나지 않는다
+        if (!wiped && !lastOne && n < MIN) { ended = false; kind = 'none'; }         // 정한 장면 전에는 끝나지 않는다 (모두 죽거나 나가면 끝)
         if (!ended && !String(out.next_text || '').trim()) {
-            if (n < SAFE) { out.next_title = out.next_title || '송출 중'; out.next_text = '화면이 지지직거린다. 방송은 아직 끝나지 않았다.'; }
+            if (n < MIN) { out.next_title = out.next_title || '송출 중'; out.next_text = '화면이 지지직거린다. 방송은 아직 끝나지 않았다.'; }
             else { ended = true; kind = 'escape'; }
         }
         // 죽는 방식 — 진행자가 적은 것 (없으면 이 재난의 말로)
