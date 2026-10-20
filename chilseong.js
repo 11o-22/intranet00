@@ -1,16 +1,18 @@
 // ==========================================
-// ★ 🐯 제 칠(七) 성군(星君) — 상담사 지급 전용 (2026-10-20)
+// ★ 🌟 제 칠(七) 성군(星君) — 상담사 지급 전용 (2026-10-20)
 // bundles.json 마지막 묶음 맨 끝 — babyfox.js · moon.js · dark-count.js · dna-gifts.js · itemfix.js 보다 뒤
 // ==========================================
 //
 // ■ 무엇인가
 //
-//   장착품이다. 차고 있으면 장착칸의 「해제」 옆에 [🐯 칠성] 이 붙고, 거기서
+//   장착품이다. 차고 있으면 장착칸의 「해제」 옆에 [🌟 칠성] 이 붙고, 거기서
 //   일곱 성군에게 청하거나 치성을 드린다. 은심장 · 호사수구 · K·LEE 와 같은 결 —
 //   상점 · 우주 쇼핑몰 · 장터 어디에도 안 깔리고 팔 수도 없다.
 //   주는 법은 chilGive(사번) 과 당국 화면의 「물품 강제 꽂기」뿐이다.
 //
-//   「재난」은 어둠 탐사를 말한다 (사용자가 정함). 기록 소실(3시 33분 방송국)에는 걸지 않는다.
+//   「재난」은 어둠 탐사를 말한다 (사용자가 정함) — 일반 어둠 · EPIC · K의 방 (2026-10-20 EPIC · K의 방까지).
+//   기록 소실(3시 33분 방송국)에는 걸지 않는다.
+//   이름의 이모지는 🌟 (처음엔 🐯 — 가진 사람은 들어올 때 새 이름으로 바뀐다 · rename)
 //
 // ■ 치성 — ★ 달린 음식을 바친다
 //
@@ -23,7 +25,7 @@
 //   ① 탐랑  하루 1번 ★ 음식 다섯 → 상점 · 횟수 하나를 초기화 (격이 높을수록 드문 쪽이 잘 뜬다)
 //            유쾌 판매소 40 · ??? 상점 30 · 우주 쇼핑몰 10 · 어둠 탐사 횟수 10 · 공용 시설 횟수 5 · 망상 홈쇼핑 5
 //   ② 거문  차고 있는 사람이 방에 있으면 최소 인원이 1인 — 혼자서도 어느 구역이든 들어간다.
-//            3인 이하로 들어가면 (차고 있는 사람에게) 안전한 선택지 표시 🐯 · 판정 +3 · 행운 +2 (낮은 굴림 다시 굴림 두 번)
+//            3인 이하로 들어가면 (차고 있는 사람에게) 안전한 선택지 표시 🌟 · 판정 +3 · 행운 +2 (낮은 굴림 다시 굴림 두 번)
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
 //   ③ 녹존  하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
 //            치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
@@ -52,7 +54,8 @@
 //   chilReset(사번)   상담사 — 오늘 쓴 것을 지운다
 
 const CHIL = {
-    NAME: '🐯 제 칠(七) 성군(星君)',
+    NAME: '🌟 제 칠(七) 성군(星君)',
+    OLD: '\ud83d\udc2f 제 칠(七) 성군(星君)',      // 처음 이름 (호랑이 이모지) — 가진 사람은 들어올 때 새 이름으로 바꾼다
     ADMIN: 'kario0987',
     GEO_DAY: 3, NOK_DAY: 3, PAG_DAY: 3,
     NOK_PT: [10000, 20000], NOK_POLL: [0, 20],
@@ -67,6 +70,7 @@ const CHIL = {
 (function chilSeong() {
 
 const NAME = CHIL.NAME;
+const OLD = CHIL.OLD;
 const ADMIN = CHIL.ADMIN;
 
 // ==========================================
@@ -86,7 +90,7 @@ function today() { try { return getTodayStr(); } catch (e) { return new Date().t
 function baseOf(w) { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); }
 function wears(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
-    return u.equippedWeapons.some(function (w) { return baseOf(w) === NAME; });
+    return u.equippedWeapons.some(function (w) { const x = baseOf(w); return x === NAME || x === OLD; });
 }
 window.chilWears = wears;
 function users() {
@@ -211,19 +215,43 @@ function closeBtn() {
         clearInterval(iv);
         ITEM_CATALOG[NAME] = {
             price: 0, usable: true, targetable: false, effect: 'chil_equip', noSell: true, equipKind: 'chil',
-            desc: '북두의 일곱 성군이 곁에 선다. 장착하면 장착칸의 [🐯 칠성] 에서 일곱 성군에게 청하거나 '
+            desc: '북두의 일곱 성군이 곁에 선다. 장착하면 장착칸의 [🌟 칠성] 에서 일곱 성군에게 청하거나 '
                 + '★ 달린 음식으로 치성을 드릴 수 있다. — 탐랑 · 거문 · 녹존 · 문곡 · 염정 · 무곡 · 파군'
         };
-        try { if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME); } catch (e) { }
+        ITEM_CATALOG[OLD] = Object.assign({}, ITEM_CATALOG[NAME]);
+        try { if (typeof NO_SELL_ITEMS !== 'undefined') [NAME, OLD].forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); }); } catch (e) { }
         if (/[.#$\[\]\/]/.test(NAME)) console.error('[칠성] 물품 이름에 파이어베이스 열쇠로 못 쓰는 글자가 있습니다: ' + NAME);
         console.log('[칠성] ' + NAME + ' 등록 — 상담사 지급 전용');
     }, 400);
 })();
+// 이름 바꾸기 — 🐯 → 🌟 (2026-10-20). 소지품 · 장착칸 · 장착 주인 표를 새 이름으로
+function rename() {
+    const u = me();
+    if (!u || u.code === undefined) return;
+    let ch = false;
+    if (Array.isArray(u.inventory)) u.inventory = u.inventory.map(function (x) { if (x === OLD) { ch = true; return NAME; } return x; });
+    if (Array.isArray(u.equippedWeapons)) u.equippedWeapons = u.equippedWeapons.map(function (x) {
+        if (baseOf(x) === OLD || x === OLD) { ch = true; return String(x).split(OLD).join(NAME); }
+        return x;
+    });
+    if (u.equipOwner && typeof u.equipOwner === 'object' && u.equipOwner[OLD] !== undefined) {
+        u.equipOwner[NAME] = u.equipOwner[OLD]; delete u.equipOwner[OLD]; ch = true;
+        try { if (db_()) db_().ref('users/' + u.code + '/equipOwner/' + OLD).remove(); } catch (e) { }
+    }
+    if (u.badge && typeof u.badge.notes === 'string' && u.badge.notes.indexOf(OLD) >= 0) { u.badge.notes = u.badge.notes.split(OLD).join(NAME); ch = true; }
+    if (ch) {
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, equippedWeapons: 1, equipOwner: 1, badge: 1 }); } catch (e) { }
+        ui();
+        console.log('[칠성] ' + OLD + ' → ' + NAME + ' 이름을 바꿨습니다.');
+    }
+}
+setInterval(function () { try { rename(); } catch (e) { } }, 3000);
 setInterval(function () {
     try {
         if (typeof ALIEN_ITEMS_POOL === 'undefined' || !ALIEN_ITEMS_POOL) return;
         let i;
         while ((i = ALIEN_ITEMS_POOL.indexOf(NAME)) > -1) ALIEN_ITEMS_POOL.splice(i, 1);
+        while ((i = ALIEN_ITEMS_POOL.indexOf(OLD)) > -1) ALIEN_ITEMS_POOL.splice(i, 1);
         if (window.RARE_ALIEN_RATE) delete window.RARE_ALIEN_RATE[NAME];
     } catch (e) { }
 }, 5000);
@@ -234,7 +262,7 @@ setInterval(function () {
         const _m = marketSellable;
         marketSellable = function () {
             const pool = _m.apply(this, arguments);
-            try { pool.delete(NAME); } catch (e) { }
+            try { pool.delete(NAME); pool.delete(OLD); } catch (e) { }
             return pool;
         };
         marketSellable._chil = true;
@@ -267,7 +295,7 @@ setInterval(function () {
             log_(u, '[장착] ' + NAME);
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
             ui();
-            alert_('🐯 북두의 일곱 성군이 곁에 섭니다.\n\n장착칸의 [🐯 칠성] 을 누르면 성군께 청하거나 치성을 드릴 수 있습니다.');
+            alert_('🌟 북두의 일곱 성군이 곁에 섭니다.\n\n장착칸의 [🌟 칠성] 을 누르면 성군께 청하거나 치성을 드릴 수 있습니다.');
         };
         useInventoryItem._chil = true;
         clearInterval(iv);
@@ -276,7 +304,7 @@ setInterval(function () {
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-// 장착칸 [🐯 칠성]
+// 장착칸 [🌟 칠성]
 (function slotBtn() {
     const ID = 'chil-list-btn';
     function stick() {
@@ -297,7 +325,7 @@ setInterval(function () {
         b.id = ID;
         b.className = 'game-btn';
         b.style.cssText = 'margin:0 0 0 6px; padding:6px 10px; font-size:11px; flex-shrink:0;' + GOLD;
-        b.textContent = '🐯 칠성';
+        b.textContent = '🌟 칠성';
         b.onclick = function () { menu(); };
         row.appendChild(b);
     }
@@ -346,7 +374,7 @@ function menu() {
             body = line('하루 한 번 ★ 음식 다섯을 바친다. 만족하시는 만큼 — 유쾌 판매소 · ??? 상점 · 우주 쇼핑몰 · 어둠 탐사 횟수 · 공용 시설 횟수 · 망상 홈쇼핑 중 하나를 초기화한다. 격이 높은 음식일수록 드문 쪽이 잘 뜬다.')
                 + '<div>' + btn('★ 다섯을 바친다', 'chilTamOpen()', !!s.tam || sc < CHIL.TAM_N, true) + tag(s.tam ? '오늘 바침' : '오늘 1번', !s.tam) + '</div>';
         } else if (g.k === 'geo') {
-            body = line('내가 방에 있으면 최소 인원이 1인 — 어느 구역이든 혼자서도 들어간다. 3인 이하로 들어가면 안전한 선택지가 🐯 로 보이고 판정 +3 · 행운 +2.')
+            body = line('내가 방에 있으면 최소 인원이 1인 — 어느 구역이든 혼자서도 들어간다. 3인 이하로 들어가면 안전한 선택지가 🌟 로 보이고 판정 +3 · 행운 +2.')
                 + line('치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사를 한 번 피하고, 그래도 죽으면 오염도 0 으로 귀환한다.')
                 + '<div>' + btn('치성 (★1)', "chilJi('geo')", (s.geo || 0) >= CHIL.GEO_DAY || sc < CHIL.JI.geo, true)
                 + tag('치성 ' + (s.geo || 0) + ' / ' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0), (s.geoArm || 0) > 0) + '</div>';
@@ -382,7 +410,7 @@ function menu() {
         return '<div style="' + CARD + '"><div style="font-size:12px; font-weight:bold; color:#ffd479;">' + esc(g.n) + '</div>'
             + '<div style="font-size:10px; color:#9a8a6a; margin-top:2px;">' + esc(g.s) + '</div>' + body + '</div>';
     }).join('');
-    box('<div style="' + HEAD + '">🐯 제 칠(七) 성군(星君)</div>'
+    box('<div style="' + HEAD + '">🌟 제 칠(七) 성군(星君)</div>'
         + '<div style="font-size:10px; color:#9a8a6a; margin-bottom:9px;">가진 ★ 음식 ' + sc + '개 · 치성은 그날 하루 걸린다</div>'
         + '<div style="' + SCROLL + '">' + h + '</div>' + closeBtn());
 }
@@ -468,10 +496,10 @@ window.chilJi = function (k) {
         if (k === 'yeom') { s2.yeomJi = 1; msg = '오늘 하루 염정성군의 속성이 L 로 굳고, 두 개까지 드릴 수 있습니다.'; }
         if (k === 'mug') { s2.mugJi = 1; s2.mugArm = 1; msg = '다음 탐사 한 번 — 살아 나오면 ×7, 같이 간 파티원은 ×5.'; }
         if (k === 'pag') { s2.pagJi = 1; s2.pagShare = 3; msg = '오늘 파군성군이 구한 사람 셋도 같은 포인트를 받습니다.'; }
-        log_(u, '[🐯 ' + JI_NAME[k] + '] 치성 — ' + foods.join(', '));
+        log_(u, '[🌟 ' + JI_NAME[k] + '] 치성 — ' + foods.join(', '));
         save({ inventory: 1, history: 1 });
         ui();
-        alert_('🐯 ' + JI_NAME[k] + '께 치성을 드렸습니다.\n\n' + msg);
+        alert_('🌟 ' + JI_NAME[k] + '께 치성을 드렸습니다.\n\n' + msg);
         if (k === 'yeom') setTimeout(window.chilYeomOpen, 300);
     });
 };
@@ -574,13 +602,13 @@ window.chilTamOpen = function () {
         const r = tamRoll(sum);
         const f = tamDo(r.k);
         s.tam = 1;
-        log_(u, '[🐯 탐랑성군] ' + foods.join(', ') + ' → ' + r.n);
+        log_(u, '[🌟 탐랑성군] ' + foods.join(', ') + ' → ' + r.n);
         save(Object.assign({ inventory: 1, history: 1 }, f));
         ui();
         try { if (typeof renderRegularShop === 'function') renderRegularShop(); } catch (e) { }
         try { if (typeof renderQShop === 'function') renderQShop(); } catch (e) { }
         const mood = sum >= 13 ? '크게 흡족해하신다' : (sum >= 9 ? '흡족해하신다' : '음식을 거두신다');
-        alert_('🐯 탐랑성군께서 ' + mood + '.\n\n「' + r.n + '」\n\n(바친 음식의 격 ' + sum + ' / 15)');
+        alert_('🌟 탐랑성군께서 ' + mood + '.\n\n「' + r.n + '」\n\n(바친 음식의 격 ' + sum + ' / 15)');
     });
 };
 
@@ -628,13 +656,61 @@ function partyHasWearer(p) {
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
+// ==========================================
+// 이번 판 — 어둠 · EPIC · K의 방 (2026-10-20 — EPIC · K의 방까지)
+// ==========================================
+//   EPIC 과 K의 방은 탐사가 시작되면서 darkRun 을 통째로 새로 만든다 (memberCount 도 없다).
+//   그래서 판에 싣는 것(치성 · 같이 간 사람 · 인원)은 darkRun 이 아니라 여기(CUR)에 적고,
+//   지금 판과 같은 판인지는 열쇠로 맞춘다 — 파티면 방 번호, 혼자면 구역.
+let CUR = null;      // { key, n, mates, pid, at, geo, nok, mug, geoUsed, pagTried }
+function runKey(r) {
+    if (!r) return '';
+    if (r.partyId) return 'p:' + r.partyId;
+    return 's:' + (r.epic ? 'epic' : (r.kroom ? 'k' : r.zone));
+}
+function curOf() {
+    const r = run();
+    if (!r || !CUR) return null;
+    return CUR.key === runKey(r) ? CUR : null;
+}
+function partyCount(r) {
+    try { const p = r && r.partyId && darkParties[r.partyId]; return p && p.members ? Object.keys(p.members).length : 0; } catch (e) { return 0; }
+}
+function runSize() {
+    const c = curOf();
+    if (c && c.n) return c.n;
+    const r = run();
+    if (!r) return 1;
+    return Number(r.memberCount) || partyCount(r) || 1;
+}
+window.chilRunSize = runSize;
+window.chilCur = function () { return curOf(); };
+function runKind(r) { r = r || run(); return !r ? '' : (r.epic ? 'epic' : (r.kroom ? 'k' : 'dark')); }
+// 판을 연다 — 걸어 둔 치성을 싣는다 (판이 시작될 때 한 번 · 시작하는 함수마다 한 번씩만 불린다)
+function begin(key, n, mates, pid) {
+    const u = me();
+    if (!u || !key) return;
+    CUR = { key: key, n: n || 1, mates: (mates || []).slice(), pid: pid || null, at: Date.now(), pagTried: {} };
+    if (!wears(u)) return;
+    const s = st(u);
+    let ch = false;
+    if (CUR.n <= 1 && (s.geoArm || 0) > 0) { s.geoArm--; CUR.geo = 1; ch = true; }
+    if (s.nokArm) { s.nokArm = 0; CUR.nok = 1; ch = true; }
+    if (s.mugArm) {
+        s.mugArm = 0; CUR.mug = 1; ch = true;
+        if (pid && db_()) { try { db_().ref('darkParties/' + pid + '/chilMug').set({ by: u.code, n: u.name || '' }); } catch (e) { } }
+    }
+    if (ch) save();
+}
+window.chilBegin = begin;
 // 지금 탐사가 거문의 작은 파티인가 (차고 있는 사람 · 3인 이하)
 function geoSmall() {
     const r = run(), u = me();
-    return !!(r && u && wears(u) && (Number(r.memberCount) || 1) <= CHIL.SMALL);
+    return !!(r && u && wears(u) && runSize() <= CHIL.SMALL);
 }
 window.chilGeoSmall = geoSmall;
-// 안전한 선택지 — 0번이 가장 안전한 쪽이다 (safe_hint 관례 · babyfox 감각과 같은 약속)
+const GEO_LINE = '<br><br><span style="color:#ffd479;">— 거문성군이 삿된 쪽을 가린다. 🌟 가 안전한 길이다.</span>';
+// 안전한 선택지 — 어둠: 0번이 가장 안전한 쪽이다 (safe_hint 관례 · babyfox 감각과 같은 약속)
 (function hookChoice() {
     const iv = setInterval(function () {
         if (typeof renderChoiceStep !== 'function') return;
@@ -642,17 +718,72 @@ window.chilGeoSmall = geoSmall;
         const _c = renderChoiceStep;
         const w = function (title, text, options, imgKey) {
             try {
-                if (geoSmall() && Array.isArray(options) && options.length > 1 && options[0] && String(options[0].label || '').indexOf('🐯') < 0) {
+                if (geoSmall() && Array.isArray(options) && options.length > 1 && options[0] && String(options[0].label || '').indexOf('🌟') < 0) {
                     const safe = Object.assign({}, options[0]);
-                    safe.label = '🐯 ' + safe.label;
+                    safe.label = '🌟 ' + safe.label;
                     options = [safe].concat(options.slice(1));
-                    text = String(text || '') + '<br><br><span style="color:#ffd479;">— 거문성군이 삿된 쪽을 가린다. 🐯 가 안전한 길이다.</span>';
+                    text = String(text || '') + GEO_LINE;
                 }
             } catch (e) { }
             return _c.call(this, title, text, options, imgKey);
         };
         w._chil = true;
         renderChoiceStep = w; window.renderChoiceStep = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// EPIC · K의 방 — 그 장면에 즉사(죽음 · 끌려감) 쪽이 섞여 있으면, 그렇지 않은 쪽에 🌟
+function markSafe(onclickRe, isBad) {
+    try {
+        const body = darkBodyEl();
+        if (!body) return;
+        const btns = Array.prototype.filter.call(body.querySelectorAll('button'), function (b) { return onclickRe.test(b.getAttribute('onclick') || ''); });
+        const rows = btns.map(function (b) { const m = (b.getAttribute('onclick') || '').match(/\((-?\d+)\)/); return { b: b, i: m ? Number(m[1]) : -1 }; })
+            .filter(function (x) { return x.i >= 0; });
+        const bad = rows.filter(function (x) { return isBad(x.i); }), good = rows.filter(function (x) { return !isBad(x.i); });
+        if (!bad.length || !good.length) return;
+        good.forEach(function (x) { if ((x.b.textContent || '').indexOf('🌟') < 0) x.b.insertAdjacentHTML('afterbegin', '🌟 '); });
+        const box0 = body.querySelector('div[style*="background:#111"]') || null;      // darkBox 의 글 칸
+        if (box0) box0.insertAdjacentHTML('beforeend', GEO_LINE);
+        else if (rows[0]) rows[0].b.insertAdjacentHTML('beforebegin', '<div style="font-size:11px; margin:0 0 8px;">' + GEO_LINE.replace(/^<br><br>/, '') + '</div>');
+    } catch (e) { }
+}
+function epicBad(o) { return !!(o && (o.die || o.doom || o.doomOnLose || o.doomOnFail)); }
+(function hookEpicScene() {
+    const iv = setInterval(function () {
+        if (typeof epicScene !== 'function') return;
+        if (epicScene._chil) { clearInterval(iv); return; }
+        const _e = epicScene;
+        const w = function (sc) {
+            const out = _e.apply(this, arguments);
+            try {
+                if (geoSmall() && sc && Array.isArray(sc.opts)) markSafe(/^epicPick\(/, function (i) { return epicBad(sc.opts[i]); });
+            } catch (e) { }
+            return out;
+        };
+        w._chil = true;
+        epicScene = w; window.epicScene = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+(function hookKNext() {
+    const iv = setInterval(function () {
+        if (typeof window.kroomNext !== 'function' || !window.KROOM) return;
+        if (window.kroomNext._chil) { clearInterval(iv); return; }
+        const _n = window.kroomNext;
+        const w = function () {
+            const out = _n.apply(this, arguments);
+            try {
+                const kr = window.KROOM.state();
+                const o = kr && kr.cur && kr.cur.sc && kr.cur.sc.o;
+                if (geoSmall() && Array.isArray(o)) markSafe(/^kroomPick\(/, function (i) { return !!(o[i] && o[i].doom); });
+            } catch (e) { }
+            return out;
+        };
+        w._chil = true;
+        window.kroomNext = w;
         clearInterval(iv);
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
@@ -693,55 +824,54 @@ window.chilGeoSmall = geoSmall;
 })();
 
 // ==========================================
-// 탐사가 시작될 때 — 걸어 둔 치성을 이번 판에 싣는다
+// 탐사가 시작될 때 — 어둠(혼자 · 파티) · EPIC 혼자 · K의 방 혼자
 // ==========================================
-function onRunStart(party) {
-    const r = run(), u = me();
-    if (!r || !u || r._chilStart) return;
-    r._chilStart = true;
-    if (!wears(u)) return;
-    const s = st(u);
-    const n = Number(r.memberCount) || 1;
-    let ch = false;
-    if (n <= 1 && (s.geoArm || 0) > 0) { s.geoArm--; r._geo = 1; ch = true; }
-    if (s.nokArm) { s.nokArm = 0; r._nok = 1; ch = true; }
-    if (s.mugArm) {
-        s.mugArm = 0; r._mug = 1; ch = true;
-        if (r.isParty && r.partyId && db_()) {
-            try { db_().ref('darkParties/' + r.partyId + '/chilMug').set({ by: u.code, n: u.name || '' }); } catch (e) { }
-        }
-    }
-    // 같이 간 사람 — 끝날 때는 방이 이미 비어 있을 수 있어 처음에 적어 둔다
-    try {
-        if (r.isParty && r.partyId) {
-            const p = (party && party.members) ? party : ((typeof darkParties !== 'undefined' && darkParties[r.partyId]) || null);
-            if (p && p.members) r._chilMates = Object.keys(p.members).filter(function (c) { return c !== u.code; });
-        }
-    } catch (e) { }
-    if (ch) save();
-}
-['startDarkRun', 'launchPartyRun'].forEach(function (fn) {
+//   파티는 어디로 가든 launchPartyRun(방) 을 먼저 지난다 (EPIC · K의 방은 그 뒤에 darkRun 을 갈아 끼운다).
+function hookStart(name, after) {
     const iv = setInterval(function () {
-        if (typeof window[fn] !== 'function') return;
-        if (window[fn]._chil) { clearInterval(iv); return; }
-        const _f = window[fn];
-        const w = function (arg) {
-            const out = _f.apply(this, arguments);
-            const party = (arg && typeof arg === 'object') ? arg : null;      // launchPartyRun(party)
-            try { onRunStart(party); } catch (e) { }
-            setTimeout(function () { try { onRunStart(party); } catch (e) { } }, 300);
+        const f = (name === 'kroomSolo') ? window.kroomSolo : window[name];
+        if (typeof f !== 'function') return;
+        if (f._chil) { clearInterval(iv); return; }
+        const w = function () {
+            const out = f.apply(this, arguments);
+            try { after.apply(this, arguments); } catch (e) { console.warn('[칠성] 판 열기 건너뜀', e && e.message); }
             return out;
         };
         w._chil = true;
-        window[fn] = w;
-        try { if (fn === 'startDarkRun') startDarkRun = w; else launchPartyRun = w; } catch (e) { }
+        window[name] = w;
+        try {
+            if (name === 'startDarkRun') startDarkRun = w;
+            else if (name === 'launchPartyRun') launchPartyRun = w;
+            else if (name === 'epicStart') epicStart = w;
+        } catch (e) { }
         clearInterval(iv);
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
+}
+hookStart('startDarkRun', function () {
+    const r = run();
+    if (r && !r.isParty) begin(runKey(r), 1, [], null);
+});
+hookStart('launchPartyRun', function (party) {
+    if (!party || !party.id) return;
+    const u = me();
+    const mem = Object.keys(party.members || {});
+    begin('p:' + party.id, mem.length || 1, mem.filter(function (c) { return !u || c !== u.code; }), party.id);
+});
+hookStart('epicStart', function (isParty) {
+    const r = run();
+    if (isParty || !r) return;
+    begin('s:epic', 1, [], null);
+    // 혼자 EPIC 은 들어갈 때 행운 등 횟수를 채우지 않는다 — 어둠처럼 채운다 (거문의 행운 +2 도 여기서 실린다)
+    try { if (typeof resetDnaCharge === 'function') resetDnaCharge(); } catch (e) { }
+});
+hookStart('kroomSolo', function () {
+    const r = run();
+    if (r && r.kroom && !r.isParty) begin('s:k', 1, [], null);
 });
 
 // ==========================================
-// 죽음 — 거문의 보호 · 녹존의 선물
+// 죽음 — 거문의 보호 · 녹존의 선물 (어둠 · EPIC · K의 방)
 // ==========================================
 const SHUT_ROOMS = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
 function freeSelf(poll) {
@@ -757,27 +887,83 @@ function giftOf() {
     try { pools.push(Object.keys(ITEM_CATALOG).filter(function (k) { return ITEM_CATALOG[k] && ITEM_CATALOG[k].qShop; })); } catch (e) { }
     try { pools.push((ALIEN_ITEMS_POOL || []).slice()); } catch (e) { }
     const ok = pools.map(function (p) {
-        return p.filter(function (n) { return n && n !== NAME && n.indexOf('소원권') < 0 && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[n]; });
+        return p.filter(function (n) { return n && n !== NAME && n !== OLD && n.indexOf('소원권') < 0 && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[n]; });
     }).filter(function (p) { return p.length; });
     if (!ok.length) return null;
     const p = ok[Math.floor(Math.random() * ok.length)];
     return p[Math.floor(Math.random() * p.length)];
 }
+// 사고 보고서의 「상담실로 긴급 이송됩니다」 를 바꿔 적는다 (어둠 · EPIC · K의 방 글이 조금씩 다르다)
+const SENT_RE = /🦊?\s*(여우\s*)?상담실로 긴급 이송됩니다\.?/;
 function patchReport(html) {
     try {
         const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
         if (!body) return;
-        const t = body.innerHTML;
-        const a = t.indexOf('🦊 여우 상담실로 긴급 이송됩니다.');
-        if (a >= 0) {
-            const b = t.indexOf('</span>', a);
-            body.innerHTML = t.slice(0, a) + html + (b >= 0 ? t.slice(b + 7) : '');
+        const tw = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+        let n, hit = null;
+        while ((n = tw.nextNode())) { if (SENT_RE.test(n.nodeValue)) { hit = n; break; } }
+        if (hit) {
+            const v = hit.nodeValue, m = v.match(SENT_RE), i = v.search(SENT_RE);
+            const sp = document.createElement('span');
+            sp.className = 'chil-sent';
+            sp.innerHTML = html;
+            hit.nodeValue = v.slice(0, i);
+            hit.parentNode.insertBefore(sp, hit.nextSibling);
+            const rest = v.slice(i + m[0].length);
+            if (rest.trim()) sp.parentNode.insertBefore(document.createTextNode(rest), sp.nextSibling);
+            let x = sp.nextSibling;
+            for (let k = 0; k < 4 && x; k++) {
+                if (x.nodeType === 1 && /회복 예상/.test(x.textContent || '')) { x.remove(); break; }
+                x = x.nextSibling;
+            }
         } else {
             const btn0 = body.querySelector('button');
-            if (btn0) btn0.insertAdjacentHTML('beforebegin', '<div style="margin:0 0 12px; font-size:12px; line-height:1.8;">' + html + '</div>');
+            if (btn0) btn0.insertAdjacentHTML('beforebegin', '<div class="chil-sent" style="margin:0 0 12px; font-size:12px; line-height:1.8;">' + html + '</div>');
         }
-        body.innerHTML = body.innerHTML.replace('오염도 <b style="color:#ff9800;">100%</b>', '오염도 <b style="color:#ffd479;">' + Math.round(me().pollution || 0) + '%</b>');
+        Array.prototype.forEach.call(body.querySelectorAll('b, span'), function (e) {
+            if ((e.textContent || '').trim() === '100%' && /ff9800/.test(e.getAttribute('style') || '')) {
+                e.textContent = Math.round(me().pollution || 0) + '%';
+                e.style.color = '#ffd479';
+            }
+        });
     } catch (e) { }
+}
+// 죽은 뒤 — 거문(홀로) 이면 오염도 0 귀환 · 녹존 치성이면 선물 들고 나옴
+function afterDeath() {
+    const u = me(), c = curOf();
+    if (!u || !c || !wears(u)) return;
+    if (!(u.pollution >= 100 && u.quarantineHospital === true)) return;     // 이송되는 죽음일 때만
+    if (c.geo) {
+        freeSelf(0);
+        log_(u, '[🌟 거문성군] 홀로 든 탐사에서 쓰러졌으나 오염도 0 으로 귀환했습니다.');
+        patchReport('🌟 거문성군의 보호 — 오염도 0% 로 귀환합니다.<br><span style="font-size:10px; color:#aaa;">상담실 · 선녀탕으로 가지 않습니다.</span>');
+        save({ history: 1 });
+    } else if (c.nok) {
+        const poll = rint(CHIL.NOK_POLL[0], CHIL.NOK_POLL[1]);
+        const g = giftOf();
+        if (g) { if (!Array.isArray(u.inventory)) u.inventory = []; u.inventory.push(g); }
+        freeSelf(poll);
+        log_(u, '[🌟 녹존성군] 옥방울 소리 — 이송되기 전에 풀려났습니다 (오염도 ' + poll + '%)' + (g ? ' · 선물 「' + g + '」' : ''));
+        patchReport('🔔 옥방울 소리가 들려온다 — 녹존성군이 업장을 거두었습니다.<br>'
+            + '<span style="font-size:10px; color:#aaa;">이송되지 않고 오염도 ' + poll + '% 로 나옵니다.</span>'
+            + (g ? '<br><span style="color:#ffd479;">녹존의 선물 — 「' + esc(g) + '」</span>' : ''));
+        save({ history: 1, inventory: 1 });
+    }
+}
+// 홀로 든 탐사 — 거문이 즉사를 한 번 비껴 세운다 (true 면 막았다)
+function geoGuard(reasonText, nextFn) {
+    const u = me(), c = curOf(), r = run();
+    if (!u || !c || !r || !c.geo || c.geoUsed || !wears(u) || runSize() > 1) return false;
+    c.geoUsed = true;
+    r.fail = Math.max(0, (r.fail || 0) - 1);
+    try { r.log.push('[🌟 거문성군] 즉사를 피함'); } catch (e) { }
+    try {
+        darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + '<br><br><span style="color:#ffd479;">— 어디선가 큰 손이 등을 받친다.<br>'
+            + '거문성군이 삿된 것을 비껴 세웠다. 한 걸음, 딱 그만큼.</span>', darkChoiceBtn('숨을 고른다.', nextFn));
+        if (r.isParty && typeof mountDarkChat === 'function') mountDarkChat('normal');
+    } catch (e) { }
+    try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
+    return true;
 }
 (function hookDeath() {
     const iv = setInterval(function () {
@@ -785,48 +971,61 @@ function patchReport(html) {
         if (darkDeath._chil) { clearInterval(iv); return; }
         const _d = darkDeath;
         const w = function (reasonText) {
-            const r = run(), u = me();
-            // 거문 — 홀로 든 탐사에서 즉사를 한 번 피한다
-            if (r && u && r._geo && !r._dead && !r._geoUsed && wears(u)) {
-                r._geoUsed = true;
-                r.fail = Math.max(0, (r.fail || 0) - 1);
-                try { r.log.push('[🐯 거문성군] 즉사를 피함'); } catch (e) { }
-                try {
-                    darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + '<br><br><span style="color:#ffd479;">— 어디선가 큰 손이 등을 받친다.<br>'
-                        + '거문성군이 삿된 것을 비껴 세웠다. 한 걸음, 딱 그만큼.</span>', darkChoiceBtn('숨을 고른다.', 'renderDarkStep();'));
-                    if (typeof mountDarkChat === 'function') mountDarkChat('normal');
-                } catch (e) { }
-                try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
-                return;
-            }
+            const r = run();
+            if (r && !r._dead && !r.epic && !r.kroom && geoGuard(reasonText, 'renderDarkStep();')) return;
             const out = _d.apply(this, arguments);
-            try {
-                const died = !!(r && r._dead && u && u.pollution >= 100 && u.quarantineHospital === true);
-                if (died && wears(u)) {
-                    if (r._geo) {
-                        freeSelf(0);
-                        log_(u, '[🐯 거문성군] 홀로 든 탐사에서 쓰러졌으나 오염도 0 으로 귀환했습니다.');
-                        patchReport('🐯 거문성군의 보호 — 오염도 0% 로 귀환합니다.<br><span style="font-size:10px; color:#aaa;">상담실 · 선녀탕으로 가지 않습니다.</span>');
-                        save({ history: 1 });
-                    } else if (r._nok) {
-                        const poll = rint(CHIL.NOK_POLL[0], CHIL.NOK_POLL[1]);
-                        const g = giftOf();
-                        if (g) { if (!Array.isArray(u.inventory)) u.inventory = []; u.inventory.push(g); }
-                        freeSelf(poll);
-                        log_(u, '[🐯 녹존성군] 옥방울 소리 — 이송되기 전에 풀려났습니다 (오염도 ' + poll + '%)' + (g ? ' · 선물 「' + g + '」' : ''));
-                        patchReport('🔔 옥방울 소리가 들려온다 — 녹존성군이 업장을 거두었습니다.<br>'
-                            + '<span style="font-size:10px; color:#aaa;">이송되지 않고 오염도 ' + poll + '% 로 나옵니다.</span>'
-                            + (g ? '<br><span style="color:#ffd479;">녹존의 선물 — 「' + esc(g) + '」</span>' : ''));
-                        save({ history: 1, inventory: 1 });
-                    }
-                }
-            } catch (e) { console.warn('[칠성] 죽음 처리 건너뜀', e && e.message); }
+            try { if (r && r._dead) afterDeath(); } catch (e) { console.warn('[칠성] 죽음 처리 건너뜀', e && e.message); }
             return out;
         };
         w._chil = true;
         darkDeath = w; window.darkDeath = w;
         clearInterval(iv);
         console.log('[칠성] 거문 · 녹존 — 죽음 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// EPIC — epicDeath (동료를 기다리는 첫 부름은 죽음이 아니다)
+(function hookEpicDeath() {
+    const iv = setInterval(function () {
+        if (typeof epicDeath !== 'function') return;
+        if (epicDeath._chil) { clearInterval(iv); return; }
+        const _d = epicDeath;
+        const w = function (txt) {
+            let E = null; try { E = er; } catch (e) { }
+            if (E && !E.dead && geoGuard(txt, 'epicMap()')) return;
+            const out = _d.apply(this, arguments);
+            try { let E2 = null; try { E2 = er; } catch (e) { } if (E2 && E2.dead) afterDeath(); } catch (e) { console.warn('[칠성] EPIC 죽음 처리 건너뜀', e && e.message); }
+            return out;
+        };
+        w._chil = true;
+        epicDeath = w; window.epicDeath = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// K의 방 — kroomDie
+(function hookKDie() {
+    const iv = setInterval(function () {
+        if (typeof window.kroomDie !== 'function' || !window.KROOM) return;
+        if (window.kroomDie._chil) { clearInterval(iv); return; }
+        const _d = window.kroomDie;
+        const w = function (text) {
+            const kr = window.KROOM.state();
+            if (kr && !kr.dead && !kr._settled) {
+                const why = (typeof text === 'string' && text) || (kr._doomCfg && kr._doomCfg.dieText) || '거기서 끝났다.';
+                if (geoGuard(why, 'kroomNext()')) {
+                    try { if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; } } catch (e) { }
+                    if (kr.down) { kr.down = false; if (kr.stats && kr.stats.hp <= 0) kr.stats.hp = 20; }
+                    return;
+                }
+            }
+            const out = _d.apply(this, arguments);
+            try { const k2 = window.KROOM.state(); if (k2 && k2.dead) afterDeath(); } catch (e) { console.warn('[칠성] K의 방 죽음 처리 건너뜀', e && e.message); }
+            return out;
+        };
+        w._chil = true;
+        window.kroomDie = w;
+        clearInterval(iv);
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -889,14 +1088,14 @@ window.chilNokGo = function (code) {
                     pollution: poll, lastPollutionTime: now, foxRoomAnswered: false,
                     chilFreed: { by: u.code, byName: u.name || '', at: now }, hasItemUsedOnMe: true };
         if (cleanBadge(x)) f.badge = x.badge;
-        log_(x, '[🐯 녹존성군] 옥방울 소리 — ' + (u.name || '') + ' 사원의 청으로 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)');
+        log_(x, '[🌟 녹존성군] 옥방울 소리 — ' + (u.name || '') + ' 사원의 청으로 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)');
         f.history = x.history;
         if (local) Object.keys(f).forEach(function (k) { local[k] = f[k]; });
         try { if (typeof updateUserFields === 'function') updateUserFields(code, Object.assign({}, f)); } catch (e) { }
         const got = rint(CHIL.NOK_PT[0], CHIL.NOK_PT[1]);
         pay(got);
         s.nok = (s.nok || 0) + 1;
-        log_(u, '[🐯 녹존성군] ' + (cur.name || nameOf(code)) + ' 사원을 ' + (bath ? '선녀탕' : '상담실') + '에서 꺼냈습니다 (+' + won(got) + ')');
+        log_(u, '[🌟 녹존성군] ' + (cur.name || nameOf(code)) + ' 사원을 ' + (bath ? '선녀탕' : '상담실') + '에서 꺼냈습니다 (+' + won(got) + ')');
         save({ history: 1 });
         ui();
         alert_('🔔 옥방울 소리가 들려온다.\n\n' + (cur.name || nameOf(code)) + ' 사원이 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)\n\n+'
@@ -934,7 +1133,7 @@ window.chilMunArm = function () {
     if (s.mun) { alert_('오늘 문곡성군께는 이미 청했습니다.'); return; }
     s.munArm = 1;
     save();
-    alert_('🐯 문곡성군께 청해 두었습니다.\n\n다음 생환 때 그 구역 회수품 셋 중 ' + (s.munJi ? '둘' : '하나') + '를 확정으로 고릅니다.');
+    alert_('🌟 문곡성군께 청해 두었습니다.\n\n다음 생환 때 그 구역 회수품 셋 중 ' + (s.munJi ? '둘' : '하나') + '를 확정으로 고릅니다.');
     menu();
 };
 let munPick = null;   // { zone, cand:[], need, sel:[] }
@@ -942,6 +1141,14 @@ function munOpen(zone) {
     const u = me(), s = st(u);
     const pool = [];
     try { (DARK_LOOT_BY_ZONE[zone] || []).forEach(function (l) { if (l && l.name && pool.indexOf(l.name) < 0) pool.push(l.name); }); } catch (e) { }
+    // EPIC · K의 방은 회수품 표가 따로 없다 — 어둠 전 구역의 회수품 가운데서 고른다
+    if (!pool.length) {
+        try {
+            Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
+                (DARK_LOOT_BY_ZONE[z] || []).forEach(function (l) { if (l && l.name && pool.indexOf(l.name) < 0 && ITEM_CATALOG[l.name]) pool.push(l.name); });
+            });
+        } catch (e) { }
+    }
     if (!pool.length) return false;
     const cand = pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 3);
     munPick = { zone: zone, cand: cand, need: Math.min(cand.length, s.munJi ? 2 : 1), sel: [] };
@@ -980,7 +1187,7 @@ window.chilMunGo = function () {
     if (!Array.isArray(u.inventory)) u.inventory = [];
     got.forEach(function (n) { u.inventory.push(n); });
     s.mun = 1; s.munArm = 0; s.munX = Math.round(rnd(CHIL.MUN_X[0], CHIL.MUN_X[1]) * 10) / 10;
-    log_(u, '[🐯 문곡성군] 회수품 확정 — ' + got.join(', ') + ' · 오늘 회수품 확률 ×' + s.munX);
+    log_(u, '[🌟 문곡성군] 회수품 확정 — ' + got.join(', ') + ' · 오늘 회수품 확률 ×' + s.munX);
     munPick = null;
     save({ inventory: 1, history: 1 });
     ui();
@@ -1059,6 +1266,32 @@ function yeomOf(u) {
     return out;
 }
 window.chilYeomOf = yeomOf;
+// 탐사 밖에서도 — 지금 염정에게 드린 속성 (EPIC 자리 고르기에 쓴다)
+function yeomAttrs(u) {
+    if (!u || !wears(u) || !u.chil || typeof u.chil !== 'object') return [];
+    const y = arr(u.chil.yeom);
+    const L = u.chil.day === today() && !!u.chil.yeomJi;
+    return L ? y.slice(0, 2) : y.slice(0, 1);
+}
+// EPIC — 맡을 자리는 전용 장비에 새겨진 속성으로 정해진다 (epic-core2.js epicOwnedAttrs). 염정의 속성도 자리가 된다
+(function hookEpicAttrs() {
+    const iv = setInterval(function () {
+        if (typeof epicOwnedAttrs !== 'function') return;
+        if (epicOwnedAttrs._chil) { clearInterval(iv); return; }
+        const _o = epicOwnedAttrs;
+        const w = function () {
+            const own = _o.apply(this, arguments) || [];
+            try {
+                yeomAttrs(me()).forEach(function (a) { if (own.indexOf(a) < 0) own.push(a); });
+            } catch (e) { }
+            return own;
+        };
+        w._chil = true;
+        epicOwnedAttrs = w; window.epicOwnedAttrs = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 function yeomVal(a, grade) {
     try {
         const mult = GEAR_MULT[grade] || 1, base = GEAR_BASE[a] || 0;
@@ -1099,7 +1332,8 @@ function yeomVal(a, grade) {
 // ==========================================
 function deathsSeen() {
     try {
-        return (partyChatLog || []).some(function (m) { return m && m.code === 'SYSTEM' && /신호가 끊겼습니다/.test(String(m.text || '')); });
+        // 어둠 「신호가 끊겼습니다」 · EPIC · K의 방 「소식이 끊겼습니다」
+        return (partyChatLog || []).some(function (m) { return m && m.code === 'SYSTEM' && /(신호|소식)이 끊겼습니다/.test(String(m.text || '')); });
     } catch (e) { return false; }
 }
 function poorest(exclude) {
@@ -1111,18 +1345,85 @@ function poorest(exclude) {
     list.sort(function (a, b) { return (Number(a.points) || 0) - (Number(b.points) || 0); });
     return list[0] || null;
 }
+// 정산서 칸에 줄을 붙인다 — 어둠 [탐사 정산서] · EPIC · K의 방 [정산]
 function addReport(html) {
     try {
         const body = darkBodyEl();
         if (!body) return;
         const all = body.querySelectorAll('div');
         let rep = null;
-        for (let i = 0; i < all.length; i++) { if ((all[i].textContent || '').indexOf('[탐사 정산서]') >= 0 && all[i].children.length > 1) rep = all[i]; }
-        const el = '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #6a5420; color:#ffd479; font-size:12px; line-height:1.8;">' + html + '</div>';
+        for (let i = 0; i < all.length; i++) {
+            const t = all[i].textContent || '';
+            if ((t.indexOf('[탐사 정산서]') >= 0 || t.indexOf('[정산]') >= 0) && all[i].children.length > 1) rep = all[i];
+        }
+        const el = '<div class="chil-rep" style="margin-top:8px; padding-top:8px; border-top:1px dashed #6a5420; color:#ffd479; font-size:12px; line-height:1.8;">' + html + '</div>';
         if (rep) rep.insertAdjacentHTML('beforeend', el);
         else { const b = body.querySelector('button'); if (b) b.insertAdjacentHTML('beforebegin', el); }
     } catch (e) { }
 }
+// 생환 직전의 모습 — 정산이 darkRun 을 지우기 전에 읽어 둔다
+function preOf() {
+    const r = run(), u = me();
+    if (!r || !u) return null;
+    const c = curOf();
+    let mugBy = null;
+    try { const p = r.partyId && darkParties[r.partyId]; mugBy = p && p.chilMug && p.chilMug.by ? p.chilMug : null; } catch (e) { }
+    return { zone: r.zone, kind: runKind(r), pid: r.partyId || null, n: runSize(), mug: !!(c && c.mug),
+             mates: (c && c.mates) ? c.mates.slice() : [], dead: deathsSeen(), mugBy: mugBy };
+}
+// ⑥ 무곡 — 살아 나온 몫 total 에 얹는다 · ④ 문곡 — 청해 둔 날이면 고르기
+function onReturn(pre, total) {
+    const u = me();
+    if (!u || !pre) return;
+    total = Math.max(0, Math.round(Number(total) || 0));
+    const lines = [];
+    if (wears(u)) {
+        const all = pre.n >= 2 && !pre.dead;
+        const x = pre.mug ? CHIL.MUG.me7 : (all ? rnd(CHIL.MUG.all[0], CHIL.MUG.all[1]) : rnd(CHIL.MUG.x[0], CHIL.MUG.x[1]));
+        const xr = Math.round(x * 10) / 10;
+        const extra = Math.round(total * (xr - 1));
+        if (extra > 0) {
+            pay(extra);
+            lines.push('🌟 무곡성군 — 생환 포인트 ×' + xr + (pre.mug ? ' (치성)' : (all ? ' (전원 생환)' : '')) + ' <b>+' + won(extra) + '</b>');
+            log_(u, '[🌟 무곡성군] 생환 포인트 ×' + xr + ' (+' + won(extra) + ')');
+        }
+        const got = total + Math.max(0, extra);
+        if (pre.mates.length && got > 0) {
+            const m = pre.mates[Math.floor(Math.random() * pre.mates.length)];
+            const sh = Math.round(got * rnd(CHIL.MUG.share[0], CHIL.MUG.share[1]));
+            if (sh > 0) {
+                sendPay(m, sh, '[🌟 무곡성군] ' + (u.name || '') + ' 사원과 함께한 탐사의 복덕 (+' + won(sh) + ')');
+                lines.push('· 함께 간 ' + esc(nameOf(m)) + ' 사원에게 ' + won(sh));
+            }
+        }
+        if (all && got > 0) {
+            const pz = poorest([u.code]);
+            const pp = Math.round(got * CHIL.MUG.poor);
+            if (pz && pp > 0) {
+                sendPay(pz.code, pp, '[🌟 무곡성군] 전원 생환의 복덕이 닿았습니다 (+' + won(pp) + ')');
+                lines.push('· 가장 가난한 ' + esc(pz.name) + ' 사원에게 ' + won(pp));
+            }
+        }
+    } else if (pre.mugBy && pre.mugBy.by !== u.code) {
+        // 같이 간 사람 — 무곡 치성 ×5
+        const extra = Math.round(total * (CHIL.MUG.mate5 - 1));
+        if (extra > 0) {
+            pay(extra);
+            lines.push('🌟 ' + esc(pre.mugBy.n || '동료') + ' 사원의 무곡성군 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' <b>+' + won(extra) + '</b>');
+            log_(u, '[🌟 무곡성군] ' + (pre.mugBy.n || '동료') + ' 사원의 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' (+' + won(extra) + ')');
+        }
+    }
+    if (lines.length) {
+        addReport(lines.join('<br>'));
+        try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+    }
+    if (wears(u)) {
+        const s = st(u);
+        if (s.munArm && !s.mun) setTimeout(function () { munOpen(pre.zone); }, 500);
+    }
+}
+window.chilOnReturn = onReturn;
+// 어둠 — renderDarkResult
 (function hookResult() {
     const iv = setInterval(function () {
         if (typeof renderDarkResult !== 'function') return;
@@ -1130,67 +1431,14 @@ function addReport(html) {
         const _r = renderDarkResult;
         const w = function () {
             const r = run(), u = me();
-            const will = !!(r && u && !r._dead && !r._settled);
-            let pre = null;
-            if (will) {
-                let mugBy = null;
-                try { const p = r.partyId && darkParties[r.partyId]; mugBy = p && p.chilMug && p.chilMug.by ? p.chilMug : null; } catch (e) { }
-                pre = { zone: r.zone, pid: r.partyId || null, n: Number(r.memberCount) || 1, mug: !!r._mug,
-                        mates: (r._chilMates || []).slice(), dead: deathsSeen(), mugBy: mugBy, logs0: (u.darkLogs || []).length ? u.darkLogs[0] : null };
-            }
+            const will = !!(r && u && !r._dead && !r._settled && !r.epic && !r.kroom);
+            const pre = will ? preOf() : null;
+            const log0 = (u && u.darkLogs && u.darkLogs.length) ? u.darkLogs[0] : null;
             const out = _r.apply(this, arguments);
             if (!pre) return out;
             try {
                 const lg = (u.darkLogs || [])[0];
-                if (!lg || lg === pre.logs0 || lg.died) return out;
-                const total = Math.max(0, Number(lg.reward) || 0);
-                const lines = [];
-                if (wears(u)) {
-                    // 무곡
-                    const all = pre.n >= 2 && !pre.dead;
-                    const x = pre.mug ? CHIL.MUG.me7 : (all ? rnd(CHIL.MUG.all[0], CHIL.MUG.all[1]) : rnd(CHIL.MUG.x[0], CHIL.MUG.x[1]));
-                    const xr = Math.round(x * 10) / 10;
-                    const extra = Math.round(total * (xr - 1));
-                    if (extra > 0) {
-                        pay(extra);
-                        lines.push('🐯 무곡성군 — 생환 포인트 ×' + xr + (pre.mug ? ' (치성)' : (all ? ' (전원 생환)' : '')) + ' <b>+' + won(extra) + '</b>');
-                        log_(u, '[🐯 무곡성군] 생환 포인트 ×' + xr + ' (+' + won(extra) + ')');
-                    }
-                    const got = total + Math.max(0, extra);
-                    if (pre.mates.length) {
-                        const m = pre.mates[Math.floor(Math.random() * pre.mates.length)];
-                        const sh = Math.round(got * rnd(CHIL.MUG.share[0], CHIL.MUG.share[1]));
-                        if (sh > 0) {
-                            sendPay(m, sh, '[🐯 무곡성군] ' + (u.name || '') + ' 사원과 함께한 탐사의 복덕 (+' + won(sh) + ')');
-                            lines.push('· 함께 간 ' + esc(nameOf(m)) + ' 사원에게 ' + won(sh));
-                        }
-                    }
-                    if (all) {
-                        const pz = poorest([u.code]);
-                        const pp = Math.round(got * CHIL.MUG.poor);
-                        if (pz && pp > 0) {
-                            sendPay(pz.code, pp, '[🐯 무곡성군] 전원 생환의 복덕이 닿았습니다 (+' + won(pp) + ')');
-                            lines.push('· 가장 가난한 ' + esc(pz.name) + ' 사원에게 ' + won(pp));
-                        }
-                    }
-                } else if (pre.mugBy && pre.mugBy.by !== u.code) {
-                    // 같이 간 사람 — 무곡 치성 ×5
-                    const extra = Math.round(total * (CHIL.MUG.mate5 - 1));
-                    if (extra > 0) {
-                        pay(extra);
-                        lines.push('🐯 ' + esc(pre.mugBy.n || '동료') + ' 사원의 무곡성군 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' <b>+' + won(extra) + '</b>');
-                        log_(u, '[🐯 무곡성군] ' + (pre.mugBy.n || '동료') + ' 사원의 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' (+' + won(extra) + ')');
-                    }
-                }
-                if (lines.length) {
-                    addReport(lines.join('<br>'));
-                    try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
-                }
-                // 문곡 — 청해 둔 날
-                if (wears(u)) {
-                    const s = st(u);
-                    if (s.munArm && !s.mun) setTimeout(function () { munOpen(pre.zone); }, 500);
-                }
+                if (lg && lg !== log0 && !lg.died) onReturn(pre, lg.reward);
             } catch (e) { console.warn('[칠성] 생환 처리 건너뜀', e && e.message); }
             return out;
         };
@@ -1201,11 +1449,54 @@ function addReport(html) {
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
+// EPIC — epicSettle(how) · 쓰러짐(dead)이 아니면 생환
+(function hookEpicSettle() {
+    const iv = setInterval(function () {
+        if (typeof epicSettle !== 'function') return;
+        if (epicSettle._chil) { clearInterval(iv); return; }
+        const _s = epicSettle;
+        const w = function (how) {
+            let E = null; try { E = er; } catch (e) { }
+            const u = me();
+            const will = !!(E && !E._settled && how !== 'dead');
+            const pre = will ? preOf() : null;
+            const log0 = (u && u.darkLogs && u.darkLogs.length) ? u.darkLogs[0] : null;
+            const out = _s.apply(this, arguments);
+            if (!pre) return out;
+            try {
+                const lg = (u.darkLogs || [])[0];
+                if (lg && lg !== log0 && !lg.died) onReturn(pre, lg.reward);
+            } catch (e) { console.warn('[칠성] EPIC 생환 처리 건너뜀', e && e.message); }
+            return out;
+        };
+        w._chil = true;
+        epicSettle = w; window.epicSettle = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// K의 방 — settle 은 안쪽 함수라 kroom-core.js 가 끝에서 이것을 부른다 (돌파 · 귀환이면 생환 · 헬퍼는 빼고)
+window.kroomSettleHook = function (how, pts, helper) {
+    try {
+        if (helper || !(how === 'clear' || how === 'leave')) return;
+        onReturn(preOf(), pts);
+    } catch (e) { console.warn('[칠성] K의 방 생환 처리 건너뜀', e && e.message); }
+};
 
 // ==========================================
 // ⑦ 파군 — 쓰러져 가는 일행을 구한다
 // ==========================================
+//   어둠 — 구조 화면(renderRescuePrompt)에 칸을 하나 붙인다
+//   EPIC · K의 방 — 위험 알림(epicRescue · epicDoomRescue · kroomRescue 단추) 옆에 단추를 붙인다
 let pagArgs = null;
+function pagTried(code) { const c = curOf(); return !!(c && c.pagTried && c.pagTried[code]); }
+function pagMark(code) { const c = curOf(); if (c) { c.pagTried = c.pagTried || {}; c.pagTried[code] = 1; } }
+function pagLabel() {
+    const s = st(me()), left = Math.max(0, CHIL.PAG_DAY - (s.pag || 0));
+    return { left: left, line: left > 0
+        ? '확정으로 구한다 — 오늘 남은 확정 ' + left + ' / ' + CHIL.PAG_DAY + ' · +' + won(CHIL.PAG_PT)
+        : '다이스로 구한다 — DC ' + CHIL.PAG_DC + ' · 성공하면 ' + won(CHIL.PAG_DICE[0]) + '~' + won(CHIL.PAG_DICE[1]) };
+}
 (function hookRescue() {
     const iv = setInterval(function () {
         if (typeof renderRescuePrompt !== 'function') return;
@@ -1215,17 +1506,15 @@ let pagArgs = null;
             const out = _r.apply(this, arguments);
             try {
                 const u = me(), r = run();
-                if (u && r && wears(u) && code && !(r._pagTried && r._pagTried[code])) {
+                if (u && r && wears(u) && code && !pagTried(code)) {
                     pagArgs = { info: info, code: code };
-                    const s = st(u), left = Math.max(0, CHIL.PAG_DAY - (s.pag || 0));
+                    const L = pagLabel();
                     const body = darkBodyEl();
                     const html = '<div id="chil-pag-box" style="border:1px solid #d4a84a; border-radius:6px; padding:11px; margin-bottom:9px; background:rgba(255,212,121,0.06);">'
-                        + '<div style="font-size:12px; color:#ffd479; font-weight:bold;">🐯 제칠 파군성군께 청한다</div>'
-                        + '<div style="font-size:10px; color:#bba; margin:4px 0 8px 0;">' + (left > 0
-                            ? '확정으로 구한다 — 오늘 남은 확정 ' + left + ' / ' + CHIL.PAG_DAY + ' · +' + won(CHIL.PAG_PT)
-                            : '다이스로 구한다 — DC ' + CHIL.PAG_DC + ' · 성공하면 ' + won(CHIL.PAG_DICE[0]) + '~' + won(CHIL.PAG_DICE[1])) + '</div>'
+                        + '<div style="font-size:12px; color:#ffd479; font-weight:bold;">🌟 제칠 파군성군께 청한다</div>'
+                        + '<div style="font-size:10px; color:#bba; margin:4px 0 8px 0;">' + L.line + '</div>'
                         + '<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;' + GOLD + '" onclick="chilPagGo(\'' + esc(code) + '\')">'
-                        + (left > 0 ? '파군성군이 끌어낸다' : '🎲 파군성군께 굴린다') + '</button></div>';
+                        + (L.left > 0 ? '파군성군이 끌어낸다' : '🎲 파군성군께 굴린다') + '</button></div>';
                     const b = body && Array.prototype.filter.call(body.querySelectorAll('button'), function (x) { return /보고만 있는다/.test(x.textContent || ''); })[0];
                     if (b) b.insertAdjacentHTML('beforebegin', html);
                     else if (body) body.insertAdjacentHTML('beforeend', html);
@@ -1240,13 +1529,37 @@ let pagArgs = null;
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
-window.chilPagGo = function (code) {
+// EPIC · K의 방 — 알림 단추 옆에 붙인다 (알림은 수시로 다시 그려지므로 늘 살핀다)
+const PAG_SRC = { epicRescue: 'epicHelp', epicDoomRescue: 'epicDoom', kroomRescue: 'kDoom' };
+function pagScan() {
     const u = me(), r = run();
-    if (!u || !r || !wears(u) || !code) return;
-    if (!r._pagTried) r._pagTried = {};
-    if (r._pagTried[code]) return;
-    r._pagTried[code] = 1;
-    const s = st(u);
+    if (!u || !r || !wears(u) || !(r.epic || r.kroom) || !r.isParty) return;
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+    if (!body) return;
+    Array.prototype.forEach.call(body.querySelectorAll('button[onclick]'), function (b) {
+        const m = (b.getAttribute('onclick') || '').match(/^(epicRescue|epicDoomRescue|kroomRescue)\('([^']+)'\)/);
+        if (!m) return;
+        const fn = m[1], code = m[2];
+        const nx = b.nextElementSibling;
+        if (nx && nx.classList && nx.classList.contains('chil-pag')) return;
+        if (pagTried(code)) return;
+        const L = pagLabel();
+        b.insertAdjacentHTML('afterend', '<button class="game-btn chil-pag" style="width:100%; margin:6px 0 0 0; padding:9px; font-size:11px;' + GOLD + '"'
+            + ' title="' + esc(L.line) + '" onclick="chilPagX(\'' + fn + '\',\'' + esc(code) + '\')">🌟 ' + (L.left > 0 ? '파군성군이 끌어낸다 (확정 ' + L.left + '/' + CHIL.PAG_DAY + ')' : '파군성군께 굴린다 (DC ' + CHIL.PAG_DC + ')') + '</button>');
+    });
+}
+setInterval(function () { try { pagScan(); } catch (e) { } }, 700);
+(function watchBody() {
+    const iv = setInterval(function () {
+        const el = document.getElementById('dro-body');
+        if (!el) return;
+        clearInterval(iv);
+        try { new MutationObserver(function () { try { pagScan(); } catch (e) { } }).observe(el, { childList: true, subtree: true }); } catch (e) { }
+    }, 1000);
+})();
+// 굴림 — 확정이 남았으면 확정, 아니면 다이스 (DC 10 · 9,000~15,000)
+function pagRoll() {
+    const s = st(me());
     const sure = (s.pag || 0) < CHIL.PAG_DAY;
     let roll = 0, ok = true, got = CHIL.PAG_PT;
     if (sure) s.pag = (s.pag || 0) + 1;
@@ -1256,48 +1569,95 @@ window.chilPagGo = function (code) {
         ok = roll !== 1 && roll >= CHIL.PAG_DC;
         got = ok ? Math.round(CHIL.PAG_DICE[0] + (Math.min(20, roll) - CHIL.PAG_DC) * (CHIL.PAG_DICE[1] - CHIL.PAG_DICE[0]) / (20 - CHIL.PAG_DC)) : 0;
     }
+    return { sure: sure, roll: roll, ok: ok, got: got };
+}
+// 구한 뒤 — 포인트 · 치성 나눔 · 기록
+function pagPaid(code, who, R) {
+    const u = me(), s = st(u);
+    let share = '';
+    if (R.ok) {
+        pay(R.got);
+        if ((s.pagShare || 0) > 0) {
+            s.pagShare--;
+            sendPay(code, R.got, '[🌟 파군성군] ' + (u.name || '') + ' 사원에게 구출받으며 받은 몫 (+' + won(R.got) + ')');
+            share = '<br><span style="font-size:11px; color:#ffd479;">치성 — ' + esc(who) + ' 사원도 ' + won(R.got) + ' 를 받는다.</span>';
+        }
+        log_(u, '[🌟 파군성군] ' + who + ' 사원 구출 — ' + (R.sure ? '확정' : '다이스 ' + R.roll) + ' (+' + won(R.got) + ')');
+    } else {
+        log_(u, '[🌟 파군성군] ' + who + ' 사원 구출 실패 — 다이스 ' + R.roll);
+    }
+    try { run().log.push('[🌟 파군] ' + (R.sure ? '확정' : 'd20 ' + R.roll + ' vs DC' + CHIL.PAG_DC) + ' — ' + (R.ok ? '성공' : '실패')); } catch (e) { }
+    save({ history: 1 });
+    return share;
+}
+function pagHead(R) {
+    return R.sure ? '' : '<div style="text-align:center; font-size:26px; font-weight:bold; color:' + (R.ok ? '#ffd479' : '#f44336') + '; margin-bottom:12px;">🎲 ' + R.roll
+        + ' <span style="font-size:13px; color:#888;">(DC ' + CHIL.PAG_DC + ')</span></div>';
+}
+const PAG_OK = '하늘이 갈라지는 소리가 난다. 흐려지던 윤곽을 커다란 손이 움켜쥐고 끌어낸다.<br><br>파군성군이 적을 격파했다.<br>';
+const PAG_NG = '별빛이 내려오다 흩어진다.<br><br>닿지 않았다. 다른 손을 써야 한다.';
+window.chilPagGo = function (code) {
+    const u = me(), r = run();
+    if (!u || !r || !wears(u) || !code || pagTried(code)) return;
+    pagMark(code);
+    const R = pagRoll();
     const who = (pagArgs && pagArgs.code === code && pagArgs.info && pagArgs.info.name) || nameOf(code);
-    let txt;
-    if (ok) {
+    if (R.ok) {
         r.success = (r.success || 0) + 1;
         try { if (db_()) db_().ref('darkParties/' + r.partyId + '/dying/' + code).remove(); } catch (e) { }
         try { sendPartyChat(u.name + ' 사원이 파군성군의 힘으로 ' + who + ' 사원을 끌어냈습니다.', true); } catch (e) { }
-        pay(got);
-        let share = '';
-        if ((s.pagShare || 0) > 0) {
-            s.pagShare--;
-            sendPay(code, got, '[🐯 파군성군] ' + (u.name || '') + ' 사원에게 구출받으며 받은 몫 (+' + won(got) + ')');
-            share = '<br><span style="font-size:11px; color:#ffd479;">치성 — ' + esc(who) + ' 사원도 ' + won(got) + ' 를 받는다.</span>';
-        }
-        log_(u, '[🐯 파군성군] ' + who + ' 사원 구출 — ' + (sure ? '확정' : '다이스 ' + roll) + ' (+' + won(got) + ')');
-        txt = '하늘이 갈라지는 소리가 난다. 흐려지던 윤곽을 커다란 손이 움켜쥐고 끌어낸다.<br><br>파군성군이 적을 격파했다.<br>'
-            + '<b style="color:#ffd479;">+' + won(got) + '</b>' + share;
     } else {
         try { sendPartyChat(u.name + ' 사원이 파군성군께 청했으나 닿지 않았습니다.', true); } catch (e) { }
-        log_(u, '[🐯 파군성군] ' + who + ' 사원 구출 실패 — 다이스 ' + roll);
-        txt = '별빛이 내려오다 흩어진다.<br><br>닿지 않았다. 다른 손을 써야 한다.';
     }
-    try { r.log.push('[🐯 파군] ' + (sure ? '확정' : 'd20 ' + roll + ' vs DC' + CHIL.PAG_DC) + ' — ' + (ok ? '성공' : '실패')); } catch (e) { }
-    save({ history: 1 });
-    const head = sure ? '' : '<div style="text-align:center; font-size:26px; font-weight:bold; color:' + (ok ? '#ffd479' : '#f44336') + '; margin-bottom:12px;">🎲 ' + roll
-        + ' <span style="font-size:13px; color:#888;">(DC ' + CHIL.PAG_DC + ')</span></div>';
+    const share = pagPaid(code, who, R);
     let next;
-    if (ok) {
+    if (R.ok) {
         r._rescueShown = false;
         next = r.isLeader ? darkChoiceBtn('계속 간다.', 'partyAdvance(' + (r.step + 1) + ')')
             : '<div style="text-align:center; font-size:11px; color:#888; padding:12px;">선임의 신호를 기다리는 중...<br>'
               + '<button class="game-btn" style="margin-top:9px; padding:7px 13px; font-size:10px;" onclick="partyAdvance(' + (r.step + 1) + ')">먼저 간다</button></div>';
-    } else {
-        next = darkChoiceBtn('다른 방법을 쓴다.', 'chilPagBack()');
-    }
+    } else next = darkChoiceBtn('다른 방법을 쓴다.', 'chilPagBack()');
     try {
-        darkBodyEl().innerHTML = darkBox(ok ? '구조 — 파군성군' : '구조 — 닿지 않음', head + txt, next);
+        darkBodyEl().innerHTML = darkBox(R.ok ? '구조 — 파군성군' : '구조 — 닿지 않음', pagHead(R) + (R.ok ? PAG_OK + '<b style="color:#ffd479;">+' + won(R.got) + '</b>' + share : PAG_NG), next);
         if (typeof mountDarkChat === 'function') mountDarkChat('normal');
     } catch (e) { }
 };
 window.chilPagBack = function () {
     if (!pagArgs) return;
     try { renderRescuePrompt(pagArgs.info, pagArgs.code); } catch (e) { }
+};
+// EPIC · K의 방 — 그 사람의 위험 알림(epicHelp · epicDoom · kDoom)을 걷으면 그쪽 화면이 「누가 왔다」로 넘어간다
+let pagBusy = false;
+window.chilPagX = function (fn, code) {
+    const u = me(), r = run(), d = db_();
+    if (!u || !r || !wears(u) || !code || !d || pagBusy || pagTried(code) || !PAG_SRC[fn]) return;
+    pagBusy = true;
+    const ref = d.ref('darkParties/' + r.partyId + '/' + PAG_SRC[fn] + '/' + code);
+    ref.once('value').then(function (sn) {
+        pagBusy = false;
+        const v = sn && sn.val ? sn.val() : null;
+        if (!v || (v.until && Date.now() > v.until)) { alert_('이미 끝났습니다.'); return; }
+        pagMark(code);
+        const who = v.name || nameOf(code);
+        const R = pagRoll();
+        if (R.ok) {
+            ref.remove();
+            r.success = (r.success || 0) + 1;
+            try {
+                if (r.epic) { er.helped = (er.helped || 0) + 1; er.score = (er.score || 0) + (fn === 'epicDoomRescue' ? 1500 : 900); }
+                if (r.kroom) { const kr = window.KROOM.state(); if (kr) kr.exp = (kr.exp || 0) + 40; }
+            } catch (e) { }
+            try { sendPartyChat(u.name + ' 사원이 파군성군의 힘으로 ' + who + ' 사원을 끌어냈습니다.', true); } catch (e) { }
+        } else {
+            try { sendPartyChat(u.name + ' 사원이 파군성군께 청했으나 ' + who + ' 사원에게 닿지 않았습니다.', true); } catch (e) { }
+        }
+        const share = pagPaid(code, who, R);
+        const back = r.epic ? darkChoiceBtn(R.ok ? '일으켜 세운다.' : '다른 방법을 쓴다.', 'epicMap()') : darkChoiceBtn(R.ok ? '계속한다.' : '다른 방법을 쓴다.', 'kroomBack()');
+        try {
+            darkBodyEl().innerHTML = darkBox(R.ok ? '구제 — 파군성군' : '구제 — 닿지 않음', pagHead(R) + (R.ok ? PAG_OK + '<b style="color:#ffd479;">+' + won(R.got) + '</b>' + share : PAG_NG), back);
+            if (typeof mountDarkChat === 'function') mountDarkChat('normal');
+        } catch (e) { }
+    }).catch(function () { pagBusy = false; });
 };
 
 // ==========================================

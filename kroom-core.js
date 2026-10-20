@@ -1005,6 +1005,17 @@ function gearPower() {
         const n = Math.min(5, 1 + Math.floor(((GEAR_T[gg] || 0) + jt) / 2));
         out[a] = { n: n, left: n, g: gg };
     });
+    // 🌟 제 칠 성군 · 염정 — 드린 속성(D · 치성이면 L)도 함께 든다. 내 장비 등급이 더 높으면 그쪽 (chilseong.js · 2026-10-20)
+    try {
+        const y = (typeof window.chilYeomOf === 'function') ? window.chilYeomOf(u) : null;
+        if (y) Object.keys(y).forEach(function (a) {
+            if (!GEAR_K[a]) return;
+            const gy = y[a];
+            if (out[a] && (GEAR_T[out[a].g] || 0) >= (GEAR_T[gy] || 0)) return;
+            const n = Math.min(5, 1 + Math.floor(((GEAR_T[gy] || 0) + jt) / 2));
+            out[a] = { n: n, left: n, g: gy };
+        });
+    } catch (e) { }
     return out;
 }
 function gearUse(a) {
@@ -2420,6 +2431,8 @@ function settle(how, txt) {
             ${pts ? '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #444;">지급 <b style="color:#ffd700; font-size:14px;">+' + pts.toLocaleString() + ' P</b></div>' : ''}
          </div>` + darkChoiceBtn('단말로 복귀한다.', 'kroomFinish()'));
     if (pts) { try { showPointGainEffect(pts); } catch (e) { } }
+    // 🌟 제 칠 성군 — 무곡 · 문곡이 정산서에 붙는 자리 (chilseong.js · 2026-10-20)
+    try { if (typeof window.kroomSettleHook === 'function') window.kroomSettleHook(how, pts, helper); } catch (e) { }
 }
 
 window.kroomFinish = function () {
