@@ -31,6 +31,8 @@
 //     효과(수치)는 적용하지 않는다 — 진행자가 이야기 속 물건으로만 쓴다. 정말 가진 것인지는 시작할 때 서버가 다시 본다.
 //   · 시작할 때 서버가 소속을 보고 자리를 가른다 — 귀빈 · 재난관리국 · 백일몽 · 예외
 //   · 귀빈은 [홀로 나간다] 를 누를 수 있다 → 그 장면이 끝나면 빠져나간다. 남은 재난관리국 · 백일몽 쪽 난이도가 기하급수로 오른다
+//   · 상담사는 관리자 — 들어가 있어도 판정 · 확정 기다림에서 빠진다 (서버)
+//   · 상담사 관전 — 목록의 「진행 중인 판」에서 [본다] → 장면 · 대화 · 판정을 그대로 본다 (말 · 확정은 못 함)
 //
 // ■ 서버에 적는 자리
 //   disaster/<판>            판 (서버 함수가 장면 · 판정 · 상태를 쓴다. 화면은 사원 들고 나기 · 확정만 쓴다)
@@ -50,7 +52,7 @@ const SURVIVE = 1, GEAR_MAX = 3;
 const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
-const ROLE_N = { vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
+const ROLE_N = { admin: '관리자', vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 4, MAX_ROUNDS = 8;
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
 const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 이만큼 기다렸다가 (방장이 없을 때를 대비)
@@ -216,6 +218,7 @@ function activeOf(all, code) {
 let ov = null, all = {}, rootRef = null, rootCb = null;
 let curId = null, chatRef = null, chatCb = null, chatLines = [];
 let tick = 0, busy = false, msg = '';
+let watchId = null;              // 상담사가 관전하는 판
 const asked = {}, doneSeen = {};
 
 function open() {
@@ -265,6 +268,7 @@ function close() {
     if (rootRef && rootCb) { try { rootRef.off('value', rootCb); } catch (e) { } }
     if (chatRef && chatCb) { try { chatRef.off('child_added', chatCb); } catch (e) { } }
     rootRef = rootCb = chatRef = chatCb = null;
+    watchId = null;
     clearInterval(tick); tick = 0;
     if (ov) ov.remove();
     ov = null; curId = null; chatLines = []; msg = '';
@@ -289,7 +293,8 @@ function sweep() {
 // 내가 들어 있는 판을 따라간다 — 대화칸을 그 판에 건다
 function follow() {
     const u = me();
-    const id = u ? activeOf(all, u.code) : null;
+    let id = u ? activeOf(all, u.code) : null;
+    if (!id && u && isAdm(u) && watchId && all[watchId]) id = watchId;        // 상담사 관전
     if (id === curId) return;
     if (chatRef && chatCb) { try { chatRef.off('child_added', chatCb); } catch (e) { } }
     chatRef = chatCb = null; chatLines = [];
@@ -340,6 +345,17 @@ function paint() {
         mem.innerHTML = ''; mem.style.display = 'none';
         bar.style.display = 'none';
         html = lobbyList(u);
+    } else if (!(r.members || {})[u.code]) {
+        // ── 상담사 관전 — 보기만 한다
+        mem.style.display = '';
+        mem.innerHTML = memberChips(r, u);
+        bar.style.display = 'none';
+        const n = Number(r.round) || 0;
+        nEl.textContent = '· 관전 · ' + (r.state === 'PLAY' ? '장면 ' + n + ' / ' + MAX_ROUNDS : (r.state === 'END' ? '끝' : '대기실'));
+        html = '<div class="dz-row" style="border-color:#5a4a2a;"><div class="w" style="color:#e8c27a;">👁 관전 중 — '
+            + esc(((r.members || {})[r.leader] || {}).n || '?') + '의 방 <i>말과 확정은 할 수 없습니다</i></div>'
+            + '<button data-unwatch="1">목록으로</button></div>'
+            + (r.state === 'END' ? ending(r, u) : (r.state === 'PLAY' ? play(r, u) : '<div class="dz-card-m">아직 시작하지 않은 방입니다.</div>'));
     } else {
         mem.style.display = '';
         mem.innerHTML = memberChips(r, u);
@@ -360,7 +376,7 @@ function paint() {
             inp.disabled = !talk || out;
             inp.placeholder = out ? '방송국을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…' : (lost ? '전파 속에서 목소리만 남았다…' : '캐릭터로 말하고 행동하기'));
             ov.querySelector('#dz-send').disabled = !talk || out;
-            done.style.display = (lost || out) ? 'none' : '';
+            done.style.display = (lost || out || isAdm(u)) ? 'none' : '';
             const on = Number((r.members[u.code] || {}).done) === n;
             done.classList.toggle('on', on);
             done.textContent = on ? '확정함 ✓' : '행동 확정';
@@ -380,13 +396,13 @@ function lobbyList(u) {
     const g = gate(u, all);
     if (!g.ok) return '<div class="dz-err" style="margin-top:20px;">🔒 ' + esc(g.why) + '</div>';
     const shut = !isOpen();
+    const free = isAdm(u);                                   // 상담사는 티켓 없이 · 닫혀 있어도
     const ids = Object.keys(all).filter(function (id) {
         const r = all[id];
         return r && r.kind === KIND && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL
             && (!shut || free || r.leader === ADMIN);
     }).sort(function (a, b) { return (all[a].createdAt || 0) - (all[b].createdAt || 0); });
     const n = tickets(u);
-    const free = isAdm(u);                                   // 상담사는 티켓 없이 · 닫혀 있어도
     let h = intro() + '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
         + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '') + '</div>';
     if (shut) h += '<div class="dz-err">🔒 닫혀 있습니다 — 상담사만 들어가 시험할 수 있습니다. (상담사가 연 방에는 다른 사원도 들어옵니다)</div>';
@@ -400,6 +416,21 @@ function lobbyList(u) {
             + '<button data-join="' + esc(id) + '"' + ((full || (!n && !free) || busy) ? ' disabled' : '') + '>' + (full ? '가득 참' : '들어간다') + '</button></div>';
     });
     h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + (((!n && !free) || busy) ? ' disabled' : '') + '>새로 연다</button></div>';
+    if (free) {
+        const live = Object.keys(all).filter(function (id) {
+            const r = all[id];
+            return r && r.kind === KIND && (r.state === 'PLAY' || (r.state === 'END' && t - (Number((r.outcome || {}).at) || 0) < 3600000));
+        }).sort(function (a, b) { return (all[b].startedAt || 0) - (all[a].startedAt || 0); });
+        h += '<div class="dz-sec">진행 중인 판 — 관전 (상담사)</div>';
+        if (!live.length) h += '<div class="dz-card-m">진행 중인 판이 없습니다.</div>';
+        live.forEach(function (id) {
+            const r = all[id], m = r.members || {}, cs = Object.keys(m);
+            const where = r.state === 'PLAY' ? '장면 ' + (Number(r.round) || 0) + ' / ' + MAX_ROUNDS : '끝 — ' + ((END_N[(r.outcome || {}).kind] || END_N.escape)[0]);
+            h += '<div class="dz-row"><div class="w">' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
+                + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + ST[m[c].st || 'ok']; }).join(' · ') + '</i></div>'
+                + '<button data-watch="' + esc(id) + '">본다</button></div>';
+        });
+    }
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
     return h;
 }
@@ -567,6 +598,11 @@ function wire() {
     const cl = ov.querySelector('[data-close]'); if (cl) cl.onclick = close;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-gear]'), function (b) { b.onclick = function () { toggleGear(b.dataset.gear); }; });
     const ot = ov.querySelector('[data-out]'); if (ot) ot.onclick = toggleOut;
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-watch]'), function (b) {
+        b.onclick = function () { if (!isAdm(me())) return; watchId = b.dataset.watch; follow(); lastInfo = ''; paint(); };
+    });
+    const uw = ov.querySelector('[data-unwatch]');
+    if (uw) uw.onclick = function () { watchId = null; follow(); lastInfo = ''; paint(); };
 }
 
 // ==========================================
@@ -696,7 +732,7 @@ function onTick() {
     if (!u || r.phase !== 'TALK' || !r.members[u.code]) return;
     // 넘길 때인가 — 시간이 다 됐거나, 살아 있는 사람이 모두 확정했거나
     const m = r.members;
-    const alive = Object.keys(m).filter(function (c) { return !gone(m[c].st || 'ok'); });
+    const alive = Object.keys(m).filter(function (c) { return !gone(m[c].st || 'ok') && m[c].role !== 'admin'; });
     const allDone = alive.length > 0 && alive.every(function (c) {
         return Number(m[c].done) === n || (m[c].role === 'vip' && Number(m[c].leave) === n);
     });
