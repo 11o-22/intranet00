@@ -17,7 +17,7 @@
 //     같은 던전에 든 팀끼리는 같은 층에서 **만난다**.
 //   · 스탯 — 체력 · 심력 · 정신력(모두) + 마력/무력/내공(직업 계열에 따라 하나 또는 없음).
 //     떨어지는 것이 막대로 보인다.
-//   · 회복 — 던전 음식 · 치유(체력, 무조건 성공) · 요리사의 요리(체력) ·
+//   · 회복 — 던전 음식 · 치유(체력, 판정) · 요리사의 요리(체력) ·
 //            응시(정신력) · 보정(마력) · 굳건(제 무력) · 연결(내공).
 //   · 전용 재화 「꿈결」. 쓰러지면 포인트처럼 가진 꿈결을 잃는다 (행운이 지키면 30~45% 남음 · 2026-10-19).
 //     밀실 거래로 주고받는다 (p2p-fix.js · p2p-multi.js · p2p-dream.js).
@@ -88,7 +88,7 @@ const K_RESET = 1;
 const ATTR = {
     evade:  { n: '회피', i: '✦', role: '함정·공격을 피하고 앞길을 살핀다' },
     break:  { n: '파괴', i: '✧', role: '기믹을 부수고 몬스터를 잡는다' },
-    heal:   { n: '치유', i: '❋', role: '동료의 체력을 고친다 (무조건 성공)' },
+    heal:   { n: '치유', i: '❋', role: '동료의 체력을 고친다 (판정)' },
     luck:   { n: '행운', i: '✺', role: '얻는 것이 좋아지고 꿈결이 더 붙는다' },
     sense:  { n: '감각', i: '◈', role: '길을 찾고 숨은 보물을 찾는다' },
     hide:   { n: '은신', i: '◐', role: '몰래 지나가고 먼저 친다' },
@@ -1506,11 +1506,22 @@ window.kroomCook = function () {
 // ==========================================
 // 5. 돌보기 — 속성마다 할 수 있는 것
 // ==========================================
-//   치유 → 체력 (무조건 성공)   응시 → 정신력   보정 → 마력
+//   치유 → 체력 (판정 — d20 + 보정 ≥ DC 10 · 2026-10-20 전에는 무조건 성공)   응시 → 정신력   보정 → 마력
 //   굳건 → 제 무력             연결 → 내공     요리사 → 국을 건넨다
 //   층마다 두 번 (치유 장비가 있으면 그 횟수만큼 더). 보정이 팀에 있으면 채우는 양이 늘어난다.
 const CARE = { heal: 'hp', gaze: 'spirit', fix: 'mana', bond: 'qi', steady: 'might' };
 function careMax() { return 2 + ((kr.gear && kr.gear.heal) ? kr.gear.heal.n : 0); }
+// ★ 치유도 판정을 굴린다 (2026-10-20) — 돌보기 DC 10 · 쓰러진 동료 일으키기는 그 쓰러짐의 DC
+//   굴림은 roll('heal') — d20 + 바탕 보정 + 치유 직업 +3 + 각성 + 팀 보정. 1 은 늘 실패 · 20 은 늘 성공
+const CARE_DC = 10;
+function healDice(R, dc, ok) {
+    return `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
+}
+function healRoll(dc) {
+    const R = roll('heal');
+    const ok = R.r !== 1 && (R.r === 20 || (R.r + R.b) >= dc);
+    return { R: R, ok: ok, dice: healDice(R, dc, ok) };
+}
 function careAmt() { return Math.round(25 * (1 + 0.2 * Math.min(2, teamCount('fix'))) * (1 + 0.1 * gi(prof().grade))); }
 function supportBtn() {
     const a = JOBS[kr.job][0];
@@ -1554,6 +1565,18 @@ window.kroomCareGo = function (code) {
         kr.items['따뜻한 국']--;
     }
     kr.uses.care = (kr.uses.care || 0) + 1;
+    // ★ 치유 — 판정 (실패해도 돌봄 한 번은 쓴다)
+    const who = code === me().code ? '스스로' : ((teamStats().filter(function (m) { return m.code === code; })[0] || {}).n || '');
+    let H_ = null;
+    if (a === 'heal') {
+        H_ = healRoll(CARE_DC);
+        if (!H_.ok) {
+            if (darkRun.isParty && code !== me().code) sendPartyChat(me().name + ' → ' + who + ' : 치유가 닿지 않았습니다', true);
+            show('돌보기', H_.dice + '손을 얹었다. 상처가 손을 밀어낸다.<br><br>아무것도 아물지 않았다.',
+                darkChoiceBtn('돌보기로 돌아간다.', 'kroomCare()') + darkChoiceBtn('돌아간다.', 'kroomBack()'));
+            return;
+        }
+    }
     const amt = careAmt();
     const give = stat ? { k: stat, v: amt } : { k: 'dish', v: 1 };
     if (code === me().code) applyAid(give, '스스로');
@@ -1561,6 +1584,11 @@ window.kroomCareGo = function (code) {
         const d = db_();
         if (d && darkRun.isParty) d.ref('darkParties/' + darkRun.partyId + '/kAid/' + code).push({ k: give.k, v: give.v, from: me().name, at: now() });
         if (darkRun.isParty) sendPartyChat(me().name + ' → ' + ((teamStats().filter(function (m) { return m.code === code; })[0] || {}).n || '') + ' : ' + (stat ? STATN[stat] + ' +' + amt : '따뜻한 국'), true);
+    }
+    if (H_) {
+        show('돌보기', H_.dice + '손을 얹었다. 상처가 손을 기억한다.<br><br>' + esc(who) + (who === '스스로' ? ' — ' : ' 사원 — ') + STATN[stat] + ' +' + amt,
+            darkChoiceBtn('돌보기로 돌아간다.', 'kroomCare()') + darkChoiceBtn('돌아간다.', 'kroomBack()'));
+        return;
     }
     kroomCare();
 };
@@ -1767,7 +1795,7 @@ function doom(cfg) {
             <div style="font-size:30px; font-weight:bold; color:#fff;"><span id="kdoom-left">${left}</span><span style="font-size:14px; color:#888;">초</span></div>
             <div style="font-size:10px; color:#aaa; margin-top:8px;">동료가 오면 살아납니다. 아무도 못 오면 여기서 끝납니다.</div></div>`);
 }
-// 체력이 바닥 — 치유가 고치면 일어서고(무조건), 아니면 끌어내기를 기다린다
+// 체력이 바닥 — 치유가 고치면 일어서고(판정 · 2026-10-20 전에는 무조건), 아니면 끌어내기를 기다린다
 function fall(txt) {
     kr.down = true; pubStat();
     const healer = darkRun.isParty && teamStats().some(function (m) { return m.code !== me().code && attrOf(m.code) === 'heal' && !m.down; });
@@ -1796,10 +1824,10 @@ function banner() {
         const v = kr.doomAll[c];
         const left = Math.max(0, Math.round((v.until - now()) / 1000));
         const heal = JOBS[kr.job][0] === 'heal' && /쓰러/.test(v.what);
-        const tried = !heal && v.tried && v.tried[me().code];
+        const tried = v.tried && v.tried[me().code];                     // 치유도 한 사람에 한 번 (판정이 있으므로)
         return `<div style="background:rgba(127,0,0,0.3); border:2px solid #ff1744; border-radius:6px; padding:11px; margin-bottom:9px;">
             <div style="font-size:12px; color:#ff1744; font-weight:bold;">⚠⚠ ${esc(v.name)} — ${esc(v.what)}</div>
-            <div style="font-size:10px; color:#ddd; margin:4px 0 7px 0;">${v.floor || '?'}층 · 남은 ${left}초 ${heal ? '· <span style="color:#4CAF50;">치유는 무조건 일으켜 세운다</span>' : '· 한 사람에 한 번 · 놓치면 이쪽이 다친다'}</div>
+            <div style="font-size:10px; color:#ddd; margin:4px 0 7px 0;">${v.floor || '?'}층 · 남은 ${left}초 ${heal ? '· <span style="color:#4CAF50;">치유로 일으켜 세운다 (판정 · 한 사람에 한 번)</span>' : '· 한 사람에 한 번 · 놓치면 이쪽이 다친다'}</div>
             ${tried ? '<div style="font-size:11px; color:#aaa; text-align:center; padding:6px;">한 번 손을 뻗었다. 다른 동료를 기다린다.</div>'
                     : `<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px; background:linear-gradient(145deg,#b71c1c,#7f0000) !important; border-color:#ff1744 !important; color:#fff !important;" onclick="kroomRescue('${c}')">${heal ? '치유로 일으킨다' : '끌어낸다'}</button>`}</div>`;
     }).join('') + '</div>';
@@ -1811,11 +1839,19 @@ window.kroomRescue = function (code) {
         const v = s.val();
         if (!v || now() > v.until) { toast('이미 끝났습니다.'); return; }
         const healDown = JOBS[kr.job][0] === 'heal' && /쓰러/.test(v.what);
-        if (healDown) {                                      // 치유 — 무조건
+        if (healDown) {                                      // 치유 — 판정 (2026-10-20 · 전에는 무조건)
+            if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 얹었다.'); return; }
+            ref.child('tried/' + me().code).set(true);
+            const hr = healRoll(v.dc || 12);
+            if (!hr.ok) {                                    // 닿지 않았다 — 치유자는 다치지 않는다 · 다른 동료가 아직 손을 뻗을 수 있다
+                sendPartyChat(me().name + ' 사원의 치유가 ' + v.name + ' 사원에게 닿지 않았습니다.', true);
+                show('구제', hr.dice + `손을 얹었다. 상처가 손을 밀어낸다.<br><br>${esc(v.name)} 사원은 아직 눈을 뜨지 못했다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
+                return;
+            }
             d.ref('darkParties/' + darkRun.partyId + '/kAid/' + code).push({ k: 'hp', v: careAmt(), from: me().name, at: now() });
             ref.remove(); kr.exp += 30;
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 치유로 일으켰습니다.', true);
-            show('구제', `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
+            show('구제', hr.dice + `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
             return;
         }
         if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 뻗었다.'); return; }   // 한 사람은 한 번만
