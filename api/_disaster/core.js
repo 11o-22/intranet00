@@ -413,7 +413,13 @@ function withBody(m, b) { return b ? Object.assign(m, { g: b.g, flip: b.flip, ch
 //   ★ 사라지는 것은 이 판 안에서만이다 — 게임 속 여우(kits)는 건드리지 않는다 (기록 소실에서만)
 const BABY = '🐾 아기 여우';
 const FOX_ORDER = ['evade', 'heal', 'hide', 'sense', 'bond', 'gaze', 'break', 'luck'];
-async function foxesOf(db, codes, P, now) {
+// picks — 사번 → 주인이 고른 여우 ('evade,heal' · '-' 는 하나도 안 데려감 · 없으면 전부) (2026-10-20)
+function pickOf(v) {
+    if (v == null || v === '') return null;
+    if (v === '-') return [];
+    return String(v).split(',').filter((k) => FOXES[k]);
+}
+async function foxesOf(db, codes, P, now, picks) {
     const day = kstDay(now);
     const got = await Promise.all(codes.map((c) => Promise.all([
         db.get('users/' + c + '/kits'), db.get('users/' + c + '/kitDay'), db.get('users/' + c + '/kitOn')])));
@@ -423,7 +429,9 @@ async function foxesOf(db, codes, P, now) {
         const owns = P && P[c] && (P[c].eq || []).concat(P[c].inv || []).some((w) => baseName(w) === BABY);
         if (owns) {
             const fresh = kday !== day;                       // 날이 바뀌었으면 여덟이 다시 살아 있다
+            const pick = pickOf(picks && picks[c]);           // 주인이 대기실에서 고른 것만
             FOX_ORDER.forEach((k) => {
+                if (pick && pick.indexOf(k) < 0) return;
                 const s = (kits && typeof kits === 'object' && kits[k] && typeof kits[k] === 'object') ? kits[k] : {};
                 if (!fresh && s.gone) return;
                 if (s.to && String(s.to) !== c) return;       // 남에게 붙여 준 것은 그쪽 곁에
@@ -521,7 +529,8 @@ async function start(b, deps, db) {
         const B0 = await bodies(db, players0, now);
         codes.forEach((c) => withBody(mem[c], B0[c]));
         // 🐾 아기 여우 — 누구 곁에 누가 왔나
-        const FX0 = await foxesOf(db, players0, P, now);
+        const picks0 = {}; players0.forEach((c) => { picks0[c] = (run.members && run.members[c] && run.members[c].foxPick) || null; });
+        const FX0 = await foxesOf(db, players0, P, now, picks0);
         codes.forEach((c) => { mem[c].foxes = foxesWith(FX0, c).map((id) => foxLabel(FX0[id], mem)); });
         const fxKinds0 = Object.keys(FX0).map((id) => FX0[id].k);
 

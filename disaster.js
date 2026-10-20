@@ -490,6 +490,58 @@ function gearPick(r, u) {
     }).join('') + '</div>';
     return h;
 }
+// ★ 🐾 아기 여우 — 주인은 데려갈 여우를 고른다 (2026-10-20)
+//   members/<사번>/foxPick = 'evade,heal' 꼴 글자 · '-' 는 하나도 안 데려감 · 없으면 데려갈 수 있는 것 전부
+//   (빈 배열은 파이어베이스가 지워 「안 고름」과 갈리지 않으므로 글자로 둔다 — 서버 core.js foxesOf 가 읽는다)
+//   남에게 붙여 준 여우는 그 사람 곁으로 가므로 여기서 고르지 않는다 · 오늘 소멸한 여우도 못 고른다
+const BABY = '🐾 아기 여우';
+const FOX_K = [['evade', '코코', '회피'], ['sense', '잭슨', '감각'], ['heal', '쭈니', '치유'], ['hide', '루팡', '은신'],
+               ['luck', '앙냥', '행운'], ['break', '디트', '파괴'], ['bond', '메리', '연결'], ['gaze', '니케', '응시']];
+function ownsBaby(u) {
+    return (u.equippedWeapons || []).concat(u.inventory || []).some(function (w) { return baseOf(w) === BABY; });
+}
+function dayStr() { try { return getTodayStr(); } catch (e) { return new Date().toISOString().slice(0, 10); } }
+function foxStateOf(u, k) {                 // 'ok' · 'gone' · '붙여 준 사람 이름'
+    const kits = (u.kits && typeof u.kits === 'object') ? u.kits : {};
+    const s = (kits[k] && typeof kits[k] === 'object') ? kits[k] : {};
+    if (u.kitDay === dayStr() && s.gone) return 'gone';
+    if (s.to && s.to !== u.code) return String(s.toName || s.to);
+    return 'ok';
+}
+function foxPickOf(x) {
+    const v = x && x.foxPick;
+    if (v == null || v === '') return null;
+    if (v === '-') return [];
+    return String(v).split(',').filter(Boolean);
+}
+function foxOn(r, u) {
+    const avail = FOX_K.filter(function (f) { return foxStateOf(u, f[0]) === 'ok'; }).map(function (f) { return f[0]; });
+    const pick = foxPickOf((r.members || {})[u.code]);
+    return { avail: avail, on: pick === null ? avail : pick.filter(function (k) { return avail.indexOf(k) >= 0; }) };
+}
+function foxPick(r, u) {
+    if (!ownsBaby(u)) return '';
+    const F = foxOn(r, u);
+    let h = '<div class="dz-sec">🐾 데려갈 아기 여우 — ' + F.on.length + ' / ' + F.avail.length + '</div>';
+    h += '<div class="dz-chk" style="margin:0 0 10px;">' + FOX_K.map(function (f) {
+        const s = foxStateOf(u, f[0]), ok = s === 'ok', sel = ok && F.on.indexOf(f[0]) >= 0;
+        return '<span data-fox="' + f[0] + '" class="' + (sel ? 'ok' : '') + '" style="cursor:' + (ok ? 'pointer' : 'default') + ';'
+            + (ok ? '' : 'opacity:.4;') + 'font-size:11px;padding:5px 9px;">' + (sel ? '✓ ' : '') + f[1]
+            + ' <i style="font-style:normal;color:#6f8c8c;">' + f[2] + (s === 'gone' ? ' · 오늘 소멸' : (ok ? '' : ' · ' + esc(s) + ' 곁')) + '</i></span>';
+    }).join('') + '</div>';
+    return h;
+}
+function toggleFox(k) {
+    const u = me(), d = db_(), r = curId && all[curId];
+    if (!u || !d || !r || r.state !== 'LOBBY' || !r.members || !r.members[u.code] || !ownsBaby(u)) return;
+    const F = foxOn(r, u);
+    if (F.avail.indexOf(k) < 0) return;
+    const cur = F.on.slice(), i = cur.indexOf(k);
+    if (i >= 0) cur.splice(i, 1); else cur.push(k);
+    const all8 = F.avail.every(function (x) { return cur.indexOf(x) >= 0; });
+    d.ref(ROOT + '/' + curId + '/members/' + u.code + '/foxPick').set(all8 ? null : (cur.length ? cur.join(',') : '-'));
+}
+
 function toggleGear(nm) {
     const u = me(), d = db_(), r = curId && all[curId];
     if (!u || !d || !r || r.state !== 'LOBBY' || !r.members || !r.members[u.code]) return;
@@ -521,6 +573,7 @@ function room(r, u) {
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + '</div>';
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
     h += gearPick(r, u);
+    h += foxPick(r, u);
     if (lead) h += '<button class="dz-btn" data-start="1"' + (busy || r.phase === 'WAIT' ? ' disabled' : '') + '>시작한다</button>';
     else h += '<div class="dz-card-m">방장이 시작하기를 기다리는 중입니다.</div>';
     h += '<div style="margin-top:8px;"><button class="dz-btn sub" data-leave="1"' + (busy ? ' disabled' : '') + '>나간다</button></div>';
@@ -620,6 +673,7 @@ function wire() {
     const lv = ov.querySelector('[data-leave]'); if (lv) lv.onclick = leave;
     const cl = ov.querySelector('[data-close]'); if (cl) cl.onclick = close;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-gear]'), function (b) { b.onclick = function () { toggleGear(b.dataset.gear); }; });
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-fox]'), function (b) { b.onclick = function () { toggleFox(b.dataset.fox); }; });
     const ot = ov.querySelector('[data-out]'); if (ot) ot.onclick = toggleOut;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-watch]'), function (b) {
         b.onclick = function () { if (!isAdm(me())) return; watchId = b.dataset.watch; follow(); lastInfo = ''; paint(); };
