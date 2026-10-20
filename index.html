@@ -9746,6 +9746,8 @@ function bjFinish(mode) {
             // ★ 상담사가 아니면 여우구슬 절대 노출 불가
             if (item === "여우구슬" && currentUser.code !== 'kario0987') return false; 
             if (item === "금고" && currentUser.code !== 'kario0987') return false;
+            // ★ 소원권은 우주 쇼핑몰에 띄우지 않는다 — 상담사 화면 · 오늘 이미 스캔한 칸도 (2026-10-20)
+            if (item === "🫙 소원권" || item === "소원권") return false;
             return true;
         });
         // 진열칸은 하루에 이길 수 있는 만큼 — 네 번 × 3종 = 12칸.
