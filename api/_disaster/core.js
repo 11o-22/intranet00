@@ -50,7 +50,7 @@ import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE } from './l
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
-    TALK_MS: 180000,         // 장면마다 대화 시간 — 3분 (2026-10-20 · 90초에서 늘림)
+    TALK_MS: 150000,         // 장면마다 대화 시간 — 2분 30초 (2026-10-20)
     MAX_ROUNDS: 8,           // 한 판 최대 장면
     MAX_MEMBERS: 8,          // 한 방 최대 인원 (2026-10-20 — 4 → 8)
     DAILY_RUNS: 3,           // 사원 한 명이 하루에 들어갈 수 있는 판
