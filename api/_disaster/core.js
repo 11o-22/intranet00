@@ -250,7 +250,7 @@ const SCHEMA_START = obj({ plan: S, title: S, text: S, notes: S, fox_lines: FOX_
 const SCHEMA_FOX = obj({ lines: FOX_LINES });
 const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
     who: S, did: S, kind: { type: 'string', enum: KIND_KEYS },
-    tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S, burn: B }) } });
+    tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S, burn: B, move: S }) } });
 // 바깥의 말을 듣는 재난 (DISASTERS[kind].meta) — 사원마다 바깥의 말을 했는지도 고른다
 const SCHEMA_ACTS_META = obj({ acts: SCHEMA_ACTS.properties.acts, meta: { type: 'array', items: obj({ who: S, said: S }) } });
 // 🐾 아기 여우의 이번 장면 행동 (장면마다 한 마리에 하나 · kind 는 코드가 속성으로 정한다)
@@ -668,7 +668,8 @@ async function start(b, deps, db) {
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
                 '   꿈결이 맺힐 자리, 등장할 사람들, 들어온 사람들의 소속 차이가 어디서 부딪힐지. 들어온 사람에게는 보이지 않는다. 1200자 안쪽.',
                 '   소속 사이에 분란을 일으킬 속임수(가짜 구조 요청 · 한쪽에만 들리는 것 등)를 두세 개 심어 둔다.',
-                '   장면마다 장소 · 괴이 · 장면의 결이 달라지게 짠다 — 같은 것을 되풀이하지 않는다.',
+                '   장면마다 괴이 · 장면의 결이 달라지게 짠다 — 같은 것을 되풀이하지 않는다.',
+                '   장소는 들어온 사람이 괄호 행동으로 움직여야 바뀐다 — 설계에는 갈 만한 곳들과 그곳의 괴이를 깔아 둔다.',
                 ...(D.roles ? ['   사람마다 「이 재난에서」 자리가 다르다 — 사람마다 무엇이 다가오고 무엇을 겪는지 설계에 넣는다.'] : []),
                 '2. title — 첫 장면 제목 (짧게, 「장소 — 무엇」 꼴).',
                 '3. text — 첫 장면. 들어온 사람들이 재난에 들어선 순간. 450자 안쪽. 열린 상황으로 끝낸다.',
@@ -762,7 +763,8 @@ export function judge(acts, mem, rand, opt) {
             }
         }
         // 귀빈이 남을 구하거나 지켰다 — 행동은 된 채로 다른 곳으로 모셔진다 (2026-10-20 · 끌어내지 않고 모신다)
-        if (opt && opt.kick && mem[a.who].role === 'vip' && a.target && a.target !== a.who
+        //   ✗ 심야 토크쇼의 주인의 소각은 빼고 (2026-10-20 — 소각으로 동료를 지켜도 모셔지지 않는다)
+        if (opt && opt.kick && mem[a.who].role === 'vip' && a.target && a.target !== a.who && !(a.burn && mem[a.who].host)
             && mem[a.target] && mem[a.target].role !== 'admin' && st[a.who] !== 'lost') {
             st[a.who] = 'out'; row.kick = true;
         }
@@ -922,6 +924,9 @@ async function round(b, deps, db) {
                     '- tier 는 이 장면 상황에서 그 행동이 얼마나 어려운지 (easy / normal / hard).',
                     '- danger 는 실패하면 괴담에 노출되어 다치거나 맞춰질 수 있는 행동이면 true.',
                     '- target 은 다른 사원을 돕거나 구하는 행동일 때 그 사원의 코드, 아니면 빈 문자열.',
+                    '- move 는 그 사원이 괄호 행동으로 다른 곳으로 움직일 때(걸어간다 · 들어간다 · 나간다 · 내려간다 · 올라간다 · 도망친다 · 따라간다 …)'
+                        + ' 어디로 가는지 짧게 (예: 비상계단 · 문 너머 복도 · 나래를 따라). 그 자리 안에서의 몸짓이면 빈 문자열.'
+                        + ' 움직이기만 하고 따로 판정할 것이 없으면 kind 는 none.',
                     '- who 와 target 에는 반드시 아래 사원 목록의 코드를 그대로 쓴다.',
                     '- ' + echo + ' · (나가며) · (관리자) 로 표시된 말은 행동으로 넣지 않는다. 상태가 lost 나 out 인 사원 · 자리가 admin 인 사람도 넣지 않는다.',
                     ...(D.roles ? ['- 자리가 vip(귀빈)인 사원은 괴담이 해치려 들지 않는다. 귀빈의 행동은 danger=false — 귀빈이 스스로 남을 구하러 위험에 뛰어들 때만 true.',
@@ -994,6 +999,11 @@ async function round(b, deps, db) {
         const quietRoll = quietNow.filter((c) => quietN[c] >= CFG.QUIET_ROLL && !acts.some((a) => a && a.who === c));
         quietRoll.forEach((c) => acts.push({ who: c, did: '말없이 머뭇거린다', kind: 'evade', tier: 'normal',
                                              danger: !(D.roles && memNow[c].role === 'vip'), target: '', quiet: true }));
+
+        // ★ 이동 — 괄호 행동으로 움직인 사람만 장소가 바뀐다 (2026-10-20). 아무도 안 움직이면 다음 장면도 같은 자리
+        const movers = acts.filter((a) => a && !a.quiet && String(a.move || '').trim() && memNow[a.who] && memNow[a.who].role !== 'admin')
+            .map((a) => ({ c: a.who, to: clip(String(a.move).trim(), 40) }));
+        const moverSet = {}; movers.forEach((m) => { moverSet[m.c] = 1; });
 
         // ② 판정 — 코드가 정한다
         const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
@@ -1086,6 +1096,13 @@ async function round(b, deps, db) {
                     + ' 실패면 불꽃이 붙지 않거나 다 태우지 못한다 (그래도 방송국은 그 손가락을 두려워한다).', ''] : []),
                 ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
                     + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
+                '[이동 — 장소는 사원이 괄호 행동으로 움직일 때만 바뀐다]',
+                ...(movers.length
+                    ? ['움직인 사람: ' + movers.map((m) => (mem[m.c].n || m.c) + ' → ' + m.to).join(' · '),
+                       ...(active.filter((c) => !moverSet[c]).length ? ['움직이지 않은 사람 (제자리에 남는다): ' + active.filter((c) => !moverSet[c]).map((c) => mem[c].n || c).join(', ')] : []),
+                       '움직인 사람만 그곳으로 간다. 일부만 움직였으면 일행이 갈라진다 — 다음 장면은 갈라진 자리마다 무슨 일이 닥치는지 쓰고, 진행 메모에 누가 어디에 있는지 적는다.']
+                    : ['이번 장면에 움직인 사람이 없다 — 다음 장면(next_text)도 지금 이 자리에서 이어진다. 장소를 옮기지 않는다 (그 자리에 새 일이 닥친다 — 방송이 바뀌고 · 누가 들어오고 · 방의 다른 구석이 드러난다).']),
+                '진행자가 사람을 마음대로 다른 곳으로 옮기지 않는다. 괴담에게 끌려가는 것은 판정 결과로만 쓴다.', '',
                 '[이번 장면에서 나눈 대화]', talkS, '',
                 ...(speakers.length ? ['[이번 장면에 말한 사람 — 한 사람도 빠뜨리지 않는다] ' + speakers.map((c) => mem[c].n || c).join(', '), ''] : []),
                 ...(quietRoll.length ? ['[계속 말이 없던 사람] ' + quietRoll.map((c) => mem[c].n || c).join(', ')
@@ -1113,7 +1130,7 @@ async function round(b, deps, db) {
                 '- ended / end_kind / end_text : 끝내면 end_text 에 결말 (300자 안쪽). 안 끝내면 end_kind=none, end_text 빈 문자열.',
                 '- next_title / next_text : 안 끝내면 다음 장면 (제목 짧게 · 본문 450자 안쪽, 열린 상황으로). 끝내면 빈 문자열.',
                 '- notes : 앞으로 기억할 진행 메모 (지난 메모를 고쳐 쓴다 · 지금까지 쓴 장소와 괴이를 짧게 적어 두어 되풀이를 피한다, 600자 안쪽).',
-                '- next_text 는 지난 장면들과 다른 곳 · 다른 괴이 · 다른 결로 연다 (지난 장면 요약 · 진행 메모를 보고 겹치지 않게).',
+                '- next_text 는 지난 장면들과 겹치지 않는 괴이 · 다른 결로 연다 (지난 장면 요약 · 진행 메모를 보고). 장소는 [이동] 을 따른다.',
                 '- summary : 이번 장면 한 줄 요약 (80자 안쪽).',
                 '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.',
                 ...(foxTalkers.length
