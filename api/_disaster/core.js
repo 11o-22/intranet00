@@ -371,6 +371,36 @@ export function marksOf(p) {
     return out;
 }
 const SIGIL_ITEM = {}; Object.keys(SIGILS).forEach((k) => SIGILS[k].items.forEach((nm) => { SIGIL_ITEM[nm] = 1; }));
+// ★ 함께 들어온 커플 — 판 안에서 짝을 맞춘다 (2026-10-20)
+//   상대 사번으로 먼저 맞추고, 사번이 없거나 어긋나면 서로의 이름(partnerName ↔ 이름)으로 맞춘다. 맞춘 쪽은 p 를 고쳐 둔다.
+//   돌려주는 값 — [[사번, 사번], …] (한 쌍에 한 번)
+export function couplesOf(mem) {
+    const codes = Object.keys(mem || {});
+    codes.forEach((c) => {
+        const cp = mem[c] && mem[c].couple;
+        if (!cp || (cp.p && mem[cp.p])) return;
+        const d = codes.find((x) => x !== c && mem[x] && mem[x].n === cp.n
+            && mem[x].couple && (mem[x].couple.p === c || mem[x].couple.n === mem[c].n));
+        if (d) cp.p = d;
+    });
+    const out = [], seen = {};
+    codes.forEach((c) => {
+        const cp = mem[c] && mem[c].couple;
+        if (!cp || !cp.p || !mem[cp.p] || cp.p === c) return;
+        const k = [c, cp.p].sort().join('|');
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push([c, cp.p]);
+    });
+    return out;
+}
+function coupleLine(mem, pairs) {
+    if (!pairs || !pairs.length) return [];
+    return ['[함께 들어온 커플] ' + pairs.map((x) => (mem[x[0]].n || x[0]) + ' ' + ((mem[x[0]].couple && mem[x[0]].couple.e) || '💍') + ' ' + (mem[x[1]].n || x[1])).join(' · ')
+        + ' — 커플링으로 이어진 연인이 같은 재난에 함께 들어왔다. 둘이 서로를 알아보고 부르고 챙기는 사이로 그린다.'
+        + ' 괴담이 그 관계를 파고들 수 있다 (갈라놓기 · 한쪽을 미끼로). 성적인 묘사는 하지 않고, 관계 때문에 판정 결과를 바꾸지 않는다.', ''];
+}
+
 async function profiles(db, codes) {
     const one = async (c) => {
         const [aff, team, pos, eq, inv, soul, cp] = await Promise.all([
@@ -378,8 +408,10 @@ async function profiles(db, codes) {
             db.get('users/' + c + '/equippedWeapons'), db.get('users/' + c + '/inventory'), db.get('users/' + c + '/soulGear/name'),
             db.get('users/' + c + '/couple')]);
         // 커플링 — { partner, partnerName, emoji, color … } (index.html couple_ring)
+        //   상대 사번이 없는 묵은 꼴이면 이름만 들고 있다가 판에서 이름으로 짝을 찾는다 (couplesOf)
         const couple = (cp && typeof cp === 'object' && cp.partner && okCode(String(cp.partner)))
-            ? { p: String(cp.partner), n: clip(cp.partnerName || cp.partner, 20), e: clip(cp.emoji || '', 4) } : null;
+            ? { p: String(cp.partner), n: clip(cp.partnerName || cp.partner, 20), e: clip(cp.emoji || '', 4) }
+            : ((cp && typeof cp === 'object' && cp.partnerName) ? { p: '', n: clip(cp.partnerName, 20), e: clip(cp.emoji || '', 4) } : null);
         return { aff: aff || '', team: team || '', pos: pos || '', eq: invArr(eq), inv: invArr(inv), soul: soul ? String(soul) : '', couple: couple };
     };
     const out = {};
@@ -648,6 +680,7 @@ async function start(b, deps, db) {
             m.couple = P[c].couple;
             m.marks = (c === CFG.ADMIN) ? [] : marksOf(P[c]);
         });
+        const pairs0 = couplesOf(mem);                       // 함께 들어온 커플 (이름으로 맞춘 짝은 p 를 고쳐 둔다)
         await db.patch('disaster/' + b.run, { state: 'PLAY', phase: 'WAIT', startedAt: now, err: null });
         // 몸 — 성별 · 걸린 효과 (진행자에게만 · 판에는 적지 않는다)
         const players0 = codes.filter((c) => mem[c].role !== 'admin');
@@ -663,6 +696,7 @@ async function start(b, deps, db) {
             model: CFG.SONNET, max: 4000, system: gmSystem(run.kind), schema: SCHEMA_START,
             user: [
                 '[들어온 사람]', memberLines(mem, D), '',
+                ...coupleLine(mem, pairs0),
                 ...(fxKinds0.length ? [foxRule(fxKinds0), ''] : []),
                 '[할 일]',
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
@@ -694,6 +728,7 @@ async function start(b, deps, db) {
             up['members/' + c + '/fate'] = null;
             up['members/' + c + '/gear'] = (m.gear && m.gear.length) ? m.gear : null;
             up['members/' + c + '/couple'] = m.couple || null;
+            up.couples = pairs0.length ? pairs0 : null;          // 화면이 💍 를 붙인다
             up['members/' + c + '/marks'] = (m.marks && m.marks.length) ? m.marks : null;
         });
         await db.patch('disaster/' + b.run, up);
@@ -1067,6 +1102,7 @@ async function round(b, deps, db) {
                 '[진행 메모]', (srv && srv.notes) || '(없음)', '',
                 '[지난 장면 요약]', sums.join('\n') || '(없음)', '',
                 '[들어온 사람 — 이번 판정까지 반영한 상태]', memberLines(memAfter, D), '',
+                ...coupleLine(memAfter, couplesOf(memAfter)),
                 ...(outNow.length ? ['[이번 장면에 홀로 나간 귀빈] ' + outNow.map((c) => mem[c].n || c).join(', ')
                     + ' — 귀빈실을 거쳐 방송국을 빠져나간다. 그 자리가 빈 순간부터 방송국이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
                 ...(surge ? ['[방송국의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
@@ -1282,6 +1318,7 @@ async function foxChat(b, deps, db) {
     const people = Object.keys(mem).filter((c) => mem[c].role !== 'admin');
     const BB = await bodies(db, people, now);
     // 커플링 — 누구와 연인인지 (같이 들어왔는지) · 2026-10-20
+    const pairsF = couplesOf(mem);
     const cpl = (m) => (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
         + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '');
     const who = people.map((c) => {
@@ -1304,6 +1341,7 @@ async function foxChat(b, deps, db) {
             ...(run.last && Number(run.last.n) === n - 1 && run.last.result ? ['[지난 장면에서 벌어진 일]', clip(run.last.result, 700), ''] : []),
             '[지금 장면] ' + (scene.title || ''), clip(scene.text || '', 900), '',
             '[판에 있는 사원 — 사람 목록]', who, '',
+            ...coupleLine(mem, pairsF),
             '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')

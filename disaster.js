@@ -618,15 +618,38 @@ function toggleGear(nm) {
     d.ref(ROOT + '/' + curId + '/members/' + u.code + '/gear').set(cur.length ? cur : null);
 }
 
+// 💍 함께 들어온 커플 — 사번 → 짝의 사번 (판이 시작되면 서버가 맞춘 couples · 대기실에서는 사원 기록의 couple 로)
+function pairMap(r) {
+    const m = r.members || {}, out = {};
+    if (Array.isArray(r.couples)) r.couples.forEach(function (x) { if (x && m[x[0]] && m[x[1]]) { out[x[0]] = x[1]; out[x[1]] = x[0]; } });
+    Object.keys(m).forEach(function (c) {
+        if (out[c]) return;
+        const uc = me();
+        const cp = (m[c].couple && m[c].couple.p) ? { partner: m[c].couple.p }
+            : ((uc && uc.code === c) ? uc.couple : ((typeof db !== 'undefined' && db.users && db.users[c]) || {}).couple) || null;
+        if (cp && cp.partner && m[cp.partner] && cp.partner !== c) { out[c] = cp.partner; out[cp.partner] = c; }
+    });
+    return out;
+}
+function coupleEmoji(c) {
+    try {
+        const u = me();
+        const src = (u && u.code === c) ? u : ((typeof db !== 'undefined' && db.users && db.users[c]) || null);
+        const cp = src && src.couple;
+        return (cp && cp.emoji) || '💍';
+    } catch (e) { return '💍'; }
+}
 function memberChips(r, u) {
     const m = r.members || {}, n = Number(r.round) || 0;
+    const pm = pairMap(r);
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
             : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + (st === 'out' && x.kick ? '모셔짐' : ST[st])
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
-        return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '">'
-            + esc(x.n || c) + tag + '</span>';
+        return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '"'
+            + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
+            + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + tag + '</span>';
     }).join('');
 }
 
@@ -638,6 +661,12 @@ function room(r, u) {
     if (r.phase === 'WAIT') h += '<div id="dz-wait">진행자가 재난을 여는 중…</div>';
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + '</div>';
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
+    // 💍 커플이 함께 들어간다 — 진행자도 안다
+    const pm = pairMap(r), seenP = {};
+    const pairs = Object.keys(pm).filter(function (c) { const k = [c, pm[c]].sort().join('|'); if (seenP[k]) return false; seenP[k] = 1; return true; });
+    if (pairs.length) h += '<div class="dz-card-m" style="margin:0 0 10px; color:#ffb7c5;">' + pairs.map(function (c) {
+        return esc((r.members[c] || {}).n || c) + ' ' + esc(coupleEmoji(c)) + ' ' + esc((r.members[pm[c]] || {}).n || pm[c]);
+    }).join(' · ') + ' — 커플이 함께 들어갑니다. 재난 속에서도 둘이 연인임을 압니다.</div>';
     h += gearPick(r, u);
     h += foxPick(r, u);
     if (lead) h += '<button class="dz-btn" data-start="1"' + (busy || r.phase === 'WAIT' ? ' disabled' : '') + '>시작한다</button>';
