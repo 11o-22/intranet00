@@ -351,6 +351,10 @@ function live(u) {
         return b && b.k && (b.run || (b.until || 0) > t);
     });
 }
+// 베낄 수 있는 버프 — 가져와서 생긴 것(K·LEE · 이레귤러 카피 · 빼앗은 것)은 뺀다 (2026-10-20)
+function takeable(u) {
+    return live(u).filter(function (b) { return !(window.ibCopied && window.ibCopied(b)); });
+}
 
 // 창 — titles.js 와 같은 모양으로 직접 만든다 (칭호 쪽에는 창 틀이 없다)
 let shell = null;
@@ -377,7 +381,7 @@ window.irrCopy = function () {
     const box = cBox(u);
     if (copyLeft(u) <= 0) { alert_('오늘은 더 베낄 수 없습니다.\n\n하루 ' + COPY_DAY + '번까지입니다.'); return; }
 
-    const list = users().filter(function (x) { return x.code !== u.code && live(x).length; });
+    const list = users().filter(function (x) { return x.code !== u.code && takeable(x).length; });
     if (!list.length) { alert_('베낄 버프를 가진 사원이 없습니다.'); return; }
 
     const rows = list.map(function (x) {
@@ -390,7 +394,7 @@ window.irrCopy = function () {
             + esc(x.name) + ' <span style="color:#8a8a8a;">NO.' + esc(x.no || '') + '</span></div>'
             + '<div style="font-size:10px; color:#8a8a8a; margin-top:3px;">'
             + (full ? '오늘은 다른 사람을 더 고를 수 없습니다'
-                    : live(x).length + '가지' + (already ? ' · 오늘 이미 베낀 사원' : ''))
+                    : takeable(x).length + '가지' + (already ? ' · 오늘 이미 베낀 사원' : ''))
             + '</div></button>';
     }).join('');
 
@@ -411,7 +415,7 @@ function pickBuff(code) {
     const u = me(), t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
     shut();
     if (!t) { alert_('사원을 찾지 못했습니다.'); return; }
-    const bs = live(t);
+    const bs = takeable(t);
     if (!bs.length) { alert_('베낄 버프가 없습니다.'); return; }
 
     const rows = bs.map(function (b, i) {

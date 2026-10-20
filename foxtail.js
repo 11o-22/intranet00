@@ -211,8 +211,12 @@ function apply(target, k, count) {
 
     } else {
         if (!Array.isArray(target.foxBuffs)) target.foxBuffs = [];
-        target.foxBuffs.push({ k: k, v: v, until: until });
-        say = T.n + ' +' + v + T.unit + ' (24시간)';
+        // 판정은 다른 판정 버프와 합쳐 +10 까지 (newitems2.js BON_CAP · 2026-10-20)
+        let vv = v;
+        if (k === 'roll' && typeof window.buffBonRoom === 'function') vv = Math.min(v, window.buffBonRoom(target));
+        if (vv > 0) target.foxBuffs.push({ k: k, v: vv, until: until });
+        say = T.n + ' +' + vv + T.unit + ' (24시간)'
+            + (vv < v ? ' — 판정 버프는 합쳐 +' + (window.BUFF_BON_CAP || 10) + ' 까지라 ' + (vv ? '+' + vv + ' 만' : '붙지 않았습니다') : '');
     }
     return say;
 }

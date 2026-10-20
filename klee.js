@@ -499,12 +499,17 @@ function liveBuffs(u) {
     });
 }
 
+// ① 가져올 수 있는 버프 — 가져와서 생긴 것(K·LEE · 이레귤러 카피 · 빼앗은 것)은 뺀다 (2026-10-20)
+function takeable(u) {
+    return liveBuffs(u).filter(function (b) { return !(window.ibCopied && window.ibCopied(b)); });
+}
+
 function m1Pick() {
     const u = me();
     shut();
     // 버프를 들고 있는 사원만 보여 준다 — 없는 사람을 고르면 가져올 것이 없다
     const list = users().filter(function (x) { return x.code !== u.code; })
-        .map(function (x) { return { u: x, b: liveBuffs(x) }; })
+        .map(function (x) { return { u: x, b: takeable(x) }; })
         .sort(function (a, b) { return b.b.length - a.b.length; });
 
     const rows = list.map(function (r) {
@@ -543,7 +548,7 @@ function m1Buffs(codes) {
     codes.forEach(function (c) {
         const t = db.users[c];
         if (!t) return;
-        liveBuffs(t).forEach(function (b, i) {
+        takeable(t).forEach(function (b, i) {
             pool.push({ code: c, name: t.name, k: b.k, v: b.v, i: i });
         });
     });

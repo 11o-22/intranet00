@@ -71,8 +71,49 @@ function ibClean(u) {
     return keep;
 }
 
+// ★ 판정 버프 상한 (2026-10-20)
+//   버프로 붙는 판정 몫 — itemBuffs 의 bon(1회짜리 포함) + 호사수구 판정(foxBuffs roll) — 은 합쳐 +10 까지.
+//   붙일 때 넘는 몫을 잘라 낸다. 이미 붙어 있는 것은 끝날 때까지 그대로 둔다 (앞으로 붙는 것만).
+//   장비 · 속성 · 각성 · DNA 고유 몫은 여기에 들지 않는다.
+//   ✗ 1회짜리 버프를 지우는 자리(아래 정산 · kroom-core 정산)는 건드리지 않는다.
+const BON_CAP = 10;
+function liveBon(u) {
+    const t = Date.now();
+    let s = 0;
+    (Array.isArray(u && u.itemBuffs) ? u.itemBuffs : []).forEach(function (b) {
+        if (b && b.k === 'bon' && b.v > 0 && (b.run || (b.until || 0) > t)) s += b.v;
+    });
+    (Array.isArray(u && u.foxBuffs) ? u.foxBuffs : []).forEach(function (b) {
+        if (b && b.k === 'roll' && b.v > 0 && (b.until || 0) > t) s += b.v;
+    });
+    return s;
+}
+window.BUFF_BON_CAP = BON_CAP;
+window.buffBonRoom = function (u) { return Math.max(0, BON_CAP - liveBon(u || currentUser)); };
+
+// ★ 가져와서 생긴 버프 — 다시 가져가지 못한다 (2026-10-20)
+//   K·LEE ① 「가져오기」 · 이레귤러 카피 · 황룡의 눈 · 산군의 도움으로 얻은 것, 빼앗겨 상쇄 중인 것.
+//   이것까지 고를 수 있으면 가져올 때마다 두 배씩 불어난다 (+2 → +4 → +12 → +28 → +60).
+window.ibCopied = function (b) {
+    const s = String((b && b.src) || '');
+    return s === 'K.LEE' || /이레귤러$/.test(s) || s === '황룡의 눈' || s === '산군의 도움' || /빼앗김$/.test(s);
+};
+
 function ibAdd(u, k, v, ms, src, opt) {
     u = u || currentUser;
+    if (k === 'bon' && v > 0) {
+        const room = Math.max(0, BON_CAP - liveBon(u));
+        if (room < v) {
+            try {
+                if (currentUser && u.code === currentUser.code && typeof addHistoryLog === 'function') {
+                    addHistoryLog(u, '[버프] 판정 버프는 합쳐 +' + BON_CAP + ' 까지 — ' + (src || '버프') + ' 판정 +' + v
+                        + (room > 0 ? ' 중 +' + room + ' 만 붙었습니다' : ' 는 붙지 않았습니다'));
+                }
+            } catch (e) { }
+            if (room <= 0) return null;
+            v = room;
+        }
+    }
     const b = { k: k, v: v, src: src || '' };
     if (opt && opt.run) b.run = 1; else b.until = Date.now() + (ms || 24 * HOUR);
     ibList(u).push(b);
@@ -1075,7 +1116,7 @@ function stealPanel(target, srcName, maxPick, dayCap) {
     function showList() {
         // 이미 빼앗겨 상쇄 중인 것은 가져올 대상이 아니다
         const bag = ibClean(target).filter(function (b) {
-            return !/빼앗김/.test(String(b.src || '')) && b.v > 0;
+            return !/빼앗김/.test(String(b.src || '')) && b.v > 0 && !window.ibCopied(b);   // 가져와서 생긴 것은 못 가져간다
         });
         const gear = (target.equippedWeapons || []).slice();
         const g0 = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
@@ -1227,15 +1268,18 @@ function stealPanel(target, srcName, maxPick, dayCap) {
             } else if (t === 'ib') {
                 const b = bag[parseInt(inp.dataset.i, 10)];
                 if (!b) return;
-                ibAdd(currentUser, b.k, b.v, life, srcName);
-                ibAdd(target, b.k, -b.v, life, srcName + '에 빼앗김');
-                took.push(buffName(b.k) + ' +' + b.v);
+                // 판정은 상한에 잘릴 수 있다 — 실제로 붙은 만큼만 상대에게서 뺀다
+                const got = ibAdd(currentUser, b.k, b.v, life, srcName);
+                const gv = got ? got.v : 0;
+                if (gv) ibAdd(target, b.k, -gv, life, srcName + '에 빼앗김');
+                took.push(buffName(b.k) + ' +' + gv);
 
             } else {
                 const k = inp.dataset.k, v = parseInt(inp.dataset.v, 10);
-                ibAdd(currentUser, k, v, life, srcName);
-                ibAdd(target, k, -v, life, srcName + '에 빼앗김');
-                took.push(buffName(k) + ' +' + v);
+                const got = ibAdd(currentUser, k, v, life, srcName);
+                const gv = got ? got.v : 0;
+                if (gv) ibAdd(target, k, -gv, life, srcName + '에 빼앗김');
+                took.push(buffName(k) + ' +' + gv);
             }
         });
 
