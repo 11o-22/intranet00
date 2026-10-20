@@ -175,6 +175,8 @@ function now() { return Date.now() + off; }
         '#dz-chat .ln.me b{color:#e8c27a;}',
         '#dz-chat .ln.echo{color:#7a8f8f;font-style:italic;}',
         '#dz-chat .sep{font-size:10px;color:#4e6a6a;text-align:center;margin:10px 0 4px;letter-spacing:2px;}',
+        '#dz-chat .dz-rh{margin-top:6px;}',             // 장면마다 — 지난 장면 결과 · 이번 장면 서술 (그 장면 대화 바로 위)
+        '#dz-foot{margin-top:12px;} #dz-foot:empty{display:none;}',
         '#dz-wait{font-size:12px;color:#e8c27a;text-align:center;padding:12px;border:1px dashed #5a4a2a;border-radius:8px;margin:10px 0;',
         '  animation:dzp 1.6s ease-in-out infinite;}',
         '@keyframes dzp{0%,100%{opacity:.55}50%{opacity:1}}',
@@ -317,7 +319,7 @@ function follow() {
     if (chatRef && chatCb) { try { chatRef.off('child_added', chatCb); } catch (e) { } }
     chatRef = chatCb = null; chatLines = [];
     const c = document.getElementById('dz-chat'); if (c) c.innerHTML = '';
-    curId = id; lastR = -1; lastInfo = '';
+    curId = id; lastR = -1; lastInfo = ''; headN = 0;
     if (!id) return;
     chatRef = db_().ref(CHAT + '/' + id).limitToLast(300);
     chatCb = function (s) { const v = s.val(); if (v && v.t) { chatLines.push(v); addLine(v); } };
@@ -325,25 +327,72 @@ function follow() {
 }
 
 let lastR = -1;
+// ★ 장면마다 한 묶음 (2026-10-20) — [지난 장면 결과 · 이번 장면 서술] 바로 아래에 그 장면의 대화가 이어진다
+//   예전에는 결과 · 서술이 창 맨 위(#dz-info)에만 있어 대화가 길어지면 한참 위로 올라가야 했다.
+//   #dz-chat > .dz-rd[data-r=장면] > .dz-rh (머리 — 결과 · 서술) + .dz-rl (대화) · 대기실(0)은 머리 없이 「— 대기실 —」
+function secOf(rn) {
+    const c = document.getElementById('dz-chat'); if (!c) return null;
+    let s = c.querySelector('.dz-rd[data-r="' + rn + '"]');
+    if (s) return s;
+    s = document.createElement('div');
+    s.className = 'dz-rd'; s.setAttribute('data-r', String(rn));
+    s.innerHTML = rn ? '<div class="dz-rh"><div class="sep">— 장면 ' + rn + ' —</div></div><div class="dz-rl"></div>'
+                     : '<div class="sep">— 대기실 —</div><div class="dz-rl"></div>';
+    const after = Array.prototype.filter.call(c.children, function (x) { return Number(x.getAttribute('data-r')) > rn; })[0];
+    c.insertBefore(s, after || null);
+    return s;
+}
 function addLine(v) {
     const c = document.getElementById('dz-chat'); if (!c) return;
     const u = me(), r = all[curId] || {};
     const rn = Number(v.r) || 0;
-    if (rn !== lastR) {
-        lastR = rn;
-        const sep = document.createElement('div');
-        sep.className = 'sep';
-        sep.textContent = rn ? '— 장면 ' + rn + ' —' : '— 대기실 —';
-        c.appendChild(sep);
-    }
+    const sec = secOf(rn); if (!sec) return;
     const m = (r.members || {})[v.c] || {};
     const el = document.createElement('div');
     // 🐾 아기 여우의 말 — 옅은 주황색 (서버가 올린 줄 · v.fox)
     el.className = 'ln' + (v.fox ? ' fox' : '') + (u && v.c === u.code ? ' me' : '') + (m.st === 'lost' ? ' echo' : '');
     el.innerHTML = '<b>' + esc(v.n || v.c) + '</b>' + esc(v.t);
-    c.appendChild(el);
+    sec.querySelector('.dz-rl').appendChild(el);
     const main = document.getElementById('dz-main');
     if (main && main.scrollHeight - main.scrollTop - main.clientHeight < 160) main.scrollTop = main.scrollHeight;
+}
+// 장면 머리 — 지난 장면 결과(판정 칩까지) · 이번 장면 서술
+function headHtml(r, n) {
+    const H = r.history || {}, cur = Number(r.round) || 0;
+    const L = (r.last && Number(r.last.n) === n - 1) ? r.last : null;
+    const p = H[n - 1] || null;
+    let h = '';
+    if (n >= 2 && (L || p)) {
+        h += '<div class="dz-sec">지난 장면 — ' + esc((L || p).title) + '</div>'
+            + '<div class="dz-res"><div class="b">' + br((L || p).result) + '</div>' + checkChips(L ? L.checks : (p && p.checks)) + '</div>';
+    }
+    const sc = (r.state === 'PLAY' && n === cur && r.scene) ? r.scene : H[n];
+    if (sc) h += '<div class="dz-sec">장면 ' + n + '</div>'
+        + '<div class="dz-scene"><div class="h">' + esc(sc.title) + '</div><div class="b">' + br(sc.text) + '</div></div>';
+    return h || '<div class="sep">— 장면 ' + n + ' —</div>';
+}
+// 장면 머리를 채운다 — 새 장면이 열리면 (아래쪽을 보고 있었으면) 그 머리가 맨 위에 오게 내린다
+let headN = 0;
+function syncHeads(r) {
+    if (!r || (r.state !== 'PLAY' && r.state !== 'END')) return;
+    const top = r.state === 'PLAY' ? (Number(r.round) || 0)
+        : Object.keys(r.history || {}).reduce(function (a, k) { return Math.max(a, Number(k) || 0); }, 0);
+    const main = document.getElementById('dz-main');
+    const low = !main || main.scrollHeight - main.scrollTop - main.clientHeight < 160 || !headN;
+    let moved = false;                                   // 지금 장면의 머리가 새로 채워졌나 (장면이 넘어가며 결과 · 서술이 차례로 닿는다)
+    for (let n = 1; n <= top; n++) {
+        const sec = secOf(n); if (!sec) return;
+        const hd = sec.querySelector('.dz-rh'), h = headHtml(r, n);
+        if (hd.getAttribute('data-h') !== h) { hd.innerHTML = h; hd.setAttribute('data-h', h); if (n === top) moved = true; }
+    }
+    if (r.state === 'PLAY' && top && (top !== headN || moved)) {
+        const first = !headN;
+        headN = top;
+        const hd = (secOf(top) || {}).firstChild;
+        if (main && hd && (low || first)) {
+            main.scrollTop += hd.getBoundingClientRect().top - main.getBoundingClientRect().top - 6;
+        }
+    }
 }
 
 // ==========================================
@@ -357,7 +406,7 @@ function paint() {
     const info = document.getElementById('dz-info'), mem = document.getElementById('dz-mem');
     const nEl = document.getElementById('dz-n'), bar = document.getElementById('dz-bar');
     const inp = document.getElementById('dz-in'), done = document.getElementById('dz-done');
-    let html = '';
+    let html = '', foot = '';
     if (!r) {
         lastR = -1;
         nEl.textContent = '· 대기실 목록';
@@ -374,7 +423,8 @@ function paint() {
         html = '<div class="dz-row" style="border-color:#5a4a2a;"><div class="w" style="color:#e8c27a;">👁 관전 중 — '
             + esc(((r.members || {})[r.leader] || {}).n || '?') + '의 방 <i>말과 확정은 할 수 없습니다</i></div>'
             + '<button data-unwatch="1">목록으로</button></div>'
-            + (r.state === 'END' ? ending(r, u) : (r.state === 'PLAY' ? play(r, u) : '<div class="dz-card-m">아직 시작하지 않은 방입니다.</div>'));
+            + ((r.state === 'END' || r.state === 'PLAY') ? '' : '<div class="dz-card-m">아직 시작하지 않은 방입니다.</div>');
+        foot = r.state === 'END' ? ending(r, u) : (r.state === 'PLAY' ? play(r, u) : '');
     } else {
         mem.style.display = '';
         mem.innerHTML = memberChips(r, u);
@@ -388,7 +438,7 @@ function paint() {
         } else if (r.state === 'PLAY') {
             const n = Number(r.round) || 0;
             nEl.textContent = '· 장면 ' + n;
-            html = play(r, u);
+            foot = play(r, u);                                  // 결과 · 서술은 대화칸의 장면 머리로 (syncHeads)
             const mySt = (r.members[u.code] || {}).st || 'ok';
             const lost = mySt === 'lost', out = mySt === 'out';
             const talk = r.phase === 'TALK';
@@ -402,11 +452,18 @@ function paint() {
             done.disabled = !talk;
         } else {
             nEl.textContent = '· 끝';
-            html = ending(r, u);
+            foot = ending(r, u);
             bar.style.display = 'none';
         }
     }
-    if (html !== lastInfo) { info.innerHTML = html; lastInfo = html; wire(); }
+    // 위(#dz-info) — 목록 · 대기실 · 관전 띠 / 아래(#dz-foot, 대화 뒤) — 지금 장면의 안내 · 끝 화면
+    const key = html + '\u0001' + foot;
+    if (key !== lastInfo) {
+        info.innerHTML = html;
+        const ft = document.getElementById('dz-foot'); if (ft) ft.innerHTML = foot;
+        lastInfo = key; wire();
+    }
+    if (r) syncHeads(r);
     onTick();
 }
 
@@ -615,17 +672,10 @@ function checkChips(list) {
     }).join('') + '</div>';
 }
 
+// 지금 장면의 안내 — 대화칸 아래 (#dz-foot). 지난 결과 · 장면 서술은 대화칸의 장면 머리에 (headHtml · 2026-10-20)
 function play(r, u) {
     const n = Number(r.round) || 0;
     let h = '';
-    if (r.last && Number(r.last.n) === n - 1) {
-        h += '<div class="dz-sec">지난 장면 — ' + esc(r.last.title) + '</div>'
-            + '<div class="dz-res"><div class="b">' + br(r.last.result) + '</div>' + checkChips(r.last.checks) + '</div>';
-    }
-    if (r.scene) {
-        h += '<div class="dz-sec">장면 ' + n + '</div>'
-            + '<div class="dz-scene"><div class="h">' + esc(r.scene.title) + '</div><div class="b">' + br(r.scene.text) + '</div></div>';
-    }
     // ✗ 「귀빈이 빠진 자리 — 난이도 +n」 · 「심야 토크쇼의 사회자가 없습니다」 같은 경고 줄은 띄우지 않는다 (2026-10-20)
     //   (진행자는 알고 이야기로 그린다 · 대기실 안내 카드에도 안 적는다)
     const x = (r.members || {})[u.code] || {}, st = x.st || 'ok';

@@ -1127,7 +1127,8 @@ async function round(b, deps, db) {
         const up = { err: null,
                      last: { n: n, title: clip(scene.title, 80), result: clip(out.result, 1500), checks: J.checks,
                              out: outNow.length ? outNow : null, surge: surge || null, nohost: NH ? (nhPlus || 1) : null } };
-        up['history/' + n] = { title: clip(scene.title, 80), text: clip(scene.text, 1500), result: clip(out.result, 1500) };
+        up['history/' + n] = { title: clip(scene.title, 80), text: clip(scene.text, 1500), result: clip(out.result, 1500),
+                               checks: J.checks.length ? J.checks : null };          // 판정 칩 — 대화칸의 장면 머리에 (2026-10-20)
         Object.keys(J.st).forEach((c) => { up['members/' + c + '/st'] = J.st[c]; });
         alive.forEach((c) => { up['members/' + c + '/quiet'] = (quietN[c] && !gone(J.st[c])) ? quietN[c] : null; });   // 몇 장면째 말이 없나
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
