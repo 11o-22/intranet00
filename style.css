@@ -251,6 +251,12 @@
 
         }
 
+        /* ★ 사택 대화 — 밝은 테마(재난관리국 · 연구팀)에서 말 글씨가 #ddd 로 남아 안 보이던 것 (2026-10-20)
+           위 .sub-panel 묶음은 바로 위 규칙의 닫는 괄호가 빠져 있어 걸리지 않는다 — 여기서는 대화칸만 따로 잡는다 */
+        body.theme-hanbok #hchat-log .hc-t, body.theme-white #hchat-log .hc-t { color: #1a2b3c !important; }
+        body.theme-hanbok #hchat-log .hc-tm, body.theme-white #hchat-log .hc-tm { color: #5a6b7c !important; }
+        body.theme-hanbok #hchat-log, body.theme-white #hchat-log { background: rgba(0,0,0,0.04) !important; }
+
         #pollution-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             pointer-events: none; z-index: 9999; transition: opacity 0.5s ease; opacity: 0;

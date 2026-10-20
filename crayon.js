@@ -99,12 +99,12 @@ function light(h) {
 window.crayonName = function (code, html) {
     const L = look(code);
     if (!L) return html;
-    return '<span class="cy-name" style="--cy-r:' + L.r + ';' + (L.n ? 'color:' + L.n + ' !important;' : '') + '">' + html + '</span>';
+    return '<span class="cy-name' + (L.n && light(L.n) ? ' cy-lt' : '') + '" style="--cy-r:' + L.r + ';' + (L.n ? 'color:' + L.n + ' !important;' : '') + '">' + html + '</span>';
 };
 window.crayonSay = function (code, html) {
     const L = look(code);
     if (!L || !L.c) return html;
-    return '<span class="cy-say" style="color:' + L.c + ' !important;">' + html + '</span>';
+    return '<span class="cy-say' + (light(L.c) ? ' cy-lt' : '') + '" style="color:' + L.c + ' !important;">' + html + '</span>';
 };
 // 광장 말풍선 — 바탕이 밝아(#f4efe2) 옅은 색이면 글자에 어두운 테를 두른다
 window.crayonBubbleCss = function (code) {
@@ -118,6 +118,10 @@ window.crayonOn = function (code) { return !!look(code); };
     const st = document.createElement('style');
     st.id = 'crayon-css';
     st.textContent = [
+        // ★ 밝은 바탕(밝은 벽지 · 재난관리국 · 연구팀 테마)에서 옅은 크레용 색은 어두운 테를 둘러 읽히게 한다 (2026-10-20)
+        //   광장 말풍선(crayonBubbleCss)과 같은 테 — 고른 색은 그대로 둔다
+        'body[data-ui-skin-tone="light"] .cy-lt,body.theme-hanbok .cy-lt,body.theme-white .cy-lt{',
+        '  text-shadow:0 0 2px rgba(0,0,0,.95),0 0 1px #000,0 1px 1px #000;}',
         // 닉네임 테두리 — 빛은 ::after 의 불투명도만 오르내린다 (줄이 많아도 가볍게)
         '.cy-name{position:relative;display:inline-block;padding:0 5px;margin:0 1px;border:1px solid var(--cy-r);',
         '  border-radius:6px;line-height:1.35;box-shadow:0 0 3px var(--cy-r);}',

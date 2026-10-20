@@ -9484,8 +9484,8 @@ if (r) {
                 <div style="margin-bottom:7px; text-align:${mine ? 'right' : 'left'};">
                     <div style="display:inline-block; max-width:80%; background:${mine ? 'rgba(76,175,80,0.12)' : 'rgba(255,255,255,0.05)'}; border:1px solid ${mine ? '#2e5c31' : '#333'}; border-radius:8px; padding:7px 10px; text-align:left;">
                         ${mine ? '' : `<div style="font-size:9px; color:var(--theme-focus); font-weight:bold; margin-bottom:3px;">${(typeof window.crayonName === 'function') ? window.crayonName(m.code, m.name) : m.name}</div>`}
-                        <div style="font-size:11px; color:#ddd; line-height:1.55; word-break:break-word;">${(typeof window.crayonSay === 'function') ? window.crayonSay(m.code, m.text) : m.text}</div>
-                        <div style="font-size:8px; color:#666; margin-top:3px; text-align:right;">${time}</div>
+                        <div class="hc-t" style="font-size:11px; color:#ddd; line-height:1.55; word-break:break-word;">${(typeof window.crayonSay === 'function') ? window.crayonSay(m.code, m.text) : m.text}</div>
+                        <div class="hc-tm" style="font-size:8px; color:#666; margin-top:3px; text-align:right;">${time}</div>
                     </div>
                 </div>`;
         }).join('');
