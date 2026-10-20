@@ -538,6 +538,7 @@ function checkChips(list) {
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
         if (c.kick) s += ' → 모셔짐';
+        if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 여우가 죽음을 대신 받았다
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
     }).join('') + '</div>';
 }

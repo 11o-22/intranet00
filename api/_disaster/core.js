@@ -47,7 +47,7 @@
 //   disasterSrv/<판>         숨긴 설계 · 진행 메모 · 장면 요약             (서버만 쓴다)
 //   disasterUse/<날짜>       하루 호출 수 · 사원별 시작 수
 // ==========================================
-import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE } from './lore.js';
+import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule } from './lore.js';
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
@@ -299,6 +299,7 @@ function memberLines(mem, d) {
             + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
             + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
+            + (Array.isArray(m.foxes) && m.foxes.length ? ' — 함께 있는 아기 여우: ' + m.foxes.join(' · ') : '')
             + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
                 + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
             + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국이 다른 곳으로 모셔 감' : stName(d, m.st));
@@ -403,6 +404,73 @@ async function bodies(db, codes, now) {
 }
 function withBody(m, b) { return b ? Object.assign(m, { g: b.g, flip: b.flip, child: b.child, fx: b.fx, body: true }) : m; }
 
+// ★ 🐾 아기 여우 — 기록 소실에서 함께 다닌다 (2026-10-20)
+//   주인(🐾 아기 여우를 가진 사람 — 차고 있든 소지품에 있든)이 판에 있으면, 오늘 아직 소멸하지 않았고
+//   남에게 붙여 주지 않은 여우가 주인 곁에 온다. 판에 든 사람에게 붙어 있는 여우(kitOn)는 그 사람 곁에 온다.
+//     users/<사번>/kits/<속성>  { gone, nick, to, toName }   kitDay — 그날 (babyfox.js)
+//     users/<사번>/kitOn/<속성> { by, byName, nick }
+//   판에는 disaster/<판>/foxes/<주인_속성> = { k, o(주인), on(곁에 있는 사람), nick, oN, gone(사라진 장면) }
+//   ★ 사라지는 것은 이 판 안에서만이다 — 게임 속 여우(kits)는 건드리지 않는다 (기록 소실에서만)
+const BABY = '🐾 아기 여우';
+const FOX_ORDER = ['evade', 'heal', 'hide', 'sense', 'bond', 'gaze', 'break', 'luck'];
+async function foxesOf(db, codes, P, now) {
+    const day = kstDay(now);
+    const got = await Promise.all(codes.map((c) => Promise.all([
+        db.get('users/' + c + '/kits'), db.get('users/' + c + '/kitDay'), db.get('users/' + c + '/kitOn')])));
+    const out = {};
+    codes.forEach((c, i) => {
+        const kits = got[i][0], kday = got[i][1], on = got[i][2];
+        const owns = P && P[c] && (P[c].eq || []).concat(P[c].inv || []).some((w) => baseName(w) === BABY);
+        if (owns) {
+            const fresh = kday !== day;                       // 날이 바뀌었으면 여덟이 다시 살아 있다
+            FOX_ORDER.forEach((k) => {
+                const s = (kits && typeof kits === 'object' && kits[k] && typeof kits[k] === 'object') ? kits[k] : {};
+                if (!fresh && s.gone) return;
+                if (s.to && String(s.to) !== c) return;       // 남에게 붙여 준 것은 그쪽 곁에
+                out[c + '_' + k] = { k: k, o: c, on: c, nick: clip(s.nick || '', 12), gone: 0 };
+            });
+        }
+        if (on && typeof on === 'object') {
+            Object.keys(on).forEach((k) => {
+                const x = on[k];
+                if (!x || typeof x !== 'object' || !FOXES[k] || !x.by || !okCode(String(x.by))) return;
+                out[String(x.by) + '_' + k] = { k: k, o: String(x.by), on: c, nick: clip(x.nick || '', 12), oN: clip(x.byName || '', 20), gone: 0 };
+            });
+        }
+    });
+    return out;
+}
+// 사람마다 곁에 있는 (살아 있는) 여우
+function foxesWith(foxes, c) {
+    return Object.keys(foxes || {}).filter((id) => foxes[id] && foxes[id].on === c && !foxes[id].gone);
+}
+function foxName(f) { return (FOXES[f.k] || {}).n || f.k; }
+function foxLabel(f, mem) {
+    const F = FOXES[f.k] || {};
+    const bits = [F.a || f.k];
+    if (f.o !== f.on) bits.push(((mem[f.o] && mem[f.o].n) || f.oN || f.o) + '이(가) 붙여 줌');
+    if (f.nick && f.nick !== F.n) bits.push('주인이 부르는 이름: ' + f.nick);
+    return (F.n || f.k) + '(' + bits.join(' · ') + ')';
+}
+// 이번 장면에 죽은 사람 — 곁의 여우 한 마리가 대신 소멸한다 (죽을 때마다 한 마리씩 · 남은 여우가 있는 동안)
+//   죽음을 부른 판정의 종류와 같은 여우가 먼저 나선다 (회피 판정이면 코코) · 없으면 회피 → 치유 → … 차례
+export function foxSave(J, memNow, foxes) {
+    const used = [];
+    Object.keys(J.st).forEach((c) => {
+        if (J.st[c] !== 'lost' || (memNow[c].st || 'ok') === 'lost') return;
+        const mine = foxesWith(foxes, c).filter((id) => used.indexOf(id) < 0);
+        if (!mine.length) return;
+        const row = J.checks.filter((r) => r.who === c && r.to === 'lost').pop() || null;
+        const want = row && row.kind;
+        const pick = mine.find((id) => foxes[id].k === want)
+            || FOX_ORDER.map((k) => mine.find((id) => foxes[id].k === k)).find(Boolean) || mine[0];
+        J.st[c] = 'hurt';
+        if (row) { row.to = 'hurt'; row.fox = { id: pick, n: foxName(foxes[pick]), k: foxes[pick].k }; }
+        used.push(pick);
+    });
+    return used;
+}
+
 // 귀빈이 홀로 나간 수 n → 남은 재난관리국 · 백일몽 쪽 난이도 + surge × (2ⁿ − 1)
 function surgeOf(d, mem) {
     if (!d || !d.roles || !d.surge) return 0;
@@ -449,13 +517,19 @@ async function start(b, deps, db) {
         });
         await db.patch('disaster/' + b.run, { state: 'PLAY', phase: 'WAIT', startedAt: now, err: null });
         // 몸 — 성별 · 걸린 효과 (진행자에게만 · 판에는 적지 않는다)
-        const B0 = await bodies(db, codes.filter((c) => mem[c].role !== 'admin'), now);
+        const players0 = codes.filter((c) => mem[c].role !== 'admin');
+        const B0 = await bodies(db, players0, now);
         codes.forEach((c) => withBody(mem[c], B0[c]));
+        // 🐾 아기 여우 — 누구 곁에 누가 왔나
+        const FX0 = await foxesOf(db, players0, P, now);
+        codes.forEach((c) => { mem[c].foxes = foxesWith(FX0, c).map((id) => foxLabel(FX0[id], mem)); });
+        const fxKinds0 = Object.keys(FX0).map((id) => FX0[id].k);
 
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4000, system: gmSystem(run.kind), schema: SCHEMA_START,
             user: [
                 '[들어온 사람]', memberLines(mem, D), '',
+                ...(fxKinds0.length ? [foxRule(fxKinds0), ''] : []),
                 '[할 일]',
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
                 '   꿈결이 맺힐 자리, 등장할 사람들, 들어온 사람들의 소속 차이가 어디서 부딪힐지. 들어온 사람에게는 보이지 않는다. 1200자 안쪽.',
@@ -469,7 +543,7 @@ async function start(b, deps, db) {
         }, SONNET_OPT));
 
         await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' } });
-        const up = { phase: 'TALK', round: 1, err: null,
+        const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
         codes.forEach((c) => {
             up['members/' + c + '/st'] = 'ok'; up['members/' + c + '/done'] = 0; up['members/' + c + '/leave'] = null;
@@ -605,6 +679,8 @@ function checkLine(c, d) {
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
     if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다';
+    if (c.fox) s += ' · [대신 소멸] 🐾 ' + c.fox.n + '(' + ((FOXES[c.fox.k] || {}).a || c.fox.k) + ') 가 ' + c.name + ' 대신 죽음을 받고 사라진다 — '
+        + c.name + ' 은(는) 다친 채 살아남는다';
     return s;
 }
 
@@ -734,6 +810,9 @@ async function round(b, deps, db) {
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             kick: !!(D.roles && D.kick) });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
+        // 🐾 아기 여우 — 이번에 죽을 사람 곁의 여우가 대신 소멸한다 (죽을 때마다 한 마리씩)
+        const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
+        const foxGone = foxSave(J, memNow, FX);
         const metaHit = J.checks.some((c) => c.meta);
         const lostNew = Object.keys(J.st).filter((c) => J.st[c] === 'lost' && (memNow[c].st || 'ok') !== 'lost');   // 이번에 죽은 사람
         const active = Object.keys(J.st).filter((c) => !gone(J.st[c]) && memNow[c].role !== 'admin');   // 아직 재난 안에서 움직이는 사람 (관리자 빼고)
@@ -748,6 +827,15 @@ async function round(b, deps, db) {
         const memAfter = {}; Object.keys(mem).forEach((c) => { memAfter[c] = Object.assign({}, memNow[c], { st: J.st[c] }); });
         kickNow.forEach((c) => { memAfter[c].kick = n; });
         Object.keys(memAfter).forEach((c) => withBody(memAfter[c], BB[c]));     // 성별 · 걸린 효과 (이번 장면에 다시 읽은 것)
+        // 함께 있는 아기 여우 — 이번에 사라진 아이는 빼고 · 판에서 빠진 사람(죽음 · 나감) 곁에는 없다
+        const FXa = {}; Object.keys(FX).forEach((id) => { FXa[id] = Object.assign({}, FX[id], foxGone.indexOf(id) >= 0 ? { gone: n } : {}); });
+        Object.keys(memAfter).forEach((c) => {
+            memAfter[c].foxes = gone(memAfter[c].st || 'ok') ? [] : foxesWith(FXa, c).map((id) => foxLabel(FXa[id], memAfter));
+        });
+        const foxKinds = Object.keys(FX).filter((id) => !FX[id].gone || foxGone.indexOf(id) >= 0).map((id) => FX[id].k);
+        // 주인 · 붙여 준 사람이 이번에 죽었는데 그 곁을 떠나 있던 여우 — 슬퍼한다
+        const foxGrief = Object.keys(FXa).filter((id) => !FXa[id].gone && FXa[id].on !== FXa[id].o
+            && J.st[FXa[id].o] === 'lost' && (memNow[FXa[id].o] && (memNow[FXa[id].o].st || 'ok') !== 'lost'));
         const sums = srv && srv.sums ? Object.keys(srv.sums).sort((a, z) => a - z).map((k) => srv.sums[k]) : [];
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4500, system: gmSystem(run.kind), schema: SCHEMA_TURN,
@@ -773,6 +861,11 @@ async function round(b, deps, db) {
                     + ' 「귀빈께서는 저희 방송과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다」 하고 귀빈을 다른 곳으로 모셔 간다.'
                     + ' 억지로 끌어내지 않는다 — 정중한 안내 · 비켜서는 방송인들 · 열리는 문. 그 극진함이 더 섬뜩하다.'
                     + ' 모셔 가는 곳은 괄호 안의 곳이다 (그 문 너머에 김이 오르는 선녀탕 · 여우 상담실이 있다). 모셔 간 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.', ''] : []),
+                ...(foxKinds.length ? [foxRule(foxKinds), ''] : []),
+                ...(foxGone.length ? ['[대신 소멸] ' + foxGone.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 대신').join(', ')
+                    + ' — 판정 결과의 [대신 소멸] 줄이다. 그 아이의 말투로 마지막 말을 남기고 사라진다. 곁의 다른 아기 여우가 있으면 반응한다.', ''] : []),
+                ...(foxGrief.length ? ['[주인을 잃은 아기 여우] ' + foxGrief.map((id) => foxName(FXa[id]) + ' — 주인 '
+                    + ((mem[FXa[id].o] || {}).n || FXa[id].o) + ' 이(가) 죽었다').join(', ') + ' — 제 성격대로 슬퍼한다.', ''] : []),
                 ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
                     + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
                 '[이번 장면에서 나눈 대화]', talk, '',
@@ -827,6 +920,7 @@ async function round(b, deps, db) {
         Object.keys(J.st).forEach((c) => { up['members/' + c + '/st'] = J.st[c]; });
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
         kickNow.forEach((c) => { up['members/' + c + '/kick'] = n; });
+        foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         // 연결로 끌어낸 사람은 죽는 방식을 지운다
         Object.keys(J.st).forEach((c) => { if (J.st[c] !== 'lost' && memNow[c].fate) up['members/' + c + '/fate'] = null; });
         let pays = null;
