@@ -40,6 +40,7 @@
 // ==========================================
 // 영구히 굳으면 안 되는 것들 — 여기에 이름을 더하면 후보에서 빠진다
 const NO_FIX = ['감자맛 물약', '아이의 운'];
+window.CLEAR_NO_FIX = NO_FIX;      // 복제품 투명 물약(copy-potion.js)도 같은 것을 뺀다 (2026-10-20)
 
 function canFix(e) {
     return !!e && !e.fixed && NO_FIX.indexOf(String(e.name || '').trim()) < 0;

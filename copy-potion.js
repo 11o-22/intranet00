@@ -59,11 +59,20 @@ function potionEff(e) {
     return !!(e && e.name && /물약$/.test(String(e.name).trim()));
 }
 
+// ★ 투명 물약이 못 건드리는 것 — 일반 투명 물약(sticker-fix.js NO_FIX)과 같다 (2026-10-20)
+//   감자맛 물약(공용시설 행운 +100) · 아이의 운 — 복제품 투명 물약으로도 기간을 늘리지 못한다
+function noClear() {
+    const L = (Array.isArray(window.CLEAR_NO_FIX) && window.CLEAR_NO_FIX.length) ? window.CLEAR_NO_FIX : ['감자맛 물약', '아이의 운'];
+    return L;
+}
+
 // 시간을 건드릴 수 있는 것만 — 고정된 것은 뺀다
 function timedCands(u, potionOnly) {
     const out = [];
+    const block = potionOnly ? [] : noClear();        // 투명 물약(늘리기)일 때만 뺀다 · 제거약은 그대로
     (u.timedEffects || []).forEach(function (e, i) {
         if (!e || e.fixed) return;
+        if (block.indexOf(String(e.name || '').trim()) >= 0) return;
         if (potionOnly && !potionEff(e)) return;
         if (leftOf(e) <= 0) return;
         out.push({ type: 'effect', idx: i, name: e.name });
@@ -120,9 +129,13 @@ function install() {
         const list = timedCands(targetUser, potionOnly);
         if (!list.length) {
             const anyFixed = (targetUser.timedEffects || []).some(function (e) { return e && e.fixed; });
+            const onlyBlocked = !potionOnly && (targetUser.timedEffects || []).some(function (e) {
+                return e && !e.fixed && noClear().indexOf(String(e.name || '').trim()) >= 0;
+            });
             showCustomAlert(anyFixed
                 ? '복제품으로는 고정된 효과를 어쩌지 못합니다.'
-                : (potionOnly ? '줄일 효과가 없습니다.' : '늘릴 효과가 없습니다.'));
+                : (potionOnly ? '줄일 효과가 없습니다.'
+                    : ('늘릴 효과가 없습니다.' + (onlyBlocked ? '\n\n' + noClear().join(' · ') + '은(는) 투명 물약이 듣지 않습니다.' : ''))));
             return false;
         }
 

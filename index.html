@@ -7498,7 +7498,8 @@ else if (cat.effect === 'clear_potion') {
     const candidates = [];
 
     (targetUser.timedEffects || []).forEach((e, i) => {
-        if (!e.fixed) candidates.push({ type: 'effect', idx: i, name: e.name });
+        // ★ 감자맛 물약 · 아이의 운은 투명 물약이 못 굳힌다 (sticker-fix.js 가 감싸지 못했을 때도 — 2026-10-20)
+        if (!e.fixed && e.name !== '감자맛 물약' && e.name !== '아이의 운') candidates.push({ type: 'effect', idx: i, name: e.name });
     });
 
     if (targetUser.slaveUntil && Date.now() < targetUser.slaveUntil && !targetUser.slaveFixed) {
