@@ -204,10 +204,10 @@ const PLAZA = {
                   down: { to: 'dfront', x: [760, 1130] },
                   // 🔒 가두리 — 안내 데스크와 정문 사이 (gaduri.js · 아래 「가두리」)
                   cage: { x: 640, w: 360, h: 400, base: 915, zy: 880 },
-                  // 주신 지도대로 — 2F 어둠 탐사 · 1F 로비 · B1 유쾌 판매소 (2026-10-20)
-                  //   (사택은 재난관리국 엘리베이터 2F · 목록에서 간다)
-                  lift: { f2: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ],
-                          b1: [ { n: '유쾌 판매소', ic: 'shop', tab: 'tab-shop',     sub: 'shop-regular' } ] },
+                  // 주신 지도대로 — 2F 사택 · 1F 로비 · B1 유쾌 판매소 · B2 어둠 탐사 (2026-10-20)
+                  lift: { f2: [ { n: '사택',        ic: 'house', tab: 'tab-house',    sub: 'house-main' } ],
+                          b1: [ { n: '유쾌 판매소', ic: 'shop',  tab: 'tab-shop',     sub: 'shop-regular' } ],
+                          b2: [ { n: '어둠 탐사',   ic: 'dark',  tab: 'tab-darkness', sub: 'dark-main' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'dfront' } ] },
 
@@ -1532,7 +1532,9 @@ function placeOf(m) {
     const keys = Object.keys(R);
     for (let i = 0; i < keys.length; i++) {
         const r = R[keys[i]];
-        const list = (r.spots || []).concat(r.lift ? [].concat(r.lift.f2 || [], r.lift.b1 || []) : []);
+        // ★ B2 는 칸(tab)으로 가는 것만 본다 — 기록 소실(fn)은 목록에서 바로 연다 (걸어가게 하지 않는다)
+        const b2 = (r.lift && r.lift.b2 || []).filter(function (x) { return !!x.tab; });
+        const list = (r.spots || []).concat(r.lift ? [].concat(r.lift.f2 || [], r.lift.b1 || [], b2) : []);
         for (let j = 0; j < list.length; j++) {
             const s = list[j];
             if (m.fn ? (s.fn === m.fn) : (s.tab === m.tab && (s.sub || '') === (m.sub || ''))) {
