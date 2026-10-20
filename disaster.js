@@ -649,7 +649,7 @@ function memberChips(r, u) {
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '"'
             + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
-            + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + tag + '</span>';
+            + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + (x.wolf && !gone(st) ? ' 🐺' : '') + tag + '</span>';
     }).join('');
 }
 
@@ -686,8 +686,9 @@ function checkChips(list) {
             if (c.tgtTo) f += ' · ' + esc(c.tgtName) + ' ' + (c.tgtFox ? '다침→멀쩡' : ST[c.tgtFrom] + '→' + ST[c.tgtTo]);
             return '<span class="fx ' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + f + '</span>';
         }
-        let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
+        let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + (c.wolf ? '+' + c.wolf : '') + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
+        if (c.wolf) s = '🐺 ' + s;          // 늑대의 모습인 경비팀장 — 주사위 +8 (2026-10-21)
         if (c.forced) s = '⚡ ' + s;
         if (c.quiet) s = '💤 ' + s;         // 말이 없어 대신 굴린 다이스
         if (c.burn) s = '🔥 ' + s;          // 📺 심야 토크쇼의 주인의 소각

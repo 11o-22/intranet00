@@ -47,7 +47,7 @@
 //   disasterSrv/<판>         숨긴 설계 · 진행 메모 · 장면 요약             (서버만 쓴다)
 //   disasterUse/<날짜>       하루 호출 수 · 사원별 시작 수
 // ==========================================
-import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule } from './lore.js';
+import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule, wolfRule } from './lore.js';
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
@@ -85,6 +85,9 @@ const ACTED = /[(（][^)）]*[^\s)）][^)）]*[)）]?/;
 // 치료 행위 — 치유 다이스를 굴린다 (치유 장비가 없어도)
 // 📺 심야 토크쇼의 주인의 소각 — 손가락을 튕겨 태운다 (2026-10-20 · 실제로 타 버린다 · 파괴 다이스)
 const BURN = /소각|손가락을?\s*(튕|딱)|불태|불살라|태워\s*버리|태워\s*없애|재로\s*만들/;
+// 🐺 경비팀장의 늑대 모습 (2026-10-21) — 괄호 행동 글로 한 번 더 본다 (해석이 놓쳐도)
+const WOLF_ON = /늑대(의?\s*(모습|형상|몸|꼴|형태))?\s*(으로|로|가|이)\s*(변|되|된|됐|돌변|바뀌|바뀐)|늑대화/;
+const WOLF_OFF = /(사람|인간)[^)）]{0,10}?(으로|로)\s*(돌아|되돌|변|바뀌|바뀐)|변신을?\s*(풀|푼|해제)|늑대의?\s*(모습|형상|몸|꼴|형태|변신)\s*(을|를|이|가)?\s*(풀|푼|벗|사라|가라앉|거두)/;
 const TREAT = /치료|지혈|붕대|싸매|싸맨|응급\s*처치|소독|약을\s*(먹|바르|발라)|부목|심폐|상처를\s*(누르|누른|눌러|막|감|닦|꿰매|봉합)|꿰매|봉합/;
 const SHOW = '📺 브라운의 심야 토크 쇼';                              // 이 장비를 찬 사람이 심야 토크쇼의 사회자 (talkshow.js)
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (화면 disaster.js 와 같은 목록)
@@ -255,6 +258,9 @@ const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
 const SCHEMA_ACTS_META = obj({ acts: SCHEMA_ACTS.properties.acts, meta: { type: 'array', items: obj({ who: S, said: S }) } });
 // 🐾 아기 여우의 이번 장면 행동 (장면마다 한 마리에 하나 · kind 는 코드가 속성으로 정한다)
 const FOX_ACTS = { type: 'array', items: obj({ fox: S, did: S, tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S }) };
+// 🐺 경비팀장이 이번 장면에 늑대의 모습이 됐나 · 사람으로 돌아왔나 (경비팀장이 있을 때만)
+const WOLF_TO = { type: 'array', items: obj({ who: S, to: { type: 'string', enum: ['wolf', 'human'] } }) };
+function withWolf(sch) { return obj(Object.assign({}, sch.properties, { wolf: WOLF_TO })); }
 function withFoxActs(sch) { return obj(Object.assign({}, sch.properties, { fox_acts: FOX_ACTS })); }
 const SCHEMA_TURN = obj({ result: S, ended: B, end_kind: { type: 'string', enum: ['none', 'clear', 'escape', 'fail'] },
     end_text: S, next_title: S, next_text: S, notes: S, summary: S,
@@ -310,6 +316,7 @@ function memberLines(mem, d) {
             + (m.body && m.fx && m.fx.length ? ' — 몸에 걸린 효과: ' + m.fx.join('; ') : '')
             + (m.child ? ' — ★ 지금 어린아이 상태 (이 사람에게는 잔혹 묘사 금지)' : '')
             + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
+            + (d && d.wolf && m.chief ? (m.wolf ? ' — 🐺 지금 늑대의 모습 (경비팀장)' : ' — 경비팀장 (늑대의 모습으로 변할 수 있다 · 지금은 사람의 모습)') : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
             + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
             + (Array.isArray(m.foxes) && m.foxes.length ? ' — 함께 있는 아기 여우: ' + m.foxes.join(' · ') : '')
@@ -335,6 +342,11 @@ export function roleOf(p, code) {
     if (/재난관리/.test(aff + ' ' + team)) return 'bureau';
     if (/백일몽/.test(aff)) return 'daydream';
     return 'other';
+}
+// 🐺 경비팀장 · 보안팀장인가 — 팀 · 직급에 「경비」나 「보안」 과 「팀장」 (2026-10-21 · 어느 자리든 · 관리자는 빼고)
+export function chiefOf(p) {
+    const s = String((p && p.team) || '') + ' ' + String((p && p.pos) || '');
+    return /경비|보안/.test(s) && /팀장/.test(s);
 }
 // 심야 토크쇼의 주인인가 (보상 — 끝까지 함께하면 reward.host)
 function hostOf(p) { return (p.eq || []).concat(p.inv || []).some((w) => baseName(w) === SHOW); }
@@ -679,7 +691,12 @@ async function start(b, deps, db) {
             m.gear = gearOf(m.gear, P[c], D.gear || 0);
             m.couple = P[c].couple;
             m.marks = (c === CFG.ADMIN) ? [] : marksOf(P[c]);
+            m.chief = !!(D.wolf && m.role !== 'admin' && c !== CFG.ADMIN && chiefOf(m));     // 🐺 경비팀장
+            m.wolf = null;
         });
+        // 🐺 경비팀장이 있으면 — 방송국이 첫 장면부터 늑대 동화를 틀 수도 있다 (때에 따라 · 코드가 정한다)
+        const chiefs0 = codes.filter((c) => mem[c].chief);
+        const tale0 = !!(chiefs0.length && D.wolf && deps.chance(Number(D.wolf.tale) || 0));
         const pairs0 = couplesOf(mem);                       // 함께 들어온 커플 (이름으로 맞춘 짝은 p 를 고쳐 둔다)
         await db.patch('disaster/' + b.run, { state: 'PLAY', phase: 'WAIT', startedAt: now, err: null });
         // 몸 — 성별 · 걸린 효과 (진행자에게만 · 판에는 적지 않는다)
@@ -698,6 +715,9 @@ async function start(b, deps, db) {
                 '[들어온 사람]', memberLines(mem, D), '',
                 ...coupleLine(mem, pairs0),
                 ...(fxKinds0.length ? [foxRule(fxKinds0), ''] : []),
+                ...(chiefs0.length ? [wolfRule(chiefs0.map((c) => mem[c].n || c)), '',
+                    tale0 ? '[늑대 동화 — 첫 장면에서 튼다] 첫 장면(text)에서 방송국이 늑대가 나오는 동화 하나를 틀어 ' + chiefs0.map((c) => mem[c].n || c).join(', ') + ' 을(를) 노린다.'
+                          : '[늑대 동화] 첫 장면에서는 틀지 않는다.', ''] : []),
                 '[할 일]',
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
                 '   꿈결이 맺힐 자리, 등장할 사람들, 들어온 사람들의 소속 차이가 어디서 부딪힐지. 들어온 사람에게는 보이지 않는다. 1200자 안쪽.',
@@ -715,7 +735,7 @@ async function start(b, deps, db) {
             ].join('\n')
         }, SONNET_OPT));
 
-        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' } });
+        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null });
         try { if (Object.keys(FX0).length) await postFox(db, b.run, FX0, out.fox_lines, 1, deps.now(), Object.keys(FX0)); } catch (e) { }
         const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
@@ -730,6 +750,8 @@ async function start(b, deps, db) {
             up['members/' + c + '/couple'] = m.couple || null;
             up.couples = pairs0.length ? pairs0 : null;          // 화면이 💍 를 붙인다
             up['members/' + c + '/marks'] = (m.marks && m.marks.length) ? m.marks : null;
+            up['members/' + c + '/chief'] = m.chief || null;
+            up['members/' + c + '/wolf'] = null;
         });
         await db.patch('disaster/' + b.run, up);
         return { ok: true };
@@ -758,6 +780,9 @@ export function judge(acts, mem, rand, opt) {
     const DC = (opt && opt.dc) || CFG.DC;
     const plus = (opt && typeof opt.plus === 'function') ? opt.plus : () => 0;
     const ease = (opt && typeof opt.ease === 'function') ? opt.ease : () => 0;      // 자리마다 쉽게 해 주는 몫 (이사팀 −2)
+    // 🐺 늑대의 모습인 경비팀장 — 주사위에 더한다 (+8 · 2026-10-21). 주사위 1 은 그래도 실패
+    const wolf = (opt && typeof opt.wolf === 'function') ? opt.wolf : () => 0;
+    const hit = (c, roll, dc) => { const w = Math.max(0, Number(wolf(c)) || 0); return { w: w, ok: roll !== 1 && roll + w >= dc }; };
     const dcOf = (base, add, ez) => Math.max(2, Math.min(20, base + add - ez));
     const safe = !!(opt && opt.safe);
     const cap = (s) => (safe && s === 'lost') ? 'hurt' : s;
@@ -778,11 +803,12 @@ export function judge(acts, mem, rand, opt) {
             const ez = Math.max(0, Number(ease(a.who)) || 0);
             const dc = dcOf(DC[tier], add, ez);
             const roll = rand(20);
-            const ok = roll >= dc;
+            const W = hit(a.who, roll, dc), ok = W.ok;
             Object.assign(row, { tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1,
                                  danger: !!a.danger });
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (W.w) row.wolf = W.w;
             if (!ok && a.danger) {
                 const from = st[a.who];
                 st[a.who] = cap(worse(from, roll === 1 ? 2 : 1));
@@ -815,11 +841,12 @@ export function judge(acts, mem, rand, opt) {
             const add = Math.max(0, Number(plus(c)) || 0);
             const ez = Math.max(0, Number(ease(c)) || 0);
             const dc = dcOf(DC[tier], add, ez);
-            const roll = rand(20), ok = roll >= dc;
+            const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(F.did || '방송국이 덮쳐 온다', 80), kind: KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, forced: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
                 st[c] = cap(worse(from, roll === 1 ? 2 : 1));
@@ -840,12 +867,13 @@ export function judge(acts, mem, rand, opt) {
             const add = Math.max(0, Number(plus(c)) || 0);
             const ez = Math.max(0, Number(ease(c)) || 0);
             const dc = dcOf(DC[tier], add, ez);
-            const roll = rand(20), ok = roll >= dc;
+            const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(M.did || '방송국이 그 말을 들었다', 80), said: clip(x.said, 60),
                           kind: KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, meta: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
                 st[c] = M.lethal ? 'lost' : worse(from, roll === 1 ? 2 : 1);     // safe 를 따르지 않는다
@@ -868,8 +896,9 @@ function checkLine(c, d) {
         return f;
     }
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
-    let s = '- ' + c.name + ' — ' + (c.burn ? '[소각] ' : '') + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
-        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '') + ', 주사위 ' + c.roll + ') → '
+    let s = '- ' + c.name + ' — ' + (c.wolf ? '[🐺 늑대] ' : '') + (c.burn ? '[소각] ' : '') + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
+        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '')
+        + ', 주사위 ' + c.roll + (c.wolf ? ' + 늑대의 힘 ' + c.wolf + ' = ' + (c.roll + c.wolf) : '') + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
@@ -935,11 +964,16 @@ async function round(b, deps, db) {
         // 🐾 이번 장면에 행동하는 아기 여우 — 살아 있고, 곁의 사람이 아직 재난 안에서 움직이는 아이
         const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
         const foxIds = Object.keys(FX).filter((id) => FX[id] && FOXES[FX[id].k] && !FX[id].gone && memNow[FX[id].on] && !gone(memNow[FX[id].on].st || 'ok'));
+        // 🐺 판에 남은 경비팀장 (2026-10-21)
+        const chiefs = D.wolf ? Object.keys(memNow).filter((c) => memNow[c].chief && memNow[c].role !== 'admin' && !gone(memNow[c].st || 'ok')) : [];
         // ① 해석 — 살아 있는 사람이 한 말이 있을 때만 (없으면 아기 여우는 제 속성의 기본 행동)
-        let acts = [], metas = [], foxActs = [];
+        let acts = [], metas = [], foxActs = [], wolfSaid = [];
         if (lines.some((l) => !l.lost && !l.out && !l.adm)) {
+            let sch = D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS;
+            if (foxIds.length) sch = withFoxActs(sch);
+            if (chiefs.length) sch = withWolf(sch);
             const res = await ask(deps, Object.assign({
-                model: CFG.HAIKU, max: 2500, schema: foxIds.length ? withFoxActs(D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS) : (D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS),
+                model: CFG.HAIKU, max: 2500, schema: sch,
                 system: [
                     '너는 재난 진행 보조다. 한 장면 동안 사원들이 나눈 채팅을 읽고, 사원마다 이번 장면에서 실제로 하려는 행동을 하나씩 골라 판정 종류로 바꾼다.',
                     '[판정 종류]', KIND_KEYS.map((k) => k + ' : ' + KINDS[k]).join('\n'),
@@ -991,13 +1025,21 @@ async function round(b, deps, db) {
                         '- target 은 치유 · 연결처럼 사원을 돕거나 구하는 행동일 때 그 사원의 코드 (다쳤거나 맞춰진 사원). 다친 아기 여우를 돌보면 그 여우 열쇠. 아니면 빈 문자열.',
                         '- 아기 여우가 채팅에 한 말은 사원의 행동(acts)이 아니다 — acts 에는 넣지 않는다.',
                         '- 아기 여우가 사람과 나누는 다정한 몸짓(안기기 · 껴안기 · 꼬리로 쓸어 주기)은 판정할 행동이 아니다 — fox_acts 는 그 아이의 속성 행동으로 고른다.'
+                    ] : []),
+                    ...(chiefs.length ? [
+                        '[🐺 늑대 — wolf]',
+                        '- 사원 목록에 「경비팀장」이 적힌 사원이 괄호 행동으로 늑대의 모습이 되면(늑대로 변한다 · 늑대의 모습으로 변모한다 …) wolf 에 { who: 코드, to: "wolf" }.',
+                        '  늑대의 모습에서 사람의 모습으로 돌아오면 { who: 코드, to: "human" }. 한 사원에 한 번까지 — 이번 장면 마지막 모습으로.',
+                        '- 몸이 실제로 늑대로 바뀐 것만 넣는다. 늑대 이야기를 하거나 · 동화를 보기만 하거나 · 늑대처럼 으르렁거리기만 한 것은 넣지 않는다.',
+                        '- 「경비팀장」이 아닌 사원은 넣지 않는다. 바뀐 게 없으면 빈 배열. 모습이 바뀐 것과 별개로 그 사원의 행동(acts)은 따로 고른다.'
                     ] : [])
                 ].join('\n'),
                 user: [
                     '[장면] ' + (scene.title || ''), scene.text || '', '',
                     '[사원 — 코드 / 이름 / 상태 / 이 재난에서의 자리]',
                     Object.keys(memNow).map((c) => c + ' / ' + (memNow[c].n || c) + ' / ' + (memNow[c].st || 'ok')
-                        + ' / ' + (memNow[c].role || 'other') + (memNow[c].host ? ' / 토크쇼 주인' : '')).join('\n'), '',
+                        + ' / ' + (memNow[c].role || 'other') + (memNow[c].host ? ' / 토크쇼 주인' : '')
+                        + (chiefs.indexOf(c) >= 0 ? ' / 경비팀장' + (memNow[c].wolf ? ' (지금 늑대의 모습)' : ' (지금 사람의 모습)') : '')).join('\n'), '',
                     ...(foxIds.length ? ['[아기 여우 — 여우 열쇠 = 이름 (속성 · 곁)]', foxKeyLines(FX, foxIds, memNow), '',
                         '[아기 여우가 채팅에 한 말 — 사원의 행동이 아니다]', foxL.map((l) => l.n + ': ' + l.t).join('\n') || '(없음)', ''] : []),
                     '[채팅]', talk
@@ -1005,6 +1047,7 @@ async function round(b, deps, db) {
             }, HAIKU_OPT));
             acts = Array.isArray(res.acts) ? res.acts : [];
             foxActs = Array.isArray(res.fox_acts) ? res.fox_acts : [];
+            wolfSaid = Array.isArray(res.wolf) ? res.wolf : [];
             // ★ 괄호 행동 묘사가 없는 사람은 행동하지 않은 것 — 코드가 한 번 더 거른다 (2026-10-20)
             const doers = {}; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && ACTED.test(l.t)) doers[l.c] = 1; });
             acts = acts.filter((a) => a && doers[a.who]);
@@ -1035,6 +1078,28 @@ async function round(b, deps, db) {
         quietRoll.forEach((c) => acts.push({ who: c, did: '말없이 머뭇거린다', kind: 'evade', tier: 'normal',
                                              danger: !(D.roles && memNow[c].role === 'vip'), target: '', quiet: true }));
 
+        // 🐺 경비팀장의 모습 — 이번 장면에 괄호 행동으로 늑대가 됐나 · 사람으로 돌아왔나 (해석 → 없으면 괄호 글로 한 번 더)
+        //   이번 장면의 판정부터 늑대의 힘이 붙는다 · 늑대인 채로 있으면 다음 장면에도 (members/<사번>/wolf = 늑대가 된 장면)
+        const wolfOn = [], wolfOff = [];
+        chiefs.forEach((c) => {
+            if (!spokeNow[c]) return;
+            let to = '';
+            wolfSaid.forEach((x) => { if (x && x.who === c && (x.to === 'wolf' || x.to === 'human')) to = x.to; });
+            if (!to) {
+                lines.forEach((l) => {
+                    if (l.c !== c || l.lost || l.out || l.adm) return;
+                    (String(l.t).match(/[(（][^)）]*[)）]?/g) || []).forEach((seg) => {
+                        if (WOLF_OFF.test(seg)) to = 'human'; else if (WOLF_ON.test(seg)) to = 'wolf';
+                    });
+                });
+            }
+            const was = !!memNow[c].wolf;
+            if (to === 'wolf' && !was) { memNow[c].wolf = n; wolfOn.push(c); }
+            if (to === 'human' && was) { memNow[c].wolf = null; wolfOff.push(c); }
+        });
+        // 다음 장면에 방송국이 늑대 동화를 트나 — 때에 따라 (잇달아 두 장면은 틀지 않는다)
+        const taleNext = !!(chiefs.length && !(srv && Number(srv.tale) === n) && deps.chance(Number(D.wolf.tale) || 0));
+
         // ★ 이동 — 괄호 행동으로 움직인 사람만 장소가 바뀐다 (2026-10-20). 아무도 안 움직이면 다음 장면도 같은 자리
         const movers = acts.filter((a) => a && !a.quiet && String(a.move || '').trim() && memNow[a.who] && memNow[a.who].role !== 'admin')
             .map((a) => ({ c: a.who, to: clip(String(a.move).trim(), 40) }));
@@ -1057,8 +1122,11 @@ async function round(b, deps, db) {
             ease: (c) => (D.ease && Number(D.ease[memNow[c].role])) || 0,
             forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)) }, D.final) : null,
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
+            wolf: (c) => (D.wolf && memNow[c] && memNow[c].chief && memNow[c].wolf) ? (Number(D.wolf.bonus) || 0) : 0,
             kick: !!(D.roles && D.kick) });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
+        const chiefsAfter = chiefs.filter((c) => !gone(J.st[c]));             // 🐺 이번 장면 뒤에도 판에 남은 경비팀장
+        const taleGo = taleNext && chiefsAfter.length > 0;
         // 🐾 아기 여우의 행동 — 사원들 뒤에 굴린다 (치유 · 연결이 사람을 되돌릴 수 있다)
         const FJ = judgeFox(foxActs, FX, foxIds, J, memNow, deps.rand, {
             dc: D.dc, plus: (c) => (memNow[c] && hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0) });
@@ -1121,6 +1189,13 @@ async function round(b, deps, db) {
                     + ' 억지로 끌어내지 않는다 — 정중한 안내 · 비켜서는 방송인들 · 열리는 문. 그 극진함이 더 섬뜩하다.'
                     + ' 모셔 가는 곳은 괄호 안의 곳이다 (그 문 너머에 김이 오르는 선녀탕 · 여우 상담실이 있다). 모셔 간 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.', ''] : []),
                 ...(foxKinds.length ? [foxRule(foxKinds), ''] : []),
+                ...(chiefs.length ? [wolfRule(chiefs.map((c) => mem[c].n || c)), '',
+                    ...(wolfOn.length ? ['[🐺 늑대의 모습이 됐다] ' + wolfOn.map((c) => mem[c].n || c).join(', ')
+                        + ' — 이번 장면에 스스로 늑대의 모습이 됐다. 그 변모를 장면 속 일로 그린다. 판정 결과의 [🐺 늑대] 줄은 늑대의 힘이 더해진 것이다.', ''] : []),
+                    ...(wolfOff.length ? ['[🐺 사람의 모습으로 돌아왔다] ' + wolfOff.map((c) => mem[c].n || c).join(', ') + ' — 이번 장면에 사람의 모습으로 돌아왔다.', ''] : []),
+                    (taleGo ? '[늑대 동화 — 다음 장면에서 튼다] 다음 장면(next_text)에서 방송국이 늑대가 나오는 동화 하나를 틀어 '
+                            + chiefsAfter.map((c) => mem[c].n || c).join(', ') + ' 을(를) 노린다 (지난번과 다른 동화로 · 끝내는 장면이면 쓰지 않는다).'
+                          : '[늑대 동화] 다음 장면에서는 틀지 않는다.'), ''] : []),
                 ...(foxGone.length ? ['[대신 소멸] ' + foxGone.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 대신').join(', ')
                     + ' — 판정 결과의 [대신 소멸] 줄이다. 그 아이의 말투로 마지막 말을 남기고 사라진다. 곁의 다른 아기 여우가 있으면 반응한다.', ''] : []),
                 ...(foxFell.length ? ['[여우 소멸] ' + foxFell.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 곁에서').join(', ')
@@ -1204,6 +1279,7 @@ async function round(b, deps, db) {
         alive.forEach((c) => { up['members/' + c + '/quiet'] = (quietN[c] && !gone(J.st[c])) ? quietN[c] : null; });   // 몇 장면째 말이 없나
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
         kickNow.forEach((c) => { up['members/' + c + '/kick'] = n; });
+        chiefs.forEach((c) => { up['members/' + c + '/wolf'] = memNow[c].wolf || null; });     // 🐺 늑대의 모습 (된 장면)
         foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         foxFell.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         Object.keys(FJ.st).forEach((id) => { const s2 = FJ.st[id] === 'hurt' ? 'hurt' : null; if ((FX[id].st || null) !== s2 && FJ.st[id] !== 'lost') up['foxes/' + id + '/st'] = s2; });
@@ -1250,6 +1326,7 @@ async function round(b, deps, db) {
         // 🐾 아기 여우 — 장면이 넘어간 직후 채팅에 (끝났으면 이 장면에)
         try { if (foxTalkers.length) await postFox(db, b.run, FXa, out.fox_lines, ended ? n : n + 1, deps.now(), foxTalkers); } catch (e) { }
         const su = { notes: clip(out.notes, 1200), readN: n, readKey: readKey || null }; su['sums/' + n] = n + '. ' + clip(out.summary, 120);
+        if (D.wolf) su.tale = (taleGo && !ended) ? n + 1 : null;          // 🐺 늑대 동화를 튼 장면 (잇달아 틀지 않게)
         await db.patch('disasterSrv/' + b.run, su);
         return { ok: true, ended: ended };
     } catch (e) {
@@ -1329,6 +1406,7 @@ async function foxChat(b, deps, db) {
             + ' · 성별: ' + (x.g || '알 수 없음') + (x.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
             + (x.fx && x.fx.length ? ' — 몸에 걸린 효과: ' + x.fx.join('; ') : '')
             + (x.child ? ' — ★ 지금 어린아이 상태' : '')
+            + (m.chief && m.wolf ? ' — 🐺 지금 늑대의 모습 (경비팀장)' : '')
             + cpl(m)
             + (/네임리스/.test(String(m.n || '')) ? ' — ★ 아기 여우는 「주인님」 또는 「네임리스 님」으로만 부른다' : '');
     }).join('\n');
@@ -1354,7 +1432,7 @@ async function foxChat(b, deps, db) {
 // 들머리
 // ==========================================
 export async function handle(body, deps) {
-    deps = Object.assign({ now: () => Date.now(), rand: (n) => 1 + Math.floor(Math.random() * n) }, deps || {});
+    deps = Object.assign({ now: () => Date.now(), rand: (n) => 1 + Math.floor(Math.random() * n), chance: (p) => Math.random() < p }, deps || {});
     const b = body || {};
     try {
         if (!okId(b.run) || !okCode(b.code)) throw new Fail(400, '요청이 이상합니다.');
