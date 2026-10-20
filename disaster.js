@@ -52,8 +52,8 @@ const ROOT = 'disaster', CHAT = 'disasterChat';
 const KIND = 'wave', GRADE = '파형(破刑)', NAME = '『 3시 33분 방송국 』';
 const SURVIVE = 1, GEAR_MAX = 3;
 const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
-const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 <b style="color:#e8c27a;">300,000 P</b> · 선생님 · 이사팀 <b style="color:#e8c27a;">150,000 P</b> · '
-    + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">150,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
+const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 · 이사팀 <b style="color:#e8c27a;">300,000 P</b> · 선생님 <b style="color:#e8c27a;">150,000 P</b> · '
+    + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">300,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 // 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다

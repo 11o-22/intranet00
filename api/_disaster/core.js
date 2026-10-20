@@ -1248,14 +1248,18 @@ async function foxChat(b, deps, db) {
     // 사원 — 성별 · 몸에 걸린 효과 (물약 등 · 부를 때마다 다시 읽는다 · 성적인 효과는 빼고)
     const people = Object.keys(mem).filter((c) => mem[c].role !== 'admin');
     const BB = await bodies(db, people, now);
+    // 커플링 — 누구와 연인인지 (같이 들어왔는지) · 2026-10-20
+    const cpl = (m) => (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
+        + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '');
     const who = people.map((c) => {
         const m = mem[c], x = BB[c] || {};
         if (m.st === 'lost') return '- ' + (m.n || c) + ' (' + (m.aff || '소속 없음') + ') — ★ 이미 죽었다 (말을 걸거나 대답하지 않는다 · 그리워하기만 한다)'
-            + (/네임리스/.test(String(m.n || '')) ? ' — 그리워할 때도 「주인님」 · 「네임리스 님」으로 부른다' : '');
+            + cpl(m) + (/네임리스/.test(String(m.n || '')) ? ' — 그리워할 때도 「주인님」 · 「네임리스 님」으로 부른다' : '');
         return '- ' + (m.n || c) + ' (' + (m.aff || '소속 없음') + (m.st && m.st !== 'ok' ? ' · ' + stName(DISASTERS[run.kind], m.st) : '') + ')'
             + ' · 성별: ' + (x.g || '알 수 없음') + (x.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
             + (x.fx && x.fx.length ? ' — 몸에 걸린 효과: ' + x.fx.join('; ') : '')
             + (x.child ? ' — ★ 지금 어린아이 상태' : '')
+            + cpl(m)
             + (/네임리스/.test(String(m.n || '')) ? ' — ★ 아기 여우는 「주인님」 또는 「네임리스 님」으로만 부른다' : '');
     }).join('\n');
     const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (mem[x.c].n || x.c))
