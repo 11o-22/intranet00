@@ -140,7 +140,9 @@ function now() { return Date.now() + off; }
         '.dz-btn.sub{background:rgba(255,255,255,.04);border-color:#3a4650;color:#bcc6cc;font-weight:normal;}',
         '#dz-ov{position:fixed;inset:0;z-index:' + Z + ';background:#06090b;color:#d8e3e3;display:flex;flex-direction:column;',
         '  height:100dvh;font-size:13px;}',
-        '#dz-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #1d3536;',
+        // ★ 아이폰 — 화면이 상태 표시줄(시계 · 배터리) 아래까지 깔린다 (viewport-fit=cover). 머리를 그만큼 내린다
+        '#dz-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1d3536;',
+        '  padding:calc(10px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px)) 10px calc(12px + env(safe-area-inset-left, 0px));',
         '  background:linear-gradient(180deg,#0d1b1c,#081011);}',
         '#dz-head .t{font-size:13px;color:#9fe3e3;font-weight:bold;letter-spacing:1px;}',
         '#dz-head .n{font-size:11px;color:#6f8c8c;}',
