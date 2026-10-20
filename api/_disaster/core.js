@@ -52,7 +52,7 @@ export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
     TALK_MS: 90000,          // 장면마다 대화 시간
     MAX_ROUNDS: 8,           // 한 판 최대 장면
-    MAX_MEMBERS: 4,
+    MAX_MEMBERS: 8,          // 한 방 최대 인원 (2026-10-20 — 4 → 8)
     DAILY_RUNS: 3,           // 사원 한 명이 하루에 들어갈 수 있는 판
     DAILY_CALLS: 250,        // 하루 전체 진행자(Sonnet) 호출 — 대략 하루 5달러 안쪽
     LOCK_STALE: 120000,      // 잡힌 채 이만큼 지나면 끊긴 것으로 보고 다시 잡게 한다
@@ -352,7 +352,8 @@ async function profiles(db, codes) {
         return { aff: aff || '', team: team || '', pos: pos || '', eq: invArr(eq), inv: invArr(inv), soul: soul ? String(soul) : '', couple: couple };
     };
     const out = {};
-    for (const c of codes) out[c] = await one(c);
+    const got = await Promise.all(codes.map(one));          // 사람마다 한꺼번에 (8명이어도 한 번 기다림)
+    codes.forEach((c, i) => { out[c] = got[i]; });
     return out;
 }
 // 귀빈이 홀로 나간 수 n → 남은 재난관리국 · 백일몽 쪽 난이도 + surge × (2ⁿ − 1)
@@ -553,7 +554,7 @@ async function round(b, deps, db) {
         const echo = D.echo || '(파형 속 목소리)';
         const lines = Object.keys(chatAll || {}).map((k) => chatAll[k])
             .filter((x) => x && Number(x.r) === n && typeof x.t === 'string' && mem[x.c])
-            .sort((a, z) => (Number(a.at) || 0) - (Number(z.at) || 0)).slice(-80)
+            .sort((a, z) => (Number(a.at) || 0) - (Number(z.at) || 0)).slice(-120)
             .map((x) => ({ c: x.c, n: mem[x.c].n || x.c, t: clip(x.t, 200).replace(/\s+/g, ' ').trim(),
                            lost: (mem[x.c].st || 'ok') === 'lost', out: memNow[x.c].st === 'out', adm: mem[x.c].role === 'admin' }));
         const talk = lines.map((l) => (l.adm ? '(관리자) ' : (l.lost ? echo + ' ' : (l.out ? '(나가며) ' : ''))) + l.n + ': ' + l.t).join('\n') || '(아무도 말하지 않았다)';
@@ -562,7 +563,7 @@ async function round(b, deps, db) {
         let acts = [];
         if (lines.some((l) => !l.lost && !l.out && !l.adm)) {
             const res = await ask(deps, Object.assign({
-                model: CFG.HAIKU, max: 1500, schema: SCHEMA_ACTS,
+                model: CFG.HAIKU, max: 2500, schema: SCHEMA_ACTS,
                 system: [
                     '너는 재난 진행 보조다. 한 장면 동안 사원들이 나눈 채팅을 읽고, 사원마다 이번 장면에서 실제로 하려는 행동을 하나씩 골라 판정 종류로 바꾼다.',
                     '[판정 종류]', KIND_KEYS.map((k) => k + ' : ' + KINDS[k]).join('\n'),
@@ -644,7 +645,8 @@ async function round(b, deps, db) {
                 ...(lostNew.length ? ['', '[이번 장면에 죽은 사람 — fates 에 코드로] ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
                 '',
                 '[쓸 것]',
-                '- result : 이번 장면에서 벌어진 일. 판정 결과와 상태 변화를 그대로. 행동한 사람은 이름이 나오게. 350자 안쪽.',
+                '- result : 이번 장면에서 벌어진 일. 판정 결과와 상태 변화를 그대로. 행동한 사람은 이름이 나오게. '
+                    + (Object.keys(mem).length > 4 ? '550' : '350') + '자 안쪽.',
                 '- ended / end_kind / end_text : 끝내면 end_text 에 결말 (300자 안쪽). 안 끝내면 end_kind=none, end_text 빈 문자열.',
                 '- next_title / next_text : 안 끝내면 다음 장면 (제목 짧게 · 본문 450자 안쪽, 열린 상황으로). 끝내면 빈 문자열.',
                 '- notes : 앞으로 기억할 진행 메모 (지난 메모를 고쳐 쓴다, 600자 안쪽).',
