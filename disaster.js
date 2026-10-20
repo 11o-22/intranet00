@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 재난 — 기록 소실 · 📡 파형 재난 (대화로 진행하는 탐사)
+// ★ 재난 — 기록 소실 · 📡 파형(破刑)급 『 3시 33분 방송국 』 (대화로 진행하는 탐사)
 // bundles.json 마지막 묶음, playtime.js 뒤
 // ==========================================
 //
@@ -23,7 +23,14 @@
 //      실패가 위험하면 다침 → 실종. 치유는 다친 동료를, 연결은 실종된 동료를 한 단계 되돌린다.
 //   4. 결말 — 종결(근원을 지움) · 탈출(살아서 나옴) · 전멸(모두 실종). 최대 8장면.
 //
-//   ✗ 아직 보상 · 장비 · 오염도와는 잇지 않았다 (게임을 짠 뒤에 잇기로 함).
+//   ✗ 아직 보상 · 오염도와는 잇지 않았다 (게임을 짠 뒤에 잇기로 함).
+//
+// ■ 『 3시 33분 방송국 』 (2026-10-20 — 설정은 api/_disaster/lore.js)
+//   · 생존 확률 1% — 대기실에 띄운다. 판정 난이도도 세게 둔다 (서버)
+//   · 대기실에서 들고 갈 장비를 3개까지 고른다 (장착 중 · 소지품의 장비 · 전용 장비). 성적인 것은 목록에 안 뜬다.
+//     효과(수치)는 적용하지 않는다 — 진행자가 이야기 속 물건으로만 쓴다. 정말 가진 것인지는 시작할 때 서버가 다시 본다.
+//   · 시작할 때 서버가 소속을 보고 자리를 가른다 — 귀빈 · 재난관리국 · 백일몽 · 예외
+//   · 귀빈은 [홀로 나간다] 를 누를 수 있다 → 그 장면이 끝나면 빠져나간다. 남은 재난관리국 · 백일몽 쪽 난이도가 기하급수로 오른다
 //
 // ■ 서버에 적는 자리
 //   disaster/<판>            판 (서버 함수가 장면 · 판정 · 상태를 쓴다. 화면은 사원 들고 나기 · 확정만 쓴다)
@@ -38,18 +45,24 @@ const DZ_TICKET = '🎫 기록 소실 티켓';
 (function disaster() {
 
 const ROOT = 'disaster', CHAT = 'disasterChat';
-const KIND = 'wave', NAME = '파형 재난';
+const KIND = 'wave', GRADE = '파형(破刑)', NAME = '『 3시 33분 방송국 』';
+const SURVIVE = 1, GEAR_MAX = 3;
+const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
+// 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
+const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
+const ROLE_N = { vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 4, MAX_ROUNDS = 8;
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
 const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 이만큼 기다렸다가 (방장이 없을 때를 대비)
 const Z = 99999980;          // 알림창(99999999) · 팔레트(99999990)보다 아래
 const ADMIN = 'kario0987';
-const ST = { ok: '멀쩡', hurt: '다침', lost: '실종' };
-const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81' };
+const ST = { ok: '멀쩡', hurt: '다침', lost: '실종', out: '홀로 나감' };
+const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81', out: '#c9b6ff' };
+function gone(st) { return st === 'lost' || st === 'out'; }
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
                  heal: '치유', luck: '행운', none: '판정 없음' };
 const END_N = { clear: ['종결', '#7fd4d4', '근원을 지웠습니다'], escape: ['탈출', '#e8c27a', '살아서 빠져나왔습니다'],
-                fail: ['전멸', '#ff6b81', '모두 파형에 맞춰졌습니다'] };
+                fail: ['전멸', '#ff6b81', '남은 사람이 모두 방송국의 매체가 되었습니다'] };
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -341,12 +354,13 @@ function paint() {
             const n = Number(r.round) || 0;
             nEl.textContent = '· 장면 ' + n + ' / ' + MAX_ROUNDS;
             html = play(r, u);
-            const lost = ((r.members[u.code] || {}).st === 'lost');
+            const mySt = (r.members[u.code] || {}).st || 'ok';
+            const lost = mySt === 'lost', out = mySt === 'out';
             const talk = r.phase === 'TALK';
-            inp.disabled = !talk;
-            inp.placeholder = !talk ? '진행자가 정리하는 중…' : (lost ? '파형 속에서 목소리만 남았다…' : '캐릭터로 말하고 행동하기');
-            ov.querySelector('#dz-send').disabled = !talk;
-            done.style.display = lost ? 'none' : '';
+            inp.disabled = !talk || out;
+            inp.placeholder = out ? '방송국을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…' : (lost ? '전파 속에서 목소리만 남았다…' : '캐릭터로 말하고 행동하기'));
+            ov.querySelector('#dz-send').disabled = !talk || out;
+            done.style.display = (lost || out) ? 'none' : '';
             const on = Number((r.members[u.code] || {}).done) === n;
             done.classList.toggle('on', on);
             done.textContent = on ? '확정함 ✓' : '행동 확정';
@@ -373,7 +387,7 @@ function lobbyList(u) {
     }).sort(function (a, b) { return (all[a].createdAt || 0) - (all[b].createdAt || 0); });
     const n = tickets(u);
     const free = isAdm(u);                                   // 상담사는 티켓 없이 · 닫혀 있어도
-    let h = '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
+    let h = intro() + '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
         + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '') + '</div>';
     if (shut) h += '<div class="dz-err">🔒 닫혀 있습니다 — 상담사만 들어가 시험할 수 있습니다. (상담사가 연 방에는 다른 사원도 들어옵니다)</div>';
     h += '<div class="dz-sec">열려 있는 방</div>';
@@ -390,12 +404,67 @@ function lobbyList(u) {
     return h;
 }
 
+// 재난 안내 — 등급 · 이름 · 생존 확률 · 개요 · 장비
+function intro() {
+    return '<div class="dz-card" style="margin-bottom:12px;">'
+        + '<div class="dz-card-m" style="margin:0 0 4px; color:#ff9aa8; letter-spacing:2px;">' + GRADE + '급 재난</div>'
+        + '<div class="dz-card-h">' + NAME + '</div>'
+        + '<div class="dz-card-t" style="margin-bottom:8px;">' + esc(BRIEF) + '</div>'
+        + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + SURVIVE + '%</b>'
+        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)</div></div>';
+}
+
+// 들고 갈 수 있는 장비 — 장착 중 · 소지품의 장비 · 전용 장비 (성적인 것 빼고)
+function baseOf(w) {
+    try { if (typeof getEquipBaseName === 'function') return getEquipBaseName(w); } catch (e) { }
+    return String(w || '').split(' (')[0].trim();
+}
+function gearPool(u) {
+    const out = [], seen = {};
+    const put = function (nm, tag) {
+        nm = String(nm || '').trim();
+        if (!nm || seen[nm] || NO_GEAR.test(nm) || nm === DZ_TICKET) return;
+        seen[nm] = 1; out.push({ n: nm, tag: tag });
+    };
+    (u.equippedWeapons || []).forEach(function (w) { put(baseOf(w), '장착 중'); });
+    const cat = (typeof ITEM_CATALOG !== 'undefined') ? ITEM_CATALOG : {};
+    (u.inventory || []).forEach(function (x) {
+        const b = baseOf(x), c = cat[x] || cat[b];
+        if (c && (String(c.effect || '').indexOf('equip') === 0 || c.equipKind)) put(b, '소지품');
+    });
+    if (u.soulGear && u.soulGear.name) put(u.soulGear.name, '전용 장비');
+    return out;
+}
+function gearPick(r, u) {
+    const mine = ((r.members || {})[u.code] || {}).gear || [];
+    const pool = gearPool(u);
+    let h = '<div class="dz-sec">들고 갈 장비 — ' + mine.length + ' / ' + GEAR_MAX + ' (효과는 적용되지 않고, 이야기 속 물건으로만 쓰입니다)</div>';
+    if (!pool.length) return h + '<div class="dz-card-m">들고 갈 수 있는 장비가 없습니다.</div>';
+    h += '<div class="dz-chk" style="margin:0 0 10px;">' + pool.map(function (g) {
+        const on = mine.indexOf(g.n) >= 0, full = !on && mine.length >= GEAR_MAX;
+        return '<span data-gear="' + esc(g.n) + '" class="' + (on ? 'ok' : '') + '" style="cursor:' + (full ? 'default' : 'pointer') + ';'
+            + (full ? 'opacity:.4;' : '') + 'font-size:11px;padding:5px 9px;">' + (on ? '✓ ' : '') + esc(g.n)
+            + ' <i style="font-style:normal;color:#6f8c8c;">' + g.tag + '</i></span>';
+    }).join('') + '</div>';
+    return h;
+}
+function toggleGear(nm) {
+    const u = me(), d = db_(), r = curId && all[curId];
+    if (!u || !d || !r || r.state !== 'LOBBY' || !r.members || !r.members[u.code]) return;
+    const cur = (r.members[u.code].gear || []).slice();
+    const i = cur.indexOf(nm);
+    if (i >= 0) cur.splice(i, 1);
+    else { if (cur.length >= GEAR_MAX) return; cur.push(nm); }
+    d.ref(ROOT + '/' + curId + '/members/' + u.code + '/gear').set(cur.length ? cur : null);
+}
+
 function memberChips(r, u) {
     const m = r.members || {}, n = Number(r.round) || 0;
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : (' · ' + ST[st] + (r.state === 'PLAY' && st !== 'lost' && Number(x.done) === n ? ' ✓' : ''));
+            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + ST[st]
+               + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '">'
             + esc(x.n || c) + tag + '</span>';
     }).join('');
@@ -404,11 +473,12 @@ function memberChips(r, u) {
 function room(r, u) {
     const lead = r.leader === u.code;
     const cs = Object.keys(r.members || {});
-    let h = '<div class="dz-card-t" style="margin-top:4px;">대기실입니다. 방장이 [시작한다]를 누르면 재난이 열립니다.<br>'
+    let h = intro() + '<div class="dz-card-t" style="margin-top:4px;">대기실입니다. 방장이 [시작한다]를 누르면 재난이 열립니다.<br>'
         + '시작하는 순간 사원마다 ' + DZ_TICKET + '이 한 장씩 사라집니다. (' + cs.length + ' / ' + MAX_MEMBERS + '명)</div>';
     if (r.phase === 'WAIT') h += '<div id="dz-wait">진행자가 재난을 여는 중…</div>';
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + '</div>';
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
+    h += gearPick(r, u);
     if (lead) h += '<button class="dz-btn" data-start="1"' + (busy || r.phase === 'WAIT' ? ' disabled' : '') + '>시작한다</button>';
     else h += '<div class="dz-card-m">방장이 시작하기를 기다리는 중입니다.</div>';
     h += '<div style="margin-top:8px;"><button class="dz-btn sub" data-leave="1"' + (busy ? ' disabled' : '') + '>나간다</button></div>';
@@ -420,6 +490,7 @@ function checkChips(list) {
         if (c.kind === 'none') return '<span>' + esc(c.name) + ' · ' + esc(c.did) + '</span>';
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
+        if (c.plus) s += ' (+' + c.plus + ')';
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
@@ -436,6 +507,21 @@ function play(r, u) {
     if (r.scene) {
         h += '<div class="dz-sec">장면 ' + n + '</div>'
             + '<div class="dz-scene"><div class="h">' + esc(r.scene.title) + '</div><div class="b">' + br(r.scene.text) + '</div></div>';
+    }
+    if (r.last && Number(r.last.n) === n - 1 && r.last.surge) {
+        h += '<div class="dz-card-m" style="color:#ff9aa8;">귀빈이 빠진 자리 — 방송국이 사나워졌습니다. 남은 사람의 판정 난이도 +' + r.last.surge + '</div>';
+    }
+    const x = (r.members || {})[u.code] || {}, st = x.st || 'ok';
+    if (st === 'out') {
+        h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
+            + '방송국을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.</div></div>';
+    } else if (x.role === 'vip' && st !== 'lost') {
+        const going = Number(x.leave) === n;
+        h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
+            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>귀빈</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
+            + '<span style="font-size:11px;color:#9a8fb8;">나가면 남은 재난관리국 · 백일몽 쪽의 난이도가 기하급수로 오릅니다.</span></div>'
+            + '<button class="dz-btn sub" data-out="1"' + (r.phase !== 'TALK' ? ' disabled' : '') + ' style="border-color:#5a4a7a;color:#c9b6ff;">'
+            + (going ? '이 장면이 끝나면 나갑니다 — 그만둔다' : '홀로 나간다') + '</button></div>';
     }
     if (r.phase === 'WAIT') h += '<div id="dz-wait">진행자가 장면을 정리하는 중…</div>';
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + ' — 잠시 뒤 다시 넘깁니다.</div>';
@@ -456,7 +542,8 @@ function ending(r, u) {
         + '<div class="dz-card-t" style="margin:0;">' + br(o.text || E[2]) + '</div></div>';
     h += '<div class="dz-sec">사원</div><div class="dz-card-m">' + Object.keys(m).map(function (c) {
         const st = m[c].st || 'ok';
-        return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — ' + (st === 'lost' ? '실종' : (st === 'hurt' ? '다친 채 생환' : '생환')) + '</span>';
+        return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — '
+            + (st === 'lost' ? '실종 (방송국의 매체가 됨)' : (st === 'out' ? '홀로 빠져나감' : (st === 'hurt' ? '다친 채 생환' : '생환'))) + '</span>';
     }).join('<br>') + '</div>';
     const hist = r.history || {};
     const ks = Object.keys(hist).sort(function (a, b) { return a - b; });
@@ -478,6 +565,8 @@ function wire() {
     const st = ov.querySelector('[data-start]'); if (st) st.onclick = startRun;
     const lv = ov.querySelector('[data-leave]'); if (lv) lv.onclick = leave;
     const cl = ov.querySelector('[data-close]'); if (cl) cl.onclick = close;
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-gear]'), function (b) { b.onclick = function () { toggleGear(b.dataset.gear); }; });
+    const ot = ov.querySelector('[data-out]'); if (ot) ot.onclick = toggleOut;
 }
 
 // ==========================================
@@ -564,10 +653,26 @@ function send() {
     const t = String(inp.value || '').trim().slice(0, 200);
     if (!t) return;
     if (r.state === 'PLAY' && r.phase !== 'TALK') return;
+    if (r.state === 'PLAY' && ((r.members || {})[u.code] || {}).st === 'out') return;
     if (r.state !== 'PLAY' && r.state !== 'LOBBY') return;
     inp.value = '';
     d.ref(CHAT + '/' + curId).push({ c: u.code, n: String(u.name || u.code), t: t, at: now(),
                                      r: r.state === 'PLAY' ? (Number(r.round) || 0) : 0 });
+}
+function toggleOut() {
+    const u = me(), d = db_(), r = curId && all[curId];
+    if (!u || !d || !r || r.state !== 'PLAY' || r.phase !== 'TALK') return;
+    const x = (r.members || {})[u.code] || {};
+    if (x.role !== 'vip' || gone(x.st)) return;
+    const n = Number(r.round) || 0;
+    const going = Number(x.leave) === n;
+    if (!going) {
+        const go = function () { d.ref(ROOT + '/' + curId + '/members/' + u.code + '/leave').set(n); };
+        // 게임의 확인창들은 이 창(z-index 99999980) 아래에 뜬다 — 브라우저 확인창을 쓴다
+        if (window.confirm('홀로 나가시겠습니까?\n\n이 장면이 끝나면 방송국을 빠져나갑니다.\n남은 사람들의 난이도가 크게 오릅니다.')) go();
+        return;
+    }
+    d.ref(ROOT + '/' + curId + '/members/' + u.code + '/leave').set(null);
 }
 function toggleDone() {
     const u = me(), d = db_(), r = curId && all[curId];
@@ -591,8 +696,10 @@ function onTick() {
     if (!u || r.phase !== 'TALK' || !r.members[u.code]) return;
     // 넘길 때인가 — 시간이 다 됐거나, 살아 있는 사람이 모두 확정했거나
     const m = r.members;
-    const alive = Object.keys(m).filter(function (c) { return (m[c].st || 'ok') !== 'lost'; });
-    const allDone = alive.length > 0 && alive.every(function (c) { return Number(m[c].done) === n; });
+    const alive = Object.keys(m).filter(function (c) { return !gone(m[c].st || 'ok'); });
+    const allDone = alive.length > 0 && alive.every(function (c) {
+        return Number(m[c].done) === n || (m[c].role === 'vip' && Number(m[c].leave) === n);
+    });
     const key = curId + '#' + n;
     if (allDone && !doneSeen[key]) doneSeen[key] = t;
     const dueAt = allDone ? Math.min(doneSeen[key], Number(r.scene.endsAt) || 0) : (Number(r.scene.endsAt) || 0);
@@ -660,7 +767,7 @@ window.disasterState = function () {
     console.log('%c===== 📡 재난 =====', 'color:#9fe3e3; font-size:13px');
     console.log('  판:', curId || '없음', '· 상태:', r ? r.state + ' / ' + (r.phase || '') + ' · 장면 ' + (r.round || 0) : '-');
     if (r) console.table(Object.keys(r.members || {}).map(function (c) {
-        const x = r.members[c]; return { 사번: c, 이름: x.n, 상태: x.st || '', 확정: x.done || 0 };
+        const x = r.members[c]; return { 사번: c, 이름: x.n, 자리: x.role || '', 상태: x.st || '', 확정: x.done || 0, 나감: x.leave || '', 장비: (x.gear || []).join(', ') };
     }));
     console.log('  내 티켓:', tickets(me()));
 };
