@@ -504,7 +504,7 @@ function memberChips(r, u) {
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + ST[st]
+            : ((x.role === 'vip' && x.host ? ' · 사회자' : (x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '')) + ' · ' + ST[st]
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '">'
             + esc(x.n || c) + tag + '</span>';
@@ -532,6 +532,7 @@ function checkChips(list) {
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.forced) s = '⚡ ' + s;
+        if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 방송국이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
@@ -559,7 +560,7 @@ function play(r, u) {
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
-            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>귀빈</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
+            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>' + (x.host ? '사회자' : '귀빈') + '</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
             + '<span style="font-size:11px;color:#9a8fb8;">나가면 남은 재난관리국 · 백일몽 쪽의 난이도가 기하급수로 오릅니다.</span></div>'
             + '<button class="dz-btn sub" data-out="1"' + (r.phase !== 'TALK' ? ' disabled' : '') + ' style="border-color:#5a4a7a;color:#c9b6ff;">'
             + (going ? '이 장면이 끝나면 나갑니다 — 그만둔다' : '홀로 나간다') + '</button></div>';
