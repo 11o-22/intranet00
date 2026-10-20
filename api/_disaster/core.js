@@ -264,6 +264,13 @@ function gmSystem(kind) {
         '사람 목록에 「커플링」이 적힌 사람은 커플링(💍)으로 이어진 연인이다. 그 관계를 알아보고 이야기에 쓴다 —',
         '서로를 부르고 감싸고, 괴담이 그 관계를 파고들 수도 있다. 상대가 이 재난 밖에 있으면 그리움이나 미끼로 쓸 수 있다.',
         '성적인 묘사는 하지 않고, 관계 때문에 판정 결과를 바꾸지 않는다.',
+        '[성별 · 몸에 걸린 효과]',
+        '- 사람 목록의 성별과 「몸에 걸린 효과」(물약 등)를 알아보고 서술에 반영한다 — 겉모습 · 몸짓 · 목소리 · 습성 · 남들과 괴담이 그 사람을 대하는 태도.',
+        '  (예: 동물 귀와 꼬리가 돋은 사람은 귀가 먼저 소리를 따라 움직이고, 손바닥만 해진 사람은 남의 주머니 속에서 고개를 내민다. 취한 사람은 말끝이 풀린다.)',
+        '- 성별은 그 사람을 부르고 그리는 데 쓴다. 물약으로 몸의 성별이 뒤바뀐 사람은 지금의 몸으로 그린다.',
+        '- 효과는 이야기 속 모습일 뿐이다 — 판정 결과를 바꾸지 않는다.',
+        '- 「어린아이 상태」인 사람에게는 잔혹한 묘사를 하지 않는다. 다치거나 죽어도 담담하게, 암시까지만 쓴다.',
+        '- 여기서도 성적인 묘사는 하지 않는다.',
         '', SIGIL_RULE,
         '', WORLD, '', styleOf(d), '', d.text
     ].join('\n');
@@ -286,6 +293,9 @@ function memberLines(mem, d) {
         const t = titleOf(m);
         return '- ' + (m.n || c) + ' — ' + (m.aff || '소속 없음') + (t ? ' ' + t : '')
             + ' · 팀: ' + (m.team || '없음') + ' · 직급: ' + (m.pos || '없음')
+            + (m.body ? ' · 성별: ' + (m.g || '알 수 없음') + (m.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '') : '')
+            + (m.body && m.fx && m.fx.length ? ' — 몸에 걸린 효과: ' + m.fx.join('; ') : '')
+            + (m.child ? ' — ★ 지금 어린아이 상태 (이 사람에게는 잔혹 묘사 금지)' : '')
             + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
             + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
@@ -363,6 +373,36 @@ async function profiles(db, codes) {
     codes.forEach((c, i) => { out[c] = got[i]; });
     return out;
 }
+// ★ 몸 — 성별 · 걸린 효과(물약 등) (2026-10-20) — 시작할 때와 장면마다 다시 읽는다 (그 사이 마신 것 · 끝난 것)
+//   badge.gender (dna.js genderOf) · timedEffects [{ name, desc, expireAt, fixed }] (index.html addTimedEffect)
+//   ✗ 성적인 효과(체리 · 우유 · 복숭아 · 망고 · 딸기 …)는 진행자에게 넘기지 않는다 — 재난 진행자는 성적인 묘사를 하지 않는다
+//   ★ 어린아이 상태(오렌지맛)는 넘기되, 그 사람에게는 잔혹 묘사를 하지 않게 따로 짚는다
+const FX_SEX = /체리맛|우유맛|복숭아맛|망고맛|딸기맛|예민|컨트|딕걸|자궁|임신|착정|발정|성감|젖|가슴|성기|애널|보지|자지|음란|최음/;
+const FX_CHILD = /오렌지맛|어린아이|퇴행/;
+const FX_SKIP = /^시험용/;
+export function bodyOf(g, te, now) {
+    const fx = [], seen = {};
+    let flip = false, child = false;
+    invArr(te).forEach((e) => {
+        if (!e || !e.name) return;
+        if (!(e.fixed || !e.expireAt || Number(e.expireAt) > now)) return;      // 끝난 것은 빼고
+        const nm = String(e.name), ds = String(e.desc || '');
+        if (FX_SKIP.test(nm) || FX_SEX.test(nm + ' ' + ds)) return;
+        if (nm === '포도맛 물약') flip = true;
+        if (FX_CHILD.test(nm + ' ' + ds)) child = true;
+        if (seen[nm]) return; seen[nm] = 1;
+        fx.push(clip(nm, 20) + (ds ? ' — ' + clip(ds, 60) : ''));
+    });
+    return { g: (g === '남성' || g === '여성') ? g : '', flip: flip, child: child, fx: fx.slice(0, 6) };
+}
+async function bodies(db, codes, now) {
+    const got = await Promise.all(codes.map((c) => Promise.all([db.get('users/' + c + '/badge/gender'), db.get('users/' + c + '/timedEffects')])));
+    const out = {};
+    codes.forEach((c, i) => { out[c] = bodyOf(got[i][0], got[i][1], now); });
+    return out;
+}
+function withBody(m, b) { return b ? Object.assign(m, { g: b.g, flip: b.flip, child: b.child, fx: b.fx, body: true }) : m; }
+
 // 귀빈이 홀로 나간 수 n → 남은 재난관리국 · 백일몽 쪽 난이도 + surge × (2ⁿ − 1)
 function surgeOf(d, mem) {
     if (!d || !d.roles || !d.surge) return 0;
@@ -408,6 +448,9 @@ async function start(b, deps, db) {
             m.marks = (c === CFG.ADMIN) ? [] : marksOf(P[c]);
         });
         await db.patch('disaster/' + b.run, { state: 'PLAY', phase: 'WAIT', startedAt: now, err: null });
+        // 몸 — 성별 · 걸린 효과 (진행자에게만 · 판에는 적지 않는다)
+        const B0 = await bodies(db, codes.filter((c) => mem[c].role !== 'admin'), now);
+        codes.forEach((c) => withBody(mem[c], B0[c]));
 
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4000, system: gmSystem(run.kind), schema: SCHEMA_START,
@@ -587,7 +630,8 @@ async function round(b, deps, db) {
     try {
         await spend(db, now, null, null);
         await db.patch('disaster/' + b.run, { phase: 'WAIT', err: null });
-        const [chatAll, srv] = await Promise.all([db.get('disasterChat/' + b.run), db.get('disasterSrv/' + b.run)]);
+        const [chatAll, srv, BB] = await Promise.all([db.get('disasterChat/' + b.run), db.get('disasterSrv/' + b.run),
+            bodies(db, Object.keys(mem).filter((c) => mem[c].role !== 'admin'), now)]);
         // 홀로 나가는 귀빈 — 이번 장면부터 판에서 빠진다 (행동도 판정도 없다)
         const outNow = alive.filter(leaving);
         const memNow = {}; Object.keys(mem).forEach((c) => { memNow[c] = Object.assign({}, mem[c]); });
@@ -703,6 +747,7 @@ async function round(b, deps, db) {
         // ③ 서술
         const memAfter = {}; Object.keys(mem).forEach((c) => { memAfter[c] = Object.assign({}, memNow[c], { st: J.st[c] }); });
         kickNow.forEach((c) => { memAfter[c].kick = n; });
+        Object.keys(memAfter).forEach((c) => withBody(memAfter[c], BB[c]));     // 성별 · 걸린 효과 (이번 장면에 다시 읽은 것)
         const sums = srv && srv.sums ? Object.keys(srv.sums).sort((a, z) => a - z).map((k) => srv.sums[k]) : [];
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4500, system: gmSystem(run.kind), schema: SCHEMA_TURN,
