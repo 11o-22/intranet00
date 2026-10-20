@@ -1329,22 +1329,47 @@ function stealPanel(target, srcName, maxPick, dayCap) {
 // ==========================================
 // 빼앗은 장비를 돌려준다 — 해제할 때 · 자정에
 // ==========================================
+// ★ 돌려줄 때 상대 기록이 내 화면에 없어도 돌려준다 (2026-10-20)
+//   ✗ 전에는 db.users[상대] 가 아직 안 들어와 있으면(접속 직후 자정 반환 · 명부가 덜 온 때) 서버에 돌려주는 일을
+//     통째로 건너뛰고, 빼앗아 둔 기록만 지웠다 — 물건이 어디에도 없이 사라졌다.
+//   이제 서버에는 사번으로 바로 돌려준다 (gearPush 는 서버 트랜잭션이라 내 사본이 필요 없다).
+//   서버에 돌려주지 못했으면 빼앗아 둔 기록을 되살려 다음에 다시 돌려준다.
+// 상대가 서버에 있는 사원인가 — 내 명부(db.users)에 아직 없을 때만 서버에 물어본다
+//   (updateUserFields 는 명부에 없는 사번에 쓰는 것을 막는다 — guard.js. 지워진 계정에 유령 기록을 만들지 않게
+//    여기서도 있는 사원에게만 쓴다)
+function victimAlive(code) {
+    try {
+        const u = db.users && db.users[code];
+        if (u && u.name) return Promise.resolve(true);
+        if (typeof database === 'undefined' || !database || !code) return Promise.resolve(false);
+        return database.ref('users/' + code + '/name').once('value').then(function (s) { return !!(s && s.val()); })
+            .catch(function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+}
+
 function returnStolen(label, quiet) {
     const rec = stolenBag(currentUser)[label];
     if (!rec) return false;
     const t = db.users[rec.from];
     let what = label;
+    // gearPush 가 없고 상대 사본도 없으면 지금은 돌려줄 길이 없다 — 기록을 지우지 않고 다음에
+    if (rec.kind !== 'state' && typeof gearPush !== 'function' && !t) return false;
 
     if (rec.kind === 'state') {
         what = rec.t || rec.field;
         currentUser[rec.field] = (rec.mine == null) ? 0 : rec.mine;
         const g = {}; g[rec.field] = 1;
         saveFields(g);
+        const back = (rec.theirs == null) ? 0 : rec.theirs;
         if (t) {
-            const back = (rec.theirs == null) ? 0 : rec.theirs;
             t[rec.field] = back;
             const f = {}; f[rec.field] = back;
             updateUserFields(t.code, f);
+        } else {
+            // 상대 사본이 없어도 서버에는 돌려준다 (있는 사원일 때만)
+            victimAlive(rec.from).then(function (ok) {
+                if (ok) database.ref('users/' + rec.from + '/' + rec.field).set(back);
+            });
         }
     } else {
         what = rec.orig;
@@ -1358,9 +1383,8 @@ function returnStolen(label, quiet) {
         if (at >= 0) eq.splice(at, 1);                     // 예전 판본 정리
         if (currentUser.equipOwner) delete currentUser.equipOwner[label];
 
+        const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
         if (t) {
-            const baseBack = (typeof getEquipBaseName === 'function') ? getEquipBaseName(rec.orig) : rec.orig;
-
             // 내 화면 사본도 맞춰 둔다 (보이는 것만 — 서버는 아래에서 따로)
             const te = t.equippedWeapons || [];
             const si = te.indexOf(SEAL + rec.orig);
@@ -1382,42 +1406,64 @@ function returnStolen(label, quiet) {
             if (typeof appendBadgeNoteToUser === 'function') {
                 appendBadgeNoteToUser(t, '[장착됨] ' + baseBack);
             }
+        }
 
-            // ★ 서버에는 배열을 통째로 보내지 않는다. 사본이 비어 있으면
-            //   상대 장착칸이 텅 빈다. 돌려줄 하나만 보낸다. (gear-move.js)
-            if (typeof gearPush === 'function') {
-                gearPush(t.code, rec.orig, rec.owner, SEAL + rec.orig, baseBack);
-            } else {
-                updateUserFields(t.code, {
-                    equippedWeapons: t.equippedWeapons,
-                    equipOwner: t.equipOwner || {},
-                    gearLock: t.gearLock || {}
-                });
-            }
+        // ★ 서버에는 배열을 통째로 보내지 않는다. 사본이 비어 있으면
+        //   상대 장착칸이 텅 빈다. 돌려줄 하나만 보낸다. (gear-move.js)
+        //   상대 사본(t)이 없어도 사번으로 바로 보낸다 — 못 보냈으면 기록을 되살린다
+        if (typeof gearPush === 'function') {
+            const keepRec = Object.assign({}, rec);
+            Promise.resolve(t ? true : victimAlive(rec.from)).then(function (alive) {
+                if (!alive) { console.warn('[반환] 돌려줄 사원이 없습니다 (지워진 계정):', rec.from, label); return true; }
+                return gearPush(rec.from, rec.orig, rec.owner, SEAL + rec.orig, baseBack);
+            }).then(function (ok) {
+                if (ok === false) throw new Error('gearPush false');
+            }).catch(function (e) {
+                try {
+                    stolenBag(currentUser)[label] = keepRec;
+                    if (!Array.isArray(currentUser.borrowedGear)) currentUser.borrowedGear = [];
+                    if (currentUser.borrowedGear.indexOf(label) < 0) currentUser.borrowedGear.push(label);
+                    saveFields({ stolenGear: 1, borrowedGear: 1 });
+                    console.warn('[반환] 서버에 돌려주지 못해 기록을 되살렸습니다 — 다음에 다시 돌려줍니다:', label, e && e.message);
+                } catch (x) { }
+            });
+        } else {
+            updateUserFields(t.code, {
+                equippedWeapons: t.equippedWeapons,
+                equipOwner: t.equipOwner || {},
+                gearLock: t.gearLock || {}
+            });
         }
     }
 
     delete currentUser.stolenGear[label];
     noUndef(currentUser.stolenGear);
     saveFields({ stolenGear: 1 });
+    // ★ 마지막 하나를 돌려주면 stolenGear 가 {} 가 되는데, 빈 객체는 저장 길목(empty-null.js)에서 빠진다 —
+    //   서버에 돌려준 기록이 그대로 남아, 다시 들어오면 또 돌려주려 들었다. 그 한 칸을 따로 지운다 (2026-10-20)
+    try { if (typeof database !== 'undefined' && database) database.ref('users/' + currentUser.code + '/stolenGear/' + label).remove(); } catch (e) { }
 
-    // 남은 것이 없으면 특이사항의 눈길·숨결 문구도 걷는다
-    if (t) {
-        const still = Object.keys(currentUser.stolenGear || {}).some(function (k) {
-            return currentUser.stolenGear[k] && currentUser.stolenGear[k].from === t.code;
-        });
-        if (!still) {
+    // 남은 것이 없으면 특이사항의 눈길·숨결 문구도 걷는다 — 봉인은 상대 사본이 없어도 서버에서 푼다
+    const still = Object.keys(currentUser.stolenGear || {}).some(function (k) {
+        return currentUser.stolenGear[k] && currentUser.stolenGear[k].from === rec.from;
+    });
+    if (!still) {
+        if (t) {
             removeBadgeLine(t, '황룡의 눈길을 받았습니다');
             removeBadgeLine(t, '산군의 숨결이 닿았습니다');
             liftSeal(t);
+        } else {
+            victimAlive(rec.from).then(function (ok) {
+                if (ok) database.ref('users/' + rec.from + '/gearSeal').remove();
+            });
         }
-        if (rec.src && !Object.keys(currentUser.stolenGear || {}).some(function (k) {
-                return currentUser.stolenGear[k] && currentUser.stolenGear[k].src === rec.src;
-            })) {
-            removeBadgeLine(currentUser, rec.src + '을(를) 썼습니다');
-        }
-        addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
     }
+    if (rec.src && !Object.keys(currentUser.stolenGear || {}).some(function (k) {
+            return currentUser.stolenGear[k] && currentUser.stolenGear[k].src === rec.src;
+        })) {
+        removeBadgeLine(currentUser, rec.src + '을(를) 썼습니다');
+    }
+    if (t) addHistoryLog(t, '[반환] ' + what + ' 이(가) 돌아왔습니다.');
     saveSelfFull();
     updateUI();
     if (!quiet) showCustomAlert((t ? t.name + ' 사원에게 ' : '') + what + ' 을(를) 돌려주었습니다.');
@@ -1445,7 +1491,9 @@ window.returnAllStolen = function () {
             const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w || '') : w;
             if (base === '황룡의 눈' || base === '산군의 도움') {
                 const n = returnBySource(base);
-                const r = _f.apply(this, arguments);
+                // 돌려주면서 장착칸이 당겨졌을 수 있다 (예전 판본 정리) — 그 물건의 자리를 다시 찾는다
+                const ni = (currentUser.equippedWeapons || []).indexOf(w);
+                const r = (ni >= 0 && ni !== index) ? _f.call(this, ni) : _f.apply(this, arguments);
                 if (n) setTimeout(function () {
                     showCustomAlert('빼앗았던 ' + n + '건이 제자리로 돌아갔습니다.');
                 }, 400);
@@ -2343,9 +2391,12 @@ function putSeal(target, srcName) {
 }
 
 function liftSeal(t) {
-    if (!t || !t.gearSeal) return;
+    if (!t || !t.code) return;
+    // ★ 내 화면의 상대 사본에 gearSeal 이 안 들어와 있어도 서버에는 걸려 있을 수 있다 — 서버에서 바로 지운다 (2026-10-20)
+    //   (전에는 사본에 없으면 그냥 돌아가, 돌려준 뒤에도 상대가 봉인된 채 아무것도 못 찼다)
     delete t.gearSeal;
-    updateUserFields(t.code, { gearSeal: null });
+    try { if (typeof database !== 'undefined' && database) database.ref('users/' + t.code + '/gearSeal').remove(); }
+    catch (e) { updateUserFields(t.code, { gearSeal: null }); }
     removeBadgeLine(t, '황룡의 시선을 받았습니다');
     removeBadgeLine(t, '산군의 기운에 억눌립니다');
 }
