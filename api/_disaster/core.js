@@ -645,7 +645,8 @@ async function round(b, deps, db) {
                 ...(lostNew.length ? ['', '[이번 장면에 죽은 사람 — fates 에 코드로] ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
                 '',
                 '[쓸 것]',
-                '- result : 이번 장면에서 벌어진 일. 판정 결과와 상태 변화를 그대로. 행동한 사람은 이름이 나오게. '
+                '- result : 이번 장면에서 벌어진 일. 판정 결과대로 일어난 일을 이야기로만 쓴다 — 「판정」「실패」「상태」「다침」 같은 말 없이,'
+                    + ' 다친 사람은 무엇에 어떻게 다쳤는지 · 죽은 사람은 어떻게 죽었는지를 장면 속 일로. 행동한 사람은 이름이 나오게. '
                     + (Object.keys(mem).length > 4 ? '550' : '350') + '자 안쪽.',
                 '- ended / end_kind / end_text : 끝내면 end_text 에 결말 (300자 안쪽). 안 끝내면 end_kind=none, end_text 빈 문자열.',
                 '- next_title / next_text : 안 끝내면 다음 장면 (제목 짧게 · 본문 450자 안쪽, 열린 상황으로). 끝내면 빈 문자열.',
