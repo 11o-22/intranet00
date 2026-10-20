@@ -505,7 +505,7 @@ function memberChips(r, u) {
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + ST[st]
+            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + (st === 'out' && x.kick ? '퇴출' : ST[st])
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '">'
             + esc(x.n || c) + tag + '</span>';
@@ -529,7 +529,7 @@ function room(r, u) {
 
 function checkChips(list) {
     return '<div class="dz-chk">' + (list || []).map(function (c) {
-        if (c.kind === 'none') return '<span>' + esc(c.name) + ' · ' + esc(c.did) + '</span>';
+        if (c.kind === 'none') return '<span' + (c.kick ? ' class="no"' : '') + '>' + esc(c.name) + ' · ' + esc(c.did) + (c.kick ? ' → 퇴출' : '') + '</span>';
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.forced) s = '⚡ ' + s;
@@ -537,6 +537,7 @@ function checkChips(list) {
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
+        if (c.kick) s += ' → 퇴출';
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
     }).join('') + '</div>';
 }
@@ -556,8 +557,10 @@ function play(r, u) {
     //   (진행자는 알고 이야기로 그린다 · 대기실 안내 카드에도 안 적는다)
     const x = (r.members || {})[u.code] || {}, st = x.st || 'ok';
     if (st === 'out') {
+        const bath = /재난관리/.test((x.aff || '') + ' ' + (x.team || ''));
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
-            + '방송국을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.</div></div>';
+            + (x.kick ? '방송국과 맞지 않는다며 쫓겨났습니다. ' + (bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로') + ' 이송됩니다.<br>남은 사람들의 이야기를 지켜봅니다.'
+                      : '방송국을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.') + '</div></div>';
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
@@ -586,7 +589,7 @@ function ending(r, u) {
     h += '<div class="dz-sec">사원</div><div class="dz-card-m">' + Object.keys(m).map(function (c) {
         const st = m[c].st || 'ok';
         return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — '
-            + (st === 'lost' ? '죽음' + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? '홀로 빠져나감' : (st === 'hurt' ? '다친 채 생환' : '생환')))
+            + (st === 'lost' ? '죽음' + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? (m[c].kick ? '퇴출 — 방송국에서 쫓겨남' : '홀로 빠져나감') : (st === 'hurt' ? '다친 채 생환' : '생환')))
             + payTag((o.pay || {})[c], m[c]) + '</span>';
     }).join('<br>') + '</div>';
     const hist = r.history || {};
@@ -855,7 +858,7 @@ function takePay(run, v) {
 function applyPay(v) {
     const u = me(); if (!u) return;
     const nm = v.name || NAME;
-    if (v.die) {
+    if (v.die || v.kick) {
         const bath = (typeof isDisasterAgent === 'function') ? isDisasterAgent(u)
             : /재난관리/.test((u.affiliation || '') + ' ' + (u.team || ''));
         u.pollution = 100;
@@ -865,7 +868,7 @@ function applyPay(v) {
         u.quarantineHospital = true;
         u.quarantineDest = bath ? 'bath' : 'fox';
         const where = bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로';
-        try { addHistoryLog(u, '[재난 사망] ' + nm + ' — ' + (v.how || '방송국에 먹혔다') + '. ' + where + ' 이송되었습니다.'); } catch (e) { }
+        try { addHistoryLog(u, (v.kick ? '[재난 퇴출] ' : '[재난 사망] ') + nm + ' — ' + (v.how || '방송국에 먹혔다') + '. ' + where + ' 이송되었습니다.'); } catch (e) { }
         try { saveFields({ pollution: 1, quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, quarantineHospital: 1, quarantineDest: 1, history: 1 }); } catch (e) { }
         try { updateUI(); } catch (e) { }
         alert_(nm + '\n\n' + (v.how || '방송국에 먹혔다') + '\n\n' + where + ' 이송됩니다. (4시간)');
