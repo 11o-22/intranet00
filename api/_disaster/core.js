@@ -289,7 +289,7 @@ function memberLines(mem, d) {
             + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
             + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
                 + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
-            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국에서 쫓겨남' : stName(d, m.st));
+            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국이 다른 곳으로 모셔 감' : stName(d, m.st));
     }).join('\n');
 }
 
@@ -457,7 +457,7 @@ function worse(st, k) { return ORDER[Math.min(2, ORDER.indexOf(st || 'ok') + k)]
 //   opt.safe    true 면 아무도 죽지 않는다 — 실패해도 「다침」이 끝 (연결로 끌어내는 것은 그대로)
 //   opt.forced  { codes, kind, tier, did } — 이 사람들 중 이번에 위험 판정이 없던 사람에게 한 번 더 굴린다 (방송국이 덮침)
 //   opt.kick    true 면 — 귀빈(vip)이 남을 구하거나 지키는 행동(target 이 다른 사람)을 하면 그 행동은 그대로 되고,
-//               그 직후 방송국과 맞지 않는다며 쫓겨난다 (상태 out · 줄에 kick). 그 행동으로 죽었으면 죽음이 먼저다
+//               그 직후 방송과 맞지 않는다며 다른 곳으로 모셔진다 (상태 out · 줄에 kick). 그 행동으로 죽었으면 죽음이 먼저다
 //   opt.meta    { list: [{ who, said }], kind, tier, did, lethal } — 바깥의 말을 한 사람에게 한 번 더 굴린다
 //               lethal 이면 실패하는 그 자리에서 죽는다 (safe 여도) · 관리자 · 이미 죽었거나 나간 사람은 빼고
 export function judge(acts, mem, rand, opt) {
@@ -497,7 +497,7 @@ export function judge(acts, mem, rand, opt) {
                 if (st[tg] !== f) { row.tgt = tg; row.tgtName = mem[tg].n || tg; row.tgtFrom = f; row.tgtTo = st[tg]; }
             }
         }
-        // 귀빈이 남을 구하거나 지켰다 — 행동은 된 채로 쫓겨난다 (2026-10-20)
+        // 귀빈이 남을 구하거나 지켰다 — 행동은 된 채로 다른 곳으로 모셔진다 (2026-10-20 · 끌어내지 않고 모신다)
         if (opt && opt.kick && mem[a.who].role === 'vip' && a.target && a.target !== a.who
             && mem[a.target] && mem[a.target].role !== 'admin' && st[a.who] !== 'lost') {
             st[a.who] = 'out'; row.kick = true;
@@ -553,13 +553,13 @@ export function judge(acts, mem, rand, opt) {
 }
 
 function checkLine(c, d) {
-    if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [강제 퇴출] ' + c.name + ' — 남을 구하거나 지켜 방송국에서 쫓겨난다' : '');
+    if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
     let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
         + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
-    if (c.kick) s += ' · [강제 퇴출] ' + c.name + ' — 남을 구하거나 지켜 방송국에서 쫓겨난다';
+    if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다';
     return s;
 }
 
@@ -682,7 +682,7 @@ async function round(b, deps, db) {
             forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => surgeHits(memNow[c].role)) }, D.final) : null,
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             kick: !!(D.roles && D.kick) });
-        const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 쫓겨난 귀빈
+        const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
         const metaHit = J.checks.some((c) => c.meta);
         const lostNew = Object.keys(J.st).filter((c) => J.st[c] === 'lost' && (memNow[c].st || 'ok') !== 'lost');   // 이번에 죽은 사람
         const active = Object.keys(J.st).filter((c) => !gone(J.st[c]) && memNow[c].role !== 'admin');   // 아직 재난 안에서 움직이는 사람 (관리자 빼고)
@@ -715,9 +715,12 @@ async function round(b, deps, db) {
                     : (finalNow
                         ? '[흐름] ' + (MIN + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.'
                         : '[흐름] 이제 행동에 따라 죽는다. 판정 결과대로 — 함정에 걸리거나 속임수를 믿고 움직인 사람이 먹힌다.'), ''] : []),
-                ...(kickNow.length ? ['[강제 퇴출] ' + kickNow.map((c) => mem[c].n || c).join(', ')
-                    + ' — 귀빈이 남을 구하거나 지키려 했다. 그 행동의 결과(판정)는 그대로 쓴다. 그 직후 방송국 사람들이 「귀빈께서는 저희 방송과 맞지 않으십니다」 하며'
-                    + ' 정중하고 섬뜩하게 귀빈을 방송국 밖으로 끌어낸다. 쫓겨난 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.', ''] : []),
+                ...(kickNow.length ? ['[모심] ' + kickNow.map((c) => (mem[c].n || c)
+                        + (/재난관리/.test((memNow[c].aff || '') + ' ' + (memNow[c].team || '')) ? ' (선녀탕으로)' : ' (여우 상담실로)')).join(', ')
+                    + ' — 귀빈이 남을 구하거나 지키려 했다. 그 행동의 결과(판정)는 그대로 쓴다. 그 직후 방송국 사람들이 다가와 깍듯이 인사하며'
+                    + ' 「귀빈께서는 저희 방송과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다」 하고 귀빈을 다른 곳으로 모셔 간다.'
+                    + ' 억지로 끌어내지 않는다 — 정중한 안내 · 비켜서는 방송인들 · 열리는 문. 그 극진함이 더 섬뜩하다.'
+                    + ' 모셔 가는 곳은 괄호 안의 곳이다 (그 문 너머에 김이 오르는 선녀탕 · 여우 상담실이 있다). 모셔 간 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.', ''] : []),
                 ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
                     + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
                 '[이번 장면에서 나눈 대화]', talk, '',
@@ -776,12 +779,12 @@ async function round(b, deps, db) {
         Object.keys(J.st).forEach((c) => { if (J.st[c] !== 'lost' && memNow[c].fate) up['members/' + c + '/fate'] = null; });
         let pays = null;
         const NAME_ = (D.grade ? D.grade + '급 ' : '') + '『 ' + (D.name || run.kind) + ' 』';
-        // ★ 쫓겨난 귀빈 — 그 자리에서 선녀탕 · 여우 상담실로 (화면이 한 번만 받는다 · 보상 없음)
+        // ★ 모셔진 귀빈 — 그 자리에서 선녀탕 · 여우 상담실로 (화면이 한 번만 받는다 · 보상 없음)
         if (kickNow.length && D.kick) {
             pays = {};
             kickNow.forEach((c) => {
                 pays[c + '/' + b.run] = { run: b.run, name: NAME_, at: now, st: 'out', kick: true,
-                                          how: clip(D.kick.how || '방송국과 맞지 않는다며 쫓겨났다', 60) };
+                                          how: clip(D.kick.how || '방송과 맞지 않는다며 다른 곳으로 모셔졌다', 60) };
             });
         }
         if (ended) {
@@ -794,7 +797,7 @@ async function round(b, deps, db) {
                 Object.keys(J.st).forEach((c) => {
                     const m = Object.assign({}, memNow[c], { st: J.st[c] });
                     if (m.role === 'admin') return;
-                    if (m.kick || kickNow.indexOf(c) >= 0) { pay[c] = -1; return; }   // 쫓겨난 귀빈 — 이미 이송 (몫 없음)
+                    if (m.kick || kickNow.indexOf(c) >= 0) { pay[c] = -1; return; }   // 모셔진 귀빈 — 이미 이송 (몫 없음)
                     const rec = { run: b.run, name: NAME_, at: now, st: m.st };
                     if (m.st === 'lost' && D.death) { rec.die = true; rec.how = fate[c] || memNow[c].fate || '방송국에 먹혔다'; }
                     else { rec.pts = payOf(D, m); if (m.st === 'out') rec.left = true; }
