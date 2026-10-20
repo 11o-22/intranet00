@@ -218,7 +218,7 @@ function closeBtn() {
             desc: '북두의 일곱 성군이 곁에 선다. 장착하면 장착칸의 [🌟 칠성] 에서 일곱 성군에게 청하거나 '
                 + '★ 달린 음식으로 치성을 드릴 수 있다. — 탐랑 · 거문 · 녹존 · 문곡 · 염정 · 무곡 · 파군'
         };
-        ITEM_CATALOG[OLD] = Object.assign({}, ITEM_CATALOG[NAME]);
+        try { delete ITEM_CATALOG[OLD]; } catch (e) { }    // 🐯 옛 이름은 목록에 안 띄운다 — 가진 사람은 rename() 이 바꾼다
         try { if (typeof NO_SELL_ITEMS !== 'undefined') [NAME, OLD].forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); }); } catch (e) { }
         if (/[.#$\[\]\/]/.test(NAME)) console.error('[칠성] 물품 이름에 파이어베이스 열쇠로 못 쓰는 글자가 있습니다: ' + NAME);
         console.log('[칠성] ' + NAME + ' 등록 — 상담사 지급 전용');
