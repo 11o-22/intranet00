@@ -51,7 +51,7 @@ import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, fox
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
-    TALK_MS: 150000,         // 장면마다 대화 시간 — 2분 30초 (2026-10-20)
+    TALK_MS: 240000,         // 장면마다 대화 시간 — 4분 (2026-10-20 · 2분 30초 → 4분)
     MAX_ROUNDS: 8,           // 한 판 최대 장면
     QUIET_ROLL: 2,           // 이 장면 수만큼 잇달아 말이 없으면 대신 다이스를 굴린다 (1장면째는 진행자가 끌어들인다)
     MAX_MEMBERS: 5,          // 한 방 최대 인원 (2026-10-20 — 4 → 8 → 5)
