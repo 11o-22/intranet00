@@ -30,6 +30,10 @@
 //   · 귀빈은 홀로 나갈 수 있다 (members/<사번>/leave = 장면 번호) → 그 장면 끝에 상태 out
 //     나간 귀빈 n 명 → 남은 재난관리국 · 백일몽 · 그 밖 쪽 난이도 + d.surge × (2ⁿ − 1) (20 이 끝)
 //   · 난이도 표 d.dc · 실종을 부르는 말 d.lost · 잔혹 묘사 d.gore
+//   · 장면 수 d.rounds · d.safe 장면까지는 아무도 죽지 않고(다침이 끝) 끝나지도 않는다 ·
+//     그 뒤로는 위험 판정이 없던 사람에게도 방송국이 덮친다 (d.final — 귀빈 · 예외 · 관리자 빼고)
+//   · 죽는 방식 — 진행자가 사람마다 한 줄 (fates → members/<사번>/fate)
+//   · 끝나면 disasterPay/<사번>/<판> 에 몫을 적는다 — 살아남은 사람 포인트(payOf) · 죽은 사람 이송. 화면(disaster.js)이 한 번만 받는다
 //   · 표식 — 특별한 커스텀 장비를 찬 사람은 괴담이 노리거나 · 끌어들이려 하거나 · 경외한다 (lore.js SIGILS · 기능은 못 씀)
 //   · 커플링 — 시작할 때 사원마다 users/<사번>/couple 을 읽어 진행자에게 「누구와 연인 · 같이 들어왔나」를 알린다 (어느 재난이든)
 //
@@ -230,7 +234,8 @@ const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
     who: S, did: S, kind: { type: 'string', enum: KIND_KEYS },
     tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S }) } });
 const SCHEMA_TURN = obj({ result: S, ended: B, end_kind: { type: 'string', enum: ['none', 'clear', 'escape', 'fail'] },
-    end_text: S, next_title: S, next_text: S, notes: S, summary: S });
+    end_text: S, next_title: S, next_text: S, notes: S, summary: S,
+    fates: { type: 'array', items: obj({ who: S, how: S }) } });
 
 function gmSystem(kind) {
     const d = DISASTERS[kind];
@@ -296,6 +301,15 @@ export function roleOf(p, code) {
     if (/재난관리/.test(aff + ' ' + team)) return 'bureau';
     if (/백일몽/.test(aff)) return 'daydream';
     return 'other';
+}
+// 심야 토크쇼의 주인인가 (보상 — 끝까지 함께하면 reward.host)
+function hostOf(p) { return (p.eq || []).concat(p.inv || []).some((w) => baseName(w) === SHOW); }
+// 살아서 끝까지 남은 사람의 몫 — 자리마다 (lore.js reward)
+export function payOf(d, m) {
+    const R = d && d.reward; if (!R || !m) return 0;
+    if (m.role === 'admin' || m.st === 'lost' || m.st === 'out') return 0;
+    if (m.role === 'vip') return m.host ? (Number(R.host) || 0) : 0;
+    return Number(R[m.role]) || 0;
 }
 // 지참 장비 — 화면이 고른 것 가운데, 정말 차고 있거나 소지품에 있거나 전용 장비인 것만 · 성적인 것 빼고 · n 개까지
 export function gearOf(want, p, n) {
@@ -378,6 +392,7 @@ async function start(b, deps, db) {
             const m = mem[c] = Object.assign({}, mem[c]);
             m.aff = P[c].aff || m.aff || ''; m.team = P[c].team || m.team || ''; m.pos = P[c].pos || m.pos || '';
             m.role = (c === CFG.ADMIN) ? 'admin' : (D.roles ? roleOf(P[c], c) : null);     // 상담사는 어느 재난이든 관리자
+            m.host = (m.role === 'vip' && hostOf(P[c])) || false;
             m.gear = gearOf(m.gear, P[c], D.gear || 0);
             m.couple = P[c].couple;
             m.marks = (c === CFG.ADMIN) ? [] : marksOf(P[c]);
@@ -407,6 +422,8 @@ async function start(b, deps, db) {
             const m = mem[c];
             up['members/' + c + '/aff'] = m.aff; up['members/' + c + '/team'] = m.team; up['members/' + c + '/pos'] = m.pos;
             up['members/' + c + '/role'] = m.role || null;
+            up['members/' + c + '/host'] = m.host || null;
+            up['members/' + c + '/fate'] = null;
             up['members/' + c + '/gear'] = (m.gear && m.gear.length) ? m.gear : null;
             up['members/' + c + '/couple'] = m.couple || null;
             up['members/' + c + '/marks'] = (m.marks && m.marks.length) ? m.marks : null;
@@ -426,11 +443,15 @@ async function start(b, deps, db) {
 // ==========================================
 function worse(st, k) { return ORDER[Math.min(2, ORDER.indexOf(st || 'ok') + k)]; }
 
-//   opt.dc    재난마다 난이도 표 (없으면 CFG.DC)
-//   opt.plus  사원마다 난이도에 더하는 몫 (귀빈이 홀로 나가 방송국이 사나워진 것) — 20 을 넘지 않는다
+//   opt.dc      재난마다 난이도 표 (없으면 CFG.DC)
+//   opt.plus    사원마다 난이도에 더하는 몫 (귀빈이 홀로 나가 방송국이 사나워진 것) — 20 을 넘지 않는다
+//   opt.safe    true 면 아무도 죽지 않는다 — 실패해도 「다침」이 끝 (연결로 끌어내는 것은 그대로)
+//   opt.forced  { codes, kind, tier, did } — 이 사람들 중 이번에 위험 판정이 없던 사람에게 한 번 더 굴린다 (방송국이 덮침)
 export function judge(acts, mem, rand, opt) {
     const DC = (opt && opt.dc) || CFG.DC;
     const plus = (opt && typeof opt.plus === 'function') ? opt.plus : () => 0;
+    const safe = !!(opt && opt.safe);
+    const cap = (s) => (safe && s === 'lost') ? 'hurt' : s;
     const st = {}; Object.keys(mem).forEach((c) => { st[c] = (mem[c] && mem[c].st) || 'ok'; });
     const seen = {}, checks = [];
     (acts || []).forEach((a) => {
@@ -451,7 +472,7 @@ export function judge(acts, mem, rand, opt) {
             if (add) row.plus = add;
             if (!ok && a.danger) {
                 const from = st[a.who];
-                st[a.who] = worse(from, roll === 1 ? 2 : 1);
+                st[a.who] = cap(worse(from, roll === 1 ? 2 : 1));
                 if (st[a.who] !== from) { row.from = from; row.to = st[a.who]; }
             }
             // 돕는 것 — 성공하면 동료 하나를 한 단계 되돌린다
@@ -465,12 +486,33 @@ export function judge(acts, mem, rand, opt) {
         }
         checks.push(row);
     });
+    // 방송국이 덮친다 — 이번에 위험 판정이 없던 사람에게 한 번 더
+    const F = opt && opt.forced;
+    if (F && Array.isArray(F.codes)) {
+        F.codes.forEach((c) => {
+            if (!mem[c] || gone(st[c]) || mem[c].role === 'admin') return;
+            if (checks.some((r) => r.who === c && r.danger && r.kind !== 'none')) return;
+            const tier = DC[F.tier] ? F.tier : 'hard';
+            const add = Math.max(0, Number(plus(c)) || 0);
+            const dc = Math.min(20, DC[tier] + add);
+            const roll = rand(20), ok = roll >= dc;
+            const row = { who: c, name: mem[c].n || c, did: clip(F.did || '방송국이 덮쳐 온다', 80), kind: KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade',
+                          tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, forced: true };
+            if (add) row.plus = add;
+            if (!ok) {
+                const from = st[c];
+                st[c] = cap(worse(from, roll === 1 ? 2 : 1));
+                if (st[c] !== from) { row.from = from; row.to = st[c]; }
+            }
+            checks.push(row);
+        });
+    }
     return { checks: checks, st: st };
 }
 
 function checkLine(c, d) {
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)';
-    let s = '- ' + c.name + ' — ' + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
+    let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
         + (c.plus ? ' — 귀빈이 빠져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
@@ -547,15 +589,21 @@ async function round(b, deps, db) {
         }
 
         // ② 판정 — 코드가 정한다
+        const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
+        const SAFE = Number(D.safe) || 0;
+        const safeNow = n <= SAFE;                                  // 이 장면까지는 아무도 죽지 않는다
+        const finalNow = !!(D.final && SAFE && n > SAFE);           // 그 뒤로는 방송국이 덮친다
         const J = judge(acts, memNow, deps.rand, {
-            dc: D.dc, plus: (c) => (surge && surgeHits(memNow[c].role) ? surge : 0) });
+            dc: D.dc, plus: (c) => (surge && surgeHits(memNow[c].role) ? surge : 0), safe: safeNow,
+            forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => surgeHits(memNow[c].role)) }, D.final) : null });
+        const lostNew = Object.keys(J.st).filter((c) => J.st[c] === 'lost' && (memNow[c].st || 'ok') !== 'lost');   // 이번에 죽은 사람
         const active = Object.keys(J.st).filter((c) => !gone(J.st[c]) && memNow[c].role !== 'admin');   // 아직 재난 안에서 움직이는 사람 (관리자 빼고)
         const aliveAfter = Object.keys(J.st).filter((c) => J.st[c] !== 'lost' && memNow[c].role !== 'admin');   // 살아 있는 사람 (홀로 나간 사람 포함)
         const lostAfter = Object.keys(J.st).filter((c) => J.st[c] === 'lost');
         // 관리자만 들어온 판(상담사 혼자 시험)은 사람이 없다고 끝내지 않는다 — 진행자가 장면을 계속 쓴다
         const players = Object.keys(memNow).filter((c) => memNow[c].role !== 'admin');
         const wiped = players.length > 0 && active.length === 0;
-        const lastOne = n >= CFG.MAX_ROUNDS;
+        const lastOne = n >= ROUNDS;
 
         // ③ 서술
         const memAfter = {}; Object.keys(mem).forEach((c) => { memAfter[c] = Object.assign({}, memNow[c], { st: J.st[c] }); });
@@ -570,21 +618,27 @@ async function round(b, deps, db) {
                 ...(outNow.length ? ['[이번 장면에 홀로 나간 귀빈] ' + outNow.map((c) => mem[c].n || c).join(', ')
                     + ' — 귀빈실을 거쳐 방송국을 빠져나간다. 그 자리가 빈 순간부터 방송국이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
                 ...(surge ? ['[방송국의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
-                '[이번 장면 ' + n + '/' + CFG.MAX_ROUNDS + '] ' + (scene.title || ''), scene.text || '', '',
+                '[이번 장면 ' + n + '/' + ROUNDS + '] ' + (scene.title || ''), scene.text || '', '',
+                ...(SAFE ? [safeNow
+                    ? '[흐름] ' + SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓고 조여 온다.'
+                    : '[흐름] ' + (SAFE + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.', ''] : []),
                 '[이번 장면에서 나눈 대화]', talk, '',
                 '[판정 결과 — 바꾸지 말 것]', J.checks.map((c) => checkLine(c, D)).join('\n') || '(판정할 행동이 없었다 — 머뭇거린 사이 상황이 조금 나빠진다)', '',
                 wiped ? (lostAfter.length
-                        ? '[반드시] 방송국 안에 남은 사람이 없다 (남은 사람은 모두 실종' + (aliveAfter.length ? ', 귀빈은 홀로 나갔다' : '') + '). ended=true, end_kind=fail 로 이 재난을 끝낸다.'
+                        ? '[반드시] 재난 안에 남은 사람이 없다 (남은 사람은 모두 ' + stName(D, 'lost') + (aliveAfter.length ? ', 귀빈은 홀로 나갔다' : '') + '). ended=true, end_kind=fail 로 이 재난을 끝낸다.'
                         : '[반드시] 모두 방송국을 빠져나갔다. ended=true, end_kind=escape 로 이 재난을 끝낸다.')
                     : (lastOne ? '[반드시] 이번이 마지막 장면이다. ended=true 로 끝낸다. 근원을 지웠으면 clear, 아니면 escape.'
-                        : '[끝내는 때] 근원을 지웠거나(clear) 모두 빠져나왔으면(escape) ended=true. 아니면 ended=false 로 다음 장면을 연다. 살아 있는 사람이 있으면 fail 은 쓰지 않는다.'),
+                        : (n < SAFE ? '[반드시] 아직 끝내지 않는다 (' + SAFE + '장면 전). ended=false, end_kind=none 으로 다음 장면을 연다.'
+                            : '[끝내는 때] 근원을 지웠거나(clear) 모두 빠져나왔으면(escape) ended=true. 아니면 ended=false 로 다음 장면을 연다. 살아 있는 사람이 있으면 fail 은 쓰지 않는다.')),
+                ...(lostNew.length ? ['', '[이번 장면에 죽은 사람 — fates 에 코드로] ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
                 '',
                 '[쓸 것]',
                 '- result : 이번 장면에서 벌어진 일. 판정 결과와 상태 변화를 그대로. 행동한 사람은 이름이 나오게. 350자 안쪽.',
                 '- ended / end_kind / end_text : 끝내면 end_text 에 결말 (300자 안쪽). 안 끝내면 end_kind=none, end_text 빈 문자열.',
                 '- next_title / next_text : 안 끝내면 다음 장면 (제목 짧게 · 본문 450자 안쪽, 열린 상황으로). 끝내면 빈 문자열.',
                 '- notes : 앞으로 기억할 진행 메모 (지난 메모를 고쳐 쓴다, 600자 안쪽).',
-                '- summary : 이번 장면 한 줄 요약 (80자 안쪽).'
+                '- summary : 이번 장면 한 줄 요약 (80자 안쪽).',
+                '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.'
             ].join('\n')
         }, SONNET_OPT));
 
@@ -594,22 +648,52 @@ async function round(b, deps, db) {
         else if (lastOne) ended = true;
         if (ended && (kind === 'none' || !kind)) kind = wiped ? 'fail' : 'escape';
         if (ended && kind === 'fail' && !wiped) kind = 'escape';
-        if (!ended && !String(out.next_text || '').trim()) { ended = true; kind = 'escape'; }
+        if (!wiped && !lastOne && n < SAFE) { ended = false; kind = 'none'; }        // 정한 장면 전에는 끝나지 않는다
+        if (!ended && !String(out.next_text || '').trim()) {
+            if (n < SAFE) { out.next_title = out.next_title || '송출 중'; out.next_text = '화면이 지지직거린다. 방송은 아직 끝나지 않았다.'; }
+            else { ended = true; kind = 'escape'; }
+        }
+        // 죽는 방식 — 진행자가 적은 것 (없으면 이 재난의 말로)
+        const fate = {};
+        (Array.isArray(out.fates) ? out.fates : []).forEach((f) => {
+            if (f && lostNew.indexOf(f.who) >= 0 && !fate[f.who] && String(f.how || '').trim()) fate[f.who] = clip(String(f.how).trim(), 60);
+        });
+        lostNew.forEach((c) => { if (!fate[c]) fate[c] = clip('방송국에 먹혔다', 60); });
 
         const up = { err: null,
                      last: { n: n, title: clip(scene.title, 80), result: clip(out.result, 1500), checks: J.checks,
                              out: outNow.length ? outNow : null, surge: surge || null } };
         up['history/' + n] = { title: clip(scene.title, 80), text: clip(scene.text, 1500), result: clip(out.result, 1500) };
         Object.keys(J.st).forEach((c) => { up['members/' + c + '/st'] = J.st[c]; });
+        lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
+        // 연결로 끌어낸 사람은 죽는 방식을 지운다
+        Object.keys(J.st).forEach((c) => { if (J.st[c] !== 'lost' && memNow[c].fate) up['members/' + c + '/fate'] = null; });
+        let pays = null;
         if (ended) {
             up.state = 'END'; up.phase = 'END'; up.scene = null;
             up.outcome = { kind: kind, text: clip(out.end_text || out.result, 1500), at: now,
                            alive: aliveAfter, lost: lostAfter, out: Object.keys(J.st).filter((c) => J.st[c] === 'out') };
+            // ★ 보상 · 죽음 — 서버가 몫을 적고, 그 사원의 화면이 한 번만 받아 적용한다 (disasterPay/<사번>/<판>)
+            if (D.reward || D.death) {
+                pays = {}; const pay = {};
+                Object.keys(J.st).forEach((c) => {
+                    const m = Object.assign({}, memNow[c], { st: J.st[c] });
+                    if (m.role === 'admin') return;
+                    const rec = { run: b.run, name: (D.grade ? D.grade + '급 ' : '') + '『 ' + (D.name || run.kind) + ' 』', at: now, st: m.st };
+                    if (m.st === 'lost' && D.death) { rec.die = true; rec.how = fate[c] || memNow[c].fate || '방송국에 먹혔다'; }
+                    else { rec.pts = payOf(D, m); if (m.st === 'out') rec.left = true; }
+                    if (!rec.die && !rec.pts && !rec.left) return;
+                    pays[c + '/' + b.run] = rec;
+                    pay[c] = rec.die ? -1 : (rec.pts || 0);
+                });
+                up.outcome.pay = Object.keys(pay).length ? pay : null;
+            }
         } else {
             up.round = n + 1; up.phase = 'TALK';
             up.scene = { n: n + 1, title: clip(out.next_title, 80), text: clip(out.next_text, 1500), endsAt: deps.now() + CFG.TALK_MS };
         }
         await db.patch('disaster/' + b.run, up);
+        if (pays && Object.keys(pays).length) await db.patch('disasterPay', pays);
         const su = { notes: clip(out.notes, 1200) }; su['sums/' + n] = n + '. ' + clip(out.summary, 120);
         await db.patch('disasterSrv/' + b.run, su);
         return { ok: true, ended: ended };

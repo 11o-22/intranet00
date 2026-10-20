@@ -33,6 +33,8 @@
 //   · 귀빈은 [홀로 나간다] 를 누를 수 있다 → 그 장면이 끝나면 빠져나간다. 남은 재난관리국 · 백일몽 쪽 난이도가 기하급수로 오른다
 //   · 상담사는 관리자 — 들어가 있어도 판정 · 확정 기다림에서 빠진다 (서버)
 //   · 상담사 관전 — 목록의 「진행 중인 판」에서 [본다] → 장면 · 대화 · 판정을 그대로 본다 (말 · 확정은 못 함)
+//   · 10장면 · 8장면까지는 아무도 죽지 않는다 · 9장면부터 방송국이 덮친다 (⚡) — 서버
+//   · 보상 · 죽음 — 끝나면 서버가 disasterPay/<사번>/<판> 에 적고, 이 파일이 한 번만 받아 적용한다 (아래 9)
 //
 // ■ 서버에 적는 자리
 //   disaster/<판>            판 (서버 함수가 장면 · 판정 · 상태를 쓴다. 화면은 사원 들고 나기 · 확정만 쓴다)
@@ -50,21 +52,23 @@ const ROOT = 'disaster', CHAT = 'disasterChat';
 const KIND = 'wave', GRADE = '파형(破刑)', NAME = '『 3시 33분 방송국 』';
 const SURVIVE = 1, GEAR_MAX = 3;
 const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
+const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 <b style="color:#e8c27a;">300,000 P</b> · 선생님 · 이사팀 <b style="color:#e8c27a;">150,000 P</b> · '
+    + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">150,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 const ROLE_N = { admin: '관리자', vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
-const MAX_MEMBERS = 4, MAX_ROUNDS = 8;
+const MAX_MEMBERS = 4, MAX_ROUNDS = 10;           // 『 3시 33분 방송국 』 — 10장면 (8장면까지는 아무도 죽지 않는다 · 서버)
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
 const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 이만큼 기다렸다가 (방장이 없을 때를 대비)
 const Z = 99999980;          // 알림창(99999999) · 팔레트(99999990)보다 아래
 const ADMIN = 'kario0987';
-const ST = { ok: '멀쩡', hurt: '다침', lost: '실종', out: '홀로 나감' };
+const ST = { ok: '멀쩡', hurt: '다침', lost: '죽음', out: '홀로 나감' };
 const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81', out: '#c9b6ff' };
 function gone(st) { return st === 'lost' || st === 'out'; }
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
                  heal: '치유', luck: '행운', none: '판정 없음' };
 const END_N = { clear: ['종결', '#7fd4d4', '근원을 지웠습니다'], escape: ['탈출', '#e8c27a', '살아서 빠져나왔습니다'],
-                fail: ['전멸', '#ff6b81', '남은 사람이 모두 방송국의 매체가 되었습니다'] };
+                fail: ['전멸', '#ff6b81', '남은 사람이 모두 방송국에 먹혔습니다'] };
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -442,7 +446,9 @@ function intro() {
         + '<div class="dz-card-h">' + NAME + '</div>'
         + '<div class="dz-card-t" style="margin-bottom:8px;">' + esc(BRIEF) + '</div>'
         + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + SURVIVE + '%</b>'
-        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)</div></div>';
+        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)'
+        + ' · ' + MAX_ROUNDS + '장면</div>'
+        + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + REWARD + '</div></div>';
 }
 
 // 들고 갈 수 있는 장비 — 장착 중 · 소지품의 장비 · 전용 장비 (성적인 것 빼고)
@@ -521,6 +527,7 @@ function checkChips(list) {
         if (c.kind === 'none') return '<span>' + esc(c.name) + ' · ' + esc(c.did) + '</span>';
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
+        if (c.forced) s = '⚡ ' + s;
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
@@ -574,7 +581,8 @@ function ending(r, u) {
     h += '<div class="dz-sec">사원</div><div class="dz-card-m">' + Object.keys(m).map(function (c) {
         const st = m[c].st || 'ok';
         return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — '
-            + (st === 'lost' ? '실종 (방송국의 매체가 됨)' : (st === 'out' ? '홀로 빠져나감' : (st === 'hurt' ? '다친 채 생환' : '생환'))) + '</span>';
+            + (st === 'lost' ? '죽음' + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? '홀로 빠져나감' : (st === 'hurt' ? '다친 채 생환' : '생환')))
+            + payTag((o.pay || {})[c], m[c]) + '</span>';
     }).join('<br>') + '</div>';
     const hist = r.history || {};
     const ks = Object.keys(hist).sort(function (a, b) { return a - b; });
@@ -589,6 +597,12 @@ function ending(r, u) {
     return h;
 }
 
+function payTag(v, x) {
+    if (v === undefined || v === null) return '';
+    const bath = /재난관리/.test(((x && x.aff) || '') + ' ' + ((x && x.team) || ''));
+    if (v < 0) return ' <i style="font-style:normal;color:#ff9aa8;">· ' + (bath ? '선녀탕' : '여우 상담실') + ' 이송</i>';
+    return ' <i style="font-style:normal;color:#e8c27a;">· ' + (v ? '+' + Number(v).toLocaleString('ko-KR') + ' P' : '보상 없음') + '</i>';
+}
 function wire() {
     if (!ov) return;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-join]'), function (b) { b.onclick = function () { join(b.dataset.join); }; });
@@ -798,12 +812,77 @@ function makeAdmin() {
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
+// ==========================================
+// 9. 보상 · 죽음 — 서버가 적어 둔 몫(disasterPay/<사번>/<판>)을 한 번만 받는다
+// ==========================================
+//   판이 끝나면 서버가 사람마다 몫을 적는다. 그 사람의 화면이 (지금이든 다음에 들어왔을 때든)
+//   트랜잭션으로 「받았다」를 박고, 포인트 · 기록 · 이송을 제 기록에 적용한 뒤 지운다.
+//   죽음은 어둠에서 죽은 것과 같다 — 오염도 100 · 4시간 · 재난관리국은 선녀탕, 그 밖은 여우 상담실.
+let payRef = null, payCode = '';
+function payWatch() {
+    const u = me(), d = db_();
+    const code = (u && u.code) || '';
+    if (code === payCode) return;
+    if (payRef) { try { payRef.off(); } catch (e) { } payRef = null; }
+    payCode = code;
+    if (!code || !d) return;
+    payRef = d.ref('disasterPay/' + code);
+    payRef.on('child_added', function (s) { takePay(s.key, s.val()); });
+}
+setInterval(payWatch, 2000);
+function takePay(run, v) {
+    const u = me(), d = db_();
+    if (!u || !d || !v || v.claimed) return;
+    const path = 'disasterPay/' + u.code + '/' + run;
+    const stamp = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    d.ref(path).transaction(function (cur) {
+        if (!cur) return cur;                   // 아직 안 읽혔거나 없다 — 서버 값으로 다시 돈다
+        if (cur.claimed) return;                // 다른 창이 이미 받았다
+        cur.claimed = stamp;
+        return cur;
+    }).then(function (res) {
+        const got = res && res.snapshot && res.snapshot.val ? res.snapshot.val() : null;
+        if (!res || !res.committed || !got || got.claimed !== stamp) return;
+        try { applyPay(got); } catch (e) { console.warn('[재난] 몫 적용 실패', e); }
+        d.ref(path).remove();
+    }).catch(function () { });
+}
+function applyPay(v) {
+    const u = me(); if (!u) return;
+    const nm = v.name || NAME;
+    if (v.die) {
+        const bath = (typeof isDisasterAgent === 'function') ? isDisasterAgent(u)
+            : /재난관리/.test((u.affiliation || '') + ' ' + (u.team || ''));
+        u.pollution = 100;
+        u.quarantineUntil = Date.now() + 4 * 3600000;
+        u.quarantineExitPollution = 40;
+        u.foxRoomAnswered = true;            // 질문 절차 생략 (어둠 사망과 같다)
+        u.quarantineHospital = true;
+        u.quarantineDest = bath ? 'bath' : 'fox';
+        const where = bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로';
+        try { addHistoryLog(u, '[재난 사망] ' + nm + ' — ' + (v.how || '방송국에 먹혔다') + '. ' + where + ' 이송되었습니다.'); } catch (e) { }
+        try { saveFields({ pollution: 1, quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, quarantineHospital: 1, quarantineDest: 1, history: 1 }); } catch (e) { }
+        try { updateUI(); } catch (e) { }
+        alert_(nm + '\n\n' + (v.how || '방송국에 먹혔다') + '\n\n' + where + ' 이송됩니다. (4시간)');
+        return;
+    }
+    const pts = Math.max(0, Number(v.pts) || 0);
+    if (pts) {
+        try { changePoints(pts); } catch (e) { u.points = (Number(u.points) || 0) + pts; try { saveFields({ points: 1 }); } catch (x) { } }
+        try { addHistoryLog(u, '[재난 생환] ' + nm + ' — 살아서 돌아왔습니다. (+' + pts.toLocaleString('ko-KR') + ' P)'); saveFields({ history: 1 }); } catch (e) { }
+        try { updateUI(); } catch (e) { }
+        alert_(nm + '\n\n살아서 돌아왔습니다.\n+' + pts.toLocaleString('ko-KR') + ' P');
+    } else if (v.left) {
+        try { addHistoryLog(u, '[재난] ' + nm + ' — 홀로 빠져나왔습니다. (보상 없음)'); saveFields({ history: 1 }); } catch (e) { }
+    }
+}
+
 window.disasterState = function () {
     const r = curId && all[curId];
     console.log('%c===== 📡 재난 =====', 'color:#9fe3e3; font-size:13px');
     console.log('  판:', curId || '없음', '· 상태:', r ? r.state + ' / ' + (r.phase || '') + ' · 장면 ' + (r.round || 0) : '-');
     if (r) console.table(Object.keys(r.members || {}).map(function (c) {
-        const x = r.members[c]; return { 사번: c, 이름: x.n, 자리: x.role || '', 상태: x.st || '', 확정: x.done || 0, 나감: x.leave || '', 장비: (x.gear || []).join(', ') };
+        const x = r.members[c]; return { 사번: c, 이름: x.n, 자리: x.role || '', 상태: x.st || '', 확정: x.done || 0, 나감: x.leave || '', 장비: (x.gear || []).join(', '), 죽음: x.fate || '' };
     }));
     console.log('  내 티켓:', tickets(me()));
 };
