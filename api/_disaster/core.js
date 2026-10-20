@@ -28,6 +28,7 @@
 //   · 귀빈은 홀로 나갈 수 있다 (members/<사번>/leave = 장면 번호) → 그 장면 끝에 상태 out
 //     나간 귀빈 n 명 → 남은 재난관리국 · 백일몽 · 그 밖 쪽 난이도 + d.surge × (2ⁿ − 1) (20 이 끝)
 //   · 난이도 표 d.dc · 실종을 부르는 말 d.lost · 잔혹 묘사 d.gore
+//   · 커플링 — 시작할 때 사원마다 users/<사번>/couple 을 읽어 진행자에게 「누구와 연인 · 같이 들어왔나」를 알린다 (어느 재난이든)
 //
 // ■ 서버에 적는 자리 (파이어베이스 REST)
 //   disaster/<판>            판 상태 · 장면 · 사원 · 지난 판정 · 결말     (화면이 지켜본다)
@@ -234,6 +235,9 @@ function gmSystem(kind) {
         '너는 웹 게임 「사내 시스템」의 재난 진행자(GM)다. 여러 사원이 한 재난에 함께 들어와 채팅으로 의논하고 행동한다.',
         '너는 장면을 쓰고, 사원들이 한 일의 결과를 이야기로 풀고, 다음 장면을 연다.',
         '판정(성공 · 실패 · 부상 · 실종)은 게임 코드가 이미 정해서 준다. 너는 그것을 바꾸지 않고 그대로 이야기로 쓴다.',
+        '사원 목록에 「커플링」이 적힌 사원은 커플링(💍)으로 이어진 연인이다. 그 관계를 알아보고 이야기에 쓴다 —',
+        '서로를 부르고 감싸고, 괴담이 그 관계를 파고들 수도 있다. 상대가 이 재난 밖에 있으면 그리움이나 미끼로 쓸 수 있다.',
+        '성적인 묘사는 하지 않고, 관계 때문에 판정 결과를 바꾸지 않는다.',
         '', WORLD, '', styleOf(d), '', d.text
     ].join('\n');
 }
@@ -246,6 +250,8 @@ function memberLines(mem, d) {
             + (m.pos ? ' · ' + m.pos : '') + ')'
             + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
+            + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
+                + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
             + ' — 지금 상태: ' + stName(d, m.st);
     }).join('\n');
 }
@@ -282,10 +288,14 @@ export function gearOf(want, p, n) {
 }
 async function profiles(db, codes) {
     const one = async (c) => {
-        const [aff, team, pos, eq, inv, soul] = await Promise.all([
+        const [aff, team, pos, eq, inv, soul, cp] = await Promise.all([
             db.get('users/' + c + '/affiliation'), db.get('users/' + c + '/team'), db.get('users/' + c + '/position'),
-            db.get('users/' + c + '/equippedWeapons'), db.get('users/' + c + '/inventory'), db.get('users/' + c + '/soulGear/name')]);
-        return { aff: aff || '', team: team || '', pos: pos || '', eq: invArr(eq), inv: invArr(inv), soul: soul ? String(soul) : '' };
+            db.get('users/' + c + '/equippedWeapons'), db.get('users/' + c + '/inventory'), db.get('users/' + c + '/soulGear/name'),
+            db.get('users/' + c + '/couple')]);
+        // 커플링 — { partner, partnerName, emoji, color … } (index.html couple_ring)
+        const couple = (cp && typeof cp === 'object' && cp.partner && okCode(String(cp.partner)))
+            ? { p: String(cp.partner), n: clip(cp.partnerName || cp.partner, 20), e: clip(cp.emoji || '', 4) } : null;
+        return { aff: aff || '', team: team || '', pos: pos || '', eq: invArr(eq), inv: invArr(inv), soul: soul ? String(soul) : '', couple: couple };
     };
     const out = {};
     for (const c of codes) out[c] = await one(c);
@@ -323,17 +333,17 @@ async function start(b, deps, db) {
         await spend(db, now, codes, names);
 
         // 이 재난에서의 자리 · 지참 장비 — 서버가 사원 기록을 읽어 정한다 (화면이 보낸 것은 고른 장비 이름뿐)
+        //   커플링도 여기서 읽는다 — 진행자가 연인을 알아보게 (어느 재난이든)
         const D = DISASTERS[run.kind];
-        if (D.roles || D.gear) {
-            const P = await profiles(db, codes);
-            const guests = D.roles ? ((await db.get('talkShowGuest')) || {}) : {};
-            codes.forEach((c) => {
-                const m = mem[c] = Object.assign({}, mem[c]);
-                m.aff = P[c].aff || m.aff || ''; m.team = P[c].team || m.team || ''; m.pos = P[c].pos || m.pos || '';
-                if (D.roles) m.role = roleOf(P[c], c, guests);
-                m.gear = gearOf(m.gear, P[c], D.gear || 0);
-            });
-        }
+        const P = await profiles(db, codes);
+        const guests = D.roles ? ((await db.get('talkShowGuest')) || {}) : {};
+        codes.forEach((c) => {
+            const m = mem[c] = Object.assign({}, mem[c]);
+            m.aff = P[c].aff || m.aff || ''; m.team = P[c].team || m.team || ''; m.pos = P[c].pos || m.pos || '';
+            if (D.roles) m.role = roleOf(P[c], c, guests);
+            m.gear = gearOf(m.gear, P[c], D.gear || 0);
+            m.couple = P[c].couple;
+        });
         await db.patch('disaster/' + b.run, { state: 'PLAY', phase: 'WAIT', startedAt: now, err: null });
 
         const out = await ask(deps, Object.assign({
@@ -355,12 +365,11 @@ async function start(b, deps, db) {
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
         codes.forEach((c) => {
             up['members/' + c + '/st'] = 'ok'; up['members/' + c + '/done'] = 0; up['members/' + c + '/leave'] = null;
-            if (D.roles || D.gear) {
-                const m = mem[c];
-                up['members/' + c + '/aff'] = m.aff; up['members/' + c + '/team'] = m.team; up['members/' + c + '/pos'] = m.pos;
-                up['members/' + c + '/role'] = m.role || null;
-                up['members/' + c + '/gear'] = (m.gear && m.gear.length) ? m.gear : null;
-            }
+            const m = mem[c];
+            up['members/' + c + '/aff'] = m.aff; up['members/' + c + '/team'] = m.team; up['members/' + c + '/pos'] = m.pos;
+            up['members/' + c + '/role'] = m.role || null;
+            up['members/' + c + '/gear'] = (m.gear && m.gear.length) ? m.gear : null;
+            up['members/' + c + '/couple'] = m.couple || null;
         });
         await db.patch('disaster/' + b.run, up);
         return { ok: true };
