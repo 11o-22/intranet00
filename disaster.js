@@ -59,7 +59,7 @@ const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터
 // 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다
 const SIGIL_ITEMS = ['🔎 감지하는 눈', '📱 K·LEE', '🩶 은심장', '🦊 호사수구', '🧧 지산의 복 : 대리자', '🐾 아기 여우', '🌙 달빛 문신', '📺 브라운의 심야 토크 쇼'];
 // 귀빈 자리(어둠 소속 · 심야 토크쇼의 주인)는 화면에 「사회자」로 띄운다 — 진행자는 귀빈으로 안다 (2026-10-20)
-const ROLE_N = { admin: '관리자', vip: '사회자', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
+const ROLE_N = { admin: '관리자', vip: '사회자', bureau: '재난관리국', daydream: '백일몽', board: '이사팀', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 5;                             // 한 방 최대 인원 (2026-10-20 — 4 → 8 → 5 · 서버 core.js 와 같이)
 // ★ 몇 장면인지는 화면에 알리지 않는다 (2026-10-20) — 장면 수는 서버(lore.js rounds)만 안다
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
@@ -588,6 +588,7 @@ function checkChips(list) {
         if (c.forced) s = '⚡ ' + s;
         if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 방송국이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
+        if (c.ease) s += ' (−' + c.ease + ')';          // 이사팀 — 조금 쉽게
         if (c.to) s += ' → ' + ST[c.to];
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
         if (c.kick) s += ' → 모셔짐';

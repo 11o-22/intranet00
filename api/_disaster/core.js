@@ -591,6 +591,8 @@ function worse(st, k) { return ORDER[Math.min(2, ORDER.indexOf(st || 'ok') + k)]
 export function judge(acts, mem, rand, opt) {
     const DC = (opt && opt.dc) || CFG.DC;
     const plus = (opt && typeof opt.plus === 'function') ? opt.plus : () => 0;
+    const ease = (opt && typeof opt.ease === 'function') ? opt.ease : () => 0;      // 자리마다 쉽게 해 주는 몫 (이사팀 −2)
+    const dcOf = (base, add, ez) => Math.max(2, Math.min(20, base + add - ez));
     const safe = !!(opt && opt.safe);
     const cap = (s) => (safe && s === 'lost') ? 'hurt' : s;
     const st = {}; Object.keys(mem).forEach((c) => { st[c] = (mem[c] && mem[c].st) || 'ok'; });
@@ -605,12 +607,14 @@ export function judge(acts, mem, rand, opt) {
         if (kind !== 'none') {
             const tier = DC[a.tier] ? a.tier : 'normal';
             const add = Math.max(0, Number(plus(a.who)) || 0);
-            const dc = Math.min(20, DC[tier] + add);
+            const ez = Math.max(0, Number(ease(a.who)) || 0);
+            const dc = dcOf(DC[tier], add, ez);
             const roll = rand(20);
             const ok = roll >= dc;
             Object.assign(row, { tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1,
                                  danger: !!a.danger });
             if (add) row.plus = add;
+            if (ez) row.ease = ez;
             if (!ok && a.danger) {
                 const from = st[a.who];
                 st[a.who] = cap(worse(from, roll === 1 ? 2 : 1));
@@ -640,11 +644,13 @@ export function judge(acts, mem, rand, opt) {
             if (checks.some((r) => r.who === c && r.danger && r.kind !== 'none')) return;
             const tier = DC[F.tier] ? F.tier : 'hard';
             const add = Math.max(0, Number(plus(c)) || 0);
-            const dc = Math.min(20, DC[tier] + add);
+            const ez = Math.max(0, Number(ease(c)) || 0);
+            const dc = dcOf(DC[tier], add, ez);
             const roll = rand(20), ok = roll >= dc;
             const row = { who: c, name: mem[c].n || c, did: clip(F.did || '방송국이 덮쳐 온다', 80), kind: KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, forced: true };
             if (add) row.plus = add;
+            if (ez) row.ease = ez;
             if (!ok) {
                 const from = st[c];
                 st[c] = cap(worse(from, roll === 1 ? 2 : 1));
@@ -663,12 +669,14 @@ export function judge(acts, mem, rand, opt) {
             did[c] = 1;
             const tier = DC[M.tier] ? M.tier : 'hard';
             const add = Math.max(0, Number(plus(c)) || 0);
-            const dc = Math.min(20, DC[tier] + add);
+            const ez = Math.max(0, Number(ease(c)) || 0);
+            const dc = dcOf(DC[tier], add, ez);
             const roll = rand(20), ok = roll >= dc;
             const row = { who: c, name: mem[c].n || c, did: clip(M.did || '방송국이 그 말을 들었다', 80), said: clip(x.said, 60),
                           kind: KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, meta: true };
             if (add) row.plus = add;
+            if (ez) row.ease = ez;
             if (!ok) {
                 const from = st[c];
                 st[c] = M.lethal ? 'lost' : worse(from, roll === 1 ? 2 : 1);     // safe 를 따르지 않는다
@@ -683,7 +691,7 @@ export function judge(acts, mem, rand, opt) {
 function checkLine(c, d) {
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
     let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
-        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → '
+        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '') + ', 주사위 ' + c.roll + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
@@ -813,9 +821,12 @@ async function round(b, deps, db) {
         const MIN = Number(D.min) || 0;                             // 이 장면 전에는 끝나지 않는다
         const safeNow = n <= SAFE;
         const finalNow = !!(D.final && MIN && n > MIN);             // 그 뒤로는 방송국이 덮친다
+        const hitRole = (r) => surgeHits(r) || !!(D.ease && D.ease[r] != null);
         const J = judge(acts, memNow, deps.rand, {
-            dc: D.dc, plus: (c) => (surgeHits(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow,
-            forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => surgeHits(memNow[c].role)) }, D.final) : null,
+            // ★ 쉽게 해 주는 자리(D.ease — 이사팀)는 예외가 아니다: 사나움 · 사회자 없음 · 덮침을 다 받고 난이도만 덜어 준다 (2026-10-20)
+            dc: D.dc, plus: (c) => (hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow,
+            ease: (c) => (D.ease && Number(D.ease[memNow[c].role])) || 0,
+            forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)) }, D.final) : null,
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             kick: !!(D.roles && D.kick) });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
