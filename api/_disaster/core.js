@@ -53,7 +53,7 @@ export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
     TALK_MS: 150000,         // 장면마다 대화 시간 — 2분 30초 (2026-10-20)
     MAX_ROUNDS: 8,           // 한 판 최대 장면
-    MAX_MEMBERS: 8,          // 한 방 최대 인원 (2026-10-20 — 4 → 8)
+    MAX_MEMBERS: 5,          // 한 방 최대 인원 (2026-10-20 — 4 → 8 → 5)
     DAILY_RUNS: 3,           // 사원 한 명이 하루에 들어갈 수 있는 판
     DAILY_CALLS: 250,        // 하루 전체 진행자(Sonnet) 호출 — 대략 하루 5달러 안쪽
     LOCK_STALE: 120000,      // 잡힌 채 이만큼 지나면 끊긴 것으로 보고 다시 잡게 한다
