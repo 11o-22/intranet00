@@ -312,7 +312,7 @@ function memberLines(mem, d) {
             + (Array.isArray(m.foxes) && m.foxes.length ? ' — 함께 있는 아기 여우: ' + m.foxes.join(' · ') : '')
             + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
                 + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
-            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국이 다른 곳으로 모셔 감' : stName(d, m.st));
+            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국이 다른 곳으로 모셔 감' : stName(d, m.st) + (m.st === 'lost' ? ' (이미 죽었다)' : ''));
     }).join('\n');
 }
 
@@ -1159,8 +1159,9 @@ async function foxChat(b, deps, db) {
 
     const chatAll = (await db.get('disasterChat/' + b.run)) || {};
     const keys = Object.keys(chatAll).sort();
+    // 죽은 사람이 남긴 말(메아리)은 여우에게 넘기지 않는다 — 여우는 죽은 사람과 말을 주고받지 않고 그리워하기만 한다 (2026-10-20)
     const rows = keys.map((k) => [k, chatAll[k]]).filter(([k, x]) => x && typeof x.t === 'string' && Number(x.r) === n
-        && !OOC.test(x.t) && (x.fox || (mem[x.c] && mem[x.c].role !== 'admin')));
+        && !OOC.test(x.t) && (x.fox || (mem[x.c] && mem[x.c].role !== 'admin' && (mem[x.c].st || 'ok') !== 'lost')));
     const humans = rows.filter(([k, x]) => !x.fox && !gone(mem[x.c].st || 'ok'));
     if (!humans.length) return { ok: false, why: 'quiet' };
     const lastKey = humans[humans.length - 1][0];
@@ -1196,6 +1197,8 @@ async function foxChat(b, deps, db) {
     const BB = await bodies(db, people, now);
     const who = people.map((c) => {
         const m = mem[c], x = BB[c] || {};
+        if (m.st === 'lost') return '- ' + (m.n || c) + ' (' + (m.aff || '소속 없음') + ') — ★ 이미 죽었다 (말을 걸거나 대답하지 않는다 · 그리워하기만 한다)'
+            + (/네임리스/.test(String(m.n || '')) ? ' — 그리워할 때도 「주인님」 · 「네임리스 님」으로 부른다' : '');
         return '- ' + (m.n || c) + ' (' + (m.aff || '소속 없음') + (m.st && m.st !== 'ok' ? ' · ' + stName(DISASTERS[run.kind], m.st) : '') + ')'
             + ' · 성별: ' + (x.g || '알 수 없음') + (x.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
             + (x.fx && x.fx.length ? ' — 몸에 걸린 효과: ' + x.fx.join('; ') : '')
