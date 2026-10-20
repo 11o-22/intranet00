@@ -1098,6 +1098,16 @@ async function foxChat(b, deps, db) {
 
     const scene = run.scene || {};
     const kinds = alive.map((id) => FX[id].k);
+    // 사원 — 성별 · 몸에 걸린 효과 (물약 등 · 부를 때마다 다시 읽는다 · 성적인 효과는 빼고)
+    const people = Object.keys(mem).filter((c) => mem[c].role !== 'admin');
+    const BB = await bodies(db, people, now);
+    const who = people.map((c) => {
+        const m = mem[c], x = BB[c] || {};
+        return '- ' + (m.n || c) + ' (' + (m.aff || '소속 없음') + (m.st && m.st !== 'ok' ? ' · ' + stName(DISASTERS[run.kind], m.st) : '') + ')'
+            + ' · 성별: ' + (x.g || '알 수 없음') + (x.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
+            + (x.fx && x.fx.length ? ' — 몸에 걸린 효과: ' + x.fx.join('; ') : '')
+            + (x.child ? ' — ★ 지금 어린아이 상태' : '');
+    }).join('\n');
     const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (mem[x.c].n || x.c))
         + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
     const res = await ask(deps, Object.assign({
@@ -1105,8 +1115,7 @@ async function foxChat(b, deps, db) {
         system: foxChatRule(kinds),
         user: [
             '[지금 장면] ' + (scene.title || ''), clip(scene.text || '', 900), '',
-            '[판에 있는 사원]', Object.keys(mem).filter((c) => mem[c].role !== 'admin').map((c) => '- ' + (mem[c].n || c)
-                + ' (' + (mem[c].aff || '소속 없음') + (mem[c].st && mem[c].st !== 'ok' ? ' · ' + stName(DISASTERS[run.kind], mem[c].st) : '') + ')').join('\n'), '',
+            '[판에 있는 사원 — 사람 목록]', who, '',
             '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')
