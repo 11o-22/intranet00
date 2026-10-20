@@ -5724,16 +5724,20 @@ if (user.code === 'kario0987') {
     function renderMySuggestions() {
         const listEl = document.getElementById('my-suggestion-list');
         if (!db.suggestions) db.suggestions = [];
-        const mySugg = db.suggestions.filter(s => s.code === currentUser.code);
+        // ★ 해결된 건의는 내 내역에서 지울 수 있다 — 지운 것(hide)은 내 목록에서만 빠진다 (상담사 목록에는 남는다 · 2026-10-20)
+        const mySugg = db.suggestions.filter(s => s && s.code === currentUser.code && !s.hide);
         if (mySugg.length === 0) {
             listEl.innerHTML = '<div style="color:#666; font-size:11px; text-align:center; padding:10px;">접수한 건의 내역이 없습니다.</div>';
             return;
         }
         listEl.innerHTML = mySugg.map(s => `
             <div style="background:#1a1a1a; border:1px solid #444; padding:12px; margin-bottom:10px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.4);">
-                <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#888; margin-bottom:6px; border-bottom:1px solid #333; padding-bottom:4px;">
                     <span>${s.date}</span>
-                    <span style="font-weight:bold; color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</span>
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-weight:bold; color:${s.status === 'RESOLVED' ? '#4CAF50' : '#ff9800'};">${s.status === 'RESOLVED' ? '해결됨' : '대기중'}</span>
+                        ${s.status === 'RESOLVED' ? `<button class="sugg-hide" onclick="hideMySuggestion(${Number(s.id)}); event.stopPropagation();" style="background:#3a1a1a; border:1px solid #6a2a2a; color:#ff9a9a; cursor:pointer; font-size:10px; border-radius:3px; padding:2px 7px;">삭제</button>` : ''}
+                    </span>
                 </div>
                 <div style="font-weight:bold; color:#fff; font-size:13px; margin-bottom:6px;">${s.title}</div>
                 <div style="color:#ccc; font-size:12px; margin-bottom:8px; line-height:1.4;">${s.content}</div>
@@ -5744,6 +5748,31 @@ if (user.code === 'kario0987') {
                 ` : ''}
             </div>
         `).join('');
+    }
+
+    // 해결된 내 건의를 내 내역에서 지운다 — 건의 자체는 상담사 목록에 남는다 (hide 표시만)
+    //   건의함 전체를 통째로 쓰지 않고 트랜잭션으로 그 한 건에만 표시를 단다 (그 사이 들어온 건의를 덮지 않게)
+    function hideMySuggestion(id) {
+        if (!currentUser) return;
+        const s0 = (db.suggestions || []).find(s => s && s.id === id && s.code === currentUser.code);
+        if (!s0 || s0.status !== 'RESOLVED') return;
+        if (!confirm('이 건의를 내 내역에서 지울까요?\n\n(상담사 쪽 기록은 남습니다)')) return;
+        const me = currentUser.code;
+        const mark = function (v) {
+            if (!v) return v;
+            Object.keys(v).forEach(function (k) {
+                const s = v[k];
+                if (s && s.id === id && s.code === me && s.status === 'RESOLVED') s.hide = true;
+            });
+            return v;
+        };
+        s0.hide = true;
+        renderMySuggestions();
+        if (database) {
+            database.ref('suggestions').transaction(mark).catch(function () {
+                s0.hide = false; renderMySuggestions(); showCustomAlert('지우지 못했습니다. 잠시 뒤 다시 해 주세요.');
+            });
+        } else saveDB();
     }
 
     function renderEmployeeCards() {

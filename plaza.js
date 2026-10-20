@@ -438,8 +438,10 @@ function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (r
 //     방 사람 모두에게 가므로, 귓속말을 거기 실으면 다 들린다.
 //     그래서 귓속말은 글줄로만 간다.
 //
-//   ★ 보낸 줄은 **내 화면에만** 세운다 (서버에 내 몫까지 적지 않는다).
-//     적으면 지웠다 썼다 할 자리가 둘이 되고, 한 줄이 두 번 뜬다.
+//   ★ 보낸 줄도 **내 앞으로 한 벌 적는다** (2026-10-20) — 다시 들어왔을 때 내가 보낸 귓속말도 남게.
+//       plazaWhisper/<내 사번>/<열쇠>  { n: 받는이 이름, c: 받는이 사번, t, at, o: 1 }   ← o 가 보낸 줄
+//     한 줄이 두 번 서지 않게 화면에 세울 때 그 열쇠(k)를 같이 넘긴다 (pushLine 이 열쇠로 거른다).
+//   ✗ 전에는 보낸 줄을 내 화면에만 세워서, 나갔다 들어오면 받은 줄만 남고 보낸 줄은 사라졌다.
 const WH = 'plazaWhisper';
 const WH_KEEP = 40;
 let whTo = '', whName = '';      // 지금 귓속말할 상대
@@ -2620,6 +2622,7 @@ function watchWhisper() {
     whRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
+        if (v.o) { pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'out', k: s.key, quiet: true }); return; }   // 내가 보낸 줄
         pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', k: s.key, quiet: now() < whFrom });
     });
 }
@@ -2871,13 +2874,21 @@ function say(text) {
     if (chatCh === 'wh') {
         if (!whTo) { sysLine('귓속말할 사원을 먼저 고르세요.'); whoPick(); return; }
         const d0 = db_();
+        let mk = '';
         if (d0) {
             try {
                 d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: now() });
                 whTrim(whTo);
+                // 내 앞으로도 한 벌 — 다시 들어와도 내가 보낸 줄이 남는다 (나에게 보낸 것이면 받은 줄로 이미 선다)
+                if (whTo !== u.code) {
+                    const mine = d0.ref(WH + '/' + u.code).push();
+                    mk = mine.key || '';
+                    mine.set({ n: whName || whTo, c: whTo, t: t, at: now(), o: 1 });
+                    whTrim(u.code);
+                }
             } catch (e) { }
         }
-        pushLine({ n: whName || whTo, t: t, c: whTo, w: 'out' });   // 보낸 줄은 내 화면에만
+        pushLine({ n: whName || whTo, t: t, c: whTo, w: 'out', k: mk || undefined });   // 같은 열쇠로 — 두 번 서지 않는다
         return;
     }
 
