@@ -382,7 +382,8 @@
       "disaster.js",
       "s3-period.js",
       "bonus-audit.js",
-      "chilseong.js"
+      "chilseong.js",
+      "popup-notice.js"
     ]
   ]
 }
