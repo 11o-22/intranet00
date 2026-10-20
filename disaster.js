@@ -661,6 +661,7 @@ function checkChips(list) {
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.forced) s = '⚡ ' + s;
         if (c.quiet) s = '💤 ' + s;         // 말이 없어 대신 굴린 다이스
+        if (c.burn) s = '🔥 ' + s;          // 📺 심야 토크쇼의 주인의 소각
         if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 방송국이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.ease) s += ' (−' + c.ease + ')';          // 이사팀 — 조금 쉽게
