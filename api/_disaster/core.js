@@ -250,6 +250,9 @@ const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
     tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S }) } });
 // 바깥의 말을 듣는 재난 (DISASTERS[kind].meta) — 사원마다 바깥의 말을 했는지도 고른다
 const SCHEMA_ACTS_META = obj({ acts: SCHEMA_ACTS.properties.acts, meta: { type: 'array', items: obj({ who: S, said: S }) } });
+// 🐾 아기 여우의 이번 장면 행동 (장면마다 한 마리에 하나 · kind 는 코드가 속성으로 정한다)
+const FOX_ACTS = { type: 'array', items: obj({ fox: S, did: S, tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S }) };
+function withFoxActs(sch) { return obj(Object.assign({}, sch.properties, { fox_acts: FOX_ACTS })); }
 const SCHEMA_TURN = obj({ result: S, ended: B, end_kind: { type: 'string', enum: ['none', 'clear', 'escape', 'fail'] },
     end_text: S, next_title: S, next_text: S, notes: S, summary: S,
     fates: { type: 'array', items: obj({ who: S, how: S }) }, fox_lines: FOX_LINES });
@@ -465,6 +468,7 @@ function foxLabel(f, mem) {
     const bits = [F.a || f.k];
     if (f.o !== f.on) bits.push(((mem[f.o] && mem[f.o].n) || f.oN || f.o) + '이(가) 붙여 줌');
     if (f.nick && f.nick !== F.n) bits.push('주인이 부르는 이름: ' + f.nick);
+    if (f.st === 'hurt') bits.push('다침');
     return (F.n || f.k) + '(' + bits.join(' · ') + ')';
 }
 // 이번 장면에 죽은 사람 — 곁의 여우 한 마리가 대신 소멸한다 (죽을 때마다 한 마리씩 · 남은 여우가 있는 동안)
@@ -484,6 +488,60 @@ export function foxSave(J, memNow, foxes) {
         used.push(pick);
     });
     return used;
+}
+
+// ★ 🐾 아기 여우도 장면마다 한 번씩 제 속성의 행동을 하고 주사위를 굴린다 (2026-10-20 — 사원과 똑같이)
+//   사원들의 판정 뒤 · 대신 소멸 앞에 굴린다. 행동은 해석(빠른 모델)이 장면에 맞게 고르고, 없으면 FOX_DO 로.
+//   kind 는 그 아이의 속성 · 난이도는 사원과 같은 표 (곁의 사람이 받는 사나움 · 사회자 없음 몫도 같이 받는다)
+//   성공 — 치유: 다친 사람(없으면 다친 여우)을 되돌린다 · 연결: 맞춰진 사람을 끌어낸다 (사원의 치유 · 연결과 같다)
+//   위험한 행동에 실패 — 여우가 다친다 → 한 번 더면 소멸 (치명적 실패는 두 단계) · 안전한 장면에는 다침이 끝
+//   여우의 다침 · 소멸은 이 판 안에서만이다 (disaster/<판>/foxes/<여우>/st · gone)
+const FOX_DO = { evade: '곁의 사람과 함께 위험을 피한다', sense: '귀를 세우고 주변을 살핀다', heal: '다친 곳을 살펴 준다',
+                 hide: '곁의 사람과 함께 몸을 숨긴다', luck: '행운을 빈다', break: '앞을 막는 것을 부순다',
+                 bond: '흩어진 일행을 잇는다', gaze: '괴담의 눈을 속인다' };
+export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
+    const DC = (opt && opt.dc) || CFG.DC;
+    const plus = (opt && typeof opt.plus === 'function') ? opt.plus : () => 0;
+    const safe = !!(opt && opt.safe);
+    const want = {};
+    (Array.isArray(fa) ? fa : []).forEach((a) => { if (a && ids.indexOf(a.fox) >= 0 && !want[a.fox]) want[a.fox] = a; });
+    const fst = {}; ids.forEach((id) => { fst[id] = FX[id].st === 'hurt' ? 'hurt' : 'ok'; });
+    const fell = [];
+    ids.forEach((id) => {
+        const f = FX[id], kind = f.k, a = want[id] || {};
+        if (fst[id] === 'lost') return;
+        const tier = DC[a.tier] ? a.tier : 'normal';
+        const add = Math.max(0, Number(plus(f.on)) || 0);
+        const dc = Math.max(2, Math.min(20, DC[tier] + add));
+        const roll = rand(20), ok = roll >= dc;
+        const row = { who: id, name: '🐾 ' + foxName(f), did: clip(String(a.did || '').trim() || FOX_DO[kind] || '곁을 지킨다', 80), kind: kind,
+                      tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: !!a.danger,
+                      fx: { id: id, n: foxName(f), k: kind, on: f.on, onN: clip((mem[f.on] && mem[f.on].n) || f.on, 20) } };
+        if (add) row.plus = add;
+        if (!ok && a.danger) {
+            const from = fst[id];
+            let to = worse(from, roll === 1 ? 2 : 1);
+            if (safe && to === 'lost') to = 'hurt';
+            fst[id] = to;
+            if (to !== from) { row.from = from; row.to = to; }
+            if (to === 'lost') fell.push(id);
+        }
+        if (ok && (kind === 'heal' || kind === 'bond')) {
+            let tg = String(a.target || '');
+            if (!tg && kind === 'heal') tg = J.st[f.on] === 'hurt' ? f.on : (fst[id] === 'hurt' ? id : '');
+            if (tg && mem[tg] && mem[tg].role !== 'admin' && J.st[tg] !== 'out') {
+                const was = J.st[tg];
+                if (kind === 'heal' && was === 'hurt') J.st[tg] = 'ok';
+                if (kind === 'bond' && was === 'lost') J.st[tg] = 'hurt';         // 맞춰진 사람을 끌어냈다
+                if (J.st[tg] !== was) { row.tgt = tg; row.tgtName = mem[tg].n || tg; row.tgtFrom = was; row.tgtTo = J.st[tg]; }
+            } else if (kind === 'heal' && tg && fst[tg] === 'hurt') {             // 다친 여우를 돌봤다
+                fst[tg] = 'ok';
+                row.tgt = tg; row.tgtName = '🐾 ' + foxName(FX[tg]); row.tgtFrom = 'hurt'; row.tgtTo = 'ok'; row.tgtFox = true;
+            }
+        }
+        J.checks.push(row);
+    });
+    return { st: fst, fell: fell };
 }
 
 // ── 🐾 아기 여우의 말을 채팅에 올린다 (disasterChat/<판>/<열쇠> { c:'fox_<여우>', n:'🐾 이름', t, at, r, fox, o })
@@ -511,7 +569,8 @@ async function postFox(db, runId, FX, list, r, now, allow) {
 }
 function foxKeyLines(FX, ids, mem) {
     return ids.map((id) => id + ' = ' + foxName(FX[id]) + ' (' + ((FOXES[FX[id].k] || {}).a || FX[id].k) + ' · '
-        + ((mem[FX[id].on] && mem[FX[id].on].n) || FX[id].on) + ' 곁' + (FX[id].o !== FX[id].on ? ' · 주인 ' + ((mem[FX[id].o] && mem[FX[id].o].n) || FX[id].oN || FX[id].o) : '') + ')').join('\n');
+        + ((mem[FX[id].on] && mem[FX[id].on].n) || FX[id].on) + ' 곁' + (FX[id].o !== FX[id].on ? ' · 주인 ' + ((mem[FX[id].o] && mem[FX[id].o].n) || FX[id].oN || FX[id].o) : '')
+        + (FX[id].st === 'hurt' ? ' · 다침' : '') + ')').join('\n');
 }
 
 // 귀빈이 홀로 나간 수 n → 남은 재난관리국 · 백일몽 쪽 난이도 + surge × (2ⁿ − 1)
@@ -729,6 +788,15 @@ export function judge(acts, mem, rand, opt) {
 }
 
 function checkLine(c, d) {
+    if (c.fx) {
+        const FS = { ok: '멀쩡', hurt: '다침', lost: '소멸' };
+        let f = '- ' + c.name + '(아기 여우 · ' + ((FOXES[c.kind] || {}).a || c.kind) + ' · ' + c.fx.onN + ' 곁) — ' + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
+            + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → ' + (c.ok ? '성공' : '실패')
+            + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
+        if (c.to) f += c.to === 'lost' ? ' · [여우 소멸] ' + c.fx.n + ' 이(가) 이 판에서 사라진다' : ' · ' + c.fx.n + ' 상태: ' + FS[c.from] + ' → ' + FS[c.to];
+        if (c.tgtTo) f += ' · ' + c.tgtName + ' 상태: ' + (c.tgtFox ? FS[c.tgtFrom] + ' → ' + FS[c.tgtTo] : stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo));
+        return f;
+    }
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
     let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
         + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '') + ', 주사위 ' + c.roll + ') → '
@@ -792,11 +860,14 @@ async function round(b, deps, db) {
         // 이번 장면에 살아서 말한 사람 — 진행자가 한 사람도 빠뜨리지 않게
         const speakers = []; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && speakers.indexOf(l.c) < 0) speakers.push(l.c); });
 
-        // ① 해석 — 살아 있는 사람이 한 말이 있을 때만
-        let acts = [], metas = [];
+        // 🐾 이번 장면에 행동하는 아기 여우 — 살아 있고, 곁의 사람이 아직 재난 안에서 움직이는 아이
+        const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
+        const foxIds = Object.keys(FX).filter((id) => FX[id] && FOXES[FX[id].k] && !FX[id].gone && memNow[FX[id].on] && !gone(memNow[FX[id].on].st || 'ok'));
+        // ① 해석 — 살아 있는 사람이 한 말이 있을 때만 (없으면 아기 여우는 제 속성의 기본 행동)
+        let acts = [], metas = [], foxActs = [];
         if (lines.some((l) => !l.lost && !l.out && !l.adm)) {
             const res = await ask(deps, Object.assign({
-                model: CFG.HAIKU, max: 2500, schema: D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS,
+                model: CFG.HAIKU, max: 2500, schema: foxIds.length ? withFoxActs(D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS) : (D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS),
                 system: [
                     '너는 재난 진행 보조다. 한 장면 동안 사원들이 나눈 채팅을 읽고, 사원마다 이번 장면에서 실제로 하려는 행동을 하나씩 골라 판정 종류로 바꾼다.',
                     '[판정 종류]', KIND_KEYS.map((k) => k + ' : ' + KINDS[k]).join('\n'),
@@ -832,6 +903,15 @@ async function round(b, deps, db) {
                             + ' 무서워서 내는 소리 · 욕 · 웃음 · 혼잣말도 바깥의 말이 아니다.',
                         '- 애매하면 넣지 않는다. 바깥의 말을 했어도 그 사원의 행동(acts)은 따로 그대로 고른다.',
                         '- ' + echo + ' · (나가며) · (관리자) 로 표시된 말은 meta 에도 넣지 않는다. 줄 앞의 이런 표시와 [앞 장면 끝에] 는 게임이 붙인 것이다.'
+                    ] : []),
+                    ...(foxIds.length ? [
+                        '[아기 여우 — fox_acts]',
+                        '- 아래 [아기 여우] 목록의 아이마다 이번 장면에서 하는 행동을 하나씩 정한다 — 한 마리도 빠뜨리지 않는다. fox 에는 여우 열쇠를 그대로 쓴다.',
+                        '- 아기 여우는 제 속성의 행동만 한다 (괄호 안의 속성 — 판정 종류는 코드가 속성으로 정한다). 장면 상황 · 곁의 사람이 하려는 행동 ·'
+                            + ' 사원들이 그 아이에게 부탁한 것 · 그 아이가 채팅에 한 말에 맞게 고른다. did 는 짧게 (30자 안쪽).',
+                        '- tier 는 그 행동이 이 장면에서 얼마나 어려운지 (easy / normal / hard). danger 는 실패하면 그 아이가 괴담에 노출되어 다치거나 사라질 수 있는 행동이면 true.',
+                        '- target 은 치유 · 연결처럼 사원을 돕거나 구하는 행동일 때 그 사원의 코드 (다쳤거나 맞춰진 사원). 다친 아기 여우를 돌보면 그 여우 열쇠. 아니면 빈 문자열.',
+                        '- 아기 여우가 채팅에 한 말은 사원의 행동(acts)이 아니다 — acts 에는 넣지 않는다.'
                     ] : [])
                 ].join('\n'),
                 user: [
@@ -839,10 +919,13 @@ async function round(b, deps, db) {
                     '[사원 — 코드 / 이름 / 상태 / 이 재난에서의 자리]',
                     Object.keys(memNow).map((c) => c + ' / ' + (memNow[c].n || c) + ' / ' + (memNow[c].st || 'ok')
                         + ' / ' + (memNow[c].role || 'other')).join('\n'), '',
+                    ...(foxIds.length ? ['[아기 여우 — 여우 열쇠 = 이름 (속성 · 곁)]', foxKeyLines(FX, foxIds, memNow), '',
+                        '[아기 여우가 채팅에 한 말 — 사원의 행동이 아니다]', foxL.map((l) => l.n + ': ' + l.t).join('\n') || '(없음)', ''] : []),
                     '[채팅]', talk
                 ].join('\n')
             }, HAIKU_OPT));
             acts = Array.isArray(res.acts) ? res.acts : [];
+            foxActs = Array.isArray(res.fox_acts) ? res.fox_acts : [];
             // ★ 괄호 행동 묘사가 없는 사람은 행동하지 않은 것 — 코드가 한 번 더 거른다 (2026-10-20)
             const doers = {}; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && ACTED.test(l.t)) doers[l.c] = 1; });
             acts = acts.filter((a) => a && doers[a.who]);
@@ -875,9 +958,15 @@ async function round(b, deps, db) {
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             kick: !!(D.roles && D.kick) });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
+        // 🐾 아기 여우의 행동 — 사원들 뒤에 굴린다 (치유 · 연결이 사람을 되돌릴 수 있다)
+        const FJ = judgeFox(foxActs, FX, foxIds, J, memNow, deps.rand, {
+            dc: D.dc, plus: (c) => (memNow[c] && hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow });
+        const foxFell = FJ.fell;                                                   // 판정에 실패해 사라진 아이
+        const FXj = {}; Object.keys(FX).forEach((id) => {
+            FXj[id] = Object.assign({}, FX[id], FJ.st[id] ? { st: FJ.st[id] === 'lost' ? 'hurt' : FJ.st[id] } : {}, foxFell.indexOf(id) >= 0 ? { gone: n } : {});
+        });
         // 🐾 아기 여우 — 이번에 죽을 사람 곁의 여우가 대신 소멸한다 (죽을 때마다 한 마리씩)
-        const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
-        const foxGone = foxSave(J, memNow, FX);
+        const foxGone = foxSave(J, memNow, FXj);
         const metaHit = J.checks.some((c) => c.meta);
         const lostNew = Object.keys(J.st).filter((c) => J.st[c] === 'lost' && (memNow[c].st || 'ok') !== 'lost');   // 이번에 죽은 사람
         const active = Object.keys(J.st).filter((c) => !gone(J.st[c]) && memNow[c].role !== 'admin');   // 아직 재난 안에서 움직이는 사람 (관리자 빼고)
@@ -893,13 +982,13 @@ async function round(b, deps, db) {
         kickNow.forEach((c) => { memAfter[c].kick = n; });
         Object.keys(memAfter).forEach((c) => withBody(memAfter[c], BB[c]));     // 성별 · 걸린 효과 (이번 장면에 다시 읽은 것)
         // 함께 있는 아기 여우 — 이번에 사라진 아이는 빼고 · 판에서 빠진 사람(죽음 · 나감) 곁에는 없다
-        const FXa = {}; Object.keys(FX).forEach((id) => { FXa[id] = Object.assign({}, FX[id], foxGone.indexOf(id) >= 0 ? { gone: n } : {}); });
+        const FXa = {}; Object.keys(FXj).forEach((id) => { FXa[id] = Object.assign({}, FXj[id], foxGone.indexOf(id) >= 0 ? { gone: n } : {}); });
         Object.keys(memAfter).forEach((c) => {
             memAfter[c].foxes = gone(memAfter[c].st || 'ok') ? [] : foxesWith(FXa, c).map((id) => foxLabel(FXa[id], memAfter));
         });
-        const foxKinds = Object.keys(FX).filter((id) => !FX[id].gone || foxGone.indexOf(id) >= 0).map((id) => FX[id].k);
+        const foxKinds = Object.keys(FX).filter((id) => !FX[id].gone || foxGone.indexOf(id) >= 0 || foxFell.indexOf(id) >= 0).map((id) => FX[id].k);
         // 장면이 넘어간 뒤 채팅에 말할 수 있는 여우 — 살아서 판에 남은 사람 곁의 아이 + 이번에 대신 소멸한 아이(마지막 말)
-        const foxTalkers = Object.keys(FXa).filter((id) => foxGone.indexOf(id) >= 0
+        const foxTalkers = Object.keys(FXa).filter((id) => foxGone.indexOf(id) >= 0 || foxFell.indexOf(id) >= 0
             || (!FXa[id].gone && memAfter[FXa[id].on] && !gone(memAfter[FXa[id].on].st || 'ok')));
         // 주인 · 붙여 준 사람이 이번에 죽었는데 그 곁을 떠나 있던 여우 — 슬퍼한다
         const foxGrief = Object.keys(FXa).filter((id) => !FXa[id].gone && FXa[id].on !== FXa[id].o
@@ -932,6 +1021,8 @@ async function round(b, deps, db) {
                 ...(foxKinds.length ? [foxRule(foxKinds), ''] : []),
                 ...(foxGone.length ? ['[대신 소멸] ' + foxGone.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 대신').join(', ')
                     + ' — 판정 결과의 [대신 소멸] 줄이다. 그 아이의 말투로 마지막 말을 남기고 사라진다. 곁의 다른 아기 여우가 있으면 반응한다.', ''] : []),
+                ...(foxFell.length ? ['[여우 소멸] ' + foxFell.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 곁에서').join(', ')
+                    + ' — 판정 결과의 [여우 소멸] 줄이다. 그 아이가 제 행동을 하다 괴담에 닿아 사라진다 (잔혹하지 않게 — 빛이나 꽃잎처럼 흩어진다). 마지막 말은 fox_lines 로. 곁의 아이들이 반응한다.', ''] : []),
                 ...(foxGrief.length ? ['[주인을 잃은 아기 여우] ' + foxGrief.map((id) => foxName(FXa[id]) + ' — 주인 '
                     + ((mem[FXa[id].o] || {}).n || FXa[id].o) + ' 이(가) 죽었다').join(', ') + ' — 제 성격대로 슬퍼한다.', ''] : []),
                 ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
@@ -963,7 +1054,7 @@ async function round(b, deps, db) {
                 ...(foxTalkers.length
                     ? ['- fox_lines : 장면이 넘어간 직후 채팅에 올릴 아기 여우의 말 0~3줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) } —'
                         + ' 대신 소멸한 아이의 마지막 말 · 주인을 잃은 아이의 슬픔 · 새 장면을 보고 하는 말. 결과에는 대사를 쓰지 않는다.',
-                       '  [아기 여우 열쇠] (이번에 사라진 아이는 마지막 말만)', foxKeyLines(FXa, foxTalkers, memAfter)]
+                       '  [아기 여우 열쇠] (이번에 사라진 아이 — 대신 소멸 · 여우 소멸 — 는 마지막 말만)', foxKeyLines(FXa, foxTalkers, memAfter)]
                     : ['- fox_lines : 빈 배열.'])
             ].join('\n')
         }, SONNET_OPT));
@@ -994,6 +1085,8 @@ async function round(b, deps, db) {
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
         kickNow.forEach((c) => { up['members/' + c + '/kick'] = n; });
         foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
+        foxFell.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
+        Object.keys(FJ.st).forEach((id) => { const s2 = FJ.st[id] === 'hurt' ? 'hurt' : null; if ((FX[id].st || null) !== s2 && FJ.st[id] !== 'lost') up['foxes/' + id + '/st'] = s2; });
         // 연결로 끌어낸 사람은 죽는 방식을 지운다
         Object.keys(J.st).forEach((c) => { if (J.st[c] !== 'lost' && memNow[c].fate) up['members/' + c + '/fate'] = null; });
         let pays = null;

@@ -167,6 +167,7 @@ function now() { return Date.now() + off; }
         '.dz-chk{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}',
         '.dz-chk span{font-size:10px;padding:3px 7px;border-radius:5px;background:rgba(0,0,0,.35);border:1px solid #2a3a3b;color:#b8c4c4;}',
         '.dz-chk span.ok{border-color:#2f6b4a;color:#9fd8a4;} .dz-chk span.no{border-color:#6b2f3a;color:#ff9aa8;}',
+        '.dz-chk span.fx{color:#ffc38a;}',             // 🐾 아기 여우의 판정
         '#dz-chat .ln{font-size:12px;line-height:1.7;padding:2px 0;word-break:break-word;}',
         '.dz-fox{color:#ffc38a;}',                     // 🐾 아기 여우의 말 — 옅은 주황
         '#dz-chat .ln.fox,#dz-chat .ln.fox b{color:#ffc38a;}',
@@ -591,6 +592,14 @@ function room(r, u) {
 function checkChips(list) {
     return '<div class="dz-chk">' + (list || []).map(function (c) {
         if (c.kind === 'none') return '<span' + (c.kick ? ' class="no"' : '') + '>' + esc(c.name) + ' · ' + esc(c.did) + (c.kick ? ' → 모셔짐' : '') + '</span>';
+        // 🐾 아기 여우의 판정 — 옅은 주황 (다침 · 소멸은 이 판 안에서만)
+        if (c.fx) {
+            let f = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
+                + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '') + (c.plus ? ' (+' + c.plus + ')' : '');
+            if (c.to) f += ' → ' + (c.to === 'lost' ? '소멸' : '다침');
+            if (c.tgtTo) f += ' · ' + esc(c.tgtName) + ' ' + (c.tgtFox ? '다침→멀쩡' : ST[c.tgtFrom] + '→' + ST[c.tgtTo]);
+            return '<span class="fx ' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + f + '</span>';
+        }
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.forced) s = '⚡ ' + s;
