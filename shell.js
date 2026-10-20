@@ -252,6 +252,30 @@ function toPlaza() {
     };
 })();
 
+// ★ 자동 로그인이 이 묶음보다 먼저 끝났을 때 (2026-10-20)
+//
+//   자동 로그인(index.html tryAutoLogin)은 첫 화면 글 안에서 바로 돈다. 그런데 이 파일은
+//   **마지막 묶음(b/08.js · 4MB 넘음)** 에 들어 있어서, 내 기록을 읽어 오는 것이 이 묶음이
+//   다 내려오는 것보다 빠르면 위 hookLogin 이 걸리기 **전에** 로그인이 끝나 버린다.
+//   그러면 toPlaza 가 한 번도 안 불려 사원이 옛 화면으로 들어갔다 (묶음이 커질수록 자주).
+//   → 이 파일이 올라온 뒤 잠깐 지켜보다가, 이미 들어와 있는 사원이면 그때 광장으로 보낸다.
+//     (로그인이 도중이었으면 끝나기를 기다린다 · 상담사는 건드리지 않는다)
+(function lateStart() {
+    let n = 0;
+    const iv = setInterval(function () {
+        n++;
+        const u = me();
+        const login = el('login-screen');
+        const inNow = !!(u && u.code && (!login || getComputedStyle(login).display === 'none'));
+        if (inNow) {
+            clearInterval(iv);
+            if (!isBoss() && !solo) { toPlaza(); console.log('[사원 화면] 로그인이 먼저 끝나 있어 광장으로 보냈습니다'); }
+            return;
+        }
+        if (n > 80) clearInterval(iv);              // 20초 — 그 뒤 로그인은 hookLogin 이 받는다
+    }, 250);
+})();
+
 // 나갈 때 되돌려 놓는다 — 다음에 상담사로 들어올 수도 있다
 (function hookLogout() {
     const old = window.logout;
