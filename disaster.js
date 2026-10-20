@@ -58,7 +58,8 @@ const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백�
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 // 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다
 const SIGIL_ITEMS = ['🔎 감지하는 눈', '📱 K·LEE', '🩶 은심장', '🦊 호사수구', '🧧 지산의 복 : 대리자', '🐾 아기 여우', '🌙 달빛 문신', '📺 브라운의 심야 토크 쇼'];
-const ROLE_N = { admin: '관리자', vip: '귀빈', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
+// 귀빈 자리(어둠 소속 · 심야 토크쇼의 주인)는 화면에 「사회자」로 띄운다 — 진행자는 귀빈으로 안다 (2026-10-20)
+const ROLE_N = { admin: '관리자', vip: '사회자', bureau: '재난관리국', daydream: '백일몽', board: '예외', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 8;                             // 한 방 최대 인원 (2026-10-20 — 4 → 8 · 서버 core.js 와 같이)
 // ★ 몇 장면인지는 화면에 알리지 않는다 (2026-10-20) — 장면 수는 서버(lore.js rounds)만 안다
 const LOBBY_TTL = 2 * 3600000, PLAY_TTL = 6 * 3600000, END_TTL = 24 * 3600000;
@@ -504,7 +505,7 @@ function memberChips(r, u) {
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : ((x.role === 'vip' && x.host ? ' · 사회자' : (x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '')) + ' · ' + ST[st]
+            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + ST[st]
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '">'
             + esc(x.n || c) + tag + '</span>';
@@ -560,7 +561,7 @@ function play(r, u) {
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
-            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>' + (x.host ? '사회자' : '귀빈') + '</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
+            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>사회자</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
             + '<span style="font-size:11px;color:#9a8fb8;">나가면 남은 재난관리국 · 백일몽 쪽의 난이도가 기하급수로 오릅니다.</span></div>'
             + '<button class="dz-btn sub" data-out="1"' + (r.phase !== 'TALK' ? ' disabled' : '') + ' style="border-color:#5a4a7a;color:#c9b6ff;">'
             + (going ? '이 장면이 끝나면 나갑니다 — 그만둔다' : '홀로 나간다') + '</button></div>';
