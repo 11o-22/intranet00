@@ -494,7 +494,8 @@ export function foxSave(J, memNow, foxes) {
 //   사원들의 판정 뒤 · 대신 소멸 앞에 굴린다. 행동은 해석(빠른 모델)이 장면에 맞게 고르고, 없으면 FOX_DO 로.
 //   kind 는 그 아이의 속성 · 난이도는 사원과 같은 표 (곁의 사람이 받는 사나움 · 사회자 없음 몫도 같이 받는다)
 //   성공 — 치유: 다친 사람(없으면 다친 여우)을 되돌린다 · 연결: 맞춰진 사람을 끌어낸다 (사원의 치유 · 연결과 같다)
-//   위험한 행동에 실패 — 여우가 다친다 → 한 번 더면 소멸 (치명적 실패는 두 단계) · 안전한 장면에는 다침이 끝
+//   위험한 행동에 실패 — 여우가 다친다. ✗ 판정에 실패해서는 소멸하지 않는다 (2026-10-20)
+//     여우가 사라지는 것은 곁의 사람이 죽을 자리에 놓였을 때 대신 소멸하는 것뿐이다 (foxSave)
 //   여우의 다침 · 소멸은 이 판 안에서만이다 (disaster/<판>/foxes/<여우>/st · gone)
 const FOX_DO = { evade: '곁의 사람과 함께 위험을 피한다', sense: '귀를 세우고 주변을 살핀다', heal: '다친 곳을 살펴 준다',
                  hide: '곁의 사람과 함께 몸을 숨긴다', luck: '행운을 빈다', break: '앞을 막는 것을 부순다',
@@ -502,7 +503,6 @@ const FOX_DO = { evade: '곁의 사람과 함께 위험을 피한다', sense: '�
 export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
     const DC = (opt && opt.dc) || CFG.DC;
     const plus = (opt && typeof opt.plus === 'function') ? opt.plus : () => 0;
-    const safe = !!(opt && opt.safe);
     const want = {};
     (Array.isArray(fa) ? fa : []).forEach((a) => { if (a && ids.indexOf(a.fox) >= 0 && !want[a.fox]) want[a.fox] = a; });
     const fst = {}; ids.forEach((id) => { fst[id] = FX[id].st === 'hurt' ? 'hurt' : 'ok'; });
@@ -520,11 +520,9 @@ export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
         if (add) row.plus = add;
         if (!ok && a.danger) {
             const from = fst[id];
-            let to = worse(from, roll === 1 ? 2 : 1);
-            if (safe && to === 'lost') to = 'hurt';
+            const to = 'hurt';                                   // 다칠 뿐 — 실패로는 사라지지 않는다
             fst[id] = to;
             if (to !== from) { row.from = from; row.to = to; }
-            if (to === 'lost') fell.push(id);
         }
         if (ok && (kind === 'heal' || kind === 'bond')) {
             let tg = String(a.target || '');
@@ -960,7 +958,7 @@ async function round(b, deps, db) {
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
         // 🐾 아기 여우의 행동 — 사원들 뒤에 굴린다 (치유 · 연결이 사람을 되돌릴 수 있다)
         const FJ = judgeFox(foxActs, FX, foxIds, J, memNow, deps.rand, {
-            dc: D.dc, plus: (c) => (memNow[c] && hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow });
+            dc: D.dc, plus: (c) => (memNow[c] && hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0) });
         const foxFell = FJ.fell;                                                   // 판정에 실패해 사라진 아이
         const FXj = {}; Object.keys(FX).forEach((id) => {
             FXj[id] = Object.assign({}, FX[id], FJ.st[id] ? { st: FJ.st[id] === 'lost' ? 'hurt' : FJ.st[id] } : {}, foxFell.indexOf(id) >= 0 ? { gone: n } : {});
