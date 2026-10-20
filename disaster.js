@@ -169,6 +169,7 @@ function now() { return Date.now() + off; }
         '.dz-chk span.ok{border-color:#2f6b4a;color:#9fd8a4;} .dz-chk span.no{border-color:#6b2f3a;color:#ff9aa8;}',
         '#dz-chat .ln{font-size:12px;line-height:1.7;padding:2px 0;word-break:break-word;}',
         '.dz-fox{color:#ffc38a;}',                     // 🐾 아기 여우의 말 — 옅은 주황
+        '#dz-chat .ln.fox,#dz-chat .ln.fox b{color:#ffc38a;}',
         '#dz-chat .ln b{color:#9fe3e3;font-weight:normal;margin-right:6px;}',
         '#dz-chat .ln.me b{color:#e8c27a;}',
         '#dz-chat .ln.echo{color:#7a8f8f;font-style:italic;}',
@@ -336,7 +337,8 @@ function addLine(v) {
     }
     const m = (r.members || {})[v.c] || {};
     const el = document.createElement('div');
-    el.className = 'ln' + (u && v.c === u.code ? ' me' : '') + (m.st === 'lost' ? ' echo' : '');
+    // 🐾 아기 여우의 말 — 옅은 주황색 (서버가 올린 줄 · v.fox)
+    el.className = 'ln' + (v.fox ? ' fox' : '') + (u && v.c === u.code ? ' me' : '') + (m.st === 'lost' ? ' echo' : '');
     el.innerHTML = '<b>' + esc(v.n || v.c) + '</b>' + esc(v.t);
     c.appendChild(el);
     const main = document.getElementById('dz-main');
@@ -778,6 +780,25 @@ function send() {
     inp.value = '';
     d.ref(CHAT + '/' + curId).push({ c: u.code, n: String(u.name || u.code), t: t, at: now(),
                                      r: r.state === 'PLAY' ? (Number(r.round) || 0) : 0 });
+    if (r.state === 'PLAY' && !/^\s*[*＊]/.test(t)) foxPoke(r);
+}
+// 🐾 아기 여우 — 판에 살아 있는 여우가 있으면, 말한 뒤 2.5초쯤 기다렸다가 여우에게 대답을 청한다 (2026-10-20)
+//   여럿이 잇달아 말하면 마지막 한 번만 부른다 · 서버가 사이 · 횟수를 따로 막는다
+let foxTimer = 0;
+function foxAlive(r) {
+    const F = r.foxes || {}, m = r.members || {};
+    return Object.keys(F).some(function (id) { const f = F[id]; return f && !f.gone && m[f.on] && !gone(m[f.on].st || 'ok'); });
+}
+function foxPoke(r) {
+    if (!foxAlive(r)) return;
+    const id = curId, u = me(), n = Number(r.round) || 0;
+    if (foxTimer) clearTimeout(foxTimer);
+    foxTimer = setTimeout(function () {
+        foxTimer = 0;
+        const rr = all[id];
+        if (!u || !rr || rr.state !== 'PLAY' || rr.phase !== 'TALK' || Number(rr.round) !== n) return;
+        post({ act: 'fox', run: id, code: u.code, round: n });
+    }, 2500);
 }
 function toggleOut() {
     const u = me(), d = db_(), r = curId && all[curId];

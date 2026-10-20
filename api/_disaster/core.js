@@ -47,7 +47,7 @@
 //   disasterSrv/<판>         숨긴 설계 · 진행 메모 · 장면 요약             (서버만 쓴다)
 //   disasterUse/<날짜>       하루 호출 수 · 사원별 시작 수
 // ==========================================
-import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule } from './lore.js';
+import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule } from './lore.js';
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
@@ -63,6 +63,11 @@ export const CFG = {
     SONNET: 'claude-sonnet-5-5',
     HAIKU: 'claude-haiku-5-5',
     ADMIN: 'kario0987',
+    // 🐾 아기 여우 채팅 (2026-10-20) — 사원이 말하면 빠른 모델이 여우의 말을 채팅에 올린다
+    FOX_GAP_MS: 6000,        // 한 판에서 여우가 말하는 사이 (이보다 잦으면 건너뛴다)
+    FOX_PER_SCENE: 10,       // 한 장면에 여우가 말하는 횟수
+    FOX_DAILY: 800,          // 하루 전체 여우 채팅 호출
+    FOX_MAX_LINES: 3,
     TICKET: '🎫 기록 소실 티켓'
 };
 
@@ -237,7 +242,9 @@ function obj(props) {
 }
 const S = { type: 'string' }, B = { type: 'boolean' };
 
-const SCHEMA_START = obj({ plan: S, title: S, text: S, notes: S });
+const FOX_LINES = { type: 'array', items: obj({ fox: S, t: S }) };      // 🐾 아기 여우가 채팅에 올릴 말
+const SCHEMA_START = obj({ plan: S, title: S, text: S, notes: S, fox_lines: FOX_LINES });
+const SCHEMA_FOX = obj({ lines: FOX_LINES });
 const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
     who: S, did: S, kind: { type: 'string', enum: KIND_KEYS },
     tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S }) } });
@@ -245,7 +252,7 @@ const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
 const SCHEMA_ACTS_META = obj({ acts: SCHEMA_ACTS.properties.acts, meta: { type: 'array', items: obj({ who: S, said: S }) } });
 const SCHEMA_TURN = obj({ result: S, ended: B, end_kind: { type: 'string', enum: ['none', 'clear', 'escape', 'fail'] },
     end_text: S, next_title: S, next_text: S, notes: S, summary: S,
-    fates: { type: 'array', items: obj({ who: S, how: S }) } });
+    fates: { type: 'array', items: obj({ who: S, how: S }) }, fox_lines: FOX_LINES });
 
 function gmSystem(kind) {
     const d = DISASTERS[kind];
@@ -479,6 +486,34 @@ export function foxSave(J, memNow, foxes) {
     return used;
 }
 
+// ── 🐾 아기 여우의 말을 채팅에 올린다 (disasterChat/<판>/<열쇠> { c:'fox_<여우>', n:'🐾 이름', t, at, r, fox, o })
+//   열쇠는 파이어베이스 push 와 같은 꼴로 만든다 — 사원들의 말과 시간 순으로 섞인다
+const PUSH_CH = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+export function pushId(t) {
+    let s = '';
+    for (let i = 0; i < 8; i++) { s = PUSH_CH.charAt(t % 64) + s; t = Math.floor(t / 64); }
+    for (let i = 0; i < 12; i++) s += PUSH_CH.charAt(Math.floor(Math.random() * 64));
+    return s;
+}
+async function postFox(db, runId, FX, list, r, now, allow) {
+    const up = {};
+    let i = 0;
+    (Array.isArray(list) ? list : []).slice(0, CFG.FOX_MAX_LINES).forEach((x) => {
+        if (!x || !FX[x.fox] || allow.indexOf(x.fox) < 0) return;
+        const t = clip(String(x.t || '').replace(/<\/?f>/g, '').replace(/\s+/g, ' ').trim(), 120);
+        if (!t) return;
+        const f = FX[x.fox];
+        up[pushId(now + i)] = { c: 'fox_' + x.fox, n: '🐾 ' + foxName(f), t: t, at: now + i, r: r, fox: f.k, o: f.o };
+        i++;
+    });
+    if (i) await db.patch('disasterChat/' + runId, up);
+    return i;
+}
+function foxKeyLines(FX, ids, mem) {
+    return ids.map((id) => id + ' = ' + foxName(FX[id]) + ' (' + ((FOXES[FX[id].k] || {}).a || FX[id].k) + ' · '
+        + ((mem[FX[id].on] && mem[FX[id].on].n) || FX[id].on) + ' 곁' + (FX[id].o !== FX[id].on ? ' · 주인 ' + ((mem[FX[id].o] && mem[FX[id].o].n) || FX[id].oN || FX[id].o) : '') + ')').join('\n');
+}
+
 // 귀빈이 홀로 나간 수 n → 남은 재난관리국 · 백일몽 쪽 난이도 + surge × (2ⁿ − 1)
 function surgeOf(d, mem) {
     if (!d || !d.roles || !d.surge) return 0;
@@ -547,11 +582,16 @@ async function start(b, deps, db) {
                 ...(D.roles ? ['   사람마다 「이 재난에서」 자리가 다르다 — 사람마다 무엇이 다가오고 무엇을 겪는지 설계에 넣는다.'] : []),
                 '2. title — 첫 장면 제목 (짧게, 「장소 — 무엇」 꼴).',
                 '3. text — 첫 장면. 들어온 사람들이 재난에 들어선 순간. 450자 안쪽. 열린 상황으로 끝낸다.',
-                '4. notes — 다음 장면을 쓸 때 기억할 메모 (300자 안쪽).'
+                '4. notes — 다음 장면을 쓸 때 기억할 메모 (300자 안쪽).',
+                ...(Object.keys(FX0).length
+                    ? ['5. fox_lines — 첫 장면이 열린 직후 채팅에 올릴 아기 여우의 말 0~2줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) }.',
+                       '   [아기 여우 열쇠]', foxKeyLines(FX0, Object.keys(FX0), mem)]
+                    : ['5. fox_lines — 빈 배열.'])
             ].join('\n')
         }, SONNET_OPT));
 
         await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' } });
+        try { if (Object.keys(FX0).length) await postFox(db, b.run, FX0, out.fox_lines, 1, deps.now(), Object.keys(FX0)); } catch (e) { }
         const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
         codes.forEach((c) => {
@@ -740,10 +780,15 @@ async function round(b, deps, db) {
             .filter(([k, x]) => x && typeof x.t === 'string' && mem[x.c] && (Number(x.r) === n || lateOf(k, x)))
             .filter(([k, x]) => !OOC.test(x.t))                    // * 로 시작하는 말은 진행자가 읽지 않는다 (사원끼리 하는 말)
             .slice(-200)
-            .map(([k, x]) => ({ c: x.c, n: mem[x.c].n || x.c, t: clip(x.t, 200).replace(/\s+/g, ' ').trim(), late: lateOf(k, x),
+            .map(([k, x]) => ({ k: k, c: x.c, n: mem[x.c].n || x.c, t: clip(x.t, 200).replace(/\s+/g, ' ').trim(), late: lateOf(k, x),
                                 lost: (mem[x.c].st || 'ok') === 'lost', out: memNow[x.c].st === 'out', adm: mem[x.c].role === 'admin' }));
         const readKey = chatKeys.length ? chatKeys[chatKeys.length - 1] : prevKey;
-        const talk = lines.map((l) => (l.late ? '[앞 장면 끝에] ' : '') + (l.adm ? '(관리자) ' : (l.lost ? echo + ' ' : (l.out ? '(나가며) ' : ''))) + l.n + ': ' + l.t).join('\n') || '(아무도 말하지 않았다)';
+        const talkLine = (l) => (l.fox ? '(아기 여우) ' : '') + (l.late ? '[앞 장면 끝에] ' : '') + (l.adm ? '(관리자) ' : (l.lost ? echo + ' ' : (l.out ? '(나가며) ' : ''))) + l.n + ': ' + l.t;
+        const talk = lines.map(talkLine).join('\n') || '(아무도 말하지 않았다)';
+        // 진행자에게는 아기 여우가 채팅에 한 말도 같이 (해석 · 바깥의 말 고르기에는 넣지 않는다)
+        const foxL = chatKeys.filter((k) => { const x = chatAll[k]; return x && x.fox && typeof x.t === 'string' && Number(x.r) === n; })
+            .map((k) => ({ k: k, fox: true, n: String(chatAll[k].n || '').replace(/^🐾\s*/, ''), t: clip(chatAll[k].t, 200).replace(/\s+/g, ' ').trim() }));
+        const talkS = foxL.length ? lines.concat(foxL).sort((a, z) => (a.k < z.k ? -1 : 1)).map(talkLine).join('\n') : talk;
         // 이번 장면에 살아서 말한 사람 — 진행자가 한 사람도 빠뜨리지 않게
         const speakers = []; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && speakers.indexOf(l.c) < 0) speakers.push(l.c); });
 
@@ -853,6 +898,9 @@ async function round(b, deps, db) {
             memAfter[c].foxes = gone(memAfter[c].st || 'ok') ? [] : foxesWith(FXa, c).map((id) => foxLabel(FXa[id], memAfter));
         });
         const foxKinds = Object.keys(FX).filter((id) => !FX[id].gone || foxGone.indexOf(id) >= 0).map((id) => FX[id].k);
+        // 장면이 넘어간 뒤 채팅에 말할 수 있는 여우 — 살아서 판에 남은 사람 곁의 아이 + 이번에 대신 소멸한 아이(마지막 말)
+        const foxTalkers = Object.keys(FXa).filter((id) => foxGone.indexOf(id) >= 0
+            || (!FXa[id].gone && memAfter[FXa[id].on] && !gone(memAfter[FXa[id].on].st || 'ok')));
         // 주인 · 붙여 준 사람이 이번에 죽었는데 그 곁을 떠나 있던 여우 — 슬퍼한다
         const foxGrief = Object.keys(FXa).filter((id) => !FXa[id].gone && FXa[id].on !== FXa[id].o
             && J.st[FXa[id].o] === 'lost' && (memNow[FXa[id].o] && (memNow[FXa[id].o].st || 'ok') !== 'lost'));
@@ -888,7 +936,7 @@ async function round(b, deps, db) {
                     + ((mem[FXa[id].o] || {}).n || FXa[id].o) + ' 이(가) 죽었다').join(', ') + ' — 제 성격대로 슬퍼한다.', ''] : []),
                 ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
                     + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
-                '[이번 장면에서 나눈 대화]', talk, '',
+                '[이번 장면에서 나눈 대화]', talkS, '',
                 ...(speakers.length ? ['[이번 장면에 말한 사람 — 한 사람도 빠뜨리지 않는다] ' + speakers.map((c) => mem[c].n || c).join(', '), ''] : []),
                 '[판정 결과 — 바꾸지 말 것]', J.checks.map((c) => checkLine(c, D)).join('\n') || '(판정할 행동이 없었다 — 머뭇거린 사이 상황이 조금 나빠진다)', '',
                 wiped ? (lostAfter.length
@@ -911,7 +959,12 @@ async function round(b, deps, db) {
                 '- notes : 앞으로 기억할 진행 메모 (지난 메모를 고쳐 쓴다 · 지금까지 쓴 장소와 괴이를 짧게 적어 두어 되풀이를 피한다, 600자 안쪽).',
                 '- next_text 는 지난 장면들과 다른 곳 · 다른 괴이 · 다른 결로 연다 (지난 장면 요약 · 진행 메모를 보고 겹치지 않게).',
                 '- summary : 이번 장면 한 줄 요약 (80자 안쪽).',
-                '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.'
+                '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.',
+                ...(foxTalkers.length
+                    ? ['- fox_lines : 장면이 넘어간 직후 채팅에 올릴 아기 여우의 말 0~3줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) } —'
+                        + ' 대신 소멸한 아이의 마지막 말 · 주인을 잃은 아이의 슬픔 · 새 장면을 보고 하는 말. 결과에는 대사를 쓰지 않는다.',
+                       '  [아기 여우 열쇠] (이번에 사라진 아이는 마지막 말만)', foxKeyLines(FXa, foxTalkers, memAfter)]
+                    : ['- fox_lines : 빈 배열.'])
             ].join('\n')
         }, SONNET_OPT));
 
@@ -979,6 +1032,8 @@ async function round(b, deps, db) {
         }
         await db.patch('disaster/' + b.run, up);
         if (pays && Object.keys(pays).length) await db.patch('disasterPay', pays);
+        // 🐾 아기 여우 — 장면이 넘어간 직후 채팅에 (끝났으면 이 장면에)
+        try { if (foxTalkers.length) await postFox(db, b.run, FXa, out.fox_lines, ended ? n : n + 1, deps.now(), foxTalkers); } catch (e) { }
         const su = { notes: clip(out.notes, 1200), readN: n, readKey: readKey || null }; su['sums/' + n] = n + '. ' + clip(out.summary, 120);
         await db.patch('disasterSrv/' + b.run, su);
         return { ok: true, ended: ended };
@@ -993,6 +1048,74 @@ async function round(b, deps, db) {
 }
 
 // ==========================================
+// 🐾 아기 여우 채팅 — 사원이 말하면 (화면이 2.5초 뒤 부른다) 여우가 대답한다 (2026-10-20)
+// ==========================================
+//   빠른 모델(Haiku)로 0~3줄 · 한 판에 6초에 한 번까지 · 한 장면 10번까지 · 하루 800번까지
+//   이미 대답한 사람 말(열쇠)보다 새 말이 없으면 부르지 않는다 — disasterSrv/<판>/fox { n, cnt, at, key }
+async function foxChat(b, deps, db) {
+    const now = deps.now();
+    const run = await db.get('disaster/' + b.run);
+    if (!run || !DISASTERS[run.kind]) throw new Fail(404, '그런 재난이 없습니다.');
+    const mem = run.members || {};
+    if (!mem[b.code]) throw new Fail(403, '이 재난에 들어와 있는 사원만 부를 수 있습니다.');
+    if (run.state !== 'PLAY' || run.phase !== 'TALK') return { ok: false, why: 'phase' };
+    const n = Number(run.round) || 0;
+    const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
+    const alive = Object.keys(FX).filter((id) => FX[id] && !FX[id].gone && mem[FX[id].on] && !gone(mem[FX[id].on].st || 'ok'));
+    if (!alive.length) return { ok: false, why: 'nofox' };
+
+    const chatAll = (await db.get('disasterChat/' + b.run)) || {};
+    const keys = Object.keys(chatAll).sort();
+    const rows = keys.map((k) => [k, chatAll[k]]).filter(([k, x]) => x && typeof x.t === 'string' && Number(x.r) === n
+        && !OOC.test(x.t) && (x.fox || (mem[x.c] && mem[x.c].role !== 'admin')));
+    const humans = rows.filter(([k, x]) => !x.fox && !gone(mem[x.c].st || 'ok'));
+    if (!humans.length) return { ok: false, why: 'quiet' };
+    const lastKey = humans[humans.length - 1][0];
+
+    // 잠금 — 같은 판에서 한 번에 하나 · 사이 · 장면 횟수 · 이미 대답한 말
+    let took = false;
+    for (let i = 0; i < 4 && !took; i++) {
+        const { val, tag } = await db.getTag('disasterSrv/' + b.run + '/fox');
+        const v = (val && typeof val === 'object') ? val : {};
+        const same = Number(v.n) === n;
+        if (same && (now - (Number(v.at) || 0) < CFG.FOX_GAP_MS || (Number(v.cnt) || 0) >= CFG.FOX_PER_SCENE)) return { ok: false, why: 'busy' };
+        if (same && v.key && String(v.key) >= lastKey) return { ok: false, why: 'answered' };
+        const st = await db.putIf('disasterSrv/' + b.run + '/fox', { n: n, cnt: (same ? (Number(v.cnt) || 0) : 0) + 1, at: now, key: lastKey }, tag);
+        if (st === 200) took = true;
+        else if (st !== 412) return { ok: false, why: 'lock' };
+    }
+    if (!took) return { ok: false, why: 'busy' };
+    // 하루 한도
+    for (let i = 0; i < 4; i++) {
+        const path = 'disasterFox/' + kstDay(now);
+        const { val, tag } = await db.getTag(path);
+        const c = Number(val) || 0;
+        if (c >= CFG.FOX_DAILY) return { ok: false, why: 'daily' };
+        const st = await db.putIf(path, c + 1, tag);
+        if (st === 200) break;
+        if (st !== 412) return { ok: false, why: 'daily' };
+    }
+
+    const scene = run.scene || {};
+    const kinds = alive.map((id) => FX[id].k);
+    const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (mem[x.c].n || x.c))
+        + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
+    const res = await ask(deps, Object.assign({
+        model: CFG.HAIKU, max: 700, schema: SCHEMA_FOX,
+        system: foxChatRule(kinds),
+        user: [
+            '[지금 장면] ' + (scene.title || ''), clip(scene.text || '', 900), '',
+            '[판에 있는 사원]', Object.keys(mem).filter((c) => mem[c].role !== 'admin').map((c) => '- ' + (mem[c].n || c)
+                + ' (' + (mem[c].aff || '소속 없음') + (mem[c].st && mem[c].st !== 'ok' ? ' · ' + stName(DISASTERS[run.kind], mem[c].st) : '') + ')').join('\n'), '',
+            '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
+            '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
+        ].join('\n')
+    }, HAIKU_OPT));
+    const nPosted = await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive);
+    return { ok: true, lines: nPosted };
+}
+
+// ==========================================
 // 들머리
 // ==========================================
 export async function handle(body, deps) {
@@ -1004,6 +1127,7 @@ export async function handle(body, deps) {
         let out;
         if (b.act === 'start') out = await start(b, deps, db);
         else if (b.act === 'round') out = await round(b, deps, db);
+        else if (b.act === 'fox') out = await foxChat(b, deps, db);
         else throw new Fail(400, '모르는 요청입니다.');
         return { status: 200, json: out };
     } catch (e) {
