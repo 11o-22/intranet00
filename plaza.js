@@ -204,10 +204,10 @@ const PLAZA = {
                   down: { to: 'dfront', x: [760, 1130] },
                   // 🔒 가두리 — 안내 데스크와 정문 사이 (gaduri.js · 아래 「가두리」)
                   cage: { x: 640, w: 360, h: 400, base: 915, zy: 880 },
-                  // 주신 지도대로 — 2F 사택 · 1F 로비 · B1 어둠 탐사·유쾌 판매소
-                  lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
-                          b1: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' },
-                                { n: '유쾌 판매소', ic: 'shop', tab: 'tab-shop',     sub: 'shop-regular' } ] },
+                  // 주신 지도대로 — 2F 어둠 탐사 · 1F 로비 · B1 유쾌 판매소 (2026-10-20)
+                  //   (사택은 재난관리국 엘리베이터 2F · 목록에서 간다)
+                  lift: { f2: [ { n: '어둠 탐사',   ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ],
+                          b1: [ { n: '유쾌 판매소', ic: 'shop', tab: 'tab-shop',     sub: 'shop-regular' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'dfront' } ] },
 
@@ -332,6 +332,8 @@ const PLAZA = {
         { g: 'point', n: '밀실 거래',  i: '🤝', ic: 'p2p',     tab: 'tab-shop',     sub: 'shop-p2p', nw: 'p2p' },
         // ④ 탐사 — 파티는 목록에서 뺐다. 재난관리국 B1 엘리베이터로 들어간다.
         { g: 'dark',  n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
+        // 📡 기록 소실 — 재난관리국 B2 와 같은 문 (disaster.js · 티켓이 없으면 못 들어감). 목록에서는 바로 연다
+        { g: 'dark',  n: '기록 소실',  i: '📡', ic: 'dark',    fn: 'disasterLost' },
         // ⑤ 생활
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
