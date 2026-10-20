@@ -603,6 +603,7 @@ function checkChips(list) {
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.forced) s = '⚡ ' + s;
+        if (c.quiet) s = '💤 ' + s;         // 말이 없어 대신 굴린 다이스
         if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 방송국이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.ease) s += ' (−' + c.ease + ')';          // 이사팀 — 조금 쉽게
@@ -644,6 +645,13 @@ function play(r, u) {
     if (r.phase === 'WAIT') h += '<div id="dz-wait">진행자가 장면을 정리하는 중…</div>';
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + ' — 잠시 뒤 다시 넘깁니다.</div>';
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
+    // 💤 말이 없던 사람에게 — 이번에도 말이 없으면 다이스가 대신 굴러간다 (2026-10-20 · 서버 core.js QUIET_ROLL)
+    const qn = Number(x.quiet) || 0;
+    if (qn && !gone(st) && r.phase === 'TALK') {
+        h += '<div class="dz-card" style="border-color:#4a5a6a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#b8c8d8;">💤 '
+            + (qn >= 2 ? '여러 장면째 아무 말도 하지 않아 다이스가 대신 굴러갔습니다.' : '지난 장면에 아무 말도 하지 않았습니다.')
+            + '<br><span style="font-size:11px;color:#8a9aaa;">이번 장면에도 말이 없으면 다이스가 대신 굴러갑니다 — 머뭇거리는 사이 상황이 닥칩니다.</span></div></div>';
+    }
     h += '<div class="dz-sec">대화 — 캐릭터로 말하고 행동하세요. 2분 30초가 지나거나 모두 확정하면 넘어갑니다.</div>';
     return h;
 }

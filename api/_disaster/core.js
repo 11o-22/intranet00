@@ -53,6 +53,7 @@ export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
     TALK_MS: 150000,         // 장면마다 대화 시간 — 2분 30초 (2026-10-20)
     MAX_ROUNDS: 8,           // 한 판 최대 장면
+    QUIET_ROLL: 2,           // 이 장면 수만큼 잇달아 말이 없으면 대신 다이스를 굴린다 (1장면째는 진행자가 끌어들인다)
     MAX_MEMBERS: 5,          // 한 방 최대 인원 (2026-10-20 — 4 → 8 → 5)
     DAILY_RUNS: 5,           // 사원 한 명이 하루에 들어갈 수 있는 판 (2026-10-20 — 3 → 5)
     DAILY_CALLS: 250,        // 하루 전체 진행자(Sonnet) 호출 — 대략 하루 5달러 안쪽
@@ -731,6 +732,7 @@ export function judge(acts, mem, rand, opt) {
         seen[a.who] = 1;
         const kind = KIND_KEYS.indexOf(a.kind) >= 0 ? a.kind : 'none';
         const row = { who: a.who, name: mem[a.who].n || a.who, did: clip(a.did, 80), kind: kind };
+        if (a.quiet) row.quiet = true;                           // 말이 없어 대신 굴린 다이스
         if (kind !== 'none') {
             const tier = DC[a.tier] ? a.tier : 'normal';
             const add = Math.max(0, Number(plus(a.who)) || 0);
@@ -826,7 +828,7 @@ function checkLine(c, d) {
         return f;
     }
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
-    let s = '- ' + c.name + ' — ' + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
+    let s = '- ' + c.name + ' — ' + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
         + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '') + ', 주사위 ' + c.roll + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
@@ -967,6 +969,17 @@ async function round(b, deps, db) {
             }
         }
 
+        // ★ 말 없는 사람 (2026-10-20) — 한 장면 말이 없으면 다음 장면에서 진행자가 그 사람을 끌어들이고 (화면에도 알림),
+        //   그다음 장면에도 말이 없으면 대신 다이스를 굴린다 — 머뭇거리는 사이 상황이 덮친다 (회피 · 보통 · 위험 / 귀빈은 위험 아님)
+        //   * 로 시작하는 말만 한 사람도 말이 없는 것이다 · 관리자 · 죽은 사람 · 나간 사람 · 이번에 홀로 나가는 귀빈은 세지 않는다
+        //   몇 장면째 말이 없는지는 members/<사번>/quiet
+        const spokeNow = {}; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm) spokeNow[l.c] = 1; });
+        const quietNow = alive.filter((c) => !leaving(c) && !spokeNow[c]);
+        const quietN = {}; quietNow.forEach((c) => { quietN[c] = (Number(mem[c].quiet) || 0) + 1; });
+        const quietRoll = quietNow.filter((c) => quietN[c] >= CFG.QUIET_ROLL && !acts.some((a) => a && a.who === c));
+        quietRoll.forEach((c) => acts.push({ who: c, did: '말없이 머뭇거린다', kind: 'evade', tier: 'normal',
+                                             danger: !(D.roles && memNow[c].role === 'vip'), target: '', quiet: true }));
+
         // ② 판정 — 코드가 정한다
         const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
         // 심야 토크쇼의 사회자가 판에 있나 (홀로 나갔거나 죽었으면 없는 것)
@@ -1057,6 +1070,12 @@ async function round(b, deps, db) {
                     + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
                 '[이번 장면에서 나눈 대화]', talkS, '',
                 ...(speakers.length ? ['[이번 장면에 말한 사람 — 한 사람도 빠뜨리지 않는다] ' + speakers.map((c) => mem[c].n || c).join(', '), ''] : []),
+                ...(quietRoll.length ? ['[계속 말이 없던 사람] ' + quietRoll.map((c) => mem[c].n || c).join(', ')
+                    + ' — 여러 장면째 아무 말도 하지 않았다. 판정 결과의 [머뭇거림] 줄은 머뭇거리는 사이 상황이 그 사람에게 닥친 것이다. 결과대로 그린다.', ''] : []),
+                ...(quietNow.some((c) => !gone(J.st[c])) ? ['[말이 없던 사람 — 다음 장면에서 끌어들인다] ' + quietNow.filter((c) => !gone(J.st[c])).map((c) => mem[c].n || c).join(', ')
+                    + ' — 이번 장면에 아무 말도 하지 않았다. 다음 장면(next_text)에서 그 사람에게 직접 무언가가 닥치게 한다'
+                    + ' (이름이 불린다 · 누가 그 사람에게 묻는다 · 무언가가 그 사람 앞에 놓인다 · 그 사람만 본 것이 있다) —'
+                    + ' 그 사람이 말하고 행동할 까닭을 준다. 다그치거나 꾸짖지 않는다.', ''] : []),
                 '[판정 결과 — 바꾸지 말 것]', J.checks.map((c) => checkLine(c, D)).join('\n') || '(판정할 행동이 없었다 — 머뭇거린 사이 상황이 조금 나빠진다)', '',
                 wiped ? (lostAfter.length
                         ? '[반드시] 재난 안에 남은 사람이 없다 (남은 사람은 모두 ' + stName(D, 'lost') + (aliveAfter.length ? ', 귀빈은 홀로 나갔다' : '') + '). ended=true, end_kind=fail 로 이 재난을 끝낸다.'
@@ -1110,6 +1129,7 @@ async function round(b, deps, db) {
                              out: outNow.length ? outNow : null, surge: surge || null, nohost: NH ? (nhPlus || 1) : null } };
         up['history/' + n] = { title: clip(scene.title, 80), text: clip(scene.text, 1500), result: clip(out.result, 1500) };
         Object.keys(J.st).forEach((c) => { up['members/' + c + '/st'] = J.st[c]; });
+        alive.forEach((c) => { up['members/' + c + '/quiet'] = (quietN[c] && !gone(J.st[c])) ? quietN[c] : null; });   // 몇 장면째 말이 없나
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
         kickNow.forEach((c) => { up['members/' + c + '/kick'] = n; });
         foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
