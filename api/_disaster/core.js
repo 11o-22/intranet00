@@ -913,6 +913,7 @@ async function round(b, deps, db) {
                     '- [앞 장면 끝에] 로 표시된 말은 앞 장면이 넘어가던 순간에 한 말이다. 이번 장면에도 이어지는 행동이면 함께 본다.',
                     '- 그 사원이 아무 말도 안 했거나 잡담뿐이면 넣지 않는다.',
                     '- 말 · 의논 · 계획만 했으면 kind 는 none.',
+                    '- 아기 여우와 나누는 몸짓(안아 들기 · 쓰다듬기 · 껴안기 · 손잡기)은 그 자체로는 판정할 행동이 아니다 — 그것뿐이면 kind none, 다른 행동과 함께면 그 행동을 고른다.',
                     '- tier 는 이 장면 상황에서 그 행동이 얼마나 어려운지 (easy / normal / hard).',
                     '- danger 는 실패하면 괴담에 노출되어 다치거나 맞춰질 수 있는 행동이면 true.',
                     '- target 은 다른 사원을 돕거나 구하는 행동일 때 그 사원의 코드, 아니면 빈 문자열.',
@@ -941,7 +942,8 @@ async function round(b, deps, db) {
                             + ' 사원들이 그 아이에게 부탁한 것 · 그 아이가 채팅에 한 말에 맞게 고른다. did 는 짧게 (30자 안쪽).',
                         '- tier 는 그 행동이 이 장면에서 얼마나 어려운지 (easy / normal / hard). danger 는 실패하면 그 아이가 괴담에 노출되어 다치거나 사라질 수 있는 행동이면 true.',
                         '- target 은 치유 · 연결처럼 사원을 돕거나 구하는 행동일 때 그 사원의 코드 (다쳤거나 맞춰진 사원). 다친 아기 여우를 돌보면 그 여우 열쇠. 아니면 빈 문자열.',
-                        '- 아기 여우가 채팅에 한 말은 사원의 행동(acts)이 아니다 — acts 에는 넣지 않는다.'
+                        '- 아기 여우가 채팅에 한 말은 사원의 행동(acts)이 아니다 — acts 에는 넣지 않는다.',
+                        '- 아기 여우가 사람과 나누는 다정한 몸짓(안기기 · 껴안기 · 꼬리로 쓸어 주기)은 판정할 행동이 아니다 — fox_acts 는 그 아이의 속성 행동으로 고른다.'
                     ] : [])
                 ].join('\n'),
                 user: [
@@ -1262,6 +1264,7 @@ async function foxChat(b, deps, db) {
         model: CFG.HAIKU, max: 700, schema: SCHEMA_FOX,
         system: foxChatRule(kinds),
         user: [
+            ...(run.last && Number(run.last.n) === n - 1 && run.last.result ? ['[지난 장면에서 벌어진 일]', clip(run.last.result, 700), ''] : []),
             '[지금 장면] ' + (scene.title || ''), clip(scene.text || '', 900), '',
             '[판에 있는 사원 — 사람 목록]', who, '',
             '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
