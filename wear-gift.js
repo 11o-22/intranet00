@@ -15,7 +15,8 @@
 //       제작자 겉옷   망토 칸     (의상과 따로 — 같이 입는다. 바깥은 머리 위 · 안쪽은 머리카락 뒤)
 //       제작자 신발   구두 칸
 //       뉴비 새싹     악세 칸 (머리)
-//       늑대 잠옷     망토 칸     (제작자 겉옷과 같은 두 장 — 바깥은 머리 위 · 후드 그림자는 머리카락 뒤)
+//       늑대 잠옷     겉옷 칸     (제작자 겉옷과 같은 두 장 — 바깥은 머리 위 · 후드 그림자는 머리카락 뒤)
+//                     ★ 처음엔 망토 칸이었다 — 망토 칸에 입혀 둔 것은 들어올 때 겉옷 칸으로 옮긴다 (아래 moveWolf)
 //
 //   소지품에 남는 일은 없지만, 혹시 다른 길로 소지품에 들어오면 「사용」으로 옷장에 넣는다.
 //   ★ 밀실 거래 (2026-10-19) — 제작자 의상 · 겉옷 · 신발(과 유리 펜)은 옷장에 든 것을 밀실 거래로
@@ -31,7 +32,7 @@ const LIST = [
     { n: '제작자 겉옷', k: 'maker-outer',   slot: '망토', d: '[의상] 제작자의 고양이 귀 겉옷. 옷장 망토 칸에서 입는다.' },
     { n: '제작자 신발', k: 'maker-shoes',   slot: '구두', d: '[의상] 제작자의 신발. 옷장 구두 칸에서 신는다.' },
     { n: '뉴비 새싹',   k: 'newbie-sprout', slot: '악세', d: '[악세] 머리 위에 돋은 새싹. 옷장 악세 칸에서 단다.' },
-    { n: '늑대 잠옷',   k: 'wolf-pj',       slot: '망토', d: '[의상] 늑대 귀 후드에 꼬리까지 달린 잠옷. 옷장 망토 칸에서 입는다.' }
+    { n: '늑대 잠옷',   k: 'wolf-pj',       slot: '겉옷', d: '[의상] 늑대 귀 후드에 꼬리까지 달린 잠옷. 옷장 겉옷 칸에서 입는다.' }
 ];
 const BY = {};
 LIST.forEach(function (x) { BY[x.n] = x; });
@@ -86,6 +87,18 @@ LIST.forEach(function (x) { window.GIFT_WEAR[x.n] = { k: x.k, slot: x.slot + ' �
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
+
+// 늑대 잠옷을 망토 칸에 입혀 둔 것 → 겉옷 칸으로 (2026-10-21 — 칸을 옮겼다)
+setInterval(function () {
+    try {
+        const u = u_();
+        if (!u || !u.dot || typeof u.dot !== 'object' || u.dot.cape !== 'wolf') return;
+        u.dot.cape = '';
+        u.dot.outer = 'wolf';
+        if (typeof saveFields === 'function') saveFields({ dot: 1 });
+        console.log('[늑대 잠옷] 망토 칸 → 겉옷 칸으로 옮겼습니다');
+    } catch (e) { }
+}, 3000);
 
 window.wearGiftState = function () {
     const u = u_();
