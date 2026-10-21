@@ -28,6 +28,7 @@
 //   currentUser.starMine   { '요리 이름 ★': 내가 직접 만들어 아직 가진 수 } (2026-10-21)
 //                          🌟 제 칠 성군의 치성은 이것만 받는다 (chilseong.js). 소지품보다 많으면 줄인다
 //                          (먹거나 · 주거나 · 판 것) — 받은 ★ 는 여기 안 든다
+//   currentUser.starSeed   이 날 전에 만들어 둔 ★ 를 한 번 셌다는 표 (starSeed() — 아래)
 //
 // ■ 콘솔
 //   foodState() · foodBook() · foodDish(번호)
@@ -762,13 +763,40 @@ function starMineFix() {
     save({ starMine: 1 });
 }
 window.starMineFix = starMineFix;
+
+// 🌟 이 날(2026-10-21) 전에 만들어 둔 ★ — 그때는 누가 만들었는지 적지 않았다.
+//   그래서 **요리 기록(cookBook — 그 요리를 성공한 횟수)** 만큼은 내가 만든 것으로 본다 (사람마다 한 번 · starSeed).
+//   ★ 는 S 등급 요리라 [요리사] 만 만든다 — 그 요리를 만든 적이 없거나 적게 만들었으면 그만큼은 받은 것이다.
+const STAR_SEED = 1;
+function starSeed() {
+    const u = currentUser;
+    if (!u || !u.code || !Array.isArray(u.inventory)) return;
+    if ((Number(u.starSeed) || 0) >= STAR_SEED) return;
+    const bk = u.cookBook || {};
+    const have = {};
+    u.inventory.forEach(function (x) { if (/ ★$/.test(String(x || ''))) have[x] = (have[x] || 0) + 1; });
+    if (!u.starMine || typeof u.starMine !== 'object') u.starMine = {};
+    let n = 0;
+    Object.keys(have).forEach(function (nm) {
+        const d = dishByName(nm);
+        if (!d) return;
+        const m = Math.min(have[nm], Number(bk[d.id]) || 0);
+        if (m > (Number(u.starMine[nm]) || 0)) { u.starMine[nm] = m; n++; }
+    });
+    u.starSeed = STAR_SEED;
+    const f = { starSeed: 1 };
+    if (Object.keys(u.starMine).length) f.starMine = 1; else u.starMine = null;
+    save(f);
+    if (n) console.log('[식당] 전에 만들어 둔 ★ 를 내가 만든 것으로 셌습니다 — ' + JSON.stringify(u.starMine));
+}
+window.starSeedNow = starSeed;
 window.starMineOf = function (u, name) {
     u = u || currentUser;
     if (!u || !u.starMine || typeof u.starMine !== 'object') return 0;
     const have = (Array.isArray(u.inventory) ? u.inventory : []).filter(function (x) { return x === name; }).length;
     return Math.min(Number(u.starMine[name]) || 0, have);
 };
-setInterval(function () { try { starMineFix(); } catch (e) { } }, 3000);
+setInterval(function () { try { starSeed(); } catch (e) { } try { starMineFix(); } catch (e) { } }, 3000);
 
 // ==========================================
 // 8. 먹기
