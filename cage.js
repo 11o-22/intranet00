@@ -7,6 +7,8 @@
 //
 //   S등급 호실에만 왼쪽에 칸이 하나 더 있다. 룸메이트를 가둘 수 있고
 //   갇힌 쪽은 그동안 아무것도 하지 못한다. 푸는 것은 가둔 쪽이다.
+//   ★ 상담사는 갇혀도 막히는 것이 없다 (2026-10-21) — 시설 · 탐사 · 상점 · 소지품 · 슬롯 · 가두기 모두 여느 때처럼.
+//     갇힌 기록 · 기구 · 정산 · 저절로 풀림은 그대로 돈다.
 //
 //   방 안에 기구를 세 가지 들일 수 있다. 산 사람만 쓸 수 있다.
 //
@@ -167,6 +169,8 @@ function caged(u) {
     return u.cage;
 }
 window.isCaged = function (u) { return !!caged(u); };
+// ★ 상담사는 갇혀도 막히는 것이 없다 (2026-10-21) — 갇힌 것 자체(기구 · 정산 · 기록)는 그대로 돈다
+function adm(u) { return !!(u && u.code === 'kario0987'); }
 
 // ==========================================
 // 갇힌 동안에는 아무것도 못 한다
@@ -179,7 +183,7 @@ BLOCK.forEach(function (name) {
         if (window[name]._cage) { clearInterval(iv); return; }
         const _o = window[name];
         window[name] = function () {
-            const c = caged(currentUser);
+            const c = adm(currentUser) ? null : caged(currentUser);     // 상담사는 막지 않는다
             if (c) {
                 try {
                     const who = nameOf(c.by);
@@ -440,7 +444,7 @@ function paintCage() {
     const gear = me.cageGear || {};
     let body;
 
-    if (myCage) {
+    if (myCage && !adm(me)) {
         const who = nameOf(myCage.by);
         const left = Math.max(0, myCage.until - now());
         const use = me.cageUse && now() < (me.cageUse.until || 0) ? me.cageUse : null;
@@ -497,6 +501,10 @@ function paintCage() {
         }
     }
 
+    // 상담사 — 갇혀 있어도 여느 때처럼 쓴다. 갇혀 있다는 것만 알린다
+    if (myCage && adm(me)) {
+        body = '<div style="color:#ffb7cd;">' + nameOf(myCage.by) + ' 사원이 문을 잠갔습니다 — 상담사는 갇혀 있어도 막히는 것이 없습니다.</div>' + body;
+    }
     const html = '<div style="font-size:11px; color:#ff8a8a; font-weight:bold; margin-bottom:7px;">🔒 감금실</div>' + body;
     if (el.innerHTML !== html) el.innerHTML = html;
     if (el.style.display !== 'block') el.style.display = 'block';
@@ -526,7 +534,7 @@ window.cageShut = function () {
     if (!hasS(me)) { showCustomAlert('S등급 호실에만 있습니다.'); return; }
     if (!m) { showCustomAlert('동거인이 없습니다.'); return; }
     if (caged(m)) { showCustomAlert('이미 갇혀 있습니다.'); return; }
-    if (caged(me)) { showCustomAlert('본인이 갇혀 있습니다.'); return; }
+    if (caged(me) && !adm(me)) { showCustomAlert('본인이 갇혀 있습니다.'); return; }
 
     m.cage = { by: me.code, at: now(), until: now() + MAX_MS };
     if (typeof addHistoryLog === 'function') {
