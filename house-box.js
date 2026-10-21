@@ -15,6 +15,10 @@
 //
 //   3. 넣을 때 **개수를 적어 한 번에** 넣는다. 「전부」도 있다.
 //
+//   4. 꺼낼 때도 **개수를 적어 한 번에** 꺼낸다. 「전부」도 있다 (2026-10-21).
+//      한 트랜잭션에서 그 이름의 것을 적은 수만큼 걷어 낸다 — 동거인이 그 사이 꺼냈으면
+//      남은 만큼만 꺼내고 몇 개였는지 알린다. 서버가 받은 뒤에야 소지품에 들어온다.
+//
 // ■ 넣기를 다시 쓴 까닭
 //
 //   storage-dup.js 가 세워 둔 넣기는 한 개짜리다. 같은 이름으로 잠금을
@@ -163,6 +167,78 @@ window.putManyToStorage = function (itemName, qty) {
     setTimeout(function () { clearInterval(iv); }, 30000);
 })();
 
+// ==========================================
+// 여러 개를 한 번에 꺼낸다 (2026-10-21)
+// ==========================================
+let taking = false;
+window.takeManyFromStorage = function (itemName, qty) {
+    if (!currentUser || typeof database === 'undefined' || !database) return;
+    if (typeof houseStorageRef !== 'function') return;
+    qty = Math.max(1, parseInt(qty, 10) || 1);
+    if (taking) { alert_('꺼내는 중입니다.\n\n잠시만 기다려 주십시오.'); return; }
+    if (sawOnline && !online) { alert_(SLOW); return; }
+    if (typeof buyGuard === 'function' && !buyGuard()) return;
+
+    const ownerCode = houseStorageRef(currentUser);
+    let took = 0, done = false;
+    taking = true;
+    database.ref('users/' + ownerCode + '/house/storage').transaction(function (arr) {
+        took = 0;
+        if (arr == null) return arr;                 // 아직 못 읽었다 — 서버 것으로 다시 돈다
+        arr = Array.isArray(arr) ? arr.slice() : Object.keys(arr).map(function (k) { return arr[k]; });
+        const keep = [];
+        arr.forEach(function (x) {
+            if (took < qty && x && x.name === itemName) { took++; return; }
+            keep.push(x);
+        });
+        if (!took) return;                           // 이미 누가 다 꺼냈다 — 그만둔다
+        return keep;
+    }, null, false)                                   // 서버가 받기 전에는 소지품에 안 들어온다
+    .then(function (res) { finish(null, !!(res && res.committed), res && res.snapshot); })
+    .catch(function (e) { finish(e, false, null); });
+
+    function finish(err, committed, snap) {
+        if (done) return;
+        done = true; taking = false;
+        if (err) { alert_('꺼내지 못했습니다.\n\n' + (err.message || '연결이 끊겼습니다.')); redraw(); return; }
+        if (!committed || !took) { alert_('이미 꺼내진 물건입니다.'); redraw(); return; }
+
+        const owner = (db.users || {})[ownerCode];
+        if (owner && typeof getHouse === 'function') getHouse(owner).storage = (snap && snap.val()) || [];
+        try { database.ref('users/' + ownerCode + '/_adminStamp').set(Date.now()); } catch (e) { }
+
+        if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+        for (let i = 0; i < took; i++) currentUser.inventory.push(itemName);
+        try {
+            if (typeof addHistoryLog === 'function') {
+                addHistoryLog(currentUser, "[사택] 보관함에서 '" + itemName + "' " + took + '개를 꺼냈습니다.');
+            }
+        } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        redraw();
+        if (took < qty) alert_('보관함에 ' + took + '개만 있어 ' + took + '개를 꺼냈습니다.');
+    }
+
+    setTimeout(function () {
+        if (done) return;
+        taking = false;
+        alert_('아직 답이 없습니다.\n\n연결이 돌아오면 저절로 꺼내집니다.\n다시 누르지 마십시오.');
+    }, 8000);
+};
+// 보관 중 줄의 단추 — 그린 순서(번호)로 이름을 찾는다 (이름에 따옴표가 있어도 깨지지 않게)
+let keptList = [];
+window.houseBoxTake = function (i, all) {
+    const k = keptList[i];
+    if (!k) return;
+    let q = k.n;
+    if (!all) {
+        const el = document.getElementById('hb-t-' + i);
+        q = el ? Math.max(1, Math.min(k.n, parseInt(el.value, 10) || 1)) : 1;
+    }
+    window.takeManyFromStorage(k.name, q);
+};
+
 window.houseBoxFold = function (id) {
     fold[id] = !fold[id];
     redraw();
@@ -223,6 +299,7 @@ function install() {
         const keptBy = group(keptNames);
 
         let keptHtml = '';
+        keptList = [];
         if (!keptNames.length) {
             keptHtml = '<div style="font-size:11px; color:#666; padding:8px 0;">비어 있습니다.</div>';
         } else {
@@ -234,15 +311,25 @@ function install() {
                 if (fold[c.id]) return;
                 keptHtml += ns.map(function (n) {
                     const k = kept[n];
+                    // ★ 여러 개면 개수를 적어 꺼내거나 「전부」 (2026-10-21) · 한 개면 전처럼
+                    const ti = keptList.push({ name: n, n: k.n }) - 1;
                     return '<div style="display:flex; justify-content:space-between; align-items:center;'
-                        + ' gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04);">'
+                        + ' gap:5px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04);">'
                         + '<div style="flex:1; min-width:0;">'
                         + '<span style="font-size:12px; color:#ddd;">' + esc(n) + '</span>'
                         + (k.n > 1 ? ' <span style="color:#ff9800; font-size:11px;">x' + k.n + '</span>' : '')
                         + '<div style="font-size:9px; color:#666;">' + esc(k.by || '') + ' 보관'
                         + (k.at ? ' · ' + new Date(k.at).toLocaleDateString() : '') + '</div></div>'
-                        + '<button class="inv-btn inv-btn-use" style="flex-shrink:0;"'
-                        + ' onclick="takeFromStorage(' + k.first + ')">꺼내기</button></div>';
+                        + (k.n > 1
+                            ? '<input type="number" id="hb-t-' + ti + '" value="1" min="1" max="' + k.n + '"'
+                              + ' style="flex:0 0 46px; min-width:0; padding:4px; font-size:11px; text-align:center;">'
+                              + '<button class="inv-btn inv-btn-use" style="flex-shrink:0;"'
+                              + ' onclick="houseBoxTake(' + ti + ')">꺼내기</button>'
+                              + '<button class="inv-btn" style="flex-shrink:0; background:rgba(255,255,255,0.05);'
+                              + ' border:1px solid #555; color:#bbb;" onclick="houseBoxTake(' + ti + ', 1)">전부</button>'
+                            : '<button class="inv-btn inv-btn-use" style="flex-shrink:0;"'
+                              + ' onclick="takeFromStorage(' + k.first + ')">꺼내기</button>')
+                        + '</div>';
                 }).join('');
             });
         }

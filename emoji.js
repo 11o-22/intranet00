@@ -167,18 +167,22 @@ function panel(onPick) {
     close();
     const d = document.createElement('div');
     d.id = PID;
+    // ★ 창은 그대로 두고 **이모티콘 칸만** 흐른다 — 윗줄(사내 이모티콘 · 닫기)은 늘 창 위에 붙어 있다 (2026-10-21)
+    //   ✗ 전에는 창 전체가 흘러, 내려 고르다가 닫으려면 다시 끝까지 올려야 했다.
     d.style.cssText = 'position:fixed; left:50%; transform:translateX(-50%); bottom:0;'
-        + ' width:100%; max-width:450px; max-height:46dvh; overflow-y:auto; z-index:9999999;'
+        + ' width:100%; max-width:450px; max-height:46dvh; overflow:hidden; z-index:9999999;'
+        + ' display:flex; flex-direction:column; box-sizing:border-box;'
         + ' background:var(--sk-panel, #141414); border-top:1px solid var(--sk-line, #444);'
         + ' border-radius:10px 10px 0 0;'
-        + ' box-shadow:0 -6px 20px rgba(0,0,0,0.8); padding:10px 10px calc(10px + env(safe-area-inset-bottom)) 10px;'
-        + ' -webkit-overflow-scrolling:touch;';
+        + ' box-shadow:0 -6px 20px rgba(0,0,0,0.8); padding:10px 10px 0 10px;';
     d.innerHTML =
-        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">'
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex:0 0 auto;">'
         + '<span style="font-size:11px; color:var(--sk-text-dim, #aaa); font-weight:bold;">사내 이모티콘</span>'
         + '<button id="emo-close" style="background:none; border:1px solid var(--sk-line, #333);'
         + ' color:var(--sk-text-dim, #888);'
         + ' font-size:11px; padding:3px 9px; border-radius:4px; cursor:pointer;">닫기</button></div>'
+        + '<div id="emo-scroll" style="flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;'
+        + ' overscroll-behavior:contain; padding-bottom:calc(10px + env(safe-area-inset-bottom));">'
         + '<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">'
         + EMO_LIST.map(function (e) {
             return '<button data-emo="' + e.i + '" title="' + e.n + '"'
@@ -189,7 +193,7 @@ function panel(onPick) {
                 + '<img src="' + e.d + '" alt="' + e.n + '" style="max-width:100%; max-height:66px;'
                 + ' pointer-events:none;"></button>';
         }).join('')
-        + '</div>';
+        + '</div></div>';
     document.body.appendChild(d);
     d.querySelector('#emo-close').onclick = close;
     d.querySelectorAll('[data-emo]').forEach(function (b) {

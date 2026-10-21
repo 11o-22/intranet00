@@ -858,11 +858,21 @@ function stampSafe(ov) {
         '.bag-do.off{opacity:.45;cursor:default;}',
         '.plaza-none{padding:24px 0;text-align:center;font-size:11.5px;color:#7d7568;}',
         // 엘리베이터 판 — 그림 위에 손 닿는 자리만 덮어 둔다
-        '#plaza-lift{position:relative;width:min(260px,66vw);margin:4px auto 8px auto;}',
+        //   ★ 2026-10-21 — 판 오른쪽에 층마다 무엇이 있는지 이름표를 단다 (단추와 같은 높이 · 눌러도 그 층으로)
+        '#plaza-lift{display:flex;justify-content:center;align-items:stretch;gap:10px;margin:4px auto 8px auto;width:100%;max-width:400px;box-sizing:border-box;}',
+        '#plaza-lift .pan{position:relative;flex:0 0 auto;width:min(170px,40vw);}',
         '#plaza-lift img{display:block;width:100%;height:auto;image-rendering:pixelated;}',
-        '#plaza-lift button{position:absolute;left:14%;width:72%;border:0;padding:0;cursor:pointer;',
+        '#plaza-lift .pan button{position:absolute;left:14%;width:72%;border:0;padding:0;cursor:pointer;',
         '  background:rgba(255,233,189,0);border-radius:6px;}',
-        '#plaza-lift button:active{background:rgba(255,233,189,.28);}',
+        '#plaza-lift .pan button:active{background:rgba(255,233,189,.28);}',
+        '#plaza-lift .lab{position:relative;flex:1 1 0;min-width:0;max-width:200px;}',
+        '#plaza-lift .lab button{position:absolute;left:0;right:0;display:flex;flex-direction:column;justify-content:center;gap:3px;',
+        '  padding:0 11px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid #2b2b38;',
+        '  color:#ded5c4;font-size:11.5px;font-family:inherit;text-align:left;cursor:pointer;}',
+        '#plaza-lift .lab button:active{background:rgba(217,160,90,.14);border-color:#8a6a2a;}',
+        '#plaza-lift .lab .it{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+        '#plaza-lift .lab .e{font-size:17px;line-height:1;flex:0 0 auto;color:#d9a05a;}',
+        '#plaza-lift .lab .here{background:transparent;border-style:dashed;color:#7d7568;}',
         // 공지판
         '#plaza-nb{overflow-y:auto;max-height:58dvh;display:flex;flex-direction:column;gap:8px;}',
         '.nb-i{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);',
@@ -3185,12 +3195,23 @@ function liftSheet(floor) {
         });
         return;
     }
-    const s = sheet('lift', '', '<div id="plaza-lift"><img src="' + P.DIR + 'lift.png" alt="엘리베이터">'
+    // ★ 층마다 무엇이 있는지 — 판 오른쪽에 단추와 같은 높이로 (2026-10-21). 1F 는 지금 선 로비
+    const pos = function (k) {
+        const h = LIFT_HIT[k];
+        return 'top:' + (h[0] * 100).toFixed(2) + '%;height:' + ((h[1] - h[0]) * 100).toFixed(2) + '%';
+    };
+    const label = function (k) {
+        if (k === 'f1') return '<button data-f="f1" class="here" style="' + pos(k) + '"><span class="it">로비 · 지금 여기</span></button>';
+        const list = (L[k] || []).filter(spotOk);
+        if (!list.length) return '';
+        return '<button data-f="' + k + '" style="' + pos(k) + '">' + list.map(function (m) {
+            return '<span class="it">' + ico(m, 'e') + esc(m.n) + '</span>';
+        }).join('') + '</button>';
+    };
+    const s = sheet('lift', '', '<div id="plaza-lift"><div class="pan"><img src="' + P.DIR + 'lift.png" alt="엘리베이터">'
         + Object.keys(LIFT_HIT).map(function (k) {
-            const h = LIFT_HIT[k];
-            return '<button data-f="' + k + '" title="' + k.toUpperCase() + '" style="top:'
-                + (h[0] * 100).toFixed(2) + '%;height:' + ((h[1] - h[0]) * 100).toFixed(2) + '%"></button>';
-        }).join('') + '</div>');
+            return '<button data-f="' + k + '" title="' + k.toUpperCase() + '" style="' + pos(k) + '"></button>';
+        }).join('') + '</div><div class="lab">' + Object.keys(LIFT_HIT).map(label).join('') + '</div></div>');
     if (!s) return;
     // ★ 연 그 손가락이 그대로 층을 누르는 것(유령 누름)을 막는다.
     //
@@ -3199,7 +3220,7 @@ function liftSheet(floor) {
     //   그래서 엘리베이터를 누르면 **2층이 같이 눌려** 사택이 바로 열렸다.
     //   창이 뜨고 0.4초 안에 오는 누름은 받지 않는다.
     const at = now();
-    Array.prototype.forEach.call(s.querySelectorAll('#plaza-lift button'), function (b) {
+    Array.prototype.forEach.call(s.querySelectorAll('#plaza-lift button[data-f]'), function (b) {
         b.onclick = function () {
             if (now() - at < 400) return;
             liftSheet(b.dataset.f);
