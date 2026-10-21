@@ -2713,12 +2713,12 @@ window.plazaWhisperTo = function (code, name) {
 //     광장(서버 · 지금 방의 맵 채팅)이 KIT_QUIET 동안 조용해지면 그때 한 번 청한다. 누가 또 말하면
 //     다시 기다린다 (그래도 처음 말한 뒤 KIT_CAP 은 넘기지 않는다). 서버는 지난 대답 뒤의 말을 다 모아 한 번에 대답한다.
 //   ★ 「들어가」 — 아기 여우에게 들어가라고 하면 그 아이(이름을 부르면 그 아이만, 다 같이면 모두)가 인사하고 들어간다.
-//   한 아이 하루 열 마디 (2026-10-21 · 처음엔 스물) — 열 번째는 작별 인사.
+//   한 아이 하루 스무 마디 (2026-10-21 · 열로 줄였다가 다시 스물) — 스무 번째는 작별 인사.
 //   plazaFox/on 에 지금 나와 있는 아이가 적힌다 (서버가 쓴다).
 const KIT_BABY = '🐾 아기 여우';
 const KIT_NAMES = { evade: '코코', sense: '잭슨', heal: '쭈니', hide: '루팡', luck: '앙냥', break: '디트', bond: '메리', gaze: '니케' };
 const KIT_ORDER = ['evade', 'sense', 'heal', 'hide', 'luck', 'break', 'bond', 'gaze'];
-const KIT_LINES = 10;          // 한 아이 하루 마디 (서버 CFG.KIT_LINES 와 같게)
+const KIT_LINES = 20;          // 한 아이 하루 마디 (서버 CFG.KIT_LINES 와 같게)
 const KIT_QUIET = 4000;        // 이만큼 조용하면 대답을 청한다
 const KIT_CAP = 12000;         // 처음 말한 뒤 이보다 오래 기다리지는 않는다
 let kitRef = null, kitHere = {}, kitBusy = false, kitTimer = 0, kitPend = 0;

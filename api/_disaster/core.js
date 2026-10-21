@@ -69,8 +69,8 @@ export const CFG = {
     FOX_PER_SCENE: 10,       // 한 장면에 여우가 말하는 횟수
     FOX_DAILY: 800,          // 하루 전체 여우 채팅 호출
     FOX_MAX_LINES: 3,
-    // 🐾 사내 채팅의 아기 여우 (2026-10-21) — 부르면 나와서 한 아이가 하루 열 마디 · 마지막은 작별 인사 · 들어가라 하면 들어감
-    KIT_LINES: 10,           // 한 아이가 하루에 나누는 말 (2026-10-21 · 20 → 10)
+    // 🐾 사내 채팅의 아기 여우 (2026-10-21) — 부르면 나와서 한 아이가 하루 스무 마디 · 마지막은 작별 인사 · 들어가라 하면 들어감
+    KIT_LINES: 20,           // 한 아이가 하루에 나누는 말 (2026-10-21 · 10 으로 줄였다가 다시 20)
     KIT_GAP_MS: 5000,        // 여우가 말하는 사이 (이보다 잦으면 건너뛴다)
     KIT_FRESH_MS: 180000,    // 이보다 오래된 사람 말에는 대답하지 않는다
     KIT_DAILY: 500,          // 하루 전체 사내 채팅 여우 호출
@@ -636,13 +636,48 @@ export function pushId(t) {
     for (let i = 0; i < 12; i++) s += PUSH_CH.charAt(Math.floor(Math.random() * 64));
     return s;
 }
-async function postFox(db, runId, FX, list, r, now, allow) {
+// ── 🐾 같은 말 되풀이 막기 (2026-10-21)
+//   괄호 몸짓을 뺀 말끼리 견준다 — 같거나 글자 두 개씩 묶음이 80% 넘게 겹치면 「같은 말」.
+//   말 없이 몸짓뿐이면 몸짓끼리 같을 때만. 짧은 말(네 글자 밑)은 똑같을 때만.
+function sayKey(t) { return String(t || '').replace(/\([^)]*\)/g, ' ').replace(/[\s.,!?~…·'"「」『』()\-—]+/g, '').toLowerCase(); }
+function gestKey(t) { const m = String(t || '').match(/\([^)]*\)/g); return m ? m.join('').replace(/[\s.,!?~…()]+/g, '') : ''; }
+function bigr(s) { const o = {}; for (let i = 0; i < s.length - 1; i++) { const k = s.slice(i, i + 2); o[k] = (o[k] || 0) + 1; } return o; }
+function alike(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.length < 4 || b.length < 4) return false;
+    const A = bigr(a), B = bigr(b);
+    let n = 0, ta = 0, tb = 0;
+    Object.keys(A).forEach((k) => { ta += A[k]; if (B[k]) n += Math.min(A[k], B[k]); });
+    Object.keys(B).forEach((k) => { tb += B[k]; });
+    return ta + tb > 0 && (2 * n) / (ta + tb) >= 0.8;
+}
+export function repeats(t, said) {
+    const k = sayKey(t);
+    if (!k) { const g = gestKey(t); return !!g && (said || []).some((x) => !sayKey(x) && gestKey(x) === g); }
+    return (said || []).some((x) => alike(k, sayKey(x)));
+}
+// 늘 쓰는 말 묶음에서 아직 안 한 말을 고른다 (다 했으면 아무거나)
+function freshOf(pool, said) {
+    const st = Math.floor(Math.random() * pool.length);
+    for (let i = 0; i < pool.length; i++) { const t = pool[(st + i) % pool.length]; if (!repeats(t, said)) return t; }
+    return pool[st];
+}
+async function postFox(db, runId, FX, list, r, now, allow, seen) {
     const up = {};
     let i = 0;
+    // 이 판에서 아기 여우가 이미 한 말 (최근)
+    if (!Array.isArray(seen)) {
+        let v = null;
+        try { v = await db.last('disasterChat/' + runId, 60); } catch (e) { v = null; }
+        seen = Object.keys(v || {}).sort().map((k) => v[k]).filter((x) => x && x.fox && typeof x.t === 'string').slice(-24).map((x) => x.t);
+    }
+    seen = seen.slice();
     (Array.isArray(list) ? list : []).slice(0, CFG.FOX_MAX_LINES).forEach((x) => {
         if (!x || !FX[x.fox] || allow.indexOf(x.fox) < 0) return;
         const t = clip(String(x.t || '').replace(/<\/?f>/g, '').replace(/\s+/g, ' ').trim(), 120);
-        if (!t) return;
+        if (!t || repeats(t, seen)) return;
+        seen.push(t);
         const f = FX[x.fox];
         up[pushId(now + i)] = { c: 'fox_' + x.fox, n: '🐾 ' + foxName(f), t: t, at: now + i, r: r, fox: f.k, o: f.o };
         i++;
@@ -1422,6 +1457,8 @@ async function foxChat(b, deps, db) {
     }).join('\n');
     const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (mem[x.c].n || x.c))
         + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
+    // 이 판에서 아기 여우가 이미 한 말 — 장면이 바뀌어도 되풀이하지 않게
+    const foxSaid = keys.map((k) => chatAll[k]).filter((x) => x && x.fox && typeof x.t === 'string').slice(-24);
     const res = await ask(deps, Object.assign({
         model: CFG.HAIKU, max: 700, schema: SCHEMA_FOX,
         system: foxChatRule(kinds),
@@ -1431,10 +1468,12 @@ async function foxChat(b, deps, db) {
             '[판에 있는 사원 — 사람 목록]', who, '',
             ...coupleLine(mem, pairsF),
             '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
+            ...(foxSaid.length ? ['[아기 여우가 최근에 한 말 — 같거나 비슷한 말을 다시 쓰지 않는다]',
+                foxSaid.map((x) => String(x.n || '').replace(/^🐾\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : []),
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')
     }, HAIKU_OPT));
-    const nPosted = await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive);
+    const nPosted = await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive, foxSaid.map((x) => x.t));
     return { ok: true, lines: nPosted };
 }
 
@@ -1444,12 +1483,13 @@ async function foxChat(b, deps, db) {
 //   부르기(kitcall) — 부를 수 있는 아이: 여우가 붙은 사람이면 그 아이, 장착자(주인)면 남에게 안 붙은 아이.
 //                      ★ 화면이 이름을 부른 아이만 pick(주인사번_속성)으로 넘긴다 — 그 아이만 나온다 (2026-10-21).
 //                        pick 이 없으면 (옛 화면) 예전처럼 다 나온다.
-//                      (오늘 소멸한 아이 · 오늘 열 마디를 다 쓴 아이는 안 나온다)
+//                      (오늘 소멸한 아이 · 오늘 스무 마디를 다 쓴 아이는 안 나온다)
 //                      나오면서 한 마디씩 인사한다 — 부른 장소에 다른 사람이 있으면 그 사람들에게도 (화면이 here 로 넘긴다).
 //   대답(kitchat)   — 광장에서 누가 말하면(서버 · 맵) 화면이 광장이 조용해질 때(4초 · 길어야 12초) 부른다.
 //                      ★ 지난 대답 뒤에 나온 사람 말을 다 모아 한 번에 대답한다 (lock.hat 뒤의 줄).
 //                      빠른 모델(Haiku)로 0~3줄 · 한 아이 한 줄.
-//                      열 번째 마디는 작별 인사(bye) — 말하고 광장을 떠난다.
+//                      스무 번째 마디는 작별 인사(bye) — 말하고 광장을 떠난다.
+//                      ★ 같은 말 되풀이 막기 — 최근 여우 줄과 같거나 거의 같은 대사는 올리지 않는다 (repeats).
 //                      ★ 「들어가」 — 들어가라는 말을 들은 아이는 go 에 담겨 bye 한 마디를 하고 들어간다.
 //   기억(kitMemory) — 재난이 끝날 때 · 어둠에서 소멸할 때 적어 둔 일을 읽어 「방송국에서 괜찮았어?」 같은 물음에 성격대로 답한다.
 //   plazaChat/all/<열쇠>             여우 줄 { n: '🐾 이름', c: 'fox_<id>', t, at, fox: 속성, o, oN, on, onN } — 서버 채팅
@@ -1460,9 +1500,28 @@ async function foxChat(b, deps, db) {
 //   kitMemory/<id>/<열쇠>            { at, d, gone, oDied, wDied, wN, oN, dead, end, dark }   (최근 다섯)
 const KIT = 'plazaFox';
 const KIT_CHAT = 'plazaChat';
-const KIT_FALLBACK = '(꼬리를 살랑인다.) 안녕하세요!';
-const KIT_BYE = '(꼬리를 흔든다.) 이제 가 봐야겠어요. 또 불러 주세요!';
-const KIT_GO = '(꼬리를 흔든다.) 네, 들어가 볼게요. 또 불러 주세요!';
+// 모델이 그 아이 몫을 안 썼거나 되풀이였을 때 — 묶음에서 아직 안 한 말로 (여럿이 같은 말을 하지 않게)
+const KIT_HI = ['(꼬리를 살랑인다.) 안녕하세요!', '(귀를 쫑긋 세운다.) 불렀어요?', '(폴짝 뛰어나온다.) 짠! 왔어요!',
+    '(두리번거린다.) 와, 사람 많다…….', '(옷자락을 톡 잡는다.) 저 왔어요.', '(꾸벅 인사한다.) 반가워요!',
+    '(기지개를 켠다.) 으음, 나왔다!', '(고개를 갸웃한다.) 무슨 일이에요?', '(꼬리를 붕붕 흔든다.) 놀아 주세요!',
+    '(살금살금 다가온다.) 헤헤, 저 여기 있어요.', '(손을 번쩍 든다.) 안녕하세요오!', '(코를 킁킁거린다.) 맛있는 냄새 나요.'];
+const KIT_BYES = ['(꼬리를 흔든다.) 이제 가 봐야겠어요. 또 불러 주세요!', '(하품을 한다.) 졸려요……. 오늘은 여기까지예요.',
+    '(손을 흔든다.) 오늘 재밌었어요. 다음에 또 놀아요!', '(귀가 살짝 처진다.) 벌써 가야 해요……. 또 불러 줄 거죠?',
+    '(꾸벅 인사한다.) 그럼 먼저 들어가 볼게요!', '(뒤를 돌아보며) 내일 또 봐요!',
+    '(눈을 비빈다.) 오늘은 많이 놀았어요. 안녕!', '(꼬리를 살랑이며 멀어진다.) 다음에 또 불러 주세요오.',
+    '(작게 손을 흔든다.) 그럼 이만…….', '(폴짝 뛰어 돌아선다.) 또 만나요!'];
+const KIT_GOS = ['(꼬리를 흔든다.) 네, 들어가 볼게요. 또 불러 주세요!', '(고개를 끄덕인다.) 알겠어요! 들어갈게요.',
+    '(아쉬운 듯 돌아본다.) 네에……. 다음에 또 봐요.', '(폴짝 돌아선다.) 그럼 들어가서 쉴게요!',
+    '(손을 흔든다.) 안녕히 계세요!', '(꼬리를 내리고 종종걸음) 들어가요, 들어가.',
+    '(입을 삐죽인다.) 칫, 더 놀고 싶었는데…….', '(꾸벅 인사한다.) 그럼 먼저 실례할게요.',
+    '(하품을 하며) 마침 졸렸어요. 들어갈게요.', '(쪼르르 달려간다.) 다음에 또 봐요!'];
+// 광장에서 아기 여우가 최근에 한 말
+function kitSaid(rows) { return rows.filter((x) => x.fox || String(x.c || '').indexOf('fox_') === 0).slice(-24); }
+function kitSaidLines(rows) {
+    const s = kitSaid(rows);
+    return s.length ? ['[아기 여우가 최근에 한 말 — 같거나 비슷한 말을 다시 쓰지 않는다]',
+        s.map((x) => String(x.n || '').replace(/^🐾\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : [];
+}
 const KIT_MEM_KEEP = 5;
 function kitName(f) { return clip(f.nick || (FOXES[f.k] || {}).n || f.k, 12); }
 function okSeat(s) { return typeof s === 'string' && /^[A-Za-z0-9_~-]{1,40}$/.test(s); }
@@ -1630,9 +1689,10 @@ async function kitCall(b, deps, db) {
     await db.patch(KIT + '/on', upOn);
     const on2 = Object.assign({}, on); Object.keys(upOn).forEach((id) => { if (upOn[id]) on2[id] = upOn[id]; else delete on2[id]; });
     // 인사 — 나온 아이마다 한 마디 (함께 있는 사람에게도)
-    let lines = [];
+    let lines = [], seen = [];
     try {
         const rows = await kitRows(db, b.seat);
+        seen = kitSaid(rows).map((x) => x.t);
         const mems = await kitMems(db, come);
         const res = await ask(deps, Object.assign({
             model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
@@ -1645,6 +1705,7 @@ async function kitCall(b, deps, db) {
                 '',
                 '[광장의 사원 — 사람 목록]', await kitPeople(db, rows, on2, now, [{ c: c, n: nm }].concat(near)), '',
                 '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(on2, come, null, mems), '',
+                ...kitSaidLines(rows),
                 '[최근 채팅 — 마지막 줄이 방금 한 말 · (맵) 은 그 장소의 맵 채팅]', kitTalk(rows) || '(아직 없음)'
             ].join('\n')
         }, HAIKU_OPT));
@@ -1653,7 +1714,9 @@ async function kitCall(b, deps, db) {
     const post = [], add = {};
     come.forEach((id) => {
         const x = lines.find((l) => l && l.fox === id);
-        const t = kitClean(x && x.t) || KIT_FALLBACK;
+        let t = kitClean(x && x.t);
+        if (!t || repeats(t, seen)) t = freshOf(KIT_HI, seen);
+        seen.push(t);
         post.push({ id: id, f: upOn[id], t: t });
         add[id] = 1;
     });
@@ -1704,6 +1767,7 @@ async function kitChat(b, deps, db) {
                 user: [
                     '[광장의 사원 — 사람 목록]', await kitPeople(db, rows, onAll, now), '',
                     '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(onAll, live, last, mems), '',
+                    ...kitSaidLines(rows),
                     '[최근 채팅 — 마지막 줄이 방금 한 말 · (맵) 은 그 장소의 맵 채팅]', kitTalk(rows), '',
                     '[아직 대답하지 않은 말 — 지난 대답 뒤에 나온 ' + fresh.length + '줄 · 한데 모아 이번 한 번에 대답한다]',
                     kitTalk(fresh) || '(없음)'
@@ -1718,21 +1782,28 @@ async function kitChat(b, deps, db) {
         if (talk.indexOf(id) >= 0 && goes.indexOf(id) < 0) goes.push(id);
     });
     const post = [], add = {}, said = {};
+    const seen = kitSaid(rows).map((x) => x.t);                   // ★ 같은 말 되풀이 막기
     ((res && res.lines) || []).forEach((x) => {
         if (post.length >= CFG.FOX_MAX_LINES || !x || talk.indexOf(x.fox) < 0 || goes.indexOf(x.fox) >= 0 || said[x.fox]) return;
         const t = kitClean(x.t);
-        if (!t) return;
+        if (!t || repeats(t, seen)) return;                        // 앞서 한 말과 같으면 이번엔 쉰다
+        seen.push(t);
         said[x.fox] = 1; add[x.fox] = 1;
         post.push({ id: x.fox, f: onAll[x.fox], t: t });
     });
-    goes.forEach((id) => {
+    const byeOf = (id, pool) => {
         const x = ((res && res.bye) || []).find((l) => l && l.fox === id);
-        post.push({ id: id, f: onAll[id], t: kitClean(x && x.t) || KIT_GO });
+        let t = kitClean(x && x.t);
+        if (!t || repeats(t, seen)) t = freshOf(pool, seen);
+        seen.push(t);
+        return t;
+    };
+    goes.forEach((id) => {
+        post.push({ id: id, f: onAll[id], t: byeOf(id, KIT_GOS) });
         add[id] = 1;
     });
     last.forEach((id) => {
-        const x = ((res && res.bye) || []).find((l) => l && l.fox === id);
-        post.push({ id: id, f: onAll[id], t: kitClean(x && x.t) || KIT_BYE });
+        post.push({ id: id, f: onAll[id], t: byeOf(id, KIT_BYES) });
         add[id] = 1;
     });
     const n = await kitPost(db, post, deps.now());
