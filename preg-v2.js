@@ -98,7 +98,8 @@ function fixDue(t) {
     const start = t.preg.sires[0].at || Date.now();
     // ★ 📱 K·LEE 의 ⑥ 「오, 실물이 더 나으시네.」를 받았으면 절반으로 센다.
     //   안 그러면 여기서 「처음 시각 + 24시간」으로 도로 늘려 놓는다.
-    const want = start + PREG_H * 3600000 - (t.preg.kleeHalf ? PREG_H * 1800000 : 0);
+    const want = start + PREG_H * 3600000 - (t.preg.kleeHalf ? PREG_H * 1800000 : 0)
+        - (Number(t.preg.cageCut) || 0);          // ★ 퍼킹 머신으로 당긴 몫도 뺀다 (cage.js cutPreg · 2026-10-21)
     if (Math.abs((t.preg.due || 0) - want) <= 60000) return false;
     t.preg.due = want;
     return true;

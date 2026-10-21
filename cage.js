@@ -12,6 +12,9 @@
 //
 //     퍼킹 머신 100,000 P   10시간 묶는다. 갇힌 쪽이 임신 중이면
 //                            묶여 있던 시간만큼 출산이 앞당겨진다
+//                            ★ 2026-10-21 — 열 시간을 채우지 않아도 묶인 만큼 (1분마다 · 풀릴 때 남은 몫까지).
+//                              가둔 쪽 · 갇힌 쪽 어느 화면에서든 센다 (settle — cageUse.cut 를 트랜잭션으로 박는다).
+//                              당긴 몫은 preg.cageCut 에 쌓아, 아버지가 늘어 기간을 다시 잡을 때도 빼고 센다 (preg-v2.js fixDue)
 //     족갑       50,000 P   최대 12시간. 세 시간마다 3~4만 P 가
 //                            공용 통장에 들어간다
 //     착유 머신 200,000 P   최대 5시간. 다섯 시간을 채우면
@@ -65,7 +68,7 @@ const HOUR = 3600 * 1000;
 
 const GEAR = {
     fuck: { n: '퍼킹 머신', p: 100000, ms: 10 * HOUR,
-            d: '룸메이트를 열 시간 묶어 둔다. 묶여 있는 동안 상대가 임신 중이면 묶인 시간만큼 출산이 앞당겨진다.' },
+            d: '룸메이트를 열 시간 묶어 둔다. 묶여 있는 동안 상대가 임신 중이면 묶인 시간만큼 출산이 앞당겨진다 (중간에 풀려도 묶여 있던 만큼).' },
     cuff: { n: '족갑',      p: 50000,  ms: 12 * HOUR,
             d: '발목에 채운다. 최대 열두 시간. 세 시간마다 3~4만 P 가 공용 통장에 들어간다.' },
     milk: { n: '착유 머신', p: 200000, ms: 5 * HOUR,
@@ -654,15 +657,49 @@ window.cageRun = function (k) {
 //   트랜잭션 함수는 **절대 undefined 를 돌려주지 않는다.** 돌려주면 서버에
 //   닿지도 못하고 그 자리에서 멈춘다 (아직 안 받아 본 자리는 처음 읽을 때
 //   null 로 보인다). 줄 것이 없으면 읽은 것을 그대로 돌려준다.
+// 퍼킹 머신 — 갇힌 사람의 출산을 ms 만큼 당긴다 (서버 preg 를 트랜잭션으로)
+//   돌려주는 값: 당긴 ms (임신이 아니면 0) · 못 썼으면 -1
+function cutPreg(m, ms) {
+    if (!(ms > 0) || !m || !m.code) return Promise.resolve(0);
+    let got = 0;
+    return tx('users/' + m.code + '/preg', function (p) {
+        got = 0;
+        if (!p) return p || null;                              // 임신이 아니다 (아직 안 읽었으면 서버 것으로 다시 돈다)
+        const sires = p.sires ? (Array.isArray(p.sires) ? p.sires.filter(Boolean) : Object.keys(p.sires)) : [];
+        const due = Number(p.due) || 0;
+        if (!sires.length || !(due > 0)) return p;
+        const nd = Math.max(now(), due - ms);
+        got = due - nd;
+        if (got <= 0) return p;
+        p.due = nd;
+        p.cageCut = (Number(p.cageCut) || 0) + got;           // 아버지가 늘어 기간을 다시 잡을 때도 뺀다 (preg-v2.js fixDue)
+        return p;
+    }).then(function (res) {
+        if (!res || !res.committed) return -1;                // 못 썼다 (이 함수는 그만두지 않으니 안 들어간 것은 막힌 것)
+        if (got > 0) {
+            try {
+                const v = res.snapshot && res.snapshot.val ? res.snapshot.val() : null;
+                if (v) {
+                    m.preg = v;
+                    const live = (typeof db !== 'undefined' && db.users) ? db.users[m.code] : null;
+                    if (live && live !== m) live.preg = JSON.parse(JSON.stringify(v));
+                    if (currentUser && currentUser.code === m.code && currentUser !== m) currentUser.preg = JSON.parse(JSON.stringify(v));
+                }
+            } catch (e) { }
+        }
+        return got;
+    });
+}
+
 function settle(m, cb) {
     const done = function () { if (typeof cb === 'function') cb(); };
     if (!m || !m.code || typeof database === 'undefined' || !database) { done(); return; }
     const path = 'users/' + m.code + '/cageUse';
 
-    let amt = 0, why = '', byCode = '', back = null;
+    let amt = 0, why = '', byCode = '', back = null, cutAdd = 0, cutWas = 0, cutTo = 0;
 
     tx(path, function (u) {
-        amt = 0; why = ''; byCode = (u && u.by) || ''; back = null;
+        amt = 0; why = ''; byCode = (u && u.by) || ''; back = null; cutAdd = 0;
         if (!u || !GEAR[u.k]) return u || null;          // 줄 것이 없다 — 그대로
         const g = GEAR[u.k];
         const end = Math.min(now(), u.until || 0);
@@ -685,6 +722,11 @@ function settle(m, cb) {
                 back = { k: 'done', v: false };
                 u.done = true;
             }
+        } else if (u.k === 'fuck') {
+            // ★ 묶여 있던 만큼 출산을 앞당긴다 — 이미 당긴 몫(cut)은 빼고 (2026-10-21)
+            //   임신이 아니면 그 시간은 흘러간 것으로 둔다 (cut 은 그대로 올린다)
+            const add = run - (Number(u.cut) || 0);
+            if (add > 0) { cutAdd = add; cutWas = Number(u.cut) || 0; cutTo = run; u.cut = run; }
         }
         return u;
     }).then(function (res) {
@@ -694,6 +736,19 @@ function settle(m, cb) {
             const v = res && res.snapshot && res.snapshot.val ? res.snapshot.val() : null;
             if (v && m.cageUse) { m.cageUse.paid = v.paid; m.cageUse.done = v.done; m.cageUse.cut = v.cut; }
         } catch (e) { }
+
+        // 퍼킹 머신 — 박은 몫만큼 출산을 당긴다 (못 당기면 박은 것을 되돌린다 · 다음 셈에 다시)
+        if (res && res.committed && cutAdd > 0) {
+            const was = cutWas, to = cutTo;
+            return cutPreg(m, cutAdd).then(function (r) {
+                if (r >= 0) { done(); return; }
+                return tx(path, function (u) {
+                    if (!u) return u || null;
+                    if (Number(u.cut) === to) u.cut = was;
+                    return u;
+                }).then(function () { if (m.cageUse && Number(m.cageUse.cut) === to) m.cageUse.cut = was; done(); });
+            });
+        }
 
         if (!res || !res.committed || amt <= 0) { done(); return; }
 
@@ -753,37 +808,11 @@ function tick() {
 
     // 셈하기를 먼저 한다. 문 여는 것을 먼저 하면 마지막 토막을 못 받는다
     const u = m.cageUse;
-    let changed = false;
 
-    // 돈은 트랜잭션으로 — 양쪽에서 불려도 한 번만 들어간다
-    if (u && (u.k === 'cuff' || u.k === 'milk')) settle(m);
-
-    if (u && GEAR[u.k]) {
-        const end = Math.min(now(), u.until || 0);
-        // 기구가 정해 둔 시간을 넘겨 세지 않는다 (시계가 어긋나도)
-        const run = Math.min(GEAR[u.k].ms, Math.max(0, end - (u.at || 0)));
-
-        if (u.k === 'fuck') {
-            // 묶여 있던 만큼 출산을 앞당긴다 — 이미 당긴 몫(cut)은 빼고 센다
-            const add = run - (u.cut || 0);
-            const preg = (typeof isPregnant === 'function') ? isPregnant(m)
-                       : !!(m.preg && m.preg.sires && m.preg.sires.length);
-            if (add > 60000) {
-                if (preg && m.preg && m.preg.due) {
-                    m.preg.due = Math.max(now(), m.preg.due - add);
-                    if (typeof updateUserFields === 'function') {
-                        updateUserFields(m.code, { preg: m.preg });
-                    }
-                }
-                u.cut = run;                 // 임신이 아니면 그 시간은 흘러간 것으로 둔다
-                changed = true;
-            }
-        }
-    }
-
-    if (changed && typeof updateUserFields === 'function') {
-        updateUserFields(m.code, { cageUse: u });
-    }
+    // 돈 · 출산 당기기는 트랜잭션으로 — 양쪽에서 불려도 한 번만 들어간다
+    //   ★ 퍼킹 머신도 여기로 (2026-10-21) — 전에는 가둔 쪽 화면에서만 따로 셌다
+    //     (가둔 사람이 접속해 있지 않으면 안 당겨지다가, 들어와서야 한꺼번에 · 풀리면 날아갔다)
+    if (u && (u.k === 'cuff' || u.k === 'milk' || (u.k === 'fuck' && owed(u)))) settle(m);
 
     // 시간이 다 됐으면 연다
     if (now() >= (c.until || 0)) { freeUser(m, '시간이 다 되어 문이 열렸습니다.'); return; }
@@ -810,6 +839,10 @@ function owed(u) {
     if (u.k === 'cuff') {
         const run = Math.min(GEAR.cuff.ms, Math.max(0, Math.min(now(), u.until || 0) - (u.at || 0)));
         return Math.floor(run / CUFF_BLOCK) > (u.paid || 0);
+    }
+    if (u.k === 'fuck') {                 // 1분 넘게 안 당긴 몫이 있으면 (풀릴 때는 남은 몫까지 settle 이 센다)
+        const run = Math.min(GEAR.fuck.ms, Math.max(0, Math.min(now(), u.until || 0) - (u.at || 0)));
+        return run - (Number(u.cut) || 0) >= 60000;
     }
     return false;
 }
