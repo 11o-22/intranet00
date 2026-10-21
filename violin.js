@@ -39,6 +39,17 @@
 //   그 뒤로는 굴림 자체를 건너뛴다. 두 사람이 같은 순간에 굴려도
 //   하나만 남는다.
 //
+// ■ 판 (2026-10-21)
+//
+//   첫 임자에게서 바이올린을 거둔 뒤, 빛에서 **한 번 더** 나올 수 있게 판을 하나 올렸다 (ROUND 2).
+//   임자 자리에 round 가 함께 적히고, 지난 판(round 없음 = 1)의 임자는 빈자리로 본다.
+//   이번 판에 누가 가져가면 다시 닫힌다. 또 열려면 ROUND 를 하나 올린다.
+//
+//   하나뿐이게 지킨다 — 임자 자리와 맞지 않게 들고 있는 바이올린은 거둔다.
+//     · 들어올 때 이미 들고 있는데 이번 판 임자가 내가 아니다 → 지난 판의 것 · 남의 것 — 거둔다
+//     · 접속 중에 새로 들어왔다 (신도에게 쓰러질 때 도는 표 · 당국 지급) → 빈자리면 임자로 적고, 아니면 거둔다
+//       (쓰러질 때 도는 표는 임자 자리를 안 거치고 바로 소지품에 넣어서, 하나뿐이 새던 자리였다)
+//
 // ■ 콘솔
 //   violinWho()        지금 누가 가지고 있나
 //   violinState(사번)  적립 상태
@@ -51,6 +62,9 @@ const ZONE = 'Qtrew-A-214';
 const RATE = 0.00001;                 // 0.001% — 아무것도 안 걸렸을 때
 const RATE_CAP = 0.00072;             // 0.072% — 배율을 다 겹쳐도 여기까지
 const OWNER = 'violinOwner';          // 최상위 자리
+const ROUND = 2;                      // ★ 판 — 2026-10-21 첫 임자에게서 거둔 뒤 한 번 더 (위 「판」)
+// 이번 판의 임자만 임자로 본다 (지난 판 = 빈자리)
+function curOwner(v) { return (v && v.code && (Number(v.round) || 1) >= ROUND) ? v : null; }
 const PAY = 10000;                    // 한 토막에 쌓이는 몫
 const BLOCK = 60 * 60 * 1000;         // 한 시간
 const ADMIN = 'kario0987';
@@ -124,7 +138,7 @@ function readOwner(force) {
         return Promise.resolve(ownerCache);
     }
     return d.ref(OWNER).once('value').then(function (s) {
-        ownerCache = s.val() || null;
+        ownerCache = curOwner(s.val());
         ownerAt = Date.now();
         return ownerCache;
     }).catch(function () { return ownerCache; });
@@ -135,10 +149,10 @@ function claim() {
     const d = db_(), u = me();
     if (!d || !u) return Promise.resolve(false);
     return d.ref(OWNER).transaction(function (cur) {
-        if (cur && cur.code) return;                 // 이미 임자가 있다 — 멈춘다
-        return { code: u.code, name: u.name, at: Date.now() };
+        if (curOwner(cur)) return;                   // 이번 판에 이미 임자가 있다 — 멈춘다
+        return { code: u.code, name: u.name, at: Date.now(), round: ROUND };
     }, null, false).then(function (res) {
-        const v = res && res.snapshot && res.snapshot.val();
+        const v = curOwner(res && res.snapshot && res.snapshot.val());
         ownerCache = v || null; ownerAt = Date.now();
         return !!(res && res.committed && v && v.code === u.code);
     }).catch(function () { return false; });
@@ -211,6 +225,7 @@ function tryRoll(rate) {
         if (Math.random() >= rate) return;
         return claim().then(function (ok) {
             if (!ok) return;                         // 같은 순간에 누가 먼저 적었다
+            freshPay(u);                             // 적립은 지금부터 (지난 판 기록이 남아 있어도)
             if (!Array.isArray(u.inventory)) u.inventory = [];
             u.inventory.push(NAME);
             try { if (typeof addHistoryLog === 'function')
@@ -682,6 +697,78 @@ setTimeout(function () {
 })();
 
 // ==========================================
+// 6. 하나뿐이게 지킨다 (2026-10-21 — 위 「판」)
+// ==========================================
+function freshPay(u) {
+    if (!u) return;
+    u.violinAt = null; u.violinPaid = 0;
+    try { if (typeof saveFields === 'function') saveFields({ violinAt: 1, violinPaid: 1 }); } catch (e) { }
+}
+function strip(u, loud) {
+    if (!u) return;
+    let n = 0;
+    if (Array.isArray(u.inventory)) {
+        const before = u.inventory.length;
+        u.inventory = u.inventory.filter(function (x) { return x !== NAME; });
+        n += before - u.inventory.length;
+    }
+    if (Array.isArray(u.equippedWeapons)) {
+        const gone = u.equippedWeapons.filter(function (w) { return base(w) === NAME; });
+        if (gone.length) {
+            u.equippedWeapons = u.equippedWeapons.filter(function (w) { return base(w) !== NAME; });
+            gone.forEach(function (w) {
+                try { if (typeof clearEquipOwner === 'function') clearEquipOwner(u, w); else if (u.equipOwner) delete u.equipOwner[w]; } catch (e) { }
+                try { if (typeof stripNoteByItem === 'function') stripNoteByItem(u, w); } catch (e) { }
+            });
+            n += gone.length;
+        }
+    }
+    if (!n) return;
+    try { if (typeof addHistoryLog === 'function')
+        addHistoryLog(u, '[🎻] ' + NAME + ' — 세상에 하나뿐이라 제자리로 돌아갔습니다.'); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ inventory: 1, equippedWeapons: 1, equipOwner: 1, history: 1, badge: 1 }); } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    try { paintName(); } catch (e) { }
+    if (loud) { try { if (typeof showCustomAlert === 'function')
+        showCustomAlert('🎻 신성의 바이올린\n\n세상에 하나뿐인 것이라 제자리로 돌아갔습니다.'); } catch (e) { } }
+    console.log('[🎻] 임자 자리와 맞지 않는 바이올린을 거뒀습니다 (' + n + ')');
+}
+let gCode = null, gHad = null, gBusy = false;     // gHad — 지난번 볼 때 들고 있었나 (들어온 뒤 처음은 null)
+function guard() {
+    const u = me(), d = db_();
+    if (!u || !u.code || !d || gBusy) return;
+    if (gCode !== u.code) { gCode = u.code; gHad = null; }
+    const hold = has(u);
+    if (!hold) { gHad = false; return; }
+    if (gHad === true) return;                       // 이미 맞춰 본 것
+    const fresh = (gHad === false);                  // 접속 중에 새로 들어왔다
+    gBusy = true;
+    d.ref(OWNER).once('value').then(function (s) {
+        const o = curOwner(s && s.val ? s.val() : null);
+        if (o && o.code === u.code) { gHad = true; return; }
+        if (!o && fresh) {
+            return claim().then(function (ok) {
+                if (ok) { freshPay(u); gHad = true; console.log('[🎻] 새로 들어온 바이올린 — 이번 판 임자로 적었습니다'); }
+                else { strip(u, true); gHad = false; }
+            });
+        }
+        if (fresh) { strip(u, true); gHad = false; return; }   // 남이 임자인데 새로 들어왔다
+        // 들고 들어온 것 — 한 번 더 읽어 보고 그래도 아니면 거둔다 (잠깐 잘못 읽은 것으로 임자의 것을 거두지 않게)
+        return new Promise(function (res) { setTimeout(res, 3000); }).then(function () {
+            return d.ref(OWNER).once('value');
+        }).then(function (s2) {
+            const o2 = curOwner(s2 && s2.val ? s2.val() : null);
+            const u2 = me();
+            if (!u2 || u2.code !== u.code) return;
+            if (o2 && o2.code === u.code) { gHad = true; return; }
+            strip(u2, false);                        // 남의 것 · 지난 판의 것
+            gHad = false;
+        });
+    }).catch(function () { }).then(function () { gBusy = false; });
+}
+setInterval(function () { try { guard(); } catch (e) { } }, 2000);
+
+// ==========================================
 // 확인
 // ==========================================
 // 손으로 한 번 정산 — 지난 시간만큼만 준다 (여러 번 불러도 두 번 안 준다)
@@ -690,7 +777,8 @@ window.violinPay = function () { try { settle(); } catch (e) { console.warn(e); 
 window.violinWho = function () {
     readOwner(true).then(function (o) {
         console.log('%c===== 🎻 신성의 바이올린 =====', 'color:#d4af37; font-size:13px');
-        if (!o || !o.code) { console.log('  아직 세상에 안 나왔습니다. (' + (RATE * 100) + '%)'); return; }
+        console.log('  판    :', ROUND);
+        if (!o || !o.code) { console.log('  이번 판에는 아직 세상에 안 나왔습니다. (' + (RATE * 100) + '%)'); return; }
         console.log('  임자  :', o.name || o.code);
         console.log('  나온 때:', new Date(o.at || 0).toLocaleString());
         const u = (typeof db !== 'undefined' && db.users) ? db.users[o.code] : null;
@@ -721,8 +809,8 @@ window.violinGive = function (who) {
             .filter(function (x) { return x && (x.no === who || x.code === who || x.name === who); })[0];
         if (!t) { console.warn('사원을 못 찾았습니다.'); return; }
         db_().ref(OWNER).transaction(function (cur) {
-            if (cur && cur.code) return;
-            return { code: t.code, name: t.name, at: Date.now() };
+            if (curOwner(cur)) return;
+            return { code: t.code, name: t.name, at: Date.now(), round: ROUND };
         }, null, false).then(function (res) {
             if (!(res && res.committed)) { console.warn('누가 먼저 가져갔습니다.'); return; }
             if (!Array.isArray(t.inventory)) t.inventory = [];
