@@ -7439,6 +7439,14 @@ if (cat.effect === 'couple_ring') {
                 try { fn(itemName); } catch (e) { console.error('[물품] ' + itemName, e); }
                 return false;                 // 처리기가 알아서 뺀다 — 여기서 또 빼지 않는다
             }
+            // ★ 장착형(표에 null — 꿈결 수집기 · 은색 저울 …)은 본인이 찬다 (2026-10-21)
+            //   복제품을 쓰면 원본 이름으로 이 길에 들어올 때가 있다 — 전에는 아래 알림으로 끝나 못 찼다
+            if (!isOthers && targetUser === currentUser && selfTbl
+                && Object.prototype.hasOwnProperty.call(selfTbl, cat.effect) && selfTbl[cat.effect] === null
+                && typeof window.__newItemWear === 'function') {
+                try { window.__newItemWear(itemName); } catch (e) { console.error('[물품] ' + itemName, e); }
+                return false;                 // 차는 쪽이 알아서 뺀다
+            }
             console.warn('[물품] 처리할 곳을 못 찾았습니다 — ' + itemName + ' (' + cat.effect + ')');
             if (!isOthers) {
                 showCustomAlert('이 물품을 다루는 부분이 아직 올라오지 않았습니다.\n\n'

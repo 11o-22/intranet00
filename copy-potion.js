@@ -97,6 +97,30 @@ function scale(u, pick, mul) {
     return { was: was, now: Math.max(0, e.expireAt - now) };
 }
 
+// ★ 줄인 시간은 서버에 바로 박는다 (2026-10-21)
+//   저장 길(save-merge.js mergeEff)은 같은 이름의 효과가 겹치면 **긴 쪽**을 남긴다 (pickEff).
+//   그래서 남은 시간을 절반으로 줄여도 서버의 긴 값이 이겨, 복제품 제거약이 아무 일도 안 한 것이 됐다.
+//   그 이름 · 고정 아닌 효과만, 지금 값보다 짧게만 고친다. 쓰는 길이 끝난 뒤에 한 번 더 본다.
+function pushCut(code, name, at) {
+    if (typeof database === 'undefined' || !database || !code || !name || !(at > 0)) return;
+    const path = 'users/' + code + '/timedEffects';
+    const go = function () {
+        try {
+            database.ref(path).transaction(function (arr) {
+                if (arr == null) return arr;                       // 아직 못 읽었다 — 서버 것으로 다시 돈다
+                const list = Array.isArray(arr) ? arr : Object.keys(arr).map(function (k) { return arr[k]; });
+                let hit = false;
+                list.forEach(function (e) {
+                    if (e && e.name === name && !e.fixed && (Number(e.expireAt) || 0) > at) { e.expireAt = at; hit = true; }
+                });
+                return hit ? list : undefined;                    // 고칠 것이 없으면 그만둔다
+            }, null, false);
+        } catch (e) { }
+    };
+    go();
+    setTimeout(go, 1500);
+}
+
 function save(u, isOthers) {
     if (!u) return;
     if (currentUser && u.code === currentUser.code) {
@@ -118,9 +142,16 @@ function install() {
     const _a = applyItemEffect;
     const wrapped = function (targetUser, itemName, isOthers) {
         const m = mark();
-        const cat = ITEM_CATALOG[itemName];
+        // ★ 복제품 이름 그대로 들어온 것도 받는다 (2026-10-21) — 「타인」으로 쓰면 표 없이
+        //   applyItemEffect(상대, '[복제품] 제거약') 로 바로 온다. 전에는 이 길을 못 알아봐서
+        //   spaceitems.js 가 원본 이름으로 바꿔 넘긴 원본 제거약이 돌았다 — 고정된 효과까지 통째로 지웠다.
+        const c0 = ITEM_CATALOG[itemName];
+        const fromLabel = (c0 && c0.effect === 'copy_of' && c0.copyOf) ? c0.copyOf
+            : (String(itemName || '').indexOf(TAG) === 0 ? String(itemName).slice(TAG.length) : null);
+        const real = fromLabel || ((m && itemName === m.real) ? m.real : null);
+        const cat = real ? ITEM_CATALOG[real] : null;
         // 복제품으로 쓰는 중이 아니거나, 그 복제품의 원본이 아니면 평소대로
-        if (!m || !cat || !targetUser || itemName !== m.real) return _a.apply(this, arguments);
+        if (!real || !cat || !targetUser) return _a.apply(this, arguments);
 
         const eff = cat.effect;
         if (eff !== 'cure_potion' && eff !== 'clear_potion') return _a.apply(this, arguments);
@@ -142,6 +173,10 @@ function install() {
         const pick = list[Math.floor(Math.random() * list.length)];
         const mul = potionOnly ? 0.5 : 2;
         const r = scale(targetUser, pick, mul);
+        if (potionOnly && pick.type === 'effect') {
+            const e = targetUser.timedEffects[pick.idx];
+            if (e) pushCut(targetUser.code, e.name, e.expireAt);
+        }
 
         const word = potionOnly
             ? ('[복제품 제거약] ' + pick.name + ' 남은 시간이 절반으로 줄었습니다. '

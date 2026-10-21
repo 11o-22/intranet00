@@ -319,8 +319,10 @@ function regOne(real) {
     const src = ITEM_CATALOG[real];
     if (!src) return;
     const nm = COPY_TAG + real;
-    if (ITEM_CATALOG[nm]) return;
     const wornLike = String(src.effect || '').indexOf('equip') === 0 || !!src.equipKind;
+    // ★ 이미 있으면 장착형 표만 다시 맞춘다 (2026-10-21) — 원본의 표(equip-kind.js)가 늦게 붙으면
+    //   복제품이 소모품으로 세어진 채 남았다 (꿈결 수집기)
+    if (ITEM_CATALOG[nm]) { if (wornLike && !ITEM_CATALOG[nm].equipKind) ITEM_CATALOG[nm].equipKind = true; return; }
     ITEM_CATALOG[nm] = {
         price: 0, usable: !!src.usable, targetable: !!src.targetable,
         effect: 'copy_of', copyOf: real, noSell: true,
@@ -638,8 +640,12 @@ function copyFree(real, label, fn) {
             };
             let out;
             const self = this;
+            // ★ 표를 남긴다 — 안쪽의 copy-potion.js 가 복제품 제거약 · 투명 물약을 알아보게 (2026-10-21)
+            //   (안 남기면 원본 제거약이 돌아 고정된 효과까지 지웠다)
+            const mk = { real: real, label: itemName, at: Date.now(), others: true };
+            window.__copyUse = mk;
             try { out = copyFree(real, itemName, function () { return _a.call(self, target, real, isOthers); }); }
-            finally { addTimedEffect = _ate; }
+            finally { addTimedEffect = _ate; if (window.__copyUse === mk) window.__copyUse = null; }
             if (out === false) return false;
 
             // 상대에게 꽂힌 것에 표를 붙인다

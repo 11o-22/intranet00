@@ -1947,6 +1947,30 @@ const SELF = {
 //   (그 길은 열 겹 넘게 감싸여 있어 한 겹만 어긋나도 그냥 지나친다)
 window.__newItemSelf = SELF;
 
+// 장착형(SELF 표에 null) — 본인이 찬다. index.html 의 applyItemEffect 가 이 파일의 손이 빠진 길로
+//   들어왔을 때도 이것을 부른다 (2026-10-21 — 복제품 꿈결 수집기가 그 길로 들어와
+//   「이 물품을 다루는 부분이 아직 올라오지 않았습니다」로 끝나던 것)
+function wearNew(itemName) {
+    if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
+    if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return false; }
+    currentUser.equippedWeapons.push(itemName);
+    setEquipOwner(currentUser, itemName, currentUser.code);
+    if (itemName === '통신 단추' && !(currentUser.buttonUses | 0)) {
+        currentUser.buttonUses = 3;
+        saveFields({ buttonUses: 1 });
+    }
+    // 은심장은 잃어버리지 않게 막아 두었으니, 옮길 때만 잠금을 푼다
+    window.__heartUnlock = true;
+    removeItemFromInventory(currentUser, itemName, 1);
+    window.__heartUnlock = false;
+    appendBadgeNoteToUser(currentUser, '[장착됨] ' + itemName);
+    addHistoryLog(currentUser, '[장비 장착] ' + itemName);
+    saveSelfFull(); updateUI();
+    showCustomAlert(itemName + '을(를) 몸에 걸었습니다.');
+    return true;
+}
+window.__newItemWear = wearNew;
+
 (function hookSelf() {
     const iv = setInterval(function () {
         if (typeof useInventoryItem !== 'function') return;
@@ -1973,22 +1997,7 @@ window.__newItemSelf = SELF;
             if (fn) { fn(itemName); return; }
 
             // 장착형
-            if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
-            currentUser.equippedWeapons.push(itemName);
-            setEquipOwner(currentUser, itemName, currentUser.code);
-            if (itemName === '통신 단추' && !(currentUser.buttonUses | 0)) {
-                currentUser.buttonUses = 3;
-                saveFields({ buttonUses: 1 });
-            }
-            // 은심장은 잃어버리지 않게 막아 두었으니, 옮길 때만 잠금을 푼다
-            window.__heartUnlock = true;
-            removeItemFromInventory(currentUser, itemName, 1);
-            window.__heartUnlock = false;
-            appendBadgeNoteToUser(currentUser, '[장착됨] ' + itemName);
-            addHistoryLog(currentUser, '[장비 장착] ' + itemName);
-            saveSelfFull(); updateUI();
-            showCustomAlert(itemName + '을(를) 몸에 걸었습니다.');
+            wearNew(itemName);
         };
         useInventoryItem._newItems2 = true;
         clearInterval(iv);
