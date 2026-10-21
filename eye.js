@@ -17,6 +17,7 @@
 //        있어서, 판 사이에 앱을 다시 열면 칸은 뜨는데 눌러도 아무 일도
 //        없었다 (아래 「승부 이전」 자리 참고).
 //   5. 상담실·선녀탕에서 포인트를 내고 바로 나온다. 다음에 갇히면 세 배로 돌아온다
+//      ★ 하루 세 번까지 (2026-10-21) — u.eyeOutDay = { d, n }. 세 배로 돌려받는 몫도 나온 만큼만 생긴다
 //   6. 탐사 횟수를 다 쓰면 그날 번 것 중 하나를 한 번 더 받는다
 //
 // ■ 2번이 어떻게 도는가
@@ -70,6 +71,7 @@ const EYE = {
     ALIEN_BACK:  2,          // 되돌리기 하루 횟수
     OUT_COST:    50000,      // 상담실·선녀탕에서 바로 나오는 값
     OUT_BACK:    3,          // 다음에 갇혔을 때 돌려받는 배수
+    OUT_DAY:     3,          // 하루에 값을 치르고 나올 수 있는 횟수 (2026-10-21)
     AGAIN_DAY:   1           // 「한 번 더」 하루 횟수
 };
 
@@ -997,17 +999,32 @@ window.eyeRewind = function () {
 function inRoom(x) {
     return !!(x && x.quarantineUntil && Date.now() < x.quarantineUntil);
 }
+// 오늘 나온 횟수 — 자정이 지나면 다시 세 번
+function outBox(me) {
+    if (!me.eyeOutDay || typeof me.eyeOutDay !== 'object' || me.eyeOutDay.d !== today()) me.eyeOutDay = { d: today(), n: 0 };
+    return me.eyeOutDay;
+}
+window.eyeOutLeft = function () {
+    const me = u_();
+    if (!me) return 0;
+    return Math.max(0, EYE.OUT_DAY - (Number(outBox(me).n) || 0));
+};
 
 window.eyeOut = function () {
     const me = u_();
     if (!me || !wears(me)) { alert_(NAME + ' 을 차고 있어야 합니다.'); return; }
     if (!inRoom(me)) { alert_('갇혀 있지 않습니다.'); return; }
+    if (window.eyeOutLeft() <= 0) {
+        alert_('오늘은 더 나올 수 없습니다.\n\n값을 치르고 나오는 것은 하루 ' + EYE.OUT_DAY + '번까지입니다. 자정이 지나면 다시 됩니다.');
+        return;
+    }
     if ((Number(me.points) || 0) < EYE.OUT_COST) {
         alert_('포인트가 모자랍니다.\n\n' + EYE.OUT_COST.toLocaleString() + ' P 가 필요합니다.');
         return;
     }
     me.points -= EYE.OUT_COST;
     me.eyeOwed = (Number(me.eyeOwed) || 0) + EYE.OUT_COST * EYE.OUT_BACK;
+    outBox(me).n = (Number(outBox(me).n) || 0) + 1;
 
     // 나올 때 값을 그대로 돌려주면 100 가까이라 나오자마자 다시 들어간다
     me.quarantineUntil = 0;
@@ -1029,7 +1046,8 @@ window.eyeOut = function () {
     });
     try { document.body.style.overflow = ''; } catch (e) { }
     alert_('눈이 문을 봅니다.\n\n나왔습니다. (오염도 50%)\n\n'
-        + '다음에 갇힐 때 ' + (EYE.OUT_COST * EYE.OUT_BACK).toLocaleString() + ' P 가 들어옵니다.');
+        + '다음에 갇힐 때 ' + (EYE.OUT_COST * EYE.OUT_BACK).toLocaleString() + ' P 가 들어옵니다.\n'
+        + '오늘 남은 횟수 ' + window.eyeOutLeft() + ' / ' + EYE.OUT_DAY);
 };
 
 // 갇히는 순간 돌려준다
@@ -1131,7 +1149,7 @@ window.eyeAgain = function () {
         const me = u_();
         if (!me || !wears(me)) { drop('eye-out-btn'); drop('eye-again-btn'); return; }
 
-        if (inRoom(me)) btn('eye-out-btn', '🔎 값을 치르고 나온다 (' + EYE.OUT_COST.toLocaleString() + ' P)',
+        if (inRoom(me) && window.eyeOutLeft() > 0) btn('eye-out-btn', '🔎 값을 치르고 나온다 (' + EYE.OUT_COST.toLocaleString() + ' P · 오늘 ' + window.eyeOutLeft() + '/' + EYE.OUT_DAY + ')',
             window.eyeOut, '#4fc3f7');
         else drop('eye-out-btn');
 
