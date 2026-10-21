@@ -794,6 +794,7 @@ function teamDown() {
 // 화면 틀 — 위에 스탯 막대
 // ==========================================
 function show(title, text, extra) {
+    if (kr) kr._going = false;                                // 내려가는 중이었으면 이제 닿았다
     darkBodyEl().innerHTML = darkBox(title, text, bar() + banner() + (extra || ''));
     kSaveSoon();                                              // 혼자 — 이 화면과 상태를 적어 둔다 (창이 끊겨도 이어 가게)
     if (darkRun && darkRun.isParty) { try { mountDarkChat('normal'); } catch (e) { } }
@@ -1465,13 +1466,25 @@ function rest() {
         망을 봐 줄 사람이 없다. 벽에 등을 붙이고 앉아 날이 새기만 기다린다.`) + `<br>
         <span style="font-size:11px; color:#888;">쉬면서 심력 +10 · 마력/무력/내공 +5${got.length ? ' · ' + (mates ? '번갈아 잠: ' : '혼자: ') + got.join(' · ') : ''}</span>`,
         restPanel() + others +
-        darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()') +
+        darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown(' + kr.floor + ')') +
         (hard().doom ? '<div style="font-size:11px; color:#ff6b6b; margin-top:8px;">올라온 길이 없다. 돌아갈 수 없다.</div>'
                      : darkChoiceBtn('여기서 돌아간다. <span style="font-size:10px; color:#888;">(얻은 것의 절반만 들고 나온다)</span>', 'kroomLeave()')));
 }
-window.kroomDown = function () {
-    if (!kr) return;
+// ★ 한 번만 내려간다 (2026-10-21)
+//   ✗ 전에는 누를 때마다 kr.floor++ 였다. 내려가면 먼저 같은 층의 다른 팀을 서버에 묻는데(meet),
+//     서버가 느리면 그동안 쉼터 화면이 그대로라 다시 누르게 된다 — 그때마다 한 층씩 더 내려가
+//     층을 건너뛰고, 끝내 맨 밑층을 지나쳐 판이 일찍 끝났다 (「맨 밑층까지 안 가진다」 · 「단추가 안 먹힌다」).
+//   → 단추에 그 쉼터의 층 번호를 실어 다른 층의 단추는 무시하고, 내려가는 동안(_going)은 다시 받지 않는다.
+//     누르면 바로 「내려가는 중」 화면으로 바꾸고, 서버에 묻는 것은 길어야 2.5초만 기다린다 (meet).
+window.kroomDown = function (from) {
+    if (!kr || kr.dead || kr._settled) return;
+    if (from != null && Number(from) !== Number(kr.floor)) return;      // 이미 내려간 쉼터의 단추
+    if (kr._going) return;
+    const D = DATA.dun[kr.dun];
+    if (D && kr.floor >= D.floors.length) return;                       // 더 내려갈 층이 없다
+    kr._going = true;
     kr.floor++; kr.idx = 0; kr._metChecked = false;
+    show2('▼ ' + kr.floor + '층', '계단을 내려간다.', '<div style="font-size:11px; color:#888; text-align:center; padding:10px;">아래층으로 내려가는 중…</div>');
     runUp();
     kroomNext();
 };
@@ -1501,7 +1514,7 @@ window.kroomEat = function (n) {
     kr.items[n]--;
     const f = ITEMS[n].food;
     const got = Object.keys(f).map(function (s) { const d = addStat(s, f[s]); return STATN[s] + ' +' + d; });
-    show('쉼터', esc(n) + '을(를) 먹었다.<br><br>' + got.join(' · '), restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()') + darkChoiceBtn('여기서 돌아간다.', 'kroomLeave()'));
+    show('쉼터', esc(n) + '을(를) 먹었다.<br><br>' + got.join(' · '), restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown(' + kr.floor + ')') + darkChoiceBtn('여기서 돌아간다.', 'kroomLeave()'));
 };
 window.kroomCook = function () {
     if (!kr || kr.job !== 'cook') return;
@@ -1509,11 +1522,11 @@ window.kroomCook = function () {
     let left = 2;
     const use = [];
     ing.forEach(function (n) { while (left > 0 && kr.items[n] > 0) { kr.items[n]--; left--; use.push(n); } });
-    if (left > 0) { use.forEach(function (n) { kr.items[n]++; }); show('쉼터', '재료가 모자라다. 둘은 있어야 국이 된다.', restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()')); return; }
+    if (left > 0) { use.forEach(function (n) { kr.items[n]++; }); show('쉼터', '재료가 모자라다. 둘은 있어야 국이 된다.', restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown(' + kr.floor + ')')); return; }
     const n = gi(prof().grade) >= 2 ? 2 : 1;                      // 각성할수록 넉넉히 끓인다
     kr.items['따뜻한 국'] = (kr.items['따뜻한 국'] || 0) + n;
     show('쉼터', `${use.map(esc).join('과 ')}을 넣고 끓였다.<br><br>김이 오른다. 이 냄새를 맡으면 다들 조금 덜 무섭다.<br>따뜻한 국 ×${n}`,
-        restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown()'));
+        restPanel() + darkChoiceBtn('▼ ' + (kr.floor + 1) + '층으로 내려간다.', 'kroomDown(' + kr.floor + ')'));
 };
 
 // ==========================================
@@ -1691,7 +1704,10 @@ function runBeat() { const d = db_(); if (d && kr && kr.dun) d.ref('kroomRuns/' 
 let othersCache = {};
 function meet() {
     const d = db_(); if (!d || !kr || !kr.dun) return Promise.resolve(null);
-    return d.ref('kroomRuns/' + kr.dun).once('value').then(function (s) {
+    // ★ 서버가 느리거나 끊겼으면 오래 기다리지 않는다 — 2.5초 안에 답이 없으면 아무도 못 만난 것으로 (2026-10-21)
+    let done = false;
+    const ask = d.ref('kroomRuns/' + kr.dun).once('value').then(function (s) {
+        if (done || !kr) return null;
         othersCache = s.val() || {};
         const mine = kr.team;
         const hit = Object.keys(othersCache).filter(function (t) {
@@ -1702,6 +1718,8 @@ function meet() {
         kr.met[hit + ':' + kr.floor] = 1;
         return Object.assign({ id: hit }, othersCache[hit]);
     }).catch(function () { return null; });
+    const late = new Promise(function (res) { setTimeout(function () { res(null); }, 2500); });
+    return Promise.race([ask, late]).then(function (v) { done = true; return v; });
 }
 function otherTeams() {
     const list = Object.keys(othersCache).filter(function (t) { const v = othersCache[t]; return t !== kr.team && v && now() - (v.at || 0) < 5 * 60 * 1000; });
@@ -2515,7 +2533,7 @@ function show2(title, text, extra) { darkBodyEl().innerHTML = darkBox(title, tex
 //     · 일행 판은 하지 않는다 (팀이 같이 움직여야 해서 — 예전처럼 다시 합류)
 const K_SAVE = 'kroomRun_', K_PLAN = 'kroomPlan_';
 const K_KEEP = 6 * 3600 * 1000;                 // 이만큼 지난 자리는 버린다
-const K_SKIP = { plan: 1, _doomT: 1, _doomCb: 1, _aidRef: 1, _giftRef: 1, _beat: 1, _picking: 1, _doomWatch: 1, _pickDun: 1 };
+const K_SKIP = { plan: 1, _doomT: 1, _doomCb: 1, _aidRef: 1, _giftRef: 1, _beat: 1, _picking: 1, _doomWatch: 1, _pickDun: 1, _going: 1 };
 let kPlanFor = null, kSaveQ = false;
 function kPlain(o, skip) {
     const out = {};
