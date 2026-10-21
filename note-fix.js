@@ -125,6 +125,15 @@ const EXPIRY = [
         try { return window.jisanNoteLive ? window.jisanNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
+    // 📖 종말예언 (옛 지산의 복) — 붉은 헤일로가 사라지면(자정) 줄도 걷는다.
+    { mark: '[ 🔴 정원을 찬양하라', live: function (u, note) {
+        try { return window.jisanNoteLive ? window.jisanNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
+    { mark: '[고행이 시작될 것이다', live: function (u, note) {
+        try { return window.jisanNoteLive ? window.jisanNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
     // 🐾 아기 여우 분신 — 거둬 가거나 소멸하면 줄도 걷는다.
     // 재는 쪽은 babyfox.js 의 kitNoteLive (u.kitOn 에 그 분신이 있나).
     { mark: '[🐾 ', live: function (u, note) {

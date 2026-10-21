@@ -1,114 +1,110 @@
 // ==========================================
-// ★ 🧧 지산의 복 : 대리자 — 상담사 지급 전용
+// ★ 📖 〈종말예언 : 어둠탐사기록〉 — 상담사 지급 전용 (옛 이름 🧧 지산의 복 : 대리자 · 2026-10-21 바꿈)
 // bundles.json 마지막 묶음, babyfox.js 보다 뒤 (맨 끝)
 // ==========================================
 //
-//   충청남도 아산시 ■■리 지산 마을 출신의 사원이 들고 다니는 둥그런 뽑기
-//   통. 그 안에 뭐가 들어 있을지는 모른다.
+//   ■■이라 부르는 각종 ■■■을 ■■한 ■■ ― 이름님께서 하사하신 경전이다.
+//   그런데그걸왜네가가지고있어?
 //
 //   은심장 · 호사수구 · K.LEE · 아기 여우와 같은 결이다. 어느 상점에도
 //   안 깔리고 팔 수도 없다. 주는 법은 jisanGive(사번) 과 당국 화면의
 //   「물품 강제 꽂기」뿐이다.
 //
+//   ★ 이름의 꺾쇠는 〈 〉 (전각)로 적는다. < > 를 그대로 쓰면 물품 이름을
+//     innerHTML 로 그리는 자리마다 태그로 읽혀 이름이 사라진다.
+//   ★ 옛 이름으로 든 것은 들어올 때 새 이름으로 바꾼다 (가방 · 장착칸 · 주인 표 · 특이사항).
+//
 // ■ 다섯 가지
 //
-//   ① 지산의 복 받으세요!
-//      장착자가 어둠에서 죽을 때(오염도로 죽는 것 포함) **파티원 하나가
-//      대신 죽는다.** 장착자는 그대로 어둠에서 나오고, 그 구역 몫의
-//      1.5 ~ 2.5 배를 받는다. 대신 죽은 사람은 그 구역 회수품을 **전부**
-//      받는다 (빛 부속성으로 적어 둔 것은 뺀다).
-//      혼자 들어갔으면 대신 죽을 사람이 없다 — 그때는 장착자가 회수품만
-//      전부 받고 죽음은 그대로 간다.
-//      걸린 사람에게는 [ 오셨구나, 지산의 복! ] 이 뜨고, 30초 동안
-//      화면 위아래로 띠 문구가 흐른다.
+//   1. 덧쓰기
+//      장착자가 탐사 중 죽으면(오염도가 차서 죽는 것 포함) 그 어둠에서 얻을 수 있는
+//      회수품 전체 — 각성 돌파권 · 확정 승인서 포함 — 가운데 1~3종을 무작위로 받는다.
+//      죽음은 그대로 간다. EPIC · K의 방은 회수품 표가 따로 없어 어둠 전 구역의 것에서 고른다.
+//      🎻 신성의 바이올린은 세계에 하나뿐이라 넣지 않는다.
 //
-//      ★ 누가 대신 갈지는 **죽는 그 자리에서 고른다.** 죽음이 닿는 순간
-//        장착자 화면에만 창이 뜨고, 그 방에 살아 있는 사람이 줄지어
-//        나온다. 하나를 누르면 그 사람이 간다. 고르기 전에는 아무것도
-//        일어나지 않으므로 창에는 닫는 단추가 없다.
-//        고른 사람 쪽에는 **늘 하던 [ 오셨구나, 지산의 복! ] 만** 뜬다 —
-//        제가 지목된 줄은 모르고, 그쪽 기록에도 지목은 한 글자도 안 적는다.
-//        (예전에는 ③ 의 황금 막대를 건넨 사람이 대리자였다. 막대는 이제
-//        공용시설 행운 쪽 일만 한다.)
+//   1(추가). 지우기
+//      장착자와 같은 파티로 탐사할 때, 파티원이 죽거나 오염도가 차면 장착자가 대신 죽기를
+//      고를 수 있다. 장착자 화면에 창이 뜨고, 「대신 죽는다」를 누르면 장착자가 죽고
+//      그 파티원은 **그 자리에서 무사히 나온다** (오염도가 찼던 것이면 50% 로 나온다).
+//        · 어둠    죽음이 닿는 순간 그 파티원은 20초 동안 멈춰 기다린다 — 답이 없으면 그대로 죽는다
+//        · K의 방  쓰러져 구조를 기다리는 동안(즉사 기믹 초읽기) 묻는다
+//        · EPIC    쓰러져 구조를 기다리는 동안(즉사 기믹 초읽기 · 동료 부르기) 묻는다
+//      장착자 쪽 죽음은 평소 죽음과 같다 — 장착자 몸에 붙은 보호 장치는 그대로 돈다.
+//      죽으니 덧쓰기도 받는다.
 //
-//   ② 세상 진리로부터 해방되게 하소서
-//      탐사 선택지에서 **죽을 길이 보인다** (☠ 가 붙는다). 그 길을 잡고도
-//      살아 돌아오면 그 탐사의 포인트를 세 배로 받는다.
+//   2. 읽어내기
+//      이름님은 모든 서사와 이야기를 아신다. 탐사 선택지에서 **죽을 길이 보인다** (☠).
+//      그 길을 잡고도 살아 돌아오면 그 탐사의 포인트를 세 배로 받는다.
 //
-//   ③ 황금빛 수탉
-//      장착자는 황금 막대를 가진다. 하루 두 번 남에게(또는 제게) 줄 수
-//      있다. 막대를 받은 사람은 공용시설 행운이 크게 오르고, 대신
-//      **공용시설을 한 번 쓸 때마다 오염도가 15 씩 오른다 — 동결과
-//      무관하게.** 슬롯에서 연달아 세 번 꽝이 나면 그 뒤 열 판은 꽝이
-//      나오지 않는다. 자정이 지나면 막대는 사라진다.
+//   3. 이계의 광기 — 붉은 헤일로
+//      장착자는 붉은 헤일로를 가진다. 하루 두 번 남에게(또는 제게) 줄 수 있다.
+//      헤일로를 받은 사람은 공용시설 행운이 크게 오르고, 대신 **공용시설을 한 번 쓸 때마다
+//      오염도가 15 씩 오른다 — 동결과 무관하게.** 슬롯에서 연달아 세 번 꽝이 나면 그 뒤 열 판은
+//      꽝이 나오지 않는다. 자정이 지나면 사라진다.
+//      헤일로를 지닌 사람의 특이사항에는 [ 🔴 정원을 찬양하라 ] · [고행이 시작될 것이다] 가 달린다.
 //
-//   ④ 잊은 자야 사라져라
-//      장착칸의 [제물] 에서 하루 세 사람까지 미리 찍어 둔다. 찍힌 사람이
-//      상담실에 들어가 있는 동안, 그 시간만큼 장착자에게 포인트가 들어온다
-//      — **한 사람에 시간당 20,000 P** (3분마다 1,000 P 씩 · 하루 다 합쳐 10만까지).
-//      받는 쪽은 **장착자**다. 제물(상담실 안)의 포인트는 건드리지 않는다.
-//      (2026-10-18 · 전에는 10분마다 600 P — 시간당 3,600 P 였다)
+//   4. 되돌리기 — [복원]
+//      장착칸의 [복원] 을 누르면 사원 목록이 뜬다. 하루 세 사람까지 미리 찍어 둔다.
+//      찍힌 사람이 상담실이나 선녀탕에 들어가 있는 동안, 그 시간만큼 **장착자와 그 사람
+//      둘 다** 포인트를 받는다 — 한 사람에 시간당 20,000 P (3분마다 1,000 P 씩).
+//      장착자가 하루에 받는 몫은 10만까지이고, 대상은 장착자가 받은 만큼 같이 받는다.
 //
-//   ⑤ 지산의 복이시여 대리자여
-//      ■■의 ■■■ 탐사에는 한 번에 25,000 P 라는 천장이 있다 (epic.js).
-//      장착자에게는 그 천장이 없다 — 쌓은 그대로 들고 나온다.
-//
-// ■ 빛 부속성 회수품
-//
-//   회수품 자료에는 이름과 확률뿐이고 (dark.js DARK_LOOT_BY_ZONE) 속성을
-//   적는 칸이 없다. 그래서 ① 에서 뺄 것을 아래 LIGHT 에 이름으로 적어
-//   둔다. 빛 부속성이 자료에 생기면 그때 이 목록 대신 그 칸을 보면 된다.
+//   5. 절대적 권능
+//      이름님에게는 한계가 존재하지 않는다. ■■의 ■■■ 탐사에는 한 번에 25,000 P 라는 천장이
+//      있다 (epic.js). 장착자에게는 그 천장이 없다 — 쌓은 그대로 들고 나온다.
 //
 // ■ 적히는 자리
 //
 //   u.jisanDay      하루가 바뀌었나
-//   u.jisanRod      { by, byName, at, miss, safe }   받은 황금 막대
-//   u.jisanRodGave  오늘 막대를 몇 번 주었나
-//                   ★ ① 에서 대신 갈 사람은 어디에도 안 적는다 — 죽는 그
-//                     자리에서 고르고, 고른 결과는 방 쪽(darkParties)에만
-//                     남는다. (예전의 u.jisanMark 는 더 쓰지 않는다.)
-//   u.jisanSac      { 사번: { at, paid } }           찍어 둔 제물과 받은 몫
-//   u.jisanTruth    이번 탐사에서 죽을 길을 잡았나
-//   darkParties/<방>/jisan/<사번> = { by, byName, at, zone }
+//   u.jisanRod      { by, byName, at, miss, safe }   받은 붉은 헤일로
+//   u.jisanRodGave  오늘 헤일로를 몇 번 주었나
+//   u.jisanSac      { 사번: { at, paid, told } }      [복원] 대상과 받은 몫
+//   darkParties/<방>/jisanWear/<사번>  = { at, name }   살아 있는 장착자 (지우기가 묻는 상대)
+//   darkParties/<방>/jisanSpare/<사번> = { ask, until, name, mode, by, byName, closed }
+//       ask    쓰러진 사람이 물은 때 (이 값으로 한 번의 물음을 가린다)
+//       by     장착자가 대신 죽기로 했다 — 양쪽 다 transaction 으로만 쓴다
+//       closed 쓰러진 사람이 기다림을 닫았다 (그 뒤로는 대신 죽을 수 없다)
 //
 //   ★ 남의 글은 통째로 덮지 않는다. 자식 길로만 쓴다.
 //
 // ■ 콘솔
 //   jisanGive(사번)   상담사가 하나 준다
 //   jisanState(사번)  지금 무엇이 걸려 있나
-//   jisanRod(사번)    황금 막대를 준다 (장착자)
-//   jisanSacList()    찍어 둔 제물
-//   jisanBand()       띠 문구를 한 번 띄워 본다 (확인용)
+//   jisanRod(사번)    붉은 헤일로를 준다 (장착자)
+//   jisanSacList()    [복원] 대상
 
 const JISAN = {
-    NAME:       '🧧 지산의 복 : 대리자',
-    ROD_NOTE:   '[🏷 지산의 복 오셨다!]',
-    POLL_NOTE:  '[성내고 욕하는 것은 부정 탄다]',
-    BAND:       '산산백지산복주시옵게대리자야',
-    BAND_MS:    30000,          // ① 띠 문구가 흐르는 시간
-    PAY_LO:     1.5,            // ① 대신 죽었을 때 받는 몫 (구역 몫의 배수)
-    PAY_HI:     2.5,
-    TRUTH_MULT: 3,             // ② 죽을 길을 잡고 살아 돌아왔을 때
-    ROD_DAY:    2,             // ③ 막대를 하루에 몇 번 주나
-    ROD_LUCK:   6,             // ③ 막대를 쥔 사람의 공용시설 행운 배수
-    ROD_POLL:   15,            // ③ 공용시설 한 번에 오르는 오염도 (동결 무관)
-    ROD_MISS:   3,             // ③ 연달아 몇 번 꽝이면
-    ROD_SAFE:   10,            // ③ 그 뒤 몇 판을 꽝 없이 가나
-    SAC_DAY:    3,             // ④ 하루에 찍을 제물 수
-    SAC_CAP:    100000,        // ④ 하루 받을 수 있는 몫의 천장 (제물 모두 합쳐 · 2026-10-18 5만 → 10만)
-    SAC_HOUR:   20000,         // ④ 제물 한 사람이 상담실에 있는 한 시간마다
-    SAC_STEP:   3,             // ④ 몇 분마다 한 번 주나 (20,000 ÷ 60 × 3 = 1,000 P)
-    EPIC_CAP:   25000,         // ⑤ epic.js:655 의 천장
-    // ① 에서 뺄 회수품 — 빛 부속성으로 치는 것들. 자료에 속성 칸이
-    //    생기기 전까지는 여기에 이름으로 적어 둔다.
-    LIGHT: ['각성 돌파권']
+    NAME:       '📖 〈종말예언 : 어둠탐사기록〉',
+    OLD:        '🧧 지산의 복 : 대리자',
+    ROD_NOTE:   '[ 🔴 정원을 찬양하라 ]',
+    POLL_NOTE:  '[고행이 시작될 것이다]',
+    OLD_NOTES:  ['[🏷 지산의 복 오셨다!]', '[성내고 욕하는 것은 부정 탄다]'],
+    OVER_MIN:   1,             // 1. 덧쓰기 — 몇 종을 받나
+    OVER_MAX:   3,
+    OVER_MORE:  ['각성 돌파권', '확정 승인서'],   // 1. 구역 표에 없어도 늘 넣는다
+    SPARE_MS:   20000,         // 1+. 지우기 — 어둠에서 쓰러진 사람이 기다리는 시간
+    SPARE_POLL: 50,            // 1+. 오염도가 차서 쓰러졌던 사람이 나올 때
+    TRUTH_MULT: 3,             // 2. 죽을 길을 잡고 살아 돌아왔을 때
+    ROD_DAY:    2,             // 3. 헤일로를 하루에 몇 번 주나
+    ROD_LUCK:   6,             // 3. 헤일로를 지닌 사람의 공용시설 행운 배수
+    ROD_POLL:   15,            // 3. 공용시설 한 번에 오르는 오염도 (동결 무관)
+    ROD_MISS:   3,             // 3. 연달아 몇 번 꽝이면
+    ROD_SAFE:   10,            // 3. 그 뒤 몇 판을 꽝 없이 가나
+    SAC_DAY:    3,             // 4. 하루에 찍을 [복원] 대상 수
+    SAC_CAP:    100000,        // 4. 장착자가 하루 받을 수 있는 몫의 천장 (대상 모두 합쳐)
+    SAC_HOUR:   20000,         // 4. 대상 한 사람이 상담실 · 선녀탕에 있는 한 시간마다
+    SAC_STEP:   3,             // 4. 몇 분마다 한 번 주나 (20,000 ÷ 60 × 3 = 1,000 P)
+    EPIC_CAP:   25000          // 5. epic.js:655 의 천장
 };
 
 (function jisanLuck() {
 
 const NAME = JISAN.NAME;
+const OLD = JISAN.OLD;
 const ADMIN = 'kario0987';
 const MOD = 'jisan-modal';
+const K_ZONE = 'Qtrew-???-999';
+const EPIC_ZONE = 'Qtrew-???-■■■';
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -145,7 +141,7 @@ function baseOf(w) {
 }
 function wears(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
-    return u.equippedWeapons.some(function (w) { return baseOf(w) === NAME; });
+    return u.equippedWeapons.some(function (w) { const b = baseOf(w); return b === NAME || b === OLD; });
 }
 window.jisanWears = wears;
 
@@ -160,8 +156,12 @@ function patch(code, path, val) {
         else d.ref('users/' + code + '/' + path).set(val).catch(function () { });
     } catch (e) { }
 }
+function pay(u, n) {
+    try { if (typeof changePoints === 'function') { changePoints(n); return; } } catch (e) { }
+    u.points = (Number(u.points) || 0) + n;
+}
 
-// 하루가 바뀌면 — 막대도 제물도 비운다
+// 하루가 바뀌면 — 헤일로도 [복원] 대상도 비운다
 function dayRoll(u) {
     if (!u || u.jisanDay === today()) return false;
     u.jisanDay = today();
@@ -204,14 +204,52 @@ function addNote(u, line) {
         if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(u, line);
     } catch (e) { }
 }
+function noteText(u) {
+    if (!u || !u.badge) return '';
+    return String(typeof u.badge === 'object' ? (u.badge[badgeKey(u)] || '') : u.badge);
+}
 // note-fix.js 가 묵은 줄을 가릴 때 쓴다
 window.jisanNoteLive = function (u, note) {
     try {
         const t = String(note || '');
+        if (JISAN.OLD_NOTES.some(function (x) { return t.indexOf(x) >= 0; })) return false;   // 옛 줄은 늘 묵은 것
         if (t.indexOf(JISAN.ROD_NOTE) < 0 && t.indexOf(JISAN.POLL_NOTE) < 0) return true;
         return !!(u && u.jisanRod && u.jisanRod.at);
     } catch (e) { return true; }
 };
+
+// ==========================================
+// 옛 이름 → 새 이름 (내 기록만 · 3초마다)
+// ==========================================
+function rename() {
+    const u = u_();
+    if (!u || !u.code) return;
+    let ch = false;
+    if (Array.isArray(u.inventory)) u.inventory = u.inventory.map(function (x) { if (x === OLD) { ch = true; return NAME; } return x; });
+    if (Array.isArray(u.equippedWeapons)) u.equippedWeapons = u.equippedWeapons.map(function (x) {
+        if (x === OLD || baseOf(x) === OLD) { ch = true; return String(x).split(OLD).join(NAME); }
+        return x;
+    });
+    if (u.equipOwner && typeof u.equipOwner === 'object' && u.equipOwner[OLD] !== undefined) {
+        u.equipOwner[NAME] = u.equipOwner[OLD]; delete u.equipOwner[OLD]; ch = true;
+        try { if (db_()) db_().ref('users/' + u.code + '/equipOwner/' + OLD).remove(); } catch (e) { }
+    }
+    // 특이사항 — 옛 이름 · 옛 헤일로 줄
+    if (noteText(u).indexOf(OLD) >= 0 && typeof u.badge === 'object') {
+        const k = badgeKey(u); u.badge[k] = String(u.badge[k]).split(OLD).join(NAME); ch = true;
+    }
+    let oldRod = false;
+    JISAN.OLD_NOTES.forEach(function (x) { if (cutNote(u, x)) { oldRod = true; ch = true; } });
+    if (oldRod && u.jisanRod && u.jisanRod.at && noteText(u).indexOf(JISAN.ROD_NOTE) < 0) {
+        addNote(u, JISAN.ROD_NOTE); addNote(u, JISAN.POLL_NOTE);
+    }
+    if (ch) {
+        save({ inventory: 1, equippedWeapons: 1, equipOwner: 1, badge: 1 });
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        console.log('[종말예언] ' + OLD + ' → ' + NAME + ' 이름을 바꿨습니다.');
+    }
+}
+setInterval(function () { try { rename(); } catch (e) { } }, 3000);
 
 // ==========================================
 // 물품 등록 — 어디에도 안 깔린다
@@ -219,18 +257,19 @@ window.jisanNoteLive = function (u, note) {
 (function reg() {
     const iv = setInterval(function () {
         if (typeof ITEM_CATALOG === 'undefined') return;
+        try { delete ITEM_CATALOG[OLD]; } catch (e) { }
         if (ITEM_CATALOG[NAME]) { clearInterval(iv); return; }
         ITEM_CATALOG[NAME] = {
             price: 0, usable: true, targetable: false,
             effect: 'equip_jisan', noSell: true,
-            desc: '[장착] 충청남도 아산시 ■■리 지산 마을 출신의 사원이 들고 다니는 둥그런 뽑기 통. '
-                + '그 안에 뭐가 들어 있을지는 모른다.'
+            desc: '[장착] ■■이라 부르는 각종 ■■■을 ■■한 ■■ ― 이름님께서 하사하신 경전이다. '
+                + '그런데그걸왜네가가지고있어?'
         };
-        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) {
-            NO_SELL_ITEMS.push(NAME);
+        if (typeof NO_SELL_ITEMS !== 'undefined') {
+            [NAME, OLD].forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); });
         }
         clearInterval(iv);
-        console.log('[지산] ' + NAME + ' 등록 — 상담사 지급 전용');
+        console.log('[종말예언] ' + NAME + ' 등록 — 상담사 지급 전용');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -242,8 +281,11 @@ window.jisanNoteLive = function (u, note) {
         const _m = marketSellable;
         const w = function () {
             const pool = _m.apply(this, arguments);
-            if (!Array.isArray(pool)) return pool;
-            return pool.filter(function (x) { return baseOf(x) !== NAME && x !== NAME; });
+            try {
+                if (pool && typeof pool.delete === 'function' && !Array.isArray(pool)) { pool.delete(NAME); pool.delete(OLD); return pool; }
+                if (Array.isArray(pool)) return pool.filter(function (x) { const b = baseOf(x); return b !== NAME && b !== OLD; });
+            } catch (e) { }
+            return pool;
         };
         w._jisan = true;
         marketSellable = w; window.marketSellable = w;
@@ -258,177 +300,323 @@ window.jisanNoteLive = function (u, note) {
         if (useInventoryItem._jisan) { clearInterval(iv); return; }
         const _u = useInventoryItem;
         useInventoryItem = function (itemName) {
-            if (itemName !== NAME) return _u.apply(this, arguments);
+            if (itemName !== NAME && itemName !== OLD) return _u.apply(this, arguments);
             const me = u_();
             if (!me) return;
             if (typeof isQuarantined === 'function' && isQuarantined(me)) {
                 alert_('격리 중에는 장착할 수 없습니다.'); return;
             }
             if (!Array.isArray(me.equippedWeapons)) me.equippedWeapons = [];
-            if (wears(me)) { alert_('이미 차고 있습니다.'); return; }
+            if (wears(me)) { alert_('이미 지니고 있습니다.'); return; }
             if (me.equippedWeapons.length >= 12) { alert_('장착 슬롯이 가득 찼습니다.'); return; }
             me.equippedWeapons.push(NAME);
             try { if (typeof setEquipOwner === 'function') setEquipOwner(me, NAME, me.code); } catch (e) { }
-            try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, NAME, 1); } catch (e) { }
+            try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, itemName, 1); } catch (e) { }
             dayRoll(me);
             addNote(me, '[장착됨] ' + NAME);
             log_(me, '[' + NAME + '] 장착했습니다.');
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-            alert_(NAME + '\n\n통을 흔들면 안에서 무언가가 굴러다닙니다.\n'
-                + '장착칸의 [제물] 로 엽니다.');
+            alert_(NAME + '\n\n이름님께서 하사하신 경전이다.\n그런데그걸왜네가가지고있어?\n\n'
+                + '장착칸의 [복원] · [헤일로] 로 엽니다.');
         };
         useInventoryItem._jisan = true;
         clearInterval(iv);
-        console.log('[지산] 장착 연결');
+        console.log('[종말예언] 장착 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
 
 // ==========================================
-// 띠 문구 — 30초 동안 위아래로 흐른다
+// 지금 어느 탐사인가 · 살아 있나
 // ==========================================
-(function bandCss() {
-    const iv = setInterval(function () {
-        if (!document.head) return;
-        if (document.getElementById('jisan-band-css')) { clearInterval(iv); return; }
-        const s = document.createElement('style');
-        s.id = 'jisan-band-css';
-        s.textContent =
-            '.jisan-band{position:fixed;left:0;right:0;z-index:999998;overflow:hidden;'
-            + 'background:linear-gradient(90deg,#4a0d0d,#8a1414,#4a0d0d);'
-            + 'border-top:1px solid #d9a05a;border-bottom:1px solid #d9a05a;'
-            + 'height:30px;display:flex;align-items:center;pointer-events:none;}'
-            + '.jisan-band.top{top:0;}.jisan-band.bot{bottom:0;}'
-            + '.jisan-band span{display:inline-block;white-space:nowrap;'
-            + 'font-size:13px;font-weight:bold;color:#ffe6a8;letter-spacing:2px;'
-            + 'text-shadow:0 0 6px rgba(255,180,80,0.7);'
-            + 'animation:jisanRun 9s linear infinite;}'
-            + '.jisan-band.bot span{animation-direction:reverse;}'
-            + '@keyframes jisanRun{from{transform:translateX(0);}to{transform:translateX(-50%);}}';
-        document.head.appendChild(s);
-        clearInterval(iv);
-    }, 300);
-    setTimeout(function () { clearInterval(iv); }, 20000);
-})();
+function modeOf(r) {
+    if (!r) return '';
+    if (r.kroom || r.zone === K_ZONE) return 'k';
+    if (r.epic || r.zone === EPIC_ZONE) return 'epic';
+    return 'dark';
+}
+function epicRun() { return (typeof er !== 'undefined') ? er : null; }
+function aliveIn(r) {
+    const m = modeOf(r);
+    if (m === 'k') {
+        const k = (window.KROOM && typeof window.KROOM.state === 'function') ? window.KROOM.state() : null;
+        return !!(k && !k.dead && !k._settled && !k.down);
+    }
+    if (m === 'epic') {
+        const e = epicRun();
+        return !!(e && !e.dead && !e._settled && !e._calledHelp && !e._doomTick);
+    }
+    return !!(r && !r._dead && !r._jisanWait);
+}
 
-window.jisanBand = function (ms) {
-    const txt = (JISAN.BAND + ' ').repeat(24);
-    ['top', 'bot'].forEach(function (k) {
-        const old = document.querySelector('.jisan-band.' + k);
-        if (old) old.remove();
-        const d = document.createElement('div');
-        d.className = 'jisan-band ' + k;
-        d.innerHTML = '<span>' + esc(txt) + '</span>';
-        document.body.appendChild(d);
-    });
+// ==========================================
+// 1. 덧쓰기 — 죽으면 회수품 1~3종
+// ==========================================
+function overPool(zone) {
+    const pool = [];
+    const add = function (n) {
+        if (!n || /바이올린/.test(n) || pool.indexOf(n) >= 0) return;
+        if (typeof ITEM_CATALOG !== 'undefined' && !ITEM_CATALOG[n]) return;
+        pool.push(n);
+    };
+    try { (DARK_LOOT_BY_ZONE[zone] || []).forEach(function (l) { add(l && l.name); }); } catch (e) { }
+    // EPIC · K의 방은 회수품 표가 따로 없다 — 어둠 전 구역의 회수품에서 고른다 (문곡성군과 같은 수)
+    if (!pool.length) {
+        try {
+            Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
+                (DARK_LOOT_BY_ZONE[z] || []).forEach(function (l) { add(l && l.name); });
+            });
+        } catch (e) { }
+    }
+    JISAN.OVER_MORE.forEach(add);
+    return pool;
+}
+function overwrite(zone) {
+    const me = u_();
+    if (!me || !wears(me)) return [];
+    const pool = overPool(zone);
+    if (!pool.length) return [];
+    const n = Math.min(pool.length, JISAN.OVER_MIN + Math.floor(Math.random() * (JISAN.OVER_MAX - JISAN.OVER_MIN + 1)));
+    const got = pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, n);
+    if (!Array.isArray(me.inventory)) me.inventory = [];
+    got.forEach(function (x) { me.inventory.push(x); });
+    log_(me, '[' + NAME + '] 덧쓰기 — 회수품 ' + got.length + '종 (' + got.join(', ') + ')');
+    save({ inventory: 1, history: 1 });
     setTimeout(function () {
-        Array.prototype.forEach.call(document.querySelectorAll('.jisan-band'),
-            function (x) { x.remove(); });
-    }, ms || JISAN.BAND_MS);
-    try { if (typeof pushNotice === 'function') pushNotice('🧧 ' + JISAN.BAND); } catch (e) { }
-};
-
-// ==========================================
-// ① 지산의 복 받으세요! — 대신 죽는다
-// ==========================================
-function zonePay(zone) {
-    let lo = 300, hi = 3000;
-    try {
-        const z = (typeof DARK_ZONES !== 'undefined') ? DARK_ZONES[zone] : null;
-        if (z && Array.isArray(z.reward)) { lo = z.reward[0]; hi = z.reward[1]; }
-    } catch (e) { }
-    const base = (lo + hi) / 2;
-    const k = JISAN.PAY_LO + Math.random() * (JISAN.PAY_HI - JISAN.PAY_LO);
-    return { pay: Math.max(100, Math.round(base * k)), k: k };
-}
-
-// 그 구역 회수품을 전부 — 빛 부속성으로 적어 둔 것은 뺀다
-function allLoot(zone) {
-    let list = [];
-    try {
-        if (typeof DARK_LOOT_BY_ZONE !== 'undefined') list = DARK_LOOT_BY_ZONE[zone] || [];
-    } catch (e) { }
-    return list.map(function (l) { return l && l.name; })
-        .filter(function (n) { return n && JISAN.LIGHT.indexOf(n) < 0; });
-}
-function giveLoot(u, zone) {
-    const got = allLoot(zone);
-    if (!got.length) return [];
-    if (!Array.isArray(u.inventory)) u.inventory = [];
-    got.forEach(function (n) { u.inventory.push(n); });
+        alert_('[ 덧쓰기 ]\n\n끝난 자리 위에 경전이 한 줄을 덧쓴다.\n\n'
+            + '회수품 ' + got.length + '종 — ' + got.join(' · '));
+    }, 900);
     return got;
 }
+window.jisanOverwrite = overwrite;
 
-// 파티에서 나 말고 살아 있는 사람
-function aliveMates() {
-    const r = run();
-    const me = u_();
-    if (!r || !r.isParty || !r.partyId || !me) return [];
-    let p = null;
-    try { p = (typeof darkParties !== 'undefined') ? darkParties[r.partyId] : null; } catch (e) { }
-    if (!p) return [];
-    const alive = p.alive || {};
-    const gone = (p.jisan || {});
-    return Object.keys(p.members || {}).filter(function (c) {
-        if (c === me.code) return false;
-        if (gone[c]) return false;                 // 이미 대신 죽은 사람
-        return alive[c] !== undefined ? !!alive[c] : true;
+// ==========================================
+// 1(추가). 지우기 — 장착자가 대신 죽는다
+// ==========================================
+function partyOf(pid) {
+    try { return (typeof darkParties !== 'undefined' && darkParties) ? darkParties[pid] || null : null; } catch (e) { return null; }
+}
+// 이 방에 살아 있는 장착자가 (나 말고) 있나
+function wearerHere(pid, mine) {
+    const p = partyOf(pid);
+    if (!p || !p.jisanWear) return false;
+    return Object.keys(p.jisanWear).some(function (c) {
+        return c !== mine && p.jisanWear[c] && (!p.members || p.members[c]);
     });
 }
+function spareRef(pid, code) { const d = db_(); return d ? d.ref('darkParties/' + pid + '/jisanSpare/' + code) : null; }
 
-// 대신 갈 사람을 고른다 — 죽음이 닿은 그 자리에서
-//
-//   ★ 닫는 단추를 두지 않는다. 이 창이 뜬 때는 죽음을 이미 멈춰 세운
-//     뒤라서(r._dead = false · 원본 darkDeath 를 안 부른다), 고르지 않고
-//     빠져나가면 아무도 안 가고 장착자도 안 죽는 어정쩡한 자리가 된다.
-function askWho(mates, zone, r, me) {
-    const rows = mates.map(function (c) {
-        return '<button class="game-btn js-pick" data-c="' + esc(c) + '" style="' + BTN + '">'
-            + '<div style="font-size:12px; color:#e6ddd0;">' + esc(nameOf(c)) + ' 사원</div>'
-            + '<div style="font-size:9px; color:#6b6257; margin-top:2px;">'
-            + '통이 이 사람 쪽으로 돌아앉습니다.</div></button>';
-    }).join('');
-    const w = box(head('[ 오셨구나, 지산의 복! ]',
-        '통이 흔들립니다. 당신이 갈 자리입니다.<br>'
-        + '<b style="color:#ffcf8f;">대신 갈 사람을 고르십시오.</b><br>'
-        + '고른 사람은 제가 지목된 줄 모릅니다.')
-        + '<div style="' + SCROLL + '">' + rows + '</div>');
-    Array.prototype.forEach.call(w.querySelectorAll('.js-pick'), function (b) {
-        b.onclick = function () {
-            shut();
-            try { goSub(b.dataset.c, zone, r, me); }
-            catch (e) { console.warn('[지산] 대신 보내기:', e && e.message); }
-        };
-    });
-}
-
-// 고른 사람을 보낸다 — 방에 적고, 장착자는 몫을 받고 걸어 나온다
-function goSub(pick, zone, r, me) {
-    const d = db_();
-    try {
-        if (d && r && r.partyId) d.ref('darkParties/' + r.partyId + '/jisan/' + pick).set({
-            by: me.code, byName: me.name, at: Date.now(), zone: zone
-        });
-    } catch (e) { }
-    const g = zonePay(zone);
-    try { if (typeof changePoints === 'function') changePoints(g.pay); }
-    catch (e) { me.points = (me.points || 0) + g.pay; }
-    log_(me, '[' + NAME + '] ' + nameOf(pick) + ' 사원이 대신 갔습니다 (+'
-        + g.pay.toLocaleString() + ' P)');
-    try {
-        if (r.isParty && typeof sendPartyChat === 'function') {
-            sendPartyChat('통이 흔들렸습니다. 무언가가 굴러 나왔습니다.', true);
+// 쓰러진 쪽 — 묻고, 답을 기다린다.  돌려주는 것: { at, close() → Promise<{ by, byName } | null> }
+window.jisanSpareAsk = function (ms, onSpared) {
+    const r = run(), me = u_();
+    if (!r || !r.isParty || !r.partyId || !me) return null;
+    if (r._jisanSac) return null;                           // 대신 죽으러 가는 길에는 또 묻지 않는다
+    if (!wearerHere(r.partyId, me.code)) return null;
+    const ref = spareRef(r.partyId, me.code);
+    if (!ref) return null;
+    const pid = r.partyId;
+    const at = Date.now();
+    try { ref.set({ ask: at, until: at + ms, name: me.name || '', mode: modeOf(r) }); } catch (e) { return null; }
+    let done = false;
+    const iv = setInterval(function () {
+        if (done) { clearInterval(iv); return; }
+        const p = partyOf(pid);
+        const v = p && p.jisanSpare ? p.jisanSpare[me.code] : null;
+        if (v && v.ask === at && v.by && !v.closed) {
+            done = true; clearInterval(iv);
+            try { onSpared(v.byName || nameOf(v.by)); } catch (e) { console.warn('[종말예언] 지우기:', e && e.message); }
+            return;
         }
+        if (v && v.ask !== at) { done = true; clearInterval(iv); }       // 새 물음이 덮었다
+        if (Date.now() > at + ms + 60000) { done = true; clearInterval(iv); }
+    }, 500);
+    return {
+        at: at,
+        // 기다림을 닫는다. 그 사이 장착자가 먼저 답했으면 그것을 돌려준다.
+        close: function () {
+            if (done) return Promise.resolve(null);
+            done = true; clearInterval(iv);
+            return ref.transaction(function (cur) {
+                if (cur === null) return null;
+                if (!cur || cur.ask !== at) return cur;
+                if (cur.by) return;                                  // 장착자가 먼저 — 닫지 않는다
+                return Object.assign({}, cur, { closed: Date.now() });
+            }).then(function (res) {
+                const v = res && res.snapshot && res.snapshot.val();
+                return (v && v.ask === at && v.by && !v.closed) ? { by: v.by, byName: v.byName || nameOf(v.by) } : null;
+            }).catch(function () { return null; });
+        }
+    };
+};
+
+// 장착자 쪽 — 살아 있다고 방에 적어 둔다 (바뀔 때만 쓴다)
+let presKey = '';
+function presence() {
+    const me = u_(), r = run(), d = db_();
+    if (!d) return;
+    const live = !!(me && r && r.isParty && r.partyId && wears(me) && aliveIn(r));
+    const key = live ? r.partyId + '|' + me.code : '';
+    if (key === presKey) return;
+    if (presKey) {
+        const old = presKey.split('|');
+        try { d.ref('darkParties/' + old[0] + '/jisanWear/' + old[1]).remove(); } catch (e) { }
+    }
+    presKey = key;
+    if (live) {
+        const ref = d.ref('darkParties/' + r.partyId + '/jisanWear/' + me.code);
+        try { ref.set({ at: Date.now(), name: me.name || '' }); ref.onDisconnect().remove(); } catch (e) { }
+    }
+}
+
+// 장착자 쪽 — 쓰러진 사람이 있으면 묻는 창
+const seenAsk = {};
+let askOpen = null;          // { c, at }
+function askCheck() {
+    const me = u_(), r = run();
+    const live = !!(me && r && r.isParty && r.partyId && wears(me) && aliveIn(r));
+    let pick = null;
+    if (live) {
+        const p = partyOf(r.partyId);
+        const all = (p && p.jisanSpare) || {};
+        Object.keys(all).some(function (c) {
+            const v = all[c];
+            if (c === me.code || !v || !v.ask || v.by || v.closed) return false;
+            if (Date.now() > (Number(v.until) || 0)) return false;
+            if (seenAsk[c + '|' + v.ask]) return false;
+            pick = { c: c, v: v };
+            return true;
+        });
+    }
+    if (askOpen && (!pick || pick.c !== askOpen.c || pick.v.ask !== askOpen.at)) {
+        // 열어 둔 물음이 끝났다 (구조됐거나 · 시간이 다 됐거나 · 다른 장착자가 먼저)
+        const still = pick && pick.c === askOpen.c && pick.v.ask === askOpen.at;
+        if (!still) { shutAsk(); }
+    }
+    if (pick && !askOpen) openAsk(pick.c, pick.v);
+    if (askOpen) {
+        const el = document.getElementById('jisan-ask-left');
+        if (el && pick) el.textContent = Math.max(0, Math.ceil(((Number(pick.v.until) || 0) - Date.now()) / 1000));
+    }
+}
+function shutAsk() {
+    askOpen = null;
+    const b = document.getElementById('jisan-ask');
+    if (b) b.remove();
+}
+function openAsk(c, v) {
+    askOpen = { c: c, at: v.ask };
+    const nm = v.name || nameOf(c);
+    const box = document.createElement('div');
+    box.id = 'jisan-ask';
+    box.style.cssText = 'position:fixed; inset:0; z-index:2147482000; display:flex; align-items:center; justify-content:center;'
+        + ' background:rgba(0,0,0,0.82); padding:16px; box-sizing:border-box;';
+    box.innerHTML = '<div style="background:linear-gradient(160deg,#1d1210,#0b0807); border:1px solid #b03030; border-radius:12px;'
+        + ' padding:16px; width:100%; max-width:400px; box-shadow:0 8px 30px rgba(0,0,0,0.75);">'
+        + '<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">[ 📖 지우기 ]</div>'
+        + '<div style="font-size:12px; color:#e6ddd0; line-height:1.8; margin:10px 0 12px 0;">'
+        + '<b style="color:#fff;">' + esc(nm) + '</b> 사원이 쓰러진다.<br>'
+        + '경전의 그 장을 당신의 이름으로 덧쓰면, 그 사원은 무사히 빠져나갑니다.<br>'
+        + '<span style="color:#ff9a9a;">대신 당신이 죽습니다.</span>'
+        + '<div style="font-size:11px; color:#888; margin-top:6px;">남은 시간 <b id="jisan-ask-left" style="color:#ffcf8f;">'
+        + Math.max(0, Math.ceil(((Number(v.until) || 0) - Date.now()) / 1000)) + '</b>초</div></div>'
+        + '<button id="jisan-ask-yes" class="game-btn" style="width:100%; margin:0 0 7px 0; padding:12px; font-size:12px;'
+        + ' background:linear-gradient(145deg,#8a1414,#3d0a0a) !important; border-color:#e07070 !important;">대신 죽는다</button>'
+        + '<button id="jisan-ask-no" class="game-btn" style="width:100%; margin:0; padding:11px; font-size:12px;'
+        + ' background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">지켜본다</button></div>';
+    document.body.appendChild(box);
+    box.querySelector('#jisan-ask-no').onclick = function () { seenAsk[c + '|' + v.ask] = 1; shutAsk(); };
+    box.querySelector('#jisan-ask-yes').onclick = function () {
+        seenAsk[c + '|' + v.ask] = 1;
+        shutAsk();
+        takePlace(c, v);
+    };
+}
+// 대신 죽는다 — 방에 먼저 적고(transaction), 적혔으면 내가 죽는다
+function takePlace(c, v) {
+    const me = u_(), r = run();
+    if (!me || !r || !r.partyId || !aliveIn(r)) { alert_('지금은 대신 갈 수 없습니다.'); return; }
+    const ref = spareRef(r.partyId, c);
+    if (!ref) return;
+    const mode = modeOf(r);
+    ref.transaction(function (cur) {
+        if (cur === null) return null;
+        if (!cur || cur.ask !== v.ask || cur.by || cur.closed) return;
+        if (Date.now() > (Number(cur.until) || 0)) return;
+        return Object.assign({}, cur, { by: me.code, byName: me.name || '', at2: Date.now() });
+    }).then(function (res) {
+        const s = res && res.snapshot && res.snapshot.val();
+        if (!(res && res.committed && s && s.by === me.code && s.ask === v.ask)) {
+            alert_('[ 📖 지우기 ]\n\n이미 늦었습니다. 그 장은 닫혔습니다.');
+            return;
+        }
+        const nm = v.name || nameOf(c);
+        log_(me, '[' + NAME + '] 지우기 — ' + nm + ' 사원 대신 죽음을 받았습니다.');
+        save({ history: 1 });
+        try { if (typeof sendPartyChat === 'function') sendPartyChat('경전 한 장이 찢겨 나갔습니다. ' + nm + ' 사원의 자리가 지워졌습니다.', true); } catch (e) { }
+        const txt = '<span style="color:#ffd9a0;">— ' + esc(nm) + ' 사원의 자리를 당신의 이름으로 덧썼다.</span><br><br>'
+            + '경전 한 장이 찢겨 나간다. 이번에는 당신 차례다.';
+        r._jisanSac = true;
+        try {
+            if (mode === 'k') { if (typeof window.kroomDie === 'function') window.kroomDie(txt); }
+            else if (mode === 'epic') {
+                const e = epicRun(); if (e) e._jisanSac = true;
+                if (typeof epicDeath === 'function') epicDeath(txt);
+            }
+            else if (typeof darkDeath === 'function') darkDeath(txt);
+        } catch (e) { console.warn('[종말예언] 대신 죽기:', e && e.message); }
+    }).catch(function () { alert_('[ 📖 지우기 ]\n\n닿지 않았습니다.'); });
+}
+setInterval(function () {
+    try { presence(); } catch (e) { }
+    try { askCheck(); } catch (e) { }
+}, 700);
+
+// 쓰러졌다가 지워져 나온 사람 — 오염도가 찼으면 50 으로
+function sparedPoll(me) {
+    if ((Number(me.pollution) || 0) >= 100) {
+        me.pollution = JISAN.SPARE_POLL;
+        me.lastPollutionTime = Date.now();
+        return true;
+    }
+    return false;
+}
+function sparedLog(me, byName) {
+    log_(me, '[' + NAME + '] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 무사히 빠져나왔습니다.');
+    save({ pollution: 1, lastPollutionTime: 1, history: 1 });
+    try { if (typeof sendPartyChat === 'function') sendPartyChat((me.name || '') + ' 사원이 무사히 빠져나갔습니다.', true); } catch (e) { }
+}
+function sparedText(byName) {
+    return '<span style="color:#ffd9a0;">— 숨이 멎기 직전, 누군가의 경전이 펼쳐졌다.<br>'
+        + esc(byName) + ' 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>당신은 무사히 빠져나온다.';
+}
+
+// ── 어둠 — 쓰러진 사람이 20초 기다린다
+function darkWait(reasonText, until) {
+    try {
+        darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + '<br><br>'
+            + '<span style="color:#d9a05a;">— 숨이 멎기 직전, 어디선가 경전이 펼쳐지는 소리가 난다.</span>',
+            '<div style="text-align:center; padding:14px; background:rgba(127,0,0,0.18); border:1px solid #7f2a1a; border-radius:6px;">'
+            + '<div style="font-size:11px; color:#ffcf8f;">누군가 대신 지워질지 고르는 중…</div>'
+            + '<div style="font-size:26px; font-weight:bold; color:#fff; margin-top:6px;"><span id="jisan-wait-left">'
+            + Math.ceil((until - Date.now()) / 1000) + '</span><span style="font-size:13px; color:#888;">초</span></div></div>');
+        try { mountDarkChat('normal'); } catch (e) { }
+        const iv = setInterval(function () {
+            const el = document.getElementById('jisan-wait-left');
+            if (!el) { clearInterval(iv); return; }
+            el.textContent = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+        }, 500);
     } catch (e) { }
-    r._dead = false;
-    alert_('[ 오셨구나, 지산의 복! ]\n\n'
-        + nameOf(pick) + ' 사원이 대신 갔습니다.\n'
-        + '당신은 그대로 걸어 나옵니다.\n\n'
-        + '+' + g.pay.toLocaleString() + ' P ('
-        + g.k.toFixed(2) + '배)');
-    window.jisanBand();
+}
+function darkSpared(r, byName) {
+    const me = u_();
+    if (!me || run() !== r || r._jisanSpared || r._dead) return;
+    r._jisanSpared = true;
+    r._jisanWait = false;
+    sparedPoll(me);
+    sparedLog(me, byName);
     try { if (typeof finishDarkRun === 'function') finishDarkRun(); } catch (e) { }
+    alert_('[ 📖 지우기 ]\n\n' + byName + ' 사원의 이름이 당신 자리에 덧쓰였습니다.\n당신은 무사히 빠져나왔습니다.');
 }
 
 (function hookDeath() {
@@ -436,96 +624,125 @@ function goSub(pick, zone, r, me) {
         if (typeof darkDeath !== 'function') return;
         if (darkDeath._jisan) { clearInterval(iv); return; }
         const _d = darkDeath;
-        const w = function (reasonText) {
+        // 원본 죽음 — 끝나고도 죽어 있으면 덧쓰기 (사직서를 고르는 중이면 아직 아니다)
+        const finalDeath = function (self, args) {
+            const me = u_(), r = run();
+            const out = _d.apply(self, args);
             try {
-                const me = u_();
-                const r = run();
-                if (me && r && wears(me) && !r._jisanUsed) {
-                    const zone = r.zone;
-                    const mates = aliveMates();
-                    if (mates.length) {
-                        // 죽음은 여기서 멈추고, 대신 갈 사람은 지금 고른다
-                        r._jisanUsed = true;
-                        r._dead = false;
-                        askWho(mates, zone, r, me);
-                        return;
-                    }
-                    // 혼자 들어왔다 — 회수품만 전부 받고 죽음은 그대로
-                    r._jisanUsed = true;
-                    const got = giveLoot(me, zone);
-                    if (got.length) {
-                        log_(me, '[' + NAME + '] 혼자였습니다 — 회수품 ' + got.length + '종');
-                        save({ inventory: 1, history: 1 });
-                        alert_('[ 오셨구나, 지산의 복! ]\n\n'
-                            + '대신 갈 사람이 없었습니다.\n'
-                            + '통이 열리고 ' + got.length + '종이 쏟아졌습니다.\n\n'
-                            + got.join(' · '));
-                    }
+                const r2 = run();
+                const resign = !!document.querySelector('#dro-body button[onclick*="useResignLetter"]');
+                if (me && r2 && r2 === r && r2._dead && !resign && wears(me) && !r2._jisanOver) {
+                    r2._jisanOver = true;
+                    overwrite(r2.zone);
                 }
-            } catch (e) { console.warn('[지산] 죽음 건너뜀:', e && e.message); }
-            return _d.apply(this, arguments);
+            } catch (e) { console.warn('[종말예언] 덧쓰기 건너뜀:', e && e.message); }
+            return out;
+        };
+        const w = function (reasonText) {
+            const r = run(), me = u_();
+            // K의 방 · EPIC 은 제 길이 따로 있다 (kroom-core.js · 아래 EPIC 연결)
+            if (!r || !me || modeOf(r) !== 'dark') return _d.apply(this, arguments);
+            if (r._jisanWait) return;                        // 기다리는 중 — 겹쳐 오는 죽음은 받지 않는다
+            if (!r._dead && r.isParty && !r._jisanSac && !r._jisanAsked) {
+                const h = window.jisanSpareAsk(JISAN.SPARE_MS, function (by) { darkSpared(r, by); });
+                if (h) {
+                    r._jisanAsked = true;
+                    r._jisanWait = true;
+                    darkWait(reasonText, h.at + JISAN.SPARE_MS);
+                    const self = this, args = arguments;
+                    setTimeout(function () {
+                        if (run() !== r || r._jisanSpared) return;
+                        h.close().then(function (sp) {
+                            if (run() !== r || r._jisanSpared) return;
+                            if (sp) { darkSpared(r, sp.byName); return; }
+                            r._jisanWait = false;
+                            finalDeath(self, args);
+                        });
+                    }, JISAN.SPARE_MS);
+                    return;
+                }
+            }
+            return finalDeath(this, arguments);
         };
         w._jisan = true;
         darkDeath = w; window.darkDeath = w;
         clearInterval(iv);
-        console.log('[지산] 대신 죽기 연결');
+        console.log('[종말예언] 덧쓰기 · 지우기 — 어둠 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-// 내가 걸렸나 — 방을 듣는다
-let watchId = '', watchRef = null, tookIt = {};
-function watchParty() {
-    const r = run();
-    const d = db_();
-    const me = u_();
-    if (!d || !me) return;
-    const pid = (r && r.isParty && r.partyId) ? r.partyId : '';
-    if (pid === watchId) return;
-    if (watchRef) { try { watchRef.off(); } catch (e) { } watchRef = null; }
-    watchId = pid;
-    if (!pid) return;
-    watchRef = d.ref('darkParties/' + pid + '/jisan');
-    watchRef.on('value', function (s) {
-        try {
-            const all = s.val() || {};
-            const mine = all[me.code];
-            if (!mine || !mine.by) return;
-            const key = pid + '|' + mine.at;
-            if (tookIt[key]) return;
-            tookIt[key] = 1;
-            fallen(mine);
-        } catch (e) { }
-    });
+// ── EPIC — 동료를 부르거나(쓰러짐) 즉사 기믹 초읽기에 들 때 묻는다
+function epicSpared(byName) {
+    const e = epicRun(), me = u_(), r = run(), d = db_();
+    if (!e || !me || e.dead || e._settled) return;
+    if (e._doomTick) { clearInterval(e._doomTick); e._doomTick = null; }
+    if (d && r && r.partyId) {
+        ['epicHelp', 'epicDoom'].forEach(function (k) {
+            const ref = d.ref('darkParties/' + r.partyId + '/' + k + '/' + me.code);
+            try { ref.off(); } catch (x) { }                   // 내가 지우는 것을 「구해졌다」로 읽지 않게
+            try { ref.remove(); } catch (x) { }
+        });
+    }
+    e._calledHelp = false; e.danger = null; e._jisanSpare = null;
+    sparedPoll(me);
+    sparedLog(me, byName);
+    try { epicSettle('out', sparedText(byName)); } catch (x) { console.warn('[종말예언] EPIC 지우기:', x && x.message); }
 }
-setInterval(function () { try { watchParty(); } catch (e) { } }, 1500);
-
-function fallen(m) {
-    const me = u_();
-    const r = run();
-    if (!me) return;
-    const got = giveLoot(me, m.zone || (r && r.zone));
-    save({ inventory: 1 });
-    log_(me, '[' + NAME + '] ' + (m.byName || nameOf(m.by)) + ' 사원 대신 갔습니다 — 회수품 '
-        + got.length + '종');
-    window.jisanBand();
-    alert_('[ 오셨구나, 지산의 복! ]\n\n'
-        + (m.byName || nameOf(m.by)) + ' 사원의 통이 흔들렸습니다.\n'
-        + '당신이 나왔습니다.\n\n'
-        + (got.length ? ('회수품 ' + got.length + '종 — ' + got.join(' · ')) : ''));
-    try {
-        // ★ 대신 죽는 사람이 저도 이 물건을 차고 있으면 또 남을 끌어들인다.
-        //   한 번 걸린 사람에게서는 ① 이 돌지 않게 막아 둔다.
-        if (r) { r._jisanFell = true; r._jisanUsed = true; }
-        if (typeof darkDeath === 'function') {
-            darkDeath('통 속에서 당신의 이름이 나왔습니다.<br><br>'
-                + '<span style="color:#ffd9a0;">산산백지산복주시옵게대리자야</span>');
-        }
-    } catch (e) { }
+function epicAsk(ms) {
+    const e = epicRun();
+    if (!e || e._jisanSac || e.dead || e._settled) return;
+    const h = window.jisanSpareAsk(ms, epicSpared);
+    if (h) e._jisanSpare = h;
 }
+function epicClose() {
+    const e = epicRun();
+    if (e && e._jisanSpare) { const h = e._jisanSpare; e._jisanSpare = null; try { h.close(); } catch (x) { } }
+}
+(function hookEpicAsk() {
+    const iv = setInterval(function () {
+        let left = 0;
+        // 동료를 부른다 — 기다림이 걸린 때
+        if (typeof epicCallHelp === 'function' && !epicCallHelp._jisan) {
+            const _c = epicCallHelp;
+            const w = function () {
+                const out = _c.apply(this, arguments);
+                try { if (out) epicAsk(90000); } catch (x) { }
+                return out;
+            };
+            w._jisan = true; epicCallHelp = w; window.epicCallHelp = w;
+        } else if (typeof epicCallHelp !== 'function') left++;
+        // 즉사 기믹 초읽기
+        if (typeof epicDoom === 'function' && !epicDoom._jisan) {
+            const _o = epicDoom;
+            const w = function (cfg) {
+                const out = _o.apply(this, arguments);
+                try {
+                    const e = epicRun(), r = run();
+                    if (e && e._doomTick && r && r.isParty) epicAsk(((cfg && cfg.sec) || 70) * 1000);
+                } catch (x) { }
+                return out;
+            };
+            Object.keys(_o).forEach(function (k) { w[k] = _o[k]; });
+            w._jisan = true; epicDoom = w; window.epicDoom = w;
+        } else if (typeof epicDoom !== 'function') left++;
+        // 구해졌다 — 기다림을 닫는다 (그 뒤로는 대신 죽을 수 없다)
+        ['epicSaved', 'epicDoomSaved'].forEach(function (n) {
+            const f = window[n];
+            if (typeof f !== 'function') { left++; return; }
+            if (f._jisan) return;
+            const w = function () { try { epicClose(); } catch (x) { } return f.apply(this, arguments); };
+            Object.keys(f).forEach(function (k) { w[k] = f[k]; });
+            w._jisan = true; window[n] = w;
+            try { if (n === 'epicSaved') epicSaved = w; else epicDoomSaved = w; } catch (x) { }
+        });
+        if (!left) { clearInterval(iv); console.log('[종말예언] 지우기 — EPIC 연결'); }
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 
 // ==========================================
-// ② 세상 진리로부터 해방되게 하소서 — 죽을 길이 보인다
+// 2. 읽어내기 — 죽을 길이 보인다
 // ==========================================
 //
 //   선택지 자료에는 「죽는 쪽」 표시가 없다. 다만 이 게임에는 관례가
@@ -535,28 +752,13 @@ function fallen(m) {
 //
 // ■ 투표판에서는 선택지에 **손대지 않는다** (중복 투표로 보이던 것)
 //
-//   파티로 함께 가는 자리에서는 선택지가 내 화면에만 있는 게 아니다.
-//   먼저 도착한 사람의 선택지가 **투표판에 통째로 올라가** 모두의 화면이
-//   그것을 쓴다 (index.html:2494 openVote · 2679 renderVoteState).
-//
-//   예전에는 여기서 선택지를 통째로 갈아 끼웠다.
-//
-//       { label:'☠ …', fn:'jisanGo', arg:'1' }      ← id 가 빠졌다
-//
-//   id 가 빠지면 투표판이 이렇게 된다.
-//
-//       · 표를 세는 칸이 tally[o.id] 인데 셋 다 tally[undefined] 가 되어
-//         **한 바구니를 같이 쓴다.** 그래서 세 사람이 각각 다른 쪽에 넣어도
-//         선택지마다 ●●● 3 이 찍힌다 — 중복 투표로 보이던 것이 이것이다.
-//       · 단추도 castVote('undefined') 라 어느 쪽을 눌러도 같은 표가 된다.
-//       · 마감 뒤 runVotedAction 이 모두의 화면에서 window[fn](arg) 를 부르는데,
-//         jisanGo 가 보는 _jisanOpt 는 **내 화면에만** 있다. 남의 화면은
-//         그 자리에 멎고, 내 쪽만 다음 칸으로 가서 투표가 또 열렸다.
-//
+//   파티로 함께 가는 자리에서는 먼저 도착한 사람의 선택지가 **투표판에 통째로
+//   올라가** 모두의 화면이 그것을 쓴다 (index.html:2494 openVote · 2679 renderVoteState).
+//   선택지를 갈아 끼우면 id 가 빠져 표가 한 바구니(tally[undefined])로 몰리고,
+//   마감 뒤 남의 화면이 jisanGo 를 못 찾아 멎었다.
 //   그래서 투표판에 올라가는 선택지는 **원래 것을 그대로** 둔다. ☠ 는 내
 //   화면의 단추에만 덧붙이고 (hookVoteView), 죽을 길을 잡았는지는 마감된
-//   투표에서 센다 (hookVoted). 혼자 가는 자리는 선택지가 밖으로 안 나가므로
-//   전처럼 jisanGo 로 받는다.
+//   투표에서 센다 (hookVoted). 혼자 가는 자리는 jisanGo 로 받는다.
 window._jisanOpt = [];
 window.jisanGo = function (i) {
     const o = window._jisanOpt[Number(i)];
@@ -569,7 +771,7 @@ window.jisanGo = function (i) {
     try {
         const fn = window[o.fn];
         if (typeof fn === 'function') return fn(o.arg);
-    } catch (e) { console.warn('[지산] 선택지:', e && e.message); }
+    } catch (e) { console.warn('[종말예언] 선택지:', e && e.message); }
 };
 
 (function hookChoice() {
@@ -585,14 +787,12 @@ window.jisanGo = function (i) {
                     options = options.map(function (o, i) {
                         const bad = (i > 0);
                         window._jisanOpt.push({ fn: o.fn, arg: o.arg, bad: bad });
-                        // ★ 함께 투표하는 자리면 **원래 선택지 그대로** 올린다
-                        //   (id 를 잃으면 표가 한 바구니로 몰린다)
                         if (shared()) return o;
                         return { id: o.id, label: (bad ? '☠ ' : '') + o.label,
                                  fn: 'jisanGo', arg: String(i) };
                     });
                     text = String(text || '')
-                        + '<br><br><span style="color:#d9a05a;">— 통 속에서 소리가 난다.'
+                        + '<br><br><span style="color:#d9a05a;">— 경전이 이 장을 미리 읽어 준다.'
                         + ' ☠ 가 붙은 쪽은 죽는 길이다.</span>';
                 }
             } catch (e) { }
@@ -601,7 +801,7 @@ window.jisanGo = function (i) {
         w._jisan = true;
         renderChoiceStep = w; window.renderChoiceStep = w;
         clearInterval(iv);
-        console.log('[지산] 죽을 길 보이기 연결');
+        console.log('[종말예언] 읽어내기 — 죽을 길 보이기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -636,7 +836,7 @@ function shared() {
         w._jisan = true;
         renderVoteState = w; window.renderVoteState = w;
         clearInterval(iv);
-        console.log('[지산] 투표판 죽을 길 표시 연결');
+        console.log('[종말예언] 투표판 죽을 길 표시 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -660,15 +860,14 @@ function shared() {
         w._jisan = true;
         runVotedAction = w; window.runVotedAction = w;
         clearInterval(iv);
-        console.log('[지산] 투표 결과 — 죽을 길 셈 연결');
+        console.log('[종말예언] 투표 결과 — 죽을 길 셈 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
 // ==========================================
-// ② 정산 — 죽을 길을 잡고 살아 돌아왔으면 세 배
+// 2. 정산 — 죽을 길을 잡고 살아 돌아왔으면 세 배
 // ==========================================
-//
 //   ★ 정산은 끝에서 darkRun 을 비운다 (index.html:4576). 그러니 배수는
 //     **원본을 부르기 전에** 베껴 둬야 한다 (talkshow.js 가 적어 둔 함정).
 (function hookResult() {
@@ -687,32 +886,31 @@ function shared() {
                     const got = ((u_() && Number(u_().points)) || 0) - before;
                     if (got > 0) {
                         const add = Math.round(got * (JISAN.TRUTH_MULT - 1));
-                        try { if (typeof changePoints === 'function') changePoints(add); }
-                        catch (e) { u_().points = (u_().points || 0) + add; }
-                        log_(u_(), '[' + NAME + '] 죽을 길을 밟고 살아 돌아왔습니다 — 포인트 '
+                        pay(u_(), add);
+                        log_(u_(), '[' + NAME + '] 읽어내기 — 죽을 길을 밟고 살아 돌아왔습니다. 포인트 '
                             + JISAN.TRUTH_MULT + '배 (+' + add.toLocaleString() + ' P)');
                         setTimeout(function () {
-                            alert_('[ 세상 진리로부터 해방되게 하소서 ]\n\n'
+                            alert_('[ 읽어내기 ]\n\n이름님은 모든 서사와 이야기를 아신다.\n'
                                 + '죽는 길을 밟고도 걸어 나왔습니다.\n\n'
                                 + '포인트 ' + JISAN.TRUTH_MULT + '배 — 모두 '
                                 + (got + add).toLocaleString() + ' P');
                         }, 700);
                     }
                 }
-            } catch (e) { console.warn('[지산] 정산 건너뜀:', e && e.message); }
+            } catch (e) { console.warn('[종말예언] 정산 건너뜀:', e && e.message); }
             return out;
         };
         w._jisan = true;
         window._jisanResult = true;        // 뒤에 감싸는 쪽이 표식을 지운다
         renderDarkResult = w; window.renderDarkResult = w;
         clearInterval(iv);
-        console.log('[지산] 세 배 정산 연결');
+        console.log('[종말예언] 세 배 정산 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
 // ==========================================
-// ③ 황금빛 수탉 — 황금 막대
+// 3. 이계의 광기 — 붉은 헤일로
 // ==========================================
 function hasRod(u) {
     if (!u) return false;
@@ -723,13 +921,13 @@ window.jisanHasRod = hasRod;
 
 window.jisanRod = function (who) {
     const me = u_();
-    if (!me || !wears(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
+    if (!me || !wears(me)) { alert_(NAME + ' 을(를) 지니고 있어야 합니다.'); return; }
     dayRoll(me);
     const left = JISAN.ROD_DAY - (Number(me.jisanRodGave) || 0);
-    if (left <= 0) { alert_('오늘 황금 막대는 다 나갔습니다.'); return; }
+    if (left <= 0) { alert_('오늘 붉은 헤일로는 다 나갔습니다.'); return; }
     const t = who ? find(who) : me;
     if (!t) { alert_('사원을 못 찾았습니다.'); return; }
-    if (hasRod(t)) { alert_(t.name + ' 사원은 이미 막대를 쥐고 있습니다.'); return; }
+    if (hasRod(t)) { alert_(t.name + ' 사원은 이미 붉은 헤일로를 지니고 있습니다.'); return; }
 
     const rod = { by: me.code, byName: me.name, at: Date.now(), miss: 0, safe: 0 };
     if (t.code === me.code) {
@@ -741,33 +939,27 @@ window.jisanRod = function (who) {
         patch(t.code, 'jisanRod', rod);
         addNote(t, JISAN.ROD_NOTE);
         addNote(t, JISAN.POLL_NOTE);
-        log_(t, '[' + NAME + '] ' + me.name + ' 사원이 황금 막대를 쥐여 주었습니다.');
+        log_(t, '[' + NAME + '] ' + me.name + ' 사원이 붉은 헤일로를 씌워 주었습니다.');
         t.hasItemUsedOnMe = true;
         try {
             if (typeof updateUserFields === 'function') {
-                // ★ jisanDay 도 같이 보낸다.
-                //   dayRoll 은 「오늘 치를 아직 안 돌렸다」 싶으면 막대를 거둔다.
-                //   그 도장은 여태 **준 사람 화면에만** 찍혀서, 받은 쪽 기록이
-                //   서버에서 내려올 때마다 도장이 없어 다시 거둬졌다 —
-                //   「받자마자 막대가 사라진다」가 이것이다.
+                // ★ jisanDay 도 같이 보낸다 — 받은 쪽 dayRoll 이 「오늘 치를 안 돌렸다」고 거두지 않게
                 updateUserFields(t.code, { badge: t.badge, history: t.history,
                                            jisanDay: t.jisanDay || today(), hasItemUsedOnMe: true });
             }
         } catch (e) { }
     }
-    // ★ 막대는 공용시설 행운 쪽 일만 한다. ① 에서 대신 갈 사람은 죽는 그
-    //   자리에서 고르므로, 여기에는 아무것도 적지 않는다.
     me.jisanRodGave = (Number(me.jisanRodGave) || 0) + 1;
-    log_(me, '[' + NAME + '] 황금 막대 → ' + t.name + ' 사원');
+    log_(me, '[' + NAME + '] 붉은 헤일로 → ' + t.name + ' 사원');
     save({ jisanRodGave: 1, jisanRod: 1, badge: 1, history: 1 });
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    alert_('🏷 황금 막대가 ' + t.name + ' 사원에게 갔습니다.\n\n'
+    alert_('🔴 붉은 헤일로가 ' + t.name + ' 사원에게 갔습니다.\n\n'
         + '공용시설 행운이 크게 오릅니다.\n'
-        + '대신 한 판마다 오염도가 ' + JISAN.ROD_POLL + ' 오릅니다 — 동결과 무관하게.\n\n'
-        + '오늘 남은 막대 ' + (JISAN.ROD_DAY - me.jisanRodGave) + '개');
+        + '대신 한 번 쓸 때마다 오염도가 ' + JISAN.ROD_POLL + ' 오릅니다 — 동결과 무관하게.\n\n'
+        + '오늘 남은 헤일로 ' + (JISAN.ROD_DAY - me.jisanRodGave) + '개');
 };
 
-// 공용시설 행운 — 막대를 쥔 사람
+// 공용시설 행운 — 헤일로를 지닌 사람
 (function hookFacLuck() {
     const iv = setInterval(function () {
         if (typeof facilityLuckMult !== 'function') return;
@@ -781,12 +973,12 @@ window.jisanRod = function (who) {
         w._jisan = true;
         facilityLuckMult = w; window.facilityLuckMult = w;
         clearInterval(iv);
-        console.log('[지산] 황금 막대 — 공용시설 행운 연결');
+        console.log('[종말예언] 붉은 헤일로 — 공용시설 행운 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-// 한 판마다 오염도 +15 — 동결과 무관하게 (그래서 applyPollutionToUser 를 안 쓴다)
+// 한 번마다 오염도 +15 — 동결과 무관하게 (그래서 applyPollutionToUser 를 안 쓴다)
 function pollRaw(u, n) {
     if (!u) return 0;
     const was = Number(u.pollution) || 0;
@@ -806,7 +998,7 @@ function pollRaw(u, n) {
             try {
                 if (on && r !== false) {
                     const up = pollRaw(me, JISAN.ROD_POLL);
-                    if (up > 0) toast('🏷 ' + JISAN.POLL_NOTE + ' (오염도 +' + up + ')');
+                    if (up > 0) toast('🔴 ' + JISAN.POLL_NOTE + ' (오염도 +' + up + ')');
                 }
             } catch (e) { }
             return r;
@@ -814,7 +1006,7 @@ function pollRaw(u, n) {
         w._jisan = true;
         useFacility = w; window.useFacility = w;
         clearInterval(iv);
-        console.log('[지산] 황금 막대 — 오염도 연결');
+        console.log('[종말예언] 붉은 헤일로 — 오염도 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -869,7 +1061,7 @@ function pollRaw(u, n) {
                     if (rod.miss >= JISAN.ROD_MISS) {
                         rod.safe = JISAN.ROD_SAFE;
                         rod.miss = 0;
-                        toast('🏷 통이 열렸다 — 다음 ' + JISAN.ROD_SAFE + '판은 꽝이 없다');
+                        toast('🔴 헤일로가 붉게 탄다 — 다음 ' + JISAN.ROD_SAFE + '판은 꽝이 없다');
                     }
                 }
                 save({ jisanRod: 1 });
@@ -879,13 +1071,13 @@ function pollRaw(u, n) {
         w._jisan = true;
         playSlot = w; window.playSlot = w;
         clearInterval(iv);
-        console.log('[지산] 황금 막대 — 슬롯 연결');
+        console.log('[종말예언] 붉은 헤일로 — 슬롯 연결');
     }, 500);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
 // ==========================================
-// ④ 잊은 자야 사라져라 — 제물
+// 4. 되돌리기 — [복원]
 // ==========================================
 function sacOf(u) {
     if (!u) return {};
@@ -897,25 +1089,50 @@ function sacPaid(u) {
     const s = sacOf(u);
     return Object.keys(s).reduce(function (a, c) { return a + (Number(s[c].paid) || 0); }, 0);
 }
+function inRoom(t, now) { return !!(t && t.quarantineUntil && now < t.quarantineUntil); }
+function roomName(t) { return (t && t.quarantineDest === 'bath') ? '선녀탕' : '상담실'; }
 window.jisanSacList = function () {
     const me = u_();
     if (!me) return;
     const s = sacOf(me);
-    console.log('%c===== 🧧 제물 =====', 'color:#d9a05a; font-size:13px');
+    console.log('%c===== 📖 [복원] 대상 =====', 'color:#d9a05a; font-size:13px');
     const ks = Object.keys(s);
     if (!ks.length) { console.log('  찍어 둔 사람이 없습니다.'); return; }
+    const now = Date.now();
     console.table(ks.map(function (c) {
         const t = userOf(c);
-        return { 사원: nameOf(c),
-                 갇혔나: (t && typeof isQuarantined === 'function' && isQuarantined(t)) ? 'O' : '-',
+        return { 사원: nameOf(c), 들어가있나: inRoom(t, now) ? roomName(t) : '-',
                  받은몫: (Number(s[c].paid) || 0).toLocaleString() + ' P' };
     }));
     console.log('  다 합쳐 ' + sacPaid(me).toLocaleString() + ' / '
         + JISAN.SAC_CAP.toLocaleString() + ' P');
 };
 
-// 찍어 둔 사람이 갇혀 있는 동안 — 그 시간만큼 들어온다
-setInterval(function () {
+// 대상에게도 같은 몫 — 남의 기록이라 transaction 으로 더한다 (p2p-fix.js 의 givePts 와 같은 수)
+function giveTo(code, n, line) {
+    const d = db_();
+    if (!d || !code || !(n > 0)) return;
+    const cap = (typeof POINT_CAP !== 'undefined') ? POINT_CAP : 30000000;
+    try {
+        d.ref('users/' + code + '/points').transaction(function (v) {
+            return Math.min(cap, Math.max(0, Math.round(Number(v) || 0) + n));
+        }).catch(function () { });
+    } catch (e) { }
+    if (!line) return;
+    try {
+        const t = new Date();
+        const time = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ':' + String(t.getSeconds()).padStart(2, '0');
+        d.ref('users/' + code + '/history').transaction(function (h) {
+            const arr = Array.isArray(h) ? h.slice() : (h && typeof h === 'object' ? Object.keys(h).sort().map(function (k) { return h[k]; }) : []);
+            arr.unshift({ time: time, text: line });
+            while (arr.length > 10) arr.pop();
+            return arr;
+        }).catch(function () { });
+    } catch (e) { }
+}
+
+// 찍어 둔 사람이 상담실 · 선녀탕에 있는 동안 — 그 시간만큼 둘 다 받는다 (1분마다)
+function sacTick() {
     try {
         const me = u_();
         if (!me || !wears(me)) return;
@@ -926,37 +1143,42 @@ setInterval(function () {
         if (left <= 0) return;
         let got = 0;
         const now = Date.now();
+        const day = today();
         codes.forEach(function (c) {
             if (left <= 0) return;
             const t = userOf(c);
             if (!t) return;
-            const inRoom = !!(t.quarantineUntil && now < t.quarantineUntil);
             const rec = s[c];
-            if (!inRoom) { rec.at = 0; return; }
+            if (!inRoom(t, now)) { rec.at = 0; return; }
             if (!rec.at) { rec.at = now; return; }
             const mins = (now - rec.at) / 60000;
             if (mins < JISAN.SAC_STEP) return;
             const step = Math.floor(mins / JISAN.SAC_STEP);
-            let pay = Math.min(left, Math.round(step * JISAN.SAC_HOUR * JISAN.SAC_STEP / 60));
-            if (pay <= 0) return;
+            const p = Math.min(left, Math.round(step * JISAN.SAC_HOUR * JISAN.SAC_STEP / 60));
+            if (p <= 0) return;
             rec.at = rec.at + step * JISAN.SAC_STEP * 60000;
-            rec.paid = (Number(rec.paid) || 0) + pay;
-            left -= pay; got += pay;
+            rec.paid = (Number(rec.paid) || 0) + p;
+            left -= p; got += p;
+            // 대상 쪽 — 같은 몫. 기록 줄은 하루 한 번만 (열 줄밖에 안 남는다)
+            const first = rec.told !== day;
+            rec.told = day;
+            giveTo(c, p, first ? ('[' + NAME + '] ' + (me.name || '') + ' 사원의 [복원] — '
+                + roomName(t) + '에 있는 동안 포인트가 함께 들어옵니다.') : null);
         });
         if (got > 0) {
-            try { if (typeof changePoints === 'function') changePoints(got); }
-            catch (e) { me.points = (me.points || 0) + got; }
-            log_(me, '[' + NAME + '] 제물이 갇혀 있는 동안 +' + got.toLocaleString() + ' P');
-            toast('🧧 제물에게서 ' + got.toLocaleString() + ' P');
+            pay(me, got);
+            log_(me, '[' + NAME + '] [복원] 대상이 갇혀 있는 동안 +' + got.toLocaleString() + ' P (대상도 같은 몫)');
+            toast('📖 [복원] ' + got.toLocaleString() + ' P');
             save({ jisanSac: 1, history: 1 });
         } else {
             save({ jisanSac: 1 });
         }
     } catch (e) { }
-}, 60000);
+}
+setInterval(sacTick, 60000);
 
 // ==========================================
-// [제물] 창
+// [복원] · [헤일로] 창
 // ==========================================
 const BTN = 'width:100%; margin:0 0 7px 0; padding:11px; font-size:12px; text-align:left;';
 const GREY = ' background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;';
@@ -984,23 +1206,22 @@ function head(t, sub) {
             + sub + '</div>' : '<div style="height:9px;"></div>');
 }
 
+// 콘솔 · 예전 단추에서 부르던 자리 — 둘 다 고를 수 있게 남겨 둔다
 window.jisanMenu = function () {
     const me = u_();
     if (!me) return;
-    if (!wears(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
+    if (!wears(me)) { alert_(NAME + ' 을(를) 지니고 있어야 합니다.'); return; }
     dayRoll(me);
     const rodLeft = JISAN.ROD_DAY - (Number(me.jisanRodGave) || 0);
     const s = sacOf(me);
-    const w = box(head('🧧 지산의 복 : 대리자',
-        '통을 흔들면 안에서 무언가가 굴러다닙니다.<br>'
-        + '오늘 황금 막대 <b style="color:#ffcf8f;">' + rodLeft + '</b>개 · '
-        + '제물 <b style="color:#ffcf8f;">' + Object.keys(s).length + ' / '
+    const w = box(head(NAME,
+        '이름님께서 하사하신 경전이다.<br>'
+        + '오늘 붉은 헤일로 <b style="color:#ffcf8f;">' + rodLeft + '</b>개 · '
+        + '[복원] <b style="color:#ffcf8f;">' + Object.keys(s).length + ' / '
         + JISAN.SAC_DAY + '</b>명 · 받은 몫 '
-        + sacPaid(me).toLocaleString() + ' / ' + JISAN.SAC_CAP.toLocaleString() + ' P<br>'
-        // ① 에서 대신 갈 사람 — 죽는 그 자리에서 고른다
-        + '대신 갈 사람은 <b style="color:#ffcf8f;">죽는 그 자리에서</b> 고릅니다.')
-        + '<button id="js-sac" class="game-btn" style="' + BTN + ' text-align:center;">제물을 찍는다</button>'
-        + '<button id="js-rod" class="game-btn" style="' + BTN + ' text-align:center;">황금 막대를 쥐여 준다</button>'
+        + sacPaid(me).toLocaleString() + ' / ' + JISAN.SAC_CAP.toLocaleString() + ' P')
+        + '<button id="js-sac" class="game-btn" style="' + BTN + ' text-align:center;">[복원] 대상을 고른다</button>'
+        + '<button id="js-rod" class="game-btn" style="' + BTN + ' text-align:center;">붉은 헤일로를 씌워 준다</button>'
         + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');
     w.querySelector('#js-x').onclick = shut;
     w.querySelector('#js-sac').onclick = pickSac;
@@ -1009,9 +1230,11 @@ window.jisanMenu = function () {
 
 function pickSac() {
     const me = u_();
+    if (!me || !wears(me)) { alert_(NAME + ' 을(를) 지니고 있어야 합니다.'); return; }
     const s = sacOf(me);
     const list = users().filter(function (x) { return x.code !== me.code; });
-    if (!list.length) { alert_('찍을 사원이 없습니다.'); return; }
+    if (!list.length) { alert_('고를 사원이 없습니다.'); return; }
+    const now = Date.now();
     const rows = list.map(function (t) {
         const on = !!s[t.code];
         return '<label style="display:flex; gap:9px; align-items:center; padding:9px 10px;'
@@ -1021,18 +1244,20 @@ function pickSac() {
             + ' style="width:17px; height:17px; flex-shrink:0;">'
             + '<div style="flex:1; min-width:0; font-size:12px; color:#e6ddd0;">'
             + esc(t.name) + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
-            + (on ? '<div style="font-size:9px; color:#d9a05a; margin-top:2px;">받은 몫 '
+            + (inRoom(t, now) ? ' <span style="font-size:9px; color:#ff9a9a;">' + roomName(t) + '</span>' : '')
+            + (on ? '<div style="font-size:9px; color:#d9a05a; margin-top:2px;">함께 받은 몫 '
                     + (Number(s[t.code].paid) || 0).toLocaleString() + ' P</div>' : '')
             + '</div></label>';
     }).join('');
-    const w = box(head('제물을 찍습니다',
-        '하루 ' + JISAN.SAC_DAY + '사람까지입니다. 찍힌 사원이 상담실에 '
-        + '들어가 있는 동안 한 사람에 시간당 ' + JISAN.SAC_HOUR.toLocaleString() + ' P 가 들어옵니다 (다 합쳐 '
-        + JISAN.SAC_CAP.toLocaleString() + ' P 까지).')
+    const w = box(head('[복원] — 죽음 · 오염에서 되돌릴 사람',
+        '하루 ' + JISAN.SAC_DAY + '사람까지 미리 찍어 둡니다. 찍힌 사원이 상담실이나 선녀탕에 '
+        + '들어가 있는 동안, 한 사람에 시간당 ' + JISAN.SAC_HOUR.toLocaleString() + ' P 가 '
+        + '<b style="color:#ffcf8f;">당신과 그 사원 둘 다에게</b> 들어옵니다 (당신 몫은 하루 다 합쳐 '
+        + JISAN.SAC_CAP.toLocaleString() + ' P 까지 · 그 사원은 당신이 받은 만큼).')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="js-ok" class="game-btn" style="' + BTN + ' text-align:center;">찍는다</button>'
-        + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
-    w.querySelector('#js-x').onclick = window.jisanMenu;
+        + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');
+    w.querySelector('#js-x').onclick = shut;
     w.querySelector('#js-ok').onclick = function () {
         const got = Array.prototype.slice.call(w.querySelectorAll('.js-sc:checked'))
             .map(function (x) { return x.value; });
@@ -1044,15 +1269,18 @@ function pickSac() {
         me.jisanSac = next;
         save({ jisanSac: 1 });
         shut();
-        alert_('제물 ' + got.length + '사람을 찍었습니다.\n\n'
+        alert_('[복원] ' + got.length + '사람을 찍었습니다.\n\n'
             + got.map(nameOf).join(' · '));
     };
 }
+window.jisanRestore = pickSac;
 
 function pickRod() {
     const me = u_();
+    if (!me || !wears(me)) { alert_(NAME + ' 을(를) 지니고 있어야 합니다.'); return; }
+    dayRoll(me);
     const left = JISAN.ROD_DAY - (Number(me.jisanRodGave) || 0);
-    if (left <= 0) { alert_('오늘 황금 막대는 다 나갔습니다.'); return; }
+    if (left <= 0) { alert_('오늘 붉은 헤일로는 다 나갔습니다.'); return; }
     const list = [me].concat(users().filter(function (x) { return x.code !== me.code; }));
     const rows = list.map(function (t) {
         const on = hasRod(t);
@@ -1060,50 +1288,54 @@ function pickRod() {
             + ' style="' + BTN + (on ? GREY : '') + '">'
             + (t.code === me.code ? '나 — ' : '') + esc(t.name)
             + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
-            + (on ? '<div style="font-size:9px; color:#a07070; margin-top:2px;">이미 쥐고 있습니다</div>' : '')
+            + (on ? '<div style="font-size:9px; color:#a07070; margin-top:2px;">이미 지니고 있습니다</div>' : '')
             + '</button>';
     }).join('');
-    const w = box(head('황금 막대 — 오늘 ' + left + '개',
-        '공용시설 행운이 크게 오릅니다. 대신 한 판마다 오염도가 '
+    const w = box(head('🔴 붉은 헤일로 — 오늘 ' + left + '개',
+        '공용시설 행운이 크게 오릅니다. 대신 한 번 쓸 때마다 오염도가 '
         + JISAN.ROD_POLL + ' 오릅니다 — 동결과 무관하게.<br>'
         + '슬롯에서 연달아 ' + JISAN.ROD_MISS + '번 꽝이면 그 뒤 '
         + JISAN.ROD_SAFE + '판은 꽝이 없습니다. 자정에 사라집니다.<br>'
-        + '<span style="color:#d9a05a;">막대를 건넨 사람이 어둠에서 당신 대신 갑니다. '
-        + '그쪽 화면에는 막대 이야기만 뜹니다.</span>')
+        + '지닌 사람의 특이사항에 ' + esc(JISAN.ROD_NOTE) + ' 가 달립니다.')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
-        + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
-    w.querySelector('#js-x').onclick = window.jisanMenu;
+        + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');
+    w.querySelector('#js-x').onclick = shut;
     Array.prototype.forEach.call(w.querySelectorAll('.js-rd'), function (b) {
         b.onclick = function () { shut(); window.jisanRod(b.dataset.c); };
     });
 }
+window.jisanHalo = pickRod;
 
-// 장착칸의 [제물] 단추
+// 장착칸 — 장착 단추 옆의 [복원] · [헤일로]
 (function badgeBtn() {
-    const ID = 'jisan-btn';
+    const ID = 'jisan-btn', ID2 = 'jisan-btn-halo';
+    function mk(id, label, fn, bg, bd) {
+        const b = document.createElement('button');
+        b.id = id;
+        b.className = 'game-btn';
+        b.style.cssText = 'margin:0 0 0 6px; padding:6px 10px; font-size:11px; flex-shrink:0;'
+            + ' background:' + bg + ' !important; border-color:' + bd + ' !important;';
+        b.textContent = label;
+        b.onclick = fn;
+        return b;
+    }
     function stick() {
         const host = document.getElementById('inventory-list-container');
         if (!host) return;
-        const old = document.querySelector('#' + ID);
-        if (!wears(u_())) { if (old) old.remove(); return; }
-        if (old && old.isConnected) return;
+        const old = document.getElementById(ID), old2 = document.getElementById(ID2);
+        if (!wears(u_())) { if (old) old.remove(); if (old2) old2.remove(); return; }
+        if (old && old.isConnected && old2 && old2.isConnected) return;
         let card = null;
         for (let i = 0; i < host.children.length; i++) {
             const t = host.children[i].textContent || '';
-            if (t.indexOf('[장착 중 슬롯') >= 0 && t.indexOf(NAME) >= 0) { card = host.children[i]; break; }
+            if (t.indexOf('[장착 중 슬롯') >= 0 && (t.indexOf(NAME) >= 0 || t.indexOf(OLD) >= 0)) { card = host.children[i]; break; }
         }
         if (!card) return;
         const row = card.querySelector('div');
         if (!row) return;
-        const b = document.createElement('button');
-        b.id = ID;
-        b.className = 'game-btn';
-        b.style.cssText = 'margin:0 0 0 6px; padding:6px 10px; font-size:11px; flex-shrink:0;'
-            + ' background:linear-gradient(145deg,#8a1414,#3d0a0a) !important;'
-            + ' border-color:#e07070 !important;';
-        b.textContent = '제물';
-        b.onclick = window.jisanMenu;
-        row.appendChild(b);
+        if (old) old.remove(); if (old2) old2.remove();
+        row.appendChild(mk(ID, '복원', pickSac, 'linear-gradient(145deg,#4a3a1a,#241a08)', '#d9a05a'));
+        row.appendChild(mk(ID2, '헤일로', pickRod, 'linear-gradient(145deg,#8a1414,#3d0a0a)', '#e07070'));
     }
     (function wrapRender() {
         const iv = setInterval(function () {
@@ -1124,7 +1356,7 @@ function pickRod() {
 })();
 
 // ==========================================
-// ⑤ ■■의 ■■■ — 천장이 없다
+// 5. 절대적 권능 — ■■의 ■■■ 천장이 없다 · (1. 덧쓰기 — EPIC 에서 죽었을 때)
 // ==========================================
 //
 //   epic.js:655 가 Math.min(25000, …) 으로 자른다. 그 안을 고칠 수는
@@ -1153,6 +1385,8 @@ function epicRaw(how) {
         const w = function (how, txt) {
             const me = u_();
             let over = 0;
+            const first = !!(epicRun() && !epicRun()._settled);
+            try { epicClose(); } catch (e) { }
             try {
                 if (me && wears(me)) {
                     const raw = epicRaw(how);
@@ -1161,13 +1395,15 @@ function epicRaw(how) {
             } catch (e) { }
             const out = _e.apply(this, arguments);
             try {
-                if (over > 0) {
-                    try { if (typeof changePoints === 'function') changePoints(over); }
-                    catch (e) { me.points = (me.points || 0) + over; }
-                    log_(me, '[' + NAME + '] 천장을 넘긴 몫 +' + over.toLocaleString() + ' P');
+                if (first && how === 'dead' && me && wears(me)) overwrite(EPIC_ZONE);
+            } catch (e) { }
+            try {
+                if (first && over > 0) {
+                    pay(me, over);
+                    log_(me, '[' + NAME + '] 절대적 권능 — 천장을 넘긴 몫 +' + over.toLocaleString() + ' P');
                     setTimeout(function () {
-                        alert_('[ 지산의 복이시여 대리자여 ]\n\n'
-                            + '지산의 복에게 한도가 있으면 안 됩니다.\n\n'
+                        alert_('[ 절대적 권능 ]\n\n'
+                            + '이름님에게는 한계가 존재하지 않는다.\n\n'
                             + '천장 ' + JISAN.EPIC_CAP.toLocaleString() + ' P 를 넘긴 '
                             + over.toLocaleString() + ' P 를 그대로 들고 나왔습니다.');
                     }, 800);
@@ -1178,7 +1414,7 @@ function epicRaw(how) {
         w._jisan = true;
         epicSettle = w; window.epicSettle = w;
         clearInterval(iv);
-        console.log('[지산] ■■의 ■■■ 천장 풀기 연결');
+        console.log('[종말예언] ■■의 ■■■ 천장 풀기 · EPIC 덧쓰기 연결');
     }, 500);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1208,27 +1444,30 @@ window.jisanState = function (who) {
     const t = find(who) || u_();
     if (!t) { console.log('로그인 전입니다.'); return; }
     dayRoll(t);
-    console.log('%c===== 🧧 지산의 복 · ' + t.name + ' =====', 'color:#d9a05a; font-size:13px');
-    console.log('  차고 있나   :', wears(t) ? 'O' : '✗');
-    console.log('  황금 막대   :', hasRod(t)
-        ? ('쥐고 있음 (' + (t.jisanRod.byName || t.jisanRod.by) + ' · 연속 꽝 '
+    console.log('%c===== 📖 종말예언 · ' + t.name + ' =====', 'color:#d9a05a; font-size:13px');
+    console.log('  지니고 있나 :', wears(t) ? 'O' : '✗');
+    console.log('  붉은 헤일로 :', hasRod(t)
+        ? ('지님 (' + (t.jisanRod.byName || t.jisanRod.by) + ' · 연속 꽝 '
            + (Number(t.jisanRod.miss) || 0) + ' · 꽝 없는 판 ' + (Number(t.jisanRod.safe) || 0) + ')')
         : '없음');
-    console.log('  오늘 준 막대:', (Number(t.jisanRodGave) || 0) + ' / ' + JISAN.ROD_DAY);
-    console.log('  대신 갈 사람:', '죽는 그 자리에서 고른다');
+    console.log('  오늘 준 헤일로:', (Number(t.jisanRodGave) || 0) + ' / ' + JISAN.ROD_DAY);
     const s = t.jisanSac || {};
-    console.log('  제물        :', Object.keys(s).map(nameOf).join(' · ') || '없음',
+    console.log('  [복원] 대상 :', Object.keys(s).map(nameOf).join(' · ') || '없음',
         '· 받은 몫 ' + sacPaid(t).toLocaleString() + ' / ' + JISAN.SAC_CAP.toLocaleString() + ' P');
     const r = run();
-    console.log('  이번 탐사   :', r ? (r.zone + (r._jisanTruth ? ' · 죽을 길을 밟음' : '')) : '밖');
-    console.log('  빛 부속성 제외 :', JISAN.LIGHT.join(' · ') || '(없음)');
+    console.log('  이번 탐사   :', r ? (r.zone + ' (' + modeOf(r) + ')' + (r._jisanTruth ? ' · 죽을 길을 밟음' : '')) : '밖');
+    if (r && r.partyId) {
+        const p = partyOf(r.partyId) || {};
+        console.log('  방의 장착자 :', Object.keys(p.jisanWear || {}).map(nameOf).join(' · ') || '없음');
+        console.log('  지우기 물음 :', JSON.stringify(p.jisanSpare || {}));
+    }
 };
 
 window.JISANFOX = { JISAN: JISAN, wears: wears, hasRod: hasRod, dayRoll: dayRoll,
-                    zonePay: zonePay, allLoot: allLoot, sacPaid: sacPaid,
-                    fallen: fallen, mates: aliveMates, epicRaw: epicRaw,
-                    pollRaw: pollRaw, noteLine: JISAN.ROD_NOTE };
+                    overPool: overPool, overwrite: overwrite, sacPaid: sacPaid,
+                    epicRaw: epicRaw, pollRaw: pollRaw, aliveIn: aliveIn, modeOf: modeOf,
+                    wearerHere: wearerHere, sacTick: sacTick, noteLine: JISAN.ROD_NOTE };
 
-console.log('[지산] jisanGive(사번) · jisanState(사번) · jisanRod(사번) · jisanBand()');
+console.log('[종말예언] jisanGive(사번) · jisanState(사번) · jisanRod(사번) · jisanSacList()');
 
 })();

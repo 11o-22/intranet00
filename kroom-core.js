@@ -1255,7 +1255,7 @@ window.kroomNext = function () {
     let vis = visible(it.sc.o);
     const fs = foxSense(vis);                                 // 🐾 감각 분신 — 즉사 기믹 쪽을 가린다
     if (fs) vis = fs.vis;
-    const skull = jisanOn();                                  // 🧧 즉사 기믹에 ☠
+    const skull = jisanOn();                                  // 📖 읽어내기 — 즉사 기믹에 ☠
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
@@ -1315,7 +1315,7 @@ window.kroomPick = function (i) {
     }
     // 특수 물건 — 즉사 기믹은 부순다
     if (!ok && !H.doom && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
-    if (o.doom && jisanOn()) kr.truth = true;               // 🧧 죽을 길을 잡았다
+    if (o.doom && jisanOn()) kr.truth = true;               // 📖 죽을 길을 잡았다
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
     // ★ 히든 직업 조건 — 갈림길을 겪은 수 (던전 등급마다) · 헬퍼 판은 안 센다
@@ -1786,13 +1786,14 @@ function doom(cfg) {
     kr._doomT = setInterval(function () {
         left--;
         const el = document.getElementById('kdoom-left'); if (el) el.innerText = left;
-        if (left <= 0) { clearInterval(kr._doomT); kroomDie(); }
+        if (left <= 0) { clearInterval(kr._doomT); doomEnd(); }
     }, 1000);
     const ref = d.ref('darkParties/' + darkRun.partyId + '/kDoom/' + me().code);
     kr._doomCb = function (s) {
         if (s.val()) return;
         ref.off('value', kr._doomCb);
         clearInterval(kr._doomT);
+        if (kr && kr._spare) { try { kr._spare.close(); } catch (e) { } kr._spare = null; }   // 📖 구해졌다 — 물음을 닫는다
         if (!kr || kr.dead) return;
         const wasDown = kr.down;
         if (kr.down) { kr.down = false; if (kr.stats.hp <= 0) setStat('hp', 20); pubStat(); }
@@ -1802,6 +1803,8 @@ function doom(cfg) {
             darkChoiceBtn('일어선다.', 'kroomNext()'));
     };
     ref.on('value', kr._doomCb);
+    // 📖 지우기 — 방에 종말예언을 지닌 사람이 살아 있으면 대신 죽을지 묻는다 (jisan.js)
+    try { kr._spare = (typeof window.jisanSpareAsk === 'function') ? window.jisanSpareAsk(sec * 1000, kroomSpared) : null; } catch (e) { kr._spare = null; }
     show(cfg.title || '—', cfg.text || '',
         `<div style="text-align:center; padding:16px; background:rgba(127,0,0,0.2); border:1px solid #b71c1c; border-radius:6px;">
             <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:6px;">손을 뻗을 수 있는 시간</div>
@@ -1925,8 +1928,8 @@ window.kroomRescue = function (code) {
 //     🐾 아기 여우    회피·치유 — 죽음을 한 번 받아 낸다 / 연결 — 끌려갈 때 끌어낸다 · 남을 확정으로 구한다 /
 //                    감각 — 즉사 기믹 쪽을 가린다 / 응시 — 굴림 + / 파괴 — 즉사 기믹 파훼 /
 //                    은신 — 격리를 막는다 / 행운 — 꿈결 1.5~3배
-//     🧧 지산의 복    쓰러질 때 파티원 하나가 대신 간다 (장착자는 걸어 나온다 · 구역 몫 1.5~2.5배) /
-//                    즉사 기믹에 ☠ 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배
+//     📖 종말예언    덧쓰기 — 쓰러지면 회수품 1~3종 / 지우기 — 일행이 쓰러져 구조를 기다릴 때 장착자가 대신 죽는다 /
+//                    읽어내기 — 즉사 기믹에 ☠ 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배 (jisan.js)
 //     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 꿈결 두 배
 //     🔎 감지하는 눈  파티 버프 / 버프 받은 사람과 생사가 엮인다 / 정산 배수
 //     📱 K·LEE       버프 / 예약 문자 — 쓰러져도 끌려가지 않는다
@@ -1935,9 +1938,9 @@ window.kroomRescue = function (code) {
 //
 // ■ 즉사 기믹 파훼 — 즉사 기믹 선택지에 실패하면 저절로 쓰인다 (전용 장비 회피보다 먼저)
 // ■ 쓰러질 때 — 이레귤러 부활 → 토크 쇼 부활 → 아기 여우 → 품 안의 것(DNA·은심장·눈의 회피)
-//               → 지산의 복 → K·LEE → 이레귤러 사망 판정 → 그래도 안 되면 쓰러진다
+//               → K·LEE → 이레귤러 사망 판정 → 그래도 안 되면 쓰러진다 (쓰러지면 종말예언 덧쓰기)
 
-const KEEP = ['🩶 은심장', '🦊 호사수구', '🐾 아기 여우', '🧧 지산의 복 : 대리자',
+const KEEP = ['🩶 은심장', '🦊 호사수구', '🐾 아기 여우', '📖 〈종말예언 : 어둠탐사기록〉', '🧧 지산의 복 : 대리자',
               '📺 브라운의 심야 토크 쇼', '🔎 감지하는 눈', '📱 K·LEE'];
 const SHOP_MORE = ['작두', '버터 나이프', '은반지', '유리손포', '착한 친구', '보안팀 의상 세트', '사자탈',
     '다이아 애널 플러그', '다이아 보지 플러그', '루비 클리 피어싱', '루비 유두 피어싱', '사인참사검', '??? 안경',
@@ -2024,7 +2027,7 @@ function hookItems() {
             resetDnaCharge = w;
         }
     } catch (e) { console.warn('[K 의 방] resetDnaCharge 못 걸었다', e); }
-    // 원래 어둠의 죽음 — 이 던전 안이면 이쪽 길로 (지산의 복에 걸린 사람 · 그 밖에 darkDeath 를 부르는 것)
+    // 원래 어둠의 죽음 — 이 던전 안이면 이쪽 길로 (darkDeath 를 부르는 것들)
     try {
         if (typeof darkDeath === 'function') {
             const _d = darkDeath;
@@ -2192,11 +2195,6 @@ function lastChance(why) {
         kv(applyPollutionToUser, null, [u, 4]);
         return standUp(why, '— 품 안의 것이 먼저 반응했다.<br>빛이 한 번 일렁이고, 그것으로 끝이었다.', '#8fd4ff');
     }
-    // 🧧 지산의 복 ① — 파티원 하나가 대신 간다
-    if (jisanOn() && !r._jisanUsed && r.isParty) {
-        const mates = teamStats().filter(function (m) { return m.code !== u.code && !m.down && !m.dead; });
-        if (mates.length) { r._jisanUsed = true; jisanAsk(mates, why); return true; }
-    }
     // 📱 K·LEE ④ — 예약 문자를 보내 두었으면 끌려가지 않는다
     if (typeof window.kleeKroom === 'function') {
         const o = window.kleeKroom();
@@ -2227,27 +2225,33 @@ function lastChance(why) {
     return false;
 }
 
-// 지산의 복 ① — 대신 갈 사람을 그 자리에서 고른다 (닫는 단추는 없다)
-function jisanAsk(mates, why) {
-    kr._jisanWhy = why;
-    show('[ 오셨구나, 지산의 복! ]', why + `<br><br>통이 흔들린다. 당신이 갈 자리다.<br><b style="color:#ffcf8f;">대신 갈 사람을 고른다.</b><br>
-        <span style="font-size:11px; color:#888;">고른 사람은 제가 지목된 줄 모른다.</span>`,
-        mates.map(function (m) { return darkChoiceBtn(esc(m.n) + ' 사원', "kroomJisan('" + m.code + "')"); }).join(''));
+// 📖 지우기 — 쓰러져 구조를 기다리는 동안 장착자가 대신 죽기로 했다. 무사히 나온다 (jisan.js 가 부른다)
+function kroomSpared(byName) {
+    if (!kr || kr.dead || kr._settled) return;
+    if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; }
+    dropDoom();
+    kr._spare = null;
+    const why = (kr._doomCfg && kr._doomCfg.text) || '';
+    if (kr.down) { kr.down = false; pubStat(); }
+    const u = me();
+    if ((Number(u.pollution) || 0) >= 100) { u.pollution = 50; u.lastPollutionTime = now(); }
+    addHistoryLog(u, '[📖 종말예언] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 무사히 빠져나왔습니다.');
+    try { sendPartyChat(u.name + ' 사원이 무사히 빠져나갔습니다.', true); } catch (e) { }
+    outNow((why ? why + '<br><br>' : '') + `<span style="color:#ffd9a0;">— 숨이 멎기 직전, 누군가의 경전이 펼쳐졌다.<br>${esc(byName)} 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>당신은 무사히 빠져나온다.`);
 }
-window.kroomJisan = function (code) {
-    if (!kr || kr.dead || kr._settled || !kr._jisanWhy) return;
-    const u = me(), d = db_(), J = window.JISANFOX;
-    const why = kr._jisanWhy; kr._jisanWhy = null;
-    try { if (d && darkRun.partyId) d.ref('darkParties/' + darkRun.partyId + '/jisan/' + code).set({ by: u.code, byName: u.name, at: now(), zone: K_CODE }); } catch (e) { }
-    const g = J ? J.zonePay(K_CODE) : { pay: 0, k: 1 };
-    try { changePoints(g.pay); } catch (e) { u.points = (u.points || 0) + g.pay; }
-    const nm = (teamStats().filter(function (m) { return m.code === code; })[0] || {}).n || code;
-    addHistoryLog(u, '[🧧 지산의 복 : 대리자] ' + nm + ' 사원이 대신 갔습니다 (+' + g.pay.toLocaleString() + ' P)');
-    try { sendPartyChat('통이 흔들렸습니다. 무언가가 굴러 나왔습니다.', true); } catch (e) { }
-    try { if (typeof jisanBand === 'function') jisanBand(); } catch (e) { }
-    outNow(why + `<br><br><span style="color:#ffd9a0;">— ${esc(nm)} 사원이 대신 갔다. 당신은 그대로 걸어 나온다.</span>
-        <div style="font-size:11px; color:#aaa; margin-top:8px;">+${g.pay.toLocaleString()} P (${g.k.toFixed(2)}배)</div>`);
-};
+// 초읽기가 다 됐다 — 물어 둔 것이 있으면 닫아 보고(그 사이 장착자가 답했으면 그쪽으로), 아니면 쓰러진다
+function doomEnd() {
+    const sp = kr && kr._spare;
+    if (kr) kr._spare = null;
+    if (sp && sp.close) {
+        sp.close().then(function (got) {
+            if (!kr || kr.dead || kr._settled) return;
+            if (got) kroomSpared(got.byName); else kroomDie();
+        });
+        return;
+    }
+    kroomDie();
+}
 
 // 쓰러지지 않고 빠져나왔다 — 경험치 · 꿈결은 절반, 반입품 · 포인트는 그대로
 function outNow(text) {
@@ -2343,6 +2347,7 @@ function hardDeath(why) {
     darkRun._dead = true;
     try { if (typeof window.heartPayParty === 'function') window.heartPayParty(); } catch (e) { }   // 🩶 은심장
     try { if (window.eyeKroom) window.eyeKroom.dead(); } catch (e) { }                            // 🔎 감지하는 눈
+    try { if (jisanOn() && typeof window.jisanOverwrite === 'function') window.jisanOverwrite(K_CODE); } catch (e) { }   // 📖 덧쓰기 (반입품을 덜어 낸 뒤에)
     settle('dead', why);
 }
 
@@ -2384,7 +2389,7 @@ function settle(how, txt) {
     if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
     if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
-        if (kr.truth && jisanOn()) { pts *= 3; extra.push('🧧 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
+        if (kr.truth && jisanOn()) { pts *= 3; extra.push('📖 읽어내기 — 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
         const p = showP();
         if (p) { let m = 1; try { m = talkShowMult(p); } catch (e) { } if (m > 1) { pts = Math.round(pts * m); extra.push('📺 무대 열기 — 포인트 ×' + m.toFixed(2)); } }
         if (window.eyeKroom) { let m = 1; try { m = window.eyeKroom.mult(); } catch (e) { } if (m !== 1) { pts = Math.round(pts * m); extra.push('🔎 눈의 몫 — 포인트 ×' + m); } }
@@ -3014,6 +3019,7 @@ window.kroomGive = function (who, field, val) {
 };
 window.KROOM = { hard: function () { return hard(); }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
+    doom: function (c) { return doom(c); },               // 시험용 — 즉사 기믹 초읽기를 바로 띄운다
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
 console.log('[K 의 방] ' + K_CODE + ' — 직업 ' + Object.keys(JOBS).length + ' · 던전 ' + Object.keys(DUNS).length + ' (준비 ' + Object.keys(DUNS).filter(function (d) { return DUNS[d].ready; }).length + ') — kroomState()');
