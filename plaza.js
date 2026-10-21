@@ -2548,7 +2548,7 @@ function watchChat() {
         const v = s.val() || {};
         if (!v.t) return;
         if (hidPeer(v.c)) return;          // 상담사의 맵 채팅 — 선염 말고는 안 보인다
-        addLine(v.n || '?', v.t, v.c, s.key);
+        addLine(v.n || '?', v.t, v.c, s.key, v.at);
     });
     paintLog();
 }
@@ -2564,7 +2564,7 @@ function watchAll() {
     allRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, k: s.key, quiet: now() < allFrom });
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, k: s.key, at: v.at, quiet: now() < allFrom });
     });
 }
 
@@ -2688,8 +2688,8 @@ function watchWhisper() {
     whRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        if (v.o) { pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'out', k: s.key, quiet: true }); return; }   // 내가 보낸 줄
-        pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', k: s.key, quiet: now() < whFrom });
+        if (v.o) { pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'out', k: s.key, at: v.at, quiet: true }); return; }   // 내가 보낸 줄
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', k: s.key, at: v.at, quiet: now() < whFrom });
     });
 }
 
@@ -2833,6 +2833,7 @@ function paintFeed() {
     }).join('');
 }
 
+const LINE_KEEP = 30 + 30 + 40 + 10;     // 서버 · 맵 · 귓속말 · 알림 줄
 // 글줄은 **들고 있다가** 창을 열 때 그린다 (창이 닫혀 있어도 안 잃는다)
 function pushLine(o) {
     if (!run) return;
@@ -2842,11 +2843,26 @@ function pushLine(o) {
     //   그 방 말이 child_added 로 처음부터 또 쏟아진다. 서버가 준 열쇠(k)
     //   가 같으면 이미 선 줄이다.
     if (o.k && run.lines.some(function (q) { return q.k === o.k; })) return;
-    run.lines.push(o);
-    while (run.lines.length > P.CHAT_KEEP + 10) run.lines.shift();
+    // ★ 때 순서로 끼운다 · 남기는 줄을 늘린다 (2026-10-21)
+    //   ✗ 들어오면 서버 채팅(30줄)을 먼저 받고 귓속말(40줄)을 뒤에 받는데, 글줄은 40줄만 남기고
+    //     **먼저 온 것부터** 버렸다. 그래서 다시 들어오면 귓속말만 남고 서버 채팅이 다 밀려났다.
+    //   → 줄마다 적힌 때(at · 없으면 서버 열쇠의 때)로 자리를 잡고, 서버 · 맵 · 귓속말이 다 남을 만큼 둔다.
+    if (o.at == null) o.at = keyTime(o.k) || now();
+    let i = run.lines.length;
+    while (i > 0 && (Number(run.lines[i - 1].at) || 0) > o.at) i--;
+    run.lines.splice(i, 0, o);
+    while (run.lines.length > LINE_KEEP) run.lines.shift();
     paintLog();
     paintFeed();
-    paintBar(o);
+    if (run.lines[run.lines.length - 1] === o) paintBar(o);   // 가장 새 줄일 때만 아래 바를 바꾼다
+}
+// 서버가 준 열쇠(push)의 앞 8자는 만든 때다 — at 이 없는 옛 줄의 자리를 잡을 때 쓴다
+function keyTime(k) {
+    const A = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+    if (!k || String(k).length < 8) return 0;
+    let t = 0;
+    for (let j = 0; j < 8; j++) { const c = A.indexOf(String(k).charAt(j)); if (c < 0) return 0; t = t * 64 + c; }
+    return (t > 1.5e12 && t < now() + 86400000) ? t : 0;
 }
 
 // 지난 이야기를 길게 — 왼쪽 아래 글줄을 누르면 뜬다 (logSheet)
@@ -2923,8 +2939,8 @@ function whHead(o) {
     return o.sv ? '<span class="sv">서버</span> ' : '';
 }
 
-function addLine(who, text, code, key) {
-    pushLine({ n: who, t: text, c: code, k: key });
+function addLine(who, text, code, key, at) {
+    pushLine({ n: who, t: text, c: code, k: key, at: at });
 }
 
 function sysLine(text) {
