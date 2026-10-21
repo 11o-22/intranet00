@@ -322,6 +322,22 @@ function kill(k, why) {
     }
     const me = u_();
     if (me && me.kitOn && me.kitOn[k]) { delete me.kitOn[k]; }
+    // 🐾 기억 — 광장에서 「괜찮았어?」 같은 물음에 성격대로 답할 때 쓴다 (api/_disaster/core.js kitMemLine · 최근 다섯)
+    try {
+        const d = db_(), r = run();
+        if (d && r && r.zone) {
+            const z = (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[r.zone]) || {};
+            const ref = d.ref('kitMemory/' + x.ownerCode + '_' + k);
+            ref.push({ at: Date.now(), d: String(z.name || r.zone).slice(0, 30), dark: 1, gone: 1,
+                       why: String(why || '').slice(0, 40), oN: (x.owner && x.owner.name) || '' });
+            ref.once('value').then(function (s) {
+                const v = s.val() || {}, ks = Object.keys(v).sort();
+                if (ks.length <= 5) return;
+                const up = {}; ks.slice(0, ks.length - 5).forEach(function (kk) { up[kk] = null; });
+                ref.update(up);
+            }).catch(function () { });
+        }
+    } catch (e) { }
     log_(x.owner, '[' + NAME + '] ' + nickOf(x) + ' — ' + (why || '소멸했습니다.'));
     toast('🐾 ' + nickOf(x) + (why ? ' — ' + why : ' 소멸'));
     return true;

@@ -727,6 +727,13 @@ function stampSafe(ov) {
         // ── 채팅 칸 머리 : 왼쪽 위에 「서버 · 맵」
         '.plaza-chh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex:0 0 auto;}',
         '.plaza-chh .t{margin-left:auto;font-size:12.5px;color:#e8dcc6;}',
+        // 🐾 아기 여우 — 부르기 단추 · 나와 있는 아이 · 여우 줄
+        '#plaza-kit{padding:5px 9px;border-radius:8px;font-size:14px;line-height:1;cursor:pointer;',
+        '  background:rgba(255,184,112,.12);border:1px solid rgba(255,184,112,.45);}',
+        '#plaza-kit:disabled{opacity:.45;}',
+        '#plaza-kit-on{font-size:10.5px;color:#ffb870;margin:-3px 0 8px 2px;flex:0 0 auto;}',
+        '#plaza-feed div.fx .who,#plaza-log div.fx .who{color:#ffb870;}',
+        '#plaza-feed div.fx,#plaza-log div.fx{color:#f3dcc4;}',
         '#plaza-ch{display:flex;gap:5px;}',
         '#plaza-ch button{padding:5px 13px;border-radius:999px;font-size:11px;cursor:pointer;',
         '  font-family:inherit;background:rgba(255,255,255,.04);color:#8d8578;',
@@ -2564,7 +2571,7 @@ function watchAll() {
     allRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
-        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, k: s.key, at: v.at, quiet: now() < allFrom });
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, sv: 1, k: s.key, at: v.at, quiet: now() < allFrom, fx: v.fox ? 1 : 0 });
     });
 }
 
@@ -2677,6 +2684,97 @@ window.plazaWhisperTo = function (code, name) {
     whTo = String(code || ''); whName = String(name || code || '');
     chatCh = 'wh'; chPaint();
 };
+
+// ==========================================
+// ★ 🐾 아기 여우 — 광장에 불러낸다 · 말은 서버 채팅으로 (2026-10-21)
+// ==========================================
+//   채팅 칸 머리의 [🐾] — 아기 여우를 찼거나 누가 붙여 준 아이가 있는 사람에게만 보인다.
+//   누르면 서버(/api/disaster · act kitcall)가 아이들을 불러낸다 —
+//     붙은 사람이 부르면 곁의 아이가, 장착자가 부르면 남에게 안 붙은 아이가 다 나온다.
+//     지금 선 장소(방)와 그 방에 함께 있는 사람을 같이 넘긴다 — 나오면서 그 사람들에게도 인사한다.
+//   여우의 말은 늘 **서버 채팅**(plazaChat/all)에 선다. 맵 · 서버 어디서 말해도 2.5초 뒤 대답을 청한다
+//   (서버가 서버 채팅과 그 방의 맵 채팅을 같이 읽는다). 한 아이 하루 스무 마디 — 스무 번째는 작별 인사.
+//   plazaFox/on 에 지금 나와 있는 아이가 적힌다 (서버가 쓴다).
+const KIT_BABY = '🐾 아기 여우';
+const KIT_NAMES = { evade: '코코', sense: '잭슨', heal: '쭈니', hide: '루팡', luck: '앙냥', break: '디트', bond: '메리', gaze: '니케' };
+let kitRef = null, kitHere = {}, kitBusy = false, kitTimer = 0;
+function kitWatch() {
+    const d = db_(); if (!d || kitRef) return;
+    kitRef = d.ref('plazaFox/on');
+    kitRef.on('value', function (s) { kitHere = s.val() || {}; kitPaint(); });
+}
+function kitUnwatch() {
+    if (kitRef) { try { kitRef.off(); } catch (e) { } kitRef = null; }
+    kitHere = {};
+    if (kitTimer) { clearTimeout(kitTimer); kitTimer = 0; }
+}
+function kitDay() { return new Date(now() + 9 * 3600000).toISOString().slice(0, 10); }
+function kitLive() {
+    const d = kitDay();
+    return Object.keys(kitHere || {}).filter(function (id) { return kitHere[id] && kitHere[id].day === d; });
+}
+function kitCan() {
+    const u = u_();
+    if (!u) return false;
+    const base = function (w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } };
+    if (Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return base(w) === KIT_BABY; })) return true;
+    return !!(u.kitOn && typeof u.kitOn === 'object' && Object.keys(u.kitOn).some(function (k) { return u.kitOn[k] && u.kitOn[k].by; }));
+}
+function kitApi(body) {
+    return fetch('/api/disaster', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); });
+}
+// 지금 이 방에 함께 있는 사람 (상담사가 안 보이는 사람에게는 상담사도 빼고)
+function kitNear() {
+    if (!run || !run.peers) return [];
+    return Object.keys(run.peers).filter(function (c) { return !hidPeer(c); }).map(function (c) {
+        const q = run.peers[c], du = (typeof db !== 'undefined' && db.users) ? db.users[c] : null;
+        return { c: c, n: (q && q.one && q.one.name) || (du ? nameOf(du) : c) };
+    }).slice(0, 12);
+}
+function kitCall() {
+    const u = u_();
+    if (!u || !run || kitBusy) return;
+    if (!kitCan()) { sysLine('부를 아기 여우가 없습니다.'); return; }
+    kitBusy = true; kitPaint();
+    const r = roomOf();
+    kitApi({ act: 'kitcall', run: 'plaza', code: u.code, room: (r && r.n) || '', seat: seatKey(run.room, run.inst), here: kitNear() })
+        .then(function (j) {
+            if (j && j.ok) return;
+            const why = j && j.why;
+            if (why === 'here') sysLine('🐾 이미 나와 있습니다.' + (j.spent && j.spent.length ? ' (오늘 다 놀고 들어간 아이: ' + j.spent.join(' · ') + ')' : ''));
+            else if (why === 'spent') sysLine('🐾 오늘은 다 놀고 들어갔습니다. 내일 다시 불러 주세요.');
+            else if (why === 'none') sysLine('부를 아기 여우가 없습니다. (남에게 붙여 주었거나 오늘 소멸한 아이는 나오지 않습니다)');
+            else if (why === 'daily') sysLine('🐾 오늘은 아이들이 너무 많이 놀았습니다. 내일 다시 불러 주세요.');
+            else sysLine('아기 여우를 부르지 못했습니다.' + (j && j.error ? ' (' + j.error + ')' : ''));
+        })
+        .catch(function () { sysLine('아기 여우를 부르지 못했습니다.'); })
+        .then(function () { kitBusy = false; kitPaint(); });
+}
+window.plazaKitCall = kitCall;
+// 말한 뒤 — 나와 있는 아이가 있으면 2.5초 뒤 대답을 청한다 (잇달아 말하면 마지막 한 번만)
+function kitPoke() {
+    if (!kitLive().length || chatCh === 'wh') return;
+    const u = u_();
+    if (!u || !run) return;
+    const seat = seatKey(run.room, run.inst);
+    if (kitTimer) clearTimeout(kitTimer);
+    kitTimer = setTimeout(function () {
+        kitTimer = 0;
+        if (!kitLive().length) return;
+        kitApi({ act: 'kitchat', run: 'plaza', code: u.code, seat: seat }).catch(function () { });
+    }, 2500);
+}
+function kitPaint() {
+    const b = document.getElementById('plaza-kit');
+    if (b) { b.style.display = kitCan() ? '' : 'none'; b.disabled = !!kitBusy; }
+    const k = document.getElementById('plaza-kit-on');
+    if (k) {
+        const ids = kitLive();
+        k.style.display = ids.length ? '' : 'none';
+        k.textContent = ids.length ? '🐾 ' + ids.map(function (id) { const f = kitHere[id] || {}; return f.nick || KIT_NAMES[f.k] || '아기 여우'; }).join(' · ') + ' 나와 있음 — 말은 서버 채팅으로' : '';
+    }
+}
 
 // ── 나에게 온 귓속말을 듣는다 (광장에 있는 내내 한 번만 건다)
 function watchWhisper() {
@@ -2827,7 +2925,7 @@ function paintFeed() {
     const rows = (run.lines || []).slice(-FEED_KEEP);
     el.innerHTML = rows.map(function (o, i) {
         const dim = (0.45 + 0.55 * ((i + 1) / rows.length)).toFixed(2);   // 묵은 줄은 옅게
-        return '<div class="' + (o.w ? 'wh' : '') + '" style="opacity:' + dim + '">' + (o.sys
+        return '<div class="' + (o.w ? 'wh' : (o.fx ? 'fx' : '')) + '" style="opacity:' + dim + '">' + (o.sys
             ? '<span class="sys">· ' + esc(o.t) + '</span>'
             : whHead(o) + '<span class="who">' + cyN(o.c, esc(o.n)) + '</span> ' + cyS(sayer(o), esc(o.t))) + '</div>';
     }).join('');
@@ -2871,7 +2969,7 @@ function paintLog() {
     if (!log || !run) return;
     log.innerHTML = (run.lines || []).map(function (o) {
         return o.sys ? '<div class="sys">· ' + esc(o.t) + '</div>'
-                     : '<div class="' + (o.w ? 'wh' : '') + '">' + whHead(o)
+                     : '<div class="' + (o.w ? 'wh' : (o.fx ? 'fx' : '')) + '">' + whHead(o)
                        + '<span class="who">' + cyN(o.c, esc(o.n)) + '</span> ' + cyS(sayer(o), esc(o.t)) + '</div>';
     }).join('') || '<div class="sys">아직 오간 말이 없습니다.</div>';
     log.scrollTop = log.scrollHeight;
@@ -2893,7 +2991,9 @@ function chatBox() {
         +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
         +   '<button data-c="wh">귓속말</button>'
         + '</div>'
+        + '<button id="plaza-kit" type="button" title="아기 여우 부르기" style="display:none">🐾</button>'
         + '<b class="t">채팅</b></div>'
+        + '<div id="plaza-kit-on" style="display:none"></div>'
         + '<div id="plaza-whto" style="display:none"></div>'
         + '<div id="plaza-log"></div>'
         + '<div id="plaza-send">'
@@ -2905,6 +3005,9 @@ function chatBox() {
     });
     const wt = s.querySelector('#plaza-whto');
     if (wt) wt.onclick = function (e) { e.stopPropagation(); whoPick(); };
+    const kb = s.querySelector('#plaza-kit');
+    if (kb) kb.onclick = function (e) { e.stopPropagation(); kitCall(); };
+    kitPaint();
     const inp = s.querySelector('#plaza-in2');
     const go = function () { say(inp.value); inp.value = ''; };
     inp.addEventListener('keydown', function (e) {
@@ -2984,6 +3087,7 @@ function say(text) {
             if (chatCh === 'all') trimAll();
         } catch (e) { }
     }
+    kitPoke();
 }
 window.plazaSay = say;
 
@@ -3588,6 +3692,7 @@ function shut() {
     leaveRoom();
     if (chatRef) { try { chatRef.off(); } catch (e) { } chatRef = null; }
     if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
+    kitUnwatch();
     if (whRef) { try { whRef.off(); } catch (e) { } whRef = null; }
     if (nbRef) { try { nbRef.off(); } catch (e) { } nbRef = null; }
     Object.keys(run.peers).forEach(dropPeer);
@@ -3882,6 +3987,7 @@ function open() {
     watchNotice();
     watchAll();
     watchWhisper();
+    kitWatch();
 
     // ★ 지난번에 서 있던 방에서 다시 시작한다 — 들어갔다 나오면 광장이
     //   아니라 **그 자리**여야 한다. 없어진 방이면 광장으로 돌아간다.

@@ -27,16 +27,6 @@
 //   마지막으로 본 때를 이 기기에 적어 둔다(localStorage). 그보다 뒤에
 //   남의 말이 올라오면 단추에 빨간 점이 붙는다.
 //
-// ■ 🐾 아기 여우 (2026-10-21)
-//
-//   여우가 붙은 사람 · 아기 여우 장착자에게는 적는 줄 옆에 [🐾] 단추가 뜬다.
-//   누르면 서버(/api/disaster · act kitcall)가 아이들을 불러낸다 —
-//     붙은 사람이 부르면 곁의 아이가, 장착자가 부르면 남에게 안 붙은 아이가 다 나온다.
-//   나와 있는 동안 누가 말하면 2.5초 뒤 서버(act kitchat)가 대답을 올린다 (여럿이 잇달아 말하면 마지막 한 번만).
-//   한 아이가 하루에 나누는 말은 스무 마디 — 스무 번째는 「이제 가 봐야겠다」는 작별 인사고, 그러고 나간다.
-//   여우 줄은 allChat 에 { code: 'fox_<주인>_<속성>', fox: 속성, oN: 주인 이름, onN: 곁의 사람 } 으로 선다.
-//   allChatFox/on 에 지금 나와 있는 아이가 적힌다 (서버가 쓴다).
-//
 // ■ 콘솔
 //   allChatState()        지금 몇 줄 · 접속자 몇 명
 //   allChatClear()        상담사 — 전부 지운다
@@ -51,8 +41,6 @@ const ALLCHAT = {
 
 const KEY = 'allChat.read.v1';
 let ref = null, log = [], open_ = false, lastSeen = 0;
-let kitRef = null, kitHere = {}, kitBusy = false, kitTimer = 0;
-const BABY = '🐾 아기 여우';
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -125,81 +113,7 @@ function attach() {
 }
 function detach() {
     if (ref) { try { ref.off(); } catch (e) { } ref = null; }
-    if (kitRef) { try { kitRef.off(); } catch (e) { } kitRef = null; }
-    log = []; kitHere = {};
-}
-
-// ==========================================
-// 🐾 아기 여우
-// ==========================================
-function kstDay() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
-function kitAttach() {
-    if (kitRef || !db_()) return;
-    kitRef = db_().ref('allChatFox/on');
-    kitRef.on('value', function (s) {
-        kitHere = s.val() || {};
-        paintKit();
-    });
-}
-function kitLive() {
-    const d = kstDay();
-    return Object.keys(kitHere || {}).filter(function (id) { return kitHere[id] && kitHere[id].day === d; });
-}
-function kitNameOf(f) { return (f && (f.nick || ({ evade: '코코', sense: '잭슨', heal: '쭈니', hide: '루팡', luck: '앙냥', break: '디트', bond: '메리', gaze: '니케' })[f.k])) || '아기 여우'; }
-// 부를 수 있는 사람 — 아기 여우를 찼거나, 누가 붙여 준 아이가 있거나
-function kitCan() {
-    const u = me();
-    if (!u) return false;
-    const base = function (w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } };
-    if (Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return base(w) === BABY; })) return true;
-    return !!(u.kitOn && typeof u.kitOn === 'object' && Object.keys(u.kitOn).some(function (k) { return u.kitOn[k] && u.kitOn[k].by; }));
-}
-function kitApi(body) {
-    return fetch('/api/disaster', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j._st = r.status; return j; }); });
-}
-function kitSay(t) { try { if (typeof showCustomAlert === 'function') showCustomAlert(t); } catch (e) { } }
-window.allChatKitCall = function () {
-    const u = me();
-    if (!u || kitBusy) return;
-    if (!kitCan()) { kitSay('부를 아기 여우가 없습니다.'); return; }
-    kitBusy = true; paintKit();
-    kitApi({ act: 'kitcall', run: 'allchat', code: u.code }).then(function (j) {
-        if (j && j.ok) return;
-        const why = j && j.why;
-        if (why === 'here') kitSay('🐾 이미 나와 있습니다.' + (j.spent && j.spent.length ? '\n\n오늘 다 놀고 들어간 아이: ' + j.spent.join(' · ') : ''));
-        else if (why === 'spent') kitSay('🐾 오늘은 다 놀고 들어갔습니다.\n내일 다시 불러 주세요.');
-        else if (why === 'none') kitSay('부를 아기 여우가 없습니다.\n(남에게 붙여 주었거나 오늘 소멸한 아이는 나오지 않습니다)');
-        else if (why === 'daily') kitSay('🐾 오늘은 아이들이 너무 많이 놀았습니다. 내일 다시 불러 주세요.');
-        else kitSay('아기 여우를 부르지 못했습니다.' + (j && j.error ? '\n(' + j.error + ')' : ''));
-    }).catch(function () { kitSay('아기 여우를 부르지 못했습니다.'); })
-      .then(function () { kitBusy = false; paintKit(); });
-};
-// 말한 뒤 — 나와 있는 아이가 있으면 2.5초 뒤 대답을 청한다 (잇달아 말하면 마지막 한 번만)
-function kitPoke() {
-    if (!kitLive().length) return;
-    const u = me();
-    if (!u) return;
-    if (kitTimer) clearTimeout(kitTimer);
-    kitTimer = setTimeout(function () {
-        kitTimer = 0;
-        if (!kitLive().length) return;
-        kitApi({ act: 'kitchat', run: 'allchat', code: u.code }).catch(function () { });
-    }, 2500);
-}
-function paintKit() {
-    const b = document.getElementById('allchat-kit');
-    if (b) {
-        b.style.display = kitCan() ? '' : 'none';
-        b.disabled = !!kitBusy;
-        b.style.opacity = kitBusy ? '0.5' : '1';
-    }
-    const k = document.getElementById('allchat-kit-on');
-    if (k) {
-        const ids = kitLive();
-        k.style.display = ids.length ? '' : 'none';
-        k.textContent = ids.length ? '🐾 ' + ids.map(function (id) { return kitNameOf(kitHere[id]); }).join(' · ') + ' 나와 있음' : '';
-    }
+    log = [];
 }
 
 // ==========================================
@@ -345,19 +259,6 @@ window.openAllChat = function () {
             + ' onclick="sendAllChat()">전송</button></div>'
             + '</div>';
         document.body.appendChild(el);
-        // 🐾 아기 여우 부르기 단추 — 부를 수 있는 사람에게만 보인다
-        const row0 = el.querySelector('#allchat-row');
-        if (row0) {
-            const kb = document.createElement('button');
-            kb.type = 'button'; kb.id = 'allchat-kit'; kb.textContent = '🐾'; kb.title = '아기 여우 부르기';
-            kb.style.cssText = 'margin:0; padding:0 10px; font-size:15px; line-height:1; flex-shrink:0;'
-                + ' background:var(--sk-tab, rgba(255,184,112,0.08));'
-                + ' border:1px solid var(--sk-line, #5a4630); border-radius:5px; cursor:pointer; display:none;';
-            kb.onclick = function () { window.allChatKitCall(); };
-            row0.insertBefore(kb, row0.firstChild);
-        }
-        const sub0 = el.querySelector('#allchat-sub');
-        if (sub0) sub0.insertAdjacentHTML('afterend', '<div id="allchat-kit-on" style="display:none; font-size:9px; color:#ffb870; margin-top:2px;"></div>');
         // 이모티콘 단추
         const row = el.querySelector('#allchat-row');
         if (row && typeof emoOpen === 'function') {
@@ -373,8 +274,6 @@ window.openAllChat = function () {
     }
     el.style.display = 'flex';
     paintSkin(el);
-    kitAttach();
-    paintKit();
     histPush();
     markRead();
     paintLog(true);
@@ -445,6 +344,8 @@ function paintLog(force) {
 }
 
 // 🐾 아기 여우 줄 — 사진 자리에 여우 · 이름 옆에 누구의 아이인지
+//   (아기 여우는 이제 광장에서 부르고 광장 서버 채팅으로 말한다 · 2026-10-21 —
+//    처음 하루 이 칸에서 불렀을 때 선 줄이 남아 있으면 이렇게 그린다)
 function foxRow(m, time) {
     const whose = (m.oN ? m.oN + '의 아기 여우' : '아기 여우') + (m.on && m.o && m.on !== m.o && m.onN ? ' · ' + m.onN + ' 곁' : '');
     return '<div style="display:flex; gap:8px; margin-bottom:9px; align-items:flex-start;">'
@@ -480,13 +381,13 @@ window.sendAllChat = function () {
     if (!u) return;
     // 격리 중에도 쓸 수 있다 — 상담실·선녀탕 안에서는 시설이 막힐 뿐,
     // 말까지 막을 까닭은 없다. (전에는 여기서 돌려보냈다)
-    if (push({ text: v.slice(0, ALLCHAT.MAX) })) { inp.value = ''; markRead(); kitPoke(); }
+    if (push({ text: v.slice(0, ALLCHAT.MAX) })) { inp.value = ''; markRead(); }
 };
 
 window.emoSendAll = function (id) {
     const e = (typeof emoById === 'function') ? emoById(id) : null;
     if (!e) return;
-    if (push({ text: '[이모티콘] ' + e.n, st: id })) { markRead(); kitPoke(); }
+    if (push({ text: '[이모티콘] ' + e.n, st: id })) markRead();
 };
 
 // ==========================================
@@ -498,8 +399,6 @@ setInterval(function () {
         attach();
         paintBtn();
         if (open_) {
-            kitAttach();
-            paintKit();
             const sub = document.getElementById('allchat-sub');
             if (sub) sub.textContent = '접속 ' + onlineCount() + '명 · 최근 ' + ALLCHAT.KEEP + '줄';
             paintSkin();     // 열어 둔 채로 벽지를 갈아도 따라오게
