@@ -1358,15 +1358,33 @@ function deathsSeen() {
         return (partyChatLog || []).some(function (m) { return m && m.code === 'SYSTEM' && /(신호|소식)이 끊겼습니다/.test(String(m.text || '')); });
     } catch (e) { return false; }
 }
+// ★ 가장 가난한 사람 — 손에 든 포인트만이 아니라 은행까지 합쳐 본다 (2026-10-21)
+//   ✗ 손에 든 포인트만 봤다. 은행에 예금을 넣어 둔 사람은 손이 비어 보여 「가장 가난한 사람」으로 뽑혔다.
+//   → 보유 포인트 + 은행 예금 − 갚을 대출 이 가장 적은 사람. (은행 장부를 못 읽으면 예전처럼 보유 포인트만)
+function wealthOf(x, bank) {
+    const b = bank ? bank[x.code] : null;
+    const dep = b ? (Number(b.deposit) || 0) : 0;
+    const owe = (b && b.loan) ? (Number(b.loan.owe) || 0) : 0;
+    return (Number(x.points) || 0) + dep - owe;
+}
 function poorest(exclude) {
     const list = users().filter(function (x) {
         if (exclude.indexOf(x.code) >= 0) return false;
         try { if (typeof isRealUser === 'function' && !isRealUser(x)) return false; } catch (e) { }
         return true;
     });
-    list.sort(function (a, b) { return (Number(a.points) || 0) - (Number(b.points) || 0); });
-    return list[0] || null;
+    const pick = function (bank) {
+        list.sort(function (a, b) { return wealthOf(a, bank) - wealthOf(b, bank); });
+        return list[0] || null;
+    };
+    const d = db_();
+    if (!d) return Promise.resolve(pick(null));
+    return d.ref('bank').once('value').then(function (s) { return pick(s.val() || {}); })
+        .catch(function () { return pick(null); });
 }
+window.chilPoorest = function () {
+    poorest([]).then(function (p) { console.log('[칠성] 가장 가난한 사원 —', p ? p.name + ' (' + p.code + ')' : '없음'); });
+};
 // 정산서 칸에 줄을 붙인다 — 어둠 [탐사 정산서] · EPIC · K의 방 [정산]
 function addReport(html) {
     try {
@@ -1419,12 +1437,12 @@ function onReturn(pre, total) {
             }
         }
         if (all && got > 0) {
-            const pz = poorest([u.code]);
             const pp = Math.round(got * CHIL.MUG.poor);
-            if (pz && pp > 0) {
+            if (pp > 0) poorest([u.code]).then(function (pz) {
+                if (!pz) return;
                 sendPay(pz.code, pp, '[🌟 무곡성군] 전원 생환의 복덕이 닿았습니다 (+' + won(pp) + ')');
-                lines.push('· 가장 가난한 ' + esc(pz.name) + ' 사원에게 ' + won(pp));
-            }
+                addReport('· 가장 가난한 ' + esc(pz.name) + ' 사원에게 ' + won(pp));
+            });
         }
     } else if (pre.mugBy && pre.mugBy.by !== u.code) {
         // 같이 간 사람 — 무곡 치성 ×5
