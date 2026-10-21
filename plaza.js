@@ -919,14 +919,70 @@ function makeOne(user, label, k, other) {
     const tag = document.createElement('div');
     tag.className = 'plaza-tag';
     //   칸 위쪽 여백이 4도트에서 29도트로 늘어, 꼭대기에 붙이면 머리에서
-    //   한참 떠 버린다. 머리 언저리(빈 몫의 절반쯤)로 내려 붙인다.
-    tag.style.top = Math.round(sp.H * k * 0.22) + 'px';
+    //   한참 떠 버린다. 머리 언저리로 내려 붙인다.
+    //   ★ 2026-10-21 — 칸의 정해진 높이(22%)가 아니라 **입은 것 가운데 가장 높은 곳** 바로 위에 띄운다.
+    //     늑대 잠옷 귀 · 갓처럼 머리보다 높은 것을 쓰면 이름표가 그 위로 올라가고,
+    //     보통 머리에서도 전보다 조금 더 띄운다 (TAG_GAP).
+    tagPlace(tag, user, k, !!other, h);
     wrap.appendChild(tag);
 
     // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
     const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null };
     setTag(one, (user && user.code) || '', label || '');
     return one;
+}
+
+// ── 🏷 이름표 높이 — 입은 장들 가운데 가장 높은 픽셀 바로 위 (2026-10-21)
+//   장마다 칸 안에서 가장 위에 그림이 있는 줄(y)을 한 번 재서 들고 있는다 (같은 장은 다시 안 잰다).
+//   재기 전에는 보통 머리 높이(TAG_TOP)로 둔다.
+const TAG_TOP = 112;          // 보통 머리 꼭대기 (칸 안 y · 352x384 칸)
+const TAG_GAP = 6;            // 그 위로 띄우는 몫 (화면 px)
+const SHEET_TOP = {};         // 장 이름 → 칸 안에서 가장 위 y (재는 중이면 콜백 목록)
+function sheetTop(name, cb) {
+    const v = SHEET_TOP[name];
+    if (typeof v === 'number') { cb(v); return; }
+    if (Array.isArray(v)) { v.push(cb); return; }
+    const wait = SHEET_TOP[name] = [cb];
+    const done = function (t) { SHEET_TOP[name] = t; wait.forEach(function (f) { try { f(t); } catch (e) { } }); };
+    const img = new Image();
+    img.onload = function () {
+        try {
+            const W = img.naturalWidth, H2 = img.naturalHeight, H = Math.floor(H2 / 2);
+            const c = document.createElement('canvas'); c.width = W; c.height = H2;
+            const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+            const d = x.getImageData(0, 0, W, H2).data;
+            let top = null;
+            for (let y = 0; y < H && top === null; y++) {
+                for (let r = 0; r < 2 && top === null; r++) {
+                    const off = (y + r * H) * W * 4;
+                    for (let i = 3; i < W * 4; i += 4) if (d[off + i] > 0) { top = y; break; }
+                }
+            }
+            done(top === null ? 9999 : top);
+        } catch (e) { done(9999); }
+    };
+    img.onerror = function () { done(9999); };
+    img.src = 'dot/' + name + '.png';
+}
+function tagPlace(tag, user, k, all, h) {
+    const put = function (top) {
+        tag.style.top = 'auto';
+        tag.style.bottom = Math.round(h - top * k + TAG_GAP) + 'px';
+    };
+    put(TAG_TOP);
+    let L = null;
+    try { if (typeof window.dotLook === 'function') L = window.dotLook(user, null, all); } catch (e) { }
+    if (!L) return;
+    const names = [L.head].concat(L.layers || [], L.tops || []).filter(Boolean);
+    if (L.body && L.body !== 'none') names.push(L.body);
+    let left = names.length, best = 9999;
+    if (!left) return;
+    names.forEach(function (n) {
+        sheetTop(n, function (t) {
+            if (t < best) best = t;
+            if (--left === 0 && best < 9999) put(best);
+        });
+    });
 }
 
 // ── 🏷 닉네임 옆 칭호
