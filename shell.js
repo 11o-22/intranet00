@@ -246,7 +246,9 @@ function toPlaza() {
     if (typeof old !== 'function') return;
     window.attemptLogin = function () {
         const r = old.apply(this, arguments);
-        const after = function () { setTimeout(toPlaza, 60); };
+        // ★ 들어오지 못했으면(사원명 · 인가 코드가 틀림 등) 광장을 열지 않는다 (2026-10-21)
+        //   열면 광장의 「아직 들어갈 수 없습니다.」가 로그인의 알림을 덮어썼다
+        const after = function () { setTimeout(function () { const u = me(); if (u && u.code) toPlaza(); }, 60); };
         try { Promise.resolve(r).then(after, after); } catch (e) { after(); }
         return r;
     };
