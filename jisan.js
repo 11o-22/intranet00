@@ -1334,8 +1334,21 @@ window.jisanHalo = pickRod;
         const row = card.querySelector('div');
         if (!row) return;
         if (old) old.remove(); if (old2) old2.remove();
-        row.appendChild(mk(ID, '복원', pickSac, 'linear-gradient(145deg,#4a3a1a,#241a08)', '#d9a05a'));
-        row.appendChild(mk(ID2, '헤일로', pickRod, 'linear-gradient(145deg,#8a1414,#3d0a0a)', '#e07070'));
+        // 세로로 — [해제] 아래로 [복원] · [헤일로] (2026-10-21)
+        let col = row.querySelector('.jisan-btn-col');
+        if (!col) {
+            col = document.createElement('div');
+            col.className = 'jisan-btn-col';
+            col.style.cssText = 'display:flex; flex-direction:column; align-items:stretch; gap:6px; flex-shrink:0;';
+            const un = Array.prototype.filter.call(row.children, function (x) { return x.tagName === 'BUTTON' || (x !== row.children[0]); })[0];
+            if (un) { row.insertBefore(col, un); col.appendChild(un); un.style.margin = '0'; }
+            else row.appendChild(col);
+        }
+        [mk(ID, '복원', pickSac, 'linear-gradient(145deg,#4a3a1a,#241a08)', '#d9a05a'),
+         mk(ID2, '헤일로', pickRod, 'linear-gradient(145deg,#8a1414,#3d0a0a)', '#e07070')].forEach(function (b) {
+            b.style.margin = '0';
+            col.appendChild(b);
+        });
     }
     (function wrapRender() {
         const iv = setInterval(function () {
