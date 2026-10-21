@@ -1,16 +1,15 @@
 // ==========================================
-// ★ 상담사 — 같은 방 직원만 임신시킨다 · 상담사의 출산 고유 아이템 (2026-10-18)
+// ★ 상담사 — 임신시키기 · 착정 · 상담사의 출산 고유 아이템 (2026-10-18)
 // bundles.json 마지막 묶음, pen.js 뒤
 // ==========================================
 //
-// ■ 임신시키기
+// ■ 임신시키기 · 착정 (2026-10-21 — 같은 방 직원만 → 다른 사원 누구에게나)
 //
-//   상담사 계정도 임신시킬 수 있다. 성별 · 물약과 상관없이 「시키는 쪽」으로 본다
-//   (canSire). 대신 **같은 방을 쓰는 직원** — 관사로 데려온 동거인
-//   (house.roomie, house-L.js) — 한 사람에게만 된다.
-//     · 사원 열람에서 동거인이 아니면 「임신시키기」 단추를 빼고 까닭을 적는다.
-//     · tryPregnancy · doPregnancy 도 동거인이 아니면 멈춘다 (동의 요청으로 돌아와도).
-//     · 동거인이라 동의 없이 바로 판정한다 (원래 규칙 isPartner 그대로).
+//   상담사 계정은 성별 · 물약과 상관없이 「시키는 쪽」이자 「받는 쪽」이다 (canSire · canBear).
+//   사원 열람에서 상대의 몸 규칙대로 단추가 뜬다 — 받을 수 있는 몸이면 「임신시키기」,
+//   시킬 수 있는 몸이면 「착정한다」 (preg-v2.js — 상담사는 단추 칸이 없어도 띄운다).
+//     · 동거인 · 커플이면 동의 없이 바로, 아니면 상대 동의 (원래 규칙 isPartner 그대로).
+//     ✗ 전에는 같은 방을 쓰는 동거인(house.roomie) 한 사람만 임신시킬 수 있었다.
 //
 // ■ 출산 고유 아이템
 //
@@ -51,11 +50,6 @@ function roomieOf(u) {
         return (h && h.roomie) || null;
     } catch (e) { return null; }
 }
-// 상담사와 같은 방을 쓰는가
-function sameRoom(code) {
-    const me = u_();
-    return !!(isAdm(me) && code && roomieOf(me) === code);
-}
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); } catch (e) { } }
 // 나는 상담사의 동거인인가 — 내 쪽이 상담사를 가리키고, 상담사 쪽도 나를 가리켜야 한다 (유령 동거인 막기)
 function adminRoomie(me) {
@@ -91,19 +85,16 @@ keepOuter('canSire', '_pregAdmin', function (f) {
 });
 
 // ==========================================
-// 2. 같은 방 직원에게만
+// 2. 상담사를 임신시키는 것은 상담사의 동거인만 (상담사가 시키는 것은 누구에게나 · 2026-10-21)
 // ==========================================
-const NOTE = '상담사는 같은 방(관사)을 쓰는 직원만 임신시킬 수 있습니다.';
 keepOuter('tryPregnancy', '_pregAdmin', function (f) {
     return function (code) {
-        if (isAdm(u_()) && !sameRoom(code)) { alert_(NOTE); return; }
         if (code === ADMIN && !isAdm(u_()) && !adminRoomie(u_())) { alert_(NOTE_IN); return; }
         return f.apply(this, arguments);
     };
 });
 keepOuter('doPregnancy', '_pregAdmin', function (f) {
     return function (code) {
-        if (isAdm(u_()) && !sameRoom(code)) { alert_(NOTE + '\n\n진행되지 않았습니다.'); return; }
         if (code === ADMIN && !isAdm(u_()) && !adminRoomie(u_())) { alert_(NOTE_IN + '\n\n진행되지 않았습니다.'); return; }
         // 알림띠 — 상담사가 시키거나 상담사가 받으면 안 띄운다 (아래 4)
         const was = forced;
@@ -122,15 +113,6 @@ keepOuter('addPregBtn', '_pregAdmin', function (f) {
                 const b = document.getElementById('preg-do-btn');
                 if (b) b.remove();
                 return r;
-            }
-            if (!isAdm(me) || sameRoom(code)) return r;
-            const box = document.getElementById('preg-btn-box');
-            if (!box) return r;
-            const btn = box.querySelector('#preg-do-btn');
-            if (btn) btn.remove();
-            if (!document.getElementById('preg-admin-note') && users()[code] && !(typeof isPregnant === 'function' && isPregnant(users()[code]))) {
-                box.insertAdjacentHTML('beforeend',
-                    '<div id="preg-admin-note" style="font-size:10px; color:#888; margin-top:8px; line-height:1.6;">' + NOTE + '</div>');
             }
         } catch (e) { }
         return r;

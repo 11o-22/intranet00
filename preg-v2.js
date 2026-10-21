@@ -358,10 +358,16 @@ window.doMilk = doMilk;
 })();
 
 function reshape(code) {
-    const box = document.getElementById('preg-btn-box');
-    if (!box || !currentUser) return;
+    if (!currentUser) return;
     const t = db.users[code];
     if (!t) return;
+    let box = document.getElementById('preg-btn-box');
+    // ★ 상담사 — 단추 칸이 없어도 착정할 수 있으면 칸을 만들어 띄운다 (2026-10-21)
+    if (!box && currentUser.code === 'kario0987' && code !== currentUser.code && canMilk(t)) {
+        const wrap = document.getElementById('emp-detail-card-container');
+        if (wrap) { wrap.insertAdjacentHTML('beforeend', '<div id="preg-btn-box"></div>'); box = document.getElementById('preg-btn-box'); }
+    }
+    if (!box) return;
 
     // 돌보기 버튼 제거
     box.querySelectorAll('button[onclick*="openCarePanel"]').forEach(function (b) { b.remove(); });
