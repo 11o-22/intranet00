@@ -31,7 +31,7 @@
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
 //   ③ 녹존  하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
 //            치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
-//   ④ 문곡  하루 1번 — 「청한다」를 눌러 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다
+//   ④ 문곡  하루 1번 — 「청한다」를 눌러 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다 (🎻 신성의 바이올린은 안 나온다)
 //            고르고 나면 그날 회수품 확률 ×1.5~2.5 · 치성(★ 셋) — 셋 중 둘
 //   ⑤ 염정  열 가지 속성(회피 · 파괴 · 치유 · 행운 · 감각 · 은신 · 연결 · 응시 · 보정 · 굳건) 중 하나를 준다 — 탐사 중 D 로 함께한다
 //            치성(★ 다섯 · 하루 1번) — 그날 그 속성 L · 두 개까지. 내 전용 장비 등급이 더 높으면 그쪽을 쓴다
@@ -1155,15 +1155,17 @@ window.chilMunArm = function () {
     menu();
 };
 let munPick = null;   // { zone, cand:[], need, sel:[] }
+// ★ 문곡성군이 고르게 해 주지 않는 회수품 — 🎻 신성의 바이올린 (세계에 하나뿐 · 2026-10-21)
+function munNo(n) { return /바이올린/.test(String(n || '')); }
 function munOpen(zone) {
     const u = me(), s = st(u);
     const pool = [];
-    try { (DARK_LOOT_BY_ZONE[zone] || []).forEach(function (l) { if (l && l.name && pool.indexOf(l.name) < 0) pool.push(l.name); }); } catch (e) { }
+    try { (DARK_LOOT_BY_ZONE[zone] || []).forEach(function (l) { if (l && l.name && !munNo(l.name) && pool.indexOf(l.name) < 0) pool.push(l.name); }); } catch (e) { }
     // EPIC · K의 방은 회수품 표가 따로 없다 — 어둠 전 구역의 회수품 가운데서 고른다
     if (!pool.length) {
         try {
             Object.keys(DARK_LOOT_BY_ZONE).forEach(function (z) {
-                (DARK_LOOT_BY_ZONE[z] || []).forEach(function (l) { if (l && l.name && pool.indexOf(l.name) < 0 && ITEM_CATALOG[l.name]) pool.push(l.name); });
+                (DARK_LOOT_BY_ZONE[z] || []).forEach(function (l) { if (l && l.name && !munNo(l.name) && pool.indexOf(l.name) < 0 && ITEM_CATALOG[l.name]) pool.push(l.name); });
             });
         } catch (e) { }
     }
@@ -1201,7 +1203,8 @@ window.chilMunGo = function () {
     if (!u || !munPick || munPick.sel.length !== munPick.need) return;
     const s = st(u);
     if (s.mun) { shut(); return; }
-    const got = munPick.sel.map(function (i) { return munPick.cand[i]; });
+    const got = munPick.sel.map(function (i) { return munPick.cand[i]; }).filter(function (n) { return n && !munNo(n); });
+    if (!got.length) { munPick = null; shut(); return; }
     if (!Array.isArray(u.inventory)) u.inventory = [];
     got.forEach(function (n) { u.inventory.push(n); });
     s.mun = 1; s.munArm = 0; s.munX = Math.round(rnd(CHIL.MUN_X[0], CHIL.MUN_X[1]) * 10) / 10;
