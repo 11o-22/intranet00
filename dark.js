@@ -10269,10 +10269,33 @@ function adminSetTester(on) {
     });
 }
 
+// ★ 지운 계정은 테스터 목록에서도 걷는다 (2026-10-21)
+//   테스터는 testers/<사번> 에 따로 적혀서, 사원 계정을 지워도 그 줄이 남아 이름이 계속 떴다.
+//   상담사 화면에서 한 번씩 users/<사번> 을 확인하고, 계정이 없으면 testers/<사번> 을 지운다.
+const testerGone = {}, testerChecked = {};
+function pruneTesters() {
+    if (!database || !currentUser || currentUser.code !== 'kario0987') return;
+    const here = c => !!(typeof db !== 'undefined' && db.users && db.users[c] && db.users[c].name);
+    const gone = c => database.ref('users/' + c).once('value').then(s => { const v = s.val(); return !(v && v.name); });
+    Object.keys(testerList).forEach(c => {
+        if (testerChecked[c] || here(c)) return;
+        testerChecked[c] = 1;
+        // 막 들어온 참이라 아직 못 읽은 것일 수 있다 — 5초 뒤 한 번 더 보고, 그때도 없으면 지운다
+        gone(c).then(g => g ? new Promise(r => setTimeout(r, 5000)).then(() => gone(c)) : false).then(g => {
+            if (!g || here(c)) { testerChecked[c] = 0; return; }
+            testerGone[c] = 1;
+            database.ref('testers/' + c).remove();
+            console.log('[점검] 지운 계정의 테스터 줄을 걷었습니다 — ' + c);
+            renderAdminTesterList();
+        }).catch(() => { testerChecked[c] = 0; });
+    });
+}
+
 function renderAdminTesterList() {
+    try { pruneTesters(); } catch (e) { }
     const box = document.getElementById('admin-tester-list');
     if (!box) return;
-    const keys = Object.keys(testerList);
+    const keys = Object.keys(testerList).filter(c => !testerGone[c]);
     box.innerHTML = keys.length
         ? `<div style="font-size:10px; color:#4CAF50; line-height:1.8;">현재 테스터 ${keys.length}명<br>` +
           keys.map(c => (testerList[c].name || c)).join(', ') + `</div>`
