@@ -1090,6 +1090,10 @@ function sacPaid(u) {
     return Object.keys(s).reduce(function (a, c) { return a + (Number(s[c].paid) || 0); }, 0);
 }
 function inRoom(t, now) { return !!(t && t.quarantineUntil && now < t.quarantineUntil); }
+// 음식으로 오른 오염도로 갇혔나 (food-quar.js) — 그동안은 둘 다 받지 않는다
+function foodQ(x) {
+    try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
+}
 function roomName(t) { return (t && t.quarantineDest === 'bath') ? '선녀탕' : '상담실'; }
 window.jisanSacList = function () {
     const me = u_();
@@ -1149,7 +1153,7 @@ function sacTick() {
             const t = userOf(c);
             if (!t) return;
             const rec = s[c];
-            if (!inRoom(t, now)) { rec.at = 0; return; }
+            if (!inRoom(t, now) || foodQ(t)) { rec.at = 0; return; }
             if (!rec.at) { rec.at = now; return; }
             const mins = (now - rec.at) / 60000;
             if (mins < JISAN.SAC_STEP) return;
@@ -1245,6 +1249,7 @@ function pickSac() {
             + '<div style="flex:1; min-width:0; font-size:12px; color:#e6ddd0;">'
             + esc(t.name) + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
             + (inRoom(t, now) ? ' <span style="font-size:9px; color:#ff9a9a;">' + roomName(t) + '</span>' : '')
+            + (inRoom(t, now) && foodQ(t) ? ' <span style="font-size:9px; color:#ffb74d;">🍽 음식 — 몫 없음</span>' : '')
             + (on ? '<div style="font-size:9px; color:#d9a05a; margin-top:2px;">함께 받은 몫 '
                     + (Number(s[t.code].paid) || 0).toLocaleString() + ' P</div>' : '')
             + '</div></label>';
@@ -1253,7 +1258,8 @@ function pickSac() {
         '하루 ' + JISAN.SAC_DAY + '사람까지 미리 찍어 둡니다. 찍힌 사원이 상담실이나 선녀탕에 '
         + '들어가 있는 동안, 한 사람에 시간당 ' + JISAN.SAC_HOUR.toLocaleString() + ' P 가 '
         + '<b style="color:#ffcf8f;">당신과 그 사원 둘 다에게</b> 들어옵니다 (당신 몫은 하루 다 합쳐 '
-        + JISAN.SAC_CAP.toLocaleString() + ' P 까지 · 그 사원은 당신이 받은 만큼).')
+        + JISAN.SAC_CAP.toLocaleString() + ' P 까지 · 그 사원은 당신이 받은 만큼).<br>'
+        + '음식으로 오른 오염도로 갇힌 동안은 들어오지 않습니다.')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="js-ok" class="game-btn" style="' + BTN + ' text-align:center;">찍는다</button>'
         + '<button id="js-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');

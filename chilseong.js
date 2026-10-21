@@ -1057,6 +1057,10 @@ function inQ(u) {
     try { if (typeof isQuarantined === 'function') return !!isQuarantined(u); } catch (e) { }
     return !!(u.quarantineUntil && Date.now() < u.quarantineUntil);
 }
+// 음식으로 오른 오염도로 갇혔나 (food-quar.js) — 꺼내 주기는 하지만 포인트는 없다 · 횟수는 준다
+function foodQ(x) {
+    try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
+}
 window.chilNokList = function () {
     const u = me();
     if (!u || !wears(u)) return;
@@ -1068,7 +1072,8 @@ window.chilNokList = function () {
         const mins = Math.max(0, Math.round((Number(x.quarantineUntil) - Date.now()) / 60000));
         return '<div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px dashed #3a2e14;">'
             + '<div style="flex:1; min-width:0; font-size:12px;">' + (bath ? '♨ ' : '🦊 ') + esc(x.name)
-            + ' <span style="font-size:10px; color:#9a8a6a;">' + (bath ? '선녀탕' : '상담실') + ' · ' + Math.floor(mins / 60) + '시간 ' + (mins % 60) + '분 남음</span></div>'
+            + ' <span style="font-size:10px; color:#9a8a6a;">' + (bath ? '선녀탕' : '상담실') + ' · ' + Math.floor(mins / 60) + '시간 ' + (mins % 60) + '분 남음</span>'
+            + (foodQ(x) ? '<div style="font-size:9.5px; color:#ffb74d; margin-top:2px;">🍽 음식으로 갇힘 — 꺼내도 포인트 없음</div>' : '') + '</div>'
             + '<button class="game-btn" style="margin:0; padding:6px 11px; font-size:11px;' + GOLD + '" onclick="chilNokGo(\'' + esc(x.code) + '\')">꺼낸다</button></div>';
     }).join('');
     box('<div style="' + HEAD + '">🔔 녹존성군 — 갇힌 사원</div>'
@@ -1103,22 +1108,26 @@ window.chilNokGo = function (code) {
         const bath = (cur.quarantineDest || 'fox') === 'bath';
         const poll = rint(CHIL.NOK_POLL[0], CHIL.NOK_POLL[1]);
         const x = { badge: cur.badge ? JSON.parse(JSON.stringify(cur.badge)) : undefined, history: Array.isArray(cur.history) ? cur.history.slice() : [] };
+        const food = foodQ(cur);
         const f = { quarantineUntil: 0, quarantineExitPollution: 0, quarantineHospital: false, quarantineDest: null,
-                    pollution: poll, lastPollutionTime: now, foxRoomAnswered: false,
+                    pollution: poll, lastPollutionTime: now, foxRoomAnswered: false, quarCause: null, quarFood: null,
                     chilFreed: { by: u.code, byName: u.name || '', at: now }, hasItemUsedOnMe: true };
         if (cleanBadge(x)) f.badge = x.badge;
         log_(x, '[🌟 녹존성군] 옥방울 소리 — ' + (u.name || '') + ' 사원의 청으로 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)');
         f.history = x.history;
         if (local) Object.keys(f).forEach(function (k) { local[k] = f[k]; });
         try { if (typeof updateUserFields === 'function') updateUserFields(code, Object.assign({}, f)); } catch (e) { }
-        const got = rint(CHIL.NOK_PT[0], CHIL.NOK_PT[1]);
-        pay(got);
+        // ★ 음식으로 오른 오염도로 갇혔던 사람 — 꺼내 주고 횟수는 쓰지만 포인트는 없다
+        const got = food ? 0 : rint(CHIL.NOK_PT[0], CHIL.NOK_PT[1]);
+        if (got) pay(got);
         s.nok = (s.nok || 0) + 1;
-        log_(u, '[🌟 녹존성군] ' + (cur.name || nameOf(code)) + ' 사원을 ' + (bath ? '선녀탕' : '상담실') + '에서 꺼냈습니다 (+' + won(got) + ')');
+        log_(u, '[🌟 녹존성군] ' + (cur.name || nameOf(code)) + ' 사원을 ' + (bath ? '선녀탕' : '상담실') + '에서 꺼냈습니다 ('
+            + (food ? '음식으로 갇힘 — 포인트 없음' : '+' + won(got)) + ')');
         save({ history: 1 });
         ui();
-        alert_('🔔 옥방울 소리가 들려온다.\n\n' + (cur.name || nameOf(code)) + ' 사원이 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)\n\n+'
-            + won(got) + '\n\n오늘 남은 구출 ' + (CHIL.NOK_DAY - s.nok) + ' / ' + CHIL.NOK_DAY);
+        alert_('🔔 옥방울 소리가 들려온다.\n\n' + (cur.name || nameOf(code)) + ' 사원이 ' + (bath ? '선녀탕' : '상담실') + '에서 나왔습니다. (오염도 ' + poll + '%)\n\n'
+            + (food ? '음식으로 오른 오염도로 갇혔던 사원이라 포인트는 들어오지 않습니다.' : '+' + won(got))
+            + '\n\n오늘 남은 구출 ' + (CHIL.NOK_DAY - s.nok) + ' / ' + CHIL.NOK_DAY);
     };
     const d = db_();
     if (!d) { go(null); return; }

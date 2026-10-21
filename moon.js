@@ -852,7 +852,9 @@ function dealPick() {
         return '<button class="game-btn mn-dl" data-c="' + esc(t.code) + '" style="' + BTN + '">'
             + esc(t.name) + ' <span style="font-size:9px; color:#7c87a8;">사번 ' + esc(t.no || '-') + '</span>'
             + '<div style="font-size:9px; color:#d9c27a; margin-top:2px;">' + (bath ? '♨ 선녀탕' : '🦊 상담실')
-            + ' · 남은 ' + Math.floor(left / 60) + '시간 ' + (left % 60) + '분</div></button>';
+            + ' · 남은 ' + Math.floor(left / 60) + '시간 ' + (left % 60) + '분</div>'
+            + (foodQ(t) ? '<div style="font-size:9px; color:#ffb74d; margin-top:2px;">🍽 음식으로 갇힘 — 계약서는 쓰이지만 포인트 없음</div>' : '')
+            + '</button>';
     }).join('');
     const w = box(head('골든 마스코트 — 계약서 ' + (d.max - d.used) + ' / ' + d.max + '장',
         '상담실 · 선녀탕에 있는 사원에게 계약서를 보내 멀끔한 상태(오염도 0)로 바로 꺼냅니다.<br>'
@@ -863,6 +865,10 @@ function dealPick() {
     Array.prototype.forEach.call(w.querySelectorAll('.mn-dl'), function (b) {
         b.onclick = function () { dealGo(b.dataset.c); };
     });
+}
+// 음식으로 오른 오염도로 갇혔나 (food-quar.js) — 꺼내 주고 계약서도 쓰이지만 포인트는 없다
+function foodQ(x) {
+    try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
 }
 let dealBusy = false;
 function dealGo(code) {
@@ -888,13 +894,14 @@ function dealGo(code) {
         const now = Date.now();
         const nm = cur.name || nameOf(code);
         const bath = (cur.quarantineDest || 'fox') === 'bath';
+        const food = foodQ(cur);
         const x = {
             badge: cur.badge ? JSON.parse(JSON.stringify(cur.badge)) : undefined,
             history: Array.isArray(cur.history) ? cur.history.slice() : []
         };
         const f = {
             quarantineUntil: 0, quarantineExitPollution: 0, quarantineHospital: false, quarantineDest: null,
-            pollution: 0, lastPollutionTime: now, foxRoomAnswered: false,
+            pollution: 0, lastPollutionTime: now, foxRoomAnswered: false, quarCause: null, quarFood: null,
             moonFreed: { by: me.code, byName: me.name, at: now }, hasItemUsedOnMe: true
         };
         if (cleanBadge(x)) f.badge = x.badge;
@@ -903,15 +910,18 @@ function dealGo(code) {
         if (local) Object.keys(f).forEach(function (k) { local[k] = f[k]; });
         try { if (typeof updateUserFields === 'function') updateUserFields(code, Object.assign({}, f)); } catch (e) { }
 
-        const got = MOON.T7_PAY;
-        pay(got); notRun(got);
+        // ★ 음식으로 오른 오염도로 갇혔던 사람 — 계약서는 쓰이고 꺼내 주지만 포인트는 없다
+        const got = food ? 0 : MOON.T7_PAY;
+        if (got) { pay(got); notRun(got); }
         d.used++; d.got += got;
         me.moonDeal = d;
-        log_(me, '[' + NAME + ' · 골든 마스코트] ' + nm + ' 사원에게 계약서 (+' + won(got) + ')');
+        log_(me, '[' + NAME + ' · 골든 마스코트] ' + nm + ' 사원에게 계약서 ('
+            + (food ? '음식으로 갇힘 — 포인트 없음' : '+' + won(got)) + ')');
         save({ moonDeal: 1, history: 1 });
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
         alert_('[ 골든 마스코트 ]\n\n' + nm + ' 사원에게 계약서를 보냈습니다.\n'
-            + (bath ? '선녀탕' : '상담실') + '에서 멀끔한 상태로 나왔습니다.\n\n+' + won(got)
+            + (bath ? '선녀탕' : '상담실') + '에서 멀끔한 상태로 나왔습니다.\n\n'
+            + (food ? '음식으로 오른 오염도로 갇혔던 사원이라 포인트는 들어오지 않습니다.' : '+' + won(got))
             + '\n\n오늘 남은 계약서 ' + (d.max - d.used) + ' / ' + d.max + '장');
     };
     if (!dbx) { go(null); return; }

@@ -140,8 +140,10 @@ function lockedWhy(tab) {
     const u = (typeof currentUser !== 'undefined') ? currentUser : null;
     if (!u || !tab) return '';
     try {
+        // 🔎 감지하는 눈 — 갇혀 있어도 은행은 열린다 (eye.js)
+        const eyeBank = tab === 'tab-vip' && typeof window.wearsEye === 'function' && window.wearsEye(u);
         if (typeof isQuarantined === 'function' && isQuarantined(u)
-            && LOCK_QUAR.indexOf(tab) >= 0) {
+            && LOCK_QUAR.indexOf(tab) >= 0 && !eyeBank) {
             return '여우 상담실 격리 중에는 들어갈 수 없습니다.';
         }
     } catch (e) { }

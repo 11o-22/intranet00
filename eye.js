@@ -17,7 +17,12 @@
 //        있어서, 판 사이에 앱을 다시 열면 칸은 뜨는데 눌러도 아무 일도
 //        없었다 (아래 「승부 이전」 자리 참고).
 //   5. 상담실·선녀탕에서 포인트를 내고 바로 나온다. 다음에 갇히면 세 배로 돌아온다
-//      ★ 하루 세 번까지 (2026-10-21) — u.eyeOutDay = { d, n }. 세 배로 돌려받는 몫도 나온 만큼만 생긴다
+//      ★ 하루 다섯 번까지 (2026-10-21 · 처음엔 세 번) — u.eyeOutDay = { d, n }. 세 배로 돌려받는 몫도 나온 만큼만 생긴다
+//      ★ 낼 값은 고른다 — 50,000 ~ 100,000 P (2026-10-21). 돌려받는 것은 낸 값의 세 배
+//      ★ 음식으로 오른 오염도로 갇혔으면 (food-quar.js 의 quarFood) —
+//          나오기는 하고 횟수도 줄지만, 세 배로 돌려받을 몫은 생기지 않는다 (값은 가장 낮은 값만)
+//          그렇게 갇힐 때는 쌓아 둔 몫도 내주지 않는다 — 다음에 갇힐 때까지 그대로 남는다
+//      ★ 차고 있으면 상담실 · 선녀탕에 있어도 은행(tab-vip)은 열린다 (index.html updateUI · shell.js lockedWhy)
 //   6. 탐사 횟수를 다 쓰면 그날 번 것 중 하나를 한 번 더 받는다
 //
 // ■ 2번이 어떻게 도는가
@@ -69,9 +74,11 @@ const EYE = {
     SHOP_PICK:   3,          // 한 가게에서 몇 종이 싸게 보이나
     ALIEN_WINS:  2,          // 한 묶음을 끝내는 승수 (index.html 의 ALIEN_BOUT_WIN 과 같다 · 참고용)
     ALIEN_BACK:  2,          // 되돌리기 하루 횟수
-    OUT_COST:    50000,      // 상담실·선녀탕에서 바로 나오는 값
-    OUT_BACK:    3,          // 다음에 갇혔을 때 돌려받는 배수
-    OUT_DAY:     3,          // 하루에 값을 치르고 나올 수 있는 횟수 (2026-10-21)
+    OUT_MIN:     50000,      // 상담실·선녀탕에서 바로 나오는 값 — 가장 낮은 값
+    OUT_MAX:     100000,     //                                  — 가장 높은 값 (2026-10-21)
+    OUT_STEP:    10000,      // 고르는 칸의 간격
+    OUT_BACK:    3,          // 다음에 갇혔을 때 돌려받는 배수 (낸 값의)
+    OUT_DAY:     5,          // 하루에 값을 치르고 나올 수 있는 횟수 (2026-10-21 · 3 → 5)
     AGAIN_DAY:   1           // 「한 번 더」 하루 횟수
 };
 
@@ -137,7 +144,7 @@ window.eyeKroom = {
             desc: '위험한 것을 감지하는 눈. 또한 사용자에게 이득이 되는 것이라면 무엇이든 알 수 있다. '
                 + '행운 300% · 회수품 확률 300% 상승. 탐사에서 최대 네 명에게 버프를 건다. '
                 + '우주 쇼핑몰과 [???] 의 일부 품목이 3분의 1 값으로 보이고, 우주 쇼핑몰에서 두 번 이기면 '
-                + '입고될 목록을 먼저 보고 되돌릴 수 있다. 갇혔을 때 값을 치르고 나올 수 있다.'
+                + '입고될 목록을 먼저 보고 되돌릴 수 있다. 갇혔을 때 값을 치르고 나올 수 있고, 갇혀 있어도 은행은 쓸 수 있다.'
         };
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME);
         console.log('[눈] ' + NAME + ' 등록 — 상담사 지급 전용');
@@ -1010,6 +1017,15 @@ window.eyeOutLeft = function () {
     return Math.max(0, EYE.OUT_DAY - (Number(outBox(me).n) || 0));
 };
 
+// 음식으로 오른 오염도로 갇혔나 (food-quar.js)
+function foodQ(x) {
+    try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
+}
+function won(n) { return (Number(n) || 0).toLocaleString() + ' P'; }
+
+// 낼 값을 고르는 칸
+const OUT_BOX = 'eye-out-pick';
+function outShut() { const o = document.getElementById(OUT_BOX); if (o) o.remove(); }
 window.eyeOut = function () {
     const me = u_();
     if (!me || !wears(me)) { alert_(NAME + ' 을 차고 있어야 합니다.'); return; }
@@ -1018,12 +1034,71 @@ window.eyeOut = function () {
         alert_('오늘은 더 나올 수 없습니다.\n\n값을 치르고 나오는 것은 하루 ' + EYE.OUT_DAY + '번까지입니다. 자정이 지나면 다시 됩니다.');
         return;
     }
-    if ((Number(me.points) || 0) < EYE.OUT_COST) {
-        alert_('포인트가 모자랍니다.\n\n' + EYE.OUT_COST.toLocaleString() + ' P 가 필요합니다.');
+    const food = foodQ(me);
+    const have = Number(me.points) || 0;
+    if (have < EYE.OUT_MIN) { alert_('포인트가 모자랍니다.\n\n' + won(EYE.OUT_MIN) + ' 가 필요합니다.'); return; }
+    outShut();
+    const steps = [];
+    for (let v = EYE.OUT_MIN; v <= EYE.OUT_MAX; v += EYE.OUT_STEP) steps.push(v);
+    if (steps[steps.length - 1] !== EYE.OUT_MAX) steps.push(EYE.OUT_MAX);
+    const list = food ? [EYE.OUT_MIN] : steps;
+    const btns = list.map(function (v) {
+        const off = have < v;
+        return '<button class="eye-out-v" data-v="' + v + '"' + (off ? ' disabled' : '')
+            + ' style="padding:10px 6px; border-radius:6px; font-size:12px; font-weight:bold; cursor:' + (off ? 'default' : 'pointer') + ';'
+            + ' background:' + (off ? '#1a1a1a' : 'linear-gradient(145deg,#1f5f7a,#0d3448)') + ';'
+            + ' border:1px solid ' + (off ? '#333' : '#4fc3f7') + '; color:' + (off ? '#555' : '#dff3ff') + ';">'
+            + won(v)
+            + (food ? '' : '<div style="font-size:9px; font-weight:normal; color:' + (off ? '#444' : '#9fd8ef') + '; margin-top:3px;">다음에 +' + won(v * EYE.OUT_BACK) + '</div>')
+            + '</button>';
+    }).join('');
+    const w = document.createElement('div');
+    w.id = OUT_BOX;
+    w.style.cssText = 'position:fixed; inset:0; z-index:100001; display:flex; align-items:center; justify-content:center;'
+        + ' background:rgba(0,0,0,0.82); padding:16px; box-sizing:border-box;';
+    w.innerHTML = '<div style="width:100%; max-width:380px; background:linear-gradient(160deg,#0f2530,#071219); border:1px solid #2a7a9a;'
+        + ' border-radius:12px; padding:15px; box-shadow:0 8px 30px rgba(0,0,0,0.7);">'
+        + '<div style="font-size:13px; color:#4fc3f7; font-weight:bold; margin-bottom:6px;">🔎 값을 치르고 나온다</div>'
+        + '<div style="font-size:10.5px; color:#9ab; line-height:1.75; margin-bottom:11px;">'
+        + (food
+            ? '<span style="color:#ffb74d;">음식으로 오른 오염도로 갇혀 있습니다.</span><br>'
+              + '나올 수는 있지만 오늘 횟수가 하나 줄고, 세 배로 돌려받을 몫은 생기지 않습니다.'
+            : '낼 값을 고릅니다 (' + won(EYE.OUT_MIN) + ' ~ ' + won(EYE.OUT_MAX) + ').<br>'
+              + '다음에 갇히면 낸 값의 세 배가 들어옵니다.')
+        + '<br>가진 포인트 ' + won(have) + ' · 오늘 남은 횟수 ' + window.eyeOutLeft() + ' / ' + EYE.OUT_DAY + '</div>'
+        + '<div style="display:grid; grid-template-columns:repeat(' + (food ? 1 : 3) + ',1fr); gap:6px; margin-bottom:9px;">' + btns + '</div>'
+        + '<button id="eye-out-x" style="width:100%; padding:9px; border-radius:6px; font-size:11px; cursor:pointer;'
+        + ' background:rgba(0,0,0,0.3); border:1px solid #333; color:#999;">그만둔다</button></div>';
+    document.body.appendChild(w);
+    w.querySelector('#eye-out-x').onclick = outShut;
+    Array.prototype.forEach.call(w.querySelectorAll('.eye-out-v'), function (b) {
+        if (b.disabled) return;
+        b.onclick = function () { outShut(); window.eyeOutPay(Number(b.getAttribute('data-v'))); };
+    });
+};
+
+window.eyeOutPay = function (amount) {
+    const me = u_();
+    if (!me || !wears(me)) { alert_(NAME + ' 을 차고 있어야 합니다.'); return; }
+    if (!inRoom(me)) { alert_('갇혀 있지 않습니다.'); return; }
+    if (window.eyeOutLeft() <= 0) {
+        alert_('오늘은 더 나올 수 없습니다.\n\n값을 치르고 나오는 것은 하루 ' + EYE.OUT_DAY + '번까지입니다. 자정이 지나면 다시 됩니다.');
         return;
     }
-    me.points -= EYE.OUT_COST;
-    me.eyeOwed = (Number(me.eyeOwed) || 0) + EYE.OUT_COST * EYE.OUT_BACK;
+    const food = foodQ(me);
+    let cost = Math.round(Number(amount) || 0);
+    if (food) cost = EYE.OUT_MIN;                       // 돌려받을 몫이 없으니 가장 낮은 값만
+    if (!(cost >= EYE.OUT_MIN && cost <= EYE.OUT_MAX)) {
+        alert_('낼 수 있는 값은 ' + won(EYE.OUT_MIN) + ' ~ ' + won(EYE.OUT_MAX) + ' 입니다.');
+        return;
+    }
+    if ((Number(me.points) || 0) < cost) {
+        alert_('포인트가 모자랍니다.\n\n' + won(cost) + ' 가 필요합니다.');
+        return;
+    }
+    me.points -= cost;
+    const back = food ? 0 : cost * EYE.OUT_BACK;
+    if (back) me.eyeOwed = (Number(me.eyeOwed) || 0) + back;
     outBox(me).n = (Number(outBox(me).n) || 0) + 1;
 
     // 나올 때 값을 그대로 돌려주면 100 가까이라 나오자마자 다시 들어간다
@@ -1034,10 +1109,14 @@ window.eyeOut = function () {
     me.pollution = 50;
     me.lastPollutionTime = Date.now();
     me.foxRoomAnswered = false;
+    me.quarCause = null;
+    me.quarFood = null;
     try { hasShownFoxAlert = false; } catch (e) { }
 
-    log_(me, '[' + NAME + '] 값을 치르고 나왔습니다. (-' + EYE.OUT_COST.toLocaleString() + ' P · 오염도 50%)');
+    log_(me, '[' + NAME + '] 값을 치르고 나왔습니다. (-' + won(cost) + ' · 오염도 50%'
+        + (food ? ' · 음식으로 갇힘 — 돌려받을 몫 없음' : '') + ')');
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ quarCause: 1, quarFood: 1, eyeOutDay: 1, eyeOwed: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay',
      'quarantine-pick-overlay', 'fox-loading-overlay'].forEach(function (id) {
@@ -1045,18 +1124,32 @@ window.eyeOut = function () {
         if (el) el.style.display = 'none';
     });
     try { document.body.style.overflow = ''; } catch (e) { }
-    alert_('눈이 문을 봅니다.\n\n나왔습니다. (오염도 50%)\n\n'
-        + '다음에 갇힐 때 ' + (EYE.OUT_COST * EYE.OUT_BACK).toLocaleString() + ' P 가 들어옵니다.\n'
+    alert_('눈이 문을 봅니다.\n\n나왔습니다. (-' + won(cost) + ' · 오염도 50%)\n\n'
+        + (food ? '음식으로 오른 오염도라 돌려받을 몫은 생기지 않았습니다.\n'
+                : '다음에 갇힐 때 ' + won(Number(me.eyeOwed) || 0) + ' 가 들어옵니다.\n')
         + '오늘 남은 횟수 ' + window.eyeOutLeft() + ' / ' + EYE.OUT_DAY);
 };
 
-// 갇히는 순간 돌려준다
+// 갇히는 순간 돌려준다 — 음식으로 갇힌 것이면 주지 않고 다음까지 남겨 둔다
+let foodHeldTold = 0;
 function owedPay() {
     const me = u_();
     if (!me) return;
     const owed = Number(me.eyeOwed) || 0;
     if (owed <= 0) return;
     if (!inRoom(me)) return;
+    if (foodQ(me)) {
+        const until = Number(me.quarantineUntil) || 0;
+        if (foodHeldTold === until) return;
+        foodHeldTold = until;
+        log_(me, '[' + NAME + '] 음식으로 오른 오염도로 갇혔습니다 — 돌려받을 ' + won(owed) + ' 는 이번에 들어오지 않습니다.');
+        try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+        setTimeout(function () {
+            alert_('눈이 고개를 돌립니다.\n\n음식으로 오른 오염도로 갇혔습니다.\n'
+                + '돌려받을 ' + won(owed) + ' 는 이번에 들어오지 않습니다.\n(다음에 갇힐 때까지 남아 있습니다)');
+        }, 900);
+        return;
+    }
     me.eyeOwed = 0;
     me.points = (Number(me.points) || 0) + owed;
     log_(me, '[' + NAME + '] 다시 갇혔습니다. 치렀던 값이 세 배로 돌아옵니다. (+' + owed.toLocaleString() + ' P)');
@@ -1149,7 +1242,7 @@ window.eyeAgain = function () {
         const me = u_();
         if (!me || !wears(me)) { drop('eye-out-btn'); drop('eye-again-btn'); return; }
 
-        if (inRoom(me) && window.eyeOutLeft() > 0) btn('eye-out-btn', '🔎 값을 치르고 나온다 (' + EYE.OUT_COST.toLocaleString() + ' P · 오늘 ' + window.eyeOutLeft() + '/' + EYE.OUT_DAY + ')',
+        if (inRoom(me) && window.eyeOutLeft() > 0) btn('eye-out-btn', '🔎 값을 치르고 나온다 (' + (EYE.OUT_MIN / 10000) + '만~' + (EYE.OUT_MAX / 10000) + '만 P · 오늘 ' + window.eyeOutLeft() + '/' + EYE.OUT_DAY + ')',
             window.eyeOut, '#4fc3f7');
         else drop('eye-out-btn');
 

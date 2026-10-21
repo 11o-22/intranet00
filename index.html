@@ -6152,7 +6152,9 @@ document.getElementById('display-gp').innerText = gp.length ? ' · ' + gp.join('
         const inQuarantine = isQuarantined(currentUser);
         const agent = isBathUser(currentUser);
         const lockBox = document.getElementById('quarantine-lock-box');
-        const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'];
+        // 🔎 감지하는 눈을 차고 있으면 갇혀 있어도 은행(tab-vip)은 열린다 (eye.js)
+        const eyeBank = typeof window.wearsEye === 'function' && window.wearsEye(currentUser);
+        const lockedTabs = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness', 'tab-house'].filter(id => !(eyeBank && id === 'tab-vip'));
         const starveLocked = ['tab-public', 'tab-vip', 'tab-shop', 'tab-darkness'];
         const starving = (currentUser.satiety || 0) <= 0 && !isQuarantined(currentUser);
 
@@ -6211,7 +6213,11 @@ const remainEl = document.getElementById('quarantine-remain-text');
                     t.style.opacity = '0.35';
                     t.style.pointerEvents = 'none';
                     if (!t.innerText.startsWith('🔒')) t.innerText = '🔒 ' + t.innerText;
-                } 
+                } else if (t.innerText.startsWith('🔒 ')) {
+                    t.style.opacity = '';
+                    t.style.pointerEvents = '';
+                    t.innerText = t.innerText.replace('🔒 ', '');
+                }
             });
 
             // 잠긴 탭이 열려 있으면 정보 열람으로 강제 이동
