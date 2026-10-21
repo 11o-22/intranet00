@@ -120,22 +120,35 @@ function clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.sl
 // ==========================================
 function dbOf(deps) {
     const F = deps.fetch, U = (p) => CFG.DB + '/' + p + '.json';
-    async function chk(r, what) {
-        if (!r.ok) throw new Fail(502, '서버 기록을 ' + what + ' 못했습니다 (' + r.status + ')');
+    const wait = deps.wait || ((ms) => new Promise((r) => setTimeout(r, ms)));
+    // ★ 파이어베이스가 잠깐 500 · 503 · 429 를 돌려줄 때가 있다 (2026-10-21 · 방송국 시작이 「서버 기록을 읽지 못했습니다 (500)」로 막힘)
+    //   그런 때는 조금 쉬었다가 두 번까지 다시 묻는다. 그래도 안 되면 어느 자리였는지까지 적어 알린다.
+    async function go(url, opt) {
+        let r = null;
+        for (let i = 0; i < 3; i++) {
+            try { r = await F(url, opt); } catch (e) { r = null; }
+            if (r && !(r.status >= 500 || r.status === 429)) return r;
+            if (i < 2) await wait(i ? 700 : 250);
+        }
+        return r || { ok: false, status: 0 };
+    }
+    async function chk(r, what, p) {
+        if (!r.ok) throw new Fail(502, '서버 기록을 ' + what + ' 못했습니다 (' + r.status + ' · ' + String(p || '').split('/').slice(0, 2).join('/') + ')');
         return r;
     }
     return {
-        get: async (p) => (await (await chk(await F(U(p)), '읽지')).json()),
+        get: async (p) => (await (await chk(await go(U(p)), '읽지', p)).json()),
         getTag: async (p) => {
-            const r = await chk(await F(U(p), { headers: { 'X-Firebase-ETag': 'true' } }), '읽지');
+            const r = await chk(await go(U(p), { headers: { 'X-Firebase-ETag': 'true' } }), '읽지', p);
             return { val: await r.json(), tag: r.headers.get('ETag') };
         },
         // 바뀌지 않았을 때만 쓴다 — 200 이면 됐다, 412 면 누가 먼저 썼다
-        putIf: async (p, v, tag) => (await F(U(p), { method: 'PUT', headers: { 'if-match': tag }, body: JSON.stringify(v) })).status,
-        put: async (p, v) => { await chk(await F(U(p), { method: 'PUT', body: JSON.stringify(v) }), '쓰지'); },
+        //   (이건 다시 묻지 않는다 — 500 이 났는데 실은 써졌으면, 다시 써서 티켓 · 한도를 두 번 셀 수 있다)
+        putIf: async (p, v, tag) => { try { return (await F(U(p), { method: 'PUT', headers: { 'if-match': tag }, body: JSON.stringify(v) })).status; } catch (e) { return 0; } },
+        put: async (p, v) => { await chk(await go(U(p), { method: 'PUT', body: JSON.stringify(v) }), '쓰지', p); },
         // 끝에서 n 개만 (열쇠 순) — 사내 채팅처럼 쌓이기만 하는 자리
-        last: async (p, n) => (await (await chk(await F(U(p) + '?orderBy=%22%24key%22&limitToLast=' + n), '읽지')).json()),
-        patch: async (p, v) => { await chk(await F(U(p), { method: 'PATCH', body: JSON.stringify(v) }), '쓰지'); }
+        last: async (p, n) => (await (await chk(await go(U(p) + '?orderBy=%22%24key%22&limitToLast=' + n), '읽지', p)).json()),
+        patch: async (p, v) => { await chk(await go(U(p), { method: 'PATCH', body: JSON.stringify(v) }), '쓰지', p); }
     };
 }
 
