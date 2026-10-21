@@ -743,6 +743,7 @@ function start(isParty, pid) {
     }
     try { kv(resetDnaCharge); } catch (e) { }                  // 회피·행운·기믹 횟수 — 쇼핑몰 것은 빼고
     try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { }
+    try { kDrop(); } catch (e) { }                            // 지난 판의 이어 갈 자리는 버린다
     darkAmbienceStart(K_CODE);
     openDarkOverlay();
     const el = document.getElementById('dro-code'); if (el) el.innerText = K_CODE;
@@ -794,6 +795,7 @@ function teamDown() {
 // ==========================================
 function show(title, text, extra) {
     darkBodyEl().innerHTML = darkBox(title, text, bar() + banner() + (extra || ''));
+    kSaveSoon();                                              // 혼자 — 이 화면과 상태를 적어 둔다 (창이 끊겨도 이어 가게)
     if (darkRun && darkRun.isParty) { try { mountDarkChat('normal'); } catch (e) { } }
     // 막대가 이전 값에서 지금 값으로 줄어드는 것이 보이게
     setTimeout(function () {
@@ -2348,6 +2350,7 @@ function settle(how, txt) {
     if (!kr || kr._settled) return;
     kr._settled = true;
     if (darkRun) darkRun._settled = true;
+    try { kDrop(); } catch (e) { }                          // 정산했다 — 이어 갈 자리를 지운다 (두 번 받지 않게)
     const u = me(), k = prof(u);
     const alive = (how === 'clear' || how === 'leave');
     const helper = isHelper();
@@ -2450,6 +2453,7 @@ window.kroomFinish = function () {
     try { detachChatListener(); } catch (e) { }
     if (pid) { try { partyRunCleanup(pid, K_CODE); } catch (e) { } }
     try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { }
+    try { kDrop(); } catch (e) { }
     kr = null;
     darkRun = null;
     try { updateUI(); } catch (e) { }
@@ -2472,6 +2476,9 @@ window.kroomFinish = function () {
                 if (!kr) {
                     // 일행 출발(launchPartyRun) — 여기서 시작한다
                     if (darkRun.isParty && darkRun.partyId && !darkRun._kresume) { start(true, darkRun.partyId); return; }
+                    // 혼자 — 적어 둔 자리가 있으면 거기서 다시 잇는다 (아래 9-1)
+                    const snap = !darkRun.isParty && me() ? kLoad(me().code) : null;
+                    if (snap && kRestore(snap)) return;
                     // 다시 들어온 것 — 던전과의 연결이 끊겼다
                     show2('—', '눈을 떴을 때 방이 아니었다.<br><br>문은 닫혀 있고, 손에 쥔 것이 없다.<br><span style="font-size:11px; color:#888;">(연결이 끊겨 던전에서 밀려났습니다. 이번 탐사는 보상 없이 끝납니다.)</span>',
                         darkChoiceBtn('단말로 복귀한다.', 'kroomFinish()'));
@@ -2486,6 +2493,173 @@ window.kroomFinish = function () {
     }, 400);
 })();
 function show2(title, text, extra) { darkBodyEl().innerHTML = darkBox(title, text, extra || ''); }
+
+// ==========================================
+// 9-1. 혼자 들어간 판 — 창이 끊겨도 이어 간다 (2026-10-21)
+// ==========================================
+//   ✗ K 의 방은 진행 상태(kr)를 메모리에만 들고 있었다. 휴대폰이 뒤에 깔린 창을 비웠다가
+//     다시 띄우거나(새로 열림), 같은 계정이 다른 창에서 열려 이 창이 새로 열리면 kr 이 사라졌다.
+//     그러면 「연결이 끊겨 던전에서 밀려났습니다 · 보상 없이 끝납니다」로 판이 통째로 날아갔다 —
+//     쉼터에서 「▼ 내려간다」를 누르고 다음 층을 기다리는 사이에 특히 잘 났다.
+//   → 화면을 그릴 때마다(show) 상태와 그 화면을 이 기기(localStorage)에 적어 둔다.
+//       kroomRun_<사번>   { at, s(판 시작 시각), kr(장면 묶음 빼고), run(darkRun), html(지금 화면), dna }
+//       kroomPlan_<사번>  { s, p(층마다 장면 묶음) } — 판마다 한 번
+//     · 같은 창에서 kr 만 사라졌으면 그 자리에서 바로 잇는다 (renderDarkStep 갈래)
+//     · 새로 열렸으면 들어온 뒤 「이어 간다 / 그만둔다」를 묻는다
+//     · 정산(settle) · 단말로 복귀(kroomFinish) · 새 판(start) 에서 지운다 — 두 번 받는 일이 없다
+//     · 일행 판은 하지 않는다 (팀이 같이 움직여야 해서 — 예전처럼 다시 합류)
+const K_SAVE = 'kroomRun_', K_PLAN = 'kroomPlan_';
+const K_KEEP = 6 * 3600 * 1000;                 // 이만큼 지난 자리는 버린다
+const K_SKIP = { plan: 1, _doomT: 1, _doomCb: 1, _aidRef: 1, _giftRef: 1, _beat: 1, _picking: 1, _doomWatch: 1, _pickDun: 1 };
+let kPlanFor = null, kSaveQ = false;
+function kPlain(o, skip) {
+    const out = {};
+    Object.keys(o || {}).forEach(function (k) {
+        if (skip && skip[k]) return;
+        const v = o[k];
+        if (typeof v === 'function' || v === undefined) return;
+        try { out[k] = JSON.parse(JSON.stringify(v)); } catch (e) { }
+    });
+    return out;
+}
+function kSaveNow() {
+    try {
+        const u = me();
+        if (!u || !u.code || !kr || typeof darkRun === 'undefined' || !darkRun || darkRun.zone !== K_CODE) return;
+        if (darkRun.isParty) return;
+        if (kr._settled || darkRun._settled) { kDrop(u.code); return; }
+        const body = darkBodyEl(); if (!body) return;
+        if (kr.plan && kPlanFor !== kr.started) {
+            localStorage.setItem(K_PLAN + u.code, JSON.stringify({ s: kr.started, p: kr.plan }));
+            kPlanFor = kr.started;
+        }
+        let dna = null;
+        try { if (typeof dnaCharge === 'object' && dnaCharge) dna = Object.assign({}, dnaCharge); } catch (e) { }
+        localStorage.setItem(K_SAVE + u.code, JSON.stringify({
+            v: 1, code: u.code, at: now(), s: kr.started,
+            kr: kPlain(kr, K_SKIP), run: kPlain(darkRun), html: body.innerHTML, dna: dna
+        }));
+    } catch (e) { console.warn('[K 의 방] 이어 갈 자리 적기 건너뜀:', e && e.message); }
+}
+// 같은 흐름에서 바로 뒤따라 바뀌는 것(idx++ 등)까지 담기게 한 박자 뒤에 적는다
+function kSaveSoon() {
+    if (kSaveQ) return;
+    kSaveQ = true;
+    Promise.resolve().then(function () { kSaveQ = false; kSaveNow(); });
+}
+function kDrop(code) {
+    code = code || (me() && me().code);
+    if (!code) return;
+    try { localStorage.removeItem(K_SAVE + code); localStorage.removeItem(K_PLAN + code); } catch (e) { }
+    kPlanFor = null;
+}
+function kLoad(code) {
+    try {
+        const s = JSON.parse(localStorage.getItem(K_SAVE + code) || 'null');
+        if (!s || s.code !== code || !s.kr || !s.run || s.run.isParty) return null;
+        if (now() - (s.at || 0) > K_KEEP) { kDrop(code); return null; }
+        if (s.kr.dun && s.kr.floor >= 1) {                    // 던전 안 — 장면 묶음이 있어야 잇는다
+            const p = JSON.parse(localStorage.getItem(K_PLAN + code) || 'null');
+            if (!p || p.s !== s.s || !Array.isArray(p.p)) return null;
+            s.plan = p.p;
+        }
+        return s;
+    } catch (e) { return null; }
+}
+function kRestore(s) {
+    const u = me();
+    if (!u || !s || s.code !== u.code) return false;
+    if (typeof darkRun !== 'undefined' && darkRun && darkRun.zone !== K_CODE) return false;
+    hookItems();
+    darkRun = Object.assign({}, s.run, { zone: K_CODE, kroom: true, isParty: false, partyId: null });
+    kr = Object.assign({}, s.kr);
+    if (s.plan) { kr.plan = s.plan; kPlanFor = kr.started; }
+    try { if (s.dna && typeof dnaCharge === 'object') dnaCharge = Object.assign({}, dnaCharge, s.dna); } catch (e) { }
+    try { darkAmbienceStart(K_CODE); } catch (e) { }
+    openDarkOverlay();
+    const el = document.getElementById('dro-code'); if (el) el.innerText = K_CODE;
+    show2('—', '다시 문 앞에 섰다.<br><br>손에 쥔 것도, 지나온 길도 그대로다.',
+        '<div style="font-size:11px; color:#888; text-align:center; padding:10px;">끊긴 자리를 잇는 중…</div>');
+    teamUp();
+    console.log('[K 의 방] 끊긴 판을 이어 갑니다 — ' + (kr.dun || '던전 전') + ' · ' + (kr.floor || 0) + '층');
+    if (!kr.job || !kr.stats) { if (!prof().job) cardPick(); else afterJob(); return true; }
+    if (!kr.dun) { afterJob(); return true; }                   // 던전을 고르던 중 — 다시 고른다
+    loadFor(kr.dun, kr.job).then(function () {
+        if (!kr) return;
+        if (!DATA.dun[kr.dun]) {
+            show2('—', '방이 열리지 않는다.<br><br>문 너머가 아직 비어 있다. (내용을 받지 못했습니다 — 잠시 뒤 다시 들어와 주십시오)',
+                darkChoiceBtn('돌아간다.', 'kroomFinish()'));
+            return;
+        }
+        if (!kr.plan || !kr.floor) { const id = kr.dun; kr.dun = null; enterDungeon({ id: id, lv: kr.dunLv }); return; }
+        runUp();
+        try { watchGift(); } catch (e) { }
+        darkBodyEl().innerHTML = s.html;
+        kSaveNow();
+        try { toast('끊긴 자리에서 이어 갑니다.'); } catch (e) { }
+    });
+    return true;
+}
+
+// 새로 열렸을 때 — 들어온 뒤 한 번 묻는다
+let kAskedFor = null;
+function kAsk(s) {
+    if (document.getElementById('kroom-resume')) return;
+    const D = s.kr && s.kr.dun ? DUNS[s.kr.dun] : null;
+    const where = D ? esc(D.n) + (s.kr.floor ? ' · ' + s.kr.floor + '층' : '') : '던전에 들어서기 전';
+    const box = document.createElement('div');
+    box.id = 'kroom-resume';
+    box.style.cssText = 'position:fixed; inset:0; z-index:2147483000; background:rgba(0,0,0,0.88); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+    box.innerHTML = `<div class="luxury-alert-box" style="border-color:#8fb8c4; box-shadow:0 15px 40px rgba(143,184,196,0.2), inset 0 0 20px rgba(0,0,0,0.8);">
+        <h3 style="color:#8fb8c4; margin-top:0; letter-spacing:1px; font-size:17px;">『 K 의 방 』 — 끊긴 탐사</h3>
+        <div style="color:#eee; margin-bottom:22px; font-size:13px; line-height:1.7;">
+            <span style="font-family:monospace; font-size:11px; color:#ff6b6b;">${K_CODE}</span><br>
+            <b style="color:#fff; font-size:14px;">${where}</b><br><br>
+            창이 닫히거나 새로 열려 끊긴 탐사가 있습니다.<br>
+            <span style="font-size:12px; color:#aaa;">이어 가면 끊긴 그 화면부터 다시 시작합니다.</span><br>
+            <span style="font-size:10px; color:#888;">그만두면 이번 탐사는 보상 없이 끝납니다.</span></div>
+        <div style="display:flex; gap:10px;">
+            <button class="luxury-alert-btn" onclick="kroomResumeGo()" style="flex:2; background:#1f3a44; color:#fff; border-color:#4f8a9c;">이어 간다</button>
+            <button class="luxury-alert-btn" onclick="kroomResumeNo()" style="flex:1; white-space:nowrap; background:transparent; border-color:#888; color:#aaa;">그만둔다</button>
+        </div></div>`;
+    document.body.appendChild(box);
+}
+function kAskClose() { const b = document.getElementById('kroom-resume'); if (b) b.remove(); }
+window.kroomResumeGo = function () {
+    kAskClose();
+    const u = me(); if (!u) return;
+    if (typeof darkRun !== 'undefined' && darkRun) { showCustomAlert('다른 탐사 중이라 이어 갈 수 없습니다.'); return; }
+    const s = kLoad(u.code);
+    if (!s || !kRestore(s)) { kDrop(u.code); showCustomAlert('이어 갈 자리를 찾지 못했습니다.'); }
+};
+window.kroomResumeNo = function () {
+    kAskClose();
+    const u = me(); if (!u) return;
+    const s = kLoad(u.code);
+    kDrop(u.code);
+    const d = db_();
+    if (s && s.kr && d) {
+        const t = s.kr.team || ('solo_' + u.code);
+        try { d.ref('kroomTeams/' + t).remove(); } catch (e) { }
+        if (s.kr.dun) { try { d.ref('kroomRuns/' + s.kr.dun + '/' + t).remove(); } catch (e) { } }
+    }
+    try { addHistoryLog(u, '[' + K_CODE + '] 끊긴 탐사를 이어 가지 않고 끝냈습니다. (보상 없음)'); saveFields({ history: 1 }); } catch (e) { }
+};
+setInterval(function () {
+    try {
+        const u = me();
+        if (!u || !u.code || kAskedFor === u.code) return;
+        if (typeof darkRun !== 'undefined' && darkRun) return;
+        if (document.visibilityState === 'hidden') return;
+        const sc = document.getElementById('session-cover');
+        if (sc && sc.style.display !== 'none') return;
+        const login = document.getElementById('login-screen');
+        if (login && getComputedStyle(login).display !== 'none') return;
+        kAskedFor = u.code;
+        const s = kLoad(u.code);
+        if (s) kAsk(s);
+    } catch (e) { }
+}, 1500);
 
 // ==========================================
 // 10. 히든 직업 — 조건 · 상담사 알림 · 금빛 카드 · L
