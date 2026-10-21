@@ -146,7 +146,7 @@ const DOT = {
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit',
-        'robe', 'han-duru', 'cape', 'maker-outer-in', 'glove'],
+        'robe', 'han-duru', 'cape', 'maker-outer-in', 'wolf-pj-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -165,7 +165,8 @@ const DOT = {
     //   ★ 제작자 겉옷(바깥 · 안쪽)은 서기 줄 여섯 칸에 꼬리가 흔들린다 — 두 장이 같이 돈다.
     //   ★ 뉴비 새싹은 서기 줄 두 칸(하트가 바뀐다).
     FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5],
-                 'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1] },
+                 'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1],
+                 'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -324,7 +325,19 @@ const DOT_SLOTS = [
             //   가장자리를 덮어야 한다. 안쪽 채색(maker-outer-in)은 **무조건 머리카락 뒤**
             //   (over — 머리보다 먼저 그린다). 한 장으로 주면 안쪽 색이 머리카락을 묻혀서 그린
             //   이가 따로 주었다.
-            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' }
+            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' },
+            // ★ 늑대 잠옷 (2026-10-21) — 늑대 귀 후드에 꼬리까지. 제작자 겉옷과 같은 두 장이다.
+            //   바깥(wolf-pj)은 머리 위(top) · 후드 안쪽 그림자(wolf-pj-in)는 머리카락 뒤(over).
+            //   **상담사가 선물함으로 보내 준 사람만** 가진다 (wear-gift.js) · 밀실 거래로 넘기지 않는다 (noTrade).
+            //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 제작자 겉옷과 같이 칸마다 가로 +30 으로 352 칸에 옮겼다.
+            //   덩어리마다 제 폭만큼 떠서 옮겼고(꼬리가 옆 칸으로 넘어가 있다), 352 칸 밖으로 나가는 꼬리 끝
+            //   몇 픽셀(걷기 넷째 6 · 서기 둘째~넷째 2·10·2)은 잘랐다 — 안 자르면 다음 칸 왼쪽에 묻는다.
+            //   걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다. 서기 줄 여섯 칸에 꼬리가 흔들린다.
+            //   ★ 걷기 2·3·4번째 칸은 바깥 그림에 후드 그림자가 같이 그려져 왔다 (그린 이가 빼는 것을 잊음).
+            //     그 그림자 색(67,70,102)만 바깥에서 걷어 내고 그림자는 뒤 장으로 — 2·3번째는 따로 준 그림자와
+            //     자리가 똑같다. 4번째는 따로 준 그림자가 그 자리를 안 덮어서(후드 안쪽이 뚫려 보였다)
+            //     걷어 낸 그림자를 뒤 장에 같이 넣었다.
+            { i: 'wolf', n: '늑대 잠옷', over: ['wolf-pj-in'], top: ['wolf-pj'], own: 'wolf-pj', noTrade: true }
         ]
     },
     {
