@@ -33,6 +33,9 @@
 //   · 귀빈은 [홀로 나간다] 를 누를 수 있다 → 그 장면이 끝나면 빠져나간다. 남은 재난관리국 · 백일몽 쪽 난이도가 기하급수로 오른다
 //   · 상담사는 관리자 — 들어가 있어도 판정 · 확정 기다림에서 빠진다 (서버)
 //   · 상담사 관전 — 목록의 「진행 중인 판」에서 [본다] → 장면 · 대화 · 판정을 그대로 본다 (말 · 확정은 못 함)
+//   · ★ 사원 관전 (2026-10-21) — 👁 기록 소실 관전 티켓이 있으면 다른 사원도 본다 (상담사가 나눠 준다 · 상점에는 없다).
+//       진행 중인 판을 골라 보기 시작할 때 한 장이 사라진다. 같은 판은 다시 들어가 봐도 또 떼지 않는다 (u.dzWatch[판]).
+//       관전 티켓만 있으면 재난이 닫혀 있어도 · 기록 소실 티켓이 없어도 창에 들어와 볼 수 있다 (방에 들거나 열지는 못 한다).
 //   · 10장면 · 1~2장면은 아무도 죽지 않고 3장면부터 행동에 따라 죽는다 · 8장면 전에는 안 끝남 · 9장면부터 방송국이 덮친다 (⚡) — 서버
 //   · 보상 · 죽음 — 끝나면 서버가 disasterPay/<사번>/<판> 에 적고, 이 파일이 한 번만 받아 적용한다 (아래 9)
 //
@@ -45,6 +48,7 @@
 //   disasterState()   지금 판
 
 const DZ_TICKET = '🎫 기록 소실 티켓';
+const DZ_WATCH = '👁 기록 소실 관전 티켓';
 
 (function disaster() {
 
@@ -88,6 +92,9 @@ function br(s) {
 }
 function alert_(m) { try { showCustomAlert(m); } catch (e) { } }
 function tickets(u) { return ((u && u.inventory) || []).filter(function (x) { return x === DZ_TICKET; }).length; }
+function wTickets(u) { return ((u && u.inventory) || []).filter(function (x) { return x === DZ_WATCH; }).length; }
+// 이미 표를 내고 본 판
+function paidWatch(u, id) { return !!(u && id && u.dzWatch && typeof u.dzWatch === 'object' && u.dzWatch[id]); }
 let off = 0;                 // 서버 시계와의 차이
 function now() { return Date.now() + off; }
 
@@ -104,6 +111,13 @@ function now() { return Date.now() + off; }
             };
         }
         try { if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(DZ_TICKET) < 0) NO_SELL_ITEMS.push(DZ_TICKET); } catch (e) { }
+        if (!ITEM_CATALOG[DZ_WATCH]) {
+            ITEM_CATALOG[DZ_WATCH] = {
+                price: '???', usable: true, targetable: false, effect: 'disaster_watch', adminOnly: true,
+                desc: '[특수] 기록 소실에서 진행 중인 재난을 지켜보는 표. 판을 골라 보기 시작할 때 한 장이 사라진다 (같은 판은 다시 봐도 그대로). 말을 하거나 판에 끼어들 수는 없다.'
+            };
+        }
+        try { if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(DZ_WATCH) < 0) NO_SELL_ITEMS.push(DZ_WATCH); } catch (e) { }
         clearInterval(iv);
     }, 300);
     setTimeout(function () { clearInterval(iv); }, 40000);
@@ -116,6 +130,10 @@ function now() { return Date.now() + off; }
         const w = function (itemName) {
             if (itemName === DZ_TICKET) {                                 // 쓰는 것은 시작할 때 — 여기서는 안 뗀다
                 alert_(DZ_TICKET + '\n\n재난관리국 지하 2층 「기록 소실」에서 씁니다.\n재난이 시작되는 순간 한 장이 사라집니다.');
+                return;
+            }
+            if (itemName === DZ_WATCH) {                                  // 쓰는 것은 판을 골라 볼 때
+                alert_(DZ_WATCH + '\n\n재난관리국 지하 2층 「기록 소실」에서 씁니다.\n진행 중인 판을 골라 보기 시작할 때 한 장이 사라집니다. (같은 판은 다시 봐도 그대로)');
                 return;
             }
             return _u.apply(this, arguments);
@@ -218,9 +236,16 @@ function gate(u, list) {
     if (!u) return { ok: false, why: '' };
     if (isAdm(u)) return { ok: true };
     if (list && activeOf(list, u.code)) return { ok: true };
+    if (canSpectate(u, list)) return { ok: true, watch: true };         // 👁 관전만
     if (!isOpen()) return { ok: false, why: '기록 소실 — 지금은 열려 있는 재난이 없습니다.' };
     if (!tickets(u)) return { ok: false, why: DZ_TICKET + '이 없으면 들어갈 수 없습니다.' };
     return { ok: true };
+}
+// 관전할 수 있나 — 상담사 · 관전 티켓이 있거나 이미 표를 낸 판이 아직 남아 있음
+function canSpectate(u, list) {
+    if (!u) return false;
+    if (isAdm(u) || wTickets(u) > 0) return true;
+    return Object.keys(list || {}).some(function (id) { return paidWatch(u, id) && list[id] && list[id].kind === KIND; });
 }
 function activeOf(all, code) {
     const ids = Object.keys(all || {}).filter(function (id) {
@@ -238,7 +263,8 @@ function activeOf(all, code) {
 let ov = null, all = {}, rootRef = null, rootCb = null;
 let curId = null, chatRef = null, chatCb = null, chatLines = [];
 let tick = 0, busy = false, msg = '';
-let watchId = null;              // 상담사가 관전하는 판
+let watchId = null;              // 관전하는 판 (상담사 · 관전 티켓을 낸 사원)
+let askWatch = null;             // 관전 티켓을 쓸지 묻는 판
 const asked = {}, doneSeen = {};
 
 function open() {
@@ -288,7 +314,7 @@ function close() {
     if (rootRef && rootCb) { try { rootRef.off('value', rootCb); } catch (e) { } }
     if (chatRef && chatCb) { try { chatRef.off('child_added', chatCb); } catch (e) { } }
     rootRef = rootCb = chatRef = chatCb = null;
-    watchId = null;
+    watchId = null; askWatch = null;
     clearInterval(tick); tick = 0;
     if (ov) ov.remove();
     ov = null; curId = null; chatLines = []; msg = '';
@@ -314,7 +340,7 @@ function sweep() {
 function follow() {
     const u = me();
     let id = u ? activeOf(all, u.code) : null;
-    if (!id && u && isAdm(u) && watchId && all[watchId]) id = watchId;        // 상담사 관전
+    if (!id && u && watchId && all[watchId] && (isAdm(u) || paidWatch(u, watchId))) id = watchId;   // 관전
     if (id === curId) return;
     if (chatRef && chatCb) { try { chatRef.off('child_added', chatCb); } catch (e) { } }
     chatRef = chatCb = null; chatLines = [];
@@ -414,7 +440,7 @@ function paint() {
         bar.style.display = 'none';
         html = lobbyList(u);
     } else if (!(r.members || {})[u.code]) {
-        // ── 상담사 관전 — 보기만 한다
+        // ── 관전 — 보기만 한다 (상담사 · 관전 티켓을 낸 사원)
         mem.style.display = '';
         mem.innerHTML = memberChips(r, u);
         bar.style.display = 'none';
@@ -478,9 +504,10 @@ function lobbyList(u) {
         return r && r.kind === KIND && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL
             && (!shut || free || r.leader === ADMIN);
     }).sort(function (a, b) { return (all[a].createdAt || 0) - (all[b].createdAt || 0); });
-    const n = tickets(u);
+    const n = tickets(u), wn = wTickets(u);
     let h = intro() + '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
-        + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '') + '</div>';
+        + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '')
+        + (!free && wn ? '<br>' + DZ_WATCH + ' <b style="color:#9fd8ef;">' + wn + '</b>장' : '') + '</div>';
     if (shut) h += '<div class="dz-err">🔒 닫혀 있습니다 — 상담사만 들어가 시험할 수 있습니다. (상담사가 연 방에는 다른 사원도 들어옵니다)</div>';
     h += '<div class="dz-sec">열려 있는 방</div>';
     if (!ids.length) h += '<div class="dz-card-m">열려 있는 방이 없습니다.</div>';
@@ -492,19 +519,28 @@ function lobbyList(u) {
             + '<button data-join="' + esc(id) + '"' + ((full || (!n && !free) || busy) ? ' disabled' : '') + '>' + (full ? '가득 참' : '들어간다') + '</button></div>';
     });
     h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + (((!n && !free) || busy) ? ' disabled' : '') + '>새로 연다</button></div>';
-    if (free) {
+    if (free || canSpectate(u, all)) {
         const live = Object.keys(all).filter(function (id) {
             const r = all[id];
-            return r && r.kind === KIND && (r.state === 'PLAY' || (r.state === 'END' && t - (Number((r.outcome || {}).at) || 0) < 3600000));
+            return r && r.kind === KIND && !(r.members || {})[u.code]
+                && (r.state === 'PLAY' || (r.state === 'END' && t - (Number((r.outcome || {}).at) || 0) < 3600000));
         }).sort(function (a, b) { return (all[b].startedAt || 0) - (all[a].startedAt || 0); });
-        h += '<div class="dz-sec">진행 중인 판 — 관전 (상담사)</div>';
+        h += '<div class="dz-sec">진행 중인 판 — 👁 관전' + (free ? ' (상담사)' : '') + '</div>';
+        if (!free) h += '<div class="dz-card-m" style="margin:0 0 8px;">판을 골라 보기 시작할 때 ' + DZ_WATCH + '이 한 장 사라집니다. 이미 본 판은 다시 봐도 그대로입니다. 말 · 확정은 할 수 없습니다.</div>';
         if (!live.length) h += '<div class="dz-card-m">진행 중인 판이 없습니다.</div>';
         live.forEach(function (id) {
             const r = all[id], m = r.members || {}, cs = Object.keys(m);
             const where = r.state === 'PLAY' ? '장면 ' + (Number(r.round) || 0) : '끝 — ' + ((END_N[(r.outcome || {}).kind] || END_N.escape)[0]);
+            const paid = free || paidWatch(u, id);
+            let btn = '<button data-watch="' + esc(id) + '"' + (!paid && !wn ? ' disabled' : '') + '>' + (paid ? '본다' : (wn ? '본다 · 1장' : '티켓 없음')) + '</button>';
             h += '<div class="dz-row"><div class="w">' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
                 + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + ST[m[c].st || 'ok']; }).join(' · ') + '</i></div>'
-                + '<button data-watch="' + esc(id) + '">본다</button></div>';
+                + btn + '</div>';
+            if (askWatch === id && !paid) {
+                h += '<div class="dz-row" style="border-color:#2a7a9a;"><div class="w" style="color:#9fd8ef;">👁 ' + DZ_WATCH + ' 한 장을 쓰고 이 판을 봅니다.<br>'
+                    + '<i>남은 ' + wn + '장 → ' + (wn - 1) + '장</i></div>'
+                    + '<button data-watchok="' + esc(id) + '">쓴다</button><button data-watchno="1">그만둔다</button></div>';
+            }
         });
     }
     if (msg) h += '<div class="dz-err">' + esc(msg) + '</div>';
@@ -783,10 +819,40 @@ function wire() {
     Array.prototype.forEach.call(ov.querySelectorAll('[data-fox]'), function (b) { b.onclick = function () { toggleFox(b.dataset.fox); }; });
     const ot = ov.querySelector('[data-out]'); if (ot) ot.onclick = toggleOut;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-watch]'), function (b) {
-        b.onclick = function () { if (!isAdm(me())) return; watchId = b.dataset.watch; follow(); lastInfo = ''; paint(); };
+        b.onclick = function () {
+            const u = me(), id = b.dataset.watch;
+            if (!u || !all[id]) return;
+            if (isAdm(u) || paidWatch(u, id)) { askWatch = null; watchId = id; follow(); lastInfo = ''; paint(); return; }
+            if (!wTickets(u)) { alert_(DZ_WATCH + '이 없습니다.\n\n상담사에게 받을 수 있습니다.'); return; }
+            askWatch = id; lastInfo = ''; paint();                      // 한 장 쓸지 묻는다
+        };
     });
+    const wok = ov.querySelector('[data-watchok]');
+    if (wok) wok.onclick = function () { spendWatch(wok.dataset.watchok); };   // (payWatch 는 아래 9 · 보상 받기의 이름이다)
+    const wno = ov.querySelector('[data-watchno]');
+    if (wno) wno.onclick = function () { askWatch = null; lastInfo = ''; paint(); };
     const uw = ov.querySelector('[data-unwatch]');
     if (uw) uw.onclick = function () { watchId = null; follow(); lastInfo = ''; paint(); };
+}
+
+// 👁 관전 티켓 한 장을 내고 본다 — 같은 판은 다시 떼지 않는다
+function spendWatch(id) {
+    const u = me();
+    askWatch = null;
+    if (!u || !all[id]) { lastInfo = ''; paint(); return; }
+    if (!paidWatch(u, id)) {
+        if (!wTickets(u)) { alert_(DZ_WATCH + '이 없습니다.'); lastInfo = ''; paint(); return; }
+        try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, DZ_WATCH, 1); else u.inventory.splice(u.inventory.indexOf(DZ_WATCH), 1); } catch (e) { }
+        const w = (u.dzWatch && typeof u.dzWatch === 'object') ? u.dzWatch : {};
+        w[id] = now();
+        // 오래된 것은 걷는다 (스무 판까지만)
+        Object.keys(w).sort(function (a, b) { return w[a] - w[b]; }).slice(0, Math.max(0, Object.keys(w).length - 20)).forEach(function (k) { delete w[k]; });
+        u.dzWatch = w;
+        const r = all[id], m = r.members || {};
+        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[기록 소실] ' + ((m[r.leader] || {}).n || '?') + '의 방을 관전합니다. (' + DZ_WATCH + ' -1)'); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, dzWatch: 1, history: 1 }); } catch (e) { }
+    }
+    watchId = id; follow(); lastInfo = ''; paint();
 }
 
 // ==========================================
