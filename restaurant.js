@@ -13,7 +13,7 @@
 //   평범끼리만  포만감이 오르거나(5~60) 오염도가 내린다(10~40)
 //   괴상끼리만  나쁜 것만 나온다
 //   섞으면      등급에 따라 좋은 것과 나쁜 것이 함께 나온다
-//   S 등급      50% 로 공용시설 +1~2 · 어둠 탐사 +1~2 · 행운 50~100% 중
+//   S 등급      20% 로 공용시설 +1~2 · 어둠 탐사 +1~2 · 행운 50~100% 중   (2026-10-21 — 50% → 20%)
 //               한둘이 더 붙는다 (이름 끝에 ★ 가 붙는다)
 //   S 디저트    평범한 재료만 쓰는 단것 열 가지. 포만감도 오염도도 안 건드리고
 //               **정해진 버프 하나만** 준다. 운에 맡기지 않는다 — 늘 같은 것이
@@ -25,6 +25,9 @@
 // ■ 저장되는 자리
 //   currentUser.cookBook   { 요리번호: 만든 횟수 }
 //   currentUser.cookStat   { ok: 성공 횟수, hi: A 이상 성공 횟수 }
+//   currentUser.starMine   { '요리 이름 ★': 내가 직접 만들어 아직 가진 수 } (2026-10-21)
+//                          🌟 제 칠 성군의 치성은 이것만 받는다 (chilseong.js). 소지품보다 많으면 줄인다
+//                          (먹거나 · 주거나 · 판 것) — 받은 ★ 는 여기 안 든다
 //
 // ■ 콘솔
 //   foodState() · foodBook() · foodDish(번호)
@@ -39,6 +42,7 @@ const COOK_TITLE = '요리사';
 // 같은 자리를 써야 칭호 목록·진도와 어긋나지 않는다.
 const COOK_ID = 'cook';
 const HI_NEED = 50;            // A 등급 이상 50번이면 요리사
+const STAR_RATE = 0.2;         // S 등급 요리에 ★ 가 붙을 몫 (2026-10-21 — 0.5 → 0.2)
 
 // ==========================================
 // 1. 재료
@@ -704,8 +708,13 @@ function finishCook(d, ok) {
         addHistoryLog(currentUser, '[식당] ' + d.name + ' 실패');
     } else {
         // 디저트는 ★ 를 안 굴린다 — 버프가 이미 못박혀 있어 두 번 받는 꼴이 된다
-        const star = (d.grade === 'S' && d.kind !== 'sweet' && Math.random() < 0.5);
+        const star = (d.grade === 'S' && d.kind !== 'sweet' && Math.random() < STAR_RATE);
         made = star ? (d.name + ' ★') : d.name;
+        // 🌟 내가 직접 만든 ★ — 칠 성군의 치성은 이것만 받는다
+        if (star) {
+            if (!currentUser.starMine || typeof currentUser.starMine !== 'object') currentUser.starMine = {};
+            currentUser.starMine[made] = (Number(currentUser.starMine[made]) || 0) + 1;
+        }
         const s = stat();
         s.ok = (s.ok || 0) + 1;
         if (d.grade === 'A' || d.grade === 'S') s.hi = (s.hi || 0) + 1;
@@ -715,7 +724,9 @@ function finishCook(d, ok) {
     }
     currentUser.inventory.push(made);
 
-    save({ inventory: 1, cookBook: 1, cookStat: 1, history: 1 });
+    const f = { inventory: 1, cookBook: 1, cookStat: 1, history: 1 };
+    if (currentUser.starMine && typeof currentUser.starMine === 'object') f.starMine = 1;
+    save(f);
     if (typeof saveSelfFull === 'function') saveSelfFull();
     if (typeof updateUI === 'function') updateUI();
     renderFood();
@@ -728,6 +739,36 @@ function finishCook(d, ok) {
         checkCookTitle();
     }
 }
+
+// 🌟 내가 만든 ★ — 소지품에 있는 것보다 많이 세어 두지 않는다 (먹거나 · 주거나 · 판 만큼 줄인다)
+function starMineFix() {
+    const u = currentUser;
+    if (!u || !u.starMine || typeof u.starMine !== 'object') return;
+    const have = {};
+    (Array.isArray(u.inventory) ? u.inventory : []).forEach(function (x) { have[x] = (have[x] || 0) + 1; });
+    let ch = false;
+    Object.keys(u.starMine).forEach(function (n) {
+        const m = Math.min(Number(u.starMine[n]) || 0, have[n] || 0);
+        if (m <= 0) { delete u.starMine[n]; ch = true; }
+        else if (m !== u.starMine[n]) { u.starMine[n] = m; ch = true; }
+    });
+    if (!ch) return;
+    // 비면 지운다 (파이어베이스에 빈 칸은 남지 않는다)
+    if (!Object.keys(u.starMine).length) {
+        u.starMine = null;
+        try { if (typeof database !== 'undefined' && database) database.ref('users/' + u.code + '/starMine').remove(); } catch (e) { }
+        return;
+    }
+    save({ starMine: 1 });
+}
+window.starMineFix = starMineFix;
+window.starMineOf = function (u, name) {
+    u = u || currentUser;
+    if (!u || !u.starMine || typeof u.starMine !== 'object') return 0;
+    const have = (Array.isArray(u.inventory) ? u.inventory : []).filter(function (x) { return x === name; }).length;
+    return Math.min(Number(u.starMine[name]) || 0, have);
+};
+setInterval(function () { try { starMineFix(); } catch (e) { } }, 3000);
 
 // ==========================================
 // 8. 먹기

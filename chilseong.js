@@ -17,6 +17,8 @@
 // ■ 치성 — ★ 달린 음식을 바친다
 //
 //   행복 식당의 S 등급 요리 ★ (이름 끝이 「 ★」 · ITEM_CATALOG[이름].star) 만 받는다.
+//   ★ 그것도 **장착자가 직접 만든 것만** (2026-10-21) — restaurant.js 가 만들 때 starMine 에 센다.
+//     받은 ★ · 산 ★ · 이 날 전에 만든 ★ 는 치성에 안 든다. 바치면 starMine 에서도 그만큼 뺀다.
 //   ★ 요리의 격 — 평범끼리(한상 차림 …) 3 · 섞은 것(셰프의 농담 …) 2 · 괴상끼리(식당의 바닥 …) 1.
 //   치성은 그날 하루 걸린다 (자정이 지나면 걷힌다).
 //
@@ -158,12 +160,17 @@ function isStar(name) {
     return !!((c && c.star) || /\s★$/.test(String(name || '')));
 }
 function tierOf(name) { return TIER[String(name || '').replace(/\s*★$/, '')] || 1; }
-// 가진 ★ 음식 — [{ n, t, c }] (격 낮은 것부터)
+// 가진 ★ 음식 가운데 내가 직접 만든 것 — [{ n, t, c }] (격 낮은 것부터)
+function mineOf(u, n) {
+    if (typeof window.starMineOf === 'function') return window.starMineOf(u, n);
+    return 0;                                   // 셀 수 없으면 아무것도 받지 않는다
+}
 function stars(u) {
     u = u || me();
     const cnt = {};
     (u && Array.isArray(u.inventory) ? u.inventory : []).forEach(function (x) { if (isStar(x)) cnt[x] = (cnt[x] || 0) + 1; });
-    return Object.keys(cnt).map(function (n) { return { n: n, t: tierOf(n), c: cnt[n] }; })
+    return Object.keys(cnt).map(function (n) { return { n: n, t: tierOf(n), c: Math.min(cnt[n], mineOf(u, n)) }; })
+        .filter(function (x) { return x.c > 0; })
         .sort(function (a, b) { return a.t - b.t || (a.n < b.n ? -1 : 1); });
 }
 function starCount(u) { return stars(u).reduce(function (a, x) { return a + x.c; }, 0); }
@@ -216,7 +223,7 @@ function closeBtn() {
         ITEM_CATALOG[NAME] = {
             price: 0, usable: true, targetable: false, effect: 'chil_equip', noSell: true, equipKind: 'chil',
             desc: '북두의 일곱 성군이 곁에 선다. 장착하면 장착칸의 [🌟 칠성] 에서 일곱 성군에게 청하거나 '
-                + '★ 달린 음식으로 치성을 드릴 수 있다. — 탐랑 · 거문 · 녹존 · 문곡 · 염정 · 무곡 · 파군'
+                + '직접 만든 ★ 달린 음식으로 치성을 드릴 수 있다. — 탐랑 · 거문 · 녹존 · 문곡 · 염정 · 무곡 · 파군'
         };
         try { delete ITEM_CATALOG[OLD]; } catch (e) { }    // 🐯 옛 이름은 목록에 안 띄운다 — 가진 사람은 rename() 이 바꾼다
         try { if (typeof NO_SELL_ITEMS !== 'undefined') [NAME, OLD].forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); }); } catch (e) { }
@@ -411,7 +418,7 @@ function menu() {
             + '<div style="font-size:10px; color:#9a8a6a; margin-top:2px;">' + esc(g.s) + '</div>' + body + '</div>';
     }).join('');
     box('<div style="' + HEAD + '">🌟 제 칠(七) 성군(星君)</div>'
-        + '<div style="font-size:10px; color:#9a8a6a; margin-bottom:9px;">가진 ★ 음식 ' + sc + '개 · 치성은 그날 하루 걸린다</div>'
+        + '<div style="font-size:10px; color:#9a8a6a; margin-bottom:9px;">직접 만든 ★ 음식 ' + sc + '개 · 치성은 그날 하루 걸린다</div>'
         + '<div style="' + SCROLL + '">' + h + '</div>' + closeBtn());
 }
 window.chilMenu = menu;
@@ -443,7 +450,7 @@ function drawPick() {
     }).join('');
     box('<div style="' + HEAD + '">' + esc(pick.title) + '</div>'
         + '<div style="font-size:11px; color:#d8cba8; margin-bottom:8px;">★ 음식 <b style="color:#ffd479;">' + tot + ' / ' + pick.need + '</b></div>'
-        + '<div style="' + SCROLL + '">' + (rows || '<div style="font-size:11px; color:#8a7a5a;">★ 음식이 없습니다.</div>') + '</div>'
+        + '<div style="' + SCROLL + '">' + (rows || '<div style="font-size:11px; color:#8a7a5a;">직접 만든 ★ 음식이 없습니다.</div>') + '</div>'
         + '<button class="game-btn" style="width:100%; margin:0 0 7px 0; padding:11px; font-size:12px;' + (tot === pick.need ? GOLD : GREY) + '"'
         + (tot === pick.need ? '' : ' disabled') + ' onclick="chilPickGo()">바친다</button>'
         + '<button class="game-btn" style="width:100%; margin:0; padding:10px; font-size:12px;" onclick="chilMenu()">돌아간다</button>');
@@ -464,8 +471,19 @@ window.chilPickGo = function () {
     const have = {}; stars(u).forEach(function (x) { have[x.n] = x.c; });
     const out = [];
     Object.keys(pick.sel).forEach(function (n) { for (let i = 0; i < (pick.sel[n] || 0) && i < (have[n] || 0); i++) out.push(n); });
-    if (out.length !== pick.need) { alert_('★ 음식이 모자랍니다.'); return; }
-    out.forEach(function (n) { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, n, 1); });
+    if (out.length !== pick.need) { alert_('직접 만든 ★ 음식이 모자랍니다.'); return; }
+    out.forEach(function (n) {
+        if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, n, 1);
+        // 바친 만큼 「내가 만든 ★」 에서도 뺀다 — 남은 받은 ★ 가 내 것으로 세어지지 않게
+        if (u.starMine && typeof u.starMine === 'object' && u.starMine[n] != null) {
+            u.starMine[n] = (Number(u.starMine[n]) || 0) - 1;
+            if (u.starMine[n] <= 0) delete u.starMine[n];
+        }
+    });
+    if (u.starMine && typeof u.starMine === 'object') {
+        if (Object.keys(u.starMine).length) save({ starMine: 1 });
+        else { u.starMine = null; try { if (db_()) db_().ref('users/' + u.code + '/starMine').remove(); } catch (e) { } }
+    }
     const go = pick.go;
     pick = null;
     shut();
@@ -486,7 +504,7 @@ window.chilJi = function (k) {
     if (k === 'yeom' && s.yeomJi) { alert_('오늘 염정성군께는 이미 치성을 드렸습니다.'); return; }
     if (k === 'mug' && s.mugJi) { alert_('오늘 무곡성군께는 이미 치성을 드렸습니다.'); return; }
     if (k === 'pag' && s.pagJi) { alert_('오늘 파군성군께는 이미 치성을 드렸습니다.'); return; }
-    if (starCount(u) < need) { alert_('★ 달린 음식이 ' + need + '개 있어야 합니다.'); return; }
+    if (starCount(u) < need) { alert_('직접 만든 ★ 음식이 ' + need + '개 있어야 합니다.'); return; }
     picker(need, JI_NAME[k] + '께 치성 — ★ ' + need + '개', function (foods) {
         const s2 = st(u);
         let msg = '';
@@ -595,7 +613,7 @@ window.chilTamOpen = function () {
     const u = me();
     if (!u || !wears(u)) return;
     if (st(u).tam) { alert_('오늘 탐랑성군께는 이미 바쳤습니다.'); return; }
-    if (starCount(u) < CHIL.TAM_N) { alert_('★ 달린 음식이 ' + CHIL.TAM_N + '개 있어야 합니다.'); return; }
+    if (starCount(u) < CHIL.TAM_N) { alert_('직접 만든 ★ 음식이 ' + CHIL.TAM_N + '개 있어야 합니다.'); return; }
     picker(CHIL.TAM_N, '탐랑성군께 바친다 — ★ ' + CHIL.TAM_N + '개', function (foods) {
         const s = st(u);
         const sum = foods.reduce(function (a, n) { return a + tierOf(n); }, 0);
