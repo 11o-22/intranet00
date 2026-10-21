@@ -47,7 +47,7 @@
 //   disasterSrv/<판>         숨긴 설계 · 진행 메모 · 장면 요약             (서버만 쓴다)
 //   disasterUse/<날짜>       하루 호출 수 · 사원별 시작 수
 // ==========================================
-import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule, wolfRule } from './lore.js';
+import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule, wolfRule, kitChatRule } from './lore.js';
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
@@ -69,6 +69,11 @@ export const CFG = {
     FOX_PER_SCENE: 10,       // 한 장면에 여우가 말하는 횟수
     FOX_DAILY: 800,          // 하루 전체 여우 채팅 호출
     FOX_MAX_LINES: 3,
+    // 🐾 사내 채팅의 아기 여우 (2026-10-21) — 부르면 나와서 한 아이가 하루 스무 마디 · 마지막은 작별 인사
+    KIT_LINES: 20,           // 한 아이가 하루에 나누는 말
+    KIT_GAP_MS: 5000,        // 여우가 말하는 사이 (이보다 잦으면 건너뛴다)
+    KIT_FRESH_MS: 180000,    // 이보다 오래된 사람 말에는 대답하지 않는다
+    KIT_DAILY: 500,          // 하루 전체 사내 채팅 여우 호출
     TICKET: '🎫 기록 소실 티켓'
 };
 
@@ -128,6 +133,8 @@ function dbOf(deps) {
         // 바뀌지 않았을 때만 쓴다 — 200 이면 됐다, 412 면 누가 먼저 썼다
         putIf: async (p, v, tag) => (await F(U(p), { method: 'PUT', headers: { 'if-match': tag }, body: JSON.stringify(v) })).status,
         put: async (p, v) => { await chk(await F(U(p), { method: 'PUT', body: JSON.stringify(v) }), '쓰지'); },
+        // 끝에서 n 개만 (열쇠 순) — 사내 채팅처럼 쌓이기만 하는 자리
+        last: async (p, n) => (await (await chk(await F(U(p) + '?orderBy=%22%24key%22&limitToLast=' + n), '읽지')).json()),
         patch: async (p, v) => { await chk(await F(U(p), { method: 'PATCH', body: JSON.stringify(v) }), '쓰지'); }
     };
 }
@@ -251,6 +258,7 @@ const S = { type: 'string' }, B = { type: 'boolean' };
 const FOX_LINES = { type: 'array', items: obj({ fox: S, t: S }) };      // 🐾 아기 여우가 채팅에 올릴 말
 const SCHEMA_START = obj({ plan: S, title: S, text: S, notes: S, fox_lines: FOX_LINES });
 const SCHEMA_FOX = obj({ lines: FOX_LINES });
+const SCHEMA_KIT = obj({ lines: FOX_LINES, bye: FOX_LINES });              // 🐾 사내 채팅 — bye 는 마지막 한 마디
 const SCHEMA_ACTS = obj({ acts: { type: 'array', items: obj({
     who: S, did: S, kind: { type: 'string', enum: KIND_KEYS },
     tier: { type: 'string', enum: ['easy', 'normal', 'hard'] }, danger: B, target: S, burn: B, move: S }) } });
@@ -1429,6 +1437,228 @@ async function foxChat(b, deps, db) {
 }
 
 // ==========================================
+// 🐾 사내 채팅의 아기 여우 (2026-10-21)
+// ==========================================
+//   부르기(kitcall) — 여우가 붙은 사람이 부르면 그 아이가, 장착자(주인)가 부르면 남에게 안 붙은 아이가 다 나온다.
+//                      (오늘 소멸한 아이 · 오늘 스무 마디를 다 쓴 아이는 안 나온다) 나오면서 한 마디씩 인사한다.
+//   대답(kitchat)   — 사원이 말하면 화면이 2.5초 뒤 부른다. 빠른 모델(Haiku)로 0~3줄 · 한 아이 한 줄.
+//                      스무 번째 마디는 작별 인사(bye) — 말하고 채팅방을 떠난다.
+//   allChat/<열쇠>                  여우 줄 { code: 'fox_<id>', name, text, at, fox: 속성, o, oN, on, onN }
+//   allChatFox/on/<id>              나와 있는 아이 { k, o, oN, on, onN, nick, by, at, day }   id = 주인사번_속성
+//   allChatFox/used/<날짜>/<id>     오늘 나눈 말 수
+//   allChatFox/lock                 { at, hat } — 마지막으로 대답한 때 · 대답한 사람 말의 때
+//   allChatFox/calls/<날짜>         하루 호출 수
+const KIT_FALLBACK = '(꼬리를 살랑인다.) 안녕하세요!';
+const KIT_BYE = '(꼬리를 흔든다.) 이제 가 봐야겠어요. 또 불러 주세요!';
+function kitName(f) { return clip(f.nick || (FOXES[f.k] || {}).n || f.k, 12); }
+function kitArr(v) { return invArr(v); }
+async function kitSpend(db, day) {
+    const path = 'allChatFox/calls/' + day;
+    for (let i = 0; i < 5; i++) {
+        const { val, tag } = await db.getTag(path);
+        const c = Number(val) || 0;
+        if (c >= CFG.KIT_DAILY) return false;
+        const st = await db.putIf(path, c + 1, tag);
+        if (st === 200) return true;
+        if (st !== 412) return false;
+    }
+    return false;
+}
+async function kitAddUsed(db, day, add) {
+    const path = 'allChatFox/used/' + day;
+    for (let i = 0; i < 6; i++) {
+        const { val, tag } = await db.getTag(path);
+        const v = (val && typeof val === 'object') ? Object.assign({}, val) : {};
+        Object.keys(add).forEach((id) => { v[id] = (Number(v[id]) || 0) + add[id]; });
+        const st = await db.putIf(path, v, tag);
+        if (st === 200) return v;
+        if (st !== 412) break;
+    }
+    return null;
+}
+// 사내 채팅에 여우 줄을 올린다 — 열쇠는 때 순서로 (사람 줄과 섞여 선다)
+async function kitPost(db, rows, now) {
+    const up = {};
+    rows.forEach((x, i) => {
+        const f = x.f;
+        up[pushId(now + i)] = { code: 'fox_' + x.id, name: '🐾 ' + kitName(f), no: '', team: '', text: x.t, at: now + i,
+                                 fox: f.k, o: f.o, oN: f.oN || '', on: f.on, onN: f.onN || '' };
+    });
+    if (Object.keys(up).length) await db.patch('allChat', up);
+    return Object.keys(up).length;
+}
+function kitClean(t) { return clip(String(t || '').replace(/<\/?f>/g, '').replace(/\s+/g, ' ').trim(), 120); }
+function kitKeys(on, ids, last) {
+    return ids.map((id) => {
+        const f = on[id], F = FOXES[f.k] || {};
+        return id + ' = ' + kitName(f) + ' (' + (F.a || f.k) + (f.nick && f.nick !== F.n ? ' · 본래 이름 ' + F.n : '')
+            + ' · 주인 ' + (f.oN || f.o) + (f.on !== f.o ? ' · ' + (f.onN || f.on) + ' 곁에 붙어 있음' : '') + ')'
+            + (last && last.indexOf(id) >= 0 ? ' — ★ 이번이 마지막 한 마디 (bye 에 작별 인사)' : '');
+    }).join('\n');
+}
+async function kitPeople(db, rows, on, now) {
+    const codes = [];
+    rows.forEach((x) => { if (x && !x.fox && x.code && okCode(String(x.code)) && codes.indexOf(x.code) < 0) codes.push(x.code); });
+    const top = codes.slice(-10);
+    const BB = await bodies(db, top, now);
+    const name = {};
+    rows.forEach((x) => { if (x && !x.fox) name[x.code] = x; });
+    return top.map((c) => {
+        const x = name[c] || {}, b = BB[c] || {};
+        const owns = Object.keys(on).filter((id) => on[id].o === c).map((id) => kitName(on[id]));
+        const near = Object.keys(on).filter((id) => on[id].on === c && on[id].o !== c).map((id) => kitName(on[id]));
+        return '- ' + clip(x.name || c, 20) + (x.team ? ' (' + clip(x.team, 20) + ')' : '')
+            + ' · 성별: ' + (b.g || '알 수 없음') + (b.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
+            + (b.fx && b.fx.length ? ' — 몸에 걸린 효과: ' + b.fx.join('; ') : '') + (b.child ? ' — ★ 지금 어린아이 상태' : '')
+            + (owns.length ? ' — ★ 아기 여우 ' + owns.join(' · ') + '의 주인' : '')
+            + (near.length ? ' — 곁에 붙은 아기 여우: ' + near.join(' · ') : '')
+            + (/네임리스/.test(String(x.name || '')) ? ' — ★ 「주인님」 또는 「네임리스 님」으로만 부른다' : '');
+    }).join('\n');
+}
+async function kitRows(db) {
+    const all = (await db.last('allChat', 40)) || {};
+    return Object.keys(all).map((k) => Object.assign({ _k: k }, all[k]))
+        .filter((x) => x && typeof x.text === 'string' && x.at).sort((a, z) => a.at - z.at);
+}
+function kitTalk(rows) {
+    return rows.slice(-30).map((x) => (x.fox ? '(아기 여우) ' + String(x.name || '').replace(/^🐾\s*/, '') : (x.name || x.code))
+        + ': ' + clip(x.text, 200).replace(/\s+/g, ' ').trim()).join('\n');
+}
+
+async function kitCall(b, deps, db) {
+    const now = deps.now(), day = kstDay(now), c = b.code;
+    const got = await Promise.all([db.get('users/' + c + '/name'), db.get('users/' + c + '/equippedWeapons'),
+        db.get('users/' + c + '/kits'), db.get('users/' + c + '/kitDay'), db.get('users/' + c + '/kitOn')]);
+    const nm = clip(got[0] || c, 20), eq = kitArr(got[1]), kits = got[2], kday = got[3], kon = got[4];
+    const want = {};
+    if (eq.some((w) => baseName(w) === BABY)) {
+        const fresh = kday !== day;
+        FOX_ORDER.forEach((k) => {
+            const s = (kits && typeof kits === 'object' && kits[k] && typeof kits[k] === 'object') ? kits[k] : {};
+            if (!fresh && s.gone) return;                    // 오늘 소멸한 아이
+            if (s.to && String(s.to) !== c) return;          // 남에게 붙여 준 아이는 그쪽 곁에
+            want[c + '_' + k] = { k: k, o: c, oN: nm, on: c, onN: nm, nick: clip(s.nick || '', 12) };
+        });
+    }
+    if (kon && typeof kon === 'object') {
+        Object.keys(kon).forEach((k) => {
+            const x = kon[k];
+            if (!x || typeof x !== 'object' || !FOXES[k] || !x.by || !okCode(String(x.by))) return;
+            want[String(x.by) + '_' + k] = { k: k, o: String(x.by), oN: clip(x.byName || '', 20), on: c, onN: nm, nick: clip(x.nick || '', 12) };
+        });
+    }
+    if (!Object.keys(want).length) return { ok: false, why: 'none' };
+    const on = (await db.get('allChatFox/on')) || {};
+    const used = (await db.get('allChatFox/used/' + day)) || {};
+    const here = [], spent = [], come = [];
+    Object.keys(want).forEach((id) => {
+        if (on[id] && on[id].day === day) { here.push(kitName(want[id])); return; }
+        if ((Number(used[id]) || 0) >= CFG.KIT_LINES - 1) { spent.push(kitName(want[id])); return; }   // 인사하고 바로 작별할 몫도 없다
+        come.push(id);
+    });
+    if (!come.length) return { ok: false, why: here.length ? 'here' : 'spent', here: here, spent: spent };
+    if (!(await kitSpend(db, day))) return { ok: false, why: 'daily' };
+    // 나와 있는 자리 — 지난날 것은 걷는다
+    const upOn = {};
+    Object.keys(on).forEach((id) => { if (!on[id] || on[id].day !== day) upOn[id] = null; });
+    come.forEach((id) => { upOn[id] = Object.assign({}, want[id], { by: c, at: now, day: day }); });
+    await db.patch('allChatFox/on', upOn);
+    const now2 = Object.assign({}, on); Object.keys(upOn).forEach((id) => { if (upOn[id]) now2[id] = upOn[id]; else delete now2[id]; });
+    // 인사 — 나온 아이마다 한 마디
+    let lines = [];
+    try {
+        const rows = await kitRows(db);
+        const res = await ask(deps, Object.assign({
+            model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
+            system: kitChatRule(come.map((id) => want[id].k)),
+            user: [
+                '[방금 일] ' + nm + ' 사원이 아기 여우를 불렀다. 아래 아이들이 지금 막 사내 채팅방에 나왔다 — 한 아이가 한 줄씩, 성격대로 짧게 인사한다 (lines).',
+                '',
+                '[채팅방의 사원 — 사람 목록]', await kitPeople(db, rows.concat([{ code: c, name: nm }]), now2, now), '',
+                '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(now2, come), '',
+                '[최근 사내 채팅 — 마지막 줄이 방금 한 말]', kitTalk(rows) || '(아직 없음)'
+            ].join('\n')
+        }, HAIKU_OPT));
+        lines = (res && Array.isArray(res.lines)) ? res.lines : [];
+    } catch (e) { lines = []; }
+    const post = [], add = {};
+    come.forEach((id) => {
+        const x = lines.find((l) => l && l.fox === id);
+        const t = kitClean(x && x.t) || KIT_FALLBACK;
+        post.push({ id: id, f: upOn[id], t: t });
+        add[id] = 1;
+    });
+    await kitPost(db, post, deps.now());
+    await kitAddUsed(db, day, add);
+    return { ok: true, came: come.map((id) => kitName(want[id])), here: here, spent: spent };
+}
+
+async function kitChat(b, deps, db) {
+    const now = deps.now(), day = kstDay(now);
+    const onAll = (await db.get('allChatFox/on')) || {};
+    const ids = Object.keys(onAll).filter((id) => onAll[id] && onAll[id].day === day && FOXES[onAll[id].k]);
+    if (!ids.length) return { ok: false, why: 'nofox' };
+    const rows = await kitRows(db);
+    const humans = rows.filter((x) => !x.fox);
+    if (!humans.length) return { ok: false, why: 'quiet' };
+    const hat = Number(humans[humans.length - 1].at) || 0;
+    if (now - hat > CFG.KIT_FRESH_MS) return { ok: false, why: 'stale' };
+    // 잠금 — 한 번에 하나 · 사이 · 이미 대답한 말
+    let took = false;
+    for (let i = 0; i < 4 && !took; i++) {
+        const { val, tag } = await db.getTag('allChatFox/lock');
+        const v = (val && typeof val === 'object') ? val : {};
+        if (now - (Number(v.at) || 0) < CFG.KIT_GAP_MS) return { ok: false, why: 'busy' };
+        if ((Number(v.hat) || 0) >= hat) return { ok: false, why: 'answered' };
+        const st = await db.putIf('allChatFox/lock', { at: now, hat: hat }, tag);
+        if (st === 200) took = true;
+        else if (st !== 412) return { ok: false, why: 'lock' };
+    }
+    if (!took) return { ok: false, why: 'busy' };
+    const used = (await db.get('allChatFox/used/' + day)) || {};
+    const left = {};
+    ids.forEach((id) => { left[id] = CFG.KIT_LINES - (Number(used[id]) || 0); });
+    const gone0 = ids.filter((id) => left[id] <= 0);                 // 다 쓴 아이 — 조용히 걷는다
+    const last = ids.filter((id) => left[id] === 1);                 // 이번이 마지막 — 작별 인사
+    const talk = ids.filter((id) => left[id] >= 2);
+    if (!(await kitSpend(db, day))) return { ok: false, why: 'daily' };
+    const live = talk.concat(last);
+    let res = null;
+    if (live.length) {
+        try {
+            res = await ask(deps, Object.assign({
+                model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
+                system: kitChatRule(live.map((id) => onAll[id].k)),
+                user: [
+                    '[채팅방의 사원 — 사람 목록]', await kitPeople(db, rows, onAll, now), '',
+                    '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(onAll, live, last), '',
+                    '[최근 사내 채팅 — 마지막 줄이 방금 한 말]', kitTalk(rows)
+                ].join('\n')
+            }, HAIKU_OPT));
+        } catch (e) { res = null; }
+    }
+    const post = [], add = {}, said = {};
+    ((res && res.lines) || []).forEach((x) => {
+        if (post.length >= CFG.FOX_MAX_LINES || !x || talk.indexOf(x.fox) < 0 || said[x.fox]) return;
+        const t = kitClean(x.t);
+        if (!t) return;
+        said[x.fox] = 1; add[x.fox] = 1;
+        post.push({ id: x.fox, f: onAll[x.fox], t: t });
+    });
+    last.forEach((id) => {
+        const x = ((res && res.bye) || []).find((l) => l && l.fox === id);
+        post.push({ id: id, f: onAll[id], t: kitClean(x && x.t) || KIT_BYE });
+        add[id] = 1;
+    });
+    const n = await kitPost(db, post, deps.now());
+    if (Object.keys(add).length) await kitAddUsed(db, day, add);
+    const off = {};
+    last.concat(gone0).forEach((id) => { off[id] = null; });
+    if (Object.keys(off).length) await db.patch('allChatFox/on', off);
+    return { ok: true, lines: n, left: last.map((id) => kitName(onAll[id])) };
+}
+
+// ==========================================
 // 들머리
 // ==========================================
 export async function handle(body, deps) {
@@ -1441,6 +1671,8 @@ export async function handle(body, deps) {
         if (b.act === 'start') out = await start(b, deps, db);
         else if (b.act === 'round') out = await round(b, deps, db);
         else if (b.act === 'fox') out = await foxChat(b, deps, db);
+        else if (b.act === 'kitcall') out = await kitCall(b, deps, db);
+        else if (b.act === 'kitchat') out = await kitChat(b, deps, db);
         else throw new Fail(400, '모르는 요청입니다.');
         return { status: 200, json: out };
     } catch (e) {
