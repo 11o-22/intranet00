@@ -72,6 +72,9 @@ const KINDS_C = {
             place: '병원', lost: '끌려감', lostEnd: '돌아오지 못함', lostIn: '어딘가에 붙들려 목소리만 새어 나간다…', vip: '사회자',
             noLeave: true,          // 귀빈이 없다 — 사회자도 똑같이 들어가고 홀로 나가지 못한다
             kinLine: '괴물들이 당신을 <b>저희와 같은 것</b>으로 알아봅니다. 끌려가지 않고, 밤의 사냥도 당신을 비껴갑니다.',
+            vanishAt: 3,            // 괴물들의 의심이 3번 쌓이면 어둠 속으로 사라진다 — 실종 (서버 lore.js kinVanish)
+            vanishIn: '어둠 속에서 목소리만 희미하게 새어 나간다…',
+            burnLine: '손가락을 튕겨(또는 「소각」을 시켜) 무언가를 태울 수 있습니다 — 파괴 판정 주사위 <b>+7</b>.',
             fail: '남은 사람이 모두 끌려갔습니다', fate: '병원 어딘가로 끌려갔다' }
 };
 const KIND_LIST = ['wave', 'ward'];
@@ -93,6 +96,8 @@ const ADMIN = 'kario0987';
 const ST = { ok: '멀쩡', hurt: '다침', lost: '죽음', out: '홀로 나감' };
 // 상태 이름 — 실종을 재난마다 다르게 부른다 (방송국은 죽음 · 병원은 끌려감)
 function stN(k, st) { return st === 'lost' ? K(k).lost : (ST[st || 'ok'] || st); }
+// 사람 하나의 상태 — 🏥 어둠 속으로 사라진 사회자는 「실종」
+function stM(k, x) { x = x || {}; return (x.vanish && x.st === 'lost') ? '실종' : stN(k, x.st || 'ok'); }
 const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81', out: '#c9b6ff' };
 function gone(st) { return st === 'lost' || st === 'out'; }
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
@@ -505,7 +510,8 @@ function paint() {
             const lost = mySt === 'lost', out = mySt === 'out';
             const talk = r.phase === 'TALK';
             inp.disabled = !talk || out;
-            inp.placeholder = out ? K(r.kind).place + '을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…' : (lost ? K(r.kind).lostIn : '캐릭터로 말하고 행동하기'));
+            inp.placeholder = out ? K(r.kind).place + '을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…'
+                : (lost ? (((r.members[u.code] || {}).vanish && K(r.kind).vanishIn) || K(r.kind).lostIn) : '캐릭터로 말하고 행동하기'));
             ov.querySelector('#dz-send').disabled = !talk || out;
             done.style.display = (lost || out || isAdm(u)) ? 'none' : '';
             const on = Number((r.members[u.code] || {}).done) === n;
@@ -579,7 +585,7 @@ function lobbyList(u) {
             const paid = free || paidWatch(u, id);
             let btn = '<button data-watch="' + esc(id) + '"' + (!paid && !wn ? ' disabled' : '') + '>' + (paid ? '본다' : (wn ? '본다 · 1장' : '티켓 없음')) + '</button>';
             h += '<div class="dz-row"><div class="w">' + esc(kName(r.kind)) + ' · ' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
-                + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + stN(r.kind, m[c].st || 'ok'); }).join(' · ') + '</i></div>'
+                + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + stM(r.kind, m[c]); }).join(' · ') + '</i></div>'
                 + btn + '</div>';
             if (askWatch === id && !paid) {
                 h += '<div class="dz-row" style="border-color:#2a7a9a;"><div class="w" style="color:#9fd8ef;">👁 ' + DZ_WATCH + ' 한 장을 쓰고 이 판을 봅니다.<br>'
@@ -728,7 +734,7 @@ function memberChips(r, u) {
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : ((x.role && ROLE_N[x.role] ? ' · ' + (x.role === 'vip' ? K(r.kind).vip : ROLE_N[x.role]) : '') + ' · ' + (st === 'out' && x.kick ? '모셔짐' : stN(r.kind, st))
+            : ((x.role && ROLE_N[x.role] ? ' · ' + (x.role === 'vip' ? K(r.kind).vip : ROLE_N[x.role]) : '') + ' · ' + (st === 'out' && x.kick ? '모셔짐' : stM(r.kind, x))
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '"'
             + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
@@ -761,6 +767,7 @@ function room(r, u) {
 
 function checkChips(list, kind) {
     return '<div class="dz-chk">' + (list || []).map(function (c) {
+        if (c.vanish) return '<span class="no" title="괴물들의 의심이 쌓였다">🌑 ' + esc(c.name) + ' · 어둠 속으로 사라짐 → 실종</span>';
         if (c.kind === 'none') return '<span' + (c.kick ? ' class="no"' : '') + '>' + esc(c.name) + ' · ' + esc(c.did) + (c.kick ? ' → 모셔짐' : '') + '</span>';
         // 🐾 아기 여우의 판정 — 옅은 주황 (다침은 이 판 안에서만 · 대신 소멸은 그날 어둠에서도 못 부름)
         if (c.fx) {
@@ -770,7 +777,7 @@ function checkChips(list, kind) {
             if (c.tgtTo) f += ' · ' + esc(c.tgtName) + ' ' + (c.tgtFox ? '다침→멀쩡' : stN(kind, c.tgtFrom) + '→' + stN(kind, c.tgtTo));
             return '<span class="fx ' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + f + '</span>';
         }
-        let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + (c.wolf ? '+' + c.wolf : '') + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
+        let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + (c.wolf ? '+' + c.wolf : '') + (c.burnPlus ? '+' + c.burnPlus : '') + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '');
         if (c.wolf) s = '🐺 ' + s;          // 늑대의 모습인 경비팀장 — 주사위 +8 (2026-10-21)
         if (c.forced) s = '⚡ ' + s;
@@ -802,9 +809,17 @@ function play(r, u) {
     } else if (x.role === 'vip' && st !== 'lost' && K(r.kind).noLeave) {
         // 🏥 새빛 병원 — 귀빈이 없다. 사회자는 똑같이 들어가되 괴물들이 동족으로 알아본다 (홀로 나가기 없음)
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
-            + K(r.kind).kinLine + '<br><span style="font-size:11px;color:#9a8fb8;">괴물답지 않게 굴면 괴물들이 이상함을 느낍니다. 홀로 나갈 수는 없습니다.</span>'
-            + (Number(x.odd) ? '<br><span style="font-size:11px;color:#ffb36b;">❓ 괴물들이 당신을 ' + Number(x.odd) + '번 이상하게 여겼습니다.</span>' : '')
+            + K(r.kind).kinLine + '<br><span style="font-size:11px;color:#9a8fb8;">괴물답지 않게 굴면 괴물들이 이상함을 느낍니다.'
+            + (K(r.kind).vanishAt ? ' 그 의심이 ' + K(r.kind).vanishAt + '번 쌓이면 어둠 속으로 사라집니다 (실종).' : '') + ' 홀로 나갈 수는 없습니다.</span>'
+            + (K(r.kind).burnLine ? '<br><span style="font-size:11px;color:#ff9a6b;">🔥 ' + K(r.kind).burnLine + '</span>' : '')
+            + (Number(x.odd) ? '<br><span style="font-size:11px;color:#ffb36b;">❓ 괴물들이 당신을 ' + Number(x.odd) + '번 이상하게 여겼습니다'
+                + (K(r.kind).vanishAt ? ' (' + K(r.kind).vanishAt + '번이면 사라집니다)' : '') + '.</span>' : '')
             + '</div></div>';
+    } else if (x.vanish && st === 'lost') {
+        // 🏥 괴물들의 의심이 쌓여 어둠 속으로 사라졌다 (실종)
+        h += '<div class="dz-card" style="border-color:#3a3a4a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#b8b0c8;">'
+            + '🌑 괴물들의 의심이 쌓였습니다. 당신은 <b>어둠 속으로 사라졌습니다</b> — 실종.<br>'
+            + '<span style="font-size:11px;color:#8a8298;">아무도 당신을 찾을 수 없습니다. 남은 사람들의 이야기를 지켜봅니다.</span></div></div>';
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
@@ -841,7 +856,7 @@ function ending(r, u) {
     h += '<div class="dz-sec">사원</div><div class="dz-card-m">' + Object.keys(m).map(function (c) {
         const st = m[c].st || 'ok';
         return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — '
-            + (st === 'lost' ? K(r.kind).lostEnd + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? (m[c].kick ? '다른 곳으로 모셔짐' : '홀로 빠져나감') : (st === 'hurt' ? '다친 채 생환' : '생환')))
+            + (st === 'lost' ? (m[c].vanish ? '실종' : K(r.kind).lostEnd) + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? (m[c].kick ? '다른 곳으로 모셔짐' : '홀로 빠져나감') : (st === 'hurt' ? '다친 채 생환' : '생환')))
             + payTag((o.pay || {})[c], m[c]) + '</span>';
     }).join('<br>') + '</div>';
     const hist = r.history || {};
@@ -1176,7 +1191,7 @@ function applyPay(v) {
         u.quarantineHospital = true;
         u.quarantineDest = bath ? 'bath' : 'fox';
         const where = bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로';
-        try { addHistoryLog(u, (v.kick ? '[재난 — 모셔짐] ' : '[재난 사망] ') + nm + ' — ' + (v.how || '돌아오지 못했다') + '. ' + where + (v.kick ? ' 모셔졌습니다.' : ' 이송되었습니다.')); } catch (e) { }
+        try { addHistoryLog(u, (v.kick ? '[재난 — 모셔짐] ' : (v.vanish ? '[재난 실종] ' : '[재난 사망] ')) + nm + ' — ' + (v.how || '돌아오지 못했다') + '. ' + where + (v.kick ? ' 모셔졌습니다.' : ' 이송되었습니다.')); } catch (e) { }
         try { saveFields({ pollution: 1, quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, quarantineHospital: 1, quarantineDest: 1, history: 1 }); } catch (e) { }
         try { updateUI(); } catch (e) { }
         alert_(nm + '\n\n' + (v.how || '돌아오지 못했다') + '\n\n' + where + (v.kick ? ' 모셔집니다. (4시간)' : ' 이송됩니다. (4시간)'));
