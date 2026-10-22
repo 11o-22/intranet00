@@ -101,14 +101,17 @@ const PLAZA = {
     // ★ 가로로 넓은 터치 화면 (폴드를 편 화면 · 태블릿 가로)
     //
     //   키에 맞추면 방이 창보다 좁아져 양옆이 검게 빈다 (폴드8 을 펴면
-    //   960x725 — 방이 742 폭이라 양옆 109씩 비었다). 그때는 **볼 것**
-    //   (y 200 ~ 1300 — 위 200 은 밋밋한 하늘, 1300 아래는 받침과 벽)만
-    //   창에 들어오게 더 키우고, 위로 그만큼 올려 둔다.
-    //       TOP  위에 남길 몫 (머리 띠가 얹힌다)
-    //       BOT  아래에 남길 몫 — 채팅 내역(5줄) · 미니맵 · 채팅 바가 앉는다.
-    //            지하 바닥(1262~1288)이 채팅 내역에 안 덮이게 이만큼 둔다.
+    //   방이 화면의 8할 폭이라 양옆이 비었다). 그때는 **가로를 채우고**,
+    //   꼭 보여야 할 자리(y 370 ~ 1300 — 위쪽 단추부터 지하 바닥 발끝까지)가
+    //   창에 들어오게 위로 올려 둔다. 그래도 못 넣을 만큼 창이 낮을 때만 덜 키운다.
+    //       TOP  위에 남길 몫
+    //       BOT  아래에 남길 몫 — 채팅 바가 앉는다.
+    //   ✗ 처음엔 채팅 내역 · 미니맵까지 아래에 비워 두었더니(168), 진짜 폴드8
+    //     은 위 상태 표시줄 · 아래 작업 표시줄만큼 창이 낮아 양옆이 또 비었다.
+    //     그래서 채팅 내역은 **지하 바닥 왼쪽 끝 바깥 폭**으로만 줄여 얹고
+    //     (paintRoom), 미니맵은 오른쪽 아래 벽 위에 그대로 얹는다.
     //   마우스 PC 는 그대로 둔다 (손가락 화면만).
-    WIDE: { band: [200, 1300], TOP: 8, BOT: 168 },
+    WIDE: { band: [370, 1300], TOP: 8, BOT: 72 },
     TAP_STOP: 3,
     // ★ 민 쪽으로 **붙고 떨어지는 데 걸리는 시간**(초).
     //   전에는 손가락이 가리키는 쪽을 그 칸에서 그대로 썼다. 손전화는
@@ -1506,7 +1509,7 @@ function zoomOf(r) {
     const vh = vb.h || 760, vw = vb.w || 0;
     const cut = (r.cut != null) ? r.cut : (P.CUT || 0);
     const zH = vh / Math.max(200, r.h - cut);
-    if (run) run._cy = 0;
+    if (run) { run._cy = 0; run._wide = false; }
     // 넓은 터치 화면 — 방이 창보다 좁을 때만 (위 WIDE 설명)
     const W = P.WIDE;
     if (!W || !run || cut <= 0 || !vw || r.w * zH >= vw || !touchy()) return zH;
@@ -1514,8 +1517,9 @@ function zoomOf(r) {
     const zFit = (vh - W.TOP - W.BOT) / Math.max(200, b[1] - b[0]);
     const z = Math.min(vw / r.w, zFit);
     if (z <= zH) return zH;
-    // 볼 것의 아래 끝이 BOT 위에 오도록 올린다 (위 끝은 창 밖으로 안 나가게)
-    run._cy = Math.max(0, Math.min(b[0] * z, b[1] * z - (vh - W.BOT)));
+    // 지하 바닥 발끝이 채팅 바 위에 오도록 올린다 (위쪽 단추는 창 밖으로 안 나가게)
+    run._cy = Math.max(0, Math.min(b[0] * z - W.TOP, b[1] * z - (vh - W.BOT)));
+    run._wide = true;
     return z;
 }
 
@@ -1541,7 +1545,17 @@ function paintRoom() {
     run.el.style.imageRendering = (r.pix || run.z >= 1) ? 'pixelated' : 'auto';
     run.el.style.backgroundImage = 'url("' + P.DIR + r.img + '")';
     run.el.style.backgroundSize = w + 'px ' + h + 'px';
-    paintMap();                     // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
+    // 넓은 터치 화면 — 채팅 내역을 지하 바닥 왼쪽 끝 바깥으로만 (걷는 사람을 안 덮게)
+    const feed = document.getElementById('plaza-feed');
+    if (feed) {
+        if (run._wide) {
+            const vb = viewBox();
+            const off = Math.max(0, ((vb.w || w) - w) / 2);
+            const x2 = (r.x2 ? r.x2[0] : 555) * run.z;
+            feed.style.maxWidth = Math.max(200, Math.round(off + x2 - 12 - 10)) + 'px';
+        } else feed.style.maxWidth = '';
+    }
+    paintMap();                   // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
     paintExits();
     paintSpots();
     paintCage();                    // 🔒 가두리 (그 방에 있으면)
