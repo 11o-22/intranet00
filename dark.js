@@ -6022,7 +6022,15 @@ function b508RequiredDocs() {
         const voted = Object.keys(votes).length;
 
         // ★ 전원 투표하면 자동 마감
-        if (voted >= alive.length) a214CloseVote(n);
+        //   ✗ 마감 트랜잭션은 이 기기에 먼저 적히면서 그 자리에서 리스너를 한 번 더 부른다.
+        //     그 안쪽 호출이 결과 화면을 그리고(_a214vNShown) 돌아오면, 여기서 아래로 내려가
+        //     투표 화면을 다시 덮어썼다 — 전원이 찍으면 「나머지를 기다리는 중」에 멈추고,
+        //     덜 찍고 [지금 마감] 을 누르면(그리는 중이 아니라서) 넘어갔다 (2026-10-22).
+        //   → 마감하면서 결과가 그려졌으면 여기서 멈춘다.
+        if (voted >= alive.length) {
+            a214CloseVote(n);
+            if (darkRun && darkRun[`_a214v${n}Shown`]) return;
+        }
 
         // ★ 45초 지나면 누구든 마감
         if (!darkRun[`_a214v${n}Timer`]) {
