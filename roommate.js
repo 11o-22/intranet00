@@ -17,9 +17,12 @@
 //
 //   찌름권  원하는 사원의 사번을 적는다. 그 주의 찌름으로 기록된다.
 //   확정권  찌름이 성공한 뒤 같은 사번을 한 번 더 적으면 배정에 반영된다.
+//   고정권  지금 룸메이트의 사번을 적는다. 다가오는 월요일 배정에서 지금 짝을 그대로 둔다 (한 장에 한 주 · 2026-10-23).
+//           둘 중 한 사람만 써도 된다 · 그 사이에 짝이 바뀌었으면(상담사가 옮김 등) 쓰이지 않는다.
 //
 // ■ 짝이 정해지는 차례
 //
+//   0. 고정권을 쓴 쌍    — 지금 짝 그대로. 서로 찌른 쌍보다도 먼저. 먼저 쓴 쌍부터.
 //   1. 서로 찌른 쌍      — 확정권 없이 바로 확정. 먼저 찌른 쌍부터.
 //   2. 한쪽만 찌른 경우  — 확정권까지 쓴 사람만. 먼저 찌른 사람이 가져간다.
 //   3. 나머지            — 무작위
@@ -53,6 +56,7 @@
 
 const RM_POKE = '룸메 찌름권';
 const RM_LOCK = '룸메 확정권';
+const RM_FIX = '룸메 고정권';            // 지금 짝을 다음 주에도 그대로 (2026-10-23)
 const RM_PRICE = 2000;
 const ADMIN = 'kario0987';
 
@@ -146,13 +150,24 @@ function pokeOK(me, pokes) {
     return rivals[0] === me;
 }
 
-function resolvePairs(codes, pokes, confirms, shuffleFn) {
-    pokes = pokes || {}; confirms = confirms || {};
+// fixes — 고정권 { 사번: { to, at } } · 지금 짝이 맞는지는 부르는 쪽이 걸러서 준다 (fixLive)
+function resolvePairs(codes, pokes, confirms, shuffleFn, fixes) {
+    pokes = pokes || {}; confirms = confirms || {}; fixes = fixes || {};
     const live = {};
     codes.forEach(function (c) { live[c] = 1; });
 
     const taken = {}, pairs = [];
     function put(a, b) { taken[a] = 1; taken[b] = 1; pairs.push([a, b]); }
+
+    // 0. 고정권을 쓴 쌍 — 지금 짝 그대로 (서로 찌른 쌍보다 먼저 · 먼저 쓴 쌍부터)
+    const fx = [];
+    codes.forEach(function (a) {
+        const f = fixes[a];
+        if (!f || !f.to || f.to === a || !live[f.to]) return;
+        fx.push({ a: a, b: f.to, at: f.at || 0 });
+    });
+    fx.sort(function (x, y) { return x.at - y.at; });
+    fx.forEach(function (f) { if (!taken[f.a] && !taken[f.b]) put(f.a, f.b); });
 
     // 1. 서로 찌른 쌍 — 확정권이 없어도 확정
     const mut = [];
@@ -192,8 +207,21 @@ function resolvePairs(codes, pokes, confirms, shuffleFn) {
     return { pairs: pairs, alone: (rest.length % 2) ? rest[rest.length - 1] : null };
 }
 
+// 고정권 가운데 **지금도 그 짝인 것**만 — 써 둔 뒤에 짝이 바뀌었으면(상담사가 옮김 등) 버린다
+//   users — { 사번: 사원 } (서버에서 읽은 것이든 화면의 db.users 든)
+function fixLive(fixes, users) {
+    const out = {};
+    Object.keys(fixes || {}).forEach(function (c) {
+        const f = fixes[c];
+        if (!f || !f.to) return;
+        const a = ((users[c] || {}).house || {}).roomie, b = ((users[f.to] || {}).house || {}).roomie;
+        if (a === f.to && b === c) out[c] = f;
+    });
+    return out;
+}
+
 window._roomRules = { weekKey: weekKey, nextMonKey: nextMonKey, pokeOK: pokeOK,
-                      resolvePairs: resolvePairs,
+                      resolvePairs: resolvePairs, fixLive: fixLive,
                       pokePath: function () { return 'roomPoke/' + nextMonKey(); },
                       assign: function (wk) { return doAssign(wk || weekKey()); } };
 
@@ -251,9 +279,14 @@ function roomAsk(title, hint, cb) {
             price: RM_PRICE, usable: true, targetable: false, effect: 'rm_lock',
             desc: '찌름이 성공했을 때 같은 사번을 한 번 더 적는다. 월요일 배정에 반영된다. 주말에만 판다.'
         };
+        ITEM_CATALOG[RM_FIX] = {
+            price: RM_PRICE, usable: true, targetable: false, effect: 'rm_fix',
+            desc: '지금 룸메이트의 사번을 적는다. 다가오는 월요일 배정에서 지금 짝을 그대로 둔다. 주말에만 판다.'
+        };
         if (typeof NO_SELL_ITEMS !== 'undefined') {
             if (NO_SELL_ITEMS.indexOf(RM_POKE) < 0) NO_SELL_ITEMS.push(RM_POKE);
             if (NO_SELL_ITEMS.indexOf(RM_LOCK) < 0) NO_SELL_ITEMS.push(RM_LOCK);
+            if (NO_SELL_ITEMS.indexOf(RM_FIX) < 0) NO_SELL_ITEMS.push(RM_FIX);
         }
         clearInterval(iv);
     }, 400);
@@ -276,8 +309,8 @@ window.buyRoomTicket = function (which) {
     if (typeof isQuarantined === 'function' && isQuarantined(currentUser)) {
         showCustomAlert('격리 중에는 상점을 이용할 수 없습니다.'); return;
     }
-    const nm = (which === 'lock') ? RM_LOCK : RM_POKE;
-    const id = (which === 'lock') ? 'rm_lock' : 'rm_poke';
+    const nm = (which === 'lock') ? RM_LOCK : (which === 'fix' ? RM_FIX : RM_POKE);
+    const id = (which === 'lock') ? 'rm_lock' : (which === 'fix' ? 'rm_fix' : 'rm_poke');
     if (boughtToday(id) >= 1) { showCustomAlert(nm + '은(는) 하루 한 장까지 살 수 있습니다.'); return; }
     if (currentUser.points < RM_PRICE) { showLuxuryAlert(); return; }
 
@@ -323,19 +356,21 @@ function ticketRow() {
     };
     row.innerHTML = '<div style="font-size:10px; color:#ff8fb1; letter-spacing:1px; margin-bottom:5px;">[주말 한정]</div>'
         + '<div style="font-size:10px; color:#888; line-height:1.6;">'
-        + '월요일 0시에 호실이 다시 배정됩니다. 같이 살고 싶은 사원이 있으면 찌르세요.</div>'
-        + cell('poke', RM_POKE) + cell('lock', RM_LOCK);
+        + '월요일 0시에 호실이 다시 배정됩니다. 같이 살고 싶은 사원이 있으면 찌르세요.<br>'
+        + '지금 룸메이트와 계속 살려면 고정권을 쓰세요.</div>'
+        + cell('poke', RM_POKE) + cell('lock', RM_LOCK) + cell('fix', RM_FIX);
     box.insertAdjacentElement('beforebegin', row);        // 다시 쓰이는 칸 밖에 둔다
 
     row.querySelector('[data-buy="poke"]').onclick = function () { buyRoomTicket('poke'); };
     row.querySelector('[data-buy="lock"]').onclick = function () { buyRoomTicket('lock'); };
+    row.querySelector('[data-buy="fix"]').onclick = function () { buyRoomTicket('fix'); };
     return row;
 }
 
 function paintTickets() {
     const row = ticketRow();
     if (!row) return;
-    [['poke', 'rm_poke'], ['lock', 'rm_lock']].forEach(function (x) {
+    [['poke', 'rm_poke'], ['lock', 'rm_lock'], ['fix', 'rm_fix']].forEach(function (x) {
         const left = boughtToday(x[1]) ? 0 : 1;
         const lab = row.querySelector('[data-left="' + x[0] + '"]');
         const bt = row.querySelector('[data-buy="' + x[0] + '"]');
@@ -378,6 +413,9 @@ function findByNo(no) {
     });
     return c ? db.users[c] : null;
 }
+function escR(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
 function nameOf(c) {
     const u = (typeof db !== 'undefined' && db.users) ? db.users[c] : null;
     return (u && u.name) || c;
@@ -386,6 +424,7 @@ function nameOf(c) {
 // 적는 자리 = 읽는 자리 = 다가오는 월요일 (위 nextMonKey 의 까닭)
 function pokeRef() { return database.ref('roomPoke/' + nextMonKey()); }
 function lockRef() { return database.ref('roomConfirm/' + nextMonKey()); }
+function fixRef() { return database.ref('roomFix/' + nextMonKey()); }
 
 // cb(true) 면 티켓을 쓴다
 function usePoke(cb) {
@@ -442,6 +481,37 @@ function useLock(cb) {
     }).catch(function () { showCustomAlert('확인하지 못했습니다.'); cb(false); });
 }
 
+// 고정권 — 지금 룸메이트의 사번을 적는다 (지금 짝을 다가오는 월요일에도 그대로)
+function useFix(cb) {
+    if (typeof database === 'undefined' || !database) { showCustomAlert('서버에 닿지 못했습니다.'); cb(false); return; }
+    const r = (typeof getRoomie === 'function') ? getRoomie(currentUser) : null;
+    if (!r || !r.code) { showCustomAlert('지금 룸메이트가 없습니다.\n\n고정권은 그대로 남습니다.'); cb(false); return; }
+    fixRef().once('value').then(function (s) {
+        const fx = s.val() || {};
+        if ((fx[currentUser.code] && fx[currentUser.code].to === r.code) || (fx[r.code] && fx[r.code].to === currentUser.code)) {
+            showCustomAlert(r.name + ' 사원과는 이미 고정되어 있습니다.\n\n고정권은 그대로 남습니다.'); cb(false); return;
+        }
+        roomAsk('룸메 고정권', '지금 룸메이트 <b style="color:#fff;">' + r.name + '</b> 사원의 사번을 적으세요.<br>'
+            + '다가오는 월요일 0시 배정에서 지금 짝을 그대로 둡니다.<br>'
+            + '서로 찌른 쌍보다도 먼저입니다.', function (no) {
+            if (no === null) { cb(false); return; }
+            const t = findByNo(no);
+            if (!t || t.code !== r.code) {
+                showCustomAlert('지금 룸메이트와 다릅니다.\n\n지금 룸메이트는 ' + r.name + ' 사원입니다.');
+                cb(false); return;
+            }
+            fixRef().child(currentUser.code).set({ to: t.code, at: Date.now() })
+                .then(function () {
+                    if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[사택] ' + t.name + ' 사원과 다음 주에도 같이 살기로 고정했습니다.');
+                    if (typeof saveFields === 'function') saveFields({ history: 1 });
+                    showCustomAlert(t.name + ' 사원과 다음 주에도 같이 삽니다.\n\n월요일 0시 배정에 반영됩니다.');
+                    cb(true);
+                })
+                .catch(function () { showCustomAlert('적지 못했습니다. 다시 시도해 주세요.'); cb(false); });
+        });
+    }).catch(function () { showCustomAlert('확인하지 못했습니다.'); cb(false); });
+}
+
 (function hookUse() {
     const iv = setInterval(function () {
         if (typeof useInventoryItem !== 'function' || typeof ITEM_CATALOG === 'undefined') return;
@@ -449,7 +519,7 @@ function useLock(cb) {
         const _u = useInventoryItem;
         useInventoryItem = function (itemName) {
             const e = (ITEM_CATALOG[itemName] || {}).effect;
-            if (e !== 'rm_poke' && e !== 'rm_lock') return _u.apply(this, arguments);
+            if (e !== 'rm_poke' && e !== 'rm_lock' && e !== 'rm_fix') return _u.apply(this, arguments);
             if (!currentUser) return;
             if ((currentUser.inventory || []).indexOf(itemName) < 0) {
                 showCustomAlert('가지고 있지 않습니다.'); return;
@@ -461,11 +531,12 @@ function useLock(cb) {
                 if (typeof updateUI === 'function') updateUI();
             };
             if (e === 'rm_poke') usePoke(done);
+            else if (e === 'rm_fix') useFix(done);
             else useLock(done);
         };
         useInventoryItem._room = true;
         clearInterval(iv);
-        console.log('[룸메] 찌름권·확정권 연결');
+        console.log('[룸메] 찌름권·확정권·고정권 연결');
     }, 400);
 })();
 
@@ -488,15 +559,23 @@ function doAssign(wk) {
 
         return Promise.all([
             database.ref('roomPoke/' + wk).once('value'),
-            database.ref('roomConfirm/' + wk).once('value')
+            database.ref('roomConfirm/' + wk).once('value'),
+            database.ref('roomFix/' + wk).once('value')
         ]).then(function (r) {
             const pokes = r[0].val() || {}, confirms = r[1].val() || {};
-            const out = resolvePairs(codes, pokes, confirms);
+            const fixes = fixLive(r[2].val() || {}, all);          // 지금도 그 짝인 고정권만
+            const out = resolvePairs(codes, pokes, confirms, null, fixes);
 
+            // ★ 짝이 그대로인 쌍(고정권 · 우연히 같은 짝) — 쪽지와 공용 보관함을 그대로 둔다 (2026-10-23)
+            //   공용함 주인(두 사번 중 앞서는 쪽)도 그대로라 짐이 남의 눈에 갈 일이 없다.
+            const same = {};
+            out.pairs.forEach(function (p) {
+                if (((all[p[0]] || {}).house || {}).roomie === p[1] && ((all[p[1]] || {}).house || {}).roomie === p[0]) { same[p[0]] = 1; same[p[1]] = 1; }
+            });
             const up = {};
             codes.forEach(function (c) {
                 up['users/' + c + '/house/roomie'] = null;
-                up['users/' + c + '/house/notes'] = null;     // 벽에 붙은 쪽지도 뗀다 — 짝이 바뀌면 남의 것이 보인다
+                if (!same[c]) up['users/' + c + '/house/notes'] = null;     // 벽에 붙은 쪽지도 뗀다 — 짝이 바뀌면 남의 것이 보인다
             });
 
             out.pairs.forEach(function (p) {
@@ -519,6 +598,7 @@ function doAssign(wk) {
             const give = {};                 // 사번 → 돌려줄 물건 이름들
             let back = 0, orphan = 0;
             codes.forEach(function (c) {
+                if (same[c]) return;                     // 짝이 그대로 — 보관함도 그대로
                 const box = ((all[c] || {}).house || {}).storage;
                 const arr = Array.isArray(box) ? box : (box ? Object.keys(box).map(function (k) { return box[k]; }) : []);
                 if (!arr.length) return;
@@ -652,7 +732,7 @@ function doAssign(wk) {
 // 「불러오는 중…」이 한 번씩 스쳐 깜박입니다.
 // 그래서 칸 밖(#house-main)에 한 번만 만들고, 찌름 자료는 귀를 달아
 // 손에 들고 있다가 바뀔 때만 글자를 갈아 끼웁니다.
-let pokeData = null, lockData = null, watchWeek = '';
+let pokeData = null, lockData = null, fixData = null, watchWeek = '';
 
 (function watchPokes() {
     function tick() {
@@ -662,14 +742,18 @@ let pokeData = null, lockData = null, watchWeek = '';
         if (watchWeek) {                                  // 주가 넘어갔다 — 옛 귀를 뗀다
             try { database.ref('roomPoke/' + watchWeek).off(); } catch (e) { }
             try { database.ref('roomConfirm/' + watchWeek).off(); } catch (e) { }
+            try { database.ref('roomFix/' + watchWeek).off(); } catch (e) { }
         }
         watchWeek = wk;
-        pokeData = null; lockData = null;
+        pokeData = null; lockData = null; fixData = null;
         database.ref('roomPoke/' + wk).on('value', function (s) {
             pokeData = s.val() || {}; paintPoke();
         });
         database.ref('roomConfirm/' + wk).on('value', function (s) {
             lockData = s.val() || {}; paintPoke();
+        });
+        database.ref('roomFix/' + wk).on('value', function (s) {
+            fixData = s.val() || {}; paintPoke();
         });
     }
     setTimeout(tick, 1500);
@@ -693,11 +777,19 @@ function pokeBox() {
 function paintPoke() {
     const el = pokeBox();
     if (!el) return;
-    if (!pokeData || !lockData) { el.style.display = 'none'; return; }
+    if (!pokeData || !lockData || !fixData) { el.style.display = 'none'; return; }
 
     const me = currentUser.code, mine = pokeData[me], lock = lockData[me];
+    // 🔒 고정권 — 나나 지금 룸메이트가 썼으면 찌름보다 먼저
+    const rm = (typeof getRoomie === 'function') ? getRoomie(currentUser) : null;
+    const fixMine = rm && fixData[me] && fixData[me].to === rm.code;
+    const fixTheirs = rm && fixData[rm.code] && fixData[rm.code].to === me;
     let body;
-    if (!mine) {
+    if (fixMine || fixTheirs) {
+        body = '<div style="color:#81c784;">🔒 ' + (fixMine ? '고정권을 썼습니다.' : escR(rm.name) + ' 사원이 고정권을 썼습니다.') + '<br>'
+             + '<b style="color:#fff;">' + escR(rm.name) + '</b> 사원과 다음 주에도 같이 삽니다.</div>'
+             + (mine ? '<div style="color:#777; font-size:10px; margin-top:4px;">고정이 먼저라 찌름은 쓰이지 않습니다.</div>' : '');
+    } else if (!mine) {
         body = '<div style="color:#888;">아직 아무도 찌르지 않았습니다.<br>'
              + '주말에 유쾌 판매소에서 찌름권을 살 수 있습니다.</div>';
     } else {
@@ -719,7 +811,7 @@ function paintPoke() {
          + (d === 1 ? '오늘 자정' : d + '일') + ' · 그 배정에 찌른 사원 '
          + Object.keys(pokeData).length + '명</div>';
 
-    if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser)) {
+    if (isWeekend() && typeof getRoomie === 'function' && getRoomie(currentUser) && !fixMine && !fixTheirs) {
         body += '<div style="color:#ffb74d; font-size:10px; margin-top:8px; border-top:1px dashed #5a3a4a; padding-top:7px;">'
              + '월요일에 짝이 바뀌면 공용 보관함은 비워지고, 넣은 물건은 넣은 사람의 소지품으로 돌아옵니다.</div>';
     }
@@ -755,9 +847,15 @@ window.roomState = function () {
     Promise.all([
         database.ref('roomPoke/' + wk).once('value'),
         database.ref('roomConfirm/' + wk).once('value'),
-        database.ref('roomAssign').once('value')
+        database.ref('roomAssign').once('value'),
+        database.ref('roomFix/' + wk).once('value')
     ]).then(function (r) {
         const pokes = r[0].val() || {}, locks = r[1].val() || {}, asg = r[2].val() || {};
+        const fx = r[3].val() || {}, fxl = fixLive(fx, db.users || {});
+        const fr = Object.keys(fx).map(function (c) {
+            return { 고정한사원: nameOf(c), 룸메이트: nameOf(fx[c].to), 때: new Date(fx[c].at).toLocaleString(), 지금도그짝: fxl[c] ? 'O' : '✗ (쓰이지 않음)' };
+        });
+        if (fr.length) { console.log('  고정권:'); console.table(fr); } else console.log('  고정권을 쓴 사원이 없습니다.');
         const rows = Object.keys(pokes).map(function (c) {
             const mutual = pokes[pokes[c].to] && pokes[pokes[c].to].to === c;
             return {
@@ -782,12 +880,13 @@ window.roomPreview = function () {
     const wk = nextMonKey();
     Promise.all([
         database.ref('roomPoke/' + wk).once('value'),
-        database.ref('roomConfirm/' + wk).once('value')
+        database.ref('roomConfirm/' + wk).once('value'),
+        database.ref('roomFix/' + wk).once('value')
     ]).then(function (r) {
         const codes = Object.keys(db.users || {}).filter(function (c) {
             return db.users[c] && db.users[c].name && c !== ADMIN;
         });
-        const out = resolvePairs(codes, r[0].val() || {}, r[1].val() || {});
+        const out = resolvePairs(codes, r[0].val() || {}, r[1].val() || {}, null, fixLive(r[2].val() || {}, db.users || {}));
         console.log('%c===== 이대로 배정하면 =====', 'color:#ff8fb1; font-size:13px');
         console.table(out.pairs.map(function (p, i) {
             return { 호실: i + 1, 가: nameOf(p[0]), 나: nameOf(p[1]) };
