@@ -287,6 +287,9 @@ const FOX_ACTS = { type: 'array', items: obj({ fox: S, did: S, tier: { type: 'st
 const WOLF_TO = { type: 'array', items: obj({ who: S, to: { type: 'string', enum: ['wolf', 'human'] } }) };
 function withWolf(sch) { return obj(Object.assign({}, sch.properties, { wolf: WOLF_TO })); }
 function withFoxActs(sch) { return obj(Object.assign({}, sch.properties, { fox_acts: FOX_ACTS })); }
+// 🏥 사회자(괴물의 동족)가 이번 장면에 괴물답지 않게 굴었나 (새빛 병원 · 2026-10-22)
+const KIN_ODD = { type: 'array', items: obj({ who: S, why: S }) };
+function withKin(sch) { return obj(Object.assign({}, sch.properties, { kin_odd: KIN_ODD })); }
 const SCHEMA_TURN = obj({ result: S, ended: B, end_kind: { type: 'string', enum: ['none', 'clear', 'escape', 'fail'] },
     end_text: S, next_title: S, next_text: S, notes: S, summary: S,
     fates: { type: 'array', items: obj({ who: S, how: S }) }, fox_lines: FOX_LINES });
@@ -340,7 +343,8 @@ function memberLines(mem, d) {
             + (m.body ? ' · 성별: ' + (m.g || '알 수 없음') + (m.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '') : '')
             + (m.body && m.fx && m.fx.length ? ' — 몸에 걸린 효과: ' + m.fx.join('; ') : '')
             + (m.child ? ' — ★ 지금 어린아이 상태 (이 사람에게는 잔혹 묘사 금지)' : '')
-            + (d && d.roles && m.role ? ' — 이 재난에서: ' + (ROLES[m.role] || m.role) : '')
+            + (d && d.roles && m.role ? ' — 이 재난에서: ' + ((d.roleText && d.roleText[m.role]) || ROLES[m.role] || m.role) : '')
+            + (d && d.kin && m.role === 'vip' && Number(m.odd) > 0 ? ' — 괴물들의 의심: ' + Number(m.odd) + '번 (괴물답지 않게 굴었다)' : '')
             + (d && d.wolf && m.chief ? (m.wolf ? ' — 🐺 지금 늑대의 모습 (경비팀장)' : ' — 경비팀장 (늑대의 모습으로 변할 수 있다 · 지금은 사람의 모습)') : '')
             + (d && d.gear ? ' — 지닌 장비: ' + gear : '')
             + (Array.isArray(m.marks) && m.marks.length ? ' — 커스텀 장비: ' + m.marks.map((x) => x.n + ' (' + ((SIGILS[x.k] || {}).n || x.k) + ')').join(', ') : '')
@@ -813,6 +817,7 @@ async function start(b, deps, db) {
             up['members/' + c + '/marks'] = (m.marks && m.marks.length) ? m.marks : null;
             up['members/' + c + '/chief'] = m.chief || null;
             up['members/' + c + '/wolf'] = null;
+            up['members/' + c + '/odd'] = null;                  // 🏥 사회자 — 괴물들의 의심 (새빛 병원)
         });
         await db.patch('disaster/' + b.run, up);
         return { ok: true };
@@ -846,7 +851,19 @@ export function judge(acts, mem, rand, opt) {
     const hit = (c, roll, dc) => { const w = Math.max(0, Number(wolf(c)) || 0); return { w: w, ok: roll !== 1 && roll + w >= dc }; };
     const dcOf = (base, add, ez) => Math.max(2, Math.min(20, base + add - ez));
     const safe = !!(opt && opt.safe);
-    const cap = (s) => (safe && s === 'lost') ? 'hurt' : s;
+    // 끌려가지(죽지) 않는 사람 — 새빛 병원의 사회자 (괴물들이 동족으로 안다 · 2026-10-22)
+    const keep = (opt && typeof opt.keep === 'function') ? opt.keep : () => false;
+    const cap = (s, c) => ((safe || (c && keep(c))) && s === 'lost') ? 'hurt' : s;
+    // 날이 갈수록 어렵게 — 그 사람의 판정을 이만큼 단계 올린다 (쉬움 → 보통 → 어려움 → 매우 어려움 · 표에 없는 단계는 건너뛴다)
+    const up = (opt && typeof opt.up === 'function') ? opt.up : () => 0;
+    const TIERS = ['easy', 'normal', 'hard', 'xhard'].filter((t) => DC[t] != null);
+    const raise = (t, c) => {
+        const k = Math.max(0, Number(up(c)) || 0);
+        if (!k) return { t: t, k: 0 };
+        const i = Math.max(0, TIERS.indexOf(t));
+        const j = Math.min(TIERS.length - 1, i + k);
+        return { t: TIERS[j], k: j - i };
+    };
     const st = {}; Object.keys(mem).forEach((c) => { st[c] = (mem[c] && mem[c].st) || 'ok'; });
     const seen = {}, checks = [];
     (acts || []).forEach((a) => {
@@ -859,7 +876,8 @@ export function judge(acts, mem, rand, opt) {
         if (a.quiet) row.quiet = true;                           // 말이 없어 대신 굴린 다이스
         if (a.burn && mem[a.who].host) row.burn = true;          // 📺 심야 토크쇼의 주인의 소각
         if (kind !== 'none') {
-            const tier = DC[a.tier] ? a.tier : 'normal';
+            const RZ = raise(DC[a.tier] ? a.tier : 'normal', a.who);
+            const tier = RZ.t;
             const add = Math.max(0, Number(plus(a.who)) || 0);
             const ez = Math.max(0, Number(ease(a.who)) || 0);
             const dc = dcOf(DC[tier], add, ez);
@@ -870,9 +888,10 @@ export function judge(acts, mem, rand, opt) {
             if (add) row.plus = add;
             if (ez) row.ease = ez;
             if (W.w) row.wolf = W.w;
+            if (RZ.k) row.up = RZ.k;
             if (!ok && a.danger) {
                 const from = st[a.who];
-                st[a.who] = cap(worse(from, roll === 1 ? 2 : 1));
+                st[a.who] = cap(worse(from, roll === 1 ? 2 : 1), a.who);
                 if (st[a.who] !== from) { row.from = from; row.to = st[a.who]; }
             }
             // 돕는 것 — 성공하면 동료 하나를 한 단계 되돌린다
@@ -910,7 +929,7 @@ export function judge(acts, mem, rand, opt) {
             if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
-                st[c] = cap(worse(from, roll === 1 ? 2 : 1));
+                st[c] = cap(worse(from, roll === 1 ? 2 : 1), c);
                 if (st[c] !== from) { row.from = from; row.to = st[c]; }
             }
             checks.push(row);
@@ -937,7 +956,7 @@ export function judge(acts, mem, rand, opt) {
             if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
-                st[c] = M.lethal ? 'lost' : worse(from, roll === 1 ? 2 : 1);     // safe 를 따르지 않는다
+                st[c] = M.lethal ? (keep(c) ? 'hurt' : 'lost') : worse(from, roll === 1 ? 2 : 1);     // safe 를 따르지 않는다 (끌려가지 않는 사람만 빼고)
                 if (st[c] !== from) { row.from = from; row.to = st[c]; }
             }
             checks.push(row);
@@ -961,6 +980,7 @@ function checkLine(c, d) {
         + (c.plus ? ' — ' + placeOf(d) + '이 사나워져 +' + c.plus : '') + (c.ease ? ' — ' + placeOf(d) + '이 조금 머뭇거려 −' + c.ease : '')
         + ', 주사위 ' + c.roll + (c.wolf ? ' + 늑대의 힘 ' + c.wolf + ' = ' + (c.roll + c.wolf) : '') + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
+    if (c.up) s = s.replace(' 판정 (난이도 ', ' 판정 (날이 갈수록 사나워져 ' + c.up + '단계 위 · 난이도 ');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
     if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 ' + placeOf(d) + '이 다른 곳으로 모셔 간다';
@@ -984,7 +1004,7 @@ async function round(b, deps, db) {
     const scene = run.scene || {};
     const D = DISASTERS[run.kind];
     const alive = Object.keys(mem).filter((c) => !gone(mem[c].st || 'ok') && mem[c].role !== 'admin');   // 관리자는 기다리지 않는다
-    const leaving = (c) => !!(D.roles && mem[c].role === 'vip' && Number(mem[c].leave) === n);   // 이번 장면에 홀로 나가겠다는 귀빈
+    const leaving = (c) => !!(D.roles && !D.noLeave && mem[c].role === 'vip' && Number(mem[c].leave) === n);   // 이번 장면에 홀로 나가겠다는 귀빈 (새빛 병원은 없다)
     const allDone = alive.length > 0 && alive.every((c) => Number(mem[c].done) === n || leaving(c));
     const left = (Number(scene.endsAt) || 0) - now;
     if (!allDone && left > CFG.EARLY_MS) throw new Fail(425, '아직 대화 시간이 남았습니다.', { wait: left });
@@ -1027,12 +1047,15 @@ async function round(b, deps, db) {
         const foxIds = Object.keys(FX).filter((id) => FX[id] && FOXES[FX[id].k] && !FX[id].gone && memNow[FX[id].on] && !gone(memNow[FX[id].on].st || 'ok'));
         // 🐺 판에 남은 경비팀장 (2026-10-21)
         const chiefs = D.wolf ? Object.keys(memNow).filter((c) => memNow[c].chief && memNow[c].role !== 'admin' && !gone(memNow[c].st || 'ok')) : [];
+        // 🏥 판에 남은 사회자 — 괴물들이 동족으로 아는 사람 (새빛 병원)
+        const kins = D.kin ? Object.keys(memNow).filter((c) => memNow[c].role === 'vip' && !gone(memNow[c].st || 'ok')) : [];
         // ① 해석 — 살아 있는 사람이 한 말이 있을 때만 (없으면 아기 여우는 제 속성의 기본 행동)
-        let acts = [], metas = [], foxActs = [], wolfSaid = [];
+        let acts = [], metas = [], foxActs = [], wolfSaid = [], kinOdd = [];
         if (lines.some((l) => !l.lost && !l.out && !l.adm)) {
             let sch = D.meta ? SCHEMA_ACTS_META : SCHEMA_ACTS;
             if (foxIds.length) sch = withFoxActs(sch);
             if (chiefs.length) sch = withWolf(sch);
+            if (kins.length) sch = withKin(sch);
             const res = await ask(deps, Object.assign({
                 model: CFG.HAIKU, max: 2500, schema: sch,
                 system: [
@@ -1059,7 +1082,7 @@ async function round(b, deps, db) {
                         + ' 움직이기만 하고 따로 판정할 것이 없으면 kind 는 none.',
                     '- who 와 target 에는 반드시 아래 사원 목록의 코드를 그대로 쓴다.',
                     '- ' + echo + ' · (나가며) · (관리자) 로 표시된 말은 행동으로 넣지 않는다. 상태가 lost 나 out 인 사원 · 자리가 admin 인 사람도 넣지 않는다.',
-                    ...(D.roles ? ['- 자리가 vip(귀빈)인 사원은 괴담이 해치려 들지 않는다. 귀빈의 행동은 danger=false — 귀빈이 스스로 남을 구하러 위험에 뛰어들 때만 true.',
+                    ...(D.roles ? [D.vipAct || '- 자리가 vip(귀빈)인 사원은 괴담이 해치려 들지 않는다. 귀빈의 행동은 danger=false — 귀빈이 스스로 남을 구하러 위험에 뛰어들 때만 true.',
                                    '- 장비는 이야기 속 물건일 뿐이다. 장비를 쓴다고 tier 를 낮추지 않는다.',
                                    '- 소각: 자리가 vip 이고 「토크쇼 주인」으로 표시된 사원이 손가락을 튕겨 무언가를 태우는 행동을 하면 burn=true, kind=break.'
                                        + ' did 에 무엇을 태우는지 적는다. 그 밖의 사원이나 그 밖의 행동은 burn=false.',
@@ -1087,6 +1110,16 @@ async function round(b, deps, db) {
                         '- 아기 여우가 채팅에 한 말은 사원의 행동(acts)이 아니다 — acts 에는 넣지 않는다.',
                         '- 아기 여우가 사람과 나누는 다정한 몸짓(안기기 · 껴안기 · 꼬리로 쓸어 주기)은 판정할 행동이 아니다 — fox_acts 는 그 아이의 속성 행동으로 고른다.'
                     ] : []),
+                    ...(kins.length ? [
+                        '[🏥 사회자 — kin_odd]',
+                        '- 자리가 vip 인 사원은 「사회자」다. 괴물들은 그 사람을 저희와 같은 것으로 알고 있다 — 그 사람이 괴물처럼 굴 때만 그렇다.',
+                        '- 사회자가 이번 장면에 괴물답지 않게 굴었으면 kin_odd 에 { who: 코드, why: 무엇을 했는지 (30자 안쪽) } 로 넣는다. 한 사람에 한 번까지.',
+                        '  괴물답지 않은 것: 사람(동료)을 구하거나 감싸거나 치료하기 · 괴물을 피해 숨거나 도망치기 · 괴물을 공격하거나 막아서기 ·'
+                            + ' 병원의 규칙(회진 · 투약 · 배식 · 조회 · 출석 · 소등)을 어기기 · 겁에 질려 비명 지르거나 떨기 · 괴물이 내미는 것을 거부하기 · 괴물 앞에서 사람답게 슬퍼하거나 다정하게 굴기.',
+                        '  괴물다운 것 (넣지 않는다): 회진을 따라 돈다 · 출석에 대답한다 · 배식 줄에 선다 · 괴물 곁에 태연히 선다 · 괴물이 하는 짓을 따라 한다 · 괴물이 내민 자리에 앉는다 · 동료를 모른 척한다.',
+                        '- 괄호 행동이 없는 사원은 넣지 않는다 (말만 한 것은 동료끼리의 말로 본다 — 괴물 앞에서 괴물에게 사람처럼 대꾸한 것은 넣는다). 애매하면 넣지 않는다.',
+                        '- 사회자가 아닌 사원은 넣지 않는다. 없으면 빈 배열.'
+                    ] : []),
                     ...(chiefs.length ? [
                         '[🐺 늑대 — wolf]',
                         '- 사원 목록에 「경비팀장」이 적힌 사원이 괄호 행동으로 늑대의 모습이 되면(늑대로 변한다 · 늑대의 모습으로 변모한다 …) wolf 에 { who: 코드, to: "wolf" }.',
@@ -1109,6 +1142,12 @@ async function round(b, deps, db) {
             acts = Array.isArray(res.acts) ? res.acts : [];
             foxActs = Array.isArray(res.fox_acts) ? res.fox_acts : [];
             wolfSaid = Array.isArray(res.wolf) ? res.wolf : [];
+            // 🏥 괴물답지 않게 군 사회자 — 이번 장면에 살아서 괄호 행동을 한 사회자만
+            if (kins.length && Array.isArray(res.kin_odd)) {
+                const did = {};
+                kinOdd = res.kin_odd.filter((x) => x && kins.indexOf(x.who) >= 0 && !did[x.who] && (did[x.who] = 1)
+                    && lines.some((l) => l.c === x.who && !l.lost && !l.out && ACTED.test(l.t)));
+            }
             // ★ 괄호 행동 묘사가 없는 사람은 행동하지 않은 것 — 코드가 한 번 더 거른다 (2026-10-20)
             const doers = {}; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && ACTED.test(l.t)) doers[l.c] = 1; });
             acts = acts.filter((a) => a && doers[a.who]);
@@ -1189,7 +1228,9 @@ async function round(b, deps, db) {
                 : (huntNow ? { codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)), kind: D.hunt.kind || 'hide', tier: huntTier, did: D.hunt.did || '괴담이 사냥하러 온다' } : null),
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             wolf: (c) => (D.wolf && memNow[c] && memNow[c].chief && memNow[c].wolf) ? (Number(D.wolf.bonus) || 0) : 0,
-            kick: !!(D.roles && D.kick) });
+            kick: !!(D.roles && D.kick),
+            up: (c) => (D.tierUp && hitRole(memNow[c].role)) ? (Number(D.tierUp[n]) || 0) : 0,
+            keep: (c) => !!(D.kin && memNow[c] && memNow[c].role === 'vip') });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
         const chiefsAfter = chiefs.filter((c) => !gone(J.st[c]));             // 🐺 이번 장면 뒤에도 판에 남은 경비팀장
         const taleGo = taleNext && chiefsAfter.length > 0;
@@ -1215,6 +1256,7 @@ async function round(b, deps, db) {
         // ③ 서술
         const memAfter = {}; Object.keys(mem).forEach((c) => { memAfter[c] = Object.assign({}, memNow[c], { st: J.st[c] }); });
         kickNow.forEach((c) => { memAfter[c].kick = n; });
+        kinOdd.forEach((x) => { memAfter[x.who].odd = (Number(mem[x.who].odd) || 0) + 1; });      // 🏥 사회자 — 이번 의심까지
         Object.keys(memAfter).forEach((c) => withBody(memAfter[c], BB[c]));     // 성별 · 걸린 효과 (이번 장면에 다시 읽은 것)
         // 함께 있는 아기 여우 — 이번에 사라진 아이는 빼고 · 판에서 빠진 사람(죽음 · 나감) 곁에는 없다
         const FXa = {}; Object.keys(FXj).forEach((id) => { FXa[id] = Object.assign({}, FXj[id], foxGone.indexOf(id) >= 0 ? { gone: n } : {}); });
@@ -1249,6 +1291,15 @@ async function round(b, deps, db) {
                     : (finalNow
                         ? '[흐름] ' + (FLOW.final || ((MIN + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.'))
                         : '[흐름] ' + (FLOW.mid || '이제 행동에 따라 죽는다. 판정 결과대로 — 함정에 걸리거나 속임수를 믿고 움직인 사람이 먹힌다.')), ''] : []),
+                ...((D.tierUp && D.tierUp[n] && D.tierNote && D.tierNote[D.tierUp[n]]) ? ['[그날의 난이도] ' + D.tierNote[D.tierUp[n]], ''] : []),
+                ...(kinOdd.length ? ['[사회자를 이상하게 여김] ' + kinOdd.map((x) => (mem[x.who].n || x.who) + ' — ' + clip(x.why, 40)
+                        + ' (지금까지 ' + ((Number(mem[x.who].odd) || 0) + 1) + '번)').join(' · '),
+                    '괴물들이 동족이라 여기던 그 사람이 괴물답지 않게 굴었다 — 괴물들이 이상함을 느낀다. 번수가 쌓일수록 짙게 그린다:'
+                    + ' 1번 — 고개를 갸웃하고 냄새를 맡는다 · 2번 — 따라다니며 지켜보고 「정말 우리 쪽이세요?」 묻는다 ·'
+                    + ' 3번 넘게 — 길을 막고 캐묻고, 저희끼리 수군거리며 그 사람을 시험한다 (출석을 부르고 · 수술대를 권하고 · 동료를 끌고 가 보라 한다).'
+                    + ' 그래도 판정 결과는 바꾸지 않는다 — 그 사람은 끌려가지 않는다.', ''] : []),
+                ...((kins.length && !kinOdd.length) ? ['[사회자] ' + kins.map((c) => (mem[c].n || c) + (Number(mem[c].odd) ? ' (괴물들의 의심 ' + Number(mem[c].odd) + '번 — 아직 남아 있다)' : '')).join(' · ')
+                    + ' — 이번 장면에는 괴물답게 굴었다 (괴물들이 동족으로 대한다).', ''] : []),
                 ...(huntNow ? ['[' + ((D.forcedTag) || '덮침') + '] ' + (FLOW.hunt || ('이번 장면에 ' + PL + '이 사람을 찾아 나섰다. 판정 결과의 [덮침] 줄은 그 사람에게 닥친 것이다.')), ''] : []),
                 ...(kickNow.length ? ['[모심] ' + kickNow.map((c) => (mem[c].n || c)
                         + (/재난관리/.test((memNow[c].aff || '') + ' ' + (memNow[c].team || '')) ? ' (선녀탕으로)' : ' (여우 상담실로)')).join(', ')
@@ -1352,6 +1403,7 @@ async function round(b, deps, db) {
         lostNew.forEach((c) => { up['members/' + c + '/fate'] = fate[c]; });
         kickNow.forEach((c) => { up['members/' + c + '/kick'] = n; });
         chiefs.forEach((c) => { up['members/' + c + '/wolf'] = memNow[c].wolf || null; });     // 🐺 늑대의 모습 (된 장면)
+        kinOdd.forEach((x) => { up['members/' + x.who + '/odd'] = (Number(mem[x.who].odd) || 0) + 1; });   // 🏥 사회자 — 괴물들의 의심
         foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         foxFell.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         Object.keys(FJ.st).forEach((id) => { const s2 = FJ.st[id] === 'hurt' ? 'hurt' : null; if ((FX[id].st || null) !== s2 && FJ.st[id] !== 'lost') up['foxes/' + id + '/st'] = s2; });

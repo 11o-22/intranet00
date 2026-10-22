@@ -67,10 +67,12 @@ const KINDS_C = {
     ward: { icon: '🏥', grade: '파형(破刑)', name: '『 새빛 병원 』', survive: 1, gear: 3,
             brief: '산자락에 버려진 정신병원. 정신병원이 되기 전에는 고등학교였고, 그보다 더 전에 이 건물에 무엇이 있었는지는 아무도 말하지 않는다. 넷째 날 새벽, 해가 뜰 때까지 사흘을 버텨야 한다.',
             reward: '넷째 날 새벽까지 살아남으면 — 재난관리국 요원 · 백일몽 사원 · 이사팀 ' + PAY_B('300,000 P') + ' · 선생님 ' + PAY_B('150,000 P') + ' · '
-                + '끝까지 함께한 심야 토크쇼의 주인 ' + PAY_B('300,000 P') + ' (홀로 나가면 0)<br>붙잡히면 실험체로 끌려갑니다 — 동료가 구하러 올 수 있습니다. 끌려간 채 끝나면 여우 상담실 · 선녀탕으로 이송됩니다.',
-            place: '병원', lost: '끌려감', lostEnd: '돌아오지 못함', lostIn: '어딘가에 묶여 목소리만 새어 나간다…', vip: '귀빈', vipLine: '이 병원의 <b>귀빈</b>',
-            kickSay: '「귀빈께서는 저희 병원과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다.」', kickWho: '간호사와 원무과 직원들이',
-            fail: '남은 사람이 모두 실험체로 끌려갔습니다', fate: '실험체로 끌려갔다' }
+                + '심야 토크쇼의 주인 ' + PAY_B('300,000 P') + '<br>둘째 날은 어려움, 셋째 날은 매우 어려움입니다. 귀빈은 없고, 아무도 홀로 나가지 못합니다.'
+                + '<br>붙잡히면 어딘가로 끌려갑니다 — 동료가 구하러 올 수 있습니다. 끌려간 채 끝나면 여우 상담실 · 선녀탕으로 이송됩니다.',
+            place: '병원', lost: '끌려감', lostEnd: '돌아오지 못함', lostIn: '어딘가에 붙들려 목소리만 새어 나간다…', vip: '사회자',
+            noLeave: true,          // 귀빈이 없다 — 사회자도 똑같이 들어가고 홀로 나가지 못한다
+            kinLine: '괴물들이 당신을 <b>저희와 같은 것</b>으로 알아봅니다. 끌려가지 않고, 밤의 사냥도 당신을 비껴갑니다.',
+            fail: '남은 사람이 모두 끌려갔습니다', fate: '병원 어딘가로 끌려갔다' }
 };
 const KIND_LIST = ['wave', 'ward'];
 const KIND = 'wave';                               // 처음 보여 주는 칸 (열린 재난이 있으면 그쪽)
@@ -730,7 +732,8 @@ function memberChips(r, u) {
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '"'
             + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
-            + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + (x.wolf && !gone(st) ? ' 🐺' : '') + tag + '</span>';
+            + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + (x.wolf && !gone(st) ? ' 🐺' : '')
+            + (x.role === 'vip' && K(r.kind).noLeave && Number(x.odd) && !gone(st) ? ' ❓' + Number(x.odd) : '') + tag + '</span>';
     }).join('');
 }
 
@@ -796,6 +799,12 @@ function play(r, u) {
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
             + (x.kick ? K(r.kind).kickSay + '<br>' + K(r.kind).kickWho + ' ' + (bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로') + ' 모셨습니다.<br>남은 사람들의 이야기를 지켜봅니다.'
                       : K(r.kind).place + '을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.') + '</div></div>';
+    } else if (x.role === 'vip' && st !== 'lost' && K(r.kind).noLeave) {
+        // 🏥 새빛 병원 — 귀빈이 없다. 사회자는 똑같이 들어가되 괴물들이 동족으로 알아본다 (홀로 나가기 없음)
+        h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
+            + K(r.kind).kinLine + '<br><span style="font-size:11px;color:#9a8fb8;">괴물답지 않게 굴면 괴물들이 이상함을 느낍니다. 홀로 나갈 수는 없습니다.</span>'
+            + (Number(x.odd) ? '<br><span style="font-size:11px;color:#ffb36b;">❓ 괴물들이 당신을 ' + Number(x.odd) + '번 이상하게 여겼습니다.</span>' : '')
+            + '</div></div>';
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
@@ -1018,7 +1027,7 @@ function toggleOut() {
     const u = me(), d = db_(), r = curId && all[curId];
     if (!u || !d || !r || r.state !== 'PLAY' || r.phase !== 'TALK') return;
     const x = (r.members || {})[u.code] || {};
-    if (x.role !== 'vip' || gone(x.st)) return;
+    if (x.role !== 'vip' || gone(x.st) || K(r.kind).noLeave) return;
     const n = Number(r.round) || 0;
     const going = Number(x.leave) === n;
     if (!going) {
@@ -1053,7 +1062,7 @@ function onTick() {
     const m = r.members;
     const alive = Object.keys(m).filter(function (c) { return !gone(m[c].st || 'ok') && m[c].role !== 'admin'; });
     const allDone = alive.length > 0 && alive.every(function (c) {
-        return Number(m[c].done) === n || (m[c].role === 'vip' && Number(m[c].leave) === n);
+        return Number(m[c].done) === n || (m[c].role === 'vip' && !K(r.kind).noLeave && Number(m[c].leave) === n);
     });
     const key = curId + '#' + n;
     if (allDone && !doneSeen[key]) doneSeen[key] = t;
