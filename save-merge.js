@@ -1613,6 +1613,47 @@ window.mergePtsMoved = function (delta) {
     return true;
 };
 
+// ==========================================
+// ★ 바깥(은행)이 내 포인트를 서버에서 옮길 때 — 병합이 직접 옮긴다 (2026-10-22)
+// ==========================================
+//
+//   mergePtsMoved 로 「옮겼다고 알려 주기」는 서버 이벤트가 **언제** 오느냐에 달려 있었다.
+//       이벤트가 먼저 오면  병합이 이미 서버 값(뽑은 몫이 든)을 받아 왔는데 한 번 더 옮긴다
+//                          → 화면에 출금액이 두 번 · 다른 돈이 날아가는 중이면 서버에도 두 번
+//                          · 입금은 두 번 빠진다 (돈이 사라진다)
+//       이벤트가 늦게 오면  안 옮기면 화면이 묵은 채로 남아 다음 저장이 그 몫을 도로 뺀다
+//   어느 쪽이든 맞으려면 flushMyPts 처럼 **돌아온 서버 값에 기준을 다시 세운다** —
+//       1. 서버 포인트에 트랜잭션으로 더한다 (곧바로 보낸다 — 기다리면 새로고침 사이에 잃는다)
+//       2. 돌아온 서버 값에 기준을 세우고, 내 화면은 그 위에 아직 안 보낸 몫만 얹는다
+//          · 이벤트가 먼저 왔으면 화면 = 기준 = 서버 → 얹을 몫 0 → 서버 값 그대로
+//          · 이벤트가 늦으면 기준 · 화면이 이 몫 없이 묵어 있다 → 서버 값으로 올라간다
+//       3. 그때 내 포인트 저장이 날아가는 중이면 손대지 않는다 — 그 저장은 이 몫 **뒤에**
+//          서버에 닿으므로(한 줄로 간다), 돌아오면서 이 몫이 든 서버 값에 맞춘다
+//   화면은 서버가 받은 뒤에 바뀐다. 기준이 안 섰으면 null — 부르는 쪽이 예전 길로 간다.
+window.mergeShiftPts = function (delta) {
+    const d = Number(delta) || 0;
+    if (!d || !ready || !currentUser || currentUser.code !== code || !database) return null;
+    const who0 = currentUser;
+    let moved = 0;
+    return txRetry('users/' + code + '/' + PTS, function (srv) {
+        const now = Number(srv) || 0;
+        const next = Math.max(0, Math.min(ptsCap(), now + d));
+        moved = next - now;
+        return next;
+    }).then(function (res) {
+        if (!res || !res.committed) return 0;
+        const after = Number(res.snapshot ? res.snapshot.val() : 0) || 0;
+        if (currentUser === who0 && ready && !ptsBusy) {
+            const pend = (Number(currentUser[PTS]) || 0) - (Number(base[PTS]) || 0);   // 아직 안 보낸 내 몫
+            base[PTS] = after;
+            currentUser[PTS] = Math.max(0, Math.min(ptsCap(), after + pend));
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+            if (pend) flushMyPts();
+        }
+        return moved;
+    });
+};
+
 window.mergeState = function () {
     console.log('%c===== 저장 병합 =====', 'color:#d4af37; font-size:13px');
     console.log('  계정:', code || '(없음)', '· 기준 준비:', ready ? 'O' : '-');

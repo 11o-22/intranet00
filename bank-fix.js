@@ -153,6 +153,33 @@ function bumpMine(delta) {
     } catch (e) { }
 }
 
+// ★ 포인트는 **병합(save-merge)이 직접** 옮긴다 (2026-10-22 · save-merge.js mergeShiftPts)
+//
+//   ✗ 예전에는 서버 포인트를 여기서 따로 트랜잭션으로 옮긴 뒤 화면 · 기준을 같은 몫만큼
+//     옮겼다(movePoints + bumpMine). 그런데 그 사이 save-merge 가 서버 이벤트로 이미
+//     그 몫을 받아 왔으면 **같은 몫이 두 번** 잡혔다 —
+//       · 화면에 출금액이 두 번 더해져 보였다가, 새로고침하면 한 번으로 돌아왔다
+//         (「출금했는데 새로고침하니 사라졌다」)
+//       · 다른 돈이 날아가는 중이었으면 서버에도 두 번 들어갔고, **입금은 두 번 빠졌다**
+//     옮기지 않게만 하면 이번엔 이벤트가 늦게 오는 때에 화면이 묵어, 다음 저장이 그 몫을 도로 뺐다.
+//   그래서 병합에게 맡긴다 — 날아가는 저장을 기다렸다가 옮기고, 돌아온 서버 값에 기준을 세우고,
+//   화면은 그 위에 아직 안 보낸 몫만 얹는다. 이벤트 순서와 상관없이 한 번만 잡힌다.
+//   기준이 서기 전(들어오자마자)에는 예전 길(movePoints)로 간다 — 그때는 화면 값만 옮긴다.
+function shiftPts(c, delta) {
+    const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+    if (u && u.code === c && typeof window.mergeShiftPts === 'function') {
+        let p = null;
+        try { p = window.mergeShiftPts(delta); } catch (e) { p = null; }
+        if (p && typeof p.then === 'function') {
+            return p.then(function (moved) { ui(); return moved; }, function (e) {
+                console.error('[은행] 포인트 쓰기 실패:', e);
+                return null;
+            });
+        }
+    }
+    return movePoints(c, delta);
+}
+
 // 되돌리기마저 못 했다 — 돈이 어느 쪽에도 없다. 숨기지 않고 알린다.
 function lost(amt, what) {
     note({ 때: new Date().toLocaleTimeString(), 무엇: what + ' 되돌리기 실패',
@@ -202,7 +229,8 @@ function withdraw() {
 
     // 1. 상한 여유를 먼저 본다
     database.ref('users/' + me + '/points').once('value').then(function (s) {
-        const have = Number(s.val()) || 0;
+        // 서버 값과 내 화면 값 중 큰 쪽으로 여유를 잰다 (화면 쪽이 아직 안 보낸 몫을 들고 있을 수 있다)
+        const have = Math.max(Number(s.val()) || 0, Number(currentUser.points) || 0);
         const room = Math.max(0, limit - have);
         if (room <= 0) {
             showCustomAlert('보유 포인트가 상한(' + limit.toLocaleString() + ' P)에 닿아 있습니다.\n\n'
@@ -223,7 +251,7 @@ function withdraw() {
             }
 
             // 3. 포인트에 더한다
-            return movePoints(me, take).then(function (moved) {
+            return shiftPts(me, take).then(function (moved) {
                 if (moved === null || moved < take) {
                     // 4. 안 들어간 몫을 예금에 되돌린다
                     const back = take - (moved || 0);
@@ -291,7 +319,7 @@ function deposit() {
         const put = Number((res.snapshot.val() || {}).lastOp) || amt;
 
         // 2. 포인트에서 뺀다 — 모자라면 그만큼만
-        return movePoints(me, -put).then(function (moved) {
+        return shiftPts(me, -put).then(function (moved) {
             const took = (moved === null) ? 0 : -moved;             // 실제로 빠진 몫
             if (took < put) {
                 const back = put - took;                            // 예금에 넣었는데 못 낸 몫
