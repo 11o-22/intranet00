@@ -184,7 +184,7 @@ function baseOf(w) {
 //   글귀는 식당이 적는 것과 똑같이 짓는다 (restaurant.js eatBuff) — 같으면 그대로 두고, 모자라면 적고, 남으면 걷는다.
 const SWEET_SRC = '식당 디저트';
 const SWEET_NAME = { pct: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼', resist: '저항' };
-function sweetLines(u) {
+function sweetGroups(u) {
     const t = Date.now();
     const live = (Array.isArray(u && u.itemBuffs) ? u.itemBuffs : []).filter(function (b) {
         return b && b.src === SWEET_SRC && !b.run && (b.until || 0) > t;
@@ -196,12 +196,14 @@ function sweetLines(u) {
     });
     groups.sort(function (a, z) { return a.at - z.at; });
     return groups.map(function (g) {
-        return '[디저트] ' + g.list.map(function (b) {
+        return { at: g.at, line: '[디저트] ' + g.list.map(function (b) {
             if (b.k === 'noPoll') return '오염 동결';
             return (SWEET_NAME[b.k] || b.k) + ' +' + b.v + (b.k === 'pct' ? '%' : '');
-        }).join(' · ') + ' (24시간)';
+        }).join(' · ') + ' (24시간)' };
     });
 }
+function sweetLines(u) { return sweetGroups(u).map(function (g) { return g.line; }); }
+window.noteSweet = sweetGroups;                     // ⏳ note-live.js 가 줄마다 끝나는 때를 찾을 때 쓴다
 
 // ==========================================
 // 벗은 고유 아이템(출산품) 줄을 걷어낸다
@@ -442,8 +444,9 @@ window.noteFixFor = function (who) {
         if (!n) return;
         // slaveFixed 도 같이 보낸다 — 「풀렸는데 남은 계약」을 여기서 꺼 두므로
         if (typeof saveFields === 'function') { try { saveFields({ badge: 1, slaveFixed: 1 }); } catch (e) { } }
-        const el = document.getElementById('badge-notes-text');
-        if (el && currentUser.badge) el.innerText = currentUser.badge.notes;
+        // ★ innerText 로 덮으면 물약 같은 시간 효과 줄(timedEffects)이 화면에서 빠진다 —
+        //   새로고침 뒤 디저트 줄을 맞추는 순간 「감자맛 물약이 사라졌다」가 이것 (2026-10-23)
+        if (typeof window.noteLivePaint === 'function') { try { window.noteLivePaint(); } catch (e) { } }
     }, 15000);
 })();
 

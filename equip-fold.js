@@ -92,8 +92,7 @@ function stripBath(notes) {
         currentUser.badge.notes = out;
         done = true;
         if (typeof saveFields === 'function') { try { saveFields({ badge: 1 }); } catch (e) { } }
-        const el = document.getElementById('badge-notes-text');
-        if (el) el.innerText = out;
+        if (typeof window.noteLivePaint === 'function') { try { window.noteLivePaint(); } catch (e) { } }
         clearInterval(iv);
         console.log('%c[혈욕조] 내 특이사항에서 흔적을 지웠습니다.', 'color:#4CAF50');
     }, 1000);

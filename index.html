@@ -5541,7 +5541,8 @@ if (user.code === 'kario0987') {
     function appendSystemBadgeNote(noteMsg) {
         if (!currentUser) return;
         appendBadgeNoteToUser(currentUser, noteMsg);
-        document.getElementById('badge-notes-text').innerText = currentUser.badge.notes;
+        if (typeof window.noteLivePaint === 'function') window.noteLivePaint();
+        else document.getElementById('badge-notes-text').innerText = currentUser.badge.notes;
         saveDB();
     }
 
@@ -6404,7 +6405,8 @@ hlL.disabled = !playable;
         if (!currentUser.letters) currentUser.letters = [];
         if (!currentUser.purchaseRecord) currentUser.purchaseRecord = {};
         document.getElementById('badge-nickname').value = currentUser.badge.nickname || "";
-        document.getElementById('badge-notes-text').innerText = currentUser.badge.notes || "특이사항 없음";
+        if (typeof window.noteLivePaint === 'function') window.noteLivePaint();
+        else document.getElementById('badge-notes-text').innerText = currentUser.badge.notes || "특이사항 없음";
         document.getElementById('badge-gender').value = currentUser.badge.gender || "";
         document.getElementById('badge-position-tag').value = currentUser.badge.posTag || "";
         renderBadgePhoto(currentUser.badge.photo);

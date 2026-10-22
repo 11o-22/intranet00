@@ -542,10 +542,17 @@ window.ribbonSync = function () {
             tag.style.cssText = 'margin-left:6px; font-size:9px; color:#81c784;';
             el.parentElement.appendChild(tag);
         }
-        const t = '유지 중';
+        // ⏳ 끝나는 때가 정해진 것(최음제 · 빨간 리본)뿐이면 남은 시간을 초 단위로 (2026-10-23)
+        //    세뇌 만년필로 유지 중이면 끝이 없으므로 붙이지 않는다
+        let t = '유지 중';
+        if (!(wears(currentUser, PEN) && (currentUser.pollution || 0) >= PEN_POLL)) {
+            const at = Math.max(currentUser.satHoldUntil || 0,
+                Math.max.apply(null, [0].concat(liveRibbons(currentUser).map(function (r) { return r.u; }))));
+            if (at > now()) t += ' · ⏳ ' + (window.tlFmt ? window.tlFmt(at - now()) : Math.ceil((at - now()) / 60000) + '분');
+        }
         if (tag.textContent !== t) tag.textContent = t;
         tag.title = heldWhy(currentUser).join(' · ');
-    }, 3000);
+    }, 1000);
 })();
 
 // ==========================================

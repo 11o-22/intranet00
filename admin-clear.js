@@ -230,8 +230,7 @@ function clearNotes() {
     if (!db_()) { try { saveDB(); } catch (e) { } }
     try { updateUI(); } catch (e) { }
     try {
-        const el = document.getElementById('badge-notes-text');
-        if (el && currentUser && targets.indexOf(currentUser.code) >= 0) el.innerText = NONE;
+        if (currentUser && targets.indexOf(currentUser.code) >= 0 && typeof window.noteLivePaint === 'function') window.noteLivePaint();
     } catch (e) { }
 
     const back = Object.keys(backSet);

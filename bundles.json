@@ -385,7 +385,8 @@
       "bonus-audit.js",
       "chilseong.js",
       "popup-notice.js",
-      "house-co.js"
+      "house-co.js",
+      "note-live.js"
     ]
   ]
 }
