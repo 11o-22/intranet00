@@ -300,7 +300,8 @@ function put(html) {
     const b = body_();
     if (!b) return;
     const h = sig_(html);
-    const tagged = html.replace('<div id="' + BOX + '"', '<div id="' + BOX + '" data-h="' + h + '"');
+    // data-side — index.html 의 「단추가 바뀌면 0.6초 막기」가 이 칸은 세지 않는다 (K 의 방에서 장면마다 누름을 먹던 것)
+    const tagged = html.replace('<div id="' + BOX + '"', '<div id="' + BOX + '" data-side="1" data-h="' + h + '"');
     const old = document.getElementById(BOX);
     if (old) {
         if (old.getAttribute('data-h') === h) return;       // 그대로다

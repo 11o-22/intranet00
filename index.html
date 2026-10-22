@@ -11573,10 +11573,17 @@ if (bathModal) bathModal.style.display = 'none';
         let sig = null;
         let queued = false;
 
+        // ★ 곁칸(data-side — 🔎 감지하는 눈의 칸처럼 화면 끝에 붙었다 떨어졌다 하는 것)은 세지 않는다 (2026-10-22)
+        //   K 의 방은 장면마다 화면을 통째로 새로 그리고, 눈은 그 뒤 1초 안에 제 칸을 다시 붙인다.
+        //   그것까지 「단추가 바뀌었다」로 세면 장면마다 0.6초씩 누름이 한 번 더 막혀
+        //   눈을 차고 K 의 방에 가면 몇 번씩 눌러야 넘어갔다. 곁칸은 끝에 붙으므로 누르던 단추를 밀지 않는다.
         function btnSig() {
             const bs = dro.querySelectorAll('button');
-            let out = dro.children.length + '|';
+            let kids = 0;
+            for (let i = 0; i < dro.children.length; i++) if (!dro.children[i].hasAttribute('data-side')) kids++;
+            let out = kids + '|';
             for (let i = 0; i < bs.length; i++) {
+                if (bs[i].closest('[data-side]')) continue;
                 out += (bs[i].getAttribute('onclick') || '') + '\u0001'
                      + (bs[i].textContent || '') + '\u0002';
             }
