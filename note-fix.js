@@ -140,8 +140,7 @@ const EXPIRY = [
         try { return window.kitNoteLive ? window.kitNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
-    // 🍰 식당 디저트 — 24시간짜리 버프. 버프가 끝나면 줄도 걷는다.
-    { mark: '[디저트]', live: function (u) { return liveBuff(u, '식당 디저트'); } },
+    // 🍰 식당 디저트 — 여기서 재지 않는다. 아래 sweetLines 가 먹은 번마다 한 줄씩 맞춘다 (2026-10-23)
     // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
     { mark: '⛓️‍💥', live: function (u, note) {
         try { return window.irrNoteLive ? window.irrNoteLive(u, note) : true; }
@@ -172,6 +171,36 @@ function setNotes(u, arr) {
 }
 function baseOf(w) {
     return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+}
+
+// ==========================================
+// 🍰 식당 디저트 — 먹은 번마다 한 줄 (2026-10-23)
+// ==========================================
+//
+//   ✗ 전에는 「식당 디저트 버프가 하나라도 살아 있나」만 보았다. 그래서
+//     ① 어제 먹은 줄이 오늘 먹은 버프 덕에 24시간을 넘겨 남고,
+//     ② 같은 디저트를 이틀 잇달아 먹으면 똑같은 줄 둘 가운데 하나가 버려져도(note-merge — 고쳤다) 되살릴 길이 없었다.
+//   이제 살아 있는 버프를 **먹은 번마다**(한 번에 건 버프는 끝나는 때가 같다) 묶어, 묶음마다 한 줄을 맞춘다.
+//   글귀는 식당이 적는 것과 똑같이 짓는다 (restaurant.js eatBuff) — 같으면 그대로 두고, 모자라면 적고, 남으면 걷는다.
+const SWEET_SRC = '식당 디저트';
+const SWEET_NAME = { pct: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼', resist: '저항' };
+function sweetLines(u) {
+    const t = Date.now();
+    const live = (Array.isArray(u && u.itemBuffs) ? u.itemBuffs : []).filter(function (b) {
+        return b && b.src === SWEET_SRC && !b.run && (b.until || 0) > t;
+    });
+    const groups = [];
+    live.forEach(function (b) {                     // 붙은 차례 그대로 — 한 번에 건 것은 끝나는 때가 몇 밀리초 안쪽
+        const g = groups.filter(function (x) { return Math.abs(x.at - b.until) < 5000; })[0];
+        if (g) g.list.push(b); else groups.push({ at: b.until, list: [b] });
+    });
+    groups.sort(function (a, z) { return a.at - z.at; });
+    return groups.map(function (g) {
+        return '[디저트] ' + g.list.map(function (b) {
+            if (b.k === 'noPoll') return '오염 동결';
+            return (SWEET_NAME[b.k] || b.k) + ' +' + b.v + (b.k === 'pct' ? '%' : '');
+        }).join(' · ') + ' (24시간)';
+    });
 }
 
 // ==========================================
@@ -287,9 +316,15 @@ function fixNotes(u) {
     const out = [];
     const ribbon = [];
     const slave = [];
+    const sweetWant = sweetLines(u);                // 🍰 있어야 할 디저트 줄 (먹은 번마다)
 
     arr.forEach(function (n) {
         if (n.indexOf(RIBBON) >= 0) { ribbon.push(n); return; }
+        if (n.indexOf('[디저트]') === 0) {          // 있어야 할 줄과 맞으면 그 자리에 두고, 아니면 버린다
+            const i = sweetWant.indexOf(n);
+            if (i >= 0) { sweetWant.splice(i, 1); out.push(n); }
+            return;
+        }
         if (n.indexOf('노예 계약') >= 0) {
             // 노예 계약은 한 줄까지 — 남길지는 아래에서 정한다
             if (!slave.length) slave.push(n);
@@ -299,6 +334,9 @@ function fixNotes(u) {
         if (expired(u, n)) return;                 // 기한이 지난 문구는 걷어낸다
         out.push(n);
     });
+
+    // --- 🍰 디저트 : 모자란 줄을 적는다 (살아 있는 버프는 있는데 줄이 없는 것) ---
+    sweetWant.forEach(function (n) { out.push(n); });
 
     // --- 빨간 리본 : 차고 있는 수와 같게 ---
     const worn = (u.equippedWeapons || []).filter(function (w) { return baseOf(w) === RIBBON; });
