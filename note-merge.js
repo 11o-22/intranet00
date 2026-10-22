@@ -219,7 +219,12 @@ function mergeBadge(code, want) {
             //   그것은 뜻이 아니라, 쓰는 쪽 사본이 묵어서 그 사이에 **생긴** 줄이
             //   「내가 지운 줄」로 보이는 것이다. 더하기만 한다.
             if (add.length) {
-                next = s.concat(msDiff(add, s));
+                // ★ 서버에 이미 같은 줄이 있다고 더할 줄을 버리면 안 된다 (2026-10-23)
+                //   ✗ 전에는 msDiff(add, s) — 서버에 같은 글자의 줄이 **하나라도** 있으면 더하지 않았다.
+                //     그래서 어제 먹은 디저트 줄이 아직 있을 때 자정 지나 같은 디저트를 또 먹으면
+                //     「[디저트] 판정 +2 (24시간)」 두 번째 줄이 통째로 버려졌다 (같은 글자 줄이 둘인 것은 다 그렇다).
+                //   서버에 **기준보다 더 생긴 몫**(같은 쓰기가 두 번 실려 온 것 — 저장이 잇달아 불릴 때)만 빼고 더한다.
+                next = s.concat(msDiff(add, msDiff(s, b)));
                 if (del.length) stats.lineSaved += del.length;
             } else {
                 const keep = s.slice();
