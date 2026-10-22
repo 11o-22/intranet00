@@ -536,7 +536,7 @@ export const DISASTERS = {
         survive: 1,
         gear: 3,
         gore: true,
-        dc: { easy: 9, normal: 13, hard: 17, xhard: 19 },
+        dc: { easy: 7, normal: 11, hard: 15, xhard: 17 },     // 2026-10-22 — 전체 2씩 낮춤 (9 · 13 · 17 · 19 → 7 · 11 · 15 · 17)
         roles: true,
         surge: 0,
         ease: { board: 2 },
