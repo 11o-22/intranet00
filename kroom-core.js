@@ -2243,19 +2243,24 @@ function lastChance(why) {
     return false;
 }
 
-// 📖 지우기 — 쓰러져 구조를 기다리는 동안 장착자가 대신 죽기로 했다. 무사히 나온다 (jisan.js 가 부른다)
+// 📖 지우기 — 쓰러져 구조를 기다리는 동안 장착자가 대신 죽기로 했다 (jisan.js 가 부른다)
+//   ★ 2026-10-22 — 죽기 직전에 구해져 그 자리에서 일어선다 (동료가 끌어낸 것과 같은 꼴 · kr._doomCb).
+//     전에는 그대로 밖으로 나왔다(outNow) — 죽은 것처럼 탐사를 더 할 수 없었다.
 function kroomSpared(byName) {
     if (!kr || kr.dead || kr._settled) return;
     if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; }
     dropDoom();
     kr._spare = null;
     const why = (kr._doomCfg && kr._doomCfg.text) || '';
-    if (kr.down) { kr.down = false; pubStat(); }
+    if (kr.down) { kr.down = false; if (kr.stats && kr.stats.hp <= 0) setStat('hp', 20); }
+    pubStat();
     const u = me();
     if ((Number(u.pollution) || 0) >= 100) { u.pollution = 50; u.lastPollutionTime = now(); }
-    addHistoryLog(u, '[📖 종말예언] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 무사히 빠져나왔습니다.');
-    try { sendPartyChat(u.name + ' 사원이 무사히 빠져나갔습니다.', true); } catch (e) { }
-    outNow((why ? why + '<br><br>' : '') + `<span style="color:#ffd9a0;">— 숨이 멎기 직전, 누군가의 경전이 펼쳐졌다.<br>${esc(byName)} 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>당신은 무사히 빠져나온다.`);
+    addHistoryLog(u, '[📖 종말예언] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 죽기 직전에 구해져 탐사를 이어 갑니다.');
+    try { saveFields({ pollution: 1, lastPollutionTime: 1, history: 1 }); } catch (e) { }
+    try { sendPartyChat(u.name + ' 사원이 죽기 직전에 구해졌습니다.', true); } catch (e) { }
+    show('—', (why ? why + '<br><br>' : '') + `<span style="color:#ffd9a0;">— 숨이 멎기 직전, 누군가의 경전이 펼쳐졌다.<br>${esc(byName)} 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>숨이 돌아온다. 아직 끝나지 않았다.`,
+        darkChoiceBtn('일어선다.', 'kroomNext()'));
 }
 // 초읽기가 다 됐다 — 물어 둔 것이 있으면 닫아 보고(그 사이 장착자가 답했으면 그쪽으로), 아니면 쓰러진다
 function doomEnd() {

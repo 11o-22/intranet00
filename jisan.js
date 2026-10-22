@@ -25,7 +25,9 @@
 //   1(추가). 지우기
 //      장착자와 같은 파티로 탐사할 때, 파티원이 죽거나 오염도가 차면 장착자가 대신 죽기를
 //      고를 수 있다. 장착자 화면에 창이 뜨고, 「대신 죽는다」를 누르면 장착자가 죽고
-//      그 파티원은 **그 자리에서 무사히 나온다** (오염도가 찼던 것이면 50% 로 나온다).
+//      그 파티원은 **죽기 직전에 구해져 탐사를 이어 간다** (오염도가 찼던 것이면 50% 로).
+//      ★ 2026-10-22 — 전에는 그 자리에서 무사히 「나왔다」. 죽은 것처럼 바로 밖으로 나와
+//        탐사를 더 할 수 없었으므로, 동료가 끌어낸 것처럼 그 자리에서 일어서게 바꿨다.
 //        · 어둠    죽음이 닿는 순간 그 파티원은 20초 동안 멈춰 기다린다 — 답이 없으면 그대로 죽는다
 //        · K의 방  쓰러져 구조를 기다리는 동안(즉사 기믹 초읽기) 묻는다
 //        · EPIC    쓰러져 구조를 기다리는 동안(즉사 기믹 초읽기 · 동료 부르기) 묻는다
@@ -516,7 +518,7 @@ function openAsk(c, v) {
         + '<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">[ 📖 지우기 ]</div>'
         + '<div style="font-size:12px; color:#e6ddd0; line-height:1.8; margin:10px 0 12px 0;">'
         + '<b style="color:#fff;">' + esc(nm) + '</b> 사원이 쓰러진다.<br>'
-        + '경전의 그 장을 당신의 이름으로 덧쓰면, 그 사원은 무사히 빠져나갑니다.<br>'
+        + '경전의 그 장을 당신의 이름으로 덧쓰면, 그 사원은 죽기 직전에 구해져 탐사를 이어 갑니다.<br>'
         + '<span style="color:#ff9a9a;">대신 당신이 죽습니다.</span>'
         + '<div style="font-size:11px; color:#888; margin-top:6px;">남은 시간 <b id="jisan-ask-left" style="color:#ffcf8f;">'
         + Math.max(0, Math.ceil(((Number(v.until) || 0) - Date.now()) / 1000)) + '</b>초</div></div>'
@@ -572,7 +574,7 @@ setInterval(function () {
     try { askCheck(); } catch (e) { }
 }, 700);
 
-// 쓰러졌다가 지워져 나온 사람 — 오염도가 찼으면 50 으로
+// 쓰러졌다가 구해진 사람 — 오염도가 찼으면 50 으로 (그대로 두면 바로 다시 쓰러진다)
 function sparedPoll(me) {
     if ((Number(me.pollution) || 0) >= 100) {
         me.pollution = JISAN.SPARE_POLL;
@@ -582,14 +584,15 @@ function sparedPoll(me) {
     return false;
 }
 function sparedLog(me, byName) {
-    log_(me, '[' + NAME + '] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 무사히 빠져나왔습니다.');
+    log_(me, '[' + NAME + '] 지우기 — ' + byName + ' 사원이 대신 지워졌습니다. 죽기 직전에 구해져 탐사를 이어 갑니다.');
     save({ pollution: 1, lastPollutionTime: 1, history: 1 });
-    try { if (typeof sendPartyChat === 'function') sendPartyChat((me.name || '') + ' 사원이 무사히 빠져나갔습니다.', true); } catch (e) { }
+    try { if (typeof sendPartyChat === 'function') sendPartyChat((me.name || '') + ' 사원이 죽기 직전에 구해졌습니다.', true); } catch (e) { }
 }
 function sparedText(byName) {
     return '<span style="color:#ffd9a0;">— 숨이 멎기 직전, 누군가의 경전이 펼쳐졌다.<br>'
-        + esc(byName) + ' 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>당신은 무사히 빠져나온다.';
+        + esc(byName) + ' 사원의 이름이 당신 자리에 덧쓰였다.</span><br><br>숨이 돌아온다. 아직 끝나지 않았다.';
 }
+window.jisanSparedText = sparedText;
 
 // ── 어둠 — 쓰러진 사람이 20초 기다린다
 function darkWait(reasonText, until) {
@@ -608,15 +611,25 @@ function darkWait(reasonText, until) {
         }, 500);
     } catch (e) { }
 }
+// 구해졌다 — 그 자리에서 일어서 탐사를 이어 간다 (거문성군 · 부활과 같은 꼴 — 지금 걸음을 다시 그린다)
 function darkSpared(r, byName) {
     const me = u_();
-    if (!me || run() !== r || r._jisanSpared || r._dead) return;
-    r._jisanSpared = true;
+    if (!me || run() !== r || r._dead) return;
+    if (r._jisanSpared === r._jisanAskAt) return;           // 같은 물음에 두 번 받지 않는다
+    r._jisanSpared = r._jisanAskAt;
     r._jisanWait = false;
+    r._jisanAsked = false;                                   // 다음에 또 쓰러지면 (살아 있는 장착자가 있으면) 다시 묻는다
+    r.fail = Math.max(0, (Number(r.fail) || 0) - 1);
+    try { r.log.push('[' + NAME + '] 지우기 — ' + byName + ' 사원이 대신 지워짐'); } catch (e) { }
     sparedPoll(me);
     sparedLog(me, byName);
-    try { if (typeof finishDarkRun === 'function') finishDarkRun(); } catch (e) { }
-    alert_('[ 📖 지우기 ]\n\n' + byName + ' 사원의 이름이 당신 자리에 덧쓰였습니다.\n당신은 무사히 빠져나왔습니다.');
+    try {
+        darkBodyEl().innerHTML = darkBox('—', String(r._jisanReason || '') + (r._jisanReason ? '<br><br>' : '') + sparedText(byName),
+            darkChoiceBtn('숨을 고른다.', 'renderDarkStep();'));
+        if (r.isParty && typeof mountDarkChat === 'function') mountDarkChat('normal');
+    } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    r._jisanReason = '';
 }
 
 (function hookDeath() {
@@ -648,12 +661,14 @@ function darkSpared(r, byName) {
                 if (h) {
                     r._jisanAsked = true;
                     r._jisanWait = true;
+                    r._jisanAskAt = h.at;
+                    r._jisanReason = reasonText;
                     darkWait(reasonText, h.at + JISAN.SPARE_MS);
                     const self = this, args = arguments;
                     setTimeout(function () {
-                        if (run() !== r || r._jisanSpared) return;
+                        if (run() !== r || r._jisanSpared === h.at) return;
                         h.close().then(function (sp) {
-                            if (run() !== r || r._jisanSpared) return;
+                            if (run() !== r || r._jisanSpared === h.at) return;
                             if (sp) { darkSpared(r, sp.byName); return; }
                             r._jisanWait = false;
                             finalDeath(self, args);
@@ -684,10 +699,17 @@ function epicSpared(byName) {
             try { ref.remove(); } catch (x) { }
         });
     }
-    e._calledHelp = false; e.danger = null; e._jisanSpare = null;
+    // 동료가 끌어낸 것과 같다 — 그 자리에서 일어선다 (epicSaved · epicDoomSaved 와 같은 꼴 · 묵은 기다림 시계도 끈다)
+    e._calledHelp = false; e._helpAt = 0; e.danger = null; e._jisanSpare = null;
     sparedPoll(me);
     sparedLog(me, byName);
-    try { epicSettle('out', sparedText(byName)); } catch (x) { console.warn('[종말예언] EPIC 지우기:', x && x.message); }
+    try {
+        const cfg = e._doomCfg || null;
+        darkBodyEl().innerHTML = darkBox('—', (cfg && cfg.text ? cfg.text + '<br><br>' : '') + sparedText(byName),
+            (typeof epicBar === 'function' ? epicBar() : '') + darkChoiceBtn('일어선다.', 'epicMap()'));
+        if (r && r.isParty && typeof mountDarkChat === 'function') mountDarkChat('normal');
+    } catch (x) { console.warn('[종말예언] EPIC 지우기:', x && x.message); }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (x) { }
 }
 function epicAsk(ms) {
     const e = epicRun();
