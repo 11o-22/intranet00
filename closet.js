@@ -144,9 +144,10 @@ const DOT = {
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
-    Z: ['pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit',
-        'robe', 'han-duru', 'cape', 'maker-outer-in', 'wolf-pj-in', 'glove'],
+    //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
+    Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
+        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -166,7 +167,10 @@ const DOT = {
     //   ★ 뉴비 새싹은 서기 줄 두 칸(하트가 바뀐다).
     FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5],
                  'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1],
-                 'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5] },
+                 'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5],
+                 // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
+                 //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
+                 'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -309,7 +313,12 @@ const DOT_SLOTS = [
             //     그 그림자 색(67,70,102)만 바깥에서 걷어 내고 그림자는 뒤 장으로 — 2·3번째는 따로 준 그림자와
             //     자리가 똑같다. 4번째는 따로 준 그림자가 그 자리를 안 덮어서(후드 안쪽이 뚫려 보였다)
             //     걷어 낸 그림자를 뒤 장에 같이 넣었다.
-            { i: 'wolf', n: '늑대 잠옷', over: ['wolf-pj-in'], top: ['wolf-pj'], own: 'wolf-pj', noTrade: true }
+            { i: 'wolf', n: '늑대 잠옷', over: ['wolf-pj-in'], top: ['wolf-pj'], own: 'wolf-pj', noTrade: true },
+            // ★ 사운드 세트 (2026-10-23) — 의상 · 코트 · 레빗 헤드셋. **상담사가 선물함으로 보내 준 사람만** 가진다 (wear-gift.js).
+            //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
+            //   걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다 (헤드셋은 여섯 칸 다 그려져 왔다).
+            //   서기 줄은 두 칸 — 의상은 두 칸이 같은 그림이라 0 에 세워 둔다.
+            { i: 'sound', n: '사운드 의상', over: ['sound-outfit'], own: 'sound-outfit', noTrade: true }
         ]
     },
     {
@@ -338,7 +347,10 @@ const DOT_SLOTS = [
             //   가장자리를 덮어야 한다. 안쪽 채색(maker-outer-in)은 **무조건 머리카락 뒤**
             //   (over — 머리보다 먼저 그린다). 한 장으로 주면 안쪽 색이 머리카락을 묻혀서 그린
             //   이가 따로 주었다.
-            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' }
+            { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' },
+            // ★ 사운드 코트 (2026-10-23) — 두 장이다. 그림자(sound-coat-in)는 코트와 같이 입고 **모든 옷 뒤**(Z 맨 앞),
+            //   코트(sound-coat)는 망토 자리. 서기 줄 두 칸에 자락이 흔들린다.
+            { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat', noTrade: true }
         ]
     },
     {
@@ -407,7 +419,9 @@ const DOT_SLOTS = [
             { i: 'glass-pen', n: '유리 펜', top: ['glass-pen'], own: 'glass-pen', cat: '손' },
             // ★ 뉴비 새싹 (2026-10-19) — 상담사가 선물함으로 보내 준 사람만. 머리 위 새싹 + 하트.
             //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
-            { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' }
+            { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' },
+            // ★ 사운드 레빗 헤드셋 (2026-10-23) — 사운드 세트. 걷기 · 서기 줄 여섯 칸 다 그려져 있다 (귀가 흔들린다).
+            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', noTrade: true, cat: '머리' }
         ]
     }
 ];
