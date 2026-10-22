@@ -380,6 +380,56 @@ export function chiefOf(p) {
     const s = String((p && p.team) || '') + ' ' + String((p && p.pos) || '');
     return /경비|보안/.test(s) && /팀장/.test(s);
 }
+// 🏥 판마다 다른 건물 (새빛 병원 · 2026-10-22) — 시작할 때 한 번 짓는다 · 진행자에게만 ([이번 판의 건물])
+//   층수 · 층마다 방 · 병원의 방 아래 비치는 옛 교실 · 덧씌운 벽 뒤의 교실 · 들어오는 문 · 어긋남 · 주술진이 숨은 곳 (lore.js build)
+export function buildOf(B, rand) {
+    if (!B) return '';
+    const R = (n) => (n > 0 ? (Math.abs(Math.floor(Number(rand(n)) || 1)) - 1) % n : 0);          // 0 … n-1
+    const mix = (a) => { a = (a || []).slice(); for (let i = a.length - 1; i > 0; i--) { const j = R(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+    const take = (a, n) => mix(a).slice(0, Math.max(0, n));
+    const span = (x, d) => { const lo = Number((x || [])[0]) || d, hi = Math.max(lo, Number((x || [])[1]) || lo); return lo + R(hi - lo + 1); };
+    const UP = span(B.up, 3), DN = span(B.down, 1);
+    const upN = [], dnN = [], fl = {};
+    for (let i = UP; i >= 1; i--) upN.push(i + '층');
+    for (let i = 1; i <= DN; i++) dnN.push('지하 ' + i + '층');
+    upN.concat(dnN).forEach((f) => { fl[f] = []; });
+    take(B.lobby, Number(B.two) || 2).forEach((r) => fl['1층'].push(r));                         // 1층 — 들어오는 쪽
+    const must = B.must || [];
+    let o = R(UP);
+    mix(must.concat(take(B.may, Math.max(1, UP * 3 - must.length)))).forEach((r) => { fl[upN[o % UP]].push(r); o++; });
+    const LO = B.low || {};
+    o = R(DN);
+    mix((LO.must || []).concat(take(LO.may, DN + 1))).forEach((r) => { fl[dnN[o % DN]].push(r); o++; });
+    // 병원의 방 아래 비치는 옛 교실 — 지상 층마다 하나 이상 (pastMust 는 늘) · 지하에도 하나
+    const pm = B.pastMust || [], noP = B.noPast || [];
+    const pastQ = pm.concat(mix((B.past || []).filter((x) => pm.indexOf(x) < 0)));
+    const over = (f) => {
+        const c = fl[f].map((r, i) => i).filter((i) => fl[f][i].indexOf('(') < 0 && noP.indexOf(fl[f][i]) < 0);
+        if (!c.length || !pastQ.length) return;
+        const i = c[R(c.length)]; fl[f][i] = fl[f][i] + '(옛 ' + pastQ.shift() + ')';
+    };
+    mix(upN).forEach(over); over(upN[R(UP)]); over(dnN[R(DN)]);
+    for (let k = 0; k < (Number(B.classes) || 0); k++) {
+        fl[upN[R(UP)]].push((B.room || '덧씌운 벽 뒤의 교실') + '(' + (1 + (R(3) + k) % 3) + '학년 ' + (1 + (R(8) + k * 3) % 8) + '반)');
+    }
+    upN.concat(dnN).forEach((f) => { fl[f] = mix(fl[f]); });
+    // 들어오는 문 — 1층이나 지하 1층의 방 하나
+    const gates = [];
+    fl['1층'].forEach((r) => { if (r.indexOf(B.room || '덧씌운 벽') < 0) gates.push(['1층', r]); });
+    fl[dnN[0]].forEach((r) => gates.push([dnN[0], r]));
+    const G = gates[R(gates.length)];
+    const all = [];
+    upN.concat(dnN).forEach((f) => fl[f].forEach((r) => { if (!(f === G[0] && r === G[1])) all.push([f, r]); }));
+    const RT = all[R(all.length)];
+    return [
+        ...((B.roof || []).length ? ['- 옥상 — ' + take(B.roof, 2).join(' · ')] : []),
+        ...upN.concat(dnN).map((f) => '- ' + f + ' — ' + fl[f].join(' · ')),
+        ...(B.outside ? ['- 바깥: ' + B.outside] : []),
+        '- 들어오는 문: ' + G[0] + ' · ' + G[1] + ' 쪽 문 — 첫 장면은 여기서 연다 (나머지 문은 잠겨 있다)',
+        ...((B.odd || []).length ? ['- 이번 판의 어긋남: ' + take(B.odd, Number(B.oddN) || 2).join(' / ')] : []),
+        ...((B.hide || []).length ? ['- 주술진이 그려진 방 (진행자만 안다 · 단서로만 흘린다): ' + RT[0] + ' · ' + RT[1] + '의 ' + take(B.hide, 1)[0]] : [])
+    ].join('\n');
+}
 // 심야 토크쇼의 주인인가 (보상 — 끝까지 함께하면 reward.host)
 function hostOf(p) { return (p.eq || []).concat(p.inv || []).some((w) => baseName(w) === SHOW); }
 // 살아서 끝까지 남은 사람의 몫 — 자리마다 (lore.js reward)
@@ -775,6 +825,8 @@ async function start(b, deps, db) {
         const FX0 = await foxesOf(db, players0, P, now, picks0);
         codes.forEach((c) => { mem[c].foxes = foxesWith(FX0, c).map((id) => foxLabel(FX0[id], mem)); });
         const fxKinds0 = Object.keys(FX0).map((id) => FX0[id].k);
+        // 🏥 판마다 다른 건물 (새빛 병원)
+        const MAP = D.build ? buildOf(D.build, deps.rand) : '';
 
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4000, system: gmSystem(run.kind), schema: SCHEMA_START,
@@ -785,16 +837,19 @@ async function start(b, deps, db) {
                 ...(chiefs0.length ? [wolfRule(chiefs0.map((c) => mem[c].n || c)), '',
                     tale0 ? '[늑대 동화 — 첫 장면에서 튼다] 첫 장면(text)에서 방송국이 늑대가 나오는 동화 하나를 틀어 ' + chiefs0.map((c) => mem[c].n || c).join(', ') + ' 을(를) 노린다.'
                           : '[늑대 동화] 첫 장면에서는 틀지 않는다.', ''] : []),
+                ...(MAP ? ['[이번 판의 건물 — 판마다 다르다 · 이 배치를 따른다 · 사원에게 한꺼번에 알려 주지 않는다]', MAP, ''] : []),
                 '[할 일]',
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
                 '   꿈결이 맺힐 자리, 등장할 사람들, 들어온 사람들의 소속 차이가 어디서 부딪힐지. 들어온 사람에게는 보이지 않는다. 1200자 안쪽.',
                 '   소속 사이에 분란을 일으킬 속임수(가짜 구조 요청 · 한쪽에만 들리는 것 등)를 두세 개 심어 둔다.',
                 '   장면마다 괴이 · 장면의 결이 달라지게 짠다 — 같은 것을 되풀이하지 않는다.',
                 '   장소는 들어온 사람이 괄호 행동으로 움직여야 바뀐다 — 설계에는 갈 만한 곳들과 그곳의 괴이를 깔아 둔다.',
+                ...(MAP ? ['   설계는 [이번 판의 건물] 위에 깐다 — 그 층 · 그 방들로 (지난 판과 다른 건물이다).'] : []),
                 ...(D.roles ? ['   사람마다 「이 재난에서」 자리가 다르다 — 사람마다 무엇이 다가오고 무엇을 겪는지 설계에 넣는다.'] : []),
                 '2. title — 첫 장면 제목 (짧게, 「장소 — 무엇」 꼴).',
                 '3. text — 첫 장면. 들어온 사람들이 재난에 들어선 순간. 450자 안쪽. 열린 상황으로 끝낸다.',
                 ...(Array.isArray(D.clock) && D.clock[0] ? ['   [때] 첫 장면은 ' + D.clock[0] + ' 이다.' + (D.clockRule ? ' ' + D.clockRule : '')] : []),
+                ...(MAP ? ['   첫 장면은 [이번 판의 건물]의 들어오는 문에서 연다.'] : []),
                 '4. notes — 다음 장면을 쓸 때 기억할 메모 (300자 안쪽).',
                 ...(Object.keys(FX0).length
                     ? ['5. fox_lines — 첫 장면이 열린 직후 채팅에 올릴 아기 여우의 말 0~2줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) }.',
@@ -803,7 +858,7 @@ async function start(b, deps, db) {
             ].join('\n')
         }, SONNET_OPT));
 
-        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null });
+        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null, map: MAP || null });
         try { if (Object.keys(FX0).length) await postFox(db, b.run, FX0, out.fox_lines, 1, deps.now(), Object.keys(FX0)); } catch (e) { }
         const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
@@ -1300,6 +1355,7 @@ async function round(b, deps, db) {
             model: CFG.SONNET, max: 4500, system: gmSystem(run.kind), schema: SCHEMA_TURN,
             user: [
                 '[숨긴 설계 — 들어온 사람에게는 보이지 않는다]', (srv && srv.plan) || '(없음)', '',
+                ...(srv && srv.map ? ['[이번 판의 건물 — 이 배치를 따른다 · 사원에게 한꺼번에 알려 주지 않는다]', String(srv.map), ''] : []),
                 '[진행 메모]', (srv && srv.notes) || '(없음)', '',
                 '[지난 장면 요약]', sums.join('\n') || '(없음)', '',
                 '[들어온 사람 — 이번 판정까지 반영한 상태]', memberLines(memAfter, D), '',
