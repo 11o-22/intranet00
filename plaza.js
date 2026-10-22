@@ -98,6 +98,17 @@ const PLAZA = {
     //   그림이 내려와 앉고(볼 것이 화면의 72%까지 내려온다), 남은 28% 가
     //   채팅과 미니맵이 앉는 어두운 자리가 된다. 사람도 한 눈금 커진다.
     CUT: 720,
+    // ★ 가로로 넓은 터치 화면 (폴드를 편 화면 · 태블릿 가로)
+    //
+    //   키에 맞추면 방이 창보다 좁아져 양옆이 검게 빈다 (폴드8 을 펴면
+    //   960x725 — 방이 742 폭이라 양옆 109씩 비었다). 그때는 **볼 것**
+    //   (y 200 ~ 1300 — 위 200 은 밋밋한 하늘, 1300 아래는 받침과 벽)만
+    //   창에 들어오게 더 키우고, 위로 그만큼 올려 둔다.
+    //       TOP  위에 남길 몫 (머리 띠가 얹힌다)
+    //       BOT  아래에 남길 몫 — 채팅 내역(5줄) · 미니맵 · 채팅 바가 앉는다.
+    //            지하 바닥(1262~1288)이 채팅 내역에 안 덮이게 이만큼 둔다.
+    //   마우스 PC 는 그대로 둔다 (손가락 화면만).
+    WIDE: { band: [200, 1300], TOP: 8, BOT: 168 },
     TAP_STOP: 3,
     // ★ 민 쪽으로 **붙고 떨어지는 데 걸리는 시간**(초).
     //   전에는 손가락이 가리키는 쪽을 그 칸에서 그대로 썼다. 손전화는
@@ -800,6 +811,9 @@ function stampSafe(ov) {
         '  max-height:82dvh;display:flex;flex-direction:column;',
         '  box-shadow:0 -10px 34px rgba(0,0,0,.6);animation:plazaUp .18s ease-out;}',
         '@keyframes plazaUp{from{transform:translateY(16px);opacity:.4}to{transform:none;opacity:1}}',
+        // 넓은 터치 화면(폴드를 편 화면)에서는 창을 가운데 한 줄로 — 끝에서 끝까지 늘어나지 않게
+        '@media (min-width:700px) and (pointer:coarse){.plaza-card{width:100%;max-width:720px;',
+        '  align-self:center;box-sizing:border-box;}}',
         '.plaza-card .grip{width:38px;height:4px;border-radius:2px;background:#39394a;',
         '  margin:0 auto 10px auto;flex:0 0 auto;}',
         '.plaza-card h4{margin:0 0 10px 0;font-size:12.5px;color:#e8dcc6;font-weight:bold;}',
@@ -1483,11 +1497,26 @@ function viewBox() {
 }
 function viewForget() { if (run) run._vb = null; }
 
+function touchy() {
+    try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; }
+}
 function zoomOf(r) {
     const v = run && run.view;
-    const vh = (v && viewBox().h) || 760;
+    const vb = v ? viewBox() : { w: 0, h: 760 };
+    const vh = vb.h || 760, vw = vb.w || 0;
     const cut = (r.cut != null) ? r.cut : (P.CUT || 0);
-    return vh / Math.max(200, r.h - cut);
+    const zH = vh / Math.max(200, r.h - cut);
+    if (run) run._cy = 0;
+    // 넓은 터치 화면 — 방이 창보다 좁을 때만 (위 WIDE 설명)
+    const W = P.WIDE;
+    if (!W || !run || cut <= 0 || !vw || r.w * zH >= vw || !touchy()) return zH;
+    const b = r.band || W.band;
+    const zFit = (vh - W.TOP - W.BOT) / Math.max(200, b[1] - b[0]);
+    const z = Math.min(vw / r.w, zFit);
+    if (z <= zH) return zH;
+    // 볼 것의 아래 끝이 BOT 위에 오도록 올린다 (위 끝은 창 밖으로 안 나가게)
+    run._cy = Math.max(0, Math.min(b[0] * z, b[1] * z - (vh - W.BOT)));
+    return z;
 }
 
 function paintRoom() {
@@ -2047,7 +2076,8 @@ function camera(snap) {
     run.camBusy = Math.abs(cx - run.cx) > 0.5;  // 아직 따라가는 중이면 쉬지 않는다
     // ★ 세로는 **맨 위에 붙여** 둔다. 아래로 넘치는 몫(빼 둔 벽)은 창 밖으로
     //   나가고, 그만큼 그림이 내려와 앉는다. 걸어도 세로는 안 움직인다.
-    run.cy = 0;
+    //   (넓은 터치 화면에서만 zoomOf 가 정한 만큼 위로 올려 둔다 — 그것도 고정)
+    run.cy = run._cy || 0;
     // ★ 같은 값이면 안 적는다 — 적기만 해도 브라우저가 매번 다시 잰다
     const L = (-Math.round(run.cx)) + 'px', T = (-Math.round(run.cy)) + 'px';
     if (run._camL !== L || run.el.style.left !== L) { run.el.style.left = L; run._camL = L; }

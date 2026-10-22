@@ -94,6 +94,15 @@ let openTab = null;
         '  padding:calc(var(--shell-top,0px) + 9px) 12px 14px 12px;',
         '  background:linear-gradient(180deg,rgba(8,8,12,.96),rgba(8,8,12,.72) 62%,rgba(8,8,12,0));}',
         '#shell-top > *{pointer-events:auto;}',
+        // ★ 넓은 터치 화면 (폴드를 편 화면 · 태블릿) — 칸을 **가운데 720 폭**으로 모은다.
+        //   끝에서 끝까지 늘이면 값과 단추가 화면 양끝으로 멀어진다. 접은 화면 · PC 는 그대로.
+        '@media (min-width:700px) and (pointer:coarse){',
+        '  #main-screen.solo{padding-left:max(14px,calc((100% - 720px) / 2));',
+        '    padding-right:max(14px,calc((100% - 720px) / 2));}',
+        '  #shell-top{padding-left:max(12px,calc((100% - 724px) / 2));',
+        '    padding-right:max(12px,calc((100% - 724px) / 2));}',
+        '  #dro-col{max-width:640px !important;}',
+        '}',
         '#shell-top .nm{flex:1;min-width:0;display:flex;align-items:center;gap:8px;',
         '  font-size:13px;font-weight:bold;color:#f1e7d6;',
         '  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
