@@ -3585,6 +3585,14 @@ function liftSheet(floor) {
 //   들어간다. 사원증·소지품처럼 **자리가 없는 것**은 전처럼 바로 연다.
 //
 //   스킵권(🎟️)을 쓴 다음 한 번은 걸음을 건너뛰고 그 자리에서 들어간다.
+// 감지하는 눈을 찼고 상담실 · 선녀탕(격리)에 있나
+function eyeQuar() {
+    const u = u_();
+    try {
+        return !!(u && typeof window.wearsEye === 'function' && window.wearsEye(u)
+            && typeof isQuarantined === 'function' && isQuarantined(u));
+    } catch (e) { return false; }
+}
 function pickMenu(m) {
     if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (m && m.sheet === 'photo') { photoSheet(); return; }
@@ -3597,6 +3605,9 @@ function pickMenu(m) {
     }
     const at = placeOf(m);
     if (!at) { goApp(m); return; }           // 자리가 없는 것은 바로 연다
+    // 🔎 감지하는 눈 — 상담실 · 선녀탕에 있는 동안은 은행을 목록에서 **바로** 연다 (2026-10-22)
+    //   격리되면 가두리에 들어가 은행 앞까지 걸어갈 수 없다. 걸어가라고만 하면 못 쓰는 것과 같았다.
+    if (m && m.tab === 'tab-vip' && eyeQuar()) { goApp(m); return; }
     // 🔒 갇혔으면 다른 방 · 다른 층의 시설로는 못 간다
     if (cageMine() && (at.room !== run.room || (at.spot.lv || 0) !== (run.lv || 0))) {
         closeSheet(); sysLine('🔒 가두리에 갇혀 있어 ' + m.n + '(으)로 갈 수 없습니다.'); return;

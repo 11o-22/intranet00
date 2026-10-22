@@ -6232,7 +6232,9 @@ const remainEl = document.getElementById('quarantine-remain-text');
                 const recTab = document.querySelector('.tabs-grid .tab');
                 if (recTab) recTab.classList.add('active');
             }
-            if (lockBox) lockBox.style.display = 'block';
+            // 🔎 감지하는 눈 — 은행 칸을 열었으면 격리 안내를 접어 은행이 바로 보이게 한다
+            const vipOpen = eyeBank && (document.getElementById('tab-vip') || { classList: { contains: () => false } }).classList.contains('active');
+            if (lockBox) lockBox.style.display = vipOpen ? 'none' : 'block';
 
        } else if (starving) {
     document.querySelectorAll('.tabs-grid .tab').forEach(t => {

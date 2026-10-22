@@ -181,6 +181,16 @@ function openPanel(tab, sub, title) {
         if (tab === 'tab-house' && typeof renderHouse === 'function') renderHouse();
         if (tab === 'tab-vip' && typeof renderBank === 'function') renderBank();
     } catch (e) { }
+    // 🔎 감지하는 눈 — 상담실 · 선녀탕에서 은행을 열면 격리 안내를 접는다 (다른 칸에서는 그대로 띄운다)
+    //   updateUI 도 같은 셈을 한다 (index.html). 칸을 여는 그 자리에서 한 번 맞춰 둔다.
+    try {
+        const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+        const box = document.getElementById('quarantine-lock-box');
+        if (u && box && typeof isQuarantined === 'function' && isQuarantined(u)) {
+            const eye = typeof window.wearsEye === 'function' && window.wearsEye(u);
+            box.style.display = (tab === 'tab-vip' && eye) ? 'none' : 'block';
+        }
+    } catch (e) { }
     if (sub) setTimeout(function () { clickSub(sub); }, 30);
 
     m.classList.add('solo');
