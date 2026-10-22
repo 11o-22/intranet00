@@ -125,6 +125,9 @@
 //                               (사택 광장 시범이 쓰던 것. 시범은 걷었지만
 //                                나중에 광장을 다시 할 때 그대로 쓴다)
 //
+// ■ 코디 (2026-10-23) — 옷장 마네킹 아래 「코디」 줄. 지금 모습(머리 · 옷 · 악세 · 색)을 다섯 칸까지 적어 두고
+//   눌러 입는다. u.dotSets 에 적힌다 (아래 「코디」 칸 참고).
+//
 // ■ 콘솔
 //       closetState()   지금 고른 것
 //       closetAll()     있는 머리·옷을 전부 늘어놓고 본다
@@ -1045,6 +1048,10 @@ window.dotStop = stop;
         '  border:1px solid rgba(255,255,255,.4);vertical-align:middle;background:transparent;}',
         '.cl-b .ou{font-style:normal;font-size:9px;color:#9a948a;margin-left:5px;}',
         '.cl-none{font-size:11px;color:#7d7568;padding:8px 2px;}',
+        // 코디 — 빈 칸은 점선 · 이름 적는 칸
+        '.cl-b.cl-empty{border-style:dashed;color:#8d8578;}',
+        '.cl-in{flex:1;min-width:0;padding:8px 10px;font-size:12px;border-radius:9px;font-family:inherit;',
+        '  background:rgba(255,255,255,.06);border:1px solid var(--theme-border,#4a5160);color:var(--theme-text,#ded5c4);}',
         '#closet-note{font-size:10px;color:#8d8578;margin-top:12px;line-height:1.6;}'
     ].join('\n');
     document.head.appendChild(s);
@@ -1204,6 +1211,7 @@ function markOn() {
     const col = p.col || {};
     Array.prototype.forEach.call(body.querySelectorAll('.cl-b'), function (b) {
         const kind = b.dataset.kind, k = b.dataset.k, v = b.dataset.v;
+        if (kind === 'set' || kind === 'sa') return;          // 코디 단추는 paintSets 가 칠한다
         // ★ 색 알은 고르는 단추가 아니다 — 물든 색만 보여 준다.
         //   ✗ 아래 일반 셈에 섞으면 ('' === '') 이라 전부 켜진 것으로 보인다.
         if (kind === 'col') {
@@ -1244,6 +1252,7 @@ function saveSoon() {
 }
 
 function tap(kind, k, v) {
+    if (kind === 'set' || kind === 'sa') { setTap(kind, k); return; }
     const p = cur();
     // 색 알 — 고르는 것이 아니라 색고리를 띄운다
     if (kind === 'col') {
@@ -1273,12 +1282,149 @@ function tap(kind, k, v) {
         } else sel.push(v);
         p[s.k] = accJoin(sel, max);
     } else { p[k] = v; }
+    if (setSel) { setSel = null; setAsk = null; paintSets(); }     // 손으로 갈아입었다 — 고른 코디 표시를 푼다
     markOn();
     paintCols();      // 갈아입었으니 물들일 거리도 달라진다
     paintDoll();
     saveSoon();
 }
 window.closetTap = tap;
+
+// ==========================================
+// 코디 — 지금 모습을 다섯 칸까지 적어 두고 눌러 입는다 (2026-10-23)
+// ==========================================
+//   u.dotSets = { s1: { n: 이름, d: { head, top, bottom, outer, shoes, glove, cape, acc, col }, at }, … s5 }
+//   빈 칸을 누르면 지금 모습을 적는다. 찬 칸을 누르면 그 모습으로 갈아입고,
+//   아래에 「덮어쓰기 · 이름 · 지우기」가 뜬다 (덮어쓰기 · 지우기는 한 번 더 눌러야 된다).
+//   ★ 색(col)도 같이 적고 같이 입는다 — 다시 입을 때 팔레트는 안 든다.
+//   ★ 입을 때 지금 못 고르는 것(가진 표에서 빠진 옷 · 소속이 바뀐 어둠 전용 머리)은 빼고 입는다.
+//     그 칸은 기본(잠옷 · 없음)으로 · 머리는 지금 머리 그대로. 적을 때 없던 칸(나중에 생긴 칸)은 지금 것 그대로.
+const SET_N = 5;
+const SET_NAME_MAX = 12;
+let setSel = null;          // 고른 칸 's1' … 's5'
+let setAsk = null;          // 'over' | 'del' — 한 번 더 눌러야 되는 것 · 'name' — 이름 적는 중
+
+function setsOf(u) {
+    const raw = u && u.dotSets, out = {};
+    if (raw && typeof raw === 'object') {
+        Object.keys(raw).forEach(function (k) { if (/^s[1-5]$/.test(k) && raw[k] && raw[k].d) out[k] = raw[k]; });
+    }
+    return out;
+}
+function setSnap() {
+    const p = cur();
+    const d = { head: p.head };
+    DOT_SLOTS.forEach(function (s) { d[s.k] = p[s.k] || ''; });
+    d.col = Object.assign({}, p.col || {});
+    return d;
+}
+function setFit(d, u) {
+    const p = cur();
+    const out = { col: Object.assign({}, (d && d.col) || {}) };
+    const hd = DOT_HEADS.filter(function (h) { return h.i === d.head; })[0];
+    out.head = (hd && allowed(hd, u)) ? d.head : p.head;
+    DOT_SLOTS.forEach(function (s) {
+        const list = items(s, u);
+        if (!Object.prototype.hasOwnProperty.call(d, s.k)) { out[s.k] = p[s.k] || ''; return; }
+        if (s.max) {
+            out[s.k] = accJoin(accSplit(d[s.k]).filter(function (id) { return list.some(function (x) { return x.i === id; }); }), s.max);
+            return;
+        }
+        const v = d[s.k] || '';
+        out[s.k] = list.some(function (x) { return x.i === v; }) ? v : ((list.filter(function (x) { return x.def; })[0] || list[0] || {}).i || '');
+    });
+    return out;
+}
+function setWrite(k, v) {
+    const u = u_(); if (!u) return;
+    const raw = (u.dotSets && typeof u.dotSets === 'object' && !Array.isArray(u.dotSets)) ? u.dotSets : {};
+    if (v) raw[k] = v; else delete raw[k];
+    u.dotSets = raw;
+    save({ dotSets: 1 });
+}
+function setSay(t) {
+    const n = document.getElementById('closet-note');
+    if (n) { n.innerText = t; clearTimeout(setSay._t); setSay._t = setTimeout(note_, 2200); }
+}
+function setsHtml() {
+    const S = setsOf(u_());
+    let chips = '';
+    for (let i = 1; i <= SET_N; i++) {
+        const k = 's' + i, x = S[k];
+        chips += '<button class="cl-b' + (x ? '' : ' cl-empty') + (setSel === k ? ' on' : '') + '" data-kind="set" data-k="' + k + '" data-v="">'
+            + (x ? esc_(x.n || ('코디 ' + i)) : '＋ 저장') + '</button>';
+    }
+    let act = '';
+    if (setSel && S[setSel]) {
+        if (setAsk === 'name') {
+            act = '<div class="cl-row"><span class="lab">이름</span><div class="pick">'
+                + '<input id="closet-set-name" class="cl-in" maxlength="' + SET_NAME_MAX + '" value="' + esc_(S[setSel].n || '') + '">'
+                + '<button class="cl-b" data-kind="sa" data-k="nameok" data-v="">확인</button>'
+                + '<button class="cl-b" data-kind="sa" data-k="back" data-v="">그만</button></div></div>';
+        } else {
+            act = rowOf('', '<button class="cl-b" data-kind="sa" data-k="over" data-v="">' + (setAsk === 'over' ? '한 번 더 누르면 덮어씁니다' : '지금 모습으로 덮어쓰기') + '</button>'
+                + '<button class="cl-b" data-kind="sa" data-k="name" data-v="">이름 바꾸기</button>'
+                + '<button class="cl-b" data-kind="sa" data-k="del" data-v="">' + (setAsk === 'del' ? '한 번 더 누르면 지웁니다' : '지우기') + '</button>');
+        }
+    }
+    return '<div class="cl-h">코디 <i>다섯 개까지</i></div>' + rowOf('불러오기', chips) + act;
+}
+function paintSets() {
+    const box = document.getElementById('closet-sets');
+    if (!box) return;
+    box.innerHTML = setsHtml();
+    Array.prototype.forEach.call(box.querySelectorAll('.cl-b'), function (b) {
+        b.onclick = function () { tap(b.dataset.kind, b.dataset.k, b.dataset.v); };
+    });
+    const inp = document.getElementById('closet-set-name');
+    if (inp) {
+        inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); setTap('sa', 'nameok'); } };
+        try { inp.focus(); inp.select(); } catch (e) { }
+    }
+}
+function setTap(kind, k) {
+    const u = u_(); if (!u) return;
+    const S = setsOf(u);
+    if (kind === 'set') {
+        const no = Number(k.slice(1));
+        setAsk = null;
+        if (!S[k]) {                                             // 빈 칸 — 지금 모습을 적는다
+            setWrite(k, { n: '코디 ' + no, d: setSnap(), at: Date.now() });
+            setSel = k;
+            paintSets();
+            setSay('코디 ' + no + ' 에 지금 모습을 저장했습니다.');
+            return;
+        }
+        pick = setFit(S[k].d, u);                                // 찬 칸 — 그 모습으로 갈아입는다
+        setSel = k;
+        paintSets(); markOn(); paintCols(); paintDoll(); saveSoon();
+        setSay((S[k].n || ('코디 ' + no)) + ' 을(를) 입었습니다.');
+        return;
+    }
+    if (!setSel || !S[setSel]) { setSel = null; setAsk = null; paintSets(); return; }
+    const x = S[setSel], nm = x.n || ('코디 ' + setSel.slice(1));
+    if (k === 'over') {
+        if (setAsk !== 'over') { setAsk = 'over'; paintSets(); return; }
+        setWrite(setSel, { n: x.n || nm, d: setSnap(), at: Date.now() });
+        setAsk = null; paintSets();
+        setSay(nm + ' 을(를) 지금 모습으로 덮어썼습니다.');
+    } else if (k === 'del') {
+        if (setAsk !== 'del') { setAsk = 'del'; paintSets(); return; }
+        setWrite(setSel, null);
+        setSel = null; setAsk = null; paintSets();
+        setSay(nm + ' 을(를) 지웠습니다.');
+    } else if (k === 'name') {
+        setAsk = 'name'; paintSets();
+    } else if (k === 'nameok') {
+        const inp = document.getElementById('closet-set-name');
+        const t = String((inp && inp.value) || '').replace(/\s+/g, ' ').trim().slice(0, SET_NAME_MAX);
+        setWrite(setSel, Object.assign({}, x, { n: t || ('코디 ' + setSel.slice(1)) }));
+        setAsk = null; paintSets();
+        setSay('이름을 바꿨습니다.');
+    } else if (k === 'back') {
+        setAsk = null; paintSets();
+    }
+}
 
 function note_() {
     const n = document.getElementById('closet-note');
@@ -1292,9 +1438,11 @@ function render() {
     if (!body) return;
     const u = u_(); if (!u) return;
     pick = null;
+    setSel = null; setAsk = null;
     body.innerHTML =
         '<div class="panel-title">[사택 옷장]</div>'
         + '<div id="closet-stage"><div id="closet-floor"></div></div>'
+        + '<div id="closet-sets">' + setsHtml() + '</div>'
         + '<div id="closet-rows">' + buildRows(u) + '</div>'
         + '<div id="closet-note"></div>';
     Array.prototype.forEach.call(body.querySelectorAll('.cl-b'), function (b) {
@@ -1349,6 +1497,8 @@ window.closetState = function () {
     console.log('  악세      :', (L.tops || []).join(' → ') || '없음',
         '(' + (L.tops || []).length + ' / ' + window.dotAccMax() + ')');
     console.log('  상담사인가:', isAdm(u) ? 'O' : '✗', '· 사번', noOf(u) || '(없음)');
+    const S = setsOf(u);
+    console.log('  코디      :', Object.keys(S).sort().map(function (k) { return k + ' ' + (S[k].n || ''); }).join(' · ') || '없음');
     DOT_SLOTS.forEach(function (s) {
         console.log('  ' + s.n + ' :', items(s, u).map(function (x) { return x.n; }).join(' · '));
     });
