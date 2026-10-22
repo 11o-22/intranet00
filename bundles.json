@@ -384,7 +384,8 @@
       "s3-period.js",
       "bonus-audit.js",
       "chilseong.js",
-      "popup-notice.js"
+      "popup-notice.js",
+      "house-co.js"
     ]
   ]
 }
