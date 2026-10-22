@@ -740,6 +740,17 @@ function memberChips(r, u) {
             + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
             + esc(x.n || c) + (pm[c] ? ' ' + esc(coupleEmoji(c)) : '') + (x.wolf && !gone(st) ? ' 🐺' : '')
             + (x.role === 'vip' && K(r.kind).noLeave && Number(x.odd) && !gone(st) ? ' ❓' + Number(x.odd) : '') + tag + '</span>';
+    }).join('') + aidChips(r);
+}
+// 🤝 조력자 — 만난 장면부터 (새빛 병원 · 2026-10-23) · 대신 끌려가면 흐리게
+function aidChips(r) {
+    const A = r.aid || {}, n = Number(r.round) || 0;
+    if (r.state !== 'PLAY' && r.state !== 'END') return '';
+    return Object.keys(A).filter(function (id) { return A[id] && Number(A[id].met) <= n; }).map(function (id) {
+        const a = A[id], off = !!a.gone;
+        const what = a.save ? '한 번 대신 끌려감' : ((a.k || '') + (a.cut ? ' −' + a.cut : ''));
+        return '<span style="color:' + (off ? '#6a6a7a' : '#9fd8ef') + ';border-color:' + (off ? '#3a3a4a' : '#2a6a8a') + ';" title="조력자">🤝 '
+            + esc(a.n || id) + ' · ' + (off ? '끌려감' : esc(what)) + '</span>';
     }).join('');
 }
 
@@ -786,9 +797,11 @@ function checkChips(list, kind) {
         if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 그곳이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.ease) s += ' (−' + c.ease + ')';          // 이사팀 — 조금 쉽게
+        if (c.help) s += ' (🤝−' + c.help + ')';        // 조력자 덕에 (새빛 병원)
         if (c.to) s += ' → ' + stN(kind, c.to);
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + stN(kind, c.tgtFrom) + '→' + stN(kind, c.tgtTo);
         if (c.kick) s += ' → 모셔짐';
+        if (c.aid) s += ' · 🤝 ' + esc(c.aid) + ' 대신 끌려감';     // 조력자가 대신 끌려갔다 (새빛 병원)
         if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 여우가 죽음을 대신 받았다
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
     }).join('') + '</div>';

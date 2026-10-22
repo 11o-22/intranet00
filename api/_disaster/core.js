@@ -382,11 +382,27 @@ export function chiefOf(p) {
 }
 // 🏥 판마다 다른 건물 (새빛 병원 · 2026-10-22) — 시작할 때 한 번 짓는다 · 진행자에게만 ([이번 판의 건물])
 //   층수 · 층마다 방 · 병원의 방 아래 비치는 옛 교실 · 덧씌운 벽 뒤의 교실 · 들어오는 문 · 어긋남 · 주술진이 숨은 곳 (lore.js build)
-export function buildOf(B, rand) {
-    if (!B) return '';
+//   방마다 기믹 (2026-10-23) — 그 방의 것 둘 (옛 교실이 비치면 방의 것 하나 + 옛 교실의 것 하나) · build.gim · build.pastGim
+//   → { text, rooms: [[층, 방], …] }
+function rng(rand) {
     const R = (n) => (n > 0 ? (Math.abs(Math.floor(Number(rand(n)) || 1)) - 1) % n : 0);          // 0 … n-1
     const mix = (a) => { a = (a || []).slice(); for (let i = a.length - 1; i > 0; i--) { const j = R(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
     const take = (a, n) => mix(a).slice(0, Math.max(0, n));
+    return { R: R, mix: mix, take: take };
+}
+function gimOf(B, room, take) {
+    const G = B.gim || {}, PG = B.pastGim || {};
+    const m = /\(옛 ([^)]+)\)$/.exec(room);
+    const base = room.replace(/\(.*\)$/, '').trim();
+    const key = Object.keys(G).filter((k) => k !== '*' && base.indexOf(k) >= 0).sort((a, z) => z.length - a.length)[0];
+    const pool = (key ? G[key] : null) || G['*'] || [];
+    const out = take(pool, m && PG[m[1]] ? 1 : 2);
+    if (m && PG[m[1]]) out.push('(옛 ' + m[1] + ') ' + PG[m[1]]);
+    return out;
+}
+export function buildMap(B, rand) {
+    if (!B) return { text: '', rooms: [] };
+    const { R, mix, take } = rng(rand);
     const span = (x, d) => { const lo = Number((x || [])[0]) || d, hi = Math.max(lo, Number((x || [])[1]) || lo); return lo + R(hi - lo + 1); };
     const UP = span(B.up, 3), DN = span(B.down, 1);
     const upN = [], dnN = [], fl = {};
@@ -418,17 +434,43 @@ export function buildOf(B, rand) {
     fl['1층'].forEach((r) => { if (r.indexOf(B.room || '덧씌운 벽') < 0) gates.push(['1층', r]); });
     fl[dnN[0]].forEach((r) => gates.push([dnN[0], r]));
     const G = gates[R(gates.length)];
-    const all = [];
-    upN.concat(dnN).forEach((f) => fl[f].forEach((r) => { if (!(f === G[0] && r === G[1])) all.push([f, r]); }));
+    const rooms = [], all = [];
+    upN.concat(dnN).forEach((f) => fl[f].forEach((r) => { rooms.push([f, r]); if (!(f === G[0] && r === G[1])) all.push([f, r]); }));
     const RT = all[R(all.length)];
-    return [
+    const floorLines = (f) => ['- ' + f].concat(fl[f].map((r) => {
+        const g = gimOf(B, r, take);
+        return '  · ' + r + (g.length ? ' — ' + g.join(' / ') : '');
+    }));
+    const lines = [
         ...((B.roof || []).length ? ['- 옥상 — ' + take(B.roof, 2).join(' · ')] : []),
-        ...upN.concat(dnN).map((f) => '- ' + f + ' — ' + fl[f].join(' · ')),
+        ...[].concat(...upN.concat(dnN).map(floorLines)),
         ...(B.outside ? ['- 바깥: ' + B.outside] : []),
         '- 들어오는 문: ' + G[0] + ' · ' + G[1] + ' 쪽 문 — 첫 장면은 여기서 연다 (나머지 문은 잠겨 있다)',
         ...((B.odd || []).length ? ['- 이번 판의 어긋남: ' + take(B.odd, Number(B.oddN) || 2).join(' / ')] : []),
         ...((B.hide || []).length ? ['- 주술진이 그려진 방 (진행자만 안다 · 단서로만 흘린다): ' + RT[0] + ' · ' + RT[1] + '의 ' + take(B.hide, 1)[0]] : [])
-    ].join('\n');
+    ];
+    return { text: lines.join('\n'), rooms: rooms, gate: G };
+}
+export function buildOf(B, rand) { return buildMap(B, rand).text; }
+// 🤝 조력자 (새빛 병원 · 2026-10-23) — 판마다 몇을 골라 건물 어딘가에 숨겨 두고, 만나는 장면을 정한다 (진행자에게만 · disasterSrv/<판>/help)
+//   kinds 의 판정 난이도를 cut 만큼 낮춘다 (만난 뒤 · 끌려가기 전까지 · 일행 모두) · save 는 한 번 사원 대신 끌려간다
+export function helpersOf(HS, rand, rooms, gate) {
+    if (!HS || !Array.isArray(HS.pool) || !HS.pool.length) return null;
+    const { R, take } = rng(rand);
+    const lo = Number((HS.meet || [])[0]) || 2, hi = Math.max(lo, Number((HS.meet || [])[1]) || lo);
+    const slots = take(Array.from({ length: hi - lo + 1 }, (x, i) => lo + i), Number(HS.n) || 2).sort((a, z) => a - z);
+    const spots = (rooms || []).filter((x) => !(gate && x[0] === gate[0] && x[1] === gate[1]));
+    const out = {};
+    take(HS.pool, slots.length).forEach((h, i) => {
+        const at = spots.length ? spots[R(spots.length)] : null;
+        out[h.id] = { n: h.n, who: h.who || '', kinds: Array.isArray(h.kinds) ? h.kinds : [], cut: Number(h.cut) || 0, save: !!h.save,
+                      meet: slots[i], at: at ? at[0] + ' · ' + at[1] : '' };
+    });
+    return out;
+}
+function helpLine(h) {
+    const k = (h.kinds || []).map((x) => KIND_NAME[x] || x).join(' · ');
+    return h.n + ' — ' + h.who + (k && h.cut ? ' (도움: ' + k + ' 판정 −' + h.cut + ')' : '') + (h.save ? ' (도움: 사원 한 사람이 끌려갈 자리에 한 번 대신 끌려간다)' : '');
 }
 // 심야 토크쇼의 주인인가 (보상 — 끝까지 함께하면 reward.host)
 function hostOf(p) { return (p.eq || []).concat(p.inv || []).some((w) => baseName(w) === SHOW); }
@@ -826,7 +868,10 @@ async function start(b, deps, db) {
         codes.forEach((c) => { mem[c].foxes = foxesWith(FX0, c).map((id) => foxLabel(FX0[id], mem)); });
         const fxKinds0 = Object.keys(FX0).map((id) => FX0[id].k);
         // 🏥 판마다 다른 건물 (새빛 병원)
-        const MAP = D.build ? buildOf(D.build, deps.rand) : '';
+        const BM = D.build ? buildMap(D.build, deps.rand) : null;
+        const MAP = BM ? BM.text : '';
+        // 🤝 조력자 — 판마다 몇을 골라 건물 어딘가에 숨겨 두고 만나는 장면을 정한다 (새빛 병원 · 2026-10-23)
+        const HELP0 = D.helpers ? helpersOf(D.helpers, deps.rand, BM ? BM.rooms : [], BM && BM.gate) : null;
 
         const out = await ask(deps, Object.assign({
             model: CFG.SONNET, max: 4000, system: gmSystem(run.kind), schema: SCHEMA_START,
@@ -838,6 +883,8 @@ async function start(b, deps, db) {
                     tale0 ? '[늑대 동화 — 첫 장면에서 튼다] 첫 장면(text)에서 방송국이 늑대가 나오는 동화 하나를 틀어 ' + chiefs0.map((c) => mem[c].n || c).join(', ') + ' 을(를) 노린다.'
                           : '[늑대 동화] 첫 장면에서는 틀지 않는다.', ''] : []),
                 ...(MAP ? ['[이번 판의 건물 — 판마다 다르다 · 이 배치를 따른다 · 사원에게 한꺼번에 알려 주지 않는다]', MAP, ''] : []),
+                ...(HELP0 ? ['[조력자 — 이번 판 (진행자만 안다 · 만나는 장면 전에는 나오지 않는다 · 게임 코드가 만나는 때를 알려 준다)]',
+                    ...Object.keys(HELP0).map((id) => '- ' + helpLine(HELP0[id]) + ' — 숨어 있는 곳: ' + (HELP0[id].at || '건물 어딘가') + ' · ' + HELP0[id].meet + '장면에 만난다'), ''] : []),
                 '[할 일]',
                 '1. plan — 이번 판의 숨긴 설계. 장면 ' + (D.rounds ? D.rounds : '6~8') + '개의 뼈대, 이번 판에 쓸 괴담의 규칙, 근원과 끝내는 법,',
                 '   꿈결이 맺힐 자리, 등장할 사람들, 들어온 사람들의 소속 차이가 어디서 부딪힐지. 들어온 사람에게는 보이지 않는다. 1200자 안쪽.',
@@ -858,9 +905,9 @@ async function start(b, deps, db) {
             ].join('\n')
         }, SONNET_OPT));
 
-        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null, map: MAP || null });
+        await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null, map: MAP || null, help: HELP0 || null });
         try { if (Object.keys(FX0).length) await postFox(db, b.run, FX0, out.fox_lines, 1, deps.now(), Object.keys(FX0)); } catch (e) { }
-        const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null,
+        const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null, aid: null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
         codes.forEach((c) => {
             up['members/' + c + '/st'] = 'ok'; up['members/' + c + '/done'] = 0; up['members/' + c + '/leave'] = null;
@@ -911,6 +958,9 @@ export function judge(acts, mem, rand, opt) {
     // 🔥 소각 — 태울 수 있는 사람 (없으면 심야 토크쇼의 주인) · 파괴 판정 주사위에 더하는 몫 (새빛 병원 +7 · 2026-10-22)
     const burner = (opt && typeof opt.burner === 'function') ? opt.burner : (c) => !!(mem[c] && mem[c].host);
     const burnAdd = Math.max(0, Number(opt && opt.burnPlus) || 0);
+    // 🤝 조력자 — 그 종류의 판정을 쉽게 (새빛 병원 · 2026-10-23) · help(c, kind) → { n, by } 또는 null
+    const help = (opt && typeof opt.help === 'function') ? opt.help : () => null;
+    const helpOf = (c, k) => { const h = help(c, k); const n = h ? Math.max(0, Number(h.n) || 0) : 0; return n ? { n: n, by: String(h.by || '') } : null; };
     const dcOf = (base, add, ez) => Math.max(2, Math.min(20, base + add - ez));
     const safe = !!(opt && opt.safe);
     // 끌려가지(죽지) 않는 사람 — 새빛 병원의 사회자 (괴물들이 동족으로 안다 · 2026-10-22)
@@ -942,7 +992,8 @@ export function judge(acts, mem, rand, opt) {
             const tier = RZ.t;
             const add = Math.max(0, Number(plus(a.who)) || 0);
             const ez = Math.max(0, Number(ease(a.who)) || 0);
-            const dc = dcOf(DC[tier], add, ez);
+            const HP = helpOf(a.who, kind);
+            const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
             const roll = rand(20);
             const BP = row.burn ? burnAdd : 0;
             const W = hit(a.who, roll, dc, BP), ok = W.ok;
@@ -950,6 +1001,7 @@ export function judge(acts, mem, rand, opt) {
                                  danger: !!a.danger });
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (HP) { row.help = HP.n; row.helpBy = HP.by; }
             if (W.w) row.wolf = W.w;
             if (BP) row.burnPlus = BP;
             if (RZ.k) row.up = RZ.k;
@@ -985,12 +1037,14 @@ export function judge(acts, mem, rand, opt) {
             const tier = DC[F.tier] ? F.tier : 'hard';
             const add = Math.max(0, Number(plus(c)) || 0);
             const ez = Math.max(0, Number(ease(c)) || 0);
-            const dc = dcOf(DC[tier], add, ez);
+            const HP = helpOf(c, KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade');
+            const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
             const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(F.did || '방송국이 덮쳐 온다', 80), kind: KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, forced: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (HP) { row.help = HP.n; row.helpBy = HP.by; }
             if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
@@ -1011,13 +1065,15 @@ export function judge(acts, mem, rand, opt) {
             const tier = DC[M.tier] ? M.tier : 'hard';
             const add = Math.max(0, Number(plus(c)) || 0);
             const ez = Math.max(0, Number(ease(c)) || 0);
-            const dc = dcOf(DC[tier], add, ez);
+            const HP = helpOf(c, KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade');
+            const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
             const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(M.did || '방송국이 그 말을 들었다', 80), said: clip(x.said, 60),
                           kind: KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade',
                           tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, meta: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
+            if (HP) { row.help = HP.n; row.helpBy = HP.by; }
             if (W.w) row.wolf = W.w;
             if (!ok) {
                 const from = st[c];
@@ -1045,6 +1101,7 @@ function checkLine(c, d) {
     if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 ' + placeOf(d) + '이 다른 곳으로 모셔 간다' : '');
     let s = '- ' + c.name + ' — ' + (c.wolf ? '[🐺 늑대] ' : '') + (c.burn ? '[소각] ' : '') + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[' + ((d && d.forcedTag) || '덮침') + '] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
         + (c.plus ? ' — ' + placeOf(d) + '이 사나워져 +' + c.plus : '') + (c.ease ? ' — ' + placeOf(d) + '이 조금 머뭇거려 −' + c.ease : '')
+        + (c.help ? ' — 조력자(' + (c.helpBy || '') + ') 덕에 −' + c.help : '')
         + ', 주사위 ' + c.roll + ((c.wolf || c.burnPlus) ? (c.wolf ? ' + 늑대의 힘 ' + c.wolf : '') + (c.burnPlus ? ' + 소각 ' + c.burnPlus : '')
             + ' = ' + (c.roll + (c.wolf || 0) + (c.burnPlus || 0)) : '') + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
@@ -1054,6 +1111,7 @@ function checkLine(c, d) {
     if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 ' + placeOf(d) + '이 다른 곳으로 모셔 간다';
     if (c.burn) s += c.ok ? ((d && d.burnOk) || ' · [소각 성공] 손가락을 튕기자 그것이 실제로 불길에 휩싸여 타 버린다 — 재가 되어 사라진다')
                           : ((d && d.burnNg) || ' · [소각 실패] 불꽃이 제대로 붙지 않거나, 붙어도 다 태우지 못한다');
+    if (c.aid) s += ' · [대신 끌려감] 조력자 ' + c.aid + ' 이(가) ' + c.name + ' 대신 붙잡혀 끌려간다 — ' + c.name + ' 은(는) 다친 채 남는다';
     if (c.fox) s += ' · [대신 소멸] 🐾 ' + c.fox.n + '(' + ((FOXES[c.fox.k] || {}).a || c.fox.k) + ') 가 ' + c.name + ' ' + ((d && d.foxTake) || '대신 죽음을 받고') + ' 사라진다 — '
         + c.name + ' 은(는) 다친 채 살아남는다';
     return s;
@@ -1290,6 +1348,15 @@ async function round(b, deps, db) {
         const huntTier = (!finalNow && D.hunt && D.hunt.at) ? D.hunt.at[n] : null;
         const huntNow = !!huntTier;
         const hitRole = (r) => surgeHits(r) || !!(D.ease && D.ease[r] != null);
+        // 🤝 조력자 — 만난 뒤 · 끌려가기 전까지 일행 모두의 그 종류 판정을 쉽게 (새빛 병원 · 2026-10-23)
+        const HELP = (srv && srv.help && typeof srv.help === 'object') ? srv.help : {};
+        const aidNow = Object.keys(HELP).filter((id) => HELP[id] && Number(HELP[id].meet) <= n && !HELP[id].gone);
+        const helpFor = (c, k) => {
+            if (!memNow[c] || memNow[c].role === 'admin') return null;
+            let best = null;
+            aidNow.forEach((id) => { const h = HELP[id]; if (h.cut && (h.kinds || []).indexOf(k) >= 0 && (!best || h.cut > best.n)) best = { n: h.cut, by: h.n }; });
+            return best;
+        };
         const J = judge(acts, memNow, deps.rand, {
             // ★ 쉽게 해 주는 자리(D.ease — 이사팀)는 예외가 아니다: 사나움 · 사회자 없음 · 덮침을 다 받고 난이도만 덜어 준다 (2026-10-20)
             dc: D.dc, plus: (c) => (hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow,
@@ -1302,7 +1369,8 @@ async function round(b, deps, db) {
             up: (c) => (D.tierUp && hitRole(memNow[c].role)) ? (Number(D.tierUp[n]) || 0) : 0,
             keep: (c) => !!(D.kin && memNow[c] && memNow[c].role === 'vip'),
             burner: (c) => !!(memNow[c] && memNow[c].role === 'vip' && (memNow[c].host || D.burnAny)),
-            burnPlus: Number(D.burnPlus) || 0 });
+            burnPlus: Number(D.burnPlus) || 0,
+            help: helpFor });
         const kickNow = J.checks.filter((c) => c.kick).map((c) => c.who);     // 이번 장면에 다른 곳으로 모셔지는 귀빈
         const chiefsAfter = chiefs.filter((c) => !gone(J.st[c]));             // 🐺 이번 장면 뒤에도 판에 남은 경비팀장
         const taleGo = taleNext && chiefsAfter.length > 0;
@@ -1315,6 +1383,19 @@ async function round(b, deps, db) {
         });
         // 🐾 아기 여우 — 이번에 죽을 사람 곁의 여우가 대신 소멸한다 (죽을 때마다 한 마리씩)
         const foxGone = foxSave(J, memNow, FXj);
+        // 🤝 조력자가 사원 대신 한 번 끌려간다 (여우 다음 · 사라짐 앞 · 2026-10-23)
+        const aidGone = [];
+        aidNow.filter((id) => HELP[id].save).forEach((id) => {
+            const c = Object.keys(J.st).find((x) => J.st[x] === 'lost' && (memNow[x].st || 'ok') !== 'lost' && memNow[x].role !== 'admin'
+                && aidGone.every((g) => g.c !== x));
+            if (!c) return;
+            J.st[c] = 'hurt';
+            const row = J.checks.filter((r) => r.who === c && r.to === 'lost').pop();
+            if (row) { row.to = 'hurt'; row.aid = HELP[id].n; }
+            aidGone.push({ id: id, c: c });
+        });
+        const aidStay = aidNow.filter((id) => aidGone.every((g) => g.id !== id));
+        const aidNext = Object.keys(HELP).filter((id) => HELP[id] && Number(HELP[id].meet) === n + 1 && !HELP[id].gone);
         // 🏥 괴물들의 의심이 쌓인 사회자 — 이번 장면에 어둠 속으로 사라진다 (실종 · 여우도 대신 못 받고 · 구할 수 없다 · 2026-10-22)
         const VN = Number(D.kinVanish) || 0;
         const vanishNow = VN ? kinOdd.filter((x) => (Number(mem[x.who].odd) || 0) + 1 >= VN && J.st[x.who] !== 'lost').map((x) => x.who) : [];
@@ -1386,6 +1467,13 @@ async function round(b, deps, db) {
                     + ' 비명도 핏자국도 없다. 어디로 갔는지 아무도 모르고, 찾을 수도 구할 수도 없다. 다시 나타나지 않는다 (그 사람의 목소리는 어디선가 희미하게 새어 나올 뿐이다).', ''] : []),
                 ...((kins.length && !kinOdd.length) ? ['[사회자] ' + kins.map((c) => (mem[c].n || c) + (Number(mem[c].odd) ? ' (괴물들의 의심 ' + Number(mem[c].odd) + '번 — 아직 남아 있다)' : '')).join(' · ')
                     + ' — 이번 장면에는 괴물답게 굴었다 (괴물들이 동족으로 대한다).', ''] : []),
+                ...(aidStay.length ? ['[조력자 — 일행과 함께 있다] ' + aidStay.map((id) => helpLine(HELP[id])).join(' / '),
+                    '판정 결과의 「조력자(…) 덕에」는 그 사람이 도운 것이다 — 그 도움을 장면 속 일로 그린다 (문을 열어 주고 · 숨을 곳을 가리키고 · 붕대를 감아 주고 · 앞을 막는 것을 쏘아 쓰러뜨리고 …).'
+                    + ' 조력자는 진짜 사람이다. 게임 코드가 정한 때에만 끌려가거나 떠난다 — 서술에서 마음대로 죽이거나 떼어 놓지 않는다. 일행이 갈라지면 누구 곁에 있는지 진행 메모에 적는다.', ''] : []),
+                ...(aidGone.length ? ['[대신 끌려감] ' + aidGone.map((g) => HELP[g.id].n + ' — ' + (mem[g.c].n || g.c) + ' 대신').join(', ')
+                    + ' — 판정 결과의 [대신 끌려감] 줄이다. 그 조력자가 사원을 밀쳐 내고 대신 괴물에게 붙잡혀 끌려간다. 이 판에서 다시 나오지 않는다.', ''] : []),
+                ...(aidNext.length ? ['[조력자 — 다음 장면(next_text)에서 만난다] ' + aidNext.map((id) => helpLine(HELP[id]) + ' · 숨어 있던 곳: ' + (HELP[id].at || '건물 어딘가')).join(' / '),
+                    '다음 장면에 그 사람을 일행 앞에 나타나게 한다 (일행이 그곳에 없으면 그 사람이 일행을 찾아온다). 끝내는 장면이면 쓰지 않는다.', ''] : []),
                 ...(huntNow ? ['[' + ((D.forcedTag) || '덮침') + '] ' + (FLOW.hunt || ('이번 장면에 ' + PL + '이 사람을 찾아 나섰다. 판정 결과의 [덮침] 줄은 그 사람에게 닥친 것이다.')), ''] : []),
                 ...(kickNow.length ? ['[모심] ' + kickNow.map((c) => (mem[c].n || c)
                         + (/재난관리/.test((memNow[c].aff || '') + ' ' + (memNow[c].team || '')) ? ' (선녀탕으로)' : ' (여우 상담실로)')).join(', ')
@@ -1493,6 +1581,10 @@ async function round(b, deps, db) {
         chiefs.forEach((c) => { up['members/' + c + '/wolf'] = memNow[c].wolf || null; });     // 🐺 늑대의 모습 (된 장면)
         kinOdd.forEach((x) => { up['members/' + x.who + '/odd'] = (Number(mem[x.who].odd) || 0) + 1; });   // 🏥 사회자 — 괴물들의 의심
         vanishNow.forEach((c) => { up['members/' + c + '/vanish'] = n; });                                    // 🏥 어둠 속으로 사라졌다 (실종)
+        // 🤝 조력자 — 화면에 (만난 장면부터) · 대신 끌려간 장면
+        aidGone.forEach((g) => { up['aid/' + g.id + '/gone'] = n; });
+        if (!ended) aidNext.forEach((id) => { const h = HELP[id];
+            up['aid/' + id] = { n: h.n, k: (h.kinds || []).map((x) => KIND_NAME[x] || x).join('·'), cut: h.cut || 0, save: !!h.save, met: n + 1 }; });
         foxGone.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         foxFell.forEach((id) => { up['foxes/' + id + '/gone'] = n; });
         Object.keys(FJ.st).forEach((id) => { const s2 = FJ.st[id] === 'hurt' ? 'hurt' : null; if ((FX[id].st || null) !== s2 && FJ.st[id] !== 'lost') up['foxes/' + id + '/st'] = s2; });
@@ -1544,6 +1636,7 @@ async function round(b, deps, db) {
         // 🐾 아기 여우 — 장면이 넘어간 직후 채팅에 (끝났으면 이 장면에)
         try { if (foxTalkers.length) await postFox(db, b.run, FXa, out.fox_lines, ended ? n : n + 1, deps.now(), foxTalkers); } catch (e) { }
         const su = { notes: clip(out.notes, 1200), readN: n, readKey: readKey || null }; su['sums/' + n] = n + '. ' + clip(out.summary, 120);
+        aidGone.forEach((g) => { su['help/' + g.id + '/gone'] = n; });
         if (D.wolf) su.tale = (taleGo && !ended) ? n + 1 : null;          // 🐺 늑대 동화를 튼 장면 (잇달아 틀지 않게)
         await db.patch('disasterSrv/' + b.run, su);
         return { ok: true, ended: ended };
