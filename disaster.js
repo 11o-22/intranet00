@@ -53,11 +53,29 @@ const DZ_WATCH = '👁 기록 소실 관전 티켓';
 (function disaster() {
 
 const ROOT = 'disaster', CHAT = 'disasterChat';
-const KIND = 'wave', GRADE = '파형(破刑)', NAME = '『 3시 33분 방송국 』';
-const SURVIVE = 1, GEAR_MAX = 3;
-const BRIEF = '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.';
-const REWARD = '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 · 이사팀 <b style="color:#e8c27a;">300,000 P</b> · 선생님 <b style="color:#e8c27a;">150,000 P</b> · '
-    + '끝까지 함께한 심야 토크쇼의 주인 <b style="color:#e8c27a;">300,000 P</b> (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.';
+// ★ 재난마다 (서버 lore.js DISASTERS 와 같은 열쇠 · 2026-10-22 『 새빛 병원 』 을 넣으며)
+//   대기실 목록 위의 칸으로 고른다 · 방(판)은 제 kind 를 들고 다닌다 · 상담사는 재난마다 열고 닫는다
+const PAY_B = function (n) { return '<b style="color:#e8c27a;">' + n + '</b>'; };
+const KINDS_C = {
+    wave: { icon: '📡', grade: '파형(破刑)', name: '『 3시 33분 방송국 』', survive: 1, gear: 3,
+            brief: '일기예보와 여러 정보를 전해 주는 방송국. 3시 33분에 정확히 3번 채널을 33번 누르면 들어온다.',
+            reward: '살아서 끝까지 남으면 — 재난관리국 요원 · 백일몽 사원 · 이사팀 ' + PAY_B('300,000 P') + ' · 선생님 ' + PAY_B('150,000 P') + ' · '
+                + '끝까지 함께한 심야 토크쇼의 주인 ' + PAY_B('300,000 P') + ' (홀로 나가면 0)<br>죽으면 여우 상담실 · 선녀탕으로 이송됩니다.',
+            place: '방송국', lost: '죽음', lostEnd: '죽음', lostIn: '전파 속에서 목소리만 남았다…', vip: '사회자', vipLine: '이 방송국의 <b>사회자</b>',
+            kickSay: '「귀빈께서는 저희 방송과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다.」', kickWho: '방송국 사람들이',
+            fail: '남은 사람이 모두 방송국에 먹혔습니다', fate: '방송국에 먹혔다' },
+    ward: { icon: '🏥', grade: '파형(破刑)', name: '『 새빛 병원 』', survive: 1, gear: 3,
+            brief: '산자락에 버려진 정신병원. 정신병원이 되기 전에는 고등학교였고, 그보다 더 전에 이 건물에 무엇이 있었는지는 아무도 말하지 않는다. 넷째 날 새벽, 해가 뜰 때까지 사흘을 버텨야 한다.',
+            reward: '넷째 날 새벽까지 살아남으면 — 재난관리국 요원 · 백일몽 사원 · 이사팀 ' + PAY_B('300,000 P') + ' · 선생님 ' + PAY_B('150,000 P') + ' · '
+                + '끝까지 함께한 심야 토크쇼의 주인 ' + PAY_B('300,000 P') + ' (홀로 나가면 0)<br>붙잡히면 실험체로 끌려갑니다 — 동료가 구하러 올 수 있습니다. 끌려간 채 끝나면 여우 상담실 · 선녀탕으로 이송됩니다.',
+            place: '병원', lost: '끌려감', lostEnd: '돌아오지 못함', lostIn: '어딘가에 묶여 목소리만 새어 나간다…', vip: '귀빈', vipLine: '이 병원의 <b>귀빈</b>',
+            kickSay: '「귀빈께서는 저희 병원과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다.」', kickWho: '간호사와 원무과 직원들이',
+            fail: '남은 사람이 모두 실험체로 끌려갔습니다', fate: '실험체로 끌려갔다' }
+};
+const KIND_LIST = ['wave', 'ward'];
+const KIND = 'wave';                               // 처음 보여 주는 칸 (열린 재난이 있으면 그쪽)
+function K(k) { return KINDS_C[k] || KINDS_C[KIND]; }
+function kName(k) { const x = K(k); return x.icon + ' ' + x.name; }
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 // 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다
@@ -71,6 +89,8 @@ const GRACE = 4000;          // 방장이 먼저 넘긴다 — 다른 사람은 
 const Z = 99999980;          // 알림창(99999999) · 팔레트(99999990)보다 아래
 const ADMIN = 'kario0987';
 const ST = { ok: '멀쩡', hurt: '다침', lost: '죽음', out: '홀로 나감' };
+// 상태 이름 — 실종을 재난마다 다르게 부른다 (방송국은 죽음 · 병원은 끌려감)
+function stN(k, st) { return st === 'lost' ? K(k).lost : (ST[st || 'ok'] || st); }
 const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81', out: '#c9b6ff' };
 function gone(st) { return st === 'lost' || st === 'out'; }
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
@@ -231,7 +251,17 @@ let cfg = {};
         d.ref('disasterCfg').on('value', function (s) { cfg = s.val() || {}; if (ov) { lastInfo = ''; paint(); } paintAdmin(); });
     }, 500);
 })();
-function isOpen() { return !!(cfg[KIND] && cfg[KIND].open); }
+// 재난 하나가 열렸나 — k 가 없으면 하나라도 열렸나
+function isOpen(k) {
+    if (k) return !!(cfg[k] && cfg[k].open);
+    return KIND_LIST.some(function (x) { return !!(cfg[x] && cfg[x].open); });
+}
+// 대기실 목록에서 고른 재난 — 처음에는 열린 재난 (둘 다 열렸거나 닫혔으면 앞의 것)
+let pickK = null;
+function curK() {
+    if (pickK && KINDS_C[pickK]) return pickK;
+    return KIND_LIST.filter(function (x) { return isOpen(x); })[0] || KIND;
+}
 function isAdm(u) { return !!(u && u.code === ADMIN); }
 // 들어갈 수 있나 — 상담사 · 이미 들어가 있는 판 · (열림 + 티켓)
 function gate(u, list) {
@@ -247,12 +277,12 @@ function gate(u, list) {
 function canSpectate(u, list) {
     if (!u) return false;
     if (isAdm(u) || wTickets(u) > 0) return true;
-    return Object.keys(list || {}).some(function (id) { return paidWatch(u, id) && list[id] && list[id].kind === KIND; });
+    return Object.keys(list || {}).some(function (id) { return paidWatch(u, id) && list[id] && !!KINDS_C[list[id].kind]; });
 }
 function activeOf(all, code) {
     const ids = Object.keys(all || {}).filter(function (id) {
         const r = all[id];
-        if (!r || r.kind !== KIND || !r.members || !r.members[code]) return false;
+        if (!r || !KINDS_C[r.kind] || !r.members || !r.members[code]) return false;
         if (r.state === 'LOBBY' || r.state === 'PLAY') return true;
         return r.state === 'END' && !(r.members[code] || {}).seen;
     });
@@ -276,7 +306,7 @@ function open() {
     lastInfo = ''; lastR = -1; msg = '';                       // 새 창 — 지난번 그린 것을 잊는다
     ov = document.createElement('div');
     ov.id = 'dz-ov';
-    ov.innerHTML = '<div id="dz-head"><span class="t">📡 ' + NAME + '</span><span class="n" id="dz-n"></span>'
+    ov.innerHTML = '<div id="dz-head"><span class="t" id="dz-t">📼 기록 소실</span><span class="n" id="dz-n"></span>'
         + '<span id="dz-timer"></span><button id="dz-x" title="닫기">✕</button></div>'
         + '<div id="dz-mem"></div>'
         + '<div id="dz-main"><div id="dz-info"></div><div id="dz-chat"></div><div id="dz-foot"></div></div>'
@@ -392,7 +422,7 @@ function headHtml(r, n) {
     let h = '';
     if (n >= 2 && (L || p)) {
         h += '<div class="dz-sec">지난 장면 — ' + esc((L || p).title) + '</div>'
-            + '<div class="dz-res"><div class="b">' + br((L || p).result) + '</div>' + checkChips(L ? L.checks : (p && p.checks)) + '</div>';
+            + '<div class="dz-res"><div class="b">' + br((L || p).result) + '</div>' + checkChips(L ? L.checks : (p && p.checks), r.kind) + '</div>';
     }
     const sc = (r.state === 'PLAY' && n === cur && r.scene) ? r.scene : H[n];
     if (sc) h += '<div class="dz-sec">장면 ' + n + '</div>'
@@ -434,6 +464,8 @@ function paint() {
     const info = document.getElementById('dz-info'), mem = document.getElementById('dz-mem');
     const nEl = document.getElementById('dz-n'), bar = document.getElementById('dz-bar');
     const inp = document.getElementById('dz-in'), done = document.getElementById('dz-done');
+    const tEl = document.getElementById('dz-t');
+    if (tEl) { const tt = r ? kName(r.kind) : '📼 기록 소실'; if (tEl.textContent !== tt) tEl.textContent = tt; }
     let html = '', foot = '';
     if (!r) {
         lastR = -1;
@@ -471,7 +503,7 @@ function paint() {
             const lost = mySt === 'lost', out = mySt === 'out';
             const talk = r.phase === 'TALK';
             inp.disabled = !talk || out;
-            inp.placeholder = out ? '방송국을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…' : (lost ? '전파 속에서 목소리만 남았다…' : '캐릭터로 말하고 행동하기'));
+            inp.placeholder = out ? K(r.kind).place + '을 빠져나왔습니다 — 지켜봅니다' : (!talk ? '진행자가 정리하는 중…' : (lost ? K(r.kind).lostIn : '캐릭터로 말하고 행동하기'));
             ov.querySelector('#dz-send').disabled = !talk || out;
             done.style.display = (lost || out || isAdm(u)) ? 'none' : '';
             const on = Number((r.members[u.code] || {}).done) === n;
@@ -499,15 +531,24 @@ function lobbyList(u) {
     const t = now();
     const g = gate(u, all);
     if (!g.ok) return '<div class="dz-err" style="margin-top:20px;">🔒 ' + esc(g.why) + '</div>';
-    const shut = !isOpen();
+    const pk = curK();
+    const shut = !isOpen(pk);
     const free = isAdm(u);                                   // 상담사는 티켓 없이 · 닫혀 있어도
     const ids = Object.keys(all).filter(function (id) {
         const r = all[id];
-        return r && r.kind === KIND && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL
+        return r && r.kind === pk && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL
             && (!shut || free || r.leader === ADMIN);
     }).sort(function (a, b) { return (all[a].createdAt || 0) - (all[b].createdAt || 0); });
     const n = tickets(u), wn = wTickets(u);
-    let h = intro() + '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
+    // 재난 고르기 — 열린 재난에 「열림」 · 대기실 방 수
+    let h = '<div class="dz-chk" style="margin:0 0 10px;">' + KIND_LIST.map(function (k) {
+        const on = k === pk, open = isOpen(k);
+        const rooms = Object.keys(all).filter(function (id) { const r = all[id]; return r && r.kind === k && r.state === 'LOBBY' && t - (r.createdAt || 0) < LOBBY_TTL; }).length;
+        return '<span data-kind="' + k + '" class="' + (on ? 'ok' : '') + '" style="cursor:pointer;font-size:12px;padding:6px 10px;">'
+            + kName(k) + ' <i style="font-style:normal;color:' + (open ? '#9fd8a4' : '#6f8c8c') + ';">' + (open ? '열림' : '닫힘')
+            + (rooms ? ' · 방 ' + rooms : '') + '</i></span>';
+    }).join('') + '</div>';
+    h += intro(pk) + '<div class="dz-card-m" style="margin:0 0 10px;">' + DZ_TICKET + ' <b style="color:#e8c27a;">' + n + '</b>장'
         + (free ? ' · 상담사는 티켓 없이 들어갑니다' : '')
         + (!free && wn ? '<br>' + DZ_WATCH + ' <b style="color:#9fd8ef;">' + wn + '</b>장' : '') + '</div>';
     if (shut) h += '<div class="dz-err">🔒 닫혀 있습니다 — 상담사만 들어가 시험할 수 있습니다. (상담사가 연 방에는 다른 사원도 들어옵니다)</div>';
@@ -520,11 +561,11 @@ function lobbyList(u) {
             + '<i>' + cs.map(function (c) { return esc(m[c].n || c); }).join(' · ') + '</i></div>'
             + '<button data-join="' + esc(id) + '"' + ((full || (!n && !free) || busy) ? ' disabled' : '') + '>' + (full ? '가득 참' : '들어간다') + '</button></div>';
     });
-    h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + (((!n && !free) || busy) ? ' disabled' : '') + '>새로 연다</button></div>';
+    h += '<div style="margin-top:14px;"><button class="dz-btn" data-make="1"' + (((!n && !free) || busy || (shut && !free)) ? ' disabled' : '') + '>새로 연다</button></div>';
     if (free || canSpectate(u, all)) {
         const live = Object.keys(all).filter(function (id) {
             const r = all[id];
-            return r && r.kind === KIND && !(r.members || {})[u.code]
+            return r && !!KINDS_C[r.kind] && !(r.members || {})[u.code]
                 && (r.state === 'PLAY' || (r.state === 'END' && t - (Number((r.outcome || {}).at) || 0) < 3600000));
         }).sort(function (a, b) { return (all[b].startedAt || 0) - (all[a].startedAt || 0); });
         h += '<div class="dz-sec">진행 중인 판 — 👁 관전' + (free ? ' (상담사)' : '') + '</div>';
@@ -535,8 +576,8 @@ function lobbyList(u) {
             const where = r.state === 'PLAY' ? '장면 ' + (Number(r.round) || 0) : '끝 — ' + ((END_N[(r.outcome || {}).kind] || END_N.escape)[0]);
             const paid = free || paidWatch(u, id);
             let btn = '<button data-watch="' + esc(id) + '"' + (!paid && !wn ? ' disabled' : '') + '>' + (paid ? '본다' : (wn ? '본다 · 1장' : '티켓 없음')) + '</button>';
-            h += '<div class="dz-row"><div class="w">' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
-                + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + ST[m[c].st || 'ok']; }).join(' · ') + '</i></div>'
+            h += '<div class="dz-row"><div class="w">' + esc(kName(r.kind)) + ' · ' + esc((m[r.leader] || {}).n || '?') + '의 방 <i>' + where + '</i><br>'
+                + '<i>' + cs.map(function (c) { return esc(m[c].n || c) + ' ' + stN(r.kind, m[c].st || 'ok'); }).join(' · ') + '</i></div>'
                 + btn + '</div>';
             if (askWatch === id && !paid) {
                 h += '<div class="dz-row" style="border-color:#2a7a9a;"><div class="w" style="color:#9fd8ef;">👁 ' + DZ_WATCH + ' 한 장을 쓰고 이 판을 봅니다.<br>'
@@ -550,14 +591,15 @@ function lobbyList(u) {
 }
 
 // 재난 안내 — 등급 · 이름 · 생존 확률 · 개요 · 장비
-function intro() {
+function intro(k) {
+    const x = K(k);
     return '<div class="dz-card" style="margin-bottom:12px;">'
-        + '<div class="dz-card-m" style="margin:0 0 4px; color:#ff9aa8; letter-spacing:2px;">' + GRADE + '급 재난</div>'
-        + '<div class="dz-card-h">' + NAME + '</div>'
-        + '<div class="dz-card-t" style="margin-bottom:8px;">' + esc(BRIEF) + '</div>'
-        + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + SURVIVE + '%</b>'
-        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + GEAR_MAX + '개</b> (효과는 적용되지 않습니다)</div>'
-        + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + REWARD + '</div></div>';
+        + '<div class="dz-card-m" style="margin:0 0 4px; color:#ff9aa8; letter-spacing:2px;">' + x.grade + '급 재난</div>'
+        + '<div class="dz-card-h">' + x.icon + ' ' + x.name + '</div>'
+        + '<div class="dz-card-t" style="margin-bottom:8px;">' + esc(x.brief) + '</div>'
+        + '<div class="dz-card-m" style="margin:0;">생존 확률 <b style="color:#ff6b81;">' + x.survive + '%</b>'
+        + ' · 들고 들어갈 수 있는 장비 <b style="color:#e8c27a;">' + x.gear + '개</b> (효과는 적용되지 않습니다)</div>'
+        + '<div class="dz-card-m" style="margin:8px 0 0;line-height:1.8;">' + x.reward + '</div></div>';
 }
 
 // 들고 갈 수 있는 장비 — 장착 중 · 소지품의 장비 · 전용 장비 (성적인 것 빼고)
@@ -584,6 +626,7 @@ function gearPool(u) {
 function gearPick(r, u) {
     const mine = ((r.members || {})[u.code] || {}).gear || [];
     const pool = gearPool(u);
+    const GEAR_MAX = K(r.kind).gear;
     let h = '<div class="dz-sec">들고 갈 장비 — ' + mine.length + ' / ' + GEAR_MAX + ' (효과는 적용되지 않고, 이야기 속 물건으로만 쓰입니다)</div>';
     if (!pool.length) return h + '<div class="dz-card-m">들고 갈 수 있는 장비가 없습니다.</div>';
     h += '<div class="dz-chk" style="margin:0 0 10px;">' + pool.map(function (g) {
@@ -652,7 +695,7 @@ function toggleGear(nm) {
     const cur = (r.members[u.code].gear || []).slice();
     const i = cur.indexOf(nm);
     if (i >= 0) cur.splice(i, 1);
-    else { if (cur.length >= GEAR_MAX) return; cur.push(nm); }
+    else { if (cur.length >= K(r.kind).gear) return; cur.push(nm); }
     d.ref(ROOT + '/' + curId + '/members/' + u.code + '/gear').set(cur.length ? cur : null);
 }
 
@@ -683,7 +726,7 @@ function memberChips(r, u) {
     return Object.keys(m).sort(function (a, b) { return (m[a].at || 0) - (m[b].at || 0); }).map(function (c) {
         const x = m[c], st = x.st || 'ok';
         const tag = r.state === 'LOBBY' ? (c === r.leader ? ' · 방장' : '')
-            : ((x.role && ROLE_N[x.role] ? ' · ' + ROLE_N[x.role] : '') + ' · ' + (st === 'out' && x.kick ? '모셔짐' : ST[st])
+            : ((x.role && ROLE_N[x.role] ? ' · ' + (x.role === 'vip' ? K(r.kind).vip : ROLE_N[x.role]) : '') + ' · ' + (st === 'out' && x.kick ? '모셔짐' : stN(r.kind, st))
                + (r.state === 'PLAY' && !gone(st) && (Number(x.done) === n || Number(x.leave) === n) ? ' ✓' : ''));
         return '<span style="color:' + (r.state === 'LOBBY' ? '#cfe' : ST_C[st]) + ';' + (c === u.code ? 'border-color:#5a7a3a;' : '') + '"'
             + (pm[c] ? ' title="' + esc(((m[pm[c]] || {}).n || '') + ' 사원과 커플') + '"' : '') + '>'
@@ -694,7 +737,7 @@ function memberChips(r, u) {
 function room(r, u) {
     const lead = r.leader === u.code;
     const cs = Object.keys(r.members || {});
-    let h = intro() + '<div class="dz-card-t" style="margin-top:4px;">대기실입니다. 방장이 [시작한다]를 누르면 재난이 열립니다.<br>'
+    let h = intro(r.kind) + '<div class="dz-card-t" style="margin-top:4px;">대기실입니다. 방장이 [시작한다]를 누르면 재난이 열립니다.<br>'
         + '시작하는 순간 사원마다 ' + DZ_TICKET + '이 한 장씩 사라집니다. (' + cs.length + ' / ' + MAX_MEMBERS + '명)</div>';
     if (r.phase === 'WAIT') h += '<div id="dz-wait">진행자가 재난을 여는 중…</div>';
     if (r.err) h += '<div class="dz-err">⚠ ' + esc(r.err) + '</div>';
@@ -713,7 +756,7 @@ function room(r, u) {
     return h;
 }
 
-function checkChips(list) {
+function checkChips(list, kind) {
     return '<div class="dz-chk">' + (list || []).map(function (c) {
         if (c.kind === 'none') return '<span' + (c.kick ? ' class="no"' : '') + '>' + esc(c.name) + ' · ' + esc(c.did) + (c.kick ? ' → 모셔짐' : '') + '</span>';
         // 🐾 아기 여우의 판정 — 옅은 주황 (다침은 이 판 안에서만 · 대신 소멸은 그날 어둠에서도 못 부름)
@@ -721,7 +764,7 @@ function checkChips(list) {
             let f = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
                 + (c.crit ? ' ★' : '') + (c.fumble ? ' ✖' : '') + (c.plus ? ' (+' + c.plus + ')' : '');
             if (c.to) f += ' → ' + (c.to === 'lost' ? '소멸' : '다침');
-            if (c.tgtTo) f += ' · ' + esc(c.tgtName) + ' ' + (c.tgtFox ? '다침→멀쩡' : ST[c.tgtFrom] + '→' + ST[c.tgtTo]);
+            if (c.tgtTo) f += ' · ' + esc(c.tgtName) + ' ' + (c.tgtFox ? '다침→멀쩡' : stN(kind, c.tgtFrom) + '→' + stN(kind, c.tgtTo));
             return '<span class="fx ' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + f + '</span>';
         }
         let s = esc(c.name) + ' · ' + KIND_N[c.kind] + ' ' + c.roll + (c.wolf ? '+' + c.wolf : '') + '/' + c.dc + ' ' + (c.ok ? '성공' : '실패')
@@ -730,11 +773,11 @@ function checkChips(list) {
         if (c.forced) s = '⚡ ' + s;
         if (c.quiet) s = '💤 ' + s;         // 말이 없어 대신 굴린 다이스
         if (c.burn) s = '🔥 ' + s;          // 📺 심야 토크쇼의 주인의 소각
-        if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 방송국이 그 말을 들었다
+        if (c.meta) s = '🔊 ' + s;          // 바깥의 말 — 그곳이 그 말을 들었다
         if (c.plus) s += ' (+' + c.plus + ')';
         if (c.ease) s += ' (−' + c.ease + ')';          // 이사팀 — 조금 쉽게
-        if (c.to) s += ' → ' + ST[c.to];
-        if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + ST[c.tgtFrom] + '→' + ST[c.tgtTo];
+        if (c.to) s += ' → ' + stN(kind, c.to);
+        if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + stN(kind, c.tgtFrom) + '→' + stN(kind, c.tgtTo);
         if (c.kick) s += ' → 모셔짐';
         if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 여우가 죽음을 대신 받았다
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
@@ -751,12 +794,12 @@ function play(r, u) {
     if (st === 'out') {
         const bath = /재난관리/.test((x.aff || '') + ' ' + (x.team || ''));
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;"><div class="dz-card-t" style="margin:0;color:#c9b6ff;">'
-            + (x.kick ? '「귀빈께서는 저희 방송과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다.」<br>방송국 사람들이 ' + (bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로') + ' 모셨습니다.<br>남은 사람들의 이야기를 지켜봅니다.'
-                      : '방송국을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.') + '</div></div>';
+            + (x.kick ? K(r.kind).kickSay + '<br>' + K(r.kind).kickWho + ' ' + (bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로') + ' 모셨습니다.<br>남은 사람들의 이야기를 지켜봅니다.'
+                      : K(r.kind).place + '을 홀로 빠져나왔습니다. 남은 사람들의 이야기를 지켜봅니다.') + '</div></div>';
     } else if (x.role === 'vip' && st !== 'lost') {
         const going = Number(x.leave) === n;
         h += '<div class="dz-card" style="border-color:#5a4a7a;margin-bottom:12px;">'
-            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 이 방송국의 <b>사회자</b>입니다. 원하면 홀로 나갈 수 있습니다.<br>'
+            + '<div class="dz-card-t" style="margin-bottom:8px;color:#c9b6ff;">당신은 ' + K(r.kind).vipLine + '입니다. 원하면 홀로 나갈 수 있습니다.<br>'
             + '<span style="font-size:11px;color:#9a8fb8;">나가면 남은 재난관리국 · 백일몽 쪽의 난이도가 기하급수로 오릅니다.</span></div>'
             + '<button class="dz-btn sub" data-out="1"' + (r.phase !== 'TALK' ? ' disabled' : '') + ' style="border-color:#5a4a7a;color:#c9b6ff;">'
             + (going ? '이 장면이 끝나면 나갑니다 — 그만둔다' : '홀로 나간다') + '</button></div>';
@@ -776,19 +819,20 @@ function play(r, u) {
 }
 
 function ending(r, u) {
-    const o = r.outcome || {}, E = END_N[o.kind] || END_N.escape;
+    const o = r.outcome || {}, E0 = END_N[o.kind] || END_N.escape;
+    const E = (o.kind === 'fail') ? [E0[0], E0[1], K(r.kind).fail] : E0;
     const m = r.members || {};
     let h = '';
     if (r.last) {
         h += '<div class="dz-sec">마지막 장면 — ' + esc(r.last.title) + '</div>'
-            + '<div class="dz-res"><div class="b">' + br(r.last.result) + '</div>' + checkChips(r.last.checks) + '</div>';
+            + '<div class="dz-res"><div class="b">' + br(r.last.result) + '</div>' + checkChips(r.last.checks, r.kind) + '</div>';
     }
     h += '<div class="dz-end" style="border-color:' + E[1] + ';"><div class="k" style="color:' + E[1] + ';">' + E[0] + '</div>'
         + '<div class="dz-card-t" style="margin:0;">' + br(o.text || E[2]) + '</div></div>';
     h += '<div class="dz-sec">사원</div><div class="dz-card-m">' + Object.keys(m).map(function (c) {
         const st = m[c].st || 'ok';
         return '<span style="color:' + ST_C[st] + ';">' + esc(m[c].n || c) + ' — '
-            + (st === 'lost' ? '죽음' + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? (m[c].kick ? '다른 곳으로 모셔짐' : '홀로 빠져나감') : (st === 'hurt' ? '다친 채 생환' : '생환')))
+            + (st === 'lost' ? K(r.kind).lostEnd + (m[c].fate ? ' — ' + esc(m[c].fate) : '') : (st === 'out' ? (m[c].kick ? '다른 곳으로 모셔짐' : '홀로 빠져나감') : (st === 'hurt' ? '다친 채 생환' : '생환')))
             + payTag((o.pay || {})[c], m[c]) + '</span>';
     }).join('<br>') + '</div>';
     const hist = r.history || {};
@@ -814,6 +858,9 @@ function wire() {
     if (!ov) return;
     Array.prototype.forEach.call(ov.querySelectorAll('[data-join]'), function (b) { b.onclick = function () { join(b.dataset.join); }; });
     const mk = ov.querySelector('[data-make]'); if (mk) mk.onclick = make;
+    Array.prototype.forEach.call(ov.querySelectorAll('[data-kind]'), function (b) {
+        b.onclick = function () { pickK = b.dataset.kind; msg = ''; lastInfo = ''; paint(); };
+    });
     const st = ov.querySelector('[data-start]'); if (st) st.onclick = startRun;
     const lv = ov.querySelector('[data-leave]'); if (lv) lv.onclick = leave;
     const cl = ov.querySelector('[data-close]'); if (cl) cl.onclick = close;
@@ -868,12 +915,13 @@ function make() {
     const u = me(), d = db_();
     if (!u || !d || busy) return;
     if (!isAdm(u) && !tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
-    if (!isAdm(u) && !isOpen()) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
+    const pk = curK();
+    if (!isAdm(u) && !isOpen(pk)) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
     if (activeOf(all, u.code)) return;
     busy = true;
     const ref = d.ref(ROOT).push();
     const m = {}; m[u.code] = prof(u);
-    ref.set({ kind: KIND, state: 'LOBBY', leader: u.code, createdAt: now(), members: m })
+    ref.set({ kind: pk, state: 'LOBBY', leader: u.code, createdAt: now(), members: m })
         .then(function () { busy = false; msg = ''; lastInfo = ''; paint(); })
         .catch(function () { busy = false; msg = '방을 열지 못했습니다.'; lastInfo = ''; paint(); });
 }
@@ -881,7 +929,7 @@ function join(id) {
     const u = me(), d = db_();
     if (!u || !d || busy || !id) return;
     if (!isAdm(u) && !tickets(u)) { msg = DZ_TICKET + '이 없습니다.'; lastInfo = ''; paint(); return; }
-    if (!isAdm(u) && !isOpen() && (all[id] || {}).leader !== ADMIN) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
+    if (!isAdm(u) && !isOpen((all[id] || {}).kind) && (all[id] || {}).leader !== ADMIN) { msg = '닫혀 있는 재난입니다.'; lastInfo = ''; paint(); return; }
     busy = true;
     const p = prof(u);
     d.ref(ROOT + '/' + id).transaction(function (r) {
@@ -976,7 +1024,7 @@ function toggleOut() {
     if (!going) {
         const go = function () { d.ref(ROOT + '/' + curId + '/members/' + u.code + '/leave').set(n); };
         // 게임의 확인창들은 이 창(z-index 99999980) 아래에 뜬다 — 브라우저 확인창을 쓴다
-        if (window.confirm('홀로 나가시겠습니까?\n\n이 장면이 끝나면 방송국을 빠져나갑니다.\n남은 사람들의 난이도가 크게 오릅니다.')) go();
+        if (window.confirm('홀로 나가시겠습니까?\n\n이 장면이 끝나면 ' + K(r.kind).place + '을 빠져나갑니다.\n남은 사람들의 난이도가 크게 오릅니다.')) go();
         return;
     }
     d.ref(ROOT + '/' + curId + '/members/' + u.code + '/leave').set(null);
@@ -1028,20 +1076,22 @@ const BOX = 'admin-disaster-box';
 function paintAdmin() {
     const box = document.getElementById(BOX);
     if (!box) return;
-    const o = isOpen(), c = cfg[KIND] || {};
-    const at = c.at ? new Date(c.at) : null;
-    const h = '<div style="display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid #24393a; border-radius:7px; background:rgba(255,255,255,.03);">'
-        + '<span style="font-size:12px; color:#bff0f0;">📡 ' + NAME + '</span>'
-        + '<span style="font-size:11px; color:' + (o ? '#9fd8a4' : '#ff9aa8') + ';">' + (o ? '열림' : '닫힘') + '</span>'
-        + (at ? '<span style="font-size:9px; color:#667;">' + (at.getMonth() + 1) + '/' + at.getDate() + ' ' + String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0') + '</span>' : '')
-        + '<button class="game-btn" style="margin:0 0 0 auto; padding:6px 12px; font-size:11px;" onclick="disasterToggle(\'' + KIND + '\')">' + (o ? '닫는다' : '연다') + '</button></div>'
+    const h = KIND_LIST.map(function (k) {
+        const o = isOpen(k), c = cfg[k] || {};
+        const at = c.at ? new Date(c.at) : null;
+        return '<div style="display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid #24393a; border-radius:7px; background:rgba(255,255,255,.03); margin-bottom:6px;">'
+            + '<span style="font-size:12px; color:#bff0f0;">' + kName(k) + '</span>'
+            + '<span style="font-size:11px; color:' + (o ? '#9fd8a4' : '#ff9aa8') + ';">' + (o ? '열림' : '닫힘') + '</span>'
+            + (at ? '<span style="font-size:9px; color:#667;">' + (at.getMonth() + 1) + '/' + at.getDate() + ' ' + String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0') + '</span>' : '')
+            + '<button class="game-btn" style="margin:0 0 0 auto; padding:6px 12px; font-size:11px;" onclick="disasterToggle(\'' + k + '\')">' + (o ? '닫는다' : '연다') + '</button></div>';
+    }).join('')
         + '<div style="font-size:10px; color:#888; margin-top:8px; line-height:1.6;">닫혀 있으면 상담사 말고는 못 들어갑니다. 진행 중인 판은 끝까지 갑니다.</div>';
     const body = box.querySelector('.dz-adm');
     if (body && body._h !== h) { body.innerHTML = h; body._h = h; }
 }
 window.disasterToggle = function (kind) {
     const u = me(), d = db_();
-    if (!isAdm(u) || !d) return;
+    if (!isAdm(u) || !d || !KINDS_C[kind]) return;
     const o = !!(cfg[kind] && cfg[kind].open);
     d.ref('disasterCfg/' + kind).set({ open: !o, at: Date.now(), by: u.code });
 };
@@ -1106,7 +1156,7 @@ function takePay(run, v) {
 }
 function applyPay(v) {
     const u = me(); if (!u) return;
-    const nm = v.name || NAME;
+    const nm = v.name || '기록 소실';
     if (v.die || v.kick) {
         const bath = (typeof isDisasterAgent === 'function') ? isDisasterAgent(u)
             : /재난관리/.test((u.affiliation || '') + ' ' + (u.team || ''));
@@ -1117,10 +1167,10 @@ function applyPay(v) {
         u.quarantineHospital = true;
         u.quarantineDest = bath ? 'bath' : 'fox';
         const where = bath ? '♨ 선녀탕으로' : '🦊 여우 상담실로';
-        try { addHistoryLog(u, (v.kick ? '[재난 — 모셔짐] ' : '[재난 사망] ') + nm + ' — ' + (v.how || '방송국에 먹혔다') + '. ' + where + (v.kick ? ' 모셔졌습니다.' : ' 이송되었습니다.')); } catch (e) { }
+        try { addHistoryLog(u, (v.kick ? '[재난 — 모셔짐] ' : '[재난 사망] ') + nm + ' — ' + (v.how || '돌아오지 못했다') + '. ' + where + (v.kick ? ' 모셔졌습니다.' : ' 이송되었습니다.')); } catch (e) { }
         try { saveFields({ pollution: 1, quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, quarantineHospital: 1, quarantineDest: 1, history: 1 }); } catch (e) { }
         try { updateUI(); } catch (e) { }
-        alert_(nm + '\n\n' + (v.how || '방송국에 먹혔다') + '\n\n' + where + (v.kick ? ' 모셔집니다. (4시간)' : ' 이송됩니다. (4시간)'));
+        alert_(nm + '\n\n' + (v.how || '돌아오지 못했다') + '\n\n' + where + (v.kick ? ' 모셔집니다. (4시간)' : ' 이송됩니다. (4시간)'));
         return;
     }
     const pts = Math.max(0, Number(v.pts) || 0);
@@ -1144,6 +1194,6 @@ window.disasterState = function () {
     console.log('  내 티켓:', tickets(me()));
 };
 
-console.log('[재난] 재난관리국 B2 기록 소실 · 📡 ' + NAME + ' — disasterOpen() · disasterState() · 상담사 disasterToggle(\'wave\')');
+console.log('[재난] 재난관리국 B2 기록 소실 · ' + KIND_LIST.map(kName).join(' · ') + ' — disasterOpen() · disasterState() · 상담사 disasterToggle(\'wave\' · \'ward\')');
 
 })();

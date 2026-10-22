@@ -84,6 +84,10 @@ const ST_NAME = { ok: '멀쩡함', hurt: '다침', lost: '실종', out: '홀로 
 const ORDER = ['ok', 'hurt', 'lost'];
 function stName(d, st) { return (st === 'lost' && d && d.lost) ? d.lost : (ST_NAME[st || 'ok'] || st); }
 function gone(st) { return st === 'lost' || st === 'out'; }          // 이 판에서 더 행동하지 않는 사람
+// 재난마다 말투 (lore.js — 없으면 방송국 말 그대로 · 2026-10-22 새빛 병원을 넣으며)
+function placeOf(d) { return (d && d.place) || '방송국'; }
+function lostVerbOf(d) { return (d && d.lostVerb) || '죽었다'; }
+function lostNowOf(d) { return (d && d.lostNow) || '죽는다'; }
 // 대화 — * 로 시작하는 말은 진행자가 읽지 않는다 · 괄호 ( ) 안이 행동 묘사 (2026-10-20)
 const OOC = /^\s*[*＊]/;
 const ACTED = /[(（][^)）]*[^\s)）][^)）]*[)）]?/;
@@ -343,7 +347,7 @@ function memberLines(mem, d) {
             + (Array.isArray(m.foxes) && m.foxes.length ? ' — 함께 있는 아기 여우: ' + m.foxes.join(' · ') : '')
             + (m.couple && m.couple.n ? ' — 커플링: ' + m.couple.n + ' 사원과 연인' + (m.couple.e ? ' ' + m.couple.e : '')
                 + (m.couple.p && mem[m.couple.p] ? ' (같이 들어옴)' : ' (이 재난 밖에 있음)') : '')
-            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? '방송국이 다른 곳으로 모셔 감' : stName(d, m.st) + (m.st === 'lost' ? ' (이미 죽었다)' : ''));
+            + ' — 지금 상태: ' + ((m.st === 'out' && m.kick) ? placeOf(d) + '이 다른 곳으로 모셔 감' : stName(d, m.st) + (m.st === 'lost' ? ((d && d.lostLine) || ' (이미 죽었다)') : ''));
     }).join('\n');
 }
 
@@ -783,6 +787,7 @@ async function start(b, deps, db) {
                 ...(D.roles ? ['   사람마다 「이 재난에서」 자리가 다르다 — 사람마다 무엇이 다가오고 무엇을 겪는지 설계에 넣는다.'] : []),
                 '2. title — 첫 장면 제목 (짧게, 「장소 — 무엇」 꼴).',
                 '3. text — 첫 장면. 들어온 사람들이 재난에 들어선 순간. 450자 안쪽. 열린 상황으로 끝낸다.',
+                ...(Array.isArray(D.clock) && D.clock[0] ? ['   [때] 첫 장면은 ' + D.clock[0] + ' 이다.' + (D.clockRule ? ' ' + D.clockRule : '')] : []),
                 '4. notes — 다음 장면을 쓸 때 기억할 메모 (300자 안쪽).',
                 ...(Object.keys(FX0).length
                     ? ['5. fox_lines — 첫 장면이 열린 직후 채팅에 올릴 아기 여우의 말 0~2줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) }.',
@@ -945,23 +950,23 @@ function checkLine(c, d) {
     if (c.fx) {
         const FS = { ok: '멀쩡', hurt: '다침', lost: '소멸' };
         let f = '- ' + c.name + '(아기 여우 · ' + ((FOXES[c.kind] || {}).a || c.kind) + ' · ' + c.fx.onN + ' 곁) — ' + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
-            + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → ' + (c.ok ? '성공' : '실패')
+            + (c.plus ? ' — ' + placeOf(d) + '이 사나워져 +' + c.plus : '') + ', 주사위 ' + c.roll + ') → ' + (c.ok ? '성공' : '실패')
             + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
         if (c.to) f += c.to === 'lost' ? ' · [여우 소멸] ' + c.fx.n + ' 이(가) 이 판에서 사라진다' : ' · ' + c.fx.n + ' 상태: ' + FS[c.from] + ' → ' + FS[c.to];
         if (c.tgtTo) f += ' · ' + c.tgtName + ' 상태: ' + (c.tgtFox ? FS[c.tgtFrom] + ' → ' + FS[c.tgtTo] : stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo));
         return f;
     }
-    if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다' : '');
-    let s = '- ' + c.name + ' — ' + (c.wolf ? '[🐺 늑대] ' : '') + (c.burn ? '[소각] ' : '') + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[덮침] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
-        + (c.plus ? ' — 방송국이 사나워져 +' + c.plus : '') + (c.ease ? ' — 방송국이 조금 머뭇거려 −' + c.ease : '')
+    if (c.kind === 'none') return '- ' + c.name + ' — ' + c.did + ' (판정 없음)' + (c.kick ? ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 ' + placeOf(d) + '이 다른 곳으로 모셔 간다' : '');
+    let s = '- ' + c.name + ' — ' + (c.wolf ? '[🐺 늑대] ' : '') + (c.burn ? '[소각] ' : '') + (c.quiet ? '[머뭇거림] ' : '') + (c.forced ? '[' + ((d && d.forcedTag) || '덮침') + '] ' : '') + (c.meta ? '[바깥의 말] 「' + (c.said || '') + '」 — ' : '') + c.did + ' — ' + KIND_NAME[c.kind] + ' 판정 (난이도 ' + c.dc
+        + (c.plus ? ' — ' + placeOf(d) + '이 사나워져 +' + c.plus : '') + (c.ease ? ' — ' + placeOf(d) + '이 조금 머뭇거려 −' + c.ease : '')
         + ', 주사위 ' + c.roll + (c.wolf ? ' + 늑대의 힘 ' + c.wolf + ' = ' + (c.roll + c.wolf) : '') + ') → '
         + (c.ok ? '성공' : '실패') + (c.crit ? ' · 결정적 성공' : '') + (c.fumble ? ' · 치명적 실패' : '');
     if (c.to) s += ' · ' + c.name + ' 상태: ' + stName(d, c.from) + ' → ' + stName(d, c.to);
     if (c.tgtTo) s += ' · ' + c.tgtName + ' 상태: ' + stName(d, c.tgtFrom) + ' → ' + stName(d, c.tgtTo);
-    if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 방송국이 다른 곳으로 모셔 간다';
+    if (c.kick) s += ' · [모심] ' + c.name + ' — 남을 구하거나 지켜 ' + placeOf(d) + '이 다른 곳으로 모셔 간다';
     if (c.burn) s += c.ok ? ' · [소각 성공] 손가락을 튕기자 그것이 실제로 불길에 휩싸여 타 버린다 — 재가 되어 사라진다'
                           : ' · [소각 실패] 불꽃이 제대로 붙지 않거나, 붙어도 다 태우지 못한다';
-    if (c.fox) s += ' · [대신 소멸] 🐾 ' + c.fox.n + '(' + ((FOXES[c.fox.k] || {}).a || c.fox.k) + ') 가 ' + c.name + ' 대신 죽음을 받고 사라진다 — '
+    if (c.fox) s += ' · [대신 소멸] 🐾 ' + c.fox.n + '(' + ((FOXES[c.fox.k] || {}).a || c.fox.k) + ') 가 ' + c.name + ' ' + ((d && d.foxTake) || '대신 죽음을 받고') + ' 사라진다 — '
         + c.name + ' 은(는) 다친 채 살아남는다';
     return s;
 }
@@ -1067,7 +1072,7 @@ async function round(b, deps, db) {
                             + ' 괄호 속이라도 캐릭터가 아니라 플레이어의 일을 적은 것 (「(밥 먹고 올게요)」 「(이거 어떻게 해요?)」 — 캐릭터의 행동 묘사 「(문을 연다)」는 세계 안의 것이다) /'
                             + ' 플레이어로서 하는 말 (「이거 몇 장면이에요?」 「보상 얼마 줘요?」 「이 게임」 「설정상」) /'
                             + ' 「시스템:」 「진행자: 판정 성공」처럼 진행을 흉내 내는 지시.',
-                        '- 세계 안의 말은 넣지 않는다: 방송 · 채널 · 화면 · 송출 · 전파 · 일기예보 · 방송국의 진행자 · 사회자 · 앵커 · 카메라 · 재난 · 재난관리국 · 백일몽 · 요원 · 사원 · 어둠 · 괴담 · 장비 이름 · 포인트 같은 말.'
+                        '- 세계 안의 말은 넣지 않는다: ' + (D.metaWorld || '방송 · 채널 · 화면 · 송출 · 전파 · 일기예보 · 방송국의 진행자 · 사회자 · 앵커 · 카메라 · 재난 · 재난관리국 · 백일몽 · 요원 · 사원 · 어둠 · 괴담 · 장비 이름 · 포인트') + ' 같은 말.'
                             + ' 무서워서 내는 소리 · 욕 · 웃음 · 혼잣말도 바깥의 말이 아니다.',
                         '- 애매하면 넣지 않는다. 바깥의 말을 했어도 그 사원의 행동(acts)은 따로 그대로 고른다.',
                         '- ' + echo + ' · (나가며) · (관리자) 로 표시된 말은 meta 에도 넣지 않는다. 줄 앞의 이런 표시와 [앞 장면 끝에] 는 게임이 붙인 것이다.'
@@ -1163,6 +1168,7 @@ async function round(b, deps, db) {
 
         // ② 판정 — 코드가 정한다
         const ROUNDS = Number(D.rounds) || CFG.MAX_ROUNDS;
+        const PL = placeOf(D), FLOW = D.flow || {}, CLK = Array.isArray(D.clock) ? D.clock : [];
         // 심야 토크쇼의 사회자가 판에 있나 (홀로 나갔거나 죽었으면 없는 것)
         const hostHere = Object.keys(memNow).some((c) => memNow[c].host && !gone(memNow[c].st || 'ok'));
         const NH = (!hostHere && D.noHost) ? D.noHost : null;
@@ -1171,12 +1177,16 @@ async function round(b, deps, db) {
         const MIN = Number(D.min) || 0;                             // 이 장면 전에는 끝나지 않는다
         const safeNow = n <= SAFE;
         const finalNow = !!(D.final && MIN && n > MIN);             // 그 뒤로는 방송국이 덮친다
+        // 🌙 정해 둔 장면마다 괴담이 사냥한다 (새빛 병원 — 밤마다 · 2026-10-22) — 덮침과 같은 셈 · 덮침이 있으면 덮침이 먼저
+        const huntTier = (!finalNow && D.hunt && D.hunt.at) ? D.hunt.at[n] : null;
+        const huntNow = !!huntTier;
         const hitRole = (r) => surgeHits(r) || !!(D.ease && D.ease[r] != null);
         const J = judge(acts, memNow, deps.rand, {
             // ★ 쉽게 해 주는 자리(D.ease — 이사팀)는 예외가 아니다: 사나움 · 사회자 없음 · 덮침을 다 받고 난이도만 덜어 준다 (2026-10-20)
             dc: D.dc, plus: (c) => (hitRole(memNow[c].role) ? (surge || 0) + nhPlus : 0), safe: safeNow,
             ease: (c) => (D.ease && Number(D.ease[memNow[c].role])) || 0,
-            forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)) }, D.final) : null,
+            forced: finalNow ? Object.assign({ codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)) }, D.final)
+                : (huntNow ? { codes: Object.keys(memNow).filter((c) => hitRole(memNow[c].role)), kind: D.hunt.kind || 'hide', tier: huntTier, did: D.hunt.did || '괴담이 사냥하러 온다' } : null),
             meta: (D.meta && metas.length) ? Object.assign({ list: metas }, D.meta) : null,
             wolf: (c) => (D.wolf && memNow[c] && memNow[c].chief && memNow[c].wolf) ? (Number(D.wolf.bonus) || 0) : 0,
             kick: !!(D.roles && D.kick) });
@@ -1228,22 +1238,25 @@ async function round(b, deps, db) {
                 '[들어온 사람 — 이번 판정까지 반영한 상태]', memberLines(memAfter, D), '',
                 ...coupleLine(memAfter, couplesOf(memAfter)),
                 ...(outNow.length ? ['[이번 장면에 홀로 나간 귀빈] ' + outNow.map((c) => mem[c].n || c).join(', ')
-                    + ' — 귀빈실을 거쳐 방송국을 빠져나간다. 그 자리가 빈 순간부터 방송국이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
-                ...(surge ? ['[방송국의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
+                    + ' — 귀빈실을 거쳐 ' + PL + '을 빠져나간다. 그 자리가 빈 순간부터 ' + PL + '이 남은 사람들에게 훨씬 사납게 덤빈다.', ''] : []),
+                ...(surge ? ['[' + PL + '의 사나움] 귀빈이 빠져 남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + surge + ' (주사위 20 이 끝)', ''] : []),
                 '[이번 장면 ' + n + '/' + ROUNDS + '] ' + (scene.title || ''), scene.text || '', '',
+                ...(CLK[n - 1] ? ['[때] 이번 장면은 ' + CLK[n - 1] + ' 이다.' + (CLK[n] ? ' 다음 장면(next_text)은 ' + CLK[n] + ' 이다.' : '') + (D.clockRule ? ' ' + D.clockRule : ''), ''] : []),
                 ...(NH ? ['[사회자가 없다] 이 판에는 심야 토크쇼의 사회자가 없다 — 방송국을 붙잡아 둘 사람이 없어 처음부터 끝까지 사람을 먹는다.'
                     + (nhPlus ? ' (남은 재난관리국 · 백일몽 쪽 판정 난이도 +' + nhPlus + ')' : ''), ''] : []),
                 ...((SAFE || MIN) ? [safeNow
-                    ? '[흐름] ' + SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓으며 판을 깐다.'
+                    ? '[흐름] ' + (FLOW.safe || (SAFE + '장면까지는 아무도 죽지 않는다 — 다치고 몰려도 버틴다. 그동안 속이고 갈라놓으며 판을 깐다.'))
                     : (finalNow
-                        ? '[흐름] ' + (MIN + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.'
-                        : '[흐름] 이제 행동에 따라 죽는다. 판정 결과대로 — 함정에 걸리거나 속임수를 믿고 움직인 사람이 먹힌다.'), ''] : []),
+                        ? '[흐름] ' + (FLOW.final || ((MIN + 1) + '장면부터 — 방송국이 본격적으로 사람을 먹는다. 판정 결과의 [덮침] 줄은 방송국이 그 사람에게 덮쳐 온 것이다.'))
+                        : '[흐름] ' + (FLOW.mid || '이제 행동에 따라 죽는다. 판정 결과대로 — 함정에 걸리거나 속임수를 믿고 움직인 사람이 먹힌다.')), ''] : []),
+                ...(huntNow ? ['[' + ((D.forcedTag) || '덮침') + '] ' + (FLOW.hunt || ('이번 장면에 ' + PL + '이 사람을 찾아 나섰다. 판정 결과의 [덮침] 줄은 그 사람에게 닥친 것이다.')), ''] : []),
                 ...(kickNow.length ? ['[모심] ' + kickNow.map((c) => (mem[c].n || c)
                         + (/재난관리/.test((memNow[c].aff || '') + ' ' + (memNow[c].team || '')) ? ' (선녀탕으로)' : ' (여우 상담실로)')).join(', ')
-                    + ' — 귀빈이 남을 구하거나 지키려 했다. 그 행동의 결과(판정)는 그대로 쓴다. 그 직후 방송국 사람들이 다가와 깍듯이 인사하며'
+                    + ' — 귀빈이 남을 구하거나 지키려 했다. 그 행동의 결과(판정)는 그대로 쓴다. '
+                    + ((D.kick && D.kick.text) || ('그 직후 방송국 사람들이 다가와 깍듯이 인사하며'
                     + ' 「귀빈께서는 저희 방송과 맞지 않으십니다. 더 어울리는 곳으로 모시겠습니다」 하고 귀빈을 다른 곳으로 모셔 간다.'
                     + ' 억지로 끌어내지 않는다 — 정중한 안내 · 비켜서는 방송인들 · 열리는 문. 그 극진함이 더 섬뜩하다.'
-                    + ' 모셔 가는 곳은 괄호 안의 곳이다 (그 문 너머에 김이 오르는 선녀탕 · 여우 상담실이 있다). 모셔 간 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.', ''] : []),
+                    + ' 모셔 가는 곳은 괄호 안의 곳이다 (그 문 너머에 김이 오르는 선녀탕 · 여우 상담실이 있다). 모셔 간 귀빈은 다시 돌아오지 못한다. 귀빈이 빠진 자리를 방송국이 더 사납게 덤빈다.')), ''] : []),
                 ...(foxKinds.length ? [foxRule(foxKinds), ''] : []),
                 ...(chiefs.length ? [wolfRule(chiefs.map((c) => mem[c].n || c)), '',
                     ...(wolfOn.length ? ['[🐺 늑대의 모습이 됐다] ' + wolfOn.map((c) => mem[c].n || c).join(', ')
@@ -1257,18 +1270,18 @@ async function round(b, deps, db) {
                 ...(foxFell.length ? ['[여우 소멸] ' + foxFell.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 곁에서').join(', ')
                     + ' — 판정 결과의 [여우 소멸] 줄이다. 그 아이가 제 행동을 하다 괴담에 닿아 사라진다 (잔혹하지 않게 — 빛이나 꽃잎처럼 흩어진다). 마지막 말은 fox_lines 로. 곁의 아이들이 반응한다.', ''] : []),
                 ...(foxGrief.length ? ['[주인을 잃은 아기 여우] ' + foxGrief.map((id) => foxName(FXa[id]) + ' — 주인 '
-                    + ((mem[FXa[id].o] || {}).n || FXa[id].o) + ' 이(가) 죽었다').join(', ') + ' — 제 성격대로 슬퍼한다.', ''] : []),
+                    + ((mem[FXa[id].o] || {}).n || FXa[id].o) + ' 이(가) ' + lostVerbOf(D)).join(', ') + ' — 제 성격대로 슬퍼한다.', ''] : []),
                 ...(J.checks.some((c) => c.burn) ? ['[소각] 판정 결과의 [소각] 줄은 심야 토크쇼의 주인이 손가락을 튕겨 태운 것이다 — 실제로 일어난다.'
-                    + ' 성공이면 그 대상은 정말로 불길에 휩싸여 타 버린다. 재가 되어 이 방송에서 사라지고, 다음 장면에도 되살아나지 않는다.'
-                    + ' 실패면 불꽃이 붙지 않거나 다 태우지 못한다 (그래도 방송국은 그 손가락을 두려워한다).', ''] : []),
-                ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 방송국에 없는 말을 입에 올린 것이다. 방송국 전체가 그 사람에게 고개를 돌린다 —'
-                    + ' 실패한 사람은 그 자리에서 죽는다 (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
+                    + ' 성공이면 그 대상은 정말로 불길에 휩싸여 타 버린다. 재가 되어 이 ' + PL + '에서 사라지고, 다음 장면에도 되살아나지 않는다.'
+                    + ' 실패면 불꽃이 붙지 않거나 다 태우지 못한다 (그래도 ' + PL + '은 그 손가락을 두려워한다).', ''] : []),
+                ...(metaHit ? ['[바깥의 말] 판정 결과의 [바깥의 말] 줄은 그 사람이 이 ' + PL + '에 없는 말을 입에 올린 것이다. ' + PL + ' 전체가 그 사람에게 고개를 돌린다 —'
+                    + ' 실패한 사람은 그 자리에서 ' + lostNowOf(D) + ' (흐름과 상관없이). 그 말을 그대로 옮기지 말고 장면 속 일로만 그린다.', ''] : []),
                 '[이동 — 장소는 사원이 괄호 행동으로 움직일 때만 바뀐다]',
                 ...(movers.length
                     ? ['움직인 사람: ' + movers.map((m) => (mem[m.c].n || m.c) + ' → ' + m.to).join(' · '),
                        ...(active.filter((c) => !moverSet[c]).length ? ['움직이지 않은 사람 (제자리에 남는다): ' + active.filter((c) => !moverSet[c]).map((c) => mem[c].n || c).join(', ')] : []),
                        '움직인 사람만 그곳으로 간다. 일부만 움직였으면 일행이 갈라진다 — 다음 장면은 갈라진 자리마다 무슨 일이 닥치는지 쓰고, 진행 메모에 누가 어디에 있는지 적는다.']
-                    : ['이번 장면에 움직인 사람이 없다 — 다음 장면(next_text)도 지금 이 자리에서 이어진다. 장소를 옮기지 않는다 (그 자리에 새 일이 닥친다 — 방송이 바뀌고 · 누가 들어오고 · 방의 다른 구석이 드러난다).']),
+                    : ['이번 장면에 움직인 사람이 없다 — 다음 장면(next_text)도 지금 이 자리에서 이어진다. 장소를 옮기지 않는다 (그 자리에 새 일이 닥친다 — ' + (D.stayHint || '방송이 바뀌고 · 누가 들어오고 · 방의 다른 구석이 드러난다') + ').']),
                 '진행자가 사람을 마음대로 다른 곳으로 옮기지 않는다. 괴담에게 끌려가는 것은 판정 결과로만 쓴다.', '',
                 '[이번 장면에서 나눈 대화]', talkS, '',
                 ...(speakers.length ? ['[이번 장면에 말한 사람 — 한 사람도 빠뜨리지 않는다] ' + speakers.map((c) => mem[c].n || c).join(', '), ''] : []),
@@ -1281,17 +1294,17 @@ async function round(b, deps, db) {
                 '[판정 결과 — 바꾸지 말 것]', J.checks.map((c) => checkLine(c, D)).join('\n') || '(판정할 행동이 없었다 — 머뭇거린 사이 상황이 조금 나빠진다)', '',
                 wiped ? (lostAfter.length
                         ? '[반드시] 재난 안에 남은 사람이 없다 (남은 사람은 모두 ' + stName(D, 'lost') + (aliveAfter.length ? ', 귀빈은 홀로 나갔다' : '') + '). ended=true, end_kind=fail 로 이 재난을 끝낸다.'
-                        : '[반드시] 모두 방송국을 빠져나갔다. ended=true, end_kind=escape 로 이 재난을 끝낸다.')
+                        : '[반드시] 모두 ' + PL + '을 빠져나갔다. ended=true, end_kind=escape 로 이 재난을 끝낸다.')
                     : (lastOne ? '[반드시] 이번이 마지막 장면이다. ended=true 로 끝낸다. 근원을 지웠으면 clear, 아니면 escape.'
                         : (n < MIN ? '[반드시] 아직 끝내지 않는다 (' + MIN + '장면 전). ended=false, end_kind=none 으로 다음 장면을 연다.'
                             : '[끝내는 때] 근원을 지웠거나(clear) 모두 빠져나왔으면(escape) ended=true. 아니면 ended=false 로 다음 장면을 연다. 살아 있는 사람이 있으면 fail 은 쓰지 않는다.')),
-                ...(lostNew.length ? ['', '[이번 장면에 죽은 사람 — fates 에 코드로] ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
+                ...(lostNew.length ? ['', (D.fateHead || '[이번 장면에 죽은 사람 — fates 에 코드로]') + ' ' + lostNew.map((c) => c + ' (' + (mem[c].n || c) + ')').join(', ')] : []),
                 '',
                 '[쓸 것]',
                 '- result : 이번 장면에서 벌어진 일. 판정 결과대로 일어난 일을 이야기로만 쓴다 — 「판정」「실패」「상태」「다침」 같은 말 없이,'
-                    + ' 다친 사람은 무엇에 어떻게 다쳤는지 · 죽은 사람은 어떻게 죽었는지를 장면 속 일로. 행동한 사람은 이름이 나오게.'
+                    + ' 다친 사람은 무엇에 어떻게 다쳤는지 · ' + (D.lostHow || '죽은 사람은 어떻게 죽었는지') + '를 장면 속 일로. 행동한 사람은 이름이 나오게.'
                     + ' 이번 장면에 말한 사람은 모두 — 그 사람이 한 말과 행동에 장면이 반응한다 (누가 무엇을 해서 어떻게 됐는지).'
-                    + ' 방송국의 인물이나 다른 사람에게 건넨 말 · 물음에는 장면 속에서 대답이나 반응이 돌아온다. 마음을 바꾼 사람은 나중에 한 것을 따른다.'
+                    + ' ' + PL + '의 인물이나 다른 사람에게 건넨 말 · 물음에는 장면 속에서 대답이나 반응이 돌아온다. 마음을 바꾼 사람은 나중에 한 것을 따른다.'
                     + ' 대화의 괄호 ( ) 안은 그 사람의 행동, 괄호 밖은 그 사람의 말이다 — 말만 한 사람은 말만 한 것으로 쓴다 (몸을 움직여 무언가를 한 것처럼 쓰지 않는다). '
                     + Math.min(800, Math.max(350, 300 + 100 * speakers.length)) + '자 안쪽.',
                 '- ended / end_kind / end_text : 끝내면 end_text 에 결말 (300자 안쪽). 안 끝내면 end_kind=none, end_text 빈 문자열.',
@@ -1299,7 +1312,7 @@ async function round(b, deps, db) {
                 '- notes : 앞으로 기억할 진행 메모 (지난 메모를 고쳐 쓴다 · 지금까지 쓴 장소와 괴이를 짧게 적어 두어 되풀이를 피한다, 600자 안쪽).',
                 '- next_text 는 지난 장면들과 겹치지 않는 괴이 · 다른 결로 연다 (지난 장면 요약 · 진행 메모를 보고). 장소는 [이동] 을 따른다.',
                 '- summary : 이번 장면 한 줄 요약 (80자 안쪽).',
-                '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.',
+                D.fateAsk || '- fates : 이번 장면에 죽은 사람마다 { who: 코드, how: 죽는 방식 한 줄 (40자 안쪽, 진행 상황에 맞게 · 다른 사람과 겹치지 않게) }. 없으면 빈 배열.',
                 ...(foxTalkers.length
                     ? ['- fox_lines : 장면이 넘어간 직후 채팅에 올릴 아기 여우의 말 0~3줄 { fox: 여우 열쇠, t: 대사 (60자 안쪽) } —'
                         + ' 대신 소멸한 아이의 마지막 말 · 주인을 잃은 아이의 슬픔 · 새 장면을 보고 하는 말. 결과에는 대사를 쓰지 않는다.',
@@ -1316,7 +1329,10 @@ async function round(b, deps, db) {
         if (ended && kind === 'fail' && !wiped) kind = 'escape';
         if (!wiped && !lastOne && n < MIN) { ended = false; kind = 'none'; }         // 정한 장면 전에는 끝나지 않는다 (모두 죽거나 나가면 끝)
         if (!ended && !String(out.next_text || '').trim()) {
-            if (n < MIN) { out.next_title = out.next_title || '송출 중'; out.next_text = '화면이 지지직거린다. 방송은 아직 끝나지 않았다.'; }
+            if (n < MIN) {
+                const FB = D.fallback || { title: '송출 중', text: '화면이 지지직거린다. 방송은 아직 끝나지 않았다.' };
+                out.next_title = out.next_title || FB.title; out.next_text = FB.text;
+            }
             else { ended = true; kind = 'escape'; }
         }
         // 죽는 방식 — 진행자가 적은 것 (없으면 이 재난의 말로)
@@ -1324,7 +1340,7 @@ async function round(b, deps, db) {
         (Array.isArray(out.fates) ? out.fates : []).forEach((f) => {
             if (f && lostNew.indexOf(f.who) >= 0 && !fate[f.who] && String(f.how || '').trim()) fate[f.who] = clip(String(f.how).trim(), 60);
         });
-        lostNew.forEach((c) => { if (!fate[c]) fate[c] = clip('방송국에 먹혔다', 60); });
+        lostNew.forEach((c) => { if (!fate[c]) fate[c] = clip(D.fateDefault || '방송국에 먹혔다', 60); });
 
         const up = { err: null,
                      last: { n: n, title: clip(scene.title, 80), result: clip(out.result, 1500), checks: J.checks,
@@ -1363,7 +1379,7 @@ async function round(b, deps, db) {
                     if (m.role === 'admin') return;
                     if (m.kick || kickNow.indexOf(c) >= 0) { pay[c] = -1; return; }   // 모셔진 귀빈 — 이미 이송 (몫 없음)
                     const rec = { run: b.run, name: NAME_, at: now, st: m.st };
-                    if (m.st === 'lost' && D.death) { rec.die = true; rec.how = fate[c] || memNow[c].fate || '방송국에 먹혔다'; }
+                    if (m.st === 'lost' && D.death) { rec.die = true; rec.how = fate[c] || memNow[c].fate || D.fateDefault || '방송국에 먹혔다'; }
                     else { rec.pts = payOf(D, m); if (m.st === 'out') rec.left = true; }
                     if (!rec.die && !rec.pts && !rec.left) return;
                     pays[c + '/' + b.run] = rec;
