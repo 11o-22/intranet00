@@ -1381,10 +1381,17 @@ function lift(one, px) {
     const v = px ? px + 'px' : '';
     if (one._lift !== v) { one.tag.style.marginBottom = v; one._lift = v; }
 }
+// 이름 — 방에 있으면 이름표에서, 떠났으면 사원 명부에서, 그래도 없으면 들 때 적어 둔 이름 (사번은 안 띄운다)
+const carryNames = {};
 function nameIn(code) {
     if (code === myCode()) return nameOf(u_());
     const q = run && run.peers[code];
-    return (q && q.one && q.one.name) || code;
+    if (q && q.one && q.one.name) { carryNames[code] = q.one.name; return q.one.name; }
+    try {
+        const u = (typeof db !== 'undefined' && db && db.users) ? db.users[code] : null;
+        if (u) return nameOf(u);
+    } catch (e) { }
+    return carryNames[code] || '누군가';
 }
 function resend() { if (run) { run.sx = -9999; run.sent = 0; } }
 function noTxt(k) { return k === 'head' ? '머리 위에는 ' + CARRY.HEAD_MAX + '명까지입니다' : '손이 차 있습니다'; }
@@ -1408,7 +1415,7 @@ function carryCheck() {
             else if (caged(x.c) || caged(me)) why = '가두리 때문에';
             else if (m.full[x.c] === me) why = noTxt(x.k);
             else if (w) why = '먼저 ' + nameIn(w.by) + ' 사원에게 가 있어서';
-            sysLine('🍍 ' + (q ? (q.one.name || x.c) : x.c) + ' 사원을 내려놓았습니다' + (why ? ' (' + why + ')' : '') + '.');
+            sysLine('🍍 ' + nameIn(x.c) + ' 사원을 내려놓았습니다' + (why ? ' (' + why + ')' : '') + '.');
         });
         if (keep.length !== mine.length) { run.carry = keep.length ? keep : null; resend(); m = remap(); }
     }
