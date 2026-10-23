@@ -148,9 +148,10 @@ const DOT = {
     WALK: 120,                                 // 걷는 빠르기 (광장에서 쓴다)
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
-    Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
+    //   ★ 상의 칸으로 옮긴 셋(룩키마트 의상 · 가을 니트 · 체육복)은 잠옷 상의 바로 뒤 — 겉옷이 그 위에 덮인다 (2026-10-23)
+    Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
-        'dress-yellow', 'dress-green', 'maid', 'maid-long', 'band-outfit', 'knit', 'gym-suit',
+        'dress-yellow', 'dress-green', 'maid', 'maid-long',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
@@ -254,7 +255,12 @@ const DOT_SLOTS = [
     {
         k: 'top', n: '상의', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true }
+            { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true },
+            // ★ 겉옷 칸에서 옮겨 왔다 (2026-10-23) — 윗옷만 그려진 셋. 겉옷에 적혀 있던 묵은 기록은 moveOld 가 상의로 읽는다.
+            //   그림 사연은 겉옷 칸에 적힌 줄 그대로 (룩키마트 의상 = 의상 뽑기 다섯 벌 · 가을 니트 · 체육복 = 통짜에서 몸을 뺀 것)
+            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' },
+            { i: 'knit', n: '가을 니트', over: ['knit'], own: 'knit' },
+            { i: 'gym', n: '체육복', over: ['gym-suit'], own: 'gym-suit' }
         ]
     },
     {
@@ -333,14 +339,12 @@ const DOT_SLOTS = [
             { i: 'ydress', n: '유치원 앞치마', over: ['dress-yellow'], own: 'dress-yellow' },
             { i: 'gdress', n: '룩키마트 앞치마', over: ['dress-green'], own: 'dress-green' },
             { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
-            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
-            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' },
+            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' }
+            // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
             //   (백일몽 정장과 같은 길) 귀 · 턱 밑에 남은 살색 몇 점도 걷어 니트와 셔츠만 남겼다. 다리는 맨다리라 하의는 따로 입는다.
-            { i: 'knit', n: '가을 니트', over: ['knit'], own: 'knit' },
             // 체육복 (2026-10-23) — 가을 니트와 같은 규격 · 같은 길 (몸과 같은 칸을 빼고 윗옷만 남겼다)
-            { i: 'gym', n: '체육복', over: ['gym-suit'], own: 'gym-suit' }
         ]
     },
     {
@@ -580,9 +584,17 @@ function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i =
 // all 이 참이면 **가진 것을 따지지 않는다.**
 //   남이 입은 모습을 그릴 때 쓴다 — 남의 소지 목록은 이쪽에 없으므로
 //   따지면 남의 옷이 통째로 안 보인다 (옷장에서 고를 때만 따지면 된다).
+// ★ 겉옷 칸 → 상의 칸으로 옮긴 옷 (2026-10-23) — 겉옷에 적혀 있는 묵은 기록(내 것 · 남의 것 · 코디)을 상의로 읽는다
+const MOVED_TOP = { band: 1, knit: 1, gym: 1 };
+function moveOld(d) {
+    if (!d || typeof d !== 'object' || !MOVED_TOP[d.outer]) return d;
+    const x = Object.assign({}, d);
+    x.top = d.outer; x.outer = '';
+    return x;
+}
 function look(user, override, all) {
     const u = user || u_() || {};
-    const d = override || u.dot || {};
+    const d = moveOld(override || u.dot || {});
     const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
     // ★ 머리가 전용 몸을 들고 있으면 그것을 쓴다 (브라운).
     //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
@@ -640,6 +652,25 @@ function look(user, override, all) {
     return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick, col: col };
 }
 window.dotLook = look;
+// 내 기록도 상의 칸으로 고쳐 적는다 (지금 입은 것 · 코디 다섯 칸) — 한 번 고치면 더 할 일이 없다
+setInterval(function () {
+    try {
+        const u = u_();
+        if (!u) return;
+        const f = {};
+        if (u.dot && MOVED_TOP[u.dot.outer]) { u.dot = moveOld(u.dot); f.dot = 1; }
+        if (u.dotSets && typeof u.dotSets === 'object') {
+            Object.keys(u.dotSets).forEach(function (k) {
+                const e = u.dotSets[k];
+                if (e && e.d && MOVED_TOP[e.d.outer]) { e.d = moveOld(e.d); f.dotSets = 1; }
+            });
+        }
+        if (Object.keys(f).length && typeof saveFields === 'function') {
+            saveFields(f);
+            console.log('[옷장] 겉옷 칸에 입은 룩키마트 의상 · 가을 니트 · 체육복 → 상의 칸으로 옮겨 적었습니다', f);
+        }
+    } catch (e) { }
+}, 3000);
 // 칸 크기를 밖에서도 쓴다 (광장이 베껴 적지 않게)
 window.dotSpec = function () { return { W: D.W, H: D.H, FOOT: D.FOOT }; };
 
@@ -1338,6 +1369,7 @@ function setSnap() {
     return d;
 }
 function setFit(d, u) {
+    d = moveOld(d);
     const p = cur();
     const out = { col: Object.assign({}, (d && d.col) || {}) };
     const hd = DOT_HEADS.filter(function (h) { return h.i === d.head; })[0];
