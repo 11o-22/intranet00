@@ -171,7 +171,8 @@ const JOBS = {
 //
 //   ■ 조건 — 넷이 다 차면 상담사에게 알림이 간다 (kroomHidden/<사번>, state 'ready')
 //       Lv 80 이상 · 지금 직업이 S 등급
-//       D · C · B · A 등급 던전에서 갈림길(◇ ○○만의 갈림길)을 등급마다 90번 이상 겪음  (k.jx)
+//       D · C · B · A 등급 던전에서 갈림길(◇ ○○만의 갈림길)을 등급마다 10번 이상 겪음  (k.jx)
+//         (처음엔 90번 — 너무 어려워 2026-10-23 10번으로 낮췄다. 이미 채운 사원은 상담사 화면이 알아서 올린다 · hiddenSweep)
 //       그 속성 직업의 임무(장면마다 붙는 ◇ 직업 선택지)를 100번 이상 해냄               (k.hq[속성])
 //       — 헬퍼로 들어간 판은 세지 않는다. 세기 시작한 것은 2026-10-19 부터다.
 //   ■ 상담사가 통제 콘솔 「히든 직업 관리」에서 지정하면(state 'offered') 그 사원이 다음에
@@ -205,7 +206,7 @@ function hiddenKeyFor(attr, u) {
     return k || null;
 }
 const L_JOBS = ['거너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
-const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 90, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
+const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 10, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
 const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
 const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
@@ -2715,7 +2716,9 @@ setInterval(function () {
 //            denied    상담사가 주지 않기로 했다    L         히든 직업이 L 이 되었다
 const H_NODE = 'kroomHidden';
 let hMine = null, hMineRef = null, hMineCode = '';
-let hAll = {}, hAllOn = false;
+let hAll = {}, hAllOn = false, hSwept = false;
+// 상담사가 켜 둔 동안 1분마다 한 번 더 훑는다
+setInterval(function () { try { if (hAllOn) hiddenSweep(); } catch (e) { } }, 60000);
 function hiddenProgress(k) {
     k = k || prof();
     const jx = k.jx || {}, hq = k.hq || {};
@@ -2749,6 +2752,35 @@ function hiddenCheck() {
     try { saveFields({ history: 1 }); } catch (e) { }
 }
 setInterval(function () { try { if (me() && !kr) hiddenCheck(); } catch (e) { } }, 20000);
+
+// 상담사 화면 — 조건을 이미 채운 사원을 찾아 올린다 (그 사원이 접속하지 않아도)
+//   갈림길 조건을 90 → 10 으로 낮춘 날(2026-10-23) 이미 채운 사람들이 바로 상담사에게 가도록.
+//   사원 기록(db.users)의 K 의 방 기록만 읽는다 — 손대지 않는다. 이미 적힌 사람(거절 · 미지정 포함)은 건너뛴다.
+function hiddenSweep() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN) return 0;
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    let n = 0;
+    Object.keys(book).forEach(function (c) {
+        if (c === ADMIN || (hAll[c] && hAll[c].state)) return;
+        const w = book[c];
+        const k = w && w.kroom;
+        if (!k || typeof k !== 'object' || stale(k) || !k.job || !JOBS[k.job]) return;
+        if (!hiddenProgress(k).ok) return;
+        const a = JOBS[k.job][0], key = hiddenKeyFor(a, w);
+        if (!key) return;
+        const entry = { state: 'ready', code: c, name: w.name || '', no: String(w.no || ''), attr: a, key: key,
+                        job: JOBS[key][2][0], from: jobName(k.job, k.grade), lv: k.lv, at: now(),
+                        jx: Object.assign({}, k.jx || {}), hq: (k.hq || {})[a] || 0, by: 'sweep' };
+        n++;
+        d.ref(H_NODE + '/' + c).transaction(function (cur) {
+            if (cur && cur.state) return;
+            return entry;
+        }).catch(function () { });
+    });
+    return n;
+}
+window.kroomHiddenSweep = hiddenSweep;
 
 // 내 것 — 지정받았는지
 setInterval(function () {
@@ -2891,6 +2923,7 @@ setInterval(function () {
     hAllOn = true;
     d.ref(H_NODE).on('value', function (s) {
         hAll = s.val() || {};
+        if (!hSwept) { hSwept = true; try { hiddenSweep(); } catch (e) { } setTimeout(function () { try { hiddenSweep(); } catch (e) { } }, 8000); }   // 사원 목록이 늦게 다 들어올 수도 있어 한 번 더
         const seen = hSeen(), news = [];
         Object.keys(hAll).forEach(function (c) {
             const v = hAll[c] || {};
