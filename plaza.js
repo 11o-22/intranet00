@@ -587,6 +587,19 @@ function stampSafe(ov) {
         '  padding:9px;border-radius:10px;background:rgba(20,17,24,.95);border:1px solid #d4af37;',
         '  box-shadow:0 4px 16px rgba(0,0,0,.65);}',
         '#plaza-carry .pc-n{font-size:11px;font-weight:bold;color:#d4af37;text-align:center;}',
+        // ✊ 가위바위보 — 뺏기 (2026-10-23)
+        '#plaza-rps{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:62;width:min(300px,86vw);',
+        '  padding:14px 14px 12px;border-radius:14px;background:rgba(20,17,24,.97);border:1px solid #d4af37;',
+        '  box-shadow:0 8px 28px rgba(0,0,0,.7);text-align:center;color:#f3ead8;}',
+        '#plaza-rps .pr-t{font-size:12.5px;font-weight:bold;color:#ffd76a;line-height:1.55;}',
+        '#plaza-rps .pr-s{font-size:11px;color:#b9ad95;margin-top:5px;line-height:1.5;}',
+        '#plaza-rps .pr-b{display:flex;gap:8px;margin-top:12px;}',
+        '#plaza-rps .pr-b button{flex:1;font:inherit;padding:10px 0 8px;border-radius:10px;cursor:pointer;',
+        '  border:1px solid #6a5630;background:#2b2418;color:#f3ead8;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;}',
+        '#plaza-rps .pr-b button i{font-style:normal;font-size:26px;line-height:1;}',
+        '#plaza-rps .pr-b button:disabled{opacity:.45;cursor:default;}',
+        '#plaza-rps .pr-r{font-size:30px;margin-top:10px;letter-spacing:6px;}',
+        '#plaza-rps .pr-x{margin-top:10px;font:inherit;font-size:11px;padding:6px 14px;border-radius:7px;border:1px solid #444;background:transparent;color:#999;cursor:pointer;}',
         '#plaza-carry button{font:inherit;font-size:12.5px;padding:9px 12px;border-radius:7px;cursor:pointer;',
         '  border:1px solid #6a5630;background:#2b2418;color:#f3ead8;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
@@ -1426,6 +1439,7 @@ function carryCheck() {
             if (w && w.by === me) { if (x.fw) delete x.fw; keep.push(x); return; }
             const q = run.peers[x.c];
             if (!q && x.fw && now() - x.fw < CARRY.FOLLOW_MS) { keep.push(x); return; }   // 따라오는 중
+            if (run.rpsLost && run.rpsLost[x.c] && now() - run.rpsLost[x.c] < 30000) return;   // ✊ 가위바위보에 져서 넘겼다 (알림은 그때 했다)
             let why = '';
             if (!q) why = x.fw ? '따라오지 못해서' : '자리를 떠나서';
             else if (!q.sm) why = '원래 크기로 돌아와서';
@@ -1717,6 +1731,216 @@ function followOff() {
 }
 setInterval(function () { try { if (run) followListen(); else followOff(); } catch (e) { } }, 1000);
 
+// ==========================================
+// ✊ 가위바위보로 뺏기 (2026-10-23)
+// ==========================================
+//   남이 머리 위 · 손에 든 작은 사람을 톡 치면 [가위바위보로 뺏기].
+//   plazaRps/<든 사람> = { id, by: 거는 사람, tiny, k, round, cp: 거는 쪽 손, hp: 든 쪽 손, st, win, at }
+//     거는 사람   먼저 고르고 적는다 (st 'ask') → 든 사람 화면이 묻는다 (10초 · 안 고르면 아무거나)
+//     든 사람     고르면 그 자리에서 가린다 — 비기면 다시(st 'again' · 세 번 비기면 든 사람이 지킨다)
+//                 지면 st 'done' · win 'c' — 작은 사람은 거는 사람이 든 사람보다 **먼저 잡은 것으로** 적어
+//                 넘겨받는다 (바닥에 한 번 내려서지 않게). 든 사람 쪽 기록은 저절로 걷힌다.
+//   답이 25초 동안 없으면 거는 쪽이 접는다.
+const RPS = { s: ['✌️', '가위'], r: ['✊', '바위'], p: ['🖐️', '보'] };
+const RPS_BEAT = { s: 'p', r: 's', p: 'r' };            // 이것이 이긴다
+const RPS_ASK_MS = 10000, RPS_WAIT_MS = 25000, RPS_DRAWS = 3;
+function rpsJudge(c, h) { return c === h ? 'd' : (RPS_BEAT[c] === h ? 'c' : 'h'); }
+function rpsClose() { const e = document.getElementById('plaza-rps'); if (e) e.remove(); if (run && run.rpsT) { clearInterval(run.rpsT); run.rpsT = 0; } }
+// 고르는 창 — done(손) · 시간이 다 되면 auto 로 아무거나
+function rpsPick(title, sub, secs, done, onX) {
+    rpsClose();
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return;
+    const m = document.createElement('div');
+    m.id = 'plaza-rps';
+    m.className = 'plaza-keep';
+    m.innerHTML = '<div class="pr-t">' + title + '</div><div class="pr-s">' + sub + '</div>'
+        + '<div class="pr-b">' + ['s', 'r', 'p'].map(function (k) {
+            return '<button class="plaza-keep" data-k="' + k + '"><i>' + RPS[k][0] + '</i>' + RPS[k][1] + '</button>';
+        }).join('') + '</div>' + (onX ? '<button class="pr-x plaza-keep">그만두기</button>' : '');
+    ov.appendChild(m);
+    let left = secs, over = false;
+    const fin = function (k) {
+        if (over) return; over = true;
+        if (run && run.rpsT) { clearInterval(run.rpsT); run.rpsT = 0; }
+        Array.prototype.forEach.call(m.querySelectorAll('.pr-b button'), function (b) { b.disabled = true; if (b.dataset.k === k) b.style.borderColor = '#d4af37'; });
+        done(k);
+    };
+    Array.prototype.forEach.call(m.querySelectorAll('button'), function (b) {
+        b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+        b.addEventListener('click', function (ev) {
+            ev.stopPropagation(); ev.preventDefault();
+            if (b.classList.contains('pr-x')) { over = true; rpsClose(); if (onX) onX(); return; }
+            fin(b.dataset.k);
+        });
+    });
+    if (secs) {
+        const subEl = m.querySelector('.pr-s');
+        const base = sub;
+        subEl.innerHTML = base + ' <b style="color:#ffd76a;">' + left + '</b>';
+        run.rpsT = setInterval(function () {
+            left--;
+            if (!document.getElementById('plaza-rps')) { clearInterval(run.rpsT); run.rpsT = 0; return; }
+            subEl.innerHTML = base + ' <b style="color:#ffd76a;">' + Math.max(0, left) + '</b>';
+            if (left <= 0) fin(['s', 'r', 'p'][Math.floor(Math.random() * 3)]);
+        }, 1000);
+    }
+}
+function rpsShow(title, line, sub) {
+    rpsClose();
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return;
+    const m = document.createElement('div');
+    m.id = 'plaza-rps';
+    m.className = 'plaza-keep';
+    m.innerHTML = '<div class="pr-t">' + title + '</div><div class="pr-r">' + line + '</div>'
+        + (sub ? '<div class="pr-s">' + sub + '</div>' : '') + '<button class="pr-x plaza-keep">닫기</button>';
+    ov.appendChild(m);
+    const x = m.querySelector('.pr-x');
+    x.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    x.addEventListener('click', function (ev) { ev.stopPropagation(); rpsClose(); });
+    setTimeout(function () { if (m.isConnected) m.remove(); }, 4500);
+}
+function rpsLine(a, b) { return (RPS[a] ? RPS[a][0] : '?') + ' : ' + (RPS[b] ? RPS[b][0] : '?'); }   // 내 손 : 상대 손
+
+// ── 거는 사람
+let rpsMine = null;                                  // { holder, tiny, id, ref, at }
+function rpsStart(tiny, holder) {
+    const d = db_(), me = myCode();
+    if (!d || !run) return;
+    if (rpsMine) { sysLine('✊ 이미 겨루는 중입니다.'); return; }
+    const ref = d.ref('plazaRps/' + holder);
+    ref.once('value').then(function (s) {
+        const v = s.val();
+        if (v && v.st !== 'done' && now() - (Number(v.at) || 0) < RPS_WAIT_MS) { sysLine('✊ ' + nameIn(holder) + ' 사원은 지금 다른 사람과 겨루는 중입니다.'); return; }
+        const w = carrierOf(tiny);
+        if (!w || w.by !== holder) { sysLine('🍍 ' + nameIn(tiny) + ' 사원은 이제 ' + nameIn(holder) + ' 사원에게 없습니다.'); return; }
+        const id = me + '-' + now().toString(36);
+        rpsMine = { holder: holder, tiny: tiny, id: id, ref: ref, at: now(), round: 1, k: w.k, start: w.start };
+        const ask = function (round) {
+            rpsPick('✊ ' + esc(nameIn(tiny)) + ' 사원을 걸고 ' + esc(nameIn(holder)) + ' 사원과 가위바위보' + (round > 1 ? ' (' + round + '판째)' : ''),
+                '무엇을 낼까요?', 0, function (k) {
+                    if (!rpsMine || rpsMine.id !== id) return;
+                    rpsMine.at = now(); rpsMine.round = round; rpsMine.cp = k;
+                    const up = { id: id, by: me, tiny: tiny, k: w.k, round: round, hp: null, win: null, at: now(), cp: k, st: 'ask' };   // st · cp 는 맨 끝에 (받는 쪽이 다 모인 뒤에 보게)
+                    (round === 1 ? ref.set(up) : ref.update(up)).catch(function () { });
+                    const e = document.querySelector('#plaza-rps .pr-s');
+                    if (e) e.innerHTML = RPS[k][0] + ' ' + RPS[k][1] + ' — ' + esc(nameIn(holder)) + ' 사원이 고르기를 기다립니다…';
+                }, function () { rpsEnd(); sysLine('✊ 그만두었습니다.'); });
+        };
+        rpsMine.ask = ask;
+        ask(1);
+        ref.on('value', rpsMine.on = function (snap) {
+            const v2 = snap.val();
+            const r = rpsMine;
+            if (!r || r.id !== id || !v2 || v2.id !== id) return;
+            if (v2.st === 'again' && v2.round > r.round) {
+                r.round = v2.round; r.cp = null; r.at = now();
+                sysLine('✊ 비겼습니다 (' + rpsLine(v2.lc, v2.lh) + ') — 다시!');
+                r.ask(v2.round);
+                return;
+            }
+            if (v2.st !== 'done') return;
+            const line = rpsLine(v2.cp, v2.hp);
+            if (v2.win === 'c') {
+                // 넘겨받는다 — 든 사람보다 먼저 잡은 것으로 적어 바닥에 내려서지 않게
+                const kk = roomOn(me, r.k, tiny) ? r.k : (r.k === 'head' ? 'hand' : 'head');
+                if (roomOn(me, kk, tiny)) {
+                    run.carry = listOf(run.carry).filter(function (x) { return x.c !== tiny; })
+                        .concat([{ c: tiny, k: kk, at: Math.max(1, (Number(r.start) || now()) - 1) }]);
+                    resend(); remap();
+                }
+                rpsShow('✊ 이겼습니다!', line, esc(nameIn(tiny)) + ' 사원을 ' + (kk === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.'));
+                sysLine('✊ 가위바위보에 이겨 ' + nameIn(holder) + ' 사원에게서 ' + nameIn(tiny) + ' 사원을 뺏어 왔습니다 (' + line + ').');
+            } else if (v2.win === 'h') {
+                rpsShow('✊ 졌습니다', line, esc(nameIn(holder)) + ' 사원이 ' + esc(nameIn(tiny)) + ' 사원을 지켰습니다.' + (v2.draws >= RPS_DRAWS ? ' (세 번 비김)' : ''));
+                sysLine('✊ 가위바위보에 져서 ' + nameIn(tiny) + ' 사원을 못 뺏었습니다 (' + line + ').');
+            } else {
+                sysLine('✊ 겨루기가 끝났습니다 — ' + nameIn(tiny) + ' 사원이 이미 ' + nameIn(holder) + ' 사원에게 없습니다.');
+                rpsClose();
+            }
+            rpsEnd(true);
+        });
+        // 답이 없으면 접는다
+        rpsMine.wait = setInterval(function () {
+            const r = rpsMine;
+            if (!r || r.id !== id) return;
+            if (r.cp && now() - r.at > RPS_WAIT_MS) {
+                rpsClose(); rpsEnd(true);
+                sysLine('✊ ' + nameIn(holder) + ' 사원이 답하지 않아 겨루기를 접었습니다.');
+            }
+        }, 1000);
+    }).catch(function () { });
+}
+function rpsEnd(clear) {
+    const r = rpsMine;
+    rpsMine = null;
+    if (!r) return;
+    try { if (r.on) r.ref.off('value', r.on); } catch (e) { }
+    if (r.wait) clearInterval(r.wait);
+    if (clear) setTimeout(function () { try { r.ref.once('value').then(function (s) { const v = s.val(); if (v && v.id === r.id) r.ref.remove(); }); } catch (e) { } }, 800);
+    else { try { r.ref.once('value').then(function (s) { const v = s.val(); if (v && v.id === r.id) r.ref.remove(); }); } catch (e) { } }
+}
+// ── 든 사람 — 내 앞으로 온 겨루기를 듣는다
+let rpsRef = null, rpsCode = '', rpsSeen = '';
+function rpsListen() {
+    const d = db_(), me = myCode();
+    if (!run || !d || !me) return;
+    if (rpsRef && rpsCode === me) return;
+    rpsOff();
+    rpsCode = me;
+    rpsRef = d.ref('plazaRps/' + me);
+    rpsRef.on('value', function (s) {
+        const v = s.val();
+        if (!v && run && run.rpsHold) { run.rpsHold = false; rpsClose(); return; }       // 거는 쪽이 그만두었다
+        if (!v || !run || v.st !== 'ask' || !v.cp || v.hp) return;
+        if (now() - (Number(v.at) || 0) > RPS_WAIT_MS) return;
+        const key = v.id + ':' + v.round;
+        if (rpsSeen === key) return;
+        rpsSeen = key;
+        const ref = rpsRef;
+        const w = carrierOf(v.tiny);
+        if (!w || w.by !== me) { ref.update({ win: 'x', at: now(), st: 'done' }).catch(function () { }); return; }
+        run.rpsHold = true;
+        rpsPick('✊ ' + esc(nameIn(v.by)) + ' 사원이 ' + esc(nameIn(v.tiny)) + ' 사원을 걸고 가위바위보를 걸어 왔습니다' + (v.round > 1 ? ' (' + v.round + '판째)' : ''),
+            '지면 뺏깁니다. 안 고르면 아무거나 냅니다 —', Math.round(RPS_ASK_MS / 1000), function (k) {
+                const res = rpsJudge(v.cp, k);
+                const draws = (Number(v.draws) || 0) + (res === 'd' ? 1 : 0);
+                const line = rpsLine(k, v.cp);                     // 내 손 : 상대 손
+                if (res === 'd' && draws < RPS_DRAWS) {
+                    ref.update({ lc: v.cp, lh: k, cp: null, hp: null, draws: draws, at: now(), round: (Number(v.round) || 1) + 1, st: 'again' }).catch(function () { });
+                    const e = document.querySelector('#plaza-rps .pr-s');
+                    if (e) e.innerHTML = '비겼습니다 (' + line + ') — 상대가 다시 고릅니다…';
+                    sysLine('✊ 비겼습니다 (' + line + ') — 다시!');
+                    setTimeout(function () { if (rpsSeen === key && run && run.rpsHold) { run.rpsHold = false; rpsClose(); } }, RPS_WAIT_MS);
+                    return;
+                }
+                if (run) run.rpsHold = false;
+                const win = (res === 'c') ? 'c' : 'h';
+                if (win === 'c') {
+                    run.rpsLost = run.rpsLost || {};
+                    run.rpsLost[v.tiny] = now();                   // 내 기록에서 저절로 걷힐 때 알림을 또 내지 않게
+                    run.dn = run.dn || {}; run.dn[v.tiny] = now(); // 스스로 올라왔던 것도 이때까지 것은 무효
+                    resend();
+                }
+                ref.update({ hp: k, win: win, draws: draws, at: now(), st: 'done' }).catch(function () { });
+                if (win === 'c') {
+                    rpsShow('✊ 졌습니다', line, esc(nameIn(v.tiny)) + ' 사원을 ' + esc(nameIn(v.by)) + ' 사원에게 뺏겼습니다.');
+                    sysLine('✊ 가위바위보에 져서 ' + nameIn(v.tiny) + ' 사원을 ' + nameIn(v.by) + ' 사원에게 뺏겼습니다 (' + line + ').');
+                } else {
+                    rpsShow('✊ 지켰습니다!', line, esc(nameIn(v.tiny)) + ' 사원은 그대로 있습니다.' + (res === 'd' ? ' (세 번 비김)' : ''));
+                    sysLine('✊ 가위바위보에 이겨 ' + nameIn(v.tiny) + ' 사원을 지켰습니다 (' + line + ').');
+                }
+            });
+    });
+}
+function rpsOff() {
+    if (rpsRef) { try { rpsRef.off(); } catch (e) { } }
+    rpsRef = null; rpsCode = '';
+}
+setInterval(function () { try { if (run) rpsListen(); else rpsOff(); } catch (e) { } }, 1000);
+window.plazaRps = function () { return { mine: rpsMine ? { holder: rpsMine.holder, tiny: rpsMine.tiny, round: rpsMine.round } : null, lost: run && run.rpsLost || null }; };
+
 // ── 보는 쪽 — 들린 사람을 든 사람에게 붙여 그린다 (tick 끝에서)
 function carryPaint(dt) {
     let busy = false;
@@ -1846,7 +2070,14 @@ function carryTap(cx, cy) {
     const pick = tinyAt(cx, cy);
     if (!pick) return false;
     const w = carrierOf(pick);
-    if (w && w.by !== me) { sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.'); return true; }
+    if (w && w.by !== me) {
+        // ✊ 남이 든 작은 사람 — 가위바위보로 뺏어 온다 (내 손이나 머리 위에 자리가 있어야 한다)
+        if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']],
+                function () { closeCarryMenu(); rpsStart(pick, w.by); });
+        }
+        sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.'); return true;
+    }
     const mine = !!(w && w.by === me);
     const items = ['hand', 'head'].filter(function (k) {
         if (mine && w.k === k) return false;
@@ -4613,7 +4844,7 @@ function shut() {
     if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
     closeCarryMenu();
     run.carry = null; run.on = null; run.dn = null;
-    followOff();
+    followOff(); rpsOff(); rpsClose(); if (rpsMine) rpsEnd();
     if (run.onWake) {
         window.removeEventListener('keydown', run.onWake, true);
         window.removeEventListener('pointerdown', run.onWake, true);
