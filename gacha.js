@@ -88,6 +88,7 @@ const GACHA_WEAR = [
     { k: 'maid-long',    n: '롱 메이드복', g: 'B', s: ['maid-long'] },
     { k: 'band-outfit',  n: '룩키마트 의상', g: 'B', s: ['band-outfit'] },
     { k: 'knit',         n: '가을 니트',    g: 'B', s: ['knit'] },
+    { k: 'gym-suit',     n: '체육복',       g: 'B', s: ['gym-suit'] },
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },
