@@ -201,6 +201,93 @@ function keep() {
 setInterval(function () { try { keep(); } catch (e) { console.warn('[물약지킴]', e); } }, TICK);
 
 // ==========================================
+// 3. 던진 쪽에서 확인 — 남에게 쓴 물약이 서버에 붙어 있나 (2026-10-23)
+// ==========================================
+//   「물약을 던졌는데 상대에게 안 먹힌다(쓴 알림은 떴는데 특이사항에도 없다)」가 또 올라왔다.
+//   두 화면을 한 서버에 묶어 스물아홉 가지를 다 던져 봐도(켜져 있을 때 · 꺼져 있다 들어올 때 ·
+//   거듭 쓰기 · 글 적는 물약) 여기서는 안 난다. 위 2번은 **받는 쪽 화면이 켜져 있을 때만** 지킨다.
+//   그래서 던진 쪽도 지킨다 — 쓴 뒤 3초 · 12초에 서버를 읽어, 걸어 준 물약이 없거나 시간이 줄어
+//   있으면 그 한 줄을 다시 붙이고(한 번만) potLog 에 그때 모습을 적는다. 다음에 나면 potLog 로 범인을 찾는다.
+//   빼는 것 — 이름이 바뀌어 붙는 것(무지개 · 석류) · 푸는 것(제거약 · 빈 약통) · 투명 · 곶감(글을 적은 뒤 붙는다)
+const VERIFY_SKIP = { rainbow_potion: 1, pomegranate_potion: 1, cure_potion: 1, q_pill: 1, clear_potion: 1, persimmon_potion: 1 };
+const vlog = [];
+function invCount(n) { return ((currentUser && currentUser.inventory) || []).filter(function (x) { return x === n; }).length; }
+function verifyLater(code, item, want, at) {
+    let fixed = false;
+    [3000, 12000].forEach(function (ms) {
+        setTimeout(function () {
+            if (fixed || typeof database === 'undefined' || !database) return;
+            const ref = database.ref('users/' + code);
+            ref.once('value').then(function (snap) {
+                const u = snap.val() || {};
+                const list = Array.isArray(u.timedEffects) ? u.timedEffects.filter(Boolean)
+                    : (u.timedEffects && typeof u.timedEffects === 'object' ? Object.keys(u.timedEffects).map(function (k) { return u.timedEffects[k]; }).filter(Boolean) : []);
+                const e = list.filter(function (x) { return x.name === item; })[0];
+                const cure = u.effCure;
+                if (cure && cure.name === item && (Number(cure.at) || 0) >= at) return;          // 그 사이 풀었다
+                if (!want.fixed && want.expireAt && want.expireAt <= Date.now()) return;          // 이미 끝날 때다
+                const short = e && !e.fixed && !want.fixed && (Number(e.expireAt) || 0) + 60000 < (Number(want.expireAt) || 0);
+                if (e && !short) return;                                                          // 잘 붙어 있다
+                fixed = true;
+                const row = { from: (currentUser && currentUser.code) || '', to: code, item: item, at: at, seen: Date.now(),
+                              after: Math.round((Date.now() - at) / 1000) + 's', why: e ? 'short' : 'missing',
+                              had: list.map(function (x) { return x.name; }).join(', ') };
+                vlog.push(row); while (vlog.length > 40) vlog.shift();
+                console.warn('%c[물약지킴] ' + (u.name || code) + ' 사원에게 쓴 ' + item + '이(가) 서버에 '
+                    + (e ? '시간이 줄어' : '없어') + ' 다시 붙입니다 (' + row.after + ')', 'color:#ff8a65');
+                try { database.ref('potLog').push(row); } catch (x) { }
+                database.ref('users/' + code + '/timedEffects').transaction(function (arr) {
+                    const a = Array.isArray(arr) ? arr.filter(Boolean)
+                        : (arr && typeof arr === 'object' ? Object.keys(arr).map(function (k) { return arr[k]; }).filter(Boolean) : []);
+                    const i = a.findIndex(function (x) { return x && x.name === item; });
+                    if (i < 0) a.push(want);
+                    else if (!a[i].fixed && (Number(a[i].expireAt) || 0) < (Number(want.expireAt) || 0)) a[i] = Object.assign({}, a[i], { expireAt: want.expireAt, desc: want.desc || a[i].desc });
+                    else return;                                                                  // 그 사이 붙었다
+                    return a;
+                }).then(function () {
+                    try { database.ref('users/' + code + '/hasItemUsedOnMe').set(true); } catch (x) { }
+                }).catch(function (x) { console.warn('[물약지킴] 다시 붙이기 실패', x); });
+            }).catch(function () { });
+        }, ms);
+    });
+}
+(function hookThrow() {
+    const iv = setInterval(function () {
+        if (typeof confirmItemTarget !== 'function') return;
+        if (confirmItemTarget._potVerify) { clearInterval(iv); return; }
+        const _c = confirmItemTarget;
+        const w = async function () {
+            let code = '', item = '', before = 0, at = Date.now();
+            try {
+                const sel = document.getElementById('item-target-select');
+                code = sel ? sel.value : '';
+                item = (typeof pendingTargetItemName !== 'undefined') ? pendingTargetItemName : '';
+                before = invCount(item);
+            } catch (e) { }
+            const r = await _c.apply(this, arguments);
+            try {
+                const cat = (typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[item]) || {};
+                if (code && item && isPotion(item) && !VERIFY_SKIP[cat.effect] && invCount(item) < before) {
+                    const t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+                    const e = t && eff(t).filter(function (x) { return x.name === item; })[0];
+                    if (e) verifyLater(code, item, JSON.parse(JSON.stringify(e)), at);
+                }
+            } catch (e) { }
+            return r;
+        };
+        Object.keys(_c).forEach(function (k) { if (!(k in w)) w[k] = _c[k]; });
+        w._potVerify = true;
+        confirmItemTarget = w; window.confirmItemTarget = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+window.potThrowLog = function () {
+    if (!vlog.length) { console.log('[물약지킴] 남에게 쓴 물약을 다시 붙인 적이 없습니다.'); return; }
+    console.table(vlog);
+};
+
+// ==========================================
 // 확인
 // ==========================================
 window.potKeep = function () {
