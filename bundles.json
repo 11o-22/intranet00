@@ -387,7 +387,8 @@
       "popup-notice.js",
       "house-co.js",
       "note-live.js",
-      "daydream-items.js"
+      "daydream-items.js",
+      "signup.js"
     ]
   ]
 }
