@@ -9,12 +9,19 @@
 //      사원명은 겹칠 수 없다 (있는 사원 · 기다리는 신청과 견준다).
 //   2. 상담사 화면 맨 위 「가입 신청」 칸 — [승인] [반려]
 //        승인  users/<새 코드> 를 만든다 (상담사 발급과 같은 buildNewUser · 팀 현장탐사팀 · 직급 사원)
-//              비밀번호는 passSalt · passHash 로 옮기고, 신청 자리는 지운다.
+//              비밀번호는 pw/<코드> 로 옮기고, 신청 자리는 지운다.
 //        반려  st: 'no' — 같은 이름으로 다시 신청하면 그 자리를 지우고 새로 적는다.
 //      팀 · 직급을 바꾸는 것은 전처럼 「인사 발령」.
 //   3. 접속 — 사원명 + 비밀번호
-//        가입한 사원     passHash 와 맞춰 본다. 맞으면 그 사원의 코드로 원래 접속 길(attemptLogin)을 탄다.
-//        예전 사원       전처럼 사원명 + 인가 코드 (인가 코드가 곧 비밀번호다).
+//        비밀번호가 있는 사원   pw/<코드> 와 맞춰 본다. 맞으면 그 사원의 코드로 원래 접속 길(attemptLogin)을 탄다.
+//        예전 사원             전처럼 사원명 + 인가 코드 (인가 코드가 곧 비밀번호다).
+//   4. 비밀번호 변경 (접속 화면) — 사원명 · 지금 비밀번호(예전 사원은 인가 코드) · 바꿀 비밀번호
+//        pw/<코드> 에 적는다. 그 뒤로는 바꾼 비밀번호로만 들어온다 (인가 코드로는 안 된다).
+//        상담사가 「인가 코드 변경」을 하면 비밀번호를 지운다 — 새 인가 코드가 다시 비밀번호가 된다 (초기화).
+//
+// ■ 비밀번호는 사원 기록 밖(pw/<코드>)에 둔다
+//   사원 기록은 여러 자리가 통째로 다시 쓴다 (set). 기록 안에 두면 묵은 사본이 덮어쓰며 지울 수 있다.
+//   접속 때 그 사람 몫만 읽어 온다 — 모든 화면에 늘 내려가지도 않는다.
 //        기다리는 신청   「승인을 기다리는 중」 · 반려됐으면 「반려되었습니다」.
 //      ★ 가입한 사원의 코드는 비밀이 아니다 (사원 기록은 모든 화면에 내려온다). 그래서 그 코드로는
 //        못 들어온다 — 이 기기에서 들어갔던 적이 있어 자동 접속하는 때만 예외.
@@ -65,6 +72,41 @@ async function pwOk(pw, salt, hash) {
     try { return (await hashPw(pw, salt)) === hash; } catch (e) { return false; }
 }
 function cryptoOk() { return !!(window.crypto && crypto.subtle && crypto.getRandomValues); }
+
+// 그 사원의 비밀번호 — pw/<코드> (예전에 사원 기록 안에 적었던 것도 읽는다)
+async function pwRec(code) {
+    const d = dbr();
+    if (d) {
+        try {
+            const v = (await d.ref('pw/' + code).once('value')).val();
+            if (v && v.s && v.h) return v;
+        } catch (e) { }
+    }
+    const u = users()[code];
+    if (u && u.passSalt && u.passHash) return { s: u.passSalt, h: u.passHash };
+    return null;
+}
+// 사원명 + 비밀번호(또는 인가 코드)가 누구인가
+//   { code, how: 'pw' | 'code' } — 맞았다
+//   codeHasPw — 인가 코드는 맞는데 그 사원은 비밀번호를 정해 두었다 (코드로는 못 들어온다)
+//   anyPw     — 그 이름의 사원 가운데 비밀번호를 정한 사람이 있다 (틀린 비밀번호)
+async function whoIs(name, pw) {
+    const U = users();
+    const same = Object.keys(U).filter(function (c) { return U[c] && U[c].name === name; });
+    let anyPw = false;
+    for (let i = 0; i < same.length; i++) {
+        const rec = await pwRec(same[i]);
+        if (!rec) continue;
+        anyPw = true;
+        if (await pwOk(pw, rec.s, rec.h)) return { code: same[i], how: 'pw' };
+    }
+    const t = U[pw];
+    if (t && t.name === name) {
+        if (await pwRec(pw)) return { codeHasPw: true, anyPw: true };
+        return { code: pw, how: 'code' };
+    }
+    return { anyPw: anyPw };
+}
 
 // ── 신청 목록 (모든 화면이 듣는다 — 이름 겹침 · 접속 때 안내에 쓴다)
 let signups = {};
@@ -131,7 +173,7 @@ window.openSignup = function () {
 function showLogin(on) {
     const box = el('login-screen');
     Array.prototype.forEach.call(box.children, function (c) {
-        if (c.tagName === 'H2' || c.id === 'signup-box') return;
+        if (c.tagName === 'H2' || c.id === 'signup-box' || c.id === 'pwc-box') return;
         c.style.display = on ? '' : 'none';
     });
 }
@@ -180,6 +222,118 @@ async function submit() {
 }
 
 // ==========================================
+// 접속 화면 — 비밀번호 변경
+// ==========================================
+//   사원명 · 지금 비밀번호(예전 사원은 인가 코드) · 바꿀 비밀번호 · 확인
+window.openPwChange = function () {
+    const box = el('login-screen');
+    if (!box) return;
+    const sb = el('signup-box'); if (sb) sb.style.display = 'none';
+    let f = el('pwc-box');
+    if (!f) {
+        f = document.createElement('div');
+        f.id = 'pwc-box';
+        f.style.cssText = 'width:100%; display:flex; flex-direction:column; align-items:stretch;';
+        f.innerHTML =
+              '<div class="login-input-group"><input type="text" id="pwc-name" maxlength="' + NAME_MAX + '" placeholder="사원명"></div>'
+            + '<div class="login-input-group"><input type="password" id="pwc-old" placeholder="지금 비밀번호 (인가 코드)"></div>'
+            + '<div class="login-input-group"><input type="password" id="pwc-new" placeholder="바꿀 비밀번호 (' + PW_MIN + '자 이상)"></div>'
+            + '<div class="login-input-group"><input type="password" id="pwc-new2" placeholder="바꿀 비밀번호 확인"></div>'
+            + '<div style="font-size:11px; color:#8d96a0; text-align:center; margin:0 0 4px; text-shadow:0 1px 3px #000;">'
+            + '바꾼 뒤에는 새 비밀번호로만 접속합니다. 인가 코드로는 더 이상 들어올 수 없습니다.</div>'
+            + '<button class="login-btn" id="pwc-go" type="button">비밀번호 바꾸기</button>'
+            + '<div style="margin-top:14px; font-size:13px; text-align:center;"><a href="#" id="pwc-back" style="color:#9aa3ad;">접속 화면으로</a></div>';
+        box.appendChild(f);
+        el('pwc-go').addEventListener('click', submitPwc);
+        el('pwc-back').addEventListener('click', function (e) { e.preventDefault(); closePwChange(); });
+        el('pwc-new2').addEventListener('keypress', function (e) { if (e.key === 'Enter') submitPwc(); });
+    }
+    showLogin(false);
+    f.style.display = 'flex';
+    const h = box.querySelector('h2'); if (h) { h.dataset.was = h.dataset.was || h.textContent; h.textContent = '비밀번호 변경'; }
+    try { el('pwc-name').value = (el('nickname-input').value || '').trim(); } catch (e) { }
+    setTimeout(function () { try { el(el('pwc-name').value ? 'pwc-old' : 'pwc-name').focus(); } catch (e) { } }, 50);
+};
+function closePwChange() {
+    const f = el('pwc-box');
+    if (f) f.style.display = 'none';
+    showLogin(true);
+    const h = el('login-screen').querySelector('h2'); if (h && h.dataset.was) h.textContent = h.dataset.was;
+}
+window.closePwChange = closePwChange;
+let pwcBusy = false;
+async function submitPwc() {
+    if (pwcBusy) return;
+    const name = (el('pwc-name').value || '').trim();
+    const old = (el('pwc-old').value || '').trim();
+    const nw = el('pwc-new').value || '', nw2 = el('pwc-new2').value || '';
+    if (!name || !old) { say('사원명과 지금 비밀번호를 적어 주세요.'); return; }
+    if (nw.length < PW_MIN) { say('바꿀 비밀번호는 ' + PW_MIN + '자 이상으로 정해 주세요.'); return; }
+    if (nw !== nw2) { say('바꿀 비밀번호 확인이 맞지 않습니다.'); return; }
+    if (!cryptoOk()) { say('이 브라우저에서는 바꿀 수 없습니다.\n\n다른 브라우저로 열어 주세요.'); return; }
+    const d = dbr();
+    if (!d) { say('서버와 연결 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+    pwcBusy = true;
+    try {
+        const r = await whoIs(name, old);
+        if (!r.code) { say('사원명 혹은 지금 비밀번호가 맞지 않습니다.'); return; }
+        const salt = newSalt();
+        const hash = await hashPw(nw, salt);
+        const up = {};
+        up['pw/' + r.code] = { s: salt, h: hash, at: Date.now() };
+        const u = users()[r.code];
+        if (u && (u.passSalt || u.passHash)) { up['users/' + r.code + '/passSalt'] = null; up['users/' + r.code + '/passHash'] = null; }
+        await d.ref().update(up);
+        el('pwc-old').value = ''; el('pwc-new').value = ''; el('pwc-new2').value = '';
+        closePwChange();
+        try { el('nickname-input').value = name; el('code-input').value = ''; } catch (e) { }
+        say('비밀번호를 바꿨습니다.\n\n이제 새 비밀번호로 접속합니다.'
+            + (r.how === 'code' ? '\n예전 인가 코드로는 더 이상 들어올 수 없습니다.' : ''));
+    } catch (e) {
+        console.error('[비밀번호] 바꾸기 실패', e);
+        say('비밀번호를 바꾸지 못했습니다.\n\n잠시 후 다시 시도해 주세요.');
+    } finally { pwcBusy = false; }
+}
+
+// 상담사가 「인가 코드 변경」을 하면 — 비밀번호를 지운다 (새 인가 코드가 다시 비밀번호가 된다 · 초기화)
+(function hookCodeChange() {
+    const iv = setInterval(function () {
+        if (typeof window.adminChangeCode !== 'function') return;
+        if (window.adminChangeCode._pw) { clearInterval(iv); return; }
+        const _c = window.adminChangeCode;
+        const w = async function () {
+            let oldCode = null, newCode = '';
+            try {
+                const no = (el('adm-target-no').value || '').trim();
+                newCode = (el('adm-new-code').value || '').trim();
+                const U = users();
+                oldCode = Object.keys(U).find(function (c) { return U[c] && (U[c].no === no || c === no); }) || null;
+            } catch (e) { }
+            const r = await _c.apply(this, arguments);
+            const d = dbr();
+            if (d && oldCode && newCode && oldCode !== newCode) {
+                try {
+                    const still = (await d.ref('users/' + oldCode).once('value')).val();
+                    if (!still) {
+                        await d.ref('pw/' + oldCode).remove();
+                        const moved = users()[newCode];
+                        if (moved && (moved.passSalt || moved.passHash)) await d.ref('users/' + newCode).update({ passSalt: null, passHash: null });
+                        console.log('[비밀번호] 인가 코드가 바뀌어 비밀번호를 지웠습니다 — 새 인가 코드로 접속합니다.');
+                    }
+                } catch (e) { console.warn('[비밀번호] 코드 변경 뒤 정리 실패', e); }
+            }
+            return r;
+        };
+        Object.keys(_c).forEach(function (k) { if (!(k in w)) w[k] = _c[k]; });
+        w._pw = true;
+        window.adminChangeCode = w;
+        try { adminChangeCode = w; } catch (e) { }
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// ==========================================
 // 접속 — 사원명 + 비밀번호
 // ==========================================
 (function hookLogin() {
@@ -195,21 +349,19 @@ async function submit() {
             if (!name || !pw) return go();
             const U = users();
             const saved = (function () { try { return localStorage.getItem('corp_logged_code'); } catch (e) { return null; } })();
-            // ① 가입한 사원 — 비밀번호로
-            const mine = Object.keys(U).map(function (c) { return U[c]; })
-                .filter(function (u) { return u && u.name === name && u.passHash && u.passSalt; });
-            for (let i = 0; i < mine.length; i++) {
-                if (await pwOk(pw, mine[i].passSalt, mine[i].passHash)) { ci.value = mine[i].code; return go(); }
-            }
-            // ② 코드로 — 예전 사원은 그대로 · 가입한 사원은 이 기기의 자동 접속만
-            const t = U[pw];
-            if (t && t.name === name) {
-                if (!t.passHash) return go();
+            const r = await whoIs(name, pw);
+            // ① 비밀번호가 있는 사원 — 비밀번호로
+            if (r.code && r.how === 'pw') { ci.value = r.code; return go(); }
+            // ② 코드로 — 예전 사원은 그대로 · 비밀번호가 있는 사원은 이 기기의 자동 접속만
+            if (r.code && r.how === 'code') return go();
+            if (r.codeHasPw) {
                 if (saved === pw) return go();
                 say('사원명 혹은 비밀번호가 맞지 않습니다.');
                 return;
             }
-            if (mine.length) { say('사원명 혹은 비밀번호가 맞지 않습니다.'); return; }
+            if (r.anyPw) { say('사원명 혹은 비밀번호가 맞지 않습니다.'); return; }
+            // 사원 기록이 아직 이 화면에 안 내려왔어도 — 비밀번호를 정한 사원의 코드로는 못 들어온다
+            if (saved !== pw && await pwRec(pw)) { say('사원명 혹은 비밀번호가 맞지 않습니다.'); return; }
             // ③ 가입 신청 — 기다리는 중 · 반려
             const sg = Object.keys(signups).map(function (k) { return signups[k]; })
                 .filter(function (s) { return s && s.name === name; });
@@ -303,10 +455,11 @@ window.signupApprove = async function (id) {
     if (typeof buildNewUser !== 'function') { say('사원 기록을 만들 수 없습니다.'); return; }
     const code = newCode();
     const u = buildNewUser(code, s.name, s.aff, '사원', '현장탐사팀');
-    u.passSalt = s.salt; u.passHash = s.hash; u.signedUpAt = s.at || Date.now();
+    u.signedUpAt = s.at || Date.now();
     try {
         const up = {};
         up['users/' + code] = u;
+        up['pw/' + code] = { s: s.salt, h: s.hash, at: Date.now() };
         up['signups/' + id] = null;
         await d.ref().update(up);
         try { db.users[code] = u; } catch (e) { }

@@ -339,6 +339,8 @@
         <button class="login-btn" onclick="attemptLogin()">시스템 활성화</button>
         <div id="signup-link" style="margin-top:16px; font-size:13px; color:#9aa3ad; text-align:center; text-shadow:0 1px 4px #000;">
             처음 오셨나요? <a href="#" onclick="if (typeof openSignup === 'function') openSignup(); else showCustomAlert('잠시 후 다시 눌러 주세요.'); return false;" style="color:#d4af37; font-weight:bold;">가입 신청</a>
+            <span style="color:#555; margin:0 6px;">·</span>
+            <a href="#" onclick="if (typeof openPwChange === 'function') openPwChange(); else showCustomAlert('잠시 후 다시 눌러 주세요.'); return false;" style="color:#9aa3ad;">비밀번호 변경</a>
         </div>
     </div>
 
