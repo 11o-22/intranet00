@@ -490,7 +490,15 @@ function isDark(user) {
     const u = user || u_();
     return /어둠/.test(((u && u.affiliation) || '') + ' ' + ((u && u.team) || ''));
 }
+// ★ 얼굴은 상담사가 정해 준 것만 (2026-10-23 · faces.js) — 정해 준 것이 있으면 그것만(어둠 · 사번 전용이어도),
+//   아직 안 정했으면 지금 얼굴 하나로 고정. 상담사는 전부. faces.js 가 아직 없으면 예전 규칙.
 function allowed(it, user) {
+    if (DOT_HEADS.indexOf(it) >= 0 && typeof window.faceList === 'function') {
+        const u = user || u_();
+        if (isAdm(u)) return true;
+        const l = window.faceList(u);
+        if (l) return l.indexOf(it.i) >= 0;
+    }
     if (it.admin) return isAdm(user);
     if (it.dark) return isAdm(user) || isDark(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
@@ -1314,7 +1322,7 @@ function tap(kind, k, v) {
         const hd = DOT_HEADS.filter(function (h) { return h.i === v; })[0];
         if (hd && !allowed(hd, u_()) && v !== p.head) {
             const n = document.getElementById('closet-note');
-            if (n) { n.innerText = '어둠 소속만 고를 수 있습니다.'; setTimeout(note_, 1800); }
+            if (n) { n.innerText = (typeof window.faceList === 'function') ? '상담사가 정해 준 얼굴만 쓸 수 있습니다.' : '어둠 소속만 고를 수 있습니다.'; setTimeout(note_, 1800); }
             return;
         }
         p.head = v;
@@ -1339,6 +1347,11 @@ function tap(kind, k, v) {
     saveSoon();
 }
 window.closetTap = tap;
+// 밖(faces.js)에서 내 얼굴을 갈아 끼웠을 때 — 옷장이 들고 있던 고른 것을 버리고 다시 그린다
+window.closetReset = function () {
+    pick = null;
+    try { if (document.getElementById('house-closet-body')) render(); } catch (e) { }
+};
 
 // ==========================================
 // 코디 — 지금 모습을 다섯 칸까지 적어 두고 눌러 입는다 (2026-10-23)

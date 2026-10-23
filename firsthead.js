@@ -76,7 +76,17 @@ function mark(quiet) {
 function open() {
     if (document.querySelector('#fh-ov')) return;
     const list = heads();
-    if (!list.length) { mark(); return; }
+    // ★ 고를 얼굴이 하나뿐이면(상담사가 하나만 정했거나 · 아직 안 정해 지금 얼굴로 고정) 묻지 않는다 (2026-10-23)
+    if (list.length <= 1) {
+        const u0 = me();
+        if (u0 && list.length === 1 && (!u0.dot || u0.dot.head !== list[0].i)) {
+            u0.dot = Object.assign({}, (u0.dot && typeof u0.dot === 'object') ? u0.dot : {});
+            u0.dot.head = list[0].i;
+            try { if (typeof saveFields === 'function') saveFields({ dot: 1 }); } catch (e) { }
+            try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+        }
+        mark(); return;
+    }
     const u = me();
     const d = document.createElement('div');
     d.id = 'fh-ov';

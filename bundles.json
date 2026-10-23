@@ -388,7 +388,8 @@
       "house-co.js",
       "note-live.js",
       "daydream-items.js",
-      "signup.js"
+      "signup.js",
+      "faces.js"
     ]
   ]
 }
