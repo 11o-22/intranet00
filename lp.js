@@ -83,9 +83,29 @@ function ac() {
     try { S.ctx = new C(); } catch (e) { return null; }
     return S.ctx;
 }
-['pointerdown', 'touchend', 'keydown'].forEach(function (ev) {
-    document.addEventListener(ev, function () { if (S.ctx && S.ctx.state === 'suspended') { try { S.ctx.resume(); } catch (e) { } } }, { passive: true });
+// ★ 소리 장치는 광장에서 화면을 처음 누를 때 열어 둔다 (2026-10-23)
+//   휴대폰(특히 아이폰 사파리)은 **사람이 누른 그 순간에만** 소리 장치를 열어 준다. 전에는 내가 건반을 칠 때만
+//   열려서, 피아노를 직접 안 친 사람은 남이 친 소리를 못 들었다 (서버에서 온 음으로는 열 수 없다).
+//   걷기 · 말하기 · 단추 — 광장에서 무엇이든 누르면 열린다. 누름은 맨 앞(capture)에서 받는다
+//   (광장 단추들이 누름을 위로 안 올려 보내서 document 에서는 못 받는 때가 있다).
+function unlock() {
+    if (!stage()) return;                                   // 광장 밖에서는 열지 않는다
+    const c = ac();
+    if (!c) return;
+    if (c.state === 'suspended') { try { c.resume(); } catch (e) { } }
+    if (!S.primed) {
+        try {
+            const buf = c.createBuffer(1, 1, 22050);
+            const src = c.createBufferSource();
+            src.buffer = buf; src.connect(c.destination); src.start(0);
+            S.primed = true;
+        } catch (e) { }
+    }
+}
+['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (ev) {
+    window.addEventListener(ev, function () { try { unlock(); } catch (e) { } }, { capture: true, passive: true });
 });
+function audible() { return !!(S.ctx && S.ctx.state === 'running'); }
 function play(midi, vol) {
     const c = ac();
     if (!c) return;
@@ -125,14 +145,23 @@ function listen(seat) {
     if (!d || !seat) return;
     S.seat = seat;
     S.ref = d.ref(LP.NOTE + '/' + seat);
+    // ★ 붙는 순간 이미 있던 음(방금 전 친 것)은 한꺼번에 들어온다 — 그것만 건너뛴다.
+    //   전에는 서버 시각으로 3초가 지났나를 봐서, 기기 시계가 어긋나면 남의 음을 다 버렸다.
+    const armAt = Date.now() + 400;
     S.onAdd = function (snap) {
         const v = snap.val();
         const u = u_();
         if (!v || !u || v.by === u.code) return;
-        if (now() - (Number(v.at) || 0) > LP.NOTE_LIFE) return;              // 묵은 음은 안 낸다
+        if (Date.now() < armAt) return;                                      // 붙을 때 이미 있던 것
+        if (Math.abs(now() - (Number(v.at) || 0)) > 30000) return;          // 아주 묵은 것만 거른다
         if (exploring()) return;                                             // 탐사 중이면 안 들린다
         const m = Number(v.m);
         if (!(m >= 36 && m <= 96)) return;
+        if (!audible()) {                                                    // 아직 화면을 안 눌러 소리 장치가 닫혀 있다
+            try { if (S.ctx) S.ctx.resume(); } catch (e) { }
+            if (!S.hinted) { S.hinted = true; toast('🎹 누군가 피아노를 칩니다 — 화면을 한 번 누르면 들립니다'); }
+            if (!S.ctx || S.ctx.state !== 'running') return;
+        }
         play(m);                                                             // 친 사람과 똑같은 소리 · 같은 크기 (2026-10-23)
     };
     S.ref.on('child_added', S.onAdd);
