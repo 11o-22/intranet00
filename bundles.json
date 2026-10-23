@@ -389,7 +389,8 @@
       "note-live.js",
       "daydream-items.js",
       "signup.js",
-      "faces.js"
+      "faces.js",
+      "lp.js"
     ]
   ]
 }

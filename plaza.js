@@ -1941,6 +1941,135 @@ function rpsOff() {
 setInterval(function () { try { if (run) rpsListen(); else rpsOff(); } catch (e) { } }, 1000);
 window.plazaRps = function () { return { mine: rpsMine ? { holder: rpsMine.holder, tiny: rpsMine.tiny, round: rpsMine.round } : null, lost: run && run.rpsLost || null }; };
 
+// ==========================================
+// 🎵 둘레 효과 · 🪩 디스코 조명 (LP 판 — lp.js 가 켜고 끈다 · 2026-10-23)
+// ==========================================
+//   내 자리 기록에 fx(효과 장 이름) · ds({ c: [색 …최대 4], at }) 를 싣는다 — 같은 방 사람들 화면에도 뜬다.
+//     fx  사람 칸 안에 장 하나를 더 깔고 여섯 칸을 돈다 (서기 줄 그림 · 걷는 동안에도 같은 그림)
+//     ds  방 화면 위에 클럽 조명을 깐다 — 어둡게 낮추고, 고른 색 빛이 돌고 흔들리며 박자에 맞춰 번쩍인다.
+//         같은 방에서 여럿이 켰으면 나중에 켠 사람 것을 쓴다. 그 사람이 방을 떠나면 꺼진다.
+const FX_OK = { 'sound-lp-fx': 1 };
+const FX_MS = 170;
+function fxOf(code) {
+    if (code === myCode()) return run.fx || null;
+    const q = run.peers[code]; return q ? (q.fx || null) : null;
+}
+function fxPaint() {
+    if (!run || !run.me) return;
+    const f = Math.floor(performance.now() / FX_MS) % 6;
+    const sp = spec();
+    const each = function (code, one) {
+        if (!one || !one.actor || !one.actor.el) return;
+        const want = fxOf(code);
+        let el = one._fx;
+        if (el && (!want || el.dataset.fx !== want || el.parentNode !== one.actor.el)) { el.remove(); one._fx = el = null; }
+        if (!want || !FX_OK[want]) return;
+        const k = one.w / sp.W;
+        if (!el) {
+            el = document.createElement('div');
+            el.className = 'dot-layer';
+            el.dataset.fx = want;
+            el.style.backgroundImage = 'url("dot/' + want + '.png")';
+            el.style.backgroundSize = Math.round(sp.W * 6 * k) + 'px ' + Math.round(sp.H * 2 * k) + 'px';
+            el.style.pointerEvents = 'none';
+            one.actor.el.appendChild(el);
+            one._fx = el;
+            el._f = -1;
+        }
+        if (el._f !== f) { el._f = f; el.style.backgroundPosition = '-' + (f * sp.W * k) + 'px -' + (sp.H * k) + 'px'; }
+    };
+    each(myCode(), run.me);
+    Object.keys(run.peers).forEach(function (c) { const q = run.peers[c]; if (q && !q.hid) each(c, q.one); });
+}
+function dsNow() {
+    if (!run) return null;
+    let best = (run.ds && run.ds.c && run.ds.c.length) ? run.ds : null;
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        if (!q || !q.ds) return;
+        if (!best || (Number(q.ds.at) || 0) > (Number(best.at) || 0)) best = q.ds;
+    });
+    return best;
+}
+function dscCss() {
+    if (document.getElementById('plaza-disco-css')) return;
+    const st = document.createElement('style');
+    st.id = 'plaza-disco-css';
+    st.textContent = [
+        '#plaza-disco{position:absolute;inset:0;z-index:30;pointer-events:none;overflow:hidden;}',
+        '#plaza-disco .dz-dim{position:absolute;inset:0;background:rgba(8,0,22,.42);}',
+        '#plaza-disco .dz-spot{position:absolute;width:85vmax;height:85vmax;left:50%;top:50%;margin:-42.5vmax 0 0 -42.5vmax;',
+        '  border-radius:50%;mix-blend-mode:screen;opacity:.55;filter:blur(2px);}',
+        '#plaza-disco .dz-beam{position:absolute;left:50%;top:-60vmax;width:120vmax;height:120vmax;margin-left:-60vmax;',
+        '  mix-blend-mode:screen;opacity:.30;transform-origin:50% 50%;}',
+        '#plaza-disco .dz-flash{position:absolute;inset:0;mix-blend-mode:screen;opacity:0;}',
+        '#plaza-disco .dz-ball{position:absolute;left:50%;top:6px;width:26px;height:26px;margin-left:-13px;border-radius:50%;',
+        '  background:radial-gradient(circle at 35% 30%,#fff 0 10%,#cfd6e6 11% 35%,#8a93a8 36% 70%,#4a5063 71%);',
+        '  box-shadow:0 0 18px rgba(255,255,255,.55);animation:dzSpin 2.4s linear infinite;}',
+        '#plaza-disco .dz-ball:before{content:"";position:absolute;left:50%;top:-8px;width:1px;height:8px;background:#999;}',
+        '@keyframes dzA{0%{transform:translate(-38%,-30%)}25%{transform:translate(34%,-18%)}50%{transform:translate(28%,32%)}75%{transform:translate(-30%,26%)}100%{transform:translate(-38%,-30%)}}',
+        '@keyframes dzB{0%{transform:translate(36%,30%)}25%{transform:translate(-32%,22%)}50%{transform:translate(-26%,-34%)}75%{transform:translate(30%,-24%)}100%{transform:translate(36%,30%)}}',
+        '@keyframes dzC{0%{transform:translate(0,-40%)}33%{transform:translate(40%,20%)}66%{transform:translate(-40%,20%)}100%{transform:translate(0,-40%)}}',
+        '@keyframes dzD{0%{transform:translate(-42%,10%)}50%{transform:translate(42%,-10%)}100%{transform:translate(-42%,10%)}}',
+        '@keyframes dzRot{from{transform:rotate(0)}to{transform:rotate(360deg)}}',
+        '@keyframes dzRot2{from{transform:rotate(360deg)}to{transform:rotate(0)}}',
+        '@keyframes dzBeat{0%,100%{opacity:0}8%{opacity:.34}30%{opacity:.06}}',
+        '@keyframes dzSpin{from{filter:hue-rotate(0)}to{filter:hue-rotate(360deg)}}'
+    ].join('\n');
+    document.head.appendChild(st);
+}
+function dscBuild(cols) {
+    const c = cols.slice(0, 4);
+    while (c.length < 4) c.push(c[c.length % Math.max(1, cols.length)] || c[0]);
+    const anim = ['dzA 7s', 'dzB 9s', 'dzC 11s', 'dzD 8s'];
+    let h = '<div class="dz-dim"></div>';
+    c.forEach(function (col, i) {
+        h += '<div class="dz-spot" style="background:radial-gradient(circle,' + col + ' 0%,' + col + 'aa 18%,transparent 58%);'
+            + 'animation:' + anim[i] + ' ease-in-out infinite;"></div>';
+    });
+    const stripes = [];
+    c.forEach(function (col, i) { const a = i * 90; stripes.push(col + ' ' + a + 'deg ' + (a + 9) + 'deg', 'transparent ' + (a + 9) + 'deg ' + (a + 45) + 'deg', col + ' ' + (a + 45) + 'deg ' + (a + 52) + 'deg', 'transparent ' + (a + 52) + 'deg ' + (a + 90) + 'deg'); });
+    h += '<div class="dz-beam" style="background:conic-gradient(from 0deg,' + stripes.join(',') + ');animation:dzRot 14s linear infinite;"></div>';
+    h += '<div class="dz-beam" style="opacity:.18;background:conic-gradient(from 45deg,' + stripes.join(',') + ');animation:dzRot2 19s linear infinite;"></div>';
+    c.forEach(function (col, i) {
+        h += '<div class="dz-flash" style="background:' + col + ';animation:dzBeat 2s ease-out ' + (i * 0.5) + 's infinite;"></div>';
+    });
+    h += '<div class="dz-ball"></div>';
+    return h;
+}
+function dscPaint() {
+    if (!run || !run.view) return;
+    const cur = dsNow();
+    let el = document.getElementById('plaza-disco');
+    if (!cur) { if (el) el.remove(); return; }
+    dscCss();
+    if (!el || el.parentNode !== run.view) {
+        if (el) el.remove();
+        el = document.createElement('div');
+        el.id = 'plaza-disco';
+        run.view.appendChild(el);
+    }
+    const key = cur.c.join(',');
+    if (el.dataset.k !== key) { el.dataset.k = key; el.innerHTML = dscBuild(cur.c); }
+}
+setInterval(function () { try { if (run) { fxPaint(); dscPaint(); } } catch (e) { } }, 90);
+const DS_COLOR = /^#[0-9a-fA-F]{6}$/;
+window.plazaFx = function (name) {
+    if (!run) return null;
+    const v = (name && FX_OK[name]) ? name : null;
+    if (run.fx !== v) { run.fx = v; resend(); }
+    return run.fx;
+};
+window.plazaDisco = function (cols) {
+    if (!run) return null;
+    const c = Array.isArray(cols) ? cols.filter(function (x) { return DS_COLOR.test(String(x)); }).slice(0, 4) : [];
+    run.ds = c.length ? { c: c, at: now() } : null;
+    resend();
+    try { dscPaint(); } catch (e) { }
+    return run.ds;
+};
+window.plazaDiscoNow = function () { return dsNow(); };
+
 // ── 보는 쪽 — 들린 사람을 든 사람에게 붙여 그린다 (tick 끝에서)
 function carryPaint(dt) {
     let busy = false;
@@ -3083,6 +3212,8 @@ function send(moving) {
             dn: run.dn || null,
             on: run.on ? { by: run.on.by, k: run.on.k, at: run.on.at || 0 } : null,
             ho: (myC && myC.k === 'head') ? Math.round(run.hox || 0) : null,
+            // 🎵 둘레 효과 장 · 🪩 디스코 조명 (LP 판 · lp.js)
+            fx: run.fx || null, ds: run.ds || null,
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
@@ -3505,6 +3636,8 @@ function onSeat(code, v, fresh) {
     q.dn = (v.dn && typeof v.dn === 'object') ? v.dn : null;   // 🍍 이 사람이 내려놓은 때
     q.on = (v.on && v.on.by) ? v.on : null;          // 🍍 이 사람이 올라간 곳
     q.ho = (typeof v.ho === 'number') ? v.ho : 0;   // 🍍 남의 머리 위 어디쯤
+    q.fx = (typeof v.fx === 'string') ? v.fx : null;  // 🎵 둘레 효과 (LP 판)
+    q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     wake();                                // 쉬고 있었으면 바로 따라 그린다
     setTag(q.one, code, v.n || code);
@@ -4845,6 +4978,7 @@ function shut() {
     closeCarryMenu();
     run.carry = null; run.on = null; run.dn = null;
     followOff(); rpsOff(); rpsClose(); if (rpsMine) rpsEnd();
+    run.fx = null; run.ds = null; try { const dd = document.getElementById('plaza-disco'); if (dd) dd.remove(); } catch (e) { }
     if (run.onWake) {
         window.removeEventListener('keydown', run.onWake, true);
         window.removeEventListener('pointerdown', run.onWake, true);

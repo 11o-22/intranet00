@@ -150,7 +150,8 @@ const DOT = {
     //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
     //   ★ 상의 칸으로 옮긴 셋(룩키마트 의상 · 가을 니트 · 체육복)은 잠옷 상의 바로 뒤 — 겉옷이 그 위에 덮인다 (2026-10-23)
     //   ★ 섹시빤츄(악세 · 2026-10-23)는 맨 앞 — 몸 바로 위 · 모든 옷 밑 (옷을 입으면 가려진다)
-    Z: ['sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
+    //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
+    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
         'dress-yellow', 'dress-green', 'maid', 'maid-long',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
@@ -177,6 +178,8 @@ const DOT = {
                  // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
                  //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
                  'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5],
+                 // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
+                 'sound-lp': [0, 1, 2, 3, 4, 5],
                  // 의상 뽑기 다섯 벌 (2026-10-23) — 서기 줄이 칸마다 다르게 그려진 셋은 여섯 칸을 돈다
                  'dress-green': [0, 1, 2, 3, 4, 5], 'maid-long': [0, 1, 2, 3, 4, 5], 'band-outfit': [0, 1, 2, 3, 4, 5] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
@@ -354,7 +357,10 @@ const DOT_SLOTS = [
             { i: 'shoes', n: '구두', over: ['shoes'], own: 'shoes' },
             { i: 'han', n: '신', over: ['han-shoes'], own: 'han-shoes' },
             { i: 'black', n: '검은 구두', over: ['shoes-black'], own: 'shoes-black' },
-            { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes' }
+            { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes' },
+            // ★ 사운드 신발 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 (wear-gift.js) · 거래하지 않는다.
+            //   받은 그림은 1728x768 (칸 288) · 칸마다 +30. 걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다. 서기는 첫 칸.
+            { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes', noTrade: true }
         ]
     },
     {
@@ -453,7 +459,12 @@ const DOT_SLOTS = [
             //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
             { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' },
             // ★ 사운드 레빗 헤드셋 (2026-10-23) — 사운드 세트. 걷기 · 서기 줄 여섯 칸 다 그려져 있다 (귀가 흔들린다).
-            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', noTrade: true, cat: '머리' }
+            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', noTrade: true, cat: '머리' },
+            // ★ LP 판 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다.
+            //   달면 광장에 LP 단추가 뜬다 — 피아노 · 디스코 (lp.js). 누르는 동안만 높은음자리표 · 음표가 둘레에 뜬다 (sound-lp-fx).
+            //   받은 그림은 1728x768 (칸 288) · 덩어리마다 주인 칸을 가려 +30 으로 옮겼다 (칸 밖으로 나간 조각 끝은 잘랐다).
+            //   서기 줄 여섯 칸에 판이 돈다. 옷 밑(over · Z 맨 앞)에 깔고, 몸(다리 · 발) 자리는 그림에서 비워 발밑에 깔린 것처럼 보인다.
+            { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', noTrade: true, cat: '그 밖' }
         ]
     }
 ];
