@@ -149,7 +149,8 @@ const DOT = {
     // 겹치는 차례 — 앞에 있는 것이 아래로 간다
     //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
     //   ★ 상의 칸으로 옮긴 셋(룩키마트 의상 · 가을 니트 · 체육복)은 잠옷 상의 바로 뒤 — 겉옷이 그 위에 덮인다 (2026-10-23)
-    Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
+    //   ★ 섹시빤츄(악세 · 2026-10-23)는 맨 앞 — 몸 바로 위 · 모든 옷 밑 (옷을 입으면 가려진다)
+    Z: ['sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
         'dress-yellow', 'dress-green', 'maid', 'maid-long',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
@@ -414,6 +415,11 @@ const DOT_SLOTS = [
             //   줄 이름(i)은 'gat' 그대로다 — 이미 고른 분의 적힌 것이 틀어진다.
             //   가진 표(own)만 장 이름과 같은 'han-gat' 이다 (gacha.js 참고).
             { i: 'gat', n: '갓', top: ['han-gat'], own: 'han-gat', cat: '머리' },
+            // ★ 섹시빤츄 (2026-10-23 · 의상 뽑기 악세 B) — 악세지만 **옷 밑**에 입는다 (over · Z 맨 앞).
+            //   주신 그림은 1440x640 JPG(칸 240 — 1728 규격을 줄인 것)라 1728 로 되늘려, 몸 그림과 색이 다른 자리 중
+            //   어둡고 색끼 없는 것(끈 · 천 · 니플 패치)만 떠서 세 가지 어둠으로 고쳐 칠했다. 몸 테두리 · 귀는 뺐다.
+            //   서기 줄은 마지막 칸에만 그려져 있어 그 칸을 여섯 칸 모두에 깔았다 (몸 서기 그림은 여섯 칸이 같다).
+            { i: 'sexy-pantsu', n: '섹시빤츄', over: ['sexy-pantsu'], own: 'sexy-pantsu', cat: '등' },
             // ★ 토끼 전용 둘 — 악세 뽑기에 **안 넣는다**. 악세서리숍에서
             //   어둠 소속이 5만 P 에 산다 (gacha.js 의 BUY).
             //
