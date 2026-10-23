@@ -1220,7 +1220,7 @@ function bubble(one, text, sty) {
 //   파인애플맛 물약으로 작아진 사람과 보통 사람이 서로를 톡 치면 고르는 칸이 뜬다.
 //     보통 사람이 작은 사람을   [손에 든다] [머리에 얹는다] — 든 사람을 다시 치면 바꿔 들기 · [내려놓는다]
 //     작은 사람이 보통 사람을   [올라가기] [손에 앉기]      — 올라가 있는 사람을 다시 치면 손 ↔ 머리
-//   멀면 걸어가서 한다. 한 사람 머리 위에는 셋까지, 손에는 하나.
+//   멀면 걸어가서 한다. 한 사람 머리 위에는 다섯까지, 양손에 하나씩 둘 — 모두 일곱 (2026-10-23 · 처음엔 머리 셋 · 손 하나).
 //
 //   ■ 누가 누구를 — 자리 기록에 **제 쪽에서** 적는다 (남의 칸은 못 쓴다)
 //       든 사람    cy: [{ c: 작은 사람, k: 'hand'|'head', at }]   내가 들었다
@@ -1230,14 +1230,14 @@ function bubble(one, text, sty) {
 //     보는 화면마다 같은 규칙으로 푼다 (carryMapNow).
 //       · 같은 둘 사이에 둘 다 적혀 있으면 **나중에 적은 것**(손인지 머리인지)
 //       · 여러 사람이 한 작은 사람을 다투면 **먼저 잡은 쪽**
-//       · 한 사람 머리 셋 · 손 하나를 넘으면 늦게 온 쪽은 못 붙는다 (그 쪽이 저절로 지운다)
+//       · 한 사람 머리 다섯 · 손 둘을 넘으면 늦게 온 쪽은 못 붙는다 (그 쪽이 저절로 지운다)
 //
 //   ■ 그리는 자리는 **보는 화면마다 든 사람에게 붙여** 셈한다
 //     작은 사람이 보낸 x·y 를 따라가면 4분의 1초씩 늦게 붙어 손에서 떨어져 보인다.
 //     그래서 든 사람의 지금 자리 + 손(또는 머리) 자리로 바로 놓고, 든 사람보다 한 겹 앞에 그린다.
-//       손   앞쪽 손 위 — 작은 사람은 못 움직인다 (걷기 · 톡 쳐서 가기 다 막힘)
+//       손   먼저 온 사람은 앞쪽 손 · 다음 사람은 뒤쪽 손 위 — 작은 사람은 못 움직인다 (걷기 · 톡 쳐서 가기 다 막힘)
 //       머리 머리 꼭대기 — 좌우로만 걸어 다닌다 (가운데서 HEAD_R 도트까지).
-//            올라설 때 비어 있는 자리(가운데 · 왼쪽 · 오른쪽)에 선다.
+//            올라설 때 비어 있는 자리(가운데 · 왼쪽 · 오른쪽 · 양 끝)에 선다.
 //     머리 위 사람들 이름표는 먼저 온 순서로 한 줄씩 올리고, 든 사람 이름표는 그 위로 올린다.
 //
 //   ■ 놓이는 때
@@ -1251,9 +1251,10 @@ const CARRY = {
     HEAD_R: 30,        // 머리 위에서 좌우로 갈 수 있는 폭 (한쪽 — 머리 꼭대기 평평한 데까지)
     HEAD_CURVE: 10,    // 가장자리로 갈수록 머리가 둥글게 내려가는 만큼 (칸 도트)
     HEAD_SPEED: 80,    // 머리 위 걷는 빠르기 (칸 도트 / 초)
-    HEAD_SLOTS: [0, -22, 22],   // 올라설 때 고르는 자리 (비어 있는 쪽부터)
-    HEAD_MAX: 3,       // 한 사람 머리 위에 몇 명까지
-    HAND_MAX: 1,       // 손에는 하나
+    HEAD_SLOTS: [0, -15, 15, -30, 30],   // 올라설 때 고르는 자리 (비어 있는 쪽부터)
+    HEAD_MAX: 5,       // 한 사람 머리 위에 몇 명까지
+    HAND_MAX: 2,       // 양손에 하나씩
+    HAND_X2: 46,       // 뒤쪽 손 — 몸 가운데서 보는 반대쪽으로 (서 있을 때 두 손이 몸 양옆에 같은 폭으로 있다)
     NEAR_W: 0.22,      // 보통 사람 칸 폭의 이만큼 안이면 닿은 것 (칸은 몸보다 훨씬 넓다 — 몸 바로 옆)
     TAG_ROOM: 16,      // 작은 사람 이름표 몫 (화면 px)
     TAG_STEP: 13,      // 머리 위 사람이 여럿이면 이름표를 이만큼씩 올린다
@@ -1361,14 +1362,21 @@ function holderPos(by) {
     return { one: one, x: x, y: y, face: face, kk: one.w / spec().W };
 }
 // 손 · 머리 자리 (방 좌표 — 작은 사람의 발이 닿는 곳)
-function attachAt(h, kind, ox) {
+function attachAt(h, kind, ox, hi) {
     const sp = spec(), z = zz(), kk = h.kk;
     if (kind === 'head') {
         const top = (h.one.tag && typeof h.one.tag._top === 'number') ? h.one.tag._top : TAG_TOP;
         const e = Math.min(1, Math.abs(ox || 0) / CARRY.HEAD_R);
         return { x: h.x + (ox || 0) * kk / z, y: h.y - (sp.H - sp.FOOT - top - CARRY.HEAD_SINK - CARRY.HEAD_CURVE * e * e) * kk / z };
     }
+    if (hi === 1) return { x: h.x + h.face * CARRY.HAND_X2 * kk / z, y: h.y - CARRY.HAND_UP * kk / z };   // 뒤쪽 손
     return { x: h.x - h.face * CARRY.HAND_X * kk / z, y: h.y - CARRY.HAND_UP * kk / z };
+}
+// 손에 든 사람이 몇 번째 손인가 (먼저 온 사람이 앞쪽 손 0 · 다음이 뒤쪽 손 1)
+function handIdx(by, c) {
+    const h = M().by[by];
+    const i = h ? h.hand.indexOf(c) : -1;
+    return i < 0 ? 0 : i;
 }
 // 작은 사람 키 (화면 px) — 든 사람 이름표를 그만큼 올린다
 function tinyTall(one) {
@@ -1394,7 +1402,7 @@ function nameIn(code) {
     return carryNames[code] || '누군가';
 }
 function resend() { if (run) { run.sx = -9999; run.sent = 0; } }
-function noTxt(k) { return k === 'head' ? '머리 위에는 ' + CARRY.HEAD_MAX + '명까지입니다' : '손이 차 있습니다'; }
+function noTxt(k) { return k === 'head' ? '머리 위에는 ' + CARRY.HEAD_MAX + '명까지입니다' : '양손이 다 차 있습니다'; }
 
 // ── 매 틀 — 내가 적은 것이 아직 말이 되나 (든 쪽 · 작은 쪽 둘 다)
 function carryCheck() {
@@ -1585,7 +1593,7 @@ function carryMe(cm, dt, ix, iy) {
             sysLine('🍍 ' + nameIn(cm.by) + ' 사원 손 위라 움직일 수 없습니다.');
         }
     }
-    const a = attachAt(h, cm.k, run.hox || 0);
+    const a = attachAt(h, cm.k, run.hox || 0, cm.k === 'hand' ? handIdx(cm.by, myCode()) : 0);
     run.x = a.x; run.y = a.y;
     run.me.zOver = (h.one._Z || 100) + 1;
     run.wasC = { by: cm.by, k: cm.k, gy: h.y };
@@ -1651,7 +1659,7 @@ function carryPaint(dt) {
             if (Math.abs(d) > 0.5) { q.hox += d * (1 - Math.exp(-dt / 0.12)); busy = true; } else q.hox = want;
             ox = q.hox;
         }
-        const a = attachAt(h, w.k, ox);
+        const a = attachAt(h, w.k, ox, w.k === 'hand' ? handIdx(w.by, code) : 0);
         q.x = q.tx = a.x; q.y = q.ty = a.y;
         q.one.actor.face(q.face || 1);
         q.one.zOver = (h.one._Z || 100) + 1;
