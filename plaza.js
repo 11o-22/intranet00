@@ -1240,8 +1240,13 @@ function bubble(one, text, sty) {
 //            올라설 때 비어 있는 자리(가운데 · 왼쪽 · 오른쪽 · 양 끝)에 선다.
 //     머리 위 사람들 이름표는 먼저 온 순서로 한 줄씩 올리고, 든 사람 이름표는 그 위로 올린다.
 //
+//   ■ 다른 방으로 갈 때 (2026-10-23) — 든 사람이 방을 옮기면 머리 위 · 손에 있던 사람이 **같이 간다**
+//     든 사람이 옮기기 직전에 plazaFollow/<작은 사람> = { by, room, inst, at } 를 적는다 (방 번호는 들어선 뒤 한 번 더).
+//     작은 사람 화면은 그것을 듣고 있다가 — 방금까지 그 사람에게 들려 있었으면 — 그 방(번호)으로 따라 들어간다.
+//     든 사람은 새 방에서 FOLLOW_MS 동안 그 사람이 안 보여도 내려놓지 않고 기다린다.
+//
 //   ■ 놓이는 때
-//     든 사람이 [내려놓는다] · 다른 방으로 감 · 광장을 닫음 · 든 사람이 작아짐
+//     든 사람이 [내려놓는다] · 광장을 닫음 · 든 사람이 작아짐 · 따라오지 못함(FOLLOW_MS)
 //     작은 사람이 원래 크기로 돌아옴(물약 시간이 끝남) · 방을 떠남 · 가두리에 갇힘
 //     놓이면 작은 사람은 그 자리 바닥(든 사람 발 높이)으로 내려선다.
 const CARRY = {
@@ -1258,7 +1263,8 @@ const CARRY = {
     NEAR_W: 0.22,      // 보통 사람 칸 폭의 이만큼 안이면 닿은 것 (칸은 몸보다 훨씬 넓다 — 몸 바로 옆)
     TAG_ROOM: 16,      // 작은 사람 이름표 몫 (화면 px)
     TAG_STEP: 13,      // 머리 위 사람이 여럿이면 이름표를 이만큼씩 올린다
-    DN_KEEP: 60000     // 내려놓은 때는 이만큼만 들고 있는다
+    DN_KEEP: 60000,    // 내려놓은 때는 이만큼만 들고 있는다
+    FOLLOW_MS: 12000   // 방을 옮긴 뒤 작은 사람이 따라 들어오기를 기다리는 만큼
 };
 const CARRY_WORD = { hand: '손에 든다', head: '머리에 얹는다' };
 const CLIMB_WORD = { head: '올라가기', hand: '손에 앉기' };
@@ -1414,10 +1420,11 @@ function carryCheck() {
         const keep = [];
         mine.forEach(function (x) {
             const w = m.of[x.c];
-            if (w && w.by === me) { keep.push(x); return; }
+            if (w && w.by === me) { if (x.fw) delete x.fw; keep.push(x); return; }
             const q = run.peers[x.c];
+            if (!q && x.fw && now() - x.fw < CARRY.FOLLOW_MS) { keep.push(x); return; }   // 따라오는 중
             let why = '';
-            if (!q) why = '자리를 떠나서';
+            if (!q) why = x.fw ? '따라오지 못해서' : '자리를 떠나서';
             else if (!q.sm) why = '원래 크기로 돌아와서';
             else if (tinyOf(u_())) why = '내가 작아져서';
             else if (caged(x.c) || caged(me)) why = '가두리 때문에';
@@ -1593,6 +1600,7 @@ function carryMe(cm, dt, ix, iy) {
             sysLine('🍍 ' + nameIn(cm.by) + ' 사원 손 위라 움직일 수 없습니다.');
         }
     }
+    run.lastBy = { by: cm.by, t: now() };           // 방을 옮기면 따라갈 사람
     const a = attachAt(h, cm.k, run.hox || 0, cm.k === 'hand' ? handIdx(cm.by, myCode()) : 0);
     run.x = a.x; run.y = a.y;
     run.me.zOver = (h.one._Z || 100) + 1;
@@ -1608,6 +1616,12 @@ function carryNote(cm) {
     if (cm) {
         const self = !!(run.on && run.on.by === cm.by && run.on.k === cm.k);
         const nm = nameIn(cm.by);
+        if (run.folBy && run.folBy.by === cm.by && now() - run.folBy.t < CARRY.FOLLOW_MS + 4000) {
+            run.folBy = null;                           // 따라 들어와 다시 붙었다 — 알림은 한 번만 (따라갈 때 적었다)
+            if (cm.k === 'head') { run.hox = freeSlot(cm.by); run.hoT = null; }
+            run.cpend = null; resend();
+            return;
+        }
         sysLine('🍍 ' + (self
             ? nm + ' 사원 ' + (cm.k === 'head' ? '머리 위에 올라갔습니다 — 좌우로 걸을 수 있습니다.' : '손에 앉았습니다 — 움직일 수 없습니다.')
             : nm + ' 사원이 ' + (cm.k === 'head' ? '머리 위에 얹었습니다 — 좌우로 걸을 수 있습니다.' : '손에 들었습니다 — 움직일 수 없습니다.')));
@@ -1638,6 +1652,67 @@ function carryNote(cm) {
     resend();
     sysLine('🍍 내려왔습니다.');
 }
+
+// ── 방을 옮길 때 — 든 사람 쪽: 지금 든 사람들을 내 기록으로 옮겨 적고 「따라오라」고 적는다
+//   스스로 올라온 사람(on)도 내 기록(cy)으로 옮겨 적는다 — 새 방에서는 그 사람 on 이 지워져 있다.
+function followMark(room, inst) {
+    if (!run) return;
+    const me = myCode(), d = db_();
+    const h = remap().by[me];
+    if (!h || !(h.head.length + h.hand.length)) { run.carry = null; return; }
+    const of = M().of, t = now(), list = [];
+    h.head.concat(h.hand).forEach(function (c) {
+        const w = of[c]; if (!w) return;
+        try { nameIn(c); } catch (e) { }                // 이름을 적어 둔다 (못 따라오면 내려놓을 때 쓴다)
+        list.push({ c: c, k: w.k, at: w.start, fw: t });
+    });
+    run.carry = list;
+    followSend(room, inst);
+}
+function followSend(room, inst) {
+    const d = db_(), me = myCode();
+    if (!d || !run) return;
+    listOf(run.carry).forEach(function (x) {
+        if (!x.fw) return;
+        try { d.ref('plazaFollow/' + x.c).set({ by: me, room: room, inst: inst || 0, at: now() }); } catch (e) { }
+    });
+}
+// ── 작은 사람 쪽 — 「따라오라」를 듣는다
+let folRef = null, folCode = '';
+function followListen() {
+    const d = db_(), me = myCode();
+    if (!run || !d || !me) return;
+    if (folRef && folCode === me) return;
+    followOff();
+    folCode = me;
+    folRef = d.ref('plazaFollow/' + me);
+    folRef.on('value', function (s) {
+        const v = s.val();
+        if (!v || !run) return;
+        try { folRef.remove(); } catch (e) { }
+        if (!v.by || !R[v.room] || now() - (Number(v.at) || 0) > 15000) return;
+        if ((Number(v.at) || 0) <= (run.folAt || 0)) return;                 // 이미 받은 것
+        run.folAt = Number(v.at) || 0;
+        if (!tinyOf(u_()) || cageMine()) return;
+        const lb = run.lastBy;
+        if (!lb || lb.by !== v.by || now() - lb.t > 15000) return;          // 방금까지 그 사람에게 들려 있었어야 한다
+        run.folBy = { by: v.by, t: now() };
+        if (v.room !== run.room) {
+            sysLine('🍍 ' + nameIn(v.by) + ' 사원을 따라 ' + R[v.room].n + '(으)로 갑니다.');
+            run.forceInst = v.inst || 0;
+            goRoom(v.room, null, 0);
+            run.lastBy = { by: v.by, t: now() };                              // 방 번호를 한 번 더 받을 수 있게
+        } else if (v.inst && v.inst !== run.inst) {
+            hopInst(v.inst);
+            run.lastBy = { by: v.by, t: now() };
+        }
+    });
+}
+function followOff() {
+    if (folRef) { try { folRef.off(); } catch (e) { } }
+    folRef = null; folCode = '';
+}
+setInterval(function () { try { if (run) followListen(); else followOff(); } catch (e) { } }, 1000);
 
 // ── 보는 쪽 — 들린 사람을 든 사람에게 붙여 그린다 (tick 끝에서)
 function carryPaint(dt) {
@@ -2427,8 +2502,12 @@ function goRoom(key, way, lv) {
     }
     const r = R[key];
 
-    // 🍍 방을 옮기면 든 것은 놓고, 들려 있던 것도 풀린다
-    run.carry = null; run.on = null; run.dn = null; run.cmap = null; run.cpend = null; run.cKey = ''; run.wasC = null; run.hox = 0; run.hoT = null;
+    // 🍍 방을 옮기면 — 든 사람들은 따라오게 적어 두고(followMark), 들려 있던 것(나)은 풀린다
+    //   (따라오라는 말을 받아 옮기는 것이면 새 방에서 든 사람이 다시 붙인다)
+    const fwHad = !!listOf(run.carry).length || !!(M().by[myCode()]);
+    try { if (fwHad && !tinyOf(u_()) && !cg) followMark(key, 0); else run.carry = null; } catch (e) { run.carry = null; }
+    if (!listOf(run.carry).some(function (x) { return x.fw; })) run.carry = null;
+    run.on = null; run.dn = null; run.cmap = null; run.cpend = null; run.cKey = ''; run.wasC = null; run.hox = 0; run.hoT = null;
     closeCarryMenu();
     if (run.me) run.me.zOver = null;
 
@@ -2842,6 +2921,7 @@ function enterInst(inst) {
     if (!run) return;
     run.inst = inst;
     run.joinAt = now();
+    try { followSend(run.room, inst); } catch (e) { }      // 🍍 따라오는 사람에게 방 번호까지
     watchRoom();
     watchChat();
     run.sx = run.sy = -9999; run.sent = 0;          // 곧바로 내 자리를 알린다
@@ -2851,6 +2931,7 @@ function enterInst(inst) {
 // 같은 장소 안에서 방만 바꾼다 (서 있던 자리는 그대로)
 function hopInst(inst) {
     if (!run || inst === run.inst) return;
+    try { if (!tinyOf(u_())) { const t = now(); listOf(run.carry).forEach(function (x) { x.fw = t; }); followMark(run.room, inst); } } catch (e) { }
     leaveRoom();
     Object.keys(run.peers).forEach(dropPeer);
     showWho();
@@ -2867,6 +2948,7 @@ function overSoon() {
 function overCheck() {
     const u = u_();
     if (!run || !run.ref || !u) return;
+    if (carryMine() || (run.folBy && now() - run.folBy.t < CARRY.FOLLOW_MS + 4000)) return;   // 🍍 들려 왔다 — 든 사람 곁에 남는다
     const codes = Object.keys(run.peers).filter(function (c) {
         const q = run.peers[c]; return q && q.at && now() - q.at <= P.STALE_MS;
     });
@@ -4518,6 +4600,7 @@ function shut() {
     if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
     closeCarryMenu();
     run.carry = null; run.on = null; run.dn = null;
+    followOff();
     if (run.onWake) {
         window.removeEventListener('keydown', run.onWake, true);
         window.removeEventListener('pointerdown', run.onWake, true);
