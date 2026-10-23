@@ -81,6 +81,12 @@ const GACHA_WEAR = [
     { k: 'agent1',      n: '요원복 1',   g: 'B', s: ['agent1'] },
     { k: 'agent2',      n: '요원복 2',   g: 'B', s: ['agent2'] },
     { k: 'han-duru',    n: '두루마기',   g: 'B', s: ['han-duru'] },
+    // 다섯 벌 더 (2026-10-23) — 이름 · 등급은 말씀이 없으셔서 그림을 보고 붙이고 B 로 두었습니다 (고치셔도 됩니다)
+    { k: 'dress-yellow', n: '노란 원피스', g: 'B', s: ['dress-yellow'] },
+    { k: 'dress-green',  n: '초록 원피스', g: 'B', s: ['dress-green'] },
+    { k: 'maid',         n: '메이드복',    g: 'B', s: ['maid'] },
+    { k: 'maid-long',    n: '롱 메이드복', g: 'B', s: ['maid-long'] },
+    { k: 'band-outfit',  n: '초록 띠 제복', g: 'B', s: ['band-outfit'] },
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },

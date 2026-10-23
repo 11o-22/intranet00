@@ -150,6 +150,7 @@ const DOT = {
     //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
     Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
+        'dress-yellow', 'dress-green', 'maid', 'maid-long', 'band-outfit',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
@@ -173,7 +174,9 @@ const DOT = {
                  'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5],
                  // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
                  //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
-                 'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5] },
+                 'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5],
+                 // 의상 뽑기 다섯 벌 (2026-10-23) — 서기 줄이 칸마다 다르게 그려진 셋은 여섯 칸을 돈다
+                 'dress-green': [0, 1, 2, 3, 4, 5], 'maid-long': [0, 1, 2, 3, 4, 5], 'band-outfit': [0, 1, 2, 3, 4, 5] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -321,7 +324,17 @@ const DOT_SLOTS = [
             //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
             //   걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다 (헤드셋은 여섯 칸 다 그려져 왔다).
             //   서기 줄은 두 칸 — 의상은 두 칸이 같은 그림이라 0 에 세워 둔다.
-            { i: 'sound', n: '사운드 의상', over: ['sound-outfit'], own: 'sound-outfit', noTrade: true }
+            { i: 'sound', n: '사운드 의상', over: ['sound-outfit'], own: 'sound-outfit', noTrade: true },
+            // ★ 의상 뽑기 다섯 벌 (2026-10-23) — 한 벌씩 통째로 그려져 있다.
+            //   주신 그림은 432x192 (칸 72x96) — 지난 규격(1728x768 · 칸 288)의 ¼ 이라 네 배로 늘려
+            //   (도트 한 칸이 4픽셀 · 요원복 · 브라운 정장과 같다) 칸마다 가로 +30 으로 352 칸에 옮겼다.
+            //   몸에 대 보니 어깨 · 발이 그대로 맞았다. 걷기 줄은 여섯 칸 다 그려져 왔다.
+            //   이름은 그림을 보고 붙였다 (말씀이 없으셨다).
+            { i: 'ydress', n: '노란 원피스', over: ['dress-yellow'], own: 'dress-yellow' },
+            { i: 'gdress', n: '초록 원피스', over: ['dress-green'], own: 'dress-green' },
+            { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
+            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
+            { i: 'band', n: '초록 띠 제복', over: ['band-outfit'], own: 'band-outfit' }
         ]
     },
     {
