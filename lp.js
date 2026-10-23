@@ -13,6 +13,7 @@
 //     🎹 피아노   높은음자리표(가온 다 C4 ~ C5)를 기본으로 한 옥타브 건반. 위 · 아래로 한 옥타브씩 옮긴다
 //                 (C3 ~ C6). 화면이 넓으면(펼친 폴드 · 태블릿) 세 옥타브를 한 줄로 다 깐다 (넓은 가로 폰은 두 옥타브).
 //                 누른 음은 같은 방 사람들에게도 **친 사람과 똑같은 소리 · 같은 크기로** 들린다 (plazaNote/<방> · 3초 뒤 지운다).
+//                 탐사(어둠 · 솔로 · EPIC · K 의 방 · 재난)에 들어가 있는 사람에게는 안 들린다.
 //     🪩 디스코   스무 가지 색 가운데 넷까지 골라 켜면 방 화면이 클럽 조명으로 바뀐다 (같은 방 사람들 화면도).
 //                 끌 때까지 켜져 있다 · LP 판을 빼거나 광장을 닫으면 꺼진다.
 //
@@ -112,6 +113,12 @@ function play(midi, vol) {
 // ==========================================
 // 같은 방에 들려주기 — plazaNote/<방>/<열쇠> = { by, m, at }
 // ==========================================
+// 탐사 중인가 — 어둠 탐사 · 솔로 · EPIC · K 의 방(darkRun) · 재난 기록 소실 창(#dz-ov)
+//   탐사에 들어간 사람에게는 같은 방에서 친 피아노 소리를 내지 않는다 (2026-10-23)
+function exploring() {
+    try { if (typeof darkRun !== 'undefined' && darkRun) return true; } catch (e) { }
+    return !!document.querySelector('#dz-ov');
+}
 function listen(seat) {
     unlisten();
     const d = db_();
@@ -123,6 +130,7 @@ function listen(seat) {
         const u = u_();
         if (!v || !u || v.by === u.code) return;
         if (now() - (Number(v.at) || 0) > LP.NOTE_LIFE) return;              // 묵은 음은 안 낸다
+        if (exploring()) return;                                             // 탐사 중이면 안 들린다
         const m = Number(v.m);
         if (!(m >= 36 && m <= 96)) return;
         play(m);                                                             // 친 사람과 똑같은 소리 · 같은 크기 (2026-10-23)
