@@ -329,12 +329,12 @@ const DOT_SLOTS = [
             //   주신 그림은 432x192 (칸 72x96) — 지난 규격(1728x768 · 칸 288)의 ¼ 이라 네 배로 늘려
             //   (도트 한 칸이 4픽셀 · 요원복 · 브라운 정장과 같다) 칸마다 가로 +30 으로 352 칸에 옮겼다.
             //   몸에 대 보니 어깨 · 발이 그대로 맞았다. 걷기 줄은 여섯 칸 다 그려져 왔다.
-            //   이름은 그림을 보고 붙였다 (말씀이 없으셨다).
-            { i: 'ydress', n: '노란 원피스', over: ['dress-yellow'], own: 'dress-yellow' },
-            { i: 'gdress', n: '초록 원피스', over: ['dress-green'], own: 'dress-green' },
+            //   이름 — 유치원 앞치마 · 룩키마트 앞치마 · 룩키마트 의상은 정해 주신 것 · 메이드복 둘은 그림을 보고 붙였다.
+            { i: 'ydress', n: '유치원 앞치마', over: ['dress-yellow'], own: 'dress-yellow' },
+            { i: 'gdress', n: '룩키마트 앞치마', over: ['dress-green'], own: 'dress-green' },
             { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
             { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
-            { i: 'band', n: '초록 띠 제복', over: ['band-outfit'], own: 'band-outfit' }
+            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' }
         ]
     },
     {
