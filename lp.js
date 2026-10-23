@@ -33,6 +33,7 @@ const LP = {
     NOTE: 'plazaNote',
     NOTE_LIFE: 3000,
     POLL: 400,
+    PB_IDLE: 30000,           // 피아노를 닫고 아무도 안 친 지 이만큼 지나면 아이폰 소리 종류를 되돌린다
     BASE: 60                  // 가온 다 (C4) — 높은음자리표의 아래 덧줄
 };
 // 디스코 색 스무 가지
@@ -76,8 +77,10 @@ function worn() {
 // ==========================================
 // 소리 — 피아노 비슷한 소리를 직접 만든다
 // ==========================================
+// 아이폰은 전화 · 잠금 뒤에 'interrupted'(끊김)로 멈춰 있는 때가 있다 — 'suspended' 만 보면 못 깨운다
+function wake(c) { if (c && c.state !== 'running' && c.state !== 'closed') { try { const p = c.resume(); if (p && p.catch) p.catch(function () { }); } catch (e) { } } }
 function ac() {
-    if (S.ctx) { if (S.ctx.state === 'suspended') { try { S.ctx.resume(); } catch (e) { } } return S.ctx; }
+    if (S.ctx) { wake(S.ctx); return S.ctx; }
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return null;
     try { S.ctx = new C(); } catch (e) { return null; }
@@ -92,8 +95,8 @@ function unlock() {
     if (!stage()) return;                                   // 광장 밖에서는 열지 않는다
     const c = ac();
     if (!c) return;
-    if (c.state === 'suspended') { try { c.resume(); } catch (e) { } }
-    if (!S.primed) {
+    wake(c);
+    if (c.state !== 'running' || !S.primed) {               // 열릴 때까지는 누를 때마다 무음 한 조각
         try {
             const buf = c.createBuffer(1, 1, 22050);
             const src = c.createBufferSource();
@@ -101,7 +104,69 @@ function unlock() {
             S.primed = true;
         } catch (e) { }
     }
+    if (S.piano || S.pbWant) pbOn(true);
 }
+
+// ★ 아이폰 무음 모드 (2026-10-23)
+//   아이폰 사파리는 직접 만든 소리(Web Audio)를 **옆면 무음 스위치가 켜져 있으면 끈다** (안드로이드에는 이 스위치가 없다).
+//   그래서 아이폰에서만 피아노가 안 들렸다 — 치는 쪽도 듣는 쪽도.
+//   피아노를 쓰는 동안만 소리 종류를 「재생」으로 바꿔 무음 스위치와 상관없이 들리게 한다.
+//     · iOS 17 이상   navigator.audioSession.type = 'playback'   (누르지 않아도 바로 바뀐다)
+//     · 그 아래       소리 없는 <audio> 를 되풀이해 틀어 두면 같은 효과 — 이것은 누른 순간에만 틀 수 있다
+//   피아노를 닫고 아무도 안 친 지 30초가 지나면 되돌린다 — 광장의 다른 소리는 전처럼 무음 스위치를 따른다.
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '')
+    || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+function hasAS() { try { return !!(navigator.audioSession && 'type' in navigator.audioSession); } catch (e) { return false; } }
+function silentUrl() {
+    const n = 1600, sr = 8000, b = new ArrayBuffer(44 + n), v = new DataView(b);
+    const w = function (o, s) { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    w(36, 'data'); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+}
+function silentOn() {
+    let a = S.silent;
+    if (!a) {
+        a = document.createElement('audio');
+        a.loop = true; a.preload = 'auto';
+        a.setAttribute('playsinline', ''); a.setAttribute('webkit-playsinline', ''); a.setAttribute('x-webkit-airplay', 'deny');
+        try { a.disableRemotePlayback = true; } catch (e) { }
+        try { a.src = silentUrl(); } catch (e) { return false; }
+        S.silent = a;
+    }
+    if (!a.paused) return true;
+    try { const p = a.play(); if (p && p.catch) p.catch(function () { S.pbWant = true; }); } catch (e) { return false; }
+    return true;
+}
+function silentOff() { if (S.silent && !S.silent.paused) { try { S.silent.pause(); } catch (e) { } } }
+// 피아노 소리를 낼 참이다 — gesture: 지금 사람이 누른 순간인가
+function pbOn(gesture) {
+    S.pbAt = Date.now();
+    if (IOS || hasAS()) {
+        if (hasAS()) {
+            try { if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { }
+            S.pbWant = false;
+        } else if (gesture) {
+            if (silentOn()) S.pbWant = false;
+        } else S.pbWant = true;                                 // 다음에 누를 때 튼다
+    }
+    clearTimeout(S._pbT); S._pbT = setTimeout(pbOff, LP.PB_IDLE);
+}
+function pbOff() {
+    clearTimeout(S._pbT);
+    if (S.piano || Date.now() - (S.pbAt || 0) < LP.PB_IDLE - 100) { S._pbT = setTimeout(pbOff, LP.PB_IDLE); return; }
+    try { if (hasAS() && navigator.audioSession.type === 'playback') navigator.audioSession.type = 'auto'; } catch (e) { }
+    silentOff();
+    S.pbWant = false; S.pbAt = 0;
+}
+// 화면을 내리면 소리 없는 <audio> 도 멈춘다 (잠금 화면에 재생 막대가 남지 않게) — 돌아와 누르면 다시 튼다
+document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (S.silent && !S.silent.paused) { silentOff(); S.pbWant = true; } }
+    else if (S.ctx) wake(S.ctx);
+});
 ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (ev) {
     window.addEventListener(ev, function () { try { unlock(); } catch (e) { } }, { capture: true, passive: true });
 });
@@ -157,8 +222,9 @@ function listen(seat) {
         if (exploring()) return;                                             // 탐사 중이면 안 들린다
         const m = Number(v.m);
         if (!(m >= 36 && m <= 96)) return;
-        if (!audible()) {                                                    // 아직 화면을 안 눌러 소리 장치가 닫혀 있다
-            try { if (S.ctx) S.ctx.resume(); } catch (e) { }
+        pbOn(false);                                                         // 아이폰 무음 스위치를 넘어 들리게
+        if (!audible() || S.pbWant) {                                        // 아직 화면을 안 눌러 소리 장치가 닫혀 있다
+            wake(S.ctx);
             if (!S.hinted) { S.hinted = true; toast('🎹 누군가 피아노를 칩니다 — 화면을 한 번 누르면 들립니다'); }
             if (!S.ctx || S.ctx.state !== 'running') return;
         }
@@ -328,7 +394,9 @@ function openPiano() {
     const st = stage();
     if (!st || !st.ov) return;
     closeDisco(true);
-    ac();
+    wake(ac());
+    S.piano = true;                                            // (곧 창으로 바뀐다) — 지금 누른 순간에 소리 종류부터 바꿔 둔다
+    pbOn(true);
     const p = document.createElement('div');
     p.id = 'lp-piano';
     p.className = 'lp-sheet plaza-keep';
@@ -400,6 +468,7 @@ function paintKeys() {
         down[id] = k;
         k.classList.add('dn');
         const m = Number(k.dataset.m);
+        pbOn(false);
         play(m);
         send(m);
     };
@@ -415,7 +484,7 @@ window.addEventListener('resize', function () {
     S._rz = setTimeout(function () { if (S.piano && octCount() !== S._n) paintKeys(); }, 120);
 });
 function closePiano(quiet) {
-    if (S.piano) S.piano.remove();
+    if (S.piano && S.piano.remove) S.piano.remove();
     S.piano = null;
     if (!quiet) fxSync();
 }
@@ -516,7 +585,8 @@ setInterval(function () { try { tick(); } catch (e) { } }, LP.POLL);
 
 window.lpState = function () {
     const o = { 달았나: worn(), 단추: !!(S.btn && S.btn.classList.contains('show')), 칸: !!S.menu, 피아노: !!S.piano,
-                디스코창: !!S.disco, 디스코: S.on, 색: cols(), 옥타브: S.oct, 방: S.seat };
+                디스코창: !!S.disco, 디스코: S.on, 색: cols(), 옥타브: S.oct, 방: S.seat,
+                소리장치: S.ctx ? S.ctx.state : '안 열림', 아이폰: IOS, 소리종류: hasAS() ? navigator.audioSession.type : (S.silent ? (S.silent.paused ? '무음 audio 멈춤' : '무음 audio 재생') : '-') };
     console.log('%c===== 💿 LP 판 =====', 'color:#c3b8ff; font-size:13px');
     console.log(o);
     return o;
