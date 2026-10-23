@@ -1877,6 +1877,8 @@ window.kroomRescue = function (code) {
             if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 얹었다.'); return; }
             ref.child('tried/' + me().code).set(true);
             const hr = healRoll(v.dc || 12);
+            const hsure = hr.ok ? '' : sureRescue();          // 확정 구출 물건 — 빗나갔을 때만 쓴다
+            if (hsure) { hr.ok = true; hr.dice = healDice(hr.R, v.dc || 12, true); }
             if (!hr.ok) {                                    // 닿지 않았다 — 치유자는 다치지 않는다 · 다른 동료가 아직 손을 뻗을 수 있다
                 sendPartyChat(me().name + ' 사원의 치유가 ' + v.name + ' 사원에게 닿지 않았습니다.', true);
                 show('구제', hr.dice + `손을 얹었다. 상처가 손을 밀어낸다.<br><br>${esc(v.name)} 사원은 아직 눈을 뜨지 못했다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
@@ -1885,7 +1887,8 @@ window.kroomRescue = function (code) {
             d.ref('darkParties/' + darkRun.partyId + '/kAid/' + code).push({ k: 'hp', v: careAmt(), from: me().name, at: now() });
             ref.remove(); kr.exp += 30;
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 치유로 일으켰습니다.', true);
-            show('구제', hr.dice + `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
+            show('구제', hr.dice + (hsure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(hsure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
+                + `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
             return;
         }
         if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 뻗었다.'); return; }   // 한 사람은 한 번만
@@ -2141,6 +2144,18 @@ function sureRescue() {
     if (hasHeart() && heartSaves() >= 10) return '🩶 은심장';
     const x = foxBond();
     if (x) { foxBondSpend(x); return '🐾 ' + foxNick(x); }
+    // 확정 구출 물건 — 이동장(탐사마다 한 번) · 종이배 · 전용 자전거 · 노스텔지어 끈 · 포승줄 · 통신 단추 (2026-10-23)
+    //   이 던전은 우주 쇼핑몰 물건을 안 먹지만(아래 7½), 확정 구출만은 연결한다.
+    //   보는 것 · 닳는 것은 원래 어둠과 같은 자리(newitems2.js rescueGuarantee · spendGuarantee)를 쓴다.
+    //   굴림이 빗나갔을 때만 쓴다 — 붙잡았으면 닳지 않는다.
+    try {
+        const src = (typeof window.rescueGuarantee === 'function') ? window.rescueGuarantee() : null;
+        if (src && src !== '은심장' && typeof window.spendGuarantee === 'function') {
+            window.spendGuarantee(src, { noHeart: true });        // 은심장 셈은 heartCount 가 한다
+            try { addHistoryLog(me(), '[확정 구출] ' + src + ' (K의 방)'); } catch (e) { }
+            return src;
+        }
+    } catch (e) { console.warn('[K의 방] 확정 구출', e); }
     return '';
 }
 function heartCount() {                  // 구하러 갈 때마다 하나 (원래 어둠과 같다)

@@ -486,10 +486,12 @@ function rescueGuarantee() {
     return null;
 }
 
-// epic 쪽에서도 「확정권이 있나」를 물어본다 (epic-grim.js)
+// epic 쪽에서도 「확정권이 있나」를 물어본다 (epic-grim.js) · K의 방은 쓰기까지 한다 (kroom-core.js sureRescue)
 window.rescueGuarantee = rescueGuarantee;
+window.spendGuarantee = function (src, opt) { return spendGuarantee(src, opt); };
 
-function spendGuarantee(src) {
+// opt.noHeart — 은심장 셈을 부른 쪽이 따로 한다 (K의 방은 구하러 갈 때마다 이미 하나 센다)
+function spendGuarantee(src, opt) {
     const u = currentUser;
 
     if (src === '％＄＠＆ 이동장') {
@@ -539,7 +541,7 @@ function spendGuarantee(src) {
         saveFields({ buttonUses: 1 });
     }
 
-    u.heartSaves = (u.heartSaves || 0) + 1;
+    if (!(opt && opt.noHeart)) u.heartSaves = (u.heartSaves || 0) + 1;
     saveFields({ cageRun: 1, heartSaves: 1 });
     saveSelfFull();
 }
