@@ -150,7 +150,7 @@ const DOT = {
     //   ★ 사운드 코트의 그림자(sound-coat-in)는 **맨 앞** — 몸 바로 위 · 모든 옷 뒤 (2026-10-23)
     Z: ['sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'pj-top', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
-        'dress-yellow', 'dress-green', 'maid', 'maid-long', 'band-outfit',
+        'dress-yellow', 'dress-green', 'maid', 'maid-long', 'band-outfit', 'knit',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
@@ -334,7 +334,11 @@ const DOT_SLOTS = [
             { i: 'gdress', n: '룩키마트 앞치마', over: ['dress-green'], own: 'dress-green' },
             { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
             { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
-            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' }
+            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' },
+            // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
+            //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
+            //   (백일몽 정장과 같은 길) 귀 · 턱 밑에 남은 살색 몇 점도 걷어 니트와 셔츠만 남겼다. 다리는 맨다리라 하의는 따로 입는다.
+            { i: 'knit', n: '가을 니트', over: ['knit'], own: 'knit' }
         ]
     },
     {
