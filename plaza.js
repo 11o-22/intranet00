@@ -580,6 +580,13 @@ function stampSafe(ov) {
         //   발을 바꿔 디뎌도 그 사람 칸만 다시 그리고, 뒤의 큰 방 그림까지
         //   다시 칠하지 않는다.
         '.plaza-one{position:absolute;pointer-events:none;will-change:transform;}',
+        // 🍍 작은 사람 들기 — 고르는 칸
+        '#plaza-carry{position:fixed;z-index:60;display:flex;flex-direction:column;gap:6px;min-width:128px;',
+        '  padding:9px;border-radius:10px;background:rgba(20,17,24,.95);border:1px solid #d4af37;',
+        '  box-shadow:0 4px 16px rgba(0,0,0,.65);}',
+        '#plaza-carry .pc-n{font-size:11px;font-weight:bold;color:#d4af37;text-align:center;}',
+        '#plaza-carry button{font:inherit;font-size:12.5px;padding:9px 12px;border-radius:7px;cursor:pointer;',
+        '  border:1px solid #6a5630;background:#2b2418;color:#f3ead8;}',
         '.plaza-one .dot-box{position:absolute;left:0;top:0;margin:0;}',
         '.plaza-tag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;',
         '  font-size:10px;font-weight:bold;color:#efe6d8;text-shadow:0 1px 2px #000,0 0 4px #000;',
@@ -1022,6 +1029,7 @@ function sheetTop(name, cb) {
 }
 function tagPlace(tag, user, k, all, h) {
     const put = function (top) {
+        tag._top = top;                                  // 🍍 머리 꼭대기 (칸 도트) — 머리에 얹을 때 쓴다
         tag.style.top = 'auto';
         tag.style.bottom = Math.round(h - top * k + TAG_GAP) + 'px';
     };
@@ -1137,11 +1145,11 @@ function putOne(one, x, y) {
     //     초당 사천 번이다. 서 있는 사람은 대개 자리가 안 바뀐다.
     if (one._L !== L) { one.wrap.style.left = L + 'px'; one._L = L; }
     if (one._T !== T) { one.wrap.style.top = T + 'px'; one._T = T; }
-    let Z = 100 + Math.round(y);                             // 아래에 있는 사람이 앞
+    let Z = (one.zOver != null) ? one.zOver : 100 + Math.round(y);   // 아래에 있는 사람이 앞 (🍍 들린 사람은 든 사람 바로 앞)
     // 🔒 가두리 — 갇힌 사람만 창살 뒤로. 나머지는 가두리 앞을 지나는 것처럼 늘 창살 앞에 그린다
     //   (뒤로 지나가면 안에 든 것처럼 보였다)
     const cgr = run && R[run.room] && R[run.room].cage;
-    if (cgr && Math.abs(x - cgr.x) < cgr.w / 2 + 60) {
+    if (one.zOver == null && cgr && Math.abs(x - cgr.x) < cgr.w / 2 + 60) {
         let inside = false;
         try { inside = !!(one.code && typeof window.gaduriOf === 'function' && window.gaduriOf(one.code) === run.room); } catch (e) { }
         if (!inside) Z = Math.max(Z, 101 + Math.round(cgr.zy));
@@ -1204,6 +1212,369 @@ function bubble(one, text, sty) {
     one.wrap.appendChild(b);
     one.bub = b;
 }
+
+// ==========================================
+// 🍍 작은 사람 들기 — 손에 든다 · 머리에 얹는다 (2026-10-23)
+// ==========================================
+//
+//   파인애플맛 물약으로 작아진 사람을 보통 사람이 톡 치면 [손에 든다] [머리에 얹는다] 가 뜬다.
+//   멀면 걸어가서 집는다. 든 사람을 다시 치면 바꿔 들거나 [내려놓는다].
+//
+//   ■ 누가 누구를 들었나 — **든 사람의 자리 기록**에 적는다
+//       cy: { c: 작은 사람 사번, k: 'hand' | 'head', at: 집은 때 }
+//     작은 사람 쪽은 머리 위에서 어디쯤 서 있는지만 싣는다 (ho — 칸 도트, 가운데 0).
+//     둘이 같은 사람을 집었으면 먼저 집은(at 이 이른) 쪽이 든다. 늦은 쪽은 저절로 놓는다.
+//
+//   ■ 그리는 자리는 **보는 화면마다 든 사람에게 붙여** 셈한다
+//     작은 사람이 보낸 x·y 를 따라가면 4분의 1초씩 늦게 붙어 손에서 떨어져 보인다.
+//     그래서 든 사람의 지금 자리 + 손(또는 머리) 자리로 바로 놓고, 든 사람보다 한 겹 앞에 그린다.
+//       손   든 사람 앞쪽 손 높이 — 작은 사람은 못 움직인다 (걷기 · 톡 쳐서 가기 다 막힘)
+//       머리 든 사람 머리 꼭대기 — 좌우로만 걸어 다닌다 (가운데서 HEAD_R 도트까지)
+//     머리에 얹으면 든 사람 이름표를 작은 사람 위로 올린다 (안 그러면 이름표가 작은 사람을 덮는다).
+//
+//   ■ 놓이는 때
+//     든 사람이 [내려놓는다] · 다른 방으로 감 · 광장을 닫음 · 든 사람이 작아짐
+//     작은 사람이 원래 크기로 돌아옴(물약 시간이 끝남) · 방을 떠남 · 가두리에 갇힘
+//     놓이면 작은 사람은 그 자리 바닥(든 사람 발 높이)으로 내려선다.
+const CARRY = {
+    HAND_UP: 78,       // 손 높이 — 땅에서 위로 (칸 도트 · 손바닥 위에 선다)
+    HAND_X: 46,        // 몸 가운데서 보는 쪽으로 (소매 끝 손)
+    HEAD_SINK: 8,      // 머리 꼭대기에서 머리카락 속으로 조금 내려 선다
+    HEAD_R: 30,        // 머리 위에서 좌우로 갈 수 있는 폭 (한쪽 — 머리 꼭대기 평평한 데까지)
+    HEAD_CURVE: 10,    // 가장자리로 갈수록 머리가 둥글게 내려가는 만큼 (칸 도트)
+    HEAD_SPEED: 80,    // 머리 위 걷는 빠르기 (칸 도트 / 초)
+    NEAR_W: 0.22,      // 내 칸 폭의 이만큼 안이면 집는다 (칸은 몸보다 훨씬 넓다 — 몸 바로 옆)
+    TAG_ROOM: 16       // 작은 사람 이름표 몫 (화면 px)
+};
+const CARRY_WORD = { hand: '손에 든다', head: '머리에 얹는다' };
+
+function myCode() { const u = u_(); return u ? u.code : ''; }
+function caged(code) {
+    try { return !!(typeof window.gaduriOf === 'function' && window.gaduriOf(code)); } catch (e) { return false; }
+}
+// 작은 사람인가 — 나는 내 효과로, 남은 실려 온 표시로
+function tinyCode(code) {
+    if (code === myCode()) return tinyOf(u_());
+    const q = run && run.peers[code];
+    return !!(q && q.sm);
+}
+// 지금 서로 집었다고 적힌 것들 (말이 되는 것만)
+function carryClaims() {
+    const out = [];
+    if (!run) return out;
+    const add = function (by, cy) {
+        if (!cy || !cy.c || (cy.k !== 'hand' && cy.k !== 'head')) return;
+        if (cy.c === by || tinyCode(by) || !tinyCode(cy.c) || caged(cy.c)) return;
+        if (cy.c !== myCode() && !run.peers[cy.c]) return;
+        out.push({ by: by, c: cy.c, k: cy.k, at: Number(cy.at) || 0 });
+    };
+    add(myCode(), run.carry);
+    Object.keys(run.peers).forEach(function (c) { add(c, run.peers[c].cy); });
+    return out;
+}
+// 이 사람을 누가 들었나 — 먼저 집은 사람 (같으면 사번 순)
+function carrierOf(code, list) {
+    let best = null;
+    (list || carryClaims()).forEach(function (x) {
+        if (x.c !== code) return;
+        if (!best || x.at < best.at || (x.at === best.at && x.by < best.by)) best = x;
+    });
+    return best;
+}
+// 든 사람의 지금 자리 · 보는 쪽 · 배
+function holderPos(by) {
+    if (!run) return null;
+    let one, x, y;
+    if (by === myCode()) { one = run.me; x = run.x; y = run.y; }
+    else { const q = run.peers[by]; if (!q) return null; one = q.one; x = q.x; y = q.y; }
+    if (!one) return null;
+    let face = 1;
+    try { face = one.actor.facing() || 1; } catch (e) { }
+    return { one: one, x: x, y: y, face: face, kk: one.w / spec().W };
+}
+// 손 · 머리 자리 (방 좌표 — 작은 사람의 발이 닿는 곳)
+function attachAt(h, kind, ox) {
+    const sp = spec(), z = zz(), kk = h.kk;
+    if (kind === 'head') {
+        const top = (h.one.tag && typeof h.one.tag._top === 'number') ? h.one.tag._top : TAG_TOP;
+        const e = Math.min(1, Math.abs(ox || 0) / CARRY.HEAD_R);
+        return { x: h.x + (ox || 0) * kk / z, y: h.y - (sp.H - sp.FOOT - top - CARRY.HEAD_SINK - CARRY.HEAD_CURVE * e * e) * kk / z };
+    }
+    return { x: h.x - h.face * CARRY.HAND_X * kk / z, y: h.y - CARRY.HAND_UP * kk / z };
+}
+// 작은 사람 키 (화면 px) — 든 사람 이름표를 그만큼 올린다
+function tinyTall(one) {
+    const sp = spec(), k = one.w / sp.W;
+    const top = (one.tag && typeof one.tag._top === 'number') ? one.tag._top : TAG_TOP;
+    return Math.round((sp.H - sp.FOOT - top) * k);
+}
+function lift(one, px) {
+    if (!one || !one.tag) return;
+    const v = px ? px + 'px' : '';
+    if (one._lift !== v) { one.tag.style.marginBottom = v; one._lift = v; }
+}
+function nameIn(code) {
+    if (code === myCode()) return nameOf(u_());
+    const q = run && run.peers[code];
+    return (q && q.one && q.one.name) || code;
+}
+function resend() { if (run) { run.sx = -9999; run.sent = 0; } }
+
+// ── 든 사람 쪽 — 내가 든 것이 아직 말이 되나 (매 틀)
+function carryCheck() {
+    if (!run || !run.carry) return;
+    const c = run.carry.c, q = run.peers[c];
+    let why = '';
+    if (tinyOf(u_())) why = '내가 작아져서';
+    else if (!q) why = '';
+    else if (!q.sm) why = '원래 크기로 돌아와서';
+    else if (caged(c)) why = '가두리에 갇혀서';
+    if (q && !why) {
+        const w = carrierOf(c);
+        if (w && w.by !== myCode()) { why = '먼저 ' + nameIn(w.by) + ' 사원이 들어서'; }
+        else return;
+    }
+    const nm = q ? (q.one.name || c) : c;
+    run.carry = null;
+    resend();
+    sysLine(q ? '🍍 ' + nm + ' 사원을 내려놓았습니다' + (why ? ' (' + why + ')' : '') + '.' : '🍍 ' + nm + ' 사원이 자리를 떠나 내려놓았습니다.');
+}
+function carryDo(c, k) {
+    closeCarryMenu();
+    if (!run) return;
+    if (k === 'down') {
+        if (run.carry && run.carry.c === c) { run.carry = null; resend(); sysLine('🍍 ' + nameIn(c) + ' 사원을 내려놓았습니다.'); }
+        return;
+    }
+    const q = run.peers[c];
+    if (!q || !q.sm) { sysLine('🍍 지금은 작지 않습니다.'); return; }
+    if (tinyOf(u_())) { sysLine('🍍 작아진 채로는 들 수 없습니다.'); return; }
+    if (caged(c)) { sysLine('🔒 가두리에 갇힌 사람은 들 수 없습니다.'); return; }
+    const w = carrierOf(c);
+    if (w && w.by !== myCode()) { sysLine('🍍 ' + nameIn(w.by) + ' 사원이 들고 있습니다.'); return; }
+    if (run.carry && run.carry.c === c) {                       // 들고 있던 것을 바꿔 든다
+        run.carry = { c: c, k: k, at: run.carry.at };
+        resend();
+        sysLine('🍍 ' + nameIn(c) + ' 사원을 ' + (k === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.'));
+        return;
+    }
+    run.cpend = { c: c, k: k };
+    carryPend();
+    if (run.cpend) walkTo(q.x, q.y);
+}
+// 멀면 걸어가서 집는다 — 다 가면 집는다 (손으로 움직이면 그만둔다)
+function carryPend() {
+    const p = run && run.cpend;
+    if (!p) return;
+    const q = run.peers[p.c];
+    const w = carrierOf(p.c);
+    if (!q || !q.sm || caged(p.c) || tinyOf(u_()) || (w && w.by !== myCode())) { run.cpend = null; return; }
+    const z = zz();
+    const near = Math.abs(run.x - q.x) * z <= run.me.w * CARRY.NEAR_W && Math.abs(run.y - q.y) * z <= run.me.h * 0.3;
+    if (near) {
+        run.cpend = null;
+        if (run.carry && run.carry.c !== p.c) sysLine('🍍 ' + nameIn(run.carry.c) + ' 사원을 내려놓았습니다.');
+        run.carry = { c: p.c, k: p.k, at: now() };
+        run.tx = null; run.ty = null; run.tseg = null;
+        resend();
+        sysLine('🍍 ' + nameIn(p.c) + ' 사원을 ' + (p.k === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.'));
+        return;
+    }
+    if (run.tx == null) walkTo(q.x, q.y);                // 멈췄는데 아직 멀다 (작은 사람이 움직였다) — 다시 간다
+}
+// 그 자리 가까운 선으로 걸어간다 (톡 쳐서 가기와 같다)
+function walkTo(x, y) {
+    const r = roomOf();
+    let best = 'up', bd = 1e9;
+    segList(r).forEach(function (o) {
+        const xr = segX(r, o);
+        const cx = Math.max(xr[0], Math.min(xr[1], x));
+        const d = Math.hypot(cx - x, segY(r, o, cx) - y);
+        if (d < bd) { bd = d; best = o; }
+    });
+    const xr2 = segX(r, best);
+    run.tseg = best;
+    run.tx = Math.max(xr2[0], Math.min(xr2[1], x));
+    run.ty = segY(r, best, run.tx, y);
+    wake();
+}
+
+// ── 작은 사람 쪽 — 내가 들려 있나 · 들려 있으면 그 자리로
+function carryMine() {
+    if (!run || !tinyOf(u_()) || caged(myCode())) return null;
+    return carrierOf(myCode());
+}
+let handSaid = 0;
+function carryMe(cm, dt, ix, iy) {
+    const h = holderPos(cm.by);
+    if (!h) return false;
+    const R = CARRY.HEAD_R;
+    let mv = false;
+    if (cm.k === 'head') {
+        if (typeof run.hox !== 'number') run.hox = 0;
+        if (run.tx != null) run.hoT = Math.max(-R, Math.min(R, (run.tx - h.x) * zz() / h.kk));
+        let dir = 0;
+        if (Math.abs(ix) > 0.15) { dir = ix > 0 ? 1 : -1; run.hoT = null; }
+        else if (typeof run.hoT === 'number') {
+            const d = run.hoT - run.hox;
+            if (Math.abs(d) < 1) { run.hox = run.hoT; run.hoT = null; } else dir = d > 0 ? 1 : -1;
+        }
+        if (dir) {
+            let nx = run.hox + dir * CARRY.HEAD_SPEED * dt;
+            if (typeof run.hoT === 'number') nx = dir > 0 ? Math.min(nx, run.hoT) : Math.max(nx, run.hoT);
+            nx = Math.max(-R, Math.min(R, nx));
+            mv = Math.abs(nx - run.hox) > 0.001;
+            run.hox = nx;
+            run.me.actor.face(dir < 0 ? 1 : -1);
+        }
+    } else {
+        run.hox = 0; run.hoT = null;
+        if ((ix || iy || run.tx != null) && now() - handSaid > 6000) {
+            handSaid = now();
+            sysLine('🍍 ' + nameIn(cm.by) + ' 사원 손에 들려 있어 움직일 수 없습니다.');
+        }
+    }
+    const a = attachAt(h, cm.k, run.hox || 0);
+    run.x = a.x; run.y = a.y;
+    run.me.zOver = (h.one._Z || 100) + 1;
+    run.wasC = { by: cm.by, k: cm.k, gy: h.y };
+    return mv;
+}
+// 들렸다 · 놓였다를 알리고, 놓였으면 바닥으로 내려선다
+function carryNote(cm) {
+    const key = cm ? cm.by + '|' + cm.k : '';
+    if (key === (run.cKey || '')) return;
+    const was = run.cKey || '';
+    run.cKey = key;
+    if (cm) {
+        sysLine('🍍 ' + nameIn(cm.by) + ' 사원이 ' + (cm.k === 'head' ? '머리 위에 얹었습니다 — 좌우로 걸을 수 있습니다.' : '손에 들었습니다 — 움직일 수 없습니다.'));
+        run.cpend = null;
+        resend();
+        return;
+    }
+    if (!was) return;
+    // 내려선다 — 든 사람 발 높이에서 가장 가까운 선
+    const r = roomOf(), w = run.wasC || {};
+    const gy = (typeof w.gy === 'number') ? w.gy : run.y;
+    let best = 'up', bd = 1e9;
+    segList(r).forEach(function (o) {
+        const xr = segX(r, o);
+        const cx = Math.max(xr[0], Math.min(xr[1], run.x));
+        const d = Math.hypot(cx - run.x, segY(r, o, cx, gy) - gy);
+        if (d < bd) { bd = d; best = o; }
+    });
+    const xr2 = segX(r, best);
+    run.seg = best;
+    run.x = Math.max(xr2[0], Math.min(xr2[1], run.x));
+    run.y = segY(r, best, run.x, gy);
+    run.lv = (run.seg === 'dn') ? 1 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0);
+    run.me.zOver = null;
+    run.hox = 0; run.hoT = null; run.wasC = null;
+    run.tx = null; run.ty = null; run.tseg = null;
+    resend();
+    sysLine('🍍 내려왔습니다.');
+}
+
+// ── 보는 쪽 — 들린 사람을 든 사람에게 붙여 그린다 (tick 끝에서)
+function carryPaint(dt, list0) {
+    let busy = false;
+    const list = list0 || carryClaims();
+    const lifts = {};
+    const zv = zz(), vbx = viewBox(), vwid = vbx.w || 0;
+    const seeL = run.cx - 140, seeR = run.cx + vwid + 140;
+    Object.keys(run.peers).forEach(function (code) {
+        const q = run.peers[code];
+        const w = q.sm ? carrierOf(code, list) : null;
+        if (!w) { if (q.one.zOver != null) q.one.zOver = null; q.hox = null; return; }
+        const h = holderPos(w.by);
+        if (!h) return;
+        let ox = 0;
+        if (w.k === 'head') {
+            const want = Math.max(-CARRY.HEAD_R, Math.min(CARRY.HEAD_R, Number(q.ho) || 0));
+            if (typeof q.hox !== 'number') q.hox = want;
+            const d = want - q.hox;
+            if (Math.abs(d) > 0.5) { q.hox += d * (1 - Math.exp(-dt / 0.12)); busy = true; } else q.hox = want;
+            ox = q.hox;
+            lifts[w.by] = tinyTall(q.one) + CARRY.TAG_ROOM;
+        }
+        const a = attachAt(h, w.k, ox);
+        q.x = q.tx = a.x; q.y = q.ty = a.y;
+        q.one.actor.face(q.face || 1);
+        q.one.zOver = (h.one._Z || 100) + 1;
+        q.one.actor.moving(w.k === 'head' && !!q.moving);
+        const sxp = q.x * zv;
+        const vis = !vwid || (sxp + q.one.w / 2 >= seeL && sxp - q.one.w / 2 <= seeR);
+        if (vis === !!q.hid) {
+            q.hid = !vis;
+            q.one.wrap.style.display = vis ? '' : 'none';
+            q.one.actor.hold(!vis);
+        }
+        if (vis) putOne(q.one, q.x, q.y);
+    });
+    // 내가 남의 머리 위에 있으면 그 사람 이름표도 올린다
+    const cm = carryMine();
+    if (cm && cm.k === 'head') lifts[cm.by] = tinyTall(run.me) + CARRY.TAG_ROOM;
+    lift(run.me, lifts[myCode()] || 0);
+    Object.keys(run.peers).forEach(function (c) { lift(run.peers[c].one, lifts[c] || 0); });
+    return busy;
+}
+
+// ── 톡 친 자리에 작은 사람이 있으면 고르는 칸을 띄운다 (있으면 참 — 걷지 않는다)
+// 그 자리(화면 좌표)에 서 있는 작은 사람 — 없으면 null
+function tinyAt(cx, cy) {
+    if (!run || tinyOf(u_()) || cageMine()) return null;
+    const PAD = 16;
+    let pick = null, bd = 1e9;
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        if (!q || !q.sm || q.hid) return;
+        const b = q.one.wrap.getBoundingClientRect();
+        // 칸 위쪽은 비어 있다 — 몸이 있는 아래쪽 3분의 2만 본다
+        const t = b.top + b.height * 0.3;
+        if (cx < b.left - PAD || cx > b.right + PAD || cy < t - PAD || cy > b.bottom + PAD) return;
+        const d = Math.hypot(cx - (b.left + b.right) / 2, cy - (t + b.bottom) / 2);
+        if (d < bd) { bd = d; pick = c; }
+    });
+    return pick;
+}
+function carryTap(cx, cy) {
+    closeCarryMenu();
+    const pick = tinyAt(cx, cy);
+    if (!pick) return false;
+    const w = carrierOf(pick);
+    if (w && w.by !== myCode()) { sysLine('🍍 ' + nameIn(w.by) + ' 사원이 들고 있습니다.'); return true; }
+    const mine = !!(run.carry && run.carry.c === pick);
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return false;
+    const m = document.createElement('div');
+    m.id = 'plaza-carry';
+    m.className = 'plaza-keep';
+    const btn = function (k, t) { return '<button class="plaza-keep" data-k="' + k + '">' + t + '</button>'; };
+    m.innerHTML = '<div class="pc-n">🍍 ' + esc(nameIn(pick)) + '</div>'
+        + (mine && run.carry.k === 'hand' ? '' : btn('hand', CARRY_WORD.hand))
+        + (mine && run.carry.k === 'head' ? '' : btn('head', CARRY_WORD.head))
+        + (mine ? btn('down', '내려놓는다') : '');
+    ov.appendChild(m);
+    const vw = window.innerWidth || 360, vh = window.innerHeight || 640;
+    const mw = m.offsetWidth || 120, mh = m.offsetHeight || 90;
+    m.style.left = Math.round(Math.max(8, Math.min(vw - mw - 8, cx - mw / 2))) + 'px';
+    m.style.top = Math.round(Math.max(8, Math.min(vh - mh - 8, cy - mh - 14))) + 'px';
+    Array.prototype.forEach.call(m.querySelectorAll('button'), function (b) {
+        b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+        b.addEventListener('click', function (ev) { ev.stopPropagation(); ev.preventDefault(); carryDo(pick, b.getAttribute('data-k')); });
+    });
+    run.cMenuT = setTimeout(closeCarryMenu, 6000);
+    return true;
+}
+function closeCarryMenu() {
+    const m = document.getElementById('plaza-carry');
+    if (m) m.remove();
+    if (run && run.cMenuT) { clearTimeout(run.cMenuT); run.cMenuT = 0; }
+}
+window.plazaCarry = function () {
+    if (!run) return null;
+    return { mine: run.carry || null, me: carryMine(), claims: carryClaims() };
+};
 
 // ==========================================
 // 방을 연다
@@ -1844,6 +2215,11 @@ function goRoom(key, way, lv) {
     }
     const r = R[key];
 
+    // 🍍 방을 옮기면 든 것은 놓고, 들려 있던 것도 풀린다
+    run.carry = null; run.cpend = null; run.cKey = ''; run.wasC = null; run.hox = 0; run.hoT = null;
+    closeCarryMenu();
+    if (run.me) run.me.zOver = null;
+
     // 있던 방에서 내 자리를 지운다 (유령이 남지 않게)
     leaveRoom();
 
@@ -1961,6 +2337,17 @@ function tick(ts) {
     // ─ 조이스틱이 먼저다. 민 만큼만 걷는다 (살짝 밀면 느리게).
     if (run.ax || run.ay) { ix = run.ax; iy = run.ay; }
 
+    // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
+    carryCheck();
+    const cm = carryMine();
+    carryNote(cm);
+    let cmMove = false;
+    if (cm) {
+        cmMove = carryMe(cm, dt, ix, iy);
+        ix = 0; iy = 0; run.vx = 0; run.vy = 0;
+        run.tx = null; run.ty = null; run.tseg = null;
+    } else if (run.cpend && (ix || iy)) run.cpend = null;      // 손으로 움직이면 집으러 가던 것을 그만둔다
+
     // ★ 민 쪽으로 **천천히 붙고 천천히 떨어진다** (P.EASE).
     //   손이 떨려도 사람이 안 꺾이고, 손을 떼도 뚝 서지 않고 한 발 더 간다.
     //   dt 를 넣어 셈하므로 화면이 느린 기계에서도 같은 빠르기로 붙는다.
@@ -2034,12 +2421,16 @@ function tick(ts) {
         else if (dx > 0.08) run.me.actor.face(-1);
     }
     cageHold(r);                            // 🔒 갇혔으면 가두리 안쪽으로
-    run.me.actor.moving(moving);
+    run.me.actor.moving(cm ? cmMove : moving);
     putOne(run.me, run.x, run.y);
     camera();
-    send(moving);
+    send(cm ? cmMove : moving);
+    if (!cm) carryPend();                   // 🍍 집으러 가는 중이면 — 닿았으면 집는다
 
-    let busy = moving || wantSeg || run.tx != null;
+    let busy = moving || wantSeg || run.tx != null || cmMove || !!(cm && typeof run.hoT === 'number');
+    const carried = {};                     // 🍍 들린 사람은 아래 carryPaint 가 든 사람에게 붙여 그린다
+    const cl = carryClaims();
+    cl.forEach(function (x) { carried[x.c] = 1; });
     // ─ 남 — 받은 자리로 미끄러져 간다
     // ★ 화면 밖에 있는 사람은 **안 그린다** (display:none · 걸음 시계도 멈춤).
     //   방은 화면보다 두 배 넘게 넓어서, 사람 절반은 대개 화면 밖이다.
@@ -2048,6 +2439,7 @@ function tick(ts) {
     const seeL = run.cx - 140, seeR = run.cx + vwid + 140;
     Object.keys(run.peers).forEach(function (code) {
         const q = run.peers[code];
+        if (carried[code] && q.sm) { q.one.actor.face(q.face || 1); if (q.sayAt && now() - q.sayAt > P.SAY_MS) { bubble(q.one, ''); q.sayAt = 0; } return; }
         const ax = q.tx - q.x, ay = q.ty - q.y;
         const d = Math.hypot(ax, ay);
         if (d > 1) {
@@ -2075,6 +2467,7 @@ function tick(ts) {
         if (q.sayAt && now() - q.sayAt > P.SAY_MS) { bubble(q.one, ''); q.sayAt = 0; }
     });
 
+    if (carryPaint(dt, cl)) busy = true;
     if (run.sayAt && now() - run.sayAt > P.SAY_MS) { bubble(run.me, ''); run.sayAt = 0; }
 
     // ★ 아무것도 안 움직이면 **쉰다** (배터리).
@@ -2148,10 +2541,13 @@ function send(moving) {
     run.sMoving = moving; run.sFace = run.me.actor.facing();
     run.sSayAt = run.sayAt;
     const u = u_(); if (!u) return;
+    const myC = carryMine();
     try {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
             f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null), sm: tinyOf(u) ? 1 : 0,
+            cy: run.carry ? { c: run.carry.c, k: run.carry.k, at: run.carry.at || 0 } : null,     // 🍍 내가 든 작은 사람
+            ho: (myC && myC.k === 'head') ? Math.round(run.hox || 0) : null,          // 🍍 남의 머리 위 어디쯤
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
@@ -2567,6 +2963,8 @@ function onSeat(code, v, fresh) {
     if (q.tx !== v.x || q.ty !== v.y || q.moving !== !!v.m) q.seen = now();
     q.tx = v.x; q.ty = v.y; q.face = v.f || 1; q.moving = !!v.m;
     q.at = v.at;
+    q.cy = (v.cy && v.cy.c) ? v.cy : null;          // 🍍 이 사람이 든 작은 사람
+    q.ho = (typeof v.ho === 'number') ? v.ho : 0;   // 🍍 남의 머리 위 어디쯤
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     wake();                                // 쉬고 있었으면 바로 따라 그린다
     setTag(q.one, code, v.n || code);
@@ -3903,6 +4301,8 @@ function shut() {
     if (cageMine() && !window._plazaForceShut) { sysLine('🔒 가두리에 갇혀 있어 광장을 떠날 수 없습니다.'); return; }
     try { cancelAnimationFrame(run.raf); } catch (e) { }
     if (run.idleT) { clearTimeout(run.idleT); run.idleT = 0; }
+    closeCarryMenu();
+    run.carry = null;
     if (run.onWake) {
         window.removeEventListener('keydown', run.onWake, true);
         window.removeEventListener('pointerdown', run.onWake, true);
@@ -4100,6 +4500,12 @@ function open() {
             //   가만히 톡 치기가 어려워 이것이 「안 눌린다」로 느껴졌다.
             const tap = (now() - at < TAP_MS) && far < TAP_SLOP;
             if (!tap && drag) eatClick();
+            // 🍍 작은 사람을 톡 쳤으면 — 들기 칸을 띄우고 걷지 않는다
+            if (tap && run && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))
+                && carryTap(e.clientX, e.clientY)) {
+                drag = false; far = 0; hit = null;
+                return;
+            }
             // 톡 쳤으면 그 자리로 걸어간다.
             // ★ 글줄·미니맵을 톡 친 것은 **그 칸을 여는 것**이지 걷는 게 아니다.
             if (tap && run
@@ -4127,6 +4533,16 @@ function open() {
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', up);
         window.addEventListener('pointercancel', up);
+        // 🍍 시설 표 앞에 선 작은 사람 — 시설 표는 걷기 쪽(up)으로 안 오고 제 click 으로 열린다.
+        //   사람이 앞에 서 있으니 사람을 먼저 고른다 (붙잡는 단계에서 가로챈다)
+        ov.addEventListener('click', function (ev) {
+            const t = ev.target;
+            if (!run || !t || !t.closest || t.closest('#plaza-carry')) return;
+            if (!t.closest('#plaza-view') || !t.closest('.plaza-spot, .plaza-keep')) return;
+            if (!tinyAt(ev.clientX, ev.clientY)) return;
+            ev.stopPropagation(); ev.preventDefault();
+            carryTap(ev.clientX, ev.clientY);
+        }, true);
         // 광장을 닫을 때 떼어 낸다 — 창에 건 것은 창이 없어져도 안 지워진다
         run.onStick = function () {
             window.removeEventListener('pointermove', onMove);
