@@ -1256,14 +1256,14 @@ window.kroomNext = function () {
     let vis = visible(it.sc.o);
     const fs = foxSense(vis);                                 // 🐾 감각 분신 — 즉사 기믹 쪽을 가린다
     if (fs) vis = fs.vis;
-    const skull = jisanOn();                                  // 📖 읽어내기 — 즉사 기믹에 ☠
+    const skull = jisanOn();                                  // 📖 읽어내기 — 즉사 기믹에 🈲
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;
             const cost = o.cost ? Object.keys(o.cost)[0] : null;
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
-            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">☠</span> ' : '')
+            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">🈲</span> ' : '')
                 + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');
             return can ? darkChoiceBtn(lab, 'kroomPick(' + v.i + ')')
@@ -1950,7 +1950,7 @@ window.kroomRescue = function (code) {
 //                    감각 — 즉사 기믹 쪽을 가린다 / 응시 — 굴림 + / 파괴 — 즉사 기믹 파훼 /
 //                    은신 — 격리를 막는다 / 행운 — 꿈결 1.5~3배
 //     📖 종말예언    덧쓰기 — 쓰러지면 회수품 1~3종 / 지우기 — 일행이 쓰러져 구조를 기다릴 때 장착자가 대신 죽는다 /
-//                    읽어내기 — 즉사 기믹에 ☠ 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배 (jisan.js)
+//                    읽어내기 — 즉사 기믹에 🈲 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배 (jisan.js)
 //     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 꿈결 두 배
 //     🔎 감지하는 눈  파티 버프 / 버프 받은 사람과 생사가 엮인다 / 정산 배수
 //     📱 K·LEE       버프 / 예약 문자 — 쓰러져도 끌려가지 않는다

@@ -35,7 +35,7 @@
 //      죽으니 덧쓰기도 받는다.
 //
 //   2. 읽어내기
-//      이름님은 모든 서사와 이야기를 아신다. 탐사 선택지에서 **죽을 길이 보인다** (☠).
+//      이름님은 모든 서사와 이야기를 아신다. 탐사 선택지에서 **죽을 길이 보인다** (🈲).
 //      그 길을 잡고도 살아 돌아오면 그 탐사의 포인트를 세 배로 받는다.
 //
 //   3. 이계의 광기 — 붉은 헤일로
@@ -770,7 +770,7 @@ function epicClose() {
 //   선택지 자료에는 「죽는 쪽」 표시가 없다. 다만 이 게임에는 관례가
 //   하나 있다 — safe_hint 가 options[0] 에 ◈ 를 붙인다
 //   (index.html:2748). 글쓴이 약속으로 **0번이 가장 안전한 쪽**이다.
-//   그러므로 나머지가 죽을 길이다. 그쪽에 ☠ 를 붙여 보여 준다.
+//   그러므로 나머지가 죽을 길이다. 그쪽에 🈲 를 붙여 보여 준다.
 //
 // ■ 투표판에서는 선택지에 **손대지 않는다** (중복 투표로 보이던 것)
 //
@@ -778,7 +778,7 @@ function epicClose() {
 //   올라가** 모두의 화면이 그것을 쓴다 (index.html:2494 openVote · 2679 renderVoteState).
 //   선택지를 갈아 끼우면 id 가 빠져 표가 한 바구니(tally[undefined])로 몰리고,
 //   마감 뒤 남의 화면이 jisanGo 를 못 찾아 멎었다.
-//   그래서 투표판에 올라가는 선택지는 **원래 것을 그대로** 둔다. ☠ 는 내
+//   그래서 투표판에 올라가는 선택지는 **원래 것을 그대로** 둔다. 🈲 는 내
 //   화면의 단추에만 덧붙이고 (hookVoteView), 죽을 길을 잡았는지는 마감된
 //   투표에서 센다 (hookVoted). 혼자 가는 자리는 jisanGo 로 받는다.
 window._jisanOpt = [];
@@ -788,7 +788,7 @@ window.jisanGo = function (i) {
     if (o.bad) {
         const r = run();
         if (r) r._jisanTruth = true;
-        toast('☠ 그 길로 간다');
+        toast('🈲 그 길로 간다');
     }
     try {
         const fn = window[o.fn];
@@ -810,12 +810,12 @@ window.jisanGo = function (i) {
                         const bad = (i > 0);
                         window._jisanOpt.push({ fn: o.fn, arg: o.arg, bad: bad });
                         if (shared()) return o;
-                        return { id: o.id, label: (bad ? '☠ ' : '') + o.label,
+                        return { id: o.id, label: (bad ? '🈲 ' : '') + o.label,
                                  fn: 'jisanGo', arg: String(i) };
                     });
                     text = String(text || '')
                         + '<br><br><span style="color:#d9a05a;">— 경전이 이 장을 미리 읽어 준다.'
-                        + ' ☠ 가 붙은 쪽은 죽는 길이다.</span>';
+                        + ' 🈲 가 붙은 쪽은 죽는 길이다.</span>';
                 }
             } catch (e) { }
             return _c.call(this, title, text, options, imgKey);
@@ -834,7 +834,7 @@ function shared() {
     return !!(r && r.isParty && !r.solo && !r.taken && !r._a214Scattered);
 }
 
-// 투표판 — ☠ 는 **내 화면의 단추에만** 덧붙인다 (투표판 글은 안 건드린다)
+// 투표판 — 🈲 는 **내 화면의 단추에만** 덧붙인다 (투표판 글은 안 건드린다)
 (function hookVoteView() {
     const iv = setInterval(function () {
         if (typeof renderVoteState !== 'function') return;
@@ -849,8 +849,8 @@ function shared() {
                 if (!area) return out;
                 const bs = area.querySelectorAll('button[onclick^="castVote"]');
                 for (let i = 1; i < bs.length; i++) {             // 0번은 안전한 쪽
-                    if (bs[i].innerHTML.indexOf('☠') >= 0) continue;
-                    bs[i].insertAdjacentHTML('afterbegin', '☠ ');
+                    if (bs[i].innerHTML.indexOf('🈲') >= 0) continue;
+                    bs[i].insertAdjacentHTML('afterbegin', '🈲 ');
                 }
             } catch (e) { }
             return out;
@@ -874,7 +874,7 @@ function shared() {
                 const me = u_(), r = run();
                 if (me && r && wears(me) && opt && vote && Array.isArray(vote.options)) {
                     const i = vote.options.findIndex(function (o) { return o && o.id === opt.id; });
-                    if (i > 0) { r._jisanTruth = true; toast('☠ 그 길로 간다'); }
+                    if (i > 0) { r._jisanTruth = true; toast('🈲 그 길로 간다'); }
                 }
             } catch (e) { }
             return _r.apply(this, arguments);
