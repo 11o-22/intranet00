@@ -328,8 +328,22 @@ function isVip(u) {
 }
 
 // 은행 화면을 한 번도 열지 않아도 판정이 돌게, 내 계좌를 따로 지켜본다
+//
+// ★ 들어올 때마다 金緞 을 「얻었다」고 하던 것 (2026-10-23)
+//
+//   들어오면 은행(bank.js bankSettle)이 내 칸에 트랜잭션을 건다. 그 첫 호출은
+//   서버 값을 받기 전이라 빈 칸(null)을 받고, 새 계좌({ 예금 · 점수 … } — vip 없음)를
+//   만들어 **화면 쪽에 먼저 그려 보인다** (applyLocally). 곧 서버 값으로 다시 돌지만,
+//   그 잠깐 사이의 값이 여기 귀에 먼저 들어왔다.
+//
+//       vip 없음 → repair() 가 「VIP 가 아닌데 金緞 이 있다」로 떼어 냄 (달고 있었으면 벗김)
+//       서버 값 → vip 있음 → check() 가 도로 붙임 → [칭호] 金緞 획득 (기록 · 알림)
+//
+//   repair 는 한 번 열 때 한 번 도니, 들어올 때마다 이렇게 됐다.
+//   → 떼어 내는 판정은 값이 10초 동안 그대로일 때만 한다 (잠깐 비친 값은 넘긴다).
+//     붙이는 판정(check)은 그대로 바로 돈다 — 잘못 붙을 일은 없다.
 (function watchBank() {
-    let key = null;
+    let key = null, repT = 0;
     setInterval(function () {
         if (typeof database === 'undefined' || !database) return;
         if (!currentUser) return;
@@ -338,7 +352,8 @@ function isVip(u) {
         database.ref('bank/' + key).on('value', function (s) {
             const b = s.val();
             vipSeen[key] = !!(b && b.vip && !b.blacklist);
-            repair();          // 잘못 붙은 것을 떼어 낸다 (딱 한 번)
+            if (repT) clearTimeout(repT);
+            repT = setTimeout(function () { repT = 0; repair(); check(); }, 10000);   // 잘못 붙은 것을 떼어 낸다 (딱 한 번)
             check();
         });
     }, 1500);
@@ -485,8 +500,10 @@ function check() {
     if (!got.length) return;
 
     save({ titles:1 });
-    if (typeof addHistoryLog === 'function') {
-        got.forEach(function (d) { addHistoryLog(currentUser, '[칭호] ' + d.n + ' 획득'); });
+    // 기록도 처음 얻을 때만 — 전에 알린 칭호가 떨어졌다 도로 붙은 것이면 조용히 붙인다
+    const first = got.filter(function (d) { return said().indexOf(d.id) < 0; });
+    if (first.length && typeof addHistoryLog === 'function') {
+        first.forEach(function (d) { addHistoryLog(currentUser, '[칭호] ' + d.n + ' 획득'); });
         save({ history:1 });
     }
     paint();
