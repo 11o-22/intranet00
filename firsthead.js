@@ -92,7 +92,7 @@ function open() {
     d.id = 'fh-ov';
     d.innerHTML = '<div class="fh-card">'
         + '<h4>어떤 얼굴로 일하시겠습니까</h4>'
-        + '<p>한 번만 고릅니다. 나중에는 <b>사택 옷장</b>에서 바꾸실 수 있습니다.</p>'
+        + '<p>한 번만 고릅니다. 고른 뒤에는 <b>상담사</b>가 정해 줄 때만 바뀝니다.</p>'
         + '<div class="fh-stage"></div>'
         + '<div class="fh-pick"></div>'
         + '<button class="fh-go" id="fh-go">이 얼굴로 합니다</button>'
