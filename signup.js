@@ -349,6 +349,8 @@ async function submitPwc() {
             if (!name || !pw) return go();
             const U = users();
             const saved = (function () { try { return localStorage.getItem('corp_logged_code'); } catch (e) { return null; } })();
+            // ⓪ 이 기기의 자동 접속 — 적어 둔 사원 코드 그대로면 서버에 묻지 않고 바로 (기다리는 사이 접속 칸이 비치지 않게)
+            if (saved && saved === pw && U[pw] && U[pw].name === name) return go();
             const r = await whoIs(name, pw);
             // ① 비밀번호가 있는 사원 — 비밀번호로
             if (r.code && r.how === 'pw') { ci.value = r.code; return go(); }

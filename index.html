@@ -1669,18 +1669,52 @@ function getTodayStr() {
         const el = document.getElementById('auto-login-overlay');
         if (!el) return;
         if (_glHideTimer) { clearTimeout(_glHideTimer); _glHideTimer = 0; }
-        if (show) { _glShownAt = Date.now(); el.style.display = 'flex'; loadSndStart(); return; }
-        const left = GL_MIN - (Date.now() - (_glShownAt || 0));
-        if (_glShownAt && left > 0) {
+        if (show) { _glShownAt = Date.now(); el.style.transition = ''; el.style.opacity = '1'; el.style.display = 'flex'; loadSndStart(); return; }
+        // ★ 걷을 때는 0.35초에 걸쳐 흐려진다 — 뚝 끊기면 밑 화면이 튀어나오는 것처럼 보인다 (2026-10-23)
+        const fade = function () {
+            _glHideTimer = 0;
+            if (el.style.display === 'none') { loadSndStop(); return; }
+            el.style.transition = 'opacity .35s ease';
+            el.style.opacity = '0';
+            loadSndStop();
             _glHideTimer = setTimeout(function () {
                 _glHideTimer = 0;
                 el.style.display = 'none';
-                loadSndStop();
-            }, left);
-            return;
-        }
-        el.style.display = 'none';
-        loadSndStop();
+                el.style.transition = ''; el.style.opacity = '1';
+            }, 360);
+        };
+        const left = GL_MIN - (Date.now() - (_glShownAt || 0));
+        if (_glShownAt && left > 0) { _glHideTimer = setTimeout(fade, left); return; }
+        fade();
+    }
+
+    // ★ 자동 로그인 — 들어간 화면이 **다 그려질 때까지** 인증 화면을 덮어 둔다 (2026-10-23)
+    //   로그인이 서버 확인을 기다리게 된 뒤로 인증 화면이 먼저 걷혀,
+    //   접속 칸(사원명 · 비밀번호가 찬 채) → 옛 화면 → 그림 없는 광장이 차례로 비쳤다.
+    //     사원    광장이 열리고 방 그림까지 다 받아 그려지면 걷는다
+    //     상담사  옛 화면이 서면 걷는다
+    //     못 들어왔으면(로그인이 끝났는데 사원이 없다) 바로 걷는다 — 접속 칸과 알림이 보이게
+    //   아무리 길어도 10초면 걷는다 (마지막 묶음이 아주 늦게 내려오는 때).
+    function autoLoginLand(r) {
+        const t0 = Date.now();
+        let settled = false, img = null, ready = false;
+        try { Promise.resolve(r).then(function () { settled = true; }, function () { settled = true; }); } catch (e) { settled = true; }
+        const done = function () { clearInterval(iv); showAutoLoginOverlay(false); };
+        const iv = setInterval(function () {
+            if (Date.now() - t0 > 10000) return done();
+            if (!currentUser) { if (settled) done(); return; }
+            if (currentUser.code === 'kario0987') return done();
+            if (ready) return;
+            const room = document.querySelector('#plaza-ov #plaza-room');
+            if (!room || !room.style.backgroundImage) return;
+            const m = /url\(["']?(.*?)["']?\)/.exec(room.style.backgroundImage);
+            if (!m) return done();
+            if (!img || img._u !== m[1]) { img = new Image(); img._u = m[1]; img.src = m[1]; }
+            if (!img.complete) return;
+            ready = true;
+            const fin = function () { requestAnimationFrame(function () { requestAnimationFrame(done); }); };
+            try { (img.decode ? img.decode() : Promise.resolve()).then(fin, fin); } catch (e) { fin(); }
+        }, 80);
     }
 
         let testerList = {};
@@ -1742,8 +1776,9 @@ function getTodayStr() {
 
             document.getElementById('nickname-input').value = u.name;
             document.getElementById('code-input').value = u.code;
-            attemptLogin();
-            showAutoLoginOverlay(false); // ★ 로그인 완료 후 해제
+            let r = null;
+            try { r = attemptLogin(); } catch (e) { console.error('자동 로그인:', e); }
+            autoLoginLand(r); // ★ 들어간 화면이 다 그려지면 해제
         }).catch(err => {
             autoLoginTried = false;
             showAutoLoginOverlay(false);
