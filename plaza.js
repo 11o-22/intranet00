@@ -936,12 +936,31 @@ function spec() {
     return { W: 288, H: 384, FOOT: 32 };
 }
 
+// 🍍 파인애플맛 물약 — 효과가 도는 동안(24시간 · 투명 물약으로 굳히면 계속) 다섯 배 작게 그린다 (2026-10-23)
+//
+//   나는 내 timedEffects 를 본다. 남은 자리 기록에 실려 온 표시(sm)를 본다 —
+//   광장으로 주고받는 것에는 옷(d)만 있고 효과 목록은 없다. send() 가 sm 을 같이 싣는다.
+//   크기가 바뀌면 나는 refreshTags(3초)가, 남은 onSeat 가 그 사람을 다시 만든다.
+const TINY = 1 / 5;
+const TINY_FX = '파인애플맛 물약';
+function tinyOf(u) {
+    if (!u) return false;
+    if (u.tiny != null) return !!u.tiny;                 // 남 — 실려 온 표시
+    const t = now();
+    return (Array.isArray(u.timedEffects) ? u.timedEffects : []).some(function (e) {
+        return e && e.name === TINY_FX && (e.fixed || !e.expireAt || e.expireAt > t);
+    });
+}
+window.plazaTinyOf = tinyOf;
+
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
 //   남의 모습은 방 칸에 적힌 dot 한 덩이로만 온다. 소지 목록(wardrobe)은
 //   이쪽에 없어서, 평소처럼 「가진 것만」으로 거르면 남이 입은 옷·악세가
 //   통째로 안 보인다. 실제로 그랬다 — 남은 늘 맨몸으로 보였다.
 function makeOne(user, label, k, other) {
+    const tiny = tinyOf(user);
+    if (tiny) k = k * TINY;                              // 🍍 칸 · 그림 · 이름표 높이 · 발밑이 다 이 배를 따른다
     const wrap = document.createElement('div');
     wrap.className = 'plaza-one';
     const sp = spec();
@@ -964,7 +983,7 @@ function makeOne(user, label, k, other) {
     wrap.appendChild(tag);
 
     // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
-    const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null };
+    const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null, tiny: tiny };
     setTag(one, (user && user.code) || '', label || '');
     return one;
 }
@@ -1056,6 +1075,20 @@ function setTag(one, code, name) {
 // 칭호를 바꿔 달면 그 자리에서 따라 바뀐다 (느리게 한 번씩 본다)
 function refreshTags() {
     if (!run) return;
+    // 🍍 내가 물약을 마셨거나 효과가 끝났다 — 내 모습을 그 크기로 다시 만들고 남에게도 바로 알린다
+    try {
+        if (run.me && tinyOf(u_()) !== !!run.me.tiny) {
+            const face = run.me.actor.facing();
+            run.me.actor.stop();
+            run.me.wrap.remove();
+            const u = u_();
+            run.me = makeOne(u, nameOf(u), run.k);
+            run.me.actor.face(face || 1);
+            run.el.appendChild(run.me.wrap);
+            putOne(run.me, run.x, run.y);
+            run.sx = -9999; run.sent = 0;
+        }
+    } catch (e) { }
     if (run.me) setTag(run.me, run.me.code, run.me.name);
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
@@ -1082,7 +1115,7 @@ function remakeFolk() {
         const lab = q.one.name || '';            // 칭호 말고 **이름만**
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
-        q.one = makeOne({ code: c, dot: d }, lab, run.k, true);
+        q.one = makeOne({ code: c, dot: d, tiny: q.sm ? 1 : 0 }, lab, run.k, true);
         q.hid = false;                         // 새 칸은 보이는 채로 시작한다 (tick 이 다시 가린다)
         q.one.actor.face(q.face || 1);
         run.el.appendChild(q.one.wrap);
@@ -2118,7 +2151,7 @@ function send(moving) {
     try {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
-            f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null),
+            f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null), sm: tinyOf(u) ? 1 : 0,
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
@@ -2520,12 +2553,13 @@ function onSeat(code, v, fresh) {
 
     let q = run.peers[code];
     const key = JSON.stringify(v.d || {});
-    if (q && q.key !== key) { dropPeer(code); q = null; }     // 옷이 바뀌었다 — 다시 만든다
+    const sm = v.sm ? 1 : 0;                                   // 🍍 작아졌나
+    if (q && (q.key !== key || (q.sm || 0) !== sm)) { dropPeer(code); q = null; }     // 옷이나 크기가 바뀌었다 — 다시 만든다
     const isNew = !q;
     if (!q) {
-        const one = makeOne({ code: code, dot: v.d || {} }, v.n || code, run.k, true);
+        const one = makeOne({ code: code, dot: v.d || {}, tiny: sm }, v.n || code, run.k, true);
         run.el.appendChild(one.wrap);
-        q = run.peers[code] = { one: one, key: key, x: v.x, y: v.y, tx: v.x, ty: v.y,
+        q = run.peers[code] = { one: one, key: key, sm: sm, x: v.x, y: v.y, tx: v.x, ty: v.y,
                                 face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
         one.actor.face(v.f || 1);
         putOne(one, q.x, q.y);
