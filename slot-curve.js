@@ -259,7 +259,10 @@ function has(u, name) {
             // ★ 여기만 달라집니다 — 벽이 없습니다
             const B = bands(facilityLuckMult(currentUser), hasAmulet);
 
-            const rollType = Math.random();
+            // 📒 유치원 지침서를 다 읽은 날 — 한 판은 잭팟 (무늬는 평소 잭팟처럼 무작위 · daydream-items.js)
+            let kgJack = false;
+            try { kgJack = (typeof window.kgJackTake === 'function') && window.kgJackTake(); } catch (e) { kgJack = false; }
+            const rollType = kgJack ? (B.fail + B.jack / 2) : Math.random();
             let res1, res2, res3;
             if (rollType < B.fail) {
                 // 완전 꽝 (3개 다름)
@@ -297,7 +300,8 @@ function has(u, name) {
                     const c = capPrize(currentUser, bet, bet * res1.mult);
                     winPoints(c.prize); addNet(currentUser, c.prize - bet);
                     msg.innerHTML = '<span style="color:#4CAF50;">[3개 일치] ' + res1.char
-                        + ' 잭팟! ×' + res1.mult + ' 배</span>' + capNote(c.cut);
+                        + ' 잭팟! ×' + res1.mult + ' 배</span>' + capNote(c.cut)
+                        + (kgJack ? '<div style="font-size:10px; color:#d4af37; margin-top:3px;">📒 유치원 지침서 — 오늘의 잭팟</div>' : '');
                     addHistoryLog(currentUser, '[슬롯 대박] ' + res1.char + ' 3개 적중 (+' + c.prize + ' P)'
                         + (c.cut ? ' · 상한으로 ' + c.cut + ' P 깎임' : ''));
                 } else if (res1.char === res2.char || res2.char === res3.char || res1.char === res3.char) {

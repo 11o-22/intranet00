@@ -143,6 +143,7 @@ function heartBonus(u) {
 const PASSIVE = {
     '꿈결 수집기': { pct: 100, fac: 1 },
     '포승줄':      { bon: 5 },
+    '노스텔지어 끈': { bon: 10 },     // 백일몽 전용 · 구출 확정 5회 · 어둠 5번이면 닳는다 (daydream-items.js)
     '공기 누름돌': { luck: 2 },
     '은색 저울':   {}
 };
@@ -478,6 +479,7 @@ function rescueGuarantee() {
     }
     if ((u.paperBoat | 0) > 0) return '종이배';
     if (hasAny(u, '전용 자전거') && dayLeft(u, '전용 자전거', 2) > 0) return '전용 자전거';
+    if (hasEquipped(u, '노스텔지어 끈')) return '노스텔지어 끈';      // 다섯 번 — daydream-items.js 가 센다
     if (hasEquipped(u, '포승줄')) return '포승줄';
     if (hasEquipped(u, '통신 단추') && (u.buttonUses | 0) > 0) return '통신 단추';
     return null;
@@ -502,6 +504,9 @@ function spendGuarantee(src) {
             setTimeout(function () { showCustomAlert('종이배가 물에 풀렸습니다.'); }, 900);
         }
         saveFields({ paperBoat: 1 });
+
+    } else if (src === '노스텔지어 끈') {
+        if (typeof window.ndSpendSave === 'function') window.ndSpendSave();
 
     } else if (src === '포승줄') {
         // 열 번 쓰면 끊어진다 — totalSpend 가 물품칸·장착칸까지 비워 준다
@@ -1655,6 +1660,9 @@ function shopAllowed(nm) {
     // (사인참사검·유리구슬·도깨비 불·사원증 뱃지·■■ 씨앗·소원권·
     //  작두·유리손포·착한 친구·보안팀 의상 세트·버터 나이프·사자탈 ...)
     // 은 여기에 없어서 반대 소속에게도 전부 보였다. 그쪽도 같이 본다.
+    // 경비팀 · 보안팀에게만 진열하는 것 (늑대 가면 · 유치원 지침서 — daydream-items.js)
+    if ((window.ALIEN_SEC_ONLY || []).indexOf(nm) >= 0 && !isCounsel(currentUser)
+        && !/보안팀|경비팀/.test((currentUser && currentUser.team) || '')) return false;
     const need = SHOP_AFFIL[nm]
         || ((typeof EQUIP_AFFIL !== 'undefined' && EQUIP_AFFIL) ? EQUIP_AFFIL[nm] : null);
     if (!need) return true;
@@ -2209,7 +2217,9 @@ window.__newItemWear = wearNew;
     // 장착칸 줄에 숫자를 덧붙인다 — 은심장 구출 횟수 · 단추 남은 횟수 · 종이배
     const COUNT_OF = {
         '🩶 은심장': function (u) { return '구출 ' + (u.heartSaves || 0) + '회'; },
-        '통신 단추': function (u) { return '남은 ' + (u.buttonUses | 0) + '회'; }
+        '통신 단추': function (u) { return '남은 ' + (u.buttonUses | 0) + '회'; },
+        '노스텔지어 끈': function (u) { return window.ndLeftText ? window.ndLeftText(u) : ''; },
+        '늑대 가면': function (u) { return window.wolfLeftText ? window.wolfLeftText(u) : ''; }
     };
 
     function addCount() {

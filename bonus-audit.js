@@ -67,6 +67,7 @@ function rowOf(c) {
     now += add('임시 버프', ib);
     const rope = wears(u, '포승줄') ? 5 : 0;
     now += add('포승줄', rope);
+    now += add('노스텔지어 끈', wears(u, '노스텔지어 끈') ? 10 : 0);
     const heart = safe(function () {
         if (!window.hasSilverHeart(u)) return 0;
         return Math.min(5, Math.floor((Number(u.heartSaves) || 0) / 2));

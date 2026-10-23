@@ -187,9 +187,9 @@ function alienAllowed(u, it) {
     const sec  = t.indexOf('보안팀') >= 0 || t.indexOf('경비팀') >= 0 || admin;
 
     if (['작두', '유리손포', '누군가가 쓴 부적', '사자탈'].indexOf(it) >= 0 && !dis) return false;
-    if (['착한 친구', '보안팀 의상 세트', '버터 나이프'].indexOf(it) >= 0 && !day) return false;
+    if (['착한 친구', '보안팀 의상 세트', '버터 나이프', '노스텔지어 끈'].indexOf(it) >= 0 && !day) return false;
     if (['은반지', '빨간 리본', '고급진 술', '금고'].indexOf(it) >= 0 && !high) return false;
-    if (it === '노스텔지어 끈' && !sec) return false;
+    if ((window.ALIEN_SEC_ONLY || []).indexOf(it) >= 0 && !sec) return false;   // 늑대 가면 · 유치원 지침서
     if (it === '여우구슬' && !admin) return false;
     if (it === '금고' && !admin) return false;
     return true;
