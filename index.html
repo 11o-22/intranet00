@@ -9783,11 +9783,12 @@ function bjFinish(mode) {
             if (unpicked.length === 0) unpicked = [...availablePool];
             let shuffled = [...unpicked].sort(() => 0.5 - Math.random());
 
-            // 진열대는 하루에 이길 수 있는 만큼 — 한 번 이기면 3종이므로 4회 × 3 = 12칸.
-            // 9칸으로 묶여 있어서 네 번을 다 이겨도 마지막 3종이 안 들어갔다.
-            const MAX_ALIEN_SLOTS = ALIEN_DAILY_MAX * 3;
-            let room = MAX_ALIEN_SLOTS - currentUser.alienUnlockedItems.length;
-            let addCount = Math.min(3, Math.max(0, room));
+            // ★ 이기면 늘 3종 (2026-10-23)
+            //   전에는 진열대를 12칸(4회 × 3)으로 막아 「12 − 지금 진열 수」만큼만 넣었다.
+            //   그런데 룩키마트 직원 리셋은 품절 칸만 걷고 주파수를 두 번 돌려준다 —
+            //   두 개를 사고 리셋하면 진열이 10칸이라, 그 뒤에 이기면 2종만 들어왔다 (1개 누락).
+            //   이길 수 있는 횟수가 이미 하루 몫으로 막혀 있으니 진열대는 따로 막지 않는다.
+            let addCount = 3;
 
             const beforeCount = currentUser.alienUnlockedItems.length;
             shuffled.slice(0, addCount).forEach(it => {
@@ -9839,9 +9840,7 @@ function bjFinish(mode) {
             if (item === "🫙 소원권" || item === "소원권") return false;
             return true;
         });
-        // 진열칸은 하루에 이길 수 있는 만큼 — 네 번 × 3종 = 12칸.
-        // 9로 잘라 두어서 네 번을 다 이겨도 아홉 개만 보였다.
-        if (currentUser.code !== 'kario0987') unlocked = unlocked.slice(0, ALIEN_DAILY_MAX * 3);
+        // 진열칸은 자르지 않는다 — 리셋 뒤에 더 이긴 몫도 다 보인다 (2026-10-23 · 전에는 12칸에서 잘랐다)
         if (unlocked.length === 0) {
             container.innerHTML = `<div style="color:#666; font-size:11px; text-align:center; padding:15px 0;">접속된 우주 주파수가 없습니다. 대결에서 승리하여 물품을 스캔하세요.</div>`;
             return;
