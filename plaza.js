@@ -340,6 +340,8 @@ const PLAZA = {
         { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
         { g: 'me',    n: '익명 편지',  i: '✉️', ic: 'letter',  tab: 'tab-record',   sub: 'rec-letters', nw: 'letter' },
         { g: 'me',    n: '칭호',       i: '🏅', ic: 'title',   tab: 'tab-record',   sub: 'rec-titles' },
+        // 🏷️ 이름표 끄기 · 켜기 — 내 화면에서만 (남의 화면은 그대로 · 이 기기에 적어 둔다 · 2026-10-23)
+        { g: 'me',    get n() { let off = false; try { off = localStorage.getItem('plazaTagsOff') === '1'; } catch (e) { } return off ? '이름표 켜기' : '이름표 끄기'; }, i: '🏷️', ic: 'tag', sheet: 'tags' },
         // ③ 포인트
         { g: 'point', n: '공용시설',   i: '🎲', ic: 'public',  tab: 'tab-public' },
         { g: 'point', n: '장기 은행',  i: '🏦', ic: 'bank',    tab: 'tab-vip' },
@@ -593,6 +595,7 @@ function stampSafe(ov) {
         '  pointer-events:none;}',
         // 칭호 표 — 밝은 방에서도 읽히게 바탕을 조금 깔아 준다
         '.plaza-tag span{background:rgba(10,10,14,.55);vertical-align:1px;}',
+        '#plaza-ov.tags-off .plaza-tag{display:none !important;}',
         // 말풍선
         // ★ 사람 칸이 좁아(가로 100~170px) 말이 석 자씩 끊겼다.
         //   절대 자리 잡은 칸은 **담은 칸 너비까지만** 늘어나기 때문이다.
@@ -2288,6 +2291,15 @@ function paintExits() {
 //
 //   누르면 그 시설로 들어간다 (광장은 닫힌다). 없는 시설은 아예 안 세운다.
 // 그림 아이콘 한 칸. ic 가 없으면 전처럼 글자 그림(i)을 쓴다.
+// 🏷️ 이름표 — 내 화면에서 끄고 켠다 (광장 · 이 기기)
+function tagsOff() { try { return localStorage.getItem('plazaTagsOff') === '1'; } catch (e) { return false; } }
+function tagsSet(off) {
+    try { localStorage.setItem('plazaTagsOff', off ? '1' : '0'); } catch (e) { }
+    const ov = document.querySelector('#plaza-ov');
+    if (ov) ov.classList.toggle('tags-off', !!off);
+    sysLine('🏷️ 이름표를 ' + (off ? '껐습니다 — 내 화면에서만 안 보입니다.' : '켰습니다.'));
+}
+window.plazaTags = function (on) { if (typeof on === 'boolean') tagsSet(!on); return !tagsOff(); };
 function ico(o, cls) {
     if (!o || (!o.ic && !o.i)) return '';      // 그림도 글자도 없으면 아예 안 그린다
     if (o && o.ic) {
@@ -4323,6 +4335,7 @@ function eyeQuar() {
     } catch (e) { return false; }
 }
 function pickMenu(m) {
+    if (m && m.sheet === 'tags') { tagsSet(!tagsOff()); menuSheet(); return; }
     if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (m && m.sheet === 'photo') { photoSheet(); return; }
     if (skipTake) {
@@ -4684,6 +4697,7 @@ function open() {
         +   '<span class="pico" style="--ic:url(\'ico/bag.png\')"></span></button>'
         + '</div>';
     document.body.appendChild(ov);
+    if (tagsOff()) ov.classList.add('tags-off');      // 🏷️ 이름표를 꺼 두었으면
     stampSafe(ov);
 
     run = {
