@@ -11,7 +11,8 @@
 //   누르면 두 단추가 나온다.
 //
 //     🎹 피아노   높은음자리표(가온 다 C4 ~ C5)를 기본으로 한 옥타브 건반. 위 · 아래로 한 옥타브씩 옮긴다
-//                 (C3 ~ C6). 누른 음은 같은 방 사람들에게도 들린다 (plazaNote/<방> · 3초 뒤 지운다).
+//                 (C3 ~ C6). 화면이 넓으면(펼친 폴드 · 태블릿) 세 옥타브를 한 줄로 다 깐다 (넓은 가로 폰은 두 옥타브).
+//                 누른 음은 같은 방 사람들에게도 **친 사람과 똑같은 소리 · 같은 크기로** 들린다 (plazaNote/<방> · 3초 뒤 지운다).
 //     🪩 디스코   스무 가지 색 가운데 넷까지 골라 켜면 방 화면이 클럽 조명으로 바뀐다 (같은 방 사람들 화면도).
 //                 끌 때까지 켜져 있다 · LP 판을 빼거나 광장을 닫으면 꺼진다.
 //
@@ -124,7 +125,7 @@ function listen(seat) {
         if (now() - (Number(v.at) || 0) > LP.NOTE_LIFE) return;              // 묵은 음은 안 낸다
         const m = Number(v.m);
         if (!(m >= 36 && m <= 96)) return;
-        play(m, 0.2);
+        play(m);                                                             // 친 사람과 똑같은 소리 · 같은 크기 (2026-10-23)
     };
     S.ref.on('child_added', S.onAdd);
 }
@@ -181,6 +182,7 @@ function send(midi) {
         '  font-size:10px;color:#6a6488;box-sizing:border-box;}',
         '.lp-keys .w.dn{background:linear-gradient(#d9d2ff,#b6a9f5);}',
         '.lp-keys .w.c0{color:#4b3fa0;font-weight:bold;}',
+        '.lp-keys.wide .w{margin:0 .5px;font-size:9px;}',
         '.lp-keys .b{position:absolute;top:0;height:92px;z-index:2;border-radius:0 0 5px 5px;',
         '  background:linear-gradient(#2c2840,#0d0b16);border:1px solid #000;box-sizing:border-box;}',
         '.lp-keys .b.dn{background:linear-gradient(#5a4aa8,#2d2260);}',
@@ -309,22 +311,42 @@ function openPiano() {
     paintKeys();
     fxSync();
 }
+// ★ 화면 폭에 맞춰 한 번에 보이는 옥타브 수 (2026-10-23)
+//   보통 폰 1 · 넓은 폰 가로 2 · 펼친 폴드 · 태블릿 3 (C3 ~ C6 를 다 깐다 — 옥타브 단추가 필요 없다)
+function octCount() {
+    const w = (S.piano && S.piano.clientWidth) || window.innerWidth || 360;
+    return w >= 640 ? 3 : (w >= 480 ? 2 : 1);
+}
 function paintKeys() {
     const p = S.piano; if (!p) return;
+    const n = octCount();
+    S._n = n;
+    S.oct = Math.max(-1, Math.min(2 - n, S.oct));              // 보이는 판이 C3 ~ C6 밖으로 안 나가게
     const base = LP.BASE + S.oct * 12;
-    p.querySelector('.lp-oct').textContent = OCT_NAME[String(S.oct)];
-    p.querySelector('[data-o="-1"]').disabled = S.oct <= -1;
-    p.querySelector('[data-o="1"]').disabled = S.oct >= 1;
+    const lo = p.querySelector('[data-o="-1"]'), hi = p.querySelector('[data-o="1"]');
+    lo.disabled = S.oct <= -1;
+    hi.disabled = S.oct >= 2 - n;
+    lo.style.display = hi.style.display = (n >= 3) ? 'none' : '';
+    p.querySelector('.lp-oct').textContent = (n === 1) ? OCT_NAME[String(S.oct)]
+        : (n >= 3 ? '𝄞 C4 기준 위 · 아래 한 옥타브 (C3 ~ C6)' : 'C' + (4 + S.oct) + ' ~ C' + (4 + S.oct + n));
     const box = p.querySelector('.lp-keys');
-    const W = [0, 2, 4, 5, 7, 9, 11, 12];                       // 도 레 미 파 솔 라 시 도
-    const B = [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5]];       // 검은 건반 — 몇 번째 흰 건반 오른쪽에
+    box.classList.toggle('wide', n >= 2);
+    const W = [], B = [];
+    for (let o = 0; o < n; o++) {
+        [0, 2, 4, 5, 7, 9, 11].forEach(function (x) { W.push(x + 12 * o); });
+        [[1, 0], [3, 1], [6, 3], [8, 4], [10, 5]].forEach(function (x) { B.push([x[0] + 12 * o, x[1] + 7 * o]); });   // 몇 번째 흰 건반 오른쪽에
+    }
+    W.push(12 * n);                                            // 맨 끝 도
     let h = '';
-    W.forEach(function (n, i) {
-        h += '<div class="w' + (i === 0 ? ' c0' : '') + '" data-m="' + (base + n) + '">' + NAMES[n % 12] + (n === 0 ? (4 + S.oct) : (n === 12 ? (5 + S.oct) : '')) + '</div>';
+    W.forEach(function (x) {
+        const m = base + x;
+        const oc = Math.floor(m / 12) - 1;
+        h += '<div class="w' + (m === LP.BASE ? ' c0' : '') + '" data-m="' + m + '">' + NAMES[x % 12] + (x % 12 === 0 ? oc : '') + '</div>';
     });
+    const kw = 100 / W.length;
     B.forEach(function (x) {
-        const left = ((x[1] + 1) / W.length) * 100;
-        h += '<div class="b" data-m="' + (base + x[0]) + '" style="left:calc(' + left + '% - ' + (100 / W.length * 0.32) + '%);width:' + (100 / W.length * 0.64) + '%;"></div>';
+        const left = (x[1] + 1) * kw;
+        h += '<div class="b" data-m="' + (base + x[0]) + '" style="left:calc(' + left + '% - ' + (kw * 0.32) + '%);width:' + (kw * 0.64) + '%;"></div>';
     });
     box.innerHTML = h;
     if (box._wired) return;
@@ -349,6 +371,12 @@ function paintKeys() {
     box.addEventListener('pointermove', function (e) { if (down[e.pointerId]) press(hit(e), e.pointerId); });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) { box.addEventListener(ev, function (e) { lift(e.pointerId); }); });
 }
+// 접었다 펴거나 돌리면 건반 수를 다시 맞춘다
+window.addEventListener('resize', function () {
+    if (!S.piano) return;
+    clearTimeout(S._rz);
+    S._rz = setTimeout(function () { if (S.piano && octCount() !== S._n) paintKeys(); }, 120);
+});
 function closePiano(quiet) {
     if (S.piano) S.piano.remove();
     S.piano = null;
