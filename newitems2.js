@@ -397,9 +397,11 @@ function payDarkPt() {
         v += 5000; (u.darkPtWhy = u.darkPtWhy || []).push('은심장 +5,000P');
     }
     const cage = u.cageSaved || 0;
-    if (hasEquipped(u, '％＄＠＆ 이동장') && cage > 0) {
-        const got = Math.min(9000, cage * 1500);
-        v += got; (u.darkPtWhy = u.darkPtWhy || []).push('％＄＠＆ 이동장 +' + got.toLocaleString() + 'P');
+    if (cage > 0) {
+        if (hasEquipped(u, '％＄＠＆ 이동장')) {
+            const got = Math.min(9000, cage * 1500);
+            v += got; (u.darkPtWhy = u.darkPtWhy || []).push('％＄＠＆ 이동장 +' + got.toLocaleString() + 'P');
+        }
         u.cageSaved = 0;
     }
 
@@ -474,9 +476,8 @@ function freezePoll(h, src) {
 function rescueGuarantee() {
     const u = currentUser;
     if (hasSilverHeart(u) && (u.heartSaves || 0) >= 10) return '은심장';
-    if (hasEquipped(u, '％＄＠＆ 이동장')) {
-        if (!u.cageRun || u.cageRun !== (darkRun && darkRun.zone) + '|' + today()) return '％＄＠＆ 이동장';
-    }
+    // 이동장 — 탐사마다 한 번 (전에는 「구역 + 날짜」로 세어, 같은 날 같은 구역에 두 번째로 들면 안 걸렸다)
+    if (hasEquipped(u, '％＄＠＆ 이동장') && darkRun && !darkRun._cageUsed) return '％＄＠＆ 이동장';
     if ((u.paperBoat | 0) > 0) return '종이배';
     if (hasAny(u, '전용 자전거') && dayLeft(u, '전용 자전거', 2) > 0) return '전용 자전거';
     if (hasEquipped(u, '노스텔지어 끈')) return '노스텔지어 끈';      // 다섯 번 — daydream-items.js 가 센다
@@ -492,6 +493,7 @@ function spendGuarantee(src) {
     const u = currentUser;
 
     if (src === '％＄＠＆ 이동장') {
+        if (darkRun) darkRun._cageUsed = true;
         u.cageRun = (darkRun && darkRun.zone) + '|' + today();
 
     } else if (src === '전용 자전거') {
@@ -537,9 +539,8 @@ function spendGuarantee(src) {
         saveFields({ buttonUses: 1 });
     }
 
-    u.cageSaved = (u.cageSaved || 0) + 1;
     u.heartSaves = (u.heartSaves || 0) + 1;
-    saveFields({ cageRun: 1, cageSaved: 1, heartSaves: 1 });
+    saveFields({ cageRun: 1, heartSaves: 1 });
     saveSelfFull();
 }
 
@@ -574,12 +575,31 @@ function maskPay(u) {
     if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
 }
 
-// 굴림을 한 번 확정으로 만든다
+// 굴림을 한 번 확정으로 만든다 — d20 은 **클수록** 좋다 (2026-10-23)
+//
+//   ✗ 전에는 Math.random 이 0.0001 을 돌려주게 했다. 그러면
+//       Math.floor(Math.random() * 20) + 1  →  1   (대실패)
+//     구출 · 끌려감 버티기는 1 이면 무조건 실패라, 「확정 구출」이 **늘 실패**하고
+//     구하러 간 쪽까지 딸려 들어갔다 (이동장 · 포승줄 · 종이배 · 자전거 · 단추 · 은심장 · 노스텔지어 끈).
+//     낚시 줄의 「끌려감 방어」도 늘 끌려갔다. 1 이 나오면 장비까지 부서졌다 (gear-break.js).
+//   → 0.9999 로 — 주사위는 20, 「확률 아래면 나쁜 일」 같은 굴림도 다 비켜 간다.
+//     luckReroll 도 그 판은 20 을 돌려주게 깃발을 같이 세운다.
 function withLucky(fn, ctx, args) {
     const _r = Math.random;
-    Math.random = function () { return 0.0001; };
+    Math.random = function () { return 0.9999; };
+    const pre = !!window.__epicSureRoll;            // 부른 쪽이 이미 세워 두었으면 (안전장치 시계까지) 그대로 둔다
+    window.__epicSureRoll = true;
     try { return fn.apply(ctx, args); }
-    finally { Math.random = _r; }
+    finally { Math.random = _r; if (!pre) window.__epicSureRoll = false; }
+}
+
+// 이동장 — 「살린 만큼 최대 9,000P」. 찬 채로 **살려 낸** 수를 센다 (확정이든 아니든 · 실패는 안 센다)
+//   전에는 확정권을 쓴 번만, 그것도 구출이 실패해도 셌다.
+function cageCount(u, won0) {
+    if (!u || !darkRun || !hasEquipped(u, '％＄＠＆ 이동장')) return;
+    if ((darkRun.success || 0) <= won0) return;
+    u.cageSaved = (u.cageSaved || 0) + 1;
+    saveFields({ cageSaved: 1 });
 }
 
 (function hookRescue() {
@@ -593,13 +613,17 @@ function withLucky(fn, ctx, args) {
 
             maskPay(u);                       // 진실 마스크 — 양쪽 정산 · 다섯 번이면 부서진다
 
+            const won0 = darkRun ? (darkRun.success || 0) : 0;
             if (!src) {
                 u.heartSaves = (u.heartSaves || 0) + 1;
                 saveFields({ heartSaves: 1 });
-                return _a.apply(this, arguments);
+                const r0 = _a.apply(this, arguments);
+                cageCount(u, won0);
+                return r0;
             }
 
             const r = withLucky(_a, this, arguments);
+            cageCount(u, won0);
             spendGuarantee(src);
             addHistoryLog(u, '[확정 구출] ' + src);
             setTimeout(function () {
@@ -641,6 +665,10 @@ function withLucky(fn, ctx, args) {
 
             window.__epicSureRoll = true;
             setTimeout(function () { window.__epicSureRoll = false; }, 8000);   // 안전장치
+            if (darkRun && hasEquipped(u, '％＄＠＆ 이동장')) {           // 확정이라 살린다 — 이동장 몫
+                u.cageSaved = (u.cageSaved || 0) + 1;
+                saveFields({ cageSaved: 1 });
+            }
             spendGuarantee(src);
             addHistoryLog(u, '[확정 구출] ' + src);
             setTimeout(function () {
