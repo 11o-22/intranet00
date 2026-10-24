@@ -79,7 +79,7 @@ export const CFG = {
 
 const KIND_KEYS = Object.keys(KINDS);
 const KIND_NAME = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결',
-                    gaze: '응시', heal: '치유', luck: '행운', none: '판정 없음' };
+                    gaze: '응시', heal: '치유', fix: '보정', steady: '굳건', luck: '행운', none: '판정 없음' };
 const ST_NAME = { ok: '멀쩡함', hurt: '다침', lost: '실종', out: '홀로 나감' };
 const ORDER = ['ok', 'hurt', 'lost'];
 function stName(d, st) { return (st === 'lost' && d && d.lost) ? d.lost : (ST_NAME[st || 'ok'] || st); }
@@ -1199,6 +1199,7 @@ async function round(b, deps, db) {
                     '- [앞 장면 끝에] 로 표시된 말은 앞 장면이 넘어가던 순간에 한 말이다. 이번 장면에도 이어지는 행동이면 함께 본다.',
                     '- 그 사원이 아무 말도 안 했거나 잡담뿐이면 넣지 않는다.',
                     '- 말 · 의논 · 계획만 했으면 kind 는 none.',
+                    '- 버티는 행동은 몸으로 버티면 steady(굳건), 마음 · 정신으로 버티거나 마주보면 gaze(응시). 고치거나 바로잡거나 남이 하는 일을 거들면 fix(보정) — 남을 거들면 target 에 그 사원.',
                     '- 아기 여우와 나누는 몸짓(안아 들기 · 쓰다듬기 · 껴안기 · 손잡기)은 그 자체로는 판정할 행동이 아니다 — 그것뿐이면 kind none, 다른 행동과 함께면 그 행동을 고른다.',
                     '- tier 는 이 장면 상황에서 그 행동이 얼마나 어려운지 (easy / normal / hard).',
                     '- danger 는 실패하면 괴담에 노출되어 다치거나 맞춰질 수 있는 행동이면 true.',

@@ -101,7 +101,7 @@ function stM(k, x) { x = x || {}; return (x.vanish && x.st === 'lost') ? '실종
 const ST_C = { ok: '#9fd8a4', hurt: '#ffb36b', lost: '#ff6b81', out: '#c9b6ff' };
 function gone(st) { return st === 'lost' || st === 'out'; }
 const KIND_N = { sense: '감각', hide: '은신', evade: '회피', break: '파괴', bond: '연결', gaze: '응시',
-                 heal: '치유', luck: '행운', none: '판정 없음' };
+                 heal: '치유', fix: '보정', steady: '굳건', luck: '행운', none: '판정 없음' };     // 열 가지 (2026-10-24)
 const END_N = { clear: ['종결', '#7fd4d4', '근원을 지웠습니다'], escape: ['탈출', '#e8c27a', '살아서 빠져나왔습니다'],
                 fail: ['전멸', '#ff6b81', '남은 사람이 모두 방송국에 먹혔습니다'] };
 
