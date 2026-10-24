@@ -184,6 +184,9 @@ const JOBS = {
 //     전직하면 직업 등급은 D 부터 다시 (Lv 은 그대로). 거절하면 'declined'.
 //   ■ 등급 올리기는 극악 — 각성 점수 D 30 · C 40 · B 50 · A 60 · S 100 (보통 직업의 열 배, S → L 은 백)
 //   ■ L 이 되면 kroomHidden 에 'L' 을 적고 상담사에게 알린다 — 그에 맞는 물건은 추후 정한다.
+//   ■ Lv (2026-10-25) — 전직하면 **Lv 1** 부터 다시 오른다 (전에는 Lv 을 그대로 가져갔다). 히든 직업만 **Lv 120** 까지 오르고,
+//     한 Lv 오르는 데 드는 경험치가 보통 직업의 **다섯 배**다 (HIDDEN_LV_MAX · HIDDEN_EXP_MULT).
+//     그 전에 전직한 사원도 한 번 Lv 1 로 맞춘다 (hiddenLv1 — 등급 · 각성은 그대로).
 //   ■ 내용 — 히든 직업만의 갈림길 · 선택지는 아직 없어서, **같은 속성 다섯 직업의 것**을 함께 쓴다.
 const HIDDEN = {
     L_gunner:   ['evade',  'might', '거너',       '거리는 숨을 고르는 시간이다. 방아쇠는 그 끝에 있다.'],
@@ -212,6 +215,8 @@ function hiddenKeyFor(attr, u) {
 const L_JOBS = ['거너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
 const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 30, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
 const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
+const HIDDEN_LV_MAX = 120;            // 히든 직업만 Lv 120 까지
+const HIDDEN_EXP_MULT = 5;            // 한 Lv 에 드는 경험치 — 보통 직업의 다섯 배
 const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
 // ── 전용 장비 — 이 방에서는 속성마다 「몇 번」 쓰는 능력이 된다
@@ -465,6 +470,9 @@ function needExp(lv) {
     if (lv < 20) return 300 + 60 * (lv - 10);
     return Math.round(1800 * Math.pow(1.03, lv - 20));
 }
+// 히든 직업은 Lv 120 까지 · 통이 다섯 배 (2026-10-25)
+function lvCap(k) { return (k && isHiddenJob(k.job)) ? HIDDEN_LV_MAX : LV_MAX; }
+function expNeed(k, lv) { return needExp(lv) * ((k && isHiddenJob(k.job)) ? HIDDEN_EXP_MULT : 1); }
 function mainAttr(u) {
     const g = u && u.soulGear;
     const a = g && g.attrs;
@@ -666,9 +674,33 @@ function loadFor(dunId, jobKey) {
 // ==========================================
 //   바탕 화면(보유 포인트 칸)과 광장 위 띠(포인트 줄) 두 곳.
 //   updateUI 가 포인트를 다시 적을 때마다 같이 고친다.
+// ★ 이미 히든 직업으로 전직한 사원 — 한 번 Lv 1 로 맞춘다 (2026-10-25 · 등급 · 각성은 그대로)
+//   접어 둔 다른 속성(kroom.alt)에 든 히든 직업도 같이 본다. 판 도중에는 건드리지 않는다.
+function hiddenLv1() {
+    const u = me(); if (!u || kr) return;
+    const k = u.kroom;
+    if (!k || typeof k !== 'object' || stale(k)) return;
+    const fix = function (p) {
+        if (!p || !isHiddenJob(p.job) || (p.hidden && p.hidden.lv1)) return null;
+        const was = p.lv || 1;
+        p.lv = 1; p.exp = 0;
+        p.hidden = Object.assign({}, p.hidden || {}, { lv1: now() });
+        return { job: p.job, grade: p.grade || 'D', was: was };
+    };
+    const done = [];
+    const a = fix(k); if (a) done.push(a);
+    Object.keys(k.alt || {}).forEach(function (x) { const b = fix(k.alt[x]); if (b) done.push(b); });
+    if (!done.length) return;
+    done.forEach(function (d) {
+        addHistoryLog(u, '[K 의 방] 히든 직업 ' + jobName(d.job, d.grade) + ' — Lv ' + d.was + ' → Lv 1 로 맞췄습니다. (히든 직업은 Lv 1 부터 Lv ' + HIDDEN_LV_MAX + ' 까지 오릅니다)');
+    });
+    saveProf();
+    console.log('[K 의 방] 히든 직업 Lv 을 1 로 맞췄습니다 —', done);
+}
 function paintDream() {
     const u = me(); if (!u) return;
     try { freshen(); } catch (e) { }
+    try { hiddenLv1(); } catch (e) { }
     const v = ((u.kroom && u.kroom.dream) || 0).toLocaleString('ko-KR');
     const a = document.getElementById('display-points');
     if (a) {
@@ -814,7 +846,7 @@ function paintEntry() {
             <div style="font-size:10px; color:#999; line-height:1.6;">${DARK_ZONES[K_CODE].brief}</div>
             <div style="font-size:10px; color:#777; margin-top:6px;">1~5인 · 네 팀까지 동시 진입 (지금 ${live}팀) · 던전 등급은 팀 평균 Lv 과 직업 등급으로 정해짐</div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:7px;">
-                Lv <b>${k.lv}</b> · ${k.job ? esc(jobName(k.job, k.grade)) + ' <span style="color:#7fd3e6;">' + k.grade + '</span>' : '<span style="color:#888;">직업 없음 — 처음 들어가면 고른다</span>'}
+                Lv <b>${k.lv}</b>${isHiddenJob(k.job) ? '<span style="color:#ffe08a;"> / ' + HIDDEN_LV_MAX + '</span>' : ''} · ${k.job ? esc(jobName(k.job, k.grade)) + ' <span style="color:#7fd3e6;">' + k.grade + '</span>' : '<span style="color:#888;">직업 없음 — 처음 들어가면 고른다</span>'}
                 · 꿈결 <b style="color:#c9a8ff;">${(k.dream || 0).toLocaleString()} D</b>
             </div>
             <div style="font-size:11px; color:#cfe9f0; margin-top:5px;">오늘 남은 횟수 <b id="kroom-left" style="color:#7fd3e6;">${kLeft()} / ${kLimit()}</b>회 <span style="font-size:10px; color:#777;">(일반 어둠과 따로 · 자정 초기화)</span></div>
@@ -2582,8 +2614,8 @@ function settle(how, txt) {
     const lv0 = k.lv;
     if (!helper) {
         k.exp = (k.exp || 0) + exp;
-        while (k.lv < LV_MAX && k.exp >= needExp(k.lv)) { k.exp -= needExp(k.lv); k.lv++; }
-        if (k.lv >= LV_MAX) k.exp = 0;
+        while (k.lv < lvCap(k) && k.exp >= expNeed(k, k.lv)) { k.exp -= expNeed(k, k.lv); k.lv++; }
+        if (k.lv >= lvCap(k)) k.exp = 0;
         // ★ Lv 100 — 다음에 들어서면 새 속성을 열 수 있다 (2026-10-25)
         if (lv0 < LV_MAX && k.lv >= LV_MAX) {
             try {
@@ -2643,7 +2675,7 @@ function settle(how, txt) {
             ${kr.job ? '직업 <b>' + esc(jobName(kr.job, k.grade)) + '</b> ' + k.grade + (wakeNeed(k) ? ' <span style="color:#888;">(각성 ' + (k.wake[k.grade] || 0) + '/' + wakeNeed(k) + ' · ' + (k.grade === 'S' && isHiddenJob(k.job) ? 'S' : k.grade) + ' 던전에서)</span>' : '') + '<br>' : ''}
             ${helper ? '<div style="color:#81c784; margin-bottom:6px;">헬퍼로 들어온 탐사입니다 — 경험치 · 꿈결 · 각성 점수 · 포인트를 받지 않고, 탐사 횟수도 줄지 않았습니다.</div>' : ''}
             경험치 <b>+${exp}</b>${how !== 'clear' && !helper ? ' <span style="color:#888;">(' + (how === 'dead' ? '35%' : '절반') + ')</span>' : ''}<br>
-            Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.exp} / ${needExp(k.lv)})</span><br>
+            Lv <b style="color:${up ? '#4CAF50' : '#ddd'};">${lv0}${up ? ' → ' + k.lv : ''}</b> <span style="color:#888;">(${k.lv >= lvCap(k) ? '최고 Lv' : k.exp + ' / ' + expNeed(k, k.lv)}${isHiddenJob(k.job) ? ' · 히든 직업 Lv ' + HIDDEN_LV_MAX + ' 까지' : ''})</span><br>
             꿈결 <b style="color:#c9a8ff;">+${dream} D</b> <span style="color:#888;">(${how === 'dead' && !helper ? '쓰러짐 — 이번에 얻은 것 없음 · ' : ''}모두 ${k.dream.toLocaleString()} D)</span><br>
             ${extra.length ? '<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #4a3a6a; color:#d4bbff; font-size:11px;">' + extra.join('<br>') + '</div>' : ''}
             ${how === 'dead' && helper ? `<div style="margin-top:6px; padding-top:6px; border-top:1px dashed #2e7d32; color:#81c784;">
@@ -3062,7 +3094,8 @@ function hiddenPopup(cont) {
         + '<div class="khid-at">' + esc(ATTR[a].n) + '</div></div>'
         + '<div class="khid-q">『 선택받은 자여 전직하겠습니까? 』</div>'
         + '<div class="khid-note">전직하면 지금 직업(' + esc(jobName(k.job, k.grade)) + ' ' + k.grade + ')을 내려놓고<br>'
-        + esc(H[2][0]) + ' D 부터 다시 시작합니다. Lv 은 그대로입니다.</div>'
+        + esc(H[2][0]) + ' D · Lv 1 부터 다시 시작합니다.<br>'
+        + '히든 직업은 Lv ' + HIDDEN_LV_MAX + ' 까지 오르며, 한 Lv 오르는 데 보통 직업의 다섯 배가 듭니다.</div>'
         + '<div class="khid-btns"><button class="khid-no">거절한다</button><button class="khid-yes">전직한다</button></div>';
     document.body.appendChild(ov);
     let done = false;
@@ -3071,14 +3104,15 @@ function hiddenPopup(cont) {
         if (done) return; done = true;
         const from = jobName(k.job, k.grade) + ' ' + k.grade;
         k.job = key; k.grade = 'D'; k.wake = {}; k.peek = null;
-        k.hidden = { attr: a, at: now(), from: from };
+        k.lv = 1; k.exp = 0;                                  // Lv 1 부터 (2026-10-25)
+        k.hidden = { attr: a, at: now(), from: from, lv1: now() };
         saveProf();
-        addHistoryLog(u, '[K 의 방] ✦ 선택받았다 — ' + from + ' → ' + H[2][0] + ' D (히든 직업)');
+        addHistoryLog(u, '[K 의 방] ✦ 선택받았다 — ' + from + ' → ' + H[2][0] + ' D · Lv 1 (히든 직업 · Lv ' + HIDDEN_LV_MAX + ' 까지)');
         try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
         try { db_().ref(H_NODE + '/' + u.code).update({ state: 'accepted', answeredAt: now(), key: key, job: H[2][0] }); } catch (e) { }
         if (hMine) hMine.state = 'accepted';
         ov.classList.add('done');
-        ov.querySelector('.khid-q').innerHTML = '✦ ' + esc(H[2][0]) + ' D ✦';
+        ov.querySelector('.khid-q').innerHTML = '✦ ' + esc(H[2][0]) + ' D · Lv 1 ✦';
         ov.querySelector('.khid-note').innerHTML = '빛이 가라앉는다. 이름이 바뀌었다.';
         ov.querySelector('.khid-btns').remove();
         close();
@@ -3256,7 +3290,7 @@ window.kroomHiddenState = function (who) {
 window.kroomState = function () {
     const k = prof(); if (!k) return;
     console.log('%c===== 『 K 의 방 』 =====', 'color:#7fd3e6; font-size:13px');
-    console.log('  Lv ' + k.lv + ' (' + k.exp + ' / ' + needExp(k.lv) + ') · 꿈결 ' + k.dream + ' · 들어간 수 ' + (k.runs || 0));
+    console.log('  Lv ' + k.lv + ' / ' + lvCap(k) + ' (' + k.exp + ' / ' + expNeed(k, k.lv) + ') · 꿈결 ' + k.dream + ' · 들어간 수 ' + (k.runs || 0));
     console.log('  직업 ' + (k.job ? jobName(k.job, k.grade) + ' ' + k.grade + ' — 각성 ' + JSON.stringify(k.wake) : '없음') + (k.rerolled ? ' · 다시 고르기 씀' : ''));
     try {
         const u0 = me(), list = window.kroomAttrs(u0);
@@ -3276,7 +3310,7 @@ window.kroomGive = function (who, field, val) {
     const code = Object.keys(book).filter(function (c) { const x = book[c] || {}; return c === who || x.name === who || String(x.no) === String(who); })[0];
     if (!code) { console.warn('사원을 못 찾았습니다.'); return; }
     const t = book[code]; const k = prof(t);
-    if (field === 'lv') k.lv = clamp(Number(val) || 1, 1, LV_MAX);
+    if (field === 'lv') k.lv = clamp(Number(val) || 1, 1, lvCap(k));
     else if (field === 'exp') k.exp = Math.max(0, Number(val) || 0);
     else if (field === 'dream') k.dream = Math.max(0, Number(val) || 0);
     else if (field === 'job') { if (val && !JOBS[val]) { console.warn('없는 직업 —', Object.keys(JOBS).join(' ')); return; } k.job = val || null; k.grade = 'D'; k.wake = {}; k.peek = null; }
@@ -3289,7 +3323,7 @@ window.kroomGive = function (who, field, val) {
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
-window.KROOM = { hard: function () { return hard(); }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+window.KROOM = { hard: function () { return hard(); }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, expNeed: expNeed, lvCap: lvCap, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
     doom: function (c) { return doom(c); },               // 시험용 — 즉사 기믹 초읽기를 바로 띄운다
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
