@@ -148,11 +148,24 @@ function markShort(name) {
         }
     };
     wrapped._shortWin = true;
+    wrapped._inner = f;
     window[name] = wrapped;
     hooked[name] = true;
     return true;
 }
 
+// ★ 봉제 인형 키트(doll-kit.js)와 서로 바깥을 다투지 않는다 (2026-10-24)
+//   그쪽은 「키트가 남는다」를 위해 늘 맨 바깥을 잡는다. 그 껍질은 키트가 아니면 그대로 안으로 넘기므로
+//   그 아래에 내 껍질이 있으면 됐다. 전에는 둘이 번갈아 덮어 30초 동안 스무 겹 넘게 쌓였다.
+function shortOnTop(f) {
+    let x = f, n = 0;
+    while (x && n++ < 60) {
+        if (x._shortWin) return true;
+        if (x._dollKeep && x._inner) { x = x._inner; continue; }
+        return false;
+    }
+    return false;
+}
 // 다른 파일들이 나중에 또 감싸므로, 한참 동안 계속 바깥쪽을 잡는다
 let tries = 0;
 const iv = setInterval(function () {
@@ -160,12 +173,12 @@ const iv = setInterval(function () {
     SHORT_WIN.forEach(function (n) {
         // 남이 다시 감쌌으면 그 바깥을 또 잡는다
         const f = window[n];
-        if (typeof f === 'function' && !f._shortWin) { hooked[n] = false; markShort(n); }
+        if (typeof f === 'function' && !shortOnTop(f)) { hooked[n] = false; markShort(n); }
     });
     if (++tries > 60) {           // 30초
         clearInterval(iv);
         const on = SHORT_WIN.filter(function (n) {
-            return typeof window[n] === 'function' && window[n]._shortWin;
+            return typeof window[n] === 'function' && shortOnTop(window[n]);
         });
         console.log('[구매자물쇠] 짧은 창 연결 ' + on.length + '곳: ' + on.join(', '));
     }
@@ -179,7 +192,7 @@ window.guardState = function () {
     console.log('  갈아끼움:', (typeof buyGuard === 'function' && buyGuard._fix) ? 'O' : '✗');
     console.log('  사는 자리 창:', SHOP + 'ms', '· 나머지:', LONG + 'ms', '(원래는 모두 700ms, 말없이 막았습니다)');
     const on = SHORT_WIN.filter(function (n) {
-        return typeof window[n] === 'function' && window[n]._shortWin;
+        return typeof window[n] === 'function' && shortOnTop(window[n]);
     });
     console.log('  짧은 창이 달린 곳:', on.join(', ') || '없음');
     const off = SHORT_WIN.filter(function (n) { return on.indexOf(n) < 0; });

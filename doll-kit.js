@@ -73,10 +73,23 @@ function human(ms) {
     let inside = false;          // 겹쳐 감싸여도 한 번만 처리한다
     let layers = 0;
 
+    // ★ 구매자물쇠(buy-guard.js)와 서로 바깥을 다투지 않는다 (2026-10-24)
+    //   그쪽도 30초 동안 「내가 맨 바깥」을 잡으려고 다시 감싼다. 둘이 번갈아 덮어 1.5초마다 한 겹씩
+    //   스무 겹 넘게 쌓였다 (콘솔의 「N겹째」). 그쪽 껍질은 짧은 창만 달고 그대로 안으로 넘기므로
+    //   **그 아래에 내가 있으면 맨 바깥과 같다.** 서로 _inner 로 안쪽을 알려 준다.
+    function onTop(f) {
+        let x = f, n = 0;
+        while (x && n++ < 60) {
+            if (x._dollKeep) return true;
+            if (x._shortWin && x._inner) { x = x._inner; continue; }
+            return false;
+        }
+        return false;
+    }
     function wrap() {
         if (typeof useInventoryItem !== 'function') return;
         if (typeof removeItemFromInventory !== 'function') return;
-        if (useInventoryItem._dollKeep) return;          // 내가 이미 맨 바깥이다
+        if (onTop(useInventoryItem)) return;             // 내가 맨 바깥이다 (구매자물쇠 껍질만 위에 있어도)
 
         const _u = useInventoryItem;
         const mine = function (itemName) {
@@ -119,6 +132,7 @@ function human(ms) {
             } finally { inside = false; }
         };
         mine._dollKeep = true;
+        mine._inner = _u;
         useInventoryItem = mine;
         layers++;
         if (layers === 1) console.log('[인형] 키트가 남습니다 — ' + WAIT_DAYS + '일 기다림');
@@ -158,7 +172,9 @@ window.dollState = function (who) {
     console.log('  다시 지을 수 있나:', l > 0 ? ('✗ ' + human(l) + ' 남음') : 'O 지금 가능');
     console.log('  인형 효과(사흘):', (u.dollPt || 0) > Date.now()
         ? ('어둠 정산 +3,000P · ' + human(u.dollPt - Date.now()) + ' 남음') : '추가 정산은 없음');
-    console.log('  연결:', (typeof useInventoryItem === 'function' && useInventoryItem._dollKeep) ? 'O' : '✗');
+    let x = (typeof useInventoryItem === 'function') ? useInventoryItem : null, ok = false;
+    for (let i = 0; x && i < 60; i++) { if (x._dollKeep) { ok = true; break; } if (x._shortWin && x._inner) x = x._inner; else break; }
+    console.log('  연결:', ok ? 'O' : '✗');
 };
 
 // 기다림을 지금 끝낸다 — 상담사
