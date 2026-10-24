@@ -246,6 +246,79 @@ function clearNotes() {
 }
 
 // ==========================================
+// ★ 버프 제거 (2026-10-24) — 걸린 버프만 걷는다 (상태이상 · 물약 효과 · 격리는 그대로)
+// ==========================================
+//
+//   걷는 것
+//     itemBuffs          물건이 얹어 준 버프 전부 (달빛 · 은화 뱀 · 감지하는 눈 · 엽서 · 인형 …, 「다음 어둠 1회」짜리까지)
+//     chil (🌟 칠성)     오늘 걸어 둔 치성 — 거문 보호 · 녹존 선물 · 문곡 청함 · 무곡 ×7 · 파군 나눔,
+//                        문곡으로 오른 그날 회수품 배수, 염정 L(치성) → D 하나로
+//                        (오늘 쓴 횟수는 그대로 둔다 — 다시 걸면 ★ 를 또 바쳐야 하고, 하루 한도도 그대로)
+//   장착한 장비가 늘 주는 것(거문의 판정 +3 등)은 장비라서 여기서 못 걷는다 — 장비 강제 회수 쪽이다.
+//
+//   서버에서 그 사원 것을 새로 읽어 지운다 (내 화면의 db.users 는 늦을 수 있다).
+//   지운 뒤 「일부러 비웠다」 도장(effClearAt)을 찍는다 — 켜 둔 화면이 제 버프를 따라 비운다 (save-merge.js).
+const CHIL_OFF = { geoArm: 0, nokArm: 0, munArm: 0, munX: 0, mugArm: 0, yeomJi: 0, pagShare: 0 };
+const CHIL_N = { geoArm: '거문 보호', nokArm: '녹존 치성', munArm: '문곡 청함', munX: '문곡 회수품 배수', mugArm: '무곡 치성', yeomJi: '염정 L', pagShare: '파군 나눔' };
+function clearBuffs() {
+    if (!isAdmin()) { showCustomAlert('상담사만 쓸 수 있습니다.'); return; }
+    const targets = (typeof getAdminTargets === 'function') ? getAdminTargets() : [];
+    if (!targets.length) { showCustomAlert('대상을 선택하거나 사번을 입력해주세요.'); return; }
+    const d = db_();
+    if (!d) { showCustomAlert('서버에 닿지 않습니다.'); return; }
+    const now = Date.now();
+    const rows = [];
+    Promise.all(targets.map(function (code) {
+        return d.ref('users/' + code).once('value').then(function (snap) {
+            const srv = snap.val() || {};
+            const u = (db.users && db.users[code]) || srv;
+            const buffs = (Array.isArray(srv.itemBuffs) ? srv.itemBuffs : Object.values(srv.itemBuffs || {})).filter(Boolean);
+            const chil = srv.chil || null;
+            const fields = {};
+            const got = [];
+            if (buffs.length) {
+                const by = {};
+                buffs.forEach(function (b) { const k = (b.src || '버프'); by[k] = (by[k] || 0) + 1; });
+                got.push('버프 ' + buffs.length + '개 (' + Object.keys(by).map(function (k) { return k + (by[k] > 1 ? ' ×' + by[k] : ''); }).join(', ') + ')');
+                fields.itemBuffs = null;
+                fields.effClearAt = now;
+            }
+            if (chil && typeof chil === 'object') {
+                const on = Object.keys(CHIL_OFF).filter(function (k) { return Number(chil[k]) > 0; });
+                const yeom = Array.isArray(chil.yeom) ? chil.yeom : Object.values(chil.yeom || {});
+                if (on.length) {
+                    on.forEach(function (k) { fields['chil/' + k] = 0; });
+                    if (chil.yeomJi && yeom.length > 1) fields['chil/yeom'] = yeom.slice(0, 1);
+                    got.push('🌟 칠성 — ' + on.map(function (k) { return CHIL_N[k]; }).join(' · '));
+                }
+            }
+            if (!got.length) { rows.push((u.name || code) + ' — 걸린 버프 없음'); return; }
+            try { addHistoryLog(u, '[당국 개입] 걸린 버프를 제거했습니다.'); } catch (e) { }
+            fields.history = u.history || [];
+            fields._adminStamp = now;
+            // 내 화면의 사본도 맞춘다
+            try {
+                if (db.users && db.users[code]) {
+                    if ('itemBuffs' in fields) db.users[code].itemBuffs = [];
+                    if (db.users[code].chil) Object.keys(fields).forEach(function (k) {
+                        if (k.indexOf('chil/') === 0) db.users[code].chil[k.slice(5)] = fields[k];
+                    });
+                }
+            } catch (e) { }
+            rows.push((u.name || code) + ' — ' + got.join(' / '));
+            return d.ref('users/' + code).update(fields);
+        });
+    })).then(function () {
+        try { updateUI(); } catch (e) { }
+        showCustomAlert('버프 제거\n\n' + rows.join('\n'));
+    }).catch(function (e) {
+        console.error('[당국] 버프 제거 실패', e);
+        showCustomAlert('버프 제거 중 오류가 났습니다.\n\n' + rows.join('\n'));
+    });
+}
+window.adminClearBuffs = clearBuffs;
+
+// ==========================================
 // 갈아끼운다 — index.html 것보다 나중에 선다
 // ==========================================
 (function swap() {
