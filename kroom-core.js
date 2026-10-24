@@ -2993,24 +2993,43 @@ setInterval(function () { try { if (me() && !kr) hiddenCheck(); } catch (e) { } 
 // 상담사 화면 — 조건을 이미 채운 사원을 찾아 올린다 (그 사원이 접속하지 않아도)
 //   갈림길 조건을 90 → 10 으로 낮춘 날(2026-10-23) 이미 채운 사람들이 바로 상담사에게 가도록.
 //   사원 기록(db.users)의 K 의 방 기록만 읽는다 — 손대지 않는다. 이미 적힌 사람(거절 · 미지정 포함)은 건너뛴다.
+// ★ 「ready」가 지금 조건을 채우는지 (2026-10-25)
+//   조건 숫자가 바뀌면 예전 숫자로 올라온 사람이 목록에 남는다 (갈림길 30 때 올라온 사람이 40 이 된 뒤에도 보였다).
+//   사원 기록(db.users)의 K 의 방 칸이 있으면 지금 값으로, 없으면 올라올 때 적어 둔 값(v.jx · v.hq)으로 본다.
+function hLive(c) {
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const k = book[c] && book[c].kroom;
+    return (k && typeof k === 'object' && !stale(k) && k.job && JOBS[k.job]) ? k : null;
+}
+function hMeets(c, v) {
+    const k = hLive(c);
+    if (k) return hiddenProgress(k).ok;
+    const jx = (v && v.jx) || {};
+    return HIDDEN_NEED.jxGrades.every(function (g) { return (jx[g] || 0) >= HIDDEN_NEED.jx; }) && ((v && v.hq) || 0) >= HIDDEN_NEED.hq;
+}
+function hJxNow(c) {
+    const k = hLive(c); if (!k) return '';
+    const jx = k.jx || {};
+    return HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + (jx[g] || 0); }).join(' · ');
+}
 function hiddenSweep() {
     const u = me(), d = db_();
     if (!u || !d || u.code !== ADMIN) return 0;
     const book = (typeof db !== 'undefined' && db.users) || {};
     let n = 0;
     // 조건이 올라가(2026-10-25 · 갈림길 10 → 40) 이제는 못 채운 「ready」는 거둔다.
-    //   사원 기록을 읽을 수 있을 때만 · 지정(offered) 이후는 건드리지 않는다. 다시 채우면 아래에서 다시 올라온다.
+    //   사원 기록이 있으면 지금 값으로, 없으면 올라올 때 적힌 값으로 본다 (hMeets) · 지정(offered) 이후는 건드리지 않는다.
+    //   다시 채우면 아래에서 다시 올라온다.
     Object.keys(hAll).forEach(function (c) {
         const h = hAll[c];
         if (!h || h.state !== 'ready') return;
-        const w = book[c], k = w && w.kroom;
-        if (!k || typeof k !== 'object' || stale(k) || !k.job || !JOBS[k.job]) return;
-        if (hiddenProgress(k).ok) return;
+        const w = book[c];
+        if (hMeets(c, h)) return;
         d.ref(H_NODE + '/' + c).transaction(function (cur) {
             if (!cur || cur.state !== 'ready') return;
             return null;
         }).then(function (res) {
-            if (res && res.committed) console.log('[히든 직업] ' + (w.name || c) + ' — 갈림길 ' + HIDDEN_NEED.jx + '번이 안 차 목록에서 거뒀습니다.');
+            if (res && res.committed) console.log('[히든 직업] ' + ((w && w.name) || h.name || c) + ' — 지금 조건(갈림길 ' + HIDDEN_NEED.jx + '번)이 안 차 목록에서 거뒀습니다.');
         }).catch(function () { });
     });
     Object.keys(book).forEach(function (c) {
@@ -3185,6 +3204,7 @@ setInterval(function () {
         Object.keys(hAll).forEach(function (c) {
             const v = hAll[c] || {};
             if (v.state !== 'ready' && v.state !== 'L') return;
+            if (v.state === 'ready' && !hMeets(c, v)) return;            // 예전 숫자로 올라온 것 — 알리지 않는다 (곧 거둔다)
             const id = c + ':' + v.state + (v.state === 'L' ? '' : ':' + v.at);   // L 은 한 사람에 한 번
             if (seen[id]) return;
             seen[id] = 1; news.push(v);
@@ -3198,7 +3218,7 @@ setInterval(function () {
             });
             try { showCustomAlert('히든 직업\n\n' + lines.join('\n') + '\n\n통제 콘솔 「히든 직업 관리」에서 정할 수 있습니다.'); } catch (e) { }
         }
-        const wait = Object.keys(hAll).filter(function (c) { return (hAll[c] || {}).state === 'ready'; }).length;
+        const wait = Object.keys(hAll).filter(function (c) { return (hAll[c] || {}).state === 'ready' && hMeets(c, hAll[c]); }).length;
         const btn = document.getElementById('btn-admin-console');
         if (btn && wait > 0) btn.classList.add('notify-dot');
         try { hiddenPaint(); } catch (e) { }
@@ -3213,7 +3233,10 @@ function hiddenPaint() {
     const box = document.getElementById('admin-hidden-list');
     if (!box) return;
     const order = { ready: 0, L: 1, offered: 2, declined: 3, denied: 4, accepted: 5 };
-    const codes = Object.keys(hAll).sort(function (a, b) {
+    const codes = Object.keys(hAll).filter(function (c) {
+        const v = hAll[c] || {};
+        return !(v.state === 'ready' && !hMeets(c, v));             // 지금 조건을 못 채운 ready 는 보이지 않는다
+    }).sort(function (a, b) {
         return (order[(hAll[a] || {}).state] || 9) - (order[(hAll[b] || {}).state] || 9) || ((hAll[b] || {}).at || 0) - ((hAll[a] || {}).at || 0);
     });
     if (!codes.length) {
@@ -3245,6 +3268,9 @@ function hiddenPaint() {
             + '<div style="font-size:10px; color:#999; margin-top:4px; line-height:1.6;">조건 당시 Lv ' + (v.lv || '-') + ' · 갈림길 '
             + HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + ((v.jx || {})[g] || 0); }).join(' · ') + ' · 임무 ' + (v.hq || 0)
             + (now_ && (v.state === 'accepted' || v.state === 'L') ? '<br>지금 ' + esc(jobName(now_.job, now_.grade)) + ' ' + esc(now_.grade || '') + ' · Lv ' + (now_.lv || '-') : '')
+            + ((v.state === 'ready' || v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && hJxNow(c) ? '<br>지금 갈림길 ' + hJxNow(c) : '')
+            + ((v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && !hMeets(c, v)
+                ? '<br><span style="color:#ff8a80;">지금 조건(갈림길 등급마다 ' + HIDDEN_NEED.jx + '번 · 임무 ' + HIDDEN_NEED.hq + '번)을 채우지 못했습니다.</span>' : '')
             + (v.state === 'L' ? '<br><span style="color:#ffe08a;">L 에 맞는 물건은 아직 정하지 않았습니다.</span>' : '')
             + (holders.length ? '<br><span style="color:#ff8a80;">이미 ' + holders.map(esc).join(', ') + ' 사원이 이 직업입니다.</span>' : '')
             + '</div>'
@@ -3258,6 +3284,11 @@ window.kroomHiddenAct = function (code, act) {
     const v = hAll[code]; if (!v) return;
     let up = null;
     // 이미 다른 속성으로 히든 직업을 받은 사원에게는 지정하지 않는다 (2026-10-25)
+    if (act === 'offer' && !hMeets(code, v)) {
+        try { showCustomAlert((v.name || code) + ' 사원은 지금 조건을 채우지 못했습니다.\n\n갈림길 D · C · B · A 등급마다 ' + HIDDEN_NEED.jx + '번 · 임무 ' + HIDDEN_NEED.hq + '번'
+            + (hJxNow(code) ? '\n지금 갈림길 ' + hJxNow(code) : '')); } catch (e) { }
+        return;
+    }
     if (act === 'offer') {
         const w = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
         if (w && w.kroom && !stale(w.kroom) && hadHidden(w.kroom)) {
