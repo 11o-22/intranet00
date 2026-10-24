@@ -191,7 +191,11 @@ function openPanel(tab, sub, title) {
             box.style.display = (tab === 'tab-vip' && eye) ? 'none' : 'block';
         }
     } catch (e) { }
-    if (sub) setTimeout(function () { clickSub(sub); }, 30);
+    // ★ 아래 칸은 **띄우기 전에** 바로 고른다 (2026-10-24)
+    //   전에는 30ms 뒤에 골랐다. 그 사이 화면에는 **지난번에 열려 있던 칸**(처음이면 사원증)이 먼저 그려지고,
+    //   느린 휴대폰에서는 그 칸을 그리느라 고르는 일이 한참 밀려 「☰ → 소지품인데 사원증이 뜬다」가 됐다.
+    //   지금은 띄우기 전에 고르고, 뒤에 한두 번 더 보아 다른 칸으로 바뀌어 있으면 다시 고른다.
+    subWatch(sub);
 
     m.classList.add('solo');
     m.style.display = 'flex';
@@ -218,6 +222,23 @@ function clickSub(sub) {
     })[0];
     if (b) { try { b.click(); } catch (e) { } }
 }
+// 고른 칸이 지금 열려 있나 — 칸의 id 가 sub 와 같다 (switchRecordSubTab · switchShopPanel · switchHousePanel …)
+function subOn(sub) {
+    const p = document.getElementById(sub);
+    return !p || p.classList.contains('active');      // 칸을 못 찾으면 단추만 누르고 따지지 않는다
+}
+let subT = [];
+function subStop() { subT.forEach(clearTimeout); subT = []; }
+function subWatch(sub) {
+    subStop();
+    if (!sub) return;
+    clickSub(sub);
+    [30, 250, 700].forEach(function (ms) {
+        subT.push(setTimeout(function () {
+            if (openTab && !subOn(sub)) clickSub(sub);
+        }, ms));
+    });
+}
 
 function nameOfTab(tab) {
     const t = Array.prototype.filter.call(document.querySelectorAll('.tabs-grid .tab'), function (e) {
@@ -227,6 +248,7 @@ function nameOfTab(tab) {
 }
 
 function closePanel() {
+    subStop();
     try { const f = document.querySelector('#shell-fac'); if (f) f.remove(); } catch (e) { }
     const m = el(MS);
     if (m) { m.classList.remove('solo'); m.style.display = 'none'; }
