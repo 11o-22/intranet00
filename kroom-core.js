@@ -23,6 +23,8 @@
 //     밀실 거래로 주고받는다 (p2p-fix.js · p2p-multi.js · p2p-dream.js).
 //   · 각성 — 직업 갈림길에서 각성 점수(wake)를 모은다. 등급마다 정해진 만큼 모이면
 //            다음 이름으로 각성한다 (D→C→B→A→S).
+//   · 속성 여러 개 (2026-10-25) — 한 속성을 Lv 100 까지 키우면 전용 장비의 다음 속성(두 번째 → 세 번째 …)을
+//            하나 연다. 새 속성은 D · Lv 1 부터. 열린 속성은 따로 자라고, 문 앞에서 어느 속성으로 들어갈지 고른다.
 //
 // ■ 내용은 들어갈 때만 내려받는다
 //   던전 장면(kroom/d1.js …)과 직업 갈림길(kroom/jd-<속성>.js …)은 게임 묶음에
@@ -292,6 +294,7 @@ function wipe(k) {
     k.lv = 1; k.exp = 0; k.job = null; k.grade = 'D'; k.wake = {};
     k.peek = null; k.rerolled = false; k.seen = {};
     k.jx = {}; k.hq = {}; k.hiddenAsk = null;
+    k.alt = null; k.open = null; k.cur = null;            // 열린 속성들 (2026-10-25)
     k.reset = K_RESET;
 }
 function prof(u) {
@@ -468,6 +471,167 @@ function mainAttr(u) {
     const first = Array.isArray(a) ? a[0] : (a && typeof a === 'object' ? a[Object.keys(a)[0]] : null);
     return (first && ATTR[first]) ? first : null;
 }
+// ==========================================
+// ★ 속성 여러 개 (2026-10-25)
+// ==========================================
+//   한 속성을 Lv 100 까지 키우면 전용 장비의 다음 속성을 하나 연다 — 지닌 속성 순서대로(두 번째 → 세 번째 …).
+//   새 속성은 D · Lv 1 · 직업 없음(카드를 새로 고른다)부터.
+//
+//   ■ 자리
+//     지금 들고 들어가는 속성의 것은 늘 kroom 맨 위 칸(lv · job · grade …)에 둔다 — 다른 코드(팀 평균 Lv ·
+//     던전 등급 · 히든 조건 · 상담사 콘솔)가 그 칸을 그대로 읽는다.
+//     나머지 열린 속성은 kroom.alt[속성] 에 접어 두고, kroom.cur 는 지금 속성, kroom.open 은 연 순서다.
+//     꿈결 · 들어간 수 · 오늘 횟수는 속성과 상관없이 하나다.
+//   ■ 몇 개까지 여나 — Lv 100 인 열린 속성의 수만큼 더 연다 (첫 속성 100 → 둘째, 둘째 100 → 셋째 …).
+//   ■ 언제 — Lv 100 뒤 K 의 방에 들어서면 묻는다. 거절하면 다음에 또 묻는다.
+//            열린 속성이 둘 이상이면 들어설 때마다 어느 속성으로 들어갈지 고른다.
+const PER = ['lv', 'exp', 'job', 'grade', 'wake', 'peek', 'rerolled', 'seen', 'jx', 'hq', 'hiddenAsk', 'hidden'];
+const NTH = ['첫', '두', '세', '네', '다섯', '여섯'];
+// 지닌 속성 — 전용 장비의 자리 순서대로 (같은 것은 한 번만)
+function heldAttrs(u) {
+    const g = u && u.soulGear;
+    const a = g && g.attrs;
+    const list = Array.isArray(a) ? a.slice() : (a && typeof a === 'object' ? Object.keys(a).sort(function (x, y) { return Number(x) - Number(y); }).map(function (x) { return a[x]; }) : []);
+    const out = [];
+    list.forEach(function (x) { if (x && ATTR[x] && out.indexOf(x) < 0) out.push(x); });
+    return out;
+}
+function curAttr(k, u) {
+    if (k && k.cur && ATTR[k.cur]) return k.cur;
+    if (k && k.job && JOBS[k.job]) return JOBS[k.job][0];
+    return mainAttr(u);
+}
+function openList(k, u) {
+    const out = [];
+    (Array.isArray(k.open) ? k.open : []).forEach(function (a) { if (ATTR[a] && out.indexOf(a) < 0) out.push(a); });
+    const c = curAttr(k, u);
+    if (c && out.indexOf(c) < 0) out.unshift(c);
+    Object.keys(k.alt || {}).forEach(function (a) { if (ATTR[a] && out.indexOf(a) < 0) out.push(a); });
+    return out;
+}
+function profOf(k, u, a) {
+    if (a === curAttr(k, u)) { const o = {}; PER.forEach(function (f) { o[f] = k[f]; }); return o; }
+    return (k.alt && k.alt[a]) || null;
+}
+function nextAttr(k, u) {
+    const open = openList(k, u);
+    return heldAttrs(u).filter(function (a) { return open.indexOf(a) < 0; })[0] || null;
+}
+function canOpenAttr(k, u) {
+    const open = openList(k, u);
+    const full = open.filter(function (a) { const p = profOf(k, u, a); return p && (p.lv || 1) >= LV_MAX; }).length;
+    return !!(nextAttr(k, u) && full >= open.length);
+}
+function nthOf(u, a) {
+    const i = heldAttrs(u).indexOf(a);
+    return i < 0 ? '' : (NTH[i] || (i + 1)) + ' 번째';
+}
+// 지금 맨 위 칸을 접어 두고(stash) 다른 속성의 것을 펼친다(load) — 없으면 새로 (D · Lv 1)
+function stashCur(k, u) {
+    const a = curAttr(k, u);
+    if (!a) return;
+    if (!k.alt || typeof k.alt !== 'object') k.alt = {};
+    const o = {};
+    PER.forEach(function (f) { if (k[f] !== undefined) o[f] = (k[f] && typeof k[f] === 'object') ? JSON.parse(JSON.stringify(k[f])) : k[f]; });
+    if (!o.lv) o.lv = 1;
+    if (!o.grade) o.grade = 'D';
+    k.alt[a] = o;
+}
+function loadAttr(k, u, a) {
+    const o = (k.alt && k.alt[a]) || {};
+    PER.forEach(function (f) { k[f] = (o[f] !== undefined) ? o[f] : null; });
+    if (!k.lv) k.lv = 1;
+    if (k.exp == null) k.exp = 0;
+    if (!k.grade) k.grade = 'D';
+    if (!k.wake || typeof k.wake !== 'object') k.wake = {};
+    if (!k.seen || typeof k.seen !== 'object') k.seen = {};
+    if (!k.jx || typeof k.jx !== 'object') k.jx = {};
+    if (!k.hq || typeof k.hq !== 'object') k.hq = {};
+    k.rerolled = !!k.rerolled;
+    if (k.alt) delete k.alt[a];
+    k.cur = a;
+}
+function openAttr(u, a) {
+    const k = prof(u);
+    const open = openList(k, u);
+    stashCur(k, u);
+    loadAttr(k, u, a);                                    // alt 에 없으니 새것 — D · Lv 1 · 직업 없음
+    k.lv = 1; k.exp = 0; k.job = null; k.grade = 'D'; k.wake = {}; k.peek = null; k.rerolled = false;
+    k.seen = {}; k.jx = {}; k.hq = {}; k.hiddenAsk = null; k.hidden = null;
+    if (open.indexOf(a) < 0) open.push(a);
+    k.open = open;
+    addHistoryLog(u, '[K 의 방] 새 속성을 열었다 — ' + ATTR[a].i + ' ' + ATTR[a].n + ' (D · Lv 1 부터)');
+    saveProf();
+}
+function switchAttr(u, a) {
+    const k = prof(u);
+    if (curAttr(k, u) === a) return;
+    const open = openList(k, u);
+    if (open.indexOf(a) < 0) return;
+    stashCur(k, u);
+    loadAttr(k, u, a);
+    k.open = open;
+    saveProf();
+}
+window.kroomAttrs = function (u) {
+    u = u || me(); const k = prof(u); if (!k) return [];
+    return openList(k, u).map(function (a) { const p = profOf(k, u, a) || {}; return { attr: a, lv: p.lv || 1, grade: p.grade || 'D', job: p.job || null, now: a === curAttr(k, u) }; });
+};
+
+// 문 앞 — 새 속성을 열지 · 어느 속성으로 들어갈지
+let gateCont = null;
+function attrGate(cont) {
+    const u = me(), k = prof(u);
+    gateCont = cont;
+    if (canOpenAttr(k, u)) { attrAsk(); return; }
+    if (openList(k, u).length > 1) { attrChoose(); return; }
+    gateCont = null; cont();
+}
+function attrAsk() {
+    const u = me(), k = prof(u);
+    const a = nextAttr(k, u), c = curAttr(k, u);
+    show('속성', `탁자 너머에 문이 하나 더 있다. 아까까지는 벽이었다.<br><br>
+        ${ATTR[c] ? ATTR[c].i + ' ' + ATTR[c].n + '은(는) 끝까지 걸었다. ' : ''}문틈으로 다른 결이 새어 든다.<br>
+        <b style="color:#fff;">${ATTR[a].i} ${ATTR[a].n}</b> <span style="font-size:11px; color:#888;">— 전용 장비 ${nthOf(u, a)} 속성</span><br><br>
+        <span style="font-size:11px; color:#8fb8c4; line-height:1.8;">열면 그 속성의 직업 카드를 새로 고르고 <b>D · Lv 1</b> 부터 시작합니다.<br>
+        지금까지 키운 속성은 그대로 남아, 다음부터 문 앞에서 골라 들어갈 수 있습니다.</span>`,
+        darkChoiceBtn('문을 연다. — ' + ATTR[a].i + ' ' + ATTR[a].n + ' D · Lv 1', 'kroomAttrOpen()')
+        + darkChoiceBtn('지금은 열지 않는다.', 'kroomAttrSkip()'));
+}
+function attrChoose() {
+    const u = me(), k = prof(u);
+    const c = curAttr(k, u);
+    const rows = openList(k, u).map(function (a) {
+        const p = profOf(k, u, a) || {};
+        const what = p.job && JOBS[p.job] ? jobName(p.job, p.grade) + ' ' + (p.grade || 'D') : '직업 미정';
+        return darkChoiceBtn(ATTR[a].i + ' ' + ATTR[a].n + ' — ' + esc(what) + ' · Lv ' + (p.lv || 1)
+            + (a === c ? ' <span style="font-size:10px; color:#7fd3e6;">(지난번)</span>' : ''), "kroomAttrPick('" + a + "')");
+    }).join('');
+    show('속성', `카드 탁자 옆에 문이 여럿 있다. 문마다 다른 결이 배어 있다.<br><br>
+        <span style="font-size:11px; color:#888;">어느 속성으로 들어갈지 고릅니다. Lv · 등급 · 각성은 속성마다 따로입니다.</span>`, rows);
+}
+function gateGo() { const f = gateCont; gateCont = null; if (typeof f === 'function') f(); }
+window.kroomAttrOpen = function () {
+    const u = me(), k = prof(u);
+    if (!gateCont || !canOpenAttr(k, u)) return;
+    const a = nextAttr(k, u);
+    openAttr(u, a);
+    if (darkRun && darkRun.isParty) { try { sendPartyChat(u.name + ' 사원이 새 속성 ' + ATTR[a].n + '의 문을 열었습니다.', true); } catch (e) { } }
+    gateGo();
+};
+window.kroomAttrSkip = function () {
+    const u = me(), k = prof(u);
+    if (!gateCont) return;
+    if (openList(k, u).length > 1) { attrChoose(); return; }
+    gateGo();
+};
+window.kroomAttrPick = function (a) {
+    const u = me();
+    if (!gateCont || !ATTR[a]) return;
+    switchAttr(u, a);
+    gateGo();
+};
+
 function jobName(key, grade) {
     const j = JOBS[key]; if (!j) return '?';
     return j[2][Math.min(j[2].length - 1, gi(grade))];
@@ -752,8 +916,11 @@ function start(isParty, pid) {
     const el = document.getElementById('dro-code'); if (el) el.innerText = K_CODE;
     teamUp();
     const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
-    if (hiddenOffered()) { hiddenPopup(goOn); return; }
-    goOn();
+    // ★ 속성 문 (2026-10-25) — 새 속성을 열지 · 어느 속성으로 들어갈지 먼저 정하고, 그다음 히든 카드 · 직업
+    attrGate(function () {
+        if (hiddenOffered()) { hiddenPopup(goOn); return; }
+        goOn();
+    });
 }
 
 // 팀 자리 — 네 팀 세는 데 쓴다
@@ -918,7 +1085,7 @@ function roll(kind) {
 // ==========================================
 function cardPick() {
     const u = me(), k = prof(u);
-    const a = mainAttr(u);
+    const a = curAttr(k, u);                                // 열린 속성이 여럿이면 지금 고른 속성 (2026-10-25)
     if (!a) { show('—', '새겨진 것이 없는 자에게는 방이 열리지 않는다.', darkChoiceBtn('돌아간다.', 'kroomFinish()')); return; }
     if (!kr.deck) {
         kr.deck = Object.keys(JOBS).filter(function (j) { return JOBS[j][0] === a && !isHiddenJob(j); })
@@ -956,7 +1123,7 @@ function cardPick() {
     show('배역', `방에 들어서자 탁자 위에 카드가 다섯 장 엎어져 있다.<br><br>
         뒷면이 모두 같다. 무늬 가운데에 K 한 글자.<br>
         ${peek ? '넘긴 한 장이 빛을 받는다.' : '하나를 넘긴다.'}<br>
-        <span style="font-size:11px; color:#888;">${ATTR[a].i} ${ATTR[a].n} — 전용 장비 첫 번째 속성의 자리들이다.</span>`,
+        <span style="font-size:11px; color:#888;">${ATTR[a].i} ${ATTR[a].n} — 전용 장비 ${nthOf(u, a) || '첫 번째'} 속성의 자리들이다.</span>`,
         `<div style="display:flex; gap:6px; perspective:600px;">${cards}</div>` + detail);
 }
 window.kroomCard = function (i) {
@@ -976,6 +1143,7 @@ window.kroomCardRe = function () {
 window.kroomCardOk = function () {
     const k = prof(), u = me(); if (!k.peek) return;
     k.job = k.peek; k.peek = null; k.grade = 'D'; k.wake = {};
+    if (!k.cur) k.cur = JOBS[k.job][0];
     addHistoryLog(u, '[K 의 방] 직업 — ' + jobName(k.job, 'D'));
     saveProf();
     if (darkRun.isParty) sendPartyChat(u.name + ' 사원이 ' + jobName(k.job, 'D') + '의 카드를 집었습니다.', true);
@@ -2416,6 +2584,13 @@ function settle(how, txt) {
         k.exp = (k.exp || 0) + exp;
         while (k.lv < LV_MAX && k.exp >= needExp(k.lv)) { k.exp -= needExp(k.lv); k.lv++; }
         if (k.lv >= LV_MAX) k.exp = 0;
+        // ★ Lv 100 — 다음에 들어서면 새 속성을 열 수 있다 (2026-10-25)
+        if (lv0 < LV_MAX && k.lv >= LV_MAX) {
+            try {
+                const na = canOpenAttr(k, me()) ? nextAttr(k, me()) : null;
+                if (na) addHistoryLog(me(), '[K 의 방] Lv 100 — 다음에 들어서면 새 속성(' + ATTR[na].i + ' ' + ATTR[na].n + ')을 열 수 있다.');
+            } catch (e) { }
+        }
         k.dream = (k.dream || 0) + dream;
         k.runs = (k.runs || 0) + 1;
     }
@@ -2813,7 +2988,9 @@ setInterval(function () {
 }, 1500);
 function hiddenOffered() {
     const k = prof();
-    return !!(hMine && hMine.state === 'offered' && k && k.job && !isHiddenJob(k.job));
+    if (!(hMine && hMine.state === 'offered' && k && k.job && !isHiddenJob(k.job))) return false;
+    // 속성이 여럿이면 — 히든 직업을 받은 그 속성으로 들어왔을 때만 (2026-10-25)
+    return !hMine.attr || !JOBS[k.job] || JOBS[k.job][0] === hMine.attr;
 }
 
 // 금빛 카드 — 『 선택받은 자여 전직하겠습니까? 』
@@ -3081,6 +3258,11 @@ window.kroomState = function () {
     console.log('%c===== 『 K 의 방 』 =====', 'color:#7fd3e6; font-size:13px');
     console.log('  Lv ' + k.lv + ' (' + k.exp + ' / ' + needExp(k.lv) + ') · 꿈결 ' + k.dream + ' · 들어간 수 ' + (k.runs || 0));
     console.log('  직업 ' + (k.job ? jobName(k.job, k.grade) + ' ' + k.grade + ' — 각성 ' + JSON.stringify(k.wake) : '없음') + (k.rerolled ? ' · 다시 고르기 씀' : ''));
+    try {
+        const u0 = me(), list = window.kroomAttrs(u0);
+        console.log('  열린 속성 — ' + list.map(function (x) { return ATTR[x.attr].n + (x.now ? '(지금)' : '') + ' ' + (x.job ? jobName(x.job, x.grade) + ' ' + x.grade : '미정') + ' Lv ' + x.lv; }).join(' · ')
+            + (canOpenAttr(k, u0) ? ' · 다음에 열 수 있음: ' + ATTR[nextAttr(k, u0)].n : (nextAttr(k, u0) ? ' · 다음 속성: ' + ATTR[nextAttr(k, u0)].n + ' (Lv 100 이 하나 더 있어야)' : '')));
+    } catch (e) { }
     console.log('  지금 든 팀 ' + liveTeams().length + ' / ' + MAX_TEAMS);
     try { const hp = hiddenProgress(k); console.log('  히든 직업 조건 — Lv ' + hp.lv + '/' + HIDDEN_NEED.lv + ' · ' + hp.grade + '/S · 갈림길 ' + hp.jx + ' · 임무 ' + hp.hq + '/' + HIDDEN_NEED.hq + (hp.ok ? ' (다 채움)' : '')); } catch (e) { }
     const a = kAdds(u_kc());
