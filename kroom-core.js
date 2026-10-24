@@ -188,6 +188,7 @@ const JOBS = {
 //     한 Lv 오르는 데 드는 경험치가 보통 직업의 **다섯 배**다 (HIDDEN_LV_MAX · HIDDEN_EXP_MULT).
 //     그 전에 전직한 사원도 한 번 Lv 1 로 맞춘다 (hiddenLv1 — 등급 · 각성은 그대로).
 //   ■ 내용 — 히든 직업만의 갈림길 · 선택지는 아직 없어서, **같은 속성 다섯 직업의 것**을 함께 쓴다.
+//   ■ 한 사람에 하나 (2026-10-25) — 속성을 여럿 열어도 히든 직업은 한 번만 받는다 (hadHidden).
 const HIDDEN = {
     L_gunner:   ['evade',  'might', '거너',       '거리는 숨을 고르는 시간이다. 방아쇠는 그 끝에 있다.'],
     L_druid:    ['heal',   'mana',  '드루이드',   '숲은 상처를 덮는 법을 안다. 그 손을 빌릴 뿐이다.'],
@@ -2945,6 +2946,14 @@ let hMine = null, hMineRef = null, hMineCode = '';
 let hAll = {}, hAllOn = false, hSwept = false;
 // 상담사가 켜 둔 동안 1분마다 한 번 더 훑는다
 setInterval(function () { try { if (hAllOn) hiddenSweep(); } catch (e) { } }, 60000);
+// ★ 히든 직업은 한 사람에 하나 (2026-10-25) — 열린 속성 중 어느 하나라도 히든 직업을 받았으면
+//   (지금 든 속성이든 접어 둔 속성이든) 다른 속성으로 조건을 다 채워도 다시 받지 못한다.
+function hadHidden(k) {
+    if (!k || typeof k !== 'object') return false;
+    if (isHiddenJob(k.job) || (k.hidden && k.hidden.at)) return true;
+    const alt = k.alt || {};
+    return Object.keys(alt).some(function (a) { const p = alt[a]; return !!(p && (isHiddenJob(p.job) || (p.hidden && p.hidden.at))); });
+}
 function hiddenProgress(k) {
     k = k || prof();
     const jx = k.jx || {}, hq = k.hq || {};
@@ -2953,7 +2962,8 @@ function hiddenProgress(k) {
         lv: k.lv || 1, grade: k.grade, attr: a,
         jx: HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + (jx[g] || 0); }).join(' · '),
         hq: a ? (hq[a] || 0) : 0,
-        ok: !!(k.job && !isHiddenJob(k.job) && (k.lv || 1) >= HIDDEN_NEED.lv && k.grade === HIDDEN_NEED.grade
+        had: hadHidden(k),
+        ok: !!(k.job && !isHiddenJob(k.job) && !hadHidden(k) && (k.lv || 1) >= HIDDEN_NEED.lv && k.grade === HIDDEN_NEED.grade
             && HIDDEN_NEED.jxGrades.every(function (g) { return (jx[g] || 0) >= HIDDEN_NEED.jx; })
             && a && (hq[a] || 0) >= HIDDEN_NEED.hq)
     };
@@ -2964,6 +2974,7 @@ function hiddenCheck() {
     if (!u || !d || u.code === ADMIN) return;
     const k = prof(u);
     if (k.hiddenAsk || !hiddenProgress(k).ok) return;
+    if (hMine && (hMine.state === 'accepted' || hMine.state === 'L')) return;     // 이미 받았다 (2026-10-25)
     k.hiddenAsk = now();
     saveProf();
     const a = JOBS[k.job][0], key = hiddenKeyFor(a, u);
@@ -3036,6 +3047,7 @@ setInterval(function () {
 function hiddenOffered() {
     const k = prof();
     if (!(hMine && hMine.state === 'offered' && k && k.job && !isHiddenJob(k.job))) return false;
+    if (hadHidden(k)) return false;                         // 다른 속성으로 이미 받았다 (2026-10-25)
     // 속성이 여럿이면 — 히든 직업을 받은 그 속성으로 들어왔을 때만 (2026-10-25)
     return !hMine.attr || !JOBS[k.job] || JOBS[k.job][0] === hMine.attr;
 }
@@ -3245,6 +3257,14 @@ window.kroomHiddenAct = function (code, act) {
     if (!u || u.code !== ADMIN || !d) return;
     const v = hAll[code]; if (!v) return;
     let up = null;
+    // 이미 다른 속성으로 히든 직업을 받은 사원에게는 지정하지 않는다 (2026-10-25)
+    if (act === 'offer') {
+        const w = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+        if (w && w.kroom && !stale(w.kroom) && hadHidden(w.kroom)) {
+            try { showCustomAlert((v.name || code) + ' 사원은 이미 다른 속성으로 히든 직업을 받았습니다.\n\n히든 직업은 한 사람에 하나입니다.'); } catch (e) { }
+            return;
+        }
+    }
     if (act === 'offer') up = { state: 'offered', offeredAt: now(), offeredBy: u.code };
     else if (act === 'deny') up = { state: 'denied', answeredAt: now() };
     else if (act === 'withdraw') up = { state: 'ready', offeredAt: null };
