@@ -171,8 +171,10 @@ const JOBS = {
 //
 //   ■ 조건 — 넷이 다 차면 상담사에게 알림이 간다 (kroomHidden/<사번>, state 'ready')
 //       Lv 80 이상 · 지금 직업이 S 등급
-//       D · C · B · A 등급 던전에서 갈림길(◇ ○○만의 갈림길)을 등급마다 10번 이상 겪음  (k.jx)
+//       D · C · B · A 등급 던전에서 갈림길(◇ ○○만의 갈림길)을 등급마다 30번 이상 겪음  (k.jx)
 //         (처음엔 90번 — 너무 어려워 2026-10-23 10번으로 낮췄다. 이미 채운 사원은 상담사 화면이 알아서 올린다 · hiddenSweep)
+//         (2026-10-25 30번으로 올렸다. 10~29 로 「ready」에 올라 있던 사원은 상담사 화면이 거둔다 — 30을 채우면 다시 올라온다.
+//          상담사가 이미 지정(offered)한 것 · 그 뒤의 상태는 건드리지 않는다)
 //       그 속성 직업의 임무(장면마다 붙는 ◇ 직업 선택지)를 100번 이상 해냄               (k.hq[속성])
 //       — 헬퍼로 들어간 판은 세지 않는다. 세기 시작한 것은 2026-10-19 부터다.
 //   ■ 상담사가 통제 콘솔 「히든 직업 관리」에서 지정하면(state 'offered') 그 사원이 다음에
@@ -206,7 +208,7 @@ function hiddenKeyFor(attr, u) {
     return k || null;
 }
 const L_JOBS = ['거너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
-const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 10, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
+const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 30, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
 const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
 const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
@@ -2763,6 +2765,21 @@ function hiddenSweep() {
     if (!u || !d || u.code !== ADMIN) return 0;
     const book = (typeof db !== 'undefined' && db.users) || {};
     let n = 0;
+    // 조건이 올라가(2026-10-25 · 갈림길 10 → 30) 이제는 못 채운 「ready」는 거둔다.
+    //   사원 기록을 읽을 수 있을 때만 · 지정(offered) 이후는 건드리지 않는다. 다시 채우면 아래에서 다시 올라온다.
+    Object.keys(hAll).forEach(function (c) {
+        const h = hAll[c];
+        if (!h || h.state !== 'ready') return;
+        const w = book[c], k = w && w.kroom;
+        if (!k || typeof k !== 'object' || stale(k) || !k.job || !JOBS[k.job]) return;
+        if (hiddenProgress(k).ok) return;
+        d.ref(H_NODE + '/' + c).transaction(function (cur) {
+            if (!cur || cur.state !== 'ready') return;
+            return null;
+        }).then(function (res) {
+            if (res && res.committed) console.log('[히든 직업] ' + (w.name || c) + ' — 갈림길 ' + HIDDEN_NEED.jx + '번이 안 차 목록에서 거뒀습니다.');
+        }).catch(function () { });
+    });
     Object.keys(book).forEach(function (c) {
         if (c === ADMIN || (hAll[c] && hAll[c].state)) return;
         const w = book[c];
