@@ -771,7 +771,9 @@ function layer(sheet, k, hue) {
     const el = document.createElement('div');
     el.className = 'dot-layer';
     el.dataset.sheet = sheet;
-    let src = D.DIR + sheet + '.png';
+    // ★ 절반 크기 그림이 있으면 그것을 깐다 (dot2/ · tools/dot2.py) — 점 하나 안 잃고 풀린 크기는 4분의 1.
+    //   배경 크기는 아래에서 원본 크기로 적으므로 같은 자리 · 같은 크기로 그려진다 (사람이 많을 때 끊기던 것 · 2026-10-24)
+    let src = ((window.DOT2 && window.DOT2[sheet]) ? 'dot2/' : D.DIR) + sheet + '.png';
     if (hue != null && hue !== '' && typeof window.dotTint === 'function') {
         el.dataset.hue = hue;
         const t = window.dotTint(sheet, hue);
@@ -882,6 +884,30 @@ function crowdOut(m) {
 }
 window.dotCrowd = function () { return crowd.size; };
 
+// ★ 걷는 남들의 시계도 하나로 (2026-10-24 · 광장에 사람이 많으면 끊기던 것)
+//   전에는 걷는 사람마다 시계를 하나씩 돌려 0.12초마다 그 사람의 장 대여섯 개를 다시 칠했다.
+//   열 명이 걸으면 시계 열 개가 제각각 깨어 1초에 여든 번 넘게 사람을 다시 칠한다.
+//   이제 시계 하나가 걷는 남들을 한꺼번에 본다. 그리고 **걷는 사람이 많으면 걸음 그림을 조금 느리게** 넘긴다
+//   (자리를 옮기는 빠르기는 그대로 — 발 바꾸는 그림만). 나 자신의 걸음은 그대로 0.12초다.
+//       걷는 남 3명까지 ×1 · 6명까지 ×1.25 · 그 위 ×1.5
+const walkers = new Set();
+let walkT = 0;
+function walkInt(n) { return D.WALK * (n > 6 ? 1.5 : (n > 3 ? 1.25 : 1)); }
+function walkTick() {
+    if (document.hidden) return;
+    const t = Date.now(), iv = walkInt(walkers.size);
+    walkers.forEach(function (m) { m.walk(t, iv); });
+}
+function walkIn(m) {
+    walkers.add(m);
+    if (!walkT) walkT = setInterval(walkTick, Math.round(D.WALK / 2));
+}
+function walkOut(m) {
+    walkers.delete(m);
+    if (!walkers.size && walkT) { clearInterval(walkT); walkT = 0; }
+}
+window.dotWalkers = function () { return walkers.size; };
+
 function actor(user, opt) {
     const o = opt || {};
     const k = o.scale || 1;
@@ -958,8 +984,17 @@ function actor(user, opt) {
     };
     // 시계 하나에 묶인 몫 — 지금 몇 번째 칸인지 보고, 바뀌었을 때만 칠한다
     const ph = Math.floor(Math.random() * BLINK_SUM);           // 깜빡이는 때를 사람마다 흩는다
-    let headF = 0, seen = false;
+    let headF = 0, seen = false, walkF = -1;
     const member = {
+        // 걷는 남 — 시계 하나(walkers)가 부른다. 걸음 칸이 바뀌었을 때만 칠한다
+        walk: function (t, iv) {
+            if (box.isConnected) seen = true;
+            else if (seen) { walkOut(member); return; }
+            const f = Math.floor((t + ph) / iv) % 6;
+            if (f === walkF) return;
+            walkF = f;
+            els.forEach(function (e) { put(e, f, 0); });
+        },
         paint: function (t) {
             if (box.isConnected) seen = true;
             else if (seen) { crowdOut(member); return; }      // 지워진 칸 — 알아서 빠진다
@@ -975,6 +1010,7 @@ function actor(user, opt) {
     const clear = function () {
         timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = [];
         crowdOut(member);
+        walkOut(member);
         if (idleEl) idleOff();
     };
 
@@ -985,6 +1021,7 @@ function actor(user, opt) {
         if (walking) {
             let f = 0;
             els.forEach(function (e) { put(e, 0, 0); });
+            if (calm) { walkF = 0; walkIn(member); return; }     // 걷는 남은 시계 하나에 묶는다
             timers.push(setInterval(function () {
                 f = (f + 1) % 6;
                 els.forEach(function (e) { put(e, f, 0); });

@@ -23,6 +23,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
+import { createHash } from 'crypto';
 
 const CFG = JSON.parse(readFileSync('bundles.json', 'utf8'));
 const OUT = CFG.out || 'b';
@@ -39,6 +40,22 @@ if (existsSync(OUT)) {
 let files = 0, bytes = 0;
 const lines = [];
 
+// ★ 옷장 그림 절반 크기(dot2/) — 원본과 지문이 맞는 것만 싣는다 (tools/dot2.py · 2026-10-24)
+//   원본을 고치고 tools/dot2.py 를 안 돌렸으면 그 장은 빠지고, 화면은 원본(dot/)을 쓴다.
+let dot2Line = 'window.DOT2 = {};\n';
+try {
+    const man = JSON.parse(readFileSync('dot2/manifest.json', 'utf8'));
+    const ok = {};
+    Object.keys(man).forEach((n) => {
+        try {
+            const h = createHash('sha1').update(readFileSync('dot/' + n + '.png')).digest('hex');
+            if (h === man[n] && existsSync('dot2/' + n + '.png')) ok[n] = 1;
+        } catch (e) { }
+    });
+    dot2Line = 'window.DOT2 = ' + JSON.stringify(ok) + ';\n';
+    console.log('  dot2 — 절반 크기 ' + Object.keys(ok).length + '장 / 목록 ' + Object.keys(man).length + '장');
+} catch (e) { console.warn('dot2 목록 없음 — 옷장 그림은 원본을 씁니다'); }
+
 CFG.groups.forEach((group, i) => {
     const name = String(i + 1).padStart(2, '0') + '.js';
     const parts = [];
@@ -47,6 +64,7 @@ CFG.groups.forEach((group, i) => {
         + '// 묶음 ' + name + ' — ' + group.length + '개\n'
         + '// build.mjs 가 만든 것입니다. 여기를 고치지 말고 원본 파일을 고치세요.\n'
         + '// ==========================================\n');
+    if (i === 0) parts.push(dot2Line);
 
     for (const src of group) {
         let txt;

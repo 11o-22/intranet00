@@ -581,7 +581,7 @@ function stampSafe(ov) {
         // ★ 사람마다 **제 층**으로 띄운다 (will-change). 그래야 누가 걷거나
         //   발을 바꿔 디뎌도 그 사람 칸만 다시 그리고, 뒤의 큰 방 그림까지
         //   다시 칠하지 않는다.
-        '.plaza-one{position:absolute;pointer-events:none;will-change:transform;}',
+        '.plaza-one{position:absolute;left:0;top:0;pointer-events:none;will-change:transform;}',
         // 🍍 작은 사람 들기 — 고르는 칸
         '#plaza-carry{position:fixed;z-index:60;display:flex;flex-direction:column;gap:6px;min-width:128px;',
         '  padding:9px;border-radius:10px;background:rgba(20,17,24,.95);border:1px solid #d4af37;',
@@ -1159,8 +1159,13 @@ function putOne(one, x, y) {
     //   ★ 그 자리 그대로면 **안 적는다.** style 에 적으면 같은 값이어도
     //     브라우저가 다시 재 본다. 사람이 스물다섯이면 한 틀에 일흔다섯 번,
     //     초당 사천 번이다. 서 있는 사람은 대개 자리가 안 바뀐다.
-    if (one._L !== L) { one.wrap.style.left = L + 'px'; one._L = L; }
-    if (one._T !== T) { one.wrap.style.top = T + 'px'; one._T = T; }
+    // ★ left · top 이 아니라 transform 으로 옮긴다 (2026-10-24) — left · top 을 바꾸면 그 사람 칸을
+    //   틀마다 다시 재야(layout) 하고, 열 명이 걸으면 그것이 한 틀에 열 번이다. transform 은 재지 않고
+    //   이미 그린 칸을 그대로 옮긴다 (사람마다 제 층 — will-change). 사람이 많을 때 끊기던 것.
+    if (one._L !== L || one._T !== T) {
+        one.wrap.style.transform = 'translate3d(' + L + 'px,' + T + 'px,0)';
+        one._L = L; one._T = T;
+    }
     let Z = (one.zOver != null) ? one.zOver : 100 + Math.round(y);   // 아래에 있는 사람이 앞 (🍍 들린 사람은 든 사람 바로 앞)
     // 🔒 가두리 — 갇힌 사람만 창살 뒤로. 나머지는 가두리 앞을 지나는 것처럼 늘 창살 앞에 그린다
     //   (뒤로 지나가면 안에 든 것처럼 보였다)
@@ -3180,9 +3185,12 @@ function camera(snap) {
     //   (넓은 터치 화면에서만 zoomOf 가 정한 만큼 위로 올려 둔다 — 그것도 고정)
     run.cy = run._cy || 0;
     // ★ 같은 값이면 안 적는다 — 적기만 해도 브라우저가 매번 다시 잰다
-    const L = (-Math.round(run.cx)) + 'px', T = (-Math.round(run.cy)) + 'px';
-    if (run._camL !== L || run.el.style.left !== L) { run.el.style.left = L; run._camL = L; }
-    if (run._camT !== T || run.el.style.top !== T) { run.el.style.top = T; run._camT = T; }
+    // ★ 방 그림도 transform 으로 민다 (2026-10-24) — left 를 바꾸면 방 안의 모든 것을 다시 쟀다
+    const L = -Math.round(run.cx), T = -Math.round(run.cy);
+    if (run._camL !== L || run._camT !== T || !run.el.style.transform) {
+        run.el.style.transform = 'translate3d(' + L + 'px,' + T + 'px,0)';
+        run._camL = L; run._camT = T;
+    }
 }
 
 // ==========================================

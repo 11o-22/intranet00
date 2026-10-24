@@ -236,7 +236,7 @@ function make(sheet, hue) {
         hands.slice().forEach(function (f) { try { f(sheet, hue, url); } catch (e) { } });
     };
     img.onerror = function () { delete busy[k]; console.warn('[색] 그림을 못 받았습니다 — ' + sheet); };
-    img.src = DIR + sheet + '.png';
+    img.src = ((window.DOT2 && window.DOT2[sheet]) ? 'dot2/' : DIR) + sheet + '.png';     // 절반 크기가 있으면 그것으로 (dot2)
 }
 
 // ★ 쟁여 둔 것이 있으면 바로 주고, 없으면 null 을 주고 뒤에서 만든다.
