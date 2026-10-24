@@ -143,8 +143,9 @@ ITEM_CATALOG["■■ 씨앗"] = { price:400, usable:true, targetable:false, effe
     desc:"■■■를 넣지 마세요." };
 ITEM_CATALOG["🫙 소원권"] = { price:15000000, usable:true, targetable:false, effect:"wish_ticket", noSell:true,
     desc:"사용 시 ??? 에게 소원을 적어 보낼 수 있다." };
-ITEM_CATALOG["도깨비 불"] = { price:1234567, usable:true, targetable:false, effect:"equip_dokkaebi",
-    desc:"착용 시 도깨비 불을 부릴 수 있다. 행운 100% 상승, 상태이상 면역, 어둠의 갈림길에서 유리한 쪽이 드러난다." };
+// ★ 2026-10-24 — 값 250만 · 설명은 한 줄만 (기능은 적지 않는다 — dokkaebi.js 머리에 적어 두었다)
+ITEM_CATALOG["도깨비 불"] = { price:2500000, usable:true, targetable:false, effect:"equip_dokkaebi",
+    desc:"길을 밝히는 장난꾸러기 불" };
 
 EQUIP_AFFIL["사인참사검"]  = "재난관리";
 EQUIP_AFFIL["유리구슬"]    = "재난관리";
@@ -274,7 +275,7 @@ function rerollLeft() {
     const _rc = renderChoiceStep;
     renderChoiceStep = function (title, text, options, imgKey) {
         try {
-            if (hasWear('도깨비 불') && Array.isArray(options) && options.length
+            if (typeof window.dokOn === 'function' && window.dokOn(currentUser) && Array.isArray(options) && options.length   // 쿨타임이면 꺼진다 (dokkaebi.js)
                 && typeof options[0].label === 'string' && !options[0].label.startsWith('◈')) {
                 options[0].label = '◈ ' + options[0].label;
             }
@@ -538,7 +539,7 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
         if (eff.some(e => e.name === '유리구슬')) m *= 4;
         if (rubyActive(u, '루비 유두 피어싱')) m *= 3;
         if (typeof hasEquip === 'function') {
-            if (hasEquip(u, '도깨비 불')) m *= 2;
+            if (typeof window.dokOn === 'function' ? window.dokOn(u) : hasEquip(u, '도깨비 불')) m *= 2;   // 쿨타임이면 꺼진다
             if (hasEquip(u, '사원증 뱃지')) m *= 1.15;
         }
         return m;
@@ -620,7 +621,8 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
     if (typeof addTimedEffect !== 'function') return;
     const _add = addTimedEffect;
     addTimedEffect = function (user, name, desc, hours) {
-        if (user && typeof hasEquip === 'function' && hasEquip(user, '도깨비 불')
+        // ★ 2026-10-24 — 도깨비 불의 물약 상쇄는 없앴다 (아래 조건은 늘 거짓)
+        if (false && user && typeof hasEquip === 'function' && hasEquip(user, '도깨비 불')
             && name !== '유리구슬') {
             if (currentUser && user.code === currentUser.code)
                 showCustomAlert('도깨비 불이 달라붙는 것을 태워 버렸습니다.');

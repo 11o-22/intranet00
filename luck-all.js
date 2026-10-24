@@ -169,7 +169,7 @@ window.luckBreak = function (key) {
     if (timed(u, '감자맛 물약')) add('감자맛 물약', 2);
     if (timed(u, '유리구슬')) add('유리구슬', 4);
     if (plugged(u, '루비 유두 피어싱')) add('루비 유두 피어싱', 3, '타인이 채워 준 것');
-    if (wears(u, '도깨비 불')) add('도깨비 불', 2);
+    if (typeof window.dokOn === 'function' ? window.dokOn(u) : wears(u, '도깨비 불')) add('도깨비 불', 2);   // 쿨타임이면 꺼진다 (dokkaebi.js)
     if (wears(u, '사원증 뱃지')) add('사원증 뱃지', 1.15);
 
     // dna-gifts.js — 고유 아이템 제 몫 (장착 중일 때만, 본인만)

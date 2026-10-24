@@ -1887,6 +1887,7 @@ window.kroomRescue = function (code) {
             }
             d.ref('darkParties/' + darkRun.partyId + '/kAid/' + code).push({ k: 'hp', v: careAmt(), from: me().name, at: now() });
             ref.remove(); kr.exp += 30;
+            try { if (typeof window.dokRescued === 'function') window.dokRescued('kroom'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 치유로 일으켰습니다.', true);
             show('구제', hr.dice + (hsure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(hsure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
                 + `손을 얹었다. 상처가 손을 기억한다.<br><br>${esc(v.name)} 사원이 숨을 몰아쉬며 눈을 떴다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
@@ -1906,6 +1907,7 @@ window.kroomRescue = function (code) {
         if (!ok && gearUse('bond')) ok = true;                // 연결 장비 — 확실한 구조
         if (ok) {
             ref.remove(); kr.exp += 40;
+            try { if (typeof window.dokRescued === 'function') window.dokRescued('kroom'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 끌어냈습니다.', true);
             show('구제', `<div style="text-align:center; font-size:24px; color:#4CAF50;">🎲 ${r} (+${b} / DC ${v.dc})</div>`
                 + (sure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(sure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
@@ -1975,6 +1977,7 @@ function shop() {
     shopSet = new Set(SHOP_MORE);
     try { if (typeof ALIEN_ITEMS_POOL !== 'undefined') ALIEN_ITEMS_POOL.forEach(function (n) { shopSet.add(n); }); } catch (e) { }
     KEEP.forEach(function (n) { shopSet.delete(n); });
+    shopSet.delete('도깨비 불');          // ★ 쇼핑몰 물건 가운데 도깨비 불만은 K의 방에서도 든다 (2026-10-24 · dokkaebi.js)
     return shopSet;
 }
 function bname(w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w; } catch (e) { return w; } }

@@ -607,6 +607,7 @@ function epicDoomRescue(code) {
             er.score += 1500;
             er.helped++;
             darkRun.success++;
+            try { if (typeof window.dokRescued === 'function') window.dokRescued('epic'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(`${currentUser.name} 사원이 ${d.name} 사원을 끌어냈습니다.`, true);
 
             darkBodyEl().innerHTML = darkBox('구제',

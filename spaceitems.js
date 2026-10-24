@@ -302,7 +302,7 @@ function realOf(name) {
 
 // 베낄 수 있는 것 — 우주 쇼핑몰에 깔리는 것 중에서 고른다
 const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '🫙 소원권', '소원권',
-                 '황룡의 눈', '산군의 도움'];
+                 '황룡의 눈', '산군의 도움', '도깨비 불'];       // 도깨비 불 — 못 베낀다 (2026-10-24)
 function copyables() {
     if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
     return ALIEN_ITEMS_POOL.filter(function (n) {
@@ -423,7 +423,7 @@ function copierAsk(real) {
 function copierMake(real) {
     if (!currentUser) return;
     if (copyLeft(currentUser) <= 0) { showCustomAlert('오늘은 더 베낄 수 없습니다.'); return; }
-    if (!ITEM_CATALOG[real]) { showCustomAlert('베낄 수 없는 물건입니다.'); return; }
+    if (!ITEM_CATALOG[real] || NO_COPY.indexOf(real) >= 0) { showCustomAlert('베낄 수 없는 물건입니다.'); return; }
 
     if (currentUser.copyDay !== dayKey()) { currentUser.copyDay = dayKey(); currentUser.copyCount = 0; }
     currentUser.copyCount = (currentUser.copyCount || 0) + 1;

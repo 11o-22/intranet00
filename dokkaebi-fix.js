@@ -90,7 +90,8 @@ function rawWears(u) {
         const _add = addTimedEffect;
         const wrapped = function (user, name, desc, hours) {
             const mine = !!(currentUser && user && user.code === currentUser.code);
-            const blocked = rawWears(user) && !FREE[name] && !mine;
+            // ★ 2026-10-24 — 도깨비 불의 물약 상쇄를 없앴다. 남이 거는 물약도 그대로 든다
+            const blocked = false && rawWears(user) && !FREE[name] && !mine;
 
             if (!blocked) {
                 // 안쪽 막이가 또 막지 않도록 그 동안만 가린다

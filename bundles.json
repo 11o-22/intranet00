@@ -391,7 +391,8 @@
       "signup.js",
       "faces.js",
       "lp.js",
-      "trace.js"
+      "trace.js",
+      "dokkaebi.js"
     ]
   ]
 }

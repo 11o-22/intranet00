@@ -510,6 +510,7 @@ function epicRescue(code) {
         er.helped++;
         er.score += 900;
         darkRun.success++;
+        try { if (typeof window.dokRescued === 'function') window.dokRescued('epic'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
         if (database) database.ref(`darkParties/${darkRun.partyId}/epicHelp/${code}`).remove();
         sendPartyChat(`${currentUser.name} 사원이 ${h.name} 사원을 붙잡았습니다.`, true);
     } else {

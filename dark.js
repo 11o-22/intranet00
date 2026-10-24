@@ -2778,6 +2778,7 @@ function input119D(n) {
                 darkRun.marked = true;
             }
             if (database) database.ref(`darkParties/${darkRun.partyId}/dying/${code}`).remove();
+            try { if (typeof window.dokRescued === 'function') window.dokRescued('dark'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(`${currentUser.name} 사원이 동료를 붙잡았습니다.`, true);
         } else {
             darkRun.fail++;
