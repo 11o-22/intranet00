@@ -113,7 +113,7 @@ const SCENES = [
     { t: '$1{이} $2{의} 꼬리를 뭅니다. $2{은} 모르는 척합니다.',
                                                         a: ['dash',  'still'], c: '#e0b05f' },
     { t: '$1{와} $2{이} 서로 털을 골라 줍니다.',            a: ['lean',  'lean'],  c: '#9fd0a6' },
-    { t: '빈 그릇 앞에서 $1{와} $2{이} 눈치를 봅니다.',      a: ['still', 'still'], c: '#b8ac97' },
+    { t: '빈 그릇 앞에서 $1{와} $2{이} 눈치를 봅니다.',      a: ['still', 'still'], c: '#b8ac97', hungry: true },
     { t: '$1{와} $2{이} 번갈아 한 번씩 웁니다.',            a: ['bob',   'bob'],   c: '#b8ac97' },
     { t: '$1{와} $2{이} 같은 곳을 한참 봅니다. 거기엔 아무것도 없습니다.',
                                                         a: ['still', 'still'], c: '#8d8578' },
@@ -143,6 +143,10 @@ const SCENE_MS = 20000;                 // 한 장면이 머무는 시간
 
 let sceneIdx = -1, sceneAt = 0, sceneFor = '';
 
+function anyHungry(keys) {
+    const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+    return keys.some(function (k) { try { return Number(P().full(k, u)) < 50; } catch (e) { return false; } });
+}
 // 지금 장면 — 같은 짝으로는 20초마다 하나씩 바뀐다
 function sceneNow(keys) {
     const tag = keys.join(',');
@@ -151,6 +155,8 @@ function sceneNow(keys) {
     if (tag !== sceneFor || sceneIdx < 0 || now - sceneAt > SCENE_MS) {
         let i = Math.floor(Math.random() * pool.length);
         if (tag === sceneFor && pool.length > 1 && i === sceneIdx) i = (i + 1) % pool.length;
+        // ★ 「빈 그릇」은 배고픈 펫이 있을 때만 (포만도 50 미만) — 다 먹였는데 빈 그릇 앞에 서 있었다 (2026-10-25)
+        if (pool[i] && pool[i].hungry && !anyHungry(keys)) i = (i + 1) % pool.length;
         sceneIdx = i; sceneAt = now; sceneFor = tag;
     }
     return pool[Math.min(sceneIdx, pool.length - 1)];

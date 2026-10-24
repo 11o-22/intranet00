@@ -1192,7 +1192,8 @@ function moodLine() {
     const useP = poll >= 50 || (poll >= 20 && sat >= 50);
     const pool = useP ? POLL[pollBand(poll)][bb] : FULL[fullBand(sat)][bb];
     return { id: k, t: pool[Math.floor(Math.random() * pool.length)],
-             why: useP ? ('오염 ' + poll + '%') : ('포만 ' + sat) };
+             // ★ 주인(사원)의 값이다 — 펫의 포만도로 읽혀 「다 먹였는데 포만 0」이 됐다 (2026-10-25)
+             why: useP ? ('내 오염도 ' + poll + '%') : ('내 포만도 ' + sat) };
 }
 
 window.petMoodPaint = function () {
