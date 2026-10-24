@@ -1949,10 +1949,10 @@ window.kroomRescue = function (code) {
 //     🦊 호사수구     꼬리 — 판정 · 회피 · 행운 · 기믹(즉사 기믹 파훼) · 오염 동결 · 격리 탈출
 //     🐾 아기 여우    회피·치유 — 죽음을 한 번 받아 낸다 / 연결 — 끌려갈 때 끌어낸다 · 남을 확정으로 구한다 /
 //                    감각 — 즉사 기믹 쪽을 가린다 / 응시 — 굴림 + / 파괴 — 즉사 기믹 파훼 /
-//                    은신 — 격리를 막는다 / 행운 — 꿈결 1.5~3배
+//                    은신 — 격리를 막는다 / 행운 — 포인트 1.5~3배 (꿈결은 안 불린다 · 2026-10-24)
 //     📖 종말예언    덧쓰기 — 쓰러지면 회수품 1~3종 / 지우기 — 일행이 쓰러져 구조를 기다릴 때 장착자가 대신 죽는다 /
 //                    읽어내기 — 즉사 기믹에 🈲 가 보인다 · 그 길을 잡고 살아 나오면 포인트 세 배 (jisan.js)
-//     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 꿈결 두 배
+//     📺 토크 쇼      판정 +1 / 부활 두 번 / 열기만큼 포인트 배수 · 사회자와 끝까지 살면 포인트 두 배 (꿈결은 안 불린다)
 //     🔎 감지하는 눈  파티 버프 / 버프 받은 사람과 생사가 엮인다 / 정산 배수
 //     📱 K·LEE       버프 / 예약 문자 — 쓰러져도 끌려가지 않는다
 //     ⛓️‍💥 이레귤러   전용 장비 L / 처음 두 굴림 확정 / 부활 하나 / 사망 판정 / 연속 실패 → 즉사 기믹 파훼
@@ -2403,13 +2403,8 @@ function settle(how, txt) {
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = 0; }   // ★ 쓰러지면 이번에 얻은 꿈결도 없다 (가진 것은 hardDeath 가 걷는다)
     if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
-    // 꿈결 — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)
-    if (alive && dream > 0) {
-        const K = fox(), lx = K && K.usable('luck');
-        if (lx) { const m = K.lootRoll(); dream = Math.round(dream * m); extra.push('🐾 ' + esc(foxNick(lx)) + ' — 꿈결 ×' + m.toFixed(2)); }
-        const p = showP();
-        if (p && p.talkShow && (p.alive || {})[p.talkShow.by]) { dream *= 2; extra.push('📺 사회자와 끝까지 — 꿈결 ×2'); }
-    }
+    // ★ 꿈결은 특수 물건이 불리지 않는다 (2026-10-24) — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)의 배수는
+    //   아래 **포인트**에 붙는다 (전에는 꿈결을 ×1.5~3 · ×2 했다). 꿈결은 직업(행운)과 던전에서 얻은 그대로.
     // 레벨
     const lv0 = k.lv;
     if (!helper) {
@@ -2431,6 +2426,10 @@ function settle(how, txt) {
         if (kr.truth && jisanOn()) { pts *= 3; extra.push('📖 읽어내기 — 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
         const p = showP();
         if (p) { let m = 1; try { m = talkShowMult(p); } catch (e) { } if (m > 1) { pts = Math.round(pts * m); extra.push('📺 무대 열기 — 포인트 ×' + m.toFixed(2)); } }
+        // 🐾 아기 여우(행운) · 📺 사회자와 끝까지 — 포인트만 불린다 (2026-10-24 · 전에는 꿈결을 불렸다)
+        const K = fox(), lx = K && K.usable('luck');
+        if (lx && pts > 0) { const m = K.lootRoll(); pts = Math.round(pts * m); extra.push('🐾 ' + esc(foxNick(lx)) + ' — 포인트 ×' + m.toFixed(2)); }
+        if (p && p.talkShow && (p.alive || {})[p.talkShow.by] && pts > 0) { pts *= 2; extra.push('📺 사회자와 끝까지 — 포인트 ×2'); }
         if (window.eyeKroom) { let m = 1; try { m = window.eyeKroom.mult(); } catch (e) { } if (m !== 1) { pts = Math.round(pts * m); extra.push('🔎 눈의 몫 — 포인트 ×' + m); } }
     }
     if (pts) { try { changePoints(pts); } catch (e) { } }
