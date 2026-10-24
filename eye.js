@@ -256,17 +256,37 @@ const BOX = 'eye-party-box';
 let room = null, ref = null, key = '';
 
 function path() { const r = run(); return 'darkParties/' + r.partyId + '/eye'; }
+// ★ 🫧 흔적 (trace.js) — 혼자 든 탐사에서도 눈을 쓴다 (2026-10-24)
+//   혼자면 고를 동료가 없어 이 칸이 아예 안 떴다. 흔적을 단 사람은 **나 자신**을 고른다 —
+//   버프 하나(보너스 포인트는 빼고 넷 중)가 걸리고, 살아 나오면 장착자 몫 ×3.
+//   혼자 든 방(1인 파티)은 방 노드에 그대로 적고, 방이 없는 혼자 판(어둠 혼자 · K의 방 혼자)은
+//   판(darkRun.eyeSolo)에 적는다. EPIC 은 원래 눈의 정산이 없어 넣지 않는다.
+function soloEye() {
+    const me = u_();
+    try { return !!(me && wears(me) && typeof window.traceSolo === 'function' && window.traceSolo()); } catch (e) { return false; }
+}
+function isLocal() { const r = run(); return !!(r && !(r.isParty && r.partyId)); }
 function on_() {
     const r = run();
-    return !!(db_() && r && r.isParty && r.partyId && !r._settled);
+    if (!r || r._settled) return false;
+    if (db_() && r.isParty && r.partyId) return true;
+    return !r.epic && soloEye();                       // 방 없는 혼자 판 — 흔적일 때만
 }
-function eye() { return (room && room.eye) || null; }
+function eye() {
+    if (isLocal()) { const r = run(); return (r && r.eyeSolo) || null; }
+    return (room && room.eye) || null;
+}
+// 나 혼자 나를 고른 판인가
+function selfOnly(s) {
+    const k = Object.keys((s && s.picks) || {});
+    return k.length === 1 && s.by === u_().code && k[0] === s.by;
+}
 function amOwner() { const s = eye(); return !!(s && s.by === u_().code); }
 function picks() { const s = eye(); return (s && s.picks) || {}; }
 function deadMap() { const s = eye(); return (s && s.dead) || {}; }
 
 function watch() {
-    if (!on_()) {
+    if (!on_() || isLocal()) {
         if (ref) { try { ref.off(); } catch (e) { } ref = null; key = ''; room = null; }
         return;
     }
@@ -322,7 +342,9 @@ function roster() {
     const p = (typeof darkParties !== 'undefined' && darkParties[r.partyId]) || {};
     const alive = Object.keys(p.alive || {});
     const base = alive.length ? alive : Object.keys(p.members || {});
-    return base.filter(function (c) { return c !== u_().code; });
+    const out = base.filter(function (c) { return c !== u_().code; });
+    if (!out.length && soloEye()) return [u_().code];  // 🫧 흔적 — 혼자면 나를 고른다
+    return out;
 }
 
 window.eyeToggle = function (code) {
@@ -339,24 +361,28 @@ window.eyeSeal = function () {
     const list = Object.keys(chosen);
     if (!list.length) { alert_('한 명도 고르지 않았습니다.'); return; }
     const out = {};
+    const me0 = u_().code;
     list.forEach(function (c) {
-        const b = BUFFS[Math.floor(Math.random() * BUFFS.length)];
+        // 혼자 나를 고르면 보너스 포인트는 빼고 넷 중에서 — 포인트 몫은 살아 나올 때의 ×3 이 맡는다
+        const pool = (c === me0) ? BUFFS.filter(function (x) { return x.k !== 'pt'; }) : BUFFS;
+        const b = pool[Math.floor(Math.random() * pool.length)];
         let v;
         if (b.k === 'pt') v = Math.round((1.5 + Math.random() * 1.5) * 100) / 100;   // 1.5~3배
         else v = b.lo + Math.floor(Math.random() * (b.hi - b.lo + 1));
         out[c] = { k: b.k, v: v, name: nameOf(c) };
     });
     const me = u_();
-    db_().ref(path()).set({
-        by: me.code, byName: me.name, at: Date.now(), picks: out
-    });
+    const rec0 = { by: me.code, byName: me.name, at: Date.now(), picks: out };
+    if (isLocal()) run().eyeSolo = rec0;
+    else db_().ref(path()).set(rec0);
     chosen = {};
     clearBox();
     const lines = Object.keys(out).map(function (c) {
         const b = out[c];
         return out[c].name + ' — ' + label(b);
     });
-    try { if (typeof sendPartyChat === 'function') sendPartyChat(me.name + ' 사원의 눈이 떠졌습니다.', true); } catch (e) { }
+    if (!isLocal()) { try { if (typeof sendPartyChat === 'function') sendPartyChat(me.name + ' 사원의 눈이 떠졌습니다.', true); } catch (e) { } }
+    else { try { paint(); } catch (e) { } }
     alert_('눈이 열렸습니다.\n\n' + lines.join('\n'));
 };
 
@@ -428,6 +454,7 @@ function markDead() {
     const s = eye();
     const iAmOwner = s.by === me.code;
 
+    if (isLocal()) { s.dead = s.dead || {}; s.dead[me.code] = true; return; }   // 혼자 판 — 끌고 갈 사람이 없다
     db_().ref(path()).transaction(function (a) {
         if (!a) return;
         a.dead = a.dead || {};
@@ -512,19 +539,22 @@ function paint() {
         const list = roster();
         if (!list.length) { clearBox(); return; }
         const n = Object.keys(chosen).length;
+        const alone = list.length === 1 && list[0] === me.code;
         const rows = list.map(function (c) {
             const on = !!chosen[c];
             return '<button onclick="eyeToggle(\'' + c + '\')" style="width:100%; margin:0 0 5px 0;'
                 + ' padding:8px 10px; text-align:left; font-size:11px; border-radius:5px; cursor:pointer;'
                 + ' background:' + (on ? 'rgba(79,195,247,0.22)' : 'rgba(0,0,0,0.3)') + ';'
                 + ' border:1px solid ' + (on ? '#4fc3f7' : '#333') + '; color:' + (on ? '#dff3ff' : '#aaa') + ';">'
-                + (on ? '◉ ' : '○ ') + esc(nameOf(c)) + '</button>';
+                + (on ? '◉ ' : '○ ') + esc(nameOf(c)) + (c === me.code ? ' (나)' : '') + '</button>';
         }).join('');
         put(wrap(
             '<div style="font-size:12px; color:#4fc3f7; font-weight:bold; margin-bottom:7px;">🔎 눈을 나눈다</div>'
             + '<div style="font-size:10px; color:#9ab; line-height:1.7; margin-bottom:9px;">'
-            + '최대 ' + EYE.PICK_MAX + '명까지 고릅니다. 고른 사람에게 버프가 하나씩 걸립니다.<br>'
-            + '이들이 죽으면 당신의 몫이 늘고, 당신이 죽으면 이들 중 하나가 같이 갑니다.</div>'
+            + (alone
+                ? '🫧 흔적 — 혼자 든 탐사입니다. 나에게 눈을 엽니다.<br>버프가 하나 걸리고, 살아 나오면 몫이 ×' + EYE.W_ALL_ALIVE + ' 입니다.</div>'
+                : '최대 ' + EYE.PICK_MAX + '명까지 고릅니다. 고른 사람에게 버프가 하나씩 걸립니다.<br>'
+                  + '이들이 죽으면 당신의 몫이 늘고, 당신이 죽으면 이들 중 하나가 같이 갑니다.</div>')
             + rows
             + '<button onclick="eyeSeal()" style="width:100%; margin-top:6px; padding:9px; font-size:11px;'
             + ' border-radius:5px; cursor:pointer; background:linear-gradient(145deg,#1f5f7a,#0d3448);'
@@ -589,6 +619,7 @@ function settleMult() {
     const p = s.picks || {};
     const anyDead = Object.keys(d).length > 0;
 
+    if (selfOnly(s)) return anyDead ? 1 : EYE.W_ALL_ALIVE;   // 🫧 혼자 나를 골랐다 — 살면 ×3
     if (s.by === me.code) {
         if (anyDead) {
             const buffedDead = Object.keys(p).some(function (c) { return d[c]; });

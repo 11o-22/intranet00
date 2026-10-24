@@ -390,7 +390,8 @@
       "daydream-items.js",
       "signup.js",
       "faces.js",
-      "lp.js"
+      "lp.js",
+      "trace.js"
     ]
   ]
 }
