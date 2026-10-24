@@ -1990,7 +1990,7 @@ window.__newItemSelf = SELF;
 //   「이 물품을 다루는 부분이 아직 올라오지 않았습니다」로 끝나던 것)
 function wearNew(itemName) {
     if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-    if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return false; }
+    if (equipFull(currentUser)) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return false; }
     currentUser.equippedWeapons.push(itemName);
     setEquipOwner(currentUser, itemName, currentUser.code);
     if (itemName === '통신 단추' && !(currentUser.buttonUses | 0)) {
@@ -2107,7 +2107,7 @@ window.__newItemWear = wearNew;
                     return _a.apply(this, arguments);           // 본인 장착은 기본 경로로
                 }
                 if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-                if (targetUser.equippedWeapons.length >= 12) {
+                if (equipFull(targetUser)) {
                     showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.'); return false;
                 }
                 const lab = itemName + ' (장착자: ' + currentUser.name + ')';
@@ -2166,7 +2166,7 @@ window.__newItemWear = wearNew;
                     showCustomAlert('타인에게만 채울 수 있습니다.'); return false;
                 }
                 if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-                if (targetUser.equippedWeapons.length >= 12) {
+                if (equipFull(targetUser)) {
                     showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.'); return false;
                 }
                 const label = itemName + ' (장착자: ' + currentUser.name + ')';

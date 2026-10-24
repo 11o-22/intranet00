@@ -205,9 +205,16 @@ function chkGear(x) {
                 rows.push({ 사원: x.nameOf(c), 장비: w, 이상: '임자 사번(' + o + ')이 없습니다' });
             }
         });
-        if (ws.length > 12) {
-            rows.push({ 사원: x.nameOf(c), 장비: ws.length + '개', 이상: '장착칸(12)을 넘었습니다' });
-        }
+        // 내가 찬 것 12칸 · 남이 채운 것 13칸 (2026-10-24)
+        let self = 0, other = 0;
+        ws.forEach(function (w) {
+            const o = own[w];
+            let byOther = o ? o !== c : false;
+            if (!o) { try { byOther = typeof window.gearOwnOthers === 'function' && !!window.gearOwnOthers(x.users[c], w); } catch (e) { } }
+            if (byOther) other++; else self++;
+        });
+        if (self > 12) rows.push({ 사원: x.nameOf(c), 장비: self + '개', 이상: '내가 찬 칸(12)을 넘었습니다' });
+        if (other > 13) rows.push({ 사원: x.nameOf(c), 장비: other + '개', 이상: '남이 채운 칸(13)을 넘었습니다' });
     });
     return { title: '장착칸이 어긋난 사원', rows: rows, hard: true };
 }

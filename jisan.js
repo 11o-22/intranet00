@@ -310,7 +310,7 @@ setInterval(function () { try { rename(); } catch (e) { } }, 3000);
             }
             if (!Array.isArray(me.equippedWeapons)) me.equippedWeapons = [];
             if (wears(me)) { alert_('이미 지니고 있습니다.'); return; }
-            if (me.equippedWeapons.length >= 12) { alert_('장착 슬롯이 가득 찼습니다.'); return; }
+            if (equipFull(me)) { alert_('장착 슬롯이 가득 찼습니다.'); return; }
             me.equippedWeapons.push(NAME);
             try { if (typeof setEquipOwner === 'function') setEquipOwner(me, NAME, me.code); } catch (e) { }
             try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, itemName, 1); } catch (e) { }

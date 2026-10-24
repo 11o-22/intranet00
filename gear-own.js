@@ -158,6 +158,9 @@ function repair(u) {
     return { fixed: fixed, unsure: unsure };
 }
 
+// 장착칸 둘로 나누기(index.html equipFull) 가 「남이 채운 것」을 셀 때 쓴다 — 주인 기록이 없을 때 라벨로
+window.gearOwnOthers = function (u, w) { return othersLabel(u, w); };
+
 window.gearOwnFix = function () {
     if (!currentUser) { console.warn('로그인이 필요합니다.'); return; }
     const r = repair(currentUser);

@@ -234,7 +234,7 @@ setInterval(function () {
             if (currentUser.equippedWeapons.indexOf(SHOW) >= 0) {
                 showCustomAlert('이미 차고 있습니다.'); return;
             }
-            if (currentUser.equippedWeapons.length >= 12) {
+            if (equipFull(currentUser)) {
                 showCustomAlert('장착 슬롯이 가득 찼습니다.'); return;
             }
             currentUser.equippedWeapons.push(SHOW);

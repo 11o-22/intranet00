@@ -30,27 +30,16 @@
 //   (index.html:6343) 그릴 때마다 다시 옮기는데, 원본이 끝난 바로 뒤에
 //   같은 호흡에서 옮기니 펼쳐진 모습이 스쳐 보이지 않습니다.
 //
-// ■ 셋 — 칸 수는 직접 바꾸셔야 합니다
+// ■ 셋 — 칸 수 (2026-10-24 · 둘로 나눔)
 //
-//   한도가 `equippedWeapons.length >= 8` 이라는 글자 그대로 17군데에
-//   박혀 있습니다. 밖에서 가로챌 수 있는 함수가 아니라 여기서는 못 고칩니다.
-//
-//       index.html     9곳
-//       newitems2.js   3곳
-//       newitems.js    2곳
-//       sapphire.js    2곳
-//       dna-gifts.js   1곳
-//
-//   다섯 파일에서 아래 글자를 전부 찾아 바꾸시면 됩니다. 17곳이 나와야 합니다.
-//
-//       찾기   equippedWeapons.length >= 8
-//       바꾸기 equippedWeapons.length >= 12
-//
-//   아래 EQUIP_MAX 도 같은 숫자로 맞춰 주세요. 접는 칸 머리에 적히는 숫자입니다.
+//   내가 찬 것 12칸 · 남이 채운 것 13칸. 숫자는 index.html 의 EQUIP_SELF_MAX · EQUIP_OTHER_MAX 한 자리에 있고,
+//   한도를 보는 자리(28곳)는 전부 equipFull(차는 사람) 을 부른다 (전에는 `equippedWeapons.length >= 12` 가 글자 그대로 박혀 있었다).
+//   카드는 renderInventory 가 내 것 먼저 · 남이 채운 것 뒤로 그리고 data-eq 를 붙인다 — 여기서는 머리글과 두 묶음의 이름표를 단다.
 
 (function equipFold() {
 
-const EQUIP_MAX = 12;          // ↑ 위 찾아 바꾸기와 같은 숫자로
+function maxSelf() { return (typeof EQUIP_SELF_MAX !== 'undefined') ? EQUIP_SELF_MAX : 12; }
+function maxOther() { return (typeof EQUIP_OTHER_MAX !== 'undefined') ? EQUIP_OTHER_MAX : 13; }
 const BATH = '혈욕조';
 const KEY = 'eqFold';
 
@@ -166,17 +155,34 @@ function paint(cards) {
         const want = COLLAPSED ? 'none' : '';
         if (c.style.display !== want) c.style.display = want;
     });
+    ['eq-sub-self', 'eq-sub-other'].forEach(function (id) {
+        const e = document.getElementById(id);
+        if (e) { const want = COLLAPSED ? 'none' : 'block'; if (e.style.display !== want) e.style.display = want; }
+    });
     const m = document.getElementById('eq-fold-mark');
     if (m) m.textContent = COLLAPSED ? '펼치기 ▼' : '접기 ▲';
 }
 
+// 두 묶음의 이름표 — 남이 채운 것이 있을 때만 단다 (다 내 것이면 머리글로 충분하다)
+function sub(id, before, text, color, show) {
+    let e = document.getElementById(id);
+    if (!show || !before) { if (e) e.remove(); return; }
+    if (!e) {
+        e = document.createElement('div');
+        e.id = id;
+        e.setAttribute('style', 'font-size:10px; font-weight:bold; letter-spacing:1px; margin:2px 0 7px 2px; color:' + color + ';');
+    }
+    if (e.textContent !== text) e.textContent = text;
+    if (e.nextSibling !== before || e.parentElement !== before.parentElement) before.parentElement.insertBefore(e, before);
+}
 function fold() {
     const f = findCards();
-    if (!f.box || f.cards.length < 2) {            // 하나뿐이면 접을 것이 없다
-        const old = document.getElementById('eq-fold-head');
-        if (old) old.remove();
+    if (!f.box || f.cards.length < 1) {            // 장착한 것이 없다
+        ['eq-fold-head', 'eq-sub-self', 'eq-sub-other'].forEach(function (id) { const o = document.getElementById(id); if (o) o.remove(); });
         return;
     }
+    const selfC = f.cards.filter(function (c) { return c.getAttribute('data-eq') !== 'other'; });
+    const otherC = f.cards.filter(function (c) { return c.getAttribute('data-eq') === 'other'; });
 
     let head = document.getElementById('eq-fold-head');
     if (!head || head.parentElement !== f.box) {
@@ -194,7 +200,7 @@ function fold() {
         //  2. 글씨 색을 박아 둔다. 밝은 테마는 벽지와 달리 어두운 바탕을
         //     밝히지 않고 글씨만 어둡게 바꾼다. 장착 중인 장비 카드처럼
         //     색을 직접 적어 두면 어느 테마에서나 어두운 바탕에 밝은 글씨다.
-        head.setAttribute('style', 'display:flex; justify-content:space-between; align-items:center;'
+        head.setAttribute('style', 'display:flex; justify-content:space-between; align-items:center; gap:10px;'
             + ' background:#241f14; border:1px solid #d4af37; border-radius:6px; color:#f3ead8;'
             + ' padding:9px 12px; margin-bottom:12px; cursor:pointer; user-select:none;');
         head.addEventListener('click', function () {
@@ -205,11 +211,16 @@ function fold() {
         f.box.insertBefore(head, f.cards[0]);
     }
 
-    const label = '장착 중 ' + f.cards.length + ' / ' + EQUIP_MAX + '칸';
-    const want = '<span style="font-size:11px; color:#d4af37; font-weight:bold;">' + label + '</span>'
-        + '<span id="eq-fold-mark" style="font-size:11px; color:#aaa;">'
+    const label = '장착 중 — 내 것 ' + selfC.length + ' / ' + maxSelf() + ' · 남이 채운 것 ' + otherC.length + ' / ' + maxOther();
+    const want = '<span style="font-size:11px; color:#d4af37; font-weight:bold; min-width:0;">' + label + '</span>'
+        + '<span id="eq-fold-mark" style="font-size:11px; color:#aaa; flex-shrink:0;">'
         + (COLLAPSED ? '펼치기 ▼' : '접기 ▲') + '</span>';
     if (head.innerHTML !== want) head.innerHTML = want;
+    if (head.nextSibling !== f.cards[0] && !(head.nextSibling && head.nextSibling.id === 'eq-sub-self')) f.box.insertBefore(head, f.cards[0]);
+
+    const both = otherC.length > 0;
+    sub('eq-sub-self', selfC[0], '내가 찬 것 ' + selfC.length + ' / ' + maxSelf(), '#d4af37', both && selfC.length > 0);
+    sub('eq-sub-other', otherC[0], '🔒 남이 채운 것 ' + otherC.length + ' / ' + maxOther(), '#ff9a9a', both);
 
     paint(f.cards);
 }
@@ -245,7 +256,7 @@ function watchBox() {
         clearInterval(iv);
         try { fold(); } catch (e) { }
         watchBox();
-        console.log('[장착칸] 접기 연결 — 최대 ' + EQUIP_MAX + '칸');
+        console.log('[장착칸] 접기 연결 — 내가 찬 것 ' + maxSelf() + '칸 · 남이 채운 것 ' + maxOther() + '칸');
     }, 400);
 })();
 
@@ -254,7 +265,7 @@ window.foldState = function () {
     const f = findCards();
     console.log('%c===== 장착칸 접기 =====', 'color:#d4af37; font-size:13px');
     console.log('  소지품 칸:', f.box ? '있음' : '✗ 못 찾음 (#inventory-list-container)');
-    console.log('  찾은 장착 카드:', f.cards.length, '장  (2장부터 접힙니다)');
+    console.log('  찾은 장착 카드:', f.cards.length, '장');
     console.log('  머리글:', document.getElementById('eq-fold-head') ? '있음' : '✗ 없음');
     console.log('  접힘 상태:', COLLAPSED);
     let ls = '됨'; try { localStorage.setItem(KEY + 'T', '1'); localStorage.removeItem(KEY + 'T'); }

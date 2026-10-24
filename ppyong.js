@@ -124,7 +124,7 @@ function whyNot(me, t) {
             if (!(currentUser.inventory || []).includes(NAME)) { showCustomAlert('해당 물품이 없습니다.'); return; }
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
             if (wearing(currentUser)) { showCustomAlert('이미 뿅망치를 장착하고 있습니다.'); return; }
-            if (currentUser.equippedWeapons.length >= 12) { showCustomAlert('장비는 최대 5개까지만 장착할 수 있습니다.'); return; }
+            if (equipFull(currentUser)) { showCustomAlert('장착 슬롯이 가득 찼습니다. (내가 찬 것 12칸)'); return; }
 
             currentUser.equippedWeapons.push(NAME);
             setEquipOwner(currentUser, NAME, currentUser.code);

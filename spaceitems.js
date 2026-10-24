@@ -199,7 +199,7 @@ window._emOn = emOn;
             if (!targetUser || !currentUser) return false;
 
             if (!Array.isArray(targetUser.equippedWeapons)) targetUser.equippedWeapons = [];
-            if (targetUser.equippedWeapons.length >= 12) {
+            if (equipFull(targetUser)) {
                 showCustomAlert(isOthers ? '대상의 장착 슬롯이 가득 찼습니다.' : '장착 슬롯이 가득 찼습니다.');
                 return false;
             }

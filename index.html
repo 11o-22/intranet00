@@ -1915,6 +1915,30 @@ if (database) {
         if (user && user.equipOwner && user.equipOwner[fullName]) delete user.equipOwner[fullName];
     }
 
+    // ★ 장착칸을 둘로 나눈다 (2026-10-24) — 내가 찬 것 12칸 · 남이 채운 것 13칸
+    //   남이 채운 것 = 주인 기록(equipOwner)이 다른 사원이거나, 기록이 없어도 라벨에 「(장착자: 남)」「(시술자: 남)」이 적힌 것
+    //   (gear-own.js 의 gearOwnOthers — 연동 · 연결은 짝의 이름이라 라벨로는 안 본다).
+    //   한도를 보는 자리는 전부 equipFull(차는 사람) 을 부른다 — 지금 화면의 사원이 남에게 채우면 남이 채운 칸, 스스로 차면 내 칸.
+    var EQUIP_SELF_MAX = 12, EQUIP_OTHER_MAX = 13;
+    function equipByOther(user, fullName) {
+        if (!user) return false;
+        const o = getEquipOwner(user, fullName);
+        if (o) return o !== user.code;
+        try { if (typeof window.gearOwnOthers === 'function') return !!window.gearOwnOthers(user, fullName); } catch (e) { }
+        return false;
+    }
+    function equipCount(user) {
+        const c = { self: 0, other: 0 };
+        ((user && user.equippedWeapons) || []).forEach(function (w) { if (equipByOther(user, w)) c.other++; else c.self++; });
+        return c;
+    }
+    function equipFull(user, byCode) {
+        if (!user) return true;
+        const by = byCode || (typeof currentUser !== 'undefined' && currentUser ? currentUser.code : null);
+        const c = equipCount(user);
+        return (by && by !== user.code) ? c.other >= EQUIP_OTHER_MAX : c.self >= EQUIP_SELF_MAX;
+    }
+
     function showCustomAlert(message) {
         document.getElementById('custom-alert-text').innerText = message;
         document.getElementById('custom-alert-overlay').style.display = 'flex';
@@ -6744,17 +6768,23 @@ if (bcEl) {
 }
 
         if (currentUser.equippedWeapons && currentUser.equippedWeapons.length > 0) {
-            currentUser.equippedWeapons.forEach((weapon, idx) => {
+            // ★ 장착칸 둘로 (2026-10-24) — 내가 찬 것(12칸)을 먼저, 남이 채운 것(13칸)을 뒤에.
+            //   해제 · 거두기는 원래 자리 번호(idx)를 그대로 쓴다. 칸 번호는 묶음 안에서 센다.
+            const eqRows = currentUser.equippedWeapons.map((w, i) => ({ w: w, i: i, o: equipByOther(currentUser, w) }));
+            const eqSorted = eqRows.filter(x => !x.o).concat(eqRows.filter(x => x.o));
+            let eqN = { s: 0, o: 0 };
+            eqSorted.forEach(({ w: weapon, i: idx, o: byOther }) => {
+                const slotNo = byOther ? ++eqN.o : ++eqN.s;
                 const base = getEquipBaseName(weapon);
                 const cat = ITEM_CATALOG[base];
                 const ownerCode = getEquipOwner(currentUser, weapon);
                 const isMine = !ownerCode || ownerCode === currentUser.code;
                 const ownerName = (ownerCode && db.users[ownerCode]) ? db.users[ownerCode].name : '';
                 html += `
-                    <div style="background:#2b2b2b; border:1px solid #d4af37; padding:10px; margin-bottom:12px; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
+                    <div data-eq="${byOther ? 'other' : 'self'}" style="background:#2b2b2b; border:1px solid ${byOther ? '#c46a6a' : '#d4af37'}; padding:10px; margin-bottom:12px; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,0.3);">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                             <div style="flex:1; min-width:0;">
-                                <span style="font-size:10px; color:#d4af37; font-weight:bold;">[장착 중 슬롯 ${idx + 1}]</span>
+                                <span style="font-size:10px; color:${byOther ? '#ff9a9a' : '#d4af37'}; font-weight:bold;">[장착 중 슬롯 ${byOther ? '남 ' : ''}${slotNo}]</span>
                                 <span style="font-weight:bold; color:#fff; font-size:13px; margin-left:6px;">${weapon}</span>
                                 <div style="font-size:10px; color:#aaa; margin-top:5px; line-height:1.45;">${cat ? cat.desc : '정보 없음'}</div>
                             </div>
@@ -7429,8 +7459,8 @@ if (cat.effect === 'couple_ring') {
                 return;
             }
             if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-            if (currentUser.equippedWeapons.length >= 12) {
-                showCustomAlert("장비는 최대 5개까지만 장착할 수 있습니다.");
+            if (equipFull(currentUser)) {
+                showCustomAlert("장착 슬롯이 가득 찼습니다. (내가 찬 것 12칸)");
                 return;
             }
 
@@ -7794,12 +7824,12 @@ else if (cat.effect === 'rainbow_potion') {
 }
 else if (cat.effect === 'equip_red_ribbon') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 12) {
+    if (equipFull(targetUser)) {
         showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
     if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-    if (currentUser.equippedWeapons.length >= 12) {
+    if (equipFull(currentUser)) {
         showCustomAlert('당신의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -7822,7 +7852,7 @@ else if (cat.effect === 'equip_red_ribbon') {
 
 }else if (cat.effect === 'equip_sonpo') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 12) {
+    if (equipFull(targetUser)) {
         if (!isOthers) showCustomAlert('장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -7839,7 +7869,7 @@ else if (cat.effect === 'equip_red_ribbon') {
 }
 else if (cat.effect === 'equip_brainwash') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 12) {
+    if (equipFull(targetUser)) {
         showCustomAlert('대상의 장착 슬롯이 가득 찼습니다.');
         return false;
     }
@@ -8007,7 +8037,7 @@ updateUI();
         }
        else if (cat.effect === 'equip_clit') {
     if (!targetUser.equippedWeapons) targetUser.equippedWeapons = [];
-    if (targetUser.equippedWeapons.length >= 12) {
+    if (equipFull(targetUser)) {
         if (!isOthers) showCustomAlert("장착 슬롯이 가득 찼습니다.");
         return false;
     }
@@ -8040,11 +8070,11 @@ updateUI();
             if (cat.effect === 'equip_sync_hole' || cat.effect === 'equip_sync_dildo') {
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
                 
-                if (currentUser.equippedWeapons.length >= 12) {
+                if (equipFull(currentUser)) {
                     if(!isOthers) showCustomAlert("당신의 장착 슬롯이 가득 차서 연동 기구를 사용할 수 없습니다.");
                     return false;
                 }
-                if (targetUser.equippedWeapons.length >= 12) {
+                if (equipFull(targetUser)) {
                     if(!isOthers) showCustomAlert("대상의 장착 슬롯이 가득 찼습니다.");
                     return false;
                 }
@@ -8072,7 +8102,7 @@ updateUI();
             } 
             // 단일 장착 기구 (다이아 애널 플러그, 에그 바이브 등)
             else {
-                if (targetUser.equippedWeapons.length >= 12) {
+                if (equipFull(targetUser)) {
                     if(!isOthers) showCustomAlert("대상(본인 포함)의 장착 슬롯이 가득 찼습니다.");
                     return false;
                 }
