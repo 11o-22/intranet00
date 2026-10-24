@@ -392,7 +392,8 @@
       "faces.js",
       "lp.js",
       "trace.js",
-      "dokkaebi.js"
+      "dokkaebi.js",
+      "copier-refund.js"
     ]
   ]
 }
