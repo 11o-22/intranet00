@@ -334,7 +334,7 @@ const DOT_SLOTS = [
             //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
             //   걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다 (헤드셋은 여섯 칸 다 그려져 왔다).
             //   서기 줄은 두 칸 — 의상은 두 칸이 같은 그림이라 0 에 세워 둔다.
-            { i: 'sound', n: '사운드 의상', over: ['sound-outfit'], own: 'sound-outfit', noTrade: true },
+            { i: 'sound', n: '사운드 의상', over: ['sound-outfit'], own: 'sound-outfit' },   // 밀실 거래 됨 (2026-10-24)
             // ★ 의상 뽑기 다섯 벌 (2026-10-23) — 한 벌씩 통째로 그려져 있다.
             //   주신 그림은 432x192 (칸 72x96) — 지난 규격(1728x768 · 칸 288)의 ¼ 이라 네 배로 늘려
             //   (도트 한 칸이 4픽셀 · 요원복 · 브라운 정장과 같다) 칸마다 가로 +30 으로 352 칸에 옮겼다.
@@ -360,7 +360,7 @@ const DOT_SLOTS = [
             { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes' },
             // ★ 사운드 신발 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 (wear-gift.js) · 거래하지 않는다.
             //   받은 그림은 1728x768 (칸 288) · 칸마다 +30. 걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다. 서기는 첫 칸.
-            { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes', noTrade: true }
+            { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes' }   // 밀실 거래 됨 (2026-10-24)
         ]
     },
     {
@@ -383,7 +383,7 @@ const DOT_SLOTS = [
             { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' },
             // ★ 사운드 코트 (2026-10-23) — 두 장이다. 그림자(sound-coat-in)는 코트와 같이 입고 **모든 옷 뒤**(Z 맨 앞),
             //   코트(sound-coat)는 망토 자리. 서기 줄 두 칸에 자락이 흔들린다.
-            { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat', noTrade: true }
+            { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat' }   // 밀실 거래 됨 (2026-10-24)
         ]
     },
     {
@@ -459,12 +459,12 @@ const DOT_SLOTS = [
             //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
             { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' },
             // ★ 사운드 레빗 헤드셋 (2026-10-23) — 사운드 세트. 걷기 · 서기 줄 여섯 칸 다 그려져 있다 (귀가 흔들린다).
-            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', noTrade: true, cat: '머리' },
+            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', cat: '머리' },   // 밀실 거래 됨 (2026-10-24)
             // ★ LP 판 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다.
             //   달면 광장에 LP 단추가 뜬다 — 피아노 · 디스코 (lp.js). 누르는 동안만 높은음자리표 · 음표가 둘레에 뜬다 (sound-lp-fx).
             //   받은 그림은 1728x768 (칸 288) · 덩어리마다 주인 칸을 가려 +30 으로 옮겼다 (칸 밖으로 나간 조각 끝은 잘랐다).
             //   서기 줄 여섯 칸에 판이 돈다. 옷 밑(over · Z 맨 앞)에 깔고, 몸(다리 · 발) 자리는 그림에서 비워 발밑에 깔린 것처럼 보인다.
-            { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', noTrade: true, cat: '그 밖' }
+            { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', cat: '그 밖' }   // 밀실 거래 됨 (2026-10-24)
         ]
     }
 ];
