@@ -5210,12 +5210,16 @@ function open() {
         window.addEventListener('pointermove', onMove);
         window.addEventListener('pointerup', up);
         window.addEventListener('pointercancel', up);
-        // 🍍 시설 표 앞에 선 사람 — 시설 표는 걷기 쪽(up)으로 안 오고 제 click 으로 열린다.
-        //   사람이 앞에 서 있으니 사람을 먼저 고른다 (붙잡는 단계에서 가로챈다)
+        // 🍍 얹어 둔 것(.plaza-keep) 앞에 선 사람 — 사람을 먼저 고른다 (붙잡는 단계에서 가로챈다)
+        // ★ 시설이 먼저다 (2026-10-24) — 시설 표(.plaza-spot · 게시판 · 먹이 던지기)는 앞에 사람이 서 있어도
+        //   **시설로 들어간다.** 전에는 시설 표 앞의 사람을 먼저 골라(들기 · 올라가기 칸이 뜸) 시설을 못 쓰는 일이 잦았다.
+        //   작은 사람이 보통 사람 앞에서 · 보통 사람이 작은 사람 앞에서 둘 다 그랬다.
+        //   그 사람을 고르려면 시설 표 밖의 몸 자리를 누르면 된다.
         ov.addEventListener('click', function (ev) {
             const t = ev.target;
             if (!run || !t || !t.closest || t.closest('#plaza-carry')) return;
-            if (!t.closest('#plaza-view') || !t.closest('.plaza-spot, .plaza-keep')) return;
+            if (t.closest('.plaza-spot')) return;                 // 시설은 그대로 연다
+            if (!t.closest('#plaza-view') || !t.closest('.plaza-keep')) return;
             if (!personAt(ev.clientX, ev.clientY)) return;
             ev.stopPropagation(); ev.preventDefault();
             carryTap(ev.clientX, ev.clientY);
