@@ -216,11 +216,16 @@ function fold() {
         + '<span id="eq-fold-mark" style="font-size:11px; color:#aaa; flex-shrink:0;">'
         + (COLLAPSED ? '펼치기 ▼' : '접기 ▲') + '</span>';
     if (head.innerHTML !== want) head.innerHTML = want;
-    if (head.nextSibling !== f.cards[0] && !(head.nextSibling && head.nextSibling.id === 'eq-sub-self')) f.box.insertBefore(head, f.cards[0]);
 
     const both = otherC.length > 0;
     sub('eq-sub-self', selfC[0], '내가 찬 것 ' + selfC.length + ' / ' + maxSelf(), '#d4af37', both && selfC.length > 0);
     sub('eq-sub-other', otherC[0], '🔒 남이 채운 것 ' + otherC.length + ' / ' + maxOther(), '#ff9a9a', both);
+
+    // 머리글은 맨 앞 묶음의 이름표(없으면 첫 카드) 바로 앞 — 이름표를 단 **뒤에** 자리를 본다.
+    //   ✗ 전에는 머리글을 먼저 놓고 이름표를 나중에 달아, 남이 채운 것만 있을 때
+    //     머리글 ↔ 「남이 채운 것」 이름표가 서로 앞자리를 뺏으며 끝없이 자리를 바꿨다 (소지품이 멈춤 · 2026-10-24).
+    const first = document.getElementById('eq-sub-self') || document.getElementById('eq-sub-other') || f.cards[0];
+    if (head.nextSibling !== first) f.box.insertBefore(head, first);
 
     paint(f.cards);
 }
@@ -234,12 +239,16 @@ function watchBox() {
     const box = document.getElementById('inventory-list-container');
     if (!box) { setTimeout(watchBox, 500); return; }
     watching = true;
-    new MutationObserver(function () {
+    const mo = new MutationObserver(function () {
         if (inFold) return;                      // 내가 만든 변화는 되받지 않는다
         inFold = true;
         try { fold(); } catch (e) { }
+        // ★ 방금 fold 가 옮긴 것은 **다음 콜백으로 또 온다** (inFold 는 그때 이미 풀려 있다).
+        //   쌓인 기록을 버려 되받지 않게 한다 — 안 그러면 자리가 한 번이라도 어긋날 때 끝없이 돈다.
+        try { mo.takeRecords(); } catch (e) { }
         inFold = false;
-    }).observe(box, { childList: true });
+    });
+    mo.observe(box, { childList: true });
 }
 
 (function hook() {
