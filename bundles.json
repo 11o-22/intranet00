@@ -393,7 +393,14 @@
       "lp.js",
       "trace.js",
       "dokkaebi.js",
-      "copier-refund.js"
+      "copier-refund.js",
+      "finale-text.js",
+      "finale-core.js",
+      "finale-op.js",
+      "finale-sw.js",
+      "finale-be.js",
+      "finale-bq.js",
+      "finale-items.js"
     ]
   ]
 }

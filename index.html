@@ -4800,6 +4800,8 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         if (darkRun.zone === 'Qtrew-S-003') {
     bonus += s003Bonus();
 }
+        // ★ 제■■■회 완벽한 피날레 — 엔딩 · 감화도 · 동행 NPC 몫 (finale-core.js)
+        if (darkRun.zone === 'Qtrew-S-■■■' && typeof window.finaleBonus === 'function') bonus += window.finaleBonus();
 
         let total = Math.max(10, base + bonus);
         if (darkRun.zone === 'Qtrew-S-010' && darkRun.turned && darkRun.turnDone >= darkRun.turnGoal) {
