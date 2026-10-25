@@ -1007,6 +1007,9 @@ function makeOne(user, label, k, other) {
 
     // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
     const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null, tiny: tiny };
+    // 🍍 잎 우산을 달았나 — 작은 사람이 머리 위 대신 잎 위를 걷는다 (leafSurf)
+    try { const L = window.dotLook(user, null, !!other); one.leaf = !tiny && (L.tops || []).indexOf(LEAF.SHEET) >= 0; } catch (e) { one.leaf = false; }
+    if (one.leaf) leafLoad();
     setTag(one, (user && user.code) || '', label || '');
     return one;
 }
@@ -1390,10 +1393,93 @@ function holderPos(by) {
     try { face = one.actor.facing() || 1; } catch (e) { }
     return { one: one, x: x, y: y, face: face, kk: one.w / spec().W };
 }
+// ── 🍍 잎 우산 위 (2026-10-25) — 든 사람이 잎 우산을 달고 있으면, 머리에 올라간 작은 사람은 **잎 위**를 걷는다.
+//   걷는 폭은 잎 끝에서 끝까지 (EDGE 만큼 안쪽) · 발은 그 자리 잎 윗면에 닿는다 (잎이 기울어 있으니 오르내린다).
+//   잎 윗면은 그림(dot/leaf-umb.png)을 칸마다 한 번 재서 들고 있다 — 걷기 여섯 칸 · 서기 여섯 칸.
+//   든 사람이 지금 몇 번째 칸을 그리고 있는지는 그 사람 잎 층의 배경 자리에서 읽는다 (걸으면 잎 모양이 바뀐다).
+//   오른쪽을 볼 때는 그림이 뒤집혀 있으므로 왼쪽 · 오른쪽을 뒤집어 읽는다.
+//   토끼도 잎 우산을 달면 같은 자리에 잎이 있으므로 그대로 올라선다.
+const LEAF = { SHEET: 'leaf-umb', EDGE: 8, SINK: 3, FEET: 6, prof: null, busy: false };
+function leafLoad() {
+    if (LEAF.prof || LEAF.busy) return;
+    LEAF.busy = true;
+    const img = new Image();
+    img.onload = function () {
+        try {
+            const sp = spec(), W = img.naturalWidth, H2 = img.naturalHeight;
+            const cw = W / 6, ch = H2 / 2, sx = sp.W / cw;            // 절반 그림이어도 칸 도트로 맞춘다
+            const c = document.createElement('canvas'); c.width = W; c.height = H2;
+            const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+            const d = x.getImageData(0, 0, W, H2).data;
+            const prof = [];
+            for (let r = 0; r < 2; r++) {
+                prof[r] = [];
+                for (let f = 0; f < 6; f++) {
+                    const top = new Array(sp.W).fill(-1);
+                    let lo = -1, hi = -1;
+                    for (let cx = 0; cx < cw; cx++) {
+                        const gx = f * cw + cx;
+                        for (let y = 0; y < ch; y++) {
+                            if (d[((r * ch + y) * W + gx) * 4 + 3] > 0) {
+                                for (let k = 0; k < sx; k++) top[Math.floor(cx * sx) + k] = y * sx;
+                                if (lo < 0) lo = Math.floor(cx * sx);
+                                hi = Math.floor(cx * sx + sx - 1);
+                                break;
+                            }
+                        }
+                    }
+                    prof[r][f] = { top: top, lo: lo, hi: hi };
+                }
+            }
+            LEAF.prof = prof;
+        } catch (e) { }
+        LEAF.busy = false;
+    };
+    img.onerror = function () { LEAF.busy = false; };
+    img.src = 'dot/' + LEAF.SHEET + '.png';
+}
+// 든 사람이 지금 그리는 잎 칸 — 없으면 null
+function leafFrame(h) {
+    if (!h || !h.one || !h.one.leaf || !LEAF.prof) return null;
+    let col = 0, row = 1;
+    try {
+        const el = h.one.wrap.querySelector('.dot-layer[data-sheet="' + LEAF.SHEET + '"]');
+        if (el) {
+            const p = (el.style.backgroundPosition || '').match(/-?[\d.]+/g) || [];
+            const cw = h.one.w, chh = h.one.h;
+            if (cw && chh) { col = Math.round(Math.abs(parseFloat(p[0]) || 0) / cw) % 6; row = Math.round(Math.abs(parseFloat(p[1]) || 0) / chh) % 2; }
+        }
+    } catch (e) { }
+    const fr = LEAF.prof[row] && LEAF.prof[row][col];
+    return (fr && fr.lo >= 0) ? fr : null;
+}
+// 머리(또는 잎) 위에서 걸을 수 있는 폭 — [왼, 오른] (칸 도트 · 가운데 0 · 화면 쪽)
+function headRange(h) {
+    const fr = leafFrame(h);
+    if (!fr) return [-CARRY.HEAD_R, CARRY.HEAD_R];
+    const C = spec().W / 2;
+    const a = fr.lo + LEAF.EDGE - C, b = fr.hi - LEAF.EDGE - C;
+    return (h.face < 0) ? [-b, -a] : [a, b];
+}
+// 잎 윗면 높이 (칸 안 y) — 잎 우산이 아니면 null
+function leafSurf(h, ox) {
+    const fr = leafFrame(h);
+    if (!fr) return null;
+    const C = spec().W / 2;
+    let col = Math.round(C + (h.face < 0 ? -ox : ox));
+    col = Math.max(fr.lo, Math.min(fr.hi, col));
+    // 두 발 폭(FEET)만큼 고르게 — 비탈에서 한쪽 발만 닿고 떠 보이지 않게
+    let sum = 0, n = 0;
+    for (let k = -LEAF.FEET; k <= LEAF.FEET; k++) { const v = fr.top[col + k]; if (typeof v === 'number' && v >= 0) { sum += v; n++; } }
+    return n ? Math.round(sum / n) + LEAF.SINK : null;
+}
+window.plazaLeafOn = function (code) { const h = holderPos(code || myCode()); return !!leafFrame(h); };
 // 손 · 머리 자리 (방 좌표 — 작은 사람의 발이 닿는 곳)
 function attachAt(h, kind, ox, hi) {
     const sp = spec(), z = zz(), kk = h.kk;
     if (kind === 'head') {
+        const lf = leafSurf(h, ox || 0);                        // 🍍 잎 우산 — 잎 윗면에 선다
+        if (lf != null) return { x: h.x + (ox || 0) * kk / z, y: h.y - (sp.H - sp.FOOT - lf) * kk / z };
         const top = (h.one.tag && typeof h.one.tag._top === 'number') ? h.one.tag._top : TAG_TOP;
         const e = Math.min(1, Math.abs(ox || 0) / CARRY.HEAD_R);
         return { x: h.x + (ox || 0) * kk / z, y: h.y - (sp.H - sp.FOOT - top - CARRY.HEAD_SINK - CARRY.HEAD_CURVE * e * e) * kk / z };
@@ -1598,11 +1684,12 @@ let handSaid = 0;
 function carryMe(cm, dt, ix, iy) {
     const h = holderPos(cm.by);
     if (!h) return false;
-    const R = CARRY.HEAD_R;
+    const RG = headRange(h);                       // 🍍 잎 우산이면 잎 끝에서 끝까지
     let mv = false;
     if (cm.k === 'head') {
         if (typeof run.hox !== 'number') run.hox = 0;
-        if (run.tx != null) run.hoT = Math.max(-R, Math.min(R, (run.tx - h.x) * zz() / h.kk));
+        run.hox = Math.max(RG[0], Math.min(RG[1], run.hox));
+        if (run.tx != null) run.hoT = Math.max(RG[0], Math.min(RG[1], (run.tx - h.x) * zz() / h.kk));
         let dir = 0;
         if (Math.abs(ix) > 0.15) { dir = ix > 0 ? 1 : -1; run.hoT = null; }
         else if (typeof run.hoT === 'number') {
@@ -1612,7 +1699,7 @@ function carryMe(cm, dt, ix, iy) {
         if (dir) {
             let nx = run.hox + dir * CARRY.HEAD_SPEED * dt;
             if (typeof run.hoT === 'number') nx = dir > 0 ? Math.min(nx, run.hoT) : Math.max(nx, run.hoT);
-            nx = Math.max(-R, Math.min(R, nx));
+            nx = Math.max(RG[0], Math.min(RG[1], nx));
             mv = Math.abs(nx - run.hox) > 0.001;
             run.hox = nx;
             run.me.actor.face(dir < 0 ? 1 : -1);
@@ -2091,7 +2178,8 @@ function carryPaint(dt) {
         if (!h) return;
         let ox = 0;
         if (w.k === 'head') {
-            const want = Math.max(-CARRY.HEAD_R, Math.min(CARRY.HEAD_R, Number(q.ho) || 0));
+            const RG = headRange(h);
+            const want = Math.max(RG[0], Math.min(RG[1], Number(q.ho) || 0));
             if (typeof q.hox !== 'number') q.hox = want;
             const d = want - q.hox;
             if (Math.abs(d) > 0.5) { q.hox += d * (1 - Math.exp(-dt / 0.12)); busy = true; } else q.hox = want;
