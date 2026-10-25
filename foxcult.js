@@ -848,6 +848,16 @@ hook('luckReroll', function (_l) {
                 out = nr;
             }
         } catch (e) { }
+        // ★ 행운 100% 면 1 은 끝까지 나오지 않는다 (2026-10-26) — 가장 바깥에서 한 번 더 본다
+        //   안쪽 재굴림(루비 · 아이 재굴림 등)이 행운을 거친 뒤 새로 굴려 1 을 낼 수 있었다.
+        try {
+            if (out === 1 && run() && typeof window.gearValue === 'function' && (Number(window.gearValue(u_(), 'luck')) || 0) >= 1) {
+                out = rnd(2, 20);
+                const r = run();
+                if (r && r.log) r.log.push('[행운] 대실패 무효 (1 → ' + out + ')');
+                toast('✺ 손이 미끄러졌다. 다시 굴린다. (' + out + ')');
+            }
+        } catch (e) { }
         return out;
     };
 });
@@ -1552,6 +1562,9 @@ function withDesc(k) {
 //         한 탐사에 신도 하나가 스무 마디. 동행하는 사람이 쓰러지면 제 一 신도는 말없이 사라지고 제 二 신도는 데리고 나온다.
 //   광장  plaza.js 의 [🎐] — 아기 여우와 같은 길(kitcall · kitchat). 불려 나올 때마다 스무 마디 · 「들어가」 하면 물러간다.
 const TALK_QUIET = 4000, TALK_CAP = 12000;
+// ★ 어둠(탐사 · K의 방 · 피날레 · EPIC)에서는 말하지 않는다 (2026-10-26 · 사용자가 정함)
+//   말은 광장(서버 · 맵 채팅으로 불렀을 때)과 재난(api/_disaster foxChat)에서만. 아래 어둠 채팅 길은 이 깃발로 닫아 둔다.
+const DARK_TALK = false;
 function api(body) {
     return fetch('/api/disaster', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().catch(function () { return {}; }); });
@@ -1564,8 +1577,9 @@ function runKey() {
     return r._foxdKey;
 }
 function mineHere() { const me = u_(); return DS.some(function (d) { return !!withOf(me, d); }); }
-function soloTalk() { const r = run(); return !!(r && !r.isParty && !r.partyId && !partyId() && mineHere()); }
+function soloTalk() { if (!DARK_TALK) return false; const r = run(); return !!(r && !r.isParty && !r.partyId && !partyId() && mineHere()); }
 function discHere() {
+    if (!DARK_TALK) return false;
     const r = run(); if (!r || !u_()) return false;
     const pid = r.partyId;
     if (pid && typeof darkParties !== 'undefined' && darkParties[pid]) {
@@ -1593,6 +1607,7 @@ function fire(tries) {
 }
 // 쓰러졌다 — 서버에 알린다 (제 一 신도는 말없이 사라지고 · 제 二 신도는 데리고 나오는 한 마디)
 function talkDead() {
+    if (!DARK_TALK) return;
     try {
         const me = u_(), key = runKey();
         if (!me || !key || !mineHere()) return;
@@ -1669,6 +1684,7 @@ hook('renderChatHead', function (_h) {
 // 탐사가 시작되면 — 내 곁의 신도가 인사한다 (한 탐사에 한 번)
 setInterval(function () {
     try {
+        if (!DARK_TALK) return;
         const r = run(), me = u_();
         if (!r || !me || r._foxdHi || r._dead || !r.zone) return;
         if (!mineHere()) return;

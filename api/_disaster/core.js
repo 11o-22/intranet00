@@ -873,6 +873,9 @@ async function start(b, deps, db) {
         const FX0 = await foxesOf(db, players0, P, now, picks0);
         codes.forEach((c) => { mem[c].foxes = foxesWith(FX0, c).map((id) => foxLabel(FX0[id], mem)); });
         const fxKinds0 = Object.keys(FX0).map((id) => FX0[id].k);
+        // 🎐 여우 신도 — 들어온 사람 곁에 동행하는 신도 (재난 채팅에서 말한다 · 2026-10-26)
+        let FD0 = {};
+        try { FD0 = await foxdAt(db, players0, false); } catch (e) { FD0 = {}; }
         // 🏥 판마다 다른 건물 (새빛 병원)
         const BM = D.build ? buildMap(D.build, deps.rand) : null;
         const MAP = BM ? BM.text : '';
@@ -913,7 +916,7 @@ async function start(b, deps, db) {
 
         await db.put('disasterSrv/' + b.run, { plan: clip(out.plan, 3000), notes: clip(out.notes, 1200), sums: { 0: '시작' }, tale: tale0 ? 1 : null, map: MAP || null, help: HELP0 || null });
         try { if (Object.keys(FX0).length) await postFox(db, b.run, FX0, out.fox_lines, 1, deps.now(), Object.keys(FX0)); } catch (e) { }
-        const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null, aid: null,
+        const up = { phase: 'TALK', round: 1, err: null, foxes: Object.keys(FX0).length ? FX0 : null, foxd: Object.keys(FD0).length ? FD0 : null, aid: null,
                      scene: { n: 1, title: clip(out.title, 80), text: clip(out.text, 1500), endsAt: now + CFG.TALK_MS } };
         codes.forEach((c) => {
             up['members/' + c + '/st'] = 'ok'; up['members/' + c + '/done'] = 0; up['members/' + c + '/leave'] = null;
@@ -1165,11 +1168,11 @@ async function round(b, deps, db) {
             .map(([k, x]) => ({ k: k, c: x.c, n: mem[x.c].n || x.c, t: clip(x.t, 200).replace(/\s+/g, ' ').trim(), late: lateOf(k, x),
                                 lost: (mem[x.c].st || 'ok') === 'lost', out: memNow[x.c].st === 'out', adm: mem[x.c].role === 'admin' }));
         const readKey = chatKeys.length ? chatKeys[chatKeys.length - 1] : prevKey;
-        const talkLine = (l) => (l.fox ? '(아기 여우) ' : '') + (l.late ? '[앞 장면 끝에] ' : '') + (l.adm ? '(관리자) ' : (l.lost ? echo + ' ' : (l.out ? '(나가며) ' : ''))) + l.n + ': ' + l.t;
+        const talkLine = (l) => (l.foxd ? '(여우 신도) ' : l.fox ? '(아기 여우) ' : '') + (l.late ? '[앞 장면 끝에] ' : '') + (l.adm ? '(관리자) ' : (l.lost ? echo + ' ' : (l.out ? '(나가며) ' : ''))) + l.n + ': ' + l.t;
         const talk = lines.map(talkLine).join('\n') || '(아무도 말하지 않았다)';
         // 진행자에게는 아기 여우가 채팅에 한 말도 같이 (해석 · 바깥의 말 고르기에는 넣지 않는다)
-        const foxL = chatKeys.filter((k) => { const x = chatAll[k]; return x && x.fox && typeof x.t === 'string' && Number(x.r) === n; })
-            .map((k) => ({ k: k, fox: true, n: String(chatAll[k].n || '').replace(/^🐾\s*/, ''), t: clip(chatAll[k].t, 200).replace(/\s+/g, ' ').trim() }));
+        const foxL = chatKeys.filter((k) => { const x = chatAll[k]; return x && (x.fox || x.foxd) && typeof x.t === 'string' && Number(x.r) === n; })
+            .map((k) => ({ k: k, fox: true, foxd: !!chatAll[k].foxd, n: String(chatAll[k].n || '').replace(/^(🐾|🎐)\s*/, ''), t: clip(chatAll[k].t, 200).replace(/\s+/g, ' ').trim() }));
         const talkS = foxL.length ? lines.concat(foxL).sort((a, z) => (a.k < z.k ? -1 : 1)).map(talkLine).join('\n') : talk;
         // 이번 장면에 살아서 말한 사람 — 진행자가 한 사람도 빠뜨리지 않게
         const speakers = []; lines.forEach((l) => { if (!l.lost && !l.out && !l.adm && speakers.indexOf(l.c) < 0) speakers.push(l.c); });
@@ -1672,14 +1675,19 @@ async function foxChat(b, deps, db) {
     const n = Number(run.round) || 0;
     const FX = (run.foxes && typeof run.foxes === 'object') ? run.foxes : {};
     const alive = Object.keys(FX).filter((id) => FX[id] && !FX[id].gone && mem[FX[id].on] && !gone(mem[FX[id].on].st || 'ok'));
-    if (!alive.length) return { ok: false, why: 'nofox' };
+    // 🎐 여우 신도 — 곁의 사람이 아직 재난 안에서 움직이면 말한다 (한 판에 신도 하나가 스무 마디까지)
+    const FD = (run.foxd && typeof run.foxd === 'object') ? run.foxd : {};
+    const dUsed0 = (await db.get('disasterSrv/' + b.run + '/foxdUsed')) || {};
+    const dAlive = Object.keys(FD).filter((id) => FD[id] && isD(FD[id].k) && mem[FD[id].on] && !gone(mem[FD[id].on].st || 'ok')
+        && (Number(dUsed0[id]) || 0) < CFG.FOXD_LINES);
+    if (!alive.length && !dAlive.length) return { ok: false, why: 'nofox' };
 
     const chatAll = (await db.get('disasterChat/' + b.run)) || {};
     const keys = Object.keys(chatAll).sort();
     // 죽은 사람이 남긴 말(메아리)은 여우에게 넘기지 않는다 — 여우는 죽은 사람과 말을 주고받지 않고 그리워하기만 한다 (2026-10-20)
     const rows = keys.map((k) => [k, chatAll[k]]).filter(([k, x]) => x && typeof x.t === 'string' && Number(x.r) === n
-        && !OOC.test(x.t) && (x.fox || (mem[x.c] && mem[x.c].role !== 'admin' && (mem[x.c].st || 'ok') !== 'lost')));
-    const humans = rows.filter(([k, x]) => !x.fox && !gone(mem[x.c].st || 'ok'));
+        && !OOC.test(x.t) && (x.fox || x.foxd || (mem[x.c] && mem[x.c].role !== 'admin' && (mem[x.c].st || 'ok') !== 'lost')));
+    const humans = rows.filter(([k, x]) => !x.fox && !x.foxd && !gone(mem[x.c].st || 'ok'));
     if (!humans.length) return { ok: false, why: 'quiet' };
     const lastKey = humans[humans.length - 1][0];
 
@@ -1728,26 +1736,64 @@ async function foxChat(b, deps, db) {
             + cpl(m)
             + (/네임리스/.test(String(m.n || '')) ? ' — ★ 아기 여우는 「주인님」 또는 「네임리스 님」으로만 부른다' : '');
     }).join('\n');
-    const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (mem[x.c].n || x.c))
+    const talk = rows.slice(-30).map(([k, x]) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '')
+            : x.foxd ? '(여우 신도) ' + String(x.n || '').replace(/^🎐\s*/, '') : (mem[x.c].n || x.c))
         + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
     // 이 판에서 아기 여우가 이미 한 말 — 장면이 바뀌어도 되풀이하지 않게
     const foxSaid = keys.map((k) => chatAll[k]).filter((x) => x && x.fox && typeof x.t === 'string').slice(-24);
+    const dSaid = keys.map((k) => chatAll[k]).filter((x) => x && x.foxd && typeof x.t === 'string').slice(-24);
+    // 사회자 · 브라운 호칭 — 토크 쇼를 가진 사람이 판에 있을 때만
+    const own = dAlive.length ? await showOwners(db, people.concat(loverCodes(FD, dAlive))) : {};
     const res = await ask(deps, Object.assign({
-        model: CFG.HAIKU, max: 700, schema: SCHEMA_FOX,
-        system: foxChatRule(kinds),
+        model: CFG.HAIKU, max: dAlive.length ? 900 : 700, schema: dAlive.length ? SCHEMA_FOXD : SCHEMA_FOX,
+        system: [alive.length ? foxChatRule(kinds) : '', dAlive.length ? foxdChatRule(dAlive.map((id) => FD[id].k), 'disaster') : ''].filter(Boolean).join('\n\n'),
         user: [
             ...(run.last && Number(run.last.n) === n - 1 && run.last.result ? ['[지난 장면에서 벌어진 일]', clip(run.last.result, 700), ''] : []),
             '[지금 장면] ' + (scene.title || ''), clip(scene.text || '', 900), '',
             '[판에 있는 사원 — 사람 목록]', who, '',
             ...coupleLine(mem, pairsF),
-            '[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), '',
+            ...(alive.length ? ['[아기 여우 열쇠 — fox 에 이것을 쓴다]', foxKeyLines(FX, alive, mem), ''] : []),
+            ...(dAlive.length ? ['[여우 신도 열쇠 — fox 에 이것을 쓴다]', dAlive.map((id) => foxdKey(id, FD[id], null)).join('\n'),
+                '[여우 신도 곁의 사람 · 호칭]', people.filter((c) => mem[c].st !== 'lost').map((c) => '- ' + (mem[c].n || c) + (own[c] ? SHOW_TAG : '')).join('\n'), ''] : []),
             ...(foxSaid.length ? ['[아기 여우가 최근에 한 말 — 같거나 비슷한 말을 다시 쓰지 않는다]',
                 foxSaid.map((x) => String(x.n || '').replace(/^🐾\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : []),
+            ...(dSaid.length ? ['[여우 신도가 최근에 한 말 — 같거나 비슷한 말을 다시 쓰지 않는다]',
+                dSaid.map((x) => String(x.n || '').replace(/^🎐\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : []),
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')
     }, HAIKU_OPT));
-    const nPosted = await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive, foxSaid.map((x) => x.t));
-    return { ok: true, lines: nPosted };
+    const nPosted = alive.length ? await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive, foxSaid.map((x) => x.t)) : 0;
+    // 🎐 신도의 말 — 신도 하나에 한 줄 · 토크 쇼 주인이 없는데 「사회자 님」이면 버린다
+    let dPosted = 0, caged = [];
+    if (dAlive.length) {
+        const up = {}, used = {}, seenD = dSaid.map((x) => x.t);
+        let i = 0;
+        const t0 = deps.now() + 50;
+        ((res && res.lines) || []).forEach((x) => {
+            if (!x || dAlive.indexOf(x.fox) < 0 || used[x.fox] || i >= 3) return;
+            const t = kitClean(x.t);
+            if (!t || repeats(t, seenD) || titleBad(t, own)) return;
+            seenD.push(t);
+            used[x.fox] = 1;
+            const f = FD[x.fox];
+            up[pushId(t0 + i)] = { c: 'foxd_' + x.fox, n: '🎐 ' + foxdName(f), t: t, at: t0 + i, r: n, foxd: f.k, o: f.o };
+            i++;
+        });
+        // 🔒 신도에게 무례하게 군 사람 — 가두리에 (재난 밖 광장 · 백일몽 가두리)
+        try {
+            const fresh = humans.slice(-20).map(([k, x]) => ({ c: x.c, n: mem[x.c].n || x.c }));
+            caged = await foxdCages(db, res, FD, dAlive, fresh, now);
+            caged.forEach((x) => { up[pushId(t0 + i)] = { c: 'foxd_' + x.id, n: '🎐 ' + foxdName(x.f), t: x.t, at: t0 + i, r: n, foxd: x.f.k, o: x.f.o }; i++; });
+        } catch (e) { caged = []; }
+        if (i) {
+            await db.patch('disasterChat/' + b.run, up);
+            const inc = {};
+            Object.keys(used).forEach((id) => { inc[id] = (Number(dUsed0[id]) || 0) + 1; });
+            if (Object.keys(inc).length) await db.patch('disasterSrv/' + b.run + '/foxdUsed', inc);
+        }
+        dPosted = i;
+    }
+    return { ok: true, lines: nPosted + dPosted, foxd: dPosted, caged: caged.map((x) => x.who) };
 }
 
 // ==========================================

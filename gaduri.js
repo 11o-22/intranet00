@@ -28,6 +28,7 @@
 //
 // ■ 콘솔
 //   gaduriState()
+//   gaduriWhy()  · gaduriWhy('사번')   — 왜 갇혔나 (격리 까닭 · 오염도 · 최근 탐사 · 관련 기록)
 
 (function gaduri() {
 
@@ -432,6 +433,41 @@ window.gaduriState = function () {
     });
     const me = u_();
     if (me) console.log('  나 :', roomOf(me.code) ? NAME[roomOf(me.code)] + ' 가두리에 갇힘' : '갇히지 않음');
+};
+
+// 왜 갇혔나 — 갇힌 사람마다 격리 까닭 · 오염도 · 마지막 탐사 · 최근 기록 (2026-10-26)
+//   입원(사망 이송)인지 · 오염 100 상담인지 · 격리가 이미 끝났는데 남은 자리인지 가린다
+window.gaduriWhy = function (code) {
+    const mins = function (t) { t = Number(t) || 0; return t > Date.now() ? Math.ceil((t - Date.now()) / 60000) + '분 남음' : (t ? '끝남' : '없음'); };
+    const KEY = /어둠|이송|상담실|선녀탕|격리|쓰러|사망|의식|오염|구출|불러|살렸|사직|가두리/;
+    const out = [];
+    ROOMS.forEach(function (r) {
+        Object.keys(all[r.k] || {}).forEach(function (c) {
+            if (code && c !== code) return;
+            const v = all[r.k][c] || {}, u = users()[c] || {};
+            const q = Number(u.quarantineUntil) || 0;
+            const why = !q || q <= Date.now() ? '격리 끝남 — 자리만 남음'
+                : u.quarantineHospital ? '입원 (어둠에서 쓰러져 이송)'
+                : '상담 (오염 100 · 방치 등)';
+            const lg = (Array.isArray(u.darkLogs) ? u.darkLogs : []).slice(0, 3).map(function (l) {
+                return (l.date || '') + ' ' + (l.zone || '') + ' ' + (l.died ? '✖ 사망' : '✔ 귀환 +' + (l.reward || 0) + 'P');
+            });
+            const hs = (Array.isArray(u.history) ? u.history : []).map(function (h) {
+                return typeof h === 'string' ? h : ((h.time ? h.time + ' ' : '') + (h.text || ''));
+            }).filter(function (t) { return KEY.test(t); }).slice(0, 6);
+            out.push({ c: c, n: u.name || v.name || c, room: r.n, v: v, u: u, q: q, why: why, lg: lg, hs: hs });
+        });
+    });
+    console.log('%c===== 🔒 가두리 — 왜 갇혔나 (' + out.length + '명) =====', 'color:#d9d4e0; font-size:13px');
+    out.forEach(function (o) {
+        console.log('%c■ ' + o.n + ' (' + o.c + ') — ' + o.room + ' 가두리 · ' + (o.v.auto ? '격리 중 (저절로)' : o.v.by === 'foxd' ? '여우 신도' : '상담사'), 'color:#ffcc80; font-weight:bold');
+        console.log('   까닭 : ' + o.why + ' · 격리 ' + mins(o.q) + ' · 자리 끝 ' + mins(o.v.until));
+        console.log('   오염도 ' + (o.u.pollution == null ? '?' : o.u.pollution) + '% · 퇴원 시 ' + (o.u.quarantineExitPollution || 0) + '% · 행선 ' + (o.u.quarantineDest || '-') + ' · 들어간 때 ' + (o.v.at ? new Date(o.v.at).toLocaleString() : '?'));
+        console.log('   최근 탐사 : ' + (o.lg.length ? '\n     ' + o.lg.join('\n     ') : '없음'));
+        console.log('   관련 기록 : ' + (o.hs.length ? '\n     ' + o.hs.join('\n     ') : '없음'));
+    });
+    if (!out.length) console.log('  갇힌 사람이 없습니다.');
+    return out.length;
 };
 
 })();

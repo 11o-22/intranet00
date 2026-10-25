@@ -383,7 +383,8 @@ function dnaUse(key) {
         luckReroll = function (roll) {
             roll = _l.apply(this, arguments);
             if (darkRun && roll <= 6 && dnaUse('luck')) {
-                const nr = Math.floor(Math.random() * 20) + 1;
+                let nr = Math.floor(Math.random() * 20) + 1;
+                if (typeof luckNoOne === 'function') nr = luckNoOne(nr);   // 행운 100% 면 1 은 안 나온다
                 if (typeof showDarkToast === 'function') showDarkToast('✦ 고유의 운 (' + roll + ' → ' + nr + ')');
                 return nr;
             }

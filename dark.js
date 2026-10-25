@@ -8654,14 +8654,12 @@ function b508RequiredDocs() {
         h.grade = nextG;
         addHistoryLog(currentUser, `[사택] ${next.name}(으)로 이사했습니다. (-${next.cost.toLocaleString()} P)`);
 
-        // 동거인도 같이 올라간다
+        // 동거인 — 같은 호실이라 새 등급을 같이 쓴다 (houseGrade). 명의 등급은 그대로 둔다 (2026-10-26)
+        //   ✗ 전에는 동거인의 명의 등급까지 올려 적어, 짝이 바뀐 뒤에도 그 등급을 영영 가졌다.
         const r = getRoomie(currentUser);
         if (r) {
-            const rh = getHouse(r);
-            rh.grade = nextG;
-            updateUserFields(r.code, { 'house/grade': nextG, history: r.history });
             addHistoryLog(r, `[사택] ${currentUser.name} 사원이 ${next.name}(으)로 이사를 신청했습니다.`);
-           
+            updateUserFields(r.code, { history: r.history });
         }
 
        saveSelfFull();
@@ -8730,7 +8728,8 @@ function b508RequiredDocs() {
     if (ub) {
         const hb = getHouse(ub);
         hb.roomie = a;
-        hb.grade = ha.grade;
+        // ★ 등급은 베껴 쓰지 않는다 (2026-10-26) — 같은 호실이면 houseGrade() 가 높은 쪽을 같이 쓰게 한다.
+        //   전에는 hb.grade = ha.grade 로 명의 등급을 통째로 옮겨 적어, 같은 호실에 넣기만 해도 S급 명의가 생겼다.
                 // 공용 보관함은 코드가 앞서는 쪽 — 다른 쪽 물건을 옮겨 둔다
         const ownerIsA = [a, b].sort()[0] === a;
         const keep = ownerIsA ? ha : hb;
@@ -10133,6 +10132,14 @@ const reply = await callFox(msgs);
     }
 
         // ★ 행운 — 대실패(굴림 1)를 확률적으로 무효화하고 다시 굴린다
+    // 행운 100% — 새로 굴린 눈이 1 이면 2~20 으로 (루비 · 아이 · 고유의 운 재굴림이 쓴다 · 2026-10-26)
+    function luckNoOne(nr) {
+        try {
+            if (nr === 1 && darkRun && (Number(gearValue(currentUser, 'luck')) || 0) >= 1) return Math.floor(Math.random() * 19) + 2;
+        } catch (e) { }
+        return nr;
+    }
+
     function luckReroll(roll) {
                 // 식은 커피 — 낮게 나오면 한 번 다시 굴린다
         if (roll <= 9 && darkRun && qFlag('reroll')) {
@@ -10143,10 +10150,13 @@ const reply = await callFox(msgs);
             roll = nr;
         }
         if (roll !== 1) return roll;
-        if (!darkRun || darkRun._luckRerollUsed) return roll;
+        if (!darkRun) return roll;
         const luckVal = gearValue(currentUser, 'luck');
         if (luckVal <= 0) return roll;
-        if (Math.random() >= luckVal) return roll;
+        // ★ 행운 100% 면 1 은 나오지 않는다 — 탐사당 한 번이 아니라 늘 다시 굴린다 (2026-10-26)
+        const full = luckVal >= 1;
+        if (darkRun._luckRerollUsed && !full) return roll;
+        if (!full && Math.random() >= luckVal) return roll;
 
         darkRun._luckRerollUsed = true;
         const newRoll = Math.floor(Math.random() * 19) + 2;

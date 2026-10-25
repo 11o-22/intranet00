@@ -415,7 +415,7 @@ function addLine(v) {
     const m = (r.members || {})[v.c] || {};
     const el = document.createElement('div');
     // 🐾 아기 여우의 말 — 옅은 주황색 (서버가 올린 줄 · v.fox)
-    el.className = 'ln' + (v.fox ? ' fox' : '') + (u && v.c === u.code ? ' me' : '') + (m.st === 'lost' ? ' echo' : '');
+    el.className = 'ln' + (v.fox || v.foxd ? ' fox' : '') + (u && v.c === u.code ? ' me' : '') + (m.st === 'lost' ? ' echo' : '');
     el.innerHTML = '<b>' + esc(v.n || v.c) + '</b>' + esc(v.t);
     sec.querySelector('.dz-rl').appendChild(el);
     const main = document.getElementById('dz-main');
@@ -1038,7 +1038,10 @@ function send() {
 let foxTimer = 0;
 function foxAlive(r) {
     const F = r.foxes || {}, m = r.members || {};
-    return Object.keys(F).some(function (id) { const f = F[id]; return f && !f.gone && m[f.on] && !gone(m[f.on].st || 'ok'); });
+    if (Object.keys(F).some(function (id) { const f = F[id]; return f && !f.gone && m[f.on] && !gone(m[f.on].st || 'ok'); })) return true;
+    // 🎐 여우 신도 — 곁의 사람이 아직 재난 안에 있으면 (서버가 판을 열 때 r.foxd 에 적는다 · 2026-10-26)
+    const D = r.foxd || {};
+    return Object.keys(D).some(function (id) { const f = D[id]; return f && m[f.on] && !gone(m[f.on].st || 'ok'); });
 }
 function foxPoke(r) {
     if (!foxAlive(r)) return;
