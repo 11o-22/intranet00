@@ -91,5 +91,41 @@
         if (typeof checkFoxRoomEntry === 'function') checkFoxRoomEntry();
     };
 
-    console.log('[오염] 격리 누락 보정 적용 — forceQuarantine() 으로 수동 실행');
+    // --- 진단: 왜 다시 들어가나 (상담사 콘솔 · 서버 기록을 읽는다 · 2026-10-26) ---
+    //   quarWhy('사번')  — 오염도 · 격리 칸(값의 종류까지) · 최근 기록 · 탐사 · 뿅망치 줄
+    window.quarWhy = function (code) {
+        if (typeof database === 'undefined' || !database) { console.warn('서버에 닿지 않습니다'); return; }
+        if (!code) { console.warn("quarWhy('사번') 처럼 사번을 넣어 주세요"); return; }
+        const ago = function (t) { t = Number(t) || 0; if (!t) return '없음'; const m = Math.round((Date.now() - t) / 60000); return m >= 0 ? m + '분 전' : (-m) + '분 뒤'; };
+        const ty = function (v) { return JSON.stringify(v) + ' (' + (v === null ? 'null' : typeof v) + ')'; };
+        database.ref('users/' + code).once('value').then(function (sn) {
+            const u = sn.val();
+            if (!u) { console.warn('그 사번의 기록이 없습니다: ' + code); return; }
+            const q = Number(u.quarantineUntil) || 0;
+            console.log('%c===== 🦊 ' + (u.name || code) + ' (' + code + ') — 오염 · 격리 =====', 'color:#ffcc80; font-size:13px');
+            console.log('  오염도            ' + ty(u.pollution));
+            console.log('  격리 끝           ' + (q ? (q > Date.now() ? Math.ceil((q - Date.now()) / 60000) + '분 남음' : '끝남 (' + ago(q) + ')') : '없음') + '  · 값 ' + ty(u.quarantineUntil));
+            console.log('  입원(쓰러짐)      ' + ty(u.quarantineHospital) + '  · 행선 ' + ty(u.quarantineDest));
+            console.log('  퇴원 시 오염도    ' + ty(u.quarantineExitPollution));
+            console.log('  문답 끝냄         ' + ty(u.foxRoomAnswered));
+            console.log('  오염 시계         ' + ago(u.lastPollutionTime) + '  · 동결 ' + ago(u.pollFreezeUntil) + '  · 안대 ' + ago(u.blindfoldUntil));
+            console.log('  음식 표시         ' + ty(u.quarFood) + '  · 까닭 ' + ty(u.quarCause));
+            const eq = (u.equippedWeapons || []).filter(Boolean);
+            console.log('  장착              ' + (eq.length ? eq.join(', ') : '없음'));
+            const te = (Array.isArray(u.timedEffects) ? u.timedEffects : Object.values(u.timedEffects || {})).filter(Boolean).map(function (e) { return e.name + (e.expireAt ? '(' + ago(e.expireAt) + ')' : ''); });
+            if (te.length) console.log('  걸린 효과         ' + te.join(', '));
+            if (u.ppyongTookDay) console.log('  뿅망치로 대신 들어간 날 ' + u.ppyongTookDay);
+            database.ref('users').once('value').then(function (all) {
+                const v = all.val() || {};
+                const by = Object.keys(v).filter(function (c) { const qq = v[c] && v[c].ppyongQueue; return Array.isArray(qq) && qq.indexOf(code) >= 0; });
+                if (by.length) console.log('  ⚠ 뿅망치 줄에 서 있음 — ' + by.map(function (c) { return (v[c].name || c) + '(' + c + ')'; }).join(', '));
+            }).catch(function () { });
+            const hs = (Array.isArray(u.history) ? u.history : Object.values(u.history || {})).map(function (h) { return typeof h === 'string' ? h : ((h.time ? h.time + ' ' : '') + (h.text || '')); });
+            console.log('  최근 기록\n     ' + (hs.length ? hs.join('\n     ') : '없음'));
+            const lg = (Array.isArray(u.darkLogs) ? u.darkLogs : []).slice(0, 3).map(function (l) { return (l.date || '') + ' ' + (l.zone || '') + ' ' + (l.died ? '✖ 쓰러짐' : l.resigned ? '사직' : '✔ 귀환'); });
+            if (lg.length) console.log('  최근 탐사\n     ' + lg.join('\n     '));
+        }).catch(function (e) { console.error('[오염] 읽기 실패', e); });
+    };
+
+    console.log('[오염] 격리 누락 보정 적용 — forceQuarantine() 으로 수동 실행 · quarWhy(\'사번\') 진단');
 })();
