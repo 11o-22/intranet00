@@ -92,7 +92,8 @@ const GACHA_WEAR = [
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },
-    { k: 'han-shoes',   n: '신',         g: 'C', s: ['han-shoes'] }
+    { k: 'han-shoes',   n: '신',         g: 'C', s: ['han-shoes'] },
+    { k: 'bungeo',      n: '붕어빵 의상', g: 'C', s: ['bungeo'] }
 ];
 
 // ── 악세 마흔아홉 가지. 이름은 주신 파일 이름 그대로입니다.

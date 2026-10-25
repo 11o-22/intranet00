@@ -154,7 +154,7 @@ const DOT = {
     Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
         'dress-yellow', 'dress-green', 'maid', 'maid-long',
-        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove'],
+        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove', 'bungeo'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -343,7 +343,11 @@ const DOT_SLOTS = [
             { i: 'ydress', n: '유치원 앞치마', over: ['dress-yellow'], own: 'dress-yellow' },
             { i: 'gdress', n: '룩키마트 앞치마', over: ['dress-green'], own: 'dress-green' },
             { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
-            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' }
+            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
+            // ★ 붕어빵 의상 (2026-10-25 · 의상 뽑기 C) — 몸통을 통째로 감싸는 탈. 1728x768 (칸 288) 이라
+            //   칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다.
+            //   서기 줄은 한 칸 — 0 에 세운다. 겹 차례는 맨 위 (D.Z 끝) — 겉옷 · 장갑까지 덮는다.
+            { i: 'bungeo', n: '붕어빵 의상', over: ['bungeo'], own: 'bungeo' }
             // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
