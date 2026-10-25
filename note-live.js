@@ -31,6 +31,7 @@
 //                [은화 뱀] · [달빛] · [인형] · [📲] · ⛓️‍💥 카피  itemBuffs[].until (· dollPt · kleeShop)
 //                꼬리 n개 사용                                 foxNotes[].until
 //                [탈모약] · [감금실] · [계약]                  hairUntil · cage · slaveUntil
+//                🎐 …가 역병을 뿌립니다. - 판정               foxPl[역병].until (한 시간)
 //                노스텔지어 끈 · 눈가리개(오염 동결)            nostalgiaUntil · blindfoldUntil
 //                정원을 찬양하라 · 고행이 시작될 것이다         자정
 //                [장착됨] 기한 있는 장비                        아래 장착과 같다
@@ -208,6 +209,16 @@ function lineAt(u, line, nth) {
         return lastOf(u, KLEE, nm ? KLEE_KEY[nm] : null);
     }
     if (has('⛓️‍💥') && has('카피')) return lastOf(u, COPY_SRC);
+    // 🎐 여우 신도의 역병 — 한 시간 (foxcult.js · u.foxPl[역병] = { line, until }) · 2026-10-25
+    if (line.indexOf('🎐 ') === 0 && has('역병을 뿌립니다')) {
+        const pl = (u.foxPl && typeof u.foxPl === 'object') ? u.foxPl : {};
+        let at = 0;
+        Object.keys(pl).forEach(function (k) {
+            const p = pl[k];
+            if (p && String(p.line || '').trim() === line && (Number(p.until) || 0) > at) at = Number(p.until) || 0;
+        });
+        return ok(at);
+    }
     if (has('[탈모약]')) return ok(u.hairUntil);
     if (has('[감금실]')) {
         const c = u.cage;
