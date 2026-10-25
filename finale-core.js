@@ -52,6 +52,19 @@ if (typeof DARK_ZONES !== 'undefined') {
         outro: '공연은 계속됩니다.',
         images: {}
     };
+    // 목록 자리 — 「동화의 뒷면」(S-003) 바로 위. 어둠 목록은 DARK_ZONES 에 넣은 순서대로 그린다.
+    (function placeAboveTale() {
+        const keys = Object.keys(DARK_ZONES);
+        const at = keys.indexOf('Qtrew-S-003');
+        if (at < 0) return;
+        const mine = DARK_ZONES[FIN];
+        const tail = keys.slice(at).filter(function (k) { return k !== FIN; });
+        const keep = {};
+        tail.forEach(function (k) { keep[k] = DARK_ZONES[k]; delete DARK_ZONES[k]; });
+        delete DARK_ZONES[FIN];
+        DARK_ZONES[FIN] = mine;
+        tail.forEach(function (k) { DARK_ZONES[k] = keep[k]; });
+    })();
 }
 
 // ==========================================
