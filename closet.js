@@ -158,11 +158,12 @@ const DOT = {
         'dress-yellow', 'dress-green', 'maid', 'maid-long',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
-    //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 잎(무조건 뒤) → 빗물(잎 위).
+    //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
     //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다).
-    BACK_Z: ['leaf-puddle', 'leaf-umb', 'leaf-rain'],
-    // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것이 제일 위다 (잎 우산 줄기)
-    FRONT: ['leaf-stem'],
+    //   ✗ 처음엔 잎을 뒤 · 줄기를 앞에 두었다 — 정반대였다 (같은 날 바로잡음).
+    BACK_Z: ['leaf-puddle', 'leaf-stem'],
+    // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
+    FRONT: ['leaf-umb', 'leaf-rain'],
     // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
     NO_TAG: ['leaf-rain', 'leaf-puddle'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
@@ -494,11 +495,11 @@ const DOT_SLOTS = [
             { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', cat: '그 밖' },   // 밀실 거래 됨 (2026-10-24)
             // ★ 잎 우산 (2026-10-25 · 뉴비 세트) — 네 장이다. 물 웅덩이 · 빗물은 **이것을 달았을 때만** 내리고 고인다 (이 칸에만 적혀 있다).
             //     물 웅덩이(leaf-puddle)  몸 뒤 · 맨 아래 — 무조건 신발(과 발) 밑
-            //     잎(leaf-umb)            몸 뒤 — 무조건 뒤 (머리카락 · 후드에 가린다)
-            //     빗물(leaf-rain)         몸 뒤 · 잎 위 — 잎에 떨어져 끝으로 흘러내린다 (몸에는 안 떨어진다 — 우산 밑이다)
-            //     줄기(leaf-stem)         맨 앞 — 무조건 앞 (FRONT · 다른 악세보다도 위)
+            //     줄기(leaf-stem)         몸 뒤 — 무조건 등 뒤
+            //     잎(leaf-umb)            맨 앞 — 무조건 앞 (FRONT · 머리 · 후드 · 다른 악세보다도 위)
+            //     빗물(leaf-rain)         맨 앞 · 잎 위 — 잎에 떨어져 끝으로 흘러내린다
             //   서기 줄 — 빗물 · 웅덩이는 여섯 칸을 돈다 (FLAP_COLS) · 잎 · 줄기는 여섯 칸이 같은 그림이라 0 에 세운다.
-            { i: 'leaf-umb', n: '잎 우산', back: ['leaf-puddle', 'leaf-umb', 'leaf-rain'], top: ['leaf-stem'], own: 'leaf-umb', noTrade: true, cat: '손' }
+            { i: 'leaf-umb', n: '잎 우산', back: ['leaf-puddle', 'leaf-stem'], top: ['leaf-umb', 'leaf-rain'], own: 'leaf-umb', noTrade: true, cat: '손' }
         ]
     }
 ];

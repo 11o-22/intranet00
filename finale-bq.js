@@ -5,10 +5,14 @@
 //
 //   연회 (2차 합류 뒤 · 살아 있는 사람 전원)
 //     도입 01~03 — 도입 03 에서는 각자 둘러볼 수 있다. 「탐사를 시작한다」를 모두 누르면 장면 01
-//     장면 01~05 — 투표로 행동을 정하고, 주사위는 파티장이 한 번만 굴린다 (파티장의 보정).
+//     장면 01~05 — 투표로 행동을 정하고, 주사위는 한 번만 굴린다.
+//                   ★ 굴리는 사람 (2026-10-25) — 파티장이 아니라 **이긴 항목에 투표한 사람 가운데 무작위 한 명**.
+//                     그 사람의 보정이 붙는다. 뽑기는 방에 한 번만 적는다 (bqrl/<장면> 트랜잭션 — 모두 같은 사람을 본다).
+//                     그 항목에 투표한 사람이 없으면(시간이 다 되어 정해진 판) 살아 있는 사람 가운데서 뽑는다.
+//                     뽑힌 사람이 굴리기 전에 쓰러지거나 나가면 다시 뽑는다.
 //                   결과는 모두에게 같이 들어간다. 대실패(1)면 각자 맨 주사위로 다시 굴려
 //                   11 이상은 일반 실패, 10 이하는 대실패(즉사 — 막기는 듣는다).
-//                   파티장이 60초 안에 안 굴리면 다른 사람이 파티장의 마지막 보정값으로 대신 굴린다.
+//                   뽑힌 사람이 60초 안에 안 굴리면 다른 사람이 그 사람의 마지막 보정값으로 대신 굴린다.
 //     장면 03    — 식탁보. 대실패만 빼고 모두 얻는다. 식탁보는 한 장 — 파티장이 챙긴다
 //                   (대실패로 다시 굴린 판이면, 살아남은 사람 가운데 파티장부터 순서대로).
 //                   감화도: 대성공 0 · 성공 +12 · 실패 +16
@@ -33,7 +37,7 @@ const sec = X.sec, opt = X.opt, x = X.x, esc = X.esc;
 function F() { return X.F(); }
 function S() { return X.S(); }
 const TAG = '이름 없는 명찰', CANDLE = '꺼지지 않는 향초', CLOTH = '식탁보';
-const ROLL_WAIT = 60;        // 파티장이 이만큼 안 굴리면 대신 굴린다
+const ROLL_WAIT = 60;        // 뽑힌 사람이 이만큼 안 굴리면 대신 굴린다
 const TAG_WAIT = 120;        // 명찰 결정 — 이만큼 지나면 잠근다
 
 function bq(n) { return sec('bq', n); }
@@ -91,12 +95,30 @@ LIVE.bqGate = true;
 AUTO.bqGate = function (sc) { if (X.gateDone(sc.g)) X.go(sc.nx); };
 
 // ==========================================
-// 장면 01~05 — 투표 · 파티장 한 번 굴림
+// 장면 01~05 — 투표 · 이긴 항목에 투표한 사람 가운데 한 명이 한 번 굴림
 // ==========================================
 function sNode(s) { return bq('장면 0' + s); }
 function vKey(s) { return 'bq' + s; }
 function tKey(s) { return 'bqt' + s; }
 function rollOf(s) { return ((S().bqr || {})[s]) || null; }
+// ★ 굴릴 사람 — 이긴 항목에 투표한 사람 가운데 무작위 한 명 (방에 한 번만 적는다)
+function rollerOf(s) { const r = (S().bqrl || {})[s]; return (r && r.who) || null; }
+function pickRoller(s, res) {
+    if (rollOf(s)) return;
+    const a = X.actives();
+    const cur = rollerOf(s);
+    if (cur && a.indexOf(cur) >= 0) return;                     // 뽑힌 사람이 아직 살아 있다
+    const v = X.voteOf(vKey(s)).v || {};
+    let pool = a.filter(function (c) { return v[c] === res; });
+    const from = pool.length ? 'vote' : 'all';
+    if (!pool.length) pool = a.slice();                         // 그 항목에 투표한 사람이 없다 — 살아 있는 사람 가운데서
+    if (!pool.length) return;
+    const who = pool[Math.floor(Math.random() * pool.length)];
+    X.tx('bqrl/' + s, function (c) {
+        if (c && c.who && a.indexOf(c.who) >= 0) return;        // 다른 사람이 먼저 뽑았다
+        return { who: who, from: from, n: pool.length, at: Date.now() };
+    }).then(function () { X.view({ keep: true }); });
+}
 function opts(s) {
     const node = sNode(s);
     const out = [];
@@ -129,7 +151,7 @@ SC.bqS = function (sc) {
             ex += ids.map(function (id) {
                 const sac = id.charAt(0) === 's';
                 return ui.b(names[id], function () { X.voteCast(key, id); X.view({ keep: true }); },
-                    { red: sac, sub: '투표 — ' + (sac ? '판정 없이 위기를 피합니다. 동행 NPC 한 명이 죽습니다.' : '파티장이 D20 을 한 번 굴립니다 (DC 15)') });
+                    { red: sac, sub: '투표 — ' + (sac ? '판정 없이 위기를 피합니다. 동행 NPC 한 명이 죽습니다.' : '이 항목에 투표한 사람 가운데 한 명이 D20 을 한 번 굴립니다 (DC 15)') });
             }).join('');
         } else ex += '<div class="fin-wait">「' + esc(names[mine]) + '」에 투표했습니다. 다른 교우를 기다리는 중</div>';
         X.draw(ui, sTitle(s), x(node), ex, { keep: true });
@@ -156,23 +178,30 @@ SC.bqS = function (sc) {
         X.draw(ui, sTitle(s), x(node), ex, { keep: true });
         return;
     }
-    // 굴림
+    // 굴림 — 이긴 항목에 투표한 사람 가운데 뽑힌 한 명
     const r = rollOf(s);
-    const ld = X.leader();
     if (!r) {
-        const vo2 = X.voteOf(key);
-        const waited = vo2.at ? Math.floor((Date.now() - vo2.at) / 1000) : 0;
-        if (ld === X.me()) {
-            ex += ui.b('주사위를 굴린다. (파티장)', function () { leaderRoll(s, false); }, { gold: true, sub: '내 보정이 모두에게 쓰입니다 · D20 · DC 15' });
+        const rl = rollerOf(s);
+        if (!rl || X.actives().indexOf(rl) < 0) {
+            pickRoller(s, res);
+            ex += '<div class="fin-wait">「' + esc(names[res] || oNode(s, res).l) + '」에 투표한 사람 가운데 주사위를 굴릴 사람을 뽑는 중…</div>';
+            X.draw(ui, sTitle(s), x(node) + '<br><br>' + x(oNode(s, res).n), ex, { keep: true });
+            return;
+        }
+        const rinfo = (S().bqrl || {})[s] || {};
+        const how = rinfo.from === 'all' ? '이 항목에 투표한 사람이 없어 살아 있는 사람 가운데 뽑혔습니다' : '이 항목에 투표한 ' + (rinfo.n || 1) + '명 가운데 뽑혔습니다';
+        const waited = rinfo.at ? Math.floor((Date.now() - rinfo.at) / 1000) : 0;
+        if (rl === X.me()) {
+            ex += ui.b('주사위를 굴린다.', function () { leaderRoll(s, false); }, { gold: true, sub: how + ' — 내 보정이 모두에게 쓰입니다 · D20 · DC 15' });
         } else {
-            ex += '<div class="fin-wait">파티장 <b style="color:#d4af37;">' + esc(X.nameOf(ld)) + '</b> 이(가) 주사위를 굴리기를 기다리는 중</div>';
-            if (waited >= ROLL_WAIT) ex += ui.b('대신 굴린다.', function () { leaderRoll(s, true); }, { sub: '파티장의 마지막 보정값으로 굴립니다.' });
+            ex += '<div class="fin-wait"><b style="color:#d4af37;">' + esc(X.nameOf(rl)) + '</b> 이(가) 주사위를 굴리기를 기다리는 중 <span style="color:#888;">(' + how + ')</span></div>';
+            if (waited >= ROLL_WAIT) ex += ui.b('대신 굴린다.', function () { leaderRoll(s, true); }, { sub: esc(X.nameOf(rl)) + ' 의 마지막 보정값으로 굴립니다.' });
         }
         X.draw(ui, sTitle(s), x(node) + '<br><br>' + x(oNode(s, res).n), ex, { keep: true });
         return;
     }
     const o = oNode(s, res);
-    const cap = '파티장 ' + esc(X.nameOf(r.ld)) + ' 의 보정' + (r.fb ? ' (대신 굴림 — ' + esc(X.nameOf(r.by)) + ')' : '');
+    const cap = esc(X.nameOf(r.rl || r.ld)) + ' 의 보정' + (r.rl ? ' (투표로 뽑힌 사람)' : '') + (r.fb ? ' (대신 굴림 — ' + esc(X.nameOf(r.by)) + ')' : '');
     const rr = { raw: r.raw, bonus: r.bonus, total: r.total, dc: r.dc, out: r.out };
     if (r.out === 'c1') {
         ex += '<div class="fin-note" style="color:#ff8a80;">대실패 — 각자 맨 주사위를 다시 굴립니다. 11 이상이면 일반 실패, 10 이하면 대실패입니다.</div>'
@@ -194,23 +223,29 @@ AUTO.bqS = function (sc) {
     if (vo.res.charAt(0) === 's') {
         const C = X.comps();
         if (C.length > 1) X.voteResolve(tKey(s), a, C);
+        return;
     }
+    if (!rollOf(s)) pickRoller(s, vo.res);
 };
 
 function leaderRoll(s, fallback) {
     if (rollOf(s)) return;
     const a = X.actives();
-    const ld = X.leader();
+    const ld = X.leader();                                       // 식탁보를 챙기는 차례는 그대로 파티장부터
+    const rl = rollerOf(s);
+    if (!rl) return;
+    if (!fallback && rl !== X.me()) return;                      // 뽑힌 사람만 제 보정으로 굴린다
     let r;
     if (!fallback) r = X.roll({ kind: 'break', dc: 15, body: true, n: a.length });
     else {
         const raw = 1 + Math.floor(Math.random() * 20);
-        const bon = +(((S().pl || {})[ld] || {}).bon) || 0;
+        const bon = +(((S().pl || {})[rl] || {}).bon) || 0;
         const total = raw + bon;
         r = { raw: raw, bonus: bon, total: total, dc: 15, out: raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= 15 ? 'ok' : 'fail' };
-        darkRun.log.push('[연회] 파티장 대신 굴림 — d20 ' + raw + ' (+' + bon + ') → ' + r.out);
+        darkRun.log.push('[연회] ' + X.nameOf(rl) + ' 대신 굴림 — d20 ' + raw + ' (+' + bon + ') → ' + r.out);
     }
-    const rec = { raw: r.raw, bonus: r.bonus, total: r.total, dc: 15, out: r.out, by: X.me(), ld: ld, fb: !!fallback,
+    if (!fallback) darkRun.log.push('[연회] 장면 0' + s + ' — 투표로 뽑혀 굴림');
+    const rec = { raw: r.raw, bonus: r.bonus, total: r.total, dc: 15, out: r.out, by: X.me(), ld: ld, rl: rl, fb: !!fallback,
         ord: [ld].concat(a.filter(function (c) { return c !== ld; })), at: Date.now() };
     X.tx('bqr/' + s, function (cur) { if (cur) return; return rec; }).then(function () { X.view({ keep: true }); });
 }
@@ -294,7 +329,7 @@ function bqResult(ui, s, k) {
     } else {
         const r = rollOf(s);
         if (r) {
-            t += X.rollHtml({ raw: r.raw, bonus: r.bonus, total: r.total, dc: r.dc, out: r.out }, '파티장 ' + esc(X.nameOf(r.ld)) + ' 의 보정');
+            t += X.rollHtml({ raw: r.raw, bonus: r.bonus, total: r.total, dc: r.dc, out: r.out }, esc(X.nameOf(r.rl || r.ld)) + ' 의 보정' + (r.rl ? ' (투표로 뽑힌 사람)' : ''));
             if (k.rr) t += '<div class="fin-roll" style="color:#ff9800;">🎲 ' + k.rr + ' <small>(다시 굴림 — 일반 실패로 처리)</small></div>';
             if (o.n.d20) t += '<div style="margin-top:6px;">' + (o.n.d20[k.out] || '') + '</div>';
         }
