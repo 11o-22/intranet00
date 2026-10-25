@@ -80,6 +80,13 @@ function pickHtml() {
             + '<div style="font-size:10px; color:#8fa8d8;">💤 펫이 모두 깊이 잠들어 있습니다 — '
             + (m >= 60 ? Math.floor(m / 60) + '시간 ' : '') + (m % 60) + '분 남음. 데려갈 수도, 따라오지도 않습니다.</div>';
     }
+    if (list.length && P().stays && P().stays(u)) {
+        const m2 = Math.ceil(P().stayLeft(u) / 60000);
+        return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
+            + '데려갈 펫</div>'
+            + '<div style="font-size:10px; color:#9fd8ef;">🏠 펫들이 집을 지키는 중입니다 — '
+            + (m2 >= 60 ? Math.floor(m2 / 60) + '시간 ' : '') + (m2 % 60) + '분 남음. 데려갈 수도, 따라오지도 않습니다.</div>';
+    }
     if (!list.length) {
         return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
             + '데려갈 펫</div>'
@@ -184,6 +191,12 @@ function begin() {
         const nk = P().nick(id, u);
         log_('[펫 동행] ' + nk + P().josa(nk, '은') + ' 깊이 잠들어 따라오지 않았습니다.');
         try { d.log.push('[펫] ' + nk + ' — 잠들어 있어 따라오지 않았다'); } catch (e) { }
+        return;
+    }
+    if (P().stays && P().stays(u)) {               // 🏠 집 지킴이 방석 — 집을 지킨다 (pet-stay.js)
+        const nk2 = P().nick(id, u);
+        log_('[펫 동행] ' + nk2 + P().josa(nk2, '은') + ' 방석 위에서 집을 지키느라 따라오지 않았습니다.');
+        try { d.log.push('[펫] ' + nk2 + ' — 집을 지키느라 따라오지 않았다'); } catch (e) { }
         return;
     }
     d._pet = id;

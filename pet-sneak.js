@@ -538,6 +538,7 @@ function begin() {
     const d = run(), u = u_();
     if (!d || !u) return;
     if (P().asleep && P().asleep(u)) return;            // 🦋 숨결 두 번 — 펫이 모두 잠들어 있다 (따라가지 않는다)
+    if (P().stays && P().stays(u)) return;              // 🏠 집 지킴이 방석 — 집을 지킨다 (pet-stay.js)
     const ps = pets(u);
     const taken = String(d._pet || '');
     const cand = Object.keys(ps).filter(function (k) {

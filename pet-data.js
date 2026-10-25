@@ -203,6 +203,9 @@ function petMe() { return (typeof currentUser !== 'undefined') ? currentUser : n
 //   가진 펫 전부가 잔다 — 데려가기(pet-with) · 몰래 따라가기(pet-sneak) · 혼자 탐사(pet-dark) · 저지른 일(pet-act) 모두 쉰다.
 function petSleepLeft(u) { u = u || petMe(); return u ? Math.max(0, (Number(u.petSleepUntil) || 0) - Date.now()) : 0; }
 function petAsleep(u) { return petSleepLeft(u) > 0; }
+// ★ 펫이 집을 지키나 — 🏠 집 지킴이 방석 (pet-stay.js · u.petStayUntil). 깨어 있지만 어둠에는 따라오지 않는다.
+function petStayLeft(u) { u = u || petMe(); return u ? Math.max(0, (Number(u.petStayUntil) || 0) - Date.now()) : 0; }
+function petStays(u) { return petStayLeft(u) > 0; }
 
 // 서버 기준 지금 — 기기 시계를 믿지 않는다 (clock.js)
 function petNow() {
@@ -778,7 +781,8 @@ window.PET = {
     pick: petPick, img: petImg, icon: petIcon, statText: petStatText, me: petMe,
     josa: petJosa, jong: petJong,
     nick: petNick, named: petNamed, rename: petRename,
-    asleep: petAsleep, sleepLeft: petSleepLeft
+    asleep: petAsleep, sleepLeft: petSleepLeft,
+    stays: petStays, stayLeft: petStayLeft
 };
 
 // ==========================================
