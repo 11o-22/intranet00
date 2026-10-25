@@ -151,10 +151,20 @@ const DOT = {
     //   ★ 상의 칸으로 옮긴 셋(룩키마트 의상 · 가을 니트 · 체육복)은 잠옷 상의 바로 뒤 — 겉옷이 그 위에 덮인다 (2026-10-23)
     //   ★ 섹시빤츄(악세 · 2026-10-23)는 맨 앞 — 몸 바로 위 · 모든 옷 밑 (옷을 입으면 가려진다)
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
-    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit',
+    //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
+    //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
+    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit',
         'dress-yellow', 'dress-green', 'maid', 'maid-long',
-        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'glove', 'bungeo'],
+        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
+    // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
+    //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 잎(무조건 뒤) → 빗물(잎 위).
+    //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다).
+    BACK_Z: ['leaf-puddle', 'leaf-umb', 'leaf-rain'],
+    // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것이 제일 위다 (잎 우산 줄기)
+    FRONT: ['leaf-stem'],
+    // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
+    NO_TAG: ['leaf-rain', 'leaf-puddle'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -181,7 +191,9 @@ const DOT = {
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
                  'sound-lp': [0, 1, 2, 3, 4, 5],
                  // 의상 뽑기 다섯 벌 (2026-10-23) — 서기 줄이 칸마다 다르게 그려진 셋은 여섯 칸을 돈다
-                 'dress-green': [0, 1, 2, 3, 4, 5], 'maid-long': [0, 1, 2, 3, 4, 5], 'band-outfit': [0, 1, 2, 3, 4, 5] },
+                 'dress-green': [0, 1, 2, 3, 4, 5], 'maid-long': [0, 1, 2, 3, 4, 5], 'band-outfit': [0, 1, 2, 3, 4, 5],
+                 // 잎 우산 (2026-10-25) — 서 있으면 빗물이 떨어지고 웅덩이가 번진다 (잎 · 줄기는 서기 여섯 칸이 같은 그림이라 0 에 세운다)
+                 'leaf-rain': [0, 1, 2, 3, 4, 5], 'leaf-puddle': [0, 1, 2, 3, 4, 5] },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -347,7 +359,13 @@ const DOT_SLOTS = [
             // ★ 붕어빵 의상 (2026-10-25 · 의상 뽑기 C) — 몸통을 통째로 감싸는 탈. 1728x768 (칸 288) 이라
             //   칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다.
             //   서기 줄은 한 칸 — 0 에 세운다. 겹 차례는 맨 위 (D.Z 끝) — 겉옷 · 장갑까지 덮는다.
-            { i: 'bungeo', n: '붕어빵 의상', over: ['bungeo'], own: 'bungeo' }
+            { i: 'bungeo', n: '붕어빵 의상', over: ['bungeo'], own: 'bungeo' },
+            // ★ 뉴비 세트 (2026-10-25) — 뉴비 의상 · 뉴비 장화 · 뉴비 병아리 후드 · 잎 우산. **상담사가 꽂아 넣어 준 사람만** (wear-gift.js) ·
+            //   뉴비 새싹처럼 밀실 거래로 넘기지 않는다 (noTrade).
+            //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
+            //   의상 · 장화 · 후드는 걷기 줄 네 칸만 와서 5·6번째를 3·2번째로 채웠다 · 서기는 첫 칸.
+            //   뉴비 의상 — 노란 윗옷에 보라 반바지가 한 장 (겉옷 칸)
+            { i: 'newbie', n: '뉴비 의상', over: ['newbie-outfit'], own: 'newbie-outfit', noTrade: true }
             // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
@@ -364,7 +382,9 @@ const DOT_SLOTS = [
             { i: 'maker', n: '제작자 신발', over: ['maker-shoes'], own: 'maker-shoes' },
             // ★ 사운드 신발 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 (wear-gift.js) · 거래하지 않는다.
             //   받은 그림은 1728x768 (칸 288) · 칸마다 +30. 걷기 줄은 네 칸만 그려져 있어 5·6번째를 3·2번째로 채웠다. 서기는 첫 칸.
-            { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes' }   // 밀실 거래 됨 (2026-10-24)
+            { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes' },   // 밀실 거래 됨 (2026-10-24)
+            // ★ 뉴비 장화 (2026-10-25 · 뉴비 세트) — 잎 우산의 물 웅덩이는 언제나 이 밑이다 (BACK_Z)
+            { i: 'newbie', n: '뉴비 장화', over: ['newbie-boots'], own: 'newbie-boots', noTrade: true }
         ]
     },
     {
@@ -387,7 +407,10 @@ const DOT_SLOTS = [
             { i: 'maker', n: '제작자 겉옷', over: ['maker-outer-in'], top: ['maker-outer'], own: 'maker-outer' },
             // ★ 사운드 코트 (2026-10-23) — 두 장이다. 그림자(sound-coat-in)는 코트와 같이 입고 **모든 옷 뒤**(Z 맨 앞),
             //   코트(sound-coat)는 망토 자리. 서기 줄 두 칸에 자락이 흔들린다.
-            { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat' }   // 밀실 거래 됨 (2026-10-24)
+            { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat' },   // 밀실 거래 됨 (2026-10-24)
+            // ★ 뉴비 병아리 후드 (2026-10-25 · 뉴비 세트) — 두 장. 제작자 겉옷 · 늑대 잠옷과 같은 길이다.
+            //   바깥(newbie-hood)은 머리 위(top) · 그림자(newbie-hood-in)는 **무조건 머리카락 뒤**(over — 머리보다 먼저 그린다).
+            { i: 'newbie', n: '뉴비 병아리 후드', over: ['newbie-hood-in'], top: ['newbie-hood'], own: 'newbie-hood', noTrade: true }
         ]
     },
     {
@@ -468,7 +491,14 @@ const DOT_SLOTS = [
             //   달면 광장에 LP 단추가 뜬다 — 피아노 · 디스코 (lp.js). 누르는 동안만 높은음자리표 · 음표가 둘레에 뜬다 (sound-lp-fx).
             //   받은 그림은 1728x768 (칸 288) · 덩어리마다 주인 칸을 가려 +30 으로 옮겼다 (칸 밖으로 나간 조각 끝은 잘랐다).
             //   서기 줄 여섯 칸에 판이 돈다. 옷 밑(over · Z 맨 앞)에 깔고, 몸(다리 · 발) 자리는 그림에서 비워 발밑에 깔린 것처럼 보인다.
-            { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', cat: '그 밖' }   // 밀실 거래 됨 (2026-10-24)
+            { i: 'sound-lp', n: 'LP 판', over: ['sound-lp'], own: 'sound-lp', cat: '그 밖' },   // 밀실 거래 됨 (2026-10-24)
+            // ★ 잎 우산 (2026-10-25 · 뉴비 세트) — 네 장이다. 물 웅덩이 · 빗물은 **이것을 달았을 때만** 내리고 고인다 (이 칸에만 적혀 있다).
+            //     물 웅덩이(leaf-puddle)  몸 뒤 · 맨 아래 — 무조건 신발(과 발) 밑
+            //     잎(leaf-umb)            몸 뒤 — 무조건 뒤 (머리카락 · 후드에 가린다)
+            //     빗물(leaf-rain)         몸 뒤 · 잎 위 — 잎에 떨어져 끝으로 흘러내린다 (몸에는 안 떨어진다 — 우산 밑이다)
+            //     줄기(leaf-stem)         맨 앞 — 무조건 앞 (FRONT · 다른 악세보다도 위)
+            //   서기 줄 — 빗물 · 웅덩이는 여섯 칸을 돈다 (FLAP_COLS) · 잎 · 줄기는 여섯 칸이 같은 그림이라 0 에 세운다.
+            { i: 'leaf-umb', n: '잎 우산', back: ['leaf-puddle', 'leaf-umb', 'leaf-rain'], top: ['leaf-stem'], own: 'leaf-umb', noTrade: true, cat: '손' }
         ]
     }
 ];
@@ -629,7 +659,7 @@ function look(user, override, all) {
     //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
     const hd = DOT_HEADS[headIdx(head)];
     const bodySheet = hd.body || D.BODY;
-    const over = [], tops = [], rabTops = [], pick = {};
+    const over = [], tops = [], rabTops = [], backs = [], pick = {};
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -643,6 +673,7 @@ function look(user, override, all) {
                 const x = list.filter(function (y) { return y.i === id; })[0];
                 if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
                 got.push(x.i);
+                (x.back || []).forEach(function (o) { backs.push(o); });
                 (x.over || []).forEach(function (o) { over.push(o); });
                 (x.top || []).forEach(function (o) { (x.rab ? rabTops : tops).push(o); });
             });
@@ -659,6 +690,7 @@ function look(user, override, all) {
         }
         if (!it) it = list.filter(function (x) { return x.def; })[0] || list[0];
         pick[s.k] = it.i;
+        (it.back || []).forEach(function (o) { backs.push(o); });
         (it.over || []).forEach(function (o) { over.push(o); });
         (it.top || []).forEach(function (o) { tops.push(o); });
     });
@@ -673,14 +705,22 @@ function look(user, override, all) {
     //     사람 몸에 올리면 가슴 한참 아래 허공에 뜬다.
     if (hd.bare) {
         tops.length = 0;
+        backs.length = 0;                                 // 몸 뒤에 까는 것(잎 우산)도 사람 자리에 맞춰 그려져 있다
         rabTops.forEach(function (o) { tops.push(o); });
     }
+    // ★ 몸 뒤에 까는 장 — BACK_Z 차례 (아래부터) · 맨 앞에 둘 장(FRONT)은 악세 끝으로 옮긴다
+    backs.sort(function (a, b) { return D.BACK_Z.indexOf(a) - D.BACK_Z.indexOf(b); });
+    (D.FRONT || []).forEach(function (f) {
+        const i = tops.indexOf(f);
+        if (i >= 0) { tops.splice(i, 1); tops.push(f); }
+    });
     // ★ 장마다 물들인 색 — { 장이름: 0~359 }. 광장이 dot 을 통째로 주고받으므로
     //   남의 화면에서도 같은 색으로 보인다 (따로 보낼 것이 없다).
     const col = (d.col && typeof d.col === 'object') ? d.col : {};
-    return { head: head, body: bodySheet, layers: over, tops: tops, pick: pick, col: col };
+    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col };
 }
 window.dotLook = look;
+window.dotNoTag = {}; (DOT.NO_TAG || []).forEach(function (n) { window.dotNoTag[n] = 1; });
 // 내 기록도 상의 칸으로 고쳐 적는다 (지금 입은 것 · 코디 다섯 칸) — 한 번 고치면 더 할 일이 없다
 setInterval(function () {
     try {
@@ -711,11 +751,11 @@ window.dotSpec = function () { return { W: D.W, H: D.H, FOOT: D.FOOT }; };
 function wornParts(user) {
     const u = user || u_();
     const L = look(u);
-    const order = (L.layers || []).concat(L.tops || []);
+    const order = (L.backs || []).concat(L.layers || []).concat(L.tops || []);
     const seen = {}, out = [];
     DOT_SLOTS.forEach(function (s) {
         s.items.forEach(function (x) {
-            (x.over || []).concat(x.top || []).forEach(function (sh) {
+            (x.back || []).concat(x.over || []).concat(x.top || []).forEach(function (sh) {
                 if (order.indexOf(sh) < 0 || seen[sh]) return;
                 seen[sh] = 1;
                 out.push({
@@ -808,8 +848,8 @@ function sprite(user, opt) {
     box.style.width = (D.W * k) + 'px';
     box.style.height = (D.H * k) + 'px';
 
-    const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
-    const headAt = 1 + L.layers.length;                 // 머리가 몇 번째 층인가
+    const sheets = (L.backs || []).concat([L.body]).concat(L.layers).concat([L.head]).concat(L.tops || []);
+    const headAt = (L.backs || []).length + 1 + L.layers.length;   // 머리가 몇 번째 층인가 (몸 뒤에 깐 장까지 센다)
     const col = L.col || {};
     const els = sheets.map(function (s) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
@@ -922,12 +962,12 @@ function actor(user, opt) {
     box.style.width = (D.W * k) + 'px';
     box.style.height = (D.H * k) + 'px';
 
-    const sheets = [L.body].concat(L.layers).concat([L.head]).concat(L.tops || []);
+    const sheets = (L.backs || []).concat([L.body]).concat(L.layers).concat([L.head]).concat(L.tops || []);
     const col = L.col || {};
     const els = sheets.map(function (s) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
-    const head = els[1 + L.layers.length];              // 악세가 머리 뒤에 더 붙는다
+    const head = els[(L.backs || []).length + 1 + L.layers.length];   // 악세가 머리 뒤에 더 붙는다 · 몸 뒤에 깐 장이 앞에 있다
     const flaps = flapsOf(els, sheets);
 
     // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다

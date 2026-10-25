@@ -1053,7 +1053,9 @@ function tagPlace(tag, user, k, all, h) {
     let L = null;
     try { if (typeof window.dotLook === 'function') L = window.dotLook(user, null, all); } catch (e) { }
     if (!L) return;
-    const names = [L.head].concat(L.layers || [], L.tops || []).filter(Boolean);
+    // ★ 몸 뒤에 깐 장(잎 우산의 잎)도 잰다 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이는 뺀다 (closet.js NO_TAG)
+    const noTag = window.dotNoTag || {};
+    const names = [L.head].concat(L.backs || [], L.layers || [], L.tops || []).filter(function (n) { return n && !noTag[n]; });
     if (L.body && L.body !== 'none') names.push(L.body);
     let left = names.length, best = 9999;
     if (!left) return;
