@@ -156,7 +156,7 @@ function dayRoll(u) {
     if (!u || u.bflyDay === today()) return false;
     u.bflyDay = today();
     KEYS.forEach(function (k) { st(u, k).gone = 0; });
-    try { if (u === u_()) save({ bfly: 1, bflyDay: 1 }); } catch (e) { }
+    try { if (u === u_()) { save({ bfly: 1, bflyDay: 1 }); selfNote(u); } } catch (e) { }
     return true;
 }
 function lvOf(u, k) { return Math.max(1, Math.min(C.LV_MAX, Number(st(u, k).lv) || 1)); }
@@ -251,9 +251,37 @@ function cutNote(u, line) {
     if (obj) u.badge[key] = out; else u.badge = out;
     return true;
 }
+// 내 곁의 나비 — 장착자 본인에게도 뱃지 한 줄 (남에게 둔 나비처럼 눈에 보이게)
+//   「[🦋 내 곁의 나비 — 판정 · 치유 · 회피 · 파훼 · 무효 나비가 당신 곁을 맴돕니다.]」
+//   보내거나 · 거둬 오거나 · 소멸하거나 · 자정에 돌아오면 다시 적는다.
+const SELF_MARK = '[🦋 내 곁의 나비';
+function selfList(u) {
+    if (!u || !wears(u)) return [];
+    const f = (u.bfly && typeof u.bfly === 'object') ? u.bfly : {};
+    return KEYS.filter(function (k) { const s = f[k] || {}; return s.lv && !s.gone && !s.to; });
+}
+function selfLine(u) {
+    const l = selfList(u);
+    return l.length ? SELF_MARK + ' — ' + l.map(function (k) { return BY_K[k].n; }).join(' · ') + ' 나비가 당신 곁을 맴돕니다.]' : '';
+}
+function notesOf(u) {
+    if (!u || !u.badge) return '';
+    return String(typeof u.badge === 'object' ? (u.badge[badgeKey(u)] || '') : u.badge);
+}
+function selfNote(u) {
+    u = u || u_();
+    if (!u || u !== u_()) return;
+    const want = selfLine(u), raw = notesOf(u);
+    const n = raw.split(SELF_MARK).length - 1;
+    if (want ? (n === 1 && raw.indexOf(want) >= 0) : n === 0) return;
+    cutNote(u, SELF_MARK);
+    if (want) { try { if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(u, want); } catch (e) { } }
+    save({ badge: 1 });
+}
 window.bflyNoteLive = function (u, note) {
     try {
         const t = String(note || '');
+        if (t.indexOf(SELF_MARK) >= 0) return selfList(u).length > 0;
         const hit = KINDS.filter(function (x) { return t.indexOf(noteLine(x.k)) >= 0; })[0];
         if (!hit) return true;
         const on = u && u.bflyOn && u.bflyOn[hit.k];
@@ -262,7 +290,7 @@ window.bflyNoteLive = function (u, note) {
         return !!(o && st(o, hit.k).to === u.code && !st(o, hit.k).gone);
     } catch (e) { return true; }
 };
-function detach(ownerCode, k) {
+function detach(ownerCode, k, quiet) {
     const o = userOf(ownerCode);
     const s = o ? st(o, k) : {};
     if (!s.to) return;
@@ -273,6 +301,8 @@ function detach(ownerCode, k) {
     }
     onPatch(s.to, k, null);
     patch(ownerCode, k, { to: null, toName: null });
+    const me = u_();
+    if (!quiet && me && ownerCode === me.code && !st(me, k).gone) selfNote(me);   // 내 곁으로 돌아왔다
 }
 function kill(k, why) {
     const x = usable(k);
@@ -281,6 +311,7 @@ function kill(k, why) {
     detach(x.ownerCode, k);
     const me = u_();
     if (me && me.bflyOn && me.bflyOn[k] && !x.mine) delete me.bflyOn[k];
+    if (x.mine) selfNote(me);
     log_(x.owner, '[' + NAME + '] ' + nickOf(x) + ' — ' + (why || '소멸했습니다.'));
     toast('🦋 ' + nickOf(x) + (why ? ' — ' + why : ' 소멸'));
     return true;
@@ -832,12 +863,13 @@ window.bflyKGuess = function (i) {
             try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, NAME, 1); } catch (e) { }
             wake(me); dayRoll(me);
             try { if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(me, '[장착됨] ' + NAME); } catch (e) { }
+            selfNote(me);
             log_(me, '[' + NAME + '] 장착했습니다.');
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
             alert_(NAME + '\n\n육체에서 떨어져 나온 것들이 날개를 폅니다.\n'
-                + KEYS.map(function (k) { return BY_K[k].icon + ' ' + BY_K[k].n + ' 나비 Lv.' + lvOf(me, k); }).join('\n')
-                + '\n\n장착칸의 [🦋 환영 나비] 로 부릅니다.');
+                + KEYS.map(function (k) { return BY_K[k].icon + ' ' + BY_K[k].n + ' 나비 Lv.' + lvOf(me, k) + (st(me, k).gone ? ' (소멸 — 자정에 돌아온다)' : st(me, k).to ? ' (' + nameOf(st(me, k).to) + ' 사원 곁)' : ' — 내 곁 · 적용 중'); }).join('\n')
+                + '\n\n사원증 특이사항에 「🦋 내 곁의 나비」 줄로 보입니다.\n장착칸의 [🦋 환영 나비] 로 부릅니다.');
         };
         w._bfly = true;
         useInventoryItem = w; try { window.useInventoryItem = w; } catch (e) { }
@@ -857,8 +889,10 @@ function box(html) {
     shut();
     const w = document.createElement('div');
     w.className = MOD;
-    w.style.cssText = 'position:fixed; inset:0; z-index:2147483100; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.82); padding:16px;';
-    w.innerHTML = '<div style="background:linear-gradient(160deg,#16131f,#0a0910); border:1px solid #8f7ccf; border-radius:12px; padding:14px; width:100%; max-width:420px; max-height:86dvh; display:flex; flex-direction:column; box-shadow:0 8px 30px rgba(0,0,0,0.7);">' + html + '</div>';
+    // ★ 탐사 화면(9999998) 위 · 알림창(99999999) 아래 — 창을 띄운 채 알림이 떠도 가려지지 않게
+    w.style.cssText = 'position:fixed; inset:0; z-index:99999990; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.82); padding:16px; box-sizing:border-box;';
+    // 창 전체가 한 번에 내려간다 — 안쪽 칸만 50% 높이로 잘라 두면 작은 화면에서 아래 나비(무효)가 안 보였다
+    w.innerHTML = '<div style="background:linear-gradient(160deg,#16131f,#0a0910); border:1px solid #8f7ccf; border-radius:12px; padding:14px; width:100%; max-width:420px; max-height:calc(100dvh - 32px); overflow-y:auto; -webkit-overflow-scrolling:touch; box-sizing:border-box; box-shadow:0 8px 30px rgba(0,0,0,0.7);">' + html + '</div>';
     w.addEventListener('click', function (e) { if (e.target === w) shut(); });
     document.body.appendChild(w);
     return w;
@@ -880,14 +914,18 @@ window.bflyMenu = function () {
     if (!wears(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
     if (wake(me)) save({ bfly: 1 });
     dayRoll(me);
+    selfNote(me);
     const rows = KINDS.map(function (x) {
         const s = st(me, x.k), lv = lvOf(me, x.k);
-        const state = s.gone ? '<span style="color:#8a6a7a;">소멸 — 자정에 돌아온다</span>' : s.to ? '<span style="color:#8fd18f;">' + esc(nameOf(s.to)) + ' 사원 곁</span>' : '<span style="color:#9fb8c8;">『 곁에 있다 』</span>';
-        return '<button class="game-btn bf-one" data-k="' + x.k + '" style="' + BTN + (s.gone ? GREY : '') + '">'
-            + '<div><span style="color:#d8c8ff;">' + x.icon + '</span> ' + esc(s.nick || x.n + ' 나비') + ' <span style="font-size:10px; color:#a58cff;">Lv.' + lv + '</span>'
-            + (lv < C.LV_MAX ? ' <span style="font-size:9px; color:#666;">' + (Number(s.xp) || 0) + '/' + (lv * C.XP_PER) + '</span>' : ' <span style="font-size:9px; color:#d4af37;">MAX</span>') + '</div>'
-            + '<div style="font-size:9.5px; margin-top:3px;">' + state + '</div>'
-            + '<div style="font-size:9px; color:#6b6480; margin-top:2px; white-space:normal;">' + esc(x.d(lv)) + '</div>' + bar(me, x.k) + '</button>';
+        const state = s.gone ? '<span style="color:#8a6a7a;">소멸 — 자정에 돌아온다</span>'
+            : s.to ? '<span style="color:#8fd18f;">' + esc(nameOf(s.to)) + ' 사원 곁 · 적용 중</span>'
+            : '<span style="color:#9fe6b0;">『 내 곁 』 적용 중</span>';
+        return '<button class="game-btn bf-one" data-k="' + x.k + '" style="' + BTN + ' padding:9px 11px; margin-bottom:6px;' + (s.gone ? GREY : '') + '">'
+            + '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:6px;">'
+            + '<span><span style="color:#d8c8ff;">' + x.icon + '</span> ' + esc(s.nick || x.n + ' 나비') + ' <span style="font-size:10px; color:#a58cff;">Lv.' + lv + '</span>'
+            + (lv < C.LV_MAX ? ' <span style="font-size:9px; color:#666;">' + (Number(s.xp) || 0) + '/' + (lv * C.XP_PER) + '</span>' : ' <span style="font-size:9px; color:#d4af37;">MAX</span>') + '</span>'
+            + '<span style="font-size:9.5px; flex-shrink:0;">' + state + '</span></div>'
+            + '<div style="font-size:9px; color:#6b6480; margin-top:3px; white-space:normal;">' + esc(x.d(lv)) + '</div>' + bar(me, x.k) + '</button>';
     }).join('');
     const p = (typeof getMyParty === 'function') ? getMyParty() : null;
     const r = run();
@@ -895,10 +933,10 @@ window.bflyMenu = function () {
         + '⏳ 모이라이의 실타래 — 오늘 남은 유예 <b style="color:#d9c27a;">' + moiraLeft(me) + ' / ' + C.MOIRA + '</b><br>'
         + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + (r ? ' (이번 탐사 남은 ' + letheLeft(me.code) + ')' : '') + '<br>'
         + '💋 에로스의 마지막 숨결 — 오늘 남은 <b style="color:#ffb3c7;">' + (C.EROS - erosUsed(me)) + ' / ' + C.EROS + '</b>'
-        + (breathN(me) ? ' · 오늘 맞은 숨결 ' + breathN(me) : '') + '<br>'
+        + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
         + '🔗 영혼의 맹약 — ' + (p ? (myPact().length ? myPact().map(nameOf).map(esc).join(', ') : '아직 없음') : '방에 있을 때 맺는다') + '</div>';
-    const w = box(head('🦋 환영 나비', '육체와 영혼을 가른 것들. 나비를 눌러 이름을 짓거나 사원 곁에 둡니다.')
-        + '<div style="' + SCROLL + '">' + rows + info + '</div>'
+    const w = box(head('🦋 환영 나비', '육체와 영혼을 가른 것들. 나비를 눌러 내 곁이나 사원 곁에 두고, 이름을 짓습니다.')
+        + rows + info
         + '<button id="bf-pact" class="game-btn" style="' + BTN + ' text-align:center;"' + (p ? '' : ' disabled') + '>🔗 영혼의 맹약' + (p ? '' : ' — 방에 들어가 있어야 합니다') + '</button>'
         + '<button id="bf-eros" class="game-btn" style="' + BTN + ' text-align:center;">💋 에로스의 마지막 숨결</button>'
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">닫는다</button>');
@@ -912,15 +950,33 @@ function one(k) {
     const me = u_();
     const s = st(me, k), x = BY_K[k];
     if (s.gone) { alert_(x.n + ' 나비는 소멸했습니다.\n\n자정이 지나면 돌아옵니다. 레벨은 그대로입니다.'); return; }
-    const w = box(head(x.icon + ' ' + (s.nick || x.n + ' 나비') + ' · Lv.' + lvOf(me, k), esc(x.d(lvOf(me, k))) + (s.to ? '<br>지금 ' + esc(nameOf(s.to)) + ' 사원 곁에 있습니다.' : ''))
+    const where = s.to ? '지금 <b style="color:#8fd18f;">' + esc(nameOf(s.to)) + ' 사원 곁</b>에서 적용 중입니다.' : '지금 <b style="color:#9fe6b0;">당신 곁</b>에서 적용 중입니다.';
+    const w = box(head(x.icon + ' ' + (s.nick || x.n + ' 나비') + ' · Lv.' + lvOf(me, k), esc(x.d(lvOf(me, k))) + '<br>' + where)
+        + '<button id="bf-self" class="game-btn" style="' + BTN + ' text-align:center;' + (s.to ? '' : ' border-color:#5fae7a !important;') + '">🦋 내 곁에 둔다' + (s.to ? ' — 거둬 온다' : '') + '</button>'
+        + '<button id="bf-send" class="game-btn" style="' + BTN + ' text-align:center;">사원 곁에 둔다' + (s.to ? ' — 다른 사원으로' : '') + '</button>'
         + '<button id="bf-nick" class="game-btn" style="' + BTN + ' text-align:center;">이름을 짓는다</button>'
-        + (s.to ? '<button id="bf-back" class="game-btn" style="' + BTN + ' text-align:center;">거둬 온다</button>'
-                : '<button id="bf-send" class="game-btn" style="' + BTN + ' text-align:center;">사원 곁에 둔다</button>')
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#bf-x').onclick = window.bflyMenu;
     w.querySelector('#bf-nick').onclick = function () { nickAsk(k); };
-    const sb = w.querySelector('#bf-send'); if (sb) sb.onclick = function () { pickWho(k); };
-    const bb = w.querySelector('#bf-back'); if (bb) bb.onclick = function () { detach(me.code, k); save({ bfly: 1 }); one(k); };
+    w.querySelector('#bf-send').onclick = function () { pickWho(k); };
+    w.querySelector('#bf-self').onclick = function () { keepSelf(k); };
+}
+// 장착자 본인에게 — 눌러서 내 곁에 앉히고, 앉았다는 것을 알림 · 뱃지 줄로 보인다
+function keepSelf(k) {
+    const me = u_(), s = st(me, k), x = BY_K[k];
+    if (!me || !wears(me)) return;
+    if (s.gone) { alert_(x.n + ' 나비는 소멸했습니다.\n\n자정이 지나면 돌아옵니다.'); return; }
+    const nick = s.nick || x.n + ' 나비';
+    const was = s.to ? nameOf(s.to) : null;
+    if (s.to) detach(me.code, k);
+    selfNote(me);
+    if (was) log_(me, '[' + NAME + '] ' + nick + josa(nick, '이', '가') + ' ' + was + ' 사원 곁에서 돌아왔습니다.');
+    save({ bfly: 1, history: 1 });
+    shut();
+    toast('🦋 ' + nick + ' — 내 곁 · 적용 중');
+    alert_('🦋 ' + nick + josa(nick, '이', '가') + (was ? ' ' + was + ' 사원 곁에서 돌아와' : '') + ' 당신 곁에 내려앉았습니다.\n\n'
+        + '지금 적용 중 — ' + x.d(lvOf(me, k)) + '\n\n'
+        + '사원증 특이사항: ' + selfLine(me));
 }
 function nickAsk(k) {
     const me = u_(), s = st(me, k), x = BY_K[k];
@@ -942,18 +998,24 @@ function nickAsk(k) {
 }
 function pickWho(k) {
     const me = u_();
+    const cur = st(me, k).to || null;
     const list = users().filter(function (x) { return x.code !== me.code; });
     const rows = list.map(function (t) {
-        const on = t.bflyOn && t.bflyOn[k];
-        return '<button class="game-btn bf-who" data-c="' + esc(t.code) + '"' + (on ? ' disabled' : '') + ' style="' + BTN + (on ? GREY : '') + '">'
+        const here = (t.code === cur);
+        const on = !here && t.bflyOn && t.bflyOn[k];
+        return '<button class="game-btn bf-who" data-c="' + esc(t.code) + '"' + (on || here ? ' disabled' : '') + ' style="' + BTN + (on || here ? GREY : '') + '">'
             + esc(t.name) + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
-            + (on ? '<div style="font-size:9px; color:#a07070; margin-top:2px;">이미 같은 나비가 곁에 있습니다</div>' : '') + '</button>';
+            + (here ? '<div style="font-size:9px; color:#8fd18f; margin-top:2px;">지금 이 사원 곁에 있습니다</div>'
+               : on ? '<div style="font-size:9px; color:#a07070; margin-top:2px;">이미 같은 나비가 곁에 있습니다</div>' : '') + '</button>';
     }).join('');
-    const w = box(head(BY_K[k].n + ' 나비를 둘 사원', '그 사원이 죽을 자리에서 이 나비가 대신 소멸할 수 있습니다.')
-        + '<div style="' + SCROLL + '">' + rows + '</div>'
+    const selfRow = '<button class="game-btn" id="bf-me" style="' + BTN + ' border-color:#5fae7a !important;">🦋 본인 — 내 곁에 둔다'
+        + (cur ? '' : '<div style="font-size:9px; color:#9fe6b0; margin-top:2px;">지금 당신 곁에서 적용 중입니다</div>') + '</button>';
+    const w = box(head(BY_K[k].n + ' 나비를 둘 사람', '그 사람이 죽을 자리에서 이 나비가 대신 소멸할 수 있습니다.')
+        + selfRow + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#bf-x').onclick = function () { one(k); };
     Array.prototype.forEach.call(w.querySelectorAll('.bf-who'), function (b) { b.onclick = function () { sendTo(k, b.dataset.c); }; });
+    w.querySelector('#bf-me').onclick = function () { keepSelf(k); };
 }
 function sendTo(k, code) {
     const me = u_(), t = userOf(code);
@@ -961,6 +1023,9 @@ function sendTo(k, code) {
     const s = st(me, k);
     if (s.gone) { alert_('소멸한 나비는 보낼 수 없습니다.'); return; }
     const nick = s.nick || BY_K[k].n + ' 나비';
+    if (code === me.code) { keepSelf(k); return; }
+    if (s.to === code) { alert_(nick + josa(nick, '은', '는') + ' 이미 ' + t.name + ' 사원 곁에 있습니다.'); return; }
+    if (s.to) detach(me.code, k, true);                 // 다른 사원 곁에 있던 것 — 그 사원 뱃지 줄을 걷고 옮긴다
     patch(me.code, k, { to: code, toName: t.name });
     onPatch(code, k, { by: me.code, byName: me.name, nick: nick, lv: lvOf(me, k) });
     try { if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(t, noteLine(k)); } catch (e) { }
@@ -969,8 +1034,9 @@ function sendTo(k, code) {
     t.hasItemUsedOnMe = true;
     try { updateUserFields(code, { badge: t.badge, history: t.history, hasItemUsedOnMe: true }); } catch (e) { }
     save({ bfly: 1, history: 1 });
+    selfNote(me);
     shut();
-    alert_(nick + josa(nick, '이', '가') + ' ' + t.name + ' 사원 곁으로 날아갔습니다.');
+    alert_(nick + josa(nick, '이', '가') + ' ' + t.name + ' 사원 곁으로 날아갔습니다.\n\n그 사원에게 적용 중 — ' + BY_K[k].d(lvOf(me, k)));
 }
 
 window.bflyPactPick = function () {
