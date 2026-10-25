@@ -145,6 +145,11 @@ const EXPIRY = [
         try { return window.bflyNoteLive ? window.bflyNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
+    // 🎐 여우 신도 — 역병(한 시간)이 끝나거나 동행을 거둬 가면 줄도 걷는다. 재는 쪽은 foxcult.js 의 foxdNoteLive.
+    { mark: '🎐', live: function (u, note) {
+        try { return window.foxdNoteLive ? window.foxdNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
     // 🍰 식당 디저트 — 여기서 재지 않는다. 아래 sweetLines 가 먹은 번마다 한 줄씩 맞춘다 (2026-10-23)
     // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
     { mark: '⛓️‍💥', live: function (u, note) {

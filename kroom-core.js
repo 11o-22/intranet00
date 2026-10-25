@@ -1165,9 +1165,16 @@ function alone() {
 function soloHard(g) {
     // 🦋 환영 나비 — 곁에 나비가 하나라도 남아 있으면 혼자가 아니다 (butterfly.js)
     try { if (window.BFLY && window.BFLY.flyCount() > 0) return null; } catch (e) { }
+    // 🎐 여우 신도 — 홀로 어둠 탐사의 역병 · 제 二 신도 동행이면 인원수에 구애받지 않는다 (foxcult.js)
+    try { if (window.FOXCULT && window.FOXCULT.free()) return null; } catch (e) { }
     return alone() ? (SOLO_HARD[g] || null) : null;
 }
 function bfly() { return window.BFLY || null; }
+function foxc() { return window.FOXCULT || null; }
+function foxSee() { try { return !!(foxc() && foxc().sees()); } catch (e) { return false; } }
+function foxLine(t) {
+    return `<div style="font-size:11px; color:#f0c987; margin:0 0 8px 0; padding:7px 9px; border:1px solid #6a3a30; border-radius:5px; background:rgba(201,86,74,.10);">🎐 ${t}</div>`;
+}
 function hurt(lose) {
     const got = {};
     if (!lose) return got;
@@ -1589,10 +1596,12 @@ window.kroomNext = function () {
     const fs = foxSense(vis);                                 // 🐾 감각 분신 — 즉사 기믹 쪽을 가린다
     if (fs) vis = fs.vis;
     const B = bfly(), bw = !!(B && B.wears());
-    const skull = jisanOn() || bw;                            // 📖 읽어내기 · 🦋 프시케의 유리 — 즉사 기믹에 🈲
+    const fsee = foxSee();                                    // 🎐 여우 신도 — 회피 7 이상
+    const skull = jisanOn() || bw || fsee;                    // 📖 읽어내기 · 🦋 프시케의 유리 · 🎐 회피 — 즉사 기믹에 🈲
     kr._bfFav = bw ? B.fav(vis, JOBS[kr.job][0]) : -1;        // 🦋 유리한 쪽 — ◈
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : '')
-        + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : ''),
+        + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : '')
+        + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">— 🎐 여우 신도가 꼬리로 한쪽을 가린다. 🈲 가 붙은 쪽은 죽는 길이다.</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;
@@ -1712,6 +1721,15 @@ window.kroomPick = function (i) {
             if (bd) {
                 show(it.sc.t + ' — 결과', dice + gl + '<div style="font-size:11px; color:#ffb3c7; margin-bottom:8px;">— 입술에 남아 있던 숨이 한 번 더 뛰었다. ' + esc(bd) + '이 그 죽음을 비껴갔다.</div>'
                     + (o.doom.text || ''), darkChoiceBtn('계속한다.', 'kroomNext()'));
+                return;
+            }
+        }
+        // 🎐 여우 신도 — 즉사 무효 (역병 몫 · 동행 몫)
+        if (o.doom && foxc()) {
+            const fx = foxc().nodeath();
+            if (fx) {
+                addStat('mind', -6);
+                show(it.sc.t + ' — 결과', dice + gl + foxLine(fx) + (o.doom.text || ''), darkChoiceBtn('계속한다.', 'kroomNext()'));
                 return;
             }
         }
@@ -2611,6 +2629,12 @@ function lastChance(why) {
         const bl = BF.save();
         if (bl) return standUp(why, bl, '#c9b8ff');
     }
+    // 🎐 여우 신도 — 즉사 무효 · 동행하는 신도의 부활 (탐사마다 신도 하나에 한 번)
+    const FX = foxc();
+    if (FX) {
+        const fl = FX.save();
+        if (fl) return standUp(why, fl, '#f0c987');
+    }
     // 품 안의 것 — 고유 DNA · 은심장 · 눈의 「회피」 횟수
     if (typeof dnaCharge !== 'undefined' && dnaCharge && ((dnaCharge.death || 0) > 0 || (dnaCharge.eva || 0) > 0)) {
         if (dnaCharge.death > 0) dnaCharge.death--; else dnaCharge.eva--;
@@ -2772,6 +2796,7 @@ function hardDeath(why) {
     try { saveSelfFull(); } catch (e) { }
     if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
     darkRun._dead = true;
+    try { if (foxc()) foxc().died(); } catch (e) { }                                               // 🎐 역병을 옮기고 · 제 二 신도가 부른다
     try { if (typeof window.heartPayParty === 'function') window.heartPayParty(); } catch (e) { }   // 🩶 은심장
     try { if (window.eyeKroom) window.eyeKroom.dead(); } catch (e) { }                            // 🔎 감지하는 눈
     try { if (jisanOn() && typeof window.jisanOverwrite === 'function') window.jisanOverwrite(K_CODE); } catch (e) { }   // 📖 덧쓰기 (반입품을 덜어 낸 뒤에)
@@ -2835,8 +2860,18 @@ function settle(how, txt) {
                 BF.runXp();
             } catch (e) { }
         }
+        // 🎐 여우 신도 — 포인트 배수 (역병 · 제 二 신도 동행 가운데 큰 쪽 · 꿈결은 그대로)
+        const FX = foxc();
+        if (FX && pts > 0) { try { const m = FX.mult(); if (m > 1) { pts = Math.round(pts * m); extra.push('🎐 아홉여우병 — 포인트 ×' + m); } } catch (e) { } }
     }
     if (pts) { try { changePoints(pts); } catch (e) { } }
+    // 🎐 여우 신도 — 역병을 뿌린 장착자에게도 같은 몫 (포인트 · 경험치)
+    if (!helper && foxc()) {
+        try {
+            const to = foxc().share(pts, exp, '『 K 의 방 』');
+            if (to && to.length) extra.push('🎐 역병의 몫 — ' + to.map(esc).join(', ') + ' 사원에게도 같은 몫이 갑니다');
+        } catch (e) { }
+    }
     if (pts > 0 && window.eyeKroom) { try { window.eyeKroom.rec(pts); } catch (e) { } }
     // 이번 탐사 한 번짜리 버프 — 여기서 쓴 것만 걷는다 (쇼핑몰 물건이 건 것은 여기서 안 먹었으니 다음 어둠까지 남긴다)
     try { if (Array.isArray(u.itemBuffs)) u.itemBuffs = u.itemBuffs.filter(function (b) { return !b || !b.run || shopSrc(b.src); }); } catch (e) { }
@@ -2884,6 +2919,19 @@ function settle(how, txt) {
     // 🌟 제 칠 성군 — 무곡 · 문곡이 정산서에 붙는 자리 (chilseong.js · 2026-10-20)
     try { if (typeof window.kroomSettleHook === 'function') window.kroomSettleHook(how, pts, helper); } catch (e) { }
 }
+
+// 🎐 여우 신도 — 역병에 걸린 사원이 얻은 경험치가 장착자에게도 들어온다 (foxcult.js 가 부른다)
+window.kroomExpGift = function (n) {
+    const u = me();
+    n = Math.round(Number(n) || 0);
+    if (!u || n <= 0) return null;
+    const k = prof(u), lv0 = k.lv;
+    k.exp = (k.exp || 0) + n;
+    while (k.lv < lvCap(k) && k.exp >= expNeed(k, k.lv)) { k.exp -= expNeed(k, k.lv); k.lv++; }
+    if (k.lv >= lvCap(k)) k.exp = 0;
+    try { saveFields({ kroom: 1 }); } catch (e) { }
+    return { lv0: lv0, lv: k.lv };
+};
 
 window.kroomFinish = function () {
     const pid = darkRun ? darkRun.partyId : null;
