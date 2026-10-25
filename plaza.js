@@ -765,9 +765,10 @@ function stampSafe(ov) {
         '.plaza-chh{display:flex;align-items:center;gap:9px;margin-bottom:9px;flex:0 0 auto;}',
         '.plaza-chh .t{margin-left:auto;font-size:12.5px;color:#e8dcc6;}',
         // 🐾 아기 여우 — 부르기 단추 · 나와 있는 아이 · 여우 줄
-        '#plaza-kit{padding:5px 9px;border-radius:8px;font-size:14px;line-height:1;cursor:pointer;',
+        '#plaza-kit,#plaza-foxd{padding:5px 9px;border-radius:8px;font-size:14px;line-height:1;cursor:pointer;',
         '  background:rgba(255,184,112,.12);border:1px solid rgba(255,184,112,.45);}',
-        '#plaza-kit:disabled{opacity:.45;}',
+        '#plaza-foxd{background:rgba(201,86,74,.14);border-color:rgba(224,144,122,.5);}',
+        '#plaza-kit:disabled,#plaza-foxd:disabled{opacity:.45;}',
         '#plaza-kit-on{font-size:10.5px;color:#ffb870;margin:-3px 0 8px 2px;flex:0 0 auto;}',
         '#plaza-kitlist{display:flex;flex-direction:column;gap:6px;max-height:44vh;overflow-y:auto;margin-bottom:10px;}',
         '#plaza-kitlist button{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:9px;',
@@ -4093,7 +4094,7 @@ window.plazaKitPick = kitPick;
 function kitCall(pick) {
     const u = u_();
     if (!u || !run || kitBusy) return;
-    if (!kitCan()) { sysLine('부를 아기 여우가 없습니다.'); return; }
+    if (!kitCan() && !foxdList().length) { sysLine('부를 아기 여우가 없습니다.'); return; }
     if (!Array.isArray(pick) || !pick.length) { kitPick(); return; }
     kitBusy = true; kitPaint();
     const r = roomOf();
@@ -4101,6 +4102,9 @@ function kitCall(pick) {
         .then(function (j) {
             if (j && j.ok) return;
             const why = j && j.why;
+            if (pick.some(function (id) { return /_d[12]$/.test(String(id)); }) && (why === 'here' || why === 'none')) {
+                sysLine(why === 'here' ? '🎐 이미 나와 있습니다.' : '부를 여우 신도가 없습니다. (남과 동행 중인 신도는 그쪽 곁에서만 나옵니다)'); return;
+            }
             if (why === 'here') sysLine('🐾 이미 나와 있습니다.' + (j.spent && j.spent.length ? ' (오늘 다 놀고 들어간 아이: ' + j.spent.join(' · ') + ')' : ''));
             else if (why === 'spent') sysLine('🐾 오늘은 다 놀고 들어갔습니다. 내일 다시 불러 주세요.');
             else if (why === 'none') sysLine('부를 아기 여우가 없습니다. (남에게 붙여 주었거나 오늘 소멸한 아이는 나오지 않습니다)');
@@ -4145,13 +4149,79 @@ function kitFire(tries) {
 function kitPaint() {
     const b = document.getElementById('plaza-kit');
     if (b) { b.style.display = kitCan() ? '' : 'none'; b.disabled = !!kitBusy; }
+    const fb = document.getElementById('plaza-foxd');
+    if (fb) { fb.style.display = foxdList().length ? '' : 'none'; fb.disabled = !!kitBusy; }
     const k = document.getElementById('plaza-kit-on');
     if (k) {
         const ids = kitLive();
+        const babies = ids.filter(function (id) { return !FOXD_NAMES[(kitHere[id] || {}).k]; });
+        const ds = ids.filter(function (id) { return !!FOXD_NAMES[(kitHere[id] || {}).k]; });
+        const parts = [];
+        if (babies.length) parts.push('🐾 ' + babies.map(function (id) { const f = kitHere[id] || {}; return f.nick || KIT_NAMES[f.k] || '아기 여우'; }).join(' · '));
+        if (ds.length) parts.push('🎐 ' + ds.map(function (id) { const f = kitHere[id] || {}; return f.nick || FOXD_NAMES[f.k]; }).join(' · '));
         k.style.display = ids.length ? '' : 'none';
-        k.textContent = ids.length ? '🐾 ' + ids.map(function (id) { const f = kitHere[id] || {}; return f.nick || KIT_NAMES[f.k] || '아기 여우'; }).join(' · ') + ' 나와 있음 — 말은 서버 채팅으로 · 「들어가」 하면 들어감' : '';
+        k.textContent = ids.length ? parts.join(' · ') + ' 나와 있음 — 말은 서버 채팅으로 · 「들어가」 하면 들어감' : '';
     }
 }
+
+// ==========================================
+// ★ 🎐 여우 신도 — 광장에 불러낸다 (2026-10-25 · 아기 여우와 같은 길)
+// ==========================================
+//   [🎐] — 여우 신도를 찼거나 신도가 곁에 동행하는 사람에게만 보인다. 부를 수 있는 신도는 foxcult.js (FOXCULT.plazaList).
+//   서버는 kitcall · kitchat 그대로 — 열쇠가 주인사번_d1 · 주인사번_d2 인 것이 신도다.
+//   신도는 한 번 불려 나올 때마다 스무 마디 (마지막은 물러가는 인사) · 「들어가」 하면 물러간다 · 나와 있는 아기 여우와도 말을 주고받는다.
+const FOXD_NAMES = { d1: '제 一 신도', d2: '제 二 신도' };
+function foxdList() { try { return (window.FOXCULT && typeof window.FOXCULT.plazaList === 'function') ? window.FOXCULT.plazaList() : []; } catch (e) { return []; } }
+function foxdPick() {
+    const u = u_();
+    if (!u || !run || kitBusy) return;
+    const list = foxdList();
+    if (!list.length) { sysLine('부를 여우 신도가 없습니다.'); return; }
+    const sel = {};
+    const live = kitLive();
+    const rows = list.map(function (x) {
+        let why = x.off || '';
+        if (!why && live.indexOf(x.id) >= 0) why = '나와 있음';
+        return '<button type="button" data-id="' + esc(x.id) + '"' + (why ? ' disabled' : '') + '>'
+            + '<b>' + esc(x.n) + '</b>'
+            + (x.by ? '<span style="font-size:10.5px;color:#8d8578;">' + esc(x.by) + ' 사원의 신도</span>' : '')
+            + '<i>' + esc(why || '부르기') + '</i></button>';
+    }).join('');
+    const sh = sheet('kit', '🎐 여우 신도 — 누구를 부를까',
+        '<div class="plaza-kitnote">이름을 부른 신도만 나옵니다. 말은 서버 채팅으로 하고, 한 번 불려 나오면 ' + KIT_LINES + '마디까지 나눕니다.<br>'
+        + '「들어가」라고 하면 물러갑니다. 나와 있는 아기 여우와도 말을 주고받습니다.</div>'
+        + '<div id="plaza-kitlist">' + rows + '</div>'
+        + '<button id="plaza-kitgo" type="button" disabled>고른 신도가 없습니다</button>');
+    if (!sh) return;
+    const go = sh.querySelector('#plaza-kitgo');
+    const paint = function () {
+        const ids = Object.keys(sel);
+        go.disabled = !ids.length;
+        go.textContent = ids.length
+            ? ids.map(function (id) { const x = list.filter(function (r) { return r.id === id; })[0]; return x ? x.n : id; }).join(' · ') + ' 부르기'
+            : '고른 신도가 없습니다';
+    };
+    Array.prototype.forEach.call(sh.querySelectorAll('#plaza-kitlist button'), function (b) {
+        b.onclick = function (e) {
+            e.stopPropagation();
+            if (b.disabled) return;
+            const id = b.dataset.id;
+            if (sel[id]) delete sel[id]; else sel[id] = 1;
+            b.classList.toggle('sel', !!sel[id]);
+            const i = b.querySelector('i'); if (i) i.textContent = sel[id] ? '부른다 ✓' : '부르기';
+            paint();
+        };
+    });
+    go.onclick = function (e) {
+        e.stopPropagation();
+        const ids = Object.keys(sel);
+        if (!ids.length) return;
+        closeSheet();
+        chatBox();
+        kitCall(ids);
+    };
+}
+window.plazaFoxdPick = foxdPick;
 
 // ── 나에게 온 귓속말을 듣는다 (광장에 있는 내내 한 번만 건다)
 function watchWhisper() {
@@ -4369,6 +4439,7 @@ function chatBox() {
         +   '<button data-c="wh">귓속말</button>'
         + '</div>'
         + '<button id="plaza-kit" type="button" title="아기 여우 부르기" style="display:none">🐾</button>'
+        + '<button id="plaza-foxd" type="button" title="여우 신도 부르기" style="display:none">🎐</button>'
         + '<b class="t">채팅</b></div>'
         + '<div id="plaza-kit-on" style="display:none"></div>'
         + '<div id="plaza-whto" style="display:none"></div>'
@@ -4384,6 +4455,8 @@ function chatBox() {
     if (wt) wt.onclick = function (e) { e.stopPropagation(); whoPick(); };
     const kb = s.querySelector('#plaza-kit');
     if (kb) kb.onclick = function (e) { e.stopPropagation(); kitPick(); };
+    const fb = s.querySelector('#plaza-foxd');
+    if (fb) fb.onclick = function (e) { e.stopPropagation(); foxdPick(); };
     kitPaint();
     const inp = s.querySelector('#plaza-in2');
     const go = function () { say(inp.value); inp.value = ''; };

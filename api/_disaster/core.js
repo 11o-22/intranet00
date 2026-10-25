@@ -47,7 +47,7 @@
 //   disasterSrv/<판>         숨긴 설계 · 진행 메모 · 장면 요약             (서버만 쓴다)
 //   disasterUse/<날짜>       하루 호출 수 · 사원별 시작 수
 // ==========================================
-import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule, wolfRule, kitChatRule } from './lore.js';
+import { WORLD, styleOf, KINDS, DISASTERS, ROLES, SIGILS, SIGIL_RULE, FOXES, foxRule, foxChatRule, wolfRule, kitChatRule, FOXD_ITEM, DISCIPLES, foxdChatRule } from './lore.js';
 
 export const CFG = {
     DB: 'https://corp-system-6a618-default-rtdb.firebaseio.com',
@@ -74,6 +74,9 @@ export const CFG = {
     KIT_GAP_MS: 5000,        // 여우가 말하는 사이 (이보다 잦으면 건너뛴다)
     KIT_FRESH_MS: 180000,    // 이보다 오래된 사람 말에는 대답하지 않는다
     KIT_DAILY: 500,          // 하루 전체 사내 채팅 여우 호출
+    // 🎐 여우 신도 (2026-10-25) — 광장은 아기 여우와 같은 길(kitcall · kitchat) · 어둠은 foxdrun
+    FOXD_LINES: 20,          // 한 번 불려 나오거나(광장) 한 탐사(어둠)에 신도가 나누는 말 — 마지막은 인사
+    FOXD_DAILY: 600,         // 하루 전체 어둠 속 신도 호출
     TICKET: '🎫 기록 소실 티켓'
 };
 
@@ -1790,7 +1793,94 @@ function kitSaidLines(rows) {
         s.map((x) => String(x.n || '').replace(/^🐾\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : [];
 }
 const KIT_MEM_KEEP = 5;
-function kitName(f) { return clip(f.nick || (FOXES[f.k] || {}).n || f.k, 12); }
+function kitName(f) { return clip(f.nick || (FOXES[f.k] || DISCIPLES[f.k] || {}).n || f.k, 12); }
+// ==========================================
+// 🎐 여우 신도 — 이름 · 곁 · 열쇠 (2026-10-25)
+// ==========================================
+function isD(k) { return !!DISCIPLES[k]; }
+function foxdName(f) { return kitName(f); }
+function kitMark(f) { return isD(f.k) ? '🎐 ' : '🐾 '; }
+// 말이 없을 때 쓰는 말 — 신도마다 (되풀이 막기로 아직 안 한 것부터)
+const FOXD_HI = {
+    d1: ['(가면 너머로 고개를 숙인다.) 부르셨습니까.', '(조용히 곁에 선다.) 이곳에 있습니다.', '(소매를 가다듬는다.) 오늘도 잘 부탁드립니다.',
+         '(한 걸음 물러나 예를 갖춘다.) 말씀만 하십시오.', '(차분히 주위를 살핀다.) 모두 평안하신지요.', '(가볍게 목례한다.) 뵙게 되어 영광입니다.'],
+    d2: ['……. 평안하셨습니까.', '(말없이 고개를 숙인다.) …….', '……. 부르셨습니까.', '(가면 아래로 시선을 내린다.) ……. 이곳에 있습니다.',
+         '……. 도울 일이 있으면 말씀하십시오.', '(한쪽에 조용히 선다.) …….']
+};
+const FOXD_BYE = {
+    d1: ['(고개를 숙인다.) 그럼 이만 물러가겠습니다.', '(조용히 뒤로 물러선다.) 필요하시면 다시 불러 주십시오.', '(가면 너머로 목례한다.) 오늘은 여기까지 모시겠습니다.',
+         '(소매를 여민다.) 먼저 물러가겠습니다. 평안하십시오.'],
+    d2: ['……. 물러가겠습니다.', '(말없이 예를 갖추고 돌아선다.) …….', '……. 부르시면 언제든 오겠습니다.', '(고개를 숙인다.) ……. 평안하십시오.']
+};
+const FOXD_RUNBYE = {
+    d1: ['(고개를 숙인다.) 이제부터는 말없이 곁을 지키겠습니다.', '(한 걸음 뒤로 선다.) 말은 여기까지 — 끝까지 곁에 있겠습니다.', '(가면을 고쳐 쓴다.) 이 뒤로는 조용히 모시겠습니다.'],
+    d2: ['……. 이제부터는 말없이 앞을 열겠습니다.', '(고개만 끄덕인다.) …….', '……. 곁에 있겠습니다.']
+};
+// 제 二 신도 — 동행하는 사람이 쓰러지면 데리고 나온다
+const FOXD_OUT = ['(쓰러진 몸을 말없이 들쳐 안는다.) ……. 나가시지요.', '(가면 너머로 숨을 고른다.) ……. 제가 모시겠습니다. 여기서 나갑시다.',
+    '(어깨에 둘러멘다.) ……. 조금만 참으십시오. 밖으로 모십니다.', '……. (팔을 둘러 일으킨다.) 끝까지 모시겠습니다.',
+    '(망설임 없이 안아 든다.) ……. 이 앞은 제가 열겠습니다.', '(무너지는 몸을 받아 낸다.) ……. 여기서 끝나게 두지 않습니다.'];
+async function nameOfCode(db, c) {
+    const g = await Promise.all([db.get('users/' + c + '/badge/nickname').catch(() => null), db.get('users/' + c + '/name').catch(() => null)]);
+    return clip(g[0] || g[1] || c, 20);
+}
+async function loverOf(db, o) {
+    try {
+        const cp = await db.get('users/' + o + '/couple');
+        const pc = cp && typeof cp === 'object' ? cp.partner : null;
+        if (!pc || !okCode(String(pc))) return null;
+        return { c: String(pc), n: await nameOfCode(db, String(pc)) };
+    } catch (e) { return null; }
+}
+// codes 곁의 신도 — 동행으로 붙은 것 (장착자가 아직 그 사람을 가리켜야 산다) · rest 면 장착자의 쉬는 신도도
+async function foxdAt(db, codes, rest) {
+    const out = {}, cache = {};
+    const owner = async (o) => {
+        if (!cache[o]) {
+            const g = await Promise.all([db.get('users/' + o + '/equippedWeapons'), db.get('users/' + o + '/foxCult'), nameOfCode(db, o), loverOf(db, o)]);
+            cache[o] = { wear: invArr(g[0]).some((w) => baseName(w) === FOXD_ITEM), cult: (g[1] && typeof g[1] === 'object') ? g[1] : {}, n: g[2], lover: g[3] };
+        }
+        return cache[o];
+    };
+    for (const c of codes) {
+        const withs = await db.get('users/' + c + '/foxWith');
+        const cN = await nameOfCode(db, c);
+        if (withs && typeof withs === 'object') {
+            for (const d of Object.keys(withs)) {
+                const x = withs[d];
+                if (!isD(d) || !x || !x.by || !okCode(String(x.by))) continue;
+                const O = await owner(String(x.by));
+                const cu = (O.cult[d] && typeof O.cult[d] === 'object') ? O.cult[d] : {};
+                if (!O.wear || String(cu.to || '') !== c) continue;
+                out[String(x.by) + '_' + d] = { k: d, o: String(x.by), oN: O.n, on: c, onN: cN, nick: clip(cu.nick || '', 12), lover: O.lover };
+            }
+        }
+        if (rest) {
+            const O = await owner(c);
+            if (O.wear) Object.keys(DISCIPLES).forEach((d) => {
+                const cu = (O.cult[d] && typeof O.cult[d] === 'object') ? O.cult[d] : {};
+                if (cu.to && String(cu.to) !== c) return;                  // 남 곁에 동행 중
+                const id = c + '_' + d;
+                if (!out[id]) out[id] = { k: d, o: c, oN: O.n, on: c, onN: cN, nick: clip(cu.nick || '', 12), lover: O.lover };
+            });
+        }
+    }
+    return out;
+}
+function foxdKey(id, f, last) {
+    const D = DISCIPLES[f.k] || {};
+    return id + ' = ' + foxdName(f) + ' (' + (D.n || f.k) + (f.nick ? ' · 주인이 지어 준 이름 ' + f.nick : '')
+        + ' · 주인 ' + (f.oN || f.o) + ' · 주인의 애인 ' + (f.lover && f.lover.n ? f.lover.n : '없음')
+        + (f.on !== f.o ? ' · 지금 ' + (f.onN || f.on) + ' 사원과 동행 중' : ' · 주인 곁') + ')'
+        + (last && last.indexOf(id) >= 0 ? ' — ★ 이번이 마지막 한 마디 (bye)' : '');
+}
+// 아기 여우 · 신도가 같이 나와 있을 때 — 규칙을 둘 다 준다
+function kitSys(on, ids, where) {
+    const babies = ids.filter((id) => on[id] && FOXES[on[id].k]).map((id) => on[id].k);
+    const ds = ids.filter((id) => on[id] && isD(on[id].k)).map((id) => on[id].k);
+    return [babies.length ? kitChatRule(babies) : '', ds.length ? foxdChatRule(ds, where || 'plaza') : ''].filter(Boolean).join('\n\n');
+}
+function hiPool(f) { return isD(f.k) ? FOXD_HI[f.k] : KIT_HI; }
 function okSeat(s) { return typeof s === 'string' && /^[A-Za-z0-9_~-]{1,40}$/.test(s); }
 async function kitSpend(db, day) {
     const path = KIT + '/calls/' + day;
@@ -1821,7 +1911,7 @@ async function kitPost(db, rows, now) {
     const up = {};
     rows.forEach((x, i) => {
         const f = x.f;
-        up[pushId(now + i)] = { n: '🐾 ' + kitName(f), c: 'fox_' + x.id, t: x.t, at: now + i,
+        up[pushId(now + i)] = { n: kitMark(f) + kitName(f), c: 'fox_' + x.id, t: x.t, at: now + i,
                                 fox: f.k, o: f.o, oN: f.oN || '', on: f.on, onN: f.onN || '' };
     });
     if (Object.keys(up).length) await db.patch(KIT_CHAT + '/all', up);
@@ -1856,6 +1946,7 @@ function kitMemLine(f, list) {
 function kitKeys(on, ids, last, mems) {
     return ids.map((id) => {
         const f = on[id], F = FOXES[f.k] || {};
+        if (isD(f.k)) return foxdKey(id, f, last);
         return id + ' = ' + kitName(f) + ' (' + (F.a || f.k) + (f.nick && f.nick !== F.n ? ' · 본래 이름 ' + F.n : '')
             + ' · 주인 ' + (f.oN || f.o) + (f.on !== f.o ? ' · ' + (f.onN || f.on) + ' 곁에 붙어 있음' : '') + ')'
             + (last && last.indexOf(id) >= 0 ? ' — ★ 이번이 마지막 한 마디 (bye 에 작별 인사)' : '')
@@ -1874,13 +1965,19 @@ async function kitPeople(db, rows, on, now, extra) {
     const BB = await bodies(db, top, now);
     return top.map((c) => {
         const x = name[c] || {}, b = BB[c] || {};
-        const owns = Object.keys(on).filter((id) => on[id].o === c).map((id) => kitName(on[id]));
-        const near = Object.keys(on).filter((id) => on[id].on === c && on[id].o !== c).map((id) => kitName(on[id]));
+        const owns = Object.keys(on).filter((id) => on[id].o === c && !isD(on[id].k)).map((id) => kitName(on[id]));
+        const near = Object.keys(on).filter((id) => on[id].on === c && on[id].o !== c && !isD(on[id].k)).map((id) => kitName(on[id]));
+        const dOwn = Object.keys(on).filter((id) => on[id].o === c && isD(on[id].k)).map((id) => kitName(on[id]));
+        const dNear = Object.keys(on).filter((id) => on[id].on === c && on[id].o !== c && isD(on[id].k)).map((id) => kitName(on[id]));
+        const dLove = Object.keys(on).filter((id) => isD(on[id].k) && on[id].lover && on[id].lover.c === c).map((id) => kitName(on[id]));
         return '- ' + clip(x.n || c, 20)
             + ' · 성별: ' + (b.g || '알 수 없음') + (b.flip ? ' (포도맛 물약 — 지금은 몸의 성별이 뒤바뀌어 있다)' : '')
             + (b.fx && b.fx.length ? ' — 몸에 걸린 효과: ' + b.fx.join('; ') : '') + (b.child ? ' — ★ 지금 어린아이 상태' : '')
             + (owns.length ? ' — ★ 아기 여우 ' + owns.join(' · ') + '의 주인' : '')
             + (near.length ? ' — 곁에 붙은 아기 여우: ' + near.join(' · ') : '')
+            + (dOwn.length ? ' — ★ 여우 신도 ' + dOwn.join(' · ') + '의 주인' : '')
+            + (dNear.length ? ' — 곁에 동행하는 여우 신도: ' + dNear.join(' · ') : '')
+            + (dLove.length ? ' — ★ 여우 신도 ' + dLove.join(' · ') + '의 주인의 애인' : '')
             + (/네임리스/.test(String(x.n || '')) ? ' — ★ 「주인님」 또는 「네임리스 님」으로만 부른다' : '');
     }).join('\n');
 }
@@ -1901,7 +1998,7 @@ async function kitRows(db, seat) {
     return out.sort((a, z) => a.at - z.at);
 }
 function kitTalk(rows) {
-    return rows.slice(-30).map((x) => (x.fox ? '(아기 여우) ' + String(x.n || '').replace(/^🐾\s*/, '') : (x.map ? '(맵) ' : '') + (x.n || x.c))
+    return rows.slice(-30).map((x) => (x.fox ? (isD(x.fox) ? '(여우 신도) ' : '(아기 여우) ') + String(x.n || '').replace(/^(🐾|🎐)\s*/, '') : (x.map ? '(맵) ' : '') + (x.n || x.c))
         + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
 }
 
@@ -1928,18 +2025,21 @@ async function kitCall(b, deps, db) {
             want[String(x.by) + '_' + k] = { k: k, o: String(x.by), oN: clip(x.byName || '', 20), on: c, onN: nm, nick: clip(x.nick || '', 12) };
         });
     }
+    // 🎐 여우 신도 — 내 곁의 신도 (장착자의 쉬는 신도 · 내 곁에 동행하는 신도)
+    const wantD = (Array.isArray(b.pick) && b.pick.some((x) => /_d[12]$/.test(String(x || '')))) ? await foxdAt(db, [c], true) : {};
+    Object.keys(wantD).forEach((id) => { want[id] = wantD[id]; });
     // ★ 이름을 부른 아이만
     if (Array.isArray(b.pick) && b.pick.length) {
         const pick = b.pick.slice(0, 16).map((x) => String(x || ''));
         Object.keys(want).forEach((id) => { if (pick.indexOf(id) < 0) delete want[id]; });
-    }
+    } else Object.keys(want).forEach((id) => { if (isD(want[id].k)) delete want[id]; });   // 옛 화면 — 신도는 이름을 불러야 나온다
     if (!Object.keys(want).length) return { ok: false, why: 'none' };
     const on = (await db.get(KIT + '/on')) || {};
     const used = (await db.get(KIT + '/used/' + day)) || {};
     const here = [], spent = [], come = [];
     Object.keys(want).forEach((id) => {
         if (on[id] && on[id].day === day) { here.push(kitName(want[id])); return; }
-        if ((Number(used[id]) || 0) >= CFG.KIT_LINES - 1) { spent.push(kitName(want[id])); return; }   // 인사하고 바로 작별할 몫도 없다
+        if (!isD(want[id].k) && (Number(used[id]) || 0) >= CFG.KIT_LINES - 1) { spent.push(kitName(want[id])); return; }   // 인사하고 바로 작별할 몫도 없다
         come.push(id);
     });
     if (!come.length) return { ok: false, why: here.length ? 'here' : 'spent', here: here, spent: spent };
@@ -1949,53 +2049,69 @@ async function kitCall(b, deps, db) {
     const near = (Array.isArray(b.here) ? b.here : []).slice(0, 12)
         .filter((x) => x && okCode(String(x.c || '')) && String(x.c) !== c && String(x.c).indexOf('fox_') !== 0)
         .map((x) => ({ c: String(x.c), n: clip(String(x.n || x.c), 20) }));
-    // 나와 있는 자리 — 지난날 것은 걷는다
+    // 나와 있는 자리 — 지난날 것은 걷는다 · 신도는 불려 나올 때마다 스무 마디 (n — 인사가 첫 마디)
     const upOn = {};
     Object.keys(on).forEach((id) => { if (!on[id] || on[id].day !== day) upOn[id] = null; });
-    come.forEach((id) => { upOn[id] = Object.assign({}, want[id], { by: c, at: now, day: day, room: room || null }); });
+    come.forEach((id) => { upOn[id] = Object.assign({}, want[id], { by: c, at: now, day: day, room: room || null }, isD(want[id].k) ? { n: 1 } : {}); });
+    // 이미 나와 있는 아이 · 신도 — 새로 나온 쪽을 한 줄로 반길 수 있다 (상호작용)
+    const others = Object.keys(on).filter((id) => on[id] && on[id].day === day && come.indexOf(id) < 0 && (FOXES[on[id].k] || isD(on[id].k))
+        && (isD(on[id].k) ? CFG.FOXD_LINES - (Number(on[id].n) || 0) : CFG.KIT_LINES - (Number(used[id]) || 0)) >= 2).slice(0, 6);
     await db.patch(KIT + '/on', upOn);
     const on2 = Object.assign({}, on); Object.keys(upOn).forEach((id) => { if (upOn[id]) on2[id] = upOn[id]; else delete on2[id]; });
-    // 인사 — 나온 아이마다 한 마디 (함께 있는 사람에게도)
+    const kindTxt = [come.some((id) => !isD(want[id].k)) ? '아기 여우' : '', come.some((id) => isD(want[id].k)) ? '여우 신도' : ''].filter(Boolean).join(' · ');
+    // 인사 — 나온 아이 · 신도마다 한 마디 (함께 있는 사람에게도)
     let lines = [], seen = [];
     try {
         const rows = await kitRows(db, b.seat);
         seen = kitSaid(rows).map((x) => x.t);
-        const mems = await kitMems(db, come);
+        const mems = await kitMems(db, come.filter((id) => !isD(want[id].k)));
         const res = await ask(deps, Object.assign({
             model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
-            system: kitChatRule(come.map((id) => want[id].k)),
+            system: kitSys(on2, come.concat(others)),
             user: [
-                '[방금 일] ' + nm + ' 사원이 ' + (room ? '「' + room + '」에서 ' : '') + '아기 여우를 불렀다. 아래 아이들이 지금 막 광장에 나왔다 — 한 아이가 한 줄씩, 성격대로 짧게 인사한다 (lines).',
+                '[방금 일] ' + nm + ' 사원이 ' + (room ? '「' + room + '」에서 ' : '') + kindTxt + '을(를) 불렀다. 아래 열쇠의 ' + kindTxt + '이(가) 지금 막 광장에 나왔다 — 하나가 한 줄씩, 성격대로 짧게 인사한다 (lines).',
+                '(여우 신도는 부름을 받아 나올 때 주인 · 부른 사람에게 짧게 예를 갖춘다 — 과묵한 신도라도 이때는 한 마디 한다.)',
                 near.length
-                    ? '[지금 그 장소에 함께 있는 사람] ' + near.map((x) => x.n).join(' · ') + ' — 부른 ' + nm + ' 사원뿐 아니라 이 사람들에게도 인사한다 (이름을 불러서 · 아이마다 다르게).'
+                    ? '[지금 그 장소에 함께 있는 사람] ' + near.map((x) => x.n).join(' · ') + ' — 부른 ' + nm + ' 사원뿐 아니라 이 사람들에게도 인사한다 (이름을 불러서 · 하나하나 다르게).'
                     : '[지금 그 장소에 함께 있는 사람] 없음 — 부른 사람에게 인사한다.',
                 '',
                 '[광장의 사원 — 사람 목록]', await kitPeople(db, rows, on2, now, [{ c: c, n: nm }].concat(near)), '',
-                '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(on2, come, null, mems), '',
+                '[열쇠 — 방금 나온 쪽 · fox 에 이것을 쓴다]', kitKeys(on2, come, null, mems), '',
+                ...(others.length ? ['[이미 나와 있는 아기 여우 · 여우 신도 — 새로 나온 쪽을 알아보고 한 줄로 반기거나 말을 걸어도 된다 (안 해도 된다 · 하나에 한 줄)]', kitKeys(on2, others, null, null), ''] : []),
                 ...kitSaidLines(rows),
                 '[최근 채팅 — 마지막 줄이 방금 한 말 · (맵) 은 그 장소의 맵 채팅]', kitTalk(rows) || '(아직 없음)'
             ].join('\n')
         }, HAIKU_OPT));
         lines = (res && Array.isArray(res.lines)) ? res.lines : [];
     } catch (e) { lines = []; }
-    const post = [], add = {};
+    const post = [], add = {}, addD = {};
     come.forEach((id) => {
         const x = lines.find((l) => l && l.fox === id);
         let t = kitClean(x && x.t);
-        if (!t || repeats(t, seen)) t = freshOf(KIT_HI, seen);
+        if (!t || repeats(t, seen)) t = freshOf(hiPool(want[id]), seen);
         seen.push(t);
         post.push({ id: id, f: upOn[id], t: t });
-        add[id] = 1;
+        if (!isD(want[id].k)) add[id] = 1;
+    });
+    // 반기는 말 — 이미 나와 있던 쪽 (되풀이면 버린다 · 둘까지)
+    lines.filter((l) => l && others.indexOf(l.fox) >= 0).slice(0, 2).forEach((x) => {
+        if (post.some((y) => y.id === x.fox)) return;
+        const t = kitClean(x.t);
+        if (!t || repeats(t, seen)) return;
+        seen.push(t);
+        post.push({ id: x.fox, f: on2[x.fox], t: t });
+        if (isD(on2[x.fox].k)) addD[x.fox] = (Number(on2[x.fox].n) || 0) + 1; else add[x.fox] = 1;
     });
     await kitPost(db, post, deps.now());
-    await kitAddUsed(db, day, add);
+    if (Object.keys(add).length) await kitAddUsed(db, day, add);
+    if (Object.keys(addD).length) { const up = {}; Object.keys(addD).forEach((id) => { up[id + '/n'] = addD[id]; }); await db.patch(KIT + '/on', up); }
     return { ok: true, came: come.map((id) => kitName(want[id])), here: here, spent: spent };
 }
 
 async function kitChat(b, deps, db) {
     const now = deps.now(), day = kstDay(now);
     const onAll = (await db.get(KIT + '/on')) || {};
-    const ids = Object.keys(onAll).filter((id) => onAll[id] && onAll[id].day === day && FOXES[onAll[id].k]);
+    const ids = Object.keys(onAll).filter((id) => onAll[id] && onAll[id].day === day && (FOXES[onAll[id].k] || isD(onAll[id].k)));
     if (!ids.length) return { ok: false, why: 'nofox' };
     const rows = await kitRows(db, b.seat);
     const humans = rows.filter((x) => !x.fox && String(x.c || '').indexOf('fox_') !== 0);
@@ -2016,7 +2132,7 @@ async function kitChat(b, deps, db) {
     if (!took) return { ok: false, why: 'busy' };
     const used = (await db.get(KIT + '/used/' + day)) || {};
     const left = {};
-    ids.forEach((id) => { left[id] = CFG.KIT_LINES - (Number(used[id]) || 0); });
+    ids.forEach((id) => { left[id] = isD(onAll[id].k) ? CFG.FOXD_LINES - (Number(onAll[id].n) || 0) : CFG.KIT_LINES - (Number(used[id]) || 0); });
     const gone0 = ids.filter((id) => left[id] <= 0);                 // 다 쓴 아이 — 조용히 걷는다
     const last = ids.filter((id) => left[id] === 1);                 // 이번이 마지막 — 작별 인사
     const talk = ids.filter((id) => left[id] >= 2);
@@ -2027,13 +2143,13 @@ async function kitChat(b, deps, db) {
     let res = null;
     if (live.length) {
         try {
-            const mems = await kitMems(db, live);
+            const mems = await kitMems(db, live.filter((id) => !isD(onAll[id].k)));
             res = await ask(deps, Object.assign({
                 model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
-                system: kitChatRule(live.map((id) => onAll[id].k)),
+                system: kitSys(onAll, live),
                 user: [
                     '[광장의 사원 — 사람 목록]', await kitPeople(db, rows, onAll, now), '',
-                    '[아기 여우 열쇠 — fox 에 이것을 쓴다]', kitKeys(onAll, live, last, mems), '',
+                    '[열쇠 — 지금 나와 있는 아기 여우 · 여우 신도 · fox 에 이것을 쓴다]', kitKeys(onAll, live, last, mems), '',
                     ...kitSaidLines(rows),
                     '[최근 채팅 — 마지막 줄이 방금 한 말 · (맵) 은 그 장소의 맵 채팅]', kitTalk(rows), '',
                     '[아직 대답하지 않은 말 — 지난 대답 뒤에 나온 ' + fresh.length + '줄 · 한데 모아 이번 한 번에 대답한다]',
@@ -2048,14 +2164,16 @@ async function kitChat(b, deps, db) {
         id = String(id || '');
         if (talk.indexOf(id) >= 0 && goes.indexOf(id) < 0) goes.push(id);
     });
-    const post = [], add = {}, said = {};
+    const post = [], add = {}, addD = {}, said = {};
     const seen = kitSaid(rows).map((x) => x.t);                   // ★ 같은 말 되풀이 막기
+    const cap = CFG.FOX_MAX_LINES + Math.min(2, live.filter((id) => isD(onAll[id].k)).length);
+    const bump = (id) => { if (isD(onAll[id].k)) addD[id] = (Number(onAll[id].n) || 0) + 1; else add[id] = 1; };
     ((res && res.lines) || []).forEach((x) => {
-        if (post.length >= CFG.FOX_MAX_LINES || !x || talk.indexOf(x.fox) < 0 || goes.indexOf(x.fox) >= 0 || said[x.fox]) return;
+        if (post.length >= cap || !x || talk.indexOf(x.fox) < 0 || goes.indexOf(x.fox) >= 0 || said[x.fox]) return;
         const t = kitClean(x.t);
         if (!t || repeats(t, seen)) return;                        // 앞서 한 말과 같으면 이번엔 쉰다
         seen.push(t);
-        said[x.fox] = 1; add[x.fox] = 1;
+        said[x.fox] = 1; bump(x.fox);
         post.push({ id: x.fox, f: onAll[x.fox], t: t });
     });
     const byeOf = (id, pool) => {
@@ -2066,19 +2184,201 @@ async function kitChat(b, deps, db) {
         return t;
     };
     goes.forEach((id) => {
-        post.push({ id: id, f: onAll[id], t: byeOf(id, KIT_GOS) });
-        add[id] = 1;
+        post.push({ id: id, f: onAll[id], t: byeOf(id, isD(onAll[id].k) ? FOXD_BYE[onAll[id].k] : KIT_GOS) });
+        bump(id);
     });
     last.forEach((id) => {
-        post.push({ id: id, f: onAll[id], t: byeOf(id, KIT_BYES) });
-        add[id] = 1;
+        post.push({ id: id, f: onAll[id], t: byeOf(id, isD(onAll[id].k) ? FOXD_BYE[onAll[id].k] : KIT_BYES) });
+        bump(id);
     });
     const n = await kitPost(db, post, deps.now());
     if (Object.keys(add).length) await kitAddUsed(db, day, add);
     const off = {};
-    last.concat(gone0, goes).forEach((id) => { off[id] = null; });
+    Object.keys(addD).forEach((id) => { off[id + '/n'] = addD[id]; });
+    last.concat(gone0, goes).forEach((id) => { off[id] = null; delete off[id + '/n']; });
     if (Object.keys(off).length) await db.patch(KIT + '/on', off);
     return { ok: true, lines: n, left: last.map((id) => kitName(onAll[id])), went: goes.map((id) => kitName(onAll[id])), heard: fresh.length };
+}
+
+// ==========================================
+// 🎐 여우 신도 — 어둠 탐사의 채팅 (2026-10-25)
+// ==========================================
+//   foxdrun — 화면(foxcult.js)이 부른다. run = 파티 방(darkParties) 열쇠 · 혼자면 'fs…' (그 탐사의 채팅 자리 darkChats/<run>)
+//     greet  탐사가 시작되면 동행하는 사람 곁의 신도가 한 마디씩 인사한다 (한 탐사에 한 번)
+//     ev:dead 동행하는 사람이 쓰러졌다 — 제 一 신도는 아무 말 없이 사라지고, 제 二 신도는 데리고 나온다 (한 마디)
+//     (기본) 사람이 말하면 화면이 조용해질 때(4초 · 길어야 12초) 부른다 — 지난 대답 뒤의 말을 모아 한 번에.
+//   한 탐사에 신도 하나가 스무 마디 — 마지막은 「이제 말없이 곁을 지키겠다」.
+//   foxdRun/<run> = { used:{ id:n }, gone:{ id:1 }, hi:{ id:1 }, lock:{ at, hat } }
+//   darkChats/<run>/<열쇠> = { code:'foxd_<id>', name:'🎐 이름', text, at, foxd:'d1' }
+const FOXD_RUN = 'foxdRun';
+async function foxdSpend(db, day) {
+    const path = 'foxdUse/' + day;
+    for (let i = 0; i < 5; i++) {
+        const { val, tag } = await db.getTag(path);
+        const c = Number(val) || 0;
+        if (c >= CFG.FOXD_DAILY) return false;
+        const st = await db.putIf(path, c + 1, tag);
+        if (st === 200) return true;
+        if (st !== 412) return false;
+    }
+    return false;
+}
+async function foxdRows(db, run) {
+    const v = (await db.last('darkChats/' + run, 40)) || {};
+    return Object.keys(v).map((k) => v[k]).filter((x) => x && typeof x.text === 'string')
+        .map((x) => ({ c: String(x.code || ''), n: x.name || '', t: x.text, at: Number(x.at) || 0, foxd: x.foxd || null, sys: x.code === 'SYSTEM' }))
+        .sort((a, z) => a.at - z.at);
+}
+function foxdTalk(rows) {
+    return rows.slice(-30).map((x) => (x.sys ? '(알림)' : x.foxd ? '(여우 신도) ' + String(x.n || '').replace(/^🎐\s*/, '') : (x.n || x.c))
+        + ': ' + clip(x.t, 200).replace(/\s+/g, ' ').trim()).join('\n');
+}
+function foxdSaid(rows) { return rows.filter((x) => x.foxd).slice(-24); }
+async function foxdPost(db, run, rows, now) {
+    const up = {};
+    rows.forEach((x, i) => { up[pushId(now + i)] = { code: 'foxd_' + x.id, name: '🎐 ' + foxdName(x.f), text: x.t, at: now + i, foxd: x.f.k }; });
+    if (Object.keys(up).length) await db.patch('darkChats/' + run, up);
+    return Object.keys(up).length;
+}
+async function foxdRun(b, deps, db) {
+    const now = deps.now(), day = kstDay(now), run = b.run, c = b.code;
+    const mem = await db.get('darkParties/' + run + '/members');
+    const party = !!(mem && typeof mem === 'object');
+    if (!party && String(run).indexOf('fs') !== 0) return { ok: false, why: 'norun' };
+    const codes = party ? Object.keys(mem).filter((x) => okCode(x)) : [c];
+    if (codes.indexOf(c) < 0) return { ok: false, why: 'notin' };
+    const D = await foxdAt(db, codes, false);
+    const ids = Object.keys(D);
+    if (!ids.length) return { ok: false, why: 'nofoxd' };
+    const st = (await db.get(FOXD_RUN + '/' + run)) || {};
+    const used = (st.used && typeof st.used === 'object') ? st.used : {};
+    const gone = (st.gone && typeof st.gone === 'object') ? st.gone : {};
+    const hi = (st.hi && typeof st.hi === 'object') ? st.hi : {};
+    const rows = await foxdRows(db, run);
+    const seen = foxdSaid(rows).map((x) => x.t);
+    const zone = clip(String(b.zone || ''), 40), scene = clip(String(b.scene || '').replace(/\s+/g, ' ').trim(), 400);
+    const names = {};
+    for (const m of codes) names[m] = (party && mem[m] && mem[m].name) ? clip(String(mem[m].name), 20) : await nameOfCode(db, m);
+    const people = codes.map((m) => {
+        const tags = [];
+        ids.forEach((id) => {
+            const f = D[id];
+            if (f.o === m) tags.push(foxdName(f) + '의 주인');
+            if (f.on === m && f.o !== m) tags.push(foxdName(f) + '이(가) 동행 중');
+            if (f.lover && f.lover.c === m) tags.push(foxdName(f) + '의 주인의 애인');
+        });
+        return '- ' + names[m] + (tags.length ? ' — ★ ' + tags.join(' · ') : '');
+    }).join('\n');
+    const saidLines = seen.length ? ['[신도가 이 탐사에서 최근에 한 말 — 같거나 비슷한 말을 다시 쓰지 않는다]', foxdSaid(rows).map((x) => String(x.n || '').replace(/^🎐\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : [];
+    const head = ['[어둠] ' + (zone || '이름 모를 곳') + (party ? ' — 파티 탐사' : ' — 혼자 들어온 탐사 (채팅에는 동행하는 사원과 신도뿐)'),
+        '[지금 장면 — 화면에 보이는 글 (그대로 믿되, 여기 없는 일은 지어내지 않는다)]', scene || '(없음)', '',
+        '[이 탐사의 사람]', people, ''];
+    // ── 쓰러졌다 — 제 一 신도는 말없이 사라지고 · 제 二 신도는 데리고 나온다
+    if (b.ev === 'dead') {
+        const mine = ids.filter((id) => D[id].on === c && !gone[id]);
+        const post = [], up = {};
+        mine.forEach((id) => {
+            up['gone/' + id] = 1;
+            if (D[id].k === 'd2') { const t = freshOf(FOXD_OUT, seen); seen.push(t); post.push({ id: id, f: D[id], t: t }); }
+        });
+        if (Object.keys(up).length) await db.patch(FOXD_RUN + '/' + run, up);
+        const n = await foxdPost(db, run, post, now);
+        return { ok: true, lines: n, out: post.length > 0, gone: mine.length };
+    }
+    // ── 첫 인사
+    if (b.greet) {
+        const mine = ids.filter((id) => D[id].on === c && !hi[id] && !gone[id]);
+        if (!mine.length) return { ok: false, why: 'greeted' };
+        const up = {};
+        mine.forEach((id) => { up['hi/' + id] = 1; up['used/' + id] = (Number(used[id]) || 0) + 1; });
+        await db.patch(FOXD_RUN + '/' + run, up);
+        let lines = [];
+        if (await foxdSpend(db, day)) {
+            try {
+                const res = await ask(deps, Object.assign({
+                    model: CFG.HAIKU, max: 700, schema: SCHEMA_KIT,
+                    system: foxdChatRule(mine.map((id) => D[id].k), 'run'),
+                    user: head.concat([
+                        '[방금 일] 탐사가 막 시작됐다. 아래 신도가 동행하는 사람에게 처음으로 한 마디씩 인사한다 (lines · 신도마다 한 줄).',
+                        '  동행하는 사람이 주인이면 주인에게, 아니면 그 사람에게 이름을 불러 인사한다 (제 一 신도는 말투 예의 결대로 — 예를 들어 처음 보는 사원이면 이름을 확인하고 동행하게 되어 영광이라는 뜻을 새 말로).',
+                        '',
+                        '[신도 열쇠 — fox 에 이것을 쓴다]', mine.map((id) => foxdKey(id, D[id], null)).join('\n'), '',
+                        ...saidLines,
+                        '[최근 채팅]', foxdTalk(rows) || '(아직 없음)'
+                    ]).join('\n')
+                }, HAIKU_OPT));
+                lines = (res && Array.isArray(res.lines)) ? res.lines : [];
+            } catch (e) { lines = []; }
+        }
+        const post = [];
+        mine.forEach((id) => {
+            const x = lines.find((l) => l && l.fox === id);
+            let t = kitClean(x && x.t);
+            if (!t || repeats(t, seen)) t = freshOf(FOXD_HI[D[id].k], seen);
+            seen.push(t);
+            post.push({ id: id, f: D[id], t: t });
+        });
+        const n = await foxdPost(db, run, post, deps.now());
+        return { ok: true, lines: n };
+    }
+    // ── 대화 — 지난 대답 뒤의 사람 말을 모아 한 번에
+    const humans = rows.filter((x) => !x.sys && !x.foxd && x.c.indexOf('foxd_') !== 0);
+    if (!humans.length) return { ok: false, why: 'quiet' };
+    const hat = Number(humans[humans.length - 1].at) || 0;
+    if (now - hat > CFG.KIT_FRESH_MS) return { ok: false, why: 'stale' };
+    let took = false, prevHat = 0;
+    for (let i = 0; i < 4 && !took; i++) {
+        const { val, tag } = await db.getTag(FOXD_RUN + '/' + run + '/lock');
+        const v = (val && typeof val === 'object') ? val : {};
+        if (now - (Number(v.at) || 0) < CFG.KIT_GAP_MS) return { ok: false, why: 'busy' };
+        if ((Number(v.hat) || 0) >= hat) return { ok: false, why: 'answered' };
+        const s2 = await db.putIf(FOXD_RUN + '/' + run + '/lock', { at: now, hat: hat }, tag);
+        if (s2 === 200) { took = true; prevHat = Number(v.hat) || 0; }
+        else if (s2 !== 412) return { ok: false, why: 'lock' };
+    }
+    if (!took) return { ok: false, why: 'busy' };
+    const left = {};
+    ids.forEach((id) => { left[id] = gone[id] ? 0 : CFG.FOXD_LINES - (Number(used[id]) || 0); });
+    const last = ids.filter((id) => left[id] === 1);
+    const talk = ids.filter((id) => left[id] >= 2);
+    const live = talk.concat(last);
+    if (!live.length) return { ok: false, why: 'spent' };
+    if (!(await foxdSpend(db, day))) return { ok: false, why: 'daily' };
+    const fresh = humans.filter((x) => (Number(x.at) || 0) > prevHat).slice(-20);
+    let res = null;
+    try {
+        res = await ask(deps, Object.assign({
+            model: CFG.HAIKU, max: 800, schema: SCHEMA_KIT,
+            system: foxdChatRule(live.map((id) => D[id].k), 'run'),
+            user: head.concat([
+                '[신도 열쇠 — fox 에 이것을 쓴다]', live.map((id) => foxdKey(id, D[id], last)).join('\n'), '',
+                ...saidLines,
+                '[최근 채팅 — 마지막 줄이 방금 한 말]', foxdTalk(rows), '',
+                '[아직 대답하지 않은 말 — 지난 대답 뒤에 나온 ' + fresh.length + '줄 · 한데 모아 이번 한 번에 대답한다]',
+                foxdTalk(fresh) || '(없음)'
+            ]).join('\n')
+        }, HAIKU_OPT));
+    } catch (e) { res = null; }
+    const post = [], up = {}, said = {};
+    ((res && res.lines) || []).forEach((x) => {
+        if (post.length >= 3 || !x || talk.indexOf(x.fox) < 0 || said[x.fox]) return;
+        const t = kitClean(x.t);
+        if (!t || repeats(t, seen)) return;
+        seen.push(t); said[x.fox] = 1;
+        up['used/' + x.fox] = (Number(used[x.fox]) || 0) + 1;
+        post.push({ id: x.fox, f: D[x.fox], t: t });
+    });
+    last.forEach((id) => {
+        const x = ((res && res.bye) || []).find((l) => l && l.fox === id);
+        let t = kitClean(x && x.t);
+        if (!t || repeats(t, seen)) t = freshOf(FOXD_RUNBYE[D[id].k], seen);
+        seen.push(t);
+        up['used/' + id] = (Number(used[id]) || 0) + 1;
+        post.push({ id: id, f: D[id], t: t });
+    });
+    if (Object.keys(up).length) await db.patch(FOXD_RUN + '/' + run, up);
+    const n = await foxdPost(db, run, post, deps.now());
+    return { ok: true, lines: n, heard: fresh.length };
 }
 
 // 재난이 끝났다 — 판에 있던 아기 여우마다 기억을 적는다 (최근 다섯만 남긴다)
@@ -2117,6 +2417,7 @@ export async function handle(body, deps) {
         else if (b.act === 'fox') out = await foxChat(b, deps, db);
         else if (b.act === 'kitcall') out = await kitCall(b, deps, db);
         else if (b.act === 'kitchat') out = await kitChat(b, deps, db);
+        else if (b.act === 'foxdrun') out = await foxdRun(b, deps, db);
         else throw new Fail(400, '모르는 요청입니다.');
         return { status: 200, json: out };
     } catch (e) {

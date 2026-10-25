@@ -84,7 +84,7 @@ const PL = [
 ];
 const PL_BY = {}; PL.forEach(function (x) { PL_BY[x.k] = x; });
 // 동행 능력치 — 0 은 안 준다
-const WITH_KEYS = { d1: ['judge', 'luck', 'gim', 'evade', 'nodeath'], d2: ['rescue', 'pts', 'luckx'] };
+const WITH_KEYS = { d1: ['judge', 'luck', 'gim', 'evade', 'nodeath'], d2: ['pts', 'luckx'] };   // 제 二 신도는 쓰러진 동행자를 늘 데리고 나온다 (2026-10-25)
 const DEATH_KEYS = ['judge', 'luck', 'gim', 'evade', 'nodeath'];         // 죽으면 옮겨 가는 것
 
 // ==========================================
@@ -368,10 +368,10 @@ function passOn(where) {
 // ==========================================
 // 동행 — 보낸다 · 거둬 온다
 // ==========================================
-function withLine(o, d, s) {
+// 특이사항 — 제 一 신도는 무엇을 지녔는지 적지 않는다 (2026-10-25 · 사용자가 정한 글귀)
+function withLine(o, d) {
     if (d === 'd2') return '🎐 ' + dName(o, d) + '가 동행합니다. 어디든지 갈 수 있습니다.';
-    const parts = WITH_KEYS.d1.filter(function (k) { return Number(s[k]) > 0; }).map(function (k) { return PL_BY[k].n + ' ' + s[k]; });
-    return '🎐 ' + dName(o, d) + '가 동행합니다.' + (parts.length ? ' - ' + parts.join(' · ') : '');
+    return '🎐 ' + dName(o, d) + '가 함께합니다. 힘이 깃듭니다.';
 }
 function recall(d, quiet) {
     const me = u_();
@@ -401,7 +401,7 @@ function sendWith(d, code, s) {
     const ss = {};
     WITH_KEYS[d].forEach(function (k) { ss[k] = Number(s[k]) || 0; });
     c.s = ss; c.to = code; c.toName = t.name || '';
-    const line = withLine(me, d, ss);
+    const line = withLine(me, d);
     const old = obj(t.foxWith) && obj(t.foxWith[d]);
     if (old && old.line) cutNote(t, old.line);
     if (!obj(t.foxWith)) t.foxWith = {};
@@ -492,7 +492,7 @@ let outPending = false;
 function callOutSoon() {
     const me = u_();
     const w = withOf(me, 'd2');
-    if (!w || !(Number(w.s.rescue) > 0)) return;
+    if (!w) return;                                   // 제 二 신도 — 동행하는 사람이 쓰러지면 늘 데리고 나온다
     setTimeout(function () {
         const m = u_();
         if (!m || !inQ(m)) return;
@@ -512,6 +512,7 @@ function died() {
     if (x) x.diedDone = true;
     try { const to = passOn(); if (to) toast('🎐 제 一 신도가 역병을 ' + to + ' 사원에게 옮겼다'); } catch (e) { console.warn('[여우 신도] 옮기기', e); }
     try { callOutSoon(); } catch (e) { }
+    try { talkDead(); } catch (e) { }
 }
 
 // 포인트 배수 — 역병 · 동행 가운데 큰 쪽
@@ -623,6 +624,16 @@ function sweep() {
             delete me.foxWith[d]; ch = true;
         });
     }
+    // 동행 줄이 옛 글귀(능력치를 적던 것)거나 이름이 바뀌었으면 새 글귀로 갈아 끼운다
+    DS.forEach(function (d) {
+        const w = withOf(me, d);
+        if (!w) return;
+        const want = withLine(w.owner, d);
+        if (w.line === want) return;
+        if (w.line) cutNote(me, w.line);
+        me.foxWith[d].line = want;
+        ch = true;
+    });
     // 살아 있는데 줄이 빠졌으면 다시 적는다
     const have = notesOf(me).split(/\s*\|\s*/).map(function (x) { return x.trim(); });
     plLive(me).forEach(function (k) { const l = plOf(me, k).line; if (l && have.indexOf(l) < 0) { addNote(me, l); ch = true; } });
@@ -658,6 +669,7 @@ window.FOXCULT = {
     died: died,
     mult: mult,
     share: share,
+    plazaList: function () { return plazaList(); },
     PL: PL, C: C
 };
 
@@ -1313,18 +1325,12 @@ function withTune(d, code) {
     const sl = {};
     let rows = '';
     WITH_KEYS[d].forEach(function (k) {
-        if (k === 'rescue') {
-            rows += '<label style="display:flex; gap:9px; align-items:center; padding:9px 10px; border:1px solid #3a2420; border-radius:7px; margin-bottom:8px;">'
-                + '<input type="checkbox" id="fd-rs"' + (prev.rescue ? ' checked' : '') + ' style="width:17px; height:17px;">'
-                + '<div style="font-size:11.5px; color:#e8d7b4;">구출 <span style="font-size:9.5px; color:#a08a70;">— 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 불러낸다</span></div></label>';
-            return;
-        }
         const P = PL_BY[k];
         sl[k] = slider('fd-s-' + k, P.vals, Number(prev[k]) || 0, '', true);
         rows += '<div style="margin-bottom:9px;"><div style="font-size:11px; color:#e8d7b4; margin-bottom:2px;">' + esc(P.n)
             + ' <span style="font-size:9px; color:#8a7560;">' + esc(withDesc(k)) + '</span></div>' + sl[k].html + '</div>';
     });
-    const w = box(head('🦊 ' + dName(me, d) + ' → ' + (code === me.code ? '본인' : t.name + ' 사원'), (d === 'd2' ? '어디든지 갈 수 있습니다 (인원수 · 구역이 차 있어도). ' : '') + '0 은 안 줍니다. 쓰러지면 탐사마다 한 번 되살립니다.')
+    const w = box(head('🦊 ' + dName(me, d) + ' → ' + (code === me.code ? '본인' : t.name + ' 사원'), (d === 'd2' ? '어디든지 갈 수 있습니다 (인원수 · 구역이 차 있어도). 그래도 쓰러지면 상담실 · 선녀탕에 두지 않고 데리고 나옵니다. ' : '') + '0 은 안 줍니다. 쓰러지면 탐사마다 한 번 되살립니다.')
         + rows
         + '<button id="fd-ok" class="game-btn" style="' + MID + RED + '">' + (c.to === code ? '능력치를 바꾼다' : '동행시킨다') + '</button>'
         + '<button id="fd-x" class="game-btn" style="' + MID + GREY + '">돌아간다</button>');
@@ -1333,17 +1339,172 @@ function withTune(d, code) {
     on(w, '#fd-ok', function () {
         const s = {};
         Object.keys(get).forEach(function (k) { s[k] = get[k](); });
-        if (d === 'd2') { const cb = w.querySelector('#fd-rs'); s.rescue = (cb && cb.checked) ? 1 : 0; }
         const line = sendWith(d, code, s);
         shut();
         if (line) alert_('🎐 ' + dName(me, d) + '가 ' + (code === me.code ? '당신' : t.name + ' 사원') + '과 동행합니다.\n\n' + line.replace(/^🎐 /, '')
-            + (d === 'd2' && s.rescue ? '\n구출 — 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 불러냅니다.' : '') + '\n\n동행하는 동안 이 신도의 역병은 뿌리지 못합니다.' + (code === me.code ? '' : '\n그 사원이 탐사에서 얻는 포인트 · 경험치가 당신에게도 똑같이 들어옵니다.'));
+            + (d === 'd2' ? '\n쓰러지면 상담실 · 선녀탕에 두지 않고 데리고 나옵니다.' : '') + '\n\n동행하는 동안 이 신도의 역병은 뿌리지 못합니다.' + (code === me.code ? '' : '\n그 사원이 탐사에서 얻는 포인트 · 경험치가 당신에게도 똑같이 들어옵니다.'));
     });
     on(w, '#fd-x', function () { c.to ? withMenu(d) : withWho(d); });
 }
 function withDesc(k) {
     return { judge: '굴림 +', luck: '눈이 9 이하면 뒤집는다 · 탐사당 수치만큼', gim: '기믹 파훼 +', evade: '회피 + · 7 이상이면 피할 길을 알려 준다',
              nodeath: '즉사할 때 들쳐 메고 나온다 · 탐사당', pts: '정산 포인트', luckx: '회수품 · 공용시설 행운' }[k] || '';
+}
+
+// ==========================================
+// 🎐 신도와 이야기 — 어둠 탐사의 채팅 · 광장 (서버 /api/disaster)
+// ==========================================
+//   어둠  파티면 그 파티 채팅에, 혼자면 이 탐사의 채팅 칸(「신도와 이야기」 · darkChats/fs…)에 신도가 말한다.
+//         탐사가 시작되면 한 마디씩 인사 · 사람이 말하면 조용해질 때(4초 · 길어야 12초) 모아서 한 번에 대답.
+//         한 탐사에 신도 하나가 스무 마디. 동행하는 사람이 쓰러지면 제 一 신도는 말없이 사라지고 제 二 신도는 데리고 나온다.
+//   광장  plaza.js 의 [🎐] — 아기 여우와 같은 길(kitcall · kitchat). 불려 나올 때마다 스무 마디 · 「들어가」 하면 물러간다.
+const TALK_QUIET = 4000, TALK_CAP = 12000;
+function api(body) {
+    return fetch('/api/disaster', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); });
+}
+function partyId() { try { return (typeof myPartyId !== 'undefined' && myPartyId) ? myPartyId : null; } catch (e) { return null; } }
+function runKey() {
+    const r = run(); if (!r) return null;
+    if (r.partyId) return r.partyId;
+    if (!r._foxdKey) r._foxdKey = 'fs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return r._foxdKey;
+}
+function mineHere() { const me = u_(); return DS.some(function (d) { return !!withOf(me, d); }); }
+function soloTalk() { const r = run(); return !!(r && !r.isParty && !r.partyId && !partyId() && mineHere()); }
+function discHere() {
+    const r = run(); if (!r || !u_()) return false;
+    const pid = r.partyId;
+    if (pid && typeof darkParties !== 'undefined' && darkParties[pid]) {
+        return Object.keys(darkParties[pid].members || {}).some(function (c) { const u = userOf(c); return u && DS.some(function (d) { return !!withOf(u, d); }); });
+    }
+    return mineHere();
+}
+function sceneTxt() { try { const b = darkBodyEl(); return b ? String(b.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 400) : ''; } catch (e) { return ''; } }
+function zoneTxt() { const r = run(); try { const z = DARK_ZONES[r.zone]; return z ? ((z.code || r.zone) + ' ' + (z.name || '')).trim() : String(r.zone || ''); } catch (e) { return ''; } }
+let tPend = 0, tTimer = 0;
+function poke() { if (!discHere()) return; if (!tPend) tPend = now(); arm(); }
+function arm() {
+    if (!tPend) return;
+    if (tTimer) clearTimeout(tTimer);
+    tTimer = setTimeout(function () { fire(0); }, Math.max(300, Math.min(TALK_QUIET, tPend + TALK_CAP - now())));
+}
+function fire(tries) {
+    tTimer = 0;
+    const me = u_(), key = runKey();
+    if (!me || !key) { tPend = 0; return; }
+    api({ act: 'foxdrun', run: key, code: me.code, zone: zoneTxt(), scene: sceneTxt() }).then(function (j) {
+        if (j && j.why === 'busy' && tries < 3 && tPend) { tTimer = setTimeout(function () { fire(tries + 1); }, 2500); return; }
+        tPend = 0;
+    }).catch(function () { tPend = 0; });
+}
+// 쓰러졌다 — 서버에 알린다 (제 一 신도는 말없이 사라지고 · 제 二 신도는 데리고 나오는 한 마디)
+function talkDead() {
+    try {
+        const me = u_(), key = runKey();
+        if (!me || !key || !mineHere()) return;
+        api({ act: 'foxdrun', run: key, code: me.code, ev: 'dead', zone: zoneTxt() }).catch(function () { });
+    } catch (e) { }
+}
+// 혼자 가는 탐사 — 채팅 칸을 「신도와 이야기」로 연다 (파티 채팅과 같은 모양 · 자리는 darkChats/fs…)
+function mountSolo() {
+    const slot = document.getElementById('dro-chat');
+    if (!slot || typeof buildChatHtml !== 'function') return;
+    const key = runKey();
+    const ck = 'foxd|' + key;
+    if (slot.dataset.chatKey === ck && slot.querySelector('[id="pchat-log"]')) { try { renderChatLog(); } catch (e) { } return; }
+    const prev = slot.querySelector('[id="pchat-input"]');
+    const keep = prev ? prev.value : '';
+    slot.innerHTML = buildChatHtml('normal');
+    slot.dataset.chatKey = ck;
+    try { attachChatListener(key); } catch (e) { }
+    try { renderChatLog(); } catch (e) { }
+    const nw = slot.querySelector('[id="pchat-input"]');
+    if (nw && keep) nw.value = keep;
+}
+hook('mountDarkChat', function (_m) {
+    return function () {
+        try { if (soloTalk()) { mountSolo(); return; } } catch (e) { }
+        return _m.apply(this, arguments);
+    };
+});
+hook('renderChatHead', function (_h) {
+    return function () {
+        const out = _h.apply(this, arguments);
+        try {
+            if (soloTalk()) {
+                const el = document.getElementById('pchat-head-label');
+                if (el && el.innerHTML.indexOf('파티 채팅') >= 0) el.innerHTML = el.innerHTML.replace('파티 채팅', '🎐 신도와 이야기');
+            }
+        } catch (e) { }
+        return out;
+    };
+});
+// ★ chat-fix.js 가 방 번호가 없으면 말을 버리고 돌아선다 — 그 겉을 감싸야 혼자 가는 탐사의 말이 나간다 (그쪽이 걸린 뒤에 건다)
+(function hookSend() {
+    const t0 = Date.now();
+    const iv = setInterval(function () {
+        const f = window.sendPartyChat;
+        if (typeof f !== 'function') return;
+        if (f._foxd) { clearInterval(iv); return; }
+        if (!f._loud && Date.now() - t0 < 8000) return;
+        const _s = f;
+        const w = (function () {
+            return function (text, isSystem) {
+                try {
+                    const me = u_(), d = db_();
+                    if (soloTalk() && me && d) {
+                        const msg = String(text || '').trim();
+                        if (!msg || msg.length > 200) return;
+                        d.ref('darkChats/' + runKey()).push({ code: isSystem ? 'SYSTEM' : me.code, name: isSystem ? '' : (me.name || ''), text: msg, at: Date.now() });
+                        if (!isSystem) poke();
+                        return;
+                    }
+                } catch (e) { }
+                const out = _s.apply(this, arguments);
+                try { if (!isSystem && discHere()) poke(); } catch (e) { }
+                return out;
+            };
+        })();
+        Object.keys(_s).forEach(function (k) { if (!(k in w)) { try { w[k] = _s[k]; } catch (e) { } } });
+        w._foxd = true;
+        window.sendPartyChat = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// 탐사가 시작되면 — 내 곁의 신도가 인사한다 (한 탐사에 한 번)
+setInterval(function () {
+    try {
+        const r = run(), me = u_();
+        if (!r || !me || r._foxdHi || r._dead || !r.zone) return;
+        if (!mineHere()) return;
+        r._foxdHi = 1;
+        setTimeout(function () {
+            if (run() !== r) return;
+            const key = runKey();
+            try { if (soloTalk() && typeof mountDarkChat === 'function') mountDarkChat('normal'); } catch (e) { }
+            api({ act: 'foxdrun', run: key, code: me.code, greet: 1, zone: zoneTxt(), scene: sceneTxt() }).catch(function () { });
+        }, 2500);
+    } catch (e) { }
+}, 1500);
+
+// 광장 — 내가 부를 수 있는 신도 (plaza.js 의 [🎐] 가 읽는다) · { id, k, n, by, off }
+function plazaList() {
+    const me = u_(), out = [];
+    if (!me) return out;
+    if (wears(me)) DS.forEach(function (d) {
+        const c = cult(me)[d];
+        const row = { id: me.code + '_' + d, k: d, n: dName(me, d) };
+        if (c.to && c.to !== me.code) row.off = nameOf(c.to) + ' 사원과 동행 중';
+        out.push(row);
+    });
+    DS.forEach(function (d) {
+        const w = withOf(me, d);
+        if (!w || w.by === me.code) return;
+        out.push({ id: w.by + '_' + d, k: d, n: dName(w.owner, d), by: w.owner.name || nameOf(w.by) });
+    });
+    return out;
 }
 
 // ==========================================
