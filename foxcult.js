@@ -166,6 +166,16 @@ function spreaders(u) {
     DS.forEach(function (d) { const w = withOf(u, d); if (w && w.by !== u.code) out[w.by] = w.owner.name || nameOf(w.by); });
     return out;
 }
+// 몫을 받아 가는 신도 — 역병을 뿌린 신도 · 동행하는 신도 (자기 자신 것은 뺀다)
+function spreadDs(u) {
+    const out = {};
+    plLive(u).forEach(function (k) { const p = plOf(u, k); if (p.by && p.by !== u.code && (p.d === 'd1' || p.d === 'd2')) out[p.d] = 1; });
+    DS.forEach(function (d) { const w = withOf(u, d); if (w && w.by !== u.code) out[d] = 1; });
+    return out;
+}
+// 정산서 — 몫을 받아 가며 신도가 하는 말
+const QUOTE = { d1: '🎐 여우 신도의 몫 - "감사히 잘 받았습니다."', d2: '🎐 여우 신도의 몫 - "정당한 대가를 받습니다."' };
+function quoteLines(ds) { return DS.filter(function (d) { return ds && ds[d]; }).map(function (d) { return QUOTE[d]; }); }
 
 function valTxt(k, v, e) {
     const P = PL_BY[k];
@@ -419,7 +429,8 @@ function retune(d, s) {
 // ==========================================
 function rs() {
     const r = run(); if (!r) return null;
-    if (!r._foxd) r._foxd = { nd: 0, flip: 0, rev: {}, by: {} };
+    if (!r._foxd) r._foxd = { nd: 0, flip: 0, rev: {}, by: {}, ds: {} };
+    if (!r._foxd.ds) r._foxd.ds = {};
     return r._foxd;
 }
 // 이번 탐사 동안 내게 역병을 뿌린 장착자 — 정산 때 끝났어도 몫은 간다
@@ -428,6 +439,8 @@ function noteSpreaders() {
     if (!me || !x) return;
     const s = spreaders(me);
     Object.keys(s).forEach(function (c) { x.by[c] = s[c]; });
+    const ds = spreadDs(me);
+    Object.keys(ds).forEach(function (d) { x.ds[d] = 1; });
 }
 setInterval(function () { try { noteSpreaders(); } catch (e) { } }, 5000);
 
@@ -510,6 +523,7 @@ function share(pts, exp, where) {
     const by = Object.assign({}, (x && x.by) || {}, spreaders(me));
     delete by[me.code];
     const who = Object.keys(by);
+    const ds = Object.assign({}, (x && x.ds) || {}, spreadDs(me));
     pts = Math.round(Number(pts) || 0); exp = Math.round(Number(exp) || 0);
     if (!who.length || (pts <= 0 && exp <= 0) || !d) return [];
     who.forEach(function (code) {
@@ -521,7 +535,7 @@ function share(pts, exp, where) {
     log_(me, '[' + NAME + '] 여우 신도의 몫 — ' + who.map(function (c) { return by[c]; }).join(', ') + ' 사원에게도 같은 몫이 갔습니다'
         + ' (' + [pts > 0 ? pts.toLocaleString() + ' P' : '', exp > 0 ? '경험치 ' + exp : ''].filter(Boolean).join(' · ') + ')');
     save({ history: 1 });
-    return who.map(function (c) { return by[c]; });
+    return quoteLines(ds);                 // 정산서에 적을 줄
 }
 
 // 장착자 쪽 — K의 방 경험치 몫을 받는다 (자리에 없었으면 들어올 때)
@@ -852,40 +866,56 @@ function settleWrap(where, _r, self, args, dead) {
     const m = mult();
     const x = rs();
     const keep = x ? Object.assign({}, x.by) : {};
+    const keepDs = x ? Object.assign({}, x.ds) : {};
     const before = Number(me.points) || 0;
     const out = _r.apply(self, args);
     try {
         const got = (Number(me.points) || 0) - before;
         if (got <= 0) return out;
         let extra = 0;
+        const lines = [];
         if (m > 1) {
             extra = Math.round(got * (m - 1));
             try { if (typeof changePoints === 'function') changePoints(extra); else me.points += extra; } catch (e) { me.points += extra; }
             log_(me, '[' + NAME + '] 포인트 배수 ×' + m + ' (+' + extra.toLocaleString() + ' P)');
             save({ history: 1 });
+            lines.push('🎐 아홉여우병 — 포인트 ×' + m + ' (+' + extra.toLocaleString() + ' P)');
         }
         // darkRun 이 비었어도 몫은 간다 — 베껴 둔 장착자 몫으로
         const by = Object.assign({}, keep, spreaders(me));
         delete by[me.code];
         const total = got + extra;
-        let to = [];
         if (Object.keys(by).length) {
             const d = db_();
             if (d) Object.keys(by).forEach(function (code) {
                 try { d.ref('payouts/' + code).push({ amount: total, note: '[' + NAME + '] ' + (me.name || '') + ' 사원의 탐사 몫 (' + where + ') +' + total.toLocaleString() + ' P', at: now() }); } catch (e) { }
             });
-            to = Object.keys(by).map(function (c) { return by[c]; });
-            log_(me, '[' + NAME + '] 여우 신도의 몫 — ' + to.join(', ') + ' 사원에게도 ' + total.toLocaleString() + ' P 가 갔습니다.');
+            log_(me, '[' + NAME + '] 여우 신도의 몫 — ' + Object.keys(by).map(function (c) { return by[c]; }).join(', ') + ' 사원에게도 ' + total.toLocaleString() + ' P 가 갔습니다.');
             save({ history: 1 });
+            quoteLines(Object.assign({}, keepDs, spreadDs(me))).forEach(function (l) { lines.push(l); });
         }
-        if (extra || to.length) {
-            setTimeout(function () {
-                alert_('🎐 ' + NAME + '\n\n' + (extra ? '포인트 배수 ×' + m + ' (+' + extra.toLocaleString() + ' P)\n' : '')
-                    + (to.length ? '여우 신도의 몫 — ' + to.join(', ') + ' 사원에게도 같은 ' + total.toLocaleString() + ' P 가 갑니다.' : ''));
-            }, 1400);
-        }
+        if (lines.length) receipt(lines);
     } catch (e) { console.warn('[여우 신도] 정산', e); }
     return out;
+}
+// 정산서에 줄을 단다 — 어둠 「[탐사 정산서]」 · EPIC · 피날레 「[정산]」 (못 찾으면 알림으로)
+function receipt(lines) {
+    const html = '<div class="foxd-receipt" style="margin-top:8px; padding-top:8px; border-top:1px dashed #6a3a30; color:#f0c987; font-size:11px; line-height:1.8;">'
+        + lines.map(esc).join('<br>') + '</div>';
+    const put = function () {
+        const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+        if (!body) return false;
+        if (body.querySelector('.foxd-receipt')) return true;
+        const head = Array.prototype.filter.call(body.querySelectorAll('div'), function (el) {
+            const t = (el.textContent || '').trim();
+            return (t === '[탐사 정산서]' || t === '[정산]') && el.children.length === 0;
+        })[0];
+        if (!head || !head.parentElement) return false;
+        head.parentElement.insertAdjacentHTML('beforeend', html);
+        return true;
+    };
+    if (put()) return;
+    setTimeout(function () { if (!put()) alert_(lines.join('\n')); }, 300);
 }
 hook('renderDarkResult', function (_r) {
     return function () {
@@ -989,6 +1019,8 @@ hook('renderDarkness', function (_d) {
 // ==========================================
 // 물품 등록 · 장착 · 장터에서 빼기
 // ==========================================
+// 황룡의 눈 · 산군의 도움이 빼앗지 못한다 (newitems2.js 가 이 표를 본다) · 복사기 NO_COPY 에도 들어 있다
+window.NO_STEAL_GEAR = (window.NO_STEAL_GEAR || []).concat([NAME]);
 (function reg() {
     const iv = setInterval(function () {
         if (typeof ITEM_CATALOG === 'undefined') return;

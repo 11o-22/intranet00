@@ -2868,8 +2868,8 @@ function settle(how, txt) {
     // 🎐 여우 신도 — 역병을 뿌린 장착자에게도 같은 몫 (포인트 · 경험치)
     if (!helper && foxc()) {
         try {
-            const to = foxc().share(pts, exp, '『 K 의 방 』');
-            if (to && to.length) extra.push('🎐 여우 신도의 몫 — ' + to.map(esc).join(', ') + ' 사원에게도 같은 몫이 갑니다');
+            const ls = foxc().share(pts, exp, '『 K 의 방 』');          // 「🎐 여우 신도의 몫 - "…"」 줄
+            if (ls && ls.length) ls.forEach(function (l) { extra.push(esc(l)); });
         } catch (e) { }
     }
     if (pts > 0 && window.eyeKroom) { try { window.eyeKroom.rec(pts); } catch (e) { } }

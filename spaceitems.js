@@ -303,7 +303,8 @@ function realOf(name) {
 
 // 베낄 수 있는 것 — 우주 쇼핑몰에 깔리는 것 중에서 고른다
 const NO_COPY = ['복사기', '우리가 도움', '여우구슬', '금고', '사직서', '랜덤박스', '🫙 소원권', '소원권',
-                 '황룡의 눈', '산군의 도움', '도깨비 불'];       // 도깨비 불 — 못 베낀다 (2026-10-24)
+                 '황룡의 눈', '산군의 도움', '도깨비 불',     // 도깨비 불 — 못 베낀다 (2026-10-24)
+                 '🎐 여우 신도 - 아홉여우병'];                     // 🎐 여우 신도 — 베끼지도 빼앗지도 못한다 (2026-10-25)
 function copyables() {
     if (typeof ALIEN_ITEMS_POOL === 'undefined') return [];
     return ALIEN_ITEMS_POOL.filter(function (n) {

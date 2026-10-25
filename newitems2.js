@@ -1153,7 +1153,11 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         const bag = ibClean(target).filter(function (b) {
             return !/빼앗김/.test(String(b.src || '')) && b.v > 0 && !window.ibCopied(b);   // 가져와서 생긴 것은 못 가져간다
         });
-        const gear = (target.equippedWeapons || []).slice();
+        // ★ 빼앗지 못하는 장비 — 🎐 여우 신도 (foxcult.js 가 window.NO_STEAL_GEAR 에 적는다 · 2026-10-25)
+        const gear = (target.equippedWeapons || []).filter(function (w) {
+            const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+            return (window.NO_STEAL_GEAR || []).indexOf(b) < 0;
+        });
         const g0 = (typeof dnaGiftOf === 'function') ? (dnaGiftOf(target) || {}) : {};
         const e = g0.e || {};
         const tmp = ibSum(target);                 // 임시로 얹힌 몫 (음수 상쇄 포함)
