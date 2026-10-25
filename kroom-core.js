@@ -316,6 +316,7 @@ function wipe(k) {
     k.peek = null; k.rerolled = false; k.seen = {};
     k.jx = {}; k.hq = {}; k.hiddenAsk = null;
     k.alt = null; k.open = null; k.cur = null;            // 열린 속성들 (2026-10-25)
+    k.reFor = null;                                       // 메인 속성이 바뀌어 고르는 중이던 속성
     k.reset = K_RESET;
 }
 function prof(u) {
@@ -656,6 +657,92 @@ window.kroomAttrPick = function (a) {
     gateGo();
 };
 
+// ==========================================
+// ★ 메인 속성이 바뀌었다 (2026-10-25)
+// ==========================================
+//   전용 장비의 첫 번째 속성을 「속성 바꾸기」로 갈았으면, 다음에 들어설 때 묻는다 —
+//   지금 직업을 새 속성의 직업으로 바꾸겠는가. 바꾸면 새 속성의 카드 다섯 장에서 고르고,
+//   고른 직업이 **기존 직업 자리에 그대로 들어선다** (Lv · 경험치 · 등급 · 각성은 그대로).
+//   옛 속성의 자리는 새 속성으로 이름만 바뀐다 — 따로 남지 않는다.
+//   거절하면 옛 직업으로 들어가고, 다음에 또 묻는다.
+//
+//   ■ 옛 속성 — 열린 속성 가운데 장비에서 사라진 것 (여럿이면 먼저 연 것 = 그때의 첫 속성)
+//   ■ 히든 직업에서 바꾸면 — 등급 L 은 S 로 · Lv 은 100 까지 · 경험치는 그 Lv 통 안으로
+//   ■ 다시 고를 기회 — 바꾸는 카드 고르기에 한 번 새로 준다 (넘긴 카드 · 다시 고른 것은 다시 들어와도 그대로)
+function mainSwap(k, u) {
+    const m = mainAttr(u);
+    if (!m || !k) return null;
+    const open = openList(k, u);
+    if (open.indexOf(m) >= 0) return null;                // 새 첫 속성의 자리가 이미 있다
+    const held = heldAttrs(u);
+    const gone = open.filter(function (a) { return held.indexOf(a) < 0; });
+    if (!gone.length) return null;
+    const ord = Array.isArray(k.open) ? k.open : [];
+    const at = function (a) { const i = ord.indexOf(a); return i < 0 ? 99 : i; };
+    gone.sort(function (a, b) { return at(a) - at(b); });
+    const from = gone[0];
+    const p = profOf(k, u, from) || {};
+    return { from: from, to: m, job: (p.job && JOBS[p.job]) ? p.job : null, lv: p.lv || 1, grade: p.grade || 'D' };
+}
+// 옛 속성 자리를 새 속성 이름으로 옮긴다 (열린 순서 그대로)
+function moveAttr(k, u, from, to) {
+    const open = [];
+    openList(k, u).forEach(function (a) { const b = (a === from) ? to : a; if (open.indexOf(b) < 0) open.push(b); });
+    if (curAttr(k, u) === from) k.cur = to;
+    else if (k.alt && k.alt[from]) { k.alt[to] = k.alt[from]; delete k.alt[from]; }
+    k.open = open;
+}
+let mainCont = null;
+function mainGate(cont) {
+    const u = me(), k = prof(u);
+    const sw = mainSwap(k, u);
+    if (!sw) { cont(); return; }
+    if (!sw.job) {                                          // 아직 직업이 없던 자리 — 묻지 않고 옮긴다
+        moveAttr(k, u, sw.from, sw.to);
+        saveProf();
+        cont();
+        return;
+    }
+    mainCont = cont;
+    const F = ATTR[sw.from], T = ATTR[sw.to];
+    show('배역', `탁자 위 카드의 뒷면 무늬가 지난번과 다르다.<br><br>
+        전용 장비의 첫 번째 결이 바뀌었다. <b style="color:#fff;">${F.i} ${F.n}</b> → <b style="color:#fff;">${T.i} ${T.n}</b><br>
+        지금 손에 든 것은 아직 <b style="color:#fff;">${esc(jobName(sw.job, sw.grade))}</b> ${sw.grade} · Lv ${sw.lv} 이다.<br><br>
+        새 직업을 얻겠는가.<br>
+        <span style="font-size:11px; color:#8fb8c4; line-height:1.8;">얻으면 ${T.i} ${T.n}의 카드 다섯 장에서 하나를 골라, 지금 직업이 그 직업으로 바뀝니다.<br>
+        <b>Lv · 경험치 · 등급 · 각성은 그대로</b>입니다.${isHiddenJob(sw.job) ? ' (히든 직업은 등급 L → S · Lv 100 까지)' : ''}<br>
+        얻지 않으면 지금 직업으로 들어가고, 다음에 들어설 때 또 묻습니다.</span>`,
+        darkChoiceBtn('새 직업을 얻는다. — ' + T.i + ' ' + T.n + ' 카드를 고른다', 'kroomMainYes()')
+        + darkChoiceBtn('지금 직업 그대로 들어간다. — ' + esc(jobName(sw.job, sw.grade)), 'kroomMainNo()'));
+}
+window.kroomMainYes = function () {
+    const u = me(), k = prof(u);
+    if (!mainCont || !kr) return;
+    const sw = mainSwap(k, u);
+    mainCont = null;
+    if (!sw) { afterMain(); return; }
+    if (curAttr(k, u) !== sw.from) switchAttr(u, sw.from);    // 옛 속성 자리를 펼쳐 둔다
+    if (k.reFor !== sw.to) { k.reFor = sw.to; k.rerolled = false; k.peek = null; saveProf(); }
+    if (k.peek && !(JOBS[k.peek] && JOBS[k.peek][0] === sw.to)) { k.peek = null; saveProf(); }
+    kr.reAttr = sw.to;
+    kr.deck = null;
+    cardPick();
+};
+window.kroomMainNo = function () {
+    if (!mainCont) return;
+    const f = mainCont; mainCont = null;
+    f();
+};
+// 바꾸지 않고 넘어가는 길 — 문(속성) → 히든 카드 → 직업
+function afterMain() {
+    const u = me();
+    const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
+    attrGate(function () {
+        if (hiddenOffered()) { hiddenPopup(goOn); return; }
+        goOn();
+    });
+}
+
 function jobName(key, grade) {
     const j = JOBS[key]; if (!j) return '?';
     return j[2][Math.min(j[2].length - 1, gi(grade))];
@@ -963,12 +1050,9 @@ function start(isParty, pid) {
     openDarkOverlay();
     const el = document.getElementById('dro-code'); if (el) el.innerText = K_CODE;
     teamUp();
-    const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
+    // ★ 메인 속성이 바뀌었으면 새 직업을 얻을지 먼저 묻는다 (mainGate · 2026-10-25)
     // ★ 속성 문 (2026-10-25) — 새 속성을 열지 · 어느 속성으로 들어갈지 먼저 정하고, 그다음 히든 카드 · 직업
-    attrGate(function () {
-        if (hiddenOffered()) { hiddenPopup(goOn); return; }
-        goOn();
-    });
+    mainGate(afterMain);
 }
 
 // 팀 자리 — 네 팀 세는 데 쓴다
@@ -1138,7 +1222,9 @@ function roll(kind) {
 // ==========================================
 function cardPick() {
     const u = me(), k = prof(u);
-    const a = curAttr(k, u);                                // 열린 속성이 여럿이면 지금 고른 속성 (2026-10-25)
+    const re = !!(kr.reAttr && ATTR[kr.reAttr] && k.job && JOBS[k.job]);   // ★ 메인 속성이 바뀌어 직업을 갈아 끼우는 중
+    const a = re ? kr.reAttr : curAttr(k, u);               // 열린 속성이 여럿이면 지금 고른 속성 (2026-10-25)
+    const reG = GRADES.includes(k.grade) ? k.grade : 'S';   // 갈아 끼우면 그대로 가져가는 등급 (히든의 L 은 S)
     if (!a) { show('—', '새겨진 것이 없는 자에게는 방이 열리지 않는다.', darkChoiceBtn('돌아간다.', 'kroomFinish()')); return; }
     if (!kr.deck) {
         kr.deck = Object.keys(JOBS).filter(function (j) { return JOBS[j][0] === a && !isHiddenJob(j); })
@@ -1154,7 +1240,7 @@ function cardPick() {
                        : 'background:repeating-linear-gradient(45deg,#1a1420 0 6px,#140f19 6px 12px); border:1px solid #4a3a5a;'}
                 display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px; text-align:center;
                 transition:transform .35s; ${open ? 'transform:rotateY(0deg);' : ''}">
-                ${open ? `<div style="font-size:18px;">${ATTR[J[0]].i}</div><div style="font-size:11px; color:#fff; font-weight:bold; margin-top:4px; word-break:keep-all;">${esc(J[2][0])}</div>`
+                ${open ? `<div style="font-size:18px;">${ATTR[J[0]].i}</div><div style="font-size:11px; color:#fff; font-weight:bold; margin-top:4px; word-break:keep-all;">${esc(re ? jobName(j, reG) : J[2][0])}</div>`
                        : `<div style="font-size:18px; color:#6a5a7a;">K</div>`}
             </div>`;
     }).join('');
@@ -1162,7 +1248,7 @@ function cardPick() {
     if (peek) {
         const J = JOBS[peek];
         detail = `<div style="background:rgba(127,211,230,0.07); border:1px solid #2f4a55; border-radius:6px; padding:12px; margin-top:12px;">
-                <div style="font-size:15px; color:#fff; font-weight:bold;">${ATTR[J[0]].i} ${esc(J[2][0])}</div>
+                <div style="font-size:15px; color:#fff; font-weight:bold;">${ATTR[J[0]].i} ${esc(re ? jobName(peek, reG) : J[2][0])}${re ? ' <span style="font-size:11px; color:#8fb8c4;">' + reG + ' · Lv ' + Math.min(k.lv || 1, LV_MAX) + '</span>' : ''}</div>
                 <div style="font-size:11px; color:#aaa; margin:5px 0 8px 0; line-height:1.6;">${esc(J[3])}</div>
                 <div style="font-size:10px; color:#8fb8c4; line-height:1.8;">
                     속성 ${ATTR[J[0]].n} — ${ATTR[J[0]].role}<br>
@@ -1173,10 +1259,15 @@ function cardPick() {
             + (k.rerolled ? '<div style="font-size:10px; color:#888; text-align:center;">다시 고를 기회는 이미 썼다.</div>'
                           : darkChoiceBtn('다시 고른다. <span style="font-size:10px; color:#888;">(한 번만)</span>', 'kroomCardRe()'));
     }
-    show('배역', `방에 들어서자 탁자 위에 카드가 다섯 장 엎어져 있다.<br><br>
+    show('배역', (re
+        ? `손에 든 카드를 탁자에 내려놓는다. 그 자리에 새 카드가 다섯 장 엎어진다.<br><br>
+        뒷면 무늬가 새 결을 따라 바뀌어 있다. 가운데의 K 한 글자만 그대로다.<br>
+        ${peek ? '넘긴 한 장이 빛을 받는다.' : '하나를 넘긴다.'}<br>
+        <span style="font-size:11px; color:#888;">${ATTR[a].i} ${ATTR[a].n} — 지금 직업 <b style="color:#ccc;">${esc(jobName(k.job, k.grade))}</b> ${k.grade} 이(가) 고른 직업으로 바뀝니다. Lv ${k.lv} · 등급 · 각성은 그대로.</span>`
+        : `방에 들어서자 탁자 위에 카드가 다섯 장 엎어져 있다.<br><br>
         뒷면이 모두 같다. 무늬 가운데에 K 한 글자.<br>
         ${peek ? '넘긴 한 장이 빛을 받는다.' : '하나를 넘긴다.'}<br>
-        <span style="font-size:11px; color:#888;">${ATTR[a].i} ${ATTR[a].n} — 전용 장비 ${nthOf(u, a) || '첫 번째'} 속성의 자리들이다.</span>`,
+        <span style="font-size:11px; color:#888;">${ATTR[a].i} ${ATTR[a].n} — 전용 장비 ${nthOf(u, a) || '첫 번째'} 속성의 자리들이다.</span>`),
         `<div style="display:flex; gap:6px; perspective:600px;">${cards}</div>` + detail);
 }
 window.kroomCard = function (i) {
@@ -1195,6 +1286,23 @@ window.kroomCardRe = function () {
 };
 window.kroomCardOk = function () {
     const k = prof(), u = me(); if (!k.peek) return;
+    // ★ 메인 속성이 바뀌어 갈아 끼우는 중 — 옛 직업 자리에 새 직업이 들어선다 (Lv · 경험치 · 등급 · 각성 그대로)
+    if (kr && kr.reAttr && k.job && JOBS[k.job] && JOBS[k.peek] && JOBS[k.peek][0] === kr.reAttr) {
+        const to = kr.reAttr, old = k.job, oldG = k.grade || 'D', from = curAttr(k, u);
+        moveAttr(k, u, from, to);
+        k.job = k.peek; k.peek = null; k.reFor = null;
+        if (!GRADES.includes(k.grade)) k.grade = 'S';                    // 히든 직업의 L — 보통 직업은 S 까지
+        k.lv = Math.max(1, Math.min(k.lv || 1, lvCap(k)));
+        if (k.lv >= lvCap(k)) k.exp = 0;
+        else k.exp = Math.max(0, Math.min(Number(k.exp) || 0, expNeed(k, k.lv) - 1));
+        kr.reAttr = null; kr.deck = null;
+        addHistoryLog(u, '[K 의 방] 직업이 바뀌었다 — ' + jobName(old, oldG) + ' ' + oldG + ' → ' + jobName(k.job, k.grade) + ' ' + k.grade
+            + ' (' + ATTR[from].n + ' → ' + ATTR[to].n + ' · Lv ' + k.lv + ' 그대로)');
+        saveProf();
+        if (darkRun.isParty) sendPartyChat(u.name + ' 사원의 카드가 ' + jobName(k.job, k.grade) + '(으)로 바뀌었습니다.', true);
+        afterJob();
+        return;
+    }
     k.job = k.peek; k.peek = null; k.grade = 'D'; k.wake = {};
     if (!k.cur) k.cur = JOBS[k.job][0];
     addHistoryLog(u, '[K 의 방] 직업 — ' + jobName(k.job, 'D'));
