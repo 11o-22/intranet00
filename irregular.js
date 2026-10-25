@@ -272,7 +272,17 @@ window.irrSmash = function () {
 
 function applySmash(step, who) {
     const d = run();
-    if (!d || d._irrSmashedAt === step) return;
+    if (!d) return;
+    // ★ 피날레(Qtrew-S-018) — 장면이 F.sc 로 돌아 partyAdvance 로 넘기면 같은 선택지로 되돌아왔다 (2026-10-25)
+    //   거기서는 「다음에 실패할 판정을 한 번 넘기는 몫」으로 건다 (finale-core.js X.smash) · 남이 끊어도 각자 하나씩
+    try {
+        if (window.FINX && typeof window.FINX.on === 'function' && window.FINX.on()) {
+            d.log && d.log.push('[' + MARK + '] 사슬 — 피날레 파훼');
+            window.FINX.smash(MARK + ' ' + (who ? who + ' 사원이 끊은 사슬' : '사슬'));
+            return;
+        }
+    } catch (e) { }
+    if (d._irrSmashedAt === step) return;
     d._irrSmashedAt = step;
     d.success = (d.success || 0) + 2;
     d.modifier = (d.modifier || 0) + 1;

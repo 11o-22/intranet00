@@ -467,6 +467,7 @@ function pendingPsy() {
 function eyes(roll) {
     const me = u_(), r = run();
     if (!me || !r || kOn()) return roll;
+    try { finPhase(); } catch (e) { }
     // 무효 — 5 이하면 없던 일로
     if (roll <= C.NULL_AT) {
         const nx = canUse('nul');
@@ -626,6 +627,13 @@ window.bflySmash = function () {
     const x = canUse('smash');
     if (!r || !x) return;
     spend('smash');
+    // ★ 피날레 — 장면이 F.sc 로 돌아 partyAdvance 로 넘기면 같은 선택지로 되돌아온다 (2026-10-25)
+    //   거기서는 「다음에 실패할 판정을 한 번 넘기는 몫」으로 건다 (finale-core.js X.smash)
+    if (finOn()) {
+        try { if (r.isParty) sendPartyChat((u_() || {}).name + ' 사원의 나비가 기믹을 부쉈습니다.', true); } catch (e) { }
+        window.FINX.smash('🦋 ' + nickOf(x) + ' (파훼 ' + used('smash') + '/' + x.lv + ')');
+        return;
+    }
     r.success = (r.success || 0) + 2;
     try { if (r.isParty) sendPartyChat((u_() || {}).name + ' 사원의 나비가 기믹을 부쉈습니다.', true); } catch (e) { }
     const box = darkBodyEl();
@@ -755,6 +763,50 @@ window.bflyRunXp = runXp;
         clearInterval(iv);
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
+// ==========================================
+// ★ 피날레 — 판 하나가 길다 (2026-10-25)
+// ==========================================
+//   피날레(Qtrew-S-018)는 오프닝 · 로비 셋 · 탐사 둘 · 연회로 판정이 서른 번 가까이 된다.
+//   「탐사당」 몫(레테 셋 · 무효 · 회피 · 파훼 · 맹약의 실)이 앞의 몇 판정에서 다 떨어져, 뒤로는 맨 주사위만 남았다
+//   (시험: 30번 중 일곱 번째 판정 뒤로 나비가 한 번도 안 움직임). 여기서는 **마당(F.ph)이 바뀔 때마다** 그 몫을 새로 채운다.
+//   파훼 나비는 선택지 화면 대신 피날레 화면 아래 단추로 — 누르면 다음에 실패할 판정을 한 번 넘긴다.
+function finOn() { try { return !!(window.FINX && typeof window.FINX.on === 'function' && window.FINX.on()); } catch (e) { return false; } }
+function finPhase() {
+    const r = run();
+    if (!r || !finOn()) return;
+    const F = window.FINX.F && window.FINX.F();
+    const ph = F && F.ph;
+    if (!ph || r._bfPh === ph) return;
+    const first = !r._bfPh;
+    r._bfPh = ph;
+    if (first) return;                                   // 들어올 때는 이미 새것
+    r._bfUse = {}; r._bfLethe = 0;
+    const me = u_();
+    if (me && wears(me)) { try { const ref = pref('bfly/' + me.code + '/abs'); if (ref) ref.set(0); } catch (e) { } const p = party(); if (p && p.bfly && p.bfly[me.code]) p.bfly[me.code].abs = 0; }
+    toast('🦋 나비들이 숨을 고른다 — 레테 · 무효 · 회피 · 파훼가 다시 차올랐다');
+}
+setInterval(function () { try { finPhase(); } catch (e) { } }, 1000);
+(function finSmashBtn() {
+    const ID = 'bfly-fin-smash';
+    setInterval(function () {
+        try {
+            const old = document.getElementById(ID);
+            const x = finOn() ? canUse('smash') : null;
+            if (!x) { if (old) old.remove(); return; }
+            const label = '🦋 ' + nickOf(x) + ' — 기믹을 부순다 (남은 ' + (x.lv - used('smash')) + ' · 다음 실패를 넘긴다)';
+            if (old && old.isConnected) { if (old.textContent !== label) old.textContent = label; return; }
+            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+            if (!body || !body.querySelector('button')) return;
+            const b = document.createElement('button');
+            b.id = ID; b.className = 'game-btn';
+            b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#3a3a6a,#1c1c3a) !important; border-color:#9fb4ff !important; color:#fff !important;';
+            b.textContent = label;
+            b.onclick = window.bflySmash;
+            body.appendChild(b);
+        } catch (e) { }
+    }, 1000);
 })();
 
 // ==========================================

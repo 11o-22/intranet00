@@ -660,6 +660,8 @@ window.FOXCULT = {
     NAME: NAME,
     wears: function () { return wears(u_()); },
     free: function () { return freeOf(u_()); },
+    // 내게 걸린 것이 있나 — 역병(누구 것이든 · 한 시간) · 곁의 신도. K의 방 혼자 A · S 규칙을 푼다 (2026-10-25 · 다 먹히게)
+    active: function () { const me = u_(); return !!(me && (plLive(me).length || DS.some(function (d) { return !!withOf(me, d); }))); },
     freeOf: freeOf,
     sees: function () { return seesOf(u_()); },
     stat: function (k) { return stat(u_(), k); },

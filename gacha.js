@@ -57,8 +57,8 @@ const GACHA = {
     wear: { n: '의상숍',     ic: 'wearshop', one: 30000, ten: 300000 },
     acc:  { n: '악세서리숍', ic: 'accshop',  one: 15000, ten: 150000 },
     // 등급이 나올 확률 (합이 100)
-    ODDS: { S: 2, A: 10, B: 30, C: 58 },
-    GRADE: { S: { c: '#ffd479', n: 'S' }, A: { c: '#c7a3ff', n: 'A' },
+    ODDS: { L: 0.5, S: 2, A: 10, B: 30, C: 57.5 },   // L — 2026-10-25 (C 에서 0.5 를 떼어 왔다)
+    GRADE: { L: { c: '#ff8fd8', n: 'L' }, S: { c: '#ffd479', n: 'S' }, A: { c: '#c7a3ff', n: 'A' },
              B: { c: '#8fc7ef', n: 'B' }, C: { c: '#9a9284', n: 'C' } },
     COUPLE_X: 3,                     // 커플링이 있으면 세트 옷이 몇 배 잘 나오나
     BACK: 3                          // 중복이면 값의 1/3 을 돌려 준다
@@ -99,6 +99,8 @@ const GACHA_WEAR = [
 // ── 악세 마흔아홉 가지. 이름은 주신 파일 이름 그대로입니다.
 //    (베일은 의상숍 쪽 「면사포」로 들어가 여기에는 없습니다)
 const GACHA_ACC = [
+    // ★ L — 2026-10-25 · 토끼 헤드셋 (귀가 서 있을 때도 팔랑인다 — closet.js FLAP_COLS)
+    { k: 'bunny-headset', n: '토끼 헤드셋',         g: 'L' , c: '머리' },
     { k: 'ac45', n: '텐시',                   g: 'S' , c: '머리' },
     { k: 'ac46', n: '하회탈',                 g: 'S' , c: '얼굴' },
     { k: 'ac39', n: '작두',                   g: 'S' , c: '손' },
@@ -224,9 +226,17 @@ window.gachaCouple = couple;
 //   커플링이 있으면 세트 옷의 몫(weight)만 세 배로 둔다 — 등급 자체의
 //   확률은 안 건드린다. 그래서 「S 가 더 잘 나온다」가 아니라
 //   「S 가 나왔을 때 드레스·턱시도·면사포 쪽일 때가 많다」가 된다.
-function gradePick() {
-    const o = GACHA.ODDS;
-    let r = Math.random() * (o.S + o.A + o.B + o.C);
+// L 이 든 가게만 L 을 굴린다 — L 이 없는 가게(의상숍)는 그 몫을 C 에 돌려 예전 확률(C 58%) 그대로
+function oddsOf(kind) {
+    const o = Object.assign({}, GACHA.ODDS);
+    const hasL = (POOL[kind] || []).some(function (x) { return x.g === 'L'; });
+    if (!hasL) { o.C += (o.L || 0); o.L = 0; }
+    return o;
+}
+function gradePick(kind) {
+    const o = oddsOf(kind);
+    let r = Math.random() * ((o.L || 0) + o.S + o.A + o.B + o.C);
+    if ((r -= (o.L || 0)) < 0) return 'L';
     if ((r -= o.S) < 0) return 'S';
     if ((r -= o.A) < 0) return 'A';
     if ((r -= o.B) < 0) return 'B';
@@ -238,10 +248,10 @@ function weightOf(it, cp) { return (cp && it.set) ? GACHA.COUPLE_X : 1; }
 function pickOne(kind) {
     const list = POOL[kind] || [];
     const cp = couple();
-    let g = gradePick();
+    let g = gradePick(kind);
     let on = list.filter(function (x) { return x.g === g; });
     // 그 등급이 비어 있으면 (등급표를 고치다 비울 수 있다) 아래 등급으로 내려간다
-    const order = ['S', 'A', 'B', 'C'];
+    const order = ['L', 'S', 'A', 'B', 'C'];
     let gi = order.indexOf(g);
     while (!on.length && gi < order.length - 1) { gi++; g = order[gi]; on = list.filter(function (x) { return x.g === g; }); }
     if (!on.length) on = list.slice();
@@ -381,9 +391,9 @@ function result(kind, out) {
 
 function listHtml(kind) {
     const u = u_(), list = POOL[kind];
-    const by = { S: [], A: [], B: [], C: [] };
+    const by = { L: [], S: [], A: [], B: [], C: [] };
     list.forEach(function (x) { (by[x.g] || by.C).push(x); });
-    return ['S', 'A', 'B', 'C'].map(function (g) {
+    return ['L', 'S', 'A', 'B', 'C'].map(function (g) {
         if (!by[g].length) return '';
         const G = GACHA.GRADE[g];
         return '<div class="gc-row"><span class="gc-g" style="color:' + G.c + ';border-color:' + G.c + '">'
@@ -464,8 +474,8 @@ function paintShop() {
         + '<button class="gc-btn go" data-n="10">10연속<b>' + won(g.ten) + ' P</b></button>'
         + '</div>'
         + '<div class="gc-note">같은 것이 또 나오면 <b>' + won(Math.floor(g.one / GACHA.BACK))
-        + ' P</b> 를 돌려 드립니다.<br>등급 확률 — S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
-        + '% · B ' + GACHA.ODDS.B + '% · C ' + GACHA.ODDS.C + '%</div>'
+        + ' P</b> 를 돌려 드립니다.<br>등급 확률 — ' + (oddsOf(shopKind).L ? 'L ' + oddsOf(shopKind).L + '% · ' : '') + 'S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
+        + '% · B ' + GACHA.ODDS.B + '% · C ' + oddsOf(shopKind).C + '%</div>'
         + buyHtml(shopKind)
         + '<div class="gc-list">' + listHtml(shopKind) + '</div>';
     // ★ **그 단추 위에서 눌렀다 뗀 것**만 뽑기로 친다.
@@ -652,12 +662,12 @@ window.gachaOdds = function (kind) {
     const k = kind === 'acc' ? 'acc' : 'wear';
     const cp = couple();
     const rows = [];
-    ['S', 'A', 'B', 'C'].forEach(function (g) {
+    ['L', 'S', 'A', 'B', 'C'].forEach(function (g) {
         const on = POOL[k].filter(function (x) { return x.g === g; });
         let sum = 0; on.forEach(function (x) { sum += weightOf(x, cp); });
         on.forEach(function (x) {
             rows.push({ 등급: g, 이름: x.n, 세트: x.set ? 'O' : '',
-                        확률: (GACHA.ODDS[g] * weightOf(x, cp) / sum).toFixed(3) + '%' });
+                        확률: (oddsOf(k)[g] * weightOf(x, cp) / sum).toFixed(3) + '%' });
         });
     });
     console.log('%c===== ' + GACHA[k].n + ' 확률' + (cp ? ' (커플링 O)' : '') + ' =====',

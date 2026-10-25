@@ -395,10 +395,39 @@ function roll(o) {
     let out;
     if (o.item) out = (raw === 1) ? 'fail' : (raw === 20) ? 'ok' : (total >= dc ? 'ok' : 'fail');
     else out = raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= dc ? 'ok' : 'fail';
-    if (typeof darkRun !== 'undefined' && darkRun && darkRun.log) darkRun.log.push('[판정] d20 ' + raw + (bonus ? (bonus > 0 ? '+' : '') + bonus : '') + ' vs ' + dc + ' → ' + out);
-    return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc };
+    // ⛓ 파훼 — 걸어 둔 것이 있으면 실패할 판정을 한 번 넘긴다 (NPC 판정은 빼고 · X.smash 참고)
+    let smashed = null;
+    if (!o.npc && F && Array.isArray(F.smash) && F.smash.length && (out === 'fail' || out === 'c1')) {
+        smashed = String(F.smash.shift() || '파훼');
+        out = 'ok';
+        save();
+    }
+    if (typeof darkRun !== 'undefined' && darkRun && darkRun.log) darkRun.log.push('[판정] d20 ' + raw + (bonus ? (bonus > 0 ? '+' : '') + bonus : '') + ' vs ' + dc + ' → ' + out + (smashed ? ' (파훼 — ' + smashed + ')' : ''));
+    return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc, smashed: smashed };
 }
 X.roll = roll;
+
+// ==========================================
+// ⛓ 파훼 — 기믹을 부수는 것들이 이 구역에서 하는 일 (2026-10-25)
+// ==========================================
+//   이 구역은 장면이 renderDarkStep 이 아니라 F.sc 로 돈다. 그래서 다른 어둠처럼
+//   「부쉈다 → partyAdvance(다음 장면)」로 넘기면 같은 선택지로 되돌아왔다 (롤백처럼 보였다).
+//   여기서는 부수는 것(⛓️‍💥 이레귤러의 사슬 · 🦋 파훼 나비 · 🐾 파괴 분신 · 루비 · 사인참사검)이
+//   **다음에 실패할 판정을 한 번 넘기는 몫**으로 쌓인다 — F.smash = ['누가 · 무엇이', …]
+//   NPC 판정에는 쓰이지 않는다 (NPC 판정은 맨 주사위 · 히든 조건).
+function on() {
+    return !!(F && F.st === 'in' && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === FIN && !darkRun._dead && !darkRun._settled);
+}
+X.on = on;
+X.smash = function (label) {
+    if (!on()) return false;
+    F.smash = (Array.isArray(F.smash) ? F.smash : []).concat([String(label || '파훼')]);
+    save();
+    try { if (typeof showDarkToast === 'function') showDarkToast('⛓ ' + (label || '파훼') + ' — 다음에 실패할 판정을 한 번 넘긴다'); } catch (e) { }
+    try { view({ keep: true }); } catch (e) { }
+    return true;
+};
+X.smashLeft = function () { return (F && Array.isArray(F.smash)) ? F.smash.length : 0; };
 function rollHtml(r, cap) {
     const good = r.out === 'ok' || r.out === 'c20';
     const col = r.out === 'c20' ? '#d4af37' : good ? '#4CAF50' : '#f44336';
@@ -406,6 +435,7 @@ function rollHtml(r, cap) {
     const sub = r.npc
         ? '(보정 없음' + (r.bonus ? ' · 동행 신청서 +' + r.bonus : '') + ')'
         : '(보정 ' + (r.bonus >= 0 ? '+' : '') + r.bonus + ' / DC ' + r.dc + ')';
+    if (r.smashed) cap = (cap ? cap + '<br>' : '') + '⛓ ' + esc(r.smashed) + ' — 막고 있던 것이 부서져 이 판정을 넘겼다';
     return '<div class="fin-roll" style="color:' + col + ';">🎲 ' + r.raw + tag + ' <small>' + sub + '</small>'
         + (cap ? '<div style="font-size:10px; color:#888; font-weight:normal; margin-top:4px;">' + cap + '</div>' : '') + '</div>';
 }
@@ -474,7 +504,8 @@ function bar() {
         + '<div class="fin-gam"><div class="t"><span>감화도</span><span style="color:' + col + '; font-weight:bold;">' + g + ' / 100</span></div>'
         + '<div class="g"><div style="width:' + g + '%; background:' + col + ';"></div></div></div>'
         + '<div style="text-align:right; line-height:1.5;">🎟 ' + (F.tix || 0) + '장'
-        + (sk ? '<br><span style="color:' + (sk >= 2 ? '#ff6b6b' : '#888') + ';">연속 실패 ' + sk + '/3</span>' : '') + '</div>'
+        + (sk ? '<br><span style="color:' + (sk >= 2 ? '#ff6b6b' : '#888') + ';">연속 실패 ' + sk + '/3</span>' : '')
+        + (Array.isArray(F.smash) && F.smash.length ? '<br><span style="color:#c9a8ff;">⛓ 파훼 ' + F.smash.length + '</span>' : '') + '</div>'
         + '<button class="fin-bag" onclick="finBag()">📦 소지품</button>'
         + '</div>';
 }

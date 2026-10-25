@@ -216,6 +216,13 @@ function rubySmash() {
     const left = smashLeft();
     const sword = hasWear('사인참사검');
 
+    // ★ 피날레 — 장면이 F.sc 로 돌아 partyAdvance 로 넘기면 같은 선택지로 되돌아온다 (2026-10-25 · finale-core.js X.smash)
+    if (window.FINX && typeof window.FINX.on === 'function' && window.FINX.on()) {
+        darkRun.log.push(`[${sword ? '사인참사검' : '루비'}] 피날레 파훼 (잔여 ${left})`);
+        saveFields({ smashDate:1, smashUsed:1, history:1 });
+        window.FINX.smash((sword ? '사인참사검' : '루비') + ' (금일 잔여 ' + left + ')');
+        return;
+    }
     darkRun.success += 2;
     darkRun.modifier = (darkRun.modifier || 0) + 1;
     darkRun.log.push(`[${sword ? '사인참사검' : '루비'}] 기믹 파괴 (잔여 ${left})`);

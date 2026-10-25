@@ -1165,8 +1165,8 @@ function alone() {
 function soloHard(g) {
     // 🦋 환영 나비 — 곁에 나비가 하나라도 남아 있으면 혼자가 아니다 (butterfly.js)
     try { if (window.BFLY && window.BFLY.flyCount() > 0) return null; } catch (e) { }
-    // 🎐 여우 신도 — 홀로 어둠 탐사의 역병 · 제 二 신도 동행이면 인원수에 구애받지 않는다 (foxcult.js)
-    try { if (window.FOXCULT && window.FOXCULT.free()) return null; } catch (e) { }
+    // 🎐 여우 신도 — 역병이 걸려 있거나 신도가 곁에 있으면 혼자 A · S 규칙이 풀린다 (foxcult.js · 2026-10-25 — S 솔플에서도 다 먹히게)
+    try { if (window.FOXCULT && (window.FOXCULT.free() || window.FOXCULT.active())) return null; } catch (e) { }
     return alone() ? (SOLO_HARD[g] || null) : null;
 }
 function bfly() { return window.BFLY || null; }

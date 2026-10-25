@@ -1552,6 +1552,13 @@ window.kitBreak = function () {
     const r = run();
     if (!r) { alert_('탐사 중에만 쓸 수 있습니다.'); return; }
     const se = usable('sense');
+    // ★ 피날레 — 장면이 F.sc 로 돌아 넘기기가 되돌아온다 (2026-10-25 · finale-core.js X.smash) — 다음 실패를 넘기는 몫으로
+    if (window.FINX && typeof window.FINX.on === 'function' && window.FINX.on()) {
+        const n0 = bump('break', 'n', BFOX.BREAK_MAX, '세 번을 다 파훼하고 소멸했습니다.');
+        if (r.log) r.log.push('[🐾 파괴] ' + nickOf(x) + ' — 피날레 파훼');
+        window.FINX.smash('🐾 ' + nickOf(x) + ' (남은 파훼 ' + Math.max(0, BFOX.BREAK_MAX - n0) + ')');
+        return;
+    }
     const add = se ? BFOX.BREAK_SENSE : BFOX.BREAK_ADD;
     r.success = (r.success || 0) + add;
     r.modifier = (r.modifier || 0) + 1;
