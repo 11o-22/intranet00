@@ -241,11 +241,13 @@ function leaderRoll(s, fallback) {
         const raw = 1 + Math.floor(Math.random() * 20);
         const bon = +(((S().pl || {})[rl] || {}).bon) || 0;
         const total = raw + bon;
-        r = { raw: raw, bonus: bon, total: total, dc: 15, out: raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= 15 ? 'ok' : 'fail' };
+        // ★ 뽑힌 사람이 🔎 · 🌟 를 지녔으면 그 사람의 경계도 같이 (finale-core.js waryOf · 2026-10-25)
+        const dcF = 15 + ((typeof X.waryOf === 'function') ? X.waryOf((typeof db !== 'undefined' && db.users) ? db.users[rl] : null) : 0);
+        r = { raw: raw, bonus: bon, total: total, dc: dcF, out: raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= dcF ? 'ok' : 'fail' };
         darkRun.log.push('[연회] ' + X.nameOf(rl) + ' 대신 굴림 — d20 ' + raw + ' (+' + bon + ') → ' + r.out);
     }
     if (!fallback) darkRun.log.push('[연회] 장면 0' + s + ' — 투표로 뽑혀 굴림');
-    const rec = { raw: r.raw, bonus: r.bonus, total: r.total, dc: 15, out: r.out, by: X.me(), ld: ld, rl: rl, fb: !!fallback,
+    const rec = { raw: r.raw, bonus: r.bonus, total: r.total, dc: r.dc || 15, out: r.out, by: X.me(), ld: ld, rl: rl, fb: !!fallback,
         ord: [ld].concat(a.filter(function (c) { return c !== ld; })), at: Date.now() };
     X.tx('bqr/' + s, function (cur) { if (cur) return; return rec; }).then(function () { X.view({ keep: true }); });
 }

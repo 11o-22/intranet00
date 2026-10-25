@@ -375,11 +375,30 @@ X.bodyMod = bodyMod; X.hc = hc;
 //   o.kind  rollDarkBonus 종류 · o.dc (기본 15) · o.n 같은 장면 인원 · o.body 상품권 디버프 · o.extra
 //   o.item  아이템 획득 판정 (1 · 20 은 그냥 실패 · 성공)
 //   o.npc   NPC 판정 — 맨 주사위 (동행 신청서만 +1)
+// ★ 경계 — 🔎 감지하는 눈 · 🌟 제 칠 성군을 지닌 사람(차고 있거나 · 소지품에 있거나 · 빼앗아 쓰고 있거나)은
+//   이 무대가 알아보고 경계한다 — 판정 DC 가 높다 (2026-10-25 · 두 장비로 너무 쉽게 깼다 — 많이 올림).
+//   하나면 +7 · 둘 다면 +10. NPC 판정(맨 주사위)은 그대로.
+const WARY = ['🔎 감지하는 눈', '🌟 제 칠(七) 성군(星君)'];
+const WARY_DC = [0, 7, 10];
+function waryOf(u) {
+    if (!u) return 0;
+    const base = function (w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } };
+    const has = function (n) {
+        const eq = Array.isArray(u.equippedWeapons) ? u.equippedWeapons : [];
+        const inv = Array.isArray(u.inventory) ? u.inventory : [];
+        const bor = Array.isArray(u.borrowedGear) ? u.borrowedGear : [];
+        return eq.some(function (w) { return base(w) === n; }) || inv.indexOf(n) >= 0
+            || bor.some(function (w) { return String(w || '').indexOf(n) === 0; });
+    };
+    return WARY_DC[WARY.filter(has).length] || 0;
+}
+X.waryOf = waryOf;
 function roll(o) {
     o = o || {};
     let raw = 1 + Math.floor(Math.random() * 20);
     let bonus = 0;
-    const dc = o.dc || 15;
+    const wary = o.npc ? 0 : waryOf(typeof currentUser !== 'undefined' ? currentUser : null);
+    const dc = (o.dc || 15) + wary;
     if (o.npc) {
         bonus = o.plus || 0;
     } else {
@@ -403,7 +422,7 @@ function roll(o) {
         save();
     }
     if (typeof darkRun !== 'undefined' && darkRun && darkRun.log) darkRun.log.push('[판정] d20 ' + raw + (bonus ? (bonus > 0 ? '+' : '') + bonus : '') + ' vs ' + dc + ' → ' + out + (smashed ? ' (파훼 — ' + smashed + ')' : ''));
-    return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc, smashed: smashed };
+    return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc, smashed: smashed, wary: wary };
 }
 X.roll = roll;
 
@@ -434,7 +453,7 @@ function rollHtml(r, cap) {
     const tag = r.out === 'c20' ? ' 대성공' : r.out === 'c1' ? ' 대실패' : '';
     const sub = r.npc
         ? '(보정 없음' + (r.bonus ? ' · 동행 신청서 +' + r.bonus : '') + ')'
-        : '(보정 ' + (r.bonus >= 0 ? '+' : '') + r.bonus + ' / DC ' + r.dc + ')';
+        : '(보정 ' + (r.bonus >= 0 ? '+' : '') + r.bonus + ' / DC ' + r.dc + (r.wary ? ' · 경계 +' + r.wary : '') + ')';
     if (r.smashed) cap = (cap ? cap + '<br>' : '') + '⛓ ' + esc(r.smashed) + ' — 막고 있던 것이 부서져 이 판정을 넘겼다';
     return '<div class="fin-roll" style="color:' + col + ';">🎲 ' + r.raw + tag + ' <small>' + sub + '</small>'
         + (cap ? '<div style="font-size:10px; color:#888; font-weight:normal; margin-top:4px;">' + cap + '</div>' : '') + '</div>';
