@@ -1870,7 +1870,7 @@ async function foxdAt(db, codes, rest) {
 function foxdKey(id, f, last) {
     const D = DISCIPLES[f.k] || {};
     return id + ' = ' + foxdName(f) + ' (' + (D.n || f.k) + (f.nick ? ' · 주인이 지어 준 이름 ' + f.nick : '')
-        + ' · 주인 ' + (f.oN || f.o) + ' · 주인의 애인 ' + (f.lover && f.lover.n ? f.lover.n : '없음')
+        + ' · 주인 ' + (f.oN || f.o) + ' · 주인의 애인 ' + (f.lover && f.lover.n ? f.lover.n + ' (「사회자 님」 · 「브라운 님」으로 부른다)' : '없음')
         + (f.on !== f.o ? ' · 지금 ' + (f.onN || f.on) + ' 사원과 동행 중' : ' · 주인 곁') + ')'
         + (last && last.indexOf(id) >= 0 ? ' — ★ 이번이 마지막 한 마디 (bye)' : '');
 }
