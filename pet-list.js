@@ -76,6 +76,7 @@ function statusOf(s) {
             : { t: '돌아옴', c: '#6f8f5e' };      // 어둠 칸에서 데려오면 된다
     if (s && (s.rest || 0) > now)
         return { t: '쉬는 중', c: '#c9a227' };
+    if (P().asleep && P().asleep()) return { t: '💤 잠듦', c: '#8fa8d8' };   // 🦋 숨결 두 번 — 모두 잔다
     return null;
 }
 

@@ -12,8 +12,9 @@
 //
 //   ① 영혼의 맹약   방의 파티원 셋까지. 맹약 대상 굴림 +2 · 장착자 굴림 +1 × 맹약 수(최대 +3).
 //                    맹약 대상의 눈이 9 이하면 실이 당겨 +6 (탐사당 다섯 번) — 대신 장착자의 다음 굴림 −2.
-//   ② 레테의 수의   눈이 9 이하면 다시 굴린다 (새 눈 +2, 무조건 적용). 탐사당 세 번 —
-//                    같은 방 파티원의 9 이하도 이 세 번에서 덮어 준다.
+//   ② 레테의 수의   장착자 본인의 눈이 9 이하면 다시 굴린다 (새 눈 +2, 무조건 적용). 탐사당 세 번.
+//                    ★ 2026-10-25 — 장착자 본인에게만. (전에는 같은 방 파티원의 9 이하도 이 세 번에서
+//                      덮어 주어, 파티원이 먼저 굴리면 장착자 몫이 남지 않았다)
 //   ③ 프시케의 유리 늘 굴림 +1 · 선택지 화면에 유리한 쪽이 보인다 · 숫자 셋 중 하나를 맞히면
 //                    다음 굴림 +4 (장착자와 맹약 대상 모두). K의 방은 즉사 기믹(🈲)과 유리한 쪽(◈)을 보이고,
 //                    유리한 쪽을 골라 숫자를 맞히면 다음 기믹 DC −3.
@@ -32,7 +33,7 @@
 //                    K의 방 혼자 — 나비가 하나라도 남아 있으면 혼자가 아니다 (혼자 S · A 규칙이 풀린다).
 //   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 회수품 ×2.5 ·
 //                    성공 정산 ×1.5 · 즉사 한 번 회피(맞은 수만큼). 두 번 다 맞으면 포만감·오염도 5시간 동결,
-//                    펫은 5시간 잠들어 어둠에 따라오지 못한다.
+//                    가진 펫이 모두 5시간 잠든다 (데려가기 · 몰래 따라가기 · 혼자 탐사 · 저지른 일 모두 쉼 — pet-data.js PET.asleep).
 //
 //   포인트 — 맹약(×1.5~2) · 모이라이(유예 1번 ×1.33 · 2번 ×1.67 · 3번 ×2) · 숨결(×1.5) 를 다 곱해도 ×2 까지.
 //            꿈결(K의 방)은 불리지 않는다.
@@ -342,24 +343,16 @@ function bump(w, field, dv, max) {     // 방 자리의 수를 하나 올린다 
     if (ref) { try { ref.transaction(function (cur) { const n = Math.max(0, (Number(cur) || 0) + dv); return (max != null && n > max) ? undefined : n; }).catch(function () { }); } catch (e) { } }
 }
 
-// 레테 — 남은 몫이 있는 장착자 (나부터). 혼자면 탐사 안에서 센다.
-function letheLeft(w) {
+// 레테 — 장착자 본인의 눈에만. 탐사 안에서 센다 (파티원 몫으로 나가지 않는다)
+function letheLeft() {
     const r = run();
-    if (!party() || !r || !r.isParty) return C.LETHE - ((r && r._bfLethe) || 0);
-    return C.LETHE - (Number(pnode(w).lethe) || 0);
+    return Math.max(0, C.LETHE - ((r && r._bfLethe) || 0));
 }
 function letheTake() {
     const me = u_(), r = run();
-    if (!me || !r) return null;
-    const list = (wears(me) ? [me.code] : []).concat(wearersHere());
-    for (let i = 0; i < list.length; i++) {
-        const w = list[i];
-        if (letheLeft(w) <= 0) continue;
-        if (!party() || !r.isParty) r._bfLethe = (r._bfLethe || 0) + 1;
-        else bump(w, 'lethe', 1, C.LETHE);
-        return w;
-    }
-    return null;
+    if (!me || !r || !wears(me) || letheLeft() <= 0) return null;
+    r._bfLethe = (r._bfLethe || 0) + 1;
+    return me.code;
 }
 
 // ==========================================
@@ -420,7 +413,7 @@ window.bflyBreathe = function (code) {
     } catch (e) { }
     shut();
     alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피'
-        + (twice ? '\n\n두 번째 숨결 — 포만감·오염도가 ' + C.EROS_HOURS + '시간 멈춥니다. 펫은 그동안 잠들어 어둠에 따라오지 못합니다.' : '')
+        + (twice ? '\n\n두 번째 숨결 — 포만감·오염도가 ' + C.EROS_HOURS + '시간 멈춥니다.\n가진 펫이 모두 ' + C.EROS_HOURS + '시간 깊이 잠듭니다 — 데려가지도, 몰래 따라오지도, 혼자 탐사를 나가지도 않습니다.' : '')
         + '\n\n(오늘 남은 숨결 ' + (C.EROS - erosUsed(me)) + '번)');
 };
 
@@ -490,8 +483,8 @@ function eyes(roll) {
         const w = letheTake();
         if (w) {
             const nr = Math.min(20, rnd(1, 20) + C.LETHE_ADD);
-            r.log && r.log.push('[🦋 레테의 수의] ' + roll + ' → ' + nr + (w !== me.code ? ' (' + nameOf(w) + ')' : ''));
-            toast('🦋 레테의 수의' + (w !== me.code ? ' — ' + nameOf(w) + ' 사원이 덮어 주었다' : '') + ' (' + roll + ' → ' + nr + ')');
+            r.log && r.log.push('[🦋 레테의 수의] ' + roll + ' → ' + nr + ' (남은 ' + letheLeft() + ')');
+            toast('🦋 레테의 수의 — 방금 것을 덮었다 (' + roll + ' → ' + nr + ' · 남은 ' + letheLeft() + ')');
             roll = nr;
         }
     }
@@ -931,7 +924,7 @@ window.bflyMenu = function () {
     const r = run();
     const info = '<div style="font-size:10.5px; color:#bbb; line-height:1.8; padding:8px 10px; border:1px solid #2e2840; border-radius:6px; margin-bottom:9px;">'
         + '⏳ 모이라이의 실타래 — 오늘 남은 유예 <b style="color:#d9c27a;">' + moiraLeft(me) + ' / ' + C.MOIRA + '</b><br>'
-        + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + (r ? ' (이번 탐사 남은 ' + letheLeft(me.code) + ')' : '') + '<br>'
+        + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + ' · 장착자 본인만' + (r ? ' (이번 탐사 남은 ' + letheLeft() + ')' : '') + '<br>'
         + '💋 에로스의 마지막 숨결 — 오늘 남은 <b style="color:#ffb3c7;">' + (C.EROS - erosUsed(me)) + ' / ' + C.EROS + '</b>'
         + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
         + '🔗 영혼의 맹약 — ' + (p ? (myPact().length ? myPact().map(nameOf).map(esc).join(', ') : '아직 없음') : '방에 있을 때 맺는다') + '</div>';
@@ -1089,6 +1082,139 @@ window.bflyErosPick = function () {
     w.querySelector('#bf-x').onclick = window.bflyMenu;
     Array.prototype.forEach.call(w.querySelectorAll('.bf-er'), function (b) { b.onclick = function () { window.bflyBreathe(b.dataset.c); }; });
 };
+
+// ==========================================
+// ★ 방 — 나비가 빈자리를 채운다 (2026-10-25 · 🐾 아기 여우 분신과 같은 길)
+// ==========================================
+//   최소 인원이 둘 이상인 구역에 혼자(또는 모자라게) 방을 잡아도, 방 사람들 곁의 나비 수만큼
+//   최소 인원을 낮춰 출발할 수 있다 (1인까지).
+//     · 센다 — 방 사람이 차고 있는 나비(소멸 안 한 것) 가운데 그 사람 곁이나 다른 방 사람 곁에 있는 것,
+//              그리고 방 밖의 장착자가 방 사람 곁에 둔 나비. 한 마리는 한 번만 센다.
+//     · 가짜 사원을 방에 넣지 않는다 — 방 화면을 그리는 동안과 출발 단추를 누른 순간에만
+//       z.min 을 낮췄다가 바로 되돌린다 (babyfox.js 와 같은 방식 · 둘이 겹치면 둘 다 뺀다).
+//     · 나비는 사람 수에 안 들어간다 — 보상 · 난이도는 그대로 사람 수로 센다.
+function goneOf(u, k) {
+    const s = (u && u.bfly && u.bfly[k]) || {};
+    return (u && u.bflyDay === today()) ? !!s.gone : false;       // 날이 바뀌었으면 자정에 돌아온 것
+}
+function seatFlies(p) {
+    const out = [], seen = {};
+    if (!p || !p.members) return out;
+    const mem = Object.keys(p.members);
+    const add = function (owner, k, at) {
+        const id = owner + ':' + k;
+        if (seen[id]) return;
+        seen[id] = 1;
+        out.push({ owner: owner, k: k, at: at });
+    };
+    mem.forEach(function (c) {
+        const u = userOf(c);
+        if (!u) return;
+        if (wears(u)) {
+            const f = (u.bfly && typeof u.bfly === 'object') ? u.bfly : {};
+            KEYS.forEach(function (k) {
+                const s = f[k] || {};
+                if (!s.lv || goneOf(u, k)) return;
+                if (!s.to || mem.indexOf(s.to) >= 0) add(c, k, s.to || c);
+            });
+        }
+        const on = (u.bflyOn && typeof u.bflyOn === 'object') ? u.bflyOn : {};
+        Object.keys(on).forEach(function (k) {
+            const by = on[k] && on[k].by;
+            if (!by || !BY_K[k] || mem.indexOf(by) >= 0) return;            // 방 사람 것은 위에서 셌다
+            const o = userOf(by);
+            if (!o || !wears(o)) return;
+            const s = (o.bfly && o.bfly[k]) || {};
+            if (s.to === c && s.lv && !goneOf(o, k)) add(by, k, c);
+        });
+    });
+    return out;
+}
+function seatBox(min0, low, list) {
+    const rows = list.map(function (x) {
+        const o = userOf(x.owner), s = (o && o.bfly && o.bfly[x.k]) || {};
+        return '<div style="font-size:11px; color:#e6ddf0; padding:3px 0;"><span style="color:#d8c8ff;">' + BY_K[x.k].icon + '</span> '
+            + esc(s.nick || BY_K[x.k].n + ' 나비') + ' <span style="font-size:9.5px; color:#a58cff;">Lv.' + (Number(s.lv) || 1) + '</span>'
+            + ' <span style="font-size:9px; color:#857c9a;">— ' + esc(nameOf(x.at)) + ' 곁' + (x.owner !== x.at ? ' (' + esc(nameOf(x.owner)) + ' 사원의 나비)' : '') + '</span></div>';
+    }).join('');
+    return '<div id="bfly-room-box" style="background:rgba(90,70,130,0.10); border:1px solid #5b4a7a; border-radius:6px; padding:11px; margin:12px 0;">'
+        + '<div style="font-size:11px; color:#c9b8ff; font-weight:bold; margin-bottom:5px;">🦋 빈자리를 채우는 나비 ' + list.length + '마리</div>'
+        + rows
+        + '<div style="font-size:9.5px; color:#857c9a; margin-top:6px; border-top:1px solid #2e2840; padding-top:6px; line-height:1.6;">'
+        + (min0 > low ? '최소 인원 <b style="color:#c9b8ff;">' + min0 + '인 → ' + low + '인</b> — 나비가 빈자리를 채웁니다.'
+                      : '최소 인원이 이미 ' + min0 + '인이라 더 낮출 것이 없습니다.')
+        + '<br>나비는 사람 수에는 안 들어갑니다 (보상 · 난이도는 사람 수로 셉니다).</div></div>';
+}
+let seatDraw = null;           // 방 화면을 그리는 동안 { min0, low, list }
+(function hookSeatChat() {
+    const iv = setInterval(function () {
+        if (typeof buildChatHtml !== 'function') return;
+        if (buildChatHtml._bfly) { clearInterval(iv); return; }
+        const _b = buildChatHtml;
+        const w = function () {
+            const out = _b.apply(this, arguments);
+            if (!seatDraw) return out;
+            try { return seatBox(seatDraw.min0, seatDraw.low, seatDraw.list) + out; } catch (e) { return out; }
+        };
+        w._bfly = true;
+        buildChatHtml = w; window.buildChatHtml = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+(function hookSeatRoom() {
+    const iv = setInterval(function () {
+        if (typeof renderPartyRoom !== 'function') return;
+        if (renderPartyRoom._bfly) { clearInterval(iv); return; }
+        const _r = renderPartyRoom;
+        const w = function (p, body) {
+            let z = null, min0 = null, list = [];
+            try {
+                if (p && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
+                    z = DARK_ZONES[p.zone];
+                    list = seatFlies(p);
+                    min0 = z.min;
+                    if (list.length) z.min = Math.max(1, min0 - list.length);   // ★ canStart 가 이 값을 본다 → 진입 단추가 열린다
+                }
+            } catch (e) { }
+            const prev = seatDraw;
+            if (list.length) seatDraw = { min0: min0, low: z.min, list: list };
+            try { return _r.apply(this, arguments); }
+            finally {
+                seatDraw = prev;
+                if (z && min0 != null) z.min = min0;
+            }
+        };
+        w._bfly = true;
+        renderPartyRoom = w; window.renderPartyRoom = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+(function hookSeatLaunch() {
+    const iv = setInterval(function () {
+        if (typeof launchParty !== 'function') return;
+        if (launchParty._bfly) { clearInterval(iv); return; }
+        const _l = launchParty;
+        const w = function () {
+            let z = null, min0 = null;
+            try {
+                const me = u_(), p = (typeof getMyParty === 'function') ? getMyParty() : null;
+                if (me && p && p.leader === me.code && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
+                    const n = seatFlies(p).length;                       // 방 화면이 보여 준 것과 같은 수
+                    if (n > 0) { z = DARK_ZONES[p.zone]; min0 = z.min; z.min = Math.max(1, min0 - n); }
+                }
+            } catch (e) { }
+            try { return _l.apply(this, arguments); }
+            finally { if (z && min0 != null) z.min = min0; }
+        };
+        w._bfly = true;
+        launchParty = w; window.launchParty = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+window.bflySeats = function () { const p = (typeof getMyParty === 'function') ? getMyParty() : null; return seatFlies(p).map(function (x) { return BY_K[x.k].n + '(' + nameOf(x.owner) + ' → ' + nameOf(x.at) + ')'; }); };
 
 // 장착칸의 [🦋 환영 나비] 단추 · 탐사 화면 위 🦋
 (function badgeBtn() {

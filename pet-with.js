@@ -73,6 +73,13 @@ function pickHtml() {
     const now = P().now();
     const cur = Number(u.petWith) || 0;
 
+    if (list.length && P().asleep && P().asleep(u)) {
+        const m = Math.ceil(P().sleepLeft(u) / 60000);
+        return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
+            + '데려갈 펫</div>'
+            + '<div style="font-size:10px; color:#8fa8d8;">💤 펫이 모두 깊이 잠들어 있습니다 — '
+            + (m >= 60 ? Math.floor(m / 60) + '시간 ' : '') + (m % 60) + '분 남음. 데려갈 수도, 따라오지도 않습니다.</div>';
+    }
     if (!list.length) {
         return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
             + '데려갈 펫</div>'
@@ -173,9 +180,10 @@ function begin() {
     const s = P().pets(u)[String(id)];
     if (!s) { u.petWith = null; return; }
     if (s.out && s.out.till) return;              // 혼자 나가 있다
-    if (Number(u.petSleepUntil) > Date.now()) {   // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 펫이 잠들어 있다
+    if (P().asleep && P().asleep(u)) {             // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 펫이 모두 잠들어 있다
         const nk = P().nick(id, u);
         log_('[펫 동행] ' + nk + P().josa(nk, '은') + ' 깊이 잠들어 따라오지 않았습니다.');
+        try { d.log.push('[펫] ' + nk + ' — 잠들어 있어 따라오지 않았다'); } catch (e) { }
         return;
     }
     d._pet = id;

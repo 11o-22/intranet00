@@ -718,6 +718,7 @@ function okIds() {
         const s = petOf(id);
         if (!s) return false;
         if (s.out || s.sneak || s.hurt) return false;      // 나가 있거나 다친 펫
+        if (P().asleep && P().asleep()) return false;      // 🦋 숨결 두 번 — 모두 잠들어 있다
         return true;
     });
 }

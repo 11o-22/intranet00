@@ -455,6 +455,15 @@ function playScene() {
         return;
     }
 
+    // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 모두 깊이 잔다
+    if (P().asleep && P().asleep(u)) {
+        const m = Math.ceil(P().sleepLeft(u) / 60000);
+        line.textContent = '💤 모두 깊이 잠들어 있습니다. ' + (m >= 60 ? Math.floor(m / 60) + '시간 ' : '') + (m % 60) + '분 뒤에 깹니다.';
+        line.style.color = '#8fa8d8';
+        here.forEach(function (k) { setMove(k, 'sleep'); });
+        sceneFor = '';
+        return;
+    }
     const sc = sceneNow(here);
     line.textContent = sceneText(sc, here, u);
     line.style.color = sc.c;

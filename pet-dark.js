@@ -96,6 +96,7 @@ function stateOf(s) {
     }
     if (s && (Number(s.rest) || 0) > now)
         return { k: 'rest', t: '쉬는 중 · ' + left(s.rest - now), c: '#c9a227' };
+    if (P().asleep && P().asleep()) return { k: 'sleep', t: '💤 잠듦 · ' + left(P().sleepLeft()), c: '#8fa8d8' };
     return { k: 'idle', t: '대기', c: '#8d8578' };
 }
 
@@ -133,6 +134,7 @@ window.petSend = function (id, zone) {
     if (st.k === 'out')  { alert_('이미 나가 있습니다.'); return; }
     if (st.k === 'done') { alert_('먼저 데려오십시오.'); return; }
     if (st.k === 'rest') { alert_('쉬는 중입니다.\n\n' + st.t + '\n사택에서 먹이를 사 두면 줄일 수 있습니다.'); return; }
+    if (st.k === 'sleep') { alert_('💤 깊이 잠들어 있습니다.\n\n' + st.t + '\n에로스의 마지막 숨결이 남긴 잠입니다. 깨어나면 보낼 수 있습니다.'); return; }
 
     // ★ 한 번에 두 마리까지 — 몰래 따라가는 쪽(pet-sneak)과 같은 수다
     const OUT_MAX = 2;

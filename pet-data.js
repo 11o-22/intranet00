@@ -199,6 +199,10 @@ const PET_SAVE_ODDS = 0.5;                    // 교감 100 — 대신 죽어 �
 // 사원 기록
 // ==========================================
 function petMe() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
+// ★ 펫이 모두 잠들어 있나 — 🦋 에로스의 마지막 숨결을 하루에 두 번 맞으면 5시간 (butterfly.js 가 u.petSleepUntil 을 적는다)
+//   가진 펫 전부가 잔다 — 데려가기(pet-with) · 몰래 따라가기(pet-sneak) · 혼자 탐사(pet-dark) · 저지른 일(pet-act) 모두 쉰다.
+function petSleepLeft(u) { u = u || petMe(); return u ? Math.max(0, (Number(u.petSleepUntil) || 0) - Date.now()) : 0; }
+function petAsleep(u) { return petSleepLeft(u) > 0; }
 
 // 서버 기준 지금 — 기기 시계를 믿지 않는다 (clock.js)
 function petNow() {
@@ -773,7 +777,8 @@ window.PET = {
     make: petMakeEgg, done: petEggDone, step: petEggStep, eggImg: petEggImg,
     pick: petPick, img: petImg, icon: petIcon, statText: petStatText, me: petMe,
     josa: petJosa, jong: petJong,
-    nick: petNick, named: petNamed, rename: petRename
+    nick: petNick, named: petNamed, rename: petRename,
+    asleep: petAsleep, sleepLeft: petSleepLeft
 };
 
 // ==========================================
