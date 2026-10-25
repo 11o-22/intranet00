@@ -15,11 +15,11 @@ if (typeof ITEM_CATALOG === 'undefined') return;
 const FIN_ITEMS = {
     '내일의 일정표': {
         price: 2500, effect: 'fin_calm',
-        desc: '[???] 내일 날짜가 적힌 빈 일정표. 아직 적어 넣을 칸이 남아 있다는 사실이 떠오른다. 사용 즉시 감화도가 15 내려간다. 제■■■회 완벽한 피날레(Qtrew-S-■■■) 탐사 중 한 번만.'
+        desc: '[???] 내일 날짜가 적힌 빈 일정표. 아직 적어 넣을 칸이 남아 있다는 사실이 떠오른다. 사용 즉시 감화도가 15 내려간다. 제■■■회 완벽한 피날레(Qtrew-S-018) 탐사 중 한 번만.'
     },
     '동행 신청서': {
         price: 1500, effect: 'fin_npc',
-        desc: '[???] 피날레교단 접수처의 낡은 양식. 「함께 퇴장할 분」 칸이 비어 있다. 다음 NPC 영입 판정 한 번에 +1. 제■■■회 완벽한 피날레(Qtrew-S-■■■) 탐사 중에만.'
+        desc: '[???] 피날레교단 접수처의 낡은 양식. 「함께 퇴장할 분」 칸이 비어 있다. 다음 NPC 영입 판정 한 번에 +1. 제■■■회 완벽한 피날레(Qtrew-S-018) 탐사 중에만.'
     }
 };
 Object.keys(FIN_ITEMS).forEach(function (n) {
@@ -41,7 +41,7 @@ function alertMsg(m) { try { showCustomAlert(m); } catch (e) { console.log(m); }
             const X = window.FINX;
             const F = X && X.F && X.F();
             if (typeof darkRun === 'undefined' || !darkRun || !X || darkRun.zone !== X.CODE || !F || F.st !== 'in') {
-                alertMsg('제■■■회 완벽한 피날레(Qtrew-S-■■■) 탐사 중에만 쓸 수 있습니다.');
+                alertMsg('제■■■회 완벽한 피날레(Qtrew-S-018) 탐사 중에만 쓸 수 있습니다.');
                 return;
             }
             if (!((currentUser.inventory || []).indexOf(itemName) >= 0)) return;

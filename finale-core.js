@@ -33,7 +33,7 @@
 (function finaleCore() {
 'use strict';
 
-const FIN = 'Qtrew-S-■■■';
+const FIN = 'Qtrew-S-018';
 const X = window.FINX = window.FINX || {};
 X.CODE = FIN;
 
