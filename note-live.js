@@ -422,7 +422,23 @@ function paintEmp() {
             }
             done++;
         }
-        if (done === 2) clearInterval(iv);
+        // ★ 소지품 칸을 다시 그린 바로 그 자리에서 장착 카드의 「⏳ 남음」 줄을 붙인다 (2026-10-25)
+        //   — updateUI 를 거치지 않고 그려질 때는 1초 시계까지 그 줄이 비어, 아래 카드들이 한 줄만큼 위로 튀었다가 돌아왔다
+        if (typeof window.renderInventory === 'function') {
+            if (!window.renderInventory._nl) {
+                const _r = window.renderInventory;
+                const w3 = function () {
+                    const r = _r.apply(this, arguments);
+                    try { const u = me(); if (u) paintCards(u); } catch (e) { }
+                    return r;
+                };
+                Object.keys(_r).forEach(function (k) { if (!(k in w3)) { try { w3[k] = _r[k]; } catch (e) { } } });
+                w3._nl = true;
+                renderInventory = w3; window.renderInventory = w3;
+            }
+            done++;
+        }
+        if (done === 3) clearInterval(iv);
     }, 500);
     setTimeout(function () { clearInterval(iv); }, 30000);
 })();

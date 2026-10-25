@@ -151,22 +151,45 @@ setInterval(function () {
 // ==========================================
 // 소지품에 남은 장수를 적어 준다
 // ==========================================
+//   ★ 소지품 칸이 깜박이던 것 (2026-10-25) — 이 줄은 2초 시계로만 붙였다. 소지품 칸이 통째로 다시 그려지면
+//     (내 기록이 바뀔 때마다) 맨 위의 이 줄(43px 남짓)이 사라졌다가 다음 시계까지(길게는 2초) 비어 있어,
+//     아래로 내려 둔 화면이 그만큼 위로 튀었다가 돌아왔다. 이제 다시 그린 **바로 그 자리에서** 붙인다
+//     (renderInventory 를 감싼다 · 시계는 그대로 남겨 둔다 — 장수가 바뀌는 것을 고친다).
 (function badge() {
     const ID = 'moon-print-left';
-    setInterval(function () {
+    function paint() {
         const u = me();
         const box = document.getElementById('inventory-list-container');
         const old = document.getElementById(ID);
         if (!box || !u || !has(u)) { if (old) old.remove(); return; }
         const txt = '🖨 오늘 남은 달빛 ' + left(u) + ' / ' + TATTOO_PRINT.DAY + '장';
-        if (old) { if (old.textContent !== txt) old.textContent = txt; return; }
+        if (old && old.parentNode === box) { if (old.textContent !== txt) old.textContent = txt; return; }
+        if (old) old.remove();
         const d = document.createElement('div');
         d.id = ID;
         d.textContent = txt;
         d.style.cssText = 'margin:0 0 10px 0; padding:8px 11px; border-radius:6px; font-size:11px;'
             + ' background:rgba(150,170,220,0.10); border:1px solid #3d4a6a; color:#c3d0ee;';
         box.insertAdjacentElement('afterbegin', d);
-    }, 2000);
+    }
+    (function wrapRender() {
+        const iv = setInterval(function () {
+            if (typeof renderInventory !== 'function') return;
+            if (renderInventory._tattooLeft) { clearInterval(iv); return; }
+            const _r = renderInventory;
+            const w = function () {
+                const r = _r.apply(this, arguments);
+                try { paint(); } catch (e) { }
+                return r;
+            };
+            Object.keys(_r).forEach(function (k) { if (!(k in w)) { try { w[k] = _r[k]; } catch (e) { } } });   // 다른 묶음의 표식은 그대로
+            w._tattooLeft = true;
+            renderInventory = w; window.renderInventory = w;
+            clearInterval(iv);
+        }, 400);
+        setTimeout(function () { clearInterval(iv); }, 40000);
+    })();
+    setInterval(function () { try { paint(); } catch (e) { } }, 2000);
 })();
 
 // ==========================================
