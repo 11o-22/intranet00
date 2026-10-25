@@ -293,30 +293,63 @@ function badgeNoteKey(u) {
 }
 
 // 특이사항에서 한 줄을 지운다
+//   ★ 2026-10-25 — 특이사항은 「 | 」로 이어 적는다 (appendBadgeNoteToUser). 전에는 <br> · 줄바꿈으로만 갈라서
+//     「 | 」로 이은 글이 통째로 한 줄이 되어, 한 줄을 지우려다 **특이사항 전체를 지웠다**
+//     (황룡의 눈 · 산군의 도움으로 빼앗길 때 다른 줄까지 날아가던 것).
+const NOTE_SPLIT = /\s*\|\s*|<br\s*\/?>|\n/;
+function cutNoteText(raw, needle) {
+    raw = String(raw || '');
+    const sep = /<br\s*\/?>/i.test(raw) ? '<br>' : (/\s\|\s/.test(raw) || raw.indexOf('\n') < 0) ? ' | ' : '\n';
+    const parts = raw.split(NOTE_SPLIT).map(function (x) { return x.trim(); }).filter(Boolean);
+    const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
+    if (keep.length === parts.length) return null;
+    return keep.length ? keep.join(sep) : '특이사항 없음';
+}
 function removeBadgeLine(u, needle) {
-    if (!u || !u.badge) return;
+    if (!u || !u.badge || !needle) return;
 
     if (typeof u.badge === 'object') {
         const key = badgeNoteKey(u);
         if (!key) return;
-        const raw = String(u.badge[key] || '');
-        const br = /<br\s*\/?>/i.test(raw);
-        const parts = raw.split(/<br\s*\/?>|\n/);
-        const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
-        if (keep.length === parts.length) return;
-        u.badge[key] = keep.join(br ? '<br>' : '\n');
+        const out = cutNoteText(u.badge[key], needle);
+        if (out === null) return;
+        u.badge[key] = out;
     } else {
-        const raw = String(u.badge);
-        const br = /<br\s*\/?>/i.test(raw);
-        const parts = raw.split(/<br\s*\/?>|\n/);
-        const keep = parts.filter(function (x) { return x.indexOf(needle) < 0; });
-        if (keep.length === parts.length) return;
-        u.badge = keep.join(br ? '<br>' : '\n');
+        const out = cutNoteText(u.badge, needle);
+        if (out === null) return;
+        u.badge = out;
     }
 
     if (u.code === currentUser.code) saveFields({ badge: 1 });
     else if (typeof updateUserFields === 'function') updateUserFields(u.code, { badge: u.badge });
 }
+
+// 남의 특이사항 줄 — 서버에서 바로 지우거나 더한다 (내 화면 사본이 없거나 묵었어도 · 2026-10-25)
+//   users/<사번>/badge/notes 는 깊은 자리라 note-merge 를 거치지 않고 그대로 트랜잭션으로 간다.
+function serverNotes(code, fn) {
+    if (!code || typeof database === 'undefined' || !database) return Promise.resolve(false);
+    return database.ref('users/' + code + '/badge/notes').transaction(function (cur) {
+        const lines = String(cur == null ? '' : cur).split(NOTE_SPLIT).map(function (x) { return x.trim(); })
+            .filter(function (x) { return x && x !== '특이사항 없음'; });
+        const out = fn(lines.slice());
+        if (!out) return;                                    // 바꿀 것 없음
+        return out.length ? out.join(' | ') : '특이사항 없음';
+    }).then(function (r) { return !!(r && r.committed); }).catch(function () { return false; });
+}
+function serverCut(code, needles) {
+    return serverNotes(code, function (lines) {
+        const keep = lines.filter(function (l) { return !needles.some(function (n) { return l.indexOf(n) >= 0; }); });
+        return keep.length === lines.length ? null : keep;
+    });
+}
+function serverAdd(code, line) {
+    return serverNotes(code, function (lines) {
+        if (lines.indexOf(line) >= 0) return null;
+        return lines.concat([line]);
+    });
+}
+// 빼앗긴 쪽에 붙는 글 — 돌려받으면 다 걷는다
+const STEAL_MARKS = ['황룡의 눈길을 받았습니다', '산군의 숨결이 닿았습니다', '황룡의 시선을 받았습니다', '산군의 기운에 억눌립니다'];
 
 function toggleWorn(name) {
     const u = currentUser;
@@ -1351,6 +1384,11 @@ function stealPanel(target, srcName, maxPick, dayCap) {
         addHistoryLog(currentUser, '[' + srcName + '] ' + target.name + ' 사원에게서 ' + took.join(', '));
         addHistoryLog(target, '[' + srcName + '] ' + word);
         appendBadgeNoteToUser(target, word);
+        serverAdd(target.code, word);
+        (pulledLabels || []).forEach(function (w) {           // 빼앗긴 장비의 [장착됨] 줄 — 서버에서도 걷는다
+            const b0 = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+            serverCut(target.code, ['[장착됨] ' + b0]);
+        });
 
         // 가져온 쪽에는 무엇을 가져왔는지 적지 않는다. 썼다는 것만 한 줄.
         removeBadgeLine(currentUser, srcName + '을(를) 썼습니다');
@@ -1442,10 +1480,12 @@ function returnStolen(label, quiet) {
             }
             t.equippedWeapons = te;
             if (t.gearLock) delete t.gearLock[baseBack];
-            if (typeof appendBadgeNoteToUser === 'function') {
+            if (typeof appendBadgeNoteToUser === 'function' && String((t.badge && t.badge.notes) || '').indexOf('[장착됨] ' + baseBack) < 0) {
                 appendBadgeNoteToUser(t, '[장착됨] ' + baseBack);
             }
         }
+        // 빼앗길 때 걷은 [장착됨] 줄을 제자리에 — 서버에 바로 (사본이 없어도)
+        victimAlive(rec.from).then(function (ok) { if (ok) serverAdd(rec.from, '[장착됨] ' + baseBack); });
 
         // ★ 서버에는 배열을 통째로 보내지 않는다. 사본이 비어 있으면
         //   상대 장착칸이 텅 빈다. 돌려줄 하나만 보낸다. (gear-move.js)
@@ -1496,6 +1536,8 @@ function returnStolen(label, quiet) {
                 if (ok) database.ref('users/' + rec.from + '/gearSeal').remove();
             });
         }
+        // 빼앗겼다는 글 · 봉인 글 — 서버에서 바로 걷는다 (사본이 없거나 묵었어도)
+        victimAlive(rec.from).then(function (ok) { if (ok) serverCut(rec.from, STEAL_MARKS); });
     }
     if (rec.src && !Object.keys(currentUser.stolenGear || {}).some(function (k) {
             return currentUser.stolenGear[k] && currentUser.stolenGear[k].src === rec.src;
@@ -1545,6 +1587,41 @@ window.returnAllStolen = function () {
         clearInterval(iv);
         console.log('[신규] 빼앗은 장비 반환 연결');
     }, 500);
+})();
+
+// ★ 특이사항 스스로 걷기 (2026-10-25) — 무엇이 남겨 둔 것이든, 지금 걸린 것이 없으면 제 줄을 지운다
+//   빼앗긴 쪽 : 봉인이 없고(풀렸거나 날이 지남) 빼앗긴 버프도 다 끝났으면 「눈길 · 숨결 · 시선 · 기운」 줄
+//               (봉인만 풀렸으면 「시선 · 기운」 줄만)
+//   빼앗은 쪽 : 그 물건으로 빼앗아 둔 것(장비 · 상태 · 버프)이 하나도 없으면 「…을(를) 썼습니다.」 줄
+(function sweepStealNotes() {
+    setInterval(function () {
+        const u = currentUser;
+        if (!u || !u.badge) return;
+        const raw = String((typeof u.badge === 'object' ? u.badge[badgeNoteKey(u) || 'notes'] : u.badge) || '');
+        if (!raw) return;
+        const now = Date.now();
+        const live = ibList(u).filter(function (b) { return b && (b.run || !b.until || b.until > now); });
+        const cut = [];
+        if (!sealOn(u)) {
+            cut.push('황룡의 시선을 받았습니다', '산군의 기운에 억눌립니다');
+            const robbed = live.some(function (b) { return /에 빼앗김$/.test(String(b.src || '')); });
+            if (!robbed) cut.push('황룡의 눈길을 받았습니다', '산군의 숨결이 닿았습니다');
+        }
+        ['황룡의 눈', '산군의 도움'].forEach(function (S) {
+            const bag = u.stolenGear || {};
+            const holds = Object.keys(bag).some(function (k) { return bag[k] && bag[k].src === S; })
+                || live.some(function (b) { return b.src === S; });
+            if (!holds) cut.push(S + '을(를) 썼습니다');
+        });
+        const hit = cut.filter(function (n) { return raw.indexOf(n) >= 0; });
+        if (!hit.length) return;
+        hit.forEach(function (n) {
+            if (typeof u.badge === 'object') { const k = badgeNoteKey(u) || 'notes'; const o = cutNoteText(u.badge[k], n); if (o !== null) u.badge[k] = o; }
+            else { const o = cutNoteText(u.badge, n); if (o !== null) u.badge = o; }
+        });
+        serverCut(u.code, hit);
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    }, 15000);
 })();
 
 // 자정이 지나면 알아서 돌아간다
@@ -2438,9 +2515,14 @@ function sealOn(u) {
 function putSeal(target, srcName) {
     target.gearSeal = { by: currentUser.code, src: srcName, day: today() };
     updateUserFields(target.code, { gearSeal: target.gearSeal });
+    const word = SEAL_WORD[srcName] || '봉인되었습니다.';
     removeBadgeLine(target, '황룡의 시선을 받았습니다');
     removeBadgeLine(target, '산군의 기운에 억눌립니다');
-    appendBadgeNoteToUser(target, SEAL_WORD[srcName] || '봉인되었습니다.');
+    appendBadgeNoteToUser(target, word);
+    serverNotes(target.code, function (lines) {
+        const keep = lines.filter(function (l) { return l.indexOf('황룡의 시선을 받았습니다') < 0 && l.indexOf('산군의 기운에 억눌립니다') < 0; });
+        return keep.concat([word]);
+    });
 }
 
 function liftSeal(t) {
@@ -2452,6 +2534,7 @@ function liftSeal(t) {
     catch (e) { updateUserFields(t.code, { gearSeal: null }); }
     removeBadgeLine(t, '황룡의 시선을 받았습니다');
     removeBadgeLine(t, '산군의 기운에 억눌립니다');
+    serverCut(t.code, ['황룡의 시선을 받았습니다', '산군의 기운에 억눌립니다']);
 }
 
 // 봉인 중에는 아무것도 차지 못한다
