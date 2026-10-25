@@ -46,7 +46,7 @@ if (typeof DARK_ZONES !== 'undefined') {
         code: FIN, grade: 'S', name: '제■■■회 완벽한 피날레',
         brief: '(그대의 마지막 순간이 가장 아름답기를.)',
         warn: '트라우마 유발 가능성 주의 — 자살 소재, 사망 장면 직접 목격',
-        danger: '최상', survival: '0.1%', min: 1, max: 8, reward: [25000, 35000], ready: true,
+        danger: '최상', survival: '0.1%', min: 3, max: 8, reward: [25000, 35000], ready: true,
         voteMode: true, finale: true,
         intro: OP1,
         outro: '공연은 계속됩니다.',
