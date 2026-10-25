@@ -1829,7 +1829,8 @@ async function loverOf(db, o) {
         const cp = await db.get('users/' + o + '/couple');
         const pc = cp && typeof cp === 'object' ? cp.partner : null;
         if (!pc || !okCode(String(pc))) return null;
-        return { c: String(pc), n: await nameOfCode(db, String(pc)) };
+        const eq = invArr(await db.get('users/' + pc + '/equippedWeapons').catch(() => null));
+        return { c: String(pc), n: await nameOfCode(db, String(pc)), host: eq.some((w) => baseName(w) === SHOW) };   // 📺 사회자면 「사회자 님」 · 「브라운 님」
     } catch (e) { return null; }
 }
 // codes 곁의 신도 — 동행으로 붙은 것 (장착자가 아직 그 사람을 가리켜야 산다) · rest 면 장착자의 쉬는 신도도
@@ -1870,7 +1871,7 @@ async function foxdAt(db, codes, rest) {
 function foxdKey(id, f, last) {
     const D = DISCIPLES[f.k] || {};
     return id + ' = ' + foxdName(f) + ' (' + (D.n || f.k) + (f.nick ? ' · 주인이 지어 준 이름 ' + f.nick : '')
-        + ' · 주인 ' + (f.oN || f.o) + ' · 주인의 애인 ' + (f.lover && f.lover.n ? f.lover.n + ' (「사회자 님」 · 「브라운 님」으로 부른다)' : '없음')
+        + ' · 주인 ' + (f.oN || f.o) + ' · 주인의 애인 ' + (f.lover && f.lover.n ? f.lover.n + (f.lover.host ? ' (📺 브라운의 심야 토크 쇼를 차고 있다 — 「사회자 님」 · 「브라운 님」으로 부른다)' : ' (「' + f.lover.n + ' 님」으로 부른다)') : '없음')
         + (f.on !== f.o ? ' · 지금 ' + (f.onN || f.on) + ' 사원과 동행 중' : ' · 주인 곁') + ')'
         + (last && last.indexOf(id) >= 0 ? ' — ★ 이번이 마지막 한 마디 (bye)' : '');
 }
