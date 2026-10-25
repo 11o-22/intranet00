@@ -1601,7 +1601,7 @@ window.kroomNext = function () {
     kr._bfFav = bw ? B.fav(vis, JOBS[kr.job][0]) : -1;        // 🦋 유리한 쪽 — ◈
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : '')
         + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : '')
-        + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">— 🎐 여우 신도가 꼬리로 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다.</span>' : ''),
+        + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">「 여우 꼬리가 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다. 」</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;

@@ -452,16 +452,14 @@ function nodeath() {
     if (p && (Number(p.left) || 0) > 0) {
         p.left = (Number(p.left) || 0) - 1;
         save({ foxPl: 1 });
-        return '— 몸 안에서 무언가가 들끓는다. 아홉여우병이 죽음을 비껴가게 했다.<br>' + esc(p.byName ? p.byName + ' 사원의 ' : '') + '제 一 신도의 역병 — 즉사 무효 (남은 ' + p.left + ')';
+        return '「 아홉여우병이 들끓는다. 죽음이 당신을 비껴갔다. 」';           // 어둠 안에서는 횟수를 띄우지 않는다 (2026-10-25)
     }
     const w = withOf(me, 'd1'), x = rs();
     if (w && x && x.nd < (Number(w.s.nodeath) || 0)) {
         x.nd++;
-        const nm = esc(dName(w.owner, 'd1'));
-        const t = [nm + '가 당신을 들쳐 메고 그 자리를 벗어났다. 등 뒤에서 무언가가 닫히는 소리가 났다.',
-                   nm + '가 당신을 안아 들고 뛰었다. 발이 땅에 닿았을 때는 이미 그것의 손이 닿지 않는 곳이었다.',
-                   nm + '가 당신의 뒷덜미를 물어 끌어냈다. 방금 서 있던 자리가 통째로 꺼진다.'][rnd(0, 2)];
-        return '— ' + t + '<br>(즉사 무효 ' + x.nd + ' / ' + w.s.nodeath + ')';
+        return ['「 여우 신도가 당신을 들쳐 메고 그 자리를 벗어났다. 」',
+                '「 여우 신도가 당신을 안아 들고 뛰었다. 」',
+                '「 여우 꼬리가 당신을 휘감아 끌어냈다. 」'][rnd(0, 2)];
     }
     return null;
 }
@@ -473,12 +471,11 @@ function revive() {
         const d = DS[i], w = withOf(me, d);
         if (!w || x.rev[d]) continue;
         x.rev[d] = 1;
-        const nm = esc(dName(w.owner, d));
         log_(me, '[' + NAME + '] ' + dName(w.owner, d) + '가 쓰러진 당신을 되살렸습니다.');
         save({ history: 1 });
         return d === 'd1'
-            ? '— 쓰러진 몸 위로 여우 그림자가 내려앉는다.<br>' + nm + '가 당신의 입에 숨을 도로 불어 넣었다. 감긴 눈이 다시 뜨인다. (부활 — 이번 탐사 한 번)'
-            : '— 방울 소리가 난다. 아주 먼 데서, 그러다 바로 귓가에서.<br>' + nm + '가 당신의 이름을 부른다. 끊어졌던 숨이 그 부름을 따라 돌아온다. (부활 — 이번 탐사 한 번)';
+            ? '「 여우 그림자가 내려앉아 숨을 도로 불어 넣었다. 」'
+            : '「 방울 소리가 당신의 이름을 불렀다. 끊어졌던 숨이 돌아온다. 」';
     }
     return null;
 }
@@ -717,8 +714,8 @@ hook('luckReroll', function (_l) {
                 x.flip++;
                 const nr = rnd(C.FLIP[0], C.FLIP[1]);
                 const r = run();
-                if (r && r.log) r.log.push('[🎐 ' + dName(w.owner, 'd1') + '] 주사위를 뒤집음 (' + out + ' → ' + nr + ')');
-                toast('🎐 ' + dName(w.owner, 'd1') + '가 주사위를 뒤집어 놓았다 (' + out + ' → ' + nr + ' · ' + x.flip + '/' + w.s.luck + ')');
+                if (r && r.log) r.log.push('[🎐] 여우 꼬리가 주사위를 돌려놓았다');
+                toast('「 여우 꼬리가 주사위를 돌려놓았다. 」');                     // 횟수 · 눈은 띄우지 않는다
                 out = nr;
             }
         } catch (e) { }
@@ -832,8 +829,8 @@ function jisanToo() { try { return !!(window.JISANFOX && window.JISANFOX.wears(u
 function seeWho() {
     const me = u_();
     const w = withOf(me, 'd1');
-    if (w && (Number(w.s.evade) || 0) >= C.SEE) return '— ' + esc(dName(w.owner, 'd1')) + '가 꼬리로 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다.';
-    return '— 열에 들뜬 눈에 다른 것이 비친다. 아홉여우병이 길을 보여 준다. ☪️ 가 붙은 쪽은 죽는 길이다.';
+    if (w && (Number(w.s.evade) || 0) >= C.SEE) return '「 여우 꼬리가 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다. 」';
+    return '「 아홉여우병이 길을 보여 준다. ☪️ 가 붙은 쪽은 죽는 길이다. 」';
 }
 hook('renderChoiceStep', function (_c) {
     return function (title, text, options, imgKey) {
