@@ -1078,7 +1078,12 @@ function alone() {
     if (!darkRun.isParty) return true;
     try { return members().length <= 1; } catch (e) { return true; }
 }
-function soloHard(g) { return alone() ? (SOLO_HARD[g] || null) : null; }
+function soloHard(g) {
+    // 🦋 환영 나비 — 곁에 나비가 하나라도 남아 있으면 혼자가 아니다 (butterfly.js)
+    try { if (window.BFLY && window.BFLY.flyCount() > 0) return null; } catch (e) { }
+    return alone() ? (SOLO_HARD[g] || null) : null;
+}
+function bfly() { return window.BFLY || null; }
 function hurt(lose) {
     const got = {};
     if (!lose) return got;
@@ -1475,14 +1480,18 @@ window.kroomNext = function () {
     let vis = visible(it.sc.o);
     const fs = foxSense(vis);                                 // 🐾 감각 분신 — 즉사 기믹 쪽을 가린다
     if (fs) vis = fs.vis;
-    const skull = jisanOn();                                  // 📖 읽어내기 — 즉사 기믹에 🈲
-    show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : ''),
+    const B = bfly(), bw = !!(B && B.wears());
+    const skull = jisanOn() || bw;                            // 📖 읽어내기 · 🦋 프시케의 유리 — 즉사 기믹에 🈲
+    kr._bfFav = bw ? B.fav(vis, JOBS[kr.job][0]) : -1;        // 🦋 유리한 쪽 — ◈
+    show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : '')
+        + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;
             const cost = o.cost ? Object.keys(o.cost)[0] : null;
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
             const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">🈲</span> ' : '')
+                + (v.i === kr._bfFav ? '<span style="color:#c9b8ff;">◈</span> ' : '')
                 + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');
             return can ? darkChoiceBtn(lab, 'kroomPick(' + v.i + ')')
@@ -1513,7 +1522,10 @@ window.kroomPick = function (i) {
     kr._panic = false;
     const R = roll(o.k);
     const H = hard();
-    const dc = (o.dc || 13) + H.dc;
+    const B = bfly();
+    const psyDown = B ? B.takePsy() : 0;                   // 🦋 프시케 — 지난 장면에서 숫자를 맞혔다
+    const fav = !!(B && i >= 0 && i === kr._bfFav);
+    const dc = (o.dc || 13) + H.dc - psyDown;
     // 1 은 늘 실패, 20 은 늘 성공 — B 이상은 DC 가 20 을 넘어 보정이 낮으면 아예 못 넘는 자리가 생긴다
     //   ★ 혼자 A · S 에서는 20 도 늘 성공이 아니다 (SOLO_HARD.no20)
     let ok = R.r !== 1 && ((R.r === 20 && !H.no20) || (R.r + R.b) >= dc);
@@ -1535,6 +1547,15 @@ window.kroomPick = function (i) {
     }
     // 특수 물건 — 즉사 기믹은 부순다
     if (!ok && !H.doom && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
+    // 🦋 레테의 수의 — 한 번 더 굴린다 (+2 · 혼자 S 라도 다시 굴린 눈은 보통 DC 로 잰다)
+    if (!ok && B && B.lethe()) {
+        const r2 = Math.floor(Math.random() * 20) + 1;
+        const dc2 = (o.dc || 13) + Math.min(H.dc, 7) - psyDown;
+        ok = r2 !== 1 && (r2 + R.b + B.C.LETHE_ADD) >= dc2;
+        gl += bflyLine('— 레테의 수의가 방금 것을 덮었다. 다시: 🎲 ' + r2 + ' (+' + B.C.LETHE_ADD + ' / DC ' + dc2 + ')' + (ok ? ' 성공' : ' 이번에도 실패'));
+    }
+    // 🦋 파훼 나비 — 즉사 기믹을 부순다
+    if (!ok && o.doom && B) { const bs = B.smash(); if (bs) { ok = true; gl += bflyLine('— ' + esc(bs) + ' — 날개 끝이 닿은 자리부터 가루가 되어 무너졌다.'); } }
     if (o.doom && jisanOn()) kr.truth = true;               // 📖 죽을 길을 잡았다
     kr.idx++;
     if (it.kind === 'j') { const k = prof(); (k.seen = k.seen || {})[it.sc.t] = 1; }
@@ -1559,7 +1580,7 @@ window.kroomPick = function (i) {
         const got = reward(o.win, it.kind);
         let tail = got;
         if (o.wake && it.kind === 'j') tail += wakeUp();
-        show(it.sc.t + ' — 결과', dice + gl + o.ok + tail, darkChoiceBtn('계속한다.', 'kroomNext()'));
+        show(it.sc.t + ' — 결과', dice + gl + o.ok + tail, (fav ? B.guessHtml() : '') + darkChoiceBtn('계속한다.', 'kroomNext()'));
     } else {
         darkRun.fail++;
         // 회피 — 즉사에 걸려도 한 번 빠져나온다
@@ -1570,7 +1591,28 @@ window.kroomPick = function (i) {
                 darkChoiceBtn('계속한다.', 'kroomNext()'));
             return;
         }
+        // 🦋 회피 나비 · 에로스의 마지막 숨결 — 즉사를 비켜 선다
+        if (o.doom && B) {
+            const be = B.evade();
+            if (be) {
+                addStat('mind', -6);
+                show(it.sc.t + ' — 결과', dice + gl + bflyLine('— ' + esc(be) + ' — 날개가 시야를 가렸다. 반 걸음 옆에 서 있다.')
+                    + (o.doom.text || ''), darkChoiceBtn('계속한다.', 'kroomNext()'));
+                return;
+            }
+            const bd = B.dodge();
+            if (bd) {
+                show(it.sc.t + ' — 결과', dice + gl + '<div style="font-size:11px; color:#ffb3c7; margin-bottom:8px;">— 입술에 남아 있던 숨이 한 번 더 뛰었다. ' + esc(bd) + '이 그 죽음을 비껴갔다.</div>'
+                    + (o.doom.text || ''), darkChoiceBtn('계속한다.', 'kroomNext()'));
+                return;
+            }
+        }
         if (o.doom) { doom(o.doom); return; }
+        // 🦋 무효 나비 — 실패해서 잃을 것을 없던 일로
+        if (B && o.lose && Object.keys(o.lose).some(function (s) { return o.lose[s] < 0; })) {
+            const bn = B.nul();
+            if (bn) { o = Object.assign({}, o, { lose: {} }); gl += bflyLine('— ' + esc(bn) + ' — 다친 자리가 처음부터 없었던 것처럼 닫힌다.'); }
+        }
         // 굳건 — 체력이 깎일 것을 한 번 막는다
         if (o.lose && o.lose.hp < 0 && !H.doom && gearUse('steady')) {
             o = Object.assign({}, o, { lose: Object.assign({}, o.lose, { hp: 0 }) });
@@ -1673,6 +1715,14 @@ function rest() {
     const mates = darkRun.isParty && teamStats().some(function (m) { return m.code !== me().code && !m.dead; });
     const R = mates ? REST_PARTY : REST_SOLO;
     const got = Object.keys(R).map(function (s) { const d = addStat(s, R[s]); return d ? STATN[s] + ' ' + (d > 0 ? '+' : '') + d : ''; }).filter(Boolean);
+    // 🦋 치유 나비 — 쉼터마다 체력 · 심력
+    try {
+        const bh = bfly() && bfly().restHeal();
+        if (bh) {
+            const a = addStat('hp', bh.hp), m = addStat('mind', bh.mind);
+            if (a || m) got.push('🦋 ' + esc(bh.nick) + (a ? ' 체력 +' + a : '') + (m ? ' 심력 +' + m : ''));
+        }
+    } catch (e) { }
     kr.uses = {};                                  // 돌봄 횟수는 층마다
     if (last) { clear(); return; }
     const others = otherTeams();
@@ -2356,6 +2406,9 @@ function itemSmash() {
     }
     return null;
 }
+function bflyLine(t) {
+    return `<div style="font-size:11px; color:#c9b8ff; margin:0 0 8px 0; padding:7px 9px; border:1px solid #4a3f6a; border-radius:5px; background:rgba(90,70,130,.12);">🦋 ${t}</div>`;
+}
 function itemLine(g) {
     return `<div style="font-size:11px; color:#ffd9a0; margin:0 0 8px 0; padding:7px 9px; border:1px solid #6a4c2a; border-radius:5px; background:rgba(147,106,46,.12);">
         ${esc(g.n)} — <b>즉사 기믹 파훼</b> <span style="color:#bbb;">${g.t}</span></div>`;
@@ -2443,6 +2496,12 @@ function lastChance(why) {
             K.kill('heal', '한 번 살리고 소멸했습니다.');
             return standUp(why, '[ 치유의 기운이 깃듭니다. ]<br>' + esc(foxNick(he)) + '이(가) 당신에게 이마를 대었다.<br>숨이 돌아온다. 그 자리에 아무것도 남지 않았다.', '#9fe6b0');
         }
+    }
+    // 🦋 환영 나비 — 나비 하나가 대신 소멸하거나, 모이라이의 실타래가 끝을 미룬다
+    const BF = bfly();
+    if (BF) {
+        const bl = BF.save();
+        if (bl) return standUp(why, bl, '#c9b8ff');
     }
     // 품 안의 것 — 고유 DNA · 은심장 · 눈의 「회피」 횟수
     if (typeof dnaCharge !== 'undefined' && dnaCharge && ((dnaCharge.death || 0) > 0 || (dnaCharge.eva || 0) > 0)) {
@@ -2659,6 +2718,15 @@ function settle(how, txt) {
         if (lx && pts > 0) { const m = K.lootRoll(); pts = Math.round(pts * m); extra.push('🐾 ' + esc(foxNick(lx)) + ' — 포인트 ×' + m.toFixed(2)); }
         if (p && p.talkShow && (p.alive || {})[p.talkShow.by] && pts > 0) { pts *= 2; extra.push('📺 사회자와 끝까지 — 포인트 ×2'); }
         if (window.eyeKroom) { let m = 1; try { m = window.eyeKroom.mult(); } catch (e) { } if (m !== 1) { pts = Math.round(pts * m); extra.push('🔎 눈의 몫 — 포인트 ×' + m); } }
+        // 🦋 환영 나비 — 맹약 · 모이라이 · 숨결 (다 곱해도 ×2 까지) · 살아 나온 나비마다 경험 +1
+        const BF = bfly();
+        if (BF) {
+            try {
+                const M = BF.mult();
+                if (M.m > 1 && pts > 0) { pts = Math.round(pts * M.m); extra.push('🦋 환영 나비 — 포인트 ×' + M.m.toFixed(2) + (M.why.length ? ' (' + M.why.join(' · ') + ')' : '')); }
+                BF.runXp();
+            } catch (e) { }
+        }
     }
     if (pts) { try { changePoints(pts); } catch (e) { } }
     if (pts > 0 && window.eyeKroom) { try { window.eyeKroom.rec(pts); } catch (e) { } }

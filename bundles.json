@@ -400,7 +400,8 @@
       "finale-sw.js",
       "finale-be.js",
       "finale-bq.js",
-      "finale-items.js"
+      "finale-items.js",
+      "butterfly.js"
     ]
   ]
 }

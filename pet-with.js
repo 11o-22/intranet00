@@ -173,6 +173,11 @@ function begin() {
     const s = P().pets(u)[String(id)];
     if (!s) { u.petWith = null; return; }
     if (s.out && s.out.till) return;              // 혼자 나가 있다
+    if (Number(u.petSleepUntil) > Date.now()) {   // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 펫이 잠들어 있다
+        const nk = P().nick(id, u);
+        log_('[펫 동행] ' + nk + P().josa(nk, '은') + ' 깊이 잠들어 따라오지 않았습니다.');
+        return;
+    }
     d._pet = id;
     P().patch(id, { 'with': 1 });
     const nick = P().nick(id, u);

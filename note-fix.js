@@ -140,6 +140,11 @@ const EXPIRY = [
         try { return window.kitNoteLive ? window.kitNoteLive(u, note) : true; }
         catch (e) { return true; }
     } },
+    // 🦋 환영 나비 — 거둬 가거나 소멸하면 줄도 걷는다. 재는 쪽은 butterfly.js 의 bflyNoteLive.
+    { mark: '[🦋 ', live: function (u, note) {
+        try { return window.bflyNoteLive ? window.bflyNoteLive(u, note) : true; }
+        catch (e) { return true; }
+    } },
     // 🍰 식당 디저트 — 여기서 재지 않는다. 아래 sweetLines 가 먹은 번마다 한 줄씩 맞춘다 (2026-10-23)
     // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
     { mark: '⛓️‍💥', live: function (u, note) {
