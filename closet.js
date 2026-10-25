@@ -159,11 +159,15 @@ const DOT = {
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
-    //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다).
+    //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다) — RAB_OK 에 적힌 것만 깐다.
     //   ✗ 처음엔 잎을 뒤 · 줄기를 앞에 두었다 — 정반대였다 (같은 날 바로잡음).
     BACK_Z: ['leaf-puddle', 'leaf-stem'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     FRONT: ['leaf-umb', 'leaf-rain'],
+    // ★ 토끼(bare)에게도 얹는 장 — 잎 우산은 내리는 비와 우산만 (발밑 웅덩이는 뺀다 · 2026-10-25)
+    //   자리는 사람 것 그대로다 — 토끼 머리 위로 잎이 조금 높이 뜨고 줄기가 손 옆에서 땅까지 닿아,
+    //   큰 잎을 받쳐 든 모양이 된다 (16도트 내려 보았더니 줄기 끝이 발밑으로 빠져 그대로 두었다).
+    RAB_OK: ['leaf-stem', 'leaf-umb', 'leaf-rain'],
     // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
     NO_TAG: ['leaf-rain', 'leaf-puddle'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
@@ -705,9 +709,15 @@ function look(user, override, all) {
     //   ★ 토끼 자리에 맞춰 그린 악세(rab)는 그 반대다 — **토끼에게만** 얹는다.
     //     사람 몸에 올리면 가슴 한참 아래 허공에 뜬다.
     if (hd.bare) {
+        // ★ 토끼에게도 얹는 사람 악세 (RAB_OK · 2026-10-25) — 잎 우산의 잎 · 빗물 · 줄기. 발밑 웅덩이는 뺀다.
+        const ok = D.RAB_OK || [];
+        const keepT = tops.filter(function (o) { return ok.indexOf(o) >= 0; });
+        const keepB = backs.filter(function (o) { return ok.indexOf(o) >= 0; });
         tops.length = 0;
-        backs.length = 0;                                 // 몸 뒤에 까는 것(잎 우산)도 사람 자리에 맞춰 그려져 있다
+        backs.length = 0;                                 // 몸 뒤에 까는 것 — 웅덩이는 사람 발 자리에 맞춰 그려져 있다
         rabTops.forEach(function (o) { tops.push(o); });
+        keepT.forEach(function (o) { tops.push(o); });
+        keepB.forEach(function (o) { backs.push(o); });
     }
     // ★ 몸 뒤에 까는 장 — BACK_Z 차례 (아래부터) · 맨 앞에 둘 장(FRONT)은 악세 끝으로 옮긴다
     backs.sort(function (a, b) { return D.BACK_Z.indexOf(a) - D.BACK_Z.indexOf(b); });
