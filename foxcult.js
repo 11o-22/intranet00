@@ -24,7 +24,7 @@
 //               행운 배수 100~1500% — 회수품 확률 · 공용시설 행운 ×(1 + 수치/100)
 //
 //   걸리면 그 사람 특이사항에  🎐 제 一 신도가 역병을 뿌립니다. - 회피 12  처럼 한 줄씩 적힌다.
-//   ★ 역병에 걸린 사람이 탐사(어둠 · EPIC · K의 방 · 피날레)에서 얻은 포인트 · 경험치(K의 방)는
+//   ★ 역병에 걸린 사람 · 신도가 동행하는 사람이 탐사(어둠 · EPIC · K의 방 · 피날레)에서 얻은 포인트 · 경험치(K의 방)는
 //     역병을 뿌린 장착자에게도 똑같이 들어간다 (payouts · foxShare — 들어오면 받는다).
 //
 // ■ 동행 — 신도를 사람 곁에 붙여 보낸다 (본인도 된다 · 거둬 올 때까지)
@@ -159,10 +159,11 @@ function plAll(u) { return (u && obj(u.foxPl)) ? u.foxPl : {}; }
 function plOf(u, k) { const p = plAll(u)[k]; return (p && (Number(p.until) || 0) > now()) ? p : null; }
 function plVal(u, k) { const p = plOf(u, k); return p ? (Number(p.v) || 0) : 0; }
 function plLive(u) { return Object.keys(plAll(u)).filter(function (k) { return !!plOf(u, k); }); }
-// 이 사람에게 역병을 뿌린 장착자들 (자기 자신은 뺀다)
+// 이 사람의 탐사 몫을 같이 받는 장착자들 — 역병을 뿌린 사람 · 신도를 동행시킨 사람 (자기 자신은 뺀다)
 function spreaders(u) {
     const out = {};
     plLive(u).forEach(function (k) { const p = plOf(u, k); if (p.by && p.by !== u.code) out[p.by] = p.byName || nameOf(p.by); });
+    DS.forEach(function (d) { const w = withOf(u, d); if (w && w.by !== u.code) out[w.by] = w.owner.name || nameOf(w.by); });
     return out;
 }
 
@@ -517,7 +518,7 @@ function share(pts, exp, where) {
             if (exp > 0) d.ref('foxShare/' + code).push({ exp: exp, from: me.code, fromName: me.name || '', where: where, at: now() });
         } catch (e) { }
     });
-    log_(me, '[' + NAME + '] 역병의 몫 — ' + who.map(function (c) { return by[c]; }).join(', ') + ' 사원에게도 같은 몫이 갔습니다'
+    log_(me, '[' + NAME + '] 여우 신도의 몫 — ' + who.map(function (c) { return by[c]; }).join(', ') + ' 사원에게도 같은 몫이 갔습니다'
         + ' (' + [pts > 0 ? pts.toLocaleString() + ' P' : '', exp > 0 ? '경험치 ' + exp : ''].filter(Boolean).join(' · ') + ')');
     save({ history: 1 });
     return who.map(function (c) { return by[c]; });
@@ -874,13 +875,13 @@ function settleWrap(where, _r, self, args, dead) {
                 try { d.ref('payouts/' + code).push({ amount: total, note: '[' + NAME + '] ' + (me.name || '') + ' 사원의 탐사 몫 (' + where + ') +' + total.toLocaleString() + ' P', at: now() }); } catch (e) { }
             });
             to = Object.keys(by).map(function (c) { return by[c]; });
-            log_(me, '[' + NAME + '] 역병의 몫 — ' + to.join(', ') + ' 사원에게도 ' + total.toLocaleString() + ' P 가 갔습니다.');
+            log_(me, '[' + NAME + '] 여우 신도의 몫 — ' + to.join(', ') + ' 사원에게도 ' + total.toLocaleString() + ' P 가 갔습니다.');
             save({ history: 1 });
         }
         if (extra || to.length) {
             setTimeout(function () {
                 alert_('🎐 ' + NAME + '\n\n' + (extra ? '포인트 배수 ×' + m + ' (+' + extra.toLocaleString() + ' P)\n' : '')
-                    + (to.length ? '역병의 몫 — ' + to.join(', ') + ' 사원에게도 같은 ' + total.toLocaleString() + ' P 가 갑니다.' : ''));
+                    + (to.length ? '여우 신도의 몫 — ' + to.join(', ') + ' 사원에게도 같은 ' + total.toLocaleString() + ' P 가 갑니다.' : ''));
             }, 1400);
         }
     } catch (e) { console.warn('[여우 신도] 정산', e); }
@@ -1084,7 +1085,7 @@ window.foxdMenu = function () {
             + '<button class="game-btn fd-nk" data-d="' + d + '" style="flex:0 0 auto; margin:0; padding:9px 10px; font-size:11px;">이름</button></div></div>';
     };
     const mine = infected();
-    const w = box(head(NAME, '두 신도가 아홉여우병을 퍼트립니다. 남에게는 몇 번이든 · 수치도 마음대로, 본인에게는 하루 딱 한 번 한 가지. 역병은 한 시간.<br>역병에 걸린 사람이 탐사에서 얻은 포인트 · 경험치는 당신에게도 똑같이 들어옵니다.')
+    const w = box(head(NAME, '두 신도가 아홉여우병을 퍼트립니다. 남에게는 몇 번이든 · 수치도 마음대로, 본인에게는 하루 딱 한 번 한 가지. 역병은 한 시간.<br>역병에 걸린 사람 · 신도가 동행하는 사람이 탐사에서 얻은 포인트 · 경험치는 당신에게도 똑같이 들어옵니다.')
         + card('d1') + card('d2')
         + '<div style="font-size:10.5px; color:#bbb; line-height:1.8; padding:8px 10px; border:1px solid #3a2420; border-radius:6px; margin-bottom:9px;">'
         + '본인에게 오늘 남은 역병 <b style="color:#f0c987;">' + (selfUsed(me) ? 0 : 1) + ' / 1</b><br>'
@@ -1265,7 +1266,7 @@ function withWho(d) {
         return '<button class="game-btn fd-ww" data-c="' + esc(t.code) + '"' + (here ? ' disabled' : '') + ' style="' + BTN + (here ? GREY : '') + '">' + esc(t.name) + ' <span style="font-size:9px; color:#777;">사번 ' + esc(t.no || '-') + '</span>'
             + (here ? '<div style="font-size:9px; color:#9fe6b0; margin-top:2px;">지금 이 사원과 동행 중</div>' : taken ? '<div style="font-size:9px; color:#a08a70; margin-top:2px;">다른 사원의 ' + D_NAME[d] + '가 곁에 있습니다 — 바꿔 붙습니다</div>' : '') + '</button>';
     }).join('');
-    const w = box(head('🦊 ' + dName(me, d) + ' — 누구와 동행', '보낼 때 신도가 지닐 능력치를 정합니다. 동행하는 동안 이 신도의 역병은 뿌리지 못합니다.')
+    const w = box(head('🦊 ' + dName(me, d) + ' — 누구와 동행', '보낼 때 신도가 지닐 능력치를 정합니다. 동행하는 동안 이 신도의 역병은 뿌리지 못합니다.<br>동행하는 사람이 탐사에서 얻은 포인트 · 경험치는 당신에게도 똑같이 들어옵니다.')
         + '<button class="game-btn" id="fd-me" style="' + BTN + ' border-color:#5fae7a !important;"' + (c.to === me.code ? ' disabled' : '') + '>🎐 본인 — 내 곁에서 어둠까지 함께' + (c.to === me.code ? '<div style="font-size:9px; color:#9fe6b0; margin-top:2px;">지금 동행 중</div>' : '') + '</button>'
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="fd-x" class="game-btn" style="' + MID + GREY + '">돌아간다</button>');
@@ -1304,7 +1305,7 @@ function withTune(d, code) {
         const line = sendWith(d, code, s);
         shut();
         if (line) alert_('🎐 ' + dName(me, d) + '가 ' + (code === me.code ? '당신' : t.name + ' 사원') + '과 동행합니다.\n\n' + line.replace(/^🎐 /, '')
-            + (d === 'd2' && s.rescue ? '\n구출 — 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 불러냅니다.' : '') + '\n\n동행하는 동안 이 신도의 역병은 뿌리지 못합니다.');
+            + (d === 'd2' && s.rescue ? '\n구출 — 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 불러냅니다.' : '') + '\n\n동행하는 동안 이 신도의 역병은 뿌리지 못합니다.' + (code === me.code ? '' : '\n그 사원이 탐사에서 얻는 포인트 · 경험치가 당신에게도 똑같이 들어옵니다.'));
     });
     on(w, '#fd-x', function () { c.to ? withMenu(d) : withWho(d); });
 }

@@ -2869,7 +2869,7 @@ function settle(how, txt) {
     if (!helper && foxc()) {
         try {
             const to = foxc().share(pts, exp, '『 K 의 방 』');
-            if (to && to.length) extra.push('🎐 역병의 몫 — ' + to.map(esc).join(', ') + ' 사원에게도 같은 몫이 갑니다');
+            if (to && to.length) extra.push('🎐 여우 신도의 몫 — ' + to.map(esc).join(', ') + ' 사원에게도 같은 몫이 갑니다');
         } catch (e) { }
     }
     if (pts > 0 && window.eyeKroom) { try { window.eyeKroom.rec(pts); } catch (e) { } }
