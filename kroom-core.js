@@ -1597,17 +1597,17 @@ window.kroomNext = function () {
     if (fs) vis = fs.vis;
     const B = bfly(), bw = !!(B && B.wears());
     const fsee = foxSee();                                    // 🎐 여우 신도 — 회피 7 이상
-    const skull = jisanOn() || bw || fsee;                    // 📖 읽어내기 · 🦋 프시케의 유리 · 🎐 회피 — 즉사 기믹에 🈲
+    const skull = jisanOn() || bw || fsee;                    // 📖 읽어내기 · 🦋 프시케의 유리 · 🎐 회피 — 즉사 기믹에 🈲 (🎐 는 ☪️)
     kr._bfFav = bw ? B.fav(vis, JOBS[kr.job][0]) : -1;        // 🦋 유리한 쪽 — ◈
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : '')
         + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : '')
-        + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">— 🎐 여우 신도가 꼬리로 한쪽을 가린다. 🈲 가 붙은 쪽은 죽는 길이다.</span>' : ''),
+        + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">— 🎐 여우 신도가 꼬리로 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다.</span>' : ''),
         (vis.length ? '' : darkChoiceBtn('① 이를 악물고 지나간다.', 'kroomPick(-1)')) +
         vis.map(function (v) {
             const o = v.o;
             const cost = o.cost ? Object.keys(o.cost)[0] : null;
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
-            const lab = (skull && o.doom ? '<span style="color:#ff6b6b;">🈲</span> ' : '')
+            const lab = (skull && o.doom ? (fsee ? '☪️ ' : '<span style="color:#ff6b6b;">🈲</span> ') : '')
                 + (v.i === kr._bfFav ? '<span style="color:#c9b8ff;">◈</span> ' : '')
                 + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');

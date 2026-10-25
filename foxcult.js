@@ -14,7 +14,7 @@
 //   제 一 신도  판정 1~15       굴림 +수치
 //               행운 1~15       행운(재산 보존 · 대실패 무효 · 회수품 ×2 …) +수치/15 (15 면 100%)
 //               기믹 파훼 1~10  기믹 파훼 횟수 +수치
-//               회피 1~15       회피(은신) 굴림 +수치 · 7 이상이면 선택지에서 죽는 길이 🈲 로 보인다
+//               회피 1~15       회피(은신) 굴림 +수치 · 7 이상이면 선택지에서 죽는 길이 ☪️ 로 보인다
 //               즉사 무효 1~10  즉사를 수치만큼 무효로 한다 (한 시간 안에 쓴 만큼 준다)
 //               ★ 병에 걸린 사람이 죽으면 제 一 신도의 역병(위 다섯)은 같은 탐사의 살아 있는 사람 하나에게 옮겨 간다
 //   제 二 신도  상담실 · 선녀탕 구출 — 바로 꺼내거나(「제 二 신도가 당신을 부릅니다.」)
@@ -32,7 +32,7 @@
 //   보낼 때 신도가 지닐 능력치를 정한다. 동행 중인 신도의 역병은 뿌리게 명하지 못한다.
 //   제 一 신도  판정 · 행운 · 기믹 파훼 · 회피 · 즉사 무효 (0 = 안 줌)
 //               행운 — 눈이 9 이하면 주사위를 뒤집어 15~20 으로 만든다 (탐사당 수치만큼)
-//               회피 7 이상 — 피할 길을 알려 준다 (🈲)
+//               회피 7 이상 — 피할 길을 알려 준다 (☪️)
 //               즉사 무효 — 죽을 자리에서 들쳐 메거나 안아 들고 빠져나온다 (탐사당 수치만큼)
 //   제 二 신도  어디든지 갈 수 있다 (인원수 · 구역이 차 있어도) · 포인트 배수 · 행운 배수 · 구출(쓰러져
 //               상담실 · 선녀탕으로 가게 되면 바로 불러낸다)
@@ -793,7 +793,7 @@ hook('epicDeath', function (_e) {
 });
 
 // ==========================================
-// 선택지 — 회피 7 이상이면 죽는 길(0번이 아닌 쪽)에 🈲 (내 화면에만 · jisan.js 와 같은 약속)
+// 선택지 — 회피 7 이상이면 죽는 길(0번이 아닌 쪽)에 ☪️ (내 화면에만 · jisan.js 와 같은 약속)
 // ==========================================
 function shared() {
     const r = run();
@@ -803,8 +803,8 @@ function jisanToo() { try { return !!(window.JISANFOX && window.JISANFOX.wears(u
 function seeWho() {
     const me = u_();
     const w = withOf(me, 'd1');
-    if (w && (Number(w.s.evade) || 0) >= C.SEE) return '— ' + esc(dName(w.owner, 'd1')) + '가 꼬리로 한쪽을 가린다. 🈲 가 붙은 쪽은 죽는 길이다.';
-    return '— 열에 들뜬 눈에 다른 것이 비친다. 아홉여우병이 길을 보여 준다. 🈲 가 붙은 쪽은 죽는 길이다.';
+    if (w && (Number(w.s.evade) || 0) >= C.SEE) return '— ' + esc(dName(w.owner, 'd1')) + '가 꼬리로 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다.';
+    return '— 열에 들뜬 눈에 다른 것이 비친다. 아홉여우병이 길을 보여 준다. ☪️ 가 붙은 쪽은 죽는 길이다.';
 }
 hook('renderChoiceStep', function (_c) {
     return function (title, text, options, imgKey) {
@@ -813,8 +813,8 @@ hook('renderChoiceStep', function (_c) {
             if (me && seesOf(me) && !jisanToo() && Array.isArray(options) && options.length > 1) {
                 if (!shared()) {
                     options = options.map(function (o, i) {
-                        if (i === 0 || !o || String(o.label || '').indexOf('🈲') >= 0) return o;
-                        return Object.assign({}, o, { label: '🈲 ' + o.label });
+                        if (i === 0 || !o || String(o.label || '').indexOf('☪️') >= 0) return o;
+                        return Object.assign({}, o, { label: '☪️ ' + o.label });
                     });
                 }
                 text = String(text || '') + '<br><br><span style="color:#f0c987;">' + seeWho() + '</span>';
@@ -833,8 +833,8 @@ hook('renderVoteState', function (_v) {
             if (!area) return out;
             const bs = area.querySelectorAll('button[onclick^="castVote"]');
             for (let i = 1; i < bs.length; i++) {
-                if (bs[i].innerHTML.indexOf('🈲') >= 0) continue;
-                bs[i].insertAdjacentHTML('afterbegin', '🈲 ');
+                if (bs[i].innerHTML.indexOf('☪️') >= 0 || bs[i].innerHTML.indexOf('🈲') >= 0) continue;
+                bs[i].insertAdjacentHTML('afterbegin', '☪️ ');
             }
         } catch (e) { }
         return out;
