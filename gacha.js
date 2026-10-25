@@ -76,6 +76,10 @@ const GACHA_WEAR = [
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
     { k: 'han-inner',   n: '내의',       g: 'A', s: ['han-inner'] },
     { k: 'brown-suit',  n: '브라운 정장', g: 'A', s: ['brown-suit'] },
+    // 탈 의상 세 벌 (2026-10-25) — 머리까지 감싸는 통짜 · 등급은 A~B 로 말씀하셔서 A 로 두었습니다
+    { k: 'golden-resort', n: '골든 리조트 의상', g: 'A', s: ['golden-resort'] },
+    { k: 'red-bunny',     n: '레드 버니 의상',   g: 'A', s: ['red-bunny'] },
+    { k: 'yongyong',      n: '용용이 의상',      g: 'A', s: ['yongyong'] },
     { k: 'dream-suit',  n: '백일몽 정장', g: 'B', s: ['dream-suit'] },
     // 요원복 두 벌 — 등급은 말씀이 없으셔서 B 로 두었습니다 (고치셔도 됩니다)
     { k: 'agent1',      n: '요원복 1',   g: 'B', s: ['agent1'] },
@@ -89,6 +93,9 @@ const GACHA_WEAR = [
     { k: 'band-outfit',  n: '룩키마트 의상', g: 'B', s: ['band-outfit'] },
     { k: 'knit',         n: '가을 니트',    g: 'B', s: ['knit'] },
     { k: 'gym-suit',     n: '체육복',       g: 'B', s: ['gym-suit'] },
+    // 퐁실 둘 (2026-10-25) — A~B 로 말씀하셔서 B 로 두었습니다
+    { k: 'pongsil',       n: '퐁실 의상', g: 'B', s: ['pongsil'] },
+    { k: 'pongsil-shoes', n: '퐁실 신발', g: 'B', s: ['pongsil-shoes'] },
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },
