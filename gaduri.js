@@ -85,6 +85,7 @@ let mineWas = null;
     setInterval(function () {
         const me = u_();
         if (!me || me.code === ADMIN || !loaded || !roomOf(me.code)) return;
+        if (typeof darkRun !== 'undefined' && darkRun) return;              // 어둠 탐사 중에는 덮지 않는다 — 나오면 그때 연다
         if (document.getElementById('plaza-ov') || typeof window.plazaOpen !== 'function') return;
         const ms = document.getElementById('main-screen');
         if (!ms) return;
@@ -118,8 +119,16 @@ setInterval(function () {
     if (now === mineWas.room) return;
     const was = mineWas.room;
     mineWas.room = now;
-    const auto = now && ((all[now] || {})[me.code] || {}).auto;
-    if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.' : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
+    const ent = now ? ((all[now] || {})[me.code] || {}) : {};
+    const auto = ent.auto;
+    // 🎐 여우 신도가 가뒀다 (무례하게 군 사람 · 서버가 적는다 · until 이 지나면 풀린다 — foxcult.js · api/_disaster)
+    const fd = !auto && ent.by === 'foxd';
+    if (fd) {
+        try { if (typeof addHistoryLog === 'function') { addHistoryLog(me, '[가두리] ' + (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.why ? ' (' + ent.why + ')' : '')); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
+    }
+    if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.'
+            : fd ? (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
+            : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
         + '\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
     else if (was) alert_('🔓 가두리\n\n' + NAME[was] + ' 가두리에서 풀려났습니다.');
 }, 1000);
@@ -202,6 +211,7 @@ function paintAdmin() {
                         + '<span style="font-size:12px; color:#fff;">' + esc((u && u.name) || v.name || c) + '</span>'
                         + '<span style="font-size:10px; color:#777;">' + esc((u && u.no) || '') + '</span>'
                         + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중 (저절로)</span>' : '')
+                        + (v.by === 'foxd' ? '<span style="font-size:10px; color:#f0c987;">' + esc(v.byName || '🎐 여우 신도') + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
                         + '<button class="game-btn" style="margin:0 0 0 auto; padding:5px 10px; font-size:10px;" onclick="gaduriFree(\'' + esc(c) + '\')">풀어 준다</button></div>';
                 }).join('') : '<div style="font-size:10px; color:#666;">비어 있습니다.</div>')
                 + '</div>';
@@ -287,6 +297,7 @@ setInterval(function () {
     ROOMS.forEach(function (r) {
         Object.keys(all[r.k] || {}).forEach(function (c) {
             const v = all[r.k][c] || {};
+            if (v.by === 'foxd' && Number(v.until) > 0 && Date.now() > Number(v.until)) { d.ref(NODE + '/' + r.k + '/' + c).remove(); return; }   // 🎐 여우 신도가 정한 시간이 다 됐다
             if (!v.auto) return;
             const u = users()[c];
             const end = Math.max(Number(v.until) || 0, Number(u && u.quarantineUntil) || 0);

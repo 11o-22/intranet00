@@ -73,7 +73,7 @@ const D_NAME = { d1: '제 一 신도', d2: '제 二 신도' };
 function seq(a, b, s) { const o = []; for (let v = a; v <= b + 1e-9; v += s) o.push(Math.round(v * 10) / 10); return o; }
 const PL = [
     { k: 'judge',   d: 'd1', n: '판정',      vals: seq(1, 15, 1),     desc: '굴림 +수치' },
-    { k: 'luck',    d: 'd1', n: '행운',      vals: seq(1, 15, 1),     desc: '행운 +수치 (15 면 100%)' },
+    { k: 'luck',    d: 'd1', n: '행운',      vals: seq(1, 15, 1),     desc: '행운 +수치 (15 면 100%) · 낮은 눈(9 이하)을 탐사당 수치만큼 15~20 으로 돌려놓는다' },
     { k: 'gim',     d: 'd1', n: '기믹 파훼', vals: seq(1, 10, 1),     desc: '기믹 파훼 횟수 +수치' },
     { k: 'evade',   d: 'd1', n: '회피',      vals: seq(1, 15, 1),     desc: '회피 굴림 +수치 · 7 이상이면 죽는 길이 보인다' },
     { k: 'nodeath', d: 'd1', n: '즉사 무효', vals: seq(1, 10, 1),     desc: '즉사를 수치만큼 무효로 한다' },
@@ -188,6 +188,19 @@ function valTxt(k, v, e) {
     if (k === 'luckx') return '행운 배수 ' + v + '%';
     return P.n + ' ' + v;
 }
+// 남이 보는 글귀 — 특이사항 · 기록 · 알림에는 수치를 적지 않는다 (2026-10-25 · 「판정 15」 같은 것)
+//   수치는 장착자의 창(고르는 칸 · 이미 걸림)에만 보인다.
+function kindTxt(k, e) {
+    const P = PL_BY[k];
+    if (k === 'rescue') return ((e && e.w === 'bath') ? '선녀탕' : '상담실') + ' 구출';
+    return P ? P.n : String(k || '');
+}
+// 옛 글귀(「… - 판정 15」)를 새 글귀로 — 앞쪽(누가 뿌렸나)은 그대로 둔다
+function plainLine(k, e) {
+    const l = String((e && e.line) || '');
+    const i = l.lastIndexOf(' - ');
+    return i < 0 ? l : l.slice(0, i) + ' - ' + kindTxt(k, e);
+}
 
 // ==========================================
 // 동행 — 곁에 붙은 신도 (장착자 쪽이 아직 이 사람을 가리켜야 산다)
@@ -267,6 +280,41 @@ function push(code, paths) {
 }
 function clean(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; } }
 
+// ★ 내 역병(foxPl) · 곁의 신도(foxWith) — 칸 하나씩 서버에 바로 쓰고, 서버 모습을 그대로 받아 든다 (2026-10-25)
+//   ✗ 전에는 saveFields({ foxPl:1 }) 로 통째 썼다. 끝난 역병을 지워 {} 가 되면 empty-null.js 가
+//     「빈 객체는 사고」로 보고 빼고 보내서 서버에는 끝난 역병이 그대로 남았다. 그러면 save-merge 는
+//     foxPl 을 「내가 손댄 칸」으로 굳혀 — **남이 새로 뿌려 준 역병(판정 15 · 행운 15 …)이 내 창에
+//     영영 안 들어왔다.** 그 계정은 역병을 받아도 다이스가 그대로였다. 다음 저장이 그것을 지우기까지 했다.
+//   → 칸마다 users/<나>/foxPl/<역병> 에 set · remove 하고, 그 두 자리를 따로 지켜보며 서버 모습을 받아 든다.
+function mineSet(path, val) {
+    const me = u_(), d = db_();
+    if (!me || !d) return;
+    try {
+        const r = d.ref('users/' + me.code + '/' + path);
+        (val === null || val === undefined) ? r.remove().catch(function () { }) : r.set(clean(val)).catch(function () { });
+    } catch (e) { console.warn('[여우 신도] 쓰기', path, e && e.message); }
+}
+let mirCode = null, mirRefs = [];
+setInterval(function () {
+    try {
+        const me = u_(), d = db_();
+        if (!me || !d || !me.code || mirCode === me.code) return;
+        mirRefs.forEach(function (r) { try { r.off(); } catch (e) { } });
+        mirRefs = [];
+        mirCode = me.code;
+        ['foxPl', 'foxWith'].forEach(function (node) {
+            const r = d.ref('users/' + me.code + '/' + node);
+            r.on('value', function (snap) {
+                const m = u_();
+                if (!m || m.code !== mirCode) return;
+                const v = snap.val();
+                m[node] = obj(v) ? v : {};
+            });
+            mirRefs.push(r);
+        });
+    } catch (e) { }
+}, 1000);
+
 // ==========================================
 // 역병을 뿌린다
 // ==========================================
@@ -290,14 +338,14 @@ function spread(d, k, code, v) {
     const e = { v: v, until: now() + C.HOUR, by: me.code, byName: me.name || '', d: d, at: now() };
     if (k === 'nodeath') e.left = v;
     if (k === 'rescue') e.w = bathOf(t) ? 'bath' : 'fox';
-    e.line = '🎐 ' + dName(me, d) + '가 역병을 뿌립니다. - ' + valTxt(k, v, e);
+    e.line = '🎐 ' + dName(me, d) + '가 역병을 뿌립니다. - ' + kindTxt(k, e);
     // 같은 역병이 걸려 있으면 바꿔 단다
     const old = plAll(t)[k];
     if (old && old.line) cutNote(t, old.line);
     if (!obj(t.foxPl)) t.foxPl = {};
     t.foxPl[k] = e;
     addNote(t, e.line);
-    const say = valTxt(k, v, e);
+    const say = kindTxt(k, e);
     log_(t, '[' + NAME + '] ' + (self ? '' : (me.name || '') + ' 사원의 ') + dName(me, d) + '가 역병을 뿌렸습니다 — ' + say + ' (한 시간)');
     let call = null;
     if (rq) {
@@ -307,7 +355,8 @@ function spread(d, k, code, v) {
     }
     if (self) {
         cult(me).selfDay = today();
-        const f = { foxPl: 1, badge: 1, history: 1, foxCult: 1 };
+        mineSet('foxPl/' + k, e);
+        const f = { badge: 1, history: 1, foxCult: 1 };
         if (call) { me.foxCallSeen = call.at; outPending = true; f.quarantineUntil = 1; f.foxCall = 1; f.foxCallSeen = 1; }
         save(f);
         try { if (typeof updateUI === 'function') updateUI(); } catch (er2) { }
@@ -345,6 +394,7 @@ function passOn(where) {
         const e = clean(plOf(me, k));
         cutNote(me, e.line);
         delete me.foxPl[k];
+        mineSet('foxPl/' + k, null);
         if (!t) return;
         const old = plAll(t)[k];
         if (old && old.line) cutNote(t, old.line);
@@ -352,9 +402,9 @@ function passOn(where) {
         t.foxPl[k] = e;
         addNote(t, e.line);
         paths['foxPl/' + k] = e;
-        moved.push(valTxt(k, e.v, e));
+        moved.push(kindTxt(k, e));
     });
-    save({ foxPl: 1, badge: 1 });
+    save({ badge: 1 });
     if (!t) { log_(me, '[' + NAME + '] 쓰러졌습니다 — 곁에 아무도 없어 제 一 신도의 역병이 흩어졌습니다.'); save({ history: 1 }); return null; }
     log_(t, '[' + NAME + '] ' + (me.name || '') + ' 사원이 쓰러지자 제 一 신도가 역병을 당신에게 옮겼습니다 — ' + moved.join(' · '));
     paths.badge = clean(t.badge); paths.history = clean(t.history || []); paths.hasItemUsedOnMe = true;
@@ -386,7 +436,8 @@ function recall(d, quiet) {
     }
     c.to = null; c.toName = null;
     if (to === me.code) {
-        save({ foxWith: 1, badge: 1, foxCult: 1 });
+        mineSet('foxWith/' + d, null);
+        save({ badge: 1, foxCult: 1 });
     } else {
         if (t) push(to, { ['foxWith/' + d]: null, badge: clean(t.badge) });
         save({ foxCult: 1 });
@@ -408,7 +459,8 @@ function sendWith(d, code, s) {
     t.foxWith[d] = { by: me.code, byName: me.name || '', line: line, at: now() };
     addNote(t, line);
     if (code === me.code) {
-        save({ foxCult: 1, foxWith: 1, badge: 1, history: 1 });
+        mineSet('foxWith/' + d, t.foxWith[d]);
+        save({ foxCult: 1, badge: 1, history: 1 });
     } else {
         log_(t, '[' + NAME + '] ' + (me.name || '') + ' 사원의 ' + dName(me, d) + '가 당신과 동행합니다.');
         push(code, { ['foxWith/' + d]: clean(t.foxWith[d]), badge: clean(t.badge), history: clean(t.history || []), hasItemUsedOnMe: true });
@@ -451,7 +503,7 @@ function nodeath() {
     const p = plOf(me, 'nodeath');
     if (p && (Number(p.left) || 0) > 0) {
         p.left = (Number(p.left) || 0) - 1;
-        save({ foxPl: 1 });
+        mineSet('foxPl/nodeath/left', p.left);
         return '「 아홉여우병이 들끓는다. 죽음이 당신을 비껴갔다. 」';           // 어둠 안에서는 횟수를 띄우지 않는다 (2026-10-25)
     }
     const w = withOf(me, 'd1'), x = rs();
@@ -484,22 +536,52 @@ function lineBox(t) {
     return '<span style="color:#f0c987;">' + t + '</span>';
 }
 
-// 쓰러져 상담실 · 선녀탕으로 가게 되면 — 제 二 신도(구출을 지니고 동행)가 바로 부른다
+// 쓰러져 상담실 · 선녀탕으로 가게 되면 — 제 二 신도가 바로 데리고 나온다
+//   ★ 2026-10-25 — 그 자리에서 풀고 서버에 적는다.
+//     ✗ 전에는 2.5초 뒤에 「아직 격리 중이면」 남은 시간만 1.5초로 당겼다. 그 사이 「의식을 잃는다」를
+//       누르면 finishDarkDeath 가 이 창의 quarantineUntil 만 0 으로 지워(서버에는 4시간 그대로)
+//       부르기를 건너뛰었다 — 화면은 나와 있는데, 다시 접속하면 상담실 · 선녀탕으로 돌아갔다.
 let outPending = false;
+function freeNow(m) {
+    let out = Number(m.quarantineExitPollution) || 0;
+    if (out >= 100) out = 99;                         // 100 이면 나오자마자 다시 들어간다
+    m.quarantineUntil = 0;
+    m.quarantineHospital = false;
+    m.quarantineDest = null;
+    m.quarantineExitPollution = 0;
+    m.pollution = out;
+    m.lastPollutionTime = now();
+    m.foxRoomAnswered = false;
+    try { hasShownFoxAlert = false; } catch (e) { }
+    if (m.badge && typeof m.badge === 'object') {
+        const key = badgeKey(m);
+        if (typeof m.badge[key] === 'string') {
+            const arr = m.badge[key].split(' | ').filter(function (n) {
+                return n.trim() !== '' && n.indexOf('의식 불명') < 0 && n.indexOf('긴급 이송') < 0 && n.indexOf('사직 반려') < 0;
+            });
+            m.badge[key] = arr.length ? arr.join(' | ') : '특이사항 없음';
+        }
+    }
+}
 function callOutSoon() {
     const me = u_();
     const w = withOf(me, 'd2');
-    if (!w) return;                                   // 제 二 신도 — 동행하는 사람이 쓰러지면 늘 데리고 나온다
+    if (!me || !w) return;                            // 제 二 신도 — 동행하는 사람이 쓰러지면 늘 데리고 나온다
+    const held = inQ(me) || !!me.quarantineHospital || (Number(me.pollution) || 0) >= 100;
+    if (!held) return;
+    const bath = bathOf(me);
+    freeNow(me);
+    me.foxCall = { k: 'out', ms: 0, until: now(), by: w.by, byName: w.owner.name || '', nick: dName(w.owner, 'd2'), at: now(), self: 1 };
+    me.foxCallSeen = me.foxCall.at;
+    outPending = true;
+    log_(me, '[' + NAME + '] ' + dName(w.owner, 'd2') + '가 ' + (bath ? '선녀탕' : '상담실') + '에서 당신을 불러냈습니다.');
+    const f = { quarantineUntil: 1, quarantineHospital: 1, quarantineDest: 1, quarantineExitPollution: 1, pollution: 1,
+                lastPollutionTime: 1, foxRoomAnswered: 1, foxCall: 1, foxCallSeen: 1, history: 1 };
+    if (me.badge !== undefined) f.badge = 1;
+    save(f);
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     setTimeout(function () {
-        const m = u_();
-        if (!m || !inQ(m)) return;
-        m.quarantineUntil = Math.min(Number(m.quarantineUntil) || 0, now() + 1500);
-        m.foxCall = { k: 'out', ms: 0, until: m.quarantineUntil, by: w.by, byName: w.owner.name || '', nick: dName(w.owner, 'd2'), at: now(), self: 1 };
-        m.foxCallSeen = m.foxCall.at;
-        outPending = true;
-        log_(m, '[' + NAME + '] ' + dName(w.owner, 'd2') + '가 ' + (bathOf(m) ? '선녀탕' : '상담실') + '에서 당신을 불러냈습니다.');
-        save({ quarantineUntil: 1, foxCall: 1, foxCallSeen: 1, history: 1 });
-        alert_('🎐 ' + dName(w.owner, 'd2') + '가 당신을 부릅니다.\n\n' + (bathOf(m) ? '선녀탕' : '상담실') + ' 문이 열립니다.');
+        alert_('🎐 ' + dName(w.owner, 'd2') + '가 당신을 부릅니다.\n\n' + (bath ? '선녀탕' : '상담실') + ' 문이 열립니다.');
     }, 2500);
 }
 // 죽은 뒤 — 역병을 옮기고, 제 二 신도가 부른다
@@ -511,6 +593,41 @@ function died() {
     try { callOutSoon(); } catch (e) { }
     try { talkDead(); } catch (e) { }
 }
+
+// ★ 살아난 죽음은 상담실 · 선녀탕 자국을 남기지 않는다 (2026-10-25)
+//   즉사를 막은 것(🎐 · 🦋 · 그 밖의 무엇이든)이 탐사를 이어 가게 했는데 격리 시각이 새로 박혀 있으면,
+//   화면은 멀쩡하고 다시 접속할 때 상담실 · 선녀탕으로 끌려간다. 그 죽음 직전의 값으로 되돌려 서버에 적는다.
+//   가장 바깥에서 본다 — 다른 파일들이 다 감싼 뒤(몇 초 뒤)에 감싼다.
+const Q_KEYS = ['pollution', 'quarantineUntil', 'quarantineHospital', 'quarantineDest', 'quarantineExitPollution', 'foxRoomAnswered'];
+const Q_ZERO = { pollution: 0, quarantineUntil: 0, quarantineHospital: false, quarantineDest: null, quarantineExitPollution: 0, foxRoomAnswered: false };
+function qSnap(u) { const o = {}; Q_KEYS.forEach(function (k) { o[k] = u[k]; }); return o; }
+(function keepAlive() {
+    const tryWrap = function () {
+        if (typeof darkDeath !== 'function') { setTimeout(tryWrap, 1500); return; }
+        if (darkDeath._qKeep) return;
+        const _d = darkDeath;
+        const w = function () {
+            const me = u_(), r0 = run();
+            const snap = (me && r0 && !r0._dead && !kOn()) ? qSnap(me) : null;
+            const out = _d.apply(this, arguments);
+            try {
+                const r = run();
+                if (snap && r && r === r0 && !r._dead && !r._settled
+                    && (Number(me.quarantineUntil) || 0) > Math.max(now(), Number(snap.quarantineUntil) || 0)) {
+                    const f = {};
+                    Q_KEYS.forEach(function (k) { me[k] = (snap[k] === undefined) ? Q_ZERO[k] : snap[k]; f[k] = 1; });
+                    save(f);
+                    console.warn('[여우 신도] 살아난 죽음에 격리가 남아 되돌렸습니다.');
+                }
+            } catch (e) { }
+            return out;
+        };
+        Object.keys(_d).forEach(function (k) { if (!(k in w)) { try { w[k] = _d[k]; } catch (e) { } } });
+        w._qKeep = true;
+        darkDeath = w; window.darkDeath = w;
+    };
+    setTimeout(tryWrap, 6000);
+})();
 
 // 포인트 배수 — 역병 · 동행 가운데 큰 쪽
 function mult() { return Math.max(1, stat(u_(), 'pts')); }
@@ -608,6 +725,7 @@ function sweep() {
         if (p && (Number(p.until) || 0) > now()) return;
         if (p && p.line) cutNote(me, p.line);
         delete all[k]; ch = true;
+        mineSet('foxPl/' + k, null);
     });
     if (obj(me.foxWith)) {
         DS.forEach(function (d) {
@@ -619,6 +737,7 @@ function sweep() {
             if (now() - (Number(w.at) || 0) < 60000) return;   // 방금 붙었다 — 장착자 쪽 기록이 아직 안 왔을 수 있다
             if (w.line) cutNote(me, w.line);
             delete me.foxWith[d]; ch = true;
+            mineSet('foxWith/' + d, null);
         });
     }
     // 동행 줄이 옛 글귀(능력치를 적던 것)거나 이름이 바뀌었으면 새 글귀로 갈아 끼운다
@@ -629,6 +748,16 @@ function sweep() {
         if (w.line === want) return;
         if (w.line) cutNote(me, w.line);
         me.foxWith[d].line = want;
+        mineSet('foxWith/' + d + '/line', want);
+        ch = true;
+    });
+    // 역병 줄이 옛 글귀(수치를 적던 것)면 새 글귀로 갈아 끼운다
+    plLive(me).forEach(function (k) {
+        const p = plOf(me, k), want = plainLine(k, p);
+        if (!p.line || p.line === want) return;
+        cutNote(me, p.line);
+        p.line = want;
+        mineSet('foxPl/' + k + '/line', want);
         ch = true;
     });
     // 살아 있는데 줄이 빠졌으면 다시 적는다
@@ -641,9 +770,7 @@ function sweep() {
         if (!window.foxdNoteLive(me, line)) { cutNote(me, line); ch = true; }
     });
     if (ch) {
-        if (!obj(me.foxPl)) me.foxPl = {};
-        if (!obj(me.foxWith)) me.foxWith = {};
-        save({ foxPl: 1, foxWith: 1, badge: 1 });
+        save({ badge: 1 });
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     }
 }
@@ -704,13 +831,15 @@ hook('rollDarkBonus', function (_r) {
     };
 });
 
-// 눈 — 동행하는 제 一 신도(행운)가 낮은 눈을 뒤집는다 (탐사당 수치만큼)
+// 눈 — 행운(역병이든 동행하는 제 一 신도든 큰 쪽)이 낮은 눈을 뒤집는다 (탐사당 수치만큼 · 피날레는 마당마다)
+//   ★ 2026-10-25 — 전에는 동행 신도만 뒤집었다. 역병 행운은 「대실패 한 번 무효」(gearValue)에만 들어가
+//     행운 15 를 받아도 눈 자체는 그대로였다.
 hook('luckReroll', function (_l) {
     return function (roll) {
         let out = _l.apply(this, arguments);
         try {
-            const me = u_(), x = rs(), w = withOf(me, 'd1');
-            if (w && x && out <= C.LOW && x.flip < (Number(w.s.luck) || 0)) {
+            const me = u_(), x = rs(), n = me ? stat(me, 'luck') : 0;
+            if (n > 0 && x && out <= C.LOW && (Number(x.flip) || 0) < n) {
                 x.flip++;
                 const nr = rnd(C.FLIP[0], C.FLIP[1]);
                 const r = run();
