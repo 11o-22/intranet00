@@ -466,6 +466,8 @@ window.signupApprove = async function (id) {
         await d.ref().update(up);
         try { db.users[code] = u; } catch (e) { }
         try { addHistoryLog(me(), '[가입 승인] ' + s.name + ' · ' + s.aff + ' · 사번 ' + u.no); } catch (e) { }
+        // 🎁 웰컴 패키지 팩 — 상담사 발급과 같이 선물함으로 (welcome.js · 2026-10-26)
+        try { if (typeof window.welcomeAuto === 'function') window.welcomeAuto(code, s.aff, '현장탐사팀'); } catch (e) { console.warn('[가입] 웰컴 패키지', e); }
         say('승인했습니다 — ' + s.name + '\n\n사번 ' + u.no + ' · ' + s.aff + ' · 현장탐사팀 · 사원');
     } catch (e) {
         console.error('[가입] 승인 실패', e);

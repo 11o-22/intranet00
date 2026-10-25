@@ -25,6 +25,10 @@
 //   상담사가 「신규 사원 등록」으로 **사번을 새로 만들 때**
 //   (adminRegisterNewEmployee). 그 함수를 감싸, 등록이 끝나면 새 계정의
 //   선물함(gifts/<인가코드>)에 한 건 넣는다.
+//   ★ 가입 신청을 **승인할 때**도 (signup.js signupApprove · 2026-10-26)
+//     ✗ 2026-10-23 가입 신청이 생긴 뒤로 새 사원은 거의 다 그 길로 들어오는데, 그 길에는 웰컴 패키지가
+//       걸려 있지 않아 **가입으로 들어온 사원은 하나도 받지 못했다.** 승인이 끝나면 welcomeAuto 를 부른다.
+//   보낸 사원에게는 users/<코드>/welcomeAt 을 적는다 — 저절로 보내는 길은 이것이 있으면 다시 안 보낸다.
 //
 //   ✗ 로그인할 때 넣으면 안 된다 — 받고 나서 다시 들어오면 또 생긴다.
 //     「새로 생긴 그 순간」 한 번만 넣어야 한다.
@@ -41,6 +45,7 @@
 // ■ 콘솔
 //   welcomeSend('사번 또는 이름')   손으로 한 번 더 보낸다 (상담사)
 //   welcomePack('백일몽 주식회사')  무엇이 들어가는지 본다
+//   welcomeMissing()               가입으로 들어와 아직 못 받은 사원 · welcomeMissing(true) 면 그 사원들에게 보낸다
 
 (function welcomePack() {
 
@@ -106,11 +111,30 @@ function sendTo(code, aff, team) {
             title: TITLE, text: TEXT, byName: SENDER,
             items: contents(p), pts: PTS
         }).then(function (n) {
-            if (n) console.log('%c[웰컴] ' + p.n + ' 묶음을 넣었습니다 — ' + code, 'color:#4CAF50');
+            if (n) {
+                console.log('%c[웰컴] ' + p.n + ' 묶음을 넣었습니다 — ' + code, 'color:#4CAF50');
+                try { d.ref('users/' + code + '/welcomeAt').set(Date.now()); } catch (e) { }
+            }
             return !!n;
         });
     }).catch(function (e) { console.error('[웰컴] 넣지 못했습니다', e); return false; });
 }
+
+// 저절로 보내는 길 — 이미 보낸 적이 있으면(welcomeAt) 건너뛴다
+function autoSend(code, aff, team) {
+    const d = db_();
+    if (!d || !code) return Promise.resolve(false);
+    return d.ref('users/' + code + '/welcomeAt').once('value').then(function (s) {
+        if (s && s.val()) { console.log('[웰컴] 이미 보낸 사원입니다 — ' + code); return false; }
+        return sendTo(code, aff, team);
+    }).catch(function () { return sendTo(code, aff, team); });
+}
+// 가입 신청 승인(signup.js)이 부른다
+window.welcomeAuto = function (code, aff, team) {
+    const u = me();
+    if (!u || u.code !== COUNSEL) return Promise.resolve(false);
+    return autoSend(code, aff, team || '현장탐사팀');
+};
 
 // ==========================================
 // 새 사번이 생기는 자리를 감싼다
@@ -142,7 +166,7 @@ function sendTo(code, aff, team) {
                 setTimeout(function () {
                     try {
                         if (typeof db === 'undefined' || !db.users || !db.users[code]) return;
-                        sendTo(code, aff, team);
+                        autoSend(code, aff, team);
                     } catch (e) { console.error('[웰컴]', e); }
                 }, 700);
             }
@@ -185,6 +209,31 @@ window.welcomeSend = function (who) {
     });
 };
 
-console.log('[웰컴] welcomePack(소속) · welcomeSend(사번)');
+// 가입으로 들어와 아직 못 받은 사원 — 보낸 적(welcomeAt) 없고 · 선물함에 받을 웰컴 팩도 없는 사원
+window.welcomeMissing = function (send) {
+    const u = me(), d = db_();
+    if (!u || u.code !== COUNSEL || !d) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const book = (typeof db !== 'undefined' && db.users) ? db.users : {};
+    const list = Object.keys(book).filter(function (c) {
+        const x = book[c];
+        return x && x.name && x.signedUpAt && !x.welcomeAt && packOf(x.affiliation, x.team);
+    });
+    Promise.all(list.map(function (c) {
+        return d.ref('gifts/' + c).once('value').then(function (s) {
+            const all = s.val() || {};
+            return Object.keys(all).some(function (k) { return all[k] && all[k].title === TITLE; }) ? null : c;
+        }).catch(function () { return c; });
+    })).then(function (got) {
+        const miss = got.filter(Boolean);
+        console.log('%c===== ' + TITLE + ' — 가입으로 들어와 못 받은 사원 ' + miss.length + '명 =====', 'color:#d4af37; font-size:13px');
+        if (miss.length) console.table(miss.map(function (c) { const x = book[c]; return { 사번: x.no, 이름: x.name, 소속: x.affiliation, 가입: new Date(x.signedUpAt).toLocaleString() }; }));
+        if (!send) { if (miss.length) console.log('  보내려면 welcomeMissing(true)'); return; }
+        miss.reduce(function (pr, c) {
+            return pr.then(function () { const x = book[c]; return sendTo(c, x.affiliation, x.team); });
+        }, Promise.resolve()).then(function () { console.log('%c✓ ' + miss.length + '명에게 보냈습니다.', 'color:#4CAF50'); });
+    });
+};
+
+console.log('[웰컴] welcomePack(소속) · welcomeSend(사번) · welcomeMissing()');
 
 })();
