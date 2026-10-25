@@ -405,7 +405,7 @@ SC.lobExit = function (sc) {
             ui.b('출구를 향해 걸어간다.', function () {
                 darkRun.log.push('[출구] 걸어 들어감');
                 X.die(x(opt(node, '출구를 향해 걸어간다')), { id: 'lobGo', k: sc.k });
-            })
+            }, { die: true })
             + ui.b('복도를 자세히 살펴본다.', function () { X.go({ id: 'lobExit', k: sc.k, s: 1 }); })
             + ui.b('로비로 돌아간다.', function () { X.go({ id: 'lobExit', k: sc.k, s: 2 }); }));
         return;

@@ -496,12 +496,33 @@ window.finA = function (i) {
     R = [];                       // 두 번 누르기 막기 — 다음 그림에서 새로 채운다
     try { f(); } catch (e) { console.error('[피날레]', e); try { view(); } catch (e2) { } }
 };
+// ☪️ 죽는 길 — 이 구역은 renderChoiceStep 을 거치지 않으므로, 죽음으로 이어지는 단추(o.die)에 여기서 단다.
+//   다른 파일이 X.addSeer(fn) 로 「보는 이」를 건다 — fn() 이 글줄을 돌려주면 그 사람 화면에서 보인다 (2026-10-25 · foxcult.js)
+const SEE = X.SEE = X.SEE || [];
+X.addSeer = function (fn) { if (typeof fn === 'function') SEE.push(fn); };
+function seeNote() {
+    for (let i = 0; i < SEE.length; i++) { try { const s = SEE[i](); if (s) return String(s); } catch (e) { } }
+    return '';
+}
+X.seeNote = seeNote;
+// 장면마다 얹는 단추 — X.addOn(fn) · fn(o) 가 html 을 돌려준다 (배드 엔딩 같은 nobar 화면에는 얹지 않는다)
+const ADD = X.ADD = X.ADD || [];
+X.addOn = function (fn) { if (typeof fn === 'function') ADD.push(fn); };
+function adds(o) {
+    if (o.nobar) return '';
+    return ADD.map(function (f) { try { return f(o) || ''; } catch (e) { return ''; } }).join('');
+}
 function UI() {
     const fns = [];
-    return {
+    const ui = {
         fns: fns,
+        seen: '',
         b: function (label, fn, o) {
             o = o || {};
+            if (o.die && !o.dis) {
+                const s = seeNote();
+                if (s) { if (String(label).indexOf('☪️') < 0) label = '☪️ ' + label; ui.seen = s; }
+            }
             const i = fns.push(fn) - 1;
             const st = 'width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;'
                 + (o.gold ? ' background:linear-gradient(145deg,#3a2f18,#1c1608) !important; border-color:#5a4a2a !important; color:#d4af37 !important;' : '')
@@ -511,6 +532,7 @@ function UI() {
                 + label + (o.sub ? '<div class="fin-bsub">' + o.sub + '</div>' : '') + '</button>';
         }
     };
+    return ui;
 }
 X.UI = UI;
 
@@ -537,7 +559,8 @@ function draw(ui, title, text, extra, o) {
     if (!b || typeof darkRun === 'undefined' || !darkRun) return;
     R = ui ? ui.fns : [];
     const keepY = o.keep ? b.scrollTop : 0;
-    b.innerHTML = darkBox(title, fill(text, o.fill), (o.nobar ? '' : bar()) + (extra || ''));
+    if (ui && ui.seen) text = String(text || '') + '<br><br><span style="color:#f0c987;">' + ui.seen + '</span>';
+    b.innerHTML = darkBox(title, fill(text, o.fill), (o.nobar ? '' : bar()) + (extra || '') + adds(o));
     b.scrollTop = keepY;
     try { mountDarkChat('normal'); } catch (e) { }
 }

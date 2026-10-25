@@ -868,6 +868,71 @@ hook('renderVoteState', function (_v) {
 });
 
 // ==========================================
+// 피날레 — 장면이 F.sc 로 돌아 renderChoiceStep · 어둠 파훼 단추를 거치지 않는다 (2026-10-25)
+// ==========================================
+//   ☪️ 죽는 길 — FINX.addSeer 로 건다 (죽음으로 이어지는 단추에 finale-core.js 가 단다)
+//   기믹 파훼 — 🎐 단추 → 다음에 실패할 판정을 한 번 넘긴다 (FINX.smash)
+//   마당(F.ph)이 바뀌면 — 즉사 무효 · 주사위 돌려놓기 · 파훼 몫이 다시 찬다 (되살리기는 탐사당 한 번)
+//   탈락(감화도 100 · 명찰 · 탈출 실패)은 즉사가 아니라 막지 못한다 — 대신 제 二 신도가 데리고 나오고, 역병은 옮겨 간다
+function finX() { return window.FINX || null; }
+function finOn() { try { const X = finX(); return !!(X && typeof X.on === 'function' && X.on()); } catch (e) { return false; } }
+function finGimLeft() {
+    const me = u_(), x = rs();
+    if (!me || !x || !finOn()) return 0;
+    return Math.max(0, stat(me, 'gim') - (Number(x.gim) || 0));
+}
+window.foxdFinSmash = function () {
+    const X = finX(), x = rs();
+    if (!X || !x || finGimLeft() <= 0) return;
+    x.gim = (Number(x.gim) || 0) + 1;
+    const r = run();
+    if (r && r.log) r.log.push('[🎐] 여우 꼬리가 기믹을 부쉈다 (피날레 — 다음 실패를 넘김)');
+    X.smash('🎐 여우 꼬리');
+};
+function finPhase() {
+    const X = finX(), x = rs();
+    if (!X || !x || !finOn() || typeof X.F !== 'function') return;
+    const F = X.F(), ph = F && F.ph;
+    if (!ph || x.fph === ph) return;
+    const first = !x.fph;
+    x.fph = ph;
+    if (first) return;                                   // 들어올 때는 이미 새것
+    const used = (x.nd || 0) + (x.flip || 0) + (x.gim || 0);
+    x.nd = 0; x.flip = 0; x.gim = 0;
+    if (used) toast('「 방울 소리가 한 번 울린다. 여우 꼬리가 다시 감긴다. 」');
+}
+(function finHook() {
+    const iv = setInterval(function () {
+        const X = finX();
+        if (!X || typeof X.addSeer !== 'function' || typeof X.addOn !== 'function') return;
+        if (X._foxd) { clearInterval(iv); return; }
+        X._foxd = true;
+        X.addSeer(function () {
+            const me = u_();
+            return (me && finOn() && seesOf(me)) ? seeWho() : '';
+        });
+        X.addOn(function () {
+            if (finGimLeft() <= 0) return '';
+            return '<button id="foxd-fin-smash" class="game-btn" style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; font-weight:normal;' + RED + '" onclick="foxdFinSmash()">'
+                + '🎐 여우 꼬리가 기믹을 부순다.<div class="fin-bsub">다음에 실패할 판정을 한 번 넘긴다</div></button>';
+        });
+        if (typeof X.eliminate === 'function' && !X.eliminate._foxd) {
+            const _el = X.eliminate;
+            const w = function () {
+                const out = _el.apply(this, arguments);
+                try { const r = run(); if (r && r._dead) died(); } catch (e) { console.warn('[여우 신도] 피날레 탈락', e); }
+                return out;
+            };
+            w._foxd = true;
+            X.eliminate = w;
+        }
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+setInterval(function () { try { finPhase(); } catch (e) { } }, 1000);
+
+// ==========================================
 // 정산 — 포인트 배수 · 몫 (어둠 · 피날레 · EPIC).  K의 방은 kroom-core.js
 // ==========================================
 function settleWrap(where, _r, self, args, dead) {

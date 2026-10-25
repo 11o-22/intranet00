@@ -239,19 +239,19 @@ SC.swP = function (sc) {
         let ex = X.notes([X.gamNote(sc.d)]);
         if (!P.lookOnlyGo) {
             ex += buy();
-            if (P.risky) ex += ui.b(P.risky + '.', function () { X.go({ id: 'swP', e: sc.e, st: 'risky' }); });
+            if (P.risky) ex += ui.b(P.risky + '.', function () { X.go({ id: 'swP', e: sc.e, st: 'risky' }); }, { die: riskDie(sc.e) });
         }
         X.draw(ui, title(sc.e, P.it), x(ln), ex + go());
         return;
     }
     if (sc.st === 'risky') {
         const rn = opt(node, P.risky);
-        X.draw(ui, title(sc.e, P.it), x(rn), ui.b(P.riskySub + '.', function () { risky(sc.e); }));
+        X.draw(ui, title(sc.e, P.it), x(rn), ui.b(P.riskySub + '.', function () { risky(sc.e); }, { die: riskDie(sc.e) }));
         return;
     }
     let extra = buy();
     extra += ui.b(P.look + '.', function () { look(sc.e); });
-    if (P.risky) extra += ui.b(P.risky + '.', function () { X.go({ id: 'swP', e: sc.e, st: 'risky' }); });
+    if (P.risky) extra += ui.b(P.risky + '.', function () { X.go({ id: 'swP', e: sc.e, st: 'risky' }); }, { die: riskDie(sc.e) });
     extra += go();
     X.draw(ui, title(sc.e, P.it), x(node), extra);
 };
@@ -321,6 +321,13 @@ SC.swPr = function (sc) {
         + ui.b('계속 간다.', function () { next(); }));
 };
 // 드림모지 체험 · 독사과 절도 — 사망 70% · 무료 획득 30%
+//   결과는 처음 보일 때 미리 정해 둔다 — 죽는 길을 보는 사람(☪️)에게 맞는 쪽을 보여 주려고 (확률은 같다)
+function riskDie(i) {
+    const e = ev(i);
+    if (!e || !PROD[e.n] || !PROD[e.n].risky) return false;
+    if (e.rk == null) { e.rk = Math.random() < 0.7 ? 1 : 0; X.save(); }
+    return !!e.rk;
+}
 function risky(i) {
     const f = F();
     const e = ev(i);
@@ -328,7 +335,7 @@ function risky(i) {
     e.done = 1;
     const P = PROD[e.n];
     const rn = opt(opt(prodNode(e.n), P.risky), P.riskySub);
-    if (Math.random() < 0.7) {
+    if (riskDie(i)) {
         darkRun.log.push('[달콤] ' + P.risky + ' — 사망 판정');
         X.save();
         X.die(x(rn.pt && rn.pt.die), { id: 'swGo' });
@@ -493,7 +500,7 @@ SC.swK = function (sc) {
     const node = sec('swc', '위기 장면 ' + e.n + ' ');
     const ui = X.UI();
     X.draw(ui, title(sc.e, '위기'), x(node), node.o.map(function (o, j) {
-        return ui.b(o.l, function () { crisis(sc.e, j); });
+        return ui.b(o.l, function () { crisis(sc.e, j); }, { die: CRISIS[e.n] && CRISIS[e.n][j] === 'd' });
     }).join(''));
 };
 function crisis(i, j) {
