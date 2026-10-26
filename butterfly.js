@@ -33,7 +33,7 @@
 //                    K의 방 혼자 — 나비가 하나라도 남아 있으면 혼자가 아니다 (혼자 S · A 규칙이 풀린다).
 //   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 회수품 ×2.5 ·
 //                    성공 정산 ×1.5 · 즉사 한 번 회피(맞은 수만큼). 두 번 다 맞으면 포만감·오염도 5시간 동결,
-//                    어둠 탐사 횟수가 다시 찬다 (맞는 사람마다 하루 한 번 · bflyBreath.charged).
+//                    어둠 탐사 · K의 방 횟수가 다시 찬다 (맞는 사람마다 하루 한 번 · bflyBreath.charged).
 //                    ✗ 2026-10-26 까지는 펫이 5시간 잠들었다 (따라오지 않음) — 사용자가 뺐다.
 //
 //   포인트 — 맹약(×1.5~2) · 모이라이(유예 1번 ×1.33 · 2번 ×1.67 · 3번 ×2) · 숨결(×1.5) 를 다 곱해도 ×2 까지.
@@ -409,9 +409,14 @@ window.bflyBreathe = function (code) {
         b.charged = 1;
         t.darkDate = today(); t.darkTries = 0;          // 내 것이면 dark-count.js 가 차이를 서버(darkUse)로 보낸다
         if (t !== me) { f.darkDate = t.darkDate; f.darkTries = 0; }   // 남의 것 — updateUserFields 가 darkUse 에도 적는다
+        // K 의 방 횟수(kroomUse)도 같이 0 으로
+        try {
+            if (typeof window.kroomTriesReset === 'function') window.kroomTriesReset(t.code);
+            else if (typeof database !== 'undefined' && database) database.ref('kroomUse/' + t.code).set({ d: today(), n: 0 }).catch(function () { });
+        } catch (e) { }
     }
     me.bflyEros = { day: today(), n: erosUsed(me) + 1 };
-    log_(t, '[' + NAME + '] ' + (t === me ? '스스로' : me.name + ' 사원이') + ' 에로스의 마지막 숨결을 불어 넣었습니다.' + (twice ? ' (두 번 — 포만감·오염도 ' + C.EROS_HOURS + '시간 동결' + (charge ? ', 어둠 탐사 횟수 충전' : '') + ')' : ''));
+    log_(t, '[' + NAME + '] ' + (t === me ? '스스로' : me.name + ' 사원이') + ' 에로스의 마지막 숨결을 불어 넣었습니다.' + (twice ? ' (두 번 — 포만감·오염도 ' + C.EROS_HOURS + '시간 동결' + (charge ? ', 어둠 탐사 · K의 방 횟수 충전' : '') + ')' : ''));
     if (t !== me) { log_(me, '[' + NAME + '] ' + t.name + ' 사원에게 숨결'); f.history = t.history; f.hasItemUsedOnMe = true; }
     try {
         if (t === me) save(Object.assign({ bflyEros: 1, history: 1 }, Object.keys(f).reduce(function (a, k) { a[k] = 1; return a; }, {})));
@@ -425,7 +430,7 @@ window.bflyBreathe = function (code) {
     shut();
     alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피'
         + (twice ? '\n\n두 번째 숨결 — 포만감·오염도가 ' + C.EROS_HOURS + '시간 멈춥니다.'
-            + (charge ? '\n어둠 탐사 횟수가 다시 찼습니다.' : '\n(어둠 탐사 횟수 충전은 오늘 이미 받았습니다)') : '')
+            + (charge ? '\n어둠 탐사 · K의 방 횟수가 다시 찼습니다.' : '\n(횟수 충전은 오늘 이미 받았습니다)') : '')
         + '\n\n(오늘 남은 숨결 ' + (C.EROS - erosUsed(me)) + '번)');
 };
 // 숨결이 펫을 재우던 것은 뺐다 (2026-10-26) — 그 전에 맞아 남아 있는 잠을 깨운다 (petSleepUntil 을 적는 곳은 숨결뿐이었다)
@@ -1147,9 +1152,9 @@ window.bflyErosPick = function () {
     const rows = list.map(function (t) {
         const n = breathN(t);
         return '<button class="game-btn bf-er" data-c="' + esc(t.code) + '" style="' + BTN + '">' + (t === me ? '본인' : esc(t.name))
-            + (n ? ' <span style="font-size:9px; color:#ffb3c7;">오늘 숨결 ' + n + '번' + (n === 1 ? ' — 한 번 더면 5시간 동결 · 탐사 횟수 충전' : '') + '</span>' : '') + '</button>';
+            + (n ? ' <span style="font-size:9px; color:#ffb3c7;">오늘 숨결 ' + n + '번' + (n === 1 ? ' — 한 번 더면 5시간 동결 · 어둠 · K의 방 횟수 충전' : '') + '</span>' : '') + '</button>';
     }).join('');
-    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
+    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 · K의 방 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#bf-x').onclick = window.bflyMenu;

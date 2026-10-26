@@ -433,6 +433,13 @@ function kUse(n) {
     kFlush();
 }
 window.kroomTriesLeft = kLeft;
+// 오늘 쓴 K 의 방 횟수를 0 으로 (🦋 에로스의 마지막 숨결 두 번 — butterfly.js · 2026-10-26)
+window.kroomTriesReset = function (code) {
+    const d = db_(); if (!d || !code) return;
+    const v = { d: kToday(), n: 0 };
+    d.ref(K_USE + '/' + code).set(v).catch(function () { });
+    if (code === KC.code) { KC.pend = 0; KC.synced = v; kCache(v); }
+};
 window.kroomTryLimit = function () { return kLimit(); };
 window.kroomTriesUsed = kUsed;
 // 일행을 모으거나 들 때 — 그 자리의 「남은 횟수」를 K 의 방 것으로 본다 (헬퍼는 0 이어도 들어간다)
