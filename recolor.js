@@ -96,9 +96,7 @@ const KEEP = {
     'brown-suit': 'grey',    // 셔츠와 그 그늘이 색끼가 없다
     'agent1': 'grey',
     'agent2': 'grey',
-    'suit': 'grey',          // 노란 정장 — 색끼 없는 자리만 남긴다
-    'maid': 'light',         // 메이드복 — 하얀 앞치마 · 깃
-    'maid-long': 'light'
+    'suit': 'grey'           // 노란 정장 — 색끼 없는 자리만 남긴다
 };
 
 const cache = new Map();     // '장@색' → 그림 주소

@@ -153,9 +153,8 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pongsil-shoes', 'pj-top', 'band-outfit', 'knit', 'gym-suit', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'pongsil',
-        'dress-yellow', 'dress-green', 'maid', 'maid-long',
+    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'knit', 'gym-suit', 'han-inner',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
@@ -195,13 +194,9 @@ const DOT = {
                  'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
                  'sound-lp': [0, 1, 2, 3, 4, 5],
-                 // 의상 뽑기 다섯 벌 (2026-10-23) — 서기 줄이 칸마다 다르게 그려진 셋은 여섯 칸을 돈다
-                 'dress-green': [0, 1, 2, 3, 4, 5], 'maid-long': [0, 1, 2, 3, 4, 5], 'band-outfit': [0, 1, 2, 3, 4, 5],
                  // 잎 우산 (2026-10-25) — 서 있으면 빗물이 떨어지고 웅덩이가 번진다 (잎 · 줄기는 서기 여섯 칸이 같은 그림이라 0 에 세운다)
                  'leaf-rain': [0, 1, 2, 3, 4, 5], 'leaf-puddle': [0, 1, 2, 3, 4, 5],
-                 // 의상 뽑기 (2026-10-25) — 탈 셋 · 퐁실 의상 · 퐁실 신발 모두 서기 줄 여섯 칸이 그려져 왔다
-                 'golden-resort': [0, 1, 2, 3, 4, 5], 'red-bunny': [0, 1, 2, 3, 4, 5], 'yongyong': [0, 1, 2, 3, 4, 5],
-                 'pongsil': [0, 1, 2, 3, 4, 5], 'pongsil-shoes': [0, 1, 2, 3, 4, 5] },
+                 },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -287,7 +282,6 @@ const DOT_SLOTS = [
             { i: 'pj', n: '잠옷 상의', over: ['pj-top'], def: true },
             // ★ 겉옷 칸에서 옮겨 왔다 (2026-10-23) — 윗옷만 그려진 셋. 겉옷에 적혀 있던 묵은 기록은 moveOld 가 상의로 읽는다.
             //   그림 사연은 겉옷 칸에 적힌 줄 그대로 (룩키마트 의상 = 의상 뽑기 다섯 벌 · 가을 니트 · 체육복 = 통짜에서 몸을 뺀 것)
-            { i: 'band', n: '룩키마트 의상', over: ['band-outfit'], own: 'band-outfit' },
             { i: 'knit', n: '가을 니트', over: ['knit'], own: 'knit' },
             { i: 'gym', n: '체육복', over: ['gym-suit'], own: 'gym-suit' }
         ]
@@ -365,10 +359,7 @@ const DOT_SLOTS = [
             //   (도트 한 칸이 4픽셀 · 요원복 · 브라운 정장과 같다) 칸마다 가로 +30 으로 352 칸에 옮겼다.
             //   몸에 대 보니 어깨 · 발이 그대로 맞았다. 걷기 줄은 여섯 칸 다 그려져 왔다.
             //   이름 — 유치원 앞치마 · 룩키마트 앞치마 · 룩키마트 의상은 정해 주신 것 · 메이드복 둘은 그림을 보고 붙였다.
-            { i: 'ydress', n: '유치원 앞치마', over: ['dress-yellow'], own: 'dress-yellow' },
-            { i: 'gdress', n: '룩키마트 앞치마', over: ['dress-green'], own: 'dress-green' },
-            { i: 'maid', n: '메이드복', over: ['maid'], own: 'maid' },
-            { i: 'maidl', n: '롱 메이드복', over: ['maid-long'], own: 'maid-long' },
+            // (유치원 앞치마 · 룩키마트 앞치마 · 메이드복 · 롱 메이드복 — 2026-10-26 판에서 뺐다 · purge1026.js)
             // ★ 붕어빵 의상 (2026-10-25 · 의상 뽑기 C) — 몸통을 통째로 감싸는 탈. 1728x768 (칸 288) 이라
             //   칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다.
             //   서기 줄은 한 칸 — 0 에 세운다. 겹 차례는 맨 위 (D.Z 끝) — 겉옷 · 장갑까지 덮는다.
@@ -377,10 +368,7 @@ const DOT_SLOTS = [
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
             //   서기 줄 여섯 칸이 저마다 달라 여섯 칸을 돈다 (FLAP_COLS).
-            { i: 'golden', n: '골든 리조트 의상', top: ['golden-resort'], own: 'golden-resort' },
-            { i: 'rbunny', n: '레드 버니 의상', top: ['red-bunny'], own: 'red-bunny' },
-            { i: 'yongyong', n: '용용이 의상', top: ['yongyong'], own: 'yongyong' },
-            { i: 'pongsil', n: '퐁실 의상', over: ['pongsil'], own: 'pongsil' },
+            // (골든 리조트 · 레드 버니 · 용용이 의상 · 퐁실 의상 — 2026-10-26 판에서 뺐다 · purge1026.js)
             // ★ 뉴비 세트 (2026-10-25) — 뉴비 의상 · 뉴비 장화 · 뉴비 병아리 후드 · 잎 우산. **상담사가 꽂아 넣어 준 사람만** (wear-gift.js) ·
             //   뉴비 새싹처럼 밀실 거래로 넘기지 않는다 (noTrade).
             //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
@@ -406,8 +394,7 @@ const DOT_SLOTS = [
             { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes' },   // 밀실 거래 됨 (2026-10-24)
             // ★ 뉴비 장화 (2026-10-25 · 뉴비 세트) — 잎 우산의 물 웅덩이는 언제나 이 밑이다 (BACK_Z)
             { i: 'newbie', n: '뉴비 장화', over: ['newbie-boots'], own: 'newbie-boots', noTrade: true },
-            // ★ 퐁실 신발 (2026-10-25 · 의상 뽑기) — 432x192 를 네 배 · 칸마다 +30
-            { i: 'pongsil', n: '퐁실 신발', over: ['pongsil-shoes'], own: 'pongsil-shoes' }
+            // (퐁실 신발 — 2026-10-26 판에서 뺐다)
         ]
     },
     {
@@ -667,7 +654,7 @@ function headIdx(id) { const k = DOT_HEADS.findIndex(function (h) { return h.i =
 //   남이 입은 모습을 그릴 때 쓴다 — 남의 소지 목록은 이쪽에 없으므로
 //   따지면 남의 옷이 통째로 안 보인다 (옷장에서 고를 때만 따지면 된다).
 // ★ 겉옷 칸 → 상의 칸으로 옮긴 옷 (2026-10-23) — 겉옷에 적혀 있는 묵은 기록(내 것 · 남의 것 · 코디)을 상의로 읽는다
-const MOVED_TOP = { band: 1, knit: 1, gym: 1 };
+const MOVED_TOP = { knit: 1, gym: 1 };          // 룩키마트 의상(band)은 2026-10-26 판에서 뺐다
 function moveOld(d) {
     if (!d || typeof d !== 'object' || !MOVED_TOP[d.outer]) return d;
     const x = Object.assign({}, d);

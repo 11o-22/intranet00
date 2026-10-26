@@ -333,6 +333,20 @@ function prof(u) {
     return k;
 }
 function saveProf() { try { saveFields({ kroom: 1, history: 1 }); } catch (e) { } }
+// ★ 네크로맨서를 다시 지정할 수 있게 (2026-10-26 · purge1026.js 가 부른다)
+//   지금 속성이든 접어 둔 속성이든 네크로맨서(L_necro)를 지녔나 · 지녔으면 K 의 방 기록을 처음부터 (꿈결 · 들어간 수 · 오늘 횟수는 그대로)
+window.kroomHasJob = function (k, key) {
+    if (!k || typeof k !== 'object') return false;
+    if (k.job === key) return true;
+    const alt = (k.alt && typeof k.alt === 'object') ? k.alt : {};
+    return Object.keys(alt).some(function (a) { return !!(alt[a] && alt[a].job === key); });
+};
+window.kroomWipe = function (k) {
+    if (!k || typeof k !== 'object') return k;
+    wipe(k);
+    k.hidden = null;
+    return k;
+};
 
 // ★ 헬퍼 (party-helper.js 의 「헬퍼로 참가」) — 2026-10-18
 //   혼자 들어갈 때는 이 창의 스위치를, 일행으로 들어갈 때는 일행 명단의 헬퍼 표시를 본다.
@@ -2366,7 +2380,7 @@ window.kroomRescue = function (code) {
 //               → K·LEE → 이레귤러 사망 판정 → 그래도 안 되면 쓰러진다 (쓰러지면 종말예언 덧쓰기)
 
 const KEEP = ['🩶 은심장', '🦊 호사수구', '🐾 아기 여우', '📖 〈종말예언 : 어둠탐사기록〉', '🧧 지산의 복 : 대리자',
-              '📺 브라운의 심야 토크 쇼', '🔎 감지하는 눈', '📱 K·LEE'];
+              '📺 브라운의 심야 토크 쇼', '🔎 감지하는 눈'];
 const SHOP_MORE = ['작두', '버터 나이프', '은반지', '유리손포', '착한 친구', '보안팀 의상 세트', '사자탈',
     '다이아 애널 플러그', '다이아 보지 플러그', '루비 클리 피어싱', '루비 유두 피어싱', '사인참사검', '??? 안경',
     '에메랄드 목줄', '에메랄드 하네스', '포승줄', '공기 누름돌', '꿈결 수집기', '부적이 깃든 등',

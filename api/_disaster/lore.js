@@ -77,7 +77,7 @@ export const ROLES = {
 //     그래서 지참 장비 3칸에서는 빠진다 (core.js gearOf · disaster.js gearPool). 뿅망치는 여기 없다.
 //   장비의 기능은 재난 안에서 쓸 수 없다 — 표식은 괴담이 그 사람을 대하는 태도만 바꾼다.
 export const SIGILS = {
-    hunt: { n: '노림',     items: ['🔎 감지하는 눈', '📱 K·LEE', '🩶 은심장'] },
+    hunt: { n: '노림',     items: ['🔎 감지하는 눈', '🩶 은심장'] },
     lure: { n: '끌어들임', items: ['🦊 호사수구', '📖 〈종말예언 : 어둠탐사기록〉', '🧧 지산의 복 : 대리자', '🐾 아기 여우', '🌙 달빛 문신'] },
     awe:  { n: '경외',     items: ['📺 브라운의 심야 토크 쇼'] }
 };

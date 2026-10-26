@@ -327,7 +327,6 @@
       "emoji.js",
       "allchat.js",
       "frame-size.js",
-      "klee.js",
       "dark-wait.js",
       "frame-pick.js",
       "admin-clear.js",
@@ -365,7 +364,6 @@
       "recolor.js",
       "closet.js",
       "plaza.js",
-      "bubbles.js",
       "shell.js",
       "skip.js",
       "palette.js",
@@ -403,7 +401,8 @@
       "finale-items.js",
       "butterfly.js",
       "pet-stay.js",
-      "foxcult.js"
+      "foxcult.js",
+      "purge1026.js"
     ]
   ]
 }
