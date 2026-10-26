@@ -131,6 +131,24 @@ function best(deck, hand, k) {
 window.bjBest = best;      // 시험에서 쓴다
 
 // ==========================================
+// ★ 판이 열려 있을 때만 (2026-10-27)
+// ==========================================
+//   ✗ 한도가 다 차 「카드를 받는다」가 막혀도(useFacility 가 false) 아래 처음 두 장 감싸개는 그대로 돌았다.
+//     지난 판의 두 장(bjPlayer)이 남아 있으면 행운으로 다시 뽑아 21 을 만들고 bjStand → bjFinish 까지 가서
+//     **지난 판의 베팅으로 또 정산**했다 (21 이면 ×2.5 — 누를 때마다 +25,000 P).
+//   그래서 판이 정말 열렸는지(bjNewDeck 이 새 덱을 만들었는지) 보고, 열린 판에서만 받기 · 멈추기 · 바꾸기 · 정산이 된다.
+let live = false;
+function liveOnly(name) {
+    const f = window[name];
+    if (typeof f !== 'function' || f._live) return !!(f && f._live);
+    const w = function () { if (!live) return; return f.apply(this, arguments); };
+    Object.keys(f).forEach(function (k) { if (!(k in w)) { try { w[k] = f[k]; } catch (e) { } } });
+    w._live = true;
+    window[name] = w;
+    return true;
+}
+
+// ==========================================
 // 갈아끼우기
 // ==========================================
 function install() {
@@ -141,7 +159,11 @@ function install() {
     // --- 처음 두 장 ---
     const _start = startBlackjack;
     startBlackjack = function () {
+        const deck0 = bjDeck;
+        live = true;
         const r = _start.apply(this, arguments);
+        if (bjDeck === deck0) { live = false; return r; }     // 판이 안 열렸다 (한도 · 베팅 · 오염) — 지난 판을 건드리지 않는다
+        if (!live) return r;                                 // 열리자마자 끝났다 (처음 두 장이 21)
         // 원래 함수가 이미 두 장씩 나눠 놓았다. 행운이 있으면 내 두 장만
         // 다시 뽑는다 — 먼저 받은 두 장을 덱에 돌려놓고 섞은 뒤에 고른다.
         try {
@@ -200,6 +222,8 @@ function killFlip() {
     if (bjFinish._noFlip) return true;
     const _fin = bjFinish;
     const wrapped = function () {
+        if (!live) return;                                  // 열린 판이 없다 — 두 번 정산하지 않는다
+        live = false;
         const _luck = facilityLuckMult;
         facilityLuckMult = function () { return 1; };     // 뒤집기만 끈다
         try { return _fin.apply(this, arguments); }
@@ -214,7 +238,9 @@ function killFlip() {
 let n = 0;
 const iv = setInterval(function () {
     const a = install(), b = killFlip();
-    if ((a && b) || ++n > 60) clearInterval(iv);
+    // 받기 · 멈추기 · 바꾸기 — 감싸개(install)가 bjHit 를 갈아 끼운 뒤에 그 겉을 싼다
+    const c = a && liveOnly('bjHit') && liveOnly('bjStand') && liveOnly('bjSwap');
+    if ((a && b && c) || ++n > 60) clearInterval(iv);
 }, 500);
 
 // ==========================================
