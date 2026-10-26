@@ -8,6 +8,7 @@
 //   장착품이다. 은심장 · 호사수구 · 아기 여우 · 환영 나비와 같은 결 — 상점 · 우주 쇼핑몰 · 장터
 //   어디에도 안 깔리고 팔 수 없다. 주는 법은 foxdGive(사번) 과 당국 화면의 「물품 강제 꽂기」뿐.
 //   차고 있으면 장착칸의 [🎐 여우 신도] 로 두 신도를 부린다. 두 신도에게는 이름을 지어 줄 수 있다.
+//   ★ Owner 만 쓴다 (2026-10-26) — 이름 · 별명 · 사번 중 하나가 「Owner」인 사원. 다른 사람은 차지 못하고, 차고 있어도 효과가 없다.
 //
 // ■ 역병 — 한 시간 (남에게는 몇 번이든 · 수치도 마음대로 / 본인에게는 하루 딱 한 번 · 한 가지)
 //
@@ -118,8 +119,16 @@ function find(who) {
     return users().filter(function (x) { return x.code === who || x.no === who || x.name === who; })[0] || null;
 }
 function baseOf(w) { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); }
+// ★ Owner 만 쓴다 (2026-10-26) — 이름 · 별명 · 사번 어느 쪽이든 「Owner」 (대소문자 무시 · 뿅망치의 「S」와 같은 길)
+//   다른 사람은 차지도 못하고, 이미 차고 있어도 아무 효과가 없다 (역병 · 동행 · 단추 모두).
+const OWNER_NAME = 'Owner';
+function isOwner(u) {
+    if (!u) return false;
+    const want = OWNER_NAME.toLowerCase();
+    return [u.name, u.badge && u.badge.nickname, u.code].some(function (x) { return String(x == null ? '' : x).trim().toLowerCase() === want; });
+}
 function wears(u) {
-    if (!u || !Array.isArray(u.equippedWeapons)) return false;
+    if (!u || !Array.isArray(u.equippedWeapons) || !isOwner(u)) return false;
     return u.equippedWeapons.some(function (w) { return baseOf(w) === NAME; });
 }
 function kOn() { try { return typeof window.kroomOn === 'function' && window.kroomOn(); } catch (e) { return false; } }
@@ -1300,7 +1309,7 @@ window.NO_STEAL_GEAR = (window.NO_STEAL_GEAR || []).concat([NAME]);
                 price: 0, usable: true, targetable: false, effect: 'equip_foxd', noSell: true,
                 desc: '[장착] 두 여우 신도가 아홉여우병을 퍼트린다. 제 一 신도 — 판정 · 행운 · 기믹 파훼 · 회피 · 즉사 무효. '
                     + '제 二 신도 — 상담실 · 선녀탕 구출 · 홀로 어둠 탐사 · 포인트 배수 · 행운 배수. 역병은 한 시간, 본인에게는 하루 한 번. '
-                    + '신도를 사람 곁에 동행시킬 수도 있다. 장착칸의 [🎐 여우 신도] 로 부른다. 상담사 지급 전용.'
+                    + '신도를 사람 곁에 동행시킬 수도 있다. 장착칸의 [🎐 여우 신도] 로 부른다. 상담사 지급 전용 · Owner 만 사용할 수 있다.'
             };
         }
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME);
@@ -1311,6 +1320,12 @@ window.NO_STEAL_GEAR = (window.NO_STEAL_GEAR || []).concat([NAME]);
 setInterval(function () {
     try { if (typeof ALIEN_ITEMS_POOL !== 'undefined') { const i = ALIEN_ITEMS_POOL.indexOf(NAME); if (i > -1) ALIEN_ITEMS_POOL.splice(i, 1); } } catch (e) { }
 }, 5000);
+hook('canWearItem', function (_c) {
+    return function (user, itemName) {
+        if (itemName === NAME || baseOf(itemName) === NAME) return isOwner(user);
+        return _c.apply(this, arguments);
+    };
+});
 hook('marketSellable', function (_m) {
     return function () {
         const pool = _m.apply(this, arguments);
@@ -1324,6 +1339,7 @@ hook('useInventoryItem', function (_u) {
         const me = u_();
         if (!me) return;
         if ((me.inventory || []).indexOf(NAME) < 0) { alert_('가지고 있지 않습니다.'); return; }
+        if (!isOwner(me)) { alert_(NAME + '\n\nOwner 만 사용할 수 있습니다.'); return; }
         if (typeof isQuarantined === 'function' && isQuarantined(me)) { alert_('격리 중에는 장착할 수 없습니다.'); return; }
         if (!Array.isArray(me.equippedWeapons)) me.equippedWeapons = [];
         if (wears(me)) { alert_('이미 차고 있습니다.'); return; }
