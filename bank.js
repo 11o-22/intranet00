@@ -10,6 +10,7 @@ const BANK_GRADES = [
 ];
 const BANK_VIP = { cap: 30000000, label: 'VIP' };
 const BANK_LOAN_DAYS = 3;
+const BANK_START = 700;           // 새 계좌의 신용 점수 — 2등급 (2026-10-26)
 const BANK_DAY = 24 * 60 * 60 * 1000;
 
 // ★ 꼼수 방지
@@ -112,7 +113,8 @@ function bankSettle() {
     if (!database || !currentUser) return;
     const me = currentUser;
     const now = Date.now();
-    const initScore = me.code === 'kario0987' ? 1000 : (me.hasVIP ? 700 : 500);
+    // ★ 새 계좌는 2등급(700)부터 (2026-10-26) — 전에는 3등급(500) · VIP 를 가진 사람만 700
+    const initScore = me.code === 'kario0987' ? 1000 : BANK_START;
 
     bankTx(bankPath(me.code), b => {
         if (!b) b = {};
@@ -222,7 +224,7 @@ function bankAddScore(delta, code) {
         bankTx(bankPath(c), b => {
             if (!b) return;
             if (b.blacklist && delta > 0) return;
-            b.score = bankClamp((b.score == null ? 500 : b.score) + delta);
+            b.score = bankClamp((b.score == null ? BANK_START : b.score) + delta);
             return b;
         });
         return;
@@ -230,7 +232,7 @@ function bankAddScore(delta, code) {
     bankEdit(c, function (b) {
         if (!b) return null;
         if (b.blacklist && delta > 0) return null;
-        return { score: bankClamp((b.score == null ? 500 : b.score) + delta) };
+        return { score: bankClamp((b.score == null ? BANK_START : b.score) + delta) };
     }).catch(e => console.error('[은행] 신용 점수 반영 실패:', e));
 }
 
