@@ -185,6 +185,7 @@
             try { aliveRef.onDisconnect().cancel(); } catch (e) { }
 
             database.ref('darkParties/' + pid + '/members/' + me).remove();
+            database.ref('darkParties/' + pid + '/roster/' + me).remove();
 
             aliveRef.remove()
                 .then(function () { return database.ref('darkParties/' + pid).once('value'); })
@@ -198,13 +199,24 @@
                             + '명 · 명단 ' + memLeft + '명');
                         return;
                     }
+                    // ★ alive · 명단이 비어 보여도, 손전화를 덮어 둔 사람이 아직 걷고 있을 수 있다
+                    //   (party-keep.js — 진행 기록이 이 방이고 최근에 적힌 사람)
+                    const ask = (typeof window.darkStillIn === 'function')
+                        ? window.darkStillIn(pid, p, me) : Promise.resolve(null);
+                    return ask.then(function (who) {
+                        if (who) { console.log('[파티] 방을 두고 나왔습니다 — 아직 걷는 사람 ' + who); return; }
+                        wipe(p);
+                    });
+                })
+                .catch(function (e) { console.error('[파티] 정리 실패:', e); });
+
+            function wipe(p) {
                     database.ref('darkParties/' + pid).remove();
                     database.ref('darkChats/' + pid).remove();
                     database.ref('darkVotes/' + pid).remove();
                     database.ref('darkC119/' + pid).remove();
                     if (zone) database.ref('darkOccupancy/' + zone).remove();
-                })
-                .catch(function (e) { console.error('[파티] 정리 실패:', e); });
+            }
         };
         window.partyRunCleanup._safe = true;
         clearInterval(iv2);
@@ -235,13 +247,24 @@
             if (!emptySince[pid]) { emptySince[pid] = now; return; }
             if (now - emptySince[pid] < STRAND) return;
 
-            delete emptySince[pid];
-            console.log('[파티] 아무도 없는 방을 치웠습니다:', pid);
-            database.ref('darkParties/' + pid).remove();
-            database.ref('darkChats/' + pid).remove();
-            database.ref('darkVotes/' + pid).remove();
-            database.ref('darkC119/' + pid).remove();
-            if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
+            // ★ alive 는 손전화가 덮이면 서버가 지운다. 비어 보여도 아직 걷는 사람이 있을 수 있다.
+            //   방에 적힌 사람 가운데 진행 기록이 이 방이고 최근에 적힌 사람이 있으면 두고 본다. (party-keep.js)
+            if (typeof window.darkRoomOnline === 'function' && window.darkRoomOnline(p)) { emptySince[pid] = now; return; }
+            if (emptySince[pid] === -1) return;            // 묻는 중
+            emptySince[pid] = -1;
+            const ask = (typeof window.darkStillIn === 'function') ? window.darkStillIn(pid, p, null) : Promise.resolve(null);
+            ask.then(function (who) {
+                if (who) { emptySince[pid] = Date.now(); return; }
+                delete emptySince[pid];
+                const cur = (typeof darkParties !== 'undefined' && darkParties) ? darkParties[pid] : null;
+                if (cur && Object.keys(cur.alive || {}).length > 0) return;     // 그 사이에 누가 돌아왔다
+                console.log('[파티] 아무도 없는 방을 치웠습니다:', pid);
+                database.ref('darkParties/' + pid).remove();
+                database.ref('darkChats/' + pid).remove();
+                database.ref('darkVotes/' + pid).remove();
+                database.ref('darkC119/' + pid).remove();
+                if (p.zone) database.ref('darkOccupancy/' + p.zone).remove();
+            }, function () { delete emptySince[pid]; });
         });
     }, 60000);
 

@@ -687,10 +687,44 @@ function runKey(r) {
     if (r.partyId) return 'p:' + r.partyId;
     return 's:' + (r.epic ? 'epic' : (r.kroom ? 'k' : r.zone));
 }
+// ★ 새로고침해도 이번 판이 남게 (2026-10-27)
+//   ✗ CUR 는 화면 메모리에만 있었다. 탐사 중에 쪽을 새로 열고 복귀하면 CUR 가 비어
+//     걸어 둔 무곡 치성(×7)이 「(전원 생환)」 으로 떨어졌다 (mugArm 은 이미 썼으니 다시 실리지도 않는다).
+//   → users/<사번>/chilRun 에 같이 적어 두고, CUR 가 비었으면 거기서 되살린다.
+const RUN_KEEP = 12 * 60 * 60 * 1000;
+function keepCur() {
+    const u = me();
+    if (!u || !CUR) return;
+    u.chilRun = {
+        key: CUR.key, n: CUR.n || 1, mates: (CUR.mates || []).slice(), pid: CUR.pid || null, at: CUR.at || Date.now(),
+        geo: CUR.geo ? 1 : 0, nok: CUR.nok ? 1 : 0, mug: CUR.mug ? 1 : 0, geoUsed: CUR.geoUsed ? 1 : 0,
+        pagTried: Object.assign({}, CUR.pagTried || {})
+    };
+    try { if (typeof saveFields === 'function') saveFields({ chilRun: 1 }); } catch (e) { }
+}
+function dropCur() {
+    const u = me();
+    if (!u || !u.chilRun) return;
+    u.chilRun = null;
+    try { if (typeof saveFields === 'function') saveFields({ chilRun: 1 }); } catch (e) { }
+}
 function curOf() {
     const r = run();
-    if (!r || !CUR) return null;
-    return CUR.key === runKey(r) ? CUR : null;
+    if (!r) return null;
+    const k = runKey(r);
+    if (CUR && CUR.key === k) return CUR;
+    const u = me(), s = u && u.chilRun;
+    if (s && typeof s === 'object' && s.key === k && Date.now() - (Number(s.at) || 0) < RUN_KEEP) {
+        CUR = { key: s.key, n: Number(s.n) || 1, mates: arr(s.mates), pid: s.pid || null, at: Number(s.at) || Date.now(),
+                pagTried: Object.assign({}, s.pagTried || {}) };
+        if (s.geo) CUR.geo = 1;
+        if (s.nok) CUR.nok = 1;
+        if (s.mug) CUR.mug = 1;
+        if (s.geoUsed) CUR.geoUsed = true;
+        console.log('[칠성] 이번 판을 되살렸습니다 — ' + k + (CUR.mug ? ' · 무곡 치성' : ''));
+        return CUR;
+    }
+    return null;
 }
 function partyCount(r) {
     try { const p = r && r.partyId && darkParties[r.partyId]; return p && p.members ? Object.keys(p.members).length : 0; } catch (e) { return 0; }
@@ -710,7 +744,7 @@ function begin(key, n, mates, pid) {
     const u = me();
     if (!u || !key) return;
     CUR = { key: key, n: n || 1, mates: (mates || []).slice(), pid: pid || null, at: Date.now(), pagTried: {} };
-    if (!wears(u)) return;
+    if (!wears(u)) { dropCur(); return; }
     const s = st(u);
     let ch = false;
     if (CUR.n <= 1 && (s.geoArm || 0) > 0) { s.geoArm--; CUR.geo = 1; ch = true; }
@@ -720,6 +754,7 @@ function begin(key, n, mates, pid) {
         if (pid && db_()) { try { db_().ref('darkParties/' + pid + '/chilMug').set({ by: u.code, n: u.name || '' }); } catch (e) { } }
     }
     if (ch) save();
+    keepCur();
 }
 window.chilBegin = begin;
 // 지금 탐사가 거문의 작은 파티인가 (차고 있는 사람 · 3인 이하)
@@ -873,6 +908,12 @@ hookStart('startDarkRun', function () {
 });
 hookStart('launchPartyRun', function (party) {
     if (!party || !party.id) return;
+    // ✗ 막혀서 판이 안 열린 부름(재진입 차단 · 복귀 창 대기)에도 begin 이 돌아 치성을 먼저 써 버리고,
+    //   진짜 출발 때 begin 이 또 돌아 치성 없는 판으로 덮었다. → 판이 이 방으로 열렸고, 아직 안 실었을 때만.
+    const r = run();
+    if (!r || r.partyId !== party.id) return;
+    const c0 = curOf();
+    if (c0 && c0.key === 'p:' + party.id) return;
     const u = me();
     const mem = Object.keys(party.members || {});
     begin('p:' + party.id, mem.length || 1, mem.filter(function (c) { return !u || c !== u.code; }), party.id);
@@ -974,6 +1015,7 @@ function geoGuard(reasonText, nextFn) {
     const u = me(), c = curOf(), r = run();
     if (!u || !c || !r || !c.geo || c.geoUsed || !wears(u) || runSize() > 1) return false;
     c.geoUsed = true;
+    keepCur();
     r.fail = Math.max(0, (r.fail || 0) - 1);
     try { r.log.push('[🌟 거문성군] 즉사를 피함'); } catch (e) { }
     try {
@@ -1417,7 +1459,9 @@ function preOf() {
     const c = curOf();
     let mugBy = null;
     try { const p = r.partyId && darkParties[r.partyId]; mugBy = p && p.chilMug && p.chilMug.by ? p.chilMug : null; } catch (e) { }
-    return { zone: r.zone, kind: runKind(r), pid: r.partyId || null, n: runSize(), mug: !!(c && c.mug),
+    // 무곡 치성은 방(chilMug)에도 적혀 있다 — 내 이름으로 걸린 것이면 내 치성이다
+    const mine = !!(mugBy && mugBy.by === u.code);
+    return { zone: r.zone, kind: runKind(r), pid: r.partyId || null, n: runSize(), mug: !!(c && c.mug) || mine,
              mates: (c && c.mates) ? c.mates.slice() : [], dead: deathsSeen(), mugBy: mugBy };
 }
 // ⑥ 무곡 — 살아 나온 몫 total 에 얹는다 · ④ 문곡 — 청해 둔 날이면 고르기
@@ -1539,7 +1583,7 @@ window.kroomSettleHook = function (how, pts, helper) {
 //   EPIC · K의 방 — 위험 알림(epicRescue · epicDoomRescue · kroomRescue 단추) 옆에 단추를 붙인다
 let pagArgs = null;
 function pagTried(code) { const c = curOf(); return !!(c && c.pagTried && c.pagTried[code]); }
-function pagMark(code) { const c = curOf(); if (c) { c.pagTried = c.pagTried || {}; c.pagTried[code] = 1; } }
+function pagMark(code) { const c = curOf(); if (c) { c.pagTried = c.pagTried || {}; c.pagTried[code] = 1; keepCur(); } }
 function pagLabel() {
     const s = st(me()), left = Math.max(0, CHIL.PAG_DAY - (s.pag || 0));
     return { left: left, line: left > 0

@@ -2608,9 +2608,20 @@ const EQUIP_AFFIL = {
             if (p.state === 'RUNNING') {
                 const aliveCount = p.alive ? Object.keys(p.alive).length : 0;
                 if (aliveCount === 0) {
-                    if (database) {
-                        database.ref('darkParties/' + pid).remove();
-                        database.ref('darkOccupancy/' + zoneCode).remove();
+                    // ★ alive 는 손전화가 덮이면 서버가 지운다 — 비어 보여도 안에서 걷는 사람이 있을 수 있다.
+                    //   지도를 연 남의 화면이 그 방을 바로 지워 대화 · 치성까지 날리던 것 (2026-10-27)
+                    //   방에 적힌 사람이 접속해 있으면 진행 중으로 본다. 아니면 비어 있는 것으로 보되,
+                    //   지우는 것은 아직 걷는 사람이 없을 때만 (party-keep.js darkStillIn).
+                    if (typeof window.darkRoomOnline === 'function' && window.darkRoomOnline(p)) return true;
+                    if (database && typeof window.darkStillIn === 'function' && !p._asking) {
+                        p._asking = true;
+                        window.darkStillIn(pid, p, null).then(who => {
+                            if (who) return;
+                            const cur = darkParties[pid];
+                            if (cur && cur.alive && Object.keys(cur.alive).length) return;
+                            database.ref('darkParties/' + pid).remove();
+                            database.ref('darkOccupancy/' + zoneCode).remove();
+                        }).catch(() => {});
                     }
                     continue;
                 }
