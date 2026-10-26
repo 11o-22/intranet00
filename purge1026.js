@@ -46,6 +46,8 @@ const KLEE_FIELDS = ['kleeUse', 'kleeDay', 'kleeShop'];
 const BUB_TICKET = '[ 💭 말풍선 선택권 ]';
 const BUB_FIELDS = ['sbub', 'sbubOwn'];
 const NECRO = 'L_necro';
+// 이 정리를 올린 때 — 이 뒤에 네크로맨서로 전직한 사람은 「새로 받은 사람」이다 (거두지 않는다 · 2026-10-27)
+const PURGE_AT = Date.parse('2026-10-26T19:24:59+09:00');
 const PREG_HALF_MS = 24 * 1800000;               // preg-v2.js — PREG_H(24) × 30분 = 절반
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -64,6 +66,22 @@ function busy() {
 function stamp() {
     const n = new Date();
     return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0') + ':' + String(n.getSeconds()).padStart(2, '0');
+}
+
+// 정리 앞에 받은 네크로맨서를 지녔나 — 지금 속성이든 접어 둔 속성이든
+//   ✗ 전에는 네크로맨서면 언제 받았든 거뒀다. 옛 화면을 켜 둔 채 정리 뒤에 새로 전직한 사람이
+//     새로 열 때(또는 들어오자마자 K 의 방에 들어가 정리가 뒤로 밀린 사람이) 거둬져
+//     「지정돼 있는데 직업을 처음부터 골라야」 했다.
+//   → 전직한 때(hidden.at)가 정리를 올린 뒤면 새로 받은 것이다.
+function necroOld(k) {
+    if (!k || typeof k !== 'object') return false;
+    const alt = obj(k.alt) || {};
+    const ps = [k].concat(Object.keys(alt).map(function (a) { return alt[a]; }));
+    return ps.some(function (p) {
+        if (!p || p.job !== NECRO) return false;
+        const at = p.hidden ? Number(p.hidden.at) || 0 : 0;
+        return at < PURGE_AT;
+    });
 }
 
 // ==========================================
@@ -144,9 +162,9 @@ function cleanUser(u) {
         nul.push('preg/kleeHalf');
     }
 
-    // ④ 네크로맨서
+    // ④ 네크로맨서 — 정리 앞에 받은 것만 (정리 뒤에 새로 전직한 사람은 그대로 둔다)
     try {
-        if (typeof window.kroomHasJob === 'function' && window.kroomHasJob(u.kroom, NECRO)) {
+        if (typeof window.kroomWipe === 'function' && necroOld(u.kroom)) {
             window.kroomWipe(u.kroom);
             set.kroom = 1; necro = true;
         }
@@ -320,6 +338,122 @@ function adminRun(force) {
     }).catch(function (e) { adminBusy = false; console.warn('[정리]', e); return n; });
 }
 setInterval(function () { try { adminRun(false); } catch (e) { adminBusy = false; } }, 15000);
+
+// ==========================================
+// ⑤ 정리 뒤에 새로 받은 네크로맨서를 거둬 간 사람 — 되돌린다 (2026-10-27)
+// ==========================================
+//   누구 — kroomHidden/<사번> 이 네크로맨서 전직(accepted · L)이고 그 때가 정리를 올린 뒤인데,
+//          이 정리(purge1026/<사번>)가 그보다 뒤에 네크로맨서를 거둬 간 사람.
+//   어떻게 — 전직한 그 자리처럼 네크로맨서 D · Lv 1 (갈림길 · 임무 수는 큰 쪽).
+//            purge1026/<사번>/back 을 트랜잭션으로 먼저 잡은 쪽이 한 번만 한다.
+//   누가 — 본인 화면(들어와서 · 어둠 · K 의 방 밖에서) · 상담사 화면(접속하지 않은 사람)
+function hurt(p, h) {
+    if (!p || !p.necro || p.back || !h) return false;
+    if (h.key !== NECRO || !(h.state === 'accepted' || h.state === 'L')) return false;
+    const ans = Number(h.answeredAt) || 0;
+    return ans >= PURGE_AT && (Number(p.at) || 0) >= ans;
+}
+function claimBack(code, by) {
+    const d = db_();
+    if (!d) return Promise.resolve(false);
+    return d.ref(NODE + '/' + code + '/back').transaction(function (cur) {
+        if (cur) return;
+        return { at: Date.now(), by: by };
+    }).then(function (r) { return !!(r && r.committed); }).catch(function () { return false; });
+}
+function readPair(code) {
+    const d = db_();
+    return Promise.all([d.ref(NODE + '/' + code).once('value'), d.ref('kroomHidden/' + code).once('value')])
+        .then(function (a) { return { p: a[0].val(), h: a[1].val() }; });
+}
+let backDone = false, backBusy = false;
+function selfBack() {
+    const u = me(), d = db_();
+    if (backDone || backBusy || !selfDone || !u || !u.code || !d || busy()) return;
+    if (typeof window.kroomPutHidden !== 'function') return;
+    backBusy = true;
+    const code = u.code;
+    readPair(code).then(function (x) {
+        if (!hurt(x.p, x.h)) { backDone = true; return; }
+        if (typeof window.kroomHasJob === 'function' && window.kroomHasJob(u.kroom, NECRO)) { backDone = true; return; }
+        // 먼저 사본에 해 본다 — 안 되면 표시를 잡지 않는다 (다음에 다시)
+        const k2 = JSON.parse(JSON.stringify(obj(u.kroom) || {}));
+        const line = window.kroomPutHidden(k2, x.h);
+        if (!line) { backDone = true; return; }
+        return claimBack(code, 'self').then(function (ok) {
+            backDone = true;
+            if (!ok || !me() || me().code !== code) return;
+            const m = me();
+            m.kroom = k2;
+            if (!Array.isArray(m.history)) m.history = [];
+            m.history.unshift({ time: stamp(), text: '[K 의 방] ✦ 네크로맨서를 되돌렸습니다 — ' + line + ' (정리가 잘못 거둬 간 것)' });
+            if (m.history.length > 10) m.history.length = 10;
+            try { if (typeof saveFields === 'function') saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+            d.ref(NODE + '/' + code + '/back').update({ line: line }).catch(function () { });
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+            setTimeout(function () { try { showCustomAlert('🌑 네크로맨서를 되돌렸습니다.\n\n' + line + '\n\n정리가 잘못 거둬 갔던 것입니다.'); } catch (e) { } }, 1500);
+            console.log('[정리] 네크로맨서 되돌림 — ' + line);
+        });
+    }).catch(function (e) { console.warn('[정리] 네크로맨서 되돌리기', e); })
+      .then(function () { backBusy = false; });
+}
+setInterval(function () { try { selfBack(); } catch (e) { backBusy = false; } }, 3000);
+
+// 상담사 — 접속하지 않은 사람은 서버 기록으로 (접속해 있으면 제 화면이 한다)
+function backOther(code, force) {
+    const d = db_();
+    if (!force && online(code)) return Promise.resolve(null);
+    return readPair(code).then(function (x) {
+        if (!hurt(x.p, x.h)) return null;
+        return d.ref('users/' + code).once('value').then(function (s) {
+            const v = s.val();
+            if (!v) return null;
+            const k = obj(v.kroom) ? v.kroom : {};
+            const line = window.kroomPutHidden(k, x.h);          // 먼저 해 보고, 되면 표시를 잡는다
+            if (!line) return null;
+            return claimBack(code, 'admin').then(function (ok) {
+                if (!ok) return null;
+                const hist = Array.isArray(v.history) ? v.history.slice() : arr(v.history);
+                hist.unshift({ time: stamp(), text: '[K 의 방] ✦ 네크로맨서를 되돌렸습니다 — ' + line + ' (정리가 잘못 거둬 간 것)' });
+                if (hist.length > 10) hist.length = 10;
+                return d.ref('users/' + code).update({ kroom: k, history: hist, _adminStamp: Date.now() }).then(function () {
+                    d.ref(NODE + '/' + code + '/back').update({ line: line }).catch(function () { });
+                    try { const loc = users()[code]; if (loc) { loc.kroom = k; loc.history = hist; } } catch (e) { }
+                    console.log('[정리] ' + (v.name || code) + ' — 네크로맨서 되돌림: ' + line);
+                    return { code: code, name: v.name || code, line: line };
+                });
+            });
+        });
+    }).catch(function (e) { console.warn('[정리] 네크로맨서 되돌리기 ' + code, e); return null; });
+}
+let backAdminAt = 0;
+function adminBack(now_, withOnline) {
+    const u = me();
+    if (!u || u.code !== ADMIN || typeof window.kroomPutHidden !== 'function') return Promise.resolve([]);
+    listenDone();
+    if (!doneSet) return Promise.resolve([]);
+    if (!now_ && Date.now() - backAdminAt < 120000) return Promise.resolve([]);
+    backAdminAt = Date.now();
+    const list = Object.keys(doneSet).filter(function (c) { const p = doneSet[c]; return p && p.necro && !p.back; });
+    const out = [];
+    const step = function (i) {
+        if (i >= list.length) return Promise.resolve(out);
+        return backOther(list[i], !!withOnline).then(function (r) { if (r) out.push(r); return step(i + 1); });
+    };
+    return step(0);
+}
+setInterval(function () { try { adminBack(false, false); } catch (e) { } }, 20000);
+// 상담사 콘솔 — 지금 바로 · necroBack(true) 는 접속해 있는 사람도 서버 기록으로
+//   (그 사람 화면이 옛 기록을 다시 적을 수 있으니 되도록 제 화면에 맡긴다 — 들어와 있으면 3초 안에 스스로 한다)
+window.necroBack = function (withOnline) {
+    return adminBack(true, !!withOnline).then(function (r) {
+        console.log('%c🌑 네크로맨서 되돌림 — ' + r.length + '명', 'color:#c9a8ff');
+        if (r.length) console.table(r.map(function (x) { return { 사원: x.name, 되돌림: x.line }; }));
+        const wait = Object.keys(doneSet || {}).filter(function (c) { const p = doneSet[c]; return p && p.necro && !p.back && online(c); });
+        if (wait.length && !withOnline) console.log('  접속 중인 ' + wait.length + '명은 제 화면이 합니다 — 기다리지 않으려면 necroBack(true)');
+        return r;
+    });
+};
 
 window.purgeRunAll = function () { return adminRun(true); };
 window.purgeState = function () {

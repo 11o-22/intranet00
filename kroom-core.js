@@ -347,6 +347,33 @@ window.kroomWipe = function (k) {
     k.hidden = null;
     return k;
 };
+// ★ 정리 뒤에 새로 받은 히든 직업을 정리가 거둬 간 사원 — 그 직업을 되돌린다 (2026-10-27 · purge1026.js 가 부른다)
+//   h = kroomHidden/<사번> (전직했을 때 적힌 것). 전직한 그 자리처럼 — D(L 이면 L) · Lv 1 · 갈림길 · 임무 수는 큰 쪽.
+//   정리 뒤에 새로 고른 직업이 있으면 그 자리에 들어선다. → 바뀐 것을 한 줄로 돌려준다 (못 하면 null)
+window.kroomPutHidden = function (k, h) {
+    if (!k || typeof k !== 'object' || !h || !HIDDEN[h.key]) return null;
+    if (stale(k)) wipe(k);
+    if (window.kroomHasJob(k, h.key)) return null;
+    const a = JOBS[h.key][0];
+    const was = (k.job && JOBS[k.job]) ? jobName(k.job, k.grade) + ' ' + (k.grade || 'D') + ' · Lv ' + (k.lv || 1) : '';
+    if (k.cur && k.cur !== a) {                            // 다른 속성으로 열려 있으면 이 속성으로 돌린다
+        if (k.alt && k.alt[a]) delete k.alt[a];
+        k.cur = a;
+    }
+    k.job = h.key;
+    k.grade = (h.state === 'L') ? 'L' : 'D';
+    k.lv = 1; k.exp = 0; k.wake = {}; k.peek = null; k.rerolled = false;
+    k.hidden = { attr: a, at: Number(h.answeredAt) || now(), from: h.from || '', lv1: now(), back: now() };
+    k.hiddenAsk = Number(h.at) || now();
+    const jx = (k.jx && typeof k.jx === 'object') ? k.jx : {};
+    Object.keys(h.jx || {}).forEach(function (g) { jx[g] = Math.max(Number(jx[g]) || 0, Number(h.jx[g]) || 0); });
+    k.jx = jx;
+    const hq = (k.hq && typeof k.hq === 'object') ? k.hq : {};
+    hq[a] = Math.max(Number(hq[a]) || 0, Number(h.hq) || 0);
+    k.hq = hq;
+    if (!k.seen || typeof k.seen !== 'object') k.seen = {};
+    return jobName(h.key, k.grade) + ' ' + k.grade + ' · Lv 1' + (was ? ' (그 사이 고른 ' + was + ' 자리에)' : '');
+};
 
 // ★ 헬퍼 (party-helper.js 의 「헬퍼로 참가」) — 2026-10-18
 //   혼자 들어갈 때는 이 창의 스위치를, 일행으로 들어갈 때는 일행 명단의 헬퍼 표시를 본다.
