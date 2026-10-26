@@ -36,6 +36,10 @@
 //                    어둠 탐사 · K의 방 횟수가 다시 찬다 (맞는 사람마다 하루 한 번 · bflyBreath.charged).
 //                    ✗ 2026-10-26 까지는 펫이 5시간 잠들었다 (따라오지 않음) — 사용자가 뺐다.
 //
+//   ⑦ 나비의 귀환    장착자가 쓰러져(어둠 · EPIC · K의 방 · 피날레) 상담실 · 선녀탕으로 가게 되면 그 자리에서 꺼내 온다.
+//                    하루 세 번. 나올 때 오염도는 퇴원 값(쓰러짐 40). 제 二 신도(여우 신도)가 먼저 꺼냈으면 횟수를 쓰지 않는다.
+//                    u.bflyOut = { day, n }   오늘 쓴 귀환
+//
 //   포인트 — 맹약(×1.5~2) · 모이라이(유예 1번 ×1.33 · 2번 ×1.67 · 3번 ×2) · 숨결(×1.5) 를 다 곱해도 ×2 까지.
 //            꿈결(K의 방)은 불리지 않는다.
 //
@@ -65,6 +69,7 @@ const BFLY_CFG = {
     PACT_MAX: 3, PACT_ABS: 5, PACT_LIFT: 6, PACT_DEBT: 2, PACT_ME: 1, PACT_THEM: 2, PACT_PTS: [1.5, 2],
     PSY_ROLL: 1, PSY_GUESS: 4, PSY_DC: 3,
     MOIRA: 3, MOIRA_ROLL: 1,
+    OUT: 3,                // 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 꺼낸다 — 하루 세 번 (2026-10-26)
     EROS: 2, EROS_ROLL: 2, EROS_LOOT: 2.5, EROS_PTS: 1.5, EROS_HOURS: 5,
     NULL_AT: 5, HEAL_POLL: 2, HEAL_HP: 10, HEAL_MIND: 3,
     PTS_CAP: 2
@@ -599,6 +604,86 @@ function saveFromDeath(where) {
     }
     return null;
 }
+// ==========================================
+// ⑦ 나비의 귀환 — 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 꺼낸다 (하루 세 번 · 장착자 본인)
+// ==========================================
+function outUsed(u) { return (u && u.bflyOut && u.bflyOut.day === today()) ? (Number(u.bflyOut.n) || 0) : 0; }
+function outLeft(u) { return wears(u) ? Math.max(0, C.OUT - outUsed(u)) : 0; }
+function heldNow(u) { return !!(u && ((Number(u.quarantineUntil) || 0) > Date.now() || u.quarantineHospital)); }
+const OUT_SHUT = ['fox-modal', 'bath-modal', 'fox-room-overlay', 'fox-nameplate-overlay', 'quarantine-pick-overlay', 'fox-loading-overlay'];
+function outNow() {
+    const me = u_();
+    if (!me || outLeft(me) <= 0 || !heldNow(me)) return false;     // 제 二 신도가 먼저 꺼냈으면 그대로
+    const bath = (me.quarantineDest || '') === 'bath';
+    let out = Number(me.quarantineExitPollution) || 0;
+    if (out >= 100) out = 99;
+    me.quarantineUntil = 0; me.quarantineHospital = false; me.quarantineDest = null; me.quarantineExitPollution = 0;
+    me.pollution = out; me.lastPollutionTime = Date.now(); me.foxRoomAnswered = false;
+    try { hasShownFoxAlert = false; } catch (e) { }
+    if (me.badge && typeof me.badge === 'object') {
+        const key = badgeKey(me);
+        if (typeof me.badge[key] === 'string') {
+            const arr = me.badge[key].split(' | ').filter(function (n) { return n.trim() !== '' && n.indexOf('의식 불명') < 0 && n.indexOf('긴급 이송') < 0; });
+            me.badge[key] = arr.length ? arr.join(' | ') : '특이사항 없음';
+        }
+    }
+    me.bflyOut = { day: today(), n: outUsed(me) + 1 };
+    const left = outLeft(me);
+    log_(me, '[' + NAME + '] 나비의 귀환 — 나비 떼가 ' + (bath ? '선녀탕' : '상담실') + '에서 당신을 데리고 나왔습니다. (오늘 남은 ' + left + ')');
+    const f = { quarantineUntil: 1, quarantineHospital: 1, quarantineDest: 1, quarantineExitPollution: 1, pollution: 1,
+                lastPollutionTime: 1, foxRoomAnswered: 1, bflyOut: 1, history: 1 };
+    if (me.badge !== undefined) f.badge = 1;
+    save(f);
+    OUT_SHUT.forEach(function (id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    alert_('🦋 나비의 귀환\n\n쓰러진 자리에서 나비 떼가 일어났습니다.\n' + (bath ? '선녀탕으로' : '상담실로') + ' 가지 않습니다. (오염도 ' + out + '%)\n\n오늘 남은 귀환 ' + left + ' / ' + C.OUT);
+    return true;
+}
+// 쓰러진 뒤 — 제 二 신도가 먼저 꺼낼 틈을 두고 본다
+function outSoon() {
+    const me = u_();
+    if (!me || outLeft(me) <= 0) return;
+    setTimeout(function () { try { outNow(); } catch (e) { console.warn('[환영 나비] 귀환', e); } }, 3000);
+}
+window.bflyOutLeft = function () { return outLeft(u_()); };
+// EPIC
+(function hookEpicOut() {
+    const iv = setInterval(function () {
+        if (typeof epicDeath !== 'function') return;
+        if (epicDeath._bflyOut) { clearInterval(iv); return; }
+        const _e = epicDeath;
+        const w = function () {
+            const out = _e.apply(this, arguments);
+            try { if (typeof er !== 'undefined' && er && er.dead) outSoon(); } catch (e) { }
+            return out;
+        };
+        Object.keys(_e).forEach(function (k) { if (!(k in w)) { try { w[k] = _e[k]; } catch (e) { } } });
+        w._bflyOut = true;
+        epicDeath = w; window.epicDeath = w;
+        clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// 피날레 탈락
+(function hookFinOut() {
+    const iv = setInterval(function () {
+        const X = window.FINX;
+        if (!X || typeof X.eliminate !== 'function') return;
+        if (X.eliminate._bflyOut) { clearInterval(iv); return; }
+        const _el = X.eliminate;
+        const w = function () {
+            const out = _el.apply(this, arguments);
+            try { const r = run(); if (r && r._dead) outSoon(); } catch (e) { }
+            return out;
+        };
+        Object.keys(_el).forEach(function (k) { if (!(k in w)) { try { w[k] = _el[k]; } catch (e) { } } });
+        w._bflyOut = true;
+        X.eliminate = w;
+        clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 (function hookDeath() {
     const iv = setInterval(function () {
         if (typeof darkDeath !== 'function') return;
@@ -621,7 +706,9 @@ function saveFromDeath(where) {
                     }
                 }
             } catch (e) { console.warn('[환영 나비] 죽음 건너뜀:', e && e.message); }
-            return _d.apply(this, arguments);
+            const out = _d.apply(this, arguments);
+            try { const r2 = run(); if (r2 && r2._dead && !kOn()) outSoon(); } catch (e) { }   // ⑦ 나비의 귀환
+            return out;
         };
         w._bfly = true;
         darkDeath = w; window.darkDeath = w;
@@ -867,6 +954,7 @@ window.BFLY = {
     dodge: function () { const me = u_(); if (breathDodgeLeft(me) <= 0) return null; const b = breathOf(me); b.dodged = (Number(b.dodged) || 0) + 1; me.bflyBreath = b; save({ bflyBreath: 1 }); return '에로스의 마지막 숨결'; },
     nul: function () { if (!canUse('nul')) return null; const x = canUse('nul'); spend('nul'); return nickOf(x) + ' (' + used('nul') + '/' + x.lv + ')'; },
     save: function () { return saveFromDeath('kroom'); },
+    died: function () { outSoon(); },          // ⑦ 나비의 귀환 — K의 방이 쓰러짐 뒤에 부른다
     restHeal: function () { const h = usable('heal'); if (!h) return null; xpAdd('heal', 1); return { hp: h.lv * C.HEAL_HP, mind: h.lv * C.HEAL_MIND, nick: nickOf(h) }; },
     runXp: runXp,
     mult: function () { return multNow(); },
@@ -891,7 +979,7 @@ window.bflyKGuess = function (i) {
         if (!ITEM_CATALOG[NAME]) {
             ITEM_CATALOG[NAME] = {
                 price: 0, usable: true, targetable: false, effect: 'equip_bfly', noSell: true,
-                desc: '[장착] 영혼의 맹약 · 레테의 수의 · 프시케의 유리 · 모이라이의 실타래 · 나비의 장례식(다섯 마리 Lv 1~10) · 에로스의 마지막 숨결. '
+                desc: '[장착] 영혼의 맹약 · 레테의 수의 · 프시케의 유리 · 모이라이의 실타래 · 나비의 장례식(다섯 마리 Lv 1~10) · 에로스의 마지막 숨결 · 나비의 귀환. '
                     + '장착칸의 [🦋 환영 나비] 로 부른다. 상담사 지급 전용.'
             };
         }
@@ -1002,6 +1090,7 @@ window.bflyMenu = function () {
     const r = run();
     const info = '<div style="font-size:10.5px; color:#bbb; line-height:1.8; padding:8px 10px; border:1px solid #2e2840; border-radius:6px; margin-bottom:9px;">'
         + '⏳ 모이라이의 실타래 — 오늘 남은 유예 <b style="color:#d9c27a;">' + moiraLeft(me) + ' / ' + C.MOIRA + '</b><br>'
+        + '🕊 나비의 귀환 — 쓰러져 상담실 · 선녀탕으로 가면 바로 꺼낸다 · 오늘 남은 <b style="color:#c9b8ff;">' + outLeft(me) + ' / ' + C.OUT + '</b><br>'
         + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + ' · 장착자 본인만' + (r ? ' (이번 탐사 남은 ' + letheLeft() + ')' : '') + '<br>'
         + '💋 에로스의 마지막 숨결 — 오늘 남은 <b style="color:#ffb3c7;">' + (C.EROS - erosUsed(me)) + ' / ' + C.EROS + '</b>'
         + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'

@@ -2804,6 +2804,7 @@ function hardDeath(why) {
     if (d && darkRun.isParty) { try { d.ref('darkParties/' + darkRun.partyId + '/alive/' + u.code).remove(); } catch (e) { } sendPartyChat(u.name + ' 사원의 소식이 끊겼습니다.', true); }
     darkRun._dead = true;
     try { if (foxc()) foxc().died(); } catch (e) { }                                               // 🎐 역병을 옮기고 · 제 二 신도가 부른다
+    try { if (bfly() && typeof bfly().died === 'function') bfly().died(); } catch (e) { }           // 🦋 나비의 귀환 — 하루 세 번 바로 꺼낸다
     try { if (typeof window.heartPayParty === 'function') window.heartPayParty(); } catch (e) { }   // 🩶 은심장
     try { if (window.eyeKroom) window.eyeKroom.dead(); } catch (e) { }                            // 🔎 감지하는 눈
     try { if (jisanOn() && typeof window.jisanOverwrite === 'function') window.jisanOverwrite(K_CODE); } catch (e) { }   // 📖 덧쓰기 (반입품을 덜어 낸 뒤에)
