@@ -330,7 +330,12 @@ function rollBirthItem(parentA, parentB, fill) {
             currentUser.birthAddedMax = Math.min(20, (currentUser.birthAddedMax || 0) + cat.ticket);
             msg.push(`공용시설 +${cat.ticket}회`);
         }
-        if (cat.dark) { currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - cat.dark); msg.push(`어둠 탐사 +${cat.dark}회`); }
+        if (cat.dark) {
+            // ★ 그날 한도에 얹는다 — 어둠 · K 의 방 둘 다 (dark-add.js · 2026-10-27)
+            if (typeof window.darkAddGiveTo === 'function') window.darkAddGiveTo(currentUser.code, cat.dark);
+            else currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - cat.dark);
+            msg.push(`어둠 탐사 +${cat.dark}회`);
+        }
         if (cat.effect === 'b_blind') {
             currentUser.blindfoldUntil = Math.max(currentUser.blindfoldUntil || 0, Date.now()) + cat.value * 3600000;
             msg.push(`${cat.value}시간 오염 동결`);

@@ -446,7 +446,10 @@ function kLimit(u) {
     u = u || me();
     const a = kAdds(u);
     // 기본 50 + 얹는 몫(요리 · 장비 · 호사수구 · K.LEE …)은 55 까지, 출산 고유 몫은 그 위에 — 모두 합쳐 70 까지
-    return Math.min(K_TRY_ABS, Math.min(K_TRY_HARD, K_TRY_BASE + kNum(a.add)) + kNum(a.dna));
+    // ★ 소지품 · 음식으로 그날 더 받은 「어둠 탐사 +n」(darkAdd — dark-add.js · 2026-10-27)은 끝 한계 밖에 그대로 얹는다
+    let extra = 0;
+    try { if (u === me() && typeof window.darkAddToday === 'function') extra = kNum(window.darkAddToday()); } catch (e) { }
+    return Math.min(K_TRY_ABS, Math.min(K_TRY_HARD, K_TRY_BASE + kNum(a.add)) + kNum(a.dna)) + extra;
 }
 function kLeft() { return Math.max(0, kLimit() - kUsed()); }
 // 한 번 쓴다 — 차이만큼 트랜잭션

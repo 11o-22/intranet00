@@ -1869,6 +1869,8 @@ const TATTOO = [
 const POSTCARD = [
     { t: '행운 +100',          run: function () { ibAdd(currentUser, 'luck', 100, 12 * HOUR, '엽서'); } },
     { t: '어둠 탐사 +1',       run: function () {
+        // ★ 그날 한도에 얹는다 — 어둠 · K 의 방 둘 다 (dark-add.js · 2026-10-27)
+        if (typeof window.darkAddGiveTo === 'function') { window.darkAddGiveTo(currentUser.code, 1); return; }
         currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
         saveFields({ darkTries: 1 });
     } },

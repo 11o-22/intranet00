@@ -7199,7 +7199,9 @@ if (cat.effect === 'couple_ring') {
                 showCustomAlert('금일 제출 한도(2회)를 모두 사용했습니다.'); return;
             }
             currentUser.darkTryAdded = (currentUser.darkTryAdded || 0) + 1;
-            currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
+            // ★ 쓴 횟수를 깎지 않고 그날 한도에 얹는다 (어둠 · K 의 방 둘 다 — dark-add.js · 2026-10-27)
+            if (typeof window.darkAddGiveTo === 'function') window.darkAddGiveTo(currentUser.code, 1);
+            else currentUser.darkTries = Math.max(0, (currentUser.darkTries || 0) - 1);
             removeItemFromInventory(currentUser, itemName, 1);
             addHistoryLog(currentUser, `[??? 사용] 밤샘 신청서 — 탐사 횟수 +1 (금일 ${currentUser.darkTryAdded}/2)`);
             saveSelfFull();
@@ -7725,7 +7727,9 @@ else if (cat.effect === 'rainbow_potion') {
                 msg.push(got > 0 ? `공용시설 +${got}회` : '공용시설 한도는 이미 가득 찼습니다');
             }
             if (cat.darkTry) {
-                targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
+                // ★ 그날 한도에 얹는다 — 어둠 · K 의 방 둘 다 (dark-add.js · 2026-10-27)
+                if (typeof window.darkAddGiveTo === 'function') window.darkAddGiveTo(targetUser.code, cat.darkTry);
+                else targetUser.darkTries = Math.max(0, (targetUser.darkTries || 0) - cat.darkTry);
                 msg.push(`어둠 탐사 +${cat.darkTry}회`);
             }
 

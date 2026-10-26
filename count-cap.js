@@ -159,9 +159,9 @@ window.capFacMax = function (u) {
 function darkOver(u) {
     u = u || me();
     if (!u) return 0;
-    const added = (u.darkTryAddDate === today()) ? Math.min(2, u.darkTryAdded || 0) : 0;
+    // 밤샘 신청서 몫(darkTryAdded)은 이제 쓴 횟수를 깎지 않고 darkAdd 에 얹힌다 (dark-add.js) — 여기서 세지 않는다
     const p = window.capParts(u);
-    const inner = window.CAP_DARK_BASE + added + p.capped.dark;
+    const inner = window.CAP_DARK_BASE + p.capped.dark;
     const over = Math.max(0, inner - window.CAP_DARK_MAX);          // 천장을 넘은 몫
     // 천장 밖 몫(호사수구 · K.LEE · 고유)까지 더한 한도에 끝 한계를 씌운다
     const max = Math.min(window.CAP_DARK_MAX, inner) + p.free.dark;

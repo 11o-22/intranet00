@@ -103,4 +103,31 @@ window.darkAddState = function () {
         '/ 한도', (typeof window.kroomTryLimit === 'function') ? window.kroomTryLimit() : '-');
 };
 
+
+// ==========================================
+// 어둠 남은 횟수에 얹는다 — 맨 바깥 (count-cap · moon 뒤)
+// ==========================================
+(function hookLeft() {
+    let depth = 0;
+    function wrap() {
+        if (typeof getDarkTriesLeft !== 'function' || getDarkTriesLeft._darkAdd) return;
+        if (!getDarkTriesLeft._capDark) return;                        // 한도 쪽이 먼저 싸야 한다
+        const _g = getDarkTriesLeft;
+        const w = function () {
+            if (depth) return _g.apply(this, arguments);
+            depth++;
+            let n;
+            try { n = _g.apply(this, arguments); } finally { depth--; }
+            try { n = (Number(n) || 0) + (window.darkAddToday() || 0); } catch (e) { }
+            return n;
+        };
+        Object.keys(_g).forEach(function (k) { try { w[k] = _g[k]; } catch (e) { } });
+        w._darkAdd = true;
+        getDarkTriesLeft = w;
+        try { window.getDarkTriesLeft = w; } catch (e) { }
+        console.log('[횟수] 「어둠 탐사 +n」을 그날 한도에 얹습니다 — darkAddState()');
+    }
+    setInterval(function () { try { wrap(); } catch (e) { } }, 1500);
+})();
+
 })();

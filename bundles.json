@@ -404,7 +404,8 @@
       "foxcult.js",
       "purge1026.js",
       "update-check.js",
-      "party-keep.js"
+      "party-keep.js",
+      "dark-add.js"
     ]
   ]
 }
