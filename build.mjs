@@ -40,6 +40,10 @@ if (existsSync(OUT)) {
 let files = 0, bytes = 0;
 const lines = [];
 
+// ★ 올린 번호 (2026-10-26) — 묶음 · sw.js · b/build.json 이 같은 번호를 쓴다.
+//   켜 둔 화면이 묵은 묶음을 계속 돌리지 않게, update-check.js 가 b/build.json 을 보고 새로 연다.
+const STAMP = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+
 // ★ 옷장 그림 절반 크기(dot2/) — 원본과 지문이 맞는 것만 싣는다 (tools/dot2.py · 2026-10-24)
 //   원본을 고치고 tools/dot2.py 를 안 돌렸으면 그 장은 빠지고, 화면은 원본(dot/)을 쓴다.
 let dot2Line = 'window.DOT2 = {};\n';
@@ -64,7 +68,7 @@ CFG.groups.forEach((group, i) => {
         + '// 묶음 ' + name + ' — ' + group.length + '개\n'
         + '// build.mjs 가 만든 것입니다. 여기를 고치지 말고 원본 파일을 고치세요.\n'
         + '// ==========================================\n');
-    if (i === 0) parts.push(dot2Line);
+    if (i === 0) { parts.push(dot2Line); parts.push("window.__BUILD = '" + STAMP + "';\n"); }
 
     for (const src of group) {
         let txt;
@@ -98,10 +102,11 @@ CFG.groups.forEach((group, i) => {
 try {
     const swPath = 'sw.js';
     let sw = readFileSync(swPath, 'utf8');
-    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const stamp = STAMP;
     const next = sw.replace(/const BUILD = '[^']*';/, "const BUILD = '" + stamp + "';");
     if (next !== sw) { writeFileSync(swPath, next); console.log('  sw.js 번호: ' + stamp); }
 } catch (e) { console.warn('sw.js 번호를 못 찍었습니다:', e.message); }
+try { writeFileSync(join(OUT, 'build.json'), JSON.stringify({ b: STAMP }) + '\n'); } catch (e) { console.warn('build.json 을 못 적었습니다:', e.message); }
 
 console.log('묶음 ' + CFG.groups.length + '개 · 원본 ' + files + '개 · '
     + (bytes / 1048576).toFixed(2) + ' MB');

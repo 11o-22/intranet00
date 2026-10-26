@@ -114,8 +114,14 @@ self.addEventListener('fetch', function (e) {
         return;
     }
 
+    // ★ 화면 · 묶음 파일 · 번호(build.json)는 **늦어도 새것**을 기다린다 (2026-10-26)
+    //   ✗ 전에는 3초 안에 안 오면 들고 있던 것을 주었다. 묶음 하나가 6MB 라 휴대폰에서는 3초를 넘기 일쑤여서,
+    //     새로 올린 뒤에도 묵은 묶음이 돌았다 (지운 이모티콘이 깨진 그림으로 남아 보이던 것 · 고친 것이 「아직도」 되던 것).
+    //   이제 네트워크가 아예 안 될 때만 들고 있던 것을 준다.
+    const code = req.mode === 'navigate' || url.pathname.indexOf('/b/') >= 0
+        || /\/(index\.html|style\.css)?$/.test(url.pathname);
     e.respondWith(
-        fresh(req).then(function (res) {
+        (code ? fetch(req) : fresh(req)).then(function (res) {
             if (res && res.ok && res.type === 'basic') {
                 const copy = res.clone();
                 caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () { });
