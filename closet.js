@@ -153,7 +153,7 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
@@ -189,6 +189,7 @@ const DOT = {
     FLAP_COLS: { robe: [0, 1], 'rab-friend': [0, 1, 2, 3, 4, 5], 'bunny-headset': [0, 1, 2, 3, 4, 5], 'glass-pen': [0, 1, 2, 3, 4, 5],
                  'maker-outer': [0, 1, 2, 3, 4, 5], 'maker-outer-in': [0, 1, 2, 3, 4, 5], 'newbie-sprout': [0, 1],
                  'wolf-pj': [0, 1, 2, 3, 4, 5], 'wolf-pj-in': [0, 1, 2, 3, 4, 5],
+                 'gochu': [0, 1],                 // 곧휴 — 서기 두 칸 (반짝이)
                  // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
                  //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
                  'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5],
@@ -463,6 +464,11 @@ const DOT_SLOTS = [
             //   어둡고 색끼 없는 것(끈 · 천 · 니플 패치)만 떠서 세 가지 어둠으로 고쳐 칠했다. 몸 테두리 · 귀는 뺐다.
             //   서기 줄은 마지막 칸에만 그려져 있어 그 칸을 여섯 칸 모두에 깔았다 (몸 서기 그림은 여섯 칸이 같다).
             { i: 'sexy-pantsu', n: '섹시빤츄', over: ['sexy-pantsu'], own: 'sexy-pantsu', cat: '등' },
+            // ★ 곧휴 (2026-10-26 · 악세 뽑기 B) — 섹시빤츄와 같은 자리 · **옷 밑**에 단다 (over · Z 섹시빤츄 바로 위).
+            //   주신 그림은 1440x640 JPG(칸 240 — 1728 규격을 줄인 것)라 1728 로 되늘려 칸마다 +30, 몸 그림과 다른 자리 중
+            //   빨강 · 짙은 빨강(얼굴) · 초록(꼭지) · 노랑(반짝이)만 2픽셀 눈금으로 떠서 그 빛깔로 고쳐 칠했다 (번진 테두리는 걷음).
+            //   서기 줄은 앞 두 칸에만 그려져 있어 그 두 칸을 돈다 (FLAP_COLS — 반짝이가 바뀐다).
+            { i: 'gochu', n: '곧휴', over: ['gochu'], own: 'gochu', cat: '등' },
             // ★ 토끼 전용 둘 — 악세 뽑기에 **안 넣는다**. 악세서리숍에서
             //   어둠 소속이 5만 P 에 산다 (gacha.js 의 BUY).
             //
