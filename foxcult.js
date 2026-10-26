@@ -37,6 +37,8 @@
 //   제 二 신도  어디든지 갈 수 있다 (인원수 · 구역이 차 있어도) · 포인트 배수 · 행운 배수 · 구출(쓰러져
 //               상담실 · 선녀탕으로 가게 되면 바로 불러낸다)
 //   동행하는 사람이 죽으면 신도마다 한 번씩(탐사당) 되살린다.
+//   동행하는 사람과 같은 파티에서 쓰러지는 사람도 구한다 — 신도마다 탐사당 1~3번 (신도 마음대로 · 둘 다 동행하면 따로 센다 ·
+//   곁의 사람이 살아 있을 때만 · darkParties/<방>/foxdSave · 2026-10-26)
 //   특이사항  🎐 제 二 신도가 동행합니다. 어디든지 갈 수 있습니다.
 //
 // ■ 적히는 자리
@@ -531,7 +533,60 @@ function revive() {
     }
     return null;
 }
-function saveMe() { return nodeath() || revive(); }
+// ★ 동행하는 사람의 파티원도 구한다 (2026-10-26)
+//   신도가 곁에 선 사람과 같은 파티에서 쓰러지는 사람을 — 신도마다 탐사당 1~3번 (몇 번인지는 신도 마음대로 · 처음 구할 때 정한다).
+//   둘 다 동행하면 둘이 따로 센다. 곁의 사람 본인은 위의 즉사 무효 · 되살림이 맡는다. 곁의 사람이 살아 있을 때만.
+//   셈은 darkParties/<방>/foxdSave/<장착자>_<d> = { max, used, to } 한 곳 — 쓰러지는 쪽 화면이 트랜잭션으로 더한다.
+const PSAVE = { pid: '', ref: null, v: {} };
+function pSaveBind() {
+    const r = run(), d = db_();
+    const pid = (r && r.partyId && d) ? r.partyId : '';
+    if (pid === PSAVE.pid) return;
+    try { if (PSAVE.ref) PSAVE.ref.off(); } catch (e) { }
+    PSAVE.pid = pid; PSAVE.ref = null; PSAVE.v = {};
+    if (!pid) return;
+    PSAVE.ref = d.ref('darkParties/' + pid + '/foxdSave');
+    PSAVE.ref.on('value', function (s) { if (PSAVE.pid === pid) PSAVE.v = obj(s.val()) || {}; });
+}
+setInterval(function () { try { pSaveBind(); } catch (e) { } }, 1500);
+function partySave() {
+    const me = u_(), r = run();
+    if (!me || !r || !r.partyId) return null;
+    pSaveBind();
+    const p = (typeof darkParties !== 'undefined') ? darkParties[r.partyId] : null;
+    if (!p) return null;
+    const alive = obj(p.alive) || {};
+    const codes = Object.keys(obj(p.members) || {}).filter(function (c) { return c !== me.code && alive[c]; });
+    for (let i = 0; i < codes.length; i++) {
+        const t = userOf(codes[i]);
+        for (let j = 0; j < DS.length; j++) {
+            const d = DS[j], w = withOf(t, d);
+            if (!w) continue;
+            const key = w.by + '_' + d;
+            const cur = obj(PSAVE.v[key]) || {};
+            const used = Number(cur.used) || 0, max = Number(cur.max) || 0;
+            if (max ? used >= max : used >= 1) continue;          // 처음 한 번은 늘 — 그 뒤는 정해진 수까지
+            PSAVE.v[key] = Object.assign({}, cur, { used: used + 1 });
+            try {
+                db_().ref('darkParties/' + r.partyId + '/foxdSave/' + key).transaction(function (v) {
+                    v = obj(v) || {};
+                    if (!v.max) v.max = rnd(1, 3);
+                    v.used = (Number(v.used) || 0) + 1;
+                    v.to = t.code;
+                    return v;
+                }).catch(function () { });
+            } catch (e) { }
+            const nm = dName(w.owner, d);
+            log_(me, '[' + NAME + '] ' + (t.name || '') + ' 사원과 동행하는 ' + nm + '가 쓰러지는 당신을 구했습니다.');
+            save({ history: 1 });
+            return d === 'd1'
+                ? '「 ' + (t.name || '') + ' 곁의 여우 신도가 꼬리를 뻗어 당신을 낚아챘다. 」'
+                : '「 ' + (t.name || '') + ' 곁에서 방울이 울렸다. 여우 신도가 당신의 숨을 붙들었다. 」';
+        }
+    }
+    return null;
+}
+function saveMe() { return nodeath() || revive() || partySave(); }
 function lineBox(t) {
     return '<span style="color:#f0c987;">' + t + '</span>';
 }
@@ -791,6 +846,7 @@ window.FOXCULT = {
     stat: function (k) { return stat(u_(), k); },
     nodeath: nodeath,
     revive: revive,
+    party: partySave,              // 동행하는 사람의 파티원 — K의 방이 즉사 때 부른다
     save: saveMe,
     died: died,
     mult: mult,

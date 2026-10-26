@@ -1733,7 +1733,7 @@ window.kroomPick = function (i) {
         }
         // 🎐 여우 신도 — 즉사 무효 (역병 몫 · 동행 몫)
         if (o.doom && foxc()) {
-            const fx = foxc().nodeath();
+            const fx = foxc().nodeath() || (typeof foxc().party === 'function' ? foxc().party() : null);   // 동행하는 사람의 파티원도 (2026-10-26)
             if (fx) {
                 addStat('mind', -6);
                 show(it.sc.t + ' — 결과', dice + gl + foxLine(fx) + (o.doom.text || ''), darkChoiceBtn('계속한다.', 'kroomNext()'));

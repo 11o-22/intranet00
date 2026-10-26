@@ -2359,7 +2359,11 @@ async function foxdPost(db, run, rows, now) {
     if (Object.keys(up).length) await db.patch('darkChats/' + run, up);
     return Object.keys(up).length;
 }
+// ★ 어둠에서는 말하지 않는다 (2026-10-26 · 사용자가 정함) — 말은 광장(kitcall · kitchat)과 재난(fox)에서만.
+//   화면(foxcult.js DARK_TALK)도 닫았지만, 옛 화면이 남아 부르면 여기서 막는다.
+const FOXD_DARK_TALK = false;
 async function foxdRun(b, deps, db) {
+    if (!FOXD_DARK_TALK) return { ok: false, why: 'off' };
     const now = deps.now(), day = kstDay(now), run = b.run, c = b.code;
     const mem = await db.get('darkParties/' + run + '/members');
     const party = !!(mem && typeof mem === 'object');
