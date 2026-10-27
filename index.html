@@ -4529,11 +4529,14 @@ return b;
                 if (isHardZone) {
             const luckRate = gearValue(currentUser, 'luck');
             const saved = luckRate > 0 && Math.random() < luckRate;
+            // 🦋 영혼의 맹약을 맺은 장착자 — 포인트는 그대로 (죽음 · 반입품 소실은 그대로 · 2026-10-27)
+            const pactKeep = !!(window.BFLY && typeof window.BFLY.pactKeep === 'function' && window.BFLY.pactKeep());
+            if (pactKeep) addHistoryLog(currentUser, `[🦋 영혼의 맹약] 쓰러졌지만 포인트는 잃지 않았습니다. (${currentUser.points.toLocaleString()} P)`);
 
             if (saved) {
                 // ★ 행운 — 절반 미만 보존
                 const keepRatio = 0.30 + Math.random() * 0.15;
-                const kept = Math.floor(currentUser.points * keepRatio);
+                const kept = pactKeep ? currentUser.points : Math.floor(currentUser.points * keepRatio);
                 lostPoints = currentUser.points - kept;
                 currentUser.points = kept;
 
@@ -4546,8 +4549,8 @@ return b;
                 darkRun._luckSaved = true;
                 addHistoryLog(currentUser, `[어둠 사망] ${z.code}에서 사망. 일부를 지켜냈습니다. (-${lostPoints} P)`);
             } else {
-                lostPoints = currentUser.points;
-                currentUser.points = 0;
+                lostPoints = pactKeep ? 0 : currentUser.points;
+                if (!pactKeep) currentUser.points = 0;
                 const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
                 carried.forEach(it => {
                     removeItemFromInventory(currentUser, it, 1);

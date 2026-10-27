@@ -758,14 +758,17 @@ function eliminate(reasonHtml) {
     const luckRate = (typeof gearValue === 'function') ? gearValue(currentUser, 'luck') : 0;
     const saved = luckRate > 0 && Math.random() < luckRate;
     const carried = [].concat(darkRun.carryEquips || [], darkRun.carryItems || []);
+    // 🦋 영혼의 맹약을 맺은 장착자 — 포인트는 그대로 (2026-10-27)
+    const pactKeep = !!(window.BFLY && typeof window.BFLY.pactKeep === 'function' && window.BFLY.pactKeep());
+    if (pactKeep) addHistoryLog(currentUser, '[🦋 영혼의 맹약] 쓰러졌지만 포인트는 잃지 않았습니다. (' + (Number(currentUser.points) || 0).toLocaleString() + ' P)');
     if (saved) {
-        const kept = Math.floor(currentUser.points * (0.30 + Math.random() * 0.15));
+        const kept = pactKeep ? currentUser.points : Math.floor(currentUser.points * (0.30 + Math.random() * 0.15));
         lostPoints = currentUser.points - kept;
         currentUser.points = kept;
         carried.slice(0, Math.ceil(carried.length / 2)).forEach(function (it) { removeItemFromInventory(currentUser, it, 1); lostItems.push(it); });
     } else {
-        lostPoints = currentUser.points;
-        currentUser.points = 0;
+        lostPoints = pactKeep ? 0 : currentUser.points;
+        if (!pactKeep) currentUser.points = 0;
         carried.forEach(function (it) { removeItemFromInventory(currentUser, it, 1); lostItems.push(it); });
     }
     addHistoryLog(currentUser, '[어둠 탈락] ' + z.code + ' — 자발적 피날레. 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.');

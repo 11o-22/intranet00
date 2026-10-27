@@ -958,6 +958,8 @@ window.BFLY = {
     restHeal: function () { const h = usable('heal'); if (!h) return null; xpAdd('heal', 1); return { hp: h.lv * C.HEAL_HP, mind: h.lv * C.HEAL_MIND, nick: nickOf(h) }; },
     runXp: runXp,
     mult: function () { return multNow(); },
+    // 🔗 영혼의 맹약을 맺은 장착자 — 쓰러져도 포인트는 잃지 않는다 (2026-10-27 · 죽음 자체는 그대로)
+    pactKeep: function () { try { const me = u_(); return !!(me && wears(me) && myPact().length); } catch (e) { return false; } },
     bonus: function () { try { return bonusNow(); } catch (e) { return 0; } },   // gear-cap.js — 보정 상한에서 뺀다
     C: C
 };

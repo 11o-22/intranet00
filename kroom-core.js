@@ -3097,7 +3097,10 @@ function hardDeath(why) {
     const luckRate = (typeof gearValue === 'function') ? (kv(gearValue, null, [u, 'luck']) || 0) : 0;
     const saved = luckRate > 0 && Math.random() < luckRate;
     let lost = 0;
-    if (saved) { const kept = Math.floor(u.points * (0.30 + Math.random() * 0.15)); lost = u.points - kept; u.points = kept; }
+    // 🦋 영혼의 맹약을 맺은 장착자 — 포인트는 그대로 (꿈결 · 반입품은 그대로 잃는다 · 2026-10-27)
+    const pactKeep = !!(window.BFLY && typeof window.BFLY.pactKeep === 'function' && window.BFLY.pactKeep());
+    if (pactKeep) { addHistoryLog(u, '[🦋 영혼의 맹약] 쓰러졌지만 포인트는 잃지 않았습니다. (' + (Number(u.points) || 0).toLocaleString() + ' P)'); }
+    else if (saved) { const kept = Math.floor(u.points * (0.30 + Math.random() * 0.15)); lost = u.points - kept; u.points = kept; }
     else { lost = u.points; u.points = 0; }
     // ★ 꿈결도 포인트처럼 잃는다 (2026-10-19) — 행운이 지켜 주면 같은 몫만 남는다
     const kp = prof(u);

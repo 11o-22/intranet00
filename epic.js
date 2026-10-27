@@ -583,8 +583,14 @@ function epicDeath(txt) {
     const luckRate = gearValue(currentUser, 'luck');
     const saved = luckRate > 0 && Math.random() < luckRate;
     let lostPoints = 0;
+    // 🦋 영혼의 맹약을 맺은 장착자 — 포인트는 그대로 (2026-10-27)
+    const pactKeep = !!(window.BFLY && typeof window.BFLY.pactKeep === 'function' && window.BFLY.pactKeep());
+    if (pactKeep) addHistoryLog(currentUser, `[🦋 영혼의 맹약] 쓰러졌지만 포인트는 잃지 않았습니다. (${currentUser.points.toLocaleString()} P)`);
 
-    if (saved) {
+    if (pactKeep) {
+        lostPoints = 0;
+        if (saved) er.luckSaved = true;
+    } else if (saved) {
         const keepRatio = 0.30 + Math.random() * 0.15;
         const kept = Math.floor(currentUser.points * keepRatio);
         lostPoints = currentUser.points - kept;
