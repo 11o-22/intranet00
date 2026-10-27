@@ -2871,6 +2871,7 @@ function settle(how, txt) {
     if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = 0; }   // ★ 쓰러지면 이번에 얻은 꿈결도 없다 (가진 것은 hardDeath 가 걷는다)
     if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
+    dream = Math.floor(dream / 5);                              // ★ K 의 방 꿈결 5분의 1 (2026-10-27 · 경험치는 그대로)
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
     // ★ 꿈결은 특수 물건이 불리지 않는다 (2026-10-24) — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)의 배수는
     //   아래 **포인트**에 붙는다 (전에는 꿈결을 ×1.5~3 · ×2 했다). 꿈결은 직업(행운)과 던전에서 얻은 그대로.
@@ -2895,7 +2896,7 @@ function settle(how, txt) {
     let pts = 0;
     if (how === 'clear') pts = rnd(1500, 4000) * ({ D: 1, C: 1.5, B: 2.2, A: 3, S: 4 }[g] || 1);
     if (how === 'leave') pts = rnd(400, 1200);
-    pts = Math.round(pts);
+    pts = Math.round(pts / 5);                                  // ★ K 의 방 포인트 5분의 1 (2026-10-27 · 그 위 배수는 같이 줄어든다)
     if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
     if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
