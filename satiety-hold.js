@@ -453,20 +453,30 @@ function sweepRibbons() {
         //
         //   이름표는 한 번 떼면 다시 세지 않으므로(차고 있는 수가 줄어든다)
         //   이렇게 해도 30초마다 불어나지 않는다.
-        const mine = owner ? (owner === currentUser.code)
-                           : (gave < owed.length);     // 주인 기록이 없는 묵은 것
-        if (mine) {
-            if (gave < owed.length) markPaid(owed[gave]);
+        // ★ 돌려주는 것은 **줄(ribbons)이 기준**이다 (2026-10-27)
+        //   ✗ 전에는 이름표의 주인 기록(equipOwner)을 보고 돌려줬다. 그런데 이름표는 글자가 같으면
+        //     (서로 묶었을 때 「빨간 리본 (연결: 갑 과장)」 둘 · 같은 사람에게 둘) 주인 칸을 하나로 나눠 쓴다.
+        //     나중에 묶은 쪽이 주인 칸을 덮어, 먼저 묶은 사람의 리본은 한 시간 뒤 **돌아오지 않고 사라졌다.**
+        //   → 내가 값을 치른 끝난 줄(owed)마다 하나씩 돌려준다 (아래). 이름표는 수만 맞춰 뗀다.
+        //     줄이 하나도 없는 묵은 것(줄을 달기 전에 묶은 것)만 주인 기록으로 본다.
+        if (!owed.length && !dead.length && owner === currentUser.code) {
             if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
             currentUser.inventory.push(RIBBON);
             gave++;
         }
     }
+    // 내가 값을 치른 끝난 줄 — 이름표를 떼었든 못 떼었든(이미 빠져 있든) 하나씩 돌려준다
+    owed.forEach(function (d) {
+        markPaid(d);
+        if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+        currentUser.inventory.push(RIBBON);
+        gave++;
+    });
 
     // 떼지 못했어도 끝난 줄은 적어 둔다 — 다음 번에 또 세지 않게
     dead.forEach(function (d) { if (d.o === currentUser.code) markPaid(d); });
 
-    if (!off && !dead.length) return;
+    if (!off && !dead.length && !gave) return;
     if (typeof addHistoryLog === 'function' && gave) {
         addHistoryLog(currentUser, '[' + RIBBON + '] 묶임이 풀렸습니다. (' + gave + '개 돌려받음)');
     }
