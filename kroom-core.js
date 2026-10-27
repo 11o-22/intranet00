@@ -316,6 +316,7 @@ function wipe(k) {
     k.peek = null; k.rerolled = false; k.seen = {};
     k.jx = {}; k.hq = {}; k.hiddenAsk = null;
     k.alt = null; k.open = null; k.cur = null;            // 열린 속성들 (2026-10-25)
+    k.trial = null;                                       // 시련 (2026-10-27)
     k.reFor = null;                                       // 메인 속성이 바뀌어 고르는 중이던 속성
     k.reset = K_RESET;
 }
@@ -561,7 +562,7 @@ function mainAttr(u) {
 //   ■ 몇 개까지 여나 — Lv 100 인 열린 속성의 수만큼 더 연다 (첫 속성 100 → 둘째, 둘째 100 → 셋째 …).
 //   ■ 언제 — Lv 100 뒤 K 의 방에 들어서면 묻는다. 거절하면 다음에 또 묻는다.
 //            열린 속성이 둘 이상이면 들어설 때마다 어느 속성으로 들어갈지 고른다.
-const PER = ['lv', 'exp', 'job', 'grade', 'wake', 'peek', 'rerolled', 'seen', 'jx', 'hq', 'hiddenAsk', 'hidden'];
+const PER = ['lv', 'exp', 'job', 'grade', 'wake', 'peek', 'rerolled', 'seen', 'jx', 'hq', 'hiddenAsk', 'hidden', 'trial'];
 const NTH = ['첫', '두', '세', '네', '다섯', '여섯'];
 // 지닌 속성 — 전용 장비의 자리 순서대로 (같은 것은 한 번만)
 function heldAttrs(u) {
@@ -1869,8 +1870,13 @@ function wakeUp() {
         return `<div style="font-size:11px; color:#d4af37; margin-top:6px;">◇ 각성 ${k.wake[g]} / ${need}</div>`;
     }
     const from = jobName(k.job, g);
+    // ★ 히든 직업 S → L 은 시련을 거친다 (2026-10-27) — 각성 점수가 차면 시련이 열리고, 이기면 L
+    if (NEXT_GRADE[g] === 'L') {
+        const fresh = trialSet(k, 'L');
+        saveProf();
+        return fresh === 'new' ? trialNote('L') : '';
+    }
     k.grade = NEXT_GRADE[g];
-    if (k.grade === 'L') { try { hiddenReachL(k); } catch (e) { } }
     const to = jobName(k.job, k.grade);
     addHistoryLog(me(), '[K 의 방] 각성 — ' + from + ' → ' + to + ' (' + k.grade + ')');
     saveProf();
@@ -1905,7 +1911,7 @@ function rest() {
         }
     } catch (e) { }
     kr.uses = {};                                  // 돌봄 횟수는 층마다
-    if (last) { clear(); return; }
+    if (last) { if (trialHere()) { trialIntro(); return; } clear(); return; }
     const others = otherTeams();
     show('쉼터 — ' + kr.floor + '층 끝', (mates
         ? `계단참에 바람이 안 든다.<br><br>
@@ -2791,6 +2797,268 @@ window.kroomLeave = function () {
     if (kr && !kr.dead && !kr._settled && hard().doom) { try { showDarkToast('올라온 길이 없다.'); } catch (e) { } return; }   // ★ 혼자 S — 돌아갈 수 없다
     settle('leave');
 };
+// ==========================================
+// ★ 시련 — 스펙이 같은 「나」를 넘는다 (2026-10-27)
+// ==========================================
+//
+//   히든 직업만. 두 번 온다.
+//     L   S 등급에서 각성 점수(100)가 다 찼을 때 — 이기면 L
+//     lv  Lv 100 에서 다음 Lv 에 닿을 만큼 경험치가 찼을 때 — 이기면 Lv 101 부터 다시 오른다
+//   S 등급 던전의 맨 밑층을 돌파한 자리(쉼터 대신)에서만 선다. 다른 등급 던전에서는 오지 않는다.
+//   둘 다 걸려 있으면 L 부터 · 한 판에 하나.
+//
+//   거울 속의 나 — 체력 · 보정 · 등급이 전부 같다. 장비 · 분신 · 나비는 거울에 닿지 않는다.
+//   돌(round)마다 셋 중 하나를 고른다. 공격 > 허점 > 방어 > 공격 — 이긴 쪽은 그 돌의 눈에 +4.
+//   각자 d20 + 보정. 높은 쪽이 상대 체력을 깎는다 (기본 20 + 차이). 같으면 둘 다 10.
+//   먼저 0 이 되는 쪽이 진다.
+//
+//   동료 한 사람 — **밖에 있는** 사원(접속해 있고, 탐사 중이 아니고, 이 일행이 아닌 사람)의 이름을 부른다.
+//   그쪽 화면에 창이 뜨고 60초 안에 응하면 시련 내내 눈에 +3 · 한 번 맞는 것을 대신 받아 준다(방패 1).
+//   같이 들어온 일행은 부를 수 없다.
+//
+//   지면 죽지 않는다 — 심력 −30 · 거울이 사라지고, 다음 S 돌파 때 다시 선다.
+const TRIAL = { HP: 100, BASE: 20, STANCE: 4, HELP_BON: 3, HELP_SHIELD: 1, ASK_MS: 60000, LOSE_MIND: 30 };
+const T_ASK = 'kroomTrialAsk';
+const STANCE = { atk: '공격', def: '방어', gap: '허점' };
+const BEATS = { atk: 'gap', gap: 'def', def: 'atk' };
+function trialSet(k, kind) {
+    if (!k || !isHiddenJob(k.job)) return false;
+    k.trial = (k.trial && typeof k.trial === 'object') ? k.trial : {};
+    if (k.trial[kind]) return 'old';
+    k.trial[kind] = now();
+    try { addHistoryLog(me(), '[K 의 방] ✦ 시련이 열렸다 — ' + (kind === 'L' ? jobName(k.job, 'L') + ' (L)' : 'Lv ' + (LV_MAX + 1)) + ' · S 등급 던전의 맨 밑을 돌파하면 거울이 선다.'); } catch (e) { }
+    return 'new';
+}
+function trialNote(kind) {
+    return `<div style="margin-top:12px; padding:12px; border:1px solid #c9a8ff; border-radius:6px; background:rgba(201,168,255,.08); text-align:center;">
+        <div style="font-size:11px; color:#c9a8ff; letter-spacing:2px;">시 련</div>
+        <div style="font-size:13px; color:#fff; margin:6px 0;">${kind === 'L' ? 'L 로 가는 문이 보인다. 문 앞에 누가 서 있다.' : 'Lv ' + (LV_MAX + 1) + ' — 더 오르려면 넘어야 할 것이 있다.'}</div>
+        <div style="font-size:10px; color:#aaa;">S 등급 던전의 맨 밑층을 돌파하면 거울이 선다. 밖에 있는 동료 한 사람을 부를 수 있다.</div></div>`;
+}
+function trialKind(k) {
+    const t = k && k.trial;
+    if (!t || !isHiddenJob(k.job)) return null;
+    if (t.L && k.grade === 'S') return 'L';
+    if (t.lv && k.lv >= LV_MAX && !t.lvOk) return 'lv';
+    return null;
+}
+// 레벨 — 히든 직업은 Lv 100 에서 한 번 멈춘다 (시련을 넘어야 101 부터)
+function lvUp(k) {
+    while (k.lv < lvCap(k) && k.exp >= expNeed(k, k.lv)) {
+        if (isHiddenJob(k.job) && k.lv >= LV_MAX && !(k.trial && k.trial.lvOk)) { trialSet(k, 'lv'); break; }
+        k.exp -= expNeed(k, k.lv); k.lv++;
+    }
+    if (k.lv >= lvCap(k)) k.exp = 0;
+}
+function trialHere() {
+    if (!kr || kr.dead || kr.down || isHelper() || kr._trialDone) return false;
+    if (!kr.dun || DUNS[kr.dun].g !== 'S') return false;
+    return !!trialKind(prof());
+}
+function trialBox(t, extra) {
+    const f = kr.trial;
+    const hp = function (v) { return `<div style="flex:1; height:8px; background:rgba(255,255,255,.07); border-radius:4px; overflow:hidden;"><div style="height:100%; width:${clamp(Math.round(v / TRIAL.HP * 100), 0, 100)}%; background:${v > 30 ? '#e05656' : '#ff2222'}; transition:width .6s;"></div></div>`; };
+    const head = f ? `<div style="border:1px solid #4a3a6a; border-radius:6px; padding:8px 10px; margin-bottom:10px; background:rgba(0,0,0,.35);">
+        <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#ddd; margin:2px 0;"><span style="width:58px;">나</span>${hp(f.me)}<span style="width:40px; text-align:right;">${f.me}</span></div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:#c9a8ff; margin:2px 0;"><span style="width:58px;">거울의 나</span>${hp(f.it)}<span style="width:40px; text-align:right;">${f.it}</span></div>
+        <div style="font-size:10px; color:#888; margin-top:4px;">${f.round}번째 돌${f.help ? ' · 🤝 ' + esc(f.help.name) + ' (+' + TRIAL.HELP_BON + ' · 방패 ' + f.shield + ')' : ''}</div></div>` : '';
+    return head + t;
+}
+function trialIntro() {
+    const k = prof(), kind = trialKind(k);
+    kr.trial = { kind: kind, me: TRIAL.HP, it: TRIAL.HP, round: 0, shield: 0, help: null, asked: {} };
+    const nm = jobName(k.job, k.grade);
+    show('시련', trialBox(`맨 밑을 돌파했다. 그런데 문이 하나 더 있다.<br><br>
+        문 너머에 누가 서 있다. 키도, 옷도, 손에 쥔 것도 같다. ${esc(nm)} ${k.grade} · Lv ${k.lv}.<br>
+        그쪽이 먼저 입을 연다. 내 목소리로.<br><br>
+        <span style="color:#c9a8ff;">「 ${kind === 'L' ? '여기서부터는 네가 아니라 내가 간다.' : '백은 끝이야. 그 위는 내 자리고.'} 」</span><br><br>
+        <span style="font-size:11px; color:#888;">체력 · 보정 · 등급이 전부 같다. 장비도 분신도 거울에는 닿지 않는다.<br>
+        밖에 있는 동료 한 사람을 부를 수 있다 — 그쪽이 응해야 한다. 같이 들어온 일행은 부를 수 없다.</span>`),
+        darkChoiceBtn('🤝 밖에 있는 동료를 부른다.', 'kTrialList()') + darkChoiceBtn('혼자 마주 선다.', 'kTrialStart()'));
+    kSaveSoon();
+}
+function trialOutside() {
+    const mine = {}; try { members().forEach(function (c) { mine[c] = 1; }); } catch (e) { }
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    let on = {}; try { on = onlineUsersMap || {}; } catch (e) { }
+    return Object.keys(on).filter(function (c) { return on[c] && book[c] && c !== me().code && c !== ADMIN && !mine[c]; })
+        .map(function (c) { return { code: c, name: book[c].name || c }; });
+}
+window.kTrialList = function () {
+    if (!kr || !kr.trial || kr.trial.round) return;
+    const d = db_();
+    const list = trialOutside();
+    if (!list.length) { show('시련', trialBox('밖에 아무도 없다.<br><br><span style="font-size:11px; color:#888;">접속해 있는 사원이 없다.</span>'), darkChoiceBtn('혼자 마주 선다.', 'kTrialStart()')); return; }
+    show('시련', trialBox('누구의 이름을 부르나.<br><span style="font-size:11px; color:#888;">탐사 중인 사람은 응할 수 없다. 응하지 않으면 60초 뒤에 다시 고른다.</span>'),
+        list.map(function (x) {
+            const was = kr.trial.asked[x.code];
+            return darkChoiceBtn(esc(x.name) + (was ? ' <span style="font-size:10px; color:#888;">(응하지 않았다)</span>' : ''), "kTrialAsk('" + x.code + "')");
+        }).join('') + darkChoiceBtn('혼자 마주 선다.', 'kTrialStart()'));
+};
+let trialAskRef = null, trialAskT = 0;
+function trialAskOff() { try { if (trialAskRef) trialAskRef.off(); } catch (e) { } trialAskRef = null; if (trialAskT) { clearTimeout(trialAskT); trialAskT = 0; } }
+window.kTrialAsk = function (code) {
+    if (!kr || !kr.trial || kr.trial.round || !code) return;
+    const d = db_(); if (!d) { kTrialStart(); return; }
+    const u = me(), k = prof();
+    const id = 't' + now().toString(36);
+    kr.trial.asked[code] = 1;
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const name = (book[code] && book[code].name) || code;
+    // 탐사 중인 사람은 부를 수 없다 (darkRuns/<사번> 이 있으면 안에 있다)
+    d.ref('darkRuns/' + code).once('value').then(function (s) {
+        if (s.val()) { show('시련', trialBox(esc(name) + ' 사원은 지금 탐사 안에 있다.'), darkChoiceBtn('다른 사람을 부른다.', 'kTrialList()') + darkChoiceBtn('혼자 마주 선다.', 'kTrialStart()')); return; }
+        const ref = d.ref(T_ASK + '/' + code);
+        ref.set({ id: id, from: u.code, name: u.name || '', job: jobName(k.job, k.grade) + ' ' + k.grade, kind: kr.trial.kind, at: now() });
+        trialAskOff();
+        trialAskRef = d.ref(T_ASK + '/' + code + '/ans');
+        let left = Math.round(TRIAL.ASK_MS / 1000);
+        const paint = function () {
+            show('시련', trialBox(esc(name) + ' 사원의 이름을 불렀다.<br><br>문 너머 어딘가에서 들었을 것이다.<br><span style="font-size:11px; color:#888;">응답을 기다리는 중 — ' + left + '초</span>'), darkChoiceBtn('기다리지 않는다.', 'kTrialList()'));
+        };
+        paint();
+        const tick = function () {
+            left--;
+            if (left <= 0) { trialAskOff(); ref.remove().catch(function () { }); if (kr && kr.trial && !kr.trial.round) { toast(name + ' 사원이 응하지 않았다.'); kTrialList(); } return; }
+            const el = darkBodyEl(); if (el && /응답을 기다리는 중/.test(el.innerHTML)) paint();
+            trialAskT = setTimeout(tick, 1000);
+        };
+        trialAskT = setTimeout(tick, 1000);
+        trialAskRef.on('value', function (sn) {
+            const a = sn.val();
+            if (!a || a.id !== id) return;
+            trialAskOff();
+            ref.remove().catch(function () { });
+            if (!kr || !kr.trial || kr.trial.round) return;
+            if (a.ok) {
+                kr.trial.help = { code: code, name: a.name || name };
+                kr.trial.shield = TRIAL.HELP_SHIELD;
+                try { addHistoryLog(u, '[K 의 방] 시련 — ' + (a.name || name) + ' 사원이 밖에서 응했다.'); } catch (e) { }
+                show('시련', trialBox('문 너머에서 목소리가 온다.<br><br><span style="color:#bdf5c8;">「 ' + esc(a.name || name) + ' — 여기 있다. 」</span><br><br><span style="font-size:11px; color:#888;">시련 내내 눈 +' + TRIAL.HELP_BON + ' · 한 번 맞는 것을 대신 받아 준다.</span>'), darkChoiceBtn('마주 선다.', 'kTrialStart()'));
+            } else {
+                toast((a.name || name) + ' 사원이 응하지 않았다.');
+                kTrialList();
+            }
+        });
+    });
+};
+window.kTrialStart = function () {
+    if (!kr || !kr.trial || kr.trial.round) return;
+    trialAskOff();
+    kr.trial.round = 1;
+    trialTurn('');
+};
+function trialTurn(pre) {
+    const f = kr.trial;
+    show('시련 — ' + f.round + '번째 돌', trialBox(pre + '거울의 나도 같은 자리에 선다. 어느 쪽으로 가나.'),
+        ['atk', 'def', 'gap'].map(function (s) { return darkChoiceBtn(STANCE[s] + ' <span style="font-size:10px; color:#888;">' + ({ atk: '허점을 찌른다', def: '공격을 받아낸다', gap: '방어를 흘린다' }[s]) + '</span>', "kTrialPick('" + s + "')"); }).join(''));
+    kSaveSoon();
+}
+window.kTrialPick = function (s) {
+    const f = kr && kr.trial; if (!f || !f.round || f.over || !BEATS[s]) return;
+    if (kr._picking) return; kr._picking = true; setTimeout(function () { if (kr) kr._picking = false; }, 400);
+    const k = prof(), a = JOBS[kr.job][0];
+    const R = roll(a);                                   // 내 보정 — 거울도 같은 보정을 쓴다
+    const b = R.b;
+    const ms = ['atk', 'def', 'gap'][Math.floor(Math.random() * 3)];
+    let mine = R.r + b + (f.help ? TRIAL.HELP_BON : 0), its = Math.floor(Math.random() * 20) + 1 + b;
+    let line = '';
+    if (BEATS[s] === ms) { mine += TRIAL.STANCE; line = STANCE[s] + '이 ' + STANCE[ms] + '을 잡았다 (+' + TRIAL.STANCE + ')'; }
+    else if (BEATS[ms] === s) { its += TRIAL.STANCE; line = '거울의 ' + STANCE[ms] + '이 내 ' + STANCE[s] + '을 잡았다 (거울 +' + TRIAL.STANCE + ')'; }
+    else line = '같은 수. ' + STANCE[s] + '과 ' + STANCE[ms] + '이 맞부딪친다';
+    let txt = `<div style="font-size:12px; color:#ccc; margin-bottom:8px;">나 🎲 ${mine - b - (f.help ? TRIAL.HELP_BON : 0)} → <b>${mine}</b> · 거울 🎲 ${its - b} → <b>${its}</b><br><span style="font-size:10px; color:#888;">${line}</span></div>`;
+    if (mine > its) { const dmg = TRIAL.BASE + (mine - its); f.it = Math.max(0, f.it - dmg); txt += '거울이 밀린다. <span style="color:#ff8a80;">−' + dmg + '</span>'; }
+    else if (its > mine) {
+        const dmg = TRIAL.BASE + (its - mine);
+        if (f.shield > 0) { f.shield--; txt += '맞을 자리에 ' + esc(f.help.name) + ' 사원의 목소리가 먼저 닿았다. <span style="color:#bdf5c8;">막았다 (방패 ' + f.shield + ')</span>'; }
+        else { f.me = Math.max(0, f.me - dmg); txt += '내가 밀린다. <span style="color:#ff8a80;">−' + dmg + '</span>'; }
+    } else { f.it = Math.max(0, f.it - 10); f.me = Math.max(0, f.me - 10); txt += '둘 다 물러선다. <span style="color:#ff8a80;">−10 · −10</span>'; }
+    f.round++;
+    if (f.it <= 0) { trialWin(txt); return; }
+    if (f.me <= 0) { trialLose(txt); return; }
+    trialTurn(txt + '<br><br>');
+};
+function trialWin(txt) {
+    const f = kr.trial, k = prof(), u = me();
+    f.over = 1; kr._trialDone = 1;
+    let got = '';
+    if (f.kind === 'L') {
+        const from = jobName(k.job, 'S');
+        k.grade = 'L'; k.trial.L = 0;
+        try { hiddenReachL(k); } catch (e) { }
+        got = esc(from) + ' → <b>' + esc(jobName(k.job, 'L')) + '</b> (L)';
+        addHistoryLog(u, '[K 의 방] ✦ 시련을 넘었다 — ' + from + ' → ' + jobName(k.job, 'L') + ' (L)' + (f.help ? ' · ' + f.help.name + ' 사원이 응했다' : ''));
+        Object.keys(kr.max).forEach(function (s) { kr.max[s] += 5; kr.stats[s] = Math.min(kr.max[s], kr.stats[s] + 5); });
+    } else {
+        k.trial.lv = 0; k.trial.lvOk = now();
+        lvUp(k);
+        got = 'Lv ' + LV_MAX + ' 의 벽이 무너졌다 — <b>Lv ' + k.lv + '</b>' + (k.lv < lvCap(k) ? ' (Lv ' + HIDDEN_LV_MAX + ' 까지)' : '');
+        addHistoryLog(u, '[K 의 방] ✦ 시련을 넘었다 — Lv ' + LV_MAX + ' → Lv ' + k.lv + (f.help ? ' · ' + f.help.name + ' 사원이 응했다' : ''));
+    }
+    saveProf();
+    if (darkRun.isParty) sendPartyChat('✦ ' + u.name + ' 사원이 시련을 넘었습니다 — ' + got.replace(/<[^>]+>/g, ''), true);
+    show('시련 — 끝', trialBox(txt + `<br><br>거울이 먼저 무릎을 꿇는다.<br><br><span style="color:#c9a8ff;">「 …그래. 네가 가라. 」</span><br><br>거울이 흩어진다. 문이 열려 있다.
+        <div style="margin-top:12px; padding:12px; border:1px solid #d4af37; border-radius:6px; background:rgba(212,175,55,.08); text-align:center;">
+        <div style="font-size:11px; color:#d4af37; letter-spacing:2px;">시 련 돌 파</div><div style="font-size:14px; color:#fff; margin-top:6px;">${got}</div></div>`),
+        darkChoiceBtn('문을 나선다.', 'kTrialEnd()'));
+    kSaveSoon();
+}
+function trialLose(txt) {
+    const f = kr.trial, u = me();
+    f.over = 1; kr._trialDone = 1;
+    const m = addStat('mind', -TRIAL.LOSE_MIND);
+    addHistoryLog(u, '[K 의 방] 시련 — 거울을 넘지 못했다. 다음 S 돌파 때 다시 선다.');
+    show('시련 — 끝', trialBox(txt + `<br><br>무릎이 먼저 꺾인다.<br><br><span style="color:#c9a8ff;">「 다음에 또 와. 난 늘 여기 있어. 」</span><br><br>거울이 사라진다. 문은 열려 있다 — 다만 그 너머는 아직 아니다.<br>
+        <span style="font-size:11px; color:#ff8a80;">심력 ${m}</span> <span style="font-size:11px; color:#888;">· 시련은 그대로 남는다. 다음 S 등급 돌파 때 다시 선다.</span>`),
+        darkChoiceBtn('문을 나선다.', 'kTrialEnd()'));
+    kSaveSoon();
+}
+window.kTrialEnd = function () {
+    if (!kr || !kr.trial || !kr.trial.over) return;
+    kr.trial = null;
+    clear();
+};
+// ── 밖에 있는 사원 — 이름이 불리면 창이 뜬다
+let tAskCode = '', tAskRef = null;
+function trialAskBind() {
+    const u = me(), d = db_();
+    if (!u || !u.code || !d) return;
+    if (tAskCode === u.code) return;
+    try { if (tAskRef) tAskRef.off(); } catch (e) { }
+    tAskCode = u.code;
+    tAskRef = d.ref(T_ASK + '/' + u.code);
+    tAskRef.on('value', function (s) {
+        const v = s.val();
+        const box = document.getElementById('ktrial-ask');
+        if (!v || v.ans || now() - (Number(v.at) || 0) > TRIAL.ASK_MS) { if (box) box.remove(); return; }
+        if (typeof darkRun !== 'undefined' && darkRun) return;            // 탐사 안에서는 응할 수 없다
+        if (box && box.dataset.id === v.id) return;
+        if (box) box.remove();
+        const el = document.createElement('div');
+        el.id = 'ktrial-ask'; el.dataset.id = v.id;
+        el.style.cssText = 'position:fixed; inset:0; z-index:2147483100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;';
+        el.innerHTML = `<div class="luxury-alert-box" style="border-color:#c9a8ff; box-shadow:0 15px 40px rgba(201,168,255,0.2), inset 0 0 20px rgba(0,0,0,0.8);">
+            <h3 style="color:#c9a8ff; margin-top:0; letter-spacing:1px; font-size:17px;">『 K 의 방 』 — 시련</h3>
+            <div style="color:#eee; margin-bottom:22px; font-size:13px; line-height:1.7;">
+                <b style="color:#fff; font-size:14px;">${esc(v.name || v.from)}</b> 사원이 당신의 이름을 부릅니다.<br>
+                <span style="font-size:12px; color:#aaa;">${esc(v.job || '')} — ${v.kind === 'L' ? 'L 로 가는 시련' : 'Lv ' + (LV_MAX + 1) + ' 로 가는 시련'} · 거울 속의 저와 마주 서 있습니다.</span><br><br>
+                <span style="font-size:11px; color:#888;">응하면 그쪽 눈에 +${TRIAL.HELP_BON} · 한 번 맞는 것을 대신 받아 줍니다. 당신이 잃는 것은 없습니다.</span></div>
+            <div style="display:flex; gap:10px;">
+                <button class="luxury-alert-btn" onclick="kTrialAnswer('${v.id}', true)" style="flex:2; background:#2a1f44; color:#fff; border-color:#8f6ad4;">응한다</button>
+                <button class="luxury-alert-btn" onclick="kTrialAnswer('${v.id}', false)" style="flex:1; white-space:nowrap; background:transparent; border-color:#888; color:#aaa;">거절한다</button>
+            </div></div>`;
+        document.body.appendChild(el);
+    });
+}
+setInterval(function () { try { trialAskBind(); } catch (e) { } }, 1500);
+window.kTrialAnswer = function (id, ok) {
+    const u = me(), d = db_();
+    const box = document.getElementById('ktrial-ask'); if (box) box.remove();
+    if (!u || !d || !id) return;
+    d.ref(T_ASK + '/' + u.code + '/ans').set({ id: id, ok: !!ok, name: u.name || '', at: now() }).catch(function () { });
+    if (ok) { try { addHistoryLog(u, '[K 의 방] 시련 — 누군가의 부름에 응했다.'); saveFields({ history: 1 }); } catch (e) { } }
+};
+
 function clear() {
     const D = DATA.dun[kr.dun];
     const g = DUNS[kr.dun].g;
@@ -2879,8 +3147,7 @@ function settle(how, txt) {
     const lv0 = k.lv;
     if (!helper) {
         k.exp = (k.exp || 0) + exp;
-        while (k.lv < lvCap(k) && k.exp >= expNeed(k, k.lv)) { k.exp -= expNeed(k, k.lv); k.lv++; }
-        if (k.lv >= lvCap(k)) k.exp = 0;
+        lvUp(k);
         // ★ Lv 100 — 다음에 들어서면 새 속성을 열 수 있다 (2026-10-25)
         if (lv0 < LV_MAX && k.lv >= LV_MAX) {
             try {
@@ -2984,8 +3251,7 @@ window.kroomExpGift = function (n) {
     if (!u || n <= 0) return null;
     const k = prof(u), lv0 = k.lv;
     k.exp = (k.exp || 0) + n;
-    while (k.lv < lvCap(k) && k.exp >= expNeed(k, k.lv)) { k.exp -= expNeed(k, k.lv); k.lv++; }
-    if (k.lv >= lvCap(k)) k.exp = 0;
+    lvUp(k);
     try { saveFields({ kroom: 1 }); } catch (e) { }
     return { lv0: lv0, lv: k.lv };
 };
@@ -3698,7 +3964,7 @@ window.kroomGive = function (who, field, val) {
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
-window.KROOM = { hard: function () { return hard(); }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, expNeed: expNeed, lvCap: lvCap, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
+window.KROOM = { hard: function () { return hard(); }, _set: function (o) { kr = o; }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, expNeed: expNeed, lvCap: lvCap, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
     doom: function (c) { return doom(c); },               // 시험용 — 즉사 기믹 초읽기를 바로 띄운다
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
