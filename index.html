@@ -4821,7 +4821,10 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
         // ★ 제■■■회 완벽한 피날레 — 엔딩 · 감화도 · 동행 NPC 몫 (finale-core.js)
         if (darkRun.zone === 'Qtrew-S-018' && typeof window.finaleBonus === 'function') bonus += window.finaleBonus();
 
-        let total = Math.max(10, base + bonus);
+        // ★ 어둠 정산 포인트 10분의 1 (2026-10-27) — 기본 보상 · 판정 보너스 · 구역 보너스를 합친 뒤 10 으로 나눈다.
+        //   그 위에 얹히는 배수(눈 · 무곡 · 전용 장비 · 지산 …)는 이 값에서 셈하므로 같이 줄어든다.
+        window.DARK_PAY_DIV = window.DARK_PAY_DIV || 10;
+        let total = Math.max(1, Math.round((base + bonus) / window.DARK_PAY_DIV));
         if (darkRun.zone === 'Qtrew-S-010' && darkRun.turned && darkRun.turnDone >= darkRun.turnGoal) {
             total = Math.floor(total * 0.5);
         }
