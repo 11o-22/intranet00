@@ -405,7 +405,8 @@
       "purge1026.js",
       "update-check.js",
       "party-keep.js",
-      "dark-add.js"
+      "dark-add.js",
+      "badge-dot.js"
     ]
   ]
 }

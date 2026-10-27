@@ -334,7 +334,7 @@ const PLAZA = {
         // ✗ 전체 대화는 뺐다 — 광장 아래 띠에서 바로 말하고, 글줄을 톡 치면
         //   채팅 칸이 열린다. 목록에까지 두면 가는 길이 둘이 된다.
         // ② 내 정보
-        { g: 'me',    n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge' },
+        { g: 'me',    n: '사원증',     i: '🪪', ic: 'badge',   tab: 'tab-record',   sub: 'rec-badge', nw: 'badge' },
         // 오른쪽 아래 가방 단추와 가는 데가 같다 — 목록에서도 찾을 수 있게 둔다
         { g: 'me',    n: '소지품',     i: '🎒', ic: 'bag',     tab: 'tab-record',   sub: 'rec-inventory' },
         { g: 'me',    n: '기록',       i: '📄', ic: 'history', tab: 'tab-record',   sub: 'rec-history' },
@@ -4716,6 +4716,7 @@ function hasNew(key) {
             return (typeof window.giftCount === 'function') && window.giftCount() > 0;
         }
         if (key === 'letter') return !!u.hasNewLetter;
+        if (key === 'badge') return (typeof window.badgeNew === 'function') && window.badgeNew();   // 사원증이 바뀜 (badge-dot.js)
         if (key === 'p2p') {
             const ds = (typeof db !== 'undefined' && db && db.p2pDeals) || [];
             return ds.some(function (d) {

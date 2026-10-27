@@ -6136,7 +6136,7 @@ function startFoxRoomSequence() {
         // 아이템 타겟 효과에 따른 점등 알림 연출
         const tabBtnBadge = document.getElementById('tab-btn-badge');
         const badgeNoteLabel = document.getElementById('badge-note-label');
-        if (currentUser.hasItemUsedOnMe) {
+        if (currentUser.hasItemUsedOnMe || (typeof window.badgeNew === 'function' && window.badgeNew())) {   // 사원증이 바뀜 (badge-dot.js)
             tabBtnBadge.classList.add('notify-dot');
             badgeNoteLabel.classList.add('notify-dot');
         } else {
