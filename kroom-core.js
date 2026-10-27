@@ -190,7 +190,7 @@ const JOBS = {
 //   ■ 내용 — 히든 직업만의 갈림길 · 선택지는 아직 없어서, **같은 속성 다섯 직업의 것**을 함께 쓴다.
 //   ■ 한 사람에 하나 (2026-10-25) — 속성을 여럿 열어도 히든 직업은 한 번만 받는다 (hadHidden).
 const HIDDEN = {
-    L_gunner:   ['evade',  'might', '거너',       '거리는 숨을 고르는 시간이다. 방아쇠는 그 끝에 있다.'],
+    L_gunner:   ['evade',  'might', '엔터테이너', '무대 위에서는 아무것도 맞지 않는다. 다 연출이었으니까.'],   // 회피 — 거너 → 엔터테이너 (2026-10-27)
     L_druid:    ['heal',   'mana',  '드루이드',   '숲은 상처를 덮는 법을 안다. 그 손을 빌릴 뿐이다.'],
     L_saintess: ['luck',   'mana',  '성녀',       '빌지 않아도 닿는 것이 있다. 그것을 운이라 부르지 않을 뿐.'],
     L_saint:    ['luck',   'mana',  '성자',       '빌지 않아도 닿는 것이 있다. 그것을 운이라 부르지 않을 뿐.'],
@@ -211,7 +211,7 @@ const HIDDEN_NAMES = {
     L_saint:    ['성자', '축복의 성자', '기적의 성자', '대성자(大聖者)', '성천자(聖天子)', '천신(天神)의 화신(化身)'],
     L_tamer:    ['테이머', '맹수 조련사', '마수 조련사', '환수 사역자', '신수(神獸)의 주인', '만수지왕(萬獸之王)'],
     L_heavenly: ['마교 말단 교도', '마교 호법(護法)', '마교 장로', '천마신교 부교주', '천마신교 교주', '천마(天魔)'],
-    L_gunner:   ['거너', '건슬링어', '마탄 사수', '탄막의 지배자', '총왕(銃王)', '총신(銃神)'],
+    L_gunner:   ['엔터테이너', '라임라이트', '헤드라이너', '쇼스토퍼', '그랜드 마에스트로', '디 아이콘(THE ICON)'],
     L_master:   ['마스터', '하이 마스터', '그랜드 마스터', '초월자(超越者)', '반신(半神)', '절대자(絶對者)'],
     L_druid:    ['드루이드', '숲의 수호자', '아크드루이드', '고목(古木)의 현자', '대자연의 대행자', '세계수(世界樹)의 의지'],
     L_wanderer: ['방랑자', '유랑객(流浪客)', '국경 없는 자', '경계를 넘는 자', '차원 방랑자', '영겁(永劫)의 방랑자']
@@ -228,7 +228,7 @@ function hiddenKeyFor(attr, u) {
     const k = Object.keys(HIDDEN).filter(function (x) { return HIDDEN[x][0] === attr; })[0];
     return k || null;
 }
-const L_JOBS = ['거너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
+const L_JOBS = ['엔터테이너', '드루이드', '성녀', '성자', '정령사', '천마', '테이머', '네크로맨서', '방랑자', '마스터', '군주'];
 const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 40, jxGrades: ['D', 'C', 'B', 'A'], hq: 100 };
 const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
 const HIDDEN_LV_MAX = 120;            // 히든 직업만 Lv 120 까지
@@ -1348,6 +1348,10 @@ window.kroomCardOk = function () {
     if (kr && kr.reAttr && k.job && JOBS[k.job] && JOBS[k.peek] && JOBS[k.peek][0] === kr.reAttr) {
         const to = kr.reAttr, old = k.job, oldG = k.grade || 'D', from = curAttr(k, u);
         moveAttr(k, u, from, to);
+        // ★ 히든 조건의 임무 수(hq)는 속성마다 따로다 — 옛 속성에서 쌓은 것을 새 속성으로 가져간다 (2026-10-27)
+        //   (보정으로 조건을 다 채운 뒤 회피로 바꾼 사원이 회피 히든의 조건에서 0 부터가 되지 않게)
+        try { k.hq = k.hq || {}; k.hq[to] = Math.max(Number(k.hq[to]) || 0, Number(k.hq[from]) || 0); } catch (e) { }
+        k.hiddenAsk = null;                                              // 새 속성으로 다시 올라간다 (hiddenCheck)
         k.job = k.peek; k.peek = null; k.reFor = null;
         if (!GRADES.includes(k.grade)) k.grade = 'S';                    // 히든 직업의 L — 보통 직업은 S 까지
         k.lv = Math.max(1, Math.min(k.lv || 1, lvCap(k)));
@@ -3249,18 +3253,35 @@ function hiddenCheck() {
     const u = me(), d = db_();
     if (!u || !d || u.code === ADMIN) return;
     const k = prof(u);
-    if (k.hiddenAsk || !hiddenProgress(k).ok) return;
     if (hMine && (hMine.state === 'accepted' || hMine.state === 'L')) return;     // 이미 받았다 (2026-10-25)
+    // ★ 이 고침 전에 이미 속성을 바꾼 사원 — 옛 속성에서 쌓은 임무 수를 지금 속성으로 가져온다 (한 번 · 2026-10-27)
+    try {
+        const a0 = (k.job && JOBS[k.job]) ? JOBS[k.job][0] : null;
+        if (a0 && hMine && hMine.attr && hMine.attr !== a0 && hMine.state !== 'accepted' && hMine.state !== 'L') {
+            const hq = k.hq || {};
+            if ((Number(hq[a0]) || 0) < (Number(hq[hMine.attr]) || 0)) { k.hq = hq; hq[a0] = Number(hq[hMine.attr]) || 0; saveProf(); }
+        }
+    } catch (e) { }
+    if (!hiddenProgress(k).ok) return;
+    const a = JOBS[k.job][0], key = hiddenKeyFor(a, u);
+    // ★ 적혀 있는데 속성이 다르다 (2026-10-27) — 보정으로 올라온 뒤 회피로 바꾼 사원.
+    //   적힌 것을 새 속성의 「조건 달성」으로 다시 쓴다 (지정돼 있었어도 — 상담사가 새 직업으로 다시 정한다)
+    const moved = !!(hMine && hMine.state && hMine.attr && hMine.attr !== a && hMine.state !== 'accepted' && hMine.state !== 'L');
+    if (k.hiddenAsk && !moved) return;
     k.hiddenAsk = now();
     saveProf();
-    const a = JOBS[k.job][0], key = hiddenKeyFor(a, u);
     const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), attr: a, key: key,
                     job: JOBS[key][2][0], from: jobName(k.job, k.grade), lv: k.lv, at: now(),
                     jx: Object.assign({}, k.jx || {}), hq: (k.hq || {})[a] || 0 };
     d.ref(H_NODE + '/' + u.code).transaction(function (cur) {
-        if (cur && cur.state) return;                 // 이미 적혀 있으면(거절 · 미지정 포함) 그대로
+        if (cur && cur.state) {
+            if (cur.state === 'accepted' || cur.state === 'L') return;
+            if (cur.attr && cur.attr !== a) { entry.moved = { from: cur.attr, job: cur.job || '', state: cur.state, at: now() }; return entry; }
+            return;                                   // 이미 적혀 있으면(거절 · 미지정 포함) 그대로
+        }
         return entry;
     }).catch(function () { });
+    if (moved) { console.log('[히든 직업] 속성이 바뀌어 다시 올렸습니다 — ' + (ATTR[a] ? ATTR[a].n : a) + ' → ' + JOBS[key][2][0]); }
     addHistoryLog(u, '[K 의 방] 무언가가 당신을 지켜보기 시작했다.');
     try { saveFields({ history: 1 }); } catch (e) { }
 }
@@ -3309,20 +3330,30 @@ function hiddenSweep() {
         }).catch(function () { });
     });
     Object.keys(book).forEach(function (c) {
-        if (c === ADMIN || (hAll[c] && hAll[c].state)) return;
+        if (c === ADMIN) return;
+        const h = hAll[c];
         const w = book[c];
         const k = w && w.kroom;
         if (!k || typeof k !== 'object' || stale(k) || !k.job || !JOBS[k.job]) return;
         if (!hiddenProgress(k).ok) return;
         const a = JOBS[k.job][0], key = hiddenKeyFor(a, w);
         if (!key) return;
+        // ★ 적혀 있는데 지금 속성과 다르다 — 새 속성으로 다시 올린다 (2026-10-27 · 전직한 사람은 그대로)
+        const moved = !!(h && h.state && h.attr && h.attr !== a && h.state !== 'accepted' && h.state !== 'L');
+        if (h && h.state && !moved) return;
         const entry = { state: 'ready', code: c, name: w.name || '', no: String(w.no || ''), attr: a, key: key,
                         job: JOBS[key][2][0], from: jobName(k.job, k.grade), lv: k.lv, at: now(),
                         jx: Object.assign({}, k.jx || {}), hq: (k.hq || {})[a] || 0, by: 'sweep' };
         n++;
         d.ref(H_NODE + '/' + c).transaction(function (cur) {
-            if (cur && cur.state) return;
+            if (cur && cur.state) {
+                if (cur.state === 'accepted' || cur.state === 'L') return;
+                if (cur.attr && cur.attr !== a) { entry.moved = { from: cur.attr, job: cur.job || '', state: cur.state, at: now() }; return entry; }
+                return;
+            }
             return entry;
+        }).then(function (res) {
+            if (moved && res && res.committed) console.log('[히든 직업] ' + (w.name || c) + ' — 속성이 바뀌어 ' + JOBS[key][2][0] + ' 으로 다시 올렸습니다.');
         }).catch(function () { });
     });
     return n;
@@ -3540,7 +3571,8 @@ function hiddenPaint() {
             + '<span style="font-size:10px; color:#888;">' + esc(v.no || c) + '</span>'
             + '<span style="margin-left:auto; font-size:10px; color:' + st[1] + ';">' + esc(st[0]) + '</span></div>'
             + '<div style="font-size:11px; color:#e3c172; margin-top:5px;">' + (ATTR[v.attr] ? ATTR[v.attr].i + ' ' + ATTR[v.attr].n : '') + ' → <b>' + esc(v.job || '') + '</b>'
-            + (v.from ? ' <span style="color:#888;">(지금 ' + esc(v.from) + ')</span>' : '') + '</div>'
+            + (v.from ? ' <span style="color:#888;">(지금 ' + esc(v.from) + ')</span>' : '')
+            + (v.moved && ATTR[v.moved.from] ? ' <span style="font-size:10px; color:#c9a8ff;">← ' + ATTR[v.moved.from].n + ' ' + esc(v.moved.job || '') + ' 에서 옮겨 옴</span>' : '') + '</div>'
             + '<div style="font-size:10px; color:#999; margin-top:4px; line-height:1.6;">조건 당시 Lv ' + (v.lv || '-') + ' · 갈림길 '
             + HIDDEN_NEED.jxGrades.map(function (g) { return g + ' ' + ((v.jx || {})[g] || 0); }).join(' · ') + ' · 임무 ' + (v.hq || 0)
             + (now_ && (v.state === 'accepted' || v.state === 'L') ? '<br>지금 ' + esc(jobName(now_.job, now_.grade)) + ' ' + esc(now_.grade || '') + ' · Lv ' + (now_.lv || '-') : '')
