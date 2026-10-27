@@ -1657,10 +1657,10 @@ function pagRoll() {
     let roll = 0, ok = true, got = CHIL.PAG_PT;
     if (sure) s.pag = (s.pag || 0) + 1;
     else {
-        roll = Math.floor(Math.random() * 30) + 1;
+        roll = Math.floor(Math.random() * 20) + 1;
         try { if (typeof luckReroll === 'function') roll = luckReroll(roll); } catch (e) { }
         ok = roll !== 1 && roll >= CHIL.PAG_DC;
-        got = ok ? Math.round(CHIL.PAG_DICE[0] + (Math.min(30, roll) - CHIL.PAG_DC) * (CHIL.PAG_DICE[1] - CHIL.PAG_DICE[0]) / (30 - CHIL.PAG_DC)) : 0;
+        got = ok ? Math.round(CHIL.PAG_DICE[0] + (Math.min(20, roll) - CHIL.PAG_DC) * (CHIL.PAG_DICE[1] - CHIL.PAG_DICE[0]) / (20 - CHIL.PAG_DC)) : 0;
     }
     return { sure: sure, roll: roll, ok: ok, got: got };
 }
@@ -1679,7 +1679,7 @@ function pagPaid(code, who, R) {
     } else {
         log_(u, '[🌟 파군성군] ' + who + ' 사원 구출 실패 — 다이스 ' + R.roll);
     }
-    try { run().log.push('[🌟 파군] ' + (R.sure ? '확정' : 'd30 ' + R.roll + ' vs DC' + CHIL.PAG_DC) + ' — ' + (R.ok ? '성공' : '실패')); } catch (e) { }
+    try { run().log.push('[🌟 파군] ' + (R.sure ? '확정' : 'd20 ' + R.roll + ' vs DC' + CHIL.PAG_DC) + ' — ' + (R.ok ? '성공' : '실패')); } catch (e) { }
     save({ history: 1 });
     return share;
 }

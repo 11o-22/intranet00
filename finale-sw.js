@@ -462,8 +462,8 @@ function npcTry(i, how) {
         const r = X.roll({ npc: true, plus: plus });
         let ok;
         if (r.raw === 30) ok = true;
-        else if (r.raw === 1) ok = false;
-        else ok = how === 'talk' ? r.total >= 20 : r.total >= 11;
+        else if (r.raw <= 3) ok = false;
+        else ok = r.total >= 16;
         const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : ok ? 'ok' : 'fail';
         r.out = out;
         let d = 0;

@@ -476,8 +476,8 @@ function epicCoAnswer(id) {
 
         const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
         const bonus = rollDarkBonus(c.need || 'bond') + (epicAttr() === 'bond' ? 3 : 0);
-        const dc = far ? 13 : 10;
-        const ok = roll !== 1 && (roll + bonus) >= dc;
+        const dc = 16;
+        const ok = roll > 3 && (roll === 30 || (roll + bonus) >= dc);
 
         if (ok) {
             ref.child('state').set('DONE');
@@ -599,8 +599,8 @@ function epicDoomRescue(code) {
         const bonus = rollDarkBonus(d.need || 'bond')
                     + (epicAttr() === 'bond' ? 3 : 0)
                     + Math.round(gearValue(currentUser, 'heal') * 10);
-        const dc = (d.dc || 13) + (far ? 2 : 0);
-        const ok = roll !== 1 && (roll + bonus) >= dc;
+        const dc = 16;
+        const ok = roll > 3 && (roll === 30 || (roll + bonus) >= dc);
 
         if (ok) {
             ref.remove();

@@ -398,7 +398,7 @@ function roll(o) {
     let raw = 1 + Math.floor(Math.random() * 30);
     let bonus = 0;
     const wary = o.npc ? 0 : waryOf(typeof currentUser !== 'undefined' ? currentUser : null);
-    const dc = (o.dc || 15) + wary;
+    const dc = 16;
     if (o.npc) {
         bonus = o.plus || 0;
     } else {
@@ -407,13 +407,14 @@ function roll(o) {
         if (o.body) bonus += bodyMod();
         if (o.n) bonus += hc(o.n);
         bonus += (o.extra || 0);
+        bonus -= wary;                                   // 경계는 보정에서 뺀다 (기준은 16 고정 · 2026-10-27)
         // 연회 — 파티장이 자리를 비웠을 때 대신 굴리는 사람이 쓰는 값
         if (!o.extra) pub('pl/' + ME + '/bon', bonus);
     }
     const total = raw + bonus;
     let out;
-    if (o.item) out = (raw === 1) ? 'fail' : (raw === 30) ? 'ok' : (total >= dc ? 'ok' : 'fail');
-    else out = raw === 1 ? 'c1' : raw === 30 ? 'c20' : total >= dc ? 'ok' : 'fail';
+    if (o.item) out = (raw <= 3) ? 'fail' : (raw === 30) ? 'ok' : (total >= dc ? 'ok' : 'fail');
+    else out = raw === 1 ? 'c1' : raw <= 3 ? 'fail' : raw === 30 ? 'c20' : total >= dc ? 'ok' : 'fail';
     // ⛓ 파훼 — 걸어 둔 것이 있으면 실패할 판정을 한 번 넘긴다 (NPC 판정은 빼고 · X.smash 참고)
     let smashed = null;
     if (!o.npc && F && Array.isArray(F.smash) && F.smash.length && (out === 'fail' || out === 'c1')) {

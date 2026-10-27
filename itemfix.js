@@ -54,7 +54,7 @@ function peekBonus(kind) {
     finally { window.consumeQFlag = orig; }
 }
 
-// d30 · 1 은 무조건 실패 · (굴림 + 보정) >= DC 이면 성공
+// d20 · 1 은 무조건 실패 · (굴림 + 보정) >= DC 이면 성공
 function odds(bonus, dc) {
     const need = dc - bonus;
     const lo = Math.max(2, need);
@@ -246,7 +246,7 @@ function qTake(k) { return (typeof consumeQFlag === 'function') && !!consumeQFla
 
             nTake('s3_find');
             const _rand = Math.random;
-            Math.random = function () { return 0.9999; };      // d30 → 20
+            Math.random = function () { return 0.9999; };      // d20 → 20
             try { return _p.apply(this, arguments); }
             finally {
                 Math.random = _rand;

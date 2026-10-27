@@ -194,10 +194,10 @@ function healBonus() {
             if (leftNow() <= 0) return _d.apply(this, arguments);
 
             const used = usedNow();
-            const dc = Number(H.dc || 12) + Number(H.dcStep || 0) * used;
+            const dc = 16;
             const roll = roll20();
             const bonus = healBonus();
-            const ok = roll !== 1 && (roll + bonus) >= dc;
+            const ok = roll > 3 && (roll === 30 || (roll + bonus) >= dc);
 
             darkRun._healBack = used + 1;
             lastKept = null;
@@ -389,9 +389,9 @@ window.epicHealState = function () {
             '· 치유쪽인가:', iAmHeal() ? 'O' : '✗');
         console.log('  스스로 일어서기 — 쓴 횟수', usedNow(), '· 남은', leftNow() + '번');
         if (iAmHeal() && leftNow() > 0) {
-            const dc = Number(H.dc || 12) + Number(H.dcStep || 0) * usedNow();
+            const dc = 16;
             const b = healBonus();
-            const n = Math.max(0, Math.min(29, 31 - (dc - b)));
+            const n = Math.max(0, Math.min(27, 31 - (dc - b)));
             console.log('  다음 판정 — DC', dc, '· 보정', (b >= 0 ? '+' : '') + b,
                 '→ 약', Math.round(n / 30 * 100) + '%');
         }

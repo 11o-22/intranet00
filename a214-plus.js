@@ -279,7 +279,7 @@ function g10() {
 }
 window.a214G10R = function (pick) {
     const roll = (typeof luckReroll === 'function')
-        ? luckReroll(Math.floor(Math.random() * 30) + 1) : Math.floor(Math.random() * 30) + 1;
+        ? luckReroll(Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
     const bns = (typeof rollDarkBonus === 'function') ? (rollDarkBonus('sense') || 0) : 0;
     const DC = { cut: 11, over: 13, wire: 9, pass: 0 }[pick];
     const ok = pick === 'pass' || (roll !== 1 && (roll + bns) >= DC);
@@ -442,7 +442,7 @@ function g12() {
 
 window.a214Look = function () {
     const roll = (typeof luckReroll === 'function')
-        ? luckReroll(Math.floor(Math.random() * 30) + 1) : Math.floor(Math.random() * 30) + 1;
+        ? luckReroll(Math.floor(Math.random() * 20) + 1) : Math.floor(Math.random() * 20) + 1;
     const bns = (typeof rollDarkBonus === 'function') ? (rollDarkBonus('sense') || 0) : 0;
     const ok = roll !== 1 && (roll + bns) >= 10;
     let txt;

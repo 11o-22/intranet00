@@ -52,7 +52,7 @@
         const o = st.opts[i];
         const roll = Math.floor(Math.random() * 30) + 1;
         const bonus = rollDarkBonus('sense') + (pv.found || []).length * 2;
-        const ok = roll !== 1 && (roll + bonus) >= o.dc;
+        const ok = roll > 3 && (roll === 30 || (roll + bonus) >= o).dc;
         if (ok) pv.ok++; else pv.no++;
 
         if (pvMeterBroke()) { pvEnd(false, st.meterLose, roll, bonus, o.dc); return; }
@@ -87,7 +87,7 @@ function pvRolePick(i) {
 
     const roll = Math.floor(Math.random() * 30) + 1;
     const bonus = rollDarkBonus('sense');
-    const ok = roll !== 1 && (roll + bonus) >= o.dc;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= o).dc;
     if (ok) pv.ok++; else pv.no++;
     pvMeter(ok ? (o.mGood != null ? o.mGood : (o.m || 0)) : (o.mBad != null ? o.mBad : ((o.m || 0) + 6)));
 

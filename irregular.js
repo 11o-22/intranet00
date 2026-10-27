@@ -66,7 +66,7 @@ function irr(u) {
     catch (e) { return false; }
 }
 function on() { return !!(run() && irr()); }
-function d20() { return Math.floor(Math.random() * 30) + 1; }
+function d20() { return Math.floor(Math.random() * 20) + 1; }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }

@@ -355,8 +355,8 @@ function npcRoll(how) {
     const plus = f.npcPlus ? 1 : 0;
     if (plus) f.npcPlus = 0;
     const r = X.roll({ npc: true, plus: plus });
-    const need = how === 'item' ? 11 : 19;
-    const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : r.total >= need ? 'ok' : 'fail';
+    const need = 16;
+    const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : r.raw <= 3 ? 'fail' : r.total >= need ? 'ok' : 'fail';
     r.out = out;
     let d = 0;
     if (out === 'c20') d = X.gam(-20, 'NPC 대성공');

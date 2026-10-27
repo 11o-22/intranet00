@@ -382,8 +382,8 @@ function epicStub() {
     const j = EPIC_JOBS[er.job];
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus(j.attr);
-    const dc = 8 + p.risk * 2;
-    const ok = roll !== 1 && (roll + bonus) >= dc;
+    const dc = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= dc);
 
     if (ok) { er.score += 120 * p.risk; darkRun.success++; }
     else { darkRun.fail++; applyPollutionToUser(currentUser, p.risk); }
@@ -423,7 +423,7 @@ function epicPick(i) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus(o.kind || j.attr);
-    const ok = roll !== 1 && (roll + bonus) >= (o.dc || 11);
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= 16);
 
     if (ok) { darkRun.success++; er.score += o.p || 150; }
     else { darkRun.fail++; if (o.poll) applyPollutionToUser(currentUser, o.poll); }
@@ -501,8 +501,8 @@ function epicRescue(code) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('rejoin') + (j.attr === 'bond' ? 3 : 0) + Math.round(gearValue(currentUser, 'heal') * 8);
-    const dc = (far ? 14 : 10) + (EPIC_PLACES[h.place] ? EPIC_PLACES[h.place].risk : 0);
-    const ok = roll !== 1 && (roll + bonus) >= dc;
+    const dc = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= dc);
 
     if (far) { er.place = h.place; er.moved++; }
 

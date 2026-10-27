@@ -60,7 +60,7 @@
             const j = EPIC_JOBS[er.job];
             const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
             const bonus = rollDarkBonus(o.kind || j.attr);
-            const ok = roll !== 1 && (roll + bonus) >= (o.dc || 13);
+            const ok = roll > 3 && (roll === 30 || (roll + bonus) >= 16);
             if (ok) {
                 er.score += o.p || 600;
                 darkRun.success++;

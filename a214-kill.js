@@ -15,8 +15,8 @@
 //        신도 화면에 「덮친다」가 뜬다. 누르면 사원 화면에 알림이 뜨고,
 //        사원은 스무 면 주사위로 **반격**할 수 있다.
 //
-//          신도   d30 + 판정 보정 + 2 (기습)
-//          사원   d30 + 판정 보정
+//          신도   d20 + 판정 보정 + 2 (기습)
+//          사원   d20 + 판정 보정
 //
 //        사원이 더 높으면 사원이 산다 — 그리고 신도가 죽는다.
 //        같거나 낮으면 사원이 죽는다. 가만히 있으면 그냥 죽는다.
@@ -85,7 +85,7 @@ function nameOf(c) {
     return (u && u.name) || c;
 }
 function d20() {
-    const r = Math.floor(Math.random() * 30) + 1;
+    const r = Math.floor(Math.random() * 20) + 1;
     try { if (typeof luckReroll === 'function') return luckReroll(r); } catch (e) { }
     return r;
 }

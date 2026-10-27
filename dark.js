@@ -1567,7 +1567,7 @@ mountDarkChat('normal');
         let DC = { forget:13, still:15, walk:17, shout:20 }[pick];
         let outcome, txt, died = false;
 
-        if (roll === 30) outcome = 'crit';
+        if (roll === 20) outcome = 'crit';
         else if (roll === 1) outcome = 'fumble';
         else outcome = (total >= DC) ? 'pass' : 'fail';
 
@@ -1591,7 +1591,7 @@ mountDarkChat('normal');
             txt = `벽이 선명해진다.<br><br>당신이 아주 또렷해졌다는 뜻이다.<br>이제 그것은 당신을 정확히 알고 있다.<br><br>다음에 그릴 때는 더 잘 그릴 것이다.`;
         }
 
-        darkRun.log.push(`[기믹 7] d30 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+        darkRun.log.push(`[기믹 7] d20 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
 
         // ★ 실패 누적이 많으면 실패도 치명적 (구제 가능)
         if (outcome === 'fail' && (darkRun.fail || 0) >= 6) {
@@ -2147,7 +2147,7 @@ function input119D(n) {
         DC -= gearValue(currentUser, 'break');
 
         let outcome, txt;
-        if (roll === 30) outcome = 'crit';
+        if (roll === 20) outcome = 'crit';
         else if (roll === 1) outcome = 'fumble';
         else outcome = (total >= DC) ? 'pass' : 'fail';
 
@@ -2170,7 +2170,7 @@ function input119D(n) {
             txt = `액자를 잡은 손이 안쪽으로 끌려 들어간다.<br>팔꿈치까지 들어갔다가, 무언가 흥미를 잃은 것처럼 놓아준다.<br><br>빠져나온 손은 분명 내 손인데, 결이 있다.`;
         }
 
-        darkRun.log.push(`[기믹 3] d30 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+        darkRun.log.push(`[기믹 3] d20 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
 
         let rerollBtn = '';
         if ((outcome === 'fail' || outcome === 'fumble') && !darkRun.rerollUsed && darkRun.carryItems.length > 0) {
@@ -2444,7 +2444,7 @@ function input119D(n) {
     }
 
         // ==========================================
-    // ★ 강제 실종 (무작위 지목 + d30 저항)
+    // ★ 강제 실종 (무작위 지목 + d20 저항)
     // ==========================================
         function renderAbduction(round) {
         const body = darkBodyEl();
@@ -2578,7 +2578,7 @@ function input119D(n) {
             mountDarkChat('normal');
             return;
         }
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
                 let bonus = rollDarkBonus('hide');
         const total = roll + bonus;
          const DC = 17;
@@ -2598,7 +2598,7 @@ function input119D(n) {
             applyPollutionToUser(currentUser, 5);
         }
 
-        darkRun.log.push(`[실종 ${round}] d30 ${roll}(+${bonus}) vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+        darkRun.log.push(`[실종 ${round}] d20 ${roll}(+${bonus}) vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
         
 
         if (taken) {
@@ -2752,7 +2752,7 @@ function input119D(n) {
     }
 
     function attemptRescue(kind, code) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         let bonus = rollDarkBonus('hide');
                 let DC = { hand: 8, item: 5, name: 7 }[kind];
         DC -= Math.round(gearValue(currentUser, 'heal') * 12);
@@ -2810,7 +2810,7 @@ function input119D(n) {
             sendPartyChat(`${currentUser.name} 사원의 시도가 빗나갔습니다.`, true);
         }
 
-        darkRun.log.push(`[구조] ${kind} d30 ${roll} vs DC${DC} — ${ok ? '성공' : '실패'}`);
+        darkRun.log.push(`[구조] ${kind} d20 ${roll} vs DC${DC} — ${ok ? '성공' : '실패'}`);
         darkRun._rescueShown = false;
 
         darkBodyEl().innerHTML = darkBox(ok ? "구조 — 성공" : "구조 — 실패",
@@ -2893,7 +2893,7 @@ function input119D(n) {
             mountDarkChat('normal');
             return;
         }
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         let bonus = rollDarkBonus('sense');
         const total = roll + bonus;
         let DC = { run: 10, brace: 15, crawl: 12, back: 13 }[pick];
@@ -2915,13 +2915,13 @@ function input119D(n) {
             txt = `가까스로 빠져나온다.<br><br>갈비뼈 쪽이 아프다. 숨을 깊게 쉬면 더 아프다.<br>뒤를 보니 벽이 완전히 맞물려 있다.`;
             if ((darkRun.fail || 0) >= 5) {
                 darkRun.dying = 'wall';
-                darkRun.log.push(`[기믹 5] d30 ${roll} — 치명`);
+                darkRun.log.push(`[기믹 5] d20 ${roll} — 치명`);
                 renderRescueScene('wall');
                 return;
             }
         }
 
-        darkRun.log.push(`[기믹 5] ${pick} d30 ${roll}(+${bonus}) vs DC${DC}`);
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
 
         if (died) { darkDeath(txt); return; }
 
@@ -4022,7 +4022,7 @@ function b508RequiredDocs() {
     }
 
     function b508G2R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = { crawl: 9, wait: 11, throw: 12, rush: 17 }[pick] - gearValue(currentUser, 'break');
                // b508G2R (소리)
@@ -4051,7 +4051,7 @@ function b508RequiredDocs() {
             applyPollutionToUser(currentUser, 7);
         }
 
-        darkRun.log.push(`[기믹 2] ${pick} d30 ${roll}(+${bonus}) vs DC${DC}`);
+        darkRun.log.push(`[기믹 2] ${pick} d20 ${roll}(+${bonus}) vs DC${DC}`);
         darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             noticeBarHtml() + darkChoiceBtn("안쪽으로 간다.", `partyAdvance(${darkRun.step + 1})`));
@@ -4125,7 +4125,7 @@ function b508RequiredDocs() {
     }
 
     function b508G4R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = { down: 9, back: 12, mirror: 10, stare: 18 }[pick] - gearValue(currentUser, 'break');
                // b508G4R (시선)
@@ -4158,7 +4158,7 @@ function b508RequiredDocs() {
             applyPollutionToUser(currentUser, 7);
         }
 
-        darkRun.log.push(`[기믹 4] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 4] ${pick} d20 ${roll} vs DC${DC}`);
         if (died) { darkDeath(txt); return; }
 
         darkBodyEl().innerHTML = darkBox("기믹 4 — 결과",
@@ -4183,7 +4183,7 @@ function b508RequiredDocs() {
     }
 
     function b508G5R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const bleeding = (darkRun.fail || 0) >= 3;
         let DC = { flour: 8, heat: 10, bait: 11, plain: 15 }[pick] - gearValue(currentUser, 'break');
@@ -4218,7 +4218,7 @@ function b508RequiredDocs() {
             applyPollutionToUser(currentUser, 8);
         }
 
-        darkRun.log.push(`[기믹 5] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll} vs DC${DC}`);
         if (died) { darkDeath(txt); return; }
 
         darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
@@ -4307,14 +4307,14 @@ function b508RequiredDocs() {
 
        function b508TryKey() {
         darkRun._keyTried = true;
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const luckVal = gearValue(currentUser, 'luck');
         const DC = Math.max(4, 12 - Math.round(luckVal * 14));
         const ok = roll >= DC;
 
         if (ok) {
             darkRun._gotKey = true;
-            darkRun.log.push(`[출고] 행운으로 열쇠 확보 (d30 ${roll} vs DC${DC})`);
+            darkRun.log.push(`[출고] 행운으로 열쇠 확보 (d20 ${roll} vs DC${DC})`);
             sendPartyChat(`${currentUser.name} 사원이 주머니에서 무언가를 꺼냈습니다.`, true);
         }
 
@@ -4339,14 +4339,14 @@ function b508RequiredDocs() {
         }
 
         // ★ 서류 부족 — 즉사가 아니라 판정
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = 20;
         const survived = roll !== 1 && (roll + bonus) >= DC;
 
         darkRun.fail += 2;
         darkRun.failedRun = true;
-        darkRun.log.push(`[출고] 서류 부족 — d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[출고] 서류 부족 — d20 ${roll} vs DC${DC}`);
 
         if (survived) {
             applyPollutionToUser(currentUser, 12);
@@ -4441,7 +4441,7 @@ function b508RequiredDocs() {
             mountDarkChat('normal');
             return;
         }
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = 15;
         const taken = roll === 1 || (roll + bonus) < DC;
@@ -4460,7 +4460,7 @@ function b508RequiredDocs() {
             addNotice(10, '지목 저항');
         }
 
-        darkRun.log.push(`[지목 ${n}] d30 ${roll} vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
+        darkRun.log.push(`[지목 ${n}] d20 ${roll} vs DC${DC} — ${taken ? '끌려감' : '저항'}`);
                 darkRun[`_b508mark${n}Done`] = taken ? 'taken' : 'safe';
         darkBodyEl().innerHTML = darkBox("—",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${taken?'#f44336':'#4CAF50'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
@@ -6626,7 +6626,7 @@ function b508RequiredDocs() {
     }
 
     function a214G2R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = { beat: 12, join: 10, crawl: 14, walk: 18 }[pick] - gearValue(currentUser, 'break');
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -6646,7 +6646,7 @@ function b508RequiredDocs() {
             applyPollutionToUser(currentUser, 10);
         }
 
-        darkRun.log.push(`[기믹 2] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 2] ${pick} d20 ${roll} vs DC${DC}`);
         darkBodyEl().innerHTML = darkBox("기믹 2 — 결과",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             a214BarHtml() + darkChoiceBtn("계속 간다.", `partyAdvance(${darkRun.step + 1})`));
@@ -6773,7 +6773,7 @@ function b508RequiredDocs() {
     }
 
     function a214G5R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('sense');
         const DC = { sit: 17, reach: 13, cover: 11, smash: 15 }[pick] - gearValue(currentUser, 'break');
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -6795,7 +6795,7 @@ function b508RequiredDocs() {
             applyPollutionToUser(currentUser, 9);
         }
 
-        darkRun.log.push(`[기믹 5] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 5] ${pick} d20 ${roll} vs DC${DC}`);
         if (died) { darkDeath(txt); return; }
 
         darkBodyEl().innerHTML = darkBox("기믹 5 — 결과",
@@ -6864,7 +6864,7 @@ function b508RequiredDocs() {
     }
 
     function a214G7R(pick) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('sense');
         const DC = { stare: 18, side: 14, mirror: 12, close: 15 }[pick] - gearValue(currentUser, 'break');
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -6886,7 +6886,7 @@ function b508RequiredDocs() {
             if (isTraitor()) a214Progress('m09', 1);
         }
 
-        darkRun.log.push(`[기믹 7] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 7] ${pick} d20 ${roll} vs DC${DC}`);
         if (died) { darkDeath(txt); return; }
 
         darkBodyEl().innerHTML = darkBox("기믹 7 — 결과",
@@ -7597,7 +7597,7 @@ function b508RequiredDocs() {
             darkRun._lastLied = false;
         }
 
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('hide');
         const DC = { down: 9, freeze: 10, watch: 16, swim: 13 }[pick] - gearValue(currentUser, 'break');
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -7898,7 +7898,7 @@ function b508RequiredDocs() {
         }
 
         if (kind === 'coexist') {
-            const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+            const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
             const ok = roll >= 9;
             if (ok) {
                 darkRun.success += 3;
@@ -7927,7 +7927,7 @@ function b508RequiredDocs() {
         }
 
         if (kind === 'rescue') {
-            const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+            const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
             const bonus = Math.floor(getHumanity() / 10);
             const ok = (roll + bonus) >= 14;
             removeItemFromInventory(currentUser, '여섯 번째 손가락', 1);
@@ -7987,7 +7987,7 @@ function b508RequiredDocs() {
             return;
         }
 
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('sense') + Math.floor(getHumanity() / 12);
         const hasRoute = darkRun.a667Route || darkRun.a667Truth;
         let DC = { name: 11, air: 14, nolook: 12 }[pick];
@@ -8019,7 +8019,7 @@ function b508RequiredDocs() {
             txt = `올라간다. 겨우 올라간다.<br><br>수면을 뚫었을 때 이미 지쳐 있었다.<br>뭔가를 두고 온 것 같은데 뭔지 모르겠다.<br><br>확인하려고 아래를 봤다. 아무것도 없었다.<br>그게 더 허전했다.`;
         }
 
-        darkRun.log.push(`[기믹 8] ${pick} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[기믹 8] ${pick} d20 ${roll} vs DC${DC}`);
         darkBodyEl().innerHTML = darkBox("기믹 8 — 귀환",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#ff9800'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span></div>${txt}`,
             darkChoiceBtn("수면으로.", "darkRun.step=99; renderDarkStep();"));
@@ -8310,7 +8310,7 @@ function b508RequiredDocs() {
 
     function driftRejoin() {
         const h = getHumanity();
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus('sense') + Math.floor(h / 15);
         const DC = 12 + Math.floor(getDepth() / 20);
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -9951,7 +9951,7 @@ const reply = await callFox(msgs);
     }
 
     function b330DoRescue1(kind) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus();
         const healVal = gearValue(currentUser, 'heal');
         let DC = { pull: 14, brace: 16, oil: 12 }[kind];
@@ -9975,7 +9975,7 @@ const reply = await callFox(msgs);
             txt = `당겨 보지만 소용없다.<br><br>벽이 한 뼘 더 좁아진다.<br>다른 방법을 찾아야 한다.`;
         }
 
-        darkRun.log.push(`[구출A] ${kind} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[구출A] ${kind} d20 ${roll} vs DC${DC}`);
         darkBodyEl().innerHTML = darkBox("구출 — 결과",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span>${healVal>0?`<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">❋ 치유 적용 중</div>`:''}</div>${txt}`,
             ok
@@ -9994,12 +9994,12 @@ const reply = await callFox(msgs);
         const r1 = (which === 'r1');
         if (r1 ? darkRun._r1Saved : darkRun._r2Saved) return;
 
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus();
         const healVal = gearValue(currentUser, 'heal');
         let DC = (r1 ? 18 : 17) - Math.round(healVal * 12);
         if (DC < 5) DC = 5;
-        const ok = roll !== 1 && (roll === 30 || (roll + bonus) >= DC);
+        const ok = roll !== 1 && (roll === 20 || (roll + bonus) >= DC);
 
         let txt;
         if (ok) {
@@ -10020,7 +10020,7 @@ const reply = await callFox(msgs);
                 ? `힘을 준다. 벽이 그만큼 더 조인다.<br><br>아직 빠지지 않았다.`
                 : `숨을 쥐어 보지만 손에 아무것도 안 잡힌다.<br><br>시야가 한 겹 더 좁아진다.`;
         }
-        darkRun.log.push(`[혼자 ${r1 ? '빼냄' : '숨'}] d30 ${roll}(${bonus >= 0 ? '+' : ''}${bonus}) vs DC${DC} — ${ok ? '성공' : '실패'}`);
+        darkRun.log.push(`[혼자 ${r1 ? '빼냄' : '숨'}] d20 ${roll}(${bonus >= 0 ? '+' : ''}${bonus}) vs DC${DC} — ${ok ? '성공' : '실패'}`);
 
         darkBodyEl().innerHTML = darkBox("혼자 힘으로",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus >= 0 ? '+' : ''}${bonus} / DC ${DC})</span></div>${txt}`,
@@ -10097,7 +10097,7 @@ const reply = await callFox(msgs);
     }
 
     function b330DoRescue2(kind) {
-        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
         const bonus = rollDarkBonus();
         const healVal = gearValue(currentUser, 'heal');
         let DC = { back: 15, call: 12, share: 10 }[kind];
@@ -10122,7 +10122,7 @@ const reply = await callFox(msgs);
             txt = `해 보지만 반응이 없다.<br><br>시간이 줄어든다.<br>다른 방법을 써야 한다.`;
         }
 
-        darkRun.log.push(`[구출B] ${kind} d30 ${roll} vs DC${DC}`);
+        darkRun.log.push(`[구출B] ${kind} d20 ${roll} vs DC${DC}`);
         darkBodyEl().innerHTML = darkBox("구출 — 결과",
             `<div style="text-align:center; font-size:26px; font-weight:bold; color:${ok?'#4CAF50':'#f44336'}; margin-bottom:12px;">🎲 ${roll} <span style="font-size:13px; color:#888;">(보정 ${bonus>=0?'+':''}${bonus} / DC ${DC})</span>${healVal>0?`<div style="font-size:10px; color:#c9a8ff; margin-top:4px;">❋ 치유 적용 중</div>`:''}</div>${txt}`,
             ok
@@ -10135,16 +10135,22 @@ const reply = await callFox(msgs);
     // 행운 100% — 새로 굴린 눈이 1 이면 2~20 으로 (루비 · 아이 · 고유의 운 재굴림이 쓴다 · 2026-10-26)
     function luckNoOne(nr) {
         try {
-            if (nr === 1 && darkRun && (Number(gearValue(currentUser, 'luck')) || 0) >= 1) return Math.floor(Math.random() * 19) + 2;
+            if (nr === 1 && darkRun && (Number(gearValue(currentUser, 'luck')) || 0) >= 1) return Math.floor(Math.random() * (window.diceMax() - 1)) + 2;
         } catch (e) { }
         return nr;
     }
 
+    // ★ 지금 판의 주사위 — S 급(동화 · 검역 · 피날레) · EPIC · K 의 방은 d30, 나머지는 d20 (2026-10-27)
+    //   S 급 규칙: 눈 3 이하는 보정과 상관없이 실패 · 30 은 늘 성공 · 기준은 16 (DC 를 따로 안 쓴다)
+    window.diceMax = function () {
+        try { if (darkRun && (darkRun.epic || darkRun.kroom || /^Qtrew-S-/.test(String(darkRun.zone || '')))) return 30; } catch (e) { }
+        return 20;
+    };
     function luckReroll(roll) {
                 // 식은 커피 — 낮게 나오면 한 번 다시 굴린다
         if (roll <= 9 && darkRun && qFlag('reroll')) {
             consumeQFlag('reroll');
-            const nr = Math.floor(Math.random() * 30) + 1;
+            const nr = Math.floor(Math.random() * window.diceMax()) + 1;
             darkRun.log.push(`[식은 커피] 재굴림 (${roll} → ${nr})`);
             showDarkToast(`☕ 정신이 들었다. 다시 굴린다. (${roll} → ${nr})`);
             roll = nr;
@@ -10159,7 +10165,7 @@ const reply = await callFox(msgs);
         if (!full && Math.random() >= luckVal) return roll;
 
         darkRun._luckRerollUsed = true;
-        const newRoll = Math.floor(Math.random() * 19) + 2;
+        const newRoll = Math.floor(Math.random() * (window.diceMax() - 1)) + 2;
         darkRun.log.push(`[행운] 대실패 무효 (1 → ${newRoll})`);
         showDarkToast(`✺ 손이 미끄러졌다. 다시 굴린다. (${newRoll})`);
         return newRoll;
@@ -10525,8 +10531,8 @@ function turnedBite(targetCode, targetName) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC = s010DC(12);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (ok) {
         database.ref(`darkParties/${darkRun.partyId}/bites`).push({
@@ -10985,8 +10991,8 @@ function s010G1() {
 function s010G1R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC = s010DC({ slow: 11, cut: 9, rush: 17 }[pick]) - gearValue(currentUser, 'break');
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11021,8 +11027,8 @@ function s010G2() {
 function s010G2R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide') + gearValue(currentUser, 'evade') * 10;
-    const DC = s010DC( { side: 12, dash: 15, bait: 10, wait: 13 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11061,8 +11067,8 @@ function s010G3() {
 function s010G3R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = s010DC({ crawl: 12, force: 14, prop: 11 }[pick]) - gearValue(currentUser, 'break');
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11096,8 +11102,8 @@ function s010G4() {
 function s010G4R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = s010DC({ listen: 11, call: 16, ignore: 13 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11131,8 +11137,8 @@ function s010G5() {
 function s010G5R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = s010DC({ solid: 14, quick: 10, weld: 13 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (ok) {
         darkRun.success++;
@@ -11169,8 +11175,8 @@ function s010G6() {
 function s010G6R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 10);
-    const DC =s010DC( { clean: 10, burn: 14, cut: 17, leave: 0 }[pick]);
-    const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
+    const DC =16;
+    const ok = pick === 'leave' ? false : (roll > 3 && (roll === 30 || (roll + bonus) >= DC));
 
     let txt;
     if (pick === 'leave') {
@@ -11213,8 +11219,8 @@ function s010G7R(pick) {
     const luck = gearValue(currentUser, 'luck');
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(luck * 12);
-    const DC = s010DC(12);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11248,8 +11254,8 @@ function s010G8() {
 function s010G8R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide');
-    const DC =s010DC( { chem: 10, blood: 13, cold: 12 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11313,8 +11319,8 @@ function s010G9() {
 function s010G9R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide') + Math.round(gearValue(currentUser, 'evade') * 14);
-    const DC =s010DC( { slide: 13, climb: 12, push: 16 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11352,8 +11358,8 @@ function s010G10() {
 function s010G10R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('rejoin');
-    const DC = s010DC({ tune: 12, code: 10, shout: 16 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11390,8 +11396,8 @@ function s010G11() {
 function s010G11R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense');
-    const DC = s010DC({ beat: 12, dark: 15, light: 11, blind: 14 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11426,8 +11432,8 @@ function s010G12() {
 function s010G12R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 12);
-    const DC =s010DC( { treat: 13, quick: 9, leave: 0 }[pick]);
-    const ok = pick === 'leave' ? false : (roll !== 1 && (roll + bonus) >= DC);
+    const DC =16;
+    const ok = pick === 'leave' ? false : (roll > 3 && (roll === 30 || (roll + bonus) >= DC));
 
     let txt;
     if (pick === 'leave') {
@@ -11471,8 +11477,8 @@ function s010G13R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze')
         + (qFlag('s010_tags') ? 6 : 0);
-    const DC = s010DC({ trace: 13, ask: 11, drop: 0 }[pick]);
-    const ok = pick === 'drop' ? false : (roll !== 1 && (roll + bonus) >= DC);
+    const DC = 16;
+    const ok = pick === 'drop' ? false : (roll > 3 && (roll === 30 || (roll + bonus) >= DC));
 
     let txt;
     if (pick === 'drop') {
@@ -11512,8 +11518,8 @@ function s010G14() {
 function s010G14R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('detect') + (qFlag('s010_roster') ? 3 : 0);
-    const DC = s010DC({ smell: 12, pulse: 11, talk: 14, skip: 0 }[pick]);
-    const ok = pick === 'skip' ? false : (roll !== 1 && (roll + bonus) >= DC);
+    const DC = 16;
+    const ok = pick === 'skip' ? false : (roll > 3 && (roll === 30 || (roll + bonus) >= DC));
 
     let txt;
     if (pick === 'skip') {
@@ -11570,8 +11576,8 @@ function s010G15R(pick) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC =s010DC( { hold: 21, flee: 16 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11604,8 +11610,8 @@ function s010G16() {
 function s010G16R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'gaze');
-    const DC = s010DC({ count: 12, time: 13, stamp: 11 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11640,8 +11646,8 @@ function s010G17() {
 function s010G17R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(gearValue(currentUser, 'heal') * 10);
-    const DC =s010DC( { full: 14, half: 11, hold: 12 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11678,8 +11684,8 @@ function s010G18() {
 function s010G18R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break') * 2;
-    const DC = s010DC({ crank: 15, half: 11, break: 13 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11713,8 +11719,8 @@ function s010G19() {
 function s010G19R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide') + (qFlag('s010_masked') ? 3 : 0);
-    const DC =s010DC( { follow: 13, avoid: 12, wait: 10 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11747,8 +11753,8 @@ function s010G20() {
 function s010G20R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('hide') + Math.round(gearValue(currentUser, 'evade') * 14);
-    const DC = s010DC({ all: 14, split: 12, wall: 15 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11788,8 +11794,8 @@ function s010G21R(pick) {
     const luck = gearValue(currentUser, 'luck');
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(luck * 14);
-    const DC =s010DC( 13);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC =16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11821,8 +11827,8 @@ function s010G22() {
 function s010G22R(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('rejoin') + (qFlag('s010_radio') ? 4 : 0);
-    const DC = s010DC({ radio: 11, light: 13, wait: 15 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -11936,8 +11942,8 @@ function s010G24R(pick) {
     const inf = getInfect();
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') - Math.floor(inf / 10);
-    const DC = s010DC({ out: 12, report: 14, close: 17 }[pick]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (pick === 'close') {
         if (ok) {
@@ -12695,8 +12701,8 @@ function doPurge(code, nm, how) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + gearValue(currentUser, 'break');
-    const DC = s010DC(24);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (ok) {
         darkRun._purged[code] = true;
@@ -14876,8 +14882,8 @@ function pickTale(round, idx) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + (qFlag('s003_shoe') ? 6 : 0);
-    const DC = s003DC(o.ok ? 11 : 15);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (o.lore) addLore(o.lore, `${role.name} ${round}장`);
 
@@ -15100,8 +15106,8 @@ function pickPageSpot(n, idx) {
     const luck = gearValue(currentUser, 'luck');
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('sense') + Math.round(luck * 10) + (qFlag('s003_crumb') ? 3 : 0);
-    const DC = 15;
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -15255,8 +15261,8 @@ function s003Resolve(title, cfg, pick) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus(o.kind || 'sense') + (o.extra ? o.extra() : 0);
-    const DC = s003DC(o.dc);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     if (o.lore) addLore(o.lore, title);
 
@@ -15615,8 +15621,8 @@ function s003EndPick(pick) {
     if (darkRun.s003Stayed) bonus -= 8;
     if (darkRun.s003Ending && darkRun.s003Ending === darkRun.taleRole) bonus += 3;
 
-    const DC = { written: 14, blank: 18, true: 12 }[pick] + 6;
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     darkRun.s003Route = pick;
 

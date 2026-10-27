@@ -242,8 +242,8 @@ function leaderRoll(s, fallback) {
         const bon = +(((S().pl || {})[rl] || {}).bon) || 0;
         const total = raw + bon;
         // ★ 뽑힌 사람이 🔎 · 🌟 를 지녔으면 그 사람의 경계도 같이 (finale-core.js waryOf · 2026-10-25)
-        const dcF = 15 + ((typeof X.waryOf === 'function') ? X.waryOf((typeof db !== 'undefined' && db.users) ? db.users[rl] : null) : 0);
-        r = { raw: raw, bonus: bon, total: total, dc: dcF, out: raw === 1 ? 'c1' : raw === 30 ? 'c20' : total >= dcF ? 'ok' : 'fail' };
+        const dcF = 16;
+        r = { raw: raw, bonus: bon, total: total, dc: dcF, out: raw === 1 ? 'c1' : raw <= 3 ? 'fail' : raw === 30 ? 'c20' : total >= dcF ? 'ok' : 'fail' };
         darkRun.log.push('[연회] ' + X.nameOf(rl) + ' 대신 굴림 — d30 ' + raw + ' (+' + bon + ') → ' + r.out);
     }
     if (!fallback) darkRun.log.push('[연회] 장면 0' + s + ' — 투표로 뽑혀 굴림');

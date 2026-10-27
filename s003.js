@@ -964,8 +964,8 @@ function s003Resist(n) {
 
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = s003KindBonus('hide');
-    const DC = s003DC(10);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     darkRun['_' + key] = ok ? 'safe' : 'taken';
     ref.child('result').set(ok ? 'safe' : 'taken');
@@ -1020,8 +1020,8 @@ function s003Search(n) {
 
         const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
         const bonus = s003KindBonus('sense');
-        const DC = s003DC(9);
-        const ok = roll !== 1 && (roll + bonus) >= DC;
+        const DC = 16;
+        const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
         let txt;
         if (ok) {
@@ -1086,8 +1086,8 @@ function s003LairPick(i) {
 
         const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
         const bonus = s003KindBonus(o.kind) + fb;
-        const DC = s003DC(o.dc);
-        const ok = roll !== 1 && (roll + bonus) >= DC;
+        const DC = 16;
+        const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
         darkRun.log.push(`[${a.name}의 장] ${o.kind} d30 ${roll} vs DC${DC} (찾은 동료 ${finders})`);
 
@@ -1362,8 +1362,8 @@ function s003RegroupPick(n, v) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const kind = { call:'rejoin', page:'sense', ahead:'hide' }[v];
     const bonus = s003KindBonus(kind) + (qFlag('rejoin_boost') ? 4 : 0);
-    const DC = s003DC({ call:9, page:10, ahead:8 }[v]);
-    const ok = roll !== 1 && (roll + bonus) >= DC;
+    const DC = 16;
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
 
     let txt;
     if (ok) {
@@ -1578,7 +1578,7 @@ function s003EndDC(pick) { return S003_END_DC[pick] + S003_END_ADD; }
 function s003EndOdds(pick) {
     const need = s003EndDC(pick) - s003EndBonus();
     let n = 0;
-    for (let r = 2; r <= 29; r++) if (r >= need) n++;
+    for (let r = 4; r <= 29; r++) if (r >= need) n++;
     return Math.round((n + 1) / 30 * 100);
 }
 
@@ -1623,9 +1623,9 @@ function s003EndBtn(pick, label) {
 function s003EndPick(pick) {
     const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = s003EndBonus();
-    const DC = s003EndDC(pick);
+    const DC = 16;
     // 20 은 언제나 통한다 — 어떤 자리에서도 길이 아주 막히지는 않게
-    const ok = roll !== 1 && (roll === 30 || (roll + bonus) >= DC);
+    const ok = roll > 3 && (roll === 30 || (roll + bonus) >= DC);
     darkRun.log.push('[마지막 장] ' + pick + ' d30 ' + roll + '(' + (bonus >= 0 ? '+' : '') + bonus
         + ') vs DC' + DC + ' — ' + (ok ? '나감' : '남음'));
 

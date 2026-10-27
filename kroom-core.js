@@ -1698,10 +1698,10 @@ window.kroomPick = function (i) {
     const B = bfly();
     const psyDown = B ? B.takePsy() : 0;                   // 🦋 프시케 — 지난 장면에서 숫자를 맞혔다
     const fav = !!(B && i >= 0 && i === kr._bfFav);
-    const dc = (o.dc || 13) + H.dc - psyDown;
+    const dc = 16 - psyDown;                                // ★ 기준 16 (d30 · 2026-10-27) — 눈 3 이하는 늘 실패 · 30 은 늘 성공 · 던전 등급 DC 는 안 쓴다
     // 1 은 늘 실패, 20 은 늘 성공 — B 이상은 DC 가 20 을 넘어 보정이 낮으면 아예 못 넘는 자리가 생긴다
     //   ★ 혼자 A · S 에서는 20 도 늘 성공이 아니다 (SOLO_HARD.no20)
-    let ok = R.r !== 1 && ((R.r === 30 && !H.no20) || (R.r + R.b) >= dc);
+    let ok = R.r > 3 && ((R.r === 30 && !H.no20) || (R.r + R.b) >= dc);
     let gl = '';                                            // 전용 장비가 한 일
     if (H.doom) ok = false;                                 // ★ 혼자 S — 아무것도 안 통한다
     // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
@@ -1711,11 +1711,11 @@ window.kroomPick = function (i) {
     // 행운 — 다시 굴림
     if (!ok && !H.doom && gearUse('luck')) {
         const R2 = roll(o.k);
-        ok = R2.r !== 1 && (R2.r === 30 || (R2.r + R2.b) >= dc);
+        ok = R2.r > 3 && (R2.r === 30 || (R2.r + R2.b) >= dc);
         gl += gearLine('luck', '— 다시 굴렸다: 🎲 ' + R2.r + (ok ? ' 성공' : ' 이번에도 실패'));
     }
     // 보정 — 5 이하로 모자라면 맞춰 준다
-    if (!ok && !H.doom && R.r !== 1 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
+    if (!ok && !H.doom && R.r > 3 && dc - (R.r + R.b) <= 5 && gearUse('fix')) {
         ok = true; gl += gearLine('fix', '— 모자란 ' + (dc - (R.r + R.b)) + '을(를) 메웠다.');
     }
     // 특수 물건 — 즉사 기믹은 부순다
@@ -1723,8 +1723,8 @@ window.kroomPick = function (i) {
     // 🦋 레테의 수의 — 한 번 더 굴린다 (+2 · 혼자 S 라도 다시 굴린 눈은 보통 DC 로 잰다)
     if (!ok && B && B.lethe()) {
         const r2 = Math.floor(Math.random() * 30) + 1;
-        const dc2 = (o.dc || 13) + Math.min(H.dc, 7) - psyDown;
-        ok = r2 !== 1 && (r2 + R.b + B.C.LETHE_ADD) >= dc2;
+        const dc2 = 16 - psyDown;
+        ok = r2 > 3 && (r2 === 30 || (r2 + R.b + B.C.LETHE_ADD) >= dc2);
         gl += bflyLine('— 레테의 수의가 방금 것을 덮었다. 다시: 🎲 ' + r2 + ' (+' + B.C.LETHE_ADD + ' / DC ' + dc2 + ')' + (ok ? ' 성공' : ' 이번에도 실패'));
     }
     // 🦋 파훼 나비 — 즉사 기믹을 부순다
@@ -1995,13 +1995,13 @@ const CARE = { heal: 'hp', gaze: 'spirit', fix: 'mana', bond: 'qi', steady: 'mig
 function careMax() { return 2 + ((kr.gear && kr.gear.heal) ? kr.gear.heal.n : 0); }
 // ★ 치유도 판정을 굴린다 (2026-10-20) — 돌보기 DC 10 · 쓰러진 동료 일으키기는 그 쓰러짐의 DC
 //   굴림은 roll('heal') — d30 + 바탕 보정 + 치유 직업 +3 + 각성 + 팀 보정. 1 은 늘 실패 · 20 은 늘 성공
-const CARE_DC = 10;
+const CARE_DC = 16;
 function healDice(R, dc, ok) {
     return `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
 }
 function healRoll(dc) {
     const R = roll('heal');
-    const ok = R.r !== 1 && (R.r === 30 || (R.r + R.b) >= dc);
+    const ok = R.r > 3 && (R.r === 30 || (R.r + R.b) >= dc);
     return { R: R, ok: ok, dice: healDice(R, dc, ok) };
 }
 function careAmt() { return Math.round(25 * (1 + 0.2 * Math.min(2, teamCount('fix'))) * (1 + 0.1 * gi(prof().grade))); }
@@ -2332,7 +2332,7 @@ window.kroomRescue = function (code) {
         if (healDown) {                                      // 치유 — 판정 (2026-10-20 · 전에는 무조건)
             if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 얹었다.'); return; }
             ref.child('tried/' + me().code).set(true);
-            const hr = healRoll(v.dc || 12);
+            const hr = healRoll16;
             const hsure = hr.ok ? '' : sureRescue();          // 확정 구출 물건 — 빗나갔을 때만 쓴다
             if (hsure) { hr.ok = true; hr.dice = healDice(hr.R, v.dc || 12, true); }
             if (!hr.ok) {                                    // 닿지 않았다 — 치유자는 다치지 않는다 · 다른 동료가 아직 손을 뻗을 수 있다
@@ -2355,7 +2355,7 @@ window.kroomRescue = function (code) {
         b += Math.min(3, teamCount('fix'));
         const r = kv(luckReroll, null, [Math.floor(Math.random() * 30) + 1]);
         afterDice();
-        let ok = r !== 1 && (r === 30 || r + b >= (v.dc || 13));
+        let ok = r > 3 && (r === 30 || r + b >= 16);
         let sure = '';
         if (!ok) { sure = sureRescue(); if (sure) ok = true; }  // 🩶 은심장(열 번) · 🐾 아기 여우(연결)
         heartCount();                                         // 구하러 갈 때마다 하나 센다
