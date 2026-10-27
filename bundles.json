@@ -406,7 +406,8 @@
       "update-check.js",
       "party-keep.js",
       "dark-add.js",
-      "badge-dot.js"
+      "badge-dot.js",
+      "inv-why.js"
     ]
   ]
 }
