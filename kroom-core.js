@@ -233,6 +233,7 @@ const HIDDEN_NEED = { lv: 80, grade: 'S', jx: 40, jxGrades: ['D', 'C', 'B', 'A']
 const HIDDEN_WAKE = { D: 30, C: 40, B: 50, A: 60, S: 100 };
 const HIDDEN_LV_MAX = 120;            // 히든 직업만 Lv 120 까지
 const HIDDEN_EXP_MULT = 5;            // 한 Lv 에 드는 경험치 — 보통 직업의 다섯 배
+const EXP_X2 = 2;                     // ★ 얻는 경험치 두 배 — 히든 · 보통 직업 모두 (2026-10-28 · 횟수를 50 → 20 으로 줄인 대신)
 const NEXT_GRADE = { D: 'C', C: 'B', B: 'A', A: 'S', S: 'L' };
 
 // ── 전용 장비 — 이 방에서는 속성마다 「몇 번」 쓰는 능력이 된다
@@ -399,9 +400,8 @@ function isHelper() { return !!(kr && kr.helper); }
 // ★ K 의 방 탐사 횟수 — 일반 어둠과 **따로** 센다 (2026-10-18)
 // ==========================================
 //
-//   하루 50회. 「어둠 탐사 +n」으로 한도를 올리는 것(요리 · 장비 · 🦊 호사수구 · K.LEE ·
-//   은화 뱀)도 얹히지만, 다 더해도 **55회까지**다. 출산 고유 아이템(유전자 고유 아이템 —
-//   차고 있는 동안 어둠 탐사 +n)의 몫만 55 위에 그대로 얹힌다.
+//   ★ 하루 20회 (2026-10-28 · 전에는 50). 「어둠 탐사 +n」으로 한도를 올리는 것(요리 · 장비 · 🦊 호사수구 · K.LEE ·
+//   은화 뱀 · 출산 고유 아이템 · 소지품 · 음식)이 다 얹혀도 **40회까지**다. (대신 경험치는 두 배 — EXP_X2)
 //   K 의 방에 들어가도 일반 어둠 탐사 횟수(8회)는 줄지 않는다.
 //
 //   쓴 횟수는 kroomUse/<사번> = { d: 날짜, n: 쓴 횟수 } 하나에 트랜잭션으로만 더한다
@@ -410,8 +410,8 @@ function isHelper() { return !!(kr && kr.helper); }
 //   (소지품을 써서 쓴 횟수를 하나 깎아 주는 것 — 밤샘 신청서 · 엽서 · 출산품 — 은
 //    일반 어둠 쪽 횟수만 돌려준다)
 //   당국이 어둠 탐사 횟수를 충전하면 K 의 방 횟수도 같이 0 으로 돌린다.
-const K_TRY_BASE = 50;
-const K_TRY_HARD = 55;
+const K_TRY_BASE = 20;
+const K_TRY_HARD = 40;        // 얹는 몫을 더해도 여기까지 (끝 한계와 같다 — 2026-10-28)
 const K_USE = 'kroomUse';
 const KC = { code: '', ref: null, synced: null, ready: false, pend: 0, busy: false };
 function kToday() { try { return getTodayStr(); } catch (e) { return ''; } }
@@ -433,24 +433,23 @@ function kBind() {
 }
 setInterval(function () { try { kBind(); } catch (e) { } }, 1000);
 function kUsed() { return kView(KC.synced) + KC.pend; }
-// 한도 — 50 + 얹는 몫(55 까지) + 출산 고유 아이템 몫
+// 한도 — 20 + 얹는 몫 + 출산 고유 아이템 몫 (다 합쳐 40 까지)
 function kAdds(u) {
     let capped = 0, free = 0, dna = 0;
     try { if (typeof window.capParts === 'function') { const p = window.capParts(u); capped = Number(p.capped.dark) || 0; free = Number(p.free.dark) || 0; } } catch (e) { }
     try { const e = (typeof myDnaEquip === 'function' && u === me()) ? myDnaEquip() : null; dna = (e && Number(e.dark)) || 0; } catch (e) { }
     return { add: Math.max(0, capped + Math.max(0, free - dna)), dna: dna };
 }
-// ★ 끝 한계 (2026-10-19) — 무엇이 얹혀도 70 을 넘지 않는다 (K.LEE 로 가져온 몫까지 얹혀 119 가 뜬 적이 있다)
-const K_TRY_ABS = 70;
+// ★ 끝 한계 (2026-10-19) — 무엇이 얹혀도 넘지 않는다 (K.LEE 로 가져온 몫까지 얹혀 119 가 뜬 적이 있다) · 2026-10-28 부터 40
+const K_TRY_ABS = 40;
 function kNum(v) { v = Number(v); return isFinite(v) && v > 0 ? v : 0; }
 function kLimit(u) {
     u = u || me();
     const a = kAdds(u);
-    // 기본 50 + 얹는 몫(요리 · 장비 · 호사수구 · K.LEE …)은 55 까지, 출산 고유 몫은 그 위에 — 모두 합쳐 70 까지
-    // ★ 소지품 · 음식으로 그날 더 받은 「어둠 탐사 +n」(darkAdd — dark-add.js · 2026-10-27)은 끝 한계 밖에 그대로 얹는다
+    // 기본 20 + 얹는 몫(요리 · 장비 · 호사수구 · K.LEE · 출산 고유 몫 · 소지품 · 음식의 darkAdd) — 모두 합쳐 40 까지 (2026-10-28)
     let extra = 0;
     try { if (u === me() && typeof window.darkAddToday === 'function') extra = kNum(window.darkAddToday()); } catch (e) { }
-    return Math.min(K_TRY_ABS, Math.min(K_TRY_HARD, K_TRY_BASE + kNum(a.add)) + kNum(a.dna)) + extra;
+    return Math.min(K_TRY_ABS, Math.min(K_TRY_HARD, K_TRY_BASE + kNum(a.add)) + kNum(a.dna) + extra);
 }
 function kLeft() { return Math.max(0, kLimit() - kUsed()); }
 // 한 번 쓴다 — 차이만큼 트랜잭션
@@ -1814,7 +1813,7 @@ function reward(win, kind) {
     const a = JOBS[kr.job][0];
     const g = DUNS[kr.dun].g;
     const mult = { D: 1, C: 1.6, B: 2.4, A: 3.4, S: 5 }[g] || 1;
-    let exp = Math.round((win.exp || 12) * mult);
+    let exp = Math.round((win.exp || 12) * mult) * EXP_X2;
     // 꿈결 — 내용 파일이 「꿈결을 준다」고 적은 자리(win.dream)와 층 끝(보스)에서 한 번씩 얻는다.
     //   얻는 양은 내용의 숫자가 아니라 던전 등급의 범위에서 굴린다.
     let times = (win.dream ? 1 : 0) + (kind === 'boss' ? 1 : 0);
@@ -1825,7 +1824,7 @@ function reward(win, kind) {
         if (a === 'luck') dream = Math.round(dream * 1.5);
         if (teamCount('luck') > 0) dream = Math.round(dream * 1.1);
     }
-    if (kind === 'boss') exp += Math.round(30 * mult);
+    if (kind === 'boss') exp += Math.round(30 * mult) * EXP_X2;
     kr.exp += exp; kr.dream += dream;
     const parts = ['경험치 +' + exp];
     if (dream) parts.push('<span style="color:#c9a8ff;">꿈결 +' + dream + ' D</span>');
@@ -2212,7 +2211,7 @@ window.kroomMeet = function (n) {
         }
     }
     if (n === 3) {
-        addStat('spirit', 8); kr.exp += 20;
+        addStat('spirit', 8); kr.exp += 20 * EXP_X2;
         t = '지나온 길을 서로 그려 보였다.<br><br>저쪽 길에는 이쪽에 없던 갈림이 있었다. 같은 방인데 다른 방이다.<br>그래도 맞춰 보니 출구 쪽은 같았다.';
     }
     if (n === 0) t = '눈을 떼지 않고 비켜 섰다.<br><br>저쪽도 그렇게 했다. 등을 보이지 않고 멀어진다.';
@@ -2342,7 +2341,7 @@ window.kroomRescue = function (code) {
                 return;
             }
             d.ref('darkParties/' + darkRun.partyId + '/kAid/' + code).push({ k: 'hp', v: careAmt(), from: me().name, at: now() });
-            ref.remove(); kr.exp += 30;
+            ref.remove(); kr.exp += 30 * EXP_X2;
             try { if (typeof window.dokRescued === 'function') window.dokRescued('kroom'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 치유로 일으켰습니다.', true);
             show('구제', hr.dice + (hsure ? `<div style="font-size:11px; color:#ffd9a0; margin-bottom:8px;">${esc(hsure)} — 손을 대신 뻗었다. 구출이 확정되었다.</div>` : '')
@@ -2362,7 +2361,7 @@ window.kroomRescue = function (code) {
         heartCount();                                         // 구하러 갈 때마다 하나 센다
         if (!ok && gearUse('bond')) ok = true;                // 연결 장비 — 확실한 구조
         if (ok) {
-            ref.remove(); kr.exp += 40;
+            ref.remove(); kr.exp += 40 * EXP_X2;
             try { if (typeof window.dokRescued === 'function') window.dokRescued('kroom'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             sendPartyChat(me().name + ' 사원이 ' + v.name + ' 사원을 끌어냈습니다.', true);
             show('구제', `<div style="text-align:center; font-size:24px; color:#4CAF50;">🎲 ${r} (+${b} / DC ${v.dc})</div>`
@@ -3063,7 +3062,7 @@ window.kTrialAnswer = function (id, ok) {
 function clear() {
     const D = DATA.dun[kr.dun];
     const g = DUNS[kr.dun].g;
-    kr.exp += Math.round(120 * ({ D: 1, C: 1.6, B: 2.4, A: 3.4, S: 5 }[g] || 1));
+    kr.exp += Math.round(120 * ({ D: 1, C: 1.6, B: 2.4, A: 3.4, S: 5 }[g] || 1)) * EXP_X2;
     kr.dream += dreamRoll();                                   // 돌파 — 한 번 더 얻는다
     settle('clear', D.outro);
 }

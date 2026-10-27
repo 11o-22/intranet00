@@ -1739,7 +1739,7 @@ window.chilPagX = function (fn, code) {
             r.success = (r.success || 0) + 1;
             try {
                 if (r.epic) { er.helped = (er.helped || 0) + 1; er.score = (er.score || 0) + (fn === 'epicDoomRescue' ? 1500 : 900); }
-                if (r.kroom) { const kr = window.KROOM.state(); if (kr) kr.exp = (kr.exp || 0) + 40; }
+                if (r.kroom) { const kr = window.KROOM.state(); if (kr) kr.exp = (kr.exp || 0) + 80; }   // ★ 경험치 두 배 (2026-10-28 · kroom-core EXP_X2 와 같이)
             } catch (e) { }
             try { if (typeof window.dokRescued === 'function') window.dokRescued('pagun'); } catch (e) { }   // 🔥 도깨비 불 — 남을 구했다 (dokkaebi.js)
             try { sendPartyChat(u.name + ' 사원이 파군성군의 힘으로 ' + who + ' 사원을 끌어냈습니다.', true); } catch (e) { }
