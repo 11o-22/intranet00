@@ -410,7 +410,10 @@
       "inv-why.js",
       "gear-cap.js",
       "p2p-ban.js",
-      "amulet-stack.js"
+      "amulet-stack.js",
+      "pet-trait.js",
+      "pet-rune.js",
+      "pet-battle.js"
     ]
   ]
 }

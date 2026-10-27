@@ -193,6 +193,15 @@ function oneView(id) {
               + ' <span style="color:#5f594f;">(B 등급이 되면 '
               + esc(P().statText(p.st)) + ')</span>')
         + line('주의 문구', esc(P().WARN[p.w].n))
+        // ★ 성별 · 성격 · 스킬 · 먹인 룬 (pet-trait.js · pet-rune.js · 2026-10-27)
+        + (window.PETTRAIT ? line('성별', esc(PETTRAIT.sexName(PETTRAIT.sex(id, me))))
+            + line('성격', esc(PETTRAIT.perName(id, me)))
+            + line('스킬', (function () { const sk = PETTRAIT.skill(id); return sk ? esc(sk.n) + ' <span style="color:#6f685e;">— ' + esc(sk.d) + '</span>' : '-'; })()) : '')
+        + (window.PETRUNE ? line('룬', (function () {
+            const r = PETRUNE.fed(id, me);
+            return (r.length ? r.map(PETRUNE.tag).map(esc).join(' · ') : '<span style="color:#8d8578;">없음</span>')
+                + ' <span style="color:#6f685e;">(' + r.length + '/' + PETRUNE.FED_MAX + ')</span>';
+        })()) : '')
         + line('내 방', P().showHas(id, me)
             ? '<span style="color:#d4af37;">내놓는 중</span>'
             : '<span style="color:#8d8578;">아니오</span>')
@@ -217,6 +226,7 @@ function oneView(id) {
         + (P().showHas(id, me) ? '방에서 내린다' : '방에 내놓는다') + '</button>'
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
+        + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')
         + (typeof window.petAdoptSend === 'function'
             ? '<button id="pet-adopt" class="game-btn" style="' + BTN + '">입양 보내기</button>' : '')
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
@@ -239,6 +249,8 @@ function oneView(id) {
         if (typeof window.petBondOpen === 'function') { shut(); window.petBondOpen(id); }
     };
     w.querySelector('#pet-nick').onclick = function () { nickView(id); };
+    const rn = w.querySelector('#pet-rune');           // pet-rune.js 가 있을 때만 붙는다
+    if (rn) rn.onclick = function () { shut(); window.petRuneFeedOpen(id, function () { oneView(id); }); };
     const ad = w.querySelector('#pet-adopt');          // pet-adopt.js 가 있을 때만 붙는다
     if (ad) ad.onclick = function () { shut(); window.petAdoptSend(id); };
 }

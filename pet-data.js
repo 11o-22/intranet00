@@ -26,7 +26,8 @@
 // ■ 사원 기록에 적히는 자리
 //
 //   u.pets      { 펫번호: { g:'D', nick, at, fed, fedAt, rest, out,
-//                            bond, bd:{d,v}, pat, play, with } }
+//                            bond, bd:{d,v}, pat, play, with,
+//                            sex, per, runes } }      ← 성별 · 성격 (pet-trait.js) · 먹인 룬 (pet-rune.js)
 //               nick 은 따로 붙여 준 이름. 비어 있으면 종 이름으로 부른다.
 //   u.petEgg    { warn, need:{물품:수}, done:{물품:수}, last, ruin }
 //   u.petEggAt  알을 산 날 (하루 하나)

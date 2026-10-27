@@ -13,6 +13,7 @@
 //
 // ■ 서버 자리
 //   gaduri/<방>/<사번> = { at, by, name, auto?, until?, fed: { 던진사번: 횟수 } }   방은 plaza · dream
+//                        by 'petbt' 는 ⚔ 펫 배틀 패배 (pet-battle.js · until 15분이 지나면 누구의 화면이든 치운다)
 //   gaduriFood/<받는사번>/<번호> = { from, fromName, room, at }
 //
 // ■ 상담실 · 선녀탕 (2026-10-19)
@@ -124,10 +125,12 @@ setInterval(function () {
     const auto = ent.auto;
     // 🎐 여우 신도가 가뒀다 (무례하게 군 사람 · 서버가 적는다 · until 이 지나면 풀린다 — foxcult.js · api/_disaster)
     const fd = !auto && ent.by === 'foxd';
+    const bt = !auto && ent.by === 'petbt';                              // ⚔ 펫 배틀에서 졌다 (pet-battle.js · until 이 지나면 풀린다)
     if (fd) {
         try { if (typeof addHistoryLog === 'function') { addHistoryLog(me, '[가두리] ' + (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.why ? ' (' + ent.why + ')' : '')); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
     }
     if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.'
+            : bt ? '펫 배틀에서 져서 ' + NAME[now] + ' 가두리에 갇힙니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
             : fd ? (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
             : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
         + '\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
@@ -213,6 +216,7 @@ function paintAdmin() {
                         + '<span style="font-size:10px; color:#777;">' + esc((u && u.no) || '') + '</span>'
                         + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중 (저절로)</span>' : '')
                         + (v.by === 'foxd' ? '<span style="font-size:10px; color:#f0c987;">' + esc(v.byName || '🎐 여우 신도') + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
+                        + (v.by === 'petbt' ? '<span style="font-size:10px; color:#ffb74d;">⚔ 펫 배틀 패배' + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
                         + '<button class="game-btn" style="margin:0 0 0 auto; padding:5px 10px; font-size:10px;" onclick="gaduriFree(\'' + esc(c) + '\')">풀어 준다</button></div>';
                 }).join('') : '<div style="font-size:10px; color:#666;">비어 있습니다.</div>')
                 + '</div>';
@@ -298,7 +302,7 @@ setInterval(function () {
     ROOMS.forEach(function (r) {
         Object.keys(all[r.k] || {}).forEach(function (c) {
             const v = all[r.k][c] || {};
-            if (v.by === 'foxd' && Number(v.until) > 0 && Date.now() > Number(v.until)) { d.ref(NODE + '/' + r.k + '/' + c).remove(); return; }   // 🎐 여우 신도가 정한 시간이 다 됐다
+            if ((v.by === 'foxd' || v.by === 'petbt') && Number(v.until) > 0 && Date.now() > Number(v.until)) { d.ref(NODE + '/' + r.k + '/' + c).remove(); return; }   // 🎐 여우 신도 · ⚔ 펫 배틀이 정한 시간이 다 됐다
             if (!v.auto) return;
             const u = users()[c];
             const end = Math.max(Number(v.until) || 0, Number(u && u.quarantineUntil) || 0);
