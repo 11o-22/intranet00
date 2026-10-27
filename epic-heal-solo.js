@@ -171,7 +171,7 @@ function showLeft() {
 }
 
 function roll20() {
-    const r = Math.floor(Math.random() * 20) + 1;
+    const r = Math.floor(Math.random() * 30) + 1;
     return (typeof luckReroll === 'function') ? luckReroll(r) : r;
 }
 function healBonus() {
@@ -391,9 +391,9 @@ window.epicHealState = function () {
         if (iAmHeal() && leftNow() > 0) {
             const dc = Number(H.dc || 12) + Number(H.dcStep || 0) * usedNow();
             const b = healBonus();
-            const n = Math.max(0, Math.min(19, 21 - (dc - b)));
+            const n = Math.max(0, Math.min(29, 31 - (dc - b)));
             console.log('  다음 판정 — DC', dc, '· 보정', (b >= 0 ? '+' : '') + b,
-                '→ 약', Math.round(n / 20 * 100) + '%');
+                '→ 약', Math.round(n / 30 * 100) + '%');
         }
     }
     console.log('  토크쇼 남은 부활:', showLeft() + '회', showLeft() > 0 ? '(이쪽이 먼저 쓰입니다)' : '');

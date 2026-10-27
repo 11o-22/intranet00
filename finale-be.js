@@ -356,7 +356,7 @@ function npcRoll(how) {
     if (plus) f.npcPlus = 0;
     const r = X.roll({ npc: true, plus: plus });
     const need = how === 'item' ? 11 : 19;
-    const out = r.raw === 20 ? 'c20' : r.raw === 1 ? 'c1' : r.total >= need ? 'ok' : 'fail';
+    const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : r.total >= need ? 'ok' : 'fail';
     r.out = out;
     let d = 0;
     if (out === 'c20') d = X.gam(-20, 'NPC 대성공');
@@ -460,7 +460,7 @@ SC.beK = function (sc) {
     }
     const o = node.o[+res.slice(1)];
     if (o.n && o.n.d20) {
-        ex += ui.b('주사위를 굴린다.', function () { kRoll(j, res); }, { gold: true, sub: 'D20 · DC 15' });
+        ex += ui.b('주사위를 굴린다.', function () { kRoll(j, res); }, { gold: true, sub: 'D30 · DC 15' });
     } else {
         ex += ui.b('계속 간다.', function () { kPlain(j, res); });
     }

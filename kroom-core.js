@@ -1261,7 +1261,7 @@ function attrOf(code) {
 }
 function teamCount(attr) { return members().filter(function (c) { return attrOf(c) === attr; }).length; }
 
-// 굴림 — d20 + 바탕 보정 + 제 속성 +3 + 각성 + 보정(팀) − 지침
+// 굴림 — d30 + 바탕 보정 + 제 속성 +3 + 각성 + 보정(팀) − 지침
 function roll(kind) {
     const k = prof();
     let b = 0;
@@ -1271,7 +1271,7 @@ function roll(kind) {
     b += Math.min(3, teamCount('fix'));
     if (kr.stats && kr.stats.mind <= 0) b -= 3;
     if (kr.stats && kr.stats.spirit <= 20) b -= 2;
-    const r = kv(luckReroll, null, [Math.floor(Math.random() * 20) + 1]);
+    const r = kv(luckReroll, null, [Math.floor(Math.random() * 30) + 1]);
     afterDice();
     return { r: r, b: b };
 }
@@ -1701,7 +1701,7 @@ window.kroomPick = function (i) {
     const dc = (o.dc || 13) + H.dc - psyDown;
     // 1 은 늘 실패, 20 은 늘 성공 — B 이상은 DC 가 20 을 넘어 보정이 낮으면 아예 못 넘는 자리가 생긴다
     //   ★ 혼자 A · S 에서는 20 도 늘 성공이 아니다 (SOLO_HARD.no20)
-    let ok = R.r !== 1 && ((R.r === 20 && !H.no20) || (R.r + R.b) >= dc);
+    let ok = R.r !== 1 && ((R.r === 30 && !H.no20) || (R.r + R.b) >= dc);
     let gl = '';                                            // 전용 장비가 한 일
     if (H.doom) ok = false;                                 // ★ 혼자 S — 아무것도 안 통한다
     // 파괴 · 감각 · 은신 · 응시 — 그 속성으로 푸는 선택지는 그대로 성공
@@ -1711,7 +1711,7 @@ window.kroomPick = function (i) {
     // 행운 — 다시 굴림
     if (!ok && !H.doom && gearUse('luck')) {
         const R2 = roll(o.k);
-        ok = R2.r !== 1 && (R2.r === 20 || (R2.r + R2.b) >= dc);
+        ok = R2.r !== 1 && (R2.r === 30 || (R2.r + R2.b) >= dc);
         gl += gearLine('luck', '— 다시 굴렸다: 🎲 ' + R2.r + (ok ? ' 성공' : ' 이번에도 실패'));
     }
     // 보정 — 5 이하로 모자라면 맞춰 준다
@@ -1722,7 +1722,7 @@ window.kroomPick = function (i) {
     if (!ok && !H.doom && o.doom) { const sm = itemSmash(); if (sm) { ok = true; gl += itemLine(sm); } }
     // 🦋 레테의 수의 — 한 번 더 굴린다 (+2 · 혼자 S 라도 다시 굴린 눈은 보통 DC 로 잰다)
     if (!ok && B && B.lethe()) {
-        const r2 = Math.floor(Math.random() * 20) + 1;
+        const r2 = Math.floor(Math.random() * 30) + 1;
         const dc2 = (o.dc || 13) + Math.min(H.dc, 7) - psyDown;
         ok = r2 !== 1 && (r2 + R.b + B.C.LETHE_ADD) >= dc2;
         gl += bflyLine('— 레테의 수의가 방금 것을 덮었다. 다시: 🎲 ' + r2 + ' (+' + B.C.LETHE_ADD + ' / DC ' + dc2 + ')' + (ok ? ' 성공' : ' 이번에도 실패'));
@@ -1988,20 +1988,20 @@ window.kroomCook = function () {
 // ==========================================
 // 5. 돌보기 — 속성마다 할 수 있는 것
 // ==========================================
-//   치유 → 체력 (판정 — d20 + 보정 ≥ DC 10 · 2026-10-20 전에는 무조건 성공)   응시 → 정신력   보정 → 마력
+//   치유 → 체력 (판정 — d30 + 보정 ≥ DC 10 · 2026-10-20 전에는 무조건 성공)   응시 → 정신력   보정 → 마력
 //   굳건 → 제 무력             연결 → 내공     요리사 → 국을 건넨다
 //   층마다 두 번 (치유 장비가 있으면 그 횟수만큼 더). 보정이 팀에 있으면 채우는 양이 늘어난다.
 const CARE = { heal: 'hp', gaze: 'spirit', fix: 'mana', bond: 'qi', steady: 'might' };
 function careMax() { return 2 + ((kr.gear && kr.gear.heal) ? kr.gear.heal.n : 0); }
 // ★ 치유도 판정을 굴린다 (2026-10-20) — 돌보기 DC 10 · 쓰러진 동료 일으키기는 그 쓰러짐의 DC
-//   굴림은 roll('heal') — d20 + 바탕 보정 + 치유 직업 +3 + 각성 + 팀 보정. 1 은 늘 실패 · 20 은 늘 성공
+//   굴림은 roll('heal') — d30 + 바탕 보정 + 치유 직업 +3 + 각성 + 팀 보정. 1 은 늘 실패 · 20 은 늘 성공
 const CARE_DC = 10;
 function healDice(R, dc, ok) {
     return `<div style="text-align:center; font-size:24px; font-weight:bold; color:${ok ? '#4CAF50' : '#f44336'}; margin-bottom:10px;">🎲 ${R.r} <span style="font-size:12px; color:#888;">(보정 ${R.b >= 0 ? '+' : ''}${R.b} / DC ${dc})</span></div>`;
 }
 function healRoll(dc) {
     const R = roll('heal');
-    const ok = R.r !== 1 && (R.r === 20 || (R.r + R.b) >= dc);
+    const ok = R.r !== 1 && (R.r === 30 || (R.r + R.b) >= dc);
     return { R: R, ok: ok, dice: healDice(R, dc, ok) };
 }
 function careAmt() { return Math.round(25 * (1 + 0.2 * Math.min(2, teamCount('fix'))) * (1 + 0.1 * gi(prof().grade))); }
@@ -2353,9 +2353,9 @@ window.kroomRescue = function (code) {
         let b = 0; try { b += kv(rollDarkBonus, null, ['bond']) || 0; } catch (e) { }
         if (JOBS[kr.job][0] === 'bond') b += 3;
         b += Math.min(3, teamCount('fix'));
-        const r = kv(luckReroll, null, [Math.floor(Math.random() * 20) + 1]);
+        const r = kv(luckReroll, null, [Math.floor(Math.random() * 30) + 1]);
         afterDice();
-        let ok = r !== 1 && (r === 20 || r + b >= (v.dc || 13));
+        let ok = r !== 1 && (r === 30 || r + b >= (v.dc || 13));
         let sure = '';
         if (!ok) { sure = sureRescue(); if (sure) ok = true; }  // 🩶 은심장(열 번) · 🐾 아기 여우(연결)
         heartCount();                                         // 구하러 갈 때마다 하나 센다
@@ -2713,7 +2713,7 @@ function lastChance(why) {
     // ⛓️‍💥 이레귤러 ② — 사망 판정 (한 탐사에 한 번)
     if (IR && IR.on() && !r._irrDeathRolled) {
         r._irrDeathRolled = 1;
-        const d = Math.floor(Math.random() * 20) + 1;
+        const d = Math.floor(Math.random() * 30) + 1;
         r.log.push('[' + IR.MARK + '] 사망 판정 ' + d + ' / ' + IR.DEATH_AT);
         if (d >= IR.DEATH_AT) {
             const was = Number(u.points) || 0;
@@ -2809,7 +2809,7 @@ window.kroomLeave = function () {
 //
 //   거울 속의 나 — 체력 · 보정 · 등급이 전부 같다. 장비 · 분신 · 나비는 거울에 닿지 않는다.
 //   돌(round)마다 셋 중 하나를 고른다. 공격 > 허점 > 방어 > 공격 — 이긴 쪽은 그 돌의 눈에 +4.
-//   각자 d20 + 보정. 높은 쪽이 상대 체력을 깎는다 (기본 20 + 차이). 같으면 둘 다 10.
+//   각자 d30 + 보정. 높은 쪽이 상대 체력을 깎는다 (기본 20 + 차이). 같으면 둘 다 10.
 //   먼저 0 이 되는 쪽이 진다.
 //
 //   동료 한 사람 — **밖에 있는** 사원(접속해 있고, 탐사 중이 아니고, 이 일행이 아닌 사람)의 이름을 부른다.
@@ -2961,7 +2961,7 @@ window.kTrialPick = function (s) {
     const R = roll(a);                                   // 내 보정 — 거울도 같은 보정을 쓴다
     const b = R.b;
     const ms = ['atk', 'def', 'gap'][Math.floor(Math.random() * 3)];
-    let mine = R.r + b + (f.help ? TRIAL.HELP_BON : 0), its = Math.floor(Math.random() * 20) + 1 + b;
+    let mine = R.r + b + (f.help ? TRIAL.HELP_BON : 0), its = Math.floor(Math.random() * 30) + 1 + b;
     let line = '';
     if (BEATS[s] === ms) { mine += TRIAL.STANCE; line = STANCE[s] + '이 ' + STANCE[ms] + '을 잡았다 (+' + TRIAL.STANCE + ')'; }
     else if (BEATS[ms] === s) { its += TRIAL.STANCE; line = '거울의 ' + STANCE[ms] + '이 내 ' + STANCE[s] + '을 잡았다 (거울 +' + TRIAL.STANCE + ')'; }

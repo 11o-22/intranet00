@@ -389,7 +389,7 @@ function rollBirthItem(parentA, parentB, fill) {
     luckReroll = function (roll) {
         roll = _l.apply(this, arguments);
         if (darkRun && roll <= 7 && nUse('c_reroll')) {
-            let nr = Math.floor(Math.random() * 20) + 1;
+            let nr = Math.floor(Math.random() * 30) + 1;
             if (typeof luckNoOne === 'function') nr = luckNoOne(nr);   // 행운 100% 면 1 은 안 나온다
             if (typeof showDarkToast === 'function') showDarkToast(`◈ 다시 굴린다. (${roll} → ${nr})`);
             return nr;

@@ -395,7 +395,7 @@ function waryOf(u) {
 X.waryOf = waryOf;
 function roll(o) {
     o = o || {};
-    let raw = 1 + Math.floor(Math.random() * 20);
+    let raw = 1 + Math.floor(Math.random() * 30);
     let bonus = 0;
     const wary = o.npc ? 0 : waryOf(typeof currentUser !== 'undefined' ? currentUser : null);
     const dc = (o.dc || 15) + wary;
@@ -412,8 +412,8 @@ function roll(o) {
     }
     const total = raw + bonus;
     let out;
-    if (o.item) out = (raw === 1) ? 'fail' : (raw === 20) ? 'ok' : (total >= dc ? 'ok' : 'fail');
-    else out = raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= dc ? 'ok' : 'fail';
+    if (o.item) out = (raw === 1) ? 'fail' : (raw === 30) ? 'ok' : (total >= dc ? 'ok' : 'fail');
+    else out = raw === 1 ? 'c1' : raw === 30 ? 'c20' : total >= dc ? 'ok' : 'fail';
     // ⛓ 파훼 — 걸어 둔 것이 있으면 실패할 판정을 한 번 넘긴다 (NPC 판정은 빼고 · X.smash 참고)
     let smashed = null;
     if (!o.npc && F && Array.isArray(F.smash) && F.smash.length && (out === 'fail' || out === 'c1')) {
@@ -421,7 +421,7 @@ function roll(o) {
         out = 'ok';
         save();
     }
-    if (typeof darkRun !== 'undefined' && darkRun && darkRun.log) darkRun.log.push('[판정] d20 ' + raw + (bonus ? (bonus > 0 ? '+' : '') + bonus : '') + ' vs ' + dc + ' → ' + out + (smashed ? ' (파훼 — ' + smashed + ')' : ''));
+    if (typeof darkRun !== 'undefined' && darkRun && darkRun.log) darkRun.log.push('[판정] d30 ' + raw + (bonus ? (bonus > 0 ? '+' : '') + bonus : '') + ' vs ' + dc + ' → ' + out + (smashed ? ' (파훼 — ' + smashed + ')' : ''));
     return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc, smashed: smashed, wary: wary };
 }
 X.roll = roll;

@@ -514,7 +514,7 @@ function eyes(roll) {
     if (roll <= C.LETHE_AT) {
         const w = letheTake();
         if (w) {
-            const nr = Math.min(20, rnd(1, 20) + C.LETHE_ADD);
+            const nr = Math.min(30, rnd(1, 30) + C.LETHE_ADD);
             r.log && r.log.push('[🦋 레테의 수의] ' + roll + ' → ' + nr + ' (남은 ' + letheLeft() + ')');
             toast('🦋 레테의 수의 — 방금 것을 덮었다 (' + roll + ' → ' + nr + ' · 남은 ' + letheLeft() + ')');
             roll = nr;

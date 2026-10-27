@@ -622,7 +622,7 @@ function pvPick(i) {
     const st = sc.steps[pv.idx];
     const o = st.opts[i];
 
-    const roll = Math.floor(Math.random() * 20) + 1;
+    const roll = Math.floor(Math.random() * 30) + 1;
     const bonus = rollDarkBonus(o.kind || st.kind || 'sense');
     const ok = roll !== 1 && (roll + bonus) >= o.dc;
 

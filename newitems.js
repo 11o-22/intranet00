@@ -268,7 +268,7 @@ function rerollLeft() {
             currentUser.rubyUsed = 0;
         }
         currentUser.rubyUsed = (currentUser.rubyUsed || 0) + 1;
-        let nr = Math.floor(Math.random() * 20) + 1;
+        let nr = Math.floor(Math.random() * 30) + 1;
         if (typeof luckNoOne === 'function') nr = luckNoOne(nr);   // 행운 100% 면 1 은 안 나온다
         darkRun.log.push(`[루비] 재굴림 ${roll} → ${nr} (잔여 ${rerollLeft()})`);
         if (typeof showDarkToast === 'function') showDarkToast(`◈ 루비의 빛 — 다시 굴린다. (${roll} → ${nr})`);

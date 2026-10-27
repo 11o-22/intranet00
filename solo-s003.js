@@ -50,7 +50,7 @@
         if (!st || st.type !== 'final') return _pvPick.apply(this, arguments);
 
         const o = st.opts[i];
-        const roll = Math.floor(Math.random() * 20) + 1;
+        const roll = Math.floor(Math.random() * 30) + 1;
         const bonus = rollDarkBonus('sense') + (pv.found || []).length * 2;
         const ok = roll !== 1 && (roll + bonus) >= o.dc;
         if (ok) pv.ok++; else pv.no++;
@@ -85,7 +85,7 @@ function pvRolePick(i) {
         return;
     }
 
-    const roll = Math.floor(Math.random() * 20) + 1;
+    const roll = Math.floor(Math.random() * 30) + 1;
     const bonus = rollDarkBonus('sense');
     const ok = roll !== 1 && (roll + bonus) >= o.dc;
     if (ok) pv.ok++; else pv.no++;

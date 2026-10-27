@@ -192,7 +192,7 @@ SC.bqS = function (sc) {
         const how = rinfo.from === 'all' ? '이 항목에 투표한 사람이 없어 살아 있는 사람 가운데 뽑혔습니다' : '이 항목에 투표한 ' + (rinfo.n || 1) + '명 가운데 뽑혔습니다';
         const waited = rinfo.at ? Math.floor((Date.now() - rinfo.at) / 1000) : 0;
         if (rl === X.me()) {
-            ex += ui.b('주사위를 굴린다.', function () { leaderRoll(s, false); }, { gold: true, sub: how + ' — 내 보정이 모두에게 쓰입니다 · D20 · DC 15' });
+            ex += ui.b('주사위를 굴린다.', function () { leaderRoll(s, false); }, { gold: true, sub: how + ' — 내 보정이 모두에게 쓰입니다 · D30 · DC 15' });
         } else {
             ex += '<div class="fin-wait"><b style="color:#d4af37;">' + esc(X.nameOf(rl)) + '</b> 이(가) 주사위를 굴리기를 기다리는 중 <span style="color:#888;">(' + how + ')</span></div>';
             if (waited >= ROLL_WAIT) ex += ui.b('대신 굴린다.', function () { leaderRoll(s, true); }, { sub: esc(X.nameOf(rl)) + ' 의 마지막 보정값으로 굴립니다.' });
@@ -238,13 +238,13 @@ function leaderRoll(s, fallback) {
     let r;
     if (!fallback) r = X.roll({ kind: 'break', dc: 15, body: true, n: a.length });
     else {
-        const raw = 1 + Math.floor(Math.random() * 20);
+        const raw = 1 + Math.floor(Math.random() * 30);
         const bon = +(((S().pl || {})[rl] || {}).bon) || 0;
         const total = raw + bon;
         // ★ 뽑힌 사람이 🔎 · 🌟 를 지녔으면 그 사람의 경계도 같이 (finale-core.js waryOf · 2026-10-25)
         const dcF = 15 + ((typeof X.waryOf === 'function') ? X.waryOf((typeof db !== 'undefined' && db.users) ? db.users[rl] : null) : 0);
-        r = { raw: raw, bonus: bon, total: total, dc: dcF, out: raw === 1 ? 'c1' : raw === 20 ? 'c20' : total >= dcF ? 'ok' : 'fail' };
-        darkRun.log.push('[연회] ' + X.nameOf(rl) + ' 대신 굴림 — d20 ' + raw + ' (+' + bon + ') → ' + r.out);
+        r = { raw: raw, bonus: bon, total: total, dc: dcF, out: raw === 1 ? 'c1' : raw === 30 ? 'c20' : total >= dcF ? 'ok' : 'fail' };
+        darkRun.log.push('[연회] ' + X.nameOf(rl) + ' 대신 굴림 — d30 ' + raw + ' (+' + bon + ') → ' + r.out);
     }
     if (!fallback) darkRun.log.push('[연회] 장면 0' + s + ' — 투표로 뽑혀 굴림');
     const rec = { raw: r.raw, bonus: r.bonus, total: r.total, dc: r.dc || 15, out: r.out, by: X.me(), ld: ld, rl: rl, fb: !!fallback,
@@ -262,7 +262,7 @@ function apply(s, reroll) {
     const o = oNode(s, X.voteOf(vKey(s)).res);
     const k = { res: X.voteOf(vKey(s)).res, out: r.out };
     if (r.out === 'c1') {
-        const raw = 1 + Math.floor(Math.random() * 20);
+        const raw = 1 + Math.floor(Math.random() * 30);
         k.rr = raw;
         if (raw <= 10) {
             k.out = 'c1';

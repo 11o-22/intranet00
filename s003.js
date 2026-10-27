@@ -962,14 +962,14 @@ function s003Resist(n) {
         return;
     }
 
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = s003KindBonus('hide');
     const DC = s003DC(10);
     const ok = roll !== 1 && (roll + bonus) >= DC;
 
     darkRun['_' + key] = ok ? 'safe' : 'taken';
     ref.child('result').set(ok ? 'safe' : 'taken');
-    darkRun.log.push(`[끌려감 ${n}] ${a.name} d20 ${roll} vs DC${DC} — ${ok ? '버팀' : '끌려감'}`);
+    darkRun.log.push(`[끌려감 ${n}] ${a.name} d30 ${roll} vs DC${DC} — ${ok ? '버팀' : '끌려감'}`);
 
     if (ok) {
         darkRun.success++;
@@ -1018,7 +1018,7 @@ function s003Search(n) {
             return;
         }
 
-        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
         const bonus = s003KindBonus('sense');
         const DC = s003DC(9);
         const ok = roll !== 1 && (roll + bonus) >= DC;
@@ -1039,7 +1039,7 @@ function s003Search(n) {
                    비슷한 장이 너무 많다. 넘길 때마다 다른 이야기다.<br>
                    ${a.name}의 냄새만 손끝에 남았다.`;
         }
-        darkRun.log.push(`[수색 ${n}] d20 ${roll} vs DC${DC} — ${ok ? '찾음' : '못 찾음'}`);
+        darkRun.log.push(`[수색 ${n}] d30 ${roll} vs DC${DC} — ${ok ? '찾음' : '못 찾음'}`);
 
         darkBodyEl().innerHTML = darkBox("수색", s003Dice(roll, bonus, DC, ok) + txt,
             loreBarHtml() + darkChoiceBtn("일행에게 돌아간다.", `partyAdvance(${myStep + 1})`));
@@ -1084,12 +1084,12 @@ function s003LairPick(i) {
         const finders = Object.keys(found).length;
         const fb = Math.min(8, finders * 4);
 
-        const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+        const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
         const bonus = s003KindBonus(o.kind) + fb;
         const DC = s003DC(o.dc);
         const ok = roll !== 1 && (roll + bonus) >= DC;
 
-        darkRun.log.push(`[${a.name}의 장] ${o.kind} d20 ${roll} vs DC${DC} (찾은 동료 ${finders})`);
+        darkRun.log.push(`[${a.name}의 장] ${o.kind} d30 ${roll} vs DC${DC} (찾은 동료 ${finders})`);
 
         // 아무도 찾지 않았고 대실패면 그 이야기에 남는다
         if (roll === 1 && finders === 0) {
@@ -1359,7 +1359,7 @@ function s003RegroupPick(n, v) {
     if (v === 'call' && darkRun.taleRole === 'ariel') { breakTaboo('소리를 냄'); if (!darkRun || darkRun._dead) return; }
     if (v === 'ahead' && darkRun.taleRole === 'momo') { breakTaboo('동료를 두고 먼저 감'); if (!darkRun || darkRun._dead) return; }
 
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const kind = { call:'rejoin', page:'sense', ahead:'hide' }[v];
     const bonus = s003KindBonus(kind) + (qFlag('rejoin_boost') ? 4 : 0);
     const DC = s003DC({ call:9, page:10, ahead:8 }[v]);
@@ -1384,7 +1384,7 @@ function s003RegroupPick(n, v) {
                맞닿았던 틈이 닫힌다. 반대편에서 누가 손바닥으로 종이를 두드린다.<br>
                ${n < 4 ? '다음 합류 때까지 혼자 읽어야 한다.' : '끝까지 혼자 읽어야 한다.'}`;
     }
-    darkRun.log.push(`[합류 ${n}] ${v} d20 ${roll} vs DC${DC} — ${ok ? '성공' : '실패'}`);
+    darkRun.log.push(`[합류 ${n}] ${v} d30 ${roll} vs DC${DC} — ${ok ? '성공' : '실패'}`);
 
     darkBodyEl().innerHTML = darkBox(`합류 ${n} — 결과`, s003Dice(roll, bonus, DC, ok) + txt,
         loreBarHtml() + darkChoiceBtn("계속 읽는다.", `partyAdvance(${myStep + 1})`));
@@ -1578,8 +1578,8 @@ function s003EndDC(pick) { return S003_END_DC[pick] + S003_END_ADD; }
 function s003EndOdds(pick) {
     const need = s003EndDC(pick) - s003EndBonus();
     let n = 0;
-    for (let r = 2; r <= 19; r++) if (r >= need) n++;
-    return Math.round((n + 1) / 20 * 100);
+    for (let r = 2; r <= 29; r++) if (r >= need) n++;
+    return Math.round((n + 1) / 30 * 100);
 }
 
 function renderS003Ending() {
@@ -1621,12 +1621,12 @@ function s003EndBtn(pick, label) {
 }
 
 function s003EndPick(pick) {
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = s003EndBonus();
     const DC = s003EndDC(pick);
     // 20 은 언제나 통한다 — 어떤 자리에서도 길이 아주 막히지는 않게
-    const ok = roll !== 1 && (roll === 20 || (roll + bonus) >= DC);
-    darkRun.log.push('[마지막 장] ' + pick + ' d20 ' + roll + '(' + (bonus >= 0 ? '+' : '') + bonus
+    const ok = roll !== 1 && (roll === 30 || (roll + bonus) >= DC);
+    darkRun.log.push('[마지막 장] ' + pick + ' d30 ' + roll + '(' + (bonus >= 0 ? '+' : '') + bonus
         + ') vs DC' + DC + ' — ' + (ok ? '나감' : '남음'));
 
     darkRun.s003Route = pick;

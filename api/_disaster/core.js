@@ -691,9 +691,9 @@ export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
         const tier = DC[a.tier] ? a.tier : 'normal';
         const add = Math.max(0, Number(plus(f.on)) || 0);
         const dc = Math.max(2, Math.min(20, DC[tier] + add));
-        const roll = rand(20), ok = roll >= dc;
+        const roll = rand(30), ok = roll >= dc;
         const row = { who: id, name: '🐾 ' + foxName(f), did: clip(String(a.did || '').trim() || FOX_DO[kind] || '곁을 지킨다', 80), kind: kind,
-                      tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: !!a.danger,
+                      tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 30, fumble: roll === 1, danger: !!a.danger,
                       fx: { id: id, n: foxName(f), k: kind, on: f.on, onN: clip((mem[f.on] && mem[f.on].n) || f.on, 20) } };
         if (add) row.plus = add;
         if (!ok && a.danger) {
@@ -1003,10 +1003,10 @@ export function judge(acts, mem, rand, opt) {
             const ez = Math.max(0, Number(ease(a.who)) || 0);
             const HP = helpOf(a.who, kind);
             const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
-            const roll = rand(20);
+            const roll = rand(30);
             const BP = row.burn ? burnAdd : 0;
             const W = hit(a.who, roll, dc, BP), ok = W.ok;
-            Object.assign(row, { tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1,
+            Object.assign(row, { tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 30, fumble: roll === 1,
                                  danger: !!a.danger });
             if (add) row.plus = add;
             if (ez) row.ease = ez;
@@ -1048,9 +1048,9 @@ export function judge(acts, mem, rand, opt) {
             const ez = Math.max(0, Number(ease(c)) || 0);
             const HP = helpOf(c, KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade');
             const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
-            const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
+            const roll = rand(30), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(F.did || '방송국이 덮쳐 온다', 80), kind: KIND_KEYS.indexOf(F.kind) >= 0 ? F.kind : 'evade',
-                          tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, forced: true };
+                          tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 30, fumble: roll === 1, danger: true, forced: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
             if (HP) { row.help = HP.n; row.helpBy = HP.by; }
@@ -1076,10 +1076,10 @@ export function judge(acts, mem, rand, opt) {
             const ez = Math.max(0, Number(ease(c)) || 0);
             const HP = helpOf(c, KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade');
             const dc = dcOf(DC[tier], add, ez + (HP ? HP.n : 0));
-            const roll = rand(20), W = hit(c, roll, dc), ok = W.ok;
+            const roll = rand(30), W = hit(c, roll, dc), ok = W.ok;
             const row = { who: c, name: mem[c].n || c, did: clip(M.did || '방송국이 그 말을 들었다', 80), said: clip(x.said, 60),
                           kind: KIND_KEYS.indexOf(M.kind) >= 0 ? M.kind : 'evade',
-                          tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 20, fumble: roll === 1, danger: true, meta: true };
+                          tier: tier, dc: dc, roll: roll, ok: ok, crit: roll === 30, fumble: roll === 1, danger: true, meta: true };
             if (add) row.plus = add;
             if (ez) row.ease = ez;
             if (HP) { row.help = HP.n; row.helpBy = HP.by; }

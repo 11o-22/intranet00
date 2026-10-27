@@ -58,7 +58,7 @@
         // 즉사 분기
         if (o.doom) {
             const j = EPIC_JOBS[er.job];
-            const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+            const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
             const bonus = rollDarkBonus(o.kind || j.attr);
             const ok = roll !== 1 && (roll + bonus) >= (o.dc || 13);
             if (ok) {

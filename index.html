@@ -4382,7 +4382,7 @@ return b;
         const DC = pick === 'knock' ? 12 : (pick === 'turn' ? 10 : 8);
 
         let outcome, txt;
-        if (roll === 20) outcome = 'crit';
+        if (roll === 30) outcome = 'crit';
         else if (roll === 1) outcome = 'fumble';
         else outcome = (total >= DC) ? 'pass' : 'fail';
 
@@ -4403,7 +4403,7 @@ return b;
             txt = `유리 속의 것과 눈이 마주쳤다.<br>그건 웃지 않았는데, 네 쪽이 웃고 있었다.<br><br>그때부터 네 그림자는 반 박자씩 늦다.`;
         }
 
-        darkRun.log.push(`[기믹 3] d20 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
+        darkRun.log.push(`[기믹 3] d30 판정 ${roll}(+${bonus}) vs DC${DC} — ${outcome}`);
 
         let rerollBtn = '';
            if ((outcome === 'fail' || outcome === 'fumble') && (qFlag('reroll') || (!darkRun.rerollUsed && darkRun.carryItems.length > 0))) {

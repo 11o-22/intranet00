@@ -380,7 +380,7 @@ function epicEnter() {
 function epicStub() {
     const p = EPIC_PLACES[er.place];
     const j = EPIC_JOBS[er.job];
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus(j.attr);
     const dc = 8 + p.risk * 2;
     const ok = roll !== 1 && (roll + bonus) >= dc;
@@ -421,7 +421,7 @@ function epicPick(i) {
     const o = sc.opts[i];
     const j = EPIC_JOBS[er.job];
 
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus(o.kind || j.attr);
     const ok = roll !== 1 && (roll + bonus) >= (o.dc || 11);
 
@@ -499,7 +499,7 @@ function epicRescue(code) {
     const j = EPIC_JOBS[er.job];
     const far = h.place !== er.place;
 
-    const roll = luckReroll(Math.floor(Math.random() * 20) + 1);
+    const roll = luckReroll(Math.floor(Math.random() * 30) + 1);
     const bonus = rollDarkBonus('rejoin') + (j.attr === 'bond' ? 3 : 0) + Math.round(gearValue(currentUser, 'heal') * 8);
     const dc = (far ? 14 : 10) + (EPIC_PLACES[h.place] ? EPIC_PLACES[h.place].risk : 0);
     const ok = roll !== 1 && (roll + bonus) >= dc;
