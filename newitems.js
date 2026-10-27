@@ -548,7 +548,8 @@ const NEW_EQUIP = ['equip_ruby_clit','equip_ruby_nip','equip_sain','equip_badge'
         if (rubyActive(u, '루비 유두 피어싱')) m *= 3;
         if (typeof hasEquip === 'function') {
             if (typeof window.dokOn === 'function' ? window.dokOn(u) : hasEquip(u, '도깨비 불')) m *= 2;   // 쿨타임이면 꺼진다
-            if (hasEquip(u, '사원증 뱃지')) m *= 1.15;
+            const nb = Math.min(2, (u.equippedWeapons || []).filter(function (w) { return (typeof getEquipBaseName === 'function' ? getEquipBaseName(w) : w) === '사원증 뱃지'; }).length);   // 두 개까지 겹친다 (2026-10-27)
+            if (nb) m *= Math.pow(1.15, nb);
         }
         return m;
     };

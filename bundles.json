@@ -409,7 +409,8 @@
       "badge-dot.js",
       "inv-why.js",
       "gear-cap.js",
-      "p2p-ban.js"
+      "p2p-ban.js",
+      "amulet-stack.js"
     ]
   ]
 }

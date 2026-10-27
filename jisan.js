@@ -1049,7 +1049,7 @@ function pollRaw(u, n) {
             if ((Number(rod.safe) || 0) > 0) {
                 let fail = 0;
                 try {
-                    const am = (me.equippedWeapons || []).some(function (x) {
+                    const am = (typeof window.amuletCount === 'function') ? window.amuletCount(me) : (me.equippedWeapons || []).some(function (x) {
                         const b = baseOf(x);
                         return b === '누군가가 쓴 부적' || b === '사원증 뱃지';
                     });

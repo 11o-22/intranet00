@@ -132,13 +132,25 @@ const TWO0 = 0.2437;      // 아무것도 없을 때 2개 일치 — 맨몸이 �
 const TWOMAX = 0.5118;    // 한없이 올렸을 때 다가가는 2개 일치 — 꼭대기 돌려받음을 정한다
 const DAY_CAP = 1000000;  // 하루에 슬롯으로 벌 수 있는 몫 (판수·운과 무관한 천장)
 const TWO_PAY = 0.45;     // 2개 일치 배당 — 기호 배수의 이만큼 (반올림, 적어도 1)
-const AMULET = 1.5;       // 부적이 배수를 쳐 주는 몫
+const AMULET = 1.5;       // 부적이 배수를 쳐 주는 몫 (하나마다)
+const AMULET_MAX = 2;     // 부적 · 사원증 뱃지는 두 개까지만 겹친다 (장착도 둘까지 — amulet-stack.js)
 
 const NERF = ['착한 친구', '유리손포'];
 const NERF_DIV = 4;       // 원래 ×4 였던 것을 ×1 로
 
+// ★ 부적 · 사원증 뱃지는 두 개까지 겹친다 (2026-10-27) — amulet 에 수(0 · 1 · 2)를 넣는다 (참 · 거짓도 받는다)
+function amuletCount(u) {
+    let n = 0;
+    ((u && u.equippedWeapons) || []).forEach(function (w) {
+        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+        if (b === '누군가가 쓴 부적' || b === '사원증 뱃지') n++;
+    });
+    return Math.min(AMULET_MAX, n);
+}
+window.amuletCount = amuletCount;
 function bands(mult, amulet) {
-    const eff = Math.max(1, mult) * (amulet ? AMULET : 1);
+    const n = (amulet === true) ? 1 : Math.min(AMULET_MAX, Math.max(0, Number(amulet) || 0));
+    const eff = Math.max(1, mult) * Math.pow(AMULET, n);
     const u = eff / (eff + K);                      // 0 … 1 (닿지는 않는다)
     const j = J0 + (JMAX - J0) * u;
     const t = TWO0 + (TWOMAX - TWO0) * u;
@@ -251,10 +263,7 @@ function has(u, name) {
             b1.classList.add('slot-rolling'); b2.classList.add('slot-rolling'); b3.classList.add('slot-rolling');
             msg.innerText = '릴이 회전하고 있습니다...';
 
-            const hasAmulet = (currentUser.equippedWeapons || []).some(function (w) {
-                const base = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-                return base === '누군가가 쓴 부적' || base === '사원증 뱃지';
-            });
+            const hasAmulet = amuletCount(currentUser);         // 0 · 1 · 2
 
             // ★ 여기만 달라집니다 — 벽이 없습니다
             const B = bands(facilityLuckMult(currentUser), hasAmulet);
@@ -366,17 +375,14 @@ function breakEven(amulet) {
 }
 
 window.slotOdds = function (mult) {
-    const amulet = !!(currentUser && (currentUser.equippedWeapons || []).some(function (w) {
-        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-        return b === '누군가가 쓴 부적' || b === '사원증 뱃지';
-    }));
+    const amulet = currentUser ? amuletCount(currentUser) : 0;
     const L = (mult != null) ? mult
         : ((typeof facilityLuckMult === 'function' && currentUser) ? facilityLuckMult(currentUser) : 1);
     const B = bands(L, amulet);
     const P = payouts();
 
     console.log('%c===== 슬롯 =====', 'color:#ffd700; font-size:13px');
-    console.log('  행운 배수:', Math.round(L).toLocaleString(), amulet ? '· 부적 있음 (×1.5)' : '· 부적 없음');
+    console.log('  행운 배수:', Math.round(L).toLocaleString(), amulet ? '· 부적 ' + amulet + '개 (×' + Math.pow(AMULET, amulet) + ')' : '· 부적 없음');
     console.table([{
         '꽝': (B.fail * 100).toFixed(1) + '%',
         '3개 일치': (B.jack * 100).toFixed(1) + '%',
