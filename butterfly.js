@@ -72,7 +72,7 @@ const BFLY_CFG = {
     OUT: 3,                // 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 꺼낸다 — 하루 세 번 (2026-10-26)
     EROS: 2, EROS_ROLL: 2, EROS_LOOT: 2.5, EROS_PTS: 1.5, EROS_HOURS: 5,
     NULL_AT: 5, HEAL_POLL: 2, HEAL_HP: 10, HEAL_MIND: 3,
-    PTS_CAP: 2
+    PTS_CAP: 1.5                     // ★ 포인트 배수는 1.5 까지 (2026-10-27 · 대신 보정 · 판정은 상한에 안 걸린다 — gear-cap.js)
 };
 
 (function butterfly() {
@@ -958,6 +958,7 @@ window.BFLY = {
     restHeal: function () { const h = usable('heal'); if (!h) return null; xpAdd('heal', 1); return { hp: h.lv * C.HEAL_HP, mind: h.lv * C.HEAL_MIND, nick: nickOf(h) }; },
     runXp: runXp,
     mult: function () { return multNow(); },
+    bonus: function () { try { return bonusNow(); } catch (e) { return 0; } },   // gear-cap.js — 보정 상한에서 뺀다
     C: C
 };
 window.bflyKGuess = function (i) {

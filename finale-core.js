@@ -408,6 +408,7 @@ function roll(o) {
         if (o.n) bonus += hc(o.n);
         bonus += (o.extra || 0);
         bonus -= wary;                                   // 경계는 보정에서 뺀다 (기준은 16 고정 · 2026-10-27)
+        try { if (typeof window.gearCapBonus === 'function') bonus = window.gearCapBonus(bonus, o.kind || 'sense'); } catch (e) { }   // ★ 보정 23 까지
         // 연회 — 파티장이 자리를 비웠을 때 대신 굴리는 사람이 쓰는 값
         if (!o.extra) pub('pl/' + ME + '/bon', bonus);
     }

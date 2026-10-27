@@ -1271,6 +1271,7 @@ function roll(kind) {
     b += Math.min(3, teamCount('fix'));
     if (kr.stats && kr.stats.mind <= 0) b -= 3;
     if (kr.stats && kr.stats.spirit <= 20) b -= 2;
+    try { if (typeof window.gearCapBonus === 'function') b = window.gearCapBonus(b, kind); } catch (e) { }   // ★ 보정 23 까지 (2026-10-27)
     const r = kv(luckReroll, null, [Math.floor(Math.random() * 30) + 1]);
     afterDice();
     return { r: r, b: b };
@@ -3167,6 +3168,7 @@ function settle(how, txt) {
     if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
     if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
+        const pts0 = pts;                                       // ★ 커스텀 장비 배수의 곱은 3 까지 (여우 신도는 빼고 · 2026-10-27 — gear-cap.js 와 같은 규칙)
         if (kr.truth && jisanOn()) { pts *= 3; extra.push('📖 읽어내기 — 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
         const p = showP();
         if (p) { let m = 1; try { m = talkShowMult(p); } catch (e) { } if (m > 1) { pts = Math.round(pts * m); extra.push('📺 무대 열기 — 포인트 ×' + m.toFixed(2)); } }
@@ -3184,7 +3186,8 @@ function settle(how, txt) {
                 BF.runXp();
             } catch (e) { }
         }
-        // 🎐 여우 신도 — 포인트 배수 (역병 · 제 二 신도 동행 가운데 큰 쪽 · 꿈결은 그대로)
+        if (pts0 > 0 && pts > pts0 * 3) { pts = Math.round(pts0 * 3); extra.push('⚖ 커스텀 장비 배수는 다 합쳐 ×3 까지'); }
+        // 🎐 여우 신도 — 포인트 배수 (역병 · 제 二 신도 동행 가운데 큰 쪽 · 꿈결은 그대로) — 상한 밖
         const FX = foxc();
         if (FX && pts > 0) { try { const m = FX.mult(); if (m > 1) { pts = Math.round(pts * m); extra.push('🎐 아홉여우병 — 포인트 ×' + m); } } catch (e) { } }
     }

@@ -407,7 +407,9 @@
       "party-keep.js",
       "dark-add.js",
       "badge-dot.js",
-      "inv-why.js"
+      "inv-why.js",
+      "gear-cap.js",
+      "p2p-ban.js"
     ]
   ]
 }
