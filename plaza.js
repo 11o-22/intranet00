@@ -399,6 +399,8 @@ const R = P.ROOMS;
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function now() { return Date.now(); }
+// 채팅 줄에 적는 때 — 서버 시계 (clock.js) · 없으면 기기 시계. 기기 시계가 틀려도 줄이 엉뚱한 자리에 서지 않게 (2026-10-28)
+function chatNow() { try { if (typeof serverNow === 'function') { const t = Number(serverNow()); if (t > 1.5e12) return t; } } catch (e) { } return Date.now(); }
 function isAdm(u) { const x = u || u_(); return !!(x && x.code === P.ADMIN); }
 function canEnter() { return P.ADMIN_ONLY ? isAdm() : !!u_(); }
 
@@ -3840,18 +3842,20 @@ function watchAll() {
 
 // 서버 채팅은 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다.
 //   (맵 채팅은 마지막 사람이 나갈 때 통째로 지워진다 — leaveRoom)
-function trimAll() {
+//   ★ 때가 하루 넘게 앞선 줄(시계가 틀린 기기에서 보낸 것)도 걷는다 — 아래 채팅 칸을 막던 것 (2026-10-28)
+function trimAll(force) {
     const d = db_(); if (!d) return;
-    if (Math.random() > 0.25) return;            // 다섯 번에 한 번쯤만
+    if (!force && Math.random() > 0.25) return;  // 다섯 번에 한 번쯤만
     try {
         d.ref(P.CHAT + '/' + P.ALL).once('value', function (s) {
             const v = s.val(); if (!v) return;
             const keys = Object.keys(v).sort();   // push 열쇠는 때 순서대로 선다
-            const over = keys.length - P.CHAT_KEEP * 2;
-            if (over <= 0) return;
             const up = {};
-            keys.slice(0, over).forEach(function (k) { up[k] = null; });
-            d.ref(P.CHAT + '/' + P.ALL).update(up);
+            const over = keys.length - P.CHAT_KEEP * 2;
+            if (over > 0) keys.slice(0, over).forEach(function (k) { up[k] = null; });
+            const lim = chatNow() + 86400000;
+            keys.forEach(function (k) { const o = v[k]; if (o && Number(o.at) > lim) up[k] = null; });
+            if (Object.keys(up).length) d.ref(P.CHAT + '/' + P.ALL).update(up);
         });
     } catch (e) { }
 }
@@ -4392,7 +4396,15 @@ function pushLine(o) {
     //   ✗ 들어오면 서버 채팅(30줄)을 먼저 받고 귓속말(40줄)을 뒤에 받는데, 글줄은 40줄만 남기고
     //     **먼저 온 것부터** 버렸다. 그래서 다시 들어오면 귓속말만 남고 서버 채팅이 다 밀려났다.
     //   → 줄마다 적힌 때(at · 없으면 서버 열쇠의 때)로 자리를 잡고, 서버 · 맵 · 귓속말이 다 남을 만큼 둔다.
-    if (o.at == null) o.at = keyTime(o.k) || now();
+    // ★ 자리는 서버 열쇠의 때로 잡는다 (2026-10-28)
+    //   ✗ 줄에 적힌 at 은 **보낸 기기의 시계**다. 시계가 앞서 있는 기기에서 보낸 서버 줄이 몇 개 남아 있으면
+    //     그 뒤로 오는 모든 줄이 그 앞에 끼어, 아래 채팅 칸(마지막 몇 줄)에는 그 묵은 줄만 남고 새 말이 안 떴다.
+    //     (맵 채팅은 방이 비면 통째로 지워져 금방 풀리는데, 서버 채팅은 남아 있어 계속 그랬다)
+    //   → 서버가 준 열쇠(push)의 때를 먼저 쓴다 — 열쇠는 서버 시계에 맞춰 만들어진다. 열쇠가 없거나 그것마저
+    //     이상하면 적힌 at 을 쓰되, 지금보다 5분 넘게 앞선 것은 지금으로 친다.
+    const kt = keyTime(o.k);
+    if (kt) o.at = kt;
+    else if (o.at == null || !(Number(o.at) > 0) || Number(o.at) > now() + 300000) o.at = now();
     let i = run.lines.length;
     while (i > 0 && (Number(run.lines[i - 1].at) || 0) > o.at) i--;
     run.lines.splice(i, 0, o);
@@ -4512,13 +4524,13 @@ function say(text) {
         let mk = '';
         if (d0) {
             try {
-                d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: now() });
+                d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: chatNow() });
                 whTrim(whTo);
                 // 내 앞으로도 한 벌 — 다시 들어와도 내가 보낸 줄이 남는다 (나에게 보낸 것이면 받은 줄로 이미 선다)
                 if (whTo !== u.code) {
                     const mine = d0.ref(WH + '/' + u.code).push();
                     mk = mine.key || '';
-                    mine.set({ n: whName || whTo, c: whTo, t: t, at: now(), o: 1 });
+                    mine.set({ n: whName || whTo, c: whTo, t: t, at: chatNow(), o: 1 });
                     whTrim(u.code);
                 }
             } catch (e) { }
@@ -4533,7 +4545,7 @@ function say(text) {
     const d = db_();
     if (d) {
         try {
-            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: now() });
+            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: chatNow() });
             if (chatCh === 'all') trimAll();
         } catch (e) { }
     }
@@ -4556,7 +4568,7 @@ function sayEmo(id) {
     if (d) {
         try {
             d.ref(chPath()).push({
-                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: now() });
+                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: chatNow() });
             if (chatCh === 'all') trimAll();
         } catch (x) { }
     }
@@ -5474,6 +5486,7 @@ function open() {
     paintMe();
     watchNotice();
     watchAll();
+    trimAll(true);                                // 시계가 틀린 기기에서 온 묵은 줄이 있으면 걷는다
     watchWhisper();
     kitWatch();
 
