@@ -15,7 +15,8 @@
 //     where 부른 자리 (①) — 함수 이름 몇 단
 //     run   그때 탐사 (구역 · K의 방 · EPIC) 또는 ''
 //
-//   invWhy(사번?)   그 줄들을 읽기 좋게 — 상담사는 남의 것도
+//   invWhy(사번·이름·사원번호?, 물건 이름?)   그 줄들을 읽기 좋게 — 상담사는 남의 것도 · 물건 이름을 주면 그 줄만
+//   줄마다 dev (이 브라우저의 짧은 표 · 폰/PC) 가 붙는다 — 두 기기를 번갈아 쓰는 사원의 줄을 가른다
 
 (function invWhy() {
 'use strict';
@@ -50,10 +51,15 @@ function where() {
         return st.slice(0, 6).join(' < ');
     } catch (e) { return ''; }
 }
+// 이 브라우저의 짧은 표 — 두 기기에서 번갈아 쓰는 사원의 줄을 가른다 (2026-10-29)
+let DEV = '';
+try { DEV = localStorage.getItem('invDev') || ''; if (!DEV) { DEV = Math.random().toString(36).slice(2, 6); localStorage.setItem('invDev', DEV); } } catch (e) { DEV = 'x'; }
+DEV += /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '') ? '·폰' : '·PC';
 let busy = false;
 function put(line) {
     const u = u_(); if (!u) return;
     if (!Array.isArray(u.invLog)) u.invLog = [];
+    line.dev = DEV;
     u.invLog.push(line);
     while (u.invLog.length > KEEP) u.invLog.shift();
     try { if (typeof saveFields === 'function' && !busy) { busy = true; setTimeout(function () { busy = false; try { saveFields({ invLog: 1 }); } catch (e) { } }, 800); } } catch (e) { }
@@ -130,16 +136,25 @@ setInterval(function () {
     }, 1500);
 })();
 
-window.invWhy = function (who) {
+// invWhy('사번' | '이름' | 사원번호 [, '물건 이름'])  — 물건 이름을 주면 그 물건이 든 줄만
+window.invWhy = function (who, item) {
     const u = u_(); if (!u) return;
     let t = u;
-    if (who && who !== u.code) { try { t = db.users[who]; } catch (e) { t = null; } }
+    if (who && who !== u.code) {
+        try {
+            const book = (typeof db !== 'undefined' && db && db.users) ? db.users : {};
+            const c = Object.keys(book).filter(function (k) { const x = book[k] || {}; return k === who || String(x.no) === String(who) || x.name === who; })[0];
+            t = c ? book[c] : null;
+        } catch (e) { t = null; }
+    }
     if (!t) { console.log('그 사원을 찾지 못했습니다.'); return; }
-    const L = Array.isArray(t.invLog) ? t.invLog : [];
-    console.log('%c===== 소지품 추적 — ' + (t.name || t.code) + ' (' + L.length + '줄) =====', 'color:#ffcc80; font-size:13px');
-    if (!L.length) { console.log('  아직 적힌 것이 없습니다.'); return; }
+    let L = Array.isArray(t.invLog) ? t.invLog : [];
+    if (item) L = L.filter(function (l) { return (l.what || []).some(function (w) { return String(w).replace(/\s+/g, '').indexOf(String(item).replace(/\s+/g, '')) >= 0; }); });
+    console.log('%c===== 소지품 추적 — ' + (t.name || t.code) + ' (' + L.length + '줄' + (item ? ' · ' + item : '') + ') =====', 'color:#ffcc80; font-size:13px');
+    console.log('  어떻게: remove = 빼는 함수가 뺐다(어디서 = 부른 자리) · shrink = 빼는 함수를 안 거치고 줄었다(통째 덮어쓰기 · 다른 기기나 남의 화면이 서버에서 뺀 것이 내려옴) · server = 서버에서만 줄었다(내 화면에는 아직 있었다) · unequip = 장착에서 빠짐');
+    if (!L.length) { console.log('  적힌 것이 없습니다.'); return; }
     console.table(L.slice().reverse().map(function (l) {
-        return { 때: new Date(l.at).toLocaleString(), 어떻게: l.how, 무엇: l.what.join(', '), 어디서: l.where || l.by || '', 탐사: l.run || '', 화면: l.scr || '' };
+        return { 때: new Date(l.at).toLocaleString(), 어떻게: l.how, 무엇: (l.what || []).join(', '), 어디서: l.where || l.by || '', 기기: l.dev || '', 탐사: l.run || '', 화면: l.scr || '' };
     }));
 };
 
