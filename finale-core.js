@@ -862,6 +862,22 @@ function settle(kind) {
 X.settle = settle;
 
 // 정산서에 얹는 몫 (index.html renderDarkResult 가 부른다)
+//   ★ 동행 NPC 몫은 소속대로 (2026-10-28 사용자)
+//     재난관리국 — 영입해서 끝까지 살아남은 NPC 1명당 +800
+//     백일몽     — 그 판에서 희생한 NPC 1명당 +800 (누가 눌렀든 투표로 정한 것이라 판 전체로 센다)
+//     어둠 소속  — 양쪽 다
+//     이기적인 엔딩은 어느 쪽도 없다.
+const NPC_PAY = 800;
+function sideOf(u) {
+    const s = String((u && u.affiliation) || '') + ' ' + String((u && u.team) || '');
+    if (/어둠/.test(s)) return 'both';
+    if (/재난관리/.test(s)) return 'agent';
+    return 'baek';
+}
+function sacrificed() {
+    const n = S.npc || {};
+    return Object.keys(n).filter(function (k) { return n[k] && n[k].dead; });
+}
 window.finaleBonus = function () {
     if (!F) return 0;
     let b = 0;
@@ -871,9 +887,21 @@ window.finaleBonus = function () {
     if (g < 20) b += 3000;
     else if (g < 40) b += 1500;
     else if (g >= 80) b -= 2000;
-    if (F.endKind !== 'selfish') b += comps().length * 800;
+    if (F.endKind !== 'selfish') {
+        const side = sideOf(currentUser);
+        const alive = comps().length, sac = sacrificed().length;
+        const lines = [];
+        if (side === 'agent' || side === 'both') { b += alive * NPC_PAY; lines.push('재난관리국 — 살아남은 동행 NPC ' + alive + '명 +' + (alive * NPC_PAY).toLocaleString() + 'P'); }
+        if (side === 'baek' || side === 'both') { b += sac * NPC_PAY; lines.push('백일몽 — 희생한 NPC ' + sac + '명 +' + (sac * NPC_PAY).toLocaleString() + 'P'); }
+        if (!F._npcPaid && lines.length) {
+            F._npcPaid = 1;
+            try { darkRun.log.push('[피날레] ' + lines.join(' · ')); } catch (e) { }
+            try { if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[피날레] ' + lines.join(' · ')); } catch (e) { }
+        }
+    }
     return b;
 };
+window.finaleNpcPay = function () { return { side: sideOf(currentUser), alive: comps().length, sac: sacrificed().length, each: NPC_PAY }; };
 
 // ==========================================
 // 소지품 창 (📦) — 언제든
