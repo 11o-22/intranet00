@@ -414,7 +414,8 @@
       "pet-trait.js",
       "pet-rune.js",
       "pet-battle.js",
-      "pet-arena.js"
+      "pet-arena.js",
+      "gear-fill.js"
     ]
   ]
 }
