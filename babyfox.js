@@ -1623,10 +1623,11 @@ window.kitBreak = function () {
                     + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
                 return;
             }
-            // 투표 칸이 있으면 그 아래, 아니면 탐사 본문(전용 화면이면 dro-body) 끝 — 단추가 있는 장면에만 (2026-10-29)
+            // 투표 칸이 있으면 그 **뒤**(형제), 아니면 탐사 본문(전용 화면이면 dro-body) 끝 — 단추가 있는 장면에만 (2026-10-29)
+            //   ★ #vote-area 안에 넣으면 투표 시계가 1초마다 그 안을 다시 그려 단추가 깜빡인다 — 작두 단추처럼 afterend 로
             const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : document.getElementById('dark-body');
-            const area = document.getElementById('vote-area') || body;
-            if (!area || !body || !body.querySelector('button')) return;
+            const vote = document.getElementById('vote-area');
+            if (!body || !body.querySelector('button')) return;
             const b = document.createElement('button');
             b.id = ID;
             b.className = 'game-btn';
@@ -1636,7 +1637,7 @@ window.kitBreak = function () {
             b.textContent = '✧ ' + nickOf(x) + '이(가) 부순다 (남은 '
                 + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
             b.onclick = window.kitBreak;
-            area.appendChild(b);
+            if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
         } catch (e) { }
     }, 1400);
 })();

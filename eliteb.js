@@ -747,16 +747,18 @@ window.ebBreak = function () {
             if (!left) { if (old) old.remove(); return; }
             const label = '🎭 True or Fake — 파훼한다 (남은 ' + left + '회)';
             if (old && old.isConnected) { old.textContent = label; return; }
-            // 선택지가 있는 장면에만 (단추가 하나라도 있는 본문) — 투표 칸이 있으면 그 아래, 아니면 본문 끝
+            // 선택지가 있는 장면에만 (단추가 하나라도 있는 본문) — 투표 칸이 있으면 그 **뒤**(형제), 아니면 본문 끝
+            //   ★ 투표 칸(#vote-area) 안에 넣으면 안 된다 — 투표 시계가 1초마다 그 안을 통째로 다시 그려
+            //     단추가 지워졌다 1.4초 뒤 다시 붙으며 미친 듯이 깜빡였다 (2026-10-28 · 작두 단추처럼 afterend 로)
             const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
-            const area = document.getElementById('vote-area') || body;
-            if (!area || !body || !body.querySelector('button')) return;
+            const vote = document.getElementById('vote-area');
+            if (!body || !body.querySelector('button')) return;
             const b = document.createElement('button');
             b.id = ID; b.className = 'game-btn';
             b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#4a5a70,#2a3240) !important; border-color:#9fb4d0 !important; color:#fff !important;';
             b.textContent = label;
             b.onclick = window.ebBreak;
-            area.appendChild(b);
+            if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
         } catch (e) { }
     }, 1400);
 })();
