@@ -201,6 +201,8 @@ function inNightWindow(t) {
 }
 
 function checkPregNeglect() {
+    // ★ 돌보기 벌칙은 없어졌다 (preg-v2.js · 2026-10-25). 묶음 순서나 묵은 화면 때문에 되살아나지 않게 여기서도 끊는다 (2026-10-29)
+    if (!window.PREG_NEGLECT_ON) return;
     if (!currentUser || !database) return;
     if (currentUser.code === 'kario0987') return; 
     if (inNightWindow()) return;                 // 자정~오전 10시는 넘어간다

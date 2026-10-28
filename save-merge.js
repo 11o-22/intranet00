@@ -22,6 +22,11 @@
 
 const SKIP = ['letters', 'hasNewLetter', 'hasNewReply', 'hasItemUsedOnMe',
               'houseChatUnread', 'house', '_adminStamp', '_stamp'];
+// ★ 다른 파일이 제 길로 맞추는 칸 — 여기서는 쓰지도 · 받아 오지도 않는다 (2026-10-29)
+//   어둠 탐사 쓴 횟수(darkTries · darkDate)는 dark-count.js 가 darkUse 트랜잭션으로 세고, 사원 기록 칸에도 제가 적는다.
+//   ✗ 전에는 이 칸도 「바뀐 것」으로 보고 보냈는데 dark-count 가 길목에서 그 칸만 떼어 내니, 보냈다고 기준(base)만 찍혔다.
+//     그 뒤 서버 메아리(아직 0)가 오면 「내가 안 바꾼 칸」으로 보여 화면 값을 0 으로 되돌렸다 — 탐사를 떠났는데 횟수가 안 줄었다.
+const OWN = ['darkTries', 'darkDate'];
 
 const CLR = 'effClearAt';       // 효과를 일부러 다 비웠다는 도장
 const INV = 'inventory';          // 배열 병합으로 다루는 항목
@@ -798,7 +803,7 @@ function soakRest(srv) {
     Object.keys(srv).forEach(function (k) {
         if (k === INV || k === PTS || k === EFF || k === BUF) return;   // 위에서 따로 맞췄다
         if (k === '_adminStamp' || k === '_stamp') return;
-        if (SKIP.indexOf(k) >= 0) return;
+        if (SKIP.indexOf(k) >= 0 || OWN.indexOf(k) >= 0) return;
         if (sameAs(k, currentUser[k], srv[k])) return;
         const v = clone(srv[k]);
         if (v === undefined) return;
@@ -1018,6 +1023,7 @@ function mergeOnSrv(srv) {
         const clearedNow = !!srv[CLR] && srv[CLR] !== base[CLR];
         Object.keys(srv).forEach(function (k) {
             if (k === '_adminStamp' || k === '_stamp') return;
+            if (OWN.indexOf(k) >= 0) return;                // 어둠 횟수 칸은 dark-count 가 맞춘다 (여기서 받아 오면 막 떠난 탐사가 지워진다)
             if (sameAs(k, srv[k], base[k])) return;         // 서버도 그대로면 볼 것 없다
             const mineTouched = !sameAs(k, currentUser[k], base[k]);
             if (mineTouched) {
@@ -1050,6 +1056,7 @@ function mergeOnSrv(srv) {
         //     checkPassivePollution 이 알아서 떼어 낸다.
         Object.keys(base).forEach(function (k) {
             if (k in srv) return;
+            if (OWN.indexOf(k) >= 0) return;
             if ((k === EFF || k === BUF) && clearedNow && sameAs(k, currentUser[k], base[k])) {
                 // 일부러 비운 것이다 — 내가 그 사이 더한 것이 없을 때만 따라 비운다
                 //   버프(itemBuffs)도 같이 본다. 효과만 비우면 당국이 소거한 뒤에도
@@ -1125,6 +1132,7 @@ function diffPayload() {
     const out = {};
     Object.keys(currentUser).forEach(function (k) {
         if (SKIP.indexOf(k) >= 0) return;
+        if (OWN.indexOf(k) >= 0) return;                    // 어둠 횟수 칸은 dark-count 가 적는다
         if (k === PTS) return;                              // 돈은 더하고 빼기로 따로 보낸다
         if (k === EFF) return;                              // 효과도 이름별로 합쳐 보낸다
         if (k === BUF) return;                              // 버프도 개수까지 세어 보낸다
