@@ -4,7 +4,7 @@
 // ==========================================
 //
 //   도입 01~05 → 고정 장면(무대 준비 안내서 · 설명서 두 권) → 모두 모이면 카테고리 공개
-//   → 아이템 획득 3 (각자 고르고 각자 굴림 · 11 이상) → 모두 모이면
+//   → 아이템 획득 3 (각자 고르고 각자 굴림) → 모두 모이면
 //   → NPC 조우 3 (제출할 사람은 따로 굴리고, 나머지는 설득/지나친다 투표 → 설득이면 투표한 사람 전원 굴림
 //                 · 성공 인원 합이 탐사팀의 2/3 (올림) 이상이면 영입) → 모두 모이면
 //   → 위기 3 (투표로 행동을 정하고 각자 굴림 · 「동행인을 민다」는 동행 NPC 가 이쪽에 있을 때만)
@@ -13,8 +13,9 @@
 //   카테고리 — 분장 · 소품 · 리허설 가운데 무작위 (씨앗 난수라 같은 부스 사람은 같은 답). 2차는 1차와 다른 것.
 //   사건 순서 — 단계 안에서만 섞는다 (역시 씨앗).
 //
-//   판정  아이템 획득 D20 11 이상 (1 · 20 은 그냥 실패 · 성공, 연속 실패에는 센다)
-//         NPC  맨 주사위 — 설득 19 이상 · 제출 11 이상 · 20 대성공(−20) · 1 대실패(+20)
+//   판정  아이템 획득 d30 (1~3 은 그냥 실패 · 30 은 성공, 연속 실패에는 센다 · 기준은 finale-core roll 의 dc)
+//         NPC  맨 주사위 — 설득 25 이상 · 제출 17 이상 (X.NPC_DC · 2026-10-29) · 30 대성공(−20) · 1 대실패(+20)
+//         ★ 어디부터 성공인지는 화면에 적지 않는다 (2026-10-29)
 //         위기 D20 DC 15 — 대실패 즉사 · 실패 +16 · 성공 0 (「성공 … 감화도 상승」은 +10) · 대성공 −10
 //         판정 없는 선택 — 감화도 +16
 
@@ -185,7 +186,7 @@ function itemAct(j, lab, node) {
         res.sk = X.streak(ok);
         darkRun.log.push('[아름다움] ' + g[1] + ' — ' + (ok ? '획득' : '실패'));
         f.be.ir[j] = res;
-        if (res.sk === 'dead' && f.st === 'in') { X.die(X.rollHtml(r, '아이템 획득 — 11 이상') + '<br>' + X.STREAK_DEATH, { id: 'beGo', nx: itemNext(j) }); return; }
+        if (res.sk === 'dead' && f.st === 'in') { X.die(X.rollHtml(r, '아이템 획득') + '<br>' + X.STREAK_DEATH, { id: 'beGo', nx: itemNext(j) }); return; }
     } else if (hasLab(G16, lab)) {
         res.d = X.gam(16, '선택');
         f.be.ir[j] = res;
@@ -206,7 +207,7 @@ SC.beIr = function (sc) {
     let t = x(node);
     if (res.r && node && node.d20) t += X.rollHtml(res.r) + esc0(node.d20[res.r.out]);
     else if (res.r) {
-        t += '<br><br>' + X.rollHtml(res.r, '아이템 획득 — 11 이상');
+        t += '<br><br>' + X.rollHtml(res.r, '아이템 획득');
         if (!res.got) t += x(sec('be', '아이템 획득 실패 공통 지문'));
     }
     const ui = X.UI();
@@ -265,7 +266,7 @@ SC.beN = function (sc) {
         let t = '';
         const d = f.be.nd[j];
         if (mine && mine.h !== 'none') {
-            if (d && d.r) t += X.rollHtml(d.r, mine.h === 'item' ? '제출 — 11 이상' : '설득 — 19 이상');
+            if (d && d.r) t += X.rollHtml(d.r, mine.h === 'item' ? '제출' : '설득');
             t += npcText(mine.h === 'pass' ? 'pass' : mine.out);
         } else t += '당신은 한 걸음 물러서서 지켜봅니다.';
         let ex = X.notes([
@@ -289,13 +290,13 @@ SC.beN = function (sc) {
     }
     const want = canSubmit(v, j);
     const sub = want ? ui.b('「' + esc(want) + '」을(를) 제출한다.', function () { npcSubmit(j, want); },
-        { sub: '투표에서 빠져 혼자 굴립니다 — 맨 주사위 11 이상 · 아이템은 결과와 관계없이 소모' + (X.invHas(want) ? '' : ' (공용 보관함에서 제출)') + (f.npcPlus ? ' · 동행 신청서 +1' : '') }) : '';
+        { sub: '투표에서 빠져 혼자 굴립니다 — 맨 주사위 · 아이템은 결과와 관계없이 소모' + (X.invHas(want) ? '' : ' (공용 보관함에서 제출)') + (f.npcPlus ? ' · 동행 신청서 +1' : '') }) : '';
     // 투표 전
     if (vo.res == null) {
         const voted = (vo.v || {})[X.me()];
         let ex = X.voteHtml(key, vs, ['talk', 'pass'], names);
         if (voted == null) {
-            ex += sub + ui.b('설득한다.', function () { X.voteCast(key, 'talk'); X.view({ keep: true }); }, { sub: '투표 — 설득으로 정해지면 투표한 사람 모두가 맨 주사위를 굴립니다 (19 이상)' + (f.npcPlus ? ' · 동행 신청서 +1' : '') })
+            ex += sub + ui.b('설득한다.', function () { X.voteCast(key, 'talk'); X.view({ keep: true }); }, { sub: '투표 — 설득으로 정해지면 투표한 사람 모두가 맨 주사위를 굴립니다' + (f.npcPlus ? ' · 동행 신청서 +1' : '') })
                 + ui.b('지나친다.', function () { X.voteCast(key, 'pass'); X.view({ keep: true }); }, { sub: '투표' });
         } else ex += '<div class="fin-wait">「' + names[voted] + '」에 투표했습니다. 다른 교우를 기다리는 중</div>';
         X.draw(ui, head, x(node), ex, { keep: true });
@@ -305,7 +306,7 @@ SC.beN = function (sc) {
     const iVoted = (vo.v || {})[X.me()] != null;
     let ex = '<div class="fin-list">투표 결과 — <b style="color:#d4af37;">' + names[vo.res] + '</b>' + (vo.tie ? ' <span style="color:#888;">(동률 — 무작위)</span>' : '') + '</div>';
     if (iVoted && vo.res === 'talk') {
-        ex += ui.b('설득한다. — 주사위를 굴린다.', function () { npcTalk(j); }, { gold: true, sub: '맨 주사위 19 이상' + (f.npcPlus ? ' · 동행 신청서 +1' : '') });
+        ex += ui.b('설득한다. — 주사위를 굴린다.', function () { npcTalk(j); }, { gold: true, sub: '맨 주사위' + (f.npcPlus ? ' · 동행 신청서 +1' : '') });
     } else if (iVoted) {
         ex += '<div class="fin-wait">정리하는 중…</div>';
     } else {
@@ -355,7 +356,7 @@ function npcRoll(how) {
     const plus = f.npcPlus ? 1 : 0;
     if (plus) f.npcPlus = 0;
     const r = X.roll({ npc: true, plus: plus });
-    const need = 16;
+    const need = (how === 'item') ? X.NPC_DC.item : X.NPC_DC.talk;     // 설득 25 · 제출 17 (2026-10-29 · 전에는 둘 다 16)
     const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : r.raw <= 3 ? 'fail' : r.total >= need ? 'ok' : 'fail';
     r.out = out;
     let d = 0;

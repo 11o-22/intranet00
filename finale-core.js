@@ -427,6 +427,8 @@ function roll(o) {
     return { raw: raw, bonus: bonus, total: total, dc: dc, out: out, npc: !!o.npc, smashed: smashed, wary: wary };
 }
 X.roll = roll;
+// NPC 영입 — 맨 주사위 기준 (2026-10-29 · 설득 25 · 아이템 제출 17 — 전에는 둘 다 16 이라 제출이 너무 쉬웠다)
+X.NPC_DC = { talk: 25, item: 17 };
 
 // ==========================================
 // ⛓ 파훼 — 기믹을 부수는 것들이 이 구역에서 하는 일 (2026-10-25)
@@ -455,7 +457,7 @@ function rollHtml(r, cap) {
     const tag = r.out === 'c20' ? ' 대성공' : r.out === 'c1' ? ' 대실패' : '';
     const sub = r.npc
         ? '(보정 없음' + (r.bonus ? ' · 동행 신청서 +' + r.bonus : '') + ')'
-        : '(보정 ' + (r.bonus >= 0 ? '+' : '') + r.bonus + ' / DC ' + r.dc + (r.wary ? ' · 경계 +' + r.wary : '') + ')';
+        : '(보정 ' + (r.bonus >= 0 ? '+' : '') + r.bonus + (r.wary ? ' · 경계 +' + r.wary : '') + ')';   // 어디부터 성공인지(DC)는 적지 않는다 (2026-10-29)
     if (r.smashed) cap = (cap ? cap + '<br>' : '') + '⛓ ' + esc(r.smashed) + ' — 막고 있던 것이 부서져 이 판정을 넘겼다';
     return '<div class="fin-roll" style="color:' + col + ';">🎲 ' + r.raw + tag + ' <small>' + sub + '</small>'
         + (cap ? '<div style="font-size:10px; color:#888; font-weight:normal; margin-top:4px;">' + cap + '</div>' : '') + '</div>';

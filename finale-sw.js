@@ -12,7 +12,8 @@
 //         살펴보기 중 「감화도 상승」이 적힌 것 +16 / 드림모지 체험 · 독사과 절도 — 사망 70% · 무료 획득 30%
 //   전투: D30 · DC 15 — 실패 +16 (도주형은 소지품 1개 분실, 없으면 상품권 1장) · 대성공 −10 · 대실패 즉사
 //         「가진 것을 던진다」 — 향초 · 식탁보 말고 무작위 하나를 잃고 +2
-//   NPC : 맨 주사위 — 설득은 20(대성공)만, 아이템은 11 이상. 대성공 −20 · 대실패 +20. 결과는 로비에서 합친다.
+//   NPC : 맨 주사위 — 설득 25 이상 · 아이템 17 이상 (X.NPC_DC · 2026-10-29). 대성공 −20 · 대실패 +20. 결과는 로비에서 합친다.
+//         어디부터 성공인지는 화면에 적지 않는다.
 //   위기: 주사위 없이 고른 대로 — 「감화도 +」 +16 · 즉사는 즉사 (막기는 듣는다). NPC 희생 없음.
 
 (function finaleSweet() {
@@ -440,9 +441,9 @@ SC.swN = function (sc) {
     const ui = X.UI();
     const plus = f.npcPlus ? ' · 동행 신청서 +1' : '';
     X.draw(ui, title(sc.e, NPC[e.n].n), x(node),
-        ui.b('설득한다.', function () { npcTry(sc.e, 'talk'); }, { sub: '맨 주사위 — 20(대성공)이어야 동행합니다.' + plus })
+        ui.b('설득한다.', function () { npcTry(sc.e, 'talk'); }, { sub: '맨 주사위' + plus })
         + ui.b('요구하는 아이템으로 회유한다. — 「' + esc(e.want) + '」', function () { npcTry(sc.e, 'item'); },
-            { dis: !have, sub: have ? ('맨 주사위 11 이상 · 아이템은 결과와 관계없이 소모' + (X.invHas(e.want) ? '' : ' (공용 보관함에서 제출)') + plus) : '요구 아이템이 없습니다.' })
+            { dis: !have, sub: have ? ('맨 주사위 · 아이템은 결과와 관계없이 소모' + (X.invHas(e.want) ? '' : ' (공용 보관함에서 제출)') + plus) : '요구 아이템이 없습니다.' })
         + ui.b('지나친다.', function () { npcTry(sc.e, 'pass'); }));
 };
 function npcTry(i, how) {
@@ -463,7 +464,7 @@ function npcTry(i, how) {
         let ok;
         if (r.raw === 30) ok = true;
         else if (r.raw <= 3) ok = false;
-        else ok = r.total >= 16;
+        else ok = r.total >= (how === 'item' ? X.NPC_DC.item : X.NPC_DC.talk);   // 설득 · 회유 25 · 아이템 17 (2026-10-29)
         const out = r.raw === 30 ? 'c20' : r.raw === 1 ? 'c1' : ok ? 'ok' : 'fail';
         r.out = out;
         let d = 0;
@@ -483,7 +484,7 @@ function npcTry(i, how) {
 SC.swNr = function (sc) {
     const e = ev(sc.e);
     const ui = X.UI();
-    const head = sc.r ? X.rollHtml(sc.r, sc.how === 'talk' ? '설득 — 20 이상' : '아이템 — 11 이상') : '';
+    const head = sc.r ? X.rollHtml(sc.r, sc.how === 'talk' ? '설득' : '아이템') : '';
     X.draw(ui, title(sc.e, NPC[e.n].n), head + npcCommon(sc.out),
         X.notes([
             sc.how === 'item' ? '「' + esc(e.want) + '」을(를) 건넸습니다.' : null,
