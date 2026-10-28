@@ -302,6 +302,8 @@ function usable(k) {
         return { k: k, owner: me, ownerCode: me.code, grade: gradeOf(me, k),
                  nick: st(me, k).nick || '', mine: true };
     }
+    // 🐺 금촉 만년필의 늑대 — 그 탐사 동안 그 속성의 분신처럼 (eliteb.js · 2026-10-29)
+    try { if (window.EBWOLF) { const wf = window.EBWOLF.usable(k); if (wf) return wf; } } catch (e) { }
     return null;
 }
 function nickOf(x) {
@@ -313,6 +315,7 @@ function nickOf(x) {
 function kill(k, why) {
     const x = usable(k);
     if (!x) return false;
+    if (x.wolf) return window.EBWOLF.kill(x, why);                 // 🐺 늑대는 제 길로 사라진다
     kitPatch(x.ownerCode, k, { gone: 1 });
     const s = st(x.owner, k);
     if (s.to) {
@@ -351,6 +354,7 @@ window.kitKill = kill;
 function bump(k, field, max, why) {
     const x = usable(k);
     if (!x) return 0;
+    if (x.wolf) return window.EBWOLF.bump(x, field, max, why);     // 🐺 늑대 — 제 셈
     const s = st(x.owner, k);
     const n = (Number(s[field]) || 0) + 1;
     const p = {}; p[field] = n;
@@ -1619,8 +1623,10 @@ window.kitBreak = function () {
                     + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
                 return;
             }
-            const area = document.getElementById('vote-area') || document.getElementById('dark-body');
-            if (!area) return;
+            // 투표 칸이 있으면 그 아래, 아니면 탐사 본문(전용 화면이면 dro-body) 끝 — 단추가 있는 장면에만 (2026-10-29)
+            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : document.getElementById('dark-body');
+            const area = document.getElementById('vote-area') || body;
+            if (!area || !body || !body.querySelector('button')) return;
             const b = document.createElement('button');
             b.id = ID;
             b.className = 'game-btn';
