@@ -12,7 +12,9 @@
 //
 // ■ 레벨 · 등급
 //   여정에서 경험치(xp)를 얻어 Lv 이 오른다 (pets[번호].lv · xp · Lv 10 까지).
-//   Lv 10 이 되면 펫 하나 화면에 「등급업」 — D → C → B → A → S (PET_GRADES). 오르면 Lv 1 · xp 0 부터.
+//   등급업은 **등급업 조각**을 모아야 한다 (2026-10-28 저녁) — D → C 는 『 첫번째 여정 』 의 조각 세 가지 (SHARDS.D).
+//   조각은 사원의 조각 주머니(u.petShard = { 이름: 수 })에 쌓이고, Lv 10 인 펫에게 세 가지를 다 넣으면 등급이 오른다
+//   (조각 하나씩 소모 · Lv 1 · xp 0 부터). 다음 등급(C → B …)의 조각은 그 등급 여정이 생기면 넣는다.
 //
 // ■ 여정 전투에 쓰는 수치 (PETGEAR.stats)
 //   종 능력치(pet-data st · B 등급부터) + 장비 몫을 합쳐 — 행운 luck · 판정 bon · 회피 eva · 기믹 파훼 gim · 저항 resist
@@ -43,6 +45,12 @@ const DROP = [
     { n: '🦴 묵은 뼈 목줄',      add: { bon: 3, resist: 1 }, sk: { n: '물어뜯기',  t: 'heavy',  d: '빗나가지 않는 강한 한 입.' },         d: '판정 +3 · 저항 +1. 누가 끝까지 물고 있던 것이다.', from: 'j1' },
     { n: '🧣 주인의 목도리 조각', add: { resist: 3, eva: 1 }, sk: { n: '웅크리기',  t: 'guard',  d: '몸을 말고 버틴다. 숨이 돌아온다.' },   d: '저항 +3 · 회피 +1. 냄새가 남아 있다. 그 냄새를 따라 돌아왔다.', from: 'j1' }
 ];
+// 등급업 조각 — 등급마다 세 가지. 여정의 어느 싸움을 이기고 나면 (enc · 0부터) 1/odds 로 하나 떨어진다 (journey.js settle)
+const SHARDS = {
+    D: [ { n: '🧩 문틈에 낀 조각',     enc: 1, odds: 30, d: '젖은 신발 괴물을 지나온 자리에 떨어져 있었다. 문틈 요괴가 물고 있던 것이다.' },
+         { n: '🧩 가로등 아래의 조각', enc: 3, odds: 30, d: '가로등 마물이 떨어뜨린 빛 속에 있었다. 만지면 아직 따뜻하다.' },
+         { n: '🧩 냄새가 밴 조각',     enc: 4, odds: 30, d: '그것이 벗어 던진 냄새 안에서 나왔다. 주인의 냄새가 난다.' } ]
+};
 const ALL = BASIC.concat(DROP);
 const BY = {};
 ALL.forEach(function (g) { BY[g.n] = g; });
@@ -83,6 +91,34 @@ function add(name, n) {
     try { if (typeof saveFields === 'function') saveFields({ petGear: 1 }); } catch (e) { }
     return v;
 }
+
+// 조각 주머니
+function shardBag(u) {
+    u = u || u_();
+    if (!u) return {};
+    const v = u.petShard;
+    if (Array.isArray(v) || !v || typeof v !== 'object') u.petShard = {};
+    return u.petShard;
+}
+function shardHave(name, u) { return Number(shardBag(u)[name]) || 0; }
+function shardAdd(name, n) {
+    const u = u_();
+    if (!u) return 0;
+    const b = shardBag(u);
+    const v = Math.max(0, (Number(b[name]) || 0) + (Number(n) || 0));
+    if (v) b[name] = v; else delete b[name];
+    try {
+        if (typeof database !== 'undefined' && database && u.code) {
+            database.ref('users/' + u.code + '/petShard/' + name).set(v || null).catch(function (e) { console.warn('[펫 조각] 저장 실패', e); });
+            return v;
+        }
+    } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ petShard: 1 }); } catch (e) { }
+    return v;
+}
+// 이 등급에서 다음 등급으로 — 조각 셋 가운데 몇 가지를 가졌나
+function shardSet(grade) { return SHARDS[grade] || null; }
+function shardCount(grade, u) { const set = shardSet(grade); if (!set) return 0; return set.filter(function (x) { return shardHave(x.n, u) > 0; }).length; }
 
 // ==========================================
 // 사기 · 끼우기 · 빼기
@@ -143,13 +179,27 @@ function addXp(key, n) {
     P().patch(String(key), { lv: lv, xp: xp });
     return { lv0: lv0, lv: lv, full: lv >= LV_MAX };
 }
-function canGradeUp(key, u) { return lvOf(key, u) >= LV_MAX && gradeIdx(key, u) < P().GRADES.length - 1; }
+// 등급업 — Lv 10 이고, 그 등급의 조각 세 가지를 다 가졌을 때
+function gradeNeed(key, u) {
+    const gi = gradeIdx(key, u);
+    if (gi >= P().GRADES.length - 1) return { ok: false, why: '이미 가장 높은 등급입니다.' };
+    const g0 = P().GRADES[gi];
+    const set = shardSet(g0);
+    if (!set) return { ok: false, why: g0 + ' 등급에서 오르는 조각은 아직 없습니다 — 다음 여정이 생기면 떨어집니다.', set: null, have: 0 };
+    const have = shardCount(g0, u);
+    if (lvOf(key, u) < LV_MAX) return { ok: false, why: 'Lv ' + LV_MAX + ' 이 되어야 합니다.', set: set, have: have };
+    if (have < set.length) return { ok: false, why: '등급업 조각이 모자랍니다 (' + have + ' / ' + set.length + ').', set: set, have: have };
+    return { ok: true, set: set, have: have };
+}
+function canGradeUp(key, u) { return !!gradeNeed(key, u).ok; }
 function gradeUp(key) {
     const u = u_();
-    if (!canGradeUp(key, u)) return { ok: false, why: 'Lv ' + LV_MAX + ' 이 되어야 등급이 오릅니다.' };
+    const need = gradeNeed(key, u);
+    if (!need.ok) return { ok: false, why: need.why };
     const g0 = P().GRADES[gradeIdx(key, u)], g1 = P().GRADES[gradeIdx(key, u) + 1];
+    need.set.forEach(function (x) { shardAdd(x.n, -1); });
     P().patch(String(key), { g: g1, lv: 1, xp: 0 });
-    log_('[펫] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (여정 Lv ' + LV_MAX + ')');
+    log_('[펫] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (여정 Lv ' + LV_MAX + ' · 조각 ' + need.set.map(function (x) { return x.n; }).join(' · ') + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true, from: g0, to: g1 };
 }
@@ -267,7 +317,8 @@ window.petGearOpen = function (key, after) {
 window.PETGEAR = {
     BASIC: BASIC, DROP: DROP, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, STAT_NAME: STAT_NAME,
     bag: bag, have: have, add: add, worn: worn, equip: equip, unequip: unequip, addText: addText,
-    lv: lvOf, xp: xpOf, needXp: needXp, addXp: addXp, gradeIdx: gradeIdx, canGradeUp: canGradeUp, gradeUp: gradeUp,
+    lv: lvOf, xp: xpOf, needXp: needXp, addXp: addXp, gradeIdx: gradeIdx, canGradeUp: canGradeUp, gradeUp: gradeUp, gradeNeed: gradeNeed,
+    SHARDS: SHARDS, shardBag: shardBag, shardHave: shardHave, shardAdd: shardAdd, shardSet: shardSet, shardCount: shardCount,
     attrs: attrs, stats: stats
 };
 
@@ -285,6 +336,18 @@ window.petGearGive = function (name, n, who) {
     if (!t) { console.warn('사원을 못 찾았습니다 —', who); return; }
     try { database.ref('users/' + t.code + '/petGear/' + name).transaction(function (c) { return Math.max(0, (Number(c) || 0) + n); }).then(function () { console.log('%c✓ ' + t.name + ' 사원 ' + name + ' +' + n, 'color:#4CAF50'); }); } catch (e) { }
 };
+window.petShardGive = function (name, n, who) {
+    const me = u_();
+    if (!me || me.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const all = Object.keys(SHARDS).reduce(function (a, g) { return a.concat(SHARDS[g].map(function (x) { return x.n; })); }, []);
+    if (all.indexOf(name) < 0) { console.warn('조각은 ' + all.join(' · ') + ' 가운데 하나입니다.'); return; }
+    n = Math.max(1, Number(n) || 1);
+    if (!who || who === me.code) { console.log('%c✓ ' + name + ' → ' + shardAdd(name, n) + '개', 'color:#4CAF50'); return; }
+    const us = Object.keys((typeof db !== 'undefined' && db.users) || {}).map(function (c) { return db.users[c]; }).filter(Boolean);
+    const t = us.filter(function (x) { return x.code === who || String(x.no) === String(who) || x.name === who; })[0];
+    if (!t) { console.warn('사원을 못 찾았습니다 —', who); return; }
+    try { database.ref('users/' + t.code + '/petShard/' + name).transaction(function (c) { return Math.max(0, (Number(c) || 0) + n); }).then(function () { console.log('%c✓ ' + t.name + ' 사원 ' + name + ' +' + n, 'color:#4CAF50'); }); } catch (e) { }
+};
 window.petXpGive = function (key, n) {
     const me = u_();
     if (!me || me.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
@@ -295,8 +358,9 @@ window.petGearState = function () {
     const u = u_();
     console.log('%c===== 🐾 반려동물용 장비 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
-    const b = bag(u);
+    const b = bag(u), sb = shardBag(u);
     console.log('  주머니:', Object.keys(b).filter(function (k) { return b[k] > 0; }).map(function (k) { return k + '×' + b[k]; }).join(', ') || '비었음');
+    console.log('  등급업 조각:', Object.keys(sb).filter(function (k) { return sb[k] > 0; }).map(function (k) { return k + '×' + sb[k]; }).join(', ') || '없음', '· D→C 는', shardCount('D', u) + ' / 3');
     const ps = P().pets(u);
     console.table(Object.keys(ps).filter(function (k) { return P().BY[k]; }).map(function (k) {
         const st = stats(k, u);
@@ -304,6 +368,6 @@ window.petGearState = function () {
     }));
 };
 
-console.log('[펫 장비] petGearState() · petGearGive(이름, 수[, 사번]) · petXpGive(번호, n)');
+console.log('[펫 장비] petGearState() · petGearGive(이름, 수[, 사번]) · petShardGive(이름, 수[, 사번]) · petXpGive(번호, n)');
 
 })();

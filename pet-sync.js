@@ -37,7 +37,8 @@
 (function petSync() {
 
 const KEYS = ['pets', 'petEgg', 'petEggAt', 'petBag', 'petFood', 'petShow', 'petWith', 'petRune', 'petRuneDay',   // ★ 룬 주머니 (pet-rune.js · 2026-10-27)
-              'petStayUntil', 'petSleepUntil'];   // ★ 🏠 집 지킴이 방석 · 💤 잠듦 (2026-10-28) — 휴대폰에서 깐 방석을 PC 가 몰라 펫이 K 의 방에 따라붙던 것
+              'petStayUntil', 'petSleepUntil',   // ★ 🏠 집 지킴이 방석 · 💤 잠듦 (2026-10-28) — 휴대폰에서 깐 방석을 PC 가 몰라 펫이 K 의 방에 따라붙던 것
+              'petGear', 'petShard'];            // ★ 반려동물용 장비 · 등급업 조각 (pet-gear.js)
 
 let bound = '';
 let refs = [];

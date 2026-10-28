@@ -201,7 +201,12 @@ function oneView(id) {
         // ★ 여정 레벨 · 장비 (pet-gear.js · journey.js · 2026-10-28)
         + (window.PETGEAR ? line('여정 Lv', (function () {
             const lv = PETGEAR.lv(id, me), xp = PETGEAR.xp(id, me);
-            return 'Lv ' + lv + (lv >= PETGEAR.LV_MAX ? ' <span style="color:#d4af37;">— 등급업 가능</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ')</span>');
+            return 'Lv ' + lv + (lv >= PETGEAR.LV_MAX ? ' <span style="color:#d4af37;">— 가득</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ')</span>');
+        })()) + line('등급업 조각', (function () {
+            const nd = PETGEAR.gradeNeed(id, me);
+            if (!nd.set) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';
+            return nd.set.map(function (x) { return '<span style="color:' + (PETGEAR.shardHave(x.n, me) ? '#d4af37' : '#4a4540') + ';" title="' + esc(x.d) + '">' + esc(x.n.replace(/^🧩 /, '')) + '</span>'; }).join(' <span style="color:#3a3530;">·</span> ')
+                + ' <span style="color:#6f685e;">(' + nd.have + '/' + nd.set.length + (nd.ok ? ' · 등급업 가능' : '') + ')</span>';
         })()) + line('장비', (function () {
             const g = PETGEAR.worn(id, me);
             return g ? esc(g) + ' <span style="color:#6f685e;">(' + esc(PETGEAR.addText(PETGEAR.BY[g].add)) + ')</span>' : '<span style="color:#8d8578;">없음</span>';

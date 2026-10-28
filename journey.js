@@ -114,7 +114,9 @@ const SK = {
 const JOURNEYS = {
     j1: {
         id: 'j1', n: '첫번째 여정 - 주인을 찾아서.', g: 'D', ic: '🐾',
-        xpFight: [8, 10, 12, 14, 20], xpClear: 30, drop: 0.35,
+        xpFight: [8, 10, 12, 14, 20], xpClear: 30, drop: 0.35, pts: 20000,
+        // 끝까지 가서 돌아온 펫 — 물고 온 것 · 꼬질꼬질한 몰골 ({n} 은 펫 이름)
+        home: '{n}은(는) 흙투성이에 털은 뭉치고 발바닥은 까맣게 꼬질꼬질한 몰골로, 입에 문 것을 주인 발치에 내려놓았다. 여정에서 물어 온 것 — 20,000 P.<br>그리고 고개를 들어 주인의 얼굴을 봤다. 기뻐하는지 보려고. 그 얼굴 하나를 보려고 여기까지 온 것처럼, 꼬리가 먼저 흔들렸다.',
         open: ['현관문이 열려 있었다. 언제부터인지는 모른다.',
                '주인의 냄새가 문지방을 넘어 밖으로 이어져 있었다. 우리는 각자의 집에서 같은 냄새를 따라 나왔다.',
                '어깨 위의 작은 기계가 깜빡였다 — 주인들이 보고 있다는 뜻이라고, 누군가 그랬다. 그러니까 찾아야 한다. 보고 있는 그 사람을.'],
@@ -328,7 +330,8 @@ function paint() {
     const w = box(head('🐾 여정', '펫이 주인을 대신해 떠나는 어둠. 1~3명이 펫 하나씩. 주인은 바디캠으로 본다.<br>오늘 남은 횟수 <b style="color:#ffcf8f;">' + left + ' / ' + DAY_MAX + '</b> — 횟수를 늘리는 물건은 듣지 않습니다.')
         + '<div style="border:1px solid #4a3f6a; border-radius:8px; padding:11px; margin-bottom:10px; background:rgba(90,70,130,.10);">'
         + '<div style="font-size:12px; color:#e8e2f0; font-weight:bold;">『 ' + esc(J.n) + ' 』 <span style="font-size:10px; color:#c9a227;">' + J.g + ' 등급</span></div>'
-        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 펫은 멀쩡하고 한 시간 잔다.</div>'
+        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 펫은 멀쩡하고 한 시간 잔다.<br>끝까지 가면 펫이 <b style="color:#ffcf8f;">20,000 P</b> 를 물고 온다 · 등급업 조각(D → C) 세 가지가 길에 놓여 있다 — '
+        + ((G().SHARDS || {})[J.g] || []).map(function (x) { return '<span style="color:' + (G().shardHave(x.n, me) ? '#d4af37' : '#5f5878') + ';">' + esc(x.n.replace(/^🧩 /, '')) + '</span>'; }).join(' · ') + ' <span style="color:#7f7898;">(' + G().shardCount(J.g, me) + '/3)</span></div>'
         + '<div style="display:flex; gap:6px; margin-top:9px;">'
         + '<button id="jr-solo" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>혼자 떠난다</button>'
         + '<button id="jr-make" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>방을 만든다</button></div></div>'
@@ -574,6 +577,25 @@ function resolve(r) {
         const mon = cur.mon;
         const order = (cur.order || Object.keys(cur.pets)).filter(function (c) { return cur.pets[c] && !cur.pets[c].ko; });
         const e = J.enc[cur.enc] || {};
+        // 괴물이 무너졌다 — 경험치 · 등급업 조각(그 싸움에 놓인 것 · 1/odds) · 다음으로
+        const beat = function () {
+            const xp = (J.xpFight || [8])[Math.min(cur.enc, (J.xpFight || [8]).length - 1)] || 8;
+            const alive = order.filter(function (c) { return !cur.pets[c].ko; });
+            alive.forEach(function (c) { cur.pets[c].xp = (cur.pets[c].xp || 0) + xp; });
+            say(mon.n + josa(mon.n, '이') + ' 무너졌다. (경험치 +' + xp + ')', 'x');
+            const sh = ((G().SHARDS || {})[J.g] || []).filter(function (x) { return Number(x.enc) === Number(cur.enc); });
+            alive.forEach(function (c) {
+                sh.forEach(function (x) {
+                    if (roll() < 1 / (Number(x.odds) || 30)) {
+                        const p = cur.pets[c];
+                        p.shards = (Array.isArray(p.shards) ? p.shards : []).concat([x.n]);
+                        say('— ' + p.nick + josa(p.nick, '이') + ' 무엇인가를 물었다. ' + x.n + '. ' + x.d, 'x');
+                    }
+                });
+            });
+            if (cur.enc + 1 >= J.enc.length) { cur.stage = 'win'; cur.endAt = Date.now(); }
+            else { cur.stage = 'between'; cur.enc = cur.enc + 1; }
+        };
         // 1. 펫들 — 고른 것대로
         order.forEach(function (c) {
             const p = cur.pets[c]; const pk = (cur.pick[c] || {}).k || 'a0';
@@ -603,11 +625,7 @@ function resolve(r) {
         });
         // 2. 괴물
         if (mon.hp <= 0) {
-            const xp = (J.xpFight || [8])[Math.min(cur.enc, (J.xpFight || [8]).length - 1)] || 8;
-            order.forEach(function (c) { cur.pets[c].xp = (cur.pets[c].xp || 0) + xp; });
-            say(mon.n + josa(mon.n, '이') + ' 무너졌다. (경험치 +' + xp + ')', 'x');
-            if (cur.enc + 1 >= J.enc.length) { cur.stage = 'win'; cur.endAt = Date.now(); }
-            else { cur.stage = 'between'; cur.enc = cur.enc + 1; }
+            beat();
         } else {
             const special = (cur.round % 3 === 0);
             const mvs = e.mv || ['친다'];
@@ -633,13 +651,7 @@ function resolve(r) {
                     if (g.heal) { const h = Math.round(t.max * g.heal); t.hp = Math.min(t.max, t.hp + h); }
                     if (t.hp <= 0) { t.ko = 1; say('— ' + t.nick + josa(t.nick, '이') + ' 쓰러지는 순간, 주인이 몸을 날려 대신 맞았다. ' + t.nick + josa(t.nick, '은') + ' 다친 데 없이 집으로 돌아갔다.', 'm'); }
                 }
-                if (mon.hp <= 0) {
-                    const xp = (J.xpFight || [8])[Math.min(cur.enc, (J.xpFight || [8]).length - 1)] || 8;
-                    order.forEach(function (c) { if (!cur.pets[c].ko) cur.pets[c].xp = (cur.pets[c].xp || 0) + xp; });
-                    say(mon.n + josa(mon.n, '이') + ' 무너졌다. (경험치 +' + xp + ')', 'x');
-                    if (cur.enc + 1 >= J.enc.length) { cur.stage = 'win'; cur.endAt = Date.now(); }
-                    else { cur.stage = 'between'; cur.enc = cur.enc + 1; }
-                }
+                if (mon.hp <= 0) beat();
             }
             const left = order.filter(function (c) { return !cur.pets[c].ko; });
             if (!left.length && cur.stage === 'fight') { cur.stage = 'lose'; cur.endAt = Date.now(); }
@@ -682,6 +694,18 @@ function settle(o) {
     if (p.ko) xp = Math.floor(xp / 2);
     let lvs = null;
     if (s && xp > 0) { lvs = G().addXp(key, xp); lines.push('경험치 +' + xp + (lvs && lvs.lv > lvs.lv0 ? ' — Lv ' + lvs.lv0 + ' → ' + lvs.lv + (lvs.full ? ' (등급업 가능)' : '') : '')); }
+    // 물고 온 것 — 끝까지 가서 돌아온 펫만 (주인이 대신 맞은 펫은 빈 입)
+    if (won && !p.ko && J.pts) {
+        const cap = (typeof POINT_CAP !== 'undefined') ? POINT_CAP : 30000000;
+        const was = Number(me.points) || 0;
+        const got = Math.max(0, Math.min(cap, was + J.pts) - was);
+        if (typeof changePoints === 'function') { try { changePoints(got); } catch (e) { me.points = was + got; } } else me.points = was + got;
+        try { if (typeof showPointGainEffect === 'function') showPointGainEffect(got); } catch (e) { }
+        lines.push('물고 온 것 — ' + got.toLocaleString() + ' P');
+    }
+    // 여정 중에 문 등급업 조각 — 주인이 대신 맞았어도 물고 있던 것은 가져온다
+    const shards = Array.isArray(p.shards) ? p.shards : (p.shards && typeof p.shards === 'object' ? Object.keys(p.shards).map(function (k) { return p.shards[k]; }) : []);
+    shards.forEach(function (n) { G().shardAdd(n, 1); lines.push('등급업 조각 — ' + n + ' (' + G().shardCount(J.g, me) + ' / 3)'); });
     let drop = '';
     if (won && !p.ko && Math.random() < (J.drop || 0)) {
         const pool = G().DROP.filter(function (g) { return g.from === J.id; });
@@ -701,7 +725,7 @@ function settle(o) {
     const last = J.enc[J.enc.length - 1];
     view = 'end';
     const w = box(head('『 ' + J.n + ' 』 — ' + (won ? '집으로' : '주인이 대신 맞았다'), '')
-        + '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; padding:10px; border:1px dashed #4a3f6a; border-radius:8px; margin-bottom:10px;">' + (won ? last.out : J.lose) + '</div>'
+        + '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; padding:10px; border:1px dashed #4a3f6a; border-radius:8px; margin-bottom:10px;">' + (won ? last.out + (!p.ko && J.home ? '<br><br>' + J.home.replace(/\{n\}은\(는\)/g, esc(p.nick) + josa(p.nick, '은')).replace(/\{n\}/g, esc(p.nick)) : '') : J.lose) + '</div>'
         + petsOf(o).map(function (q) { return petRow(q, q.code === me.code); }).join('')
         + '<div style="font-size:11px; color:#ffcf8f; line-height:1.7; margin:10px 0;">' + esc(p.nick) + ' — ' + (lines.length ? lines.map(esc).join('<br>') : '얻은 것이 없다') + '</div>'
         + '<button id="jr-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
