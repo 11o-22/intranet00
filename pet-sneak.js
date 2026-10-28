@@ -545,6 +545,7 @@ function begin() {
         const s = ps[k];
         if (!s || s.hurt) return false;                 // 다친 펫은 안 간다
         if (s.out) return false;                        // 혼자 탐사 중
+        if ((Number(s.jsleep) || 0) > Date.now()) return false;   // 💤 여정 뒤 잠 (journey.js)
         if (k === taken) return false;                  // 데려간 펫
         return (Number(s.bond) || 0) >= BOND_NEED;
     }).sort(function (a, b) {

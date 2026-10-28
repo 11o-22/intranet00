@@ -208,6 +208,9 @@ function petAsleep(u) { return petSleepLeft(u) > 0; }
 // ★ 펫이 집을 지키나 — 🏠 집 지킴이 방석 (pet-stay.js · u.petStayUntil). 깨어 있지만 어둠에는 따라오지 않는다.
 function petStayLeft(u) { u = u || petMe(); return u ? Math.max(0, (Number(u.petStayUntil) || 0) - Date.now()) : 0; }
 function petStays(u) { return petStayLeft(u) > 0; }
+// ★ 🐾 여정(journey.js)에서 주인이 대신 맞고 돌아온 펫 — 한 시간 잔다 (pets[번호].jsleep · 그동안 어둠 · 여정 못 간다)
+function petJSleepLeft(id, u) { const s = petsOf(u)[String(id)]; return Math.max(0, (Number(s && s.jsleep) || 0) - Date.now()); }
+function petJSleeps(id, u) { return petJSleepLeft(id, u) > 0; }
 
 // 서버 기준 지금 — 기기 시계를 믿지 않는다 (clock.js)
 function petNow() {
@@ -784,7 +787,8 @@ window.PET = {
     josa: petJosa, jong: petJong,
     nick: petNick, named: petNamed, rename: petRename,
     asleep: petAsleep, sleepLeft: petSleepLeft,
-    stays: petStays, stayLeft: petStayLeft
+    stays: petStays, stayLeft: petStayLeft,
+    jsleeps: petJSleeps, jsleepLeft: petJSleepLeft
 };
 
 // ==========================================

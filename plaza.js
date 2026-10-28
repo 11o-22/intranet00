@@ -271,7 +271,8 @@ const PLAZA = {
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           // ✗ 「파티」는 뺐다 (2026-10-16)
                           b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ],
-                          b2: [ { n: '기록 소실', ic: 'dark', fn: 'disasterLost' } ] },
+                          b2: [ { n: '여정', ic: 'pet', fn: 'journeyOpen' },             // 🐾 펫 동반 어둠 (journey.js · 2026-10-28) — 기록 소실 왼쪽
+                                { n: '기록 소실', ic: 'dark', fn: 'disasterLost' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
@@ -349,6 +350,8 @@ const PLAZA = {
         // ④ 탐사 — 파티는 목록에서 뺐다. 재난관리국 B1 엘리베이터로 들어간다.
         { g: 'dark',  n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
         // 📡 기록 소실 — 재난관리국 B2 와 같은 문 (disaster.js · 티켓이 없으면 못 들어감). 목록에서는 바로 연다
+        // 🐾 여정 — 펫이 대신 떠나는 어둠 (journey.js · 2026-10-28) — 기록 소실 왼쪽
+        { g: 'dark',  n: '여정',       i: '🐾', ic: 'pet',     fn: 'journeyOpen' },
         { g: 'dark',  n: '기록 소실',  i: '📡', ic: 'dark',    fn: 'disasterLost' },
         // ⑤ 생활
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },

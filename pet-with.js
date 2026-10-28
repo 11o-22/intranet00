@@ -50,7 +50,7 @@ function ready(u) {
     u = u || u_();
     const ps = P().pets(u);
     return Object.keys(ps).filter(function (k) {
-        return P().BY[k] && !(ps[k].out && ps[k].out.till);
+        return P().BY[k] && !(ps[k].out && ps[k].out.till) && !((Number(ps[k].jsleep) || 0) > Date.now());   // 💤 여정 뒤 잠 (journey.js)
     }).sort(function (a, b) { return Number(a) - Number(b); });
 }
 

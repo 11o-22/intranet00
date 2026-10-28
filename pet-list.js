@@ -76,6 +76,7 @@ function statusOf(s) {
             : { t: '돌아옴', c: '#6f8f5e' };      // 어둠 칸에서 데려오면 된다
     if (s && (s.rest || 0) > now)
         return { t: '쉬는 중', c: '#c9a227' };
+    if (s && (Number(s.jsleep) || 0) > now) return { t: '💤 여정 뒤 잠', c: '#8fa8d8' };   // 🐾 여정에서 주인이 대신 맞았다 (journey.js)
     if (P().asleep && P().asleep()) return { t: '💤 잠듦', c: '#8fa8d8' };   // 🦋 숨결 두 번 — 모두 잔다
     return null;
 }
@@ -197,6 +198,14 @@ function oneView(id) {
         + (window.PETTRAIT ? line('성별', esc(PETTRAIT.sexName(PETTRAIT.sex(id, me))))
             + line('성격', esc(PETTRAIT.perName(id, me)))
             + line('스킬', (function () { const sk = PETTRAIT.skill(id); return sk ? esc(sk.n) + ' <span style="color:#6f685e;">— ' + esc(sk.d) + '</span>' : '-'; })()) : '')
+        // ★ 여정 레벨 · 장비 (pet-gear.js · journey.js · 2026-10-28)
+        + (window.PETGEAR ? line('여정 Lv', (function () {
+            const lv = PETGEAR.lv(id, me), xp = PETGEAR.xp(id, me);
+            return 'Lv ' + lv + (lv >= PETGEAR.LV_MAX ? ' <span style="color:#d4af37;">— 등급업 가능</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ')</span>');
+        })()) + line('장비', (function () {
+            const g = PETGEAR.worn(id, me);
+            return g ? esc(g) + ' <span style="color:#6f685e;">(' + esc(PETGEAR.addText(PETGEAR.BY[g].add)) + ')</span>' : '<span style="color:#8d8578;">없음</span>';
+        })()) : '')
         + (window.PETRUNE ? line('룬', (function () {
             const r = PETRUNE.fed(id, me);
             return (r.length ? r.map(PETRUNE.tag).map(esc).join(' · ') : '<span style="color:#8d8578;">없음</span>')
@@ -227,6 +236,8 @@ function oneView(id) {
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')
+        + (window.PETGEAR ? '<button id="pet-gear" class="game-btn" style="' + BTN + '">장비</button>'
+            + (PETGEAR.canGradeUp(id, me) ? '<button id="pet-up" class="game-btn" style="' + BTN + ' background:linear-gradient(145deg,#6b4a1d,#38250e) !important; border-color:#ffd766 !important; color:#ffe9bd !important;">등급업 — ' + esc(s.g || 'D') + ' → ' + esc(P().GRADES[PETGEAR.gradeIdx(id, me) + 1] || '') + '</button>' : '') : '')
         + (typeof window.petAdoptSend === 'function'
             ? '<button id="pet-adopt" class="game-btn" style="' + BTN + '">입양 보내기</button>' : '')
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
@@ -251,6 +262,15 @@ function oneView(id) {
     w.querySelector('#pet-nick').onclick = function () { nickView(id); };
     const rn = w.querySelector('#pet-rune');           // pet-rune.js 가 있을 때만 붙는다
     if (rn) rn.onclick = function () { shut(); window.petRuneFeedOpen(id, function () { oneView(id); }); };
+    const gr = w.querySelector('#pet-gear');           // pet-gear.js
+    if (gr) gr.onclick = function () { shut(); window.petGearOpen(id, function () { oneView(id); }); };
+    const up = w.querySelector('#pet-up');
+    if (up) up.onclick = function () {
+        const r = PETGEAR.gradeUp(id);
+        if (!r.ok) { alert_(r.why); return; }
+        alert_(P().nick(id, me) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 올랐습니다.\n\n여정 Lv 1 부터 다시 오릅니다.');
+        oneView(id);
+    };
     const ad = w.querySelector('#pet-adopt');          // pet-adopt.js 가 있을 때만 붙는다
     if (ad) ad.onclick = function () { shut(); window.petAdoptSend(id); };
 }
