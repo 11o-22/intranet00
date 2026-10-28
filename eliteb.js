@@ -17,8 +17,8 @@
 //     정예조 조원 = 조장이 가면을 씌워 준 두 사람.  일반 조원 = 그 밖의 사람.
 //
 //   1. 정예조 가면 — 쓰면 「True or Fake」. 기믹 선택지에 안전한 쪽(True ◈)이 표시되고, 즉사 선택지가 있는 장면에서는 그쪽(Fake ✖)도.
-//      기믹을 **하루 2회** 파훼한다(작두처럼 성공 +2 · 보정 +1 · 다음 장면). 조장도 가면을 쓴 셈 — 같은 효과.
-//      조장은 정예조 조원을 **확정 구출 하루 3회**(인당 아니라 통틀어) — 조원이 쓰러질 때 그 자리에서 끌어낸다.
+//      쓴 사람은 판정 **+2** (매뉴얼의 역할 보정과 따로 더한다). 조장도 가면을 쓴 셈 — 같은 효과.
+//      (2026-10-28 사용자: 하루 2회 파훼 · 조장의 확정 구출 하루 3회는 뺐다 — 「다이스 조정으로 가자」)
 //   2. 어둠 탐사 매뉴얼 — 판정 보정: 조장 +3~5 · 정예조 조원 +2~4 · 일반 조원 +1~3 (굴릴 때마다 그 사이에서 무작위 · 조장이 같은 방에 있을 때).
 //   3. 가죽 반장갑 — 공용시설 행운 +300% · 공용시설 횟수 +3~8 (날마다 무작위 · 그날 자정까지 · 상한 안에서).
 //   4. 카세트테이프 — 함께 탐사를 갔던 사람이 상담실 · 선녀탕에 있으면 풀어 준다. 사람마다 하루 한 번.
@@ -28,8 +28,6 @@
 // ■ 적히는 자리
 //   u.ebMasks  = { <사번>: { name, at } }     조장이 씌운 가면 (둘까지)
 //   u.ebMask   = { by, byName, at }           내게 씌워진 가면
-//   u.ebBreak  = { d, n }                     오늘 파훼한 수 (가면)
-//   u.ebSave   = { d, n }                     오늘 확정 구출한 수 (조장)
 //   u.ebGlove  = 'YYYY-MM-DD'                 오늘 반장갑 몫을 받았나
 //   u.ebMates  = { <사번>: at }               함께 탐사한 사람 (카세트테이프 대상)
 //   u.ebTape   = { d, used: { <사번>: 1 } }   오늘 풀어 준 사람
@@ -40,7 +38,7 @@
 //   ebGive(사번)   상담사 — 준다      ebState()   지금 상태      ebMenu()   창
 window.EB = window.EB || {
     NAME: '🐺 （구） 정예 B조 ■■',          // ★ 괄호는 전각 — 장비 이름에 「 (」가 들면 getEquipBaseName 이 그 앞까지만 이름으로 본다 (index.html:1898)
-    MASK_MAX: 2, BREAK_MAX: 2, SAVE_MAX: 3, WOLF_MAX: 3,
+    MASK_MAX: 2, MASK_BON: 2, WOLF_MAX: 3,          // MASK_BON — 가면을 쓴 사람의 판정 보정 (고정)
     PTS: { lead: 1.5, elite: 1.5, member: 1.0 },
     PTS_ALL: { lead: 3.0, elite: 2.0, member: 1.5 },
     LOOT: 2,
@@ -56,7 +54,7 @@ const NAME = C.NAME;
 const ADMIN = 'kario0987';
 const MOD = 'eb-modal';
 const PARTS = [
-    { k: 'mask',   n: '정예조 가면',   i: '🎭', d: '쓰면 「True or Fake」 — 기믹의 안전한 쪽이 보이고, 하루 2회 기믹을 파훼한다. 조장이 조원 둘에게 씌워 줄 수 있다. 조장은 정예조 조원을 하루 3회 확정 구출한다.' },
+    { k: 'mask',   n: '정예조 가면',   i: '🎭', d: '쓰면 「True or Fake」 — 기믹의 안전한 쪽이 보이고, 판정 +2. 조장이 조원 둘에게 씌워 줄 수 있다.' },
     { k: 'manual', n: '어둠 탐사 매뉴얼', i: '📘', d: '판정 보정 — 조장 +3~5 · 정예조 조원 +2~4 · 일반 조원 +1~3. 조장이 같은 방에 있을 때.' },
     { k: 'glove',  n: '가죽 반장갑',   i: '🧤', d: '공용시설 행운 +300% · 공용시설 횟수 +3~8 (날마다 무작위).' },
     { k: 'tape',   n: '카세트테이프',  i: '📼', d: '함께 탐사를 갔던 사람이 상담실 · 선녀탕에 있으면 풀어 준다. 사람마다 하루 한 번.' },
@@ -84,7 +82,6 @@ function baseOf(w) { try { return (typeof getEquipBaseName === 'function') ? get
 function wears(u) { return !!(u && Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return baseOf(w) === NAME; })); }
 window.ebWears = wears;
 function save(f) { try { if (typeof saveFields === 'function') saveFields(f); } catch (e) { } }
-function dayBox(u, key) { if (!u[key] || u[key].d !== today()) u[key] = { d: today(), n: 0 }; return u[key]; }
 function parties() { try { return (typeof darkParties !== 'undefined' && darkParties) ? darkParties : {}; } catch (e) { return {}; } }
 function myParty() { try { return (typeof getMyParty === 'function') ? getMyParty() : null; } catch (e) { return null; } }
 
@@ -238,11 +235,10 @@ window.ebMenu = function () {
     const me = u_();
     if (!me || !wears(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
     const ms = masksOf(me);
-    const br = dayBox(me, 'ebBreak'), sv = dayBox(me, 'ebSave');
     const w = box(head('🐺 （구） 정예 B조 ■■', '생환 포인트 1.5배 · 회수품 2배. 가면을 쓴 조원은 배율이 오르고, 전원 생환하면 조장 3배 · 정예조 2배 · 일반 1.5배.')
         + PARTS.map(function (p) {
             let line = '';
-            if (p.k === 'mask') line = '씌운 사람 ' + Object.keys(ms).length + ' / ' + C.MASK_MAX + ' · 오늘 파훼 ' + br.n + '/' + C.BREAK_MAX + ' · 오늘 확정 구출 ' + sv.n + '/' + C.SAVE_MAX;
+            if (p.k === 'mask') line = '씌운 사람 ' + Object.keys(ms).length + ' / ' + C.MASK_MAX;
             if (p.k === 'glove') line = me.ebGlove === today() ? '오늘 몫을 받았다' : '오늘 몫은 접속하면 붙는다';
             if (p.k === 'tape') line = '함께 탐사한 사람 ' + Object.keys(me.ebMates || {}).length + '명';
             if (p.k === 'pen') line = '데려갈 늑대 ' + (Number(me.ebWolves) || 0) + ' / ' + C.WOLF_MAX;
@@ -267,7 +263,7 @@ function maskMenu() {
             + '<div style="flex:1; font-size:11.5px;">🎭 ' + esc(ms[c].name || nameOf(c)) + ' <span style="font-size:9.5px; color:#8a95a8;">· ' + new Date(Number(ms[c].at) || 0).toLocaleDateString() + '</span></div>'
             + '<button class="game-btn eb-off" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + GREY + '">거둔다</button></div>';
     }).join('');
-    const w = box(head('🎭 정예조 가면', '조원 둘에게 씌운다. 쓴 사람은 「True or Fake」 · 하루 2회 파훼 · 조장의 확정 구출 대상이 된다. 같은 방으로 들어갈 때 효력이 있다.')
+    const w = box(head('🎭 정예조 가면', '조원 둘에게 씌운다. 쓴 사람은 「True or Fake」 · 판정 +' + C.MASK_BON + ' · 전원 생환 때 2배. 같은 방으로 들어갈 때 효력이 있다.')
         + (rows || '<div style="font-size:10.5px; color:#8a95a8; padding:6px 0;">아직 아무에게도 씌우지 않았다.</div>')
         + (Object.keys(ms).length < C.MASK_MAX ? '<button id="eb-add" class="game-btn" style="' + BTN + ' margin-top:10px;">사원에게 씌운다</button>' : '')
         + '<button id="eb-back" class="game-btn" style="' + BTN + GREY + '">돌아간다</button>');
@@ -654,8 +650,9 @@ function myMult() {
 })();
 
 // ==========================================
-// 매뉴얼 — 판정 보정 (역할마다 무작위)
+// 판정 보정 — 매뉴얼(역할마다 무작위) + 가면(쓴 사람 고정 +2)
 // ==========================================
+//   매뉴얼 몫은 조장이 살아 있을 때. 가면 몫은 쓰고 있으면(조장 · 정예조) 늘.
 (function hookBonus() {
     const iv = setInterval(function () {
         if (typeof rollDarkBonus !== 'function' || rollDarkBonus._eb) { if (typeof rollDarkBonus === 'function' && rollDarkBonus._eb) clearInterval(iv); return; }
@@ -668,6 +665,7 @@ function myMult() {
                     const rg = C.BON[role] || [0, 0];
                     b = (Number(b) || 0) + rnd(rg[0], rg[1]);
                 }
+                if (role === 'lead' || role === 'elite') b = (Number(b) || 0) + C.MASK_BON;
             } catch (e) { }
             return b;
         };
@@ -679,7 +677,7 @@ function myMult() {
 })();
 
 // ==========================================
-// 가면 — True or Fake · 파훼 · 확정 구출
+// 가면 — True or Fake 표시
 // ==========================================
 (function hookChoice() {
     const iv = setInterval(function () {
@@ -707,59 +705,6 @@ function myMult() {
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
-// 파훼 단추 — 작두 · 분신 단추와 같은 자리
-window.ebBreak = function () {
-    const me = u_(), r = run();
-    if (!me || !r) { alert_('탐사 중에만 쓸 수 있습니다.'); return; }
-    if (!masked()) { alert_('가면을 쓰고 있지 않습니다.'); return; }
-    const bx = dayBox(me, 'ebBreak');
-    if (bx.n >= C.BREAK_MAX) { alert_('오늘 파훼는 ' + C.BREAK_MAX + '회까지입니다.'); return; }
-    bx.n++;
-    save({ ebBreak: 1 });
-    if (window.FINX && typeof window.FINX.on === 'function' && window.FINX.on()) {
-        if (r.log) r.log.push('[🎭 가면] 피날레 파훼');
-        window.FINX.smash('🎭 정예조 가면 (남은 파훼 ' + (C.BREAK_MAX - bx.n) + ')');
-        return;
-    }
-    r.success = (r.success || 0) + 2;
-    r.modifier = (r.modifier || 0) + 1;
-    if (r.log) r.log.push('[🎭 가면] True or Fake — 기믹을 파훼했다 (+2)');
-    try { if (r.isParty && typeof sendPartyChat === 'function') sendPartyChat((me.name || '') + ' 사원이 가면 너머로 답을 보았습니다.', true); } catch (e) { }
-    try {
-        if (typeof darkBodyEl === 'function' && typeof darkBox === 'function' && typeof darkChoiceBtn === 'function') {
-            darkBodyEl().innerHTML = darkBox('🎭 True or Fake', '가면 너머로 보면 답은 하나뿐이다.<br><br>막고 있던 것이 거짓이었다는 듯 물러난다.<br><br><span style="font-size:11px; color:#8aa;">남은 파훼 ' + (C.BREAK_MAX - bx.n) + '회</span>',
-                darkChoiceBtn('지나간다.', 'partyAdvance(' + ((Number(r.step) || 0) + 1) + ')'));
-            try { if (typeof mountDarkChat === 'function') mountDarkChat('normal'); } catch (e) { }
-        }
-    } catch (e) { }
-};
-(function breakBtn() {
-    const ID = 'eb-break-btn';
-    setInterval(function () {
-        try {
-            const r = run(), me = u_();
-            const old = document.querySelector('#' + ID);
-            if (!r || !me || !masked()) { if (old) old.remove(); return; }
-            const bx = dayBox(me, 'ebBreak');
-            const left = Math.max(0, C.BREAK_MAX - bx.n);
-            if (!left) { if (old) old.remove(); return; }
-            const label = '🎭 True or Fake — 파훼한다 (남은 ' + left + '회)';
-            if (old && old.isConnected) { old.textContent = label; return; }
-            // 선택지가 있는 장면에만 (단추가 하나라도 있는 본문) — 투표 칸이 있으면 그 아래, 아니면 본문 끝
-            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
-            const area = document.getElementById('vote-area') || body;
-            if (!area || !body || !body.querySelector('button')) return;
-            const b = document.createElement('button');
-            b.id = ID; b.className = 'game-btn';
-            b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#4a5a70,#2a3240) !important; border-color:#9fb4d0 !important; color:#fff !important;';
-            b.textContent = label;
-            b.onclick = window.ebBreak;
-            area.appendChild(b);
-        } catch (e) { }
-    }, 1400);
-})();
-
-// 확정 구출 — 정예조 조원이 쓰러질 때 조장이 끌어낸다 (하루 3회 · 조장 기록 users/<조장>/ebSave)
 // 쓰러진 것은 방에 적는다 (전원 생환 셈)
 (function hookDeath() {
     const iv = setInterval(function () {
@@ -767,38 +712,6 @@ window.ebBreak = function () {
         const _d = darkDeath;
         const w = function (reasonText) {
             const me = u_(), r = run();
-            try {
-                if (me && r && r.isParty && r.partyId && roleIn(me.code, r.partyId) === 'elite' && leadAlive(r.partyId)) {
-                    const e = ebOf(r.partyId);
-                    const lead = userOf(e.lead);
-                    const used = (lead && lead.ebSave && lead.ebSave.d === today()) ? (Number(lead.ebSave.n) || 0) : 0;
-                    if (used < C.SAVE_MAX) {
-                        const d = db_();
-                        if (d) {
-                            d.ref('users/' + e.lead + '/ebSave').transaction(function (cur) {
-                                const n = (cur && cur.d === today()) ? (Number(cur.n) || 0) : 0;
-                                if (n >= C.SAVE_MAX) return;
-                                return { d: today(), n: n + 1 };
-                            }).catch(function () { });
-                        }
-                        if (lead) { if (!lead.ebSave || lead.ebSave.d !== today()) lead.ebSave = { d: today(), n: 0 }; lead.ebSave.n = used + 1; }
-                        r._dead = false;
-                        if (r.log) r.log.push('[🐺 확정 구출] ' + (e.leadName || nameOf(e.lead)) + ' 조장이 끌어냈다 (' + (used + 1) + '/' + C.SAVE_MAX + ')');
-                        log_(me, '[' + NAME + '] ' + (e.leadName || nameOf(e.lead)) + ' 조장이 당신을 끌어냈습니다. (' + (used + 1) + '/' + C.SAVE_MAX + ')');
-                        try {
-                            if (typeof darkBodyEl === 'function' && typeof darkBox === 'function' && typeof darkChoiceBtn === 'function') {
-                                darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + '<br><br><span style="color:#9fb4d0;">— 뒤에서 팔이 뻗어 와 옷깃을 잡았다.<br>'
-                                    + esc(e.leadName || nameOf(e.lead)) + ' 조장이다. 「아직이다.」<br>끌려 나온 자리에 그것은 없었다.</span>', darkChoiceBtn('숨을 고른다.', 'renderDarkStep();'));
-                                try { if (typeof mountDarkChat === 'function') mountDarkChat('normal'); } catch (e2) { }
-                            }
-                            if (typeof sendPartyChat === 'function') sendPartyChat((e.leadName || nameOf(e.lead)) + ' 조장이 ' + (me.name || '') + ' 사원을 끌어냈습니다.', true);
-                        } catch (e2) { }
-                        try { if (typeof saveDB === 'function') saveDB(); } catch (e2) { }
-                        return;
-                    }
-                }
-            } catch (err) { console.warn('[정예 B조] 구출 건너뜀', err && err.message); }
-            // 쓰러진다 — 방에 적는다
             try {
                 if (me && r && r.isParty && r.partyId && ebOf(r.partyId)) {
                     const d = db_();
@@ -811,7 +724,7 @@ window.ebBreak = function () {
         Object.keys(_d).forEach(function (k) { try { w[k] = _d[k]; } catch (e) { } });
         w._eb = true; darkDeath = w; window.darkDeath = w;
         clearInterval(iv);
-        console.log('[정예 B조] 확정 구출 연결');
+        console.log('[정예 B조] 쓰러짐 기록 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -852,7 +765,7 @@ window.ebState = function () {
     console.log('%c===== 🐺 （구） 정예 B조 ■■ =====', 'color:#9fb4d0; font-size:13px');
     if (!me) return;
     console.log('  차고 있나:', wears(me), '· 가면 씌운 사람:', Object.keys(masksOf(me)).map(nameOf).join(', ') || '없음', '· 내게 씌워진 가면:', me.ebMask ? (me.ebMask.byName || me.ebMask.by) : '없음');
-    console.log('  오늘 파훼:', dayBox(me, 'ebBreak').n + '/' + C.BREAK_MAX, '· 확정 구출:', dayBox(me, 'ebSave').n + '/' + C.SAVE_MAX, '· 반장갑:', me.ebGlove === today() ? '받았다' : '아직', '· 늑대:', Number(me.ebWolves) || 0);
+    console.log('  반장갑:', me.ebGlove === today() ? '받았다' : '아직', '· 늑대:', Number(me.ebWolves) || 0, '· 가면 보정: +' + C.MASK_BON);
     console.log('  함께 탐사한 사람:', Object.keys(me.ebMates || {}).map(nameOf).join(', ') || '없음');
     if (r) console.log('  탐사 중 — 역할:', myRole() || '없음', '· 배수:', myMult(), '· 늑대:', window.EBWOLF.list().map(function (w) { return w.nick + '(' + attrName(w.k) + ' ' + w.g + (w.gone ? ' · 사라짐' : '') + ')'; }).join(' · ') || '없음', '· 방 eliteB:', r.partyId ? JSON.stringify(ebOf(r.partyId)) : '-');
 };
