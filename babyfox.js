@@ -29,6 +29,8 @@
 //   감각  살아나갈 선택지만 보이게 한다. 다이스를 망치면 사라진다.
 //   치유  죽을 자리에서 한 번 살리고 소멸한다 —「치유의 기운이 깃듭니다.」
 //   은신  끌려가거나 함정에 빠질 일을 세 번 막고 소멸한다.
+//         오염 100 이송도 막는다 — 막으면 오염도를 HIDE_POLL(90)까지 내려 놓는다 (2026-10-29 · 그대로 두면 20초마다 되풀이됐다).
+//         쓰러져 입원하는 길 · 이미 격리 중 · 탐사 중에는 나서지 않는다 (죽음은 회피 · 치유의 몫).
 //   행운  회수품 확률을 150~300% 올린다. 공용시설을 대신 돌릴 수도 있다
 //         (장착자 한도에서 · 그때 행운이 등급만큼 더 붙는다).
 //   파괴  어떤 기믹이든 파훼한다. 세 번 쓰면 소멸한다.
@@ -93,6 +95,7 @@ const BFOX = {
     LOOT_HI:   3.0,                                             // 회수품 300%
     SPIN:      { D:100, C:150, B:200, A:300, S:350, L:400 },    // 행운 — 대신 돌릴 때 얹는 행운(%)
     HIDE_MAX:  3,                                               // 은신 — 막아 주는 횟수
+    HIDE_POLL: 90,                                              // 은신이 이송을 막으면 오염도를 여기까지 내린다 (100 그대로면 20초 뒤 또 끌려가 세 번이 금방 닳았다)
     BREAK_MAX: 3,                                               // 파괴 — 파훼 횟수
     BOND_SAVE: 1,                                               // 연결 — 확정 구출
     BOND_JOIN: 3,                                               // 연결 — 합류
@@ -1066,14 +1069,29 @@ setInterval(function () {
             const _o = window[fn];
             const w = function () {
                 try {
-                    const hd = usable('hide');
+                    const me = u_();
+                    // ★ 숨길 자리가 아닌 때는 원본에 맡긴다 (2026-10-29)
+                    //   · 쓰러져 입원(quarantineHospital)한 길 — 죽음은 회피 · 치유 분신의 몫이다. 전에는 입원 직후 600ms 에 도는
+                    //     startFoxRoomSequence 를 은신이 가로채 입원을 지우고(오염은 100 그대로) 「숨겼습니다」만 띄웠다
+                    //   · 이미 격리 중 · 어둠 탐사 중
+                    const inRoom = !!(me && Number(me.quarantineUntil) > Date.now());
+                    const inDark = (typeof darkRun !== 'undefined' && !!darkRun);
+                    const hd = (me && !me.quarantineHospital && !inRoom && !inDark) ? usable('hide') : null;
                     if (hd) {
                         const n = bump('hide', 'n', BFOX.HIDE_MAX, '세 번을 다 막고 소멸했습니다.');
-                        const me = u_();
-                        if (me) { me.quarantineUntil = 0; me.quarantineHospital = false; }
-                        try { if (typeof saveFields === 'function') saveFields({ quarantineUntil: 1 }); } catch (e) { }
+                        me.quarantineUntil = 0; me.quarantineHospital = false;
+                        // ★ 오염도를 내려 놓는다 — 100 그대로 두면 pollution-fix 가 20초마다 다시 이송을 걸어
+                        //   은신 세 번이 1분 안에 닳고 결국 끌려갔다 (100 → 구출 → 100 → 구출 → …)
+                        const was = Number(me.pollution) || 0;
+                        me.pollution = Math.min(was, BFOX.HIDE_POLL);
+                        me.lastPollutionTime = Date.now();
+                        me.foxRoomAnswered = false;
+                        try { hasShownFoxAlert = false; } catch (e) { }
+                        try { if (typeof saveFields === 'function') saveFields({ quarantineUntil: 1, quarantineHospital: 1, pollution: 1, lastPollutionTime: 1, foxRoomAnswered: 1 }); } catch (e) { }
+                        try { log_(me, '[' + NAME + '] ' + nickOf(hd) + '이(가) 당신을 숨겨 이송을 막았습니다. (오염도 ' + was + ' → ' + me.pollution + '% · ' + n + '/' + BFOX.HIDE_MAX + ')'); } catch (e) { }
                         alert_('🐾 ' + nickOf(hd) + '이(가) 당신을 숨겼습니다.\n\n'
-                            + '끌려가지 않았습니다. (' + n + ' / ' + BFOX.HIDE_MAX + ')');
+                            + '끌려가지 않았습니다. (' + n + ' / ' + BFOX.HIDE_MAX + ')\n오염도 ' + was + '% → ' + me.pollution + '%');
+                        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
                         return false;
                     }
                 } catch (e) { }
