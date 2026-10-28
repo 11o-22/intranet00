@@ -306,31 +306,66 @@ function tx(key, fn) { const d = db_(); return d ? d.ref(NODE + '/runs/' + key).
 
 let shownTag = '';
 let view = '';                      // 지금 창에 보이는 것 — list · lobby · run · end
+// 오류 — 어디서 났는지 남긴다 (journeyState 가 보여 준다). 한 군데가 막혀도 나머지는 돈다 (2026-10-29)
+const ERR = [];
+let lastErr = null;                 // { k, round, where, msg } — 그 판에서 난 오류 · 화면에 보여 주고 「다시」를 준다
+function err(where, e, r) {
+    const o = { at: Date.now(), where: where, msg: String((e && e.message) || e), k: r ? r._k : '', round: r ? r.round : 0 };
+    ERR.push(o); if (ERR.length > 20) ERR.shift();
+    lastErr = o;
+    window._journeyErr = ERR;
+    console.warn('[여정] ' + where, e);
+}
 function onChange() {
     const me = u_();
     if (!me || !ready()) return;
-    sweep();
-    settleSweep();
+    try { sweep(); } catch (e) { err('sweep', e); }
+    try { settleSweep(); } catch (e) { err('settle', e); }
     const r = myRun();
     if (r && runAlive(r)) {
         if (inDark()) return;
-        if (r.stage === 'fight' && allPicked(r)) { resolve(r); return; }
+        if (r.stage === 'fight' && allPicked(r)) {
+            // 판 풀기 — 오류가 나면 화면에 알리고 「다시」를 준다 (가만히 멎어 있지 않게)
+            try { resolve(r); return; }
+            catch (e) { err('resolve', e, r); shownTag = ''; try { paintRun(r); } catch (e2) { err('paint', e2, r); } return; }
+        }
         const tag = [r._k, r.stage, r.enc, r.round, JSON.stringify(r.pick || {}), logArr(r).length, JSON.stringify(petsOf(r).map(function (p) { return [p.hp, p.ko]; })), (r.mon || {}).hp].join('|');
         if (tag === shownTag && document.getElementById(OV) && view === 'run') return;
         shownTag = tag;
-        paintRun(r);
+        if (lastErr && (lastErr.k !== r._k || Number(lastErr.round) !== Number(r.round))) lastErr = null;   // 판이 넘어갔으면 지난 오류는 잊는다
+        try { paintRun(r); } catch (e) { err('paint', e, r); }
         return;
     }
-    if (document.getElementById(OV) && (view === 'list' || view === 'lobby')) paint();   // 끝 화면(end) 은 덮지 않는다
+    if (!document.getElementById(OV)) return;
+    if (view === 'list' || view === 'lobby') paint();                       // 끝 화면(end) 은 덮지 않는다
+    else if (view === 'run' && !r) {                                         // 보던 여정이 사라졌다 — 멎은 화면을 두지 않고 목록으로
+        shownTag = '';
+        paint();
+        alert_('보고 있던 여정의 기록이 사라졌습니다. 목록으로 돌아왔습니다.');
+    }
 }
-setInterval(function () { try { if (ready() && watching) onChange(); } catch (e) { } }, 5000);
+setInterval(function () { try { if (ready() && watching) onChange(); } catch (e) { err('tick', e); } }, 5000);
+// 단추를 눌렀는데 글이 안 바뀌었다 (이미 고른 판 · 넘어간 판 · 끝난 여정) → 보던 화면이 묵은 것이니 다시 그린다
+function resync(res) { if (!res || !res.committed) { shownTag = ''; try { onChange(); } catch (e) { err('resync', e); } } return res; }
 
-// 묵은 방 · 끝난 여정
+// 묵은 방 · 끝난 여정 — **내 것만** 치운다 (방장 · 여정에 든 사람). 상담사는 다 치운다.
+//   전에는 모두가 모두의 것을 치웠다 — 시계가 크게 어긋난 기기 하나가 다른 사람의 진행 중인 여정까지 지워 버릴 수 있었다.
 function sweep() {
-    const d = db_(); if (!d) return;
+    const d = db_(); const me = u_(); if (!d || !me) return;
+    const adm = me.code === 'kario0987';
     const t = now();
-    Object.keys(live.lobby).forEach(function (k) { const o = live.lobby[k]; if (!o || t - Number(o.at || 0) > LOBBY_LIVE) d.ref(NODE + '/lobby/' + k).remove().catch(function () { }); });
-    Object.keys(live.runs).forEach(function (k) { const o = live.runs[k]; if (!o || t - Number(o.at || 0) > RUN_LIVE) d.ref(NODE + '/runs/' + k).remove().catch(function () { }); });
+    Object.keys(live.lobby).forEach(function (k) {
+        const o = live.lobby[k];
+        if (!o) { if (adm) d.ref(NODE + '/lobby/' + k).remove().catch(function () { }); return; }
+        if (!(adm || o.lead === me.code)) return;
+        if (t - Number(o.at || 0) > LOBBY_LIVE) d.ref(NODE + '/lobby/' + k).remove().catch(function () { });
+    });
+    Object.keys(live.runs).forEach(function (k) {
+        const o = live.runs[k];
+        if (!o) { if (adm) d.ref(NODE + '/runs/' + k).remove().catch(function () { }); return; }
+        if (!(adm || (o.pets && o.pets[me.code]))) return;
+        if (t - Number(o.at || 0) > RUN_LIVE) d.ref(NODE + '/runs/' + k).remove().catch(function () { });
+    });
 }
 
 // ==========================================
@@ -553,7 +588,7 @@ function paintRun(r) {
             + '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; margin:12px 0; padding:10px; border:1px dashed #4a3f6a; border-radius:8px;">' + J.open.map(esc).join('<br><br>') + '</div>'
             + (r.lead === me.code ? '<button id="jr-start" class="game-btn" style="' + BTN + GOLD + '">문을 나선다</button>' : '<div style="font-size:11px; color:#9fd8ef; text-align:center; padding:8px 0;">방장이 문을 나서기를 기다리는 중…</div>')
             + '<button id="jr-quit" class="game-btn" style="' + BTN + GREY + '">돌아간다 (기권)</button>');
-        const st = w.querySelector('#jr-start'); if (st) st.onclick = function () { tx(r._k, function (cur) { if (!cur || cur.stage !== 'intro') return; cur.stage = 'fight'; cur.roundAt = Date.now(); cur.log = [{ r: 0, t: J.enc[0].in, k: 'n' }]; return cur; }); };
+        const st = w.querySelector('#jr-start'); if (st) st.onclick = function () { tx(r._k, function (cur) { if (!cur || cur.stage !== 'intro') return; cur.stage = 'fight'; cur.roundAt = Date.now(); cur.log = [{ r: 0, t: J.enc[0].in, k: 'n' }]; return cur; }).then(resync).catch(function (e) { err('start', e, r); resync(null); }); };
         w.querySelector('#jr-quit').onclick = function () { quit(r); };
         return;
     }
@@ -575,7 +610,7 @@ function paintRun(r) {
                 Object.keys(cur.pets).forEach(function (c) { const p = cur.pets[c]; p.gused = 0; p.guard = null; if (!p.ko) p.hp = Math.min(p.max, p.hp + Math.round(p.max * REST_HEAL)); });
                 cur.log = logArr(cur).concat([{ r: 0, t: '— 잠깐 숨을 골랐다. (체력 ' + Math.round(REST_HEAL * 100) + '% 회복)', k: 'x' }, { r: 0, t: e.in, k: 'n' }]).slice(-LOG_KEEP);
                 return cur;
-            });
+            }).then(resync).catch(function (e) { err('next', e, r); resync(null); });
         };
         w.querySelector('#jr-quit').onclick = function () { quit(r); };
         return;
@@ -594,7 +629,8 @@ function paintRun(r) {
         + '<div style="font-size:10.5px; line-height:1.7; background:rgba(0,0,0,0.35); border:1px solid #2a2436; border-radius:6px; padding:7px 9px; margin:8px 0; min-height:40px;">'
         + logs.map(function (l) { return '<div style="color:' + (l.k === 'n' ? '#d8d2e6' : l.k === 'm' ? '#ff9e9e' : l.k === 'x' ? '#ffd766' : '#9fe6b0') + ';">' + (l.k === 'n' ? '' : '· ') + l.t + '</div>'; }).join('') + '</div>'
         + (mine && !mine.ko
-            ? (picked ? '<div style="font-size:11px; color:#9fd8ef; text-align:center; padding:8px 0;">골랐습니다. 다른 동물을 기다리는 중…' + (late ? '<br><button id="jr-force" class="game-btn" style="margin:8px 0 0 0; padding:8px; font-size:10.5px;">1분이 지났다 — 안 고른 동물은 보통 공격으로</button>' : '') + '</div>'
+            ? (picked ? '<div style="font-size:11px; color:#9fd8ef; text-align:center; padding:8px 0;">골랐습니다. 다른 동물을 기다리는 중…' + (late ? '<br><button id="jr-force" class="game-btn" style="margin:8px 0 0 0; padding:8px; font-size:10.5px;">1분이 지났다 — 안 고른 동물은 보통 공격으로</button>' : '')
+                  + (lastErr && lastErr.k === r._k && Number(lastErr.round) === Number(r.round) ? '<div style="font-size:10px; color:#ff9e9e; margin-top:8px; line-height:1.6;">판을 푸는 중 오류가 났습니다 — ' + esc(lastErr.msg).slice(0, 80) + '<br><button id="jr-retry" class="game-btn" style="margin:6px 0 0 0; padding:8px; font-size:10.5px;">다시 푼다</button></div>' : '') + '</div>'
                 : '<div style="font-size:10px; color:#7f7898; margin-bottom:4px;">공격 — ' + esc(mine.nick) + '</div>'
                   + '<div style="display:flex; gap:5px; margin-bottom:7px;">' + (mine.a || []).map(function (s, i) { return '<button class="game-btn jr-o" data-k="a' + i + '" style="flex:1; margin:0; padding:9px 4px; font-size:10.5px;">' + esc(s[0]) + '<br><span style="font-size:8.5px; color:#8d8578;">' + T_NAME[s[1]] + '</span></button>'; }).join('') + '</div>'
                   + '<div style="font-size:10px; color:#7f7898; margin-bottom:4px;">방어</div>'
@@ -607,6 +643,7 @@ function paintRun(r) {
     Array.prototype.forEach.call(w.querySelectorAll('.jr-o'), function (b) {
         b.onclick = function () {
             const k = b.dataset.k;
+            Array.prototype.forEach.call(w.querySelectorAll('.jr-o'), function (x) { x.disabled = true; x.style.opacity = '.55'; });   // 두 번 눌리지 않게 · 눌렸다는 표
             tx(r._k, function (cur) {
                 if (!cur || cur.stage !== 'fight' || Number(cur.round) !== Number(r.round)) return;
                 cur.pick = cur.pick || {};
@@ -614,7 +651,7 @@ function paintRun(r) {
                 if (k === 'g' && (!cur.pets[me.code].gsk || cur.pets[me.code].gused)) return;
                 cur.pick[me.code] = { k: k };
                 return cur;
-            });
+            }).then(resync).catch(function (e) { err('pick', e, r); resync(null); });
         };
     });
     const fc = w.querySelector('#jr-force');
@@ -625,8 +662,10 @@ function paintRun(r) {
             cur.pick = cur.pick || {};
             Object.keys(cur.pets).forEach(function (c) { if (!cur.pets[c].ko && !cur.pick[c]) cur.pick[c] = { k: 'a0', auto: 1 }; });
             return cur;
-        });
+        }).then(resync).catch(function (e) { err('force', e, r); resync(null); });
     };
+    const rt = w.querySelector('#jr-retry');
+    if (rt) rt.onclick = function () { lastErr = null; shownTag = ''; onChange(); };
     w.querySelector('#jr-quit').onclick = function () { quit(r); };
 }
 function quit(r) {
@@ -641,7 +680,7 @@ function quit(r) {
         if (!alive.length) { cur.stage = 'lose'; cur.endAt = Date.now(); }
         else if (cur.lead === me.code) cur.lead = alive[0];
         return cur;
-    });
+    }).then(resync).catch(function (e) { err('quit', e, r); resync(null); });
 }
 
 // ==========================================
@@ -749,7 +788,7 @@ function resolve(r) {
         cur.pick = null;
         if (cur.stage === 'fight') { cur.round = (Number(cur.round) || 1) + 1; cur.roundAt = Date.now(); Object.keys(cur.pets).forEach(function (c) { cur.pets[c].guard = null; }); }
         return cur;
-    });
+    }).then(resync).catch(function (e) { err('resolve', e, r); resync(null); });
 }
 
 // ==========================================
@@ -786,7 +825,13 @@ function settleSweep() {
         if (o.settled && o.settled[me.code]) return;
         if (settling[k]) return;
         settling[k] = 1;
-        settle(Object.assign({ _k: k }, o));
+        try { settle(Object.assign({ _k: k }, o)); }
+        catch (e) {
+            // 정산 중에 오류 — 끝 화면만이라도 보여 주고, 여정은 끝난 것으로 적는다 (두 번 정산하지 않게)
+            err('settle', e, Object.assign({ _k: k }, o));
+            try { const d = db_(); const patch = {}; patch['settled/' + me.code] = 1; if (d) d.ref(NODE + '/runs/' + k).update(patch).catch(function () { }); } catch (e2) { }
+            try { endBox(Object.assign({ _k: k }, o), ['정산 중에 오류가 났습니다 — ' + String((e && e.message) || e).slice(0, 80)]); } catch (e3) { err('endBox', e3); }
+        }
     });
 }
 function settle(o) {
@@ -832,15 +877,23 @@ function settle(o) {
     const patch = {}; patch['settled/' + me.code] = 1;
     if (d) d.ref(NODE + '/runs/' + o._k).update(patch).then(function () { delete settling[o._k]; }).catch(function () { delete settling[o._k]; });
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    endBox(o, lines);
+    shownTag = '';
+}
+// 끝 화면 — 정산한 줄들과 함께 (정산이 도중에 막혀도 이것만은 그린다)
+function endBox(o, lines) {
+    const me = u_();
+    const J = JOURNEYS[o.j] || JOURNEYS.j1;
+    const p = o.pets[me.code] || {};
+    const won = o.stage === 'win';
     const last = J.enc[J.enc.length - 1];
     view = 'end';
     const w = box(head('『 ' + J.n + ' 』 — ' + (won ? '집으로' : '주인이 대신 맞았다'), '')
         + '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; padding:10px; border:1px dashed #4a3f6a; border-radius:8px; margin-bottom:10px;">' + (won ? last.out + (!p.ko && J.home ? '<br><br>' + J.home.replace(/\{n\}이\(가\)/g, esc(p.nick) + josa(p.nick, '이')).replace(/\{n\}/g, esc(p.nick)) + '<br>' + esc(HOME[Number(p.key)] || HOME[2]) : '') : J.lose) + '</div>'
         + petsOf(o).map(function (q) { return petRow(q, q.code === me.code); }).join('')
-        + '<div style="font-size:11px; color:#ffcf8f; line-height:1.7; margin:10px 0;">' + esc(p.nick) + ' — ' + (lines.length ? lines.map(esc).join('<br>') : '얻은 것이 없다') + '</div>'
+        + '<div style="font-size:11px; color:#ffcf8f; line-height:1.7; margin:10px 0;">' + esc(p.nick || '') + ' — ' + (lines.length ? lines.map(esc).join('<br>') : '얻은 것이 없다') + '</div>'
         + '<button id="jr-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
     w.querySelector('#jr-x').onclick = shut;
-    shownTag = '';
 }
 
 // ==========================================
@@ -858,12 +911,18 @@ window.journeyOpen = function () {
 };
 window.journeyOn = function () { const r = myRun(); return !!(r && runAlive(r)); };
 window.journeyState = function () {
-    console.log('%c===== 🐾 여정 =====', 'color:#c9b8ff; font-size:13px');
-    console.log('  오늘 남은 횟수:', triesLeft() + ' / ' + DAY_MAX, '· 방', Object.keys(live.lobby).length, '· 여정', Object.keys(live.runs).length);
     const r = myRun();
-    if (r) console.log('  내 여정:', r._k, r.stage, '·', r.enc + 1, '번째 ·', r.round, '판 ·', petsOf(r).map(function (p) { return p.nick + ' ' + p.hp + '/' + p.max + (p.ko ? ' (대신 맞음)' : ''); }).join(' · '));
-    console.log('  보낼 수 있는 펫:', myPets().join(', ') || '없음');
+    console.log('%c===== 🐾 여정 =====', 'color:#c9b8ff; font-size:13px');
+    console.log('  오늘 남은 횟수:', triesLeft() + ' / ' + DAY_MAX, '· 방', Object.keys(live.lobby).length, '· 여정', Object.keys(live.runs).length, '· 화면', view || '(닫힘)', '· 듣는 중', watching);
+    if (r) {
+        console.log('  내 여정:', r._k, '·', r.stage, '· 싸움', (Number(r.enc) || 0) + 1, '·', r.round + '판', '· 고른 것', JSON.stringify(r.pick || null), '· 괴물', r.mon ? r.mon.n + ' ' + r.mon.hp + '/' + r.mon.max : '-', '· 정산', JSON.stringify(r.settled || null));
+        petsOf(r).forEach(function (p) { console.log('   ', p.nick, '(' + p.sp + ' · ' + p.name + ')', p.hp + '/' + p.max, p.ko ? '· 대신 맞음' : '', p.gear ? '· ' + p.gear + (p.gused ? ' (스킬 씀)' : '') : ''); });
+        const lg = logArr(r).slice(-5); if (lg.length) console.log('  기록:', lg.map(function (l) { return l.t; }).join(' | '));
+    } else console.log('  내 여정: 없음');
+    if (ERR.length) { console.log('%c  오류 ' + ERR.length + '건', 'color:#ff8a80'); ERR.slice(-5).forEach(function (o) { console.log('   ', new Date(o.at).toLocaleTimeString(), o.where, o.round ? o.round + '판' : '', '—', o.msg); }); }
+    else console.log('  오류: 없음');
 };
+
 window.JOURNEY = { J: JOURNEYS, RECALL: RECALL, HOME: HOME, GEST: GEST, TRIO: TRIO, trioScene: trioScene, SK: SK, ATK_T: ATK_T, DEF_T: DEF_T, GEAR_T: GEAR_T, DAY_MAX: DAY_MAX, build: build, myPets: myPets, triesLeft: triesLeft };
 
 console.log('[여정] journeyOpen() · journeyState()');
