@@ -25,7 +25,7 @@
 //   내 자리의 펫 칸 일곱에 귀를 달아 두고, 서버가 바뀌면 currentUser 를
 //   맞추고 화면을 다시 그린다.
 //
-//       pets · petEgg · petEggAt · petBag · petFood · petShow · petWith · petRune · petRuneDay
+//       pets · petEgg · petEggAt · petBag · petFood · petShow · petWith · petRune · petRuneDay · petStayUntil · petSleepUntil
 //
 //   내가 쓴 것은 파이어베이스가 바로 되돌려 주므로 값이 같아 그냥 넘어간다.
 //   저장이 날아가는 중(pendingSaves)에 「없음」이 오면 받지 않는다 —
@@ -36,7 +36,8 @@
 
 (function petSync() {
 
-const KEYS = ['pets', 'petEgg', 'petEggAt', 'petBag', 'petFood', 'petShow', 'petWith', 'petRune', 'petRuneDay'];   // ★ 룬 주머니 (pet-rune.js · 2026-10-27)
+const KEYS = ['pets', 'petEgg', 'petEggAt', 'petBag', 'petFood', 'petShow', 'petWith', 'petRune', 'petRuneDay',   // ★ 룬 주머니 (pet-rune.js · 2026-10-27)
+              'petStayUntil', 'petSleepUntil'];   // ★ 🏠 집 지킴이 방석 · 💤 잠듦 (2026-10-28) — 휴대폰에서 깐 방석을 PC 가 몰라 펫이 K 의 방에 따라붙던 것
 
 let bound = '';
 let refs = [];

@@ -354,9 +354,12 @@ window.petBondOpen = function (id) {
             : '<div style="font-size:10px; color:#666; padding:4px 0 8px 0;">'
               + '가진 먹이가 없습니다. 사택에서 사 오십시오.</div>')
 
-        + '<button id="pb-x" class="game-btn" style="' + BTN + GREY + ' margin-top:6px;">닫는다</button>');
+        + '<button id="pb-list" class="game-btn" style="' + BTN + ' margin-top:6px;">🐶 펫 목록으로</button>'
+        + '<button id="pb-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
 
     w.querySelector('#pb-x').onclick = shut;
+    // ★ 먹이고 나서 바로 다른 펫에게 — 목록으로 (건의 2026-10-27)
+    w.querySelector('#pb-list').onclick = function () { shut(); try { if (typeof window.petOpen === 'function') window.petOpen(); } catch (e) { } };
     w.querySelector('#pb-pat').onclick = function () {
         const r = window.petPat(id); if (r.ok) window.petBondOpen(id);
     };

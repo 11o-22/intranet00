@@ -1839,9 +1839,12 @@ function reward(win, kind) {
     }
     return `<div style="font-size:11px; color:#8fb8c4; margin-top:10px; padding-top:8px; border-top:1px dashed #2f4a55;">${parts.join(' · ')}</div>`;
 }
+// ★ 꿈결 5분의 1 은 **굴릴 때** 줄인다 (2026-10-28) — 전에는 정산에서 나눠, 탐사 중 「꿈결 +84 D」로 쌓여 보인 수와
+//   정산의 수가 달랐다 (1,101 → 226). 이제 쌓이는 수가 곧 정산 수다.
+const DREAM_DIV = 5;
 function dreamRoll() {
     const r = DREAM[(kr && kr.dun && DUNS[kr.dun]) ? DUNS[kr.dun].g : 'D'] || DREAM.D;
-    return rnd(r[0], r[1]);
+    return Math.max(1, Math.round(rnd(r[0], r[1]) / DREAM_DIV));
 }
 function lossLine(lose) {
     if (!lose) return '';
@@ -3142,7 +3145,7 @@ function settle(how, txt) {
     if (how === 'leave' || how === 'out') { exp = Math.round(exp * 0.5); dream = Math.floor(dream * 0.5); }
     if (how === 'dead') { exp = Math.round(exp * 0.35); dream = 0; }   // ★ 쓰러지면 이번에 얻은 꿈결도 없다 (가진 것은 hardDeath 가 걷는다)
     if (helper) { exp = 0; dream = 0; }                         // 헬퍼 — 경험치 · 꿈결 없음
-    dream = Math.floor(dream / 5);                              // ★ K 의 방 꿈결 5분의 1 (2026-10-27 · 경험치는 그대로)
+    // (꿈결 5분의 1 은 dreamRoll 에서 — 탐사 중 보인 수와 정산 수가 같다 · 2026-10-28)
     const extra = [];                                           // 특수 물건이 보탠 것 — 정산에 한 줄씩
     // ★ 꿈결은 특수 물건이 불리지 않는다 (2026-10-24) — 🐾 아기 여우(행운) · 📺 토크 쇼(사회자와 끝까지)의 배수는
     //   아래 **포인트**에 붙는다 (전에는 꿈결을 ×1.5~3 · ×2 했다). 꿈결은 직업(행운)과 던전에서 얻은 그대로.
