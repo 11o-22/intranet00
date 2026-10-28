@@ -3838,11 +3838,12 @@ function watchChat() {
     // ✗ 글줄칸을 비우지 않는다 — 방을 옮겨도 하던 얘기는 그대로 둔다.
     //   (전에는 여기서 innerHTML 을 털고 새 방 줄로 다시 채웠다)
     chatRef = d.ref(P.CHAT + '/' + seatKey(run.room, run.inst)).limitToLast(P.CHAT_KEEP);
+    const chatFrom = now() + 1500;         // 걸자마자 쏟아지는 지난 줄은 「묵은 것」 (자리 잡는 데 쓴다 · pushLine)
     chatRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
         if (hidPeer(v.c)) return;          // 상담사의 맵 채팅 — 선염 말고는 안 보인다
-        addLine(v.n || '?', v.t, v.c, s.key, v.at);
+        pushLine({ n: v.n || '?', t: v.t, c: v.c, k: s.key, at: v.at, hist: now() < chatFrom });
         kitHeard(v);                       // 🐾 대답을 기다리던 중이면 조금 더 모은다
     });
     paintLog();
@@ -4426,12 +4427,19 @@ function pushLine(o) {
     //     (맵 채팅은 방이 비면 통째로 지워져 금방 풀리는데, 서버 채팅은 남아 있어 계속 그랬다)
     //   → 서버가 준 열쇠(push)의 때를 먼저 쓴다 — 열쇠는 서버 시계에 맞춰 만들어진다. 열쇠가 없거나 그것마저
     //     이상하면 적힌 at 을 쓰되, 지금보다 5분 넘게 앞선 것은 지금으로 친다.
-    //   ★ 열쇠가 없는 줄(알림 줄 · 내가 보낸 귓속말)도 **같은 서버 시계**(chatNow)로 잡는다 (2026-10-28 저녁)
-    //     ✗ 알림 줄만 기기 시계(now)로 잡았더니, 기기 시계가 몇 분 앞선 사람은 방을 옮길 때마다 쌓이는
-    //       「~에 들어왔습니다」가 늘 맨 아래에 남고 새 말은 그 위에 끼어 — 아래 채팅 칸에 말이 안 남았다.
-    const kt = keyTime(o.k);
-    if (kt) o.at = kt;
-    else if (o.at == null || !(Number(o.at) > 0) || Number(o.at) > chatNow() + 300000) o.at = chatNow();
+    //   ★ 세 번째 고침 (2026-10-28 밤) — **지금 들어온 줄은 들어온 때**로 잡는다.
+    //     ✗ 열쇠의 때도 믿을 게 못 됐다. 어느 사원의 기기 시계가 열일곱 시간 앞서 있었는데 그 열쇠(push)까지
+    //       그 시계로 만들어져 와서, 그 사람의 서버 줄 열두 개가 하루 안의 「미래」에 서서 아래 칸을 다 차지했다.
+    //     → 걸어 둔 귀로 **지금 막 들어온 줄**(살아 있는 줄 · 알림 줄 · 내가 보낸 줄)은 들어온 그 때(서버 시계)로 선다.
+    //       귀를 걸자마자 쏟아지는 **지난 줄**(hist · quiet)만 열쇠의 때로 자리를 잡되, 지금보다 뒤면 지금으로 당긴다.
+    //       그러면 무슨 시계로 적혔든 새 말은 늘 맨 아래에 온다.
+    const tn = chatNow();
+    if (o.hist || o.quiet) {
+        const kt = keyTime(o.k);
+        let a = kt || Number(o.at) || tn;
+        if (!(a > 0) || a > tn) a = tn;
+        o.at = a;
+    } else o.at = tn;
     let i = run.lines.length;
     while (i > 0 && (Number(run.lines[i - 1].at) || 0) > o.at) i--;
     run.lines.splice(i, 0, o);
