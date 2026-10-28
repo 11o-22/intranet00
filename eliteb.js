@@ -122,9 +122,14 @@ window.ebRole = myRole;
 // ==========================================
 // 물품 등록 · 장터 숨김 · 장착
 // ==========================================
+//   ★ 바로 등록한다 — 시계(400ms)로 미루면 그 사이에 자동 로그인이 소지품 칸을 먼저 그려
+//     「알 수 없는 물품입니다 · 정가 -」 로 뜨고, 깜박임 막기(norepaint2.js)가 그 뒤의 다시
+//     그리기를 건너뛰어 그대로 남는다 (2026-10-28 · 실제로 그렇게 떴다). ITEM_CATALOG 는
+//     index.html 이 묶음보다 먼저 만들어 두므로 이 줄이 돌 때 이미 있다.
+//     이미 그 이름으로 그려진 칸이 있으면 그 자리에서 한 번 다시 그린다.
 (function reg() {
-    const iv = setInterval(function () {
-        if (typeof ITEM_CATALOG === 'undefined') return;
+    function put() {
+        if (typeof ITEM_CATALOG === 'undefined') return false;
         if (!ITEM_CATALOG[NAME]) {
             ITEM_CATALOG[NAME] = {
                 price: 0, usable: true, targetable: false, effect: 'equip_eliteb', noSell: true,
@@ -133,9 +138,24 @@ window.ebRole = myRole;
             };
             if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME);
             console.log('[정예 B조] ' + NAME + ' 등록 — 상담사 지급 전용');
+            repaint();
         }
-        clearInterval(iv);
-    }, 400);
+        return true;
+    }
+    // 등록 전에 그려진 소지품 칸 — 「알 수 없는 물품」 으로 남아 있으면 손으로 부른 셈 치고 다시 그린다
+    function repaint() {
+        try {
+            const box = document.getElementById('inventory-list-container');
+            if (!box || !box.childNodes.length) return;
+            if (String(box.textContent || '').indexOf(NAME) < 0) return;
+            if (typeof currentUser === 'undefined' || !currentUser || typeof renderInventory !== 'function') return;
+            renderInventory();
+            console.log('[정예 B조] 등록 전에 그려진 소지품 칸을 다시 그렸습니다');
+        } catch (e) { }
+    }
+    window.ebRegister = put;
+    if (put()) return;
+    const iv = setInterval(function () { if (put()) clearInterval(iv); }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
 (function hideMarket() {
