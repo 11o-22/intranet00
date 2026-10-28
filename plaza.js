@@ -5587,6 +5587,21 @@ window.plazaState = function () {
         return (run.peers[c].one.name || c) + '(' + c + ')'; }).join(', ') : '혼자');
 };
 
+// 💬 글줄 들여다보기 — 「채팅 칸에 말이 안 남는다」를 쫓을 때 (2026-10-28)
+window.plazaLines = function (n) {
+    console.log('%c===== 💬 광장 글줄 =====', 'color:#9fd8ef; font-size:13px');
+    if (!run) { console.log('  들어와 있지 않습니다.'); return; }
+    const sk = (typeof serverNow === 'function') ? (serverNow() - Date.now()) : 0;
+    console.log('  서버 시계 − 기기 시계:', Math.round(sk / 1000) + '초', '· 글줄', (run.lines || []).length, '· 갈래', chatCh, '· 방', seatKey(run.room, run.inst));
+    const rows = (run.lines || []).slice(-(n || 12)).map(function (o) {
+        return { 종류: o.sys ? '알림' : (o.w ? '귓' : (o.sv ? '서버' : '맵')), 누구: o.n || '', 말: String(o.t || '').slice(0, 24),
+                 때: new Date(Number(o.at) || 0).toLocaleTimeString(), 열쇠때: o.k ? (keyTime(o.k) ? new Date(keyTime(o.k)).toLocaleTimeString() : '✗') : '-', 열쇠: o.k || '' };
+    });
+    console.table(rows);
+    const feed = document.getElementById('plaza-feed');
+    console.log('  아래 칸:', feed ? feed.innerText.replace(/\n/g, ' | ') : '없음');
+};
+
 // 지금 선 자리 — 시험과 콘솔에서 들여다본다
 window.plazaWhere = function () {
     if (!run) return null;
