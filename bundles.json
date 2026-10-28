@@ -418,7 +418,8 @@
       "gear-fill.js",
       "pet-gear.js",
       "journey.js",
-      "letter-shop.js"
+      "letter-shop.js",
+      "dark-kbd.js"
     ]
   ]
 }
