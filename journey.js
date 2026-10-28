@@ -25,6 +25,8 @@
 //   journey/lobby/<열쇠>  { at, j, lead, leadName, members: { 사번: { name, key, nick, sp, at } }, run }
 //   journey/runs/<열쇠>   { at, j, stage, enc, round, roundAt, lead, order, pets: { 사번: {…} }, mon, pick, log, settled }
 //       stage  intro 회상 · fight 싸움 · between 다음 싸움 앞 · win · lose
+//   한 여정에는 **같은 동물이 둘 못 간다** (방에 들어갈 때 거른다 · 2026-10-28 밤)
+//   주인이 대신 맞으면 펫은 한 시간 자고, **주인은 한 시간 가두리** (gaduri/<방>/<사번> by 'journey' · gaduri.js 가 때가 되면 치운다)
 //   journeyUse/<사번>     { d, n }
 //
 // ■ 콘솔
@@ -108,6 +110,24 @@ const HOME = {
     24: '날개 끝이 조금 찢어지고 가루가 벗겨졌다. 물고 올 입이 없어 발로 들고 왔다. 주인 손등에 내려앉아 날개를 천천히 두 번 접었다 편다. 봐 달라는 것이다.',
     25: '깃털이 흐트러지고 부리 끝이 흙으로 까맣다. 가져온 것을 내려놓자마자 빈 어깨로 날아올라 귀에 대고 떠든다. 칭찬이 올 때까지 멈출 생각이 없다.'
 };
+// 셋이 함께 갈 때 — 길 중간의 장면 (2026-10-28 밤)
+//   세 마리가 한 여정에 있으면 싸움 사이에 세 번, 서로 어울리는 장면이 끼어든다 (1번째 · 3번째 · 4번째 싸움 뒤 = 보스 앞).
+//   역할({a} {b} {c})은 장면마다 한 자리씩 돌아간다. 하나가 주인 대신 맞고 빠졌으면 둘이 그 자리를 돌아보는 한 줄로 바뀐다.
+//   {a} 이름 · {A} 동물 · {ga} 그 동물의 몸짓 — 뒤에 이/을/은/와 를 붙이면 받침을 맞춘다 ({a이} {A와})
+const GEST = {
+    1: '꼬리 끝만 까딱하며', 2: '온몸으로 꼬리를 흔들며', 3: '작은 몸으로 큰 소리를 내며', 4: '깃털을 둥글게 부풀리며', 5: '소리 없이 다가와',
+    6: '볕 드는 자리를 골라 앉으며', 7: '느릿느릿 목을 빼고', 8: '짹짹 두 번 울고', 9: '볼을 가득 부풀리고', 10: '흰 줄무늬를 세우고',
+    11: '묵직하게 몸을 붙이며', 12: '슬쩍 감아 오며', 13: '웃는 얼굴로', 14: '귀를 바짝 세우고', 15: '돌을 꼭 쥔 채',
+    16: '겁도 없이 삐약거리며', 17: '화난 얼굴로 꼬리를 흔들며', 18: '소리 없이 내려앉아', 19: '웃는 얼굴로 몸을 비비며', 20: '눈을 크게 뜨고',
+    21: '뭐든 한 입 씹어 보며', 22: '낮게 울며', 23: '덤불 같은 몸을 기대며', 24: '소리 없이 내려앉아', 25: '귀에 대고 떠들며'
+};
+const TRIO = [
+    '첫 싸움이 끝나자 셋은 서로를 처음 보는 눈으로 봤다. {a이} {ga} 먼저 {b} 쪽으로 다가갔다. {b은} 한 발 물러섰다가, {A}의 냄새를 맡고 다시 한 발 돌아왔다. 그 사이 {c이} {gc} 둘 사이에 끼어들었다. {A}, {B}, {C}. 셋 다 주인이 다르다. 셋 다 같은 길 위에 있다. 누가 먼저랄 것도 없이 같은 방향으로 걷기 시작했다.',
+    '골목을 빠져나와 셋은 처음으로 한자리에 앉았다. {b이} {gb} 제 몫의 자리를 비켜 주었다. {c은} 그 자리에 앉지 않고 {b} 옆에 몸을 붙였다. {a이} 그 둘을 한참 보다가, {ga} 가운데에 끼어 누웠다. 밤바람이 지나갔다. 어느 주인의 바디캠에서든 세 개의 등이 같은 박자로 오르내리는 것이 보였다. 누가 깨우기 전까지는 아무도 먼저 일어나지 않을 것 같았다.',
+    '가로등 너머에서 냄새가 왔다. 주인의 냄새. 셋 다 동시에 멈췄다. {c이} {gc} 먼저 그쪽을 향했다. {a이} 뒤따르려다 멈춰, 뒤를 돌아 {b을} 봤다. {b은} 몸이 떨리고 있었다. {A와} {C이} 양옆에 섰다. 말은 없었다. 그냥 섰다. {b이} {gb} 먼저 앞으로 나섰고, 셋은 나란히 마지막 길로 들어갔다. 서로의 주인은 모른다. 서로가 누구의 것인지는 안다.'
+];
+const TRIO_ONE_DOWN = '{a와} {b은} 걸음을 멈추고, {c이} 서 있던 자리를 한 번씩 돌아봤다. {c은} 지금 주인 품에서 자고 있다. 둘은 다시 걸었다. 조금 더 붙어서.';
+const TRIO_AT = { 1: 0, 3: 1, 4: 2 };     // between 단계의 enc → 장면 번호
 const SK = {
     1:  { a: [['냥펀치', 'hit'], ['할퀴기', 'multi'], ['숨었다 덮치기', 'sure']],          d: [['등 세우기', 'counter'], ['상자 속으로', 'dodge']] },
     2:  { a: [['돌진 안기기', 'heavy'], ['물고 늘어지기', 'drain'], ['짖기', 'hit']],        d: [['앞에 서기', 'taunt'], ['공 물어오기', 'heal']] },
@@ -374,23 +394,27 @@ function paint() {
     w.querySelector('#jr-x').onclick = shut;
     const solo = w.querySelector('#jr-solo'); if (solo) solo.onclick = function () { pickPet(function (key) { startRun([{ code: me.code, key: key }]); }); };
     const mk = w.querySelector('#jr-make'); if (mk) mk.onclick = function () { pickPet(function (key) { makeLobby(key); }); };
-    Array.prototype.forEach.call(w.querySelectorAll('.jr-join'), function (b) { b.onclick = function () { pickPet(function (key) { joinLobby(b.dataset.k, key); }); }; });
+    Array.prototype.forEach.call(w.querySelectorAll('.jr-join'), function (b) { b.onclick = function () { const lb = live.lobby[b.dataset.k]; if (!lb) { paint(); return; } pickPet(function (key) { joinLobby(b.dataset.k, key); }, lb); }; });
 }
-function pickPet(cb) {
+// 방에 이미 있는 동물(종) — 한 여정에는 같은 동물이 둘 못 간다
+function takenIn(lobby) { const out = {}; Object.keys((lobby && lobby.members) || {}).forEach(function (c) { const k = lobby.members[c] && lobby.members[c].key; if (k) out[String(k)] = lobby.members[c].sp || (P().BY[k] || {}).n || ''; }); return out; }
+function pickPet(cb, lobby) {
     const me = u_();
     if (inDark()) { alert_('어둠 탐사 중에는 떠날 수 없습니다.'); return; }
     if (!triesLeft()) { alert_('오늘 여정은 ' + DAY_MAX + '번까지입니다.'); return; }
     const keys = myPets();
     if (!keys.length) { alert_('보낼 수 있는 펫이 없습니다.\n(탐사 중 · 동행 중 · 다친 펫 · 여정 뒤 자는 펫은 못 갑니다)'); return; }
+    const taken = takenIn(lobby);
+    if (lobby && keys.every(function (k) { return !!taken[k]; })) { alert_('그 방에 이미 있는 동물뿐입니다.\n한 여정에는 같은 동물이 둘 못 갑니다.'); return; }
     view = 'pick';
-    const w = box(head('보낼 펫', '펫 하나가 떠납니다. 낀 장비의 스킬을 한 싸움에 한 번 씁니다.')
+    const w = box(head('보낼 펫', '펫 하나가 떠납니다. 낀 장비의 스킬을 한 싸움에 한 번 씁니다.' + (lobby ? ' 방에 이미 있는 동물은 못 갑니다.' : ''))
         + '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:9px;">'
         + keys.map(function (k) {
-            const st = G().stats(k, me);
-            return '<button class="game-btn jr-pet" data-k="' + esc(k) + '" style="margin:0; padding:8px 4px; font-size:10px; display:flex; flex-direction:column; align-items:center; gap:3px;">'
+            const st = G().stats(k, me), dup = !!taken[k];
+            return '<button class="game-btn jr-pet" data-k="' + esc(k) + '"' + (dup ? ' disabled' : '') + ' style="margin:0; padding:8px 4px; font-size:10px; display:flex; flex-direction:column; align-items:center; gap:3px;' + (dup ? ' opacity:0.4;' : '') + '">'
                 + '<img src="' + P().icon(k) + '" alt="" style="width:40px; height:40px; object-fit:contain; image-rendering:pixelated;">'
                 + '<span style="max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(P().nick(k, me)) + '</span>'
-                + '<span style="font-size:8.5px; color:#8d8578;">Lv ' + st.lv + ' · 체력 ' + st.max + (st.gear ? ' · 장비' : '') + '</span></button>';
+                + '<span style="font-size:8.5px; color:#8d8578;">' + (dup ? '방에 이미 있는 동물' : 'Lv ' + st.lv + ' · 체력 ' + st.max + (st.gear ? ' · 장비' : '')) + '</span></button>';
         }).join('') + '</div>'
         + '<button id="jr-back" class="game-btn" style="' + BTN + GREY + '">돌아간다</button>');
     w.querySelector('#jr-back').onclick = paint;
@@ -408,20 +432,25 @@ function joinLobby(k, key) {
     const me = u_(), d = db_();
     if (!me || !d) return;
     view = 'list';
+    let why = '';
     d.ref(NODE + '/lobby/' + k).transaction(function (cur) {
-        if (!cur || cur.run) return;
+        why = '';
+        if (!cur || cur.run) { why = '찼거나 이미 떠났습니다'; return; }
         cur.members = cur.members || {};
-        if (!cur.members[me.code] && Object.keys(cur.members).length >= 3) return;
+        if (!cur.members[me.code] && Object.keys(cur.members).length >= 3) { why = '찼습니다'; return; }
+        // 한 여정에는 같은 동물이 둘 못 간다
+        const dup = Object.keys(cur.members).some(function (c) { return c !== me.code && String(cur.members[c].key) === String(key); });
+        if (dup) { why = '같은 동물이 이미 있습니다 — 한 여정에는 한 종류씩만 갑니다'; return; }
         cur.members[me.code] = { name: me.name, key: String(key), nick: P().nick(key, me), sp: (P().BY[key] || {}).n || '', at: Date.now() };
         return cur;
-    }).then(function (r) { if (!r || !r.committed) alert_('그 방에는 들어갈 수 없습니다. (찼거나 이미 떠났습니다)'); });
+    }).then(function (r) { if (!r || !r.committed) alert_('그 방에는 들어갈 수 없습니다. (' + (why || '찼거나 이미 떠났습니다') + ')'); });
 }
 function paintLobby(o) {
     const me = u_(), d = db_();
     view = 'lobby';
     const lead = o.lead === me.code;
     const ms = Object.keys(o.members).map(function (c) { return Object.assign({ code: c }, o.members[c]); }).sort(function (a, b) { return a.at - b.at; });
-    const w = box(head('🐾 여정 — ' + o.leadName + ' 사원의 방', '『 ' + esc(JOURNEYS[o.j || 'j1'].n) + ' 』 · 셋까지. ' + (lead ? '다 모이면 「출발」을 누릅니다.' : '방장이 출발하기를 기다리는 중…'))
+    const w = box(head('🐾 여정 — ' + o.leadName + ' 사원의 방', '『 ' + esc(JOURNEYS[o.j || 'j1'].n) + ' 』 · 셋까지 · 같은 동물은 하나씩. ' + (lead ? '다 모이면 「출발」을 누릅니다.' : '방장이 출발하기를 기다리는 중…'))
         + ms.map(function (m) {
             return '<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">'
                 + '<img src="' + P().icon(m.key) + '" alt="" style="width:30px; height:30px; object-fit:contain; image-rendering:pixelated;">'
@@ -453,6 +482,8 @@ function startRun(members, lobbyKey) {
     if (!me || !d) return;
     if (inDark()) { alert_('어둠 탐사 중에는 떠날 수 없습니다.'); return; }
     const J = JOURNEYS.j1;
+    const seenSp = {};
+    for (let i = 0; i < members.length; i++) { const sk = String(members[i].key); if (seenSp[sk]) { alert_('같은 동물이 둘 있습니다 — 한 여정에는 한 종류씩만 갑니다.\n(' + ((P().BY[sk] || {}).n || sk) + ')'); return; } seenSp[sk] = 1; }
     const pets = {}, order = [];
     for (let i = 0; i < members.length; i++) {
         const p = build(members[i].code, members[i].key);
@@ -474,6 +505,34 @@ function startRun(members, lobbyKey) {
             } catch (e) { }
         });
     });
+}
+
+// 셋이 함께 가는 장면 — 글(HTML) 또는 ''
+function fillScene(t, ps) {
+    return esc(t).replace(/\{(g?[abcABC])(이|을|은|와|로)?\}/g, function (_, k, j) {
+        const p = ps[{ a: 0, b: 1, c: 2 }[k.slice(-1).toLowerCase()]];
+        if (!p) return '';
+        let w;
+        if (k.charAt(0) === 'g') w = GEST[Number(p.key)] || '';
+        else if (k === k.toUpperCase()) w = p.sp || (P().BY[p.key] || {}).n || '';
+        else w = p.nick || '';
+        return esc(w) + ((j && k.charAt(0) !== 'g') ? josa(w, j) : '');
+    });
+}
+function trioScene(r) {
+    const i = TRIO_AT[Number(r.enc)];
+    if (i == null) return '';
+    const all = petsOf(r);
+    if (all.length !== 3) return '';
+    let ps = all.slice(i % 3).concat(all.slice(0, i % 3));        // 장면마다 역할을 한 자리씩 돌린다
+    const ko = ps.filter(function (p) { return p.ko; });
+    let t = TRIO[i];
+    if (ko.length === 1) { ps = ps.filter(function (p) { return !p.ko; }).concat(ko); t = TRIO_ONE_DOWN; }
+    else if (ko.length) return '';
+    return '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; padding:10px; border:1px dashed #7a5fa8; border-radius:8px; margin-bottom:10px; background:rgba(201,184,255,0.05);">'
+        + '<div style="display:flex; align-items:center; gap:4px; margin-bottom:6px;"><span style="font-size:10px; color:#c9b8ff;">✦ 셋이서</span>'
+        + all.map(function (p) { return '<img src="' + P().icon(p.key) + '" alt="" style="width:22px; height:22px; object-fit:contain; image-rendering:pixelated;' + (p.ko ? ' opacity:0.35;' : '') + '">'; }).join('') + '</div>'
+        + fillScene(t, ps) + '</div>';
 }
 
 // ==========================================
@@ -502,6 +561,7 @@ function paintRun(r) {
         const m = J.enc[r.enc - 1], nx = J.enc[r.enc];
         const w = box(head('『 ' + J.n + ' 』 — ' + r.enc + ' / ' + J.enc.length, '')
             + '<div style="font-size:11.5px; line-height:1.75; color:#e8e2f0; padding:10px; border:1px dashed #4a3f6a; border-radius:8px; margin-bottom:10px;">' + (m ? m.out : '') + '</div>'
+            + trioScene(r)
             + petsOf(r).map(function (p) { return petRow(p, p.code === me.code); }).join('')
             + '<button id="jr-next" class="game-btn" style="' + BTN + GOLD + ' margin-top:10px;">계속 간다 — ' + esc(nx ? nx.kind + ' 「' + nx.n + '」' : '') + '</button>'
             + '<button id="jr-quit" class="game-btn" style="' + BTN + GREY + '">돌아간다 (기권)</button>');
@@ -696,6 +756,26 @@ function resolve(r) {
 // 정산 — 내 펫만 내가 (끝난 것을 보면 그 자리에서 · 늦게 들어와도)
 // ==========================================
 const settling = {};
+// 펫 대신 맞은 주인 — 가두리 한 시간 (광장 → 백일몽 차례로 빈 자리 · 둘 다 찼으면 밖에 둔다 · gaduri.js by 'journey')
+const CAGE_MS = 60 * 60 * 1000;
+function cage(me) {
+    const d = db_();
+    if (!d || !me || me.code === 'kario0987') return;
+    const until = Date.now() + CAGE_MS;
+    const rooms = ['plaza', 'dream'];
+    const put = function (i) {
+        if (i >= rooms.length) return;
+        d.ref('gaduri/' + rooms[i]).transaction(function (box) {
+            box = box || {};
+            if (box[me.code]) { if (!box[me.code].until || box[me.code].until < until) { box[me.code].until = until; box[me.code].by = box[me.code].by || 'journey'; } return box; }
+            if (Object.keys(box).length >= 3) return;
+            box[me.code] = { at: Date.now(), by: 'journey', until: until, name: me.name || me.code };
+            return box;
+        }).then(function (res) { if (!res || !res.committed) put(i + 1); }).catch(function () { });
+    };
+    put(0);
+}
+
 function settleSweep() {
     const me = u_();
     if (!me) return;
@@ -744,6 +824,8 @@ function settle(o) {
         const fed = Math.min(Date.now(), (Number(s.fedAt) || Date.now()) + SLEEP_MS);     // 포만도 시계도 한 시간 멈춘다
         P().patch(key, { jsleep: until, fedAt: fed });
         lines.push('한 시간 잔다 — 포만도는 그동안 줄지 않는다');
+        cage(me);                                                                           // 대신 맞은 주인은 한 시간 가두리
+        lines.push('주인은 한 시간 가두리에서 쉰다');
     }
     log_('[여정] 『 ' + J.n + ' 』 ' + (won ? '끝까지 갔다' : '주인이 대신 맞았다') + ' — ' + p.nick + (lines.length ? ' · ' + lines.join(' · ') : ''));
     try { saveFields({ history: 1 }); } catch (e) { }
@@ -782,7 +864,7 @@ window.journeyState = function () {
     if (r) console.log('  내 여정:', r._k, r.stage, '·', r.enc + 1, '번째 ·', r.round, '판 ·', petsOf(r).map(function (p) { return p.nick + ' ' + p.hp + '/' + p.max + (p.ko ? ' (대신 맞음)' : ''); }).join(' · '));
     console.log('  보낼 수 있는 펫:', myPets().join(', ') || '없음');
 };
-window.JOURNEY = { J: JOURNEYS, RECALL: RECALL, HOME: HOME, SK: SK, ATK_T: ATK_T, DEF_T: DEF_T, GEAR_T: GEAR_T, DAY_MAX: DAY_MAX, build: build, myPets: myPets, triesLeft: triesLeft };
+window.JOURNEY = { J: JOURNEYS, RECALL: RECALL, HOME: HOME, GEST: GEST, TRIO: TRIO, trioScene: trioScene, SK: SK, ATK_T: ATK_T, DEF_T: DEF_T, GEAR_T: GEAR_T, DAY_MAX: DAY_MAX, build: build, myPets: myPets, triesLeft: triesLeft };
 
 console.log('[여정] journeyOpen() · journeyState()');
 

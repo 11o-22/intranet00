@@ -14,6 +14,7 @@
 // ■ 서버 자리
 //   gaduri/<방>/<사번> = { at, by, name, auto?, until?, fed: { 던진사번: 횟수 } }   방은 plaza · dream
 //                        by 'petbt' 는 ⚔ 펫 배틀 패배 (pet-battle.js · until 15분이 지나면 누구의 화면이든 치운다)
+//                        by 'journey' 는 🐾 여정에서 펫 대신 맞은 주인 (journey.js · until 한 시간)
 //   gaduriFood/<받는사번>/<번호> = { from, fromName, room, at }
 //
 // ■ 상담실 · 선녀탕 (2026-10-19)
@@ -126,11 +127,13 @@ setInterval(function () {
     // 🎐 여우 신도가 가뒀다 (무례하게 군 사람 · 서버가 적는다 · until 이 지나면 풀린다 — foxcult.js · api/_disaster)
     const fd = !auto && ent.by === 'foxd';
     const bt = !auto && ent.by === 'petbt';                              // ⚔ 펫 배틀에서 졌다 (pet-battle.js · until 이 지나면 풀린다)
+    const jr = !auto && ent.by === 'journey';                            // 🐾 여정에서 펫 대신 맞았다 (journey.js · 한 시간)
     if (fd) {
         try { if (typeof addHistoryLog === 'function') { addHistoryLog(me, '[가두리] ' + (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.why ? ' (' + ent.why + ')' : '')); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
     }
     if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.'
             : bt ? '펫 배틀에서 져서 ' + NAME[now] + ' 가두리에 갇힙니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
+            : jr ? '여정에서 펫 대신 맞아, ' + NAME[now] + ' 가두리에서 한 시간 쉽니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
             : fd ? (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
             : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
         + '\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
@@ -217,6 +220,7 @@ function paintAdmin() {
                         + (v.auto ? '<span style="font-size:10px; color:#ff9f80;">격리 중 (저절로)</span>' : '')
                         + (v.by === 'foxd' ? '<span style="font-size:10px; color:#f0c987;">' + esc(v.byName || '🎐 여우 신도') + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
                         + (v.by === 'petbt' ? '<span style="font-size:10px; color:#ffb74d;">⚔ 펫 배틀 패배' + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
+                        + (v.by === 'journey' ? '<span style="font-size:10px; color:#c9b8ff;">🐾 여정 — 펫 대신 맞음' + (v.until ? ' · ' + Math.max(0, Math.round((v.until - Date.now()) / 60000)) + '분' : '') + '</span>' : '')
                         + '<button class="game-btn" style="margin:0 0 0 auto; padding:5px 10px; font-size:10px;" onclick="gaduriFree(\'' + esc(c) + '\')">풀어 준다</button></div>';
                 }).join('') : '<div style="font-size:10px; color:#666;">비어 있습니다.</div>')
                 + '</div>';
@@ -302,7 +306,7 @@ setInterval(function () {
     ROOMS.forEach(function (r) {
         Object.keys(all[r.k] || {}).forEach(function (c) {
             const v = all[r.k][c] || {};
-            if ((v.by === 'foxd' || v.by === 'petbt') && Number(v.until) > 0 && Date.now() > Number(v.until)) { d.ref(NODE + '/' + r.k + '/' + c).remove(); return; }   // 🎐 여우 신도 · ⚔ 펫 배틀이 정한 시간이 다 됐다
+            if ((v.by === 'foxd' || v.by === 'petbt' || v.by === 'journey') && Number(v.until) > 0 && Date.now() > Number(v.until)) { d.ref(NODE + '/' + r.k + '/' + c).remove(); return; }   // 🎐 여우 신도 · ⚔ 펫 배틀 · 🐾 여정이 정한 시간이 다 됐다
             if (!v.auto) return;
             const u = users()[c];
             const end = Math.max(Number(v.until) || 0, Number(u && u.quarantineUntil) || 0);
@@ -464,7 +468,7 @@ window.gaduriWhy = function (code) {
     });
     console.log('%c===== 🔒 가두리 — 왜 갇혔나 (' + out.length + '명) =====', 'color:#d9d4e0; font-size:13px');
     out.forEach(function (o) {
-        console.log('%c■ ' + o.n + ' (' + o.c + ') — ' + o.room + ' 가두리 · ' + (o.v.auto ? '격리 중 (저절로)' : o.v.by === 'foxd' ? '여우 신도' : '상담사'), 'color:#ffcc80; font-weight:bold');
+        console.log('%c■ ' + o.n + ' (' + o.c + ') — ' + o.room + ' 가두리 · ' + (o.v.auto ? '격리 중 (저절로)' : o.v.by === 'foxd' ? '여우 신도' : o.v.by === 'petbt' ? '펫 배틀 패배' : o.v.by === 'journey' ? '여정 — 펫 대신 맞음' : '상담사'), 'color:#ffcc80; font-weight:bold');
         console.log('   까닭 : ' + o.why + ' · 격리 ' + mins(o.q) + ' · 자리 끝 ' + mins(o.v.until));
         console.log('   오염도 ' + (o.u.pollution == null ? '?' : o.u.pollution) + '% · 퇴원 시 ' + (o.u.quarantineExitPollution || 0) + '% · 행선 ' + (o.u.quarantineDest || '-') + ' · 들어간 때 ' + (o.v.at ? new Date(o.v.at).toLocaleString() : '?'));
         console.log('   최근 탐사 : ' + (o.lg.length ? '\n     ' + o.lg.join('\n     ') : '없음'));

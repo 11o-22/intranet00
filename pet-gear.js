@@ -4,7 +4,7 @@
 // ==========================================
 //
 // ■ 반려동물용 장비
-//   망상 홈쇼핑 🐾 펫 숍(룬 아래)에서 **기본급 다섯 가지** — 펫 속성(행운 · 판정 · 회피 · 기믹 파훼 · 저항)마다 +2.
+//   망상 홈쇼핑 🐾 펫 숍(룬 아래)에서 **기본급 다섯 가지** — 속성(애교 · 근력 · 경청 · 인내 · 눈치 · 룬과 같은 다섯)마다 +2.
 //   개당 5,000 P. 장비 주머니(u.petGear = { 이름: 수 })에 들어가고, 펫 하나에 **하나만** 낀다 (pets[번호].gear).
 //   🐶 펫 → 펫 하나 → 「장비」 에서 끼우고 뺀다. 뺀 것은 주머니로 돌아온다.
 //   여정(journey.js)에서는 조금 더 좋은 장비가 떨어진다 (DROP) — 두 속성이 붙어 있다. 같은 자리에 낀다.
@@ -17,13 +17,13 @@
 //   (조각 하나씩 소모 · Lv 1 · xp 0 부터). 다음 등급(C → B …)의 조각은 그 등급 여정이 생기면 넣는다.
 //
 // ■ 여정 전투에 쓰는 수치 (PETGEAR.stats)
-//   종 능력치(pet-data st · B 등급부터) + 장비 몫을 합쳐 — 행운 luck · 판정 bon · 회피 eva · 기믹 파훼 gim · 저항 resist
-//     체력  60 + Lv·6 + 등급·20 + 저항·4        공격  8 + Lv·1.5 + 등급·4 + 판정·2
-//     방어  2 + Lv·0.5 + 등급·2 + 저항·1.5      회피% 5 + 회피·3        치명% 5 + 행운/8        보스 추가 피해 기믹·4
+//   종 능력치(pet-data st · B 등급부터 — 행운 luck · 판정 bon · 회피 eva · 기믹 파훼 gim · 저항 resist) + 장비 속성(애교 · 근력 · 경청 · 인내 · 눈치)
+//     체력  60 + Lv·6 + 등급·20 + 저항·4                    공격  8 + Lv·1.5 + 등급·4 + 판정·2 + 근력 + 애교·2/3
+//     방어  2 + Lv·0.5 + 등급·2 + 저항·1.5 + 인내 + 애교/3   회피% 5 + 회피·3 + 눈치·3   치명% 5 + 행운/8 + 경청·3   보스 추가 피해 기믹·4
 //
 // ■ 콘솔
 //   petGearState()           주머니 · 펫마다 낀 것 · Lv
-//   petGearGive('🍀 네잎 목걸이', 1[, 사번])   상담사
+//   petGearGive('🎀 리본 목걸이', 1[, 사번])   상담사
 //   petXpGive(번호, n)       상담사 — 내 펫에 경험치
 
 (function petGear() {
@@ -32,18 +32,26 @@ const PRICE = 5000;
 const LV_MAX = 10;
 // k 속성 · v 몫 · sk 장비 스킬 { n, t(종류), d }
 //   스킬 종류 — crit 이번 턴 치명 확정 · heavy 강타(180% · 확정 명중) · dodge 이번 턴 회피 확정 · pierce 방어 무시 150% · guard 피해 30% 로 + 15% 회복
+// 장비의 속성은 룬과 같은 다섯 — 애교 · 근력 · 경청 · 인내 · 눈치 (2026-10-28 저녁 · 전에는 펫 능력치 이름을 썼다)
+//   근력 → 공격력 +1 씩 · 인내 → 방어력 +1 씩 · 애교 → 공격 2/3 · 방어 1/3 씩 (+3 이면 공격 +2 · 방어 +1)
+//   눈치 → 회피 +3% 씩 · 경청 → 급소(치명) +3% 씩
 const BASIC = [
-    { n: '🍀 네잎 목걸이',     add: { luck: 2 },   sk: { n: '행운의 잎',  t: 'crit',   d: '이번 공격은 반드시 급소에 닿는다.' },   d: '행운 +2. 목에 걸면 잎이 하나 더 돋는다.' },
-    { n: '🦷 송곳니 목줄',     add: { bon: 2 },    sk: { n: '물어뜯기',   t: 'heavy',  d: '빗나가지 않는 강한 한 입.' },           d: '판정 +2. 누구 것인지 모를 이빨이 달려 있다.' },
-    { n: '🪶 깃털 발찌',       add: { eva: 2 },    sk: { n: '깃털 걸음',  t: 'dodge',  d: '이번 턴은 아무것도 닿지 않는다.' },     d: '회피 +2. 발이 바닥에서 한 치 뜬다.' },
-    { n: '🔨 작은 망치 펜던트', add: { gim: 2 },    sk: { n: '두드리기',   t: 'pierce', d: '막고 있는 것째로 두드린다.' },          d: '기믹 파훼 +2. 작지만 무겁다.' },
-    { n: '🛡 가죽 조끼',       add: { resist: 2 }, sk: { n: '웅크리기',   t: 'guard',  d: '몸을 말고 버틴다. 숨이 돌아온다.' },     d: '저항 +2. 주인의 낡은 재킷으로 만든 것 같다.' }
+    { n: '🎀 리본 목걸이',     add: { '애교': 2 }, sk: { n: '애교 부리기', t: 'crit',   d: '이번 공격은 반드시 급소에 닿는다 — 상대가 넘어간다.' }, d: '애교 +2. 목에 매면 고개를 갸웃하는 각도가 달라진다.' },
+    { n: '🦷 송곳니 목줄',     add: { '근력': 2 }, sk: { n: '물어뜯기',   t: 'heavy',  d: '빗나가지 않는 강한 한 입.' },                         d: '근력 +2. 누구 것인지 모를 이빨이 달려 있다.' },
+    { n: '🔔 작은 방울 목걸이', add: { '경청': 2 }, sk: { n: '귀 기울이기', t: 'pierce', d: '숨소리를 듣고 막고 있는 것째로 친다.' },              d: '경청 +2. 방울 소리보다 상대 숨소리가 먼저 들린다.' },
+    { n: '🛡 가죽 조끼',       add: { '인내': 2 }, sk: { n: '웅크리기',   t: 'guard',  d: '몸을 말고 버틴다. 숨이 돌아온다.' },                   d: '인내 +2. 주인의 낡은 재킷으로 만든 것 같다.' },
+    { n: '🪶 깃털 발찌',       add: { '눈치': 2 }, sk: { n: '깃털 걸음',  t: 'dodge',  d: '이번 턴은 아무것도 닿지 않는다.' },                   d: '눈치 +2. 발이 바닥에서 한 치 뜬다.' }
 ];
-// 여정에서 떨어지는 것 — 조금 더 좋다 (두 속성)
+// 여정에서 떨어지는 것 — 조금 더 좋다 (+3)
 const DROP = [
-    { n: '🌙 달빛 목걸이',       add: { luck: 3, bon: 1 },    sk: { n: '행운의 잎', t: 'crit',   d: '이번 공격은 반드시 급소에 닿는다.' }, d: '행운 +3 · 판정 +1. 밤길에서 주웠다. 주인의 손목에 있던 것과 닮았다.', from: 'j1' },
-    { n: '🦴 묵은 뼈 목줄',      add: { bon: 3, resist: 1 }, sk: { n: '물어뜯기',  t: 'heavy',  d: '빗나가지 않는 강한 한 입.' },         d: '판정 +3 · 저항 +1. 누가 끝까지 물고 있던 것이다.', from: 'j1' },
-    { n: '🧣 주인의 목도리 조각', add: { resist: 3, eva: 1 }, sk: { n: '웅크리기',  t: 'guard',  d: '몸을 말고 버틴다. 숨이 돌아온다.' },   d: '저항 +3 · 회피 +1. 냄새가 남아 있다. 그 냄새를 따라 돌아왔다.', from: 'j1' }
+    { n: '🌙 달빛 목걸이',       add: { '인내': 3 }, sk: { n: '달빛 한 줌',  t: 'guard',  d: '달빛을 두르고 버틴다. 숨이 돌아온다.' },   d: '인내 +3 — 방어력이 올라간다. 밤길에서 주웠다. 주인의 손목에 있던 것과 닮았다.', from: 'j1' },
+    { n: '🦴 묵은 뼈 목줄',      add: { '근력': 3 }, sk: { n: '물어뜯기',   t: 'heavy',  d: '빗나가지 않는 강한 한 입.' },               d: '근력 +3 — 공격력이 올라간다. 누가 끝까지 물고 있던 것이다.', from: 'j1' },
+    { n: '🧣 주인의 목도리 조각', add: { '애교': 3 }, sk: { n: '목도리 두르기', t: 'crit', d: '주인의 냄새를 두르면 이번 공격은 급소에 닿는다.' }, d: '애교 +3 — 공격력과 방어력이 조금씩 올라간다 (+2 · +1). 냄새가 남아 있다. 그 냄새를 따라 돌아왔다.', from: 'j1' }
+];
+// 전에 팔던 이름 — 산 사람이 있을 수 있어 그대로 듣는다 (가게에는 안 나온다)
+const LEGACY = [
+    { n: '🍀 네잎 목걸이',     add: { '애교': 2 }, sk: { n: '행운의 잎', t: 'crit',   d: '이번 공격은 반드시 급소에 닿는다.' }, d: '애교 +2 (예전 이름).', legacy: 1 },
+    { n: '🔨 작은 망치 펜던트', add: { '경청': 2 }, sk: { n: '두드리기',  t: 'pierce', d: '막고 있는 것째로 두드린다.' },      d: '경청 +2 (예전 이름).', legacy: 1 }
 ];
 // 등급업 조각 — 등급마다 세 가지. 여정의 어느 싸움을 이기고 나면 (enc · 0부터) 1/odds 로 하나 떨어진다 (journey.js settle)
 const SHARDS = {
@@ -51,10 +59,11 @@ const SHARDS = {
          { n: '🧩 가로등 아래의 조각', enc: 3, odds: 30, d: '가로등 마물이 떨어뜨린 빛 속에 있었다. 만지면 아직 따뜻하다.' },
          { n: '🧩 냄새가 밴 조각',     enc: 4, odds: 30, d: '그것이 벗어 던진 냄새 안에서 나왔다. 주인의 냄새가 난다.' } ]
 };
-const ALL = BASIC.concat(DROP);
+const ALL = BASIC.concat(DROP, LEGACY);
 const BY = {};
 ALL.forEach(function (g) { BY[g.n] = g; });
-const STAT_NAME = { luck: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼', resist: '저항' };
+const ATTR_EFF = { '애교': '공격 2/3 · 방어 1/3', '근력': '공격력', '경청': '급소 3%', '인내': '방어력', '눈치': '회피 3%' };
+const STAT_NAME = { luck: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼', resist: '저항', '애교': '애교', '근력': '근력', '경청': '경청', '인내': '인내', '눈치': '눈치' };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function P() { return window.PET; }
@@ -63,7 +72,7 @@ function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(
 function log_(t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u_(), t); } catch (e) { } }
 function ui() { try { if (typeof updateUI === 'function') updateUI(); } catch (e) { } }
 function copyFlags(from, to) { Object.keys(from).forEach(function (k) { if (!(k in to)) { try { to[k] = from[k]; } catch (e) { } } }); }
-function addText(add) { return Object.keys(add || {}).map(function (k) { return STAT_NAME[k] + ' +' + add[k]; }).join(' · '); }
+function addText(add) { return Object.keys(add || {}).map(function (k) { return (STAT_NAME[k] || k) + ' +' + add[k] + (ATTR_EFF[k] ? ' (' + ATTR_EFF[k] + ')' : ''); }).join(' · '); }
 
 // ==========================================
 // 장비 주머니
@@ -209,8 +218,8 @@ function gradeUp(key) {
 // ==========================================
 function attrs(key, u) {
     const sp = P().BY[key] || {};
-    const out = { luck: 0, bon: 0, eva: 0, gim: 0, resist: 0 };
-    if (gradeIdx(key, u) >= 2) Object.keys(sp.st || {}).forEach(function (k) { if (k in out) out[k] += Number(sp.st[k]) || 0; });
+    const out = { luck: 0, bon: 0, eva: 0, gim: 0, resist: 0, '애교': 0, '근력': 0, '경청': 0, '인내': 0, '눈치': 0 };
+    if (gradeIdx(key, u) >= 2) Object.keys(sp.st || {}).forEach(function (k) { if (k in out) out[k] += Number(sp.st[k]) || 0; });   // 종 능력치 — B 등급부터
     const g = BY[worn(key, u)];
     if (g) Object.keys(g.add).forEach(function (k) { if (k in out) out[k] += g.add[k]; });
     return out;
@@ -220,10 +229,10 @@ function stats(key, u) {
     const luckN = a.luck >= 10 ? a.luck / 20 : a.luck;         // 종 행운은 % 단위(40~90) — 20 으로 나눠 다른 속성과 결을 맞춘다
     return {
         max: Math.round(60 + lv * 6 + gi * 20 + a.resist * 4),
-        atk: Math.round((8 + lv * 1.5 + gi * 4 + a.bon * 2) * 10) / 10,
-        def: Math.round((2 + lv * 0.5 + gi * 2 + a.resist * 1.5) * 10) / 10,
-        eva: Math.min(60, 5 + a.eva * 3),
-        crit: Math.min(60, Math.round(5 + luckN * 8)),
+        atk: Math.round((8 + lv * 1.5 + gi * 4 + a.bon * 2 + a['근력'] + Math.round(a['애교'] * 2 / 3)) * 10) / 10,
+        def: Math.round((2 + lv * 0.5 + gi * 2 + a.resist * 1.5 + a['인내'] + Math.round(a['애교'] / 3)) * 10) / 10,
+        eva: Math.min(60, 5 + a.eva * 3 + a['눈치'] * 3),
+        crit: Math.min(60, Math.round(5 + luckN * 8 + a['경청'] * 3)),
         gim: a.gim,
         lv: lv, gi: gi, gear: worn(key, u)
     };
@@ -235,7 +244,7 @@ function stats(key, u) {
 function boxHtml() {
     const u = u_();
     return '<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">🐾 펫 숍 — 반려동물용 장비</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">🐾 여정에 데려갈 펫에게 끼웁니다. 속성마다 +2 · 개당 ' + PRICE.toLocaleString() + ' P. 장비 주머니에 들어가고, 펫 칸에서 펫 하나에 하나씩 낍니다. 여정에서는 더 좋은 것이 떨어집니다.</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">🐾 여정에 데려갈 펫에게 끼웁니다. 애교 · 근력 · 경청 · 인내 · 눈치 — 속성마다 +2 · 개당 ' + PRICE.toLocaleString() + ' P. 장비 주머니에 들어가고, 펫 칸에서 펫 하나에 하나씩 낍니다 (장비 하나는 한 마리만 — 열 마리면 열 개). 여정에서는 더 좋은 것(+3)이 떨어집니다.<br>근력은 공격력 · 인내는 방어력 · 애교는 공격과 방어 조금씩 · 눈치는 회피 · 경청은 급소.</div>'
         + BASIC.map(function (g) {
             const n = have(g.n, u);
             return '<div style="display:flex; align-items:center; gap:6px; padding:5px 0; border-top:1px solid rgba(255,255,255,0.05);">'
@@ -296,7 +305,7 @@ window.petGearOpen = function (key, after) {
     const st = stats(key, u);
     const list = ALL.filter(function (g) { return have(g.n, u) > 0; });
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">' + esc(nm) + ' — 장비</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">펫 하나에 하나만 낍니다. 뺀 것은 주머니로 돌아옵니다.<br>여정 수치 — 체력 ' + st.max + ' · 공격 ' + st.atk + ' · 방어 ' + st.def + ' · 회피 ' + st.eva + '% · 치명 ' + st.crit + '%</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">펫 하나에 하나만 낍니다. 장비 하나는 한 마리만 — 끼우면 주머니에서 빠지고, 뺀 것은 주머니로 돌아옵니다.<br>여정 수치 — 체력 ' + st.max + ' · 공격 ' + st.atk + ' · 방어 ' + st.def + ' · 회피 ' + st.eva + '% · 치명 ' + st.crit + '%</div>'
         + '<div style="font-size:11px; color:#c9a227; margin-bottom:8px;">낀 것: ' + (cur ? esc(cur) + ' <span style="color:#6f685e;">(' + esc(addText(BY[cur].add)) + ' · 「' + esc(BY[cur].sk.n) + '」)</span>' : '<span style="color:#6f685e;">없음</span>') + '</div>'
         + (cur ? '<button id="pg-off" class="game-btn" style="' + BTN + GREY + '">뺀다 — 주머니로</button>' : '')
         + (list.length ? list.map(function (g) {
@@ -315,7 +324,7 @@ window.petGearOpen = function (key, after) {
 };
 
 window.PETGEAR = {
-    BASIC: BASIC, DROP: DROP, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, STAT_NAME: STAT_NAME,
+    BASIC: BASIC, DROP: DROP, LEGACY: LEGACY, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, STAT_NAME: STAT_NAME, ATTR_EFF: ATTR_EFF,
     bag: bag, have: have, add: add, worn: worn, equip: equip, unequip: unequip, addText: addText,
     lv: lvOf, xp: xpOf, needXp: needXp, addXp: addXp, gradeIdx: gradeIdx, canGradeUp: canGradeUp, gradeUp: gradeUp, gradeNeed: gradeNeed,
     SHARDS: SHARDS, shardBag: shardBag, shardHave: shardHave, shardAdd: shardAdd, shardSet: shardSet, shardCount: shardCount,
