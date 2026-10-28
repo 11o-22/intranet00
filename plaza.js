@@ -401,6 +401,31 @@ function db_() { return (typeof database !== 'undefined') ? database : null; }
 function now() { return Date.now(); }
 // 채팅 줄에 적는 때 — 서버 시계 (clock.js) · 없으면 기기 시계. 기기 시계가 틀려도 줄이 엉뚱한 자리에 서지 않게 (2026-10-28)
 function chatNow() { try { if (typeof serverNow === 'function') { const t = Number(serverNow()); if (t > 1.5e12) return t; } } catch (e) { } return Date.now(); }
+// ★ 줄에 적는 때는 **서버가 찍는다** (ServerValue.TIMESTAMP · 2026-10-28 밤)
+//   어느 사원의 기기 시계가 열일곱 시간 앞서 있었고, 파이어베이스가 만드는 열쇠(push)까지 그 시계로 찍혀 왔다.
+//   열쇠 순서로 마지막 서른 줄(limitToLast)을 받으니 그 미래 열쇠 줄이 창을 다 차지해 **다른 사람의 새 말은 창에 못 들었다**
+//   — 서버에 적히기는 하는데 아무에게도 안 내려왔다. 그래서 때를 서버가 찍고, 받을 때도 at 차례(orderByChild)로 받는다.
+function svAt() { try { if (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue) return firebase.database.ServerValue.TIMESTAMP; } catch (e) { } return chatNow(); }
+const FUTURE_MS = 10 * 60 * 1000;      // 이보다 앞선 때가 적힌 줄은 시계가 틀린 것 — 걷는다
+// 한 칸(서버 채팅 · 맵 채팅 · 귓속말)의 묵은 줄 · 미래 줄을 걷는다 — keep 줄만 at 차례로 남긴다
+function trimNode(path, keep, force) {
+    const d = db_(); if (!d) return;
+    if (!force && Math.random() > 0.25) return;
+    try {
+        d.ref(path).once('value', function (s) {
+            const v = s.val(); if (!v || typeof v !== 'object') return;
+            const tn = chatNow();
+            const up = {};
+            const keys = Object.keys(v);
+            keys.forEach(function (k) { const o = v[k]; if (o && Number(o.at) > tn + FUTURE_MS) up[k] = null; });
+            const rest = keys.filter(function (k) { return !(k in up); })
+                .sort(function (a, b) { return (Number((v[a] || {}).at) || keyTime(a)) - (Number((v[b] || {}).at) || keyTime(b)) || (a < b ? -1 : 1); });
+            const over = rest.length - keep;
+            if (over > 0) rest.slice(0, over).forEach(function (k) { up[k] = null; });
+            if (Object.keys(up).length) d.ref(path).update(up);
+        });
+    } catch (e) { }
+}
 function isAdm(u) { const x = u || u_(); return !!(x && x.code === P.ADMIN); }
 function canEnter() { return P.ADMIN_ONLY ? isAdm() : !!u_(); }
 
@@ -3837,7 +3862,9 @@ function watchChat() {
     //   (끄는 자리는 shut() 한 곳뿐이다)
     // ✗ 글줄칸을 비우지 않는다 — 방을 옮겨도 하던 얘기는 그대로 둔다.
     //   (전에는 여기서 innerHTML 을 털고 새 방 줄로 다시 채웠다)
-    chatRef = d.ref(P.CHAT + '/' + seatKey(run.room, run.inst)).limitToLast(P.CHAT_KEEP);
+    const seatPath = P.CHAT + '/' + seatKey(run.room, run.inst);
+    trimNode(seatPath, P.CHAT_KEEP * 2, true);                      // 시계가 틀린 기기에서 온 미래 줄이 있으면 먼저 걷는다
+    chatRef = d.ref(seatPath).orderByChild('at').limitToLast(P.CHAT_KEEP);
     const chatFrom = now() + 1500;         // 걸자마자 쏟아지는 지난 줄은 「묵은 것」 (자리 잡는 데 쓴다 · pushLine)
     chatRef.on('child_added', function (s) {
         const v = s.val() || {};
@@ -3856,7 +3883,7 @@ function watchAll() {
     const d = db_(); if (!d || !run) return;
     if (allRef) { try { allRef.off(); } catch (e) { } allRef = null; }
     allFrom = now() + 1500;        // 걸자마자 오는 지난 줄은 조용히 받는다
-    allRef = d.ref(P.CHAT + '/' + P.ALL).limitToLast(P.CHAT_KEEP);
+    allRef = d.ref(P.CHAT + '/' + P.ALL).orderByChild('at').limitToLast(P.CHAT_KEEP);
     allRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
@@ -3867,23 +3894,7 @@ function watchAll() {
 
 // 서버 채팅은 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다.
 //   (맵 채팅은 마지막 사람이 나갈 때 통째로 지워진다 — leaveRoom)
-//   ★ 때가 하루 넘게 앞선 줄(시계가 틀린 기기에서 보낸 것)도 걷는다 — 아래 채팅 칸을 막던 것 (2026-10-28)
-function trimAll(force) {
-    const d = db_(); if (!d) return;
-    if (!force && Math.random() > 0.25) return;  // 다섯 번에 한 번쯤만
-    try {
-        d.ref(P.CHAT + '/' + P.ALL).once('value', function (s) {
-            const v = s.val(); if (!v) return;
-            const keys = Object.keys(v).sort();   // push 열쇠는 때 순서대로 선다
-            const up = {};
-            const over = keys.length - P.CHAT_KEEP * 2;
-            if (over > 0) keys.slice(0, over).forEach(function (k) { up[k] = null; });
-            const lim = chatNow() + 86400000;
-            keys.forEach(function (k) { const o = v[k]; if (o && Number(o.at) > lim) up[k] = null; });
-            if (Object.keys(up).length) d.ref(P.CHAT + '/' + P.ALL).update(up);
-        });
-    } catch (e) { }
-}
+function trimAll(force) { trimNode(P.CHAT + '/' + P.ALL, P.CHAT_KEEP * 2, force); }
 
 // ── 서버/맵/귓속말 고르기
 function chSet(c) {
@@ -4258,7 +4269,8 @@ function watchWhisper() {
     if (!d || !u || !run) return;
     if (whRef) { try { whRef.off(); } catch (e) { } whRef = null; }
     whFrom = now() + 1500;              // 걸자마자 오는 묵은 줄은 조용히 받는다
-    whRef = d.ref(WH + '/' + u.code).limitToLast(WH_KEEP);
+    trimNode(WH + '/' + u.code, WH_KEEP * 2, true);
+    whRef = d.ref(WH + '/' + u.code).orderByChild('at').limitToLast(WH_KEEP);
     whRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
@@ -4268,21 +4280,7 @@ function watchWhisper() {
 }
 
 // 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다 (서버 채팅과 같은 길)
-function whTrim(code) {
-    const d = db_(); if (!d) return;
-    if (Math.random() > 0.2) return;
-    try {
-        d.ref(WH + '/' + code).once('value').then(function (s) {
-            const v = s.val(); if (!v) return;
-            const keys = Object.keys(v).sort();
-            const over = keys.length - WH_KEEP * 2;
-            if (over <= 0) return;
-            const up = {};
-            keys.slice(0, over).forEach(function (k) { up[k] = null; });
-            d.ref(WH + '/' + code).update(up);
-        });
-    } catch (e) { }
-}
+function whTrim(code) { trimNode(WH + '/' + code, WH_KEEP * 2, false); }
 
 // ==========================================
 // ★ 사원증 칸 — 사진 · 닉네임 · 사번
@@ -4435,8 +4433,7 @@ function pushLine(o) {
     //       그러면 무슨 시계로 적혔든 새 말은 늘 맨 아래에 온다.
     const tn = chatNow();
     if (o.hist || o.quiet) {
-        const kt = keyTime(o.k);
-        let a = kt || Number(o.at) || tn;
+        let a = Number(o.at) || keyTime(o.k) || tn;       // at 은 이제 서버가 찍는다 · 옛 줄은 열쇠의 때
         if (!(a > 0) || a > tn) a = tn;
         o.at = a;
     } else o.at = tn;
@@ -4559,13 +4556,13 @@ function say(text) {
         let mk = '';
         if (d0) {
             try {
-                d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: chatNow() });
+                d0.ref(WH + '/' + whTo).push({ n: nameOf(u), c: u.code, t: t, at: svAt() });
                 whTrim(whTo);
                 // 내 앞으로도 한 벌 — 다시 들어와도 내가 보낸 줄이 남는다 (나에게 보낸 것이면 받은 줄로 이미 선다)
                 if (whTo !== u.code) {
                     const mine = d0.ref(WH + '/' + u.code).push();
                     mk = mine.key || '';
-                    mine.set({ n: whName || whTo, c: whTo, t: t, at: chatNow(), o: 1 });
+                    mine.set({ n: whName || whTo, c: whTo, t: t, at: svAt(), o: 1 });
                     whTrim(u.code);
                 }
             } catch (e) { }
@@ -4580,7 +4577,7 @@ function say(text) {
     const d = db_();
     if (d) {
         try {
-            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: chatNow() });
+            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: svAt() });
             if (chatCh === 'all') trimAll();
         } catch (e) { }
     }
@@ -4603,7 +4600,7 @@ function sayEmo(id) {
     if (d) {
         try {
             d.ref(chPath()).push({
-                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: chatNow() });
+                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: svAt() });
             if (chatCh === 'all') trimAll();
         } catch (x) { }
     }
