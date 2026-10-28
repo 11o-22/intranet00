@@ -3166,7 +3166,7 @@ function settle(how, txt) {
     let pts = 0;
     if (how === 'clear') pts = rnd(1500, 4000) * ({ D: 1, C: 1.5, B: 2.2, A: 3, S: 4 }[g] || 1);
     if (how === 'leave') pts = rnd(400, 1200);
-    pts = Math.round(pts / 5);                                  // ★ K 의 방 포인트 5분의 1 (2026-10-27 · 그 위 배수는 같이 줄어든다)
+    // (2026-10-27 에 포인트를 5분의 1 로 줄였다가 2026-10-28 에 원래대로 되돌렸다 — 꿈결은 그대로 5분의 1)
     if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
     if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }

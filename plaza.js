@@ -4426,9 +4426,12 @@ function pushLine(o) {
     //     (맵 채팅은 방이 비면 통째로 지워져 금방 풀리는데, 서버 채팅은 남아 있어 계속 그랬다)
     //   → 서버가 준 열쇠(push)의 때를 먼저 쓴다 — 열쇠는 서버 시계에 맞춰 만들어진다. 열쇠가 없거나 그것마저
     //     이상하면 적힌 at 을 쓰되, 지금보다 5분 넘게 앞선 것은 지금으로 친다.
+    //   ★ 열쇠가 없는 줄(알림 줄 · 내가 보낸 귓속말)도 **같은 서버 시계**(chatNow)로 잡는다 (2026-10-28 저녁)
+    //     ✗ 알림 줄만 기기 시계(now)로 잡았더니, 기기 시계가 몇 분 앞선 사람은 방을 옮길 때마다 쌓이는
+    //       「~에 들어왔습니다」가 늘 맨 아래에 남고 새 말은 그 위에 끼어 — 아래 채팅 칸에 말이 안 남았다.
     const kt = keyTime(o.k);
     if (kt) o.at = kt;
-    else if (o.at == null || !(Number(o.at) > 0) || Number(o.at) > now() + 300000) o.at = now();
+    else if (o.at == null || !(Number(o.at) > 0) || Number(o.at) > chatNow() + 300000) o.at = chatNow();
     let i = run.lines.length;
     while (i > 0 && (Number(run.lines[i - 1].at) || 0) > o.at) i--;
     run.lines.splice(i, 0, o);
@@ -4443,7 +4446,7 @@ function keyTime(k) {
     if (!k || String(k).length < 8) return 0;
     let t = 0;
     for (let j = 0; j < 8; j++) { const c = A.indexOf(String(k).charAt(j)); if (c < 0) return 0; t = t * 64 + c; }
-    return (t > 1.5e12 && t < now() + 86400000) ? t : 0;
+    return (t > 1.5e12 && t < chatNow() + 86400000) ? t : 0;
 }
 
 // 지난 이야기를 길게 — 왼쪽 아래 글줄을 누르면 뜬다 (logSheet)

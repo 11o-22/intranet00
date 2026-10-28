@@ -661,7 +661,7 @@ function epicSettle(how, txt) {
 
     if (how === 'dead') total = Math.floor(total * 0.35);
     total = Math.max(300, Math.min(25000, Math.round(total)));
-    total = Math.max(60, Math.round(total / 5));                 // ★ EPIC 정산 5분의 1 (2026-10-27)
+    // (2026-10-27 에 5분의 1 로 줄였다가 2026-10-28 에 원래대로 되돌렸다)
 
     changePoints(total);
     addHistoryLog(currentUser, `[${EPIC_CODE}] ${j.name}으로 ${how === 'dead' ? '쓰러짐' : '귀환'} (+${total.toLocaleString()} P)`);
