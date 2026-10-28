@@ -15,6 +15,8 @@
 //   벽지 견본첩 ×10     벽지 견본첩 ×10
 //   뉴비 의상           뉴비 의상          ← 2026-10-25 · 뉴비 세트 (받으면 소지품이 아니라 옷장으로 — wear-gift.js)
 //   잎 우산             잎 우산
+//   뉴비 새싹           뉴비 새싹          ← 2026-10-29 · 악세 (옷장 악세 칸 · 거래 안 됨)
+//   칭호 🌱 뉴비        칭호 🌱 뉴비        ← 2026-10-29 · 받는 순간 titleAdmin 에 붙는다 (giftbox.js titles)
 //
 //   둘 다 그 소속만 찰 수 있는 물건들이다 (EQUIP_AFFIL). 그래서 소속을
 //   보고 갈라 보낸다. 어느 쪽도 아닌 소속(어둠 따위)은 **안 보낸다** —
@@ -60,17 +62,19 @@ const SKIN_N = 10;
 const PACK = [
     { re: /백일몽/, n: '백일몽 주식회사', items: {
         '보안팀 의상 세트': 1, '버터 나이프': 1, '착한 친구': 1, '정갈한 문패': 2,
-        '뉴비 의상': 1, '잎 우산': 1
+        '뉴비 의상': 1, '잎 우산': 1, '뉴비 새싹': 1
     } },
     { re: /재난관리국/, n: '재난관리국', items: {
         '사자탈': 1, '작두': 1, '유리손포': 1, '오색 신발끈': 2,
-        '뉴비 의상': 1, '잎 우산': 1
+        '뉴비 의상': 1, '잎 우산': 1, '뉴비 새싹': 1
     } }
 ];
+// 같이 붙는 칭호 — 소속 가리지 않고 (titles.js ADMIN_TITLES 에 있는 이름이어야 그림이 붙는다)
+const TITLES = ['뉴비'];
 
 const TEXT = '입사를 환영합니다.\n'
-    + '소속에 맞는 장비와 당장 쓸 포인트를 함께 보냅니다.\n'
-    + '받으시면 물품은 소지품으로, 포인트는 바로 들어갑니다.';
+    + '소속에 맞는 장비와 당장 쓸 포인트, 뉴비 옷과 새싹, 뉴비 칭호를 함께 보냅니다.\n'
+    + '받으시면 물품은 소지품으로, 옷과 새싹은 옷장으로, 포인트와 칭호는 바로 들어갑니다.';
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -109,7 +113,7 @@ function sendTo(code, aff, team) {
         if (dup) { console.log('[웰컴] 이미 들어가 있습니다 — ' + code); return false; }
         return giftSendRaw([code], {
             title: TITLE, text: TEXT, byName: SENDER,
-            items: contents(p), pts: PTS
+            items: contents(p), pts: PTS, titles: TITLES
         }).then(function (n) {
             if (n) {
                 console.log('%c[웰컴] ' + p.n + ' 묶음을 넣었습니다 — ' + code, 'color:#4CAF50');
@@ -192,6 +196,7 @@ window.welcomePack = function (aff, team) {
     console.log('%c===== ' + TITLE + ' — ' + p.n + ' =====', 'color:#d4af37; font-size:13px');
     Object.keys(it).forEach(function (k) { console.log('  · ' + k + (it[k] > 1 ? ' ×' + it[k] : '')); });
     console.log('  · ' + PTS.toLocaleString('ko-KR') + ' P');
+    TITLES.forEach(function (t) { console.log('  · 칭호 [' + t + ']'); });
 };
 
 window.welcomeSend = function (who) {

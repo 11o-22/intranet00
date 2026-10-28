@@ -88,6 +88,17 @@ function itemPairs(g) {
     }).filter(function (p) { return p[0] && p[1] > 0; });
 }
 
+// 같이 온 칭호 — 이름 배열
+function titleList(g) {
+    const t = g && g.titles;
+    if (Array.isArray(t)) return t.map(String).filter(Boolean);
+    if (t && typeof t === 'object') return Object.keys(t).map(function (k) { return String(t[k]); }).filter(Boolean);
+    return [];
+}
+// 보일 때 그림을 붙인다 (titles.js 의 ADMIN_ICON 과 같게 — 저장되는 이름은 그대로)
+const TITLE_ICON = { '또류': '🐋', '뉴비': '🌱', '고인물': '👑', '전설': '🎤', '이레귤러': '⛓️‍💥', '페르소나': '🎭', '흔적': '🫧' };
+function titleLabel(n) { return (TITLE_ICON[n] ? TITLE_ICON[n] + ' ' : '') + n; }
+
 // 트랜잭션 — 거는 동안 그 자리를 지켜본다 (안 그러면 첫 굴림이 null 이다)
 function tx(path, fn) {
     const d = db_();
@@ -125,7 +136,9 @@ function send(codes, opt) {
     });
     // ★ 포인트도 같이 보낼 수 있다 (웰컴 패키지 팩 — welcome.js)
     const pts = Math.max(0, Math.floor(Number((opt && opt.pts) || 0)));
-    if (!title && !text && !Object.keys(items).length && !pts) return Promise.resolve(0);
+    // ★ 칭호도 같이 보낼 수 있다 (웰컴 패키지 팩 — 🌱 뉴비 · 2026-10-29). 받는 순간 titleAdmin 에 붙는다 (상담사가 붙인 것과 같은 꼴)
+    const titles = (opt && Array.isArray(opt.titles) ? opt.titles : []).map(function (t) { return String(t || '').trim(); }).filter(Boolean).slice(0, 5);
+    if (!title && !text && !Object.keys(items).length && !pts && !titles.length) return Promise.resolve(0);
 
     const base = { at: Date.now(), by: u.code,
                    byName: String((opt && opt.byName) || u.name || '') };
@@ -136,6 +149,7 @@ function send(codes, opt) {
         base.items = Object.keys(items).map(function (k) { return { n: k, q: items[k] }; });
     }
     if (pts) base.pts = pts;
+    if (titles.length) base.titles = titles;
 
     const up = {};
     list.forEach(function (c) {
@@ -388,9 +402,14 @@ function listHtml() {
             h += '<div style="font-size:11px; color:#ffd479; line-height:1.8; margin-bottom:8px;">'
                 + '• <b>' + gp.toLocaleString('ko-KR') + ' P</b></div>';
         }
+        const gt = titleList(g);
+        if (gt.length) {
+            h += '<div style="font-size:11px; color:#c9b8ff; line-height:1.8; margin-bottom:8px;">'
+                + gt.map(function (t) { return '• 칭호 <b>' + esc(titleLabel(t)) + '</b>'; }).join('<br>') + '</div>';
+        }
         h += '<button class="game-btn" style="width:100%; margin:0; padding:9px; font-size:11px;"'
             + ' onclick="giftTake(\'' + id + '\')">'
-            + ((pairs.length || gp) ? '받는다' : '확인했다') + '</button></div>';
+            + ((pairs.length || gp || gt.length) ? '받는다' : '확인했다') + '</button></div>';
     });
     return h;
 }
@@ -456,9 +475,17 @@ window.giftTake = function (id) {
         }
         // ★ 포인트도 같이 올 수 있다 (웰컴 패키지 팩)
         if (pts) u.points = (Number(u.points) || 0) + pts;
+        // ★ 칭호도 같이 올 수 있다 — titleAdmin 에 붙는다 (이미 있으면 그대로)
+        const titles = titleList(got);
+        const tGot = [], tHad = [];
+        if (titles.length) {
+            if (!Array.isArray(u.titleAdmin)) u.titleAdmin = [];
+            titles.forEach(function (t) { if (u.titleAdmin.indexOf(t) >= 0) tHad.push(t); else { u.titleAdmin.push(t); tGot.push(t); } });
+        }
 
         const what = pairs.map(function (p) { return p[0] + (p[1] > 1 ? '×' + p[1] : ''); })
-            .concat(pts ? [pts.toLocaleString('ko-KR') + ' P'] : []);
+            .concat(pts ? [pts.toLocaleString('ko-KR') + ' P'] : [])
+            .concat(titles.map(function (t) { return '칭호 [' + titleLabel(t) + ']'; }));
         const line = what.length
             ? ('[선물함] ' + (got.byName || '당국') + ' 쪽에서 '
                 + what.join(', ') + ' 을(를) 받았습니다.')
@@ -467,6 +494,7 @@ window.giftTake = function (id) {
         if (typeof addHistoryLog === 'function') addHistoryLog(u, line);
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
         if (typeof updateUI === 'function') { try { updateUI(); } catch (e) { } }
+        if (tGot.length && typeof renderTitleList === 'function') { try { renderTitleList(); } catch (e) { } }
         if (pts && typeof showPointGainEffect === 'function') {
             try { showPointGainEffect(pts); } catch (e) { }
         }
@@ -485,10 +513,12 @@ window.giftTake = function (id) {
                         : ' — 옷장 ' + (w.slot || '') + '에 들어왔습니다');
                 }
                 return '· ' + p[0] + (p[1] > 1 ? ' ×' + p[1] : '');
-            }).concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : []).join('\n');
+            }).concat(pts ? ['· ' + pts.toLocaleString('ko-KR') + ' P'] : [])
+              .concat(titles.map(function (t) { return '· 칭호 [' + titleLabel(t) + ']' + (tHad.indexOf(t) >= 0 ? ' — 이미 가지고 있습니다' : ' — 칭호 칸에 들어왔습니다'); })).join('\n');
             showCustomAlert(head + '받았습니다.\n\n' + body
                 + (toInv ? '\n\n물품은 소지품에 들어왔습니다.' : '')
-                + (worn.length ? '\n\n옷장이나 광장 가방에서 입거나 달 수 있습니다.' : ''));
+                + (worn.length ? '\n\n옷장이나 광장 가방에서 입거나 달 수 있습니다.' : '')
+                + (tGot.length ? '\n\n칭호는 칭호 탭에서 달 수 있습니다.' : ''));
         } else {
             showCustomAlert('확인했습니다.\n\n내용은 기록에 남았습니다.');
         }
