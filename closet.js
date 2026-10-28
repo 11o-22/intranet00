@@ -1080,8 +1080,11 @@ function actor(user, opt) {
         if (idleEl) idleOff();
     };
 
+    // ★ pose — 한 칸에 멈춰 세운다 (걷는 줄 row 0 의 col 칸). 🍍 점프하는 동안 걸음 4번 모션(col 3)으로 (plaza.js · 2026-10-29)
+    let posed = null;
     const start = function () {
         clear();
+        if (posed != null) { els.forEach(function (e) { put(e, posed, 0); }); return; }   // 멈춰 세운 동안은 걷기 · 서기 시계를 안 돌린다
         if (held) return;                                   // 안 보이는 동안은 그대로 둔다
         if (idleEl && !walking) idleWait = setTimeout(idleGo, IM.after);
         if (walking) {
@@ -1120,6 +1123,8 @@ function actor(user, opt) {
     return {
         el: box,
         moving: function (on) { on = !!on; if (on === walking) return; walking = on; start(); },
+        // 한 칸에 멈춰 세운다 — col (걷는 줄의 몇 번째 칸, 0부터) · null 이면 풀어서 원래 움직임으로
+        pose: function (c) { const v = (c == null) ? null : Number(c); if (v === posed) return; posed = v; start(); },
         // 화면 밖이면 시계를 멈추고, 다시 들어오면 그때 모습으로 다시 돌린다
         hold: function (on) { on = !!on; if (on === held) return; held = on; start(); },
         // 그림은 **왼쪽을 보고** 그려져 있다. 오른쪽을 보게 하려면 뒤집는다.

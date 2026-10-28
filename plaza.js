@@ -852,6 +852,14 @@ function stampSafe(ov) {
         '  background:rgba(12,12,18,.62);border:1px solid rgba(190,170,120,.26);',
         '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
         '#plaza-map.off{display:none;}',
+        // 🍍 점프 단추 — 작아진 사람에게만 · 미니맵 바로 위 (plaza-jump · 자리는 jumpPaint 가 미니맵 높이를 보고 맞춘다)
+        '#plaza-jump{position:absolute;right:12px;z-index:19;display:none;width:116px;padding:9px 0;border-radius:13px;',
+        '  border:1px solid rgba(190,170,120,.4);background:rgba(12,12,18,.7);color:#ffe9bd;font-size:12px;font-weight:bold;',
+        '  cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;',
+        '  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}',
+        '#plaza-jump.on{display:block;}',
+        '#plaza-jump:active{background:rgba(217,160,90,.35);}',
+        '#plaza-jump .pc{font-size:9px;font-weight:normal;color:#9a9284;margin-left:4px;}',
         '#plaza-map .mp-n{font-size:10px;font-weight:bold;color:#ffe9bd;margin-bottom:5px;',
         '  text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
         '#plaza-map .mp-g{display:grid;gap:3px;}',
@@ -1209,10 +1217,10 @@ function remakeFolk() {
 // 방 안의 자리(x·y)는 **그림 원래 크기**로 센다. 화면에 놓을 때만 배로 늘린다.
 function zz() { return (run && run.z) || 1; }
 
-function putOne(one, x, y) {
+function putOne(one, x, y, lift) {
     const z = zz();
     const L = Math.round(x * z - one.w / 2);
-    const T = Math.round(y * z - (one.h - (one.foot || 0)));
+    const T = Math.round(y * z - (one.h - (one.foot || 0)) - (lift || 0));   // 🍍 lift — 점프로 떠 있는 높이(px)
     // ★ 칸 아래끝이 곧 발이 아니다 — 새 규격은 발밑이 여덟 도트 비어 있다.
     //   그만큼(foot) 도로 내려 놓아야 땅에 선다.
     //
@@ -1236,6 +1244,46 @@ function putOne(one, x, y) {
         if (!inside) Z = Math.max(Z, 101 + Math.round(cgr.zy));
     }
     if (one._Z !== Z) { one.wrap.style.zIndex = String(Z); one._Z = Z; }
+}
+
+// ==========================================
+// 🍍 점프 — 파인애플맛 물약으로 작아진 사람만 (2026-10-29)
+// ==========================================
+//
+//   미니맵 위의 「점프」 단추 (PC 는 스페이스바). 제 키의 두 배까지 떠올랐다 내려온다 (JUMP_MS).
+//   들려 있을 때는 못 뛴다. 뛴 때(jp · 서버 시각)를 자리 기록에 실어 보내고, 받는 쪽은 받은 순간부터 같은 포물선을 그린다.
+const JUMP_MS = 620;
+const JUMP_X = 2;                 // 제 키의 몇 배까지
+const JUMP_POSE = 3;              // 뛰는 동안의 그림 — 걸음 4번 모션 (0부터 세어 3)
+function jumping(t0) { return !!(t0 && performance.now() - t0 < JUMP_MS); }
+function poseJump(one, t0) { try { if (one && one.actor && one.actor.pose) one.actor.pose(jumping(t0) ? JUMP_POSE : null); } catch (e) { } }
+function jumpLift(one, t0) {
+    if (!t0 || !one) return 0;
+    const p = (performance.now() - t0) / JUMP_MS;
+    if (p <= 0 || p >= 1) return 0;
+    return Math.round(one.h * JUMP_X * 4 * p * (1 - p));
+}
+function canJump() { return !!(run && run.me && run.me.tiny && !carryMine()); }
+function jump() {
+    if (!canJump()) return false;
+    if (run.jumpT0 && performance.now() - run.jumpT0 < JUMP_MS) return false;   // 공중에서는 또 못 뛴다
+    run.jumpT0 = performance.now();
+    run.jumpAt = now();
+    wake();
+    return true;
+}
+window.plazaJump = jump;
+let jumpShown = null;
+function jumpPaint() {
+    const b = document.getElementById('plaza-jump'); if (!b) return;
+    const map = document.getElementById('plaza-map');
+    const on = canJump() && !!(map && !map.classList.contains('off'));
+    if (on) {
+        const bot = map.offsetHeight + 8;
+        const want = 'calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + ' + (74 + bot) + 'px)';
+        if (b._bot !== want) { b.style.bottom = want; b._bot = want; }
+    }
+    if (jumpShown !== on) { b.classList.toggle('on', on); jumpShown = on; }
 }
 
 // ★ 이모티콘은 말풍선 길을 그대로 탄다.
@@ -3235,12 +3283,15 @@ function tick(ts) {
     }
     cageHold(r);                            // 🔒 갇혔으면 가두리 안쪽으로
     run.me.actor.moving(cm ? cmMove : moving);
-    putOne(run.me, run.x, run.y);
+    const myLift = jumpLift(run.me, run.jumpT0);                                  // 🍍 점프
+    if (run.jumpT0) { poseJump(run.me, run.jumpT0); if (!jumping(run.jumpT0)) run.jumpT0 = 0; }   // 뛰는 동안은 걸음 4번 모션으로 멈춰 선다 · 내려오면 푼다
+    putOne(run.me, run.x, run.y, myLift);
     camera();
     send(cm ? cmMove : moving);
+    jumpPaint();
     if (!cm) carryPend();                   // 🍍 집으러 가는 중이면 — 닿았으면 집는다
 
-    let busy = moving || wantSeg || run.tx != null || cmMove || !!(cm && typeof run.hoT === 'number');
+    let busy = moving || wantSeg || run.tx != null || cmMove || !!(cm && typeof run.hoT === 'number') || myLift > 0 || jumping(run.jumpT0);
     const carried = M().of;                 // 🍍 들린 사람은 아래 carryPaint 가 든 사람에게 붙여 그린다
     // ─ 남 — 받은 자리로 미끄러져 간다
     // ★ 화면 밖에 있는 사람은 **안 그린다** (display:none · 걸음 시계도 멈춤).
@@ -3274,7 +3325,10 @@ function tick(ts) {
             q.one.wrap.style.display = vis ? '' : 'none';
             q.one.actor.hold(!vis);
         }
-        if (vis) putOne(q.one, q.x, q.y);
+        const ql = jumpLift(q.one, q.jumpT0);                                   // 🍍 남의 점프
+        if (ql > 0 || jumping(q.jumpT0)) busy = true;
+        if (q.jumpT0) { poseJump(q.one, q.jumpT0); if (!jumping(q.jumpT0)) q.jumpT0 = 0; }
+        if (vis) putOne(q.one, q.x, q.y, ql);
         if (q.sayAt && now() - q.sayAt > P.SAY_MS) { bubble(q.one, ''); q.sayAt = 0; }
     });
 
@@ -3348,12 +3402,13 @@ function send(moving) {
         || moving !== run.sMoving || run.me.actor.facing() !== run.sFace
         || run.sayAt !== run.sSayAt;
     const stopping = (!moving && run.sMoving);
+    const jumped = (run.jumpAt || 0) !== (run.sJumpAt || 0);   // 🍍 뛴 것은 바로 알린다
     const beat = t - run.sent > P.BEAT_MS;           // 가만히 있어도 살아 있다고 알린다
-    if (!stopping && !beat && (!changed || t - run.sent < P.SEND_MS)) return;
+    if (!stopping && !jumped && !beat && (!changed || t - run.sent < P.SEND_MS)) return;
     run.sent = t;
     run.sx = run.x; run.sy = run.y;
     run.sMoving = moving; run.sFace = run.me.actor.facing();
-    run.sSayAt = run.sayAt;
+    run.sSayAt = run.sayAt; run.sJumpAt = run.jumpAt || 0;
     const u = u_(); if (!u) return;
     const myC = carryMine();
     try {
@@ -3367,6 +3422,7 @@ function send(moving) {
             ho: (myC && myC.k === 'head') ? Math.round(run.hox || 0) : null,
             // 🎵 둘레 효과 장 · 🪩 디스코 조명 (LP 판 · lp.js)
             fx: run.fx || null, ds: run.ds || null,
+            jp: run.jumpAt || null,                 // 🍍 마지막으로 뛴 때
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
@@ -3792,6 +3848,8 @@ function onSeat(code, v, fresh) {
     q.fx = (typeof v.fx === 'string') ? v.fx : null;  // 🎵 둘레 효과 (LP 판)
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
+    // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
+    if (v.jp && v.jp !== q.jp) { if (!isNew && now() - v.jp < 3000 && q.sm) q.jumpT0 = performance.now(); q.jp = v.jp; }
     wake();                                // 쉬고 있었으면 바로 따라 그린다
     setTag(q.one, code, v.n || code);
     // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
@@ -5273,6 +5331,7 @@ function open() {
         //   있어야 한다. 끌지 않고 톡 친 것만 열린다 (stick 참고).
         + '<div id="plaza-feed"></div>'
         + '<div id="plaza-map"><div class="mp-n"></div><div class="mp-g"></div></div>'
+        + '<button id="plaza-jump" type="button">🍍 점프<span class="pc">스페이스</span></button>'
         + '<div id="plaza-bottom">'
         + '<button class="plaza-ico plaza-keep" id="plaza-emo">🙂</button>'
         + '<div id="plaza-bar" class="plaza-keep"><span class="dot"></span>'
@@ -5498,6 +5557,7 @@ function open() {
         if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
         const k = KEY[e.key];
         if (k) { run.keys[k] = true; run.tx = null; e.preventDefault(); }
+        if ((e.key === ' ' || e.code === 'Space') && !e.repeat) { if (canJump()) { jump(); e.preventDefault(); } }   // 🍍 PC — 스페이스바로 점프
         if (e.key === 'Escape') { if (sheetOpen()) closeSheet(); else shut(); }
     };
     run.onKeyUp = function (e) { const k = KEY[e.key]; if (k && run) run.keys[k] = false; };
@@ -5512,6 +5572,12 @@ function open() {
         if (typeof window.openGiftBox === 'function') goApp({ fn: 'openGiftBox' });
     };
     document.getElementById('plaza-menu').onclick = menuSheet;
+    (function () {                                  // 🍍 점프 단추 — 누르는 순간 뛴다 (조이스틱 잡기에 안 뺏기게 막는다)
+        const jb = document.getElementById('plaza-jump');
+        if (!jb) return;
+        jb.addEventListener('pointerdown', function (e) { e.stopPropagation(); e.preventDefault(); jump(); });
+        jb.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); });
+    })();
     document.getElementById('plaza-emo').onclick = function () {
         if (typeof window.emoOpen === 'function') window.emoOpen('plaza', sayEmo);
     };
