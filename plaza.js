@@ -584,6 +584,30 @@ function stampSafe(ov) {
         //   발을 바꿔 디뎌도 그 사람 칸만 다시 그리고, 뒤의 큰 방 그림까지
         //   다시 칠하지 않는다.
         '.plaza-one{position:absolute;left:0;top:0;pointer-events:none;will-change:transform;}',
+        // ⚔ 펫 배틀 — 주인 옆의 펫 · 맞은 사람 흔들림 · 피해 숫자 (pet-arena.js · 2026-10-28)
+        '.plaza-pet{position:absolute;bottom:0;pointer-events:none;image-rendering:pixelated;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6));',
+        '  transition:transform .25s ease-out;}',
+        '.plaza-pet.bump{animation:plazaPetBump .5s ease-in-out;}',
+        '@keyframes plazaPetBump{0%{transform:translateY(0)}40%{transform:translateY(-9px) scale(1.12)}100%{transform:translateY(0)}}',
+        '.plaza-fly{position:fixed;z-index:999996;pointer-events:none;image-rendering:pixelated;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6));',
+        '  transition:left .34s cubic-bezier(.3,.9,.4,1),top .34s cubic-bezier(.3,.9,.4,1);}',
+        // 칸(transform 으로 옮김)은 건드리지 않고 **안쪽 그림**만 좌우로 민다 · 칸은 붉게 번쩍인다
+        '.plaza-one.hit{animation:plazaHitF .45s ease-in-out;}',
+        '.plaza-one.hit .dot-box{animation:plazaHit .45s ease-in-out;}',
+        '@keyframes plazaHitF{0%{filter:none}20%{filter:brightness(1.6) sepia(1) saturate(4) hue-rotate(-20deg)}100%{filter:none}}',
+        '@keyframes plazaHit{0%{margin-left:0}20%{margin-left:-5px}50%{margin-left:5px}80%{margin-left:-3px}100%{margin-left:0}}',
+        '.plaza-dmg{position:fixed;z-index:999996;pointer-events:none;font-size:15px;font-weight:bold;color:#ff8a80;text-shadow:0 0 4px #000,0 0 8px #000;',
+        '  animation:plazaDmg 1.1s ease-out forwards;}',
+        '.plaza-dmg.block{color:#9fe6b0;}',
+        '@keyframes plazaDmg{0%{opacity:0;transform:translate(-50%,0)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-38px)}}',
+        '.plaza-skill{position:fixed;inset:0;z-index:999998;display:flex;align-items:center;justify-content:center;pointer-events:none;',
+        '  animation:plazaSkillIn .25s ease-out;}',
+        '@keyframes plazaSkillIn{0%{opacity:0;transform:scale(.8)}100%{opacity:1;transform:scale(1)}}',
+        '.plaza-skill .sk{background:linear-gradient(145deg,#1b1410,#0d0b09);border:2px solid #ffcf8f;border-radius:14px;padding:14px 16px;',
+        '  width:min(320px,84vw);text-align:center;box-shadow:0 10px 34px rgba(0,0,0,.8);}',
+        '.plaza-skill .sk img{max-width:100%;max-height:36vh;filter:drop-shadow(0 4px 8px rgba(0,0,0,.7));}',
+        '.plaza-skill .sk .n{font-size:13px;font-weight:bold;color:#ffcf8f;margin-top:8px;}',
+        '.plaza-skill .sk .t{font-size:12.5px;color:#f3ead8;line-height:1.6;margin-top:4px;}',
         // 🍍 작은 사람 들기 — 고르는 칸
         '#plaza-carry{position:fixed;z-index:60;display:flex;flex-direction:column;gap:6px;min-width:128px;',
         '  padding:9px;border-radius:10px;background:rgba(20,17,24,.95);border:1px solid #d4af37;',
@@ -5565,6 +5589,16 @@ window.plazaWhere = function () {
     if (!run) return null;
     return { room: run.room, inst: run.inst || 0, x: Math.round(run.x), y: Math.round(run.y),
              seg: run.seg, lv: run.lv };
+};
+
+// ⚔ 펫 배틀 연출(pet-arena.js) — 그 사번의 사람 칸 (나 · 같은 방의 남). 없으면 null
+window.plazaOneOf = function (code) {
+    if (!run || !code) return null;
+    const me = u_();
+    const one = (me && code === me.code) ? run.me : ((run.peers[code] || {}).one || null);
+    if (!one || !one.wrap || !one.wrap.parentNode) return null;
+    if (run.peers[code] && run.peers[code].hid) return null;        // 화면 밖이라 안 그리는 사람
+    return { wrap: one.wrap, w: one.w, h: one.h, foot: one.foot || 0, face: (one.actor && one.actor.facing && one.actor.facing()) || 1 };
 };
 
 // 지금 방 그림 — 유리 펜(pen.js)이 방 바닥 그림 위에 그린다

@@ -88,12 +88,15 @@ const BTN = 'width:100%; margin:0 0 7px 0; padding:11px; font-size:12px;';
 const GREY = ' background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;';
 const RED = ' background:linear-gradient(145deg,#6a2a2a,#3a1818) !important; border-color:#a04a4a !important;';
 function shut() { const m = document.getElementById(MOD); if (m) m.remove(); }
+// ★ 광장에 있을 때는 창을 **아래쪽에 낮게** 두고 뒤를 옅게 가린다 — 위쪽 광장에서 주인 옆의 펫이 치고 받는 것이 보이게 (pet-arena.js · 2026-10-28)
+function inPlaza() { return !!document.getElementById('plaza-ov'); }
 function box(html, noOut) {
     shut();
     const w = document.createElement('div');
     w.id = MOD;
-    w.style.cssText = 'position:fixed; inset:0; z-index:999997; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.86); padding:14px;';
-    w.innerHTML = '<div style="background:linear-gradient(145deg,#171410,#0d0b09); border:1px solid #c08a3e; border-radius:10px; padding:14px; width:100%; max-width:430px; max-height:88dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; box-shadow:0 6px 24px rgba(0,0,0,0.75);">' + html + '</div>';
+    const low = inPlaza();
+    w.style.cssText = 'position:fixed; inset:0; z-index:999997; display:flex; align-items:' + (low ? 'flex-end' : 'center') + '; justify-content:center; background:rgba(0,0,0,' + (low ? '0.18' : '0.86') + '); padding:' + (low ? '0 8px calc(8px + env(safe-area-inset-bottom)) 8px' : '14px') + ';';
+    w.innerHTML = '<div style="background:linear-gradient(145deg,#171410,#0d0b09); border:1px solid #c08a3e; border-radius:10px; padding:14px; width:100%; max-width:430px; max-height:' + (low ? '58dvh' : '88dvh') + '; overflow-y:auto; -webkit-overflow-scrolling:touch; box-shadow:0 6px 24px rgba(0,0,0,0.75);">' + html + '</div>';
     if (!noOut) w.addEventListener('click', function (e) { if (e.target === w) shut(); });
     document.body.appendChild(w);
     return w;
@@ -218,8 +221,10 @@ function watch() {
         Object.keys(live).forEach(function (k) { delete live[k]; });
         Object.keys(v).forEach(function (k) { live[k] = v[k]; });
         try { tick(); } catch (e) { console.warn('[펫 배틀]', e); }
+        hooks.forEach(function (fn) { try { fn(live); } catch (e) { console.warn('[펫 배틀] 듣는 쪽', e); } });   // pet-arena.js 가 듣는다
     });
 }
+const hooks = [];
 // 내가 걸려 있는 살아 있는 배틀 — 가장 새것
 function mineLive() {
     const me = u_();
@@ -755,6 +760,13 @@ setInterval(function () { try { if (ready() && watching) tick(); } catch (e) { }
 // ==========================================
 // 확인
 // ==========================================
+// 바깥(pet-arena.js — 광장 연출)에 내어 준다
+window.PETBATTLE = {
+    all: function () { return live; }, mine: mineLive, side: sideOf, other: other, logs: logArr,
+    on: function (fn) { if (typeof fn === 'function' && hooks.indexOf(fn) < 0) hooks.push(fn); },
+    HP: HP, MOD: MOD
+};
+
 window.petBattleState = function () {
     const me = u_();
     console.log('%c===== ⚔ 펫 배틀 =====', 'color:#ffb74d; font-size:13px');

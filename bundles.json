@@ -413,7 +413,8 @@
       "amulet-stack.js",
       "pet-trait.js",
       "pet-rune.js",
-      "pet-battle.js"
+      "pet-battle.js",
+      "pet-arena.js"
     ]
   ]
 }
