@@ -119,7 +119,10 @@ function paint() {
         if (!btns[i].disabled) { btns[i].disabled = true; touched = true; }
     }
 
-    const last = btns[btns.length - 1];
+    // ★ 덧붙은 단추(data-aux — 정예 B조 파훼 · 아기 여우 파괴)는 「준비 중」 칸으로 쓰지 않는다 (2026-10-29)
+    //   그 단추를 집으면 그쪽 시계가 글귀를 도로 바꿔 「준비」와 「파훼」가 번갈아 깜빡였다
+    const main = b.querySelectorAll('.game-btn:not([data-aux])');
+    const last = main.length ? main[main.length - 1] : btns[btns.length - 1];
     let el = document.getElementById('adv-wait');
     if (!el) {
         last.innerHTML = '<span id="adv-wait">준비 중...</span>';

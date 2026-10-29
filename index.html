@@ -3144,11 +3144,11 @@ const EQUIP_AFFIL = {
         };
 
         const jakduBtn = jakduAvailable()
-            ? `<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ ${smashWeapon()}로 박살낸다 (1회)</button>`
+            ? `<button class="game-btn" data-aux="1" style="width:100%; margin:10px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#7a1f1f,#4a0f0f) !important; border-color:#b71c1c !important; color:#fff !important;" onclick="jakduSmash()">⚔ ${smashWeapon()}로 박살낸다 (1회)</button>`
             : '';
 
                     const diaBtn = diaAvailable()
-            ? `<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#6a4c93,#3a2560) !important; border-color:#c9a8ff !important; color:#fff !important;" onclick="useDiaPlug()">◆ 다이아의 빛으로 밀어낸다 (잔여 ${diaCharges() - (currentUser.diaDate === getTodayStr() ? (currentUser.diaUsed || 0) : 0)}회)</button>`
+            ? `<button class="game-btn" data-aux="1" style="width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#6a4c93,#3a2560) !important; border-color:#c9a8ff !important; color:#fff !important;" onclick="useDiaPlug()">◆ 다이아의 빛으로 밀어낸다 (잔여 ${diaCharges() - (currentUser.diaDate === getTodayStr() ? (currentUser.diaUsed || 0) : 0)}회)</button>`
             : '';
 
         if (together) {
@@ -3253,7 +3253,9 @@ function renderAdvanceWait(nextStep) {
     if (body) {
         const btns = body.querySelectorAll('.game-btn');
         btns.forEach(b => { b.disabled = true; });
-        const last = btns[btns.length - 1];
+        // ★ 덧붙은 단추(data-aux — 파훼 · 분신 단추)는 「준비 중」 칸으로 쓰지 않는다 (2026-10-29 · dark-wait.js 와 같이)
+        const main = body.querySelectorAll('.game-btn:not([data-aux])');
+        const last = main.length ? main[main.length - 1] : btns[btns.length - 1];
         if (last) last.innerHTML = `<span id="adv-wait">준비 중...</span>`;
         if (!document.getElementById('adv-wait-list')) {
             body.insertAdjacentHTML('beforeend',
@@ -8100,7 +8102,12 @@ updateUI();
             // 연동 기구 (나와 상대방 양쪽 모두 장착)
             if (cat.effect === 'equip_sync_hole' || cat.effect === 'equip_sync_dildo') {
                 if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-                
+                // ★ 본인에게 쓰면 「상대」도 「나」도 같은 사람이라 같은 것이 두 개 장착됐다 (2026-10-29) — 연동 기구는 다른 사원을 지정해야 한다
+                if (!isOthers || !targetUser || targetUser === currentUser || targetUser.code === currentUser.code) {
+                    showCustomAlert(itemName + '\n\n연동 기구는 「장착 타인」으로 다른 사원을 지정해야 합니다. 본인에게는 찰 수 없습니다.');
+                    return false;
+                }
+
                 if (equipFull(currentUser)) {
                     if(!isOthers) showCustomAlert("당신의 장착 슬롯이 가득 차서 연동 기구를 사용할 수 없습니다.");
                     return false;

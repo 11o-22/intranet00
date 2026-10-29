@@ -1631,6 +1631,7 @@ window.kitBreak = function () {
             const b = document.createElement('button');
             b.id = ID;
             b.className = 'game-btn';
+            b.setAttribute('data-aux', '1');       // 「준비 중」 표시가 맨 끝 .game-btn 을 집어 쓰지 않게 (2026-10-29)
             b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px;'
                 + ' background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
                 + ' border-color:#d9a05a !important; color:#fff !important;';
