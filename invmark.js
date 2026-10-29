@@ -4,6 +4,13 @@
 // ==========================================
 
 // --- 저장소 ---
+//   ★ 열쇠는 물건 이름 그대로가 아니라 invKey(이름)이다 (2026-10-29).
+//     파이어베이스 열쇠에는 . # $ / [ ] 가 못 들어간다. 「[ 🎨 컬러 팔레트 ]」처럼 괄호가 든 이름을
+//     그대로 열쇠로 쓰면 저장이 거부되어 화면에만 잠겨 있다가, 다른 물건을 쓰고 서버 값이
+//     내려오는 순간 잠금이 풀렸다. 그런 글자는 %XX 로 바꿔 적는다 (다른 이름은 그대로).
+function invKey(n) {
+    return String(n == null ? '' : n).replace(/[.#$\/\[\]]/g, function (c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase(); });
+}
 function invMark() {
     if (!currentUser) return { fav: {}, lock: {} };
     if (!currentUser.invMark) currentUser.invMark = { fav: {}, lock: {} };
@@ -11,27 +18,28 @@ function invMark() {
     if (!currentUser.invMark.lock) currentUser.invMark.lock = {};
     return currentUser.invMark;
 }
-function isFav(n) { return !!invMark().fav[n]; }
-function isLock(n) { return !!invMark().lock[n]; }
+function isFav(n) { return !!invMark().fav[invKey(n)]; }
+function isLock(n) { return !!invMark().lock[invKey(n)]; }
 
 function toggleFav(n) {
-    const m = invMark();
-    if (m.fav[n]) delete m.fav[n]; else m.fav[n] = true;
+    const m = invMark(), k = invKey(n);
+    if (m.fav[k]) delete m.fav[k]; else m.fav[k] = true;
     saveFields({ invMark: 1 });
     renderInventory();
 }
 function toggleLock(n) {
-    const m = invMark();
-    if (m.lock[n]) {
-        delete m.lock[n];
+    const m = invMark(), k = invKey(n);
+    if (m.lock[k]) {
+        delete m.lock[k];
         saveFields({ invMark: 1 });
         renderInventory();
         return;
     }
-    m.lock[n] = true;
+    m.lock[k] = true;
     saveFields({ invMark: 1 });
     renderInventory();
 }
+window.invKey = invKey;
 
 // ==========================================
 // 확인 팝업

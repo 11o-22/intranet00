@@ -90,6 +90,7 @@ function cell(p) {
     if (!s) {
         // 입양 전 — 어둡게
         return '<div style="text-align:center; padding:4px 2px; opacity:0.85;">'
+            + '<div style="height:4px; margin:0 3px 2px 3px;"></div><div style="height:4px; margin:0 3px 2px 3px;"></div>'
             + '<div style="width:100%; aspect-ratio:1/1; display:flex; align-items:center;'
             + ' justify-content:center; border:1px solid #2a2622; border-radius:7px;'
             + ' background:rgba(0,0,0,0.5);">'
@@ -103,8 +104,18 @@ function cell(p) {
     const st = statusOf(s);
     const nick = P().nick(p.i, me);
     const inRoom = P().showHas(p.i, me);
+    // ★ 포만도 막대(초록) · 다쳤으면 상처 깊이 막대(붉음) — 목록에서 바로 보이게 (2026-10-29 사용자 요청)
+    let full = 0; try { full = Math.max(0, Math.min(100, Number(P().full(p.i, me)) || 0)); } catch (e) { }
+    const hurt = (s.hurt && typeof s.hurt === 'object') ? s.hurt : null;
+    const deep = hurt ? Math.max(0, Math.min(100, Number(hurt.deep) || 0)) : 0;
+    const fullCol = full <= 20 ? '#e05a4a' : (full <= 50 ? '#d9a05a' : '#6fbf5e');
+    const bars = '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="포만도 ' + full + '%">'
+        + '<div style="height:100%; width:' + full + '%; background:' + fullCol + ';"></div></div>'
+        + (hurt ? '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="상처 깊이 ' + deep + '">'
+            + '<div style="height:100%; width:' + deep + '%; background:#e05a4a;"></div></div>' : '<div style="height:4px; margin:0 3px 2px 3px;"></div>');
     return '<div class="pet-cell" data-i="' + p.i + '" style="text-align:center; padding:4px 2px;'
         + ' cursor:pointer;">'
+        + bars
         + '<div style="position:relative; width:100%; aspect-ratio:1/1; display:flex;'
         + ' align-items:center; justify-content:center; border:1px solid '
         + (inRoom ? '#c9a227' : '#4a3a26') + ';'
@@ -116,8 +127,10 @@ function cell(p) {
         + '<span style="position:absolute; top:-3px; right:-3px; font-size:8px; font-weight:bold;'
         + ' color:#1a1208; background:#c9a227; border-radius:3px; padding:0 3px;">'
         + esc(s.g || 'D') + '</span>'
+        + (hurt ? '<span style="position:absolute; top:-4px; left:' + (inRoom ? '10px' : '-3px') + '; font-size:9px; line-height:1;" title="다침">🩹</span>' : '')
         + (st ? '<span style="position:absolute; bottom:1px; left:1px; right:1px; font-size:7.5px;'
-            + ' color:' + st.c + '; background:rgba(0,0,0,0.72);">' + st.t + '</span>' : '')
+            + ' color:' + st.c + '; background:rgba(0,0,0,0.72);">' + st.t + '</span>'
+            : (hurt ? '<span style="position:absolute; bottom:1px; left:1px; right:1px; font-size:7.5px; color:#ff8a80; background:rgba(0,0,0,0.72);">다침 · 깊이 ' + deep + '</span>' : ''))
         + '</div>'
         + '<div style="font-size:8.5px; color:#e8d7b4; margin-top:3px; line-height:1.2;'
         + ' overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(nick) + '</div>'
@@ -140,7 +153,7 @@ function listView() {
         + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
         + '가진 펫을 누르면 이름을 붙이고, 사택 방에 내놓을 펫을 고를 수 있습니다.<br>'
-        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다.</div>'
+        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 초록 막대는 포만도, 붉은 막대는 상처 깊이(🩹 다친 펫)입니다.</div>'
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 

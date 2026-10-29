@@ -944,6 +944,9 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#a79e8f;font-family:inherit;}',
         '.plaza-tabs button.on{background:rgba(217,160,90,.16);border-color:#8a6a2a;color:#ffe9bd;}',
         '#plaza-bagbody{overflow-y:auto;}',
+        '#plaza-bagq{width:100%;box-sizing:border-box;margin:0 0 8px 0;padding:9px 11px;border-radius:10px;border:1px solid #4a3a26;background:rgba(0,0,0,0.45);color:#ffe9bd;font-size:12.5px;outline:none;}',
+        '#plaza-bagq::placeholder{color:#7d7568;}',
+        '#plaza-bagq:focus{border-color:#d9a05a;}',
         '.plaza-stage{display:flex;justify-content:center;padding:4px 0 10px 0;overflow:hidden;',
         '  background:radial-gradient(ellipse at 50% 92%,rgba(217,160,90,.13),rgba(0,0,0,0) 62%);}',
         // ★ 칸이 384 로 커지며 머리 위가 29도트까지 넓어졌다. 마네킹은
@@ -5122,11 +5125,20 @@ function itemInfo(name) {
 }
 
 let bagOpenItem = '';          // 펴 둔 물건 (다시 그려도 그대로 펴 둔다)
+let bagQuery = '';             // ★ 찾기 (2026-10-29 사용자 요청) — 창을 닫으면 비운다
 
 function bagSheet() {
     const u = u_(); if (!u) return;
-    const s = sheet('bag', '소지품', '<div id="plaza-bagbody">' + bagInv(u) + '</div>');
+    bagQuery = '';
+    const s = sheet('bag', '소지품', '<input id="plaza-bagq" type="search" placeholder="🔍 물건 이름으로 찾기" autocomplete="off">'
+        + '<div id="plaza-bagbody">' + bagInv(u) + '</div>');
     if (!s) return;
+    const q = s.querySelector('#plaza-bagq');
+    if (q) {
+        q.oninput = function () { bagQuery = String(q.value || '').trim(); bagRepaint(); };
+        q.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        q.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    }
     bagWire(s);
 }
 // 다시 그릴 때는 **속만** 갈아 끼운다 — 창을 새로 띄우면 내려 둔 자리가 풀린다
@@ -5169,6 +5181,12 @@ function bagInv(u) {
     inv.forEach(function (x) { const n = String(x); cnt[n] = (cnt[n] || 0) + 1; });
     let names = Object.keys(cnt);
     try { if (typeof invSortNames === 'function') names = invSortNames(names); } catch (e) { }
+    // ★ 찾기 — 이름에 그 글자가 든 것만 (띄어쓰기 · 대소문자는 안 가린다)
+    if (bagQuery) {
+        const ql = bagQuery.replace(/\s+/g, '').toLowerCase();
+        names = names.filter(function (n) { return String(n).replace(/\s+/g, '').toLowerCase().indexOf(ql) >= 0; });
+        if (!names.length) return '<div class="plaza-none">「' + esc(bagQuery) + '」 — 그런 물건이 없습니다.</div>';
+    }
 
     const cats = bagCats();
     const mine = {};

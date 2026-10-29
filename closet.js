@@ -1414,25 +1414,43 @@ function markOn() {
     if (cnt && s) cnt.innerText = sel.length + ' / ' + (s.max || 1);
 }
 
-function saveSoon() {
+// ★ 고르는 대로 바로 저장하지 않는다 (2026-10-29 사용자 요청).
+//   옷장 마네킹에는 바로 입혀 보이지만, 밖(광장 · 남의 눈)에는 「갈아입기 확정」을 눌러야 적용된다.
+//   확정 전에 옷장을 떠나면 고른 것은 버려진다 (다시 열면 저장된 모습으로 돌아온다).
+//   물들이기(dotSetCol)는 팔레트가 한 개 드는 일이라 전처럼 그 자리에서 적는다.
+let dirty = false;
+function saveSoon() { dirty = true; paintConfirm(); }
+function commit() {
     clearTimeout(saveT);
-    saveT = setTimeout(function () {
-        const me = u_(); if (!me) return;
-        const p = cur();
-        const out = { head: p.head };
-        DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
-        // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
-        out.col = Object.assign({}, p.col || {});
-        me.dot = out;
-        save({ dot: 1 });
-        // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
-        //   ✗ 안 부르면 옷장에서는 갈아입었는데 **광장 사람은 옛 옷 그대로**다.
-        //     (광장은 칸 뒤에 열린 채 깔려 있고, 사람을 만든 뒤로는 다시 안 만든다)
-        //     전에는 광장 가방에서 갈아입어 saveDot 이 해 주던 일이다 —
-        //     옷을 옷장으로 옮기면서 그 길이 끊겼다.
-        try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
-    }, 600);
+    const me = u_(); if (!me) return;
+    const p = cur();
+    const out = { head: p.head };
+    DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
+    // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
+    out.col = Object.assign({}, p.col || {});
+    me.dot = out;
+    save({ dot: 1 });
+    // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
+    //   ✗ 안 부르면 옷장에서는 갈아입었는데 **광장 사람은 옛 옷 그대로**다.
+    //     (광장은 칸 뒤에 열린 채 깔려 있고, 사람을 만든 뒤로는 다시 안 만든다)
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    dirty = false;
+    paintConfirm();
+    const n = document.getElementById('closet-note');
+    if (n) { n.innerText = '갈아입었습니다 — 밖에서도 이 모습입니다.'; setTimeout(note_, 1800); }
 }
+function revert() {
+    pick = null; dirty = false;
+    render();
+}
+function paintConfirm() {
+    const bar = document.getElementById('closet-confirm');
+    if (!bar) return;
+    bar.style.display = dirty ? 'flex' : 'none';
+}
+window.closetCommit = commit;
+window.closetRevert = revert;
+window.closetDirty = function () { return dirty; };
 
 function tap(kind, k, v) {
     if (kind === 'set' || kind === 'sa') { setTap(kind, k); return; }
@@ -1618,25 +1636,32 @@ function setTap(kind, k) {
 function note_() {
     const n = document.getElementById('closet-note');
     if (!n) return;
-    n.innerText = isAdm(u_()) ? '고르는 대로 저장됩니다.'
-        : '고르는 대로 저장됩니다. 옷과 악세는 망상 홈쇼핑 뽑기에서 늘립니다.';
+    n.innerText = isAdm(u_()) ? '고른 뒤 「갈아입기 확정」을 눌러야 밖에서 보입니다.'
+        : '고른 뒤 「갈아입기 확정」을 눌러야 밖에서 보입니다. 옷과 악세는 망상 홈쇼핑 뽑기에서 늘립니다.';
 }
 
 function render() {
     const body = document.getElementById('house-closet-body');
     if (!body) return;
     const u = u_(); if (!u) return;
-    pick = null;
+    pick = null; dirty = false;
     setSel = null; setAsk = null;
     body.innerHTML =
         '<div class="panel-title">[사택 옷장]</div>'
         + '<div id="closet-stage"><div id="closet-floor"></div></div>'
+        + '<div id="closet-confirm" style="display:none; gap:7px; margin:0 0 10px 0;">'
+        + '<button id="closet-ok" class="game-btn" style="flex:1; margin:0; padding:11px; font-size:12px; background:linear-gradient(145deg,#6a4c1a,#3d2c0c) !important; border-color:#d9a05a !important; color:#ffe9bd !important;">✔ 갈아입기 확정</button>'
+        + '<button id="closet-undo" class="game-btn" style="flex:0 0 auto; margin:0; padding:11px 13px; font-size:12px; background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">↩ 되돌린다</button>'
+        + '</div>'
         + '<div id="closet-sets">' + setsHtml() + '</div>'
         + '<div id="closet-rows">' + buildRows(u) + '</div>'
         + '<div id="closet-note"></div>';
     Array.prototype.forEach.call(body.querySelectorAll('.cl-b'), function (b) {
         b.onclick = function () { tap(b.dataset.kind, b.dataset.k, b.dataset.v); };
     });
+    const okB = body.querySelector('#closet-ok'), unB = body.querySelector('#closet-undo');
+    if (okB) okB.onclick = commit;
+    if (unB) unB.onclick = revert;
     note_();
     paintDoll();
 }
