@@ -35,6 +35,7 @@
 //   u.ebWolves = 0~3                          데려갈 늑대 수
 //   darkParties/<방>/eliteB = { lead, leadName, crew: { <사번>: 1 }(출발 때 인원), masks: { <사번>: 1 }, dead: { <사번>: 1 } }
 //     전원 생환은 crew 로 센다 — members 는 먼저 귀환한 사람부터 빠져서(partyRunCleanup) 정산 때 둘 미만이 되곤 했다 (2026-10-29)
+//     ★ 조장이 조원에게 가면을 씌웠으면(masks 가 하나라도) 조장은 전원 생환이 아니어도 ×3 (2026-10-29 사용자)
 //
 // ■ 콘솔
 //   ebGive(사번)   상담사 — 준다      ebState()   지금 상태      ebMenu()   창
@@ -533,14 +534,17 @@ function allSurvived(pid) {
     const dead = e.dead || {};
     return mem.every(function (c) { return !dead[c]; });
 }
+function masksGiven(pid) { const e = ebOf(pid); return e && e.masks ? Object.keys(e.masks).length : 0; }
 function myMult() {
     const me = u_(), r = run();
     if (!me || !r) return 1;
     if (!r.isParty) return wears(me) ? C.PTS.lead : 1;
     const role = roleIn(me.code, r.partyId);
     if (!role) return 1;
-    if (role !== 'lead' && !leadAlive(r.partyId)) return 1;            // 조장이 쓰러졔 있으면 조원 몫은 없다
+    if (role !== 'lead' && !leadAlive(r.partyId)) return 1;            // 조장이 쓰러져 있으면 조원 몫은 없다
     const all = allSurvived(r.partyId);
+    // ★ 조장이 조원에게 가면을 씌웠으면 조장은 ×3 (2026-10-29 사용자) — 전원 생환이 아니어도
+    if (role === 'lead' && masksGiven(r.partyId) > 0) return C.PTS_ALL.lead;
     return (all ? C.PTS_ALL : C.PTS)[role] || 1;
 }
 (function hookSettle() {
@@ -563,14 +567,15 @@ function myMult() {
                 if (extra <= 0) return out;
                 try { if (typeof changePoints === 'function') changePoints(extra); else me.points = (Number(me.points) || 0) + extra; } catch (e) { me.points = (Number(me.points) || 0) + extra; }
                 const who = role === 'lead' ? '조장' : role === 'elite' ? '정예조 조원' : '일반 조원';
-                log_(me, '[' + NAME + '] ' + who + (all ? ' · 전원 생환' : '') + ' — 생환 포인트 ×' + mult + ' (+' + extra.toLocaleString() + ' P)');
+                const why = all ? ' · 전원 생환' : ((role === 'lead' && r0 && r0.isParty && masksGiven(r0.partyId) > 0) ? ' · 가면을 씌움' : '');
+                log_(me, '[' + NAME + '] ' + who + why + ' — 생환 포인트 ×' + mult + ' (+' + extra.toLocaleString() + ' P)');
                 save({ points: 1, history: 1 });
                 try {
                     const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
                     if (body) {
                         const el = document.createElement('div');
                         el.style.cssText = 'margin-top:8px; padding:8px 10px; border:1px dashed #6a7a90; border-radius:5px; font-size:11px; color:#cfd8e6;';
-                        el.textContent = '🐺 ' + who + (all ? ' · 전원 생환' : '') + ' — 생환 포인트 ×' + mult + ' (+' + extra.toLocaleString() + ' P)';
+                        el.textContent = '🐺 ' + who + why + ' — 생환 포인트 ×' + mult + ' (+' + extra.toLocaleString() + ' P)';
                         const btn = body.querySelector('button');
                         if (btn) btn.insertAdjacentElement('beforebegin', el); else body.appendChild(el);
                     }
@@ -624,7 +629,13 @@ function myMult() {
                     b = (Number(b) || 0) + rnd(rg[0], rg[1]);
                 }
                 if (role === 'lead' || role === 'elite') b = (Number(b) || 0) + C.MASK_BON;
-                if (r && r._ebRescue) b = (Number(b) || 0) + r._ebRescue;
+                if (r && r._ebRescue) {
+                    if (r._ebRescueOnce && Date.now() - (Number(r._ebRescueAt) || 0) > 15000) { delete r._ebRescue; delete r._ebRescueOnce; }
+                    else {
+                        b = (Number(b) || 0) + r._ebRescue;
+                        if (r._ebRescueOnce) { delete r._ebRescue; delete r._ebRescueOnce; }
+                    }
+                }
             } catch (e) { }
             return b;
         };
@@ -692,55 +703,69 @@ window.ebBreak = function () {
     } catch (e) { }
 };
 //   ★ K 의 방(darkRun.kroom)에서는 안 붙인다 — 거기는 본문을 자주 다시 그려서 단추가 깜빡이고 느려졌다 (2026-10-28)
-(function breakBtn() {
+//   ★ 본문이 다시 그려지는 **그 자리에서** 붙인다 (2026-10-29) — 전에는 1.4초 시계로만 붙여서, 장면이 바뀔 때마다
+//     단추가 사라졌다 1초쯤 뒤에 나타나 깜빡이는 것처럼 보였다(영상 · 동화의 뒷면은 장면이 잘게 자주 바뀐다).
+//     이제 본문(#dro-body · #darkness-body)의 자식이 바뀌면 MutationObserver 가 바로(그리기 전에) 붙인다. 시계는 뒷받침.
+function ensureBreak() {
     const ID = 'eb-break-btn';
-    setInterval(function () {
-        try {
-            const r = run(), me = u_();
-            const old = document.querySelector('#' + ID);
-            if (!r || r.kroom || !me || !masked()) { if (old) old.remove(); return; }
-            const left = Math.max(0, C.BREAK_MAX - (Number(r._ebBreakN) || 0));
-            if (!left) { if (old) old.remove(); return; }
-            const label = '🎭 True or Fake — 파훼한다 (남은 ' + left + '회)';
-            if (old && old.isConnected) { old.textContent = label; return; }
-            // 선택지가 있는 장면에만 (단추가 하나라도 있는 본문) — 투표 칸이 있으면 그 **뒤**(형제), 아니면 본문 끝
-            //   ★ 투표 칸(#vote-area) 안에 넣으면 안 된다 — 투표 시계가 1초마다 그 안을 통째로 다시 그려
-            //     단추가 지워졌다 1.4초 뒤 다시 붙으며 미친 듯이 깜빡였다 (2026-10-28 · 작두 단추처럼 afterend 로)
-            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
-            const vote = document.getElementById('vote-area');
-            if (!body || !body.querySelector('button')) return;
-            const b = document.createElement('button');
-            b.id = ID; b.className = 'game-btn';
-            b.setAttribute('data-aux', '1');       // ★ 「준비 중」 표시가 맨 끝 .game-btn 을 집어 쓰는데(index.html renderAdvanceWait · dark-wait.js) 이 단추는 건너뛰게
-            b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#4a5a70,#2a3240) !important; border-color:#9fb4d0 !important; color:#fff !important;';
-            b.textContent = label;
-            b.onclick = window.ebBreak;
-            if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
-        } catch (e) { }
-    }, 1400);
-})();
-
+    const r = run(), me = u_();
+    const old = document.querySelector('#' + ID);
+    if (!r || r.kroom || !me || !masked()) { if (old) old.remove(); return; }
+    const left = Math.max(0, C.BREAK_MAX - (Number(r._ebBreakN) || 0));
+    if (!left) { if (old) old.remove(); return; }
+    const label = '🎭 True or Fake — 파훼한다 (남은 ' + left + '회)';
+    if (old && old.isConnected) { if (old.textContent !== label) old.textContent = label; return; }
+    // 선택지가 있는 장면에만 (단추가 하나라도 있는 본문) — 투표 칸이 있으면 그 **뒤**(형제), 아니면 본문 끝
+    //   ★ 투표 칸(#vote-area) 안에 넣으면 안 된다 — 투표 시계가 1초마다 그 안을 통째로 다시 그려
+    //     단추가 지워졌다 1.4초 뒤 다시 붙으며 미친 듯이 깜빡였다 (2026-10-28 · 작두 단추처럼 afterend 로)
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+    const vote = document.getElementById('vote-area');
+    if (!body || !body.querySelector('button')) return;
+    const b = document.createElement('button');
+    b.id = ID; b.className = 'game-btn';
+    b.setAttribute('data-aux', '1');       // ★ 「준비 중」 표시가 맨 끝 .game-btn 을 집어 쓰는데(index.html renderAdvanceWait · dark-wait.js) 이 단추는 건너뛰게
+    b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px; background:linear-gradient(145deg,#4a5a70,#2a3240) !important; border-color:#9fb4d0 !important; color:#fff !important;';
+    b.textContent = label;
+    b.onclick = window.ebBreak;
+    if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
+}
 // 🐺 늑대 줄 — 데려간 늑대가 있으면 본문 맨 위에 한 줄 (안 보이는 속성의 늑대도 있다는 것을 알 수 있게 · 2026-10-29)
-(function wolfLine() {
+function ensureWolf() {
     const ID = 'eb-wolf-line';
-    setInterval(function () {
-        try {
-            const r = run();
-            const old = document.getElementById(ID);
-            const ws = (r && !r.kroom && Array.isArray(r._ebWolves)) ? r._ebWolves : [];
-            if (!ws.length) { if (old) old.remove(); return; }
-            const txt = '🐺 ' + ws.map(function (w) { return w.nick + ' — ' + attrName(w.k) + ' ' + (w.g || 'D') + (w.gone ? ' (사라짐)' : ''); }).join(' · ');
-            if (old && old.isConnected) { if (old.textContent !== txt) old.textContent = txt; return; }
-            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
-            if (!body || !body.childNodes.length) return;
-            const el = document.createElement('div');
-            el.id = ID;
-            el.style.cssText = 'font-size:10px; color:#9fb4d0; margin:0 0 8px 0; padding:6px 8px; border:1px dashed #4a5a70; border-radius:5px; line-height:1.5;';
-            el.textContent = txt;
-            body.insertAdjacentElement('afterbegin', el);
-        } catch (e) { }
-    }, 1400);
+    const r = run();
+    const old = document.getElementById(ID);
+    const ws = (r && !r.kroom && Array.isArray(r._ebWolves)) ? r._ebWolves : [];
+    if (!ws.length) { if (old) old.remove(); return; }
+    const txt = '🐺 ' + ws.map(function (w) { return w.nick + ' — ' + attrName(w.k) + ' ' + (w.g || 'D') + (w.gone ? ' (사라짐)' : ''); }).join(' · ');
+    if (old && old.isConnected) { if (old.textContent !== txt) old.textContent = txt; return; }
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+    if (!body || !body.childNodes.length) return;
+    const el = document.createElement('div');
+    el.id = ID;
+    el.style.cssText = 'font-size:10px; color:#9fb4d0; margin:0 0 8px 0; padding:6px 8px; border:1px dashed #4a5a70; border-radius:5px; line-height:1.5;';
+    el.textContent = txt;
+    body.insertAdjacentElement('afterbegin', el);
+}
+let ensureT = 0;
+function ensureSoon() {
+    if (ensureT) return;
+    ensureT = requestAnimationFrame(function () { ensureT = 0; try { ensureWolf(); } catch (e) { } try { ensureBreak(); } catch (e) { } });
+}
+(function watchBody() {
+    const seen = {};
+    function hook(id) {
+        const el = document.getElementById(id);
+        if (!el || seen[id]) return;
+        seen[id] = 1;
+        new MutationObserver(function (muts) {
+            // 내 것(단추 · 늑대 줄)만 붙거나 떨어진 것이면 넘어간다 — 그래도 ensure 는 있으면 아무것도 안 하므로 돌아도 된다
+            ensureSoon();
+        }).observe(el, { childList: true });
+    }
+    const iv = setInterval(function () { hook('dro-body'); hook('darkness-body'); if (seen['dro-body'] && seen['darkness-body']) clearInterval(iv); }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
 })();
+setInterval(function () { try { ensureWolf(); } catch (e) { } try { ensureBreak(); } catch (e) { } }, 1400);
 
 // 파훼 횟수는 darkRun 에만 있어서, 나갔다 돌아오면(복귀) 새 darkRun 에는 없다 — darkRuns/<사번>/ebBreakN 에 같이 적고 복귀 때 되찾는다
 (function keepBreakN() {
@@ -808,6 +833,30 @@ function wrapRescue(name, targetOf) {
     setTimeout(function () { clearInterval(iv); }, 60000);
 }
 wrapRescue('attemptRescue', function (kind, code) { return code; });
+// ★ K 의 방(kroomRescue(사번))도 — 굴림이 서버를 읽은 뒤(비동기)에 돌아서 try/finally 로 못 건다.
+//   한 번 쓰고 지우는 표(_ebRescueOnce)로 걸어 두고, rollDarkBonus 가 처음 더할 때 지운다 (15초 지나면 그냥 버린다).
+(function wrapKroomRescue() {
+    const iv = setInterval(function () {
+        const f = window.kroomRescue;
+        if (typeof f !== 'function') return;
+        if (f._eb) { clearInterval(iv); return; }
+        const w = function (code) {
+            const r = run();
+            let bon = 0;
+            try { bon = rescueBon(code); } catch (e) { bon = 0; }
+            if (r && bon) {
+                r._ebRescue = bon; r._ebRescueOnce = 1; r._ebRescueAt = Date.now();
+                try { if (r.log) r.log.push('[🐺 가면] ' + nameOf(code) + ' 구출 — 조장의 구출 판정 +' + bon + ' (K 의 방)'); } catch (e) { }
+                toast('🎭 정예조 조원 — 구출 판정 +' + bon);
+            }
+            return f.apply(this, arguments);
+        };
+        Object.keys(f).forEach(function (k) { try { w[k] = f[k]; } catch (e) { } });
+        w._eb = true; window.kroomRescue = w;
+        clearInterval(iv);
+    }, 700);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 wrapRescue('b330DoRescue1', function () { const r = run(), p = r && parties()[r.partyId]; return p && p.rescue1 && p.rescue1.target; });
 wrapRescue('b330DoRescue2', function () { const r = run(), p = r && parties()[r.partyId]; return p && p.rescue2 && p.rescue2.target; });
 
@@ -863,7 +912,7 @@ window.ebRunMask = runMaskMenu;
         try {
             const r = run(), me = u_();
             const old = document.getElementById(ID);
-            const ok = r && r.isParty && r.partyId && !r.kroom && me && wears(me) && roleIn(me.code, r.partyId) === 'lead';
+            const ok = r && r.isParty && r.partyId && me && wears(me) && roleIn(me.code, r.partyId) === 'lead';   // K 의 방에서도 (2026-10-29)
             if (!ok) { if (old) old.remove(); return; }
             if (old && old.isConnected) return;
             const role = document.getElementById('dro-role');

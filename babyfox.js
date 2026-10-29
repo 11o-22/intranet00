@@ -1610,37 +1610,46 @@ window.kitBreak = function () {
 };
 
 // 선택지 아래에 단추를 붙인다 (작두·다이아 단추와 같은 자리)
-(function breakBtn() {
+//   ★ 본문이 다시 그려지는 그 자리에서 붙인다 (2026-10-29 · eliteb.js 와 같이) — 1.4초 시계로만 붙이면 장면이 바뀔 때마다
+//     단추가 사라졌다 늦게 나타나 깜빡이는 것처럼 보였다. 본문 자식이 바뀌면 MutationObserver 가 바로 붙인다. 시계는 뒷받침.
+function ensureBreakBtn() {
     const ID = 'kit-break-btn';
-    setInterval(function () {
-        try {
-            const r = run();
-            const old = document.querySelector('#' + ID);
-            const x = r ? usable('break') : null;
-            if (!x) { if (old) old.remove(); return; }
-            if (old && old.isConnected) {
-                old.textContent = '✧ ' + nickOf(x) + '이(가) 부순다 (남은 '
-                    + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
-                return;
-            }
-            // 투표 칸이 있으면 그 **뒤**(형제), 아니면 탐사 본문(전용 화면이면 dro-body) 끝 — 단추가 있는 장면에만 (2026-10-29)
-            //   ★ #vote-area 안에 넣으면 투표 시계가 1초마다 그 안을 다시 그려 단추가 깜빡인다 — 작두 단추처럼 afterend 로
-            const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : document.getElementById('dark-body');
-            const vote = document.getElementById('vote-area');
-            if (!body || !body.querySelector('button')) return;
-            const b = document.createElement('button');
-            b.id = ID;
-            b.className = 'game-btn';
-            b.setAttribute('data-aux', '1');       // 「준비 중」 표시가 맨 끝 .game-btn 을 집어 쓰지 않게 (2026-10-29)
-            b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px;'
-                + ' background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
-                + ' border-color:#d9a05a !important; color:#fff !important;';
-            b.textContent = '✧ ' + nickOf(x) + '이(가) 부순다 (남은 '
-                + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
-            b.onclick = window.kitBreak;
-            if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
-        } catch (e) { }
-    }, 1400);
+    const r = run();
+    const old = document.querySelector('#' + ID);
+    const x = r ? usable('break') : null;
+    if (!x) { if (old) old.remove(); return; }
+    const label = '✧ ' + nickOf(x) + '이(가) 부순다 (남은 '
+        + Math.max(0, BFOX.BREAK_MAX - (Number(st(x.owner, 'break').n) || 0)) + '회)';
+    if (old && old.isConnected) { if (old.textContent !== label) old.textContent = label; return; }
+    // 투표 칸이 있으면 그 **뒤**(형제), 아니면 탐사 본문(전용 화면이면 dro-body) 끝 — 단추가 있는 장면에만 (2026-10-29)
+    //   ★ #vote-area 안에 넣으면 투표 시계가 1초마다 그 안을 다시 그려 단추가 깜빡인다 — 작두 단추처럼 afterend 로
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : document.getElementById('dark-body');
+    const vote = document.getElementById('vote-area');
+    if (!body || !body.querySelector('button')) return;
+    const b = document.createElement('button');
+    b.id = ID;
+    b.className = 'game-btn';
+    b.setAttribute('data-aux', '1');       // 「준비 중」 표시가 맨 끝 .game-btn 을 집어 쓰지 않게 (2026-10-29)
+    b.style.cssText = 'width:100%; margin:8px 0 0 0; padding:12px; font-size:12px;'
+        + ' background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
+        + ' border-color:#d9a05a !important; color:#fff !important;';
+    b.textContent = label;
+    b.onclick = window.kitBreak;
+    if (vote && vote.parentElement) vote.insertAdjacentElement('afterend', b); else body.appendChild(b);
+}
+(function breakBtn() {
+    let t = 0;
+    function soon() { if (t) return; t = requestAnimationFrame(function () { t = 0; try { ensureBreakBtn(); } catch (e) { } }); }
+    const seen = {};
+    function hook(id) {
+        const el = document.getElementById(id);
+        if (!el || seen[id]) return;
+        seen[id] = 1;
+        new MutationObserver(function () { soon(); }).observe(el, { childList: true });
+    }
+    const iv = setInterval(function () { hook('dro-body'); hook('darkness-body'); hook('dark-body'); if (seen['dro-body'] && seen['darkness-body']) clearInterval(iv); }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+    setInterval(function () { try { ensureBreakBtn(); } catch (e) { } }, 1400);
 })();
 
 // ==========================================

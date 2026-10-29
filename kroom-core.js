@@ -2335,9 +2335,11 @@ window.kroomRescue = function (code) {
         if (healDown) {                                      // 치유 — 판정 (2026-10-20 · 전에는 무조건)
             if (v.tried && v.tried[me().code]) { toast('이미 한 번 손을 얹었다.'); return; }
             ref.child('tried/' + me().code).set(true);
-            const hr = healRoll16;
+            // ★ 2ab2f35(DC 16 통일) 때 healRoll(v.dc || 12) 가 「healRoll16」 이라는 없는 이름으로 잘못 바뀌어
+            //   치유 직업의 쓰러진 동료 일으키기가 ReferenceError 로 아무 일도 안 했다 (2026-10-29)
+            const hr = healRoll(16);
             const hsure = hr.ok ? '' : sureRescue();          // 확정 구출 물건 — 빗나갔을 때만 쓴다
-            if (hsure) { hr.ok = true; hr.dice = healDice(hr.R, v.dc || 12, true); }
+            if (hsure) { hr.ok = true; hr.dice = healDice(hr.R, 16, true); }
             if (!hr.ok) {                                    // 닿지 않았다 — 치유자는 다치지 않는다 · 다른 동료가 아직 손을 뻗을 수 있다
                 sendPartyChat(me().name + ' 사원의 치유가 ' + v.name + ' 사원에게 닿지 않았습니다.', true);
                 show('구제', hr.dice + `손을 얹었다. 상처가 손을 밀어낸다.<br><br>${esc(v.name)} 사원은 아직 눈을 뜨지 못했다.`, darkChoiceBtn('계속한다.', 'kroomBack()'));
