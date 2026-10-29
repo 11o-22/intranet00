@@ -676,8 +676,10 @@ window.foxOpen = step1;
         const u = currentUser;
         const old = document.getElementById(ID);
         const inRoom = !!(u && u.quarantineUntil && Date.now() < u.quarantineUntil);
+        // 🐾 여정에서 펫 대신 맞아 광장 가두리에 갇힌 것도 격리와 같이 푼다 (2026-10-30 사용자 · cage-escape.js)
+        const caged = !inRoom && !!(u && typeof window.cageTimedOf === 'function' && window.cageTimedOf(u.code));
         const n = (u && u.foxEscape) || 0;
-        if (!inRoom || n <= 0) { if (old) old.remove(); return; }
+        if ((!inRoom && !caged) || n <= 0) { if (old) old.remove(); return; }
         if (old) { old.textContent = '🐯 금제를 푼다 (' + n + ')'; return; }
 
         const b = document.createElement('button');
@@ -690,6 +692,19 @@ window.foxOpen = step1;
         b.textContent = '🐯 금제를 푼다 (' + n + ')';
         b.onclick = function () {
             if (!currentUser || (currentUser.foxEscape || 0) <= 0) return;
+            // 가두리(여정) — 격리가 아니면 가두리 문만 연다
+            if (!(currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil)) {
+                if (typeof window.cageTimedOf !== 'function' || !window.cageTimedOf(currentUser.code) || typeof window.cageRelease !== 'function') return;
+                currentUser.foxEscape -= 1;
+                if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[' + FOX + '] 연등을 밝혀 금제를 풀고 가두리에서 나왔습니다.');
+                if (typeof saveFields === 'function') { try { saveFields({ foxEscape: 1, history: 1 }); } catch (e) { } }
+                b.remove();
+                window.cageRelease(currentUser.code).then(function (ok) {
+                    showCustomAlert(ok ? '🪷 연등 하나가 밝았습니다.\n\n가두리에서 나왔습니다.\n남은 탈출 ' + (currentUser.foxEscape || 0) + '회'
+                                       : '가두리 문이 열리지 않았습니다. 잠시 뒤 다시 눌러 주십시오.');
+                });
+                return;
+            }
             currentUser.foxEscape -= 1;
             // 나올 때의 값(보통 100 가까이)을 그대로 두면 나오자마자 다시 들어간다.
             // 꺼내 온 사람은 오염도 50 으로 둔다.

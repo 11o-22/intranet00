@@ -22,7 +22,7 @@
 //      (2026-10-29 사용자: 안에서 씌운 것이 밖에 남아 다음 어둠에 겹쳐 씌워지던 것 → 가면은 방(eliteB.masks)에만 두고 사원에는 안 적는다)
 //   2. 어둠 탐사 매뉴얼 — 판정 보정: 조장 +3~5 · 정예조 조원 +2~4 · 일반 조원 +1~3 (굴릴 때마다 그 사이에서 무작위 · 조장이 같은 방에 있을 때).
 //   3. 가죽 반장갑 — 공용시설 행운 +300% · 공용시설 횟수 +3~8 (날마다 무작위 · 그날 자정까지 · 상한 안에서).
-//   4. 카세트테이프 — 함께 탐사를 갔던 사람이 상담실 · 선녀탕에 있으면 풀어 준다. 사람마다 하루 한 번.
+//   4. 카세트테이프 — 함께 탐사를 갔던 사람이 상담실 · 선녀탕 · 여정 가두리에 있으면 풀어 준다. 사람마다 하루 한 번.
 //   5. 금촉 만년필 — 다인 탐사를 **둘이서** 간다(조장의 방 · 최소 인원 2). 동행인의 각인(전용 장비 속성) 가운데 하나를
 //      무작위로 복사한 늑대를 **세 마리까지** 데려간다 — 늑대는 그 속성의 아기 여우 분신처럼 움직인다(babyfox.js 가 늑대도 본다).
 //
@@ -59,7 +59,7 @@ const PARTS = [
     { k: 'mask',   n: '정예조 가면',   i: '🎭', d: '쓰면 「True or Fake」 — 기믹의 안전한 쪽이 보이고, 어둠 한 판에 2회 기믹을 파훼하며, 판정 +2. 조장이 어둠 안에서 조원 둘에게 씌워 주고(그 탐사에서만), 조장이 그 조원을 구출할 때 구출 판정 +1~3.' },
     { k: 'manual', n: '어둠 탐사 매뉴얼', i: '📘', d: '판정 보정 — 조장 +3~5 · 정예조 조원 +2~4 · 일반 조원 +1~3. 조장이 같은 방에 있을 때.' },
     { k: 'glove',  n: '가죽 반장갑',   i: '🧤', d: '공용시설 행운 +300% · 공용시설 횟수 +3~8 (날마다 무작위).' },
-    { k: 'tape',   n: '카세트테이프',  i: '📼', d: '함께 탐사를 갔던 사람이 상담실 · 선녀탕에 있으면 풀어 준다. 사람마다 하루 한 번.' },
+    { k: 'tape',   n: '카세트테이프',  i: '📼', d: '함께 탐사를 갔던 사람이 상담실 · 선녀탕 · 여정 가두리에 있으면 풀어 준다. 사람마다 하루 한 번.' },
     { k: 'pen',    n: '금촉 만년필',   i: '🖋', d: '다인 탐사를 둘이서 간다. 동행인의 각인 하나를 복사한 늑대를 세 마리까지 데려간다.' }
 ];
 // 즉사가 정해진 선택지 — fn → arg (True or Fake 의 Fake 표)
@@ -266,6 +266,8 @@ window.ebMenu = function () {
 
 // ── 카세트테이프
 function quarantinedU(u) { return !!(u && Number(u.quarantineUntil) > Date.now()); }
+// 🐾 여정에서 펫 대신 맞아 광장 가두리에 갇힌 것 — 격리와 같이 풀어 준다 (2026-10-30 사용자 · cage-escape.js)
+function cagedU(u) { try { return (u && typeof window.cageTimedOf === 'function') ? window.cageTimedOf(u.code) : null; } catch (e) { return null; } }
 function tapeMenu() {
     const me = u_(); if (!me) return;
     if (!me.ebTape || me.ebTape.d !== today()) me.ebTape = { d: today(), used: {} };
@@ -274,14 +276,16 @@ function tapeMenu() {
     const rows = codes.map(function (c) {
         const t = userOf(c);
         if (!t) return '';
-        const q = quarantinedU(t);
+        const cg = quarantinedU(t) ? null : cagedU(t);
+        const q = quarantinedU(t) || !!cg;
         const used = !!(me.ebTape.used && me.ebTape.used[c]);
-        const where = q ? ((t.quarantineDest || 'fox') === 'bath' ? '♨ 선녀탕' : '🦊 상담실') + ' · ' + Math.max(1, Math.ceil((t.quarantineUntil - Date.now()) / 36e5)) + '시간' : '밖에 있다';
+        const where = cg ? '🔒 가두리 (여정) · ' + Math.max(1, Math.ceil((Number(cg.until) - Date.now()) / 60000)) + '분'
+            : q ? ((t.quarantineDest || 'fox') === 'bath' ? '♨ 선녀탕' : '🦊 상담실') + ' · ' + Math.max(1, Math.ceil((t.quarantineUntil - Date.now()) / 36e5)) + '시간' : '밖에 있다';
         return '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid rgba(255,255,255,0.06);">'
             + '<div style="flex:1; min-width:0; font-size:11.5px;">' + esc(t.name || c) + ' <span style="font-size:9.5px; color:#8a95a8;">· ' + where + (used ? ' · 오늘 풀어 줬다' : '') + '</span></div>'
             + (q && !used ? '<button class="game-btn eb-free" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;">풀어 준다</button>' : '') + '</div>';
     }).join('');
-    const w = box(head('📼 카세트테이프', '구형 카세트테이프. 심신 안정에 도움이 되는 노래가 감겨 있다. 함께 탐사를 갔던 사람이 상담실 · 선녀탕에 있으면 풀어 준다 — 사람마다 하루 한 번.')
+    const w = box(head('📼 카세트테이프', '구형 카세트테이프. 심신 안정에 도움이 되는 노래가 감겨 있다. 함께 탐사를 갔던 사람이 상담실 · 선녀탕 · 여정 가두리에 있으면 풀어 준다 — 사람마다 하루 한 번.')
         + (rows || '<div style="font-size:10.5px; color:#8a95a8; padding:6px 0;">함께 탐사한 사람이 아직 없다.</div>')
         + '<button id="eb-back" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">돌아간다</button>');
     w.querySelector('#eb-back').onclick = window.ebMenu;
@@ -292,7 +296,22 @@ function tapeFree(code) {
     if (!me.ebTape || me.ebTape.d !== today()) me.ebTape = { d: today(), used: {} };
     if (me.ebTape.used && me.ebTape.used[code]) { alert_('오늘은 이미 풀어 줬습니다.'); return; }
     const t = userOf(code);
-    if (!t || !quarantinedU(t)) { alert_('지금 상담실 · 선녀탕에 있지 않습니다.'); tapeMenu(); return; }
+    if (t && !quarantinedU(t) && cagedU(t) && typeof window.cageRelease === 'function') {
+        // 여정 가두리 — 문만 연다
+        if (!me.ebTape.used) me.ebTape.used = {};
+        me.ebTape.used[code] = 1;
+        log_(me, '[' + NAME + '] 카세트테이프로 ' + (t.name || code) + ' 사원을 가두리에서 풀어 줬습니다.');
+        save({ ebTape: 1, history: 1 });
+        const tmp = { history: Array.isArray(t.history) ? t.history.slice() : [] };
+        log_(tmp, '[' + NAME + '] ' + (me.name || me.code) + ' 사원의 카세트테이프 — 노래가 끝나자 가두리 문이 열렸습니다.');
+        try { if (typeof updateUserFields === 'function') updateUserFields(code, { history: tmp.history }); } catch (e) { }
+        window.cageRelease(code).then(function (ok) {
+            alert_(ok ? '📼 ' + (t.name || code) + ' 사원이 가두리에서 나왔습니다.\n\n노래가 끝나자 문이 열렸습니다.' : '가두리 문이 열리지 않았습니다.');
+            tapeMenu();
+        });
+        return;
+    }
+    if (!t || !quarantinedU(t)) { alert_('지금 상담실 · 선녀탕 · 가두리에 있지 않습니다.'); tapeMenu(); return; }
     let out = Number(t.quarantineExitPollution) || 0; if (out >= 100) out = 99;
     const f = { quarantineUntil: 0, quarantineDest: null, quarantineHospital: false, quarantineExitPollution: 0, pollution: Math.min(out, Number(t.pollution) || 0), lastPollutionTime: Date.now(), foxRoomAnswered: false };
     Object.keys(f).forEach(function (k) { t[k] = f[k]; });
