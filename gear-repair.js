@@ -10,6 +10,12 @@
 // 깎이기 전 등급을 gearFull 에 적어 두지만,
 // 이 파일을 붙이기 전에 깎인 것에는 기록이 없다.
 // 기록이 없는 자리는 본체 등급을 상한으로 삼는다.
+//
+// ★ 2026-10-29 — 「닫힌 자리 다시 열기」는 **파손으로 닫힌 자리(gearFull._closed)만**.
+//   전에는 gearFull 에 적혀 있는데 지금 자리에 없는 열쇠는 전부 「닫힌 자리」로 보고 다시 열었다.
+//   그런데 속성 변경(지우기)으로 뺀 옛 속성도 gearFull 에 그대로 남아 있어서, 재봉 도구를 쓰면
+//   옛 속성(감각 따위)이 네 번째 자리로 되살아났다. 이제 파손으로 닫힌 것만 표시해 두고 그것만 열며,
+//   속성 변경으로 지우면 기록에서도 지운다. 자리 수(slots)도 넘지 않는다. 넘쳐 있는 장비는 뒤에서부터 거둔다.
 
 function gearFullOf(user) {
     user = user || currentUser;
@@ -58,6 +64,8 @@ function gearGradesArr() {
                 before.attrs.forEach(function (k, i) {
                     if (i === 0) return;                       // 첫 자리는 본체 등급
                     if (F[k] == null) F[k] = before.ag[k] || before.grade;
+                    // ★ 파손으로 자리가 닫혔다 — 그것만 재봉 도구가 다시 연다
+                    if ((g.attrs || []).indexOf(k) < 0) { if (!F._closed || typeof F._closed !== 'object') F._closed = {}; F._closed[k] = 1; }
                 });
                 saveFields({ gearFull: 1 });
             }
@@ -104,16 +112,18 @@ function repairGearOnce() {
         return { ok: true, what: nameOf(key), from: cur, to: G[pos + 1] };
     }
 
-    // 2) 닫힌 자리를 다시 연다 — 기록에는 있는데 자리에서 빠진 것
-    const closed = Object.keys(F).filter(function (k) {
-        return k !== '_main' && attrs.indexOf(k) < 0;
-    });
-    if (closed.length) {
+    // 2) 파손으로 닫힌 자리를 다시 연다 — _closed 에 표시된 것만 (세 자리까지)
+    //    파손은 자리를 닫으며 slots 도 하나 줄이므로(gear-break.js), 다시 열 때 slots 도 되돌린다
+    gearFullPrune(g, F);
+    const closed = closedKeys(g, F);
+    if (closed.length && attrs.length < 3) {
         const key = closed[closed.length - 1];
         if (!g.attrs) g.attrs = [];
         if (!g.attrGrades) g.attrGrades = {};
         g.attrs.push(key);
         g.attrGrades[key] = G[0];                      // 가장 낮은 등급으로 다시 열린다
+        g.slots = Math.min(3, Math.max(Number(g.slots) || 1, g.attrs.length));
+        delete F._closed[key];
         return { ok: true, what: nameOf(key), from: '닫힘', to: G[0], reopen: true };
     }
 
@@ -146,11 +156,88 @@ function gearLeftBroken() {
         const cap = (F[k] != null) ? F[k] : g.grade;
         if (cur !== cap) left++;
     });
-    Object.keys(F).forEach(function (k) {
-        if (k !== '_main' && attrs.indexOf(k) < 0) left++;
-    });
+    left += closedKeys(g, F).length;
     return left;
 }
+
+// 파손으로 닫힌 자리 — 지금 자리에 없고 _closed 에 표시된 것
+function closedKeys(g, F) {
+    const attrs = (g && g.attrs) || [];
+    const c = (F && F._closed && typeof F._closed === 'object') ? F._closed : {};
+    return Object.keys(c).filter(function (k) { return c[k] && attrs.indexOf(k) < 0; });
+}
+// 기록 정리 — 지금 자리에 없고 파손으로 닫힌 것도 아닌 열쇠(속성 변경으로 뺀 옛 속성)는 지운다
+function gearFullPrune(g, F) {
+    const attrs = (g && g.attrs) || [];
+    const c = (F && F._closed && typeof F._closed === 'object') ? F._closed : {};
+    let n = 0;
+    Object.keys(F || {}).forEach(function (k) {
+        if (k === '_main' || k === '_closed') return;
+        if (attrs.indexOf(k) < 0 && !c[k]) { delete F[k]; n++; }
+    });
+    if (n) { try { saveFields({ gearFull: 1 }); } catch (e) { } }
+    return n;
+}
+// 자리 수를 넘은 장비 — 뒤에서부터 거둔다 (잘못 되살아난 네 번째 자리)
+function gearTrimOver(user) {
+    user = user || currentUser;
+    const g = (typeof getGear === 'function') ? getGear(user) : null;
+    if (!g || !Array.isArray(g.attrs)) return [];
+    const max = Math.max(1, Number(g.slots) || 1);
+    const gone = [];
+    while (g.attrs.length > max) {
+        const k = g.attrs.pop();
+        if (g.attrGrades) delete g.attrGrades[k];
+        gone.push(k);
+    }
+    if (gone.length) {
+        const nameOf = function (k) { return (typeof gearAttrName === 'function') ? gearAttrName(k) : k; };
+        try { addHistoryLog(user, '[전용 장비] 자리 수를 넘어 되살아난 속성을 거뒀습니다 — ' + gone.map(nameOf).join(' · ')); } catch (e) { }
+        try { if (user === currentUser) { saveSelfFull(); updateUI(); } } catch (e) { }
+    }
+    return gone;
+}
+window.gearTrimOver = gearTrimOver;
+
+// ==========================================
+// 속성 변경(지우기)으로 뺀 속성 — 기록(gearFull)에서도 지운다 · 들어올 때 넘친 자리는 거둔다
+// ==========================================
+(function hookReattrPrune() {
+    const iv = setInterval(function () {
+        if (typeof doGearReattr !== 'function') return;
+        if (doGearReattr._fullPrune) { clearInterval(iv); return; }
+        const _d = doGearReattr;
+        const w = function (attr) {
+            const r = _d.apply(this, arguments);
+            try {
+                const F = gearFullOf(currentUser);
+                if (attr && (F[attr] != null || (F._closed && F._closed[attr]))) {
+                    delete F[attr];
+                    if (F._closed) delete F._closed[attr];
+                    saveFields({ gearFull: 1 });
+                }
+            } catch (e) { }
+            return r;
+        };
+        Object.keys(_d).forEach(function (k) { try { w[k] = _d[k]; } catch (e) { } });
+        w._fullPrune = true;
+        doGearReattr = w; window.doGearReattr = w;
+        clearInterval(iv);
+    }, 500);
+})();
+(function trimOnLogin() {
+    let tries = 0;
+    const iv = setInterval(function () {
+        if (typeof currentUser === 'undefined' || !currentUser || typeof getGear !== 'function') { if (++tries > 120) clearInterval(iv); return; }
+        clearInterval(iv);
+        setTimeout(function () {
+            try {
+                const g = getGear(currentUser);
+                if (g) { gearFullPrune(g, gearFullOf(currentUser)); const gone = gearTrimOver(currentUser); if (gone.length) console.log('[재봉] 자리 수를 넘은 속성을 거뒀습니다:', gone.join(', ')); }
+            } catch (e) { }
+        }, 6000);
+    }, 1000);
+})();
 
 // ==========================================
 // 재봉 도구를 가로챈다
@@ -220,9 +307,12 @@ function gearRepairState() {
             손상: cur !== cap ? '✗' : ''
         });
     });
+    closedKeys(g, F).forEach(function (k) {
+        rows.push({ 자리: '닫힘 (파손)', 항목: nameOf(k), 지금: '없음', 상한: F[k] != null ? F[k] : G[0], 손상: '✗' });
+    });
     Object.keys(F).forEach(function (k) {
-        if (k === '_main' || attrs.indexOf(k) >= 0) return;
-        rows.push({ 자리: '닫힘', 항목: nameOf(k), 지금: '없음', 상한: F[k], 손상: '✗' });
+        if (k === '_main' || k === '_closed' || attrs.indexOf(k) >= 0 || (F._closed && F._closed[k])) return;
+        rows.push({ 자리: '옛 기록', 항목: nameOf(k), 지금: '없음 (속성 변경으로 뺀 것 — 다시 열지 않음)', 상한: F[k], 손상: '' });
     });
     console.table(rows);
     console.log('  남은 손상:', gearLeftBroken() + '군데');
