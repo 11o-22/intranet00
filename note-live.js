@@ -101,9 +101,10 @@ const KLEE_KEY = {                                   // klee.js KEY_OF 와 같�
     '공용시설 행운': 'pct', '회수품 확률': 'kleeLoot'
 };
 const COPY_SRC = '⛓️‍💥 이레귤러';                     // irregular.js
-const FOX_SRC = '🦊 호사수구';                         // foxtail.js
+const FOX_SRC = '🦊 호가호위';                         // foxtail.js (2026-10-29 이름 바꿈)
+const FOX_SRC_OLD = '🦊 호사수구';
 // 특이사항에 줄이 따로 있는 버프 — 그 줄에 시간을 붙인다
-const HAS_LINE = ['식당 디저트', '은화 뱀', '달빛', '봉제 인형', KLEE, COPY_SRC, FOX_SRC];
+const HAS_LINE = ['식당 디저트', '은화 뱀', '달빛', '봉제 인형', KLEE, COPY_SRC, FOX_SRC, FOX_SRC_OLD];
 const BUFF_NAME = { luck: '행운', pct: '행운', eva: '회피', bon: '판정', fac: '공용시설', dark: '어둠 탐사',
                     gim: '기믹 파훼', resc: '구출 확률', resist: '저항', noPoll: '오염 동결', kleeLoot: '회수품 확률' };
 function buffWord(b) {

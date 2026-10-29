@@ -58,7 +58,7 @@ const COOK_SRC = '식당 ★';
 //   둘 다 「가지고 온」 것이라 적힌 숫자가 적힌 대로 들어가야 한다.
 //   천장(공용 30 · 어둠 12) 안에 밀어 넣으면, 이미 요리나 출산으로
 //   한도가 찬 사원에게는 아무것도 안 들어가 꼬리를 버리는 꼴이 된다.
-const FREE_SRC = ['은화 뱀', '🦊 호사수구'];   // K.LEE 는 판에서 뺐다 (2026-10-26)
+const FREE_SRC = ['은화 뱀', '🦊 호가호위', '🦊 호사수구'];   // 호가호위 — 2026-10-29 이름 바꿈 (옛 이름 버프가 남아 있는 동안 둘 다)   // K.LEE 는 판에서 뺐다 (2026-10-26)
 
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function today() {

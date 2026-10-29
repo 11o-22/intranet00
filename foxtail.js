@@ -1,5 +1,6 @@
 // ==========================================
-// ★ 🦊 호사수구 — 구미호의 아홉 꼬리
+// ★ 🦊 호가호위 — 아홉 개의 🪷 연등  (2026-10-29 · 「🦊 호사수구 — 구미호의 아홉 꼬리」 에서 이름과 꼬리→연등 바꿈 · 사용자)
+//   옛 이름으로 남은 것은 fox-rename.js 가 들어올 때 · 상담사 훑기로 바꿔 준다
 // bundles.json 마지막 그룹, newitems2.js·spaceitems.js 보다 뒤 · save-merge.js 앞
 // ==========================================
 //
@@ -62,7 +63,9 @@
 
 (function foxTail() {
 
-const FOX = '🦊 호사수구';
+const FOX = '🦊 호가호위';
+const FOX_OLD = '🦊 호사수구';          // 옛 이름 — 아직 안 바뀐 것도 같은 것으로 본다 (fox-rename.js 가 바꿔 준다)
+window.FOX_NAME = FOX; window.FOX_NAME_OLD = FOX_OLD;
 const HEART = '은심장';
 const DAY_TAILS = 9;
 const BUFF_MS = 24 * 3600 * 1000;
@@ -101,7 +104,7 @@ function wearsFox(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
     return u.equippedWeapons.some(function (w) {
         const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-        return b === FOX;
+        return b === FOX || b === FOX_OLD;
     });
 }
 
@@ -130,11 +133,14 @@ window._foxSum = sum;
         clearInterval(iv);
         ITEM_CATALOG[FOX] = {
             price: 0, usable: true, targetable: false, effect: 'fox_equip', noSell: true,
-            desc: '구미호의 꼬리를 본떠 만든 것. 꼬리가 아홉이고 꼬리마다 다른 힘이 깃든다. '
+            desc: '여우가 호랑이의 위세를 빌리듯, 🪷 연등 아홉을 빌려 쓴다. 연등마다 다른 힘이 깃든다. '
                 + '하루에 아홉 개를 쓸 수 있고 자정이 지나면 다시 아홉이 된다. '
-                + '주로 쓸 꼬리에 다른 꼬리를 더하면 그만큼 세진다.'
+                + '주로 쓸 연등에 다른 연등을 더하면 그만큼 세진다.'
         };
+        // 옛 이름(🦊 호사수구)으로 남은 것도 같은 물건으로 — fox-rename.js 가 바꿔 주기 전까지 「알 수 없는 물품」이 안 되게
+        ITEM_CATALOG[FOX_OLD] = ITEM_CATALOG[FOX];
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(FOX) < 0) NO_SELL_ITEMS.push(FOX);
+        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(FOX_OLD) < 0) NO_SELL_ITEMS.push(FOX_OLD);
         // 어느 상점 후보에도 들어가지 않게
         [FOX].forEach(function (n) {
             if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
@@ -163,7 +169,7 @@ setInterval(function () {
         const _m = marketSellable;
         marketSellable = function () {
             const pool = _m.apply(this, arguments);
-            try { pool.delete(FOX); pool.delete(HEART); } catch (e) { }
+            try { pool.delete(FOX); pool.delete(FOX_OLD); pool.delete(HEART); } catch (e) { }
             return pool;
         };
         marketSellable._foxHide = true;
@@ -269,7 +275,7 @@ function noteSelf(u, T, count, say) {
         return true;
     });
 
-    const line = '꼬리 ' + count + '개 사용 - ' + say;
+    const line = '🪷 연등 ' + count + '개 사용 - ' + say;
     appendBadgeNoteToUser(u, line);
     u.foxNotes.push({ k: T.k, line: line, until: now + BUFF_MS });
 }
@@ -301,7 +307,7 @@ function noteSelf(u, T, count, say) {
 //
 //   치우는 것은 제 자리뿐이다 — 각자 접속하면 1분 안에 치워진다.
 //   한꺼번에 치우려면 상담사가 foxNoteClean() 을 쓴다.
-const FOX_LINE = /^\s*(꼬리 \d+개 사용 -|여우의 금제가 걸렸습니다)/;
+const FOX_LINE = /^\s*(🪷 연등 \d+개 사용 -|꼬리 \d+개 사용 -|여우의 금제가 걸렸습니다)/;   // 옛 줄(꼬리 …)도 같이 치운다
 
 // 아직 걸려 있는 힘이 있나 (시간으로 도는 것만 본다)
 function foxLive(u) {
@@ -390,14 +396,14 @@ function useTails(target, k, count, isSelf) {
     if (!me || !target) return;
     const T = tailOf(k);
     if (!T) return;
-    if (count < 1 || count > T.max) { showCustomAlert('꼬리 수가 맞지 않습니다.'); return; }
-    if (tailsLeft(me) < count) { showCustomAlert('남은 꼬리가 모자랍니다.'); return; }
+    if (count < 1 || count > T.max) { showCustomAlert('연등 수가 맞지 않습니다.'); return; }
+    if (tailsLeft(me) < count) { showCustomAlert('남은 연등이 모자랍니다.'); return; }
 
     const say = apply(target, k, count);
     spendTails(me, count);
 
     if (typeof addHistoryLog === 'function') {
-        addHistoryLog(me, '[' + FOX + '] 꼬리 ' + count + '개 — ' + (isSelf ? '본인' : target.name) + ' · ' + say);
+        addHistoryLog(me, '[' + FOX + '] 🪷 연등 ' + count + '개 — ' + (isSelf ? '본인' : target.name) + ' · ' + say);
     }
 
     if (isSelf) {
@@ -443,9 +449,9 @@ function useTails(target, k, count, isSelf) {
         if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
     }
     if (typeof updateUI === 'function') updateUI();
-    showCustomAlert('꼬리 ' + count + '개를 풀었습니다.\n\n'
+    showCustomAlert('🪷 연등 ' + count + '개를 밝혔습니다.\n\n'
         + (isSelf ? '' : target.name + ' 사원 — ') + say
-        + '\n\n오늘 남은 꼬리 ' + tailsLeft(me) + ' / ' + DAY_TAILS);
+        + '\n\n오늘 남은 연등 ' + tailsLeft(me) + ' / ' + DAY_TAILS);
 }
 
 // ==========================================
@@ -472,10 +478,10 @@ const GREY = ' background:#2a2a2a !important; border-color:#444 !important; colo
 function step1() {
     if (!currentUser) return;
     const left = tailsLeft(currentUser);
-    if (left <= 0) { showCustomAlert('오늘 쓸 꼬리가 없습니다.\n\n자정이 지나면 아홉 개가 됩니다.'); return; }
+    if (left <= 0) { showCustomAlert('오늘 밝힐 연등이 없습니다.\n\n자정이 지나면 아홉 개가 됩니다.'); return; }
     shut();
     const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">' + FOX + '</div>'
-        + '<div style="font-size:10px; color:#888; margin:5px 0 13px 0;">오늘 남은 꼬리 '
+        + '<div style="font-size:10px; color:#888; margin:5px 0 13px 0;">오늘 남은 🪷 연등 '
         + left + ' / ' + DAY_TAILS + '</div>'
         + '<button id="fx-me" class="game-btn" style="' + BTN + '">본인에게</button>'
         + '<button id="fx-you" class="game-btn" style="' + BTN + '">타인에게</button>'
@@ -518,12 +524,12 @@ function step2(target, isSelf) {
             + (can ? '' : ' opacity:.4;') + '">'
             + '<span style="color:#ffcf8f; font-weight:bold;">' + T.i + '. ' + T.n + '</span>'
             + '<div style="font-size:10px; color:#aaa; margin-top:3px; font-weight:normal;">'
-            + T.say + ' · 꼬리 하나당 +' + T.step + T.unit + ' · 최대 꼬리 ' + T.max + '개</div></button>';
+            + T.say + ' · 연등 하나당 +' + T.step + T.unit + ' · 최대 연등 ' + T.max + '개</div></button>';
     }).join('');
 
-    const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">주로 쓸 꼬리</div>'
+    const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">주로 밝힐 🪷 연등</div>'
         + '<div style="font-size:10px; color:#888; margin:5px 0 11px 0;">'
-        + (isSelf ? '본인' : target.name + ' 사원') + ' · 남은 꼬리 ' + left + '</div>'
+        + (isSelf ? '본인' : target.name + ' 사원') + ' · 남은 연등 ' + left + '</div>'
         + '<div style="overflow-y:auto; flex:1;">' + rows + '</div>'
         + '<button id="fx-back" class="game-btn" style="' + BTN + GREY + ' margin-top:9px;">그만둔다</button>');
     w.querySelector('#fx-back').onclick = shut;
@@ -542,19 +548,19 @@ function step3(target, isSelf, k) {
     for (let n = 1; n <= most; n++) {
         opts.push('<button class="fox-cnt game-btn" data-n="' + n + '"'
             + ' style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px; text-align:left;">'
-            + '<span style="color:#ffcf8f; font-weight:bold;">꼬리 ' + n + '개</span>'
+            + '<span style="color:#ffcf8f; font-weight:bold;">🪷 연등 ' + n + '개</span>'
             + '<span style="color:#fff; margin-left:8px;">'
             + (k === 'freeze' ? (n + '시간')
                : (k === 'fluck' ? ('+' + (n * 50) + '%') : ('+' + n + T.unit)))
             + '</span>'
             + (n === 1 ? '' : '<div style="font-size:10px; color:#888; margin-top:3px; font-weight:normal;">'
-               + '주 꼬리 1 + 더하는 꼬리 ' + (n - 1) + '</div>')
+               + '주 연등 1 + 더하는 연등 ' + (n - 1) + '</div>')
             + '</button>');
     }
-    const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">다른 꼬리와 합치겠습니까</div>'
+    const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">다른 연등과 합치겠습니까</div>'
         + '<div style="font-size:11px; color:#ddd; margin:6px 0 3px 0;">' + T.i + '. ' + T.n + '</div>'
         + '<div style="font-size:10px; color:#888; margin-bottom:11px;">'
-        + '더해진 꼬리는 제 힘을 잃고 이 꼬리의 몫이 됩니다. · 남은 꼬리 ' + left + '</div>'
+        + '더해진 연등은 제 빛을 잃고 이 연등의 몫이 됩니다. · 남은 연등 ' + left + '</div>'
         + '<div style="overflow-y:auto; flex:1;">' + opts.join('') + '</div>'
         + '<button id="fx-b2" class="game-btn" style="' + BTN + GREY + ' margin-top:9px;">뒤로</button>');
     w.querySelector('#fx-b2').onclick = function () { step2(target, isSelf); };
@@ -594,7 +600,7 @@ window.foxOpen = step1;
             if (typeof addHistoryLog === 'function') addHistoryLog(currentUser, '[장착] ' + FOX);
             if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
             if (typeof updateUI === 'function') updateUI();
-            showCustomAlert('꼬리가 아홉입니다.\n\n장착칸의 「🦊 남은 꼬리」를 눌러 씁니다.\n'
+            showCustomAlert('🪷 연등이 아홉입니다.\n\n장착칸의 「🪷 남은 연등」을 눌러 씁니다.\n'
                 + '힘의 시간이 다해도 이것 자체는 풀리지 않습니다.');
         };
         useInventoryItem._fox = true;
@@ -614,12 +620,12 @@ window.foxOpen = step1;
         const has = wearsFox(currentUser);
         const old = document.getElementById(ID);
         if (!has) { if (old) old.remove(); return; }
-        if (old) { old.textContent = '🦊 남은 꼬리 ' + tailsLeft(currentUser); return; }
+        if (old) { old.textContent = '🪷 남은 연등 ' + tailsLeft(currentUser); return; }
 
         let card = null;
         for (let i = 0; i < box2.children.length; i++) {
             const t = box2.children[i].textContent || '';
-            if (t.indexOf('[장착 중 슬롯') >= 0 && t.indexOf(FOX) >= 0) { card = box2.children[i]; break; }
+            if (t.indexOf('[장착 중 슬롯') >= 0 && (t.indexOf(FOX) >= 0 || t.indexOf(FOX_OLD) >= 0)) { card = box2.children[i]; break; }
         }
         if (!card) return;
         const row = card.querySelector('div');
@@ -629,7 +635,7 @@ window.foxOpen = step1;
         b.className = 'game-btn';
         b.style.cssText = 'margin:0 0 0 6px; padding:6px 10px; font-size:11px; flex-shrink:0;'
             + ' background:linear-gradient(145deg,#8a5a1e,#4a2f0c) !important; border-color:#c08a3e !important;';
-        b.textContent = '🦊 남은 꼬리 ' + tailsLeft(currentUser);
+        b.textContent = '🪷 남은 연등 ' + tailsLeft(currentUser);
         b.onclick = step1;
         row.appendChild(b);
     }
@@ -695,12 +701,12 @@ window.foxOpen = step1;
             currentUser.lastPollutionTime = Date.now();
             currentUser.foxRoomAnswered = false;
             if (typeof addHistoryLog === 'function') {
-                addHistoryLog(currentUser, '[' + FOX + '] 꼬리로 금제를 풀고 나왔습니다. (오염도 50%)');
+                addHistoryLog(currentUser, '[' + FOX + '] 연등을 밝혀 금제를 풀고 나왔습니다. (오염도 50%)');
             }
             if (typeof saveSelfFull === 'function') { try { saveSelfFull(); } catch (e) { } }
             if (typeof updateUI === 'function') updateUI();
             b.remove();
-            showCustomAlert('꼬리가 하나 풀렸습니다.\n\n나왔습니다. (오염도 50%)\n남은 탈출 '
+            showCustomAlert('🪷 연등 하나가 밝았습니다.\n\n나왔습니다. (오염도 50%)\n남은 탈출 '
                 + (currentUser.foxEscape || 0) + '회');
         };
         document.body.appendChild(b);
@@ -774,13 +780,13 @@ window.foxState = function (who) {
     if (!u) { console.warn('사원을 못 찾았습니다.'); return; }
     console.log('%c===== ' + u.name + ' · ' + FOX + ' =====', 'color:#ffcf8f; font-size:13px');
     console.log('  장착:', wearsFox(u) ? 'O' : '✗',
-        '· 오늘 남은 꼬리:', tailsLeft(u) + ' / ' + DAY_TAILS,
+        '· 오늘 남은 연등:', tailsLeft(u) + ' / ' + DAY_TAILS,
         '(' + (u.foxDay || '아직 안 씀') + ')');
     const b = buffs(u);
     if (b.length) {
         console.table(b.map(function (x) {
             const T = tailOf(x.k) || {};
-            return { 꼬리: T.n || x.k, 몫: '+' + x.v + (T.unit || ''),
+            return { 연등: T.n || x.k, 몫: '+' + x.v + (T.unit || ''),
                      남은시간: Math.max(0, Math.round((x.until - Date.now()) / 60000)) + '분' };
         }));
     } else console.log('  걸려 있는 힘: 없음');
@@ -809,7 +815,7 @@ window.foxReset = function (who) {
     u.foxDay = today(); u.foxUsed = 0;
     if (typeof updateUserFields === 'function') updateUserFields(u.code, { foxDay: u.foxDay, foxUsed: 0 });
     if (typeof updateUI === 'function') updateUI();
-    console.log('%c✓ ' + u.name + ' 사원의 꼬리를 아홉으로 되돌렸습니다.', 'color:#4CAF50');
+    console.log('%c✓ ' + u.name + ' 사원의 연등을 아홉으로 되돌렸습니다.', 'color:#4CAF50');
 };
 
 console.log('[여우] foxState(사번) · foxGive(사번, 개수) · foxReset(사번) · foxOpen()');
