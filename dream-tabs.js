@@ -88,8 +88,11 @@ function mount() {
     if (!bar) {
         bar = document.createElement('div');
         bar.id = BAR;
-        bar.className = 'sub-tabs-grid';
-        bar.style.cssText = 'margin-bottom:10px;';
+        // ★ 클래스는 sub-tabs-grid 를 쓰지 않는다 (2026-10-29) — 광장 바탕의 한 칸 꼴(shell.js)에서는
+        //   「#tab-shop .sub-tabs-grid { display:none !important }」 로 상점 안의 고르는 줄을 다 감추므로,
+        //   그 이름을 쓰면 탭이 안 보여 치료 · 룬 · 장비 칸이 「사라진」 것처럼 됐다 (점검표 10.29 14:21)
+        bar.className = 'dream-tabs-bar';
+        bar.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; row-gap:4px; margin-bottom:10px;';
         bar.innerHTML = TABS.map(function (t) { return '<button class="sub-tab" data-k="' + t.k + '" style="flex:1 1 22%; font-size:10.5px;">' + t.n + '</button>'; }).join('');
         Array.prototype.forEach.call(bar.querySelectorAll('.sub-tab'), function (x) { x.onclick = function () { set(x.dataset.k); }; });
         p.insertBefore(bar, b);
