@@ -490,6 +490,9 @@ const petStarveBusy = {};
 function petStarveSweep(cb) {
     const u = petMe();
     if (!u) return [];
+    // ★ 서버 시계가 서기 전에는 세지 않는다 (2026-10-29) — 들어온 직후 기기 시계로 셈하면, 시계가 앞서 있는 기기가
+    //   아직 사흘이 안 된 펫을 굶은 것으로 보고 지울 수 있다 (clock.js 가 8초 안에 서버와 맞춘다)
+    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return []; } catch (e) { }
     const ps = petsOf(u);
     const now = petNow();
 
@@ -555,7 +558,7 @@ function petStarveCheck(u, k, cb) {
         } catch (e) { return Promise.resolve(petFedMark[String(k)] || null); }
     };
     readMark().then(function (mark) {
-        let killed = false;
+        let killed = false, seen = null;
         return database.ref('users/' + code + '/pets/' + k).transaction(function (cur) {
             killed = false;
             if (cur === null) return null;            // 비어 보이면 서버와 견주게 한다
@@ -567,6 +570,7 @@ function petStarveCheck(u, k, cb) {
                 return;                                // 살아 있다
             }
             killed = true;
+            seen = { own: own, mark: petFedOf(k, cur, mark), at: Number(cur.at) || 0, markB: mark ? Number(mark.b) : null, now: petNow(), skew: (typeof clockState === 'function') ? 'clock.js' : '-' };
             return null;
         }).then(function (r) {
             done();
@@ -576,6 +580,14 @@ function petStarveCheck(u, k, cb) {
             const mine = petsOf(me);
             if (r && r.committed && killed && v === null) {
                 delete mine[String(k)];
+                // ★ 왜 지웠는지 남긴다 (2026-10-29) — 「먹였는데 굶어 죽었다」를 뒤에서 살필 수 있게
+                try {
+                    const f = function (t) { return t ? new Date(t).toLocaleString('ko-KR') : '없음'; };
+                    const why = '[펫] ' + nm + ' 굶주림 셈 — 펫 칸 먹인 때 ' + f(seen && seen.own) + ' · 칸 밖 기록 ' + f(seen && seen.mark)
+                        + (seen && seen.markB != null && seen.markB !== seen.at ? ' (기록의 태어난 때가 달라 안 씀)' : '') + ' · 지금 ' + f(seen && seen.now);
+                    console.warn(why);
+                    if (typeof addHistoryLog === 'function') addHistoryLog(me, why);
+                } catch (e) { }
                 if (typeof cb === 'function') cb([{ i: String(k), n: nm, sp: sp }]);
                 return;
             }
@@ -794,6 +806,23 @@ window.PET = {
 // ==========================================
 // 확인
 // ==========================================
+// 펫마다 굶주림 셈 — 먹인 때(칸 · 칸 밖) · 남은 시간 · 포만도
+window.petStarveState = function () {
+    const u = petMe();
+    if (!u) { console.log('로그인 전입니다.'); return; }
+    const ps = petsOf(u);
+    const f = function (t) { return t ? new Date(Number(t)).toLocaleString('ko-KR') : '없음'; };
+    const rows = Object.keys(ps).filter(function (k) { return ps[k] && PET_BY_ID[k]; }).map(function (k) {
+        const s = ps[k], m = petFedMark[String(k)];
+        const left = petStarveLeft(k, u);
+        return { 펫: petNick(k, u), 칸의_먹인때: f(s.fedAt), 칸밖_기록: m ? f(m.f) + (Number(m.b) !== (Number(s.at) || 0) ? ' (태어난 때 다름 — 안 씀)' : '') : '없음',
+                 포만도: petFull(k, u) + '%', 남은시간: (left / 3600000).toFixed(1) + '시간', 태어난때: f(s.at) };
+    });
+    console.log('%c===== 🐶 굶주림 셈 =====', 'color:#ffb74d; font-size:13px');
+    console.log('  지금(서버 기준): ' + f(petNow()) + ' · 서버 시계 ' + ((typeof window.clockReady === 'function' && window.clockReady()) ? '섰음' : '아직'));
+    if (rows.length) console.table(rows); else console.log('  펫이 없습니다.');
+};
+
 window.petState = function () {
     const u = petMe();
     console.log('%c===== 🐶 펫 =====', 'color:#ffb74d; font-size:13px');
