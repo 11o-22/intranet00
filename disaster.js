@@ -84,7 +84,7 @@ function kName(k) { const x = K(k); return x.icon + ' ' + x.name; }
 // 성적인 표현이 들어간 장비는 지참하지 못한다 (서버 core.js 와 같은 목록)
 const NO_GEAR = /플러그|오나홀|딜도|바이브|흡입기|피어싱|가터|콘돔|정조대|하네스|목줄|유두|클리|보지|애널|자지/;
 // 커스텀 장비 — 가지고 있으면 서버가 알아서 진행자에게 알린다 (lore.js SIGILS). 지참 장비 3칸에는 안 넣는다
-const SIGIL_ITEMS = ['🔎 감지하는 눈', '🩶 은심장', '🐯 호가호위', '🦊 호가호위', '🦊 호사수구', '📖 〈종말예언 : 어둠탐사기록〉', '🧧 지산의 복 : 대리자', '🐾 아기 여우', '🌙 달빛 문신', '📺 브라운의 심야 토크 쇼', '🌟 제 칠(七) 성군(星君)', '🐯 제 칠(七) 성군(星君)'];
+const SIGIL_ITEMS = ['🔎 감지하는 눈', '🩶 은심장', '🐯 호가호위', '🦊 호가호위', '🦊 호사수구', '📖 〈종말예언 : 어둠탐사기록〉', '🧧 지산의 복 : 대리자', '🐾 아기 호랑이', '🐾 아기 여우', '🌙 달빛 문신', '📺 브라운의 심야 토크 쇼', '🌟 제 칠(七) 성군(星君)', '🐯 제 칠(七) 성군(星君)'];
 // 귀빈 자리(어둠 소속 · 심야 토크쇼의 주인)는 화면에 「사회자」로 띄운다 — 진행자는 귀빈으로 안다 (2026-10-20)
 const ROLE_N = { admin: '관리자', vip: '사회자', bureau: '재난관리국', daydream: '백일몽', board: '이사팀', teacher: '예외', other: '그 밖' };
 const MAX_MEMBERS = 5;                             // 한 방 최대 인원 (2026-10-20 — 4 → 8 → 5 · 서버 core.js 와 같이)
@@ -214,9 +214,9 @@ function now() { return Date.now() + off; }
         '.dz-chk{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}',
         '.dz-chk span{font-size:10px;padding:3px 7px;border-radius:5px;background:rgba(0,0,0,.35);border:1px solid #2a3a3b;color:#b8c4c4;}',
         '.dz-chk span.ok{border-color:#2f6b4a;color:#9fd8a4;} .dz-chk span.no{border-color:#6b2f3a;color:#ff9aa8;}',
-        '.dz-chk span.fx{color:#ffc38a;}',             // 🐾 아기 여우의 판정
+        '.dz-chk span.fx{color:#ffc38a;}',             // 🐾 아기 호랑이의 판정
         '#dz-chat .ln{font-size:12px;line-height:1.7;padding:2px 0;word-break:break-word;}',
-        '.dz-fox{color:#ffc38a;}',                     // 🐾 아기 여우의 말 — 옅은 주황
+        '.dz-fox{color:#ffc38a;}',                     // 🐾 아기 호랑이의 말 — 옅은 주황
         '#dz-chat .ln.fox,#dz-chat .ln.fox b{color:#ffc38a;}',
         '#dz-chat .ln b{color:#9fe3e3;font-weight:normal;margin-right:6px;}',
         '#dz-chat .ln.me b{color:#e8c27a;}',
@@ -648,12 +648,14 @@ function gearPick(r, u) {
 // ★ 🐾 아기 여우 — 주인은 데려갈 여우를 고른다 (2026-10-20)
 //   members/<사번>/foxPick = 'evade,heal' 꼴 글자 · '-' 는 하나도 안 데려감 · 없으면 데려갈 수 있는 것 전부
 //   (빈 배열은 파이어베이스가 지워 「안 고름」과 갈리지 않으므로 글자로 둔다 — 서버 core.js foxesOf 가 읽는다)
-//   남에게 붙여 준 여우는 그 사람 곁으로 가므로 여기서 고르지 않는다 · 오늘 소멸한 여우도 못 고른다
-const BABY = '🐾 아기 여우';
+//   남에게 붙여 준 아이는 그 사람 곁으로 가므로 여기서 고르지 않는다 · 오늘 소멸한 아이도 못 고른다
+const BABY = '🐾 아기 호랑이';
+const BABY_OLDS = ['🐾 아기 여우'];                                         // 옛 이름 (2026-10-29 이름 바꿈 · fox-rename.js 가 글자를 바꾼다)
+function isBaby(n) { return n === BABY || BABY_OLDS.indexOf(n) >= 0; }
 const FOX_K = [['evade', '코코', '회피'], ['sense', '잭슨', '감각'], ['heal', '쭈니', '치유'], ['hide', '루팡', '은신'],
                ['luck', '앙냥', '행운'], ['break', '디트', '파괴'], ['bond', '메리', '연결'], ['gaze', '니케', '응시']];
 function ownsBaby(u) {
-    return (u.equippedWeapons || []).concat(u.inventory || []).some(function (w) { return baseOf(w) === BABY; });
+    return (u.equippedWeapons || []).concat(u.inventory || []).some(function (w) { return isBaby(baseOf(w)); });
 }
 function dayStr() { try { return getTodayStr(); } catch (e) { return new Date().toISOString().slice(0, 10); } }
 function foxStateOf(u, k) {                 // 'ok' · 'gone' · '붙여 준 사람 이름'
@@ -677,7 +679,7 @@ function foxOn(r, u) {
 function foxPick(r, u) {
     if (!ownsBaby(u)) return '';
     const F = foxOn(r, u);
-    let h = '<div class="dz-sec">🐾 데려갈 아기 여우 — ' + F.on.length + ' / ' + F.avail.length + '</div>';
+    let h = '<div class="dz-sec">🐾 데려갈 아기 호랑이 — ' + F.on.length + ' / ' + F.avail.length + '</div>';
     h += '<div class="dz-chk" style="margin:0 0 10px;">' + FOX_K.map(function (f) {
         const s = foxStateOf(u, f[0]), ok = s === 'ok', sel = ok && F.on.indexOf(f[0]) >= 0;
         return '<span data-fox="' + f[0] + '" class="' + (sel ? 'ok' : '') + '" style="cursor:' + (ok ? 'pointer' : 'default') + ';'
@@ -802,7 +804,7 @@ function checkChips(list, kind) {
         if (c.tgtTo) s += ' · ' + esc(c.tgtName) + ' ' + stN(kind, c.tgtFrom) + '→' + stN(kind, c.tgtTo);
         if (c.kick) s += ' → 모셔짐';
         if (c.aid) s += ' · 🤝 ' + esc(c.aid) + ' 대신 끌려감';     // 조력자가 대신 끌려갔다 (새빛 병원)
-        if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 여우가 죽음을 대신 받았다
+        if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 호랑이가 죽음을 대신 받았다
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
     }).join('') + '</div>';
 }

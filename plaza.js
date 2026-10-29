@@ -4067,7 +4067,9 @@ window.plazaWhisperTo = function (code, name) {
 //   ★ 「들어가」 — 아기 여우에게 들어가라고 하면 그 아이(이름을 부르면 그 아이만, 다 같이면 모두)가 인사하고 들어간다.
 //   한 아이 하루 스무 마디 (2026-10-21 · 열로 줄였다가 다시 스물) — 스무 번째는 작별 인사.
 //   plazaFox/on 에 지금 나와 있는 아이가 적힌다 (서버가 쓴다).
-const KIT_BABY = '🐾 아기 여우';
+const KIT_BABY = '🐾 아기 호랑이';
+const KIT_BABY_OLDS = ['🐾 아기 여우'];                 // 옛 이름 (2026-10-29 · fox-rename.js 가 글자를 바꾼다)
+function kitIsBaby(n) { return n === KIT_BABY || KIT_BABY_OLDS.indexOf(n) >= 0; }
 const KIT_NAMES = { evade: '코코', sense: '잭슨', heal: '쭈니', hide: '루팡', luck: '앙냥', break: '디트', bond: '메리', gaze: '니케' };
 const KIT_ORDER = ['evade', 'sense', 'heal', 'hide', 'luck', 'break', 'bond', 'gaze'];
 const KIT_LINES = 20;          // 한 아이 하루 마디 (서버 CFG.KIT_LINES 와 같게)
@@ -4094,7 +4096,7 @@ function kitBase(w) { try { return (typeof getEquipBaseName === 'function') ? ge
 function kitCan() {
     const u = u_();
     if (!u) return false;
-    if (Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return kitBase(w) === KIT_BABY; })) return true;
+    if (Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return kitIsBaby(kitBase(w)); })) return true;
     return !!(u.kitOn && typeof u.kitOn === 'object' && Object.keys(u.kitOn).some(function (k) { return u.kitOn[k] && u.kitOn[k].by; }));
 }
 // 내가 부를 수 있는 아이들 — { id, k, n, by, off }
@@ -4102,7 +4104,7 @@ function kitList() {
     const u = u_();
     if (!u) return [];
     const out = [];
-    const wear = Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return kitBase(w) === KIT_BABY; });
+    const wear = Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return kitIsBaby(kitBase(w)); });
     let td = ''; try { td = getTodayStr(); } catch (e) { }
     const fresh = u.kitDay !== td;
     const kits = (u.kits && typeof u.kits === 'object') ? u.kits : {};
@@ -4137,9 +4139,9 @@ function kitNear() {
 function kitPick() {
     const u = u_();
     if (!u || !run || kitBusy) return;
-    if (!kitCan()) { sysLine('부를 아기 여우가 없습니다.'); return; }
+    if (!kitCan()) { sysLine('부를 아기 호랑이가 없습니다.'); return; }
     const list = kitList();
-    if (!list.length) { sysLine('부를 아기 여우가 없습니다.'); return; }
+    if (!list.length) { sysLine('부를 아기 호랑이가 없습니다.'); return; }
     const sel = {};
     const draw = function (used) {
         const live = kitLive();
@@ -4152,7 +4154,7 @@ function kitPick() {
                 + (x.by ? '<span style="font-size:10.5px;color:#8d8578;">' + esc(x.by) + ' 사원의 아이</span>' : '')
                 + '<i>' + esc(why || '부르기') + '</i></button>';
         }).join('');
-        const sh = sheet('kit', '🐾 아기 여우 — 누구를 부를까',
+        const sh = sheet('kit', '🐾 아기 호랑이 — 누구를 부를까',
             '<div class="plaza-kitnote">이름을 부른 아이만 나옵니다. 말은 서버 채팅으로 하고, 한 아이가 하루 ' + KIT_LINES + '마디까지 나눕니다.<br>'
             + '「들어가」라고 하면 들어갑니다.</div>'
             + '<div id="plaza-kitlist">' + rows + '</div>'
@@ -4198,7 +4200,7 @@ window.plazaKitPick = kitPick;
 function kitCall(pick) {
     const u = u_();
     if (!u || !run || kitBusy) return;
-    if (!kitCan() && !foxdList().length) { sysLine('부를 아기 여우가 없습니다.'); return; }
+    if (!kitCan() && !foxdList().length) { sysLine('부를 아기 호랑이가 없습니다.'); return; }
     if (!Array.isArray(pick) || !pick.length) { kitPick(); return; }
     kitBusy = true; kitPaint();
     const r = roomOf();
@@ -4211,11 +4213,11 @@ function kitCall(pick) {
             }
             if (why === 'here') sysLine('🐾 이미 나와 있습니다.' + (j.spent && j.spent.length ? ' (오늘 다 놀고 들어간 아이: ' + j.spent.join(' · ') + ')' : ''));
             else if (why === 'spent') sysLine('🐾 오늘은 다 놀고 들어갔습니다. 내일 다시 불러 주세요.');
-            else if (why === 'none') sysLine('부를 아기 여우가 없습니다. (남에게 붙여 주었거나 오늘 소멸한 아이는 나오지 않습니다)');
+            else if (why === 'none') sysLine('부를 아기 호랑이가 없습니다. (남에게 붙여 주었거나 오늘 소멸한 아이는 나오지 않습니다)');
             else if (why === 'daily') sysLine('🐾 오늘은 아이들이 너무 많이 놀았습니다. 내일 다시 불러 주세요.');
-            else sysLine('아기 여우를 부르지 못했습니다.' + (j && j.error ? ' (' + j.error + ')' : ''));
+            else sysLine('아기 호랑이를 부르지 못했습니다.' + (j && j.error ? ' (' + j.error + ')' : ''));
         })
-        .catch(function () { sysLine('아기 여우를 부르지 못했습니다.'); })
+        .catch(function () { sysLine('아기 호랑이를 부르지 못했습니다.'); })
         .then(function () { kitBusy = false; kitPaint(); });
 }
 window.plazaKitCall = kitCall;
@@ -4261,7 +4263,7 @@ function kitPaint() {
         const babies = ids.filter(function (id) { return !FOXD_NAMES[(kitHere[id] || {}).k]; });
         const ds = ids.filter(function (id) { return !!FOXD_NAMES[(kitHere[id] || {}).k]; });
         const parts = [];
-        if (babies.length) parts.push('🐾 ' + babies.map(function (id) { const f = kitHere[id] || {}; return f.nick || KIT_NAMES[f.k] || '아기 여우'; }).join(' · '));
+        if (babies.length) parts.push('🐾 ' + babies.map(function (id) { const f = kitHere[id] || {}; return f.nick || KIT_NAMES[f.k] || '아기 호랑이'; }).join(' · '));
         if (ds.length) parts.push('🎐 ' + ds.map(function (id) { const f = kitHere[id] || {}; return f.nick || FOXD_NAMES[f.k]; }).join(' · '));
         k.style.display = ids.length ? '' : 'none';
         k.textContent = ids.length ? parts.join(' · ') + ' 나와 있음 — 말은 서버 채팅으로 · 「들어가」 하면 들어감' : '';
@@ -4293,7 +4295,7 @@ function foxdPick() {
     }).join('');
     const sh = sheet('kit', '🎐 여우 신도 — 누구를 부를까',
         '<div class="plaza-kitnote">이름을 부른 신도만 나옵니다. 말은 서버 채팅으로 하고, 한 번 불려 나오면 ' + KIT_LINES + '마디까지 나눕니다.<br>'
-        + '「들어가」라고 하면 물러갑니다. 나와 있는 아기 여우와도 말을 주고받습니다.</div>'
+        + '「들어가」라고 하면 물러갑니다. 나와 있는 아기 호랑이와도 말을 주고받습니다.</div>'
         + '<div id="plaza-kitlist">' + rows + '</div>'
         + '<button id="plaza-kitgo" type="button" disabled>고른 신도가 없습니다</button>');
     if (!sh) return;
@@ -4546,7 +4548,7 @@ function chatBox() {
         +   '<button data-c="all">서버</button><button data-c="map">맵</button>'
         +   '<button data-c="wh">귓속말</button>'
         + '</div>'
-        + '<button id="plaza-kit" type="button" title="아기 여우 부르기" style="display:none">🐾</button>'
+        + '<button id="plaza-kit" type="button" title="아기 호랑이 부르기" style="display:none">🐾</button>'
         + '<button id="plaza-foxd" type="button" title="여우 신도 부르기" style="display:none">🎐</button>'
         + '<b class="t">채팅</b></div>'
         + '<div id="plaza-kit-on" style="display:none"></div>'

@@ -1,11 +1,11 @@
 // ==========================================
-// ★ 🐾 아기 여우 — 상담사 지급 전용
+// ★ 🐾 아기 호랑이 — 상담사 지급 전용 (2026-10-29 「🐾 아기 여우」 에서 이름 · 묘사를 호랑이로 — 옛 이름도 같은 것으로 받는다)
 // bundles.json 마지막 묶음, foxtail.js · eye.js · klee.js 보다 뒤 · 맨 끝
 // ==========================================
 //
 // ■ 무엇인가
 //
-//   장착품이다. 차고 있으면 아기 여우 여덟 마리를 다룬다. 한 마리씩
+//   장착품이다. 차고 있으면 아기 호랑이 여덟 마리를 다룬다. 한 마리씩
 //   **장착자의 분신**으로 움직인다.
 //
 //       회피 · 감각 · 치유 · 은신 · 행운 · 파괴 · 연결 · 응시
@@ -89,7 +89,8 @@
 //   kitHelp()         분신마다 무엇을 하는지
 
 const BFOX = {
-    NAME:      '🐾 아기 여우',
+    NAME:      '🐾 아기 호랑이',
+    OLDS:      ['🐾 아기 여우'],                                   // 옛 이름 — 소지품 · 장착칸에 남아 있어도 같은 것 (fox-rename.js 가 글자를 바꾼다)
     NICK_MAX:  8,
     LOOT_LO:   1.5,                                             // 회수품 150%
     LOOT_HI:   3.0,                                             // 회수품 300%
@@ -107,6 +108,8 @@ const BFOX = {
 (function babyFox() {
 
 const NAME = BFOX.NAME;
+const OLDS = BFOX.OLDS;
+function isKit(n) { return n === NAME || OLDS.indexOf(n) >= 0; }
 const ADMIN = 'kario0987';
 const MOD = 'kit-modal';
 
@@ -163,7 +166,7 @@ function baseOf(w) {
 }
 function wears(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
-    return u.equippedWeapons.some(function (w) { return baseOf(w) === NAME; });
+    return u.equippedWeapons.some(function (w) { return isKit(baseOf(w)); });
 }
 window.kitWears = wears;
 
@@ -370,17 +373,17 @@ function bump(k, field, max, why) {
     const iv = setInterval(function () {
         if (typeof ITEM_CATALOG === 'undefined') return;
         if (ITEM_CATALOG[NAME]) { clearInterval(iv); return; }
-        ITEM_CATALOG[NAME] = {
+        const ent = {
             price: 0, usable: true, targetable: false,
             effect: 'equip_babyfox', noSell: true,
-            desc: '[장착] 아기 여우 여덟 마리를 분신으로 다룬다. 속성과 등급은 장착자를 따른다. '
+            desc: '[장착] 아기 호랑이 여덟 마리를 분신으로 다룬다. 속성과 등급은 장착자를 따른다. '
                 + '남에게 붙여 줄 수 있고, 소멸하면 자정까지 다시 못 부른다.'
         };
-        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) {
-            NO_SELL_ITEMS.push(NAME);
-        }
+        ITEM_CATALOG[NAME] = ent;
+        OLDS.forEach(function (o) { if (!ITEM_CATALOG[o]) ITEM_CATALOG[o] = Object.assign({}, ent, { desc: '[옛 이름 — ' + NAME + '] ' + ent.desc }); });
+        if (typeof NO_SELL_ITEMS !== 'undefined') [NAME].concat(OLDS).forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); });
         clearInterval(iv);
-        console.log('[아기 여우] ' + NAME + ' 등록 — 상담사 지급 전용');
+        console.log('[아기 호랑이] ' + NAME + ' 등록 — 상담사 지급 전용');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -394,7 +397,7 @@ function bump(k, field, max, why) {
         const w = function () {
             const pool = _m.apply(this, arguments);
             if (!Array.isArray(pool)) return pool;
-            return pool.filter(function (x) { return baseOf(x) !== NAME && x !== NAME; });
+            return pool.filter(function (x) { return !isKit(baseOf(x)) && !isKit(x); });
         };
         w._kit = true;
         marketSellable = w;
@@ -411,7 +414,7 @@ function bump(k, field, max, why) {
         if (useInventoryItem._kit) { clearInterval(iv); return; }
         const _u = useInventoryItem;
         useInventoryItem = function (itemName) {
-            if (itemName !== NAME) return _u.apply(this, arguments);
+            if (!isKit(itemName)) return _u.apply(this, arguments);
             const me = u_();
             if (!me) return;
             if (typeof isQuarantined === 'function' && isQuarantined(me)) {
@@ -422,17 +425,17 @@ function bump(k, field, max, why) {
             if (equipFull(me)) { alert_('장착 슬롯이 가득 찼습니다.'); return; }
             me.equippedWeapons.push(NAME);
             try { if (typeof setEquipOwner === 'function') setEquipOwner(me, NAME, me.code); } catch (e) { }
-            try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, NAME, 1); } catch (e) { }
+            try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(me, itemName, 1); } catch (e) { }
             dayRoll(me);
             try { if (typeof appendBadgeNoteToUser === 'function') appendBadgeNoteToUser(me, '[장착됨] ' + NAME); } catch (e) { }
             log_(me, '[' + NAME + '] 장착했습니다.');
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-            alert_(NAME + '\n\n여덟 마리가 깨어났습니다.\n장착칸의 [🐾 아기 여우] 로 부릅니다.');
+            alert_(NAME + '\n\n여덟 마리가 깨어났습니다.\n장착칸의 [🐾 아기 호랑이] 로 부릅니다.');
         };
         useInventoryItem._kit = true;
         clearInterval(iv);
-        console.log('[아기 여우] 장착 연결');
+        console.log('[아기 호랑이] 장착 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -495,7 +498,7 @@ window.kitMenu = function () {
             + esc(x.d) + '</div></button>';
     }).join('');
 
-    const w = box(head('🐾 아기 여우',
+    const w = box(head('🐾 아기 호랑이',
         '여덟 마리가 당신의 분신으로 움직입니다. 속성과 등급은 당신을 따릅니다.<br>'
         + '한 마리를 눌러 이름을 짓거나 사원에게 붙입니다.')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
@@ -891,7 +894,7 @@ window.kitWishPick = function () {
         let card = null;
         for (let i = 0; i < host.children.length; i++) {
             const t = host.children[i].textContent || '';
-            if (t.indexOf('[장착 중 슬롯') >= 0 && t.indexOf(NAME) >= 0) { card = host.children[i]; break; }
+            if (t.indexOf('[장착 중 슬롯') >= 0 && (t.indexOf(NAME) >= 0 || OLDS.some(function (o) { return t.indexOf(o) >= 0; }))) { card = host.children[i]; break; }
         }
         if (!card) return;
         const row = card.querySelector('div');
@@ -902,7 +905,7 @@ window.kitWishPick = function () {
         b.style.cssText = 'margin:0 0 0 6px; padding:6px 10px; font-size:11px; flex-shrink:0;'
             + ' background:linear-gradient(145deg,#8a5a2a,#3d2714) !important;'
             + ' border-color:#d9a05a !important;';
-        b.textContent = '🐾 아기 여우';
+        b.textContent = '🐾 아기 호랑이';
         b.onclick = window.kitMenu;
         row.appendChild(b);
     }
@@ -955,7 +958,7 @@ window.kitWishPick = function () {
                     draw('—', String(reasonText || '') + '<br><br>'
                         + '<span style="color:#ffd9a0;">— 작은 것이 앞으로 나섰다.<br>'
                         + esc(nm) + '이(가) 당신 대신 그것을 받았다.<br>'
-                        + '털 한 줌이 남고, 그마저 곧 보이지 않는다.</span>');
+                        + '줄무늬 털 한 줌이 남고, 그마저 곧 보이지 않는다.</span>');
                     return;
                 }
                 const he = usable('heal');
@@ -968,14 +971,14 @@ window.kitWishPick = function () {
                         + '숨이 돌아온다. 그 자리에 아무것도 남지 않았다.</span>');
                     return;
                 }
-            } catch (e) { console.warn('[아기 여우] 죽음 건너뜀:', e && e.message); }
+            } catch (e) { console.warn('[아기 호랑이] 죽음 건너뜀:', e && e.message); }
             return _d.apply(this, arguments);
         };
         w._kit = true;
         darkDeath = w;
         window.darkDeath = w;
         clearInterval(iv);
-        console.log('[아기 여우] 회피·치유 연결');
+        console.log('[아기 호랑이] 회피·치유 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1011,7 +1014,7 @@ window.kitWishPick = function () {
         renderChoiceStep = w;
         window.renderChoiceStep = w;
         clearInterval(iv);
-        console.log('[아기 여우] 감각 연결');
+        console.log('[아기 호랑이] 감각 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1035,7 +1038,7 @@ window.kitWishPick = function () {
         luckReroll = w;
         window.luckReroll = w;
         clearInterval(iv);
-        console.log('[아기 여우] 감각·응시 굴림 연결');
+        console.log('[아기 호랑이] 감각·응시 굴림 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1133,7 +1136,7 @@ function lootRoll() {
         emLootMult = w;
         window.emLootMult = w;
         clearInterval(iv);
-        console.log('[아기 여우] 행운 — 회수품 연결');
+        console.log('[아기 호랑이] 행운 — 회수품 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1218,7 +1221,7 @@ window.kitSpinOn = function () { return spinOn || spinArm || autoOn; };
         facilityLuckMult = w;
         window.facilityLuckMult = w;
         clearInterval(iv);
-        console.log('[아기 여우] 행운 — 공용시설 연결');
+        console.log('[아기 호랑이] 행운 — 공용시설 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1769,7 +1772,7 @@ function pin(list, want) {
             getToday5ShopItems = w2; window.getToday5ShopItems = w2;
             done++;
         }
-        if (done) console.log('[아기 여우] 응시 — 상점 확정 진열 연결');
+        if (done) console.log('[아기 호랑이] 응시 — 상점 확정 진열 연결');
         if ((typeof qshopItems === 'function' && qshopItems._kit)
             && (typeof getToday5ShopItems === 'function' && getToday5ShopItems._kit)) clearInterval(iv);
     }, 500);
@@ -1910,7 +1913,7 @@ function openZoneList(body) {
         renderDarkness = w;
         window.renderDarkness = w;
         clearInterval(iv);
-        console.log('[아기 여우] 구역 목록 — 모집 단추 열기 연결');
+        console.log('[아기 호랑이] 구역 목록 — 모집 단추 열기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1934,7 +1937,7 @@ function openZoneList(body) {
         createParty = w;
         window.createParty = w;
         clearInterval(iv);
-        console.log('[아기 여우] 방 — 구역 한계 넘기 연결');
+        console.log('[아기 호랑이] 방 — 구역 한계 넘기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -1964,7 +1967,7 @@ function openZoneList(body) {
         joinParty = w;
         window.joinParty = w;
         clearInterval(iv);
-        console.log('[아기 여우] 방 — 들어가서 분신 부르기 연결');
+        console.log('[아기 호랑이] 방 — 들어가서 분신 부르기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -2037,7 +2040,7 @@ function openZoneList(body) {
         launchParty = w;
         window.launchParty = w;
         clearInterval(iv);
-        console.log('[아기 여우] 방 — 최소 인원 채우기 연결');
+        console.log('[아기 호랑이] 방 — 최소 인원 채우기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -2204,7 +2207,7 @@ let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그�
         renderPartyRoom = w;
         window.renderPartyRoom = w;
         clearInterval(iv);
-        console.log('[아기 여우] 방 화면 — 분신 칸과 진입 단추 연결');
+        console.log('[아기 호랑이] 방 화면 — 분신 칸과 진입 단추 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -2243,7 +2246,7 @@ window.kitState = function (who) {
     const t = find(who) || u_();
     if (!t) { console.log('로그인 전입니다.'); return; }
     dayRoll(t);
-    console.log('%c===== 🐾 아기 여우 · ' + t.name + ' =====', 'color:#d9a05a; font-size:13px');
+    console.log('%c===== 🐾 아기 호랑이 · ' + t.name + ' =====', 'color:#d9a05a; font-size:13px');
     console.log('  차고 있나 :', wears(t) ? 'O' : '✗',
         '· 전용 장비 :', (typeof gearLabel === 'function') ? gearLabel(t) : '-');
     console.table(KINDS.map(function (x) {
@@ -2271,7 +2274,7 @@ window.kitState = function (who) {
 };
 
 window.kitHelp = function () {
-    console.log('%c===== 🐾 아기 여우 여덟 =====', 'color:#d9a05a; font-size:13px');
+    console.log('%c===== 🐾 아기 호랑이 여덟 =====', 'color:#d9a05a; font-size:13px');
     KINDS.forEach(function (x) { console.log('  ' + x.icon + ' ' + x.n + ' — ' + x.d); });
     console.log('  소멸하면 자정까지 다시 못 부릅니다. 자정이 지나면 여덟이 다시 깨어납니다.');
     console.log('  kitGive(사번) · kitState(사번) · kitRevive(사번)');
@@ -2283,6 +2286,6 @@ window.KITFOX = { KINDS: KINDS, BY_K: BY_K, KEYS: KEYS, BFOX: BFOX,
                   roomKeys: roomPicked, lootRoll: lootRoll,
                   spin: function () { return spinOn; } };
 
-console.log('[아기 여우] kitGive(사번) · kitState(사번) · kitHelp()');
+console.log('[아기 호랑이] kitGive(사번) · kitState(사번) · kitHelp()');
 
 })();

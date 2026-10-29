@@ -343,17 +343,17 @@ function paintLog(force) {
     if (force || atBottom) box.scrollTop = box.scrollHeight;
 }
 
-// 🐾 아기 여우 줄 — 사진 자리에 여우 · 이름 옆에 누구의 아이인지
-//   (아기 여우는 이제 광장에서 부르고 광장 서버 채팅으로 말한다 · 2026-10-21 —
+// 🐾 아기 호랑이 줄 — 사진 자리에 호랑이 · 이름 옆에 누구의 아이인지
+//   (아기 호랑이는 이제 광장에서 부르고 광장 서버 채팅으로 말한다 · 2026-10-21 —
 //    처음 하루 이 칸에서 불렀을 때 선 줄이 남아 있으면 이렇게 그린다)
 function foxRow(m, time) {
-    const whose = (m.oN ? m.oN + '의 아기 여우' : '아기 여우') + (m.on && m.o && m.on !== m.o && m.onN ? ' · ' + m.onN + ' 곁' : '');
+    const whose = (m.oN ? m.oN + '의 아기 호랑이' : '아기 호랑이') + (m.on && m.o && m.on !== m.o && m.onN ? ' · ' + m.onN + ' 곁' : '');
     return '<div style="display:flex; gap:8px; margin-bottom:9px; align-items:flex-start;">'
         + '<div style="width:30px; height:30px; flex-shrink:0; border-radius:50%; background:rgba(255,184,112,0.14);'
-        + ' border:1px solid rgba(255,184,112,0.45); display:flex; align-items:center; justify-content:center; font-size:16px;">🦊</div>'
+        + ' border:1px solid rgba(255,184,112,0.45); display:flex; align-items:center; justify-content:center; font-size:16px;">🐯</div>'
         + '<div style="min-width:0; flex:1;">'
         + '<div style="font-size:10px; margin-bottom:2px; display:flex; gap:5px; align-items:baseline; min-width:0;">'
-        + '<b style="color:#ffb870; flex-shrink:0;">' + esc(m.name || '🐾 아기 여우') + '</b>'
+        + '<b style="color:#ffb870; flex-shrink:0;">' + esc(m.name || '🐾 아기 호랑이') + '</b>'
         + '<span style="color:var(--sk-text-dim, #6b5a48); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(whose) + '</span>'
         + '<span style="color:var(--sk-text-dim, #444); flex-shrink:0;">' + time + '</span></div>'
         + '<div><span style="font-size:12px; color:#f3dcc4; line-height:1.6; word-break:break-word;">' + esc(m.text) + '</span></div>'

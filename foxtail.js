@@ -678,7 +678,7 @@ window.foxOpen = step1;
         const inRoom = !!(u && u.quarantineUntil && Date.now() < u.quarantineUntil);
         const n = (u && u.foxEscape) || 0;
         if (!inRoom || n <= 0) { if (old) old.remove(); return; }
-        if (old) { old.textContent = '🦊 금제를 푼다 (' + n + ')'; return; }
+        if (old) { old.textContent = '🐯 금제를 푼다 (' + n + ')'; return; }
 
         const b = document.createElement('button');
         b.id = ID;
@@ -687,7 +687,7 @@ window.foxOpen = step1;
             + ' z-index:99998; padding:11px 18px; font-size:12px; border-radius:22px;'
             + ' background:linear-gradient(145deg,#8a5a1e,#4a2f0c) !important; border-color:#c08a3e !important;'
             + ' box-shadow:0 4px 14px rgba(0,0,0,0.5);';
-        b.textContent = '🦊 금제를 푼다 (' + n + ')';
+        b.textContent = '🐯 금제를 푼다 (' + n + ')';
         b.onclick = function () {
             if (!currentUser || (currentUser.foxEscape || 0) <= 0) return;
             currentUser.foxEscape -= 1;
