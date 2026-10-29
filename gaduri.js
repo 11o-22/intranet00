@@ -59,6 +59,12 @@ function roomOf(code) {
     return '';
 }
 window.gaduriOf = roomOf;
+// 갇힌 기록 그대로 — { room, at, by, until?, auto?, … } (없으면 null) · plaza.js 가 남은 시간을 적는 데 쓴다 (2026-10-30)
+window.gaduriEntry = function (code) {
+    const r = roomOf(code);
+    if (!r) return null;
+    return Object.assign({ room: r }, (all[r] || {})[code] || {});
+};
 window.gaduriList = function () {
     const out = {};
     ROOMS.forEach(function (r) { out[r.k] = Object.keys(all[r.k] || {}); });

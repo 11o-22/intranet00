@@ -2483,7 +2483,7 @@ function paintCage() {
     e.style.width = Math.round(c.w * z) + 'px';
     e.style.height = Math.round(c.h * z) + 'px';
     e.style.zIndex = String(100 + Math.round(c.zy));
-    e.innerHTML = '<img src="' + P.DIR + 'gaduri.png" alt=""><div class="t">가두리</div>';
+    e.innerHTML = '<img src="' + P.DIR + 'gaduri.png" alt=""><div class="t">' + cageLabel() + '</div>';
     run.el.appendChild(e);
     // 🍖 먹이 던지기 — 가두리 위에 (갇힌 사람에게는 안 보인다 · gaduri.js 가 고르는 창을 띄운다)
     const f = document.createElement('div');
@@ -2500,6 +2500,26 @@ function paintCage() {
     });
     run.el.appendChild(f);
 }
+// 가두리 이름표 — 내가 때가 정해진 가두리(여정 · 펫 배틀 · 여우 신도)에 갇혀 있으면 남은 시간을 같이 적는다 (2026-10-30 점검표)
+function cageLeftMin() {
+    try {
+        const u = u_();
+        const ent = (u && typeof window.gaduriEntry === 'function') ? window.gaduriEntry(u.code) : null;
+        if (!ent || !(Number(ent.until) > 0)) return -1;
+        return Math.max(0, Math.ceil((Number(ent.until) - now()) / 60000));
+    } catch (e) { return -1; }
+}
+function cageLabel() {
+    const m = cageMine() ? cageLeftMin() : -1;
+    return m < 0 ? '가두리' : '가두리 · 남은 ' + m + '분';
+}
+setInterval(function () {
+    if (!run || !run.el) return;
+    const t = run.el.querySelector('.plaza-cage .t');
+    if (!t) return;
+    const s = cageLabel();
+    if (t.textContent !== s) t.textContent = s;
+}, 5000);
 // 갇히거나 풀리면 그 자리에서 — 다른 방이면 데려가고, 같은 방이면 안으로 세운다
 let cageWas = '';
 setInterval(function () {
@@ -2516,7 +2536,8 @@ setInterval(function () {
             const m = cageMid(roomOf());
             if (m) { run.x = m.x; run.y = m.y; run.lv = 0; run.seg = 'up'; run.tx = null; run.tseg = null; putOne(run.me, run.x, run.y); camera(true); wake(); }
         }
-        sysLine('🔒 ' + R[k].n + ' 가두리에 갇혔습니다.');
+        const lm = cageLeftMin();
+        sysLine('🔒 ' + R[k].n + ' 가두리에 갇혔습니다.' + (lm >= 0 ? ' (' + lm + '분 뒤에 풀립니다)' : ''));
     } else if (before) {
         sysLine('🔓 가두리에서 풀려났습니다.');
     }
