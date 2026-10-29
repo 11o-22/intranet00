@@ -9,9 +9,8 @@
 //   상점 · 우주 쇼핑몰 · 장터 어디에도 안 깔리고 팔 수 없다. 주는 법은 ebGive(사번) 과 당국 화면의 「물품 강제 꽂기」뿐.
 //
 //   『 🐺 (구) 정예 B조 ■■ 』
-//     어둠 탐사 생환 포인트 1.5배 · 회수품 확률 2배.
-//     정예조 가면을 쓴 조원은 생환 포인트 배율이 0.5 씩 오른다(×1.5).
-//     **전원 생환**하면 조장 3배 · 정예조 조원 2배 · 일반 조원 1.5배.  (상한 ⚖ ×3 — gear-cap.js 안에서)
+//     어둠 탐사 생환 포인트 — 조장 1.5배(가면을 씌웠거나 전원 생환이면 3배) · 정예조 조원 2배 · 일반 조원 1.5배 · 회수품 확률 2배(조장).
+//     (2026-10-29 사용자: 정예조 2배 · 일반 1.5배는 전원 생환 조건 없이 — 조장이 살아 있으면 늘.  상한 ⚖ ×3 — gear-cap.js 안에서)
 //
 //   조원 — 같은 방(파티)으로 들어간 사람. 조장 = 이 장비를 찬 사람(방에 하나뿐이어야 한다 · 둘이면 먼저 적은 쪽).
 //     정예조 조원 = 조장이 가면을 씌워 준 두 사람.  일반 조원 = 그 밖의 사람.
@@ -42,8 +41,8 @@
 window.EB = window.EB || {
     NAME: '🐺 （구） 정예 B조 ■■',          // ★ 괄호는 전각 — 장비 이름에 「 (」가 들면 getEquipBaseName 이 그 앞까지만 이름으로 본다 (index.html:1898)
     MASK_MAX: 2, MASK_BON: 2, BREAK_MAX: 2, RESCUE_BON: [1, 3], WOLF_MAX: 3,   // MASK_BON 가면 판정 보정(고정) · BREAK_MAX 한 판 파훼 · RESCUE_BON 조장→정예조 구출 보정
-    PTS: { lead: 1.5, elite: 1.5, member: 1.0 },
-    PTS_ALL: { lead: 3.0, elite: 2.0, member: 1.5 },
+    PTS: { lead: 1.5, elite: 2.0, member: 1.5 },        // 조장이 살아 있을 때 — 정예조 ×2 · 일반 ×1.5 (2026-10-29 · 전에는 전원 생환 때만)
+    PTS_ALL: { lead: 3.0, elite: 2.0, member: 1.5 },    // 전원 생환 — 조장 ×3 (가면을 씌웠어도 ×3)
     LOOT: 2,
     BON: { lead: [3, 5], elite: [2, 4], member: [1, 3] },
     GLOVE_PCT: 300, GLOVE_FAC: [3, 8],
@@ -143,7 +142,7 @@ window.ebRole = myRole;
         if (!ITEM_CATALOG[NAME]) {
             ITEM_CATALOG[NAME] = {
                 price: 0, usable: true, targetable: false, effect: 'equip_eliteb', noSell: true,
-                desc: '[장착] 정예 B조의 장비. 생환 포인트 1.5배 · 회수품 2배. 가면을 쓴 조원은 배율이 오르고, 전원 생환하면 조장 3배 · 정예조 2배 · 일반 1.5배. '
+                desc: '[장착] 정예 B조의 장비. 생환 포인트 — 조장 1.5배(가면을 씌우거나 전원 생환이면 3배) · 정예조 조원 2배 · 일반 조원 1.5배 · 회수품 2배. '
                     + '정예조 가면 · 어둠 탐사 매뉴얼 · 가죽 반장갑 · 카세트테이프 · 금촉 만년필이 딸려 있다.'
             };
             if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(NAME) < 0) NO_SELL_ITEMS.push(NAME);
@@ -246,7 +245,7 @@ function head(t, sub) {
 window.ebMenu = function () {
     const me = u_();
     if (!me || !wears(me)) { alert_(NAME + ' 를 차고 있어야 합니다.'); return; }
-    const w = box(head('🐺 （구） 정예 B조 ■■', '생환 포인트 1.5배 · 회수품 2배. 가면을 쓴 조원은 배율이 오르고, 전원 생환하면 조장 3배 · 정예조 2배 · 일반 1.5배.')
+    const w = box(head('🐺 （구） 정예 B조 ■■', '생환 포인트 — 조장 1.5배(가면을 씌우거나 전원 생환이면 3배) · 정예조 조원 2배 · 일반 조원 1.5배 · 회수품 2배.')
         + PARTS.map(function (p) {
             let line = '';
             if (p.k === 'mask') line = '어둠 안에서 위쪽 🎭 단추로 고른다 — 한 판에 둘까지 · 그 탐사에서만';
@@ -654,8 +653,10 @@ function myMult() {
         if (typeof renderChoiceStep !== 'function' || renderChoiceStep._eb) { if (typeof renderChoiceStep === 'function' && renderChoiceStep._eb) clearInterval(iv); return; }
         const _c = renderChoiceStep;
         const w = function (title, text, options, imgKey) {
+            let on = false;
             try {
                 if (masked() && Array.isArray(options) && options.length > 1) {
+                    on = true;
                     options = options.map(function (o) { return Object.assign({}, o); });
                     if (String(options[0].label || '').indexOf('◈') < 0) options[0].label = '◈ True — ' + options[0].label;
                     else options[0].label = String(options[0].label).replace('◈ ', '◈ True — ');
@@ -666,13 +667,45 @@ function myMult() {
                     text = String(text || '') + '<br><br><span style="color:#9fb4d0;">🎭 True or Fake — 가면이 한쪽을 가리킨다.</span>';
                 }
             } catch (e) { }
-            return _c.call(this, title, text, options, imgKey);
+            const out = _c.call(this, title, text, options, imgKey);
+            // ★ 다른 커스텀 무기(아기 여우 감각 ◈ · 칠성 🌟 · 종말예언 🈲)가 안쪽에서 제 표를 또 앞에 붙여 「◈ ◈ True — ①」 「🌟 ◈ True — ①」 처럼 겹쳤다 (2026-10-29)
+            //   — 그린 뒤 단추 글씨의 앞 표를 하나로 정리한다 (투표 칸은 renderVoteState 뒤에서도)
+            if (on) { try { tidyMarks(); } catch (e) { } }
+            return out;
         };
         Object.keys(_c).forEach(function (k) { try { w[k] = _c[k]; } catch (e) { } });
         w._eb = true; renderChoiceStep = w; window.renderChoiceStep = w;
         clearInterval(iv);
         console.log('[정예 B조] True or Fake 연결');
     }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// 앞에 겹친 표를 하나로 — 「🌟 ◈ True — ①」 → 「◈ True — ①」 · 「🈲 ✖ Fake — ④」 → 「✖ Fake — ④」 (우리 표가 없는 글씨는 안 건드린다)
+const MARK_RE = /^\s*((?:[◈🌟🈲✖]\s*)+)(?=[◈✖] (?:True|Fake) — )/u;
+function tidyOne(el) {
+    if (!el) return;
+    const t = el.textContent || '';
+    if (!MARK_RE.test(t)) return;
+    const fixed = t.replace(MARK_RE, '');
+    // 글자만 든 단추면 통째로, 아니면 첫 글자 마디만 고친다
+    if (!el.children.length) { el.textContent = fixed; return; }
+    const n = el.firstChild;
+    if (n && n.nodeType === 3 && MARK_RE.test(n.nodeValue || '')) n.nodeValue = (n.nodeValue || '').replace(MARK_RE, '');
+}
+function tidyMarks() {
+    const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+    if (!body) return;
+    Array.prototype.forEach.call(body.querySelectorAll('button, .vote-opt, .vote-label, b, span'), tidyOne);
+}
+(function hookVoteTidy() {
+    const iv = setInterval(function () {
+        if (typeof renderVoteState !== 'function' || renderVoteState._eb) { if (typeof renderVoteState === 'function' && renderVoteState._eb) clearInterval(iv); return; }
+        const _v = renderVoteState;
+        const w = function () { const out = _v.apply(this, arguments); try { tidyMarks(); } catch (e) { } return out; };
+        Object.keys(_v).forEach(function (k) { try { w[k] = _v[k]; } catch (e) { } });
+        w._eb = true; renderVoteState = w; window.renderVoteState = w;
+        clearInterval(iv);
+    }, 500);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 // 파훼 단추 — 작두 · 분신 단추와 같은 자리 (어둠 한 판에 2회 · 가면을 쓴 사람 · 횟수는 darkRun._ebBreakN)
