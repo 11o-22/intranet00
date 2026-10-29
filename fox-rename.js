@@ -24,8 +24,9 @@
 (function foxRename() {
 'use strict';
 
-const OLD = '🦊 호사수구';
-const NEW = '🦊 호가호위';
+const OLDS = ['🦊 호가호위', '🦊 호사수구'];   // 옛 이름들 (🦊 호가호위 는 2026-10-29 한때 쓴 이름)
+const OLD = OLDS[0];
+const NEW = '🐯 호가호위';
 const ADMIN = 'kario0987';
 const TAG = '[호가호위]';
 
@@ -37,10 +38,12 @@ function asList(v) {
     return [];
 }
 function base(w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } }
+function isOld(w) { return OLDS.indexOf(w) >= 0; }
 function fixName(w) {
     if (typeof w !== 'string') return w;
-    if (w === OLD) return NEW;
-    if (base(w) === OLD && w.indexOf(OLD) === 0) return NEW + w.slice(OLD.length);
+    if (isOld(w)) return NEW;
+    const b = base(w);
+    if (isOld(b) && w.indexOf(b) === 0) return NEW + w.slice(b.length);
     return w;
 }
 function key_(n) { try { return (typeof invKey === 'function') ? invKey(n) : n; } catch (e) { return n; } }
@@ -51,7 +54,7 @@ function planFor(u) {
     const up = {};
     let n = 0;
     const inv = asList(u.inventory);
-    if (inv.some(function (x) { return x === OLD; })) { up.inventory = inv.map(fixName); n++; }
+    if (inv.some(isOld)) { up.inventory = inv.map(fixName); n++; }
     const eq = asList(u.equippedWeapons);
     if (eq.some(function (x) { return fixName(x) !== x; })) { up.equippedWeapons = eq.map(fixName); n++; }
     if (u.equipOwner && typeof u.equipOwner === 'object') {
@@ -60,14 +63,14 @@ function planFor(u) {
         if (hit) { up.equipOwner = eo; n++; }
     }
     const st = (u.house && u.house.storage) ? asList(u.house.storage) : [];
-    if (st.some(function (x) { return x && typeof x === 'object' && x.name === OLD; })) {
-        up['house/storage'] = st.map(function (x) { return (x && typeof x === 'object' && x.name === OLD) ? Object.assign({}, x, { name: NEW }) : x; }); n++;
+    if (st.some(function (x) { return x && typeof x === 'object' && isOld(x.name); })) {
+        up['house/storage'] = st.map(function (x) { return (x && typeof x === 'object' && isOld(x.name)) ? Object.assign({}, x, { name: NEW }) : x; }); n++;
     }
     if (u.invMark && typeof u.invMark === 'object') {
         const m = JSON.parse(JSON.stringify(u.invMark)); let hit = false;
         ['fav', 'lock'].forEach(function (g) {
             if (!m[g] || typeof m[g] !== 'object') return;
-            [OLD, key_(OLD)].forEach(function (ok) { if (m[g][ok]) { delete m[g][ok]; m[g][key_(NEW)] = true; hit = true; } });
+            OLDS.forEach(function (o) { [o, key_(o)].forEach(function (ok) { if (m[g][ok]) { delete m[g][ok]; m[g][key_(NEW)] = true; hit = true; } }); });
         });
         if (hit) { up.invMark = m; n++; }
     }
@@ -98,15 +101,15 @@ function mine() {
             let own = u.code; try { if (typeof houseStorageRef === 'function') own = houseStorageRef(u) || u.code; } catch (e) { }
             if (d) d.ref('users/' + own + '/house/storage').transaction(function (arr) {
                 const l = asList(arr);
-                if (!l.some(function (v) { return v && v.name === OLD; })) return;
-                return l.map(function (v) { return (v && v.name === OLD) ? Object.assign({}, v, { name: NEW }) : v; });
+                if (!l.some(function (v) { return v && isOld(v.name); })) return;
+                return l.map(function (v) { return (v && isOld(v.name)) ? Object.assign({}, v, { name: NEW }) : v; });
             }).then(function (r) {
                 try { const o = (own === u.code) ? u : ((typeof db !== 'undefined' && db.users) ? db.users[own] : null); if (o && r && r.snapshot && o.house) o.house.storage = r.snapshot.val() || []; } catch (e) { }
                 try { if (typeof renderHouseStorage === 'function') renderHouseStorage(); } catch (e) { }
             }).catch(function () { });
         } catch (e) { }
     }
-    try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, '[' + NEW + '] 「' + OLD + '」 가 「' + NEW + '」 로 이름이 바뀌었습니다. (꼬리 → 🪷 연등)'); saveFields({ history: 1 }); } } catch (e) { }
+    try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, '[' + NEW + '] 「🦊 호사수구」 가 「' + NEW + '」 로 이름이 바뀌었습니다. (꼬리 → 🪷 연등)'); saveFields({ history: 1 }); } } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     console.log('%c' + TAG + ' 내 것을 새 이름으로 바꿨습니다 — ' + Object.keys(f).join(' · '), 'color:#4CAF50');
     return true;
@@ -138,16 +141,16 @@ function sweepUser(code, x) {
     const up = planFor(x);
     if (!up) return Promise.resolve([]);
     const jobs = [];
-    if (up.inventory) jobs.push(txPath('users/' + code + '/inventory', function (cur) { const l = asList(cur); return l.some(function (v) { return v === OLD; }) ? l.map(fixName) : undefined; }).then(function (ok) { return ok ? 'inventory' : null; }));
+    if (up.inventory) jobs.push(txPath('users/' + code + '/inventory', function (cur) { const l = asList(cur); return l.some(isOld) ? l.map(fixName) : undefined; }).then(function (ok) { return ok ? 'inventory' : null; }));
     if (up.equippedWeapons) jobs.push(txPath('users/' + code + '/equippedWeapons', function (cur) { const l = asList(cur); return l.some(function (v) { return fixName(v) !== v; }) ? l.map(fixName) : undefined; }).then(function (ok) { return ok ? 'equippedWeapons' : null; }));
     if (up.equipOwner) jobs.push(txPath('users/' + code + '/equipOwner', function (cur) { if (!cur || typeof cur !== 'object') return; const eo = {}; let hit = false; Object.keys(cur).forEach(function (k) { const k2 = fixName(k); if (k2 !== k) hit = true; eo[k2] = cur[k]; }); return hit ? eo : undefined; }).then(function (ok) { return ok ? 'equipOwner' : null; }));
-    if (up['house/storage']) jobs.push(txPath('users/' + code + '/house/storage', function (cur) { const l = asList(cur); return l.some(function (v) { return v && v.name === OLD; }) ? l.map(function (v) { return (v && v.name === OLD) ? Object.assign({}, v, { name: NEW }) : v; }) : undefined; }).then(function (ok) { return ok ? 'house/storage' : null; }));
-    if (up.invMark) jobs.push(txPath('users/' + code + '/invMark', function (cur) { if (!cur || typeof cur !== 'object') return; const m = JSON.parse(JSON.stringify(cur)); let hit = false; ['fav', 'lock'].forEach(function (g) { if (!m[g] || typeof m[g] !== 'object') return; [OLD, key_(OLD)].forEach(function (ok) { if (m[g][ok]) { delete m[g][ok]; m[g][key_(NEW)] = true; hit = true; } }); }); return hit ? m : undefined; }).then(function (ok) { return ok ? 'invMark' : null; }));
+    if (up['house/storage']) jobs.push(txPath('users/' + code + '/house/storage', function (cur) { const l = asList(cur); return l.some(function (v) { return v && isOld(v.name); }) ? l.map(function (v) { return (v && isOld(v.name)) ? Object.assign({}, v, { name: NEW }) : v; }) : undefined; }).then(function (ok) { return ok ? 'house/storage' : null; }));
+    if (up.invMark) jobs.push(txPath('users/' + code + '/invMark', function (cur) { if (!cur || typeof cur !== 'object') return; const m = JSON.parse(JSON.stringify(cur)); let hit = false; ['fav', 'lock'].forEach(function (g) { if (!m[g] || typeof m[g] !== 'object') return; OLDS.forEach(function (o) { [o, key_(o)].forEach(function (ok) { if (m[g][ok]) { delete m[g][ok]; m[g][key_(NEW)] = true; hit = true; } }); }); }); return hit ? m : undefined; }).then(function (ok) { return ok ? 'invMark' : null; }));
     return Promise.all(jobs).then(function (done) {
         const got = done.filter(Boolean);
         if (got.length) {
             const d = db_();
-            try { d.ref('users/' + code + '/history').transaction(function (h) { const l = asList(h); l.unshift({ time: new Date().toTimeString().slice(0, 8), text: '[' + NEW + '] 「' + OLD + '」 가 「' + NEW + '」 로 이름이 바뀌었습니다. (꼬리 → 🪷 연등)' }); while (l.length > 10) l.pop(); return l; }).catch(function () { }); } catch (e) { }
+            try { d.ref('users/' + code + '/history').transaction(function (h) { const l = asList(h); l.unshift({ time: new Date().toTimeString().slice(0, 8), text: '[' + NEW + '] 「🦊 호사수구」 가 「' + NEW + '」 로 이름이 바뀌었습니다. (꼬리 → 🪷 연등)' }); while (l.length > 10) l.pop(); return l; }).catch(function () { }); } catch (e) { }
         }
         return got.length ? [{ code: code, what: got }] : [];
     });
@@ -163,8 +166,8 @@ function sweepGiftsMarket() {
             const box = all[code] || {};
             Object.keys(box).forEach(function (gid) {
                 const g = box[gid];
-                if (g && g.items && typeof g.items === 'object' && g.items[OLD] != null) {
-                    jobs.push(txPath('gifts/' + code + '/' + gid + '/items', function (cur) { if (!cur || cur[OLD] == null) return; const c = Object.assign({}, cur); c[NEW] = (Number(c[NEW]) || 0) + (Number(c[OLD]) || 0); delete c[OLD]; return c; }).then(function (ok) { if (ok) out.push({ code: code, what: ['선물함 ' + gid] }); }));
+                if (g && g.items && typeof g.items === 'object' && OLDS.some(function (o) { return g.items[o] != null; })) {
+                    jobs.push(txPath('gifts/' + code + '/' + gid + '/items', function (cur) { if (!cur) return; let hit = false; const c = Object.assign({}, cur); OLDS.forEach(function (o) { if (c[o] != null) { c[NEW] = (Number(c[NEW]) || 0) + (Number(c[o]) || 0); delete c[o]; hit = true; } }); return hit ? c : undefined; }).then(function (ok) { if (ok) out.push({ code: code, what: ['선물함 ' + gid] }); }));
                 }
             });
         });
@@ -174,7 +177,7 @@ function sweepGiftsMarket() {
         const jobs = [];
         Object.keys(all).forEach(function (id) {
             const p = all[id];
-            if (p && p.item === OLD) jobs.push(txPath('market/' + id + '/item', function (cur) { return cur === OLD ? NEW : undefined; }).then(function (ok) { if (ok) out.push({ code: p.seller || p.buyer || '-', what: ['장터 글 ' + id] }); }));
+            if (p && isOld(p.item)) jobs.push(txPath('market/' + id + '/item', function (cur) { return isOld(cur) ? NEW : undefined; }).then(function (ok) { if (ok) out.push({ code: p.seller || p.buyer || '-', what: ['장터 글 ' + id] }); }));
         });
         return Promise.all(jobs);
     }).then(function () { return out; }).catch(function (e) { console.warn(TAG + ' 선물함 · 장터', e && e.message); return out; });
@@ -197,7 +200,7 @@ window.foxRenameAll = function (quiet) {
     }).then(function (rows) { return sweepGiftsMarket().then(function (m) { return rows.concat(m); }); }).then(function (rows) {
         allBusy = false;
         if (!rows.length) { if (quiet !== true) console.log(TAG + ' 바꿀 것이 없습니다.'); return rows; }
-        console.log('%c===== 🦊 호가호위 — 이름 바꾸기 =====', 'color:#4CAF50; font-size:13px');
+        console.log('%c===== 🐯 호가호위 — 이름 바꾸기 =====', 'color:#4CAF50; font-size:13px');
         console.table(rows.map(function (r) { const x = (typeof db !== 'undefined' && db.users && db.users[r.code]) || {}; return { 사원: x.name || r.code, 바꾼곳: r.what.join(' · ') }; }));
         return rows;
     }).catch(function (e) { allBusy = false; console.error(TAG + ' 전체 바꾸기 실패:', e); return []; });
@@ -209,7 +212,7 @@ window.foxRenameCheck = function () {
         const all = s.val() || {};
         const rows = [];
         Object.keys(all).forEach(function (c) { const up = planFor(all[c]); if (up) rows.push({ 사원: (all[c] || {}).name || c, 남은곳: Object.keys(up).join(' · ') }); });
-        console.log('%c===== 🦊 아직 옛 이름(호사수구)이 남은 자리 =====', 'color:#ffd700; font-size:13px');
+        console.log('%c===== 🐯 아직 옛 이름(🦊 호사수구 · 🦊 호가호위)이 남은 자리 =====', 'color:#ffd700; font-size:13px');
         if (rows.length) { console.table(rows); console.log('  바꾸려면 foxRenameAll()'); } else console.log('  사원 자리에는 없습니다. (선물함 · 장터는 foxRenameAll() 이 같이 봅니다)');
     });
 };
@@ -222,5 +225,5 @@ window.foxRenameCheck = function () {
     }, 1000);
 })();
 
-console.log(TAG + ' 🦊 호사수구 → 🦊 호가호위 — foxRenameCheck() · foxRenameAll()');
+console.log(TAG + ' 🦊 호사수구 · 🦊 호가호위 → 🐯 호가호위 — foxRenameCheck() · foxRenameAll()');
 })();

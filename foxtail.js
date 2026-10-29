@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 🦊 호가호위 — 아홉 개의 🪷 연등  (2026-10-29 · 「🦊 호사수구 — 구미호의 아홉 꼬리」 에서 이름과 꼬리→연등 바꿈 · 사용자)
+// ★ 🐯 호가호위 — 아홉 개의 🪷 연등  (2026-10-29 · 「🦊 호사수구 — 구미호의 아홉 꼬리」 에서 이름과 꼬리→연등 바꿈 · 앞 그림 🐯 · 사용자)
 //   옛 이름으로 남은 것은 fox-rename.js 가 들어올 때 · 상담사 훑기로 바꿔 준다
 // bundles.json 마지막 그룹, newitems2.js·spaceitems.js 보다 뒤 · save-merge.js 앞
 // ==========================================
@@ -63,9 +63,9 @@
 
 (function foxTail() {
 
-const FOX = '🦊 호가호위';
-const FOX_OLD = '🦊 호사수구';          // 옛 이름 — 아직 안 바뀐 것도 같은 것으로 본다 (fox-rename.js 가 바꿔 준다)
-window.FOX_NAME = FOX; window.FOX_NAME_OLD = FOX_OLD;
+const FOX = '🐯 호가호위';                // 2026-10-29 — 앞 그림은 🐯 (사용자)
+const FOX_OLDS = ['🦊 호가호위', '🦊 호사수구'];   // 옛 이름들 — 아직 안 바뀐 것도 같은 것으로 본다 (fox-rename.js 가 바꿔 준다)
+window.FOX_NAME = FOX; window.FOX_NAME_OLDS = FOX_OLDS;
 const HEART = '은심장';
 const DAY_TAILS = 9;
 const BUFF_MS = 24 * 3600 * 1000;
@@ -104,7 +104,7 @@ function wearsFox(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
     return u.equippedWeapons.some(function (w) {
         const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
-        return b === FOX || b === FOX_OLD;
+        return b === FOX || FOX_OLDS.indexOf(b) >= 0;
     });
 }
 
@@ -138,9 +138,9 @@ window._foxSum = sum;
                 + '주로 쓸 연등에 다른 연등을 더하면 그만큼 세진다.'
         };
         // 옛 이름(🦊 호사수구)으로 남은 것도 같은 물건으로 — fox-rename.js 가 바꿔 주기 전까지 「알 수 없는 물품」이 안 되게
-        ITEM_CATALOG[FOX_OLD] = ITEM_CATALOG[FOX];
+        FOX_OLDS.forEach(function (o) { ITEM_CATALOG[o] = ITEM_CATALOG[FOX]; });
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(FOX) < 0) NO_SELL_ITEMS.push(FOX);
-        if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(FOX_OLD) < 0) NO_SELL_ITEMS.push(FOX_OLD);
+        FOX_OLDS.forEach(function (o) { if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(o) < 0) NO_SELL_ITEMS.push(o); });
         // 어느 상점 후보에도 들어가지 않게
         [FOX].forEach(function (n) {
             if (typeof ALIEN_ITEMS_POOL !== 'undefined') {
@@ -169,7 +169,7 @@ setInterval(function () {
         const _m = marketSellable;
         marketSellable = function () {
             const pool = _m.apply(this, arguments);
-            try { pool.delete(FOX); pool.delete(FOX_OLD); pool.delete(HEART); } catch (e) { }
+            try { pool.delete(FOX); FOX_OLDS.forEach(function (o) { pool.delete(o); }); pool.delete(HEART); } catch (e) { }
             return pool;
         };
         marketSellable._foxHide = true;
@@ -625,7 +625,7 @@ window.foxOpen = step1;
         let card = null;
         for (let i = 0; i < box2.children.length; i++) {
             const t = box2.children[i].textContent || '';
-            if (t.indexOf('[장착 중 슬롯') >= 0 && (t.indexOf(FOX) >= 0 || t.indexOf(FOX_OLD) >= 0)) { card = box2.children[i]; break; }
+            if (t.indexOf('[장착 중 슬롯') >= 0 && (t.indexOf(FOX) >= 0 || FOX_OLDS.some(function (o) { return t.indexOf(o) >= 0; }))) { card = box2.children[i]; break; }
         }
         if (!card) return;
         const row = card.querySelector('div');
