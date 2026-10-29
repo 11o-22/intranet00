@@ -1793,9 +1793,13 @@ function withPool(fn, ctx, args) {
 }
 
 (function hookShop() {
+    // ★ playHighLow 도 같이 (2026-10-29) — 이기는 순간 진열에 넣을 3종을 고르는 코드가 playHighLow 안에 있다.
+    //   전에는 전체 후보에서 골라 소속에 안 맞는 것이 들어오면 fixUnlocked 가 「아무 허용 품목」으로 바꿨는데,
+    //   그 대체품에 🫙 소원권(진열 확률 0 · 화면에서는 숨긴다)이나 다른 묶음의 희귀품이 섞여 들어갔다.
+    //   소원권이 들어오면 화면에는 두 개만 보였다 (문의 10.29). 처음부터 허용 품목에서만 고르면 바꿀 일이 없다.
     const iv = setInterval(function () {
         let hit = 0;
-        ['renderAlienShop', 'buyAlienItem'].forEach(function (n) {
+        ['renderAlienShop', 'buyAlienItem', 'playHighLow'].forEach(function (n) {
             if (typeof window[n] !== 'function') return;
             if (window[n]._newAffil) { hit++; return; }
             const _f = window[n];
@@ -1803,7 +1807,7 @@ function withPool(fn, ctx, args) {
             window[n]._newAffil = true;
             hit++;
         });
-        if (hit < 2) return;
+        if (hit < 3) return;
         clearInterval(iv);
         console.log('[신규] 우주 쇼핑몰 소속 제한 연결');
     }, 500);
@@ -1814,25 +1818,38 @@ function withPool(fn, ctx, args) {
 // (진열은 alienUnlockedItems 에 하루치로 쌓인다.
 //  지우면 칸이 비어 1~2개만 보이게 되므로, 같은 수를 유지한다.)
 // ==========================================
+// 진열에 있어도 화면이 숨기는 것 (index.html renderAlienShop) — 칸만 차지하고 안 보이므로 바꿔 준다 (2026-10-29)
+const SHELF_HIDDEN = ['🫙 소원권', '소원권'];
+function shelfOk(nm) {
+    if (!shopAllowed(nm) || SHELF_HIDDEN.indexOf(nm) >= 0) return false;
+    // 목록에 없는 이름도 화면이 비운다 — 다만 묶음이 늦게 올라오는 동안(40초)은 기다린다
+    if (typeof ITEM_CATALOG !== 'undefined' && !ITEM_CATALOG[nm] && performance.now() > 40000) return false;
+    return true;
+}
+function isRareAny(nm) {                                   // 어느 묶음의 희귀품이든 — 대체품으로 주지 않는다
+    if (RARE3.indexOf(nm) >= 0) return true;
+    const R = window.RARE_ALIEN_RATE;
+    return !!(R && R[nm] !== undefined && Number(R[nm]) < 1);
+}
 function fixUnlocked() {
     const u = currentUser;
     if (!u || !Array.isArray(u.alienUnlockedItems)) return;
     if (isCounsel(u)) return;
 
-    const bad = u.alienUnlockedItems.filter(function (nm) { return !shopAllowed(nm); });
+    const bad = u.alienUnlockedItems.filter(function (nm) { return !shelfOk(nm); });
     if (!bad.length) return;
 
     const pool = (typeof ALIEN_ITEMS_POOL !== 'undefined' ? ALIEN_ITEMS_POOL : [])
         .filter(function (nm) {
-            if (!shopAllowed(nm)) return false;
+            if (!shelfOk(nm)) return false;
             if (u.alienUnlockedItems.indexOf(nm) >= 0) return false;
-            if (RARE3.indexOf(nm) >= 0) return false;         // 희귀는 대체품으로 주지 않는다
+            if (isRareAny(nm)) return false;                   // 희귀는 대체품으로 주지 않는다 (소원권 · 다른 묶음의 희귀품까지)
             return true;
         });
 
     let swapped = 0;
     u.alienUnlockedItems = u.alienUnlockedItems.map(function (nm) {
-        if (shopAllowed(nm)) return nm;
+        if (shelfOk(nm)) return nm;
         if (!pool.length) return nm;                           // 바꿀 게 없으면 그냥 둔다
         const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
         swapped++;
