@@ -37,12 +37,26 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function 
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); else console.log(m); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
 
+const LOCK_MS = 30 * 60000;        // ★ 여정 가두리는 처음 삼십 분 동안 어떠한 행위로도 못 나온다 (2026-10-30 사용자) — 금제 · 카세트 · 탄원서 다 막힌다
 function entry(code) { try { return (typeof window.gaduriEntry === 'function') ? window.gaduriEntry(code) : null; } catch (e) { return null; } }
-function timed(code) {
+function journeyCage(code) {
     const e = entry(code);
     return (e && e.by === 'journey' && Number(e.until) > Date.now()) ? e : null;
 }
+// 잠김이 몇 분 남았나 — 0 이면 풀 수 있다 · -1 이면 여정 가두리가 아니다
+function lockLeft(code) {
+    const e = journeyCage(code);
+    if (!e) return -1;
+    const end = Math.min(Number(e.until), (Number(e.at) || Number(e.until) - LOCK_MS) + LOCK_MS);
+    return Math.max(0, Math.ceil((end - Date.now()) / 60000));
+}
+function timed(code) {                 // 나갈 길이 통하는 여정 가두리 — 잠김이 풀린 뒤에만
+    const e = journeyCage(code);
+    return (e && lockLeft(code) === 0) ? e : null;
+}
 window.cageTimedOf = timed;
+window.cageJourneyOf = journeyCage;
+window.cageLockLeft = lockLeft;
 window.cageRelease = function (code) {
     const d = db_(), e = entry(code);
     if (!d || !e) return Promise.resolve(false);

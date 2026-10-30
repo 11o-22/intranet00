@@ -277,9 +277,11 @@ function tapeMenu() {
         const t = userOf(c);
         if (!t) return '';
         const cg = quarantinedU(t) ? null : cagedU(t);
+        const lockM = (!quarantinedU(t) && !cg && typeof window.cageLockLeft === 'function') ? window.cageLockLeft(c) : -1;   // 여정 가두리 잠김 (삼십 분)
         const q = quarantinedU(t) || !!cg;
         const used = !!(me.ebTape.used && me.ebTape.used[c]);
         const where = cg ? '🔒 가두리 (여정) · ' + Math.max(1, Math.ceil((Number(cg.until) - Date.now()) / 60000)) + '분'
+            : lockM > 0 ? '🔒 가두리 (여정) · 잠김 ' + lockM + '분 — 어떠한 행위로도 못 나온다'
             : q ? ((t.quarantineDest || 'fox') === 'bath' ? '♨ 선녀탕' : '🦊 상담실') + ' · ' + Math.max(1, Math.ceil((t.quarantineUntil - Date.now()) / 36e5)) + '시간' : '밖에 있다';
         return '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid rgba(255,255,255,0.06);">'
             + '<div style="flex:1; min-width:0; font-size:11.5px;">' + esc(t.name || c) + ' <span style="font-size:9.5px; color:#8a95a8;">· ' + where + (used ? ' · 오늘 풀어 줬다' : '') + '</span></div>'

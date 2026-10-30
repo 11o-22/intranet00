@@ -413,7 +413,7 @@ function paint() {
     const w = box(head('🐾 여정', '펫이 주인을 대신해 떠나는 어둠. 1~3명이 펫 하나씩. 주인은 바디캠으로 본다.<br>오늘 남은 횟수 <b style="color:#ffcf8f;">' + left + ' / ' + DAY_MAX + '</b> — 횟수를 늘리는 물건은 듣지 않습니다.')
         + '<div style="border:1px solid #4a3f6a; border-radius:8px; padding:11px; margin-bottom:10px; background:rgba(90,70,130,.10);">'
         + '<div style="font-size:12px; color:#e8e2f0; font-weight:bold;">『 ' + esc(J.n) + ' 』 <span style="font-size:10px; color:#c9a227;">' + J.g + ' 등급</span></div>'
-        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 펫은 멀쩡하고 한 시간 잔다.<br>끝까지 가면 펫이 <b style="color:#ffcf8f;">20,000 P</b> 를 물고 온다 · 등급업 조각(D → C) 세 가지가 길에 놓여 있다 — '
+        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 펫은 멀쩡하고 한 시간 잔다. 주인은 삼십 분 가두리 — 그동안은 어떠한 행위로도 나올 수 없다 (기권해도 같다).<br>끝까지 가면 펫이 <b style="color:#ffcf8f;">20,000 P</b> 를 물고 온다 · 등급업 조각(D → C) 세 가지가 길에 놓여 있다 — '
         + ((G().SHARDS || {})[J.g] || []).map(function (x) { return '<span style="color:' + (G().shardHave(x.n, me) ? '#d4af37' : '#5f5878') + ';">' + esc(x.n.replace(/^🧩 /, '')) + '</span>'; }).join(' · ') + ' <span style="color:#7f7898;">(' + G().shardCount(J.g, me) + '/3)</span></div>'
         + '<div style="display:flex; gap:6px; margin-top:9px;">'
         + '<button id="jr-solo" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>혼자 떠난다</button>'
@@ -573,9 +573,12 @@ function trioScene(r) {
 // ==========================================
 // 여정 화면
 // ==========================================
+const warned = {};
 function paintRun(r) {
     const me = u_();
     view = 'run';
+    // ★ 시작할 때 한 번 — 삼십 분 가두리 주의 (2026-10-30 사용자)
+    if (r && r._k && !warned[r._k] && runAlive(r)) { warned[r._k] = 1; setTimeout(function () { alert_('🐾 여정\n\n' + CAGE_WARN); }, 350); }
     const J = JOURNEYS[r.j] || JOURNEYS.j1;
     const mine = r.pets[me.code];
     if (r.stage === 'intro') {
@@ -680,7 +683,11 @@ function quit(r) {
         if (!alive.length) { cur.stage = 'lose'; cur.endAt = Date.now(); }
         else if (cur.lead === me.code) cur.lead = alive[0];
         return cur;
-    }).then(resync).catch(function (e) { err('quit', e, r); resync(null); });
+    }).then(function (res) {
+        // ★ 기권해도 가두리 삼십 분 (2026-10-30 사용자) — 그 자리에서 바로 · 정산 때 또 넣어도 늘지 않는다
+        if (res && res.committed) { try { cage(me); log_('[여정] 기권 — 주인은 ' + cageMin() + '분 가두리에서 쉰다 (어떠한 행위로도 나올 수 없다)'); } catch (e) { } }
+        resync(res);
+    }).catch(function (e) { err('quit', e, r); resync(null); });
 }
 
 // ==========================================
@@ -795,8 +802,10 @@ function resolve(r) {
 // 정산 — 내 펫만 내가 (끝난 것을 보면 그 자리에서 · 늦게 들어와도)
 // ==========================================
 const settling = {};
-// 펫 대신 맞은 주인 — 가두리 한 시간 (광장 → 백일몽 차례로 빈 자리 · 둘 다 찼으면 밖에 둔다 · gaduri.js by 'journey')
-const CAGE_MS = 60 * 60 * 1000;
+// 펫 대신 맞은 주인 · 기권한 주인 — 가두리 삼십 분 (광장 → 백일몽 차례로 빈 자리 · 둘 다 찼으면 밖에 둔다 · gaduri.js by 'journey')
+const CAGE_MS = 30 * 60 * 1000;           // ★ 삼십 분 (2026-10-30 사용자 · 전에는 한 시간) — 그동안은 어떠한 행위로도 못 나온다 (cage-escape.js LOCK_MS)
+const CAGE_WARN = '⚠️ 삼십분 동안은 어떠한 행위로도 가두리를 나올 수 없습니다.\n이 점 유의하시길 바랍니다.';
+function cageMin() { return Math.round(CAGE_MS / 60000); }
 function cage(me) {
     const d = db_();
     if (!d || !me || me.code === 'kario0987') return;
@@ -806,7 +815,12 @@ function cage(me) {
         if (i >= rooms.length) return;
         d.ref('gaduri/' + rooms[i]).transaction(function (box) {
             box = box || {};
-            if (box[me.code]) { if (!box[me.code].until || box[me.code].until < until) { box[me.code].until = until; box[me.code].by = box[me.code].by || 'journey'; } return box; }
+            if (box[me.code]) {
+                // 이미 여정 가두리에 있고 아직 때가 안 됐으면 그대로 (기권 때 넣고 정산 때 또 넣어도 늘지 않게)
+                if (box[me.code].by === 'journey' && Number(box[me.code].until) > Date.now()) return box;
+                if (!box[me.code].until || box[me.code].until < until) { box[me.code].until = until; box[me.code].by = box[me.code].by || 'journey'; box[me.code].at = Date.now(); }
+                return box;
+            }
             if (Object.keys(box).length >= 3) return;
             box[me.code] = { at: Date.now(), by: 'journey', until: until, name: me.name || me.code };
             return box;
@@ -869,8 +883,8 @@ function settle(o) {
         const fed = Math.min(Date.now(), (Number(s.fedAt) || Date.now()) + SLEEP_MS);     // 포만도 시계도 한 시간 멈춘다
         P().patch(key, { jsleep: until, fedAt: fed });
         lines.push('한 시간 잔다 — 포만도는 그동안 줄지 않는다');
-        cage(me);                                                                           // 대신 맞은 주인은 한 시간 가두리
-        lines.push('주인은 한 시간 가두리에서 쉰다');
+        cage(me);                                                                           // 대신 맞은 주인은 삼십 분 가두리
+        lines.push('주인은 ' + cageMin() + '분 가두리에서 쉰다 — 그동안은 어떠한 행위로도 나올 수 없다');
     }
     log_('[여정] 『 ' + J.n + ' 』 ' + (won ? '끝까지 갔다' : '주인이 대신 맞았다') + ' — ' + p.nick + (lines.length ? ' · ' + lines.join(' · ') : ''));
     try { saveFields({ history: 1 }); } catch (e) { }

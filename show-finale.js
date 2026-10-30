@@ -6,9 +6,10 @@
 // ■ 무엇인가
 //
 //   「📺 브라운의 심야 토크 쇼」를 찬 사원의 장착칸에 [🎬 피날레] 단추가 붙는다.
-//   누르면 지금 여우 상담실 · 선녀탕에 갇힌 사원이 죽 뜨고, 고르면
+//   누르면 지금 **어디든 갇힌** 사원이 죽 뜬다 — 여우 상담실 · 선녀탕 · 입원 · 광장 가두리(상담사 · 펫 배틀 · 여우 신도 · 여정 — 잠김 중이어도) ·
+//   사택 감금실. 고르면
 //       『 당신의 쇼는 여기서 끝났습니까? 』
-//   팝업이 뜬다. 「끝났다 — 꺼낸다」를 누르면 그 사원이 격리에서 풀려난다 (오염도는 50 을 넘지 않게 · 토크 쇼 초대와 같게).
+//   팝업이 뜬다. 「끝났다 — 꺼낸다」를 누르면 그 사원이 **무슨 조건이든 막히는 일 없이** 풀려난다 (2026-10-30 사용자 · 오염도는 50 을 넘지 않게).
 //   **횟수 제한이 없다** — 초대의 「사원당 하루 한 번」과는 다른 길이다.
 //
 //   풀려난 사원의 화면에도 같은 문구가 팝업으로 뜬다 (talkFinale/<사번> 을 보고 · 접속해 있지 않으면 들어올 때).
@@ -37,9 +38,24 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function 
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); } catch (e) { } }
 function baseOf(w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } }
 function wears(u) { return !!(u && Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return baseOf(w) === SHOW; })); }
-function locked(u) { return !!(u && Number(u.quarantineUntil) > Date.now()); }
-function where(u) { return (u.quarantineDest || 'fox') === 'bath' ? '♨ 선녀탕' : '🦊 여우 상담실'; }
+function qLocked(u) { return !!(u && Number(u.quarantineUntil) > Date.now()); }
+function gEntry(code) { try { return (typeof window.gaduriEntry === 'function') ? window.gaduriEntry(code) : null; } catch (e) { return null; } }
+function cCaged(u) { try { return !!(u && typeof window.isCaged === 'function' && window.isCaged(u)); } catch (e) { return false; } }
+function locked(u) { return !!(u && (qLocked(u) || gEntry(u.code) || cCaged(u))); }
 function leftH(u) { return Math.max(0.1, Math.round((Number(u.quarantineUntil) - Date.now()) / 360000) / 10); }
+// 어디에 갇혔나 — 여러 곳이면 다 적는다
+function where(u) {
+    const out = [];
+    if (qLocked(u)) out.push((u.quarantineHospital ? '🏥 입원 · ' : '') + ((u.quarantineDest || 'fox') === 'bath' ? '♨ 선녀탕' : '🦊 여우 상담실') + ' · ' + leftH(u) + '시간');
+    const g = gEntry(u.code);
+    if (g) {
+        const by = g.auto ? '격리' : g.by === 'journey' ? '여정' : g.by === 'petbt' ? '펫 배틀' : g.by === 'foxd' ? '여우 신도' : '상담사';
+        const lock = (g.by === 'journey' && typeof window.cageLockLeft === 'function') ? window.cageLockLeft(u.code) : -1;
+        out.push('🔒 ' + (g.room === 'dream' ? '백일몽' : '광장') + ' 가두리 (' + by + (Number(g.until) > Date.now() ? ' · ' + Math.max(1, Math.ceil((Number(g.until) - Date.now()) / 60000)) + '분' : '') + (lock > 0 ? ' · 잠김 ' + lock + '분' : '') + ')');
+    }
+    if (cCaged(u)) out.push('🚪 사택 감금실');
+    return out.join(' · ') || '갇힌 곳 없음';
+}
 
 // ==========================================
 // 장착칸의 [🎬 피날레] 단추
@@ -114,11 +130,11 @@ window.showFinaleMenu = function () {
     const rows = list.map(function (c) {
         const x = book[c];
         return '<div style="display:flex; align-items:center; gap:8px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.06);">'
-            + '<div style="flex:1; min-width:0; font-size:11.5px; color:#f3e6d2;">' + esc(x.name || c) + ' <span style="font-size:9.5px; color:#a88d6a;">· ' + where(x) + ' · ' + leftH(x) + '시간' + (x.quarantineHospital ? ' · 입원' : '') + '</span></div>'
+            + '<div style="flex:1; min-width:0; font-size:11.5px; color:#f3e6d2;">' + esc(x.name || c) + ' <span style="font-size:9.5px; color:#a88d6a;">· ' + where(x) + '</span></div>'
             + '<button class="game-btn sf-pick" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px; background:linear-gradient(145deg,#6a4a22,#2a1b0e) !important; border-color:#c79a5b !important; color:#f3e6d2 !important;">피날레</button></div>';
     }).join('');
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎬 피날레 — ' + SHOW.replace('📺 ', '') + '</div>'
-        + '<div style="font-size:10px; color:#a88d6a; margin-bottom:11px; line-height:1.6;">여우 상담실 · 선녀탕에 갇힌 사원을 무대로 불러내 쇼를 끝냅니다. 횟수 제한이 없습니다.</div>'
+        + '<div style="font-size:10px; color:#a88d6a; margin-bottom:11px; line-height:1.6;">여우 상담실 · 선녀탕 · 입원 · 광장 가두리 · 사택 감금실 — 어디에 갇혀 있든 무대로 불러내 쇼를 끝냅니다. 막히는 조건이 없고, 횟수 제한도 없습니다.</div>'
         + (rows || '<div style="font-size:10.5px; color:#a88d6a; padding:6px 0;">지금 갇힌 사원이 없습니다.</div>')
         + '<button id="sf-x" class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px; font-size:12px; background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">닫는다</button>');
     w.querySelector('#sf-x').onclick = shut;
@@ -131,7 +147,7 @@ function ask(code) {
     const w = box('<div style="text-align:center; padding:12px 4px 4px;">'
         + '<div style="font-size:30px; margin-bottom:10px; text-shadow:0 0 14px rgba(199,154,91,.8);">📺</div>'
         + '<div style="font-size:16px; letter-spacing:2px; color:#f3e6d2; line-height:1.8; font-family:\'Nanum Myeongjo\',\'Noto Serif KR\',serif; text-shadow:0 0 10px rgba(199,154,91,.6);">『 ' + esc(LINE) + ' 』</div>'
-        + '<div style="font-size:11px; color:#a88d6a; margin-top:12px; line-height:1.7;">' + esc(x.name || code) + ' 사원 — ' + where(x) + ' · 남은 ' + leftH(x) + '시간<br>끝났다고 하면 지금 무대로 불러냅니다. (오염도는 ' + OUT_POLL + '% 를 넘지 않게)</div>'
+        + '<div style="font-size:11px; color:#a88d6a; margin-top:12px; line-height:1.7;">' + esc(x.name || code) + ' 사원 — ' + where(x) + '<br>끝났다고 하면 지금 무대로 불러냅니다 — 어디에 갇혀 있든 막히지 않습니다. (오염도는 ' + OUT_POLL + '% 를 넘지 않게)</div>'
         + '</div>'
         + '<div style="display:flex; gap:8px; margin-top:16px;">'
         + '<button id="sf-no" class="game-btn" style="flex:1; margin:0; padding:11px; font-size:12px; background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">아직이다</button>'
@@ -143,22 +159,33 @@ function ask(code) {
 function free(code) {
     const me = u_(), d = db_(), x = users()[code];
     if (!me || !x) return;
-    const out = Math.min(OUT_POLL, Number(x.pollution) || 0);
-    const f = { quarantineUntil: 0, quarantineDest: null, quarantineHospital: false, quarantineExitPollution: 0,
-                pollution: out, lastPollutionTime: Date.now(), foxRoomAnswered: false };
-    if (x.badge && typeof x.badge.notes === 'string') {
-        const arr = x.badge.notes.split(' | ').filter(function (n) { return n.trim() !== '' && !/의식 불명|긴급 이송|사직 반려/.test(n); });
-        f.badge = Object.assign({}, x.badge, { notes: arr.length ? arr.join(' | ') : '특이사항 없음' });
+    const was = where(x);
+    const f = {};
+    let out = null;
+    // ① 상담실 · 선녀탕 · 입원
+    if (qLocked(x)) {
+        out = Math.min(OUT_POLL, Number(x.pollution) || 0);
+        Object.assign(f, { quarantineUntil: 0, quarantineDest: null, quarantineHospital: false, quarantineExitPollution: 0,
+                           pollution: out, lastPollutionTime: Date.now(), foxRoomAnswered: false });
+        if (x.badge && typeof x.badge.notes === 'string') {
+            const arr = x.badge.notes.split(' | ').filter(function (n) { return n.trim() !== '' && !/의식 불명|긴급 이송|사직 반려/.test(n); });
+            f.badge = Object.assign({}, x.badge, { notes: arr.length ? arr.join(' | ') : '특이사항 없음' });
+        }
     }
+    // ② 광장 · 백일몽 가두리 — 누가 가뒀든 · 여정 잠김 중이어도 (무슨 조건이든 꺼낸다)
+    const g = gEntry(code);
+    if (g && d) { try { d.ref('gaduri/' + g.room + '/' + code).remove(); } catch (e) { } }
     const tmp = { history: Array.isArray(x.history) ? x.history.slice() : [] };
-    try { addHistoryLog(tmp, '[토크쇼] 🎬 피날레 — ' + (me.name || me.code) + ' 사회자가 무대로 불러냈습니다. 「' + LINE + '」 (오염도 ' + out + '%)'); } catch (e) { }
+    try { addHistoryLog(tmp, '[토크쇼] 🎬 피날레 — ' + (me.name || me.code) + ' 사회자가 무대로 불러냈습니다. 「' + LINE + '」 (' + was + (out != null ? ' · 오염도 ' + out + '%' : '') + ')'); } catch (e) { }
     f.history = tmp.history;
     Object.keys(f).forEach(function (k) { x[k] = f[k]; });
     try { if (typeof updateUserFields === 'function') updateUserFields(code, f); } catch (e) { }
-    if (d) { try { d.ref(NODE + '/' + code).set({ by: me.code, name: me.name || me.code, at: Date.now() }); } catch (e) { } }
-    try { addHistoryLog(me, '[토크쇼] 🎬 피날레 — ' + (x.name || code) + ' 사원을 ' + where(x) + '에서 불러냈습니다.'); if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+    // ③ 사택 감금실 — cage.js 가 정산까지 하고 지운다
+    if (cCaged(x)) { try { if (typeof window.cageFreeUser === 'function') window.cageFreeUser(x, '🎬 피날레 — ' + (me.name || me.code) + ' 사회자가 무대로 불러냈습니다.'); } catch (e) { } }
+    if (d) { try { d.ref(NODE + '/' + code).set({ by: me.code, name: me.name || me.code, at: Date.now(), was: was }); } catch (e) { } }
+    try { addHistoryLog(me, '[토크쇼] 🎬 피날레 — ' + (x.name || code) + ' 사원을 불러냈습니다 (' + was + ').'); if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     shut();
-    alert_('🎬 피날레\n\n' + (x.name || code) + ' 사원의 쇼가 끝났습니다.\n' + where(x) + '에서 무대로 불러냈습니다. (오염도 ' + out + '%)');
+    alert_('🎬 피날레\n\n' + (x.name || code) + ' 사원의 쇼가 끝났습니다.\n' + was + ' → 무대로 불러냈습니다.' + (out != null ? ' (오염도 ' + out + '%)' : ''));
 }
 
 // ==========================================
@@ -174,7 +201,7 @@ function free(code) {
             const v = s.val();
             if (!v || !v.at) return;
             if (Date.now() - Number(v.at) > 3 * 24 * 3600000) { try { d.ref(NODE + '/' + me.code).remove(); } catch (e) { } return; }
-            // 격리 값이 내 화면에도 내려온 뒤에
+            // 격리 값이 내 화면에도 내려온 뒤에 (가두리 · 감금실은 서버 기록이 지워지며 제 화면이 알아서 푼다)
             me.quarantineUntil = 0; me.quarantineDest = null; me.quarantineHospital = null; me.quarantineExitPollution = 0; me.foxRoomAnswered = false;
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
             alert_('📺 『 ' + LINE + ' 』\n\n' + (v.name || v.by) + ' 사회자가 당신을 무대로 불러냈습니다.\n쇼는 여기서 끝났습니다 — 격리에서 풀려났습니다.');
@@ -188,7 +215,7 @@ window.showFinaleState = function () {
     console.log('%c===== 🎬 피날레 — ' + SHOW + ' =====', 'color:#c79a5b; font-size:13px');
     console.log('  차고 있나: ' + (wears(me) ? '예' : '아니오') + ' · 단추: ' + (document.getElementById(ID) ? '있음' : '없음'));
     const book = users();
-    console.table(lockedList().map(function (c) { const x = book[c]; return { 사원: x.name || c, 어디: where(x), 남은시간: leftH(x) }; }));
+    console.table(lockedList().map(function (c) { const x = book[c]; return { 사원: x.name || c, 어디: where(x) }; }));
 };
 
 console.log('[토크쇼] 🎬 피날레 — 갇힌 사원을 제한 없이 무대로 불러낸다');

@@ -139,7 +139,7 @@ setInterval(function () {
     }
     if (now) alert_('🔒 가두리\n\n' + (auto ? '격리되어 있는 동안 ' + NAME[now] + ' 가두리에 갇힙니다.'
             : bt ? '펫 배틀에서 져서 ' + NAME[now] + ' 가두리에 갇힙니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
-            : jr ? '여정에서 펫 대신 맞아, ' + NAME[now] + ' 가두리에서 한 시간 쉽니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
+            : jr ? '여정에서 펫 대신 맞아(또는 기권해), ' + NAME[now] + ' 가두리에서 쉽니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '') + '\n삼십분 동안은 어떠한 행위로도 가두리를 나올 수 없습니다.'
             : fd ? (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.until ? '\n(' + Math.max(1, Math.round((ent.until - Date.now()) / 60000)) + '분 뒤에 풀립니다)' : '')
             : '상담사가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.')
         + '\n광장에 있는 동안 가두리 밖으로 나갈 수 없습니다.');
