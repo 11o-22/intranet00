@@ -269,6 +269,9 @@ async function ask(deps, o) {
 }
 const SONNET_OPT = { thinking: { type: 'between_tools' }, effort: 'medium' };
 const HAIKU_OPT = { thinking: { type: 'disabled' }, effort: 'low' };
+// 🎐 여우 신도가 끼는 채팅은 더 좋은 모델로 (2026-10-30 사용자 — 빠른 모델이 같은 말만 되풀이했다)
+const FOXD_OPT = { model: CFG.SONNET, thinking: { type: 'disabled' }, effort: 'medium' };
+function chatModel(hasD) { return hasD ? FOXD_OPT : Object.assign({ model: CFG.HAIKU }, HAIKU_OPT); }
 
 function obj(props) {
     return { type: 'object', properties: props, required: Object.keys(props), additionalProperties: false };
@@ -1747,7 +1750,7 @@ async function foxChat(b, deps, db) {
     // 사회자 · 브라운 호칭 — 토크 쇼를 가진 사람이 판에 있을 때만
     const own = dAlive.length ? await showOwners(db, people.concat(loverCodes(FD, dAlive))) : {};
     const res = await ask(deps, Object.assign({
-        model: CFG.HAIKU, max: dAlive.length ? 900 : 700, schema: dAlive.length ? SCHEMA_FOXD : SCHEMA_FOX,
+        max: dAlive.length ? 900 : 700, schema: dAlive.length ? SCHEMA_FOXD : SCHEMA_FOX,
         system: [alive.length ? foxChatRule(kinds) : '', dAlive.length ? foxdChatRule(dAlive.map((id) => FD[id].k), 'disaster') : ''].filter(Boolean).join('\n\n'),
         user: [
             ...(run.last && Number(run.last.n) === n - 1 && run.last.result ? ['[지난 장면에서 벌어진 일]', clip(run.last.result, 700), ''] : []),
@@ -1763,7 +1766,7 @@ async function foxChat(b, deps, db) {
                 dSaid.map((x) => String(x.n || '').replace(/^🎐\s*/, '') + ': ' + clip(x.t, 120)).join('\n'), ''] : []),
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')
-    }, HAIKU_OPT));
+    }, chatModel(dAlive.length > 0)));
     const nPosted = alive.length ? await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive, foxSaid.map((x) => x.t)) : 0;
     // 🎐 신도의 말 — 신도 하나에 한 줄 · 토크 쇼 주인이 없는데 「사회자 님」이면 버린다
     let dPosted = 0, caged = [];
@@ -2178,7 +2181,7 @@ async function kitCall(b, deps, db) {
         const ppl = [{ c: c, n: nm }].concat(near);
         if (come.concat(others).some((id) => isD(on2[id].k))) own = await showOwners(db, peopleTop(rows, ppl).top.concat(loverCodes(on2, come.concat(others))));
         const res = await ask(deps, Object.assign({
-            model: CFG.HAIKU, max: 900, schema: SCHEMA_KIT,
+            max: 900, schema: SCHEMA_KIT,
             system: kitSys(on2, come.concat(others)),
             user: [
                 '[방금 일] ' + nm + ' 사원이 ' + (room ? '「' + room + '」에서 ' : '') + kindTxt + '을(를) 불렀다. 아래 열쇠의 ' + kindTxt + '이(가) 지금 막 광장에 나왔다 — 하나가 한 줄씩, 성격대로 짧게 인사한다 (lines).',
@@ -2193,7 +2196,7 @@ async function kitCall(b, deps, db) {
                 ...kitSaidLines(rows),
                 '[최근 채팅 — 마지막 줄이 방금 한 말 · (맵) 은 그 장소의 맵 채팅]', kitTalk(rows) || '(아직 없음)'
             ].join('\n')
-        }, HAIKU_OPT));
+        }, chatModel(come.concat(others).some((id) => isD(on2[id].k)))));
         lines = (res && Array.isArray(res.lines)) ? res.lines : [];
     } catch (e) { lines = []; }
     const post = [], add = {}, addD = {};
@@ -2259,7 +2262,7 @@ async function kitChat(b, deps, db) {
         try {
             const mems = await kitMems(db, live.filter((id) => !isD(onAll[id].k)));
             res = await ask(deps, Object.assign({
-                model: CFG.HAIKU, max: 900, schema: hasD ? SCHEMA_FOXD : SCHEMA_KIT,
+                max: 900, schema: hasD ? SCHEMA_FOXD : SCHEMA_KIT,
                 system: kitSys(onAll, live),
                 user: [
                     '[광장의 사원 — 사람 목록]', await kitPeople(db, rows, onAll, now, null, own), '',
@@ -2269,7 +2272,7 @@ async function kitChat(b, deps, db) {
                     '[아직 대답하지 않은 말 — 지난 대답 뒤에 나온 ' + fresh.length + '줄 · 한데 모아 이번 한 번에 대답한다]',
                     kitTalk(fresh) || '(없음)'
                 ].join('\n')
-            }, HAIKU_OPT));
+            }, chatModel(hasD)));
         } catch (e) { res = null; }
     }
     // 들어가라는 말을 들은 아이 — 작별 한 마디를 하고 들어간다 (이번이 마지막인 아이는 원래대로 last 에서)
@@ -2422,7 +2425,7 @@ async function foxdRun(b, deps, db) {
         if (await foxdSpend(db, day)) {
             try {
                 const res = await ask(deps, Object.assign({
-                    model: CFG.HAIKU, max: 700, schema: SCHEMA_KIT,
+                    max: 700, schema: SCHEMA_KIT,
                     system: foxdChatRule(mine.map((id) => D[id].k), 'run'),
                     user: head.concat([
                         '[방금 일] 탐사가 막 시작됐다. 아래 신도가 동행하는 사람에게 처음으로 한 마디씩 인사한다 (lines · 신도마다 한 줄).',
@@ -2432,7 +2435,7 @@ async function foxdRun(b, deps, db) {
                         ...saidLines,
                         '[최근 채팅]', foxdTalk(rows) || '(아직 없음)'
                     ]).join('\n')
-                }, HAIKU_OPT));
+                }, FOXD_OPT));
                 lines = (res && Array.isArray(res.lines)) ? res.lines : [];
             } catch (e) { lines = []; }
         }
@@ -2474,7 +2477,7 @@ async function foxdRun(b, deps, db) {
     let res = null;
     try {
         res = await ask(deps, Object.assign({
-            model: CFG.HAIKU, max: 800, schema: SCHEMA_FOXD,
+            max: 800, schema: SCHEMA_FOXD,
             system: foxdChatRule(live.map((id) => D[id].k), 'run'),
             user: head.concat([
                 '[신도 열쇠 — fox 에 이것을 쓴다]', live.map((id) => foxdKey(id, D[id], last)).join('\n'), '',
@@ -2483,7 +2486,7 @@ async function foxdRun(b, deps, db) {
                 '[아직 대답하지 않은 말 — 지난 대답 뒤에 나온 ' + fresh.length + '줄 · 한데 모아 이번 한 번에 대답한다]',
                 foxdTalk(fresh) || '(없음)'
             ]).join('\n')
-        }, HAIKU_OPT));
+        }, FOXD_OPT));
     } catch (e) { res = null; }
     const post = [], up = {}, said = {};
     ((res && res.lines) || []).forEach((x) => {
