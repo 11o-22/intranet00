@@ -66,8 +66,9 @@ export const CFG = {
     ADMIN: 'kario0987',
     // 🐾 아기 호랑이 채팅 (2026-10-20) — 사원이 말하면 빠른 모델이 아기 호랑이의 말을 채팅에 올린다
     FOX_GAP_MS: 6000,        // 한 판에서 아기 호랑이가 말하는 사이 (이보다 잦으면 건너뛴다)
-    FOX_PER_SCENE: 10,       // 한 장면에 아기 호랑이가 말하는 횟수
-    FOX_DAILY: 800,          // 하루 전체 아기 호랑이 채팅 호출
+    FOX_PER_SCENE: 20,       // 한 장면에 부르는 횟수 (마디 한도가 먼저 걸린다 · 2026-10-30 10 → 20)
+    FOX_SCENE_LINES: 20,     // ★ 한 장면(턴)에 아기 호랑이 · 여우 신도가 채팅에 올리는 마디 — 다 합쳐 (2026-10-30 사용자 · 하루 800 호출 대신)
+    FOX_DAILY: 800,          // (안 쓴다 · 2026-10-30 — 하루 호출 한도는 뺐다 · 세기만 한다)
     FOX_MAX_LINES: 3,
     // 🐾 사내 채팅의 아기 호랑이 (2026-10-21) — 부르면 나와서 한 아이가 하루 스무 마디 · 마지막은 작별 인사 · 들어가라 하면 들어감
     KIT_LINES: 20,           // 한 아이가 하루에 나누는 말 (2026-10-21 · 10 으로 줄였다가 다시 20)
@@ -1668,8 +1669,9 @@ async function round(b, deps, db) {
 // ==========================================
 // 🐾 아기 호랑이 채팅 — 사원이 말하면 (화면이 2.5초 뒤 부른다) 여우가 대답한다 (2026-10-20)
 // ==========================================
-//   빠른 모델(Haiku)로 0~3줄 · 한 판에 6초에 한 번까지 · 한 장면 10번까지 · 하루 800번까지
-//   이미 대답한 사람 말(열쇠)보다 새 말이 없으면 부르지 않는다 — disasterSrv/<판>/fox { n, cnt, at, key }
+//   0~3줄 · 한 판에 6초에 한 번까지 · ★ 한 장면(턴)에 다 합쳐 스무 마디까지 (2026-10-30 · 하루 한도는 뺐다)
+//   이미 대답한 사람 말(열쇠)보다 새 말이 없으면 부르지 않는다 — disasterSrv/<판>/fox { n, cnt, at, key, lines }
+//   🎐 신도의 스무 마디(foxdUsed)도 장면마다 새로 센다 — { n, used: { 신도: 마디 } }
 async function foxChat(b, deps, db) {
     const now = deps.now();
     const run = await db.get('disaster/' + b.run);
@@ -1682,7 +1684,8 @@ async function foxChat(b, deps, db) {
     const alive = Object.keys(FX).filter((id) => FX[id] && !FX[id].gone && mem[FX[id].on] && !gone(mem[FX[id].on].st || 'ok'));
     // 🎐 여우 신도 — 곁의 사람이 아직 재난 안에서 움직이면 말한다 (한 판에 신도 하나가 스무 마디까지)
     const FD = (run.foxd && typeof run.foxd === 'object') ? run.foxd : {};
-    const dUsed0 = (await db.get('disasterSrv/' + b.run + '/foxdUsed')) || {};
+    const dUsedRaw = (await db.get('disasterSrv/' + b.run + '/foxdUsed')) || {};
+    const dUsed0 = (Number(dUsedRaw.n) === n && dUsedRaw.used && typeof dUsedRaw.used === 'object') ? dUsedRaw.used : {};   // 장면마다 새로
     const dAlive = Object.keys(FD).filter((id) => FD[id] && isD(FD[id].k) && mem[FD[id].on] && !gone(mem[FD[id].on].st || 'ok')
         && (Number(dUsed0[id]) || 0) < CFG.FOXD_LINES);
     if (!alive.length && !dAlive.length) return { ok: false, why: 'nofox' };
@@ -1696,29 +1699,28 @@ async function foxChat(b, deps, db) {
     if (!humans.length) return { ok: false, why: 'quiet' };
     const lastKey = humans[humans.length - 1][0];
 
-    // 잠금 — 같은 판에서 한 번에 하나 · 사이 · 장면 횟수 · 이미 대답한 말
-    let took = false;
+    // 잠금 — 같은 판에서 한 번에 하나 · 사이 · 장면 횟수 · 장면 마디 · 이미 대답한 말
+    let took = false, usedLines = 0;
     for (let i = 0; i < 4 && !took; i++) {
         const { val, tag } = await db.getTag('disasterSrv/' + b.run + '/fox');
         const v = (val && typeof val === 'object') ? val : {};
         const same = Number(v.n) === n;
+        usedLines = same ? (Number(v.lines) || 0) : 0;
+        if (same && usedLines >= CFG.FOX_SCENE_LINES) return { ok: false, why: 'limit' };     // ★ 이 장면의 스무 마디를 다 썼다
         if (same && (now - (Number(v.at) || 0) < CFG.FOX_GAP_MS || (Number(v.cnt) || 0) >= CFG.FOX_PER_SCENE)) return { ok: false, why: 'busy' };
         if (same && v.key && String(v.key) >= lastKey) return { ok: false, why: 'answered' };
-        const st = await db.putIf('disasterSrv/' + b.run + '/fox', { n: n, cnt: (same ? (Number(v.cnt) || 0) : 0) + 1, at: now, key: lastKey }, tag);
+        const st = await db.putIf('disasterSrv/' + b.run + '/fox', { n: n, cnt: (same ? (Number(v.cnt) || 0) : 0) + 1, at: now, key: lastKey, lines: usedLines }, tag);
         if (st === 200) took = true;
         else if (st !== 412) return { ok: false, why: 'lock' };
     }
     if (!took) return { ok: false, why: 'busy' };
-    // 하루 한도
-    for (let i = 0; i < 4; i++) {
+    const remain = CFG.FOX_SCENE_LINES - usedLines;              // 이 장면에 남은 마디
+    // 하루 호출 — 세기만 한다 (한도는 뺐다 · 2026-10-30)
+    try {
         const path = 'disasterFox/' + kstDay(now);
         const { val, tag } = await db.getTag(path);
-        const c = Number(val) || 0;
-        if (c >= CFG.FOX_DAILY) return { ok: false, why: 'daily' };
-        const st = await db.putIf(path, c + 1, tag);
-        if (st === 200) break;
-        if (st !== 412) return { ok: false, why: 'daily' };
-    }
+        await db.putIf(path, (Number(val) || 0) + 1, tag);
+    } catch (e) { }
 
     const scene = run.scene || {};
     const kinds = alive.map((id) => FX[id].k);
@@ -1767,15 +1769,19 @@ async function foxChat(b, deps, db) {
             '[이번 장면 채팅 — 마지막 줄이 방금 한 말]', talk
         ].join('\n')
     }, chatModel(dAlive.length > 0)));
-    const nPosted = alive.length ? await postFox(db, b.run, FX, res && res.lines, n, deps.now(), alive, foxSaid.map((x) => x.t)) : 0;
-    // 🎐 신도의 말 — 신도 하나에 한 줄 · 토크 쇼 주인이 없는데 「사회자 님」이면 버린다
+    // 아기 호랑이 — 이 장면에 남은 마디 안에서 (신도 몫으로 신도 수만큼은 남겨 둔다)
+    const tigerCap = Math.max(0, Math.min(CFG.FOX_MAX_LINES, remain - Math.min(dAlive.length, 2)));
+    const tigerLines = (res && Array.isArray(res.lines)) ? res.lines.filter((x) => x && alive.indexOf(x.fox) >= 0).slice(0, tigerCap) : [];
+    const nPosted = (alive.length && tigerCap > 0) ? await postFox(db, b.run, FX, tigerLines, n, deps.now(), alive, foxSaid.map((x) => x.t)) : 0;
+    // 🎐 신도의 말 — 신도 하나에 한 줄 · 토크 쇼 주인이 없는데 「사회자 님」이면 버린다 · 장면에 남은 마디 안에서
     let dPosted = 0, caged = [];
-    if (dAlive.length) {
+    const dCap = Math.max(0, Math.min(3, remain - nPosted));
+    if (dAlive.length && dCap > 0) {
         const up = {}, used = {}, seenD = dSaid.map((x) => x.t);
         let i = 0;
         const t0 = deps.now() + 50;
         ((res && res.lines) || []).forEach((x) => {
-            if (!x || dAlive.indexOf(x.fox) < 0 || used[x.fox] || i >= 3) return;
+            if (!x || dAlive.indexOf(x.fox) < 0 || used[x.fox] || i >= dCap) return;
             const t = kitClean(x.t);
             if (!t || repeats(t, seenD) || titleBad(t, own)) return;
             seenD.push(t);
@@ -1792,13 +1798,16 @@ async function foxChat(b, deps, db) {
         } catch (e) { caged = []; }
         if (i) {
             await db.patch('disasterChat/' + b.run, up);
-            const inc = {};
-            Object.keys(used).forEach((id) => { inc[id] = (Number(dUsed0[id]) || 0) + 1; });
-            if (Object.keys(inc).length) await db.patch('disasterSrv/' + b.run + '/foxdUsed', inc);
+            const inc = { n: n };
+            Object.keys(used).forEach((id) => { inc['used/' + id] = (Number(dUsed0[id]) || 0) + 1; });
+            if (Number(dUsedRaw.n) !== n) await db.put('disasterSrv/' + b.run + '/foxdUsed', { n: n, used: {} });   // 지난 장면 몫은 지운다
+            if (Object.keys(inc).length > 1) await db.patch('disasterSrv/' + b.run + '/foxdUsed', inc);
         }
         dPosted = i;
     }
-    return { ok: true, lines: nPosted + dPosted, foxd: dPosted, caged: caged.map((x) => x.who) };
+    // 이 장면에 쓴 마디
+    if (nPosted + dPosted) { try { await db.patch('disasterSrv/' + b.run + '/fox', { n: n, lines: usedLines + nPosted + dPosted }); } catch (e) { } }
+    return { ok: true, lines: nPosted + dPosted, foxd: dPosted, caged: caged.map((x) => x.who), left: Math.max(0, remain - nPosted - dPosted) };
 }
 
 // ==========================================
