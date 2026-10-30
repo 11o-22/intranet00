@@ -1944,6 +1944,7 @@ setInterval(function () { try { if (run) followListen(); else followOff(); } cat
 const RPS = { s: ['✌️', '가위'], r: ['✊', '바위'], p: ['🖐️', '보'] };
 const RPS_BEAT = { s: 'p', r: 's', p: 'r' };            // 이것이 이긴다
 const RPS_ASK_MS = 10000, RPS_WAIT_MS = 25000, RPS_DRAWS = 3;
+const RPS_ESC_COOL = 20000;                             // ✊ 잡힌 작은 사람이 빠져나가기에 지면 이만큼 뒤에 다시
 function rpsJudge(c, h) { return c === h ? 'd' : (RPS_BEAT[c] === h ? 'c' : 'h'); }
 function rpsClose() { const e = document.getElementById('plaza-rps'); if (e) e.remove(); if (run && run.rpsT) { clearInterval(run.rpsT); run.rpsT = 0; } }
 // 고르는 창 — done(손) · 시간이 다 되면 auto 로 아무거나
@@ -2016,9 +2017,10 @@ function rpsStart(tiny, holder) {
         const w = carrierOf(tiny);
         if (!w || w.by !== holder) { sysLine('🍍 ' + nameIn(tiny) + ' 사원은 이제 ' + nameIn(holder) + ' 사원에게 없습니다.'); return; }
         const id = me + '-' + now().toString(36);
-        rpsMine = { holder: holder, tiny: tiny, id: id, ref: ref, at: now(), round: 1, k: w.k, start: w.start };
+        const escape = (tiny === me);                      // ✊ 잡힌 작은 사람이 스스로 빠져나가려 한다 (2026-10-30)
+        rpsMine = { holder: holder, tiny: tiny, id: id, ref: ref, at: now(), round: 1, k: w.k, start: w.start, escape: escape };
         const ask = function (round) {
-            rpsPick('✊ ' + esc(nameIn(tiny)) + ' 사원을 걸고 ' + esc(nameIn(holder)) + ' 사원과 가위바위보' + (round > 1 ? ' (' + round + '판째)' : ''),
+            rpsPick('✊ ' + (escape ? esc(nameIn(holder)) + ' 사원에게서 빠져나가려 가위바위보' : esc(nameIn(tiny)) + ' 사원을 걸고 ' + esc(nameIn(holder)) + ' 사원과 가위바위보') + (round > 1 ? ' (' + round + '판째)' : ''),
                 '무엇을 낼까요?', 0, function (k) {
                     if (!rpsMine || rpsMine.id !== id) return;
                     rpsMine.at = now(); rpsMine.round = round; rpsMine.cp = k;
@@ -2042,7 +2044,16 @@ function rpsStart(tiny, holder) {
             }
             if (v2.st !== 'done') return;
             const line = rpsLine(v2.cp, v2.hp);
-            if (v2.win === 'c') {
+            if (v2.win === 'c' && r.escape) {
+                // ✊ 빠져나왔다 — 든 사람이 제 기록을 걷는다 · 내가 올라간 것도 지운다
+                run.on = null; resend(); remap();
+                rpsShow('✊ 이겼습니다!', line, esc(nameIn(holder)) + ' 사원의 손에서 빠져나왔습니다.');
+                sysLine('✊ 가위바위보에 이겨 ' + nameIn(holder) + ' 사원에게서 빠져나왔습니다 (' + line + ').');
+            } else if (v2.win === 'h' && r.escape) {
+                run.escLostAt = now();
+                rpsShow('✊ 졌습니다', line, esc(nameIn(holder)) + ' 사원이 놓아주지 않습니다.' + (v2.draws >= RPS_DRAWS ? ' (세 번 비김)' : '') + '<br>' + Math.round(RPS_ESC_COOL / 1000) + '초 뒤에 다시 할 수 있습니다.');
+                sysLine('✊ 가위바위보에 져서 빠져나가지 못했습니다 (' + line + ').');
+            } else if (v2.win === 'c') {
                 // 넘겨받는다 — 든 사람보다 먼저 잡은 것으로 적어 바닥에 내려서지 않게
                 const kk = roomOn(me, r.k, tiny) ? r.k : (r.k === 'head' ? 'hand' : 'head');
                 if (roomOn(me, kk, tiny)) {
@@ -2102,8 +2113,9 @@ function rpsListen() {
         const w = carrierOf(v.tiny);
         if (!w || w.by !== me) { ref.update({ win: 'x', at: now(), st: 'done' }).catch(function () { }); return; }
         run.rpsHold = true;
-        rpsPick('✊ ' + esc(nameIn(v.by)) + ' 사원이 ' + esc(nameIn(v.tiny)) + ' 사원을 걸고 가위바위보를 걸어 왔습니다' + (v.round > 1 ? ' (' + v.round + '판째)' : ''),
-            '지면 뺏깁니다. 안 고르면 아무거나 냅니다 —', Math.round(RPS_ASK_MS / 1000), function (k) {
+        const escape = (v.by === v.tiny);                  // ✊ 잡힌 작은 사람이 빠져나가려 한다
+        rpsPick('✊ ' + (escape ? esc(nameIn(v.tiny)) + ' 사원이 빠져나가려 가위바위보를 걸어 왔습니다' : esc(nameIn(v.by)) + ' 사원이 ' + esc(nameIn(v.tiny)) + ' 사원을 걸고 가위바위보를 걸어 왔습니다') + (v.round > 1 ? ' (' + v.round + '판째)' : ''),
+            (escape ? '지면 놓아줘야 합니다.' : '지면 뺏깁니다.') + ' 안 고르면 아무거나 냅니다 —', Math.round(RPS_ASK_MS / 1000), function (k) {
                 const res = rpsJudge(v.cp, k);
                 const draws = (Number(v.draws) || 0) + (res === 'd' ? 1 : 0);
                 const line = rpsLine(k, v.cp);                     // 내 손 : 상대 손
@@ -2121,10 +2133,14 @@ function rpsListen() {
                     run.rpsLost = run.rpsLost || {};
                     run.rpsLost[v.tiny] = now();                   // 내 기록에서 저절로 걷힐 때 알림을 또 내지 않게
                     run.dn = run.dn || {}; run.dn[v.tiny] = now(); // 스스로 올라왔던 것도 이때까지 것은 무효
-                    resend();
+                    if (escape) run.carry = listOf(run.carry).filter(function (x) { return x.c !== v.tiny; });   // 놓아준다
+                    resend(); if (escape) remap();
                 }
                 ref.update({ hp: k, win: win, draws: draws, at: now(), st: 'done' }).catch(function () { });
-                if (win === 'c') {
+                if (win === 'c' && escape) {
+                    rpsShow('✊ 졌습니다', line, esc(nameIn(v.tiny)) + ' 사원이 빠져나갔습니다.');
+                    sysLine('✊ 가위바위보에 져서 ' + nameIn(v.tiny) + ' 사원을 놓아주었습니다 (' + line + ').');
+                } else if (win === 'c') {
                     rpsShow('✊ 졌습니다', line, esc(nameIn(v.tiny)) + ' 사원을 ' + esc(nameIn(v.by)) + ' 사원에게 뺏겼습니다.');
                     sysLine('✊ 가위바위보에 져서 ' + nameIn(v.tiny) + ' 사원을 ' + nameIn(v.by) + ' 사원에게 뺏겼습니다 (' + line + ').');
                 } else {
@@ -2393,8 +2409,17 @@ function carryTap(cx, cy) {
             if (w && w.k === k) return false;                         // 지금 서 있는 곳은 빼고
             return roomOn(big, k, me);
         }).map(function (k) { return [k, CLIMB_WORD[k]]; });
+        // ✊ 나를 든 사람 — 가위바위보로 빠져나간다 (2026-10-30 사용자 · 잡힌 작은 사람의 길)
+        if (w && w.by === big) {
+            if (run.escLostAt && now() - run.escLostAt < RPS_ESC_COOL) items.push(['rpsx', '✊ 가위바위보 (' + Math.ceil((RPS_ESC_COOL - (now() - run.escLostAt)) / 1000) + '초 뒤)']);
+            else items.push(['rps', '✊ 가위바위보로 빠져나가기']);
+        }
         if (!items.length) { sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.'); return true; }
-        return openMenu(cx, cy, nameIn(big), items, function (k) { climbDo(big, k); });
+        return openMenu(cx, cy, nameIn(big), items, function (k) {
+            if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
+            if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
+            climbDo(big, k);
+        });
     }
     // 보통 사람이 작은 사람을 — 손에 든다 · 머리에 얹는다 · 내려놓는다
     const pick = tinyAt(cx, cy);
