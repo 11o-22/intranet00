@@ -13356,6 +13356,21 @@ function tetDrop() {
     tetLock();
     tetDraw();
 }
+// ★ 모바일 ▼ — 한 칸 내리기 (2026-10-30 사용자 요청 · 전에는 바로 떨어뜨렸다). 누르고 있으면 빠르게 이어서 내려간다.
+//   블록이 바닥에 닿아 새 블록이 나오면 멈춘다 — 다음 블록까지 떨어지지 않게. 바로 떨어뜨리기는 홀드 옆 「드롭」 단추.
+let tetSoftTimer = null;
+function tetSoftStart() {
+    tetSoftEnd();
+    if (!tet || tet.over) return;
+    tetTick();
+    tetSoftTimer = setInterval(function () {
+        if (!tet || tet.over) { tetSoftEnd(); return; }
+        const y = tet.pos.y;
+        tetTick();
+        if (!tet || tet.over || tet.pos.y <= y) tetSoftEnd();      // 잠겼다(새 블록) — 멈춘다
+    }, 65);
+}
+function tetSoftEnd() { if (tetSoftTimer) { clearInterval(tetSoftTimer); tetSoftTimer = null; } }
 
 function tetKey(e) {
     if (!tet || tet.over) return;

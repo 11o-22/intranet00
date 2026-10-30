@@ -228,10 +228,11 @@
     <button class="game-btn" style="margin:0; padding:16px 20px; font-size:17px;" ontouchstart="event.preventDefault(); tetMove(-1);" onclick="tetMove(-1)">◀</button>
     <button class="game-btn" style="margin:0; padding:16px 20px; font-size:17px;" ontouchstart="event.preventDefault(); tetRotate();" onclick="tetRotate()">↻</button>
     <button class="game-btn" style="margin:0; padding:16px 20px; font-size:17px;" ontouchstart="event.preventDefault(); tetMove(1);" onclick="tetMove(1)">▶</button>
-    <button class="game-btn" style="margin:0; padding:16px 20px; font-size:17px;" ontouchstart="event.preventDefault(); tetDrop();" onclick="tetDrop()">▼</button>
+    <button class="game-btn" style="margin:0; padding:16px 20px; font-size:17px;" title="한 칸 내리기 (↓)" ontouchstart="event.preventDefault(); tetSoftStart();" ontouchend="tetSoftEnd();" ontouchcancel="tetSoftEnd();" onclick="tetTick()">▼</button>
 </div>
-<div style="display:flex; justify-content:center; margin-top:10px;">
+<div style="display:flex; justify-content:center; gap:10px; margin-top:10px;">
     <button class="game-btn" style="margin:0; padding:12px 26px; font-size:12px; background:linear-gradient(145deg,#2a4a5a,#152830) !important; border-color:#3a6a7a !important; color:#7fd4d4 !important;" ontouchstart="event.preventDefault(); tetHold();" onclick="tetHold()">홀드 (C)</button>
+    <button class="game-btn" style="margin:0; padding:12px 26px; font-size:12px; background:linear-gradient(145deg,#5a2a2a,#301515) !important; border-color:#7a3a3a !important; color:#ffb4a8 !important;" ontouchstart="event.preventDefault(); tetDrop();" onclick="tetDrop()">⤓ 드롭 (Space)</button>
 </div>
 
         <div id="tetris-msg" style="font-size:12px; color:#aaa; margin-top:14px; min-height:20px; line-height:1.7;"></div>
