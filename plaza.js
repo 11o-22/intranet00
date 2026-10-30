@@ -4617,11 +4617,12 @@ function chatBox() {
     const inp = s.querySelector('#plaza-in2');
     const go = function () { say(inp.value); inp.value = ''; };
     inp.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); go(); }
+        if (e.key === 'Enter') { if (e.isComposing || e.keyCode === 229) return; e.preventDefault(); go(); }   // 한글 조합 중의 Enter 는 자판 것 (2026-10-30)
     });
     s.querySelector('#plaza-go').onclick = go;
     chPaint();
     paintLog();
+    chatHistPush();                 // ★ 물리 뒤로가기 → 이 창만 닫힌다 (2026-10-30 사용자)
     setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
 }
 
@@ -4823,12 +4824,41 @@ function sheetOpen(kind) {
     return kind ? (s.dataset.kind === kind) : true;
 }
 
-function closeSheet() {
+function closeSheet(fromBack) {
     const s = document.getElementById('plaza-sheet');
+    const wasChat = !!(s && s.dataset && s.dataset.kind === 'chat');
     if (s) s.remove();
     mapShow(true);
     if (run) { run.ax = 0; run.ay = 0; run.keys = {}; }
+    if (wasChat && fromBack !== true) chatHistPop();        // 닫기 단추 · 바깥 누르기로 닫혔다 — 밀어 둔 칸을 뺀다
 }
+// ★ 물리 뒤로가기 — 채팅(아래 바의 입력칸 · 채팅 창)이 열려 있으면 **그것만** 닫힌다 (2026-10-30 사용자)
+//   전에는 광장이 집(shell.js)이라 뒤로가기가 그대로 앱을 끝냈다. 열 때 히스토리를 한 칸 밀고, 닫힐 때 뺀다.
+let chatHist = false, chatHistSelf = false;
+function chatHistPush() {
+    if (chatHist) return;
+    try { history.pushState({ plazaChat: 1 }, '', ''); chatHist = true; } catch (e) { }
+}
+function chatHistPop() {
+    if (!chatHist) return;
+    chatHist = false; chatHistSelf = true;
+    try { history.back(); } catch (e) { chatHistSelf = false; }
+    setTimeout(function () { chatHistSelf = false; }, 400);
+}
+try {
+    window.addEventListener('popstate', function () {
+        if (chatHistSelf) { chatHistSelf = false; return; }
+        if (!chatHist) return;
+        chatHist = false;                                   // 칸은 이미 빠졌다
+        const sheetChat = sheetOpen('chat');
+        if (sheetChat) closeSheet(true);
+        const bar = document.getElementById('plaza-bar');
+        if (bar && bar.classList.contains('typing') && run && typeof run.barBack === 'function') {
+            if (sheetChat) chatHistPush();                  // 창을 닫았는데 입력칸도 열려 있다 — 다음 뒤로가기 몫을 다시 민다
+            else run.barBack(true);
+        }
+    });
+} catch (e) { }
 
 //   바깥(어두운 자리)을 누르면 닫힌다. 안쪽을 눌러도 안 닫힌다.
 function sheet(kind, title, inner) {
@@ -5081,19 +5111,28 @@ function chatSheet() {
     bar.innerHTML = '<input id="plaza-in" maxlength="' + P.SAY_MAX + '" enterkeyhint="send">';
     const inp = bar.querySelector('#plaza-in');
     chPaint();                      // 적는 칸에 「서버/맵」 어느 쪽인지 적어 준다
-    const back = function () {
+    const back = function (fromBack) {
         if (!bar.classList.contains('typing')) return;
         bar.classList.remove('typing');
         bar.innerHTML = keep;
+        if (run) run.barBack = null;
         paintBar((run && run.lines || []).slice(-1)[0]);
+        if (fromBack !== true) chatHistPop();
     };
+    if (run) run.barBack = back;
+    chatHistPush();                 // ★ 물리 뒤로가기 → 입력칸만 접힌다 (2026-10-30 사용자)
     inp.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); sendSay(); inp.value = ''; }
+        if (e.key === 'Enter') { if (e.isComposing || e.keyCode === 229) return; e.preventDefault(); sendSay(); inp.value = ''; }   // 한글 조합 중의 Enter 는 자판 것
         else if (e.key === 'Escape') { e.preventDefault(); back(); }
     });
     // 적다 만 글이 없을 때만 접는다 (자판이 닫혔다고 글을 버리지 않는다)
+    // ★ 한/영 전환 · 자판 갈아 끼우기로 잠깐 초점이 빠졌다 돌아오는 때는 접지 않는다 (2026-10-30 · 어떤 자판은 한글로 바꾸는 순간 blur 가 나서 칸이 닫혔다)
     inp.addEventListener('blur', function () {
-        setTimeout(function () { if (!inp.value.trim()) back(); }, 150);
+        setTimeout(function () {
+            if (document.activeElement === inp) return;
+            if (!bar.contains(inp)) return;
+            if (!inp.value.trim()) back();
+        }, 450);
     });
     setTimeout(function () { try { inp.focus(); } catch (e) { } }, 40);
 }
@@ -5615,7 +5654,8 @@ function open() {
     run.onKey = function (e) {
         if (!run) return;
         if (document.activeElement && document.activeElement.id === 'plaza-in') {
-            if (e.key === 'Enter') sendSay();
+            // ★ Enter 는 입력칸 자신의 keydown 이 보낸다 (chatSheet) — 여기서 또 보내면 한글 조합 중(keyCode 229 · isComposing)의
+            //   Enter 까지 잡아 조합 중인 글을 보내거나 비웠다 (2026-10-30 · 어떤 자판에서는 한글을 아예 못 쓰는 것으로 보였다)
             return;
         }
         // ★ 게시판 같은 다른 창에서 글을 치는 중에는 안 걷는다 (a·d·w·s 가 글자다)

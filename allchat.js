@@ -252,7 +252,7 @@ window.openAllChat = function () {
             + ' placeholder="사내 전체에 보냅니다…" style="flex:1; min-width:0; font-size:12px; padding:9px;'
             + ' background:var(--sk-base, #0a0a0a); color:var(--sk-text, #ddd);'
             + ' border:1px solid var(--sk-edge-soft, #333); border-radius:5px;"'
-            + ' onkeypress="if(event.key===\'Enter\') sendAllChat()">'
+            + ' onkeypress="if(event.key===\'Enter\' && !event.isComposing) sendAllChat()">'
             + '<button class="game-btn" style="margin:0; padding:9px 15px; font-size:11px; flex-shrink:0;'
             + ' background:var(--sk-tab, #222); border:1px solid var(--sk-edge, #444);'
             + ' color:var(--sk-accent-text, #d4af37);"'
