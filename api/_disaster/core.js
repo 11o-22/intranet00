@@ -271,8 +271,19 @@ async function ask(deps, o) {
 const SONNET_OPT = { thinking: { type: 'between_tools' }, effort: 'medium' };
 const HAIKU_OPT = { thinking: { type: 'disabled' }, effort: 'low' };
 // 🎐 여우 신도가 끼는 채팅은 더 좋은 모델로 (2026-10-30 사용자 — 빠른 모델이 같은 말만 되풀이했다)
-const FOXD_OPT = { model: CFG.SONNET, thinking: { type: 'disabled' }, effort: 'medium' };
-function chatModel(hasD) { return hasD ? FOXD_OPT : Object.assign({ model: CFG.HAIKU }, HAIKU_OPT); }
+//   ★ Sonnet 5.5 는 thinking 'disabled' 를 400 으로 거절한다 — 가장 낮은 설정은 'between_tools' (문서 · 2026-10-30 저녁 신도가 말을 안 해서 고침)
+const FOXD_OPT = { model: CFG.SONNET, thinking: { type: 'between_tools' }, effort: 'medium' };
+const HAIKU_FULL = Object.assign({ model: CFG.HAIKU }, HAIKU_OPT);
+function chatModel(hasD) { return hasD ? FOXD_OPT : HAIKU_FULL; }
+// 채팅 호출 — 좋은 모델이 거절하면(400 · 과부하) 빠른 모델로 한 번 더. 말이 끊기는 것보다 낫다
+async function askChat(deps, o) {
+    try { return await ask(deps, o); }
+    catch (e) {
+        if (o.model === CFG.HAIKU) throw e;
+        console.warn('[채팅] ' + o.model + ' 실패 → haiku 로 다시:', e && e.message);
+        return ask(deps, Object.assign({}, o, HAIKU_FULL));
+    }
+}
 
 function obj(props) {
     return { type: 'object', properties: props, required: Object.keys(props), additionalProperties: false };
@@ -1751,7 +1762,7 @@ async function foxChat(b, deps, db) {
     const dSaid = keys.map((k) => chatAll[k]).filter((x) => x && x.foxd && typeof x.t === 'string').slice(-24);
     // 사회자 · 브라운 호칭 — 토크 쇼를 가진 사람이 판에 있을 때만
     const own = dAlive.length ? await showOwners(db, people.concat(loverCodes(FD, dAlive))) : {};
-    const res = await ask(deps, Object.assign({
+    const res = await askChat(deps, Object.assign({
         max: dAlive.length ? 900 : 700, schema: dAlive.length ? SCHEMA_FOXD : SCHEMA_FOX,
         system: [alive.length ? foxChatRule(kinds) : '', dAlive.length ? foxdChatRule(dAlive.map((id) => FD[id].k), 'disaster') : ''].filter(Boolean).join('\n\n'),
         user: [
@@ -2189,7 +2200,7 @@ async function kitCall(b, deps, db) {
         const mems = await kitMems(db, come.filter((id) => !isD(want[id].k)));
         const ppl = [{ c: c, n: nm }].concat(near);
         if (come.concat(others).some((id) => isD(on2[id].k))) own = await showOwners(db, peopleTop(rows, ppl).top.concat(loverCodes(on2, come.concat(others))));
-        const res = await ask(deps, Object.assign({
+        const res = await askChat(deps, Object.assign({
             max: 900, schema: SCHEMA_KIT,
             system: kitSys(on2, come.concat(others)),
             user: [
@@ -2270,7 +2281,7 @@ async function kitChat(b, deps, db) {
     if (live.length) {
         try {
             const mems = await kitMems(db, live.filter((id) => !isD(onAll[id].k)));
-            res = await ask(deps, Object.assign({
+            res = await askChat(deps, Object.assign({
                 max: 900, schema: hasD ? SCHEMA_FOXD : SCHEMA_KIT,
                 system: kitSys(onAll, live),
                 user: [
@@ -2433,7 +2444,7 @@ async function foxdRun(b, deps, db) {
         let lines = [];
         if (await foxdSpend(db, day)) {
             try {
-                const res = await ask(deps, Object.assign({
+                const res = await askChat(deps, Object.assign({
                     max: 700, schema: SCHEMA_KIT,
                     system: foxdChatRule(mine.map((id) => D[id].k), 'run'),
                     user: head.concat([
@@ -2485,7 +2496,7 @@ async function foxdRun(b, deps, db) {
     const fresh = humans.filter((x) => (Number(x.at) || 0) > prevHat).slice(-20);
     let res = null;
     try {
-        res = await ask(deps, Object.assign({
+        res = await askChat(deps, Object.assign({
             max: 800, schema: SCHEMA_FOXD,
             system: foxdChatRule(live.map((id) => D[id].k), 'run'),
             user: head.concat([
