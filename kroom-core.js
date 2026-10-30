@@ -591,7 +591,9 @@ function profOf(k, u, a) {
 }
 function nextAttr(k, u) {
     const open = openList(k, u);
-    return heldAttrs(u).filter(function (a) { return open.indexOf(a) < 0; })[0] || null;
+    // 🔥 재난의 길을 걷는 사원은 전용 장비에 없는 속성도 연다 — 열 가지 전부 (2026-10-30)
+    const pool = onPath(k) ? Object.keys(ATTR) : heldAttrs(u);
+    return pool.filter(function (a) { return open.indexOf(a) < 0; })[0] || null;
 }
 function canOpenAttr(k, u) {
     const open = openList(k, u);
@@ -668,7 +670,7 @@ function attrAsk() {
     const a = nextAttr(k, u), c = curAttr(k, u);
     show('속성', `탁자 너머에 문이 하나 더 있다. 아까까지는 벽이었다.<br><br>
         ${ATTR[c] ? ATTR[c].i + ' ' + ATTR[c].n + '은(는) 끝까지 걸었다. ' : ''}문틈으로 다른 결이 새어 든다.<br>
-        <b style="color:#fff;">${ATTR[a].i} ${ATTR[a].n}</b> <span style="font-size:11px; color:#888;">— 전용 장비 ${nthOf(u, a)} 속성</span><br><br>
+        <b style="color:#fff;">${ATTR[a].i} ${ATTR[a].n}</b> <span style="font-size:11px; color:#888;">— ${heldAttrs(u).indexOf(a) >= 0 ? '전용 장비 ' + nthOf(u, a) + ' 속성' : '🔥 재난의 길 — 전용 장비에 없는 속성'}</span><br><br>
         <span style="font-size:11px; color:#8fb8c4; line-height:1.8;">열면 그 속성의 직업 카드를 새로 고르고 <b>D · Lv 1</b> 부터 시작합니다.<br>
         지금까지 키운 속성은 그대로 남아, 다음부터 문 앞에서 골라 들어갈 수 있습니다.</span>`,
         darkChoiceBtn('문을 연다. — ' + ATTR[a].i + ' ' + ATTR[a].n + ' D · Lv 1', 'kroomAttrOpen()')
@@ -723,6 +725,7 @@ window.kroomAttrPick = function (a) {
 function mainSwap(k, u) {
     const m = mainAttr(u);
     if (!m || !k) return null;
+    if (onPath(k)) return null;                           // 🔥 재난의 길 — 장비의 첫 속성에 매이지 않는다 (2026-10-30)
     const open = openList(k, u);
     if (open.indexOf(m) >= 0) return null;                // 새 첫 속성의 자리가 이미 있다
     const held = heldAttrs(u);
@@ -789,6 +792,8 @@ function afterMain() {
     const u = me();
     const goOn = function () { if (!prof(u).job) cardPick(); else afterJob(); };
     attrGate(function () {
+        // 🔥 재난의 길 — 상담사가 지정했으면 붉은 카드 (2026-10-30). 들어서면 문(속성)을 다시 묻는다 — 바로 새 속성을 열 수 있게
+        if (pathOffered()) { pathPopup(function (went) { if (went) attrGate(goOn); else goOn(); }); return; }
         if (hiddenOffered()) { hiddenPopup(goOn); return; }
         goOn();
     });
@@ -3501,6 +3506,7 @@ setInterval(function () {
 const H_NODE = 'kroomHidden';
 let hMine = null, hMineRef = null, hMineCode = '';
 let hAll = {}, hAllOn = false, hSwept = false;
+let hTaken = { key: '', at: 0, by: '', busy: false };   // 사원 쪽 — 내 히든 직업을 누가 이미 받았나 (한 번 읽어 둔 것)
 // 상담사가 켜 둔 동안 1분마다 한 번 더 훑는다
 setInterval(function () { try { if (hAllOn) hiddenSweep(); } catch (e) { } }, 60000);
 // ★ 히든 직업은 한 사람에 하나 (2026-10-25) — 열린 속성 중 어느 하나라도 히든 직업을 받았으면
@@ -3545,6 +3551,16 @@ function hiddenCheck() {
     //   적힌 것을 새 속성의 「조건 달성」으로 다시 쓴다 (지정돼 있었어도 — 상담사가 새 직업으로 다시 정한다)
     const moved = !!(hMine && hMine.state && hMine.attr && hMine.attr !== a && hMine.state !== 'accepted' && hMine.state !== 'L');
     if (k.hiddenAsk && !moved) return;
+    // ★ 같은 히든 직업을 누가 이미 받았으면 올리지 않는다 (2026-10-30 사용자) — 서버를 한 번 읽어 10분 동안 기억한다
+    if (hTaken.key === key && now() - hTaken.at < 600000) { if (hTaken.by) return; }
+    else {
+        if (!hTaken.busy) {
+            hTaken.busy = true;
+            d.ref(H_NODE).once('value').then(function (s) { hTaken = { key: key, at: now(), by: hiddenTakenBy(key, u.code, s.val() || {}), busy: false }; })
+                .catch(function () { hTaken.busy = false; });
+        }
+        return;                                           // 읽은 뒤 다음 번에
+    }
     k.hiddenAsk = now();
     saveProf();
     const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), attr: a, key: key,
@@ -3575,8 +3591,20 @@ function hLive(c) {
     const k = book[c] && book[c].kroom;
     return (k && typeof k === 'object' && !stale(k) && k.job && JOBS[k.job]) ? k : null;
 }
+// ★ 같은 히든 직업을 누가 이미 받았나 (2026-10-30 사용자 — 히든 직업마다 한 사람) · 받은 사람 이름, 없으면 ''
+function hiddenTakenBy(key, exceptCode, book_) {
+    const all = book_ || hAll || {};
+    if (!key) return '';
+    const c = Object.keys(all).filter(function (x) {
+        const w = all[x] || {};
+        return x !== exceptCode && w.key === key && (w.state === 'accepted' || w.state === 'L');
+    })[0];
+    return c ? ((all[c] || {}).name || c) : '';
+}
 function hMeets(c, v) {
     const k = hLive(c);
+    const key = (v && v.key) || (k ? hiddenKeyFor(JOBS[k.job][0], (typeof db !== 'undefined' && db.users) ? db.users[c] : null) : null);
+    if (hiddenTakenBy(key, c)) return false;                 // 이미 주인이 있는 직업 — 뜨지 않는다
     if (k) return hiddenProgress(k).ok;
     const jx = (v && v.jx) || {};
     return HIDDEN_NEED.jxGrades.every(function (g) { return (jx[g] || 0) >= HIDDEN_NEED.jx; }) && ((v && v.hq) || 0) >= HIDDEN_NEED.hq;
@@ -3603,7 +3631,7 @@ function hiddenSweep() {
             if (!cur || cur.state !== 'ready') return;
             return null;
         }).then(function (res) {
-            if (res && res.committed) console.log('[히든 직업] ' + ((w && w.name) || h.name || c) + ' — 지금 조건(갈림길 ' + HIDDEN_NEED.jx + '번)이 안 차 목록에서 거뒀습니다.');
+            if (res && res.committed) console.log('[히든 직업] ' + ((w && w.name) || h.name || c) + ' — ' + (hiddenTakenBy(h.key, c) ? '이미 ' + hiddenTakenBy(h.key, c) + ' 사원이 받은 직업이라' : '지금 조건(갈림길 ' + HIDDEN_NEED.jx + '번)이 안 차') + ' 목록에서 거뒀습니다.');
         }).catch(function () { });
     });
     Object.keys(book).forEach(function (c) {
@@ -3615,6 +3643,7 @@ function hiddenSweep() {
         if (!hiddenProgress(k).ok) return;
         const a = JOBS[k.job][0], key = hiddenKeyFor(a, w);
         if (!key) return;
+        if (hiddenTakenBy(key, c)) return;                      // 이미 주인이 있는 직업 — 올리지 않는다 (2026-10-30)
         // ★ 적혀 있는데 지금 속성과 다르다 — 새 속성으로 다시 올린다 (2026-10-27 · 전직한 사람은 그대로)
         const moved = !!(h && h.state && h.attr && h.attr !== a && h.state !== 'accepted' && h.state !== 'L');
         if (h && h.state && !moved) return;
@@ -3869,6 +3898,10 @@ window.kroomHiddenAct = function (code, act) {
     const v = hAll[code]; if (!v) return;
     let up = null;
     // 이미 다른 속성으로 히든 직업을 받은 사원에게는 지정하지 않는다 (2026-10-25)
+    if (act === 'offer' && hiddenTakenBy(v.key, code)) {
+        try { showCustomAlert(v.job + ' 은(는) 이미 ' + hiddenTakenBy(v.key, code) + ' 사원이 받았습니다.\n\n히든 직업은 직업마다 한 사람입니다.'); } catch (e) { }
+        return;
+    }
     if (act === 'offer' && !hMeets(code, v)) {
         try { showCustomAlert((v.name || code) + ' 사원은 지금 조건을 채우지 못했습니다.\n\n갈림길 D · C · B · A 등급마다 ' + HIDDEN_NEED.jx + '번 · 임무 ' + HIDDEN_NEED.hq + '번'
             + (hJxNow(code) ? '\n지금 갈림길 ' + hJxNow(code) : '')); } catch (e) { }
@@ -3938,6 +3971,335 @@ window.kroomHiddenState = function (who) {
 // ==========================================
 // 콘솔
 // ==========================================
+// ==========================================
+// 11. 🔥 재난의 길 — 세 속성을 끝까지 걸은 사원에게 (2026-10-30 사용자)
+// ==========================================
+//   kroomPath/<사번> = { state, code, name, no, lvs: { 속성: Lv }, at, offeredAt, offeredBy, answeredAt }
+//     state  ready     조건을 채웠다 — 상담사에게 알림 (통제 콘솔 「재난의 길 관리」)
+//            offered   상담사가 지정했다 — 다음에 K 의 방에 들어설 때 붉은 카드 『 재난의 길로 들어서겠습니까? 』
+//            accepted  들어섰다 (kroom.path = { at })     declined  사원이 거절했다     denied  상담사가 주지 않기로 했다
+//   ■ 조건 — 열린 속성 가운데 세 개가 최고 Lv (보통 100 · 히든 120 → 합 300).
+//            히든 직업을 받은 사원은 목록에 오르지 않는다. 한 사람에 한 번 — 들어선 사람은 끝.
+//   ■ 걷는 사람 — 전용 장비에 없는 속성도 문 앞에서 연다 (nextAttr · 열 가지 전부 · 속성마다 Lv 100 까지).
+//            장비의 첫 속성이 바뀌어도 배역을 묻지 않는다 (mainSwap).
+const P_NODE = 'kroomPath';
+const PATH_NEED = 3;
+const PATH_NAME = '재난의 길';
+let pMine = null, pMineRef = null, pMineCode = '';
+let pAll = {}, pAllOn = false, pSwept = false;
+function onPath(k) { return !!(k && typeof k === 'object' && k.path && k.path.at); }
+function pathFull(k, u) {
+    return openList(k, u).filter(function (a) { const p = profOf(k, u, a); return p && (p.lv || 1) >= LV_MAX; });
+}
+function pathLvs(k, u) {
+    const o = {};
+    openList(k, u).forEach(function (a) { const p = profOf(k, u, a); o[a] = (p && p.lv) || 1; });
+    return o;
+}
+// 히든 직업을 받았나 — K 의 방 기록(지금 · 접어 둔 속성) 과 kroomHidden 둘 다 본다
+function pathHadHidden(k, h) { return hadHidden(k) || !!(h && (h.state === 'accepted' || h.state === 'L')); }
+function pathEligible(k, u, h) {
+    if (!k || typeof k !== 'object' || stale(k) || onPath(k)) return false;
+    if (pathHadHidden(k, h)) return false;
+    return pathFull(k, u).length >= PATH_NEED;
+}
+window.kroomOnPath = function (u) { return onPath(prof(u || me())); };
+
+// 사원 쪽 — 조건을 채우면 한 번 올린다
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d) return;
+    if (pMineCode === u.code) return;
+    try { if (pMineRef) pMineRef.off(); } catch (e) { }
+    pMineCode = u.code; pMine = null;
+    pMineRef = d.ref(P_NODE + '/' + u.code);
+    pMineRef.on('value', function (s) { pMine = s.val() || null; });
+}, 1500);
+function pathCheck() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code === ADMIN) return;
+    const k = prof(u);
+    if (pMine && pMine.state) return;                        // 이미 적혀 있다 (지정 · 거절 · 미지정 · 들어섬)
+    if (k.pathAsk) return;
+    if (!pathEligible(k, u, hMine)) return;
+    k.pathAsk = now();
+    saveProf();
+    const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), lvs: pathLvs(k, u), at: now() };
+    d.ref(P_NODE + '/' + u.code).transaction(function (cur) { return (cur && cur.state) ? undefined : entry; }).catch(function () { });
+    addHistoryLog(u, '[K 의 방] 세 갈래 길이 끝났다. 발밑이 뜨겁다.');
+    try { saveFields({ history: 1 }); } catch (e) { }
+}
+setInterval(function () { try { if (me() && !kr) pathCheck(); } catch (e) { } }, 20000);
+
+function pathOffered() {
+    const k = prof();
+    return !!(pMine && pMine.state === 'offered' && k && !onPath(k) && !pathHadHidden(k, hMine));
+}
+
+// 붉은 카드 — 『 재난의 길로 들어서겠습니까? 』
+function pathCss() {
+    if (document.getElementById('kpath-css')) return;
+    const st = document.createElement('style');
+    st.id = 'kpath-css';
+    st.textContent = [
+        '#kpath-ov{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;',
+        '  padding:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,rgba(70,8,8,.94) 0%,rgba(18,4,4,.97) 45%,rgba(6,1,2,.99) 80%);',
+        '  animation:kpathFade 1.2s ease both;}',
+        '#kpath-ov .kpath-ember{position:absolute;bottom:-10px;width:3px;height:3px;border-radius:50%;background:#ffb08a;',
+        '  box-shadow:0 0 6px #ff5a3c,0 0 12px rgba(255,90,60,.6);opacity:0;animation:kpathRise linear infinite;pointer-events:none;}',
+        '#kpath-ov .kpath-ring{position:absolute;width:330px;height:330px;border-radius:50%;top:50%;left:50%;margin:-215px 0 0 -165px;',
+        '  border:1px solid rgba(255,90,60,.22);box-shadow:0 0 60px rgba(255,60,40,.14) inset;animation:kpathSpin 40s linear infinite;pointer-events:none;}',
+        '#kpath-ov .kpath-ring:after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px dashed rgba(255,110,80,.16);}',
+        '#kpath-ov .kpath-card{position:relative;width:168px;aspect-ratio:2/3;border-radius:14px;display:flex;flex-direction:column;',
+        '  align-items:center;justify-content:center;background:linear-gradient(155deg,#4a0a0a 0%,#1c0404 52%,#3a0808 100%);',
+        '  border:2px solid #ff6a4a;box-shadow:0 0 18px rgba(255,80,50,.8),0 0 60px rgba(255,40,30,.4),inset 0 0 24px rgba(255,120,90,.3);',
+        '  animation:kpathIn 1.7s cubic-bezier(.2,.8,.2,1) both,kpathGlow 2.4s ease-in-out 1.7s infinite;}',
+        '#kpath-ov .kpath-card:before{content:"";position:absolute;inset:7px;border-radius:9px;border:1px solid rgba(255,140,110,.4);}',
+        '#kpath-ov .kpath-card:after{content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;',
+        '  background:linear-gradient(115deg,transparent 32%,rgba(255,200,180,.4) 50%,transparent 68%);background-size:260% 100%;',
+        '  animation:kpathSheen 3.6s ease-in-out 1.7s infinite;}',
+        '#kpath-ov .kpath-tag{position:absolute;top:16px;font-size:9px;letter-spacing:6px;color:#ff9a7a;}',
+        '#kpath-ov .kpath-ico{font-size:44px;text-shadow:0 0 14px #ff5a3c,0 0 30px rgba(255,80,40,.7);}',
+        '#kpath-ov .kpath-nm{margin-top:12px;font-size:20px;letter-spacing:5px;color:#ffe3da;text-shadow:0 0 10px rgba(255,90,60,.9);',
+        '  font-family:"Nanum Myeongjo","Noto Serif KR",serif;font-weight:bold;}',
+        '#kpath-ov .kpath-at{position:absolute;bottom:16px;font-size:10px;letter-spacing:3px;color:#d07060;}',
+        '#kpath-ov .kpath-q{margin-top:30px;font-size:17px;letter-spacing:3px;color:#ffd0c4;text-align:center;line-height:1.7;',
+        '  text-shadow:0 0 12px rgba(255,80,50,.8);font-family:"Nanum Myeongjo","Noto Serif KR",serif;animation:kpathFade 1.4s ease 1.3s both;}',
+        '#kpath-ov .kpath-note{margin-top:10px;font-size:11px;color:#c49a90;text-align:center;line-height:1.7;animation:kpathFade 1.4s ease 1.8s both;}',
+        '#kpath-ov .kpath-btns{display:flex;gap:10px;margin-top:22px;animation:kpathFade 1.4s ease 2.2s both;}',
+        '#kpath-ov .kpath-btns button{padding:11px 22px;border-radius:999px;font-size:13px;cursor:pointer;font-family:inherit;}',
+        '#kpath-ov .kpath-yes{background:linear-gradient(145deg,#e0503a,#8a1e12);color:#fff1ec;font-weight:bold;border:1px solid #ff8a6a;',
+        '  box-shadow:0 0 16px rgba(255,80,50,.6);}',
+        '#kpath-ov .kpath-no{background:rgba(0,0,0,.25);color:#b08a80;border:1px solid #5a2a22;}',
+        '#kpath-ov.done .kpath-card{animation:kpathBurst 1.2s ease both;}',
+        '@keyframes kpathFade{from{opacity:0}to{opacity:1}}',
+        '@keyframes kpathIn{0%{transform:translateY(40px) rotateY(180deg) scale(.55);opacity:0;filter:brightness(3)}',
+        '  55%{opacity:1}100%{transform:none;opacity:1;filter:none}}',
+        '@keyframes kpathGlow{0%,100%{box-shadow:0 0 18px rgba(255,80,50,.8),0 0 60px rgba(255,40,30,.4),inset 0 0 24px rgba(255,120,90,.3)}',
+        '  50%{box-shadow:0 0 32px rgba(255,110,80,1),0 0 110px rgba(255,50,30,.6),inset 0 0 36px rgba(255,140,110,.45)}}',
+        '@keyframes kpathSheen{0%{background-position:160% 0}100%{background-position:-60% 0}}',
+        '@keyframes kpathRise{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.95}100%{transform:translateY(-112vh) translateX(-24px);opacity:0}}',
+        '@keyframes kpathSpin{to{transform:rotate(-360deg)}}',
+        '@keyframes kpathBurst{0%{filter:brightness(1)}35%{filter:brightness(2.6);transform:scale(1.08)}100%{filter:brightness(1.2);transform:scale(1)}}'
+    ].join('\n');
+    document.head.appendChild(st);
+}
+function pathPopup(cont) {
+    const u = me(), k = prof(u);
+    pathCss();
+    const old = document.getElementById('kpath-ov'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'kpath-ov';
+    let ember = '';
+    for (let i = 0; i < 34; i++) {
+        ember += '<i class="kpath-ember" style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-duration:'
+            + (5 + Math.random() * 8).toFixed(1) + 's;animation-delay:' + (Math.random() * 8).toFixed(1) + 's;"></i>';
+    }
+    const full = pathFull(k, u);
+    ov.innerHTML = ember + '<div class="kpath-ring"></div>'
+        + '<div class="kpath-card"><div class="kpath-tag">DISASTER</div>'
+        + '<div class="kpath-ico">🔥</div>'
+        + '<div class="kpath-nm">' + esc(PATH_NAME) + '</div>'
+        + '<div class="kpath-at">' + full.map(function (a) { return ATTR[a].i; }).join(' ') + '</div></div>'
+        + '<div class="kpath-q">『 ' + esc(PATH_NAME) + '로 들어서겠습니까? 』</div>'
+        + '<div class="kpath-note">' + full.map(function (a) { return ATTR[a].n; }).join(' · ') + ' — 세 갈래를 끝까지 걸었다.<br>'
+        + '들어서면 전용 장비에 없는 속성도 문 앞에서 열 수 있다 — 열 가지 전부, 속성마다 Lv ' + LV_MAX + ' 까지.<br>'
+        + '한 번 들어서면 돌아오지 않는다.</div>'
+        + '<div class="kpath-btns"><button class="kpath-no">거절한다</button><button class="kpath-yes">들어선다</button></div>';
+    document.body.appendChild(ov);
+    let done = false;
+    const close = function (went) { setTimeout(function () { ov.remove(); if (typeof cont === 'function') cont(went); }, 1900); };
+    ov.querySelector('.kpath-yes').onclick = function () {
+        if (done) return; done = true;
+        if (!cont) { ov.remove(); return; }                   // 상담사 미리 보기 — 아무것도 바꾸지 않는다
+        k.path = { at: now(), by: (pMine && pMine.offeredBy) || null, attrs: full.slice() };
+        saveProf();
+        addHistoryLog(u, '[K 의 방] 🔥 ' + PATH_NAME + '로 들어섰다 — ' + full.map(function (a) { return ATTR[a].n; }).join(' · ') + ' 을(를) 끝까지 걷고. 이제 어느 속성이든 연다.');
+        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+        try { db_().ref(P_NODE + '/' + u.code).update({ state: 'accepted', answeredAt: now(), lvs: pathLvs(k, u) }); } catch (e) { }
+        if (pMine) pMine.state = 'accepted';
+        if (darkRun && darkRun.isParty) { try { sendPartyChat(u.name + ' 사원이 ' + PATH_NAME + '로 들어섰습니다.', true); } catch (e) { } }
+        ov.classList.add('done');
+        ov.querySelector('.kpath-q').innerHTML = '🔥 ' + esc(PATH_NAME) + ' 🔥';
+        ov.querySelector('.kpath-note').innerHTML = '불이 발을 감싼다. 뜨겁지 않다.';
+        ov.querySelector('.kpath-btns').remove();
+        close(true);
+    };
+    ov.querySelector('.kpath-no').onclick = function () {
+        if (done) return; done = true;
+        if (!cont) { ov.remove(); return; }
+        try { db_().ref(P_NODE + '/' + u.code).update({ state: 'declined', answeredAt: now() }); } catch (e) { }
+        if (pMine) pMine.state = 'declined';
+        addHistoryLog(u, '[K 의 방] 붉은 카드를 덮었다.');
+        try { saveFields({ history: 1 }); } catch (e) { }
+        ov.querySelector('.kpath-card').style.transition = 'opacity 1.2s, transform 1.2s';
+        ov.querySelector('.kpath-card').style.opacity = '0';
+        ov.querySelector('.kpath-card').style.transform = 'rotateY(180deg) scale(.7)';
+        ov.querySelector('.kpath-q').innerHTML = '불이 사그라든다.';
+        ov.querySelector('.kpath-note').innerHTML = '';
+        ov.querySelector('.kpath-btns').remove();
+        close(false);
+    };
+}
+window.kroomPathPreview = function () { pathPopup(null); };     // 상담사 — 카드 모양 보기 (아무것도 안 바뀐다)
+
+// 상담사 — 조건을 채운 사원을 찾아 올린다 · 못 채우게 된 ready 는 거둔다
+function pLive(c) {
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const k = book[c] && book[c].kroom;
+    return (k && typeof k === 'object' && !stale(k)) ? k : null;
+}
+function pMeets(c, v) {
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const k = pLive(c);
+    if (k) return pathEligible(k, book[c], hAll[c]);
+    return !!(v && v.lvs && Object.keys(v.lvs).filter(function (a) { return Number(v.lvs[a]) >= LV_MAX; }).length >= PATH_NEED);
+}
+function pathSweep() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN) return 0;
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    let n = 0;
+    Object.keys(pAll).forEach(function (c) {
+        const h = pAll[c];
+        if (!h || h.state !== 'ready' || pMeets(c, h)) return;
+        d.ref(P_NODE + '/' + c).transaction(function (cur) { return (!cur || cur.state !== 'ready') ? undefined : null; })
+            .then(function (res) { if (res && res.committed) console.log('[재난의 길] ' + (((book[c] || {}).name) || h.name || c) + ' — 지금은 조건에 맞지 않아 목록에서 거뒀습니다.'); })
+            .catch(function () { });
+    });
+    Object.keys(book).forEach(function (c) {
+        if (c === ADMIN || (pAll[c] && pAll[c].state)) return;
+        const w = book[c], k = w && w.kroom;
+        if (!k || !pathEligible(k, w, hAll[c])) return;
+        const entry = { state: 'ready', code: c, name: w.name || '', no: String(w.no || ''), lvs: pathLvs(k, w), at: now(), by: 'sweep' };
+        n++;
+        d.ref(P_NODE + '/' + c).transaction(function (cur) { return (cur && cur.state) ? undefined : entry; }).catch(function () { });
+    });
+    return n;
+}
+window.kroomPathSweep = pathSweep;
+setInterval(function () { try { if (pAllOn) pathSweep(); } catch (e) { } }, 60000);
+function pSeen() { try { return JSON.parse(localStorage.getItem('kPathSeen') || '{}'); } catch (e) { return {}; } }
+function pSeenPut(m) { try { localStorage.setItem('kPathSeen', JSON.stringify(m)); } catch (e) { } }
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN || pAllOn) return;
+    pAllOn = true;
+    d.ref(P_NODE).on('value', function (s) {
+        pAll = s.val() || {};
+        if (!pSwept) { pSwept = true; setTimeout(function () { try { pathSweep(); } catch (e) { } }, 9000); }
+        const seen = pSeen(), news = [];
+        Object.keys(pAll).forEach(function (c) {
+            const v = pAll[c] || {};
+            if (v.state !== 'ready' || !pMeets(c, v)) return;
+            const id = c + ':' + v.at;
+            if (seen[id]) return;
+            seen[id] = 1; news.push(v);
+        });
+        if (news.length) {
+            pSeenPut(seen);
+            try { showCustomAlert('🔥 ' + PATH_NAME + '\n\n' + news.map(function (v) { return '🔥 ' + v.name + ' 사원' + (v.no ? ' (' + v.no + ')' : '') + ' — 세 속성 최고 Lv'; }).join('\n') + '\n\n통제 콘솔 「' + PATH_NAME + ' 관리」에서 정할 수 있습니다.'); } catch (e) { }
+        }
+        const wait = Object.keys(pAll).filter(function (c) { return (pAll[c] || {}).state === 'ready' && pMeets(c, pAll[c]); }).length;
+        const btn = document.getElementById('btn-admin-console');
+        if (btn && wait > 0) btn.classList.add('notify-dot');
+        try { pathPaint(); } catch (e) { }
+    });
+}, 1500);
+const P_STATE = {
+    ready: ['조건 달성 — 정해 주세요', '#ff9a7a'], offered: ['지정함 — K 의 방에 들어서면 붉은 카드', '#c9a8ff'],
+    accepted: ['들어섬', '#4CAF50'], declined: ['사원이 거절함', '#ff8a80'], denied: ['주지 않기로 함', '#888']
+};
+function pathPaint() {
+    const box = document.getElementById('admin-path-list');
+    if (!box) return;
+    const order = { ready: 0, offered: 1, declined: 2, denied: 3, accepted: 4 };
+    const codes = Object.keys(pAll).filter(function (c) { const v = pAll[c] || {}; return !(v.state === 'ready' && !pMeets(c, v)); })
+        .sort(function (a, b) { return (order[(pAll[a] || {}).state] || 9) - (order[(pAll[b] || {}).state] || 9) || ((pAll[b] || {}).at || 0) - ((pAll[a] || {}).at || 0); });
+    if (!codes.length) { box.innerHTML = '<div style="font-size:11px; color:#777; padding:8px 0;">아직 조건을 채운 사원이 없습니다.</div>'; return; }
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    box.innerHTML = codes.map(function (c) {
+        const v = pAll[c] || {};
+        const st = P_STATE[v.state] || [v.state, '#aaa'];
+        const k = pLive(c);
+        const lvs = k ? pathLvs(k, book[c]) : (v.lvs || {});
+        let btns = '';
+        if (v.state === 'ready' || v.state === 'denied' || v.state === 'declined') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#c0402a,#7a1a10) !important; color:#fff1ec !important; border-color:#ff8a6a !important;" onclick="kroomPathAct(\'' + c + '\',\'offer\')">'
+                + (v.state === 'ready' ? '지정한다' : '다시 지정한다') + '</button>';
+            if (v.state === 'ready') btns += '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomPathAct(\'' + c + '\',\'deny\')">주지 않는다</button>';
+        } else if (v.state === 'offered') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomPathAct(\'' + c + '\',\'withdraw\')">지정을 거둔다</button>';
+        }
+        return '<div style="border:1px solid #5a2a22; border-radius:6px; padding:10px; margin-bottom:8px; background:rgba(255,90,60,.05);">'
+            + '<div style="display:flex; align-items:center; gap:6px; font-size:12px;"><b style="color:#fff;">' + esc(v.name || c) + '</b>'
+            + '<span style="font-size:10px; color:#888;">' + esc(v.no || c) + '</span>'
+            + '<span style="margin-left:auto; font-size:10px; color:' + st[1] + ';">' + esc(st[0]) + '</span></div>'
+            + '<div style="font-size:11px; color:#ffb8a4; margin-top:5px;">' + Object.keys(lvs).map(function (a) { return (ATTR[a] ? ATTR[a].i + ' ' + ATTR[a].n : a) + ' Lv ' + lvs[a]; }).join(' · ') + '</div>'
+            + ((v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && !pMeets(c, v) ? '<div style="font-size:10px; color:#ff8a80; margin-top:4px;">지금은 조건(세 속성 최고 Lv · 히든 직업 없음)에 맞지 않습니다.</div>' : '')
+            + (btns ? '<div style="display:flex; gap:6px; margin-top:8px;">' + btns + '</div>' : '')
+            + '</div>';
+    }).join('');
+}
+window.kroomPathAct = function (code, act) {
+    const u = me(), d = db_();
+    if (!u || u.code !== ADMIN || !d) return;
+    const v = pAll[code]; if (!v) return;
+    if (act === 'offer' && !pMeets(code, v)) {
+        try { showCustomAlert((v.name || code) + ' 사원은 지금 조건에 맞지 않습니다.\n\n세 속성이 최고 Lv 이고, 히든 직업을 받지 않은 사원에게만 줄 수 있습니다.'); } catch (e) { }
+        return;
+    }
+    let up = null;
+    if (act === 'offer') up = { state: 'offered', offeredAt: now(), offeredBy: u.code };
+    else if (act === 'deny') up = { state: 'denied', answeredAt: now() };
+    else if (act === 'withdraw') up = { state: 'ready', offeredAt: null };
+    if (!up) return;
+    d.ref(P_NODE + '/' + code).update(up).then(function () {
+        try {
+            showCustomAlert(act === 'offer' ? (v.name + ' 사원에게 ' + PATH_NAME + '을 지정했습니다.\n\n다음에 K 의 방에 들어설 때 붉은 카드가 뜹니다.')
+                : act === 'deny' ? (v.name + ' 사원에게는 주지 않기로 했습니다.') : '지정을 거두었습니다.');
+        } catch (e) { }
+    }).catch(function (e) { try { showCustomAlert('적지 못했습니다.\n\n' + (e && e.message)); } catch (x) { } });
+};
+(function pathPanel() {
+    function make() {
+        const scr = document.getElementById('admin-screen');
+        if (!scr || document.getElementById('admin-path-box')) return;
+        const anchor = document.getElementById('admin-hidden-box') || scr.querySelector('.action-buttons');
+        const html = '<div class="admin-panel-box" id="admin-path-box" style="border-color:#c0402a; background-color:#1a0806;">'
+            + '<h4 style="color:#ff9a7a;">🔥 ' + PATH_NAME + ' 관리 (K 의 방)</h4>'
+            + '<div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.6;">'
+            + '조건 — K 의 방에서 세 속성의 직업을 모두 최고 Lv (합 300) 까지 올린 사원. 히든 직업을 받은 사원은 오르지 않습니다.<br>'
+            + '지정하면 그 사원이 K 의 방에 들어설 때 붉은 카드 『 ' + PATH_NAME + '로 들어서겠습니까? 』 가 뜨고, 들어서면 전용 장비에 없는 속성도 열어 모든 속성을 Lv ' + LV_MAX + ' 까지 올릴 수 있습니다. 한 사람에 한 번.'
+            + '</div><div id="admin-path-list"></div>'
+            + '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:7px; font-size:10px;" onclick="kroomPathPreview()">카드 모양 보기</button></div>';
+        if (anchor && anchor.id === 'admin-hidden-box') anchor.insertAdjacentHTML('afterend', html);
+        else if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
+        else scr.insertAdjacentHTML('beforeend', html);
+    }
+    const iv = setInterval(function () {
+        if (typeof openAdminScreen !== 'function') return;
+        if (openAdminScreen._kPath) { clearInterval(iv); return; }
+        const _o = openAdminScreen;
+        const w = function () {
+            const r = _o.apply(this, arguments);
+            setTimeout(function () { make(); pathPaint(); }, 220);
+            return r;
+        };
+        Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
+        w._kPath = true;
+        openAdminScreen = w; window.openAdminScreen = w;
+        clearInterval(iv);
+    }, 500);
+})();
+window.kroomPathState = function () {
+    const u = me(), k = prof(u); if (!k) return;
+    console.log('%c===== 🔥 ' + PATH_NAME + ' =====', 'color:#ff9a7a; font-size:13px');
+    console.log('  걷는 중: ' + (onPath(k) ? '예 (' + new Date(k.path.at).toLocaleString() + ')' : '아니오') + ' · 최고 Lv 속성 ' + pathFull(k, u).length + ' / ' + PATH_NEED
+        + ' · 히든 직업 ' + (pathHadHidden(k, hMine) ? '받음 (목록에 안 오름)' : '없음') + ' · 서버 상태 ' + ((pMine && pMine.state) || '없음'));
+    console.log('  속성 — ' + JSON.stringify(pathLvs(k, u)) + (onPath(k) ? ' · 다음에 열 수 있는 속성: ' + (nextAttr(k, u) ? ATTR[nextAttr(k, u)].n : '없음 (열 가지 다 열었다)') : ''));
+};
+
 window.kroomState = function () {
     const k = prof(); if (!k) return;
     console.log('%c===== 『 K 의 방 』 =====', 'color:#7fd3e6; font-size:13px');
@@ -3949,6 +4311,7 @@ window.kroomState = function () {
             + (canOpenAttr(k, u0) ? ' · 다음에 열 수 있음: ' + ATTR[nextAttr(k, u0)].n : (nextAttr(k, u0) ? ' · 다음 속성: ' + ATTR[nextAttr(k, u0)].n + ' (Lv 100 이 하나 더 있어야)' : '')));
     } catch (e) { }
     console.log('  지금 든 팀 ' + liveTeams().length + ' / ' + MAX_TEAMS);
+    if (onPath(k)) console.log('  🔥 재난의 길을 걷는 중 — 장비에 없는 속성도 연다');
     try { const hp = hiddenProgress(k); console.log('  히든 직업 조건 — Lv ' + hp.lv + '/' + HIDDEN_NEED.lv + ' · ' + hp.grade + '/S · 갈림길 ' + hp.jx + ' · 임무 ' + hp.hq + '/' + HIDDEN_NEED.hq + (hp.ok ? ' (다 채움)' : '')); } catch (e) { }
     const a = kAdds(u_kc());
     console.log('  오늘 횟수 — 쓴 ' + kUsed() + ' · 한도 ' + kLimit() + ' (기본 ' + K_TRY_BASE + ' + 얹는 몫 ' + a.add + ' → 최대 ' + K_TRY_HARD
@@ -3970,7 +4333,8 @@ window.kroomGive = function (who, field, val) {
     else if (field === 'jx') { k.jx = k.jx || {}; HIDDEN_NEED.jxGrades.forEach(function (g) { k.jx[g] = Math.max(0, Number(val) || 0); }); }
     else if (field === 'hq') { const a = (k.job && JOBS[k.job]) ? JOBS[k.job][0] : null; if (!a) { console.warn('직업이 없습니다.'); return; } k.hq = k.hq || {}; k.hq[a] = Math.max(0, Number(val) || 0); }
     else if (field === 'hiddenAsk') { k.hiddenAsk = null; }
-    else { console.warn('lv · exp · dream · job · grade · reroll · jx · hq · hiddenAsk'); return; }
+    else if (field === 'path') { k.path = val ? { at: now(), by: 'console' } : null; k.pathAsk = null; }   // 🔥 재난의 길 — 1 이면 걷게, 0 이면 거둔다
+    else { console.warn('lv · exp · dream · job · grade · reroll · jx · hq · hiddenAsk · path'); return; }
     if (typeof updateUserFields === 'function') updateUserFields(code, { kroom: k });
     console.log('%c✓ ' + (t.name || code) + ' — ' + field + ' = ' + JSON.stringify(val), 'color:#4CAF50');
 };
