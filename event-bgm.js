@@ -17,6 +17,7 @@
 //   이상한 나라가 광장보다 앞선다 (광장 위에 띄운 어둠 창에서 방을 만들어도 이상한 나라 곡).
 //   끄고 켜기: 광장 위 띠의 🔊 (이 브라우저에 기억) · 어둠 탐사 화면의 🔇 도 이상한 나라 곡을 끈다.
 //   곡이 바뀔 때는 짧게 줄였다 키운다. 브라우저가 아직 소리를 막고 있으면 다음 누름 때 튼다.
+//   🎹 광장 피아노(lp.js)를 치는 동안은 쉰다 — 피아노 창이 열려 있거나 피아노 소리가 난 지 6초 안.
 //
 // ■ 콘솔
 //   eventBgmState()
@@ -67,6 +68,8 @@ function wonderTrack() {
 }
 function pick() {
     if (off) return null;
+    // 🎹 피아노를 치는 동안(창이 열려 있거나 방금 피아노 소리가 났으면)은 쉰다 (2026-10-31 사용자)
+    try { if (typeof window.lpPianoBusy === 'function' && window.lpPianoBusy()) return null; } catch (e) { }
     if (inRunW() || partyW() || briefOpenW()) return darkMuted() ? null : wonderTrack();
     let room = '';
     try { room = (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : ''; } catch (e) { }

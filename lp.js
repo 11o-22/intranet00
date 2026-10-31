@@ -23,6 +23,9 @@
 //
 // ■ 콘솔
 //   lpState()
+//
+// ★ 2026-10-31 사용자 — 피아노 칠 땐 배경 음악이 안 들리게: window.lpPianoBusy() 를 event-bgm.js 가 본다
+//   (피아노 창이 열려 있거나, 이 방에서 피아노 소리가 난 지 6초가 안 됐으면 참)
 (function lpBoard() {
 'use strict';
 
@@ -49,6 +52,7 @@ const OCT_NAME = { '-1': '낮은 옥타브 (C3)', '0': '높은음자리표 (C4)'
 
 const S = { btn: null, menu: null, piano: null, disco: null, oct: 0, pick: [], on: false,
             seat: null, ref: null, onAdd: null, mine: {}, ctx: null };
+window.lpPianoBusy = function () { return !!S.piano || (Date.now() - (S.lastNote || 0) < 6000); };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined' && database && database.ref) ? database : null; }
@@ -172,6 +176,7 @@ document.addEventListener('visibilitychange', function () {
 });
 function audible() { return !!(S.ctx && S.ctx.state === 'running'); }
 function play(midi, vol) {
+    S.lastNote = Date.now();                                   // 🎃 배경 음악은 피아노 소리가 나는 동안 쉰다 (event-bgm.js)
     const c = ac();
     if (!c) return;
     const t = c.currentTime;
