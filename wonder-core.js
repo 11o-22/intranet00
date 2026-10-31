@@ -292,6 +292,24 @@ function normMeta() {
     m.used = m.used || {};
     Object.keys(m.used).forEach(function (k) { m.used[k] = arr(m.used[k]); });
 }
+// ★ 내가 들어 있는 챕터에 못 박는다 (2026-10-31 — 「강시 → 검역 가랬는데 검역에 가니 피날레」)
+//   팀은 같은 방의 meta.idx 를 함께 쓴다. 한 사람이 먼저 연계판을 마치고 「이어서 간다」를 누르면 meta.idx 가 넘어가,
+//   아직 그 챕터(또는 그 부탁)에 있던 사람의 화면이 다음 챕터 것으로 바뀌었다 — 부탁 자리 · 연계판 · 결말 · 보상 열쇠가 전부 meta.idx 를 본다.
+//   그래서 챕터에 들어설 때(문 · 연계 어둠 입장) F.cx = { rid, idx } 를 적고, 그동안 이 화면의 S.meta.idx 는 그 값으로 본다.
+//   「이어서 간다」(contGo)에서 푼다. 서버의 meta 는 건드리지 않는다 (meta/idx 는 트랜잭션으로만 올린다 · 진짜 값은 m._real).
+function pinMeta() {
+    const m = S && S.meta;
+    if (!m) return;
+    if (m._real == null) m._real = m.idx || 0;
+    const cx = F && F.cx;
+    m.idx = (cx && cx.rid === m.rid && cx.idx != null) ? Number(cx.idx) : m._real;
+}
+function setCx(cx) {
+    if (!F) return;
+    F.cx = cx || null;
+    pinMeta();
+}
+X.pinMeta = pinMeta;
 // 내 회차 기록
 function rec() {
     if (!currentUser.wonder) currentUser.wonder = { rounds: 0, cur: null };
@@ -671,6 +689,7 @@ THEN.toDoor = function () {
     F.introDone = true;
     const m = S.meta || {};
     const ch = m.order[m.idx || 0];
+    setCx({ rid: m.rid, idx: m.idx || 0 });              // 이 챕터에 못 박는다 — 동료가 먼저 넘어가도 내 화면은 이 챕터
     F.ch = ch;
     F.chRes = null;
     save();
@@ -938,6 +957,7 @@ X.contGo = function (c) {
     tx('meta/idx', function (cur) { return (cur || 0) < nx ? nx : cur; });
     F.introDone = true;
     F.need = nx;
+    setCx(null);                                         // 챕터에서 풀린다 — 이제 방의 진짜 차례를 따른다 (동료가 더 앞에 있으면 거기로)
     go({ id: 'hall' });
 };
 
@@ -1113,6 +1133,10 @@ function begin(isResume) {
                 // 연계 어둠으로 들어왔다 — 받아 둔 부탁에서 잇는다
                 F.st = 'in'; F.away = null;
                 if (LK.st !== 'live' || !F.sc) F.sc = { id: 'link' };      // 처음 들어오면 부탁 자리에서 · 새로고침이면 있던 자리에서
+                // 받아 둔 부탁의 챕터에 못 박는다 — 그사이 동료가 먼저 마치고 넘어갔어도 이 부탁(강시면 검역)을 잇는다
+                //   (부탁을 마치고 돌아온 뒤 — back · 다음 챕터로 넘어간 뒤 — need 면 다시 박지 않는다)
+                if (LK.rid && LK.idx != null && !LK.back && !(Number(F.need) > Number(LK.idx))
+                    && !(F.cx && F.cx.rid === LK.rid && Number(F.cx.idx) > Number(LK.idx))) setCx({ rid: LK.rid, idx: Number(LK.idx) });
                 pub('pl/' + ME + '/st', 'in');
                 const t = ticket(); if (t && t.st !== 'live') { t.st = 'live'; setTicket(t); }
                 LK.st = 'live';
@@ -1145,8 +1169,11 @@ function begin(isResume) {
             const me = rec();
             if (!me.cur) me.cur = newRound();
             saveRec();
+            // ★ 혼자 방(solo_사번)은 늘 내 회차 기록을 따른다 (2026-10-31) — 쓰러진 뒤 창을 닫아 지난 회차의 meta 가 남아 있으면
+            //   새 회차(새 차례) 대신 지난 차례가 되살아나 챕터가 뒤섞였다.
+            const solo = String(PID).indexOf('solo_') === 0;
             tx('meta', function (cur) {
-                if (cur && cur.rid) return;
+                if (cur && cur.rid && !(solo && cur.rid !== me.cur.rid)) return;
                 return { n0: cnt, rid: me.cur.rid, order: me.cur.order, idx: me.cur.idx || 0, used: me.cur.used || {}, rounds: me.rounds || 0, leader: ME, at: now() };
             });
         }
@@ -1165,6 +1192,7 @@ function attach() {
     sharedRef.on('value', function (s) {
         S = s.val() || {};
         normMeta();
+        pinMeta();
         // 회차를 파티 것으로 맞춘다 (팀원)
         if (F && F.st === 'in' && S.meta && S.meta.rid) {
             const me = rec();
