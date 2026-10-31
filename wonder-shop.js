@@ -141,8 +141,15 @@ function shopHtml(preview) {
         + '「이상한 나라의 ■■■」 이벤트 샵' + (preview ? ' <span style="color:#a87;">(관리자 미리보기 — 아직 닫혀 있음)</span>' : '') + '<br>'
         + '이 어둠에서는 어떤 장비도 통하지 않습니다. 물건은 적힌 챕터와 그 연계판 안에서만 쓸 수 있습니다.<br>'
         + '진열은 ' + Math.floor(left / 60) + '시간 ' + (left % 60) + '분 뒤에 바뀝니다. · 항목당 ' + CAP + '개 한정</div>'
+        // ★ 전체 구매 · 테마별 전체 구매 (2026-11-01 사용자) — shop-bulk.js 가 낱개 구매(buyWonderItem)를 되풀이한다
+        + (preview || typeof window.shopBulkAll !== 'function' ? ''
+            : '<button class="game-btn shop-bulk-all" onclick="shopBulkAll(\'qshop-body\')">전 품목 일괄 구매</button>')
         + ORDER.map(function (ch) {
-            return '<div style="font-size:11px; color:#e8d9a8; font-weight:bold; margin:14px 0 6px 2px;">' + esc(CH_NAME[ch]) + '</div>'
+            const any = LIST[ch].some(function (r) { return adm || (rec[r[0]] || 0) < CAP; });
+            return '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:14px 0 6px 2px;">'
+                + '<span style="font-size:11px; color:#e8d9a8; font-weight:bold;">' + esc(CH_NAME[ch]) + '</span>'
+                + (any ? '<button class="wonder-buy-theme" onclick="wonderBuyTheme(\'' + ch + '\')" style="flex-shrink:0; width:auto; margin:0; padding:5px 9px; font-size:10px; background:#2a2312; border:1px solid #6a5a2a; color:#e8d9a8; border-radius:5px; cursor:pointer;">테마 전체 구매</button>' : '')
+                + '</div>'
                 + LIST[ch].map(function (r) {
                     const name = r[0], price = r[1];
                     const bought = rec[name] || 0;
@@ -175,6 +182,20 @@ window.buyWonderItem = function (name) {
     try { saveSelfFull(); } catch (e) { }
     try { updateUI(); } catch (e) { }
     try { renderQShop(); } catch (e) { }
+};
+
+// 테마(챕터) 하나의 물품을 모두 남은 만큼 — shop-bulk.js 의 되풀이를 그대로 쓴다 (한도 · 포인트 · 저장이 낱개와 같다)
+window.wonderBuyTheme = function (ch) {
+    const u = me();
+    if (!u || !LIST[ch]) return;
+    if (!ON && !isAdmin()) { alertMsg('지금은 열려 있지 않습니다.'); return; }
+    const rec = recOf();
+    const calls = LIST[ch].filter(function (r) { return isAdmin() || (rec[r[0]] || 0) < CAP; })
+        .map(function (r) { return { fn: 'buyWonderItem', args: [r[0]], name: r[0] }; });
+    if (!calls.length) { alertMsg('이 테마는 다 샀습니다.'); return; }
+    const title = '이벤트 샵 — ' + CH_NAME[ch].split(' · ')[0] + ' 테마 전체 구매';
+    if (typeof window.shopBulkBuy === 'function') return window.shopBulkBuy(title, calls, CH_NAME[ch].split(' · ')[0] + ' 테마의 물품');
+    calls.forEach(function (c) { for (let i = 0; i < CAP; i++) { const p0 = u.points; window.buyWonderItem(c.name); if (u.points === p0) break; } });
 };
 
 // 켜고 끌 때는 바로 다시 그린다 — 다른 파일의 「바뀐 게 없으면 안 그림」을 건너뛰려고 안쪽 함수를 직접 부른다

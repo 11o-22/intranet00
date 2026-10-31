@@ -25,10 +25,16 @@
 
 (function shopBulk() {
 
+// ★ ??? 자리에는 이벤트 샵(wonder-shop.js — buyWonderItem)이 대신 열릴 때가 있다 (2026-11-01 사용자 「이벤트샵 전체구매가 막힌다」)
+//   예전에는 buyQShopItem 단추만 찾아서, 이벤트 샵이 열려 있으면 「살 수 있는 물품이 없습니다」로 막혔다.
 const SHOPS = [
-    { box: 'regular-shop-items-container', fn: 'buyRegularShopItem', name: '유쾌 판매소' },
-    { box: 'qshop-body',                   fn: 'buyQShopItem',       name: '???' }
+    { box: 'regular-shop-items-container', fn: 'buyRegularShopItem', fns: ['buyRegularShopItem'], name: '유쾌 판매소' },
+    { box: 'qshop-body',                   fn: 'buyQShopItem',       fns: ['buyQShopItem', 'buyWonderItem'], name: '???' }
 ];
+function shopName(shop) {
+    try { if (shop.box === 'qshop-body' && window.WONDER && WONDER.shopOn && WONDER.shopOn()) return '이벤트 샵'; } catch (e) { }
+    return shop.name;
+}
 const CAP = 30;            // 한 품목을 한 번에 사는 끝 (한도가 없는 상담사도 여기까지)
 const CAP_ADMIN = 10;
 const stat = { runs: 0, bought: 0 };
@@ -50,10 +56,22 @@ function parseCall(btn, fn) {
     const name = (fn === 'buyRegularShopItem') ? args[1] : args[0];
     return { fn: fn, args: args, name: name };
 }
+// fn — 함수 이름 하나 또는 여럿(가게 줄마다 다를 수 있다)
+function fnOf(b, fn) {
+    const oc = (b && b.getAttribute('onclick')) || '';
+    const list = Array.isArray(fn) ? fn : [fn];
+    for (let i = 0; i < list.length; i++) if (oc.indexOf(list[i] + '(') >= 0) return list[i];
+    return null;
+}
 function mainBtn(row, fn) {
     return Array.prototype.filter.call(row.querySelectorAll('button'), function (b) {
-        return !b.classList.contains('shop-bulk-one') && (b.getAttribute('onclick') || '').indexOf(fn + '(') >= 0;
+        return !b.classList.contains('shop-bulk-one') && !!fnOf(b, fn);
     })[0] || null;
+}
+function callOf(row, shop) {
+    const b = mainBtn(row, shop.fns);
+    const fn = b && fnOf(b, shop.fns);
+    return fn ? parseCall(b, fn) : null;
 }
 
 // ==========================================
@@ -136,20 +154,24 @@ function lock() {
 
 function bulkOne(shop, row) {
     if (!lock()) return;
-    const call = parseCall(mainBtn(row, shop.fn), shop.fn);
+    const call = callOf(row, shop);
     if (!call) return;
     const r = withQuiet(function (msgs) { return buyMany(call, msgs, capFor()); });
-    report(shop.name + ' — 일괄 구매', [{ name: call.name, n: r.n, spent: r.spent }],
+    report(shopName(shop) + ' — 일괄 구매', [{ name: call.name, n: r.n, spent: r.spent }],
         r.n ? (/모자/.test(r.why) ? whyText(r.why) : '') : whyText(r.why));
 }
 function bulkAll(shop) {
-    if (!lock()) return;
     const box = document.getElementById(shop.box);
     if (!box) return;
     const calls = Array.prototype.map.call(box.querySelectorAll('.shop-item'), function (row) {
-        const b = mainBtn(row, shop.fn);
-        return (b && !b.disabled) ? parseCall(b, shop.fn) : null;
+        const b = mainBtn(row, shop.fns);
+        return (b && !b.disabled) ? callOf(row, shop) : null;
     }).filter(Boolean);
+    runCalls(shopName(shop) + ' — 전 품목 일괄 구매', calls);
+}
+// 물품 목록을 차례로 남은 만큼 산다 — calls: [{ fn, args, name }]
+function runCalls(title, calls) {
+    if (!lock()) return;
     if (!calls.length) { alert_('살 수 있는 물품이 없습니다.'); return; }
     let stop = '';
     const rows = withQuiet(function (msgs) {
@@ -161,22 +183,35 @@ function bulkAll(shop) {
         }
         return out;
     });
-    report(shop.name + ' — 전 품목 일괄 구매', rows, stop);
+    report(title, rows, stop);
 }
-function askAll(shop) {
+function ask(title, what, yes) {
     const old = document.getElementById('shop-bulk-ask'); if (old) old.remove();
     const d = document.createElement('div');
     d.id = 'shop-bulk-ask';
     d.style.cssText = 'position:fixed;inset:0;z-index:100050;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);padding:20px;';
     d.innerHTML = '<div class="modal-content" style="max-width:330px;width:100%;text-align:center;">'
-        + '<div style="font-size:14px;font-weight:bold;margin-bottom:10px;">' + esc(shop.name) + ' — 전 품목 일괄 구매</div>'
-        + '<div style="font-size:12px;color:#aaa;line-height:1.8;margin-bottom:16px;">진열된 물품을 모두 남은 수량만큼 삽니다.<br>포인트가 모자라면 그 자리에서 멈춥니다.</div>'
+        + '<div style="font-size:14px;font-weight:bold;margin-bottom:10px;">' + esc(title) + '</div>'
+        + '<div style="font-size:12px;color:#aaa;line-height:1.8;margin-bottom:16px;">' + esc(what) + '을 모두 남은 수량만큼 삽니다.<br>포인트가 모자라면 그 자리에서 멈춥니다.</div>'
         + '<div style="display:flex;gap:8px;"><button class="btn-cancel" style="flex:1;" id="sb-no">그만둔다</button>'
         + '<button class="game-btn" style="flex:1;margin:0;padding:11px;" id="sb-yes">산다</button></div></div>';
     document.body.appendChild(d);
     d.querySelector('#sb-no').onclick = function () { d.remove(); };
-    d.querySelector('#sb-yes').onclick = function () { d.remove(); bulkAll(shop); };
+    d.querySelector('#sb-yes').onclick = function () { d.remove(); yes(); };
 }
+function askAll(shop) {
+    ask(shopName(shop) + ' — 전 품목 일괄 구매', '진열된 물품', function () { bulkAll(shop); });
+}
+// 다른 가게 파일이 부른다
+//   shopBulkAll('qshop-body')                       그 상자의 전 품목 (한 번 묻는다)
+//   shopBulkBuy(제목, [{fn, args, name}], 무엇)      그 물품들만 (한 번 묻는다) — 이벤트 샵 테마별 전체 구매
+window.shopBulkAll = function (boxId) {
+    const sh = SHOPS.filter(function (s) { return s.box === boxId; })[0];
+    if (sh) askAll(sh);
+};
+window.shopBulkBuy = function (title, calls, what) {
+    ask(title, what || '이 물품들', function () { runCalls(title, (calls || []).filter(Boolean)); });
+};
 
 // ==========================================
 // 단추 달기 — 가게가 다시 그려질 때마다
@@ -207,7 +242,7 @@ function decorate(shop) {
     // 줄마다
     Array.prototype.forEach.call(rows, function (row) {
         if (row.querySelector('.shop-bulk-one')) return;
-        const mb = mainBtn(row, shop.fn);
+        const mb = mainBtn(row, shop.fns);
         if (!mb || mb.disabled) return;
         const b = document.createElement('button');
         b.className = 'shop-bulk-one';
