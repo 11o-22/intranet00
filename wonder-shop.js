@@ -4,7 +4,9 @@
 // ==========================================
 //
 //   이벤트 기간에는 상점의 「???」 샵 자리를 이 샵이 대신한다 (설계표 「이벤트 샵 — 챕터마다 5종」).
-//   · 켜고 끄기: Firebase wonderEvent/on (관리자 콘솔 wonderEvent(true|false)).
+//   · 켜고 끄기: Firebase wonderEvent/shop (관리자 콘솔 wonderEvent(true|false)).
+//     2026-10-31 사용자 「이벤트 샵 바로 넣어 줘」 — 값이 없으면 **열려 있다** (false 로 적어야 닫힌다).
+//     (예전 열쇠 wonderEvent/on 은 시험하며 false 가 남았을 수 있어 쓰지 않는다)
 //     꺼져 있어도 관리자에게는 ??? 샵 위에 미리보기로 보인다.
 //   · 진열당 항목마다 5개까지 (??? 샵과 같은 진열 시간표).
 //   · 물건은 적힌 챕터와 그 챕터의 연계판 안에서만 쓴다. 들어갈 때 반입해서 🎒 로 쓰거나,
@@ -85,7 +87,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 // ==========================================
 // 켜짐
 // ==========================================
-let ON = false;
+let ON = true;
 X.shopOn = function () { return ON; };
 (function listen() {
     const iv = setInterval(function () {
@@ -93,9 +95,9 @@ X.shopOn = function () { return ON; };
         if (!d) return;
         clearInterval(iv);
         try {
-            d.ref('wonderEvent/on').on('value', function (s) {
+            d.ref('wonderEvent/shop').on('value', function (s) {
                 const was = ON;
-                ON = s.val() === true;
+                ON = s.val() !== false;
                 if (was !== ON) repaint();
             });
         } catch (e) { }
@@ -104,7 +106,7 @@ X.shopOn = function () { return ON; };
 window.wonderEvent = function (v) {
     if (!isAdmin()) { console.log('관리자만'); return; }
     const d = db_();
-    if (d) d.ref('wonderEvent/on').set(!!v);
+    if (d) d.ref('wonderEvent/shop').set(!!v);
     console.log('이벤트 샵 ' + (v ? '열림' : '닫힘'));
 };
 
