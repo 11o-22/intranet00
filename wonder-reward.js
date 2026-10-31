@@ -52,9 +52,11 @@ X.reward = function (key, chName, misName) {
     if (got.kind === 'ticket') {
         if (!u.inventory) u.inventory = [];
         u.inventory.push(got.name);
+        try { if (typeof darkRun !== 'undefined' && darkRun) darkRun.wGainItems = (Array.isArray(darkRun.wGainItems) ? darkRun.wGainItems : []).concat([got.name]); } catch (e) { }   // 쓰러져도 남는다 (wonder-core.js die)
         try { addHistoryLog(u, '[이상한 나라] ' + chName + ' 「' + misName + '」 성공 — ' + got.name + ' 획득'); } catch (e) { }
     } else {
         u.points = (Number(u.points) || 0) + got.n;
+        try { if (typeof darkRun !== 'undefined' && darkRun) darkRun.wGain = (Number(darkRun.wGain) || 0) + got.n; } catch (e) { }       // 쓰러져도 남는다 (wonder-core.js die)
         try { addHistoryLog(u, '[이상한 나라] ' + chName + ' 「' + misName + '」 성공 — +' + got.n.toLocaleString() + ' P'); } catch (e) { }
         try { showPointGainEffect(got.n); } catch (e) { }
     }

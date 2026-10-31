@@ -255,7 +255,8 @@ function snapRun() {
             log: (darkRun.log || []).slice(-20), lostItems: [],
             isParty: !!darkRun.isParty, isLeader: !!darkRun.isLeader, partyId: darkRun.partyId || null,
             memberCount: darkRun.memberCount || 1, counted: true, wonder: true,
-            wonderLink: darkRun.wonderLink ? clean(darkRun.wonderLink) : null
+            wonderLink: darkRun.wonderLink ? clean(darkRun.wonderLink) : null,
+            wGain: Number(darkRun.wGain) || 0, wGainItems: arr(darkRun.wGainItems)
         });
     } catch (e) { }
 }
@@ -1086,15 +1087,23 @@ function die(reasonHtml) {
     const grade = (DARK_ZONES[W] && DARK_ZONES[W].grade) || 'A';
     let lostPoints = 0;
     const lostItems = [];
+    // ★ 이 어둠에서 얻은 것(미션 보상 포인트 · 교환권)은 쓰러져도 남는다 (2026-10-31 사용자) — darkRun.wGain · wGainItems (wonder-reward.js 가 적는다)
+    const gain = Math.max(0, Number(darkRun.wGain) || 0);
+    const gainIt = arr(darkRun.wGainItems).slice();
+    let kept = 0;
     if (['S', 'A', 'B'].indexOf(grade) >= 0) {
-        lostPoints = Number(currentUser.points) || 0;
-        currentUser.points = 0;
+        const pts = Number(currentUser.points) || 0;
+        kept = Math.min(pts, gain);
+        lostPoints = pts - kept;
+        currentUser.points = kept;
         [].concat(darkRun.carryEquips || [], darkRun.carryItems || []).forEach(function (it) {
+            const gi = gainIt.indexOf(it);
+            if (gi >= 0) { gainIt.splice(gi, 1); return; }          // 이 어둠에서 얻은 물건이면 남긴다
             try { removeItemFromInventory(currentUser, it, 1); } catch (e) { }
             lostItems.push(it);
         });
     }
-    try { addHistoryLog(currentUser, '[어둠 사망] ' + W + ' 이상한 나라의 ■■■ — 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.'); } catch (e) { }
+    try { addHistoryLog(currentUser, '[어둠 사망] ' + W + ' 이상한 나라의 ■■■ — 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.' + (kept ? ' (이 어둠에서 얻은 ' + kept.toLocaleString() + ' P 는 남음)' : '')); } catch (e) { }
     // ★ 이벤트 어둠 한정 — 상담실 · 선녀탕으로 끌려가지 않는다. 가두리에 15분 (2026-10-31 사용자)
     try { cageMe(); } catch (e) { console.warn('[이상한 나라] 가두리', e); }
     const d = db_();
@@ -1123,6 +1132,8 @@ function die(reasonHtml) {
             + (lostPoints || lostItems.length
                 ? '보유 포인트 <b style="color:#f44336;">-' + lostPoints + ' P</b><br>' + (lostItems.length ? '반입품 <b style="color:#f44336;">' + esc(lostItems.join(', ')) + '</b> 소실<br>' : '')
                 : '<span style="color:#aaa;">잃은 것이 없습니다.</span><br>')
+            + (kept ? '<span style="color:#4CAF50;">이 어둠에서 얻은 <b>' + kept.toLocaleString() + ' P</b> 는 남았습니다.</span><br>' : '')
+            + (gain || arr(darkRun.wGainItems).length ? '<span style="color:#4CAF50; font-size:11px;">해당 어둠 내에서 얻은 재산은 사망 시 소실되지 않습니다.</span><br>' : '')
             + '<span style="color:#aaa;">이 어둠에서는 어떤 장비도 통하지 않았습니다.</span><br>'
             + '이번 회차는 처음부터 다시 합니다.<br>'
             + '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#c9a3f0;">🎃 이벤트 어둠 — 상담실 · 선녀탕 대신 🔒 가두리에 15분 갇힙니다.</div>'
@@ -1299,6 +1310,8 @@ function cleanup() {
             const lk = snap && snap.zone === W && snap.wonderLink ? snap.wonderLink : null;
             const r = _a.apply(this, arguments);
             try { if (lk && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W && !darkRun.wonderLink) darkRun.wonderLink = lk; } catch (e) { }
+            // 이 어둠에서 얻은 것 — 복귀해도 이어서 센다
+            try { if (snap && snap.zone === W && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W) { if (!darkRun.wGain) darkRun.wGain = Number(snap.wGain) || 0; if (!darkRun.wGainItems) darkRun.wGainItems = arr(snap.wGainItems); } } catch (e) { }
             return r;
         };
         window.acceptDarkResume = w;
