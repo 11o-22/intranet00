@@ -47,7 +47,7 @@ const LIST = [
     { n: '뉴비 병아리 후드',   k: 'newbie-hood',   slot: '망토', d: '[의상] 빨간 병아리 후드. 옷장 망토 칸에서 입는다.' },
     { n: '잎 우산',            k: 'leaf-umb',      slot: '악세', d: '[악세] 커다란 잎 한 장을 우산처럼 든다. 옷장 악세 칸에서 단다. 달고 있는 동안 잎 위로 비가 내리고 발밑에 물이 고인다.' },
     // 검은 고양이 헤일로 (2026-10-31) — 상담사만 준다 · 거래하지 않는다 (closet.js noTrade). 악세 칸 · 「등」 줄
-    { n: '검은 고양이 헤일로', k: 'cat-halo',      slot: '악세', d: '[악세] 등 뒤로 붉은 헤일로가 번지고, 검은 고양이 한 마리가 곁을 따라다닌다. 걸으면 내려와 함께 걷고, 멈추면 어깨 위로 뛰어오른다. 옷장 악세 칸에서 단다.' },
+    { n: '검은 고양이 헤일로', k: 'cat-halo',      slot: '악세', at: '등', d: '[악세 · 등] 등 뒤로 붉은 헤일로가 번지고, 검은 고양이 한 마리가 곁을 따라다닌다. 걸으면 내려와 함께 걷고, 멈추면 어깨 위로 뛰어오른다. 옷장 악세 칸의 「등」 줄에서 단다.' },
 ];
 const BY = {};
 LIST.forEach(function (x) { BY[x.n] = x; });
@@ -58,7 +58,7 @@ function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustom
 
 // 선물함이 받는 순간 옷장으로 넣는 표
 window.GIFT_WEAR = window.GIFT_WEAR || {};
-LIST.forEach(function (x) { window.GIFT_WEAR[x.n] = { k: x.k, slot: x.slot + ' 칸' }; });
+LIST.forEach(function (x) { window.GIFT_WEAR[x.n] = { k: x.k, slot: x.slot + ' 칸' + (x.at ? '의 「' + x.at + '」 줄' : '') }; });   // at — 악세 칸 안의 다는 자리 (closet.js cat)
 
 // 물품 표 — 상담사 「물품 강제 꽂기」 목록에 뜨게
 (function reg() {
