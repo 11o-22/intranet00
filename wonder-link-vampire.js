@@ -343,7 +343,7 @@ function vEnd(end) {
     const E = endings();
     const e = E[end.t] || {};
     const line = e.ret || '';
-    X.draw(ok ? '✔' : '✖', retPage(ok, line) + '<div class="wd-sys">' + (ok ? '미션 성공 — ' + (mine === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 「황금빛 열쇠 사탕」 · 보상은 나중에 들어갑니다' : '미션 실패 — 잃는 것은 없습니다') + '</div>',
+    X.draw(ok ? '✔' : '✖', retPage(ok, line) + '<div class="wd-sys">' + (ok ? '미션 성공 — ' + (mine === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 「황금빛 열쇠 사탕」 · 홀로 돌아가면 보상을 받습니다' : '미션 실패 — 잃는 것은 없습니다') + '</div>',
         X.btn('문을 지난다.', 'WONDER.L.done()'));
 }
 const GEN_FAIL = '판이 멈춤';    // 원고에 따로 없는 「✔에 닿지 못함」

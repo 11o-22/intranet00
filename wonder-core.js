@@ -14,7 +14,7 @@
 //   · 단계 몽환(1~2회차) → 어색(3~4) → 피폐(5~6) → 기괴(7~8). 끝까지 마친 회차만 센다.
 //   · 회차 = 여섯 챕터 · 여섯 미션. 회차마다 챕터 순서는 무작위(720가지 전부). 사탕 열쇠는 다음 문만 연다.
 //   · 미션은 솔로 4 · 팀 8 가운데 무작위, 같은 회차 안에서는 겹치지 않는다(처음부터 다시 해도).
-//   · 성공 = 이상한 나라 쪽 ✔ 또는 어둠 쪽 ✔ → 황금빛 열쇠 사탕(보상은 다 만든 뒤). 실패 = 잃는 것 없이 다음 챕터.
+//   · 성공 = 이상한 나라 쪽 ✔ 또는 어둠 쪽 ✔ → 황금빛 열쇠 사탕 + 보상(wonder-reward.js). 실패 = 잃는 것 없이 다음 챕터.
 //   · 죽으면 기존처럼 상담실 · 선녀탕. 그 회차는 처음부터.
 //   · 챕터를 끝낼 때마다 멈추기 / 잇기 — 팀은 투표. 동률이면 각자 d30(16+) — 실패한 사람은 나오고
 //     (다음엔 처음부터) 성공한 사람은 진행. 짝수 인원이 반반으로 갈리면 다시 굴려 반드시 과반.
@@ -746,7 +746,7 @@ VIEW.result = function (sc) {
     const ch = m.order[m.idx || 0];
     const ok = sc.r === 'w' || sc.r === 'd';
     const txt = ok
-        ? '계단을 오르면 다시 ' + esc(CH[ch].name) + '의 자리입니다. 누군가 당신의 손바닥 위에 황금빛 열쇠 사탕 하나를 올려놓습니다.<br><span style="font-size:11px; color:#888;">(미션 성공 — ' + (sc.r === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 보상은 나중에 들어갑니다)</span>'
+        ? '계단을 오르면 다시 ' + esc(CH[ch].name) + '의 자리입니다. 누군가 당신의 손바닥 위에 황금빛 열쇠 사탕 하나를 올려놓습니다.<br><span style="font-size:11px; color:#888;">(미션 성공 — ' + (sc.r === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 홀로 돌아가면 보상을 받습니다)</span>'
         : '계단을 오릅니다. 문은 닫혀 있고, 아무도 당신을 부르지 않습니다. 당신은 아무것도 받지 못했습니다.<br><span style="font-size:11px; color:#888;">(미션 실패 — 잃는 것은 없습니다)</span>';
     draw(ok ? '✔' : '✖', txt, btn('홀로 돌아간다.', 'WONDER.chapterDone()'));
 };
@@ -770,33 +770,41 @@ X.chapterDone = function (given) {
     me.cur.res[ch] = r;
     me.cur.idx = (m.idx || 0) + 1;
     try { darkRun.log.push('[이상한 나라] ' + CH[ch].name + ' 「' + misName(ch, mid) + '」 ' + (r === 'f' ? '실패' : '성공')); } catch (e) { }
+    // 미션 성공 보상 (wonder-reward.js) — 사람마다 한 번. 실패는 아무것도 없이 다음 챕터.
+    const rwKey = 'rw_' + m.rid + '_' + (m.idx || 0);
+    if ((r === 'w' || r === 'd') && X.reward) { try { X.reward(rwKey, CH[ch].name, misName(ch, mid)); } catch (e) { console.error(e); } }
     if (me.cur.idx >= 6) {
         me.rounds = (me.rounds || 0) + 1;
         me.cur = null;
         saveRec();
-        return go({ id: 'roundEnd', rounds: me.rounds });
+        return go({ id: 'roundEnd', rounds: me.rounds, rw: rwKey });
     }
     saveRec();
-    go({ id: 'cont', idx: m.idx || 0 });
+    go({ id: 'cont', idx: m.idx || 0, rw: rwKey });
 };
 
 // ==========================================
 // 멈추기 / 잇기
 // ==========================================
 function vkey() { const m = S.meta || {}; return 'cont_' + m.rid + '_' + (m.idx || 0); }
-VIEW.cont = function () {
+function rewardBox(sc) {
+    const g = sc && sc.rw && F.rewarded && F.rewarded[sc.rw];
+    return g && X.rewardHtml ? X.rewardHtml(g) : '';
+}
+VIEW.cont = function (sc) {
+    const rb = rewardBox(sc);
     const key = vkey();
     const v = (S.vote || {})[key] || {};
     const a = actives();
     const mine = v[ME];
     if (!isTeam()) {
-        draw('—', '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 가시겠습니까?<br><span style="font-size:11px; color:#888;">(멈추면 이번 회차는 그 자리에 남고, 다음에 들어오면 남은 챕터부터 이어집니다.)</span>',
+        draw('—', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 가시겠습니까?<br><span style="font-size:11px; color:#888;">(멈추면 이번 회차는 그 자리에 남고, 다음에 들어오면 남은 챕터부터 이어집니다.)</span>',
             btn('이어서 간다.', "WONDER.contGo('go')") + btn('여기서 멈춘다.', "WONDER.contGo('stop')"));
         return;
     }
     const done = a.filter(function (c) { return !!v[c]; });
     if (done.length < a.length) {
-        draw('투표', '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴립니다. 실패한 사람은 나가고, 다음에 들어오면 처음부터 다시 합니다.)</span>',
+        draw('투표', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴립니다. 실패한 사람은 나가고, 다음에 들어오면 처음부터 다시 합니다.)</span>',
             mine ? '<div class="wd-wait">' + (mine === 'go' ? '「이어서 간다」' : '「멈춘다」') + '에 투표했습니다.<br>' + a.map(function (c) { return (v[c] ? '✔ ' : '… ') + esc(nameOf(c)); }).join(' · ') + '</div>'
                  : btn('이어서 간다.', "WONDER.vote('go')") + btn('여기서 멈춘다.', "WONDER.vote('stop')"));
         return;
@@ -864,7 +872,7 @@ VIEW.tieOut = function () {
 };
 VIEW.roundEnd = function (sc) {
     const st = stageOf(sc.rounds);
-    draw('회차 종료', '여섯 개의 문이 모두 닫힙니다. 분수의 물방울이 처음으로 바닥에 떨어집니다.<br><br><span style="font-size:11px; color:#888;">(' + sc.rounds + '회차를 마쳤습니다. 다음 회차는 「' + STAGES[st] + '」입니다.)</span>',
+    draw('회차 종료', rewardBox(sc) + '여섯 개의 문이 모두 닫힙니다. 분수의 물방울이 처음으로 바닥에 떨어집니다.<br><br><span style="font-size:11px; color:#888;">(' + sc.rounds + '회차를 마쳤습니다. 다음 회차는 「' + STAGES[st] + '」입니다.)</span>',
         btn('단말로 복귀한다.', 'WONDER.leave()'));
 };
 X.leave = function () {

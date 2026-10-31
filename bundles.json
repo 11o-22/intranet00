@@ -428,6 +428,8 @@
       "show-finale.js",
       "wonder-text.js",
       "wonder-core.js",
+      "wonder-entry.js",
+      "wonder-reward.js",
       "wonder-shop.js",
       "wonder-ch-angel.js",
       "wonder-link.js",

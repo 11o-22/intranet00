@@ -460,7 +460,7 @@ function renderEnd(end) {
     let html = '';
     if (!ok && e.ret) html = e.ret + '<br><br>';
     html += retCommon(ok, line);
-    html += '<div class="wd-sys">' + (ok ? '미션 성공 — ' + (mine === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 보상은 나중에 들어갑니다' : '미션 실패 — 잃는 것은 없습니다') + '</div>';
+    html += '<div class="wd-sys">' + (ok ? '미션 성공 — ' + (mine === 'w' ? '이상한 나라 쪽' : '어둠 쪽') + ' · 홀로 돌아가면 보상을 받습니다' : '미션 실패 — 잃는 것은 없습니다') + '</div>';
     X.draw(ok ? '✔' : '✖', html, X.btn('홀로 돌아간다.', "WONDER.L.done()"));
 }
 L.endPage = function (n) { const f = F(); f.lk.e = f.lk.e || {}; f.lk.e.pg = n; X.save(); X.view(); };
