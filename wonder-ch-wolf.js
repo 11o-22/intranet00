@@ -166,7 +166,9 @@ W.lastHtml = function (cfg, st) {
 W.sungHtml = function (cfg, st) {
     const s = W.sung(cfg, st);
     const cur = st.cur;
-    return '<div style="text-align:center; font-size:12px; color:#888; margin-bottom:8px;">♪ ' + (s.length ? s.map(esc).join(' / ') + ' / …' : '…') + (cur ? ' <span style="color:#555;">(' + cur.n + '박자 노래)</span>' : '') + '</div>';
+    // ★ 몇 박자 노래인지는 보이지 않는다 (2026-10-31 사용자 — 보이면 마지막 박자에만 멈추면 된다).
+    //   노래는 그대로 바뀐다: 6 → 5 → 4 → 3박자를 되풀이하고, 곡마다 분할을 새로 고른다. 박 수는 🎼 자장가 악보로만 안다.
+    return '<div style="text-align:center; font-size:12px; color:#888; margin-bottom:8px;">♪ ' + (s.length ? s.map(esc).join(' / ') + ' / …' : '…') + '</div>';
 };
 // 수면 모자 실밥 · 자장가 악보
 W.itemBtns = function (st) {
@@ -287,7 +289,7 @@ X.VIEW.wprac = function (sc) {
     const done = (sc.r || []).map(function (r, k) { return esc(s.ph[k]) + (r ? (r.go ? ' (전진' + (r.c ? ' · 들킴' : '') + ')' : ' (정지)') : ''); });
     X.draw('창밖의 모자', '“그럼 연습이에요! 세 걸음만!”<br><br>도토리 모자 요정이 지휘봉을 들자 요정들이 다시 자장가를 시작합니다.'
         + '<div style="text-align:center; font-size:15px; color:#d4af37; margin:12px 0;">♪ ' + (done.length ? done.join(' / ') + ' / …' : '…') + '</div>'
-        + '<div class="wd-sys">연습 놀이 — 세 박자 · 벌칙 없음 (' + s.n + '박자 노래)</div>',
+        + '<div class="wd-sys">연습 놀이 — 세 박자 · 벌칙 없음</div>',
         X.btn('전진한다.', "WONDER.WOLF.prac('go')") + X.btn('정지한다.', "WONDER.WOLF.prac('stop')"));
 };
 W.prac = function (v) {
