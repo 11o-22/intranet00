@@ -13,6 +13,12 @@
 //   (이어지는 어둠 — 빛을 찾아서 · 물고기가 인간이 되었다 · 피날레 · K의 방 · 검역 실패 · 동화의 뒷면 — 은
 //    이상한 나라 안에서 따로 돌리는 연계판이고, 그 어둠에 그냥 들어가면 예전 그대로다.)
 //
+//   · 부탁(미션)을 받으면 「이들의 부탁을 들어 주러 간다.」 로 이 어둠을 나간다 (2026-10-31 사용자).
+//     어둠 목록에서 그 연계 어둠 칸이 나에게만 보라색 「이상한 나라의 부탁」 칸으로 바뀌고,
+//     거기서 혼자 들어가거나(혼자 받은 부탁) 파티를 편성하면(함께 받은 부탁) 받아 둔 부탁에서 이어진다.
+//     속은 이 어둠(구역 W)으로 돌린다 — 그 어둠의 방 수 · 정원 · 다른 팀 진행과 상관없이 들어가고, 횟수도 쓰지 않는다.
+//     부탁이 남아 있는 동안 이상한 나라에는 새로 들어가지 않는다 (그 칸의 「부탁을 포기한다」로 실패 처리 가능).
+//
 // ■ 콘솔
 //   wonderTries()        오늘 남은 횟수
 //   wonderTriesReset()   오늘 횟수 되돌리기 (관리자)
@@ -69,12 +75,13 @@ function countEntry(key) {
 }
 
 // 이상한 나라로 들어가는 길에서만 「남은 횟수」를 이 어둠 것으로 바꿔 끼우고, 일반 횟수는 쓰지 않은 것으로 되돌린다
-function asWonder(fn, self, args, after) {
+//   link 면 부탁을 들어 주러 연계 어둠으로 들어가는 길 — 이상한 나라 횟수도 일반 횟수도 쓰지 않는다
+function asWonder(fn, self, args, after, link) {
     const u = me();
     const g = window.getDarkTriesLeft;
     const keepT = u ? u.darkTries : undefined, keepD = u ? u.darkDate : undefined;
     const before = (typeof darkRun !== 'undefined') ? darkRun : null;
-    window.getDarkTriesLeft = function () { return left(); };
+    window.getDarkTriesLeft = function () { return link ? 99 : left(); };
     let out;
     try { out = fn.apply(self, args); }
     finally {
@@ -85,6 +92,7 @@ function asWonder(fn, self, args, after) {
     return out;
 }
 function zoneOfParty(pid) { try { return (darkParties[pid] || {}).zone; } catch (e) { return null; } }
+function partyOf(pid) { try { return darkParties[pid] || null; } catch (e) { return null; } }
 
 function wrap(name, make) {
     const iv = setInterval(function () {
@@ -95,12 +103,77 @@ function wrap(name, make) {
         window[name] = w;
     }, 80);
 }
-wrap('createParty', function (_f) { return function (zone) { if (zone !== W) return _f.apply(this, arguments); return asWonder(_f, this, arguments); }; });
-wrap('joinParty', function (_f) { return function (pid) { if (zoneOfParty(pid) !== W) return _f.apply(this, arguments); return asWonder(_f, this, arguments); }; });
-wrap('openDarkBriefing', function (_f) { return function (zone) { if (zone !== W) return _f.apply(this, arguments); return asWonder(_f, this, arguments); }; });
+
+// ==========================================
+// 부탁 표 (wonder-core.js) — 받아 둔 부탁이 있으면 이상한 나라 대신 그 연계 어둠으로
+// ==========================================
+let linkArm = null;            // 보라색 칸에서 누른 표 — 다음 한 번의 입장이 「부탁을 들어 주러」 가는 길
+function tk() { try { return X.ticket ? X.ticket() : null; } catch (e) { return null; } }
+function clone(o) { try { return JSON.parse(JSON.stringify(o)); } catch (e) { return null; } }
+function zoneName(z) { try { return (DARK_ZONES[z] && DARK_ZONES[z].name) || z; } catch (e) { return z; } }
+function pendingMsg(t) {
+    return '🎃 이상한 나라에서 받아 둔 부탁이 있습니다.\n「' + (t.misName || '') + '」\n\n어둠 탐사 목록에서 보라색으로 바뀐 【' + zoneName(t.zone) + '】(으)로 들어가십시오.\n(그만두려면 그 칸의 「부탁을 포기한다」)';
+}
+
+wrap('createParty', function (_f) {
+    return function (zone) {
+        if (zone !== W) return _f.apply(this, arguments);
+        const t = tk();
+        if (linkArm && t) {
+            const arm = linkArm; linkArm = null;
+            const out = asWonder(_f, this, arguments, null, true);
+            try {
+                if (typeof myPartyId !== 'undefined' && myPartyId && darkParties[myPartyId] && darkParties[myPartyId].zone === W) {
+                    const mark = { pid: arm.pid, zone: arm.zone, ch: arm.ch, mis: arm.mis || '', misName: arm.misName || '', linkName: arm.linkName || '' };
+                    darkParties[myPartyId].wonderGo = mark;
+                    const d = db_(); if (d) d.ref('darkParties/' + myPartyId + '/wonderGo').set(mark);
+                    try { renderPartyPanel(); } catch (e) { }
+                }
+            } catch (e) { }
+            return out;
+        }
+        if (t) { alertMsg(pendingMsg(t)); return; }
+        return asWonder(_f, this, arguments);
+    };
+});
+wrap('joinParty', function (_f) {
+    return function (pid) {
+        if (zoneOfParty(pid) !== W) return _f.apply(this, arguments);
+        const p = partyOf(pid), t = tk();
+        if (p && p.wonderGo) {
+            if (!t || t.pid !== p.wonderGo.pid) { alertMsg('🎃 이상한 나라에서 같은 부탁을 함께 받은 사원만 들어올 수 있는 파티입니다.'); return; }
+            return asWonder(_f, this, arguments, null, true);
+        }
+        if (t) { alertMsg(pendingMsg(t)); return; }
+        return asWonder(_f, this, arguments);
+    };
+});
+wrap('openDarkBriefing', function (_f) {
+    return function (zone) {
+        if (zone !== W) { linkArm = null; return _f.apply(this, arguments); }
+        const t = tk();
+        if (linkArm && t) {
+            const out = asWonder(_f, this, arguments, null, true);
+            try { dressBrief(t); } catch (e) { }
+            return out;
+        }
+        if (t) { alertMsg(pendingMsg(t)); return; }
+        return asWonder(_f, this, arguments);
+    };
+});
 wrap('startDarkRun', function (_f) {
     return function (zone) {
         if (zone !== W) return _f.apply(this, arguments);
+        const t = tk();
+        if (linkArm && t) {
+            linkArm = null;
+            X._armed = clone(t);                 // 탐사가 그려지기 전에 wonder-core 의 begin 이 받는다
+            return asWonder(_f, this, arguments, function (before) {
+                if (!before && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W && !darkRun.wonderLink) darkRun.wonderLink = clone(t);
+                X._armed = null;
+            }, true);
+        }
+        if (t) { alertMsg(pendingMsg(t)); return; }
         if (left() <= 0) { alertMsg('「이상한 나라의 ■■■」는 하루에 ' + DAY_MAX + '번까지 들어갈 수 있습니다.\n자정에 초기화됩니다.'); return; }
         return asWonder(_f, this, arguments, function (before) {
             if (!before && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W) countEntry('s' + Date.now());
@@ -110,11 +183,91 @@ wrap('startDarkRun', function (_f) {
 wrap('launchPartyRun', function (_f) {
     return function (party) {
         if (!party || party.zone !== W) return _f.apply(this, arguments);
+        if (party.wonderGo) {
+            const t = tk();
+            if (!t || t.pid !== party.wonderGo.pid) return;      // 같은 부탁을 쥔 사람만 (들어올 때 이미 막는다)
+            X._armed = clone(t);
+            return asWonder(_f, this, arguments, function (before) {
+                if (!before && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W && !darkRun.wonderLink) darkRun.wonderLink = clone(t);
+                X._armed = null;
+            }, true);
+        }
         return asWonder(_f, this, arguments, function (before) {
             if (!before && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W) countEntry('p' + party.id);
         });
     };
 });
+// 반입 화면 — 이상한 나라 대신 그 연계 어둠의 이름으로 보이게
+function dressBrief(t) {
+    const body = document.getElementById('darkness-body');
+    if (!body) return;
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(function (n) {
+        if (n.nodeValue.trim() === W) n.nodeValue = n.nodeValue.replace(W, t.zone);
+        else if (n.nodeValue.trim() === '(Eat me.)') { try { n.nodeValue = DARK_ZONES[t.zone].brief || n.nodeValue; } catch (e) { } }
+        else if (n.nodeValue.indexOf('이상한 나라의 ■■■') >= 0) n.nodeValue = n.nodeValue.replace('이상한 나라의 ■■■', zoneName(t.zone));
+    });
+    const box = body.querySelector('div[style*="border-radius:6px"]');
+    if (box && !document.getElementById('wonder-link-note')) {
+        box.insertAdjacentHTML('beforebegin', '<div id="wonder-link-note" style="background:linear-gradient(145deg,#2c1745,#170b26); border:1px solid #9b6ad6; border-radius:6px; padding:10px 12px; margin-bottom:12px; font-size:11px; line-height:1.7; color:#efe4ff;">'
+            + '🎃 <b>이상한 나라의 부탁</b> — 「' + esc(t.misName || '') + '」<br><span style="color:#a993c6; font-size:10px;">들어가면 이상한 나라에서 받은 부탁이 이어집니다. 탐사 횟수를 쓰지 않습니다.</span></div>');
+    }
+}
+// 파티 대기실 — 부탁 파티는 그 연계 어둠의 이름으로
+wrap('renderPartyPanel', function (_f) {
+    return function () {
+        const out = _f.apply(this, arguments);
+        try {
+            const p = (typeof getMyParty === 'function') ? getMyParty() : null;
+            if (p && p.wonderGo) {
+                const host = document.getElementById('dark-party') || document.body;
+                const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+                const nodes = [];
+                while (walker.nextNode()) nodes.push(walker.currentNode);
+                nodes.forEach(function (n) {
+                    if (n.nodeValue.indexOf(W) >= 0) n.nodeValue = n.nodeValue.split(W).join(p.wonderGo.zone);
+                    if (n.nodeValue.indexOf('이상한 나라의 ■■■') >= 0) n.nodeValue = n.nodeValue.split('이상한 나라의 ■■■').join(zoneName(p.wonderGo.zone) + ' — 🎃 「' + (p.wonderGo.misName || '') + '」');
+                    if (n.nodeValue.trim() === '(Eat me.)') { try { n.nodeValue = DARK_ZONES[p.wonderGo.zone].brief || n.nodeValue; } catch (e) { } }
+                });
+            }
+        } catch (e) { }
+        return out;
+    };
+});
+
+// 보라색 칸의 단추
+window.wonderLinkSolo = function () {
+    const t = tk(); if (!t) return;
+    if (t.team) { alertMsg('🎃 함께 받은 부탁입니다. 「파티 편성」으로 동료들과 들어가십시오.'); return; }
+    linkArm = t;
+    openDarkBriefing(W);
+};
+window.wonderLinkParty = function () {
+    const t = tk(); if (!t) return;
+    // 같은 부탁을 받은 동료가 이미 꾸린 파티가 있으면 그리로
+    try {
+        const ids = Object.keys(darkParties || {});
+        for (let i = 0; i < ids.length; i++) {
+            const p = darkParties[ids[i]];
+            if (p && p.zone === W && p.wonderGo && p.wonderGo.pid === t.pid && p.state === 'RECRUIT') return joinParty(ids[i]);
+        }
+    } catch (e) { }
+    linkArm = t;
+    createParty(W);
+    linkArm = null;
+};
+window.wonderLinkGiveUp = function () {
+    const t = tk(); if (!t) return;
+    const go = function () {
+        try { X.abandon(); } catch (e) { console.error(e); }
+        try { renderDarkness(); } catch (e) { }
+        alertMsg('부탁을 포기했습니다.\n「' + (t.misName || '') + '」 — 실패로 넘기고, 이상한 나라에 다시 들어가면 다음 챕터부터 이어집니다.');
+    };
+    try { if (typeof showCustomConfirm === 'function') { showCustomConfirm('「' + (t.misName || '') + '」 부탁을 포기하겠습니까?\n이 챕터는 실패로 넘어갑니다.', go); return; } } catch (e) { }
+    if (window.confirm('「' + (t.misName || '') + '」 부탁을 포기하겠습니까?\n이 챕터는 실패로 넘어갑니다.')) go();
+};
 
 // ==========================================
 // 동시 입장 제한 없음
@@ -144,7 +297,9 @@ function cardHtml() {
         + '<div style="font-size:15px; color:' + PURPLE.text + '; font-weight:bold; margin:7px 0 3px;">' + esc(z.name || '이상한 나라의 ■■■') + '</div>'
         + '<div style="font-size:10px; color:' + PURPLE.dim + '; line-height:1.6;">' + esc(z.brief || '') + '</div>'
         + '<div style="font-size:10px; color:' + PURPLE.dim + '; margin-top:6px; line-height:1.6;">1~' + PEOPLE_MAX + '인 · 하루 ' + DAY_MAX + '번 (오늘 남은 <b id="wonder-card-left" style="color:' + PURPLE.text + ';">' + n + '</b> / ' + DAY_MAX + ') · 이곳에서는 어떤 장비도 통하지 않습니다</div>'
-        + (open
+        + (tk()
+            ? '<div style="font-size:10.5px; color:' + PURPLE.text + '; margin-top:10px; padding:9px 10px; border:1px dashed ' + PURPLE.line + '; border-radius:6px; line-height:1.7;">🎃 받아 둔 부탁 — 「' + esc(tk().misName || '') + '」<br><span style="color:' + PURPLE.dim + ';">보라색으로 바뀐 【' + esc(zoneName(tk().zone)) + '】(으)로 들어가면 이어집니다.</span></div>'
+            : open
             ? '<div style="display:flex; gap:6px; margin-top:11px;">'
                 + '<button class="game-btn" style="' + BTN + '" onclick="openDarkBriefing(\'' + W + '\')">혼자 들어간다</button>'
                 + '<button class="game-btn" style="' + BTN + '" onclick="createParty(\'' + W + '\')">파티 편성</button></div>'
@@ -163,6 +318,63 @@ function dropBase(body) {
         if (c && c !== body && body.contains(c) && c.style && c.style.marginBottom === '10px') c.remove();
     }
 }
+// ── 부탁을 받은 연계 어둠 — 그 칸을 보라색 「부탁」 칸으로 바꿔 그린다 (나에게만)
+const LCARD = 'wonder-link-card';
+function baseCardOf(body, zone) {
+    if (zone === 'Qtrew-???-999') return document.getElementById('kroom-entry');
+    const ds = body.querySelectorAll('div');
+    for (let i = 0; i < ds.length; i++) {
+        const d = ds[i];
+        if (d.childElementCount || (d.textContent || '').trim() !== zone) continue;
+        if (d.closest('#' + LCARD) || d.closest('#' + CARD)) continue;
+        if (!/monospace/.test(d.getAttribute('style') || '')) continue;
+        const c = d.parentElement && d.parentElement.parentElement && d.parentElement.parentElement.parentElement;
+        if (c && c !== body && body.contains(c)) return c;
+    }
+    return null;
+}
+function linkCardHtml(t) {
+    const z = (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[t.zone]) || {};
+    const BTN = 'flex:1; margin:0; padding:11px; font-size:11px; background:linear-gradient(145deg,#7a4bb8,#4a2577) !important; border-color:' + PURPLE.line + ' !important; color:#fff !important;';
+    return '<div id="' + LCARD + '" data-k="' + esc(t.pid + '|' + t.rid + '|' + t.idx) + '" style="background:linear-gradient(145deg,' + PURPLE.bg1 + ',' + PURPLE.bg2 + '); border:1px solid ' + PURPLE.line + '; border-radius:8px; padding:14px; margin-bottom:10px; text-align:left; box-shadow:0 0 16px rgba(155,106,214,0.28);">'
+        + '<div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">'
+        + '<span style="font-size:9.5px; font-weight:bold; color:#1a0d29; background:' + PURPLE.soft + '; border-radius:10px; padding:2px 9px; letter-spacing:1px;">🎃 이상한 나라의 부탁</span>'
+        + '<span style="font-family:monospace; font-size:10px; color:' + PURPLE.soft + '; font-weight:bold;">' + esc(t.zone) + '</span></div>'
+        + '<div style="font-size:14px; color:' + PURPLE.text + '; font-weight:bold; margin:7px 0 3px;">' + esc(z.name || t.linkName || '') + '</div>'
+        + '<div style="font-size:10px; color:' + PURPLE.dim + '; line-height:1.6;">' + esc(z.brief || '') + '</div>'
+        + '<div style="font-size:11px; color:' + PURPLE.text + '; margin-top:8px; line-height:1.7;">「' + esc(t.misName || '') + '」 — ' + (t.team ? '함께 받은 부탁' : '혼자 받은 부탁') + '</div>'
+        + '<div style="font-size:10px; color:' + PURPLE.dim + '; margin-top:3px; line-height:1.6;">들어가면 이상한 나라에서 이어집니다 · 다른 팀 진행 · 방 수와 상관없이 들어갑니다 · 탐사 횟수를 쓰지 않습니다</div>'
+        + '<div style="display:flex; gap:6px; margin-top:11px;">'
+        + (t.team
+            ? '<button class="game-btn" style="' + BTN + '" onclick="wonderLinkParty()">파티 편성</button>'
+            : '<button class="game-btn" style="' + BTN + '" onclick="wonderLinkSolo()">혼자 들어간다</button>')
+        + '</div>'
+        + '<div style="text-align:right; margin-top:7px;"><button class="game-btn" style="margin:0; padding:5px 9px; font-size:9.5px; background:transparent !important; border-color:#4a2f6e !important; color:#8f7aac !important;" onclick="wonderLinkGiveUp()">부탁을 포기한다</button></div>'
+        + '</div>';
+}
+function paintLink(body) {
+    const t = tk();
+    let card = document.getElementById(LCARD);
+    // 감춰 둔 원래 칸 — 표가 없어졌거나 다른 어둠이면 되돌린다
+    Array.prototype.forEach.call(body.querySelectorAll('[data-wonder-hid]'), function (e) {
+        if (!t || e.getAttribute('data-wonder-hid') !== t.zone) { e.style.display = ''; e.removeAttribute('data-wonder-hid'); }
+    });
+    if (!t) { if (card) card.remove(); return; }
+    const key = t.pid + '|' + t.rid + '|' + t.idx;
+    if (card && card.getAttribute('data-k') !== key) { card.remove(); card = null; }
+    const base = baseCardOf(body, t.zone);
+    if (base && base.style.display !== 'none') { base.style.display = 'none'; base.setAttribute('data-wonder-hid', t.zone); }
+    if (!card) {
+        if (base) base.insertAdjacentHTML('beforebegin', linkCardHtml(t));
+        else {
+            const w = document.getElementById(CARD);
+            if (w) w.insertAdjacentHTML('afterend', linkCardHtml(t));
+            else body.insertAdjacentHTML('afterbegin', linkCardHtml(t));
+        }
+    } else if (base && card.nextElementSibling !== base) {
+        base.parentElement.insertBefore(card, base);
+    }
+}
 function listShown(body) {
     if (typeof darkRun !== 'undefined' && darkRun) return false;
     if (typeof darkBriefingOpen !== 'undefined' && darkBriefingOpen) return false;
@@ -173,6 +385,7 @@ function place() {
     if (!body || !me()) return;
     if (!listShown(body)) return;
     dropBase(body);
+    try { paintLink(body); } catch (e) { console.warn('[이상한 나라] 부탁 칸', e); }
     let card = document.getElementById(CARD);
     if (!card) {
         body.insertAdjacentHTML('afterbegin', cardHtml());
@@ -184,8 +397,9 @@ function place() {
 }
 wrap('renderDarkness', function (_f) {
     return function () {
+        linkArm = null;
         const out = _f.apply(this, arguments);
-        try { const c = document.getElementById(CARD); if (c) c.remove(); place(); } catch (e) { console.warn('[이상한 나라] 목록 카드', e); }
+        try { const c = document.getElementById(CARD); if (c) c.remove(); const l = document.getElementById(LCARD); if (l) l.remove(); place(); } catch (e) { console.warn('[이상한 나라] 목록 카드', e); }
         return out;
     };
 });

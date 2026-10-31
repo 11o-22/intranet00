@@ -18,6 +18,8 @@
 //   · 죽으면 기존처럼 상담실 · 선녀탕. 그 회차는 처음부터.
 //   · 챕터를 끝낼 때마다 멈추기 / 잇기 — 팀은 투표. 동률이면 각자 d30(16+) — 실패한 사람은 나오고
 //     (다음엔 처음부터) 성공한 사람은 진행. 짝수 인원이 반반으로 갈리면 다시 굴려 반드시 과반.
+//     → 2026-10-31 사용자: 주사위는 「고른 쪽」의 성공 · 실패. 이어서 간다 — 성공 진행 · 실패 퇴장(처음부터) /
+//       멈춘다 — 성공 퇴장(멈춘 자리 그대로) · 실패 진행. 반반 다시 굴리기는 「남는 사람 · 나가는 사람」으로 센다.
 //   · 멈추면 회차는 그 자리에 남는다 — 다음에 들어오면 남은 챕터부터.
 //   · 이 어둠(연계판 포함)에서는 어떤 장비도 통하지 않는다 — 판정 보정 · 즉사 막기 · 행운 · 맹약 전부.
 //     도움은 이벤트 샵(wonder-shop.js) 물건뿐.
@@ -167,6 +169,37 @@ X.on = on;
 function inW() { return typeof darkRun !== 'undefined' && !!darkRun && (darkRun.zone === W || !!darkRun.wonderLink); }
 X.inW = inW;
 
+// ==========================================
+// 부탁 표 — 연계판은 기존 어둠에서 (2026-10-31 사용자)
+// ==========================================
+//   미션을 받으면 「이들의 부탁을 들어 주러 간다.」 로 이 어둠을 나가고, 어둠 목록에서 보라색으로 바뀐
+//   그 어둠(연계 어둠)에 들어가면 이어진다. 그 사이를 잇는 것이 사람마다 한 장씩 쥔 표다.
+//     users/{사번}/wonderGo = { pid(이상한 나라 방), ch, zone(연계 어둠), mis, misName, linkName, rid, idx, team, st:'go'|'live', at }
+//   연계 어둠으로 들어간 탐사도 속은 이 어둠(구역 W)으로 돌린다 — 다른 어둠의 장치 · 점유 · 정원이 끼어들지 않게.
+//   darkRun.wonderLink = 그 표. 방(PID)은 표의 pid 를 그대로 쓴다 (함께 보는 곳 · 내 화면이 이어진다).
+const LINK_ZONE = { kroom: 'Qtrew-???-999' };
+function linkZoneOf(ch) { const z = CH[ch] && CH[ch].link; return LINK_ZONE[z] || z; }
+X.linkZoneOf = linkZoneOf;
+function ticket() { try { return (currentUser && currentUser.wonderGo && currentUser.wonderGo.pid) ? currentUser.wonderGo : null; } catch (e) { return null; } }
+X.ticket = ticket;
+function setTicket(t) {
+    try { currentUser.wonderGo = t || null; } catch (e) { }
+    const d = db_();
+    try { if (d && currentUser) d.ref('users/' + currentUser.code + '/wonderGo').set(t ? clean(t) : null); } catch (e) { }
+}
+X.setTicket = setTicket;
+function runPid() {
+    try { if (darkRun && darkRun.wonderLink && darkRun.wonderLink.pid) return darkRun.wonderLink.pid; } catch (e) { }
+    return (darkRun && darkRun.partyId) ? darkRun.partyId : ('solo_' + currentUser.code);
+}
+// 지금 받은 미션의 연계판을 여기서 돌리는가 (연계 어둠으로 들어온 탐사 · 그 회차 그 챕터)
+function linkHere() {
+    const L = (typeof darkRun !== 'undefined' && darkRun) ? darkRun.wonderLink : null;
+    const m = S.meta || {};
+    return !!(L && L.rid === m.rid && Number(L.idx) === Number(m.idx || 0));
+}
+X.linkHere = linkHere;
+
 function hash(s) {
     let h = 2166136261 >>> 0;
     s = String(s);
@@ -209,7 +242,8 @@ function snapRun() {
             carryEquips: darkRun.carryEquips || [], carryItems: darkRun.carryItems || [],
             log: (darkRun.log || []).slice(-20), lostItems: [],
             isParty: !!darkRun.isParty, isLeader: !!darkRun.isLeader, partyId: darkRun.partyId || null,
-            memberCount: darkRun.memberCount || 1, counted: true, wonder: true
+            memberCount: darkRun.memberCount || 1, counted: true, wonder: true,
+            wonderLink: darkRun.wonderLink ? clean(darkRun.wonderLink) : null
         });
     } catch (e) { }
 }
@@ -720,6 +754,7 @@ VIEW.link = function () {
     const m = S.meta || {};
     const ch = m.order[m.idx || 0];
     const c = X.chapters[ch];
+    if (!linkHere()) return goScreen(ch);
     if (c && c.link) return c.link(api(), F.mis);
     const r = (S.res || {})['r_' + m.rid + '_' + (m.idx || 0)];
     if (r) return go({ id: 'result', r: r });
@@ -728,6 +763,64 @@ VIEW.link = function () {
         canSet && isAdmin()
             ? '<div class="wd-adm">관리자 시험 — 결말을 고릅니다.</div>' + btn('✔ 이상한 나라 쪽 성공', "WONDER.setRes('w')") + btn('✔ 어둠 쪽 성공', "WONDER.setRes('d')") + btn('✖ 실패', "WONDER.setRes('f')")
             : canSet ? btn('돌아간다.', "WONDER.setRes('f')") : waitHtml('_none', '파티장을 기다립니다.'));
+};
+// 부탁을 받은 뒤 — 이 어둠을 나가 연계 어둠으로 간다
+function goScreen(ch) {
+    const zone = linkZoneOf(ch);
+    const zn = (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[zone] && DARK_ZONES[zone].name) || CH[ch].linkName;
+    draw('부탁', '「' + esc(misName(ch, F.mis)) + '」<br><br>'
+        + '이들의 부탁은 이 홀 밖, <b style="color:#c9a3f0;">【' + esc(zn) + '】</b>에서 이어집니다.<br>'
+        + '<span style="font-size:11px; color:#a993c6;">(이 어둠을 나가면 어둠 탐사 목록에서 그 어둠이 보라색으로 바뀝니다. '
+        + (isTeam() ? '함께 부탁을 받은 동료들과 그 어둠에서 파티를 꾸려 들어가면' : '그 어둠에 혼자 들어가면')
+        + ' 이야기가 여기서부터 이어집니다. 그 어둠의 정원 · 다른 팀 진행과 상관없이 들어갈 수 있고, 탐사 횟수도 쓰지 않습니다.)</span>',
+        btn('이들의 부탁을 들어 주러 간다.', 'WONDER.goAway()'));
+}
+X.goAway = function () {
+    if (!F || F.st !== 'in') return;
+    const m = S.meta || {};
+    const ch = m.order[m.idx || 0];
+    setTicket({ pid: PID, ch: ch, zone: linkZoneOf(ch), mis: F.mis, misName: misName(ch, F.mis), linkName: CH[ch].linkName,
+                rid: m.rid, idx: m.idx || 0, team: isTeam(), st: 'go', at: now() });
+    F.st = 'away'; F.away = 1;
+    save();
+    try { darkRun.log.push('[이상한 나라] 「' + misName(ch, F.mis) + '」 — ' + CH[ch].linkName + '(으)로 간다'); } catch (e) { }
+    try { darkRun.success = 0; darkRun.fail = 0; } catch (e) { }
+    try { finishDarkRun(); } catch (e) { console.error(e); }
+    const zn = (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[linkZoneOf(ch)] && DARK_ZONES[linkZoneOf(ch)].name) || CH[ch].linkName;
+    const mn = (ticket() || {}).misName || '';
+    setTimeout(function () { try { showCustomAlert('🎃 「' + mn + '」\n\n어둠 탐사 목록에서 보라색으로 바뀐 【' + zn + '】(으)로 들어가십시오.'); } catch (e) { } }, 300);
+};
+// 표를 버린다 — 기록을 못 찾았을 때
+X.dropTicket = function () {
+    setTicket(null);
+    try { darkRun.success = 0; darkRun.fail = 0; } catch (e) { }
+    F = null;
+    try { finishDarkRun(); } catch (e) { console.error(e); }
+};
+// 부탁을 포기한다 (어둠 목록의 보라색 칸) — 그 챕터는 실패로 넘기고, 다음에 들어오면 다음 챕터부터
+X.abandon = function () {
+    const t = ticket();
+    if (!t) return;
+    const me = rec();
+    normRec();
+    if (me.cur && me.cur.rid === t.rid && Number(me.cur.idx || 0) === Number(t.idx)) {
+        me.cur.used = me.cur.used || {};
+        const u = arr(me.cur.used[t.ch]); if (t.mis && u.indexOf(t.mis) < 0) u.push(t.mis); me.cur.used[t.ch] = u;
+        me.cur.res = me.cur.res || {}; me.cur.res[t.ch] = 'f';
+        me.cur.idx = Number(t.idx) + 1;
+        if (me.cur.idx >= 6) { me.rounds = (me.rounds || 0) + 1; me.cur = null; }
+        saveRec();
+    }
+    const d = db_();
+    if (d) {
+        try {
+            if (String(t.pid).indexOf('solo_') === 0) { d.ref('wonder/' + t.pid).remove(); d.ref('wonderMe/' + t.pid).remove(); }
+            else { d.ref('wonder/' + t.pid + '/pl/' + currentUser.code + '/st').set('out'); d.ref('wonderMe/' + t.pid + '/' + currentUser.code + '/st').set('out'); }
+        } catch (e) { }
+    }
+    try { addHistoryLog(currentUser, '[이상한 나라] 「' + (t.misName || '') + '」 부탁을 포기했습니다 (실패로 넘김).'); } catch (e) { }
+    setTicket(null);
+    try { saveSelfFull(); } catch (e) { }
 };
 X.setRes = function (r) {
     const m = S.meta || {};
@@ -770,6 +863,7 @@ X.chapterDone = function (given) {
     me.cur.res = me.cur.res || {};
     me.cur.res[ch] = r;
     me.cur.idx = (m.idx || 0) + 1;
+    { const t = ticket(); if (t && t.rid === m.rid && Number(t.idx) === Number(m.idx || 0)) setTicket(null); }
     try { darkRun.log.push('[이상한 나라] ' + CH[ch].name + ' 「' + misName(ch, mid) + '」 ' + (r === 'f' ? '실패' : '성공')); } catch (e) { }
     // 미션 성공 보상 (wonder-reward.js) — 사람마다 한 번. 실패는 아무것도 없이 다음 챕터.
     const rwKey = 'rw_' + m.rid + '_' + (m.idx || 0);
@@ -805,7 +899,7 @@ VIEW.cont = function (sc) {
     }
     const done = a.filter(function (c) { return !!v[c]; });
     if (done.length < a.length) {
-        draw('투표', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴립니다. 실패한 사람은 나가고, 다음에 들어오면 처음부터 다시 합니다.)</span>',
+        draw('투표', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴려, 자기가 고른 쪽의 성공 · 실패를 정합니다. 「이어서 간다」 실패면 나가서 다음에 처음부터, 「멈춘다」 실패면 이어서 갑니다.)</span>',
             mine ? '<div class="wd-wait">' + (mine === 'go' ? '「이어서 간다」' : '「멈춘다」') + '에 투표했습니다.<br>' + a.map(function (c) { return (v[c] ? '✔ ' : '… ') + esc(nameOf(c)); }).join(' · ') + '</div>'
                  : btn('이어서 간다.', "WONDER.vote('go')") + btn('여기서 멈춘다.', "WONDER.vote('stop')"));
         return;
@@ -836,7 +930,7 @@ VIEW.tie = function (sc) {
     const mineR = (D[round] || {})[ME];
     const got = a.filter(function (c) { return (D[round] || {})[c]; });
     if (!mineR) {
-        draw('동률', '표가 반으로 갈렸습니다. 멈추지 않고 각자 주사위를 굴립니다.<br>성공하면 이어서 가고, 실패하면 이 회차에서 나갑니다.' + (round ? '<br><span style="color:#d4af37;">(반반으로 갈려 다시 굴립니다.)</span>' : ''),
+        draw('동률', '표가 반으로 갈렸습니다. 각자 주사위를 굴려, 자기가 고른 쪽이 이루어지는지 봅니다.<br>' + (((S.vote || {})[sc.key] || {})[ME] === 'stop' ? '「멈춘다」 — 성공하면 여기서 멈추고, 실패하면 이어서 갑니다.' : '「이어서 간다」 — 성공하면 이어서 가고, 실패하면 이 회차에서 나갑니다.') + (round ? '<br><span style="color:#d4af37;">(반반으로 갈려 다시 굴립니다.)</span>' : ''),
             btn('주사위를 굴린다.', 'WONDER.tieRoll()'));
         return;
     }
@@ -844,13 +938,18 @@ VIEW.tie = function (sc) {
         draw('동률', rollHtml(mineR), '<div class="wd-wait">' + a.map(function (c) { const r = (D[round] || {})[c]; return (r ? (r.ok ? '✔ ' : '✖ ') : '… ') + esc(nameOf(c)); }).join(' · ') + '</div>');
         return;
     }
-    const okN = got.filter(function (c) { return D[round][c].ok; }).length;
+    // 2026-10-31 사용자 — 주사위는 「자기가 고른 쪽」의 성공 · 실패다.
+    //   이어서 간다 → 성공: 진행 · 실패: 퇴장(다음엔 처음부터) / 멈춘다 → 성공: 퇴장(멈춘 자리 그대로) · 실패: 진행
+    const V = (S.vote || {})[sc.key] || {};
+    const stays = function (c) { const ok = !!D[round][c].ok; return (V[c] === 'stop') ? !ok : ok; };
+    const okN = got.filter(stays).length;
     if (a.length % 2 === 0 && okN * 2 === a.length) {
         if (leader() === ME) tx('dice/' + sc.key + '/_n', function (cur) { return (cur || 0) === round ? round + 1 : cur; });
         draw('동률', rollHtml(mineR), '<div class="wd-wait">성공과 실패가 반반입니다. 다시 굴립니다…</div>');
         return;
     }
-    if (mineR.ok) return X.contGo('go');
+    if (stays(ME)) return X.contGo('go');
+    if (V[ME] === 'stop') return go({ id: 'stopped' });     // 멈추기에 성공 — 회차는 멈춘 자리에 남는다
     go({ id: 'tieOut' });
 };
 X.tieRoll = function () {
@@ -890,6 +989,7 @@ function die(reasonHtml) {
     if (typeof darkRun === 'undefined' || !darkRun || darkRun._dead) return;
     darkRun._dead = true;
     if (F) { F.st = 'dead'; pub('pl/' + ME + '/st', 'dead'); save(); }
+    if (ticket()) setTicket(null);
     // 회차는 처음부터
     restartRound();
     saveRec();
@@ -962,7 +1062,13 @@ function newRound() {
 }
 function begin(isResume) {
     ME = currentUser.code;
-    PID = (darkRun.partyId) ? darkRun.partyId : ('solo_' + ME);
+    // 새로고침으로 다시 붙었는데 연계 어둠에 들어가 있던 표가 있으면 그대로 잇는다
+    // 연계 어둠 입구(wonder-entry.js)가 막 들어가며 걸어 둔 표 — startDarkRun 안에서 바로 그려지므로 여기서 받는다
+    if (!darkRun.wonderLink && X._armed) { darkRun.wonderLink = X._armed; }
+    X._armed = null;
+    { const t = ticket(); if (!darkRun.wonderLink && t && t.st === 'live' && isResume) darkRun.wonderLink = clean(t); }
+    PID = runPid();
+    const LK = darkRun.wonderLink || null;
     const d = db_();
     if (!d) { draw('—', '연결이 없습니다.', btn('단말로 복귀한다.', 'finishDarkRun()'), { nobar: true }); return; }
     S = {};
@@ -974,11 +1080,32 @@ function begin(isResume) {
     }).catch(function () { });
     loadRec.then(function () { return d.ref('wonderMe/' + PID + '/' + ME).once('value'); }).then(function (s) {
         const v = s && s.val();
-        if (v && v.v && v.pid === PID && v.st === 'in') {
+        if (v && v.v && v.pid === PID && (v.st === 'in' || (LK && v.st === 'away'))) {
             F = v;
             if (!F.usedIt) F.usedIt = [];
+            if (LK) {
+                // 연계 어둠으로 들어왔다 — 받아 둔 부탁에서 잇는다
+                F.st = 'in'; F.away = null;
+                if (LK.st !== 'live' || !F.sc) F.sc = { id: 'link' };      // 처음 들어오면 부탁 자리에서 · 새로고침이면 있던 자리에서
+                pub('pl/' + ME + '/st', 'in');
+                const t = ticket(); if (t && t.st !== 'live') { t.st = 'live'; setTicket(t); }
+                LK.st = 'live';
+                // 팀 — 같이 오지 않은 동료는 이번 연계판에서 빼 둔다 (기다리는 문이 걸리지 않게)
+                try {
+                    const pp = darkRun.partyId ? darkParties[darkRun.partyId] : null;
+                    const here = pp && pp.members ? Object.keys(pp.members) : [ME];
+                    if (!darkRun.partyId || (pp && pp.leader === ME)) Object.keys(pl()).forEach(function (c) { if (here.indexOf(c) < 0) pub('pl/' + c + '/gone', true); });
+                } catch (e) { }
+                save();
+            }
             pub('pl/' + ME + '/gone', null);
             view();
+            return;
+        }
+        if (LK) {
+            // 받아 둔 부탁의 기록이 없다 — 표를 버리고 나간다
+            draw('—', '이 부탁의 기록을 찾지 못했습니다.<br><span style="font-size:11px; color:#888;">(부탁은 실패로 넘기지 않고 지웁니다. 이상한 나라에 다시 들어가면 남은 챕터부터 이어집니다.)</span>',
+                btn('단말로 복귀한다.', 'WONDER.dropTicket()'), { nobar: true });
             return;
         }
         F = fresh();
@@ -1055,9 +1182,9 @@ function cleanup() {
         clearInterval(iv);
         const _r = renderDarkStep;
         renderDarkStep = function () {
-            if (typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W && !darkRun.wonderLink) {
+            if (typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W) {
                 if (darkRun._dead) return;
-                if (!F || F.pid !== ((darkRun.partyId) ? darkRun.partyId : ('solo_' + currentUser.code))) { begin(!!darkRun.rejoined); return; }
+                if (!F || F.pid !== runPid()) { begin(!!darkRun.rejoined); return; }
                 view();
                 return;
             }
@@ -1065,6 +1192,22 @@ function cleanup() {
         };
         try { window.renderDarkStep = renderDarkStep; } catch (e) { }
     }, 50);
+
+    // 복귀 — 연계 어둠에서 돌던 탐사면 표(방 번호)를 다시 붙인다
+    const iv4 = setInterval(function () {
+        if (typeof window.acceptDarkResume !== 'function') return;
+        clearInterval(iv4);
+        const _a = window.acceptDarkResume;
+        const w = function () {
+            const snap = window._pendingResume;
+            const lk = snap && snap.zone === W && snap.wonderLink ? snap.wonderLink : null;
+            const r = _a.apply(this, arguments);
+            try { if (lk && typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W && !darkRun.wonderLink) darkRun.wonderLink = lk; } catch (e) { }
+            return r;
+        };
+        window.acceptDarkResume = w;
+        try { acceptDarkResume = w; } catch (e) { }
+    }, 60);
 
     const iv2 = setInterval(function () {
         if (typeof renderRejoinScene !== 'function') return;
@@ -1088,8 +1231,9 @@ function cleanup() {
             const _f = window[nm];
             const w = function () {
                 const mine = typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W;
+                const away = !!(F && F.st === 'away');
                 if (mine && F && F.st === 'in') { F.st = 'out'; pub('pl/' + ME + '/st', 'out'); save(); }
-                const pid = mine ? PID : null;
+                const pid = (mine && !away) ? PID : null;
                 const r = _f.apply(this, arguments);
                 if (mine || F) cleanup();
                 if (pid && pid.indexOf('solo_') === 0) {
