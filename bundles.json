@@ -338,6 +338,7 @@
       "clock.js",
       "irregular.js",
       "letter-sent.js",
+      "letter-admin.js",
       "pet-data.js",
       "pet-list.js",
       "pet-shop.js",

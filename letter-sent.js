@@ -103,6 +103,8 @@ function note(code, text) {
     });
     while (arr.length > KEEP) arr.pop();
     try { if (typeof saveFields === 'function') saveFields({ sentLetters: 1 }); } catch (e) { }
+    // 상담사 열람용 기록 (letter-admin.js) — 2026-11-01
+    try { if (typeof window.letterLogPut === 'function') window.letterLogPut(code, text); } catch (e) { }
     try { paint(); } catch (e) { }
 }
 
