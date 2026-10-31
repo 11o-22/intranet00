@@ -1300,6 +1300,32 @@ function cleanup() {
         try { window.renderDarkStep = renderDarkStep; } catch (e) { }
     }, 50);
 
+    // ★ 기본 진행 기록(saveDarkRunState)은 통째로 덮어써서 이 어둠의 표(wonderLink · wonder · wGain)를 지웠다 (2026-10-31)
+    //   파티 탐사는 party-keep.js 가 30초마다 그것을 부른다 → 새로 열어 복귀하면 연계 탐사의 방 번호를 잃고 새 방에서 처음부터 시작했다.
+    //   덮어쓴 바로 뒤에 이 어둠의 칸을 다시 얹는다.
+    const iv5 = setInterval(function () {
+        if (typeof window.saveDarkRunState !== 'function') return;
+        clearInterval(iv5);
+        const _s = window.saveDarkRunState;
+        const w = function () {
+            const r = _s.apply(this, arguments);
+            try {
+                const d = db_();
+                if (d && inW() && currentUser) {
+                    d.ref('darkRuns/' + currentUser.code).update({
+                        wonder: true, zone: W,
+                        wonderLink: darkRun.wonderLink ? clean(darkRun.wonderLink) : null,
+                        wGain: Number(darkRun.wGain) || 0, wGainItems: arr(darkRun.wGainItems)
+                    });
+                }
+            } catch (e) { }
+            return r;
+        };
+        Object.keys(_s).forEach(function (k) { try { w[k] = _s[k]; } catch (e) { } });
+        window.saveDarkRunState = w;
+        try { saveDarkRunState = w; } catch (e) { }
+    }, 60);
+
     // 복귀 — 연계 어둠에서 돌던 탐사면 표(방 번호)를 다시 붙인다
     const iv4 = setInterval(function () {
         if (typeof window.acceptDarkResume !== 'function') return;
@@ -1341,8 +1367,17 @@ function cleanup() {
             const w = function () {
                 const mine = typeof darkRun !== 'undefined' && darkRun && darkRun.zone === W;
                 const away = !!(F && F.st === 'away');
-                if (mine && F && F.st === 'in') { F.st = 'out'; pub('pl/' + ME + '/st', 'out'); save(); }
-                const pid = (mine && !away) ? PID : null;
+                // ★ 내가 고른 길(멈춘다 · 나간다 · 부탁하러 간다 · 쓰러짐)이 아닌데 탐사가 닫혔다 — 튕긴 것이다 (2026-10-31 「연계 어둠에서 쫓겨나고 초기화」)
+                //   전에는 여기서 「나갔다」로 적고 혼자 방 기록까지 지워, 다시 들어가면 처음부터(부탁 표는 「기록을 못 찾았다」로 버려짐)였다.
+                //   이제 내 화면 기록(wonderMe · st 'in')은 그대로 두고 지우지도 않는다 — 다시 들어가면(연계면 보라색 칸) 있던 자리에서 잇는다.
+                //   팀이면 함께 보는 자리(pl)에서만 빠져 동료가 나를 기다리지 않게 한다 (돌아오면 begin 이 다시 'in' 으로 적는다).
+                const kicked = !!(mine && F && F.st === 'in');
+                if (kicked) {
+                    try { if (isTeam()) pub('pl/' + ME + '/st', 'out'); } catch (e) { }
+                    try { F.kickedAt = now(); save(); } catch (e) { }
+                    try { console.warn('[이상한 나라] 탐사가 닫혔습니다 — 자리를 남겨 둡니다 (다시 들어가면 잇습니다)', new Error().stack); } catch (e) { }
+                }
+                const pid = (mine && !away && !kicked) ? PID : null;
                 const r = _f.apply(this, arguments);
                 if (mine || F) cleanup();
                 if (pid && pid.indexOf('solo_') === 0) {
