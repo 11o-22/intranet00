@@ -11,8 +11,8 @@
 //     wonder-jiangshi.mp3  강시 챕터 (연계판까지)
 //     wonder-vampire.mp3   뱀파이어 챕터 (연계판까지)
 //     wonder-siren.mp3     세이렌 챕터 (연계판까지)
-//     halloween-plaza.mp3  할로윈 광장 — 광장 길 · 건물 안 여덟 방 전체
-//     halloween.mp3        그냥 할로윈 — 포토존 「핼러윈」
+//     halloween.mp3        할로윈 광장 — 광장 길 · 건물 안 여덟 방 전체   (2026-10-31 사용자: 둘을 서로 바꿈)
+//     halloween-plaza.mp3  포토존 「핼러윈」
 //
 //   이상한 나라가 광장보다 앞선다 (광장 위에 띄운 어둠 창에서 방을 만들어도 이상한 나라 곡).
 //   끄고 켜기: 광장 위 띠의 🔊 (이 브라우저에 기억) · 어둠 탐사 화면의 🔇 도 이상한 나라 곡을 끈다.
@@ -30,8 +30,8 @@ const T = {
     jiangshi: 'snd/wonder-jiangshi.mp3',
     vampire:  'snd/wonder-vampire.mp3',
     siren:    'snd/wonder-siren.mp3',
-    plaza:    'snd/halloween-plaza.mp3',
-    pzh:      'snd/halloween.mp3'
+    plaza:    'snd/halloween.mp3',          // ★ 2026-10-31 사용자 — 광장 곡과 포토존 곡을 서로 바꿨다
+    pzh:      'snd/halloween-plaza.mp3'
 };
 const VOL = 0.42;
 const FADE_MS = 700;
