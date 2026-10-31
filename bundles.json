@@ -429,7 +429,9 @@
       "wonder-text.js",
       "wonder-core.js",
       "wonder-shop.js",
-      "wonder-ch-angel.js"
+      "wonder-ch-angel.js",
+      "wonder-link.js",
+      "wonder-link-angel.js"
     ]
   ]
 }

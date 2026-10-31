@@ -675,6 +675,13 @@ X.setRes = function (r) {
     tx('res/r_' + m.rid + '_' + (m.idx || 0), function (cur) { return cur || r; });
 };
 X.linkEnd = function (r) { X.setRes(r); };
+// 연계판이 결말을 다 보여 준 뒤 부른다 — personal 이면 나만의 결과 (T8 「따라 올라간다」처럼 사람마다 갈리는 결말)
+X.finish = function (r, personal) {
+    const m = S.meta || {};
+    const key = 'r_' + m.rid + '_' + (m.idx || 0) + (personal ? '_' + ME : '');
+    tx('res/' + key, function (cur) { return cur || r; });
+    X.chapterDone(r);
+};
 
 VIEW.result = function (sc) {
     const m = S.meta || {};
@@ -687,10 +694,11 @@ VIEW.result = function (sc) {
 };
 
 // 챕터 끝 — 내 회차 기록에 적고, 멈출지 이을지
-X.chapterDone = function () {
+X.chapterDone = function (given) {
     const m = S.meta || {};
     const ch = m.order[m.idx || 0];
-    const r = (S.res || {})['r_' + m.rid + '_' + (m.idx || 0)] || 'f';
+    const rkey = 'r_' + m.rid + '_' + (m.idx || 0);
+    const r = given || (S.res || {})[rkey + '_' + ME] || (S.res || {})[rkey] || 'f';
     const mid = (S.mis || {})['mis_' + m.rid + '_' + (m.idx || 0)];
     const me = rec();
     if (!me.cur || me.cur.rid !== m.rid) me.cur = { rid: m.rid, order: m.order, idx: m.idx || 0, used: m.used || {}, res: {} };
@@ -953,8 +961,9 @@ function onShared() {
     // 다른 사람의 결정으로 화면이 바뀌는 곳
     if (sc.id === 'link') {
         const m = S.meta || {};
+        const c = X.chapters[(m.order || [])[m.idx || 0]];
         const r = (S.res || {})['r_' + m.rid + '_' + (m.idx || 0)];
-        if (r) return go({ id: 'result', r: r });
+        if (r && !(c && c.link)) return go({ id: 'result', r: r });
     }
     if (sc.id === 'walk' && F.wait) return view();
     if (LIVE[sc.id]) return view();
