@@ -4,7 +4,7 @@
 // ==========================================
 //
 //   · 인원 1~5.
-//   · 하루 5번 — 이 어둠만의 횟수다. 다른 어둠의 「금일 탐사 횟수」는 쓰지도 막지도 않는다.
+//   · 횟수 제한 없음 (2026-10-31 사용자 — 전에는 하루 5번). 다른 어둠의 「금일 탐사 횟수」는 쓰지도 막지도 않는다.
 //       진짜 값은 wonderUse/{사번} = { d: 날짜, n: 들어간 수, k: [최근 판 열쇠] } 하나 (트랜잭션으로 +1).
 //       파티는 파티 번호로 한 번만 센다(다시 붙어도 두 번 세지 않게).
 //   · 동시 입장 제한 없음 — 이 구역은 점유 잠금(darkOccupancy)을 쓰지 않고, 파티가 여럿 있어도 막지 않는다.
@@ -52,7 +52,10 @@ let use = null, useCode = null, useRef = null;
         useRef.on('value', function (s) { use = s.val(); });
     }, 500);
 })();
+// ★ 2026-10-31 사용자 — 하루 횟수 없이 쭉 들어갈 수 있게. 들어간 수(wonderUse)는 그대로 적어 두기만 한다.
+const NO_LIMIT = true;
 function left() {
+    if (NO_LIMIT) return 99;
     const u = use || {};
     return (u.d === today()) ? Math.max(0, DAY_MAX - (u.n || 0)) : DAY_MAX;
 }
@@ -308,7 +311,7 @@ function cardHtml() {
         + '<span style="font-family:monospace; font-size:10px; color:' + PURPLE.soft + '; font-weight:bold;">' + W + '</span></div>'
         + '<div style="font-size:15px; color:' + PURPLE.text + '; font-weight:bold; margin:7px 0 3px;">' + esc(z.name || '이상한 나라의 ■■■') + '</div>'
         + '<div style="font-size:10px; color:' + PURPLE.dim + '; line-height:1.6;">' + esc(z.brief || '') + '</div>'
-        + '<div style="font-size:10px; color:' + PURPLE.dim + '; margin-top:6px; line-height:1.6;">1~' + PEOPLE_MAX + '인 · 하루 ' + DAY_MAX + '번 (오늘 남은 <b id="wonder-card-left" style="color:' + PURPLE.text + ';">' + n + '</b> / ' + DAY_MAX + ') · 이곳에서는 어떤 장비도 통하지 않습니다</div>'
+        + '<div style="font-size:10px; color:' + PURPLE.dim + '; margin-top:6px; line-height:1.6;">1~' + PEOPLE_MAX + '인 · ' + (NO_LIMIT ? '횟수 제한 없음' : '하루 ' + DAY_MAX + '번 (오늘 남은 <b id="wonder-card-left" style="color:' + PURPLE.text + ';">' + n + '</b> / ' + DAY_MAX + ')') + ' · 이곳에서는 어떤 장비도 통하지 않습니다</div>'
         + (tk()
             ? '<div style="font-size:10.5px; color:' + PURPLE.text + '; margin-top:10px; padding:9px 10px; border:1px dashed ' + PURPLE.line + '; border-radius:6px; line-height:1.7;">🎃 받아 둔 부탁 — 「' + esc(tk().misName || '') + '」<br><span style="color:' + PURPLE.dim + ';">보라색으로 바뀐 【' + esc(zoneName(tk().zone)) + '】(으)로 들어가면 이어집니다.</span></div>'
             : open
@@ -576,5 +579,5 @@ window.wonderTriesReset = function () {
     console.log('오늘 횟수를 되돌렸습니다.');
 };
 
-console.log('[이상한 나라] 입장 — 1~' + PEOPLE_MAX + '인 · 하루 ' + DAY_MAX + '번 · 동시 입장 허용');
+console.log('[이상한 나라] 입장 — 1~' + PEOPLE_MAX + '인 · ' + (NO_LIMIT ? '횟수 제한 없음' : '하루 ' + DAY_MAX + '번') + ' · 동시 입장 허용');
 })();
