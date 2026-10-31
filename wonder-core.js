@@ -15,7 +15,7 @@
 //   · 회차 = 여섯 챕터 · 여섯 미션. 회차마다 챕터 순서는 무작위(720가지 전부). 사탕 열쇠는 다음 문만 연다.
 //   · 미션은 솔로 4 · 팀 8 가운데 무작위, 같은 회차 안에서는 겹치지 않는다(처음부터 다시 해도).
 //   · 성공 = 이상한 나라 쪽 ✔ 또는 어둠 쪽 ✔ → 황금빛 열쇠 사탕 + 보상(wonder-reward.js). 실패 = 잃는 것 없이 다음 챕터.
-//   · 죽으면 상담실 · 선녀탕으로 가지 않고 오염도 50% (2026-10-31 사용자). 그 회차는 처음부터.
+//   · 죽으면 상담실 · 선녀탕으로 가지 않고 가두리에 15분 (2026-10-31 사용자). 그 회차는 처음부터.
 //   · 챕터를 끝낼 때마다 멈추기 / 잇기 — 팀은 투표. 동률이면 각자 d30(16+) — 실패한 사람은 나오고
 //     (다음엔 처음부터) 성공한 사람은 진행. 짝수 인원이 반반으로 갈리면 다시 굴려 반드시 과반.
 //     → 2026-10-31 사용자: 주사위는 「고른 쪽」의 성공 · 실패. 이어서 간다 — 성공 진행 · 실패 퇴장(처음부터) /
@@ -996,7 +996,27 @@ X.leave = function () {
 // ==========================================
 // 죽음 — 막기 없이 (이 어둠에서는 장비가 통하지 않는다)
 // ==========================================
-const DIE_POLL = 50;            // 쓰러지면 오염도 — 상담실 · 선녀탕 대신 (2026-10-31 사용자)
+// ★ 쓰러지면 상담실 · 선녀탕 대신 가두리에 15분 (2026-10-31 사용자) — 광장 → 백일몽 → 우체국 … 차례로 빈 가두리 (gaduri.js FILL)
+//   gaduri/<방>/<사번> = { by:'wonder', until } — until 이 지나면 누구의 화면이든 치운다 (gaduri.js). 다 찼으면 밖에 둔다. 오염도는 건드리지 않는다.
+const CAGE_MS = 15 * 60 * 1000;
+function cageMe() {
+    const d = db_(), me = currentUser;
+    if (!d || !me || me.code === 'kario0987') return;
+    const until = now() + CAGE_MS;
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream', 'post'];
+    const put = function (i) {
+        if (i >= rooms.length) return;
+        d.ref('gaduri/' + rooms[i]).transaction(function (box) {
+            box = box || {};
+            if (box[me.code]) { if (!(Number(box[me.code].until) > until)) { box[me.code].until = until; if (!box[me.code].auto) box[me.code].by = box[me.code].by || 'wonder'; } return box; }
+            if (Object.keys(box).length >= 3) return;
+            box[me.code] = { at: now(), by: 'wonder', until: until, name: me.name || me.code };
+            return box;
+        }).then(function (res) { if (!res || !res.committed) put(i + 1); }).catch(function () { });
+    };
+    put(0);
+}
+X.cageMe = cageMe;
 function die(reasonHtml) {
     reasonHtml = stageText(reasonHtml);
     if (typeof darkRun === 'undefined' || !darkRun || darkRun._dead) return;
@@ -1018,9 +1038,8 @@ function die(reasonHtml) {
         });
     }
     try { addHistoryLog(currentUser, '[어둠 사망] ' + W + ' 이상한 나라의 ■■■ — 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.'); } catch (e) { }
-    // ★ 이벤트 어둠 한정 — 상담실 · 선녀탕으로 끌려가지 않는다. 대신 오염도 50% (2026-10-31 사용자)
-    currentUser.pollution = DIE_POLL;
-    currentUser.lastPollutionTime = Date.now();
+    // ★ 이벤트 어둠 한정 — 상담실 · 선녀탕으로 끌려가지 않는다. 가두리에 15분 (2026-10-31 사용자)
+    try { cageMe(); } catch (e) { console.warn('[이상한 나라] 가두리', e); }
     const d = db_();
     if (d && darkRun.isParty && darkRun.partyId) {
         try {
@@ -1049,8 +1068,7 @@ function die(reasonHtml) {
                 : '<span style="color:#aaa;">잃은 것이 없습니다.</span><br>')
             + '<span style="color:#aaa;">이 어둠에서는 어떤 장비도 통하지 않았습니다.</span><br>'
             + '이번 회차는 처음부터 다시 합니다.<br>'
-            + '오염도 <b style="color:#ff9800;">' + DIE_POLL + '%</b>'
-            + '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#c9a3f0;">🎃 이벤트 어둠 — 상담실 · 선녀탕으로 이송되지 않습니다.</div>'
+            + '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#c9a3f0;">🎃 이벤트 어둠 — 상담실 · 선녀탕 대신 🔒 가두리에 15분 갇힙니다.</div>'
             + '</div>' + darkChoiceBtn('눈을 감는다.', 'finishDarkDeath()'));
     }
     try { darkAmbienceStop(); } catch (e) { }
