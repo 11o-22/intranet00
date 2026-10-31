@@ -388,6 +388,19 @@ function plainKey(h) {
         .replace(/\s+/g, ' ').trim();
 }
 function stageNow() { return stageOf((S.meta || {}).rounds); }
+// 단계 지문은 크다(수 MB) — 어색 이상 회차에 들어올 때만 따로 불러온다
+const STAGE_V = '20261031b';
+let stageLoading = false;
+function ensureStage() {
+    if (window.WONDER_STAGE || stageLoading || !S.meta || !stageNow()) return;
+    stageLoading = true;
+    const sc = document.createElement('script');
+    sc.src = 'wonder-stage.js?v=' + STAGE_V;
+    sc.onload = function () { try { if (F && F.st === 'in') view(); } catch (e) { } };
+    sc.onerror = function () { stageLoading = false; console.warn('[이상한 나라] 단계 지문을 불러오지 못했습니다'); };
+    document.head.appendChild(sc);
+}
+X.ensureStage = ensureStage;
 X.stageNow = stageNow;
 function stageText(html) {
     const st = stageNow();
@@ -563,6 +576,7 @@ const VIEW = {};
 X.VIEW = VIEW;
 function view() {
     if (!F) return;
+    ensureStage();
     if (F.st !== 'in') return;
     const sc = F.sc || { id: 'intro' };
     try {
