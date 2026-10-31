@@ -214,7 +214,7 @@ window.mjListTables = listTables;
 function makeTable(players) {
     const u = me();
     if (!u || !db_()) return Promise.resolve(null);
-    const n = Math.max(2, Math.min(4, Number(players) || 4));
+    const n = Math.max(3, Math.min(4, Number(players) || 4));          // 2마는 없앴다 (2026-10-31 사용자) — 3인 · 4인
     const id = 'mj' + now().toString(36) + Math.floor(Math.random() * 1000);
     const t = {
         id: id, host: u.code, made: now(), state: 'WAIT', players: n,
@@ -233,6 +233,7 @@ function joinTable(id) {
     return tx(ROOT + '/' + id, function (t) {
         if (!t) { window._mjJoinWhy = '그 자리가 없어졌습니다.'; return; }
         if (t.state !== 'WAIT') { window._mjJoinWhy = '벌써 시작한 판입니다.'; return; }
+        if (Number(t.players) < 3) { window._mjJoinWhy = '2인 마작은 없앴습니다. 3인 · 4인 자리를 만들어 주세요.'; return; }   // 2026-10-31
         const s = arr(t.seats);
         if (s.some(function (x) { return x && x.code === u.code; })) { window._mjJoinWhy = ''; return t; }
         if (s.length >= t.players) { window._mjJoinWhy = '자리가 다 찼습니다.'; return; }

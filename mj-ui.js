@@ -502,7 +502,7 @@ window.mjOpen = function () {
     // 앉아 있던 판은 격리가 풀린 뒤에도 연다 — 1위는 끝나자마자 풀리기 때문이다
     const seated = window.mjCur && window.mjCur();
     if (seated && seated.t) { tryFull(); safePaint(seated.t); return; }
-    if (!inside()) { showCustomAlert('상담실·선녀탕 안에서만 둘 수 있습니다.'); return; }
+    // ★ 2026-10-31 사용자 — 광장 목록(☰ · 생활)에 두고 누구나 둔다. 상담실 · 선녀탕 안 단추도 그대로 둔다.
     tryFull();
     lobby();
 };
@@ -527,11 +527,12 @@ function lobby(quiet) {
     window.mjListTables().then(function (list) {
         if (!atLobby) return;
         const c = hue();
-        const open = list.filter(function (t) { return t.state === 'WAIT'; });
+        const open = list.filter(function (t) { return t.state === 'WAIT' && Number(t.players) >= 3; });   // 2마는 없앴다 (2026-10-31)
         let h = '<div class="mj-h2" style="color:' + c + ';">🀄 마작</div>'
             + '<div class="mj-note" style="margin-bottom:14px;">'
-            + '동풍전 — 사람 수만큼 국을 돕니다. 끝나면 1위가 나갑니다.<br>'
-            + '2·3인은 북과 만수 2~8 을 빼고 치(吃)가 없습니다.</div>';
+            + '동풍전 — 사람 수만큼 국을 돕니다. 점수만큼 포인트를 주고받습니다.<br>'
+            + '상담실 · 선녀탕에 갇혀 있으면 1위는 바로 나갑니다.<br>'
+            + '3인은 북과 만수 2~8 을 빼고 치(吃)가 없습니다.</div>';
 
         h += '<div style="font-size:11px; color:#9fbfae; margin-bottom:6px;">열린 자리</div>';
         if (!open.length) h += '<div style="font-size:11px; color:#6a8275; padding:10px 0;">아직 없습니다. 아래에서 만드세요.</div>';
@@ -546,7 +547,7 @@ function lobby(quiet) {
 
         h += '<div style="font-size:11px; color:#9fbfae; margin:14px 0 6px 0;">새 자리</div>'
             + '<div style="display:flex; gap:6px;">'
-            + [2, 3, 4].map(function (n) {
+            + [3, 4].map(function (n) {
                 return '<button class="mj-btn" style="flex:1; padding:11px;" onclick="mjMakeUI('
                     + n + ')">' + n + '인</button>';
             }).join('')
@@ -602,6 +603,7 @@ function busy(msg) {
 }
 
 window.mjMakeUI = function (n) {
+    if (Number(n) < 3) { showCustomAlert('마작은 3인 · 4인만 둡니다.'); return; }    // 2마는 없앴다 (2026-10-31)
     tryFull();
     busy('자리를 만드는 중');
     try {
@@ -1038,7 +1040,7 @@ function settle(t) {
     if (typeof addHistoryLog === 'function') {
         addHistoryLog(u, '[마작] 동풍전 ' + (rank.indexOf(mine) + 1) + '위 · '
             + mine.score.toLocaleString() + '점 (' + (diff >= 0 ? '+' : '') + diff.toLocaleString() + ')'
-            + (first ? ' — 1위로 격리 해제' : ''));
+            + (f.quarantineUntil ? ' — 1위로 격리 해제' : ''));
         f.history = 1;
     }
     try { if (typeof saveFields === 'function') saveFields(f); } catch (e) { }
