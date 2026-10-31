@@ -425,7 +425,11 @@
       "plate-lace-refund.js",
       "fox-rename.js",
       "cage-escape.js",
-      "show-finale.js"
+      "show-finale.js",
+      "wonder-text.js",
+      "wonder-core.js",
+      "wonder-shop.js",
+      "wonder-ch-angel.js"
     ]
   ]
 }
