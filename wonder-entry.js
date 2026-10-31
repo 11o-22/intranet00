@@ -124,9 +124,137 @@ wrap('occupyZone', function (_f) { return function (zone) { if (zone === W) retu
 wrap('isZoneTaken', function (_f) { return function (zone) { if (zone === W) return false; return _f.apply(this, arguments); }; });
 
 // ==========================================
+// 목록 — 맨 위 보라색 「이벤트 어둠」 카드 (2026-10-31 사용자)
+// ==========================================
+//   원래 목록(renderDarkness)이 그린 이 어둠 칸은 걷어 내고, #darkness-body 맨 첫 자리에 따로 그린다.
+//   EPIC · K의 방 입구가 뒤에 「afterbegin」으로 끼어들어도 다시 맨 위로 올린다.
+const CARD = 'wonder-entry-card';
+const PURPLE = { bg1: '#2c1745', bg2: '#170b26', line: '#9b6ad6', soft: '#c9a3f0', text: '#f1e6ff', dim: '#a993c6' };
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function isOpen() { try { return typeof isZoneOpen !== 'function' || !!isZoneOpen(W); } catch (e) { return true; } }
+function cardHtml() {
+    const z = (typeof DARK_ZONES !== 'undefined' && DARK_ZONES[W]) || {};
+    const open = isOpen();
+    const n = left();
+    const BTN = 'flex:1; margin:0; padding:11px; font-size:11px; background:linear-gradient(145deg,#7a4bb8,#4a2577) !important; border-color:' + PURPLE.line + ' !important; color:#fff !important;';
+    return '<div id="' + CARD + '" style="background:linear-gradient(145deg,' + PURPLE.bg1 + ',' + PURPLE.bg2 + '); border:1px solid ' + PURPLE.line + '; border-radius:8px; padding:14px; margin-bottom:14px; text-align:left; box-shadow:0 0 16px rgba(155,106,214,0.28);' + (open ? '' : ' opacity:0.55;') + '">'
+        + '<div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">'
+        + '<span style="font-size:9.5px; font-weight:bold; color:#1a0d29; background:' + PURPLE.soft + '; border-radius:10px; padding:2px 9px; letter-spacing:1px;">🦇 이벤트 어둠 🎃</span>'
+        + '<span style="font-family:monospace; font-size:10px; color:' + PURPLE.soft + '; font-weight:bold;">' + W + '</span></div>'
+        + '<div style="font-size:15px; color:' + PURPLE.text + '; font-weight:bold; margin:7px 0 3px;">' + esc(z.name || '이상한 나라의 ■■■') + '</div>'
+        + '<div style="font-size:10px; color:' + PURPLE.dim + '; line-height:1.6;">' + esc(z.brief || '') + '</div>'
+        + '<div style="font-size:10px; color:' + PURPLE.dim + '; margin-top:6px; line-height:1.6;">1~' + PEOPLE_MAX + '인 · 하루 ' + DAY_MAX + '번 (오늘 남은 <b id="wonder-card-left" style="color:' + PURPLE.text + ';">' + n + '</b> / ' + DAY_MAX + ') · 이곳에서는 어떤 장비도 통하지 않습니다</div>'
+        + (open
+            ? '<div style="display:flex; gap:6px; margin-top:11px;">'
+                + '<button class="game-btn" style="' + BTN + '" onclick="openDarkBriefing(\'' + W + '\')">혼자 들어간다</button>'
+                + '<button class="game-btn" style="' + BTN + '" onclick="createParty(\'' + W + '\')">파티 편성</button></div>'
+            : '<div style="font-size:10px; color:#888; margin-top:10px; text-align:center;">🔒 지금은 닫혀 있습니다</div>')
+        + '</div>';
+}
+// 원래 목록이 그린 칸 — 구역 번호 글자(monospace) → 세 칸 위가 카드
+function dropBase(body) {
+    const ds = body.querySelectorAll('div');
+    for (let i = 0; i < ds.length; i++) {
+        const d = ds[i];
+        if (d.childElementCount || (d.textContent || '').trim() !== W) continue;
+        if (d.closest('#' + CARD)) continue;
+        if (!/monospace/.test(d.getAttribute('style') || '')) continue;
+        const c = d.parentElement && d.parentElement.parentElement && d.parentElement.parentElement.parentElement;
+        if (c && c !== body && body.contains(c) && c.style && c.style.marginBottom === '10px') c.remove();
+    }
+}
+function listShown(body) {
+    if (typeof darkRun !== 'undefined' && darkRun) return false;
+    if (typeof darkBriefingOpen !== 'undefined' && darkBriefingOpen) return false;
+    return !!body.querySelector('[onclick*="createParty("], [onclick*="openDarkBriefing("]');
+}
+function place() {
+    const body = document.getElementById('darkness-body');
+    if (!body || !me()) return;
+    if (!listShown(body)) return;
+    dropBase(body);
+    let card = document.getElementById(CARD);
+    if (!card) {
+        body.insertAdjacentHTML('afterbegin', cardHtml());
+        return;
+    }
+    if (body.firstElementChild !== card) body.insertBefore(card, body.firstChild);
+    const l = document.getElementById('wonder-card-left');
+    if (l && l.textContent !== String(left())) l.textContent = String(left());
+}
+wrap('renderDarkness', function (_f) {
+    return function () {
+        const out = _f.apply(this, arguments);
+        try { const c = document.getElementById(CARD); if (c) c.remove(); place(); } catch (e) { console.warn('[이상한 나라] 목록 카드', e); }
+        return out;
+    };
+});
+setInterval(function () { try { place(); } catch (e) { } }, 700);
+// 다른 입구(EPIC · K의 방)가 뒤늦게 맨 앞에 끼어들면 그 자리에서 다시 올린다 — 깜박이지 않게
+(function keepTop() {
+    const iv = setInterval(function () {
+        const body = document.getElementById('darkness-body');
+        if (!body || typeof MutationObserver === 'undefined') return;
+        clearInterval(iv);
+        new MutationObserver(function () {
+            const c = document.getElementById(CARD);
+            if (c && c.parentElement === body && body.firstElementChild !== c) body.insertBefore(c, body.firstChild);
+        }).observe(body, { childList: true });
+    }, 300);
+})();
+
+// ==========================================
+// 🦇🎃 — 혼자 들어가든 파티를 편성하든, 이 어둠에 있는 동안 아래에서 비눗방울처럼 올라온다
+// ==========================================
+let briefW = false;      // 지금 열린 반입 화면이 이 어둠 것인가
+wrap('openDarkBriefing', function (_f) { return function (zone) { briefW = (zone === W); return _f.apply(this, arguments); }; });
+function inCtx() {
+    try { if (X.inW && X.inW()) return true; } catch (e) { }
+    try { const p = (typeof getMyParty === 'function') ? getMyParty() : null; if (p && p.zone === W) return true; } catch (e) { }
+    try { if (briefW && typeof darkBriefingOpen !== 'undefined' && darkBriefingOpen) return true; } catch (e) { }
+    return false;
+}
+const BUB = 'wonder-bubbles';
+let bubT = null;
+(function css() {
+    if (document.getElementById('wonder-bub-css')) return;
+    const st = document.createElement('style');
+    st.id = 'wonder-bub-css';
+    st.textContent = '#' + BUB + '{position:fixed;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:9998;overflow:hidden}'
+        + '#' + BUB + ' span{position:absolute;bottom:-40px;font-size:20px;opacity:0;animation:wdRise 10s linear forwards;will-change:transform,opacity}'
+        + '@keyframes wdRise{0%{opacity:0;transform:translateY(0) translateX(0)}12%{opacity:.55}70%{opacity:.4}100%{opacity:0;transform:translateY(-104vh) translateX(var(--wdx,0px))}}';
+    document.head.appendChild(st);
+})();
+function bubbles(on) {
+    let box = document.getElementById(BUB);
+    if (!on) {
+        if (bubT) { clearInterval(bubT); bubT = null; }
+        if (box) box.remove();
+        return;
+    }
+    if (!box) { box = document.createElement('div'); box.id = BUB; document.body.appendChild(box); }
+    if (bubT) return;
+    const pop = function () {
+        const b = document.getElementById(BUB);
+        if (!b || b.childElementCount > 8) return;
+        const s = document.createElement('span');
+        s.textContent = Math.random() < 0.5 ? '🦇' : '🎃';
+        s.style.left = (6 + Math.random() * 88) + 'vw';
+        s.style.fontSize = (15 + Math.random() * 11) + 'px';
+        s.style.setProperty('--wdx', (Math.random() * 44 - 22) + 'px');
+        s.style.animationDuration = (8 + Math.random() * 4) + 's';
+        b.appendChild(s);
+        setTimeout(function () { try { s.remove(); } catch (e) { } }, 13000);
+    };
+    pop();
+    bubT = setInterval(pop, 1700);
+}
+setInterval(function () { try { bubbles(inCtx()); } catch (e) { } }, 800);
+
+// ==========================================
 // 콘솔
 // ==========================================
-window.wonderTries = function () { console.log('이상한 나라 — 오늘 남은 횟수', left() + ' / ' + DAY_MAX, use); return left(); };
+window.wonderTries =function () { console.log('이상한 나라 — 오늘 남은 횟수', left() + ' / ' + DAY_MAX, use); return left(); };
 window.wonderTriesReset = function () {
     const u = me(), d = db_();
     if (!u || u.code !== 'kario0987') { console.log('관리자만'); return; }

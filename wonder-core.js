@@ -94,14 +94,15 @@ X.misName = misName;
 X.chapters = X.chapters || {};
 
 // ==========================================
-// 구역 등록 — 다 만들어지기 전까지는 관리자만
+// 구역 등록 — 2026-10-31 사용자: 모두에게 연다 (관리자가 「폐쇄」로 닫으면 닫힘)
+//   목록에서는 맨 위 보라색 「이벤트 어둠」 카드로 따로 그린다 (wonder-entry.js)
 // ==========================================
 if (typeof DARK_ZONES !== 'undefined') {
     DARK_ZONES[W] = {
         code: W, grade: 'A', name: '이상한 나라의 ■■■',
         brief: '(Eat me.)',
         warn: '이벤트 어둠 — 이곳에서는 어떤 장비도 통하지 않습니다.',
-        danger: '최상', survival: '?', min: 1, max: 6, reward: [0, 0], ready: false,
+        danger: '최상', survival: '?', min: 1, max: 6, reward: [0, 0], ready: true,
         wonder: true,
         intro: '당신은 눈을 뜹니다.',
         outro: '이야기는 계속됩니다.',
@@ -116,8 +117,8 @@ function isAdmin() { return typeof currentUser !== 'undefined' && currentUser &&
         const _o = isZoneOpen;
         isZoneOpen = function (code) {
             if (code === W) {
-                try { if (darkZoneOverride[W] === true) return true; } catch (e) { }
-                return isAdmin();
+                try { if (darkZoneOverride[W] === false) return false; } catch (e) { }
+                return true;
             }
             return _o.apply(this, arguments);
         };
