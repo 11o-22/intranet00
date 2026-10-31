@@ -408,6 +408,43 @@ function scene(key, h) {
     return null;
 }
 X.scene = scene;
+
+// ★ 줄이기 (2026-10-31 사용자 — 「시나리오가 너무 길다, 챕터마다 절반쯤」 · 연계판은 그대로)
+//   X.cut(키, 장면, [문단 앞머리, …]) — 그 장면의 모든 쪽(갈래 안까지)에서 앞머리가 같은 문단을 통째로 뺀다.
+//   글은 고치지 않고 빼기만 한다 — 단계 지문(어색 · 피폐 · 기괴)이 문단 글로 찾아 갈아 끼우므로, 남은 문단은 그대로 맞는다.
+//   쪽이 비게 되면 그 쪽의 첫 문단은 남긴다. 앞머리는 태그를 걷은 글로 견준다. 장면을 통째로 건너뛰는 것은 각 챕터 파일의 흐름(SEQ · THEN)에서.
+X.CUT_LOG = [];
+X.cut = function (key, h, heads) {
+    const sc = scene(key, h);
+    if (!sc) { X.CUT_LOG.push('없는 장면 ' + key + ' ' + h); return 0; }
+    const want = (heads || []).map(function (x) { return plainKey(x); }).filter(Boolean);
+    const hit = {};
+    let n = 0;
+    (function walkP(list) {
+        (list || []).forEach(function (pg) {
+            if (pg && typeof pg.x === 'string') {
+                const ps = pg.x.split('<br><br>');
+                const keep = ps.filter(function (q) {
+                    const k = plainKey(q);
+                    for (let i = 0; i < want.length; i++) if (k && k.indexOf(want[i]) === 0) { hit[i] = 1; return false; }
+                    return true;
+                });
+                if (keep.length !== ps.length) { n += ps.length - keep.length; pg.x = (keep.length ? keep : ps.slice(0, 1)).join('<br><br>'); }
+            }
+            (pg && pg.o || []).forEach(function (o) { walkP(o.b); });
+        });
+    })(sc.p);
+    want.forEach(function (w, i) { if (!hit[i]) X.CUT_LOG.push('못 찾음 ' + key + ' ' + h + ' 「' + w.slice(0, 20) + '」'); });
+    return n;
+};
+// 공통 도입(PROLOGUE) — 묘사 문단 절반쯤 (줄거리 · 토끼 · 회중시계 · 여섯 문 · 「Eat me.」는 그대로)
+X.cut('intro', 1, [
+    '눈앞에는 끝없이 펼쳐진 꽃밭이', '멀리 보이는 언덕은 완만하고',
+    '바람은 여전히 따뜻합니다.', '탁자 위에는 책 한 권이',
+    '걸음마다 길게 늘어진 귀가',
+    '구멍 안쪽은 어둡지만', '구멍 안으로 몸을 기울이면',
+    '안쪽으로 조금 더 들어서면', '유리병에 담긴 별사탕', '한쪽 벽에는 창문이 있습니다.', '얼마나 오랫동안 내려가고'
+]);
 // 메모 괄호(*(…)*)는 화면에 내지 않는다 — 조건 줄은 챕터 파일이 먼저 고친다
 function clip(html) {
     return String(html || '')
@@ -1201,9 +1238,14 @@ function attach() {
                 saveRec();
             }
         }
-        onShared();
+        // ★ 한 박자 뒤에 그린다 (2026-10-31 — 「솔로로 미션을 다 해도 『…』에서 멈춘다」)
+        //   진짜 Firebase 는 내 쓰기(set · transaction)의 이벤트를 **그 자리에서(동기로)** 쏜다. 그리는 도중에 쓰면(결말 적기 · 판 짜기)
+        //   이 자리에서 새 화면이 먼저 그려지고, 쓰기를 부른 바깥 그리기가 이어서 낡은 「…」 기다림으로 덮어써 그대로 멈춰 있었다
+        //   (다음 소식이 없으면 영영). S 는 바로 바꾸고, 화면만 지금 그리기가 끝난 뒤에 다시 그린다.
+        if (!shTimer) shTimer = setTimeout(function () { shTimer = 0; try { onShared(); } catch (e) { console.error(e); } }, 0);
     });
 }
+let shTimer = 0;
 const LIVE = { hall: 1, mission: 1, link: 1, cont: 1, tie: 1, nochap: 1 };
 X.LIVE = LIVE;
 function onShared() {
