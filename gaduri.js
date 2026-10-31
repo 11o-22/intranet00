@@ -37,7 +37,17 @@
 const ADMIN = 'kario0987';
 const NODE = 'gaduri';
 const MAX = 3;
-const ROOMS = [ { k: 'plaza', n: '광장' }, { k: 'dream', n: '백일몽' } ];
+// ★ 2026-10-31 사용자 — 가두리를 모든 맵에 (광장 길 · 건물 안 여덟 방). 빈 자리는 무작위 차례로 찾는다.
+const ROOMS = [ { k: 'plaza', n: '광장' }, { k: 'dream', n: '백일몽' }, { k: 'dfront', n: '백일몽 건물 앞' }, { k: 'casino', n: '카지노 거리' },
+                { k: 'post', n: '우체국' }, { k: 'gate', n: '재난관리국 앞' }, { k: 'bureau', n: '재난관리국' }, { k: 'dshop', n: '망상 홈쇼핑' } ];
+window.GADURI_ROOMS = ROOMS.map(function (r) { return r.k; });
+window.GADURI_NAMES = {}; ROOMS.forEach(function (r) { window.GADURI_NAMES[r.k] = r.n; });
+// 가둘 방 차례 — 무작위로 섞는다 (여러 맵에 고루 퍼지게)
+window.gaduriOrder = function () {
+    const a = ROOMS.map(function (r) { return r.k; });
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+};
 const NAME = {}; ROOMS.forEach(function (r) { NAME[r.k] = r.n; });
 
 let all = {};          // { plaza: { 사번: {...} }, dream: {...} }
@@ -289,9 +299,10 @@ setInterval(function () {
         }
         if (Date.now() - autoTry < 30000) return;                       // 찼으면 한동안 다시 안 본다
         autoTry = Date.now();
+        const order = window.gaduriOrder();
         const put = function (i) {
-            if (i >= ROOMS.length) return;                              // 둘 다 찼다 — 밖에 둔다
-            const k = ROOMS[i].k;
+            if (i >= order.length) return;                              // 다 찼다 — 밖에 둔다
+            const k = order[i];
             d.ref(NODE + '/' + k).transaction(function (box) {
                 box = box || {};
                 if (box[me.code]) return box;

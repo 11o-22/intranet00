@@ -1203,7 +1203,7 @@ function applyPay(v) {
         const bath = (typeof isDisasterAgent === 'function') ? isDisasterAgent(u)
             : /재난관리/.test((u.affiliation || '') + ' ' + (u.team || ''));
         u.pollution = 100;
-        u.quarantineUntil = Date.now() + 4 * 3600000;
+        u.quarantineUntil = Date.now() + 1 * 3600000;   // ★ 입원 한 시간 (2026-10-31 사용자 · 전에는 4시간)
         u.quarantineExitPollution = 40;
         u.foxRoomAnswered = true;            // 질문 절차 생략 (어둠 사망과 같다)
         u.quarantineHospital = true;
@@ -1212,7 +1212,7 @@ function applyPay(v) {
         try { addHistoryLog(u, (v.kick ? '[재난 — 모셔짐] ' : (v.vanish ? '[재난 실종] ' : '[재난 사망] ')) + nm + ' — ' + (v.how || '돌아오지 못했다') + '. ' + where + (v.kick ? ' 모셔졌습니다.' : ' 이송되었습니다.')); } catch (e) { }
         try { saveFields({ pollution: 1, quarantineUntil: 1, quarantineExitPollution: 1, foxRoomAnswered: 1, quarantineHospital: 1, quarantineDest: 1, history: 1 }); } catch (e) { }
         try { updateUI(); } catch (e) { }
-        alert_(nm + '\n\n' + (v.how || '돌아오지 못했다') + '\n\n' + where + (v.kick ? ' 모셔집니다. (4시간)' : ' 이송됩니다. (4시간)'));
+        alert_(nm + '\n\n' + (v.how || '돌아오지 못했다') + '\n\n' + where + (v.kick ? ' 모셔집니다. (1시간)' : ' 이송됩니다. (1시간)'));
         return;
     }
     const pts = Math.max(0, Number(v.pts) || 0);

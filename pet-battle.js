@@ -22,7 +22,7 @@
 //              막아도 원래 피해의 1/3 은 받는다. 못 막으면 그대로. 「방어 실패」라고는 띄우지 않는다.
 //              상대가 **무슨 속성으로 쳤는지는 안 보인다** — 피해만 보인다.
 //            다치는 것은 펫이 아니라 **주인**이다. 주인 체력 100 이 먼저 닳는 쪽이 진다.
-//   ⑥ 정산   이긴 쪽이 진 쪽이 건 것을 가져간다. 진 쪽은 **가두리에 15분** (gaduri.js · by 'petbt'). 펫은 멀쩡하다.
+//   ⑥ 정산   이긴 쪽이 진 쪽이 건 것을 가져간다. 진 쪽은 **가두리에 한 시간** (gaduri.js · by 'petbt'). 펫은 멀쩡하다.
 //            양쪽 펫에 먹였던 룬은 소모된다.
 //
 //   판에서 3분 넘게 고르지 않으면 상대가 「기권 처리」할 수 있다 — 자리를 비운 쪽이 진 것으로 친다.
@@ -54,7 +54,7 @@ const BLOCK_DIV = 3;
 const PICK_WAIT = 3 * 60 * 1000;         // 이보다 오래 안 고르면 기권 처리할 수 있다
 const STAGE_WAIT = 10 * 60 * 1000;       // 신청 · 확인 · 준비는 이만큼
 const FIGHT_WAIT = 30 * 60 * 1000;       // 공방 중 둘 다 이만큼 안 고르면 없던 일
-const CAGE_MS = 15 * 60 * 1000;
+const CAGE_MS = 60 * 60 * 1000;          // ★ 한 시간 (2026-10-31 사용자 · 전에는 15분)
 const LIVE = 48 * 3600 * 1000;           // 이보다 묵은 글은 치운다
 const SETTLE_LIVE = 24 * 3600 * 1000;    // 늦게 들어와도 이 안이면 정산한다
 const MOD = 'pet-battle-modal';
@@ -297,7 +297,7 @@ function askStart(code) {
     if (!myStakes().length) { alert_('걸 것이 없습니다.\n\n먹이 · 돌봄 물품 · 펫 장비 · 룬 가운데 하나는 있어야 합니다.'); return; }
     const w = box(head('⚔ 펫 배틀', '<b style="color:#ffcf8f;">' + esc(o.name) + '</b> 사원의 펫에게 결투를 신청합니다.<br><br>'
         + '내 펫 하나를 내보내고, 펫에 관한 것 하나를 겁니다. 상대도 펫 하나와 걸 것을 정해 받으면 붙습니다.<br>'
-        + '다치는 것은 펫이 아니라 <b>주인</b>입니다 — 지면 건 것을 잃고 가두리에 15분 갇힙니다.')
+        + '다치는 것은 펫이 아니라 <b>주인</b>입니다 — 지면 건 것을 잃고 가두리에 한 시간 갇힙니다.')
         + '<button id="bt-ok" class="game-btn" style="' + BTN + '">신청한다</button>'
         + '<button id="bt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
     w.querySelector('#bt-no').onclick = shut;
@@ -419,7 +419,7 @@ function askView(o) {
     const a = o.a, ou = userOf(a.code) || { name: a.name };
     const w = box(head('⚔ 결투 신청이 들어왔습니다',
         '<b style="color:#ffcf8f;">' + esc(a.name) + '</b> 사원이 당신의 펫에게 결투를 신청했습니다.<br>'
-        + '다치는 것은 펫이 아니라 <b>주인</b>입니다. 지면 건 것을 잃고 가두리에 15분 갇힙니다. 펫은 멀쩡합니다.')
+        + '다치는 것은 펫이 아니라 <b>주인</b>입니다. 지면 건 것을 잃고 가두리에 한 시간 갇힙니다. 펫은 멀쩡합니다.')
         + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(ou, a.pet, a.name + ' 사원의 펫') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:11px;">상대가 건 것 — ' + stakeText(a.stake) + '</div>'
         + '<button id="bt-ok" class="game-btn" style="' + BTN + '">받는다 — 내 펫과 걸 것을 고른다</button>'
@@ -582,7 +582,7 @@ function fightView(o) {
                 }).join('') + '</div>'
               + '<button id="bt-go" class="game-btn" style="' + BTN + '">결정</button>')
         + (sel.give
-            ? '<button id="bt-give2" class="game-btn" style="' + BTN + RED + '">정말 기권한다 — 건 것을 잃고 가두리 15분</button>'
+            ? '<button id="bt-give2" class="game-btn" style="' + BTN + RED + '">정말 기권한다 — 건 것을 잃고 가두리 한 시간</button>'
               + '<button id="bt-give0" class="game-btn" style="' + BTN + GREY + '">아니, 계속한다</button>'
             : '<button id="bt-give" class="game-btn" style="' + BTN + GREY + '">기권한다 (진 것으로)</button>'), true);
     // 상대가 오래 안 고르면 「기권 처리」 단추가 나오게 — 그때 다시 그린다
@@ -699,7 +699,7 @@ function settle(o, side) {
         log_('[펫 배틀] ' + theirs.name + ' 사원과의 결투에서 이겼습니다 — ' + nm + ' · 받은 것: ' + sname(stakeTheirs));
     } else {
         takeStake(stakeMine);
-        log_('[펫 배틀] ' + theirs.name + ' 사원과의 결투에서 졌습니다 — ' + nm + ' · 잃은 것: ' + sname(stakeMine) + ' · 가두리 15분');
+        log_('[펫 배틀] ' + theirs.name + ' 사원과의 결투에서 졌습니다 — ' + nm + ' · 잃은 것: ' + sname(stakeMine) + ' · 가두리 한 시간');
         cage(me);
     }
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
@@ -712,7 +712,7 @@ function settle(o, side) {
         + hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false)
         + '<div style="font-size:11px; color:#e8d7b4; line-height:1.7; margin:9px 0;">'
         + (won ? '받은 것 — <b style="color:#ffcf8f;">' + esc(sname(stakeTheirs)) + '</b>'
-               : '잃은 것 — <b style="color:#ff8a80;">' + esc(sname(stakeMine)) + '</b><br><span style="color:#ff8a80;">가두리에 15분 갇힙니다.</span>')
+               : '잃은 것 — <b style="color:#ff8a80;">' + esc(sname(stakeMine)) + '</b><br><span style="color:#ff8a80;">가두리에 한 시간 갇힙니다.</span>')
         + '<br><span style="color:#8d8578;">' + esc(nm) + josa(nm, '은') + ' 멀쩡합니다. 먹였던 룬은 소모됐습니다.</span></div>'
         + '<button id="bt-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
     w.querySelector('#bt-x').onclick = shut;
@@ -722,7 +722,7 @@ function cage(me) {
     const d = db_();
     if (!d || !me || me.code === ADMIN) return;
     const until = Date.now() + CAGE_MS;
-    const rooms = ['plaza', 'dream'];
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream'];   // 모든 맵 · 무작위 차례
     const put = function (i) {
         if (i >= rooms.length) return;
         d.ref('gaduri/' + rooms[i]).transaction(function (box) {

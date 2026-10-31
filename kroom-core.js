@@ -3122,7 +3122,7 @@ function hardDeath(why) {
     [].concat(darkRun.carryEquips || [], darkRun.carryItems || []).forEach(function (it) { removeItemFromInventory(u, it, 1); items.push(it); });
     kr.lostPts = lost; kr.lostItems = items; kr.luckSaved = saved;
     u.pollution = 100;
-    u.quarantineUntil = now() + 4 * 60 * 60 * 1000;
+    u.quarantineUntil = now() + 1 * 60 * 60 * 1000;   // ★ 입원 한 시간 (2026-10-31 사용자)
     u.quarantineHospital = true;
     u.quarantineDest = isDisasterAgent(u) ? 'bath' : 'fox';
     u.quarantineExitPollution = 40;

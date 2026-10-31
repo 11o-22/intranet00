@@ -54,7 +54,7 @@ function where(u) {
     if (g) {
         const by = g.auto ? '격리' : g.by === 'journey' ? '여정' : g.by === 'petbt' ? '펫 배틀' : g.by === 'foxd' ? '여우 신도' : '상담사';
         const lock = (g.by === 'journey' && typeof window.cageLockLeft === 'function') ? window.cageLockLeft(u.code) : -1;
-        if (!g.auto) out.push('🔒 ' + (g.room === 'dream' ? '백일몽' : '광장') + ' 가두리 (' + by + (Number(g.until) > Date.now() ? ' · ' + Math.max(1, Math.ceil((Number(g.until) - Date.now()) / 60000)) + '분' : '') + (lock > 0 ? ' · 잠김 ' + lock + '분' : '') + ' — 본인만 나올 수 있음)');
+        if (!g.auto) out.push('🔒 ' + ((window.GADURI_NAMES && window.GADURI_NAMES[g.room]) || (g.room === 'dream' ? '백일몽' : '광장')) + ' 가두리 (' + by + (Number(g.until) > Date.now() ? ' · ' + Math.max(1, Math.ceil((Number(g.until) - Date.now()) / 60000)) + '분' : '') + (lock > 0 ? ' · 잠김 ' + lock + '분' : '') + ' — 본인만 나올 수 있음)');
     }
     if (cCaged(u)) out.push('🚪 사택 감금실');
     return out.join(' · ') || '갇힌 곳 없음';

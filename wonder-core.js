@@ -1006,7 +1006,7 @@ function die(reasonHtml) {
     }
     try { addHistoryLog(currentUser, '[어둠 사망] ' + W + ' 이상한 나라의 ■■■ — 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.'); } catch (e) { }
     currentUser.pollution = 100;
-    currentUser.quarantineUntil = Date.now() + 4 * 60 * 60 * 1000;
+    currentUser.quarantineUntil = Date.now() + 1 * 60 * 60 * 1000;   // ★ 입원 한 시간 (2026-10-31 사용자)
     currentUser.quarantineExitPollution = 40;
     currentUser.foxRoomAnswered = true;
     currentUser.quarantineHospital = true;

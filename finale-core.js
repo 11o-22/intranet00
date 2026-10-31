@@ -776,7 +776,7 @@ function eliminate(reasonHtml) {
     addHistoryLog(currentUser, '[어둠 탈락] ' + z.code + ' — 자발적 피날레. 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.');
 
     currentUser.pollution = 100;
-    currentUser.quarantineUntil = Date.now() + 4 * 60 * 60 * 1000;
+    currentUser.quarantineUntil = Date.now() + 1 * 60 * 60 * 1000;   // ★ 입원 한 시간 (2026-10-31 사용자)
     currentUser.quarantineExitPollution = 40;
     currentUser.foxRoomAnswered = true;
     currentUser.quarantineHospital = true;

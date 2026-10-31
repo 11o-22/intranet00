@@ -350,14 +350,16 @@ function spread(d, k, code, v) {
     if (k === 'nodeath') e.left = v;
     if (k === 'rescue') e.w = bathOf(t) ? 'bath' : 'fox';
     e.line = '🎐 ' + dName(me, d) + '가 역병을 뿌립니다. - ' + kindTxt(k, e);
-    // 같은 역병이 걸려 있으면 바꿔 단다
+    // ★ 2026-10-31 사용자 — 구출은 역병이 아니다. 그냥 꺼내 주거나(시간을 줄여 주거나) 끝이고, 한 시간 동안 남는 것이 없다
+    //   (특이사항 줄 · foxPl · 몫 나누기 모두 없음). 예전에 걸어 둔 구출 역병이 있으면 걷는다.
+    const keep = (k !== 'rescue');
     const old = plAll(t)[k];
     if (old && old.line) cutNote(t, old.line);
     if (!obj(t.foxPl)) t.foxPl = {};
-    t.foxPl[k] = e;
-    addNote(t, e.line);
+    if (keep) { t.foxPl[k] = e; addNote(t, e.line); }
+    else delete t.foxPl[k];
     const say = kindTxt(k, e);
-    log_(t, '[' + NAME + '] ' + (self ? '' : (me.name || '') + ' 사원의 ') + dName(me, d) + '가 역병을 뿌렸습니다 — ' + say + ' (한 시간)');
+    log_(t, '[' + NAME + '] ' + (self ? '' : (me.name || '') + ' 사원의 ') + dName(me, d) + (keep ? '가 역병을 뿌렸습니다 — ' + say + ' (한 시간)' : '가 ' + (rq && rq.out ? (e.w === 'bath' ? '선녀탕' : '상담실') + '에서 꺼내 주었습니다.' : (e.w === 'bath' ? '선녀탕' : '상담실') + ' 시간을 ' + v + '시간 줄여 주었습니다.')));
     let call = null;
     if (rq) {
         call = { k: rq.out ? 'out' : 'cut', ms: rq.ms, until: rq.until, by: me.code, byName: me.name || '', nick: dName(me, 'd2'), at: now() };
@@ -366,13 +368,13 @@ function spread(d, k, code, v) {
     }
     if (self) {
         cult(me).selfDay = today();
-        mineSet('foxPl/' + k, e);
+        mineSet('foxPl/' + k, keep ? e : null);
         const f = { badge: 1, history: 1, foxCult: 1 };
         if (call) { me.foxCallSeen = call.at; outPending = true; f.quarantineUntil = 1; f.foxCall = 1; f.foxCallSeen = 1; }
         save(f);
         try { if (typeof updateUI === 'function') updateUI(); } catch (er2) { }
     } else {
-        const paths = { ['foxPl/' + k]: clean(e), badge: clean(t.badge), history: clean(t.history || []), hasItemUsedOnMe: true };
+        const paths = { ['foxPl/' + k]: keep ? clean(e) : null, badge: clean(t.badge), history: clean(t.history || []), hasItemUsedOnMe: true };
         if (call) { paths.quarantineUntil = rq.until; paths.foxCall = call; }
         push(code, paths);
         t.hasItemUsedOnMe = true;

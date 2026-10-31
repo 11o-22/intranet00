@@ -612,7 +612,7 @@ function epicDeath(txt) {
 
     // 상담실 · 선녀탕 이송
     currentUser.pollution = 100;
-     currentUser.quarantineUntil = Date.now() + (4 * 60 * 60 * 1000);
+     currentUser.quarantineUntil = Date.now() + (1 * 60 * 60 * 1000);   // ★ 입원 한 시간 (2026-10-31 사용자)
      currentUser.quarantineHospital = true;
     currentUser.quarantineDest = isDisasterAgent(currentUser) ? 'bath' : 'fox';   // 입원은 소속대로
     currentUser.quarantineExitPollution = 40;

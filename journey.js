@@ -685,7 +685,7 @@ function quit(r) {
         return cur;
     }).then(function (res) {
         // ★ 기권해도 가두리 삼십 분 (2026-10-30 사용자) — 그 자리에서 바로 · 정산 때 또 넣어도 늘지 않는다
-        if (res && res.committed) { try { cage(me); log_('[여정] 기권 — 주인은 ' + cageMin() + '분 가두리에서 쉰다 (어떠한 행위로도 나올 수 없다)'); } catch (e) { } }
+        if (res && res.committed) { try { cage(me); log_('[여정] 기권 — 주인은 ' + cageMin() + '분 가두리에서 쉰다 (처음 삼십 분은 어떠한 행위로도 나올 수 없다)'); } catch (e) { } }
         resync(res);
     }).catch(function (e) { err('quit', e, r); resync(null); });
 }
@@ -803,14 +803,14 @@ function resolve(r) {
 // ==========================================
 const settling = {};
 // 펫 대신 맞은 주인 · 기권한 주인 — 가두리 삼십 분 (광장 → 백일몽 차례로 빈 자리 · 둘 다 찼으면 밖에 둔다 · gaduri.js by 'journey')
-const CAGE_MS = 30 * 60 * 1000;           // ★ 삼십 분 (2026-10-30 사용자 · 전에는 한 시간) — 그동안은 어떠한 행위로도 못 나온다 (cage-escape.js LOCK_MS)
+const CAGE_MS = 60 * 60 * 1000;           // ★ 한 시간 (2026-10-31 사용자 · 전에는 삼십 분) — 처음 삼십 분은 어떠한 행위로도 못 나온다 (cage-escape.js LOCK_MS)
 const CAGE_WARN = '⚠️ 삼십분 동안은 어떠한 행위로도 가두리를 나올 수 없습니다.\n이 점 유의하시길 바랍니다.';
 function cageMin() { return Math.round(CAGE_MS / 60000); }
 function cage(me) {
     const d = db_();
     if (!d || !me || me.code === 'kario0987') return;
     const until = Date.now() + CAGE_MS;
-    const rooms = ['plaza', 'dream'];
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream'];   // 모든 맵 · 무작위 차례
     const put = function (i) {
         if (i >= rooms.length) return;
         d.ref('gaduri/' + rooms[i]).transaction(function (box) {
@@ -884,7 +884,7 @@ function settle(o) {
         P().patch(key, { jsleep: until, fedAt: fed });
         lines.push('한 시간 잔다 — 포만도는 그동안 줄지 않는다');
         cage(me);                                                                           // 대신 맞은 주인은 삼십 분 가두리
-        lines.push('주인은 ' + cageMin() + '분 가두리에서 쉰다 — 그동안은 어떠한 행위로도 나올 수 없다');
+        lines.push('주인은 ' + cageMin() + '분 가두리에서 쉰다 — 처음 삼십 분은 어떠한 행위로도 나올 수 없다');
     }
     log_('[여정] 『 ' + J.n + ' 』 ' + (won ? '끝까지 갔다' : '주인이 대신 맞았다') + ' — ' + p.nick + (lines.length ? ' · ' + lines.join(' · ') : ''));
     try { saveFields({ history: 1 }); } catch (e) { }
