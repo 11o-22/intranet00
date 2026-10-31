@@ -37,7 +37,7 @@
 //
 // ■ 2·3인 규칙
 //
-//   2인·3인은 북과 만수 2~8 을 뺀다. 치(吃)는 없다. 동풍전은 사람 수만큼.
+//   3인은 만수 2~8 을 뺀다(북은 넣는다). 치(吃)는 없다. 동풍전은 사람 수만큼.
 //
 // ■ 숨김에 대하여
 //
@@ -420,6 +420,8 @@ function discard(tile) {
         const h = t.h;
         const seat = seatOf(t, u.code);
         if (h.turn !== seat || h.phase !== 'DISCARD') return;
+        // ★ 리치를 건 뒤에는 **가져온 패만** 버린다 (2026-10-31 사용자 「쯔모한 패가 아닌 손패도 버릴 수 있음」)
+        if (h.riichi && h.riichi[u.code] && h.drawn != null && tile !== h.drawn) return;
         const hand = arr(h.hands[u.code]);
         const i = hand.indexOf(tile);
         if (i < 0) return;
@@ -511,6 +513,11 @@ function claim(kind, tiles) {
             why = (kind === 'pass') ? '' : '후로 창이 이미 닫혔습니다.';
             return;
         }
+        // ★ 내가 버린 적 있는 패로는 론이 안 된다 (후리텐) — 단추만 믿지 않고 여기서도 본다
+        if (kind === 'ron') {
+            const hd = arr(h.hands && h.hands[u.code]), ml = arr(h.melds && h.melds[u.code]);
+            if (furiten(t, h, u.code, hd, ml) || ownDiscard(h, u.code, h.last.tile)) { why = '버린 적 있는 패라 론을 할 수 없습니다 (후리텐).'; return; }
+        }
         if (late) h.phase = 'CLAIM';
         h.claims = h.claims || {};
         h.claims[u.code] = { kind: kind, tiles: tiles || null, at: now() };
@@ -545,8 +552,9 @@ function claimsFor(t, h, seat) {
     const c = {};
     const cnt = hand.filter(function (x) { return x === tile; }).length;
 
-    // 론
-    if (window.mjShanten(hand.concat([tile]), melds.length) === -1 && !furiten(t, h, code, hand, melds)) {
+    // 론 — 내가 버린 적 있는 패로는 안 된다 (후리텐)
+    if (window.mjShanten(hand.concat([tile]), melds.length) === -1 && !furiten(t, h, code, hand, melds)
+        && !ownDiscard(h, code, tile)) {
         const r = window.mjScore(winArgs(t, h, code, tile, false));
         if (r && r.ok) c.ron = r;
     }
@@ -583,6 +591,15 @@ function furiten(t, h, code, hand, melds) {
     const mine = arr(h.pond && h.pond[code]);
     return w.some(function (x) { return mine.indexOf(x) >= 0; });
 }
+// ★ 이 패를 내가 버린 적이 있나 — 있으면 그 패로는 쯔모도 론도 안 된다
+//   (2026-10-31 사용자 「버림패로 쯔모나 론이 되면 안 됨」)
+function ownDiscard(h, code, tile) {
+    if (tile == null) return false;
+    return arr(h.pond && h.pond[code]).indexOf(tile) >= 0;
+}
+window.mjOwnDiscard = function (code, tile) {
+    const h = cur && cur.t && cur.t.h; return !!(h && ownDiscard(h, code, tile));
+};
 
 function winArgs(t, h, code, tile, tsumo) {
     const seat = seatOf(t, code);
@@ -611,6 +628,8 @@ function tsumoWin() {
     const u = me(); if (!u || !cur) return;
     const t = cur.t, h = t && t.h;
     if (!h || h.phase !== 'DISCARD' || h.turn !== seatOf(t, u.code)) return;
+    if (h.drawn == null) return;
+    if (ownDiscard(h, u.code, h.drawn)) { if (typeof showCustomAlert === 'function') showCustomAlert('버린 적 있는 패라 쯔모를 할 수 없습니다.'); return; }
     const r = window.mjScore(winArgs(t, h, u.code, h.drawn, true));
     if (!r || !r.ok) { if (typeof showCustomAlert === 'function') showCustomAlert('역이 없습니다.'); return; }
     return settleWin(u.code, null, r);
@@ -806,7 +825,9 @@ function doRon(code, tbl) {
     const t = tbl || (cur && cur.t); if (!t || !t.h) return;
     const h = t.h;
     if (!h.last) return;
-    const r = window.mjScore(winArgs(t, h, code, h.last.tile, false));
+    // 버린 적 있는 패로 론 — 물린다 (아래 「역이 없었다」와 같은 길)
+    const fur = (function () { try { return furiten(t, h, code, arr(h.hands && h.hands[code]), arr(h.melds && h.melds[code])) || ownDiscard(h, code, h.last.tile); } catch (e) { return false; } })();
+    const r = fur ? null : window.mjScore(winArgs(t, h, code, h.last.tile, false));
     // 역이 없었다 — 물리고 차례를 넘긴다.
     //   이것도 _ron 이 아직 그 사람일 때만 한다. 안 그러면 여럿이
     //   한꺼번에 물려서 차례가 두 번 세 번 넘어간다.

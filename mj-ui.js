@@ -230,24 +230,35 @@ function ui() {
 }
 .mj-seatg { position:absolute; inset:0; }
 .mj-seatg > * { position:absolute; left:50%; transform:translateX(-50%); }
-.mj-wall { bottom:2.5%; display:flex; }
-.mj-wall .mjt { width:11px; height:15px; margin-right:-1px; border-radius:2px; }
-.mj-seatg .mj-melds { bottom:10.5%; gap:5px; }
-.mj-seatg .mj-melds .mjt { width:15px; height:20px; border-radius:2px; }
-.mj-seatg .mj-pond { bottom:19%; }
-.mj-seatg .mj-pond { grid-template-columns:repeat(8, auto); }
-.mj-seatg .mj-pond .mjt { width:17px; height:23px; border-radius:2px; }
+/* ★ 버린 패를 키웠다 (2026-10-31 사용자 「버림패 크기를 키워야 함」)
+   크기는 모두 상 크기(--s)에 맞춘다 — 가로로 눕혀도 세로로 봐도 같은 꼴.
+   자리마다(상 한 변 = 100) 바깥에서 안으로:
+     산          95.6 ~ 99.2   (가늘게 — 남은 장수는 가운데 알림판에도 있다)
+     버린 패      68 ~ 95.2     한 줄 여섯 장, 셋째 줄부터는 오른쪽으로 잇는다
+                  왼쪽 끝 32 — 가운데 네모(32~68)의 왼쪽 금에 맞춘다(바람개비꼴)
+                  그래서 옆자리 버린 패와 겹치지 않는다
+     남의 후로     오른쪽 귀퉁이(75~) 에 세로로 쌓는다 */
+.mj-wall { bottom:0.8%; display:flex; }
+.mj-wall .mjt { width:calc(var(--s,340px) * 0.027); height:calc(var(--s,340px) * 0.036); margin-right:-1px; border-radius:2px; }
+.mj-seatg > .mj-melds { left:75%; top:69.5%; bottom:auto; transform:none;
+    flex-direction:column; align-items:flex-start; gap:calc(var(--s,340px) * 0.008); }
+.mj-seatg .mj-melds .mjt { width:calc(var(--s,340px) * 0.034); height:calc(var(--s,340px) * 0.046); border-radius:2px; }
+.mj-seatg > .mj-pond { left:32%; top:68%; bottom:auto; transform:none; }
+.mj-seatg .mj-pond, .mj-seatg .mj-prow { gap:calc(var(--s,340px) * 0.003); }
+.mj-seatg .mj-pond .mjt { width:calc(var(--s,340px) * 0.066); height:calc(var(--s,340px) * 0.0885);
+    border-radius:calc(var(--s,340px) * 0.008); }
 
 /* 가운데 알림판 — 상 위에 같이 누워 있다. 눌려 보이므로 글씨를 키운다. */
 .mj-mid3 {
     position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
     background:linear-gradient(180deg,rgba(14,18,16,0.92),rgba(6,10,8,0.95));
     border:1px solid rgba(255,255,255,0.16); border-radius:9px;
-    padding:6px 9px; text-align:center; white-space:nowrap; line-height:1.35;
+    padding:5px 7px; text-align:center; white-space:nowrap; line-height:1.35;
+    max-width:36%; box-sizing:border-box;            /* 가운데 네모(32~68) 안에 머문다 — 버린 패를 덮지 않게 */
     box-shadow:0 3px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .mj-mid3 .mj-r1 { font-size:14px; font-weight:700; color:#ffd76a; letter-spacing:0.02em; }
-.mj-mid3 .mj-r2 { font-size:11px; color:#9fbfae; margin-top:2px; }
+.mj-mid3 .mj-r2 { font-size:10px; color:#9fbfae; margin-top:2px; }
 .mj-mid3 .mj-dora { display:flex; gap:3px; justify-content:center; margin-top:4px; }
 .mj-mid3 .mj-dora .mjt { width:15px; height:20px; border-radius:2px; }
 
@@ -300,7 +311,8 @@ function ui() {
 #mj-overlay:not(.mj-wide) .mj-pl-r .mj-cnt { display:none; }
 
 /* --- 버린 패 · 후로 --- */
-.mj-pond { display:grid; grid-template-columns:repeat(6, auto); gap:2px; justify-content:center; }
+.mj-pond { display:flex; flex-direction:column; gap:2px; align-items:flex-start; }
+.mj-prow { display:flex; gap:2px; }
 .mj-melds { display:flex; gap:7px; flex-wrap:nowrap; justify-content:center; }
 .mj-meld { display:flex; gap:1px; }
 
@@ -532,7 +544,7 @@ function lobby(quiet) {
             + '<div class="mj-note" style="margin-bottom:14px;">'
             + '동풍전 — 사람 수만큼 국을 돕니다. 점수만큼 포인트를 주고받습니다.<br>'
             + '상담실 · 선녀탕에 갇혀 있으면 1위는 바로 나갑니다.<br>'
-            + '3인은 북과 만수 2~8 을 빼고 치(吃)가 없습니다.</div>';
+            + '3인은 만수 2~8 을 빼고 치(吃)가 없습니다.</div>';
 
         h += '<div style="font-size:11px; color:#9fbfae; margin-bottom:6px;">열린 자리</div>';
         if (!open.length) h += '<div style="font-size:11px; color:#6a8275; padding:10px 0;">아직 없습니다. 아래에서 만드세요.</div>';
@@ -664,10 +676,18 @@ function plate(x, score, wind, turn, riichi, where, cnt) {
         + '</div>';
 }
 
+// 버린 패 — 여섯 장씩 두 줄, 셋째 줄은 끝까지 오른쪽으로 잇는다 (마작판 버릇대로)
 function pondHTML(list, hotIdx) {
     if (!list.length) return '';
+    const rows = [list.slice(0, 6), list.slice(6, 12), list.slice(12)];
+    let k = 0;
     return '<div class="mj-pond">'
-        + list.map(function (t, i) { return T(t, 's', i === hotIdx ? 'mjt-hot' : ''); }).join('')
+        + rows.filter(function (r) { return r.length; }).map(function (r) {
+            return '<div class="mj-prow">' + r.map(function (t) {
+                const i = k++;
+                return T(t, 's', i === hotIdx ? 'mjt-hot' : '');
+            }).join('') + '</div>';
+        }).join('')
         + '</div>';
 }
 function meldsHTML(melds, size) {
@@ -785,6 +805,8 @@ function paint(t) {
 // ==========================================
 function mineHTML(t, h, s, u) {
     const canDiscard = s.mine && s.phase === 'DISCARD';
+    // ★ 리치를 건 뒤에는 가져온 패만 버린다 — 손패는 못 누른다 (2026-10-31 사용자)
+    const lockHand = !!s.riichi && h.drawn != null;
 
     // 방금 가져온 패는 따로 떼어 두고, 나머지는 정렬해서 본다
     let hand = s.hand.slice();
@@ -814,7 +836,7 @@ function mineHTML(t, h, s, u) {
     o += '<div id="mj-mine-c"><div id="mj-hand"'
         + (meldW ? ' style="--mj-mw:' + meldW + 'px;"' : '') + '>';
     hand.forEach(function (tile) {
-        const no = arming && !okForRiichi(tile);
+        const no = (arming && !okForRiichi(tile)) || (lockHand && !(drawn == null && tile === h.drawn));
         o += '<button class="mj-h' + (arming ? (no ? ' mj-off' : ' mj-pick') : '') + '"'
             + ((canDiscard && !no) ? '' : ' disabled')
             + ((canDiscard && !no) ? ' onclick="mjDiscardUI(' + tile + ')"' : '')
@@ -852,7 +874,7 @@ function mineHTML(t, h, s, u) {
     if (s.mine && s.phase === 'DRAW') acts.push(['패를 가져온다', 'mjDraw()', 'mj-go', '']);
     if (s.mine && s.phase === 'DISCARD') {
         const r = window.mjScore(window.mjWinArgs(t, h, u.code, h.drawn, true));
-        if (h.drawn != null && r && r.ok) {
+        if (h.drawn != null && r && r.ok && !(window.mjOwnDiscard && window.mjOwnDiscard(u.code, h.drawn))) {   // 버린 적 있는 패로는 쯔모 안 됨
             acts.push(['쯔모', 'mjTsumoUI()', 'mj-go', r.han + '판 ' + (r.name || r.points)]);
         }
         if (!s.riichi && !s.melds.length) {
