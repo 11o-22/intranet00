@@ -6,7 +6,8 @@
 // ■ 무엇인가
 //
 //   「📺 브라운의 심야 토크 쇼」를 찬 사원의 장착칸에 [🎬 피날레] 단추가 붙는다.
-//   누르면 지금 **어디든 갇힌** 사원이 죽 뜬다 — 여우 상담실 · 선녀탕 · 입원 · 광장 가두리(상담사 · 펫 배틀 · 여우 신도 · 여정 — 잠김 중이어도) ·
+//   누르면 지금 **어디든 갇힌** 사원이 죽 뜬다 — 여우 상담실 · 선녀탕 · 입원 ·
+//   (2026-10-31 사용자: 가두리는 빠짐 — 커스텀 장비는 남의 가두리에 관여하지 못하고 갇힌 본인만 나올 수 있다. 🎐 여우 신도만 예외)
 //   사택 감금실. 고르면
 //       『 당신의 쇼는 여기서 끝났습니까? 』
 //   팝업이 뜬다. 「끝났다 — 꺼낸다」를 누르면 그 사원이 **무슨 조건이든 막히는 일 없이** 풀려난다 (2026-10-30 사용자 · 오염도는 50 을 넘지 않게).
@@ -41,7 +42,9 @@ function wears(u) { return !!(u && Array.isArray(u.equippedWeapons) && u.equippe
 function qLocked(u) { return !!(u && Number(u.quarantineUntil) > Date.now()); }
 function gEntry(code) { try { return (typeof window.gaduriEntry === 'function') ? window.gaduriEntry(code) : null; } catch (e) { return null; } }
 function cCaged(u) { try { return !!(u && typeof window.isCaged === 'function' && window.isCaged(u)); } catch (e) { return false; } }
-function locked(u) { return !!(u && (qLocked(u) || gEntry(u.code) || cCaged(u))); }
+// 가두리는 갇힌 본인만 나올 수 있다 (2026-10-31 사용자 — 커스텀 장비는 남의 가두리에 관여하지 못함 · 🎐 여우 신도만 예외).
+//   피날레는 상담실 · 선녀탕 · 입원 · 사택 감금실만 꺼낸다. 격리에 딸려 생긴 가두리(auto)는 격리와 함께 풀린다.
+function locked(u) { return !!(u && (qLocked(u) || cCaged(u))); }
 function leftH(u) { return Math.max(0.1, Math.round((Number(u.quarantineUntil) - Date.now()) / 360000) / 10); }
 // 어디에 갇혔나 — 여러 곳이면 다 적는다
 function where(u) {
@@ -51,7 +54,7 @@ function where(u) {
     if (g) {
         const by = g.auto ? '격리' : g.by === 'journey' ? '여정' : g.by === 'petbt' ? '펫 배틀' : g.by === 'foxd' ? '여우 신도' : '상담사';
         const lock = (g.by === 'journey' && typeof window.cageLockLeft === 'function') ? window.cageLockLeft(u.code) : -1;
-        out.push('🔒 ' + (g.room === 'dream' ? '백일몽' : '광장') + ' 가두리 (' + by + (Number(g.until) > Date.now() ? ' · ' + Math.max(1, Math.ceil((Number(g.until) - Date.now()) / 60000)) + '분' : '') + (lock > 0 ? ' · 잠김 ' + lock + '분' : '') + ')');
+        if (!g.auto) out.push('🔒 ' + (g.room === 'dream' ? '백일몽' : '광장') + ' 가두리 (' + by + (Number(g.until) > Date.now() ? ' · ' + Math.max(1, Math.ceil((Number(g.until) - Date.now()) / 60000)) + '분' : '') + (lock > 0 ? ' · 잠김 ' + lock + '분' : '') + ' — 본인만 나올 수 있음)');
     }
     if (cCaged(u)) out.push('🚪 사택 감금실');
     return out.join(' · ') || '갇힌 곳 없음';
@@ -134,7 +137,7 @@ window.showFinaleMenu = function () {
             + '<button class="game-btn sf-pick" data-c="' + esc(c) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px; background:linear-gradient(145deg,#6a4a22,#2a1b0e) !important; border-color:#c79a5b !important; color:#f3e6d2 !important;">피날레</button></div>';
     }).join('');
     const w = box('<div style="font-size:13px; color:#f3e6d2; font-weight:bold; margin-bottom:4px;">🎬 피날레 — ' + SHOW.replace('📺 ', '') + '</div>'
-        + '<div style="font-size:10px; color:#a88d6a; margin-bottom:11px; line-height:1.6;">여우 상담실 · 선녀탕 · 입원 · 광장 가두리 · 사택 감금실 — 어디에 갇혀 있든 무대로 불러내 쇼를 끝냅니다. 막히는 조건이 없고, 횟수 제한도 없습니다.</div>'
+        + '<div style="font-size:10px; color:#a88d6a; margin-bottom:11px; line-height:1.6;">여우 상담실 · 선녀탕 · 입원 · 사택 감금실 — 어디에 갇혀 있든 무대로 불러내 쇼를 끝냅니다. 막히는 조건이 없고, 횟수 제한도 없습니다. 가두리는 갇힌 본인만 나올 수 있어 불러내지 못합니다.</div>'
         + (rows || '<div style="font-size:10.5px; color:#a88d6a; padding:6px 0;">지금 갇힌 사원이 없습니다.</div>')
         + '<button id="sf-x" class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px; font-size:12px; background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;">닫는다</button>');
     w.querySelector('#sf-x').onclick = shut;
@@ -172,9 +175,10 @@ function free(code) {
             f.badge = Object.assign({}, x.badge, { notes: arr.length ? arr.join(' | ') : '특이사항 없음' });
         }
     }
-    // ② 광장 · 백일몽 가두리 — 누가 가뒀든 · 여정 잠김 중이어도 (무슨 조건이든 꺼낸다)
+    // ② 가두리 — 격리에 딸려 생긴 것(auto)만 함께 지운다. 진짜 가두리(여정 · 펫 배틀 · 여우 신도 · 상담사)는 건드리지 않는다
+    //   (2026-10-31 사용자 — 남의 가두리에 관여하는 능력은 허용하지 않음)
     const g = gEntry(code);
-    if (g && d) { try { d.ref('gaduri/' + g.room + '/' + code).remove(); } catch (e) { } }
+    if (g && g.auto && d) { try { d.ref('gaduri/' + g.room + '/' + code).remove(); } catch (e) { } }
     const tmp = { history: Array.isArray(x.history) ? x.history.slice() : [] };
     try { addHistoryLog(tmp, '[토크쇼] 🎬 피날레 — ' + (me.name || me.code) + ' 사회자가 무대로 불러냈습니다. 「' + LINE + '」 (' + was + (out != null ? ' · 오염도 ' + out + '%' : '') + ')'); } catch (e) { }
     f.history = tmp.history;
