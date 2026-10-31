@@ -155,12 +155,24 @@ wrap('openDarkBriefing', function (_f) {
         if (linkArm && t) {
             const out = asWonder(_f, this, arguments, null, true);
             try { dressBrief(t); } catch (e) { }
+            try { keepLine(); } catch (e) { }
             return out;
         }
         if (t) { alertMsg(pendingMsg(t)); return; }
-        return asWonder(_f, this, arguments);
+        const out = asWonder(_f, this, arguments);
+        try { keepLine(); } catch (e) { }
+        return out;
     };
 });
+// 반입 화면의 초록 줄 — 「본 구역은 D등급으로, 사망 시 재산 소멸 규정이 적용되지 않습니다.」 대신 (2026-10-31 사용자)
+const KEEP_LINE = '해당 어둠 내에서 얻은 재산은 사망 시 소실되지 않습니다.';
+function keepLine() {
+    const body = document.getElementById('darkness-body');
+    if (!body) return;
+    Array.prototype.forEach.call(body.querySelectorAll('span'), function (sp) {
+        if (/재산 소멸 규정이 적용되지 않습니다/.test(sp.textContent || '')) sp.textContent = KEEP_LINE;
+    });
+}
 wrap('startDarkRun', function (_f) {
     return function (zone) {
         if (zone !== W) return _f.apply(this, arguments);
