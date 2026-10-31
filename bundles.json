@@ -449,6 +449,8 @@
       "wonder-text-wolf.js",
       "wonder-ch-wolf.js",
       "wonder-link-wolf.js",
+      "wonder-dice-text.js",
+      "wonder-dice.js",
       "event-bgm.js"
     ]
   ]
