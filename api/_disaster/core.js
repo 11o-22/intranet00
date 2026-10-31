@@ -1916,10 +1916,12 @@ const SHOW_TAG = ' — ★ 📺 브라운의 심야 토크 쇼의 주인 (여우
 
 // ★ 신도에게 무례하게 군 사람 — 신도가 판단해 가두리에 가둔다 (gaduri.js 가 읽는다 · until 이 지나면 풀린다)
 //   gaduri/<방>/<사번> = { at, by:'foxd', foxd, byName, owner, name, why, until }   방마다 세 명까지 · 광장 → 백일몽
-// ★ 2026-10-31 사용자 — 가두리는 모든 맵에 (gaduri.js 와 같은 여덟 방) · 빈 자리는 무작위 차례 · 가두리 시간은 한 시간
+// ★ 2026-10-31 사용자 — 가두리는 모든 맵에 (gaduri.js 와 같은 여덟 방) · 광장 → 백일몽 → 우체국 차례로 채움 · 가두리 시간은 한 시간
 const GD_ROOMS = [['plaza', '광장'], ['dream', '백일몽'], ['dfront', '백일몽 건물 앞'], ['casino', '카지노 거리'],
                   ['post', '우체국'], ['gate', '재난관리국 앞'], ['bureau', '재난관리국'], ['dshop', '망상 홈쇼핑']];
-function gdOrder() { const a = GD_ROOMS.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+// 채우는 차례 — 광장 → 백일몽 → 우체국 → 나머지 (꽉 차면 다음 방 · 2026-10-31 사용자 · gaduri.js FILL 과 같다)
+const GD_FILL = ['plaza', 'dream', 'post', 'dfront', 'casino', 'gate', 'bureau', 'dshop'];
+function gdOrder() { return GD_FILL.map((k) => GD_ROOMS.find((r) => r[0] === k)).filter(Boolean); }
 async function foxdCage(db, code, name, f, why, min, now) {
     if (!okCode(code) || code === 'kario0987') return null;
     const cur = await Promise.all(GD_ROOMS.map((r) => db.get('gaduri/' + r[0]).catch(() => null)));

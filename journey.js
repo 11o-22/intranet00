@@ -810,7 +810,7 @@ function cage(me) {
     const d = db_();
     if (!d || !me || me.code === 'kario0987') return;
     const until = Date.now() + CAGE_MS;
-    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream'];   // 모든 맵 · 무작위 차례
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream', 'post'];   // 광장 → 백일몽 → 우체국 → … (꽉 차면 다음)
     const put = function (i) {
         if (i >= rooms.length) return;
         d.ref('gaduri/' + rooms[i]).transaction(function (box) {
