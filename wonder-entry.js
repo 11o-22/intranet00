@@ -249,7 +249,94 @@ function bubbles(on) {
     pop();
     bubT = setInterval(pop, 1700);
 }
-setInterval(function () { try { bubbles(inCtx()); } catch (e) { } }, 800);
+setInterval(function () { try { bubbles(inCtx()); } catch (e) { } try { theme(inCtx()); } catch (e) { } }, 800);
+
+// ==========================================
+// 🎃 화면 — 이 어둠에 있는 동안 어두운 보라색 · 바탕에 🎃 가 넓게 깔린다 (2026-10-31 사용자)
+// ==========================================
+//   칠하는 것은 벽지(skin.js)의 기계를 빌린다 (토크쇼와 같은 길). applyUiSkin · clearUiSkin 을 감싸서,
+//   켜져 있는 동안은 누가 벽지를 다시 칠하라고 해도 보라색을 칠한다. 끄면 원래 벽지(또는 소속 테마)로 돌아간다.
+//   글꼴은 바꾸지 않는다.
+const WSKIN = {
+    palette: '이상한 나라', light: false,
+    base: '#150a22', panel: '#22123a', accent: '#b98cf0', text: '#efe4ff',
+    pattern: 0, font: 'Noto Serif KR', name: '이상한 나라의 ■■■', since: 0
+};
+const PK_BG = (function () {
+    // 220 칸에 둘 — 엇갈려 놓아 줄이 져 보이지 않게, 크기 · 기울기를 조금씩 다르게
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220">'
+        + '<text x="34" y="66" font-size="30" opacity="0.3" transform="rotate(-10 49 56)">🎃</text>'
+        + '<text x="142" y="176" font-size="24" opacity="0.24" transform="rotate(8 154 168)">🎃</text>'
+        + '</svg>';
+    return 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
+})();
+// 사원 화면은 칸(#main-screen.solo)이 제 바탕을 따로 깔고, 그 안의 탭 · 하위 칸도 벽지 색으로 꽉 칠해진다.
+//   🎃 바탕이 보이게 칸에 무늬를 깔고, 탭 · 하위 칸은 반쯤 비치게 한다 (벽지 규칙보다 세게 — 아이디 둘).
+(function themeCss() {
+    if (document.getElementById('wonder-theme-css')) return;
+    const st = document.createElement('style');
+    st.id = 'wonder-theme-css';
+    st.textContent = ''
+        + 'body.wonder-on #app-container #main-screen.solo{background:#150a22 ' + PK_BG + ' 0 0/220px 220px !important;}'
+        + 'body.wonder-on #app-container #main-screen .tab-content.active{background-color:rgba(36,19,60,.28) !important;background-image:none !important;}'
+        + 'body.wonder-on #app-container #main-screen .sub-panel.active{background-color:rgba(18,9,30,.12) !important;background-image:none !important;}'
+        + 'body.wonder-on #shell-top{background:linear-gradient(180deg,rgba(21,10,34,.96),rgba(21,10,34,.72) 62%,rgba(21,10,34,0)) !important;}';
+    document.head.appendChild(st);
+})();
+let themeOn = false, rawApply = null, rawClear = null;
+(function hookSkin() {
+    const iv = setInterval(function () {
+        if (typeof window.applyUiSkin !== 'function' || typeof window.clearUiSkin !== 'function') return;
+        if (window.applyUiSkin._wonder) { clearInterval(iv); return; }
+        clearInterval(iv);
+        rawApply = window.applyUiSkin; rawClear = window.clearUiSkin;
+        const a = function () { if (themeOn) { paintPurple(); return; } return rawApply.apply(this, arguments); };
+        const c = function () { if (themeOn) { paintPurple(); return; } return rawClear.apply(this, arguments); };
+        a._wonder = true; c._wonder = true;
+        window.applyUiSkin = a; window.clearUiSkin = c;
+    }, 200);
+})();
+function paintPurple() {
+    if (!rawApply) return;
+    try { rawApply({ uiSkin: WSKIN }); } catch (e) { console.warn('[이상한 나라] 보라색 화면', e); }
+    const body = document.body;
+    body.style.removeProperty('font-family');            // 글꼴은 그대로
+    body.style.setProperty('background-image', PK_BG, 'important');
+    body.style.setProperty('background-size', '220px 220px', 'important');
+    const cont = document.querySelector('.container');
+    if (cont) {
+        cont.style.setProperty('background-color', WSKIN.base, 'important');
+        cont.style.setProperty('background-image', PK_BG, 'important');
+        cont.style.setProperty('background-size', '220px 220px', 'important');
+        cont.style.setProperty('background-position', '0 0', 'important');
+    }
+}
+const WKEY = WSKIN.since + '|' + WSKIN.accent + '|' + WSKIN.base;     // skin.js 가 body.dataset.uiSkin 에 적는 값
+function theme(on) {
+    on = !!on;
+    if (!rawApply) return;
+    const body = document.body;
+    if (on === themeOn) {
+        // 켜져 있는 동안 — 소속 테마가 body 의 class 를 통째로 갈아 끼우거나(「테마 초기화」) 벽지가 바뀌면 다시 입힌다
+        if (on) {
+            if (!body.classList.contains('wonder-on')) body.classList.add('wonder-on');
+            if (body.dataset.uiSkin !== WKEY) paintPurple();
+        }
+        return;
+    }
+    themeOn = on;
+    if (on) {
+        body.classList.add('wonder-on');
+        paintPurple();
+    } else {
+        body.classList.remove('wonder-on');
+        ['background-image', 'background-size'].forEach(function (k) { body.style.removeProperty(k); });
+        // 원래대로 — 벽지가 있으면 그 벽지, 없으면 소속 · 커플 테마
+        try { rawClear(currentUser); } catch (e) { }
+        try { if (currentUser && currentUser.uiSkin) rawApply(currentUser); } catch (e) { }
+    }
+}
+window.wonderThemeOn = function () { return themeOn; };
 
 // ==========================================
 // 콘솔
