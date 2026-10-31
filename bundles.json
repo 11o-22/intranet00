@@ -431,7 +431,13 @@
       "wonder-shop.js",
       "wonder-ch-angel.js",
       "wonder-link.js",
-      "wonder-link-angel.js"
+      "wonder-link-angel.js",
+      "wonder-text-vampire.js",
+      "wonder-ch-vampire.js",
+      "wonder-link-vampire.js",
+      "wonder-text-jiangshi.js",
+      "wonder-ch-jiangshi.js",
+      "wonder-link-jiangshi.js"
     ]
   ]
 }

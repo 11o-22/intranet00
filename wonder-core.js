@@ -627,6 +627,16 @@ function usedOf(ch) {
     const m = S.meta || {};
     return ((m.used || {})[ch] || []).slice();
 }
+// 받은 미션은 그 자리에서 내 회차 기록에 적는다 — 연계판에서 죽어 처음부터 다시 해도 같은 회차에 다시 나오지 않게
+function markUsed(ch, id) {
+    const me = rec();
+    if (!me.cur) return;
+    me.cur.used = me.cur.used || {};
+    const u = arr(me.cur.used[ch]);
+    if (u.indexOf(id) < 0) u.push(id);
+    me.cur.used[ch] = u;
+    saveRec();
+}
 X.toMission = function () {
     const m = S.meta || {};
     const ch = m.order[m.idx || 0];
@@ -648,6 +658,7 @@ X.toMission = function () {
 VIEW.mission = function (sc) {
     const id = (S.mis || {})[sc.key];
     if (!id) { draw('—', '', waitHtml('_none', '부탁을 고르는 중입니다…')); return; }
+    if (F.mis !== id) markUsed(sc.ch, id);
     F.mis = id;
     const c = X.chapters[sc.ch];
     if (c && c.mission) return c.mission(api(), id);
@@ -702,7 +713,9 @@ X.chapterDone = function (given) {
     const mid = (S.mis || {})['mis_' + m.rid + '_' + (m.idx || 0)];
     const me = rec();
     if (!me.cur || me.cur.rid !== m.rid) me.cur = { rid: m.rid, order: m.order, idx: m.idx || 0, used: m.used || {}, res: {} };
-    me.cur.used = clean(m.used || {});
+    const mu = clean(m.used || {}) || {};
+    Object.keys(me.cur.used || {}).forEach(function (k) { mu[k] = arr(mu[k]).concat(arr(me.cur.used[k]).filter(function (x) { return arr(mu[k]).indexOf(x) < 0; })); });
+    me.cur.used = mu;
     if (!me.cur.used[ch]) me.cur.used[ch] = [];
     if (mid && me.cur.used[ch].indexOf(mid) < 0) me.cur.used[ch].push(mid);
     if (mid && leader() === ME) tx('meta/used/' + ch, function (cur) { cur = arr(cur); if (cur.indexOf(mid) < 0) cur.push(mid); return cur; });
