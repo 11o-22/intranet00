@@ -286,6 +286,22 @@ const PLAZA = {
     },
     START: 'plaza',
 
+    // ── 🎃 핼러윈 (2026-10-31 사용자) — 맵마다 호박 셋 · 우중충한 빛
+    //   포토존은 빼고 길 · 건물 안 여덟 방에만. 자리는 [x, 발 닿는 y, 키] (방 그림 좌표).
+    //   위층 바닥은 y 845~905 의 뒤쪽(사람이 앞을 지나가게) · 지하는 1262~1288.
+    //   시설 입구(x 940 등) · 가두리 · 계단 위는 피했다. 끄려면 HALLOWEEN: false.
+    HALLOWEEN: true,
+    PK: {
+        plaza:  [[1120, 858, 100], [1665, 861, 94],  [700, 1266, 104]],
+        dream:  [[300, 853, 96],   [1740, 857, 100], [1230, 1266, 102]],
+        casino: [[625, 856, 102],  [1460, 859, 94],  [1200, 1266, 100]],
+        post:   [[520, 853, 98],   [1560, 860, 104], [700, 1266, 96]],
+        gate:   [[640, 856, 100],  [1300, 858, 96],  [1210, 1266, 104]],
+        bureau: [[470, 853, 98],   [1330, 858, 102], [680, 1266, 96]],
+        dfront: [[520, 856, 104],  [1420, 858, 96],  [1200, 1266, 100]],
+        dshop:  [[560, 856, 96],   [1300, 858, 104], [700, 1266, 98]]
+    },
+
     // ── 📸 포토존 — 장소마다 방이 둘 (목록 ☰ 「포토존」에서 고른다)
     //
     //   주신 그림(4800x2556)은 **도트 한 칸이 6픽셀**인 도트 그림이다. 그래서
@@ -700,6 +716,12 @@ function stampSafe(ov) {
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
         // 🔒 가두리 — 사람처럼 선 자리(zy)로 앞뒤를 가린다. 누름은 받지 않는다
         '.plaza-cage{position:absolute;pointer-events:none;}',
+        // 🎃 핼러윈 — 방 그림 바로 위에 우중충한 막(사람 · 입구보다 아래) · 바닥의 호박
+        '.plaza-gloom{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;',
+        '  background:radial-gradient(ellipse at 50% 38%,rgba(0,0,0,0) 30%,rgba(8,4,16,.5) 100%),',
+        '  linear-gradient(180deg,rgba(38,24,58,.46) 0%,rgba(30,20,42,.36) 50%,rgba(12,7,20,.42) 100%);}',
+        '.plaza-pk{position:absolute;pointer-events:none;}',
+        '.plaza-pk img{display:block;width:100%;height:100%;filter:drop-shadow(0 0 7px rgba(255,140,40,.55)) drop-shadow(0 3px 3px rgba(0,0,0,.6));}',
         '.plaza-cage img{display:block;width:100%;height:100%;filter:drop-shadow(0 4px 5px rgba(0,0,0,.5));}',
         '.plaza-cage .t{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:2px;font-size:10px;',
         '  font-weight:bold;color:#d9d4e0;white-space:nowrap;text-shadow:0 1px 3px #000,0 0 5px #000;}',
@@ -2860,6 +2882,32 @@ function paintRoom() {
     paintExits();
     paintSpots();
     paintCage();                    // 🔒 가두리 (그 방에 있으면)
+    paintHalloween();               // 🎃 핼러윈 — 호박 셋 · 우중충한 막
+}
+
+// 🎃 핼러윈 (2026-10-31 사용자) — P.PK 의 자리에 호박을 세우고 방 그림 위에 막을 한 장 깐다
+function paintHalloween() {
+    Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-pk, .plaza-gloom'), function (e) { e.remove(); });
+    const list = P.HALLOWEEN ? P.PK[run.room] : null;
+    if (!list) return;
+    const z = zz();
+    const g = document.createElement('div');
+    g.className = 'plaza-gloom';
+    run.el.insertBefore(g, run.el.firstChild);
+    list.forEach(function (p) {
+        const h = p[2], w = h;                       // 호박 그림은 44 x 44
+        const e = document.createElement('div');
+        e.className = 'plaza-pk';
+        e.style.left = Math.round((p[0] - w / 2) * z) + 'px';
+        e.style.top = Math.round((p[1] - h) * z) + 'px';
+        e.style.width = Math.round(w * z) + 'px';
+        e.style.height = Math.round(h * z) + 'px';
+        e.style.zIndex = String(100 + Math.round(p[1]));
+        // 도트 한 칸보다 크게 그릴 때만 또렷하게 — 작게 줄일 때 pixelated 면 이가 빠진다
+        e.style.imageRendering = (h * z >= 44) ? 'pixelated' : 'auto';
+        e.innerHTML = '<img src="' + P.DIR + 'pumpkin.png" alt="">';
+        run.el.appendChild(e);
+    });
 }
 
 // 나갈 수 있는 쪽에 화살표를 띄운다
@@ -5416,6 +5464,7 @@ function open() {
         +   '<span class="pico" style="--ic:url(\'ico/notice.png\')"></span><i class="nd"></i></button>'
         + '<button class="plaza-ico plaza-keep" id="plaza-gift">'
         +   '<span class="pico" style="--ic:url(\'ico/gift.png\')"></span><i class="nd"></i></button>'
+        + '<button class="plaza-ico plaza-keep" id="plaza-bgm" title="배경 음악">🔊</button>'
         + '<button class="plaza-ico plaza-keep" id="plaza-menu">☰</button>'
         + '</div>'
         + '<div id="plaza-who"></div>'
@@ -5678,6 +5727,13 @@ function open() {
         if (typeof window.openGiftBox === 'function') goApp({ fn: 'openGiftBox' });
     };
     document.getElementById('plaza-menu').onclick = menuSheet;
+    (function () {                                  // 🔊 배경 음악 켜고 끄기 (event-bgm.js)
+        const b = document.getElementById('plaza-bgm');
+        if (!b) return;
+        const show = function () { b.textContent = (typeof window.eventBgmMuted === 'function' && window.eventBgmMuted()) ? '🔇' : '🔊'; };
+        show();
+        b.onclick = function () { if (typeof window.eventBgmToggle === 'function') window.eventBgmToggle(); show(); };
+    })();
     (function () {                                  // 🍍 점프 단추 — 누르는 순간 뛴다 (조이스틱 잡기에 안 뺏기게 막는다)
         const jb = document.getElementById('plaza-jump');
         if (!jb) return;
@@ -5753,6 +5809,9 @@ window.plazaRooms = function () {
                  아래: (downOf(r) ? downOf(r).to : '-') };
     }));
 };
+
+// 지금 어느 방인가 — 광장이 닫혀 있으면 '' (event-bgm.js 가 배경 음악을 고른다)
+window.plazaRoomNow = function () { return (run && run.el && run.room) ? run.room : ''; };
 
 window.plazaState = function () {
     console.log('%c===== 🚶 광장 =====', 'color:#ffcf8f; font-size:13px');

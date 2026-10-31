@@ -448,7 +448,8 @@
       "wonder-link-succubus.js",
       "wonder-text-wolf.js",
       "wonder-ch-wolf.js",
-      "wonder-link-wolf.js"
+      "wonder-link-wolf.js",
+      "event-bgm.js"
     ]
   ]
 }
