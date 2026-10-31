@@ -824,6 +824,8 @@ VIEW.link = function () {
     const ch = m.order[m.idx || 0];
     const c = X.chapters[ch];
     if (!linkHere()) return goScreen(ch);
+    // 부탁 번호가 비었으면 들고 온 표에서 채운다 (2026-10-31 「연계판을 찾지 못했습니다」)
+    if (!F.mis) { try { const t = darkRun.wonderLink; if (t && t.ch === ch && t.mis) { F.mis = t.mis; save(); } } catch (e) { } }
     if (c && c.link) return c.link(api(), F.mis);
     const r = (S.res || {})['r_' + m.rid + '_' + (m.idx || 0)];
     if (r) return go({ id: 'result', r: r });

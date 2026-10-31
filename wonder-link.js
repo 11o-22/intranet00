@@ -43,9 +43,24 @@ L.K = {};
 // ==========================================
 // 시작
 // ==========================================
+// ★ 「미션 받고 갔더니 『연계판을 찾지 못했습니다』」 (2026-10-31 사용자)
+//   내 화면의 연계판 자리(f.lk)는 회차_챕터(rk)가 같으면 그대로 이어 썼다. 그래서 같은 챕터에서 앞서 남은 자리
+//   (다른 부탁 · 다른 챕터 · 부탁 번호가 빈 것)가 있으면 지금 받은 부탁 대신 그것을 찾다가 못 찾았다.
+//   이제 들고 온 부탁(표 — darkRun.wonderLink)과 지금 부탁이 다르면 새로 연다. 부탁 번호가 비었으면 표에서 채운다.
+function tkHere() {
+    try {
+        const t = (typeof darkRun !== 'undefined' && darkRun) ? darkRun.wonderLink : null;
+        const m = S().meta || {};
+        return (t && t.rid === m.rid && Number(t.idx) === Number(m.idx || 0)) ? t : null;
+    } catch (e) { return null; }
+}
+function has(ch, mid) { return !!(ch && mid && L.M[ch] && L.M[ch][mid]); }
 L.run = function (ch, mid) {
     const f = F();
-    if (!f.lk || f.lk.rk !== L.rk()) {
+    const t = tkHere();
+    if (!has(ch, mid) && t && t.ch === ch && has(ch, t.mis)) { mid = t.mis; f.mis = mid; }
+    if (!f.lk || f.lk.rk !== L.rk() || f.lk.ch !== ch || (has(ch, mid) && f.lk.mid !== mid)) {
+        if (f.lk && f.lk.rk === L.rk()) { try { console.warn('[이상한 나라] 연계판 자리를 새로 엽니다 — 남아 있던 것', JSON.stringify(f.lk).slice(0, 200), '→', ch, mid); } catch (e) { } }
         f.lk = { rk: L.rk(), ch: ch, mid: mid, i: 0, hints: [], used: {} };
         X.save();
     }
@@ -69,7 +84,20 @@ function makePlan() {
 X.VIEW.lk = function () {
     const f = F();
     const d = def();
-    if (!d) { X.draw('—', '(연계판을 찾지 못했습니다)', X.btn('홀로 돌아간다.', "WONDER.finish('f')")); return; }
+    if (!d) {
+        // 들고 온 부탁(표)으로 한 번 더 찾는다
+        const t = tkHere();
+        if (f && t && has(t.ch, t.mis) && !(f.lk && f.lk.fixed)) {
+            try { console.warn('[이상한 나라] 연계판을 표에서 다시 찾습니다', JSON.stringify(f.lk || null).slice(0, 200), JSON.stringify(t)); } catch (e) { }
+            f.mis = t.mis;
+            f.lk = { rk: L.rk(), ch: t.ch, mid: t.mis, i: 0, hints: [], used: {}, fixed: 1 };
+            X.save();
+            return X.view();
+        }
+        try { console.warn('[이상한 나라] 연계판을 찾지 못했습니다', JSON.stringify(f && f.lk || null).slice(0, 200), f && f.mis, JSON.stringify(t || (typeof darkRun !== 'undefined' && darkRun && darkRun.wonderLink) || null)); } catch (e) { }
+        X.draw('—', '(연계판을 찾지 못했습니다)', X.btn('홀로 돌아간다.', "WONDER.finish('f')"));
+        return;
+    }
     const st = L.st();
     if (!st.plan) {
         if (X.leader() === ME() || !L.team()) {
