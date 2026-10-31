@@ -4,6 +4,8 @@
 // ==========================================
 //
 // ■ 하나 — 구출이 쌓이면 사람을 꺼내 올 수 있다
+//   ★ 2026-10-31 사용자: 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외)
+//     → 꺼내 오기는 닫았다. heartPull 은 막히고 소지품의 은심장 칸도 뜨지 않는다. 아래는 예전 설명.
 //
 //       누적 200회   상담실·선녀탕에 있는 사원을 하루 두 번 꺼내 온다
 //       누적 300회   하루 세 번
@@ -87,6 +89,8 @@ function whereOf(u) {
 window.heartPull = function (who) {
     const me = currentUser;
     if (!me) return;
+    showCustomAlert('🩶 은심장\n\n남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없습니다.\n갇힌 본인만 나올 수 있어 꺼내 오기는 닫혔습니다.');
+    return;
     if (!hasHeart(me)) { showCustomAlert('은심장을 지녀야 합니다.'); return; }
 
     const max = pullMax(me);
@@ -165,7 +169,8 @@ function paintBox() {
     const host = document.getElementById('inventory-list-container');
     if (!host || !currentUser) return;
     let el = document.getElementById('heart-pull-box');
-    if (!pullMax(currentUser)) { if (el) el.remove(); return; }
+    if (el) el.remove();
+    return;     // 2026-10-31 — 꺼내 오기는 닫았다 (남의 상담실 · 선녀탕에 관여하지 못함)
 
     if (!el) {
         el = document.createElement('div');

@@ -40,8 +40,8 @@
 //                         +1,000 P — **도운 것은 한 탐사에 3번까지만 센다.**
 //                         (붙잡았습니다 · 되살렸습니다 · 끌어냈습니다 · 치유로 일으켰습니다 ·
 //                          ■■의 ■■■ 의 붙잡은 동료 수)
-//   ⑦ 골든 마스코트        상담실 · 선녀탕에 있는 사원에게 계약서를 보내 오염도 0 으로 꺼낸다.
-//                         **한 장에 1만 P · 하루 3장.**
+//   ⑦ 골든 마스코트        (2026-10-31 사용자: 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 — 계약서는 닫았다. 🎐 여우 신도만 예외)
+//                         예전: 상담실 · 선녀탕에 있는 사원에게 계약서를 보내 오염도 0 으로 꺼낸다. 한 장에 1만 P · 하루 3장.
 //
 // ■ ② · ⑥ 은 탐사 하나를 통째로 본다
 //
@@ -118,8 +118,8 @@ const MOON_TATS = [
        + '늘어난다. (1회 1천 포인트, 최대 3회)',
       q: '이쪽.' },
     { id: 't7', n: '골든 마스코트',
-      d: '완전히 오염되거나 죽어서 상담실/선녀탕에 있는 사원에게 계약서를 보내 멀끔한 상태로 '
-       + '즉시 꺼내 주며, 포인트를 얻는다. (계약서 일일 한도 3장, 1장 당 1만 포인트)',
+      d: '완전히 오염되거나 죽어서 상담실/선녀탕에 있는 사원에게 계약서를 보내 꺼내 주던 문신. '
+       + '남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없어 지금은 계약서를 보낼 수 없다.',
       q: '' }
 ];
 
@@ -840,7 +840,10 @@ window.moonShopReset = shopReset;
 // ==========================================
 // ⑦ 골든 마스코트 — 계약서
 // ==========================================
+// ★ 2026-10-31 사용자 — 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외)
+const DEAL_SHUT = '[ 골든 마스코트 ]\n\n계약서를 보낼 수 없습니다.\n남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없습니다 — 갇힌 본인만 나올 수 있습니다.';
 function dealPick() {
+    alert_(DEAL_SHUT); return;
     const me = u_();
     if (!on(me, 't7')) { alert_('골든 마스코트를 꺼내야 합니다.'); return; }
     const d = dealOf(me);
@@ -872,6 +875,7 @@ function foodQ(x) {
 }
 let dealBusy = false;
 function dealGo(code) {
+    alert_(DEAL_SHUT); return;
     const me = u_();
     if (!me || !on(me, 't7') || dealBusy) return;
     const d0 = dealOf(me);
@@ -1029,7 +1033,7 @@ function state(u, id) {
     if (id === 't5') { const s = shopOf(u); return '우주 쇼핑몰 리셋 ' + s.alien + ' / ' + MOON.T5_TIMES + '회'; }
     if (id === 't6') return '탐사마다 +' + won(MOON.T6_BASE) + ' · 도울 때마다 +' + won(MOON.T6_HELP) + ' (한 탐사에 ' + MOON.T6_HELP_MAX + '번까지)'
         + (T_ ? ' · 이번 탐사 도운 것 ' + Math.min(MOON.T6_HELP_MAX, T_.h || 0) + '번' : '');
-    if (id === 't7') { const d = dealOf(u); return d ? '계약서 ' + (d.max - d.used) + ' / ' + d.max + '장 · 오늘 받은 몫 ' + won(d.got) : ''; }
+    if (id === 't7') return '남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없다 — 계약서는 닫혔다';
     return '';
 }
 function actions(u, id) {
@@ -1040,7 +1044,7 @@ function actions(u, id) {
             return smallBtn('shop-' + k, SHOP_NAME[k] + ' 리셋 (' + (MOON.T5_TIMES - s[k]) + '회 남음)', s[k] >= MOON.T5_TIMES);
         }).join('');
     }
-    if (id === 't7') { const d = dealOf(u); return smallBtn('deal', '계약서를 보낸다', !d || d.used >= d.max); }
+    if (id === 't7') return smallBtn('deal', '계약서를 보낸다 (닫힘)', true);
     return '';
 }
 

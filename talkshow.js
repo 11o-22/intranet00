@@ -17,9 +17,11 @@
 //   1  초대장을 받은 사람만 들어온다. 초대장은 갈색 팝업으로 뜬다.
 //      한 번 부른 사람은 파티를 나갔다 다시 와도, 그 사회자의 다음 파티에도
 //      그대로 들어올 수 있다 — 초대장의 기운이 남는다.
-//   2  사회자는 상담실·선녀탕에 매이지 않는다. 입원·온천욕·상담 중인
-//      사원도 사원당 하루 한 번 불러올 수 있다. 불려 나온 사원은 거기서
-//      꺼내지고 오염도가 50 으로 맞춰진다 (그대로 두면 바로 다시 들어간다).
+//   2  사회자는 상담실·선녀탕에 매이지 않는다 (본인 · 그대로).
+//      ★ 2026-10-31 사용자 — 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외).
+//        입원·온천욕·상담 중인 사원을 불러와 꺼내 주던 것은 닫았다 — 그런 사원에게는 초대장을 못 보내고,
+//        이미 받은 초대장이 있어도 갇혀 있는 동안은 쇼에 못 들어온다.
+//      (예전: 사원당 하루 한 번 불러오고, 불려 나온 사원은 꺼내져 오염도 50 으로 맞춰졌다.)
 //   3  초대받은 사람은 탐사 횟수를 쓰지 않는다. 초대장을 받은 사람만.
 //   4  들어온 모두가 부활 2회 · 모든 판정 +1. 초대와 상관없다.
 //      다만 이 장비를 찬 사람이 파티의 주인일 때만.
@@ -311,8 +313,13 @@ function withoutQuarantine(fn) {
                 return;
             }
 
-            // 초대받은 사람은 탐사 횟수를 쓰지 않고, 격리 중에도 들어온다
+            // 초대받은 사람은 탐사 횟수를 쓰지 않는다
             const wasLocked = (typeof isQuarantined === 'function') && isQuarantined(currentUser);
+            // ★ 2026-10-31 — 갇힌 손님은 쇼로 나오지 못한다 (남의 상담실 · 선녀탕에 관여하지 못함). 사회자 본인은 그대로.
+            if (wasLocked && !isHost(p)) {
+                showCustomAlert('📺 심야 토크 쇼입니다.\n\n상담실 · 선녀탕에 있는 동안에는 쇼에 들어올 수 없습니다.\n갇힌 본인만 나올 수 있습니다.');
+                return;
+            }
             const _q = (typeof isQuarantined === 'function') ? isQuarantined : null;
             const _t = (typeof getDarkTriesLeft === 'function') ? getDarkTriesLeft : null;
             if (_q) isQuarantined = function () { return false; };
@@ -473,17 +480,12 @@ window.showSendInvite = function (kind) {
         if (!msg) { showCustomAlert('보낼 말을 적어 주세요.'); return; }
     }
 
-    // 기능 2 — 격리 중인 사원은 하루 한 번만 부를 수 있다
+    // 기능 2 — ★ 2026-10-31 사용자: 갇힌 사원은 부르지 못한다 (남의 상담실 · 선녀탕 · 가두리에 관여하지 못함 · 🎐 여우 신도만 예외)
     const locked = (typeof isQuarantined === 'function') && isQuarantined(u);
     if (locked) {
-        if (!currentUser.talkInvDay) currentUser.talkInvDay = {};
-        if (currentUser.talkInvDay[target] === today()) {
-            showCustomAlert(u.name + ' 사원은 오늘 이미 불렀습니다.\n\n'
-                + '상담실·선녀탕에 있는 사원은 하루 한 번만 부를 수 있습니다.');
-            return;
-        }
-        currentUser.talkInvDay[target] = today();
-        if (typeof saveFields === 'function') saveFields({ talkInvDay: 1 });
+        showCustomAlert(u.name + ' 사원은 지금 상담실 · 선녀탕에 있습니다.\n\n'
+            + '남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없어 쇼에 부를 수 없습니다.');
+        return;
     }
 
     const iid = 'di_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
@@ -524,7 +526,7 @@ window.showSendInvite = function (kind) {
                 if (!p || !p.talkShow || !isHost(p)) return r;
                 const body = document.getElementById('dark-party-body');
                 if (!body) return r;
-                // 어디에 있는지 적어 준다 — 상담실·선녀탕·감금실에 있어도 부를 수 있다
+                // 어디에 있는지 적어 준다 — 상담실·선녀탕에 있는 사원은 부를 수 없다 (2026-10-31)
                 const sel = body.querySelector('#dark-invite-target');
                 if (sel) {
                     for (let i = 0; i < sel.options.length; i++) {
@@ -619,12 +621,12 @@ window.showSendInvite = function (kind) {
     }, 400);
 })();
 
-// 지금 어디에 있나 — 상담실·선녀탕·감금실에 있어도 초대할 수 있다
+// 지금 어디에 있나 — 상담실·선녀탕에 있는 사원은 부를 수 없다 (2026-10-31 · 감금실은 그대로)
 function whereTag(u) {
     if (!u) return '';
     if (typeof isQuarantined === 'function' && isQuarantined(u)) {
-        if (u.quarantineHospital) return '· 입원 중';
-        return ((u.quarantineDest || 'fox') === 'bath') ? '· 선녀탕' : '· 상담실';
+        if (u.quarantineHospital) return '· 입원 중 (부를 수 없음)';
+        return ((u.quarantineDest || 'fox') === 'bath') ? '· 선녀탕 (부를 수 없음)' : '· 상담실 (부를 수 없음)';
     }
     const c = u.cage;
     if (c && c.by && c.at) {

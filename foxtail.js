@@ -26,7 +26,8 @@
 //       공용시설 횟수           최대 +6   (꼬리 6개)
 //       공용시설 행운           최대 450% (꼬리 9개)
 //       동결                    최대 9시간 (꼬리 9개)
-//       즉시 탈출               최대 6회  (꼬리 6개)
+//       즉시 탈출               최대 6회  (꼬리 6개) — 2026-10-31 사용자: 본인에게만 · 호가호위를 지닌 본인만 쓴다
+//                                (커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못함 · 🎐 여우 신도만 예외)
 //
 //   시간으로 도는 힘은 전부 24시간이다.
 //
@@ -99,6 +100,15 @@ function tailsLeft(u) {
 function spendTails(u, n) {
     if (u.foxDay !== today()) { u.foxDay = today(); u.foxUsed = 0; }
     u.foxUsed = (u.foxUsed || 0) + n;
+}
+// 호가호위를 지녔나 (찼든 소지품에 있든) — 즉시 탈출은 지닌 본인만 쓴다 (2026-10-31)
+function ownsFox(u) {
+    if (!u) return false;
+    if (wearsFox(u)) return true;
+    return (Array.isArray(u.inventory) ? u.inventory : []).some(function (w) {
+        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : w;
+        return b === FOX || FOX_OLDS.indexOf(b) >= 0;
+    });
 }
 function wearsFox(u) {
     if (!u || !Array.isArray(u.equippedWeapons)) return false;
@@ -398,6 +408,7 @@ function useTails(target, k, count, isSelf) {
     if (!T) return;
     if (count < 1 || count > T.max) { showCustomAlert('연등 수가 맞지 않습니다.'); return; }
     if (tailsLeft(me) < count) { showCustomAlert('남은 연등이 모자랍니다.'); return; }
+    if (k === 'out' && !isSelf) { showCustomAlert('즉시 탈출은 남에게 걸 수 없습니다.\n\n남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없습니다 — 갇힌 본인만 나올 수 있습니다.'); return; }
 
     const say = apply(target, k, count);
     spendTails(me, count);
@@ -518,13 +529,14 @@ function step2(target, isSelf) {
     shut();
     const left = tailsLeft(currentUser);
     const rows = TAILS.map(function (T) {
-        const can = left >= 1;
+        // ★ 2026-10-31 사용자 — 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외): 즉시 탈출은 본인에게만
+        const can = left >= 1 && !(T.k === 'out' && !isSelf);
         return '<button class="fox-pick game-btn" data-k="' + T.k + '"' + (can ? '' : ' disabled')
             + ' style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px; text-align:left;'
             + (can ? '' : ' opacity:.4;') + '">'
             + '<span style="color:#ffcf8f; font-weight:bold;">' + T.i + '. ' + T.n + '</span>'
             + '<div style="font-size:10px; color:#aaa; margin-top:3px; font-weight:normal;">'
-            + T.say + ' · 연등 하나당 +' + T.step + T.unit + ' · 최대 연등 ' + T.max + '개</div></button>';
+            + (T.k === 'out' && !isSelf ? '남에게는 걸 수 없다 — 갇힌 본인만 나올 수 있다' : T.say + ' · 연등 하나당 +' + T.step + T.unit + ' · 최대 연등 ' + T.max + '개') + '</div></button>';
     }).join('');
 
     const w = box('<div style="font-size:13px; color:#ffcf8f; font-weight:bold;">주로 밝힐 🪷 연등</div>'
@@ -678,7 +690,8 @@ window.foxOpen = step1;
         const inRoom = !!(u && u.quarantineUntil && Date.now() < u.quarantineUntil);
         // 🐾 여정에서 펫 대신 맞아 광장 가두리에 갇힌 것도 격리와 같이 푼다 (2026-10-30 사용자 · cage-escape.js)
         const caged = !inRoom && !!(u && typeof window.cageTimedOf === 'function' && window.cageTimedOf(u.code));
-        const n = (u && u.foxEscape) || 0;
+        // ★ 2026-10-31 사용자 — 남이 걸어 준 탈출로 나오는 것도 막는다: 호가호위를 지닌 본인만 쓴다 (🎐 여우 신도만 예외)
+        const n = (u && ownsFox(u) && u.foxEscape) || 0;
         if ((!inRoom && !caged) || n <= 0) { if (old) old.remove(); return; }
         if (old) { old.textContent = '🐯 금제를 푼다 (' + n + ')'; return; }
 
@@ -691,7 +704,7 @@ window.foxOpen = step1;
             + ' box-shadow:0 4px 14px rgba(0,0,0,0.5);';
         b.textContent = '🐯 금제를 푼다 (' + n + ')';
         b.onclick = function () {
-            if (!currentUser || (currentUser.foxEscape || 0) <= 0) return;
+            if (!currentUser || (currentUser.foxEscape || 0) <= 0 || !ownsFox(currentUser)) return;
             // 가두리(여정) — 격리가 아니면 가두리 문만 연다
             if (!(currentUser.quarantineUntil && Date.now() < currentUser.quarantineUntil)) {
                 if (typeof window.cageTimedOf !== 'function' || !window.cageTimedOf(currentUser.code) || typeof window.cageRelease !== 'function') return;

@@ -30,7 +30,8 @@
 //   ② 거문  차고 있는 사람이 방에 있으면 최소 인원이 1인 — 혼자서도 어느 구역이든 들어간다.
 //            3인 이하로 들어가면 (차고 있는 사람에게) 안전한 선택지 표시 🌟 · 판정 +3 · 행운 +2 (낮은 굴림 다시 굴림 두 번)
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
-//   ③ 녹존  하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
+//   ③ 녹존  (2026-10-31 사용자: 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 — 남을 꺼내는 구출은 막았다. 🎐 여우 신도만 예외)
+//            예전: 하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
 //            치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
 //   ④ 문곡  하루 1번 — 「청한다」를 눌러 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다 (🎻 신성의 바이올린은 안 나온다)
 //            고르고 나면 그날 회수품 확률 ×1.5~2.5 · 치성(★ 셋) — 셋 중 둘
@@ -387,11 +388,10 @@ function menu() {
                 + '<div>' + btn('치성 (★1)', "chilJi('geo')", (s.geo || 0) >= CHIL.GEO_DAY || sc < CHIL.JI.geo, true)
                 + tag('치성 ' + (s.geo || 0) + ' / ' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0), (s.geoArm || 0) > 0) + '</div>';
         } else if (g.k === 'nok') {
-            body = line('선녀탕 · 상담실에 갇힌 사원을 꺼낸다 (하루 세 번). 구출할 때마다 10,000~20,000 P · 그 사원은 옥방울 소리와 함께 오염도 0~20% 로 나온다.')
-                + line('치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다.')
-                + '<div>' + btn('갇힌 사원 보기', 'chilNokList()', (s.nok || 0) >= CHIL.NOK_DAY, true)
-                + btn('치성 (★5)', "chilJi('nok')", !!s.nokArm || sc < CHIL.JI.nok)
-                + tag('구출 ' + (s.nok || 0) + ' / ' + CHIL.NOK_DAY + (s.nokArm ? ' · 치성 걸림' : ''), !!s.nokArm) + '</div>';
+            body = line('치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다.')
+                + line('<span style="color:#8a7a5a;">남의 선녀탕 · 상담실 · 가두리에는 관여할 수 없다 — 갇힌 사원을 꺼내 주던 구출은 닫혔다.</span>')
+                + '<div>' + btn('치성 (★5)', "chilJi('nok')", !!s.nokArm || sc < CHIL.JI.nok, true)
+                + tag(s.nokArm ? '치성 걸림' : '치성 없음', !!s.nokArm) + '</div>';
         } else if (g.k === 'mun') {
             body = line('하루 한 번 — 청해 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다. 고르고 나면 그날 회수품 확률이 1.5~2.5배.')
                 + line('치성(★ 셋) — 셋 중 둘을 고른다.')
@@ -1103,9 +1103,12 @@ function inQ(u) {
 function foodQ(x) {
     try { return typeof window.quarFood === 'function' && !!window.quarFood(x); } catch (e) { return false; }
 }
+// ★ 2026-10-31 사용자 — 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 (🎐 여우 신도만 예외). 구출은 닫는다.
+const NOK_SHUT = '녹존성군께 남을 꺼내 달라 청할 수 없습니다.\n\n남의 상담실 · 선녀탕 · 가두리에는 관여할 수 없습니다 — 갇힌 본인만 나올 수 있습니다.';
 window.chilNokList = function () {
     const u = me();
     if (!u || !wears(u)) return;
+    alert_(NOK_SHUT); return;
     const s = st(u);
     if ((s.nok || 0) >= CHIL.NOK_DAY) { alert_('오늘 녹존성군께 청할 수 있는 구출은 다 썼습니다.'); return; }
     const list = users().filter(function (x) { return x.code !== u.code && inQ(x); });
@@ -1137,6 +1140,7 @@ let nokBusy = false;
 window.chilNokGo = function (code) {
     const u = me();
     if (!u || !wears(u) || nokBusy) return;
+    alert_(NOK_SHUT); return;
     if ((st(u).nok || 0) >= CHIL.NOK_DAY) { alert_('오늘 녹존성군께 청할 수 있는 구출은 다 썼습니다.'); return; }
     nokBusy = true;
     shut();
