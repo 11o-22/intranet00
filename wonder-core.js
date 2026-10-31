@@ -19,7 +19,7 @@
 //   · 챕터를 끝낼 때마다 멈추기 / 잇기 — 팀은 투표. 동률이면 각자 d30(16+) — 실패한 사람은 나오고
 //     (다음엔 처음부터) 성공한 사람은 진행. 짝수 인원이 반반으로 갈리면 다시 굴려 반드시 과반.
 //     → 2026-10-31 사용자: 주사위는 「고른 쪽」의 성공 · 실패. 이어서 간다 — 성공 진행 · 실패 퇴장(처음부터) /
-//       멈춘다 — 성공 퇴장(멈춘 자리 그대로) · 실패 진행. 반반 다시 굴리기는 「남는 사람 · 나가는 사람」으로 센다.
+//       멈춘다 — 성공 퇴장(멈춘 자리 그대로) · 실패 진행. 결과는 사람마다 따로 (다른 사람을 기다리지 않고 반반 다시 굴리기도 없다).
 //   · 멈추면 회차는 그 자리에 남는다 — 다음에 들어오면 남은 챕터부터.
 //   · 이 어둠(연계판 포함)에서는 어떤 장비도 통하지 않는다 — 판정 보정 · 즉사 막기 · 행운 · 맹약 전부.
 //     도움은 이벤트 샵(wonder-shop.js) 물건뿐.
@@ -852,6 +852,9 @@ X.chapterDone = function (given) {
     const rkey = 'r_' + m.rid + '_' + (m.idx || 0);
     const r = given || (S.res || {})[rkey + '_' + ME] || (S.res || {})[rkey] || 'f';
     const mid = (S.mis || {})['mis_' + m.rid + '_' + (m.idx || 0)];
+    // 연계 어둠에서 부탁을 마쳤다 — 그 자리에서 이상한 나라로 돌아가 잇는다 (2026-10-31 사용자)
+    const back = linkHere() ? 1 : 0;
+    if (back) { try { darkRun.wonderLink.back = 1; darkRun.log.push('[이상한 나라] 부탁을 마치고 이상한 나라로 돌아옴'); } catch (e) { } }
     const me = rec();
     if (!me.cur || me.cur.rid !== m.rid) me.cur = { rid: m.rid, order: m.order, idx: m.idx || 0, used: m.used || {}, res: {} };
     const mu = clean(m.used || {}) || {};
@@ -872,22 +875,26 @@ X.chapterDone = function (given) {
         me.rounds = (me.rounds || 0) + 1;
         me.cur = null;
         saveRec();
-        return go({ id: 'roundEnd', rounds: me.rounds, rw: rwKey });
+        return go({ id: 'roundEnd', rounds: me.rounds, rw: rwKey, back: back });
     }
     saveRec();
-    go({ id: 'cont', idx: m.idx || 0, rw: rwKey });
+    go({ id: 'cont', idx: m.idx || 0, rw: rwKey, back: back });
 };
 
 // ==========================================
 // 멈추기 / 잇기
 // ==========================================
 function vkey() { const m = S.meta || {}; return 'cont_' + m.rid + '_' + (m.idx || 0); }
+function backBox(sc) {
+    if (!sc || !sc.back) return '';
+    return '<div class="wd-note" style="border-color:#6a4a9a; text-align:center; color:#e6d6ff;">🎃 부탁을 마쳤습니다.<br>계단을 오르자, 다시 이상한 나라입니다. 분수 소리가 들립니다.</div>';
+}
 function rewardBox(sc) {
     const g = sc && sc.rw && F.rewarded && F.rewarded[sc.rw];
     return g && X.rewardHtml ? X.rewardHtml(g) : '';
 }
 VIEW.cont = function (sc) {
-    const rb = rewardBox(sc);
+    const rb = backBox(sc) + rewardBox(sc);
     const key = vkey();
     const v = (S.vote || {})[key] || {};
     const a = actives();
@@ -899,7 +906,7 @@ VIEW.cont = function (sc) {
     }
     const done = a.filter(function (c) { return !!v[c]; });
     if (done.length < a.length) {
-        draw('투표', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴려, 자기가 고른 쪽의 성공 · 실패를 정합니다. 「이어서 간다」 실패면 나가서 다음에 처음부터, 「멈춘다」 실패면 이어서 갑니다.)</span>',
+        draw('투표', rb + '여섯 문 가운데 하나가 닫힙니다. 탐사를 이어 갈지 정합니다.<br><span style="font-size:11px; color:#888;">(동률이면 각자 주사위를 굴려, 자기가 고른 쪽의 성공 · 실패를 정합니다 — 사람마다 따로. 「이어서 간다」 실패면 나가서 다음에 처음부터, 「멈춘다」 실패면 이어서 갑니다.)</span>',
             mine ? '<div class="wd-wait">' + (mine === 'go' ? '「이어서 간다」' : '「멈춘다」') + '에 투표했습니다.<br>' + a.map(function (c) { return (v[c] ? '✔ ' : '… ') + esc(nameOf(c)); }).join(' · ') + '</div>'
                  : btn('이어서 간다.', "WONDER.vote('go')") + btn('여기서 멈춘다.', "WONDER.vote('stop')"));
         return;
@@ -924,40 +931,33 @@ X.contGo = function (c) {
 
 // 동률 — 각자 d30. 짝수 인원이 반반으로 갈리면 모두 다시 굴린다.
 VIEW.tie = function (sc) {
-    const a = actives();
+    // 2026-10-31 사용자 — 주사위는 「자기가 고른 쪽」의 성공 · 실패이고, **사람마다 따로** 적용된다.
+    //   이어서 간다 → 성공: 진행 · 실패: 퇴장(다음엔 처음부터) / 멈춘다 → 성공: 퇴장(멈춘 자리 그대로) · 실패: 진행
+    //   다른 사람의 주사위를 기다리지 않고, 반반 다시 굴리기도 없다.
     const D = (S.dice || {})[sc.key] || {};
-    const round = D._n || 0;
-    const mineR = (D[round] || {})[ME];
-    const got = a.filter(function (c) { return (D[round] || {})[c]; });
+    const mineR = (D[0] || {})[ME];
+    const mv = ((S.vote || {})[sc.key] || {})[ME];
     if (!mineR) {
-        draw('동률', '표가 반으로 갈렸습니다. 각자 주사위를 굴려, 자기가 고른 쪽이 이루어지는지 봅니다.<br>' + (((S.vote || {})[sc.key] || {})[ME] === 'stop' ? '「멈춘다」 — 성공하면 여기서 멈추고, 실패하면 이어서 갑니다.' : '「이어서 간다」 — 성공하면 이어서 가고, 실패하면 이 회차에서 나갑니다.') + (round ? '<br><span style="color:#d4af37;">(반반으로 갈려 다시 굴립니다.)</span>' : ''),
+        draw('동률', '표가 반으로 갈렸습니다. 각자 주사위를 굴려, 자기가 고른 쪽이 이루어지는지 봅니다. 결과는 사람마다 따로 적용됩니다.<br>'
+            + (mv === 'stop' ? '「멈춘다」 — 성공하면 여기서 멈추고, 실패하면 이어서 갑니다.' : '「이어서 간다」 — 성공하면 이어서 가고, 실패하면 이 회차에서 나갑니다.'),
             btn('주사위를 굴린다.', 'WONDER.tieRoll()'));
         return;
     }
-    if (got.length < a.length) {
-        draw('동률', rollHtml(mineR), '<div class="wd-wait">' + a.map(function (c) { const r = (D[round] || {})[c]; return (r ? (r.ok ? '✔ ' : '✖ ') : '… ') + esc(nameOf(c)); }).join(' · ') + '</div>');
-        return;
-    }
-    // 2026-10-31 사용자 — 주사위는 「자기가 고른 쪽」의 성공 · 실패다.
-    //   이어서 간다 → 성공: 진행 · 실패: 퇴장(다음엔 처음부터) / 멈춘다 → 성공: 퇴장(멈춘 자리 그대로) · 실패: 진행
-    const V = (S.vote || {})[sc.key] || {};
-    const stays = function (c) { const ok = !!D[round][c].ok; return (V[c] === 'stop') ? !ok : ok; };
-    const okN = got.filter(stays).length;
-    if (a.length % 2 === 0 && okN * 2 === a.length) {
-        if (leader() === ME) tx('dice/' + sc.key + '/_n', function (cur) { return (cur || 0) === round ? round + 1 : cur; });
-        draw('동률', rollHtml(mineR), '<div class="wd-wait">성공과 실패가 반반입니다. 다시 굴립니다…</div>');
-        return;
-    }
-    if (stays(ME)) return X.contGo('go');
-    if (V[ME] === 'stop') return go({ id: 'stopped' });     // 멈추기에 성공 — 회차는 멈춘 자리에 남는다
-    go({ id: 'tieOut' });
+    const ok = !!mineR.ok;
+    const stay = (mv === 'stop') ? !ok : ok;
+    const what = stay
+        ? (mv === 'stop' ? '「멈춘다」에 실패했습니다. 당신은 이어서 갑니다.' : '「이어서 간다」에 성공했습니다. 당신은 이어서 갑니다.')
+        : (mv === 'stop' ? '「멈춘다」에 성공했습니다. 당신은 여기서 멈춥니다.' : '「이어서 간다」에 실패했습니다. 당신은 이 회차에서 나갑니다.');
+    draw('동률', rollHtml(mineR) + '<div class="wd-sys">' + what + '</div>',
+        stay ? btn('홀로 간다.', "WONDER.contGo('go')")
+             : (mv === 'stop' ? btn('여기서 멈춘다.', "WONDER.go({id:'stopped'})") : btn('홀 밖으로 나간다.', "WONDER.go({id:'tieOut'})")));
 };
 X.tieRoll = function () {
     const sc = F.sc;
     const D = (S.dice || {})[sc.key] || {};
-    const round = D._n || 0;
+    if ((D[0] || {})[ME]) return;
     const r = roll(0);
-    pub('dice/' + sc.key + '/' + round + '/' + ME, { ok: r.ok, raw: r.raw, total: r.total, bonus: 0 });
+    pub('dice/' + sc.key + '/0/' + ME, { ok: r.ok, raw: r.raw, total: r.total, bonus: 0 }).then(function () { view(); });
 };
 
 // 나가는 화면들
@@ -972,7 +972,7 @@ VIEW.tieOut = function () {
 };
 VIEW.roundEnd = function (sc) {
     const st = stageOf(sc.rounds);
-    draw('회차 종료', rewardBox(sc) + '여섯 개의 문이 모두 닫힙니다. 분수의 물방울이 처음으로 바닥에 떨어집니다.<br><br><span style="font-size:11px; color:#888;">(' + sc.rounds + '회차를 마쳤습니다. 다음 회차는 「' + STAGES[st] + '」입니다.)</span>',
+    draw('회차 종료', backBox(sc) + rewardBox(sc) + '여섯 개의 문이 모두 닫힙니다. 분수의 물방울이 처음으로 바닥에 떨어집니다.<br><br><span style="font-size:11px; color:#888;">(' + sc.rounds + '회차를 마쳤습니다. 다음 회차는 「' + STAGES[st] + '」입니다.)</span>',
         btn('단말로 복귀한다.', 'WONDER.leave()'));
 };
 X.leave = function () {
