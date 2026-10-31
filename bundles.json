@@ -437,7 +437,13 @@
       "wonder-link-vampire.js",
       "wonder-text-jiangshi.js",
       "wonder-ch-jiangshi.js",
-      "wonder-link-jiangshi.js"
+      "wonder-link-jiangshi.js",
+      "wonder-text-siren.js",
+      "wonder-ch-siren.js",
+      "wonder-link-siren.js",
+      "wonder-text-succubus.js",
+      "wonder-ch-succubus.js",
+      "wonder-link-succubus.js"
     ]
   ]
 }

@@ -573,7 +573,7 @@ V.exit = function () {
     if (step.k === 's4bell') return V.s4out();
     vDie('출구를 찾는다', '출구를 찾는다');
 };
-L.K.s4end = function () { L.end('아름다운 인내', 'w', { lead: sect(scn('행사가 끝날 때'), '') || body(scn('행사가 끝날 때').p[0].x) }); };
+L.K.v_s4end = function () { L.end('아름다운 인내', 'w', { lead: sect(scn('행사가 끝날 때'), '') || body(scn('행사가 끝날 때').p[0].x) }); };
 function hold(s) { return gam(16); }
 
 // ==========================================
@@ -1101,7 +1101,7 @@ L.M.vampire = {
             { k: 'vroom', b: 'sweet', n: 0, after: hold }, { k: 's4bell', n: 0 },
             { k: 'vroom', b: 'beauty', n: 1, after: hold }, { k: 's4bell', n: 1 },
             { k: 'vroom', b: 'feast', n: 0, after: hold }, { k: 's4bell', n: 2 },
-            { k: 'vroom', b: 'feast', n: 1 }, { k: 's4end' }])
+            { k: 'vroom', b: 'feast', n: 1 }, { k: 'v_s4end' }])
     }),
     T1: M(44, {
         mid: 'T1',

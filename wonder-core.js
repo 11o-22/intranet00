@@ -376,10 +376,42 @@ function bar() {
         + (isTeam() ? '<span style="margin-left:auto;">' + actives().length + '인</span>' : '')
         + '</div>';
 }
+// ==========================================
+// 단계 지문 — 어색 · 피폐 · 기괴
+// ==========================================
+//   window.WONDER_STAGE[챕터|'common'][단계 1~3][평문 키] = 그 단계의 문단 html  (wonder-stage.js, 단계 지문 문서에서 생성)
+//   화면에 그릴 때 문단(<br><br>)마다 평문 키로 찾아 갈아 끼운다. 없으면 몽환 원문 그대로.
+//   사건 · 대사 · 선택지 · 판정은 단계마다 같다 (사용자 원칙) — 선택지 글은 바꾸지 않는다.
+function plainKey(h) {
+    return String(h).replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, '')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ').trim();
+}
+function stageNow() { return stageOf((S.meta || {}).rounds); }
+X.stageNow = stageNow;
+function stageText(html) {
+    const st = stageNow();
+    const W = window.WONDER_STAGE;
+    if (!st || !W || !html) return html;
+    const ch = F && F.ch;
+    const A = (ch && W[ch] && W[ch][st]) || null;
+    const C = (W.common && W.common[st]) || null;
+    if (!A && !C) return html;
+    return String(html).split('<br><br>').map(function (p) {
+        const m = p.match(/^((?:\s*<(?:div|button)[^>]*>[\s\S]*?<\/(?:div|button)>)*)([\s\S]*?)((?:<div[^>]*>[\s\S]*?<\/div>\s*)*)$/);
+        if (!m) return p;
+        const k = plainKey(m[2]);
+        if (!k) return p;
+        const v = (A && A[k]) || (C && C[k]);
+        return v ? m[1] + v + m[3] : p;
+    }).join('<br><br>');
+}
+X.stageText = stageText;
 function draw(title, text, extra, o) {
     const b = body();
     if (!b) return;
     o = o || {};
+    text = stageText(text);
     b.innerHTML = darkBox(title || '—', (o.nobar ? '' : bar()) + '<div class="wd-txt">' + (text || '') + '</div>', extra || '');
     try { mountDarkChat('normal'); } catch (e) { }
 }
@@ -583,7 +615,8 @@ THEN.toDoor = function () {
     save();
     const st = stageOf(m.rounds);
     const c = X.chapters[ch];
-    if (c && c.run && (!c.stages || c.stages.indexOf(st) >= 0)) {
+    // 단계마다 사건 · 선택 · 판정은 같고 보이는 묘사만 바뀐다 — 묘사는 stageText 가 덧씌운다
+    if (c && c.run) {
         try { darkRun.log.push('[이상한 나라] ' + CH[ch].name + ' — ' + STAGES[st]); } catch (e) { }
         // 챕터 등급 — 사망 규정이 이 등급을 따른다
         try { DARK_ZONES[W].grade = chGrade(ch); } catch (e) { }
@@ -830,6 +863,7 @@ X.leave = function () {
 // 죽음 — 막기 없이 (이 어둠에서는 장비가 통하지 않는다)
 // ==========================================
 function die(reasonHtml) {
+    reasonHtml = stageText(reasonHtml);
     if (typeof darkRun === 'undefined' || !darkRun || darkRun._dead) return;
     darkRun._dead = true;
     if (F) { F.st = 'dead'; pub('pl/' + ME + '/st', 'dead'); save(); }

@@ -447,7 +447,7 @@ J.s2open = function () {
     s.gt = s.r.ok ? '' : J.addInf(10, '감염 판정');
     X.save(); X.view();
 };
-L.K.s2door = function () {
+L.K.j_s2door = function () {
     const pg = p0('격리실 앞');
     L.draw('격리실 앞', L.txt(pg.x), (pg.o || []).map(function (o, j) { return X.btn(L.txt(o.l), 'WONDER.JS.s2end(' + j + ')'); }).join(''));
 };
@@ -575,7 +575,7 @@ J.s4 = function (k) {
     if (k === 0) return E('잠긴 문', 'd');
     lk().take = 1; X.save(); L.next(true);
 };
-L.K.s4end = function () { E('오래오래', 'w'); L.draw('—', '', X.waitHtml('_none', '…')); };
+L.K.j_s4end = function () { E('오래오래', 'w'); L.draw('—', '', X.waitHtml('_none', '…')); };
 
 // ==========================================
 // T1 숨은 술래
@@ -1015,7 +1015,7 @@ function t5room(n) {
         }
     };
 }
-L.K.t5end = function () {
+L.K.j_t5end = function () {
     const x = L.x();
     const b = J.bearer();
     if (b && J.infOf(b) >= 60) E('빛나는 눈', 'f');
@@ -1177,7 +1177,7 @@ J.t7r = function () {
     if (J.inf() >= 60) return E('감염', 'f');
     X.view();
 };
-L.K.t7end = function () { L.draw('—', '', X.waitHtml('_none', '…')); };
+L.K.j_t7end = function () { L.draw('—', '', X.waitHtml('_none', '…')); };
 
 // ==========================================
 // T8 영원한 놀이 친구
@@ -1303,7 +1303,7 @@ L.M[CH] = {
     S2: M('S2', {
         timeEnd: '감염', infEnd: '감염',
         endCond: function (c) { return c === '실패 귀환 장면에 한 줄'; },
-        steps: HEAD.concat([0, 1, 2, 3, 4].map(function (n) { return { k: 's2room', n: n }; })).concat([{ k: 's2door' }])
+        steps: HEAD.concat([0, 1, 2, 3, 4].map(function (n) { return { k: 's2room', n: n }; })).concat([{ k: 'j_s2door' }])
     }),
     S3: M('S3', {
         timeEnd: '두 번', infEnd: '두 번',
@@ -1319,7 +1319,7 @@ L.M[CH] = {
         timeEnd: '놓친 손', infEnd: '옮은 손',
         plan: function (p, rnd) { p.bit = rnd() < 0.5; },
         endCond: function (c) { return c === '물린 판이었다면' && !!plan().bit; },
-        steps: HEAD.concat([{ k: 's4obs', n: 0 }, s4room(0), { k: 's4obs', n: 1 }, s4room(1), { k: 's4obs', n: 2 }, { k: 's4iso' }, s4room(2), { k: 's4end' }])
+        steps: HEAD.concat([{ k: 's4obs', n: 0 }, s4room(0), { k: 's4obs', n: 1 }, s4room(1), { k: 's4obs', n: 2 }, { k: 's4iso' }, s4room(2), { k: 'j_s4end' }])
     }),
     T1: M('T1', {
         timeEnd: '술래의 친구들',
@@ -1363,7 +1363,7 @@ L.M[CH] = {
             if (e && L.x().t5took) e.body = e.body.map(function (q) { return q.replace('처음과 같은 세기다. 조금 약하다.', '조금 약하다.'); });
         },
         teamInf: function () { if (J.bearer() === ME()) E('빛나는 눈', 'f'); },
-        steps: HEAD.concat([{ k: 'jroom', n: 0 }, t5vote(0), t5take(0), t5def(0), t5def(1), t5room(1), t5vote(1), t5take(1), t5room(2), t5vote(2), { k: 't5end' }])
+        steps: HEAD.concat([{ k: 'jroom', n: 0 }, t5vote(0), t5take(0), t5def(0), t5def(1), t5room(1), t5vote(1), t5take(1), t5room(2), t5vote(2), { k: 'j_t5end' }])
     }),
     T6: M('T6', {
         timeEnd: '반만 찾음',
@@ -1374,7 +1374,7 @@ L.M[CH] = {
         timeEnd: '감염',
         plan: function (p, rnd) { p.t7loc = Math.floor(rnd() * 5); },
         teamInf: function () { E('감염', 'f'); },
-        steps: HEAD.concat([{ k: 'jroom', n: 0 }, { k: 'jroom', n: 1 }, t7talk(0), t7talk(1), t7talk(2), T7_FINAL, { k: 't7get' }, { k: 't7end' }])
+        steps: HEAD.concat([{ k: 'jroom', n: 0 }, { k: 'jroom', n: 1 }, t7talk(0), t7talk(1), t7talk(2), T7_FINAL, { k: 't7get' }, { k: 'j_t7end' }])
     }),
     T8: M('T8', {
         timeEnd: '닫힌 셔터',
