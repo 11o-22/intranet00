@@ -83,6 +83,8 @@ const ADMIN = CHIL.ADMIN;
 function me() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
 function esc(s) {
@@ -710,7 +712,7 @@ function dropCur() {
 }
 function curOf() {
     const r = run();
-    if (!r) return null;
+    if (!r || wOff()) return null;                     // 이벤트 어둠 — 칠성의 판이 없다
     const k = runKey(r);
     if (CUR && CUR.key === k) return CUR;
     const u = me(), s = u && u.chilRun;
@@ -760,7 +762,7 @@ window.chilBegin = begin;
 // 지금 탐사가 거문의 작은 파티인가 (차고 있는 사람 · 3인 이하)
 function geoSmall() {
     const r = run(), u = me();
-    return !!(r && u && wears(u) && runSize() <= CHIL.SMALL);
+    return !!(r && u && wears(u) && !wOff() && runSize() <= CHIL.SMALL);
 }
 window.chilGeoSmall = geoSmall;
 const GEO_LINE = '<br><br><span style="color:#ffd479;">— 거문성군이 삿된 쪽을 가린다. 🌟 가 안전한 길이다.</span>';
@@ -904,10 +906,10 @@ function hookStart(name, after) {
 }
 hookStart('startDarkRun', function () {
     const r = run();
-    if (r && !r.isParty) begin(runKey(r), 1, [], null);
+    if (r && !r.isParty && !wOff()) begin(runKey(r), 1, [], null);     // 이벤트 어둠 — 걸어 둔 치성을 싣지(쓰지) 않는다
 });
 hookStart('launchPartyRun', function (party) {
-    if (!party || !party.id) return;
+    if (!party || !party.id || wOff(party.zone)) return;               // 이벤트 어둠 — 걸어 둔 치성을 싣지(쓰지) 않는다
     // ✗ 막혀서 판이 안 열린 부름(재진입 차단 · 복귀 창 대기)에도 begin 이 돌아 치성을 먼저 써 버리고,
     //   진짜 출발 때 begin 이 또 돌아 치성 없는 판으로 덮었다. → 판이 이 방으로 열렸고, 아직 안 실었을 때만.
     const r = run();

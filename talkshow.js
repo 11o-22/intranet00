@@ -81,6 +81,8 @@ function has(u, n) {
             return String(w) === n || String(w).indexOf(n) >= 0;
         }) : false;
 }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function party(pid) {
     if (typeof darkParties === 'undefined') return null;
     return darkParties[pid] || null;
@@ -114,6 +116,7 @@ function mirror(p) {
 }
 
 function showOf() {
+    if (wOff()) return null;                           // 이벤트 어둠 — 쇼가 아니다
     const inRun = (typeof darkRun !== 'undefined' && darkRun && darkRun.partyId)
         ? party(darkRun.partyId) : null;
     const p = inRun || myParty();
@@ -270,7 +273,7 @@ function withoutQuarantine(fn) {
         const _c = createParty;
         createParty = function () {
             const self = this, args = arguments;
-            const wear = currentUser && has(currentUser, SHOW);
+            const wear = currentUser && has(currentUser, SHOW) && !wOff(args[0]);   // 이벤트 어둠 방은 쇼가 되지 않는다
             const before = (typeof myPartyId !== 'undefined') ? myPartyId : null;
             const r = wear ? withoutQuarantine(function () { return _c.apply(self, args); })
                            : _c.apply(self, args);
@@ -305,7 +308,7 @@ function withoutQuarantine(fn) {
         const _j = joinParty;
         joinParty = function (pid) {
             const p = party(pid);
-            if (!p || !p.talkShow || !currentUser) return _j.apply(this, arguments);
+            if (!p || !p.talkShow || !currentUser || wOff(p.zone)) return _j.apply(this, arguments);
 
             const inv = invitedTo(p);
             if (!inv && !isHost(p)) {
@@ -379,7 +382,7 @@ function pullOut() {
         if (launchPartyRun._show) { clearInterval(iv); return; }
         const _l = launchPartyRun;
         launchPartyRun = function (p) {
-            const show = !!(p && p.talkShow && p.talkShow.by);
+            const show = !!(p && p.talkShow && p.talkShow.by) && !wOff(p.zone);
             const invited = show && currentUser && invitedTo(p);
             const triesWas = currentUser ? (currentUser.darkTries || 0) : 0;
             const dateWas = currentUser ? currentUser.darkDate : null;

@@ -134,6 +134,8 @@ const KEYS = KINDS.map(function (x) { return x.k; });
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
@@ -290,7 +292,7 @@ window.kitNoteLive = function (u, note) {
 //   돌려주는 것 — { k, owner, ownerCode, grade, nick, mine }
 function usable(k) {
     const me = u_();
-    if (!me) return null;
+    if (!me || wOff()) return null;                  // 이벤트 어둠 — 분신도 · 늑대도 안 나온다
     // 내게 붙어 있는 남의 분신
     const on = me.kitOn && me.kitOn[k];
     if (on && on.by) {
@@ -766,7 +768,7 @@ function pushRoomKits() {
     const out = {};
     // ★ 차고 있어야 센다. 벗으면 데려갈 수 없는데 방에는 적힌 채로 남아
     //   남의 화면에만 분신이 보이던 것을 여기서 막는다.
-    if (wears(me)) {
+    if (wears(me) && !wOff(p.zone)) {                 // 이벤트 어둠 방에는 분신을 적지 않는다
         roomPicked(me).forEach(function (k) {
             out[k] = { by: me.code, byName: me.name, nick: st(me, k).nick || BY_K[k].n };
         });
@@ -1925,7 +1927,7 @@ function openZoneList(body) {
         const _c = createParty;
         const w = function () {
             const me = u_();
-            const on = !!(me && wears(me));
+            const on = !!(me && wears(me)) && !wOff(arguments[0]);
             if (on) bypass = true;
             try { return _c.apply(this, arguments); }
             finally {
@@ -2016,7 +2018,7 @@ function openZoneList(body) {
                 const p = myParty();
                 // ★ 출발 단추는 방장이 누른다. 방장이 안 차고 있어도
                 //   들어온 사람이 데려온 분신은 그대로 센다.
-                if (me && p && p.leader === me.code
+                if (me && p && p.leader === me.code && !wOff(p.zone)
                     && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {
                     // 방 화면이 보여 준 것과 **같은 수**를 쓴다
                     const n = roomKitList(p, me).length;
@@ -2158,6 +2160,10 @@ let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그�
         const w = function (p, body) {
             const me = u_();
             let z = null, min0 = null, low = null, list = [], show = false;
+            if (p && wOff(p.zone)) {                     // 이벤트 어둠 방 — 분신 칸을 그리지 않는다
+                try { const stale = document.getElementById('kit-room-fallback'); if (stale) stale.remove(); } catch (e) { }
+                return _r.apply(this, arguments);
+            }
 
             try {
                 if (me && p && typeof DARK_ZONES !== 'undefined' && DARK_ZONES[p.zone]) {

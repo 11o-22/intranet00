@@ -72,6 +72,8 @@ const DEADLY = { a667G8R: ['stay'] };
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
@@ -113,7 +115,7 @@ function roleIn(code, pid) {
 // 내 역할 — 탐사 중 (파티면 방의 eliteB · 혼자면 차고 있으면 조장)
 function myRole() {
     const me = u_(), r = run();
-    if (!me || !r) return null;
+    if (!me || !r || wOff()) return null;              // 이벤트 어둠 — 조장 · 정예조 가면이 없다
     if (r.isParty && r.partyId) {
         const role = roleIn(me.code, r.partyId);
         if (role) return role;
@@ -463,7 +465,7 @@ window.EBWOLF = {
             try {
                 const me = u_(), r = run();
                 if (me && party && r && r.partyId) {
-                    if (wears(me)) {
+                    if (wears(me) && !wOff(party.zone)) {      // 이벤트 어둠 — 조장 표 · 늑대를 부르지 않는다
                         const d = db_();
                         // 가면은 어둠 안에서 고른다 — 출발 때는 비워 둔다. crew = 출발 때 인원 (전원 생환 셈)
                         if (d) d.ref('darkParties/' + party.id + '/eliteB').update({ lead: me.code, leadName: me.name || me.code, crew: crewOf(party), masks: null, dead: null, at: Date.now() });
@@ -778,7 +780,7 @@ function ensureWolf() {
     const ID = 'eb-wolf-line';
     const r = run();
     const old = document.getElementById(ID);
-    const ws = (r && !r.kroom && Array.isArray(r._ebWolves)) ? r._ebWolves : [];
+    const ws = (r && !r.kroom && !wOff() && Array.isArray(r._ebWolves)) ? r._ebWolves : [];
     if (!ws.length) { if (old) old.remove(); return; }
     const txt = '🐺 ' + ws.map(function (w) { return w.nick + ' — ' + attrName(w.k) + ' ' + (w.g || 'D') + (w.gone ? ' (사라짐)' : ''); }).join(' · ');
     if (old && old.isConnected) { if (old.textContent !== txt) old.textContent = txt; return; }
@@ -956,7 +958,7 @@ window.ebRunMask = runMaskMenu;
         try {
             const r = run(), me = u_();
             const old = document.getElementById(ID);
-            const ok = r && r.isParty && r.partyId && me && wears(me) && roleIn(me.code, r.partyId) === 'lead';   // K 의 방에서도 (2026-10-29)
+            const ok = r && r.isParty && r.partyId && me && wears(me) && !wOff() && roleIn(me.code, r.partyId) === 'lead';   // K 의 방에서도 (2026-10-29)
             if (!ok) { if (old) old.remove(); return; }
             if (old && old.isConnected) return;
             const role = document.getElementById('dro-role');

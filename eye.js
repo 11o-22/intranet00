@@ -90,6 +90,8 @@ const HOUR = 3600 * 1000;
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function today() {
     try { return getTodayStr(); } catch (e) { return new Date().toISOString().slice(0, 10); }
 }
@@ -268,7 +270,7 @@ function soloEye() {
 function isLocal() { const r = run(); return !!(r && !(r.isParty && r.partyId)); }
 function on_() {
     const r = run();
-    if (!r || r._settled) return false;
+    if (!r || r._settled || wOff()) return false;      // 이벤트 어둠 — 눈이 뜨지 않는다
     if (db_() && r.isParty && r.partyId) return true;
     return !r.epic && soloEye();                       // 방 없는 혼자 판 — 흔적일 때만
 }

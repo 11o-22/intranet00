@@ -168,6 +168,18 @@ X.on = on;
 // 이 어둠 안인가 — 연계판에 들어가 있어도 참
 function inW() { return typeof darkRun !== 'undefined' && !!darkRun && (darkRun.zone === W || !!darkRun.wonderLink); }
 X.inW = inW;
+// ★ 커스텀 장비 · 출산 고유 아이템 끄기 (2026-10-31 사용자) — 이벤트 어둠(연계판 포함)에서는 먹히지 않는다 (이벤트 샵 물건만 통한다)
+//   장비 파일들이 부른다: WONDER_GEAR_OFF()      지금 이 어둠 안이거나, 탐사 밖에서 이 어둠 파티 대기실에 있으면 참
+//                         WONDER_GEAR_OFF(구역)  그 구역이 이 어둠이면 참 (파티 만들기 · 들어가기 · 출발 · 방 화면)
+window.WONDER_GEAR_OFF = function (zone) {
+    if (zone !== undefined && zone !== null) return zone === W || !!(zone && typeof zone === 'object' && zone.zone === W);
+    if (inW()) return true;
+    try {
+        if (typeof darkRun !== 'undefined' && darkRun) return false;
+        const p = (typeof getMyParty === 'function') ? getMyParty() : null;
+        return !!(p && p.zone === W);
+    } catch (e) { return false; }
+};
 
 // ==========================================
 // 부탁 표 — 연계판은 기존 어둠에서 (2026-10-31 사용자)
@@ -1266,14 +1278,18 @@ function cleanup() {
     wrapOnce('rollDarkBonus', function (_f) { return function () { if (inW()) return 0; return _f.apply(this, arguments); }; });
     wrapOnce('luckReroll', function (_f) { return function (r) { if (inW()) return r; return _f.apply(this, arguments); }; });
     wrapOnce('gearCapBonus', function (_f) { return function (b) { if (inW()) return 0; return _f.apply(this, arguments); }; });
+    // ★ 다른 감싸개가 안쪽 표(_wonder)까지 베껴 가면 표만 보고는 바깥에 있는지 모른다 — 내 것인지로 본다 (2026-10-31)
+    let mine = null;
     function wrapDeath() {
-        if (typeof window.darkDeath !== 'function' || window.darkDeath._wonder) return;
+        if (typeof window.darkDeath !== 'function' || window.darkDeath === mine) return;
         const _f = window.darkDeath;
         const w = function (reason) {
             if (inW()) return die(reason);
             return _f.apply(this, arguments);
         };
+        Object.keys(_f).forEach(function (k) { if (!(k in w)) { try { w[k] = _f[k]; } catch (e) { } } });
         w._wonder = true;
+        mine = w;
         window.darkDeath = w;
         try { darkDeath = w; } catch (e) { }
     }

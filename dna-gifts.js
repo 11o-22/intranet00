@@ -177,7 +177,13 @@ function dnaEffOf(cat) {
     const o = cat.dnaOwner && (typeof db !== 'undefined' && db.users) ? db.users[cat.dnaOwner] : null;
     return dnaBaseEff(o) || cat.dnaEff || null;
 }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함) 탐사 중에는 고유 아이템이 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+//   차고 있는지(하나만 찰 수 있다)는 그대로 본다 — myDnaEquipRaw
 function myDnaEquip() {
+    try { if (typeof darkRun !== 'undefined' && darkRun && window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF()) return null; } catch (e) { }
+    return myDnaEquipRaw();
+}
+function myDnaEquipRaw() {
     if (!currentUser || !currentUser.equippedWeapons) return null;
     for (let i = 0; i < currentUser.equippedWeapons.length; i++) {
         const w = currentUser.equippedWeapons[i];
@@ -196,7 +202,7 @@ function myDnaEquip() {
         if (isQuarantined(currentUser)) { showCustomAlert('격리 중에는 장착할 수 없습니다.'); return; }
 
         if (!currentUser.equippedWeapons) currentUser.equippedWeapons = [];
-        if (myDnaEquip()) { showCustomAlert('고유 아이템은 하나만 찰 수 있습니다.'); return; }
+        if (myDnaEquipRaw()) { showCustomAlert('고유 아이템은 하나만 찰 수 있습니다.'); return; }
         if (equipFull(currentUser)) { showCustomAlert('장착 슬롯이 가득 찼습니다.'); return; }
 
         currentUser.equippedWeapons.push(itemName);

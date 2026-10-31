@@ -100,6 +100,8 @@ const SAC_ORDER = ['heal', 'nul', 'smash', 'evade', 'judge'];
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
@@ -185,7 +187,7 @@ function onPatch(code, k, val) {
 // 지금 이 화면에서 쓸 수 있는 나비 — 내게 붙어 있는 남의 것, 또는 남에게 안 붙인 내 것
 function usable(k) {
     const me = u_();
-    if (!me) return null;
+    if (!me || wOff()) return null;                    // 이벤트 어둠 — 나비가 날지 않는다
     const on = me.bflyOn && me.bflyOn[k];
     if (on && on.by && on.by !== me.code) {
         const o = userOf(on.by);
@@ -1269,7 +1271,7 @@ function goneOf(u, k) {
 }
 function seatFlies(p) {
     const out = [], seen = {};
-    if (!p || !p.members) return out;
+    if (!p || !p.members || wOff(p.zone)) return out;          // 이벤트 어둠 방 — 나비가 빈자리를 채우지 않는다
     const mem = Object.keys(p.members);
     const add = function (owner, k, at) {
         const id = owner + ':' + k;
@@ -1427,7 +1429,7 @@ window.bflySeats = function () { const p = (typeof getMyParty === 'function') ? 
         try {
             const ov = document.getElementById('dark-run-overlay');
             const old = document.getElementById('bfly-run-btn');
-            if (!ov || ov.style.display === 'none' || !wears(u_())) { if (old) old.remove(); return; }
+            if (!ov || ov.style.display === 'none' || !wears(u_()) || wOff()) { if (old) old.remove(); return; }
             if (old) return;
             const mute = document.getElementById('dark-mute-btn');
             if (!mute) return;

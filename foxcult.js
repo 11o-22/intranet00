@@ -96,6 +96,8 @@ const DEATH_KEYS = ['judge', 'luck', 'gim', 'evade', 'nodeath'];         // 죽�
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
@@ -1217,7 +1219,7 @@ hook('epicSettle', function (_s) {
 let bypass = false;
 function partyNow() { try { return (typeof getMyParty === 'function') ? getMyParty() : null; } catch (e) { return null; } }
 function anyFree(p) {
-    if (!p || !p.members) return null;
+    if (!p || !p.members || wOff(p.zone)) return null;          // 이벤트 어둠 방 — 「어디든지」 표시를 하지 않는다
     const c = Object.keys(p.members).filter(function (x) { return freeOf(userOf(x)); })[0];
     return c || null;
 }
@@ -1650,11 +1652,11 @@ function runKey() {
     if (!r._foxdKey) r._foxdKey = 'fs' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     return r._foxdKey;
 }
-function mineHere() { const me = u_(); return DS.some(function (d) { return !!withOf(me, d); }); }
+function mineHere() { const me = u_(); if (wOff()) return false; return DS.some(function (d) { return !!withOf(me, d); }); }   // 이벤트 어둠 — 신도가 곁에 없다
 function soloTalk() { if (!DARK_TALK) return false; const r = run(); return !!(r && !r.isParty && !r.partyId && !partyId() && mineHere()); }
 function discHere() {
     if (!DARK_TALK) return false;
-    const r = run(); if (!r || !u_()) return false;
+    const r = run(); if (!r || !u_() || wOff()) return false;
     const pid = r.partyId;
     if (pid && typeof darkParties !== 'undefined' && darkParties[pid]) {
         return Object.keys(darkParties[pid].members || {}).some(function (c) { const u = userOf(c); return u && DS.some(function (d) { return !!withOf(u, d); }); });
@@ -1835,7 +1837,7 @@ function plazaList() {
         try {
             const ov = document.getElementById('dark-run-overlay');
             const old = document.getElementById('foxd-run-btn');
-            if (!ov || ov.style.display === 'none' || !wears(u_())) { if (old) old.remove(); return; }
+            if (!ov || ov.style.display === 'none' || !wears(u_()) || wOff()) { if (old) old.remove(); return; }
             if (old) return;
             const mute = document.getElementById('dark-mute-btn');
             if (!mute) return;

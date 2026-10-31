@@ -57,6 +57,8 @@ function hasHeart(u) {
         || (u.equippedWeapons || []).indexOf(HEART) >= 0;
 }
 function saves(u) { return Number((u || {}).heartSaves) || 0; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 
 // 하루 몇 번 꺼낼 수 있나
 function pullMax(u) {
@@ -229,6 +231,7 @@ setInterval(function () { try { paintBox(); } catch (e) { } }, 3000);
 // ==========================================
 function payParty() {
     if (typeof darkRun === 'undefined' || !darkRun || !darkRun.partyId) return;
+    if (wOff()) return;                                // 이벤트 어둠 — 은심장이 식어도 아무 일 없다
     if (ONCE_PER_RUN && darkRun._heartPaid) return;
     if (typeof darkParties === 'undefined') return;
     const p = darkParties[darkRun.partyId];

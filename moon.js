@@ -133,6 +133,8 @@ const BOOT = Date.now();
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
 function run() { return (typeof darkRun !== 'undefined') ? darkRun : null; }
+// ★ 이벤트 어둠(「이상한 나라의 ■■■」 · 연계판 포함)에서는 커스텀 장비가 먹히지 않는다 (2026-10-31 사용자 · wonder-core.js WONDER_GEAR_OFF)
+function wOff(z) { try { return !!(window.WONDER_GEAR_OFF && window.WONDER_GEAR_OFF(z)); } catch (e) { return false; } }
 function alert_(t) { if (typeof showCustomAlert === 'function') showCustomAlert(t); else console.log(t); }
 function toast(t) { try { if (typeof showDarkToast === 'function') showDarkToast(t); } catch (e) { } }
 function log_(u, t) { try { if (typeof addHistoryLog === 'function') addHistoryLog(u, t); } catch (e) { } }
@@ -657,6 +659,7 @@ setInterval(function () {
         const u = u_();
         if (!u) return;
         const r = run();
+        if (r && r.zone && wOff()) return;              // 이벤트 어둠 — 판으로 세지 않는다 (② 배수 · ⑥ 추가 정산 없음)
         if (r && r.zone) {
             const k = runKey(r);
             if (T && T.k !== k) { if (tLive) finish(); else T = null; }
