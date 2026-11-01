@@ -25,7 +25,8 @@ const PTS = [5000, 10000];
 X.TICKETS = TICKETS;
 
 TICKETS.forEach(function (n) {
-    ITEM_CATALOG[n] = { price: '???', usable: false, targetable: false, wonderTicket: true, desc: '[이상한 나라] 교환을 위한 준비중' };
+    // 설명은 사용자가 쓴 그대로 — 「교환을 위한 준비중」 (2026-11-01 소지품 「이벤트」 칸에 들어간다 — invcat.js)
+    ITEM_CATALOG[n] = { price: '???', usable: false, targetable: false, wonderTicket: true, desc: '교환을 위한 준비중' };
 });
 try { TICKETS.forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_ITEMS.push(n); }); } catch (e) { }
 

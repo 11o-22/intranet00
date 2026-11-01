@@ -4,6 +4,8 @@
 // ==========================================
 
 const INV_CATS = [
+    // ★ 이벤트 (2026-11-01 사용자) — 「이상한 나라의 ■■■」 한정 교환권. 맨 위에 둔다
+    { id:'event',  name:'이벤트',      icon:'🎃', color:'#c9a3f0' },
     { id:'food',   name:'음식',        icon:'🍚', color:'#8bc34a' },
     { id:'heal',   name:'회복',        icon:'💊', color:'#4CAF50' },
     { id:'potion', name:'물약',        icon:'🧪', color:'#ba68c8' },
@@ -19,6 +21,7 @@ const INV_CATS = [
 function invCatOf(name) {
     const c = ITEM_CATALOG[name];
     if (!c) return 'etc';
+    if (c.wonderTicket) return 'event';         // 한정 교환권 (wonder-reward.js)
 
     if (c.effect === 'food' || c.cookMat) return 'food';
     if (name.endsWith('물약')) return 'potion';
