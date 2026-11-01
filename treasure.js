@@ -27,13 +27,17 @@
 // ■ 상품 확률 (뽑기 한 번)
 //   먼저 한정품 — 소원권 0.01% · 여우구슬 0.1% · 금고 0.2% · 사직서 · 기록 소실 티켓 · 사원명 변경권 각 0.3%
 //   나머지는 무게로 — 무게 = 1 / √값  (50,000 P 도 값 50,000 으로 센다 · 값이 없는 것은 10,000)
-//                     새 장신구 넷 = 우주 쇼핑몰 물품 무게의 가운데값 ÷ 5
+//   새 장신구 넷 — 각각 0.2% (한정품 다음에 본다)
 //
 // ■ 새 장신구 (장착 — 소지품에서 「사용」)
 //   💎 진주 혀 피어싱      하루에 한 번 가두리에서 나올 수 있다 (가두리 위 💎 단추 · 여정 가두리의 첫 30분 잠김은 그대로)
 //   📿 진주 목걸이         공용시설 행운 200% 상승 (×3)
 //   💠 아쿠아마린 귀걸이   어둠 회수품 200% 상승 (×3 — 커스텀 장비 상한 밖)
 //   👁 아쿠아마린 렌즈     어둠에서 사망하면 포인트 +5,000 · 공용시설 행운 100% 상승 (×2)
+//   ★ 세트 (2026-11-01 사용자) — 둘 다 차면 낱개 몫 대신
+//     진주 세트(혀 피어싱 + 목걸이)          행운 250% (×3.5)
+//     아쿠아마린 세트(귀걸이 + 렌즈)         사망 시 +8,000 P · 행운 120% (×2.2)   — 귀걸이의 회수품 ×3 은 그대로
+//   ★ 나올 확률은 넷 다 **각각 0.2%** (2026-11-01 사용자 — 처음엔 다른 물품 무게의 5분의 1)
 //   이벤트 어둠(이상한 나라 · 연계판)에서는 장비가 통하지 않으므로 회수품 · 사망 몫은 꺼진다.
 //
 // ■ 콘솔
@@ -73,12 +77,14 @@ const JEWEL = {
     LENS:    '아쿠아마린 렌즈'
 };
 const NEW = [
-    { n: JEWEL.TONGUE, e: 'equip_tr_tongue', d: '[보물 찾기] 장착 시 하루에 한 번 가두리에서 나올 수 있다.' },
-    { n: JEWEL.NECK,   e: 'equip_tr_neck',   d: '[보물 찾기] 장착 시 행운 200% 상승.' },
-    { n: JEWEL.EAR,    e: 'equip_tr_ear',    d: '[보물 찾기] 장착 시 회수품 상승 200%.' },
-    { n: JEWEL.LENS,   e: 'equip_tr_lens',   d: '[보물 찾기] 장착 시 사망 시 포인트 + 5000, 행운 100%.' }
+    { n: JEWEL.TONGUE, e: 'equip_tr_tongue', d: '[보물 찾기] 장착 시 하루에 한 번 가두리에서 나올 수 있다. 진주 세트(진주 혀 피어싱 · 진주 목걸이)로 착용 시 행운 250%.' },
+    { n: JEWEL.NECK,   e: 'equip_tr_neck',   d: '[보물 찾기] 장착 시 행운 200% 상승. 진주 세트(진주 혀 피어싱 · 진주 목걸이)로 착용 시 행운 250%.' },
+    { n: JEWEL.EAR,    e: 'equip_tr_ear',    d: '[보물 찾기] 장착 시 회수품 상승 200%. 아쿠아마린 세트(아쿠아마린 귀걸이 · 아쿠아마린 렌즈)로 착용 시 사망 시 포인트 + 8000p, 행운 120%.' },
+    { n: JEWEL.LENS,   e: 'equip_tr_lens',   d: '[보물 찾기] 장착 시 사망 시 포인트 + 5000, 행운 100%. 아쿠아마린 세트(아쿠아마린 귀걸이 · 아쿠아마린 렌즈)로 착용 시 사망 시 포인트 + 8000p, 행운 120%.' }
 ];
-const NEW_DIV = 5;
+const JEWEL_P = 0.002;           // 새 장신구 넷 — 각각 0.2% (2026-11-01 사용자)
+function pearlSet(u) { return wears(u, JEWEL.TONGUE) && wears(u, JEWEL.NECK); }
+function aquaSet(u) { return wears(u, JEWEL.EAR) && wears(u, JEWEL.LENS); }
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined' && database) ? database : null; }
@@ -282,9 +288,6 @@ function table() {
         });
     } catch (e) { }
     const rows = pool.map(function (n) { return { n: n, w: 1 / Math.sqrt(priceOf(n)) }; });
-    const ws = rows.map(function (r) { return r.w; }).sort(function (a, b) { return a - b; });
-    const mid = ws.length ? ws[Math.floor(ws.length / 2)] : 0.01;
-    NEW.forEach(function (x) { rows.push({ n: x.n, w: mid / NEW_DIV, jewel: true }); });
     rows.push({ n: '__pts', w: 1 / Math.sqrt(POINTS), pts: true });
     return rows;
 }
@@ -296,7 +299,7 @@ function pick(rows) {
 }
 function normal() {
     const r = pick(table());
-    return r.pts ? { kind: 'points', n: POINTS } : { kind: 'item', name: r.n, jewel: !!r.jewel };
+    return r.pts ? { kind: 'points', n: POINTS } : { kind: 'item', name: r.n };
 }
 // 한정품 — 서버 전체 개수를 세어 남았을 때만
 function capTake(s) {
@@ -317,6 +320,11 @@ function roll() {
             const s = SPECIAL[i];
             return capTake(s).then(function (ok) { return ok ? { kind: 'item', name: s.n, special: s.k } : normal(); });
         }
+    }
+    // 새 장신구 넷 — 각각 0.2%
+    for (let i = 0; i < NEW.length; i++) {
+        acc += JEWEL_P;
+        if (q < acc) return Promise.resolve({ kind: 'item', name: NEW[i].n, jewel: true });
     }
     return Promise.resolve(normal());
 }
@@ -384,8 +392,9 @@ function give(p, rec) {
         const w = function (user) {
             let m = Number(_f.apply(this, arguments)) || 1;
             const u = user || u_();
-            if (wears(u, JEWEL.NECK)) m *= 3;
-            if (wears(u, JEWEL.LENS)) m *= 2;
+            // 세트로 차면 낱개 몫 대신 — 진주 250% (×3.5) · 아쿠아마린 120% (×2.2)
+            if (pearlSet(u)) m *= 3.5; else if (wears(u, JEWEL.NECK)) m *= 3;
+            if (aquaSet(u)) m *= 2.2; else if (wears(u, JEWEL.LENS)) m *= 2;
             return m;
         };
         Object.keys(_f).forEach(function (k) { try { w[k] = _f[k]; } catch (e) { } });
@@ -429,14 +438,16 @@ function give(p, rec) {
         const w = function () {
             const u = u_();
             const on = !!(u && wears(u, JEWEL.LENS) && !gearOff() && typeof darkRun !== 'undefined' && darkRun);
+            const set = on && aquaSet(u);                       // 아쿠아마린 세트면 +8,000
+            const add = set ? 8000 : 5000;
             const out = _f.apply(this, arguments);
             if (on) {
                 try {
-                    u.points = (Number(u.points) || 0) + 5000;
-                    if (typeof addHistoryLog === 'function') addHistoryLog(u, '[아쿠아마린 렌즈] 사망 — +5,000 P');
+                    u.points = (Number(u.points) || 0) + add;
+                    if (typeof addHistoryLog === 'function') addHistoryLog(u, '[' + (set ? '아쿠아마린 세트' : '아쿠아마린 렌즈') + '] 사망 — +' + add.toLocaleString('ko-KR') + ' P');
                     save({ points: 1, history: 1 });
                     if (typeof updateUI === 'function') updateUI();
-                    setTimeout(function () { try { if (typeof showPointGainEffect === 'function') showPointGainEffect(5000); } catch (e) { } }, 400);
+                    setTimeout(function () { try { if (typeof showPointGainEffect === 'function') showPointGainEffect(add); } catch (e) { } }, 400);
                 } catch (e) { }
             }
             return out;
@@ -514,10 +525,11 @@ window.treasureState = function () {
 window.treasureTable = function () {
     const rows = table();
     const tot = rows.reduce(function (a, r) { return a + r.w; }, 0);
-    const rest = 1 - SPECIAL.reduce(function (a, s) { return a + s.p; }, 0);
+    const rest = 1 - SPECIAL.reduce(function (a, s) { return a + s.p; }, 0) - JEWEL_P * NEW.length;
     const out = rows.map(function (r) { return { 상품: r.pts ? POINTS.toLocaleString() + ' P' : r.n, 값: priceOf(r.pts ? '__pts' : r.n), 확률: (r.w / tot * rest * 100).toFixed(3) + '%' }; })
         .sort(function (a, b) { return parseFloat(b.확률) - parseFloat(a.확률); });
-    console.table(SPECIAL.map(function (s) { return { 상품: s.n + ' (서버 전체 ' + s.cap + '개)', 값: '-', 확률: (s.p * 100).toFixed(3) + '%' }; }).concat(out));
+    console.table(SPECIAL.map(function (s) { return { 상품: s.n + ' (서버 전체 ' + s.cap + '개)', 값: '-', 확률: (s.p * 100).toFixed(3) + '%' }; })
+        .concat(NEW.map(function (x) { return { 상품: x.n, 값: '-', 확률: (JEWEL_P * 100).toFixed(3) + '%' }; })).concat(out));
     return out;
 };
 window.treasureTest = function (n) {
@@ -527,6 +539,7 @@ window.treasureTest = function (n) {
         const q = Math.random();
         let acc = 0, hit = null;
         for (let j = 0; j < SPECIAL.length; j++) { acc += SPECIAL[j].p; if (q < acc) { hit = SPECIAL[j].n; break; } }
+        if (!hit) for (let j = 0; j < NEW.length; j++) { acc += JEWEL_P; if (q < acc) { hit = NEW[j].n; break; } }
         const p = hit ? { name: hit } : normal();
         const k = p.kind === 'points' ? POINTS + ' P' : p.name;
         c[k] = (c[k] || 0) + 1;
