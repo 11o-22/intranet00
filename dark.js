@@ -13261,7 +13261,8 @@ function startTetris(mode) {
     cur: null, next: tetRandom(), pos: {x:3,y:0}, rot: 0,
     hold: null, holdUsed: false,
     lines: 0, score: 0, over: false, timer: null, speed: tetSpeedOf(0),
-    garbage: 0, landAt: 0, lockN: 0
+    garbage: 0, landAt: 0, lockN: 0,
+    gid: Array.from({length:20}, () => Array(10).fill(null)), pid: 0, curId: 0     // 칸마다 어느 조각인가 — 테두리 모양 (tetris-plus.js)
 };
     tetSpawn();
     tetDraw();
@@ -13296,6 +13297,7 @@ function tetFits(type, rot, ox, oy) {
 }
 
 function tetSpawn() {
+    tet.curId = ++tet.pid;
     tet.cur = tet.next;
     tet.next = tetRandom();
     tet.rot = 0;
@@ -13326,8 +13328,9 @@ function tetTick() {
 }
 
 function tetLock() {
+    if (!tet.gid) tet.gid = Array.from({length:20}, () => Array(10).fill(null));
     tetCells(tet.cur, tet.rot, tet.pos.x, tet.pos.y).forEach(([x,y]) => {
-        if (y >= 0 && y < 20) tet.grid[y][x] = tet.cur;
+        if (y >= 0 && y < 20) { tet.grid[y][x] = tet.cur; tet.gid[y][x] = tet.curId; }
     });
 
     let cleared = 0;
@@ -13335,6 +13338,8 @@ function tetLock() {
         if (tet.grid[y].every(c => c)) {
             tet.grid.splice(y, 1);
             tet.grid.unshift(Array(10).fill(null));
+            tet.gid.splice(y, 1);
+            tet.gid.unshift(Array(10).fill(null));
             cleared++;
             y++;
         }
@@ -13417,18 +13422,22 @@ function tetDraw() {
     if (!board || !tet) return;
 
     const view = tet.grid.map(row => row.slice());
+    const ids = (tet.gid || tet.grid.map(r => r.map(() => null))).map(row => row.slice());    // 조각 번호 — 테두리 모양
     if (!tet.over) {
         tetCells(tet.cur, tet.rot, tet.pos.x, tet.pos.y).forEach(([x,y]) => {
-            if (y >= 0 && y < 20 && x >= 0 && x < 10) view[y][x] = tet.cur;
+            if (y >= 0 && y < 20 && x >= 0 && x < 10) { view[y][x] = tet.cur; ids[y][x] = 'cur'; }
         });
     }
 
+    // ★ 블럭 모양 (S 사택 이상이 고른 것 · tetris-plus.js) — 기본이면 아래 그대로
+    if (!(typeof window.tetSkinBoard === 'function' && window.tetSkinBoard(board, view, ids)))
     board.innerHTML = view.map(row => row.map(c =>
         `<div style="background:${c ? TET_COLORS[c] : 'rgba(255,255,255,0.03)'}; border-radius:2px;"></div>`
     ).join('')).join('');
 
     const nextBox = document.getElementById('tetris-next');
-    if (nextBox) {
+    if (nextBox && typeof window.tetSkinMini === 'function' && window.tetSkinMini(nextBox, tet.next, false)) { }
+    else if (nextBox) {
         const ncells = tetCells(tet.next, 0, 0, 0);
         let g = Array.from({length:4}, () => Array(4).fill(null));
         ncells.forEach(([x,y]) => { if (y < 4 && x < 4) g[y][x] = tet.next; });
@@ -13438,7 +13447,8 @@ function tetDraw() {
     }
 
     const holdBox = document.getElementById('tetris-hold');
-if (holdBox) {
+if (holdBox && typeof window.tetSkinMini === 'function' && window.tetSkinMini(holdBox, tet.hold, tet.holdUsed)) { }
+else if (holdBox) {
     let g = Array.from({length:4}, () => Array(4).fill(null));
     if (tet.hold) {
         tetCells(tet.hold, 0, 0, 0).forEach(([x,y]) => { if (y < 4 && x < 4) g[y][x] = tet.hold; });
@@ -13911,6 +13921,7 @@ function tetHold() {
         tet.cur = tet.next;
         tet.next = tetRandom();
     }
+    tet.curId = ++tet.pid;
     tet.rot = 0;
     tet.pos = { x:3, y:0 };
     tet.holdUsed = true;
@@ -13927,6 +13938,7 @@ function tetRaiseGarbage(n) {
         row[hole] = null;
         tet.grid.shift();
         tet.grid.push(row);
+        if (tet.gid) { const gid = 'g' + (++tet.pid); tet.gid.shift(); tet.gid.push(row.map(c => c ? gid : null)); }
     }
 }
 

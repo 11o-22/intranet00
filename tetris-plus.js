@@ -248,6 +248,171 @@ window.addEventListener('popstate', function (e) {
     // 사택 칸은 shell.js 의 popstate 가 닫는다 → 광장
 }, true);
 
+// ==========================================
+// 4. 블럭 모양 — S 사택 이상이 오락실에서 고른다 (2026-11-01 사용자 · 보내 준 그림 셋)
+// ==========================================
+//   base  기본 — 지금 그대로 (dark.js)
+//   bevel 입체 — 고전 테트리스처럼 모서리가 깎인 블럭 (밝은 위 · 왼쪽 / 어두운 아래 · 오른쪽)
+//   line  테두리 — 조각마다 바깥 테두리만 둥글게 (칸 사이 금 없이 한 조각이 한 덩어리 · dark.js tet.gid 로 조각을 가른다)
+//   jelly 젤리 — 둥근 칸 · 윤이 나는 사탕 같은 블럭 (빈칸도 둥근 칸)
+//   u.tetSkin = 'base' | 'bevel' | 'line' | 'jelly'   — S 사택(옥탑)보다 낮으면 늘 기본으로 그린다 (고른 것은 남는다)
+const SKIN_MIN = 'S';
+const SKINS = {
+    base:  { n: '기본' },
+    bevel: { n: '입체',   board: '#3a3a3a', gap: '0px',
+             pal: { I: '#3fcfe0', O: '#e4cd3a', T: '#9a3ed6', S: '#4cc13a', Z: '#d83232', J: '#2a4ad8', L: '#e3922e', G: '#6d6d6d' } },
+    line:  { n: '테두리', board: '#2a2d33', gap: '0px',
+             pal: { I: '#4a90e2', O: '#ececec', T: '#f2c14e', S: '#8fd14f', Z: '#e8584a', J: '#4a90e2', L: '#ececec', G: '#6d717a' } },
+    jelly: { n: '젤리',   board: '#232325', gap: '1px', empty: '#38383b',
+             pal: { I: '#5fd23e', O: '#3d9df2', T: '#b44fe3', S: '#f4bf2f', Z: '#ea4a2e', J: '#d35fe0', L: '#f28b30', G: '#77777b' } }
+};
+const SKIN_KEYS = ['base', 'bevel', 'line', 'jelly'];
+function me_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
+function skinOk(u) {
+    try {
+        if (!u || typeof houseGrade !== 'function' || typeof HOUSE_GRADES === 'undefined') return false;
+        return HOUSE_GRADES.indexOf(houseGrade(u)) >= HOUSE_GRADES.indexOf(SKIN_MIN);
+    } catch (e) { return false; }
+}
+function skinNow() { const u = me_(); const k = u && u.tetSkin; return (skinOk(u) && SKINS[k]) ? k : 'base'; }
+function rgb(h) { h = String(h).replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+function mix(h, to, t) { const a = rgb(h); return 'rgb(' + a.map(function (v) { return Math.round(v + (to - v) * t); }).join(',') + ')'; }
+function lt(h, t) { return mix(h, 255, t); }
+function dk(h, t) { return mix(h, 0, t); }
+// 칸 하나 — view: 종류 글자 격자 · ids: 조각 번호 격자 · mini: 미리보기(작은 칸)
+function cellHtml(sk, view, ids, x, y, mini, dim) {
+    const S = SKINS[sk], c = view[y][x];
+    if (sk === 'jelly') {
+        const mg = mini ? '0.5px' : '1px';
+        if (!c) return '<div style="margin:' + mg + '; border-radius:24%; background:' + (mini ? 'transparent' : S.empty) + ';"></div>';
+        const col = dim ? S.pal.G : S.pal[c];
+        return '<div style="margin:' + mg + '; border-radius:30%; background:linear-gradient(180deg,' + lt(col, .5) + ' 0%,' + lt(col, .18) + ' 24%,' + col + ' 46%,' + col + ' 78%,' + dk(col, .14) + ' 100%);'
+            + ' box-shadow:inset 0 0 0 1px ' + lt(col, .32) + ';"></div>';
+    }
+    if (!c) return '<div></div>';
+    const col = dim ? S.pal.G : S.pal[c];
+    if (sk === 'bevel') {
+        const b = mini ? 2 : 3;
+        return '<div style="box-sizing:border-box; background:linear-gradient(135deg,' + lt(col, .14) + ',' + col + ' 60%); border:' + b + 'px solid;'
+            + ' border-color:' + lt(col, .38) + ' ' + dk(col, .28) + ' ' + dk(col, .36) + ' ' + lt(col, .22) + ';"></div>';
+    }
+    // line — 같은 조각이 이웃하면 그쪽은 열어 두고, 다르면 테두리. 볼록한 모서리는 둥글게, 오목한 모서리는 금을 이어 준다
+    const id = ids[y][x];
+    const same = function (dx, dy) {
+        const yy = y + dy, xx = x + dx;
+        return yy >= 0 && yy < view.length && xx >= 0 && xx < view[0].length && !!view[yy][xx] && ids[yy][xx] === id;
+    };
+    const m = mini ? 1 : 2, w = mini ? 1.5 : 2, r = mini ? 2 : 4;
+    const T = same(0, -1), B = same(0, 1), L = same(-1, 0), R = same(1, 0);
+    const ins = 'top:' + (T ? 0 : m) + 'px; bottom:' + (B ? 0 : m) + 'px; left:' + (L ? 0 : m) + 'px; right:' + (R ? 0 : m) + 'px;';
+    const bw = (T ? 0 : w) + 'px ' + (R ? 0 : w) + 'px ' + (B ? 0 : w) + 'px ' + (L ? 0 : w) + 'px';
+    const rad = (!T && !L ? r : 0) + 'px ' + (!T && !R ? r : 0) + 'px ' + (!B && !R ? r : 0) + 'px ' + (!B && !L ? r : 0) + 'px';
+    const g = 'linear-gradient(' + col + ',' + col + ')';
+    const bg = [];
+    const corner = function (vx, vy) {            // vx 'left' | 'right' · vy 'top' | 'bottom'
+        bg.push(g + ' ' + vx + ' ' + m + 'px ' + vy + ' 0 / ' + w + 'px ' + (m + w) + 'px no-repeat');
+        bg.push(g + ' ' + vx + ' 0 ' + vy + ' ' + m + 'px / ' + (m + w) + 'px ' + w + 'px no-repeat');
+    };
+    if (T && R && !same(1, -1)) corner('right', 'top');
+    if (T && L && !same(-1, -1)) corner('left', 'top');
+    if (B && R && !same(1, 1)) corner('right', 'bottom');
+    if (B && L && !same(-1, 1)) corner('left', 'bottom');
+    return '<div style="position:relative;' + (bg.length ? ' background:' + bg.join(',') + ';' : '') + '">'
+        + '<div style="position:absolute; ' + ins + ' box-sizing:border-box; border-style:solid; border-color:' + col + '; border-width:' + bw + '; border-radius:' + rad + ';"></div></div>';
+}
+function gridHtml(sk, view, ids, mini, dim) {
+    let out = '';
+    for (let y = 0; y < view.length; y++) for (let x = 0; x < view[y].length; x++) out += cellHtml(sk, view, ids, x, y, mini, dim);
+    return out;
+}
+function boardStyle(board, sk) {
+    const S = SKINS[sk];
+    const bg = (sk === 'base') ? '#050505' : S.board, gap = (sk === 'base') ? '1px' : S.gap;
+    if (board.dataset.sk !== sk) {
+        board.style.background = bg;
+        board.style.gap = gap;
+        board.dataset.sk = sk;
+    }
+}
+window.tetSkinBoard = function (board, view, ids) {
+    const sk = skinNow();
+    boardStyle(board, sk);
+    if (sk === 'base') return false;
+    board.innerHTML = gridHtml(sk, view, ids, false, false);
+    return true;
+};
+function miniView(type) {
+    const v = Array.from({ length: 4 }, function () { return Array(4).fill(null); });
+    const ids = Array.from({ length: 4 }, function () { return Array(4).fill(null); });
+    if (type && typeof tetCells === 'function') tetCells(type, 0, 0, 0).forEach(function (c) { if (c[1] < 4 && c[0] < 4) { v[c[1]][c[0]] = type; ids[c[1]][c[0]] = 'p'; } });
+    return { v: v, ids: ids };
+}
+window.tetSkinMini = function (box, type, dim) {
+    const sk = skinNow();
+    if (sk === 'base') { if (box.dataset.sk && box.dataset.sk !== 'base') { box.style.gap = '1px'; box.dataset.sk = 'base'; } return false; }
+    if (box.dataset.sk !== sk) { box.style.gap = (sk === 'jelly') ? '0px' : '0px'; box.dataset.sk = sk; }
+    const mv = miniView(type);
+    box.innerHTML = gridHtml(sk, mv.v, mv.ids, true, dim);
+    return true;
+};
+
+// 오락실 — 블럭 모양 고르기 (기본 · 입체 · 테두리 · 젤리)
+function preview(sk) {
+    const mv = miniView('T');
+    const v = mv.v.slice(0, 2), ids = mv.ids.slice(0, 2);
+    const bg = sk === 'base' ? '#050505' : SKINS[sk].board;
+    const inner = sk === 'base'
+        ? v.map(function (row) { return row.map(function (c) { return '<div style="background:' + (c ? (typeof TET_COLORS !== 'undefined' ? TET_COLORS[c] : '#ba68c8') : 'rgba(255,255,255,0.03)') + '; border-radius:2px;"></div>'; }).join(''); }).join('')
+        : gridHtml(sk, v, ids, false, false);
+    return '<div style="display:inline-grid; grid-template-columns:repeat(4, 13px); grid-template-rows:repeat(2, 13px); gap:' + (sk === 'base' ? '1px' : SKINS[sk].gap) + ';'
+        + ' background:' + bg + '; padding:3px; border-radius:3px;">' + inner + '</div>';
+}
+window.tetSkinPick = function (k) {
+    const u = me_();
+    if (!u || !SKINS[k]) return;
+    if (!skinOk(u)) { try { showCustomAlert('블럭 모양은 S 사택(옥탑) 이상에서 고를 수 있습니다.'); } catch (e) { } return; }
+    u.tetSkin = k;
+    try { if (typeof saveFields === 'function') saveFields({ tetSkin: 1 }); } catch (e) { }
+    try { renderTetrisLobby(); } catch (e) { }
+    try { const t = T(); if (t && typeof tetDraw === 'function') tetDraw(); } catch (e) { }
+};
+function skinBox() {
+    const u = me_();
+    const ok = skinOk(u), cur = skinNow();
+    return '<div id="tet-skin-box" style="margin:4px 0 9px 0; padding:10px; background:rgba(0,0,0,0.25); border:1px solid ' + (ok ? '#3a3a4a' : '#2a2a2a') + '; border-radius:6px;">'
+        + '<div style="font-size:11px; color:' + (ok ? '#cfd8e6' : '#777') + '; margin-bottom:8px;">🎨 블럭 모양' + (ok ? '' : ' <span style="font-size:10px; color:#666;">🔒 S 사택(옥탑) 이상</span>') + '</div>'
+        + '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">'
+        + SKIN_KEYS.map(function (k) {
+            const on = ok && cur === k;
+            return '<button class="game-btn" ' + (ok ? 'onclick="tetSkinPick(\'' + k + '\')"' : 'disabled') + ' style="margin:0; padding:7px 2px; font-size:10px; line-height:1.5;'
+                + (on ? ' background:linear-gradient(145deg,#4a5a70,#2a3240) !important; border-color:#9fb4d0 !important; color:#fff !important;' : '')
+                + (ok ? '' : ' opacity:.45; cursor:default;') + '">' + preview(k) + '<br>' + SKINS[k].n + '</button>';
+        }).join('') + '</div></div>';
+}
+(function hookLobby() {
+    const iv = setInterval(function () {
+        if (typeof window.renderTetrisLobby !== 'function' || window.renderTetrisLobby._skin) return;
+        const f = window.renderTetrisLobby;
+        const w = function () {
+            const out = f.apply(this, arguments);
+            try {
+                const box = document.getElementById('tetris-lobby');
+                if (box && !document.getElementById('tet-skin-box')) {
+                    const last = box.lastElementChild;                      // 아래 「지운 줄 …」 안내 앞에
+                    if (last) last.insertAdjacentHTML('beforebegin', skinBox()); else box.insertAdjacentHTML('beforeend', skinBox());
+                }
+            } catch (e) { console.warn('[테트리스] 블럭 모양', e); }
+            return out;
+        };
+        w._skin = true;
+        window.renderTetrisLobby = w;
+        try { renderTetrisLobby = w; } catch (e) { }
+        clearInterval(iv);
+        try { if (document.getElementById('tetris-lobby') && document.getElementById('tetris-lobby').innerHTML) w(); } catch (e) { }
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 window.tetrisPlusState = function () {
     const t = T();
     console.log('%c===== 🎮 테트리스 =====', 'color:#7fd4d4; font-size:13px');
