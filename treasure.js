@@ -17,7 +17,8 @@
 // ■ 어떻게 도나
 //
 //   상자는 모두가 같이 본다 — treasure/<방>/<0~4> = { x, y, lv, k, g }   (방 그림 좌표 · lv 1 이면 지하 · k 상자 모양 · g 이 자리 번호)
-//     · 먼저 연 사람이 가져가고, 그 상자는 그 방의 **다른 자리**로 옮겨 다시 숨는다 (방마다 늘 다섯).
+//     · 먼저 연 사람이 가져가고, 연 상자는 **모두의 화면에서 사라진다** (2026-11-01 사용자 — 처음엔 다른 자리로 옮겨 다시 숨었다).
+//       { …, taken: 사번, tat } 로 남겨 두고 그리지 않는다. 날이 바뀌면(day) 방마다 다섯 개를 새 자리에 다시 깐다.
 //     · 여는 것은 트랜잭션 한 번 — g 가 그대로일 때만 연다 (둘이 동시에 눌러도 한 사람만).
 //   상자 가까이(가로 170) 같은 층에 서 있어야 열린다. 멀리서 누르면 그쪽으로 걸어간다(누름이 광장으로 넘어간다).
 //   하루 몫 — currentUser.treasure = { day, n }   (상담사는 세지 않는다)
@@ -141,9 +142,9 @@ function newSpot(key, avoid) {
         const y = Math.round(b.y[0] + Math.random() * Math.max(0, b.y[1] - b.y[0]));
         if (blocked(r, b.lv, x)) continue;
         if ((avoid || []).some(function (o) { return o && o.lv === b.lv && Math.abs(o.x - x) < 90; })) continue;
-        return { x: x, y: y, lv: b.lv, k: Math.floor(Math.random() * KINDS), g: rid(), at: Date.now() };
+        return { x: x, y: y, lv: b.lv, k: Math.floor(Math.random() * KINDS), g: rid(), at: Date.now(), day: today() };
     }
-    return { x: Math.round(r.w * 0.3), y: r.floor[1], lv: 0, k: 0, g: rid(), at: Date.now() };
+    return { x: Math.round(r.w * 0.3), y: r.floor[1], lv: 0, k: 0, g: rid(), at: Date.now(), day: today() };
 }
 
 // ==========================================
@@ -163,9 +164,10 @@ function listen(key) {
         boxes = s.val() || {};
         // 빈 자리는 들어와 있는 사람이 채운다 (여럿이 채워도 트랜잭션이라 하나만 들어간다)
         //   한꺼번에 채울 때 서로 겹치지 않게 — 방금 고른 자리도 피한다
-        const made = Object.keys(boxes).map(function (k) { return boxes[k]; });
+        //   오늘 깐 것이 아니면(어제 것 · 예전 꼴) 새로 깐다 — 연 상자는 그날 안에는 다시 생기지 않는다
+        const made = Object.keys(boxes).map(function (k) { return boxes[k]; }).filter(fresh);
         for (let i = 0; i < PER_ROOM; i++) {
-            if (boxes[i]) continue;
+            if (fresh(boxes[i])) continue;
             const sp = newSpot(key, made);
             if (sp) { made.push(sp); seed(key, i, sp); }
         }
@@ -174,8 +176,10 @@ function listen(key) {
 }
 function seed(key, i, sp) {
     const d = db_(); if (!d) return;
-    d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) { return cur || sp; });
+    d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) { return fresh(cur) ? cur : sp; });
 }
+function fresh(b) { return !!(b && b.day === today()); }
+function live(b) { return fresh(b) && !b.taken; }
 
 // ==========================================
 // 그리기 — 방 그림 위에 작게
@@ -193,7 +197,7 @@ function paint(force) {
     if (st.room !== curRoom) { lastSig = ''; return; }
     for (let i = 0; i < PER_ROOM; i++) {
         const b = boxes[i];
-        if (!b || !(b.x >= 0)) continue;
+        if (!live(b) || !(b.x >= 0)) continue;           // 연 상자 · 어제 상자는 그리지 않는다
         const s = Math.max(6, Math.round(SIZE * z));            // 화면에서 상자 크기
         const hit = Math.max(s, 30);                            // 누르는 자리는 손가락만큼
         const e = document.createElement('div');
@@ -248,9 +252,8 @@ function open(key, i, g) {
     if (leftToday() <= 0) { alert_('🎁 오늘은 보물 상자를 ' + PER_DAY + '개 다 열었습니다.\n\n내일 다시 찾아보세요.'); return; }
     busy = true;
     d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) {
-        if (!cur || cur.g !== g) return;                                // 누가 먼저 열었다
-        const others = Object.keys(boxes).filter(function (k) { return String(k) !== String(i); }).map(function (k) { return boxes[k]; });
-        return newSpot(key, others);                                     // 다른 자리로 옮겨 다시 숨는다
+        if (!live(cur) || cur.g !== g) return;                          // 누가 먼저 열었다
+        return Object.assign({}, cur, { taken: u.code, tat: Date.now() });   // 연 상자는 사라진다 (오늘 안에는 다시 안 생긴다)
     }).then(function (r) {
         if (!r || !r.committed) { busy = false; alert_('🎁 한 발 늦었습니다 — 누군가 먼저 열었습니다.'); return; }
         const rec = dayRec();
