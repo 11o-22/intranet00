@@ -63,15 +63,20 @@ function fmt(t) {
 // ==========================================
 // ① 보낼 때 적는다 — letter-sent.js 가 부른다
 // ==========================================
-window.letterLogPut = function (toCode, text) {
+// ★ 답신(letter-reply.js)은 { reply: true } 를 붙여 부른다. 글은 받은 편지함에 들어간 그대로 적는다 —
+//   앞에 「↩ 답신 — 」을 붙여 적었더니 받은 편지함의 같은 편지와 글이 달라 두 장으로 갈렸고,
+//   기록 쪽 한 장은 「받은 쪽에 없음」으로 떴다 (2026-11-01 점검).
+window.letterLogPut = function (toCode, text, opt) {
     const u = me(), d = db_();
     if (!u || !d || !toCode || !text) return;
     const t = who(toCode);
     try {
-        d.ref('letterLog').push({
+        const row = {
             at: Date.now(), fromCode: u.code, fromName: u.name || '', fromNo: u.no || '',
             toCode: toCode, toName: t.name, toNo: t.no, content: String(text)
-        });
+        };
+        if (opt && opt.reply) row.reply = true;
+        d.ref('letterLog').push(row);
     } catch (e) { console.warn('[편지 열람] 적기', e); }
 };
 
@@ -103,6 +108,7 @@ function collect() {
             const x = out[i];
             if (x.from === o.from && x.to === o.to && x.content === o.content && Math.abs((x.at || 0) - (o.at || 0)) < 5 * 60000) {
                 if (o.where) x.where = o.where;
+                if (o.reply) x.reply = true;
                 if (!x.at && o.at) x.at = o.at;
                 return;
             }
@@ -114,21 +120,24 @@ function collect() {
     Object.keys(U).forEach(function (code) {
         const u = U[code]; if (!u) return;
         arr(u.letters).forEach(function (l) {
-            add({ at: Number(l.id) || 0, date: l.date, from: l.fromCode || '', fromName: l.fromName, to: code, content: l.content, where: '편지함' });
+            add({ at: Number(l.id) || 0, date: l.date, from: l.fromCode || '', fromName: l.fromName, to: code, content: l.content, where: '편지함', reply: !!l.reply });
         });
         arr(u.keptLetters).forEach(function (l) {
-            add({ at: Number(l.id) || 0, date: l.date, from: l.fromCode || '', fromName: l.fromName, to: code, content: l.content, where: '보관함' });
+            add({ at: Number(l.id) || 0, date: l.date, from: l.fromCode || '', fromName: l.fromName, to: code, content: l.content, where: '보관함', reply: !!l.reply });
         });
     });
     // ① 보낼 때 적은 것
     logCache.forEach(function (l) {
-        add({ at: Number(l.at) || 0, from: l.fromCode || '', fromName: l.fromName, to: l.toCode || '', toName: l.toName, content: l.content, where: '' });
+        // 예전 답신 기록은 글 앞에 「↩ 답신 — 」이 붙어 있다 — 떼고 답신 표를 붙인다
+        let txt = String(l.content || ''), rep = !!l.reply;
+        if (txt.indexOf('↩ 답신 — ') === 0) { txt = txt.slice('↩ 답신 — '.length); rep = true; }
+        add({ at: Number(l.at) || 0, from: l.fromCode || '', fromName: l.fromName, to: l.toCode || '', toName: l.toName, content: txt, where: '', reply: rep });
     });
     // ③ 보낸 쪽에 남은 것
     Object.keys(U).forEach(function (code) {
         const u = U[code]; if (!u) return;
         arr(u.sentLetters).forEach(function (l) {
-            add({ at: Number(l.id) || 0, date: l.date, from: code, fromName: u.name, to: l.toCode || '', toName: l.toName, content: l.content, where: '' });
+            add({ at: Number(l.id) || 0, date: l.date, from: code, fromName: u.name, to: l.toCode || '', toName: l.toName, content: l.content, where: '', reply: !!l.reply });
         });
     });
     out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
@@ -189,7 +198,7 @@ function paint() {
                 + ' · <b style="color:#ffcc80;">' + esc(fName) + '</b>' + (f.no ? ' <span style="color:#777;">(NO.' + esc(f.no) + ')</span>' : '')
                 + ' → <b style="color:#ffcc80;">' + esc(tName) + '</b>' + (t.no ? ' <span style="color:#777;">(NO.' + esc(t.no) + ')</span>' : '')
                 + '<br><span style="font-size:10px;">' + tag + '</span></div>'
-                + '<div class="letter-body">' + esc(l.content) + '</div></div>';
+                + '<div class="letter-body">' + (l.reply ? '<span style="color:#9fd8ef;">↩ 답신 · </span>' : '') + esc(l.content) + '</div></div>';
         });
         if (list.length > n) {
             h += '<button onclick="moreAdminLetters()" style="width:100%; margin-top:4px; padding:8px; font-size:11px;'

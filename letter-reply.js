@@ -101,7 +101,7 @@ function send(where, id, text) {
         try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[익명 편지] 받은 편지에 답신을 보냈습니다. (편지지 소모)'); } catch (e) { }
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
         try { if (typeof saveFields === 'function') saveFields(where === 'kept' ? { keptLetters: 1, sentLetters: 1, history: 1, inventory: 1 } : { letters: 1, sentLetters: 1, history: 1, inventory: 1 }); } catch (e) { }
-        try { if (typeof window.letterLogPut === 'function') window.letterLogPut(to, '↩ 답신 — ' + text); } catch (e) { }
+        try { if (typeof window.letterLogPut === 'function') window.letterLogPut(to, text, { reply: true }); } catch (e) { }   // 글은 그대로 — 받은 편지함의 것과 한 장으로 합쳐지게 (2026-11-01)
         try { if (typeof renderLetters === 'function') renderLetters(); } catch (e) { }
         alert_('답신을 보냈습니다.');
     };
