@@ -206,46 +206,48 @@
 </div>
 
 <div id="tetris-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100dvh; background:#0a0a0a; z-index:10003; justify-content:center; align-items:center; padding:16px; box-sizing:border-box;">
-    <div style="width:100%; max-width:430px; text-align:center;">
-        <div style="font-size:10px; color:#666; letter-spacing:1px; margin-bottom:12px;" id="tetris-title">사택 오락실</div>
+    <!-- ★ 화면 크기에 맞춰 칸 크기(--tc)와 꼴을 고른다 (2026-11-01 사용자: 폴드에서도 크게 · tetris-plus.js tetFit)
+         세로(tall) — 판 · 옆 칸 / 아래 단추   ·   넓은 화면(wide) — 왼쪽 홀드 · ◀▶▼ / 판 / 오른쪽 다음 · 점수 · ↻ · 드롭 -->
+    <div id="tet-wrap">
+        <div id="tetris-title">사택 오락실</div>
 
-        <div style="display:flex; gap:10px; justify-content:center; align-items:flex-start;">
-            <div id="tetris-board" style="display:grid; grid-template-columns:repeat(10, var(--tc, 22px)); grid-template-rows:repeat(20, var(--tc, 22px)); gap:1px; background:#050505; border:2px solid #2a2a2a; padding:3px; border-radius:4px;"></div>
-            <div style="flex:1; min-width:78px; text-align:left;">
-                <div style="font-size:10px; color:#888; margin-bottom:4px;">홀드</div>
-                <div id="tetris-hold" style="display:grid; grid-template-columns:repeat(4, 14px); grid-template-rows:repeat(4, 14px); gap:1px; margin-bottom:14px;"></div>
-                <div style="font-size:10px; color:#888; margin-bottom:4px;">다음</div>
-                <div id="tetris-next" style="display:grid; grid-template-columns:repeat(4, 14px); grid-template-rows:repeat(4, 14px); gap:1px; margin-bottom:14px;"></div>
-                <div style="font-size:10px; color:#888;">지운 줄</div>
-                <div id="tetris-lines" style="font-size:22px; font-weight:bold; color:#d4af37; margin-bottom:10px;">0</div>
-                <div style="font-size:10px; color:#888;">점수</div>
-                <div id="tetris-score" style="font-size:15px; font-weight:bold; color:#ddd; margin-bottom:10px;">0</div>
-                <div style="font-size:10px; color:#888;">속도</div>
-                <div id="tetris-level" style="font-size:13px; font-weight:bold; color:#7fd4d4; margin-bottom:10px;">Lv.1</div>
-                <div id="tetris-rival" style="font-size:10px; color:#888; line-height:1.6;"></div>
-            </div>
-        </div>
-
-        <!-- ★ 조작 단추 (2026-11-01 사용자: 간격을 두고 하기 편하게) — 왼손 ◀ ▼ ▶ · 오른손 ↻ · 위 줄 홀드 / 드롭
-             ◀ ▶ 는 누르고 있으면 이어서 움직인다 · ▼ 는 누르고 있으면 빠르게 내려간다 (tetris-plus.js tetPadDown) -->
-        <div id="tetris-pad">
-            <div class="tet-row">
-                <button class="game-btn tet-btn tet-hold" ontouchstart="event.preventDefault(); tetPadDown('hold');" onmousedown="tetPadDown('hold')">홀드 <span class="tet-key">C</span></button>
-                <button class="game-btn tet-btn tet-drop" ontouchstart="event.preventDefault(); tetPadDown('drop');" onmousedown="tetPadDown('drop')">⤓ 드롭 <span class="tet-key">Space</span></button>
-            </div>
-            <div class="tet-row">
-                <div class="tet-cluster">
-                    <button class="game-btn tet-btn tet-arrow" ontouchstart="event.preventDefault(); tetPadDown('L');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('L')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">◀</button>
-                    <button class="game-btn tet-btn tet-arrow" title="한 칸 내리기 (↓)" ontouchstart="event.preventDefault(); tetPadDown('down');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('down')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▼</button>
-                    <button class="game-btn tet-btn tet-arrow" ontouchstart="event.preventDefault(); tetPadDown('R');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('R')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▶</button>
+        <div id="tet-main">
+            <div id="tetris-board"></div>
+            <div id="tetris-side">
+                <div id="tet-holdbox"><div class="tet-lab">홀드</div><div id="tetris-hold" class="tet-mini"></div></div>
+                <div id="tet-nextbox"><div class="tet-lab">다음</div><div id="tetris-next" class="tet-mini"></div></div>
+                <div id="tet-stats">
+                    <div class="tet-lab">지운 줄</div>
+                    <div id="tetris-lines">0</div>
+                    <div class="tet-lab">점수</div>
+                    <div id="tetris-score">0</div>
+                    <div class="tet-lab">속도</div>
+                    <div id="tetris-level">Lv.1</div>
+                    <div id="tetris-rival"></div>
                 </div>
-                <button class="game-btn tet-btn tet-rot" title="돌리기 (↑)" ontouchstart="event.preventDefault(); tetPadDown('rot');" onmousedown="tetPadDown('rot')">↻</button>
+            </div>
+
+            <!-- ★ 조작 단추 (2026-11-01 사용자: 간격을 두고 하기 편하게) — 왼손 ◀ ▼ ▶ · 오른손 ↻ · 위 줄 홀드 / 드롭
+                 ◀ ▶ 는 누르고 있으면 이어서 움직인다 · ▼ 는 누르고 있으면 빠르게 내려간다 (tetris-plus.js tetPadDown) -->
+            <div id="tetris-pad">
+                <div class="tet-row tet-row1">
+                    <button class="game-btn tet-btn tet-hold" ontouchstart="event.preventDefault(); tetPadDown('hold');" onmousedown="tetPadDown('hold')">홀드 <span class="tet-key">C</span></button>
+                    <button class="game-btn tet-btn tet-drop" ontouchstart="event.preventDefault(); tetPadDown('drop');" onmousedown="tetPadDown('drop')">⤓ 드롭 <span class="tet-key">Space</span></button>
+                </div>
+                <div class="tet-row tet-row2">
+                    <div class="tet-cluster">
+                        <button class="game-btn tet-btn tet-arrow tet-l" ontouchstart="event.preventDefault(); tetPadDown('L');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('L')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">◀</button>
+                        <button class="game-btn tet-btn tet-arrow tet-d" title="한 칸 내리기 (↓)" ontouchstart="event.preventDefault(); tetPadDown('down');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('down')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▼</button>
+                        <button class="game-btn tet-btn tet-arrow tet-r" ontouchstart="event.preventDefault(); tetPadDown('R');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('R')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▶</button>
+                    </div>
+                    <button class="game-btn tet-btn tet-rot" title="돌리기 (↑)" ontouchstart="event.preventDefault(); tetPadDown('rot');" onmousedown="tetPadDown('rot')">↻</button>
+                </div>
             </div>
         </div>
 
-        <div id="tetris-msg" style="font-size:12px; color:#aaa; margin-top:14px; min-height:20px; line-height:1.7;"></div>
+        <div id="tetris-msg"></div>
 
-        <button class="btn-cancel" id="tetris-quit" onclick="exitTetris()" style="width:100%; margin-top:14px; background:#333; border-color:#444 !important; font-size:11px; padding:9px;">나간다</button>
+        <button class="btn-cancel" id="tetris-quit" onclick="exitTetris()">나간다</button>
     </div>
 </div>
 

@@ -48,29 +48,110 @@ function say(html) {
     if (document.getElementById('tetris-plus-css')) return;
     const s = document.createElement('style');
     s.id = 'tetris-plus-css';
-    const tc = function (vh) { return 'max(14px, min(24px, calc((100vw - 140px) / 10), calc((' + vh + ' - 330px) / 20)))'; };
+    // 크기는 모두 칸 하나(--tc)의 몇 배로 — tetFit 이 화면에 맞춰 --tc 를 정한다 (처음 값은 화면이 정해지기 전 임시)
+    const U = function (k) { return 'calc(var(--tc) * ' + k + ')'; };
     s.textContent = [
-        '#tetris-overlay{overflow-y:auto; -webkit-overflow-scrolling:touch; --tc:' + tc('100vh') + ';}',
-        '@supports (height:100dvh){ #tetris-overlay{--tc:' + tc('100dvh') + ';} }',
-        '#tetris-overlay > div{margin:auto;}',
-        '#tetris-pad{margin:16px auto 0 auto; max-width:380px; display:flex; flex-direction:column; gap:12px;}',
-        '#tetris-pad .tet-row{display:flex; justify-content:space-between; align-items:center; gap:16px;}',
-        '#tetris-pad .tet-cluster{display:flex; gap:10px;}',
-        '#tetris-pad .tet-btn{margin:0 !important; touch-action:manipulation; -webkit-user-select:none; user-select:none;'
+        '#tetris-overlay{overflow:auto; -webkit-overflow-scrolling:touch; --tc:22px;}',
+        '#tet-wrap{margin:auto; text-align:center; width:max-content; max-width:100%;}',
+        '#tetris-title{font-size:10px; line-height:14px; color:#666; letter-spacing:1px; margin-bottom:8px;}',
+        '#tet-main{display:grid; width:max-content; margin:0 auto; justify-content:center;'
+            + ' grid-template-columns:auto ' + U(3.6) + '; column-gap:' + U(0.4) + ';'
+            + ' grid-template-areas:"board side" "pad pad";}',
+        '#tetris-board{grid-area:board; display:grid; grid-template-columns:repeat(10, var(--tc)); grid-template-rows:repeat(20, var(--tc));'
+            + ' gap:1px; background:#050505; border:2px solid #2a2a2a; padding:3px; border-radius:4px; align-self:start;}',
+        '#tetris-side{grid-area:side; text-align:left; min-width:0;}',
+        '.tet-lab{font-size:max(10px, ' + U(0.42) + '); color:#888; margin-bottom:' + U(0.15) + ';}',
+        '.tet-mini{display:grid; grid-template-columns:repeat(4, ' + U(0.6) + '); grid-template-rows:repeat(4, ' + U(0.6) + '); gap:1px; margin-bottom:' + U(0.55) + ';}',
+        '#tetris-lines{font-size:' + U(1) + '; font-weight:bold; color:#d4af37; line-height:1.15; margin-bottom:' + U(0.4) + ';}',
+        '#tetris-score{font-size:' + U(0.68) + '; font-weight:bold; color:#ddd; line-height:1.2; margin-bottom:' + U(0.4) + ';}',
+        '#tetris-level{font-size:' + U(0.6) + '; font-weight:bold; color:#7fd4d4; line-height:1.2; margin-bottom:' + U(0.4) + ';}',
+        '#tetris-rival{font-size:max(10px, ' + U(0.42) + '); color:#888; line-height:1.6;}',
+        '#tetris-msg{font-size:12px; color:#aaa; margin-top:8px; min-height:18px; line-height:1.6;}',
+        '#tetris-quit{display:block; width:100%; margin:8px 0 0 0 !important; height:34px; padding:0 !important; font-size:11px !important;'
+            + ' background:#333 !important; border-color:#444 !important;}',
+        // 단추 — 세로 꼴
+        '#tetris-pad{grid-area:pad; margin-top:' + U(0.6) + '; display:flex; flex-direction:column; gap:' + U(0.45) + ';}',
+        '#tetris-pad .tet-row{display:flex; justify-content:space-between; align-items:center; gap:' + U(0.5) + ';}',
+        '#tetris-pad .tet-cluster{display:flex; gap:' + U(0.45) + ';}',
+        '#tetris-pad .tet-btn{margin:0 !important; padding:0 !important; touch-action:manipulation; -webkit-user-select:none; user-select:none;'
             + ' -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; box-sizing:border-box; transition:transform .06s, filter .06s;}',
-        '#tetris-pad .tet-arrow{width:60px !important; height:56px !important; padding:0 !important; font-size:20px !important;}',
-        '#tetris-pad .tet-rot{width:80px !important; height:56px !important; padding:0 !important; font-size:26px !important; border-radius:28px !important;'
+        '#tetris-pad .tet-arrow{width:' + U(2.6) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(0.85) + ' !important;}',
+        '#tetris-pad .tet-rot{width:' + U(3.4) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(1.1) + ' !important; border-radius:' + U(1.2) + ' !important;'
             + ' background:linear-gradient(145deg,#4a3a6a,#2a2040) !important; border-color:#7a6aa0 !important; color:#e6dcff !important;}',
-        '#tetris-pad .tet-hold,#tetris-pad .tet-drop{min-width:120px; height:44px !important; padding:0 16px !important; font-size:12px !important;}',
+        '#tetris-pad .tet-hold,#tetris-pad .tet-drop{width:' + U(5.2) + ' !important; height:' + U(1.8) + ' !important; font-size:max(12px, ' + U(0.52) + ') !important;}',
         '#tetris-pad .tet-hold{background:linear-gradient(145deg,#2a4a5a,#152830) !important; border-color:#3a6a7a !important; color:#7fd4d4 !important;}',
         '#tetris-pad .tet-drop{background:linear-gradient(145deg,#5a2a2a,#301515) !important; border-color:#7a3a3a !important; color:#ffb4a8 !important;}',
         '#tetris-pad .tet-key{font-size:9px; opacity:.6; margin-left:3px;}',
         '@media (pointer:coarse){ #tetris-pad .tet-key{display:none;} }',
         '#tetris-pad .tet-btn.on{filter:brightness(1.4); transform:scale(.95);}',
-        '@media (max-width:350px){ #tetris-pad .tet-arrow{width:52px !important;} #tetris-pad .tet-cluster{gap:8px;} #tetris-pad .tet-rot{width:70px !important;} }'
+        // 넓은 화면 꼴 — 판 양옆에 단추 (왼손 홀드 · ◀▶▼ / 오른손 다음 · 점수 · 드롭 · ↻)
+        '#tet-main.wide{grid-template-columns:' + U(3.2) + ' auto ' + U(3.2) + '; column-gap:' + U(0.6) + ';'
+            + ' grid-template-rows:auto auto 1fr auto auto;'
+            + ' grid-template-areas:"holdbox board nextbox" ". board stats" ". board ." "holdbtn board drop" "dpad board rot";}',
+        '#tet-main.wide #tetris-side,#tet-main.wide #tetris-pad,#tet-main.wide .tet-row{display:contents;}',
+        '#tet-main.wide #tetris-board{grid-row:1 / 6;}',
+        '#tet-main.wide #tet-holdbox{grid-area:holdbox; text-align:left;}',
+        '#tet-main.wide #tet-nextbox{grid-area:nextbox; text-align:left;}',
+        '#tet-main.wide #tet-stats{grid-area:stats; text-align:left;}',
+        '#tet-main.wide .tet-hold{grid-area:holdbtn; align-self:end; width:100% !important; margin-bottom:' + U(0.4) + ' !important;}',
+        '#tet-main.wide .tet-drop{grid-area:drop; align-self:end; width:100% !important; margin-bottom:' + U(0.4) + ' !important;}',
+        '#tet-main.wide .tet-cluster{grid-area:dpad; align-self:end; display:grid; grid-template-columns:1fr 1fr; gap:' + U(0.2) + ';'
+            + ' grid-template-areas:"l r" "d d";}',
+        '#tet-main.wide .tet-l{grid-area:l;} #tet-main.wide .tet-r{grid-area:r;}',
+        '#tet-main.wide .tet-d{grid-area:d; justify-self:center;}',
+        '#tet-main.wide .tet-arrow{width:' + U(1.5) + ' !important; height:' + U(1.6) + ' !important; font-size:' + U(0.7) + ' !important;}',
+        '#tet-main.wide .tet-rot{grid-area:rot; align-self:end; width:100% !important; height:' + U(2.6) + ' !important;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
+
+// ==========================================
+// 0. 화면에 맞추기 — 칸 크기(--tc)와 꼴(세로 · 넓은 화면)
+// ==========================================
+//   두 꼴을 칸 20px · 30px 로 한 번씩 그려 높이 · 폭이 칸 크기에 따라 어떻게 느는지 재고,
+//   화면(오락기 창의 안쪽)에 들어가는 가장 큰 칸 크기를 꼴마다 구해 더 큰 쪽을 쓴다 (12 ~ 60px).
+//   폴드를 펼친 화면처럼 넓으면 「넓은 화면」 꼴이 이기고, 보통 폰은 세로 꼴이 이긴다.
+let fitKey = '';
+function tetFit(force) {
+    const o = ov();
+    if (!o || !ovOpen()) return;
+    const wrap = document.getElementById('tet-wrap'), main = document.getElementById('tet-main');
+    if (!wrap || !main) return;
+    const cs = getComputedStyle(o);
+    const W = o.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const H = o.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const key = W + 'x' + H;
+    if (!force && key === fitKey) return;
+    fitKey = key;
+    const measure = function (wide, tc) {
+        main.classList.toggle('wide', wide);
+        o.style.setProperty('--tc', tc + 'px');
+        return { w: main.offsetWidth, h: wrap.offsetHeight };
+    };
+    let best = { tc: 0, wide: false };
+    [false, true].forEach(function (wide) {
+        const a = measure(wide, 20), b = measure(wide, 30);
+        const kw = (b.w - a.w) / 10, kh = (b.h - a.h) / 10;
+        const tw = kw > 0 ? 20 + (W - a.w) / kw : 60, th = kh > 0 ? 20 + (H - a.h) / kh : 60;
+        const tc = Math.max(12, Math.min(60, Math.floor(Math.min(tw, th) * 2) / 2));
+        if (tc > best.tc + 0.5) best = { tc: tc, wide: wide };      // 거의 같으면 세로 꼴
+    });
+    // 글자 크기의 아랫단(최소 10 · 12px) 때문에 줄이 조금 휠 수 있다 — 넘치면 반 칸씩 줄인다
+    let r = measure(best.wide, best.tc), n = 0;
+    while ((r.h > H + 0.5 || r.w > W + 0.5) && best.tc > 12 && n++ < 40) { best.tc -= 0.5; r = measure(best.wide, best.tc); }
+    o.dataset.fit = (best.wide ? 'wide' : 'tall') + ' ' + best.tc;
+    try { if (T() && typeof tetDraw === 'function') tetDraw(); } catch (e) { }
+}
+window.tetFit = tetFit;
+window.addEventListener('resize', function () { setTimeout(function () { tetFit(true); }, 60); });
+window.addEventListener('orientationchange', function () { setTimeout(function () { tetFit(true); }, 300); });
+let fitOpen = false;
+setInterval(function () {
+    const open = ovOpen();
+    if (open && !fitOpen) { fitKey = ''; tetFit(true); setTimeout(function () { tetFit(true); }, 250); }
+    else if (open) tetFit(false);
+    fitOpen = open;
+}, 150);
 
 // ==========================================
 // 1. 조작 단추
@@ -280,6 +361,9 @@ function mix(h, to, t) { const a = rgb(h); return 'rgb(' + a.map(function (v) { 
 function lt(h, t) { return mix(h, 255, t); }
 function dk(h, t) { return mix(h, 0, t); }
 // 칸 하나 — view: 종류 글자 격자 · ids: 조각 번호 격자 · mini: 미리보기(작은 칸)
+// 지금 칸 크기 (px) — 테두리 · 깎인 모서리 굵기를 칸에 맞춰 키운다 (폴드처럼 칸이 클 때 금이 가늘어 보이지 않게)
+let TCPX = 22;
+function tcNow() { try { const v = parseFloat(getComputedStyle(ov()).getPropertyValue('--tc')); return v > 0 ? v : 22; } catch (e) { return 22; } }
 function cellHtml(sk, view, ids, x, y, mini, dim) {
     const S = SKINS[sk], c = view[y][x];
     if (sk === 'jelly') {
@@ -292,7 +376,7 @@ function cellHtml(sk, view, ids, x, y, mini, dim) {
     if (!c) return '<div></div>';
     const col = dim ? S.pal.G : S.pal[c];
     if (sk === 'bevel') {
-        const b = mini ? 2 : 3;
+        const b = mini ? 2 : Math.max(3, Math.round(TCPX * 0.13));
         return '<div style="box-sizing:border-box; background:linear-gradient(135deg,' + lt(col, .14) + ',' + col + ' 60%); border:' + b + 'px solid;'
             + ' border-color:' + lt(col, .38) + ' ' + dk(col, .28) + ' ' + dk(col, .36) + ' ' + lt(col, .22) + ';"></div>';
     }
@@ -302,7 +386,8 @@ function cellHtml(sk, view, ids, x, y, mini, dim) {
         const yy = y + dy, xx = x + dx;
         return yy >= 0 && yy < view.length && xx >= 0 && xx < view[0].length && !!view[yy][xx] && ids[yy][xx] === id;
     };
-    const m = mini ? 1 : 2, w = mini ? 1.5 : 2, r = mini ? 2 : 4;
+    const m = mini ? 1 : Math.max(2, Math.round(TCPX * 0.08)), w = mini ? Math.max(1.5, Math.round(TCPX * 0.06 * 2) / 2) : Math.max(2, Math.round(TCPX * 0.09)),
+          r = mini ? 2 : Math.max(4, Math.round(TCPX * 0.2));
     const T = same(0, -1), B = same(0, 1), L = same(-1, 0), R = same(1, 0);
     const ins = 'top:' + (T ? 0 : m) + 'px; bottom:' + (B ? 0 : m) + 'px; left:' + (L ? 0 : m) + 'px; right:' + (R ? 0 : m) + 'px;';
     const bw = (T ? 0 : w) + 'px ' + (R ? 0 : w) + 'px ' + (B ? 0 : w) + 'px ' + (L ? 0 : w) + 'px';
@@ -338,6 +423,7 @@ window.tetSkinBoard = function (board, view, ids) {
     const sk = skinNow();
     boardStyle(board, sk);
     if (sk === 'base') return false;
+    TCPX = tcNow();
     board.innerHTML = gridHtml(sk, view, ids, false, false);
     return true;
 };
@@ -352,6 +438,7 @@ window.tetSkinMini = function (box, type, dim) {
     if (sk === 'base') { if (box.dataset.sk && box.dataset.sk !== 'base') { box.style.gap = '1px'; box.dataset.sk = 'base'; } return false; }
     if (box.dataset.sk !== sk) { box.style.gap = (sk === 'jelly') ? '0px' : '0px'; box.dataset.sk = sk; }
     const mv = miniView(type);
+    TCPX = tcNow();
     box.innerHTML = gridHtml(sk, mv.v, mv.ids, true, dim);
     return true;
 };
@@ -363,7 +450,7 @@ function preview(sk) {
     const bg = sk === 'base' ? '#050505' : SKINS[sk].board;
     const inner = sk === 'base'
         ? v.map(function (row) { return row.map(function (c) { return '<div style="background:' + (c ? (typeof TET_COLORS !== 'undefined' ? TET_COLORS[c] : '#ba68c8') : 'rgba(255,255,255,0.03)') + '; border-radius:2px;"></div>'; }).join(''); }).join('')
-        : gridHtml(sk, v, ids, false, false);
+        : (TCPX = 22, gridHtml(sk, v, ids, false, false));
     return '<div style="display:inline-grid; grid-template-columns:repeat(4, 13px); grid-template-rows:repeat(2, 13px); gap:' + (sk === 'base' ? '1px' : SKINS[sk].gap) + ';'
         + ' background:' + bg + '; padding:3px; border-radius:3px;">' + inner + '</div>';
 }
