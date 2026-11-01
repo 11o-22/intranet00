@@ -339,6 +339,7 @@
       "irregular.js",
       "letter-sent.js",
       "letter-admin.js",
+      "letter-reply.js",
       "pet-data.js",
       "pet-list.js",
       "pet-shop.js",
