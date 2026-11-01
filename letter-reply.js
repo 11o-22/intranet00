@@ -14,7 +14,7 @@
 //
 //   · 편지 한 장에 답신은 한 번 (l.replied 에 적는다)
 //   · 답신에도 다시 답신할 수 있다 — 답신 역시 보낸 사람(fromCode)을 품은 익명 편지이므로
-//   · 편지지(「익명 편지」)는 쓰지 않는다 — 답신은 받은 편지에 딸린 것
+//   · 답신도 편지지(「익명 편지」)를 한 장 쓴다 (2026-11-01 사용자 — 처음엔 안 썼다)
 //   · 격리(상담실 · 선녀탕) 중에는 못 보낸다 — 익명 편지와 같다
 //   · 받는 쪽 편지함은 여느 편지처럼 여덟 장까지 (LETTER_KEEP)
 //   · 내 「보낸 편지」 칸에는 받는 사람을 「익명 (답신)」으로 적는다 — 내 화면에서도 상대가 드러나지 않게
@@ -42,6 +42,8 @@ function listOf(where) {
     if (!Array.isArray(u.letters)) u.letters = arr(u.letters);
     return u.letters;
 }
+const PAPER = '익명 편지';
+function hasPaper(u) { return !!(u && (u.inventory || []).indexOf(PAPER) >= 0); }
 function canReply(l) { const u = me(); return !!(l && l.fromCode && u && l.fromCode !== u.code); }
 
 // ==========================================
@@ -53,13 +55,14 @@ window.letterReplyOpen = function (where, i) {
     const l = listOf(where)[i];
     if (!u || !canReply(l)) { alert_('답신할 수 없는 편지입니다.'); return; }
     if (l.replied) { alert_('이 편지에는 이미 답신을 보냈습니다.'); return; }
+    if (!hasPaper(u)) { alert_("소지품에 '익명 편지'가 없습니다.\n\n답신에도 편지지가 한 장 듭니다."); return; }
     if (typeof isQuarantined === 'function' && isQuarantined(u)) { alert_('여우 상담실 격리 중에는 서신을 보낼 수 없습니다.'); return; }
     if (typeof openTextInput !== 'function') return;
     const id = l.id;
     openTextInput('답신',
         '이 편지를 보낸 사람에게 익명으로 답합니다.<br>'
         + '<span style="color:#888; font-size:10px;">「' + esc(plain(l.content).slice(0, RE_LEN)) + (plain(l.content).length > RE_LEN ? '…' : '') + '」<br>'
-        + '서로 누구인지는 드러나지 않습니다. 편지 한 장에 한 번 · 편지지는 쓰지 않습니다. (최대 ' + MAX + '자)</span>',
+        + '서로 누구인지는 드러나지 않습니다. 편지 한 장에 한 번 · 편지지(「익명 편지」) 한 장이 듭니다. (최대 ' + MAX + '자)</span>',
         '답신을 적어 주세요',
         function (text) { send(where, id, text); });
     const f = document.getElementById('text-input-field');
@@ -73,6 +76,7 @@ function send(where, id, text) {
     const i = list.findIndex(function (x) { return x && x.id === id; });
     const l = list[i];
     if (!canReply(l) || l.replied) return;
+    if (!hasPaper(u)) { alert_("소지품에 '익명 편지'가 없습니다."); return; }
     text = String(text || '').slice(0, MAX);
     if (!text) return;
     const to = l.fromCode;
@@ -83,14 +87,20 @@ function send(where, id, text) {
     };
     const done = function () {
         l.replied = Date.now();
+        // 편지지 한 장
+        try {
+            const k = (u.inventory || []).indexOf(PAPER);
+            if (k >= 0) u.inventory.splice(k, 1);
+        } catch (e) { }
         // 내 「보낸 편지」 — 받는 사람은 드러내지 않는다 (상담사 열람이 사번으로 잇는다)
         try {
             if (!Array.isArray(u.sentLetters)) u.sentLetters = arr(u.sentLetters);
             u.sentLetters.unshift({ id: letter.id, date: letter.date, toCode: to, toName: '익명 (답신)', toNo: '', content: text, reply: true });
             while (u.sentLetters.length > 8) u.sentLetters.pop();
         } catch (e) { }
-        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[익명 편지] 받은 편지에 답신을 보냈습니다.'); } catch (e) { }
-        try { if (typeof saveFields === 'function') saveFields(where === 'kept' ? { keptLetters: 1, sentLetters: 1, history: 1 } : { letters: 1, sentLetters: 1, history: 1 }); } catch (e) { }
+        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[익명 편지] 받은 편지에 답신을 보냈습니다. (편지지 소모)'); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields(where === 'kept' ? { keptLetters: 1, sentLetters: 1, history: 1, inventory: 1 } : { letters: 1, sentLetters: 1, history: 1, inventory: 1 }); } catch (e) { }
         try { if (typeof window.letterLogPut === 'function') window.letterLogPut(to, '↩ 답신 — ' + text); } catch (e) { }
         try { if (typeof renderLetters === 'function') renderLetters(); } catch (e) { }
         alert_('답신을 보냈습니다.');
