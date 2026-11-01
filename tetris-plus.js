@@ -327,14 +327,14 @@ window.addEventListener('popstate', function (e) {
 }, true);
 
 // ==========================================
-// 4. 블럭 모양 — S 사택 이상이 오락실에서 고른다 (2026-11-01 사용자 · 보내 준 그림 셋)
+// 4. 블럭 모양 — 오락실에서 고른다 (2026-11-01 사용자 · 보내 준 그림 셋 · 같은 날 「S 에 한정하지 않고 전 사택에서」)
 // ==========================================
 //   base  기본 — 지금 그대로 (dark.js)
 //   bevel 입체 — 고전 테트리스처럼 모서리가 깎인 블럭 (밝은 위 · 왼쪽 / 어두운 아래 · 오른쪽)
 //   line  테두리 — 조각마다 바깥 테두리만 둥글게 (칸 사이 금 없이 한 조각이 한 덩어리 · dark.js tet.gid 로 조각을 가른다)
 //   jelly 젤리 — 둥근 칸 · 윤이 나는 사탕 같은 블럭 (빈칸도 둥근 칸)
-//   u.tetSkin = 'base' | 'bevel' | 'line' | 'jelly'   — S 사택(옥탑)보다 낮으면 늘 기본으로 그린다 (고른 것은 남는다)
-const SKIN_MIN = 'S';
+//   u.tetSkin = 'base' | 'bevel' | 'line' | 'jelly'   — 모든 사택 등급에서 고른다 (처음에는 S 사택 이상만이었다)
+const SKIN_MIN = 'D';                 // 가장 낮은 등급부터 — 모든 사택 (2026-11-01 사용자 · 전에는 'S')
 const SKINS = {
     base:  { n: '기본' },
     bevel: { n: '입체',   board: '#3a3a3a', gap: '0px',
@@ -349,7 +349,9 @@ const SKIN_KEYS = ['base', 'bevel', 'line', 'jelly'];
 function me_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function skinOk(u) {
     try {
-        if (!u || typeof houseGrade !== 'function' || typeof HOUSE_GRADES === 'undefined') return false;
+        if (!u) return false;
+        if (SKIN_MIN === 'D') return true;
+        if (typeof houseGrade !== 'function' || typeof HOUSE_GRADES === 'undefined') return false;
         return HOUSE_GRADES.indexOf(houseGrade(u)) >= HOUSE_GRADES.indexOf(SKIN_MIN);
     } catch (e) { return false; }
 }
