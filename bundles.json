@@ -452,7 +452,8 @@
       "wonder-link-wolf.js",
       "wonder-dice-text.js",
       "wonder-dice.js",
-      "event-bgm.js"
+      "event-bgm.js",
+      "treasure.js"
     ]
   ]
 }
