@@ -340,7 +340,8 @@ const SKINS = {
     bevel: { n: '입체',   board: '#3a3a3a', gap: '0px',
              pal: { I: '#3fcfe0', O: '#e4cd3a', T: '#9a3ed6', S: '#4cc13a', Z: '#d83232', J: '#2a4ad8', L: '#e3922e', G: '#6d6d6d' } },
     line:  { n: '테두리', board: '#2a2d33', gap: '0px',
-             pal: { I: '#4a90e2', O: '#ececec', T: '#f2c14e', S: '#8fd14f', Z: '#e8584a', J: '#4a90e2', L: '#ececec', G: '#6d717a' } },
+             // ★ 일곱 모양 모두 다른 색 (2026-11-01 사용자 — 전에는 I · J 가 파랑, O · L 이 흰색으로 겹쳤다)
+             pal: { I: '#4a90e2', O: '#ececec', T: '#f2c14e', S: '#8fd14f', Z: '#e8584a', J: '#b07ce8', L: '#f0903a', G: '#6d717a' } },
     jelly: { n: '젤리',   board: '#232325', gap: '1px', empty: '#38383b',
              pal: { I: '#5fd23e', O: '#3d9df2', T: '#b44fe3', S: '#f4bf2f', Z: '#ea4a2e', J: '#d35fe0', L: '#f28b30', G: '#77777b' } }
 };
