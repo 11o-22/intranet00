@@ -155,18 +155,44 @@ body { overscroll-behavior-y: none; }
     // ==========================================
     // 스크롤 중에는 다시 그리지 않는다
     // ==========================================
-    let scrolling = false, tmr = null;
-    window.addEventListener('scroll', function () {
-        scrolling = true;
+    // ★ 2026-11-01 「소지품을 위로 올리면 도로 아래로 튄다」 (영상)
+    //   사원 화면(shell.js)에서는 칸이 #main-screen 안에서 넘어간다 — 창(window)이 아니다.
+    //   칸 안의 스크롤 이벤트는 위로 번지지 않아 window 에서 듣던 이 자리에 안 걸렸고, 그래서 넘기는 중에도
+    //   3초마다 도는 updateUI 가 그대로 돌았다. 그때 restoreAll 이 updateUI 직전에 잰 자리로 칸을 되돌렸는데,
+    //   손전화는 넘기는 동안 화면 쪽 자리와 스크립트 쪽 자리가 어긋나 있어(그리기가 무거우면 더) 재 둔 값이 몇 초 묵은 자리였다
+    //   — 그 자리(처음에 있던 맨 아래)로 홱 튀었다.
+    //   → 칸 안 스크롤 · 손가락 터치도 붙잡아(capture) 「넘기는 중」으로 친다 (광장 바닥 조이스틱은 뺀다).
+    //   → 되돌리기는 다시 그리느라 자리가 **실제로 틀어졌을 때만**, 그리고 그 사이 손으로 넘겼으면 하지 않는다.
+    let scrolling = false, tmr = null, scrollGen = 0, touching = false;
+    function inPlaza(t) { try { return !!(t && t.closest && t.closest('#plaza-ov')); } catch (e) { return false; } }
+    function busy() {
+        scrolling = true; scrollGen++;
         clearTimeout(tmr);
-        tmr = setTimeout(function () { scrolling = false; }, 400);
-    }, { passive: true });
+        tmr = setTimeout(function () { scrolling = false; }, 450);
+    }
+    window.addEventListener('scroll', busy, { passive: true });
+    document.addEventListener('scroll', function (e) {
+        const t = e.target;
+        if (t === document || t === document.documentElement || !inPlaza(t)) busy();
+    }, { passive: true, capture: true });
+    let touchT = null;
+    document.addEventListener('touchstart', function (e) {
+        if (inPlaza(e.target)) return;
+        touching = true; busy();
+        clearTimeout(touchT);
+        touchT = setTimeout(function () { touching = false; }, 15000);      // 손 뗀 소식이 끝내 안 와도 묶여 있지 않게
+    }, { passive: true, capture: true });
+    document.addEventListener('touchmove', function (e) { if (touching) busy(); }, { passive: true, capture: true });
+    ['touchend', 'touchcancel'].forEach(function (n) {
+        document.addEventListener(n, function () { if (touching) { touching = false; busy(); } }, { passive: true, capture: true });
+    });
 
     // ==========================================
     // 어느 탭이든 스크롤 자리를 지킨다
     // ==========================================
     function snapAll() {
         const list = [];
+        const gen = scrollGen;
         document.querySelectorAll('div, section, ul, ol').forEach(function (el) {
             if (el.scrollTop <= 0) return;
             if (el.scrollHeight - el.clientHeight < 8) return;
@@ -176,16 +202,19 @@ body { overscroll-behavior-y: none; }
                 end: (el.scrollHeight - el.scrollTop - el.clientHeight) < 6
             });
         });
-        return { win: window.pageYOffset || document.documentElement.scrollTop || 0, list: list };
+        return { win: window.pageYOffset || document.documentElement.scrollTop || 0, list: list, gen: gen };
     }
 
     function restoreAll(s) {
         if (!s) return;
         const put = function () {
+            if (s.gen !== scrollGen) return;               // 그 사이 손으로 넘겼다 — 손이 옳다
             s.list.forEach(function (x) {
                 if (!x.el.isConnected) return;
                 const max = Math.max(0, x.el.scrollHeight - x.el.clientHeight);
-                x.el.scrollTop = x.end ? x.el.scrollHeight : Math.min(x.top, max);
+                const want = x.end ? max : Math.min(x.top, max);
+                if (Math.abs(x.el.scrollTop - want) <= 2) return;   // 틀어지지 않았으면 손대지 않는다
+                x.el.scrollTop = want;
             });
             if (s.win) {
                 const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
@@ -205,8 +234,8 @@ body { overscroll-behavior-y: none; }
             const _u = updateUI;
             let pending = false;
             updateUI = function () {
-                // 손가락으로 넘기는 중이면 미뤄 둔다
-                if (scrolling) {
+                // 손가락으로 넘기는 중이면 미뤄 둔다 (칸 안 스크롤 · 터치도 — 위 busy)
+                if (scrolling || touching) {
                     if (pending) return;
                     pending = true;
                     setTimeout(function () { pending = false; updateUI(); }, 500);
