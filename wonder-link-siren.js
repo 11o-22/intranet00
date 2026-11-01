@@ -483,6 +483,9 @@ SA.s4end = function (j) {
 // T1 진주는 어디에? — 심해의 범인 찾기
 // ==========================================
 const LAMP = ['분홍 불', '노란 불', '푸른 불', '보라 불'];
+// 누가 무슨 불인가 — 증언 · 지목 화면 모두 (2026-11-01 사용자: 지목할 때도 보이게)
+function lampWho(k) { return LAMP[k] + '(' + SX.NAMES[k] + ')'; }
+function lampMap() { return '<div class="wd-sys">' + SX.NAMES.map(function (n, k) { return n + ' → ' + LAMP[k]; }).join(' · ') + '</div>'; }
 const PLACE = [
     { d: 20, t: '거품 기둥 옆. 불빛이 수다스럽게 흔들린다.', after: '증언을 끝내고 얼른 덧붙인다. “그런데 여기서는 세는 게 잘 안 돼요.”' },
     { d: 40, t: '건물 창문. 창틀에 등불을 올려둔다. 거울을 보는 자세다. 거울은 없다.', after: '' },
@@ -496,14 +499,14 @@ L.K.sr_t1hear = function () {
     const mine = t1mine();
     const i = s.i || 0;
     const P = t1puz();
-    const head = '<div class="wd-sys">산호 → 분홍 불 · 소라 → 노란 불 · 윤슬 → 푸른 불 · 파랑 → 보라 불</div>';
+    const head = lampMap();
     if (!mine.length) { L.draw('증언', head + '당신 앞으로 오는 불빛은 없다. 다른 사람들의 입만 보인다.' + (lk.comp ? '<br><br>' + esc(lk.comp) + josa(lk.comp, '은', '는') + ' 아무것도 듣지 못한다.' : ''), X.btn('모두가 들을 때까지 기다린다.', 'WONDER.lkNext()')); return; }
     if (i >= mine.length) { L.draw('증언', head + '들은 것을 일행에게 나눈다. (채팅)', X.btn('넷이 다시 모이는 곳으로 간다.', 'WONDER.lkNext()')); return; }
     const k = mine[i];
     const pl = PLACE[k];
     if (D() !== pl.d) { me().d = pl.d; X.save(); }
     const btn = (s.btn || {})[k];
-    let x = (i === 0 ? paras(p0('증언 (네 곳)').x).slice(0, 2).join('<br><br>') + '<br><br>' : '') + '<b>' + LAMP[k] + '</b> — ' + pl.t + '<br><br><b>' + esc(P.s[SX.LET[k]]) + '</b>' + (pl.after ? '<br><br>' + pl.after : '');
+    let x = (i === 0 ? paras(p0('증언 (네 곳)').x).slice(0, 2).join('<br><br>') + '<br><br>' : '') + '<b>' + lampWho(k) + '</b> — ' + pl.t + '<br><br><b>' + esc(P.s[SX.LET[k]]) + '</b>' + (pl.after ? '<br><br>' + pl.after : '');
     if (btn) x += '<div class="wd-sys">◈ 진주 단추가 ' + (btn === 't' ? '맑게 빛납니다 — 이 증언은 참입니다.' : '흐려집니다 — 이 증언은 거짓입니다.') + '</div>';
     let b = '';
     if (!btn && X.has && X.has('진주 단추')) b += X.btn('진주 단추를 대어 본다. <span style="font-size:10px;color:#d4af37;">(참 · 거짓)</span>', 'WONDER.SA.t1btn(' + k + ')');
@@ -522,9 +525,9 @@ function t1point(n) {
     return {
         k: 'team', id: 't1p' + n, title: '지목',
         skip: function () { return n > 0 && L.x().t1ok; },
-        text: function () { return L.txt(paras(p0('지목').x).join('<br><br>')) + (n > 0 ? '<div class="wd-sys">넷이 다시 나란히 선다. 자리가 조금 바뀌어 있다. — 두 번째 지목</div>' : '') + '<div class="wd-sys">모두 같은 불을 가리켜야 합니다. 갈리면 ✖, 오답 두 번이면 ✖.</div>'; },
-        opts: function () { return LAMP.map(function (l, k) { return { l: l + '을 가리킨다.', v: 'L' + k }; }); },
-        mineTxt: function (v) { return LAMP[+val(v).slice(1)] + '을 가리켰습니다.'; },
+        text: function () { return L.txt(paras(p0('지목').x).join('<br><br>')) + (n > 0 ? '<div class="wd-sys">넷이 다시 나란히 선다. 자리가 조금 바뀌어 있다. — 두 번째 지목</div>' : '') + lampMap() + '<div class="wd-sys">모두 같은 불을 가리켜야 합니다. 갈리면 ✖, 오답 두 번이면 ✖.</div>'; },
+        opts: function () { return LAMP.map(function (l, k) { return { l: lampWho(k) + '을 가리킨다.', v: 'L' + k }; }); },
+        mineTxt: function (v) { return lampWho(+val(v).slice(1)) + '을 가리켰습니다.'; },
         resolve: function (m) {
             const vs = Object.keys(m).map(function (c) { return val(m[c]); });
             if (vs.some(function (v) { return v !== vs[0]; })) return { end: ['지목이 갈림', 'f'] };
