@@ -266,10 +266,11 @@ X.cDone = function (name) {
 };
 function rollDc(dc, bonus) {
     const raw = 1 + Math.floor(Math.random() * 30);
-    const total = raw + (bonus || 0);
+    bonus = (bonus || 0) + (Number(X.EASE) || 0);           // ★ 주사위 완화 (2026-11-01) — wonder-core.js roll 과 같은 값
+    const total = raw + bonus;
     const ok = total >= dc;
     try { darkRun.log.push('[판정] d30 ' + raw + (bonus ? '+' + bonus : '') + ' vs ' + dc + ' → ' + (ok ? '성공' : '실패')); } catch (e) { }
-    return { raw: raw, bonus: bonus || 0, total: total, ok: ok, dc: dc };
+    return { raw: raw, bonus: bonus, total: total, ok: ok, dc: dc };
 }
 function rHtml(r) {
     return '<div class="wd-roll" style="color:' + (r.ok ? '#4CAF50' : '#f44336') + ';">' + r.total

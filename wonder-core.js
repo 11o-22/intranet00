@@ -373,9 +373,15 @@ function waitHtml(key, label) {
 X.gatePress = gatePress; X.gateDone = gateDone; X.waitHtml = waitHtml;
 
 // 맨 주사위 — 이 어둠에는 장비 보정이 없다. extra 는 이벤트 샵 물건 몫.
-function roll(extra) {
+// ★ 주사위 완화 (2026-11-01 사용자 「이벤트 어둠 다이스 좀 완화」) — 이 어둠의 모든 d30 판정에 +EASE.
+//   문턱(16 · DC)은 그대로 두고 더하는 값으로 준다 — 화면에 「(굴린 수 + 5) / 16」 으로 보인다.
+//   서큐버스 · K의 방 쪽 DC 판정(wonder-ch-succubus.js rollDc)도 같은 값을 쓴다 (X.EASE).
+//   멈추기 · 잇기 동률 주사위는 난이도가 아니므로 빼고 굴린다 (roll(0, true)).
+const EASE = 5;
+X.EASE = EASE;
+function roll(extra, plain) {
     const raw = 1 + Math.floor(Math.random() * 30);
-    const bonus = extra || 0;
+    const bonus = (extra || 0) + (plain ? 0 : EASE);
     const total = raw + bonus;
     const ok = total >= 16;
     try { if (darkRun && darkRun.log) darkRun.log.push('[판정] d30 ' + raw + (bonus ? '+' + bonus : '') + ' vs 16 → ' + (ok ? '성공' : '실패')); } catch (e) { }
@@ -1028,7 +1034,7 @@ X.tieRoll = function () {
     const sc = F.sc;
     const D = (S.dice || {})[sc.key] || {};
     if ((D[0] || {})[ME]) return;
-    const r = roll(0);
+    const r = roll(0, true);
     pub('dice/' + sc.key + '/0/' + ME, { ok: r.ok, raw: r.raw, total: r.total, bonus: 0 }).then(function () { view(); });
 };
 

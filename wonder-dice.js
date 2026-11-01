@@ -46,7 +46,7 @@ function rollNow() {
     return X.roll(-m);
 }
 function headLine(rule, die) {
-    return sys('🎲 ' + esc(rule.what || '판정') + ' — d30 · 16 이상 성공' + malNote() + (die ? '<br><span style="color:#ff6b6b;">실패하면 무사하지 못할 수 있습니다.</span>' : ''));
+    return sys('🎲 ' + esc(rule.what || '판정') + ' — d30 · 16 이상 성공' + (X.EASE ? ' <span style="color:#7fe0a0;">(완화 +' + X.EASE + ')</span>' : '') + malNote() + (die ? '<br><span style="color:#ff6b6b;">실패하면 무사하지 못할 수 있습니다.</span>' : ''));
 }
 
 // ==========================================
