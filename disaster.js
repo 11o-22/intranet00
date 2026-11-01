@@ -805,6 +805,7 @@ function checkChips(list, kind) {
         if (c.kick) s += ' → 모셔짐';
         if (c.aid) s += ' · 🤝 ' + esc(c.aid) + ' 대신 끌려감';     // 조력자가 대신 끌려갔다 (새빛 병원)
         if (c.fox) s += ' · 🐾 ' + esc(c.fox.n) + ' 대신 소멸';      // 아기 호랑이가 죽음을 대신 받았다
+        if (c.bfly) s += ' · 🦋 ' + esc(c.bfly.nick || c.bfly.n) + ' 대신 소멸';   // 환영 나비가 주인 대신 죽었다 (2026-11-01)
         return '<span class="' + (c.ok ? 'ok' : 'no') + '" title="' + esc(c.did) + '">' + s + '</span>';
     }).join('') + '</div>';
 }

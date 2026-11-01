@@ -737,6 +737,60 @@ export function judgeFox(fa, FX, ids, J, mem, rand, opt) {
     return { st: fst, fell: fell };
 }
 
+// ★ 🦋 환영 나비 — 기록 소실에서 주인 대신 죽는다 (2026-11-01 사용자)
+//   🦋 환영 나비를 차고 있는 사람이 이번 장면에 죽을 자리(lost)에 놓이면, 그 사람 곁의 나비 한 마리가 대신 소멸하고
+//   그 사람은 다친 채 남는다 — 죽을 때마다 한 마리씩 · 남은 나비가 있는 동안 · 약한 것부터, 판정은 마지막 (butterfly.js SAC_ORDER).
+//   곁의 나비 = 레벨이 있고 · 오늘 소멸하지 않았고 · 남에게 보내지 않은 것 (to 가 없거나 제 사번). 주인만 지킨다 (남에게 보낸 나비는 안 나선다).
+//   여우(foxSave) 다음 · 조력자 앞. 어둠 속으로 사라지는 사회자(실종)는 대신 못 받는다 (사라짐은 이 뒤에 정해진다).
+//   ★ 대신 소멸한 나비는 그날 쓰지 못한다 — 자정에 돌아온다: users/<사번>/bfly/<나비>/gone = 1 (butterfly.js kill 과 같은 자리 · 레벨은 남는다)
+//     bflyDay 가 오늘이 아니면 butterfly.js dayRoll 처럼 먼저 다 되살려 두고 오늘로 적는다 (어제 소멸이 남지 않게)
+const BFLY = '🦋 환영 나비';
+const BFLY_ORDER = ['heal', 'nul', 'smash', 'evade', 'judge'];
+const BFLY_N = { judge: '판정', heal: '치유', evade: '회피', smash: '파훼', nul: '무효' };
+function eqList(v) { return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.keys(v).map((k) => v[k]) : []); }
+async function bflyWith(db, c, now) {
+    const [eq, f, day] = await Promise.all([db.get('users/' + c + '/equippedWeapons'), db.get('users/' + c + '/bfly'), db.get('users/' + c + '/bflyDay')]);
+    if (!eqList(eq).some((w) => baseName(w) === BFLY)) return [];
+    const fresh = day !== kstDay(now);                    // 날이 바뀌었으면 다섯이 다시 살아 있다
+    const fl = (f && typeof f === 'object') ? f : {};
+    return BFLY_ORDER.filter((k) => {
+        const x = fl[k];
+        return x && typeof x === 'object' && Number(x.lv) > 0 && (fresh || !x.gone) && (!x.to || String(x.to) === c);
+    }).map((k) => ({ k: k, n: BFLY_N[k] + ' 나비', nick: clip(fl[k].nick || '', 12), lv: Number(fl[k].lv) || 1 }));
+}
+export async function bflySave(db, J, memNow, now) {
+    const out = [];
+    for (const c of Object.keys(J.st)) {
+        if (J.st[c] !== 'lost' || !memNow[c] || (memNow[c].st || 'ok') === 'lost' || memNow[c].role === 'admin') continue;
+        let mine = [];
+        try { mine = await bflyWith(db, c, now); } catch (e) { mine = []; }
+        if (!mine.length) continue;
+        const b = mine[0];
+        J.st[c] = 'hurt';
+        const row = J.checks.filter((r) => r.who === c && r.to === 'lost').pop() || null;
+        if (row) { row.to = 'hurt'; row.bfly = { k: b.k, n: b.n, nick: b.nick }; }
+        out.push({ c: c, k: b.k, n: b.n, nick: b.nick });
+    }
+    return out;
+}
+export async function bflyGone(db, list, now) {
+    const day = kstDay(now);
+    const by = {};
+    list.forEach((x) => { if (x && BFLY_N[x.k] && okCode(String(x.c))) (by[x.c] = by[x.c] || []).push(x.k); });
+    for (const c of Object.keys(by)) {
+        const [bday, f, name] = await Promise.all([db.get('users/' + c + '/bflyDay'), db.get('users/' + c + '/bfly'), db.get('users/' + c + '/name')]);
+        if (name == null) continue;                                             // 없는 사원 — 새로 만들지 않는다
+        const up = {};
+        if (bday !== day) {
+            up.bflyDay = day;
+            Object.keys((f && typeof f === 'object') ? f : {}).forEach((k) => { if (BFLY_N[k]) up['bfly/' + k + '/gone'] = 0; });
+        }
+        by[c].forEach((k) => { up['bfly/' + k + '/gone'] = 1; });
+        await db.patch('users/' + c, up);
+    }
+}
+function bflyName(x) { return x.nick && x.nick !== x.n ? x.nick + '(' + x.n + ')' : x.n; }
+
 // ★ 재난에서 대신 소멸한 아기 호랑이 — 그날은 어둠에서도 동행 못 한다 · 자정이 지나야 (2026-10-20)
 //   babyfox.js kill() 과 같은 꼴로 users/<주인>/kits/<속성>/gone = 1 (자식 길로만 · 통째로 덮지 않는다)
 //   kitDay 가 오늘이 아니면 babyfox.js dayRoll 처럼 여덟을 먼저 되살려 두고 오늘로 적는다 (어제 소멸이 남지 않게)
@@ -1140,6 +1194,8 @@ function checkLine(c, d) {
     if (c.aid) s += ' · [대신 끌려감] 조력자 ' + c.aid + ' 이(가) ' + c.name + ' 대신 붙잡혀 끌려간다 — ' + c.name + ' 은(는) 다친 채 남는다';
     if (c.fox) s += ' · [대신 소멸] 🐾 ' + c.fox.n + '(' + ((FOXES[c.fox.k] || {}).a || c.fox.k) + ') 가 ' + c.name + ' ' + ((d && d.foxTake) || '대신 죽음을 받고') + ' 사라진다 — '
         + c.name + ' 은(는) 다친 채 살아남는다';
+    if (c.bfly) s += ' · [대신 소멸] 🦋 ' + bflyName(c.bfly) + ' 가 ' + c.name + ' ' + ((d && d.foxTake) || '대신 죽음을 받고') + ' 흩어진다 — '
+        + c.name + ' 은(는) 다친 채 살아남는다';
     return s;
 }
 
@@ -1410,6 +1466,9 @@ async function round(b, deps, db) {
         });
         // 🐾 아기 호랑이 — 이번에 죽을 사람 곁의 여우가 대신 소멸한다 (죽을 때마다 한 마리씩)
         const foxGone = foxSave(J, memNow, FXj);
+        // 🦋 환영 나비 — 주인이 죽을 자리면 곁의 나비 한 마리가 대신 소멸한다 (여우 다음 · 조력자 앞 · 2026-11-01)
+        let bfGone = [];
+        try { bfGone = await bflySave(db, J, memNow, now); } catch (e) { bfGone = []; }
         // 🤝 조력자가 사원 대신 한 번 끌려간다 (여우 다음 · 사라짐 앞 · 2026-10-23)
         const aidGone = [];
         aidNow.filter((id) => HELP[id].save).forEach((id) => {
@@ -1519,6 +1578,9 @@ async function round(b, deps, db) {
                           : '[늑대 동화] 다음 장면에서는 틀지 않는다.'), ''] : []),
                 ...(foxGone.length ? ['[대신 소멸] ' + foxGone.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 대신').join(', ')
                     + ' — 판정 결과의 [대신 소멸] 줄이다. 그 아이의 말투로 마지막 말을 남기고 사라진다. 곁의 다른 아기 호랑이가 있으면 반응한다.', ''] : []),
+                ...(bfGone.length ? ['[대신 소멸 — 🦋 환영 나비] ' + bfGone.map((x) => bflyName(x) + ' — ' + ((mem[x.c] || {}).n || x.c) + ' 대신').join(', ')
+                    + ' — 판정 결과의 [대신 소멸] 줄이다. 그 사람 곁을 맴돌던 환영 나비 한 마리가 그 자리를 대신 받고 빛가루처럼 흩어진다 (잔혹하지 않게).'
+                    + ' 나비는 말을 하지 않는다. 그 사람은 다친 채 살아남는다.', ''] : []),
                 ...(foxFell.length ? ['[호랑이 소멸] ' + foxFell.map((id) => foxName(FX[id]) + ' — ' + ((mem[FX[id].on] || {}).n || FX[id].on) + ' 곁에서').join(', ')
                     + ' — 판정 결과의 [호랑이 소멸] 줄이다. 그 아이가 제 행동을 하다 괴담에 닿아 사라진다 (잔혹하지 않게 — 빛이나 꽃잎처럼 흩어진다). 마지막 말은 fox_lines 로. 곁의 아이들이 반응한다.', ''] : []),
                 ...(foxGrief.length ? ['[주인을 잃은 아기 호랑이] ' + foxGrief.map((id) => foxName(FXa[id]) + ' — 주인 '
@@ -1658,6 +1720,8 @@ async function round(b, deps, db) {
         if (pays && Object.keys(pays).length) await db.patch('disasterPay', pays);
         // 🐾 대신 소멸한 아기 호랑이 — 그날은 어둠에서도 못 데려간다 (자정이 지나야)
         try { if (foxGone.length) await foxKitGone(db, FX, foxGone, now); } catch (e) { }
+        // 🦋 대신 소멸한 환영 나비 — 그날은 못 쓴다 (자정이 지나야)
+        try { if (bfGone.length) await bflyGone(db, bfGone, now); } catch (e) { }
         // 🐾 아기 호랑이의 기억 — 판이 끝나면 (광장에서 「방송국에서 괜찮았어?」 같은 물음에 답할 때 쓴다)
         try { if (ended && Object.keys(FX || {}).length) await kitRemember(db, FX, memNow, lostAfter, D, kind, now, foxGone.concat(foxFell)); } catch (e) { }
         // 🐾 아기 호랑이 — 장면이 넘어간 직후 채팅에 (끝났으면 이 장면에)
