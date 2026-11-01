@@ -435,7 +435,8 @@ function chatNow() { try { if (typeof serverNow === 'function') { const t = Numb
 function svAt() { try { if (typeof firebase !== 'undefined' && firebase.database && firebase.database.ServerValue) return firebase.database.ServerValue.TIMESTAMP; } catch (e) { } return chatNow(); }
 const FUTURE_MS = 10 * 60 * 1000;      // 이보다 앞선 때가 적힌 줄은 시계가 틀린 것 — 걷는다
 // 한 칸(서버 채팅 · 맵 채팅 · 귓속말)의 묵은 줄 · 미래 줄을 걷는다 — keep 줄만 at 차례로 남긴다
-function trimNode(path, keep, force) {
+//   maxAge 가 있으면 그보다 오래된 줄도 걷는다 (귓속말 — 이틀 · 2026-11-01 사용자)
+function trimNode(path, keep, force, maxAge) {
     const d = db_(); if (!d) return;
     if (!force && Math.random() > 0.25) return;
     try {
@@ -445,6 +446,11 @@ function trimNode(path, keep, force) {
             const up = {};
             const keys = Object.keys(v);
             keys.forEach(function (k) { const o = v[k]; if (o && Number(o.at) > tn + FUTURE_MS) up[k] = null; });
+            if (maxAge) keys.forEach(function (k) {
+                const o = v[k] || {};
+                const a = Number(o.at) || keyTime(k);
+                if (a > 0 && tn - a > maxAge) up[k] = null;
+            });
             const rest = keys.filter(function (k) { return !(k in up); })
                 .sort(function (a, b) { return (Number((v[a] || {}).at) || keyTime(a)) - (Number((v[b] || {}).at) || keyTime(b)) || (a < b ? -1 : 1); });
             const over = rest.length - keep;
@@ -514,6 +520,10 @@ function chPath() { return PLAZA.CHAT + '/' + (chatCh === 'all' ? PLAZA.ALL : (r
 //   ✗ 전에는 보낸 줄을 내 화면에만 세워서, 나갔다 들어오면 받은 줄만 남고 보낸 줄은 사라졌다.
 const WH = 'plazaWhisper';
 const WH_KEEP = 40;
+// ★ 이틀이 지난 귓속말은 저절로 사라진다 (2026-11-01 사용자)
+//   서버에서 — 광장에 들어올 때(내 앞으로 온 것 · 보낸 줄 사본) · 보낼 때 받는 이 칸을 걷는다 (trimNode maxAge)
+//   화면에서 — 받을 때 이틀 지난 줄은 안 세우고, 광장에 오래 있어도 1분마다 걷어 낸다 (whAgeSweep)
+const WH_AGE = 2 * 24 * 3600 * 1000;
 let whTo = '', whName = '';      // 지금 귓속말할 상대
 let whRef = null, whFrom = 0;
 
@@ -4437,18 +4447,29 @@ function watchWhisper() {
     if (!d || !u || !run) return;
     if (whRef) { try { whRef.off(); } catch (e) { } whRef = null; }
     whFrom = now() + 1500;              // 걸자마자 오는 묵은 줄은 조용히 받는다
-    trimNode(WH + '/' + u.code, WH_KEEP * 2, true);
+    trimNode(WH + '/' + u.code, WH_KEEP * 2, true, WH_AGE);
     whRef = d.ref(WH + '/' + u.code).orderByChild('at').limitToLast(WH_KEEP);
     whRef.on('child_added', function (s) {
         const v = s.val() || {};
         if (!v.t) return;
+        { const a = Number(v.at) || keyTime(s.key); if (a > 0 && chatNow() - a > WH_AGE) return; }   // 이틀 지난 줄은 안 세운다
         if (v.o) { pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'out', k: s.key, at: v.at, quiet: true }); return; }   // 내가 보낸 줄
         pushLine({ n: v.n || '?', t: v.t, c: v.c, w: 'in', k: s.key, at: v.at, quiet: now() < whFrom });
     });
 }
 
 // 아무도 안 지워 주므로 가끔 묵은 줄을 걷어 낸다 (서버 채팅과 같은 길)
-function whTrim(code) { trimNode(WH + '/' + code, WH_KEEP * 2, false); }
+function whTrim(code) { trimNode(WH + '/' + code, WH_KEEP * 2, false, WH_AGE); }
+// 광장에 오래 머물러도 — 화면에 선 귓속말 가운데 이틀 지난 줄을 걷는다
+function whAgeSweep() {
+    if (!run || !run.lines || !run.lines.length) return;
+    const tn = chatNow();
+    const keep = run.lines.filter(function (o) { return !(o && (o.w === 'in' || o.w === 'out') && Number(o.at) > 0 && tn - Number(o.at) > WH_AGE); });
+    if (keep.length === run.lines.length) return;
+    run.lines = keep;
+    try { paintLog(); paintFeed(); } catch (e) { }
+}
+setInterval(function () { try { whAgeSweep(); } catch (e) { } }, 60000);
 
 // ==========================================
 // ★ 사원증 칸 — 사진 · 닉네임 · 사번
