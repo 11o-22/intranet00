@@ -8,11 +8,14 @@
 //         한정 의상 교환권 · 한정 악세서리 교환권 · 한정 장비 교환권
 //         한정 펫 의상 교환권 · 한정 펫 악세서리 교환권 · 한정 칭호 교환권
 //     · 나머지(99.4%) — 5,000 ~ 10,000 P
+//     ★ 2026-11-01 사용자 — 한정 교환권 확률은 **이번 회차에서 앞서 미션에 성공한 챕터 수만큼 1.5배씩** 오른다.
+//         첫 성공 0.1% → 다음 챕터 성공 0.15% → 0.225% → … (회차가 새로 시작되면 처음으로)
+//         셈은 내 회차 기록(currentUser.wonder.cur.res)의 성공('w' · 'd') 수 — 지금 챕터는 빼고.
 //   교환권은 「교환을 위한 준비중」. 사용 단추는 꺼 두고, 판매도 막는다(잘못 팔아 버리지 않게).
 //   팀이면 사람마다 따로 굴린다. 같은 챕터 보상은 한 번만.
 //
 // ■ 콘솔 (관리자)
-//   wonderRewardTest(n)  n번 굴려 나온 것 세기 (지급 없음)
+//   wonderRewardTest(n, 앞서 성공한 챕터 수)  n번 굴려 나온 것 세기 (지급 없음)
 
 (function wonderReward() {
 'use strict';
@@ -21,6 +24,17 @@ if (!X || typeof ITEM_CATALOG === 'undefined') return;
 
 const TICKETS = ['한정 의상 교환권', '한정 악세서리 교환권', '한정 장비 교환권', '한정 펫 의상 교환권', '한정 펫 악세서리 교환권', '한정 칭호 교환권'];
 const P_TICKET = 0.001;
+const STEP = 1.5;                     // 앞서 성공한 챕터 하나마다 ×1.5
+// 이번 회차에서 앞서 성공한 챕터 수 — 보상은 chapterDone 이 지금 챕터의 결과를 적은 뒤에 부르므로 하나를 뺀다
+function priorWins() {
+    try {
+        const cur = currentUser && currentUser.wonder && currentUser.wonder.cur;
+        const res = (cur && cur.res) || {};
+        const n = Object.keys(res).filter(function (k) { return res[k] === 'w' || res[k] === 'd'; }).length;
+        return Math.max(0, n - 1);
+    } catch (e) { return 0; }
+}
+X.ticketMult = function () { return Math.pow(STEP, priorWins()); };
 const PTS = [5000, 10000];
 X.TICKETS = TICKETS;
 
@@ -33,10 +47,11 @@ try { TICKETS.forEach(function (n) { if (NO_SELL_ITEMS.indexOf(n) < 0) NO_SELL_I
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 // 한 번 굴린다 — { kind:'ticket', name } | { kind:'points', n }
-function draw(rnd) {
+function draw(rnd, mult) {
     rnd = rnd || Math.random;
     const r = rnd();
-    const i = Math.floor(r / P_TICKET);
+    const p = P_TICKET * (Number(mult) > 0 ? Number(mult) : 1);   // 교환권 하나의 확률
+    const i = Math.floor(r / p);
     if (i < TICKETS.length) return { kind: 'ticket', name: TICKETS[i] };
     return { kind: 'points', n: PTS[0] + Math.floor(rnd() * (PTS[1] - PTS[0] + 1)) };
 }
@@ -49,7 +64,10 @@ X.reward = function (key, chName, misName) {
     F.rewarded = F.rewarded || {};
     if (F.rewarded[key]) return F.rewarded[key];
     const u = currentUser;
-    const got = draw();
+    const mult = X.ticketMult();
+    const got = draw(null, mult);
+    got.mult = mult;
+    try { darkRun.log.push('[보상] 한정 교환권 확률 ×' + (Math.round(mult * 1000) / 1000) + ' (앞서 성공한 챕터 ' + priorWins() + ')'); } catch (e) { }
     if (got.kind === 'ticket') {
         if (!u.inventory) u.inventory = [];
         u.inventory.push(got.name);
@@ -105,12 +123,13 @@ X.rewardHtml = function (got) {
     setInterval(function () { try { decorate(); } catch (e) { } }, 2000);
 })();
 
-window.wonderRewardTest = function (n) {
+window.wonderRewardTest = function (n, wins) {
     n = n || 100000;
     const c = {};
     let sum = 0, pts = 0;
+    const mult = Math.pow(STEP, Number(wins) || 0);
     for (let i = 0; i < n; i++) {
-        const g = draw();
+        const g = draw(null, mult);
         const k = g.kind === 'ticket' ? g.name : 'points';
         c[k] = (c[k] || 0) + 1;
         if (g.kind === 'points') { sum += g.n; pts++; }
