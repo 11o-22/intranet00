@@ -13181,6 +13181,15 @@ const TET_SHAPES = {
 };
 
 let tet = null;
+// ★ 가방제 (2026-11-01 사용자) — 일곱 가지가 하나씩 든 가방에서 무작위로 하나씩 뽑고, 다 뽑으면 새 가방
+let tetBag = [];
+// ★ 지운 줄이 늘수록 빨라진다 (2026-11-01 사용자) — 10줄마다 한 단계 · 한 단계에 12% 씩 · 가장 빨라도 90ms
+//   (✗ 전에는 지운 줄이 딱 10의 배수일 때만 60ms 씩 줄었다 — 두 줄 이상을 한꺼번에 지워 10의 배수를 건너뛰면 그대로였다)
+const TET_LV_LINES = 10, TET_SPEED0 = 700, TET_SPEED_RATE = 0.88, TET_SPEED_MIN = 90;
+function tetLevelOf(lines) { return Math.floor((lines || 0) / TET_LV_LINES); }
+function tetSpeedOf(lines) { return Math.max(TET_SPEED_MIN, Math.round(TET_SPEED0 * Math.pow(TET_SPEED_RATE, tetLevelOf(lines)))); }
+// ★ 바닥에 닿은 뒤 잠기기까지 (빨라져도 옆으로 밀 틈이 있게) — 닿은 채 옮기거나 돌리면 다시 센다 (블록 하나에 15번까지)
+const TET_LOCK_MS = 450, TET_LOCK_RESETS = 15;
 
 function renderTetrisLobby() {
     const box = document.getElementById('tetris-lobby');
@@ -13245,13 +13254,14 @@ function startTetris(mode) {
     document.getElementById('tetris-rival').innerHTML = '';
     document.getElementById('tetris-title').innerText = mode === 'duel' ? '사택 오락실 — 대전' : '사택 오락실';
 
+   tetBag = [];                                   // 판마다 새 가방
    tet = {
     mode: mode,
     grid: Array.from({length:20}, () => Array(10).fill(null)),
     cur: null, next: tetRandom(), pos: {x:3,y:0}, rot: 0,
     hold: null, holdUsed: false,
-    lines: 0, score: 0, over: false, timer: null, speed: 700,
-    garbage: 0
+    lines: 0, score: 0, over: false, timer: null, speed: tetSpeedOf(0),
+    garbage: 0, landAt: 0, lockN: 0
 };
     tetSpawn();
     tetDraw();
@@ -13260,8 +13270,14 @@ function startTetris(mode) {
 }
 
 function tetRandom() {
-    const keys = Object.keys(TET_SHAPES);
-    return keys[Math.floor(Math.random() * keys.length)];
+    if (!tetBag.length) {
+        tetBag = Object.keys(TET_SHAPES);
+        for (let i = tetBag.length - 1; i > 0; i--) {          // 섞는다
+            const j = Math.floor(Math.random() * (i + 1));
+            const t = tetBag[i]; tetBag[i] = tetBag[j]; tetBag[j] = t;
+        }
+    }
+    return tetBag.pop();
 }
 
 function tetCells(type, rot, ox, oy) {
@@ -13285,15 +13301,26 @@ function tetSpawn() {
     tet.rot = 0;
     tet.pos = { x:3, y:0 };
     tet.holdUsed = false;
+    tet.landAt = 0; tet.lockN = 0;
     if (!tetFits(tet.cur, 0, 3, 0)) tetGameOver();
 }
 
+function tetGround() { return !!tet && !tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y + 1); }
+// 옮기거나 돌린 뒤 — 바닥에 닿아 있으면 잠기는 시간을 다시 센다 (블록 하나에 TET_LOCK_RESETS 번까지)
+function tetAfterShift() {
+    if (!tet) return;
+    if (tetGround()) {
+        if (!tet.landAt || (tet.lockN || 0) < TET_LOCK_RESETS) { tet.landAt = Date.now(); tet.lockN = (tet.lockN || 0) + 1; }
+    } else tet.landAt = 0;
+}
 function tetTick() {
     if (!tet || tet.over) return;
     if (tetFits(tet.cur, tet.rot, tet.pos.x, tet.pos.y + 1)) {
         tet.pos.y++;
+        tet.landAt = tetGround() ? Date.now() : 0;      // 이번에 바닥에 닿았다 — 여기서부터 센다
     } else {
-        tetLock();
+        if (!tet.landAt) tet.landAt = Date.now();
+        if (Date.now() - tet.landAt >= TET_LOCK_MS) tetLock();
     }
     tetDraw();
 }
@@ -13315,8 +13342,9 @@ function tetLock() {
    if (cleared > 0) {
     tet.lines += cleared;
     tet.score += [0, 100, 300, 500, 800][cleared];
-    if (tet.lines % 10 === 0 && tet.speed > 180) {
-        tet.speed -= 60;
+    const sp = tetSpeedOf(tet.lines);
+    if (sp !== tet.speed) {
+        tet.speed = sp;
         clearInterval(tet.timer);
         tet.timer = setInterval(tetTick, tet.speed);
     }
@@ -13337,16 +13365,18 @@ if (tet.garbage > 0) {
 
 function tetMove(dir) {
     if (!tet || tet.over) return;
-    if (tetFits(tet.cur, tet.rot, tet.pos.x + dir, tet.pos.y)) tet.pos.x += dir;
+    if (tetFits(tet.cur, tet.rot, tet.pos.x + dir, tet.pos.y)) { tet.pos.x += dir; tetAfterShift(); }
     tetDraw();
 }
 
 function tetRotate() {
     if (!tet || tet.over) return;
     const nr = (tet.rot + 1) % 4;
+    const r0 = tet.rot;
     if (tetFits(tet.cur, nr, tet.pos.x, tet.pos.y)) tet.rot = nr;
     else if (tetFits(tet.cur, nr, tet.pos.x - 1, tet.pos.y)) { tet.rot = nr; tet.pos.x--; }
     else if (tetFits(tet.cur, nr, tet.pos.x + 1, tet.pos.y)) { tet.rot = nr; tet.pos.x++; }
+    if (tet.rot !== r0) tetAfterShift();
     tetDraw();
 }
 
@@ -13420,6 +13450,8 @@ if (holdBox) {
 
     document.getElementById('tetris-lines').innerText = tet.lines;
     document.getElementById('tetris-score').innerText = tet.score;
+    const lvEl = document.getElementById('tetris-level');
+    if (lvEl) { const t = 'Lv.' + (tetLevelOf(tet.lines) + 1); if (lvEl.innerText !== t) lvEl.innerText = t; }
 }
 
 function tetGameOver() {
@@ -13560,7 +13592,8 @@ function handleDuelState() {
     if (!d) return;
 
     if (d.state === 'REJECTED') {
-        showCustomAlert(`${d.guestName} 사원이 거절했습니다.`);
+        // ★ 상대가 테트리스를 하는 중이면 신청창이 뜨지 않고 저절로 물린다 (tetris-plus.js · busy)
+        showCustomAlert(d.busy ? `${d.guestName} 사원이 지금 오락기 앞에 있어 신청을 받지 못했습니다.` : `${d.guestName} 사원이 거절했습니다.`);
         database.ref('duels/' + d.id).remove();
         detachDuel();
         return;
@@ -13881,6 +13914,7 @@ function tetHold() {
     tet.rot = 0;
     tet.pos = { x:3, y:0 };
     tet.holdUsed = true;
+    tet.landAt = 0; tet.lockN = 0;
     if (!tetFits(tet.cur, 0, 3, 0)) { tetGameOver(); return; }
     tetDraw();
 }
