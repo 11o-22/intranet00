@@ -884,8 +884,9 @@ X.abandon = function () {
         me.cur.used = me.cur.used || {};
         const u = arr(me.cur.used[t.ch]); if (t.mis && u.indexOf(t.mis) < 0) u.push(t.mis); me.cur.used[t.ch] = u;
         me.cur.res = me.cur.res || {}; me.cur.res[t.ch] = 'f';
+        try { if (X.statCh) X.statCh(t.ch, 'f', t.rid + '_' + t.idx); } catch (e) { }           // 기록 (wonder-stats.js)
         me.cur.idx = Number(t.idx) + 1;
-        if (me.cur.idx >= 6) { me.rounds = (me.rounds || 0) + 1; me.cur = null; }
+        if (me.cur.idx >= 6) { me.rounds = (me.rounds || 0) + 1; me.cur = null; try { if (X.statRound) X.statRound(me.rounds); } catch (e) { } }
         saveRec();
     }
     const d = db_();
@@ -942,6 +943,7 @@ X.chapterDone = function (given) {
     if (mid && leader() === ME) tx('meta/used/' + ch, function (cur) { cur = arr(cur); if (cur.indexOf(mid) < 0) cur.push(mid); return cur; });
     me.cur.res = me.cur.res || {};
     me.cur.res[ch] = r;
+    try { if (X.statCh) X.statCh(ch, r, m.rid + '_' + (m.idx || 0)); } catch (e) { }       // 기록 (wonder-stats.js)
     me.cur.idx = (m.idx || 0) + 1;
     { const t = ticket(); if (t && t.rid === m.rid && Number(t.idx) === Number(m.idx || 0)) setTicket(null); }
     try { darkRun.log.push('[이상한 나라] ' + CH[ch].name + ' 「' + misName(ch, mid) + '」 ' + (r === 'f' ? '실패' : '성공')); } catch (e) { }
@@ -950,6 +952,7 @@ X.chapterDone = function (given) {
     if ((r === 'w' || r === 'd') && X.reward) { try { X.reward(rwKey, CH[ch].name, misName(ch, mid)); } catch (e) { console.error(e); } }
     if (me.cur.idx >= 6) {
         me.rounds = (me.rounds || 0) + 1;
+        try { if (X.statRound) X.statRound(me.rounds); } catch (e) { }                         // 회차 완주 (wonder-stats.js)
         me.cur = null;
         saveRec();
         return go({ id: 'roundEnd', rounds: me.rounds, rw: rwKey, back: back });
@@ -1171,6 +1174,7 @@ function begin(isResume) {
     { const t = ticket(); if (!darkRun.wonderLink && t && t.st === 'live' && isResume) darkRun.wonderLink = clean(t); }
     PID = runPid();
     const LK = darkRun.wonderLink || null;
+    try { if (X.statBegin) X.statBegin(!!isResume, !!LK); } catch (e) { }                       // 입장 · 머문 시간 (wonder-stats.js)
     const d = db_();
     if (!d) { draw('—', '연결이 없습니다.', btn('단말로 복귀한다.', 'finishDarkRun()'), { nobar: true }); return; }
     S = {};
@@ -1386,6 +1390,7 @@ function cleanup() {
                     try { console.warn('[이상한 나라] 탐사가 닫혔습니다 — 자리를 남겨 둡니다 (다시 들어가면 잇습니다)', new Error().stack); } catch (e) { }
                 }
                 const pid = (mine && !away && !kicked) ? PID : null;
+                try { if (mine && X.statEnd) X.statEnd(!!(F && F.st === 'dead')); } catch (e) { }   // 머문 시간 · 사망 (wonder-stats.js)
                 const r = _f.apply(this, arguments);
                 if (mine || F) cleanup();
                 if (pid && pid.indexOf('solo_') === 0) {
