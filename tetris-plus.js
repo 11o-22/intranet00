@@ -84,22 +84,19 @@ function say(html) {
         '#tetris-pad .tet-key{font-size:9px; opacity:.6; margin-left:3px;}',
         '@media (pointer:coarse){ #tetris-pad .tet-key{display:none;} }',
         '#tetris-pad .tet-btn.on{filter:brightness(1.4); transform:scale(.95);}',
-        // 넓은 화면 꼴 — 판 양옆에 단추 (왼손 홀드 · ◀▶▼ / 오른손 다음 · 점수 · 드롭 · ↻)
+        // 넓은 화면 꼴 — 판 양옆에 홀드 · 다음 · 점수 · 드롭 · ↻, 판 아래(「나간다」 위)에 ◀ ▼ ▶ (2026-11-01 사용자)
         '#tet-main.wide{grid-template-columns:' + U(3.2) + ' auto ' + U(3.2) + '; column-gap:' + U(0.6) + ';'
-            + ' grid-template-rows:auto auto 1fr auto auto;'
-            + ' grid-template-areas:"holdbox board nextbox" ". board stats" ". board ." "holdbtn board drop" "dpad board rot";}',
+            + ' grid-template-rows:auto auto 1fr auto auto auto;'
+            + ' grid-template-areas:"holdbox board nextbox" ". board stats" ". board ." ". board drop" "holdbtn board rot" "dpad dpad dpad";}',
         '#tet-main.wide #tetris-side,#tet-main.wide #tetris-pad,#tet-main.wide .tet-row{display:contents;}',
         '#tet-main.wide #tetris-board{grid-row:1 / 6;}',
         '#tet-main.wide #tet-holdbox{grid-area:holdbox; text-align:left;}',
         '#tet-main.wide #tet-nextbox{grid-area:nextbox; text-align:left;}',
         '#tet-main.wide #tet-stats{grid-area:stats; text-align:left;}',
-        '#tet-main.wide .tet-hold{grid-area:holdbtn; align-self:end; width:100% !important; margin-bottom:' + U(0.4) + ' !important;}',
+        '#tet-main.wide .tet-hold{grid-area:holdbtn; align-self:end; width:100% !important;}',
         '#tet-main.wide .tet-drop{grid-area:drop; align-self:end; width:100% !important; margin-bottom:' + U(0.4) + ' !important;}',
-        '#tet-main.wide .tet-cluster{grid-area:dpad; align-self:end; display:grid; grid-template-columns:1fr 1fr; gap:' + U(0.2) + ';'
-            + ' grid-template-areas:"l r" "d d";}',
-        '#tet-main.wide .tet-l{grid-area:l;} #tet-main.wide .tet-r{grid-area:r;}',
-        '#tet-main.wide .tet-d{grid-area:d; justify-self:center;}',
-        '#tet-main.wide .tet-arrow{width:' + U(1.5) + ' !important; height:' + U(1.6) + ' !important; font-size:' + U(0.7) + ' !important;}',
+        '#tet-main.wide .tet-cluster{grid-area:dpad; display:flex; justify-content:center; gap:' + U(0.8) + '; margin-top:' + U(0.5) + ';}',
+        '#tet-main.wide .tet-arrow{width:' + U(2.8) + ' !important; height:' + U(1.9) + ' !important; font-size:' + U(0.8) + ' !important;}',
         '#tet-main.wide .tet-rot{grid-area:rot; align-self:end; width:100% !important; height:' + U(2.6) + ' !important;}'
     ].join('\n');
     document.head.appendChild(s);
