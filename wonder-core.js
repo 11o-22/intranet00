@@ -15,7 +15,7 @@
 //   · 회차 = 여섯 챕터 · 여섯 미션. 회차마다 챕터 순서는 무작위(720가지 전부). 사탕 열쇠는 다음 문만 연다.
 //   · 미션은 솔로 4 · 팀 8 가운데 무작위, 같은 회차 안에서는 겹치지 않는다(처음부터 다시 해도).
 //   · 성공 = 이상한 나라 쪽 ✔ 또는 어둠 쪽 ✔ → 황금빛 열쇠 사탕 + 보상(wonder-reward.js). 실패 = 잃는 것 없이 다음 챕터.
-//   · 죽으면 상담실 · 선녀탕으로 가지 않고 가두리에 15분 (2026-10-31 사용자). 그 회차는 처음부터.
+//   · 죽으면 상담실 · 선녀탕으로 가지 않고 가두리에 5분 (2026-10-31 사용자 · 2026-11-01 15분 → 5분). 그 회차는 처음부터.
 //   · 챕터를 끝낼 때마다 멈추기 / 잇기 — 팀은 투표. 동률이면 각자 d30(16+) — 실패한 사람은 나오고
 //     (다음엔 처음부터) 성공한 사람은 진행. 짝수 인원이 반반으로 갈리면 다시 굴려 반드시 과반.
 //     → 2026-10-31 사용자: 주사위는 「고른 쪽」의 성공 · 실패. 이어서 간다 — 성공 진행 · 실패 퇴장(처음부터) /
@@ -1062,9 +1062,9 @@ X.leave = function () {
 // ==========================================
 // 죽음 — 막기 없이 (이 어둠에서는 장비가 통하지 않는다)
 // ==========================================
-// ★ 쓰러지면 상담실 · 선녀탕 대신 가두리에 15분 (2026-10-31 사용자) — 광장 → 백일몽 → 우체국 … 차례로 빈 가두리 (gaduri.js FILL)
+// ★ 쓰러지면 상담실 · 선녀탕 대신 가두리에 5분 (2026-10-31 사용자 · 2026-11-01 15분 → 5분) — 광장 → 백일몽 → 우체국 … 차례로 빈 가두리 (gaduri.js FILL)
 //   gaduri/<방>/<사번> = { by:'wonder', until } — until 이 지나면 누구의 화면이든 치운다 (gaduri.js). 다 찼으면 밖에 둔다. 오염도는 건드리지 않는다.
-const CAGE_MS = 15 * 60 * 1000;
+const CAGE_MS = 5 * 60 * 1000;          // 2026-11-01 사용자 — 15분 → 5분
 function cageMe() {
     const d = db_(), me = currentUser;
     if (!d || !me || me.code === 'kario0987') return;
@@ -1112,7 +1112,7 @@ function die(reasonHtml) {
         });
     }
     try { addHistoryLog(currentUser, '[어둠 사망] ' + W + ' 이상한 나라의 ■■■ — 포인트 ' + lostPoints + ' P' + (lostItems.length ? '와 반입품' : '') + ' 소실.' + (kept ? ' (이 어둠에서 얻은 ' + kept.toLocaleString() + ' P 는 남음)' : '')); } catch (e) { }
-    // ★ 이벤트 어둠 한정 — 상담실 · 선녀탕으로 끌려가지 않는다. 가두리에 15분 (2026-10-31 사용자)
+    // ★ 이벤트 어둠 한정 — 상담실 · 선녀탕으로 끌려가지 않는다. 가두리에 5분 (2026-10-31 사용자 · 2026-11-01 5분으로)
     try { cageMe(); } catch (e) { console.warn('[이상한 나라] 가두리', e); }
     const d = db_();
     if (d && darkRun.isParty && darkRun.partyId) {
@@ -1144,7 +1144,7 @@ function die(reasonHtml) {
             + (gain || arr(darkRun.wGainItems).length ? '<span style="color:#4CAF50; font-size:11px;">해당 어둠 내에서 얻은 재산은 사망 시 소실되지 않습니다.</span><br>' : '')
             + '<span style="color:#aaa;">이 어둠에서는 어떤 장비도 통하지 않았습니다.</span><br>'
             + '이번 회차는 처음부터 다시 합니다.<br>'
-            + '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#c9a3f0;">🎃 이벤트 어둠 — 상담실 · 선녀탕 대신 🔒 가두리에 15분 갇힙니다.</div>'
+            + '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #7f0000; color:#c9a3f0;">🎃 이벤트 어둠 — 상담실 · 선녀탕 대신 🔒 가두리에 ' + Math.round(CAGE_MS / 60000) + '분 갇힙니다.</div>'
             + '</div>' + darkChoiceBtn('눈을 감는다.', 'finishDarkDeath()'));
     }
     try { darkAmbienceStop(); } catch (e) { }

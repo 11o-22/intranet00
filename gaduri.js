@@ -15,7 +15,7 @@
 //   gaduri/<방>/<사번> = { at, by, name, auto?, until?, fed: { 던진사번: 횟수 } }   방은 plaza · dream
 //                        by 'petbt' 는 ⚔ 펫 배틀 패배 (pet-battle.js · until 15분이 지나면 누구의 화면이든 치운다)
 //                        by 'journey' 는 🐾 여정에서 펫 대신 맞은 주인 (journey.js · until 한 시간)
-//                        by 'wonder' 는 🎃 이벤트 어둠(이상한 나라 · 연계판)에서 쓰러진 사람 (wonder-core.js · until 15분 · 2026-10-31 사용자)
+//                        by 'wonder' 는 🎃 이벤트 어둠(이상한 나라 · 연계판)에서 쓰러진 사람 (wonder-core.js · until 5분 · 2026-10-31 사용자 · 2026-11-01 15분 → 5분)
 //   gaduriFood/<받는사번>/<번호> = { from, fromName, room, at }
 //
 // ■ 상담실 · 선녀탕 (2026-10-19)
@@ -142,7 +142,7 @@ setInterval(function () {
     const fd = !auto && ent.by === 'foxd';
     const bt = !auto && ent.by === 'petbt';                              // ⚔ 펫 배틀에서 졌다 (pet-battle.js · until 이 지나면 풀린다)
     const jr = !auto && ent.by === 'journey';                            // 🐾 여정에서 펫 대신 맞았다 (journey.js · 한 시간)
-    const wd = !auto && ent.by === 'wonder';                             // 🎃 이벤트 어둠에서 쓰러졌다 (wonder-core.js · 15분)
+    const wd = !auto && ent.by === 'wonder';                             // 🎃 이벤트 어둠에서 쓰러졌다 (wonder-core.js · 5분)
     if (fd) {
         try { if (typeof addHistoryLog === 'function') { addHistoryLog(me, '[가두리] ' + (ent.byName || '🎐 여우 신도') + '가 당신을 ' + NAME[now] + ' 가두리에 가뒀습니다.' + (ent.why ? ' (' + ent.why + ')' : '')); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
     }
