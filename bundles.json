@@ -457,7 +457,8 @@
       "wonder-stats.js",
       "event-bgm.js",
       "treasure.js",
-      "hideseek.js"
+      "hideseek.js",
+      "special-cure.js"
     ]
   ]
 }

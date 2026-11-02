@@ -127,7 +127,8 @@ function cured(name) {
     const c = currentUser && currentUser.effCure;
     if (!c || !c.at) return false;
     if (Date.now() - c.at > CURE_LIFE) return false;
-    return c.name === name;
+    // 특수 제거약(special-cure.js)은 여럿을 한꺼번에 풀어 names 에 다 적는다 (2026-11-02)
+    return c.name === name || (Array.isArray(c.names) && c.names.indexOf(name) >= 0);
 }
 
 // ==========================================
@@ -224,7 +225,7 @@ function verifyLater(code, item, want, at) {
                     : (u.timedEffects && typeof u.timedEffects === 'object' ? Object.keys(u.timedEffects).map(function (k) { return u.timedEffects[k]; }).filter(Boolean) : []);
                 const e = list.filter(function (x) { return x.name === item; })[0];
                 const cure = u.effCure;
-                if (cure && cure.name === item && (Number(cure.at) || 0) >= at) return;          // 그 사이 풀었다
+                if (cure && (cure.name === item || (Array.isArray(cure.names) && cure.names.indexOf(item) >= 0)) && (Number(cure.at) || 0) >= at) return;          // 그 사이 풀었다
                 if (!want.fixed && want.expireAt && want.expireAt <= Date.now()) return;          // 이미 끝날 때다
                 const short = e && !e.fixed && !want.fixed && (Number(e.expireAt) || 0) + 60000 < (Number(want.expireAt) || 0);
                 if (e && !short) return;                                                          // 잘 붙어 있다
