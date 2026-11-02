@@ -1483,6 +1483,7 @@ function onReturn(pre, total) {
         const extra = Math.round(total * (xr - 1));
         if (extra > 0) {
             pay(extra);
+            try { if (window.gearPtsMark) window.gearPtsMark('chil', xr, extra); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
             lines.push('🌟 무곡성군 — 생환 포인트 ×' + xr + (pre.mug ? ' (치성)' : (all ? ' (전원 생환)' : '')) + ' <b>+' + won(extra) + '</b>');
             log_(u, '[🌟 무곡성군] 생환 포인트 ×' + xr + ' (+' + won(extra) + ')');
         }
@@ -1508,6 +1509,7 @@ function onReturn(pre, total) {
         const extra = Math.round(total * (CHIL.MUG.mate5 - 1));
         if (extra > 0) {
             pay(extra);
+            try { if (window.gearPtsMark) window.gearPtsMark('chil', CHIL.MUG.mate5, extra); } catch (e) { }
             lines.push('🌟 ' + esc(pre.mugBy.n || '동료') + ' 사원의 무곡성군 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' <b>+' + won(extra) + '</b>');
             log_(u, '[🌟 무곡성군] ' + (pre.mugBy.n || '동료') + ' 사원의 치성 — 생환 포인트 ×' + CHIL.MUG.mate5 + ' (+' + won(extra) + ')');
         }

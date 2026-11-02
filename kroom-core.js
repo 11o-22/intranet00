@@ -3180,25 +3180,43 @@ function settle(how, txt) {
     if (helper) pts = 0;                                        // 헬퍼 — 포인트 없음
     if (alive && !helper) {
         if (hasHeart() && heartSaves() >= 30) { pts += 5000; extra.push('🩶 은심장 +5,000 P'); }
-        const pts0 = pts;                                       // ★ 커스텀 장비 배수의 곱은 3 까지 (여우 신도는 빼고 · 2026-10-27 — gear-cap.js 와 같은 규칙)
-        if (kr.truth && jisanOn()) { pts *= 3; extra.push('📖 읽어내기 — 죽을 길을 잡고 살아 나왔다 — 포인트 ×3'); }
+        const pts0 = pts;                                       // ★ 커스텀 장비 배수는 ×3 까지 (여우 신도는 빼고 · 2026-10-27 — gear-cap.js 와 같은 규칙)
+        // ★ 커스텀 장비 포인트 배수가 둘 이상 겹치면 **가장 높은 하나만** 따른다 (2026-11-02 사용자 · gear-cap.js 와 같은 규칙)
+        //   한 장비 안의 배수(📺 무대 열기 × 사회자와 끝까지)는 한 몫으로 곱한다. 🎐 여우 신도는 이 규칙 밖 (아래에서 그대로).
+        //   (2026-10-24 — 🐾 아기 여우(행운) · 📺 사회자와 끝까지는 꿈결이 아니라 포인트만 불린다)
+        const gm = [];                                          // { n, m, why }
+        if (kr.truth && jisanOn()) gm.push({ n: '📖 읽어내기', m: 3, why: '죽을 길을 잡고 살아 나왔다' });
         const p = showP();
-        if (p) { let m = 1; try { m = talkShowMult(p); } catch (e) { } if (m > 1) { pts = Math.round(pts * m); extra.push('📺 무대 열기 — 포인트 ×' + m.toFixed(2)); } }
-        // 🐾 아기 여우(행운) · 📺 사회자와 끝까지 — 포인트만 불린다 (2026-10-24 · 전에는 꿈결을 불렸다)
+        if (p) {
+            let m = 1; const why = [];
+            try { const h = talkShowMult(p); if (h > 1) { m *= h; why.push('무대 열기 ×' + h.toFixed(2)); } } catch (e) { }
+            if (p.talkShow && (p.alive || {})[p.talkShow.by]) { m *= 2; why.push('사회자와 끝까지 ×2'); }
+            if (m > 1) gm.push({ n: '📺 토크 쇼', m: m, why: why.join(' · ') });
+        }
         const K = fox(), lx = K && K.usable('luck');
-        if (lx && pts > 0) { const m = K.lootRoll(); pts = Math.round(pts * m); extra.push('🐾 ' + esc(foxNick(lx)) + ' — 포인트 ×' + m.toFixed(2)); }
-        if (p && p.talkShow && (p.alive || {})[p.talkShow.by] && pts > 0) { pts *= 2; extra.push('📺 사회자와 끝까지 — 포인트 ×2'); }
-        if (window.eyeKroom) { let m = 1; try { m = window.eyeKroom.mult(); } catch (e) { } if (m !== 1) { pts = Math.round(pts * m); extra.push('🔎 눈의 몫 — 포인트 ×' + m); } }
-        // 🦋 환영 나비 — 맹약 · 모이라이 · 숨결 (다 곱해도 ×2 까지) · 살아 나온 나비마다 경험 +1
+        if (lx) { const m = K.lootRoll(); if (m > 1) gm.push({ n: '🐾 ' + esc(foxNick(lx)), m: m }); }
+        let eyeM = 1;
+        if (window.eyeKroom) { try { eyeM = window.eyeKroom.mult(); } catch (e) { } if (eyeM > 1) gm.push({ n: '🔎 눈의 몫', m: eyeM }); }
+        // 🦋 환영 나비 — 맹약 · 모이라이 · 숨결 (다 곱해도 ×1.5 까지) · 살아 나온 나비마다 경험 +1
         const BF = bfly();
         if (BF) {
             try {
                 const M = BF.mult();
-                if (M.m > 1 && pts > 0) { pts = Math.round(pts * M.m); extra.push('🦋 환영 나비 — 포인트 ×' + M.m.toFixed(2) + (M.why.length ? ' (' + M.why.join(' · ') + ')' : '')); }
+                if (M.m > 1) gm.push({ n: '🦋 환영 나비', m: M.m, why: M.why.join(' · ') });
                 BF.runXp();
             } catch (e) { }
         }
-        if (pts0 > 0 && pts > pts0 * 3) { pts = Math.round(pts0 * 3); extra.push('⚖ 커스텀 장비 배수는 다 합쳐 ×3 까지'); }
+        let topG = null;
+        gm.forEach(function (g) { if (!topG || g.m > topG.m) topG = g; });
+        if (topG && pts > 0) {
+            pts = Math.round(pts * topG.m);
+            extra.push(topG.n + ' — 포인트 ×' + (Math.round(topG.m * 100) / 100) + (topG.why ? ' (' + topG.why + ')' : ''));
+            if (gm.length > 1) extra.push('⚖ 커스텀 장비 배수가 겹쳤습니다 — 가장 높은 하나만 따릅니다 ('
+                + gm.filter(function (g) { return g !== topG; }).map(function (g) { return g.n + ' ×' + (Math.round(g.m * 100) / 100); }).join(' · ') + ' 은 빠졌습니다)');
+        }
+        if (eyeM > 0 && eyeM < 1 && pts > 0) { pts = Math.round(pts * eyeM); extra.push('🔎 눈의 몫 — 포인트 ×' + eyeM); }   // (깎는 배수는 겹침과 상관없이 그대로)
+        if (pts0 > 0 && pts > pts0 * 3) { pts = Math.round(pts0 * 3); extra.push('⚖ 커스텀 장비 배수는 ×3 까지'); }
+        try { if (window.gearPtsSet) window.gearPtsSet(pts0 > 0 ? pts / pts0 : 1, topG ? topG.n : ''); } catch (e) { }   // 🌙 달빛 문신이 판 끝에 본다
         // 🎐 여우 신도 — 포인트 배수 (역병 · 제 二 신도 동행 가운데 큰 쪽 · 꿈결은 그대로) — 상한 밖
         const FX = foxc();
         if (FX && pts > 0) { try { const m = FX.mult(); if (m > 1) { pts = Math.round(pts * m); extra.push('🎐 아홉여우병 — 포인트 ×' + m); } } catch (e) { } }

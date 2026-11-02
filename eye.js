@@ -656,6 +656,7 @@ function settleMult() {
                     if (mult > 1) {
                         const extra = Math.round(got * (mult - 1));
                         me.points += extra;
+                        try { if (window.gearPtsMark) window.gearPtsMark('eye', mult, extra); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
                         log_(me, '[' + NAME + '] 눈의 몫 ×' + mult + ' (+' + extra.toLocaleString() + ' P)');
                         try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
                         try { if (typeof showPointGainEffect === 'function') showPointGainEffect(extra); } catch (e) { }

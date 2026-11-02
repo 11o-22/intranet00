@@ -1161,6 +1161,7 @@ function settleWrap(where, _r, self, args, dead) {
         if (m > 1) {
             extra = Math.round(got * (m - 1));
             try { if (typeof changePoints === 'function') changePoints(extra); else me.points += extra; } catch (e) { me.points += extra; }
+            try { if (window.gearPtsMark) window.gearPtsMark('fox', m, extra); } catch (e) { }   // 겹침 규칙 밖 — gear-cap 이 이 몫은 빼고 센다
             log_(me, '[' + NAME + '] 포인트 배수 ×' + m + ' (+' + extra.toLocaleString() + ' P)');
             save({ history: 1 });
             lines.push('🎐 아홉여우병 — 포인트 ×' + m + ' (+' + extra.toLocaleString() + ' P)');

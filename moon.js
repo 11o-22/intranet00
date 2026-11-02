@@ -634,10 +634,22 @@ function finish() {
         let m = two ? mult(t.d) : 1;
         let from = two && m > 1 ? '함께 간 사람이 ' + t.d + '번 죽었습니다' : '';
         if ((t.g || 1) > m) { m = t.g; from = '일행이 쌓아 둔 배수를 넘겨받았습니다'; }
-        if (m > 1 && gained > 0) {
-            const add = Math.round(gained * (m - 1));
+        // ★ 커스텀 장비 포인트 배수가 겹치면 가장 높은 하나만 따른다 (2026-11-02 사용자 · gear-cap.js)
+        //   이 판 정산에서 이미 따른 커스텀 배수(prev)가 있으면 그보다 높을 때만 — gained 는 이미 prev 를 탄 몫이라
+        //   gained × (m / prev − 1) 만 더 붙인다 (prev 대신 m 을 따른 셈). 낮거나 같으면 안 붙인다.
+        let prev = 1, prevN = '';
+        try {
+            const L = (typeof window.gearPtsLast === 'function') ? window.gearPtsLast((Number(t.at) || 0) - 5000) : null;
+            if (L && L.m > 1) { prev = L.m; prevN = (typeof window.gearPtsName === 'function') ? window.gearPtsName(L.id) : ''; }
+        } catch (e) { }
+        if (m > 1 && gained > 0 && prev > 1 && m <= prev) {
+            lines.push('[ 세광공업고등학교 학생 ]\n' + from + ' — 포인트 ×' + m
+                + '\n커스텀 장비 배수는 겹치면 가장 높은 하나만 — 더 높은 ' + (prevN || '배수') + ' ×' + (Math.round(prev * 100) / 100) + ' 를 따랐습니다.');
+        } else if (m > 1 && gained > 0) {
+            const add = Math.round(gained * (m / prev - 1));
             pay(add); net += add;
             lines.push('[ 세광공업고등학교 학생 ]\n' + from + ' — 포인트 ×' + m
+                + (prev > 1 ? ' (겹친 ' + (prevN || '배수') + ' ×' + (Math.round(prev * 100) / 100) + ' 대신)' : '')
                 + '\n' + won(gained) + ' → ' + won(gained + add));
         }
         if (six) {

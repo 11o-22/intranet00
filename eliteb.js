@@ -672,6 +672,7 @@ function myMult() {
                 const extra = Math.round(base * (mult - 1));
                 if (extra <= 0) return out;
                 try { if (typeof changePoints === 'function') changePoints(extra); else me.points = (Number(me.points) || 0) + extra; } catch (e) { me.points = (Number(me.points) || 0) + extra; }
+                try { if (window.gearPtsMark) window.gearPtsMark('eb', mult, extra); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
                 const who = role === 'lead' ? '조장' : role === 'elite' ? '정예조 조원' : '일반 조원';
                 const why = all ? ' · 전원 생환' : ((role === 'lead' && r0 && r0.isParty && masksGiven(r0.partyId) > 0) ? ' · 가면을 씌움' : '');
                 log_(me, '[' + NAME + '] ' + who + why + ' — 생환 포인트 ×' + mult + ' (+' + extra.toLocaleString() + ' P)');

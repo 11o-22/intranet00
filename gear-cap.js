@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 커스텀 장비 상한 — 회수품 행운 ×2 · 정산 포인트 ×3 · 보정 +23 (2026-10-27)
+// ★ 커스텀 장비 상한 — 회수품 행운 ×2 · 정산 포인트 ×3 (겹치면 가장 높은 하나만 · 2026-11-02) · 보정 +23 (2026-10-27)
 // bundles.json 마지막 묶음 맨 끝 (모든 커스텀 장비 파일 뒤)
 // ==========================================
 //
@@ -10,8 +10,15 @@
 //     정산 포인트 배수   다 곱해도 ×3 까지        (기본 정산의 3배 — 「다음 탐사 +10,000 P」 같은 고정 몫은 세지 않는다)
 //     굴림 보정          다 더해도 +23 까지
 //
+//   ★ 포인트 배수가 겹치면 (2026-11-02 사용자) — 커스텀 장비 둘 이상이 한 정산에 포인트 배수를 얹으면
+//     **배수가 가장 높은 하나만** 따른다 (곱하지 않는다). 한 장비 안의 여러 배수(📺 무대 열기 × 사회자와 끝까지)는 한 몫.
+//     장비마다 정산에서 붙인 몫을 window.gearPtsMark(id, 배수, 붙인 P) 로 적어 두고, 맨 바깥 겹(여기)이
+//     「커스텀 몫을 걷어 낸 포인트 × 가장 높은 배수 × 🎐 여우 신도 배수」를 넘는 만큼을 걷는다.
+//     🌙 달빛 문신(②)은 판이 끝난 뒤 따로 붙어 gearPtsLast 로 앞서 따른 배수를 보고 그보다 높을 때만 그 차이를 붙인다.
+//     K 의 방은 settle() 안에서 같은 규칙으로 고른다 (kroom-core.js).
+//
 //   예외
-//     🎐 여우 신도      상한에 안 걸린다 — 제 몫은 상한 위에 그대로 얹는다
+//     🎐 여우 신도      상한에 안 걸린다 — 제 몫은 상한 위에 그대로 얹는다 (겹침 규칙에도 안 든다)
 //     🦋 환영 나비      포인트 배수는 1.5 까지 (butterfly.js PTS_CAP) · 대신 보정 · 판정 몫은 상한에서 뺀다 (그대로 다 붙는다)
 //     🌟 칠성군         포인트 배수는 2 까지 (chilseong.js MUG · MUN_X)
 //
@@ -91,8 +98,43 @@ wrap('emLootMult', function (_e) {
     };
 }, '_gearCap');
 
-// ── 정산 포인트 — 커스텀 몫의 곱은 3 까지 (어둠 · 피날레 · EPIC)
+// ── 포인트 배수 겹침 — 장비마다 붙인 몫을 적는다 (정산 하나 동안만)
+const PTS_NAME = { bfly: '🦋 환영 나비', chil: '🌟 칠성군', eb: '🐺 정예 B조', eye: '🔎 감지하는 눈', jisan: '📖 종말예언', show: '📺 토크 쇼', moon: '🌙 달빛 문신' };
+let marks = null, depth = 0, lastTop = null, lastOver = null;
+window.gearPtsMark = function (id, m, extra) {
+    if (!marks) return;
+    marks.push({ id: String(id), m: Number(m) || 1, x: Math.round(Number(extra) || 0) });
+};
+// 앞서 따른 커스텀 배수 — { at, m, id } (since 뒤의 것만)
+window.gearPtsLast = function (since) { return (lastTop && lastTop.at >= (Number(since) || 0)) ? lastTop : null; };
+window.gearPtsSet = function (m, id) { lastTop = { at: Date.now(), m: Math.max(1, Number(m) || 1), id: id || '' }; };
+window.gearPtsName = function (id) { return PTS_NAME[id] || String(id || ''); };
+function fmtX(m) { return '×' + (Math.round(m * 100) / 100); }
+function cutPts(me, cut, msg) {
+    try { if (typeof changePoints === 'function') changePoints(-cut); else me.points -= cut; } catch (e) { me.points -= cut; }
+    try { addHistoryLog(me, '[⚖ 상한] ' + msg); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
+    try {
+        const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
+        if (body) {
+            const el = document.createElement('div');
+            el.style.cssText = 'margin-top:8px; padding:8px 10px; border:1px dashed #6a5a3a; border-radius:5px; font-size:11px; color:#d9c38a;';
+            el.textContent = '⚖ ' + msg;
+            const btn = body.querySelector('button');
+            if (btn) btn.insertAdjacentElement('beforebegin', el); else body.appendChild(el);
+        }
+    } catch (e) { }
+}
+
+// ── 정산 포인트 — 겹치면 가장 높은 배수 하나 · 그래도 ×3 까지 (어둠 · 피날레 · EPIC)
+//    겹이 여럿 감겨도 맨 바깥 겹만 센다 (안쪽 겹은 그냥 지나간다)
 function settleWrap(_f, self, args) {
+    if (depth) return _f.apply(self, args);
+    depth++; marks = [];
+    try { return settleCore(_f, self, args); }
+    finally { depth--; marks = null; }
+}
+function settleCore(_f, self, args) {
     const me = u_();
     const before = me ? (Number(me.points) || 0) : 0;
     const log0 = (me && me.darkLogs && me.darkLogs.length) ? me.darkLogs[0] : null;
@@ -106,24 +148,40 @@ function settleWrap(_f, self, args) {
         if (!base) return out;
         let got = (Number(me.points) || 0) - before;
         if (pend0 && !(Number(me.darkPtPend) || 0)) got -= pend0;         // 「다음 탐사 +n P」 고정 몫은 세지 않는다
-        const fox = foxPts();
+        // ── 겹친 배수 — 가장 높은 하나만 (2026-11-02)
+        const ms = (marks || []).slice();
+        const gear = {}; let fx = 0, fxM = 1;
+        ms.forEach(function (k) {
+            if (k.id === 'fox') { fx += k.x; fxM *= Math.max(1, k.m); return; }
+            const g = gear[k.id] || (gear[k.id] = { m: 1, x: 0 });
+            g.m *= k.m; g.x += k.x;
+        });
+        const ids = Object.keys(gear).filter(function (id) { return gear[id].m > 1; });
+        let top = null;
+        ids.forEach(function (id) { if (!top || gear[id].m > gear[top].m) top = id; });
+        const topM = top ? Math.min(CAP.PTS, gear[top].m) : 1;
+        window.gearPtsSet(topM, top);
+        if (ids.length >= 2 && got > 0) {
+            const sumX = ids.reduce(function (a, id) { return a + gear[id].x; }, 0);
+            const base0 = got - sumX - fx;                                  // 커스텀 몫을 다 걷어 낸 포인트
+            if (base0 > 0) {
+                const target = Math.round(base0 * topM * fxM);
+                const cut = got - target;
+                if (cut > 0) {
+                    const rest = ids.filter(function (id) { return id !== top; }).map(function (id) { return PTS_NAME[id] + ' ' + fmtX(gear[id].m); }).join(' · ');
+                    cutPts(me, cut, '커스텀 장비 포인트 배수가 겹쳤습니다 — 가장 높은 ' + PTS_NAME[top] + ' ' + fmtX(gear[top].m) + ' 만 따릅니다 ('
+                        + rest + ' 몫 ' + cut.toLocaleString() + ' P 는 들어오지 않았습니다.)');
+                    lastOver = { ids: ids.map(function (id) { return id + ' ' + fmtX(gear[id].m); }), top: top, got: got, base0: base0, target: target, cut: cut, at: Date.now() };
+                    got -= cut;
+                }
+            }
+        }
+        const fox = Math.max(foxPts(), fxM);                               // 여우 신도 — 정산에서 실제로 붙은 배수가 있으면 그것
         const allow = Math.round(base * fox * CAP.PTS);
         if (got > allow) {
             const cut = got - allow;
-            try { if (typeof changePoints === 'function') changePoints(-cut); else me.points -= cut; } catch (e) { me.points -= cut; }
             lastPts = { base: base, got: got, allow: allow, cut: cut, at: Date.now() };
-            try { addHistoryLog(me, '[⚖ 상한] 커스텀 장비 포인트 배수는 다 합쳐 ×3 까지 — ' + cut.toLocaleString() + ' P 는 들어오지 않았습니다.'); } catch (e) { }
-            try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
-            try {
-                const body = (typeof darkBodyEl === 'function') ? darkBodyEl() : null;
-                if (body) {
-                    const el = document.createElement('div');
-                    el.style.cssText = 'margin-top:8px; padding:8px 10px; border:1px dashed #6a5a3a; border-radius:5px; font-size:11px; color:#d9c38a;';
-                    el.textContent = '⚖ 커스텀 장비 배수는 다 합쳐 ×3 까지 — ' + cut.toLocaleString() + ' P 는 들어오지 않았습니다.';
-                    const btn = body.querySelector('button');
-                    if (btn) btn.insertAdjacentElement('beforebegin', el); else body.appendChild(el);
-                }
-            } catch (e) { }
+            cutPts(me, cut, '커스텀 장비 포인트 배수는 ×3 까지 — ' + cut.toLocaleString() + ' P 는 들어오지 않았습니다.');
         }
     } catch (e) { console.warn('[상한] 정산 상한 건너뜀', e && e.message); }
     return out;
@@ -133,10 +191,11 @@ wrap('epicSettle', function (_s) { return function () { return settleWrap(_s, th
 
 window.gearCapState = function () {
     console.log('%c===== ⚖ 커스텀 장비 상한 =====', 'color:#d9c38a; font-size:13px');
-    console.log('  회수품 ×' + CAP.LOOT + ' · 포인트 ×' + CAP.PTS + ' · 보정 +' + CAP.BON + ' (🎐 여우 신도는 상한 밖 · 🦋 보정 몫은 상한 밖 · 포인트 1.5 · 🌟 포인트 2)');
+    console.log('  회수품 ×' + CAP.LOOT + ' · 포인트 ×' + CAP.PTS + ' (겹치면 가장 높은 하나만) · 보정 +' + CAP.BON + ' (🎐 여우 신도는 상한 밖 · 🦋 보정 몫은 상한 밖 · 포인트 1.5 · 🌟 포인트 2)');
     console.log('  연결:', ['rollDarkBonus', 'emLootMult', 'renderDarkResult', 'epicSettle'].map(function (n) { return n + ' ' + ((typeof window[n] === 'function' && window[n]._gearCap) ? 'O' : '✗'); }).join(' · '));
     console.log('  지금 회수품 배수:', (typeof window.emLootMult === 'function') ? window.emLootMult(u_()) : '-', '· 보정(sense):', (typeof window.rollDarkBonus === 'function' && run()) ? window.rollDarkBonus('sense') : '-');
     console.log('  마지막으로 깎은 것 — 회수품:', lastLoot, '· 포인트:', lastPts, '· 보정:', lastBon);
+    console.log('  포인트 배수 겹침 — 마지막으로 따른 것:', lastTop, '· 걷은 것:', lastOver);
 };
 
 })();

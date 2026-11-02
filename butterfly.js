@@ -842,6 +842,7 @@ window.bflyRunXp = runXp;
                 if (M.m > 1 && got > 0) {
                     const extra = Math.round(got * (M.m - 1));
                     me.points += extra;
+                    try { if (window.gearPtsMark) window.gearPtsMark('bfly', M.m, extra); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
                     lines.push('포인트 ×' + M.m.toFixed(2) + ' (+' + extra.toLocaleString() + ' P)' + (M.why.length ? ' — ' + M.why.join(' · ') : ''));
                     log_(me, '[' + NAME + '] 정산 ×' + M.m.toFixed(2) + ' (+' + extra.toLocaleString() + ' P)');
                 }

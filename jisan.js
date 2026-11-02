@@ -909,6 +909,7 @@ function shared() {
                     if (got > 0) {
                         const add = Math.round(got * (JISAN.TRUTH_MULT - 1));
                         pay(u_(), add);
+                        try { if (window.gearPtsMark) window.gearPtsMark('jisan', JISAN.TRUTH_MULT, add); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
                         log_(u_(), '[' + NAME + '] 읽어내기 — 죽을 길을 밟고 살아 돌아왔습니다. 포인트 '
                             + JISAN.TRUTH_MULT + '배 (+' + add.toLocaleString() + ' P)');
                         setTimeout(function () {

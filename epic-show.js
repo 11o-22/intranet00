@@ -186,6 +186,7 @@ function inEpic() {
 
                 const extra = Math.round(got * (m - 1));
                 currentUser.points += extra;
+                try { if (window.gearPtsMark) window.gearPtsMark('show', m, extra); } catch (e) { }   // 겹치면 가장 높은 배수 하나만 (gear-cap.js)
                 const heat = Number(p.heat || 0);
                 if (typeof addHistoryLog === 'function') {
                     addHistoryLog(currentUser, '[토크쇼] 무대 열기 ' + heat + '단'
