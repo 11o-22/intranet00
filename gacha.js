@@ -73,6 +73,8 @@ const GACHA_WEAR = [
     { k: 'dress',       n: '드레스',     g: 'S', s: ['dress'],       set: 1 },
     { k: 'tuxedo',      n: '턱시도',     g: 'S', s: ['tuxedo'],      set: 1 },
     { k: 'veil',        n: '면사포',     g: 'S', s: ['veil'],        set: 1 },
+    // 비눗방울 세일러 (2026-11-02 사용자 · S) — 이름은 그림을 보고 붙였다
+    { k: 'sailor-bubble', n: '비눗방울 세일러', g: 'S', s: ['sailor-bubble'] },
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
     { k: 'han-inner',   n: '내의',       g: 'A', s: ['han-inner'] },
     { k: 'brown-suit',  n: '브라운 정장', g: 'A', s: ['brown-suit'] },

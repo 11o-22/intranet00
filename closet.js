@@ -154,7 +154,7 @@ const DOT = {
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
     Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'knit', 'gym-suit', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
@@ -203,6 +203,8 @@ const DOT = {
                  // ★ 사운드 코트 — 서기 줄 두 칸에 자락이 흔들린다 (그림자도 같이 돈다 · 두 칸이 같은 그림이라 티는 안 난다)
                  //   사운드 레빗 헤드셋 — 서기 줄 여섯 칸에 귀가 흔들린다 (2026-10-23)
                  'sound-coat': [0, 1], 'sound-coat-in': [0, 1], 'sound-headset': [0, 1, 2, 3, 4, 5],
+                 // 비눗방울 세일러 (2026-11-02) — 서기 줄 여섯 칸에 비눗방울 · 반짝이가 떠다닌다
+                 'sailor-bubble': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
                  'sound-lp': [0, 1, 2, 3, 4, 5],
                  // 잎 우산 (2026-10-25) — 서 있으면 빗물이 떨어지고 웅덩이가 번진다 (잎 · 줄기는 서기 여섯 칸이 같은 그림이라 0 에 세운다)
@@ -377,6 +379,11 @@ const DOT_SLOTS = [
             //   칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다.
             //   서기 줄은 한 칸 — 0 에 세운다. 겹 차례는 맨 위 (D.Z 끝) — 겉옷 · 장갑까지 덮는다.
             { i: 'bungeo', n: '붕어빵 의상', over: ['bungeo'], own: 'bungeo' },
+            // ★ 비눗방울 세일러 (2026-11-02 · 의상 뽑기 S) — 세일러 윗옷 · 반바지에 비눗방울이 떠다니는 한 벌.
+            //   주신 그림은 1440x640 JPG (칸 240x320 · 검은 바탕) — 1728x768 로 늘려 칸마다 가로 +30 으로 352 칸에 옮기고,
+            //   4픽셀 도트마다 가운데 색을 떠서 살색(몸) · 바탕을 걷고 옷은 열 가지 색으로 모았다. 비눗방울 · 반짝이는 2픽셀로 따로 떴다.
+            //   서기 줄 여섯 칸에 방울이 움직여 여섯 칸을 돈다 (FLAP_COLS). 이름은 그림을 보고 붙였다.
+            { i: 'sailor', n: '비눗방울 세일러', over: ['sailor-bubble'], own: 'sailor-bubble' },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
