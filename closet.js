@@ -153,7 +153,7 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'pj-top', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
@@ -416,6 +416,10 @@ const DOT_SLOTS = [
             { i: 'sound', n: '사운드 신발', over: ['sound-shoes'], own: 'sound-shoes' },   // 밀실 거래 됨 (2026-10-24)
             // ★ 뉴비 장화 (2026-10-25 · 뉴비 세트) — 잎 우산의 물 웅덩이는 언제나 이 밑이다 (BACK_Z)
             { i: 'newbie', n: '뉴비 장화', over: ['newbie-boots'], own: 'newbie-boots', noTrade: true },
+            // ★ 세일러 신발 (2026-11-02 · 의상 뽑기 B · 세일러복 짝) — 주신 그림은 2160x960 JPG (칸 360x480 · 흰 바탕 · 지난 규격의 1.25 배).
+            //   세일러복과 같은 길로 1728x768 로 줄여 칸마다 가로 +30. 몸에 대 보니 발이 그대로 맞았다.
+            //   가만히 있을 때 안 움직이게 — 서기 줄 여섯 칸을 모두 첫 칸 그림으로 맞췄다 (FLAP_COLS 에도 안 적는다).
+            { i: 'sailor', n: '세일러 신발', over: ['sailor-shoes'], own: 'sailor-shoes' },
             // (퐁실 신발 — 2026-10-26 판에서 뺐다)
         ]
     },

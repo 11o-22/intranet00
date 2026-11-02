@@ -89,6 +89,8 @@ const GACHA_WEAR = [
     { k: 'gym-suit',     n: '체육복',       g: 'B', s: ['gym-suit'] },
     // (퐁실 의상 · 퐁실 신발 — 2026-10-26 판에서 뺐다)
     { k: 'shoes-black', n: '검은 구두',  g: 'B', s: ['shoes-black'], set: 1 },
+    // 세일러 신발 (2026-11-02 사용자 · B · 세일러복 짝)
+    { k: 'sailor-shoes', n: '세일러 신발', g: 'B', s: ['sailor-shoes'] },
     { k: 'glove',       n: '검은 장갑',  g: 'B', s: ['glove'],       set: 1 },
     { k: 'shoes',       n: '구두',       g: 'C', s: ['shoes'] },
     { k: 'han-shoes',   n: '신',         g: 'C', s: ['han-shoes'] },
