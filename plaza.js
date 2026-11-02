@@ -383,6 +383,8 @@ const PLAZA = {
         { g: 'life',  n: '포토존',     i: '📸', ic: 'camera',  sheet: 'photo' },
         // 🀄 마작 — 누구나 (2026-10-31 사용자 · 전에는 상담실 · 선녀탕 안에서만) · 3인 · 4인 (mj-ui.js)
         { g: 'life',  n: '마작',       i: '🀄',                fn: 'mjOpen' },
+        // 🫣 숨바꼭질 — 둘 이상 · 접속한 사람을 불러 (hideseek.js · 2026-11-02 사용자)
+        { g: 'life',  n: '숨바꼭질',   i: '🫣',                fn: 'hsOpen' },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
@@ -474,7 +476,15 @@ function noOf(u) {
     const n = (u && u.no != null) ? String(u.no).trim() : '';
     return (n && n.length < 4) ? ('0000' + n).slice(-4) : n;
 }
+// ★ 🫣 숨바꼭질 (hideseek.js · 2026-11-02 사용자) — 놀이 중에는 그쪽이 방 번호 · 크기 · 이름표 · 걸음을 정한다.
+//   window.PLAZA_HS = { on(), inst(room), tiny(), block(kind, to), frozen(), pin(), pinOf(code) }
+//   on() 이 참일 때만 본다 — 놀이가 끝나면 광장은 늘 하던 대로다.
+function HS() { try { const h = window.PLAZA_HS; return (h && h.on && h.on()) ? h : null; } catch (e) { return null; } }
+function hsCall(name) { const h = HS(); if (!h || typeof h[name] !== 'function') return undefined; try { return h[name].apply(h, Array.prototype.slice.call(arguments, 1)); } catch (e) { return undefined; } }
+let hsSaidAt = 0;
+function hsNote(t) { if (!t) return; if (now() - hsSaidAt < 2500) return; hsSaidAt = now(); try { sysLine(t); } catch (e) { } }
 function hidPeer(code) {
+    if (HS()) return false;                 // 🫣 놀이 방에는 참여자만 있다 — 상담사도 함께 보인다
     if (!code || code !== P.ADMIN) return false;
     const u = u_();
     if (!u || u.code === P.ADMIN) return false;
@@ -637,6 +647,7 @@ function stampSafe(ov) {
         '#plaza-hud .pol i{background:linear-gradient(90deg,#4caf50,#ff9800,#f44336);}',
         // 「같이 있는 사람」 줄 — 포인트·바가 들어오면서 한 칸 내려 앉았다
         // (긴 이름이 여럿이면 왼쪽 바와 겹쳤다)
+        '.plaza-tag.hs-hide{display:none !important;}',      // 🫣 숨바꼭질 — 이름표 감춤
         '#plaza-who{position:absolute;left:12px;right:12px;z-index:19;text-align:center;',
         '  top:calc(var(--plaza-safe-top,env(safe-area-inset-top,0px)) + 96px);',
         '  font-size:10.5px;color:#b9b0a0;text-shadow:0 1px 3px #000;pointer-events:none;}',
@@ -1075,6 +1086,8 @@ const TINY_FX = '파인애플맛 물약';
 function tinyOf(u) {
     if (!u) return false;
     if (u.tiny != null) return !!u.tiny;                 // 남 — 실려 온 표시
+    const hsT = hsCall('tiny');                          // 🫣 숨바꼭질 — 술래는 보통 크기 · 나머지는 파인애플 크기
+    if (hsT != null) return !!hsT;
     const t = now();
     return (Array.isArray(u.timedEffects) ? u.timedEffects : []).some(function (e) {
         return e && e.name === TINY_FX && (e.fixed || !e.expireAt || e.expireAt > t);
@@ -1202,6 +1215,7 @@ function setTag(one, code, name) {
     if (!one || !one.tag) return;
     one.name = name || '';
     one.code = code || '';
+    one.tag.classList.toggle('hs-hide', !!HS());          // 🫣 숨바꼭질 — 이름표를 아예 안 보인다
     const h = tagHtmlOf(one.code, one.name);
     if (one.tag._h === h) return;          // 그대로면 안 건드린다 (칸이 깜빡인다)
     one.tag.innerHTML = h;
@@ -2439,6 +2453,7 @@ function openMenu(cx, cy, title, items, onPick) {
 function carryTap(cx, cy) {
     closeCarryMenu();
     if (!run) return false;
+    if (HS()) return false;                 // 🫣 숨바꼭질 — 사람을 톡 쳐도 아무것도 안 뜬다 (이름이 드러나지 않게)
     const me = myCode();
     // 작은 사람이 보통 사람을 — 올라가기 · 손에 앉기
     const big = bigAt(cx, cy);
@@ -3026,6 +3041,7 @@ function paintSpots() {
         e.addEventListener('click', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
             if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
+            if (s.go) { const hb = hsCall('block', 'door', s.go); if (hb) { sysLine(hb); return; } }     // 🫣
             goApp(s);
         });
         run.el.appendChild(e);
@@ -3179,6 +3195,7 @@ function goApp(s) {
 //     들어가자마자 또 오른쪽 끝에 서고 그대로 다음 방으로 밀려 갔다.
 function goRoom(key, way, lv) {
     if (!run || !R[key]) return;
+    if (HS() && R[key].photo) { sysLine('🫣 숨바꼭질 중에는 포토존에 갈 수 없습니다.'); return; }
     // 🔒 갇혔으면 가두리 방 밖으로는 못 간다 — 이미 거기 있으면 그대로, 밖이면 그리로 데려간다
     const cg = cageMine();
     if (cg && key !== cg) {
@@ -3312,6 +3329,8 @@ function tick(ts) {
 
     // ─ 조이스틱이 먼저다. 민 만큼만 걷는다 (살짝 밀면 느리게).
     if (run.ax || run.ay) { ix = run.ax; iy = run.ay; }
+    // 🫣 숨바꼭질 — 셀 동안의 술래 · 잡힌 사람은 못 움직인다
+    if (hsCall('frozen')) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; }
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();
@@ -3379,8 +3398,13 @@ function tick(ts) {
 
         // ─ 넘어간 직후에는 쉬어 간다 (두 방을 끝없이 오가지 않게)
         if (!cageMine() && now() - (run.warp || 0) > P.WARP_MS) {
-            if (r.left && run.x <= P.EDGE) { goRoom(r.left, 'left'); return; }
-            if (r.right && run.x >= r.w - P.EDGE) { goRoom(r.right, 'right'); return; }
+            const goL = !!(r.left && run.x <= P.EDGE), goR = !!(r.right && run.x >= r.w - P.EDGE);
+            const hb = (goL || goR) ? hsCall('block', 'walk', goL ? r.left : r.right) : '';    // 🫣 찾는 동안 숨은 사람은 못 넘어간다
+            if (hb) { run.x = goL ? P.EDGE + 2 : r.w - P.EDGE - 2; hsNote(hb); }
+            else {
+                if (goL) { goRoom(r.left, 'left'); return; }
+                if (goR) { goRoom(r.right, 'right'); return; }
+            }
         }
         // ★ 건물 안팎(재관국앞↔재관국 · 백일몽앞↔백일몽)은 **걸어서 안 넘어간다.**
         //   입구를 눌러야 들어가고 나간다 (ROOMS 의 go 입구). 전에는 바닥 띠
@@ -3397,6 +3421,12 @@ function tick(ts) {
         else if (dx > 0.08) run.me.actor.face(-1);
     }
     cageHold(r);                            // 🔒 갇혔으면 가두리 안쪽으로
+    // 🫣 숨바꼭질 — 잡힌 사람은 술래 뒤 이동식 가두리 안에 붙는다 (술래가 방을 옮기면 따라간다)
+    const hsPin = hsCall('pin');
+    if (hsPin) {
+        if (hsPin.room && hsPin.room !== run.room && R[hsPin.room]) { goRoom(hsPin.room, null, hsPin.lv || 0); return; }
+        if (hsPin.x != null) { run.x = hsPin.x; run.y = hsPin.y; run.vx = run.vy = 0; }
+    }
     run.me.actor.moving(cm ? cmMove : moving);
     const myLift = jumpLift(run.me, run.jumpT0);                                  // 🍍 점프
     if (run.jumpT0) { poseJump(run.me, run.jumpT0); if (!jumping(run.jumpT0)) run.jumpT0 = 0; }   // 뛰는 동안은 걸음 4번 모션으로 멈춰 선다 · 내려오면 푼다
@@ -3416,6 +3446,8 @@ function tick(ts) {
     const seeL = run.cx - 140, seeR = run.cx + vwid + 140;
     Object.keys(run.peers).forEach(function (code) {
         const q = run.peers[code];
+        const hsP = hsCall('pinOf', code);              // 🫣 잡힌 사람 — 어느 화면에서나 가두리 안 같은 자리에
+        if (hsP) { q.x = q.tx = hsP.x; q.y = q.ty = hsP.y; }
         if (carried[code] && q.sm) { q.one.actor.face(q.face || 1); if (q.sayAt && now() - q.sayAt > P.SAY_MS) { bubble(q.one, ''); q.sayAt = 0; } return; }
         const ax = q.tx - q.x, ay = q.ty - q.y;
         const d = Math.hypot(ax, ay);
@@ -3604,6 +3636,8 @@ function joinInst(want, force) {
     if (!run) return;
     const tok = run.joinTok = (run.joinTok || 0) + 1;
     const room = run.room, u = u_();
+    const hsI = hsCall('inst', room);                    // 🫣 숨바꼭질 — 참여자만 드는 방 번호로
+    if (hsI) { want = hsI; force = true; }
     census().then(function (cs) {
         if (!run || run.joinTok !== tok || run.room !== room) return;   // 그 사이 또 옮겼다
         const inst = force ? want : pickInst(cs, room, want, u && u.code);
@@ -3624,7 +3658,7 @@ function enterInst(inst) {
     watchChat();
     run.sx = run.sy = -9999; run.sent = 0;          // 곧바로 내 자리를 알린다
     paintMap();
-    if (inst > 1) sysLine(roomOf().n + ' ' + inst + '번 방입니다. (한 방에 ' + P.CAP + '명까지)');
+    if (inst > 1 && !HS()) sysLine(roomOf().n + ' ' + inst + '번 방입니다. (한 방에 ' + P.CAP + '명까지)');
 }
 // 같은 장소 안에서 방만 바꾼다 (서 있던 자리는 그대로)
 function hopInst(inst) {
@@ -3646,6 +3680,7 @@ function overSoon() {
 function overCheck() {
     const u = u_();
     if (!run || !run.ref || !u) return;
+    if (HS()) return;                                    // 🫣 놀이 방은 몇 명이든 한 방
     if (carryMine() || (run.folBy && now() - run.folBy.t < CARRY.FOLLOW_MS + 4000)) return;   // 🍍 들려 왔다 — 든 사람 곁에 남는다
     const codes = Object.keys(run.peers).filter(function (c) {
         const q = run.peers[c]; return q && q.at && now() - q.at <= P.STALE_MS;
@@ -3723,6 +3758,7 @@ function matesSheet() {
 function goMate(r) {
     const u = u_();
     if (!run || !r || !R[r.room]) return;
+    if (HS()) { closeSheet(); sysLine('🫣 숨바꼭질 중에는 목록으로 옮겨 다닐 수 없습니다.'); return; }
     if (r.c === P.ADMIN && !isAdm(u)) { closeSheet(); return; }          // 상담사에게는 같이 가기 없음
     if (cageMine()) { closeSheet(); sysLine('🔒 가두리에 갇혀 있어 다른 곳으로 갈 수 없습니다.'); return; }
     closeSheet();
@@ -3736,6 +3772,7 @@ function goMate(r) {
             });
         });
         if (!at) { sysLine(r.name + ' 님이 지금은 광장에 없습니다.'); return; }
+        if (inst >= 7000) { sysLine(r.name + ' 님은 지금 🫣 숨바꼭질 중입니다.'); return; }      // 놀이 방에는 참여자만 든다
         if (room === run.room && inst === run.inst) { sysLine(r.name + ' 님과 이미 같은 방입니다.'); return; }
         if (headcount(cs, room, inst, u && u.code) >= P.CAP) {
             sysLine(R[room].n + ' ' + inst + '번 방이 가득 찼습니다. (' + P.CAP + '명)');
@@ -3847,6 +3884,7 @@ function photoSheet(zone) {
 function goPhoto(zone, inst) {
     const u = u_();
     if (!run || !R[zone]) return;
+    if (HS()) { closeSheet(); sysLine('🫣 숨바꼭질 중에는 포토존에 갈 수 없습니다.'); return; }
     if (cageMine()) { closeSheet(); sysLine('🔒 가두리에 갇혀 있어 다른 곳으로 갈 수 없습니다.'); return; }
     census().then(function (cs) {
         if (!run) return;
@@ -4023,6 +4061,7 @@ function leaveRoom() {
 
 function showWho() {
     const el = document.getElementById('plaza-who'); if (!el || !run) return;
+    if (HS()) { el.innerText = '🫣 숨바꼭질 중'; return; }
     const ns = Object.keys(run.peers).map(function (c) { return run.peers[c].one.name || c; });
     el.innerText = ns.length ? ('같이 있는 사람 — ' + ns.join(' · ')) : '지금은 혼자 있습니다.';
 }
@@ -4551,7 +4590,7 @@ function paintMap() {
     const el = document.getElementById('plaza-map');
     if (!el || !run) return;
     const m = mapOf(), r = roomOf();
-    el.querySelector('.mp-n').innerText = r.n + (run.inst ? ' · ' + run.inst + '번 방' : '');
+    el.querySelector('.mp-n').innerText = r.n + (HS() ? ' · 🫣 숨바꼭질' : (run.inst ? ' · ' + run.inst + '번 방' : ''));
     const g = el.querySelector('.mp-g');
     g.style.display = r.photo ? 'none' : '';
     g.style.gridTemplateColumns = 'repeat(' + m.w + ',1fr)';
@@ -4767,7 +4806,7 @@ function say(text) {
     const d = db_();
     if (d) {
         try {
-            d.ref(chPath()).push({ n: nameOf(u), c: u.code, t: t, at: svAt() });
+            d.ref(chPath()).push({ n: (HS() && chatCh !== 'all') ? '🫣' : nameOf(u), c: u.code, t: t, at: svAt() });   // 🫣 놀이 방 말은 이름 없이
             if (chatCh === 'all') trimAll();
         } catch (e) { }
     }
@@ -4790,7 +4829,7 @@ function sayEmo(id) {
     if (d) {
         try {
             d.ref(chPath()).push({
-                n: nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: svAt() });
+                n: (HS() && chatCh !== 'all') ? '🫣' : nameOf(u), c: u.code, t: '[이모티콘] ' + e.n, at: svAt() });
             if (chatCh === 'all') trimAll();
         } catch (x) { }
     }
@@ -5135,6 +5174,11 @@ function eyeQuar() {
 }
 function pickMenu(m) {
     if (m && m.sheet === 'tags') { tagsSet(!tagsOff()); menuSheet(); return; }
+    // 🫣 숨바꼭질 — 목록으로 옮겨 다니지 못한다 (걸어서만) · 누가 어디 있는지(동료 목록)도 안 본다
+    if (HS() && m && (m.sheet === 'mates' || m.sheet === 'photo' || placeOf(m))) {
+        const hb = hsCall('block', 'menu', m) || '🫣 숨바꼭질 중에는 목록으로 옮겨 다닐 수 없습니다.';
+        closeSheet(); sysLine(hb); return;
+    }
     if (m && m.sheet === 'mates') { matesSheet(); return; }
     if (m && m.sheet === 'photo') { photoSheet(); return; }
     if (skipTake) {
@@ -5869,6 +5913,19 @@ window.plazaLines = function (n) {
     const feed = document.getElementById('plaza-feed');
     console.log('  아래 칸:', feed ? feed.innerText.replace(/\n/g, ' | ') : '없음');
 };
+
+// 🫣 숨바꼭질 (hideseek.js) — 나 · 같은 방 사람이 **이 화면에 그려진** 자리 · 보는 쪽 (방 그림 좌표)
+window.plazaPosOf = function (code) {
+    if (!run || !code) return null;
+    const me = u_();
+    if (me && code === me.code) return { x: run.x, y: run.y, lv: run.lv || 0, face: (run.me && run.me.actor.facing && run.me.actor.facing()) || 1, room: run.room, me: true };
+    const q = run.peers[code];
+    if (!q) return null;
+    return { x: q.x, y: q.y, face: q.face || 1, room: run.room };
+};
+window.plazaPeerCodes = function () { return run ? Object.keys(run.peers || {}) : []; };
+window.plazaReseat = function () { if (!run || !run.room) return false; const k = R[run.room].photo ? P.START : run.room; goRoom(k, null, run.lv || 0); return true; };
+window.plazaHsRefresh = function () { try { refreshTags(); showWho(); paintMap(); } catch (e) { } };
 
 // 지금 선 자리 — 시험과 콘솔에서 들여다본다
 window.plazaWhere = function () {
