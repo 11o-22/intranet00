@@ -13185,9 +13185,19 @@ let tet = null;
 let tetBag = [];
 // ★ 지운 줄이 늘수록 빨라진다 (2026-11-01 사용자) — 10줄마다 한 단계 · 한 단계에 12% 씩 · 가장 빨라도 90ms
 //   (✗ 전에는 지운 줄이 딱 10의 배수일 때만 60ms 씩 줄었다 — 두 줄 이상을 한꺼번에 지워 10의 배수를 건너뛰면 그대로였다)
+// ★ 200줄을 넘기면 더 빨라진다 (2026-11-02 사용자) — 90ms 에 머물던 것을 200줄에서 60ms 로 끌어내리고,
+//   그 뒤로도 10줄마다 12% 씩 · 가장 빨라도 20ms (바닥에 닿은 뒤 잠기기까지 450ms 는 그대로라 옆으로 밀 틈은 남는다)
 const TET_LV_LINES = 10, TET_SPEED0 = 700, TET_SPEED_RATE = 0.88, TET_SPEED_MIN = 90;
+const TET_FAST_LINES = 200, TET_FAST0 = 60, TET_FAST_MIN = 20;
 function tetLevelOf(lines) { return Math.floor((lines || 0) / TET_LV_LINES); }
-function tetSpeedOf(lines) { return Math.max(TET_SPEED_MIN, Math.round(TET_SPEED0 * Math.pow(TET_SPEED_RATE, tetLevelOf(lines)))); }
+function tetSpeedOf(lines) {
+    lines = lines || 0;
+    if (lines >= TET_FAST_LINES) {
+        const k = Math.floor((lines - TET_FAST_LINES) / TET_LV_LINES);
+        return Math.max(TET_FAST_MIN, Math.round(TET_FAST0 * Math.pow(TET_SPEED_RATE, k)));
+    }
+    return Math.max(TET_SPEED_MIN, Math.round(TET_SPEED0 * Math.pow(TET_SPEED_RATE, tetLevelOf(lines))));
+}
 // ★ 바닥에 닿은 뒤 잠기기까지 (빨라져도 옆으로 밀 틈이 있게) — 닿은 채 옮기거나 돌리면 다시 센다 (블록 하나에 15번까지)
 const TET_LOCK_MS = 450, TET_LOCK_RESETS = 15;
 
