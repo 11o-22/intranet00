@@ -168,7 +168,8 @@ const DOT = {
     // ★ 토끼(bare)에게도 얹는 장 — 잎 우산은 내리는 비와 우산만 (발밑 웅덩이는 뺀다 · 2026-10-25)
     //   자리는 사람 것 그대로다 — 토끼 머리 위로 잎이 조금 높이 뜨고 줄기가 손 옆에서 땅까지 닿아,
     //   큰 잎을 받쳐 든 모양이 된다 (16도트 내려 보았더니 줄기 끝이 발밑으로 빠져 그대로 두었다).
-    RAB_OK: ['leaf-stem', 'leaf-umb', 'leaf-rain'],
+    //   ★ 회냥 · 삼냥 · 흰냥 (2026-11-02 사용자) — 발밑 땅에 그려져 있어 토끼(발 자리가 사람과 같다)에게도 그대로 맞는다.
+    RAB_OK: ['leaf-stem', 'leaf-umb', 'leaf-rain', 'nyang-gray', 'nyang-calico', 'nyang-white'],
     // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
     NO_TAG: ['leaf-rain', 'leaf-puddle', 'cat-halo-halo'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
