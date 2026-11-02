@@ -25,6 +25,8 @@ from PIL import Image
 
 SRC, OUT = 'dot', 'dot2'
 SIZE = (2112, 768)
+# ★ 큰 칸 장 (2026-11-03 · Null Owner — 칸 480x576 · 6줄) 도 절반으로 (closet.js D.BIG)
+SIZES = [SIZE, (2880, 3456)]
 
 
 def main():
@@ -38,7 +40,7 @@ def main():
         p = os.path.join(SRC, f)
         raw = open(p, 'rb').read()
         im = Image.open(p)
-        if im.size != SIZE:
+        if im.size not in SIZES:
             continue
         a = np.array(im.convert('RGBA'))
         s = a[0::2, 0::2]

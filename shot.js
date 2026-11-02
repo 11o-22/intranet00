@@ -124,7 +124,7 @@ async function draw(zoom) {
             const L = f.layers[j];
             let sheet;
             try { sheet = await load(L.src); } catch (e) { continue; }
-            const cw = sheet.naturalWidth / 6, ch = sheet.naturalHeight / 2;
+            const cw = sheet.naturalWidth / (L.cols || 6), ch = sheet.naturalHeight / (L.rows || 2);
             g.save();
             if (f.flip) {                            // 오른쪽을 볼 때는 뒤집어 그린다
                 g.translate(f.x + f.w, f.y);
@@ -132,7 +132,8 @@ async function draw(zoom) {
             } else {
                 g.translate(f.x, f.y);
             }
-            g.drawImage(sheet, L.col * cw, L.row * ch, cw, ch, 0, 0, f.w, f.h);
+            // 층의 자리 · 크기 — 큰 칸 장은 사람 칸 밖으로 넘친다 (plaza.js plazaShotData · 2026-11-03)
+            g.drawImage(sheet, L.col * cw, L.row * ch, cw, ch, L.x || 0, L.y || 0, L.w || f.w, L.h || f.h);
             g.restore();
         }
         g.imageSmoothingEnabled = true;

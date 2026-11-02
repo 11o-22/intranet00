@@ -3109,12 +3109,19 @@ window.plazaShotData = function () {
             if (e.style.display === 'none') return;          // 가만히 서 있는 동작이 갈아 끼운 층은 빼고
             const u = /url\(["']?(.*?)["']?\)/.exec(e.style.backgroundImage || '');
             const src = u ? u[1] : ('dot/' + (e.dataset.sheet || '') + '.png');
-            // 칸 크기 = 사람 칸 크기와 같다 (옷 장 한 칸이 곧 사람 한 칸)
+            // 칸 크기 = 그 층의 크기 (보통은 사람 칸과 같고, 큰 칸 장은 더 크다 · closet.js D.BIG)
+            // ★ 2026-11-03 — 층 크기 · 자리 · 장의 줄 수까지 넘긴다 (스물네 · 서른여섯 칸짜리 장, 큰 칸 장도 보이는 그대로 찍히게)
             const p = (e.style.backgroundPosition || '').match(/-?[\d.]+/g) || [];
+            const bs = (e.style.backgroundSize || '').match(/[\d.]+/g) || [];
+            const ow = e.offsetWidth || 1, oh = e.offsetHeight || 1;
+            const bw = box ? (box.offsetWidth || 1) : 1, sc = b.width / bw;
             layers.push({
                 src: src,
-                col: b.width ? Math.round(Math.abs(parseFloat(p[0]) || 0) / b.width) : 0,
-                row: b.height ? Math.round(Math.abs(parseFloat(p[1]) || 0) / b.height) : 0
+                col: Math.round(Math.abs(parseFloat(p[0]) || 0) / ow),
+                row: Math.round(Math.abs(parseFloat(p[1]) || 0) / oh),
+                cols: bs[0] ? Math.max(1, Math.round(parseFloat(bs[0]) / ow)) : 6,
+                rows: bs[1] ? Math.max(1, Math.round(parseFloat(bs[1]) / oh)) : 2,
+                x: e.offsetLeft * sc, y: e.offsetTop * sc, w: ow * sc, h: oh * sc
             });
         });
         // 이름표가 붙은 높이 — 글자 밑선까지

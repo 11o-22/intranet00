@@ -161,30 +161,39 @@ const DOT = {
     //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다) — RAB_OK 에 적힌 것만 깐다.
     //   ✗ 처음엔 잎을 뒤 · 줄기를 앞에 두었다 — 정반대였다 (같은 날 바로잡음).
     //   ★ 검은 고양이 헤일로의 헤일로(cat-halo-halo · 2026-10-31)는 **맨 아래** — 몸 · 옷 · 웅덩이보다도 뒤.
-    BACK_Z: ['cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
+    //   ★ Null Owner 의 틈(nuow-rift · 2026-11-03)도 맨 아래 — 등 뒤에서 열리는 틈과 손.
+    BACK_Z: ['nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
-    FRONT: ['leaf-umb', 'leaf-rain', 'cat-halo-cat'],
+    //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
+    FRONT: ['leaf-umb', 'leaf-rain', 'cat-halo-cat', 'nuow-friend'],
     // ★ 토끼(bare)에게도 얹는 장 — 잎 우산은 내리는 비와 우산만 (발밑 웅덩이는 뺀다 · 2026-10-25)
     //   자리는 사람 것 그대로다 — 토끼 머리 위로 잎이 조금 높이 뜨고 줄기가 손 옆에서 땅까지 닿아,
     //   큰 잎을 받쳐 든 모양이 된다 (16도트 내려 보았더니 줄기 끝이 발밑으로 빠져 그대로 두었다).
     //   ★ 회냥 · 삼냥 · 흰냥 (2026-11-02 사용자) — 발밑 땅에 그려져 있어 토끼(발 자리가 사람과 같다)에게도 그대로 맞는다.
     RAB_OK: ['leaf-stem', 'leaf-umb', 'leaf-rain', 'nyang-gray', 'nyang-calico', 'nyang-white'],
     // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
-    NO_TAG: ['leaf-rain', 'leaf-puddle', 'cat-halo-halo'],
+    NO_TAG: ['leaf-rain', 'leaf-puddle', 'cat-halo-halo', 'nuow-rift', 'nuow-friend'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
     //   rab-friend ↔ rab-friend-r   친구 리본 — 서 있을 때 뜨는 글씨가 반대쪽
     //     (걷는 줄은 글씨가 없어 두 장이 똑같다 — 서 있는 줄만 다르다)
     //   cat-halo-cat ↔ cat-halo-cat-r   검은 고양이 헤일로 — 걷기 시작할 때 뜨는 「이쯕」 글씨가 반대쪽 (2026-10-31)
-    FACE_PAIR: { h05: 'h09', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r' },
+    //   nuow-friend ↔ nuow-friend-r   Null Owner — 서 있을 때 토끼가 적는 말풍선 글씨가 반대쪽 (2026-11-03 · 글씨만 미리 뒤집은 짝을 만들어 두었다)
+    FACE_PAIR: { h05: 'h09', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r', 'nuow-friend': 'nuow-friend-r' },
     // ★ 스물네 칸짜리 장 (2026-10-31 · 검은 고양이 헤일로) — 네 줄 (윗 두 줄 걷기 1~12 · 아랫 두 줄 정지 13~24) · 제 시계로 돈다.
     //   걷기  1~12 를 한 번 → 7~12 를 되풀이. n 번째 칸은 몸의 걷기 (n-1)%6 칸과 같은 자리라 몸의 걸음 칸과 함께 넘긴다.
     //   정지  **멈춘 그 순간부터** 13~24 를 한 번 → 19~24 를 되풀이 (대기 동작처럼 기다리지 않는다) · 몸의 서기 칸과 같은 자리.
     //   SEQ_STOP — 정지 13~24 한 칸 · SEQ_LOOP — 19~24 되풀이 한 칸에 머무는 시간
-    SEQ: { 'cat-halo-cat': 1, 'cat-halo-cat-r': 1, 'cat-halo-halo': 1 },
+    //   ★ 서른여섯 칸짜리 장 (2026-11-03 · Null Owner) — 여섯 줄 (윗 세 줄 걷기 1~18 · 아랫 세 줄 정지 19~36).
+    //     값이 「한쪽 줄 수」다 (1 은 예전 그대로 두 줄). 걷기 1~18 을 한 번 → 13~18 되풀이 · 정지 19~36 을 한 번 → 31~36 되풀이.
+    SEQ: { 'cat-halo-cat': 1, 'cat-halo-cat-r': 1, 'cat-halo-halo': 1, 'nuow-rift': 3, 'nuow-friend': 3, 'nuow-friend-r': 3 },
     SEQ_STOP: 120, SEQ_LOOP: 160,
+    // ★ 큰 칸 장 (2026-11-03 · Null Owner) — 칸이 352x384 보다 크다. W x H 칸 · 몸은 칸 안 (X, Y) 에서 시작한다
+    //   (보통 칸의 (0,0) 이 이 칸의 (X, Y)). 층을 그만큼 왼쪽 · 위로 내밀어 크게 깐다 — 사람 칸 밖으로 삐져나와 그려진다.
+    //   주신 그림은 2880x3456 (칸 480x576 · 6x6) — 몸과 한 점도 안 틀리게 맞는 자리가 (162, 192) 였다.
+    BIG: { 'nuow-rift': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend-r': { W: 480, H: 576, X: 162, Y: 192 } },
     // 서 있을 때 나부끼는 장 — 서 있기 줄의 0·2·4 칸을 돌아가며 쓴다
     FLAPS: ['suit', 'cape'],
     // ★ 칸 수가 다른 장은 여기에 **쓸 칸을 적어** 둔다.
@@ -544,7 +553,14 @@ const DOT_SLOTS = [
             //   주신 그림은 1728x1536 (칸 288 · 4줄 24칸) 세 장 — 고양이 · 몸(필요하면) · 헤일로. 칸마다 +30 으로 352 칸에 옮겼다.
             //   몸은 기본 몸과 한 점도 안 틀려서(+30 자리에서 걷기 · 서기 모두 100% 겹침) 안 쓴다 — 입은 사람의 몸 · 옷이 그대로 그 자리다.
             //   층 — 고양이(맨 앞 · FRONT) > 옷 > 몸 > 헤일로(맨 아래 · BACK_Z). 움직임은 위 SEQ 참고.
-            { i: 'cat-halo', n: '검은 고양이 헤일로', back: ['cat-halo-halo'], top: ['cat-halo-cat'], own: 'cat-halo', noTrade: true, cat: '등' }
+            { i: 'cat-halo', n: '검은 고양이 헤일로', back: ['cat-halo-halo'], top: ['cat-halo-cat'], own: 'cat-halo', noTrade: true, cat: '등' },
+            // ★ Null Owner (2026-11-03) — 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다 (wear-gift.js). 악세 칸 「그 밖」 줄.
+            //   주신 그림은 2880x3456 (칸 480x576 · 6줄 36칸) 세 장 — 배경 브라운(틈과 흰 장갑 손) · 악세 착한 친구(토끼 인형) · 몸(필요하면).
+            //   몸은 기본 몸과 (162, 192) 자리에서 한 점도 안 틀려 안 쓴다. 칸이 커서 큰 칸 장(D.BIG)으로 깐다 — 틈이 머리 위 · 등 뒤로 넘친다.
+            //   층 — 착한 친구(맨 앞 · FRONT) > 옷 > 몸 > 틈(맨 아래 · BACK_Z). 움직임은 위 SEQ(3) — 걸으면 틈이 열려 손이 나왔다 닫히고
+            //   토끼는 종이를 날리며 따라오고, 멈추면 틈 속에서 눈이 엿보다 닫히고 토끼는 말풍선에 글을 적는다.
+            //   말풍선 글씨는 오른쪽을 볼 때 짝(nuow-friend-r · 글씨만 미리 뒤집음)으로 바꿔 단다 (FACE_PAIR).
+            { i: 'nuow', n: 'Null Owner', back: ['nuow-rift'], top: ['nuow-friend'], own: 'nuow', noTrade: true, cat: '그 밖' }
         ]
     }
 ];
@@ -876,25 +892,46 @@ function layer(sheet, k, hue) {
         if (t) src = t;
     }
     el.style.backgroundImage = 'url("' + src + '")';
-    el.style.backgroundSize = (D.SHEET_W * k) + 'px ' + (D.SHEET_H * k * (isSeq(sheet) ? 2 : 1)) + 'px';
-    if (isSeq(sheet)) el._seq = 1;
+    const R = seqR(sheet);
+    const big = D.BIG && D.BIG[sheet];
+    if (big) {
+        // ★ 큰 칸 장 — 사람 칸보다 크게, 몸 자리(X, Y)만큼 왼쪽 · 위로 내밀어 깐다
+        el.style.inset = 'auto';
+        el.style.left = (-big.X * k) + 'px';
+        el.style.top = (-big.Y * k) + 'px';
+        el.style.width = (big.W * k) + 'px';
+        el.style.height = (big.H * k) + 'px';
+        el.style.backgroundSize = (big.W * 6 * k) + 'px ' + (big.H * 2 * (R || 1) * k) + 'px';
+        el._cw = big.W; el._ch = big.H;
+    } else {
+        el.style.backgroundSize = (D.SHEET_W * k) + 'px ' + (D.SHEET_H * k * (R || 1)) + 'px';
+    }
+    if (R) el._seq = R;
     return el;
 }
 // ==========================================
 // 스물네 칸짜리 장 (D.SEQ · 검은 고양이 헤일로) — 걷기 · 정지 칸 고르기
 // ==========================================
 function isSeq(sheet) { return !!(D.SEQ && D.SEQ[sheet]); }
-// 걷기 — 몸의 걸음을 n 번 넘겼을 때의 칸 (0 부터 · 0~11 한 번 → 6~11 되풀이)
-function seqWalk(n) { n = Math.max(0, n | 0); return n < 12 ? n : 6 + ((n - 6) % 6); }
-// 정지 — 멈춘 뒤 ms 가 지났을 때의 칸 (12~23 한 번 → 18~23 되풀이)
-function seqStop(ms) {
-    const a = D.SEQ_STOP * 12;
-    if (ms < a) return 12 + Math.floor(Math.max(0, ms) / D.SEQ_STOP);
-    return 18 + (Math.floor((ms - a) / D.SEQ_LOOP) % 6);
+// 한쪽(걷기 · 정지) 줄 수 — 예전 장(값 1)은 두 줄 · 서른여섯 칸짜리(값 3)는 세 줄 (2026-11-03)
+function seqR(sheet) { const v = D.SEQ && D.SEQ[sheet]; return v ? Math.max(2, v | 0) : 0; }
+// 걷기 — 몸의 걸음을 n 번 넘겼을 때의 칸 (0 부터 · 0~6R-1 한 번 → 마지막 여섯 칸 되풀이)
+function seqWalk(n, R) { R = R || 2; const N = 6 * R, L = N - 6; n = Math.max(0, n | 0); return n < N ? n : L + ((n - L) % 6); }
+// 정지 — 멈춘 뒤 ms 가 지났을 때의 칸 (6R ~ 12R-1 한 번 → 마지막 여섯 칸 되풀이)
+function seqStop(ms, R) {
+    R = R || 2;
+    const N = 6 * R, a = D.SEQ_STOP * N;
+    if (ms < a) return N + Math.floor(Math.max(0, ms) / D.SEQ_STOP);
+    return N + N - 6 + (Math.floor((ms - a) / D.SEQ_LOOP) % 6);
 }
+// 되풀이 칸의 첫 자리 — 걷기 · 정지
+function seqLoopW(R) { return 6 * ((R || 2) - 1); }
+function seqLoopS(R) { R = R || 2; return 6 * R + 6 * (R - 1); }
 function seqPut(el, idx, k) {
     const col = idx % 6, row = Math.floor(idx / 6);
-    el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
+    if (el._si === idx && el._sk === k) return;
+    el._si = idx; el._sk = k;
+    el.style.backgroundPosition = '-' + (col * (el._cw || D.W) * k) + 'px -' + (row * (el._ch || D.H) * k) + 'px';
 }
 // 색을 다 칠하면 지금 떠 있는 칸들을 갈아 끼운다
 if (typeof window.dotTintOn === 'function') {
@@ -931,7 +968,7 @@ function sprite(user, opt) {
     };
     els.forEach(function (e) { put(e, 0); });
     const seqEls = els.filter(function (e) { return e._seq; });
-    seqEls.forEach(function (e) { seqPut(e, pose === 'walk' ? (o.live === false ? 6 : 0) : (o.live === false ? 18 : 12), k); });
+    seqEls.forEach(function (e) { seqPut(e, pose === 'walk' ? (o.live === false ? seqLoopW(e._seq) : 0) : (o.live === false ? seqLoopS(e._seq) : 6 * e._seq), k); });
 
     box._dot = { els: els, sheets: sheets, timers: [] };
     if (o.live === false) return box;
@@ -943,18 +980,15 @@ function sprite(user, opt) {
             f = (f + 1) % 6;
             els.forEach(function (e) { put(e, f); });
             n++;
-            seqEls.forEach(function (e) { seqPut(e, seqWalk(n), k); });
+            seqEls.forEach(function (e) { seqPut(e, seqWalk(n, e._seq), k); });
         }, D.WALK));
     } else {
         // 스물네 칸짜리 장 — 서자마자 정지 동작
         if (seqEls.length) {
             const t0 = Date.now();
-            let last = 12;
             box._dot.timers.push(setInterval(function () {
-                const i = seqStop(Date.now() - t0);
-                if (i === last) return;
-                last = i;
-                seqEls.forEach(function (e) { seqPut(e, i, k); });
+                const ms = Date.now() - t0;
+                seqEls.forEach(function (e) { seqPut(e, seqStop(ms, e._seq), k); });     // 바뀐 칸만 칠한다 (seqPut)
             }, 40));
         }
         // 서기 — 몸·신발은 세워 두고, 옷자락은 제 칸을 돌고, 머리는 깜빡인다
@@ -1117,10 +1151,13 @@ function actor(user, opt) {
     //   정지 — 멈춘 그 순간(seqT0)부터 시간으로. 처음 그려질 때 · 화면 밖에서 돌아올 때는 멈춘 것이 아니라 되풀이 칸에서
     const seqEls = els.filter(function (e) { return e._seq; });
     let seqN = -1, seqF = 0, seqT0 = 0, seqI = -1, seqStopNow = false;
-    const seqPaint = function (i) {
-        if (!seqEls.length || i === seqI) return;
-        seqI = i;
-        seqEls.forEach(function (e) { seqPut(e, i, k); });
+    // ★ 장마다 줄 수(R)가 다를 수 있다 (2026-11-03) — 칸 번호는 장마다 fn(R) 로 정하고, 바뀐 칸만 칠한다 (seqPut)
+    const seqMaxR = seqEls.reduce(function (m, e) { return Math.max(m, e._seq || 2); }, 2);
+    const seqPaint = function (fn) {
+        if (!seqEls.length) return;
+        if (seqI === -1) seqEls.forEach(function (e) { e._si = -1; });
+        seqI = 0;
+        seqEls.forEach(function (e) { seqPut(e, fn(e._seq || 2), k); });
     };
     // 시계 하나에 묶인 몫 — 지금 몇 번째 칸인지 보고, 바뀌었을 때만 칠한다
     const ph = Math.floor(Math.random() * BLINK_SUM);           // 깜빡이는 때를 사람마다 흩는다
@@ -1134,7 +1171,7 @@ function actor(user, opt) {
             if (f === walkF) return;
             walkF = f;
             els.forEach(function (e) { put(e, f, 0); });
-            if (seqEls.length) { seqN = (seqN < 0) ? f : seqN + ((f - seqF + 6) % 6); seqF = f; seqPaint(seqWalk(seqN)); }
+            if (seqEls.length) { seqN = (seqN < 0) ? f : seqN + ((f - seqF + 6) % 6); seqF = f; seqPaint(function (R) { return seqWalk(seqN, R); }); }
         },
         paint: function (t) {
             if (box.isConnected) seen = true;
@@ -1142,7 +1179,7 @@ function actor(user, opt) {
             let m = (t + ph) % BLINK_SUM, f = 0;
             while (f < D.BLINK.length - 1 && m >= D.BLINK[f]) { m -= D.BLINK[f]; f++; }
             if (f !== headF) { headF = f; put(head, f, 1); }
-            if (seqEls.length) seqPaint(seqStop(t - seqT0));
+            if (seqEls.length) seqPaint(function (R) { return seqStop(t - seqT0, R); });
             flaps.forEach(function (fl) {
                 const g = Math.floor((t + ph) / D.FLAP) % fl.cols.length;
                 if (g !== fl.g) { fl.g = g; put(fl.el, fl.cols[g], 1); }
@@ -1160,26 +1197,26 @@ function actor(user, opt) {
     let posed = null;
     const start = function () {
         clear();
-        if (posed != null) { els.forEach(function (e) { put(e, posed, 0); }); seqPaint(6 + (posed % 6)); return; }   // 멈춰 세운 동안은 걷기 · 서기 시계를 안 돌린다
+        if (posed != null) { els.forEach(function (e) { put(e, posed, 0); }); seqPaint(function (R) { return seqLoopW(R) + (posed % 6); }); return; }   // 멈춰 세운 동안은 걷기 · 서기 시계를 안 돌린다
         if (held) return;                                   // 안 보이는 동안은 그대로 둔다
         if (idleEl && !walking) idleWait = setTimeout(idleGo, IM.after);
         if (walking) {
             let f = 0;
             els.forEach(function (e) { put(e, 0, 0); });
-            seqN = calm ? -1 : 0; seqF = 0; seqI = -1; seqPaint(0);
+            seqN = calm ? -1 : 0; seqF = 0; seqI = -1; seqPaint(function () { return 0; });
             if (calm) { walkF = 0; walkIn(member); return; }     // 걷는 남은 시계 하나에 묶는다
             timers.push(setInterval(function () {
                 f = (f + 1) % 6;
                 els.forEach(function (e) { put(e, f, 0); });
-                if (seqEls.length) { seqN++; seqPaint(seqWalk(seqN)); }
+                if (seqEls.length) { seqN++; seqPaint(function (R) { return seqWalk(seqN, R); }); }
             }, D.WALK));
         } else {
             els.forEach(function (e) { put(e, 0, 1); });
             // 스물네 칸짜리 장 — 막 멈췄으면 정지 동작을 처음부터, 아니면(처음 그려짐 · 화면 밖에서 돌아옴) 되풀이 칸부터
-            seqT0 = seqStopNow ? Date.now() : Date.now() - D.SEQ_STOP * 12;
+            seqT0 = seqStopNow ? Date.now() : Date.now() - D.SEQ_STOP * 6 * seqMaxR;
             seqStopNow = false;
-            seqI = -1; seqPaint(seqStop(Date.now() - seqT0));
-            if (seqEls.length && !calm) timers.push(setInterval(function () { seqPaint(seqStop(Date.now() - seqT0)); }, 40));
+            seqI = -1; seqPaint(function (R) { return seqStop(Date.now() - seqT0, R); });
+            if (seqEls.length && !calm) timers.push(setInterval(function () { seqPaint(function (R) { return seqStop(Date.now() - seqT0, R); }); }, 40));
             if (calm) {                                     // 서 있는 남은 시계 하나에 묶는다
                 headF = 0; flaps.forEach(function (fl) { fl.g = 0; });
                 crowdIn(member);
@@ -1237,7 +1274,7 @@ function actor(user, opt) {
                 const pair = D.FACE_PAIR[nm];
                 if (!pair || !els[i]) return;
                 const use = (d < 0) ? pair : nm;
-                let src = D.DIR + use + '.png';
+                let src = ((window.DOT2 && window.DOT2[use]) ? 'dot2/' : D.DIR) + use + '.png';   // 절반 크기가 있으면 그것 (2026-11-03)
                 // 물들인 층이면 짝도 같은 빛깔로 물들여 쓴다
                 const hue = els[i].dataset.hue;
                 if (hue != null && hue !== '' && typeof window.dotTint === 'function') {
