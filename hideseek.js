@@ -113,6 +113,7 @@ function phase() {
     return 'over';
 }
 function amSeeker() { return !!(game && game.seeker === myCode()); }
+const SEEK_SPEED = 2;            // 술래 걷는 빠르기 배수 (2026-11-03 사용자)
 
 // ==========================================
 // plaza.js 가 묻는 것
@@ -121,6 +122,9 @@ window.PLAZA_HS = {
     on: function () { return hsOn; },
     inst: function () { return (game && game.inst) || 0; },
     tiny: function () { return !amSeeker(); },
+    // 걷는 빠르기 배수 — 술래는 두 배 (2026-11-03 사용자 「파인애플을 찾는 사람은 이속 두 배」)
+    speed: function () { return amSeeker() ? SEEK_SPEED : 1; },
+    speedOf: function (code) { return (game && code && game.seeker === code) ? SEEK_SPEED : 1; },
     block: function (kind, to) {
         const R = rooms();
         if (to && R[to] && R[to].photo) return '🫣 숨바꼭질 중에는 포토존에 갈 수 없습니다.';

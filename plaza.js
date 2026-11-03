@@ -3361,6 +3361,8 @@ function tick(ts) {
     if (!iy && Math.abs(run.vy) < 0.012) run.vy = 0;
 
     let dx = run.vx, dy = run.vy;
+    // 🫣 숨바꼭질 — 술래는 두 배 빠르게 (2026-11-03 사용자 · hideseek.js PLAZA_HS.speed)
+    const SPD = P.SPEED * (Number(hsCall('speed')) || 1);
 
     if (ix || iy) { run.tx = null; run.ty = null; run.tseg = null; }
     else if (run.tx != null) {
@@ -3375,7 +3377,7 @@ function tick(ts) {
         // ★ 한 칸에 갈 만큼 가까우면 **그 자리에 붙인다.**
         //   전에는 3픽셀 안에 들 때까지 걸었는데, 한 칸에 3.5픽셀씩 가므로
         //   목표를 넘었다 돌아왔다 하며 떨었다 (느린 기계일수록 심했다).
-        const near = Math.max(P.TAP_STOP, P.SPEED * dt);
+        const near = Math.max(P.TAP_STOP, SPD * dt);
         let atX = false, atY = false;
         if (Math.abs(ax) <= near) { run.x += ax; dx = 0; atX = true; }
         else dx = ax / Math.abs(ax);
@@ -3398,10 +3400,10 @@ function tick(ts) {
     const wantSeg = (run.tx != null && run.tseg != null && run.tseg !== run.seg);
     const moving = mag > 0.001;
     if (moving || wantSeg) {
-        run.x += dx * P.SPEED * dt;
+        run.x += dx * SPD * dt;
         // ★ 바닥 띠 위에서는 **세로로도 걷는다** (돌바닥을 앞뒤로 밟는다).
         //   계단은 선이라 세로로 안 민다 — 세로 입력은 갈아타는 데에만 쓴다.
-        if (segBand(r, run.seg)) run.y += dy * P.SPEED * dt;
+        if (segBand(r, run.seg)) run.y += dy * SPD * dt;
 
         // ─ 넘어간 직후에는 쉬어 간다 (두 방을 끝없이 오가지 않게)
         if (!cageMine() && now() - (run.warp || 0) > P.WARP_MS) {
@@ -3460,7 +3462,7 @@ function tick(ts) {
         const d = Math.hypot(ax, ay);
         if (d > 1) {
             busy = true;
-            const step = Math.min(d, P.SPEED * P.CATCH * dt);
+            const step = Math.min(d, P.SPEED * (Number(hsCall('speedOf', code)) || 1) * P.CATCH * dt);   // 🫣 술래는 남의 화면에서도 두 배로 따라붙는다
             q.x += (ax / d) * step;
             q.y += (ay / d) * step;
             q.one.actor.moving(true);
