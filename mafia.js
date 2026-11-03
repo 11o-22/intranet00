@@ -122,13 +122,11 @@ function stage() { try { return (typeof window.plazaStage === 'function') ? wind
 function posOf(code) { try { return (typeof window.plazaPosOf === 'function') ? window.plazaPosOf(code) : null; } catch (e) { return null; } }
 function closeOv(id) { const e = document.getElementById(id); if (e) e.remove(); }
 
-// ⏰ 쉬는 시간 — 2026-11-03 오후 7시 ~ 9시 (한국 시각) 동안은 행맨에 들어오지 못한다 (사용자 · 오늘만 잠시)
-//   부르기 · 초대 수락 · 시작을 막고, 하고 있던 사람도 쫓아낸다 (사용자 — 「하고 있는 사람들도 다 쫓겨나게」). 서버 시각으로 잰다.
-const REST_FROM = Date.UTC(2026, 10, 3, 10, 0, 0), REST_TO = Date.UTC(2026, 10, 3, 12, 0, 0);
+// ⏰ 쉬는 시간 (rest-time.js — 2026-11-03 오후 7시 ~ 9시 · 인트라넷 전체를 덮고 로그아웃시킨다)
+//   그 사이 하던 행맨 판은 취소(why:'rest')로 적고 걷는다 — 9시 뒤 다시 들어왔을 때 두 시간 묵은 판이 이어지지 않게. 상품은 없다.
+//   알림은 rest-time.js 의 덮개가 띄우므로 여기서는 조용히.
 const REST_MSG = '휴식을 취하실 시간입니다.';
-function restNow() { const t = srv(); return t >= REST_FROM && t < REST_TO; }
-// 하고 있던 사람도 쫓아낸다 — 판을 취소(why:'rest')로 적고 내 화면에서 걷는다. 상품은 없다.
-//   먼저 본 사람이 적고, 나머지는 판이 취소된 것을 보거나 제 시계로 알아서 나온다.
+function restNow() { try { return typeof window.restTimeOn === 'function' && !!window.restTimeOn(myCode()); } catch (e) { return false; } }
 let restKicked = '';
 function kickRest() {
     if (!game) return;
@@ -149,7 +147,6 @@ function kickRest() {
     if (mfOn) restLeaveLocal();
     hideLobby();
     unwatchGame();
-    alert_(REST_MSG);
 }
 function restLeaveLocal() {
     closeAll();
@@ -289,7 +286,7 @@ function onGame() {
         if (mfOn) restLeaveLocal();
         hideLobby();
         unwatchGame();
-        if (rest) { if (restKicked !== id) { restKicked = id; alert_(REST_MSG); } }
+        if (rest) restKicked = id;
         else if (!host) toast('🕵️ 행맨이 취소되었습니다.');
         return;
     }

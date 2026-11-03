@@ -3944,9 +3944,11 @@ function watchRoom() {
     if (!d || !u) return;
     offRoom();
     run.ref = d.ref(P.PATH + '/' + seatKey(run.room, run.inst));
-    run.onAdd = function (s) { onSeat(s.key, s.val(), true); };
-    run.onChg = function (s) { onSeat(s.key, s.val(), false); };
+    // ★ 로그아웃하며 광장을 닫은 뒤(run = null)에도 마지막 소식이 올 수 있다 — 그때는 안 본다
+    run.onAdd = function (s) { if (!run) return; onSeat(s.key, s.val(), true); };
+    run.onChg = function (s) { if (!run) return; onSeat(s.key, s.val(), false); };
     run.onDel = function (s) {
+        if (!run) return;
         if (run.hidden) delete run.hidden[s.key];
         if (run.peers[s.key]) { dropPeer(s.key); showWho(); }
     };

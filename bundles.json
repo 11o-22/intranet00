@@ -2,6 +2,7 @@
   "out": "b",
   "groups": [
     [
+      "rest-time.js",
       "dark.js"
     ],
     [
