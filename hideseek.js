@@ -21,6 +21,7 @@
 //     오브젝트 뒤에 숨어 안 보여도 그 둘레를 뒤지면 잡힌다 (덤불을 헤쳐 보는 셈).
 //   · 놀이 방의 맵 채팅은 이름 대신 🫣 로 적힌다 · 사람을 톡 쳐도 아무것도 안 뜬다.
 //   · 끝 — 5분이 지나거나 모두 잡히면. 결과(술래 · 잡힌 사람 · 끝까지 숨은 사람)를 띄우고 모두 원래 방으로.
+//   · 상품 (2026-11-03) — 🎁 랜덤박스 · 술래는 잡은 파인애플 수만큼 · 끝까지 숨은 파인애플은 1개 (hsGame/<판>/paid 로 한 번만)
 //
 // ■ 서버 자리
 //   hsGame/<판> = { id, host, hostName, at, st:'LOBBY'|'PLAY'|'END'|'CANCEL', inst,
@@ -216,8 +217,35 @@ function finishMine() {
     loopOff();
     paintClear();
     try { if (typeof window.plazaReseat === 'function') window.plazaReseat(); } catch (e) { }
-    showResult(g);
+    const n = prizeOf(g, myCode());
+    showResult(g, n);
+    payPrize(g, n);
     unwatchGame();
+}
+
+// ── 이긴 몫 — 🎁 랜덤박스 (2026-11-03 사용자)
+//   술래 — 잡은 파인애플 수만큼 · 파인애플 — 끝까지 안 잡혔으면 1개 · 잡힌 파인애플은 없음
+//   한 판에 한 사람 한 번 — hsGame/<판>/paid/<사번> 를 트랜잭션으로 찍은 사람만 받는다 (두 기기 · 새로고침에도 두 번 안 받게)
+const PRIZE = '랜덤박스';
+function prizeOf(g, c) {
+    if (!g || !c || !g.mem || !g.mem[c]) return 0;
+    const cg = g.caught || {};
+    if (c === g.seeker) return Object.keys(g.mem).filter(function (h) { return h !== g.seeker && cg[h]; }).length;
+    return cg[c] ? 0 : 1;
+}
+function payPrize(g, n) {
+    const d = db_(), u = me();
+    if (!d || !u || !g || !(n > 0)) return;
+    d.ref(G + '/' + g.id + '/paid/' + u.code).transaction(function (cur) { return cur ? undefined : srv(); }).then(function (res) {
+        if (!res || !res.committed) return;                                  // 이미 받았다
+        const cu = me();
+        if (!cu || cu.code !== u.code) return;
+        if (!Array.isArray(cu.inventory)) cu.inventory = [];
+        for (let i = 0; i < n; i++) cu.inventory.push(PRIZE);
+        try { if (typeof addHistoryLog === 'function') addHistoryLog(cu, '[숨바꼭질] ' + (cu.code === g.seeker ? '술래 — 파인애플 ' + n + '명을 찾았습니다' : '끝까지 숨었습니다') + ' · ' + PRIZE + ' ' + n + '개'); } catch (e) { }
+        try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); else if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+        try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    }).catch(function (e) { console.warn('[숨바꼭질] 상품', e); });
 }
 
 // ==========================================
@@ -496,7 +524,7 @@ function loopOff() {
 // ==========================================
 // 결과
 // ==========================================
-function showResult(g) {
+function showResult(g, prize) {
     if (!g) return;
     const mem = g.mem || {};
     const hs = Object.keys(mem).filter(function (c) { return c !== g.seeker; });
@@ -513,6 +541,7 @@ function showResult(g) {
         + '<div>👀 술래 — <b>' + nm(g.seeker) + '</b></div>'
         + '<div>🔒 잡힌 파인애플 (' + got.length + ') — ' + (got.length ? got.map(nm).join(' · ') : '없음') + '</div>'
         + '<div>🍍 끝까지 숨은 파인애플 (' + safe.length + ') — ' + (safe.length ? safe.map(nm).join(' · ') : '없음') + '</div>'
+        + (prize > 0 ? '<div style="color:#ffd479;">🎁 ' + PRIZE + ' ' + prize + '개를 받았습니다.</div>' : '')
         + '<div class="hs-btns"><button class="go" id="hs-res-x">확인</button></div></div>';
     document.body.appendChild(ov);
     ov.querySelector('#hs-res-x').onclick = function () { closeOv('hs-res-ov'); };
