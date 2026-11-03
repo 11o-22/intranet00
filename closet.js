@@ -162,18 +162,20 @@ const DOT = {
     //   ✗ 처음엔 잎을 뒤 · 줄기를 앞에 두었다 — 정반대였다 (같은 날 바로잡음).
     //   ★ 검은 고양이 헤일로의 헤일로(cat-halo-halo · 2026-10-31)는 **맨 아래** — 몸 · 옷 · 웅덩이보다도 뒤.
     //   ★ Null Owner 의 틈(nuow-rift · 2026-11-03)도 맨 아래 — 등 뒤에서 열리는 틈과 손.
-    BACK_Z: ['nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
+    //   ★ Null Owner 2 의 여우불(nuow2-fox · 2026-11-03)도 맨 아래 — 등 뒤에서 푸른 불이 일고 여우가 뛴다.
+    BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
     //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
-    FRONT: ['leaf-umb', 'leaf-rain', 'cat-halo-cat', 'nuow-friend'],
+    //   ★ Null Owner 2 의 호유원 인형(nuow2-doll · 2026-11-03)도 맨 앞 — 발치에서 말풍선에 글을 적는 인형.
+    FRONT: ['leaf-umb', 'leaf-rain', 'cat-halo-cat', 'nuow-friend', 'nuow2-doll'],
     // ★ 토끼(bare)에게도 얹는 장 — 잎 우산은 내리는 비와 우산만 (발밑 웅덩이는 뺀다 · 2026-10-25)
     //   자리는 사람 것 그대로다 — 토끼 머리 위로 잎이 조금 높이 뜨고 줄기가 손 옆에서 땅까지 닿아,
     //   큰 잎을 받쳐 든 모양이 된다 (16도트 내려 보았더니 줄기 끝이 발밑으로 빠져 그대로 두었다).
     //   ★ 회냥 · 삼냥 · 흰냥 (2026-11-02 사용자) — 발밑 땅에 그려져 있어 토끼(발 자리가 사람과 같다)에게도 그대로 맞는다.
     RAB_OK: ['leaf-stem', 'leaf-umb', 'leaf-rain', 'nyang-gray', 'nyang-calico', 'nyang-white'],
     // 이름표 높이를 잴 때 빼는 장 — 칸 맨 위까지 떨어지는 빗물 · 발밑 웅덩이 (plaza.js tagPlace)
-    NO_TAG: ['leaf-rain', 'leaf-puddle', 'cat-halo-halo', 'nuow-rift', 'nuow-friend'],
+    NO_TAG: ['leaf-rain', 'leaf-puddle', 'cat-halo-halo', 'nuow-rift', 'nuow-friend', 'nuow2-fox', 'nuow2-doll'],
     // ★ 좌우로 따로 그린 머리 — 오른쪽을 볼 때는 짝 쪽 그림을 쓴다.
     //   그냥 뒤집으면 안대가 반대 눈으로 가 버리기 때문이다.
     //   h05 ↔ h09   백사헌 — 안대가 반대쪽
@@ -181,19 +183,22 @@ const DOT = {
     //     (걷는 줄은 글씨가 없어 두 장이 똑같다 — 서 있는 줄만 다르다)
     //   cat-halo-cat ↔ cat-halo-cat-r   검은 고양이 헤일로 — 걷기 시작할 때 뜨는 「이쯕」 글씨가 반대쪽 (2026-10-31)
     //   nuow-friend ↔ nuow-friend-r   Null Owner — 서 있을 때 토끼가 적는 말풍선 글씨가 반대쪽 (2026-11-03 · 글씨만 미리 뒤집은 짝을 만들어 두었다)
-    FACE_PAIR: { h05: 'h09', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r', 'nuow-friend': 'nuow-friend-r' },
+    //   nuow2-doll ↔ nuow2-doll-r   Null Owner 2 — 인형이 적는 말풍선 글씨가 반대쪽 (2026-11-03 · 글씨만 뒤집은 짝을 만들어 두었다)
+    FACE_PAIR: { h05: 'h09', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r', 'nuow-friend': 'nuow-friend-r', 'nuow2-doll': 'nuow2-doll-r' },
     // ★ 스물네 칸짜리 장 (2026-10-31 · 검은 고양이 헤일로) — 네 줄 (윗 두 줄 걷기 1~12 · 아랫 두 줄 정지 13~24) · 제 시계로 돈다.
     //   걷기  1~12 를 한 번 → 7~12 를 되풀이. n 번째 칸은 몸의 걷기 (n-1)%6 칸과 같은 자리라 몸의 걸음 칸과 함께 넘긴다.
     //   정지  **멈춘 그 순간부터** 13~24 를 한 번 → 19~24 를 되풀이 (대기 동작처럼 기다리지 않는다) · 몸의 서기 칸과 같은 자리.
     //   SEQ_STOP — 정지 13~24 한 칸 · SEQ_LOOP — 19~24 되풀이 한 칸에 머무는 시간
     //   ★ 서른여섯 칸짜리 장 (2026-11-03 · Null Owner) — 여섯 줄 (윗 세 줄 걷기 1~18 · 아랫 세 줄 정지 19~36).
     //     값이 「한쪽 줄 수」다 (1 은 예전 그대로 두 줄). 걷기 1~18 을 한 번 → 13~18 되풀이 · 정지 19~36 을 한 번 → 31~36 되풀이.
-    SEQ: { 'cat-halo-cat': 1, 'cat-halo-cat-r': 1, 'cat-halo-halo': 1, 'nuow-rift': 3, 'nuow-friend': 3, 'nuow-friend-r': 3 },
+    SEQ: { 'cat-halo-cat': 1, 'cat-halo-cat-r': 1, 'cat-halo-halo': 1, 'nuow-rift': 3, 'nuow-friend': 3, 'nuow-friend-r': 3, 'nuow2-fox': 3, 'nuow2-doll': 3, 'nuow2-doll-r': 3 },
     SEQ_STOP: 120, SEQ_LOOP: 160,
     // ★ 큰 칸 장 (2026-11-03 · Null Owner) — 칸이 352x384 보다 크다. W x H 칸 · 몸은 칸 안 (X, Y) 에서 시작한다
     //   (보통 칸의 (0,0) 이 이 칸의 (X, Y)). 층을 그만큼 왼쪽 · 위로 내밀어 크게 깐다 — 사람 칸 밖으로 삐져나와 그려진다.
     //   주신 그림은 2880x3456 (칸 480x576 · 6x6) — 몸과 한 점도 안 틀리게 맞는 자리가 (162, 192) 였다.
-    BIG: { 'nuow-rift': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend-r': { W: 480, H: 576, X: 162, Y: 192 } },
+    //   ★ Null Owner 2 (2026-11-03) — 4032x3456 (칸 672x576 · 6x6) · 몸과 한 점도 안 틀리게 맞는 자리가 (258, 192).
+    BIG: { 'nuow-rift': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend': { W: 480, H: 576, X: 162, Y: 192 }, 'nuow-friend-r': { W: 480, H: 576, X: 162, Y: 192 },
+           'nuow2-fox': { W: 672, H: 576, X: 258, Y: 192 }, 'nuow2-doll': { W: 672, H: 576, X: 258, Y: 192 }, 'nuow2-doll-r': { W: 672, H: 576, X: 258, Y: 192 } },
     // 서 있을 때 나부끼는 장 — 서 있기 줄의 0·2·4 칸을 돌아가며 쓴다
     FLAPS: ['suit', 'cape'],
     // ★ 칸 수가 다른 장은 여기에 **쓸 칸을 적어** 둔다.
@@ -560,7 +565,15 @@ const DOT_SLOTS = [
             //   층 — 착한 친구(맨 앞 · FRONT) > 옷 > 몸 > 틈(맨 아래 · BACK_Z). 움직임은 위 SEQ(3) — 걸으면 틈이 열려 손이 나왔다 닫히고
             //   토끼는 종이를 날리며 따라오고, 멈추면 틈 속에서 눈이 엿보다 닫히고 토끼는 말풍선에 글을 적는다.
             //   말풍선 글씨는 오른쪽을 볼 때 짝(nuow-friend-r · 글씨만 미리 뒤집음)으로 바꿔 단다 (FACE_PAIR).
-            { i: 'nuow', n: 'Null Owner', back: ['nuow-rift'], top: ['nuow-friend'], own: 'nuow', noTrade: true, cat: '그 밖' }
+            { i: 'nuow', n: 'Null Owner', back: ['nuow-rift'], top: ['nuow-friend'], own: 'nuow', noTrade: true, cat: '그 밖' },
+            // ★ Null Owner 2 (2026-11-03) — 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다 (wear-gift.js). 악세 칸 「그 밖」 줄.
+            //   주신 그림은 4032x3456 (칸 672x576 · 6줄 36칸) 세 장 — 배경 호유원(푸른 여우불과 여우) · 호유원 인형 · 브라운 몸(필요하면).
+            //   몸은 기본 몸과 (258, 192) 자리에서 한 점도 안 틀려 안 쓴다. 큰 칸 장(D.BIG)으로 깐다.
+            //   층 — 인형(맨 앞 · FRONT) > 옷 > 몸 > 여우불(맨 아래 · BACK_Z). 움직임은 SEQ(3) — 걸으면 여우불 속에서 여우가 뛰어나와
+            //   달리고 인형은 종이를 날리며 따라오고, 멈추면 여우불이 타올랐다 사그라지고 인형은 말풍선에 글을 적는다.
+            //   말풍선 글씨는 오른쪽을 볼 때 짝(nuow2-doll-r · 글씨만 미리 뒤집음)으로 바꿔 단다 (FACE_PAIR).
+            //   인형을 누르면 글씨 세 글자 · 글자마다 색을 고른다 (nuow-text.js).
+            { i: 'nuow2', n: 'Null Owner 2', back: ['nuow2-fox'], top: ['nuow2-doll'], own: 'nuow2', noTrade: true, cat: '그 밖' }
         ]
     }
 ];
@@ -785,9 +798,13 @@ function look(user, override, all) {
     // ★ 장마다 물들인 색 — { 장이름: 0~359 }. 광장이 dot 을 통째로 주고받으므로
     //   남의 화면에서도 같은 색으로 보인다 (따로 보낼 것이 없다).
     const col = (d.col && typeof d.col === 'object') ? d.col : {};
-    // ★ Null Owner 착한 친구 말풍선 글씨 (nuow-text.js · 2026-11-03) — { t: 두 글자, c: '#rrggbb' } · 없으면 그려 둔 그대로
-    const nw = (d.nw && typeof d.nw === 'object' && d.nw.t) ? { t: String(d.nw.t), c: String(d.nw.c || '') } : null;
-    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col, nw: nw };
+    // ★ 말풍선 글씨 (nuow-text.js · 2026-11-03) — 장 이름 → 고른 글씨. 없으면 그려 둔 그대로
+    //   nw  Null Owner 착한 친구   { t: 두 글자, c: '#rrggbb' }
+    //   nw2 Null Owner 2 호유원 인형 { t: 세 글자, c: ['#rrggbb', …] 글자마다 }
+    const nw = {};
+    if (d.nw && typeof d.nw === 'object' && d.nw.t) nw['nuow-friend'] = d.nw;
+    if (d.nw2 && typeof d.nw2 === 'object' && d.nw2.t) nw['nuow2-doll'] = d.nw2;
+    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col, nw: Object.keys(nw).length ? nw : null };
 }
 window.dotLook = look;
 window.dotNoTag = {}; (DOT.NO_TAG || []).forEach(function (n) { window.dotNoTag[n] = 1; });
@@ -914,12 +931,14 @@ function layer(sheet, k, hue) {
 // ==========================================
 // 스물네 칸짜리 장 (D.SEQ · 검은 고양이 헤일로) — 걷기 · 정지 칸 고르기
 // ==========================================
-// 🐰 Null Owner 착한 친구 — 고른 글씨가 있으면 그 글씨를 써 넣은 장으로 갈아 낀다 (nuow-text.js)
+// 🐰 말풍선 글씨 — 고른 글씨가 있으면 그 글씨를 써 넣은 장으로 갈아 낀다 (nuow-text.js · 착한 친구 · 호유원 인형)
+//   nw — look() 의 { 장 이름: 고른 글씨 }. 짝(-r)이어도 같은 글씨를 쓴다.
 function nwPut(el, sheet, nw) {
     if (!nw || !el || typeof window.nuowTextPut !== 'function') return;
-    if (sheet !== 'nuow-friend' && sheet !== 'nuow-friend-r') return;
+    const spec = nw[String(sheet).replace(/-r$/, '')];
+    if (!spec) return;
     el._nw = nw;
-    try { window.nuowTextPut(el, sheet, nw); } catch (e) { }
+    try { window.nuowTextPut(el, sheet, spec); } catch (e) { }
 }
 function isSeq(sheet) { return !!(D.SEQ && D.SEQ[sheet]); }
 // 한쪽(걷기 · 정지) 줄 수 — 예전 장(값 1)은 두 줄 · 서른여섯 칸짜리(값 3)는 세 줄 (2026-11-03)
@@ -1561,6 +1580,7 @@ function commit() {
     // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
     out.col = Object.assign({}, p.col || {});
     if (me.dot && me.dot.nw) out.nw = me.dot.nw;        // 🐰 말풍선 글씨는 옷장이 안 다루므로 그대로 둔다
+    if (me.dot && me.dot.nw2) out.nw2 = me.dot.nw2;
     me.dot = out;
     save({ dot: 1 });
     // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
