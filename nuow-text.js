@@ -36,21 +36,26 @@ const STEP = [0.12, 0.3, 0.5, 0.68, 0.86, 1];  // 여섯 칸 — 전체 획 가�
 const COLORS = ['#ff95f3', '#e7b775', '#ff4d6d', '#ff9f1c', '#ffd60a', '#52b788', '#4cc9f0', '#4361ee', '#9d4edd', '#8d6e63', '#ffffff', '#111111'];
 
 // 말풍선 하나마다 — 칸 크기 · 글씨 자리(원본 좌표) · 짝을 뒤집는 축 · 글자 칸 · 기울기 · 누르는 자리
-//   CX, CY — 글씨 가운데. 판 왼쪽 위(CX-192, CY-144)가 그려 둔 글씨의 점 줄(4로 나눈 나머지)에 맞게 골랐다.
-//   AXIS — 짝(-r)은 x → AXIS - x (원본에서 재었다 · 착한 친구 278 · 호유원 인형 410)
+//   CX, CY — 글씨 가운데 = 말풍선 몸통 가운데 (꼬리 뺀 말풍선에서 재었다). 판 왼쪽 위(CX-192, CY-144)가
+//            그려 둔 글씨의 점 줄(4로 나눈 나머지)에 맞게 골랐다.
+//   AXIS   — 짝(-r)에 뒤집어 그릴 축 = 2 × CX (글씨가 제자리에서 뒤집힌다)
+//   rot    — 글씨 기울기 = **말풍선 기울기** (2026-11-03 사용자 「글씨가 말풍선 기울기대로」).
+//            꼬리를 뺀 말풍선 테두리에 타원을 맞춰 긴 축의 기울기를 재었다 — 착한 친구 -14° · 호유원 인형 -43°(-42 로).
+//            (그려 둔 글씨는 -9° · -22° 였다)
+//            ★ 오른쪽을 볼 때는 몸과 함께 말풍선도 뒤집혀 반대로 기운다 — 짝(-r)에는 반대 기울기로 써서 뒤집어 넣는다.
 const CFG = {
     'nuow-friend': {
         key: 'nw', base: 'nuow-friend-nt', SW: 2880, CW: 480, CH: 576, ROW: 5,
-        CX: 146, CY: 354, AXIS: 278, max: 2, per: false, defC: '#ff95f3',
-        bw: 15, bh: 20, gap: 3, rot: -4, jit: 0.5,
+        CX: 142, CY: 358, AXIS: 284, max: 2, per: false, defC: '#ff95f3',
+        bw: 15, bh: 20, gap: 3, rot: -14, jit: 0.5,
         hit: { x0: 196, x1: 314, y0: 430, y1: 576 },                 // 토끼
         pv: { x: 20, y: 216, w: 420, h: 360 },
         title: '🐰 착한 친구 말풍선', item: 'Null Owner'
     },
     'nuow2-doll': {
         key: 'nw2', base: 'nuow2-doll-nt', SW: 4032, CW: 672, CH: 576, ROW: 5,
-        CX: 204, CY: 388, AXIS: 410, max: 3, per: true, defC: '#e7b775',
-        bw: 13, bh: 15, gap: 1, rot: -18, jit: 0,
+        CX: 208, CY: 396, AXIS: 416, max: 3, per: true, defC: '#e7b775',
+        bw: 13, bh: 15, gap: 1, rot: -42, jit: 0,
         hit: { x0: 288, x1: 392, y0: 440, y1: 576 },                 // 인형
         pv: { x: 60, y: 240, w: 420, h: 336 },
         title: '🧸 호유원 인형 말풍선', item: 'Null Owner 2'
@@ -199,11 +204,12 @@ function syllable(ch) {
 // ==========================================
 function jit(seed) { const x = Math.sin(seed * 12.9898) * 43758.5453; return (x - Math.floor(x)) - 0.5; }
 // 글씨 → 획 목록 [{ px: [[x, y], …] (그림 점), ci: 몇째 글자 }] (쓰는 차례)
-function strokesOf(cf, t) {
+function strokesOf(cf, t, rotDeg) {
     const cs = chars(t), n = cs.length;
     const tw = n * cf.bw + (n - 1) * cf.gap;
     const ox0 = AW / 2 - tw / 2, oy = AH / 2 - cf.bh / 2;
-    const th = cf.rot * Math.PI / 180, co = Math.cos(th), si = Math.sin(th);
+    const rd = (rotDeg == null) ? cf.rot : rotDeg;
+    const th = rd * Math.PI / 180, co = Math.cos(th), si = Math.sin(th);
     const rot = function (x, y) { const dx = x - AW / 2, dy = y - AH / 2; return [AW / 2 + dx * co - dy * si, AH / 2 + dx * si + dy * co]; };
     const out = [];
     cs.forEach(function (ch, ci) {
@@ -222,7 +228,7 @@ function strokesOf(cf, t) {
                 out.push({ px: Object.keys(px).map(function (k) { const a = k.split(','); return [+a[0], +a[1]]; }), ci: ci });
             });
         } else {
-            out.push({ px: glyphPx(ch, ox, oy, cf, rot), ci: ci });       // 한글이 아닌 글자 — 한 획으로
+            out.push({ px: glyphPx(ch, ox, oy, cf, rot, rd), ci: ci });       // 한글이 아닌 글자 — 한 획으로
         }
     });
     return out;
@@ -242,13 +248,13 @@ function line(px, a, b) {
     }
 }
 // 한글이 아닌 글자 — 글꼴로 찍고 같은 굵기(2점)로 다듬는다
-function glyphPx(ch, ox, oy, cf, rot) {
+function glyphPx(ch, ox, oy, cf, rot, rd) {
     const c = document.createElement('canvas');
     c.width = AW; c.height = AH;
     const g = c.getContext('2d');
     const ctr = rot(ox + cf.bw / 2, oy + cf.bh / 2);
     g.translate(ctr[0], ctr[1]);
-    g.rotate(cf.rot * Math.PI / 180);
+    g.rotate(rd * Math.PI / 180);
     g.font = '500 ' + Math.round(cf.bh * 0.95) + 'px sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#000';
@@ -331,7 +337,7 @@ function make(sheet, sp, hue) {
         cv.width = im.naturalWidth; cv.height = im.naturalHeight;
         const g = cv.getContext('2d');
         g.drawImage(im, 0, 0);
-        const st = strokesOf(cf, sp.t);
+        const st = strokesOf(cf, sp.t, flip ? -cf.rot : cf.rot);      // 짝은 반대로 기울여 쓴 뒤 뒤집는다
         STEP.forEach(function (fr, f) { drawCell(g, cf, s, f, boardOf(st, sp.cs, Math.max(1, Math.round(st.length * fr))), flip); });
         return new Promise(function (res) {
             const done = function (url) { cache[k] = url; made++; res(url); };
@@ -554,11 +560,28 @@ function save(nw) {
     try { if (typeof showCustomAlert === 'function') showCustomAlert(nw ? ic + ' 말풍선 글씨를 「' + nw.t + '」(으)로 바꿨습니다.' : ic + ' 말풍선 글씨를 원래대로 돌렸습니다.'); } catch (e) { }
 }
 
+// 시험 · 콘솔 — 다 써진 칸(여섯째) 하나를 그려 data 주소로 (바탕 그림 위에)
+window.nuowTextCell = function (fam, t, cs, flip) {
+    const cf = CFG[fam];
+    return loadImg(baseUrl(cf)).then(function (im) {
+        const s = im.naturalWidth / cf.SW;
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(cf.CW * s); cv.height = Math.round(cf.CH * s);
+        const g = cv.getContext('2d');
+        g.imageSmoothingEnabled = false;
+        g.drawImage(im, 5 * cf.CW * s, cf.ROW * cf.CH * s, cf.CW * s, cf.CH * s, 0, 0, cf.CW * s, cf.CH * s);
+        g.translate(-5 * cf.CW * s, -cf.ROW * cf.CH * s);
+        const st = strokesOf(cf, t, flip ? -cf.rot : cf.rot);
+        drawCell(g, cf, s, 5, boardOf(st, cs || [cf.defC, cf.defC, cf.defC], st.length), !!flip);
+        return cv.toDataURL();
+    });
+};
 window.nuowTextState = function () {
     const u = u_(), d = (u && u.dot) || {};
     FAMS.forEach(function (f) { console.log('[말풍선 글씨]', f, '· 하고 있음', wearing(f), '· 고른 것', JSON.stringify(d[CFG[f].key] || null)); });
     console.log('  만든 장', made, '· 쟁여 둔 것', Object.keys(cache));
 };
 // 시험 · 콘솔 — 글씨를 판(그림 점)으로만 그려 본다
+window.nuowTextCfg = CFG;          // 시험 · 콘솔 — 자리 · 기울기를 들여다본다
 window.nuowTextBoard = function (fam, t, cs) { const cf = CFG[fam]; const st = strokesOf(cf, t); return boardOf(st, cs || [cf.defC, cf.defC, cf.defC], st.length); };
 })();
