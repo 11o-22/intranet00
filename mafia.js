@@ -5,7 +5,7 @@
 //
 // ■ 사용자가 정한 것
 //
-//   · 3 ~ 7명. 대기실은 광장 — 목록 「생활」 🕵️ 행맨 로 접속한 사람을 불러 모은다.
+//   · 5 ~ 9명 (2026-11-03 사용자 · 처음엔 3 ~ 7). 대기실은 광장 — 목록 「생활」 🕵️ 행맨 로 접속한 사람을 불러 모은다.
 //   · 맵은 포토존 일곱 곳을 이어 붙인 것 (사용자가 그린 지도 그대로)
 //
 //         [헝그리 행맨] ─ [여우 상담실]
@@ -16,7 +16,7 @@
 //
 //     좌우는 방 끝으로 걸어 넘어가고, 위아래는 방 안의 문(⬆ · ⬇)으로 넘어간다.
 //     놀이 동안 「기본」 포토존의 이름은 「중앙」 — 긴급 회의 단추가 거기 있다.
-//   · 범인 — 3~5명이면 1명 · 6~7명이면 2명. 범인끼리는 서로 안다.
+//   · 범인 — 5~6명이면 1명 · 7~9명이면 2명. 범인끼리는 서로 안다.
 //   · 미션 — 맵마다 3개 (모두 21). 시민이 살아서 끝낸 것만 센다 (유령 · 범인도 할 수는 있지만 안 센다).
 //     숫자 순서대로 누르기 · 카드 정렬 · 박스 크기대로 놓기 · 같은 색 선 잇기 · 내려오는 사과 3번 받기
 //     · 불빛 순서 기억 · 레버 꾹 누르기 · 같은 그림 짝 · 다이얼 맞추기 · 쓰레기 줍기 · 스위치 켜기 · 스캔
@@ -52,7 +52,8 @@
 'use strict';
 
 const G = 'mfGame', INV = 'mfInv';
-const MIN_P = 3, MAX_P = 7;
+const MIN_P = 5, MAX_P = 9;
+const TWO_AT = 7;                        // 이 인원부터 범인 둘
 const LOBBY_TTL = 15 * 60000, INV_TTL = 3 * 60000;
 const REVEAL_MS = 4000;                  // 처음 — 역할을 보여 주는 동안 (못 움직인다)
 const KILL_COOL = 500;                   // 처치 대기 0.5초 (사용자)
@@ -1380,7 +1381,7 @@ function paintPick() {
     ov.className = 'mf-ov'; ov.id = 'mf-pick';
     const n = Object.keys(pickSel).length;
     ov.innerHTML = '<div class="mf-card"><h3>🕵️ 행맨 — 부를 사람<button id="mf-pick-x">✕</button></h3>'
-        + '<div class="mf-sub">접속한 사원을 골라 부릅니다 (나까지 ' + MIN_P + ' ~ ' + MAX_P + '명). 범인은 ' + MIN_P + '~5명이면 1명, 6~7명이면 2명.<br>'
+        + '<div class="mf-sub">접속한 사원을 골라 부릅니다 (나까지 ' + MIN_P + ' ~ ' + MAX_P + '명). 범인은 ' + MIN_P + '~' + (TWO_AT - 1) + '명이면 1명, ' + TWO_AT + '~' + MAX_P + '명이면 2명.<br>'
         + '포토존 일곱 곳을 이어 붙인 맵에서 미션을 하고, 시체를 보면 회의를 열어 범인을 찾습니다.</div>'
         + '<div class="mf-list">' + (list.length ? list.map(function (k) {
             return '<div class="mf-prow' + (pickSel[k] ? ' on' : '') + '" data-c="' + esc(k) + '"><span class="ck">' + (pickSel[k] ? '✓' : '') + '</span>' + esc(nameOf(k)) + '</div>';
@@ -1464,7 +1465,7 @@ function startGame() {
         Object.keys(cur.inv || {}).forEach(function (c) { if (cur.inv[c].st === 'ok') m[c] = { n: cur.inv[c].n || c }; });
         const codes = Object.keys(m);
         if (codes.length < MIN_P || codes.length > MAX_P) return;
-        const nm = codes.length >= 6 ? 2 : 1;
+        const nm = codes.length >= TWO_AT ? 2 : 1;
         const mf = {};
         shuffle(codes).slice(0, nm).forEach(function (c) { mf[c] = 1; });
         cur.mem = m;

@@ -385,7 +385,7 @@ const PLAZA = {
         { g: 'life',  n: '마작',       i: '🀄',                fn: 'mjOpen' },
         // 🫣 숨바꼭질 — 둘 이상 · 접속한 사람을 불러 (hideseek.js · 2026-11-02 사용자)
         { g: 'life',  n: '숨바꼭질',   i: '🫣',                fn: 'hsOpen' },
-        // 🕵️ 행맨 — 3~7명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
+        // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
         { g: 'life',  n: '행맨',       i: '🕵️',                fn: 'mfOpen' },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
