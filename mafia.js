@@ -20,7 +20,7 @@
 //   · 미션 — 맵마다 3개 (모두 21). 시민이 살아서 끝낸 것만 센다 (유령 · 범인도 할 수는 있지만 안 센다).
 //     숫자 순서대로 누르기 · 카드 정렬 · 박스 크기대로 놓기 · 같은 색 선 잇기 · 내려오는 사과 3번 받기
 //     · 불빛 순서 기억 · 레버 꾹 누르기 · 같은 그림 짝 · 다이얼 맞추기 · 쓰레기 줍기 · 스위치 켜기 · 스캔
-//   · 처치 — 범인이 산 사람(보통 크기)에게 🪩 를 날린다. 맞으면 죽는다. 한 사람분 거리 안 · 0.5초에 한 번.
+//   · 처치 — 범인이 산 사람(보통 크기)에게 🪩 를 날린다. 맞으면 죽는다. 한 사람분 거리 안 · 시작하고 20초 뒤부터 · 한 번 처치하면 20초 쉰다.
 //     맞는 자리에 처치 자국(plaza/mf-slash.png · 사용자 그림 세 칸)이 번지고 「슉 — 팍」 소리.
 //   · 시체 — 파인애플 크기로 눕고 눈을 감는다. 산 사람이 누르면 회의가 열린다.
 //   · 유령 — 죽으면(쫓겨나도) 파인애플 크기 · 회색 · 두 배 빠르게 다닌다. 산 사람에게는 안 보인다. 유령끼리는 보인다.
@@ -56,7 +56,7 @@ const MIN_P = 5, MAX_P = 9;
 const TWO_AT = 7;                        // 이 인원부터 범인 둘
 const LOBBY_TTL = 15 * 60000, INV_TTL = 3 * 60000;
 const REVEAL_MS = 4000;                  // 처음 — 역할을 보여 주는 동안 (못 움직인다)
-const KILL_COOL = 500;                   // 처치 대기 0.5초 (사용자)
+const KILL_COOL = 20000;                 // 처치 대기 — 시작하고 20초 뒤부터 · 한 번 처치하면 20초 (2026-11-03 사용자 · 처음엔 0.5초)
 const MEET_MS = 100000;                  // 회의 — 이야기 + 투표 (모두 투표하면 바로 끝)
 const RES_MS = 4500;                     // 회의 결과를 보여 주는 동안
 const VISION = 300;                      // 산 사람의 시야 반지름 (방 그림 좌표)
@@ -377,6 +377,16 @@ function winCheck(why) {
 // 처치
 // ==========================================
 let killAt = 0;
+// 처치까지 남은 때 (ms) — 판이 시작한 때(t0)와 내가 마지막으로 처치한 때 가운데 늦은 쪽에서 20초.
+//   마지막 처치는 서버의 처치 기록(dead · by)에서 찾는다 — 새로 고침해도 그대로다.
+function killWait() {
+    if (!game) return KILL_COOL;
+    let last = Number(game.t0) || 0;
+    const dd = game.dead || {}, c = myCode();
+    Object.keys(dd).forEach(function (k) { if (dd[k] && dd[k].by === c) last = Math.max(last, Number(dd[k].at) || 0); });
+    if (killAt) last = Math.max(last, srv() - (Date.now() - killAt));     // 방금 누른 것 — 서버 기록이 오기 전에도 막는다
+    return Math.max(0, last + KILL_COOL - srv());
+}
 function personW() {
     const st = stage();
     const k = (st && st.k) || 1, z = (st && st.z) || 1;
@@ -396,7 +406,7 @@ function killTarget() {
     return best;
 }
 window.mfKill = function () {
-    if (Date.now() - killAt < KILL_COOL) return;
+    if (killWait() > 0) return;
     const t = killTarget(); if (!t) return;
     killAt = Date.now();
     const p = posOf(myCode()), q = posOf(t);
@@ -1248,9 +1258,12 @@ function paintHud() {
             kb.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); window.mfKill(); });
             document.body.appendChild(kb);
         }
-        const t = killTarget();
+        const wait = killWait();
+        const t = wait > 0 ? null : killTarget();
         kb.disabled = !t;
         kb.style.opacity = t ? '1' : '.4';
+        const lab = wait > 0 ? '🪩 ' + Math.ceil(wait / 1000) + '초' : '🪩 처치';
+        if (kb._l !== lab) { kb.textContent = lab; kb._l = lab; }
     } else if (kb) kb.remove();
     // 손 단추 — 가까운 것 (문 · 미션 · 긴급 회의 · 시체)
     let ab = document.getElementById('mf-act');
@@ -1300,7 +1313,7 @@ function showReveal() {
     ov.id = 'mf-reveal'; ov.className = 'mf-ov';
     ov.innerHTML = '<div class="mf-card" style="text-align:center;align-items:center;">'
         + (isMafia()
-            ? '<div style="font-size:46px;">🕵️</div><h3 style="color:#ff6b6b;">당신은 범인입니다</h3><div class="mf-sub">산 사람 가까이에서 🪩 를 날려 처치하세요. 들키지 않게 미션을 하는 척하세요.' + (mates.length ? '<br>동료 범인 — <b style="color:#ff9a8a;">' + mates.map(esc).join(', ') + '</b>' : '') + '</div>'
+            ? '<div style="font-size:46px;">🕵️</div><h3 style="color:#ff6b6b;">당신은 범인입니다</h3><div class="mf-sub">산 사람 가까이에서 🪩 를 날려 처치하세요 (시작 20초 뒤부터 · 처치하면 20초 쉼). 들키지 않게 미션을 하는 척하세요.' + (mates.length ? '<br>동료 범인 — <b style="color:#ff9a8a;">' + mates.map(esc).join(', ') + '</b>' : '') + '</div>'
             : '<div style="font-size:46px;">🙂</div><h3>당신은 시민입니다</h3><div class="mf-sub">맵 곳곳의 미션 ' + missions().length + '개를 모두 끝내거나, 회의에서 범인을 찾아내세요.<br>시체를 보면 눌러 회의를 여세요. 중앙의 🚨 는 긴급 회의 (한 번).</div>')
         + '<div class="mf-sub">범인 ' + Object.keys(game.mafia || {}).length + '명 · 모두 ' + mem().length + '명</div></div>';
     document.body.appendChild(ov);
