@@ -708,7 +708,7 @@ function myMult() {
         const _e = emLootMult;
         const w = function (user) {
             let m = Number(_e.apply(this, arguments)) || 1;
-            try { const me = u_(); if (me && (!user || user.code === me.code) && wears(me)) m *= C.LOOT; } catch (e) { }
+            try { const me = u_(); if (me && (!user || user.code === me.code) && wears(me)) { m *= C.LOOT; if (window.gearLootMark) window.gearLootMark('eb', C.LOOT); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js)
             return m;
         };
         Object.keys(_e).forEach(function (k) { if (k !== '_gearCap') { try { w[k] = _e[k]; } catch (e) { } } });

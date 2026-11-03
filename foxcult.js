@@ -961,7 +961,7 @@ hook('emLootMult', function (_e) {
         let m = _e.apply(this, arguments);
         try {
             const me = u_(), u = user || me;
-            if (me && u && u.code === me.code) { const p = stat(me, 'luckx'); if (p > 0) m *= (1 + p / 100); }
+            if (me && u && u.code === me.code) { const p = stat(me, 'luckx'); if (p > 0) { m *= (1 + p / 100); if (window.gearLootMark) window.gearLootMark('fox', 1 + p / 100); } }   // 겹침 규칙 밖 (gear-cap.js 가 빼고 센다)
         } catch (e) { }
         return m;
     };

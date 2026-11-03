@@ -6,7 +6,7 @@
 //   커스텀 장비(🦋 환영 나비 · 🌟 칠성군 · 🔎 눈 · 📺 토크 쇼 · 🐾 아기 여우 · 📖 지산 · 🎐 여우 신도 …)가
 //   얹는 배수와 보정에 천장을 둔다.
 //
-//     회수품 확률 배수   다 곱해도 ×2 까지        (에메랄드 하네스 같은 보통 물건의 몫은 그 밖 — 그 위에 곱한다)
+//     회수품 확률 배수   겹치지 않는다 — 가장 높은 하나만 · ×2 까지 (2026-11-03 · 전에는 다 곱해 ×2)  (에메랄드 하네스 같은 보통 물건의 몫은 그 밖)
 //     정산 포인트 배수   다 곱해도 ×3 까지        (기본 정산의 3배 — 「다음 탐사 +10,000 P」 같은 고정 몫은 세지 않는다)
 //     굴림 보정          다 더해도 +23 까지
 //
@@ -84,17 +84,32 @@ wrap('rollDarkBonus', function (_r) {
     };
 }, '_gearCap');
 
-// ── 회수품 — 커스텀 몫의 곱은 2 까지
+// ── 회수품 — 커스텀 장비 배수는 겹치지 않는다 · 가장 높은 하나만 · 그것도 ×2 까지 (2026-11-03 사용자)
+//   전에는 커스텀 몫을 다 곱한 뒤 ×2 로 잘랐다. 이제 장비마다 곱한 몫을 window.gearLootMark(id, 배수) 로 적어 두고,
+//   맨 바깥 겹(여기)이 그 곱을 걷어 낸 뒤 가장 높은 하나(×2 까지)만 다시 곱한다.
+//   🐾 아기 여우 · 🦋 환영 나비(숨결) · 🌟 칠성군(문곡 · 치성) · 🐺 정예 B조 · 🔎 감지하는 눈 · 📺 토크 쇼 — 🎐 여우 신도는 규칙 밖 (그대로 곱한다).
+//   에메랄드 · 아쿠아마린 같은 보통 물건 몫은 적지 않으니 건드리지 않는다. 겹이 여럿 감겨도 맨 바깥 겹만 센다.
+let lootMarks = null, lootDepth = 0;
+window.gearLootMark = function (id, m) {
+    if (!lootMarks) return;
+    m = Number(m) || 1;
+    if (m > 0 && m !== 1) lootMarks.push({ id: String(id), m: m });
+};
 wrap('emLootMult', function (_e) {
     return function (user) {
-        const total = Number(_e.apply(this, arguments)) || 1;
-        let base = 1;
-        try { if (baseLoot) base = Number(baseLoot.call(this, user)) || 1; } catch (e) { base = 1; }
-        const fox = foxLoot(user);
-        const custom = total / (base * fox);
-        if (custom <= CAP.LOOT) return total;
-        lastLoot = { was: custom, at: Date.now() };
-        return base * fox * CAP.LOOT;
+        if (lootDepth) return _e.apply(this, arguments);
+        lootDepth++; lootMarks = [];
+        try {
+            const total = Number(_e.apply(this, arguments)) || 1;
+            const ms = lootMarks.filter(function (x) { return x.id !== 'fox'; });
+            if (!ms.length) return total;
+            let prod = 1, top = 1, topId = '';
+            ms.forEach(function (x) { prod *= x.m; if (x.m > top) { top = x.m; topId = x.id; } });
+            const keep = Math.min(CAP.LOOT, top);
+            const out = total / prod * keep;
+            if (Math.abs(out - total) > 1e-9) lastLoot = { marks: ms.map(function (x) { return x.id + ' ×' + (Math.round(x.m * 100) / 100); }), top: topId, keep: keep, was: total, now: out, at: Date.now() };
+            return out;
+        } finally { lootDepth--; lootMarks = null; }
     };
 }, '_gearCap');
 
@@ -191,7 +206,7 @@ wrap('epicSettle', function (_s) { return function () { return settleWrap(_s, th
 
 window.gearCapState = function () {
     console.log('%c===== ⚖ 커스텀 장비 상한 =====', 'color:#d9c38a; font-size:13px');
-    console.log('  회수품 ×' + CAP.LOOT + ' · 포인트 ×' + CAP.PTS + ' (겹치면 가장 높은 하나만) · 보정 +' + CAP.BON + ' (🎐 여우 신도는 상한 밖 · 🦋 보정 몫은 상한 밖 · 포인트 1.5 · 🌟 포인트 2)');
+    console.log('  회수품 ×' + CAP.LOOT + ' · 포인트 ×' + CAP.PTS + ' (둘 다 커스텀 장비끼리 겹치면 가장 높은 하나만) · 보정 +' + CAP.BON + ' (🎐 여우 신도는 상한 밖 · 🦋 보정 몫은 상한 밖 · 포인트 1.5 · 🌟 포인트 2)');
     console.log('  연결:', ['rollDarkBonus', 'emLootMult', 'renderDarkResult', 'epicSettle'].map(function (n) { return n + ' ' + ((typeof window[n] === 'function' && window[n]._gearCap) ? 'O' : '✗'); }).join(' · '));
     console.log('  지금 회수품 배수:', (typeof window.emLootMult === 'function') ? window.emLootMult(u_()) : '-', '· 보정(sense):', (typeof window.rollDarkBonus === 'function' && run()) ? window.rollDarkBonus('sense') : '-');
     console.log('  마지막으로 깎은 것 — 회수품:', lastLoot, '· 포인트:', lastPts, '· 보정:', lastBon);

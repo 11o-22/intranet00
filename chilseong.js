@@ -1283,7 +1283,7 @@ window.chilMunGo = function () {
             let m = _e.apply(this, arguments);
             try {
                 const u = user || me();
-                if (u && wears(u) && u.chil && u.chil.day === today() && u.chil.munX) m *= Number(u.chil.munX) || 1;
+                if (u && wears(u) && u.chil && u.chil.day === today() && u.chil.munX) { const k = Number(u.chil.munX) || 1; m *= k; if (window.gearLootMark) window.gearLootMark('chil', k); }   // 겹치면 가장 높은 하나만 (gear-cap.js)
             } catch (e) { }
             return m;
         };

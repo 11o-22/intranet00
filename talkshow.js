@@ -913,7 +913,7 @@ let lootBoostWas = false;       // 알림에 적으려고 남겨 둔다
         const _e = emLootMult;
         const wrapped = function (u) {
             let v = _e.apply(this, arguments) || 1;
-            if (lootBoost) v *= 2;                  // 기능 6
+            if (lootBoost) { v *= 2; if (window.gearLootMark) window.gearLootMark('show', 2); }   // 기능 6 · 겹치면 가장 높은 하나만 (gear-cap.js)
             return v;
         };
         wrapped._show = true;

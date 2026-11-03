@@ -871,7 +871,7 @@ window.bflyRunXp = runXp;
         const _e = emLootMult;
         const w = function () {
             let m = _e.apply(this, arguments);
-            try { if (breathN(u_()) > 0) m *= C.EROS_LOOT; } catch (e) { }
+            try { if (breathN(u_()) > 0) { m *= C.EROS_LOOT; if (window.gearLootMark) window.gearLootMark('bfly', C.EROS_LOOT); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js)
             return m;
         };
         w._bfly = true;

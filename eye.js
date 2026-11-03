@@ -234,7 +234,7 @@ setInterval(function () {
         const _e = emLootMult;
         const wrapped = function (user) {
             let v = _e.apply(this, arguments) || 1;
-            try { if (wears(user || u_())) v *= EYE.LOOT; } catch (e) { }
+            try { if (wears(user || u_())) { v *= EYE.LOOT; if (window.gearLootMark) window.gearLootMark('eye', EYE.LOOT); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js)
             return v;
         };
         wrapped._eye = true;

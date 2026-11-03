@@ -1131,7 +1131,7 @@ function lootRoll() {
         const _e = emLootMult;
         const w = function (user) {
             let m = _e.apply(this, arguments);
-            try { if (usable('luck')) m *= lootRoll(); } catch (e) { }
+            try { if (usable('luck')) { const k = lootRoll(); m *= k; if (window.gearLootMark) window.gearLootMark('kit', k); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js)
             return m;
         };
         w._kit = true;
