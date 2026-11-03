@@ -458,7 +458,8 @@
       "event-bgm.js",
       "treasure.js",
       "hideseek.js",
-      "special-cure.js"
+      "special-cure.js",
+      "mafia.js"
     ]
   ]
 }
