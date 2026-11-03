@@ -63,6 +63,8 @@ function nameOf(c) { const u = (me() && me().code === c) ? me() : users()[c]; re
 function rooms() { return (typeof PLAZA !== 'undefined' && PLAZA.ROOMS) ? PLAZA.ROOMS : {}; }
 function roomNow() { try { return (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : ''; } catch (e) { return ''; } }
 function online() { try { return (typeof onlineUsersMap !== 'undefined' && onlineUsersMap) ? onlineUsersMap : {}; } catch (e) { return {}; } }
+// 하던 판 번호 — 사람마다 따로 (한 기기에서 여러 사원으로 들어와도 남의 판을 이어 보지 않게 · 2026-11-03)
+function gidKey() { return 'hsGid_' + (myCode() || ''); }
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } return null; }
 function hash(s) { let h = 2166136261; s = String(s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed) { let a = hash(seed) || 1; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -88,7 +90,7 @@ function watchGame(id) {
     unwatchGame();
     const d = db_(); if (!d || !id) return;
     gid = id;
-    ls('hsGid', id);
+    ls(gidKey(), id);
     gRef = d.ref(G + '/' + id);
     gFn = function (s) { game = s.val(); onGame(); };
     gRef.on('value', gFn);
@@ -96,7 +98,7 @@ function watchGame(id) {
 function unwatchGame() {
     if (gRef && gFn) { try { gRef.off('value', gFn); } catch (e) { } }
     gRef = null; gFn = null; gid = ''; game = null;
-    ls('hsGid', null);
+    ls(gidKey(), null);
 }
 function isMem(c) { return !!(game && game.mem && game.mem[c || myCode()]); }
 function hiders() { return game && game.mem ? Object.keys(game.mem).filter(function (c) { return c !== game.seeker; }) : []; }
@@ -222,7 +224,8 @@ function endCheck() {
     const d = db_(); if (!d) return;
     const why = allCaught() ? 'all' : 'time';
     d.ref(G + '/' + game.id).transaction(function (cur) {
-        if (!cur || cur.st !== 'PLAY') return;
+        if (cur === null) return null;                 // 서버 값으로 다시 부르게 (수락과 같은 까닭)
+        if (cur.st !== 'PLAY') return;
         cur.st = 'END';
         cur.end = { at: srv(), why: why };
         return cur;
@@ -622,7 +625,8 @@ function startGame() {
     const room = (here && R[here] && !R[here].photo) ? here : 'plaza';
     const id = game.id;
     d.ref(G + '/' + id).transaction(function (cur) {
-        if (!cur || cur.st !== 'LOBBY') return;
+        if (cur === null) return null;                 // 아직 내 화면에 없으면 서버 값으로 다시 부르게 (위 수락과 같은 까닭)
+        if (cur.st !== 'LOBBY') return;
         const mem = cur.mem || {};
         Object.keys(cur.inv || {}).forEach(function (c) { if (cur.inv[c].st === 'ok') mem[c] = { n: cur.inv[c].n || c }; });
         const codes = Object.keys(mem);
@@ -635,7 +639,7 @@ function startGame() {
         cur.caught = null; cur.sk = { r: room, lv: 0 };
         return cur;
     }).then(function (res) {
-        if (!res || !res.committed) { alert_('시작하지 못했습니다. (수락한 사람이 있어야 합니다)'); return; }
+        if (!res || !res.committed || !res.snapshot || !res.snapshot.val() || res.snapshot.val().st !== 'PLAY') { alert_('시작하지 못했습니다. (수락한 사람이 있어야 합니다)'); return; }
         const inv = (res.snapshot.val() || {}).inv || {};
         const up = {};
         Object.keys(inv).forEach(function (c) { up[INV + '/' + c + '/' + id] = null; });
@@ -679,14 +683,21 @@ function onInvite(id, v) {
         if (why) { alert_('🫣 숨바꼭질\n\n' + why); return; }
         if (hsOn) { alert_('🫣 이미 다른 숨바꼭질 중입니다.'); return; }
         const c = myCode();
+        // ★ 2026-11-03 사용자 「숨바꼭질 하려고 하면 여전히 시작했거나 끝났다고만 뜬다」
+        //   초대받은 사람 화면은 그 판을 아직 듣고 있지 않다. 진짜 Firebase 트랜잭션은 그럴 때 **처음엔 null 로** 부르는데,
+        //   거기서 undefined 를 돌려주면 서버 값을 보지도 않고 접어 버려 늘 「이미 시작했거나 끝난」이 떴다
+        //   (시험 화면은 한 브라우저라 부른 사람의 판 번호를 같이 들고 있어 안 났다).
+        //   null 이면 null 을 돌려줘 서버 값으로 다시 부르게 하고, 다 끝난 뒤 정말 수락으로 적혔는지 본다.
         d.ref(G + '/' + id).transaction(function (cur) {
-            if (!cur || cur.st !== 'LOBBY' || !cur.inv || !cur.inv[c]) return;
+            if (cur === null) return null;
+            if (cur.st !== 'LOBBY' || !cur.inv || !cur.inv[c]) return;
             if (srv() - (Number(cur.at) || 0) > LOBBY_TTL) return;
             cur.inv[c].st = 'ok';
             return cur;
         }).then(function (res) {
             done();
-            if (!res || !res.committed) { alert_('🫣 이미 시작했거나 끝난 숨바꼭질입니다.'); return; }
+            const v = res && res.snapshot ? res.snapshot.val() : null;
+            if (!res || !res.committed || !v || !v.inv || !v.inv[c] || v.inv[c].st !== 'ok') { alert_('🫣 이미 시작했거나 끝난 숨바꼭질입니다.'); return; }
             watchGame(id);
             toast('🫣 수락했습니다. 부른 사람이 시작하기를 기다립니다.');
         }).catch(function () { done(); });
@@ -697,7 +708,7 @@ function onInvite(id, v) {
 setInterval(function () {
     try { watchInv(); } catch (e) { }
     if (!gid && myCode()) {
-        const id = ls('hsGid');
+        const id = ls(gidKey());
         if (id) watchGame(id);
     }
     // 묵은 모이는 판 — 부른 사람이 오래 손대지 않았으면 취소한다
