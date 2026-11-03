@@ -1225,7 +1225,7 @@ function setTag(one, code, name) {
     if (!one || !one.tag) return;
     one.name = name || '';
     one.code = code || '';
-    one.tag.classList.toggle('hs-hide', !!HS() && hsCall('tagHide') !== false);   // 🫣 숨바꼭질 — 이름표를 아예 안 보인다 (🕵️ 행맨는 보인다)
+    one.tag.classList.toggle('hs-hide', !!HS() && hsCall('tagHide') !== false);   // 🫣 숨바꼭질 — 이름표를 아예 안 보인다 (🕵️ 행맨은 보인다)
     const h = tagHtmlOf(one.code, one.name);
     if (one.tag._h === h) return;          // 그대로면 안 건드린다 (칸이 깜빡인다)
     one.tag.innerHTML = h;

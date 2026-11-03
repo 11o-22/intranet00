@@ -122,6 +122,43 @@ function stage() { try { return (typeof window.plazaStage === 'function') ? wind
 function posOf(code) { try { return (typeof window.plazaPosOf === 'function') ? window.plazaPosOf(code) : null; } catch (e) { return null; } }
 function closeOv(id) { const e = document.getElementById(id); if (e) e.remove(); }
 
+// ⏰ 쉬는 시간 — 2026-11-03 오후 7시 ~ 9시 (한국 시각) 동안은 행맨에 들어오지 못한다 (사용자 · 오늘만 잠시)
+//   부르기 · 초대 수락 · 시작을 막고, 하고 있던 사람도 쫓아낸다 (사용자 — 「하고 있는 사람들도 다 쫓겨나게」). 서버 시각으로 잰다.
+const REST_FROM = Date.UTC(2026, 10, 3, 10, 0, 0), REST_TO = Date.UTC(2026, 10, 3, 12, 0, 0);
+const REST_MSG = '휴식을 취하실 시간입니다.';
+function restNow() { const t = srv(); return t >= REST_FROM && t < REST_TO; }
+// 하고 있던 사람도 쫓아낸다 — 판을 취소(why:'rest')로 적고 내 화면에서 걷는다. 상품은 없다.
+//   먼저 본 사람이 적고, 나머지는 판이 취소된 것을 보거나 제 시계로 알아서 나온다.
+let restKicked = '';
+function kickRest() {
+    if (!game) return;
+    const id = game.id, st = game.st, host = game.host === myCode(), inv = game.inv || {};
+    if (restKicked === id) return;
+    restKicked = id;
+    gtx(function (cur) {
+        if (cur.st !== 'PLAY' && cur.st !== 'LOBBY') return;
+        cur.st = 'CANCEL'; cur.why = 'rest';
+        if (cur.meet) cur.meet.on = false;
+        return cur;
+    });
+    if (st === 'LOBBY' && host) {
+        const d = db_(), up = {};
+        Object.keys(inv).forEach(function (c) { up[INV + '/' + c + '/' + id] = null; });
+        if (d) d.ref('/').update(up).catch(function () { });
+    }
+    if (mfOn) restLeaveLocal();
+    hideLobby();
+    unwatchGame();
+    alert_(REST_MSG);
+}
+function restLeaveLocal() {
+    closeAll();
+    setOn(false);
+    loopOff();
+    mapOff();
+    try { if (typeof window.plazaReseat === 'function') window.plazaReseat(); } catch (e) { }
+}
+
 function busyWhy(u) {
     u = u || me();
     if (!u) return '로그인이 필요합니다.';
@@ -246,7 +283,17 @@ let joinedPlay = '', shownEnd = '', shownRes = 0, resShow = 0, seenDead = {}, gh
 function onGame() {
     const c = myCode();
     if (!game) { setOn(false); hideLobby(); return; }
-    if (game.st === 'CANCEL') { setOn(false); hideLobby(); if (game.host !== c) toast('🕵️ 행맨가 취소되었습니다.'); unwatchGame(); return; }
+    if (game.st === 'CANCEL') {
+        // 놀이 중에 취소되었다 (⏰ 쉬는 시간) — 내 화면도 판을 걷는다
+        const rest = game.why === 'rest', host = game.host === c, id = game.id;
+        if (mfOn) restLeaveLocal();
+        hideLobby();
+        unwatchGame();
+        if (rest) { if (restKicked !== id) { restKicked = id; alert_(REST_MSG); } }
+        else if (!host) toast('🕵️ 행맨이 취소되었습니다.');
+        return;
+    }
+    if ((game.st === 'PLAY' || game.st === 'LOBBY') && restNow()) { kickRest(); return; }
     if (game.st === 'LOBBY') { if (game.host === c) paintLobby(); return; }
     if (game.st === 'PLAY') {
         hideLobby();
@@ -306,6 +353,7 @@ function leaveLocal() {
 }
 function closeAll() {
     ['mf-meet', 'mf-res', 'mf-reveal', 'mf-mis', 'mf-hud', 'mf-act', 'mf-kill', 'mf-quit'].forEach(closeOv);
+    stopGame();
     misOpen = null;
     paintClear();
 }
@@ -1293,7 +1341,7 @@ function paintHud() {
     }
 }
 function quitGame() {
-    if (!window.confirm('행맨를 그만두고 나갈까요?\n(남은 사람에게는 쫓겨난 것으로 셉니다)')) return;
+    if (!window.confirm('행맨을 그만두고 나갈까요?\n(남은 사람에게는 쫓겨난 것으로 셉니다)')) return;
     const c = myCode();
     gtx(function (cur) {
         if (cur.st !== 'PLAY') return;
@@ -1340,6 +1388,7 @@ function loopOn() {
     if (!raf) raf = requestAnimationFrame(frame);
     if (!slowT) slowT = setInterval(function () {
         if (!mfOn || !game) return;
+        if (restNow()) { kickRest(); return; }
         try { paintHud(); } catch (e) { }
         onTick();
         try { meetCheck(); } catch (e) { }
@@ -1377,6 +1426,7 @@ window.mfOpen = function () {
     const u = me(); if (!u) return;
     if (mfOn) { toast('🕵️ 이미 행맨 중입니다.'); return; }
     if (game && game.st === 'LOBBY' && game.host === u.code) { paintLobby(true); return; }
+    if (restNow()) { alert_(REST_MSG); return; }
     const why = busyWhy(u);
     if (why) { alert_('🕵️ 행맨\n\n' + why); return; }
     pickSel = {};
@@ -1415,6 +1465,7 @@ function paintPick() {
 function invite(codes) {
     const u = me(), d = db_();
     if (!u || !d || codes.length < MIN_P - 1) return;
+    if (restNow()) { alert_(REST_MSG); return; }
     const why = busyWhy(u);
     if (why) { alert_('🕵️ 행맨\n\n' + why); return; }
     const id = 'mf' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1468,6 +1519,7 @@ function cancelLobby() {
 }
 function startGame() {
     const d = db_(), u = me(); if (!d || !game || !u) return;
+    if (restNow()) { alert_(REST_MSG); return; }
     const why = busyWhy(u);
     if (why) { alert_('🕵️ 행맨\n\n' + why); return; }
     const id = game.id;
@@ -1528,6 +1580,7 @@ function onInvite(id, v) {
         done();
     };
     ov.querySelector('#mf-ask-ok').onclick = function () {
+        if (restNow()) { alert_(REST_MSG); return; }
         const why = busyWhy(me());
         if (why) { alert_('🕵️ 행맨\n\n' + why); return; }
         if (mfOn) { alert_('🕵️ 이미 다른 행맨 중입니다.'); return; }
@@ -1566,6 +1619,7 @@ setInterval(function () {
         const id = ls(gidKey());
         if (id) watchGame(id);
     }
+    if (game && (game.st === 'PLAY' || game.st === 'LOBBY') && restNow()) { kickRest(); return; }
     if (game && game.st === 'LOBBY' && game.host === myCode() && srv() - (Number(game.at) || 0) > LOBBY_TTL) cancelLobby();
 }, 1500);
 
