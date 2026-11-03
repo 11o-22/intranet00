@@ -23,6 +23,7 @@
 //   상자 가까이(가로 170) 같은 층에 서 있어야 열린다. 멀리서 누르면 그쪽으로 걸어간다(누름이 광장으로 넘어간다).
 //   하루 몫 — currentUser.treasure = { day, n }   (상담사는 세지 않는다)
 //   한정품 — treasureCap/<열쇠> 에 서버 전체 개수를 센다 (다 나갔으면 보통 상품으로 다시 뽑는다)
+//   🎉 소원권을 주우면 treasureWish = { k, code, name, at } — 켜 둔 모두의 화면에 「🎉 ~ 사원이 소원권을 주웠습니다! 🎉」 팝업 (2026-11-03)
 //
 // ■ 상품 확률 (뽑기 한 번)
 //   먼저 한정품 — 소원권 0.00001% · 여우구슬 0.01% · 금고 0.02% · 사직서 · 기록 소실 티켓 · 사원명 변경권 각 0.03%
@@ -348,7 +349,49 @@ function give(p, rec) {
     const left = isAdm() ? '' : '\n\n오늘 남은 상자 ' + Math.max(0, PER_DAY - (Number(rec.n) || 0)) + ' / ' + PER_DAY;
     const desc = (p.kind === 'item' && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[p.name]) ? '\n' + ITEM_CATALOG[p.name].desc : '';
     alert_('🎁 보물 상자를 열었습니다!\n\n' + (p.special ? '✨ ' : '') + line + desc + left);
+    if (p.special === 'wish') wishShout(u);
 }
+
+// ==========================================
+// 🎉 소원권을 주우면 모두에게 팝업 (2026-11-03 사용자)
+// ==========================================
+//   「 🎉 ~ 사원이 소원권을 주웠습니다! 🎉 」 — 주운 사람이 treasureWish 에 적으면, 켜 둔 모두의 화면이 받아 띄운다.
+//   주운 본인은 상자 알림이 따로 뜨므로 빼고, 10분 넘게 지난 소식 · 이미 본 소식(이 기기에서)은 띄우지 않는다.
+const WISH = 'treasureWish';
+const WISH_FRESH = 10 * 60 * 1000;
+function wishText(name) { return '🎉 ' + (name || '누군가') + ' 사원이 소원권을 주웠습니다! 🎉'; }
+function wishShout(u) {
+    const d = db_();
+    if (!d || !u) return;
+    try { d.ref(WISH).set({ k: rid(), code: u.code, name: u.name || u.code, at: Date.now() }); } catch (e) { }
+}
+function wishSeen(k) {
+    try { const o = JSON.parse(localStorage.getItem('treasureWishSeen') || '{}'); return !!o[k]; } catch (e) { return false; }
+}
+function wishMark(k) {
+    try { const o = JSON.parse(localStorage.getItem('treasureWishSeen') || '{}'); o[k] = 1; localStorage.setItem('treasureWishSeen', JSON.stringify(o)); } catch (e) { }
+}
+(function wishListen() {
+    let on = false;
+    const shown = {};
+    const iv = setInterval(function () {
+        const d = db_(), u = u_();
+        if (on || !d || !u) return;
+        on = true;
+        clearInterval(iv);
+        d.ref(WISH).on('value', function (snap) {
+            const v = snap.val();
+            if (!v || !v.k || shown[v.k] || wishSeen(v.k)) return;
+            const me = u_();
+            if (me && v.code === me.code) { shown[v.k] = 1; wishMark(v.k); return; }      // 주운 본인
+            const at = Number(v.at) || 0;
+            if (!at || Math.abs(Date.now() - at) > WISH_FRESH) return;                      // 묵은 소식
+            shown[v.k] = 1; wishMark(v.k);
+            alert_(wishText(v.name));
+        });
+    }, 1000);
+})();
+window.treasureWishTest = function (name) { if (!isAdm()) { console.log('상담사만'); return; } alert_(wishText(name || (u_() || {}).name)); };
 
 // ==========================================
 // 💎 진주 혀 피어싱 · 📿 진주 목걸이 · 💠 아쿠아마린 귀걸이 · 👁 아쿠아마린 렌즈
