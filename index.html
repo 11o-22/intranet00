@@ -232,15 +232,16 @@
             <div id="tetris-pad">
                 <div class="tet-row tet-row1">
                     <button class="game-btn tet-btn tet-hold" ontouchstart="event.preventDefault(); tetPadDown('hold');" onmousedown="tetPadDown('hold')">홀드 <span class="tet-key">C</span></button>
-                    <button class="game-btn tet-btn tet-drop" ontouchstart="event.preventDefault(); tetPadDown('drop');" onmousedown="tetPadDown('drop')">⤓ 드롭 <span class="tet-key">Space</span></button>
                 </div>
+                <!-- ◀ ▼ ▶ ↻ 드롭 — 화살표 옆에 이 차례로 한 줄 (2026-11-03 사용자) -->
                 <div class="tet-row tet-row2">
                     <div class="tet-cluster">
                         <button class="game-btn tet-btn tet-arrow tet-l" ontouchstart="event.preventDefault(); tetPadDown('L');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('L')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">◀</button>
                         <button class="game-btn tet-btn tet-arrow tet-d" title="한 칸 내리기 (↓)" ontouchstart="event.preventDefault(); tetPadDown('down');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('down')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▼</button>
                         <button class="game-btn tet-btn tet-arrow tet-r" ontouchstart="event.preventDefault(); tetPadDown('R');" ontouchend="tetPadUp();" ontouchcancel="tetPadUp();" onmousedown="tetPadDown('R')" onmouseup="tetPadUp()" onmouseleave="tetPadUp()">▶</button>
+                        <button class="game-btn tet-btn tet-rot" title="돌리기 (↑)" ontouchstart="event.preventDefault(); tetPadDown('rot');" onmousedown="tetPadDown('rot')">↻</button>
+                        <button class="game-btn tet-btn tet-drop" ontouchstart="event.preventDefault(); tetPadDown('drop');" onmousedown="tetPadDown('drop')">⤓ 드롭 <span class="tet-key">Space</span></button>
                     </div>
-                    <button class="game-btn tet-btn tet-rot" title="돌리기 (↑)" ontouchstart="event.preventDefault(); tetPadDown('rot');" onmousedown="tetPadDown('rot')">↻</button>
                 </div>
             </div>
         </div>

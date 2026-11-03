@@ -72,32 +72,35 @@ function say(html) {
         // 단추 — 세로 꼴
         '#tetris-pad{grid-area:pad; margin-top:' + U(0.6) + '; display:flex; flex-direction:column; gap:' + U(0.45) + ';}',
         '#tetris-pad .tet-row{display:flex; justify-content:space-between; align-items:center; gap:' + U(0.5) + ';}',
-        '#tetris-pad .tet-cluster{display:flex; gap:' + U(0.45) + ';}',
+        '#tetris-pad .tet-cluster{display:flex; gap:' + U(0.4) + '; width:100%; justify-content:space-between;}',
         '#tetris-pad .tet-btn{margin:0 !important; padding:0 !important; touch-action:manipulation; -webkit-user-select:none; user-select:none;'
             + ' -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; box-sizing:border-box; transition:transform .06s, filter .06s;}',
-        '#tetris-pad .tet-arrow{width:' + U(2.6) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(0.85) + ' !important;}',
-        '#tetris-pad .tet-rot{width:' + U(3.4) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(1.1) + ' !important; border-radius:' + U(1.2) + ' !important;'
+        // ◀ ▼ ▶ ↻ 드롭 한 줄 (2026-11-03 사용자) — 판 폭(칸 열넷쯤)에 들게 줄였다
+        '#tetris-pad .tet-arrow{width:' + U(2.3) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(0.85) + ' !important;}',
+        '#tetris-pad .tet-rot{width:' + U(2.5) + ' !important; height:' + U(2.4) + ' !important; font-size:' + U(1.1) + ' !important; border-radius:' + U(1.2) + ' !important;'
             + ' background:linear-gradient(145deg,#4a3a6a,#2a2040) !important; border-color:#7a6aa0 !important; color:#e6dcff !important;}',
-        '#tetris-pad .tet-hold,#tetris-pad .tet-drop{width:' + U(5.2) + ' !important; height:' + U(1.8) + ' !important; font-size:max(12px, ' + U(0.52) + ') !important;}',
+        '#tetris-pad .tet-hold{width:' + U(5.2) + ' !important; height:' + U(1.8) + ' !important; font-size:max(12px, ' + U(0.52) + ') !important;}',
+        '#tetris-pad .tet-drop{width:' + U(3.2) + ' !important; height:' + U(2.4) + ' !important; font-size:max(12px, ' + U(0.55) + ') !important; line-height:1.15 !important;}',
         '#tetris-pad .tet-hold{background:linear-gradient(145deg,#2a4a5a,#152830) !important; border-color:#3a6a7a !important; color:#7fd4d4 !important;}',
         '#tetris-pad .tet-drop{background:linear-gradient(145deg,#5a2a2a,#301515) !important; border-color:#7a3a3a !important; color:#ffb4a8 !important;}',
         '#tetris-pad .tet-key{font-size:9px; opacity:.6; margin-left:3px;}',
         '@media (pointer:coarse){ #tetris-pad .tet-key{display:none;} }',
         '#tetris-pad .tet-btn.on{filter:brightness(1.4); transform:scale(.95);}',
-        // 넓은 화면 꼴 — 판 양옆에 홀드 · 다음 · 점수 · 드롭 · ↻, 판 아래(「나간다」 위)에 ◀ ▼ ▶ (2026-11-01 사용자)
+        // 넓은 화면 꼴 — 판 양옆에 홀드 · 다음 · 점수, 판 아래(「나간다」 위)에 ◀ ▼ ▶ ↻ 드롭 (2026-11-01 · 11-03 사용자)
         '#tet-main.wide{grid-template-columns:' + U(3.2) + ' auto ' + U(3.2) + '; column-gap:' + U(0.6) + ';'
             + ' grid-template-rows:auto auto 1fr auto auto auto;'
-            + ' grid-template-areas:"holdbox board nextbox" ". board stats" ". board ." ". board drop" "holdbtn board rot" "dpad dpad dpad";}',
+            + ' grid-template-areas:"holdbox board nextbox" ". board stats" ". board ." ". board ." "holdbtn board ." "dpad dpad dpad";}',
         '#tet-main.wide #tetris-side,#tet-main.wide #tetris-pad,#tet-main.wide .tet-row{display:contents;}',
         '#tet-main.wide #tetris-board{grid-row:1 / 6;}',
         '#tet-main.wide #tet-holdbox{grid-area:holdbox; text-align:left;}',
         '#tet-main.wide #tet-nextbox{grid-area:nextbox; text-align:left;}',
         '#tet-main.wide #tet-stats{grid-area:stats; text-align:left;}',
         '#tet-main.wide .tet-hold{grid-area:holdbtn; align-self:end; width:100% !important;}',
-        '#tet-main.wide .tet-drop{grid-area:drop; align-self:end; width:100% !important; margin-bottom:' + U(0.4) + ' !important;}',
-        '#tet-main.wide .tet-cluster{grid-area:dpad; display:flex; justify-content:center; gap:' + U(0.8) + '; margin-top:' + U(0.5) + ';}',
+        '#tet-main.wide .tet-cluster{grid-area:dpad; display:flex; justify-content:center; gap:' + U(0.6) + '; margin-top:' + U(0.5) + '; width:auto;}',
         '#tet-main.wide .tet-arrow{width:' + U(2.8) + ' !important; height:' + U(1.9) + ' !important; font-size:' + U(0.8) + ' !important;}',
-        '#tet-main.wide .tet-rot{grid-area:rot; align-self:end; width:100% !important; height:' + U(2.6) + ' !important;}'
+        // 넓은 화면에서도 ↻ · 드롭은 화살표 옆 (dpad 한 줄)
+        '#tet-main.wide .tet-rot{width:' + U(2.8) + ' !important; height:' + U(1.9) + ' !important;}',
+        '#tet-main.wide .tet-drop{width:' + U(3.6) + ' !important; height:' + U(1.9) + ' !important;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
