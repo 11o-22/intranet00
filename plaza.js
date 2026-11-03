@@ -3050,6 +3050,8 @@ function paintSpots() {
         });
         e.addEventListener('click', function (ev) {
             ev.preventDefault(); ev.stopPropagation();
+            // 🐰 시설 앞에 선 내 토끼 인형을 누른 것이면 — 시설 대신 말풍선 글씨 창 (nuow-text.js · 토끼 둘레만 본다)
+            try { if (typeof window.nuowTap === 'function' && window.nuowTap(ev.clientX, ev.clientY)) return; } catch (x) { }
             if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
             if (s.go) { const hb = hsCall('block', 'door', s.go); if (hb) { sysLine(hb); return; } }     // 🫣
             goApp(s);
@@ -5705,6 +5707,12 @@ function open() {
             //   가만히 톡 치기가 어려워 이것이 「안 눌린다」로 느껴졌다.
             const tap = (now() - at < TAP_MS) && far < TAP_SLOP;
             if (!tap && drag) eatClick();
+            // 🐰 내 Null Owner 토끼 인형을 톡 쳤으면 — 말풍선 글씨 고르는 창 (nuow-text.js · 2026-11-03)
+            if (tap && run && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))) {
+                let nw = false;
+                try { nw = typeof window.nuowTap === 'function' && window.nuowTap(e.clientX, e.clientY); } catch (x) { nw = false; }
+                if (nw) { drag = false; far = 0; hit = null; return; }
+            }
             // 🍍 작은 사람(내가 작으면 보통 사람)을 톡 쳤으면 — 고르는 칸을 띄우고 걷지 않는다
             if (tap && run && !(hit && hit.closest && hit.closest('#plaza-feed, #plaza-map'))
                 && carryTap(e.clientX, e.clientY)) {

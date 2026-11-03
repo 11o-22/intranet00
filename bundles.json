@@ -460,7 +460,8 @@
       "treasure.js",
       "hideseek.js",
       "special-cure.js",
-      "mafia.js"
+      "mafia.js",
+      "nuow-text.js"
     ]
   ]
 }

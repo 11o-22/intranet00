@@ -785,7 +785,9 @@ function look(user, override, all) {
     // ★ 장마다 물들인 색 — { 장이름: 0~359 }. 광장이 dot 을 통째로 주고받으므로
     //   남의 화면에서도 같은 색으로 보인다 (따로 보낼 것이 없다).
     const col = (d.col && typeof d.col === 'object') ? d.col : {};
-    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col };
+    // ★ Null Owner 착한 친구 말풍선 글씨 (nuow-text.js · 2026-11-03) — { t: 두 글자, c: '#rrggbb' } · 없으면 그려 둔 그대로
+    const nw = (d.nw && typeof d.nw === 'object' && d.nw.t) ? { t: String(d.nw.t), c: String(d.nw.c || '') } : null;
+    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col, nw: nw };
 }
 window.dotLook = look;
 window.dotNoTag = {}; (DOT.NO_TAG || []).forEach(function (n) { window.dotNoTag[n] = 1; });
@@ -912,6 +914,13 @@ function layer(sheet, k, hue) {
 // ==========================================
 // 스물네 칸짜리 장 (D.SEQ · 검은 고양이 헤일로) — 걷기 · 정지 칸 고르기
 // ==========================================
+// 🐰 Null Owner 착한 친구 — 고른 글씨가 있으면 그 글씨를 써 넣은 장으로 갈아 낀다 (nuow-text.js)
+function nwPut(el, sheet, nw) {
+    if (!nw || !el || typeof window.nuowTextPut !== 'function') return;
+    if (sheet !== 'nuow-friend' && sheet !== 'nuow-friend-r') return;
+    el._nw = nw;
+    try { window.nuowTextPut(el, sheet, nw); } catch (e) { }
+}
 function isSeq(sheet) { return !!(D.SEQ && D.SEQ[sheet]); }
 // 한쪽(걷기 · 정지) 줄 수 — 예전 장(값 1)은 두 줄 · 서른여섯 칸짜리(값 3)는 세 줄 (2026-11-03)
 function seqR(sheet) { const v = D.SEQ && D.SEQ[sheet]; return v ? Math.max(2, v | 0) : 0; }
@@ -970,6 +979,7 @@ function sprite(user, opt) {
     const seqEls = els.filter(function (e) { return e._seq; });
     seqEls.forEach(function (e) { seqPut(e, pose === 'walk' ? (o.live === false ? seqLoopW(e._seq) : 0) : (o.live === false ? seqLoopS(e._seq) : 6 * e._seq), k); });
 
+    els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     box._dot = { els: els, sheets: sheets, timers: [] };
     if (o.live === false) return box;
 
@@ -1087,6 +1097,7 @@ function actor(user, opt) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
     const head = els[(L.backs || []).length + 1 + L.layers.length];   // 악세가 머리 뒤에 더 붙는다 · 몸 뒤에 깐 장이 앞에 있다
+    els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     const flaps = flapsOf(els, sheets);
 
     // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다
@@ -1282,6 +1293,7 @@ function actor(user, opt) {
                     if (t) src = t;
                 }
                 els[i].style.backgroundImage = 'url("' + src + '")';
+                if (els[i]._nw) nwPut(els[i], use, els[i]._nw);      // 🐰 말풍선 글씨 — 짝에도 같은 글씨
             });
         },
         facing: function () { return dir; },
@@ -1548,6 +1560,7 @@ function commit() {
     DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
     // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
     out.col = Object.assign({}, p.col || {});
+    if (me.dot && me.dot.nw) out.nw = me.dot.nw;        // 🐰 말풍선 글씨는 옷장이 안 다루므로 그대로 둔다
     me.dot = out;
     save({ dot: 1 });
     // ★ 광장에 서 있는 내 모습도 그 자리에서 갈아입힌다.
