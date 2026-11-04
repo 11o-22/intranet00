@@ -235,11 +235,28 @@ function shuffle(arr, rnd) {
 }
 X.srand = srand; X.shuffle = shuffle;
 
+// ★ 파이어베이스가 못 받는 열쇠(. # $ [ ] / · 빈 열쇠)를 _ 로 바꿔 쓴다 (2026-11-04)
+//   열쇠 하나만 잘못돼도 set 이 통째로 던져, 그 뒤로 내 화면(wonderMe)이 한 번도 저장되지 않았다 — 조용히 삼켜서 몰랐다.
+//   그러면 새로고침 · 재접속 · 새 판이 올라와 다시 열릴 때마다 마지막으로 저장된 자리(챕터 첫 판정)로 되돌아간다.
+let badKeySaid = false;
+function fbSafe(v) {
+    if (!v || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(fbSafe);
+    const o = {};
+    Object.keys(v).forEach(function (k) {
+        let k2 = String(k).replace(/[.#$\[\]\/]/g, '_');
+        if (!k2) k2 = '_';
+        if (k2 !== k && !badKeySaid) { badKeySaid = true; console.warn('[이상한 나라] 저장 못 하는 열쇠를 고쳐 씁니다 —', k); }
+        o[k2] = fbSafe(v[k]);
+    });
+    return o;
+}
+X.fbSafe = fbSafe;
 function save() {
     if (!F || !PID || !ME) return;
     F.at = now();
     const d = db_();
-    if (d) { try { d.ref('wonderMe/' + PID + '/' + ME).set(clean(F)); } catch (e) { } }
+    if (d) { try { d.ref('wonderMe/' + PID + '/' + ME).set(fbSafe(clean(F))); } catch (e) { console.warn('[이상한 나라] 내 화면 저장 실패', e && e.message); } }
     snapRun();
 }
 X.save = save;

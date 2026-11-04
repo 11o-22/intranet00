@@ -96,7 +96,8 @@ function markSeen() {
 // ==========================================
 // 물어보는 자리 (02 · 03) — 「이전 선택지로」로 돌아오고, 「계속 간다」는 다 들어 본 뒤에
 // ==========================================
-function hubKey(h, opt) { return 'h' + h + ':' + norm(opt); }
+// ★ 열쇠에 . # $ [ ] / 가 있으면 내 화면(wonderMe)이 저장되지 않는다 (2026-11-04) — 「어떻게 … 묻는다.」의 마침표. _ 로 바꾼다
+function hubKey(h, opt) { return ('h' + h + ':' + norm(opt)).replace(/[.#$\[\]\/]/g, '_'); }
 function seen(h, opt) { return !!((F().s || {}).seen || {})[hubKey(h, opt)]; }
 function hubFix(i, gateLabel) {
     const s = clone('s_intro', i);

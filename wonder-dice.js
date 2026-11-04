@@ -52,6 +52,7 @@ function headLine(rule, die) {
 // ==========================================
 // 1) 이상한 나라 쪽 — 원고 선택지에 붙는 판정
 // ==========================================
+function fbKey(k) { return String(k).replace(/[.#$\[\]\/]/g, '_'); }
 function chOfKey(k) { const p = String(k || '').slice(0, 2); return PRE[p] || null; }
 function seqAt(sc, loc) {
     let seq = sc.p;
@@ -86,7 +87,10 @@ X.pick = function (i) {
             const op = pg && pg.o && pg.o[i];
             const ri = op ? ruleFor(ch, sc.h, op.l) : -1;
             if (ri >= 0) {
-                const key = rk() + ':' + w.k + ':' + norm(sc.h) + ':' + w.loc.join('.') + ':' + i;
+                // ★ 열쇠에 . # $ [ ] / 가 들어가면 파이어베이스가 내 화면(wonderMe)을 통째로 안 받는다 (2026-11-04)
+                //   장면 제목이 「01. 달님이 잠든 숲」 꼴이라 첫 판정부터 저장이 다 실패했고, 새로고침 · 재접속 · 새 판이 올라와 다시 열릴 때마다
+                //   그 챕터 첫 판정 자리로 되돌아갔다 (「늑대 · 세이렌의 장에 갇혀 무한 반복」). 그런 글자는 _ 로 바꾼다.
+                const key = fbKey(rk() + ':' + w.k + ':' + norm(sc.h) + ':' + w.loc.join('_') + ':' + i);
                 f.dz = f.dz || {};
                 if (!f.dz[key]) {
                     f.dPend = { key: key, ch: ch, ri: ri, i: i, lbl: norm(op.l), walk: JSON.parse(JSON.stringify(w)) };
