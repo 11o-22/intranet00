@@ -1259,6 +1259,8 @@ window.bflyErosPick = function () {
 // ==========================================
 // ★ 방 — 나비가 빈자리를 채운다 (2026-10-25 · 🐾 아기 여우 분신과 같은 길)
 // ==========================================
+// ✗ 2026-11-04 사용자 — 「호가호위랑 B 조 조장, 여우 신도 외에 혼자 탐사 갈 수 있는 커스텀 장비들 싹 없애 줘」
+//   SEAT_FILL 을 껐다 — 나비가 최소 인원을 채우지 않는다 (방 화면의 나비 칸도 안 뜬다). 되살릴 때 true.
 //   최소 인원이 둘 이상인 구역에 혼자(또는 모자라게) 방을 잡아도, 방 사람들 곁의 나비 수만큼
 //   최소 인원을 낮춰 출발할 수 있다 (1인까지).
 //     · 센다 — 방 사람이 차고 있는 나비(소멸 안 한 것) 가운데 그 사람 곁이나 다른 방 사람 곁에 있는 것,
@@ -1270,8 +1272,10 @@ function goneOf(u, k) {
     const s = (u && u.bfly && u.bfly[k]) || {};
     return (u && u.bflyDay === today()) ? !!s.gone : false;       // 날이 바뀌었으면 자정에 돌아온 것
 }
+const SEAT_FILL = false;
 function seatFlies(p) {
     const out = [], seen = {};
+    if (!SEAT_FILL) return out;
     if (!p || !p.members || wOff(p.zone)) return out;          // 이벤트 어둠 방 — 나비가 빈자리를 채우지 않는다
     const mem = Object.keys(p.members);
     const add = function (owner, k, at) {

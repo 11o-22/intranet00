@@ -63,9 +63,10 @@
 //
 //   데려갈 분신은 방을 만들 때 고르고, 이미 만든 방에도 더 넣을 수 있다.
 //   **남의 방에 들어가서도 데려간다** — 방장만의 몫이 아니다. 방 안의
-//   누구든 제 분신을 부르고, 모자란 최소 인원은 그 모두를 합한 수로
-//   채운다. **남에게 붙여 준 분신은 데려갈 수 없다** — 그쪽 사람 곁에
+//   누구든 제 분신을 부른다. **남에게 붙여 준 분신은 데려갈 수 없다** — 그쪽 사람 곁에
 //   있기 때문이다.
+//   ✗ 모자란 최소 인원을 분신으로 채우던 것은 뺐다 (2026-11-04 사용자 — 혼자 탐사 가는 커스텀 장비는
+//     호가호위 · B조 조장 · 여우 신도만). 분신은 사람 수에 안 들어가므로 최소 인원은 사람으로 채운다.
 //
 // ■ 적히는 자리
 //
@@ -676,7 +677,6 @@ window.kitRoomPick = function () {
     }).join('');
     const w = box(head('방에 데려갈 분신',
         '방을 만들 때도, 남의 방에 들어가서도 이 분신들을 데려갑니다.<br>'
-        + '모자란 최소 인원은 방 안의 모두가 데려온 분신으로 채웁니다.<br>'
         + '남에게 붙여 준 분신은 데려갈 수 없습니다.')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="kit-ok" class="game-btn" style="' + BTN + ' text-align:center;">정한다</button>'
@@ -2023,11 +2023,7 @@ function openZoneList(body) {
                     // 방 화면이 보여 준 것과 **같은 수**를 쓴다
                     const n = roomKitList(p, me).length;
                     if (n > 0) {
-                        z = DARK_ZONES[p.zone];
-                        min0 = z.min;
-                        // ★ 가짜 사원을 방에 넣지 않는다 — 방 자료가 꼬인다.
-                        //   최소 인원만 분신 수만큼 낮췄다가 바로 되돌린다.
-                        z.min = Math.max(1, min0 - n);
+                        // ✗ 2026-11-04 — 최소 인원은 낮추지 않는다 (분신이 빈자리를 채우지 않는다). 차 있는 구역 건너뛰기(bypass)만 남긴다.
                         bypass = true;
                     }
                 }
@@ -2042,7 +2038,7 @@ function openZoneList(body) {
         launchParty = w;
         window.launchParty = w;
         clearInterval(iv);
-        console.log('[아기 호랑이] 방 — 최소 인원 채우기 연결');
+        console.log('[아기 호랑이] 방 — 차 있는 구역 출발 연결 (최소 인원은 안 채운다)');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -2103,14 +2099,10 @@ function kitRoomBox(p, me, min0, low, list) {
         + (list.length
             ? rows + '<div style="font-size:9.5px; color:#8d8578; margin-top:5px;'
                    + ' border-top:1px solid #3a3027; padding-top:6px; line-height:1.6;">'
-                   + (min0 > low
-                        ? '최소 인원 <b style="color:#d9a05a;">' + min0 + '인 → ' + low + '인</b>'
-                          + ' — 분신이 빈자리를 채웁니다.'
-                        : '최소 인원이 이미 ' + min0 + '인이라 더 낮출 것이 없습니다.')
-                   + '<br>분신은 사람 수에는 안 들어갑니다 (보상·난이도는 사람 수로 셉니다).'
+                   + '분신은 사람 수에는 안 들어갑니다 (최소 인원 · 보상 · 난이도는 사람 수로 셉니다).'
                    + '</div>'
             : '<div style="font-size:10px; color:#8d8578; line-height:1.6;">'
-              + (mine ? '아직 아무도 안 골랐습니다. 아래에서 고르면 최소 인원을 채웁니다.'
+              + (mine ? '아직 아무도 안 골랐습니다. 아래에서 고르면 탐사에 데려갑니다.'
                       : '이 방에 데려온 분신이 없습니다.') + '</div>')
         + (mine
             ? '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:9px;'
@@ -2172,11 +2164,8 @@ let drawing = null;        // { p, me, min0, low, list } — 방 화면을 그�
                     // 내 쪽이 달라졌을 때만 한 박자 뒤에 올린다 (그리면서 쓰지 않는다)
                     syncRoomKits(p);
                     min0 = z.min;
-                    low = Math.max(1, min0 - list.length);
+                    low = min0;                              // ✗ 2026-11-04 — 최소 인원을 분신으로 낮추지 않는다
                     show = !!(list.length || wears(me));
-                    // ★ 여기서 최소 인원을 낮춘다 — canStart 가 이 값을 본다
-                    //   (index.html:3365) 그래서 진입 단추가 열린다
-                    if (list.length) z.min = low;
                 }
             } catch (e) { }
 

@@ -27,7 +27,7 @@
 //
 //   ① 탐랑  하루 1번 ★ 음식 다섯 → 상점 · 횟수 하나를 초기화 (격이 높을수록 드문 쪽이 잘 뜬다)
 //            유쾌 판매소 40 · ??? 상점 30 · 우주 쇼핑몰 10 · 어둠 탐사 횟수 10 · 공용 시설 횟수 5 · 망상 홈쇼핑 5
-//   ② 거문  차고 있는 사람이 방에 있으면 최소 인원이 1인 — 혼자서도 어느 구역이든 들어간다.
+//   ② 거문  ✗ (2026-11-04 사용자 — 혼자 탐사 가는 커스텀 장비는 호가호위 · B조 조장 · 여우 신도만) 최소 인원 1인은 뺐다.
 //            3인 이하로 들어가면 (차고 있는 사람에게) 안전한 선택지 표시 🌟 · 판정 +3 · 행운 +2 (낮은 굴림 다시 굴림 두 번)
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
 //   ③ 녹존  (2026-10-31 사용자: 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 — 남을 꺼내는 구출은 막았다. 🎐 여우 신도만 예외)
@@ -385,7 +385,7 @@ function menu() {
             body = line('하루 한 번 ★ 음식 다섯을 바친다. 만족하시는 만큼 — 유쾌 판매소 · ??? 상점 · 우주 쇼핑몰 · 어둠 탐사 횟수 · 공용 시설 횟수 · 망상 홈쇼핑 중 하나를 초기화한다. 격이 높은 음식일수록 드문 쪽이 잘 뜬다.')
                 + '<div>' + btn('★ 다섯을 바친다', 'chilTamOpen()', !!s.tam || sc < CHIL.TAM_N, true) + tag(s.tam ? '오늘 바침' : '오늘 1번', !s.tam) + '</div>';
         } else if (g.k === 'geo') {
-            body = line('내가 방에 있으면 최소 인원이 1인 — 어느 구역이든 혼자서도 들어간다. 3인 이하로 들어가면 안전한 선택지가 🌟 로 보이고 판정 +3 · 행운 +2.')
+            body = line('3인 이하로 들어가면 안전한 선택지가 🌟 로 보이고 판정 +3 · 행운 +2.')
                 + line('치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사를 한 번 피하고, 그래도 죽으면 오염도 0 으로 귀환한다.')
                 + '<div>' + btn('치성 (★1)', "chilJi('geo')", (s.geo || 0) >= CHIL.GEO_DAY || sc < CHIL.JI.geo, true)
                 + tag('치성 ' + (s.geo || 0) + ' / ' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0), (s.geoArm || 0) > 0) + '</div>';
@@ -634,8 +634,10 @@ window.chilTamOpen = function () {
 };
 
 // ==========================================
-// ② 거문 — 최소 인원 1인 · 작은 파티의 길잡이 · 홀로 탐사 보호
+// ② 거문 — 작은 파티의 길잡이 · 홀로 탐사 보호
 // ==========================================
+// ★ 최소 인원 1인은 뺐다 (2026-11-04 사용자 「호가호위랑 B 조 조장, 여우 신도 외에 혼자 탐사 갈 수 있는 커스텀 장비들 싹 없애 줘」)
+//   아래 훅은 SOLO_ON 이 거짓이면 아무것도 안 한다 (되살릴 때 true).
 function partyHasWearer(p) {
     try {
         if (!p || !p.members) return false;
@@ -645,7 +647,9 @@ function partyHasWearer(p) {
         });
     } catch (e) { return false; }
 }
+const SOLO_ON = false;
 (function hookRoom() {
+    if (!SOLO_ON) return;
     const iv = setInterval(function () {
         if (typeof renderPartyRoom !== 'function' || typeof launchParty !== 'function' || typeof DARK_ZONES === 'undefined') return;
         if (renderPartyRoom._chil && launchParty._chil) { clearInterval(iv); return; }
