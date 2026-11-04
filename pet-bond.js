@@ -17,13 +17,13 @@
 //     놀아주기  20분마다   공짜
 //     먹이주기  먹이 하나  (굶주림 시계도 같이 되돌린다)
 //
-//   교감 100 인 펫은 어둠에 같이 들어갔을 때 주인 대신 죽어 줄 수 있다
-//   (pet-with.js).
+//   교감 100 인 펫은 어둠에 같이 들어갔을 때 주인 대신 맞아 줄 수 있다
+//   (pet-with.js · 그러면 교감이 70 깎인다).
 //
 // ■ 굶주림
 //
-//   먹이를 사흘 동안 안 주면 죽는다. 죽으면 목록에서 사라지고 그 자리는
-//   다시 「입양 전」이 된다. 하루가 안 남으면 붉게 띄운다.
+//   ★ 펫은 죽지 않는다 (2026-11-04) — 먹이를 사흘 동안 안 주면 교감이 70 깎이고,
+//   그 뒤로도 안 먹이면 사흘마다 또 깎인다 (pet-data.js). 하루가 안 남으면 붉게 띄운다.
 //
 // ■ 콘솔
 //   petRoom()    내 방 · 교감 · 굶주림 상태
@@ -196,20 +196,20 @@ const BTN = 'width:100%; margin:0 0 7px 0; padding:11px; font-size:12px;';
 const GREY = ' background:#2a2a2a !important; border-color:#444 !important; color:#aaa !important;';
 
 // ==========================================
-// 굶어 죽은 펫 걷어 가기
+// 굶은 펫 — 교감이 깎였다 (예전에는 죽어서 걷어 갔다)
 // ==========================================
 let told = 0;
 function sweep(quiet) {
     const u = u_();
     if (!u || !P()) return;
-    // ★ 서버에서 확인한 뒤에야 지우므로, 죽은 펫은 대개 나중에 cb 로 온다
+    // ★ 서버에서 확인한 뒤에야 깎으므로, 대개 나중에 cb 로 온다
     const gone = P().sweep(function (late) { buried(late, quiet); });
     buried(gone, quiet);
 }
 function buried(gone, quiet) {
     if (!gone || !gone.length) return;
     gone.forEach(function (g) {
-        log_('[펫] ' + g.n + P().josa(g.n, '이') + ' 굶어 죽었습니다. (' + g.sp + ')');
+        log_('[펫] ' + g.n + P().josa(g.n, '이') + ' 사흘 동안 굶었습니다. (' + g.sp + ') 교감 ' + g.was + ' → ' + g.now);
     });
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     paint();
@@ -218,8 +218,8 @@ function buried(gone, quiet) {
     if (now - told < 5000) return;
     told = now;
     alert_('사흘 동안 아무것도 먹지 못했습니다.\n\n'
-        + gone.map(function (g) { return '— ' + g.n + ' (' + g.sp + ')'; }).join('\n')
-        + '\n\n자리가 비었습니다.');
+        + gone.map(function (g) { return '— ' + g.n + ' (' + g.sp + ')  교감 ' + g.was + ' → ' + g.now; }).join('\n')
+        + '\n\n먹이를 주지 않으면 사흘마다 교감이 ' + P().DEATH_HIT + '씩 깎입니다.');
 }
 
 // ==========================================
@@ -311,7 +311,7 @@ window.petBondOpen = function (id) {
         + ' border-radius:4px;"></div></div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px;">'
         + (full
-            ? '<span style="color:#d4af37;">가득 찼습니다 — 어둠에 같이 들어가면 주인 대신 죽어 줄 수 있습니다.</span>'
+            ? '<span style="color:#d4af37;">가득 찼습니다 — 어둠에 같이 들어가면 주인 대신 맞아 줄 수 있습니다. (교감 -' + P().DEATH_HIT + ')</span>'
             : ('오늘 더 오를 몫 ' + room + ' <span style="color:#555;">/ 하루 ' + P().BOND_DAY + '</span>'))
         + '</div>'
 
@@ -327,7 +327,7 @@ window.petBondOpen = function (id) {
         + ' border-radius:4px;"></div></div>'
         + '<div style="font-size:9.5px; color:' + (soon ? '#e07a5f' : '#6f685e') + ';">'
         + (hunger <= 0 ? '굶었습니다' : (span(hunger) + ' 뒤에 굶습니다'))
-        + (soon ? ' — 먹이를 주지 않으면 죽습니다.' : '')
+        + (soon ? ' — 먹이를 주지 않으면 교감이 ' + P().DEATH_HIT + ' 깎입니다.' : '')
         + '</div></div>'
 
         + '<button id="pb-pat" class="game-btn" ' + ((out || patLeft > 0) ? 'disabled ' : '')
@@ -399,7 +399,7 @@ function html() {
 
     return head
         + '<div style="font-size:9.5px; color:#777; margin-bottom:7px; line-height:1.6;">'
-        + '누르면 쓰다듬고 놀아 주고 먹일 수 있습니다. 먹이를 사흘 동안 안 주면 죽습니다.</div>'
+        + '누르면 쓰다듬고 놀아 주고 먹일 수 있습니다. 먹이를 사흘 동안 안 주면 교감이 ' + P().DEATH_HIT + ' 깎입니다.</div>'
         + (hungry.length
             ? '<div style="font-size:10px; color:#e07a5f; margin-bottom:7px;">'
               + hungry.map(function (k) {
@@ -555,7 +555,7 @@ window.petRoom = function () {
                  오늘남은몫: P().bondRoom(k, u),
                  포만도: P().full(k, u) + ' / 100',
                  굶기까지: span(Math.max(0, P().starveLeft(k, u))),
-                 대신죽기: P().bondFull(k, u) ? ('O (' + Math.round(P().SAVE_ODDS * 100) + '%)') : '✗',
+                 대신맞기: P().bondFull(k, u) ? ('O (' + Math.round(P().SAVE_ODDS * 100) + '%)') : '✗',
                  지금: (s.out && s.out.till) ? '탐사 중' : (s['with'] ? '동행 중' : '방') };
     }));
 };

@@ -16,12 +16,12 @@
 //   돌아왔을 때, **구역 등급이 제 등급보다 높으면** 많이 다쳐 있다.
 //   한 단계 위면 깊이 40, 두 단계면 60, 셋이면 80, 넷이면 100 이다.
 //
-//   ★ 죽지는 않는다. 몰래 따라간 펫은 어둠에서 죽지 않는다 —
-//     죽는 것은 주인이 **데려갔을 때**뿐이다 (pet-with 의 대신 죽기).
+//   ★ 죽지는 않는다. 몰래 따라간 펫은 어둠에서 죽지 않는다 (펫은 이제 어디서도 죽지 않는다 — 2026-11-04).
 //
 // ■ 두 시간
 //
-//   다친 채로 두 시간이 지나면 죽는다. 그 전에 **완전히** 나아야 한다.
+//   다친 채로 두 시간이 지나면 교감이 70 깎이고 스스로 일어난다 (★ 2026-11-04 — 예전에는 죽었다).
+//   그 전에 **완전히** 나아야 교감을 지킨다.
 //   망상 홈쇼핑에 치료 물품 열 가지를 두었다. 깊이를 0 까지 내려야 하고,
 //   하나로는 모자라게 값을 매겼다.
 //
@@ -612,7 +612,7 @@ function end() {
                 ? (nm + ' — 멀쩡합니다. 따라온 것을 들키지 않았다고 여기는 얼굴입니다.')
                 : (nm + ' (깊이 ' + r.deep + ')\n' + pick(HURT, kindOf(r.k)));
         }).join('\n\n')
-        + (hurtRows.length ? '\n\n두 시간 안에 **완전히** 고치지 않으면 죽습니다.\n'
+        + (hurtRows.length ? '\n\n두 시간 안에 **완전히** 고치지 않으면 교감이 ' + P().DEATH_HIT + ' 깎입니다.\n'
             + '사택 맨 위 · 망상 홈쇼핑 맨 위의 「한 번에 낫게」를 누르면'
             + ' 모자란 몫만 사서 바로 낫습니다.' : ''));
     }, 1200);
@@ -631,7 +631,7 @@ setInterval(function () {
 }, 800);
 
 // ==========================================
-// 두 시간 · 곁에 있으면 안 죽는다
+// 두 시간 · 곁에 있으면 안 흐른다 — 지나면 교감 -70 (★ 2026-11-04 — 예전에는 죽었다)
 // ==========================================
 setInterval(function () {
     const u = u_();
@@ -673,18 +673,18 @@ setInterval(function () {
         }
         if (h.calm) { h.calm = 0; h.at = now; patch(k, { hurt: h }); changed++; return; }
         if (now - Number(h.at || now) >= DIE_MS) {
+            // ★ 죽지 않는다 — 교감이 70 깎이고 스스로 일어난다 (상처는 걷힌다)
             const nm = nick(k, u);
-            try { delete pets(u)[String(k)]; } catch (e) { }
-            try {
-                if (typeof database !== 'undefined' && database) {
-                    database.ref('users/' + u.code + '/pets/' + k).set(null);
-                }
-            } catch (e) { }
-            log_('[펫] ' + nm + ' — 다친 채로 두 시간이 지나 숨을 거두었습니다.');
+            let hit = null;
+            try { hit = P().bondHit(k); } catch (e) { }
+            patch(k, { hurt: null });
+            const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
+            log_('[펫] ' + nm + ' — 다친 채로 두 시간이 지났습니다. ' + bt);
             changed++;
             setTimeout(function () {
-                alert_(nm + josa(nm, '은') + ' 끝내 일어나지 못했습니다.\n\n'
-                    + '다친 펫은 두 시간 안에 완전히 고쳐야 합니다.');
+                alert_(nm + josa(nm, '은') + ' 끝내 혼자 일어났습니다.\n'
+                    + '아무도 오지 않았던 두 시간을 기억합니다.\n\n' + bt + '\n\n'
+                    + '다친 펫은 두 시간 안에 완전히 고쳐야 교감을 지킵니다.');
             }, 300);
         }
     });
@@ -917,7 +917,7 @@ function hurtBanner() {
             const live = h.calm ? '<span style="color:#7fd4d4;">곁에서 낫는 중</span>'
                 : '<span style="color:#e07a5f;">'
                   + Math.max(0, Math.ceil((Number(h.at) + DIE_MS - Date.now()) / 60000))
-                  + '분 뒤에 죽습니다</span>';
+                  + '분 뒤에 교감 -' + P().DEATH_HIT + '</span>';
             return '<div style="display:flex; align-items:center; gap:8px; padding:5px 0;">'
                 + '<img src="' + P().icon(k) + '" alt="" style="width:26px; height:26px;'
                 + ' object-fit:contain; image-rendering:pixelated;">'
@@ -950,8 +950,8 @@ function shopHtml() {
         + '🩹 치료 물품' + (mine ? ' <span style="color:#9fd8ef; font-size:10px;'
             + ' font-weight:normal;">· 가진 것 ' + mine + '개</span>' : '') + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:7px; line-height:1.6;">'
-        + '어둠을 따라갔다 다친 펫에게 씁니다. 깊이를 0 까지 내려야 삽니다.<br>'
-        + '다친 채로 두 시간이 지나면 죽습니다 — 다만 주인이 상담실·선녀탕에 있으면'
+        + '어둠을 따라갔다 다친 펫에게 씁니다. 깊이를 0 까지 내려야 낫습니다.<br>'
+        + '다친 채로 두 시간이 지나면 교감이 ' + P().DEATH_HIT + ' 깎입니다 — 다만 주인이 상담실·선녀탕에 있으면'
         + ' 곁에서 같이 낫습니다.<br>'
         + '<span style="color:#8d8578;">깊이 100 짜리 상처는 하나로 안 낫습니다.'
         + ' 아래에서 개수를 골라 한 번에 사십시오.</span></div>'
@@ -1124,7 +1124,7 @@ window.petHurtOpen = function () {
         + '<div style="font-size:12px; color:#e07a5f; font-weight:bold; margin-bottom:4px;">'
         + '🩹 다친 펫</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:6px; line-height:1.6;">'
-        + '깊이를 0 까지 내려야 삽니다. 두 시간이 지나면 죽습니다.<br>'
+        + '깊이를 0 까지 내려야 낫습니다. 두 시간이 지나면 교감이 ' + P().DEATH_HIT + ' 깎입니다.<br>'
         + '상담실·선녀탕에 들어가 있으면 곁에서 같이 낫습니다.</div>'
         + body
         + '<button class="game-btn" style="width:100%; margin:10px 0 0 0; padding:11px;'
@@ -1168,7 +1168,7 @@ setInterval(function () {
                 return nick(k, u) + ' — ' + pick(CALM, kindOf(k));
             }).join('\n\n')
             + (come.some(function (k) { return ps[k].hurt; })
-                ? '\n\n다친 펫은 여기서는 죽지 않습니다. 곁에서 천천히 낫습니다.' : ''));
+                ? '\n\n다친 펫은 여기서는 두 시간이 흐르지 않습니다. 곁에서 천천히 낫습니다.' : ''));
     }, 1500);
 }, 5000);
 

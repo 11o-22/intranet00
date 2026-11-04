@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 펫 — 어둠 동행 · 주인 대신 죽기
+// ★ 펫 — 어둠 동행 · 주인 대신 맞기 (예전에는 대신 죽기)
 // bundles.json 마지막 묶음, pet-bond.js 와 irregular.js 보다 뒤
 // ==========================================
 //
@@ -13,10 +13,11 @@
 //
 //   들어가면 화면 왼쪽 아래에서 펫이 위아래로 둥실거린다.
 //
-// ■ 대신 죽는다
+// ■ 대신 맞는다
 //
 //   교감 100 인 펫만 할 수 있다. 주인이 죽는 자리에서 한 탐사에 한 번
-//   주사위를 굴려, 절반쯤의 확률로 펫이 대신 간다. 그 펫은 영영 사라진다.
+//   주사위를 굴려, 절반쯤의 확률로 펫이 대신 맞는다.
+//   ★ 2026-11-04 — 펫은 죽지 않는다. 사라지는 대신 교감이 70 깎이고(100 → 30) 곁에 남는다.
 //
 //   darkDeath 를 감싼다. 이레귤러보다 바깥이라 펫이 먼저 나선다.
 //
@@ -255,7 +256,7 @@ function sprite() {
 }
 
 // ==========================================
-// 대신 죽는다
+// 대신 맞는다
 // ==========================================
 const SAY = [
     '앞으로 나선 것이 먼저였다. 말릴 틈이 없었다.',
@@ -278,34 +279,22 @@ function sacrifice(reasonText) {
     d._petRolled = 1;
     if (Math.random() >= P().SAVE_ODDS) {
         try { d.log.push('[펫 동행] 대신 가지 못했습니다.'); } catch (e) { }
-        return false;                               // 원래대로 죽는다
+        return false;                               // 원래대로 주인이 죽는다
     }
 
     const nick = P().nick(id, u);
     const sp = (P().BY[id] || {}).n || '';
 
-    // 펫을 영영 지운다
-    delete P().pets(u)[String(id)];
-    u.petWith = null;
-    d._pet = 0;
-    let wrote = false;
-    try {
-        if (typeof database !== 'undefined' && database && u.code) {
-            const up = { petWith: null };
-            up['pets/' + id] = null;
-            database.ref('users/' + u.code).update(up)
-                .catch(function (e) { console.warn('[펫] 저장 실패', e); });
-            wrote = true;
-        }
-    } catch (e) { }
-    if (!wrote) save({ pets: 1, petWith: 1 });
+    // ★ 지우지 않는다 — 교감만 70 깎이고 곁에 남는다 (2026-11-04)
+    let hit = null;
+    try { hit = P().bondHit(id); } catch (e) { }
+    const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
 
     d.fail = Math.max(0, (d.fail || 0) - 1);
-    d.log.push('[펫 동행] ' + nick + P().josa(nick, '이') + ' 대신 갔습니다.');
+    d.log.push('[펫 동행] ' + nick + P().josa(nick, '이') + ' 대신 맞았습니다. (' + bt + ')');
     log_('[펫 동행] ' + nick + '(' + sp + ')' + P().josa(nick, '이')
-        + ' 주인 대신 어둠에 남았습니다.');
+        + ' 주인 대신 맞았습니다. ' + bt);
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
-    drop();
 
     const say = SAY[Math.floor(Math.random() * SAY.length)];
     try {
@@ -313,16 +302,16 @@ function sacrifice(reasonText) {
             darkBodyEl().innerHTML = darkBox('—',
                 reasonText + '<br><br>'
                 + '<span style="color:#d4af37;">— ' + esc(say) + '<br><br>'
-                + '숨이 돌아온다. 옆이 비어 있다.</span>'
+                + '숨이 돌아온다. 옆에서 ' + esc(nick) + P().josa(nick, '이') + ' 떨고 있다.</span>'
                 + '<div style="margin-top:12px; padding:10px; border-radius:6px;'
                 + ' background:rgba(0,0,0,0.3); border:1px solid #5a4a2a; font-size:11px;'
                 + ' color:#d4af37; text-align:center; line-height:1.8;">'
                 + esc(nick) + ' <span style="color:#8d8578;">(' + esc(sp) + ')</span><br>'
-                + '교감 ' + P().BOND_MAX + ' — 주인 대신 남았습니다</div>',
+                + esc(bt) + ' — 주인 대신 맞았습니다</div>',
                 darkChoiceBtn('일어선다.', 'renderDarkStep();'));
             if (typeof mountDarkChat === 'function') mountDarkChat('normal');
         } else {
-            alert_(nick + P().josa(nick, '이') + ' 주인 대신 어둠에 남았습니다.');
+            alert_(nick + P().josa(nick, '이') + ' 주인 대신 맞았습니다.\n\n' + bt);
         }
     } catch (e) { console.warn('[펫]', e); }
     return true;
@@ -342,7 +331,7 @@ function sacrifice(reasonText) {
         darkDeath = w;
         window.darkDeath = w;
         clearInterval(iv);
-        console.log('[펫] 대신 죽기 연결');
+        console.log('[펫] 대신 맞기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -357,7 +346,7 @@ window.petWith = function () {
     const id = Number(u.petWith) || 0;
     console.log('  데려가기로 한 펫 :', id ? (P().nick(id, u) + ' (♥' + P().bond(id, u) + ')') : '없음');
     console.log('  지금 같이 있는 펫 :', (d && d._pet) ? P().nick(d._pet, u) : '없음');
-    console.log('  대신 죽기        :', (id && P().bondFull(id, u))
+    console.log('  대신 맞기        :', (id && P().bondFull(id, u))
         ? ('가능 · 확률 ' + Math.round(P().SAVE_ODDS * 100) + '%')
         : '교감 ' + P().BOND_MAX + ' 이어야 합니다');
 };

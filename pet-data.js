@@ -187,15 +187,18 @@ const PET_RUIN = {
 //   교감도는 0 에서 100 까지. 쓰다듬기 · 놀아주기 · 먹이주기로 한 번에
 //   둘~셋씩 오른다. 하루에 오르는 몫은 열까지다.
 //
-//   먹이를 사흘 동안 안 주면 펫이 죽는다. 죽은 펫은 목록에서 사라지고
-//   그 자리는 다시 「입양 전」이 된다.
+//   ★ 펫은 죽지 않는다 (2026-11-04 사용자 「펫은 죽는 게 아니라, 호감도 -70 깎는 걸로 하자」)
+//     죽던 자리 넷 — 굶주림(사흘) · 다친 채 두 시간(pet-sneak) · 제 등급 밖 혼자 탐사(pet-dark) · 주인 대신 죽기(pet-with) —
+//     에서 이제는 교감만 70 깎인다 (0 밑으로는 안 내려간다). 펫은 그대로 남는다.
+//   굶주림: 먹이를 사흘 동안 안 주면 교감 -70. 그 뒤로도 안 먹이면 사흘마다 또 -70 (pets[번호].stv = 깎은 때).
 const PET_BOND_MAX = 100;
+const PET_DEATH_HIT = 70;                     // 죽던 자리에서 깎는 교감
 const PET_BOND_DAY = 10;                      // 하루에 오르는 몫
 const PET_BOND_STEP = [2, 3];                 // 한 번에 둘~셋
 const PET_PAT_GAP = 10 * 60 * 1000;           // 쓰다듬기 사이
 const PET_PLAY_GAP = 20 * 60 * 1000;          // 놀아주기 사이
 const PET_STARVE = 3 * 24 * 3600 * 1000;      // 사흘
-const PET_SAVE_ODDS = 0.5;                    // 교감 100 — 대신 죽어 줄 확률
+const PET_SAVE_ODDS = 0.5;                    // 교감 100 — 대신 맞아 줄 확률 (맞으면 교감 -70)
 
 // ==========================================
 // 사원 기록
@@ -288,6 +291,17 @@ function petBond(id, u) {
     return Math.max(0, Math.min(PET_BOND_MAX, Number(s && s.bond) || 0));
 }
 function petBondFull(id, u) { return petBond(id, u) >= PET_BOND_MAX; }
+
+// 교감을 깎는다 — 죽던 자리에서 (기본 70) · { was, now } 를 돌려준다 · 교감 칸 하나만 쓴다
+function petBondHit(id, n) {
+    const u = petMe();
+    const s = petsOf(u)[String(id)];
+    if (!s) return null;
+    const was = petBond(id, u);
+    const now = Math.max(0, was - (n == null ? PET_DEATH_HIT : Number(n) || 0));
+    petPatch(id, { bond: now });
+    return { was: was, now: now };
+}
 
 // 오늘 더 올릴 수 있는 몫
 function petBondRoom(id, u) {
@@ -392,6 +406,19 @@ function petStarveLeft(id, u) {
     if (!at) return PET_STARVE;          // 아직 시계가 안 붙은 펫은 굶지 않는다
     return (at + PET_STARVE) - petNow();
 }
+// 굶주림으로 교감을 깎을 때 — 굶은 지 사흘째 한 번, 그 뒤 안 먹이면 사흘마다 (먹이면 stv 보다 fed 가 늦어져 새로 센다)
+function petStarveDue(s, fed) {
+    if (!s || !fed) return Infinity;
+    const base = fed + PET_STARVE;
+    const stv = Number(s.stv) || 0;
+    return stv >= base ? stv + PET_STARVE : base;
+}
+function petStarveHitLeft(id, u) {
+    const s = petsOf(u)[String(id)];
+    if (!s) return Infinity;
+    const fed = Math.max(Number(s.fedAt) || 0, petFedOf(id, s));
+    return petStarveDue(s, fed) - petNow();
+}
 
 // 포만도 — 0 에서 100 까지
 //
@@ -422,7 +449,6 @@ function petFillAt(id, u, frac) {
              now: Math.max(0, Math.min(100, Math.round(next / PET_STARVE * 100))) };
 }
 
-// 굶어 죽은 펫을 걷어 간다 — 치운 펫 목록을 돌려준다
 // ==========================================
 // 방에 내놓을 펫 — 두 마리까지
 // ==========================================
@@ -484,8 +510,8 @@ function petShowToggle(id) {
     return { on: cur.indexOf(key) >= 0, out: out };
 }
 
-//   cb(gone) — 서버에서 확인하고 지운 펫을 나중에 알려 준다.
-//   돌려주는 값은 그 자리에서 지운 것(서버가 없을 때)뿐이다.
+//   cb(gone) — 서버에서 확인하고 교감을 깎은 펫을 나중에 알려 준다 ({ i, n, sp, was, now }).
+//   돌려주는 값은 그 자리에서 깎은 것(서버가 없을 때)뿐이다.
 const petStarveBusy = {};
 function petStarveSweep(cb) {
     const u = petMe();
@@ -522,16 +548,17 @@ function petStarveSweep(cb) {
     }
 
     const cand = Object.keys(ps).filter(function (k) {
-        return PET_BY_ID[k] && petStarveLeft(k, u) <= 0;
+        return PET_BY_ID[k] && petStarveHitLeft(k, u) <= 0;
     });
     if (!cand.length) return [];
 
-    // 서버가 없으면 예전처럼 그 자리에서 지운다
+    // 서버가 없으면 그 자리에서 깎는다 (★ 2026-11-04 — 지우지 않는다)
     if (typeof database === 'undefined' || !database || !u.code) {
+        const now = petNow();
         const gone = cand.map(function (k) {
-            const g = { i: k, n: petNick(k, u), sp: (PET_BY_ID[k] || {}).n };
-            delete ps[k];
-            return g;
+            const was = petBond(k, u), to = Math.max(0, was - PET_DEATH_HIT);
+            ps[k].bond = to; ps[k].stv = now;
+            return { i: k, n: petNick(k, u), sp: (PET_BY_ID[k] || {}).n, was: was, now: to };
         });
         petSave({ pets: 1 });
         return gone;
@@ -540,7 +567,7 @@ function petStarveSweep(cb) {
     return [];
 }
 
-// 서버에서 확인하고 지운다
+// 서버에서 확인하고 교감을 깎는다 (★ 2026-11-04 — 예전에는 지웠다)
 function petStarveCheck(u, k, cb) {
     const code = u.code;
     if (petStarveBusy[code + '/' + k]) return;
@@ -558,43 +585,48 @@ function petStarveCheck(u, k, cb) {
         } catch (e) { return Promise.resolve(petFedMark[String(k)] || null); }
     };
     readMark().then(function (mark) {
-        let killed = false, seen = null;
+        let hit = null, seen = null;
         return database.ref('users/' + code + '/pets/' + k).transaction(function (cur) {
-            killed = false;
+            hit = null;
             if (cur === null) return null;            // 비어 보이면 서버와 견주게 한다
             const own = Number(cur.fedAt) || 0;
             const fed = Math.max(own, petFedOf(k, cur, mark));
             if (!fed) return;                          // 시계가 없는 펫은 건드리지 않는다
-            if (fed + PET_STARVE > petNow()) {
+            const nowT = petNow();
+            if (petStarveDue(cur, fed) > nowT) {
                 if (fed > own) { cur.fedAt = fed; return cur; }   // 덮여 있던 먹인 때를 되살린다
-                return;                                // 살아 있다
+                return;                                // 아직 깎을 때가 아니다
             }
-            killed = true;
-            seen = { own: own, mark: petFedOf(k, cur, mark), at: Number(cur.at) || 0, markB: mark ? Number(mark.b) : null, now: petNow(), skew: (typeof clockState === 'function') ? 'clock.js' : '-' };
-            return null;
+            // ★ 2026-11-04 — 지우지 않고 교감만 70 깎는다 (stv = 깎은 때 · 안 먹이면 사흘 뒤 또)
+            const was = Math.max(0, Math.min(PET_BOND_MAX, Number(cur.bond) || 0));
+            hit = { was: was, now: Math.max(0, was - PET_DEATH_HIT) };
+            cur.bond = hit.now;
+            cur.stv = nowT;
+            if (fed > own) cur.fedAt = fed;
+            seen = { own: own, mark: petFedOf(k, cur, mark), at: Number(cur.at) || 0, markB: mark ? Number(mark.b) : null, now: nowT };
+            return cur;
         }).then(function (r) {
             done();
             const me = petMe();
             if (!me || me.code !== code) return;
             const v = (r && r.snapshot) ? r.snapshot.val() : null;
             const mine = petsOf(me);
-            if (r && r.committed && killed && v === null) {
-                delete mine[String(k)];
-                // ★ 왜 지웠는지 남긴다 (2026-10-29) — 「먹였는데 굶어 죽었다」를 뒤에서 살필 수 있게
+            if (r && r.committed && hit && v) {
+                mine[String(k)] = v;
+                // ★ 왜 깎았는지 남긴다 — 「먹였는데 굶었다」를 뒤에서 살필 수 있게
                 try {
                     const f = function (t) { return t ? new Date(t).toLocaleString('ko-KR') : '없음'; };
                     const why = '[펫] ' + nm + ' 굶주림 셈 — 펫 칸 먹인 때 ' + f(seen && seen.own) + ' · 칸 밖 기록 ' + f(seen && seen.mark)
                         + (seen && seen.markB != null && seen.markB !== seen.at ? ' (기록의 태어난 때가 달라 안 씀)' : '') + ' · 지금 ' + f(seen && seen.now);
                     console.warn(why);
-                    if (typeof addHistoryLog === 'function') addHistoryLog(me, why);
                 } catch (e) { }
-                if (typeof cb === 'function') cb([{ i: String(k), n: nm, sp: sp }]);
+                if (typeof cb === 'function') cb([{ i: String(k), n: nm, sp: sp, was: hit.was, now: hit.now }]);
                 return;
             }
             if (v) {
                 mine[String(k)] = v;                       // 서버 모습으로 맞춘다
                 if (mark) petFedMark[String(k)] = mark;
-                console.log('[펫] ' + nm + ' — 서버에서는 굶지 않았습니다. 살려 둡니다.');
+                console.log('[펫] ' + nm + ' — 서버에서는 아직 교감을 깎을 때가 아닙니다.');
             } else if (r && r.committed) {
                 delete mine[String(k)];                    // 서버에 이미 없다 (다른 화면이 치웠다)
             }
@@ -787,6 +819,7 @@ window.PET = {
     BOND_MAX: PET_BOND_MAX, BOND_DAY: PET_BOND_DAY, PAT_GAP: PET_PAT_GAP,
     PLAY_GAP: PET_PLAY_GAP, STARVE: PET_STARVE, SAVE_ODDS: PET_SAVE_ODDS,
     bond: petBond, bondFull: petBondFull, bondRoom: petBondRoom, bondUp: petBondUp,
+    bondHit: petBondHit, DEATH_HIT: PET_DEATH_HIT, starveHitLeft: petStarveHitLeft,
     starveLeft: petStarveLeft, sweep: petStarveSweep, fedMark: petFedMark, fedNote: petFedNote,
     full: petFull, fillAt: petFillAt,
     SHOW_MAX: PET_SHOW_MAX,

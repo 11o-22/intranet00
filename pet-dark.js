@@ -12,7 +12,7 @@
 //   한 번 나가면 한두 시간, 돌아오면 포인트를 물어 온다. 다녀온 펫은
 //   두 시간 쉰다 — 먹이를 주면 그 시간이 준다 (pet-food.js).
 //
-//   **제 등급보다 높은 구역에 보내면 돌아오지 못한다.** 전부 D 로
+//   **제 등급보다 높은 구역에 보내면 빈손으로 돌아오고 교감이 70 깎인다** (★ 2026-11-04 — 예전에는 돌아오지 못했다). 전부 D 로
 //   깨어나므로 지금은 D 구역만 안전하다. 구역 고르는 창에서 붉게 띄우고
 //   두 번 눌러야 가게 해 두었다.
 //
@@ -170,7 +170,7 @@ window.petSend = function (id, zone) {
         + ' 들어갔습니다.\n\n'
         + (doom
             ? (z.grade + ' 등급입니다. ' + nick + P().josa(nick, '은') + ' '
-               + ((s.g || 'D')) + ' 등급입니다.\n돌아오지 못합니다.')
+               + ((s.g || 'D')) + ' 등급입니다.\n빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다.')
             : (hours + '시간 뒤에 돌아옵니다.')));
 };
 
@@ -193,25 +193,16 @@ function collect(key) {
     const nick = P().nick(key, u);
     const sp = (P().BY[key] || {}).n || '';
 
-    // 제 등급보다 높은 곳에 보낸 펫은 돌아오지 않는다
+    // 제 등급보다 높은 곳에 보낸 펫 — ★ 2026-11-04 죽지 않는다: 빈손으로 돌아오고 교감이 70 깎인다 (쉬는 것은 같다)
     if (s.out.doom) {
-        delete P().pets(u)[String(key)];
-        if (Number(u.petWith) === Number(key)) u.petWith = null;
-        let wrote = false;
-        try {
-            if (typeof database !== 'undefined' && database && u.code) {
-                const up = {};
-                up['pets/' + key] = null;
-                if (u.petWith === null) up.petWith = null;
-                database.ref('users/' + u.code).update(up)
-                    .catch(function (e) { console.warn('[펫] 저장 실패', e); });
-                wrote = true;
-            }
-        } catch (e) { }
-        if (!wrote) { try { if (typeof saveFields === 'function') saveFields({ pets: 1, petWith: 1 }); } catch (e) { } }
+        const grade = s.out.grade || '?';
+        let hit = null;
+        try { hit = P().bondHit(key); } catch (e) { }
+        P().patch(key, { out: null, fed: null, rest: now + P().REST });
+        const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
         log_('[펫 탐사] ' + nick + '(' + sp + ')' + P().josa(nick, '이') + ' ' + z
-            + '에서 돌아오지 못했습니다. (' + (s.out.grade || '?') + '등급)');
-        return { nick: nick, sp: sp, zone: z, pay: 0, dead: true, grade: s.out.grade || '?' };
+            + '에서 빈손으로 돌아왔습니다. (' + grade + '등급) ' + bt);
+        return { nick: nick, sp: sp, zone: z, pay: 0, dead: true, grade: grade, bt: bt };
     }
 
     const got = Math.max(0, Number(s.out.pay) || 0);
@@ -254,15 +245,15 @@ function sweep(quiet) {
             + ' (+' + x.pay.toLocaleString() + ' P)');
     });
     if (live.length > 1) lines.push('', '모두 +' + sum.toLocaleString() + ' P');
-    if (live.length) lines.push('', '두 시간 쉽니다.');
     if (gone.length) {
         if (lines.length) lines.push('');
         gone.forEach(function (x) {
             lines.push('✗ ' + x.nick + '(' + x.sp + ')' + P().josa(x.nick, '은') + ' '
-                + x.zone + '에서 돌아오지 못했습니다.');
+                + x.zone + '에서 빈손으로 돌아왔습니다. ' + (x.bt || ''));
         });
         lines.push('', x_grade(gone));
     }
+    lines.push('', '두 시간 쉽니다.');
     alert_(lines.join('\n'));
     return back;
 }
@@ -271,7 +262,7 @@ function x_grade(gone) {
     const one = g.length && g.every(function (x) { return x === g[0]; }) ? g[0] : null;
     return one
         ? (one + ' 등급은 그 펫의 등급 밖이었습니다.')
-        : '제 등급보다 높은 어둠에서는 돌아오지 못합니다.';
+        : '제 등급보다 높은 어둠에서는 빈손으로 돌아오고 교감이 깎입니다.';
 }
 
 window.petCollect = function () { return sweep(false); };
@@ -318,7 +309,7 @@ window.petPickZone = function (id) {
             + '<div class="pd-sub" style="font-size:10px; color:' + (over ? '#e07a5f' : '#aaa')
             + '; margin-top:3px; font-weight:normal;">'
             + (over
-                ? (esc(k) + ' · 제 등급 밖입니다 — <b>돌아오지 못합니다</b>')
+                ? (esc(k) + ' · 제 등급 밖입니다 — <b>빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다</b>')
                 : (esc(k) + ' · 한두 시간 · ' + lo.toLocaleString() + ' ~ ' + hi.toLocaleString() + ' P'))
             + '</div></button>';
     }).join('');
@@ -329,7 +320,7 @@ window.petPickZone = function (id) {
         + '<div style="font-size:9.5px; color:#6f685e; margin:4px 0 11px 0; line-height:1.6;">'
         + '사원 본인의 탐사 횟수는 쓰지 않습니다.<br>'
         + '<span style="color:#e07a5f;">제 등급(' + esc(s.g || 'D')
-        + ')보다 높은 구역에 보내면 돌아오지 못합니다.</span>'
+        + ')보다 높은 구역에 보내면 빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다.</span>'
         + (s.fed ? '<br><span style="color:#c9a227;">먹인 것이 남아 있습니다 — +'
             + Math.round(s.fed * 100) + '%</span>' : '') + '</div>'
         + rows
@@ -343,7 +334,7 @@ window.petPickZone = function (id) {
                 b.setAttribute('data-arm', '1');
                 const sub = b.querySelector('.pd-sub');
                 if (sub) sub.innerHTML = '<b style="color:#ff8f7a;">한 번 더 누르면 보냅니다. '
-                    + '그 펫은 사라집니다.</b>';
+                    + '빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다.</b>';
                 b.style.setProperty('background', 'linear-gradient(145deg,#7f2a1a,#3a1208)', 'important');
                 b.style.setProperty('border-color', '#e07a5f', 'important');
                 b.style.setProperty('opacity', '1', 'important');
@@ -355,7 +346,7 @@ window.petPickZone = function (id) {
                     b.style.setProperty('opacity', '.8', 'important');
                     const s2 = b.querySelector('.pd-sub');
                     if (s2) s2.innerHTML = esc(b.getAttribute('data-k'))
-                        + ' · 제 등급 밖입니다 — <b>돌아오지 못합니다</b>';
+                        + ' · 제 등급 밖입니다 — <b>빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다</b>';
                 }, 5000);
                 return;
             }
@@ -414,7 +405,7 @@ function html() {
         + '<div style="font-size:9.5px; color:#777; margin-bottom:10px; line-height:1.6;">'
         + '펫은 혼자 들어갑니다. 사원 본인의 탐사 횟수는 쓰지 않습니다.'
         + ' 한두 시간 뒤에 포인트를 물어 옵니다.<br>'
-        + '<span style="color:#e07a5f;">제 등급보다 높은 구역에 보내면 돌아오지 못합니다.</span></div>';
+        + '<span style="color:#e07a5f;">제 등급보다 높은 구역에 보내면 빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다.</span></div>';
 
     if (!keys.length) {
         return head + '<div style="font-size:11px; color:#666; padding:6px 0;">'

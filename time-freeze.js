@@ -153,10 +153,11 @@ U_FN.push(function (u, w) {
     let ch = false;
     each(u.pets, function (p) {
         if (sh(p, 'fedAt', lt, w)) ch = true;               // 포만감 — 먹은 때부터 사흘
+        if (sh(p, 'stv', lt, w)) ch = true;                 // 굶어서 교감을 깎은 때 — 안 먹이면 사흘 뒤 또 (pet-data.js)
         if (p.out && sh(p.out, 'till', dl, w)) ch = true;   // 혼자 탐사 — 돌아오는 때
         if (sh(p, 'rest', dl, w)) ch = true;                // 탐사 뒤 쉼
         if (sh(p, 'jsleep', dl, w)) ch = true;              // 여정 뒤 잠
-        if (p.hurt && typeof p.hurt === 'object') {         // 다친 펫 — 다친 때부터 2시간이면 죽는다
+        if (p.hurt && typeof p.hurt === 'object') {         // 다친 펫 — 다친 때부터 2시간이면 교감 -70
             if (sh(p.hurt, 'at', lt, w)) ch = true;
             if (sh(p.hurt, 'last', lt, w)) ch = true;
         }
