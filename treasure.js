@@ -92,7 +92,18 @@ function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null
 function db_() { return (typeof database !== 'undefined' && database) ? database : null; }
 function isAdm() { const u = u_(); return !!(u && u.code === ADMIN); }
 function alert_(m) { try { if (typeof showCustomAlert === 'function') showCustomAlert(m); else console.log(m); } catch (e) { } }
-function today() { try { if (typeof getTodayStr === 'function') return getTodayStr(); } catch (e) { } const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+// ★ 날짜는 **서버 시각 · 한국 날짜**로 센다 (2026-11-04 — 「백일몽 로비에 선물상자들이 계속 돌아다닌다」)
+//   예전에는 기기 날짜(getTodayStr)였다. 기기 날짜가 다른 사람(시간대가 다르거나 날짜를 바꿔 둔 기기)이 같은 방에 있으면
+//   서로 상대가 깐 상자를 「오늘 것이 아니다」로 보고 새 자리에 다시 깔았다 — 그것을 또 상대가 다시 깔아,
+//   사람이 많은 로비에서 상자가 쉴 새 없이 자리를 옮겼다. 꼴(YYYY-MM-DD)은 예전과 같다.
+function today() {
+    let t = Date.now();
+    try { if (typeof window.serverNow === 'function') { const s = Number(window.serverNow()); if (s > 1.5e12) t = s; } } catch (e) { }
+    const d = new Date(t + 9 * 3600000);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+// 서버 시계가 섰나 — 서기 전(들어온 직후 몇 초)에는 기기 시계라 상자를 깔지 않는다
+function clockOk() { try { return typeof window.clockReady !== 'function' || !!window.clockReady(); } catch (e) { return true; } }
 function rooms() { try { return PLAZA.ROOMS; } catch (e) { return {}; } }
 function baseOf(w) { try { return (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || ''); } catch (e) { return String(w || ''); } }
 function wears(u, name) { return !!(u && Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return baseOf(w) === name; })); }
@@ -159,10 +170,11 @@ function newSpot(key, avoid) {
 // 지금 방의 상자 — 서버에서 듣는다
 // ==========================================
 let curRoom = '', ref = null, boxes = {};
+let lastFill = 0, gotRoom = '';          // gotRoom — 서버 값을 한 번이라도 받은 방 (받기 전에는 빈 줄 알고 깔면 안 된다)
 function listen(key) {
     if (key === curRoom) return;
     if (ref) { try { ref.off(); } catch (e) { } ref = null; }
-    curRoom = key; boxes = {};
+    curRoom = key; boxes = {}; gotRoom = '';
     paint(true);
     const d = db_();
     if (!d || !key || !rooms()[key]) return;
@@ -170,21 +182,37 @@ function listen(key) {
     ref.on('value', function (s) {
         if (curRoom !== key) return;
         boxes = s.val() || {};
-        // 빈 자리는 들어와 있는 사람이 채운다 (여럿이 채워도 트랜잭션이라 하나만 들어간다)
-        //   한꺼번에 채울 때 서로 겹치지 않게 — 방금 고른 자리도 피한다
-        //   오늘 깐 것이 아니면(어제 것 · 예전 꼴) 새로 깐다 — 연 상자는 그날 안에는 다시 생기지 않는다
-        const made = Object.keys(boxes).map(function (k) { return boxes[k]; }).filter(fresh);
-        for (let i = 0; i < PER_ROOM; i++) {
-            if (fresh(boxes[i])) continue;
-            const sp = newSpot(key, made);
-            if (sp) { made.push(sp); seed(key, i, sp); }
-        }
+        gotRoom = key;
+        fill(key);
         paint(true);
     });
 }
+// 빈 자리는 들어와 있는 사람이 채운다 (여럿이 채워도 트랜잭션이라 하나만 들어간다)
+//   한꺼번에 채울 때 서로 겹치지 않게 — 방금 고른 자리도 피한다
+//   오늘 깐 것이 아니면(어제 것 · 예전 꼴) 새로 깐다 — 연 상자는 그날 안에는 다시 생기지 않는다
+//   ★ 서버 시계가 서기 전에는 깔지 않는다 — 서면 아래 시계가 다시 부른다
+//   ★ 날짜가 오늘보다 **뒤**인 상자(자정 무렵 시계가 조금 앞선 사람이 먼저 깐 것)는 그대로 둔다 — 서로 다시 깔며 다투지 않게
+function fill(key) {
+    if (!clockOk() || key !== curRoom) return;
+    const made = Object.keys(boxes).map(function (k) { return boxes[k]; }).filter(keep);
+    for (let i = 0; i < PER_ROOM; i++) {
+        if (keep(boxes[i])) continue;
+        const sp = newSpot(key, made);
+        if (sp) { made.push(sp); seed(key, i, sp); }
+    }
+}
 function seed(key, i, sp) {
     const d = db_(); if (!d) return;
-    d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) { return fresh(cur) ? cur : sp; });
+    d.ref(ROOT + '/' + key + '/' + i).transaction(function (cur) { return keep(cur) ? cur : sp; });
+}
+// 오늘 것이거나, 하루 앞선 것 (자정을 넘긴 사람이 먼저 깐 것)
+function keep(b) {
+    if (fresh(b)) return true;
+    if (!b || typeof b.day !== 'string') return false;
+    const t = today();
+    if (b.day <= t) return false;
+    const n = new Date(Date.parse(t + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+    return b.day === n;
 }
 function fresh(b) { return !!(b && b.day === today()); }
 function live(b) { return fresh(b) && !b.taken; }
@@ -246,7 +274,16 @@ setInterval(function () {
     try {
         const key = (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : '';
         if (key !== curRoom) listen(key);
-        else paint(false);
+        else {
+            paint(false);
+            // 시계가 서기 전에 들어온 방 · 자정이 지난 방 — 비어 있거나 어제 것인 자리를 채운다 (5초마다 한 번 살핀다)
+            if (Date.now() - lastFill > 5000) {
+                lastFill = Date.now();
+                let need = false;
+                for (let i = 0; i < PER_ROOM; i++) if (!keep(boxes[i])) need = true;
+                if (need && ref && gotRoom === curRoom) fill(curRoom);
+            }
+        }
     } catch (e) { }
 }, 400);
 
