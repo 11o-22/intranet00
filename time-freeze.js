@@ -13,7 +13,9 @@
 //   그동안 시간이 흐르지 않은 것과 같다.
 //     · 끝 시각 D (물약 · 격리 · 안대 · 노예 계약 …) — 셧다운이 시작될 때 아직 안 끝났으면(D > 시작) 셧다운 길이(8시간)만큼 늦춘다.
 //     · 시작 시각 L (포만감 · 오염이 마지막으로 줄거나 오른 때, 펫이 마지막으로 먹은 때, 쿨타임 …) — 셧다운 안에서 흐른 만큼 늦춘다.
-//   ★ 감금실(cage.js · cage-plus.js)은 건드리지 않는다 (사용자).
+//   ★ 감금실(cage.js · cage-plus.js — cage · cageUse · cageRoom · houseBank · 임신의 cageCut)은 건드리지 않는다 (사용자).
+//   ★ 탐사 도중 셧다운으로 로그아웃되면 — 어둠 탐사는 「나간 때」를 셧다운 끝으로 밀어, 끝난 뒤 5분 안에 돌아오면 이어진다.
+//     (kroom · 달 · 파티 도우미의 이어 하기는 브라우저에만 적혀 있어 6시간이 넘으면 끊긴다 — 여기서 못 민다)
 //
 // ■ 누가 미나 — 쉬는 시간이 끝난 뒤 처음 화면을 연 사람(누구든)이 모든 사원 것을 한 번에
 //   · freeze/done = 마지막으로 민 쉬는 시간의 날짜('YYYY-MM-DD'). 더 늦게 끝난 쉬는 시간이 있으면 민다.
@@ -40,7 +42,7 @@ function cu() { try { return (typeof currentUser !== 'undefined') ? currentUser 
 //   w = { id, a, b } 쉬는 시간 한 칸
 function dl(v, w) {                         // 끝 시각 — 시작 때 아직 안 끝났으면 통째로
     v = Number(v);
-    if (!v || !isFinite(v) || v <= w.a) return null;
+    if (!v || !isFinite(v) || v <= w.a || v >= 1e14) return null;     // 1e14 넘는 것은 「끝이 없다」는 표시 (고정 효과 등)
     return v + (w.b - w.a);
 }
 function lt(v, w) {                         // 시작 시각 — 그 뒤 쉬는 시간 안에서 흐른 만큼
@@ -49,22 +51,34 @@ function lt(v, w) {                         // 시작 시각 — 그 뒤 쉬는 
     const d = w.b - Math.max(w.a, v);
     return d > 0 ? v + d : null;
 }
+// o[k] 를 민다 — 바뀌었으면 true
+function sh(o, k, f, w) {
+    if (!o || typeof o !== 'object') return false;
+    const v = f(o[k], w);
+    if (v == null) return false;
+    o[k] = v;
+    return true;
+}
+function each(o, fn) { if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === 'object') fn(o[k], k); }); }
 
 // ==========================================
 // 무엇을 미나 — 사원 기록 (users/<사번>)
 // ==========================================
-const U_DL = [];          // 끝 시각 칸 (아래에서 채운다)
+//   ★ 감금실(cage · cageUse · cageRoom · houseBank · preg.cageCut)은 넣지 않는다 (사용자).
+const U_DL = [];          // 끝 시각 칸
 const U_LT = [];          // 시작 시각 칸
-const U_FN = [];          // 안쪽까지 봐야 하는 것 — function (u, w) → 바뀐 칸 이름들
+const U_FN = [];          // 안쪽까지 봐야 하는 것 — function (u, w) → 바뀐 최상위 칸 이름들
 const G = [];             // 사원 밖 자리 — { path, fn(val, w, up, path) } : 그 자리 값을 받아 바뀐 것을 up['경로'] 에 적는다 (val 도 고친다)
 
-// ── 사원 기록의 끝 시각 · 시작 시각 (index.html checkPassivePollution 등)
 [
     'quarantineUntil',        // 여우 상담실 · 선녀탕 격리 (감금실과 다르다)
+    'qSteadyAt',              // 굳건이 이미 줄인 격리 끝 — quarantineUntil 과 === 로 견주므로 똑같이 민다 (attr2.js)
     'slaveUntil',             // 노예 계약 (slaveFixed 면 끝이 없어 안 민다)
     'blindfoldUntil', 'nostalgiaUntil', 'hairUntil', 'satHoldUntil', 'pollFreezeUntil', 'securityPurgeUntil', 'noteGlowUntil',
     'petStayUntil', 'petSleepUntil',
-    'copyExpire', 'glassesExpire', 'garterExpire', 'butterKnifeExpireTime', 'silverRingExpireTime'
+    'glassesExpire', 'garterExpire', 'butterKnifeExpireTime', 'silverRingExpireTime', 'jakduExpireTime',
+    'dollPt',                 // 봉제 인형 사흘
+    'dollKitAt'               // 인형 꾸러미 나흘 기다림
 ].forEach(function (k) { U_DL.push(k); });
 [
     'lastSatietyTime',        // 포만감 — 2시간마다 5 줄어든다
@@ -72,21 +86,172 @@ const G = [];             // 사원 밖 자리 — { path, fn(val, w, up, path) 
     'nostalgiaLastReduced',   // 노스텔지어 끈 — 5분마다 오염 1 줄인다
     'securityPurgeLast',      // 보안팀 의상 — 10분마다 오염 3 줄인다
     'lastAlienPlayTime',      // 우주 쇼핑몰 — 다음 연결까지 2시간
-    'bloodBathEquippedAt'     // 혈욕조 — 하루 3시간까지 차는 시간
+    'bloodBathEquippedAt',    // 혈욕조 — 하루 3시간까지 차는 시간
+    'quarFood',               // 음식 때문에 격리된 때 (30시간 믿는다)
+    'moonT4At',               // 달 ④ — 5시간 창
+    'violinAt',               // 바이올린 — 한 시간마다 (violinPaid 와 함께 센다)
+    'petActAt',               // 펫 말썽 — 2시간 간격
+    'petGaveAt'               // 펫 넘기기 — 사흘 간격
 ].forEach(function (k) { U_LT.push(k); });
+
 // 걸린 효과(물약 …) — 고정이 아닌 것의 끝 시각
 U_FN.push(function (u, w) {
-    const L = u.timedEffects;
-    if (!L || typeof L !== 'object') return [];
     let ch = false;
-    Object.keys(L).forEach(function (i) {
-        const e = L[i];
-        if (!e || e.fixed) return;
-        const v = dl(e.expireAt, w);
-        if (v != null) { e.expireAt = v; ch = true; }
-    });
+    each(u.timedEffects, function (e) { if (!e.fixed && sh(e, 'expireAt', dl, w)) ch = true; });
     return ch ? ['timedEffects'] : [];
 });
+// 버프 · 호가호위 · 그 문구 · 역병 — 끝 시각 (until). 탐사 한 번짜리(run) 버프는 시간이 없어 그대로
+U_FN.push(function (u, w) {
+    const out = [];
+    ['itemBuffs', 'foxBuffs', 'foxNotes', 'foxPl'].forEach(function (k) {
+        let ch = false;
+        each(u[k], function (b) { if (sh(b, 'until', dl, w)) ch = true; });
+        if (ch) out.push(k);
+    });
+    return out;
+});
+// 붉은 리본 — 한 시간 포만 묶음 (u = 끝 시각 · 두 사람 기록에 같은 값이라 똑같이 밀린다)
+U_FN.push(function (u, w) {
+    let ch = false;
+    each(u.ribbons, function (r) { if (sh(r, 'u', dl, w)) ch = true; });
+    return ch ? ['ribbons'] : [];
+});
+// 복사기로 찍은 것 — [{ n, at }] (예전 꼴 { 이름: 끝 시각 } 도)
+U_FN.push(function (u, w) {
+    const c = u.copyExpire;
+    if (!c || typeof c !== 'object') return [];
+    let ch = false;
+    if (Array.isArray(c)) c.forEach(function (x) { if (x && sh(x, 'at', dl, w)) ch = true; });
+    else Object.keys(c).forEach(function (k) {
+        if (c[k] && typeof c[k] === 'object') { if (sh(c[k], 'at', dl, w)) ch = true; }
+        else if (sh(c, k, dl, w)) ch = true;
+    });
+    return ch ? ['copyExpire'] : [];
+});
+// 여우 부름 · 음식 격리 표시 — 격리 끝을 베껴 둔 값이라 똑같이 민다 (부름의 at 은 차례 표시라 안 민다)
+U_FN.push(function (u, w) {
+    const out = [];
+    if (u.foxCall && sh(u.foxCall, 'until', dl, w)) out.push('foxCall');
+    if (u.quarCause) {
+        const a = sh(u.quarCause, 'until', dl, w), b = sh(u.quarCause, 'at', lt, w);
+        if (a || b) out.push('quarCause');
+    }
+    return out;
+});
+// 도깨비 — 지켜 주는 12시간(on) · 쉬는 12시간(cd) · 이미 준 cd(paid — cd 와 === 로 견준다)
+U_FN.push(function (u, w) {
+    const d = u.dok;
+    if (!d || typeof d !== 'object') return [];
+    const paidWasCd = d.paid != null && d.paid === d.cd;
+    let ch = sh(d, 'on', dl, w);
+    if (sh(d, 'cd', dl, w)) { ch = true; if (paidWasCd) d.paid = d.cd; }
+    return ch ? ['dok'] : [];
+});
+// 펫 — 먹은 때(포만감) · 혼자 탐사 · 쉼 · 잠 · 다침 · 쓰다듬기 · 놀기 · 알 돌보기
+U_FN.push(function (u, w) {
+    const out = [];
+    let ch = false;
+    each(u.pets, function (p) {
+        if (sh(p, 'fedAt', lt, w)) ch = true;               // 포만감 — 먹은 때부터 사흘
+        if (p.out && sh(p.out, 'till', dl, w)) ch = true;   // 혼자 탐사 — 돌아오는 때
+        if (sh(p, 'rest', dl, w)) ch = true;                // 탐사 뒤 쉼
+        if (sh(p, 'jsleep', dl, w)) ch = true;              // 여정 뒤 잠
+        if (p.hurt && typeof p.hurt === 'object') {         // 다친 펫 — 다친 때부터 2시간이면 죽는다
+            if (sh(p.hurt, 'at', lt, w)) ch = true;
+            if (sh(p.hurt, 'last', lt, w)) ch = true;
+        }
+        if (sh(p, 'pat', lt, w)) ch = true;
+        if (sh(p, 'play', lt, w)) ch = true;
+    });
+    if (ch) out.push('pets');
+    if (u.petEgg && sh(u.petEgg, 'last', lt, w)) out.push('petEgg');
+    return out;
+});
+// 임신 — 낳는 때(due) · 아빠마다 시작(sires[].at — due 를 다시 셀 때 쓴다) · 돌봄 간격(careAt)
+U_FN.push(function (u, w) {
+    const g = u.preg;
+    if (!g || typeof g !== 'object') return [];
+    let ch = sh(g, 'due', dl, w);
+    each(g.sires, function (x) { if (sh(x, 'at', lt, w)) ch = true; });
+    if (g.careAt && typeof g.careAt === 'object') Object.keys(g.careAt).forEach(function (k) { if (sh(g.careAt, k, lt, w)) ch = true; });
+    return ch ? ['preg'] : [];
+});
+// 금고 이자 · 칭호 열흘 · 지산 · 칠성군 · 눈(우주 쇼핑몰 되돌리기)
+U_FN.push(function (u, w) {
+    const out = [];
+    let ch = false;
+    each(u.safeBoxes, function (b) { if (sh(b, 'lastInterest', lt, w)) ch = true; });
+    if (ch) out.push('safeBoxes');
+    if (u.ti && typeof u.ti === 'object') {
+        const a = sh(u.ti, 'pureFrom', lt, w), b = sh(u.ti, 'healthFrom', lt, w);
+        if (a || b) out.push('ti');
+    }
+    ch = false;
+    each(u.jisanSac, function (x) { if (sh(x, 'at', lt, w)) ch = true; });
+    if (ch) out.push('jisanSac');
+    if (u.chilRun && sh(u.chilRun, 'at', lt, w)) out.push('chilRun');
+    if (u.eyeAlienSnap && sh(u.eyeAlienSnap, 'last', lt, w)) out.push('eyeAlienSnap');
+    return out;
+});
+
+// ==========================================
+// 사원 밖 자리
+// ==========================================
+function gEach(val, path, fn) { each(val, function (x, k) { fn(x, path + '/' + k); }); }
+function put(up, path, o, k) { up[path + '/' + k] = o[k]; }
+// 펫 포만감 사본 — petFed/<사번>/<펫>.f (먹은 때)
+G.push({ path: 'petFed', fn: function (val, w, up, path) {
+    gEach(val, path, function (byPet, p1) { gEach(byPet, p1, function (x, p2) { if (sh(x, 'f', lt, w)) put(up, p2, x, 'f'); }); });
+} });
+// 은행 — 대출 갚을 날 · 이자 · 빌린 때 · 블랙리스트 창 · 쿨타임
+G.push({ path: 'bank', fn: function (val, w, up, path) {
+    gEach(val, path, function (b, p1) {
+        ['lastInterest', 'lastGainAt', 'vipRejectedAt'].forEach(function (k) { if (sh(b, k, lt, w)) put(up, p1, b, k); });
+        if (b.loan && typeof b.loan === 'object') {
+            if (sh(b.loan, 'dueAt', dl, w)) put(up, p1 + '/loan', b.loan, 'dueAt');
+            if (sh(b.loan, 'takenAt', lt, w)) put(up, p1 + '/loan', b.loan, 'takenAt');
+        }
+        if (b.loanTimes && typeof b.loanTimes === 'object') {
+            let ch = false;
+            Object.keys(b.loanTimes).forEach(function (k) { if (sh(b.loanTimes, k, lt, w)) ch = true; });
+            if (ch) put(up, p1, b, 'loanTimes');
+        }
+    });
+} });
+// 어둠 탐사 이어 하기 — 나간 때(savedAt). 셧다운이 로그아웃시키므로, 끝난 뒤 5분 안에 돌아오면 이어진다
+G.push({ path: 'darkRuns', fn: function (val, w, up, path) {
+    gEach(val, path, function (r, p1) { if (sh(r, 'savedAt', lt, w)) put(up, p1, r, 'savedAt'); });
+} });
+// 가두리(펫 배틀 · 여정 · 이상한 나라 · 여우) — 갇힌 때 · 풀리는 때. 감금실이 아니다
+G.push({ path: 'gaduri', fn: function (val, w, up, path) {
+    gEach(val, path, function (room, p1) { gEach(room, p1, function (x, p2) {
+        if (sh(x, 'until', dl, w)) put(up, p2, x, 'until');
+        if (sh(x, 'at', lt, w)) put(up, p2, x, 'at');
+    }); });
+} });
+// 장터 — 올린 때 (사흘 지나면 돌려준다)
+G.push({ path: 'market', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) { if (sh(x, 'at', lt, w)) put(up, p1, x, 'at'); });
+} });
+// 사원 사이 거래 제안 — 만든 때 (기다리는 것만 · 24시간)
+G.push({ path: 'p2pDeals', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) { if (x.status === 'PENDING' && sh(x, 'createdAt', lt, w)) put(up, p1, x, 'createdAt'); });
+} });
+// 탄원서(격리) — 낸 때 · 정해진 때 (24시간 · 30분 간격)
+G.push({ path: 'pleas', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) {
+        if (x.state === 'PENDING' && sh(x, 'at', lt, w)) put(up, p1, x, 'at');
+        if (sh(x, 'decidedAt', lt, w)) put(up, p1, x, 'decidedAt');
+    });
+} });
+// 토크쇼 피날레 풀려남 소식 — 사흘 기다린다
+G.push({ path: 'talkFinale', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) { if (sh(x, 'at', lt, w)) put(up, p1, x, 'at'); });
+} });
+// 팝업 알림 — 올린 때 (한 시간 띄우고 하루 두었다 지운다)
+G.push({ path: 'popupNotices', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) { if (sh(x, 'at', lt, w)) put(up, p1, x, 'at'); });
+} });
 
 // 한 사원 — 바뀐 최상위 칸 이름 목록
 function shiftUser(u, w) {
@@ -110,6 +275,12 @@ function pendingWins() {
     return window.restWindows(0, now).filter(function (w) { return w.b <= now && (!done || w.id > done); });
 }
 // 아직 밀지 않은 끝난 쉬는 시간이 있나 (모르면 — 아직 freeze/done 을 못 받았으면 — 끝난 쉬는 시간이 하나라도 있으면 있다고 본다)
+function lastEnd() {
+    if (typeof window.restWindows !== 'function') return 0;
+    const now = srv();
+    const all = window.restWindows(0, now).filter(function (w) { return w.b <= now; });
+    return all.length ? all[all.length - 1].b : 0;
+}
 window.timeFreezePending = function () {
     if (typeof window.restWindows !== 'function') return false;
     const now = srv();
@@ -195,8 +366,9 @@ setInterval(run, 3000);
         if (typeof f !== 'function') return;
         clearInterval(iv);
         if (f._frz) return;
+        // ★ 밀기가 계속 실패해도 효과가 영영 안 끝나는 일은 없게 — 쉬는 시간이 끝나고 10분이 지나면 기다리지 않는다
         const w = function () {
-            if (window.timeFreezePending()) { run(); return; }
+            if (window.timeFreezePending() && srv() - lastEnd() < 10 * 60000) { run(); return; }
             return f.apply(this, arguments);
         };
         w._frz = true;
