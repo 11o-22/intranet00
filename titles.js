@@ -155,6 +155,10 @@ const ADMIN_ONLY = ['여우구슬', '금고'];
 // 진열 확률이 0.1% 라 사실상 막혀 있는 것 (newitems2.js RARE_RATE)
 const TOO_RARE = ['황룡의 눈', '산군의 도움'];
 
+// 콜렉터에서 빼는 것 (2026-11-04 사용자 「컬렉터 호칭에서 정갈한 문패랑 오색 신발끈은 빼자」)
+//   판에서 내렸지만(rare-odds.js NEVER) 늦게 밀어 넣는 자리가 있어 목록에 다시 섞일 수 있다 — 여기서 확실히 뺀다
+const COLLECT_SKIP = ['정갈한 문패', '오색 신발끈'];
+
 // ==========================================
 // 컬렉터 — 테두리 전부
 // ==========================================
@@ -229,6 +233,7 @@ function alienPool() {
     const out = ALIEN_ITEMS_POOL.filter(function (n) {
         if (ADMIN_ONLY.indexOf(n) >= 0) return false;
         if (TOO_RARE.indexOf(n) >= 0) return false;
+        if (COLLECT_SKIP.indexOf(n) >= 0) return false;
         if (typeof ITEM_CATALOG === 'undefined' || !ITEM_CATALOG[n]) return false;
         return true;
     });
