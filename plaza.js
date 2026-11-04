@@ -1021,7 +1021,7 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.04);border:1px solid #2b2b38;color:#b5ab9a;',
         '  white-space:nowrap;cursor:pointer;font-family:inherit;}',
         '.plaza-row .pick button.on{background:rgba(217,160,90,.18);border-color:#8a6a2a;color:#ffe9bd;}',
-        // 악세 몇 개 달렸나 (3개까지)
+        // 악세 몇 개 달렸나 (5개까지)
         '.plaza-row .pick .cnt{flex:0 0 auto;align-self:center;font-size:10px;color:#9a948a;}',
         // ── 가방(소지품) — 갈래마다 벌여 놓고, 누르면 그 밑에 한 칸이 펴진다
         '.bag-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}',

@@ -94,7 +94,7 @@
 //
 //   상·하의는 따로 입고 벗는다. 겉옷·구두·망토 줄은 상담사 옷장에만 보이고,
 //   악세는 상담사와 적어 둔 사번에게만 보인다 (nos).
-//   ★ 악세만 **세 개까지 겹쳐 단다** (칸에 max:3). 옷장에서는 「악세 1·2·3」
+//   ★ 악세만 **다섯 개까지 겹쳐 단다** (칸에 max:5 · 2026-11-04 사용자 — 전에는 셋). 옷장에서는 「악세 1·2·3」
 //     세 줄로, 광장 가방에서는 눌러서 달고 다시 눌러 벗는 식이다.
 //     적힐 때는 쉼표로 이은 한 줄 — 'cat,veil,gat'.
 //   옷을 더 그려 주시면 아래 DOT_SLOTS 에 한 줄씩 보태면 된다.
@@ -488,11 +488,11 @@ const DOT_SLOTS = [
         // ★ 악세는 **머리 위**에 얹는다 (over 가 아니라 top).
         //   고양이 귀가 머리카락에 가려지면 안 되기 때문이다.
         //
-        // ★ max — 이 칸만 **세 개까지 겹쳐 단다.**
+        // ★ max — 이 칸만 **다섯 개까지 겹쳐 단다** (2026-11-04 사용자 — 전에는 셋).
         //   적힐 때는 쉼표로 이은 한 줄이다 ('cat,veil,gat'). 'cat' 하나만
         //   적힌 묵은 자료도 그대로 읽힌다 (accSplit 참고). 겹침 차례는
         //   적힌 차례 그대로다 — 먼저 적힌 것이 아래로 간다.
-        k: 'acc', n: '악세', max: 3, items: [
+        k: 'acc', n: '악세', max: 5, items: [
             { i: '', n: '없음', top: [] },
             { i: 'cat', n: '고양이', top: ['cat'], nos: ['9013', '8634', '8449'], cat: '머리' },
             // ★ 베일은 일부러 **덜 비치게** 그려 주셨다 (알파 163).
@@ -677,7 +677,7 @@ function accSplit(v) {
         .map(function (x) { return x.trim(); })
         .filter(function (x, i, a) { return x && a.indexOf(x) === i; });
 }
-function accJoin(a, max) { return a.filter(Boolean).slice(0, max || 3).join(','); }
+function accJoin(a, max) { return a.filter(Boolean).slice(0, max || 5).join(','); }
 // 밖(광장 가방)에서도 몇 개까지인지 알아야 한다
 window.dotAccMax = function () { const s = slotOf('acc'); return (s && s.max) || 1; };
 window.dotAccList = accSplit;
@@ -1471,7 +1471,7 @@ function paintDoll() {
 //   자리가 0 으로 돌아가, 방금 고른 단추가 화면 밖으로 사라진다.
 //   그래서 켜짐 표시(on)만 갈아 끼우고 칸은 그대로 둔다.
 //
-// 악세는 세 개까지 겹친다 (DOT_SLOTS 의 max). 누르면 달고 다시 누르면 벗는다.
+// 악세는 다섯 개까지 겹친다 (DOT_SLOTS 의 max). 누르면 달고 다시 누르면 벗는다.
 const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '그 밖'];
 
 function esc_(s) {
@@ -1538,7 +1538,7 @@ function buildRows(u) {
                 }).join(''));
             });
         }
-        html += '<div class="cl-h">악세 <i>세 개까지</i></div>'
+        html += '<div class="cl-h">악세 <i>' + max + '개까지</i></div>'
             + (acc || '<div class="cl-none">가진 악세가 없습니다.</div>');
     }
 
