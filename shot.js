@@ -32,9 +32,18 @@
 //   넓이만 좁아진다. 방 밖(검은 데)이 들어오지 않게 가장자리에서 멈춘다.
 //   글씨·말풍선은 배로 나눠 두어, 당겨도 글자만 커지지 않는다.
 //
+// ■ 📸 배경 전체 (2026-11-04 사용자 — 「포토존 전체 배경으로 찍을 수 있는 스크린샷 모드」)
+//
+//   포토존 방에서는 카메라를 누르면 **방 그림 전체**를 한 장으로 찍는다 (화면에 안 보이는 양옆까지).
+//   방에 있는 사람은 화면 밖에 있던 사람까지 모두 제자리에 넣는다 (plazaShotData(true)).
+//   포토존 그림은 도트 한 칸이 한 점인 800 폭 파일이라, 정수배(×3 → 2400 폭)로 키워 또렷하게 그린다.
+//   이름표 · 말풍선은 화면에서 보이던 비율 그대로 (사람과 같이 커진다).
+//   보는 창에서 「배경 전체 · 화면 · ×1.5 · ×2 · ×3」 사이를 오갈 수 있다 (포토존이 아니면 「배경 전체」는 없다).
+//
 // ■ 콘솔
-//       shotNow()     지금 바로 한 장 (전체)
-//       shotNow(2)    두 배로 당겨서
+//       shotNow()        지금 바로 한 장 (화면 그대로)
+//       shotNow(2)       두 배로 당겨서
+//       shotNow('all')   방 그림 전체 (포토존)
 
 (function shotCam() {
 
@@ -44,8 +53,8 @@ let busy = false;
 function el(id) { return document.querySelector('#' + id); }
 
 // 광장 안쪽 값을 물어본다 (plaza.js 가 내어 준 문)
-function look() {
-    try { return (typeof window.plazaShotData === 'function') ? window.plazaShotData() : null; }
+function look(all) {
+    try { return (typeof window.plazaShotData === 'function') ? window.plazaShotData(!!all) : null; }
     catch (e) { return null; }
 }
 
@@ -75,12 +84,25 @@ function bubble(g, x, y, w, h, tipX, u) {
 //   ★ 당겨 찍기(zoom) — **나를 가운데 두고** 그만큼 크게 그린다.
 //     사진 크기(창 크기)는 그대로 두고 담기는 넓이만 좁아진다.
 //     글씨·말풍선은 배로 나눠 두어 당겨도 글자가 커지지 않는다.
+const FULL_W = 2400;            // 배경 전체 — 사진 폭 (포토존 800 폭 그림의 세 배)
 async function draw(zoom) {
-    const d = look();
+    const FULL = (zoom === 'all');
+    const d = look(FULL);
     if (!d) throw new Error('광장이 아닙니다');
-    const Z = Math.max(1, Math.min(4, Number(zoom) || 1));
-    const u = 1 / Z;                                 // 화면 한 칸 = 밑그림 u 칸
-    const W = Math.round(d.vw), H = Math.round(d.vh);
+    const room = await load(d.room.img);
+    let Z = 1, u, W, H, F = 1;
+    if (FULL) {
+        // 방 그림 전체 — 도트 그림(pix)은 파일 한 점이 정수배가 되게 키운다
+        const nat = room.naturalWidth || d.room.w;
+        W = d.room.pix ? nat * Math.max(2, Math.round(FULL_W / nat)) : Math.round(Math.min(FULL_W, d.room.w * 2));
+        F = W / d.room.w;                            // 화면 한 칸 = 사진 F 칸
+        H = Math.round(d.room.h * F);
+        u = 1;                                       // 글씨 · 말풍선도 사람과 같이 커진다 (화면에서 보이던 비율 그대로)
+    } else {
+        Z = Math.max(1, Math.min(4, Number(zoom) || 1));
+        u = 1 / Z;                                   // 화면 한 칸 = 밑그림 u 칸
+        W = Math.round(d.vw); H = Math.round(d.vh);
+    }
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
@@ -107,12 +129,16 @@ async function draw(zoom) {
     }
 
     g.save();
-    g.translate(W / 2, H / 2);
-    g.scale(Z, Z);
-    g.translate(-fx, -fy);
+    if (FULL) {
+        g.scale(F, F);
+        g.translate(d.cx, d.cy);                     // 방 그림 왼쪽 위가 사진 (0, 0)
+    } else {
+        g.translate(W / 2, H / 2);
+        g.scale(Z, Z);
+        g.translate(-fx, -fy);
+    }
 
     // 1) 방 그림 — 화면에 깔린 그 자리·그 크기로 통째로 깐다
-    const room = await load(d.room.img);
     g.imageSmoothingEnabled = !d.room.pix;          // 포토존은 도트 그림이라 흐리게 늘리지 않는다
     g.drawImage(room, rx0, ry0, d.room.w, d.room.h);
 
@@ -178,13 +204,15 @@ async function draw(zoom) {
     g.restore();
     g.imageSmoothingEnabled = true;
 
-    // 3) 어디에서 찍었는지 한 줄
-    g.font = 'bold 11px -apple-system, system-ui, sans-serif';
+    // 3) 어디에서 찍었는지 한 줄 (배경 전체는 사진이 큰 만큼 글씨도 키운다)
+    const L = FULL ? F : 1;
+    g.font = 'bold ' + (11 * L) + 'px -apple-system, system-ui, sans-serif';
     g.textAlign = 'left';
-    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.8)';
-    g.strokeText('📍 ' + d.room.name, 12, H - 14);
+    g.lineWidth = 3 * L; g.strokeStyle = 'rgba(0,0,0,.8)';
+    g.strokeText('📍 ' + d.room.name, 12 * L, H - 14 * L);
     g.fillStyle = '#ffe9bd';
-    g.fillText('📍 ' + d.room.name, 12, H - 14);
+    g.fillText('📍 ' + d.room.name, 12 * L, H - 14 * L);
+    cv._photo = !!d.room.photo;
     return cv;
 }
 
@@ -196,15 +224,16 @@ async function draw(zoom) {
 const ZOOMS = [1, 1.5, 2, 3];
 
 function show(cv, name, z) {
+    const zs = (cv._photo ? ['all'] : []).concat(ZOOMS);
     const old = el('shot-ov'); if (old) old.remove();
     const url = cv.toDataURL('image/png');
     const d = document.createElement('div');
     d.id = 'shot-ov';
     d.innerHTML = '<div class="sh-card">'
         + '<img src="' + url + '" alt="찍은 사진">'
-        + '<div class="sh-zoom">' + ZOOMS.map(function (x) {
+        + '<div class="sh-zoom">' + zs.map(function (x) {
             return '<button data-z="' + x + '"' + (x === z ? ' class="on"' : '') + '>'
-                + (x === 1 ? '전체' : '×' + x) + '</button>';
+                + (x === 'all' ? '배경 전체' : x === 1 ? (cv._photo ? '화면' : '전체') : '×' + x) + '</button>';
         }).join('') + '</div>'
         + '<div class="sh-row">'
         + '<a class="sh-btn go" download="' + name + '" href="' + url + '">저장</a>'
@@ -216,21 +245,21 @@ function show(cv, name, z) {
     d.addEventListener('pointerdown', function (e) { if (e.target === d) d.remove(); });
     d.querySelector('#shot-x').onclick = function () { d.remove(); };
     Array.prototype.forEach.call(d.querySelectorAll('.sh-zoom button'), function (b) {
-        b.onclick = function () { take(Number(b.dataset.z)); };
+        b.onclick = function () { take(b.dataset.z === 'all' ? 'all' : Number(b.dataset.z)); };
     });
 }
 
 async function take(zoom) {
     if (busy) return;
     busy = true;
-    const z = Number(zoom) || 1;
+    const z = (zoom === 'all') ? 'all' : (Number(zoom) || 1);
     try {
         const cv = await draw(z);
         const t = new Date();
         const p = function (n) { return (n < 10 ? '0' : '') + n; };
         show(cv, '사내시스템_' + t.getFullYear() + p(t.getMonth() + 1) + p(t.getDate())
             + '_' + p(t.getHours()) + p(t.getMinutes()) + p(t.getSeconds())
-            + (z > 1 ? '_x' + z : '') + '.png', z);
+            + (z === 'all' ? '_배경전체' : z > 1 ? '_x' + z : '') + '.png', z);
     } catch (e) {
         if (typeof showCustomAlert === 'function') showCustomAlert('사진을 찍지 못했습니다. ' + (e && e.message || ''));
         else console.warn('[사진] ' + (e && e.message));
@@ -273,6 +302,10 @@ window.shotNow = take;
     document.head.appendChild(s);
 })();
 
+function inPhoto() {
+    try { const k = window.plazaRoomNow && window.plazaRoomNow(); return !!(k && PLAZA.ROOMS[k] && PLAZA.ROOMS[k].photo); } catch (e) { return false; }
+}
+
 // ── 광장이 열릴 때마다 단추를 붙인다
 (function hook() {
     const put = function () {
@@ -283,7 +316,8 @@ window.shotNow = take;
         b.className = 'plaza-keep';
         b.title = '사진을 찍는다';
         b.innerHTML = '<span class="pico" style="--ic:url(\'ico/camera.png\')"></span>';
-        b.onclick = function () { take(1); };
+        // 포토존에서는 방 그림 전체를 찍는다 (보는 창에서 화면 그대로로 바꿀 수 있다)
+        b.onclick = function () { take(inPhoto() ? 'all' : 1); };
         ov.appendChild(b);
     };
     const _open = window.plazaOpen;
@@ -297,6 +331,6 @@ window.shotNow = take;
     setInterval(put, 1500);        // 다른 길로 열려도 붙는다
 })();
 
-console.log('[사진] 사원증 아래 📷 — shotNow()');
+console.log('[사진] 사원증 아래 📷 — shotNow() · 포토존은 배경 전체 shotNow(\'all\')');
 
 })();

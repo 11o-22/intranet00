@@ -3109,7 +3109,11 @@ window.plazaRedress = function () {
 //   ★ 장 이름은 dataset.sheet 가 아니라 **지금 깔린 그림 주소**에서 읽는다.
 //     오른쪽을 볼 때 머리 장은 짝(h05 → h09)으로 갈리는데, dataset 은
 //     만들 때 적힌 채라 안 바뀐다. 그대로 쓰면 사진에서 안대가 건너간다.
-window.plazaShotData = function () {
+//
+//   ★ all (2026-11-04 · 📸 배경 전체) — 화면 밖이라 안 그리던 사람(q.hid)까지 넣는다.
+//     그 자리에 잠깐 세워 재고 도로 감춘다 (한 번에 이어서 하므로 화면에는 안 비친다).
+//     all 이 아니면 화면 밖 사람은 뺀다 — 크기가 0 이라 이름표만 왼쪽 위에 떠 찍혔다.
+window.plazaShotData = function (all) {
     if (!run || !run.room) return null;
     const r = roomOf(), z = zz();
     const v = run.view.getBoundingClientRect();
@@ -3154,12 +3158,20 @@ window.plazaShotData = function () {
     if (run.me) folk.push(one(run.me, run.me.name || ''));
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
+        if (q.hid) {
+            if (!all) return;
+            q.one.wrap.style.display = '';
+            putOne(q.one, q.x, q.y, 0);
+            try { folk.push(one(q.one, q.one.name || '')); }
+            finally { q.one.wrap.style.display = 'none'; }
+            return;
+        }
         folk.push(one(q.one, q.one.name || ''));
     });
     return {
         vw: viewBox().w, vh: viewBox().h,
         cx: run.cx, cy: run.cy,
-        room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z, pix: !!r.pix },
+        room: { img: P.DIR + r.img, name: r.n, w: r.w * z, h: r.h * z, pix: !!r.pix, photo: !!r.photo },
         folk: folk
     };
 };
