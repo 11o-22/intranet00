@@ -273,6 +273,11 @@ const DOT_HEADS = [
     { i: 'h08', n: '청달래' },            //  7
     { i: 'h05', n: '백사헌' },            //  8   왼쪽용. 오른쪽용 짝은 h09 (FACE_PAIR)
     { i: 'h10', n: '호유원' },            //  9
+    // ★ 호유원 (여) (2026-11-04 사용자 — 김솔음 (여)처럼 한 개 더) — 얼굴은 호유원(h10)을 그대로 베낀 장(h10f) +
+    //   긴 뒷머리(hair-h10f). 뒷머리는 **몸 뒤** — 몸 · 옷보다 뒤에 깐다 (back · look). 몸 뒤 악세(BACK_Z)보다는 앞.
+    //   주신 그림은 864x512 (칸 144x256 · 도트 4픽셀) — 칸마다 (102, 100) 밀어 352x384 칸에 옮겼다.
+    //   가로 102 는 몸 가운데에 맞추고 도트 눈금(x ≡ 2 mod 4)을 맞춘 값이다. 머리 뒤에 묻혀 있던 살빛 한 점은 걷었다.
+    { i: 'h10f', n: '호유원 (여)', back: ['hair-h10f'] },
     { i: 'h11', n: '진나솔' },            // 10
     { i: 'h12', n: '김솔음' },            // 11
     { i: 'h13', n: '김솔음 (여)' },       // 12
@@ -833,6 +838,8 @@ function look(user, override, all) {
     }
     // ★ 몸 뒤에 까는 장 — BACK_Z 차례 (아래부터) · 맨 앞에 둘 장(FRONT)은 악세 끝으로 옮긴다
     backs.sort(function (a, b) { return D.BACK_Z.indexOf(a) - D.BACK_Z.indexOf(b); });
+    // ★ 머리에 딸린 뒷머리 (호유원 (여) · 2026-11-04) — 몸 바로 뒤 (몸 뒤 악세보다 앞 · 몸 · 옷 · 머리 · 악세보다 뒤)
+    if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); });
     (D.FRONT || []).forEach(function (f) {
         const i = tops.indexOf(f);
         if (i >= 0) { tops.splice(i, 1); tops.push(f); }
