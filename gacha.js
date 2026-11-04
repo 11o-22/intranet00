@@ -80,7 +80,7 @@ const GACHA_WEAR = [
     { k: 'sdress',      n: '숏 드레스',  g: 'S', s: ['sdress'],      b: 'body-f' },
     { k: 'school-m',    n: '교복(남자)', g: 'A', s: ['school-m'] },
     { k: 'devil-m',     n: '악마(남자)', g: 'A', s: ['devil-m'] },
-    { k: 'devil-f',     n: '악마(여자)', g: 'A', s: ['devil-f'],     b: 'body-f' },
+    { k: 'devil-f',     n: '악마(여자)', g: 'A', s: ['devil-f'] },        // 보통 몸 (부츠가 보통 몸 걸음에 맞춰 그려져 있다)
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
     { k: 'han-inner',   n: '내의',       g: 'A', s: ['han-inner'] },
     { k: 'brown-suit',  n: '브라운 정장', g: 'A', s: ['brown-suit'] },
