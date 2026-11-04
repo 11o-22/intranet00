@@ -3,6 +3,7 @@
   "groups": [
     [
       "rest-time.js",
+      "time-freeze.js",
       "dark.js"
     ],
     [

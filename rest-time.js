@@ -38,6 +38,22 @@ function cu() { try { return (typeof currentUser !== 'undefined') ? currentUser 
 function blocked(code) { return inTime() && code !== ADMIN; }
 window.restTimeOn = function (code) { return blocked(code == null ? ((cu() && cu().code) || '') : code); };
 window.restTimeMsg = MSG;
+// 쉬는 시간 칸들 — [t0, t1) 와 겹치는 것 (time-freeze.js 가 시간을 멈춘 만큼 되돌릴 때 쓴다)
+//   { id: 'YYYY-MM-DD'(한국 날짜), a: 시작 ms, b: 끝 ms }
+window.restWindows = function (t0, t1) {
+    const out = [];
+    t0 = Math.max(Number(t0) || 0, START); t1 = Number(t1) || 0;
+    if (t1 <= t0) return out;
+    let d = Math.floor((t0 + KST) / 86400000) * 86400000 - KST;     // t0 가 든 한국 날짜의 0시
+    for (let n = 0; d < t1 && n < 800; n++, d += 86400000) {
+        const a = d + FROM_H * 3600000, b = d + TO_H * 3600000;
+        if (b <= t0 || a >= t1) continue;
+        const k = new Date(d + KST);
+        out.push({ id: k.getUTCFullYear() + '-' + String(k.getUTCMonth() + 1).padStart(2, '0') + '-' + String(k.getUTCDate()).padStart(2, '0'), a: a, b: b });
+    }
+    return out;
+};
+window.restNow = now;
 
 // 덮개
 function cover(show) {
@@ -86,6 +102,19 @@ function wrapLogin() {
             cover(true);
             try { if (typeof showAutoLoginOverlay === 'function') showAutoLoginOverlay(false); } catch (e) { }
             return Promise.resolve(null);
+        }
+        // ⏸ 끝난 쉬는 시간만큼 시계를 아직 안 밀었으면(time-freeze.js) 밀 때까지 잠깐 기다렸다 들어간다 (12초까지)
+        const self = this, args = arguments;
+        if (typeof window.timeFreezePending === 'function' && window.timeFreezePending()) {
+            return new Promise(function (res) {
+                const t0 = Date.now();
+                const wait = function () {
+                    try { if (typeof window.timeFreezeRun === 'function') window.timeFreezeRun(); } catch (e) { }
+                    if (!window.timeFreezePending() || Date.now() - t0 > 12000) { res(f.apply(self, args)); return; }
+                    setTimeout(wait, 250);
+                };
+                wait();
+            });
         }
         return f.apply(this, arguments);
     };
