@@ -9693,7 +9693,7 @@ function bjFinish(mode) {
 }
   // --- 우주 쇼핑몰 ---
    const ALIEN_DAILY_MAX = 4;                       // 하루 네 번
-   const ALIEN_COOL_MS = 3 * 60 * 60 * 1000;        // 세 시간에 한 번
+   const ALIEN_COOL_MS = 2 * 60 * 60 * 1000;        // 두 시간에 한 번 (2026-11-04 사용자 · 전에는 세 시간)
    const ALIEN_BOUT_ROUNDS = 3;                     // 한 도전은 업다운 세 판
    const ALIEN_BOUT_WIN = 2;                        // 그 중 두 판을 이겨야 입고된다
    let dealerCardValue = 50; 
@@ -9730,7 +9730,7 @@ function bjFinish(mode) {
         return;
     }
 
-    // 다음 도전은 앞 도전으로부터 세 시간 뒤에만
+    // 다음 도전은 앞 도전으로부터 두 시간 뒤에만 (ALIEN_COOL_MS)
     if (currentUser.alienDailyUsed >= 1 && currentUser.lastAlienPlayTime) {
         const elapsed = now - currentUser.lastAlienPlayTime;
         if (elapsed < ALIEN_COOL_MS) {
@@ -11581,7 +11581,7 @@ if (bathModal) bathModal.style.display = 'none';
         // 스택이 비어있으면 메인 화면이므로 브라우저가 알아서 종료(나가기)됨
     });
     // ==========================================
-    // ★ 우주 쇼핑몰 3시간 쿨타임 실시간 타이머 갱신
+    // ★ 우주 쇼핑몰 2시간 쿨타임 실시간 타이머 갱신
     // ==========================================
        setInterval(() => {
         if (!activeVipSessionId || !db.vipSessions || !db.vipSessions[activeVipSessionId]) return;
