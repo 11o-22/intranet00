@@ -155,6 +155,7 @@ const DOT = {
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
     Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
+        'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
@@ -220,6 +221,8 @@ const DOT = {
                  // 세일러복 (2026-11-02) — 서기 줄 여섯 칸에 비눗방울 · 반짝이가 떠다닌다
                  //   ★ 옷은 안 움직이게 (같은 날 사용자) — 서기 줄 1~5 칸의 옷을 0 칸 옷으로 덮어 그렸다 (방울 · 반짝이만 칸마다 다르다)
                  'sailor-bubble': [0, 1, 2, 3, 4, 5],
+                 // 숏 드레스 (2026-11-04) — 서기 줄 여섯 칸에 나비가 날고 리본이 흔들린다 (몸은 첫 칸 그대로)
+                 'sdress': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
                  'sound-lp': [0, 1, 2, 3, 4, 5],
                  // 잎 우산 (2026-10-25) — 서 있으면 빗물이 떨어지고 웅덩이가 번진다 (잎 · 줄기는 서기 여섯 칸이 같은 그림이라 0 에 세운다)
@@ -400,6 +403,22 @@ const DOT_SLOTS = [
             //   흰 바탕과 그 바탕에 이어진 옅은 지우개 자국을 걷고, 줄이기 전에 바탕 자리를 옆 옷 색으로 채워 흰 테가 안 남게 했다.
             //   서기 줄 여섯 칸에 방울이 움직여 여섯 칸을 돈다 (FLAP_COLS). 이름은 정해 주신 것 (처음엔 「비눗방울 세일러」 · 열쇠는 그대로).
             { i: 'sailor', n: '세일러복', over: ['sailor-bubble'], own: 'sailor-bubble' },
+            // ★ 의상 1차 (2026-11-04 · 의상 뽑기 — 숏 드레스 S · 나머지 A · 이름은 주신 파일 이름 그대로)
+            //   주신 그림은 1728x768 (칸 288) — 칸마다 가로 +30 으로 352 칸에 옮겼다. 몸에 대 보니 어깨 · 발이 그대로 맞았다.
+            //   ★ 교복(남자)만 보통 몸 위에 입는다. 나머지 셋은 **체형이 바뀐다** (사용자) —
+            //     body  입으면 몸판을 이것으로 바꾼다 (look)
+            //     alone 입으면 다른 칸의 옷(상의 · 하의 · 구두 · 장갑 · 망토)은 고른 채로 두고 안 그린다 — 보통 몸에 맞춘 옷이 바뀐 몸 위에 뜨지 않게.
+            //           악세는 그대로 단다.
+            //   body-f (여자 몸) — 숏 드레스 그림에 그려진 몸을 옷과 갈라 낸 것 (살빛만 떠냈다).
+            //     드레스에 가려 안 보이던 자리 — 다리는 밑단 바로 아래 다리를 위로 늘려 채우고, 몸통은 보통 몸으로 채웠다.
+            //     머리(목 위)는 보통 몸 그대로 — 머리 장들이 모두 그 머리에 맞춰 그려져 있다. 서기 줄은 첫 칸 몸 하나.
+            //   숏 드레스 — 나비 · 리본이 서기 여섯 칸에 움직인다 (FLAP_COLS). 몸은 body-f.
+            //   악마(여자) — 그림에 다리가 비어 있다(치마와 부츠 사이) — body-f 의 다리가 보인다.
+            //   악마(남자) — 손만 빼고 몸을 다 덮는다. 손은 보통 몸의 손이 소매 끝에 나온다.
+            { i: 'school-m', n: '교복(남자)', over: ['school-m'], own: 'school-m' },
+            { i: 'sdress', n: '숏 드레스', over: ['sdress'], own: 'sdress', body: 'body-f', alone: true },
+            { i: 'devil-m', n: '악마(남자)', over: ['devil-m'], own: 'devil-m', alone: true },
+            { i: 'devil-f', n: '악마(여자)', over: ['devil-f'], own: 'devil-f', body: 'body-f', alone: true },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -733,8 +752,9 @@ function look(user, override, all) {
     // ★ 머리가 전용 몸을 들고 있으면 그것을 쓴다 (브라운).
     //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
     const hd = DOT_HEADS[headIdx(head)];
-    const bodySheet = hd.body || D.BODY;
+    let bodySheet = hd.body || D.BODY;
     const over = [], tops = [], rabTops = [], backs = [], pick = {};
+    const chosen = [];                   // 악세 밖 칸에서 고른 것 — 체형이 바뀌는 옷(body · alone)을 보려고
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -765,10 +785,30 @@ function look(user, override, all) {
         }
         if (!it) it = list.filter(function (x) { return x.def; })[0] || list[0];
         pick[s.k] = it.i;
+        chosen.push(it);
         (it.back || []).forEach(function (o) { backs.push(o); });
         (it.over || []).forEach(function (o) { over.push(o); });
         (it.top || []).forEach(function (o) { tops.push(o); });
     });
+    // ★ 체형이 바뀌는 옷 (2026-11-04 · 의상 1차) — 몸판을 바꾸고(body), 다른 칸의 옷은 안 그린다(alone · 악세는 그대로).
+    //   한 벌로 그려진 머리(브라운 특전 · 토끼)는 제 몸이 있으므로 건드리지 않는다.
+    if (!hd.solo && !hd.bare) {
+        const bodyIt = chosen.filter(function (x) { return x.body; })[0];
+        if (bodyIt) bodySheet = bodyIt.body;
+        const lone = chosen.filter(function (x) { return x.alone; })[0];
+        if (lone) {
+            const mine = {};
+            (lone.back || []).concat(lone.over || [], lone.top || []).forEach(function (o) { mine[o] = 1; });
+            const drop = {};
+            chosen.forEach(function (x) {
+                if (x === lone) return;
+                (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { if (!mine[o]) drop[o] = 1; });
+            });
+            [over, tops, backs].forEach(function (arr) {
+                for (let i = arr.length - 1; i >= 0; i--) if (drop[arr[i]]) arr.splice(i, 1);
+            });
+        }
+    }
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
     // 한 벌로 그려진 머리는 옷을 안 겹친다 — 고른 것은 그대로 두되 안 그린다
     if (hd.solo) over.length = 0;

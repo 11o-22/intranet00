@@ -75,6 +75,12 @@ const GACHA_WEAR = [
     { k: 'veil',        n: '면사포',     g: 'S', s: ['veil'],        set: 1 },
     // 세일러복 (2026-11-02 사용자 · S · 이름도 정해 주셨다 — 처음엔 「비눗방울 세일러」 · 열쇠는 그대로)
     { k: 'sailor-bubble', n: '세일러복', g: 'S', s: ['sailor-bubble'] },
+    // 의상 1차 (2026-11-04 사용자 — 숏 드레스 S · 나머지 A · 이름은 주신 파일 이름 그대로)
+    //   b — 체형이 바뀌는 옷은 그 몸에 입혀 보여 준다 (closet.js 의 body 와 같다)
+    { k: 'sdress',      n: '숏 드레스',  g: 'S', s: ['sdress'],      b: 'body-f' },
+    { k: 'school-m',    n: '교복(남자)', g: 'A', s: ['school-m'] },
+    { k: 'devil-m',     n: '악마(남자)', g: 'A', s: ['devil-m'] },
+    { k: 'devil-f',     n: '악마(여자)', g: 'A', s: ['devil-f'],     b: 'body-f' },
     { k: 'cape',        n: '하얀 망토',  g: 'A', s: ['cape'] },
     { k: 'han-inner',   n: '내의',       g: 'A', s: ['han-inner'] },
     { k: 'brown-suit',  n: '브라운 정장', g: 'A', s: ['brown-suit'] },
@@ -357,7 +363,7 @@ function figStop(el) {
 
 // 그 물건 하나를 몸에 입힌 그림 (의상이면 옷 장, 악세면 악세 장)
 function sheetsOf(it) {
-    return ['body'].concat(it.s || [it.k]);
+    return [it.b || 'body'].concat(it.s || [it.k]);
 }
 
 // ==========================================
