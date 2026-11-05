@@ -2466,15 +2466,39 @@ function bigAt(cx, cy) {
     });
     return pick;
 }
-function personAt(cx, cy) { return tinyAt(cx, cy) || bigAt(cx, cy); }
+// 👤 아무 사람이나 (크기 가리지 않고) — 몸 자리를 짚었나 (2026-11-05 사용자 「상대방 캐릭터를 누르면 정보보기」)
+function peerAt(cx, cy) {
+    if (!run || HS()) return null;
+    let pick = null, bd = 1e9;
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c];
+        if (!q || q.hid || !q.one || !q.one.wrap) return;
+        const b = q.one.wrap.getBoundingClientRect();
+        if (!b.width || !b.height) return;
+        const mx = (b.left + b.right) / 2;
+        const half = b.width * (q.sm ? 0.3 : 0.2);
+        const t = b.top + b.height * (q.sm ? 0.3 : 0.28), bot = b.bottom - b.height * 0.04;
+        if (cx < mx - half || cx > mx + half || cy < t || cy > bot) return;
+        const d = Math.hypot(cx - mx, cy - (t + bot) / 2);
+        if (d < bd) { bd = d; pick = c; }
+    });
+    return pick;
+}
+function personAt(cx, cy) { return tinyAt(cx, cy) || bigAt(cx, cy) || peerAt(cx, cy); }
+// 👤 정보 보기 — 사원 열람의 그 사람 칸
+const INFO_ITEM = ['info', '👤 정보 보기'];
+function infoOpen(code) {
+    closeCarryMenu();
+    try { if (typeof window.openEmpDetailModal === 'function') window.openEmpDetailModal(code); } catch (e) { console.warn('[광장] 정보 보기', e); }
+}
 
-function openMenu(cx, cy, title, items, onPick) {
+function openMenu(cx, cy, title, items, onPick, icon) {
     const ov = document.getElementById('plaza-ov');
     if (!ov) return false;
     const m = document.createElement('div');
     m.id = 'plaza-carry';
     m.className = 'plaza-keep';
-    m.innerHTML = '<div class="pc-n">🍍 ' + esc(title) + '</div>'
+    m.innerHTML = '<div class="pc-n">' + (icon == null ? '🍍 ' : icon) + esc(title) + '</div>'
         + items.map(function (it) { return '<button class="plaza-keep" data-k="' + it[0] + '">' + it[1] + '</button>'; }).join('');
     ov.appendChild(m);
     const vw = window.innerWidth || 360, vh = window.innerHeight || 640;
@@ -2508,8 +2532,10 @@ function carryTap(cx, cy) {
             if (run.escLostAt && now() - run.escLostAt < RPS_ESC_COOL) items.push(['rpsx', '✊ 가위바위보 (' + Math.ceil((RPS_ESC_COOL - (now() - run.escLostAt)) / 1000) + '초 뒤)']);
             else items.push(['rps', '✊ 가위바위보로 빠져나가기']);
         }
-        if (!items.length) { sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.'); return true; }
+        if (!items.length) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
+        items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
+            if (k === 'info') { infoOpen(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -2517,15 +2543,21 @@ function carryTap(cx, cy) {
     }
     // 보통 사람이 작은 사람을 — 손에 든다 · 머리에 얹는다 · 내려놓는다
     const pick = tinyAt(cx, cy);
-    if (!pick) return false;
+    if (!pick) {
+        // 👤 크기를 안 가리는 사람 — 정보 보기만
+        const any = peerAt(cx, cy);
+        if (!any) return false;
+        return openMenu(cx, cy, nameIn(any), [INFO_ITEM], function () { infoOpen(any); }, '');
+    }
     const w = carrierOf(pick);
     if (w && w.by !== me) {
         // ✊ 남이 든 작은 사람 — 가위바위보로 뺏어 온다 (내 손이나 머리 위에 자리가 있어야 한다)
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']],
-                function () { closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기'], INFO_ITEM],
+                function (k) { if (k === 'info') { infoOpen(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
-        sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.'); return true;
+        sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
+        return openMenu(cx, cy, nameIn(pick), [INFO_ITEM], function () { infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const items = ['hand', 'head'].filter(function (k) {
@@ -2533,8 +2565,9 @@ function carryTap(cx, cy) {
         return roomOn(me, k, pick);
     }).map(function (k) { return [k, CARRY_WORD[k]]; });
     if (mine) items.push(['down', '내려놓는다']);
-    if (!items.length) { sysLine('🍍 손도 머리 위도 자리가 없습니다.'); return true; }
-    return openMenu(cx, cy, nameIn(pick), items, function (k) { carryDo(pick, k); });
+    if (!items.length) sysLine('🍍 손도 머리 위도 자리가 없습니다.');
+    items.push(INFO_ITEM);
+    return openMenu(cx, cy, nameIn(pick), items, function (k) { if (k === 'info') { infoOpen(pick); return; } carryDo(pick, k); });
 }
 function closeCarryMenu() {
     const m = document.getElementById('plaza-carry');
@@ -4586,8 +4619,12 @@ function paintMe() {
     const el = document.getElementById('plaza-me');
     const u = u_();
     if (!el || !u) return;
-    const p = u.badge && u.badge.photo;
-    el.querySelector('.pm-pic').innerHTML = p ? '<img src="' + esc(p) + '" alt="사진">' : 'PHOTO';
+    // 👤 사진 대신 캐릭터 (dot-portrait.js · 2026-11-05 사용자) — 아직 안 올라왔으면 옛 사진
+    const pic = el.querySelector('.pm-pic');
+    if (!(typeof window.dotPortraitMe === 'function' && window.dotPortraitMe(pic, 32))) {
+        const p = u.badge && u.badge.photo;
+        pic.innerHTML = p ? '<img src="' + esc(p) + '" alt="사진">' : 'PHOTO';
+    }
     el.querySelector('.pm-n').innerText = nameOf(u);
     const no = (u.no != null && String(u.no).trim()) ? String(u.no).trim() : (u.code || '');
     el.querySelector('.pm-no').innerText = no ? ('사번 ' + no) : '';

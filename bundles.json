@@ -464,7 +464,8 @@
       "hideseek.js",
       "special-cure.js",
       "mafia.js",
-      "nuow-text.js"
+      "nuow-text.js",
+      "dot-portrait.js"
     ]
   ]
 }
