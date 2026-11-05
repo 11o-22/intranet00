@@ -185,6 +185,11 @@ const DOT = {
     //   cat-halo-cat ↔ cat-halo-cat-r   검은 고양이 헤일로 — 걷기 시작할 때 뜨는 「이쯕」 글씨가 반대쪽 (2026-10-31)
     //   nuow-friend ↔ nuow-friend-r   Null Owner — 서 있을 때 토끼가 적는 말풍선 글씨가 반대쪽 (2026-11-03 · 글씨만 미리 뒤집은 짝을 만들어 두었다)
     //   nuow2-doll ↔ nuow2-doll-r   Null Owner 2 — 인형이 적는 말풍선 글씨가 반대쪽 (2026-11-03 · 글씨만 뒤집은 짝을 만들어 두었다)
+    // ★ 포도맛 물약 (2026-11-05 사용자 「포도맛 물약 맞으면 자동으로 지금 하고 있는 캐릭터의 반대 되는 성별로 외형이 바뀌게」)
+    //   — 물약이 도는 동안(timedEffects 「포도맛 물약」) 보이는 머리만 짝으로 바꾼다. 고른 머리(dot.head)는 그대로 — 물약이 끝나면 저절로 돌아온다.
+    //   짝이 없는 머리(J3 · 장허운 · 브라운 …)는 그대로.
+    GENDER_SWAP: [['h02', 'h02f'], ['h03', 'h03f'], ['h04', 'h04m'], ['h05', 'h05f'], ['h06', 'h06f'], ['h07', 'h14'], ['h08', 'h08m'],
+                  ['h10', 'h10f'], ['h11', 'h11m'], ['h12', 'h13'], ['h15', 'h15f'], ['h16', 'h16f'], ['h17', 'h17m'], ['h18', 'h18f']],
     FACE_PAIR: { h05: 'h09', h05f: 'h09f', 'rab-friend': 'rab-friend-r', 'cat-halo-cat': 'cat-halo-cat-r', 'nuow-friend': 'nuow-friend-r', 'nuow2-doll': 'nuow2-doll-r' },
     // ★ 스물네 칸짜리 장 (2026-10-31 · 검은 고양이 헤일로) — 네 줄 (윗 두 줄 걷기 1~12 · 아랫 두 줄 정지 13~24) · 제 시계로 돈다.
     //   걷기  1~12 를 한 번 → 7~12 를 되풀이. n 번째 칸은 몸의 걷기 (n-1)%6 칸과 같은 자리라 몸의 걸음 칸과 함께 넘긴다.
@@ -777,7 +782,9 @@ function moveOld(d) {
 function look(user, override, all) {
     const u = user || u_() || {};
     const d = moveOld(override || u.dot || {});
-    const head = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
+    const headPick = DOT_HEADS.some(function (h) { return h.i === d.head; }) ? d.head : DOT_HEADS[0].i;
+    // 🍇 포도맛 물약 — 보이는 머리만 반대 성별 짝으로 (고른 머리는 headPick 그대로 · 저장은 그것을 쓴다)
+    const head = grapeOn(u) ? swapHead(headPick) : headPick;
     // ★ 머리가 전용 몸을 들고 있으면 그것을 쓴다 (브라운).
     //   몸 겉모양이 보통 몸과 100% 같으므로 옷은 그대로 다 맞는다.
     const hd = DOT_HEADS[headIdx(head)];
@@ -899,9 +906,43 @@ function look(user, override, all) {
     //   말풍선을 껐다 (2026-11-05 · dot.nwOff · dot.nw2Off) — { off: 1 } 를 얹어 말풍선만 걷은 장을 깐다 (고른 글씨는 남겨 둔다)
     if (d.nwOff) nw['nuow-friend'] = Object.assign({}, nw['nuow-friend'] || {}, { off: 1 });
     if (d.nw2Off) nw['nuow2-doll'] = Object.assign({}, nw['nuow2-doll'] || {}, { off: 1 });
-    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null };
+    return { head: head, headPick: headPick, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null };
 }
 window.dotLook = look;
+
+// 🍇 포도맛 물약 — 이 사람에게 지금 도는가 (넘겨받은 사람 자료의 timedEffects 만 본다.
+//   광장의 남은 자리 기록 dot 에 이미 바뀐 머리가 실려 오므로(plaza.js) 두 번 뒤집지 않는다)
+function grapeOn(u) {
+    const fx = u && u.timedEffects;
+    if (!fx) return false;
+    const list = Array.isArray(fx) ? fx : Object.keys(fx).map(function (k) { return fx[k]; });
+    const t = Date.now();
+    return list.some(function (e) { return e && e.name === '포도맛 물약' && (e.fixed || !e.expireAt || e.expireAt > t); });
+}
+const SWAP = {};
+(D.GENDER_SWAP || []).forEach(function (p) { SWAP[p[0]] = p[1]; SWAP[p[1]] = p[0]; });
+function swapHead(id) { return (SWAP[id] && DOT_HEADS.some(function (h) { return h.i === SWAP[id]; })) ? SWAP[id] : id; }
+window.dotGrapeOn = grapeOn;
+// 남에게 보내는 내 모습(광장 자리 기록) — 물약 중이면 바뀐 머리를 실어 보낸다
+window.dotShownDot = function (u) {
+    const d = (u && u.dot && typeof u.dot === 'object') ? u.dot : null;
+    if (!d || !grapeOn(u)) return d;
+    const h = swapHead(d.head);
+    return h === d.head ? d : Object.assign({}, d, { head: h });
+};
+// 물약이 들거나 풀리면 광장의 내 모습을 다시 그리고 남에게도 다시 알린다
+(function grapeWatch() {
+    let was = null;
+    setInterval(function () {
+        const u = u_(); if (!u) return;
+        const on = grapeOn(u);
+        if (was !== null && on !== was) {
+            try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+            try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { }
+        }
+        was = on;
+    }, 2000);
+})();
 window.dotNoTag = {}; (DOT.NO_TAG || []).forEach(function (n) { window.dotNoTag[n] = 1; });
 // 내 기록도 상의 칸으로 고쳐 적는다 (지금 입은 것 · 코디 다섯 칸) — 한 번 고치면 더 할 일이 없다
 setInterval(function () {
@@ -971,7 +1012,7 @@ window.dotSetCol = function (sheet, hue) {
     // 아직 한 번도 안 고른 사람이면 지금 보이는 대로 적어 둔다
     if (!me.dot || typeof me.dot !== 'object') {
         const L = look(me);
-        const d = { head: L.head };
+        const d = { head: L.headPick || L.head };
         DOT_SLOTS.forEach(function (s) { d[s.k] = L.pick[s.k] || ''; });
         me.dot = d;
     }
@@ -1497,7 +1538,7 @@ function cur() {
     const u = u_();
     if (!pick) {
         const L = look(u);
-        pick = { head: L.head, col: Object.assign({}, L.col) };
+        pick = { head: L.headPick || L.head, col: Object.assign({}, L.col) };
         DOT_SLOTS.forEach(function (s) { pick[s.k] = L.pick[s.k] || ''; });
     }
     return pick;

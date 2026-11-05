@@ -3659,7 +3659,7 @@ function send(moving) {
     try {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
-            f: run.sFace, m: moving ? 1 : 0, d: (u.dot || null), sm: tinyOf(u) ? 1 : 0,
+            f: run.sFace, m: moving ? 1 : 0, d: (typeof window.dotShownDot === 'function' ? window.dotShownDot(u) : u.dot) || null, sm: tinyOf(u) ? 1 : 0,   // 🍇 포도맛 물약 중이면 바뀐 머리
             // 🍍 내가 든 작은 사람들 · 내려놓은 때 · 내가 올라간 곳 · 남의 머리 위 어디쯤
             cy: listOf(run.carry).length ? listOf(run.carry).map(function (x) { return { c: x.c, k: x.k, at: x.at || 0 }; }) : null,
             dn: run.dn || null,

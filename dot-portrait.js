@@ -46,7 +46,8 @@ let made = 0;
 function keyOf(u, view, w, h) {
     let d = '';
     try { d = JSON.stringify((u && u.dot) || {}); } catch (e) { }
-    return (u && u.code) + '|' + view + '|' + w + 'x' + h + '|' + bgOf(u) + '|' + d;
+    const g = (typeof window.dotGrapeOn === 'function' && window.dotGrapeOn(u)) ? '|g' : '';   // 🍇 포도맛 물약 — 바뀐 머리
+    return (u && u.code) + '|' + view + '|' + w + 'x' + h + '|' + bgOf(u) + '|' + d + g;
 }
 function build(u, view, w, h) {
     const V = VIEW[view] || VIEW.bust;
