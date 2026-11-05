@@ -165,6 +165,8 @@ const DOT = {
     //   ★ Null Owner 의 틈(nuow-rift · 2026-11-03)도 맨 아래 — 등 뒤에서 열리는 틈과 손.
     //   ★ Null Owner 2 의 여우불(nuow2-fox · 2026-11-03)도 맨 아래 — 등 뒤에서 푸른 불이 일고 여우가 뛴다.
     BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
+    // ★ 뒷머리가 있는 머리(호유원 (여))를 쓰면 그 뒷머리 **밑**으로 내리는 악세 장 (2026-11-05) — 면사포
+    UNDER_HAIR: ['veil'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
     //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
@@ -839,6 +841,14 @@ function look(user, override, all) {
     // ★ 몸 뒤에 까는 장 — BACK_Z 차례 (아래부터) · 맨 앞에 둘 장(FRONT)은 악세 끝으로 옮긴다
     backs.sort(function (a, b) { return D.BACK_Z.indexOf(a) - D.BACK_Z.indexOf(b); });
     // ★ 머리에 딸린 뒷머리 (호유원 (여) · 2026-11-04) — 몸 바로 뒤 (몸 뒤 악세보다 앞 · 몸 · 옷 · 머리 · 악세보다 뒤)
+    //   ★ 면사포는 그 뒷머리보다 **뒤** (2026-11-05 사용자 「면사포가 호유원 (여) 머리카락 뒤에 와야 해」)
+    //     — 뒷머리가 있는 머리일 때만 맨 위(tops)에서 빼서 뒷머리 바로 밑에 깐다 (몸 · 옷 · 머리보다도 뒤가 된다).
+    if (!hd.solo && !hd.bare && (hd.back || []).length) {
+        (D.UNDER_HAIR || []).forEach(function (o) {
+            const i = tops.indexOf(o);
+            if (i >= 0) { tops.splice(i, 1); backs.push(o); }
+        });
+    }
     if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); });
     (D.FRONT || []).forEach(function (f) {
         const i = tops.indexOf(f);
