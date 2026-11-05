@@ -208,7 +208,10 @@ setInterval(function () {
         '#badge-photo-display{background:transparent;}',
         // 접속 중 불 — 사원 칸 왼쪽 위 모서리에 걸친다
         '#employee-cards-container .emp-list-card{position:relative;}',
-        '#employee-cards-container .emp-list-card > .dp-online{top:-10px !important;left:-10px !important;width:14px !important;height:14px !important;z-index:6 !important;}'
+        '#employee-cards-container .emp-list-card > .dp-online{position:absolute !important;top:-10px !important;left:-10px !important;width:14px !important;height:14px !important;z-index:6 !important;margin:0 !important;}',
+        // ✗ 테두리 두른 칸은 테두리 쪽 규칙(frames-video* — 「칸 안 것은 모두 position:relative !important」)에 밀려 불이 칸 가운데 왼쪽에 떴다 (2026-11-05 사용자).
+        //   그 칸은 빛을 칸 안에 가두느라 바깥을 자른다(frame-size.js overflow:hidden) — 모서리 **안쪽**에 둔다 (테두리 빛보다 위).
+        '#employee-cards-container .emp-list-card.fr-wrap > .dp-online{top:5px !important;left:5px !important;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
