@@ -721,6 +721,8 @@ function stampSafe(ov) {
         '.plaza-tag{text-align:center;}',
         '.plaza-dk{color:#ff3a3a;font-size:10px;font-weight:bold;letter-spacing:.5px;margin-bottom:1px;',
         '  text-shadow:0 1px 2px #000,0 0 4px #000,0 0 6px rgba(255,40,40,.45);}',
+        // 점이 . .. ... .... ..... 차례로 늘어난다 — 남은 점은 자리만 차지해 글자가 좌우로 흔들리지 않는다
+        '.plaza-dkd i{visibility:hidden;font-style:normal;}',
         '#plaza-ov.tags-off .plaza-tag{display:none !important;}',
         // 말풍선
         // ★ 사람 칸이 좁아(가로 100~170px) 말이 석 자씩 끊겼다.
@@ -1237,12 +1239,27 @@ function setTag(one, code, name) {
     one.name = name || '';
     one.code = code || '';
     one.tag.classList.toggle('hs-hide', !!HS() && hsCall('tagHide') !== false);   // 🫣 숨바꼭질 — 이름표를 아예 안 보인다 (🕵️ 행맨은 보인다)
-    // 🔦 탐사 중이면 이름 위에 붉게 「탐사 중……」 (2026-11-05 사용자) — 남은 자리 칸의 dk, 나는 darkRun 으로 본다
-    const h = (one.dk ? '<div class="plaza-dk">탐사 중……</div>' : '') + tagHtmlOf(one.code, one.name);
+    // 🔦 탐사 중이면 이름 위에 붉게 「탐사 중.....」 (2026-11-05 사용자) — 남은 자리 칸의 dk, 나는 darkRun 으로 본다
+    const h = (one.dk ? '<div class="plaza-dk">탐사 중<b class="plaza-dkd"></b></div>' : '') + tagHtmlOf(one.code, one.name);
     if (one.tag._h === h) return;          // 그대로면 안 건드린다 (칸이 깜빡인다)
     one.tag.innerHTML = h;
     one.tag._h = h;
+    dkPaint(one.tag);
 }
+// 🔦 「탐사 중」 뒤 점 — . .. ... .... ..... ..... 차례로 되풀이 (2026-11-05 사용자)
+//   시각으로 몇째 칸인지 정해 모든 사람 이름표가 함께 움직인다 · 이름표를 새로 그려도 그 자리에서 이어진다
+const DK_STEPS = [1, 2, 3, 4, 5, 5], DK_MS = 350;
+function dkHtml() {
+    const n = DK_STEPS[Math.floor(Date.now() / DK_MS) % DK_STEPS.length];
+    return '.'.repeat(n) + '<i>' + '.'.repeat(5 - n) + '</i>';
+}
+function dkPaint(root) {
+    const els = (root || document).querySelectorAll('.plaza-dkd');
+    if (!els.length) return;
+    const h = dkHtml();
+    els.forEach(function (el) { if (el._h !== h) { el.innerHTML = h; el._h = h; } });
+}
+setInterval(function () { const ov = document.getElementById('plaza-ov'); if (ov && !document.hidden) dkPaint(ov); }, DK_MS);
 // 칭호를 바꿔 달면 그 자리에서 따라 바뀐다 (느리게 한 번씩 본다)
 function refreshTags() {
     if (!run) return;
