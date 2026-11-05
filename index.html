@@ -5867,7 +5867,11 @@ if (user.code === 'kario0987') {
     function renderEmployeeCards() {
         const container = document.getElementById('employee-cards-container');
         if (!container) return;
-        const usersList = Object.values(db.users).filter(u => u.code !== 'kario0987');
+        // ★ 접속 중(초록불)인 사원을 맨 위로 (2026-11-05 사용자) — 나머지 차례는 그대로
+        const usersList = Object.values(db.users).filter(u => u.code !== 'kario0987')
+            .map((u, i) => ({ u, i, on: (typeof onlineUsersMap !== 'undefined' && onlineUsersMap && onlineUsersMap[u.code]) ? 1 : 0 }))
+            .sort((a, b) => (b.on - a.on) || (a.i - b.i))
+            .map(x => x.u);
         
         container.innerHTML = usersList.map(u => {
             const statusInfo = getPollutionStatusInfo(u.pollution);
