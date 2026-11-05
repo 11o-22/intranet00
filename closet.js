@@ -341,6 +341,17 @@ const DOT_HEADS = [
 
 // 칸(슬롯)마다 고를 수 있는 것. admin 이 붙은 것은 상담사 옷장에만 보인다.
 const DOT_SLOTS = [
+    // ★ 체형 (2026-11-06 사용자 「이거 체형으로 하고, 상담사한테만 · 옷장에 체형 칸에 여성 체형으로 · 꼭 상담사만」)
+    //   몸판만 바꾼다(body · 옷 칸이 아니라 그림 층은 없다). 여성 체형 = body-w (받은 1728 장 · 칸마다 +30 → 352 칸).
+    //   admin — 상담사 옷장에만 보이고, look() 도 상담사가 아니면 걸러 기본 몸으로 그린다 (자리 기록을 손대도 남 화면에 안 나온다).
+    //   체형이 바뀌는 옷(숏 드레스 · body)을 입으면 그 옷의 몸이 먼저다 (그 옷은 그 몸에 맞춰 그려졌다).
+    //   고를 것이 하나(기본)뿐인 사람에게는 줄이 안 생긴다.
+    {
+        k: 'shape', n: '체형', items: [
+            { i: '', n: '기본', over: [], def: true },
+            { i: 'fem', n: '여성 체형', over: [], body: 'body-w', admin: true, shape: true }
+        ]
+    },
     {
         k: 'top', n: '상의', items: [
             { i: '', n: '없음', over: [] },
@@ -829,7 +840,7 @@ function look(user, override, all) {
     // ★ 체형이 바뀌는 옷 (2026-11-04 · 의상 1차) — 몸판을 바꾸고(body), 다른 칸의 옷은 안 그린다(alone · 악세는 그대로).
     //   한 벌로 그려진 머리(브라운 특전 · 토끼)는 제 몸이 있으므로 건드리지 않는다.
     if (!hd.solo && !hd.bare) {
-        const bodyIt = chosen.filter(function (x) { return x.body; })[0];
+        const bodyIt = chosen.filter(function (x) { return x.body && !x.shape; })[0] || chosen.filter(function (x) { return x.body; })[0];   // 옷의 몸 > 체형
         if (bodyIt) bodySheet = bodyIt.body;
         const lone = chosen.filter(function (x) { return x.alone; })[0];
         if (lone) {
