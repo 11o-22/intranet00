@@ -3200,7 +3200,8 @@ window.plazaShotData = function (all) {
                 row: Math.round(Math.abs(parseFloat(p[1]) || 0) / oh),
                 cols: bs[0] ? Math.max(1, Math.round(parseFloat(bs[0]) / ow)) : 6,
                 rows: bs[1] ? Math.max(1, Math.round(parseFloat(bs[1]) / oh)) : 2,
-                x: e.offsetLeft * sc, y: e.offsetTop * sc, w: ow * sc, h: oh * sc
+                // 들썩이는 몸을 따라 내린 층 (closet.js D.BOB · translateY) — 사진에도 그 자리로
+                x: e.offsetLeft * sc, y: (e.offsetTop + (parseFloat((/translateY\(([-\d.]+)px\)/.exec(e.style.transform || '') || [])[1]) || 0)) * sc, w: ow * sc, h: oh * sc
             });
         });
         // 이름표가 붙은 높이 — 글자 밑선까지

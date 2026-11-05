@@ -237,6 +237,14 @@ const DOT = {
                  // 회냥 · 삼냥 · 흰냥 (2026-11-02 · 악세 뽑기 L) — 서 있으면 옆에 앉아 여섯 칸 꼬리를 흔든다
                  'nyang-gray': [0, 1, 2, 3, 4, 5], 'nyang-calico': [0, 1, 2, 3, 4, 5], 'nyang-white': [0, 1, 2, 3, 4, 5],
                  },
+    // ★ 서기 칸마다 위아래로 들썩이는 몸 (2026-11-06 사용자 「움직일 때 얼굴 헤어 악세도 같이 움직이게 해줘」)
+    //   몸 장 이름 → 서기 줄 칸마다 내려가는 도트 수 (칸 0 이 기준). 재 보면 여성 체형은 머리 · 몸통 · 팔이
+    //   칸 0~5 에 0 · 2 · 4 · 2 · 0 · 2 도트씩 통째로 내려간다 (다리 · 발은 그대로).
+    //   그 몸일 때 머리(얼굴 · 머리카락) · 뒷머리 · 악세를 같은 만큼 내린다 (옷은 몸에 그려 맞춘 대로 둔다).
+    BOB: { 'body-w': [0, 2, 4, 2, 0, 2] },
+    //   안 따라 내리는 악세 — 바닥에 앉은 것 · 몸과 떨어져 따로 서 있는 것
+    NO_BOB: ['nyang-gray', 'nyang-calico', 'nyang-white', 'leaf-puddle', 'sound-lp',
+             'nuow-rift', 'nuow-friend', 'nuow-friend-r', 'nuow2-fox', 'nuow2-doll', 'nuow2-doll-r'],
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -746,6 +754,28 @@ function flapsOf(els, sheets) {
     return out;
 }
 function wrap(n, len) { return ((n % len) + len) % len; }
+// ★ 몸이 서기 칸마다 들썩이면 (D.BOB) 그 몸의 펄럭임(flap)에 따라 내릴 층을 매단다
+//   els · sheets — 깐 층과 장 이름 · bodyAt — 몸이 몇 번째 층인가 · k — 크기
+function bobOf(L, els, sheets, flaps, bodyAt, k) {
+    const dy = D.BOB && D.BOB[L.body];
+    if (!dy) return null;
+    const fl = flaps.filter(function (f) { return f.el === els[bodyAt]; })[0];
+    if (!fl) return null;
+    const F = L.follow || {};
+    const list = els.filter(function (e, i) { return i !== bodyAt && F[sheets[i]]; });
+    if (!list.length) return null;
+    fl.bob = { dy: dy, els: list, k: k, v: 0 };
+    return fl.bob;
+}
+// 몸 칸(col)에 맞춰 내린다 — col 이 null 이면 제자리로 (걷기 · 멈춰 세움)
+function bobPut(b, col) {
+    if (!b) return;
+    const v = (col == null) ? 0 : (b.dy[col] || 0);
+    if (v === b.v) return;
+    b.v = v;
+    const t = v ? 'translateY(' + (v * b.k) + 'px)' : '';
+    b.els.forEach(function (e) { e.style.transform = t; });
+}
 
 // ★ 가만히 서 있을 때 틀 동작 — 없으면 null
 //   남(광장의 다른 사람)은 자리 기록에 사번이 안 실려 오므로 사원 명부(db.users)에서 찾는다.
@@ -804,6 +834,7 @@ function look(user, override, all) {
     let bodySheet = hd.body || D.BODY;
     const over = [], tops = [], rabTops = [], backs = [], pick = {};
     const chosen = [];                   // 악세 밖 칸에서 고른 것 — 체형이 바뀌는 옷(body · alone)을 보려고
+    const fol = {};                      // 몸이 들썩일 때 같이 내릴 장 (D.BOB) — 악세 · 머리 · 뒷머리
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -817,6 +848,7 @@ function look(user, override, all) {
                 const x = list.filter(function (y) { return y.i === id; })[0];
                 if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
                 got.push(x.i);
+                (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { fol[o] = 1; });
                 (x.back || []).forEach(function (o) { backs.push(o); });
                 (x.over || []).forEach(function (o) { over.push(o); });
                 (x.top || []).forEach(function (o) { (x.rab ? rabTops : tops).push(o); });
@@ -893,6 +925,7 @@ function look(user, override, all) {
             backs.push(o);
             if (UH[o]) {
                 tops.splice(i, 1, UH[o]);
+                if (fol[o]) fol[UH[o]] = 1;
                 // 물들인 색 — 남기는 장도 같은 색. 셀 수 없는 칸으로 붙여 옷장 · 팔레트가 베껴 저장하지 않게 한다
                 const c0 = (d.col && typeof d.col === 'object') ? d.col : {};
                 if (c0[o] != null && c0[o] !== '') {
@@ -902,7 +935,9 @@ function look(user, override, all) {
             } else tops.splice(i, 1);
         });
     }
-    if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); });
+    if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); fol[o] = 1; });
+    fol[head] = 1;
+    (D.NO_BOB || []).forEach(function (o) { delete fol[o]; });
     (D.FRONT || []).forEach(function (f) {
         const i = tops.indexOf(f);
         if (i >= 0) { tops.splice(i, 1); tops.push(f); }
@@ -919,7 +954,7 @@ function look(user, override, all) {
     //   말풍선을 껐다 (2026-11-05 · dot.nwOff · dot.nw2Off) — { off: 1 } 를 얹어 말풍선만 걷은 장을 깐다 (고른 글씨는 남겨 둔다)
     if (d.nwOff) nw['nuow-friend'] = Object.assign({}, nw['nuow-friend'] || {}, { off: 1 });
     if (d.nw2Off) nw['nuow2-doll'] = Object.assign({}, nw['nuow2-doll'] || {}, { off: 1 });
-    return { head: head, headPick: headPick, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null };
+    return { head: head, headPick: headPick, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
 
@@ -1170,10 +1205,13 @@ function sprite(user, opt) {
             }, 40));
         }
         // 서기 — 몸·신발은 세워 두고, 옷자락은 제 칸을 돌고, 머리는 깜빡인다
-        flapsOf(els, sheets).forEach(function (f) {
+        const fls = flapsOf(els, sheets);
+        bobOf(L, els, sheets, fls, (L.backs || []).length, k);       // 들썩이는 몸 — 머리 · 악세를 같이 내린다
+        fls.forEach(function (f) {
             box._dot.timers.push(setInterval(function () {
                 f.g = (f.g + 1) % f.cols.length;
                 put(f.el, f.cols[f.g]);
+                bobPut(f.bob, f.cols[f.g]);
             }, D.FLAP));
         });
         const head = els[headAt];
@@ -1267,6 +1305,7 @@ function actor(user, opt) {
     const head = els[(L.backs || []).length + 1 + L.layers.length];   // 악세가 머리 뒤에 더 붙는다 · 몸 뒤에 깐 장이 앞에 있다
     els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     const flaps = flapsOf(els, sheets);
+    const bob = bobOf(L, els, sheets, flaps, (L.backs || []).length, k);   // 들썩이는 몸 — 서 있을 때 머리 · 뒷머리 · 악세를 같이 내린다
 
     // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다
     //   (한 장짜리도, 여러 장을 겹친 것도 있다 — 아래 장부터 차례로 깐다)
@@ -1361,7 +1400,7 @@ function actor(user, opt) {
             if (seqEls.length) seqPaint(function (R) { return seqStop(t - seqT0, R); });
             flaps.forEach(function (fl) {
                 const g = Math.floor((t + ph) / D.FLAP) % fl.cols.length;
-                if (g !== fl.g) { fl.g = g; put(fl.el, fl.cols[g], 1); }
+                if (g !== fl.g) { fl.g = g; put(fl.el, fl.cols[g], 1); bobPut(fl.bob, fl.cols[g]); }
             });
         }
     };
@@ -1376,6 +1415,7 @@ function actor(user, opt) {
     let posed = null;
     const start = function () {
         clear();
+        bobPut(bob, null);                                  // 걷기 · 멈춰 세움 · 다시 서기 — 일단 제자리로 (서면 칸마다 다시 내린다)
         if (posed != null) { els.forEach(function (e) { put(e, posed, 0); }); seqPaint(function (R) { return seqLoopW(R) + (posed % 6); }); return; }   // 멈춰 세운 동안은 걷기 · 서기 시계를 안 돌린다
         if (held) return;                                   // 안 보이는 동안은 그대로 둔다
         if (idleEl && !walking) idleWait = setTimeout(idleGo, IM.after);
@@ -1405,6 +1445,7 @@ function actor(user, opt) {
                 timers.push(setInterval(function () {
                     f.g = (f.g + 1) % f.cols.length;
                     put(f.el, f.cols[f.g], 1);
+                    bobPut(f.bob, f.cols[f.g]);
                 }, D.FLAP));
             });
             let f = 0;
