@@ -6,6 +6,9 @@
 // ■ 사용자가 정한 것
 //
 //   · 선물 상자를 광장 모든 방(길 · 건물 안 · 지하)과 📸 포토존에 **방마다 5개**씩 깐다.
+//     ★ 2026-11-05 사용자 「보물 갯수 총 100개로」 — 방마다 5개(15방 75개) → **모두 합쳐 100개**.
+//       방 차례대로 고르게 나눈다 — 100 ÷ 방 수의 몫씩, 남는 것은 앞 방부터 하나씩 더 (15방이면 길 · 건물 여덟 방과 중앙 · 헝그리 행맨이 7개, 나머지 포토존 다섯이 6개).
+//       방이 늘거나 줄어도 합은 100 이다 (perRoom).
 //     작게 그려 찾기 어렵게 둔다. (그림 plaza/treasure.png — 다섯 가지 상자, 18x18 도트)
 //   · 한 사람이 **하루 3개**까지 연다.
 //   · 상품 — 50,000 P · 우주 쇼핑몰에서 **지금 파는** 물품 전부(소속 상관없이)
@@ -16,7 +19,7 @@
 //
 // ■ 어떻게 도나
 //
-//   상자는 모두가 같이 본다 — treasure/<방>/<0~4> = { x, y, lv, k, g }   (방 그림 좌표 · lv 1 이면 지하 · k 상자 모양 · g 이 자리 번호)
+//   상자는 모두가 같이 본다 — treasure/<방>/<0~6> = { x, y, lv, k, g }   (방 그림 좌표 · lv 1 이면 지하 · k 상자 모양 · g 이 자리 번호)
 //     · 먼저 연 사람이 가져가고, 연 상자는 **모두의 화면에서 사라진다** (2026-11-01 사용자 — 처음엔 다른 자리로 옮겨 다시 숨었다).
 //       { …, taken: 사번, tat } 로 남겨 두고 그리지 않는다. 날이 바뀌면(day) 방마다 다섯 개를 새 자리에 다시 깐다.
 //     · 여는 것은 트랜잭션 한 번 — g 가 그대로일 때만 연다 (둘이 동시에 눌러도 한 사람만).
@@ -53,7 +56,15 @@
 const ROOT = 'treasure';
 const CAPS = 'treasureCap';
 const ADMIN = 'kario0987';
-const PER_ROOM = 5;
+const TOTAL = 100;                // 광장 · 포토존을 모두 합친 상자 수 (2026-11-05 · 처음엔 방마다 5)
+// 이 방의 상자 수 — 100 을 방 차례대로 고르게 (몫 + 앞 방부터 나머지 하나씩)
+function perRoom(key) {
+    const ks = Object.keys(rooms() || {});
+    const n = ks.length; if (!n) return 0;
+    const i = ks.indexOf(key); if (i < 0) return 0;
+    const base = Math.floor(TOTAL / n), rem = TOTAL - base * n;
+    return base + (i < rem ? 1 : 0);
+}
 const PER_DAY = 3;
 const SIZE = 34;                 // 방 그림 좌표에서 상자 키 (사람 키 236)
 const NEAR = 170;                // 이만큼 가까이 서야 열린다 (가로 · 방 그림 좌표)
@@ -195,7 +206,7 @@ function listen(key) {
 function fill(key) {
     if (!clockOk() || key !== curRoom) return;
     const made = Object.keys(boxes).map(function (k) { return boxes[k]; }).filter(keep);
-    for (let i = 0; i < PER_ROOM; i++) {
+    for (let i = 0, n = perRoom(key); i < n; i++) {
         if (keep(boxes[i])) continue;
         const sp = newSpot(key, made);
         if (sp) { made.push(sp); seed(key, i, sp); }
@@ -231,7 +242,7 @@ function paint(force) {
     if (!force && sig === lastSig) return;
     Array.prototype.forEach.call(st.el.querySelectorAll('.plaza-tr'), function (e) { e.remove(); });
     if (st.room !== curRoom) { lastSig = ''; return; }
-    for (let i = 0; i < PER_ROOM; i++) {
+    for (let i = 0, n = perRoom(curRoom); i < n; i++) {
         const b = boxes[i];
         if (!live(b) || !(b.x >= 0)) continue;           // 연 상자 · 어제 상자는 그리지 않는다
         const s = Math.max(6, Math.round(SIZE * z));            // 화면에서 상자 크기
@@ -280,7 +291,7 @@ setInterval(function () {
             if (Date.now() - lastFill > 5000) {
                 lastFill = Date.now();
                 let need = false;
-                for (let i = 0; i < PER_ROOM; i++) if (!keep(boxes[i])) need = true;
+                for (let i = 0, n = perRoom(curRoom); i < n; i++) if (!keep(boxes[i])) need = true;
                 if (need && ref && gotRoom === curRoom) fill(curRoom);
             }
         }
@@ -595,7 +606,7 @@ window.treasureState = function () {
     const r = dayRec();
     console.log('%c===== 🎁 보물 찾기 =====', 'color:#ffcf8f; font-size:13px');
     console.log('  오늘 연 상자', r.n, '/', PER_DAY, isAdm() ? '(상담사 — 세지 않음)' : '');
-    console.log('  지금 방', curRoom || '-', '· 상자', Object.keys(boxes).length);
+    console.log('  지금 방', curRoom || '-', '· 상자', Object.keys(boxes).length, '/', perRoom(curRoom), '· 모든 방', Object.keys(rooms()).map(function (k) { return k + ' ' + perRoom(k); }).join(' · '));
     if (Object.keys(boxes).length) console.table(Object.keys(boxes).map(function (k) { const b = boxes[k]; return { 칸: k, x: b.x, y: b.y, 층: b.lv ? '지하' : '길', 모양: b.k }; }));
     const d = db_();
     if (d) d.ref(CAPS).once('value').then(function (s) {
@@ -603,6 +614,7 @@ window.treasureState = function () {
         console.table(SPECIAL.map(function (x) { return { 물품: x.n, 확률: (x.p * 100) + '%', 나간수: v[x.k] || 0, 끝: x.cap }; }));
     });
 };
+window.treasurePerRoom = function () { const o = {}; Object.keys(rooms()).forEach(function (k) { o[k] = perRoom(k); }); return o; };
 window.treasureTable = function () {
     const rows = table();
     const tot = rows.reduce(function (a, r) { return a + r.w; }, 0);
@@ -635,5 +647,5 @@ window.treasureReset = function (all) {
     console.log('상자 자리를 새로 —', keys.join(', '));
 };
 
-console.log('[보물 찾기] 광장 · 포토존 방마다 상자 ' + PER_ROOM + '개 · 하루 ' + PER_DAY + '개 — treasureState() · treasureTable()');
+console.log('[보물 찾기] 광장 · 포토존 모두 합쳐 상자 ' + TOTAL + '개 (방마다 고르게) · 하루 ' + PER_DAY + '개 — treasureState() · treasureTable()');
 })();
