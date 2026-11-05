@@ -9,7 +9,7 @@
 // ■ 어디에
 //   · 사원증 칸(기록 › 사원증)의 큰 사진 칸 (#badge-photo-display) — 온몸
 //   · 옛 화면 위쪽 사원증의 작은 사진 (#card-mini-photo) — 윗몸
-//   · 사원 열람 목록 (.emp-list-card .emp-list-avatar) — 윗몸 · 접속 중 초록 불은 사원 칸(바깥 네모) 왼쪽 위 모서리로 옮긴다
+//   · 사원 열람 목록 (.emp-list-card .emp-list-avatar) — 윗몸 · 접속 중은 초록 불 대신 이름 줄의 「온라인 · 오프라인」 글자 (index.html)
 //   · 사원 열람 › 한 사람 (#emp-detail-card-container .id-avatar-mini) — 윗몸
 //   · 광장 왼쪽 위 사원증 칸 (#plaza-me .pm-pic) — 얼굴 (plaza.js paintMe 가 부른다)
 //   그림은 옷장과 같은 것(dotSprite · 지금 입은 옷 · 물들인 색 · 악세)을 멈춘 채로 쓴다.
@@ -116,15 +116,7 @@ function paintList() {
     Array.prototype.forEach.call(box.querySelectorAll('.emp-list-card'), function (card) {
         const c = codeOfCard(card); const u = c && U[c];
         if (!u) return;
-        const av = card.querySelector('.emp-list-avatar');
-        // 🟢 접속 중 불 — 사진 칸 안에 갇혀 반쯤 잘렸다. 바깥 네모(사원 칸) 왼쪽 위 모서리로 옮긴다 (2026-11-05 사용자)
-        if (av) Array.prototype.slice.call(av.children).forEach(function (c) {
-            if (c.tagName === 'DIV' && !c.classList.contains('dp-pt') && /border-radius:\s*50%/.test(c.getAttribute('style') || '')) {
-                c.classList.add('dp-online');
-                card.insertBefore(c, card.firstChild);
-            }
-        });
-        put(av, u, 'bust', 45, 55);
+        put(card.querySelector('.emp-list-avatar'), u, 'bust', 45, 55);
     });
 }
 let detailCode = null;
@@ -205,13 +197,7 @@ setInterval(function () {
         '#dp-bg .dp-sw button.on{border-color:#fff;box-shadow:0 0 0 2px #d4af37;}',
         '#dp-bg .dp-sw label{position:relative;width:24px;height:24px;border-radius:50%;border:2px dashed rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:12px;color:#ccc;cursor:pointer;overflow:hidden;}',
         '#dp-bg .dp-sw label input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}',
-        '#badge-photo-display{background:transparent;}',
-        // 접속 중 불 — 사원 칸 왼쪽 위 모서리에 걸친다
-        '#employee-cards-container .emp-list-card{position:relative;}',
-        '#employee-cards-container .emp-list-card > .dp-online{position:absolute !important;top:-10px !important;left:-10px !important;width:14px !important;height:14px !important;z-index:6 !important;margin:0 !important;}',
-        // ✗ 테두리 두른 칸은 테두리 쪽 규칙(frames-video* — 「칸 안 것은 모두 position:relative !important」)에 밀려 불이 칸 가운데 왼쪽에 떴다 (2026-11-05 사용자).
-        //   그 칸은 빛을 칸 안에 가두느라 바깥을 자른다(frame-size.js overflow:hidden) — 모서리 **안쪽**에 둔다 (테두리 빛보다 위).
-        '#employee-cards-container .emp-list-card.fr-wrap > .dp-online{top:5px !important;left:5px !important;}'
+        '#badge-photo-display{background:transparent;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
