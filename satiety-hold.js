@@ -487,12 +487,22 @@ function sweepRibbons() {
         if (d.o !== currentUser.code) return;
         const u = db.users[d.p];
         if (!u || typeof updateUserFields !== 'function') return;
-        const mine = (u.ribbons || []).filter(function (r) { return r && r.u > t; });
+        // ★ 상대가 채운 끝난 줄은 지우지 않는다 (2026-11-06 사용자 「붉은 리본이 계속 사라져」 — 소지품으로 안 돌아옴)
+        //   ✗ 전에는 상대 줄에서 끝난 것을 **전부** 걷었다. 서로 묶었거나(갑→을 · 을→갑) 상대가 다른 사람에게도
+        //     묶어 둔 채 둘 다 끝났을 때, 상대가 꺼져 있고 내가 먼저 정리하면 **상대가 값을 치른 줄까지** 지워져
+        //     상대가 들어와도 돌려받을 줄이 없었다 — 리본이 그냥 사라졌다.
+        //   → 상대가 채운(o = 상대) 끝난 줄은 아직 안 돌려받았으면 남긴다 (상대가 들어오면 제 정리에서 돌려받는다).
+        //     이름표는 전처럼 살아 있는 줄 수만큼만 남긴다.
+        const paidU = Array.isArray(u.ribbonPaid) ? u.ribbonPaid : [];
+        const live = (u.ribbons || []).filter(function (r) { return r && r.u > t; });
+        const mine = (u.ribbons || []).filter(function (r) {
+            return r && (r.u > t || (r.o === d.p && paidU.indexOf(payKey(r)) < 0));
+        });
         const teq = (u.equippedWeapons || []).slice();
         const tw = teq.filter(function (w) {
             return base(w) === RIBBON && String(w).indexOf(PERM_MARK) < 0;
         }).length;
-        let cut = Math.max(0, tw - mine.length);
+        let cut = Math.max(0, tw - live.length);
         const myName = currentUser.name || '';
         while (cut-- > 0) {
             let i = myName ? teq.findIndex(function (w) {
