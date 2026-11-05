@@ -117,6 +117,8 @@ setInterval(function () {
             position: currentUser.position || '사원',
             ready: false, equips: [], items: [], joinedAt: Date.now()
         };
+        // ★ 헬퍼였으면 헬퍼 표시도 같이 (2026-11-05 — 빠지면 출발할 때 보통 탐사가 됐다 · party-helper.js)
+        try { if (typeof window.helperOf === 'function' && window.helperOf(want, currentUser.code)) me.helper = true; } catch (e) { }
         database.ref('darkParties/' + want + '/members/' + currentUser.code).set(me);
         database.ref('darkParties/' + want + '/members/' + currentUser.code).onDisconnect().remove();
         if (!p.members) p.members = {};

@@ -42,6 +42,24 @@
 //   수가 없는 값이라서다. 탐사 하나를 통째로 지키는 6 은 K 의 방에도 그대로 돈다
 //   (kroom-core.js 가 darkRun.helper 를 적어 둔다).
 
+// ■ 헬퍼가 보통 탐사로 바뀌던 것 (2026-11-05 사용자 제보 — 「헬퍼로 들어간 뒤 완전히 나갔다가 새로고침하면
+//   일반 탐사로 바뀌어 보상이 들어오고 횟수가 깎인다 · 횟수가 0 일 때 헬퍼로 들어가 이렇게 하면 악용된다」)
+//
+//   헬퍼 표시가 파티 명단의 내 자리(members/<나>/helper) **한 군데에만** 있었다.
+//   그런데 내 자리를 다시 적는 곳이 둘 있고, 둘 다 헬퍼 표시 없이 통째로 적었다.
+//     · party-stay.js — 모집 중에 연결이 끊겨 자리가 지워지면 다시 앉힌다
+//     · party-keep.js — 탐사 중에 자리가 지워지면 다시 앉힌다 (들고 있던 자리가 없으면 틀로)
+//   그 뒤 출발(launchPartyRun)하거나, 새로 열어 파티 감시기가 다시 출발시키면 「헬퍼가 아니다」로 보고
+//   보통 탐사로 들어갔다 — 횟수가 0 이어도 막지 않았다 (횟수는 들어갈 때만 본다).
+//
+//   이제
+//     ① 헬퍼 표시를 파티에 따로도 적는다 — darkParties/<방>/helpers/<사번> (자리를 다시 적어도 안 지워진다)
+//     ② 출발할 때 헬퍼인지는 넷 중 하나라도 맞으면 헬퍼다
+//          명단의 표시 · ①의 표시 · 이 기기에 적어 둔 헬퍼 탐사(같은 방) · **남은 횟수가 0**
+//        (횟수가 없는 사람은 헬퍼로만 들어올 수 있다 — 어떤 길로 왔든 보통 탐사가 되지 않는다)
+//        헬퍼인데 명단 표시가 빠져 있으면 다시 적는다.
+//     ③ 자리를 다시 적는 두 곳도 헬퍼 표시를 같이 적는다 (window.helperOf)
+
 (function partyHelper() {
 
 const KEY = 'darkHelperMode';      // 이 창의 헬퍼 참가 여부
@@ -67,15 +85,43 @@ function iAmHelper() {
     const pid = myPid();
     if (!pid || typeof darkParties === 'undefined' || !darkParties[pid]) return false;
     const m = (darkParties[pid].members || {})[currentUser.code];
-    return !!(m && m.helper);
+    if (m && m.helper) return true;
+    const hs = darkParties[pid].helpers || {};
+    return !!hs[currentUser.code];
 }
 window.iAmHelper = iAmHelper;
+
+// 이 방에서 이 사원이 헬퍼인가 — 명단 표시 · 방의 헬퍼 표(①) · 이 기기에 적어 둔 헬퍼 탐사
+function helperOf(party, code) {
+    if (!party || !code) return false;
+    const m = (party.members || {})[code];
+    if (m && m.helper) return true;
+    if (party.helpers && party.helpers[code]) return true;
+    try {
+        const h = JSON.parse(localStorage.getItem('helperRun_' + code) || 'null');
+        if (h && h.code === code && party.id && String(h.k || '').split('|')[1] === String(party.id)) return true;
+    } catch (e) { }
+    return false;
+}
+window.helperOf = function (pid, code) {
+    try {
+        const p = (typeof darkParties !== 'undefined' && darkParties[pid]) || null;
+        if (p && !p.id) p.id = pid;
+        if (helperOf(p, code)) return true;
+        if (typeof darkRun !== 'undefined' && darkRun && darkRun.partyId === pid && darkRun.helper
+            && currentUser && currentUser.code === code) return true;
+    } catch (e) { }
+    return false;
+};
 
 // 파티 명단에 헬퍼 표시를 남긴다
 function markHelper(pid) {
     if (!database || !pid || !currentUser) return;
     database.ref('darkParties/' + pid + '/members/' + currentUser.code + '/helper')
         .set(true).catch(function (e) { console.warn('[파티] 헬퍼 표시 실패:', e && e.message); });
+    // ① 방에 따로도 적는다 — 내 자리를 다시 적어도 남는다
+    database.ref('darkParties/' + pid + '/helpers/' + currentUser.code)
+        .set(true).catch(function () { });
     setTimeout(function () {
         if (typeof sendPartyChat === 'function') {
             try { sendPartyChat(currentUser.name + ' 사원이 헬퍼로 들어왔습니다. (보상 없음 · 횟수 차감 없음)', true); } catch (e) { }
@@ -241,8 +287,20 @@ function withTriesOpen(fn) {
         const _l = launchPartyRun;
         launchPartyRun = function (party) {
             const me = (party && party.members) ? party.members[currentUser.code] : null;
-            const helper = !!(me && me.helper);
+            // ② 넷 중 하나라도 맞으면 헬퍼 — 명단 표시 · 방의 헬퍼 표 · 이 기기의 헬퍼 탐사 · 남은 횟수 0
+            let left = 1;
+            try { if (typeof getDarkTriesLeft === 'function') left = Number(getDarkTriesLeft()); } catch (e) { }
+            const noTries = !(left > 0);
+            const helper = !!me && (helperOf(party, currentUser.code) || noTries);
             const keep = currentUser ? currentUser.darkTries : null;
+            if (helper && party && party.id && database && !(me && me.helper)) {
+                // 명단 표시가 빠져 있었다 — 다시 적는다
+                try {
+                    database.ref('darkParties/' + party.id + '/members/' + currentUser.code + '/helper').set(true).catch(function () { });
+                    database.ref('darkParties/' + party.id + '/helpers/' + currentUser.code).set(true).catch(function () { });
+                } catch (e) { }
+                console.warn('[파티] 헬퍼로 출발합니다 — ' + (noTries ? '남은 탐사 횟수가 없습니다' : '명단의 헬퍼 표시가 빠져 있었습니다'));
+            }
 
             const r = _l.apply(this, arguments);
             if (!helper || !currentUser) return r;
@@ -256,7 +314,9 @@ function withTriesOpen(fn) {
             if (typeof saveFields === 'function') { try { saveFields({ darkTries: 1 }); } catch (e) { } }
 
             setTimeout(function () {
-                if (typeof showDarkToast === 'function') showDarkToast('헬퍼로 들어왔습니다. 횟수는 줄지 않습니다.');
+                if (typeof showDarkToast === 'function') showDarkToast(noTries && !helperOf(party, currentUser.code)
+                    ? '남은 탐사 횟수가 없어 헬퍼로 들어왔습니다. 보상은 받지 않습니다.'
+                    : '헬퍼로 들어왔습니다. 횟수는 줄지 않습니다.');
             }, 1200);
             return r;
         };

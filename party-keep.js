@@ -146,11 +146,15 @@ function remember(pid, p, u) {
 }
 
 function mineOf(r, u) {
-    if (hold.mine) return hold.mine;
-    return {
+    // ★ 헬퍼 표시를 잃지 않는다 (2026-11-05 — 틀로 다시 앉히면 빠져, 새로 열 때 보통 탐사로 다시 출발했다)
+    const helper = !!(r && r.helper) || !!(hold.mine && hold.mine.helper);
+    if (hold.mine) return helper ? Object.assign({}, hold.mine, { helper: true }) : hold.mine;
+    const m = {
         code: u.code, name: u.name || '', position: u.position || '사원', ready: true,
         equips: (r.carryEquips || []).slice(), items: (r.carryItems || []).slice(), joinedAt: Date.now()
     };
+    if (helper) m.helper = true;
+    return m;
 }
 
 function listen(pid, code) {
@@ -199,6 +203,9 @@ function tick(why) {
     });
     if (!p || !p.alive || !p.alive[code]) { up[root + 'alive/' + code] = true; did.push('alive'); }
     if (!p || !p.members || !p.members[code]) { up[root + 'members/' + code] = mineOf(r, u); did.push('members'); }
+    // 헬퍼인데 명단 · 방의 헬퍼 표에 표시가 빠졌다 — 다시 적는다 (party-helper.js)
+    else if (r.helper && !p.members[code].helper) { up[root + 'members/' + code + '/helper'] = true; did.push('helper'); }
+    if (r.helper && (!p || !p.helpers || !p.helpers[code])) { up[root + 'helpers/' + code] = true; if (did.indexOf('helper') < 0) did.push('helper'); }
     if (!p || !p.roster || !p.roster[code]) { up[root + 'roster/' + code] = true; did.push('roster'); }
 
     if (did.length) {
