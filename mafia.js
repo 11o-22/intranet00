@@ -18,6 +18,9 @@
 //     놀이 동안 「기본」 포토존의 이름은 「중앙」 — 긴급 회의 단추가 거기 있다.
 //   · 범인 — 5~6명이면 1명 · 7~9명이면 2명. 범인끼리는 서로 안다.
 //   · 미션 — 맵마다 3개 (모두 21). 시민이 살아서 끝낸 것만 센다 (유령 · 범인도 할 수는 있지만 안 센다).
+//     ★ 2026-11-05 사용자 「한 건 못 하게 하는 식이 아니라, 미션도 한 55번 해야 끝나는 식으로. 인원이 적으면 그만큼 줄이고」
+//       — 같은 미션을 몇 번이든 다시 할 수 있다. 시민이 해낸 횟수를 모두 합쳐(cnt) 목표(goal)에 닿으면 시민 승리.
+//         목표 = 55 × 시작할 때 시민 수 ÷ 7 (9명 · 시민 7명이면 55번 · 시민 6명 47 · 5명 39 · 4명 31). 시작할 때 정해 판에 적는다.
 //     숫자 순서대로 누르기 · 카드 정렬 · 박스 크기대로 놓기 · 같은 색 선 잇기 · 내려오는 사과 3번 받기
 //     · 불빛 순서 기억 · 레버 꾹 누르기 · 같은 그림 짝 · 다이얼 맞추기 · 쓰레기 줍기 · 스위치 켜기 · 스캔
 //   · 처치 — 범인이 산 사람(보통 크기)에게 🪩 를 날린다. 맞으면 죽는다. 한 사람분 거리 안 · 시작하고 20초 뒤부터 · 한 번 처치하면 20초 쉰다.
@@ -36,7 +39,7 @@
 //   mfGame/<판> = { id, host, hostName, at, st:'LOBBY'|'PLAY'|'END'|'CANCEL', inst,
 //                   inv: { 사번: { n, st } }, mem: { 사번: { n } }, mafia: { 사번: 1 }, t0, seed,
 //                   dead: { 사번: { at, by, r, x, y, kx, ky } }, out: { 사번: { at, n, quit } },
-//                   done: { 미션: { by, at } }, emer: { 사번: 때 },
+//                   done: { 미션: { by, at } } (옛 — 한 번씩) · cnt: 해낸 횟수 · goal: 목표 횟수, emer: { 사번: 때 },
 //                   meet: { n, on, kind:'body'|'emer', by, body, at, until, res:{ out, tally, skip }, end },
 //                   votes: { 회의번호: { 사번: 사번|'skip' } }, chat: { 회의번호: { … { c, n, t, at } } },
 //                   end: { at, win:'crew'|'mafia', why }, paid: { 사번: 때 } }
@@ -64,6 +67,7 @@ const REACH = 150;                       // 미션 · 문 · 단추 · 시체에
 const GHOST_SPEED = 2;
 const PRIZE = '안구';
 const STALE = 3 * 3600000;               // 이만큼 묵은 판은 잇지 않는다
+const GOAL_MAX = 55, GOAL_CREW = 7;      // 미션 목표 — 시민 7명(9명 판)일 때 55번 · 시민이 적으면 그만큼 줄인다 (2026-11-05 사용자)
 
 // 방 — 사용자가 그린 지도 (좌우는 방 끝 · 위아래는 문)
 const MAP = {
@@ -216,8 +220,15 @@ function missions() {
     misCache = { id: game.id, list: list };
     return list;
 }
-function doneOf(id) { return !!(game && game.done && game.done[id]); }
-function doneN() { return missions().filter(function (m) { return doneOf(m.id); }).length; }
+// 미션 횟수 — 같은 미션을 몇 번이든 (2026-11-05) · 시민이 해낸 것을 모두 합친다
+function goalCalc(crew) { return Math.max(1, Math.round(GOAL_MAX * crew / GOAL_CREW)); }
+function goalOf(g) {
+    g = g || game; if (!g) return 0;
+    if (Number(g.goal) > 0) return Number(g.goal);
+    const n = Object.keys(g.mem || {}).length, mf = Object.keys(g.mafia || {}).length;
+    return goalCalc(Math.max(1, n - mf));
+}
+function cntOf(g) { g = g || game; return Math.max(0, Number(g && g.cnt) || 0); }
 
 // ==========================================
 // 방 — 놀이 동안만 포토존을 이어 붙인다 (내 화면에서만 · 끝나면 되돌린다)
@@ -404,7 +415,7 @@ function winCheck(why) {
     gtx(function (cur) {
         if (cur.st !== 'PLAY') return;
         const crew = crewAlive(cur), mf = mafiaAlive(cur);
-        const total = missions().length, done = Object.keys(cur.done || {}).length;
+        const total = goalOf(cur), done = cntOf(cur);
         let win = null, w = '';
         if (!mf.length) { win = 'crew'; w = 'found'; }
         else if (total && done >= total) { win = 'crew'; w = 'tasks'; }
@@ -625,7 +636,7 @@ function meetCheck() {
         cur.meet.res = { out: outC, tally: tally, skip: skip, tie: tie };
         // 승리 — 투표 직후 (사용자 규칙)
         const crew = crewAlive(cur), mf = mafiaAlive(cur);
-        const total = missions().length, done = Object.keys(cur.done || {}).length;
+        const total = goalOf(cur), done = cntOf(cur);
         let win = null, w = '';
         if (!mf.length) { win = 'crew'; w = 'found'; }
         else if (total && done >= total) { win = 'crew'; w = 'tasks'; }
@@ -744,7 +755,6 @@ function resCheck() {
 // ==========================================
 function openMission(m) {
     if (misOpen || !playing() || meetOn()) return;
-    if (doneOf(m.id) && !amGhost() && !isMafia()) { toast('✅ 이미 끝난 미션입니다.'); return; }
     misOpen = m;
     const ov = document.createElement('div');
     ov.id = 'mf-mis'; ov.className = 'mf-ov';
@@ -764,8 +774,13 @@ function missionDone(m) {
     if (amGhost()) { toast('👻 해냈지만 유령의 미션은 세지 않습니다.'); return; }
     if (isMafia()) { toast('🕵️ 하는 척했습니다. (범인의 미션은 세지 않습니다)'); return; }
     const d = db_(); if (!d) return;
-    d.ref(G + '/' + game.id + '/done/' + m.id).transaction(function (cur) { return cur ? undefined : { by: c, at: srv() }; }).then(function (res) {
-        if (res && res.committed) { toast('✅ 미션 완료 — ' + m.n); setTimeout(function () { winCheck('task'); }, 300); }
+    // 같은 미션도 몇 번이든 — 판의 횟수(cnt)를 하나 올린다
+    d.ref(G + '/' + game.id + '/cnt').transaction(function (cur) { return (Number(cur) || 0) + 1; }).then(function (res) {
+        if (res && res.committed) {
+            const n = Number(res.snapshot && res.snapshot.val()) || 0;
+            toast('✅ 미션 완료 — ' + m.n + ' (' + Math.min(n, goalOf()) + '/' + goalOf() + ')');
+            setTimeout(function () { winCheck('task'); }, 300);
+        }
     }).catch(function () { });
 }
 
@@ -1158,8 +1173,7 @@ function useThing(o) {
 function paintMarks() {
     const st = stage();
     if (!st || !st.el || !MAP[st.room]) { if (lay.box) { lay.box.remove(); lay.box = null; lay.key = ''; } return; }
-    const dn = missions().filter(function (m) { return m.room === st.room && doneOf(m.id); }).map(function (m) { return m.id; }).join(',');
-    const key = game.id + '|' + st.room + '|' + st.z + '|' + dn + '|' + (game.emer && game.emer[myCode()] ? 1 : 0);
+    const key = game.id + '|' + st.room + '|' + st.z + '|' + (game.emer && game.emer[myCode()] ? 1 : 0);
     if (lay.key === key && lay.box && lay.box.isConnected) return;
     if (lay.box) lay.box.remove();
     lay.bodies = {};
@@ -1167,8 +1181,8 @@ function paintMarks() {
     box.className = 'mf-layer';
     const z = st.z, fy = floorY(st.room);
     things(st.room).forEach(function (o) {
-        const tx = o.t === 'door' ? o.n : (o.t === 'emer' ? o.n : o.n + (doneOf(o.m.id) ? ' ✅' : ''));
-        const e = mk(o.x, fy, o.t === 'mis' && doneOf(o.m.id) ? '✅' : o.ic, tx, o.t === 'emer' ? 'emer' : (o.t === 'mis' && doneOf(o.m.id) ? 'done' : ''), function () { useThing(o); });
+        const tx = o.n;                                                   // 미션은 몇 번이든 — 끝난 표(✅)를 달지 않는다
+        const e = mk(o.x, fy, o.ic, tx, o.t === 'emer' ? 'emer' : '', function () { useThing(o); });
         e.style.left = Math.round(o.x * z) + 'px';
         e.style.top = Math.round(fy * z) + 'px';
         box.appendChild(e);
@@ -1283,16 +1297,15 @@ function paintHud() {
     let hud = document.getElementById('mf-hud');
     if (!hud) { hud = document.createElement('div'); hud.id = 'mf-hud'; document.body.appendChild(hud); }
     const room = roomNow(), rn = (MAP[room] && MAP[room].n) || '';
-    const total = missions().length, dn = doneN();
-    const roomLeft = missions().filter(function (m) { return m.room === room && !doneOf(m.id); }).length;
+    const total = goalOf(), dn = Math.min(cntOf(), total);
     let role = isMafia() ? '🕵️ 범인' : '🙂 시민';
     if (amGhost()) role += ' · 👻 유령';
     const mates = isMafia() ? mem().filter(function (x) { return x !== c && isMafia(x); }).map(nameOf) : [];
     let sub = isMafia() ? '산 사람 가까이에서 🪩 처치 · 미션은 하는 척만' + (mates.length ? ' · 동료 범인 ' + mates.join(', ') : '')
-        : '미션을 끝내거나 범인을 찾아내세요 · 시체를 누르면 회의';
+        : '미션을 ' + goalOf() + '번 해내거나(같은 미션도 다시 됩니다) 범인을 찾아내세요 · 시체를 누르면 회의';
     if (amGhost()) sub = '산 사람에게 안 보입니다 · 미션은 해도 세지 않습니다';
     if (revealing()) sub = '곧 시작합니다…';
-    const html = role + ' · 📍 ' + esc(rn) + ' · 🛠 미션 ' + dn + '/' + total + (roomLeft ? ' (이 방 ' + roomLeft + ')' : '') + ' · 🙂 ' + aliveList().length + '명<small>' + esc(sub) + '</small>';
+    const html = role + ' · 📍 ' + esc(rn) + ' · 🛠 미션 ' + dn + '/' + total + ' · 🙂 ' + aliveList().length + '명<small>' + esc(sub) + '</small>';
     if (hud._h !== html) { hud.innerHTML = html; hud._h = html; }
     // 처치 단추
     let kb = document.getElementById('mf-kill');
@@ -1359,7 +1372,7 @@ function showReveal() {
     ov.innerHTML = '<div class="mf-card" style="text-align:center;align-items:center;">'
         + (isMafia()
             ? '<div style="font-size:46px;">🕵️</div><h3 style="color:#ff6b6b;">당신은 범인입니다</h3><div class="mf-sub">산 사람 가까이에서 🪩 를 날려 처치하세요 (시작 20초 뒤부터 · 처치하면 20초 쉼). 들키지 않게 미션을 하는 척하세요.' + (mates.length ? '<br>동료 범인 — <b style="color:#ff9a8a;">' + mates.map(esc).join(', ') + '</b>' : '') + '</div>'
-            : '<div style="font-size:46px;">🙂</div><h3>당신은 시민입니다</h3><div class="mf-sub">맵 곳곳의 미션 ' + missions().length + '개를 모두 끝내거나, 회의에서 범인을 찾아내세요.<br>시체를 보면 눌러 회의를 여세요. 중앙의 🚨 는 긴급 회의 (한 번).</div>')
+            : '<div style="font-size:46px;">🙂</div><h3>당신은 시민입니다</h3><div class="mf-sub">맵 곳곳의 미션을 시민 모두 합쳐 <b style="color:#ffe3a0;">' + goalOf() + '번</b> 해내거나 (같은 미션을 몇 번이든 다시 할 수 있습니다), 회의에서 범인을 찾아내세요.<br>시체를 보면 눌러 회의를 여세요. 중앙의 🚨 는 긴급 회의 (한 번).</div>')
         + '<div class="mf-sub">범인 ' + Object.keys(game.mafia || {}).length + '명 · 모두 ' + mem().length + '명</div></div>';
     document.body.appendChild(ov);
     setTimeout(function () { closeOv('mf-reveal'); }, Math.max(800, (Number(game.t0) || 0) + REVEAL_MS - srv()));
@@ -1402,7 +1415,7 @@ function loopOff() {
 function showResult(g, won) {
     if (!g || !g.end) return;
     const e = g.end, mf = Object.keys(g.mafia || {});
-    const why = { tasks: '시민이 미션을 모두 끝냈습니다.', found: '시민이 범인을 모두 찾아냈습니다.', vote: '투표 뒤 산 시민이 2명 이하가 되었습니다.', kill: '산 시민이 남지 않았습니다.', quit: '남은 사람이 없어 끝났습니다.' }[e.why] || '';
+    const why = { tasks: '시민이 미션을 ' + goalOf(g) + '번 모두 해냈습니다.', found: '시민이 범인을 모두 찾아냈습니다.', vote: '투표 뒤 산 시민이 2명 이하가 되었습니다.', kill: '산 시민이 남지 않았습니다.', quit: '남은 사람이 없어 끝났습니다.' }[e.why] || '';
     closeOv('mf-end');
     const ov = document.createElement('div');
     ov.className = 'mf-ov'; ov.id = 'mf-end';
@@ -1535,6 +1548,8 @@ function startGame() {
         cur.st = 'PLAY';
         cur.t0 = srv() + 1500;
         cur.dead = null; cur.out = null; cur.done = null; cur.meet = null; cur.votes = null; cur.chat = null; cur.emer = null;
+        cur.cnt = 0;
+        cur.goal = goalCalc(codes.length - nm);           // 미션 목표 — 시민 수만큼 (2026-11-05)
         return cur;
     }).then(function (res) {
         const v = res && res.snapshot ? res.snapshot.val() : null;
@@ -1625,7 +1640,7 @@ window.mfState = function () {
     if (!game) { console.log('  판 없음'); return; }
     console.log('  판', game.id, '·', game.st, '· 켜짐', mfOn, '· 방 번호', game.inst, '· 회의', meetOn() ? game.meet.n : '-');
     console.table(mem().map(function (c) { return { 사번: c, 이름: nameOf(c), 역할: isMafia(c) ? '범인' : '시민', 상태: deadOf(c) ? '처치됨' : (outOf(c) ? '쫓겨남' : '삶') }; }));
-    console.log('  미션', doneN() + '/' + missions().length);
+    console.log('  미션', cntOf() + '/' + goalOf() + ' (같은 미션도 몇 번이든 · 미션 자리 ' + missions().length + ')');
 };
 window.mfMissions = function () { return missions(); };
 window.mfGames = GAMES;
