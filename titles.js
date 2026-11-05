@@ -156,6 +156,7 @@ const ADMIN_ONLY = ['여우구슬', '금고'];
 const TOO_RARE = ['황룡의 눈', '산군의 도움'];
 
 // 콜렉터에서 빼는 것 (2026-11-04 사용자 「컬렉터 호칭에서 정갈한 문패랑 오색 신발끈은 빼자」)
+//   스파이에서도 뺀다 (2026-11-06 사용자 「오색 신발끈이랑 정갈한 문패 스파이 칭호에도 미포함되게 해줘」 · otherSideItems)
 //   판에서 내렸지만(rare-odds.js NEVER) 늦게 밀어 넣는 자리가 있어 목록에 다시 섞일 수 있다 — 여기서 확실히 뺀다
 const COLLECT_SKIP = ['정갈한 문패', '오색 신발끈'];
 
@@ -260,6 +261,7 @@ function otherSideItems(u) {
         if (!need) return;
         if (TOO_RARE.indexOf(n) >= 0) return;
         if (ADMIN_ONLY.indexOf(n) >= 0) return;
+        if (COLLECT_SKIP.indexOf(n) >= 0) return;   // 판에서 내린 것 (정갈한 문패 · 오색 신발끈)
         if (where.indexOf(need) < 0) out.push(n);   // 내가 못 쓰는 쪽 = 반대 소속
     });
     return out;
