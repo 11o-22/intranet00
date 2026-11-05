@@ -4,6 +4,7 @@
     [
       "security.js",
       "rest-time.js",
+      "back-exit.js",
       "time-freeze.js",
       "dark.js"
     ],

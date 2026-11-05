@@ -878,6 +878,9 @@ function look(user, override, all) {
     const nw = {};
     if (d.nw && typeof d.nw === 'object' && d.nw.t) nw['nuow-friend'] = d.nw;
     if (d.nw2 && typeof d.nw2 === 'object' && d.nw2.t) nw['nuow2-doll'] = d.nw2;
+    //   말풍선을 껐다 (2026-11-05 · dot.nwOff · dot.nw2Off) — { off: 1 } 를 얹어 말풍선만 걷은 장을 깐다 (고른 글씨는 남겨 둔다)
+    if (d.nwOff) nw['nuow-friend'] = Object.assign({}, nw['nuow-friend'] || {}, { off: 1 });
+    if (d.nw2Off) nw['nuow2-doll'] = Object.assign({}, nw['nuow2-doll'] || {}, { off: 1 });
     return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null };
 }
 window.dotLook = look;

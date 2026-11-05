@@ -23,6 +23,12 @@
 //     광장은 dot 을 통째로 주고받으므로 남의 화면에서도 같은 글씨다. 고른 것이 없으면 그려 둔 그대로다.
 //   · 물들이기(recolor.js)를 했으면 물든 바탕 위에 쓴다 (글씨 색은 고른 색 그대로).
 //
+// ■ 말풍선 켜고 끄기 (2026-11-05 사용자 「Null Owner 악세 두 개 다 말풍선 on off」)
+//   · 고르는 창 맨 위 「말풍선 켜기 · 끄기」 — 누르는 즉시 저장한다. dot.nwOff · dot.nw2Off 가 1 이면 끈 것.
+//   · 끄면 말풍선(과 그 안 글씨)만 지운 장(nuow-friend-nb · nuow2-doll-nb — 말풍선이 나오는 일곱 칸에서 말풍선 덩어리만 걷음)을 깐다.
+//     토끼 · 인형 · 종이는 그대로 움직인다. 글씨가 없으니 짝(-r)도 같은 장을 쓴다 (몸과 함께 뒤집힌다).
+//   · 끈 동안에도 고른 글씨는 그대로 남아 있어, 다시 켜면 그 글씨로 나온다.
+//
 // ■ 콘솔
 //   nuowTextOpen('nuow-friend' | 'nuow2-doll')     고르는 창
 //   nuowTextState()
@@ -45,7 +51,7 @@ const COLORS = ['#ff95f3', '#e7b775', '#ff4d6d', '#ff9f1c', '#ffd60a', '#52b788'
 //            ★ 오른쪽을 볼 때는 몸과 함께 말풍선도 뒤집혀 반대로 기운다 — 짝(-r)에는 반대 기울기로 써서 뒤집어 넣는다.
 const CFG = {
     'nuow-friend': {
-        key: 'nw', base: 'nuow-friend-nt', SW: 2880, CW: 480, CH: 576, ROW: 5,
+        key: 'nw', offKey: 'nwOff', nb: 'nuow-friend-nb', base: 'nuow-friend-nt', SW: 2880, CW: 480, CH: 576, ROW: 5,
         CX: 142, CY: 358, AXIS: 284, max: 2, per: false, defC: '#ff95f3',
         bw: 15, bh: 20, gap: 3, rot: -14, jit: 0.5,
         hit: { x0: 196, x1: 314, y0: 430, y1: 576 },                 // 토끼
@@ -53,7 +59,7 @@ const CFG = {
         title: '🐰 착한 친구 말풍선', item: 'Null Owner'
     },
     'nuow2-doll': {
-        key: 'nw2', base: 'nuow2-doll-nt', SW: 4032, CW: 672, CH: 576, ROW: 5,
+        key: 'nw2', offKey: 'nw2Off', nb: 'nuow2-doll-nb', base: 'nuow2-doll-nt', SW: 4032, CW: 672, CH: 576, ROW: 5,
         CX: 208, CY: 396, AXIS: 416, max: 3, per: true, defC: '#e7b775',
         bw: 13, bh: 15, gap: 1, rot: -42, jit: 0,
         hit: { x0: 288, x1: 392, y0: 440, y1: 576 },                 // 인형
@@ -70,6 +76,7 @@ function cleanT(t, max) { return chars(t).slice(0, max).join(''); }
 function cleanC(c, def) { c = String(c || '').trim(); return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : def; }
 function famOf(sheet) { return String(sheet || '').replace(/-r$/, ''); }
 function baseUrl(cf) { return ((window.DOT2 && window.DOT2[cf.base]) ? 'dot2/' : 'dot/') + cf.base + '.png'; }
+function nbUrl(cf) { return ((window.DOT2 && window.DOT2[cf.nb]) ? 'dot2/' : 'dot/') + cf.nb + '.png'; }
 function origUrl(fam) { return ((window.DOT2 && window.DOT2[fam]) ? 'dot2/' : 'dot/') + fam + '.png'; }
 // 고른 것 → { t, cs: [글자마다 색] }
 function specOf(cf, nw) {
@@ -310,15 +317,16 @@ function loadImg(url) {
     return imgs[url];
 }
 // 바탕 — 물들였으면 물든 바탕 (다 될 때까지 기다린다 · 10초 넘으면 안 물든 바탕)
-function baseFor(cf, hue) {
-    if (hue == null || hue === '' || typeof window.dotTint !== 'function') return Promise.resolve(baseUrl(cf));
+function baseFor(cf, hue, nb) {
+    const sh = nb ? cf.nb : cf.base, plain = nb ? nbUrl(cf) : baseUrl(cf);
+    if (hue == null || hue === '' || typeof window.dotTint !== 'function') return Promise.resolve(plain);
     return new Promise(function (res) {
         const t0 = Date.now();
         const look = function () {
             let u = null;
-            try { u = window.dotTint(cf.base, hue); } catch (e) { }
+            try { u = window.dotTint(sh, hue); } catch (e) { }
             if (u) return res(u);
-            if (Date.now() - t0 > 10000) return res(baseUrl(cf));
+            if (Date.now() - t0 > 10000) return res(plain);
             setTimeout(look, 150);
         };
         look();
@@ -360,9 +368,23 @@ function make(sheet, sp, hue) {
 window.nuowTextPut = function (el, sheet, nw) {
     const cf = CFG[famOf(sheet)];
     if (!el || !cf) return;
+    const hue = (el.dataset.hue != null && el.dataset.hue !== '') ? el.dataset.hue : null;
+    // 말풍선을 껐다 — 말풍선만 걷은 장 (물들였으면 물든 것). 짝(-r)도 같은 장
+    if (nw && nw.off) {
+        const ko = famOf(sheet) + '|off|' + (hue == null ? '' : hue);
+        el.dataset.nwk = ko;
+        if (cache[ko]) { el.style.backgroundImage = 'url("' + cache[ko] + '")'; return; }
+        el.style.backgroundImage = 'url("' + nbUrl(cf) + '")';
+        baseFor(cf, hue, true).then(function (url) {
+            cache[ko] = url;
+            Array.prototype.forEach.call(document.querySelectorAll('.dot-layer[data-nwk]'), function (e) {
+                if (e.dataset.nwk === ko) e.style.backgroundImage = 'url("' + url + '")';
+            });
+        });
+        return;
+    }
     const sp = specOf(cf, nw);
     if (!sp) return;
-    const hue = (el.dataset.hue != null && el.dataset.hue !== '') ? el.dataset.hue : null;
     const k = keyOf(sheet, sp, hue);
     el.dataset.nwk = k;
     if (cache[k]) { el.style.backgroundImage = 'url("' + cache[k] + '")'; return; }
@@ -441,7 +463,12 @@ window.nuowTap = function (cx, cy) {
         '#nw-ov .nw-sub{font-size:10.5px;color:#8f8778;text-align:center;}',
         '#nw-ov .nw-btns{display:flex;gap:8px;justify-content:center;}',
         '#nw-ov .nw-btns button{padding:9px 14px;border-radius:10px;border:1px solid #4a3f5a;background:#262030;color:#e8e0d0;font-weight:bold;cursor:pointer;}',
-        '#nw-ov .nw-btns button.go{background:linear-gradient(145deg,#ff9fe9,#c85fb5);color:#2a0a24;border-color:#ffc6f2;}'
+        '#nw-ov .nw-btns button.go{background:linear-gradient(145deg,#ff9fe9,#c85fb5);color:#2a0a24;border-color:#ffc6f2;}',
+        // 말풍선 켜기 · 끄기
+        '#nw-ov .nw-tg{display:flex;flex:1;border:1px solid #4a3f5a;border-radius:10px;overflow:hidden;}',
+        '#nw-ov .nw-tg button{flex:1;padding:8px 0;border:none;background:#1a1622;color:#9a9182;font-weight:bold;font-size:12.5px;cursor:pointer;}',
+        '#nw-ov .nw-tg button.on{background:linear-gradient(145deg,#ff9fe9,#c85fb5);color:#2a0a24;}',
+        '#nw-ov .nw-card.off #nw-pv{opacity:.35;}'
     ].join('\n');
     document.head.appendChild(s);
 })();
@@ -463,7 +490,9 @@ window.nuowTextOpen = function (fam) {
     if (ov) ov.remove();
     ov = document.createElement('div');
     ov.id = 'nw-ov';
-    ov.innerHTML = '<div class="nw-card"><h3>' + cf.title + '<button id="nw-x">✕</button></h3>'
+    const isOff = !!(u.dot && u.dot[cf.offKey]);
+    ov.innerHTML = '<div class="nw-card' + (isOff ? ' off' : '') + '"><h3>' + cf.title + '<button id="nw-x">✕</button></h3>'
+        + '<div class="nw-row"><label>말풍선</label><div class="nw-tg" id="nw-tg"><button data-v="on"' + (isOff ? '' : ' class="on"') + '>켜기</button><button data-v="off"' + (isOff ? ' class="on"' : '') + '>끄기</button></div></div>'
         + '<canvas id="nw-pv" width="' + (cf.pv.w / 4) + '" height="' + (cf.pv.h / 4) + '"></canvas>'
         + '<div class="nw-row"><label>글씨</label><input type="text" id="nw-t" maxlength="' + cf.max + '" placeholder="' + (cf.max === 3 ? '세' : '두') + ' 글자" value="' + esc(pv.t) + '" autocomplete="off"></div>'
         + (cf.per ? '<div class="nw-row"><label>글자</label><div class="nw-chips" id="nw-chips"></div></div>' : '')
@@ -490,6 +519,7 @@ window.nuowTextOpen = function (fam) {
     ov.querySelector('#nw-c').addEventListener('input', function () { setC(cleanC(this.value, cf.defC)); });
     if (cf.per) ov.querySelector('#nw-all').onclick = function () { const c = pv.cs[pv.sel]; pv.cs = pv.cs.map(function () { return c; }); paintChips(); paintPv(); };
     ov.querySelector('#nw-x').onclick = close;
+    Array.prototype.forEach.call(ov.querySelectorAll('#nw-tg button'), function (b) { b.onclick = function () { setOff(b.getAttribute('data-v') === 'off'); }; });
     ov.querySelector('#nw-def').onclick = function () { save(null); };
     ov.querySelector('#nw-ok').onclick = function () {
         pv.t = cleanT(inp.value, cf.max);
@@ -500,6 +530,19 @@ window.nuowTextOpen = function (fam) {
     paintChips(); markSw(); paintPv();
 };
 function close() { const ov = document.getElementById('nw-ov'); if (ov) ov.remove(); }
+// 말풍선 켜기 · 끄기 — 누르는 즉시 저장 (창은 그대로)
+function setOff(off) {
+    const u = u_(); if (!u || !pv || !u.dot || typeof u.dot !== 'object') return;
+    const cf = CFG[pv.fam];
+    if (!!u.dot[cf.offKey] === !!off) return;
+    if (off) u.dot[cf.offKey] = 1;
+    else delete u.dot[cf.offKey];
+    try { if (typeof saveFields === 'function') saveFields({ dot: 1 }); } catch (e) { }
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    const card = document.querySelector('#nw-ov .nw-card');
+    if (card) card.classList.toggle('off', !!off);
+    Array.prototype.forEach.call(document.querySelectorAll('#nw-tg button'), function (b) { b.classList.toggle('on', (b.getAttribute('data-v') === 'off') === !!off); });
+}
 function paintChips() {
     const box = document.getElementById('nw-chips'); if (!box || !pv) return;
     const cf = CFG[pv.fam], cs = chars(pv.t);
@@ -578,7 +621,7 @@ window.nuowTextCell = function (fam, t, cs, flip) {
 };
 window.nuowTextState = function () {
     const u = u_(), d = (u && u.dot) || {};
-    FAMS.forEach(function (f) { console.log('[말풍선 글씨]', f, '· 하고 있음', wearing(f), '· 고른 것', JSON.stringify(d[CFG[f].key] || null)); });
+    FAMS.forEach(function (f) { console.log('[말풍선 글씨]', f, '· 하고 있음', wearing(f), '· 고른 것', JSON.stringify(d[CFG[f].key] || null), '· 말풍선', d[CFG[f].offKey] ? '끔' : '켬'); });
     console.log('  만든 장', made, '· 쟁여 둔 것', Object.keys(cache));
 };
 // 시험 · 콘솔 — 글씨를 판(그림 점)으로만 그려 본다
