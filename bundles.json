@@ -2,6 +2,7 @@
   "out": "b",
   "groups": [
     [
+      "security.js",
       "rest-time.js",
       "time-freeze.js",
       "dark.js"
