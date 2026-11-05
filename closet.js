@@ -166,7 +166,9 @@ const DOT = {
     //   ★ Null Owner 2 의 여우불(nuow2-fox · 2026-11-03)도 맨 아래 — 등 뒤에서 푸른 불이 일고 여우가 뛴다.
     BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
     // ★ 뒷머리가 있는 머리(호유원 (여))를 쓰면 그 뒷머리 **밑**으로 내리는 악세 장 (2026-11-05) — 면사포
-    UNDER_HAIR: ['veil'],
+    //   { 내리는 장: 그 대신 맨 위에 남기는 장 } — 면사포는 정수리 장미(veil-rose · 면사포 장에서 정수리 장미만 오려 낸 것)만 앞에 남는다
+    //   (사용자 「장미는 앞에 나오게 해서 뒷부분만 머리카락 뒤에」). 남기는 장은 내리는 장의 물들인 색을 그대로 따른다.
+    UNDER_HAIR: { veil: 'veil-rose' },
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
     //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
@@ -843,10 +845,23 @@ function look(user, override, all) {
     // ★ 머리에 딸린 뒷머리 (호유원 (여) · 2026-11-04) — 몸 바로 뒤 (몸 뒤 악세보다 앞 · 몸 · 옷 · 머리 · 악세보다 뒤)
     //   ★ 면사포는 그 뒷머리보다 **뒤** (2026-11-05 사용자 「면사포가 호유원 (여) 머리카락 뒤에 와야 해」)
     //     — 뒷머리가 있는 머리일 때만 맨 위(tops)에서 빼서 뒷머리 바로 밑에 깐다 (몸 · 옷 · 머리보다도 뒤가 된다).
+    //     정수리 장미는 그 자리(맨 위)에 남긴다 — UNDER_HAIR 의 짝 장.
+    let colOut = null;
     if (!hd.solo && !hd.bare && (hd.back || []).length) {
-        (D.UNDER_HAIR || []).forEach(function (o) {
+        const UH = D.UNDER_HAIR || {};
+        Object.keys(UH).forEach(function (o) {
             const i = tops.indexOf(o);
-            if (i >= 0) { tops.splice(i, 1); backs.push(o); }
+            if (i < 0) return;
+            backs.push(o);
+            if (UH[o]) {
+                tops.splice(i, 1, UH[o]);
+                // 물들인 색 — 남기는 장도 같은 색. 셀 수 없는 칸으로 붙여 옷장 · 팔레트가 베껴 저장하지 않게 한다
+                const c0 = (d.col && typeof d.col === 'object') ? d.col : {};
+                if (c0[o] != null && c0[o] !== '') {
+                    if (!colOut) colOut = Object.assign({}, c0);
+                    Object.defineProperty(colOut, UH[o], { value: c0[o], enumerable: false });
+                }
+            } else tops.splice(i, 1);
         });
     }
     if (!hd.solo && !hd.bare) (hd.back || []).forEach(function (o) { backs.push(o); });
@@ -863,7 +878,7 @@ function look(user, override, all) {
     const nw = {};
     if (d.nw && typeof d.nw === 'object' && d.nw.t) nw['nuow-friend'] = d.nw;
     if (d.nw2 && typeof d.nw2 === 'object' && d.nw2.t) nw['nuow2-doll'] = d.nw2;
-    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: col, nw: Object.keys(nw).length ? nw : null };
+    return { head: head, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null };
 }
 window.dotLook = look;
 window.dotNoTag = {}; (DOT.NO_TAG || []).forEach(function (n) { window.dotNoTag[n] = 1; });
