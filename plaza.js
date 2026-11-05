@@ -717,6 +717,10 @@ function stampSafe(ov) {
         '  pointer-events:none;}',
         // 칭호 표 — 밝은 방에서도 읽히게 바탕을 조금 깔아 준다
         '.plaza-tag span{background:rgba(10,10,14,.55);vertical-align:1px;}',
+        // 🔦 탐사 중 — 이름 위 한 줄, 붉게
+        '.plaza-tag{text-align:center;}',
+        '.plaza-dk{color:#ff3a3a;font-size:10px;font-weight:bold;letter-spacing:.5px;margin-bottom:1px;',
+        '  text-shadow:0 1px 2px #000,0 0 4px #000,0 0 6px rgba(255,40,40,.45);}',
         '#plaza-ov.tags-off .plaza-tag{display:none !important;}',
         // 말풍선
         // ★ 사람 칸이 좁아(가로 100~170px) 말이 석 자씩 끊겼다.
@@ -1221,12 +1225,20 @@ function tagHtmlOf(code, name) {
     } catch (e) { }
     return t + cyN(code, esc(name || ''));
 }
+// 🔦 내가 지금 탐사 중인가 — 어둠 · K의 방 · EPIC · 피날레 · 이벤트 어둠 모두 darkRun 이 선다 (끝나면 비운다)
+function inDark() {
+    try {
+        const r = (typeof darkRun !== 'undefined') ? darkRun : null;
+        return !!(r && r.zone);
+    } catch (e) { return false; }
+}
 function setTag(one, code, name) {
     if (!one || !one.tag) return;
     one.name = name || '';
     one.code = code || '';
     one.tag.classList.toggle('hs-hide', !!HS() && hsCall('tagHide') !== false);   // 🫣 숨바꼭질 — 이름표를 아예 안 보인다 (🕵️ 행맨은 보인다)
-    const h = tagHtmlOf(one.code, one.name);
+    // 🔦 탐사 중이면 이름 위에 붉게 「탐사 중……」 (2026-11-05 사용자) — 남은 자리 칸의 dk, 나는 darkRun 으로 본다
+    const h = (one.dk ? '<div class="plaza-dk">탐사 중……</div>' : '') + tagHtmlOf(one.code, one.name);
     if (one.tag._h === h) return;          // 그대로면 안 건드린다 (칸이 깜빡인다)
     one.tag.innerHTML = h;
     one.tag._h = h;
@@ -1248,7 +1260,7 @@ function refreshTags() {
             run.sx = -9999; run.sent = 0;
         }
     } catch (e) { }
-    if (run.me) setTag(run.me, run.me.code, run.me.name);
+    if (run.me) { run.me.dk = inDark(); setTag(run.me, run.me.code, run.me.name); }
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
         if (q && q.one) setTag(q.one, c, q.one.name);
@@ -3580,7 +3592,8 @@ function send(moving) {
     const t = now();
     const changed = Math.abs(run.x - run.sx) > 0.7 || Math.abs(run.y - run.sy) > 0.7
         || moving !== run.sMoving || run.me.actor.facing() !== run.sFace
-        || run.sayAt !== run.sSayAt;
+        || run.sayAt !== run.sSayAt
+        || inDark() !== !!run.sDk;                 // 🔦 탐사에 들어가거나 나왔다 — 바로 알린다
     const stopping = (!moving && run.sMoving);
     const jumped = (run.jumpAt || 0) !== (run.sJumpAt || 0);   // 🍍 뛴 것은 바로 알린다
     const beat = t - run.sent > P.BEAT_MS;           // 가만히 있어도 살아 있다고 알린다
@@ -3589,6 +3602,8 @@ function send(moving) {
     run.sx = run.x; run.sy = run.y;
     run.sMoving = moving; run.sFace = run.me.actor.facing();
     run.sSayAt = run.sayAt; run.sJumpAt = run.jumpAt || 0;
+    run.sDk = inDark();
+    if (run.me && run.me.dk !== run.sDk) { run.me.dk = run.sDk; setTag(run.me, run.me.code, run.me.name); }
     const u = u_(); if (!u) return;
     const myC = carryMine();
     try {
@@ -3603,6 +3618,7 @@ function send(moving) {
             // 🎵 둘레 효과 장 · 🪩 디스코 조명 (LP 판 · lp.js)
             fx: run.fx || null, ds: run.ds || null,
             jp: run.jumpAt || null,                 // 🍍 마지막으로 뛴 때
+            dk: run.sDk ? 1 : null,                 // 🔦 탐사 중 (어둠 · K의 방 · EPIC · 이벤트 어둠 …)
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
         });
@@ -4039,6 +4055,7 @@ function onSeat(code, v, fresh) {
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
     if (v.jp && v.jp !== q.jp) { if (!isNew && now() - v.jp < 3000 && q.sm) q.jumpT0 = performance.now(); q.jp = v.jp; }
     wake();                                // 쉬고 있었으면 바로 따라 그린다
+    q.one.dk = !!v.dk;                     // 🔦 탐사 중
     setTag(q.one, code, v.n || code);
     // 말풍선 — 아직 안 보여 준 말이고 너무 묵지 않았으면 띄운다
     if (v.st && v.st !== q.sayAt && now() - v.st < P.SAY_MS) {
