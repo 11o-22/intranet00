@@ -29,6 +29,18 @@
 //   · 새로고침하면 전 화면이 밀어 둔 칸의 이름표(지킴 칸 · 창)가 그대로 남아 있다 — 이 화면의 맨 밑으로 지운다 (replaceState).
 //   · 뒤로가기로 전 화면의 칸에 내려와 새로 열렸으면(back_forward) — 나가려던 것이므로 감시를 세우지 않는다.
 //
+// ■ 「종료」가 안 눌린다 (2026-11-05 사용자 「팝업이 뜨면, 확인을 눌러서 나가야 하는데 확인이 안 눌려」)
+//   ✗ 「종료」는 window.close() 를 불렀는데, 크롬은 **기록이 두 칸 이상인 창**은 스스로 닫지 못하게 막는다.
+//     지킴 칸 · 창 · 채팅 · 테트리스가 기록(pushState)을 밀어 두므로 늘 두 칸이 넘어 한 번도 닫히지 않았다.
+//   → 안드로이드(닫기 감시가 있는 곳)에서는 **기록을 아예 쌓지 않는다** — 「가짜 기록」.
+//     · history.pushState(상태) — 진짜 기록 대신 상태를 제 목록(V)에 쌓고 닫기 감시를 하나 세운다.
+//       기기 뒤로가기는 맨 위 감시부터 받으므로, 받으면 그 칸을 빼고 popstate(상태)를 대신 쏜다 — 창 · 채팅 · 테트리스는 전과 같이 닫힌다.
+//     · history.back() · go(-n) — 쌓인 칸이 있으면 감시를 걷고 빼고 popstate 를 쏜다. history.state — 맨 위 칸의 상태.
+//     · 맨 밑에는 늘 「지킴 감시」(G) 하나 — 받으면 「종료하시겠습니까?」. 진짜 기록이 한 칸이라 「종료」 의 window.close() 가 앱을 닫는다.
+//     · 누르지 않고 세운 감시는 크롬이 앞 감시와 한 묶음으로 묶어 뒤로가기 한 번에 함께 닫는다 — 지킴 감시가 위 칸과 함께 닫혔으면 묻지 않고 다시 세운다.
+//   · 그 밖(PC · 감시가 없는 브라우저)은 전처럼 진짜 기록에 지킴 칸 — 「종료」가 막히면 「한 번 더 누르면 종료」를 밝힌다.
+//   · 이 바꿈 앞에 쌓여 있던 진짜 기록은 앱을 새로 열 때까지 남는다 — 그동안은 「종료」가 막힐 수 있다.
+//
 // ■ 콘솔
 //   backExitState()
 
@@ -39,33 +51,105 @@ let progQ = [];          // 스스로 history.back · go 를 부른 때들 — p
 let asking = false;      // 「종료하시겠습니까?」가 떠 있나
 let leaving = false;     // 「종료」를 눌렀다
 let shown = 0, guards = 0, watches = 0;
-let W = null;            // 닫기 감시
+let W = null;            // 닫기 감시 (진짜 기록 쪽)
 const CW = typeof window.CloseWatcher === 'function' && /Android/i.test(navigator.userAgent || '');
-
-// 스스로 부른 뒤로가기 — 적어 둔다
-['back', 'go'].forEach(function (m) {
-    const f = history[m];
-    if (typeof f !== 'function') return;
+const H = window.history;
+const NAT = { push: H.pushState, replace: H.replaceState, back: H.back, go: H.go };
+const NAT_STATE = (function () { try { return (Object.getOwnPropertyDescriptor(History.prototype, 'state') || {}).get; } catch (e) { return null; } })();
+function natState() { try { return NAT_STATE ? NAT_STATE.call(H) : null; } catch (e) { return null; } }
+// 가짜 기록을 쓰나 — 안드로이드 + 닫기 감시 + state 를 덮어쓸 수 있을 때
+let VIRT = false;
+if (CW && NAT_STATE) {
     try {
-        history[m] = function () { progQ.push(Date.now()); return f.apply(history, arguments); };
-    } catch (e) { }
-});
+        Object.defineProperty(H, 'state', { configurable: true, get: function () { return VIRT && V.length ? V[V.length - 1].state : natState(); } });
+        VIRT = true;
+    } catch (e) { VIRT = false; }
+}
 
-// 누가 칸을 밀면 감시를 걷는다 — 그 칸이 뒤로가기를 받는다
-(function () {
-    const f = history.pushState;
-    if (typeof f !== 'function') return;
-    try { history.pushState = function () { unwatch(); return f.apply(history, arguments); }; } catch (e) { }
-})();
+// ==========================================
+// 가짜 기록 (안드로이드)
+// ==========================================
+const V = [];            // 쌓인 칸 { state, w: 닫기 감시 }
+let G = null;            // 맨 밑 지킴 감시
+let lastVClose = 0, vPushes = 0;
+function vTopState() { return V.length ? V[V.length - 1].state : null; }
+function fire() {
+    const st = vTopState();
+    setTimeout(function () { try { window.dispatchEvent(new PopStateEvent('popstate', { state: st })); } catch (e) { } }, 0);
+}
+function vPush(state) {
+    const ent = { state: state === undefined ? null : state, w: null };
+    try { const w = new window.CloseWatcher(); w.onclose = function () { vClosed(ent); }; ent.w = w; } catch (e) { }
+    V.push(ent); vPushes++;
+}
+// 기기 뒤로가기가 이 칸의 감시를 닫았다
+function vClosed(ent) {
+    const i = V.indexOf(ent);
+    if (i < 0) return;
+    lastVClose = Date.now();
+    V.splice(i).forEach(function (x) { if (x !== ent && x.w) { try { x.w.onclose = null; x.w.destroy(); } catch (e) { } } });
+    fire();
+    if (!V.length && !G) gArm();
+}
+// 스스로 뒤로 — 맨 위 칸부터 감시를 걷고 뺀다
+function vBack(n) {
+    let any = false;
+    while (n-- > 0 && V.length) {
+        const x = V.pop(); any = true;
+        if (x.w) { try { x.w.onclose = null; x.w.destroy(); } catch (e) { } }
+    }
+    if (any) { fire(); if (!V.length && !G) gArm(); }
+    return any;
+}
+function gArm() {
+    if (!VIRT || G || asking || leaving || V.length) return false;
+    try { G = new window.CloseWatcher(); G.onclose = gClosed; watches++; return true; } catch (e) { G = null; return false; }
+}
+function gClosed() {
+    G = null;
+    if (leaving || asking) return;
+    if (V.length || Date.now() - lastVClose < 80) { gArm(); return; }   // 위 칸과 한 묶음으로 함께 닫혔다 — 그 뒤로가기는 위 칸 몫
+    if (darkOn()) { gArm(); return; }                                    // 탐사 중 — 뒤로가기를 막는다 (index.html 과 같이)
+    if (panelOpen()) { try { window.plazaPanelClose(); } catch (e) { } gArm(); return; }   // 사택 칸만 닫는다
+    ask();
+}
+
+// history 를 감싼다 — 가짜 기록이면 가짜로, 아니면 진짜로 (스스로 부른 뒤로가기는 적어 둔다)
+function sameUrl(url) {
+    if (url == null || url === '') return true;
+    try { return new URL(String(url), location.href).href === location.href; } catch (e) { return false; }
+}
+try {
+    H.pushState = function (state, title, url) {
+        if (VIRT && sameUrl(url)) { vPush(state); return; }
+        unwatch();                                            // 누가 칸을 밀면 감시를 걷는다 — 그 칸이 뒤로가기를 받는다
+        return NAT.push.apply(H, arguments);
+    };
+    H.replaceState = function (state, title, url) {
+        if (VIRT && V.length && sameUrl(url)) { V[V.length - 1].state = state === undefined ? null : state; return; }
+        return NAT.replace.apply(H, arguments);
+    };
+    H.back = function () {
+        if (VIRT && vBack(1)) return;
+        progQ.push(Date.now());
+        return NAT.back.apply(H, arguments);
+    };
+    H.go = function (n) {
+        n = Number(n) || 0;
+        if (VIRT && n < 0 && V.length) { vBack(-n); return; }
+        if (n !== 0) progQ.push(Date.now());
+        return NAT.go.apply(H, arguments);
+    };
+} catch (e) { }
 
 function atBottom() { return history.state == null; }
 function guard() {
-    if (!atBottom() || asking || leaving) return;
+    if (VIRT || !atBottom() || asking || leaving) return;
     try { history.pushState({ exitGuard: 1 }, '', ''); guards++; } catch (e) { }
 }
 // 닫기 감시 — 맨 밑에서 지킴 칸을 깔 수 없을 때 (누르기 전 · 뒤로가기 직후)
 function watch() {
-    if (!CW || W || asking || leaving || !atBottom()) return false;
+    if (VIRT || !CW || W || asking || leaving || !atBottom()) return false;
     try { W = new window.CloseWatcher(); W.onclose = onWatch; watches++; return true; } catch (e) { W = null; return false; }
 }
 function unwatch() {
@@ -110,7 +194,8 @@ function sig() {
 
 function darkOn() { try { return typeof darkRun !== 'undefined' && !!darkRun; } catch (e) { return false; } }
 
-window.addEventListener('popstate', function () {
+window.addEventListener('popstate', function (e) {
+    if (VIRT) { if (asking && e && e.isTrusted) hide(); return; }       // 가짜 기록 — 묻는 것은 지킴 감시가 한다
     if (leaving) return;
     if (asking) { hide(); return; }
     const now = Date.now();
@@ -176,6 +261,7 @@ function hide() {
 }
 function cancel() {
     hide();
+    if (VIRT) { gArm(); return; }            // 누른 손으로 지킴 감시를 다시 세운다
     guard();                                 // 누른 손으로 지킴 칸을 다시 깐다
     if (atBottom()) watch();                 // 못 깔았으면 감시라도
 }
@@ -190,21 +276,23 @@ function quit() {
     }, 300);
 }
 // 다른 데서 맨 밑으로 돌아왔을 때 떠 있으면 걷는다 (앞으로 가기 등)
-window.addEventListener('pageshow', function () { if (asking && !atBottom()) hide(); });
+window.addEventListener('pageshow', function () { if (!VIRT && asking && !atBottom()) hide(); });
 
 // 열 때 — 새로고침이면 전 화면의 칸 이름표를 지워 이 화면의 맨 밑으로 · 뒤로가기로 열린 것이 아니면 감시를 세운다
 (function boot() {
     let nav = '';
     try { const e = performance.getEntriesByType('navigation')[0]; nav = (e && e.type) || ''; } catch (e) { }
-    if (history.state != null && (nav === 'reload' || nav === 'back_forward')) { try { history.replaceState(null, '', ''); } catch (e) { } }
+    if (natState() != null && (nav === 'reload' || nav === 'back_forward')) { try { NAT.replace.call(H, null, '', ''); } catch (e) { } }
+    if (VIRT) { if (nav !== 'back_forward') gArm(); return; }
     // 감시를 못 쓰는 곳(PC · 오래된 브라우저)은 지킴 칸을 바로 깐다 — 누르기 전에 민 칸은 크롬이 건너뛰지만(그러면 전과 같다),
     //   한 번이라도 누르면 그 칸이 살아난다. 건너뛰지 않는 브라우저에서는 그대로 지킨다.
     if (nav !== 'back_forward' && !watch() && atBottom()) { try { history.pushState({ exitGuard: 1 }, '', ''); guards++; } catch (e) { } }
 })();
-window.backExitWatching = function () { return !!W; };
+window.backExitWatching = function () { return VIRT ? !!(G || V.length) : !!W; };
 
 window.backExitState = function () {
     console.log('[뒤로가기 종료] 맨 밑', atBottom(), '· 지금 칸', JSON.stringify(history.state), '· 칸 수', history.length,
-        '· 묻는 중', asking, '· 물은 횟수', shown, '· 지킴 칸 깐 횟수', guards, '· 닫기 감시', CW ? (W ? '서 있음' : '없음') : '못 씀', '· 세운 횟수', watches);
+        '· 묻는 중', asking, '· 물은 횟수', shown, '· 지킴 칸 깐 횟수', guards, '· 닫기 감시', CW ? (W ? '서 있음' : '없음') : '못 씀', '· 세운 횟수', watches,
+        '· 가짜 기록', VIRT ? ('씀 — 쌓인 칸 ' + V.length + ' · 지킴 감시 ' + (G ? '서 있음' : '없음') + ' · 쌓은 횟수 ' + vPushes) : '안 씀');
 };
 })();
