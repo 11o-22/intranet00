@@ -719,8 +719,9 @@ function stampSafe(ov) {
         '.plaza-tag span{background:rgba(10,10,14,.55);vertical-align:1px;}',
         // 🔦 탐사 중 — 이름 위 한 줄, 붉게
         '.plaza-tag{text-align:center;}',
-        '.plaza-dk{color:#ff3a3a;font-size:10px;font-weight:bold;letter-spacing:.5px;margin-bottom:1px;',
-        '  text-shadow:0 1px 2px #000,0 0 4px #000,0 0 6px rgba(255,40,40,.45);}',
+        // 2026-11-05 사용자 「탐사중 색깔 오렌지색으로 · 너무 쨍하지 않게」 — 빨강(#ff3a3a) → 차분한 주황
+        '.plaza-dk{color:#e8a05a;font-size:10px;font-weight:bold;letter-spacing:.5px;margin-bottom:1px;',
+        '  text-shadow:0 1px 2px #000,0 0 4px #000,0 0 5px rgba(232,160,90,.3);}',
         // 점이 . .. ... .... ..... 차례로 늘어난다 — 남은 점은 자리만 차지해 글자가 좌우로 흔들리지 않는다
         '.plaza-dkd i{visibility:hidden;font-style:normal;}',
         '#plaza-ov.tags-off .plaza-tag{display:none !important;}',
