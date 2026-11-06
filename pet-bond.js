@@ -390,7 +390,7 @@ function html() {
             + '방이 비었습니다. 환몽알이 깨어나면 여기에 섭니다.</div>';
     }
 
-    const keys = P().show(u);                 // 내놓기로 한 둘
+    const keys = P().show(u);                 // 내놓기로 한 것 (세 마리까지)
     const rest = all.length - keys.length;
 
     const hungry = all.filter(function (k) {

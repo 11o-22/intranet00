@@ -373,7 +373,7 @@ window.petAdoptAsk = function (ownerCode, petKey) {
     };
 };
 
-// 사원 열람 맨 밑 — 그 사원이 방에 내놓은 펫 두 마리
+// 사원 열람 맨 밑 — 그 사원이 방에 내놓은 펫 (세 마리까지 · pet-data.js PET_SHOW_MAX)
 function empPets(code) {
     const o = userOf(code);
     if (!o) return [];
