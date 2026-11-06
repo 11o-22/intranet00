@@ -1103,6 +1103,7 @@ const TINY_FX = '파인애플맛 물약';
 function tinyOf(u) {
     if (!u) return false;
     if (u.tiny != null) return !!u.tiny;                 // 남 — 실려 온 표시
+    if (u.code && wfOf(u.code)) return true;             // 🪄 소원권(물약)이 된 동안 — 작은 사람처럼 들린다
     const hsT = hsCall('tiny');                          // 🫣 숨바꼭질 — 술래는 보통 크기 · 나머지는 파인애플 크기
     if (hsT != null) return !!hsT;
     const t = now();
@@ -1111,6 +1112,202 @@ function tinyOf(u) {
     });
 }
 window.plazaTinyOf = tinyOf;
+
+// ==========================================
+// 🪄 도깨비 방망이 — 소원권 물약 (2026-11-06 사용자)
+// ==========================================
+//
+//   도깨비 방망이(dokkaebi-bat.js)를 쥔 재난관리국 사원이 광장에서 사람을 눌러 「🪄 때리기」 하면
+//   맞은 사원은 30분 동안 소원권 — 물약 두 가지 중 하나(⏰ 시계 · 🌙 달) — 가 된다. 방망이는 한 번 쓰면 사라진다.
+//     · 물약은 파인애플맛 물약처럼 작은 사람으로 친다 — 남이 **손으로** 들 수 있다 (머리에는 안 얹는다)
+//     · 제 발로 걸을 수 있고 빠르기는 두 배
+//     · 든 사람에게 「🫙 소원권 사용」 단추 — 쓰면 ??? 에게 소원을 보내고, 물약은 그 자리에서 원래 사람으로 돌아온다
+//     · 아무도 안 쓰면 30분 뒤 저절로 돌아온다
+//
+//   wishForm/<사번> = { k: 1 시계 | 2 달, by: 때린 사람, bn: 그 이름, at, until }
+//   모두가 이 칸을 듣는다. 광장 자리 기록에도 w(물약 종류)를 실어 남의 화면이 그 모습으로 다시 만든다.
+const WF_PATH = 'wishForm';
+const WF_MS = 30 * 60 * 1000;
+const WF_BAT = '🪄 도깨비 방망이';
+const WF_IMG = { 1: 'plaza/wish-clock.png', 2: 'plaza/wish-moon.png' };
+const WF_SZ = { 1: [89, 125], 2: [72, 191] };      // 그림 크기 (도트)
+const WF_BELOW = { 1: 9, 2: 0 };                    // 바닥 아래로 늘어진 몫 (시계 물약 사슬)
+const WF_BODY = 116;                                // 병 몸통 높이 — 두 장을 같은 배로 그린다
+const WF_TALL = 0.8;                                // 몸통 높이 = 작은 사람 칸 높이의 이만큼
+const WF = {};
+function wfOf(code) { const v = code ? WF[code] : null; return (v && Number(v.until) > Date.now()) ? v : null; }
+function wfKind(code) { const v = wfOf(code); return v ? (Number(v.k) === 2 ? 2 : 1) : 0; }
+window.plazaWishOf = function (code) { return wfOf(code); };
+window.plazaWishForms = function () {
+    return Object.keys(WF).map(function (c) { const v = WF[c] || {}; return { 사번: c, 물약: Number(v.k) === 2 ? '🌙 달' : '⏰ 시계', 때린사람: v.bn || v.by, 남은분: Math.max(0, Math.round((Number(v.until) - Date.now()) / 60000)) }; });
+};
+(function wfListen() {
+    let on = false, mineAt = 0;
+    const iv = setInterval(function () {
+        const u = u_();
+        if (on || typeof database === 'undefined' || !database || !u) return;
+        on = true;
+        clearInterval(iv);
+        database.ref(WF_PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(WF).forEach(function (c) { if (!v[c]) delete WF[c]; });
+            Object.keys(v).forEach(function (c) { if (v[c] && typeof v[c] === 'object') WF[c] = v[c]; });
+            const me = u_();
+            if (me) {
+                const m = wfOf(me.code);
+                const at = m ? Number(m.at) || 1 : 0;
+                if (at && at !== mineAt) {
+                    if (Date.now() - at < 60000) {
+                        try { if (typeof showCustomAlert === 'function') showCustomAlert('🪄 ' + (m.bn || '누군가') + ' 사원의 도깨비 방망이에 맞았습니다!\n\n'
+                            + (Number(m.k) === 2 ? '🌙 달' : '⏰ 시계') + ' 물약 — 소원권이 되었습니다.\n누군가 소원을 빌거나 30분이 지나면 원래 모습으로 돌아옵니다.'); } catch (e) { }
+                    }
+                } else if (!at && mineAt) {
+                    try { if (typeof showCustomAlert === 'function') showCustomAlert('원래 모습으로 돌아왔습니다.'); } catch (e) { }
+                }
+                mineAt = at;
+            }
+            try { if (run) { refreshTags(); wfBtnPaint(); } } catch (e) { }
+        });
+    }, 1000);
+    // 끝난 물약은 걷는다 — 나는 내 것을, 상담사는 남은 것도
+    setInterval(function () {
+        const u = u_();
+        if (!u || typeof database === 'undefined' || !database) return;
+        Object.keys(WF).forEach(function (c) {
+            const v = WF[c];
+            if (!v || Number(v.until) > Date.now()) return;
+            if (c !== u.code && u.code !== 'kario0987') return;
+            database.ref(WF_PATH + '/' + c).transaction(function (cur) {
+                if (!cur || Number(cur.until) > Date.now()) return;      // 그사이 새로 맞았다 — 두다
+                return null;
+            });
+        });
+    }, 5000);
+})();
+// 물약 모습 — 사람 그림은 숨기고 그 자리에 물약을 세운다 (손에 들기 · 걷기 · 이름표는 그대로)
+function wfDress(one, kind, k) {
+    if (!kind || !one || !one.wrap) return;
+    const sp = spec();
+    const s = (sp.H * k * WF_TALL) / WF_BODY;          // 도트 하나가 화면에서 몇 px
+    const sz = WF_SZ[kind] || WF_SZ[1];
+    try { one.actor.el.style.opacity = '0'; } catch (e) { }
+    const im = document.createElement('img');
+    im.className = 'plaza-wf';
+    im.src = WF_IMG[kind] || WF_IMG[1];
+    im.alt = '';
+    im.draggable = false;
+    im.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;image-rendering:pixelated;'
+        + 'width:' + (sz[0] * s).toFixed(1) + 'px;height:' + (sz[1] * s).toFixed(1) + 'px;'
+        + 'bottom:' + ((sp.FOOT * k) - (WF_BELOW[kind] || 0) * s).toFixed(1) + 'px;';
+    one.wrap.insertBefore(im, one.tag || null);
+    one.wf = kind;
+}
+function wfBatOn() {
+    const u = u_();
+    if (!u || !Array.isArray(u.equippedWeapons)) return false;
+    return u.equippedWeapons.some(function (w) {
+        const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+        return b === WF_BAT;
+    });
+}
+// 🪄 때리기 — 메뉴에 넣을 것 (방망이를 쥐었고 · 상대가 아직 물약이 아니면)
+function wfBonkItem(code) {
+    if (!code || code === myCode() || !wfBatOn() || wfOf(code)) return [];
+    return [['bonk', '🪄 때리기']];
+}
+function wfBonk(code) {
+    closeCarryMenu();
+    const u = u_();
+    if (!u || !run || !wfBatOn()) return;
+    if (wfOf(code)) { sysLine('🪄 ' + nameIn(code) + ' 사원은 이미 소원권입니다.'); return; }
+    if (typeof database === 'undefined' || !database) return;
+    const kind = Math.random() < 0.5 ? 1 : 2;
+    const t = Date.now();
+    const rec = { k: kind, by: u.code, bn: nameOf(u), at: t, until: t + WF_MS };
+    database.ref(WF_PATH + '/' + code).transaction(function (cur) {
+        if (cur && Number(cur.until) > Date.now()) return;           // 이미 물약이다
+        return rec;
+    }, function (err, ok) {
+        if (err || !ok) { sysLine('🪄 ' + nameIn(code) + ' 사원은 이미 소원권입니다.'); return; }
+        WF[code] = rec;
+        // 방망이는 한 번 — 손에서 거둔다
+        const me = u_();
+        if (me && Array.isArray(me.equippedWeapons)) {
+            const i = me.equippedWeapons.findIndex(function (w) {
+                const b = (typeof getEquipBaseName === 'function') ? getEquipBaseName(w) : String(w || '');
+                return b === WF_BAT;
+            });
+            if (i >= 0) {
+                const lab = me.equippedWeapons[i];
+                me.equippedWeapons.splice(i, 1);
+                try { if (me.equipOwner && typeof me.equipOwner === 'object') delete me.equipOwner[lab]; } catch (e) { }
+            }
+            try { if (typeof addHistoryLog === 'function') addHistoryLog(me, '[' + WF_BAT + '] ' + nameIn(code) + ' 사원을 때렸습니다 — 소원권이 되었습니다'); } catch (e) { }
+            try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+        }
+        sysLine('🪄 ' + nameIn(code) + ' 사원을 도깨비 방망이로 때렸습니다 — ' + (kind === 2 ? '🌙 달' : '⏰ 시계') + ' 물약, 소원권이 되었습니다! 방망이는 사라졌습니다.');
+        try { refreshTags(); } catch (e) { }
+    });
+}
+// 🫙 든 물약을 쓴다 — 소원을 보내고 그 사원은 원래대로
+function wfUse(code) {
+    closeCarryMenu();
+    const v = wfOf(code);
+    if (!v) { sysLine('🫙 ' + nameIn(code) + ' 사원은 이미 원래 모습입니다.'); wfBtnPaint(); return; }
+    const w = carrierOf(code);
+    if (!w || w.by !== myCode()) { sysLine('🫙 손에 들고 있어야 쓸 수 있습니다.'); return; }
+    if (typeof window.wishAsk !== 'function' || typeof window.wishSend !== 'function') return;
+    const who = nameIn(code);
+    window.wishAsk(esc(who) + ' 사원이 변한 소원권입니다.', function (wish) {
+        database.ref(WF_PATH + '/' + code).transaction(function (cur) {
+            if (!cur || Number(cur.until) <= Date.now()) return;      // 그사이 돌아왔다
+            return null;
+        }, function (err, ok) {
+            if (err || !ok) { try { showCustomAlert('소원권이 이미 원래 모습으로 돌아왔습니다.'); } catch (e) { } return; }
+            delete WF[code];
+            const me = u_();
+            window.wishSend('[🫙 소원권] ' + nameOf(me) + ' 사원의 소원 (' + WF_BAT + ' — ' + who + ' 사원)', wish);
+            try { if (typeof addHistoryLog === 'function') addHistoryLog(me, '[🫙 소원권] ' + who + ' 사원이 변한 소원권으로 소원을 적어 보냈습니다.'); } catch (e) { }
+            try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+            if (run) {
+                run.carry = listOf(run.carry).filter(function (x) { return x.c !== code; });
+                if (!run.carry.length) run.carry = null;
+                run.dn = run.dn || {}; run.dn[code] = now();
+                resend(); remap();
+            }
+            wfBtnPaint();
+            sysLine('🫙 소원을 빌었습니다 — ' + who + ' 사원이 원래 모습으로 돌아왔습니다.');
+            try { showCustomAlert('물약이 손에서 사라졌습니다.\n\n' + who + ' 사원이 원래 모습으로 돌아왔습니다.\n누가 읽었는지는 알 수 없습니다.'); } catch (e) { }
+        });
+    });
+}
+// 든 물약이 있으면 「🫙 소원권 사용」 단추
+function wfHeld() {
+    if (!run) return null;
+    const me = myCode();
+    const x = listOf(run.carry).filter(function (y) { const w = carrierOf(y.c); return wfOf(y.c) && w && w.by === me; })[0];
+    return x ? x.c : null;
+}
+function wfBtnPaint() {
+    const ov = document.getElementById('plaza-ov');
+    let b = document.getElementById('plaza-wfuse');
+    const c = (run && ov) ? wfHeld() : null;
+    if (!c) { if (b) b.remove(); return; }
+    if (!b) {
+        b = document.createElement('button');
+        b.id = 'plaza-wfuse';
+        b.className = 'plaza-keep';
+        b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 132px);z-index:61;'
+            + 'background:linear-gradient(145deg,#1c2a4a,#0e1628);border:1px solid #d4af37;color:#f0d27a;border-radius:18px;padding:8px 16px;'
+            + 'font-size:13px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);cursor:pointer;';
+        b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+        b.addEventListener('click', function (ev) { ev.stopPropagation(); ev.preventDefault(); const cc = b.getAttribute('data-c'); if (cc) wfUse(cc); });
+        ov.appendChild(b);
+    }
+    if (b.getAttribute('data-c') !== c) { b.setAttribute('data-c', c); b.textContent = '🫙 소원권 사용 — ' + nameIn(c); }
+}
+setInterval(function () { try { if (run) wfBtnPaint(); } catch (e) { } }, 700);
 
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
@@ -1143,6 +1340,9 @@ function makeOne(user, label, k, other) {
 
     // foot = 칸 아래끝에서 발바닥까지 빈 몫. 이만큼 내려 놓아야 땅에 닿는다.
     const one = { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null, tiny: tiny };
+    // 🪄 소원권 물약 — 남은 실려 온 표시(wf)로, 나는 wishForm 으로
+    const wfk = (user && user.wf != null) ? (Number(user.wf) || 0) : wfKind(user && user.code);
+    if (wfk) wfDress(one, wfk, k);
     // 🍍 잎 우산을 달았나 — 작은 사람이 머리 위 대신 잎 위를 걷는다 (leafSurf)
     try { const L = window.dotLook(user, null, !!other); one.leaf = !tiny && (L.tops || []).indexOf(LEAF.SHEET) >= 0; } catch (e) { one.leaf = false; }
     if (one.leaf) leafLoad();
@@ -1266,7 +1466,7 @@ function refreshTags() {
     if (!run) return;
     // 🍍 내가 물약을 마셨거나 효과가 끝났다 — 내 모습을 그 크기로 다시 만들고 남에게도 바로 알린다
     try {
-        if (run.me && tinyOf(u_()) !== !!run.me.tiny) {
+        if (run.me && (tinyOf(u_()) !== !!run.me.tiny || wfKind(myCode()) !== (run.me.wf || 0))) {
             const face = run.me.actor.facing();
             run.me.actor.stop();
             run.me.wrap.remove();
@@ -1304,7 +1504,7 @@ function remakeFolk() {
         const lab = q.one.name || '';            // 칭호 말고 **이름만**
         try { q.one.actor.stop(); } catch (e) { }
         q.one.wrap.remove();
-        q.one = makeOne({ code: c, dot: d, tiny: q.sm ? 1 : 0 }, lab, run.k, true);
+        q.one = makeOne({ code: c, dot: d, tiny: q.sm ? 1 : 0, wf: q.wk || 0 }, lab, run.k, true);
         q.hid = false;                         // 새 칸은 보이는 채로 시작한다 (tick 이 다시 가린다)
         q.one.actor.face(q.face || 1);
         run.el.appendChild(q.one.wrap);
@@ -1735,7 +1935,7 @@ function carryCheck() {
             if (run.rpsLost && run.rpsLost[x.c] && now() - run.rpsLost[x.c] < 30000) return;   // ✊ 가위바위보에 져서 넘겼다 (알림은 그때 했다)
             let why = '';
             if (!q) why = x.fw ? '따라오지 못해서' : '자리를 떠나서';
-            else if (!q.sm) why = '원래 크기로 돌아와서';
+            else if (!q.sm) why = (q.wk ? '원래 모습으로 돌아와서' : '원래 크기로 돌아와서');
             else if (tinyOf(u_())) why = '내가 작아져서';
             else if (caged(x.c) || caged(me)) why = '가두리 때문에';
             else if (m.full[x.c] === me) why = noTxt(x.k);
@@ -1778,8 +1978,12 @@ function carryDo(c, k) {
     if (tinyOf(u_())) { sysLine('🍍 작아진 채로는 들 수 없습니다.'); return; }
     if (caged(c) || cageMine()) { sysLine('🔒 가두리 때문에 들 수 없습니다.'); return; }
     if (w && w.by !== me) { sysLine('🍍 ' + nameIn(w.by) + ' 사원에게 가 있습니다.'); return; }
+    if (k === 'head' && wfOf(c)) { sysLine('🫙 소원권은 손으로만 듭니다.'); return; }
     if (!roomOn(me, k, c)) { sysLine('🍍 ' + noTxt(k) + '.'); return; }
-    const done = function () { sysLine('🍍 ' + nameIn(c) + ' 사원을 ' + (k === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.')); };
+    const done = function () {
+        sysLine('🍍 ' + nameIn(c) + ' 사원을 ' + (k === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.'));
+        if (wfOf(c)) { sysLine('🫙 소원권을 주웠습니다 — 「🫙 소원권 사용」을 누르면 소원을 빌 수 있습니다.'); setTimeout(wfBtnPaint, 300); }
+    };
     if (w && w.by === me) {                            // 이미 내게 있다 — 손 ↔ 머리
         const list = listOf(run.carry);
         const e = list.filter(function (x) { return x.c === c; })[0];
@@ -1842,6 +2046,7 @@ function carryPend() {
         run.tx = null; run.ty = null; run.tseg = null;
         resend(); remap();
         sysLine('🍍 ' + nameIn(p.c) + ' 사원을 ' + (p.k === 'head' ? '머리에 얹었습니다.' : '손에 들었습니다.'));
+        if (wfOf(p.c)) { sysLine('🫙 소원권을 주웠습니다 — 「🫙 소원권 사용」을 누르면 소원을 빌 수 있습니다.'); setTimeout(wfBtnPaint, 300); }
         return;
     }
     if (run.tx == null) walkTo(q.x, q.y);              // 멈췄는데 아직 멀다 (상대가 움직였다) — 다시 간다
@@ -2525,6 +2730,7 @@ function carryTap(cx, cy) {
         const w = carrierOf(me);
         if (w && w.by !== big) { sysLine('🍍 ' + nameIn(w.by) + ' 사원에게 ' + ((run.on && run.on.by === w.by) ? '올라가' : '들려') + ' 있어 갈 수 없습니다.'); return true; }
         const items = ['head', 'hand'].filter(function (k) {
+            if (wfOf(me)) return false;                               // 🪄 물약은 스스로 올라가지 않는다
             if (w && w.k === k) return false;                         // 지금 서 있는 곳은 빼고
             return roomOn(big, k, me);
         }).map(function (k) { return [k, CLIMB_WORD[k]]; });
@@ -2533,10 +2739,12 @@ function carryTap(cx, cy) {
             if (run.escLostAt && now() - run.escLostAt < RPS_ESC_COOL) items.push(['rpsx', '✊ 가위바위보 (' + Math.ceil((RPS_ESC_COOL - (now() - run.escLostAt)) / 1000) + '초 뒤)']);
             else items.push(['rps', '✊ 가위바위보로 빠져나가기']);
         }
-        if (!items.length) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
+        if (!items.length && !wfOf(me)) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
+        wfBonkItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
+            if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -2548,7 +2756,8 @@ function carryTap(cx, cy) {
         // 👤 크기를 안 가리는 사람 — 정보 보기만
         const any = peerAt(cx, cy);
         if (!any) return false;
-        return openMenu(cx, cy, nameIn(any), [INFO_ITEM], function () { infoOpen(any); }, '');
+        const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
+        return openMenu(cx, cy, nameIn(any), bk.concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(any); return; } infoOpen(any); }, '');
     }
     const w = carrierOf(pick);
     if (w && w.by !== me) {
@@ -2561,14 +2770,23 @@ function carryTap(cx, cy) {
         return openMenu(cx, cy, nameIn(pick), [INFO_ITEM], function () { infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
+    const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
     const items = ['hand', 'head'].filter(function (k) {
+        if (potion && k !== 'hand') return false;
         if (mine && w.k === k) return false;
         return roomOn(me, k, pick);
     }).map(function (k) { return [k, CARRY_WORD[k]]; });
+    if (mine && potion) items.unshift(['wish', '🫙 소원권 사용']);
     if (mine) items.push(['down', '내려놓는다']);
     if (!items.length) sysLine('🍍 손도 머리 위도 자리가 없습니다.');
+    wfBonkItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
-    return openMenu(cx, cy, nameIn(pick), items, function (k) { if (k === 'info') { infoOpen(pick); return; } carryDo(pick, k); });
+    return openMenu(cx, cy, nameIn(pick), items, function (k) {
+        if (k === 'info') { infoOpen(pick); return; }
+        if (k === 'wish') { wfUse(pick); return; }
+        if (k === 'bonk') { wfBonk(pick); return; }
+        carryDo(pick, k);
+    }, potion ? '🫙 ' : null);
 }
 function closeCarryMenu() {
     const m = document.getElementById('plaza-carry');
@@ -3450,7 +3668,7 @@ function tick(ts) {
 
     let dx = run.vx, dy = run.vy;
     // 🫣 숨바꼭질 — 술래는 두 배 빠르게 (2026-11-03 사용자 · hideseek.js PLAZA_HS.speed)
-    const SPD = P.SPEED * (Number(hsCall('speed')) || 1);
+    const SPD = P.SPEED * (Number(hsCall('speed')) || 1) * (wfOf(myCode()) ? 2 : 1);   // 🪄 소원권 물약은 두 배
 
     if (ix || iy) { run.tx = null; run.ty = null; run.tseg = null; }
     else if (run.tx != null) {
@@ -3550,7 +3768,7 @@ function tick(ts) {
         const d = Math.hypot(ax, ay);
         if (d > 1) {
             busy = true;
-            const step = Math.min(d, P.SPEED * (Number(hsCall('speedOf', code)) || 1) * P.CATCH * dt);   // 🫣 술래는 남의 화면에서도 두 배로 따라붙는다
+            const step = Math.min(d, P.SPEED * (Number(hsCall('speedOf', code)) || 1) * (q.wk ? 2 : 1) * P.CATCH * dt);   // 🫣 술래는 남의 화면에서도 두 배로 따라붙는다 · 🪄 물약도 두 배
             q.x += (ax / d) * step;
             q.y += (ay / d) * step;
             q.one.actor.moving(true);
@@ -3662,6 +3880,7 @@ function send(moving) {
         run.ref.child(u.code).set({
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
             f: run.sFace, m: moving ? 1 : 0, d: (typeof window.dotShownDot === 'function' ? window.dotShownDot(u) : u.dot) || null, sm: tinyOf(u) ? 1 : 0,   // 🍇 포도맛 물약 중이면 바뀐 머리
+            w: wfKind(u.code) || null,              // 🪄 소원권 물약 (1 시계 · 2 달)
             // 🍍 내가 든 작은 사람들 · 내려놓은 때 · 내가 올라간 곳 · 남의 머리 위 어디쯤
             cy: listOf(run.carry).length ? listOf(run.carry).map(function (x) { return { c: x.c, k: x.k, at: x.at || 0 }; }) : null,
             dn: run.dn || null,
@@ -4084,12 +4303,13 @@ function onSeat(code, v, fresh) {
     let q = run.peers[code];
     const key = JSON.stringify(v.d || {});
     const sm = v.sm ? 1 : 0;                                   // 🍍 작아졌나
-    if (q && (q.key !== key || (q.sm || 0) !== sm)) { dropPeer(code); q = null; }     // 옷이나 크기가 바뀌었다 — 다시 만든다
+    const wk = Number(v.w) || 0;                               // 🪄 소원권 물약 (1 시계 · 2 달)
+    if (q && (q.key !== key || (q.sm || 0) !== sm || (q.wk || 0) !== wk)) { dropPeer(code); q = null; }     // 옷이나 크기가 바뀌었다 — 다시 만든다
     const isNew = !q;
     if (!q) {
-        const one = makeOne({ code: code, dot: v.d || {}, tiny: sm }, v.n || code, run.k, true);
+        const one = makeOne({ code: code, dot: v.d || {}, tiny: sm, wf: wk }, v.n || code, run.k, true);
         run.el.appendChild(one.wrap);
-        q = run.peers[code] = { one: one, key: key, sm: sm, x: v.x, y: v.y, tx: v.x, ty: v.y,
+        q = run.peers[code] = { one: one, key: key, sm: sm, wk: wk, x: v.x, y: v.y, tx: v.x, ty: v.y,
                                 face: v.f || 1, moving: !!v.m, seen: now(), sayAt: 0 };
         one.actor.face(v.f || 1);
         putOne(one, q.x, q.y);

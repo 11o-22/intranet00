@@ -75,6 +75,7 @@ const KINDS = 5;
 const EXCLUDE = ['황룡의 눈', '산군의 도움'];
 // ★ 2026-11-01 사용자 — 소원권 0.1% → 0.01% → **0.00001%**, 나머지 한정품은 10분의 1로
 const SPECIAL = [
+    { k: 'bat',    n: '🪄 도깨비 방망이', p: 0.00000001, cap: 1 }, // 0.000001% · 서버 전체 하나 (2026-11-06 사용자 · dokkaebi-bat.js)
     { k: 'wish',   n: '🫙 소원권',        p: 0.0000001, cap: 1 },  // 0.00001%
     { k: 'fox',    n: '여우구슬',          p: 0.0001, cap: 1 },     // 0.01%  (처음 0.1%)
     { k: 'safe',   n: '금고',              p: 0.0002, cap: 2 },     // 0.02%  (처음 0.2%)
@@ -398,6 +399,7 @@ function give(p, rec) {
     const desc = (p.kind === 'item' && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[p.name]) ? '\n' + ITEM_CATALOG[p.name].desc : '';
     alert_('🎁 보물 상자를 열었습니다!\n\n' + (p.special ? '✨ ' : '') + line + desc + left);
     if (p.special === 'wish') wishShout(u);
+    if (p.special === 'bat') wishShout(u, 'bat');            // 🪄 도깨비 방망이도 소원권처럼 모두에게 (2026-11-06)
 }
 
 // ==========================================
@@ -407,11 +409,12 @@ function give(p, rec) {
 //   주운 본인은 상자 알림이 따로 뜨므로 빼고, 10분 넘게 지난 소식 · 이미 본 소식(이 기기에서)은 띄우지 않는다.
 const WISH = 'treasureWish';
 const WISH_FRESH = 10 * 60 * 1000;
-function wishText(name) { return '🎉 ' + (name || '누군가') + ' 사원이 소원권을 주웠습니다! 🎉'; }
-function wishShout(u) {
+//   it — 무엇을 주웠나 ('bat' = 🪄 도깨비 방망이 · 없으면 소원권)
+function wishText(name, it) { return '🎉 ' + (name || '누군가') + ' 사원이 ' + (it === 'bat' ? '🪄 도깨비 방망이를' : '소원권을') + ' 주웠습니다! 🎉'; }
+function wishShout(u, it) {
     const d = db_();
     if (!d || !u) return;
-    try { d.ref(WISH).set({ k: rid(), code: u.code, name: u.name || u.code, at: Date.now() }); } catch (e) { }
+    try { d.ref(WISH).set({ k: rid(), code: u.code, name: u.name || u.code, at: Date.now(), it: it || null }); } catch (e) { }
 }
 function wishSeen(k) {
     try { const o = JSON.parse(localStorage.getItem('treasureWishSeen') || '{}'); return !!o[k]; } catch (e) { return false; }
@@ -435,7 +438,7 @@ function wishMark(k) {
             const at = Number(v.at) || 0;
             if (!at || Math.abs(Date.now() - at) > WISH_FRESH) return;                      // 묵은 소식
             shown[v.k] = 1; wishMark(v.k);
-            alert_(wishText(v.name));
+            alert_(wishText(v.name, v.it));
         });
     }, 1000);
 })();

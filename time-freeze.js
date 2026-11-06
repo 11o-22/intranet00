@@ -230,6 +230,10 @@ G.push({ path: 'gaduri', fn: function (val, w, up, path) {
         if (sh(x, 'at', lt, w)) put(up, p2, x, 'at');
     }); });
 } });
+// 🪄 도깨비 방망이에 맞아 소원권(물약)이 된 사원 — 30분 (plaza.js · 2026-11-06)
+G.push({ path: 'wishForm', fn: function (val, w, up, path) {
+    gEach(val, path, function (x, p1) { if (sh(x, 'until', dl, w)) put(up, p1, x, 'until'); });
+} });
 // 장터 — 올린 때 (사흘 지나면 돌려준다)
 G.push({ path: 'market', fn: function (val, w, up, path) {
     gEach(val, path, function (x, p1) { if (sh(x, 'at', lt, w)) put(up, p1, x, 'at'); });
