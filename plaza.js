@@ -2317,6 +2317,7 @@ function rpsStart(tiny, holder) {
         if (!w || w.by !== holder) { sysLine('🍍 ' + nameIn(tiny) + ' 사원은 이제 ' + nameIn(holder) + ' 사원에게 없습니다.'); return; }
         const id = me + '-' + now().toString(36);
         const escape = (tiny === me);                      // ✊ 잡힌 작은 사람이 스스로 빠져나가려 한다 (2026-10-30)
+        if (!escape && wfOf(tiny)) { sysLine('🫙 소원권은 가위바위보로 뺏을 수 없습니다.'); return; }
         rpsMine = { holder: holder, tiny: tiny, id: id, ref: ref, at: now(), round: 1, k: w.k, start: w.start, escape: escape };
         const ask = function (round) {
             rpsPick('✊ ' + (escape ? esc(nameIn(holder)) + ' 사원에게서 빠져나가려 가위바위보' : esc(nameIn(tiny)) + ' 사원을 걸고 ' + esc(nameIn(holder)) + ' 사원과 가위바위보') + (round > 1 ? ' (' + round + '판째)' : ''),
@@ -2411,6 +2412,7 @@ function rpsListen() {
         const ref = rpsRef;
         const w = carrierOf(v.tiny);
         if (!w || w.by !== me) { ref.update({ win: 'x', at: now(), st: 'done' }).catch(function () { }); return; }
+        if (v.by !== v.tiny && wfOf(v.tiny)) { ref.update({ win: 'x', at: now(), st: 'done' }).catch(function () { }); return; }   // 🪄 소원권은 못 뺏는다
         run.rpsHold = true;
         const escape = (v.by === v.tiny);                  // ✊ 잡힌 작은 사람이 빠져나가려 한다
         rpsPick('✊ ' + (escape ? esc(nameIn(v.tiny)) + ' 사원이 빠져나가려 가위바위보를 걸어 왔습니다' : esc(nameIn(v.by)) + ' 사원이 ' + esc(nameIn(v.tiny)) + ' 사원을 걸고 가위바위보를 걸어 왔습니다') + (v.round > 1 ? ' (' + v.round + '판째)' : ''),
@@ -2762,6 +2764,11 @@ function carryTap(cx, cy) {
     const w = carrierOf(pick);
     if (w && w.by !== me) {
         // ✊ 남이 든 작은 사람 — 가위바위보로 뺏어 온다 (내 손이나 머리 위에 자리가 있어야 한다)
+        // 🪄 소원권 물약은 가위바위보로 못 뺏는다 (2026-11-06 사용자 「소원권이 된 사원은 가위바위보로 못 갖고가게 해줘」)
+        if (wfOf(pick)) {
+            sysLine('🫙 ' + nameIn(pick) + ' 사원(소원권)은 ' + nameIn(w.by) + ' 사원 손에 있습니다 — 가위바위보로 뺏을 수 없습니다.');
+            return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
+        }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
             return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기'], INFO_ITEM],
                 function (k) { if (k === 'info') { infoOpen(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
