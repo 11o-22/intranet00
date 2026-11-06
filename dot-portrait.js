@@ -57,7 +57,9 @@ function build(u, view, w, h) {
     if (typeof window.dotSprite !== 'function' || !u) return wrap;
     const k = h / (V.y1 - V.y0);
     let el = null;
-    try { el = window.dotSprite(u, { pose: 'stand', scale: k, live: false }); } catch (e) { el = null; }
+    // ★ 사원증 · 정보 열람에는 체형을 안 쓴다 — 늘 기본 체형 (2026-11-06 사용자 「정보열람이나 사원증에는 여성 체형 안 뜨게」)
+    const plain = Object.assign({}, (u && u.dot) || {}, { shape: '' });
+    try { el = window.dotSprite(u, { pose: 'stand', scale: k, live: false, dot: plain }); } catch (e) { el = null; }
     if (!el) return wrap;
     el.style.position = 'absolute';
     el.style.left = Math.round(w / 2 - V.cx * k) + 'px';

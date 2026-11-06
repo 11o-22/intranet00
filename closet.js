@@ -362,7 +362,7 @@ const DOT_SLOTS = [
     {
         k: 'shape', n: '체형', items: [
             { i: '', n: '기본', over: [], def: true },
-            { i: 'fem', n: '여성 체형', over: [], body: 'body-w', admin: true, shape: true }
+            { i: 'fem', n: '여성 체형', over: [], body: 'body-w', owner: true, shape: true }
         ]
     },
     {
@@ -668,6 +668,7 @@ function isAdm(user) {
 // ★ 누구 옷장에 보이나
 //
 //   admin: true        상담사만
+//   owner: true        상담사 + **Owner** 사원만 (이름 · 별명 · 계정 어느 쪽이든 「Owner」 — foxcult.js 와 같은 잣대)
 //   dark: true         상담사 + **어둠 소속**만
 //   nos: ['9013',…]    상담사 + 적어 둔 **사번**(u.no)만
 //   아무것도 없으면     모두
@@ -675,6 +676,12 @@ function isAdm(user) {
 //   사번은 u.code(계정 열쇠)가 아니라 u.no 다. 앞에 0 이 붙는 사번이
 //   있으므로 글자로 견주고, 네 자리로 채워서도 한 번 더 본다.
 function noOf(u) { return (u && u.no != null) ? String(u.no).trim() : ''; }
+// 여성 체형 (2026-11-06 사용자 「여성 체형 Owner 사원한테도 주고」)
+function isOwnerU(user) {
+    const u = user || u_();
+    if (!u) return false;
+    return [u.name, u.badge && u.badge.nickname, u.code].some(function (x) { return String(x == null ? '' : x).trim().toLowerCase() === 'owner'; });
+}
 function hasNo(it, u) {
     const n = noOf(u); if (!n) return false;
     const p = n.length < 4 ? ('0000' + n).slice(-4) : n;
@@ -703,6 +710,7 @@ function allowed(it, user) {
         if (l) return l.indexOf(it.i) >= 0;
     }
     if (it.admin) return isAdm(user);
+    if (it.owner) return isAdm(user) || isOwnerU(user);
     if (it.dark) return isAdm(user) || isDark(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
     if (it.own) return isAdm(user) || hasOwn(it, user);
