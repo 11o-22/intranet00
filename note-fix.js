@@ -151,6 +151,11 @@ const EXPIRY = [
         catch (e) { return true; }
     } },
     // 🍰 식당 디저트 — 여기서 재지 않는다. 아래 sweetLines 가 먹은 번마다 한 줄씩 맞춘다 (2026-10-23)
+    // 🪄 도깨비 방망이 — 때리면 부서져 사라진다. 손에 없으면 「[장착됨] 🪄 도깨비 방망이」 줄도 걷는다
+    //   (2026-11-06 사용자 「장착해서 사용한 도깨비 방망이가 사용 후 사라졌음에도 특이사항에 남아있는 거 수정해 줘」)
+    { mark: '🪄 도깨비 방망이', live: function (u) {
+        return Array.isArray(u.equippedWeapons) && u.equippedWeapons.some(function (w) { return baseOf(w) === '🪄 도깨비 방망이'; });
+    } },
     // ⛓️‍💥 이레귤러 — 카피(24시간)와 부활(이번 탐사). 재는 쪽은 irregular.js.
     { mark: '⛓️‍💥', live: function (u, note) {
         try { return window.irrNoteLive ? window.irrNoteLive(u, note) : true; }

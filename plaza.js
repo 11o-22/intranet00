@@ -1241,9 +1241,12 @@ function wfBonk(code) {
                 const lab = me.equippedWeapons[i];
                 me.equippedWeapons.splice(i, 1);
                 try { if (me.equipOwner && typeof me.equipOwner === 'object') delete me.equipOwner[lab]; } catch (e) { }
+                // 특이사항의 「[장착됨] 🪄 도깨비 방망이」 줄도 걷는다 (2026-11-06 사용자)
+                try { if (typeof stripNoteByItem === 'function') stripNoteByItem(me, WF_BAT); } catch (e) { }
             }
             try { if (typeof addHistoryLog === 'function') addHistoryLog(me, '[' + WF_BAT + '] ' + nameIn(code) + ' 사원을 때렸습니다 — 소원권이 되었습니다'); } catch (e) { }
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+            try { if (typeof saveFields === 'function') saveFields({ badge: 1, equippedWeapons: 1, equipOwner: 1 }); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
         }
         sysLine('🪄 ' + nameIn(code) + ' 사원을 도깨비 방망이로 때렸습니다 — ' + (kind === 2 ? '🌙 달' : '⏰ 시계') + ' 물약, 소원권이 되었습니다! 방망이는 사라졌습니다.');
