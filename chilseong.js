@@ -26,7 +26,8 @@
 // ■ 일곱
 //
 //   ① 탐랑  하루 1번 ★ 음식 다섯 → 상점 · 횟수 하나를 초기화 (격이 높을수록 드문 쪽이 잘 뜬다)
-//            유쾌 판매소 40 · ??? 상점 30 · 우주 쇼핑몰 10 · 어둠 탐사 횟수 10 · 공용 시설 횟수 5 · 망상 홈쇼핑 5
+//            유쾌 판매소 40 · ??? 상점 30 · 우주 쇼핑몰 10 · 망상 홈쇼핑 5
+//            (어둠 탐사 횟수 · 공용 시설 횟수 초기화는 뺐다 — 2026-11-06 사용자 「칠성군 치성, 탐사랑 공용시설 초기화는 빼자」)
 //   ② 거문  ✗ (2026-11-04 사용자 — 혼자 탐사 가는 커스텀 장비는 호가호위 · B조 조장 · 여우 신도만) 최소 인원 1인은 뺐다.
 //            3인 이하로 들어가면 (차고 있는 사람에게) 안전한 선택지 표시 🌟 · 판정 +3 · 행운 +2 (낮은 굴림 다시 굴림 두 번)
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
@@ -382,7 +383,7 @@ function menu() {
     const h = GODS.map(function (g) {
         let body = '';
         if (g.k === 'tam') {
-            body = line('하루 한 번 ★ 음식 다섯을 바친다. 만족하시는 만큼 — 유쾌 판매소 · ??? 상점 · 우주 쇼핑몰 · 어둠 탐사 횟수 · 공용 시설 횟수 · 망상 홈쇼핑 중 하나를 초기화한다. 격이 높은 음식일수록 드문 쪽이 잘 뜬다.')
+            body = line('하루 한 번 ★ 음식 다섯을 바친다. 만족하시는 만큼 — 유쾌 판매소 · ??? 상점 · 우주 쇼핑몰 · 망상 홈쇼핑 중 하나를 초기화한다. 격이 높은 음식일수록 드문 쪽이 잘 뜬다.')
                 + '<div>' + btn('★ 다섯을 바친다', 'chilTamOpen()', !!s.tam || sc < CHIL.TAM_N, true) + tag(s.tam ? '오늘 바침' : '오늘 1번', !s.tam) + '</div>';
         } else if (g.k === 'geo') {
             body = line('3인 이하로 들어가면 안전한 선택지가 🌟 로 보이고 판정 +3 · 행운 +2.')
@@ -532,13 +533,12 @@ const TAM = [
     { k: 'joy',   n: '유쾌 판매소 초기화',     w: 40, b: -0.5 },
     { k: 'q',     n: '??? 상점 초기화',        w: 30, b: 0 },
     { k: 'alien', n: '우주 쇼핑몰 초기화',     w: 10, b: 1 },
-    { k: 'dark',  n: '어둠 탐사 횟수 초기화',  w: 10, b: 2 },
-    { k: 'fac',   n: '공용 시설 횟수 초기화',  w: 5,  b: 3 },
+    // 어둠 탐사 횟수 · 공용 시설 횟수 초기화는 뺐다 (2026-11-06 사용자 「칠성군 치성, 탐사랑 공용시설 초기화는 빼자」)
     { k: 'dream', n: '망상 홈쇼핑 초기화',     w: 5,  b: 3 }
 ];
 // 격 합 5~15 → 기울기 0~1. 드문 쪽(b 가 큰 쪽)이 그만큼 무거워진다
-//   전부 괴상 ★(5) — 40 · 30 · 10 · 10 · 5 · 5
-//   전부 평범 ★(15) — 20 · 30 · 20 · 30 · 20 · 20
+//   전부 괴상 ★(5) — 40 · 30 · 10 · 5
+//   전부 평범 ★(15) — 20 · 30 · 20 · 20
 function tamWeights(sum) {
     const tilt = Math.max(0, Math.min(1, (sum - 5) / 10));
     return TAM.map(function (x) { return Math.max(0.1, x.w * (1 + tilt * x.b)); });
@@ -571,11 +571,6 @@ function tamDo(k) {
         Object.assign(f, { alienTries: 1, alienDailyUsed: 1, lastAlienPlayTime: 1, alienDate: 1 });
         rmRemote('users/' + u.code + '/alienUnlockedItems');
         rmRemote('users/' + u.code + '/alienBoughtItems');
-    } else if (k === 'dark') {
-        u.darkDate = d; u.darkTries = 0;            // dark-count.js 가 차이를 서버(darkUse)로 보낸다
-    } else if (k === 'fac') {
-        u.facilityCount = 0; u.lastFacilityDate = d;
-        Object.assign(f, { facilityCount: 1, lastFacilityDate: 1 });
     } else if (k === 'dream') {
         u.petEggAt = '';
         f.petEggAt = 1;
