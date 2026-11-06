@@ -85,7 +85,7 @@ const G = [];             // 사원 밖 자리 — { path, fn(val, w, up, path) 
     'lastPollutionTime',      // 오염 — 3시간마다 3 오른다
     'nostalgiaLastReduced',   // 노스텔지어 끈 — 5분마다 오염 1 줄인다
     'securityPurgeLast',      // 보안팀 의상 — 10분마다 오염 3 줄인다
-    'lastAlienPlayTime',      // 우주 쇼핑몰 — 다음 연결까지 2시간
+    // 'lastAlienPlayTime' — 우주 쇼핑몰은 쉬는 시간에도 시간이 흐른다 (2026-11-06 사용자 「셧다운동안 우주쇼핑몰 시간은 안 멈추게」)
     'bloodBathEquippedAt',    // 혈욕조 — 하루 3시간까지 차는 시간
     'quarFood',               // 음식 때문에 격리된 때 (30시간 믿는다)
     'moonT4At',               // 달 ④ — 5시간 창
@@ -177,7 +177,7 @@ U_FN.push(function (u, w) {
     if (g.careAt && typeof g.careAt === 'object') Object.keys(g.careAt).forEach(function (k) { if (sh(g.careAt, k, lt, w)) ch = true; });
     return ch ? ['preg'] : [];
 });
-// 금고 이자 · 칭호 열흘 · 지산 · 칠성군 · 눈(우주 쇼핑몰 되돌리기)
+// 금고 이자 · 칭호 열흘 · 지산 · 칠성군
 U_FN.push(function (u, w) {
     const out = [];
     let ch = false;
@@ -191,7 +191,7 @@ U_FN.push(function (u, w) {
     each(u.jisanSac, function (x) { if (sh(x, 'at', lt, w)) ch = true; });
     if (ch) out.push('jisanSac');
     if (u.chilRun && sh(u.chilRun, 'at', lt, w)) out.push('chilRun');
-    if (u.eyeAlienSnap && sh(u.eyeAlienSnap, 'last', lt, w)) out.push('eyeAlienSnap');
+    // 눈(우주 쇼핑몰 되돌리기)의 last 도 안 민다 — lastAlienPlayTime 과 짝이다 (2026-11-06)
     return out;
 });
 
