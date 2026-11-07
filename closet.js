@@ -722,6 +722,12 @@ function isOwnerU(user) {
     if (!u) return false;
     return [u.name, u.badge && u.badge.nickname, u.code].some(function (x) { return String(x == null ? '' : x).trim().toLowerCase() === 'owner'; });
 }
+// ★ 상담사가 콘솔로 준 것 — u.dotGrant = { fem: 1, … } (2026-11-08 사용자 「여성 체형, 상담사가 콘솔로 줄 수 있게」)
+//   dotGrant('사번', 'fem') 주기 · dotGrant('사번', 'fem', false) 거두기. owner: true 인 것(여성 체형 · 그 옷들)에 쓴다
+function hasGrant(it, user) {
+    const u = user || u_();
+    return !!(u && u.dotGrant && u.dotGrant[it.i]);
+}
 function hasNo(it, u) {
     const n = noOf(u); if (!n) return false;
     const p = n.length < 4 ? ('0000' + n).slice(-4) : n;
@@ -750,7 +756,7 @@ function allowed(it, user) {
         if (l) return l.indexOf(it.i) >= 0;
     }
     if (it.admin) return isAdm(user);
-    if (it.owner) return isAdm(user) || isOwnerU(user);
+    if (it.owner) return isAdm(user) || isOwnerU(user) || hasGrant(it, user);
     if (it.dark) return isAdm(user) || isDark(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
     if (it.own) return isAdm(user) || hasOwn(it, user);
@@ -2281,6 +2287,23 @@ setInterval(function () {
 
         clearInterval(iv);
         console.log('[옷장] 사택에 탭 연결');
+        // 상담사 콘솔 — 여성 체형 같은 owner 전용 칸을 사번에게 준다 (사번은 u.no · 계정 열쇠도 받는다)
+        window.dotGrant = function (no, id, on) {
+            const me = u_();
+            if (!isAdm(me)) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+            id = id || 'fem';
+            const want = String(no == null ? '' : no).trim(), pad = want.length < 4 ? ('0000' + want).slice(-4) : want;
+            const all = (typeof db !== 'undefined' && db && db.users) ? db.users : {};
+            const code = Object.keys(all).filter(function (c) { const n = noOf(all[c]); return c === want || n === want || n === pad; })[0];
+            if (!code) { console.warn('그 사번의 사원이 없습니다: ' + want); return; }
+            const v = (on === false) ? null : 1;
+            const dbh = (typeof database !== 'undefined') ? database : null;
+            if (!dbh) { console.warn('데이터베이스가 없습니다.'); return; }
+            try { dbh.ref('users/' + code + '/dotGrant/' + id).set(v); } catch (e) { console.warn(e); return; }
+            try { all[code].dotGrant = all[code].dotGrant || {}; if (v) all[code].dotGrant[id] = 1; else delete all[code].dotGrant[id]; } catch (e) { }
+            console.log('%c✓ ' + (all[code].name || code) + ' (' + code + ') — ' + id + (v ? ' 줌' : ' 거둠'), 'color:#4CAF50');
+        };
+        console.log('[옷장] dotGrant(사번, "fem") — 여성 체형 주기 · dotGrant(사번, "fem", false) 거두기');
     }, 700);
 })();
 
