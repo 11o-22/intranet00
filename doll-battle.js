@@ -42,7 +42,8 @@ const AT = {
     atk: [[28, 363, 110, 467], [116, 363, 198, 467], [204, 363, 286, 467]],
     def: [[28, 477, 151, 537], [163, 477, 286, 537]],
     back: [28, 547, 287, 601],
-    foe: { cx: 230, foot: 218 }, me: { l: 6, t: 146, px: 128 }, btnPet: { l: 31, t: 346, px: 128 }
+    // ★ 내 뒷모습 — 주신 그림이 8배율 → 6배율로 바뀌었다 (2026-11-07): 판(4배) 기준 2배(128) → 1.5배(96). 발끝 274 · 가운데 70 그대로
+    foe: { cx: 230, foot: 218 }, me: { l: 22, t: 178, px: 96 }, btnPet: { l: 31, t: 346, px: 128 }
 };
 
 // ==========================================
@@ -260,6 +261,12 @@ function q(sel) { return B && B.ui.st.querySelector(sel); }
 // ── 그림
 function paintFoe(silhouette) {
     const f = B.foe, e = B.ui.foe;
+    if (silhouette === 'base') {                       // 🧸 따라쟁이 봉제인형 원형 (doll/base.webp · 64칸)
+        e.innerHTML = '<div class="bob" style="background:url(doll/base.webp) no-repeat;background-size:64px 64px;image-rendering:pixelated;width:64px;height:64px"></div>';
+        e.style.left = (AT.foe.cx - 32) + 'px'; e.style.top = (AT.foe.foot - 62) + 'px';
+        e.style.filter = '';
+        return;
+    }
     if (f.mon != null) {
         const px = f.boss ? 100 : 86;
         e.innerHTML = '<div style="' + D().monCss(f.mon, px) + '"></div>';
@@ -409,6 +416,34 @@ async function whiteIn(who) {
     e.style.filter = '';
     await sleep(120);
 }
+// 🧸 원형이 모자이크로 흐려졌다가, 흉내 낸 모습으로 또렷해진다 (2026-11-07 사용자 「원형이 먼저 등장하고, 모자이크되면서 다른 봉제인형으로」)
+const IMG = {};
+function img(src) {
+    if (!IMG[src]) IMG[src] = new Promise(function (r) { const i = new Image(); i.onload = function () { r(i); }; i.onerror = function () { r(null); }; i.src = src; });
+    return IMG[src];
+}
+async function mosaicMorph() {
+    const f = B.foe, e = B.ui.foe;
+    const base = await img('doll/base.webp'), sheet = await img('doll/pf.webp');
+    if (!B || !base || !sheet) { if (B) paintFoe(false); return; }
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    c.className = 'bob'; c.style.cssText = 'width:64px;height:64px;image-rendering:pixelated;display:block';
+    const t = document.createElement('canvas'); t.width = 64; t.height = 64;
+    const cx = c.getContext('2d'), tx = t.getContext('2d');
+    const cell = D().cellOf(f.sp);
+    const draw = function (src, sx, sy, b) {
+        const n = Math.max(1, Math.round(64 / b));
+        tx.clearRect(0, 0, 64, 64); tx.imageSmoothingEnabled = true;
+        tx.drawImage(src, sx, sy, 64, 64, 0, 0, n, n);           // 칸마다 빛깔을 고르게 (모자이크 한 칸 = 그 자리의 평균)
+        cx.clearRect(0, 0, 64, 64); cx.imageSmoothingEnabled = false;
+        cx.drawImage(t, 0, 0, n, n, 0, 0, 64, 64);
+    };
+    e.innerHTML = ''; e.appendChild(c);
+    const ST = [1, 2, 3, 4, 6, 8, 11, 16];
+    for (let i = 0; i < ST.length; i++) { if (!B) return; draw(base, 0, 0, ST[i]); await sleep(i ? 70 : 160); }
+    for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; draw(sheet, cell.c * 64, cell.r * 64, ST[i]); await sleep(i ? 70 : 120); }
+    if (B) paintFoe(false);
+}
 async function flashAll(n) {
     for (let i = 0; i < n; i++) { B.ui.fl.style.opacity = '.85'; await sleep(110); B.ui.fl.style.opacity = '0'; await sleep(110); }
 }
@@ -535,7 +570,7 @@ async function begin(opt) {
     const ui = build(opt.loc);
     B = { ui: ui, opt: opt, foe: opt.foe, me: null, out: {}, cache: {}, kind: opt.kind, tut: !!opt.tut, pick: null, wrapped: false };
     ui.ov.addEventListener('pointerdown', onTap);
-    paintFoe(B.foe.wild);
+    paintFoe(B.foe.wild ? 'base' : false);
     paintStat();
     await enterFx(ui, !B.foe.wild);
     await sleep(60);
@@ -549,8 +584,7 @@ async function begin(opt) {
         M.dexSeen(B.foe.sp);
         await say(fmt(pick(TX.start), { w: WILD }), 1500);
         if (B.tut) await say('도깨비: 「어어어! 나왔다! 나왔어! 김서방! 저놈이야! 저놈!」', 1800);
-        await flashAll(2);
-        paintFoe(false);
+        await mosaicMorph();
         await say(fmt(pick(TX.morph), { w: WILD, s: B.foe.name }), 1500);
     } else {
         const fresh = M.darkSeen(B.foe.mon);
