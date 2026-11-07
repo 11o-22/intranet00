@@ -270,6 +270,7 @@ function open(key, at, opt) {
     let p = Array.isArray(at) ? at : ((sc.start && sc.start[at]) || (sc.start && sc.start[Object.keys(sc.start)[0]]) || sc.lines[0][0]);
     const n = nearest(sc, p[0], p[1], true);
     run.x = n.x; run.y = n.y; run.at = n;
+    if (n.x > sc.w * 0.75) run.face = 1;                 // 오른쪽 끝에서 들어오면 맵 안쪽(왼쪽)을 본다
     layout();
     makeMe();
     makeDoll();
@@ -375,7 +376,7 @@ function makeDoll() {
     if (run.dollEl) { run.dollEl.remove(); run.dollEl = null; }
     const d = leadDoll();
     if (!d) return;
-    const px = Math.round(34 * run.Z);
+    const px = Math.round(26 * run.Z);                   // 2026-11-07 사용자 「인형 크기를 좀 줄이자」 (34 → 26)
     const el = document.createElement('div');
     el.className = 'ds-doll';
     el.innerHTML = '<div style="' + D().spriteCss(d.sp, px) + 'animation:dsbob .5s steps(2) infinite paused"></div>';
@@ -691,6 +692,15 @@ function npcShow(x, y, face) {
     run.npc = { x: x, y: y, face: face || 1, path: [], f: 0, ft: 0, jump: 0 };
     paintNpc();
 }
+// 사람 바로 앞 (바라보는 쪽) — 같은 줄에 서서 사람을 마주 본다 (2026-11-07 사용자 「위치는 같게 하되, 캐릭터 앞에 서있게」)
+function frontAt(gap) {
+    const dir = run.face === 1 ? -1 : 1;                 // face 1 = 왼쪽을 본다
+    let x = run.x + dir * gap;
+    if (x < 10 || x > run.sc.w - 10) x = run.x - dir * gap;
+    const n = nearest(run.sc, x, run.y, true);
+    return { x: n.x, y: n.y, face: n.x > run.x ? 1 : -1 };
+}
+function npcFront(gap) { const f = frontAt(gap || 32); npcShow(f.x, f.y, f.face); }
 function npcHide() { if (run && run.npcEl) { run.npcEl.remove(); run.npcEl = null; } if (run) run.npc = null; }
 function npcScale() { return run.key === 'gong' ? 1.15 : 0.95; }
 function paintNpc() {
@@ -703,7 +713,7 @@ function paintNpc() {
     e.style.backgroundSize = Math.round(cw * 6) + 'px ' + Math.round(ch * 2) + 'px';
     e.style.backgroundPosition = Math.round(-(n.f % 6) * cw) + 'px ' + Math.round(-row * ch) + 'px';
     e.style.left = Math.round(n.x * Z - cw / 2) + 'px';
-    e.style.top = Math.round(n.y * Z - ch * 0.97) + 'px';
+    e.style.top = Math.round(n.y * Z - ch * (row ? 74 : 86) / 96) + 'px';     // 발끝 — 걷기 줄 86 · 서 있기 줄 74 (96칸 가운데)
     e.style.zIndex = String(1000 + Math.round(n.y));
     e.style.transform = (n.face < 0 ? 'scaleX(-1)' : '') + (n.jump ? ' translateY(' + (-n.jump * Z) + 'px)' : '');
 }
@@ -929,7 +939,8 @@ async function tutStart() {
     await sleep(350);
     await npcJump();
     exclaim(run.npc.x, 219 - 62, '!!');
-    await npcWalk(run.x + (fromX > run.x ? 26 : -26), run.y, SPD * 2.4);
+    const fr = frontAt(32);
+    await npcWalk(fr.x, fr.y, SPD * 2.4);
     run.npc.face = run.npc.x > run.x ? 1 : -1;
     await talk([
         '김서방!!!!',
@@ -989,21 +1000,22 @@ function giveRibbons() {
 }
 async function tutLeadOut() {
     // 도깨비가 먼저 왼쪽(출몰지)으로 간다 — 따라가면 출몰지
-    if (!run.npc) npcShow(run.x + 30, run.y, 1);
+    if (!run.npc) npcFront(32);
     run.tut = { step: 'go-wild' };
     sys('◀ 도깨비를 따라가세요', 6000);
     npcWalk(4, 219, SPD * 1.6).then(function () { npcHide(); });
 }
 async function tutResumeFront() {
     run.tut = { step: 'go-wild' };
-    npcShow(Math.min(run.x + 30, run.sc.w - 20), run.y, 1);
+    npcFront(32);
     await talk(['오, 김서방! 어디 갔었나? 자, 얼른 따라오게!'], WHO);
     if (run) tutLeadOut();
 }
 async function tutWild() {
     run.tut = { step: 'wild' };
-    npcShow(Math.min(run.x + 34, run.sc.w - 10), run.y, 1);
+    npcFront(32);
     for (let i = 0; i < 3; i++) { if (!run || !run.npc) break; run.npc.face = -run.npc.face; paintNpc(); await sleep(380); }
+    if (run && run.npc) { run.npc.face = run.npc.x > run.x ? 1 : -1; paintNpc(); }
     await talk([
         '자아, 여기가 좋겠구먼!',
         '김서방, 저기 보이나? 수풀이며 잡동사니며, 이것저것 잔뜩 쌓여 있는 거 말이야!',
@@ -1025,7 +1037,7 @@ async function tutWild() {
 async function tutAfterCatch() {
     if (!run) return;
     tutSet('caught');
-    if (!run.npc) npcShow(Math.min(run.x + 34, run.sc.w - 10), run.y, 1);
+    if (!run.npc) npcFront(32);
     await npcJump();
     await talk([
         '잡았다!!!!',
