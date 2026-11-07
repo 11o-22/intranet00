@@ -30,8 +30,8 @@ function walkKey(u) {
         const v = u.petWalk;
         let k = null;
         if (v === 0 || v === '0') return null;                       // 아무도 안 데리고 다닌다
-        if (v != null && ds[String(v)]) k = String(v);
-        else if (v == null) { const w = M.withList(u); k = w[0] || null; }   // 안 정했으면 동행 첫째 (전처럼)
+        if (v != null && ds[String(v)]) k = String(v);                 // 고른 인형 — 동행이 아니어도 따라온다 (2026-11-07 사용자 「동행에서 뺀 인형도 데리고 다니기 가능하게」)
+        else if (v == null) { const w = M.withList(u); k = w[0] || null; }   // 안 정했으면 동행 첫째 (전처럼) · 「그만 데리고 다닌다」(0)면 아무도
         if (!k) return null;
         const d = ds[k];
         if (!d) return null;
