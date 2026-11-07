@@ -221,14 +221,14 @@ function rollGrade(luck) {
 function cellOf(sp) { const i = Math.max(1, Math.min(25, (P() && P().sp ? P().sp(sp) : Number(sp)) || 1)) - 1; return { c: i % 5, r: Math.floor(i / 5) }; }
 //   px — 한 칸을 몇 px 로 그리나. back 이면 뒷모습
 // 🎨 예전 펫 그림으로 보는 사원 — u.petArt 'old' / 'doll' 로 정하고, 안 정했으면 이름이 Benz 인 사원 (2026-11-07 사용자 「Benz 사원한테는 봉제인형이 아니라 기존에 있던 펫 그림으로」)
-//   상담사 콘솔: dollArtSet('사번', 'old' | 'doll' | null)
+//   상담사 콘솔: dollArtSet('사번', 'old' | 'doll' | null) — 사번 0010 은 코드에 고정
+const ART_OLD_CODES = ['0010'];                                        // ★ 사번으로 고정 — Benz 사원 (2026-11-07 사용자 「사번으로 고정해 줘. 0010」)
 function artOld(u) {
     u = u || u_();
     if (!u) return false;
     if (u.petArt === 'old') return true;
     if (u.petArt === 'doll') return false;
-    const nm = String(u.name || '').trim().toLowerCase();
-    return nm === 'benz' || nm === 'banz';                             // 사용자 「Benz였어」(2026-11-07)
+    return ART_OLD_CODES.indexOf(String(u.code || '')) >= 0;
 }
 function oldCss(sp, px) {
     const n = String(Math.max(1, Number(sp) || 1)).padStart(2, '0');
@@ -552,7 +552,7 @@ window.dollArtSet = function (code, v) {
     const me = u_(), d = db_();
     if (!me || !isAdmin(me) || !d) { console.warn('상담사만 쓸 수 있습니다.'); return; }
     const val = (v === 'old' || v === 'doll') ? v : null;
-    d.ref('users/' + code + '/petArt').set(val).then(function () { console.log('%c✓ ' + code + ' — 펫 그림 ' + (val || '기본(이름이 Benz 면 예전 그림)'), 'color:#4CAF50'); });
+    d.ref('users/' + code + '/petArt').set(val).then(function () { console.log('%c✓ ' + code + ' — 펫 그림 ' + (val || '기본(사번 0010 은 예전 그림)'), 'color:#4CAF50'); });
 };
 console.log('[🧸] 따라쟁이 봉제인형 (= 펫) — dollState() · dollArtSet(사번, old|doll)');
 })();
