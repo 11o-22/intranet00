@@ -35,7 +35,11 @@
 //   먹이(u.petFood) · 돌봄 물품(u.petBag) · 펫 장비(소지품의 집 지킴이 방석 · 🐾 펫 이름 개명권) · 룬(u.petRune)
 //
 // ■ 적히는 자리
-//   petBattle/<열쇠> = { at, stage, a:{code,name,pet,stake:{k,n},ready,runes,hp}, b:{…},
+//   ★ 2026-11-07 — 인형끼리 겨룬다 (사용자 「펫 배틀 시에도 출몰처럼 상대 펫과 내 펫이 겨룰 수 있게」)
+//     준비됐다 를 누를 때 내 인형의 모습(doll — 능력치 · 체력 · 먹인 룬)을 글에 적고, 둘 다 적혔으면 공방은
+//     출몰 전투 화면(doll-battle.js DOLLBT.pvp)에서 — 내 인형 뒷모습 vs 상대 인형 앞모습. 판은 DOLLBT.resolvePvp 가 트랜잭션으로 푼다.
+//     인형 체력이 먼저 다 닳는 쪽이 진다. 끝난 뒤 인형이 입은 상처는 그대로 남는다 (수선소). 주인 체력(hp 100)으로 싸우던 옛 글은 옛 창으로.
+//   petBattle/<열쇠> = { at, stage, a:{code,name,pet,stake:{k,n},ready,runes,hp,doll}, b:{…}, play:{판:[지문…]},
 //                        round, first, roundAt, pick:{a:{atk,def}, b:{…}}, log:[…], winner, why, endAt, settled:{사번:1} }
 //       stage  ask 받기 기다림 · stake 신청한 쪽 확인 기다림 · prep 룬 먹이는 중 · fight 공방 · done 끝 · no 없던 일
 //       a 는 신청한 쪽 · b 는 받은 쪽
@@ -139,6 +143,7 @@ function myPets(u) {
         if (!s || !P().BY[k]) return false;
         if (s.out && s.out.till && s.out.till > t) return false;      // 탐사 중
         if (s['with']) return false;                                   // 동행 중
+        try { if (D_() && D_().hpOf(s) <= 0) return false; } catch (e) { }   // 🧸 체력이 없는 인형은 못 나선다 (수선소)
         return true;
     }).sort(function (a, b) { return Number(a) - Number(b); });
 }
@@ -211,6 +216,26 @@ function logArr(o) {
     return [];
 }
 function runesArr(v) { return Array.isArray(v) ? v : (v && typeof v === 'object') ? Object.keys(v).map(function (k) { return v[k]; }) : []; }
+// 🧸 인형끼리 겨루기 — 내 인형의 모습을 글에 적는다 (doll-party.js snap 과 같은 꼴)
+function D_() { return window.DOLL; }
+function dollSnap(key, u) {
+    u = u || u_();
+    const D = D_();
+    if (!D || !u) return null;
+    const d = D.dolls(u)[String(key)];
+    if (!d) return null;
+    const s = D.stats(d);
+    const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
+    if (d.nick) o.nick = String(d.nick).slice(0, 12);
+    try { const f = R().fed(key, u); if (f.length) { o.runes = f; o.runeN = R().uses(key, u); } } catch (e) { }
+    return o;
+}
+function isDollFight(o) { return !!(o && o.a && o.b && o.a.doll && o.b.doll && window.DOLLBT && window.DOLLBT.pvp && window.DOLLBT.resolvePvp); }
+function dollHpBar(label, d, mine) {
+    const max = Math.max(1, Number(d && d.max) || 1), v = Math.max(0, Math.min(max, Number(d && d.hp) || 0));
+    return '<div style="margin-bottom:5px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:' + (mine ? '#ffcf8f' : '#c9b8ff') + ';"><span>' + esc(label) + '</span><span>' + v + ' / ' + max + '</span></div>'
+        + '<div style="height:9px; background:#241f18; border:1px solid #3a3025; border-radius:5px; overflow:hidden;"><div style="height:100%; width:' + Math.round(v / max * 100) + '%; background:' + (v / max > 0.4 ? 'linear-gradient(90deg,#4caf50,#9fe6b0)' : 'linear-gradient(90deg,#c62828,#ff8a80)') + ';"></div></div></div>';
+}
 
 function watch() {
     const r = ref();
@@ -389,11 +414,76 @@ function tick() {
     if (tag === shownTag) return;                 // 닫아 둔 창은 바뀔 때까지 다시 띄우지 않는다
     // 둘 다 골랐다 — 그 판을 풀고 끝낸다. 풀린 모습이 다시 들어오면 그때 그린다 (지금 모습으로 그리면 묵은 판이 남는다)
     if (o.stage === 'fight' && o.pick && o.pick.a && o.pick.b) { fightResolve(o); return; }
+    if (PV.running) return;                       // 🧸 전투 화면이 떠 있다 — 그쪽이 글을 본다
     shownTag = tag;
     if (o.stage === 'ask') { if (side === 'b') askView(o); else waitView(o, '상대가 받기를 기다리는 중'); }
     else if (o.stage === 'stake') { if (side === 'a') stakeView(o); else waitView(o, '신청한 쪽이 확인하기를 기다리는 중'); }
     else if (o.stage === 'prep') prepView(o);
-    else if (o.stage === 'fight') fightView(o);
+    else if (o.stage === 'fight') { if (isDollFight(o)) pvpOpen(o); else fightView(o); }
+}
+
+// ==========================================
+// 🧸 인형끼리 — 출몰 전투 화면에서 (doll-battle.js DOLLBT.pvp)
+// ==========================================
+const PV = { key: '', running: false };
+function playArr(v) { return Array.isArray(v) ? v.filter(Boolean) : (v && typeof v === 'object') ? Object.keys(v).sort(function (a, b) { return Number(a) - Number(b); }).map(function (k) { return v[k]; }).filter(Boolean) : []; }
+function playOf(o, round) { const p = o && o.play; if (!p) return null; const v = p[round] != null ? p[round] : p[String(round)]; return v ? playArr(v) : null; }
+function pvpOpen(o) {
+    const me = u_();
+    if (!me || PV.running) return;
+    if (document.getElementById('dbt-ov')) { shownTag = ''; return; }      // 다른 전투(출몰 · 여정)가 떠 있다 — 다음 번에
+    const key = o._k, side = sideOf(o, me.code);
+    if (!side) return;
+    PV.key = key; PV.running = true;
+    shut();
+    const get = function () { const v = live[key]; return v ? Object.assign({ _k: key }, v) : null; };
+    // 배경 — 지금 서 있는 방 (광장 · 카지노 · 백일몽 · 우체국 · 재관국 · 의상숍 · 출몰지 · 공방 앞)
+    const RM = { plaza: 'plaza', casino: 'casino', dream: 'dream', post: 'post', gate: 'gate', bureau: 'bureau', dshop: 'dshop', dwild: 'wild', dgfront: 'dfront', dgong: 'dfront' };
+    let loc = 'plaza';
+    try { const st = window.plazaStage && window.plazaStage(); if (st && RM[st.room]) loc = RM[st.room]; } catch (e) { }
+    window.DOLLBT.pvp({
+        side: side, loc: loc, names: { a: o.a.name, b: o.b.name }, get: get,
+        pick: function (k) {
+            tx(key, function (cur) {
+                if (!cur || cur.stage !== 'fight') return;
+                cur.pick = cur.pick || {};
+                if (cur.pick[side]) return;
+                cur.pick[side] = String(k);
+                return cur;
+            });
+        },
+        forfeit: function () {
+            tx(key, function (cur) {
+                if (!cur || cur.stage !== 'fight') return;
+                cur.stage = 'done'; cur.winner = other(side); cur.why = 'forfeit'; cur.endAt = Date.now();
+                return cur;
+            });
+        },
+        waitPlay: function (round) {
+            return new Promise(function (res) {
+                let awayAsked = false;
+                const iv = setInterval(function () {
+                    const v = live[key];
+                    if (!v || v.stage === 'no') { clearInterval(iv); return res(null); }
+                    const pl = playOf(v, round);
+                    if (pl) { clearInterval(iv); return res(pl); }
+                    if (v.stage === 'done') { clearInterval(iv); return res(null); }
+                    // 상대가 3분 넘게 안 고른다 — 기권 처리 (옛 창의 「기권 처리」 단추와 같다)
+                    if (!awayAsked && v.pick && v.pick[side] && !v.pick[other(side)] && Date.now() - Number(v.roundAt || v.at || 0) > PICK_WAIT) {
+                        awayAsked = true;
+                        tx(key, function (cur) {
+                            if (!cur || cur.stage !== 'fight') return;
+                            if (cur.pick && cur.pick[other(side)]) return;
+                            if (Date.now() - Number(cur.roundAt || cur.at || 0) < PICK_WAIT) return;
+                            cur.stage = 'done'; cur.winner = side; cur.why = 'away'; cur.endAt = Date.now();
+                            return cur;
+                        });
+                    }
+                }, 200);
+            });
+        }
+    }).then(function () { PV.running = false; shownTag = ''; tick(); })
+      .catch(function (e) { console.warn('[인형 배틀] 전투 화면', e); PV.running = false; shownTag = ''; });
 }
 
 function waitView(o, why) {
@@ -419,7 +509,7 @@ function askView(o) {
     const a = o.a, ou = userOf(a.code) || { name: a.name };
     const w = box(head('⚔ 결투 신청이 들어왔습니다',
         '<b style="color:#ffcf8f;">' + esc(a.name) + '</b> 사원이 당신의 인형에게 결투를 신청했습니다.<br>'
-        + '다치는 것은 인형이 아니라 <b>주인</b>입니다. 지면 건 것을 잃고 가두리에 한 시간 갇힙니다. 인형은 멀쩡합니다.')
+        + '인형끼리 겨룹니다 — 체력이 먼저 다 닳는 인형이 집니다. 지면 건 것을 잃고 가두리에 한 시간 갇힙니다. 인형이 입은 상처는 그대로 남습니다 (수선소).')
         + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(ou, a.pet, a.name + ' 사원의 인형') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:11px;">상대가 건 것 — ' + stakeText(a.stake) + '</div>'
         + '<button id="bt-ok" class="game-btn" style="' + BTN + '">받는다 — 내 인형과 걸 것을 고른다</button>'
@@ -510,12 +600,15 @@ function prepView(o) {
             return;
         }
         const runes = R().fed(mine.pet, me);
+        const doll = dollSnap(mine.pet, me);                         // 🧸 내 인형의 모습 — 이대로 겨룬다
+        if (doll && doll.hp <= 0) { alert_(nickOf(me, mine.pet) + josa(nickOf(me, mine.pet), '은') + ' 체력이 없어 나설 수 없습니다.\n\n수선소에서 고친 뒤에 준비하십시오.'); return; }
         tx(o._k, function (cur) {
             if (!cur || cur.stage !== 'prep') return;
-            cur[side] = Object.assign({}, cur[side] || {}, { ready: 1, runes: runes, hp: HP });
+            cur[side] = Object.assign({}, cur[side] || {}, { ready: 1, runes: runes, hp: HP, doll: doll || null });
             if (cur.a && cur.a.ready && cur.b && cur.b.ready) {
-                cur.stage = 'fight'; cur.round = 1; cur.first = 'a'; cur.roundAt = Date.now(); cur.pick = null; cur.log = [];
-                cur.a.hp = HP; cur.b.hp = HP;
+                cur.stage = 'fight'; cur.round = 1; cur.first = 'a'; cur.roundAt = Date.now(); cur.pick = null; cur.log = []; cur.play = null;
+                if (cur.a.doll && cur.b.doll) { cur.a.hp = Number(cur.a.doll.hp) || 0; cur.b.hp = Number(cur.b.doll.hp) || 0; }
+                else { cur.a.hp = HP; cur.b.hp = HP; }
             }
             return cur;
         });
@@ -637,6 +730,13 @@ function fightView(o) {
 // 둘 다 골랐으면 그 판을 푼다 — 어느 쪽 화면이든, 트랜잭션이라 한 번만 풀린다
 function fightResolve(o) {
     if (!o.pick || !o.pick.a || !o.pick.b) return;
+    if (isDollFight(o)) {                                             // 🧸 인형끼리 — 셈은 doll-battle.js 가
+        tx(o._k, function (cur) {
+            if (!cur || cur.stage !== 'fight' || !cur.pick || !cur.pick.a || !cur.pick.b) return;
+            return window.DOLLBT.resolvePvp(cur);
+        });
+        return;
+    }
     const rolls = { a: { rune: rnd(DMG.rune[0], DMG.rune[1]), skill: rnd(DMG.skill[0], DMG.skill[1]) },
                     b: { rune: rnd(DMG.rune[0], DMG.rune[1]), skill: rnd(DMG.skill[0], DMG.skill[1]) } };
     tx(o._k, function (cur) {
@@ -669,7 +769,7 @@ function fightResolve(o) {
 const settling = {};
 function settleSweep() {
     const me = u_();
-    if (!me) return;
+    if (!me || PV.running) return;                                    // 🧸 전투 화면이 끝나는 걸 보여 준 뒤에
     Object.keys(live).forEach(function (k) {
         const o = live[k];
         if (!o || o.stage !== 'done') return;
@@ -689,9 +789,13 @@ function settle(o, side) {
     const stakeMine = mine.stake, stakeTheirs = theirs.stake;
     const nm = nickOf(me, mine.pet);
     const sname = function (s) { return s ? (s.k === 'rune' ? tagR(s.n) + ' 룬' : s.n) : '없음'; };
+    const dollFight = !!(mine.doll && theirs.doll);
     const why = o.why === 'forfeit' ? (won ? '상대가 기권했습니다.' : '기권했습니다.')
               : o.why === 'away' ? (won ? '상대가 자리를 비워 기권 처리됐습니다.' : '자리를 오래 비워 기권 처리됐습니다.')
+              : dollFight ? (won ? '상대 인형의 체력이 먼저 다 닳았습니다.' : '내 인형의 체력이 먼저 다 닳았습니다.')
               : (won ? '상대 주인의 체력이 먼저 다 닳았습니다.' : '내 체력이 먼저 다 닳았습니다.');
+    // 🧸 인형이 입은 상처는 그대로 — 글에 적힌 체력을 인형에게
+    if (dollFight) { try { const D = D_(), d = D.dolls(me)[String(mine.pet)]; if (d && Math.round(D.hpOf(d)) !== Math.round(Number(mine.doll.hp) || 0)) D.patchDoll(String(mine.pet), { hp: Math.max(0, Math.round(Number(mine.doll.hp) || 0)) }, me); } catch (e) { } }
     // 먹였던 룬은 전투 한 번을 치른 것으로 — 일곱 번이면 깨진다 (pet-rune.js wear · 2026-11-07)
     let broke = [];
     try { broke = R().wear(mine.pet) || []; } catch (e) { }
@@ -710,11 +814,12 @@ function settle(o, side) {
     shut(); shownTag = '';
     const w = box(head('⚔ 인형 배틀 — ' + (won ? '이겼습니다' : '졌습니다'), esc(why))
         + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
-        + hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false)
+        + (dollFight ? dollHpBar('내 ' + nm + ' 체력', mine.doll, true) + dollHpBar(theirs.name + ' 사원의 ' + nickOf(userOf(theirs.code) || {}, theirs.pet) + ' 체력', theirs.doll, false)
+                     : hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false))
         + '<div style="font-size:11px; color:#e8d7b4; line-height:1.7; margin:9px 0;">'
         + (won ? '받은 것 — <b style="color:#ffcf8f;">' + esc(sname(stakeTheirs)) + '</b>'
                : '잃은 것 — <b style="color:#ff8a80;">' + esc(sname(stakeMine)) + '</b><br><span style="color:#ff8a80;">가두리에 한 시간 갇힙니다.</span>')
-        + '<br><span style="color:#8d8578;">' + esc(nm) + josa(nm, '은') + ' 멀쩡합니다. 먹인 룬은 전투 한 번을 치렀습니다' + (broke.length ? ' — ' + esc(broke.map(tagR).join(' · ')) + ' 룬이 깨졌습니다' : '') + '.</span></div>'
+        + '<br><span style="color:#8d8578;">' + (dollFight ? esc(nm) + josa(nm, '이') + ' 입은 상처는 그대로입니다 (수선소). ' : esc(nm) + josa(nm, '은') + ' 멀쩡합니다. ') + '먹인 룬은 전투 한 번을 치렀습니다' + (broke.length ? ' — ' + esc(broke.map(tagR).join(' · ')) + ' 룬이 깨졌습니다' : '') + '.</span></div>'
         + '<button id="bt-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
     w.querySelector('#bt-x').onclick = shut;
 }
@@ -765,7 +870,7 @@ setInterval(function () { try { if (ready() && watching) tick(); } catch (e) { }
 window.PETBATTLE = {
     all: function () { return live; }, mine: mineLive, side: sideOf, other: other, logs: logArr,
     on: function (fn) { if (typeof fn === 'function' && hooks.indexOf(fn) < 0) hooks.push(fn); },
-    HP: HP, MOD: MOD
+    HP: HP, MOD: MOD, isDollFight: isDollFight, pv: PV
 };
 
 window.petBattleState = function () {

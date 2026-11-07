@@ -114,6 +114,31 @@ function fromDoll(id) {
     const s = M.stats(d);
     return { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d) };
 }
+// 🔺 야생 인형의 등급 — 내가 앞세울 인형의 등급을 꼭짓점으로 한 피라미드 (2026-11-07 사용자 「등급 차이가 너무 나버리면 안 되니까」)
+//   같은 등급 40 · 한 단계 아래 25 · 한 단계 위 20 · 두 단계 아래 8 · 두 단계 위 5 · 세 단계 1 — 범위 밖은 버리고 남은 몫으로 뽑는다
+const PYR = { 0: 40, '-1': 25, 1: 20, '-2': 8, 2: 5, '-3': 1, 3: 1 };
+function leadGrade(u) {
+    const M = D();
+    let best = -1, lead = -1;
+    try {
+        M.withList(u).forEach(function (id) {
+            const d = M.dolls(u)[id]; if (!d) return;
+            const gi = M.gradeIdx(M.stats(d).g);
+            if (lead < 0 && M.hpOf(d) > 0) lead = gi;
+            if (gi > best) best = gi;
+        });
+    } catch (e) { }
+    return lead >= 0 ? lead : (best >= 0 ? best : 0);
+}
+function pyramidGrade(u) {
+    const M = D(), G = M.GRADES, c = leadGrade(u);
+    const w = G.map(function (_, i) { return PYR[String(i - c)] || 0; });
+    let sum = 0; w.forEach(function (x) { sum += x; });
+    if (!sum) return M.rollGrade();
+    let r = Math.random() * sum;
+    for (let i = 0; i < G.length; i++) { r -= w[i]; if (r < 0) return G[i]; }
+    return G[c];
+}
 function wildFoe(o) {
     const M = D(), u = u_();
     let sp = o.sp;
@@ -123,7 +148,7 @@ function wildFoe(o) {
         try { mine = Object.keys(window.PET.pets(u)).filter(function (k) { return window.PET.BY[k]; }); } catch (e) { }
         sp = (mine.length && Math.random() < 0.4) ? Number(pick(mine)) : (1 + Math.floor(Math.random() * 25));
     }
-    const g = o.g || (o.tut ? 'D' : M.rollGrade());
+    const g = o.g || (o.tut ? 'D' : pyramidGrade(u));
     const lv = o.lv || (o.tut ? 1 : 1 + Math.floor(Math.random() * 3));
     const fake = { sp: sp, g: g, lv: lv };
     const s = M.stats(fake);
@@ -1200,11 +1225,213 @@ async function partyEnd(r, o) {
     return r;
 }
 
+// ==========================================
+// ⚔ 인형 배틀 — 사원 대 사원 (pet-battle.js 가 판을 쥔다 · 2026-11-07 사용자 「펫 배틀 시에도 출몰처럼 상대 펫과 내 펫이 겨룰 수 있게」)
+// ==========================================
+//   판 (petBattle/<열쇠>) = { a: { doll }, b: { doll }, round, first, pick: { a, b }, play: { 판: [지문…] }, log: [요약…] }
+//   둘 다 고르면 어느 화면이든 트랜잭션으로 한 판을 푼다 (resolvePvp). 지문(play)은 두 화면이 같은 연출로 보여 준다.
+//   고르는 것 — a0~a2 · d0~d1 (동물 스킬) · rn:i (먹인 룬으로 친다) · rd:i (먹인 룬으로 막는다 — 상대 룬 공격의 속성을 이기면 1/3)
+//   싸우는 것은 **인형**이다 — 인형 체력이 먼저 다 닳는 쪽이 진다. 끝나면 인형 체력은 그대로 적힌다 (수선소).
+function arrOf(v) { return Array.isArray(v) ? v : (v && typeof v === 'object') ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; }
+function fromSnap(d, id) {
+    return { id: id, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: Number(d.hp) || 0, max: d.max, atk: d.atk, def: d.def, eva: d.eva, crit: d.crit, sk: skills(d.sp), bond: d.bond, runes: arrOf(d.runes), runeN: arrOf(d.runeN) };
+}
+function resolvePvp(cur) {
+    if (!cur || cur.stage !== 'fight' || !cur.pick || !cur.pick.a || !cur.pick.b || !cur.a || !cur.b || !cur.a.doll || !cur.b.doll) return;
+    const round = Number(cur.round) || 1;
+    if (cur.play && cur.play[round]) return;
+    const S = { a: JSON.parse(JSON.stringify(cur.a.doll)), b: JSON.parse(JSON.stringify(cur.b.doll)) };
+    const nmOf = function (s) { return S[s].nick || D().spName(S[s].sp); };
+    const order = cur.first === 'b' ? ['b', 'a'] : ['a', 'b'];
+    const play = [], flat = arrOf(cur.log).filter(Boolean);
+    const guards = {}, runeDef = {};
+    const RT = window.PETRUNE;
+    order.forEach(function (s) {
+        const k = String(cur.pick[s] || 'a0');
+        if (k.charAt(0) === 'd') { const s1 = skills(S[s].sp).d[Number(k.slice(1))]; const t = s1 ? (T().DEF[s1[1]] || {}) : {}; if (s1 && !t.heal) guards[s] = t; }
+        else if (k.indexOf('rd:') === 0) runeDef[s] = arrOf(S[s].runes)[Number(k.slice(3))] || null;
+    });
+    let done = false;
+    for (let i = 0; i < order.length && !done; i++) {
+        const s = order[i], t = s === 'a' ? 'b' : 'a', d = S[s], e = S[t];
+        if (d.hp <= 0) continue;
+        const nm = nmOf(s), en = nmOf(t), sk = skills(d.sp);
+        let k = String(cur.pick[s] || 'a0');
+        if (k.charAt(0) === 'd') {
+            const s1 = sk.d[Number(k.slice(1))] || sk.d[0], tt = T().DEF[s1[1]] || {};
+            play.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: s });
+            if (tt.heal) { d.hp = Math.min(d.max, d.hp + Math.round(d.max * tt.heal)); play.push({ t: fmt(pick(TX.heal), { a: nm }), heal: s, hp: d.hp }); }
+            else play.push({ t: nm + D().josa(nm, '이') + ' 자세를 잡았다. (' + ((T().NAME || {})[s1[1]] || '') + ')' });
+            continue;
+        }
+        if (k.indexOf('rd:') === 0) {
+            const rn = runeDef[s];
+            play.push({ t: nm + D().josa(nm, '이') + ' ' + (rn && RT ? RT.tag(rn) : '룬') + ' 룬을 들어 막을 채비를 했다.', a: s });
+            continue;
+        }
+        if (k.indexOf('rn:') === 0) {
+            const rn = arrOf(d.runes)[Number(k.slice(3))];
+            if (rn) {
+                const rtag = RT ? RT.tag(rn) : rn;
+                play.push({ t: fmt(pick(TX.use), { a: nm, m: rtag + ' 룬' }), a: s });
+                let dm = Math.max(1, Math.round((d.atk * 1.45 * 1.6 - (e.def || 0) * 0.6) * rnd(0.92, 1.08) * (Math.random() * 100 < (d.crit || 5) + 20 ? 1.5 : 1)));
+                const blocked = !!(runeDef[t] && RT && RT.beats(runeDef[t], rn));
+                if (blocked) dm = Math.max(1, Math.ceil(dm / 3));
+                e.hp = Math.max(0, e.hp - dm);
+                play.push({ t: (blocked ? en + D().josa(en, '이') + ' 룬으로 받아 넘겼다! (피해 1/3) ' : '') + fmt(pick(TX.hit), { a: nm, d: en }) + ' (' + dm + ')', hit: t, hp: e.hp });
+                flat.push({ r: round, who: s, atk: rn, dmg: dm, blocked: blocked });
+                if (e.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: en }), ko: t }); done = true; }
+                continue;
+            }
+            k = 'a0';
+        }
+        const s1 = sk.a[Number(k.slice(1))] || sk.a[0];
+        play.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: s });
+        const r = strike(d, e, s1[1], guards[t]);
+        if (!r.hit) { play.push({ t: fmt(pick(TX.miss), { a: nm, d: en }) }); flat.push({ r: round, who: s, atk: 'skill', dmg: 0, blocked: false }); continue; }
+        e.hp = Math.max(0, e.hp - r.dmg);
+        play.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: en })) + ' (' + r.dmg + ')', hit: t, hp: e.hp });
+        if (r.eff > 1) play.push({ t: pick(TX.great) }); else if (r.eff < 1) play.push({ t: pick(TX.weak) });
+        flat.push({ r: round, who: s, atk: 'skill', dmg: r.dmg, blocked: !!(guards[t] && guards[t].take) });
+        if (r.drain && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.drain); play.push({ t: nm + D().josa(nm, '이') + ' 기운을 조금 빨아들였다!', heal: s, hp: d.hp }); }
+        const g = guards[t];
+        if (g && g.reflect && e.hp > 0) {
+            const back = Math.max(1, Math.round(r.dmg * g.reflect));
+            d.hp = Math.max(0, d.hp - back);
+            play.push({ t: en + D().josa(en, '이') + ' 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', hit: s, hp: d.hp });
+        }
+        if (e.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: en }), ko: t }); done = true; }
+        else if (d.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: nm }), ko: s }); done = true; }
+    }
+    cur.a.doll = S.a; cur.b.doll = S.b;
+    cur.a.hp = S.a.hp; cur.b.hp = S.b.hp;
+    cur.log = flat;
+    cur.play = cur.play || {}; cur.play[round] = play;
+    cur.pick = null;
+    if (done) { cur.stage = 'done'; cur.winner = (S.a.hp > 0) ? 'a' : 'b'; cur.why = 'hp'; cur.endAt = Date.now(); }
+    else { cur.round = round + 1; cur.first = (cur.first === 'b') ? 'a' : 'b'; cur.roundAt = Date.now(); }
+    return cur;
+}
+//   o = { side, loc, names: { a, b }, get() 지금 판, pick(k), waitPlay(round) → Promise(지문 | null) }
+async function pvpFight(o) {
+    if (B) return { res: 'busy' };
+    const v0 = o.get();
+    if (!v0 || !v0.a || !v0.b || !v0.a.doll || !v0.b.doll) return { res: 'gone' };
+    const side = o.side, osd = side === 'a' ? 'b' : 'a';
+    const ui = build(o.loc || 'plaza');
+    B = { ui: ui, foe: fromSnap(v0[osd].doll, 'foe'), me: fromSnap(v0[side].doll, 'me'), out: {}, cache: {}, kind: 'pvp', pick: null, mates: {} };
+    ui.ov.addEventListener('pointerdown', onTap);
+    paintFoe(false); paintMe(); paintStat();
+    await enterFx(ui, false);
+    await sleep(60);
+    ui.gF.style.transform = 'translateX(0)'; ui.gM.style.transform = 'translateX(0)';
+    await sleep(750);
+    await say((o.names[osd] || '상대') + ' 사원의 ' + B.foe.name + D().josa(B.foe.name, '이') + ' 나섰다!', 1500);
+    showStat(true, false);
+    await say(fmt(pick(TX.go), { a: B.me.name }), 1000);
+    await whiteIn('me'); showStat(true, true);
+    let lastPlayed = 0;
+    for (;;) {
+        const v = o.get();
+        if (!B) return { res: 'gone' };
+        if (!v || (v.stage !== 'fight' && v.stage !== 'done')) return pvpEnd({ res: 'gone' });
+        const r = Number(v.round) || 1;
+        if (v.stage === 'fight' && !(v.pick && v.pick[side])) {
+            B.ui.txt.textContent = (Math.random() < 0.3) ? fmt(pick(TX.idle), { a: B.me.name }) : (B.me.name + D().josa(B.me.name, '은') + ' 무엇을 할까?');
+            const k = await pvpPick(o, v);
+            if (!B) return { res: 'gone' };
+            if (k) o.pick(k);
+        }
+        menu(0);
+        B.ui.txt.textContent = '상대가 고르기를 기다리는 중…';
+        const pl = await o.waitPlay(r);
+        if (!B) return { res: 'gone' };
+        if (!pl) { const v3 = o.get(); if (v3 && v3.stage === 'done') return pvpEnd({ res: v3.winner === side ? 'win' : 'lose' }); return pvpEnd({ res: 'gone' }); }
+        if (lastPlayed !== r) {
+            lastPlayed = r;
+            for (let i = 0; i < pl.length; i++) {
+                const e = pl[i];
+                if (!B) return { res: 'gone' };
+                if (e.a) await lunge(e.a === side ? 'me' : 'foe');
+                if (e.hit) { const who = e.hit === side ? 'me' : 'foe'; await blink(who); (who === 'me' ? B.me : B.foe).hp = e.hp; paintStat(); await sleep(450); }
+                if (e.heal) { (e.heal === side ? B.me : B.foe).hp = e.hp; paintStat(); }
+                if (e.ko) await faintFx(e.ko === side ? 'me' : 'foe');
+                await say(e.t, e.ko ? 1400 : 1100);
+            }
+        }
+        const v2 = o.get();
+        if (v2 && v2.stage === 'done') {
+            const won = v2.winner === side;
+            if (won && B.me) await say(fmt(pick(TX.win), { a: B.me.name }), 1200);
+            return pvpEnd({ res: won ? 'win' : 'lose' });
+        }
+    }
+}
+function pvpPick(o, v) {
+    return new Promise(function (resolve) {
+        const me = B.me;
+        const loop = async function () {
+            if (!B) return resolve(null);
+            menu(1);
+            const k = await wait();
+            if (!B) return resolve(null);
+            if (k === 'run') {
+                menu(3);
+                const box = el('div', 'menu');
+                box.innerHTML = '<div style="font-size:9px;color:#e8d7b4;margin:2px 0 6px">결투에서 물러서면 진 것으로 — 건 것을 잃고 가두리 한 시간</div><button data-k="give">정말 기권한다</button><button data-k="back">아니, 계속한다</button>';
+                B.ui.st.appendChild(box);
+                Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+                    b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+                    b.onclick = function (ev) { ev.stopPropagation(); fadeRm(box); menu(0); if (b.dataset.k === 'back') loop(); else { try { o.forfeit(); } catch (e) { } resolve(null); } };
+                });
+                return;
+            }
+            if (k === 'bag') {
+                menu(3);
+                const RT = window.PETRUNE;
+                const rl = me.runes || [], rn = me.runeN || [];
+                const box = el('div', 'menu');
+                box.innerHTML = rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
+                    + rl.map(function (r, i) { return '<button data-k="rd:' + i + '">🛡 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 막는다 <small style="color:#524173">— 상대 룬 공격의 속성을 이기면 1/3</small></button>'; }).join('')
+                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">' + (rl.length ? '먹인 룬은 전투 ' + (RT ? RT.WEAR_MAX : 7) + '번이면 깨진다' : '먹인 룬이 없다 — 룬은 인형 칸에서 먹인다') + '</div><button data-k="back">돌아간다</button>';
+                B.ui.st.appendChild(box);
+                Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+                    b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+                    b.onclick = function (ev) { ev.stopPropagation(); fadeRm(box); menu(0); if (b.dataset.k === 'back') loop(); else resolve(b.dataset.k); };
+                });
+                return;
+            }
+            const sk = me.sk;
+            AT.atk.forEach(function (_, i) { const s1 = sk.a[i]; q('.ska' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
+            AT.def.forEach(function (_, i) { const s1 = sk.d[i]; q('.skd' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
+            B.ui.txt.textContent = me.name + D().josa(me.name, '은') + ' 무엇을 쓸까? (위 셋은 공격 · 아래 둘은 방어)';
+            menu(2);
+            const k2 = await wait();
+            if (!B) return resolve(null);
+            if (k2 === 'back') return loop();
+            menu(0);
+            resolve(k2);
+        };
+        loop();
+    });
+}
+async function pvpEnd(r) {
+    if (!B) return r;
+    menu(0);
+    const ov = B.ui.ov;
+    await exitFx(B.ui);
+    window.removeEventListener('resize', B.ui.fit);
+    ov.remove();
+    B = null; tapNow = null;
+    return r;
+}
+
 window.DOLLBT = {
     wild: function (o) { o = o || {}; return begin({ kind: 'wild', loc: o.loc || 'wild', tut: !!o.tut, foe: wildFoe(o) }); },
     monster: function (o) { o = o || {}; return begin({ kind: 'mon', loc: o.loc || 'arcade', foe: monFoe(o.mon != null ? o.mon : 9) }); },
     busy: function () { return !!B; },
-    party: partyFight, resolve: resolveRound, foeFor: foeFor, xpFor: xpFor, MUL: MUL
+    party: partyFight, resolve: resolveRound, foeFor: foeFor, xpFor: xpFor, MUL: MUL,
+    pvp: pvpFight, resolvePvp: resolvePvp, pyramidGrade: pyramidGrade
 };
 window.dollBattleTest = function (mon) {
     if (!D() || !D().isAdmin()) { console.warn('상담사만'); return; }
