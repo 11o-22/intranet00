@@ -27,7 +27,7 @@
 const OV = 'dbt-ov';
 const W = 314, H = 685;
 const D = function () { return window.DOLL; };
-const BG = { wild: 'wild', arcade: 'arcade', plaza: 'plaza', casino: 'casino', dfront: 'dfront', dream: 'dream', post: 'post', gate: 'gate', bureau: 'bureau', dshop: 'dshop' };
+const BG = { wild: 'wild', arcade: 'arcade', garden: 'garden', plaza: 'plaza', casino: 'casino', dfront: 'dfront', dream: 'dream', post: 'post', gate: 'gate', bureau: 'bureau', dshop: 'dshop' };   // garden — 🏚 첫번째 여정(저택) 전투 (2026-11-07)
 const WILD = '따라쟁이 봉제인형';
 const CATCH = { D: 0.85, C: 0.65, B: 0.45, A: 0.28, S: 0.14 };
 const XP = { wild: 8, mon: 10, boss: 25 };
@@ -177,7 +177,11 @@ function css() {
         '#dbt-ov .bob{animation:dbbob 1.3s ease-in-out infinite}',
         '#dbt-ov .bob2{animation:dbbob 1.3s ease-in-out -.65s infinite}',
         '@keyframes dbbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}',
-        '@keyframes dbwob{0%,100%{transform:rotate(0)}25%{transform:rotate(-24deg)}75%{transform:rotate(24deg)}}'
+        '@keyframes dbwob{0%,100%{transform:rotate(0)}25%{transform:rotate(-24deg)}75%{transform:rotate(24deg)}}',
+        // 🎀 포옹 리본 — 주신 그림 (doll/ribbon.webp · 2026-11-07) · 날아가며 빙글 돈다
+        '#dbt-ov .rib{position:absolute;width:30px;height:18px;background:url(doll/ribbon.webp) no-repeat;background-size:30px 18px;image-rendering:pixelated;pointer-events:none;transform-origin:50% 50%}',
+        '#dbt-ov .rib i{display:block;width:100%;height:100%}',
+        '@keyframes dbspin{to{transform:rotate(720deg)}}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -799,11 +803,24 @@ async function throwRibbon() {
     const M = D(), u = u_(), f = B.foe;
     if (!M.bagAdd(M.ITEM.RIBBON, -1, u)) { await say('포옹 리본이 없다!', 1000); return 'back'; }
     await say(fmt(pick(TX.ribbon), { d: f.name }), 1000);
-    const rb = fx('🎀', [40, 330], 900);
-    rb.style.fontSize = '20px';
-    await sleep(30);
-    rb.style.left = (AT.foe.cx - 10) + 'px'; rb.style.top = (AT.foe.foot - 40) + 'px';
-    await sleep(470);
+    // 던진다 — 내 쪽(왼쪽 아래)에서 상대 머리 위로 포물선 · 빙글 돌며
+    const rb = el('div', 'rib', 'left:40px;top:300px;animation:dbspin .6s linear 1');
+    B.ui.st.appendChild(rb);
+    const x0 = 40, y0 = 300, x1 = AT.foe.cx - 15, y1 = AT.foe.foot - 46;
+    const t0 = performance.now(), DUR = 560;
+    await new Promise(function (res) {
+        const step = function (t) {
+            if (!B) return res();
+            const k = Math.min(1, (t - t0) / DUR);
+            rb.style.left = Math.round(x0 + (x1 - x0) * k) + 'px';
+            rb.style.top = Math.round(y0 + (y1 - y0) * k - 70 * Math.sin(k * Math.PI)) + 'px';
+            if (k < 1) requestAnimationFrame(step); else res();
+        };
+        requestAnimationFrame(step);
+    });
+    rb.style.animation = '';
+    await sleep(60);
+    rb.remove();
     B.ui.foe.style.transform = 'scale(.1)'; B.ui.foe.style.opacity = '0';
     await say(fmt(pick(TX.wrap), { d: f.name }), 1100);
     // 잡힐 몫 — 등급이 높을수록 · 체력이 많을수록 어렵다
@@ -812,8 +829,9 @@ async function throwRibbon() {
     if (B.tut) p = 1;
     const ok = Math.random() < p;
     const wob = ok ? 3 : 1 + Math.floor(Math.random() * 3);
-    const sit = fx('🎀', [AT.foe.cx - 10, AT.foe.foot - 26], 4000);
-    sit.style.transition = 'none'; sit.style.fontSize = '20px';
+    const sit = el('div', 'rib', 'left:' + (AT.foe.cx - 15) + 'px;top:' + (AT.foe.foot - 28) + 'px');
+    B.ui.st.appendChild(sit);
+    setTimeout(function () { sit.remove(); }, 4000);
     for (let i = 0; i < wob; i++) { sit.style.animation = 'dbwob .5s 1'; await sleep(560); sit.style.animation = ''; await sleep(260); }
     if (!ok) {
         sit.remove();

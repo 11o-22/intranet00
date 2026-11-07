@@ -31,12 +31,12 @@ const D = function () { return window.DOLL; };
 const OV = 'ds-ov';
 const SPD = 93;                     // 1초에 몇 칸(그림 원래 크기) 걷나 — 62 × 1.5 (2026-11-07 사용자 「캐릭터 이동 속도를 1.5배」)
 const STEP = 26;                    // 튜토리얼 — 오브제 뒤를 이만큼 걸으면 바로 나온다
-// ★ 출몰지 조우 — 500~700 걸음에 한 번 (2026-11-07 사용자 「확률적이게 · 한 500~700번 걸어야 한 번 나오는 정도로」)
-//   걸음 하나 = 캐릭터 발걸음 하나 — 걷기 그림 한 바퀴(6칸 × 0.12초)에 두 걸음 → SPD 62 로 약 22칸
-//   출몰지 어디를 걸어도 센다. 몇 걸음째에 나올지는 500~700 사이에서 그때그때 정하고,
+// ★ 출몰지 조우 — 몇십 걸음에 한 번 (2026-11-07 사용자 「확률적이게」 · 처음 500~700 → 20~30)
+//   걸음 하나 = 캐릭터 발걸음 하나 — 걷기 그림 한 바퀴(6칸 × 0.12초)에 두 걸음 → 약 0.36초 걸은 거리
+//   출몰지 어디를 걸어도 센다. 몇 걸음째에 나올지는 ENC_STEPS 사이에서 그때그때 정하고,
 //   다 채우면 다음에 수상한 장소(수풀 · 잡동사니 뒤)를 밟을 때 나온다. 센 걸음은 이 기기에 적어 둔다 (나갔다 와도 이어서).
 const FOOT = SPD * 0.36;
-const ENC_STEPS = [500, 700];
+const ENC_STEPS = [20, 30];         // 2026-11-07 사용자 — 500~700 → 20~30 걸음
 const K_STEP = [1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1];
 
 // ==========================================
@@ -49,13 +49,15 @@ const SC = {
     wild: {
         n: '봉제인형 출몰지', img: 'doll/wild.webp', ob: 'doll/wild-ob.webp', w: 1536, h: 512, band: [40, 372], body: 46, bt: 'wild',
         zoom: 0.68,                                      // 2026-11-07 사용자 「출몰지 배경 너무 확대 되어서 좀 줌 아웃」
-        lines: [                                         // 위층(길) + 오른쪽 지하 — 왼쪽 지하는 뺐다 (2026-11-07 사용자)
-            [[0, 219], [530, 219], [588, 243], [650, 243], [785, 243], [805, 243], [845, 222], [1305, 222], [1536, 222]],
-            [[785, 243], [872, 313], [1180, 313], [1305, 222]]
+        lines: [                                         // 길 · 지하 둘 · 오른쪽 덱 (광장 방 dwild 와 같다 · 2026-11-07)
+            [[0, 219], [530, 219], [588, 243], [650, 243], [785, 243], [805, 243], [845, 222], [1025, 222], [1290, 222], [1536, 222]],
+            [[30, 315], [565, 315], [650, 243]],
+            [[785, 243], [872, 313], [1180, 313], [1290, 222]],
+            [[1025, 222], [1105, 135], [1530, 135]]
         ],
         zones: [
             { x: [131, 377], y: 219 }, { x: [1024, 1197], y: 222 }, { x: [1225, 1287], y: 222 }, { x: [1321, 1494], y: 222 },
-            { x: [858, 934], y: 313 }, { x: [1010, 1112], y: 313 }     // 오른쪽 지하 (왼쪽 지하 것은 뺐다 · 2026-11-07)
+            { x: [26, 128], y: 315 }, { x: [216, 308], y: 315 }, { x: [415, 517], y: 315 }, { x: [858, 934], y: 313 }, { x: [1010, 1112], y: 313 }
         ],
         spots: [
             // 2026-11-07 사용자 「우체국 - 출몰지 - 도깨비공방 - 재관국」 (이 맵은 튜토리얼 때만 — 평소에는 광장 방 dwild)
@@ -99,12 +101,21 @@ const SC = {
         start: { door: [385, 400] }
     },
     arcade: {
-        n: '매직버니 아케이드존', img: 'doll/arcade.webp', w: 1536, h: 512, band: [45, 365], body: 50, bt: 'arcade', dark: 1, vision: 86,
+        n: '매직버니 아케이드존', img: 'doll/arcade.webp', w: 1536, h: 512, band: [45, 365], body: 50, bt: 'arcade', dark: 1, vision: 86, party: 1,
         lines: [ [[20, 333], [95, 333], [1495, 333]] ],
         spots: [ { x: 95, y: 333, n: '나간다', i: '🚪', act: 'arcadeQuit' } ],
-        mons: [ { x: 236 }, { x: 543 }, { x: 834 }, { x: 1135 } ],
+        mons: [ { x: 236, y: 333 }, { x: 543, y: 333 }, { x: 834, y: 333 }, { x: 1135, y: 333 } ],
         boss: { x: 1385, y: 300, at: 1290 },
         start: { spawn: [80, 333] }
+    },
+    // 🏚 첫번째 여정 — 버려진 저택 (주신 그림 · 2026-11-07 「어둠(여정)은 저걸로」) · 전투 배경은 정원(bt/garden)
+    manor: {
+        n: '첫번째 여정', img: 'doll/manor.webp', w: 1536, h: 512, band: [45, 365], body: 50, bt: 'garden', dark: 1, vision: 86, party: 1,
+        lines: [ [[20, 326], [95, 326], [1495, 326]] ],
+        spots: [ { x: 95, y: 326, n: '나간다', i: '🚪', act: 'arcadeQuit' } ],
+        mons: [ { x: 236, y: 326 }, { x: 543, y: 326 }, { x: 834, y: 326 }, { x: 1135, y: 326 } ],
+        boss: { x: 1385, y: 300, at: 1290 },
+        start: { spawn: [80, 326] }
     }
 };
 
@@ -278,7 +289,7 @@ function open(key, at, opt) {
     ov.innerHTML = '<div class="ds-world"><img class="ds-bg" alt=""></div>'
         + '<div class="ds-top"><span class="nm"></span><span class="sp"></span><button class="ds-x" title="나간다">✕</button></div>'
         + '<div class="ds-sys"><span style="opacity:0"></span></div><div class="ds-flash"></div>';
-    const keepTut = run && run.tut, keepArc = (opt.arc !== undefined) ? opt.arc : (run && key === 'arcade' ? run.arc : null);
+    const keepTut = run && run.tut, keepArc = (opt.arc !== undefined) ? opt.arc : (run && sc.party ? run.arc : null);
     run = { key: key, sc: sc, el: ov, world: ov.querySelector('.ds-world'), path: [], face: -1, trail: [], encAcc: 0, encOff: Date.now() + 1500,
             tut: opt.tut || keepTut || null, arc: keepArc, busy: false, last: 0, npcEl: null, tags: [], pt: opt.party || null, mates: {} };
     ov.querySelector('.nm').textContent = '📍 ' + (opt.title || sc.n);
@@ -296,7 +307,7 @@ function open(key, at, opt) {
     makeDoll();
     paintSpots();
     if (sc.dark) makeVision();
-    if (key === 'arcade') arcadePaint();
+    if (sc.party) arcadePaint();
     tick();
     try { if (window.DOLL && DOLL.sweep) DOLL.sweep(); } catch (e) { }
     setTimeout(function () { onEnter(key, opt); }, 60);
@@ -322,7 +333,7 @@ function onResize() {
         const k0 = run.k;
         layout();
         if (run.k !== k0) makeMe();
-        makeDoll(); paintSpots(); if (run.sc.dark) makeVision(); if (run.key === 'arcade') arcadePaint();
+        makeDoll(); paintSpots(); if (run.sc.dark) makeVision(); if (run.sc.party) arcadePaint();
         paintNpc();
     }, 150);
 }
@@ -484,7 +495,7 @@ function canWalk() { return !!(run && !busy() && !(run.pt && (!run.pt.lead() || 
 // 🕹 조이스틱 — 출몰지 · 여정(아케이드) (2026-11-07 사용자 「이동 시에 조이스틱 … 여정이랑 출몰지」)
 //   광장과 같다 — 화면 아무 데나 짚고 끌면 짚은 자리가 한가운데인 손잡이가 뜨고, 민 쪽으로 민 만큼 빠르게 걷는다.
 //   끝까지 민 뒤에는 한가운데가 손가락을 따라온다. 톡 치면 전처럼 그 자리로 걸어간다.
-const JOY_MAPS = { wild: 1, arcade: 1 };
+const JOY_MAPS = { wild: 1, arcade: 1, manor: 1 };
 const J_DEAD = 14, J_REACH = 62;
 // 손을 뗀 곳이 맵 밖(전투 화면 · 말 창)이어도 놓은 것으로 — 전투가 끝난 뒤 저절로 걸어가지 않게
 let STOP_IN = null;
@@ -693,7 +704,7 @@ function onMove(d) {
             encSave(o);
             encounter();
         }
-    } else if (run.key === 'arcade') {
+    } else if (run.sc.party) {
         arcadeCheck();
     }
 }
@@ -1113,7 +1124,7 @@ function onEnter(key, opt) {
     if (key === 'wild' && !t.done && (t.step === 'go-wild' || t.step === 'wild-go')) { tutWild(); return; }
     if (key === 'gong' && !t.done && t.step === 'caught') { tutGong(); return; }
     if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(▶)에 먼저 들러 보세요.', 4500);
-    if (key === 'arcade' && run.pt && !opt.resume) {
+    if (run.sc.party && run.pt && !opt.resume) {
         // 판 소식(dollRun)이 아직 안 왔으면 첫 말이 비어 있다 — 올 때까지 잠깐 기다린다
         const r0 = run;
         let n = 0;
@@ -1378,7 +1389,8 @@ function leave() { close(); toPlazaRoom(null, null); }
 const API = {
     talk: talk, ask: ask, sys: sys, flash: flash, sleep: sleep, run: function () { return run; },
     open: open, close: close, makeDoll: makeDoll, npcJump: npcJump,
-    partySync: partySync, fightStart: fightStart, fightEnd: fightEnd, leave: leave
+    partySync: partySync, fightStart: fightStart, fightEnd: fightEnd, leave: leave,
+    sc: function (k) { return SC[k] || null; }
 };
 window.DOLLSCENE = API;
 window.dollRepaint = function () {
@@ -1425,9 +1437,11 @@ function plazaRooms() {
     };
     return {
         dwild: { n: '봉제인형 출몰지', img: '../doll/wild.webp', ob: '../doll/wild-ob.webp', w: rr(1536, W), h: rr(512, W), cut: 0, k: 1, pix: 1, doll: W,
-                 // 위층(길) + 오른쪽 지하(872~1180)와 그 양쪽 계단 — 왼쪽 지하는 뺐다 (2026-11-07 사용자)
-                 floor: [rr(212, W), rr(246, W)], floor2: [rr(309, W), rr(320, W)], x2: [rr(872, W), rr(1180, W)],
-                 stairs: [ st(W, 785, 246, 872, 309), st(W, 1180, 309, 1305, 246) ],
+                 // 길 + 지하 둘(왼쪽 30~565 · 오른쪽 872~1180 · 사이는 못 밟는다) + 오른쪽 위층 덱(1100~1530) — 계단은 그림에서 쟀다 (2026-11-07 사용자 화살표)
+                 floor: [rr(212, W), rr(246, W)],
+                 floor2: [rr(309, W), rr(320, W)], x2: [rr(30, W), rr(1180, W)], x2gap: [[rr(565, W), rr(872, W)]],
+                 floor0: [rr(122, W), rr(148, W)], x0: [rr(1100, W), rr(1530, W)],
+                 stairs: [ st(W, 565, 309, 650, 246), st(W, 790, 246, 872, 309), st(W, 1180, 309, 1290, 246), st(W, 1025, 212, 1105, 148) ],
                  left: 'post', right: 'dgfront', spots: [] },
         dgfront: { n: '도깨비 공방 앞', img: '../doll/gfront.webp', w: rr(470, F), h: rr(512, F), cut: 0, k: 1, pix: 1, doll: F,
                  floor: [rr(210, F), rr(226, F)], floor2: [rr(312, F), rr(322, F)], x2: [rr(138, F), rr(332, F)],
@@ -1500,7 +1514,7 @@ function enterRoom(room, w) {
     if (k === 'gong' && (t.step === 'caught' || t.step === 'gong')) { BR.hold = room; open('gong', 'door'); return; }
     sys(k === 'wild' ? '수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방 앞(▶)에 먼저 들러 보세요.' : '도깨비 공방 앞에서 도깨비를 먼저 만나 보세요.', 4500);
 }
-// 출몰지 — 걸음을 세다가 500~700 걸음이 차면 다음 수상한 장소에서 (위 onMove 와 같은 셈)
+// 출몰지 — 걸음을 세다가 ENC_STEPS 걸음이 차면 다음 수상한 장소에서 (위 onMove 와 같은 셈)
 function wildStep(w) {
     if (!tutOf().done) { BR.last = null; return; }
     const k = 'wild', x = w.x / RS[k], y = w.y / RS[k];

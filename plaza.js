@@ -2164,7 +2164,7 @@ function carryNote(cm) {
     run.seg = best;
     run.x = Math.max(xr2[0], Math.min(xr2[1], run.x));
     run.y = segY(r, best, run.x, gy);
-    run.lv = (run.seg === 'dn') ? 1 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0);
+    run.lv = (run.seg === 'dn') ? 1 : (run.seg === 'tp' ? 2 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0));
     run.me.zOver = null;
     run.hox = 0; run.hoT = null; run.wasC = null;
     run.tx = null; run.ty = null; run.tseg = null;
@@ -2937,12 +2937,21 @@ setInterval(function () {
 //   · 계단 밖에서는 지금 있는 층의 띠 안에만 머문다.
 //   · 옆 방으로 넘어갈 때는 **있던 층 그대로** 간다. 지하에서 옆으로 가면
 //     그쪽 지하로 나온다 (지하도 좌우로 이어져 있다).
+// ★ 층 — 0 길(floor) · 1 지하(floor2 · x2) · 2 위층 덱(floor0 · x0 — 🧸 봉제인형 출몰지 · 2026-11-07)
+//   계단은 양 끝의 y 로 어느 띠와 닿는지 안다 (윗끝 y = 위 띠 아랫변 · 아랫끝 y = 아래 띠 윗변)
 function bandOf(r, lv) {
-    return (lv === 1 && r.floor2) ? r.floor2 : r.floor;
+    if (lv === 1 && r.floor2) return r.floor2;
+    if (lv === 2 && r.floor0) return r.floor0;
+    return r.floor;
 }
+function stairTop(s) { return (s.y0[0] < s.y0[1]) ? { x: s.x[0], y: midY([s.y0[0], s.y1[0]]) } : { x: s.x[1], y: midY([s.y0[1], s.y1[1]]) }; }
+function stairBot(s) { return (s.y0[0] < s.y0[1]) ? { x: s.x[1], y: midY([s.y0[1], s.y1[1]]) } : { x: s.x[0], y: midY([s.y0[0], s.y1[0]]) }; }
+// 계단 윗끝이 닿는 띠 ('tp' · 'up') · 아랫끝이 닿는 띠 ('up' · 'dn')
+function stairHi(r, s) { return (r.floor0 && stairTop(s).y <= r.floor[0] - 1) ? 'tp' : 'up'; }
+function stairLo(r, s) { return (r.floor2 && stairBot(s).y >= r.floor[1] + 1) ? 'dn' : 'up'; }
 function stairAt(r, x) {
     const st = r.stairs;
-    if (!st || !st.length || !r.floor2) return null;
+    if (!st || !st.length) return null;
     for (let i = 0; i < st.length; i++) {
         if (x >= st[i].x[0] && x <= st[i].x[1]) return st[i];
     }
@@ -2964,6 +2973,7 @@ function downOf(r) {
 }
 
 function lvAt(r, y) {
+    if (r.floor0 && y < (r.floor0[1] + r.floor[0]) / 2) return 2;
     if (!r.floor2) return 0;
     const mid = (r.floor[1] + r.floor2[0]) / 2;
     return y >= mid ? 1 : 0;
@@ -3007,13 +3017,15 @@ function stairTopX(s) { return (s.y0[0] < s.y0[1]) ? s.x[0] : s.x[1]; }
 function segList(r) {
     const out = ['up'];
     if (r.floor2 && r.x2) out.push('dn');
-    (r.stairs || []).forEach(function (_, i) { if (r.floor2) out.push(i); });
+    if (r.floor0 && r.x0) out.push('tp');
+    (r.stairs || []).forEach(function (_, i) { if (r.floor2 || r.floor0) out.push(i); });
     return out;
 }
-// 띠로 된 선인가 — 길·지하는 띠(위아래로 다닌다), 계단은 선
+// 띠로 된 선인가 — 길·지하·덱은 띠(위아래로 다닌다), 계단은 선
 function segBand(r, seg) {
     if (seg === 'dn') return r.floor2;
     if (seg === 'up') return r.floor;
+    if (seg === 'tp') return r.floor0;
     return null;
 }
 // 그 선(띠) 위의 y. 띠면 **지금 y 를 띠 안으로 자른 값**, 선이면 선의 y.
@@ -3024,11 +3036,18 @@ function segY(r, seg, x, y) {
 }
 function segX(r, seg) {
     if (seg === 'dn') return [r.x2[0], r.x2[1]];
+    if (seg === 'tp') return [r.x0[0], r.x0[1]];
     if (typeof seg === 'number') return [r.stairs[seg].x[0], r.stairs[seg].x[1]];
     return [P.EDGE, r.w - P.EDGE];
 }
-// 깊이 — 길 0 · 계단 1 · 지하 2 (어느 쪽으로 갈아타야 하는지 셀 때)
-function segDeep(seg) { return seg === 'up' ? 0 : (seg === 'dn' ? 2 : 1); }
+// 깊이 — 덱 -2 · 덱 계단 -1 · 길 0 · 계단 1 · 지하 2 (어느 쪽으로 갈아타야 하는지 셀 때)
+function segDeep(seg, r) {
+    if (seg === 'up') return 0;
+    if (seg === 'dn') return 2;
+    if (seg === 'tp') return -2;
+    r = r || roomOf();
+    return (r && r.stairs && r.stairs[seg] && stairHi(r, r.stairs[seg]) === 'tp') ? -1 : 1;
+}
 
 // 선 끝에서 **y 가 맞닿는** 다른 선 (계단 아랫끝 ↔ 지하처럼)
 function nextSeg(r, seg, x) {
@@ -3036,6 +3055,7 @@ function nextSeg(r, seg, x) {
     let best = null, bd = 60;
     segList(r).forEach(function (o) {
         if (o === seg) return;
+        if (segBand(r, seg) && segBand(r, o)) return;          // 띠끼리는 맞닿지 않는다 (덱 ↔ 길이 바로 붙지 않게)
         const xr = segX(r, o);
         if (x < xr[0] - 1 || x > xr[1] + 1) return;
         const d = Math.abs(segY(r, o, Math.max(xr[0], Math.min(xr[1], x)), y) - y);
@@ -3048,22 +3068,23 @@ function nextSeg(r, seg, x) {
 function wayX(r, seg, want) {
     if (seg === want) return null;
     const st = r.stairs || [];
-    if (seg === 'up') {                       // 길 → 계단·지하 : 가까운 계단 윗끝
-        if (typeof want === 'number') return stairTopX(st[want]);
-        let bx = null, bd = 1e9;
-        st.forEach(function (s) {
-            const d = Math.abs(stairTopX(s) - run.x);
-            if (d < bd) { bd = d; bx = stairTopX(s); }
-        });
-        return bx;
+    const nearest_ = function (list) { let bx = null, bd = 1e9; list.forEach(function (x) { const d = Math.abs(x - run.x); if (d < bd) { bd = d; bx = x; } }); return bx; };
+    if (seg === 'up') {
+        if (typeof want === 'number') return (stairHi(r, st[want]) === 'tp') ? stairBot(st[want]).x : stairTop(st[want]).x;
+        if (segDeep(want, r) < 0)             // 길 → 덱 : 덱 계단의 아랫끝
+            return nearest_(st.filter(function (x) { return stairHi(r, x) === 'tp'; }).map(function (x) { return stairBot(x).x; }));
+        return nearest_(st.filter(function (x) { return stairLo(r, x) === 'dn'; }).map(function (x) { return stairTop(x).x; }));   // 길 → 지하 : 계단 윗끝
     }
     if (seg === 'dn') {                       // 지하 → 계단·길 : 가까운 계단 아랫끝
         const xr = segX(r, 'dn');
         return (Math.abs(run.x - xr[0]) <= Math.abs(run.x - xr[1])) ? xr[0] : xr[1];
     }
+    if (seg === 'tp') {                       // 덱 → 아래 : 가까운 덱 계단 윗끝
+        if (typeof want === 'number' && stairHi(r, st[want]) === 'tp') return stairTop(st[want]).x;
+        return nearest_(st.filter(function (x) { return stairHi(r, x) === 'tp'; }).map(function (x) { return stairTop(x).x; }));
+    }
     const s = st[seg];                        // 계단 → 위면 윗끝, 아래면 아랫끝
-    const top = stairTopX(s);
-    return (segDeep(want) < 1) ? top : (top === s.x[0] ? s.x[1] : s.x[0]);
+    return (segDeep(want, r) < segDeep(seg, r)) ? stairTop(s).x : stairBot(s).x;
 }
 
 // 띠에서 다른 선으로 넘어갈 때 **어느 깊이로** 걸어 나가야 하나.
@@ -3071,34 +3092,46 @@ function wayX(r, seg, want) {
 function wayY(r, seg, want) {
     const b = segBand(r, seg);
     if (!b) return null;
-    return (segDeep(want) > segDeep(seg)) ? b[1] : b[0];
+    return (segDeep(want, r) > segDeep(seg, r)) ? b[1] : b[0];
 }
 
 // 한 칸 움직인 뒤 — 선을 갈아타고, x 를 자르고, y 를 선 위에 얹는다
 function segStep(r, vdir) {
-    if (!r.floor2 || !(r.stairs || []).length) {       // 층이 하나인 방
+    if ((!r.floor2 && !r.floor0) || !(r.stairs || []).length) {       // 층이 하나인 방
         run.seg = 'up'; run.lv = 0;
         const xr0 = segX(r, 'up');
         run.x = Math.max(xr0[0], Math.min(xr0[1], run.x));
         run.y = segY(r, 'up', run.x, run.y);
         return;
     }
-    if (run.seg == null || (typeof run.seg === 'number' && !r.stairs[run.seg])) {
-        run.seg = (run.lv === 1) ? 'dn' : 'up';
+    if (run.seg == null || (typeof run.seg === 'number' && !r.stairs[run.seg]) || (run.seg === 'dn' && !r.floor2) || (run.seg === 'tp' && !r.floor0)) {
+        run.seg = (run.lv === 1 && r.floor2) ? 'dn' : ((run.lv === 2 && r.floor0) ? 'tp' : 'up');
     }
 
-    // ① 위아래로 밀었다 — **띠 아랫변까지 걸어 나간 뒤**에 계단으로 내려선다.
-    //   띠 안에서는 그냥 앞뒤로 걷는다 (tick 이 y 를 민다). 아랫변에 닿고도
-    //   더 밀면, 그때 계단 윗끝이 가까우면 계단을 탄다.
-    //   계단 윗끝 y 가 띠 아랫변과 같아서 갈아탈 때 위아래로 안 튄다.
-    if (vdir > 0 && run.seg === 'up' && run.y >= r.floor[1] - 0.8) {
+    // ① 위아래로 밀었다 — **띠 아랫변(윗변)까지 걸어 나간 뒤**에 계단으로 내려선다(올라선다).
+    //   띠 안에서는 그냥 앞뒤로 걷는다 (tick 이 y 를 민다). 변에 닿고도
+    //   더 밀면, 그때 계단 끝이 가까우면 계단을 탄다.
+    //   계단 끝 y 가 띠 변과 같아서 갈아탈 때 위아래로 안 튄다.
+    //   ★ 덱(floor0)이 있으면 — 길에서 위로 밀어 덱 계단 아랫끝에 서면 올라가고, 덱에서 아래로 밀어 계단 윗끝에 서면 내려온다 (2026-11-07)
+    const bandSeg = segBand(r, run.seg) ? run.seg : null;
+    if (bandSeg && vdir > 0 && run.y >= segBand(r, bandSeg)[1] - 0.8) {
         for (let i = 0; i < r.stairs.length; i++) {
-            const tx = stairTopX(r.stairs[i]);
+            if (stairHi(r, r.stairs[i]) !== bandSeg) continue;
+            const tx = stairTop(r.stairs[i]).x;
             if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = i; run.x = tx; break; }
         }
+    } else if (bandSeg && vdir < 0 && run.y <= segBand(r, bandSeg)[0] + 0.8) {
+        for (let i = 0; i < r.stairs.length; i++) {
+            if (stairLo(r, r.stairs[i]) !== bandSeg) continue;
+            const bx = stairBot(r.stairs[i]).x;
+            if (Math.abs(run.x - bx) <= JOIN_X) { run.seg = i; run.x = bx; break; }
+        }
     } else if (vdir < 0 && typeof run.seg === 'number') {
-        const tx = stairTopX(r.stairs[run.seg]);
-        if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = 'up'; run.x = tx; }
+        const s = r.stairs[run.seg], tx = stairTop(s).x;
+        if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = stairHi(r, s); run.x = tx; }
+    } else if (vdir > 0 && typeof run.seg === 'number') {
+        const s = r.stairs[run.seg], bx = stairBot(s).x;
+        if (Math.abs(run.x - bx) <= JOIN_X) { run.seg = stairLo(r, s); run.x = bx; }
     }
 
     // ② 선 끝을 넘었다 — 맞닿은 선으로 건너간다 (계단 아랫끝 ↔ 지하)
@@ -3114,8 +3147,10 @@ function segStep(r, vdir) {
     // ③ 선(띠) 위에 얹는다
     const xr2 = segX(r, run.seg);
     run.x = Math.max(xr2[0], Math.min(xr2[1], run.x));
+    // 지하가 둘로 나뉜 방 (🧸 출몰지) — 사이 빈 자리(x2gap)는 못 밟는다 · 가까운 끝에 선다
+    if (run.seg === 'dn' && r.x2gap) r.x2gap.forEach(function (g) { if (run.x > g[0] && run.x < g[1]) run.x = (run.x - g[0] < g[1] - run.x) ? g[0] : g[1]; });
     run.y = segY(r, run.seg, run.x, run.y);
-    run.lv = (run.seg === 'dn') ? 1 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0);
+    run.lv = (run.seg === 'dn') ? 1 : (run.seg === 'tp' ? 2 : (typeof run.seg === 'number' ? lvAt(r, run.y) : 0));
 }
 
 // 방 그림을 **세로로 화면에 꼭 맞춘다.**
@@ -3274,13 +3309,17 @@ function paintExits() {
         if (r.left)  mk('◀', 8, fy - 70);
         if (r.right || r.rightFn) mk('▶', r.w * z - 24, fy - 70);
     });
+    // 덱 계단 — 길에서 올라서는 자리(계단 아랫끝)에 표
+    (r.stairs || []).forEach(function (s) {
+        if (!r.floor0 || stairHi(r, s) !== 'tp') return;
+        mk('⇵', stairBot(s).x * z - 8, (r.floor[0] - 30) * z);
+    });
     // ★ ▲ ▼ 는 안 세운다 — 건물 안팎은 이제 **입구를 눌러야** 드나든다.
     //   화살표만 남으면 걸어가면 넘어가는 줄 알고 바닥 끝을 더듬게 된다.
     // 계단 — 내려가고 올라가는 자리
     (r.stairs || []).forEach(function (s) {
-        if (!r.floor2) return;
-        const t = (s.y0[0] < s.y0[1]) ? 0 : 1;            // 위쪽 끝이 어느 쪽인가
-        mk('⇵', (t ? s.x[1] : s.x[0]) * z - 8, (r.floor[1] - 4) * z);
+        if (!r.floor2 || stairLo(r, s) !== 'dn') return;
+        mk('⇵', stairTop(s).x * z - 8, (r.floor[1] - 4) * z);
     });
 }
 
@@ -3581,10 +3620,11 @@ function goRoom(key, way, lv) {
     //   건물 안팎을 드나들 때(up·down)는 그 방의 바닥으로 내려 세운다.
     if (way === 'left' || way === 'right') {
         if (run.lv === 1 && !r.floor2) run.lv = 0;          // 그쪽에 지하가 없으면 위층으로
+        if (run.lv === 2 && !r.floor0) run.lv = 0;          // 그쪽에 덱이 없으면 길로
     } else {
         run.lv = 0;
     }
-    if (lv != null) run.lv = (lv === 1 && r.floor2) ? 1 : 0;   // 집어서 보낸 층
+    if (lv != null) run.lv = (lv === 1 && r.floor2) ? 1 : ((lv === 2 && r.floor0) ? 2 : 0);   // 집어서 보낸 층
     const bnd = bandOf(r, run.lv);
 
     // 걸어간 쪽의 **반대편**에, 문턱 안쪽으로 들여 선다
@@ -3603,7 +3643,7 @@ function goRoom(key, way, lv) {
     }
 
     // ★ 선 위에 세운다 — 들어온 층의 선에 얹고, 그 선의 x 폭 안으로 자른다
-    run.seg = (run.lv === 1 && r.floor2 && r.x2) ? 'dn' : 'up';
+    run.seg = (run.lv === 1 && r.floor2 && r.x2) ? 'dn' : ((run.lv === 2 && r.floor0 && r.x0) ? 'tp' : 'up');
     segStep(r, 0);
     run.tx = null; run.tseg = null;
     run.warp = now();                       // 넘어간 직후에는 또 안 넘어간다
@@ -4145,7 +4185,7 @@ function goMate(r) {
         }
         const rr = R[room];
         if (room !== run.room) {
-            const lv = (rr.floor2 && at.y > (rr.floor[1] + rr.floor2[0]) / 2) ? 1 : 0;
+            const lv = lvAt(rr, at.y);
             run.forceInst = inst;
             goRoom(room, null, lv);
         } else {
@@ -6249,7 +6289,7 @@ window.plazaOpen = open;
 window.plazaGo = function (key, way, x, lv) {
     if (!run) { console.warn('광장에 들어와 있어야 합니다.'); return; }
     if (!R[key]) { console.warn('그런 방이 없습니다 —', Object.keys(R).join(' · ')); return; }
-    goRoom(key, way || null, (lv === 0 || lv === 1) ? lv : undefined);
+    goRoom(key, way || null, (lv === 0 || lv === 1 || lv === 2) ? lv : undefined);
     // 🕵️ 행맨 — 문으로 넘어가면 건너편 문 앞에 선다 (2026-11-03)
     if (x != null && run && run.room === key) {
         const r = R[key];
@@ -6281,7 +6321,7 @@ window.plazaState = function () {
     const r = roomOf();
     console.log('  지금 :', r.n, '(' + run.room + ')');
     console.log('  자리 :', Math.round(run.x) + ', ' + Math.round(run.y),
-        '· ' + (run.lv === 1 ? '지하' : '길') + ' 바닥 ' + bandOf(r, run.lv).join('~')
+        '· ' + (run.lv === 1 ? '지하' : run.lv === 2 ? '덱' : '길') + ' 바닥 ' + bandOf(r, run.lv).join('~')
         + (stairAt(r, run.x) ? ' · 계단 위' : '') + ' · 사람 ' + run.k + '배');
     const ns = Object.keys(run.peers);
     console.log('  같이 :', ns.length ? ns.map(function (c) {

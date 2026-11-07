@@ -36,12 +36,11 @@ const DAY = 3;
 const LOBBY_LIVE = 10 * 60 * 1000;
 const PICK_MS = 25000, FAIL_MS = 45000, WAIT_MEM = 15000;
 const GR5 = ['D', 'C', 'B', 'A', 'S'];
-const POS = [236, 543, 834, 1135];
-const BOSS_AT = { x: 1385, y: 300 };
+// 괴담 자리는 맵(doll-scene.js SC[맵].mons · boss)에서 — 여정마다 맵이 다르다 (j1 저택 manor · arc 아케이드)
 const J = {
-    j1:  { n: '첫번째 여정 - 주인을 찾아서.', ic: '🐾', mons: [0, 1, 2, 3], boss: 4, pay: 'P', base: 20000, gear: 0.35,
+    j1:  { n: '첫번째 여정 - 주인을 찾아서.', ic: '🐾', map: 'manor', bt: 'garden', mons: [0, 1, 2, 3], boss: 4, pay: 'P', base: 20000, gear: 0.35,
            d: '현관문이 열려 있었다. 주인의 냄새를 따라 나선 길 — 문틈손 · 젖은 신발 · 네발이 · 등불이, 그리고 마지막은 가짜 주인.' },
-    arc: { n: '매직버니 아케이드존', ic: '🎪', pool: [7, 8, 9, 11, 12, 13], boss: 10, pay: 'D', base: 500,
+    arc: { n: '매직버니 아케이드존', ic: '🎪', map: 'arcade', bt: 'arcade', pool: [7, 8, 9, 11, 12, 13], boss: 10, pay: 'D', base: 500,
            d: '불 꺼진 아케이드. 시야가 좁다. 길에 괴담 넷, 무대 위에 북 치는 토끼.\n⚠️ 지면 💤 꿈결을 모두 잃고 10분 동안 가두리에 갇힙니다.' }
 };
 
@@ -227,9 +226,11 @@ function leaveLobby(L) {
 // ==========================================
 const S = { runKey: null, ref: null, run: null, code: '', seenRun: {}, fightOn: null, waiters: [], applied: {}, lastX: 0, xT: 0, timer: null, ended: false };
 
+function sceneOf(j) { return (window.DOLLSCENE && DOLLSCENE.sc && DOLLSCENE.sc(J[j].map)) || { mons: [{ x: 236, y: 333 }, { x: 543, y: 333 }, { x: 834, y: 333 }, { x: 1135, y: 333 }], boss: { x: 1385, y: 300 } }; }
 function genMons(j) {
+    const sc = sceneOf(j);
     const pool = J[j].mons ? J[j].mons.slice() : J[j].pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 4);
-    return pool.map(function (i, n) { return { i: i, x: POS[n], y: 333 }; }).concat([{ i: J[j].boss, x: BOSS_AT.x, y: BOSS_AT.y, boss: 1 }]);
+    return pool.map(function (i, n) { const m = sc.mons[n] || sc.mons[sc.mons.length - 1]; return { i: i, x: m.x, y: m.y }; }).concat([{ i: J[j].boss, x: sc.boss.x, y: sc.boss.y, boss: 1 }]);
 }
 function start(j, diff, lobby) {
     const me = u_(), d = db_();
@@ -264,7 +265,7 @@ function enter(key) {
                 S.timer = setInterval(tick, 1000);
                 M().log('[🐾 여정] 『 ' + J[v.j].n + ' 』 난이도 ' + v.diff + ' — 떠났습니다.');
                 M().saveHist();
-                window.DOLLSCENE.open('arcade', 'spawn', { party: PT, title: J[v.j].n });
+                window.DOLLSCENE.open(J[v.j].map || 'arcade', 'spawn', { party: PT, title: J[v.j].n });
             });
         });
     });
@@ -334,7 +335,7 @@ function startFight(id) {
     try { window.DOLLSCENE.fightStart(); } catch (e) { }
     const v = S.run;
     window.DOLLBT.party({
-        code: S.code, lead: isLead(), loc: 'arcade',
+        code: S.code, lead: isLead(), loc: (J[v.j] && J[v.j].bt) || 'arcade',
         get: function () { return S.run; },
         pick: function (k) { const p = {}; p['fight/picks/' + S.code] = k; S.ref.update(p); },
         waitLog: function (round) {
@@ -554,7 +555,7 @@ setInterval(function () {
                 S.runKey = k; S.code = me.code; S.ended = false; S.applied = {};
                 S.ref = d.ref(RUN + '/' + k); S.ref.on('value', onRun);
                 clearInterval(S.timer); S.timer = setInterval(tick, 1000);
-                window.DOLLSCENE.open('arcade', 'spawn', { party: PT, title: J[v.j].n, resume: 1 });
+                window.DOLLSCENE.open(J[v.j].map || 'arcade', 'spawn', { party: PT, title: J[v.j].n, resume: 1 });
             });
         }).catch(function () { }).then(function () { S._scan = 0; });
     } catch (e) { }
