@@ -260,6 +260,12 @@ const DOT = {
     //     머리 바로 위 층에 깔고 머리와 같이 내린다. 여러 머리에 대 보니 볼 자리에 맞았다. 끝나면 걷는다.
     TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 6, blush: 'tk-blush' } },
     BLINK_SHUT: 3,
+    // ★ 벗기기 (2026-11-08 사용자 「기존에 있는 건 다른 사원이 해당 의상을 입은 사원을 건드렸을 때 [ 벗기기 ] 버튼이 나왔을 때에
+    //   7~12 프레임만 쓴 다음 그대로 아예 옷이 없어지게 해줘. (여성 체형.)」)
+    //   입은 장 이름 → 벗길 때 그 장 대신 까는 장. 서기 줄(7~12) 여섯 칸을 한 번 돌고, 끝나면 그 장을 걷는다.
+    //   red-bikini-off — 처음 주신 레드 비키비키니 그림(벗겨지는 그림)을 그대로 옮겨 둔 것. 서기 줄이 여성 체형 서기 칸과 맞는다.
+    //   광장(plaza.js 「벗기기」)이 dotActor 의 strip(칸) 으로 넘긴다.
+    STRIP: { 'red-bikini': { sheet: 'red-bikini-off' } },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -496,6 +502,8 @@ const DOT_SLOTS = [
             //   주신 그림은 1728x768 (칸 288) — 칸마다 가로 +30 으로 352 칸에 옮겼다. 여성 체형(body-w) 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다.
             //   owner — 상담사 + Owner 사원만 · fem — 몸이 여성 체형일 때만 입는다 (look 이 다른 몸이면 안 그린다 · 옷장은 체형이 여성일 때만 고르게)
             //   alone — 입으면 다른 칸의 옷(상의 · 하의 · 구두 · 장갑 · 망토)은 고른 채로 두고 안 그린다 (악세는 그대로) · 서기 여섯 칸을 돈다 (FLAP_COLS)
+            //   ★ 2026-11-08 그림을 새로 주셔서 바꿨다 — 벗겨지지 않는 그림. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2).
+            //     처음 그림(벗겨지는 그림)은 red-bikini-off 로 남겨 남이 [ 벗기기 ] 할 때 쓴다 (D.STRIP · plaza.js)
             { i: 'rbikini', n: '레드 비키비키니', over: ['red-bikini'], owner: true, fem: true, alone: true },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
@@ -1008,6 +1016,19 @@ function look(user, override, all) {
     return { head: head, headPick: headPick, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
+// ★ 벗기기 (2026-11-08) — 다 벗겨진 사원이 제 옷을 다 벗는다 (체형 · 악세 · 머리 · 색은 그대로).
+//   벗겨지기 전에 레드 비키비키니(alone)가 다른 칸 옷을 안 그리고 있었으므로, 겉옷만 벗기면 잠옷 같은 것이 도로 나타난다
+//   — 그래서 옷 칸(상의 · 하의 · 겉옷 · 구두 · 장갑 · 망토)을 모두 「없음」으로 적는다. 광장은 plaza.js 가 다시 입힌다.
+window.dotUndress = function (user) {
+    const u = user || u_();
+    if (!u) return false;
+    const d = Object.assign({}, (u.dot && typeof u.dot === 'object') ? u.dot : {});
+    DOT_SLOTS.forEach(function (s) { if (!s.max && s.k !== 'shape') d[s.k] = ''; });
+    u.dot = d;
+    if (u === u_()) save({ dot: 1 });
+    try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { }
+    return true;
+};
 
 // 🍇 포도맛 물약 — 이 사람에게 지금 도는가 (넘겨받은 사람 자료의 timedEffects 만 본다.
 //   광장의 남은 자리 기록 dot 에 이미 바뀐 머리가 실려 오므로(plaza.js) 두 번 뒤집지 않는다)
@@ -1378,6 +1399,20 @@ function actor(user, opt) {
     let tk = null;
     // 지금 눈 감은 얼굴로 둘 칸인가 (TKS.shut 앞 · 1~6)
     const tkShut = function () { return !!(TKS && TKS.shut && tk != null && tk >= 0 && tk < TKS.shut); };
+    // ★ 벗기기 (2026-11-08 · D.STRIP) — 입은 장(레드 비키비키니)을 벗겨지는 장으로 갈아 끼우고 서기 칸 0~5 를 한 번 · 끝나면 그 장을 걷는다.
+    //   st — null 이면 벗기는 중이 아니다 · 0~5 이면 그 칸 · 'gone' 이면 다 벗겼다 (이 칸에서는 다시 안 입힌다).
+    //   벗기는 동안 몸판은 같은 서기 칸에 세우고(들썩임도 그 칸 몫) 다른 층도 서 있는 모습으로 — 그림이 서 있는 몸에 맞춰 그려져 있다.
+    const stAt = sheets.findIndex(function (s) { return !!(D.STRIP && D.STRIP[s]); });
+    const stripEl = stAt >= 0 ? els[stAt] : null;
+    const STS = stAt >= 0 ? D.STRIP[sheets[stAt]] : null;
+    if (STS) { try { const im = new Image(); im.src = tkSrc(STS.sheet); } catch (e) { } }   // 미리 받아 둔다
+    let st = null;
+    const stBob = function (col) {                       // 들썩이는 몸이면 머리 · 악세를 그 칸 몫만큼
+        if (!bob) return;
+        const v = (col == null) ? 0 : (bob.dy[col] || 0);
+        const t = v ? 'translateY(' + (v * k) + 'px)' : '';
+        bob.els.forEach(function (e) { e.style.transform = t; });
+    };
 
     // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다
     //   (한 장짜리도, 여러 장을 겹친 것도 있다 — 아래 장부터 차례로 깐다)
@@ -1438,6 +1473,11 @@ function actor(user, opt) {
             if (el === bodyEl) return;                      // 간지럽히는 동안 몸판은 tickle 이 칠한다
             if (el === head && tkShut()) { col = D.BLINK_SHUT; row = 1; }   // 1~6 동안은 눈 감은 얼굴 (깜빡임 시계가 칠해도)
             else if (row === 0) { col = 0; row = 1; }       // 걷거나 멈춰 세워도 옷은 서 있는 모습 — 간지럽히기 몸이 서 있는 그림이다
+        }
+        if (st != null && el === stripEl) return;            // 벗기는 장은 strip 이 칠한다 (다 벗긴 뒤에는 숨어 있다)
+        if (typeof st === 'number' && tk == null) {
+            if (el === bodyEl) { col = st; row = 1; }        // 몸은 벗겨지는 그림과 같은 서기 칸
+            else if (row === 0) { col = 0; row = 1; }        // 걷던 옷 · 머리도 서 있는 모습으로
         }
         el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
     };
@@ -1583,6 +1623,49 @@ function actor(user, opt) {
             });
         },
         facing: function () { return dir; },
+        // ★ 벗기기 (2026-11-08) — 벗길 수 있는 옷(D.STRIP)을 입었나 · 이 칸에서 이미 다 벗겼으면 거짓
+        strips: function () { return !!(stripEl && st !== 'gone'); },
+        // f — 벗겨지는 장 서기 줄의 몇 번째 칸(0~5) · 'gone' 이면 그 옷을 걷는다 · null 이면 원래대로
+        strip: function (f) {
+            if (!stripEl || !STS) return false;
+            if (f == null) {
+                if (st == null) return true;
+                st = null;
+                stripEl.style.display = '';
+                stripEl.style.backgroundImage = stripEl._stWas || stripEl.style.backgroundImage;
+                if (bob) { bob.lock = false; bob.v = NaN; }
+                stBob(null);
+                start();
+                return true;
+            }
+            if (f === 'gone') {
+                if (st === 'gone') return true;
+                st = 'gone';
+                stripEl.style.display = 'none';              // 옷이 아예 없어진다 — 다른 칸 옷은 원래 안 그리고 있었다 (alone)
+                if (bob) { bob.lock = false; bob.v = NaN; }
+                stBob(null);
+                start();                                    // 몸 · 머리를 원래 움직임으로
+                return true;
+            }
+            f = Math.max(0, Math.min(5, f | 0));
+            if (st === 'gone') return true;
+            if (st == null) {
+                if (idleEl) idleOff();
+                stripEl._stWas = stripEl.style.backgroundImage;
+                stripEl.style.backgroundImage = 'url("' + tkSrc(STS.sheet) + '")';
+                if (bob) bob.lock = true;
+                st = -1;
+                if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷 · 머리도 서 있는 칸으로
+            }
+            if (f === st) return true;
+            st = f;
+            stripEl.style.backgroundPosition = '-' + (f * D.W * k) + 'px -' + (D.H * k) + 'px';
+            if (tk == null) {
+                put(bodyEl, f, 1);                          // 몸은 벗겨지는 그림과 같은 서기 칸
+                stBob(f);                                   // 들썩이는 몸 — 머리 · 악세도 그 칸 몫만큼
+            }
+            return true;
+        },
         // ★ 간지럽히기 (2026-11-07) — 몸이 간지럽히기 장을 가졌나 (여성 체형)
         tickles: !!TKS,
         // f — 간지럽히기 장의 몇 번째 칸(0~11)을 깐다 · null 이면 풀고 원래 움직임으로 (D.TICKLE)

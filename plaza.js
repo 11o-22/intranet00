@@ -1496,6 +1496,106 @@ function tkHit(code) {
     });
 }
 
+// ==========================================
+// 벗기기 (2026-11-08 사용자)
+// ==========================================
+//
+//   「레드 비키비키니 이걸로 바꿔주고, 기존에 있는 건 다른 사원이 해당 의상을 입은 사원을 건드렸을 때 [ 벗기기 ] 버튼이
+//    나왔을 때에 7~12 프레임만 쓴 다음 그대로 아예 옷이 없어지게 해줘. (여성 체형.)」
+//
+//   · 벗길 수 있는 옷(closet.js D.STRIP — 레드 비키비키니 · 여성 체형에만 그려진다)을 입은 남을 누르면 [ 벗기기 ]
+//   · 누르면 모두의 화면에서 그 사원의 옷이 처음 그림(벗겨지는 그림)의 7~12 로 한 번 벗겨지고 (한 칸 ST_MS) 그대로 없어진다
+//   · 벗겨진 사원은 제 화면에서 옷 칸을 모두 「없음」으로 적는다 (closet.js dotUndress) — 옷장에서 다시 입으면 된다
+//
+//   plazaStrip/<사번> = { id, by: 벗긴 사람, bn: 그 이름, at }
+//   모두가 이 칸을 듣는다. 들어오기 전의 것(처음 받은 것)은 안 튼다.
+const ST_PATH = 'plazaStrip';
+const ST_MS = 300;                       // 7~12 한 칸 (서 있을 때 옷이 흔들리는 빠르기와 같다)
+const ST_ITEM = ['strip', '벗기기'];
+const STL = {};                          // 내 화면에서 도는 것 { id, t0, bn, done }
+let stT = 0;
+(function stListen() {
+    let on = false;
+    const seen = {};
+    const iv = setInterval(function () {
+        if (on || typeof database === 'undefined' || !database || !u_()) return;
+        on = true;
+        clearInterval(iv);
+        let first = true;
+        database.ref(ST_PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(v).forEach(function (c) {
+                const x = v[c];
+                if (!x || typeof x !== 'object' || !x.id) return;
+                if (seen[c] === x.id) return;
+                seen[c] = x.id;
+                if (!first) stHeard(c, x);
+            });
+            first = false;
+        });
+    }, 1000);
+})();
+function stHeard(c, v) {
+    if (!v || !v.id) return;
+    if (STL[c] && STL[c].id === v.id) return;
+    STL[c] = { id: v.id, t0: now(), bn: v.bn || '' };
+    if (!stT) stT = setInterval(stTick, 40);
+    stTick();
+}
+function stTick() {
+    const t = now();
+    let live = 0;
+    Object.keys(STL).forEach(function (c) {
+        const L = STL[c];
+        const f = Math.floor((t - L.t0) / ST_MS);
+        const one = tkOne(c);
+        const a = (one && one.actor && typeof one.actor.strip === 'function' && !one.wf) ? one.actor : null;
+        if (f < 6) { live++; if (a) a.strip(f); return; }
+        if (a) a.strip('gone');                               // 옷이 아예 없어진다
+        if (!L.done) { L.done = 1; if (c === myCode()) stUndress(L); }
+        // 벗은 모습이 다시 실려 올 때까지 조금 더 — 그사이 다시 만들어진 칸도 벗긴 채로 둔다
+        if (t - L.t0 < 6 * ST_MS + 6000) { live++; return; }
+        delete STL[c];
+    });
+    if (!live && stT) { clearInterval(stT); stT = 0; }
+}
+// 나 — 옷을 다 벗고 광장 모습을 다시 알린다 · 다 쓴 칸은 걷는다
+function stUndress(L) {
+    const me = u_();
+    if (!me) return;
+    try { if (typeof window.dotUndress === 'function') window.dotUndress(me); } catch (e) { }
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    sysLine('👙 ' + (L.bn || '누군가') + ' 사원이 레드 비키비키니를 벗겼습니다.');
+    try {
+        database.ref(ST_PATH + '/' + me.code).transaction(function (cur) {
+            if (!cur || cur.id !== L.id) return;
+            return null;
+        });
+    } catch (e) { }
+}
+// 메뉴에 넣을 것 — 남이고 · 벗길 수 있는 옷을 입었고 · 지금 벗기는 중이 아니면
+function stItem(code) {
+    if (!run || !code || code === myCode()) return [];
+    const q = run.peers && run.peers[code];
+    if (!q || !q.one || q.one.wf || !q.one.actor || typeof q.one.actor.strips !== 'function' || !q.one.actor.strips()) return [];
+    if (STL[code] && !STL[code].done) return [];
+    return [ST_ITEM];
+}
+function stDo(code) {
+    closeCarryMenu();
+    const me = u_(), d = db_();
+    if (!me || !d || !stItem(code).length) return;
+    const id = me.code + ':' + now();
+    const rec = { id: id, by: me.code, bn: nameOf(me), at: chatNow() };
+    d.ref(ST_PATH + '/' + code).transaction(function (cur) {
+        if (cur && cur.id && chatNow() - (Number(cur.at) || 0) < 6 * ST_MS + 3000) return;   // 방금 누가 벗기는 중
+        return rec;
+    }, function (err, ok) {
+        if (err || !ok) return;
+        stHeard(code, rec);                                   // 내 화면은 바로
+    });
+}
+
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
 //   남의 모습은 방 칸에 적힌 dot 한 덩이로만 온다. 소지 목록(wardrobe)은
@@ -2937,11 +3037,13 @@ function carryTap(cx, cy) {
         if (!items.length && !wfOf(me)) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
         wfBonkItem(big).forEach(function (x) { items.push(x); });
         tkItem(big).forEach(function (x) { items.push(x); });
+        stItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'tickle') { tkStart(big); return; }
+            if (k === 'strip') { stDo(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -2954,9 +3056,10 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { tkStart(any); return; }
+            if (k === 'strip') { stDo(any); return; }
             infoOpen(any);
         }, '');
     }
@@ -2969,11 +3072,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -2987,12 +3090,14 @@ function carryTap(cx, cy) {
     if (!items.length) sysLine('🍍 손도 머리 위도 자리가 없습니다.');
     wfBonkItem(pick).forEach(function (x) { items.push(x); });
     tkItem(pick).forEach(function (x) { items.push(x); });
+    stItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
         if (k === 'info') { infoOpen(pick); return; }
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
         if (k === 'tickle') { tkStart(pick); return; }
+        if (k === 'strip') { stDo(pick); return; }
         carryDo(pick, k);
     }, potion ? '🫙 ' : null);
 }
