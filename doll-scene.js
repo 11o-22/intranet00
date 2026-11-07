@@ -233,6 +233,10 @@ function css() {
         '#ds-ov .ds-talk.sys{border-color:#6fd3c4;color:#c8fff6}',
         '#ds-ov .ds-flash{position:absolute;inset:0;z-index:40000;pointer-events:none;background:#fff;opacity:0}',
         '#ds-ov .ds-ex{position:absolute;z-index:6100;transform:translate(-50%,-100%);font-size:18px;font-weight:bold;color:#ffe14d;text-shadow:0 0 3px #000,0 0 6px #000;pointer-events:none}',
+        // 🕹 조이스틱 — 짚은 자리에 뜬다 (끄는 동안만 · 광장 #plaza-stick 과 같은 모양)
+        '#ds-ov .ds-stick{position:absolute;z-index:15000;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;pointer-events:none;border:2px solid rgba(232,226,214,.20);background:rgba(10,10,14,.16);opacity:0;transition:opacity .13s}',
+        '#ds-ov .ds-stick.on{opacity:1}',
+        '#ds-ov .ds-stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(232,226,214,.28);border:1px solid rgba(232,226,214,.42);box-shadow:0 2px 10px rgba(0,0,0,.45)}',
         '@keyframes dsnx{0%,100%{opacity:.3}50%{opacity:1}}',
         '@keyframes dsbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%)}}',
         '@keyframes dsjump{0%{transform:translateY(0)}30%{transform:translateY(-40%)}60%{transform:translateY(0)}75%{transform:translateY(-14%)}100%{transform:translateY(0)}}'
@@ -468,8 +472,35 @@ function walkTo(x, y, then) {
 //   ★ 2026-11-07 사용자 「움직이기 어려워서 개선」
 //     누른 채로 두면 손가락 쪽으로 계속 걷는다 (화면이 따라가므로 맵 끝까지) · 끌면 따라온다 · PC 는 방향키 · WASD
 function canWalk() { return !!(run && !busy() && !(run.pt && (!run.pt.lead() || !run.pt.ready()))); }
+// 🕹 조이스틱 — 출몰지 · 여정(아케이드) (2026-11-07 사용자 「이동 시에 조이스틱 … 여정이랑 출몰지」)
+//   광장과 같다 — 화면 아무 데나 짚고 끌면 짚은 자리가 한가운데인 손잡이가 뜨고, 민 쪽으로 민 만큼 빠르게 걷는다.
+//   끝까지 민 뒤에는 한가운데가 손가락을 따라온다. 톡 치면 전처럼 그 자리로 걸어간다.
+const JOY_MAPS = { wild: 1, arcade: 1 };
+const J_DEAD = 14, J_REACH = 62;
+// 손을 뗀 곳이 맵 밖(전투 화면 · 말 창)이어도 놓은 것으로 — 전투가 끝난 뒤 저절로 걸어가지 않게
+let STOP_IN = null;
+window.addEventListener('pointerup', function () { if (STOP_IN) try { STOP_IN(); } catch (e) { } }, true);
+window.addEventListener('pointercancel', function () { if (STOP_IN) try { STOP_IN(); } catch (e) { } }, true);
 function bindInput(ov) {
     let down = false, lastT = 0, holdIv = 0, at = null, toNpc = false, sx = 0, sy = 0;
+    let joy = false, ox = 0, oy = 0, stickEl = null;
+    const joyMap = function () { return !!(run && JOY_MAPS[run.key]); };
+    const stickOf = function () {
+        if (!stickEl || stickEl.parentNode !== ov) { stickEl = document.createElement('div'); stickEl.className = 'ds-stick'; stickEl.innerHTML = '<i></i>'; ov.appendChild(stickEl); }
+        return stickEl;
+    };
+    const drawStick = function (dx, dy, d) {
+        const st = stickOf(), r = ov.getBoundingClientRect();
+        st.style.left = Math.round(ox - r.left) + 'px'; st.style.top = Math.round(oy - r.top) + 'px';
+        const m = d ? Math.min(1, d / J_REACH) : 0;
+        st.firstChild.style.transform = 'translate(' + Math.round(d ? dx / d * J_REACH * m : 0) + 'px,' + Math.round(d ? dy / d * J_REACH * m : 0) + 'px)';
+        st.classList.add('on');
+    };
+    const joyOff = function () {
+        if (stickEl) stickEl.classList.remove('on');
+        if (run) { run.ax = 0; run.ay = 0; if (joy && !run.then) run.path = []; }    // 손을 떼면 그 자리에 선다
+        joy = false;
+    };
     const world = function (cx, cy) { const r = ov.getBoundingClientRect(); return toWorld(cx - r.left, cy - r.top); };
     const go = function (ev) {
         if (!run || busy()) return;
@@ -481,17 +512,19 @@ function bindInput(ov) {
         if (n) { try { if (window.DOLLGONG && DOLLGONG.prefetch) DOLLGONG.prefetch(n.act); } catch (e) { } walkTo(n.x, n.y, function () { act(n.act, n); }); return; }
         walkTo(w.x, w.y, null);
     };
-    const stop = function () { down = false; clearInterval(holdIv); holdIv = 0; };
+    const stop = function () { down = false; clearInterval(holdIv); holdIv = 0; joyOff(); };
+    STOP_IN = stop;
     ov.addEventListener('pointerdown', function (ev) {
         if (run && run.talkOn) return;               // 말 창은 제가 받는다
         if (ev.target.closest && ev.target.closest('.ds-top,.ds-spot')) return;
         down = true; lastT = Date.now(); at = { x: ev.clientX, y: ev.clientY }; sx = ev.clientX; sy = ev.clientY;
+        joy = false; ox = ev.clientX; oy = ev.clientY;
         go(ev);
         clearInterval(holdIv);
         const r0 = run;
         holdIv = setInterval(function () {
-            if (!down || !run || run !== r0) { stop(); return; }     // 맵이 바뀌면 손을 뗀 것으로
-            if (toNpc || !canWalk() || !at) return;
+            if (!down || !run || run !== r0) { if (!joy) stop(); return; }     // 맵이 바뀌면 손을 뗀 것으로 (조이스틱은 이어서)
+            if (joy || toNpc || !canWalk() || !at) return;
             const w = world(at.x, at.y);
             walkTo(w.x, w.y, null);
         }, 150);
@@ -499,6 +532,19 @@ function bindInput(ov) {
     ov.addEventListener('pointermove', function (ev) {
         if (!down) return;
         at = { x: ev.clientX, y: ev.clientY };
+        // 🕹 출몰지 · 여정 — 끌면 조이스틱
+        if (joyMap() && !toNpc) {
+            let dx = ev.clientX - ox, dy = ev.clientY - oy, d = Math.hypot(dx, dy);
+            if (joy || d >= J_DEAD) {
+                if (!canWalk()) { joyOff(); return; }
+                if (!joy) { joy = true; run.path = []; run.then = null; }
+                if (d > J_REACH) { ox += dx * (d - J_REACH) / d; oy += dy * (d - J_REACH) / d; dx = ev.clientX - ox; dy = ev.clientY - oy; d = J_REACH; }
+                const m = Math.min(1, (d - J_DEAD) / (J_REACH - J_DEAD));
+                run.ax = d ? dx / d * m : 0; run.ay = d ? dy / d * m : 0;
+                drawStick(dx, dy, d);
+                return;
+            }
+        }
         if (toNpc && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 24) toNpc = false;   // 사람을 누르고 끌면 그냥 걷기
         if (Date.now() - lastT < 120) return;
         lastT = Date.now();
@@ -527,6 +573,16 @@ window.addEventListener('keyup', function (ev) {
 }, true);
 window.addEventListener('blur', function () { Object.keys(KEYS).forEach(function (k) { delete KEYS[k]; }); });
 function keyWalk(t) {
+    // 🕹 조이스틱 — 민 쪽으로, 민 만큼 빠르게 (살짝 밀면 느리게)
+    const am = Math.hypot(run.ax || 0, run.ay || 0);
+    if (am > 0.01) {
+        run.spd = Math.max(0.35, am);
+        if (!canWalk() || t - (run.keyT || 0) < 100) return;
+        run.keyT = t;
+        walkTo(run.x + run.ax / am * 40, run.y + run.ay / am * 40, null);
+        return;
+    }
+    run.spd = 1;
     const dx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), dy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0);
     if (!dx && !dy) { if (run.keyOn) { run.keyOn = 0; if (!run.then) run.path = run.path.slice(0, 1); } return; }
     if (!canWalk() || t - (run.keyT || 0) < 110) return;
@@ -543,7 +599,7 @@ function tick(t) {
     keyWalk(t);
     let moved = 0;
     if (run.path.length && !run.talkOn && !run.busy) {
-        let left = SPD * dt;
+        let left = SPD * dt * (run.spd || 1);
         while (left > 0 && run.path.length) {
             const p = run.path[0];
             const dx = p[0] - run.x, dy = p[1] - run.y;
