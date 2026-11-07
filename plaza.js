@@ -1345,7 +1345,8 @@ setInterval(function () { try { if (run) wfBtnPaint(); } catch (e) { } }, 700);
 const TK_PATH = 'tickle';
 const TK_MAX = 40;
 const TK_SLOW = 220, TK_FAST = 50;      // 1~6 한 칸에 머무는 시간 — 첫 번째 · 39 번째
-const TK_END = 520;                     // 7~12 한 칸
+// 7~12 한 칸 · 몇 번 도나 (2026-11-07 사용자 「7로 넘어갈 때에 속도를 좀 늦춰주고 7~12로 가고 7~12를 한 번 더 반복하자」 — 520 → 700 · 한 번 → 두 번)
+const TK_END = 700, TK_END_ROUNDS = 2;
 const TK_IDLE = 2500;
 const TK_ITEM = ['tickle', '쑤시기'];   // 메뉴 이름 — 「간지럽히기」에서 바꿈 (2026-11-07 사용자 「이름만」)
 const TKR = {};                         // 서버에 적힌 것
@@ -1420,8 +1421,9 @@ function tkTick() {
         const L = TKL[c];
         if (!L || L.done) return;
         if (L.p2) {
-            const f = 6 + Math.floor((t - L.p2) / TK_END);
-            if (f > 11) {                                     // 12 까지 — 원래 모습으로
+            const k2 = Math.floor((t - L.p2) / TK_END);
+            const f = 6 + (k2 % 6);
+            if (k2 >= 6 * TK_END_ROUNDS) {                    // 7~12 를 TK_END_ROUNDS 번 — 원래 모습으로
                 L.done = 1;
                 tkPaint(c, null);
                 if (run && run.tkOn === c) run.tkOn = null;
