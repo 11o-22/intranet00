@@ -155,6 +155,9 @@ const SK = {
     24: { a: [['인분 흩뿌리기', 'sure'], ['날개 치기', 'multi'], ['더듬이 찌르기', 'pierce']],  d: [['바람에 흩어지기', 'dodge'], ['날개 접기', 'guard']] },
     25: { a: [['고성방가', 'sure'], ['부리 쪼기', 'multi'], ['날개 치기', 'hit']],             d: [['어깨 뒤로', 'dodge'], ['깃 고르기', 'heal']] }
 };
+// 🧸 따라쟁이 봉제인형(doll-battle.js)도 같은 스킬표를 쓴다 — 동물마다 공격 셋 · 방어 둘
+window.JOURNEY_SK = { SK: SK, ATK_T: ATK_T, DEF_T: DEF_T, T_NAME: T_NAME };
+
 
 // ==========================================
 // 여정 — 지금은 하나
@@ -420,6 +423,8 @@ function paint() {
         + '<div style="display:flex; gap:6px; margin-top:9px;">'
         + '<button id="jr-solo" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>혼자 떠난다</button>'
         + '<button id="jr-make" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>방을 만든다</button></div></div>'
+        // 🎪 매직버니 아케이드존 — 봉제인형이 동행하는 두 번째 여정 (doll-scene.js · 2026-11-07)
+        + (typeof window.dollArcadeCard === 'function' ? window.dollArcadeCard() : '')
         + '<div style="font-size:10px; color:#7f7898; margin-bottom:5px;">열린 방 — 같이 떠날 동료를 기다리는 중</div>'
         + (open.length ? open.map(function (o) {
             const ms = Object.keys(o.members).map(function (c) { return o.members[c]; });
@@ -429,6 +434,7 @@ function paint() {
         }).join('') : '<div style="font-size:10.5px; color:#5f5878; padding:6px 0 10px 0;">열린 방이 없습니다.</div>')
         + '<button id="jr-x" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">닫는다</button>');
     w.querySelector('#jr-x').onclick = shut;
+    const arc = w.querySelector('#jr-arcade'); if (arc) arc.onclick = function () { shut(); setTimeout(function () { window.dollArcadeOpen(); }, 60); };
     const solo = w.querySelector('#jr-solo'); if (solo) solo.onclick = function () { pickPet(function (key) { startRun([{ code: me.code, key: key }]); }); };
     const mk = w.querySelector('#jr-make'); if (mk) mk.onclick = function () { pickPet(function (key) { makeLobby(key); }); };
     Array.prototype.forEach.call(w.querySelectorAll('.jr-join'), function (b) { b.onclick = function () { const lb = live.lobby[b.dataset.k]; if (!lb) { paint(); return; } pickPet(function (key) { joinLobby(b.dataset.k, key); }, lb); }; });

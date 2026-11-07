@@ -468,7 +468,11 @@
       "special-cure.js",
       "mafia.js",
       "nuow-text.js",
-      "dot-portrait.js"
+      "dot-portrait.js",
+      "doll-data.js",
+      "doll-scene.js",
+      "doll-battle.js",
+      "doll-gong.js"
     ]
   ]
 }
