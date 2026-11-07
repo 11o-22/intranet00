@@ -255,7 +255,10 @@ const DOT = {
     //   광장(plaza.js 「간지럽히기」 · 메뉴 이름은 「쑤시기」)이 dotActor 의 tickle(칸) 으로 넘긴다.
     //   ★ shut — 이 칸 앞까지(1~6)는 눈 감은 얼굴로 둔다 (2026-11-07 사용자 「1~6 프레임 반복할 때에 눈 감고 있는 얼굴로 유지하자」)
     //     머리 장 서기 줄의 BLINK_SHUT 칸 — 재 보면 머리마다 깜빡임 넷째 칸(3)이 눈을 다 감은 칸이다. 7~12 는 다시 깜빡인다.
-    TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 6 } },
+    //   ★ blush — 쑤시는 동안(1~12)에만 얼굴 위에 까는 홍조 장 (2026-11-07 사용자 「쑤시기 상호작용 있을 때에만 이거 홍조 사용하자」)
+    //     주신 그림(1728 장)을 칸마다 +30 옮겨 tk-blush 로 — 서기 줄 여섯 칸이 같은 그림이라 서기 첫 칸에 세운다.
+    //     머리 바로 위 층에 깔고 머리와 같이 내린다. 여러 머리에 대 보니 볼 자리에 맞았다. 끝나면 걷는다.
+    TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 6, blush: 'tk-blush' } },
     BLINK_SHUT: 3,
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
@@ -1363,6 +1366,15 @@ function actor(user, opt) {
     const TKS = (D.TICKLE && D.TICKLE[L.body]) || null;
     const tkFol = TKS ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
     if (TKS) { try { const im = new Image(); im.src = tkSrc(TKS.sheet); } catch (e) { } }   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
+    // 홍조 (TKS.blush) — 머리 바로 위에 숨겨 깔아 두고, 쑤시는 동안만 보인다 · 머리와 같이 내린다
+    let blushEl = null;
+    if (TKS && TKS.blush && head) {
+        blushEl = layer(TKS.blush, k, null);
+        blushEl.style.display = 'none';
+        blushEl.style.backgroundPosition = '0px -' + (D.H * k) + 'px';      // 서기 줄 첫 칸 (여섯 칸이 같다)
+        box.insertBefore(blushEl, head.nextSibling);
+        tkFol.push(blushEl);
+    }
     let tk = null;
     // 지금 눈 감은 얼굴로 둘 칸인가 (TKS.shut 앞 · 1~6)
     const tkShut = function () { return !!(TKS && TKS.shut && tk != null && tk >= 0 && tk < TKS.shut); };
@@ -1581,6 +1593,7 @@ function actor(user, opt) {
                 tk = null;
                 bodyEl.style.backgroundImage = bodyEl._tkWas || '';
                 tkFol.forEach(function (e) { e.style.transform = ''; });
+                if (blushEl) blushEl.style.display = 'none';   // 홍조를 걷는다
                 if (bob) { bob.lock = false; bob.v = 0; }
                 if (head) put(head, 0, 1);                  // 감았던 눈을 뜬다 (화면 밖이라 start 가 안 칠해도)
                 start();                                    // 서기 · 걷기를 그때 모습으로 다시 돌린다
@@ -1592,6 +1605,7 @@ function actor(user, opt) {
                 bodyEl._tkWas = bodyEl.style.backgroundImage;
                 bodyEl.style.backgroundImage = 'url("' + tkSrc(TKS.sheet) + '")';
                 if (bob) bob.lock = true;
+                if (blushEl) blushEl.style.display = '';     // 쑤시는 동안만 홍조
                 tk = -1;
                 if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷도 서 있는 칸으로
             }
