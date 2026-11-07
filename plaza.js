@@ -6045,7 +6045,9 @@ function open() {
         stick.id = 'plaza-stick';
         stick.innerHTML = '<i></i>';
         ov.appendChild(stick);
+        let byMouse = false;                                  // ★ PC(마우스)에서는 조이스틱 그림을 안 띄운다 — 걷기는 그대로 (2026-11-07 사용자 「PC 로 진행할 때 방향키 화면에 뜨는 거 없애줘」)
         const draw = function (dx, dy, d) {
+            if (byMouse) return;
             stick.style.left = ox + 'px'; stick.style.top = oy + 'px';
             const m = d ? Math.min(1, d / REACH) : 0;
             const kx = d ? dx / d * REACH * m : 0, ky = d ? dy / d * REACH * m : 0;
@@ -6076,7 +6078,7 @@ function open() {
             if (!t.closest(GRAB)) return;                        // 단추·창 위에서는 안 걷는다
             if (t.closest('.plaza-spot, .plaza-keep')) return;   // 시설 표·얹어 둔 것
             id = e.pointerId; ox = e.clientX; oy = e.clientY; at = now();
-            drag = false; far = 0; hit = t;
+            drag = false; far = 0; hit = t; byMouse = (e.pointerType === 'mouse');
         });
         // ★ 끌기는 **창 전체**에서 듣는다. 붙잡기(setPointerCapture)는 안 쓴다.
         //

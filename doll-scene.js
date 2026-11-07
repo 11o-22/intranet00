@@ -503,13 +503,14 @@ window.addEventListener('pointerup', function () { if (STOP_IN) try { STOP_IN();
 window.addEventListener('pointercancel', function () { if (STOP_IN) try { STOP_IN(); } catch (e) { } }, true);
 function bindInput(ov) {
     let down = false, lastT = 0, holdIv = 0, at = null, toNpc = false, sx = 0, sy = 0;
-    let joy = false, ox = 0, oy = 0, stickEl = null;
+    let joy = false, ox = 0, oy = 0, stickEl = null, byMouse = false;   // ★ PC(마우스)에서는 조이스틱 그림을 안 띄운다 (2026-11-07 사용자)
     const joyMap = function () { return !!(run && JOY_MAPS[run.key]); };
     const stickOf = function () {
         if (!stickEl || stickEl.parentNode !== ov) { stickEl = document.createElement('div'); stickEl.className = 'ds-stick'; stickEl.innerHTML = '<i></i>'; ov.appendChild(stickEl); }
         return stickEl;
     };
     const drawStick = function (dx, dy, d) {
+        if (byMouse) return;
         const st = stickOf(), r = ov.getBoundingClientRect();
         st.style.left = Math.round(ox - r.left) + 'px'; st.style.top = Math.round(oy - r.top) + 'px';
         const m = d ? Math.min(1, d / J_REACH) : 0;
@@ -538,7 +539,7 @@ function bindInput(ov) {
         if (run && run.talkOn) return;               // 말 창은 제가 받는다
         if (ev.target.closest && ev.target.closest('.ds-top,.ds-spot')) return;
         down = true; lastT = Date.now(); at = { x: ev.clientX, y: ev.clientY }; sx = ev.clientX; sy = ev.clientY;
-        joy = false; ox = ev.clientX; oy = ev.clientY;
+        joy = false; ox = ev.clientX; oy = ev.clientY; byMouse = (ev.pointerType === 'mouse');
         go(ev);
         clearInterval(holdIv);
         const r0 = run;
