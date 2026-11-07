@@ -57,9 +57,9 @@ function build(u, view, w, h) {
     if (typeof window.dotSprite !== 'function' || !u) return wrap;
     const k = h / (V.y1 - V.y0);
     let el = null;
-    // ★ 사원증 · 정보 열람에는 체형을 안 쓴다 — 늘 기본 체형 (2026-11-06 사용자 「정보열람이나 사원증에는 여성 체형 안 뜨게」)
-    const plain = Object.assign({}, (u && u.dot) || {}, { shape: '' });
-    try { el = window.dotSprite(u, { pose: 'stand', scale: k, live: false, dot: plain }); } catch (e) { el = null; }
+    // ★ 체형도 그대로 — 옷장에서 고른 몸(여성 체형)으로 나온다 (2026-11-08 사용자 「사원 열람이나 내 정보에 이제 여성 체형도 뜨게」)
+    //   (2026-11-06 에는 기본 체형으로만 보였다 — shape 를 비워 넘겼었다)
+    try { el = window.dotSprite(u, { pose: 'stand', scale: k, live: false }); } catch (e) { el = null; }
     if (!el) return wrap;
     el.style.position = 'absolute';
     el.style.left = Math.round(w / 2 - V.cx * k) + 'px';
