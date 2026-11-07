@@ -15,9 +15,9 @@
 (function dollWalk() {
 'use strict';
 
-const SZ = 0.40;                 // 인형 키 — 사람 키의 몫
-const GAP = 62;                  // 주인 뒤 이만큼 (방 그림 px)
-const TRAIL = 80;
+const SZ = 0.20;                 // 인형 키 — 사람 키의 몫 (2026-11-07 사용자 「두 배 더 작게」 · 전에는 0.40)
+const GAP = 120;                 // 주인 뒤 이만큼 (방 그림 px · 「너무 붙어 있다」 → 전에는 62)
+const TRAIL = 120;
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function D() { return window.DOLL; }
