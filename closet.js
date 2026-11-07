@@ -142,6 +142,7 @@ const DOT = {
     //   땅에서 32px 떠 보인다. 광장과 옷장 둘 다 이만큼 내려 놓는다.
     FOOT: 32,
     BODY: 'body', BROWN_BODY: 'body-brown', BROWN_HEAD: 'h-brown',
+    FEM_BODY: 'body-w',                        // 여성 체형 몸 — fem 이 붙은 옷은 이 몸일 때만 입는다 (2026-11-07)
     ADMIN: 'kario0987',
     BLINK: [1900, 110, 110, 110, 110, 110],   // 머리 칸마다 머무는 시간
     FLAP: 300,                                 // 옷자락 나부끼는 빠르기
@@ -153,7 +154,7 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
@@ -228,6 +229,8 @@ const DOT = {
                  'sailor-bubble': [0, 1, 2, 3, 4, 5],
                  // 숏 드레스 (2026-11-04) — 서기 줄 여섯 칸에 나비가 날고 리본이 흔들린다 (몸은 첫 칸 그대로)
                  'sdress': [0, 1, 2, 3, 4, 5],
+                 // 레드 비키비키니 (2026-11-07) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다 · 여성 체형 몸과 같은 시계로 돈다
+                 'red-bikini': [0, 1, 2, 3, 4, 5],
                  // 여성 체형 (2026-11-06 사용자 「서있을 때 7번으로 고정 · 움직이게 그렸는데」) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다
                  'body-w': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
@@ -483,6 +486,11 @@ const DOT_SLOTS = [
             { i: 'sdress', n: '숏 드레스', over: ['sdress'], own: 'sdress', body: 'body-f', alone: true },
             { i: 'devil-m', n: '악마(남자)', over: ['devil-m'], own: 'devil-m', alone: true },
             { i: 'devil-f', n: '악마(여자)', over: ['devil-f'], own: 'devil-f', alone: true },
+            // ★ 레드 비키비키니 (2026-11-07 사용자 「Owner랑 상담사한테만 넣어 주고 여성 신체만 입을 수 있게 해줘. 이름은 레드 비키비키니. 겉옷 쪽에」)
+            //   주신 그림은 1728x768 (칸 288) — 칸마다 가로 +30 으로 352 칸에 옮겼다. 여성 체형(body-w) 몸에 대 보니 걷기 · 서기 열두 칸이 맞았다.
+            //   owner — 상담사 + Owner 사원만 · fem — 몸이 여성 체형일 때만 입는다 (look 이 다른 몸이면 안 그린다 · 옷장은 체형이 여성일 때만 고르게)
+            //   alone — 입으면 다른 칸의 옷(상의 · 하의 · 구두 · 장갑 · 망토)은 고른 채로 두고 안 그린다 (악세는 그대로) · 서기 여섯 칸을 돈다 (FLAP_COLS)
+            { i: 'rbikini', n: '레드 비키비키니', over: ['red-bikini'], owner: true, fem: true, alone: true },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -733,6 +741,12 @@ function items(slot, user) {
     return slot.items.filter(function (it) { return allowed(it, user); });
 }
 function slotOf(k) { return DOT_SLOTS.filter(function (s) { return s.k === k; })[0]; }
+// 이 체형(shape 칸의 열쇠)이 여성 체형 몸인가 — fem 옷을 고를 수 있나 (2026-11-07)
+function femShape(v) {
+    const s = slotOf('shape');
+    const it = s ? s.items.filter(function (x) { return x.i === (v || ''); })[0] : null;
+    return !!(it && it.body === D.FEM_BODY);
+}
 
 // ★ 여러 개 겹쳐 다는 칸(악세) — 적힌 한 줄을 목록으로 푼다
 //
@@ -893,6 +907,20 @@ function look(user, override, all) {
     if (!hd.solo && !hd.bare) {
         const bodyIt = chosen.filter(function (x) { return x.body && !x.shape; })[0] || chosen.filter(function (x) { return x.body; })[0];   // 옷의 몸 > 체형
         if (bodyIt) bodySheet = bodyIt.body;
+        // ★ 여성 체형에서만 입는 옷 (fem · 레드 비키비키니 · 2026-11-07) — 몸이 여성 체형이 아니면 안 그리고 alone 도 안 건다
+        //   (체형을 기본으로 돌렸거나 · 사원증 · 정보 열람처럼 늘 기본 몸으로 그리는 자리)
+        if (bodySheet !== D.FEM_BODY) {
+            for (let i = chosen.length - 1; i >= 0; i--) {
+                const x = chosen[i];
+                if (!x.fem) continue;
+                const off = {};
+                (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { off[o] = 1; });
+                [over, tops, backs].forEach(function (arr) {
+                    for (let j = arr.length - 1; j >= 0; j--) if (off[arr[j]]) arr.splice(j, 1);
+                });
+                chosen.splice(i, 1);
+            }
+        }
         const lone = chosen.filter(function (x) { return x.alone; })[0];
         if (lone) {
             const mine = {};
@@ -1887,7 +1915,26 @@ function tap(kind, k, v) {
             return;
         } else sel.push(v);
         p[s.k] = accJoin(sel, max);
-    } else { p[k] = v; }
+    } else {
+        // ★ 여성 체형에서만 입는 옷 (fem · 레드 비키비키니 · 2026-11-07) — 체형이 여성일 때만 고른다 ·
+        //   체형을 다른 것으로 바꾸면 입고 있던 그 옷은 벗긴다 (없음)
+        const s = slotOf(k);
+        const it = s ? s.items.filter(function (x) { return x.i === v; })[0] : null;
+        if (it && it.fem && !femShape(p.shape)) {
+            const n = document.getElementById('closet-note');
+            if (n) { n.innerText = '여성 체형일 때만 입을 수 있습니다.'; setTimeout(note_, 1800); }
+            return;
+        }
+        p[k] = v;
+        if (k === 'shape' && !femShape(v)) {
+            DOT_SLOTS.forEach(function (o) {
+                if (o.max) return;
+                const w = o.items.filter(function (x) { return x.i === (p[o.k] || ''); })[0];
+                if (w && w.fem) p[o.k] = '';
+            });
+            markOn();
+        }
+    }
     if (setSel) { setSel = null; setAsk = null; paintSets(); }     // 손으로 갈아입었다 — 고른 코디 표시를 푼다
     markOn();
     paintCols();      // 갈아입었으니 물들일 거리도 달라진다
