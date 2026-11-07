@@ -266,10 +266,8 @@ function oneView(id) {
         + '<button id="pet-room" class="game-btn" style="' + BTN + ' margin-top:12px;'
         + (P().showHas(id, me) ? GREY : '') + '">'
         + (P().showHas(id, me) ? '방에서 내린다' : '방에 내놓는다') + '</button>'
-        + (window.DOLLWALK ? (P().showHas(id, me)
-            ? '<button id="pet-walk" class="game-btn" style="' + BTN + (String(window.DOLLWALK.key(me)) === String(id) ? GREY : '') + '">'
-              + (String(window.DOLLWALK.key(me)) === String(id) ? '그만 데리고 다닌다' : '데리고 다닌다 — 광장 · 출몰지에서 따라온다') + '</button>'
-            : '<div style="font-size:10px; color:#6f685e; margin:2px 0 8px;">방에 내놓은(동행) 인형만 데리고 다닐 수 있습니다.</div>') : '')
+        + (window.DOLLWALK ? '<button id="pet-walk" class="game-btn" style="' + BTN + (String(window.DOLLWALK.key(me)) === String(id) ? GREY : '') + '">'
+            + (String(window.DOLLWALK.key(me)) === String(id) ? '그만 데리고 다닌다' : '데리고 다닌다 — 광장 · 출몰지에서 따라온다') + '</button>' : '')
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')

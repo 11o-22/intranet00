@@ -30,11 +30,9 @@ function walkKey(u) {
         const v = u.petWalk;
         let k = null;
         if (v === 0 || v === '0') return null;                       // 아무도 안 데리고 다닌다
-        const w = M.withList(u);
         if (v != null && ds[String(v)]) k = String(v);
-        else if (v == null) k = w[0] || null;                          // 안 정했으면 동행 첫째 (전처럼)
+        else if (v == null) { const w = M.withList(u); k = w[0] || null; }   // 안 정했으면 동행 첫째 (전처럼)
         if (!k) return null;
-        if (w.indexOf(k) < 0) return null;                             // ★ 동행에서 뺀 인형은 따라오지 않는다 (2026-11-07 사용자 「아예 동행 해제 하면 펫 자체가 동행하지 않게」)
         const d = ds[k];
         if (!d) return null;
         if (d.out && d.out.till && d.out.till > M.now()) return null;   // 탐사 중
@@ -55,7 +53,6 @@ function setWalk(key, u) {
     if (!u) return false;
     const v = key == null ? '0' : String(key);
     if (v !== '0' && !D().dolls(u)[v]) return false;
-    if (v !== '0' && D().withList(u).indexOf(v) < 0) return false;     // 동행이 아니면 못 데리고 다닌다
     u.petWalk = v;
     try { D().put({ petWalk: v }, u); } catch (e) { }
     return true;
