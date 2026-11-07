@@ -423,7 +423,7 @@ function dex(S) {
         if (tab === 0) {
             const seen = Object.keys(dx).filter(function (k) { return dx[k] && dx[k].s; }).length;
             const got = Object.keys(dx).filter(function (k) { return dx[k] && dx[k].c; }).length;
-            body = '<div class="sub">본 것 ' + seen + ' · 잡은 것 ' + got + ' / 25 — 따라쟁이가 흉내 낸 모습이 적힙니다.</div><div class="gb-dex">'
+            body = '<div class="sub">본 것 ' + seen + ' · 잡은 것 ' + got + ' / ' + window.PET.LIST.length + ' — 따라쟁이가 흉내 낸 모습이 적힙니다.</div><div class="gb-dex">'
                 + window.PET.LIST.map(function (p) {
                     const e = dx[p.i] || {};
                     const s = !!e.s, c = !!e.c;

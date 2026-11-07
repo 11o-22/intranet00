@@ -108,7 +108,9 @@ function perName(key, u) {
     return list[perOf(key, u)] || '';
 }
 function sexName(sex) { return sex === 'm' ? '♂ 수컷' : sex === 'f' ? '♀ 암컷' : '?'; }
-function skillOf(key) { return SKILL[(window.PET && PET.sp) ? PET.sp(key) : Number(key)] || null; }
+// 🧸 캐릭터 봉제인형(26~)은 한 가지 — 솜 안아 넘기기 (2026-11-07)
+const CHR_SKILL = { n: '솜 안아 넘기기', t: '애교', v: '와락 안아 넘어뜨린다', d: '솜뭉치가 온몸으로 안긴다. 피할 틈이 없다.' };
+function skillOf(key) { const sp = (window.PET && PET.sp) ? PET.sp(key) : Number(key); return SKILL[sp] || ((window.PET && PET.isChr && PET.isChr(sp)) ? CHR_SKILL : null); }
 
 // 내 펫 가운데 칸이 없는 것은 해시 값을 적어 둔다 — 새로 깨어난 펫도 같은 길이다
 //   (태어난 때가 밀리초라 그 해시가 곧 무작위다 · 적힌 뒤로는 그 값이 그대로다)

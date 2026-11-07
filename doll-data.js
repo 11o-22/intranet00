@@ -218,7 +218,21 @@ function rollGrade(luck) {
 }
 
 // 그림 — 앞(pf · 64칸 · 1~25) / 뒤(pb · 64칸 · 그려 쓸 때 두 배) · 5 × 5
-function cellOf(sp) { const i = Math.max(1, Math.min(25, (P() && P().sp ? P().sp(sp) : Number(sp)) || 1)) - 1; return { c: i % 5, r: Math.floor(i / 5) }; }
+// 🧸 캐릭터 봉제인형(26~)은 doll/cf.webp · cb.webp — 96칸 6×3 (2026-11-07 사용자). 동물(1~25)은 doll/pf · pb — 64칸 5×5
+function isChr(sp) { try { return !!(P() && P().isChr && P().isChr(sp)); } catch (e) { return false; } }
+function cellOf(sp) {
+    const n = (P() && P().sp ? P().sp(sp) : Number(sp)) || 1;
+    if (isChr(n)) { const j = Math.max(0, n - 26); return { c: j % 6, r: Math.floor(j / 6), chr: true, cs: 96, cols: 6, rows: 3 }; }
+    const i = Math.max(1, Math.min(25, n)) - 1;
+    return { c: i % 5, r: Math.floor(i / 5), chr: false, cs: 64, cols: 5, rows: 5 };
+}
+// 캐릭터 봉제인형 — 동물과 같은 도트 크기로, 칸(96)이 64보다 커서 상자를 1.5배로 키우고 음수 여백으로 발끝 · 가운데를 맞춘다
+function chrCss(sp, px, back) {
+    const c = cellOf(sp), k = px * 1.5;
+    return 'background-image:url(doll/' + (back ? 'cb' : 'cf') + '.webp);background-repeat:no-repeat;image-rendering:pixelated;'
+        + 'background-size:' + (k * 6) + 'px ' + (k * 3) + 'px;background-position:' + (-c.c * k) + 'px ' + (-c.r * k) + 'px;'
+        + 'width:' + k + 'px;height:' + k + 'px;margin:' + (-px * 0.5) + 'px 0 0 ' + (-px * 0.25) + 'px;';
+}
 //   px — 한 칸을 몇 px 로 그리나. back 이면 뒷모습
 // 🎨 예전 펫 그림으로 보는 사원 — u.petArt 'old' / 'doll' 로 정하고, 안 정했으면 이름이 Benz 인 사원 (2026-11-07 사용자 「Benz 사원한테는 봉제인형이 아니라 기존에 있던 펫 그림으로」)
 //   상담사 콘솔: dollArtSet('사번', 'old' | 'doll' | null) — 사번 0010 은 코드에 고정
@@ -298,6 +312,7 @@ function oldCss(sp, px) {
         + 'width:' + px + 'px;height:' + px + 'px;';
 }
 function spriteCss(sp, px, back, old) {
+    if (isChr(sp)) return chrCss(sp, px, back);                       // 캐릭터 봉제인형은 옛 그림이 없다
     if (old) return oldCss(sp, px);
     const c = cellOf(sp);
     return 'background-image:url(doll/' + (back ? 'pb' : 'pf') + '.webp);background-repeat:no-repeat;image-rendering:pixelated;'
@@ -602,7 +617,7 @@ window.DOLL = {
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
     stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
-    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire, wordFix: wordFix,
+    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, isChr: isChr, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire, wordFix: wordFix,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,
     addDoll: addDoll, patchDoll: patchDoll, removeDoll: removeDoll, setWith: setWith,

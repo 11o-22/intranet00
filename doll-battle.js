@@ -149,7 +149,10 @@ function wildFoe(o) {
         // 그 사람이 기억하는 모습을 흉내 낸다 — 기르는 펫의 종이면 조금 더 자주
         let mine = [];
         try { mine = Object.keys(window.PET.pets(u)).filter(function (k) { return window.PET.BY[k]; }); } catch (e) { }
-        sp = (mine.length && Math.random() < 0.4) ? Number(pick(mine)) : (1 + Math.floor(Math.random() * 25));
+        // 🧸 캐릭터 봉제인형 — 열에 하나 반쯤 (15%) · 나머지는 동물 (내 펫 종이면 조금 더 자주)
+        const chrs = []; try { window.PET.LIST.forEach(function (p) { if (p.chr) chrs.push(p.i); }); } catch (e) { }
+        if (chrs.length && Math.random() < 0.15) sp = pick(chrs);
+        else sp = (mine.length && Math.random() < 0.4) ? Number(pick(mine)) : (1 + Math.floor(Math.random() * 25));
     }
     const g = o.g || (o.tut ? 'D' : pyramidGrade(u));
     const lv = o.lv || (o.tut ? 1 : 1 + Math.floor(Math.random() * 3));
@@ -500,18 +503,18 @@ function img(src) {
 }
 async function mosaicMorph() {
     const f = B.foe, e = B.ui.foe;
-    const base = await img('doll/base.webp'), sheet = await img('doll/pf.webp');
-    const old = f.old ? await img('pet/old/s' + String(f.sp).padStart(2, '0') + '.webp') : null;   // 🎨 옛 펫 외형
+    const cell = D().cellOf(f.sp);
+    const base = await img('doll/base.webp'), sheet = await img(cell.chr ? 'doll/cf.webp' : 'doll/pf.webp');   // 🧸 캐릭터 봉제인형은 제 장에서
+    const old = (f.old && !cell.chr) ? await img('pet/old/s' + String(f.sp).padStart(2, '0') + '.webp') : null;   // 🎨 옛 펫 외형
     if (!B || !base || !sheet) { if (B) paintFoe(false); return; }
     const c = document.createElement('canvas'); c.width = 64; c.height = 64;
     c.className = 'bob'; c.style.cssText = 'width:64px;height:64px;image-rendering:pixelated;display:block';
     const t = document.createElement('canvas'); t.width = 64; t.height = 64;
     const cx = c.getContext('2d'), tx = t.getContext('2d');
-    const cell = D().cellOf(f.sp);
-    const draw = function (src, sx, sy, b) {
+    const draw = function (src, sx, sy, b, cs) {
         const n = Math.max(1, Math.round(64 / b));
         tx.clearRect(0, 0, 64, 64); tx.imageSmoothingEnabled = true;
-        tx.drawImage(src, sx, sy, 64, 64, 0, 0, n, n);           // 칸마다 빛깔을 고르게 (모자이크 한 칸 = 그 자리의 평균)
+        tx.drawImage(src, sx, sy, cs || 64, cs || 64, 0, 0, n, n);           // 칸마다 빛깔을 고르게 (모자이크 한 칸 = 그 자리의 평균)
         cx.clearRect(0, 0, 64, 64); cx.imageSmoothingEnabled = false;
         cx.drawImage(t, 0, 0, n, n, 0, 0, 64, 64);
     };
@@ -526,7 +529,7 @@ async function mosaicMorph() {
     e.innerHTML = ''; e.appendChild(c);
     const ST = [1, 2, 3, 4, 6, 8, 11, 16];
     for (let i = 0; i < ST.length; i++) { if (!B) return; draw(base, 0, 0, ST[i]); await sleep(i ? 70 : 160); }
-    for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; if (old) drawFit(old, ST[i]); else draw(sheet, cell.c * 64, cell.r * 64, ST[i]); await sleep(i ? 70 : 120); }
+    for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; if (old) drawFit(old, ST[i]); else draw(sheet, cell.c * cell.cs, cell.r * cell.cs, ST[i], cell.cs); await sleep(i ? 70 : 120); }
     if (B) paintFoe(false);
 }
 async function flashAll(n) {

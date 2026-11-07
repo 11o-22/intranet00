@@ -91,8 +91,29 @@ const PET_LIST = [
     { i: 22, n: '늑대',     w: 'noise', deform: false, st: { bon: 4, eva: 1 }, d: '밤마다 운다. 달이 없는 날에도 운다.' },
     { i: 23, n: '양',       w: 'cold',  deform: false, st: { resist: 2, luck: 50 }, d: '세고 있으면 잠이 온다. 세 마리째에서 진다.' },
     { i: 24, n: '나비',     w: 'wet',   deform: false, st: { eva: 5 },    d: '손에 앉았다가, 손을 보면 없다.' },
-    { i: 25, n: '모란앵무', w: 'noise', deform: false, st: { luck: 60, bon: 1 }, d: '한 번 정한 사람 곁에서 떨어지지 않는다. 그쪽 사정은 묻지 않는다.' }
+    { i: 25, n: '모란앵무', w: 'noise', deform: false, st: { luck: 60, bon: 1 }, d: '한 번 정한 사람 곁에서 떨어지지 않는다. 그쪽 사정은 묻지 않는다.' },
+    // 🧸 캐릭터 봉제인형 (2026-11-07 사용자 「캐릭터 봉제인형도 넣자. 출몰 지역에」) — 출몰지에서만 나온다 (알에서는 안 깨어남 · chr)
+    //   그림: doll/cf.webp · cb.webp (96칸 6×3) · pet/sNN · pNN. 번호는 주신 차례 (1번 따라쟁이 원형은 doll/base.webp 그대로)
+    { i: 26, n: '김솔음 봉제인형', w: 'wet', deform: false, chr: 1, st: { resist: 3 }, d: '김솔음을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 27, n: '백사헌 봉제인형', w: 'heat', deform: false, chr: 1, st: { eva: 5 }, d: '백사헌을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 28, n: '최요원 봉제인형', w: 'cold', deform: false, chr: 1, st: { luck: 40 }, d: '최요원을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 29, n: '장허운 봉제인형', w: 'scent', deform: false, chr: 1, st: { bon: 1 }, d: '장허운을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 30, n: '곽제강 봉제인형', w: 'noise', deform: false, chr: 1, st: { resist: 2, eva: 2 }, d: '곽제강을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 31, n: 'J3 봉제인형', w: 'wet', deform: false, chr: 1, st: { resist: 3 }, d: 'J3을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 32, n: '이자헌 봉제인형', w: 'heat', deform: false, chr: 1, st: { eva: 5 }, d: '이자헌을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 33, n: '류재관 봉제인형', w: 'cold', deform: false, chr: 1, st: { luck: 40 }, d: '류재관을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 34, n: '브라운 봉제인형', w: 'scent', deform: false, chr: 1, st: { bon: 1 }, d: '브라운을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 35, n: '은하제 봉제인형', w: 'noise', deform: false, chr: 1, st: { resist: 2, eva: 2 }, d: '은하제를 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 36, n: 'B조 조장 봉제인형', w: 'wet', deform: false, chr: 1, st: { resist: 3 }, d: 'B조 조장을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 37, n: '이성해 봉제인형', w: 'heat', deform: false, chr: 1, st: { eva: 5 }, d: '이성해를 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 38, n: '고영은 봉제인형', w: 'cold', deform: false, chr: 1, st: { luck: 40 }, d: '고영은을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 39, n: '청달래 봉제인형', w: 'scent', deform: false, chr: 1, st: { bon: 1 }, d: '청달래를 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 40, n: '진나솔 봉제인형', w: 'noise', deform: false, chr: 1, st: { resist: 2, eva: 2 }, d: '진나솔을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 41, n: '호유원 봉제인형', w: 'wet', deform: false, chr: 1, st: { resist: 3 }, d: '호유원을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
+    { i: 42, n: '박민성 봉제인형', w: 'heat', deform: false, chr: 1, st: { eva: 5 }, d: '박민성을 쏙 빼닮은 봉제인형. 따라쟁이가 흉내 낸 모습이 그대로 굳었다.' },
 ];
+const PET_CHR_MIN = 26;
+function petIsChr(sp) { const p = PET_BY_RAW[petSp(sp) || Number(sp)]; return !!(p && p.chr); }
 
 // ★ 같은 동물 여러 마리 (2026-11-07 사용자 「연동이 되는 만큼 펫도 같은 종류를 여러마리 데리고 있을 수 있게」)
 //   첫째는 종 번호 그대로(13), 둘째부터 100 씩 얹는다 (113 · 213 …). 종은 열쇠 % 100.
@@ -802,7 +823,7 @@ function petEggImg(e) {
 
 // 그 묶음에서 한 마리 — 아직 없는 것을 먼저 준다
 function petPick(warn, u) {
-    const pool = PET_LIST.filter(function (p) { return p.w === warn; });
+    const pool = PET_LIST.filter(function (p) { return p.w === warn && !p.chr; });     // 캐릭터 봉제인형은 알에서 안 깨어난다
     const fresh = pool.filter(function (p) { return !petHas(p.i, u); });
     const from = fresh.length ? fresh : pool;
     return from[Math.floor(Math.random() * from.length)];
@@ -840,14 +861,14 @@ function petJosa(s, kind) {
 
 // 🎨 옛 펫 외형으로 보기(doll-data.js artOld)가 켜진 사원은 pet/old/ 그림 (2026-11-07 사용자)
 function petArtDir() { try { return (window.DOLL && window.DOLL.artOld()) ? 'pet/old/' : 'pet/'; } catch (e) { return 'pet/'; } }
-function petImg(id)  { return petArtDir() + 'p' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
-function petIcon(id) { return petArtDir() + 's' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
+function petImg(id)  { return (petIsChr(id) ? 'pet/' : petArtDir()) + 'p' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
+function petIcon(id) { return (petIsChr(id) ? 'pet/' : petArtDir()) + 's' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
 
 // ==========================================
 // 바깥에 내어 준다
 // ==========================================
 window.PET = {
-    LIST: PET_LIST, BY: PET_BY_ID, WARN: PET_WARN, WARN_KEYS: PET_WARN_KEYS,
+    LIST: PET_LIST, BY: PET_BY_ID, WARN: PET_WARN, WARN_KEYS: PET_WARN_KEYS, isChr: petIsChr, CHR_MIN: PET_CHR_MIN,
     CARE: PET_CARE, CARE_BY: PET_CARE_BY, TAGS: PET_TAGS, GRADES: PET_GRADES,
     RUIN: PET_RUIN, EGG_NAME: PET_EGG_NAME, EGG_PRICE: PET_EGG_PRICE,
     DUP_BACK: PET_DUP_BACK,
