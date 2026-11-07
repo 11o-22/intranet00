@@ -860,6 +860,17 @@ function dollStrip(list, cur) {
             + '</button>';
     }).join('') + '</div>';
 }
+// 🎀 하루 포획 횟수 — 20마리 (2026-11-07 사용자 「하루 포획 횟수를 20회로 제한하자」) · u.dollCatch = { d: 날짜, n: 잡은 수 } · 튜토리얼은 안 센다
+const CATCH_MAX = 20;
+function dayStr() { try { return (typeof getTodayStr === 'function') ? getTodayStr() : new Date().toISOString().slice(0, 10); } catch (e) { return new Date().toISOString().slice(0, 10); } }
+function catchN(u) { u = u || u_(); const c = u && u.dollCatch; return (c && c.d === dayStr()) ? (Number(c.n) || 0) : 0; }
+function catchLeft(u) { return Math.max(0, CATCH_MAX - catchN(u)); }
+function catchAdd(u) {
+    u = u || u_(); if (!u) return;
+    const v = { d: dayStr(), n: catchN(u) + 1 };
+    u.dollCatch = v;
+    try { D().put({ dollCatch: v }, u); } catch (e) { }
+}
 // 소지품 — 🎀 포옹 리본 · 🔁 인형 바꾸기
 function bagMenu() {
     return new Promise(function (resolve) {
@@ -873,7 +884,8 @@ function bagMenu() {
         }).filter(Boolean);
         const box = el('div', 'menu');
         box.innerHTML = dollStrip(all, B.me && B.me.id)
-            + '<button data-k="ribbon"' + ((B.foe.wild && n > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (B.foe.wild ? '' : ' — 괴담은 감쌀 수 없다') + '</button>'
+            + '<button data-k="ribbon"' + ((B.foe.wild && n > 0 && (B.tut || catchLeft(u) > 0)) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n
+            + (!B.foe.wild ? ' — 괴담은 감쌀 수 없다' : (B.tut ? '' : (catchLeft(u) > 0 ? ' <small style="color:#524173">(오늘 포획 ' + catchN(u) + '/' + CATCH_MAX + ')</small>' : ' — 오늘은 더 잡을 수 없다 (' + CATCH_MAX + '마리)'))) + '</button>'
             + '<button data-k="back">돌아간다</button>';
         B.ui.st.appendChild(box);
         B.ui.txt.textContent = '무엇을 쓸까?';
@@ -909,6 +921,7 @@ async function swapTo(id) {
 }
 async function throwRibbon() {
     const M = D(), u = u_(), f = B.foe;
+    if (!B.tut && catchLeft(u) <= 0) { await say('오늘은 더 잡을 수 없다! (하루 ' + CATCH_MAX + '마리)', 1200); return 'back'; }
     if (!M.bagAdd(M.ITEM.RIBBON, -1, u)) { await say('포옹 리본이 없다!', 1000); return 'back'; }
     await say(fmt(pick(TX.ribbon), { d: f.name }), 1000);
     // 던진다 — 내 쪽(왼쪽 아래)에서 상대 머리 위로 포물선 · 빙글 돌며
@@ -963,8 +976,9 @@ async function throwRibbon() {
         await say('보관함이 가득 차 있다! ' + f.name + D().josa(f.name, '이') + ' 리본을 풀고 달아났다……', 1800);
         return finish({ res: 'full' });
     }
+    if (!B.tut) catchAdd(u);
     await say(fmt(pick(TX.caught), { d: f.name }), 1500);
-    await say(f.name + ' (' + f.g + ' · Lv.' + f.lv + ')' + D().josa(f.name, '은') + (r.where === 'with' ? ' 동행 목록에 들어갔다!' : ' 보관함(펫 박스)으로 보내졌다!') + ' 봉제인형 도감에 적혔다.', 1800);
+    await say(f.name + ' (' + f.g + ' · Lv.' + f.lv + ')' + D().josa(f.name, '은') + (r.where === 'with' ? ' 동행 목록에 들어갔다!' : ' 보관함(펫 박스)으로 보내졌다!') + ' 봉제인형 도감에 적혔다.' + (B.tut ? '' : ' (오늘 ' + catchN(u) + '/' + CATCH_MAX + ')'), 1800);
     M.log('[🧸 포획] ' + f.name + ' (' + f.g + ' · Lv.' + f.lv + ') — ' + (r.where === 'with' ? '동행' : '보관함'), u);
     M.saveHist();
     if (B.me) saveHp(B.me);
@@ -1579,7 +1593,7 @@ window.DOLLBT = {
     monster: function (o) { o = o || {}; return begin({ kind: 'mon', loc: o.loc || 'arcade', foe: monFoe(o.mon != null ? o.mon : 9) }); },
     busy: function () { return !!B; },
     party: partyFight, resolve: resolveRound, foeFor: foeFor, xpFor: xpFor, MUL: MUL,
-    pvp: pvpFight, resolvePvp: resolvePvp, pyramidGrade: pyramidGrade
+    pvp: pvpFight, resolvePvp: resolvePvp, pyramidGrade: pyramidGrade, CATCH_MAX: CATCH_MAX, catchN: catchN, catchLeft: catchLeft
 };
 window.dollBattleTest = function (mon) {
     if (!D() || !D().isAdmin()) { console.warn('상담사만'); return; }
