@@ -1461,6 +1461,7 @@ function tkItem(code) {
     if (!run || !code || code === myCode()) return [];
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.tickles) return [];
+    if (blBusy(code)) return [];                               // 괴롭히기가 도는 동안은 안 뜬다 (2026-11-08)
     return [TK_ITEM];
 }
 function tkStart(code) {
@@ -1593,6 +1594,136 @@ function stDo(code) {
     }, function (err, ok) {
         if (err || !ok) return;
         stHeard(code, rec);                                   // 내 화면은 바로
+    });
+}
+
+// ==========================================
+// 괴롭히기 (2026-11-08 사용자)
+// ==========================================
+//
+//   「이거 여성체만 상호작용으로 넣어줘. 여성체 눌렀을 때 [ 괴롭히기 ] 버튼 뜨게 해주고 클릭할 때마다 1~2 프레임 두 번
+//    반복하다가 3~4 번을 20번 정도 계속 반복하고 (이때 점점 속도 올리기.) 그리고 5~6번 올 때에 속도 늦춰준 뒤에
+//    7~12로. 7~12는 한 번 더 반복.」
+//
+//   · 몸이 괴롭히기 장을 가진 남(여성 체형 · closet.js D.BULLY)을 누르면 [ 괴롭히기 ] — 소원권 물약이 된 동안은 빼고
+//   · 한 번 누르면 모두의 화면에서 끝까지 저절로 돈다 (쑤시기처럼 사람을 계속 누르지 않는다)
+//       1~2 를 두 번 (한 칸 BL_A)
+//       3~4 를 BL_N(20) 번 — 돌수록 빨라진다 (한 칸 BL_A → BL_FAST)
+//       5~6 — 늦춘다 (BL_SLOW)
+//       7~12 를 두 번 (한 칸 BL_END) — 그리고 원래 모습으로
+//   · 도는 동안은 [ 괴롭히기 ] · [ 쑤시기 ] 가 안 뜬다 — 다 돌면 다시 누를 수 있다
+//
+//   plazaBully/<사번> = { id, by: 누른 사람, bn: 그 이름, at }
+//   모두가 이 칸을 듣는다. 들어오기 전의 것(처음 받은 것)은 안 튼다. 다 돌면 누른 사람이 걷는다.
+const BL_PATH = 'plazaBully';
+const BL_ITEM = ['bully', '괴롭히기'];
+const BL_A = 220, BL_FAST = 50;          // 1~2 한 칸 · 3~4 첫 바퀴 한 칸 → 마지막 바퀴 한 칸
+const BL_N = 20;                         // 3~4 를 몇 번
+const BL_SLOW = [350, 550];              // 5 · 6 한 칸 — 확 늦춘다
+const BL_END = 700, BL_END_ROUNDS = 2;   // 7~12 한 칸 · 몇 번 (쑤시기 7~12 와 같은 빠르기)
+// 차례 — [칸(0~11), 끝나는 때(ms)] — 모두가 같은 표로 튼다
+const BL_SEQ = (function () {
+    const s = [];
+    let t = 0;
+    const add = function (f, ms) { t += Math.round(ms); s.push([f, t]); };
+    for (let i = 0; i < 2; i++) { add(0, BL_A); add(1, BL_A); }
+    for (let i = 0; i < BL_N; i++) {
+        const ms = BL_A - (BL_A - BL_FAST) * (i / Math.max(1, BL_N - 1));
+        add(2, ms); add(3, ms);
+    }
+    add(4, BL_SLOW[0]); add(5, BL_SLOW[1]);
+    for (let r = 0; r < BL_END_ROUNDS; r++) for (let f = 6; f < 12; f++) add(f, BL_END);
+    return s;
+})();
+const BL_LEN = BL_SEQ[BL_SEQ.length - 1][1];
+const BLL = {};                          // 내 화면에서 도는 것 { id, t0, by }
+let blT = 0;
+function blFrame(ms) {
+    for (let i = 0; i < BL_SEQ.length; i++) if (ms < BL_SEQ[i][1]) return BL_SEQ[i][0];
+    return -1;                                                 // 다 돌았다
+}
+function blBusy(code) { return !!(BLL[code]); }
+(function blListen() {
+    let on = false;
+    const seen = {};
+    const iv = setInterval(function () {
+        if (on || typeof database === 'undefined' || !database || !u_()) return;
+        on = true;
+        clearInterval(iv);
+        let first = true;
+        database.ref(BL_PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(v).forEach(function (c) {
+                const x = v[c];
+                if (!x || typeof x !== 'object' || !x.id) return;
+                if (seen[c] === x.id) return;
+                seen[c] = x.id;
+                if (!first) blHeard(c, x);
+            });
+            first = false;
+        });
+    }, 1000);
+})();
+function blHeard(c, v) {
+    if (!v || !v.id) return;
+    if (BLL[c] && BLL[c].id === v.id) return;
+    BLL[c] = { id: v.id, t0: now(), by: v.by || '' };
+    if (!blT) blT = setInterval(blTick, 30);
+    blTick();
+}
+function blPaint(code, f) {
+    const one = tkOne(code);
+    if (!one || !one.actor || typeof one.actor.bully !== 'function') return;
+    try { one.actor.bully(one.wf ? null : f); } catch (e) { }
+}
+function blTick() {
+    const t = now();
+    let live = 0;
+    Object.keys(BLL).forEach(function (c) {
+        const L = BLL[c];
+        const f = blFrame(t - L.t0);
+        if (f < 0) {                                           // 다 돌았다 — 원래 모습으로
+            blPaint(c, null);
+            delete BLL[c];
+            if (L.by && L.by === myCode()) blDel(c, L.id);
+            return;
+        }
+        live++;
+        blPaint(c, f);
+    });
+    if (!live && blT) { clearInterval(blT); blT = 0; }
+}
+// 다 쓴 칸을 걷는다 — 그 판이 그대로일 때만
+function blDel(code, id) {
+    if (typeof database === 'undefined' || !database) return;
+    try {
+        database.ref(BL_PATH + '/' + code).transaction(function (cur) {
+            if (!cur || cur.id !== id) return;
+            return null;
+        });
+    } catch (e) { }
+}
+// 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니고 · 지금 괴롭히거나 쑤시는 중이 아니면
+function blItem(code) {
+    if (!run || !code || code === myCode()) return [];
+    const q = run.peers && run.peers[code];
+    if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.bullies) return [];
+    if (blBusy(code)) return [];
+    if (TKL[code] && !TKL[code].done) return [];
+    return [BL_ITEM];
+}
+function blDo(code) {
+    closeCarryMenu();
+    const me = u_(), d = db_();
+    if (!me || !d || !blItem(code).length) return;
+    const id = me.code + ':' + now();
+    const rec = { id: id, by: me.code, bn: nameOf(me), at: chatNow() };
+    d.ref(BL_PATH + '/' + code).transaction(function (cur) {
+        if (cur && cur.id && chatNow() - (Number(cur.at) || 0) < BL_LEN + 3000) return;   // 방금 누가 괴롭히는 중
+        return rec;
+    }, function (err, ok) {
+        if (err || !ok) return;
+        blHeard(code, rec);                                   // 내 화면은 바로
     });
 }
 
@@ -3038,12 +3169,13 @@ function carryTap(cx, cy) {
         wfBonkItem(big).forEach(function (x) { items.push(x); });
         tkItem(big).forEach(function (x) { items.push(x); });
         stItem(big).forEach(function (x) { items.push(x); });
+        blItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'tickle') { tkStart(big); return; }
-            if (k === 'strip') { stDo(big); return; }
+            if (k === 'strip') { stDo(big); return; } if (k === 'bully') { blDo(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -3056,10 +3188,10 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), blItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { tkStart(any); return; }
-            if (k === 'strip') { stDo(any); return; }
+            if (k === 'strip') { stDo(any); return; } if (k === 'bully') { blDo(any); return; }
             infoOpen(any);
         }, '');
     }
@@ -3072,11 +3204,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), blItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'bully') { blDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), blItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'bully') { blDo(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -3091,13 +3223,14 @@ function carryTap(cx, cy) {
     wfBonkItem(pick).forEach(function (x) { items.push(x); });
     tkItem(pick).forEach(function (x) { items.push(x); });
     stItem(pick).forEach(function (x) { items.push(x); });
+    blItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
         if (k === 'info') { infoOpen(pick); return; }
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
         if (k === 'tickle') { tkStart(pick); return; }
-        if (k === 'strip') { stDo(pick); return; }
+        if (k === 'strip') { stDo(pick); return; } if (k === 'bully') { blDo(pick); return; }
         carryDo(pick, k);
     }, potion ? '🫙 ' : null);
 }
