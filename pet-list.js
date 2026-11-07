@@ -228,7 +228,7 @@ function oneView(id) {
         // ★ 여정 레벨 · 장비 (pet-gear.js · journey.js · 2026-10-28)
         + (window.PETGEAR ? line('여정 Lv', (function () {
             const lv = PETGEAR.lv(id, me), xp = PETGEAR.xp(id, me);
-            return 'Lv ' + lv + (lv >= PETGEAR.LV_MAX ? ' <span style="color:#d4af37;">— 가득</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ')</span>');
+            return 'Lv ' + lv + (lv >= PETGEAR.lvCapOf(id, me) ? ' <span style="color:#d4af37;">— 가득</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ' · 상한 ' + PETGEAR.lvCapOf(id, me) + ')</span>');
         })()) + line('각성의 룬', (function () {
             const nd = PETGEAR.gradeNeed(id, me);
             if (!nd.rune) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';

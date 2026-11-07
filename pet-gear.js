@@ -170,21 +170,26 @@ function unequip(key) {
 // ==========================================
 // 레벨 · 경험치 · 등급업
 // ==========================================
-function lvOf(key, u) { const s = P().pets(u)[String(key)]; return Math.max(1, Math.min(LV_MAX, Number(s && s.lv) || 1)); }
-function xpOf(key, u) { const s = P().pets(u)[String(key)]; return Math.max(0, Number(s && s.xp) || 0); }
+// ★ 등급마다 채워야 하는 레벨이 10씩 늘어난다 — D 10 · C 20 · B 30 · A 40 · S 50 (2026-11-07 사용자 「등급이 올라갈수록 채워야 하는 레벨이 10씩 늘어나게」)
+const LV_CAP = [10, 20, 30, 40, 50];
+function lvMax(gi) { return LV_CAP[Math.max(0, Math.min(LV_CAP.length - 1, Number(gi) || 0))]; }
 function gradeIdx(key, u) { const s = P().pets(u)[String(key)]; const i = P().GRADES.indexOf((s && s.g) || 'D'); return i < 0 ? 0 : i; }
+function lvCapOf(key, u) { return lvMax(gradeIdx(key, u)); }
+function lvOf(key, u) { const s = P().pets(u)[String(key)]; return Math.max(1, Math.min(lvCapOf(key, u), Number(s && s.lv) || 1)); }
+function xpOf(key, u) { const s = P().pets(u)[String(key)]; return Math.max(0, Number(s && s.xp) || 0); }
 function needXp(lv) { return 20 + lv * 10; }
 // 경험치를 더한다 — 돌려주는 값 { lv0, lv, full } (full: Lv 10 꽉 참)
 function addXp(key, n) {
     const u = u_();
     const s = P().pets(u)[String(key)];
     if (!s) return null;
+    const cap = lvCapOf(key, u);
     let lv = lvOf(key, u), xp = xpOf(key, u) + Math.max(0, Math.round(Number(n) || 0));
     const lv0 = lv;
-    while (lv < LV_MAX && xp >= needXp(lv)) { xp -= needXp(lv); lv++; }
-    if (lv >= LV_MAX) xp = 0;
+    while (lv < cap && xp >= needXp(lv)) { xp -= needXp(lv); lv++; }
+    if (lv >= cap) xp = 0;
     P().patch(String(key), { lv: lv, xp: xp });
-    return { lv0: lv0, lv: lv, full: lv >= LV_MAX };
+    return { lv0: lv0, lv: lv, full: lv >= cap, cap: cap };
 }
 // 등급업 — Lv 10 이고, 다음 등급의 각성의 룬이 하나 있을 때 (awk-rune.js · 2026-11-07 · 전에는 조각 세 가지)
 function gradeNeed(key, u) {
@@ -194,7 +199,8 @@ function gradeNeed(key, u) {
     const A = window.AWK;
     const rune = A ? A.RUNE(g1) : g1 + '급 각성의 룬';
     const have = A ? A.have(rune, u) : 0;
-    if (lvOf(key, u) < LV_MAX) return { ok: false, why: 'Lv ' + LV_MAX + ' 이 되어야 합니다.', rune: rune, have: have };
+    const cap = lvMax(gi);
+    if (lvOf(key, u) < cap) return { ok: false, why: 'Lv ' + cap + ' 이 되어야 합니다.', rune: rune, have: have, cap: cap };
     if (!have) return { ok: false, why: rune + '이 필요합니다 (조각 셋을 도깨비 공방에서 합칩니다).', rune: rune, have: have };
     return { ok: true, rune: rune, have: have };
 }
@@ -206,7 +212,7 @@ function gradeUp(key) {
     const g0 = P().GRADES[gradeIdx(key, u)], g1 = P().GRADES[gradeIdx(key, u) + 1];
     if (!window.AWK || !window.AWK.add(need.rune, -1, u)) return { ok: false, why: need.rune + '이 없습니다.' };
     P().patch(String(key), { g: g1, lv: 1, xp: 0 });
-    log_('[인형] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (Lv ' + LV_MAX + ' · ' + need.rune + ')');
+    log_('[인형] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (Lv ' + need.cap + ' · ' + need.rune + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true, from: g0, to: g1 };
 }
@@ -322,7 +328,7 @@ window.petGearOpen = function (key, after) {
 };
 
 window.PETGEAR = {
-    BASIC: BASIC, DROP: DROP, LEGACY: LEGACY, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, STAT_NAME: STAT_NAME, ATTR_EFF: ATTR_EFF,
+    BASIC: BASIC, DROP: DROP, LEGACY: LEGACY, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, LV_CAP: LV_CAP, lvMax: lvMax, lvCapOf: lvCapOf, STAT_NAME: STAT_NAME, ATTR_EFF: ATTR_EFF,
     bag: bag, have: have, add: add, worn: worn, equip: equip, unequip: unequip, addText: addText,
     lv: lvOf, xp: xpOf, needXp: needXp, addXp: addXp, gradeIdx: gradeIdx, canGradeUp: canGradeUp, gradeUp: gradeUp, gradeNeed: gradeNeed,
     SHARDS: SHARDS, shardBag: shardBag, shardHave: shardHave, shardAdd: shardAdd, shardSet: shardSet, shardCount: shardCount,

@@ -750,7 +750,7 @@ function dollMenu(id) {
     const at = new Date(d.at || 0);
     const days = Math.ceil(M.fedLeft(d) / 86400000);
     const html = '<div style="display:flex;gap:12px;align-items:center">' + icon(d.sp, 72) + '<div><h3>' + esc(M.nickOf(d)) + (d.fav ? ' <span style="color:#e6b400">★</span>' : '') + '</h3>'
-        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (s.lv < M.LV_MAX ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ')' : ' (최고)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
+        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (s.lv < M.lvMaxOf(d) ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ' · 상한 Lv ' + M.lvMaxOf(d) + ')' : ' (최고)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
         + '<div class="gb-row"><div class="tx"><div style="font-size:11px;color:#d8ceff;line-height:1.7">체력 ' + Math.ceil(M.hpOf(d)) + ' / ' + s.max + ' · 공격 ' + s.atk + ' · 방어 ' + s.def + ' · 회피 ' + s.eva + '% · 급소 ' + s.crit + '%<br>'
         + '포만 ' + M.fullPct(d) + '% — ' + (days > 0 ? days + '일 안에 먹이를 주세요' : '곧 달아납니다!') + '<br>잡은 날 ' + at.getFullYear() + '.' + (at.getMonth() + 1) + '.' + at.getDate() + ' · ' + (inW ? '동행 중' : '보관함') + '</div>'
         + '<div style="margin-top:6px">기술 — ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { a: [] }).a.map(function (x) { return x[0]; }).join(' · ')) + ' / ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { d: [] }).d.map(function (x) { return x[0]; }).join(' · ')) + '</div></div></div>'
@@ -1065,8 +1065,8 @@ function runeUi() {
     const paint = function () {
         const ds = M.dolls(u);
         const ready = Object.keys(ds).filter(function (id) { return M.gradeNeed(id, u).ok; });
-        const lv10 = Object.keys(ds).filter(function (id) { const nd = M.gradeNeed(id, u); return !nd.ok && nd.rune && M.stats(ds[id]).lv >= M.LV_MAX; });
-        const html = '<h3>💠 각성 공방</h3><div class="sub">펫 동행 어둠(여정 · 아케이드존)에서 괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각이 나오지만 드뭅니다.<br>조각 셋 → 룬 하나. Lv ' + M.LV_MAX + ' 인형에게 다음 등급의 룬을 쓰면 각성합니다 (Lv 1 부터 다시).</div>'
+        const lv10 = Object.keys(ds).filter(function (id) { const nd = M.gradeNeed(id, u); return !nd.ok && nd.rune && M.stats(ds[id]).lv >= M.lvMaxOf(ds[id]); });
+        const html = '<h3>💠 각성 공방</h3><div class="sub">펫 동행 어둠(여정 · 아케이드존)에서 괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각이 나오지만 드뭅니다.<br>조각 셋 → 룬 하나. 등급 상한 레벨(D 10 · C 20 · B 30 · A 40)에 닿은 인형에게 다음 등급의 룬을 쓰면 각성합니다 (Lv 1 부터 다시).</div>'
             + ['C', 'B', 'A', 'S'].map(function (g) {
                 const sh = A.have(A.SHARD(g), u), rn = A.have(A.RUNE(g), u);
                 return '<div class="gb-row"><div class="tx"><b>' + g + '급</b> <span style="font-size:10px;color:#8f84b5">· ' + ({ C: 'D → C', B: 'C → B', A: 'B → A', S: 'A → S' })[g] + '</span><div>조각 ' + sh + '개 · 룬 ' + rn + '개</div></div>'
@@ -1074,7 +1074,7 @@ function runeUi() {
             }).join('')
             + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">각성할 수 있는 인형</div>'
             + (ready.length ? ready.map(function (id) { const d = ds[id], s = M.stats(d), nd = M.gradeNeed(id, u); return '<div class="gb-row">' + icon(d.sp, 36) + '<div class="tx">' + dollLine(d) + '<div>💠 ' + esc(nd.rune) + '</div></div><button class="gb-btn pri" data-u="' + id + '">' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + '</button></div>'; }).join('')
-                            : '<div class="sub">' + (lv10.length ? 'Lv ' + M.LV_MAX + ' 인형 ' + lv10.length + '마리 — 다음 등급의 룬이 없습니다.' : 'Lv ' + M.LV_MAX + ' 인 인형이 없습니다.') + '</div>')
+                            : '<div class="sub">' + (lv10.length ? '상한 레벨에 닿은 인형 ' + lv10.length + '마리 — 다음 등급의 룬이 없습니다.' : '상한 레벨에 닿은 인형이 없습니다.') + '</div>')
             + '<div class="gb-btns"><button class="gb-btn" data-x="1">닫는다</button></div>';
         if (!dim) dim = panel(html); else dim.firstChild.innerHTML = html;
         dim.querySelector('[data-x]').onclick = function () { dim._close(); };

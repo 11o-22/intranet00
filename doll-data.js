@@ -186,7 +186,7 @@ function stats(d, u) {
     let s = null;
     try { if (d && d.id && window.PETGEAR && P().pets(u)[d.id] === d) s = window.PETGEAR.stats(d.id, u); } catch (e) { s = null; }
     if (!s) {                               // 남의 인형(교환 창) — 같은 셈을 직접
-        const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min(LV_MAX, Number(d && d.lv) || 1));
+        const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min(lvMax(gi), Number(d && d.lv) || 1));
         const st = (gi >= 2) ? (sp.st || {}) : {};
         const n = function (k) { return Number(st[k]) || 0; };
         const luck = n('luck') >= 10 ? n('luck') / 20 : n('luck');
@@ -197,6 +197,9 @@ function stats(d, u) {
     return { max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, lv: s.lv, gi: s.gi, g: GRADES[s.gi] || 'D', att: sp.w || 'wet' };
 }
 function gOf(d) { return stats(d).g; }
+// ★ 등급마다 레벨 상한 — D 10 · C 20 · B 30 · A 40 · S 50 (pet-gear.js LV_CAP)
+function lvMax(gi) { try { return window.PETGEAR.lvMax(gi); } catch (e) { return [10, 20, 30, 40, 50][Math.max(0, Math.min(4, Number(gi) || 0))]; } }
+function lvMaxOf(d) { return lvMax(gradeIdx(d && d.g)); }
 function hpOf(d) {
     const s = stats(d);
     const h = (d && d.hp != null) ? Number(d.hp) : s.max;
@@ -386,7 +389,7 @@ function addDoll(o, u) {
     const sp = P().sp(o.sp) || 1;
     const id = P().newKey(sp, u);
     const t = now();
-    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(LV_MAX, Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t };
+    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(lvMax(gradeIdx(o.g || 'D')), Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t };
     if (o.nick) d.nick = String(o.nick).slice(0, 12);
     P().pets(u)[id] = d;
     const s = stats(Object.assign({ id: id, sp: sp }, d), u);
@@ -487,6 +490,30 @@ function sweep() {
         finish(v);
     }).catch(function () { sweepBusy = false; });
 }
+// ★ 지금 있는 B · A · S 인형은 전부 C 로 내린다 — 사원마다 한 번 (2026-11-07 사용자 「지금 있는 B~S 펫들은 전부 D~C로 내려줘」)
+//   레벨은 C 상한(20)에 맞춰 자르고 경험치는 비운다. u.petGradeCut 에 적어 두어 다시 안 돈다.
+function gradeCut() {
+    const u = u_();
+    if (!u || !u.code || u.petGradeCut || !u.dollMig) return;
+    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
+    const ds = dolls(u), p = {}, names = [];
+    Object.keys(ds).forEach(function (id) {
+        const d = ds[id];
+        if (!d || gradeIdx(d.g) < 2) return;
+        const lv = Math.max(1, Math.min(lvMax(1), Number(d.lv) || 1));
+        d.g = 'C'; d.lv = lv; d.xp = 0;
+        p['pets/' + id + '/g'] = 'C'; p['pets/' + id + '/lv'] = lv; p['pets/' + id + '/xp'] = 0;
+        names.push(nickOf(d));
+    });
+    u.petGradeCut = 1; p.petGradeCut = 1;
+    put(p, u);
+    if (names.length) {
+        log_('[🧸 인형] 등급 조정 — ' + names.join(' · ') + ' : C 등급으로 (B~S 인형은 모두 C 로 내렸습니다)', u);
+        saveHist();
+        try { if (typeof window.petRoomPaint === 'function') window.petRoomPaint(); } catch (e) { }
+    }
+}
+setInterval(function () { try { gradeCut(); } catch (e) { } }, 4000);
 setInterval(function () { try { sweep(); } catch (e) { } }, 60 * 1000);
 setTimeout(function () { try { sweep(); } catch (e) { } }, 15000);
 
@@ -616,7 +643,7 @@ window.DOLL = {
     spOf: spOf, spName: spName, objOf: objOf,
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
-    stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
+    stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf, lvMax: lvMax, lvMaxOf: lvMaxOf,
     spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, isChr: isChr, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire, wordFix: wordFix,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,

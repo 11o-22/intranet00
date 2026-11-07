@@ -134,13 +134,13 @@ function leadGrade(u) {
     return lead >= 0 ? lead : (best >= 0 ? best : 0);
 }
 function pyramidGrade(u) {
-    const M = D(), G = M.GRADES, c = leadGrade(u);
-    const w = G.map(function (_, i) { return PYR[String(i - c)] || 0; });
-    let sum = 0; w.forEach(function (x) { sum += x; });
-    if (!sum) return M.rollGrade();
-    let r = Math.random() * sum;
-    for (let i = 0; i < G.length; i++) { r -= w[i]; if (r < 0) return G[i]; }
-    return G[c];
+    const M = D(), G = M.GRADES;
+    // ★ 2026-11-07 사용자 「출몰 지역에서 나오는 것들 등급은 다 소유자가 데리고 다니는 펫들 등급에 맞춰서」 — 동행 인형들의 등급 가운데 하나를 그대로 (동행이 없으면 D)
+    const gs = [];
+    try { M.withList(u).forEach(function (id) { const d = M.dolls(u)[id]; if (d) gs.push(M.stats(d).g); }); } catch (e) { }
+    if (gs.length) return pick(gs);
+    const c = leadGrade(u);
+    return G[c] || 'D';
 }
 function wildFoe(o) {
     const M = D(), u = u_();
