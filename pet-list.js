@@ -258,10 +258,16 @@ function oneView(id) {
                 + ' <span style="color:#6f685e;">· ' + t + ' 뒤에 굶습니다</span>';
         })())
         + (st ? line('지금', '<span style="color:' + st.c + ';">' + st.t + '</span>') : '')
+        // 🧸 데리고 다니기 — 광장 · 출몰지 같은 곳에서 뒤를 따라다닌다 (doll-walk.js · 2026-11-07 사용자)
+        + (window.DOLLWALK ? line('데리고 다니기', (String(window.DOLLWALK.key(me)) === String(id))
+            ? '<span style="color:#d4af37;">따라다니는 중</span> <span style="color:#6f685e;">— 광장 · 출몰지에서 뒤를 따라온다</span>'
+            : '<span style="color:#8d8578;">아니오</span>') : '')
 
         + '<button id="pet-room" class="game-btn" style="' + BTN + ' margin-top:12px;'
         + (P().showHas(id, me) ? GREY : '') + '">'
         + (P().showHas(id, me) ? '방에서 내린다' : '방에 내놓는다') + '</button>'
+        + (window.DOLLWALK ? '<button id="pet-walk" class="game-btn" style="' + BTN + (String(window.DOLLWALK.key(me)) === String(id) ? GREY : '') + '">'
+            + (String(window.DOLLWALK.key(me)) === String(id) ? '그만 데리고 다닌다' : '데리고 다닌다 — 광장 · 출몰지에서 따라온다') + '</button>' : '')
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')
@@ -282,6 +288,14 @@ function oneView(id) {
         } else {
             alert_(nm + P().josa(nm, '을') + ' 방에서 내렸습니다.');
         }
+        oneView(id);
+    };
+    const wk = w.querySelector('#pet-walk');
+    if (wk) wk.onclick = function () {
+        const on = String(window.DOLLWALK.key(me)) === String(id);
+        const nm = P().nick(id, me);
+        if (on) { window.DOLLWALK.set(null, me); alert_(nm + P().josa(nm, '은') + ' 이제 따라다니지 않습니다.'); }
+        else { window.DOLLWALK.set(id, me); alert_(nm + P().josa(nm, '이') + ' 광장 · 출몰지에서 뒤를 따라다닙니다.\n\n데리고 다니는 인형은 하나입니다.'); }
         oneView(id);
     };
     w.querySelector('#pet-care').onclick = function () {

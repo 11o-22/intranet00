@@ -2944,6 +2944,22 @@ function bandOf(r, lv) {
     if (lv === 2 && r.floor0) return r.floor0;
     return r.floor;
 }
+// ★ 길 띠가 x 에 따라 다른 방 — 🧸 출몰지는 가운데 테라스가 한 단 낮다 (2026-11-07 사용자 「저 위에서 걸어야 하는데 계속 내려가네」)
+//   r.floorX = [[x, 윗변, 아랫변], …] x 차례로. 매듭 사이는 선으로 잇는다 — 테라스 계단을 걸어 내려가듯 y 가 따라 내려간다.
+function upBand(r, x) {
+    const k = r.floorX;
+    if (!k || !k.length || x == null) return r.floor;
+    if (x <= k[0][0]) return [k[0][1], k[0][2]];
+    for (let i = 1; i < k.length; i++) {
+        if (x <= k[i][0]) {
+            const a = k[i - 1], b = k[i], t = (x - a[0]) / Math.max(1, b[0] - a[0]);
+            return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        }
+    }
+    const l = k[k.length - 1];
+    return [l[1], l[2]];
+}
+function bandAt(r, seg, x) { return (seg === 'up') ? upBand(r, x) : segBand(r, seg); }
 function stairTop(s) { return (s.y0[0] < s.y0[1]) ? { x: s.x[0], y: midY([s.y0[0], s.y1[0]]) } : { x: s.x[1], y: midY([s.y0[1], s.y1[1]]) }; }
 function stairBot(s) { return (s.y0[0] < s.y0[1]) ? { x: s.x[1], y: midY([s.y0[1], s.y1[1]]) } : { x: s.x[0], y: midY([s.y0[0], s.y1[0]]) }; }
 // 계단 윗끝이 닿는 띠 ('tp' · 'up') · 아랫끝이 닿는 띠 ('up' · 'dn')
@@ -3030,7 +3046,7 @@ function segBand(r, seg) {
 }
 // 그 선(띠) 위의 y. 띠면 **지금 y 를 띠 안으로 자른 값**, 선이면 선의 y.
 function segY(r, seg, x, y) {
-    const b = segBand(r, seg);
+    const b = bandAt(r, seg, x);
     if (b) return (y == null) ? midY(b) : Math.max(b[0], Math.min(b[1], y));
     return midY(stairBand(r.stairs[seg], x));
 }
@@ -3089,8 +3105,8 @@ function wayX(r, seg, want) {
 
 // 띠에서 다른 선으로 넘어갈 때 **어느 깊이로** 걸어 나가야 하나.
 //   아래로 가려면 띠 아랫변(계단 윗끝이 거기 있다), 위로 가려면 띠 윗변.
-function wayY(r, seg, want) {
-    const b = segBand(r, seg);
+function wayY(r, seg, want, x) {
+    const b = bandAt(r, seg, x != null ? x : run.x);
     if (!b) return null;
     return (segDeep(want, r) > segDeep(seg, r)) ? b[1] : b[0];
 }
@@ -3114,13 +3130,13 @@ function segStep(r, vdir) {
     //   계단 끝 y 가 띠 변과 같아서 갈아탈 때 위아래로 안 튄다.
     //   ★ 덱(floor0)이 있으면 — 길에서 위로 밀어 덱 계단 아랫끝에 서면 올라가고, 덱에서 아래로 밀어 계단 윗끝에 서면 내려온다 (2026-11-07)
     const bandSeg = segBand(r, run.seg) ? run.seg : null;
-    if (bandSeg && vdir > 0 && run.y >= segBand(r, bandSeg)[1] - 0.8) {
+    if (bandSeg && vdir > 0 && run.y >= bandAt(r, bandSeg, run.x)[1] - 0.8) {
         for (let i = 0; i < r.stairs.length; i++) {
             if (stairHi(r, r.stairs[i]) !== bandSeg) continue;
             const tx = stairTop(r.stairs[i]).x;
             if (Math.abs(run.x - tx) <= JOIN_X) { run.seg = i; run.x = tx; break; }
         }
-    } else if (bandSeg && vdir < 0 && run.y <= segBand(r, bandSeg)[0] + 0.8) {
+    } else if (bandSeg && vdir < 0 && run.y <= bandAt(r, bandSeg, run.x)[0] + 0.8) {
         for (let i = 0; i < r.stairs.length; i++) {
             if (stairLo(r, r.stairs[i]) !== bandSeg) continue;
             const bx = stairBot(r.stairs[i]).x;
@@ -3312,14 +3328,14 @@ function paintExits() {
     // 덱 계단 — 길에서 올라서는 자리(계단 아랫끝)에 표
     (r.stairs || []).forEach(function (s) {
         if (!r.floor0 || stairHi(r, s) !== 'tp') return;
-        mk('⇵', stairBot(s).x * z - 8, (r.floor[0] - 30) * z);
+        mk('⇵', stairBot(s).x * z - 8, (stairBot(s).y - 30) * z);
     });
     // ★ ▲ ▼ 는 안 세운다 — 건물 안팎은 이제 **입구를 눌러야** 드나든다.
     //   화살표만 남으면 걸어가면 넘어가는 줄 알고 바닥 끝을 더듬게 된다.
     // 계단 — 내려가고 올라가는 자리
     (r.stairs || []).forEach(function (s) {
         if (!r.floor2 || stairLo(r, s) !== 'dn') return;
-        mk('⇵', stairTop(s).x * z - 8, (r.floor[1] - 4) * z);
+        mk('⇵', stairTop(s).x * z - 8, (stairTop(s).y - 4) * z);
     });
 }
 
@@ -3755,7 +3771,7 @@ function tick(ts) {
         //   바닥 띠 위에서는 **짚은 깊이까지** 세로로도 걸어간다.
         const onSeg = (run.tseg == null || run.tseg === run.seg);
         const gx = onSeg ? run.tx : wayX(r, run.seg, run.tseg);
-        const gy = onSeg ? run.ty : wayY(r, run.seg, run.tseg);
+        const gy = onSeg ? run.ty : wayY(r, run.seg, run.tseg, gx != null ? gx : run.x);
         const ax = (gx == null ? run.tx : gx) - run.x;
         const ay = (gy == null) ? 0 : (gy - run.y);
         // ★ 한 칸에 갈 만큼 가까우면 **그 자리에 붙인다.**

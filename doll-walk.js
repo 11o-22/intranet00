@@ -5,12 +5,13 @@
 //
 //   2026-11-07 사용자 「펫 동행 누르면 펫이 아예 출몰지나 광장 같은 곳에서 같이 다닐 수 있게」
 //
-//   동행(사택 방에 내놓은 셋 · petShow) 가운데 첫째 인형이 주인 뒤를 졸졸 따라다닌다.
+//   데리고 다닐 인형 하나가 주인 뒤를 졸졸 따라다닌다 — 인형 돌보기(인형 목록)에서 인형을 눌러 고른다
+//   (u.petWalk = 인형 번호 · '0' 이면 아무도 · 안 정했으면 동행 첫째 — 2026-11-07 사용자 「따라다니는 동행 여부는 인형 돌보기에서 눌렀을 때 뜨게」).
 //   튜토리얼 · 여정 맵(doll-scene.js)에서 따라오던 것과 같은 그림(doll/pf.webp) · 같은 걸음.
 //   같은 방 사람들에게도 보인다 — 자리 묶음(plaza.js send)에 pt(종 번호)를 실어 보내고,
 //   받은 쪽은 그 사람 뒤에 같은 인형을 세운다.
 //
-//   콘솔: dollWalkState()
+//   콘솔: dollWalkState() · DOLLWALK.key() 지금 데리고 다니는 인형 · DOLLWALK.set(번호 | null)
 
 (function dollWalk() {
 'use strict';
@@ -22,14 +23,41 @@ const TRAIL = 120;
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function D() { return window.DOLL; }
 function stage() { try { return (typeof window.plazaStage === 'function') ? window.plazaStage() : null; } catch (e) { return null; } }
+// 데리고 다니는 인형의 번호 — 없으면 null
+function walkKey(u) {
+    try {
+        const M = D(), ds = M.dolls(u);
+        const v = u.petWalk;
+        let k = null;
+        if (v === 0 || v === '0') return null;                       // 아무도 안 데리고 다닌다
+        if (v != null && ds[String(v)]) k = String(v);
+        else if (v == null) { const w = M.withList(u); k = w[0] || null; }   // 안 정했으면 동행 첫째 (전처럼)
+        if (!k) return null;
+        const d = ds[k];
+        if (!d) return null;
+        if (d.out && d.out.till && d.out.till > M.now()) return null;   // 탐사 중
+        return k;
+    } catch (e) { return null; }
+}
 function leadSp(u) {
     try {
-        const w = D().withList(u);
-        if (!w.length) return null;
-        const d = D().dolls(u)[w[0]];
+        const k = walkKey(u);
+        if (!k) return null;
+        const d = D().dolls(u)[k];
         return d ? Number(d.sp) : null;
     } catch (e) { return null; }
 }
+// 인형 돌보기에서 고른다 — key 면 그 인형, null 이면 아무도
+function setWalk(key, u) {
+    u = u || u_();
+    if (!u) return false;
+    const v = key == null ? '0' : String(key);
+    if (v !== '0' && !D().dolls(u)[v]) return false;
+    u.petWalk = v;
+    try { D().put({ petWalk: v }, u); } catch (e) { }
+    return true;
+}
+window.DOLLWALK = { key: walkKey, set: setWalk };
 
 function css() {
     if (document.getElementById('dw-css')) return;
@@ -125,7 +153,7 @@ function tick() {
 window.plazaExtra = function () { const sp = leadSp(u_()); return sp != null ? { pt: sp } : {}; };
 
 window.dollWalkState = function () {
-    const o = { 방: F.room, 내_인형: F.me ? F.me.sp : null, 남: Object.keys(F.peers).map(function (c) { return c + ':' + F.peers[c].sp; }) };
+    const o = { 방: F.room, 데리고: walkKey(u_()), 내_인형: F.me ? F.me.sp : null, 남: Object.keys(F.peers).map(function (c) { return c + ':' + F.peers[c].sp; }) };
     console.log(o);
     return o;
 };
