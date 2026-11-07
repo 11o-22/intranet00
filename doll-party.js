@@ -77,6 +77,7 @@ function snap(k) {
     const D = M(), d = D.dolls()[k], s = D.stats(d);
     const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
     if (d.nick) o.nick = String(d.nick).slice(0, 12);
+    if (D.artOld(u_())) o.art = 'old';                   // 🎨 예전 펫 그림으로 보는 사원 (동료 화면에도)
     // 💠 먹인 속성 룬 — 여정에서도 공격 수단 (pet-rune.js · 2026-11-07 사용자)
     try { const R = window.PETRUNE; if (R) { const f = R.fed(k, u_()); if (f.length) { o.runes = f; o.runeN = R.uses(k, u_()); } } } catch (e) { }
     return o;

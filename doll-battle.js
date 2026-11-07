@@ -112,7 +112,7 @@ function fromDoll(id) {
     const M = D(), d = M.dolls()[id];
     if (!d) return null;
     const s = M.stats(d);
-    const o = { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d), runes: [], runeN: [] };
+    const o = { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d), runes: [], runeN: [], old: M.artOld() };
     // 💠 먹인 속성 룬 — 출몰 전투에서도 룬으로 친다 (2026-11-07 사용자 「공격할 때 룬 속성 공격도 추가」)
     try { const R = window.PETRUNE; if (R) { o.runes = R.fed(id); o.runeN = R.uses(id); } } catch (e) { }
     return o;
@@ -174,7 +174,7 @@ function css() {
     s.id = 'dbt-css';
     s.textContent = [
         '#dbt-ov{position:fixed;inset:0;z-index:99995;background:#131214;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}',
-        '#dbt-ov .st{position:absolute;left:50%;top:50%;transform-origin:0 0}',
+        '#dbt-ov .st{position:absolute;left:50%;top:50%;transform-origin:0 0;overflow:hidden}',   // ★ 밀어 둔 판(스테이터스 · 인형)이 넓은 화면에서 판 밖으로 비치지 않게 (2026-11-07)
         '#dbt-ov .ly{position:absolute;left:0;top:0;width:314px;height:685px;image-rendering:pixelated;pointer-events:none}',
         '#dbt-ov .grp{position:absolute;left:0;top:0;width:314px;height:685px;pointer-events:none;transition:transform .7s cubic-bezier(.2,.8,.3,1)}',
         '#dbt-ov .spr{position:absolute;transition:transform .18s, opacity .35s, filter .25s}',
@@ -318,7 +318,7 @@ function paintFoe(silhouette) {
         e.innerHTML = '<div style="' + D().monCss(f.mon, px) + '"></div>';
         e.style.left = (AT.foe.cx - px / 2) + 'px'; e.style.top = (AT.foe.foot - px + 2) + 'px';
     } else {
-        e.innerHTML = '<div class="bob" style="' + D().spriteCss(f.sp, 64) + '"></div>';
+        e.innerHTML = '<div class="bob" style="' + D().spriteCss(f.sp, 64, false, f.old) + '"></div>';
         e.style.left = (AT.foe.cx - 32) + 'px'; e.style.top = (AT.foe.foot - 62) + 'px';
     }
     e.style.filter = silhouette ? 'brightness(0) invert(1) opacity(.9)' : '';
@@ -326,8 +326,8 @@ function paintFoe(silhouette) {
 function paintMe() {
     const m = B.me, e = B.ui.me, bp = q('.bpet');
     if (!m) { e.innerHTML = ''; if (bp) bp.innerHTML = ''; return; }
-    e.innerHTML = '<div' + (B.foe && B.foe.wild ? ' class="bob2"' : '') + ' style="' + D().spriteCss(m.sp, AT.me.px, true) + '"></div>';
-    if (bp) bp.innerHTML = '<div style="' + D().spriteCss(m.sp, AT.btnPet.px) + '"></div>';
+    e.innerHTML = '<div' + (B.foe && B.foe.wild ? ' class="bob2"' : '') + ' style="' + D().spriteCss(m.sp, AT.me.px, true, m.old) + '"></div>';
+    if (bp) bp.innerHTML = '<div style="' + D().spriteCss(m.sp, AT.btnPet.px, false, m.old) + '"></div>';
 }
 function hpColor(p) { return p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30'); }
 function paintStat() {
@@ -841,7 +841,7 @@ function dollStrip(list, cur) {
         const ko = c.hp <= 0, isCur = String(c.id) === String(cur);
         const p = Math.max(0, Math.min(1, c.hp / Math.max(1, c.max)));
         return '<button data-k="sw:' + esc(String(c.id)) + '" class="' + (isCur ? 'cur' : '') + (ko ? ' ko' : '') + '"' + ((isCur || ko) ? ' disabled' : '') + '>'
-            + '<span class="sp" style="' + D().spriteCss(c.sp, 48) + '"></span>'
+            + '<span class="sp" style="' + D().spriteCss(c.sp, 48, false, c.old) + '"></span>'
             + '<span class="nm">' + esc(c.name) + '</span>'
             + '<span class="hp"><i style="width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></span>'
             + '<small>' + Math.ceil(Math.max(0, c.hp)) + '/' + c.max + (isCur ? ' · 나와 있음' : ko ? ' · 쓰러짐' : ' · 내보내기') + '</small>'
@@ -1159,7 +1159,7 @@ function allyPaint() {
         if (!a || !a.d) return '<div class="ally" data-c="' + c + '" style="font-size:7px;color:#aaa;background:rgba(0,0,0,.55);margin-bottom:2px;padding:1px 4px;border-radius:3px">' + esc(a ? a.name : '') + ' — 지침</div>';
         const p = Math.max(0, a.d.hp) / a.d.max;
         return '<div class="ally" data-c="' + c + '" style="display:flex;align-items:center;gap:3px;font-size:7px;color:#fff;background:rgba(0,0,0,.55);margin-bottom:2px;padding:1px 4px;border-radius:3px;transition:transform .15s,opacity .2s">'
-            + '<div style="' + D().spriteCss(a.d.sp, 16) + '"></div><div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden">' + esc(a.name) + ' · ' + esc(a.d.nick || D().spName(a.d.sp)) + '</div>'
+            + '<div style="' + D().spriteCss(a.d.sp, 16, false, !!a.d.art) + '"></div><div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden">' + esc(a.name) + ' · ' + esc(a.d.nick || D().spName(a.d.sp)) + '</div>'
             + '<div style="height:3px;background:#333"><i style="display:block;height:100%;width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></div></div></div>';
     });
     box.innerHTML = rows.join('');
@@ -1168,7 +1168,7 @@ function myFrom(run, code) {
     const m = run.members[code];
     if (!m || m.out || !m.act || !m.dolls || !m.dolls[m.act]) return null;
     const d = m.dolls[m.act];
-    return { id: m.act, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: d.hp, max: d.max, sk: skills(d.sp), bond: d.bond };
+    return { id: m.act, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: d.hp, max: d.max, sk: skills(d.sp), bond: d.bond, old: !!d.art };
 }
 function matesFrom(run, code) {
     const out = {};
@@ -1239,7 +1239,8 @@ async function partyFight(o) {
                 if (k) o.pick(k);
             }
             menu(0);
-            B.ui.txt.textContent = Object.keys(B.mates).length ? '다른 사원이 고르기를 기다리는 중…' : '…';
+            const meOut = !!(run.members && run.members[o.code] && run.members[o.code].out);
+            B.ui.txt.textContent = meOut ? '내 봉제인형이 모두 지쳤다 — 동료의 싸움을 지켜본다…' : (Object.keys(B.mates).length ? '다른 사원이 고르기를 기다리는 중…' : '…');
         }
         const lg = await o.waitLog(r);
         if (!B) return { res: 'gone' };
@@ -1271,7 +1272,7 @@ function pickOne(o, run, mine) {
                 const RT = window.PETRUNE;
                 const box = el('div', 'menu');
                 // 🧸 동행 셋을 그림으로 — 누르면 바꿔 내보낸다 (나와 있는 것 · 쓰러진 것은 못 누른다)
-                const strip = dollStrip(Object.keys(m.dolls || {}).map(function (x) { const d = m.dolls[x]; return { id: x, sp: d.sp, name: d.nick || D().spName(d.sp), hp: Number(d.hp) || 0, max: d.max }; }), m.act);
+                const strip = dollStrip(Object.keys(m.dolls || {}).map(function (x) { const d = m.dolls[x]; return { id: x, sp: d.sp, name: d.nick || D().spName(d.sp), hp: Number(d.hp) || 0, max: d.max, old: !!d.art }; }), m.act);
                 box.innerHTML = strip
                     + rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
                     + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">🎀 포옹 리본은 어둠에서 쓸 수 없다' + (rl.length ? '' : ' · 룬을 먹인 인형은 룬으로도 친다') + '</div><button data-k="back">돌아간다</button>';
@@ -1318,7 +1319,7 @@ async function partyEnd(r, o) {
 //   싸우는 것은 **인형**이다 — 인형 체력이 먼저 다 닳는 쪽이 진다. 끝나면 인형 체력은 그대로 적힌다 (수선소).
 function arrOf(v) { return Array.isArray(v) ? v : (v && typeof v === 'object') ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; }
 function fromSnap(d, id) {
-    return { id: id, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: Number(d.hp) || 0, max: d.max, atk: d.atk, def: d.def, eva: d.eva, crit: d.crit, sk: skills(d.sp), bond: d.bond, runes: arrOf(d.runes), runeN: arrOf(d.runeN) };
+    return { id: id, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: Number(d.hp) || 0, max: d.max, atk: d.atk, def: d.def, eva: d.eva, crit: d.crit, sk: skills(d.sp), bond: d.bond, runes: arrOf(d.runes), runeN: arrOf(d.runeN), old: !!d.art };
 }
 function resolvePvp(cur) {
     if (!cur || cur.stage !== 'fight' || !cur.pick || !cur.pick.a || !cur.pick.b || !cur.a || !cur.b || !cur.a.doll || !cur.b.doll) return;
@@ -1522,7 +1523,7 @@ function pvpPick(o, v) {
                 const mine = (o.get() || {})[o.side] || {};
                 const team = Object.keys(mine.dolls || {}).map(function (id) {
                     const d = mine.dolls[id]; const isCur = String(id) === String(mine.act);
-                    return { id: id, sp: d.sp, name: d.nick || D().spName(d.sp), hp: isCur ? me.hp : (Number(d.hp) || 0), max: d.max };
+                    return { id: id, sp: d.sp, name: d.nick || D().spName(d.sp), hp: isCur ? me.hp : (Number(d.hp) || 0), max: d.max, old: !!d.art };
                 });
                 box.innerHTML = dollStrip(team, mine.act)
                     + rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')

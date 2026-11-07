@@ -72,15 +72,15 @@ function css() {
 
 // 한 사람의 인형 — { el, sp, px, trail, L, T }
 const F = { me: null, peers: {}, room: null };
-function mk(sp, px) {
+function mk(sp, px, old) {
     css();
     const el = document.createElement('div');
     el.className = 'plaza-doll';
     el.style.width = px + 'px'; el.style.height = px + 'px';
     const i = document.createElement('i');
-    i.style.cssText = D().spriteCss(sp, px);
+    i.style.cssText = D().spriteCss(sp, px, false, !!old);
     el.appendChild(i);
-    return { el: el, sp: sp, px: px, trail: [], L: null, T: null, face: 1 };
+    return { el: el, sp: sp, px: px, old: !!old, trail: [], L: null, T: null, face: 1 };
 }
 function sizeOf(st) {
     // 사람 키(dot 384 × k) 의 몫 — 도트가 고르게 찍히게 4 의 배수로
@@ -114,10 +114,10 @@ function put(o, st, x, y, face, moving) {
     if (walking !== o.walk) { o.walk = walking; o.el.classList.toggle('walk', walking); }
 }
 function drop(o) { if (o && o.el) { try { o.el.remove(); } catch (e) { } } }
-function want(o, st, sp) {
+function want(o, st, sp, old) {
     const px = sizeOf(st);
-    if (o && (o.sp !== sp || o.px !== px || o.el.parentNode !== st.el)) { drop(o); o = null; }
-    if (!o && sp != null) { o = mk(sp, px); st.el.appendChild(o.el); }
+    if (o && (o.sp !== sp || o.px !== px || o.old !== !!old || o.el.parentNode !== st.el)) { drop(o); o = null; }
+    if (!o && sp != null) { o = mk(sp, px, old); st.el.appendChild(o.el); }
     return o;
 }
 
@@ -129,7 +129,7 @@ function tick() {
     // 나
     const w = window.plazaWhere ? window.plazaWhere() : null;
     const sp = leadSp(u);
-    F.me = want(F.me, st, sp);
+    F.me = want(F.me, st, sp, D().artOld(u));
     if (F.me && w) {
         const moving = (lastX != null) && (Math.abs(w.x - lastX) > 0.3 || Math.abs(w.y - lastY) > 0.3);
         lastX = w.x; lastY = w.y;
@@ -142,7 +142,7 @@ function tick() {
         const q = window.plazaPeerPos ? window.plazaPeerPos(c) : null;
         if (!q || q.pt == null || q.hid) { if (F.peers[c]) { drop(F.peers[c]); delete F.peers[c]; } return; }
         seen[c] = 1;
-        F.peers[c] = want(F.peers[c], st, Number(q.pt));
+        F.peers[c] = want(F.peers[c], st, Number(q.pt), !!q.po);
         if (F.peers[c]) put(F.peers[c], st, q.x, q.y, q.face, q.moving);
     });
     Object.keys(F.peers).forEach(function (c) { if (!seen[c]) { drop(F.peers[c]); delete F.peers[c]; } });
@@ -150,7 +150,7 @@ function tick() {
 (function loop() { try { tick(); } catch (e) { } requestAnimationFrame(loop); })();
 
 // 자리 묶음에 실어 보내는 것 — 데리고 다니는 인형의 종
-window.plazaExtra = function () { const sp = leadSp(u_()); return sp != null ? { pt: sp } : {}; };
+window.plazaExtra = function () { const sp = leadSp(u_()); if (sp == null) return {}; const o = { pt: sp }; try { if (D().artOld(u_())) o.po = 1; } catch (e) { } return o; };
 
 window.dollWalkState = function () {
     const o = { 방: F.room, 데리고: walkKey(u_()), 내_인형: F.me ? F.me.sp : null, 남: Object.keys(F.peers).map(function (c) { return c + ':' + F.peers[c].sp; }) };

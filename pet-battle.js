@@ -227,6 +227,7 @@ function dollSnap(key, u) {
     const s = D.stats(d);
     const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
     if (d.nick) o.nick = String(d.nick).slice(0, 12);
+    try { if (D.artOld(u)) o.art = 'old'; } catch (e) { }   // 🎨 예전 펫 그림 — 상대 화면에도
     try { const f = R().fed(key, u); if (f.length) { o.runes = f; o.runeN = R().uses(key, u); } } catch (e) { }
     return o;
 }

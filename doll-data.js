@@ -220,7 +220,22 @@ function rollGrade(luck) {
 // 그림 — 앞(pf · 64칸 · 1~25) / 뒤(pb · 64칸 · 그려 쓸 때 두 배) · 5 × 5
 function cellOf(sp) { const i = Math.max(1, Math.min(25, (P() && P().sp ? P().sp(sp) : Number(sp)) || 1)) - 1; return { c: i % 5, r: Math.floor(i / 5) }; }
 //   px — 한 칸을 몇 px 로 그리나. back 이면 뒷모습
-function spriteCss(sp, px, back) {
+// 🎨 예전 펫 그림으로 보는 사원 — u.petArt 'old' / 'doll' 로 정하고, 안 정했으면 이름이 Banz 인 사원 (2026-11-07 사용자 「Banz 사원한테는 봉제인형이 아니라 기존에 있던 펫 그림으로」)
+//   상담사 콘솔: dollArtSet('사번', 'old' | 'doll' | null)
+function artOld(u) {
+    u = u || u_();
+    if (!u) return false;
+    if (u.petArt === 'old') return true;
+    if (u.petArt === 'doll') return false;
+    return String(u.name || '').trim().toLowerCase() === 'banz';
+}
+function oldCss(sp, px) {
+    const n = String(Math.max(1, Number(sp) || 1)).padStart(2, '0');
+    return 'background-image:url(pet/' + (px > 64 ? 'p' : 's') + n + '.webp);background-repeat:no-repeat;background-position:center bottom;background-size:contain;image-rendering:pixelated;'
+        + 'width:' + px + 'px;height:' + px + 'px;';
+}
+function spriteCss(sp, px, back, old) {
+    if (old) return oldCss(sp, px);
     const c = cellOf(sp);
     return 'background-image:url(doll/' + (back ? 'pb' : 'pf') + '.webp);background-repeat:no-repeat;image-rendering:pixelated;'
         + 'background-size:' + (px * 5) + 'px ' + (px * 5) + 'px;background-position:' + (-c.c * px) + 'px ' + (-c.r * px) + 'px;'
@@ -524,7 +539,7 @@ window.DOLL = {
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
     stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
-    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf,
+    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,
     addDoll: addDoll, patchDoll: patchDoll, removeDoll: removeDoll, setWith: setWith,
@@ -532,5 +547,11 @@ window.DOLL = {
     bondOf: bondOf, bondUp: bondUp, BOND_MAX: BOND_MAX, gradeNeed: gradeNeed, gradeUp: gradeUp, migrate: migrate
 };
 
-console.log('[🧸] 따라쟁이 봉제인형 (= 펫) — dollState()');
+window.dollArtSet = function (code, v) {
+    const me = u_(), d = db_();
+    if (!me || !isAdmin(me) || !d) { console.warn('상담사만 쓸 수 있습니다.'); return; }
+    const val = (v === 'old' || v === 'doll') ? v : null;
+    d.ref('users/' + code + '/petArt').set(val).then(function () { console.log('%c✓ ' + code + ' — 펫 그림 ' + (val || '기본(이름이 Banz 면 예전 그림)'), 'color:#4CAF50'); });
+};
+console.log('[🧸] 따라쟁이 봉제인형 (= 펫) — dollState() · dollArtSet(사번, old|doll)');
 })();

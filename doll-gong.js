@@ -110,7 +110,7 @@ function panel(html, onClose) {
     dim._close = close;
     return dim;
 }
-function icon(sp, px) { return '<div class="ic" style="' + D().spriteCss(sp, px || 40) + '"></div>'; }
+function icon(sp, px) { return '<div class="ic" style="' + D().spriteCss(sp, px || 40, false, D().artOld()) + '"></div>'; }
 function hpBar(d) {
     const M = D(), mx = M.stats(d).max, h = M.hpOf(d), p = h / mx;
     return '<div class="gb-hp"><i style="width:' + Math.round(p * 100) + '%;background:' + (p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30')) + '"></i></div>';
@@ -427,7 +427,7 @@ function dex(S) {
                 + window.PET.LIST.map(function (p) {
                     const e = dx[p.i] || {};
                     const s = !!e.s, c = !!e.c;
-                    return '<div class="c"><div style="display:flex;justify-content:center;' + (s ? '' : 'filter:brightness(0) opacity(.5)') + '">' + '<div style="' + M.spriteCss(p.i, 44) + '"></div></div>'
+                    return '<div class="c"><div style="display:flex;justify-content:center;' + (s ? '' : 'filter:brightness(0) opacity(.5)') + '">' + '<div style="' + M.spriteCss(p.i, 44, false, M.artOld()) + '"></div></div>'
                         + '<div class="no">No.' + String(p.i).padStart(2, '0') + (c ? ' 🎀' : '') + '</div><div>' + (s ? esc(p.n) + ' ' + (M.ATTR[p.w] || {}).e : '???') + '</div>'
                         + (c ? '<div class="no">' + (e.n || 1) + '마리</div>' : '') + '</div>';
                 }).join('') + '</div>';
@@ -596,7 +596,7 @@ function slotHtml(e, d, s, px) {
     const mx = M.stats(d).max, h = M.hpOf(d), p = h / mx, f = M.fullPct(d);
     e.innerHTML = '<div class="hb"><i style="width:' + Math.round(p * 100) + '%;background:' + (p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30')) + '"></i></div>'
         + (d.fav ? '<div class="st">★</div>' : '')
-        + '<div style="' + M.spriteCss(d.sp, Math.round(px * s * 0.95)) + 'pointer-events:none' + (h <= 0 ? ';filter:grayscale(1) opacity(.6)' : '') + '"></div>'
+        + '<div style="' + M.spriteCss(d.sp, Math.round(px * s * 0.95), false, M.artOld()) + 'pointer-events:none' + (h <= 0 ? ';filter:grayscale(1) opacity(.6)' : '') + '"></div>'
         + '<div class="nm" style="font-size:' + (6.5 * s) + 'px;' + (f < 30 ? 'color:#c0392b' : '') + '">' + esc(M.nickOf(d)) + '</div>';
 }
 // 누르기 · 길게 눌러 끌기
@@ -611,7 +611,7 @@ function bindDrag(box, s) {
             timer = setTimeout(function () {
                 drag = document.createElement('div');
                 drag.className = 'db-ghost';
-                drag.innerHTML = '<div style="' + D().spriteCss(D().dolls()[e.dataset.id].sp, Math.round(46 * s)) + '"></div>';
+                drag.innerHTML = '<div style="' + D().spriteCss(D().dolls()[e.dataset.id].sp, Math.round(46 * s), false, D().artOld()) + '"></div>';
                 document.body.appendChild(drag);
                 place(ev.clientX, ev.clientY);
             }, 350);

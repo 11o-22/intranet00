@@ -4432,6 +4432,7 @@ function onSeat(code, v, fresh) {
     q.ho = (typeof v.ho === 'number') ? v.ho : 0;   // 🍍 남의 머리 위 어디쯤
     q.fx = (typeof v.fx === 'string') ? v.fx : null;  // 🎵 둘레 효과 (LP 판)
     q.pt = (v.pt != null) ? v.pt : null;              // 🧸 데리고 다니는 봉제인형 (doll-walk.js)
+    q.po = v.po ? 1 : 0;                              // 🎨 예전 펫 그림으로 보이는 사원 (doll-walk.js)
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
@@ -6392,7 +6393,7 @@ window.plazaWhere = function () {
 window.plazaPeerPos = function (code) {
     const q = run && run.peers && run.peers[code];
     if (!q) return null;
-    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, moving: !!q.moving };
+    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, po: !!q.po, moving: !!q.moving };
 };
 window.plazaMeFace = function () { try { return (run && run.me && run.me.actor.facing()) || 1; } catch (e) { return 1; } };
 // ⚔ 펫 배틀 연출(pet-arena.js) — 그 사번의 사람 칸 (나 · 같은 방의 남). 없으면 null

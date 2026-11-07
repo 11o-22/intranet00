@@ -410,7 +410,7 @@ function makeDoll() {
     const px = Math.round(26 * run.Z);                   // 2026-11-07 사용자 「인형 크기를 좀 줄이자」 (34 → 26)
     const el = document.createElement('div');
     el.className = 'ds-doll';
-    el.innerHTML = '<div style="' + D().spriteCss(d.sp, px) + 'animation:dsbob .5s steps(2) infinite paused"></div>';
+    el.innerHTML = '<div style="' + D().spriteCss(d.sp, px, false, D().artOld()) + 'animation:dsbob .5s steps(2) infinite paused"></div>';
     el.style.width = px + 'px'; el.style.height = px + 'px';
     run.world.appendChild(el);
     run.dollEl = el; run.dollPx = px;
