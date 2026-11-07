@@ -112,7 +112,10 @@ function fromDoll(id) {
     const M = D(), d = M.dolls()[id];
     if (!d) return null;
     const s = M.stats(d);
-    return { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d) };
+    const o = { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d), runes: [], runeN: [] };
+    // 💠 먹인 속성 룬 — 출몰 전투에서도 룬으로 친다 (2026-11-07 사용자 「공격할 때 룬 속성 공격도 추가」)
+    try { const R = window.PETRUNE; if (R) { o.runes = R.fed(id); o.runeN = R.uses(id); } } catch (e) { }
+    return o;
 }
 // 🔺 야생 인형의 등급 — 내가 앞세울 인형의 등급을 꼭짓점으로 한 피라미드 (2026-11-07 사용자 「등급 차이가 너무 나버리면 안 되니까」)
 //   같은 등급 40 · 한 단계 아래 25 · 한 단계 위 20 · 두 단계 아래 8 · 두 단계 위 5 · 세 단계 1 — 범위 밖은 버리고 남은 몫으로 뽑는다
@@ -186,6 +189,10 @@ function css() {
         '#dbt-ov .menu{position:absolute;left:28px;top:363px;width:258px;max-height:238px;overflow:auto;background:#d5cbea;border:3px solid #aa91db;padding:6px;box-sizing:border-box}',
         '#dbt-ov .menu button{display:block;width:100%;margin:0 0 5px;padding:7px 6px;background:#c9b9e8;border:2px solid #524173;color:#2a2140;font-size:10px;font-weight:bold;text-align:left}',
         '#dbt-ov .menu button[disabled]{opacity:.45}',
+        // 💠 룬 속성 공격 — 기술 판 아래 빈 자리(610~680)에 가로로 (2026-11-07 사용자)
+        '#dbt-ov .rrow{top:608px;max-height:74px;padding:4px 5px;display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start}',
+        '#dbt-ov .rrow .lb{flex:0 0 100%;font-size:7.5px;color:#524173;margin:0 0 1px}',
+        '#dbt-ov .rrow button{flex:1 1 40%;width:auto;margin:0;padding:6px 4px;font-size:9.5px;text-align:center}',
         // 🧸 동행 셋 — 소지품에 그림으로 띄워 바꿔 내보낸다 (2026-11-07 사용자 「동행 펫 세마리 소지품에 띄워서 교체 가능하게 · 전투중에」)
         '#dbt-ov .dstrip{display:flex;gap:5px;margin:0 0 6px}',
         '#dbt-ov .dstrip button{flex:1 1 0;min-width:0;margin:0;padding:5px 3px 4px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}',
@@ -381,7 +388,37 @@ function menu(mode) {
     pane(B.ui.b1, mode === 1);
     pane(B.ui.b2, mode === 2);
     B.ui.dim.style.opacity = (mode === 1 || mode === 2) ? '0' : (mode === 3 ? '.82' : '.55');
-    const old = q('.menu'); if (old) fadeRm(old);
+    Array.prototype.forEach.call(B.ui.st.querySelectorAll('.menu'), fadeRm);
+}
+// 💠 룬 속성 공격 줄 — 기술 판(menu 2)과 함께. 누르면 wait() 가 'rn:i' 로 풀린다
+function runeRow(me) {
+    const RT = window.PETRUNE;
+    const rl = me ? arrOf(me.runes) : [], rn = me ? arrOf(me.runeN) : [];
+    if (!rl.length) return null;
+    const box = el('div', 'menu rrow');
+    box.innerHTML = '<div class="lb">💠 룬 속성 공격 — 빗나가지 않고 급소가 잦다 · 전투 ' + (RT ? RT.WEAR_MAX : 7) + '번이면 깨진다</div>'
+        + rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬 <small>(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('');
+    B.ui.st.appendChild(box);
+    Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+        b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+        b.onclick = function (ev) { ev.stopPropagation(); const f = B && B.pick; if (!f) return; B.pick = null; b.classList.add('prs'); setTimeout(function () { f(b.dataset.k); }, 100); };
+    });
+    return box;
+}
+// 💠 룬으로 친다 (출몰 전투) — 빗나가지 않는다 · 급소 +20 · 속성을 안 탄다
+async function runeAttack(rn) {
+    const A = B.me, Dd = B.foe, RT = window.PETRUNE;
+    const tag = RT ? RT.tag(rn) : rn;
+    await say(fmt(pick(TX.use), { a: A.name, m: tag + ' 룬' }), 1100);
+    await lunge('me');
+    const crit = Math.random() * 100 < (A.crit || 5) + 20;
+    const dm = Math.max(1, Math.round((A.atk * 1.45 * 1.6 - (Dd.def || 0) * 0.6) * rnd(0.92, 1.08) * (crit ? 1.5 : 1)));
+    await blink('foe');
+    await setHp('foe', Dd.hp - dm);
+    if (crit) await say(fmt(pick(TX.crit), { a: A.name }), 1000);
+    await say(fmt(pick(TX.hit), { a: A.name, d: Dd.name }) + ' (' + dm + ')', 1000);
+    if (Dd.hp > 0 && Dd.hp / Dd.max < 0.25 && Math.random() < 0.5) await say(fmt(pick(TX.low), { d: Dd.name }), 1000);
+    return { dmg: dm, hit: true, crit: crit };
 }
 // 누른 칸이 잠깐 눌려 보인 뒤에 넘어간다
 function onTap(ev) {
@@ -400,7 +437,7 @@ async function enterFx(ui, dark) {
     const v = ui.veil;
     ui.ov.style.background = 'transparent'; ui.st.style.opacity = '0';
     v.style.background = '#fff'; v.style.transition = 'opacity .45s ease-in';
-    await sleep(30); v.style.opacity = '1';
+    await sleep(30); v.style.opacity = '.7';                          // ★ 눈부시지 않게 — 전에는 1 (2026-11-07 사용자 「흰색 화면 밝기를 낮추자」)
     await sleep(480);
     ui.ov.style.background = ''; ui.st.style.opacity = '1';
     if (dark) ui.foe.style.filter = 'brightness(0)';
@@ -585,7 +622,7 @@ async function myFaint() {
     B.out[m.id] = m;
     const next = nextDoll();
     if (!next) { B.me = null; return; }
-    B.me = next;
+    B.me = next; B.used[next.id] = 1;
     paintMe(); paintStat();
     await say(fmt(pick(TX.go), { a: next.name }), 1100);
     await whiteIn('me');
@@ -607,7 +644,7 @@ async function begin(opt) {
     if (B) return { res: 'busy' };
     const M = D();
     const ui = build(opt.loc);
-    B = { ui: ui, opt: opt, foe: opt.foe, me: null, out: {}, cache: {}, kind: opt.kind, tut: !!opt.tut, pick: null, wrapped: false };
+    B = { ui: ui, opt: opt, foe: opt.foe, me: null, out: {}, cache: {}, kind: opt.kind, tut: !!opt.tut, pick: null, wrapped: false, used: {} };
     ui.ov.addEventListener('pointerdown', onTap);
     paintFoe(B.foe.wild ? 'base' : false);
     paintStat();
@@ -634,6 +671,7 @@ async function begin(opt) {
     // ─ 내 인형
     B.me = nextDoll();
     if (B.me) {
+        B.used[B.me.id] = 1;
         paintMe(); paintStat();
         await say(fmt(pick(TX.go), { a: B.me.name }), 1100);
         await whiteIn('me');
@@ -695,11 +733,17 @@ async function loop() {
         AT.def.forEach(function (_, i) { const s = sk.d[i]; q('.skd' + i).innerHTML = s ? esc(s[0]) + '<small>' + esc((T().NAME || {})[s[1]] || '') + '</small>' : ''; });
         B.ui.txt.textContent = B.me.name + D().josa(B.me.name, '은') + ' 무엇을 쓸까? (위 셋은 공격 · 아래 둘은 방어)';
         menu(2);
+        runeRow(B.me);
         const k2 = await wait();
         if (k2 === 'back') continue;
         menu(0);
         let guard = null;
-        if (k2.charAt(0) === 'a') {
+        if (k2.indexOf('rn:') === 0) {                                 // 💠 룬 속성 공격
+            const rn = (B.me.runes || [])[Number(k2.slice(3))];
+            if (!rn) continue;
+            B.used[B.me.id] = 1;
+            await runeAttack(rn);
+        } else if (k2.charAt(0) === 'a') {
             const s = sk.a[Number(k2.slice(1))];
             if (!s) continue;
             await attack('me', s, null);
@@ -846,7 +890,7 @@ async function swapTo(id) {
         await faintFx('me');
         B.ui.me.style.transform = '';
     }
-    B.me = c;
+    B.me = c; B.used[c.id] = 1;
     paintMe(); paintStat(); showStat(true, true);
     await say(fmt(pick(TX.go), { a: c.name }), 1000);
     await whiteIn('me');
@@ -875,8 +919,9 @@ async function throwRibbon() {
     rb.remove();
     B.ui.foe.style.transform = 'scale(.1)'; B.ui.foe.style.opacity = '0';
     await say(fmt(pick(TX.wrap), { d: f.name }), 1100);
-    // 잡힐 몫 — 등급이 높을수록 · 체력이 많을수록 어렵다
-    let p = (CATCH[f.g] || 0.5) * (1 - 0.66 * f.hp / f.max) + 0.1;
+    // 잡힐 몫 — 등급이 높을수록 · 체력이 많을수록 어렵다. ★ 체력이 많이 남았으면 리본을 풀고 다시 나온다 (2026-11-07 사용자 「체력에 따라서 확률적으로 다시 나오게」)
+    //   D 등급: 체력 가득 18% · 절반 49% · 1할 남으면 83%  /  S 등급: 7% · 12% · 18%
+    let p = (CATCH[f.g] || 0.5) * (1 - 0.85 * f.hp / f.max) + 0.05;
     p = Math.max(0.05, Math.min(0.95, p));
     if (B.tut) p = 1;
     const ok = Math.random() < p;
@@ -886,8 +931,14 @@ async function throwRibbon() {
     setTimeout(function () { sit.remove(); }, 4000);
     for (let i = 0; i < wob; i++) { sit.style.animation = 'dbwob .5s 1'; await sleep(560); sit.style.animation = ''; await sleep(260); }
     if (!ok) {
+        // 리본이 터져 날아가고 — 인형이 튀어나온다
+        fx('💥', [AT.foe.cx - 12, AT.foe.foot - 50], 700);
+        sit.style.transition = 'transform .4s ease-in, opacity .4s'; sit.style.transform = 'translate(26px,-70px) rotate(260deg)'; sit.style.opacity = '0';
+        const e = B.ui.foe;
+        e.style.transition = 'transform .38s cubic-bezier(.2,1.7,.4,1), opacity .15s'; e.style.transform = 'scale(1)'; e.style.opacity = '1';
+        await sleep(420);
+        e.style.transition = ''; e.style.transform = '';
         sit.remove();
-        B.ui.foe.style.transform = ''; B.ui.foe.style.opacity = '1';
         await say(fmt(pick(TX.miss2), { d: f.name }), 1300);
         return 'used';
     }
@@ -917,6 +968,10 @@ async function finish(r) {
         Object.keys(B.cache).forEach(function (id) { saveHp(B.cache[id]); });
         if (B.me) saveHp(B.me);
     } catch (e) { }
+    // 💠 나왔던 인형의 먹인 룬은 전투 한 번을 치렀다 — 일곱 번이면 깨진다 (튜토리얼은 안 센다)
+    let broke = [];
+    try { const RT = window.PETRUNE; if (RT && !B.tut && B.used) Object.keys(B.used).forEach(function (id) { broke = broke.concat(RT.wear(id) || []); }); } catch (e) { }
+    if (broke.length) { try { const RT = window.PETRUNE; setTimeout(function () { try { window.DOLLSCENE.sys('💠 ' + broke.map(RT.tag).join(' · ') + ' 룬이 깨졌다 (전투 ' + RT.WEAR_MAX + '번)', 4000); } catch (x) { } }, 1600); } catch (e) { } }
     menu(0);
     const ov = B.ui.ov;
     await exitFx(B.ui);
@@ -1233,6 +1288,7 @@ function pickOne(o, run, mine) {
             AT.def.forEach(function (_, i) { const s1 = sk.d[i]; q('.skd' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
             B.ui.txt.textContent = mine.name + D().josa(mine.name, '은') + ' 무엇을 쓸까? (위 셋은 공격 · 아래 둘은 방어)';
             menu(2);
+            try { const cur = (run.members[o.code].dolls || {})[run.members[o.code].act]; runeRow(cur); } catch (e) { }   // 💠 룬 속성 공격 줄
             const k2 = await wait();
             if (k2 === 'back') return loop();
             menu(0);
@@ -1484,6 +1540,7 @@ function pvpPick(o, v) {
             AT.def.forEach(function (_, i) { const s1 = sk.d[i]; q('.skd' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
             B.ui.txt.textContent = me.name + D().josa(me.name, '은') + ' 무엇을 쓸까? (위 셋은 공격 · 아래 둘은 방어)';
             menu(2);
+            runeRow(me);                                                // 💠 룬 속성 공격 줄
             const k2 = await wait();
             if (!B) return resolve(null);
             if (k2 === 'back') return loop();

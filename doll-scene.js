@@ -745,7 +745,7 @@ function flash(n) {
         const step = function () {
             if (i >= n * 2) { f.style.opacity = '0'; r(); return; }
             f.style.background = (i % 4 < 2) ? '#fff' : '#000';
-            f.style.opacity = (i % 2 === 0) ? '0.9' : '0';
+            f.style.opacity = (i % 2 === 0) ? '0.55' : '0';            // ★ 눈부시지 않게 — 전에는 .9 (2026-11-07 사용자)
             i++;
             setTimeout(step, 90);
         };
