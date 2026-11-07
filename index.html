@@ -1104,6 +1104,13 @@
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5d4037, #3e2723); border-color:#4e342e; margin:0;" onclick="adminClearNotes()">특이사항 초기화</button>
                 <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #00695c, #004d40); border-color:#00897b; margin:0;" onclick="adminClearBuffs()">버프 제거</button>
             </div>
+            <!-- ★ 장비 하나씩 빼기 (2026-11-06 · admin-equip.js) -->
+            <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
+                <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #455a64, #37474f); border-color:#263238; margin:0;" onclick="adminLoadEquips()">장비 조회</button>
+                <select id="adm-equip-item" style="flex:2; min-width:0;"><option value="">-- 사번 조회 필요 --</option></select>
+                <button class="game-btn" style="flex:0 0 auto; background:linear-gradient(145deg, #e65100, #bf360c); border-color:#e65100; margin:0; padding:8px 10px;" onclick="adminUnequipOne(false)" title="채워 준 사람(없으면 본인) 소지품으로 돌려줍니다">해제</button>
+                <button class="game-btn" style="flex:0 0 auto; background:linear-gradient(145deg, #c62828, #8e0000); border-color:#7f0000; margin:0; padding:8px 10px;" onclick="adminUnequipOne(true)" title="장비를 없앱니다">삭제</button>
+            </div>
             <div style="font-size:12px; margin-bottom:10px; display:flex; gap:6px; align-items:center;">
     <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #5a4a2a, #3a2f18) !important; border-color:#7a6a3a !important; margin:0;" onclick="adminSeizeSafe()">금고 압수</button>
         <button class="game-btn" style="flex:1; background:linear-gradient(145deg, #c62828, #8e0000) !important; border-color:#7f0000 !important; color:#fff !important; margin:0;" onclick="adminBreakCouple()">커플 해제</button>
