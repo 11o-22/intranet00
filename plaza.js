@@ -415,6 +415,9 @@ const R = P.ROOMS;
     pz('pz_flower',    '플라워 골든 리조트',    'flower',    [568, 593]);
     pz('pz_halloween', '핼러윈',               'halloween', [610, 632]);
     pz('pz_brown',     '브라운의 심야 토크쇼',  'brown',     [560, 592]);
+    // 🔒 비밀방 (2026-11-07 사용자) — 여우 상담실에 1번 · 2번 방과 따로 하나. secret 은 그 방 번호 (자리 열쇠 pz_fox~3).
+    //   저절로 고르는 방(1 ~ max)에는 안 들어서, 비밀번호를 친 사람만 든다 (아래 「비밀방」)
+    R.pz_fox.secret = 3;
 })();
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
@@ -813,6 +816,15 @@ function stampSafe(ov) {
         '  background:rgba(255,255,255,.06);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
         '.plaza-pz .pz-who span.me{background:rgba(217,160,90,.22);color:#ffe9bd;}',
         '.plaza-pz .pz-none{font-size:11px;color:#6f685c;margin-top:7px;}',
+        // 🔒 비밀방 — 비밀번호 칸 (2026-11-07)
+        '.plaza-pzlock{display:flex;flex-direction:column;gap:10px;padding:2px 2px 6px;}',
+        '.plaza-pzlock .pl-t{font-size:12px;color:#e8dcc6;line-height:1.5;}',
+        '.plaza-pzlock input{width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #8a6a2a;',
+        '  background:rgba(255,255,255,.05);color:#ffe9bd;font-family:inherit;font-size:22px;letter-spacing:12px;text-align:center;}',
+        '.plaza-pzlock .pl-m{min-height:16px;font-size:12px;color:#ff9b8a;}',
+        '.plaza-pzlock button{padding:11px;border-radius:12px;font-family:inherit;font-size:13px;cursor:pointer;',
+        '  background:rgba(217,160,90,.16);border:1px solid #8a6a2a;color:#ffe9bd;}',
+        '.plaza-pzlock button:disabled{opacity:.5;cursor:default;}',
         '.plaza-board{gap:1px;animation:none;}',
         '.plaza-board .bd{position:relative;filter:drop-shadow(0 4px 5px rgba(0,0,0,.55));}',
         '.plaza-board .bd svg{display:block;width:100%;height:100%;}',
@@ -4271,7 +4283,7 @@ function enterInst(inst) {
     watchChat();
     run.sx = run.sy = -9999; run.sent = 0;          // 곧바로 내 자리를 알린다
     paintMap();
-    if (inst > 1 && !HS()) sysLine(roomOf().n + ' ' + inst + '번 방입니다. (한 방에 ' + P.CAP + '명까지)');
+    if (inst > 1 && !HS()) sysLine(roomOf().n + ' ' + instName(run.room, inst) + '입니다. (한 방에 ' + P.CAP + '명까지)');
 }
 // 같은 장소 안에서 방만 바꾼다 (서 있던 자리는 그대로)
 function hopInst(inst) {
@@ -4359,7 +4371,7 @@ function matesSheet() {
                 const t = here ? '같은 방' : (full ? '가득 참' : '같은 장소로');
                 return '<div class="mt-row">'
                     + '<div class="mt-who"><b>' + esc(r.name) + '</b>'
-                    + '<span>' + esc(R[r.room].n) + ' · ' + r.inst + '번 방 <i>' + r.n + '/' + P.CAP + '</i></span></div>'
+                    + '<span>' + esc(R[r.room].n) + ' · ' + instName(r.room, r.inst) + ' <i>' + r.n + '/' + P.CAP + '</i></span></div>'
                     + '<button data-i="' + i + '"' + ((here || full) ? ' disabled' : '') + '>' + t + '</button></div>';
             }).join('');
         Array.prototype.forEach.call(box.querySelectorAll('button[data-i]'), function (b) {
@@ -4388,26 +4400,33 @@ function goMate(r) {
         if (inst >= 7000) { sysLine(r.name + ' 님은 지금 🫣 숨바꼭질 중입니다.'); return; }      // 놀이 방에는 참여자만 든다
         if (room === run.room && inst === run.inst) { sysLine(r.name + ' 님과 이미 같은 방입니다.'); return; }
         if (headcount(cs, room, inst, u && u.code) >= P.CAP) {
-            sysLine(R[room].n + ' ' + inst + '번 방이 가득 찼습니다. (' + P.CAP + '명)');
+            sysLine(R[room].n + ' ' + instName(room, inst) + '이 가득 찼습니다. (' + P.CAP + '명)');
             return;
         }
         const rr = R[room];
-        if (room !== run.room) {
-            const lv = lvAt(rr, at.y);
-            run.forceInst = inst;
-            goRoom(room, null, lv);
-        } else {
-            hopInst(inst);
-        }
-        // 그 사람 곁에 선다
-        if (typeof at.x === 'number' && typeof at.y === 'number') {
-            run.x = Math.max(P.EDGE + P.INSET, Math.min(rr.w - P.EDGE - P.INSET, at.x + 60));
-            run.y = at.y;
-            try { segStep(rr, 0); } catch (e) { }
-            putOne(run.me, run.x, run.y);
-            camera(true);
-        }
-        sysLine(r.name + ' 님이 있는 ' + rr.n + ' ' + inst + '번 방으로 왔습니다.');
+        const go = function () {
+            if (!run) return;
+            closeSheet();                                    // 비밀번호 칸을 거쳐 왔으면 닫는다
+            if (room !== run.room) {
+                const lv = lvAt(rr, at.y);
+                run.forceInst = inst;
+                goRoom(room, null, lv);
+            } else {
+                hopInst(inst);
+            }
+            // 그 사람 곁에 선다
+            if (typeof at.x === 'number' && typeof at.y === 'number') {
+                run.x = Math.max(P.EDGE + P.INSET, Math.min(rr.w - P.EDGE - P.INSET, at.x + 60));
+                run.y = at.y;
+                try { segStep(rr, 0); } catch (e) { }
+                putOne(run.me, run.x, run.y);
+                camera(true);
+            }
+            sysLine(r.name + ' 님이 있는 ' + rr.n + ' ' + instName(room, inst) + '으로 왔습니다.');
+        };
+        // 🔒 비밀방이면 비밀번호를 쳐야 따라 들어간다 (2026-11-07 사용자 「같은 장소로 가기 할 시에 비밀번호 쳐서 들어갈 수 있게」)
+        if (isSecret(room, inst)) secretAsk(room, inst, go);
+        else go();
     });
 }
 
@@ -4435,10 +4454,11 @@ function pzListHtml(cs) {
             const r = R[k];
             const a = pzSeats(cs, k, 1).length, b = pzSeats(cs, k, 2).length;
             const cnt = function (n) { return n ? '<em>' + n + '명</em>' : '0명'; };
+            const sec = secretOf(k) ? ' · 비밀방 ' + cnt(pzSeats(cs, k, secretOf(k)).length) : '';
             return '<button class="pz-zone' + (run && run.room === k ? ' on' : '') + '" data-z="' + k + '">'
                 + '<span class="pz-th" style="background-image:url(\'' + P.DIR + r.thumb + '\')"></span>'
                 + '<span class="pz-zn"><b>' + esc(r.pn) + '</b>'
-                + '<i>1번 방 ' + cnt(a) + ' · 2번 방 ' + cnt(b) + (run && run.room === k ? ' · 지금 ' + run.inst + '번 방' : '') + '</i></span>'
+                + '<i>1번 방 ' + cnt(a) + ' · 2번 방 ' + cnt(b) + sec + (run && run.room === k ? ' · 지금 ' + instName(k, run.inst) : '') + '</i></span>'
                 + '</button>';
         }).join('');
 }
@@ -4460,6 +4480,24 @@ function pzRoomsHtml(cs, zone) {
                     return '<span' + (u && w.c === u.code ? ' class="me"' : '') + '>' + esc(w.n) + '</span>';
                 }).join('') + '</div>'
                 : '<div class="pz-none">비어 있습니다</div>')
+            + '</div>';
+    }
+    // 🔒 비밀방 — 안에 몇 명인지만 (이름은 안에 있는 사람에게만) · 누르면 비밀번호 칸
+    const si = secretOf(zone);
+    if (si) {
+        const who = pzSeats(cs, zone, si);
+        const here = !!(run && run.room === zone && run.inst === si);
+        if (here && u && !who.some(function (w) { return w.c === u.code; })) who.unshift({ c: u.code, n: nameOf(u) });
+        const full = !here && who.length >= P.CAP;
+        html += '<div class="pz-room' + (here ? ' on' : '') + '">'
+            + '<div class="pz-rh"><b>🔒 비밀방</b><i>' + who.length + ' / ' + P.CAP + '</i>'
+            + '<button data-s="' + si + '"' + ((here || full) ? ' disabled' : '') + '>'
+            + (here ? '지금 여기' : (full ? '가득 참' : '들어가기')) + '</button></div>'
+            + (here
+                ? '<div class="pz-who">' + who.map(function (w) {
+                    return '<span' + (u && w.c === u.code ? ' class="me"' : '') + '>' + esc(w.n) + '</span>';
+                }).join('') + '</div>'
+                : '<div class="pz-none">' + (who.length ? '비밀번호 4자리를 쳐야 들어갑니다' : '비어 있습니다 — 먼저 들어가는 사람이 비밀번호 4자리를 정합니다') + '</div>')
             + '</div>';
     }
     return html;
@@ -4489,6 +4527,9 @@ function photoSheet(zone) {
             Array.prototype.forEach.call(box.querySelectorAll('.pz-rh button[data-i]'), function (b) {
                 b.onclick = function () { goPhoto(z, Number(b.dataset.i)); };
             });
+            Array.prototype.forEach.call(box.querySelectorAll('.pz-rh button[data-s]'), function (b) {
+                b.onclick = function () { goPhoto(z, Number(b.dataset.s)); };
+            });
         });
     };
     paint();
@@ -4503,16 +4544,116 @@ function goPhoto(zone, inst) {
         if (!run) return;
         if (zone === run.room && inst === run.inst) { closeSheet(); return; }
         if (headcount(cs, zone, inst, u && u.code) >= P.CAP) {
-            sysLine(R[zone].n + ' ' + inst + '번 방이 가득 찼습니다. (' + P.CAP + '명)');
+            sysLine(R[zone].n + ' ' + instName(zone, inst) + '이 가득 찼습니다. (' + P.CAP + '명)');
             photoSheet(zone);
             return;
         }
-        closeSheet();
-        if (zone !== run.room) { run.forceInst = inst; goRoom(zone, null, 0); }
-        else { hopInst(inst); sysLine(R[zone].n + ' ' + inst + '번 방으로 옮겼습니다.'); }
+        const go = function () {
+            if (!run) return;
+            closeSheet();
+            if (zone !== run.room) { run.forceInst = inst; goRoom(zone, null, 0); }
+            else { hopInst(inst); sysLine(R[zone].n + ' ' + instName(zone, inst) + '으로 옮겼습니다.'); }
+        };
+        if (isSecret(zone, inst)) secretAsk(zone, inst, go);      // 🔒 비밀방 — 비밀번호를 쳐야 든다
+        else go();
     });
 }
 window.plazaPhoto = function (zone) { if (run) photoSheet(zone); };
+
+// ==========================================
+// 🔒 비밀방 (2026-11-07 사용자)
+// ==========================================
+//
+//   「포토존의 여우 상담실 방을 따로 비밀방으로 하나 만들 수 있게 설정해서 먼저 들어간 사람이 비밀번호를
+//    4자리 치면 다른 사람도 비밀번호 쳐서 들어올 수 있게 하자. 같은 장소로 가기도 안 되게 하고.
+//    같은 장소로 가기 할 시에 비밀번호 쳐서 들어갈 수 있게.」
+//
+//   · 방 표에 secret: 방 번호 를 적은 장소(여우 상담실 · 3)에 1번 · 2번 방과 따로 비밀방이 하나 있다
+//   · 저절로 고르는 방(pickInst — 1 ~ max)에는 안 든다 — 포토존 「들어가기」 · 동료 목록 「같은 장소로」 모두
+//     비밀번호 칸(secretAsk)을 거쳐야 든다. 손에 들려 따라오는 작은 사람(🍍)은 든 사람을 따라 그대로 든다
+//   · 비어 있으면 먼저 들어가는 사람이 숫자 4자리를 정한다 → 다음 사람부터는 그 4자리를 쳐야 든다
+//   · 안에 아무도 없고 정한 지 LOCK_GRACE 가 지났으면 그 비밀번호는 끝 — 다음에 먼저 드는 사람이 새로 정한다
+//   · 포토존 목록에는 안에 몇 명인지만 보인다 (이름은 안에 있는 사람에게만)
+//
+//   plazaLock/<자리 열쇠 — pz_fox~3> = { pw: 네 자리, by: 정한 사람, bn: 그 이름, at: 정한 때(서버 시계) }
+const LOCK_PATH = 'plazaLock';
+const LOCK_GRACE = 30000;             // 정한 사람이 들어가는 사이 — 아직 아무도 없어도 이만큼은 그 비밀번호가 산다
+function secretOf(room) { return (R[room] && R[room].secret) || 0; }
+function isSecret(room, inst) { const s = secretOf(room); return !!(s && Number(inst) === s); }
+function instName(room, inst) { return isSecret(room, inst) ? '🔒 비밀방' : inst + '번 방'; }
+function lockRef(room, inst) { const d = db_(); return d ? d.ref(LOCK_PATH + '/' + seatKey(room, inst)) : null; }
+function lockRead(room, inst) {
+    const r = lockRef(room, inst);
+    if (!r) return Promise.resolve(null);
+    return r.once('value').then(function (s) { return s.val(); }).catch(function () { return null; });
+}
+// 지금 살아 있는 비밀번호인가 — 안에 사람이 있거나 · 막 정했다
+function lockLive(v, cs, room, inst) {
+    if (!v || !/^\d{4}$/.test(String(v.pw || ''))) return false;
+    if (headcount(cs, room, inst) > 0) return true;
+    return chatNow() - (Number(v.at) || 0) < LOCK_GRACE;
+}
+// 비밀번호 칸을 띄운다 — 맞으면 go()
+function secretAsk(room, inst, go) {
+    const u = u_();
+    Promise.all([census(), lockRead(room, inst)]).then(function (res) {
+        if (!run) return;
+        const cs = res[0], v = res[1];
+        if (headcount(cs, room, inst, u && u.code) >= P.CAP) { sysLine(R[room].n + ' 비밀방이 가득 찼습니다. (' + P.CAP + '명)'); return; }
+        lockSheet(room, inst, !lockLive(v, cs, room, inst), go, '');
+    });
+}
+function lockSheet(room, inst, make, go, msg) {
+    const s = sheet('pzlock', '🔒 ' + R[room].pn + ' 비밀방', '<div class="plaza-pzlock">'
+        + '<div class="pl-t">' + (make
+            ? '비어 있는 비밀방입니다.<br>같이 들어올 사람들이 칠 비밀번호 숫자 4자리를 정하세요.'
+            : '비밀번호 숫자 4자리를 치면 들어갑니다.') + '</div>'
+        + '<input id="plaza-pl-in" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" enterkeyhint="go">'
+        + '<div class="pl-m">' + esc(msg || '') + '</div>'
+        + '<button id="plaza-pl-go">' + (make ? '정하고 들어가기' : '들어가기') + '</button></div>');
+    if (!s) return;
+    const inp = s.querySelector('#plaza-pl-in'), btn = s.querySelector('#plaza-pl-go'), m = s.querySelector('.pl-m');
+    const say = function (t) { if (m) m.textContent = t || ''; };
+    inp.addEventListener('input', function () { const v = inp.value.replace(/\D/g, '').slice(0, 4); if (v !== inp.value) inp.value = v; });
+    inp.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); } });
+    let busy = false;
+    const submit = function () {
+        const pw = inp.value;
+        if (!/^\d{4}$/.test(pw)) { say('숫자 4자리를 쳐 주세요.'); return; }
+        if (busy) return;
+        busy = true; btn.disabled = true;
+        const me = u_();
+        const done = function (t) { busy = false; btn.disabled = false; if (t != null) { say(t); inp.value = ''; try { inp.focus(); } catch (e) { } } };
+        Promise.all([census(), lockRead(room, inst)]).then(function (res) {
+            if (!run || !s.isConnected) return;
+            const cs = res[0], v = res[1];
+            if (headcount(cs, room, inst, me && me.code) >= P.CAP) { done('비밀방이 가득 찼습니다. (' + P.CAP + '명)'); return; }
+            const live = lockLive(v, cs, room, inst);
+            if (make) {
+                if (live) { lockSheet(room, inst, false, go, '방금 다른 사원이 비밀방을 열었습니다. 그 비밀번호를 쳐 주세요.'); return; }
+                const occ = headcount(cs, room, inst, me && me.code) > 0;
+                const ref = lockRef(room, inst);
+                if (!ref || !me) { done('지금은 비밀방을 열 수 없습니다.'); return; }
+                ref.transaction(function (cur) {
+                    if (cur && /^\d{4}$/.test(String(cur.pw || '')) && (occ || chatNow() - (Number(cur.at) || 0) < LOCK_GRACE)) return;   // 그 사이 누가 정했다
+                    return { pw: pw, by: me.code, bn: nameOf(me), at: chatNow() };
+                }, function (err, ok) {
+                    if (!run) return;
+                    if (err) { done('지금은 비밀방을 열 수 없습니다.'); return; }
+                    if (!ok) { lockSheet(room, inst, false, go, '방금 다른 사원이 비밀방을 열었습니다. 그 비밀번호를 쳐 주세요.'); return; }
+                    sysLine('🔒 비밀방 비밀번호를 정했습니다 — 같이 들어올 사람에게만 알려 주세요.');
+                    go();
+                });
+                return;
+            }
+            if (!live) { lockSheet(room, inst, true, go, '비밀방이 비었습니다 — 새 비밀번호를 정하세요.'); return; }
+            if (String(v.pw) !== pw) { done('비밀번호가 맞지 않습니다.'); return; }
+            go();
+        });
+    };
+    btn.onclick = submit;
+    setTimeout(function () { try { inp.focus(); } catch (e) { } }, 60);
+}
 
 // ==========================================
 // 같은 방 사람
@@ -5213,7 +5354,7 @@ function paintMap() {
     const el = document.getElementById('plaza-map');
     if (!el || !run) return;
     const m = mapOf(), r = roomOf();
-    el.querySelector('.mp-n').innerText = r.n + (HS() ? ' · ' + (hsCall('label') || '🫣 숨바꼭질') : (run.inst ? ' · ' + run.inst + '번 방' : ''));
+    el.querySelector('.mp-n').innerText = r.n + (HS() ? ' · ' + (hsCall('label') || '🫣 숨바꼭질') : (run.inst ? ' · ' + instName(run.room, run.inst) : ''));
     const g = el.querySelector('.mp-g');
     g.style.display = r.photo ? 'none' : '';
     g.style.gridTemplateColumns = 'repeat(' + m.w + ',1fr)';
