@@ -772,7 +772,7 @@ async function afterMine(guard) {
     if (B.foe.hp <= 0) return winFoe();
     // 야생이 달아난다
     if (B.foe.wild && !B.tut && !B.wrapped) {
-        const pr = (B.foe.hp / B.foe.max < 0.25) ? 0.10 : 0.04;
+        const pr = (B.foe.hp / B.foe.max < 0.25) ? 0.03 : 0.012;      // ★ 덜 달아나게 — 전에는 10% · 4% (2026-11-07 사용자 「봉제인형이 너무 도망가」)
         if (Math.random() < pr) {
             await say(fmt(pick(TX.flee), { w: WILD }), 1400);
             return finish({ res: 'fled' });
