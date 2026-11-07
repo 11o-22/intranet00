@@ -42,7 +42,7 @@ const J = {
     j1:  { n: '첫번째 여정 - 주인을 찾아서.', ic: '🐾', mons: [0, 1, 2, 3], boss: 4, pay: 'P', base: 20000, gear: 0.35,
            d: '현관문이 열려 있었다. 주인의 냄새를 따라 나선 길 — 문틈손 · 젖은 신발 · 네발이 · 등불이, 그리고 마지막은 가짜 주인.' },
     arc: { n: '매직버니 아케이드존', ic: '🎪', pool: [7, 8, 9, 11, 12, 13], boss: 10, pay: 'D', base: 500,
-           d: '불 꺼진 아케이드. 시야가 좁다. 길에 괴담 넷, 무대 위에 북 치는 토끼.' }
+           d: '불 꺼진 아케이드. 시야가 좁다. 길에 괴담 넷, 무대 위에 북 치는 토끼.\n⚠️ 지면 💤 꿈결을 모두 잃고 10분 동안 가두리에 갇힙니다.' }
 };
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -420,9 +420,18 @@ async function endRun(why) {
                 await S2.talk(home.concat([{ sys: 1, t: lines.join('\n') }]));
             }
         } else if (why === 'lose') {
-            D.log('[🐾 여정] 『 ' + J[v.j].n + ' 』 — 봉제인형들이 모두 지쳐 물러났습니다.', u);
+            // ★ 매직버니 아케이드존에서 지면 — 꿈결 전액 소실 · 10분 가두리 (2026-11-07 사용자)
+            let lost = 0;
+            if (v.j === 'arc') {
+                try {
+                    const r = await db_().ref('users/' + u.code + '/kroom/dream').transaction(function (x) { lost = Math.max(0, Math.floor(Number(x) || 0)); return 0; });
+                    if (r && r.committed) { if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {}; u.kroom.dream = 0; }
+                } catch (e) { lost = 0; }
+                cage(u);
+            }
+            D.log('[🐾 여정] 『 ' + J[v.j].n + ' 』 — 봉제인형들이 모두 지쳐 물러났습니다.' + (v.j === 'arc' ? ' 💤 꿈결 ' + lost.toLocaleString() + ' D 를 잃고 ' + CAGE_MIN + '분 가두리.' : ''), u);
             D.saveHist();
-            if (S2 && S2.run()) await S2.talk([{ sys: 1, t: '봉제인형들을 데리고 어둠에서 물러났다.\n도깨비 공방 수선소에서 고쳐 주세요.' }]);
+            if (S2 && S2.run()) await S2.talk([{ sys: 1, t: '봉제인형들을 데리고 어둠에서 물러났다.\n도깨비 공방 수선소에서 고쳐 주세요.' + (v.j === 'arc' ? '\n\n무대의 토끼가 주머니를 털어 갔다 — 💤 꿈결 ' + lost.toLocaleString() + ' D 를 모두 잃었다.\n' + CAGE_MIN + '분 동안 가두리에 갇힙니다.' : '') }]);
         } else if (why === 'quit' && v.lead !== S.code) {
             alert_('🐾 파티장이 여정을 그만두었습니다.');
         }
@@ -430,6 +439,28 @@ async function endRun(why) {
     try { if (S.ref) S.ref.off(); } catch (e) { }
     S.runKey = null; S.ref = null; S.run = null; S.fightOn = null; S.waiters = [];
     try { if (S2 && S2.run()) S2.leave(); } catch (e) { }
+}
+// 🎪 아케이드존 패배 — 10분 가두리 (광장 → 백일몽 → … 빈 자리 · gaduri.js by 'arcade' · 때가 되면 저절로 풀린다)
+const CAGE_MIN = 10;
+function cage(me) {
+    const d = db_();
+    if (!d || !me || me.code === 'kario0987') return;
+    const until = Date.now() + CAGE_MIN * 60000;
+    const rooms = (typeof window.gaduriOrder === 'function') ? window.gaduriOrder() : ['plaza', 'dream', 'post'];
+    const put = function (i) {
+        if (i >= rooms.length) return;
+        d.ref('gaduri/' + rooms[i]).transaction(function (box) {
+            box = box || {};
+            if (box[me.code]) {
+                if (!box[me.code].until || box[me.code].until < until) { box[me.code].until = until; box[me.code].by = box[me.code].by || 'arcade'; box[me.code].at = Date.now(); }
+                return box;
+            }
+            if (Object.keys(box).length >= 3) return;
+            box[me.code] = { at: Date.now(), by: 'arcade', until: until, name: me.name || me.code };
+            return box;
+        }).then(function (res) { if (!res || !res.committed) put(i + 1); }).catch(function () { });
+    };
+    put(0);
 }
 function quit() {
     const v = S.run;

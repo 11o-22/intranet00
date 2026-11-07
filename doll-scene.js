@@ -29,7 +29,7 @@
 
 const D = function () { return window.DOLL; };
 const OV = 'ds-ov';
-const SPD = 62;                     // 1초에 몇 칸(그림 원래 크기) 걷나
+const SPD = 93;                     // 1초에 몇 칸(그림 원래 크기) 걷나 — 62 × 1.5 (2026-11-07 사용자 「캐릭터 이동 속도를 1.5배」)
 const STEP = 26;                    // 튜토리얼 — 오브제 뒤를 이만큼 걸으면 바로 나온다
 // ★ 출몰지 조우 — 500~700 걸음에 한 번 (2026-11-07 사용자 「확률적이게 · 한 500~700번 걸어야 한 번 나오는 정도로」)
 //   걸음 하나 = 캐릭터 발걸음 하나 — 걷기 그림 한 바퀴(6칸 × 0.12초)에 두 걸음 → SPD 62 로 약 22칸
@@ -49,12 +49,13 @@ const SC = {
     wild: {
         n: '봉제인형 출몰지', img: 'doll/wild.webp', ob: 'doll/wild-ob.webp', w: 1536, h: 512, band: [40, 372], body: 46, bt: 'wild',
         zoom: 0.68,                                      // 2026-11-07 사용자 「출몰지 배경 너무 확대 되어서 좀 줌 아웃」
-        lines: [                                         // 위층(길)만 — 지하 · 계단은 뺐다 (2026-11-07 사용자)
-            [[0, 219], [530, 219], [588, 243], [650, 243], [785, 243], [805, 243], [845, 222], [1305, 222], [1536, 222]]
+        lines: [                                         // 위층(길) + 오른쪽 지하 — 왼쪽 지하는 뺐다 (2026-11-07 사용자)
+            [[0, 219], [530, 219], [588, 243], [650, 243], [785, 243], [805, 243], [845, 222], [1305, 222], [1536, 222]],
+            [[785, 243], [872, 313], [1180, 313], [1305, 222]]
         ],
         zones: [
-            { x: [131, 377], y: 219 }, { x: [1024, 1197], y: 222 }, { x: [1225, 1287], y: 222 }, { x: [1321, 1494], y: 222 }
-            // ✗ 지하의 수상한 장소는 뺐다 — 위층만 밟는다 (2026-11-07)
+            { x: [131, 377], y: 219 }, { x: [1024, 1197], y: 222 }, { x: [1225, 1287], y: 222 }, { x: [1321, 1494], y: 222 },
+            { x: [858, 934], y: 313 }, { x: [1010, 1112], y: 313 }     // 오른쪽 지하 (왼쪽 지하 것은 뺐다 · 2026-11-07)
         ],
         spots: [
             // 2026-11-07 사용자 「우체국 - 출몰지 - 도깨비공방 - 재관국」 (이 맵은 튜토리얼 때만 — 평소에는 광장 방 dwild)
@@ -243,6 +244,11 @@ function css() {
     // 광장 방 위 말 창(#ds-dlg) — 같은 꾸밈을 쓴다
     s.textContent += '\n#ds-dlg{position:fixed;inset:0;z-index:99990;pointer-events:none;user-select:none;-webkit-user-select:none}'
         + '\n#ds-dlg.on{pointer-events:auto;touch-action:none;background:rgba(0,0,0,.08)}'
+        // 채팅 바(아래 74px) 위에 — 말 창을 누르던 손가락이 채팅 바에 닿지 않게 (2026-11-07 사용자 「도깨비 누를 때 채팅창이 올라가는 것」)
+        + '\n#ds-dlg .ds-talk{bottom:calc(env(safe-area-inset-bottom,0px) + 84px) !important}'
+        + '\n#ds-dlg .ds-sys{bottom:calc(env(safe-area-inset-bottom,0px) + 90px) !important}'
+        // 누른 도깨비 바로 위에 뜨는 「살펴보는 중……」 (2026-11-07 사용자)
+        + '\n#ds-dlg .ds-sys.at{left:0;right:auto;bottom:auto !important;width:max-content;max-width:86vw;transform:translate(-50%,-100%)}'
         + s.textContent.split('\n').filter(function (r) { return /^#ds-ov \.ds-(talk|sys)/.test(r); }).map(function (r) { return '\n' + r.replace(/#ds-ov/g, '#ds-dlg'); }).join('');
     document.head.appendChild(s);
 }
@@ -754,17 +760,36 @@ function hostOf() {
 function hostDone(h) {
     if (!h || !h.dlg) return;
     DLG.n = Math.max(0, DLG.n - 1);
-    if (!DLG.n && DLG.el) DLG.el.classList.remove('on');
+    if (!DLG.n && DLG.el) { DLG.el.classList.remove('on'); eatClick(); }
+}
+// 막이 걷힌 바로 뒤의 click 한 번은 삼킨다 — 말 창을 닫은 손가락이 그 밑 채팅 바 · 시설 표를 누르지 않게
+function eatClick() {
+    const kill = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+    window.addEventListener('click', kill, true);
+    setTimeout(function () { window.removeEventListener('click', kill, true); }, 450);
+}
+// 광장 방 — 누른 도깨비(시설 표) 위에 붙인다. 표가 없으면 아래 띠에
+function sysFollow() {
+    const box = DLG.el && DLG.el.querySelector('.ds-sys');
+    if (!box) return;
+    const a = DLG.anchor;
+    if (!a || !a.isConnected) { box.classList.remove('at'); box.style.left = ''; box.style.top = ''; return; }
+    const r = a.getBoundingClientRect();
+    const x = Math.max(90, Math.min(window.innerWidth - 90, r.left + r.width / 2));
+    box.classList.add('at');
+    box.style.left = Math.round(x) + 'px';
+    box.style.top = Math.round(r.top - 8) + 'px';
 }
 function sys(t, ms) {
-    if (!run) {                                          // 광장 방 — 아래 띠에 잠깐
+    if (!run) {                                          // 광장 방
         css();
         if (!DLG.el || !DLG.el.parentNode) { hostDone(hostOf()); }
         const s2 = DLG.el.querySelector('.ds-sys span');
         if (!s2) return;
         s2.textContent = t; s2.style.opacity = t ? '1' : '0';
-        clearTimeout(DLG._sysT);
-        DLG._sysT = setTimeout(function () { s2.style.opacity = '0'; }, ms || 3800);
+        clearTimeout(DLG._sysT); clearInterval(DLG._sysF);
+        if (t) { sysFollow(); DLG._sysF = setInterval(sysFollow, 120); }
+        DLG._sysT = setTimeout(function () { s2.style.opacity = '0'; clearInterval(DLG._sysF); }, ms || 3800);
         return;
     }
     const s = run.el.querySelector('.ds-sys span');
@@ -1400,7 +1425,9 @@ function plazaRooms() {
     };
     return {
         dwild: { n: '봉제인형 출몰지', img: '../doll/wild.webp', ob: '../doll/wild-ob.webp', w: rr(1536, W), h: rr(512, W), cut: 0, k: 1, pix: 1, doll: W,
-                 floor: [rr(212, W), rr(246, W)],              // 위층(길)만 밟는다 — 지하 · 계단은 뺐다 (2026-11-07 사용자)
+                 // 위층(길) + 오른쪽 지하(872~1180)와 그 양쪽 계단 — 왼쪽 지하는 뺐다 (2026-11-07 사용자)
+                 floor: [rr(212, W), rr(246, W)], floor2: [rr(309, W), rr(320, W)], x2: [rr(872, W), rr(1180, W)],
+                 stairs: [ st(W, 785, 246, 872, 309), st(W, 1180, 309, 1305, 246) ],
                  left: 'post', right: 'dgfront', spots: [] },
         dgfront: { n: '도깨비 공방 앞', img: '../doll/gfront.webp', w: rr(470, F), h: rr(512, F), cut: 0, k: 1, pix: 1, doll: F,
                  floor: [rr(210, F), rr(226, F)], floor2: [rr(312, F), rr(322, F)], x2: [rr(138, F), rr(332, F)],
@@ -1423,6 +1450,9 @@ window.dollNpcTap = function (spot) {
     const G = window.DOLLGONG, a = spot && spot.act;
     if (!G || !a || typeof G[a] !== 'function') return;
     if (DLG.talkOn) return;
+    // 「살펴보는 중……」이 그 도깨비 위에 뜨게 — 누른 시설 표를 기억해 둔다
+    DLG.anchor = null;
+    try { DLG.anchor = Array.prototype.find.call(document.querySelectorAll('#plaza-ov .plaza-spot'), function (e) { const t = e.querySelector('.t'); return t && t.textContent === spot.n; }) || null; } catch (e) { }
     try { if (G.prefetch) G.prefetch(a); } catch (e) { }
     try { G[a](API, spot); } catch (e) { console.warn('[👺]', e); }
 };
