@@ -602,9 +602,17 @@ function prepView(o) {
         const runes = R().fed(mine.pet, me);
         const doll = dollSnap(mine.pet, me);                         // 🧸 내 인형의 모습 — 이대로 겨룬다
         if (doll && doll.hp <= 0) { alert_(nickOf(me, mine.pet) + josa(nickOf(me, mine.pet), '은') + ' 체력이 없어 나설 수 없습니다.\n\n수선소에서 고친 뒤에 준비하십시오.'); return; }
+        // 🧸 동행 셋도 같이 — 전투 중에 바꿔 내보낸다 (고른 인형 + 동행 가운데 체력 있는 것 · 셋까지 · 2026-11-07 사용자)
+        const dolls = {}; const used = {};
+        if (doll) {
+            const ids = [String(mine.pet)];
+            try { D_().withList(me).forEach(function (id) { if (ids.indexOf(String(id)) < 0 && ids.length < 3) ids.push(String(id)); }); } catch (e) { }
+            ids.forEach(function (id) { const d = dollSnap(id, me); if (d && d.hp > 0) dolls[id] = d; });
+            used[String(mine.pet)] = 1;
+        }
         tx(o._k, function (cur) {
             if (!cur || cur.stage !== 'prep') return;
-            cur[side] = Object.assign({}, cur[side] || {}, { ready: 1, runes: runes, hp: HP, doll: doll || null });
+            cur[side] = Object.assign({}, cur[side] || {}, { ready: 1, runes: runes, hp: HP, doll: doll || null, dolls: doll ? dolls : null, act: doll ? String(mine.pet) : null, used: doll ? used : null });
             if (cur.a && cur.a.ready && cur.b && cur.b.ready) {
                 cur.stage = 'fight'; cur.round = 1; cur.first = 'a'; cur.roundAt = Date.now(); cur.pick = null; cur.log = []; cur.play = null;
                 if (cur.a.doll && cur.b.doll) { cur.a.hp = Number(cur.a.doll.hp) || 0; cur.b.hp = Number(cur.b.doll.hp) || 0; }
@@ -787,18 +795,26 @@ function settle(o, side) {
     const won = (o.winner === side);
     const mine = o[side], theirs = o[other(side)];
     const stakeMine = mine.stake, stakeTheirs = theirs.stake;
-    const nm = nickOf(me, mine.pet);
+    const nm = nickOf(me, (mine.act != null && mine.dolls) ? mine.act : mine.pet);
     const sname = function (s) { return s ? (s.k === 'rune' ? tagR(s.n) + ' 룬' : s.n) : '없음'; };
     const dollFight = !!(mine.doll && theirs.doll);
     const why = o.why === 'forfeit' ? (won ? '상대가 기권했습니다.' : '기권했습니다.')
               : o.why === 'away' ? (won ? '상대가 자리를 비워 기권 처리됐습니다.' : '자리를 오래 비워 기권 처리됐습니다.')
               : dollFight ? (won ? '상대 인형의 체력이 먼저 다 닳았습니다.' : '내 인형의 체력이 먼저 다 닳았습니다.')
               : (won ? '상대 주인의 체력이 먼저 다 닳았습니다.' : '내 체력이 먼저 다 닳았습니다.');
-    // 🧸 인형이 입은 상처는 그대로 — 글에 적힌 체력을 인형에게
-    if (dollFight) { try { const D = D_(), d = D.dolls(me)[String(mine.pet)]; if (d && Math.round(D.hpOf(d)) !== Math.round(Number(mine.doll.hp) || 0)) D.patchDoll(String(mine.pet), { hp: Math.max(0, Math.round(Number(mine.doll.hp) || 0)) }, me); } catch (e) { } }
-    // 먹였던 룬은 전투 한 번을 치른 것으로 — 일곱 번이면 깨진다 (pet-rune.js wear · 2026-11-07)
+    // 🧸 인형이 입은 상처는 그대로 — 글에 적힌 체력을 인형에게 (나왔던 셋 모두)
+    if (dollFight) {
+        try {
+            const D = D_(), ds = D.dolls(me);
+            const hpOf = {}; hpOf[String(mine.act != null ? mine.act : mine.pet)] = Number(mine.doll.hp) || 0;
+            if (mine.dolls && typeof mine.dolls === 'object') Object.keys(mine.dolls).forEach(function (id) { if (hpOf[id] == null) hpOf[id] = Number(mine.dolls[id].hp) || 0; });
+            Object.keys(hpOf).forEach(function (id) { const d = ds[id]; if (d && Math.round(D.hpOf(d)) !== Math.round(hpOf[id])) D.patchDoll(id, { hp: Math.max(0, Math.round(hpOf[id])) }, me); });
+        } catch (e) { }
+    }
+    // 먹였던 룬은 전투 한 번을 치른 것으로 — 일곱 번이면 깨진다 (pet-rune.js wear · 2026-11-07) · 🧸 나왔던 인형마다
     let broke = [];
-    try { broke = R().wear(mine.pet) || []; } catch (e) { }
+    const usedIds = (mine.used && typeof mine.used === 'object') ? Object.keys(mine.used) : [String(mine.pet)];
+    usedIds.forEach(function (id) { try { broke = broke.concat(R().wear(id) || []); } catch (e) { } });
     if (won) {
         giveStake(stakeTheirs);
         log_('[인형 배틀] ' + theirs.name + ' 사원과의 결투에서 이겼습니다 — ' + nm + ' · 받은 것: ' + sname(stakeTheirs));
@@ -812,9 +828,10 @@ function settle(o, side) {
     save(o._k, patch).then(function () { delete settling[o._k]; }).catch(function () { delete settling[o._k]; });
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     shut(); shownTag = '';
+    const myKey = (mine.act != null && mine.dolls) ? String(mine.act) : mine.pet, thKey = (theirs.act != null && theirs.dolls) ? String(theirs.act) : theirs.pet;   // 🧸 마지막에 나와 있던 인형
     const w = box(head('⚔ 인형 배틀 — ' + (won ? '이겼습니다' : '졌습니다'), esc(why))
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
-        + (dollFight ? dollHpBar('내 ' + nm + ' 체력', mine.doll, true) + dollHpBar(theirs.name + ' 사원의 ' + nickOf(userOf(theirs.code) || {}, theirs.pet) + ' 체력', theirs.doll, false)
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, myKey, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, thKey, theirs.name + ' 사원') + '</div>'
+        + (dollFight ? dollHpBar('내 ' + nm + ' 체력', mine.doll, true) + dollHpBar(theirs.name + ' 사원의 ' + ((theirs.doll && theirs.doll.nick) || speciesOf(thKey) || '인형') + ' 체력', theirs.doll, false)
                      : hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false))
         + '<div style="font-size:11px; color:#e8d7b4; line-height:1.7; margin:9px 0;">'
         + (won ? '받은 것 — <b style="color:#ffcf8f;">' + esc(sname(stakeTheirs)) + '</b>'

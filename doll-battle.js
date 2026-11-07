@@ -186,6 +186,16 @@ function css() {
         '#dbt-ov .menu{position:absolute;left:28px;top:363px;width:258px;max-height:238px;overflow:auto;background:#d5cbea;border:3px solid #aa91db;padding:6px;box-sizing:border-box}',
         '#dbt-ov .menu button{display:block;width:100%;margin:0 0 5px;padding:7px 6px;background:#c9b9e8;border:2px solid #524173;color:#2a2140;font-size:10px;font-weight:bold;text-align:left}',
         '#dbt-ov .menu button[disabled]{opacity:.45}',
+        // 🧸 동행 셋 — 소지품에 그림으로 띄워 바꿔 내보낸다 (2026-11-07 사용자 「동행 펫 세마리 소지품에 띄워서 교체 가능하게 · 전투중에」)
+        '#dbt-ov .dstrip{display:flex;gap:5px;margin:0 0 6px}',
+        '#dbt-ov .dstrip button{flex:1 1 0;min-width:0;margin:0;padding:5px 3px 4px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}',
+        '#dbt-ov .dstrip button.cur{background:#ffe9bd;border-color:#b07a1d}',
+        '#dbt-ov .dstrip button.ko{opacity:.5}',
+        '#dbt-ov .dstrip .sp{width:48px;height:48px;image-rendering:pixelated}',
+        '#dbt-ov .dstrip .nm{font-size:8.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+        '#dbt-ov .dstrip .hp{width:100%;height:5px;background:#6e5f8f;border:1px solid #524173;box-sizing:border-box}',
+        '#dbt-ov .dstrip .hp i{display:block;height:100%}',
+        '#dbt-ov .dstrip small{font-size:7.5px;color:#524173;font-weight:normal}',
         '#dbt-ov .fx{position:absolute;pointer-events:none;font-size:22px;transition:all .45s ease-in}',
         '#dbt-ov .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s}',
         '#dbt-ov .nx{position:absolute;left:292px;top:330px;font-size:8px;color:#c9b8ff;animation:dbnx 1s infinite;pointer-events:none}',
@@ -780,17 +790,34 @@ async function tryRun() {
     return finish({ res: 'run' });
 }
 
+// 🧸 동행 셋을 그림으로 — list: [{id, sp, name, hp, max, g, lv}] · cur: 나와 있는 인형 번호. 누르면 data-k="sw:번호"
+function dollStrip(list, cur) {
+    if (!list.length) return '';
+    return '<div class="dstrip">' + list.map(function (c) {
+        const ko = c.hp <= 0, isCur = String(c.id) === String(cur);
+        const p = Math.max(0, Math.min(1, c.hp / Math.max(1, c.max)));
+        return '<button data-k="sw:' + esc(String(c.id)) + '" class="' + (isCur ? 'cur' : '') + (ko ? ' ko' : '') + '"' + ((isCur || ko) ? ' disabled' : '') + '>'
+            + '<span class="sp" style="' + D().spriteCss(c.sp, 48) + '"></span>'
+            + '<span class="nm">' + esc(c.name) + '</span>'
+            + '<span class="hp"><i style="width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></span>'
+            + '<small>' + Math.ceil(Math.max(0, c.hp)) + '/' + c.max + (isCur ? ' · 나와 있음' : ko ? ' · 쓰러짐' : ' · 내보내기') + '</small>'
+            + '</button>';
+    }).join('') + '</div>';
+}
 // 소지품 — 🎀 포옹 리본 · 🔁 인형 바꾸기
 function bagMenu() {
     return new Promise(function (resolve) {
         const M = D(), u = u_();
         menu(3);
         const n = M.bagHas(M.ITEM.RIBBON, u);
-        const others = M.withList(u).filter(function (id) { return !B.out[id] && (!B.me || B.me.id !== id); })
-            .map(function (id) { return B.cache[id] || fromDoll(id); }).filter(function (c) { return c && c.hp > 0; });
+        // 동행 셋 전부 — 나와 있는 것 · 쓰러진 것도 보이되 누를 수 없다
+        const all = M.withList(u).map(function (id) {
+            if (B.me && B.me.id === id) return B.me;
+            return B.out[id] || B.cache[id] || fromDoll(id);
+        }).filter(Boolean);
         const box = el('div', 'menu');
-        box.innerHTML = '<button data-k="ribbon"' + ((B.foe.wild && n > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (B.foe.wild ? '' : ' — 괴담은 감쌀 수 없다') + '</button>'
-            + others.map(function (c) { return '<button data-k="sw:' + c.id + '">🔁 ' + esc(c.name) + ' 내보내기 · ' + Math.ceil(c.hp) + '/' + c.max + '</button>'; }).join('')
+        box.innerHTML = dollStrip(all, B.me && B.me.id)
+            + '<button data-k="ribbon"' + ((B.foe.wild && n > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (B.foe.wild ? '' : ' — 괴담은 감쌀 수 없다') + '</button>'
             + '<button data-k="back">돌아간다</button>';
         B.ui.st.appendChild(box);
         B.ui.txt.textContent = '무엇을 쓸까?';
@@ -1182,15 +1209,16 @@ function pickOne(o, run, mine) {
             if (k === 'bag') {
                 menu(3);
                 const m = run.members[o.code];
-                const others = Object.keys(m.dolls || {}).filter(function (x) { return x !== m.act && m.dolls[x].hp > 0; });
                 // 💠 지금 인형에게 먹인 속성 룬 — 여정에서도 친다 (전투 7번이면 깨진다 · pet-rune.js)
                 const cur = m.dolls[m.act] || {};
                 const rl = Array.isArray(cur.runes) ? cur.runes : (cur.runes ? Object.keys(cur.runes).map(function (x) { return cur.runes[x]; }) : []);
                 const rn = Array.isArray(cur.runeN) ? cur.runeN : (cur.runeN ? Object.keys(cur.runeN).map(function (x) { return cur.runeN[x]; }) : []);
                 const RT = window.PETRUNE;
                 const box = el('div', 'menu');
-                box.innerHTML = rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
-                    + others.map(function (x) { const d = m.dolls[x]; return '<button data-k="sw:' + x + '">🔁 ' + esc(d.nick || D().spName(d.sp)) + ' 내보내기 · ' + Math.ceil(d.hp) + '/' + d.max + '</button>'; }).join('')
+                // 🧸 동행 셋을 그림으로 — 누르면 바꿔 내보낸다 (나와 있는 것 · 쓰러진 것은 못 누른다)
+                const strip = dollStrip(Object.keys(m.dolls || {}).map(function (x) { const d = m.dolls[x]; return { id: x, sp: d.sp, name: d.nick || D().spName(d.sp), hp: Number(d.hp) || 0, max: d.max }; }), m.act);
+                box.innerHTML = strip
+                    + rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
                     + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">🎀 포옹 리본은 어둠에서 쓸 수 없다' + (rl.length ? '' : ' · 룬을 먹인 인형은 룬으로도 친다') + '</div><button data-k="back">돌아간다</button>';
                 B.ui.st.appendChild(box);
                 Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
@@ -1240,23 +1268,53 @@ function resolvePvp(cur) {
     if (!cur || cur.stage !== 'fight' || !cur.pick || !cur.pick.a || !cur.pick.b || !cur.a || !cur.b || !cur.a.doll || !cur.b.doll) return;
     const round = Number(cur.round) || 1;
     if (cur.play && cur.play[round]) return;
-    const S = { a: JSON.parse(JSON.stringify(cur.a.doll)), b: JSON.parse(JSON.stringify(cur.b.doll)) };
+    const deep = function (v) { return JSON.parse(JSON.stringify(v)); };
+    const S = { a: deep(cur.a.doll), b: deep(cur.b.doll) };
+    // 🧸 동행 셋 — 바꿔 내보내고(한 턴 씀), 쓰러지면 다음 인형이 나온다. 다 쓰러져야 진다 (2026-11-07 사용자)
+    const TM = { a: (cur.a.dolls && typeof cur.a.dolls === 'object') ? deep(cur.a.dolls) : null, b: (cur.b.dolls && typeof cur.b.dolls === 'object') ? deep(cur.b.dolls) : null };
+    const ACT = { a: cur.a.act != null ? String(cur.a.act) : null, b: cur.b.act != null ? String(cur.b.act) : null };
+    const USED = { a: deep(cur.a.used || {}), b: deep(cur.b.used || {}) };
+    const sync = function (s) { if (TM[s] && ACT[s] && TM[s][ACT[s]]) TM[s][ACT[s]] = S[s]; };
+    const bench = function (s) { if (!TM[s]) return []; return Object.keys(TM[s]).filter(function (id) { return id !== ACT[s] && Number(TM[s][id].hp) > 0; }); };
     const nmOf = function (s) { return S[s].nick || D().spName(S[s].sp); };
+    const sendOut = function (s, id) {
+        sync(s); ACT[s] = id; S[s] = TM[s][id]; USED[s][id] = 1;
+        play.push({ t: fmt(pick(TX.go), { a: nmOf(s) }), go: s, doll: deep(S[s]) });
+    };
     const order = cur.first === 'b' ? ['b', 'a'] : ['a', 'b'];
     const play = [], flat = arrOf(cur.log).filter(Boolean);
-    const guards = {}, runeDef = {};
+    const guards = {}, runeDef = {}, skip = {};
     const RT = window.PETRUNE;
     order.forEach(function (s) {
         const k = String(cur.pick[s] || 'a0');
         if (k.charAt(0) === 'd') { const s1 = skills(S[s].sp).d[Number(k.slice(1))]; const t = s1 ? (T().DEF[s1[1]] || {}) : {}; if (s1 && !t.heal) guards[s] = t; }
         else if (k.indexOf('rd:') === 0) runeDef[s] = arrOf(S[s].runes)[Number(k.slice(3))] || null;
     });
-    let done = false;
+    let done = false, winner = null;
+    // 쓰러졌다 — 다음 인형이 있으면 나오고(이번 판에는 안 움직인다), 없으면 끝
+    const fell = function (t) {
+        const en = nmOf(t);
+        play.push({ t: fmt(pick(TX.faint), { d: en }), ko: t });
+        const nx = bench(t);
+        if (nx.length) { sendOut(t, nx[0]); skip[t] = 1; return false; }
+        done = true; winner = t === 'a' ? 'b' : 'a'; return true;
+    };
     for (let i = 0; i < order.length && !done; i++) {
-        const s = order[i], t = s === 'a' ? 'b' : 'a', d = S[s], e = S[t];
+        const s = order[i], t = s === 'a' ? 'b' : 'a';
+        if (skip[s]) continue;
+        const d = S[s], e = S[t];
         if (d.hp <= 0) continue;
         const nm = nmOf(s), en = nmOf(t), sk = skills(d.sp);
         let k = String(cur.pick[s] || 'a0');
+        if (k.indexOf('sw:') === 0) {                                  // 🔁 바꿔 내보낸다 — 이번 턴은 이것으로 끝
+            const id = k.slice(3);
+            if (TM[s] && TM[s][id] && id !== ACT[s] && Number(TM[s][id].hp) > 0) {
+                play.push({ t: fmt(pick(TX.back), { a: nm }), sw: s });
+                sendOut(s, id);
+                continue;
+            }
+            k = 'a0';
+        }
         if (k.charAt(0) === 'd') {
             const s1 = sk.d[Number(k.slice(1))] || sk.d[0], tt = T().DEF[s1[1]] || {};
             play.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: s });
@@ -1280,7 +1338,7 @@ function resolvePvp(cur) {
                 e.hp = Math.max(0, e.hp - dm);
                 play.push({ t: (blocked ? en + D().josa(en, '이') + ' 룬으로 받아 넘겼다! (피해 1/3) ' : '') + fmt(pick(TX.hit), { a: nm, d: en }) + ' (' + dm + ')', hit: t, hp: e.hp });
                 flat.push({ r: round, who: s, atk: rn, dmg: dm, blocked: blocked });
-                if (e.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: en }), ko: t }); done = true; }
+                if (e.hp <= 0) fell(t);
                 continue;
             }
             k = 'a0';
@@ -1300,15 +1358,18 @@ function resolvePvp(cur) {
             d.hp = Math.max(0, d.hp - back);
             play.push({ t: en + D().josa(en, '이') + ' 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', hit: s, hp: d.hp });
         }
-        if (e.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: en }), ko: t }); done = true; }
-        else if (d.hp <= 0) { play.push({ t: fmt(pick(TX.faint), { d: nm }), ko: s }); done = true; }
+        if (e.hp <= 0) fell(t);
+        else if (d.hp <= 0) fell(s);
     }
+    sync('a'); sync('b');
     cur.a.doll = S.a; cur.b.doll = S.b;
     cur.a.hp = S.a.hp; cur.b.hp = S.b.hp;
+    if (TM.a) { cur.a.dolls = TM.a; cur.a.act = ACT.a; cur.a.used = USED.a; }
+    if (TM.b) { cur.b.dolls = TM.b; cur.b.act = ACT.b; cur.b.used = USED.b; }
     cur.log = flat;
     cur.play = cur.play || {}; cur.play[round] = play;
     cur.pick = null;
-    if (done) { cur.stage = 'done'; cur.winner = (S.a.hp > 0) ? 'a' : 'b'; cur.why = 'hp'; cur.endAt = Date.now(); }
+    if (done) { cur.stage = 'done'; cur.winner = winner || ((S.a.hp > 0) ? 'a' : 'b'); cur.why = 'hp'; cur.endAt = Date.now(); }
     else { cur.round = round + 1; cur.first = (cur.first === 'b') ? 'a' : 'b'; cur.roundAt = Date.now(); }
     return cur;
 }
@@ -1356,6 +1417,16 @@ async function pvpFight(o) {
                 if (e.hit) { const who = e.hit === side ? 'me' : 'foe'; await blink(who); (who === 'me' ? B.me : B.foe).hp = e.hp; paintStat(); await sleep(450); }
                 if (e.heal) { (e.heal === side ? B.me : B.foe).hp = e.hp; paintStat(); }
                 if (e.ko) await faintFx(e.ko === side ? 'me' : 'foe');
+                if (e.sw) { const who = e.sw === side ? 'me' : 'foe'; await say(e.t, 1000); await faintFx(who); (who === 'me' ? B.ui.me : B.ui.foe).style.transform = ''; continue; }
+                if (e.go && e.doll) {                                  // 🧸 다음 인형이 나온다 — 그림 · 이름 · 체력을 갈아 끼운다
+                    const who = e.go === side ? 'me' : 'foe';
+                    if (who === 'me') { B.me = fromSnap(e.doll, 'me'); paintMe(); } else { B.foe = fromSnap(e.doll, 'foe'); paintFoe(false); }
+                    (who === 'me' ? B.ui.me : B.ui.foe).style.transform = '';
+                    paintStat();
+                    await say(e.t, 900);
+                    await whiteIn(who);
+                    continue;
+                }
                 await say(e.t, e.ko ? 1400 : 1100);
             }
         }
@@ -1391,9 +1462,16 @@ function pvpPick(o, v) {
                 const RT = window.PETRUNE;
                 const rl = me.runes || [], rn = me.runeN || [];
                 const box = el('div', 'menu');
-                box.innerHTML = rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
+                // 🧸 동행 셋 — 바꿔 내보낸다 (한 턴을 쓴다)
+                const mine = (o.get() || {})[o.side] || {};
+                const team = Object.keys(mine.dolls || {}).map(function (id) {
+                    const d = mine.dolls[id]; const isCur = String(id) === String(mine.act);
+                    return { id: id, sp: d.sp, name: d.nick || D().spName(d.sp), hp: isCur ? me.hp : (Number(d.hp) || 0), max: d.max };
+                });
+                box.innerHTML = dollStrip(team, mine.act)
+                    + rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
                     + rl.map(function (r, i) { return '<button data-k="rd:' + i + '">🛡 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 막는다 <small style="color:#524173">— 상대 룬 공격의 속성을 이기면 1/3</small></button>'; }).join('')
-                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">' + (rl.length ? '먹인 룬은 전투 ' + (RT ? RT.WEAR_MAX : 7) + '번이면 깨진다' : '먹인 룬이 없다 — 룬은 인형 칸에서 먹인다') + '</div><button data-k="back">돌아간다</button>';
+                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">' + (team.length > 1 ? '인형을 바꾸면 그 턴은 바꾸는 데 쓴다 · ' : '') + (rl.length ? '먹인 룬은 전투 ' + (RT ? RT.WEAR_MAX : 7) + '번이면 깨진다' : '먹인 룬이 없다 — 룬은 인형 칸에서 먹인다') + '</div><button data-k="back">돌아간다</button>';
                 B.ui.st.appendChild(box);
                 Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
                     b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });

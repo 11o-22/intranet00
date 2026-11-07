@@ -277,8 +277,8 @@ const PLAZA = {
                   lift: { f2: [ { n: '사택', ic: 'house', tab: 'tab-house', sub: 'house-main' } ],
                           // ✗ 「파티」는 뺐다 (2026-10-16)
                           b1: [ { n: '재난 탐사', ic: 'dark', tab: 'tab-darkness', sub: 'dark-main' } ],
-                          b2: [ { n: '여정', ic: 'pet', fn: 'journeyOpen' },             // 🐾 펫 동반 어둠 (journey.js · 2026-10-28) — 기록 소실 왼쪽
-                                { n: '기록 소실', ic: 'dark', fn: 'disasterLost' } ] },
+                          b2: [ { n: '여정', ic: 'journey', fn: 'journeyOpen' },             // 🐾 펫 동반 어둠 (journey.js · 2026-10-28) — 기록 소실 왼쪽
+                                { n: '기록 소실', ic: 'lost', fn: 'disasterLost' } ] },
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
@@ -373,8 +373,8 @@ const PLAZA = {
         { g: 'dark',  n: '어둠 탐사',  i: '🌑', ic: 'dark',    tab: 'tab-darkness', sub: 'dark-main' },
         // 📡 기록 소실 — 재난관리국 B2 와 같은 문 (disaster.js · 티켓이 없으면 못 들어감). 목록에서는 바로 연다
         // 🐾 여정 — 펫이 대신 떠나는 어둠 (journey.js · 2026-10-28) — 기록 소실 왼쪽
-        { g: 'dark',  n: '여정',       i: '🐾', ic: 'pet',     fn: 'journeyOpen' },
-        { g: 'dark',  n: '기록 소실',  i: '📡', ic: 'dark',    fn: 'disasterLost' },
+        { g: 'dark',  n: '여정',       i: '🐾', ic: 'journey', fn: 'journeyOpen' },     // 🎨 새 아이콘 묶음 (2026-11-07 사용자)
+        { g: 'dark',  n: '기록 소실',  i: '📡', ic: 'lost',    fn: 'disasterLost' },
         // ⑤ 생활
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
@@ -382,11 +382,11 @@ const PLAZA = {
         // 📸 포토존 — 장소 목록 → 1번 · 2번 방 (안에 있는 사람까지) → 누르면 그 방으로
         { g: 'life',  n: '포토존',     i: '📸', ic: 'camera',  sheet: 'photo' },
         // 🀄 마작 — 누구나 (2026-10-31 사용자 · 전에는 상담실 · 선녀탕 안에서만) · 3인 · 4인 (mj-ui.js)
-        { g: 'life',  n: '마작',       i: '🀄',                fn: 'mjOpen' },
+        { g: 'life',  n: '마작',       i: '🀄', ic: 'mahjong', fn: 'mjOpen' },
         // 🫣 숨바꼭질 — 둘 이상 · 접속한 사람을 불러 (hideseek.js · 2026-11-02 사용자)
-        { g: 'life',  n: '숨바꼭질',   i: '🫣',                fn: 'hsOpen' },
+        { g: 'life',  n: '숨바꼭질',   i: '🫣', ic: 'hide',    fn: 'hsOpen' },
         // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
-        { g: 'life',  n: '행맨',       i: '🕵️',                fn: 'mfOpen' },
+        { g: 'life',  n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },

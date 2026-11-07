@@ -76,7 +76,7 @@ const SC = {
         spots: [
             { x: 4, y: 219, n: '출몰지', i: '◀', edge: 1, act: 'toWildR' },
             { x: 466, y: 219, n: '재난관리국 앞', i: '▶', edge: 1, act: 'toGate' },
-            { x: 245, y: 219, n: '도깨비 공방', i: '🚪', act: 'toGong' }
+            { x: 245, y: 219, n: '도깨비 공방', i: '🚪', ic: 'dokkaebi', act: 'toGong' }
             // ✗ 아래층 문 표(236, 316)는 뺐다 (2026-11-07 사용자)
         ],
         start: { left: [16, 219], right: [454, 219], door: [245, 219] }
@@ -454,7 +454,7 @@ function paintSpots() {
         const lx = s.edge ? Math.max(24 / Z, Math.min(sc.w - 24 / Z, s.x)) : s.x;
         e.style.left = Math.round(lx * Z) + 'px';
         e.style.top = Math.round((s.y - sc.body * 1.35) * Z) + 'px';
-        e.innerHTML = '<div class="b">' + esc(s.i || '•') + '</div><div class="t">' + esc(s.n) + '</div>';
+        e.innerHTML = '<div class="b">' + (s.ic ? '<span class="pico" style="--ic:url(\'ico/' + s.ic + '.png\')"></span>' : esc(s.i || '•')) + '</div><div class="t">' + esc(s.n) + '</div>';
         e.addEventListener('pointerup', function (ev) { ev.stopPropagation(); if (busy()) return; walkTo(s.x, s.y, function () { act(s.act, s); }); });
         e.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
         run.world.appendChild(e);
@@ -1452,18 +1452,20 @@ function plazaRooms() {
                  floor: [rr(210, F), rr(226, F)], floor2: [rr(312, F), rr(322, F)], x2: [rr(138, F), rr(332, F)],
                  stairs: [ st(F, 48, 226, 138, 312), st(F, 332, 312, 422, 226) ],
                  left: 'dwild', right: 'gate',
-                 spots: [ { x: rr(245, F), y: rr(196, F), n: '도깨비 공방', i: '🚪', go: 'dgong', golv: 1, gox: rr(385, G) } ] },   // 아래층 문 표는 뺐다
+                 spots: [ { x: rr(245, F), y: rr(196, F), n: '도깨비 공방', i: '🚪', ic: 'dokkaebi', go: 'dgong', golv: 1, gox: rr(385, G) } ] },   // 아래층 문 표는 뺐다
         dgong: { n: '도깨비 공방', img: '../doll/gong.webp', w: rr(899, G), h: rr(512, G), cut: 0, k: 1, pix: 1, doll: G,
                  floor: [rr(234, G), rr(246, G)], floor2: [rr(394, G), rr(406, G)], x2: [rr(165, G), rr(800, G)],
                  stairs: [ st(G, 25, 246, 165, 394) ],
                  spots: (SC.gong.npcs || []).map(function (n) {
                      const lv = n.y > 300 ? 1 : 0;
                      if (n.act === 'toGfrontDoor') return { x: rr(n.x, G), y: rr(n.r[1], G), lv: 1, n: '나간다', ic: 'out', go: 'dgfront', golv: 0, gox: rr(245, F) };
-                     return { x: rr(n.x, G), y: rr(n.r[1], G), lv: lv, n: n.n, i: NPC_IC[n.act] || '👺', fn: 'dollNpcTap', stay: 1, act: n.act };
+                     return { x: rr(n.x, G), y: rr(n.r[1], G), lv: lv, n: n.n, i: NPC_IC[n.act] || '👺', ic: NPC_ICO[n.act] || 'dokkaebi', fn: 'dollNpcTap', stay: 1, act: n.act };
                  }) }
     };
 }
 const NPC_IC = { sew: '✂️', shop: '🛒', trade: '🔁', box: '📦', dex: '📖', mask: '💠', nap: '💤' };
+// 🎨 그림 아이콘 (ico/*.png · 2026-11-07 사용자 묶음) — 수선소 · 잡화점 · 교환소 · 보관소 · 도감 · 각성 공방. 조는 도깨비는 도깨비 그림
+const NPC_ICO = { sew: 'sew', shop: 'goods', trade: 'trade', box: 'box', dex: 'dex', mask: 'awaken', nap: 'dokkaebi' };
 // 공방 도깨비를 누르면 — 광장 위에 말 창을 띄우고 공방 일을 본다 (doll-gong.js)
 window.dollNpcTap = function (spot) {
     const G = window.DOLLGONG, a = spot && spot.act;
@@ -1565,8 +1567,8 @@ window.dollSteps = function (n) {
         const M = PLAZA.MENU;
         if (!M.some(function (m) { return m.fn === 'dollGongOpen'; })) {
             const at = M.findIndex(function (m) { return m.fn === 'petOpen'; });
-            const rows = [{ g: 'life', n: '도깨비 공방', i: '👺', fn: 'dollGongOpen' },
-                          { g: 'life', n: '봉제인형 출몰지', i: '🧸', fn: 'dollWildOpen' }];
+            const rows = [{ g: 'life', n: '도깨비 공방', i: '👺', ic: 'dokkaebi', fn: 'dollGongOpen' },
+                          { g: 'life', n: '봉제인형 출몰지', i: '🧸', ic: 'wild', fn: 'dollWildOpen' }];
             if (at >= 0) M.splice(at + 1, 0, rows[0], rows[1]); else M.push(rows[0], rows[1]);
         }
     } catch (e) { console.warn('[🧸] 광장 잇기', e); }
