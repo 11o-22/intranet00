@@ -146,13 +146,14 @@ function listView() {
     const have = mine.length;
     const kinds = L.filter(function (p) { return mine.some(function (k) { return P().sp(k) === p.i; }); }).length;
     // ★ 같은 종을 여럿 데리고 있을 수 있다 — 그 종 칸 바로 뒤에 이어 붙인다 (2026-11-07)
+    // ★ 없는 종은 아예 안 보인다 (2026-11-07 사용자 「보유하지 않는 펫은 아예 안 뜨게」)
     const cells = [];
     L.forEach(function (p) {
-        cells.push(cell(p));
-        mine.filter(function (k) { return Number(k) !== p.i && P().sp(k) === p.i; })
-            .sort(function (a, b) { return a - b; })
-            .forEach(function (k) { cells.push(cell(p, k)); });
+        const owned = mine.filter(function (k) { return P().sp(k) === p.i; }).sort(function (a, b) { return a - b; });
+        if (!owned.length) return;
+        owned.forEach(function (k) { cells.push(Number(k) === p.i ? cell(p) : cell(p, k)); });
     });
+    if (!cells.length) cells.push('<div style="grid-column:1/-1; font-size:10.5px; color:#6f685e; padding:14px 0; text-align:center;">아직 인형이 없습니다 — 출몰지에서 포옹 리본으로 잡아 옵니다.</div>');
 
     const grid = '<div style="display:grid; grid-template-columns:repeat(' + COLS + ',1fr);'
         + ' gap:5px;">' + cells.join('') + '</div>';
@@ -170,7 +171,7 @@ function listView() {
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 
     w.querySelector('#pet-x').onclick = shut;
-    try { if (window.DOLL && DOLL.artSwitchWire) DOLL.artSwitchWire(w); } catch (e) { }
+    try { if (window.DOLL && DOLL.artSwitchWire) DOLL.artSwitchWire(w, function () { listView(); }); } catch (e) { }   // 켜고 끄면 그림을 바꿔 다시 그린다
     Array.prototype.forEach.call(w.querySelectorAll('.pet-cell'), function (el) {
         el.onclick = function () { oneView(Number(el.getAttribute('data-i'))); };
     });

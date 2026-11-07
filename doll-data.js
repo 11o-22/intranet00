@@ -265,9 +265,10 @@ function artSwitchWire(root, after) {
         if (typeof after === 'function') after(v);
     };
 }
+//   옛 그림은 pet/old/ — 2026-11-07 봉제인형으로 바꾸기 전(0ea31b2^)의 pet/sNN · pNN 을 그대로 꺼내 둔 것
 function oldCss(sp, px) {
     const n = String(Math.max(1, Number(sp) || 1)).padStart(2, '0');
-    return 'background-image:url(pet/' + (px > 64 ? 'p' : 's') + n + '.webp);background-repeat:no-repeat;background-position:center bottom;background-size:contain;image-rendering:pixelated;'
+    return 'background-image:url(pet/old/' + (px > 64 ? 'p' : 's') + n + '.webp);background-repeat:no-repeat;background-position:center bottom;background-size:contain;image-rendering:pixelated;'
         + 'width:' + px + 'px;height:' + px + 'px;';
 }
 function spriteCss(sp, px, back, old) {

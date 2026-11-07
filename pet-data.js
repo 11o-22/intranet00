@@ -838,8 +838,10 @@ function petJosa(s, kind) {
     return '';
 }
 
-function petImg(id)  { return 'pet/p' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
-function petIcon(id) { return 'pet/s' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
+// 🎨 옛 펫 외형으로 보기(doll-data.js artOld)가 켜진 사원은 pet/old/ 그림 (2026-11-07 사용자)
+function petArtDir() { try { return (window.DOLL && window.DOLL.artOld()) ? 'pet/old/' : 'pet/'; } catch (e) { return 'pet/'; } }
+function petImg(id)  { return petArtDir() + 'p' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
+function petIcon(id) { return petArtDir() + 's' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
 
 // ==========================================
 // 바깥에 내어 준다
