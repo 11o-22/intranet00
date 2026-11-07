@@ -3212,6 +3212,16 @@ function paintRoom() {
             feed.style.maxWidth = Math.max(200, Math.round(off + x2 - 12 - 10)) + 'px';
         } else feed.style.maxWidth = '';
     }
+    // ★ 앞그림(ob) — 사람 앞에 한 장 더 깐다 (🧸 봉제인형 출몰지의 수풀 · 잡동사니 · doll-scene.js · 2026-11-07)
+    Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-ob'), function (e) { e.remove(); });
+    if (r.ob) {
+        const ob = document.createElement('img');
+        ob.className = 'plaza-ob';
+        ob.alt = '';
+        ob.src = P.DIR + r.ob;
+        ob.style.cssText = 'position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;z-index:5000;pointer-events:none;image-rendering:pixelated';
+        run.el.appendChild(ob);
+    }
     paintMap();                   // 미니맵이 방 이름까지 맡는다 (📍 띠를 대신한다)
     paintExits();
     paintSpots();
@@ -3480,7 +3490,25 @@ function goApp(s) {
         // 엘리베이터 — 층을 고르는 판을 띄운다
         if (s.lift) { liftSheet(); return; }
         // 방으로 들어가는 입구 — 광장을 닫지 않고 그 방으로 건너간다
-        if (s.go) { closeSheet(); goRoom(s.go, null, s.golv); return; }
+        if (s.go) {
+            closeSheet(); goRoom(s.go, null, s.golv);
+            // ★ 들어갈 자리 — 건너편 문 앞에 선다 (🧸 도깨비 공방 문 · 2026-11-07)
+            if (s.gox != null && run && run.room === s.go) {
+                const rr = R[s.go];
+                run.x = Math.max(P.EDGE + P.INSET, Math.min(rr.w - P.EDGE - P.INSET, Number(s.gox)));
+                run.tx = null; run.tseg = null;
+                try { segStep(rr, 0); } catch (e) { }
+                try { send(false); } catch (e) { }
+            }
+            return;
+        }
+        // ★ stay — 광장을 그대로 두고 그 위에 띄우는 것 (🧸 도깨비 공방 도깨비들과 이야기 · doll-scene.js)
+        if (s.fn && s.stay) {
+            closeSheet();
+            const f0 = window[s.fn];
+            if (typeof f0 === 'function') setTimeout(function () { try { f0(s); } catch (e) { } }, 40);
+            return;
+        }
         if (s.fn) {
             // 창(모달)은 광장 위에 뜬다 — 사원 쪽은 광장을 바탕으로 깔아 두었다
             if (!solo) shut();
@@ -6218,10 +6246,10 @@ window.plazaOpen = open;
 // ==========================================
 // 콘솔
 // ==========================================
-window.plazaGo = function (key, way, x) {
+window.plazaGo = function (key, way, x, lv) {
     if (!run) { console.warn('광장에 들어와 있어야 합니다.'); return; }
     if (!R[key]) { console.warn('그런 방이 없습니다 —', Object.keys(R).join(' · ')); return; }
-    goRoom(key, way || null);
+    goRoom(key, way || null, (lv === 0 || lv === 1) ? lv : undefined);
     // 🕵️ 행맨 — 문으로 넘어가면 건너편 문 앞에 선다 (2026-11-03)
     if (x != null && run && run.room === key) {
         const r = R[key];

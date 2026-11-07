@@ -59,29 +59,31 @@ const SC = {
             { x: [26, 128], y: 315 }, { x: [216, 308], y: 315 }, { x: [415, 517], y: 315 }, { x: [858, 934], y: 313 }, { x: [1010, 1112], y: 313 }
         ],
         spots: [
-            // 2026-11-07 — 공방이 재관국 앞 오른쪽으로 옮겼다: 재관국 앞 → 공방 앞 → 출몰지 → 광장
-            { x: 4, y: 219, n: '도깨비 공방', i: '◀', edge: 1, act: 'toGfrontR' },
-            { x: 4, y: 315, n: '도깨비 공방', i: '◀', edge: 1, act: 'toGfrontR' },
-            { x: 1532, y: 222, n: '광장', i: '▶', edge: 1, act: 'toPlaza' }
+            // 2026-11-07 사용자 「우체국 - 출몰지 - 도깨비공방 - 재관국」 (이 맵은 튜토리얼 때만 — 평소에는 광장 방 dwild)
+            { x: 4, y: 219, n: '우체국', i: '◀', edge: 1, act: 'toPost' },
+            { x: 4, y: 315, n: '우체국', i: '◀', edge: 1, act: 'toPost' },
+            { x: 1532, y: 222, n: '도깨비 공방', i: '▶', edge: 1, act: 'toGfront' }
         ],
         start: { left: [16, 219], right: [1520, 222] }
     },
     gfront: {
         n: '도깨비 공방 앞', img: 'doll/gfront.webp', w: 470, h: 512, band: [25, 357], body: 46, bt: 'wild',
+        zoom: 0.68,                                      // 2026-11-07 사용자 「도깨비 공방 앞도 출몰지처럼 줌아웃」
         lines: [
             [[0, 219], [48, 219], [245, 219], [422, 219], [470, 219]],
             [[48, 219], [70, 250], [102, 252], [138, 316], [236, 316], [332, 316], [368, 252], [400, 250], [422, 219]]
         ],
         spots: [
-            { x: 4, y: 219, n: '재난관리국 앞', i: '◀', edge: 1, act: 'toGate' },
-            { x: 466, y: 219, n: '출몰지', i: '▶', edge: 1, act: 'toWildL' },
-            { x: 245, y: 219, n: '도깨비 공방', i: '🚪', act: 'toGong' },
-            { x: 236, y: 316, n: '도깨비 공방', i: '🚪', act: 'toGong' }
+            { x: 4, y: 219, n: '출몰지', i: '◀', edge: 1, act: 'toWildR' },
+            { x: 466, y: 219, n: '재난관리국 앞', i: '▶', edge: 1, act: 'toGate' },
+            { x: 245, y: 219, n: '도깨비 공방', i: '🚪', act: 'toGong' }
+            // ✗ 아래층 문 표(236, 316)는 뺐다 (2026-11-07 사용자)
         ],
-        start: { left: [16, 219], right: [454, 219], door: [236, 316] }
+        start: { left: [16, 219], right: [454, 219], door: [245, 219] }
     },
     gong: {
         n: '도깨비 공방', img: 'doll/gong.webp', w: 899, h: 512, band: [20, 420], body: 62, bt: 'wild',
+        zoom: 0.8,
         lines: [
             [[25, 240], [160, 240], [385, 240], [680, 240], [815, 240], [885, 240]],
             [[25, 240], [165, 400], [245, 400], [385, 400], [505, 400], [730, 400], [800, 400]]
@@ -241,6 +243,10 @@ function css() {
         '@keyframes dsbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6%)}}',
         '@keyframes dsjump{0%{transform:translateY(0)}30%{transform:translateY(-40%)}60%{transform:translateY(0)}75%{transform:translateY(-14%)}100%{transform:translateY(0)}}'
     ].join('\n');
+    // 광장 방 위 말 창(#ds-dlg) — 같은 꾸밈을 쓴다
+    s.textContent += '\n#ds-dlg{position:fixed;inset:0;z-index:99990;pointer-events:none;user-select:none;-webkit-user-select:none}'
+        + '\n#ds-dlg.on{pointer-events:auto;touch-action:none;background:rgba(0,0,0,.08)}'
+        + s.textContent.split('\n').filter(function (r) { return /^#ds-ov \.ds-(talk|sys)/.test(r); }).map(function (r) { return '\n' + r.replace(/#ds-ov/g, '#ds-dlg'); }).join('');
     document.head.appendChild(s);
 }
 
@@ -701,7 +707,7 @@ async function encounter() {
     if (!run || run.busy) return;
     if (!canHunt()) {
         run.encOff = Date.now() + 8000;
-        sys('수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방(◀)에 먼저 들러 보세요.');
+        sys('수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방(▶)에 먼저 들러 보세요.');
         return;
     }
     run.busy = true; run.path = []; run.then = null;
@@ -732,8 +738,38 @@ function flash(n) {
         step();
     });
 }
+// 말 창을 띄울 자리 — 맵(겹친 화면)이 열려 있으면 그 위, 아니면 광장 위에 투명한 막(#ds-dlg)
+const DLG = { el: null, n: 0, talkOn: false };
+function hostOf() {
+    if (run) return { el: run.el, st: run };
+    css();
+    if (!DLG.el || !DLG.el.parentNode) {
+        const e = document.createElement('div');
+        e.id = 'ds-dlg';
+        e.innerHTML = '<div class="ds-sys"><span style="opacity:0"></span></div>';
+        document.body.appendChild(e);
+        DLG.el = e;
+    }
+    DLG.n++;
+    DLG.el.classList.add('on');
+    return { el: DLG.el, st: DLG, dlg: true };
+}
+function hostDone(h) {
+    if (!h || !h.dlg) return;
+    DLG.n = Math.max(0, DLG.n - 1);
+    if (!DLG.n && DLG.el) DLG.el.classList.remove('on');
+}
 function sys(t, ms) {
-    if (!run) return;
+    if (!run) {                                          // 광장 방 — 아래 띠에 잠깐
+        css();
+        if (!DLG.el || !DLG.el.parentNode) { hostDone(hostOf()); }
+        const s2 = DLG.el.querySelector('.ds-sys span');
+        if (!s2) return;
+        s2.textContent = t; s2.style.opacity = t ? '1' : '0';
+        clearTimeout(DLG._sysT);
+        DLG._sysT = setTimeout(function () { s2.style.opacity = '0'; }, ms || 3800);
+        return;
+    }
     const s = run.el.querySelector('.ds-sys span');
     if (!s) return;
     s.textContent = t;
@@ -749,12 +785,13 @@ function sys(t, ms) {
 function talk(lines, who) {
     lines = (Array.isArray(lines) ? lines : []).filter(function (L) { return L && (typeof L === 'string' || L.t); });
     return new Promise(function (resolve) {
-        if (!run || !lines.length) return resolve();     // 할 말이 없으면 빈 창을 띄우지 않는다
-        run.talkOn = true; run.path = [];
+        if (!lines.length) return resolve();             // 할 말이 없으면 빈 창을 띄우지 않는다
+        const h = hostOf();
+        h.st.talkOn = true; if (run) run.path = [];
         let i = 0;
         const box = document.createElement('div');
         box.className = 'ds-talk';
-        run.el.appendChild(box);
+        h.el.appendChild(box);
         let ready = 0;
         const show = function () {
             const L = lines[i];
@@ -770,34 +807,36 @@ function talk(lines, who) {
             if (Date.now() < ready) return;
             i++;
             if (i >= lines.length) {
-                run && run.el.removeEventListener('pointerdown', next, true);
+                h.el.removeEventListener('pointerdown', next, true);
                 box.remove();
-                if (run) run.talkOn = false;
+                h.st.talkOn = false;
+                hostDone(h);
                 resolve();
                 return;
             }
             show();
         };
         show();
-        run.el.addEventListener('pointerdown', next, true);
+        h.el.addEventListener('pointerdown', next, true);
     });
 }
 //   고르기 — 돌려주는 값은 고른 번호
 function ask(who, text, opts) {
     return new Promise(function (resolve) {
-        if (!run) return resolve(-1);
-        run.talkOn = true; run.path = [];
+        const h = hostOf();
+        h.st.talkOn = true; if (run) run.path = [];
         const box = document.createElement('div');
         box.className = 'ds-talk';
         box.innerHTML = (who ? '<div class="who">' + esc(who) + '</div>' : '') + '<div class="tx">' + esc(text).replace(/\n/g, '<br>') + '</div>'
             + '<div class="ch">' + opts.map(function (o, i) { return '<button data-i="' + i + '">' + esc(o) + '</button>'; }).join('') + '</div>';
-        run.el.appendChild(box);
+        h.el.appendChild(box);
         box.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
         Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
             b.onclick = function (ev) {
                 ev.stopPropagation();
                 box.remove();
-                if (run) run.talkOn = false;
+                h.st.talkOn = false;
+                hostDone(h);
                 resolve(Number(b.dataset.i));
             };
         });
@@ -999,8 +1038,8 @@ function plazaWhere() {
     return { room: null, x: null };
 }
 function plazaOn() { try { return !!document.getElementById('plaza-ov'); } catch (e) { return false; } }
-function toPlazaRoom(room, x) {
-    const go = function () { try { if (room && typeof window.plazaGo === 'function') window.plazaGo(room, null, x); } catch (e) { } };
+function toPlazaRoom(room, x, lv) {
+    const go = function () { try { if (room && typeof window.plazaGo === 'function') window.plazaGo(room, null, x, lv); } catch (e) { } };
     if (plazaOn()) { go(); return; }
     try { if (typeof window.plazaOpen === 'function') { window.plazaOpen(); setTimeout(go, 700); } } catch (e) { }
 }
@@ -1020,13 +1059,12 @@ function act(name, o) {
     if (!run) return;
     switch (name) {
         case 'toPlaza':    close(); toPlazaRoom('plaza', 1830); return;
-        case 'toGate':     close(); toPlazaRoom('gate', 1800); return;      // 재관국 앞 오른쪽 끝으로
-        case 'toGfront':   open('gfront', 'left'); return;
-        case 'toGfrontR':  open('gfront', 'right'); return;
-        case 'toWildR':    open('wild', 'right'); return;
-        case 'toWildL':    open('wild', 'left'); return;
-        case 'toGong':     open('gong', 'door'); return;
-        case 'toGfrontDoor': open('gfront', 'door'); return;
+        case 'toPost':     close(); toPlazaRoom('post', 1830); return;      // 우체국 오른쪽 끝으로
+        case 'toGate':     close(); toPlazaRoom('gate', 60); return;        // 재관국 앞 왼쪽 끝으로
+        case 'toGfront':   open('gfront', 'left'); plazaSync('dgfront', 16, 219); return;
+        case 'toWildR':    open('wild', 'right'); plazaSync('dwild', 1520, 222); return;
+        case 'toGong':     open('gong', 'door'); plazaSync('dgong', 385, 400); return;
+        case 'toGfrontDoor': open('gfront', 'door'); plazaSync('dgfront', 245, 219); return;
         case 'arcadeQuit': arcadeQuit(); return;
     }
     const G = window.DOLLGONG;
@@ -1052,7 +1090,7 @@ function onEnter(key, opt) {
     if (key === 'gfront' && !t.done && t.step === 'go-wild') { tutResumeFront(); return; }
     if (key === 'wild' && !t.done && (t.step === 'go-wild' || t.step === 'wild-go')) { tutWild(); return; }
     if (key === 'gong' && !t.done && t.step === 'caught') { tutGong(); return; }
-    if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(◀)에 먼저 들러 보세요.', 4500);
+    if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(▶)에 먼저 들러 보세요.', 4500);
     if (key === 'arcade' && run.pt && !opt.resume) {
         // 판 소식(dollRun)이 아직 안 왔으면 첫 말이 비어 있다 — 올 때까지 잠깐 기다린다
         const r0 = run;
@@ -1139,8 +1177,8 @@ async function tutLeadOut() {
     // 도깨비가 먼저 왼쪽(출몰지)으로 간다 — 따라가면 출몰지
     if (!run.npc) npcFront(32);
     run.tut = { step: 'go-wild' };
-    sys('도깨비를 따라가세요 ▶', 6000);
-    npcWalk(466, 219, SPD * 1.6).then(function () { npcHide(); });
+    sys('◀ 도깨비를 따라가세요', 6000);
+    npcWalk(4, 219, SPD * 1.6).then(function () { npcHide(); });
 }
 async function tutResumeFront() {
     run.tut = { step: 'go-wild' };
@@ -1186,6 +1224,7 @@ async function tutAfterCatch() {
     if (!run) return;
     await flash(1);
     open('gong', 'door', { tut: { step: 'gong' }, quiet: 1 });
+    plazaSync('dgong', 385, 400);
 }
 function lookAt(x) {
     // 카메라만 잠깐 그쪽으로 — 사람은 그대로 (x 가 null 이면 사람에게 돌아온다)
@@ -1279,6 +1318,8 @@ async function tutGong() {
     if (!run) return;
     run.tut = null;
     npcWalk(890, 240, SPD * 1.5).then(npcHide);
+    // ★ 이제부터는 광장 방 — 같은 자리에서 채팅 · 목록 · 다른 사원들과 (2026-11-07 사용자 「모든 기능이 광장에서처럼」)
+    setTimeout(function () { if (run && run.key === 'gong' && !run.tut) toPlazaHere(); }, 1800);
 }
 
 // ==========================================
@@ -1322,12 +1363,14 @@ window.dollRepaint = function () {
     try { if (run) makeDoll(); } catch (e) { }
     try { if (window.DOLLGONG && DOLLGONG.repaint) DOLLGONG.repaint(); } catch (e) { }
 };
-window.dollWildOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('wild', 'right'); };
-window.dollGfrontOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('gfront', 'left'); };
+// ★ 출몰지 · 공방 앞 · 공방은 이제 **광장 방**이다 (dwild · dgfront · dgong — 아래 「광장 방」)
+//   목록에서 고르면 그 방으로 간다. 튜토리얼 전이면 공방 앞으로 (거기서 도깨비가 맞는다).
+window.dollWildOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } toPlazaRoom(tutOf().done ? 'dwild' : 'dgfront', null); };
+window.dollGfrontOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } toPlazaRoom('dgfront', null); };
 window.dollGongOpen = function () {
     if (inDark()) { alert_('어둠 탐사 중입니다.'); return; }
-    if (!tutOf().done) { open('gfront', 'door'); return; }
-    open('gong', 'door');
+    if (!tutOf().done) { toPlazaRoom('dgfront', null); return; }
+    toPlazaRoom('dgong', 385 * RS.gong, 1);
 };
 window.dollGo = function (k, at) { if (!SC[k]) { console.log(Object.keys(SC).join(' · ')); return; } open(k, at); };
 window.dollWalk = function (x, y) { if (run && !busy()) walkTo(x, y, null); };
@@ -1338,18 +1381,142 @@ window.dollSceneState = function () {
     return o;
 };
 
-// 광장 — 입구와 ☰ 목록
+// ==========================================
+// 🏙 광장 방 — 출몰지 · 도깨비 공방 앞 · 도깨비 공방 (2026-11-07 사용자)
+// ==========================================
+//   「도깨비 공방이나 출몰지에서도 채팅이 가능하게 해주고, 모든 기능이 광장에서처럼 가능하게」
+//   「맵 위치를 우체국-출몰지-도깨비공방-재관국으로」
+//   → 세 곳을 광장 방으로 넣는다 (plaza.js 가 그리고 걷고 채팅 · 목록 · 다른 사원 · 점프 … 모두 광장 그대로).
+//     우체국 ▶ dwild ▶ dgfront ▶ 재관국 앞 · 공방 앞 문 🚪 ↔ dgong
+//   방 크기 — 그림의 사람 키(출몰지 · 공방 앞 46칸 · 공방 62칸)가 광장 사람 키 236 이 되게 늘린다 (RS).
+//   바닥 — 광장처럼 위층 띠 · 아래층 띠 · 계단. 그림 선(SC.lines)에서 재 왔다.
+//     출몰지 오른쪽 지하(872~1180)는 광장 방 꼴(아래층 하나)에 안 맞아 뺐다 — 왼쪽 지하와 계단 하나만.
+//   튜토리얼은 전처럼 겹친 맵(이 파일의 open)에서 한다 — 끝나면 광장 방으로 돌려보낸다.
+const RS = { wild: 236 / 46, gfront: 236 / 46, gong: 236 / 62 };
+const PROOM = { dwild: 'wild', dgfront: 'gfront', dgong: 'gong' };
+const SCENE_ROOM = { wild: 'dwild', gfront: 'dgfront', gong: 'dgong' };
+function rr(v, k) { return Math.round(v * RS[k]); }
+function plazaRooms() {
+    const W = 'wild', F = 'gfront', G = 'gong';
+    const st = function (k, xa, ya, xb, yb) {          // 계단 — (xa,ya) → (xb,yb) 를 잇는 선 (위아래로 5칸씩 띠)
+        return { x: [rr(xa, k), rr(xb, k)], y0: [rr(ya - 5, k), rr(yb - 5, k)], y1: [rr(ya + 5, k), rr(yb + 5, k)] };
+    };
+    return {
+        dwild: { n: '봉제인형 출몰지', img: '../doll/wild.webp', ob: '../doll/wild-ob.webp', w: rr(1536, W), h: rr(512, W), cut: 0, k: 1, pix: 1, doll: W,
+                 floor: [rr(212, W), rr(246, W)], floor2: [rr(309, W), rr(320, W)], x2: [rr(30, W), rr(560, W)],
+                 stairs: [ st(W, 560, 309, 650, 246) ],
+                 left: 'post', right: 'dgfront', spots: [] },
+        dgfront: { n: '도깨비 공방 앞', img: '../doll/gfront.webp', w: rr(470, F), h: rr(512, F), cut: 0, k: 1, pix: 1, doll: F,
+                 floor: [rr(210, F), rr(226, F)], floor2: [rr(312, F), rr(322, F)], x2: [rr(138, F), rr(332, F)],
+                 stairs: [ st(F, 48, 226, 138, 312), st(F, 332, 312, 422, 226) ],
+                 left: 'dwild', right: 'gate',
+                 spots: [ { x: rr(245, F), y: rr(196, F), n: '도깨비 공방', i: '🚪', go: 'dgong', golv: 1, gox: rr(385, G) } ] },   // 아래층 문 표는 뺐다
+        dgong: { n: '도깨비 공방', img: '../doll/gong.webp', w: rr(899, G), h: rr(512, G), cut: 0, k: 1, pix: 1, doll: G,
+                 floor: [rr(234, G), rr(246, G)], floor2: [rr(394, G), rr(406, G)], x2: [rr(165, G), rr(800, G)],
+                 stairs: [ st(G, 25, 246, 165, 394) ],
+                 spots: (SC.gong.npcs || []).map(function (n) {
+                     const lv = n.y > 300 ? 1 : 0;
+                     if (n.act === 'toGfrontDoor') return { x: rr(n.x, G), y: rr(n.r[1], G), lv: 1, n: '나간다', ic: 'out', go: 'dgfront', golv: 0, gox: rr(245, F) };
+                     return { x: rr(n.x, G), y: rr(n.r[1], G), lv: lv, n: n.n, i: NPC_IC[n.act] || '👺', fn: 'dollNpcTap', stay: 1, act: n.act };
+                 }) }
+    };
+}
+const NPC_IC = { sew: '✂️', shop: '🛒', trade: '🔁', box: '📦', dex: '📖', mask: '💠', nap: '💤' };
+// 공방 도깨비를 누르면 — 광장 위에 말 창을 띄우고 공방 일을 본다 (doll-gong.js)
+window.dollNpcTap = function (spot) {
+    const G = window.DOLLGONG, a = spot && spot.act;
+    if (!G || !a || typeof G[a] !== 'function') return;
+    if (DLG.talkOn) return;
+    try { if (G.prefetch) G.prefetch(a); } catch (e) { }
+    try { G[a](API, spot); } catch (e) { console.warn('[👺]', e); }
+};
+// 겹친 맵에서 옮길 때 — 광장 쪽 자리도 그 방으로 (그만두고 닫으면 거기 서 있게)
+function plazaSync(room, x, y) {
+    const k = PROOM[room];
+    if (!k || !plazaOn() || typeof window.plazaGo !== 'function') return;
+    BR.room = room; BR.hold = room;
+    try { window.plazaGo(room, null, Math.round(x * RS[k]), y > 300 ? 1 : 0); } catch (e) { }
+}
+// 겹친 맵을 닫고 — 지금 자리 그대로 광장 방으로
+function toPlazaHere() {
+    if (!run) return;
+    const room = SCENE_ROOM[run.key];
+    if (!room) { close(); return; }
+    const x = Math.round(run.x * RS[run.key]), lv = run.y > 300 ? 1 : 0;
+    close();
+    BR.room = room; BR.hold = room;
+    toPlazaRoom(room, x, lv);
+}
+
+// ── 광장 방에서 — 튜토리얼 이어 하기 · 출몰지 조우
+const BR = { room: '', hold: '', last: null, t: 0 };
+function bridge() {
+    let w = null;
+    try { w = (typeof window.plazaWhere === 'function') ? window.plazaWhere() : null; } catch (e) { w = null; }
+    if (!w || !plazaOn()) { BR.room = ''; BR.last = null; return; }
+    const room = w.room;
+    if (room !== BR.room) { BR.room = room; BR.last = null; if (BR.hold !== room) BR.hold = ''; enterRoom(room, w); }
+    if (run || DLG.talkOn || (window.DOLLBT && DOLLBT.busy && DOLLBT.busy())) { BR.last = null; return; }
+    if (room === 'dwild') wildStep(w);
+    else BR.last = null;
+}
+setInterval(function () { try { bridge(); } catch (e) { } }, 120);
+// 튜토리얼 — 아직이면 그 방의 겹친 맵을 띄워 이어 한다 (그만두고 닫았으면 그 방을 나갔다 올 때까지 안 띄운다)
+function enterRoom(room, w) {
+    const k = PROOM[room];
+    if (!k || run || inDark()) return;
+    if (BR.hold === room) return;
+    const t = tutOf();
+    if (t.done) return;
+    const at = [Math.round(w.x / RS[k]), (w.lv === 1) ? (k === 'gong' ? 400 : (k === 'gfront' ? 316 : 315)) : (k === 'gong' ? 240 : (k === 'gfront' ? 219 : 222))];
+    if (k === 'gfront' && (!t.step || t.step === 'front' || t.step === 'go-wild')) { BR.hold = room; open('gfront', at); return; }
+    if (k === 'wild' && (t.step === 'go-wild' || t.step === 'wild-go')) { BR.hold = room; open('wild', at); return; }
+    if (k === 'gong' && (t.step === 'caught' || t.step === 'gong')) { BR.hold = room; open('gong', 'door'); return; }
+    sys(k === 'wild' ? '수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방 앞(▶)에 먼저 들러 보세요.' : '도깨비 공방 앞에서 도깨비를 먼저 만나 보세요.', 4500);
+}
+// 출몰지 — 걸음을 세다가 500~700 걸음이 차면 다음 수상한 장소에서 (위 onMove 와 같은 셈)
+function wildStep(w) {
+    if (!tutOf().done) { BR.last = null; return; }
+    const k = 'wild', x = w.x / RS[k], y = w.y / RS[k];
+    const L = BR.last;
+    BR.last = { x: x, y: y };
+    if (!L || Date.now() < (BR.off || 0)) return;
+    const d = Math.hypot(x - L.x, y - L.y);
+    if (d <= 0 || d > 80) return;                     // 순간 이동은 걸음이 아니다
+    const o = BR.enc || (BR.enc = encLoad());
+    o.acc += d;
+    let stepped = 0;
+    while (o.acc >= FOOT) { o.acc -= FOOT; o.n++; stepped++; }
+    if (stepped && o.n % 10 === 0) encSave(o);
+    if (o.n < o.need) return;
+    const lv = w.lv === 1 ? 1 : 0;
+    const inZ = (SC.wild.zones || []).some(function (z) { return (z.y > 280 ? 1 : 0) === lv && x >= z.x[0] && x <= z.x[1]; });
+    if (!inZ) return;
+    o.n = 0; o.acc = 0; o.need = ENC_STEPS[0] + Math.floor(Math.random() * (ENC_STEPS[1] - ENC_STEPS[0] + 1));
+    encSave(o);
+    BR.last = null;
+    try {
+        window.DOLLBT.wild({ loc: 'wild' }).then(function () { BR.off = Date.now() + 2500; BR.last = null; });
+    } catch (e) { console.warn('[🧸] 조우', e); }
+}
+
+// 콘솔 — 출몰지 걸음 (n 을 주면 그 걸음으로)
+window.dollSteps = function (n) {
+    const o = BR.enc || (BR.enc = encLoad());
+    if (n != null) { o.n = Math.max(0, Number(n) || 0); encSave(o); }
+    console.log('출몰지 걸음', o.n, '/', o.need);
+    return { n: o.n, need: o.need };
+};
+
+// 광장 — 방 · 입구와 ☰ 목록
 (function plazaHook() {
     try {
         const R = PLAZA.ROOMS;
-        if (R.plaza && !R.plaza.spots.some(function (s) { return s.fn === 'dollWildOpen'; })) {
-            R.plaza.spots.push({ x: 1760, n: '봉제인형 출몰지', i: '🧸', fn: 'dollWildOpen' });
-        }
-        // ★ 도깨비 공방은 재관국 앞 오른쪽 — 오른쪽 끝으로 걸어가도 들어간다 (plaza.js rightFn · 2026-11-07 사용자)
-        if (R.gate && !R.gate.spots.some(function (s) { return s.fn === 'dollGfrontOpen'; })) {
-            R.gate.spots.push({ x: 1720, n: '도깨비 공방', i: '👺', fn: 'dollGfrontOpen' });
-        }
-        if (R.gate && !R.gate.right) R.gate.rightFn = 'dollGfrontOpen';
+        const add = plazaRooms();
+        Object.keys(add).forEach(function (k) { if (!R[k]) R[k] = add[k]; });
+        // 우체국 ▶ 출몰지 ▶ 공방 앞 ▶ 재관국 앞
+        if (R.post) R.post.right = 'dwild';
+        if (R.gate) { R.gate.left = 'dgfront'; delete R.gate.rightFn; }
         const M = PLAZA.MENU;
         if (!M.some(function (m) { return m.fn === 'dollGongOpen'; })) {
             const at = M.findIndex(function (m) { return m.fn === 'petOpen'; });
