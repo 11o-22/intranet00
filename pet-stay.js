@@ -74,7 +74,7 @@ window.petStayBuy = function (name) {
     else u.points = (Number(u.points) || 0) - x.price;
     if (!Array.isArray(u.inventory)) u.inventory = [];
     u.inventory.push(x.n);
-    log_('[망상 홈쇼핑] ' + x.n + ' 구입 (-' + x.price.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + x.n + ' 구입 (-' + x.price.toLocaleString() + ' P)');
     try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     alert_(x.n + '을(를) 샀습니다.\n\n소지품에서 「사용」하면 ' + x.h + '시간 동안 인형이 어둠에 따라오지 않습니다.');

@@ -77,6 +77,8 @@ function snap(k) {
     const D = M(), d = D.dolls()[k], s = D.stats(d);
     const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
     if (d.nick) o.nick = String(d.nick).slice(0, 12);
+    // 💠 먹인 속성 룬 — 여정에서도 공격 수단 (pet-rune.js · 2026-11-07 사용자)
+    try { const R = window.PETRUNE; if (R) { const f = R.fed(k, u_()); if (f.length) { o.runes = f; o.runeN = R.uses(k, u_()); } } } catch (e) { }
     return o;
 }
 
@@ -371,6 +373,12 @@ function applyLog(id, lg) {
         if (d && Math.round(D.hpOf(d)) !== Math.round(me.dolls[k].hp)) D.patchDoll(k, { hp: Math.max(0, Math.round(me.dolls[k].hp)) }, u);
     });
     lg.forEach(function (e) {
+        // 💠 전투가 끝났다(이김 · 짐) — 내보냈던 인형의 먹인 룬이 한 번씩 닳는다 (일곱 번이면 깨진다)
+        if ((e.win || e.lose) && !S.applied[id + ':wear']) {
+            S.applied[id + ':wear'] = 1;
+            const part0 = (v.fight && v.fight.part && v.fight.part[S.code]) || {};
+            try { const R = window.PETRUNE; if (R) Object.keys(part0).forEach(function (k) { if (D.dolls(u)[k]) { const b = R.wear(k, u); if (b && b.length) { try { window.DOLLSCENE.sys('💠 ' + b.map(R.tag).join(' · ') + ' 룬이 깨졌다 (전투 ' + R.WEAR_MAX + '번)', 4000); } catch (x) { } } } }); } catch (e2) { }
+        }
         if (!e.win) return;
         const tag = id + ':win';
         if (S.applied[tag]) return;

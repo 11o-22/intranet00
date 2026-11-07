@@ -138,7 +138,7 @@ window.petGearBuy = function (name) {
     if ((Number(u.points) || 0) < PRICE) { alert_('포인트가 모자랍니다.\n\n' + name + ' ' + PRICE.toLocaleString() + ' P'); return; }
     u.points = (Number(u.points) || 0) - PRICE;
     add(name, 1);
-    log_('[망상 홈쇼핑] ' + name + ' 구입 (-' + PRICE.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + name + ' 구입 (-' + PRICE.toLocaleString() + ' P)');
     try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
     ui(); paint();
 };

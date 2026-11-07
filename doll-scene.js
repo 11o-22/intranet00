@@ -775,9 +775,12 @@ function hostDone(h) {
 }
 // 막이 걷힌 바로 뒤의 click 한 번은 삼킨다 — 말 창을 닫은 손가락이 그 밑 채팅 바 · 시설 표를 누르지 않게
 function eatClick() {
-    const kill = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+    // 그 손가락의 click 하나만 — 새로 누르는 손가락(pointerdown)이 오면 바로 푼다 (바로 이어 누른 단추가 먹히지 않게)
+    const off = function () { window.removeEventListener('click', kill, true); window.removeEventListener('pointerdown', off, true); };
+    const kill = function (ev) { ev.stopPropagation(); ev.preventDefault(); off(); };
     window.addEventListener('click', kill, true);
-    setTimeout(function () { window.removeEventListener('click', kill, true); }, 450);
+    setTimeout(function () { window.addEventListener('pointerdown', off, true); }, 0);
+    setTimeout(off, 450);
 }
 // 광장 방 — 누른 도깨비(시설 표) 위에 붙인다. 표가 없으면 아래 띠에
 function sysFollow() {

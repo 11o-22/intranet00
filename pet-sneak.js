@@ -724,7 +724,7 @@ window.petMedBuy = function (name, qty) {
     if ((Number(u.points) || 0) < cost) { alert_('포인트가 모자랍니다.'); return; }
     if (typeof changePoints === 'function') changePoints(-cost);
     medAdd(name, n);
-    log_('[망상 홈쇼핑] ' + name + ' ' + n + '개 구입 (-' + cost.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + name + ' ' + n + '개 구입 (-' + cost.toLocaleString() + ' P)');
     alert_(name + ' ' + n + '개를 샀습니다.');
     try { if (typeof window.petMedPaint === 'function') window.petMedPaint(); } catch (e) { }
     try { if (typeof window.petHurtPaint === 'function') window.petHurtPaint(); } catch (e) { }
@@ -878,7 +878,7 @@ window.petHealBuy = function (key) {
     if (buy.cost) {
         if (typeof changePoints === 'function') changePoints(-buy.cost);
         else u.points = (Number(u.points) || 0) - buy.cost;
-        log_('[망상 홈쇼핑] 치료 물품 ' + usedText(buy.list)
+        log_('[👺 잡화점] 치료 물품 ' + usedText(buy.list)
             + ' 구입 (-' + buy.cost.toLocaleString() + ' P)');
     }
     const all = {};

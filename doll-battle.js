@@ -941,6 +941,20 @@ function resolveRound(run, now) {
             continue;
         }
         const sk = skills(d.sp);
+        // 💠 먹인 속성 룬으로 친다 — 세고 빗나가지 않는다 (급소 자주) · 룬 공격은 속성을 안 탄다
+        if (k.indexOf('rn:') === 0) {
+            const rl = Array.isArray(d.runes) ? d.runes : (d.runes ? Object.keys(d.runes).map(function (x) { return d.runes[x]; }) : []);
+            const rn = rl[Number(k.slice(3))];
+            if (rn) {
+                const RT = window.PETRUNE, rtag = RT ? RT.tag(rn) : rn;
+                log.push({ t: fmt(pick(TX.use), { a: nm, m: rtag + ' 룬' }), a: c });
+                const dm = Math.max(1, Math.round((d.atk * 1.45 * 1.6 - (foe.def || 0) * 0.6) * rnd(0.92, 1.08) * (Math.random() * 100 < (d.crit || 5) + 20 ? 1.5 : 1)));
+                foe.hp = Math.max(0, foe.hp - dm);
+                log.push({ t: fmt(pick(TX.hit), { a: nm, d: foe.name }) + ' (룬 ' + dm + ')', hit: 'foe', hp: foe.hp });
+                if (foe.hp <= 0) won = true;
+                continue;
+            }
+        }
         if (k.charAt(0) === 'd') {
             const s1 = sk.d[Number(k.slice(1))] || sk.d[0];
             const t = T().DEF[s1[1]] || {};
@@ -1144,9 +1158,15 @@ function pickOne(o, run, mine) {
                 menu(3);
                 const m = run.members[o.code];
                 const others = Object.keys(m.dolls || {}).filter(function (x) { return x !== m.act && m.dolls[x].hp > 0; });
+                // 💠 지금 인형에게 먹인 속성 룬 — 여정에서도 친다 (전투 7번이면 깨진다 · pet-rune.js)
+                const cur = m.dolls[m.act] || {};
+                const rl = Array.isArray(cur.runes) ? cur.runes : (cur.runes ? Object.keys(cur.runes).map(function (x) { return cur.runes[x]; }) : []);
+                const rn = Array.isArray(cur.runeN) ? cur.runeN : (cur.runeN ? Object.keys(cur.runeN).map(function (x) { return cur.runeN[x]; }) : []);
+                const RT = window.PETRUNE;
                 const box = el('div', 'menu');
-                box.innerHTML = others.map(function (x) { const d = m.dolls[x]; return '<button data-k="sw:' + x + '">🔁 ' + esc(d.nick || D().spName(d.sp)) + ' 내보내기 · ' + Math.ceil(d.hp) + '/' + d.max + '</button>'; }).join('')
-                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">🎀 포옹 리본은 어둠에서 쓸 수 없다</div><button data-k="back">돌아간다</button>';
+                box.innerHTML = rl.map(function (r, i) { return '<button data-k="rn:' + i + '">💠 ' + esc(RT ? RT.tag(r) : r) + ' 룬으로 친다 <small style="color:#524173">(' + (Number(rn[i]) || 0) + '/' + (RT ? RT.WEAR_MAX : 7) + ')</small></button>'; }).join('')
+                    + others.map(function (x) { const d = m.dolls[x]; return '<button data-k="sw:' + x + '">🔁 ' + esc(d.nick || D().spName(d.sp)) + ' 내보내기 · ' + Math.ceil(d.hp) + '/' + d.max + '</button>'; }).join('')
+                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">🎀 포옹 리본은 어둠에서 쓸 수 없다' + (rl.length ? '' : ' · 룬을 먹인 인형은 룬으로도 친다') + '</div><button data-k="back">돌아간다</button>';
                 B.ui.st.appendChild(box);
                 Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
                     b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });

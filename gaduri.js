@@ -41,7 +41,7 @@ const NODE = 'gaduri';
 const MAX = 3;
 // ★ 2026-10-31 사용자 — 가두리를 모든 맵에 (광장 길 · 건물 안 여덟 방). 채우는 차례는 아래 FILL (광장 → 백일몽 → 우체국 → …).
 const ROOMS = [ { k: 'plaza', n: '광장' }, { k: 'dream', n: '백일몽' }, { k: 'dfront', n: '백일몽 건물 앞' }, { k: 'casino', n: '카지노 거리' },
-                { k: 'post', n: '우체국' }, { k: 'gate', n: '재난관리국 앞' }, { k: 'bureau', n: '재난관리국' }, { k: 'dshop', n: '망상 홈쇼핑' } ];
+                { k: 'post', n: '우체국' }, { k: 'gate', n: '재난관리국 앞' }, { k: 'bureau', n: '재난관리국' }, { k: 'dshop', n: '의상숍' } ];
 window.GADURI_ROOMS = ROOMS.map(function (r) { return r.k; });
 window.GADURI_NAMES = {}; ROOMS.forEach(function (r) { window.GADURI_NAMES[r.k] = r.n; });
 // 가둘 방 차례 — 2026-10-31 사용자: 나눠 넣지 말고 광장 → 백일몽 → 우체국 차례로, 꽉 차면 다음 방 (그 뒤는 나머지 방)

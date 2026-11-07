@@ -54,6 +54,9 @@ function css() {
     s.textContent = [
         '.gb-dim{position:fixed;inset:0;z-index:99997;background:rgba(5,3,10,.55);display:flex;align-items:flex-end;justify-content:center}',
         '.gb-pan{width:100%;max-width:440px;max-height:86vh;overflow:auto;background:#1c1528;border:2px solid #a78bdb;border-bottom:0;border-radius:14px 14px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px);color:#ece6ff;font-size:12px;box-sizing:border-box}',
+        // 잡화점 안에 들인 망상 홈쇼핑 칸 — 제목은 감추고, 원래 꾸밈대로 보이게
+        '.gb-pan #shop-dream.in-gong{display:block;background:rgba(0,0,0,.25);border:1px solid #3d2f5c;border-radius:10px;padding:8px;margin:0}',
+        '.gb-pan #shop-dream.in-gong>.panel-title{display:none}',
         '.gb-pan h3{margin:0 0 4px;font-size:14px;color:#ffe6b8}',
         '.gb-pan .sub{font-size:10.5px;color:#a99ccc;line-height:1.55;margin-bottom:10px}',
         '.gb-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.07)}',
@@ -77,10 +80,9 @@ function css() {
         '.gb-dex .c{background:#261d38;border:1px solid #3d2f5c;border-radius:8px;padding:4px 2px;text-align:center;font-size:9px;color:#b8acd8}',
         '.gb-dex .c .no{color:#7f72a8}',
         // 펫 박스
-        // ★ 보관함 판은 화면 위쪽에, 동행 판은 아래에 — 한 그림을 둘로 잘라 따로 놓는다 (2026-11-07 사용자 「노란색 친 만큼 올려」)
-        '.db-wrap{position:fixed;left:0;right:0;z-index:99997;display:flex;justify-content:center;pointer-events:none}',
-        '.db-wrap.t{top:calc(env(safe-area-inset-top,0px) + 13vh)}',
-        '.db-wrap.b{bottom:0}',
+        // ★ 보관함 판 · 동행 판 모두 화면 위쪽에 — 한 그림을 둘로 잘라 붙여 놓는다 (2026-11-07 사용자 「노란색 친 만큼 올려」 · 「아래것도 같이 위로」)
+        '.db-all{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 12vh);z-index:99997;display:flex;flex-direction:column;align-items:center;pointer-events:none}',
+        '.db-wrap{display:flex;justify-content:center;pointer-events:none}',
         '.db-box{position:relative;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}',
         '.db-box .bg{position:absolute;left:0;top:0;image-rendering:pixelated;pointer-events:none}',
         '.db-box .a{position:absolute;box-sizing:border-box}',
@@ -322,6 +324,22 @@ async function shop(S) {
         return;
     }
 }
+// 망상 홈쇼핑 칸(#shop-dream)을 잡화점 판 안으로 옮겼다가(active 로 — 그 안의 칸들이 저마다 그린다) 닫으면 제자리로
+const DS = { home: null, next: null, el: null };
+function dreamPut(host) {
+    const sd = DS.el || document.getElementById('shop-dream');
+    if (!sd) return;
+    if (host) {
+        if (!DS.home) { DS.home = sd.parentNode; DS.next = sd.nextSibling; DS.el = sd; }
+        host.appendChild(sd);
+        sd.classList.add('active', 'in-gong');
+        try { if (typeof window.renderDream === 'function') window.renderDream(); } catch (e) { }
+    } else if (DS.home) {
+        sd.classList.remove('active', 'in-gong');
+        try { DS.home.insertBefore(sd, DS.next && DS.next.parentNode === DS.home ? DS.next : null); } catch (e) { DS.home.appendChild(sd); }
+        DS.home = null; DS.next = null; DS.el = null;
+    }
+}
 function shopUi() {
     return new Promise(function (resolve) {
         const M = D(), u = u_();
@@ -343,10 +361,12 @@ function shopUi() {
                             + '<button class="gb-btn pri" data-buy="' + esc(k) + '">산다</button></div>';
                     }).join('');
                 }).join('')
-                + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">탐사 물품</div><div class="sub">망상 홈쇼핑 물건은 꿈결 값이 정해지면 이 자리로 옮겨 옵니다.</div>'
+                // ★ 망상 홈쇼핑에 있던 것 전부 — 치료 · 환몽알 · 돌봄 · 속성 룬 · 장비 · 방석 (#shop-dream 칸을 이 아래에 들인다 · 2026-11-07)
+                + '<div style="font-size:10.5px;color:#ffcf8f;margin:14px 0 4px">🩹 치료 · 🥚 환몽알 · 돌봄 · 💠 속성 룬 · ⚙ 장비 · 🏠 방석</div><div class="gb-host"></div>'
                 + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
-            if (!dim) dim = panel(html, function () { resolve(out); });
+            if (!dim) dim = panel(html, function () { dreamPut(null); resolve(out); });
             else dim.firstChild.innerHTML = html;
+            dreamPut(dim.querySelector('.gb-host'));
             Array.prototype.forEach.call(dim.querySelectorAll('[data-q]'), function (b) { b.onclick = function () { const k = b.dataset.q; qty[k] = Math.max(1, Math.min(99, qty[k] + Number(b.dataset.d))); paint(); }; });
             Array.prototype.forEach.call(dim.querySelectorAll('[data-buy]'), function (b) { b.onclick = function () { buy(b.dataset.buy); }; });
             dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };

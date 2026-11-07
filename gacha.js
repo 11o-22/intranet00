@@ -587,7 +587,7 @@ window.accShopOpen = function () { open('acc'); };
     const add = put.filter(function (x) {
         return !(r.spots || []).some(function (s) { return s.fn === x.fn; });
     }).map(function (x) { return { x: 0, n: x.n, ic: x.ic, fn: x.fn }; });
-    if (add.length) r.spots.splice.apply(r.spots, [1, 0].concat(add));
+    if (add.length) r.spots.splice.apply(r.spots, [0, 0].concat(add));     // 가게 칸(망상 홈쇼핑)은 뺐으므로 맨 앞에 (2026-11-07)
     // 나가는 자리(go)는 제자리에 두고, 가게만 고르게 벌린다
     r.spots.filter(function (s) { return !s.go; })
         .forEach(function (s, i) { s.x = 560 + i * 380; });

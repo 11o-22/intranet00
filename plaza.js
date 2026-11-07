@@ -263,8 +263,9 @@ const PLAZA = {
                   cage: { x: 690, w: 360, h: 400, base: 915, zy: 880 },
                   // 지하 가게로는 **그 자리에서 들어간다** (go 가 붙은 입구)
                   // ★ 건물 안으로도 **입구를 눌러야** 들어간다 (걸어서는 안 넘어간다)
+                  // ✗ 망상 홈쇼핑은 없앴다 — 물건은 모두 도깨비 공방 잡화점으로 (2026-11-07 사용자). 지하 건물은 의상숍 · 악세서리숍만 남는다 (gacha.js)
                   spots: [ { x: 940,  n: '재난관리국', i: '🏛', go: 'bureau' },
-                           { x: 940, n: '망상 홈쇼핑', i: '📺', ic: 'dream', lv: 1, go: 'dshop' } ] },
+                           { x: 940, n: '의상숍 · 악세서리숍', i: '👗', ic: 'wearshop', lv: 1, go: 'dshop' } ] },
 
         bureau: { n: '재난관리국', img: 'bureau.webp', w: 1880, h: 2556, k: 1,
                   floor: [845, 905], floor2: [1262, 1288], x2: [555, 1325],
@@ -281,14 +282,13 @@ const PLAZA = {
                   spots: [ { x: 940, n: '엘리베이터', i: '🛗', lv: 1, lift: true },
                            { x: 1600, n: '나간다', ic: 'out', go: 'gate' } ] },
 
-        dshop:  { n: '망상 홈쇼핑', img: 'dshop.webp', w: 1880, h: 2556, k: 1,
+        dshop:  { n: '의상숍 · 악세서리숍', img: 'dshop.webp', w: 1880, h: 2556, k: 1,          // 전 「망상 홈쇼핑」 건물 — 가게 칸은 뺐다 (2026-11-07)
                   cage: { x: 1180, w: 360, h: 400, base: 915, zy: 880 },
                   floor: [845, 905], floor2: [1262, 1288], x2: [555, 1325],
                   stairs: [ { x: [105, 555],   y0: [890, 1247], y1: [920, 1277] },
                             { x: [1325, 1775], y0: [1247, 890], y1: [1277, 920] } ],
-                  spots: [ { x: 940,  n: '망상 홈쇼핑', i: '📺', ic: 'dream', tab: 'tab-shop', sub: 'shop-dream' },
-                           // 들어온 자리가 재관국 앞 **지하**라, 나갈 때도 그 층으로 돌려보낸다
-                           { x: 1600, n: '나간다', ic: 'out', go: 'gate', golv: 1 } ] },
+                  // 들어온 자리가 재관국 앞 **지하**라, 나갈 때도 그 층으로 돌려보낸다 (의상숍 · 악세서리숍은 gacha.js 가 끼워 넣는다)
+                  spots: [ { x: 1600, n: '나간다', ic: 'out', go: 'gate', golv: 1 } ] },
     },
     START: 'plaza',
 
@@ -391,8 +391,8 @@ const PLAZA = {
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
         { g: 'shop',  n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
-        { g: 'shop',  n: '우주 쇼핑몰', i: '🛸', ic: 'alien',  tab: 'tab-shop',     sub: 'shop-alien' },
-        { g: 'shop',  n: '망상 홈쇼핑', i: '📺', ic: 'dream',  tab: 'tab-shop',     sub: 'shop-dream' }
+        { g: 'shop',  n: '우주 쇼핑몰', i: '🛸', ic: 'alien',  tab: 'tab-shop',     sub: 'shop-alien' }
+        // ✗ 망상 홈쇼핑 — 도깨비 공방 잡화점으로 옮겼다 (2026-11-07 사용자)
     ]
 };
 

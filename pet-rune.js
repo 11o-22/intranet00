@@ -42,6 +42,7 @@ const BEATS = { '애교': '근력', '근력': '경청', '경청': '인내', '인
 const PRICE = 2000;
 const DAY_MAX = 2;            // 종류마다 하루
 const FED_MAX = 2;            // 인형 하나에
+const WEAR_MAX = 7;           // ★ 먹인 룬은 전투 일곱 번을 치르면 깨진다 (2026-11-07 사용자 「7번 전투 시에 깨지게」) — 배틀 · 여정 모두 센다
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function P() { return window.PET; }
@@ -112,7 +113,7 @@ window.petRuneBuy = function (name) {
     const d = dayBox(u);
     d.n[name] = boughtToday(name, u) + 1;
     add(name, 1);
-    log_('[망상 홈쇼핑] ' + tag(name) + ' 룬 구입 (-' + PRICE.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + tag(name) + ' 룬 구입 (-' + PRICE.toLocaleString() + ' P)');
     let wrote = false;
     try {
         if (typeof database !== 'undefined' && database && u.code) { database.ref('users/' + u.code + '/petRuneDay').set(d).catch(function () { }); wrote = true; }
@@ -132,6 +133,27 @@ function fed(key, u) {
     if (r && typeof r === 'object') return Object.keys(r).map(function (k) { return r[k]; }).filter(function (x) { return BY[x]; }).slice(0, FED_MAX);
     return [];
 }
+// 먹인 룬마다 치른 전투 수 (runes 와 나란히 · pets[번호].runeN)
+function uses(key, u) {
+    u = u || u_();
+    const s = P().pets(u)[String(key)];
+    const r = s && s.runeN;
+    const arr = Array.isArray(r) ? r : (r && typeof r === 'object') ? Object.keys(r).sort(function (a, b) { return a - b; }).map(function (k) { return r[k]; }) : [];
+    return fed(key, u).map(function (_, i) { return Number(arr[i]) || 0; });
+}
+// 전투 하나를 치렀다 — 먹인 룬마다 한 번씩 · WEAR_MAX 번이면 깨진다. 돌려주는 값은 깨진 룬 이름들
+function wear(key, u) {
+    u = u || u_();
+    if (!u || !P().pets(u)[String(key)]) return [];
+    const cur = fed(key, u);
+    if (!cur.length) return [];
+    const n = uses(key, u).map(function (x) { return x + 1; });
+    const keep = [], keepN = [], broke = [];
+    cur.forEach(function (r, i) { if (n[i] >= WEAR_MAX) broke.push(r); else { keep.push(r); keepN.push(n[i]); } });
+    P().patch(String(key), { runes: keep.length ? keep : null, runeN: keep.length ? keepN : null });
+    if (broke.length) { log_('[인형] ' + P().nick(key, u) + '에게 먹인 ' + broke.map(tag).join(' · ') + ' 룬이 전투 ' + WEAR_MAX + '번을 치르고 깨졌습니다.'); try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { } }
+    return broke;
+}
 // 돌려주는 값 — { ok } 또는 { ok:false, why }
 function feed(key, name) {
     const u = u_();
@@ -144,7 +166,7 @@ function feed(key, name) {
     if (cur.length >= FED_MAX) return { ok: false, why: '룬은 인형 하나에 ' + FED_MAX + '개까지입니다.' };
     add(name, -1);
     const next = cur.concat([name]);
-    P().patch(String(key), { runes: next });
+    P().patch(String(key), { runes: next, runeN: uses(key, u).concat([0]) });
     log_('[인형] ' + P().nick(key, u) + '에게 ' + tag(name) + ' 룬을 먹였습니다. (' + next.map(tag).join(' · ') + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true, runes: next };
@@ -153,7 +175,7 @@ function feed(key, name) {
 function clear(key) {
     const u = u_();
     if (!u || !P().pets(u)[String(key)]) return;
-    P().patch(String(key), { runes: null });
+    P().patch(String(key), { runes: null, runeN: null });
 }
 
 // ==========================================
@@ -189,9 +211,9 @@ window.petRuneFeedOpen = function (key, after) {
             + ' style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + ((n > 0 && cur.length < FED_MAX) ? '' : ' opacity:.4;') + '">먹인다</button></div>';
     }).join('');
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">' + esc(nm) + ' — 룬 먹이기</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">인형 하나에 ' + FED_MAX + '개까지 (같은 종류 둘도 됩니다). 먹인 룬이 배틀의 공격 · 방어 수단이 되고, 배틀이 끝나면 소모됩니다.<br>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">인형 하나에 ' + FED_MAX + '개까지 (같은 종류 둘도 됩니다). 먹인 룬은 인형 배틀과 여정(어둠)에서 공격 수단이 되고, 전투 ' + WEAR_MAX + '번을 치르면 깨집니다.<br>'
         + '상성 — 애교 › 근력 › 경청 › 인내 › 눈치 › 애교</div>'
-        + '<div style="font-size:11px; color:#c9a227; margin-bottom:6px;">먹인 룬: ' + (cur.length ? cur.map(tag).join(' · ') : '<span style="color:#6f685e;">없음</span>') + ' <span style="color:#6f685e;">(' + cur.length + '/' + FED_MAX + ')</span></div>'
+        + '<div style="font-size:11px; color:#c9a227; margin-bottom:6px;">먹인 룬: ' + (cur.length ? cur.map(function (r, i) { return tag(r) + ' <span style="color:#8d8578;">(' + uses(key, u)[i] + '/' + WEAR_MAX + ')</span>'; }).join(' · ') : '<span style="color:#6f685e;">없음</span>') + ' <span style="color:#6f685e;">(' + cur.length + '/' + FED_MAX + ')</span></div>'
         + rows
         + '<button id="rn-x" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">닫는다</button>');
     w.querySelector('#rn-x').onclick = function () { shut(); if (typeof after === 'function') after(fed(key, u)); };
@@ -269,9 +291,9 @@ setInterval(function () {
 // 바깥에 내어 준다
 // ==========================================
 window.PETRUNE = {
-    LIST: LIST, BY: BY, BEATS: BEATS, PRICE: PRICE, DAY_MAX: DAY_MAX, FED_MAX: FED_MAX,
+    LIST: LIST, BY: BY, BEATS: BEATS, PRICE: PRICE, DAY_MAX: DAY_MAX, FED_MAX: FED_MAX, WEAR_MAX: WEAR_MAX,
     tag: tag, beats: beats, bag: bag, have: have, total: total, add: add,
-    fed: fed, feed: feed, clear: clear, leftToday: leftToday
+    fed: fed, feed: feed, clear: clear, uses: uses, wear: wear, leftToday: leftToday
 };
 
 // ==========================================

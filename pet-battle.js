@@ -692,8 +692,9 @@ function settle(o, side) {
     const why = o.why === 'forfeit' ? (won ? '상대가 기권했습니다.' : '기권했습니다.')
               : o.why === 'away' ? (won ? '상대가 자리를 비워 기권 처리됐습니다.' : '자리를 오래 비워 기권 처리됐습니다.')
               : (won ? '상대 주인의 체력이 먼저 다 닳았습니다.' : '내 체력이 먼저 다 닳았습니다.');
-    // 먹였던 룬은 소모
-    try { R().clear(mine.pet); } catch (e) { }
+    // 먹였던 룬은 전투 한 번을 치른 것으로 — 일곱 번이면 깨진다 (pet-rune.js wear · 2026-11-07)
+    let broke = [];
+    try { broke = R().wear(mine.pet) || []; } catch (e) { }
     if (won) {
         giveStake(stakeTheirs);
         log_('[인형 배틀] ' + theirs.name + ' 사원과의 결투에서 이겼습니다 — ' + nm + ' · 받은 것: ' + sname(stakeTheirs));
@@ -713,7 +714,7 @@ function settle(o, side) {
         + '<div style="font-size:11px; color:#e8d7b4; line-height:1.7; margin:9px 0;">'
         + (won ? '받은 것 — <b style="color:#ffcf8f;">' + esc(sname(stakeTheirs)) + '</b>'
                : '잃은 것 — <b style="color:#ff8a80;">' + esc(sname(stakeMine)) + '</b><br><span style="color:#ff8a80;">가두리에 한 시간 갇힙니다.</span>')
-        + '<br><span style="color:#8d8578;">' + esc(nm) + josa(nm, '은') + ' 멀쩡합니다. 먹였던 룬은 소모됐습니다.</span></div>'
+        + '<br><span style="color:#8d8578;">' + esc(nm) + josa(nm, '은') + ' 멀쩡합니다. 먹인 룬은 전투 한 번을 치렀습니다' + (broke.length ? ' — ' + esc(broke.map(tagR).join(' · ')) + ' 룬이 깨졌습니다' : '') + '.</span></div>'
         + '<button id="bt-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
     w.querySelector('#bt-x').onclick = shut;
 }

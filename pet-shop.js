@@ -81,7 +81,7 @@ window.dreamBuyEgg = function () {
     u.petEgg = P().make();
     u.petEggAt = P().today();
 
-    log_('[망상 홈쇼핑] ' + P().EGG_NAME + ' 구입 (-' + P().EGG_PRICE.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + P().EGG_NAME + ' 구입 (-' + P().EGG_PRICE.toLocaleString() + ' P)');
     P().save({ points: 1, history: 1 });
     P().eggSave();
     ui();
@@ -133,7 +133,7 @@ window.dreamBuyCare = function (name, qid) {
 
     u.points = (Number(u.points) || 0) - cost;
     P().bagAdd(name, qty);
-    log_('[망상 홈쇼핑] ' + name + ' ' + qty + '개 구입 (-' + cost.toLocaleString() + ' P)');
+    log_('[👺 잡화점] ' + name + ' ' + qty + '개 구입 (-' + cost.toLocaleString() + ' P)');
     P().save({ points: 1, history: 1 });
     ui();
     render();
