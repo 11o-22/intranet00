@@ -33,7 +33,7 @@ const BAR = 'dream-tabs';
 const TABS = [
     { k: 'med',  n: '🩹 치료',        ids: ['pet-med-box'] },
     { k: 'care', n: '🥚 환몽알 · 돌봄', ids: [] },                 // 나머지 전부
-    { k: 'shop', n: '🐾 펫 숍',       ids: ['pet-rune-box', 'pet-gear-box'] },
+    { k: 'shop', n: '🐾 인형 숍',       ids: ['pet-rune-box', 'pet-gear-box'] },
     { k: 'stay', n: '🏠 방석',        ids: ['pet-stay-box'] }
 ];
 const KNOWN = {};
@@ -116,5 +116,5 @@ setInterval(function () {
 }, 1200);
 (function first() { const iv = setInterval(function () { if (mount()) clearInterval(iv); }, 500); setTimeout(function () { clearInterval(iv); }, 60000); })();
 
-console.log('[망상 홈쇼핑] 갈래 탭 — 치료 · 환몽알·돌봄 · 펫 숍 · 방석');
+console.log('[망상 홈쇼핑] 갈래 탭 — 치료 · 환몽알·돌봄 · 인형 숍 · 방석');
 })();

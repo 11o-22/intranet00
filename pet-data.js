@@ -94,8 +94,33 @@ const PET_LIST = [
     { i: 25, n: '모란앵무', w: 'noise', deform: false, st: { luck: 60, bon: 1 }, d: '한 번 정한 사람 곁에서 떨어지지 않는다. 그쪽 사정은 묻지 않는다.' }
 ];
 
-const PET_BY_ID = {};
-PET_LIST.forEach(function (p) { PET_BY_ID[p.i] = p; });
+// ★ 같은 동물 여러 마리 (2026-11-07 사용자 「연동이 되는 만큼 펫도 같은 종류를 여러마리 데리고 있을 수 있게」)
+//   첫째는 종 번호 그대로(13), 둘째부터 100 씩 얹는다 (113 · 213 …). 종은 열쇠 % 100.
+//   열쇠가 숫자라 여기저기 Number(열쇠) 로 줄 세우던 것이 그대로 돈다. 종 표(BY)는 둘째 열쇠로 물어도 그 종을 준다.
+function petSp(k) { const n = Math.floor(Number(k)) || 0; return n > 0 ? (n % 100) : 0; }
+const PET_BY_RAW = {};
+PET_LIST.forEach(function (p) { PET_BY_RAW[p.i] = p; });
+const PET_BY_ID = new Proxy(PET_BY_RAW, {
+    get: function (t, k) {
+        if (typeof k !== 'string') return t[k];
+        if (k in t) return t[k];
+        const s = petSp(k);
+        return (s && /^\d+$/.test(k)) ? t[s] : undefined;
+    },
+    has: function (t, k) {
+        if (typeof k !== 'string') return k in t;
+        if (k in t) return true;
+        const s = petSp(k);
+        return !!(s && /^\d+$/.test(k) && t[s]);
+    }
+});
+// 그 종의 빈 열쇠 — 없으면 종 번호, 있으면 113 · 213 …
+function petNewKey(sp, u) {
+    const ps = petsOf(u);
+    sp = petSp(sp);
+    for (let n = 0; n < 60; n++) { const k = String(sp + 100 * n); if (!ps[k]) return k; }
+    return String(sp + 100 * 60);
+}
 
 const PET_STAT_NAME = {
     luck: '행운', bon: '판정', eva: '회피', gim: '기믹 파훼', resist: '저항'
@@ -151,7 +176,7 @@ PET_CARE.forEach(function (x) { PET_CARE_BY[x[0]] = { tag: x[1], price: x[2] }; 
 // ==========================================
 const PET_EGG_NAME = '환몽알';
 const PET_EGG_PRICE = 500000;
-const PET_DUP_BACK = 300000;              // 이미 있는 펫이 또 나왔을 때 돌려주는 값
+const PET_DUP_BACK = 300000;              // 이미 있는 인형이 또 나왔을 때 돌려주는 값
 const PET_CARE_GAP = 10 * 60 * 1000;      // 한 번 쓰고 다음까지
 const PET_REST_MS = 2 * 3600 * 1000;      // 탐사 뒤 쉬는 시간
 
@@ -274,7 +299,7 @@ function petBagAdd(name, n) {
     try {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code + '/petBag/' + name).set(v || null)
-                .catch(function (e) { console.warn('[펫] 주머니 저장 실패', e); });
+                .catch(function (e) { console.warn('[인형] 주머니 저장 실패', e); });
             return v;
         }
     } catch (e) { }
@@ -395,7 +420,7 @@ function petFedNote(k, s, fedAt) {
         database.ref('petFed/' + u.code + '/' + key).transaction(function (c) {
             if (c && Number(c.b) === b && (Number(c.f) || 0) >= fedAt) return;     // 이미 더 늦다
             return { b: b, f: fedAt };
-        }).catch(function (e) { console.warn('[펫] 먹인 때 적기 실패', e); });
+        }).catch(function (e) { console.warn('[인형] 먹인 때 적기 실패', e); });
     } catch (e) { }
 }
 
@@ -403,7 +428,7 @@ function petStarveLeft(id, u) {
     const s = petsOf(u)[String(id)];
     if (!s) return 0;
     const at = Math.max(Number(s.fedAt) || 0, petFedOf(id, s));
-    if (!at) return PET_STARVE;          // 아직 시계가 안 붙은 펫은 굶지 않는다
+    if (!at) return PET_STARVE;          // 아직 시계가 안 붙은 인형은 굶지 않는다
     return (at + PET_STARVE) - petNow();
 }
 // 굶주림으로 교감을 깎을 때 — 굶은 지 사흘째 한 번, 그 뒤 안 먹이면 사흘마다 (먹이면 stv 보다 fed 가 늦어져 새로 센다)
@@ -463,13 +488,16 @@ function petShowList(u) {
     u = u || petMe();
     if (!u) return [];
     const ps = petsOf(u);
-    const raw = Array.isArray(u.petShow) ? u.petShow : [];
+    const raw = Array.isArray(u.petShow) ? u.petShow
+        : (u.petShow && typeof u.petShow === 'object') ? Object.keys(u.petShow).sort(function (a2, b2) { return a2 - b2; }).map(function (k) { return u.petShow[k]; }) : [];
     const out = [];
     raw.forEach(function (x) {
         const k = String(x);
         if (ps[k] && PET_BY_ID[k] && out.indexOf(k) < 0) out.push(k);
     });
     if (out.length >= PET_SHOW_MAX) return out.slice(0, PET_SHOW_MAX);
+    // ★ 봉제인형 동행(doll-data.js)으로 정해 둔 뒤로는 저절로 채우지 않는다 — 보관함에 두고 싶은 것을 끌어오지 않게
+    if (u.petShowSet) return out;
     // 모자라면 번호가 빠른 것으로 채운다
     Object.keys(ps).filter(function (k) { return PET_BY_ID[k]; })
         .sort(function (a2, b2) { return Number(a2) - Number(b2); })
@@ -484,10 +512,12 @@ function petShowSave(list) {
     const u = petMe();
     if (!u) return;
     u.petShow = list.map(Number);
+    u.petShowSet = 1;
+    try { if (typeof database !== 'undefined' && database && u.code) database.ref('users/' + u.code + '/petShowSet').set(1); } catch (e) { }
     try {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code + '/petShow').set(u.petShow)
-                .catch(function (e) { console.warn('[펫] 방 저장 실패', e); });
+                .catch(function (e) { console.warn('[인형] 방 저장 실패', e); });
             return;
         }
     } catch (e) { }
@@ -549,8 +579,10 @@ function petStarveSweep(cb) {
         } catch (e) { }
     }
 
+    // ★ 보관함(펫 박스)에 있는 인형은 도깨비가 돌본다 — 교감이 안 깎인다 · 동행(집) 셋만 (2026-11-07 · doll-data.js)
+    const home = u.dollMig ? petShowList(u) : null;
     const cand = Object.keys(ps).filter(function (k) {
-        return PET_BY_ID[k] && petStarveHitLeft(k, u) <= 0;
+        return PET_BY_ID[k] && (!home || home.indexOf(String(k)) >= 0) && petStarveHitLeft(k, u) <= 0;
     });
     if (!cand.length) return [];
 
@@ -593,7 +625,7 @@ function petStarveCheck(u, k, cb) {
             if (cur === null) return null;            // 비어 보이면 서버와 견주게 한다
             const own = Number(cur.fedAt) || 0;
             const fed = Math.max(own, petFedOf(k, cur, mark));
-            if (!fed) return;                          // 시계가 없는 펫은 건드리지 않는다
+            if (!fed) return;                          // 시계가 없는 인형은 건드리지 않는다
             const nowT = petNow();
             if (petStarveDue(cur, fed) > nowT) {
                 if (fed > own) { cur.fedAt = fed; return cur; }   // 덮여 있던 먹인 때를 되살린다
@@ -618,7 +650,7 @@ function petStarveCheck(u, k, cb) {
                 // ★ 왜 깎았는지 남긴다 — 「먹였는데 굶었다」를 뒤에서 살필 수 있게
                 try {
                     const f = function (t) { return t ? new Date(t).toLocaleString('ko-KR') : '없음'; };
-                    const why = '[펫] ' + nm + ' 굶주림 셈 — 펫 칸 먹인 때 ' + f(seen && seen.own) + ' · 칸 밖 기록 ' + f(seen && seen.mark)
+                    const why = '[인형] ' + nm + ' 굶주림 셈 — 인형 칸 먹인 때 ' + f(seen && seen.own) + ' · 칸 밖 기록 ' + f(seen && seen.mark)
                         + (seen && seen.markB != null && seen.markB !== seen.at ? ' (기록의 태어난 때가 달라 안 씀)' : '') + ' · 지금 ' + f(seen && seen.now);
                     console.warn(why);
                 } catch (e) { }
@@ -628,12 +660,12 @@ function petStarveCheck(u, k, cb) {
             if (v) {
                 mine[String(k)] = v;                       // 서버 모습으로 맞춘다
                 if (mark) petFedMark[String(k)] = mark;
-                console.log('[펫] ' + nm + ' — 서버에서는 아직 교감을 깎을 때가 아닙니다.');
+                console.log('[인형] ' + nm + ' — 서버에서는 아직 교감을 깎을 때가 아닙니다.');
             } else if (r && r.committed) {
                 delete mine[String(k)];                    // 서버에 이미 없다 (다른 화면이 치웠다)
             }
         });
-    }).catch(function (e) { done(); console.warn('[펫] 굶주림 확인 실패', e); });
+    }).catch(function (e) { done(); console.warn('[인형] 굶주림 확인 실패', e); });
 }
 
 // 알 쪽 기록 — 통째로 쓴다 (알은 한 번에 하나뿐이라 겹칠 일이 없다)
@@ -644,7 +676,7 @@ function petEggSave() {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code).update({
                 petEgg: u.petEgg || null, petEggAt: u.petEggAt || null
-            }).catch(function (e) { console.warn('[펫] 알 저장 실패', e); });
+            }).catch(function (e) { console.warn('[인형] 알 저장 실패', e); });
             return;
         }
     } catch (e) { }
@@ -669,7 +701,7 @@ function petPatch(id, patch) {
     try {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code + '/pets/' + key).update(patch)
-                .catch(function (e) { console.warn('[펫] 저장 실패', e); });
+                .catch(function (e) { console.warn('[인형] 저장 실패', e); });
             return true;
         }
     } catch (e) { }
@@ -703,7 +735,7 @@ function petRename(id, name) {
     if (!u) return { ok: false, why: '로그인 전입니다.' };
     const key = String(id);
     const s = petsOf(u)[key];
-    if (!s) return { ok: false, why: '아직 없는 펫입니다.' };
+    if (!s) return { ok: false, why: '아직 없는 인형입니다.' };
 
     let nk = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
     if (nk.length > PET_NICK_MAX) nk = nk.slice(0, PET_NICK_MAX);
@@ -806,8 +838,8 @@ function petJosa(s, kind) {
     return '';
 }
 
-function petImg(id)  { return 'pet/p' + String(id).padStart(2, '0') + '.webp'; }
-function petIcon(id) { return 'pet/s' + String(id).padStart(2, '0') + '.webp'; }
+function petImg(id)  { return 'pet/p' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
+function petIcon(id) { return 'pet/s' + String(petSp(id) || id).padStart(2, '0') + '.webp'; }
 
 // ==========================================
 // 바깥에 내어 준다
@@ -831,7 +863,7 @@ window.PET = {
     bagAdd: petBagAdd, bagHas: petBagHas, eggSave: petEggSave,
     make: petMakeEgg, done: petEggDone, step: petEggStep, eggImg: petEggImg,
     pick: petPick, img: petImg, icon: petIcon, statText: petStatText, me: petMe,
-    josa: petJosa, jong: petJong,
+    josa: petJosa, jong: petJong, sp: petSp, newKey: petNewKey,
     nick: petNick, named: petNamed, rename: petRename,
     asleep: petAsleep, sleepLeft: petSleepLeft,
     stays: petStays, stayLeft: petStayLeft,
@@ -850,21 +882,21 @@ window.petStarveState = function () {
     const rows = Object.keys(ps).filter(function (k) { return ps[k] && PET_BY_ID[k]; }).map(function (k) {
         const s = ps[k], m = petFedMark[String(k)];
         const left = petStarveLeft(k, u);
-        return { 펫: petNick(k, u), 칸의_먹인때: f(s.fedAt), 칸밖_기록: m ? f(m.f) + (Number(m.b) !== (Number(s.at) || 0) ? ' (태어난 때 다름 — 안 씀)' : '') : '없음',
+        return { 인형: petNick(k, u), 칸의_먹인때: f(s.fedAt), 칸밖_기록: m ? f(m.f) + (Number(m.b) !== (Number(s.at) || 0) ? ' (태어난 때 다름 — 안 씀)' : '') : '없음',
                  포만도: petFull(k, u) + '%', 남은시간: (left / 3600000).toFixed(1) + '시간', 태어난때: f(s.at) };
     });
     console.log('%c===== 🐶 굶주림 셈 =====', 'color:#ffb74d; font-size:13px');
     console.log('  지금(서버 기준): ' + f(petNow()) + ' · 서버 시계 ' + ((typeof window.clockReady === 'function' && window.clockReady()) ? '섰음' : '아직'));
-    if (rows.length) console.table(rows); else console.log('  펫이 없습니다.');
+    if (rows.length) console.table(rows); else console.log('  인형이 없습니다.');
 };
 
 window.petState = function () {
     const u = petMe();
-    console.log('%c===== 🐶 펫 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 🧸 인형 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
     const ps = petsOf(u);
     const keys = Object.keys(ps);
-    console.log('  가진 펫:', keys.length + ' / ' + PET_LIST.length + '마리');
+    console.log('  가진 인형:', keys.length + ' / ' + PET_LIST.length + '마리');
     if (keys.length) {
         console.table(keys.map(function (k) {
             const p = PET_BY_ID[k] || {};
@@ -892,7 +924,7 @@ window.petState = function () {
 };
 
 window.petAll = function () {
-    console.log('%c===== 펫 ' + PET_LIST.length + '종 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 인형 ' + PET_LIST.length + '종 =====', 'color:#ffb74d; font-size:13px');
     PET_WARN_KEYS.forEach(function (w) {
         console.log('%c' + PET_WARN[w].n, 'color:#9fd8ef');
         PET_LIST.filter(function (p) { return p.w === w; }).forEach(function (p) {
@@ -902,4 +934,4 @@ window.petAll = function () {
     });
 };
 
-console.log('[펫] petState() · petAll()');
+console.log('[인형] petState() · petAll()');

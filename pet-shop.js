@@ -170,7 +170,7 @@ function eggBox() {
         + '<div style="font-size:10px; color:#8d8578; line-height:1.55; margin-bottom:7px;">'
         + '안에서 무엇이 자라는지는 깨어나 봐야 압니다. 알마다 아래 가운데'
         + ' <b style="color:#b8ac97;">한 줄</b>이 적혀 있고, 그 줄을 어기면 그 자리에서 상합니다.'
-        + '<br>이미 있는 펫이 또 나오면 데려가지 않고 '
+        + '<br>이미 있는 인형이 또 나오면 데려가지 않고 '
         + '<b style="color:#c9a227;">' + P().DUP_BACK.toLocaleString() + ' P</b>를 돌려받습니다.'
         + '</div>'
         + '<div style="border-top:1px solid #2a241c; border-bottom:1px solid #2a241c;'
@@ -307,7 +307,7 @@ window.petGiveEgg = function (who, warn) {
         else if (typeof updateUserFields === 'function') updateUserFields(t.code, { petEgg: egg });
         else if (typeof database !== 'undefined' && database)
             database.ref('users/' + t.code + '/petEgg').set(egg);
-    } catch (e) { console.warn('[펫] 저장 실패', e); }
+    } catch (e) { console.warn('[인형] 저장 실패', e); }
     try {
         if (typeof addHistoryLog === 'function') {
             addHistoryLog(t, '[당국 개입] ' + P().EGG_NAME + ' 지급 — 「' + P().WARN[egg.warn].n + '」');
@@ -364,7 +364,7 @@ window.adminGiveEgg = function () {
                 updateUserFields(code, { petEgg: egg, history: t.history });
             else if (typeof database !== 'undefined' && database)
                 database.ref('users/' + code + '/petEgg').set(egg);
-        } catch (e) { console.warn('[펫] 저장 실패', e); }
+        } catch (e) { console.warn('[인형] 저장 실패', e); }
         ok.push(t.name + ' — 「' + P().WARN[egg.warn].n + '」');
     });
 
@@ -407,7 +407,7 @@ window.adminGiveEgg = function () {
 
         boxes[boxes.length - 1].insertAdjacentElement('afterend', el);
         try { if (typeof initAdminAccordion === 'function') initAdminAccordion(); } catch (e) { }
-        console.log('[펫] 제어 콘솔에 ' + P().EGG_NAME + ' 지급 칸을 붙였습니다');
+        console.log('[인형] 제어 콘솔에 ' + P().EGG_NAME + ' 지급 칸을 붙였습니다');
     }
     setInterval(function () { try { mount(); } catch (e) { } }, 1000);
 })();
@@ -431,6 +431,6 @@ window.dreamShop = function () {
     console.log('  돌봄 주머니 :', k.length ? k.map(function (x) { return x + '×' + bag[x]; }).join(', ') : '비었음');
 };
 
-console.log('[펫] dreamShop() · petGiveBag() · petGiveEgg(사번[, 주의])');
+console.log('[인형] dreamShop() · petGiveBag() · petGiveEgg(사번[, 주의])');
 
 })();

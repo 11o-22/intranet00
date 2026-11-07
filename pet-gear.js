@@ -54,11 +54,9 @@ const LEGACY = [
     { n: '🔨 작은 망치 펜던트', add: { '경청': 2 }, sk: { n: '두드리기',  t: 'pierce', d: '막고 있는 것째로 두드린다.' },      d: '경청 +2 (예전 이름).', legacy: 1 }
 ];
 // 등급업 조각 — 등급마다 세 가지. 여정의 어느 싸움을 이기고 나면 (enc · 0부터) 1/odds 로 하나 떨어진다 (journey.js settle)
-const SHARDS = {
-    D: [ { n: '🧩 문틈에 낀 조각',     enc: 1, odds: 30, d: '젖은 신발을 지나온 자리에 떨어져 있었다. 문틈손이 물고 있던 것이다.' },
-         { n: '🧩 가로등 아래의 조각', enc: 3, odds: 30, d: '등불이가 떨어뜨린 빛 속에 있었다. 만지면 아직 따뜻하다.' },
-         { n: '🧩 냄새가 밴 조각',     enc: 4, odds: 30, d: '그것이 벗어 던진 냄새 안에서 나왔다. 주인의 냄새가 난다.' } ]
-};
+// ✗ 등급업 조각(D → C 세 가지)은 없앴다 — 이제 각성의 룬 (awk-rune.js · 2026-11-07 사용자)
+//   가지고 있던 조각은 C급 각성의 룬 조각으로 바뀐다. 표는 비워 두고 이름만 남긴다 (옛 화면이 물어도 안 터지게).
+const SHARDS = {};
 const ALL = BASIC.concat(DROP, LEGACY);
 const BY = {};
 ALL.forEach(function (g) { BY[g.n] = g; });
@@ -93,7 +91,7 @@ function add(name, n) {
     if (v) b[name] = v; else delete b[name];
     try {
         if (typeof database !== 'undefined' && database && u.code) {
-            database.ref('users/' + u.code + '/petGear/' + name).set(v || null).catch(function (e) { console.warn('[펫 장비] 저장 실패', e); });
+            database.ref('users/' + u.code + '/petGear/' + name).set(v || null).catch(function (e) { console.warn('[인형 장비] 저장 실패', e); });
             return v;
         }
     } catch (e) { }
@@ -118,7 +116,7 @@ function shardAdd(name, n) {
     if (v) b[name] = v; else delete b[name];
     try {
         if (typeof database !== 'undefined' && database && u.code) {
-            database.ref('users/' + u.code + '/petShard/' + name).set(v || null).catch(function (e) { console.warn('[펫 조각] 저장 실패', e); });
+            database.ref('users/' + u.code + '/petShard/' + name).set(v || null).catch(function (e) { console.warn('[인형 조각] 저장 실패', e); });
             return v;
         }
     } catch (e) { }
@@ -149,14 +147,14 @@ function equip(key, name) {
     const u = u_();
     if (!u) return { ok: false, why: '로그인 전입니다.' };
     const s = P().pets(u)[String(key)];
-    if (!s) return { ok: false, why: '아직 없는 펫입니다.' };
+    if (!s) return { ok: false, why: '아직 없는 인형입니다.' };
     if (!BY[name]) return { ok: false, why: '그런 장비가 없습니다.' };
     if (!have(name, u)) return { ok: false, why: name + '이(가) 주머니에 없습니다.' };
     const old = worn(key, u);
     if (old) add(old, 1);
     add(name, -1);
     P().patch(String(key), { gear: name });
-    log_('[펫] ' + P().nick(key, u) + '에게 ' + name + ' 장착' + (old ? ' (' + old + ' 은 주머니로)' : ''));
+    log_('[인형] ' + P().nick(key, u) + '에게 ' + name + ' 장착' + (old ? ' (' + old + ' 은 주머니로)' : ''));
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true };
 }
@@ -188,17 +186,17 @@ function addXp(key, n) {
     P().patch(String(key), { lv: lv, xp: xp });
     return { lv0: lv0, lv: lv, full: lv >= LV_MAX };
 }
-// 등급업 — Lv 10 이고, 그 등급의 조각 세 가지를 다 가졌을 때
+// 등급업 — Lv 10 이고, 다음 등급의 각성의 룬이 하나 있을 때 (awk-rune.js · 2026-11-07 · 전에는 조각 세 가지)
 function gradeNeed(key, u) {
     const gi = gradeIdx(key, u);
-    if (gi >= P().GRADES.length - 1) return { ok: false, why: '이미 가장 높은 등급입니다.' };
-    const g0 = P().GRADES[gi];
-    const set = shardSet(g0);
-    if (!set) return { ok: false, why: g0 + ' 등급에서 오르는 조각은 아직 없습니다 — 다음 여정이 생기면 떨어집니다.', set: null, have: 0 };
-    const have = shardCount(g0, u);
-    if (lvOf(key, u) < LV_MAX) return { ok: false, why: 'Lv ' + LV_MAX + ' 이 되어야 합니다.', set: set, have: have };
-    if (have < set.length) return { ok: false, why: '등급업 조각이 모자랍니다 (' + have + ' / ' + set.length + ').', set: set, have: have };
-    return { ok: true, set: set, have: have };
+    if (gi >= P().GRADES.length - 1) return { ok: false, why: '이미 가장 높은 등급입니다.', rune: null, have: 0 };
+    const g1 = P().GRADES[gi + 1];
+    const A = window.AWK;
+    const rune = A ? A.RUNE(g1) : g1 + '급 각성의 룬';
+    const have = A ? A.have(rune, u) : 0;
+    if (lvOf(key, u) < LV_MAX) return { ok: false, why: 'Lv ' + LV_MAX + ' 이 되어야 합니다.', rune: rune, have: have };
+    if (!have) return { ok: false, why: rune + '이 필요합니다 (조각 셋을 도깨비 공방에서 합칩니다).', rune: rune, have: have };
+    return { ok: true, rune: rune, have: have };
 }
 function canGradeUp(key, u) { return !!gradeNeed(key, u).ok; }
 function gradeUp(key) {
@@ -206,9 +204,9 @@ function gradeUp(key) {
     const need = gradeNeed(key, u);
     if (!need.ok) return { ok: false, why: need.why };
     const g0 = P().GRADES[gradeIdx(key, u)], g1 = P().GRADES[gradeIdx(key, u) + 1];
-    need.set.forEach(function (x) { shardAdd(x.n, -1); });
+    if (!window.AWK || !window.AWK.add(need.rune, -1, u)) return { ok: false, why: need.rune + '이 없습니다.' };
     P().patch(String(key), { g: g1, lv: 1, xp: 0 });
-    log_('[펫] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (여정 Lv ' + LV_MAX + ' · 조각 ' + need.set.map(function (x) { return x.n; }).join(' · ') + ')');
+    log_('[인형] ' + P().nick(key, u) + ' — ' + g0 + ' → ' + g1 + ' 등급 (Lv ' + LV_MAX + ' · ' + need.rune + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true, from: g0, to: g1 };
 }
@@ -243,8 +241,8 @@ function stats(key, u) {
 // ==========================================
 function boxHtml() {
     const u = u_();
-    return '<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">🐾 펫 숍 — 반려동물용 장비</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">🐾 여정에 데려갈 펫에게 끼웁니다. 애교 · 근력 · 경청 · 인내 · 눈치 — 속성마다 +2 · 개당 ' + PRICE.toLocaleString() + ' P. 장비 주머니에 들어가고, 펫 칸에서 펫 하나에 하나씩 낍니다 (장비 하나는 한 마리만 — 열 마리면 열 개). 여정에서는 더 좋은 것(+3)이 떨어집니다.<br>근력은 공격력 · 인내는 방어력 · 애교는 공격과 방어 조금씩 · 눈치는 회피 · 경청은 급소.</div>'
+    return '<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">🐾 인형 숍 — 반려동물용 장비</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">🐾 여정에 데려갈 인형에게 끼웁니다. 애교 · 근력 · 경청 · 인내 · 눈치 — 속성마다 +2 · 개당 ' + PRICE.toLocaleString() + ' P. 장비 주머니에 들어가고, 인형 칸에서 인형 하나에 하나씩 낍니다 (장비 하나는 한 마리만 — 열 마리면 열 개). 여정에서는 더 좋은 것(+3)이 떨어집니다.<br>근력은 공격력 · 인내는 방어력 · 애교는 공격과 방어 조금씩 · 눈치는 회피 · 경청은 급소.</div>'
         + BASIC.map(function (g) {
             const n = have(g.n, u);
             return '<div style="display:flex; align-items:center; gap:6px; padding:5px 0; border-top:1px solid rgba(255,255,255,0.05);">'
@@ -305,7 +303,7 @@ window.petGearOpen = function (key, after) {
     const st = stats(key, u);
     const list = ALL.filter(function (g) { return have(g.n, u) > 0; });
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">' + esc(nm) + ' — 장비</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">펫 하나에 하나만 낍니다. 장비 하나는 한 마리만 — 끼우면 주머니에서 빠지고, 뺀 것은 주머니로 돌아옵니다.<br>여정 수치 — 체력 ' + st.max + ' · 공격 ' + st.atk + ' · 방어 ' + st.def + ' · 회피 ' + st.eva + '% · 치명 ' + st.crit + '%</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">인형 하나에 하나만 낍니다. 장비 하나는 한 마리만 — 끼우면 주머니에서 빠지고, 뺀 것은 주머니로 돌아옵니다.<br>여정 수치 — 체력 ' + st.max + ' · 공격 ' + st.atk + ' · 방어 ' + st.def + ' · 회피 ' + st.eva + '% · 치명 ' + st.crit + '%</div>'
         + '<div style="font-size:11px; color:#c9a227; margin-bottom:8px;">낀 것: ' + (cur ? esc(cur) + ' <span style="color:#6f685e;">(' + esc(addText(BY[cur].add)) + ' · 「' + esc(BY[cur].sk.n) + '」)</span>' : '<span style="color:#6f685e;">없음</span>') + '</div>'
         + (cur ? '<button id="pg-off" class="game-btn" style="' + BTN + GREY + '">뺀다 — 주머니로</button>' : '')
         + (list.length ? list.map(function (g) {
@@ -313,7 +311,7 @@ window.petGearOpen = function (key, after) {
                 + '<div style="flex:1; min-width:0;"><div style="font-size:11.5px; color:#e8d7b4;">' + esc(g.n) + ' <span style="font-size:10px; color:#8d8578;">· ' + have(g.n, u) + '개</span></div>'
                 + '<div style="font-size:9.5px; color:#6f685e; margin-top:2px;">' + esc(addText(g.add)) + ' · 「' + esc(g.sk.n) + '」 ' + esc(g.sk.d) + '</div></div>'
                 + '<button class="game-btn pg-on" data-n="' + esc(g.n) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;">낀다</button></div>';
-        }).join('') : '<div style="font-size:10.5px; color:#6f685e; padding:6px 0;">주머니에 장비가 없습니다. 망상 홈쇼핑 🐾 펫 숍에서 삽니다.</div>')
+        }).join('') : '<div style="font-size:10.5px; color:#6f685e; padding:6px 0;">주머니에 장비가 없습니다. 망상 홈쇼핑 🐾 인형 숍에서 삽니다.</div>')
         + '<button id="pg-x" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">닫는다</button>');
     w.querySelector('#pg-x').onclick = function () { shut(); if (typeof after === 'function') after(); };
     const off = w.querySelector('#pg-off');
@@ -361,7 +359,7 @@ window.petXpGive = function (key, n) {
     const me = u_();
     if (!me || me.code !== 'kario0987') { console.warn('상담사만 쓸 수 있습니다.'); return; }
     const r = addXp(key, n);
-    console.log(r ? ('%c✓ ' + P().nick(key, me) + ' Lv ' + r.lv0 + ' → ' + r.lv) : '없는 펫', 'color:#4CAF50');
+    console.log(r ? ('%c✓ ' + P().nick(key, me) + ' Lv ' + r.lv0 + ' → ' + r.lv) : '없는 인형', 'color:#4CAF50');
 };
 window.petGearState = function () {
     const u = u_();
@@ -377,6 +375,6 @@ window.petGearState = function () {
     }));
 };
 
-console.log('[펫 장비] petGearState() · petGearGive(이름, 수[, 사번]) · petShardGive(이름, 수[, 사번]) · petXpGive(번호, n)');
+console.log('[인형 장비] petGearState() · petGearGive(이름, 수[, 사번]) · petShardGive(이름, 수[, 사번]) · petXpGive(번호, n)');
 
 })();

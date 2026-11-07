@@ -53,7 +53,7 @@ function copyFlags(from, to) { Object.keys(from).forEach(function (k) { if (!(k 
         LIST.forEach(function (x) {
             if (!ITEM_CATALOG[x.n]) {
                 ITEM_CATALOG[x.n] = { price: 0, usable: true, targetable: false, effect: 'pet_stay', noSell: true,
-                    desc: '[펫] 쓰면 ' + x.h + '시간 동안 가진 펫이 모두 집을 지킨다 — 어둠에 따라오지 않는다 (데려가기 · 몰래 따라가기 모두). 남은 시간 뒤에 이어 붙는다. 망상 홈쇼핑에서 판다.' };
+                    desc: '[인형] 쓰면 ' + x.h + '시간 동안 가진 인형이 모두 집을 지킨다 — 어둠에 따라오지 않는다 (데려가기 · 몰래 따라가기 모두). 남은 시간 뒤에 이어 붙는다. 망상 홈쇼핑에서 판다.' };
             }
             if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(x.n) < 0) NO_SELL_ITEMS.push(x.n);
         });
@@ -77,7 +77,7 @@ window.petStayBuy = function (name) {
     log_('[망상 홈쇼핑] ' + x.n + ' 구입 (-' + x.price.toLocaleString() + ' P)');
     try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-    alert_(x.n + '을(를) 샀습니다.\n\n소지품에서 「사용」하면 ' + x.h + '시간 동안 펫이 어둠에 따라오지 않습니다.');
+    alert_(x.n + '을(를) 샀습니다.\n\n소지품에서 「사용」하면 ' + x.h + '시간 동안 인형이 어둠에 따라오지 않습니다.');
     try { window.petStayPaint(); } catch (e) { }
 };
 
@@ -97,11 +97,11 @@ window.petStayBuy = function (name) {
             const base = Math.max(Date.now(), Number(u.petStayUntil) || 0);
             u.petStayUntil = base + x.h * 3600 * 1000;
             try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, itemName, 1); } catch (e) { }
-            log_('[🏠 집 지킴이 방석] ' + x.h + '시간 — 펫이 어둠에 따라오지 않습니다 (남은 ' + span(left(u)) + ')');
+            log_('[🏠 집 지킴이 방석] ' + x.h + '시간 — 인형이 어둠에 따라오지 않습니다 (남은 ' + span(left(u)) + ')');
             try { if (typeof saveFields === 'function') saveFields({ petStayUntil: 1, inventory: 1, history: 1 }); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
-            alert_('🏠 ' + x.n + '\n\n방석을 깔아 두었습니다. 펫들이 그 위에서 집을 지킵니다.\n'
-                + '남은 시간 ' + span(left(u)) + ' — 그동안 데려가기로 고른 펫도, 몰래 따라붙던 펫도 어둠에 따라오지 않습니다.');
+            alert_('🏠 ' + x.n + '\n\n방석을 깔아 두었습니다. 인형들이 그 위에서 집을 지킵니다.\n'
+                + '남은 시간 ' + span(left(u)) + ' — 그동안 데려가기로 고른 인형도, 몰래 따라붙던 인형도 어둠에 따라오지 않습니다.');
         };
         copyFlags(_u, w);
         w._petStay = true;
@@ -120,7 +120,7 @@ function boxHtml() {
     const l = left(u);
     return '<div style="font-size:12px; color:#9fd8ef; font-weight:bold; margin:0 0 4px;">🏠 집 지킴이 방석</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:7px; line-height:1.6;">'
-        + '쓰면 그 시간 동안 가진 펫이 모두 집을 지킵니다 — 데려가기로 고른 펫도, 몰래 따라붙는 펫도 어둠에 따라오지 않습니다.<br>'
+        + '쓰면 그 시간 동안 가진 인형이 모두 집을 지킵니다 — 데려가기로 고른 인형도, 몰래 따라붙는 인형도 어둠에 따라오지 않습니다.<br>'
         + '<span style="color:#8d8578;">소지품으로 들어갑니다. 쓰면 남은 시간 뒤에 이어 붙습니다.</span></div>'
         + (l ? '<div style="font-size:10.5px; color:#9fd8ef; margin-bottom:6px;">지금 집을 지키는 중 — ' + span(l) + ' 남음</div>' : '')
         + LIST.map(function (x) {

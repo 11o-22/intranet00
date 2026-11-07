@@ -81,11 +81,12 @@ function statusOf(s) {
     return null;
 }
 
-function cell(p) {
+function cell(p, key) {
     const me = u_();
     const ps = P().pets(me);
-    const s = ps[String(p.i)];
-    const img = P().icon(p.i);
+    const k = key != null ? Number(key) : p.i;          // ★ 같은 종 둘째부터는 113 · 213 … (pet-data.js newKey)
+    const s = ps[String(k)];
+    const img = P().icon(k);
 
     if (!s) {
         // 입양 전 — 어둡게
@@ -97,15 +98,15 @@ function cell(p) {
             + '<img src="' + img + '" alt="" style="max-width:88%; max-height:88%;'
             + ' image-rendering:pixelated; filter:brightness(0.14) grayscale(1);">'
             + '</div>'
-            + '<div style="font-size:8.5px; color:#5a544c; margin-top:3px; line-height:1.2;">입양 전</div>'
+            + '<div style="font-size:8.5px; color:#5a544c; margin-top:3px; line-height:1.2;">아직 없음</div>'
             + '</div>';
     }
 
     const st = statusOf(s);
-    const nick = P().nick(p.i, me);
-    const inRoom = P().showHas(p.i, me);
+    const nick = P().nick(k, me);
+    const inRoom = P().showHas(k, me);
     // ★ 포만도 막대(초록) · 다쳤으면 상처 깊이 막대(붉음) — 목록에서 바로 보이게 (2026-10-29 사용자 요청)
-    let full = 0; try { full = Math.max(0, Math.min(100, Number(P().full(p.i, me)) || 0)); } catch (e) { }
+    let full = 0; try { full = Math.max(0, Math.min(100, Number(P().full(k, me)) || 0)); } catch (e) { }
     const hurt = (s.hurt && typeof s.hurt === 'object') ? s.hurt : null;
     const deep = hurt ? Math.max(0, Math.min(100, Number(hurt.deep) || 0)) : 0;
     const fullCol = full <= 20 ? '#e05a4a' : (full <= 50 ? '#d9a05a' : '#6fbf5e');
@@ -113,7 +114,7 @@ function cell(p) {
         + '<div style="height:100%; width:' + full + '%; background:' + fullCol + ';"></div></div>'
         + (hurt ? '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="상처 깊이 ' + deep + '">'
             + '<div style="height:100%; width:' + deep + '%; background:#e05a4a;"></div></div>' : '<div style="height:4px; margin:0 3px 2px 3px;"></div>');
-    return '<div class="pet-cell" data-i="' + p.i + '" style="text-align:center; padding:4px 2px;'
+    return '<div class="pet-cell" data-i="' + k + '" style="text-align:center; padding:4px 2px;'
         + ' cursor:pointer;">'
         + bars
         + '<div style="position:relative; width:100%; aspect-ratio:1/1; display:flex;'
@@ -141,19 +142,29 @@ function listView() {
     const me = u_();
     if (!me) { alert_('로그인 뒤에 쓸 수 있습니다.'); return; }
     const L = P().LIST;
-    const have = Object.keys(P().pets(me)).filter(function (k) { return P().BY[k]; }).length;
+    const mine = Object.keys(P().pets(me)).filter(function (k) { return P().BY[k]; });
+    const have = mine.length;
+    const kinds = L.filter(function (p) { return mine.some(function (k) { return P().sp(k) === p.i; }); }).length;
+    // ★ 같은 종을 여럿 데리고 있을 수 있다 — 그 종 칸 바로 뒤에 이어 붙인다 (2026-11-07)
+    const cells = [];
+    L.forEach(function (p) {
+        cells.push(cell(p));
+        mine.filter(function (k) { return Number(k) !== p.i && P().sp(k) === p.i; })
+            .sort(function (a, b) { return a - b; })
+            .forEach(function (k) { cells.push(cell(p, k)); });
+    });
 
     const grid = '<div style="display:grid; grid-template-columns:repeat(' + COLS + ',1fr);'
-        + ' gap:5px;">' + L.map(cell).join('') + '</div>';
+        + ' gap:5px;">' + cells.join('') + '</div>';
 
     const w = box(
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
-        + '<span style="font-size:13px; color:#ffcf8f; font-weight:bold;">🐶 펫</span>'
-        + '<span style="font-size:10px; color:#8d8578;">' + have + ' / ' + L.length + '마리</span>'
+        + '<span style="font-size:13px; color:#ffcf8f; font-weight:bold;">🧸 인형</span>'
+        + '<span style="font-size:10px; color:#8d8578;">' + have + '마리 · 종 ' + kinds + ' / ' + L.length + '</span>'
         + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
-        + '가진 펫을 누르면 이름을 붙이고, 사택 방에 내놓을 펫을 고를 수 있습니다.<br>'
-        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 초록 막대는 포만도, 붉은 막대는 상처 깊이(🩹 다친 펫)입니다.</div>'
+        + '가진 인형을 누르면 이름을 붙이고, 사택 방에 내놓을 인형을 고를 수 있습니다.<br>'
+        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 초록 막대는 포만도, 붉은 막대는 상처 깊이(🩹 다친 인형)입니다.</div>'
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 
@@ -215,11 +226,11 @@ function oneView(id) {
         + (window.PETGEAR ? line('여정 Lv', (function () {
             const lv = PETGEAR.lv(id, me), xp = PETGEAR.xp(id, me);
             return 'Lv ' + lv + (lv >= PETGEAR.LV_MAX ? ' <span style="color:#d4af37;">— 가득</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ')</span>');
-        })()) + line('등급업 조각', (function () {
+        })()) + line('각성의 룬', (function () {
             const nd = PETGEAR.gradeNeed(id, me);
-            if (!nd.set) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';
-            return nd.set.map(function (x) { return '<span style="color:' + (PETGEAR.shardHave(x.n, me) ? '#d4af37' : '#4a4540') + ';" title="' + esc(x.d) + '">' + esc(x.n.replace(/^🧩 /, '')) + '</span>'; }).join(' <span style="color:#3a3530;">·</span> ')
-                + ' <span style="color:#6f685e;">(' + nd.have + '/' + nd.set.length + (nd.ok ? ' · 등급업 가능' : '') + ')</span>';
+            if (!nd.rune) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';
+            return '<span style="color:' + (nd.have ? '#9fd8ef' : '#6f685e') + ';">💠 ' + esc(nd.rune) + ' ' + nd.have + '개</span>'
+                + ' <span style="color:#6f685e;">' + (nd.ok ? '· 등급업 가능' : '· ' + esc(nd.why)) + '</span>';
         })()) + line('장비', (function () {
             const g = PETGEAR.worn(id, me);
             return g ? esc(g) + ' <span style="color:#6f685e;">(' + esc(PETGEAR.addText(PETGEAR.BY[g].add)) + ')</span>' : '<span style="color:#8d8578;">없음</span>';
@@ -256,8 +267,7 @@ function oneView(id) {
         + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')
         + (window.PETGEAR ? '<button id="pet-gear" class="game-btn" style="' + BTN + '">장비</button>'
             + (PETGEAR.canGradeUp(id, me) ? '<button id="pet-up" class="game-btn" style="' + BTN + ' background:linear-gradient(145deg,#6b4a1d,#38250e) !important; border-color:#ffd766 !important; color:#ffe9bd !important;">등급업 — ' + esc(s.g || 'D') + ' → ' + esc(P().GRADES[PETGEAR.gradeIdx(id, me) + 1] || '') + '</button>' : '') : '')
-        + (typeof window.petAdoptSend === 'function'
-            ? '<button id="pet-adopt" class="game-btn" style="' + BTN + '">입양 보내기</button>' : '')
+        // ✗ 입양 보내기 — 도깨비 공방 교환소로 바뀌었다 (2026-11-07)
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
 
     w.querySelector('#pet-back').onclick = listView;
@@ -348,7 +358,7 @@ setInterval(function () {
         b = document.createElement('button');
         b.id = FAB;
         b.type = 'button';
-        b.textContent = '🐶 펫';
+        b.textContent = '🧸 인형';
         b.style.cssText = 'position:fixed; right:12px; z-index:9997;'
             + ' bottom:calc(16px + env(safe-area-inset-bottom)); padding:9px 13px;'
             + ' border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer;'
@@ -362,6 +372,6 @@ setInterval(function () {
 window.petOpen = listView;
 window.petShut = shut;
 
-console.log('[펫] petOpen()');
+console.log('[인형] petOpen()');
 
 })();

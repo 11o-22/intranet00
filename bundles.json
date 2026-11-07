@@ -470,9 +470,11 @@
       "nuow-text.js",
       "dot-portrait.js",
       "doll-data.js",
+      "awk-rune.js",
       "doll-scene.js",
       "doll-battle.js",
-      "doll-gong.js"
+      "doll-gong.js",
+      "doll-party.js"
     ]
   ]
 }

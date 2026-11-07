@@ -128,7 +128,7 @@ window.petSend = function (id, zone) {
     if (!u || !sp || !z) { alert_('그런 구역이 없습니다.'); return; }
     const key = String(id);
     const s = P().pets(u)[key];
-    if (!s) { alert_('아직 없는 펫입니다.'); return; }
+    if (!s) { alert_('아직 없는 인형입니다.'); return; }
     const st = stateOf(s);
     if (st.k === 'with') { alert_('주인과 같이 어둠에 들어가 있습니다.'); return; }
     if (st.k === 'out')  { alert_('이미 나가 있습니다.'); return; }
@@ -144,7 +144,7 @@ window.petSend = function (id, zone) {
     });
     if (nowOut.length >= OUT_MAX) {
         alert_('한 번에 두 마리까지만 내보낼 수 있습니다.\n\n'
-            + '지금 나가 있는 펫 : '
+            + '지금 나가 있는 인형 : '
             + nowOut.map(function (k2) { return P().nick(k2, u); }).join(' · '));
         return;
     }
@@ -161,7 +161,7 @@ window.petSend = function (id, zone) {
     P().patch(key, { out: out });
 
     const nick = P().nick(id, u);
-    log_('[펫 탐사] ' + nick + P().josa(nick, '을') + ' ' + z.name + '에 보냈습니다. ('
+    log_('[인형 탐사] ' + nick + P().josa(nick, '을') + ' ' + z.name + '에 보냈습니다. ('
         + hours + '시간' + (doom ? ' · ' + z.grade + '등급 — 제 등급 밖' : '') + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     shut();
@@ -200,7 +200,7 @@ function collect(key) {
         try { hit = P().bondHit(key); } catch (e) { }
         P().patch(key, { out: null, fed: null, rest: now + P().REST });
         const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
-        log_('[펫 탐사] ' + nick + '(' + sp + ')' + P().josa(nick, '이') + ' ' + z
+        log_('[인형 탐사] ' + nick + '(' + sp + ')' + P().josa(nick, '이') + ' ' + z
             + '에서 빈손으로 돌아왔습니다. (' + grade + '등급) ' + bt);
         return { nick: nick, sp: sp, zone: z, pay: 0, dead: true, grade: grade, bt: bt };
     }
@@ -208,7 +208,7 @@ function collect(key) {
     const got = Math.max(0, Number(s.out.pay) || 0);
     u.points = Math.max(0, Math.min(cap(), (Number(u.points) || 0) + got));
     P().patch(key, { out: null, fed: null, rest: now + P().REST });
-    log_('[펫 탐사] ' + nick + P().josa(nick, '이') + ' ' + z + '에서 돌아왔습니다. (+'
+    log_('[인형 탐사] ' + nick + P().josa(nick, '이') + ' ' + z + '에서 돌아왔습니다. (+'
         + got.toLocaleString() + ' P)');
     return { nick: nick, sp: sp, zone: z, pay: got };
 }
@@ -261,7 +261,7 @@ function x_grade(gone) {
     const g = gone.map(function (x) { return x.grade; }).filter(Boolean);
     const one = g.length && g.every(function (x) { return x === g[0]; }) ? g[0] : null;
     return one
-        ? (one + ' 등급은 그 펫의 등급 밖이었습니다.')
+        ? (one + ' 등급은 그 인형의 등급 밖이었습니다.')
         : '제 등급보다 높은 어둠에서는 빈손으로 돌아오고 교감이 깎입니다.';
 }
 
@@ -401,15 +401,15 @@ function html() {
         .sort(function (a, b) { return Number(a) - Number(b); });
 
     const head = '<div style="font-size:12px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
-        + '🐶 펫 탐사</div>'
+        + '🧸 인형 탐사</div>'
         + '<div style="font-size:9.5px; color:#777; margin-bottom:10px; line-height:1.6;">'
-        + '펫은 혼자 들어갑니다. 사원 본인의 탐사 횟수는 쓰지 않습니다.'
+        + '인형은 혼자 들어갑니다. 사원 본인의 탐사 횟수는 쓰지 않습니다.'
         + ' 한두 시간 뒤에 포인트를 물어 옵니다.<br>'
         + '<span style="color:#e07a5f;">제 등급보다 높은 구역에 보내면 빈손으로 돌아오고 교감이 ' + P().DEATH_HIT + ' 깎입니다.</span></div>';
 
     if (!keys.length) {
         return head + '<div style="font-size:11px; color:#666; padding:6px 0;">'
-            + '보낼 펫이 없습니다. 망상 홈쇼핑에서 환몽알을 가져오십시오.</div>';
+            + '보낼 인형이 없습니다. 망상 홈쇼핑에서 환몽알을 가져오십시오.</div>';
     }
 
     return head + keys.map(function (k) {
@@ -469,14 +469,14 @@ function paint() {
         const _r = renderDarkness;
         const w = function () {
             const out = _r.apply(this, arguments);
-            try { paint(); } catch (e) { console.warn('[펫]', e); }
+            try { paint(); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._pet = true;
         renderDarkness = w;
         window.renderDarkness = w;
         clearInterval(iv);
-        console.log('[펫] 펫 탐사 칸 연결');
+        console.log('[인형] 인형 탐사 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -500,11 +500,11 @@ setInterval(function () { try { sweep(false); } catch (e) { } }, 60000);
 // ==========================================
 window.petTrips = function () {
     const u = u_();
-    console.log('%c===== 펫 탐사 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 인형 탐사 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
     const ps = P().pets(u);
     const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; });
-    if (!keys.length) { console.log('  펫이 없습니다.'); return; }
+    if (!keys.length) { console.log('  인형이 없습니다.'); return; }
     console.table(keys.map(function (k) {
         const s = ps[k], st = stateOf(s);
         return { 번호: k, 이름: P().nick(k, u), 등급: s.g || 'D', 지금: st.t,
@@ -513,6 +513,6 @@ window.petTrips = function () {
     }));
 };
 
-console.log('[펫] petTrips() · petSend(번호, 구역) · petBack(번호)');
+console.log('[인형] petTrips() · petSend(번호, 구역) · petBack(번호)');
 
 })();

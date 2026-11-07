@@ -104,11 +104,11 @@ function perOf(key, u) {
     return (hash(key, s) >>> 1) % 10;
 }
 function perName(key, u) {
-    const list = PER[Number(key)] || PER[1];
+    const list = PER[(window.PET && PET.sp) ? PET.sp(key) : Number(key)] || PER[1];
     return list[perOf(key, u)] || '';
 }
 function sexName(sex) { return sex === 'm' ? '♂ 수컷' : sex === 'f' ? '♀ 암컷' : '?'; }
-function skillOf(key) { return SKILL[Number(key)] || null; }
+function skillOf(key) { return SKILL[(window.PET && PET.sp) ? PET.sp(key) : Number(key)] || null; }
 
 // 내 펫 가운데 칸이 없는 것은 해시 값을 적어 둔다 — 새로 깨어난 펫도 같은 길이다
 //   (태어난 때가 밀리초라 그 해시가 곧 무작위다 · 적힌 뒤로는 그 값이 그대로다)

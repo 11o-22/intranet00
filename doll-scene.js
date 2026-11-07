@@ -33,9 +33,6 @@ const SPD = 62;                     // 1초에 몇 칸(그림 원래 크기) 걷
 const STEP = 26;                    // 오브제 뒤를 이만큼 걸을 때마다 한 번 굴린다
 const ENC = 0.10;                   // 한 번 굴릴 때 조우할 몫
 const K_STEP = [1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1];
-const ARC_DAY = 3;                  // 아케이드존 하루 횟수
-const ARC_USE = 'dollRun';          // dollRun/<사번> = { d, n }
-const ARC_DREAM = 500;              // 보스까지 깨면 꿈결
 
 // ==========================================
 // 맵
@@ -88,7 +85,7 @@ const SC = {
             { id: 'trade', r: [486, 316, 527, 364], x: 505, y: 400, n: '교환소 도깨비', act: 'trade' },
             { id: 'box',   r: [745, 110, 875, 242], x: 815, y: 240, n: '보관소', act: 'box' },
             { id: 'dex',   r: [318, 196, 452, 250], x: 385, y: 240, n: '봉제인형 도감', act: 'dex' },
-            { id: 'mask',  r: [652, 160, 706, 238], x: 680, y: 240, n: '탈 깎는 도깨비', act: 'mask' },
+            { id: 'mask',  r: [652, 160, 706, 238], x: 680, y: 240, n: '💠 각성 공방', act: 'mask' },
             { id: 'nap',   r: [694, 336, 770, 398], x: 730, y: 400, n: '조는 도깨비', act: 'nap' },
             { id: 'door',  r: [350, 296, 422, 398], x: 385, y: 400, n: '나간다', act: 'toGfrontDoor' }
         ],
@@ -263,8 +260,9 @@ function open(key, at, opt) {
         + '<div class="ds-sys"><span style="opacity:0"></span></div><div class="ds-flash"></div>';
     const keepTut = run && run.tut, keepArc = (opt.arc !== undefined) ? opt.arc : (run && key === 'arcade' ? run.arc : null);
     run = { key: key, sc: sc, el: ov, world: ov.querySelector('.ds-world'), path: [], face: -1, trail: [], encAcc: 0, encOff: Date.now() + 1500,
-            tut: opt.tut || keepTut || null, arc: keepArc, busy: false, last: 0, npcEl: null, tags: [] };
-    ov.querySelector('.nm').textContent = '📍 ' + sc.n;
+            tut: opt.tut || keepTut || null, arc: keepArc, busy: false, last: 0, npcEl: null, tags: [], pt: opt.party || null, mates: {} };
+    ov.querySelector('.nm').textContent = '📍 ' + (opt.title || sc.n);
+    if (run.pt) { const n0 = nearest(sc, run.pt.posOf(run.pt.me()), 333, true); at = [n0.x, n0.y]; }
     ov.querySelector('.ds-x').onclick = function (ev) { ev.stopPropagation(); quit(); };
     const bg = ov.querySelector('.ds-bg');
     bg.src = sc.img;
@@ -430,9 +428,7 @@ function paintSpots() {
         run.world.appendChild(e);
     });
     (sc.npcs || []).forEach(function (n) {
-        if (n.id === 'door' || n.id === 'mask' || n.id === 'nap') {
-            if (n.id !== 'door') return;
-        }
+        if (n.id === 'nap') return;
         const e = document.createElement('div');
         e.className = 'ds-tag';
         e.style.left = Math.round((n.r[0] + n.r[2]) / 2 * Z) + 'px';
@@ -465,10 +461,12 @@ function bindInput(ov) {
     let down = false, lastT = 0;
     const go = function (ev) {
         if (!run || busy()) return;
+        if (run.pt && !run.pt.lead()) { sys('파티장을 따라갑니다.', 1500); return; }
+        if (run.pt && !run.pt.ready()) { sys('같이 갈 사원들이 들어오기를 기다리는 중…', 1500); return; }
         const r = ov.getBoundingClientRect();
         const w = toWorld(ev.clientX - r.left, ev.clientY - r.top);
         const n = npcAt(w.x, w.y);
-        if (n) { walkTo(n.x, n.y, function () { act(n.act, n); }); return; }
+        if (n) { try { if (window.DOLLGONG && DOLLGONG.prefetch) DOLLGONG.prefetch(n.act); } catch (e) { } walkTo(n.x, n.y, function () { act(n.act, n); }); return; }
         walkTo(w.x, w.y, null);
     };
     ov.addEventListener('pointerdown', function (ev) {
@@ -479,7 +477,7 @@ function bindInput(ov) {
     ov.addEventListener('pointermove', function (ev) {
         if (!down || Date.now() - lastT < 140) return;
         lastT = Date.now();
-        if (!run || busy()) return;
+        if (!run || busy() || (run.pt && (!run.pt.lead() || !run.pt.ready()))) return;
         const r = ov.getBoundingClientRect();
         const w = toWorld(ev.clientX - r.left, ev.clientY - r.top);
         walkTo(w.x, w.y, null);
@@ -522,6 +520,7 @@ function tick(t) {
     if (run.me && run.walking !== walking) { run.walking = walking; try { run.me.moving(walking); } catch (e) { } }
     placeMe();
     placeDoll(false);
+    if (run.pt) { followLead(); matesSync(dt); if (moved && run.pt.lead()) run.pt.onWalk(run.x); }
     camera();
     if (run.sc.dark) paintVision();
     if (moved) onMove(moved);
@@ -580,7 +579,7 @@ async function encounter() {
         return;
     }
     run.busy = true; run.path = []; run.then = null;
-    await flash(3);
+    // 번쩍임 대신 — 전투 화면이 하얗게 덮으며 들어온다 (doll-battle.js enterFx)
     const tut = !!(run.tut);
     let res = null;
     try { res = await window.DOLLBT.wild({ loc: run.sc.bt, tut: tut }); } catch (e) { console.warn('[🧸] 전투', e); }
@@ -774,13 +773,14 @@ function paintVision() {
     v._k = k;
     v.style.background = 'radial-gradient(circle ' + Math.round(R) + 'px at ' + Math.round(s.x) + 'px ' + Math.round(s.y) + 'px, rgba(0,0,0,0) 0, rgba(0,0,0,0) ' + Math.round(R - 2) + 'px, rgba(4,2,8,.985) ' + Math.round(R) + 'px)';
 }
+// 괴담은 여정 판(doll-party.js)이 쥐고 있다 — run.pt
 function arcadePaint() {
     Array.prototype.forEach.call(run.world.querySelectorAll('.ds-mon'), function (e) { e.remove(); });
-    const A = run.arc;
-    if (!A) return;
+    const PT = run.pt;
+    if (!PT) return;
     const Z = run.Z;
-    A.mons.forEach(function (m, i) {
-        if (m.dead) return;
+    PT.mons().forEach(function (m, i) {
+        if (!m || m.dead) return;
         const px = Math.round((m.boss ? 78 : 62) * Z);
         const e = document.createElement('div');
         e.className = 'ds-mon';
@@ -788,139 +788,72 @@ function arcadePaint() {
         e.style.left = Math.round(m.x * Z - px / 2) + 'px';
         e.style.top = Math.round(m.y * Z - px * 0.97) + 'px';
         e.style.zIndex = String(1000 + Math.round(m.y) - 2);
-        if (m.face) e.style.transform = 'scaleX(-1)';
         e.dataset.i = i;
         run.world.appendChild(e);
-        m.el = e;
     });
 }
 function arcadeCheck() {
-    const A = run.arc;
-    if (!A || run.busy) return;
-    for (let i = 0; i < A.mons.length; i++) {
-        const m = A.mons[i];
-        if (m.dead) continue;
+    const PT = run.pt;
+    if (!PT || !PT.lead() || run.busy || PT.stage() !== 'walk') return;
+    const ms = PT.mons();
+    for (let i = 0; i < ms.length; i++) {
+        const m = ms[i];
+        if (!m || m.dead) continue;
         const near = m.boss ? (run.x >= run.sc.boss.at) : (Math.abs(run.x - m.x) < 26);
-        if (near) { arcadeFight(i); return; }
-    }
-}
-async function arcadeFight(i) {
-    const A = run.arc, m = A.mons[i];
-    run.busy = true; run.path = []; run.then = null;
-    exclaim(m.x, m.y - (m.boss ? 80 : 62), '!');
-    await sleep(500);
-    await flash(m.boss ? 4 : 3);
-    let res = null;
-    try { res = await window.DOLLBT.monster({ loc: 'arcade', mon: m.i, boss: !!m.boss }); } catch (e) { console.warn('[🧸] 괴담 전투', e); }
-    if (!run) return;
-    run.busy = false;
-    makeDoll();
-    const r = res && res.res;
-    if (r === 'win') {
-        m.dead = true;
-        if (m.el) { m.el.style.opacity = '0'; m.el.style.transform = 'translateY(20%)'; }
-        A.wins++;
-        if (m.boss) { arcadeClear(); return; }
-        sys('괴담이 흩어졌다. 길이 조금 더 열렸다. (' + A.wins + ' / ' + A.mons.length + ')');
-    } else if (r === 'run') {
-        // 물러섰다 — 왼쪽으로 조금 밀려난다
-        const n = nearest(run.sc, Math.max(30, m.x - 60), run.y, true);
-        run.x = n.x; run.y = n.y; run.at = n;
-        sys('물러섰다. 괴담은 아직 그 자리에 있다.');
-    } else {
-        arcadeFail();
-    }
-}
-async function arcadeClear() {
-    const u = u_(), M = D();
-    run.busy = true;
-    let got = 0;
-    try {
-        const d = db_();
-        if (d && u) {
-            const r = await d.ref('users/' + u.code + '/kroom/dream').transaction(function (v) { return Math.max(0, Math.floor(Number(v) || 0)) + ARC_DREAM; });
-            if (r && r.committed) {
-                got = ARC_DREAM;
-                if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {};
-                u.kroom.dream = Math.max(0, Math.floor(Number(r.snapshot.val()) || 0));
-            }
+        if (near) {
+            run.busy = true; run.path = []; run.then = null;
+            exclaim(m.x, m.y - (m.boss ? 80 : 62), '!');
+            if (!PT.encounter(i)) run.busy = false;
+            return;
         }
-    } catch (e) { }
-    M.withList(u).forEach(function (id) { M.giveXp(id, 15, u); });
-    M.log('[🧸 매직버니 아케이드존] 북 치는 토끼를 쓰러뜨리고 빠져나왔습니다.' + (got ? ' 💤 꿈결 +' + got + ' D' : ''), u);
-    M.saveHist();
-    run.busy = false;
-    await talk([{ sys: 1, t: '무대의 북소리가 멎었다. 불 꺼진 아케이드에 반짝이는 것만 남았다.' },
-                { sys: 1, t: '매직버니 아케이드존을 빠져나왔습니다.\n동행 인형 경험치 +15' + (got ? '\n💤 꿈결 +' + got + ' D' : '') }]);
-    leaveArcade();
+    }
 }
-async function arcadeFail() {
-    await talk([{ sys: 1, t: '더 이상 싸울 수 있는 봉제인형이 없다!' }, { sys: 1, t: '봉제인형들을 데리고 아케이드존에서 물러났다.\n도깨비 공방 수선소에서 고쳐 주세요.' }]);
-    leaveArcade();
-}
-function leaveArcade() {
-    const back = run && run.arc && run.arc.back;
-    close();
-    toPlazaRoom(back && back.room, back && back.x);
-}
-async function arcadeQuit() {
-    const i = await ask(null, '아케이드존을 나갈까요?\n오늘 쓴 횟수는 돌아오지 않습니다.', ['나간다', '더 둘러본다']);
-    if (i === 0) leaveArcade();
-}
+function arcadeQuit() { if (run && run.pt) run.pt.quit(); else close(); }
 
-function arcTriesUsed(cb) {
-    const u = u_(), d = db_();
-    if (!u || !d) return cb(0);
-    d.ref(ARC_USE + '/' + u.code).once('value').then(function (s) {
-        const v = s.val();
-        cb((v && v.d === D().today()) ? Math.max(0, Number(v.n) || 0) : 0);
-    }).catch(function () { cb(0); });
-}
-function arcUseOne() {
-    const u = u_(), d = db_();
-    if (!u || !d) return Promise.resolve(true);
-    const t = D().today();
-    return d.ref(ARC_USE + '/' + u.code).transaction(function (c) {
-        const n = (c && c.d === t) ? Math.max(0, Number(c.n) || 0) : 0;
-        if (n >= ARC_DAY) return;
-        return { d: t, n: n + 1 };
-    }).then(function (r) { return !!(r && r.committed); }).catch(function () { return false; });
-}
-function arcadeReady() {
-    const u = u_(), M = D();
-    if (!u || !M) return '로그인 전입니다.';
-    if (inDark()) return '어둠 탐사 중에는 들어갈 수 없습니다.';
-    if (quarantined()) return '격리 중에는 들어갈 수 없습니다.';
-    const ds = M.dolls(u);
-    const ok = M.withList(u).filter(function (id) { return M.hpOf(ds[id]) > 0; });
-    if (!ok.length) return '함께 갈 봉제인형이 없습니다.\n(동행 중이고 체력이 남은 인형이 하나는 있어야 합니다 — 도깨비 공방 보관소 · 수선소)';
-    return '';
-}
-window.dollArcadeOpen = function () {
-    const no = arcadeReady();
-    if (no) { alert_('🎪 매직버니 아케이드존\n\n' + no); return; }
-    arcTriesUsed(function (n) {
-        if (n >= ARC_DAY) { alert_('🎪 매직버니 아케이드존은 하루 ' + ARC_DAY + '번까지입니다.'); return; }
-        arcUseOne().then(function (ok) {
-            if (!ok) { alert_('🎪 오늘은 더 들어갈 수 없습니다.'); return; }
-            const pool = [7, 8, 9, 11, 12, 13].sort(function () { return Math.random() - 0.5; }).slice(0, 4);
-            const sc = SC.arcade;
-            const back = plazaWhere();
-            const arc = { wins: 0, back: back,
-                          mons: sc.mons.map(function (m, i) { return { i: pool[i], x: m.x, y: 333, face: 0 }; })
-                              .concat([{ i: 10, x: sc.boss.x, y: sc.boss.y, boss: 1 }]) };
-            open('arcade', 'spawn', { arc: arc });
-        });
+// ── 같이 온 사원 — 줄지어 따라온다
+function matesSync(dt) {
+    const PT = run.pt;
+    if (!PT) return;
+    run.mates = run.mates || {};
+    const order = PT.order(), me = PT.me();
+    Object.keys(run.mates).forEach(function (c) { if (order.indexOf(c) < 0) { try { run.mates[c].a && run.mates[c].a.stop && run.mates[c].a.stop(); } catch (e) { } run.mates[c].wrap.remove(); delete run.mates[c]; } });
+    order.forEach(function (c) {
+        if (c === me) return;
+        let m = run.mates[c];
+        const sp = run.spec || { W: 352, H: 384, FOOT: 32 };
+        if (!m) {
+            const usr = (typeof db !== 'undefined' && db.users && db.users[c]) || { code: c, name: PT.name(c) };
+            const wrap = document.createElement('div');
+            wrap.className = 'ds-act';
+            wrap.style.width = Math.round(sp.W * run.k) + 'px'; wrap.style.height = Math.round(sp.H * run.k) + 'px';
+            let a = null;
+            try { a = window.dotActor(usr, { scale: run.k, all: true }); wrap.appendChild(a.el); } catch (e) { }
+            const tag = document.createElement('div');
+            tag.className = 'ds-tag';
+            tag.style.cssText = 'left:50%;top:22%;';
+            tag.textContent = PT.name(c);
+            wrap.appendChild(tag);
+            run.world.appendChild(wrap);
+            m = run.mates[c] = { wrap: wrap, a: a, x: PT.posOf(c), face: -1, walking: false };
+        }
+        const tx = PT.posOf(c);
+        const dx = tx - m.x;
+        const moving = Math.abs(dx) > 1;
+        if (moving) { m.x += Math.sign(dx) * Math.min(Math.abs(dx), SPD * 1.25 * dt); const f = dx < 0 ? 1 : -1; if (f !== m.face) { m.face = f; try { m.a && m.a.face(f); } catch (e) { } } }
+        if (moving !== m.walking) { m.walking = moving; try { m.a && m.a.moving(moving); } catch (e) { } }
+        const Z = run.Z, w = sp.W * run.k, h = sp.H * run.k;
+        m.wrap.style.left = Math.round(m.x * Z - w / 2) + 'px';
+        m.wrap.style.top = Math.round(333 * Z - (h - sp.FOOT * run.k)) + 'px';
+        m.wrap.style.zIndex = String(1000 + 333 - 1);
     });
-};
-window.dollArcadeCard = function () {
-    const no = arcadeReady();
-    return '<div style="border:1px solid #6a3f6a; border-radius:8px; padding:11px; margin-bottom:10px; background:rgba(130,60,110,.12);">'
-        + '<div style="font-size:12px; color:#f0e2f0; font-weight:bold;">『 매직버니 아케이드존 』 <span style="font-size:10px; color:#ff9fd0;">🧸 봉제인형 동행</span></div>'
-        + '<div style="font-size:10px; color:#b898b8; margin-top:4px; line-height:1.6;">불 꺼진 아케이드. 시야가 좁다. 길에 괴담 넷, 무대 위에 보스.<br>동행 봉제인형(세 마리까지)이 싸운다 — 다친 인형은 도깨비 공방 수선소에서 고친다.<br>하루 ' + ARC_DAY + '번 · 끝까지 가면 💤 꿈결 ' + ARC_DREAM + ' D · 만난 괴담은 어둠 도감에 적힌다.</div>'
-        + (no ? '<div style="font-size:10px; color:#ff8f8f; margin-top:6px;">' + esc(no.split('\n')[0]) + '</div>' : '')
-        + '<button id="jr-arcade" class="game-btn" style="width:100%; margin:9px 0 0 0; padding:10px; font-size:11px;">들어간다</button></div>';
-};
+}
+// 방장이 아닌 사람 — 제 자리(방장 뒤)로 걸어간다
+function followLead() {
+    const PT = run.pt;
+    if (!PT || PT.lead() || run.busy || run.talkOn) return;
+    const tx = PT.posOf(PT.me());
+    if (Math.abs(tx - run.x) > 2) { const n = nearest(run.sc, tx, 333, true); if (!run.path.length || Math.abs(run.path[run.path.length - 1][0] - n.x) > 2) run.path = [[n.x, n.y]]; }
+}
 
 // ==========================================
 // 광장과 잇기
@@ -936,7 +869,7 @@ function toPlazaRoom(room, x) {
     try { if (typeof window.plazaOpen === 'function') { window.plazaOpen(); setTimeout(go, 700); } } catch (e) { }
 }
 function quit() {
-    if (run && run.key === 'arcade') { arcadeQuit(); return; }
+    if (run && run.pt) { run.pt.quit(); return; }
     if (run && run.tut && !(u_().dollTut || {}).done) {
         ask(null, '튜토리얼을 멈추고 나갈까요?\n다음에 도깨비 공방 앞에 오면 이어서 합니다.', ['나간다', '계속한다']).then(function (i) { if (i === 0) { close(); } });
         return;
@@ -982,10 +915,7 @@ function onEnter(key, opt) {
     if (key === 'wild' && !t.done && (t.step === 'go-wild' || t.step === 'wild-go')) { tutWild(); return; }
     if (key === 'gong' && !t.done && t.step === 'caught') { tutGong(); return; }
     if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(▶)에 먼저 들러 보세요.', 4500);
-    if (key === 'arcade') {
-        talk([{ sys: 1, t: '불 꺼진 아케이드. 어디선가 북소리가 들린다 — 둥, 둥.' },
-              { sys: 1, t: '시야가 좁습니다. 앞으로(→) 나아가면 괴담과 마주칩니다.\n무대 위의 것을 쓰러뜨리면 빠져나갈 수 있습니다.' }]);
-    }
+    if (key === 'arcade' && run.pt && !opt.resume) talk(run.pt.intro());
     if (key === 'gong' && t.done && !opt.quiet) sys('도깨비들을 누르면 이야기할 수 있습니다.', 3000);
 }
 
@@ -1205,9 +1135,38 @@ async function tutGong() {
 // ==========================================
 // 밖에 내놓는 것 — 공방 쪽(doll-gong.js)이 쓴다
 // ==========================================
+// 여정 판에서 부르는 것 (doll-party.js)
+function partySync() {
+    if (!run || !run.pt) return;
+    const ms = run.pt.mons();
+    Array.prototype.forEach.call(run.world.querySelectorAll('.ds-mon'), function (e) {
+        const m = ms[Number(e.dataset.i)];
+        if (m && m.dead && !e._gone) { e._gone = 1; e.style.opacity = '0'; e.style.transform = 'translateY(20%)'; setTimeout(function () { e.remove(); }, 600); }
+    });
+}
+function fightStart() { if (!run) return; run.busy = true; run.path = []; run.then = null; }
+function fightEnd(res, m) {
+    if (!run) return;
+    run.busy = false;
+    makeDoll();
+    partySync();
+    if (res === 'run' && run.pt && run.pt.lead()) {
+        const ms = run.pt.mons(), mm = ms[m];
+        const n = nearest(run.sc, Math.max(30, (mm ? mm.x : run.x) - 60), 333, true);
+        run.x = n.x; run.y = n.y; run.at = n;
+        run.pt.pushBack(run.x);
+        sys('물러섰다. 괴담은 아직 그 자리에 있다.');
+    } else if (res === 'win') {
+        const ms = run.pt ? run.pt.mons() : [];
+        sys('괴담이 흩어졌다. 길이 조금 더 열렸다. (' + ms.filter(function (x) { return x && x.dead; }).length + ' / ' + ms.length + ')');
+    }
+}
+function leave() { close(); toPlazaRoom(null, null); }
+
 const API = {
     talk: talk, ask: ask, sys: sys, flash: flash, sleep: sleep, run: function () { return run; },
-    open: open, close: close, makeDoll: makeDoll, npcJump: npcJump
+    open: open, close: close, makeDoll: makeDoll, npcJump: npcJump,
+    partySync: partySync, fightStart: fightStart, fightEnd: fightEnd, leave: leave
 };
 window.DOLLSCENE = API;
 window.dollRepaint = function () {

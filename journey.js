@@ -194,6 +194,9 @@ const JOURNEYS = {
     }
 };
 
+// 🧸 첫번째 여정의 글(들어설 때 · 이겼을 때)은 몬스터 출몰 여정(doll-party.js)이 그대로 쓴다 (2026-11-07)
+window.JOURNEY_J1 = JOURNEYS.j1;
+
 // ==========================================
 // 바탕
 // ==========================================
@@ -211,7 +214,7 @@ function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 function josa(w, k) { try { return P().josa(w, k); } catch (e) { return k; } }
 function ready() { return !!(window.PET && window.PETGEAR && window.PETTRAIT); }
 function inDark() { try { return !!(typeof darkRun !== 'undefined' && darkRun); } catch (e) { return false; } }
-function nickOf(code, key) { try { return P().nick(key, users()[code] || (u_() && u_().code === code ? u_() : {})); } catch (e) { return (P().BY[key] || {}).n || '펫'; } }
+function nickOf(code, key) { try { return P().nick(key, users()[code] || (u_() && u_().code === code ? u_() : {})); } catch (e) { return (P().BY[key] || {}).n || '인형'; } }
 
 // ==========================================
 // 하루 세 번
@@ -261,7 +264,7 @@ function build(code, key) {
     if (!u) return null;
     const st = G().stats(key, u);
     const sp = P().BY[key] || {};
-    const sk = SK[Number(key)] || SK[1];
+    const sk = SK[P().sp ? P().sp(key) : Number(key)] || SK[1];
     const gear = G().BY[st.gear] || null;
     return { code: code, name: u.name || code, key: String(key), sp: sp.n || '', nick: P().nick(key, u),
              hp: st.max, max: st.max, atk: st.atk, def: st.def, eva: st.eva, crit: st.crit, gim: st.gim,
@@ -415,10 +418,10 @@ function paint() {
         .filter(function (o) { return o && !o.run && o.members && Object.keys(o.members).length < 3 && now() - Number(o.at || 0) <= LOBBY_LIVE; })
         .sort(function (a, b) { return b.at - a.at; });
     const left = triesLeft();
-    const w = box(head('🐾 여정', '펫이 주인을 대신해 떠나는 어둠. 1~3명이 펫 하나씩. 주인은 바디캠으로 본다.<br>오늘 남은 횟수 <b style="color:#ffcf8f;">' + left + ' / ' + DAY_MAX + '</b> — 횟수를 늘리는 물건은 듣지 않습니다.')
+    const w = box(head('🐾 여정', '인형이 주인을 대신해 떠나는 어둠. 1~3명이 인형 하나씩. 주인은 바디캠으로 본다.<br>오늘 남은 횟수 <b style="color:#ffcf8f;">' + left + ' / ' + DAY_MAX + '</b> — 횟수를 늘리는 물건은 듣지 않습니다.')
         + '<div style="border:1px solid #4a3f6a; border-radius:8px; padding:11px; margin-bottom:10px; background:rgba(90,70,130,.10);">'
         + '<div style="font-size:12px; color:#e8e2f0; font-weight:bold;">『 ' + esc(J.n) + ' 』 <span style="font-size:10px; color:#c9a227;">' + J.g + ' 등급</span></div>'
-        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 펫은 멀쩡하고 한 시간 잔다. 주인은 삼십 분 가두리 — 그동안은 어떠한 행위로도 나올 수 없다 (기권해도 같다).<br>끝까지 가면 펫이 <b style="color:#ffcf8f;">20,000 P</b> 를 물고 온다 · 등급업 조각(D → C) 세 가지가 길에 놓여 있다 — '
+        + '<div style="font-size:10px; color:#9f98b8; margin-top:4px; line-height:1.6;">요괴 · 괴물 · 마수 · 마물 넷, 마지막은 보스. 동물마다 공격 3 · 방어 2, 낀 장비의 스킬 1.<br>지면 주인이 몸을 날려 대신 맞는다 — 인형은 멀쩡하고 한 시간 잔다. 주인은 삼십 분 가두리 — 그동안은 어떠한 행위로도 나올 수 없다 (기권해도 같다).<br>끝까지 가면 인형이 <b style="color:#ffcf8f;">20,000 P</b> 를 물고 온다 · 등급업 조각(D → C) 세 가지가 길에 놓여 있다 — '
         + ((G().SHARDS || {})[J.g] || []).map(function (x) { return '<span style="color:' + (G().shardHave(x.n, me) ? '#d4af37' : '#5f5878') + ';">' + esc(x.n.replace(/^🧩 /, '')) + '</span>'; }).join(' · ') + ' <span style="color:#7f7898;">(' + G().shardCount(J.g, me) + '/3)</span></div>'
         + '<div style="display:flex; gap:6px; margin-top:9px;">'
         + '<button id="jr-solo" class="game-btn" style="flex:1; margin:0; padding:10px; font-size:11px;' + (left ? '' : ' opacity:.4;') + '"' + (left ? '' : ' disabled') + '>혼자 떠난다</button>'
@@ -446,11 +449,11 @@ function pickPet(cb, lobby) {
     if (inDark()) { alert_('어둠 탐사 중에는 떠날 수 없습니다.'); return; }
     if (!triesLeft()) { alert_('오늘 여정은 ' + DAY_MAX + '번까지입니다.'); return; }
     const keys = myPets();
-    if (!keys.length) { alert_('보낼 수 있는 펫이 없습니다.\n(탐사 중 · 동행 중 · 다친 펫 · 여정 뒤 자는 펫은 못 갑니다)'); return; }
+    if (!keys.length) { alert_('보낼 수 있는 인형이 없습니다.\n(탐사 중 · 동행 중 · 다친 인형 · 여정 뒤 자는 인형은 못 갑니다)'); return; }
     const taken = takenIn(lobby);
     if (lobby && keys.every(function (k) { return !!taken[k]; })) { alert_('그 방에 이미 있는 동물뿐입니다.\n한 여정에는 같은 동물이 둘 못 갑니다.'); return; }
     view = 'pick';
-    const w = box(head('보낼 펫', '펫 하나가 떠납니다. 낀 장비의 스킬을 한 싸움에 한 번 씁니다.' + (lobby ? ' 방에 이미 있는 동물은 못 갑니다.' : ''))
+    const w = box(head('보낼 인형', '인형 하나가 떠납니다. 낀 장비의 스킬을 한 싸움에 한 번 씁니다.' + (lobby ? ' 방에 이미 있는 동물은 못 갑니다.' : ''))
         + '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:9px;">'
         + keys.map(function (k) {
             const st = G().stats(k, me), dup = !!taken[k];
@@ -530,7 +533,7 @@ function startRun(members, lobbyKey) {
     const pets = {}, order = [];
     for (let i = 0; i < members.length; i++) {
         const p = build(members[i].code, members[i].key);
-        if (!p) { alert_(members[i].code + ' 사원의 펫 기록을 못 읽었습니다.'); return; }
+        if (!p) { alert_(members[i].code + ' 사원의 인형 기록을 못 읽었습니다.'); return; }
         pets[p.code] = p; order.push(p.code);
     }
     const k = 'r' + Date.now() + Math.floor(Math.random() * 1000);
@@ -924,7 +927,7 @@ function endBox(o, lines) {
 window.journeyOpen = function () {
     const me = u_();
     if (!me) { alert_('로그인 뒤에 쓸 수 있습니다.'); return; }
-    if (!ready()) { alert_('펫 자료를 아직 못 읽었습니다. 잠시 뒤에 다시.'); return; }
+    if (!ready()) { alert_('인형 자료를 아직 못 읽었습니다. 잠시 뒤에 다시.'); return; }
     if (!db_()) { alert_('서버에 닿아야 할 수 있습니다.'); return; }
     watch();
     const r = myRun();

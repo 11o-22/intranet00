@@ -339,7 +339,7 @@ function sweep(quiet) {
 function buried(gone, quiet) {
     if (!gone || !gone.length) return;
     gone.forEach(function (g) {
-        log_('[펫] ' + g.n + P().josa(g.n, '이') + ' 사흘 동안 굶었습니다. (' + g.sp + ') 교감 ' + g.was + ' → ' + g.now);
+        log_('[인형] ' + g.n + P().josa(g.n, '이') + ' 사흘 동안 굶었습니다. (' + g.sp + ') 교감 ' + g.was + ' → ' + g.now);
     });
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     paint();
@@ -358,9 +358,9 @@ function buried(gone, quiet) {
 function touch(id, kind) {
     const u = u_();
     const sp = P().BY[id];
-    if (!u || !sp) return { ok: false, why: '그런 펫이 없습니다.' };
+    if (!u || !sp) return { ok: false, why: '그런 인형이 없습니다.' };
     const s = P().pets(u)[String(id)];
-    if (!s) return { ok: false, why: '아직 없는 펫입니다.' };
+    if (!s) return { ok: false, why: '아직 없는 인형입니다.' };
     if (s.out && s.out.till) return { ok: false, why: '탐사를 나가 있습니다.' };
 
     const pat = (kind === 'pat');
@@ -404,7 +404,7 @@ window.petBondOpen = function (id) {
     const sp = P().BY[id];
     if (!u || !sp) return;
     const s = P().pets(u)[String(id)];
-    if (!s) { alert_('아직 없는 펫입니다.'); return; }
+    if (!s) { alert_('아직 없는 인형입니다.'); return; }
 
     const now = P().now();
     const b = P().bond(id, u);
@@ -484,7 +484,7 @@ window.petBondOpen = function (id) {
             : '<div style="font-size:10px; color:#666; padding:4px 0 8px 0;">'
               + '가진 먹이가 없습니다. 사택에서 사 오십시오.</div>')
 
-        + '<button id="pb-list" class="game-btn" style="' + BTN + ' margin-top:6px;">🐶 펫 목록으로</button>'
+        + '<button id="pb-list" class="game-btn" style="' + BTN + ' margin-top:6px;">🧸 인형 목록으로</button>'
         + '<button id="pb-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');
 
     w.querySelector('#pb-x').onclick = shut;
@@ -555,7 +555,7 @@ function html() {
         + '</div>'
         + '<div class="pet-scene" id="pet-scene-line"></div>'
         + '<div style="font-size:9px; color:#5f594f; margin-top:6px; text-align:center;">'
-        + '방에는 ' + P().SHOW_MAX + '마리까지 — [🐶 펫] 칸에서 고릅니다'
+        + '방에는 ' + P().SHOW_MAX + '마리까지 — [🧸 인형] 칸에서 고릅니다'
         + (rest > 0 ? ' <span style="color:#4a443c;">· 나머지 ' + rest + '마리는 쉬는 중</span>' : '')
         + '</div>';
 }
@@ -649,14 +649,14 @@ window.petRoomPaint = paint;
         const _r = renderHouse;
         const w = function () {
             const out = _r.apply(this, arguments);
-            try { sweep(false); paint(); } catch (e) { console.warn('[펫]', e); }
+            try { sweep(false); paint(); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._petRoom = true;
         renderHouse = w;
         window.renderHouse = w;
         clearInterval(iv);
-        console.log('[펫] 내 방 칸 연결');
+        console.log('[인형] 내 방 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -675,9 +675,9 @@ window.petRoom = function () {
     const ps = P().pets(u);
     const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; });
     if (!keys.length) { console.log('  방이 비었습니다.'); return; }
-    console.log('  방에 내놓은 펫:', P().show(u).map(function (k) {
+    console.log('  방에 내놓은 인형:', P().show(u).map(function (k) {
         return P().nick(k, u);
-    }).join(' · ') || '-', '(최대 ' + P().SHOW_MAX + '마리 · [🐶 펫] 칸에서 고릅니다)');
+    }).join(' · ') || '-', '(최대 ' + P().SHOW_MAX + '마리 · [🧸 인형] 칸에서 고릅니다)');
     console.table(keys.map(function (k) {
         const s = ps[k];
         return { 번호: k, 이름: P().nick(k, u), 방: P().showHas(k, u) ? '🏠' : '',
@@ -692,6 +692,6 @@ window.petRoom = function () {
 
 try { style(); } catch (e) { }
 
-console.log('[펫] petRoom() · petPat(번호) · petPlay(번호)');
+console.log('[인형] petRoom() · petPat(번호) · petPlay(번호)');
 
 })();

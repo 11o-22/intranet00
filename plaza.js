@@ -378,7 +378,7 @@ const PLAZA = {
         // ⑤ 생활
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
-        { g: 'life',  n: '펫 돌보기',  i: '🐾', ic: 'pet',     fn: 'petOpen' },
+        { g: 'life',  n: '인형 돌보기',  i: '🧸', ic: 'pet',     fn: 'petOpen' },
         // 📸 포토존 — 장소 목록 → 1번 · 2번 방 (안에 있는 사람까지) → 누르면 그 방으로
         { g: 'life',  n: '포토존',     i: '📸', ic: 'camera',  sheet: 'photo' },
         // 🀄 마작 — 누구나 (2026-10-31 사용자 · 전에는 상담실 · 선녀탕 안에서만) · 3인 · 4인 (mj-ui.js)

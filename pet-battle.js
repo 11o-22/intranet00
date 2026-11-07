@@ -76,7 +76,7 @@ function now() { try { return P().now(); } catch (e) { return Date.now(); } }
 function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 function ready() { return !!(window.PET && window.PETRUNE && window.PETTRAIT); }
 function inDark() { try { return !!(typeof darkRun !== 'undefined' && darkRun); } catch (e) { return false; } }
-function nickOf(u, key) { try { return P().nick(key, u); } catch (e) { return (P().BY[key] || {}).n || '펫'; } }
+function nickOf(u, key) { try { return P().nick(key, u); } catch (e) { return (P().BY[key] || {}).n || '인형'; } }
 function speciesOf(key) { return (P().BY[key] || {}).n || ''; }
 function skillOf(key) { return T().skill(key) || { n: '몸통 박치기', t: '근력' }; }
 function tagR(n) { return R().tag(n); }
@@ -117,7 +117,7 @@ function petCard(u, key, label) {
 }
 function stakeText(s) {
     if (!s || !s.n) return '<span style="color:#6f685e;">없음</span>';
-    const kindName = { food: '먹이', care: '돌봄 물품', gear: '펫 장비', rune: '룬' }[s.k] || '';
+    const kindName = { food: '먹이', care: '돌봄 물품', gear: '인형 장비', rune: '룬' }[s.k] || '';
     return esc(s.k === 'rune' ? tagR(s.n) + ' 룬' : s.n) + (kindName ? ' <span style="color:#6f685e;">(' + kindName + ')</span>' : '');
 }
 function hpBar(label, hp, mine) {
@@ -220,8 +220,8 @@ function watch() {
         const v = s.val() || {};
         Object.keys(live).forEach(function (k) { delete live[k]; });
         Object.keys(v).forEach(function (k) { live[k] = v[k]; });
-        try { tick(); } catch (e) { console.warn('[펫 배틀]', e); }
-        hooks.forEach(function (fn) { try { fn(live); } catch (e) { console.warn('[펫 배틀] 듣는 쪽', e); } });   // pet-arena.js 가 듣는다
+        try { tick(); } catch (e) { console.warn('[인형 배틀]', e); }
+        hooks.forEach(function (fn) { try { fn(live); } catch (e) { console.warn('[인형 배틀] 듣는 쪽', e); } });   // pet-arena.js 가 듣는다
     });
 }
 const hooks = [];
@@ -250,7 +250,7 @@ function tx(key, fn) { const r = ref(); return r ? r.child(key).transaction(fn) 
         const _o = openEmpDetailModal;
         const w = function (code) {
             const r = _o.apply(this, arguments);
-            setTimeout(function () { try { empBtn(code); } catch (e) { console.warn('[펫 배틀]', e); } }, 140);
+            setTimeout(function () { try { empBtn(code); } catch (e) { console.warn('[인형 배틀]', e); } }, 140);
             return r;
         };
         Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
@@ -258,7 +258,7 @@ function tx(key, fn) { const r = ref(); return r ? r.child(key).transaction(fn) 
         openEmpDetailModal = w;
         try { window.openEmpDetailModal = w; } catch (e) { }
         clearInterval(iv);
-        console.log('[펫 배틀] 사원 열람에 결투 단추 연결');
+        console.log('[인형 배틀] 사원 열람에 결투 단추 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -278,8 +278,8 @@ function empBtn(code) {
     d.id = 'petbt-emp-box';
     d.style.cssText = 'background:rgba(255,183,77,0.05); border:1px solid #4a3a26; border-radius:6px; padding:9px 11px; margin-top:10px;';
     d.innerHTML = '<div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">'
-        + '<div style="min-width:0;"><div style="font-size:11px; color:#ffcf8f; font-weight:bold;">⚔ 펫 배틀</div>'
-        + '<div style="font-size:9.5px; color:#6f685e;">펫 ' + theirs + '마리 · 펫에 관한 것을 서로 걸고 붙는다</div></div>'
+        + '<div style="min-width:0;"><div style="font-size:11px; color:#ffcf8f; font-weight:bold;">⚔ 인형 배틀</div>'
+        + '<div style="font-size:9.5px; color:#6f685e;">인형 ' + theirs + '마리 · 인형에 관한 것을 서로 걸고 붙는다</div></div>'
         + '<button class="game-btn" id="petbt-ask" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;">결투 신청</button></div>';
     const adopt = document.getElementById('adopt-emp-box');
     if (adopt && adopt.parentNode === host) adopt.insertAdjacentElement('afterend', d); else host.appendChild(d);
@@ -293,23 +293,23 @@ function askStart(code) {
     if (!db_()) { alert_('서버에 닿아야 할 수 있습니다.'); return; }
     if (inDark()) { alert_('어둠 탐사 중에는 할 수 없습니다.'); return; }
     if (mineLive()) { alert_('이미 걸려 있는 결투가 있습니다.'); return; }
-    if (!myPets().length) { alert_('내보낼 펫이 없습니다.'); return; }
-    if (!myStakes().length) { alert_('걸 것이 없습니다.\n\n먹이 · 돌봄 물품 · 펫 장비 · 룬 가운데 하나는 있어야 합니다.'); return; }
-    const w = box(head('⚔ 펫 배틀', '<b style="color:#ffcf8f;">' + esc(o.name) + '</b> 사원의 펫에게 결투를 신청합니다.<br><br>'
-        + '내 펫 하나를 내보내고, 펫에 관한 것 하나를 겁니다. 상대도 펫 하나와 걸 것을 정해 받으면 붙습니다.<br>'
-        + '다치는 것은 펫이 아니라 <b>주인</b>입니다 — 지면 건 것을 잃고 가두리에 한 시간 갇힙니다.')
+    if (!myPets().length) { alert_('내보낼 인형이 없습니다.'); return; }
+    if (!myStakes().length) { alert_('걸 것이 없습니다.\n\n먹이 · 돌봄 물품 · 인형 장비 · 룬 가운데 하나는 있어야 합니다.'); return; }
+    const w = box(head('⚔ 인형 배틀', '<b style="color:#ffcf8f;">' + esc(o.name) + '</b> 사원의 인형에게 결투를 신청합니다.<br><br>'
+        + '내 인형 하나를 내보내고, 인형에 관한 것 하나를 겁니다. 상대도 인형 하나와 걸 것을 정해 받으면 붙습니다.<br>'
+        + '다치는 것은 인형이 아니라 <b>주인</b>입니다 — 지면 건 것을 잃고 가두리에 한 시간 갇힙니다.')
         + '<button id="bt-ok" class="game-btn" style="' + BTN + '">신청한다</button>'
         + '<button id="bt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
     w.querySelector('#bt-no').onclick = shut;
-    w.querySelector('#bt-ok').onclick = function () { pickPet(function (pet) { pickStake(function (stake) { sendAsk(code, pet, stake); }, '내가 거는 것'); }, '내보낼 펫'); };
+    w.querySelector('#bt-ok').onclick = function () { pickPet(function (pet) { pickStake(function (stake) { sendAsk(code, pet, stake); }, '내가 거는 것'); }, '내보낼 인형'); };
 }
 
 // 내 펫 고르기 → cb(번호)
 function pickPet(cb, title) {
     const me = u_();
     const keys = myPets(me);
-    if (!keys.length) { alert_('내보낼 펫이 없습니다. (탐사 중 · 동행 중인 펫은 못 나갑니다)'); return; }
-    const w = box(head(title || '펫 고르기', '지금 집에 있는 펫만 나갈 수 있습니다. 펫은 다치지 않습니다.')
+    if (!keys.length) { alert_('내보낼 인형이 없습니다. (탐사 중 · 동행 중인 인형은 못 나갑니다)'); return; }
+    const w = box(head(title || '인형 고르기', '지금 집에 있는 인형만 나갈 수 있습니다. 인형은 다치지 않습니다.')
         + '<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:9px;">'
         + keys.map(function (k) {
             const sk = skillOf(k), fed = R().fed(k, me);
@@ -327,8 +327,8 @@ function pickStake(cb, title) {
     const me = u_();
     const list = myStakes(me);
     if (!list.length) { alert_('걸 것이 없습니다.'); return; }
-    const kindName = { food: '먹이', care: '돌봄 물품', gear: '펫 장비', rune: '룬' };
-    const w = box(head(title || '걸 것 고르기', '펫에 관한 것만 걸 수 있습니다 — 먹이 · 돌봄 물품 · 펫 장비 · 룬. 하나씩입니다.')
+    const kindName = { food: '먹이', care: '돌봄 물품', gear: '인형 장비', rune: '룬' };
+    const w = box(head(title || '걸 것 고르기', '인형에 관한 것만 걸 수 있습니다 — 먹이 · 돌봄 물품 · 인형 장비 · 룬. 하나씩입니다.')
         + '<div style="max-height:46dvh; overflow-y:auto; margin-bottom:9px;">'
         + list.map(function (s, i) {
             return '<button class="game-btn bt-st" data-i="' + i + '" style="width:100%; margin:0 0 5px 0; padding:9px; font-size:11px; text-align:left; display:flex; justify-content:space-between; gap:8px;">'
@@ -351,7 +351,7 @@ function sendAsk(code, pet, stake) {
         a: { code: me.code, name: me.name, pet: String(pet), stake: stake },
         b: { code: o.code, name: o.name }
     });
-    log_('[펫 배틀] ' + o.name + ' 사원의 펫에게 결투를 신청했습니다. (' + nickOf(me, pet) + ' · 건 것: ' + (stake.k === 'rune' ? tagR(stake.n) + ' 룬' : stake.n) + ')');
+    log_('[인형 배틀] ' + o.name + ' 사원의 인형에게 결투를 신청했습니다. (' + nickOf(me, pet) + ' · 건 것: ' + (stake.k === 'rune' ? tagR(stake.n) + ' 룬' : stake.n) + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
 }
 
@@ -372,7 +372,7 @@ function tick() {
             const o2 = live[lastKey];
             if (o2 && o2.stage === 'no' && document.getElementById(MOD)) {
                 shut();
-                alert_('⚔ 펫 배틀\n\n' + (o2.why === 'refuse' ? '상대가 거절했습니다.' : o2.why === 'expire' ? '시간이 지나 없던 일이 됐습니다.' : '결투가 거둬졌습니다.'));
+                alert_('⚔ 인형 배틀\n\n' + (o2.why === 'refuse' ? '상대가 거절했습니다.' : o2.why === 'expire' ? '시간이 지나 없던 일이 됐습니다.' : '결투가 거둬졌습니다.'));
             }
         }
         lastKey = ''; shownTag = '';
@@ -400,8 +400,8 @@ function waitView(o, why) {
     const me = u_();
     const side = sideOf(o, me.code);
     const mine = o[side], theirs = o[other(side)];
-    const w = box(head('⚔ 펫 배틀 — 기다리는 중', esc(why) + '…')
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 펫') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
+    const w = box(head('⚔ 인형 배틀 — 기다리는 중', esc(why) + '…')
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:9px;">내가 건 것 — ' + stakeText(mine.stake) + '<br>상대가 건 것 — ' + stakeText(theirs.stake) + '</div>'
         + '<button id="bt-x" class="game-btn" style="' + BTN + GREY + '">창을 닫는다 (결투는 그대로)</button>'
         + '<button id="bt-cancel" class="game-btn" style="' + BTN + RED + '">결투를 거둔다</button>');
@@ -418,11 +418,11 @@ function askView(o) {
     const me = u_();
     const a = o.a, ou = userOf(a.code) || { name: a.name };
     const w = box(head('⚔ 결투 신청이 들어왔습니다',
-        '<b style="color:#ffcf8f;">' + esc(a.name) + '</b> 사원이 당신의 펫에게 결투를 신청했습니다.<br>'
-        + '다치는 것은 펫이 아니라 <b>주인</b>입니다. 지면 건 것을 잃고 가두리에 한 시간 갇힙니다. 펫은 멀쩡합니다.')
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(ou, a.pet, a.name + ' 사원의 펫') + '</div>'
+        '<b style="color:#ffcf8f;">' + esc(a.name) + '</b> 사원이 당신의 인형에게 결투를 신청했습니다.<br>'
+        + '다치는 것은 인형이 아니라 <b>주인</b>입니다. 지면 건 것을 잃고 가두리에 한 시간 갇힙니다. 인형은 멀쩡합니다.')
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(ou, a.pet, a.name + ' 사원의 인형') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:11px;">상대가 건 것 — ' + stakeText(a.stake) + '</div>'
-        + '<button id="bt-ok" class="game-btn" style="' + BTN + '">받는다 — 내 펫과 걸 것을 고른다</button>'
+        + '<button id="bt-ok" class="game-btn" style="' + BTN + '">받는다 — 내 인형과 걸 것을 고른다</button>'
         + '<button id="bt-no" class="game-btn" style="' + BTN + GREY + '">거절한다</button>', true);
     w.querySelector('#bt-no').onclick = function () {
         save(o._k, { stage: 'no', why: 'refuse', endAt: Date.now() });
@@ -431,8 +431,8 @@ function askView(o) {
     };
     w.querySelector('#bt-ok').onclick = function () {
         if (inDark()) { alert_('어둠 탐사 중에는 할 수 없습니다.'); return; }
-        if (!myPets().length) { alert_('내보낼 펫이 없습니다.'); return; }
-        if (!myStakes().length) { alert_('걸 것이 없습니다.\n\n먹이 · 돌봄 물품 · 펫 장비 · 룬 가운데 하나는 있어야 합니다.'); return; }
+        if (!myPets().length) { alert_('내보낼 인형이 없습니다.'); return; }
+        if (!myStakes().length) { alert_('걸 것이 없습니다.\n\n먹이 · 돌봄 물품 · 인형 장비 · 룬 가운데 하나는 있어야 합니다.'); return; }
         pickPet(function (pet) {
             pickStake(function (stake) {
                 shut(); shownTag = '';
@@ -446,7 +446,7 @@ function askView(o) {
                     if (!r || !r.committed) { alert_('신청이 이미 거둬졌습니다.'); return; }
                 });
             }, '내가 거는 것');
-        }, '내보낼 펫');
+        }, '내보낼 인형');
     };
 }
 
@@ -455,8 +455,8 @@ function stakeView(o) {
     const me = u_();
     const b = o.b, ou = userOf(b.code) || { name: b.name };
     const w = box(head('⚔ 상대가 받았습니다',
-        '<b style="color:#ffcf8f;">' + esc(b.name) + '</b> 사원이 펫과 걸 것을 정했습니다. 이대로 붙겠습니까.')
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, o.a.pet, '내 펫') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(ou, b.pet, b.name + ' 사원의 펫') + '</div>'
+        '<b style="color:#ffcf8f;">' + esc(b.name) + '</b> 사원이 인형과 걸 것을 정했습니다. 이대로 붙겠습니까.')
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, o.a.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(ou, b.pet, b.name + ' 사원의 인형') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:11px;">내가 건 것 — ' + stakeText(o.a.stake) + '<br>상대가 건 것 — ' + stakeText(b.stake) + '</div>'
         + '<button id="bt-ok" class="game-btn" style="' + BTN + '">이대로 붙는다</button>'
         + '<button id="bt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>', true);
@@ -483,9 +483,9 @@ function prepView(o) {
     const fed = R().fed(mine.pet, me);
     const iAm = !!mine.ready, they = !!theirs.ready;
     const w = box(head('⚔ 준비 — 룬을 먹입니다',
-        '내 펫에게 룬을 ' + R().FED_MAX + '개까지 먹일 수 있습니다. 상대는 내가 무엇을 먹였는지 모릅니다.<br>'
+        '내 인형에게 룬을 ' + R().FED_MAX + '개까지 먹일 수 있습니다. 상대는 내가 무엇을 먹였는지 모릅니다.<br>'
         + '공격은 먹인 룬이나 스킬로, 방어는 먹인 룬으로 합니다. 룬이 없으면 스킬로만 치고 그냥 버팁니다.')
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 펫') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
         + '<div style="font-size:10.5px; color:#b8ac97; margin-bottom:6px;">내가 건 것 — ' + stakeText(mine.stake) + '<br>상대가 건 것 — ' + stakeText(theirs.stake) + '</div>'
         + '<div style="font-size:11px; color:#c9a227; margin-bottom:9px;">먹인 룬: ' + (fed.length ? fed.map(tagR).map(esc).join(' · ') : '<span style="color:#6f685e;">없음</span>') + ' <span style="color:#6f685e;">(' + fed.length + '/' + R().FED_MAX + ')</span>'
         + ' · 스킬: ' + esc(skillOf(mine.pet).n) + '</div>'
@@ -497,7 +497,7 @@ function prepView(o) {
     w.querySelector('#bt-no').onclick = function () {
         save(o._k, { stage: 'no', why: 'cancel', endAt: Date.now() });
         shut();
-        alert_('결투를 거뒀습니다. 먹인 룬은 펫에게 그대로 남아 있습니다.');
+        alert_('결투를 거뒀습니다. 먹인 룬은 인형에게 그대로 남아 있습니다.');
     };
     const fb = w.querySelector('#bt-feed');
     if (fb) fb.onclick = function () { shut(); window.petRuneFeedOpen(mine.pet, function () { shownTag = ''; tick(); }); };
@@ -564,8 +564,8 @@ function fightView(o) {
     const logs = logArr(o).slice(-8);
     const late = oppPicked === false && picked && (Date.now() - Number(o.roundAt || o.at || 0)) > PICK_WAIT;
 
-    const w = box(head('⚔ 펫 배틀 — ' + (o.round || 1) + '판', esc(mine.name) + ' vs ' + esc(theirs.name) + ' · 먼저 치는 쪽: ' + (o.first === side ? '나' : '상대'))
-        + '<div style="display:flex; gap:8px; margin-bottom:8px;">' + petCard(me, mine.pet, '내 펫') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
+    const w = box(head('⚔ 인형 배틀 — ' + (o.round || 1) + '판', esc(mine.name) + ' vs ' + esc(theirs.name) + ' · 먼저 치는 쪽: ' + (o.first === side ? '나' : '상대'))
+        + '<div style="display:flex; gap:8px; margin-bottom:8px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
         + hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false)
         + '<div style="font-size:10.5px; line-height:1.7; background:rgba(0,0,0,0.35); border:1px solid #2a241c; border-radius:6px; padding:7px 9px; margin:8px 0; min-height:36px;">'
         + (logs.length ? logs.map(function (l) { return lineOf(o, l, side); }).join('') : '<span style="color:#6f685e;">공격과 방어를 하나씩 고르면 판이 풀립니다.</span>') + '</div>'
@@ -696,10 +696,10 @@ function settle(o, side) {
     try { R().clear(mine.pet); } catch (e) { }
     if (won) {
         giveStake(stakeTheirs);
-        log_('[펫 배틀] ' + theirs.name + ' 사원과의 결투에서 이겼습니다 — ' + nm + ' · 받은 것: ' + sname(stakeTheirs));
+        log_('[인형 배틀] ' + theirs.name + ' 사원과의 결투에서 이겼습니다 — ' + nm + ' · 받은 것: ' + sname(stakeTheirs));
     } else {
         takeStake(stakeMine);
-        log_('[펫 배틀] ' + theirs.name + ' 사원과의 결투에서 졌습니다 — ' + nm + ' · 잃은 것: ' + sname(stakeMine) + ' · 가두리 한 시간');
+        log_('[인형 배틀] ' + theirs.name + ' 사원과의 결투에서 졌습니다 — ' + nm + ' · 잃은 것: ' + sname(stakeMine) + ' · 가두리 한 시간');
         cage(me);
     }
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
@@ -707,8 +707,8 @@ function settle(o, side) {
     save(o._k, patch).then(function () { delete settling[o._k]; }).catch(function () { delete settling[o._k]; });
     try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
     shut(); shownTag = '';
-    const w = box(head('⚔ 펫 배틀 — ' + (won ? '이겼습니다' : '졌습니다'), esc(why))
-        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 펫') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
+    const w = box(head('⚔ 인형 배틀 — ' + (won ? '이겼습니다' : '졌습니다'), esc(why))
+        + '<div style="display:flex; gap:8px; margin-bottom:9px;">' + petCard(me, mine.pet, '내 인형') + '<div style="align-self:center; color:#8d8578; font-size:12px;">vs</div>' + petCard(userOf(theirs.code) || {}, theirs.pet, theirs.name + ' 사원') + '</div>'
         + hpBar('내 체력 (주인)', mine.hp, true) + hpBar(theirs.name + ' 사원 체력', theirs.hp, false)
         + '<div style="font-size:11px; color:#e8d7b4; line-height:1.7; margin:9px 0;">'
         + (won ? '받은 것 — <b style="color:#ffcf8f;">' + esc(sname(stakeTheirs)) + '</b>'
@@ -769,13 +769,13 @@ window.PETBATTLE = {
 
 window.petBattleState = function () {
     const me = u_();
-    console.log('%c===== ⚔ 펫 배틀 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== ⚔ 인형 배틀 =====', 'color:#ffb74d; font-size:13px');
     const rows = Object.keys(live).map(function (k) {
         const o = live[k];
         return { 열쇠: k, 단계: o.stage, 신청: o.a && o.a.name, 받음: o.b && o.b.name, 판: o.round || '-', 'a 체력': o.a && o.a.hp, 'b 체력': o.b && o.b.hp, 승자: o.winner ? (o[o.winner] || {}).name : '-', 때: new Date(Number(o.at) || 0).toLocaleTimeString() };
     });
     if (rows.length) console.table(rows); else console.log('  걸려 있는 배틀이 없습니다.');
-    if (me) console.log('  내 펫:', myPets(me).join(', ') || '없음', '· 걸 수 있는 것:', myStakes(me).length + '가지');
+    if (me) console.log('  내 인형:', myPets(me).join(', ') || '없음', '· 걸 수 있는 것:', myStakes(me).length + '가지');
 };
 window.petBattleClear = function () {
     const me = u_(), r = ref();
@@ -785,6 +785,6 @@ window.petBattleClear = function () {
     console.log('%c✓ 끝난 글 ' + n + '개를 치웠습니다.', 'color:#4CAF50');
 };
 
-console.log('[펫 배틀] petBattleState()');
+console.log('[인형 배틀] petBattleState()');
 
 })();

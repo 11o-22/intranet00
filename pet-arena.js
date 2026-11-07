@@ -24,7 +24,7 @@
 (function petArena() {
 
 const KEEP_AFTER = 4500;          // 끝난 뒤 이만큼 더 세워 둔다
-const PET_FRAC = 0.42;            // 펫 키 — 주인 키의 몫
+const PET_FRAC = 0.42;            // 인형 키 — 주인 키의 몫
 const FLY_MS = 380, BACK_MS = 380;
 const POP_MS = 2300;
 
@@ -38,7 +38,7 @@ function T() { return window.PETTRAIT; }
 function B() { return window.PETBATTLE; }
 function userOf(code) { try { return (db && db.users && db.users[code]) || null; } catch (e) { return null; } }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-function nickOf(code, key) { try { return P().nick(key, userOf(code) || {}); } catch (e) { return (P().BY[key] || {}).n || '펫'; } }
+function nickOf(code, key) { try { return P().nick(key, userOf(code) || {}); } catch (e) { return (P().BY[key] || {}).n || '인형'; } }
 function josa(w, k) { try { return P().josa(w, k); } catch (e) { return k; } }
 function oneOf(code) { try { return (typeof window.plazaOneOf === 'function') ? window.plazaOneOf(code) : null; } catch (e) { return null; } }
 function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -184,7 +184,7 @@ function onLive(live) {
                 const att = o[l.who] || {}, def = o[B_.other(l.who)] || {};
                 if (l.atk === 'skill') popup(o, l);                    // 팝업은 떠 있는 채로 다음 연출로 넘어간다
                 return fly(att.code, def.code, l).then(function () { return wait(250); });
-            }).catch(function (e) { console.warn('[펫 배틀 연출]', e); });
+            }).catch(function (e) { console.warn('[인형 배틀 연출]', e); });
         });
     });
     // 끝난 글은 잊는다
@@ -201,8 +201,8 @@ function onLive(live) {
 })();
 
 window.petArenaState = function () {
-    console.log('%c===== ⚔ 펫 배틀 — 광장 연출 =====', 'color:#ffb74d; font-size:13px');
-    console.log('  세워 둔 펫:', Object.keys(pets).map(function (c) { return c + ' → ' + pets[c].pet; }).join(', ') || '없음');
+    console.log('%c===== ⚔ 인형 배틀 — 광장 연출 =====', 'color:#ffb74d; font-size:13px');
+    console.log('  세워 둔 인형:', Object.keys(pets).map(function (c) { return c + ' → ' + pets[c].pet; }).join(', ') || '없음');
     console.log('  본 기록:', JSON.stringify(seen));
 };
 

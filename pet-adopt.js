@@ -72,7 +72,7 @@
 const GAP = 3 * 24 * 3600 * 1000;      // 보내는 쪽 사흘
 const NEED_BASE = 100;                 // 기본으로 채워야 하는 마음
 const SAY_MAX = 5;                     // 말은 다섯 번까지
-const RETRY = 24 * 3600 * 1000;        // 틀어진 뒤 그 펫에게 다시 해 볼 때까지
+const RETRY = 24 * 3600 * 1000;        // 틀어진 뒤 그 인형에게 다시 해 볼 때까지
 const LIVE = 6 * 3600 * 1000;          // 이보다 묵은 글은 치운다
 const MOD = 'pet-adopt-modal';
 
@@ -131,7 +131,7 @@ function petOf(u, key) {
     try { return P().pets(u)[String(key)] || null; } catch (e) { return null; }
 }
 function nickOf(u, key) {
-    try { return P().nick(key, u); } catch (e) { return (P().BY[key] || {}).n || '펫'; }
+    try { return P().nick(key, u); } catch (e) { return (P().BY[key] || {}).n || '인형'; }
 }
 function bondOf(u, key) {
     try { return P().bond(key, u); } catch (e) { return 0; }
@@ -266,11 +266,16 @@ function save(key, patch) {
 // ==========================================
 // ① 보내기 — 주인이 고른다
 // ==========================================
+// ★ 입양은 도깨비 공방 교환소(1:1)로 바뀌었다 (2026-11-07 사용자 · 기획안 「기존 펫 입양 시스템을 폐지」)
+//   보내기 · 신청은 막고 교환소로 안내한다. 이미 걸려 있던 입양은 그대로 끝까지 간다.
+const ADOPT_OFF = true;
+function adoptOff() { alert_('🔁 입양은 도깨비 공방 교환소로 바뀌었습니다.\n\n서로 한 마리씩 올려 1 : 1 로 바꿉니다.\n(광장 → 재난관리국 앞 「도깨비 공방」 → 교환소 도깨비)'); }
 window.petAdoptSend = function (id) {
+    if (ADOPT_OFF) { adoptOff(); return; }
     const me = u_();
     if (!me) return;
     const key = String(id);
-    if (!petOf(me, key)) { alert_('아직 없는 펫입니다.'); return; }
+    if (!petOf(me, key)) { alert_('아직 없는 인형입니다.'); return; }
     if (!db_()) { alert_('서버에 닿아야 할 수 있습니다.'); return; }
 
     const left = giveLeft(me);
@@ -346,11 +351,12 @@ function confirmSend(key, to) {
 // ② 신청 — 사원 열람 맨 밑
 // ==========================================
 window.petAdoptAsk = function (ownerCode, petKey) {
+    if (ADOPT_OFF) { adoptOff(); return; }
     const me = u_();
     const o = userOf(ownerCode);
     if (!me || !o) return;
     if (!db_()) { alert_('서버에 닿아야 할 수 있습니다.'); return; }
-    if (ownerCode === me.code) { alert_('제 펫입니다.'); return; }
+    if (ownerCode === me.code) { alert_('제 인형입니다.'); return; }
     const nm = nickOf(o, petKey);
 
     const w = box(head(nm + josa(nm, '을') + ' 입양 신청합니다',
@@ -394,7 +400,7 @@ function empPets(code) {
         };
         openEmpDetailModal._adopt = true;
         clearInterval(iv);
-        console.log('[입양] 사원 열람에 펫 칸 연결');
+        console.log('[입양] 사원 열람에 인형 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -420,7 +426,7 @@ function empRow(code) {
             + '<div style="flex:1; min-width:0;">'
             + '<div style="font-size:11px; color:#e8d7b4;">' + esc(nm) + '</div>'
             + '<div style="font-size:9.5px; color:#6f685e;">' + esc(sp) + '</div></div>'
-            + (own ? '' : '<button class="game-btn adopt-ask" data-k="' + esc(k) + '"'
+            + ((own || ADOPT_OFF) ? '' : '<button class="game-btn adopt-ask" data-k="' + esc(k) + '"'
                 + ' style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;">입양 신청</button>')
             + '</div>';
     }).join('');
@@ -429,7 +435,7 @@ function empRow(code) {
     d.id = 'adopt-emp-box';
     d.style.cssText = 'background:rgba(255,207,143,0.05); border:1px solid #4a3a26;'
         + ' border-radius:6px; padding:9px 11px; margin-top:12px;';
-    d.innerHTML = '<div style="font-size:11px; color:#ffcf8f; font-weight:bold;">🐾 사택 방의 펫</div>'
+    d.innerHTML = '<div style="font-size:11px; color:#ffcf8f; font-weight:bold;">🐾 사택 방의 인형</div>'
         + html;
     host.appendChild(d);
     Array.prototype.forEach.call(d.querySelectorAll('.adopt-ask'), function (b) {
@@ -533,7 +539,7 @@ function appealView(o) {
     const me = u_();
     const owner = userOf(o.owner);
     if (!me) return;
-    const nm = (owner ? nickOf(owner, o.pet) : (P().BY[o.pet] || {}).n) || '펫';
+    const nm = (owner ? nickOf(owner, o.pet) : (P().BY[o.pet] || {}).n) || '인형';
     const need = Number(o.need) || NEED_BASE;
     const kind = kindOf(o.pet);
     const st = { score: Number(o.score) || 0, used: Object.assign({}, o.used || {}),
@@ -638,6 +644,8 @@ function win(o, nm) {
     if (!me) return;
     const key = String(o.pet);
     const src = owner ? petOf(owner, key) : null;
+    // ★ 같은 동물을 이미 기르고 있어도 받는다 — 내 쪽 빈 열쇠로 (2026-11-07)
+    const dst = (P().newKey ? P().newKey(key, me) : key);
     const pet = Object.assign({}, src || { g: 'D' }, {
         at: Date.now(), fedAt: Date.now(), bond: 0, bd: null,
         pat: 0, play: 0, with: 0, out: 0, rest: 0,
@@ -651,11 +659,11 @@ function win(o, nm) {
     up['users/' + o.owner + '/pets/' + key] = null;
     up['users/' + o.owner + '/petGaveAt'] = Date.now();
     if (show) up['users/' + o.owner + '/petShow'] = show;
-    up['users/' + me.code + '/pets/' + key] = pet;
+    up['users/' + me.code + '/pets/' + dst] = pet;
     if (db_()) { try { db_().ref('/').update(up); } catch (e) { console.warn('[입양]', e); } }
 
     // 내 화면도 바로 맞춘다
-    try { P().pets(me)[key] = pet; } catch (e) { }
+    try { P().pets(me)[dst] = pet; } catch (e) { }
     if (owner) { try { delete P().pets(owner)[key]; } catch (e) { } }
     try { if (typeof addHistoryLog === 'function') {
         addHistoryLog(me, '[입양] ' + o.ownerName + ' 사원에게서 ' + nm + josa(nm, '을') + ' 데려왔습니다.');
@@ -667,7 +675,7 @@ function win(o, nm) {
     save(o._k, { stage: 'done', score: Number(o.need) || NEED_BASE });
 
     const w = box(head(nm + josa(nm, '이') + ' 따라왔습니다',
-        '마음을 얻었습니다. 이제 ' + esc(nm) + josa(nm, '은') + ' 당신의 펫입니다.<br>'
+        '마음을 얻었습니다. 이제 ' + esc(nm) + josa(nm, '은') + ' 당신의 인형입니다.<br>'
         + '<b>이름을 한 번 새로 붙일 수 있습니다.</b> 그 뒤로는 상담사의 개명권이 있어야 합니다.')
         + '<div style="text-align:center; margin-bottom:10px;">'
         + '<img src="' + P().img(key) + '" alt="" style="max-width:100%; max-height:170px;"></div>'
@@ -724,7 +732,7 @@ setInterval(function () {
 // ==========================================
 window.petAdoptState = function () {
     const me = u_();
-    console.log('%c===== 펫 입양 =====', 'color:#ffcf8f; font-size:13px');
+    console.log('%c===== 인형 입양 =====', 'color:#ffcf8f; font-size:13px');
     if (!me) { console.log('  로그인 후에 쓰세요.'); return; }
     const l = giveLeft(me);
     console.log('  보내기 : ' + (l > 0 ? (leftText(l) + ' 뒤에 됩니다') : '지금 됩니다')
@@ -738,13 +746,13 @@ window.petAdoptState = function () {
         const o = live[k];
         if (!o) return;
         rows.push({ 갈래: o.k === 'give' ? '보내기' : '신청', 주인: o.ownerName, 상대: o.otherName,
-                    펫: o.pet, 단계: o.stage, 마음: (o.score || 0) + ' / ' + (o.need || '?'),
+                    인형: o.pet, 단계: o.stage, 마음: (o.score || 0) + ' / ' + (o.need || '?'),
                     때: new Date(Number(o.at) || 0).toLocaleTimeString() });
     });
     if (rows.length) console.table(rows); else console.log('  걸려 있는 입양이 없습니다.');
     const ps = (function () { try { return P().pets(me); } catch (e) { return {}; } })();
     const mine2 = Object.keys(ps).map(function (k) {
-        return { 펫: nickOf(me, k), 교감: bondOf(me, k),
+        return { 인형: nickOf(me, k), 교감: bondOf(me, k),
                  '이름 붙일 수 있나': canName(me, k) ? 'O' : '✗' };
     });
     if (mine2.length) console.table(mine2);
@@ -759,7 +767,7 @@ window.petAdoptState = function () {
         clearInterval(iv);
         ITEM_CATALOG[TICKET] = {
             price: 0, usable: true, targetable: false, effect: 'pet_rename_ticket', noSell: true,
-            desc: '펫 이름을 한 번 다시 붙인다. 쓰면 펫을 고르는 창이 뜬다. 쓰면 사라진다.'
+            desc: '인형 이름을 한 번 다시 붙인다. 쓰면 인형을 고르는 창이 뜬다. 쓰면 사라진다.'
         };
         if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(TICKET) < 0) {
             NO_SELL_ITEMS.push(TICKET);
@@ -776,10 +784,10 @@ window.petTicketUse = function () {
     if (ticketCount(me) <= 0) { alert_('해당 물품이 없습니다.'); return; }
     const ps = (function () { try { return P().pets(me) || {}; } catch (e) { return {}; } })();
     const keys = Object.keys(ps).filter(function (k) { return P().BY[k]; });
-    if (!keys.length) { alert_('이름을 붙일 펫이 없습니다.'); return; }
+    if (!keys.length) { alert_('이름을 붙일 인형이 없습니다.'); return; }
 
     const w = box(head('펫 이름 개명권',
-        '이름을 다시 붙일 펫을 고르십시오. 쓰면 개명권 한 장이 사라집니다.<br>'
+        '이름을 다시 붙일 인형을 고르십시오. 쓰면 개명권 한 장이 사라집니다.<br>'
         + '가진 개명권 <b style="color:#ffcf8f;">' + ticketCount(me) + '장</b>')
         + '<div style="max-height:40dvh; overflow-y:auto; margin-bottom:9px;">'
         + keys.map(function (k) {

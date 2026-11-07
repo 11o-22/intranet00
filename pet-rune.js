@@ -41,7 +41,7 @@ LIST.forEach(function (r) { BY[r.n] = r; });
 const BEATS = { '애교': '근력', '근력': '경청', '경청': '인내', '인내': '눈치', '눈치': '애교' };
 const PRICE = 2000;
 const DAY_MAX = 2;            // 종류마다 하루
-const FED_MAX = 2;            // 펫 하나에
+const FED_MAX = 2;            // 인형 하나에
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function P() { return window.PET; }
@@ -137,15 +137,15 @@ function feed(key, name) {
     const u = u_();
     if (!u) return { ok: false, why: '로그인 전입니다.' };
     const s = P().pets(u)[String(key)];
-    if (!s) return { ok: false, why: '아직 없는 펫입니다.' };
+    if (!s) return { ok: false, why: '아직 없는 인형입니다.' };
     if (!BY[name]) return { ok: false, why: '그런 룬이 없습니다.' };
     if (!have(name, u)) return { ok: false, why: tag(name) + ' 룬이 주머니에 없습니다.' };
     const cur = fed(key, u);
-    if (cur.length >= FED_MAX) return { ok: false, why: '룬은 펫 하나에 ' + FED_MAX + '개까지입니다.' };
+    if (cur.length >= FED_MAX) return { ok: false, why: '룬은 인형 하나에 ' + FED_MAX + '개까지입니다.' };
     add(name, -1);
     const next = cur.concat([name]);
     P().patch(String(key), { runes: next });
-    log_('[펫] ' + P().nick(key, u) + '에게 ' + tag(name) + ' 룬을 먹였습니다. (' + next.map(tag).join(' · ') + ')');
+    log_('[인형] ' + P().nick(key, u) + '에게 ' + tag(name) + ' 룬을 먹였습니다. (' + next.map(tag).join(' · ') + ')');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return { ok: true, runes: next };
 }
@@ -189,7 +189,7 @@ window.petRuneFeedOpen = function (key, after) {
             + ' style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;' + ((n > 0 && cur.length < FED_MAX) ? '' : ' opacity:.4;') + '">먹인다</button></div>';
     }).join('');
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">' + esc(nm) + ' — 룬 먹이기</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">펫 하나에 ' + FED_MAX + '개까지 (같은 종류 둘도 됩니다). 먹인 룬이 배틀의 공격 · 방어 수단이 되고, 배틀이 끝나면 소모됩니다.<br>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">인형 하나에 ' + FED_MAX + '개까지 (같은 종류 둘도 됩니다). 먹인 룬이 배틀의 공격 · 방어 수단이 되고, 배틀이 끝나면 소모됩니다.<br>'
         + '상성 — 애교 › 근력 › 경청 › 인내 › 눈치 › 애교</div>'
         + '<div style="font-size:11px; color:#c9a227; margin-bottom:6px;">먹인 룬: ' + (cur.length ? cur.map(tag).join(' · ') : '<span style="color:#6f685e;">없음</span>') + ' <span style="color:#6f685e;">(' + cur.length + '/' + FED_MAX + ')</span></div>'
         + rows
@@ -209,8 +209,8 @@ window.petRuneFeedOpen = function (key, after) {
 // ==========================================
 function boxHtml() {
     const u = u_();
-    return '<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">🐾 펫 숍 — 속성 룬</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">펫 배틀에 쓰는 룬입니다. 개당 ' + PRICE.toLocaleString() + ' P · 종류마다 하루 ' + DAY_MAX + '개. 룬 주머니에 들어가고, 펫 칸에서 펫에게 먹입니다 (펫 하나에 ' + FED_MAX + '개까지).<br>'
+    return '<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">🐾 인형 숍 — 속성 룬</div>'
+        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:8px; line-height:1.55;">인형 배틀에 쓰는 룬입니다. 개당 ' + PRICE.toLocaleString() + ' P · 종류마다 하루 ' + DAY_MAX + '개. 룬 주머니에 들어가고, 인형 칸에서 인형에게 먹입니다 (인형 하나에 ' + FED_MAX + '개까지).<br>'
         + '상성 — 애교 › 근력 › 경청 › 인내 › 눈치 › 애교</div>'
         + LIST.map(function (r) {
             const n = have(r.n, u), left = leftToday(r.n, u);

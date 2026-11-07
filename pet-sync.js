@@ -37,9 +37,9 @@
 (function petSync() {
 
 const KEYS = ['pets', 'petEgg', 'petEggAt', 'petBag', 'petFood', 'petShow', 'petWith', 'petRune', 'petRuneDay',   // ★ 룬 주머니 (pet-rune.js · 2026-10-27)
-              'petStayUntil', 'petSleepUntil',   // ★ 🏠 집 지킴이 방석 · 💤 잠듦 (2026-10-28) — 휴대폰에서 깐 방석을 PC 가 몰라 펫이 K 의 방에 따라붙던 것
+              'petStayUntil', 'petSleepUntil',   // ★ 🏠 집 지킴이 방석 · 💤 잠듦 (2026-10-28) — 휴대폰에서 깐 방석을 PC 가 몰라 인형이 K 의 방에 따라붙던 것
               'petGear', 'petShard',             // ★ 반려동물용 장비 · 등급업 조각 (pet-gear.js)
-              'dolls', 'dollWith', 'dollBag', 'dollDex', 'darkDex', 'dollTut', 'dollSort'];   // 🧸 따라쟁이 봉제인형 (doll-data.js · 2026-11-07)
+              'dollBag', 'dollDex', 'darkDex', 'dollTut', 'dollSort', 'petShowSet', 'dollMig', 'awkBag', 'awkConv'];   // 🧸 따라쟁이 봉제인형 (doll-data.js · 2026-11-07)
 
 let bound = '';
 let refs = [];
@@ -101,19 +101,19 @@ function bind() {
             repaint();
         });
     });
-    console.log('[펫] 서버와 맞춰 둡니다 — petSyncState()');
+    console.log('[인형] 서버와 맞춰 둡니다 — petSyncState()');
 }
 
 setInterval(function () { try { bind(); } catch (e) { } }, 1200);
 
 window.petSyncState = function () {
-    console.log('%c===== 펫 맞추기 =====', 'color:#9fd0ff; font-size:13px');
+    console.log('%c===== 인형 맞추기 =====', 'color:#9fd0ff; font-size:13px');
     console.log('  보고 있는 사원 :', bound || '없음', '· 귀', refs.length, '개');
     console.log('  맞춘 횟수 :', hits);
     const u = u_();
     if (u) {
         const ps = (window.PET ? PET.pets(u) : (u.pets || {}));
-        console.log('  지금 펫 :', Object.keys(ps).length, '마리',
+        console.log('  지금 인형 :', Object.keys(ps).length, '마리',
             '· 알', (u.petEgg && u.petEgg.warn) ? '있음' : '없음',
             '· 산 날', u.petEggAt || '-');
     }

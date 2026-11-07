@@ -46,7 +46,7 @@ const DEFS = [
     { id:'mola',    n:'개복치',      need:'어둠에서 50번 사망',
       check:(u,s)=> s.dead >= 50 },
 
-    { id:'tamer',   n:'조련사',      need:'펫 전부 보유 (지금 데리고 있는 펫 기준)',
+    { id:'tamer',   n:'조련사',      need:'봉제인형 전부 보유 (지금 데리고 있는 인형 기준)',
       check:(u)=> petsAllOwned(u) },            // 펫 24종을 한꺼번에 가지고 있으면 (2026-10-18 켬)
 
     { id:'weapon',  n:'웨폰 마스터', need:'전용 장비 세 자리 전부 L',

@@ -72,10 +72,10 @@ function log_(t) {
     try { if (typeof addHistoryLog === 'function') addHistoryLog(u_(), t); } catch (e) { }
 }
 function kindOf(id) {
-    try { return (window.PETTALK && window.PETTALK.KIND[id]) || 'small'; } catch (e) { return 'small'; }
+    try { return (window.PETTALK && window.PETTALK.KIND[(window.PET && PET.sp) ? PET.sp(id) : id]) || 'small'; } catch (e) { return 'small'; }
 }
 function josa(w, k) { try { return P().josa(w, k); } catch (e) { return k; } }
-function nick(id, u) { try { return P().nick(id, u || u_()); } catch (e) { return '펫'; } }
+function nick(id, u) { try { return P().nick(id, u || u_()); } catch (e) { return '인형'; } }
 
 // 갈래가 붙은 줄 가운데 하나 — 제 갈래 것이 먼저, 없으면 아무거나
 function pick(list, kind) {
@@ -233,7 +233,7 @@ const CALM = [
 //       교감: f(40 미만) m(80 미만) d(깊음)
 const FULL = {
 starve: {
- f:['배에서 소리가 났다. 펫이 한 번 쳐다보고 만다.',
+ f:['배에서 소리가 났다. 인형이 한 번 쳐다보고 만다.',
     '제 밥그릇을 슬쩍 당신 쪽으로 민다. 그러고 뒤로 물러선다.',
     '당신이 비틀거리자 길을 비킨다. 그것이 배려의 전부다.',
     '먹는 소리가 안 나는 것을 이상하게 여기는 눈치다.',
@@ -537,16 +537,16 @@ let was = false;
 function begin() {
     const d = run(), u = u_();
     if (!d || !u) return;
-    if (P().asleep && P().asleep(u)) return;            // 🦋 숨결 두 번 — 펫이 모두 잠들어 있다 (따라가지 않는다)
+    if (P().asleep && P().asleep(u)) return;            // 🦋 숨결 두 번 — 인형이 모두 잠들어 있다 (따라가지 않는다)
     if (P().stays && P().stays(u)) return;              // 🏠 집 지킴이 방석 — 집을 지킨다 (pet-stay.js)
     const ps = pets(u);
     const taken = String(d._pet || '');
     const cand = Object.keys(ps).filter(function (k) {
         const s = ps[k];
-        if (!s || s.hurt) return false;                 // 다친 펫은 안 간다
+        if (!s || s.hurt) return false;                 // 다친 인형은 안 간다
         if (s.out) return false;                        // 혼자 탐사 중
         if ((Number(s.jsleep) || 0) > Date.now()) return false;   // 💤 여정 뒤 잠 (journey.js)
-        if (k === taken) return false;                  // 데려간 펫
+        if (k === taken) return false;                  // 데려간 인형
         return (Number(s.bond) || 0) >= BOND_NEED;
     }).sort(function (a, b) {
         return (Number(ps[b].bond) || 0) - (Number(ps[a].bond) || 0);
@@ -561,7 +561,7 @@ function begin() {
             + esc(pick(SNEAK, kindOf(k))));
     });
     try {
-        d.log.push('[펫] 따라 들어왔습니다 — ' + cand.map(function (k) { return nick(k, u); }).join(' · '));
+        d.log.push('[인형] 따라 들어왔습니다 — ' + cand.map(function (k) { return nick(k, u); }).join(' · '));
     } catch (e) { }
     setTimeout(function () {
         alert_('말리지 못했습니다.\n\n'
@@ -600,7 +600,7 @@ function end() {
 
     const hurtRows = rows.filter(function (r) { return !r.ok; });
     if (hurtRows.length) {
-        log_('[펫] ' + hurtRows.map(function (r) { return nick(r.k, u); }).join(' · ')
+        log_('[인형] ' + hurtRows.map(function (r) { return nick(r.k, u); }).join(' · ')
             + ' — 따라갔다가 다쳤습니다.');
     }
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
@@ -665,7 +665,7 @@ setInterval(function () {
                 h.deep = Math.max(0, Number(h.deep) - CALM_HEAL);
                 if (h.deep <= 0) {
                     patch(k, { hurt: null });
-                    log_('[펫] ' + nick(k, u) + ' — 곁에서 다 나았습니다.');
+                    log_('[인형] ' + nick(k, u) + ' — 곁에서 다 나았습니다.');
                 } else patch(k, { hurt: h });
                 changed++;
             }
@@ -679,12 +679,12 @@ setInterval(function () {
             try { hit = P().bondHit(k); } catch (e) { }
             patch(k, { hurt: null });
             const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
-            log_('[펫] ' + nm + ' — 다친 채로 두 시간이 지났습니다. ' + bt);
+            log_('[인형] ' + nm + ' — 다친 채로 두 시간이 지났습니다. ' + bt);
             changed++;
             setTimeout(function () {
                 alert_(nm + josa(nm, '은') + ' 끝내 혼자 일어났습니다.\n'
                     + '아무도 오지 않았던 두 시간을 기억합니다.\n\n' + bt + '\n\n'
-                    + '다친 펫은 두 시간 안에 완전히 고쳐야 교감을 지킵니다.');
+                    + '다친 인형은 두 시간 안에 완전히 고쳐야 교감을 지킵니다.');
             }, 300);
         }
     });
@@ -737,7 +737,7 @@ window.petMedUse = function (key, name) {
     const b = medBag(u);
     if (!(Number(b[name]) > 0)) { alert_('가지고 있지 않습니다.'); return; }
     const s = pets(u)[String(key)];
-    if (!s || !s.hurt) { alert_('다친 펫이 아닙니다.'); return; }
+    if (!s || !s.hurt) { alert_('다친 인형이 아닙니다.'); return; }
 
     medAdd(name, -1);
     const h = s.hurt;
@@ -745,7 +745,7 @@ window.petMedUse = function (key, name) {
     const nm = nick(key, u);
     if (h.deep <= 0) {
         patch(key, { hurt: null });
-        log_('[펫] ' + nm + ' — 다 나았습니다.');
+        log_('[인형] ' + nm + ' — 다 나았습니다.');
         alert_(nm + josa(nm, '이') + ' 다 나았습니다.\n\n' + '일어나 한 바퀴 돌아 보입니다.');
     } else {
         patch(key, { hurt: h });
@@ -826,7 +826,7 @@ function usedText(used) {
 
 function done(key, u) {
     const nm = nick(key, u);
-    log_('[펫] ' + nm + ' — 다 나았습니다.');
+    log_('[인형] ' + nm + ' — 다 나았습니다.');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     return nm + josa(nm, '이') + ' 다 나았습니다.\n\n일어나 한 바퀴 돌아 보입니다.';
 }
@@ -844,7 +844,7 @@ window.petHealFast = function (key) {
     const u = u_();
     if (!u) return;
     const s = pets(u)[String(key)];
-    if (!s || !s.hurt) { alert_('다친 펫이 아닙니다.'); return; }
+    if (!s || !s.hurt) { alert_('다친 인형이 아닙니다.'); return; }
     const deep = Math.max(0, Number(s.hurt.deep) || 0);
     const r = spend(u, deep);
     if (!Object.keys(r.used).length) {
@@ -866,7 +866,7 @@ window.petHealBuy = function (key) {
     const u = u_();
     if (!u) return;
     const s = pets(u)[String(key)];
-    if (!s || !s.hurt) { alert_('다친 펫이 아닙니다.'); return; }
+    if (!s || !s.hurt) { alert_('다친 인형이 아닙니다.'); return; }
     const deep = Math.max(0, Number(s.hurt.deep) || 0);
     const mine = spend(u, deep);                       // 가진 것으로 되는 데까지
     const buy = cheapest(mine.left);                   // 모자란 몫
@@ -910,7 +910,7 @@ function hurtBanner() {
     return '<div style="background:rgba(224,122,95,0.12); border:1px solid #e07a5f;'
         + ' border-radius:7px; padding:11px; margin-bottom:12px;">'
         + '<div style="font-size:11px; color:#e07a5f; font-weight:bold; margin-bottom:7px;">'
-        + '🩹 다친 펫 ' + keys.length + '마리</div>'
+        + '🩹 다친 인형 ' + keys.length + '마리</div>'
         + keys.map(function (k) {
             const h = ps[k].hurt;
             const c = cheapest(Math.max(0, Number(h.deep) || 0));
@@ -950,7 +950,7 @@ function shopHtml() {
         + '🩹 치료 물품' + (mine ? ' <span style="color:#9fd8ef; font-size:10px;'
             + ' font-weight:normal;">· 가진 것 ' + mine + '개</span>' : '') + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:7px; line-height:1.6;">'
-        + '어둠을 따라갔다 다친 펫에게 씁니다. 깊이를 0 까지 내려야 낫습니다.<br>'
+        + '어둠을 따라갔다 다친 인형에게 씁니다. 깊이를 0 까지 내려야 낫습니다.<br>'
         + '다친 채로 두 시간이 지나면 교감이 ' + P().DEATH_HIT + ' 깎입니다 — 다만 주인이 상담실·선녀탕에 있으면'
         + ' 곁에서 같이 낫습니다.<br>'
         + '<span style="color:#8d8578;">깊이 100 짜리 상처는 하나로 안 낫습니다.'
@@ -1060,7 +1060,7 @@ setInterval(function () {
         renderDream = w;
         window.renderDream = w;
         clearInterval(iv);
-        console.log('[펫] 망상 홈쇼핑에 치료 물품 연결');
+        console.log('[인형] 망상 홈쇼핑에 치료 물품 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -1072,7 +1072,7 @@ window.petHurtOpen = function () {
     const u = u_();
     if (!u) return;
     const keys = anyHurt(u);
-    if (!keys.length) { alert_('다친 펫이 없습니다.'); return; }
+    if (!keys.length) { alert_('다친 인형이 없습니다.'); return; }
     const b = medBag(u);
     const have = MED.filter(function (x) { return Number(b[x[0]]) > 0; });
 
@@ -1122,7 +1122,7 @@ window.petHurtOpen = function () {
         + ' border:1px solid #e07a5f; border-radius:10px; padding:14px; width:100%;'
         + ' max-width:420px; max-height:86dvh; overflow-y:auto;">'
         + '<div style="font-size:12px; color:#e07a5f; font-weight:bold; margin-bottom:4px;">'
-        + '🩹 다친 펫</div>'
+        + '🩹 다친 인형</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:6px; line-height:1.6;">'
         + '깊이를 0 까지 내려야 낫습니다. 두 시간이 지나면 교감이 ' + P().DEATH_HIT + ' 깎입니다.<br>'
         + '상담실·선녀탕에 들어가 있으면 곁에서 같이 낫습니다.</div>'
@@ -1159,7 +1159,7 @@ setInterval(function () {
     }).slice(0, MAX_SNEAK);
     if (!come.length) return;
 
-    log_('[펫] ' + come.map(function (k) { return nick(k, u); }).join(' · ')
+    log_('[인형] ' + come.map(function (k) { return nick(k, u); }).join(' · ')
         + ' — 따라 들어와 곁에 있습니다.');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     setTimeout(function () {
@@ -1168,7 +1168,7 @@ setInterval(function () {
                 return nick(k, u) + ' — ' + pick(CALM, kindOf(k));
             }).join('\n\n')
             + (come.some(function (k) { return ps[k].hurt; })
-                ? '\n\n다친 펫은 여기서는 두 시간이 흐르지 않습니다. 곁에서 천천히 낫습니다.' : ''));
+                ? '\n\n다친 인형은 여기서는 두 시간이 흐르지 않습니다. 곁에서 천천히 낫습니다.' : ''));
     }, 1500);
 }, 5000);
 
@@ -1237,14 +1237,14 @@ setInterval(function () {
 // ==========================================
 window.petHurt = function () {
     const u = u_();
-    console.log('%c===== 다친 펫 =====', 'color:#e07a5f; font-size:13px');
+    console.log('%c===== 다친 인형 =====', 'color:#e07a5f; font-size:13px');
     if (!u) { console.log('  로그인 후에 쓰세요.'); return; }
     const keys = anyHurt(u);
-    if (!keys.length) { console.log('  다친 펫이 없습니다.'); }
+    if (!keys.length) { console.log('  다친 인형이 없습니다.'); }
     else {
         console.table(keys.map(function (k) {
             const h = pets(u)[k].hurt;
-            return { 펫: nick(k, u), 깊이: h.deep, 구역: h.zone || '-',
+            return { 인형: nick(k, u), 깊이: h.deep, 구역: h.zone || '-',
                      상태: h.calm ? '곁에서 낫는 중' : '두 시간 셈 중',
                      남은시간: h.calm ? '—'
                         : Math.max(0, Math.ceil((Number(h.at) + DIE_MS - Date.now()) / 60000)) + '분' };
@@ -1252,12 +1252,12 @@ window.petHurt = function () {
     }
     const ps = pets(u);
     const sneak = Object.keys(ps).filter(function (k) { return ps[k] && ps[k].sneak; });
-    console.log('  지금 따라 들어가 있는 펫 :', sneak.length
+    console.log('  지금 따라 들어가 있는 인형 :', sneak.length
         ? sneak.map(function (k) { return nick(k, u); }).join(' · ') : '없음');
     const able = Object.keys(ps).filter(function (k) {
         return (Number(ps[k].bond) || 0) >= BOND_NEED;
     });
-    console.log('  따라갈 수 있는 펫 (교감 ' + BOND_NEED + ' 이상) :',
+    console.log('  따라갈 수 있는 인형 (교감 ' + BOND_NEED + ' 이상) :',
         able.length ? able.map(function (k) { return nick(k, u) + '(' + ps[k].bond + ')'; }).join(' · ')
                     : '없음', '· 한 번에 ' + MAX_SNEAK + '마리까지');
     console.log('  가진 치료 물품 :', JSON.stringify(medBag(u)));
@@ -1265,7 +1265,7 @@ window.petHurt = function () {
 
 window.petMedShop = function () {
     const b = medBag(u_());
-    console.log('%c===== 펫 치료 물품 =====', 'color:#e07a5f; font-size:13px');
+    console.log('%c===== 인형 치료 물품 =====', 'color:#e07a5f; font-size:13px');
     console.table(MED.map(function (x) {
         return { 물품: x[0], '깎는 깊이': x[1], 값: x[2].toLocaleString() + ' P',
                  '한 점당': Math.round(x[2] / x[1]) + ' P',
@@ -1301,7 +1301,7 @@ window.petHealAll = function () {
             } catch (e) { }
         });
     });
-    console.log('%c✓ 다친 펫 ' + n + '마리를 고쳤습니다.', 'color:#4CAF50');
+    console.log('%c✓ 다친 인형 ' + n + '마리를 고쳤습니다.', 'color:#4CAF50');
 };
 
 // 들여다보기 — 묘사가 몇 가지인지
@@ -1309,6 +1309,6 @@ window._petSneak = { SNEAK: SNEAK, HURT: HURT, CALM: CALM, FULL: FULL, POLL: POL
                      MED: MED, pick: pick, bands: { bondBand: bondBand, fullBand: fullBand,
                      pollBand: pollBand }, zoneGrade: zoneGrade };
 
-console.log('[펫] 몰래 따라가기 · 다침 — petHurt() · petMedShop()');
+console.log('[인형] 몰래 따라가기 · 다침 — petHurt() · petMedShop()');
 
 })();

@@ -209,11 +209,10 @@ window.petEggClear = function () {
 function hatch(e) {
     const u = u_();
     const p = P().pick(e.warn, u);
-    const key = String(p.i);
+    // ★ 같은 동물이 또 나와도 데려온다 — 둘째부터 열쇠 113 · 213 … (2026-11-07 · 전에는 값을 돌려줬다)
+    const key = P().newKey ? P().newKey(p.i, u) : String(p.i);
     const now = P().now();
-
-    // 그 묶음 넷을 다 가지고 있으면 겹쳐서 나온다 — 그때는 값을 돌려준다
-    if (P().has(p.i, u)) { dup(p); return; }
+    if (!P().newKey && P().has(p.i, u)) { dup(p); return; }
 
     const rec = { g: 'D', at: now, fedAt: now, bond: 0 };
 
@@ -226,12 +225,14 @@ function hatch(e) {
             const up = { petEgg: null };
             up['pets/' + key] = rec;
             database.ref('users/' + u.code).update(up)
-                .catch(function (er) { console.warn('[펫] 부화 저장 실패', er); });
+                .catch(function (er) { console.warn('[인형] 부화 저장 실패', er); });
             wrote = true;
         }
     } catch (er) { }
     if (!wrote) P().save({ pets: 1, petEgg: 1, petEggAt: 1 });
 
+    // 🧸 펫 = 봉제인형 (2026-11-07) — 도감에 적고, 동행 칸이 비어 있으면 동행으로
+    try { if (window.DOLL) { DOLL.dexCaught(p.i, u); const w = DOLL.withList(u); if (w.length < DOLL.PARTY_MAX) DOLL.setWith(w.concat([key]), u); } } catch (er) { }
     log_('[환몽알] ' + p.n + P().josa(p.n, '이') + ' 깨어났습니다.');
     P().save({ history: 1 });
     ui();
@@ -445,14 +446,14 @@ function paint() {
         const _r = renderHouse;
         const w = function () {
             const out = _r.apply(this, arguments);
-            try { paint(); } catch (e) { console.warn('[펫]', e); }
+            try { paint(); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._pet = true;
         renderHouse = w;
         window.renderHouse = w;
         clearInterval(iv);
-        console.log('[펫] 사택 알 칸 연결');
+        console.log('[인형] 사택 알 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -497,6 +498,6 @@ window.petEggForce = function () {
     hatch(e);
 };
 
-console.log('[펫] petEggNow()');
+console.log('[인형] petEggNow()');
 
 })();

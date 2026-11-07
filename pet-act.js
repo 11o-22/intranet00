@@ -78,7 +78,7 @@ function esc(s) {
 }
 function josa(w, k) { try { return P().josa(w, k); } catch (e) { return k; } }
 function kindOf(id) {
-    try { return (window.PETTALK && window.PETTALK.KIND[id]) || 'small'; }
+    try { return (window.PETTALK && window.PETTALK.KIND[(window.PET && PET.sp) ? PET.sp(id) : id]) || 'small'; }
     catch (e) { return 'small'; }
 }
 const KIND_NAME = { dog: '개', cat: '고양이', bird: '새', water: '물', rept: '기는 것',
@@ -490,7 +490,7 @@ ACT.forEach(function (a) {
 function pets() { try { return P().pets(u_()) || {}; } catch (e) { return {}; } }
 function petOf(id) { return pets()[String(id)] || null; }
 function nickOf(id) {
-    try { return P().nick(id, u_()); } catch (e) { return (P().BY[id] || {}).n || '펫'; }
+    try { return P().nick(id, u_()); } catch (e) { return (P().BY[id] || {}).n || '인형'; }
 }
 function fixOf(id) {
     const s = petOf(id);
@@ -604,7 +604,7 @@ function answer(id, scold) {
 
     if (typeof addHistoryLog === 'function') {
         try {
-            addHistoryLog(u_(), '[펫] ' + nickOf(id) + josa(nickOf(id), '을') + ' '
+            addHistoryLog(u_(), '[인형] ' + nickOf(id) + josa(nickOf(id), '을') + ' '
                 + (scold ? '혼냈습니다' : '쓰다듬었습니다')
                 + ' — 교감 ' + (bond > 0 ? '+' + bond : bond));
         } catch (e) { }
@@ -717,7 +717,7 @@ function okIds() {
         if (!id || !BY_KIND[kindOf(id)]) return false;
         const s = petOf(id);
         if (!s) return false;
-        if (s.out || s.sneak || s.hurt) return false;      // 나가 있거나 다친 펫
+        if (s.out || s.sneak || s.hurt) return false;      // 나가 있거나 다친 인형
         if (P().asleep && P().asleep()) return false;      // 🦋 숨결 두 번 — 모두 잠들어 있다
         return true;
     });
@@ -732,6 +732,7 @@ function quarantined() {
 function maybe(force) {
     if (!u_() || !window.PET) return false;
     if (document.querySelector('#' + MOD)) return false;
+    if (document.getElementById('ds-ov') || document.getElementById('dbt-ov')) return false;   // 🧸 봉제인형 맵 · 전투 중에는 띄우지 않는다
     if (quarantined()) return false;
     const ids = okIds();
     if (!ids.length) return false;
@@ -766,14 +767,14 @@ setInterval(function () {
 // ==========================================
 window.petActNow = function () {
     if (!maybe(true)) {
-        console.log('  띄울 것이 없습니다 — 방에 내놓은 펫이 없거나, 그 펫은 버릇을 다 고쳤습니다.');
+        console.log('  띄울 것이 없습니다 — 방에 내놓은 인형이 없거나, 그 인형은 버릇을 다 고쳤습니다.');
         return;
     }
     console.log('  띄웠습니다.');
 };
 
 window.petActList = function () {
-    console.log('%c===== 🐾 펫이 저지르는 일 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 🐾 인형이 저지르는 일 =====', 'color:#ffb74d; font-size:13px');
     Object.keys(KIND_NAME).forEach(function (k) {
         const list = BY_KIND[k] || [];
         console.log('%c  ' + KIND_NAME[k] + ' — ' + list.length + '가지 (잘못 '
@@ -790,17 +791,17 @@ window.petActList = function () {
 
 window.petActState = function () {
     const u = u_();
-    console.log('%c===== 🐾 펫 버릇 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 🐾 인형 버릇 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
     const cl = coolLeft();
     console.log('  오늘 ' + dayUsed() + ' / ' + DAY_MAX + '번'
         + ' · 다음까지 ' + (cl > 0 ? Math.ceil(cl / 60000) + '분' : '지금 바로'));
     const ids = Object.keys(pets()).map(Number).filter(function (i) { return i; });
-    if (!ids.length) { console.log('  펫이 없습니다.'); return; }
+    if (!ids.length) { console.log('  인형이 없습니다.'); return; }
     console.table(ids.map(function (id) {
         const p = pending(id);
         const list = BY_KIND[kindOf(id)] || [];
-        return { 펫: nickOf(id), 갈래: KIND_NAME[kindOf(id)] || '-',
+        return { 인형: nickOf(id), 갈래: KIND_NAME[kindOf(id)] || '-',
                  교감: P().bond(id, u) + ' / ' + P().BOND_MAX,
                  고친버릇: fixOf(id).length + ' / ' + list.length,
                  걸린일: p ? (p.i + ' ' + p.t.slice(0, 18) + '…') : '-',
@@ -832,6 +833,6 @@ window.PETACT = { ACT: ACT, BY_KIND: BY_KIND, BY_I: BY_I, KIND_NAME: KIND_NAME,
                   DROP_BAD: DROP_BAD, DROP_GOOD: DROP_GOOD,
                   UP_BAD: UP_BAD, UP_GOOD: UP_GOOD };
 
-console.log('[펫] 버릇 ' + ACT.length + '가지 — petActNow() · petActList() · petActState()');
+console.log('[인형] 버릇 ' + ACT.length + '가지 — petActNow() · petActList() · petActState()');
 
 })();

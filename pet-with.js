@@ -62,7 +62,7 @@ window.petWithSet = function (id) {
     const u = u_();
     if (!u) return;
     const n = Number(id) || 0;
-    if (n && !P().pets(u)[String(n)]) { alert_('아직 없는 펫입니다.'); return; }
+    if (n && !P().pets(u)[String(n)]) { alert_('아직 없는 인형입니다.'); return; }
     u.petWith = n || null;
     save({ petWith: 1 });
     try { paintPick(); } catch (e) { }
@@ -77,28 +77,28 @@ function pickHtml() {
     if (list.length && P().asleep && P().asleep(u)) {
         const m = Math.ceil(P().sleepLeft(u) / 60000);
         return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
-            + '데려갈 펫</div>'
-            + '<div style="font-size:10px; color:#8fa8d8;">💤 펫이 모두 깊이 잠들어 있습니다 — '
+            + '데려갈 인형</div>'
+            + '<div style="font-size:10px; color:#8fa8d8;">💤 인형이 모두 깊이 잠들어 있습니다 — '
             + (m >= 60 ? Math.floor(m / 60) + '시간 ' : '') + (m % 60) + '분 남음. 데려갈 수도, 따라오지도 않습니다.</div>';
     }
     if (list.length && P().stays && P().stays(u)) {
         const m2 = Math.ceil(P().stayLeft(u) / 60000);
         return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
-            + '데려갈 펫</div>'
-            + '<div style="font-size:10px; color:#9fd8ef;">🏠 펫들이 집을 지키는 중입니다 — '
+            + '데려갈 인형</div>'
+            + '<div style="font-size:10px; color:#9fd8ef;">🏠 인형들이 집을 지키는 중입니다 — '
             + (m2 >= 60 ? Math.floor(m2 / 60) + '시간 ' : '') + (m2 % 60) + '분 남음. 데려갈 수도, 따라오지도 않습니다.</div>';
     }
     if (!list.length) {
         return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
-            + '데려갈 펫</div>'
-            + '<div style="font-size:10px; color:#666;">데려갈 수 있는 펫이 없습니다.</div>';
+            + '데려갈 인형</div>'
+            + '<div style="font-size:10px; color:#666;">데려갈 수 있는 인형이 없습니다.</div>';
     }
 
     return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:5px;">'
-        + '데려갈 펫</div>'
+        + '데려갈 인형</div>'
         + '<div style="font-size:10px; color:#888; margin-bottom:7px; line-height:1.6;">'
-        + '교감이 가득 찬 펫은 치명적인 자리에서 주인 대신 갈 수 있습니다.'
-        + ' <span style="color:#e07a5f;">그 펫은 돌아오지 않습니다.</span></div>'
+        + '교감이 가득 찬 인형은 치명적인 자리에서 주인 대신 갈 수 있습니다.'
+        + ' <span style="color:#e07a5f;">그 인형은 돌아오지 않습니다.</span></div>'
         + '<select id="' + PICK + '-sel" onchange="petWithSet(this.value)"'
         + ' style="width:100%; margin-bottom:6px; box-sizing:border-box;">'
         + '<option value="0"' + (cur ? '' : ' selected') + '>— 혼자 간다 —</option>'
@@ -144,14 +144,14 @@ function mount(hostId, btnSel) {
         const _o = openDarkBriefing;
         const w = function () {
             const out = _o.apply(this, arguments);
-            try { mount('darkness-body', 'button[onclick^="startDarkRun"]'); } catch (e) { console.warn('[펫]', e); }
+            try { mount('darkness-body', 'button[onclick^="startDarkRun"]'); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._pet = true;
         openDarkBriefing = w;
         window.openDarkBriefing = w;
         clearInterval(iv);
-        console.log('[펫] 어둠 진입 화면 연결');
+        console.log('[인형] 어둠 진입 화면 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -163,14 +163,14 @@ function mount(hostId, btnSel) {
         const _o = openPartyCarryModal;
         const w = function () {
             const out = _o.apply(this, arguments);
-            try { mount('dark-party-body', 'button[onclick^="savePartyCarry"]'); } catch (e) { console.warn('[펫]', e); }
+            try { mount('dark-party-body', 'button[onclick^="savePartyCarry"]'); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._pet = true;
         openPartyCarryModal = w;
         window.openPartyCarryModal = w;
         clearInterval(iv);
-        console.log('[펫] 파티 반입 창 연결');
+        console.log('[인형] 파티 반입 창 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -188,22 +188,22 @@ function begin() {
     const s = P().pets(u)[String(id)];
     if (!s) { u.petWith = null; return; }
     if (s.out && s.out.till) return;              // 혼자 나가 있다
-    if (P().asleep && P().asleep(u)) {             // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 펫이 모두 잠들어 있다
+    if (P().asleep && P().asleep(u)) {             // 🦋 에로스의 마지막 숨결을 두 번 맞았다 — 인형이 모두 잠들어 있다
         const nk = P().nick(id, u);
-        log_('[펫 동행] ' + nk + P().josa(nk, '은') + ' 깊이 잠들어 따라오지 않았습니다.');
-        try { d.log.push('[펫] ' + nk + ' — 잠들어 있어 따라오지 않았다'); } catch (e) { }
+        log_('[인형 동행] ' + nk + P().josa(nk, '은') + ' 깊이 잠들어 따라오지 않았습니다.');
+        try { d.log.push('[인형] ' + nk + ' — 잠들어 있어 따라오지 않았다'); } catch (e) { }
         return;
     }
     if (P().stays && P().stays(u)) {               // 🏠 집 지킴이 방석 — 집을 지킨다 (pet-stay.js)
         const nk2 = P().nick(id, u);
-        log_('[펫 동행] ' + nk2 + P().josa(nk2, '은') + ' 방석 위에서 집을 지키느라 따라오지 않았습니다.');
-        try { d.log.push('[펫] ' + nk2 + ' — 집을 지키느라 따라오지 않았다'); } catch (e) { }
+        log_('[인형 동행] ' + nk2 + P().josa(nk2, '은') + ' 방석 위에서 집을 지키느라 따라오지 않았습니다.');
+        try { d.log.push('[인형] ' + nk2 + ' — 집을 지키느라 따라오지 않았다'); } catch (e) { }
         return;
     }
     d._pet = id;
     P().patch(id, { 'with': 1 });
     const nick = P().nick(id, u);
-    log_('[펫 동행] ' + nick + P().josa(nick, '을') + ' 데리고 들어갔습니다.');
+    log_('[인형 동행] ' + nick + P().josa(nick, '을') + ' 데리고 들어갔습니다.');
 }
 
 function end() {
@@ -278,7 +278,7 @@ function sacrifice(reasonText) {
 
     d._petRolled = 1;
     if (Math.random() >= P().SAVE_ODDS) {
-        try { d.log.push('[펫 동행] 대신 가지 못했습니다.'); } catch (e) { }
+        try { d.log.push('[인형 동행] 대신 가지 못했습니다.'); } catch (e) { }
         return false;                               // 원래대로 주인이 죽는다
     }
 
@@ -291,8 +291,8 @@ function sacrifice(reasonText) {
     const bt = hit ? ('교감 ' + hit.was + ' → ' + hit.now) : ('교감 -' + P().DEATH_HIT);
 
     d.fail = Math.max(0, (d.fail || 0) - 1);
-    d.log.push('[펫 동행] ' + nick + P().josa(nick, '이') + ' 대신 맞았습니다. (' + bt + ')');
-    log_('[펫 동행] ' + nick + '(' + sp + ')' + P().josa(nick, '이')
+    d.log.push('[인형 동행] ' + nick + P().josa(nick, '이') + ' 대신 맞았습니다. (' + bt + ')');
+    log_('[인형 동행] ' + nick + '(' + sp + ')' + P().josa(nick, '이')
         + ' 주인 대신 맞았습니다. ' + bt);
     try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
 
@@ -313,7 +313,7 @@ function sacrifice(reasonText) {
         } else {
             alert_(nick + P().josa(nick, '이') + ' 주인 대신 맞았습니다.\n\n' + bt);
         }
-    } catch (e) { console.warn('[펫]', e); }
+    } catch (e) { console.warn('[인형]', e); }
     return true;
 }
 
@@ -324,14 +324,14 @@ function sacrifice(reasonText) {
         const _d = darkDeath;
         const w = function (reasonText) {
             try { if (sacrifice(reasonText)) return; }
-            catch (e) { console.warn('[펫]', e); }
+            catch (e) { console.warn('[인형]', e); }
             return _d.apply(this, arguments);
         };
         w._petWith = true;
         darkDeath = w;
         window.darkDeath = w;
         clearInterval(iv);
-        console.log('[펫] 대신 맞기 연결');
+        console.log('[인형] 대신 맞기 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
@@ -341,16 +341,16 @@ function sacrifice(reasonText) {
 // ==========================================
 window.petWith = function () {
     const u = u_(), d = run();
-    console.log('%c===== 펫 동행 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 인형 동행 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
     const id = Number(u.petWith) || 0;
-    console.log('  데려가기로 한 펫 :', id ? (P().nick(id, u) + ' (♥' + P().bond(id, u) + ')') : '없음');
-    console.log('  지금 같이 있는 펫 :', (d && d._pet) ? P().nick(d._pet, u) : '없음');
+    console.log('  데려가기로 한 인형 :', id ? (P().nick(id, u) + ' (♥' + P().bond(id, u) + ')') : '없음');
+    console.log('  지금 같이 있는 인형 :', (d && d._pet) ? P().nick(d._pet, u) : '없음');
     console.log('  대신 맞기        :', (id && P().bondFull(id, u))
         ? ('가능 · 확률 ' + Math.round(P().SAVE_ODDS * 100) + '%')
         : '교감 ' + P().BOND_MAX + ' 이어야 합니다');
 };
 
-console.log('[펫] petWith() · petWithSet(번호)');
+console.log('[인형] petWith() · petWithSet(번호)');
 
 })();

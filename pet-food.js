@@ -92,7 +92,7 @@ function add(name, n) {
     try {
         if (typeof database !== 'undefined' && database && u.code) {
             database.ref('users/' + u.code + '/petFood/' + name).set(v || null)
-                .catch(function (e) { console.warn('[펫] 먹이 저장 실패', e); });
+                .catch(function (e) { console.warn('[인형] 먹이 저장 실패', e); });
             return v;
         }
     } catch (e) { }
@@ -136,7 +136,7 @@ function feed(id, name) {
     const sp = P().BY[id];
     if (!u || !f || !sp) return { ok: false, why: '그런 먹이가 없습니다.' };
     const s = P().pets(u)[String(id)];
-    if (!s) return { ok: false, why: '아직 없는 펫입니다.' };
+    if (!s) return { ok: false, why: '아직 없는 인형입니다.' };
     if (!have(name, u)) return { ok: false, why: name + P().josa(name, '이') + ' 없습니다.' };
     if (s.out && s.out.till) return { ok: false, why: '탐사를 나가 있습니다.' };
 
@@ -179,7 +179,7 @@ function feed(id, name) {
     }
     P().patch(id, patch);
 
-    log_('[펫] ' + P().nick(id, u) + '에게 ' + name + P().josa(name, '을') + ' 주었습니다.');
+    log_('[인형] ' + P().nick(id, u) + '에게 ' + name + P().josa(name, '을') + ' 주었습니다.');
     try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
     paint();
     return { ok: true, msg: P().nick(id, u) + P().josa(P().nick(id, u), '이') + ' ' + name
@@ -221,7 +221,7 @@ function html() {
     }).join('');
 
     return '<div style="font-size:11px; color:#d4af37; font-weight:bold; margin-bottom:4px;">'
-        + '🍖 펫 먹이</div>'
+        + '🍖 인형 먹이</div>'
         + '<div style="font-size:9.5px; color:#777; margin-bottom:6px; line-height:1.6;">'
         + '먹이면 포만도가 찹니다. 사흘치가 포만도 100 입니다.'
         + ' <span style="color:#e07a5f;">포만도가 0 이 되면 교감이 ' + P().DEATH_HIT + ' 깎입니다.</span><br>'
@@ -252,14 +252,14 @@ function paint() {
         const _r = renderHouse;
         const w = function () {
             const out = _r.apply(this, arguments);
-            try { paint(); } catch (e) { console.warn('[펫]', e); }
+            try { paint(); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._petFood = true;
         renderHouse = w;
         window.renderHouse = w;
         clearInterval(iv);
-        console.log('[펫] 사택 먹이 칸 연결');
+        console.log('[인형] 사택 먹이 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -271,13 +271,13 @@ window.PETFOOD = { LIST: FOOD, BY: FOOD_BY, bag: bag, have: have, add: add, feed
 
 window.petFoodBag = function () {
     const u = u_();
-    console.log('%c===== 펫 먹이 =====', 'color:#ffb74d; font-size:13px');
+    console.log('%c===== 인형 먹이 =====', 'color:#ffb74d; font-size:13px');
     if (!u) { console.log('  로그인 전입니다.'); return; }
     const b = bag(u);
     const k = Object.keys(b).filter(function (x) { return b[x] > 0; });
     console.log('  ' + (k.length ? k.map(function (x) { return x + '×' + b[x]; }).join(', ') : '비었음'));
 };
 
-console.log('[펫] petFoodBag() · petFeed(번호, 먹이)');
+console.log('[인형] petFoodBag() · petFeed(번호, 먹이)');
 
 })();

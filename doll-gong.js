@@ -31,7 +31,8 @@ const PRICE = {
 };
 const FIX = { '🍶 청주': 1, '🥣 메밀묵': 1 };      // 인형 하나 수선에 드는 것
 const TRADE = 'dollTrade';
-const TRADE_LIVE = 10 * 60 * 1000;
+// ★ 교환 신청에 한도를 두지 않는다 (2026-11-07 사용자 「봉제인형 교환 신청은 한도 두지 말고」)
+//   여럿에게 동시에 신청할 수 있고, 교환 중에 온 신청은 끝날 때까지 기다렸다가 차례로 묻는다. 시간 제한도 없다.
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function db_() { return (typeof database !== 'undefined') ? database : null; }
@@ -113,7 +114,7 @@ function dollLine(d) {
     const M = D();
     const s = M.stats(d);
     return '<b>' + esc(M.nickOf(d)) + '</b>' + (d.fav ? ' <span style="color:#e6b400">★</span>' : '')
-        + '<div>' + esc(M.spName(d.sp)) + ' · ' + d.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + ' · 체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + ' · 포만 ' + M.fullPct(d) + '%</div>';
+        + '<div>' + esc(M.spName(d.sp)) + ' · ' + s.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + ' · 체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + ' · ♥' + M.bondOf(d) + ' · 먹이 ' + M.fullPct(d) + '%</div>';
 }
 
 // ==========================================
@@ -169,6 +170,73 @@ const SHOP_TALK = [
     ['자자, 천천히 둘러보쇼. 구경하는 데는 돈 안 받으니까!']
 ];
 
+// ==========================================
+// 🤖 도깨비 말 — Claude Sonnet 5.5 (api/dokkaebi.js) · 같은 말이 안 나오게 최근 말을 같이 보낸다
+//   부르지 못하면(한도 · 오류 · 15초) 정해 둔 대사 가운데 하나로
+// ==========================================
+function recentOf(who) { try { return JSON.parse(localStorage.getItem('dkb-' + who) || '[]') || []; } catch (e) { return []; } }
+function remember(who, lines) { try { localStorage.setItem('dkb-' + who, JSON.stringify(recentOf(who).concat(lines).slice(-16))); } catch (e) { } }
+// 누른 탐사자의 상태 — 도깨비가 보고 말한다 (2026-11-07 사용자 「상태이상, 포만감, 봉제인형 상태 등등」)
+function stateCtx() {
+    const u = u_(), M = D();
+    if (!u || !M) return {};
+    const ds = M.dolls(u), all = Object.keys(ds), t = Date.now();
+    const pct = function (d) { const s2 = M.stats(d); return Math.round(M.hpOf(d) / s2.max * 100); };
+    const effs = (Array.isArray(u.timedEffects) ? u.timedEffects : []).filter(function (e) { return e && e.name && (!e.expireAt || e.expireAt > t); }).map(function (e) { return String(e.name); });
+    let q = false;
+    try { q = typeof isQuarantined === 'function' && !!isQuarantined(u); } catch (e) { }
+    return {
+        포만감: Math.round(Number(u.satiety) || 0), 오염도: Math.round(Number(u.pollution) || 0), 격리: q, 상태이상: effs,
+        꿈결: dream(u), 포인트: Math.round(Number(u.points) || 0), 보관함: M.boxList(u).length,
+        배고픈_인형: all.filter(function (k) { return M.fullPct(ds[k]) < 30; }).length,
+        다친_인형: all.filter(function (k) { const p = pct(ds[k]); return p > 0 && p < 50; }).length,
+        쓰러진_인형: all.filter(function (k) { return pct(ds[k]) <= 0; }).length,
+        동행: M.withList(u).map(function (k) { const d = ds[k]; return d ? { 이름: M.nickOf(d), 종: M.spName(d.sp), 등급: M.stats(d).g, 체력: pct(d), 먹이: M.fullPct(d), 교감: M.bondOf(d) } : null; }).filter(Boolean),
+        주머니: { 포옹리본: M.bagHas(M.ITEM.RIBBON, u), 간식: M.bagHas(M.ITEM.SNACK, u), 청주: M.bagHas(M.ITEM.WINE, u), 메밀묵: M.bagHas(M.ITEM.JELLY, u) }
+    };
+}
+function askAi(who, mode, ms) {
+    const u = u_();
+    return new Promise(function (resolve) {
+        let done = false;
+        const fin = function (v) { if (!done) { done = true; resolve(v); } };
+        setTimeout(function () { fin(null); }, ms || 15000);
+        try {
+            fetch('/api/dokkaebi', { method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ who: who, mode: mode, code: u && u.code, name: u && u.name, recent: recentOf(who), ctx: stateCtx() }) })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) { const l = (j && Array.isArray(j.lines) && j.lines.length) ? j.lines.map(String) : null; if (l) remember(who, l); fin(l); })
+                .catch(function () { fin(null); });
+        } catch (e) { fin(null); }
+    });
+}
+// 누를 때 — 걸어가는 동안 미리 부른다 (doll-scene.js 가 누른 순간 prefetch)
+const PRE = {};
+const WHO_OF = { sew: 'sew', shop: 'shop', trade: 'trade', mask: 'mask', nap: 'nap' };
+function prefetch(act) { const w = WHO_OF[act]; if (!w || !tutDone()) return; PRE[w] = { at: Date.now(), p: askAi(w, 'greet', 9000) }; }
+function greetLines(who, fallback) {
+    const pre = PRE[who];
+    delete PRE[who];
+    const p = (pre && Date.now() - pre.at < 20000) ? pre.p : askAi(who, 'greet', 9000);
+    return p.then(function (l) { return l || [pick(fallback)]; });
+}
+// 말 건네고 고르기 — 인사는 AI (마지막 마디를 물음으로), 두 번째부터는 짧게
+async function greetAsk(S, who, name, fallback, again, opts, first) {
+    if (!first) return S.ask(name, pick(again), opts);
+    try { S.sys('(' + name + D().josa(name, '이') + ' 김서방을 살펴보는 중……)', 9000); } catch (e) { }
+    const l = await greetLines(who, fallback);
+    try { S.sys('', 10); } catch (e) { }
+    if (l.length > 1) await S.talk(l.slice(0, -1), name);
+    return S.ask(name, l[l.length - 1], opts);
+}
+async function aiTalk(S, who, name, fallback) {
+    try { S.sys('(' + name + D().josa(name, '이') + ' 무슨 말을 할지 고르는 중……)', 15000); } catch (e) { }
+    let lines = await askAi(who, 'chat', 15000);
+    try { S.sys('', 10); } catch (e) { }
+    if (!lines) lines = pick(fallback);
+    await S.talk(lines, name);
+}
+
 function needTut(S) {
     if (tutDone()) return false;
     S.talk([{ sys: 1, t: '도깨비 공방 앞에서 튜토리얼을 먼저 마쳐 주세요.' }]);
@@ -181,11 +249,11 @@ function needTut(S) {
 async function sew(S) {
     const WHO = '수선소 도깨비';
     if (needTut(S)) return;
-    for (;;) {
-        const i = await S.ask(WHO, pick(['……어서 와. 봉제인형을 고치러 왔어?', '실밥이 뜯어졌다고……? 어디 보자. 음, 이 정도면 금방 고칠 수 있겠네…….', '그런데…… 혹시 청주랑 메밀묵 좀 가져다줄 수 있을까……? 내가 그걸 참 좋아하거든…….']),
-            ['봉제인형 수선하기', '그냥 대화하기', '돌아가기']);
+    for (let n = 0; ; n++) {
+        const i = await greetAsk(S, 'sew', WHO, ['……어서 와. 봉제인형을 고치러 왔어?', '실밥이 뜯어졌다고……? 어디 보자. 음, 이 정도면 금방 고칠 수 있겠네…….', '그런데…… 혹시 청주랑 메밀묵 좀 가져다줄 수 있을까……? 내가 그걸 참 좋아하거든…….'],
+            ['……또 필요한 게 있어?', '……다른 건?'], ['봉제인형 수선하기', '그냥 대화하기', '돌아가기'], n === 0);
         if (i === 0) { const ok = await sewUi(); if (ok) await S.talk(['……다 됐어. 터진 실밥도 다시 꿰매고, 솜도 잘 정리해 뒀어.', '이제 괜찮을 거야…… 소중히 데리고 다녀 줘.'], WHO); return; }
-        if (i === 1) { await S.talk(pick(SEW_TALK), WHO); continue; }
+        if (i === 1) { await aiTalk(S, 'sew', WHO, SEW_TALK); continue; }
         return;
     }
 }
@@ -244,10 +312,10 @@ function sewUi() {
 async function shop(S) {
     const WHO = '잡화점 도깨비';
     if (needTut(S)) return;
-    for (;;) {
-        const i = await S.ask(WHO, pick(SHOP_TALK)[0], ['물건 구매하기', '그냥 대화하기', '돌아가기']);
+    for (let n = 0; ; n++) {
+        const i = await greetAsk(S, 'shop', WHO, SHOP_TALK.map(function (x) { return x[0]; }), ['또 뭐 필요한 거 있으쇼?', '자자, 더 보시겠수?'], ['물건 구매하기', '그냥 대화하기', '돌아가기'], n === 0);
         if (i === 0) { const r = await shopUi(); if (r === 'ok') await S.talk([pick(['매번 고맙수다! 아주 좋은 물건을 고르셨구먼!', '잘 쓰고, 또 필요하면 들르쇼!'])], WHO); else if (r === 'poor') await S.talk([pick(['어이쿠, 김서방! 가진 돈이 좀 모자란 것 같은데?', '아쉽지만 외상은 안 되오. 우리도 먹고살아야 하지 않겠수!'])], WHO); return; }
-        if (i === 1) { await S.talk(pick(SHOP_TALK), WHO); continue; }
+        if (i === 1) { await aiTalk(S, 'shop', WHO, SHOP_TALK); continue; }
         return;
     }
 }
@@ -591,7 +659,7 @@ function dropOn(id, fromSlot, toSlot, toId) {
 function reorder(list) {
     const M = D(), u = u_(), ds = M.dolls(u);
     const p = {};
-    list.forEach(function (id, i) { if (ds[id]) { ds[id].ord = i; p['dolls/' + id + '/ord'] = i; } });
+    list.forEach(function (id, i) { if (ds[id]) { ds[id].ord = i; p['pets/' + id + '/ord'] = i; } });
     u.dollSort = 'own';
     p.dollSort = 'own';
     M.put(p, u);
@@ -654,11 +722,17 @@ function dollMenu(id) {
     const at = new Date(d.at || 0);
     const days = Math.ceil(M.fedLeft(d) / 86400000);
     const html = '<div style="display:flex;gap:12px;align-items:center">' + icon(d.sp, 72) + '<div><h3>' + esc(M.nickOf(d)) + (d.fav ? ' <span style="color:#e6b400">★</span>' : '') + '</h3>'
-        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + d.g + ' · Lv.' + s.lv + (s.lv < M.LV_MAX ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ')' : ' (최고)') + '</div></div></div>'
+        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (s.lv < M.LV_MAX ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ')' : ' (최고)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
         + '<div class="gb-row"><div class="tx"><div style="font-size:11px;color:#d8ceff;line-height:1.7">체력 ' + Math.ceil(M.hpOf(d)) + ' / ' + s.max + ' · 공격 ' + s.atk + ' · 방어 ' + s.def + ' · 회피 ' + s.eva + '% · 급소 ' + s.crit + '%<br>'
         + '포만 ' + M.fullPct(d) + '% — ' + (days > 0 ? days + '일 안에 먹이를 주세요' : '곧 달아납니다!') + '<br>잡은 날 ' + at.getFullYear() + '.' + (at.getMonth() + 1) + '.' + at.getDate() + ' · ' + (inW ? '동행 중' : '보관함') + '</div>'
         + '<div style="margin-top:6px">기술 — ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { a: [] }).a.map(function (x) { return x[0]; }).join(' · ')) + ' / ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { d: [] }).d.map(function (x) { return x[0]; }).join(' · ')) + '</div></div></div>'
         + '<div class="gb-row"><input id="gb-nick" maxlength="12" placeholder="별명 (비우면 종 이름)" value="' + esc(d.nick || '') + '" style="flex:1;padding:7px;border-radius:7px;border:1px solid #6d5aa0;background:#2b2140;color:#fff"><button class="gb-btn" data-k="nick">바꾼다</button></div>'
+        + (function () {
+            const nd = M.gradeNeed(id, u);
+            if (!nd.rune) return '';
+            return '<div class="gb-row"><div class="tx"><div style="font-size:10.5px;color:' + (nd.ok ? '#9fd8ef' : '#8f84b5') + '">💠 ' + esc(nd.rune) + ' ' + nd.have + '개 — ' + (nd.ok ? '각성할 수 있습니다' : esc(nd.why)) + '</div></div>'
+                + (nd.ok ? '<button class="gb-btn pri" data-k="up">각성 (' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + ')</button>' : '') + '</div>';
+        })()
         + '<div class="gb-btns"><button class="gb-btn" data-k="fav">' + (d.fav ? '☆ 즐겨찾기 해제' : '★ 즐겨찾기') + '</button><button class="gb-btn" data-k="mv">' + (inW ? '보관함으로' : '동행으로') + '</button></div>'
         + '<div class="gb-btns"><button class="gb-btn" data-k="rel"' + (d.fav ? ' disabled' : '') + ' style="color:#ffb3b3">놓아주기</button><button class="gb-btn" data-k="x">닫는다</button></div>';
     const dim = panel(html);
@@ -667,6 +741,13 @@ function dollMenu(id) {
     dim.querySelector('[data-k=nick]').onclick = function () {
         const v = String(dim.querySelector('#gb-nick').value || '').trim().slice(0, 12);
         M.patchDoll(id, { nick: v || null }, u); dim._close(); boxPaint();
+    };
+    const upB = dim.querySelector('[data-k=up]');
+    if (upB) upB.onclick = function () {
+        const r = M.gradeUp(id);
+        if (!r.ok) { alert_(r.why); return; }
+        alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성했습니다.\n\nLv 1 부터 다시 오릅니다.');
+        dim._close(); boxPaint();
     };
     dim.querySelector('[data-k=fav]').onclick = function () { M.patchDoll(id, { fav: d.fav ? null : 1 }, u); dim._close(); boxPaint(); };
     dim.querySelector('[data-k=mv]').onclick = function () {
@@ -690,15 +771,16 @@ async function box(S) {
 // ==========================================
 // 교환소 — 1 : 1
 // ==========================================
-const TR = { id: null, ref: null, v: null, dim: null, me: '', side: '', listen: null, code: '', askSeen: {} };
+const TR = { id: null, ref: null, v: null, dim: null, me: '', side: '', listen: null, code: '', askSeen: {}, queue: [], out: {} };
 async function trade(S) {
     const WHO = '교환소 도깨비';
     if (needTut(S)) return;
-    for (;;) {
-        const i = await S.ask(WHO, pick(['어서 오쇼, 김서방! 인형을 바꾸러 오셨소?', '여기선 인형 하나에 인형 하나요. 하나를 받으려면 하나를 내놓아야지!', '그냥 주고 싶다고? 에이, 그러지 마쇼! 직접 잡는 재미도 있어야 하지 않겠소?']),
-            ['교환 신청하기', '그냥 대화하기', '돌아가기']);
+    for (let n = 0; ; n++) {
+        const i = await greetAsk(S, 'trade', WHO, ['어서 오쇼, 김서방! 인형을 바꾸러 오셨소?', '여기선 인형 하나에 인형 하나요. 하나를 받으려면 하나를 내놓아야지!', '그냥 주고 싶다고? 에이, 그러지 마쇼! 직접 잡는 재미도 있어야 하지 않겠소?'],
+            ['또 무슨 볼일이 있소?', '다른 건 없소?'], ['교환 신청하기', '그냥 대화하기', '돌아가기', '보낸 신청 보기 (' + Object.keys(TR.out).length + ')'], n === 0);
         if (i === 0) { tradeAsk(); return; }
-        if (i === 1) { await S.talk(pick(TRADE_TALK), WHO); continue; }
+        if (i === 1) { await aiTalk(S, 'trade', WHO, TRADE_TALK); continue; }
+        if (i === 3) { tradeMine(); return; }
         return;
     }
 }
@@ -710,7 +792,7 @@ function tradeAsk() {
     let dim = null, q = '';
     const paint = function () {
         const rows = list.filter(function (c) { return !q || String(users()[c].name).indexOf(q) >= 0; }).slice(0, 60);
-        const html = '<h3>🔁 교환 신청</h3><div class="sub">교환할 동료를 고르세요. 상대가 받으면 교환 창이 열립니다 (10분 안에).</div>'
+        const html = '<h3>🔁 교환 신청</h3><div class="sub">교환할 동료를 고르세요 (여럿에게 보내도 됩니다). 상대가 받으면 교환 창이 열립니다.</div>'
             + '<input id="gb-tq" placeholder="이름 검색" value="' + esc(q) + '" style="width:100%;box-sizing:border-box;padding:7px;border-radius:7px;border:1px solid #6d5aa0;background:#2b2140;color:#fff;margin-bottom:6px">'
             + rows.map(function (c) { const x = users()[c]; return '<div class="gb-row"><div class="tx"><b>' + esc(x.name) + '</b><div>' + esc((x.affiliation || '') + ' · ' + (x.team || '')) + '</div></div><button class="gb-btn" data-c="' + esc(c) + '">신청</button></div>'; }).join('')
             + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
@@ -728,9 +810,40 @@ function tradeSend(code) {
     const ref = d.ref(TRADE).push();
     const v = { at: D().now(), ac: me.code, bc: code, state: 'ask', a: { code: me.code, name: me.name }, b: { code: code, name: you.name } };
     ref.set(v).then(function () {
+        TR.out[ref.key] = v;
         alert_('🔁 ' + you.name + ' 사원에게 교환을 신청했습니다.\n상대가 받으면 교환 창이 열립니다.');
-        tradeWatch(ref.key, 'a');
     });
+}
+// 보낸 신청 — 받기 전이면 거둘 수 있다
+function tradeMine() {
+    const keys = Object.keys(TR.out);
+    const html = '<h3>🔁 보낸 신청</h3><div class="sub">상대가 아직 받지 않은 신청입니다.</div>'
+        + (keys.length ? keys.map(function (k) { const o = TR.out[k]; return '<div class="gb-row"><div class="tx"><b>' + esc(o.b && o.b.name) + '</b><div>' + new Date(Number(o.at) || 0).toLocaleString('ko-KR') + '</div></div><button class="gb-btn" data-k="' + esc(k) + '">거두기</button></div>'; }).join('')
+                     : '<div class="sub">기다리는 신청이 없습니다.</div>')
+        + '<div class="gb-btns"><button class="gb-btn" data-x="1">닫는다</button></div>';
+    const dim = panel(html);
+    dim.querySelector('[data-x]').onclick = function () { dim._close(); };
+    Array.prototype.forEach.call(dim.querySelectorAll('[data-k]'), function (b) {
+        b.onclick = function () { db_().ref(TRADE + '/' + b.dataset.k).update({ state: 'cancel', why: '신청한 쪽이 거둠' }); delete TR.out[b.dataset.k]; dim._close(); tradeMine(); };
+    });
+}
+// 교환 창이 비면 기다리던 것을 차례로
+function tradeNext() {
+    if (TR.id || !TR.queue.length) return;
+    const k = TR.queue.shift();
+    db_().ref(TRADE + '/' + k).once('value').then(function (s) {
+        const v = s.val();
+        if (!v) { tradeNext(); return; }
+        if (v.state === 'ask' && v.bc === u_().code) askOne(k, v);
+        else if (v.state === 'open' && (v.ac === u_().code || v.bc === u_().code)) tradeWatch(k, v.ac === u_().code ? 'a' : 'b');
+        else tradeNext();
+    });
+}
+function askOne(k, v) {
+    const d = db_();
+    const yes = confirm('🔁 ' + (v.a && v.a.name) + ' 사원이 봉제인형 교환을 신청했습니다.\n\n교환 창을 열까요? (서로 한 마리씩 올리고, 둘 다 승인해야 바뀝니다)');
+    if (!yes) { d.ref(TRADE + '/' + k).update({ state: 'cancel', why: '거절' }); setTimeout(tradeNext, 200); return; }
+    d.ref(TRADE + '/' + k).update({ state: 'open' }).then(function () { tradeWatch(k, 'b'); });
 }
 // 내게 온 신청 · 내가 연 교환을 지켜본다
 function tradeBind() {
@@ -740,15 +853,28 @@ function tradeBind() {
     const onAsk = function (s) {
         const v = s.val();
         if (!v || v.state !== 'ask' || v.bc !== me.code || TR.askSeen[s.key]) return;
-        if (D().now() - Number(v.at || 0) > TRADE_LIVE) return;
         TR.askSeen[s.key] = 1;
-        if (TR.id) { d.ref(TRADE + '/' + s.key).update({ state: 'cancel', why: '상대가 다른 교환 중' }); return; }
-        const yes = confirm('🔁 ' + (v.a && v.a.name) + ' 사원이 봉제인형 교환을 신청했습니다.\n\n교환 창을 열까요? (서로 한 마리씩 올리고, 둘 다 승인해야 바뀝니다)');
-        if (!yes) { d.ref(TRADE + '/' + s.key).update({ state: 'cancel', why: '거절' }); return; }
-        d.ref(TRADE + '/' + s.key).update({ state: 'open' }).then(function () { tradeWatch(s.key, 'b'); });
+        if (TR.id) { if (TR.queue.indexOf(s.key) < 0) TR.queue.push(s.key); return; }     // 교환 중 — 끝나면 묻는다
+        askOne(s.key, v);
     };
     d.ref(TRADE).orderByChild('bc').equalTo(me.code).on('child_added', onAsk);
     d.ref(TRADE).orderByChild('bc').equalTo(me.code).on('child_changed', onAsk);
+    // 내가 보낸 것 — 상대가 받으면(open) 창을 연다 · 거절 · 취소는 알린다
+    const onMine = function (s) {
+        const v = s.val();
+        if (!v || v.ac !== me.code) return;
+        if (v.state === 'ask') { TR.out[s.key] = v; return; }
+        const was = TR.out[s.key];
+        delete TR.out[s.key];
+        if (v.state === 'open' && TR.id !== s.key) {
+            if (TR.id) { if (TR.queue.indexOf(s.key) < 0) TR.queue.push(s.key); }
+            else tradeWatch(s.key, 'a');
+        } else if (v.state === 'cancel' && was && TR.id !== s.key && v.why === '거절') {
+            alert_('🔁 ' + (v.b && v.b.name) + ' 사원이 교환 신청을 거절했습니다.');
+        }
+    };
+    d.ref(TRADE).orderByChild('ac').equalTo(me.code).on('child_added', onMine);
+    d.ref(TRADE).orderByChild('ac').equalTo(me.code).on('child_changed', onMine);
 }
 setInterval(function () { try { tradeBind(); } catch (e) { } }, 2000);
 
@@ -775,20 +901,19 @@ function tradeWatch(id, side) {
         }
         if (v.state === 'open') { tradePaint(); tradeTry(); }
     });
-    // 10분이 지나면 저절로 그만
-    setTimeout(function () { if (TR.id === id && TR.v && TR.v.state !== 'done') d.ref(TRADE + '/' + id).update({ state: 'cancel', why: '시간 초과' }); }, TRADE_LIVE);
 }
 function tradeEnd() {
     if (TR.ref) { try { TR.ref.off(); } catch (e) { } }
     if (TR.dim) TR.dim._close();
     TR.id = null; TR.ref = null; TR.v = null; TR.dim = null;
+    setTimeout(tradeNext, 400);
 }
 function tradeCard(o, mine) {
     const M = D();
     if (!o || !o.doll) return '<div class="sub" style="text-align:center;padding:14px 0">' + (mine ? '아직 올리지 않았습니다' : '상대가 고르는 중…') + '</div>';
     const d = o.doll, s = M.stats(d);
     return '<div style="display:flex;flex-direction:column;align-items:center">' + icon(d.sp, 64) + '<b style="color:#fff3d6">' + esc(M.nickOf(d)) + '</b>'
-        + '<div style="font-size:10px;color:#a99ccc;text-align:center;line-height:1.5">' + esc(M.spName(d.sp)) + ' · No.' + String(d.sp).padStart(2, '0') + '<br>' + d.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + '<br>체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + '</div></div>';
+        + '<div style="font-size:10px;color:#a99ccc;text-align:center;line-height:1.5">' + esc(M.spName(d.sp)) + ' · No.' + String(d.sp).padStart(2, '0') + '<br>' + s.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + '<br>체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + '</div></div>';
 }
 function tradePaint() {
     const v = TR.v;
@@ -823,7 +948,8 @@ function tradePick() {
     Array.prototype.forEach.call(dim.querySelectorAll('[data-id]'), function (b) {
         b.onclick = function () {
             const d = ds[b.dataset.id];
-            const snap = { id: d.id, sp: d.sp, g: d.g, lv: d.lv || 1, xp: d.xp || 0, hp: M.hpOf(d), at: d.at || 0 };
+            const st = M.stats(d);
+            const snap = { id: d.id, sp: d.sp, g: st.g, lv: st.lv, xp: d.xp || 0, hp: M.hpOf(d), at: d.at || 0 };
             if (d.nick) snap.nick = d.nick;
             const p = {};
             p[TR.side + '/doll'] = snap; p['a/ready'] = false; p['b/ready'] = false; p['a/ok'] = false; p['b/ok'] = false;
@@ -839,32 +965,45 @@ function tradeTry() {
     const d = db_(), me = u_();
     d.ref(TRADE + '/' + TR.id + '/exec').transaction(function (c) { return c ? undefined : me.code; }).then(function (r) {
         if (!r || !r.committed) return;
-        const A = v.a.code, Bc = v.b.code, xa = v.a.doll.id, xb = v.b.doll.id;
+        const A = v.a.code, Bc = v.b.code, xa = String(v.a.doll.id), xb = String(v.b.doll.id);
         return Promise.all([
-            d.ref('users/' + A + '/dolls/' + xa).once('value'), d.ref('users/' + Bc + '/dolls/' + xb).once('value'),
-            d.ref('users/' + A + '/dollWith').once('value'), d.ref('users/' + Bc + '/dollWith').once('value')
+            d.ref('users/' + A + '/pets').once('value'), d.ref('users/' + Bc + '/pets').once('value'),
+            d.ref('users/' + A + '/petShow').once('value'), d.ref('users/' + Bc + '/petShow').once('value')
         ]).then(function (ss) {
-            const da = ss[0].val(), db2 = ss[1].val();
+            const M = D(), PT = window.PET;
+            const pa = M.objOf(ss[0].val()), pb = M.objOf(ss[1].val());
+            const da = pa[xa], db2 = pb[xb];
             if (!da || !db2) { d.ref(TRADE + '/' + TR.id).update({ state: 'cancel', why: '올린 인형이 이미 없습니다' }); return; }
+            // 받는 쪽의 빈 열쇠 (같은 동물이 있으면 113 · 213 …)
+            const free = function (ps, gone, sp) { for (let n = 0; n < 60; n++) { const k = String(sp + 100 * n); if (k === gone || !ps[k]) return k; } return String(sp + 6000); };
+            const ka = free(pa, xa, PT.sp(xb)), kb = free(pb, xb, PT.sp(xa));
             const arr = function (x) { return Array.isArray(x) ? x : ((x && typeof x === 'object') ? Object.keys(x).sort().map(function (k) { return x[k]; }) : []); };
-            const wa = arr(ss[2].val()).filter(function (x) { return x && x !== xa; });
-            const wb = arr(ss[3].val()).filter(function (x) { return x && x !== xb; });
-            const t = D().now();
-            const na = Object.assign({}, db2, { ord: t, fav: null, fedAt: t });
-            const nb = Object.assign({}, da, { ord: t, fav: null, fedAt: t });
+            const wa = arr(ss[2].val()).map(String).filter(function (x) { return x && x !== xa; });
+            const wb = arr(ss[3].val()).map(String).filter(function (x) { return x && x !== xb; });
+            const t = M.now();
+            // 주인이 바뀐다 — 교감 · 즐겨찾기 · 나가 있던 일은 비우고, 등급 · Lv · 이름 · 장비 · 체력은 그대로
+            const fresh = function (rec) {
+                const o = Object.assign({}, rec, { ord: t, fedAt: t, at: t, bond: 0 });
+                ['fav', 'bd', 'with', 'out', 'rest', 'jsleep', 'hurt', 'stv', 'doll', 'pet'].forEach(function (k) { delete o[k]; });
+                return o;
+            };
             const p = {};
-            p['users/' + A + '/dolls/' + xa] = null;
-            p['users/' + Bc + '/dolls/' + xb] = null;
-            p['users/' + A + '/dolls/' + xb] = na;
-            p['users/' + Bc + '/dolls/' + xa] = nb;
-            p['users/' + A + '/dollWith'] = wa.length ? wa : null;
-            p['users/' + Bc + '/dollWith'] = wb.length ? wb : null;
+            p['users/' + A + '/pets/' + xa] = null;
+            p['users/' + Bc + '/pets/' + xb] = null;
+            p['users/' + A + '/pets/' + ka] = fresh(db2);
+            p['users/' + Bc + '/pets/' + kb] = fresh(da);
+            p['users/' + A + '/petShow'] = wa.length ? wa.map(Number) : null;
+            p['users/' + Bc + '/petShow'] = wb.length ? wb.map(Number) : null;
+            p['users/' + A + '/petShowSet'] = 1;
+            p['users/' + Bc + '/petShowSet'] = 1;
+            p['petFed/' + A + '/' + xa] = null;
+            p['petFed/' + Bc + '/' + xb] = null;
             p[TRADE + '/' + TR.id + '/state'] = 'done';
             p[TRADE + '/' + TR.id + '/doneAt'] = t;
+            p[TRADE + '/' + TR.id + '/keys'] = { a: ka, b: kb };
             return d.ref().update(p).then(function () {
                 try {
-                    const M = D();
-                    M.log('[🔁 교환소] ' + M.nickOf(da) + ' ↔ ' + M.nickOf(db2) + ' (' + (me.code === A ? v.b.name : v.a.name) + ' 사원과)', me);
+                    M.log('[🔁 교환소] ' + (da.nick || M.spName(PT.sp(xa))) + ' ↔ ' + (db2.nick || M.spName(PT.sp(xb))) + ' (' + (me.code === A ? v.b.name : v.a.name) + ' 사원과)', me);
                     M.saveHist();
                 } catch (e) { }
             });
@@ -876,13 +1015,65 @@ window.dollTradeState = function () { console.log({ 교환: TR.id, 쪽: TR.side,
 // ==========================================
 // 나머지 도깨비
 // ==========================================
-async function mask(S) { await S.talk([pick(['……탈은 얼굴을 숨기는 게 아니라, 다른 얼굴을 빌리는 거라네.', '따라쟁이들도 탈을 쓰는 거랑 비슷하지. 남의 얼굴을 빌려 쓰는 거야.', '이 탈? 아직 덜 깎았네. 눈을 뚫으면 저 혼자 웃기 시작하거든.'])], '탈 깎는 도깨비'); }
-async function nap(S) { await S.talk([pick(['……쿨…… 쿨……', '……으음…… 메밀묵은 내 거야……', '……김서방…… 리본…… 다섯 개……'])], '조는 도깨비'); }
+// ==========================================
+// 💠 각성 공방 — 탈 깎는 도깨비 (조각 셋 → 룬 · Lv 10 인형을 각성)
+// ==========================================
+const MASK_TALK = [['……탈은 얼굴을 숨기는 게 아니라, 다른 얼굴을 빌리는 거라네.'], ['따라쟁이들도 탈을 쓰는 거랑 비슷하지. 남의 얼굴을 빌려 쓰는 거야.'], ['조각 셋이면 룬 하나. 모자라면 어둠에 더 다녀오게.']];
+async function mask(S) {
+    const WHO = '탈 깎는 도깨비';
+    if (needTut(S)) return;
+    for (let n = 0; ; n++) {
+        const i = await greetAsk(S, 'mask', WHO, ['……룬 조각을 가져왔나. 셋이면 하나로 깎아 주지.', '각성하려는 녀석이 있나? Lv 이 가득 차야 룬이 듣는다네.', '……어둠에서 주워 온 조각이로군. 이리 줘 보게.'],
+            ['……또 볼일이 있나?', '다른 건 없고?'], ['각성의 룬 다루기', '그냥 대화하기', '돌아가기'], n === 0);
+        if (i === 0) { runeUi(); return; }
+        if (i === 1) { await aiTalk(S, 'mask', WHO, MASK_TALK); continue; }
+        return;
+    }
+}
+function runeUi() {
+    const M = D(), A = window.AWK, u = u_();
+    if (!A) { alert_('각성의 룬을 다룰 수 없습니다.'); return; }
+    let dim = null;
+    const paint = function () {
+        const ds = M.dolls(u);
+        const ready = Object.keys(ds).filter(function (id) { return M.gradeNeed(id, u).ok; });
+        const lv10 = Object.keys(ds).filter(function (id) { const nd = M.gradeNeed(id, u); return !nd.ok && nd.rune && M.stats(ds[id]).lv >= M.LV_MAX; });
+        const html = '<h3>💠 각성 공방</h3><div class="sub">펫 동행 어둠(여정 · 아케이드존)에서 괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각이 나오지만 드뭅니다.<br>조각 셋 → 룬 하나. Lv ' + M.LV_MAX + ' 인형에게 다음 등급의 룬을 쓰면 각성합니다 (Lv 1 부터 다시).</div>'
+            + ['C', 'B', 'A', 'S'].map(function (g) {
+                const sh = A.have(A.SHARD(g), u), rn = A.have(A.RUNE(g), u);
+                return '<div class="gb-row"><div class="tx"><b>' + g + '급</b> <span style="font-size:10px;color:#8f84b5">· ' + ({ C: 'D → C', B: 'C → B', A: 'B → A', S: 'A → S' })[g] + '</span><div>조각 ' + sh + '개 · 룬 ' + rn + '개</div></div>'
+                    + '<button class="gb-btn' + (sh >= 3 ? ' pri' : '') + '" data-c="' + g + '"' + (sh >= 3 ? '' : ' disabled') + '>합치기' + (sh >= 6 ? ' ×' + Math.floor(sh / 3) : '') + '</button></div>';
+            }).join('')
+            + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">각성할 수 있는 인형</div>'
+            + (ready.length ? ready.map(function (id) { const d = ds[id], s = M.stats(d), nd = M.gradeNeed(id, u); return '<div class="gb-row">' + icon(d.sp, 36) + '<div class="tx">' + dollLine(d) + '<div>💠 ' + esc(nd.rune) + '</div></div><button class="gb-btn pri" data-u="' + id + '">' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + '</button></div>'; }).join('')
+                            : '<div class="sub">' + (lv10.length ? 'Lv ' + M.LV_MAX + ' 인형 ' + lv10.length + '마리 — 다음 등급의 룬이 없습니다.' : 'Lv ' + M.LV_MAX + ' 인 인형이 없습니다.') + '</div>')
+            + '<div class="gb-btns"><button class="gb-btn" data-x="1">닫는다</button></div>';
+        if (!dim) dim = panel(html); else dim.firstChild.innerHTML = html;
+        dim.querySelector('[data-x]').onclick = function () { dim._close(); };
+        Array.prototype.forEach.call(dim.querySelectorAll('[data-c]'), function (b) { b.onclick = function () { const n = A.combine(b.dataset.c, 99); if (n) alert_('💠 ' + A.RUNE(b.dataset.c) + ' ' + n + '개를 깎았습니다.'); paint(); }; });
+        Array.prototype.forEach.call(dim.querySelectorAll('[data-u]'), function (b) {
+            b.onclick = function () {
+                const d = M.dolls(u)[b.dataset.u];
+                const r = M.gradeUp(b.dataset.u);
+                if (!r.ok) { alert_(r.why); return; }
+                alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성했습니다.\n\nLv 1 부터 다시 오릅니다.');
+                paint();
+            };
+        });
+    };
+    paint();
+}
+async function nap(S) {
+    try { S.sys('(쿨…… 쿨……)', 9000); } catch (e) { }
+    const l = await greetLines('nap', ['……쿨…… 쿨……', '……으음…… 메밀묵은 내 거야……', '……김서방…… 리본…… 다섯 개……']);
+    try { S.sys('', 10); } catch (e) { }
+    await S.talk(l, '조는 도깨비');
+}
 
 window.DOLLGONG = {
     sew: sew, shop: shop, trade: trade, box: box, dex: dex, mask: mask, nap: nap,
     repaint: function () { try { if (BX.a) boxPaint(); } catch (e) { } try { if (TR.dim) tradePaint(); } catch (e) { } },
-    boxOpen: boxOpen, boxClose: boxClose
+    boxOpen: boxOpen, boxClose: boxClose, panel: panel, icon: icon, dollLine: dollLine, css: css, prefetch: prefetch, stateCtx: stateCtx
 };
 window.dollBoxOpen = boxOpen;
 

@@ -311,12 +311,13 @@ function roomPets() {
     if (!ids.length) {
         try { ids = Object.keys(P().pets(u)).slice(0, 2); } catch (e) { ids = []; }
     }
-    return ids.map(Number).filter(function (i) { return KIND[i]; });
+    return ids.map(Number).filter(function (i) { return KIND[spOf(i)]; });
 }
 
-function kindOf(id) { return KIND[id] || 'small'; }
+function spOf(k) { return (window.PET && PET.sp) ? PET.sp(k) : Number(k); }
+function kindOf(id) { return KIND[spOf(id)] || 'small'; }
 function nickOf(id) {
-    try { return P().nick(id, u_()); } catch (e) { return (P().BY[id] || {}).n || '펫'; }
+    try { return P().nick(id, u_()); } catch (e) { return (P().BY[id] || {}).n || '인형'; }
 }
 
 // 한 마디에 대한 대답 — [{ id, nick, line }]
@@ -360,7 +361,7 @@ window.petTalkSend = function () {
     const a = answer(text);
     if (a.none) {
         show('<div style="font-size:10.5px; color:#8d8578; padding:7px 0;">'
-            + '방에 내놓은 펫이 없습니다. 펫 칸에서 내놓을 펫을 정해 주십시오.</div>');
+            + '방에 내놓은 인형이 없습니다. 인형 칸에서 내놓을 인형을 정해 주십시오.</div>');
         return;
     }
     const head = '<div style="font-size:10px; color:#8d8578; margin-bottom:3px;">「'
@@ -436,14 +437,14 @@ setInterval(function () {
         const _r = renderHouse;
         const w = function () {
             const out = _r.apply(this, arguments);
-            try { mount(); } catch (e) { console.warn('[펫]', e); }
+            try { mount(); } catch (e) { console.warn('[인형]', e); }
             return out;
         };
         w._petTalk = true;
         renderHouse = w;
         window.renderHouse = w;
         clearInterval(iv);
-        console.log('[펫] 말 걸기 칸 연결');
+        console.log('[인형] 말 걸기 칸 연결');
     }, 400);
     setTimeout(function () { clearInterval(iv); }, 40000);
 })();
@@ -453,7 +454,7 @@ setInterval(function () {
 // ==========================================
 window.petSay = function (text) {
     const a = answer(text);
-    if (a.none) { console.log('  방에 내놓은 펫이 없습니다.'); return; }
+    if (a.none) { console.log('  방에 내놓은 인형이 없습니다.'); return; }
     console.log('%c「' + text + '」' + (a.said ? ' → ' + a.said : ' → 못 알아들음'),
         'color:#9fd8ef; font-size:13px');
     a.rows.forEach(function (r) {
@@ -485,6 +486,6 @@ window.petGreetTest = function () {
 
 window.PETTALK = { SAY: SAY, GREET: GREET, KIND: KIND, answer: answer, find: findSay };
 
-console.log('[펫] petSay(\'앉아\') · petTalkList() · petGreetTest()');
+console.log('[인형] petSay(\'앉아\') · petTalkList() · petGreetTest()');
 
 })();

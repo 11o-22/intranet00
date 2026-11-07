@@ -1,30 +1,34 @@
 // ==========================================
-// ★ 🧸 따라쟁이 봉제인형 — 바탕 (자료 · 동행 · 보관함 · 주머니 · 도감)
-// bundles.json 마지막 묶음 — journey.js · pet-data.js 보다 뒤, doll-scene · doll-battle · doll-gong 보다 앞
+// ★ 🧸 따라쟁이 봉제인형 — 바탕 (펫 = 봉제인형 · 동행 · 보관함 · 주머니 · 도감)
+// bundles.json 마지막 묶음 — journey.js · pet-data.js · pet-gear.js 보다 뒤, doll-scene · doll-battle · doll-gong 보다 앞
 // ==========================================
 //
 // 2026-11-07 사용자 「여정 시스템을 이렇게 구현하자. 야생 펫 조우 맵. 펫 전투 화면. + 도깨비 공방 추가」
-//   (기획안 — 펫 시스템 확장 기획안 · 펫 전투 · 수선소 · 잡화점 · 교환소 · 보관함 · 펫 로스 · 튜토리얼)
+// 2026-11-07 사용자 「기존의 펫들을 싹 없애고 그 부분을 봉제인형으로 매꾸자」
+//   → 「인형으로 바꿔 줌」 · 「인형이 모두 이어받음」 · 「알에서 인형이 나옴」
 //
 // ■ 무엇인가
-//   야생에서 잡는 「따라쟁이 봉제인형」. 탐사자가 기억하는 동물(펫 25종)의 모습을 흉내 낸다.
-//   기존 펫(u.pets — 진짜 동물 · 종마다 한 마리)과는 **따로** 둔다. 같은 종을 여럿 잡을 수 있어야 해서다
-//   (중복 포획 → 교환소). 그림은 봉제인형 그림(doll/pf · pb)을 쓴다.
+//   펫이 곧 봉제인형이다. 따로 두던 인형 칸(u.dolls)은 없앴고, 펫 칸(u.pets)에 그대로 들어간다.
+//   그래서 사택 방 · 쓰다듬기 · 먹이 · 몰래 따라오기 · 펫 결투 · 알 부화 같은 펫 기능을 인형이 그대로 이어받는다.
+//   그림만 봉제인형 그림으로 바뀌었다 (pet/p○○ · s○○ 를 인형 그림으로 다시 만들었다).
+//   같은 동물을 여럿 가질 수 있다 — 둘째부터 열쇠에 100 씩 얹는다 (13 · 113 · 213 …, pet-data.js PET.sp · newKey).
 //
 // ■ 사원 기록에 적히는 자리
-//   u.dolls     { 열쇠: { id, sp(종 1~25), nick, g(D~S), lv, xp, hp, at(잡은 때), fedAt, fav, ord } }
-//   u.dollWith  [열쇠, 열쇠, 열쇠]   동행 — 세 마리까지. 나머지는 보관함(펫 박스)
-//   u.dollBag   { '🎀 포옹 리본': n, '🍶 청주': n, '🥣 메밀묵': n, '🧶 솜뭉치 간식': n }  — 소지품과 따로
-//   u.dollDex   { 종: { s: 처음 본 때, c: 처음 잡은 때, n: 잡은 수 } }      봉제인형 도감
-//   u.darkDex   { 괴담 번호: 처음 만난 때 }                                    어둠 · 재난 도감 (잡을 수 없다)
-//   u.dollTut   { step, done }   도깨비 공방 튜토리얼
-//   u.dollSort  'dex' | 'cap' | 'own'   보관함 정렬
+//   u.pets[열쇠]  펫 칸 그대로 + { hp(전투 체력), fav(즐겨찾기), ord(보관함 순서) }  — 등급 g · lv · xp · bond · nick · fedAt 은 원래 있던 것
+//   u.petShow    [열쇠 셋]  동행 = 집(방에 내놓은 셋). 나머지는 보관함(펫 박스). u.petShowSet 이 있으면 저절로 채우지 않는다
+//   u.dollBag    { '🎀 포옹 리본': n, '🍶 청주': n, '🥣 메밀묵': n, '🧶 솜뭉치 간식': n }  — 소지품과 따로
+//   u.dollDex    { 종: { s: 처음 본 때, c: 처음 잡은 때, n: 잡은 수 } }      봉제인형 도감
+//   u.darkDex    { 괴담 번호: 처음 만난 때 }                                    어둠 · 재난 도감 (잡을 수 없다)
+//   u.dollTut    { step, done }   도깨비 공방 튜토리얼 · u.dollSort 보관함 정렬 · u.dollMig 옮겨 왔나
 //
-//   쓸 때는 users/<사번>/dolls/<열쇠> 처럼 **한 칸씩** 쓴다 (통째로 덮지 않는다). pet-sync.js 가 다른 기기에서 받아 온다.
+// ■ 옮겨 오기 (사원마다 한 번 — u.dollMig)
+//   예전 인형 칸(u.dolls · u.dollWith)이 있으면 펫 칸으로 옮기고, 가진 펫은 모두 도감에 「잡은 것」으로 적는다.
+//   옮기는 날 먹이 시계를 새로 맞춰 준다 — 바뀐 규칙(7일이면 탈출) 때문에 바로 달아나지 않게.
 //
-// ■ 탈출 (펫 로스 개선안)
-//   7일 동안 먹이(🧶 솜뭉치 간식)를 안 주면 **탈출**한다 — 목록에서 사라지고 원형의 야생 인형으로 돌아간다.
-//   동행 · 보관함 둘 다 같다. 보관함의 「일괄 먹이 주기」로 한꺼번에 준다.
+// ■ 굶주림 · 탈출
+//   동행(집) 셋은 펫처럼 사흘 굶으면 교감 -70 (pet-data.js). 보관함에 있는 동안은 도깨비가 돌봐서 교감이 안 깎인다.
+//   어디에 있든 7일 동안 먹이를 못 받으면 **탈출** — 목록에서 사라지고 원형의 야생 인형으로 돌아간다.
+//   🧶 솜뭉치 간식 · 사택 먹이 모두 먹이로 친다 (fedAt).
 //
 // ■ 콘솔
 //   dollState()                 내 인형 · 동행 · 주머니
@@ -122,18 +126,31 @@ function objOf(v) {
     if (Array.isArray(v)) { const o = {}; v.forEach(function (x, i) { if (x != null) o[i] = x; }); return o; }
     return v;
 }
-function dolls(u) { u = u || u_(); if (!u) return {}; u.dolls = objOf(u.dolls); return u.dolls; }
+// 인형 = 펫 칸. 열쇠(id) · 종(sp)을 칸 안에 붙여 둔다 (화면에서만 · 서버에는 안 쓴다)
+function dolls(u) {
+    u = u || u_();
+    if (!u) return {};
+    let ps = {};
+    try { ps = P().pets(u); } catch (e) { return {}; }
+    const out = {};
+    Object.keys(ps).forEach(function (k) {
+        const r = ps[k];
+        if (!r || typeof r !== 'object' || !P().BY[k]) return;
+        if (r.id !== k) { try { Object.defineProperty(r, 'id', { value: k, enumerable: false, configurable: true, writable: true }); } catch (e) { r.id = k; } }
+        const sp = P().sp(k);
+        if (r.sp !== sp) { try { Object.defineProperty(r, 'sp', { value: sp, enumerable: false, configurable: true, writable: true }); } catch (e) { r.sp = sp; } }
+        out[k] = r;
+    });
+    return out;
+}
 function bag(u) { u = u || u_(); if (!u) return {}; u.dollBag = objOf(u.dollBag); return u.dollBag; }
 function dex(u) { u = u || u_(); if (!u) return {}; u.dollDex = objOf(u.dollDex); return u.dollDex; }
 function darkDex(u) { u = u || u_(); if (!u) return {}; u.darkDex = objOf(u.darkDex); return u.darkDex; }
+// 동행 = 방에 내놓은 셋 (pet-data.js petShowList · 저절로 채우기는 u.petShowSet 이 없을 때만)
 function withList(u) {
     u = u || u_();
     if (!u) return [];
-    const ds = dolls(u);
-    const raw = Array.isArray(u.dollWith) ? u.dollWith : (u.dollWith && typeof u.dollWith === 'object' ? Object.keys(u.dollWith).sort().map(function (k) { return u.dollWith[k]; }) : []);
-    const out = [];
-    raw.forEach(function (id) { if (id && ds[id] && out.indexOf(id) < 0 && out.length < PARTY_MAX) out.push(String(id)); });
-    return out;
+    try { return P().show(u).map(String).slice(0, PARTY_MAX); } catch (e) { return []; }
 }
 function boxList(u) {
     u = u || u_();
@@ -144,7 +161,6 @@ function boxList(u) {
 // ==========================================
 // 쓰기 — 한 칸씩 (users/<사번>/…)
 // ==========================================
-//   paths 는 { 'dolls/열쇠': 값, 'dollBag/이름': 값 … } — 내 화면(currentUser)은 부르는 쪽이 먼저 고쳐 둔다.
 function put(paths, u) {
     u = u || u_();
     if (!u || !u.code) return Promise.resolve(false);
@@ -161,34 +177,36 @@ function put(paths, u) {
 function saveHist() { try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { } }
 
 // ==========================================
-// 인형 하나의 수치
+// 인형 하나의 수치 — 펫 수치 그대로 (pet-gear.js PETGEAR.stats · 등급 · Lv · 장비)
 // ==========================================
-//   종 능력치(pet-data st)는 등급 B 부터 붙는다 — 펫과 같은 규칙 (그래서 D · C 는 종 차이가 속성뿐이다)
-//     체력 50 + Lv·6 + 등급·15 + 저항·4      공격 8 + Lv·1.5 + 등급·3 + 판정·2
-//     방어 2 + Lv·0.5 + 등급·1.5 + 저항       회피% 5 + 회피·3         치명% 5 + 행운/10
 function gradeIdx(g) { const i = GRADES.indexOf(g); return i < 0 ? 0 : i; }
-function stats(d) {
+function stats(d, u) {
+    u = u || u_();
     const sp = spOf(d && d.sp) || { st: {}, w: 'wet' };
-    const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min(LV_MAX, Number(d && d.lv) || 1));
-    const st = (gi >= 2) ? (sp.st || {}) : {};
-    const n = function (k) { return Number(st[k]) || 0; };
-    return {
-        max: Math.round(50 + lv * 6 + gi * 15 + n('resist') * 4),
-        atk: Math.round((8 + lv * 1.5 + gi * 3 + n('bon') * 2) * 10) / 10,
-        def: Math.round((2 + lv * 0.5 + gi * 1.5 + n('resist')) * 10) / 10,
-        eva: Math.min(40, 5 + n('eva') * 3),
-        crit: Math.min(40, Math.round(5 + n('luck') / 10)),
-        att: sp.w || 'wet', lv: lv, gi: gi
-    };
+    let s = null;
+    try { if (d && d.id && window.PETGEAR && P().pets(u)[d.id] === d) s = window.PETGEAR.stats(d.id, u); } catch (e) { s = null; }
+    if (!s) {                               // 남의 인형(교환 창) — 같은 셈을 직접
+        const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min(LV_MAX, Number(d && d.lv) || 1));
+        const st = (gi >= 2) ? (sp.st || {}) : {};
+        const n = function (k) { return Number(st[k]) || 0; };
+        const luck = n('luck') >= 10 ? n('luck') / 20 : n('luck');
+        s = { max: Math.round(60 + lv * 6 + gi * 20 + n('resist') * 4), atk: Math.round((8 + lv * 1.5 + gi * 4 + n('bon') * 2) * 10) / 10,
+              def: Math.round((2 + lv * 0.5 + gi * 2 + n('resist') * 1.5) * 10) / 10, eva: Math.min(60, 5 + n('eva') * 3),
+              crit: Math.min(60, Math.round(5 + luck * 8)), lv: lv, gi: gi };
+    }
+    return { max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, lv: s.lv, gi: s.gi, g: GRADES[s.gi] || 'D', att: sp.w || 'wet' };
 }
+function gOf(d) { return stats(d).g; }
 function hpOf(d) {
     const s = stats(d);
     const h = (d && d.hp != null) ? Number(d.hp) : s.max;
     return Math.max(0, Math.min(s.max, isFinite(h) ? h : s.max));
 }
-function nickOf(d) { return (d && d.nick) ? String(d.nick) : spName(d && d.sp); }
-// 경험치 — Lv 마다 20 · 30 · 40 … (Lv·10 + 10)
-function xpNeed(lv) { return lv * 10 + 10; }
+function nickOf(d) {
+    if (d && d.nick && String(d.nick).trim()) return String(d.nick).trim();
+    return spName(d && d.sp);
+}
+function xpNeed(lv) { try { return window.PETGEAR.needXp(lv); } catch (e) { return 20 + lv * 10; } }
 // 등급을 무게로 뽑는다 — 야생에서 만나는 것
 function rollGrade(luck) {
     const r = Math.random() * 100 - (Number(luck) || 0);
@@ -198,10 +216,9 @@ function rollGrade(luck) {
     if (r < 40) return 'C';
     return 'D';
 }
-function newId() { return 'd' + now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 // 그림 — 앞(pf · 64칸 · 1~25) / 뒤(pb · 64칸 · 그려 쓸 때 두 배) · 5 × 5
-function cellOf(sp) { const i = Math.max(1, Math.min(25, Number(sp) || 1)) - 1; return { c: i % 5, r: Math.floor(i / 5) }; }
+function cellOf(sp) { const i = Math.max(1, Math.min(25, (P() && P().sp ? P().sp(sp) : Number(sp)) || 1)) - 1; return { c: i % 5, r: Math.floor(i / 5) }; }
 //   px — 한 칸을 몇 px 로 그리나. back 이면 뒷모습
 function spriteCss(sp, px, back) {
     const c = cellOf(sp);
@@ -239,6 +256,7 @@ function bagAdd(name, n, u) {
 // ==========================================
 function dexSeen(sp, u) {
     u = u || u_();
+    sp = P().sp(sp);
     const dx = dex(u), k = String(sp);
     if (dx[k] && dx[k].s) return;
     dx[k] = Object.assign({}, dx[k] || {}, { s: now() });
@@ -246,6 +264,7 @@ function dexSeen(sp, u) {
 }
 function dexCaught(sp, u) {
     u = u || u_();
+    sp = P().sp(sp);
     const dx = dex(u), k = String(sp);
     const o = Object.assign({}, dx[k] || {});
     if (!o.s) o.s = now();
@@ -266,58 +285,57 @@ function darkSeen(i, u) {
 // ==========================================
 // 인형 넣기 · 빼기 · 옮기기
 // ==========================================
-//   잡은 인형 — 동행에 자리가 있으면 동행으로, 없으면 보관함으로. 보관함도 가득이면 null
+//   잡은 인형 — 펫 칸의 빈 열쇠로. 동행에 자리가 있으면 동행으로, 없으면 보관함으로. 보관함도 가득이면 null
 function addDoll(o, u) {
     u = u || u_();
     if (!u) return null;
-    const ds = dolls(u);
     if (boxList(u).length >= BOX_MAX && withList(u).length >= PARTY_MAX) return null;
-    const id = o.id || newId();
+    const sp = P().sp(o.sp) || 1;
+    const id = P().newKey(sp, u);
     const t = now();
-    const d = { id: id, sp: Number(o.sp) || 1, g: o.g || 'D', lv: Number(o.lv) || 1, xp: 0, at: o.at || t, fedAt: t, ord: t };
+    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(LV_MAX, Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t };
     if (o.nick) d.nick = String(o.nick).slice(0, 12);
-    const s = stats(d);
+    P().pets(u)[id] = d;
+    const s = stats(Object.assign({ id: id, sp: sp }, d), u);
     d.hp = (o.hp != null) ? Math.max(1, Math.min(s.max, Number(o.hp))) : s.max;
-    ds[id] = d;
-    const p = {}; p['dolls/' + id] = d;
+    const p = {}; p['pets/' + id] = d;
+    put(p, u);
+    try { P().fedNote(id, d, t); } catch (e) { }
     const w = withList(u);
     let where = 'box';
-    if (w.length < PARTY_MAX) { w.push(id); u.dollWith = w; p.dollWith = w; where = 'with'; }
-    put(p, u);
-    dexCaught(d.sp, u);
+    if (w.length < PARTY_MAX) { setWith(w.concat([id]), u); where = 'with'; }
+    dexCaught(sp, u);
+    dolls(u);
     return { id: id, where: where, d: d };
 }
 function patchDoll(id, fields, u) {
     u = u || u_();
-    const ds = dolls(u);
-    if (!ds[id]) return false;
-    const p = {};
-    Object.keys(fields).forEach(function (k) {
-        const v = fields[k];
-        if (v == null) delete ds[id][k]; else ds[id][k] = v;
-        p['dolls/' + id + '/' + k] = (v == null) ? null : v;
-    });
-    put(p, u);
-    return true;
+    try { return P().patch(String(id), fields); } catch (e) { return false; }
 }
 function removeDoll(id, u) {
     u = u || u_();
-    const ds = dolls(u);
-    if (!ds[id]) return false;
-    delete ds[id];
-    const w = withList(u).filter(function (x) { return x !== id; });
-    u.dollWith = w;
-    const p = { dollWith: w.length ? w : null }; p['dolls/' + id] = null;
+    const ps = P().pets(u);
+    if (!ps[id]) return false;
+    delete ps[id];
+    const w = withList(u).filter(function (x) { return x !== String(id); });
+    const p = {}; p['pets/' + id] = null;
+    u.petShow = w.map(Number); u.petShowSet = 1;
+    p.petShow = w.length ? u.petShow : null; p.petShowSet = 1;
+    if (String(u.petWith || '') === String(id)) { u.petWith = null; p.petWith = null; }
     put(p, u);
+    const d = db_();
+    if (d && u.code) d.ref('petFed/' + u.code + '/' + id).remove().catch(function () { });
     return true;
 }
 function setWith(list, u) {
     u = u || u_();
     const ds = dolls(u);
     const w = [];
-    (list || []).forEach(function (id) { if (ds[id] && w.indexOf(id) < 0 && w.length < PARTY_MAX) w.push(id); });
-    u.dollWith = w;
-    put({ dollWith: w.length ? w : null }, u);
+    (list || []).forEach(function (id) { id = String(id); if (ds[id] && w.indexOf(id) < 0 && w.length < PARTY_MAX) w.push(id); });
+    u.petShow = w.map(Number);
+    u.petShowSet = 1;
+    put({ petShow: w.length ? u.petShow : null, petShowSet: 1 }, u);
+    try { if (typeof window.petRoomPaint === 'function') window.petRoomPaint(); } catch (e) { }
     return w;
 }
 
@@ -330,27 +348,22 @@ function fullPct(d) { return Math.round(fedLeft(d) / ESCAPE_MS * 100); }
 function feed(ids, u) {
     u = u || u_();
     const ds = dolls(u);
-    const list = (ids || []).filter(function (id) { return ds[id]; })
+    const list = (ids || []).map(String).filter(function (id) { return ds[id]; })
         .sort(function (a, b) { return fedLeft(ds[a]) - fedLeft(ds[b]); });
     const have = bagHas(ITEM.SNACK, u);
     const n = Math.min(have, list.length);
     const fed = list.slice(0, n);
     if (!n) return { fed: [], short: list.length };
     const t = now();
-    const p = {};
-    fed.forEach(function (id) { ds[id].fedAt = t; p['dolls/' + id + '/fedAt'] = t; });
-    const b = bag(u);
-    const left = have - n;
-    if (left) b[ITEM.SNACK] = left; else delete b[ITEM.SNACK];
-    p['dollBag/' + ITEM.SNACK] = left || null;
-    put(p, u);
+    fed.forEach(function (id) { patchDoll(id, { fedAt: t }, u); bondUp(id, u); });
+    bagAdd(ITEM.SNACK, -n, u);
     return { fed: fed, short: list.length - n };
 }
 
 let sweepBusy = false;
 function sweep() {
     const u = u_(), d = db_();
-    if (!u || !u.code || sweepBusy) return;
+    if (!u || !u.code || sweepBusy || !u.dollMig) return;
     try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
     const ds = dolls(u);
     const gone = Object.keys(ds).filter(function (id) { return fedLeft(ds[id]) <= 0; });
@@ -363,8 +376,8 @@ function sweep() {
         gone.forEach(function (id) {
             const s = srv ? srv[id] : ds[id];
             if (!s) return;
-            if (srv && fedLeft(s) > 0) { ds[id] = s; return; }
-            out.push({ id: id, n: nickOf(ds[id] || s), sp: spName((ds[id] || s).sp) });
+            if (srv && fedLeft(s) > 0) { P().pets(u)[id] = s; return; }
+            out.push({ id: id, n: nickOf(ds[id]), sp: spName(ds[id].sp) });
             removeDoll(id, u);
         });
         if (!out.length) return;
@@ -375,33 +388,106 @@ function sweep() {
         try { if (typeof window.dollRepaint === 'function') window.dollRepaint(); } catch (e) { }
     };
     if (!d) { finish(null); return; }
-    d.ref('users/' + u.code + '/dolls').once('value').then(function (s) { finish(objOf(s.val())); })
-        .catch(function () { sweepBusy = false; });
+    d.ref('users/' + u.code + '/pets').once('value').then(function (s) {
+        const v = objOf(s.val());
+        Object.keys(v).forEach(function (k) { /* 열쇠 그대로 */ });
+        finish(v);
+    }).catch(function () { sweepBusy = false; });
 }
 setInterval(function () { try { sweep(); } catch (e) { } }, 60 * 1000);
 setTimeout(function () { try { sweep(); } catch (e) { } }, 15000);
 
 // ==========================================
-// 경험치
+// 경험치 · 호감도 · 등급업 — 펫과 같은 길 (pet-gear.js · pet-data.js · awk-rune.js)
 // ==========================================
 //   돌려주는 값 { lv, up } (up 은 오른 Lv 수)
 function giveXp(id, n, u) {
     u = u || u_();
     const d = dolls(u)[id];
-    if (!d) return null;
-    let lv = Math.max(1, Number(d.lv) || 1), xp = (Number(d.xp) || 0) + Math.max(0, Number(n) || 0), up = 0;
-    while (lv < LV_MAX && xp >= xpNeed(lv)) { xp -= xpNeed(lv); lv++; up++; }
-    if (lv >= LV_MAX) xp = 0;
-    const was = stats(d).max;
-    const f = { lv: lv, xp: xp };
-    if (up) {                               // 오른 몫만큼 체력도 같이 오른다 (쓰러진 것은 그대로)
-        const nd = Object.assign({}, d, f);
-        const gain = stats(nd).max - was;
-        if (hpOf(d) > 0) f.hp = Math.min(stats(nd).max, hpOf(d) + gain);
-    }
-    patchDoll(id, f, u);
-    return { lv: lv, up: up };
+    if (!d || !window.PETGEAR) return null;
+    const was = stats(d, u).max, h0 = hpOf(d);
+    const r = window.PETGEAR.addXp(id, n);
+    if (!r) return null;
+    const up = r.lv - r.lv0;
+    if (up && h0 > 0) patchDoll(id, { hp: Math.min(stats(d, u).max, h0 + (stats(d, u).max - was)) }, u);
+    return { lv: r.lv, up: up };
 }
+const BOND_MAX = 100;
+function bondOf(d, u) { try { return P().bond(d.id, u || u_()); } catch (e) { return 0; } }
+function bondUp(id, u) {
+    try { const patch = {}; const got = P().bondUp(String(id), patch); if (got) P().patch(String(id), patch); return got; } catch (e) { return 0; }
+}
+function gradeNeed(id, u) { try { return window.PETGEAR.gradeNeed(String(id), u || u_()); } catch (e) { return { ok: false, why: '등급업을 할 수 없습니다.' }; } }
+function gradeUp(id) { try { return window.PETGEAR.gradeUp(String(id)); } catch (e) { return { ok: false, why: '등급업을 할 수 없습니다.' }; } }
+
+// ==========================================
+// 옮겨 오기 — 사원마다 한 번
+// ==========================================
+let migBusy = false;
+function migrate() {
+    const u = u_(), d = db_();
+    if (!u || !u.code || u.dollMig || migBusy) return;
+    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
+    migBusy = true;
+    const done = function (srv) {
+        const t = now();
+        const p = {};
+        const ps = P().pets(u);
+        // ① 예전 인형 칸 → 펫 칸
+        const old = objOf(srv ? srv.dolls : u.dolls);
+        const oldWith = Array.isArray(srv ? srv.dollWith : u.dollWith) ? (srv ? srv.dollWith : u.dollWith) : [];
+        const map = {};
+        Object.keys(old).forEach(function (oid) {
+            const o = old[oid];
+            if (!o || !o.sp) return;
+            const k = P().newKey(o.sp, u);
+            const rec = { g: o.g || 'D', lv: Number(o.lv) || 1, xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: 0, ord: o.ord || o.at || t };
+            if (o.nick) rec.nick = o.nick;
+            if (o.fav) rec.fav = 1;
+            if (o.hp != null) rec.hp = Number(o.hp);
+            ps[k] = rec;
+            p['pets/' + k] = rec;
+            map[oid] = k;
+        });
+        // ② 가진 펫 — 먹이 시계를 새로 · 도감에 「잡은 것」
+        const dx = dex(u);
+        Object.keys(ps).forEach(function (k) {
+            if (!P().BY[k]) return;
+            if (!p['pets/' + k]) { ps[k].fedAt = t; p['pets/' + k + '/fedAt'] = t; }
+            const sp = String(P().sp(k));
+            const e = Object.assign({}, dx[sp] || {});
+            if (!e.s) e.s = t; if (!e.c) e.c = t; e.n = (Number(e.n) || 0) + 1;
+            dx[sp] = e;
+            p['dollDex/' + sp] = e;
+        });
+        // ③ 동행 — 예전 인형 동행이 있으면 그것을, 아니면 방에 내놓은 셋 그대로
+        //     (저절로 채워 보이던 셋도 그대로 적어 둔다 — 옮긴 뒤 방이 비지 않게)
+        const w = oldWith.map(function (x) { return map[x]; }).filter(Boolean);
+        const cur = withList(u).filter(function (k) { return w.indexOf(k) < 0; });
+        const nw = w.concat(cur).slice(0, PARTY_MAX);
+        if (nw.length) {
+            u.petShow = nw.map(Number); p.petShow = u.petShow;
+            u.petShowSet = 1; p.petShowSet = 1;
+        }
+        p.dolls = null; p.dollWith = null;
+        delete u.dolls; delete u.dollWith;
+        u.dollMig = t; p.dollMig = t;
+        put(p, u).then(function () {
+            migBusy = false;
+            Object.keys(ps).forEach(function (k) { try { P().fedNote(k, ps[k], t); } catch (e) { } });
+            if (Object.keys(map).length) log_('[🧸] 봉제인형 ' + Object.keys(map).length + '마리를 펫 칸으로 옮겼습니다.', u);
+            try { if (typeof window.dollRepaint === 'function') window.dollRepaint(); } catch (e) { }
+        });
+    };
+    if (!d) { done(null); return; }
+    d.ref('users/' + u.code).once('value').then(function (s) {
+        const v = s.val() || {};
+        if (v.dollMig) { u.dollMig = v.dollMig; migBusy = false; return; }
+        try { if (v.pets) u.pets = v.pets; } catch (e) { }
+        done({ dolls: v.dolls, dollWith: v.dollWith });
+    }).catch(function () { migBusy = false; });
+}
+setInterval(function () { try { migrate(); } catch (e) { } }, 3000);
 
 // ==========================================
 // 콘솔
@@ -413,15 +499,15 @@ window.dollState = function () {
     console.log('%c===== 🧸 봉제인형 =====', 'color:#ffcf8f; font-size:13px');
     console.table(Object.keys(ds).map(function (id) {
         const d = ds[id], s = stats(d);
-        return { 열쇠: id, 이름: nickOf(d), 종: spName(d.sp), 등급: d.g, Lv: d.lv, 체력: hpOf(d) + '/' + s.max,
-                 자리: w.indexOf(id) >= 0 ? '동행 ' + (w.indexOf(id) + 1) : '보관함', 포만: fullPct(d) + '%', 즐겨찾기: d.fav ? '★' : '' };
+        return { 열쇠: id, 이름: nickOf(d), 종: spName(d.sp), 등급: s.g, Lv: s.lv, 체력: hpOf(d) + '/' + s.max, 교감: bondOf(d),
+                 자리: w.indexOf(id) >= 0 ? '동행 ' + (w.indexOf(id) + 1) : '보관함', 먹이: fullPct(d) + '%', 즐겨찾기: d.fav ? '★' : '' };
     }));
     console.log('주머니', JSON.stringify(bag(u)), '· 도감', Object.keys(dex(u)).length, '종 · 어둠 도감', Object.keys(darkDex(u)).length);
 };
 window.dollGive = function (sp, g) {
     if (!isAdmin()) { console.warn('상담사만'); return; }
     const r = addDoll({ sp: sp || (1 + Math.floor(Math.random() * 25)), g: g || 'D' });
-    console.log(r ? '넣었습니다 — ' + r.where : '자리가 없습니다');
+    console.log(r ? '넣었습니다 — ' + r.id + ' · ' + r.where : '자리가 없습니다');
     try { if (typeof window.dollRepaint === 'function') window.dollRepaint(); } catch (e) { }
 };
 window.dollBagGive = function (name, n) {
@@ -437,13 +523,14 @@ window.DOLL = {
     spOf: spOf, spName: spName, objOf: objOf,
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
-    stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx,
+    stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
     spriteCss: spriteCss, monCss: monCss, cellOf: cellOf,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,
     addDoll: addDoll, patchDoll: patchDoll, removeDoll: removeDoll, setWith: setWith,
-    fedLeft: fedLeft, fullPct: fullPct, feed: feed, sweep: sweep, giveXp: giveXp
+    fedLeft: fedLeft, fullPct: fullPct, feed: feed, sweep: sweep, giveXp: giveXp,
+    bondOf: bondOf, bondUp: bondUp, BOND_MAX: BOND_MAX, gradeNeed: gradeNeed, gradeUp: gradeUp, migrate: migrate
 };
 
-console.log('[🧸] 따라쟁이 봉제인형 — dollState()');
+console.log('[🧸] 따라쟁이 봉제인형 (= 펫) — dollState()');
 })();

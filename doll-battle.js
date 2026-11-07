@@ -71,7 +71,8 @@ const TX = {
     back: ['{a}! 돌아와!', '{a을} 불러들였다.', '{a이} 당신의 곁으로 돌아왔다.', '{a이} 아쉬운 듯 뒤돌아보았다.', '{a이} 당신의 품으로 돌아왔다.'],
     win: ['{a이} 승리를 기뻐하고 있다!', '{a이} 칭찬을 기다리는 눈치다.', '{a이} 자랑스럽게 가슴을 폈다!', '{a이} 신이 나서 폴짝폴짝 뛰었다!', '{a이} 당신을 향해 두 팔을 활짝 벌렸다!', '{a이} 당신에게 머리를 쓰다듬어 달라는 듯 다가왔다.'],
     idle: ['{a이} 당신을 빤히 바라보고 있다.', '{a이} 당신의 관심을 끌려고 애쓰고 있다.', '{a이} 제자리에서 폴짝 뛰었다.', '{a이} 의기양양하게 가슴을 폈다.', '{a이} 자신의 솜을 꾹꾹 눌러 정리했다.', '{a이} 당신에게 손을 흔들었다.', '{a이} 당신의 명령을 기다리고 있다.', '{a이} 상대를 열심히 노려보고 있다.', '{a이} 용감한 척하고 있다.', '{a이} 당신을 흉내 내고 있다.', '{a이} 괜히 멋진 자세를 취했다.', '{a이} 두 팔을 벌려 자신을 크게 보이려 한다.', '{a이} 당신에게 칭찬받을 생각에 들떠 있다.', '{a이} 삐져나온 실밥을 황급히 감췄다.', '{a이} 당신에게 잘 보이려고 꼿꼿이 섰다.'],
-    lose: ['더 이상 싸울 수 있는 봉제인형이 없다!', '봉제인형들이 모두 지쳐버렸다.', '봉제인형들을 데리고 전투에서 물러났다.']
+    lose: ['더 이상 싸울 수 있는 봉제인형이 없다!', '봉제인형들이 모두 지쳐버렸다.', '봉제인형들을 데리고 전투에서 물러났다.'],
+    hold: ['{d이} 당신에게 칭찬받기 위해 버텼다!', '{d이} 당신을 실망시키고 싶지 않아 버텼다!', '{d이} 당신과 더 함께하고 싶어 버텼다!', '{d이} 마지막 힘을 쥐어짜 버텼다!', '{d이} 쓰러지려다 당신을 보고 다시 일어섰다!', '{d이} 당신의 응원을 떠올리고 간신히 버텼다!', '{d이} 당신 앞에서 멋진 모습을 보이려고 버텼다!', '{d이} 당신의 칭찬을 기다리며 꿋꿋이 버텼다!']
 };
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 //   {a} {a이} {a을} {a은} {a와} {a로} — 받침을 맞춘다
@@ -110,7 +111,7 @@ function fromDoll(id) {
     const M = D(), d = M.dolls()[id];
     if (!d) return null;
     const s = M.stats(d);
-    return { id: id, sp: d.sp, g: d.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0 };
+    return { id: id, sp: d.sp, g: s.g, lv: s.lv, name: M.nickOf(d), att: s.att, hp: M.hpOf(d), max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(d.sp), xp: 0, bond: M.bondOf(d) };
 }
 function wildFoe(o) {
     const M = D(), u = u_();
@@ -163,6 +164,14 @@ function css() {
         '#dbt-ov .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s}',
         '#dbt-ov .nx{position:absolute;left:292px;top:330px;font-size:8px;color:#c9b8ff;animation:dbnx 1s infinite;pointer-events:none}',
         '@keyframes dbnx{0%,100%{opacity:.25}50%{opacity:1}}',
+        // ★ 들고 나는 것은 모두 서서히 (2026-11-07 하단 버튼 영상) — 하얗게 들어와 까맣게 나간다 · 버튼 판은 눌린 뒤 꺼졌다 켜진다
+        '#dbt-ov .veil{position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;background:#fff}',
+        '#dbt-ov .dim{position:absolute;left:0;top:346px;width:314px;height:339px;background:#05040a;opacity:.55;pointer-events:none;transition:opacity .25s ease-out}',
+        '#dbt-ov .pane{transition:opacity .18s ease-out, transform .2s ease-out;transform-origin:50% 70%}',
+        '#dbt-ov .pane.off .hit{pointer-events:none !important}',
+        '#dbt-ov .hit.prs{background:rgba(0,0,0,.32)}',
+        '#dbt-ov .menu{animation:dbfi .22s ease-out}',
+        '@keyframes dbfi{from{opacity:0}to{opacity:1}}',
         '@keyframes dbwob{0%,100%{transform:rotate(0)}25%{transform:rotate(-24deg)}75%{transform:rotate(24deg)}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -213,8 +222,9 @@ function build(loc) {
     st.appendChild(el('img', 'ly')).src = 'doll/bt-under.webp';
     st.appendChild(el('div', 'txt'));
     st.appendChild(el('div', 'nx', 'display:none', '▼'));
+    st.appendChild(el('div', 'dim'));                 // 기다리는 동안 버튼 자리는 어둑하게
     // 1 버튼 — 1번_2 → 버튼용 펫 → 1번_1  /  버튼 2번
-    const b1 = el('div', 'grp b1', 'display:none');
+    const b1 = el('div', 'grp b1 pane off', 'display:none;opacity:0');
     const b12 = el('img', 'ly'); b12.src = 'doll/bt-b12.webp'; b1.appendChild(b12);
     b1.appendChild(el('div', 'spr bpet', 'left:' + AT.btnPet.l + 'px;top:' + AT.btnPet.t + 'px'));
     const b11 = el('img', 'ly'); b11.src = 'doll/bt-b11.webp'; b1.appendChild(b11);
@@ -222,13 +232,14 @@ function build(loc) {
         const h = el('button', 'hit', rectCss(x[1]) + 'pointer-events:auto'); h.dataset.k = x[0]; b1.appendChild(h);
     });
     st.appendChild(b1);
-    const b2 = el('div', 'grp b2', 'display:none');
+    const b2 = el('div', 'grp b2 pane off', 'display:none;opacity:0');
     const b2i = el('img', 'ly'); b2i.src = 'doll/bt-b2.webp'; b2.appendChild(b2i);
     AT.atk.forEach(function (r, i) { b2.appendChild(el('div', 'sk ska' + i, rectCss(r) + 'font-size:9.5px;padding:0 4px;box-sizing:border-box')); const h = el('button', 'hit', rectCss(r) + 'pointer-events:auto'); h.dataset.k = 'a' + i; b2.appendChild(h); });
     AT.def.forEach(function (r, i) { b2.appendChild(el('div', 'sk skd' + i, rectCss(r) + 'font-size:9.5px;padding:0 4px;box-sizing:border-box')); const h = el('button', 'hit', rectCss(r) + 'pointer-events:auto'); h.dataset.k = 'd' + i; b2.appendChild(h); });
     const hb = el('button', 'hit', rectCss(AT.back) + 'pointer-events:auto'); hb.dataset.k = 'back'; b2.appendChild(hb);
     st.appendChild(b2);
     st.appendChild(el('div', 'flash'));
+    ov.appendChild(el('div', 'veil'));
     document.body.appendChild(ov);
     const fit = function () {
         const v = { w: ov.clientWidth || window.innerWidth, h: ov.clientHeight || window.innerHeight };
@@ -238,7 +249,7 @@ function build(loc) {
     fit();
     window.addEventListener('resize', fit);
     return { ov: ov, st: st, fit: fit, foe: foe, me: me, gF: gF, gM: gM, sF: sF, sM: sM, b1: b1, b2: b2,
-             txt: st.querySelector('.txt'), nx: st.querySelector('.nx'), fl: st.querySelector('.flash') };
+             txt: st.querySelector('.txt'), nx: st.querySelector('.nx'), fl: st.querySelector('.flash'), dim: st.querySelector('.dim'), veil: ov.querySelector('.veil') };
 }
 function q(sel) { return B && B.ui.st.querySelector(sel); }
 
@@ -294,10 +305,66 @@ function say(t, ms) {
         setTimeout(fin, ms || 1500);
     });
 }
+//   0 지문만 (버튼 자리 어둑) · 1 첫 판 · 2 기술 판 · 3 소지품 목록 (더 어둡게)
+function pane(e, on) {
+    if (on) {
+        if (e._on) return;
+        e._on = 1; e.classList.remove('off');
+        e.style.display = ''; e.style.transitionDelay = '.06s';
+        e.style.opacity = '0'; e.style.transform = 'scale(.97)';
+        void e.offsetWidth;
+        e.style.opacity = '1'; e.style.transform = 'scale(1)';
+    } else {
+        if (!e._on) return;
+        e._on = 0; e.classList.add('off');
+        e.style.transitionDelay = '0s'; e.style.opacity = '0';
+        setTimeout(function () { if (!e._on) e.style.display = 'none'; }, 200);
+    }
+}
+function fadeRm(e) {
+    if (!e) return;
+    e.style.animation = 'none'; e.style.transition = 'opacity .16s'; e.style.pointerEvents = 'none'; e.style.opacity = '0';
+    setTimeout(function () { e.remove(); }, 170);
+}
 function menu(mode) {
-    B.ui.b1.style.display = (mode === 1) ? '' : 'none';
-    B.ui.b2.style.display = (mode === 2) ? '' : 'none';
-    const old = q('.menu'); if (old) old.remove();
+    if (!B) return;
+    pane(B.ui.b1, mode === 1);
+    pane(B.ui.b2, mode === 2);
+    B.ui.dim.style.opacity = (mode === 1 || mode === 2) ? '0' : (mode === 3 ? '.82' : '.55');
+    const old = q('.menu'); if (old) fadeRm(old);
+}
+// 누른 칸이 잠깐 눌려 보인 뒤에 넘어간다
+function onTap(ev) {
+    const h = ev.target.closest && ev.target.closest('.hit');
+    if (h && B && B.pick) {
+        ev.stopPropagation();
+        const f = B.pick; B.pick = null;
+        h.classList.add('prs');
+        setTimeout(function () { h.classList.remove('prs'); f(h.dataset.k); }, 120);
+        return;
+    }
+    if (tapNow) tapNow();
+}
+// 들어올 때 — 하얗게 덮였다가 걷힌다 / 나갈 때 — 까맣게 덮였다가 지도가 드러난다
+async function enterFx(ui, dark) {
+    const v = ui.veil;
+    ui.ov.style.background = 'transparent'; ui.st.style.opacity = '0';
+    v.style.background = '#fff'; v.style.transition = 'opacity .45s ease-in';
+    await sleep(30); v.style.opacity = '1';
+    await sleep(480);
+    ui.ov.style.background = ''; ui.st.style.opacity = '1';
+    if (dark) ui.foe.style.filter = 'brightness(0)';
+    await sleep(380);
+    v.style.transition = 'opacity .55s ease-out'; v.style.opacity = '0';
+}
+async function exitFx(ui) {
+    const v = ui.veil;
+    v.style.background = '#000'; v.style.transition = 'opacity .4s ease-in'; v.style.opacity = '1';
+    await sleep(430);
+    ui.st.style.display = 'none'; ui.ov.style.background = 'transparent';
+    await sleep(320);
+    v.style.transition = 'opacity .45s ease-out'; v.style.opacity = '0';
+    await sleep(470);
 }
 function wait() { return new Promise(function (r) { B.pick = r; }); }
 
@@ -381,7 +448,11 @@ async function attack(atkr, sk, guard) {
     const r = strike(A, Dd, sk[1], guard);
     if (!r.hit) { await say(fmt(pick(TX.miss), vName), 1200); return r; }
     await blink(atkr === 'me' ? 'foe' : 'me');
+    // 호감도가 가득 찬 인형은 한 싸움에 한 번 — 쓰러지기 직전에 버틴다 (지문 9)
+    let held = false;
+    if (atkr === 'foe' && Dd.hp - r.dmg <= 0 && (Number(Dd.bond) || 0) >= 100 && !Dd.held) { Dd.held = 1; held = true; r.dmg = Math.max(0, Dd.hp - 1); }
     await setHp(atkr === 'me' ? 'foe' : 'me', Dd.hp - r.dmg);
+    if (held) await say(fmt(pick(TX.hold), { d: Dd.name }), 1500);
     if (r.n > 1) await say(r.n + '번 맞았다!', 900);
     if (r.crit) await say(fmt(pick(TX.crit), vName), 1000);
     if (r.eff > 1) await say(pick(TX.great), 1000);
@@ -459,17 +530,16 @@ async function begin(opt) {
     const M = D();
     const ui = build(opt.loc);
     B = { ui: ui, opt: opt, foe: opt.foe, me: null, out: {}, cache: {}, kind: opt.kind, tut: !!opt.tut, pick: null, wrapped: false };
-    ui.ov.addEventListener('pointerdown', function (ev) {
-        const h = ev.target.closest && ev.target.closest('.hit');
-        if (h && B && B.pick) { ev.stopPropagation(); const f = B.pick; B.pick = null; f(h.dataset.k); return; }
-        if (tapNow) tapNow();
-    });
+    ui.ov.addEventListener('pointerdown', onTap);
     paintFoe(B.foe.wild);
     paintStat();
+    await enterFx(ui, !B.foe.wild);
     await sleep(60);
     ui.gF.style.transform = 'translateX(0)';
     ui.gM.style.transform = 'translateX(0)';
     await sleep(750);
+    if (!B.foe.wild) ui.foe.style.filter = '';         // 그림자였던 괴담에 빛이 든다
+    await sleep(200);
     // ─ 나타났다
     if (B.foe.wild) {
         M.dexSeen(B.foe.sp);
@@ -591,6 +661,7 @@ async function winFoe() {
     if (f.wild) await say(WILD + '이 쓰러졌다! 솜뭉치로 돌아가 데굴데굴 굴러갔다.', 1500);
     else await say(fmt(pick(TX.faint), { d: f.name }), 1300);
     if (B.me) await say(fmt(pick(TX.win), { a: B.me.name }), 1300);
+    if (B.me) { try { const g = M.bondUp(B.me.id); if (g) await say(B.me.name + '의 교감 +' + g, 800); } catch (e) { } }
     const gain = f.wild ? XP.wild : (f.boss ? XP.boss : XP.mon);
     await giveXp(gain);
     if (!f.wild && !f.boss) await rest();
@@ -646,7 +717,7 @@ async function tryRun() {
 function bagMenu() {
     return new Promise(function (resolve) {
         const M = D(), u = u_();
-        menu(0);
+        menu(3);
         const n = M.bagHas(M.ITEM.RIBBON, u);
         const others = M.withList(u).filter(function (id) { return !B.out[id] && (!B.me || B.me.id !== id); })
             .map(function (id) { return B.cache[id] || fromDoll(id); }).filter(function (c) { return c && c.hp > 0; });
@@ -661,7 +732,7 @@ function bagMenu() {
             b.onclick = async function (ev) {
                 ev.stopPropagation();
                 if (b.disabled) return;
-                box.remove();
+                fadeRm(box); menu(0);
                 const k = b.dataset.k;
                 if (k === 'back') return resolve('back');
                 if (k === 'ribbon') return resolve(await throwRibbon());
@@ -740,9 +811,7 @@ async function finish(r) {
     } catch (e) { }
     menu(0);
     const ov = B.ui.ov;
-    ov.style.transition = 'opacity .35s';
-    ov.style.opacity = '0';
-    await sleep(380);
+    await exitFx(B.ui);
     window.removeEventListener('resize', B.ui.fit);
     ov.remove();
     B = null;
@@ -750,10 +819,316 @@ async function finish(r) {
     return r;
 }
 
+
+// ==========================================
+// 🐾 여럿이 같이 싸우는 괴담 전투 — 펫 동행 어둠 (doll-party.js 가 판을 쥔다)
+// ==========================================
+//   판 (dollRun/<열쇠>/fight) = { m, foe, round, roundAt, picks: { 사번: 고른 것 }, log: { 판: [지문…] }, part: { 사번: { 인형: 1 } }, res }
+//   사원마다 제 인형 하나(act)를 내보내 고른다 — 다 고르면(또는 시간이 지나면) 파티장 화면이 한 판을 풀어 log 에 적는다.
+//   모든 화면은 log 를 받아 같은 연출로 보여 주고, 제 인형의 체력 · 경험치 · 조각만 제 기록에 적는다.
+const MUL = { hp: [0.6, 1.2, 1.85, 2.5, 3.2], atk: [0.55, 0.95, 1.3, 1.65, 2.0], def: [1, 1.6, 2.2, 2.8, 3.4] };   // 난이도 D~S (시험 셈으로 맞춘 값)
+const GR5 = ['D', 'C', 'B', 'A', 'S'];
+function foeFor(mi, diff, n) {
+    const m = D().MON_BY[mi], di = Math.max(0, GR5.indexOf(diff));
+    const hp = Math.round(m.hp * MUL.hp[di] * (1 + 0.9 * Math.max(0, n - 1)));
+    return { i: mi, name: m.n, kind: m.k, boss: !!m.boss, att: m.a, hp: hp, max: hp, atk: Math.round(m.atk * MUL.atk[di] * 10) / 10,
+             def: Math.round(m.def * MUL.def[di] * 10) / 10, eva: 5, crit: 5 };
+}
+function xpFor(diff, boss) { const di = Math.max(0, GR5.indexOf(diff)); return Math.round((boss ? XP.boss : XP.mon) * (1 + 0.5 * di)); }
+function aliveKey(m, prefer) {
+    const ds = m.dolls || {};
+    if (prefer && ds[prefer] && ds[prefer].hp > 0) return prefer;
+    const ks = Object.keys(ds).filter(function (k) { return ds[k] && ds[k].hp > 0; });
+    return ks.length ? ks[0] : null;
+}
+// 한 판을 푼다 — 돌려주는 값은 run 아래에 적을 칸들 (update 한 번)
+function resolveRound(run, now) {
+    const F = run.fight, foe = Object.assign({}, F.foe), P = {}, log = [];
+    const order = (run.order || Object.keys(run.members || {})).filter(function (c) { const m = run.members[c]; return m && !m.left; });
+    const mem = {};
+    order.forEach(function (c) { mem[c] = JSON.parse(JSON.stringify(run.members[c])); });
+    const picks = F.picks || {};
+    const guards = {};
+    const touch = function (c, k) { P['fight/part/' + c + '/' + k] = 1; P['members/' + c + '/dolls/' + k + '/hp'] = Math.max(0, Math.round(mem[c].dolls[k].hp)); };
+    const live = function () { return order.filter(function (c) { const m = mem[c]; return !m.out && m.act && m.dolls && m.dolls[m.act] && m.dolls[m.act].hp > 0; }); };
+    // 내보낸 인형이 없으면 다음 것으로
+    order.forEach(function (c) {
+        const m = mem[c];
+        if (m.out) return;
+        const k = aliveKey(m, m.act);
+        if (!k) { m.out = 1; P['members/' + c + '/out'] = 1; return; }
+        if (k !== m.act) { m.act = k; P['members/' + c + '/act'] = k; }
+        P['fight/part/' + c + '/' + k] = 1;
+    });
+    let won = false;
+    // ① 사원들 차례 (들어온 차례대로)
+    for (let i = 0; i < order.length && !won; i++) {
+        const c = order[i], m = mem[c];
+        if (m.out) continue;
+        const d = m.dolls[m.act], k = picks[c] || 'a0';
+        const nm = d.nick || D().spName(d.sp);
+        if (k === 'run' && c === run.lead && !foe.boss) {
+            log.push({ t: m.name + ' 사원이 물러서자고 손짓했다. 파티가 괴담에게서 물러났다!', run: 1 });
+            P['fight/res'] = 'run'; P['stage'] = 'walk';
+            P['fight/log/' + F.round] = log; P['fight/foe/hp'] = foe.hp;
+            return P;
+        }
+        if (k.indexOf('sw:') === 0) {
+            const k2 = k.slice(3);
+            if (k2 !== m.act && m.dolls[k2] && m.dolls[k2].hp > 0) {
+                log.push({ t: fmt(pick(TX.back), { a: nm }), sw: c, key: m.act, out: 1 });
+                m.act = k2; P['members/' + c + '/act'] = k2;
+                const d2 = m.dolls[k2], n2 = d2.nick || D().spName(d2.sp);
+                log.push({ t: fmt(pick(TX.go), { a: n2 }), go: c, key: k2 });
+                touch(c, k2);
+            }
+            continue;
+        }
+        const sk = skills(d.sp);
+        if (k.charAt(0) === 'd') {
+            const s1 = sk.d[Number(k.slice(1))] || sk.d[0];
+            const t = T().DEF[s1[1]] || {};
+            log.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: c, def: s1[1] });
+            if (t.heal) { d.hp = Math.min(d.max, d.hp + Math.round(d.max * t.heal)); touch(c, m.act); log.push({ t: fmt(pick(TX.heal), { a: nm }), heal: c, key: m.act, hp: d.hp }); }
+            else { guards[c] = t; log.push({ t: nm + D().josa(nm, '이') + ' 자세를 잡았다. (' + ((T().NAME || {})[s1[1]] || '') + ')' }); }
+            continue;
+        }
+        const s1 = sk.a[Number(k.slice(1))] || sk.a[0];
+        log.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: c });
+        const r = strike(d, foe, s1[1], null);
+        if (!r.hit) { log.push({ t: fmt(pick(TX.miss), { a: nm, d: foe.name }) }); continue; }
+        foe.hp = Math.max(0, foe.hp - r.dmg);
+        log.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: foe.name })), hit: 'foe', hp: foe.hp });
+        if (r.eff > 1) log.push({ t: pick(TX.great) }); else if (r.eff < 1) log.push({ t: pick(TX.weak) });
+        if (r.drain && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.drain); touch(c, m.act); log.push({ t: nm + D().josa(nm, '이') + ' 기운을 조금 빨아들였다!', heal: c, key: m.act, hp: d.hp }); }
+        if (foe.hp <= 0) won = true;
+    }
+    // ② 괴담 차례
+    if (!won) {
+        const hits = (foe.boss && order.length >= 2) ? 2 : 1;
+        for (let h = 0; h < hits && !won; h++) {
+            const al = live();
+            if (!al.length) break;
+            const tau = al.filter(function (c) { return guards[c] && guards[c].taunt; });
+            const c = (tau.length ? tau : al)[Math.floor(Math.random() * (tau.length ? tau.length : al.length))];
+            const m = mem[c], d = m.dolls[m.act], nm = d.nick || D().spName(d.sp);
+            const mv = pick(D().MON_BY[foe.i].mv);
+            log.push({ t: fmt(pick(TX.use), { a: foe.name, m: mv[0] }), f: 1 });
+            const r = strike(foe, d, mv[1], guards[c]);
+            if (!r.hit) { log.push({ t: fmt(pick(TX.miss), { a: foe.name, d: nm }) }); continue; }
+            let dmg = r.dmg, held = false;
+            if (d.hp - dmg <= 0 && (Number(d.bond) || 0) >= 100 && !d.held) { d.held = 1; held = true; dmg = Math.max(0, d.hp - 1); P['members/' + c + '/dolls/' + m.act + '/held'] = 1; }
+            d.hp = Math.max(0, d.hp - dmg);
+            touch(c, m.act);
+            log.push({ t: (r.crit ? '급소에 맞았다! ' : '') + fmt(pick(TX.hurt), { d: nm }), hit: c, key: m.act, hp: d.hp });
+            if (held) log.push({ t: fmt(pick(TX.hold), { d: nm }) });
+            if (r.eff > 1) log.push({ t: pick(TX.great) });
+            const g = guards[c];
+            if (g && g.reflect && d.hp > 0) {
+                const back = Math.max(1, Math.round(r.dmg * g.reflect));
+                foe.hp = Math.max(0, foe.hp - back);
+                log.push({ t: nm + D().josa(nm, '이') + ' 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', hit: 'foe', hp: foe.hp });
+                if (foe.hp <= 0) won = true;
+            }
+            if (d.hp <= 0) {
+                log.push({ t: fmt(pick(TX.faint), { d: nm }), ko: c, key: m.act });
+                const k2 = aliveKey(m, null);
+                if (k2) {
+                    m.act = k2; P['members/' + c + '/act'] = k2;
+                    const d2 = m.dolls[k2];
+                    log.push({ t: m.name + ' — ' + fmt(pick(TX.go), { a: d2.nick || D().spName(d2.sp) }), go: c, key: k2 });
+                    P['fight/part/' + c + '/' + k2] = 1;
+                } else { m.out = 1; P['members/' + c + '/out'] = 1; log.push({ t: m.name + ' 사원의 봉제인형이 모두 지쳤다.' }); }
+            }
+        }
+    }
+    P['fight/foe/hp'] = foe.hp;
+    if (won || foe.hp <= 0) {
+        log.push({ t: fmt(pick(TX.faint), { d: foe.name }), ko: 'foe' });
+        const drops = {};
+        order.forEach(function (c) { if (window.AWK) { const g = window.AWK.rollDrop(run.diff || 'D', foe.boss); if (g.length) drops[c] = g; } });
+        log.push({ t: foe.boss ? '무대 위의 것이 쓰러졌다!' : '괴담이 흩어졌다!', win: 1, xp: xpFor(run.diff, foe.boss), drops: drops, boss: foe.boss ? 1 : 0 });
+        if (!foe.boss) {
+            order.forEach(function (c) {
+                const m = mem[c];
+                Object.keys(m.dolls || {}).forEach(function (k) { const d = m.dolls[k]; if (d.hp > 0) { d.hp = Math.min(d.max, d.hp + Math.round(d.max * REST)); P['members/' + c + '/dolls/' + k + '/hp'] = Math.round(d.hp); } });
+                if (m.out && aliveKey(m, null)) { P['members/' + c + '/out'] = null; }
+            });
+            log.push({ t: '봉제인형들이 숨을 고른다. (체력 ' + Math.round(REST * 100) + '% 회복 · 쓰러진 인형 빼고)', rest: 1 });
+        }
+        P['fight/res'] = 'win';
+        P['mons/' + F.m + '/dead'] = 1;
+        P['stage'] = foe.boss ? 'clear' : 'walk';
+    } else if (!live().length) {
+        TX.lose.forEach(function (t) { log.push({ t: t }); });
+        log[log.length - 1].lose = 1;
+        P['fight/res'] = 'lose';
+        P['stage'] = 'lose';
+    }
+    P['fight/log/' + F.round] = log;
+    P['fight/round'] = F.round + 1;
+    P['fight/picks'] = null;
+    P['fight/roundAt'] = now;
+    return P;
+}
+
+// ── 화면 (모든 사원)
+//   o = { code, lead, loc, get() 지금 판, pick(k), waitLog(round) → Promise(log | null) }
+function allyPaint() {
+    let box = q('.allies');
+    if (!box) { box = el('div', 'allies', 'position:absolute;left:150px;top:99px;width:160px;pointer-events:none'); B.ui.st.appendChild(box); }
+    const rows = Object.keys(B.mates).map(function (c) {
+        const a = B.mates[c];
+        if (!a || !a.d) return '<div class="ally" data-c="' + c + '" style="font-size:7px;color:#aaa;background:rgba(0,0,0,.55);margin-bottom:2px;padding:1px 4px;border-radius:3px">' + esc(a ? a.name : '') + ' — 지침</div>';
+        const p = Math.max(0, a.d.hp) / a.d.max;
+        return '<div class="ally" data-c="' + c + '" style="display:flex;align-items:center;gap:3px;font-size:7px;color:#fff;background:rgba(0,0,0,.55);margin-bottom:2px;padding:1px 4px;border-radius:3px;transition:transform .15s,opacity .2s">'
+            + '<div style="' + D().spriteCss(a.d.sp, 16) + '"></div><div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden">' + esc(a.name) + ' · ' + esc(a.d.nick || D().spName(a.d.sp)) + '</div>'
+            + '<div style="height:3px;background:#333"><i style="display:block;height:100%;width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></div></div></div>';
+    });
+    box.innerHTML = rows.join('');
+}
+function myFrom(run, code) {
+    const m = run.members[code];
+    if (!m || m.out || !m.act || !m.dolls || !m.dolls[m.act]) return null;
+    const d = m.dolls[m.act];
+    return { id: m.act, sp: d.sp, g: d.g, lv: d.lv, name: d.nick || D().spName(d.sp), att: d.att, hp: d.hp, max: d.max, sk: skills(d.sp), bond: d.bond };
+}
+function matesFrom(run, code) {
+    const out = {};
+    (run.order || Object.keys(run.members || {})).forEach(function (c) {
+        if (c === code) return;
+        const m = run.members[c];
+        if (!m || m.left) return;
+        const d = (!m.out && m.act && m.dolls) ? m.dolls[m.act] : null;
+        out[c] = { name: m.name, d: d ? { sp: d.sp, nick: d.nick, hp: d.hp, max: d.max } : null };
+    });
+    return out;
+}
+async function playEntry(e, o) {
+    const code = o.code;
+    const ally = function (c) { return q('.ally[data-c="' + c + '"]'); };
+    if (e.a) { if (e.a === code) await lunge('me'); else { const r = ally(e.a); if (r) { r.style.transform = 'translateX(-6px)'; await sleep(160); r.style.transform = ''; } } }
+    if (e.f) await lunge('foe');
+    if (e.hit === 'foe') { await blink('foe'); B.foe.hp = e.hp; paintStat(); await sleep(450); }
+    else if (e.hit) {
+        if (e.hit === code && B.me && B.me.id === e.key) { await blink('me'); B.me.hp = e.hp; paintStat(); await sleep(450); }
+        else if (B.mates[e.hit] && B.mates[e.hit].d) { const r = ally(e.hit); B.mates[e.hit].d.hp = e.hp; allyPaint(); const r2 = ally(e.hit); if (r2) { r2.style.opacity = '.3'; await sleep(120); r2.style.opacity = '1'; } }
+    }
+    if (e.heal) { if (e.heal === code && B.me && B.me.id === e.key) { B.me.hp = e.hp; paintStat(); } else if (B.mates[e.heal] && B.mates[e.heal].d) { B.mates[e.heal].d.hp = e.hp; allyPaint(); } }
+    if (e.ko === 'foe') await faintFx('foe');
+    else if (e.ko === code) { await faintFx('me'); }
+    if (e.sw === code && e.out) { await faintFx('me'); B.ui.me.style.transform = ''; }
+    await say(e.t, e.win || e.lose ? 1500 : 1150);
+    if (e.go) {
+        const run = o.get();
+        if (e.go === code) { B.me = myFrom(run, code); paintMe(); paintStat(); showStat(true, !!B.me); if (B.me) await whiteIn('me'); }
+        else { B.mates = matesFrom(run, code); allyPaint(); }
+    }
+}
+async function partyFight(o) {
+    if (B) return { res: 'busy' };
+    const run0 = o.get();
+    const F0 = run0.fight;
+    const ui = build(o.loc || 'arcade');
+    B = { ui: ui, foe: Object.assign({ mon: F0.foe.i, g: F0.foe.boss ? '보스' : F0.foe.kind }, F0.foe), me: myFrom(run0, o.code), mates: matesFrom(run0, o.code), out: {}, cache: {}, kind: 'party', pick: null };
+    B.foe.mon = F0.foe.i;
+    ui.ov.addEventListener('pointerdown', onTap);
+    paintFoe(false); paintMe(); paintStat(); allyPaint();
+    await enterFx(ui, true);
+    await sleep(60);
+    ui.gF.style.transform = 'translateX(0)'; ui.gM.style.transform = 'translateX(0)';
+    await sleep(750);
+    ui.foe.style.filter = '';
+    await sleep(200);
+    const fresh = D().darkSeen(B.foe.mon);
+    if (F0.intro) await say(F0.intro, 2600);
+    await say((B.foe.boss ? '무대 위의 ' : '') + B.foe.name + D().josa(B.foe.name, '이') + ' 나타났다!' + (fresh ? ' (어둠 도감에 적혔다)' : ''), 1500);
+    showStat(true, false);
+    if (B.me) { await say(fmt(pick(TX.go), { a: B.me.name }), 1000); await whiteIn('me'); showStat(true, true); }
+    for (;;) {
+        const run = o.get();
+        if (!run || !run.fight) return partyEnd({ res: 'gone' }, o);
+        const F = run.fight;
+        if (F.res && !(F.log && F.log[F.round - 1] && !B.seen)) { /* 끝난 판 — 마지막 log 는 아래에서 */ }
+        const r = F.round;
+        // 내 차례
+        if (!F.res) {
+            B.me = myFrom(run, o.code) || B.me;
+            if (B.me && B.me.hp <= 0) B.me = myFrom(run, o.code);
+            const mine = myFrom(run, o.code);
+            if (mine && !(F.picks && F.picks[o.code])) {
+                B.ui.txt.textContent = (Math.random() < 0.3) ? fmt(pick(TX.idle), { a: mine.name }) : (mine.name + D().josa(mine.name, '은') + ' 무엇을 할까?');
+                const k = await pickOne(o, run, mine);
+                if (k) o.pick(k);
+            }
+            menu(0);
+            B.ui.txt.textContent = Object.keys(B.mates).length ? '다른 사원이 고르기를 기다리는 중…' : '…';
+        }
+        const lg = await o.waitLog(r);
+        if (!B) return { res: 'gone' };
+        if (!lg) return partyEnd({ res: 'gone' }, o);
+        for (let i = 0; i < lg.length; i++) await playEntry(lg[i], o);
+        o.applyLog(lg);
+        const nowRun = o.get();
+        B.mates = matesFrom(nowRun, o.code); allyPaint();
+        if (nowRun.fight && nowRun.fight.res) return partyEnd({ res: nowRun.fight.res, log: lg }, o);
+    }
+}
+function pickOne(o, run, mine) {
+    return new Promise(function (resolve) {
+        const loop = async function () {
+            menu(1);
+            const k = await wait();
+            if (k === 'run') {
+                if (!o.lead) { await say('물러서는 것은 파티장만 정할 수 있다.', 1200); return loop(); }
+                if (run.fight.foe.boss) { await say('무대 위의 것에게서는 도망칠 수 없다!', 1200); return loop(); }
+                menu(0); return resolve('run');
+            }
+            if (k === 'bag') {
+                menu(3);
+                const m = run.members[o.code];
+                const others = Object.keys(m.dolls || {}).filter(function (x) { return x !== m.act && m.dolls[x].hp > 0; });
+                const box = el('div', 'menu');
+                box.innerHTML = others.map(function (x) { const d = m.dolls[x]; return '<button data-k="sw:' + x + '">🔁 ' + esc(d.nick || D().spName(d.sp)) + ' 내보내기 · ' + Math.ceil(d.hp) + '/' + d.max + '</button>'; }).join('')
+                    + '<div style="font-size:8.5px;color:#524173;margin:2px 0 6px">🎀 포옹 리본은 어둠에서 쓸 수 없다</div><button data-k="back">돌아간다</button>';
+                B.ui.st.appendChild(box);
+                Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+                    b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+                    b.onclick = function (ev) { ev.stopPropagation(); fadeRm(box); menu(0); if (b.dataset.k === 'back') loop(); else resolve(b.dataset.k); };
+                });
+                return;
+            }
+            // 싸운다
+            const sk = mine.sk;
+            AT.atk.forEach(function (_, i) { const s1 = sk.a[i]; q('.ska' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
+            AT.def.forEach(function (_, i) { const s1 = sk.d[i]; q('.skd' + i).innerHTML = s1 ? esc(s1[0]) + '<small>' + esc((T().NAME || {})[s1[1]] || '') + '</small>' : ''; });
+            B.ui.txt.textContent = mine.name + D().josa(mine.name, '은') + ' 무엇을 쓸까? (위 셋은 공격 · 아래 둘은 방어)';
+            menu(2);
+            const k2 = await wait();
+            if (k2 === 'back') return loop();
+            menu(0);
+            resolve(k2);
+        };
+        loop();
+    });
+}
+async function partyEnd(r, o) {
+    if (!B) return r;
+    menu(0);
+    if (r.res === 'win' && B.me) await say(fmt(pick(TX.win), { a: B.me.name }), 1100);
+    const ov = B.ui.ov;
+    await exitFx(B.ui);
+    window.removeEventListener('resize', B.ui.fit);
+    ov.remove();
+    B = null; tapNow = null;
+    return r;
+}
+
 window.DOLLBT = {
     wild: function (o) { o = o || {}; return begin({ kind: 'wild', loc: o.loc || 'wild', tut: !!o.tut, foe: wildFoe(o) }); },
     monster: function (o) { o = o || {}; return begin({ kind: 'mon', loc: o.loc || 'arcade', foe: monFoe(o.mon != null ? o.mon : 9) }); },
-    busy: function () { return !!B; }
+    busy: function () { return !!B; },
+    party: partyFight, resolve: resolveRound, foeFor: foeFor, xpFor: xpFor, MUL: MUL
 };
 window.dollBattleTest = function (mon) {
     if (!D() || !D().isAdmin()) { console.warn('상담사만'); return; }
