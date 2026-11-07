@@ -1335,7 +1335,7 @@ const TK_MAX = 40;
 const TK_SLOW = 220, TK_FAST = 50;      // 1~6 한 칸에 머무는 시간 — 첫 번째 · 39 번째
 const TK_END = 520;                     // 7~12 한 칸
 const TK_IDLE = 2500;
-const TK_ITEM = ['tickle', '간지럽히기'];
+const TK_ITEM = ['tickle', '쑤시기'];   // 메뉴 이름 — 「간지럽히기」에서 바꿈 (2026-11-07 사용자 「이름만」)
 const TKR = {};                         // 서버에 적힌 것
 const TKL = {};                         // 내 화면에서 도는 것 { s, n, rt: 마지막 소식, p2: 7~12 시작, f, st, done, mine, lt }
 let tkT = 0;
