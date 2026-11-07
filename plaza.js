@@ -3262,7 +3262,7 @@ function paintExits() {
     bands.forEach(function (b) {
         const fy = (b[0] + b[1]) / 2 * z;
         if (r.left)  mk('◀', 8, fy - 70);
-        if (r.right) mk('▶', r.w * z - 24, fy - 70);
+        if (r.right || r.rightFn) mk('▶', r.w * z - 24, fy - 70);
     });
     // ★ ▲ ▼ 는 안 세운다 — 건물 안팎은 이제 **입구를 눌러야** 드나든다.
     //   화살표만 남으면 걸어가면 넘어가는 줄 알고 바닥 끝을 더듬게 된다.
@@ -3729,6 +3729,13 @@ function tick(ts) {
             else {
                 if (goL) { goRoom(r.left, 'left'); return; }
                 if (goR) { goRoom(r.right, 'right'); return; }
+            }
+            // ★ 광장 밖 다른 화면으로 이어진 오른쪽 끝 — 재관국 앞 → 도깨비 공방 (doll-scene.js · rightFn · 2026-11-07)
+            //   넘어가면 끝에서 조금 물려 세워 둔다 (돌아왔을 때 다시 빨려 들어가지 않게)
+            if (!r.right && r.rightFn && run.x >= r.w - P.EDGE) {
+                run.x = r.w - P.EDGE - P.INSET - 30; run.tx = null; run.tseg = null; run.warp = now();
+                if (HS()) sysLine('🫣 숨바꼭질 중에는 나갈 수 없습니다.');
+                else if (!document.getElementById('ds-ov') && typeof window[r.rightFn] === 'function') { try { window[r.rightFn](); } catch (e) { } }
             }
         }
         // ★ 건물 안팎(재관국앞↔재관국 · 백일몽앞↔백일몽)은 **걸어서 안 넘어간다.**

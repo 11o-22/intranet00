@@ -30,8 +30,13 @@
 const D = function () { return window.DOLL; };
 const OV = 'ds-ov';
 const SPD = 62;                     // 1초에 몇 칸(그림 원래 크기) 걷나
-const STEP = 26;                    // 오브제 뒤를 이만큼 걸을 때마다 한 번 굴린다
-const ENC = 0.10;                   // 한 번 굴릴 때 조우할 몫
+const STEP = 26;                    // 튜토리얼 — 오브제 뒤를 이만큼 걸으면 바로 나온다
+// ★ 출몰지 조우 — 500~700 걸음에 한 번 (2026-11-07 사용자 「확률적이게 · 한 500~700번 걸어야 한 번 나오는 정도로」)
+//   걸음 하나 = 캐릭터 발걸음 하나 — 걷기 그림 한 바퀴(6칸 × 0.12초)에 두 걸음 → SPD 62 로 약 22칸
+//   출몰지 어디를 걸어도 센다. 몇 걸음째에 나올지는 500~700 사이에서 그때그때 정하고,
+//   다 채우면 다음에 수상한 장소(수풀 · 잡동사니 뒤)를 밟을 때 나온다. 센 걸음은 이 기기에 적어 둔다 (나갔다 와도 이어서).
+const FOOT = SPD * 0.36;
+const ENC_STEPS = [500, 700];
 const K_STEP = [1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1];
 
 // ==========================================
@@ -43,6 +48,7 @@ const K_STEP = [1 / 4, 1 / 3, 1 / 2, 2 / 3, 3 / 4, 1];
 const SC = {
     wild: {
         n: '봉제인형 출몰지', img: 'doll/wild.webp', ob: 'doll/wild-ob.webp', w: 1536, h: 512, band: [40, 372], body: 46, bt: 'wild',
+        zoom: 0.68,                                      // 2026-11-07 사용자 「출몰지 배경 너무 확대 되어서 좀 줌 아웃」
         lines: [
             [[0, 219], [530, 219], [588, 243], [650, 243], [785, 243], [805, 243], [845, 222], [1305, 222], [1536, 222]],
             [[0, 315], [560, 315], [650, 243]],
@@ -53,9 +59,10 @@ const SC = {
             { x: [26, 128], y: 315 }, { x: [216, 308], y: 315 }, { x: [415, 517], y: 315 }, { x: [858, 934], y: 313 }, { x: [1010, 1112], y: 313 }
         ],
         spots: [
-            { x: 4, y: 219, n: '광장', i: '◀', edge: 1, act: 'toPlaza' },
-            { x: 4, y: 315, n: '광장', i: '◀', edge: 1, act: 'toPlaza' },
-            { x: 1532, y: 222, n: '도깨비 공방', i: '▶', edge: 1, act: 'toGfront' }
+            // 2026-11-07 — 공방이 재관국 앞 오른쪽으로 옮겼다: 재관국 앞 → 공방 앞 → 출몰지 → 광장
+            { x: 4, y: 219, n: '도깨비 공방', i: '◀', edge: 1, act: 'toGfrontR' },
+            { x: 4, y: 315, n: '도깨비 공방', i: '◀', edge: 1, act: 'toGfrontR' },
+            { x: 1532, y: 222, n: '광장', i: '▶', edge: 1, act: 'toPlaza' }
         ],
         start: { left: [16, 219], right: [1520, 222] }
     },
@@ -66,8 +73,8 @@ const SC = {
             [[48, 219], [70, 250], [102, 252], [138, 316], [236, 316], [332, 316], [368, 252], [400, 250], [422, 219]]
         ],
         spots: [
-            { x: 4, y: 219, n: '출몰지', i: '◀', edge: 1, act: 'toWildR' },
-            { x: 466, y: 219, n: '재난관리국 앞', i: '▶', edge: 1, act: 'toGate' },
+            { x: 4, y: 219, n: '재난관리국 앞', i: '◀', edge: 1, act: 'toGate' },
+            { x: 466, y: 219, n: '출몰지', i: '▶', edge: 1, act: 'toWildL' },
             { x: 245, y: 219, n: '도깨비 공방', i: '🚪', act: 'toGong' },
             { x: 236, y: 316, n: '도깨비 공방', i: '🚪', act: 'toGong' }
         ],
@@ -310,7 +317,7 @@ function onResize() {
 // 화면에 맞춘다 — 띠(band)가 세로에 꼭 맞게
 function layout() {
     const sc = run.sc, v = vp();
-    run.Z = v.h / (sc.band[1] - sc.band[0]);
+    run.Z = v.h / (sc.band[1] - sc.band[0]) * (sc.zoom || 1);
     run.k = snapK(sc.body * run.Z / 236);
     const W = Math.round(sc.w * run.Z), H = Math.round(sc.h * run.Z);
     const bg = run.el.querySelector('.ds-bg');
@@ -326,7 +333,7 @@ function camera() {
     if (W <= v.w) cx = (W - v.w) / 2;
     else cx = Math.max(0, Math.min(W - v.w, cx));
     run.cx = cx;
-    run.cy = sc.band[0] * Z;
+    run.cy = sc.band[0] * Z - Math.max(0, (v.h - (sc.band[1] - sc.band[0]) * Z) / 2);   // 줌 아웃하면 띠를 세로 가운데에
     run.world.style.transform = 'translate(' + Math.round(-cx) + 'px,' + Math.round(-run.cy) + 'px)';
 }
 function toScreen(x, y) { return { x: x * run.Z - run.cx, y: y * run.Z - run.cy }; }
@@ -458,34 +465,73 @@ function walkTo(x, y, then) {
     run.then = then || null;
     run.tgt = to;
 }
+//   ★ 2026-11-07 사용자 「움직이기 어려워서 개선」
+//     누른 채로 두면 손가락 쪽으로 계속 걷는다 (화면이 따라가므로 맵 끝까지) · 끌면 따라온다 · PC 는 방향키 · WASD
+function canWalk() { return !!(run && !busy() && !(run.pt && (!run.pt.lead() || !run.pt.ready()))); }
 function bindInput(ov) {
-    let down = false, lastT = 0;
+    let down = false, lastT = 0, holdIv = 0, at = null, toNpc = false, sx = 0, sy = 0;
+    const world = function (cx, cy) { const r = ov.getBoundingClientRect(); return toWorld(cx - r.left, cy - r.top); };
     const go = function (ev) {
         if (!run || busy()) return;
         if (run.pt && !run.pt.lead()) { sys('파티장을 따라갑니다.', 1500); return; }
         if (run.pt && !run.pt.ready()) { sys('같이 갈 사원들이 들어오기를 기다리는 중…', 1500); return; }
-        const r = ov.getBoundingClientRect();
-        const w = toWorld(ev.clientX - r.left, ev.clientY - r.top);
+        const w = world(ev.clientX, ev.clientY);
         const n = npcAt(w.x, w.y);
+        toNpc = !!n;
         if (n) { try { if (window.DOLLGONG && DOLLGONG.prefetch) DOLLGONG.prefetch(n.act); } catch (e) { } walkTo(n.x, n.y, function () { act(n.act, n); }); return; }
         walkTo(w.x, w.y, null);
     };
+    const stop = function () { down = false; clearInterval(holdIv); holdIv = 0; };
     ov.addEventListener('pointerdown', function (ev) {
         if (run && run.talkOn) return;               // 말 창은 제가 받는다
         if (ev.target.closest && ev.target.closest('.ds-top,.ds-spot')) return;
-        down = true; lastT = Date.now(); go(ev);
+        down = true; lastT = Date.now(); at = { x: ev.clientX, y: ev.clientY }; sx = ev.clientX; sy = ev.clientY;
+        go(ev);
+        clearInterval(holdIv);
+        const r0 = run;
+        holdIv = setInterval(function () {
+            if (!down || !run || run !== r0) { stop(); return; }     // 맵이 바뀌면 손을 뗀 것으로
+            if (toNpc || !canWalk() || !at) return;
+            const w = world(at.x, at.y);
+            walkTo(w.x, w.y, null);
+        }, 150);
     });
     ov.addEventListener('pointermove', function (ev) {
-        if (!down || Date.now() - lastT < 140) return;
+        if (!down) return;
+        at = { x: ev.clientX, y: ev.clientY };
+        if (toNpc && Math.hypot(ev.clientX - sx, ev.clientY - sy) > 24) toNpc = false;   // 사람을 누르고 끌면 그냥 걷기
+        if (Date.now() - lastT < 120) return;
         lastT = Date.now();
-        if (!run || busy() || (run.pt && (!run.pt.lead() || !run.pt.ready()))) return;
-        const r = ov.getBoundingClientRect();
-        const w = toWorld(ev.clientX - r.left, ev.clientY - r.top);
+        if (toNpc || !canWalk()) return;
+        const w = world(ev.clientX, ev.clientY);
         walkTo(w.x, w.y, null);
     });
-    const up = function () { down = false; };
-    ov.addEventListener('pointerup', up);
-    ov.addEventListener('pointercancel', up);
+    ov.addEventListener('pointerup', stop);
+    ov.addEventListener('pointercancel', stop);
+    ov.addEventListener('pointerleave', stop);
+}
+// 방향키 — 맵이 열려 있을 때만 (광장 쪽으로는 넘기지 않는다)
+const KEYS = {}, KEYMAP = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', a: 'l', d: 'r', w: 'u', s: 'd', A: 'l', D: 'r', W: 'u', S: 'd' };
+window.addEventListener('keydown', function (ev) {
+    if (!run || !document.getElementById(OV)) return;
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
+    const k = KEYMAP[ev.key];
+    if (!k) return;
+    KEYS[k] = 1;
+    ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
+}, true);
+window.addEventListener('keyup', function (ev) {
+    const k = KEYMAP[ev.key];
+    if (k) delete KEYS[k];                               // 뗀 것은 광장에도 알린다 (광장 쪽 걸음이 눌린 채로 남지 않게)
+}, true);
+window.addEventListener('blur', function () { Object.keys(KEYS).forEach(function (k) { delete KEYS[k]; }); });
+function keyWalk(t) {
+    const dx = (KEYS.r ? 1 : 0) - (KEYS.l ? 1 : 0), dy = (KEYS.d ? 1 : 0) - (KEYS.u ? 1 : 0);
+    if (!dx && !dy) { if (run.keyOn) { run.keyOn = 0; if (!run.then) run.path = run.path.slice(0, 1); } return; }
+    if (!canWalk() || t - (run.keyT || 0) < 110) return;
+    run.keyT = t; run.keyOn = 1;
+    walkTo(run.x + dx * 40, run.y + dy * 40, null);
 }
 
 function tick(t) {
@@ -494,6 +540,7 @@ function tick(t) {
     t = t || performance.now();
     const dt = run.last ? Math.min(0.05, (t - run.last) / 1000) : 0;
     run.last = t;
+    keyWalk(t);
     let moved = 0;
     if (run.path.length && !run.talkOn && !run.busy) {
         let left = SPD * dt;
@@ -517,6 +564,7 @@ function tick(t) {
             else edgeGo();
         }
     }
+    if (!run) return;                                    // 끝으로 걸어 나가 맵이 닫혔다
     const walking = moved > 0;
     if (run.me && run.walking !== walking) { run.walking = walking; try { run.me.moving(walking); } catch (e) { } }
     placeMe();
@@ -550,14 +598,35 @@ function inZone() {
     }
     return null;
 }
+function encLoad() {
+    const u = u_(), k = 'dollEnc-' + (u && u.code);
+    let o = null;
+    try { o = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { }
+    if (!o || !(o.need >= ENC_STEPS[0] && o.need <= ENC_STEPS[1])) o = { n: 0, acc: 0, need: ENC_STEPS[0] + Math.floor(Math.random() * (ENC_STEPS[1] - ENC_STEPS[0] + 1)) };
+    o.k = k;
+    return o;
+}
+function encSave(o) { try { localStorage.setItem(o.k, JSON.stringify({ n: o.n, acc: o.acc, need: o.need })); } catch (e) { } }
 function onMove(d) {
     if (run.key === 'wild') {
-        if (!inZone() || Date.now() < run.encOff) return;
-        run.encAcc += d;
-        while (run.encAcc >= STEP) {
-            run.encAcc -= STEP;
-            const forced = run.tut && run.tut.step === 'wild-go';
-            if (forced || Math.random() < ENC) { encounter(); return; }
+        if (Date.now() < run.encOff) return;
+        // 튜토리얼 — 수상한 장소를 조금 걸으면 바로 나온다
+        if (run.tut && run.tut.step === 'wild-go') {
+            if (!inZone()) return;
+            run.encAcc += d;
+            if (run.encAcc >= STEP) { run.encAcc = 0; encounter(); }
+            return;
+        }
+        if (!canHunt()) { if (inZone()) { run.encAcc += d; if (run.encAcc >= STEP * 4) { run.encAcc = 0; encounter(); } } return; }   // 공방 먼저 — 알림만
+        const o = run.enc || (run.enc = encLoad());
+        o.acc += d;
+        let stepped = 0;
+        while (o.acc >= FOOT) { o.acc -= FOOT; o.n++; stepped++; }
+        if (stepped && o.n % 10 === 0) encSave(o);
+        if (o.n >= o.need && inZone()) {
+            o.n = 0; o.acc = 0; o.need = ENC_STEPS[0] + Math.floor(Math.random() * (ENC_STEPS[1] - ENC_STEPS[0] + 1));
+            encSave(o);
+            encounter();
         }
     } else if (run.key === 'arcade') {
         arcadeCheck();
@@ -576,7 +645,7 @@ async function encounter() {
     if (!run || run.busy) return;
     if (!canHunt()) {
         run.encOff = Date.now() + 8000;
-        sys('수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방(▶)에 먼저 들러 보세요.');
+        sys('수풀 속에서 뭔가 바스락거렸다…… 도깨비 공방(◀)에 먼저 들러 보세요.');
         return;
     }
     run.busy = true; run.path = []; run.then = null;
@@ -622,8 +691,9 @@ function sys(t, ms) {
 // ==========================================
 //   lines — [ '말' 또는 { who, t, sys } ] · 돌려주는 값은 Promise
 function talk(lines, who) {
+    lines = (Array.isArray(lines) ? lines : []).filter(function (L) { return L && (typeof L === 'string' || L.t); });
     return new Promise(function (resolve) {
-        if (!run) return resolve();
+        if (!run || !lines.length) return resolve();     // 할 말이 없으면 빈 창을 띄우지 않는다
         run.talkOn = true; run.path = [];
         let i = 0;
         const box = document.createElement('div');
@@ -894,9 +964,11 @@ function act(name, o) {
     if (!run) return;
     switch (name) {
         case 'toPlaza':    close(); toPlazaRoom('plaza', 1830); return;
-        case 'toGate':     close(); toPlazaRoom('gate', 60); return;
+        case 'toGate':     close(); toPlazaRoom('gate', 1800); return;      // 재관국 앞 오른쪽 끝으로
         case 'toGfront':   open('gfront', 'left'); return;
+        case 'toGfrontR':  open('gfront', 'right'); return;
         case 'toWildR':    open('wild', 'right'); return;
+        case 'toWildL':    open('wild', 'left'); return;
         case 'toGong':     open('gong', 'door'); return;
         case 'toGfrontDoor': open('gfront', 'door'); return;
         case 'arcadeQuit': arcadeQuit(); return;
@@ -924,8 +996,17 @@ function onEnter(key, opt) {
     if (key === 'gfront' && !t.done && t.step === 'go-wild') { tutResumeFront(); return; }
     if (key === 'wild' && !t.done && (t.step === 'go-wild' || t.step === 'wild-go')) { tutWild(); return; }
     if (key === 'gong' && !t.done && t.step === 'caught') { tutGong(); return; }
-    if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(▶)에 먼저 들러 보세요.', 4500);
-    if (key === 'arcade' && run.pt && !opt.resume) talk(run.pt.intro());
+    if (key === 'wild' && !t.done && !run.tut) sys('도깨비 공방(◀)에 먼저 들러 보세요.', 4500);
+    if (key === 'arcade' && run.pt && !opt.resume) {
+        // 판 소식(dollRun)이 아직 안 왔으면 첫 말이 비어 있다 — 올 때까지 잠깐 기다린다
+        const r0 = run;
+        let n = 0;
+        const iv = setInterval(function () {
+            if (run !== r0) { clearInterval(iv); return; }
+            const L = run.pt.intro();
+            if (L.length || ++n > 40) { clearInterval(iv); if (L.length) talk(L); }
+        }, 150);
+    }
     if (key === 'gong' && t.done && !opt.quiet) sys('도깨비들을 누르면 이야기할 수 있습니다.', 3000);
 }
 
@@ -1002,8 +1083,8 @@ async function tutLeadOut() {
     // 도깨비가 먼저 왼쪽(출몰지)으로 간다 — 따라가면 출몰지
     if (!run.npc) npcFront(32);
     run.tut = { step: 'go-wild' };
-    sys('◀ 도깨비를 따라가세요', 6000);
-    npcWalk(4, 219, SPD * 1.6).then(function () { npcHide(); });
+    sys('도깨비를 따라가세요 ▶', 6000);
+    npcWalk(466, 219, SPD * 1.6).then(function () { npcHide(); });
 }
 async function tutResumeFront() {
     run.tut = { step: 'go-wild' };
@@ -1185,8 +1266,8 @@ window.dollRepaint = function () {
     try { if (run) makeDoll(); } catch (e) { }
     try { if (window.DOLLGONG && DOLLGONG.repaint) DOLLGONG.repaint(); } catch (e) { }
 };
-window.dollWildOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('wild', 'left'); };
-window.dollGfrontOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('gfront', 'right'); };
+window.dollWildOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('wild', 'right'); };
+window.dollGfrontOpen = function () { if (inDark()) { alert_('어둠 탐사 중입니다.'); return; } open('gfront', 'left'); };
 window.dollGongOpen = function () {
     if (inDark()) { alert_('어둠 탐사 중입니다.'); return; }
     if (!tutOf().done) { open('gfront', 'door'); return; }
@@ -1196,7 +1277,7 @@ window.dollGo = function (k, at) { if (!SC[k]) { console.log(Object.keys(SC).joi
 window.dollWalk = function (x, y) { if (run && !busy()) walkTo(x, y, null); };
 window.dollSceneState = function () {
     if (!run) { console.log('열려 있지 않습니다.'); return; }
-    const o = { 맵: run.key, x: Math.round(run.x), y: Math.round(run.y), Z: run.Z.toFixed(2), k: run.k, 튜토리얼: tutOf(), 걷는중: run.path.length, 말: !!run.talkOn, 바쁨: !!run.busy };
+    const o = { 맵: run.key, x: Math.round(run.x), y: Math.round(run.y), Z: run.Z.toFixed(2), k: run.k, 튜토리얼: tutOf(), 걷는중: run.path.length, 말: !!run.talkOn, 바쁨: !!run.busy, 조우: run.enc ? run.enc.n + ' / ' + run.enc.need + ' 걸음' : '' };
     console.log(o);
     return o;
 };
@@ -1208,9 +1289,11 @@ window.dollSceneState = function () {
         if (R.plaza && !R.plaza.spots.some(function (s) { return s.fn === 'dollWildOpen'; })) {
             R.plaza.spots.push({ x: 1760, n: '봉제인형 출몰지', i: '🧸', fn: 'dollWildOpen' });
         }
+        // ★ 도깨비 공방은 재관국 앞 오른쪽 — 오른쪽 끝으로 걸어가도 들어간다 (plaza.js rightFn · 2026-11-07 사용자)
         if (R.gate && !R.gate.spots.some(function (s) { return s.fn === 'dollGfrontOpen'; })) {
-            R.gate.spots.push({ x: 150, n: '도깨비 공방', i: '👺', fn: 'dollGfrontOpen' });
+            R.gate.spots.push({ x: 1720, n: '도깨비 공방', i: '👺', fn: 'dollGfrontOpen' });
         }
+        if (R.gate && !R.gate.right) R.gate.rightFn = 'dollGfrontOpen';
         const M = PLAZA.MENU;
         if (!M.some(function (m) { return m.fn === 'dollGongOpen'; })) {
             const at = M.findIndex(function (m) { return m.fn === 'petOpen'; });

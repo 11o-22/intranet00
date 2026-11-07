@@ -172,6 +172,10 @@ function css() {
         '#dbt-ov .hit.prs{background:rgba(0,0,0,.32)}',
         '#dbt-ov .menu{animation:dbfi .22s ease-out}',
         '@keyframes dbfi{from{opacity:0}to{opacity:1}}',
+        // ★ 포획(야생) 전투 — 봉제인형들이 제자리에서 조금씩 위아래로 (2026-11-07 사용자)
+        '#dbt-ov .bob{animation:dbbob 1.3s ease-in-out infinite}',
+        '#dbt-ov .bob2{animation:dbbob 1.3s ease-in-out -.65s infinite}',
+        '@keyframes dbbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}',
         '@keyframes dbwob{0%,100%{transform:rotate(0)}25%{transform:rotate(-24deg)}75%{transform:rotate(24deg)}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -261,7 +265,7 @@ function paintFoe(silhouette) {
         e.innerHTML = '<div style="' + D().monCss(f.mon, px) + '"></div>';
         e.style.left = (AT.foe.cx - px / 2) + 'px'; e.style.top = (AT.foe.foot - px + 2) + 'px';
     } else {
-        e.innerHTML = '<div style="' + D().spriteCss(f.sp, 64) + '"></div>';
+        e.innerHTML = '<div class="bob" style="' + D().spriteCss(f.sp, 64) + '"></div>';
         e.style.left = (AT.foe.cx - 32) + 'px'; e.style.top = (AT.foe.foot - 62) + 'px';
     }
     e.style.filter = silhouette ? 'brightness(0) invert(1) opacity(.9)' : '';
@@ -269,7 +273,7 @@ function paintFoe(silhouette) {
 function paintMe() {
     const m = B.me, e = B.ui.me, bp = q('.bpet');
     if (!m) { e.innerHTML = ''; if (bp) bp.innerHTML = ''; return; }
-    e.innerHTML = '<div style="' + D().spriteCss(m.sp, AT.me.px, true) + '"></div>';
+    e.innerHTML = '<div' + (B.foe && B.foe.wild ? ' class="bob2"' : '') + ' style="' + D().spriteCss(m.sp, AT.me.px, true) + '"></div>';
     if (bp) bp.innerHTML = '<div style="' + D().spriteCss(m.sp, AT.btnPet.px) + '"></div>';
 }
 function hpColor(p) { return p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30'); }
