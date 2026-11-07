@@ -261,12 +261,6 @@ const DOT = {
     //     주신 그림(1728 장)을 칸마다 +30 옮겨 tk-blush 로 — 서기 줄 여섯 칸이 같은 그림이라 서기 첫 칸에 세운다.
     //     머리 바로 위 층에 깔고 머리와 같이 내린다. 여러 머리에 대 보니 볼 자리에 맞았다. 끝나면 걷는다.
     TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 6, blush: 'tk-blush' } },
-    // ★ 괴롭히기 (2026-11-08 사용자 「여성체 눌렀을 때 [ 괴롭히기 ] 버튼 뜨게 · 1~2 두 번 · 3~4 스무 번(점점 빠르게) · 5~6 늦추고 · 7~12 를 한 번 더」)
-    //   간지럽히기와 같은 틀 — 몸판만 이 장으로 갈아 끼우고 칸마다 머리 · 뒷머리 · 악세를 dy 만큼 내린다 (눈 감기 · 홍조는 없다).
-    //   주신 그림(1728 장)을 칸마다 +30 옮겨 body-w-bl 로 — 7번 칸이 여성 체형 서기 7번과 한 점도 안 틀린다.
-    //   재 보면 짝수 칸(2 · 4 · … · 12)은 머리 · 목 · 몸통이 4 만큼 통째로 내려가 있다 (다리 · 발은 그대로).
-    //   광장(plaza.js 「괴롭히기」)이 dotActor 의 bully(칸) 으로 넘긴다.
-    BULLY: { 'body-w': { sheet: 'body-w-bl', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4] } },
     BLINK_SHUT: 3,
     // ★ 벗기기 (2026-11-08 사용자 「기존에 있는 건 다른 사원이 해당 의상을 입은 사원을 건드렸을 때 [ 벗기기 ] 버튼이 나왔을 때에
     //   7~12 프레임만 쓴 다음 그대로 아예 옷이 없어지게 해줘. (여성 체형.)」)
@@ -1403,10 +1397,8 @@ function actor(user, opt) {
     const bodyAt = (L.backs || []).length;
     const bodyEl = els[bodyAt];
     const TKS = (D.TICKLE && D.TICKLE[L.body]) || null;
-    const BLS = (D.BULLY && D.BULLY[L.body]) || null;     // 괴롭히기 장 (2026-11-08) — 간지럽히기와 같은 길로 깐다 (tkSet)
-    const tkFol = (TKS || BLS) ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
+    const tkFol = TKS ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
     if (TKS) { try { const im = new Image(); im.src = tkSrc(TKS.sheet); } catch (e) { } }   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
-    if (BLS) { try { const im = new Image(); im.src = tkSrc(BLS.sheet); } catch (e) { } }
     // 홍조 (TKS.blush) — 머리 바로 위에 숨겨 깔아 두고, 쑤시는 동안만 보인다 · 머리와 같이 내린다
     let blushEl = null;
     if (TKS && TKS.blush && head) {
@@ -1417,9 +1409,8 @@ function actor(user, opt) {
         tkFol.push(blushEl);
     }
     let tk = null;
-    let tkCfg = null;                                      // 지금 깐 장 — TKS(쑤시기) 또는 BLS(괴롭히기)
-    // 지금 눈 감은 얼굴로 둘 칸인가 (TKS.shut 앞 · 1~6) — 괴롭히기(BLS)는 shut 이 없어 늘 거짓
-    const tkShut = function () { return !!(tkCfg && tkCfg.shut && tk != null && tk >= 0 && tk < tkCfg.shut); };
+    // 지금 눈 감은 얼굴로 둘 칸인가 (TKS.shut 앞 · 1~6)
+    const tkShut = function () { return !!(TKS && TKS.shut && tk != null && tk >= 0 && tk < TKS.shut); };
     // ★ 벗기기 (2026-11-08 · D.STRIP) — 입은 장(레드 비키비키니)을 벗겨지는 장으로 갈아 끼우고 서기 칸 0~5 를 한 번 · 끝나면 그 장을 걷는다.
     //   st — null 이면 벗기는 중이 아니다 · 0~5 이면 그 칸 · 'gone' 이면 다 벗겼다 (이 칸에서는 다시 안 입힌다).
     //   벗기는 동안 몸판은 같은 서기 칸에 세우고(들썩임도 그 칸 몫) 다른 층도 서 있는 모습으로 — 그림이 서 있는 몸에 맞춰 그려져 있다.
@@ -1598,47 +1589,6 @@ function actor(user, opt) {
     };
     start();
 
-    // ★ 몸판 갈아 끼우기 — 간지럽히기(TKS) · 괴롭히기(BLS · 2026-11-08) 가 같이 쓴다
-    //   cfg — 깔 장 · f — 그 장의 몇 번째 칸(0~11) · null 이면 풀고 원래 움직임으로
-    const tkSet = function (cfg, f) {
-        if (!cfg || !bodyEl) return false;
-        if (f == null) {
-            if (tk == null || tkCfg !== cfg) return true;   // 다른 장이 돌고 있으면 건드리지 않는다
-            tk = null;
-            tkCfg = null;
-            bodyEl.style.backgroundImage = bodyEl._tkWas || '';
-            tkFol.forEach(function (e) { e.style.transform = ''; });
-            if (blushEl) blushEl.style.display = 'none';   // 홍조를 걷는다
-            if (bob) { bob.lock = false; bob.v = 0; }
-            if (head) put(head, 0, 1);                  // 감았던 눈을 뜬다 (화면 밖이라 start 가 안 칠해도)
-            start();                                    // 서기 · 걷기를 그때 모습으로 다시 돌린다
-            return true;
-        }
-        f = Math.max(0, Math.min(11, f | 0));
-        if (tk == null) {
-            if (idleEl) idleOff();
-            bodyEl._tkWas = bodyEl.style.backgroundImage;
-            if (bob) bob.lock = true;
-            tk = -1;
-            if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷도 서 있는 칸으로
-        }
-        if (tkCfg !== cfg) {
-            tkCfg = cfg;
-            tk = -1;
-            bodyEl.style.backgroundImage = 'url("' + tkSrc(cfg.sheet) + '")';
-            if (blushEl) blushEl.style.display = cfg.blush ? '' : 'none';   // 쑤시는 동안만 홍조
-        }
-        if (f === tk) return true;
-        const shutWas = tkShut();
-        tk = f;
-        if (head && tkShut() !== shutWas) put(head, tkShut() ? D.BLINK_SHUT : 0, 1);   // 1~6 이면 눈을 감고 · 7 로 넘어가면 뜬다
-        bodyEl.style.backgroundPosition = '-' + ((f % 6) * D.W * k) + 'px -' + (Math.floor(f / 6) * D.H * k) + 'px';
-        const v = cfg.dy[f] || 0;
-        const t = v ? 'translateY(' + (v * k) + 'px)' : '';
-        tkFol.forEach(function (e) { e.style.transform = t; });
-        return true;
-    };
-
     return {
         el: box,
         moving: function (on) { on = !!on; if (on === walking) return; walking = on; if (!on) seqStopNow = true; start(); },
@@ -1731,10 +1681,39 @@ function actor(user, opt) {
         // ★ 간지럽히기 (2026-11-07) — 몸이 간지럽히기 장을 가졌나 (여성 체형)
         tickles: !!TKS,
         // f — 간지럽히기 장의 몇 번째 칸(0~11)을 깐다 · null 이면 풀고 원래 움직임으로 (D.TICKLE)
-        tickle: function (f) { return tkSet(TKS, f); },
-        // ★ 괴롭히기 (2026-11-08) — 몸이 괴롭히기 장을 가졌나 (여성 체형) · f 는 tickle 과 같다 (D.BULLY)
-        bullies: !!BLS,
-        bully: function (f) { return tkSet(BLS, f); },
+        tickle: function (f) {
+            if (!TKS || !bodyEl) return false;
+            if (f == null) {
+                if (tk == null) return true;
+                tk = null;
+                bodyEl.style.backgroundImage = bodyEl._tkWas || '';
+                tkFol.forEach(function (e) { e.style.transform = ''; });
+                if (blushEl) blushEl.style.display = 'none';   // 홍조를 걷는다
+                if (bob) { bob.lock = false; bob.v = 0; }
+                if (head) put(head, 0, 1);                  // 감았던 눈을 뜬다 (화면 밖이라 start 가 안 칠해도)
+                start();                                    // 서기 · 걷기를 그때 모습으로 다시 돌린다
+                return true;
+            }
+            f = Math.max(0, Math.min(11, f | 0));
+            if (tk == null) {
+                if (idleEl) idleOff();
+                bodyEl._tkWas = bodyEl.style.backgroundImage;
+                bodyEl.style.backgroundImage = 'url("' + tkSrc(TKS.sheet) + '")';
+                if (bob) bob.lock = true;
+                if (blushEl) blushEl.style.display = '';     // 쑤시는 동안만 홍조
+                tk = -1;
+                if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷도 서 있는 칸으로
+            }
+            if (f === tk) return true;
+            const shutWas = tkShut();
+            tk = f;
+            if (head && tkShut() !== shutWas) put(head, tkShut() ? D.BLINK_SHUT : 0, 1);   // 1~6 이면 눈을 감고 · 7 로 넘어가면 뜬다
+            bodyEl.style.backgroundPosition = '-' + ((f % 6) * D.W * k) + 'px -' + (Math.floor(f / 6) * D.H * k) + 'px';
+            const v = TKS.dy[f] || 0;
+            const t = v ? 'translateY(' + (v * k) + 'px)' : '';
+            tkFol.forEach(function (e) { e.style.transform = t; });
+            return true;
+        },
         stop: clear
     };
 }
