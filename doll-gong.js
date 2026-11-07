@@ -77,7 +77,10 @@ function css() {
         '.gb-dex .c{background:#261d38;border:1px solid #3d2f5c;border-radius:8px;padding:4px 2px;text-align:center;font-size:9px;color:#b8acd8}',
         '.gb-dex .c .no{color:#7f72a8}',
         // 펫 박스
-        '.db-wrap{position:fixed;left:0;right:0;bottom:0;z-index:99997;display:flex;justify-content:center;pointer-events:none}',
+        // ★ 보관함 판은 화면 위쪽에, 동행 판은 아래에 — 한 그림을 둘로 잘라 따로 놓는다 (2026-11-07 사용자 「노란색 친 만큼 올려」)
+        '.db-wrap{position:fixed;left:0;right:0;z-index:99997;display:flex;justify-content:center;pointer-events:none}',
+        '.db-wrap.t{top:calc(env(safe-area-inset-top,0px) + 13vh)}',
+        '.db-wrap.b{bottom:0}',
         '.db-box{position:relative;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}',
         '.db-box .bg{position:absolute;left:0;top:0;image-rendering:pixelated;pointer-events:none}',
         '.db-box .a{position:absolute;box-sizing:border-box}',
@@ -432,7 +435,7 @@ function dex(S) {
 const BX = { a: null, page: 0, multi: false, sel: {}, q: '', fav: false };
 //   자리 (314 × 685 그림 기준) — 위 판 41~271 × 146~423 · 아래 판 42~272 × 459~564
 const BL = {
-    crop: [130, 580],
+    crop: [130, 580], cropT: [130, 432], cropB: [448, 580],      // 위 판(보관함) · 아래 판(동행)
     title: [76, 168, 238, 194], prev: [50, 166, 78, 197], next: [235, 166, 263, 197],
     grid: { x: 50, y: 202, cw: 54, ch: 54, gap: 0 },
     tb: [[50, 368, 116, 388], [124, 368, 190, 388], [198, 368, 264, 388]],
@@ -465,8 +468,9 @@ function boxOpen() {
     css();
     if (BX.a) boxClose();
     const wrap = document.createElement('div');
-    wrap.className = 'db-wrap';
-    wrap.innerHTML = '<div class="db-box"><img class="bg" src="doll/box.webp" alt=""></div>';
+    wrap.className = 'db-all';
+    wrap.innerHTML = '<div class="db-wrap t"><div class="db-box t"><img class="bg" src="doll/box.webp" alt=""></div></div>'
+        + '<div class="db-wrap b"><div class="db-box b"><img class="bg" src="doll/box.webp" alt=""></div></div>';
     document.body.appendChild(wrap);
     BX.a = wrap; BX.multi = false; BX.sel = {};
     wrap.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
@@ -486,28 +490,32 @@ function boxClose() {
 }
 function boxScale() {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const h0 = BL.crop[1] - BL.crop[0];
-    return Math.min(Math.min(vw, 460) / 314, (vh * 0.78) / h0);
+    const h0 = (BL.cropT[1] - BL.cropT[0]) + (BL.cropB[1] - BL.cropB[0]);
+    return Math.min(Math.min(vw, 460) / 314, (vh * 0.72) / h0);
 }
+function cropOf(r) { return r[1] >= BL.cropB[0] ? BL.cropB : BL.cropT; }
 function bx(r, s, extra) {
-    return 'left:' + Math.round(r[0] * s) + 'px;top:' + Math.round((r[1] - BL.crop[0]) * s) + 'px;width:' + Math.round((r[2] - r[0]) * s) + 'px;height:' + Math.round((r[3] - r[1]) * s) + 'px;' + (extra || '');
+    return 'left:' + Math.round(r[0] * s) + 'px;top:' + Math.round((r[1] - cropOf(r)[0]) * s) + 'px;width:' + Math.round((r[2] - r[0]) * s) + 'px;height:' + Math.round((r[3] - r[1]) * s) + 'px;' + (extra || '');
 }
 function boxPaint() {
     if (!BX.a) return;
     const M = D(), u = u_(), ds = M.dolls(u);
     const s = boxScale();
-    const box = BX.a.querySelector('.db-box');
-    const h0 = BL.crop[1] - BL.crop[0];
-    box.style.width = Math.round(314 * s) + 'px'; box.style.height = Math.round(h0 * s) + 'px';
-    const bg = box.querySelector('.bg');
-    bg.style.width = Math.round(314 * s) + 'px'; bg.style.height = Math.round(685 * s) + 'px'; bg.style.top = Math.round(-BL.crop[0] * s) + 'px';
+    const box = BX.a;
+    [['t', BL.cropT], ['b', BL.cropB]].forEach(function (pc) {
+        const el = BX.a.querySelector('.db-box.' + pc[0]), cr = pc[1];
+        el.style.width = Math.round(314 * s) + 'px'; el.style.height = Math.round((cr[1] - cr[0]) * s) + 'px';
+        el.style.overflow = 'hidden';
+        const bg = el.querySelector('.bg');
+        bg.style.width = Math.round(314 * s) + 'px'; bg.style.height = Math.round(685 * s) + 'px'; bg.style.top = Math.round(-cr[0] * s) + 'px';
+    });
     Array.prototype.forEach.call(box.querySelectorAll('.a'), function (e) { e.remove(); });
     const add = function (r, cls, html, extra) {
         const e = document.createElement('div');
         e.className = 'a ' + (cls || '');
         e.style.cssText = bx(r, s, extra);
         if (html != null) e.innerHTML = html;
-        box.appendChild(e);
+        BX.a.querySelector('.db-box.' + (cropOf(r) === BL.cropB ? 'b' : 't')).appendChild(e);
         return e;
     };
     const all = filtered(sortedBox());

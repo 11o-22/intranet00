@@ -3952,7 +3952,13 @@ function send(moving) {
     const stopping = (!moving && run.sMoving);
     const jumped = (run.jumpAt || 0) !== (run.sJumpAt || 0);   // 🍍 뛴 것은 바로 알린다
     const beat = t - run.sent > P.BEAT_MS;           // 가만히 있어도 살아 있다고 알린다
-    if (!stopping && !jumped && !beat && (!changed || t - run.sent < P.SEND_MS)) return;
+    // 🧸 덧붙여 보내는 것 (doll-walk.js — 데리고 다니는 봉제인형) · 바뀌면 바로 알린다
+    let ex = null;
+    try { ex = (typeof window.plazaExtra === 'function') ? window.plazaExtra() : null; } catch (e) { ex = null; }
+    const exKey = ex ? JSON.stringify(ex) : '';
+    const exChanged = exKey !== (run.sEx || '');
+    if (!stopping && !jumped && !beat && !exChanged && (!changed || t - run.sent < P.SEND_MS)) return;
+    run.sEx = exKey;
     run.sent = t;
     run.sx = run.x; run.sy = run.y;
     run.sMoving = moving; run.sFace = run.me.actor.facing();
@@ -3962,7 +3968,7 @@ function send(moving) {
     const u = u_(); if (!u) return;
     const myC = carryMine();
     try {
-        run.ref.child(u.code).set({
+        const pk = {
             n: nameOf(u), x: Math.round(run.x), y: Math.round(run.y),
             f: run.sFace, m: moving ? 1 : 0, d: (typeof window.dotShownDot === 'function' ? window.dotShownDot(u) : u.dot) || null, sm: tinyOf(u) ? 1 : 0,   // 🍇 포도맛 물약 중이면 바뀐 머리
             w: wfKind(u.code) || null,              // 🪄 소원권 물약 (1 시계 · 2 달)
@@ -3977,7 +3983,9 @@ function send(moving) {
             dk: run.sDk ? 1 : null,                 // 🔦 탐사 중 (어둠 · K의 방 · EPIC · 이벤트 어둠 …)
             s: run.say || null, st: run.sayAt || 0, b: sbMine() || null, at: t,
             j: run.joinAt || t                     // 이 방에 들어온 때 — 넘치면 늦게 온 쪽이 옮긴다
-        });
+        };
+        if (ex) Object.keys(ex).forEach(function (k) { pk[k] = ex[k]; });
+        run.ref.child(u.code).set(pk);
     } catch (e) { }
 }
 
@@ -4407,6 +4415,7 @@ function onSeat(code, v, fresh) {
     q.on = (v.on && v.on.by) ? v.on : null;          // 🍍 이 사람이 올라간 곳
     q.ho = (typeof v.ho === 'number') ? v.ho : 0;   // 🍍 남의 머리 위 어디쯤
     q.fx = (typeof v.fx === 'string') ? v.fx : null;  // 🎵 둘레 효과 (LP 판)
+    q.pt = (v.pt != null) ? v.pt : null;              // 🧸 데리고 다니는 봉제인형 (doll-walk.js)
     q.ds = (v.ds && Array.isArray(v.ds.c) && v.ds.c.length) ? v.ds : null;   // 🪩 디스코 조명
     q.j = v.j || 0;                        // 옛 판(j 없음)은 먼저 온 사람으로 친다
     // 🍍 뛰었다 — 새 때(jp)가 오면 받은 순간부터 포물선 (처음 본 사람의 묵은 jp 는 따라 뛰지 않는다)
@@ -6363,6 +6372,13 @@ window.plazaWhere = function () {
              seg: run.seg, lv: run.lv };
 };
 
+// 🧸 같은 방 사람의 지금 자리 (doll-walk.js — 따라다니는 봉제인형) · 나는 plazaWhere
+window.plazaPeerPos = function (code) {
+    const q = run && run.peers && run.peers[code];
+    if (!q) return null;
+    return { x: q.x, y: q.y, face: q.face || 1, hid: !!q.hid, pt: q.pt || null, moving: !!q.moving };
+};
+window.plazaMeFace = function () { try { return (run && run.me && run.me.actor.facing()) || 1; } catch (e) { return 1; } };
 // ⚔ 펫 배틀 연출(pet-arena.js) — 그 사번의 사람 칸 (나 · 같은 방의 남). 없으면 null
 window.plazaOneOf = function (code) {
     if (!run || !code) return null;

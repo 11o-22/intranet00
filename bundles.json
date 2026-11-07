@@ -474,7 +474,8 @@
       "doll-scene.js",
       "doll-battle.js",
       "doll-gong.js",
-      "doll-party.js"
+      "doll-party.js",
+      "doll-walk.js"
     ]
   ]
 }
