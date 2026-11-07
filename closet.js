@@ -245,6 +245,12 @@ const DOT = {
     //   안 따라 내리는 악세 — 바닥에 앉은 것 · 몸과 떨어져 따로 서 있는 것
     NO_BOB: ['nyang-gray', 'nyang-calico', 'nyang-white', 'leaf-puddle', 'sound-lp',
              'nuow-rift', 'nuow-friend', 'nuow-friend-r', 'nuow2-fox', 'nuow2-doll', 'nuow2-doll-r'],
+    // ★ 간지럽히기 (2026-11-07 사용자 「여성 신체인 사람을 누르면 [ 간지럽히기 ] … 1~6 프레임이 계속 반복 · 40번에 7~12」)
+    //   몸 장 이름 → 간지럽히는 동안 몸판 대신 까는 장 · 열두 칸(1~6 · 7~12)마다 머리 · 뒷머리 · 악세를 내리는 몫.
+    //   주신 그림(1728 장)을 칸마다 +30 옮겨 body-w-tk 로 — 7번 칸이 여성 체형 서기 7번과 한 점도 안 틀린다.
+    //   재 보면 짝수 칸(2 · 4 · 6 · 8 · 10 · 12)은 머리 · 목 · 몸통이 4 만큼 통째로 내려가 있다 (다리 · 발은 그대로).
+    //   광장(plaza.js 「간지럽히기」)이 dotActor 의 tickle(칸) 으로 넘긴다.
+    TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4] } },
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -780,7 +786,7 @@ function bobOf(L, els, sheets, flaps, bodyAt, k) {
 }
 // 몸 칸(col)에 맞춰 내린다 — col 이 null 이면 제자리로 (걷기 · 멈춰 세움)
 function bobPut(b, col) {
-    if (!b) return;
+    if (!b || b.lock) return;                              // 간지럽히는 동안은 tickle 이 내린다
     const v = (col == null) ? 0 : (b.dy[col] || 0);
     if (v === b.v) return;
     b.v = v;
@@ -1090,6 +1096,8 @@ window.dotSetCol = function (sheet, hue) {
 // ==========================================
 // 모습이 든 칸을 만든다
 // ==========================================
+// 간지럽히기 장 (D.TICKLE) — 절반 크기가 있으면 그것 (몸과 얼굴은 물들이지 않는다 · palette.js)
+function tkSrc(sheet) { return ((window.DOT2 && window.DOT2[sheet]) ? 'dot2/' : D.DIR) + sheet + '.png'; }
 // ★ hue 가 있으면 **색을 갈아 끼운 그림**을 깐다 (recolor.js).
 //   아직 안 만들어졌으면 원래 그림을 깔아 두고, 다 되면 갈아 끼운다
 //   (아래 dotTintOn). 그래서 기다리는 빈 칸이 안 보인다.
@@ -1317,6 +1325,14 @@ function actor(user, opt) {
     els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     const flaps = flapsOf(els, sheets);
     const bob = bobOf(L, els, sheets, flaps, (L.backs || []).length, k);   // 들썩이는 몸 — 서 있을 때 머리 · 뒷머리 · 악세를 같이 내린다
+    // ★ 간지럽히기 (2026-11-07 · D.TICKLE) — 몸판만 간지럽히기 장으로 갈아 끼우고, 칸마다 머리 · 뒷머리 · 악세(follow)를 같이 내린다.
+    //   tk — 지금 깐 칸(0~11) · null 이면 간지럽히는 중이 아니다. 그동안 몸판은 서기 · 걷기 시계가 칠하지 않는다 (put).
+    const bodyAt = (L.backs || []).length;
+    const bodyEl = els[bodyAt];
+    const TKS = (D.TICKLE && D.TICKLE[L.body]) || null;
+    const tkFol = TKS ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
+    if (TKS) { try { const im = new Image(); im.src = tkSrc(TKS.sheet); } catch (e) { } }   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
+    let tk = null;
 
     // ★ 가만히 서 있으면 나오는 동작 (DOT.IDLES) — 해당하는 사람만 장을 더 깔아 둔다
     //   (한 장짜리도, 여러 장을 겹친 것도 있다 — 아래 장부터 차례로 깐다)
@@ -1343,7 +1359,7 @@ function actor(user, opt) {
     };
     const idleGo = function () {
         idleWait = 0;
-        if (!idleEl || walking || held) return;
+        if (!idleEl || walking || held || tk != null) return;
         // 서 있는 동안 돌던 것(깜빡임·펄럭임)은 멈춘다 — 안 보이는 층을 칠할 까닭이 없다
         timers.forEach(function (t) { clearInterval(t); clearTimeout(t); }); timers = [];
         crowdOut(member);
@@ -1373,6 +1389,10 @@ function actor(user, opt) {
     let walking = false, dir = 1, timers = [];
     const put = function (el, col, row) {
         if (el._seq) return;                                // 스물네 칸짜리 장은 제 시계로 (seqPaint)
+        if (tk != null) {
+            if (el === bodyEl) return;                      // 간지럽히는 동안 몸판은 tickle 이 칠한다
+            if (row === 0) { col = 0; row = 1; }            // 걷거나 멈춰 세워도 옷은 서 있는 모습 — 간지럽히기 몸이 서 있는 그림이다
+        }
         el.style.backgroundPosition = '-' + (col * D.W * k) + 'px -' + (row * D.H * k) + 'px';
     };
     // ★ 스물네 칸짜리 장 (D.SEQ · 검은 고양이 헤일로)
@@ -1517,6 +1537,37 @@ function actor(user, opt) {
             });
         },
         facing: function () { return dir; },
+        // ★ 간지럽히기 (2026-11-07) — 몸이 간지럽히기 장을 가졌나 (여성 체형)
+        tickles: !!TKS,
+        // f — 간지럽히기 장의 몇 번째 칸(0~11)을 깐다 · null 이면 풀고 원래 움직임으로 (D.TICKLE)
+        tickle: function (f) {
+            if (!TKS || !bodyEl) return false;
+            if (f == null) {
+                if (tk == null) return true;
+                tk = null;
+                bodyEl.style.backgroundImage = bodyEl._tkWas || '';
+                tkFol.forEach(function (e) { e.style.transform = ''; });
+                if (bob) { bob.lock = false; bob.v = 0; }
+                start();                                    // 서기 · 걷기를 그때 모습으로 다시 돌린다
+                return true;
+            }
+            f = Math.max(0, Math.min(11, f | 0));
+            if (tk == null) {
+                if (idleEl) idleOff();
+                bodyEl._tkWas = bodyEl.style.backgroundImage;
+                bodyEl.style.backgroundImage = 'url("' + tkSrc(TKS.sheet) + '")';
+                if (bob) bob.lock = true;
+                tk = -1;
+                if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷도 서 있는 칸으로
+            }
+            if (f === tk) return true;
+            tk = f;
+            bodyEl.style.backgroundPosition = '-' + ((f % 6) * D.W * k) + 'px -' + (Math.floor(f / 6) * D.H * k) + 'px';
+            const v = TKS.dy[f] || 0;
+            const t = v ? 'translateY(' + (v * k) + 'px)' : '';
+            tkFol.forEach(function (e) { e.style.transform = t; });
+            return true;
+        },
         stop: clear
     };
 }

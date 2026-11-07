@@ -1312,6 +1312,176 @@ function wfBtnPaint() {
 }
 setInterval(function () { try { if (run) wfBtnPaint(); } catch (e) { } }, 700);
 
+// ==========================================
+// 간지럽히기 (2026-11-07 사용자)
+// ==========================================
+//
+//   「이건 여성 신체인 사람만 해당 되는 거고, 타인이 여성 신체인 사람을 누르면 [ 간지럽히기 ] 가 나오고.
+//    그 버튼을 누른 후에 여성 신체인 사람을 눌러대면 1~6 프레임이 계속 반복. 한 40번 정도 클릭했을 때에
+//    7~12프레임으로 가게 해줘. 그리고 1~6 반복할 때에 위 아래 움직임이 횟수가 찰 수록 더 빨리 움직이고
+//    7 프레임으로 넘어갈 때에는 확 느려지게 해서 12까지로. 머리카락이랑 얼굴도 같이 움직이게 해야해.」
+//
+//   · 몸이 간지럽히기 장을 가진 사람(여성 체형 · closet.js D.TICKLE)에게만 뜬다 — 소원권 물약이 된 동안은 빼고
+//   · [ 간지럽히기 ] 를 누른 뒤에는 그 사람을 누를 때마다 한 번씩 센다 (다른 데를 누르면 그만둔다)
+//   · 1~6 을 되풀이 — 셀수록 빨라진다 (한 칸 TK_SLOW → TK_FAST)
+//   · TK_MAX(40) 번째에 7~12 를 한 번, 확 느리게 (한 칸 TK_END) — 그리고 원래 모습으로
+//   · TK_IDLE 동안 아무도 안 누르면 그만 — 다시 누르면 처음부터 센다
+//   · 여럿이 같이 누르면 같이 센다 · 머리(얼굴 · 머리카락) · 뒷머리 · 악세는 closet.js 가 칸마다 같이 내린다
+//
+//   tickle/<사번> = { s: 판 열쇠, n: 센 수, t: 마지막으로 누른 때, by: 마지막으로 누른 사람 }
+//   모두가 이 칸을 듣고 제 화면의 그 사람(나 자신 포함)을 칠한다. 다 돌면 마지막에 누른 사람이 걷는다.
+const TK_PATH = 'tickle';
+const TK_MAX = 40;
+const TK_SLOW = 220, TK_FAST = 50;      // 1~6 한 칸에 머무는 시간 — 첫 번째 · 39 번째
+const TK_END = 520;                     // 7~12 한 칸
+const TK_IDLE = 2500;
+const TK_ITEM = ['tickle', '간지럽히기'];
+const TKR = {};                         // 서버에 적힌 것
+const TKL = {};                         // 내 화면에서 도는 것 { s, n, rt: 마지막 소식, p2: 7~12 시작, f, st, done, mine, lt }
+let tkT = 0;
+function tkIv(n) { const r = Math.max(0, Math.min(1, (n - 1) / (TK_MAX - 2))); return TK_SLOW - (TK_SLOW - TK_FAST) * r; }
+(function tkListen() {
+    let on = false;
+    const seen = {};
+    const iv = setInterval(function () {
+        if (on || typeof database === 'undefined' || !database || !u_()) return;
+        on = true;
+        clearInterval(iv);
+        let first = true;
+        database.ref(TK_PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(TKR).forEach(function (c) {
+                if (v[c]) return;
+                const old = TKR[c];
+                delete TKR[c]; delete seen[c];
+                tkGone(c, old);
+            });
+            Object.keys(v).forEach(function (c) {
+                const x = v[c];
+                if (!x || typeof x !== 'object') return;
+                TKR[c] = x;
+                const key = x.s + '|' + x.t;
+                if (seen[c] === key) return;                 // 그대로인 칸 — 다른 사람 칸이 바뀌어 같이 왔다
+                seen[c] = key;
+                if (!first) tkHeard(c, x);                   // 처음 받은 것은 들어오기 전 일이다
+            });
+            first = false;
+        });
+    }, 1000);
+})();
+function tkHeard(c, v) {
+    const t = now();
+    const n = Math.min(TK_MAX, Number(v.n) || 0);
+    let L = TKL[c];
+    if (L && L.p2 && !L.done) return;                        // 7~12 가 도는 동안은 마저 돈다
+    if (L && (L.done || (L.s !== v.s && t - L.rt > TK_IDLE))) L = null;
+    if (!L) L = TKL[c] = { s: v.s, n: 0, rt: t, p2: 0, f: 0, st: t };
+    L.s = v.s;
+    L.rt = t;
+    if (n > L.n) L.n = n;
+    if (L.n >= TK_MAX) L.p2 = t;
+    tkRun();
+}
+function tkGone(c, old) {
+    const L = TKL[c];
+    if (!L || (old && L.s !== old.s)) return;
+    if (L.p2 && !L.done) return;                              // 마저 돈다
+    if (!L.done) tkPaint(c, null);
+    delete TKL[c];
+}
+function tkOne(code) {
+    if (!run) return null;
+    if (code === myCode()) return run.me || null;
+    const q = run.peers && run.peers[code];
+    return q ? q.one : null;
+}
+function tkPaint(code, f) {
+    const one = tkOne(code);
+    if (!one || !one.actor || typeof one.actor.tickle !== 'function') return;
+    try { one.actor.tickle(one.wf ? null : f); } catch (e) { }
+}
+function tkRun() { if (!tkT) tkT = setInterval(tkTick, 30); }
+function tkTick() {
+    const t = now();
+    let live = 0;
+    Object.keys(TKL).forEach(function (c) {
+        const L = TKL[c];
+        if (!L || L.done) return;
+        if (L.p2) {
+            const f = 6 + Math.floor((t - L.p2) / TK_END);
+            if (f > 11) {                                     // 12 까지 — 원래 모습으로
+                L.done = 1;
+                tkPaint(c, null);
+                if (run && run.tkOn === c) run.tkOn = null;
+                if (L.mine) { const s = L.s; setTimeout(function () { tkDel(c, s, null); }, 1500); }
+                return;
+            }
+            live++;
+            L.f = f; tkPaint(c, f);
+            return;
+        }
+        if (t - L.rt > TK_IDLE) {                             // 아무도 안 누른다 — 그만
+            tkPaint(c, null);
+            if (L.mine) tkDel(c, L.s, L.lt);
+            delete TKL[c];
+            if (run && run.tkOn === c) run.tkOn = null;
+            return;
+        }
+        live++;
+        if (t - L.st >= tkIv(L.n)) { L.f = (L.f + 1) % 6; L.st = t; }
+        tkPaint(c, L.f);
+    });
+    if (!live && tkT) { clearInterval(tkT); tkT = 0; }
+}
+// 걷는다 — 그 판이 그대로일 때만 (lt 가 있으면 그 뒤로 아무도 안 눌렀을 때만)
+function tkDel(code, s, lt) {
+    if (typeof database === 'undefined' || !database) return;
+    database.ref(TK_PATH + '/' + code).transaction(function (cur) {
+        if (!cur || cur.s !== s) return;
+        if (lt != null && (cur.t !== lt || (Number(cur.n) || 0) >= TK_MAX)) return;
+        return null;
+    });
+}
+// 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니면
+function tkItem(code) {
+    if (!run || !code || code === myCode()) return [];
+    const q = run.peers && run.peers[code];
+    if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.tickles) return [];
+    return [TK_ITEM];
+}
+function tkStart(code) {
+    closeCarryMenu();
+    if (!tkItem(code).length) return;
+    run.tkOn = code;
+    sysLine(nameIn(code) + ' 사원을 계속 누르세요.');
+}
+// 한 번 누름
+function tkHit(code) {
+    const me = myCode();
+    if (!me || !run || typeof database === 'undefined' || !database) return;
+    const t = now();
+    let L = TKL[code];
+    if (L && L.p2 && !L.done) return;                         // 7~12 가 도는 중 — 다 돌면 다시
+    const fresh = !L || L.done || t - L.rt > TK_IDLE;
+    if (fresh) L = TKL[code] = { s: me + ':' + t, n: 0, rt: t, p2: 0, f: 0, st: t };
+    L.n = Math.min(TK_MAX, L.n + 1);
+    L.rt = t; L.mine = 1; L.lt = t;
+    if (L.n >= TK_MAX) L.p2 = t;
+    tkRun();
+    tkTick();                                                  // 누른 그 순간 칠한다
+    const s = L.s, n0 = L.n;
+    database.ref(TK_PATH + '/' + code).transaction(function (cur) {
+        const ok = !!(cur && typeof cur === 'object');
+        const cn = ok ? (Number(cur.n) || 0) : 0;
+        if (ok && cur.s === s) {
+            if (cn >= TK_MAX) return;                          // 이미 다 셌다
+            return { s: s, n: Math.min(TK_MAX, cn + 1), t: t, by: me };
+        }
+        if (ok && !fresh && cn < TK_MAX) return { s: cur.s, n: cn + 1, t: t, by: me };   // 그사이 남이 연 판 — 거기에 보탠다
+        return { s: s, n: n0, t: t, by: me };                  // 새 판 (묵은 것은 덮는다)
+    });
+}
+
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
 //   남의 모습은 방 칸에 적힌 dot 한 덩이로만 온다. 소지 목록(wardrobe)은
@@ -2728,6 +2898,12 @@ function carryTap(cx, cy) {
     closeCarryMenu();
     if (!run) return false;
     if (HS()) return false;                 // 🫣 숨바꼭질 — 사람을 톡 쳐도 아무것도 안 뜬다 (이름이 드러나지 않게)
+    // 간지럽히기 — [ 간지럽히기 ] 를 누른 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다)
+    if (run.tkOn) {
+        const tp = personAt(cx, cy);
+        if (tp && tp === run.tkOn && tkItem(tp).length) { tkHit(tp); return true; }
+        run.tkOn = null;
+    }
     const me = myCode();
     // 작은 사람이 보통 사람을 — 올라가기 · 손에 앉기
     const big = bigAt(cx, cy);
@@ -2746,10 +2922,12 @@ function carryTap(cx, cy) {
         }
         if (!items.length && !wfOf(me)) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
         wfBonkItem(big).forEach(function (x) { items.push(x); });
+        tkItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
+            if (k === 'tickle') { tkStart(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -2762,7 +2940,11 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(any); return; } infoOpen(any); }, '');
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), [INFO_ITEM]), function (k) {
+            if (k === 'bonk') { wfBonk(any); return; }
+            if (k === 'tickle') { tkStart(any); return; }
+            infoOpen(any);
+        }, '');
     }
     const w = carrierOf(pick);
     if (w && w.by !== me) {
@@ -2773,11 +2955,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기'], INFO_ITEM],
-                function (k) { if (k === 'info') { infoOpen(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), [INFO_ITEM], function () { infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -2790,11 +2972,13 @@ function carryTap(cx, cy) {
     if (mine) items.push(['down', '내려놓는다']);
     if (!items.length) sysLine('🍍 손도 머리 위도 자리가 없습니다.');
     wfBonkItem(pick).forEach(function (x) { items.push(x); });
+    tkItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
         if (k === 'info') { infoOpen(pick); return; }
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
+        if (k === 'tickle') { tkStart(pick); return; }
         carryDo(pick, k);
     }, potion ? '🫙 ' : null);
 }
