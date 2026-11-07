@@ -2304,6 +2304,54 @@ setInterval(function () {
             console.log('%c✓ ' + (all[code].name || code) + ' (' + code + ') — ' + id + (v ? ' 줌' : ' 거둠'), 'color:#4CAF50');
         };
         console.log('[옷장] dotGrant(사번, "fem") — 여성 체형 주기 · dotGrant(사번, "fem", false) 거두기');
+        // ★ 선물함으로도 준다 (2026-11-08 사용자 「상담사 콘솔 선물함으로 넣기로 가능하게」)
+        //   상담사 「물품 강제 꽂기」 목록에 「여성 체형」 · 「레드 비키비키니」가 뜨고, 사원이 선물함에서 받는 순간 옷장 권한(u.dotGrant)이 된다 (giftbox.js GIFT_WEAR grant)
+        //   콘솔: giftSendItem('사번', '여성 체형', 1)
+        const GRANT_GIFT = [
+            { n: '여성 체형',     grant: 'fem',     slot: '체형 칸', d: '[옷장] 여성 체형을 쓸 수 있게 된다. 선물함에서 받으면 옷장 체형 칸에 생긴다.' },
+            { n: '레드 비키비키니', grant: 'rbikini', slot: '겉옷 칸', d: '[의상] 레드 비키비키니. 선물함에서 받으면 옷장 겉옷 칸에 생긴다 (여성 체형일 때만 입는다).' }
+        ];
+        window.GIFT_WEAR = window.GIFT_WEAR || {};
+        GRANT_GIFT.forEach(function (x) { window.GIFT_WEAR[x.n] = { grant: x.grant, slot: x.slot }; });
+        (function reg() {
+            let n = 0;
+            const iv = setInterval(function () {
+                n++;
+                if (typeof ITEM_CATALOG === 'undefined') { if (n > 100) clearInterval(iv); return; }
+                GRANT_GIFT.forEach(function (x) {
+                    if (!ITEM_CATALOG[x.n]) ITEM_CATALOG[x.n] = { price: 0, usable: true, targetable: false, effect: 'wear_gift', noSell: true, desc: x.d };
+                    if (typeof NO_SELL_ITEMS !== 'undefined' && NO_SELL_ITEMS.indexOf(x.n) < 0) NO_SELL_ITEMS.push(x.n);
+                });
+                clearInterval(iv);
+            }, 400);
+        })();
+        // 혹시 소지품으로 들어온 것은 「사용」하면 옷장 권한이 된다
+        (function hookUse() {
+            let n = 0;
+            const iv = setInterval(function () {
+                n++;
+                if (typeof useInventoryItem !== 'function') { if (n > 100) clearInterval(iv); return; }
+                if (useInventoryItem._dotGrant) { clearInterval(iv); return; }
+                const _u = useInventoryItem;
+                const w = function (itemName) {
+                    const x = GRANT_GIFT.filter(function (g) { return g.n === itemName; })[0];
+                    if (!x) return _u.apply(this, arguments);
+                    const u = u_();
+                    if (!u || !Array.isArray(u.inventory) || u.inventory.indexOf(itemName) < 0) return;
+                    if (!u.dotGrant || typeof u.dotGrant !== 'object') u.dotGrant = {};
+                    try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, itemName, 1); } catch (e) { }
+                    if (u.dotGrant[x.grant]) { try { showCustomAlert(x.n + '은(는) 이미 옷장에 있습니다.'); } catch (e) { } }
+                    else { u.dotGrant[x.grant] = 1; try { showCustomAlert(x.n + '\n\n옷장 ' + x.slot + '에 들어왔습니다.'); } catch (e) { } }
+                    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[' + x.n + '] 옷장 ' + x.slot + '에 넣었습니다.'); } catch (e) { }
+                    try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
+                    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+                };
+                Object.keys(_u).forEach(function (k) { try { w[k] = _u[k]; } catch (e) { } });
+                w._dotGrant = true;
+                useInventoryItem = w; window.useInventoryItem = w;
+                clearInterval(iv);
+            }, 400);
+        })();
     }, 700);
 })();
 

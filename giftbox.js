@@ -463,6 +463,13 @@ window.giftTake = function (id) {
             if (!Array.isArray(u.inventory)) u.inventory = [];
             pairs.forEach(function (p) {
                 const w = WEAR[p[0]];
+                // ★ 옷장 권한으로 가는 물품 — 여성 체형 · 그 옷들 (closet.js dotGrant 와 같은 자리 u.dotGrant · 2026-11-08)
+                if (w && w.grant) {
+                    if (!u.dotGrant || typeof u.dotGrant !== 'object') u.dotGrant = {};
+                    if (u.dotGrant[w.grant]) had.push(p[0]);
+                    else { u.dotGrant[w.grant] = 1; worn.push(p[0]); }
+                    return;
+                }
                 if (w && w.k) {
                     if (!u.wardrobe || typeof u.wardrobe !== 'object') u.wardrobe = {};
                     if (u.wardrobe[w.k]) had.push(p[0]);
@@ -507,7 +514,7 @@ window.giftTake = function (id) {
             const head = got.title ? (got.title + '\n\n') : '';
             const body = pairs.map(function (p) {
                 const w = WEAR[p[0]];
-                if (w && w.k) {
+                if (w && (w.k || w.grant)) {
                     return '· ' + p[0] + (had.indexOf(p[0]) >= 0
                         ? ' — 이미 옷장에 있습니다'
                         : ' — 옷장 ' + (w.slot || '') + '에 들어왔습니다');
