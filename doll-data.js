@@ -230,6 +230,41 @@ function artOld(u) {
     if (u.petArt === 'doll') return false;
     return ART_OLD_CODES.indexOf(String(u.code || '')) >= 0;
 }
+// 🔘 외형 고르기 스위치 — 인형 돌보기 · 사택 방 (2026-11-07 사용자 「옛 펫 외형 혹은 지금 봉제인형 외형을 선택할 수 있는 버튼 … 기본은 봉제인형」)
+function artSet(v, u) {
+    u = u || u_();
+    if (!u) return;
+    const val = (v === 'old') ? 'old' : 'doll';
+    u.petArt = val;
+    put({ petArt: val }, u);
+}
+function artSwitchCss() {
+    if (document.getElementById('pet-artsw-css')) return;
+    const s = document.createElement('style');
+    s.id = 'pet-artsw-css';
+    s.textContent = '.pet-artsw{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#b8ac97;padding:7px 0;cursor:pointer;user-select:none}'
+        + '.pet-artsw .sw{position:relative;flex:0 0 auto;width:44px;height:24px;border-radius:12px;background:#555;transition:background .18s}'
+        + '.pet-artsw .sw i{position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.5);transition:left .18s}'
+        + '.pet-artsw .sw.on{background:#d4af37}.pet-artsw .sw.on i{left:23px}';
+    document.head.appendChild(s);
+}
+function artSwitchHtml() {
+    artSwitchCss();
+    return '<div class="pet-artsw"><span>옛 펫 외형으로 보기 <span style="color:#6f685e;">— 광장 · 전투 · 보관함 (끄면 봉제인형)</span></span><span class="sw' + (artOld() ? ' on' : '') + '" role="switch"><i></i></span></div>';
+}
+function artSwitchWire(root, after) {
+    const row = root && root.querySelector('.pet-artsw');
+    if (!row) return;
+    row.onclick = function (ev) {
+        ev.stopPropagation();
+        const sw = row.querySelector('.sw');
+        const v = sw.classList.contains('on') ? 'doll' : 'old';
+        artSet(v);
+        sw.classList.toggle('on', v === 'old');
+        try { if (typeof window.petRoomPaint === 'function') window.petRoomPaint(); } catch (e) { }
+        if (typeof after === 'function') after(v);
+    };
+}
 function oldCss(sp, px) {
     const n = String(Math.max(1, Number(sp) || 1)).padStart(2, '0');
     return 'background-image:url(pet/' + (px > 64 ? 'p' : 's') + n + '.webp);background-repeat:no-repeat;background-position:center bottom;background-size:contain;image-rendering:pixelated;'
@@ -540,7 +575,7 @@ window.DOLL = {
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
     stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
-    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss,
+    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,
     addDoll: addDoll, patchDoll: patchDoll, removeDoll: removeDoll, setWith: setWith,

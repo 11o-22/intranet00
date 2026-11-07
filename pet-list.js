@@ -165,10 +165,12 @@ function listView() {
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
         + '가진 인형을 누르면 이름을 붙이고, 사택 방에 내놓을 인형을 고를 수 있습니다.<br>'
         + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 초록 막대는 포만도, 붉은 막대는 상처 깊이(🩹 다친 인형)입니다.</div>'
+        + (window.DOLL && DOLL.artSwitchHtml ? DOLL.artSwitchHtml() : '')      // 🔘 옛 펫 외형 ↔ 봉제인형
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 
     w.querySelector('#pet-x').onclick = shut;
+    try { if (window.DOLL && DOLL.artSwitchWire) DOLL.artSwitchWire(w); } catch (e) { }
     Array.prototype.forEach.call(w.querySelectorAll('.pet-cell'), function (el) {
         el.onclick = function () { oneView(Number(el.getAttribute('data-i'))); };
     });

@@ -557,7 +557,8 @@ function html() {
         + '<div style="font-size:9px; color:#5f594f; margin-top:6px; text-align:center;">'
         + '방에는 ' + P().SHOW_MAX + '마리까지 — [🧸 인형] 칸에서 고릅니다'
         + (rest > 0 ? ' <span style="color:#4a443c;">· 나머지 ' + rest + '마리는 쉬는 중</span>' : '')
-        + '</div>';
+        + '</div>'
+        + (window.DOLL && DOLL.artSwitchHtml ? DOLL.artSwitchHtml() : '');      // 🔘 옛 펫 외형 ↔ 봉제인형 (2026-11-07 사용자)
 }
 
 // ==========================================
@@ -626,7 +627,7 @@ function paint() {
     }
     const h = html();
     // 글 자체를 재 둔다 — 장면이 class 를 바꾸므로 innerHTML 로 재면 늘 어긋난다
-    if (el._petH !== h) { el._petH = h; el.innerHTML = h; }
+    if (el._petH !== h) { el._petH = h; el.innerHTML = h; try { if (window.DOLL && DOLL.artSwitchWire) DOLL.artSwitchWire(el); } catch (e) { } }
     try { playScene(); } catch (e) { }
 }
 
