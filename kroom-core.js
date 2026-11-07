@@ -476,6 +476,15 @@ function kUse(n) {
     KC.pend += (n || 1);
     kFlush();
 }
+// ★ 일행 방 하나에 횟수는 한 번만 — 어느 방의 횟수를 썼는지 사원 기록(kroomPaid)에 적어 둔다 (2026-11-08)
+//   새로고침하면 파티 감시기가 같은 방으로 다시 출발시키는데(launchPartyRun → start), 그때마다 깎이던 것.
+//   방 번호는 만들 때마다 새로 나오므로(pt_시각_난수) 지난 방 번호가 남아 있어도 다른 방을 막지 않는다.
+function kPaid(pid) { const u = me(); return !!(pid && u && u.kroomPaid === pid); }
+function kPay(pid) {
+    const u = me(); if (!pid || !u) return;
+    u.kroomPaid = pid;
+    try { saveFields({ kroomPaid: 1 }); } catch (e) { }
+}
 window.kroomTriesLeft = kLeft;
 // 오늘 쓴 K 의 방 횟수를 0 으로 (🦋 에로스의 마지막 숨결 두 번 — butterfly.js · 2026-10-26)
 window.kroomTriesReset = function (code) {
@@ -1089,8 +1098,10 @@ function start(isParty, pid) {
         try { saveFields({ satiety: 1 }); } catch (e) { }
     } else {
         // 일행 출발(launchPartyRun)은 어느 어둠이든 darkTries 를 하나 올리고 바로 여기로 온다 — 되돌린다
-        u.darkTries = Math.max(0, (Number(u.darkTries) || 0) - 1);
-        if (!helper) kUse(1);
+        //   (복귀 창(acceptDarkResume)으로 다시 들어온 것은 올리지 않았다 — 되돌리지 않는다)
+        if (!(old && old.rejoined)) u.darkTries = Math.max(0, (Number(u.darkTries) || 0) - 1);
+        // ★ 같은 방에 다시 들어온 것(새로고침 → 파티 감시기가 다시 출발)은 횟수를 또 쓰지 않는다 (2026-11-08)
+        if (!helper && !kPaid(pid)) { kUse(1); kPay(pid); }
     }
     kr = { team: isParty ? pid : ('solo_' + u.code), dun: null, floor: 0, idx: 0, step: 'job',
            exp: 0, dream: 0, items: {}, log: [], started: now(), met: {}, seenJ: {},
@@ -2290,7 +2301,20 @@ function doom(cfg) {
         name: me().name, what: cfg.what || '위험합니다', dc: cfg.dc || 13, until: now() + sec * 1000, floor: kr.floor
     });
     sendPartyChat('⚠⚠ ' + me().name + ' — ' + (cfg.what || '위험합니다'), true);
-    let left = sec;
+    const left = sec;
+    doomArm(left);
+    // 📖 지우기 — 방에 종말예언을 지닌 사람이 살아 있으면 대신 죽을지 묻는다 (jisan.js)
+    try { kr._spare = (typeof window.jisanSpareAsk === 'function') ? window.jisanSpareAsk(sec * 1000, kroomSpared) : null; } catch (e) { kr._spare = null; }
+    show(cfg.title || '—', cfg.text || '',
+        `<div style="text-align:center; padding:16px; background:rgba(127,0,0,0.2); border:1px solid #b71c1c; border-radius:6px;">
+            <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:6px;">손을 뻗을 수 있는 시간</div>
+            <div style="font-size:30px; font-weight:bold; color:#fff;"><span id="kdoom-left">${left}</span><span style="font-size:14px; color:#888;">초</span></div>
+            <div style="font-size:10px; color:#aaa; margin-top:8px;">동료가 오면 살아납니다. 아무도 못 오면 여기서 끝납니다.</div></div>`);
+}
+// 손을 뻗을 시간을 센다 — kDoom/<나> 가 지워지면(동료가 왔다) 살아난다. 끊긴 판을 이을 때도 여기로 다시 건다 (kRestore)
+function doomArm(left) {
+    const d = db_(); if (!d || !kr) return;
+    if (kr._doomT) clearInterval(kr._doomT);
     kr._doomT = setInterval(function () {
         left--;
         const el = document.getElementById('kdoom-left'); if (el) el.innerText = left;
@@ -2311,13 +2335,23 @@ function doom(cfg) {
             darkChoiceBtn('일어선다.', 'kroomNext()'));
     };
     ref.on('value', kr._doomCb);
-    // 📖 지우기 — 방에 종말예언을 지닌 사람이 살아 있으면 대신 죽을지 묻는다 (jisan.js)
-    try { kr._spare = (typeof window.jisanSpareAsk === 'function') ? window.jisanSpareAsk(sec * 1000, kroomSpared) : null; } catch (e) { kr._spare = null; }
-    show(cfg.title || '—', cfg.text || '',
-        `<div style="text-align:center; padding:16px; background:rgba(127,0,0,0.2); border:1px solid #b71c1c; border-radius:6px;">
-            <div style="font-size:12px; color:#ff6b6b; font-weight:bold; margin-bottom:6px;">손을 뻗을 수 있는 시간</div>
-            <div style="font-size:30px; font-weight:bold; color:#fff;"><span id="kdoom-left">${left}</span><span style="font-size:14px; color:#888;">초</span></div>
-            <div style="font-size:10px; color:#aaa; margin-top:8px;">동료가 오면 살아납니다. 아무도 못 오면 여기서 끝납니다.</div></div>`);
+}
+// 끊긴 판을 이었는데 「손을 뻗을 시간」 화면이었다 — 남은 시간부터 다시 센다 (kDoom/<나> 가 이미 없으면 구해진 것)
+function doomRearm() {
+    const d = db_(); if (!d || !kr || !darkRun || !darkRun.isParty) return;
+    d.ref('darkParties/' + darkRun.partyId + '/kDoom/' + me().code).once('value').then(function (s) {
+        const v = s.val();
+        if (!kr || kr.dead || kr._settled) return;
+        if (!v) {
+            if (kr.down) { kr.down = false; if (kr.stats.hp <= 0) setStat('hp', 20); pubStat(); }
+            show('—', `팔이 잡힌다.<br><br>끌어내는 힘이 세다. 어깨가 빠질 것 같았다.<br>바닥에 끌려 나와 한참 누워 있었다.`,
+                darkChoiceBtn('일어선다.', 'kroomNext()'));
+            return;
+        }
+        const left = Math.max(1, Math.ceil(((Number(v.until) || 0) - now()) / 1000));
+        const el = document.getElementById('kdoom-left'); if (el) el.innerText = left;
+        doomArm(left);
+    }).catch(function () { });
 }
 // 체력이 바닥 — 치유가 고치면 일어서고(판정 · 2026-10-20 전에는 무조건), 아니면 끌어내기를 기다린다
 function fall(txt) {
@@ -3352,10 +3386,15 @@ window.kroomFinish = function () {
             if (typeof darkRun !== 'undefined' && darkRun && darkRun.zone === K_CODE) {
                 if (!kr) {
                     // 일행 출발(launchPartyRun) — 여기서 시작한다
-                    if (darkRun.isParty && darkRun.partyId && !darkRun._kresume) { start(true, darkRun.partyId); return; }
+                    //   ★ 새로고침으로 같은 방에 다시 끌려 들어온 것이면 적어 둔 자리에서 잇는다 — 처음부터 다시 돌지 않는다 (2026-11-08)
+                    if (darkRun.isParty && darkRun.partyId) {
+                        const ps = me() ? kLoad(me().code) : null;
+                        if (ps && ps.run.isParty && ps.run.partyId === darkRun.partyId && kRestore(ps)) return;
+                        start(true, darkRun.partyId); return;
+                    }
                     // 혼자 — 적어 둔 자리가 있으면 거기서 다시 잇는다 (아래 9-1)
-                    const snap = !darkRun.isParty && me() ? kLoad(me().code) : null;
-                    if (snap && kRestore(snap)) return;
+                    const snap = me() ? kLoad(me().code) : null;
+                    if (snap && !snap.run.isParty && kRestore(snap)) return;
                     // 다시 들어온 것 — 던전과의 연결이 끊겼다
                     show2('—', '눈을 떴을 때 방이 아니었다.<br><br>문은 닫혀 있고, 손에 쥔 것이 없다.<br><span style="font-size:11px; color:#888;">(연결이 끊겨 던전에서 밀려났습니다. 이번 탐사는 보상 없이 끝납니다.)</span>',
                         darkChoiceBtn('단말로 복귀한다.', 'kroomFinish()'));
@@ -3384,7 +3423,8 @@ function show2(title, text, extra) { darkBodyEl().innerHTML = darkBox(title, tex
 //     · 같은 창에서 kr 만 사라졌으면 그 자리에서 바로 잇는다 (renderDarkStep 갈래)
 //     · 새로 열렸으면 들어온 뒤 「이어 간다 / 그만둔다」를 묻는다
 //     · 정산(settle) · 단말로 복귀(kroomFinish) · 새 판(start) 에서 지운다 — 두 번 받는 일이 없다
-//     · 일행 판은 하지 않는다 (팀이 같이 움직여야 해서 — 예전처럼 다시 합류)
+//     · 일행 판도 적어 둔다 (2026-11-08) — 새로고침하면 파티 감시기가 같은 방으로 다시 출발시키는데(launchPartyRun),
+//       그때 같은 방 번호의 자리가 있으면 거기서 잇는다 (renderDarkStep 갈래). 묻는 창(kAsk)은 혼자 판에만 띄운다.
 const K_SAVE = 'kroomRun_', K_PLAN = 'kroomPlan_';
 const K_KEEP = 6 * 3600 * 1000;                 // 이만큼 지난 자리는 버린다
 const K_SKIP = { plan: 1, _doomT: 1, _doomCb: 1, _aidRef: 1, _giftRef: 1, _beat: 1, _picking: 1, _doomWatch: 1, _pickDun: 1, _going: 1 };
@@ -3403,7 +3443,6 @@ function kSaveNow() {
     try {
         const u = me();
         if (!u || !u.code || !kr || typeof darkRun === 'undefined' || !darkRun || darkRun.zone !== K_CODE) return;
-        if (darkRun.isParty) return;
         if (kr._settled || darkRun._settled) { kDrop(u.code); return; }
         const body = darkBodyEl(); if (!body) return;
         if (kr.plan && kPlanFor !== kr.started) {
@@ -3433,7 +3472,7 @@ function kDrop(code) {
 function kLoad(code) {
     try {
         const s = JSON.parse(localStorage.getItem(K_SAVE + code) || 'null');
-        if (!s || s.code !== code || !s.kr || !s.run || s.run.isParty) return null;
+        if (!s || s.code !== code || !s.kr || !s.run) return null;
         if (now() - (s.at || 0) > K_KEEP) { kDrop(code); return null; }
         if (s.kr.dun && s.kr.floor >= 1) {                    // 던전 안 — 장면 묶음이 있어야 잇는다
             const p = JSON.parse(localStorage.getItem(K_PLAN + code) || 'null');
@@ -3448,7 +3487,14 @@ function kRestore(s) {
     if (!u || !s || s.code !== u.code) return false;
     if (typeof darkRun !== 'undefined' && darkRun && darkRun.zone !== K_CODE) return false;
     hookItems();
-    darkRun = Object.assign({}, s.run, { zone: K_CODE, kroom: true, isParty: false, partyId: null });
+    const party = !!(s.run.isParty && s.run.partyId);
+    const old = (typeof darkRun !== 'undefined') ? darkRun : null;
+    if (party && !(old && old.isParty && old.partyId === s.run.partyId)) return false;   // 일행 판은 감시기가 그 방으로 다시 출발시켰을 때만 잇는다
+    darkRun = Object.assign({}, s.run, { zone: K_CODE, kroom: true, isParty: party, partyId: party ? s.run.partyId : null, rejoined: false });
+    // 일행 출발(launchPartyRun)은 darkTries 를 하나 올리고 왔다 — 되돌린다 (복귀 창으로 온 것은 올리지 않았다)
+    if (party && !(old && old.rejoined)) u.darkTries = Math.max(0, (Number(u.darkTries) || 0) - 1);
+    // 일행 출발이 적은 일반 진행 기록(darkRuns)은 지운다 — start() 와 같다. 남겨 두면 다음 새로고침에 일반 복귀 창(5 분 · 실패 처리)이 끼어든다
+    if (party) { try { if (typeof clearDarkRunState === 'function') clearDarkRunState(); } catch (e) { } }
     kr = Object.assign({}, s.kr);
     if (s.plan) { kr.plan = s.plan; kPlanFor = kr.started; }
     try { if (s.dna && typeof dnaCharge === 'object') dnaCharge = Object.assign({}, dnaCharge, s.dna); } catch (e) { }
@@ -3470,8 +3516,13 @@ function kRestore(s) {
         }
         if (!kr.plan || !kr.floor) { const id = kr.dun; kr.dun = null; enterDungeon({ id: id, lv: kr.dunLv }); return; }
         runUp();
-        try { watchGift(); } catch (e) { }
+        try { watchAid(); watchDoom(); watchGift(); } catch (e) { }
         darkBodyEl().innerHTML = s.html;
+        if (party) {
+            try { mountDarkChat('normal'); } catch (e) { }
+            try { pubStat(); } catch (e) { }
+            if (/id="kdoom-left"/.test(s.html || '')) doomRearm();   // 손을 뻗을 시간을 세던 중이었다
+        }
         kSaveNow();
         try { toast('끊긴 자리에서 이어 갑니다.'); } catch (e) { }
     });
@@ -3507,7 +3558,7 @@ window.kroomResumeGo = function () {
     const u = me(); if (!u) return;
     if (typeof darkRun !== 'undefined' && darkRun) { showCustomAlert('다른 탐사 중이라 이어 갈 수 없습니다.'); return; }
     const s = kLoad(u.code);
-    if (!s || !kRestore(s)) { kDrop(u.code); showCustomAlert('이어 갈 자리를 찾지 못했습니다.'); }
+    if (!s || s.run.isParty || !kRestore(s)) { kDrop(u.code); showCustomAlert('이어 갈 자리를 찾지 못했습니다.'); }
 };
 window.kroomResumeNo = function () {
     kAskClose();
@@ -3534,7 +3585,7 @@ setInterval(function () {
         if (login && getComputedStyle(login).display !== 'none') return;
         kAskedFor = u.code;
         const s = kLoad(u.code);
-        if (s) kAsk(s);
+        if (s && !s.run.isParty) kAsk(s);                      // 일행 판은 파티 감시기가 그 방으로 다시 데려간다
     } catch (e) { }
 }, 1500);
 
