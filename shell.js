@@ -251,18 +251,23 @@ function closePanel() {
     subStop();
     try { const f = document.querySelector('#shell-fac'); if (f) f.remove(); } catch (e) { }
     const m = el(MS);
-    if (m) { m.classList.remove('solo'); m.style.display = 'none'; }
+    // ★ 상담사가 광장 위에 칸을 띄운 것이면 — 옛 화면은 도로 보이게, 광장은 도로 맨 위로 (2026-11-08)
+    if (m) { m.classList.remove('solo'); m.style.display = solo ? 'none' : ''; }
+    if (!solo) { const pov = document.querySelector('#plaza-ov'); if (pov) pov.classList.remove('plaza-base'); }
     const top = el('shell-top');
     if (top) top.style.display = 'none';
     openTab = null;
 }
 
-// 광장이 쓰는 문 — 칸을 띄워 달라고 한다. 사원 쪽일 때만 받는다.
+// 광장이 쓰는 문 — 칸을 띄워 달라고 한다. 사원 쪽일 때 받고,
+// ★ 상담사도 광장 안에서 누른 것이면 받는다 — 전에는 광장을 닫고 옛 화면으로 나가 버렸다 (2026-11-08 사용자 「상담사 계정, 광장에서 옷장 갈 때 계속 광장에서 나가지는데」)
+function bossInPlaza() { return isBoss() && !!document.querySelector('#plaza-ov'); }
 window.plazaPanel = function (tab, sub, title) {
-    if (!solo) return false;
+    if (!solo && !bossInPlaza()) return false;
     return openPanel(tab, sub, title);
 };
 window.plazaPanelClose = closePanel;
+window.plazaBoss = isBoss;                      // 광장이 상담사인지 물을 때
 // 지금 사원 쪽으로 돌고 있나 — 광장이 이것으로 길을 가른다
 window.plazaSolo = function () { return solo; };
 

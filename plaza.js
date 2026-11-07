@@ -4053,6 +4053,7 @@ window.plazaShotData = function (all) {
 //   거기뿐이다. 그 칸만 광장 위에 띄우고(shell.js 의 plazaPanel),
 //   닫으면 그대로 광장이 남아 있다.
 //   상담사 쪽은 전처럼 광장을 닫고 옛 화면의 그 탭을 누른다.
+function isBossHere() { try { if (typeof window.plazaBoss === 'function') return !!window.plazaBoss(); const u = u_(); return !!(u && u.code === 'kario0987'); } catch (e) { return false; } }
 function goApp(s) {
     const solo = !!(typeof window.plazaSolo === 'function' && window.plazaSolo());
     try {
@@ -4086,7 +4087,7 @@ function goApp(s) {
             if (typeof f === 'function') setTimeout(function () { try { f(); } catch (e) { } }, 40);
             return;
         }
-        if (solo) {
+        if (solo || isBossHere()) {                              // ★ 상담사도 광장 위에 칸을 띄운다 (2026-11-08)
             closeSheet();
             if (window.plazaPanel(s.tab, s.sub, esc(s.n || ''))) return;
         }
