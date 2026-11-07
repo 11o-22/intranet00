@@ -154,7 +154,7 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
@@ -231,6 +231,8 @@ const DOT = {
                  'sdress': [0, 1, 2, 3, 4, 5],
                  // 레드 비키비키니 (2026-11-07) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다 · 여성 체형 몸과 같은 시계로 돈다
                  'red-bikini': [0, 1, 2, 3, 4, 5],
+                 // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
+                 'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 여성 체형 (2026-11-06 사용자 「서있을 때 7번으로 고정 · 움직이게 그렸는데」) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다
                  'body-w': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
@@ -399,7 +401,11 @@ const DOT_SLOTS = [
             // ★ 겉옷 칸에서 옮겨 왔다 (2026-10-23) — 윗옷만 그려진 셋. 겉옷에 적혀 있던 묵은 기록은 moveOld 가 상의로 읽는다.
             //   그림 사연은 겉옷 칸에 적힌 줄 그대로 (룩키마트 의상 = 의상 뽑기 다섯 벌 · 가을 니트 · 체육복 = 통짜에서 몸을 뺀 것)
             { i: 'knit', n: '가을 니트', over: ['knit'], own: 'knit' },
-            { i: 'gym', n: '체육복', over: ['gym-suit'], own: 'gym-suit' }
+            { i: 'gym', n: '체육복', over: ['gym-suit'], own: 'gym-suit' },
+            // ★ 셔츠 (2026-11-08 사용자 「여성 신체 있는 둘한테만 넣어주고 상의 - 셔츠로 해서 넣어줘. 여성 신체용.」)
+            //   주신 그림은 1728x768 (칸 288) — 칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2).
+            //   여성 체형(body-w) 몸에 대 보니 열두 칸이 맞았다. owner — 상담사 + Owner 사원만 · fem — 몸이 여성 체형일 때만 (레드 비키비키니와 같다)
+            { i: 'wshirt', n: '셔츠', over: ['w-shirt'], owner: true, fem: true }
         ]
     },
     {
