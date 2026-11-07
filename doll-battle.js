@@ -155,7 +155,7 @@ function wildFoe(o) {
     const lv = o.lv || (o.tut ? 1 : 1 + Math.floor(Math.random() * 3));
     const fake = { sp: sp, g: g, lv: lv };
     const s = M.stats(fake);
-    return { wild: 1, sp: sp, g: g, lv: lv, name: M.spName(sp), att: s.att, hp: s.max, max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(sp) };
+    return { wild: 1, sp: sp, g: g, lv: lv, name: M.spName(sp), att: s.att, hp: s.max, max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(sp), old: M.artOld(u) };   // 🎨 옛 펫 외형을 켠 사원에게는 야생도 옛 그림
 }
 function monFoe(i) {
     const m = D().MON_BY[i];
@@ -501,6 +501,7 @@ function img(src) {
 async function mosaicMorph() {
     const f = B.foe, e = B.ui.foe;
     const base = await img('doll/base.webp'), sheet = await img('doll/pf.webp');
+    const old = f.old ? await img('pet/old/s' + String(f.sp).padStart(2, '0') + '.webp') : null;   // 🎨 옛 펫 외형
     if (!B || !base || !sheet) { if (B) paintFoe(false); return; }
     const c = document.createElement('canvas'); c.width = 64; c.height = 64;
     c.className = 'bob'; c.style.cssText = 'width:64px;height:64px;image-rendering:pixelated;display:block';
@@ -514,10 +515,18 @@ async function mosaicMorph() {
         cx.clearRect(0, 0, 64, 64); cx.imageSmoothingEnabled = false;
         cx.drawImage(t, 0, 0, n, n, 0, 0, 64, 64);
     };
+    const drawFit = function (src, b) {                             // 옛 그림은 64칸에 맞춰 넣는다 (바닥 맞춤)
+        const n = Math.max(1, Math.round(64 / b));
+        const sc = Math.min(64 / src.width, 64 / src.height), w = src.width * sc, h = src.height * sc, ox = (64 - w) / 2, oy = 64 - h;
+        tx.clearRect(0, 0, 64, 64); tx.imageSmoothingEnabled = true;
+        tx.drawImage(src, 0, 0, src.width, src.height, ox * n / 64, oy * n / 64, w * n / 64, h * n / 64);
+        cx.clearRect(0, 0, 64, 64); cx.imageSmoothingEnabled = false;
+        cx.drawImage(t, 0, 0, n, n, 0, 0, 64, 64);
+    };
     e.innerHTML = ''; e.appendChild(c);
     const ST = [1, 2, 3, 4, 6, 8, 11, 16];
     for (let i = 0; i < ST.length; i++) { if (!B) return; draw(base, 0, 0, ST[i]); await sleep(i ? 70 : 160); }
-    for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; draw(sheet, cell.c * 64, cell.r * 64, ST[i]); await sleep(i ? 70 : 120); }
+    for (let i = ST.length - 1; i >= 0; i--) { if (!B) return; if (old) drawFit(old, ST[i]); else draw(sheet, cell.c * 64, cell.r * 64, ST[i]); await sleep(i ? 70 : 120); }
     if (B) paintFoe(false);
 }
 async function flashAll(n) {

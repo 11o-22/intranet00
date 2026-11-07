@@ -266,6 +266,32 @@ function artSwitchWire(root, after) {
     };
 }
 //   옛 그림은 pet/old/ — 2026-11-07 봉제인형으로 바꾸기 전(0ea31b2^)의 pet/sNN · pNN 을 그대로 꺼내 둔 것
+// 🐾 옛 펫 외형을 켠 사원에게는 글도 「인형」이 아니라 「펫」 (2026-11-07 사용자 「옛 펫으로 보기 버튼을 한 사람한텐 인형이 아니라 펫으로 뜨게」)
+//   펫 화면들(목록 · 방 · 배틀 · 전투 · 공방 · 보관함 · 광장 목록 · 표 · 지도)에 새로 그려지는 글에서 봉제인형 → 펫 · 인형 → 펫 · 🧸 → 🐾
+const WORD_ROOTS = '#pet-modal,#pet-room-box,#pet-bond-modal,#pet-battle-modal,#pet-rune-modal,#pet-gear-modal,#dbt-ov,.gb-pan,.db-all,#plaza-sheet,.plaza-spot,#ds-ov,#ds-dlg,#custom-alert-overlay,.plaza-tag';
+function wordFix(s) { return String(s).replace(/봉제인형/g, '펫').replace(/인형/g, '펫').replace(/🧸/g, '🐾'); }
+function wordNode(n) {
+    if (n.nodeType === 3) { const t = n.nodeValue; if (t && /인형|🧸/.test(t)) n.nodeValue = wordFix(t); return; }
+    if (n.nodeType !== 1) return;
+    if (n.hasAttribute && n.hasAttribute('placeholder')) { const ph = n.getAttribute('placeholder'); if (/인형|🧸/.test(ph)) n.setAttribute('placeholder', wordFix(ph)); }
+    const w = document.createTreeWalker(n, 4);
+    let x; const list = [];
+    while ((x = w.nextNode())) list.push(x);
+    list.forEach(function (tn) { const t = tn.nodeValue; if (t && /인형|🧸/.test(t)) tn.nodeValue = wordFix(t); });
+}
+function inRoot(n) { const e = (n.nodeType === 1) ? n : n.parentNode; return !!(e && e.closest && e.closest(WORD_ROOTS)); }
+(function wordWatch() {
+    if (typeof MutationObserver === 'undefined') return;
+    const mo = new MutationObserver(function (recs) {
+        if (!artOld()) return;
+        recs.forEach(function (r) {
+            if (r.type === 'characterData') { if (inRoot(r.target)) wordNode(r.target); return; }
+            Array.prototype.forEach.call(r.addedNodes, function (n) { if (inRoot(n)) wordNode(n); });
+        });
+    });
+    const start = function () { if (document.body) mo.observe(document.body, { childList: true, subtree: true, characterData: true }); else setTimeout(start, 200); };
+    start();
+})();
 function oldCss(sp, px) {
     const n = String(Math.max(1, Number(sp) || 1)).padStart(2, '0');
     return 'background-image:url(pet/old/' + (px > 64 ? 'p' : 's') + n + '.webp);background-repeat:no-repeat;background-position:center bottom;background-size:contain;image-rendering:pixelated;'
@@ -576,7 +602,7 @@ window.DOLL = {
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
     stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf,
-    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire,
+    spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire, wordFix: wordFix,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,
     addDoll: addDoll, patchDoll: patchDoll, removeDoll: removeDoll, setWith: setWith,
