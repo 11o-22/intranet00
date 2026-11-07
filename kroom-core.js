@@ -1191,10 +1191,36 @@ function bar() {
             <span>${d ? esc(d.n || kr.dun) + (kr.floor ? ' · ' + kr.floor + '층' : '') : ''}</span>
         </div>${rows}
         ${kr.gear && Object.keys(kr.gear).length ? '<div style="font-size:10px; color:#b9a3e0; margin-top:4px;">' + Object.keys(kr.gear).map(function (a) { return ATTR[a].i + ' ' + GEAR_K[a].n + ' ' + kr.gear[a].left + '/' + kr.gear[a].n; }).join(' · ') + '</div>' : ''}
-        <div style="display:flex; justify-content:space-between; font-size:10px; color:#888; margin-top:4px;">
-            <span>경험치 +${kr.exp}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream} D</span></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#888; margin-top:4px;">
+            <span>경험치 +${kr.exp}</span><span style="color:#c9a8ff;">꿈결 +${kr.dream} D</span>
+            ${(!kr.dead && !kr._settled && !kr.trial) ? '<button class="game-btn" onclick="kroomGiveUp()" style="margin:0; padding:3px 8px; font-size:9.5px; background:rgba(255,255,255,.06) !important; border:1px solid #4a3a3a !important; color:#c9a0a0 !important; width:auto;">🏳 포기</button>' : ''}</div>
     </div>`;
 }
+// ★ 중간에 포기한다 — 어느 장면에서든 (2026-11-08 사용자 「K의 방 중간에 포기할 수 있게」)
+//   쉼터의 「여기서 돌아간다」와 같은 정산(leave) — 얻은 경험치 · 꿈결의 절반 · 포인트 조금 · 횟수는 쓴 것. 혼자 S(올라온 길이 없다)에서는 전처럼 못 나간다.
+window.kroomGiveUp = function () {
+    if (!kr || kr.dead || kr._settled) return;
+    if (hard().doom) { try { showDarkToast('올라온 길이 없다.'); } catch (e) { } return; }
+    if (kr._askQuit) return;
+    kr._askQuit = true;
+    const body = document.getElementById('dro-body');
+    const box = document.createElement('div');
+    box.id = 'kroom-quit';
+    box.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:20px;';
+    box.innerHTML = '<div style="background:#0f1518; border:1px solid #3a2a2a; border-radius:8px; padding:16px; max-width:320px; width:100%;">'
+        + '<div style="font-size:13px; color:#ffb3b3; font-weight:bold; margin-bottom:8px;">🏳 여기서 포기합니까?</div>'
+        + '<div style="font-size:11px; color:#ccc; line-height:1.7; margin-bottom:12px;">얻은 경험치와 꿈결의 <b>절반</b>만 들고 나옵니다.<br>오늘 횟수는 쓴 것으로 칩니다.' + ((darkRun && darkRun.isParty) ? '<br>일행은 그대로 이어 갑니다.' : '') + '</div>'
+        + '<div style="display:flex; gap:8px;"><button class="game-btn" id="kq-no" style="flex:1; margin:0;">계속한다</button><button class="game-btn" id="kq-yes" style="flex:1; margin:0; background:linear-gradient(145deg,#7a2a2a,#4a1a1a) !important; border-color:#a04040 !important; color:#fff !important;">포기한다</button></div></div>';
+    document.body.appendChild(box);
+    const close = function () { try { box.remove(); } catch (e) { } if (kr) kr._askQuit = false; };
+    box.querySelector('#kq-no').onclick = close;
+    box.querySelector('#kq-yes').onclick = function () {
+        close();
+        if (!kr || kr.dead || kr._settled) return;
+        try { addHistoryLog(me(), '[K 의 방] ' + (kr.floor ? kr.floor + '층에서 ' : '') + '포기하고 돌아왔다.'); } catch (e) { }
+        settle('leave');
+    };
+};
 
 function setStat(s, v, why) {
     if (!kr || !kr.stats || kr.stats[s] == null) return 0;
