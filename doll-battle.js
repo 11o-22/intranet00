@@ -43,7 +43,10 @@ const AT = {
     def: [[28, 477, 151, 537], [163, 477, 286, 537]],
     back: [28, 547, 287, 601],
     // ★ 내 뒷모습 — 주신 그림이 8배율 → 6배율로 바뀌었다 (2026-11-07): 판(4배) 기준 2배(128) → 1.5배(96). 발끝 274 · 가운데 70 그대로
-    foe: { cx: 230, foot: 218 }, me: { l: 22, t: 178, px: 96 }, btnPet: { l: 31, t: 346, px: 128 }
+    foe: { cx: 230, foot: 218 }, me: { l: 22, t: 178, px: 96 }, btnPet: { l: 31, t: 346, px: 128 },
+    // ★ 싸운다! 단추 속 확대 그림 (2026-11-08 사용자 「싸울 때 버튼에 저런식으로」) — 단추 안쪽(테두리 3) 왼쪽, 글자 「싸운다!」 앞까지
+    //   캐릭터 봉제인형 확대 그림(312×192)은 높이를 맞추고 왼쪽부터 보여 오른쪽(리본 쪽)이 글자에 가려 잘린다 · 동물 확대 그림은 칸에 맞춰 넣는다
+    btnPic: { l: 32, t: 367, w: 112, h: 96 }
 };
 
 // ==========================================
@@ -182,6 +185,9 @@ function css() {
         '#dbt-ov .ly{position:absolute;left:0;top:0;width:314px;height:685px;image-rendering:pixelated;pointer-events:none}',
         '#dbt-ov .grp{position:absolute;left:0;top:0;width:314px;height:685px;pointer-events:none;transition:transform .7s cubic-bezier(.2,.8,.3,1)}',
         '#dbt-ov .spr{position:absolute;transition:transform .18s, opacity .35s, filter .25s}',
+        '#dbt-ov .bpic{position:absolute;overflow:hidden;pointer-events:none}',
+        '#dbt-ov .bpic img{position:absolute;left:0;top:-4px;height:134px;width:auto;image-rendering:pixelated}',   // 캐릭터 — 주신 본에 맞춰 칸보다 크게(1.4배) · 위아래가 조금 잘린다
+        '#dbt-ov .bpic img.fit{left:50%;top:50%;height:auto;width:auto;max-width:100%;max-height:100%;transform:translate(-50%,-50%)}',
         '#dbt-ov .stt{position:absolute;color:#fff;font-weight:bold;pointer-events:none;white-space:nowrap}',
         '#dbt-ov .hpb{position:absolute;height:5px;background:#2b2b2b;border:1px solid #777;border-radius:2px;overflow:hidden}',
         '#dbt-ov .hpb i{display:block;height:100%;background:#4cd964;transition:width .55s linear, background .3s}',
@@ -281,7 +287,7 @@ function build(loc) {
     // 1 버튼 — 1번_2 → 버튼용 펫 → 1번_1  /  버튼 2번
     const b1 = el('div', 'grp b1 pane off', 'display:none;opacity:0');
     const b12 = el('img', 'ly'); b12.src = 'doll/bt-b12.webp'; b1.appendChild(b12);
-    b1.appendChild(el('div', 'spr bpet', 'left:' + AT.btnPet.l + 'px;top:' + AT.btnPet.t + 'px'));
+    b1.appendChild(el('div', 'bpic bpet', 'left:' + AT.btnPic.l + 'px;top:' + AT.btnPic.t + 'px;width:' + AT.btnPic.w + 'px;height:' + AT.btnPic.h + 'px'));
     const b11 = el('img', 'ly'); b11.src = 'doll/bt-b11.webp'; b1.appendChild(b11);
     [['fight', AT.fight], ['run', AT.run], ['bag', AT.bag]].forEach(function (x) {
         const h = el('button', 'hit', rectCss(x[1]) + 'pointer-events:auto'); h.dataset.k = x[0]; b1.appendChild(h);
@@ -331,7 +337,11 @@ function paintMe() {
     const m = B.me, e = B.ui.me, bp = q('.bpet');
     if (!m) { e.innerHTML = ''; if (bp) bp.innerHTML = ''; return; }
     e.innerHTML = '<div' + (B.foe && B.foe.wild ? ' class="bob2"' : '') + ' style="' + D().spriteCss(m.sp, AT.me.px, true, m.old) + '"></div>';
-    if (bp) bp.innerHTML = '<div style="' + D().spriteCss(m.sp, AT.btnPet.px, false, m.old) + '"></div>';
+    if (bp) bp.innerHTML = '<img class="' + (D().isChr(m.sp) ? '' : 'fit') + '" src="' + portraitSrc(m.sp, m.old) + '" alt="">';
+}
+// 확대 그림 — 캐릭터 봉제인형은 늘 pet/ · 동물은 옛 펫 외형을 켠 사원이면 pet/old/
+function portraitSrc(sp, old) {
+    return ((old && !D().isChr(sp)) ? 'pet/old/' : 'pet/') + 'p' + String(sp).padStart(2, '0') + '.webp';
 }
 function hpColor(p) { return p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30'); }
 function paintStat() {
