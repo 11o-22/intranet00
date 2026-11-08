@@ -391,8 +391,10 @@ const PLAZA = {
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
         { g: 'shop',  n: '행복 식당',  i: '🍚', ic: 'food',    tab: 'tab-shop',     sub: 'shop-food' },
-        { g: 'shop',  n: '우주 쇼핑몰', i: '🛸', ic: 'alien',  tab: 'tab-shop',     sub: 'shop-alien' }
+        { g: 'shop',  n: '우주 쇼핑몰', i: '🛸', ic: 'alien',  tab: 'tab-shop',     sub: 'shop-alien' },
         // ✗ 망상 홈쇼핑 — 도깨비 공방 잡화점으로 옮겼다 (2026-11-07 사용자)
+        // 👗 그 자리에 의상숍 — 지하 건물(dshop) 위층, 의상숍(560)과 악세서리숍(940) 사이에 선다 (2026-11-08 사용자 「망상홈쇼핑 자리에 의상 자리를」)
+        { g: 'shop',  n: '의상숍',     i: '👗', ic: 'wearshop', go: 'dshop', gox: 750 }
     ]
 };
 
