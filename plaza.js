@@ -1456,9 +1456,20 @@ function tkDel(code, s, lt) {
         return null;
     });
 }
-// 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니면
+// 💑 커플이 있는 사람은 커플끼리만 (2026-11-08 사용자 「쑤시기 버튼이나 벗기기 버튼은 커플 있는 사람들은 커플만 가능하게 하자」)
+//   상대에게 커플이 있으면 그 짝만 · 나에게 커플이 있으면 내 짝에게만 — 둘 다 없으면 누구나 (쑤시기 · 벗기기)
+function cpOk(code) {
+    const me = myCode(), u = u_();
+    const du = (typeof db !== 'undefined' && db && db.users) ? db.users[code] : null;
+    const mine = (u && u.couple && u.couple.partner) || null;
+    const theirs = (du && du.couple && du.couple.partner) || null;
+    if (mine && mine !== code) return false;
+    if (theirs && theirs !== me) return false;
+    return true;
+}
+// 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니고 · 커플이면 짝끼리
 function tkItem(code) {
-    if (!run || !code || code === myCode()) return [];
+    if (!run || !code || code === myCode() || !cpOk(code)) return [];
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.tickles) return [];
     return [TK_ITEM];
@@ -1573,9 +1584,9 @@ function stUndress(L) {
         });
     } catch (e) { }
 }
-// 메뉴에 넣을 것 — 남이고 · 벗길 수 있는 옷을 입었고 · 지금 벗기는 중이 아니면
+// 메뉴에 넣을 것 — 남이고 · 벗길 수 있는 옷을 입었고 · 지금 벗기는 중이 아니고 · 커플이면 짝끼리 (cpOk)
 function stItem(code) {
-    if (!run || !code || code === myCode()) return [];
+    if (!run || !code || code === myCode() || !cpOk(code)) return [];
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || typeof q.one.actor.strips !== 'function' || !q.one.actor.strips()) return [];
     if (STL[code] && !STL[code].done) return [];
