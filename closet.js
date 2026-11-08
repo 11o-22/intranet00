@@ -404,7 +404,9 @@ const DOT_SLOTS = [
     {
         k: 'shape', n: '체형', items: [
             { i: '', n: '기본', over: [], def: true },
-            { i: 'fem', n: '여성 체형', over: [], body: 'body-w', owner: true, shape: true }
+            // ★ 2026-11-08 사용자 「포도맛을 마신 남성이나 여성들은 여성 체형 쓰게」 — 상담사 · Owner · 받은 사람(dotGrant) 에 더해
+            //   사원증 성별이 여성이거나 🍇 포도맛 물약이 도는 동안(grapeOn) 누구나 (femBase · allowed). 물약이 끝나면 저절로 보통 몸으로 돌아간다
+            { i: 'fem', n: '여성 체형', over: [], body: 'body-w', femBase: true, shape: true }
         ]
     },
     {
@@ -547,7 +549,8 @@ const DOT_SLOTS = [
             // ★ 란제리 (2026-11-08 사용자 「Owner랑 상담사 계정에 이거 겉옷으로 해서 란제리 넣어줘. 여성 신체 전용」) — 주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸.
             //   걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2) · 서기 줄 여섯 칸은 몸의 들썩임을 따라 그려져 있다 (FLAP_COLS).
             //   alone — 다른 칸의 옷(상의 · 하의 · 구두 · 장갑 · 망토)은 고른 채로 두고 안 그린다 (레드 비키비키니와 같다 · 악세는 그대로)
-            { i: 'lingerie', n: '란제리', over: ['lingerie'], owner: true, fem: true, alone: true },
+            //   ★ 2026-11-08 사용자 「여성체형으로 될 시에 기본으로 란제리」 — 여성 체형을 쓸 수 있는 사람은 누구나 (femBase) · 여성 체형 옷을 안 고르면 이것이 입혀진다 (look)
+            { i: 'lingerie', n: '란제리', over: ['lingerie'], femBase: true, fem: true, alone: true },
             // ★ 슬레이브 목티 (2026-11-08 사용자 「옷은 여성 체형 전용이고 Owner랑 상담사한테만 · 이름은 슬레이브 목티 · 겉옷에」)
             //   주신 그림 1728x768 (칸 288 · 알파 224 — 주신 그대로) → 칸마다 +30 으로 352 칸. 걷기 넷(5=3 · 6=2) · 서기 여섯 칸은 들썩임을 따라 그려져 있다.
             //   keep — 망토 칸(바니걸 털 망토)만은 같이 그린다 (2026-11-08 사용자 「슬레이브 목티 위에도 바니걸 털망토 입을 수 있게」) — Z 는 뒤 털 → 목티 → 앞 털
@@ -774,6 +777,17 @@ function isOwnerU(user) {
     if (!u) return false;
     return [u.name, u.badge && u.badge.nickname, u.code].some(function (x) { return String(x == null ? '' : x).trim().toLowerCase() === 'owner'; });
 }
+// ★ 여성 체형을 쓸 수 있나 (2026-11-08) — 상담사 · Owner · 받은 사람(dotGrant.fem) · 사원증 성별 여성 · 🍇 포도맛 물약 중
+function isWoman(user) { const u = user || u_(); return !!(u && u.badge && u.badge.gender === '여성'); }
+function femOk(user) {
+    const u = user || u_();
+    if (!u) return false;
+    if (isAdm(u) || isOwnerU(u)) return true;
+    if (u.dotGrant && u.dotGrant.fem) return true;
+    if (isWoman(u)) return true;
+    try { return grapeOn(u); } catch (e) { return false; }
+}
+window.dotFemOk = femOk;
 // ★ 상담사가 콘솔로 준 것 — u.dotGrant = { fem: 1, … } (2026-11-08 사용자 「여성 체형, 상담사가 콘솔로 줄 수 있게」)
 //   dotGrant('사번', 'fem') 주기 · dotGrant('사번', 'fem', false) 거두기. owner: true 인 것(여성 체형 · 그 옷들)에 쓴다
 function hasGrant(it, user) {
@@ -808,6 +822,7 @@ function allowed(it, user) {
         if (l) return l.indexOf(it.i) >= 0;
     }
     if (it.admin) return isAdm(user);
+    if (it.femBase) return femOk(user);
     if (it.owner) return isAdm(user) || isOwnerU(user) || hasGrant(it, user);
     if (it.dark) return isAdm(user) || isDark(user);
     if (it.nos) return isAdm(user) || hasNo(it, user);
@@ -1015,6 +1030,27 @@ function look(user, override, all) {
                     for (let j = arr.length - 1; j >= 0; j--) if (off[arr[j]]) arr.splice(j, 1);
                 });
                 chosen.splice(i, 1);
+            }
+        }
+        // ★ 여성 체형의 기본 옷은 란제리 (2026-11-08 사용자 「여성체형으로 될 시에 기본으로 란제리를 입게」)
+        //   여성 체형 옷(fem)을 하나도 안 고르고 보통 옷(잠옷 같은 것)을 입고 있으면 란제리로 바꿔 그린다 — 고른 것은 그대로 두고 그림만.
+        //   다 벗은 상태(모든 칸 「없음」 · 벗기기 dotUndress)는 그대로 둔다 — 란제리를 억지로 입히지 않는다
+        if (bodySheet === D.FEM_BODY) {
+            const os = slotOf('outer');
+            const ling = os ? os.items.filter(function (x) { return x.i === 'lingerie'; })[0] : null;
+            const cur = os ? chosen.filter(function (x) { return os.items.indexOf(x) >= 0; })[0] : null;
+            const anyFem = chosen.some(function (x) { return x.fem && !x.shape; });
+            const wearing = chosen.some(function (x) { return !x.shape && ((x.over || []).length || (x.top || []).length || (x.back || []).length); });
+            if (ling && !anyFem && wearing) {
+                if (cur) {
+                    const off = {};
+                    (cur.back || []).concat(cur.over || [], cur.top || []).forEach(function (o) { off[o] = 1; });
+                    [over, tops, backs].forEach(function (arr) { for (let j = arr.length - 1; j >= 0; j--) if (off[arr[j]]) arr.splice(j, 1); });
+                    chosen.splice(chosen.indexOf(cur), 1);
+                }
+                chosen.push(ling);
+                pick[os.k] = ling.i;                                    // 옷장에도 란제리가 골라진 것으로 보인다
+                (ling.over || []).forEach(function (o) { over.push(o); });
             }
         }
         // ★ 스타킹을 신은 여성 체형 몸 — 몸판만 그 다리 그림으로 (이름은 그대로 body-w — 들썩임 · 쑤시기 같은 것은 그 이름으로 찾는다)

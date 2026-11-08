@@ -184,9 +184,32 @@ const GACHA_BUY = {
     ]
 };
 
+// ── 여성 체형 의상 뽑기 (2026-11-08 사용자 「의상 뽑기 쪽에 여성 체형 의상 뽑기를 따로 두고 … 회당 30000 · 10연차 · 꽝도 · 등급 없이 옷 반 꽝 반」)
+//    의상숍 창 안의 둘째 칸. k 는 옷장 열쇠(i) — 뽑으면 u.dotGrant[k] 에 적혀 옷장에 생긴다 (closet.js hasGrant · 상담사가 선물함으로 준 것과 같다)
+//    u.wardrobe 에도 적어 「모은 것」을 센다. 여성 체형을 쓸 수 있는 사람(closet.js dotFemOk)에게만 보인다. 중복은 다른 가게처럼 ⅓ 을 돌려 준다.
+const GACHA_FEM = [
+    { k: 'rbikini',    n: '레드 비키비키니',    s: ['red-bikini'] },
+    { k: 'bunny',      n: '바니걸 의상',        s: ['bunny-suit'] },
+    { k: 'bunny-fur',  n: '바니걸 털 망토',     s: ['bunny-fur-b', 'bunny-fur-f'] },
+    { k: 'bunny-stk',  n: '바니걸 스타킹',      s: ['bunny-stk'], b: 'body-w-stk' },
+    { k: 'bunny-band', n: '바니걸 머리띠&초커', s: ['bunny-ears'] },
+    { k: 'wshirt',     n: '셔츠',               s: ['w-shirt'] },
+    { k: 'wpanty',     n: '여성용 속옷',        s: ['w-panty'] },
+    { k: 'slavetee',   n: '슬레이브 목티',      s: ['slave-tee'] },
+    { k: 'gleash',     n: '금 목줄',            s: ['gold-leash'] }
+];
+GACHA.fem = { n: '여성 체형 의상 뽑기', ic: 'wearshop', one: 30000, ten: 300000, miss: 50 };
+
 (function gacha() {
 
-const POOL = { wear: GACHA_WEAR, acc: GACHA_ACC };
+const POOL = { wear: GACHA_WEAR, acc: GACHA_ACC, fem: GACHA_FEM };
+function femOk(u) { try { return typeof window.dotFemOk === 'function' && window.dotFemOk(u || u_()); } catch (e) { return false; } }
+function femHas(k, u) { const x = u || u_(); return !!(x && ((x.dotGrant && x.dotGrant[k]) || (x.wardrobe && x.wardrobe[k]))); }
+function femGrant(k, u) {                                   // 저장은 roll() 의 saveFields({ dotGrant }) 가 한다
+    const x = u || u_(); if (!x) return;
+    if (!x.dotGrant || typeof x.dotGrant !== 'object') x.dotGrant = {};
+    x.dotGrant[k] = 1;
+}
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function isAdm(u) { const x = u || u_(); return !!(x && x.code === 'kario0987'); }
@@ -283,6 +306,7 @@ function pickOne(kind) {
 function roll(kind, n) {
     const u = u_(); if (!u) return null;
     const g = GACHA[kind];
+    if (kind === 'fem' && !femOk(u)) { showCustomAlert('여성 체형을 쓸 수 있는 사원만 뽑을 수 있습니다.'); return null; }
     const cost = (n === 10) ? g.ten : g.one;
     if ((u.points || 0) < cost) {
         if (typeof showLuxuryAlert === 'function') showLuxuryAlert();
@@ -292,8 +316,19 @@ function roll(kind, n) {
     u.points -= cost;
     const one = g.one, back = Math.floor(one / GACHA.BACK);
     const got = [], w = bag(u);
-    let refund = 0;
+    let refund = 0, miss = 0;
     for (let i = 0; i < n; i++) {
+        if (kind === 'fem') {
+            // ★ 등급 없음 — 꽝 반 · 옷 반 (옷은 아홉 가지 가운데 고르게)
+            if (Math.random() * 100 < g.miss) { got.push({ miss: true }); miss++; continue; }
+            const list = POOL.fem;
+            const it = list[Math.floor(Math.random() * list.length)];
+            const dup = femHas(it.k, u);
+            if (dup) refund += back;
+            else { w[it.k] = Date.now(); femGrant(it.k, u); }
+            got.push({ it: it, dup: dup });
+            continue;
+        }
         const it = pickOne(kind);
         if (!it) break;
         const dup = !!w[it.k];
@@ -302,14 +337,15 @@ function roll(kind, n) {
         got.push({ it: it, dup: dup });
     }
     u.points += refund;
-    const names = got.map(function (x) { return x.it.n + (x.dup ? '(중복)' : ''); }).join(', ');
+    const names = got.map(function (x) { return x.miss ? '꽝' : x.it.n + (x.dup ? '(중복)' : ''); }).join(', ');
     try {
         addHistoryLog(u, '[' + g.n + '] ' + n + '회 (-' + won(cost) + ' P'
             + (refund ? ' · 중복 환급 +' + won(refund) + ' P' : '') + ') — ' + names);
-        saveFields({ points: 1, wardrobe: 1, history: 1 });
+        saveFields(kind === 'fem' ? { points: 1, wardrobe: 1, history: 1, dotGrant: 1 } : { points: 1, wardrobe: 1, history: 1 });
+        if (kind === 'fem') { try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { } }
         updateUI();
     } catch (e) { }
-    return { got: got, cost: cost, refund: refund };
+    return { got: got, cost: cost, refund: refund, miss: miss };
 }
 
 // ==========================================
@@ -362,8 +398,8 @@ function figStop(el) {
 }
 
 // 그 물건 하나를 몸에 입힌 그림 (의상이면 옷 장, 악세면 악세 장)
-function sheetsOf(it) {
-    return [it.b || 'body'].concat(it.s || [it.k]);
+function sheetsOf(it, kind) {
+    return [it.b || (kind === 'fem' ? 'body-w' : 'body')].concat(it.s || [it.k]);
 }
 
 // ==========================================
@@ -371,15 +407,22 @@ function sheetsOf(it) {
 // ==========================================
 let shopKind = null;
 
-function card(r) {
-    const G = GACHA.GRADE[r.it.g] || GACHA.GRADE.C;
+function card(r, kind) {
     const d = document.createElement('div');
+    if (r.miss) {                                            // 꽝 (여성 체형 의상 뽑기)
+        d.className = 'gc-card dup';
+        d.innerHTML = '<div class="gc-g" style="color:#777;border-color:#555">—</div>'
+            + '<div class="gc-pic" style="display:flex;align-items:center;justify-content:center;font-size:30px;color:#666;">✕</div>'
+            + '<div class="gc-nm">꽝</div><div class="gc-dup">다음 기회에</div>';
+        return d;
+    }
+    const G = (kind === 'fem') ? { c: '#f2a7c8', n: '♀' } : (GACHA.GRADE[r.it.g] || GACHA.GRADE.C);
     d.className = 'gc-card' + (r.dup ? ' dup' : '');
     d.innerHTML = '<div class="gc-g" style="color:' + G.c + ';border-color:' + G.c + '">' + G.n + '</div>'
         + '<div class="gc-pic"></div>'
         + '<div class="gc-nm">' + esc(r.it.n) + '</div>'
         + (r.dup ? '<div class="gc-dup">중복 · 환급</div>' : '<div class="gc-new">NEW</div>');
-    d.querySelector('.gc-pic').appendChild(fig(sheetsOf(r.it), 0.36));
+    d.querySelector('.gc-pic').appendChild(fig(sheetsOf(r.it, kind), 0.36));
     return d;
 }
 
@@ -397,13 +440,18 @@ function result(kind, out) {
         + '<button class="gc-btn go" id="gc-res-x">확인</button>'
         + '</div>';
     const grid = d.querySelector('.gc-grid');
-    out.got.forEach(function (r) { grid.appendChild(card(r)); });
+    out.got.forEach(function (r) { grid.appendChild(card(r, kind)); });
     document.body.appendChild(d);
     d.querySelector('#gc-res-x').onclick = function () { figStop(d); d.remove(); paintShop(); };
 }
 
 function listHtml(kind) {
     const u = u_(), list = POOL[kind];
+    if (kind === 'fem') {
+        return '<div class="gc-row"><span class="gc-g" style="color:#f2a7c8;border-color:#f2a7c8">♀</span><div class="gc-its">'
+            + list.map(function (x) { const own = isAdm(u) || femHas(x.k, u); return '<span class="' + (own ? 'on' : '') + '">' + esc(x.n) + '</span>'; }).join('')
+            + '</div></div>';
+    }
     const by = { L: [], S: [], A: [], B: [], C: [] };
     list.forEach(function (x) { (by[x.g] || by.C).push(x); });
     return ['L', 'S', 'A', 'B', 'C'].map(function (g) {
@@ -470,27 +518,36 @@ function paintShop() {
     const box = document.getElementById('gc-body');
     if (!box || !shopKind) return;
     const u = u_(), g = GACHA[shopKind], list = POOL[shopKind];
-    const mine = list.filter(function (x) { return has(x.k, u); }).length;
+    const mine = list.filter(function (x) { return shopKind === 'fem' ? femHas(x.k, u) : has(x.k, u); }).length;
     const cp = couple();
-    box.innerHTML =
-        '<div class="gc-top">'
+    // ★ 의상숍 창 안 — 「의상 뽑기」 · 「여성 체형 의상 뽑기」 두 칸 (여성 체형을 쓸 수 있는 사람에게만 둘째 칸) (2026-11-08)
+    const tabs = (shopKind === 'wear' || shopKind === 'fem') && femOk(u)
+        ? '<div class="gc-tabs"><button class="gc-tab' + (shopKind === 'wear' ? ' on' : '') + '" data-kind="wear">의상 뽑기</button>'
+          + '<button class="gc-tab' + (shopKind === 'fem' ? ' on' : '') + '" data-kind="fem">♀ 여성 체형 의상 뽑기</button></div>'
+        : '';
+    const noteFem = '<div class="gc-note">등급 없음 — 옷 <b>' + (100 - g.miss) + '%</b> · 꽝 <b>' + g.miss + '%</b> (옷은 아홉 가지 가운데 고르게).<br>'
+        + '같은 것이 또 나오면 <b>' + won(Math.floor(g.one / GACHA.BACK)) + ' P</b> 를 돌려 드립니다. 뽑은 옷은 옷장에 생기고, 여성 체형일 때 입습니다.</div>';
+    box.innerHTML = tabs
+        + '<div class="gc-top">'
         + '<div class="gc-pt">가진 포인트 <b>' + won((u && u.points) || 0) + ' P</b></div>'
         + '<div class="gc-have">모은 것 <b>' + mine + '</b> / ' + list.length + '</div>'
         + '</div>'
         // ★ 「세 배 잘 나온다」가 아니라 **등급 안에서 세 배 몫**이다.
         //   등급이 나올 확률(S 2% …)은 그대로이므로, 나온 뒤에 그쪽일 때가
         //   많아지는 것이다. 숨기지 않고 그대로 적는다.
-        + (cp ? '<div class="gc-cp">💍 커플링 — 드레스 · 턱시도 · 면사포 · 검은 구두 · 검은 장갑이 '
+        + (cp && shopKind !== 'fem' ? '<div class="gc-cp">💍 커플링 — 드레스 · 턱시도 · 면사포 · 검은 구두 · 검은 장갑이 '
                 + '같은 등급 안에서 <b>' + GACHA.COUPLE_X + '배 몫</b>을 받습니다.</div>' : '')
         + '<div class="gc-buy">'
         + '<button class="gc-btn" data-n="1">1회<b>' + won(g.one) + ' P</b></button>'
         + '<button class="gc-btn go" data-n="10">10연속<b>' + won(g.ten) + ' P</b></button>'
         + '</div>'
-        + '<div class="gc-note">같은 것이 또 나오면 <b>' + won(Math.floor(g.one / GACHA.BACK))
-        + ' P</b> 를 돌려 드립니다.<br>등급 확률 — ' + (oddsOf(shopKind).L ? 'L ' + oddsOf(shopKind).L + '% · ' : '') + 'S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
-        + '% · B ' + GACHA.ODDS.B + '% · C ' + oddsOf(shopKind).C + '%</div>'
+        + (shopKind === 'fem' ? noteFem
+            : '<div class="gc-note">같은 것이 또 나오면 <b>' + won(Math.floor(g.one / GACHA.BACK))
+            + ' P</b> 를 돌려 드립니다.<br>등급 확률 — ' + (oddsOf(shopKind).L ? 'L ' + oddsOf(shopKind).L + '% · ' : '') + 'S ' + GACHA.ODDS.S + '% · A ' + GACHA.ODDS.A
+            + '% · B ' + GACHA.ODDS.B + '% · C ' + oddsOf(shopKind).C + '%</div>')
         + buyHtml(shopKind)
         + '<div class="gc-list">' + listHtml(shopKind) + '</div>';
+    Array.prototype.forEach.call(box.querySelectorAll('.gc-tab'), function (b) { b.onclick = function () { shopKind = b.dataset.kind; paintShop(); }; });
     // ★ **그 단추 위에서 눌렀다 뗀 것**만 뽑기로 친다.
     //
     //   한 장에 30,000 P 가 나가는 단추다. 다른 데서 눌린 손가락이
@@ -536,7 +593,7 @@ function open(kind) {
     d.id = 'gc-ov';
     d.innerHTML = '<div class="gc-card-big">'
         + '<div class="gc-head"><span class="pico" style="--ic:url(\'ico/' + GACHA[kind].ic + '.png\')"></span>'
-        + esc(GACHA[kind].n) + '<button id="gc-x">✕</button></div>'
+        + esc(GACHA[kind === 'fem' ? 'wear' : kind].n) + '<button id="gc-x">✕</button></div>'
         + '<div id="gc-body"></div></div>';
     document.body.appendChild(d);
     d.addEventListener('pointerdown', function (e) { if (e.target === d) { figStop(d); d.remove(); } });
@@ -623,6 +680,10 @@ window.accShopOpen = function () { open('acc'); };
         '.gc-btn.go{background:linear-gradient(145deg,#4a3a1e,#2a2112);border-color:#8a6a2a;color:#ffe9bd;}',
         '.gc-btn.go b{color:#d9b375;}',
         '.gc-note{font-size:10.5px;color:#8d8578;line-height:1.7;text-align:center;}',
+        '.gc-tabs{display:flex;gap:6px;}',
+        '.gc-tab{flex:1;padding:8px 6px;border-radius:9px;border:1px solid #2b2b38;background:#13131c;color:#9a9284;',
+        '  font-size:12px;cursor:pointer;}',
+        '.gc-tab.on{background:#2a1e2a;border-color:#f2a7c8;color:#ffe9bd;font-weight:bold;}',
         '.gc-list{display:flex;flex-direction:column;gap:7px;}',
         '.gc-row{display:flex;gap:8px;align-items:flex-start;}',
         '.gc-g{flex:0 0 auto;width:22px;height:22px;border-radius:7px;border:1px solid;',
