@@ -1473,7 +1473,7 @@ function tkItem(code) {
     if (!run || !code || code === myCode() || !cpOk(code)) return [];
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.tickles) return [];
-    if (MSL[code] && !MSL[code].done) return [];          // 마사지 받는 중에는 안 뜬다 (2026-11-08)
+    if (MSL[code] && !MSL[code].done) return [];          // 젖 마사지 받는 중에는 안 뜬다 (2026-11-08)
     return [TK_ITEM];
 }
 function tkStart(code, lk) {
@@ -1514,15 +1514,15 @@ function tkHit(code) {
 }
 
 // ==========================================
-// 마사지 (2026-11-08 사용자)
+// 젖 마사지 (2026-11-08 사용자)
 // ==========================================
 //
-//   「여성 체형 상호작용으로 해서 1~12 전부 눈 감고 있게 해주고 [마사지] 로 해서 타인이 마사지 해주는 느낌. 홍조도 쭉 유지되게
-//    해주고 마사지 받는 동안에는 못 움직이게. (움직일 시 마사지가 풀림...) 1~4까지 약 30 번 정도 조금씩 더 빠르게 반복하다가
+//   「여성 체형 상호작용으로 해서 1~12 전부 눈 감고 있게 해주고 [젖 마사지] 로 해서 타인이 젖 마사지 해주는 느낌. 홍조도 쭉 유지되게
+//    해주고 젖 마사지 받는 동안에는 못 움직이게. (움직일 시 마사지가 풀림...) 1~4까지 약 30 번 정도 조금씩 더 빠르게 반복하다가
 //    5~12까지 갈 때에 천천히 느려지기. 다른 점은 7~12가 끝날 때까지 계속 터치해야 해.」 「5~12도 12까지 갈 때까지 계속 터치해야 해.」
 //
-//   · 몸이 마사지 장을 가진 남(여성 체형 · closet.js D.MASSAGE)을 누르면 [ 마사지 ] — 물약 모습 · 쑤시는 중에는 빼고
-//   · [ 마사지 ] 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다)
+//   · 몸이 젖 마사지 장을 가진 남(여성 체형 · closet.js D.MASSAGE)을 누르면 [ 젖 마사지 ] — 물약 모습 · 쑤시는 중에는 빼고
+//   · [ 젖 마사지 ] 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다)
 //       1~4 를 되풀이 — 셀수록 빨라진다 (한 칸 MS_SLOW → MS_FAST) · MS_N(30) 번째에 5~12 로 — 한 칸씩 점점 느리게 (MS_END)
 //   · 5~12 가 끝날 때까지도 계속 눌러야 한다 — MS_IDLE 동안 아무도 안 누르면 그 자리에서 풀린다 (1~4 때도 같다)
 //   · 열두 칸 내내 눈 감은 얼굴 · 홍조 (closet.js)
@@ -1536,7 +1536,7 @@ const MS_SLOW = 240, MS_FAST = 80;                      // 1~4 한 칸 — 첫 �
 const MS_END = [150, 200, 260, 330, 410, 500, 600, 700]; // 5~12 한 칸씩 — 점점 느리게
 const MS_IDLE = 2000;
 const MS_MOVE = 8;                                       // 받는 사람이 이만큼 넘게 옮겨지면 풀린다
-const MS_ITEM = ['massage', '마사지'];
+const MS_ITEM = ['massage', '젖 마사지'];
 const MSL = {};                                          // 내 화면에서 도는 것 { s, n, rt, p2, f, st, done, mine, lt, x0, y0 }
 let msT = 0;
 function msIv(n) { const r = Math.max(0, Math.min(1, (n - 1) / (MS_N - 2))); return MS_SLOW - (MS_SLOW - MS_FAST) * r; }
@@ -1697,7 +1697,7 @@ function msHit(code) {
 //   「받는 사람이 수락을 누를 시에 하는 식으로 하자. 쑤시기도 포함해서. 대신 선택지를 눌렀을 때에 허락 받기, 그냥 하기 칸을
 //    눌러서 그냥 하기로 하면 움직일 수 있게 하고.」
 //
-//   · [ 쑤시기 ] · [ 마사지 ] 를 누르면 「허락 받기」 · 「그냥 하기」 를 고른다
+//   · [ 쑤시기 ] · [ 젖 마사지 ] 를 누르면 「허락 받기」 · 「그냥 하기」 를 고른다
 //   · 그냥 하기 — 바로 시작한다. 받는 사람은 움직일 수 있다 (마사지는 움직이면 풀린다 · 쑤시기는 그대로)
 //   · 허락 받기 — 받는 사람 화면에 [ 수락 ] · [ 거절 ] 이 뜬다. 수락하면 묻던 사람이 시작하고, 그 판(lk)이 도는 동안
 //     받는 사람은 움직이지 못한다 — 다 돌거나 · 아무도 안 눌러 풀리면(TK_IDLE · MS_IDLE) 다시 움직인다 (ASK_LOCK_MAX 가 넘어도 푼다)
@@ -1708,7 +1708,7 @@ const ASK_PATH = 'plazaAsk';
 const ASK_WAIT = 20000;
 const ASK_LOCK_MAX = 60000;
 let askW = null;                                         // 내가 기다리는 답 { ref, cb, to }
-function askWhat(kind) { return kind === 'ms' ? '마사지' : '쑤시기'; }
+function askWhat(kind) { return kind === 'ms' ? '젖 마사지' : '쑤시기'; }
 function askPick(kind, code) {
     closeCarryMenu();
     if (!(kind === 'ms' ? msItem(code) : tkItem(code)).length) return;
@@ -3408,7 +3408,7 @@ function carryTap(cx, cy) {
         run.tkOn = null;
         run.lkOn = null;
     }
-    // 마사지 — [ 마사지 ] 를 누른 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다 · 2026-11-08)
+    // 젖 마사지 — [ 젖 마사지 ] 를 누른 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다 · 2026-11-08)
     if (run.msOn) {
         const mp = personAt(cx, cy);
         if (mp && mp === run.msOn && msItem(mp).length) { msHit(mp); return true; }
