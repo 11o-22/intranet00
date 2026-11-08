@@ -180,9 +180,10 @@ function useMemo() {
 // 평소 규칙대로 소속·직급으로 막힌 품목은 뺀다. (index.html:9074 와 같은 걸러내기)
 function alienAllowed(u, it) {
     const a = (u.affiliation || ''), t = (u.team || ''), admin = isAdmin(u);
+    const tr   = (typeof window._traceHas === 'function' && window._traceHas(u));     // ★ 🫧 흔적 — 소속 없이 다 (2026-11-08)
     const dis  = a.indexOf('재난관리국') >= 0 || t.indexOf('재난관리') >= 0 || admin
-              || /어둠/.test(a + ' ' + t);
-    const day  = a.indexOf('백일몽 주식회사') >= 0 || admin || /어둠/.test(a + ' ' + t);
+              || /어둠/.test(a + ' ' + t) || tr;
+    const day  = a.indexOf('백일몽 주식회사') >= 0 || admin || /어둠/.test(a + ' ' + t) || tr;
     const high = ['과장', '차장', '부장', '이사', '대표', '사장'].indexOf(u.position) >= 0 || admin;
     const sec  = t.indexOf('보안팀') >= 0 || t.indexOf('경비팀') >= 0 || admin;
 

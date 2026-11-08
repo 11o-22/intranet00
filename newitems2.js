@@ -1744,6 +1744,8 @@ NEW.forEach(function (row) { SHOP_AFFIL[row[0]] = row[2]; });
 // 어둠 소속은 어느 소속 물건이든 찬다
 // ==========================================
 function isDark(u) {
+    // ★ 🫧 흔적 칭호를 가진 사람도 어둠 소속처럼 어느 소속 물품이든 본다 · 찬다 (2026-11-08 사용자 · trace.js _traceHas)
+    try { if (typeof window._traceHas === 'function' && window._traceHas(u)) return true; } catch (e) { }
     return /어둠/.test(((u && u.affiliation) || '') + ' ' + ((u && u.team) || ''));
 }
 

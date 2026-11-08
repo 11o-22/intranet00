@@ -475,7 +475,8 @@
       "doll-battle.js",
       "doll-gong.js",
       "doll-party.js",
-      "doll-walk.js"
+      "doll-walk.js",
+      "solo-room.js"
     ]
   ]
 }

@@ -11,6 +11,10 @@
 //                      흔적을 단 사람이 **혼자** 방에 있을 때만 최소 인원이 1인 (둘 이상이면 원래 인원을 채워야 한다).
 //   ② 감지하는 눈 솔플  혼자 든 탐사에서 눈을 나에게 연다 — 버프 하나 · 살아 나오면 ×3 (eye.js 가 window.traceSolo 를 본다)
 //   ③ 솔플 생존        혼자 든 탐사(어둠 · EPIC · K의 방)에서 판정 +3 · 즉사를 한 판에 한 번 버틴다
+//   ④ 따로 두는 방      솔플 방은 구역 수에 들지 않는다 — solo-room.js (2026-11-08 사용자 「흔적 칭호도 솔플 시 방 따로」)
+//   ⑤ 소속 없는 물품    칭호를 **가진** 사람(titleAdmin)은 소속과 상관없이 — 우주 쇼핑몰에 어느 소속 물품이든 나오고(index.html · newitems2.js ·
+//                      rare-odds.js · secretbox.js 가 _traceHas 를 본다), 어느 소속 물품이든 쓰고 찬다 (canWearItem)
+//                      (2026-11-08 사용자 「그 칭호를 가진 사람은 소속 상관 없이 아이템이 무작위로 다 우주 쇼핑몰에 나오게 · 사용도 다 가능하게」)
 //
 //   「혼자 든 탐사」 = 처음 들어간 인원이 나 하나 (1인 파티 · 혼자 들어가는 구역 · EPIC 혼자 · K의 방 혼자).
 //   인원은 칠성(chilseong.js)이 판을 열 때 세어 둔 것을 쓴다 (chilRunSize).
@@ -39,6 +43,30 @@ function on(u) {
     return !!(u && u.titleOn === TR.NAME && Array.isArray(u.titleAdmin) && u.titleAdmin.indexOf(TR.NAME) >= 0);
 }
 window._trace = on;
+// 가진 것 — 달지 않아도 (⑤ 소속 없는 물품은 가진 것으로 본다)
+function has(u) {
+    u = u || me();
+    return !!(u && Array.isArray(u.titleAdmin) && u.titleAdmin.indexOf(TR.NAME) >= 0);
+}
+window._traceHas = has;
+// ⑤ 어느 소속 물품이든 쓰고 찬다
+(function hookWear() {
+    const iv = setInterval(function () {
+        if (typeof canWearItem !== 'function') return;
+        if (canWearItem._trace) { clearInterval(iv); return; }
+        const _c = canWearItem;
+        const w = function (user) {
+            if (has(user)) return true;
+            return _c.apply(this, arguments);
+        };
+        Object.keys(_c).forEach(function (k) { try { w[k] = _c[k]; } catch (e) { } });
+        w._trace = true;
+        canWearItem = w; window.canWearItem = w;
+        clearInterval(iv);
+        console.log('[흔적] 소속 없는 물품 — 착용 · 사용 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 
 // 이번 판에 처음 들어간 인원
 function size() {
