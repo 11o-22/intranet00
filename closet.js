@@ -154,10 +154,13 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
-        'robe', 'han-duru', 'cape', 'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
+        'robe', 'han-duru', 'cape',
+        // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
+        'bunny-fur-b', 'bunny-suit', 'bunny-fur-f',
+        'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
     //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다) — RAB_OK 에 적힌 것만 깐다.
@@ -231,6 +234,8 @@ const DOT = {
                  'sdress': [0, 1, 2, 3, 4, 5],
                  // 레드 비키비키니 (2026-11-07) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다 · 여성 체형 몸과 같은 시계로 돈다
                  'red-bikini': [0, 1, 2, 3, 4, 5],
+                 // 바니걸 (2026-11-08) — 의상 · 뒤 털 · 스타킹은 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 (머리띠는 첫 칸을 들썩임 몫만큼 내린 것과 같아 그대로 둔다)
+                 'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 여성 체형 (2026-11-06 사용자 「서있을 때 7번으로 고정 · 움직이게 그렸는데」) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다
@@ -249,7 +254,8 @@ const DOT = {
     BOB: { 'body-w': [0, 2, 4, 2, 0, 2] },
     //   안 따라 내리는 악세 — 바닥에 앉은 것 · 몸과 떨어져 따로 서 있는 것
     NO_BOB: ['nyang-gray', 'nyang-calico', 'nyang-white', 'leaf-puddle', 'sound-lp',
-             'nuow-rift', 'nuow-friend', 'nuow-friend-r', 'nuow2-fox', 'nuow2-doll', 'nuow2-doll-r'],
+             'nuow-rift', 'nuow-friend', 'nuow-friend-r', 'nuow2-fox', 'nuow2-doll', 'nuow2-doll-r',
+             'bunny-stk'],   // 바니걸 스타킹 (2026-11-08) — 악세지만 서기 칸마다 따로 그려져 있고 발이 땅에 붙어 있다
     // ★ 간지럽히기 (2026-11-07 사용자 「여성 신체인 사람을 누르면 [ 간지럽히기 ] … 1~6 프레임이 계속 반복 · 40번에 7~12」)
     //   몸 장 이름 → 간지럽히는 동안 몸판 대신 까는 장 · 열두 칸(1~6 · 7~12)마다 머리 · 뒷머리 · 악세를 내리는 몫.
     //   주신 그림(1728 장)을 칸마다 +30 옮겨 body-w-tk 로 — 7번 칸이 여성 체형 서기 7번과 한 점도 안 틀린다.
@@ -511,6 +517,11 @@ const DOT_SLOTS = [
             //   ★ 2026-11-08 그림을 새로 주셔서 바꿨다 — 벗겨지지 않는 그림. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2).
             //     처음 그림(벗겨지는 그림)은 red-bikini-off 로 남겨 남이 [ 벗기기 ] 할 때 쓴다 (D.STRIP · plaza.js)
             { i: 'rbikini', n: '레드 비키비키니', over: ['red-bikini'], owner: true, fem: true, alone: true },
+            // ★ 바니걸 (2026-11-08 사용자 「겉옷 : 바니걸 의상 · 망토 : 바니걸 털 망토 · 머리띠 : 바니걸 머리띠&초커 · 다리 : 바니걸 스타킹 …
+            //   전부 여성 신체용이고 일단 Owner 랑 상담사 계정에만」) — 주신 그림은 모두 1728x768 (칸 288) → 칸마다 +30 으로 352 칸.
+            //   걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2). 같이 주신 완전체 그림과 한 점도 안 틀리게 맞췄다.
+            //   alone — 다른 칸 옷은 안 그린다 · keep — 망토 칸(바니걸 털 망토)만은 같이 그린다
+            { i: 'bunny', n: '바니걸 의상', over: ['bunny-suit'], owner: true, fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -571,7 +582,11 @@ const DOT_SLOTS = [
             { i: 'sound', n: '사운드 코트', over: ['sound-coat-in', 'sound-coat'], own: 'sound-coat' },   // 밀실 거래 됨 (2026-10-24)
             // ★ 뉴비 병아리 후드 (2026-10-25 · 뉴비 세트) — 두 장. 제작자 겉옷 · 늑대 잠옷과 같은 길이다.
             //   바깥(newbie-hood)은 머리 위(top) · 그림자(newbie-hood-in)는 **무조건 머리카락 뒤**(over — 머리보다 먼저 그린다).
-            { i: 'newbie', n: '뉴비 병아리 후드', over: ['newbie-hood-in'], top: ['newbie-hood'], own: 'newbie-hood', noTrade: true }
+            { i: 'newbie', n: '뉴비 병아리 후드', over: ['newbie-hood-in'], top: ['newbie-hood'], own: 'newbie-hood', noTrade: true },
+            // ★ 바니걸 털 망토 (2026-11-08) — 「앞쪽으로 와야 하는 털 부분과 뒤쪽으로 와야하는 털 부분 구분」
+            //   완전체 그림을 재 보니 옆으로 늘어진 털은 의상 **밑**, 걸을 때 앞으로 감기는 털은 의상 **위**였다 (걷기 1번 손 쪽 털 몇 점도 위).
+            //   그래서 두 장 — bunny-fur-b(뒤 · 의상 밑) · bunny-fur-f(앞 · 의상 위). 둘 다 몸보다는 앞이다 (완전체에서 팔 위로 덮인다).
+            { i: 'bunny-fur', n: '바니걸 털 망토', over: ['bunny-fur-b', 'bunny-fur-f'], owner: true, fem: true }
         ]
     },
     {
@@ -652,7 +667,12 @@ const DOT_SLOTS = [
             //   지난 규격(칸 288) → 칸마다 +30. 걷기 5·6 = 3·2, 서기 두 칸이 번갈아 돈다.
             { i: 'newbie-sprout', n: '뉴비 새싹', top: ['newbie-sprout'], own: 'newbie-sprout', noTrade: true, cat: '머리' },
             // ★ 사운드 레빗 헤드셋 (2026-10-23) — 사운드 세트. 걷기 · 서기 줄 여섯 칸 다 그려져 있다 (귀가 흔들린다).
-            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', cat: '머리' },   // 밀실 거래 됨 (2026-10-24)
+            { i: 'sound-headset', n: '사운드 레빗 헤드셋', top: ['sound-headset'], own: 'sound-headset', cat: '머리' },
+            // ★ 바니걸 머리띠&초커 · 바니걸 스타킹 (2026-11-08 · 여성 체형 · 상담사 + Owner 만)
+            //   머리띠는 머리 위(top) · 들썩임을 따라 내린다. 스타킹은 그려 주신 투명도(알파 217) 그대로 — 몸 바로 위(over · Z 맨 앞쪽).
+            //   legs — 스타킹을 신으면 몸판을 이 장으로 갈아 끼운다 (완전체 그림의 다리 · body-w-stk). 여성 체형 몸일 때만.
+            { i: 'bunny-band', n: '바니걸 머리띠&초커', top: ['bunny-ears'], owner: true, fem: true, cat: '머리' },
+            { i: 'bunny-stk', n: '바니걸 스타킹', over: ['bunny-stk'], owner: true, fem: true, legs: 'body-w-stk', cat: '다리' },   // 밀실 거래 됨 (2026-10-24)
             // ★ LP 판 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다.
             //   달면 광장에 LP 단추가 뜬다 — 피아노 · 디스코 (lp.js). 누르는 동안만 높은음자리표 · 음표가 둘레에 뜬다 (sound-lp-fx).
             //   받은 그림은 1728x768 (칸 288) · 덩어리마다 주인 칸을 가려 +30 으로 옮겼다 (칸 밖으로 나간 조각 끝은 잘랐다).
@@ -892,6 +912,8 @@ function look(user, override, all) {
     const over = [], tops = [], rabTops = [], backs = [], pick = {};
     const chosen = [];                   // 악세 밖 칸에서 고른 것 — 체형이 바뀌는 옷(body · alone)을 보려고
     const fol = {};                      // 몸이 들썩일 때 같이 내릴 장 (D.BOB) — 악세 · 머리 · 뒷머리
+    const femAcc = [];                   // 여성 체형에서만 다는 악세 (fem · 2026-11-08 바니걸) — 다른 몸이면 아래에서 뗀다
+    let legsImg = null, bodyImg = null;  // 신으면 몸판을 갈아 끼우는 악세 (legs · 바니걸 스타킹)
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -905,6 +927,8 @@ function look(user, override, all) {
                 const x = list.filter(function (y) { return y.i === id; })[0];
                 if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
                 got.push(x.i);
+                if (x.fem) femAcc.push(x);
+                if (x.legs) legsImg = x.legs;
                 (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { fol[o] = 1; });
                 (x.back || []).forEach(function (o) { backs.push(o); });
                 (x.over || []).forEach(function (o) { over.push(o); });
@@ -936,6 +960,13 @@ function look(user, override, all) {
         // ★ 여성 체형에서만 입는 옷 (fem · 레드 비키비키니 · 2026-11-07) — 몸이 여성 체형이 아니면 안 그리고 alone 도 안 건다
         //   (체형을 기본으로 돌렸거나 · 사원증 · 정보 열람처럼 늘 기본 몸으로 그리는 자리)
         if (bodySheet !== D.FEM_BODY) {
+            femAcc.forEach(function (x) {                // 악세도 (바니걸 머리띠 · 스타킹)
+                const off = {};
+                (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { off[o] = 1; });
+                [over, tops, backs].forEach(function (arr) {
+                    for (let j = arr.length - 1; j >= 0; j--) if (off[arr[j]]) arr.splice(j, 1);
+                });
+            });
             for (let i = chosen.length - 1; i >= 0; i--) {
                 const x = chosen[i];
                 if (!x.fem) continue;
@@ -947,13 +978,18 @@ function look(user, override, all) {
                 chosen.splice(i, 1);
             }
         }
+        // ★ 스타킹을 신은 여성 체형 몸 — 몸판만 그 다리 그림으로 (이름은 그대로 body-w — 들썩임 · 쑤시기 같은 것은 그 이름으로 찾는다)
+        if (bodySheet === D.FEM_BODY && legsImg) bodyImg = legsImg;
         const lone = chosen.filter(function (x) { return x.alone; })[0];
         if (lone) {
             const mine = {};
             (lone.back || []).concat(lone.over || [], lone.top || []).forEach(function (o) { mine[o] = 1; });
+            // keep — 그 칸 옷은 같이 그린다 (바니걸 의상 → 망토 칸)
+            const keepSlots = (lone.keep || []).map(slotOf).filter(Boolean);
             const drop = {};
             chosen.forEach(function (x) {
                 if (x === lone) return;
+                if (keepSlots.some(function (ks) { return ks.items.indexOf(x) >= 0; })) return;
                 (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { if (!mine[o]) drop[o] = 1; });
             });
             [over, tops, backs].forEach(function (arr) {
@@ -1025,7 +1061,7 @@ function look(user, override, all) {
     //   말풍선을 껐다 (2026-11-05 · dot.nwOff · dot.nw2Off) — { off: 1 } 를 얹어 말풍선만 걷은 장을 깐다 (고른 글씨는 남겨 둔다)
     if (d.nwOff) nw['nuow-friend'] = Object.assign({}, nw['nuow-friend'] || {}, { off: 1 });
     if (d.nw2Off) nw['nuow2-doll'] = Object.assign({}, nw['nuow2-doll'] || {}, { off: 1 });
-    return { head: head, headPick: headPick, body: bodySheet, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
+    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
 // ★ 벗기기 (2026-11-08) — 다 벗겨진 사원이 제 옷을 다 벗는다 (체형 · 악세 · 머리 · 색은 그대로).
@@ -1258,6 +1294,7 @@ function sprite(user, opt) {
     const els = sheets.map(function (s) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
+    if (L.bodyImg) els[(L.backs || []).length].style.backgroundImage = 'url("' + tkSrc(L.bodyImg) + '")';   // 스타킹 다리 (바니걸 · 2026-11-08)
 
     const row = (pose === 'walk') ? 0 : 1;
     const put = function (el, col) {
@@ -1388,6 +1425,7 @@ function actor(user, opt) {
     const els = sheets.map(function (s) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
+    if (L.bodyImg) els[(L.backs || []).length].style.backgroundImage = 'url("' + tkSrc(L.bodyImg) + '")';   // 스타킹 다리 (바니걸 · 2026-11-08)
     const head = els[(L.backs || []).length + 1 + L.layers.length];   // 악세가 머리 뒤에 더 붙는다 · 몸 뒤에 깐 장이 앞에 있다
     els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     const flaps = flapsOf(els, sheets);
@@ -1828,7 +1866,7 @@ function paintDoll() {
 //   그래서 켜짐 표시(on)만 갈아 끼우고 칸은 그대로 둔다.
 //
 // 악세는 다섯 개까지 겹친다 (DOT_SLOTS 의 max). 누르면 달고 다시 누르면 벗는다.
-const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '그 밖'];
+const ACC_CATS = ['머리', '귀', '얼굴', '목', '손', '등', '다리', '그 밖'];   // 다리 — 바니걸 스타킹 (2026-11-08)
 
 function esc_(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -2027,6 +2065,12 @@ function tap(kind, k, v) {
         let sel = accSplit(p[s.k]);
         if (!v) sel = [];                                            // 「없음」은 전부 벗는다
         else if (sel.indexOf(v) >= 0) sel = sel.filter(function (x) { return x !== v; });
+        else if ((s.items.filter(function (x) { return x.i === v; })[0] || {}).fem && !femShape(p.shape)) {
+            // 여성 체형에서만 다는 악세 (바니걸 머리띠 · 스타킹 · 2026-11-08)
+            const n = document.getElementById('closet-note');
+            if (n) { n.innerText = '여성 체형일 때만 달 수 있습니다.'; setTimeout(note_, 1800); }
+            return;
+        }
         else if (sel.length >= max) {
             const n = document.getElementById('closet-note');
             if (n) { n.innerText = '악세는 ' + max + '개까지 답니다.'; setTimeout(note_, 1800); }
@@ -2046,7 +2090,14 @@ function tap(kind, k, v) {
         p[k] = v;
         if (k === 'shape' && !femShape(v)) {
             DOT_SLOTS.forEach(function (o) {
-                if (o.max) return;
+                if (o.max) {                                 // 악세도 — 여성 체형에서만 다는 것은 뗀다
+                    const keep = accSplit(p[o.k]).filter(function (id) {
+                        const w2 = o.items.filter(function (x) { return x.i === id; })[0];
+                        return !(w2 && w2.fem);
+                    });
+                    p[o.k] = accJoin(keep, o.max);
+                    return;
+                }
                 const w = o.items.filter(function (x) { return x.i === (p[o.k] || ''); })[0];
                 if (w && w.fem) p[o.k] = '';
             });
