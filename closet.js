@@ -521,7 +521,9 @@ const DOT_SLOTS = [
             //   전부 여성 신체용이고 일단 Owner 랑 상담사 계정에만」) — 주신 그림은 모두 1728x768 (칸 288) → 칸마다 +30 으로 352 칸.
             //   걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2). 같이 주신 완전체 그림과 한 점도 안 틀리게 맞췄다.
             //   alone — 다른 칸 옷은 안 그린다 · keep — 망토 칸(바니걸 털 망토)만은 같이 그린다
-            { i: 'bunny', n: '바니걸 의상', over: ['bunny-suit'], owner: true, fem: true, alone: true, keep: ['cape'] },
+            //   ★ 홍조 (2026-11-08 사용자 「바니걸 의상 입을 때에 이 홍조도 넣어줘」 「서있을 때만 해서 쭉 유지되게」) — 쑤시기 홍조와 같은 그림(tk-blush).
+            //     서기 줄에만 그려져 있어 서 있을 때만 · 내내 보인다. 머리 위(top)에 얹고 follow 로 머리와 같이 들썩인다.
+            { i: 'bunny', n: '바니걸 의상', over: ['bunny-suit'], top: ['tk-blush'], follow: ['tk-blush'], owner: true, fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
@@ -951,6 +953,7 @@ function look(user, override, all) {
         (it.back || []).forEach(function (o) { backs.push(o); });
         (it.over || []).forEach(function (o) { over.push(o); });
         (it.top || []).forEach(function (o) { tops.push(o); });
+        (it.follow || []).forEach(function (o) { fol[o] = 1; });   // 머리와 같이 들썩일 장 (바니걸 홍조 · 2026-11-08)
     });
     // ★ 체형이 바뀌는 옷 (2026-11-04 · 의상 1차) — 몸판을 바꾸고(body), 다른 칸의 옷은 안 그린다(alone · 악세는 그대로).
     //   한 벌로 그려진 머리(브라운 특전 · 토끼)는 제 몸이 있으므로 건드리지 않는다.
@@ -1439,7 +1442,7 @@ function actor(user, opt) {
     if (TKS) { try { const im = new Image(); im.src = tkSrc(TKS.sheet); } catch (e) { } }   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
     // 홍조 (TKS.blush) — 머리 바로 위에 숨겨 깔아 두고, 쑤시는 동안만 보인다 · 머리와 같이 내린다
     let blushEl = null;
-    if (TKS && TKS.blush && head) {
+    if (TKS && TKS.blush && head && sheets.indexOf(TKS.blush) < 0) {   // 옷에 홍조가 이미 있으면(바니걸) 두 겹 안 깐다
         blushEl = layer(TKS.blush, k, null);
         blushEl.style.display = 'none';
         blushEl.style.backgroundPosition = '0px -' + (D.H * k) + 'px';      // 서기 줄 첫 칸 (여섯 칸이 같다)
