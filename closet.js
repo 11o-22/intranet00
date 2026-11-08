@@ -154,14 +154,14 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'han-inner',
+    Z: ['gold-leash',                                           // 🪢 금 목줄 (2026-11-09 사용자 「옷 위가 아니라 옷 아래로」) — 몸 바로 위 · 모든 옷 밑
+        'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape',
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
         'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'bunny-fur-f',
-        'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo',
-        'gold-leash'],                                        // 🪢 금 목줄 (2026-11-08) — 옷 위로 늘어진다
+        'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
     //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다) — RAB_OK 에 적힌 것만 깐다.
