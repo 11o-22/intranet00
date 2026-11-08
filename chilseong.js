@@ -33,7 +33,8 @@
 //            치성(★ 하나 · 하루 세 번) — 다음 홀로 탐사 한 번: 즉사 한 번 피함 · 그래도 죽으면 오염도 0 으로 귀환 (격리 없음)
 //   ③ 녹존  (2026-10-31 사용자: 커스텀 장비는 남의 상담실 · 선녀탕 · 가두리에 관여하지 못한다 — 남을 꺼내는 구출은 막았다. 🎐 여우 신도만 예외)
 //            예전: 하루 3번 — 선녀탕 · 상담실에 갇힌 사원을 꺼낸다. 나는 10,000~20,000 P · 그 사원은 오염도 0~20% 로 나온다 (옥방울 소리)
-//            치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
+//            치성(★ 다섯 · 하루 세 번) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물(유쾌 · ??? · 우주 물품 하나)을 들고 바로 나온다
+//            (2026-11-08 사용자 「하루 세 번 가능하게 · 장착자가 나오면서 선물 들고 나오게」 — 치성을 세 번까지 겹쳐 걸고, 판마다 하나씩 쓴다)
 //   ④ 문곡  하루 1번 — 「청한다」를 눌러 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다 (🎻 신성의 바이올린은 안 나온다)
 //            고르고 나면 그날 회수품 확률 ×1.5~2.5 · 치성(★ 셋) — 셋 중 둘
 //   ⑤ 염정  열 가지 속성(회피 · 파괴 · 치유 · 행운 · 감각 · 은신 · 연결 · 응시 · 보정 · 굳건) 중 하나를 준다 — 탐사 중 D 로 함께한다
@@ -49,7 +50,8 @@
 //
 // ■ 적히는 자리 — users/<사번>/chil (날짜를 안에 둔다 · 날이 바뀌면 그 자리에서 다시 센다)
 //
-//   { day, tam, geo, geoArm, nok, nokArm, mun, munArm, munJi, munX, yeom:[], yeomJi, mugJi, mugArm, pag, pagJi, pagShare }
+//   { day, tam, geo, geoArm, nok, nokJi, nokArm, mun, munArm, munJi, munX, yeom:[], yeomJi, mugJi, mugArm, pag, pagJi, pagShare }
+//   nokJi 오늘 녹존께 드린 치성 수(하루 세 번) · nokArm 걸려 있는(아직 안 쓴) 치성 수 — 판을 열 때 하나씩 싣는다
 //   users/<사번>/chilFreed  { by, byName, at }    녹존에게 구출받은 쪽 (화면이 방을 닫고 알린다)
 //   darkParties/<방>/chilMug { by, n }             무곡 치성이 걸린 파티 — 같이 간 사람 ×5
 //
@@ -62,7 +64,7 @@ const CHIL = {
     NAME: '🌟 제 칠(七) 성군(星君)',
     OLD: '\ud83d\udc2f 제 칠(七) 성군(星君)',      // 처음 이름 (호랑이 이모지) — 가진 사람은 들어올 때 새 이름으로 바꾼다
     ADMIN: 'kario0987',
-    GEO_DAY: 3, NOK_DAY: 3, PAG_DAY: 3,
+    GEO_DAY: 3, NOK_DAY: 3, NOK_JI_DAY: 3, PAG_DAY: 3,
     NOK_PT: [10000, 20000], NOK_POLL: [0, 20],
     PAG_PT: 2000, PAG_DC: 10, PAG_DICE: [9000, 15000],
     SMALL: 3, GEO_BON: 3, GEO_LUCK: 2,
@@ -391,10 +393,10 @@ function menu() {
                 + '<div>' + btn('치성 (★1)', "chilJi('geo')", (s.geo || 0) >= CHIL.GEO_DAY || sc < CHIL.JI.geo, true)
                 + tag('치성 ' + (s.geo || 0) + ' / ' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0), (s.geoArm || 0) > 0) + '</div>';
         } else if (g.k === 'nok') {
-            body = line('치성(★ 다섯) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다.')
+            body = line('치성(★ 다섯 · 하루 세 번) — 다음 탐사 한 번: 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나온다. 세 번까지 겹쳐 걸어 두면 탐사마다 하나씩 쓴다.')
                 + line('<span style="color:#8a7a5a;">남의 선녀탕 · 상담실 · 가두리에는 관여할 수 없다 — 갇힌 사원을 꺼내 주던 구출은 닫혔다.</span>')
-                + '<div>' + btn('치성 (★5)', "chilJi('nok')", !!s.nokArm || sc < CHIL.JI.nok, true)
-                + tag(s.nokArm ? '치성 걸림' : '치성 없음', !!s.nokArm) + '</div>';
+                + '<div>' + btn('치성 (★5)', "chilJi('nok')", (s.nokJi || 0) >= CHIL.NOK_JI_DAY || sc < CHIL.JI.nok, true)
+                + tag('치성 ' + (s.nokJi || 0) + ' / ' + CHIL.NOK_JI_DAY + ' · 걸린 선물 ' + (s.nokArm || 0), (s.nokArm || 0) > 0) + '</div>';
         } else if (g.k === 'mun') {
             body = line('하루 한 번 — 청해 두면 다음 생환 때 그 구역 회수품 셋 중 하나를 확정으로 고른다. 고르고 나면 그날 회수품 확률이 1.5~2.5배.')
                 + line('치성(★ 셋) — 셋 중 둘을 고른다.')
@@ -503,7 +505,7 @@ window.chilJi = function (k) {
     if (!u || !wears(u)) return;
     const s = st(u), need = CHIL.JI[k];
     if (k === 'geo' && (s.geo || 0) >= CHIL.GEO_DAY) { alert_('오늘 거문성군께 드릴 치성은 다 드렸습니다.'); return; }
-    if (k === 'nok' && s.nokArm) { alert_('녹존성군의 치성이 이미 걸려 있습니다.'); return; }
+    if (k === 'nok' && (s.nokJi || 0) >= CHIL.NOK_JI_DAY) { alert_('오늘 녹존성군께 드릴 치성은 다 드렸습니다.'); return; }
     if (k === 'mun' && (s.munJi || s.mun)) { alert_('오늘은 문곡성군께 더 청할 수 없습니다.'); return; }
     if (k === 'yeom' && s.yeomJi) { alert_('오늘 염정성군께는 이미 치성을 드렸습니다.'); return; }
     if (k === 'mug' && s.mugJi) { alert_('오늘 무곡성군께는 이미 치성을 드렸습니다.'); return; }
@@ -513,7 +515,7 @@ window.chilJi = function (k) {
         const s2 = st(u);
         let msg = '';
         if (k === 'geo') { s2.geo = (s2.geo || 0) + 1; s2.geoArm = (s2.geoArm || 0) + 1; msg = '다음 홀로 탐사 한 번 — 즉사를 한 번 피하고, 그래도 죽으면 오염도 0 으로 귀환합니다.'; }
-        if (k === 'nok') { s2.nokArm = 1; msg = '다음 탐사 한 번 — 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나옵니다.'; }
+        if (k === 'nok') { s2.nokJi = (s2.nokJi || 0) + 1; s2.nokArm = (s2.nokArm || 0) + 1; msg = '다음 탐사 한 번 — 죽어서 선녀탕 · 상담실로 가게 되면 녹존의 선물을 들고 바로 나옵니다.\n(걸린 치성 ' + s2.nokArm + ' · 오늘 ' + s2.nokJi + ' / ' + CHIL.NOK_JI_DAY + ')'; }
         if (k === 'mun') { s2.munJi = 1; s2.munArm = 1; msg = '다음 생환 때 회수품 셋 중 둘을 고릅니다.'; }
         if (k === 'yeom') { s2.yeomJi = 1; msg = '오늘 하루 염정성군의 속성이 L 로 굳고, 두 개까지 드릴 수 있습니다.'; }
         if (k === 'mug') { s2.mugJi = 1; s2.mugArm = 1; msg = '다음 탐사 한 번 — 살아 나오면 ×7, 같이 간 파티원은 ×5.'; }
@@ -749,7 +751,7 @@ function begin(key, n, mates, pid) {
     const s = st(u);
     let ch = false;
     if (CUR.n <= 1 && (s.geoArm || 0) > 0) { s.geoArm--; CUR.geo = 1; ch = true; }
-    if (s.nokArm) { s.nokArm = 0; CUR.nok = 1; ch = true; }
+    if ((s.nokArm || 0) > 0) { s.nokArm = (s.nokArm || 0) - 1; CUR.nok = 1; ch = true; }   // 겹쳐 건 치성 — 판마다 하나씩
     if (s.mugArm) {
         s.mugArm = 0; CUR.mug = 1; ch = true;
         if (pid && db_()) { try { db_().ref('darkParties/' + pid + '/chilMug').set({ by: u.code, n: u.name || '' }); } catch (e) { } }
@@ -950,7 +952,14 @@ function giftOf() {
     const ok = pools.map(function (p) {
         return p.filter(function (n) { return n && n !== NAME && n !== OLD && n.indexOf('소원권') < 0 && typeof ITEM_CATALOG !== 'undefined' && ITEM_CATALOG[n]; });
     }).filter(function (p) { return p.length; });
-    if (!ok.length) return null;
+    if (!ok.length) {
+        // 물품 목록이 아직 안 올라왔으면 — 쓸 수 있는 물품 아무거나 (빈손으로 나오지 않게 · 2026-11-08)
+        try {
+            const any = Object.keys(ITEM_CATALOG).filter(function (n) { const c = ITEM_CATALOG[n]; return c && c.usable && n !== NAME && n !== OLD && n.indexOf('소원권') < 0; });
+            if (any.length) return any[Math.floor(Math.random() * any.length)];
+        } catch (e) { }
+        return null;
+    }
     const p = ok[Math.floor(Math.random() * ok.length)];
     return p[Math.floor(Math.random() * p.length)];
 }
@@ -1786,7 +1795,7 @@ window.chilState = function (who) {
     console.log('  장착 :', wears(u) ? 'O' : '✗', ' · ★ 음식', starCount(u) + '개');
     console.log('  탐랑 :', s.tam ? '오늘 바침' : '-');
     console.log('  거문 :', '치성 ' + (s.geo || 0) + '/' + CHIL.GEO_DAY + ' · 걸린 보호 ' + (s.geoArm || 0));
-    console.log('  녹존 :', '구출 ' + (s.nok || 0) + '/' + CHIL.NOK_DAY + (s.nokArm ? ' · 치성 걸림' : ''));
+    console.log('  녹존 :', '치성 ' + (s.nokJi || 0) + '/' + CHIL.NOK_JI_DAY + ' · 걸린 선물 ' + (s.nokArm || 0));
     console.log('  문곡 :', s.mun ? '고름 ×' + s.munX : (s.munArm ? '청해 둠' + (s.munJi ? ' (둘)' : '') : '-'));
     console.log('  염정 :', arr((u.chil || {}).yeom).join(', ') || '-', s.yeomJi ? '(오늘 L)' : '(D)');
     console.log('  무곡 :', s.mugArm ? '치성 걸림' : (s.mugJi ? '오늘 치성 씀' : '-'));
