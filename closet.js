@@ -154,7 +154,7 @@ const DOT = {
     //   ★ LP 판(악세 · 2026-10-23)도 맨 앞 — 발밑에 깔리고 날아다니는 조각은 옷 뒤로 지나간다 (몸 자리는 그림에서 비워 두었다)
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
-    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'knit', 'gym-suit', 'han-inner',
+    Z: ['sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape',
@@ -238,6 +238,8 @@ const DOT = {
                  'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
+                 // 풀어진 셔츠 · 여성용 속옷 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
+                 'w-shirt-open': [0, 1, 2, 3, 4, 5], 'w-panty': [0, 1, 2, 3, 4, 5],
                  // 여성 체형 (2026-11-06 사용자 「서있을 때 7번으로 고정 · 움직이게 그렸는데」) — 서기 줄 여섯 칸(7~12번)이 저마다 다르다
                  'body-w': [0, 1, 2, 3, 4, 5],
                  // LP 판 — 서기 줄 여섯 칸에 판이 돈다 (2026-10-23)
@@ -274,6 +276,8 @@ const DOT = {
     //   red-bikini-off — 처음 주신 레드 비키비키니 그림(벗겨지는 그림)을 그대로 옮겨 둔 것. 서기 줄이 여성 체형 서기 칸과 맞는다.
     //   광장(plaza.js 「벗기기」)이 dotActor 의 strip(칸) 으로 넘긴다.
     STRIP: { 'red-bikini': { sheet: 'red-bikini-off' } },
+    // ★ 까기 (2026-11-08) — 칸 · 입은 것 → 바뀌는 것. 광장(plaza.js 「까기」)이 dotPeel 로 바꾼다. 그 장을 그리고 있어야(여성 체형) 뜬다.
+    PEEL: [{ k: 'top', from: 'wshirt', to: 'wshirt-open', sheet: 'w-shirt' }],
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
     //
     //   주신 그림(sit-swing.png)은 **한 벌이 통째로** 그려진 열두 칸이다 —
@@ -405,13 +409,20 @@ const DOT_SLOTS = [
             // ★ 셔츠 (2026-11-08 사용자 「여성 신체 있는 둘한테만 넣어주고 상의 - 셔츠로 해서 넣어줘. 여성 신체용.」)
             //   주신 그림은 1728x768 (칸 288) — 칸마다 가로 +30 으로 352 칸에 옮겼다. 걷기 줄은 네 칸만 와서 5·6번째를 3·2번째로 채웠다 (몸 걷기도 5=3 · 6=2).
             //   여성 체형(body-w) 몸에 대 보니 열두 칸이 맞았다. owner — 상담사 + Owner 사원만 · fem — 몸이 여성 체형일 때만 (레드 비키비키니와 같다)
-            { i: 'wshirt', n: '셔츠', over: ['w-shirt'], owner: true, fem: true }
+            // ★ 2026-11-08 「셔츠는 내가 지금 준 걸로 교체」 — 새 그림(여민 셔츠)이 w-shirt · 처음 그림(풀어진 셔츠)은 w-shirt-open 으로 남겼다.
+            //   남(커플이면 짝)이 [ 까기 ] 하거나 본인이 저를 눌러 [ 까기 ] 하면 풀어진 셔츠로 바뀐다 (D.PEEL · plaza.js 「까기」).
+            //   바뀐 것은 옷장에서 다시 입을 때까지 그대로 — 풀어진 셔츠(hide)는 옷장에 안 보인다.
+            { i: 'wshirt', n: '셔츠', over: ['w-shirt'], owner: true, fem: true },
+            { i: 'wshirt-open', n: '셔츠', over: ['w-shirt-open'], owner: true, fem: true, hide: true }
         ]
     },
     {
         k: 'bottom', n: '하의', items: [
             { i: '', n: '없음', over: [] },
-            { i: 'pj', n: '잠옷 하의', over: ['pj-bottom'], def: true }
+            { i: 'pj', n: '잠옷 하의', over: ['pj-bottom'], def: true },
+            // ★ 여성용 속옷 (2026-11-08 사용자 「하의에 여성용 속옷 하나 넣어주고」) — 여성 체형 · 상담사 + Owner 만 (다른 여성 체형 옷과 같다)
+            //   주신 그림 1728 장 → 칸마다 +30 · 걷기 5·6 은 3·2 로 채웠다
+            { i: 'wpanty', n: '여성용 속옷', over: ['w-panty'], owner: true, fem: true }
         ]
     },
     {
@@ -1067,6 +1078,27 @@ function look(user, override, all) {
     return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
+// ★ 까기 (2026-11-08) — 이 사람이 지금 깔 수 있는 것을 입었나 (그 장을 그리고 있나) · 있으면 그 D.PEEL 칸
+window.dotPeelOf = function (user, all) {
+    try {
+        const L = look(user, null, !!all);
+        const d = (user && user.dot && typeof user.dot === 'object') ? user.dot : {};
+        return (D.PEEL || []).filter(function (p) { return d[p.k] === p.from && (L.layers || []).indexOf(p.sheet) >= 0; })[0] || null;
+    } catch (e) { return null; }
+};
+// 깐다 — 본인 칸에서만 적는다 (남이 누르면 plaza.js 가 알려 주고, 그 사람 화면이 이것을 부른다)
+window.dotPeel = function (user) {
+    const u = user || u_();
+    if (!u) return false;
+    const p = window.dotPeelOf(u, false);
+    if (!p) return false;
+    const d = Object.assign({}, u.dot);
+    d[p.k] = p.to;
+    u.dot = d;
+    if (u === u_()) save({ dot: 1 });
+    try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { }
+    return true;
+};
 // ★ 벗기기 (2026-11-08) — 다 벗겨진 사원이 제 옷을 다 벗는다 (체형 · 악세 · 머리 · 색은 그대로).
 //   벗겨지기 전에 레드 비키비키니(alone)가 다른 칸 옷을 안 그리고 있었으므로, 겉옷만 벗기면 잠옷 같은 것이 도로 나타난다
 //   — 그래서 옷 칸(상의 · 하의 · 겉옷 · 구두 · 장갑 · 망토)을 모두 「없음」으로 적는다. 광장은 plaza.js 가 다시 입힌다.
@@ -1905,7 +1937,7 @@ function buildRows(u) {
     let wear = '';
     DOT_SLOTS.forEach(function (s) {
         if (s.max) return;                       // 악세는 아래에서 따로
-        const list = items(s, u);
+        const list = items(s, u).filter(function (x) { return !x.hide; });   // hide — 옷장에는 안 보이는 칸 (풀어진 셔츠)
         if (list.length < 2) return;             // 고를 것이 하나뿐이면 줄을 안 만든다
         wear += rowOf(s.n, list.map(function (x) {
             return btn('one', s.k, x.i, x.n, x.i === (p[s.k] || ''));

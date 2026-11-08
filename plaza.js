@@ -1607,6 +1607,80 @@ function stDo(code) {
     });
 }
 
+// ==========================================
+// 까기 (2026-11-08 사용자)
+// ==========================================
+//
+//   「셔츠는 내가 지금 준 걸로 교체. 타인(혹은 커플)이 터치해서 [까기]를 눌렀을 때에 내가 기존에 넣어놨던 걸로 바뀌게 해주고.
+//    본인 스스로 터치해서도 기존에 넣어둔 셔츠로 바뀌게 해줘. 바뀐 건 다시 옷장에서 입지 않는 이상은 유지되게.」
+//
+//   · 깔 수 있는 것(closet.js D.PEEL — 여민 셔츠)을 입고 그것이 그려지는(여성 체형) 사람을 누르면 [ 까기 ]
+//     남은 커플 규칙(cpOk)을 따른다 — 짝이 있으면 짝끼리만 · 본인은 제 사람을 눌러 언제나 깔 수 있다
+//   · 누르면 그 사람의 옷이 풀어진 셔츠로 바뀐다 — 옷장에서 다시 입기 전까지 그대로 (본인 칸에 적힌다)
+//
+//   plazaPeel/<사번> = { id, by: 깐 사람, bn: 그 이름, at } — 그 사람 화면이 듣고 제 옷을 바꾼다 (들어오기 전 것은 안 듣는다)
+const PK_PATH = 'plazaPeel';
+const PK_ITEM = ['peel', '까기'];
+(function pkListen() {
+    let on = false;
+    const iv = setInterval(function () {
+        const me = u_();
+        if (on || typeof database === 'undefined' || !database || !me) return;
+        on = true;
+        clearInterval(iv);
+        let first = true, seen = null;
+        database.ref(PK_PATH + '/' + me.code).on('value', function (snap) {
+            const v = snap.val();
+            const id = v && v.id;
+            if (first) { first = false; seen = id || null; return; }
+            if (!id || id === seen) return;
+            seen = id;
+            pkApply(v.bn || '');
+            snap.ref.transaction(function (cur) { if (!cur || cur.id !== id) return; return null; });   // 다 쓴 칸은 걷는다
+        });
+    }, 1000);
+})();
+// 나 — 내 옷을 풀어진 것으로 바꾸고 광장 모습을 다시 알린다
+function pkApply(byName) {
+    const me = u_();
+    if (!me || typeof window.dotPeel !== 'function') return false;
+    if (!window.dotPeel(me)) return false;
+    try { if (typeof window.plazaRedress === 'function') window.plazaRedress(); } catch (e) { }
+    if (byName) sysLine('👔 ' + byName + ' 사원이 셔츠를 깠습니다.');
+    return true;
+}
+function pkPeerOk(code) {
+    const q = run && run.peers && run.peers[code];
+    if (!q || !q.one || q.one.wf || typeof window.dotPeelOf !== 'function') return false;
+    let d = {};
+    try { d = JSON.parse(q.key) || {}; } catch (e) { }
+    return !!window.dotPeelOf({ code: code, dot: d }, true);
+}
+// 메뉴에 넣을 것 — 남이고 · 깔 것을 입었고 · 커플이면 짝끼리 (cpOk)
+function pkItem(code) {
+    if (!run || !code || code === myCode() || !cpOk(code) || !pkPeerOk(code)) return [];
+    return [PK_ITEM];
+}
+function pkDo(code) {
+    closeCarryMenu();
+    const me = u_(), d = db_();
+    if (!me || !d || !pkItem(code).length) return;
+    d.ref(PK_PATH + '/' + code).set({ id: me.code + ':' + now(), by: me.code, bn: nameOf(me), at: chatNow() });
+}
+// 본인 — 제 사람을 눌렀나 (peerAt 과 같은 자리 재기)
+function meAt(cx, cy) {
+    if (!run || !run.me || !run.me.wrap || HS()) return false;
+    const b = run.me.wrap.getBoundingClientRect();
+    if (!b.width || !b.height) return false;
+    const mx = (b.left + b.right) / 2, half = b.width * 0.2;
+    const t = b.top + b.height * 0.28, bot = b.bottom - b.height * 0.04;
+    return !(cx < mx - half || cx > mx + half || cy < t || cy > bot);
+}
+function pkSelfOk() {
+    const me = u_();
+    return !!(me && run && run.me && !run.me.wf && typeof window.dotPeelOf === 'function' && window.dotPeelOf(me, false));
+}
+
 // ★ other 가 참이면 **남**이다 — 가진 것을 따지지 않고 입은 그대로 그린다.
 //
 //   남의 모습은 방 칸에 적힌 dot 한 덩이로만 온다. 소지 목록(wardrobe)은
@@ -3029,6 +3103,13 @@ function carryTap(cx, cy) {
         if (tp && tp === run.tkOn && tkItem(tp).length) { tkHit(tp); return true; }
         run.tkOn = null;
     }
+    // 까기 — 본인이 제 사람을 누르면 [ 까기 ] (깔 것을 입었을 때만 · 남이 그 자리에 겹쳐 서 있으면 남이 먼저 · 2026-11-08)
+    if (!personAt(cx, cy) && meAt(cx, cy) && pkSelfOk()) {
+        return openMenu(cx, cy, nameIn(myCode()), [PK_ITEM], function (k) {
+            closeCarryMenu();
+            if (k === 'peel') pkApply('');
+        }, '');
+    }
     const me = myCode();
     // 작은 사람이 보통 사람을 — 올라가기 · 손에 앉기
     const big = bigAt(cx, cy);
@@ -3049,12 +3130,14 @@ function carryTap(cx, cy) {
         wfBonkItem(big).forEach(function (x) { items.push(x); });
         tkItem(big).forEach(function (x) { items.push(x); });
         stItem(big).forEach(function (x) { items.push(x); });
+        pkItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'tickle') { tkStart(big); return; }
             if (k === 'strip') { stDo(big); return; }
+            if (k === 'peel') { pkDo(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -3067,10 +3150,11 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), pkItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { tkStart(any); return; }
             if (k === 'strip') { stDo(any); return; }
+            if (k === 'peel') { pkDo(any); return; }
             infoOpen(any);
         }, '');
     }
@@ -3083,11 +3167,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -3102,6 +3186,7 @@ function carryTap(cx, cy) {
     wfBonkItem(pick).forEach(function (x) { items.push(x); });
     tkItem(pick).forEach(function (x) { items.push(x); });
     stItem(pick).forEach(function (x) { items.push(x); });
+    pkItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
         if (k === 'info') { infoOpen(pick); return; }
@@ -3109,6 +3194,7 @@ function carryTap(cx, cy) {
         if (k === 'bonk') { wfBonk(pick); return; }
         if (k === 'tickle') { tkStart(pick); return; }
         if (k === 'strip') { stDo(pick); return; }
+        if (k === 'peel') { pkDo(pick); return; }
         carryDo(pick, k);
     }, potion ? '🫙 ' : null);
 }
