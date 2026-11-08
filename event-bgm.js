@@ -7,10 +7,13 @@
 //
 //     wonder-intro.mp3     공통 도입부 — 「이상한 나라의 ■■■」 를 혼자 들어가려고 반입 화면을 열거나 파티를 편성하면
 //                          (방을 만든 순간부터) 틀고, 탐사 안에서도 공통 도입 · 둥근 홀 · 멈추기/잇기 동안 이어 튼다.
-//                          제 음원이 없는 챕터(천사 · 서큐버스 · 늑대인간)도 이 곡을 그대로 이어 튼다.
+//                          (✗ 2026-11-08 까지는 천사 · 서큐버스 · 늑대인간도 이 곡을 이어 틀었다 — 이제 제 곡이 있다)
 //     wonder-jiangshi.mp3  강시 챕터 (연계판까지)
 //     wonder-vampire.mp3   뱀파이어 챕터 (연계판까지)
 //     wonder-siren.mp3     세이렌 챕터 (연계판까지)
+//     wonder-angel.mp3     천사와 악마 챕터 (event_h_ad · 2026-11-08 사용자) — 연계판까지
+//     wonder-succubus.mp3  서큐버스 챕터   (event_h_s  · 2026-11-08 사용자)
+//     wonder-wolf.mp3      늑대인간 챕터   (event_h_w  · 2026-11-08 사용자)
 //     halloween.mp3        할로윈 광장 — 광장 길 · 건물 안 여덟 방 전체   (2026-10-31 사용자: 둘을 서로 바꿈)
 //     halloween-plaza.mp3  포토존 「핼러윈」
 //
@@ -30,6 +33,9 @@ const T = {
     jiangshi: 'snd/wonder-jiangshi.mp3',
     vampire:  'snd/wonder-vampire.mp3',
     siren:    'snd/wonder-siren.mp3',
+    angel:    'snd/wonder-angel.mp3',       // 천사와 악마 (2026-11-08)
+    succubus: 'snd/wonder-succubus.mp3',    // 서큐버스
+    wolf:     'snd/wonder-wolf.mp3',        // 늑대인간
     plaza:    'snd/halloween.mp3',          // ★ 2026-10-31 사용자 — 광장 곡과 포토존 곡을 서로 바꿨다
     pzh:      'snd/halloween-plaza.mp3'
 };
