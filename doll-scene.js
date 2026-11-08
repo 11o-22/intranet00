@@ -1410,6 +1410,12 @@ window.dollGongOpen = function () {
     if (!tutOf().done) { toPlazaRoom('dgfront', null); return; }
     toPlazaRoom('dgong', 385 * RS.gong, 1);
 };
+// 📦 펫박스(보관소) 앞으로 — 공방 위층 보관소 자리 (2026-11-08 사용자 「메뉴에 펫박스 — 곧바로 펫박스 앞으로 워프」)
+window.dollBoxGo = function () {
+    if (inDark()) { alert_('어둠 탐사 중입니다.'); return; }
+    if (!tutOf().done) { toPlazaRoom('dgfront', null); return; }
+    toPlazaRoom('dgong', 815 * RS.gong, 0);
+};
 window.dollGo = function (k, at) { if (!SC[k]) { console.log(Object.keys(SC).join(' · ')); return; } open(k, at); };
 window.dollWalk = function (x, y) { if (run && !busy()) walkTo(x, y, null); };
 window.dollSceneState = function () {
@@ -1568,9 +1574,10 @@ window.dollSteps = function (n) {
         const M = PLAZA.MENU;
         if (!M.some(function (m) { return m.fn === 'dollGongOpen'; })) {
             const at = M.findIndex(function (m) { return m.fn === 'petOpen'; });
-            const rows = [{ g: 'life', n: '도깨비 공방', i: '👺', ic: 'dokkaebi', fn: 'dollGongOpen' },
+            const rows = [{ g: 'life', n: '펫박스', i: '📦', ic: 'box', fn: 'dollBoxGo' },            // 인형 돌보기 옆 — 보관소 앞으로 (2026-11-08)
+                          { g: 'life', n: '도깨비 공방', i: '👺', ic: 'dokkaebi', fn: 'dollGongOpen' },
                           { g: 'life', n: '봉제인형 출몰지', i: '🧸', ic: 'wild', fn: 'dollWildOpen' }];
-            if (at >= 0) M.splice(at + 1, 0, rows[0], rows[1]); else M.push(rows[0], rows[1]);
+            if (at >= 0) M.splice.apply(M, [at + 1, 0].concat(rows)); else M.push.apply(M, rows);
         }
     } catch (e) { console.warn('[🧸] 광장 잇기', e); }
 })();

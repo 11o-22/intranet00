@@ -105,15 +105,17 @@ function cell(p, key) {
     const st = statusOf(s);
     const nick = P().nick(k, me);
     const inRoom = P().showHas(k, me);
-    // ★ 포만도 막대(초록) · 다쳤으면 상처 깊이 막대(붉음) — 목록에서 바로 보이게 (2026-10-29 사용자 요청)
+    // ★ 막대 둘 — 체력(전투 체력 색 · 초록→노랑→빨강) · 배고픔(흰색 · 포만도) (2026-11-08 사용자 「게이지도 두 개로 — 체력과 배고픔, 배고픔은 흰색」)
+    //   (2026-10-29 에는 포만도(초록) · 상처 깊이(붉음)였다 — 상처는 🩹 표시와 글로 남긴다)
     let full = 0; try { full = Math.max(0, Math.min(100, Number(P().full(k, me)) || 0)); } catch (e) { }
+    let hpr = 1; try { const d = window.DOLL.dolls(me)[String(k)]; hpr = Math.max(0, Math.min(1, window.DOLL.hpOf(d) / (window.DOLL.stats(d).max || 1))); } catch (e) { }
     const hurt = (s.hurt && typeof s.hurt === 'object') ? s.hurt : null;
     const deep = hurt ? Math.max(0, Math.min(100, Number(hurt.deep) || 0)) : 0;
-    const fullCol = full <= 20 ? '#e05a4a' : (full <= 50 ? '#d9a05a' : '#6fbf5e');
-    const bars = '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="포만도 ' + full + '%">'
-        + '<div style="height:100%; width:' + full + '%; background:' + fullCol + ';"></div></div>'
-        + (hurt ? '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="상처 깊이 ' + deep + '">'
-            + '<div style="height:100%; width:' + deep + '%; background:#e05a4a;"></div></div>' : '<div style="height:4px; margin:0 3px 2px 3px;"></div>');
+    const hpCol = hpr > 0.5 ? '#4cd964' : (hpr > 0.2 ? '#ffcc00' : '#ff3b30');
+    const bars = '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="체력 ' + Math.round(hpr * 100) + '%">'
+        + '<div style="height:100%; width:' + Math.round(hpr * 100) + '%; background:' + hpCol + ';"></div></div>'
+        + '<div style="height:4px; border-radius:2px; background:rgba(255,255,255,0.08); margin:0 3px 2px 3px; overflow:hidden;" title="배고픔 — 포만도 ' + full + '%">'
+        + '<div style="height:100%; width:' + full + '%; background:#f4f1ea;"></div></div>';
     return '<div class="pet-cell" data-i="' + k + '" style="text-align:center; padding:4px 2px;'
         + ' cursor:pointer;">'
         + bars
@@ -144,16 +146,13 @@ function listView() {
     const L = P().LIST;
     const mine = Object.keys(P().pets(me)).filter(function (k) { return P().BY[k]; });
     const have = mine.length;
-    const kinds = L.filter(function (p) { return mine.some(function (k) { return P().sp(k) === p.i; }); }).length;
-    // ★ 같은 종을 여럿 데리고 있을 수 있다 — 그 종 칸 바로 뒤에 이어 붙인다 (2026-11-07)
-    // ★ 없는 종은 아예 안 보인다 (2026-11-07 사용자 「보유하지 않는 펫은 아예 안 뜨게」)
-    const cells = [];
-    L.forEach(function (p) {
-        const owned = mine.filter(function (k) { return P().sp(k) === p.i; }).sort(function (a, b) { return a - b; });
-        if (!owned.length) return;
-        owned.forEach(function (k) { cells.push(Number(k) === p.i ? cell(p) : cell(p, k)); });
-    });
-    if (!cells.length) cells.push('<div style="grid-column:1/-1; font-size:10.5px; color:#6f685e; padding:14px 0; text-align:center;">아직 인형이 없습니다 — 출몰지에서 포옹 리본으로 잡아 옵니다.</div>');
+    // ★ 동행 중인 셋만 (2026-11-08 사용자 「펫 돌보기에는 동행 중인 펫 3마리만 뜨도록」) — 맡겨 둔 인형은 보관소(펫박스)에서 「돌보기」로 연다
+    //   (2026-11-07 까지는 가진 종을 다 깔았다 — 같은 종 여럿은 그 종 칸 뒤에 · 없는 종은 안 보이게)
+    let withIds = mine;
+    try { if (window.DOLL && DOLL.withList) withIds = DOLL.withList(me).map(String).filter(function (k) { return P().BY[k] && P().pets(me)[k]; }); } catch (e) { }
+    const PM = (window.DOLL && DOLL.PARTY_MAX) || 3;
+    const cells = withIds.map(function (k) { const p = P().BY[k]; return Number(k) === p.i ? cell(p) : cell(p, k); });
+    if (!cells.length) cells.push('<div style="grid-column:1/-1; font-size:10.5px; color:#6f685e; padding:14px 0; text-align:center;">' + (have ? '동행 중인 인형이 없습니다 — 보관소(펫박스)에서 동행으로 옮깁니다.' : '아직 인형이 없습니다 — 출몰지에서 포옹 리본으로 잡아 옵니다.') + '</div>');
 
     const grid = '<div style="display:grid; grid-template-columns:repeat(' + COLS + ',1fr);'
         + ' gap:5px;">' + cells.join('') + '</div>';
@@ -161,11 +160,11 @@ function listView() {
     const w = box(
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
         + '<span style="font-size:13px; color:#ffcf8f; font-weight:bold;">🧸 인형</span>'
-        + '<span style="font-size:10px; color:#8d8578;">' + have + '마리 · 종 ' + kinds + ' / ' + L.length + '</span>'
+        + '<span style="font-size:10px; color:#8d8578;">동행 중 ' + withIds.length + ' / ' + PM + ' · 전체 ' + have + '마리</span>'
         + '</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
-        + '가진 인형을 누르면 이름을 붙이고, 사택 방에 내놓을 인형을 고를 수 있습니다.<br>'
-        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 초록 막대는 포만도, 붉은 막대는 상처 깊이(🩹 다친 인형)입니다.</div>'
+        + '동행 중인 인형만 보입니다. 맡겨 둔 인형은 도깨비 공방 보관소(펫박스)에서 「돌보기」로 돌봅니다.<br>'
+        + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 막대 — 위는 체력, 아래 흰 막대는 배고픔(포만도)입니다.</div>'
         + (window.DOLL && DOLL.artSwitchHtml ? DOLL.artSwitchHtml() : '')      // 🔘 옛 펫 외형 ↔ 봉제인형
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
@@ -387,6 +386,7 @@ setInterval(function () {
 }, 1200);
 
 window.petOpen = listView;
+window.petOneOpen = oneView;          // 보관소(펫박스)의 「돌보기」 — 인형 하나의 창 (doll-gong.js · 2026-11-08)
 window.petShut = shut;
 
 console.log('[인형] petOpen()');

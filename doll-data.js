@@ -458,16 +458,19 @@ function fullPct(d) { return Math.round(fedLeft(d) / ESCAPE_MS * 100); }
 function feed(ids, u) {
     u = u || u_();
     const ds = dolls(u);
-    const list = (ids || []).map(String).filter(function (id) { return ds[id]; })
+    // ★ 포만도(사흘 시계 · pet-data full)가 가득한 인형은 건너뛴다 — 먹이 주기와 같은 셈 (2026-11-08)
+    const full = function (id) { try { return P().full(id, u) >= 100; } catch (e) { return false; } };
+    const all = (ids || []).map(String).filter(function (id) { return ds[id]; });
+    const list = all.filter(function (id) { return !full(id); })
         .sort(function (a, b) { return fedLeft(ds[a]) - fedLeft(ds[b]); });
     const have = bagHas(ITEM.SNACK, u);
     const n = Math.min(have, list.length);
     const fed = list.slice(0, n);
-    if (!n) return { fed: [], short: list.length };
+    if (!n) return { fed: [], short: list.length, skipped: all.length - list.length };
     const t = now();
     fed.forEach(function (id) { patchDoll(id, { fedAt: t }, u); bondUp(id, u); });
     bagAdd(ITEM.SNACK, -n, u);
-    return { fed: fed, short: list.length - n };
+    return { fed: fed, short: list.length - n, skipped: all.length - list.length };
 }
 
 let sweepBusy = false;

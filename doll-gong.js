@@ -93,6 +93,12 @@ function css() {
         '.db-slot .st{position:absolute;right:2px;top:1px;font-size:8px;color:#e6b400}',
         '.db-slot .hb{position:absolute;left:3px;right:3px;top:2px;height:2px;background:rgba(0,0,0,.15)}',
         '.db-slot .hb i{display:block;height:100%}',
+        // ★ 둘째 막대 — 배고픔(포만도 · 흰색) (2026-11-08 사용자 「게이지를 하나 더 — 흰색 배고픔 게이지」)
+        '.db-slot .hb2{position:absolute;left:3px;right:3px;top:5px;height:2px;background:rgba(0,0,0,.15)}',
+        '.db-slot .hb2 i{display:block;height:100%;background:#fff}',
+        // 🔘 옛 펫 외형 ↔ 봉제인형 — 판 위 (2026-11-08 사용자 「펫박스 역시 기존 외형 보기 on/off 버튼을 상단에」)
+        '.db-sw{pointer-events:auto;box-sizing:border-box;background:rgba(24,18,40,.92);border:1px solid #6b56a0;border-radius:8px;padding:0 10px;margin-bottom:4px}',
+        '.db-sw .pet-artsw{color:#d8ceff;padding:6px 0}',
         '.db-tbtn{display:flex;align-items:center;justify-content:center;border-radius:7px;background:#c9b9e8;border:1.5px solid #6b56a0;color:#2a2140;font-weight:bold;cursor:pointer}',
         '.db-tbtn.on{background:#6b4fb0;color:#fff}',
         '.db-ghost{position:fixed;z-index:99999;pointer-events:none;opacity:.85}'
@@ -111,6 +117,8 @@ function panel(html, onClose) {
     return dim;
 }
 function icon(sp, px) { return '<div class="ic" style="' + D().spriteCss(sp, px || 40, false, D().artOld()) + '"></div>'; }
+// 배고픔 — 인형 돌보기와 같은 포만도(사흘 시계 · pet-data full). 0 이면 굶었다 · 7일 안 먹이면 달아난다 (fedLeft)
+function fullOf(d) { try { return Math.max(0, Math.min(100, Number(window.PET.full(d.id)) || 0)); } catch (e) { return D().fullPct(d); } }
 function hpBar(d) {
     const M = D(), mx = M.stats(d).max, h = M.hpOf(d), p = h / mx;
     return '<div class="gb-hp"><i style="width:' + Math.round(p * 100) + '%;background:' + (p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30')) + '"></i></div>';
@@ -119,7 +127,7 @@ function dollLine(d) {
     const M = D();
     const s = M.stats(d);
     return '<b>' + esc(M.nickOf(d)) + '</b>' + (d.fav ? ' <span style="color:#e6b400">★</span>' : '')
-        + '<div>' + esc(M.spName(d.sp)) + ' · ' + s.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + ' · 체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + ' · ♥' + M.bondOf(d) + ' · 먹이 ' + M.fullPct(d) + '%</div>';
+        + '<div>' + esc(M.spName(d.sp)) + ' · ' + s.g + ' · Lv.' + s.lv + ' · ' + (M.ATTR[s.att] || {}).e + ' · 체력 ' + Math.ceil(M.hpOf(d)) + '/' + s.max + ' · ♥' + M.bondOf(d) + ' · 포만도 ' + fullOf(d) + '</div>';
 }
 
 // ==========================================
@@ -489,11 +497,13 @@ function boxOpen() {
     if (BX.a) boxClose();
     const wrap = document.createElement('div');
     wrap.className = 'db-all';
-    wrap.innerHTML = '<div class="db-wrap t"><div class="db-box t"><img class="bg" src="doll/box.webp" alt=""></div></div>'
+    wrap.innerHTML = '<div class="db-wrap s"><div class="db-sw">' + (D().artSwitchHtml ? D().artSwitchHtml() : '') + '</div></div>'
+        + '<div class="db-wrap t"><div class="db-box t"><img class="bg" src="doll/box.webp" alt=""></div></div>'
         + '<div class="db-wrap b"><div class="db-box b"><img class="bg" src="doll/box.webp" alt=""></div></div>';
     document.body.appendChild(wrap);
     BX.a = wrap; BX.multi = false; BX.sel = {};
     wrap.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    try { if (D().artSwitchWire) D().artSwitchWire(wrap, function () { boxPaint(); }); } catch (e) { }
     boxPaint();
     // 바깥(위쪽 맵)을 누르면 닫는다
     const dim = document.createElement('div');
@@ -511,7 +521,7 @@ function boxClose() {
 function boxScale() {
     const vw = window.innerWidth, vh = window.innerHeight;
     const h0 = (BL.cropT[1] - BL.cropT[0]) + (BL.cropB[1] - BL.cropB[0]);
-    return Math.min(Math.min(vw, 460) / 314, (vh * 0.72) / h0);
+    return Math.min(Math.min(vw, 460) / 314, (vh * 0.68) / h0);
 }
 function cropOf(r) { return r[1] >= BL.cropB[0] ? BL.cropB : BL.cropT; }
 function bx(r, s, extra) {
@@ -522,6 +532,7 @@ function boxPaint() {
     const M = D(), u = u_(), ds = M.dolls(u);
     const s = boxScale();
     const box = BX.a;
+    const swRow = BX.a.querySelector('.db-sw'); if (swRow) swRow.style.width = Math.round(314 * s) + 'px';
     [['t', BL.cropT], ['b', BL.cropB]].forEach(function (pc) {
         const el = BX.a.querySelector('.db-box.' + pc[0]), cr = pc[1];
         el.style.width = Math.round(314 * s) + 'px'; el.style.height = Math.round((cr[1] - cr[0]) * s) + 'px';
@@ -593,8 +604,9 @@ function boxPaint() {
 }
 function slotHtml(e, d, s, px) {
     const M = D();
-    const mx = M.stats(d).max, h = M.hpOf(d), p = h / mx, f = M.fullPct(d);
+    const mx = M.stats(d).max, h = M.hpOf(d), p = h / mx, f = fullOf(d);
     e.innerHTML = '<div class="hb"><i style="width:' + Math.round(p * 100) + '%;background:' + (p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30')) + '"></i></div>'
+        + '<div class="hb2"><i style="width:' + f + '%"></i></div>'
         + (d.fav ? '<div class="st">★</div>' : '')
         + '<div style="' + M.spriteCss(d.sp, Math.round(px * s * 0.95), false, M.artOld()) + 'pointer-events:none' + (h <= 0 ? ';filter:grayscale(1) opacity(.6)' : '') + '"></div>'
         + '<div class="nm" style="font-size:' + (6.5 * s) + 'px;' + (f < 30 ? 'color:#c0392b' : '') + '">' + esc(M.nickOf(d)) + '</div>';
@@ -694,16 +706,59 @@ function reorder(list) {
     boxPaint();
 }
 function feedAll() {
-    const M = D(), u = u_();
-    const ids = Object.keys(M.dolls(u));
+    // ★ 인형 돌보기의 먹이 주기와 같은 셈 (2026-11-08 사용자 「일괄 먹이 주기가 기존 먹이 주기와 기능이 같아야 — 지금은 따로 두 번 줘야」)
+    //   먹이(사택 · 물 만 밥 … 특제 도시락)는 pet-food.js 의 feed 를 한 마리씩 · 🧶 솜뭉치 간식(잡화점)은 포만도 가득 + 교감.
+    //   포만도(사흘 시계)가 가득한 인형은 건너뛰고, 배고픈 인형부터 가진 만큼 준다. 둘 다 같은 fedAt 을 미니 어디서 봐도 한 번이다.
+    const M = D(), u = u_(), ds = M.dolls(u);
+    const ids = Object.keys(ds);
     if (!ids.length) { alert_('먹일 인형이 없습니다.'); return; }
-    const have = M.bagHas(M.ITEM.SNACK, u);
-    const yes = confirm('① 일괄 먹이 주기\n\n인형 ' + ids.length + '마리 — 🧶 솜뭉치 간식 ' + ids.length + '개가 필요합니다.\n가진 것 ' + have + '개' + (have < ids.length ? '\n\n모자라면 배고픈 인형부터 줍니다.' : '') + '\n\n줄까요?');
-    if (!yes) return;
-    const r = M.feed(ids, u);
-    alert_('🧶 ' + r.fed.length + '마리에게 먹이를 주었습니다.' + (r.short ? '\n' + r.short + '마리는 간식이 모자라 못 받았습니다 (잡화점).' : '') + '\n\n먹이를 받은 인형은 7일 동안 달아나지 않습니다.');
-    M.log('[🧸 보관소] 일괄 먹이 — ' + r.fed.length + '마리', u); M.saveHist();
-    boxPaint();
+    const hungry = ids.filter(function (id) { return fullOf(ds[id]) < 100; })
+        .sort(function (a, b) { return fullOf(ds[a]) - fullOf(ds[b]); });
+    const PF = window.PETFOOD;      // pet-food.js — LIST · have · feed (창 없이 한 마리)
+    const foods = (PF ? PF.LIST.map(function (f) { return { n: f.n, fill: f.fill == null ? 1 : f.fill, bond: f.bond !== false, cut: f.cut, up: f.up, have: PF.have(f.n, u) }; }) : []).filter(function (f) { return f.have > 0; });
+    const snack = M.bagHas(M.ITEM.SNACK, u);
+    const row = function (k, n, have, eff) {
+        return '<button class="gb-btn" data-f="' + esc(k) + '" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin:0 0 5px;text-align:left"' + (hungry.length ? '' : ' disabled') + '>'
+            + '<span>' + esc(n) + ' <span style="color:#a99ccc;font-size:10px">×' + have + '</span></span><span style="color:#9fd8ef;font-size:10px">' + esc(eff) + '</span></button>';
+    };
+    let list = foods.map(function (f) {
+        const eff = (f.fill >= 1 ? '포만도 가득' : '포만도 +' + Math.round(f.fill * 100)) + (f.bond ? ' · 교감' : '') + (f.cut < 0 ? ' · 쉬는 시간 전부' : f.cut ? ' · 쉬는 시간 -' + Math.round(f.cut / 60000) + '분' : '') + (f.up ? ' · 다음 탐사 +' + Math.round(f.up * 100) + '%' : '');
+        return row(f.n, f.n, f.have, eff);
+    }).join('');
+    if (snack > 0) list += row(M.ITEM.SNACK, M.ITEM.SNACK, snack, '포만도 가득 · 교감');
+    if (!list) list = '<div class="sub">가진 먹이가 없습니다 — 먹이는 사택에서, 🧶 솜뭉치 간식은 잡화점에서 삽니다.</div>';
+    const html = '<h3>① 일괄 먹이 주기</h3>'
+        + '<div class="sub">배고픈 인형 ' + hungry.length + '마리 <span style="color:#8f84b5">(포만도 100 미만 · 전체 ' + ids.length + '마리)</span><br>'
+        + '고른 먹이를 배고픈 인형부터 한 마리에 하나씩, 가진 만큼 줍니다. 인형 돌보기에서 주는 것과 같습니다.</div>'
+        + '<div style="margin:8px 0 4px">' + list + '</div>'
+        + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
+    const dim = panel(html);
+    dim.style.zIndex = '99998';
+    dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+    Array.prototype.forEach.call(dim.querySelectorAll('[data-f]'), function (b) {
+        b.onclick = function () {
+            const name = b.getAttribute('data-f');
+            const have = (name === M.ITEM.SNACK) ? M.bagHas(M.ITEM.SNACK, u) : (PF ? PF.have(name, u) : 0);
+            const n = Math.min(have, hungry.length);
+            if (!n) return;
+            if (!confirm(name + ' ' + n + '개 — 배고픈 인형 ' + n + '마리에게 줄까요?' + (hungry.length > n ? '\n(' + (hungry.length - n) + '마리는 모자라 못 받습니다)' : ''))) return;
+            let fed = [], miss = [];
+            if (name === M.ITEM.SNACK) {
+                const r = M.feed(hungry, u); fed = r.fed; if (r.short) miss.push(r.short + '마리는 간식이 모자라 못 받았습니다');
+            } else {
+                hungry.forEach(function (id) {
+                    if (fed.length >= n) return;
+                    const r = PF.feed(Number(id), name);
+                    if (r && r.ok) fed.push(id); else if (r && r.why) miss.push(M.nickOf(ds[id]) + ' — ' + String(r.why).split('\n')[0]);
+                });
+                if (hungry.length > fed.length + miss.length) miss.push((hungry.length - fed.length - miss.length) + '마리는 먹이가 모자라 못 받았습니다');
+            }
+            dim._close();
+            alert_(name + ' — ' + fed.length + '마리에게 먹이를 주었습니다.' + (miss.length ? '\n' + miss.slice(0, 6).join('\n') : '') + '\n\n먹이를 받은 인형은 7일 동안 달아나지 않습니다.');
+            M.log('[🧸 보관소] 일괄 먹이 — ' + name + ' · ' + fed.length + '마리', u); M.saveHist();
+            boxPaint();
+        };
+    });
 }
 function multiRelease() {
     const M = D(), u = u_(), ds = M.dolls(u);
@@ -752,7 +807,7 @@ function dollMenu(id) {
     const html = '<div style="display:flex;gap:12px;align-items:center">' + icon(d.sp, 72) + '<div><h3>' + esc(M.nickOf(d)) + (d.fav ? ' <span style="color:#e6b400">★</span>' : '') + '</h3>'
         + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (s.lv < M.lvMaxOf(d) ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ' · 상한 Lv ' + M.lvMaxOf(d) + ')' : ' (최고)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
         + '<div class="gb-row"><div class="tx"><div style="font-size:11px;color:#d8ceff;line-height:1.7">체력 ' + Math.ceil(M.hpOf(d)) + ' / ' + s.max + ' · 공격 ' + s.atk + ' · 방어 ' + s.def + ' · 회피 ' + s.eva + '% · 급소 ' + s.crit + '%<br>'
-        + '포만 ' + M.fullPct(d) + '% — ' + (days > 0 ? days + '일 안에 먹이를 주세요' : '곧 달아납니다!') + '<br>잡은 날 ' + at.getFullYear() + '.' + (at.getMonth() + 1) + '.' + at.getDate() + ' · ' + (inW ? '동행 중' : '보관함') + '</div>'
+        + '포만도 ' + fullOf(d) + ' / 100 — ' + (days > 0 ? days + '일 안에 먹이를 주세요' : '곧 달아납니다!') + '<br>잡은 날 ' + at.getFullYear() + '.' + (at.getMonth() + 1) + '.' + at.getDate() + ' · ' + (inW ? '동행 중' : '보관함') + '</div>'
         + '<div style="margin-top:6px">기술 — ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { a: [] }).a.map(function (x) { return x[0]; }).join(' · ')) + ' / ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { d: [] }).d.map(function (x) { return x[0]; }).join(' · ')) + '</div></div></div>'
         + '<div class="gb-row"><input id="gb-nick" maxlength="12" placeholder="별명 (비우면 종 이름)" value="' + esc(d.nick || '') + '" style="flex:1;padding:7px;border-radius:7px;border:1px solid #6d5aa0;background:#2b2140;color:#fff"><button class="gb-btn" data-k="nick">바꾼다</button></div>'
         + (function () {
@@ -761,11 +816,17 @@ function dollMenu(id) {
             return '<div class="gb-row"><div class="tx"><div style="font-size:10.5px;color:' + (nd.ok ? '#9fd8ef' : '#8f84b5') + '">💠 ' + esc(nd.rune) + ' ' + nd.have + '개 — ' + (nd.ok ? '각성할 수 있습니다' : esc(nd.why)) + '</div></div>'
                 + (nd.ok ? '<button class="gb-btn pri" data-k="up">각성 (' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + ')</button>' : '') + '</div>';
         })()
-        + '<div class="gb-btns"><button class="gb-btn" data-k="fav">' + (d.fav ? '☆ 즐겨찾기 해제' : '★ 즐겨찾기') + '</button><button class="gb-btn" data-k="mv">' + (inW ? '보관함으로' : '동행으로') + '</button></div>'
+        + '<div class="gb-btns"><button class="gb-btn pri" data-k="care">🧸 돌보기</button><button class="gb-btn" data-k="fav">' + (d.fav ? '☆ 즐겨찾기 해제' : '★ 즐겨찾기') + '</button><button class="gb-btn" data-k="mv">' + (inW ? '보관함으로' : '동행으로') + '</button></div>'
         + '<div class="gb-btns"><button class="gb-btn" data-k="rel"' + (d.fav ? ' disabled' : '') + ' style="color:#ffb3b3">놓아주기</button><button class="gb-btn" data-k="x">닫는다</button></div>';
     const dim = panel(html);
     dim.style.zIndex = '99998';
     dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+    // 🧸 돌보기 — 인형 돌보기에서 인형을 눌렀을 때의 창 그대로 (pet-list.js petOneOpen · 2026-11-08 사용자)
+    dim.querySelector('[data-k=care]').onclick = function () {
+        dim._close();
+        if (typeof window.petOneOpen === 'function') window.petOneOpen(Number(id));
+        else alert_('인형 돌보기 창을 열 수 없습니다.');
+    };
     dim.querySelector('[data-k=nick]').onclick = function () {
         const v = String(dim.querySelector('#gb-nick').value || '').trim().slice(0, 12);
         M.patchDoll(id, { nick: v || null }, u); dim._close(); boxPaint();
