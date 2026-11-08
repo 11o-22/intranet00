@@ -1860,7 +1860,10 @@ function lsAsk(code) {
     if (!me || !d || !run || !lsItem(code).length || LS.lead) return;
     const id = me.code + ':' + now();
     const ref = d.ref(LS_PATH + '/' + code);
-    ref.set({ id: id, by: me.code, bn: nameOf(me), at: chatNow(), st: 'ask' });
+    try {
+        const pr = ref.set({ id: id, by: me.code, bn: nameOf(me), at: chatNow(), st: 'ask' });
+        if (pr && pr.catch) pr.catch(function (e) { sysLine('🪢 묻지 못했습니다 — ' + ((e && e.message) || e)); console.warn('[끌고가기] 적기 실패', e); lsLeadStop(true); });
+    } catch (e) { sysLine('🪢 묻지 못했습니다.'); return; }
     sysLine('🪢 ' + nameIn(code) + ' 사원에게 끌고가도 되는지 물었습니다.');
     const L = { code: code, id: id, ref: ref, cb: null, to: 0, sent: '', sentAt: 0, on: false };
     L.cb = function (snap) {
@@ -1906,16 +1909,26 @@ function lsRelease(code, quiet) {
 }
 // ── 끌려가는 쪽 — 묻는 것이 오면 [ 동의 ] · [ 거절 ] · 동의한 뒤에는 L 을 따라간다
 (function lsListen() {
-    let on = false;
-    const iv = setInterval(function () {
+    // ★ 사번이 바뀌면(같은 화면에서 다른 계정으로 다시 들어옴) 그 사번의 칸으로 옮겨 듣는다 — 한 번 붙이고 마는 것이 아니다 (2026-11-08)
+    let ref = null, code = '', cb = null;
+    setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
         const me = u_();
-        if (on || typeof database === 'undefined' || !database || !me) return;
-        on = true;
-        clearInterval(iv);
+        const c = (me && me.code) ? String(me.code) : '';
+        if (c === code) return;
+        if (ref) { try { ref.off('value', cb); } catch (e) { } ref = null; }
+        if (LS.led) lsLedStop(null);
+        code = c;
+        if (!c) return;
         let first = true, seen = null;
-        database.ref(LS_PATH + '/' + me.code).on('value', function (snap) {
+        cb = function (snap) {
             const v = snap.val();
-            if (first) { first = false; seen = (v && v.id) || null; if (v && v.st === 'ok') { try { snap.ref.remove(); } catch (e) { } } return; }   // 들어오기 전 것은 안 잇는다
+            if (first) {
+                first = false; seen = (v && v.id) || null;
+                if (v && v.st === 'ok') { try { snap.ref.remove(); } catch (e) { } return; }               // 들어오기 전에 따라가던 것은 안 잇는다
+                if (v && v.id && v.st === 'ask' && chatNow() - (Number(v.at) || 0) <= LS_WAIT) { lsShow(v, snap.ref); }   // 붙기 직전에 온 물음은 아직 살아 있다
+                return;
+            }
             if (!v || !v.id) { if (LS.led) lsLedStop('🪢 목줄이 풀렸습니다.'); return; }
             if (LS.led && LS.led.id === v.id) { LS.led.L = v.L || LS.led.L; return; }
             if (v.st === 'ask' && v.id !== seen) {
@@ -1929,7 +1942,10 @@ function lsRelease(code, quiet) {
                 lsLedUi(true);
                 try { wake(); } catch (e) { }
             }
-        });
+        };
+        ref = database.ref(LS_PATH + '/' + c);
+        ref.on('value', cb);
+        console.log('[끌고가기] 듣기 — ' + c);
     }, 1000);
 })();
 function lsShow(v, ref) {
@@ -1939,20 +1955,41 @@ function lsShow(v, ref) {
             return Object.assign({}, cur, { st: a });
         });
     };
-    if (!run || !lsMeWears()) { answer('no'); return; }       // 광장에 없거나 목줄을 안 찼으면 거절
-    const s = sheet('leash', '🪢 끌고가기', '<div class="plaza-pzlock">'
+    console.log('[끌고가기] 물음 — ' + (v.bn || v.by) + ' · 광장 ' + (run ? '안' : '밖') + ' · 목줄 ' + (lsMeWears() ? 'O' : '✗'));
+    if (!lsMeWears()) { answer('no'); return; }                // 목줄을 안 찼으면 거절
+    // ★ 광장 판(#plaza-ov)이 안 보이는 때 — 광장 밖이거나 · 광장 위에 다른 칸(옷장 · 사택 …)을 띄워 둔 동안 — 에도 묻는다 (2026-11-08 사용자 「끌고가기 했는데 동의가 안 떠」)
+    //   그때는 광장 판이 아니라 화면 맨 위에 따로 띄운다. 동의하면 광장을 연다 — 따라가는 것은 광장 안에서만 돈다
+    const ov = document.getElementById('plaza-ov');
+    const ovShown = !!(run && ov && ov.getClientRects().length > 0 && getComputedStyle(ov).display !== 'none' && getComputedStyle(ov).visibility !== 'hidden');   // fixed 라 offsetParent 는 못 쓴다
+    const inner = '<div class="plaza-pzlock">'
         + '<div class="pl-t">' + esc(v.bn || '누군가') + ' 사원이 끌고가려고 합니다. 동의합니까?<br>'
         + '동의하면 그 사원이 가는 대로 따라가고, 그동안 제 손으로는 움직일 수 없습니다. 화면의 [ 🪢 목줄 풀기 ] 로 언제든 풉니다.</div>'
-        + '<button data-a="ok">동의</button><button data-a="no">거절</button></div>');
-    if (!s) return;
+        + '<button data-a="ok">동의</button><button data-a="no">거절</button></div>';
+    let s = ovShown ? sheet('leash', '🪢 끌고가기', inner) : null;
+    let standalone = false;
+    if (!s) {
+        standalone = true;
+        const old = document.getElementById('plaza-leash-ask'); if (old) old.remove();
+        s = document.createElement('div');
+        s.id = 'plaza-leash-ask';
+        s.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);';
+        s.innerHTML = '<div style="width:min(92vw,360px);background:#1b1426;border:1px solid #a58cff;border-radius:14px;padding:16px 14px;color:#e8dcc6;font-size:12px;line-height:1.6;">'
+            + '<div style="font-size:13px;font-weight:bold;color:#d8ceff;margin-bottom:8px;">🪢 끌고가기</div>' + inner + '</div>';
+        document.body.appendChild(s);
+    }
+    const close = function () { if (standalone) { if (s.isConnected) s.remove(); } else closeSheet(); };
     Array.prototype.forEach.call(s.querySelectorAll('button[data-a]'), function (b) {
+        if (standalone) b.style.cssText = 'display:block;width:100%;margin:6px 0 0;padding:11px;border-radius:12px;border:1px solid #8a6a2a;background:#2a1f3a;color:#ffe6a8;font-size:13px;font-weight:bold;';
         b.onclick = function () {
             answer(b.dataset.a);
-            closeSheet();
-            if (b.dataset.a === 'ok') sysLine('🪢 동의했습니다 — ' + (v.bn || '그 사원') + ' 사원이 가는 대로 따라갑니다.');
+            close();
+            if (b.dataset.a === 'ok') {
+                sysLine('🪢 동의했습니다 — ' + (v.bn || '그 사원') + ' 사원이 가는 대로 따라갑니다.');
+                if (!run) { try { window.plazaOpen(); } catch (e) { } }       // 광장 밖에서 동의했다 — 광장을 열어 따라간다
+            }
         };
     });
-    setTimeout(function () { if (s.isConnected) closeSheet(); }, LS_WAIT);
+    setTimeout(function () { if (s.isConnected) close(); }, LS_WAIT);
 }
 function lsLedActive() { return !!(LS.led && run); }
 function lsLedStop(msg) {
@@ -1990,6 +2027,7 @@ function lsLedUi(on) {
 function lsFollowStep() {
     const D0 = LS.led;
     if (!D0 || !run) return;
+    lsLedUi(true);                                                                       // 광장 밖에서 동의했으면 이제야 단추를 단다
     const L = D0.L;
     const t = now();
     if (!lsMeWears()) { lsLedQuit(); return; }                                         // 목줄을 벗었다
