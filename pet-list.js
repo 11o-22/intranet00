@@ -24,6 +24,7 @@
 const FAB = 'pet-fab';
 const MOD = 'pet-modal';
 const COLS = 5;                 // 사용자가 적어 준 차례대로 다섯 칸씩
+let showAll = false;            // ★ 목록 — 동행 중인 셋만(기본) ↔ 가진 인형 전부 (창을 닫아도 이번 접속 동안은 기억) (2026-11-08)
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function esc(s) {
@@ -146,12 +147,20 @@ function listView() {
     const L = P().LIST;
     const mine = Object.keys(P().pets(me)).filter(function (k) { return P().BY[k]; });
     const have = mine.length;
-    // ★ 동행 중인 셋만 (2026-11-08 사용자 「펫 돌보기에는 동행 중인 펫 3마리만 뜨도록」) — 맡겨 둔 인형은 보관소(펫박스)에서 「돌보기」로 연다
-    //   (2026-11-07 까지는 가진 종을 다 깔았다 — 같은 종 여럿은 그 종 칸 뒤에 · 없는 종은 안 보이게)
+    // ★ 기본은 동행 중인 셋만 · 위 단추로 가진 인형 전부 (2026-11-08 사용자 「동행 중인 펫 세 마리만 기본으로 · 위에 버튼 누르면 보유 중인 펫 전부」)
+    //   전부 볼 때는 2026-11-07 처럼 — 종 차례로 · 같은 종 여럿은 그 종 칸 뒤에 · 없는 종은 안 보이게
     let withIds = mine;
     try { if (window.DOLL && DOLL.withList) withIds = DOLL.withList(me).map(String).filter(function (k) { return P().BY[k] && P().pets(me)[k]; }); } catch (e) { }
     const PM = (window.DOLL && DOLL.PARTY_MAX) || 3;
-    const cells = withIds.map(function (k) { const p = P().BY[k]; return Number(k) === p.i ? cell(p) : cell(p, k); });
+    const cells = [];
+    if (showAll) {
+        L.forEach(function (p) {
+            const owned = mine.filter(function (k) { return P().sp(k) === p.i; }).sort(function (a, b) { return a - b; });
+            owned.forEach(function (k) { cells.push(Number(k) === p.i ? cell(p) : cell(p, k)); });
+        });
+    } else {
+        withIds.forEach(function (k) { const p = P().BY[k]; cells.push(Number(k) === p.i ? cell(p) : cell(p, k)); });
+    }
     if (!cells.length) cells.push('<div style="grid-column:1/-1; font-size:10.5px; color:#6f685e; padding:14px 0; text-align:center;">' + (have ? '동행 중인 인형이 없습니다 — 보관소(펫박스)에서 동행으로 옮깁니다.' : '아직 인형이 없습니다 — 출몰지에서 포옹 리본으로 잡아 옵니다.') + '</div>');
 
     const grid = '<div style="display:grid; grid-template-columns:repeat(' + COLS + ',1fr);'
@@ -162,14 +171,17 @@ function listView() {
         + '<span style="font-size:13px; color:#ffcf8f; font-weight:bold;">🧸 인형</span>'
         + '<span style="font-size:10px; color:#8d8578;">동행 중 ' + withIds.length + ' / ' + PM + ' · 전체 ' + have + '마리</span>'
         + '</div>'
+        + '<button id="pet-all" class="game-btn" style="' + BTN + ' padding:8px; font-size:11px;' + (showAll ? '' : GREY) + '">'
+        + (showAll ? '동행 중인 인형만 본다' : '가진 인형 전부 본다 (' + have + '마리)') + '</button>'
         + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:10px; line-height:1.6;">'
-        + '동행 중인 인형만 보입니다. 맡겨 둔 인형은 도깨비 공방 보관소(펫박스)에서 「돌보기」로 돌봅니다.<br>'
+        + (showAll ? '가진 인형 전부입니다. 동행 중인 인형은 금빛 테두리 · ' : '동행 중인 인형만 보입니다. 맡겨 둔 인형은 위 단추나 도깨비 공방 보관소(펫박스)에서 봅니다. ')
         + '🏠 표시가 지금 방에 있는 ' + P().SHOW_MAX + '마리입니다. 그림 위 막대 — 위는 체력, 아래 흰 막대는 배고픔(포만도)입니다.</div>'
         + (window.DOLL && DOLL.artSwitchHtml ? DOLL.artSwitchHtml() : '')      // 🔘 옛 펫 외형 ↔ 봉제인형
         + grid
         + '<button id="pet-x" class="game-btn" style="' + BTN + GREY + ' margin-top:11px;">닫는다</button>');
 
     w.querySelector('#pet-x').onclick = shut;
+    w.querySelector('#pet-all').onclick = function () { showAll = !showAll; listView(); };
     try { if (window.DOLL && DOLL.artSwitchWire) DOLL.artSwitchWire(w, function () { listView(); }); } catch (e) { }   // 켜고 끄면 그림을 바꿔 다시 그린다
     Array.prototype.forEach.call(w.querySelectorAll('.pet-cell'), function (el) {
         el.onclick = function () { oneView(Number(el.getAttribute('data-i'))); };
