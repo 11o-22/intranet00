@@ -31,8 +31,9 @@
 //                    소멸한 나비는 자정에 돌아오고, 레벨은 남는다.
 //                    경험 — 살아 나온 탐사마다 +1 · 능력을 쓸 때마다 +1 · 다음 레벨까지 Lv×5.
 //                    K의 방 혼자 — 나비가 하나라도 남아 있으면 혼자가 아니다 (혼자 S · A 규칙이 풀린다).
-//   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 회수품 ×2.5 ·
-//                    성공 정산 ×1.5 · 즉사 한 번 회피(맞은 수만큼). 두 번 다 맞으면 포만감·오염도 5시간 동결,
+//   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 즉사 한 번 회피(맞은 수만큼).
+//                    (✗ 회수품 ×2.5 · 성공 정산 ×1.5 는 뺐다 — 2026-11-08 사용자 「포인트랑 회수품 확률 버프 싹 빼주고」)
+//                    두 번 다 맞으면 포만감·오염도 5시간 동결,
 //                    어둠 탐사 · K의 방 횟수가 다시 찬다 (맞는 사람마다 하루 한 번 · bflyBreath.charged).
 //                    ✗ 2026-10-26 까지는 펫이 5시간 잠들었다 (따라오지 않음) — 사용자가 뺐다.
 //
@@ -40,8 +41,12 @@
 //                    하루 세 번. 나올 때 오염도는 퇴원 값(쓰러짐 40). 제 二 신도(여우 신도)가 먼저 꺼냈으면 횟수를 쓰지 않는다.
 //                    u.bflyOut = { day, n }   오늘 쓴 귀환
 //
-//   포인트 — 맹약(×1.5~2) · 모이라이(유예 1번 ×1.33 · 2번 ×1.67 · 3번 ×2) · 숨결(×1.5) 를 다 곱해도 ×2 까지.
-//            꿈결(K의 방)은 불리지 않는다.
+//   ✗ 포인트 배수(맹약 ×1.5~2 · 모이라이 · 숨결 ×1.5 · 상한 ×1.5) · 회수품 배수(숨결 ×2.5)는 모두 뺐다 (2026-11-08 사용자).
+//     multNow 는 늘 ×1 — 맹약을 맺은 장착자가 쓰러져도 포인트를 잃지 않는 것(pactKeep)만 남는다.
+//
+//   ■ 방 (2026-11-08 사용자 「나비들이랑 같이 탐사할 수 있게 · 다른 방과 별개의 방을 둘 수 있게 — 아기 호랑이처럼」)
+//     장착자는 **구역이 차 있어도** 방을 만들 수 있다 — 다른 팀이 편성해 두었거나 탐사 중인 구역에도 「🦋 파티 모집」이 열린다.
+//     (babyfox.js 와 같은 결 — isZoneTaken 을 만드는 동안만 건너뛴다. 나비는 붙은 사람 곁에서 늘 함께 가므로 따로 고르지 않는다)
 //
 // ■ 적히는 자리
 //
@@ -435,7 +440,7 @@ window.bflyBreathe = function (code) {
         }
     } catch (e) { }
     shut();
-    alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피'
+    alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 즉사 한 번 회피'
         + (twice ? '\n\n두 번째 숨결 — 포만감·오염도가 ' + C.EROS_HOURS + '시간 멈춥니다.'
             + (charge ? '\n어둠 탐사 · K의 방 횟수가 다시 찼습니다.' : '\n(횟수 충전은 오늘 이미 받았습니다)') : '')
         + '\n\n(오늘 남은 숨결 ' + (C.EROS - erosUsed(me)) + '번)');
@@ -810,18 +815,9 @@ function smashBtn() {
 // ==========================================
 // 정산 — 포인트 ×2 까지 · 치유 나비 · 경험
 // ==========================================
-function multNow() {
-    const me = u_(), r = run();
-    if (!me || !r) return { m: 1, why: [] };
-    let m = 1; const why = [];
-    if (wears(me) && myPact().length) {
-        if (!r._bfPactMult) r._bfPactMult = C.PACT_PTS[0] + Math.random() * (C.PACT_PTS[1] - C.PACT_PTS[0]);
-        m *= r._bfPactMult; why.push('맹약 ×' + r._bfPactMult.toFixed(2));
-    }
-    if (r._bfMoira) { const mm = 1 + Math.min(C.MOIRA, r._bfMoira) / C.MOIRA * (C.PTS_CAP - 1); m *= mm; why.push('모이라이 ×' + mm.toFixed(2)); }
-    if (breathN(me) > 0) { m *= C.EROS_PTS; why.push('숨결 ×' + C.EROS_PTS); }
-    return { m: Math.min(C.PTS_CAP, m), why: why };
-}
+// ✗ 포인트 배수는 뺐다 (2026-11-08 사용자 「포인트랑 회수품 확률 버프 싹 빼주고」) — 늘 ×1
+//   (전에는 맹약 ×1.5~2 · 모이라이 유예 수 · 숨결 ×1.5 를 곱해 C.PTS_CAP 까지였다)
+function multNow() { return { m: 1, why: [] }; }
 function runXp() { KEYS.forEach(function (k) { if (usable(k)) xpAdd(k, 1); }); }
 window.bflyRunXp = runXp;
 (function hookResult() {
@@ -870,9 +866,8 @@ window.bflyRunXp = runXp;
         if (emLootMult._bfly) { clearInterval(iv); return; }
         const _e = emLootMult;
         const w = function () {
-            let m = _e.apply(this, arguments);
-            try { if (breathN(u_()) > 0) { m *= C.EROS_LOOT; if (window.gearLootMark) window.gearLootMark('bfly', C.EROS_LOOT); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js)
-            return m;
+            // ✗ 숨결의 회수품 ×2.5 는 뺐다 (2026-11-08 사용자) — 그대로 넘긴다
+            return _e.apply(this, arguments);
         };
         w._bfly = true;
         emLootMult = w; window.emLootMult = w;
@@ -1099,7 +1094,7 @@ window.bflyMenu = function () {
         + '🕊 나비의 귀환 — 쓰러져 상담실 · 선녀탕으로 가면 바로 꺼낸다 · 오늘 남은 <b style="color:#c9b8ff;">' + outLeft(me) + ' / ' + C.OUT + '</b><br>'
         + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + ' · 장착자 본인만' + (r ? ' (이번 탐사 남은 ' + letheLeft() + ')' : '') + '<br>'
         + '💋 에로스의 마지막 숨결 — 오늘 남은 <b style="color:#ffb3c7;">' + (C.EROS - erosUsed(me)) + ' / ' + C.EROS + '</b>'
-        + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
+        + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
         + '🔗 영혼의 맹약 — ' + (p ? (myPact().length ? myPact().map(nameOf).map(esc).join(', ') : '아직 없음') : '방에 있을 때 맺는다') + '</div>';
     const w = box(head('🦋 환영 나비', '육체와 영혼을 가른 것들. 나비를 눌러 내 곁이나 사원 곁에 두고, 이름을 짓습니다.')
         + rows + info
@@ -1249,7 +1244,7 @@ window.bflyErosPick = function () {
         return '<button class="game-btn bf-er" data-c="' + esc(t.code) + '" style="' + BTN + '">' + (t === me ? '본인' : esc(t.name))
             + (n ? ' <span style="font-size:9px; color:#ffb3c7;">오늘 숨결 ' + n + '번' + (n === 1 ? ' — 한 번 더면 5시간 동결 · 어둠 · K의 방 횟수 충전' : '') + '</span>' : '') + '</button>';
     }).join('');
-    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 · K의 방 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
+    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 · K의 방 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#bf-x').onclick = window.bflyMenu;
@@ -1490,6 +1485,106 @@ window.bflyHelp = function () {
     KINDS.forEach(function (x) { console.log('  ' + x.icon + ' ' + x.n + ' — ' + x.d('Lv')); });
     console.log('  bflyGive(사번) · bflyState(사번) · bflyRevive(사번) · bflyLevel(사번, 나비, Lv)');
 };
+
+// ==========================================
+// 방 — 구역이 차 있어도 만든다 (2026-11-08 사용자 「다른 방과 별개의 방을 둘 수 있게 — 아기 호랑이처럼」)
+// ==========================================
+//   babyfox.js 와 같은 결. isZoneTaken 을 한 겹 더 싸서 장착자가 방을 만드는 동안만 「안 찼다」고 답하고,
+//   구역 목록의 ⛔ 자리에 「🦋 파티 모집」 단추를 끼운다 (아기 호랑이가 이미 끼웠으면 그대로 둔다).
+let zoneBypass = false;
+(function hookZone() {
+    const iv = setInterval(function () {
+        if (typeof isZoneTaken !== 'function') return;
+        if (isZoneTaken._bfly) { clearInterval(iv); return; }
+        const _z = isZoneTaken;
+        const w = function () {
+            if (zoneBypass) return false;
+            return _z.apply(this, arguments);
+        };
+        w._bfly = true; if (_z._kit) w._kit = true;
+        isZoneTaken = w; window.isZoneTaken = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+(function hookCreate() {
+    const iv = setInterval(function () {
+        if (typeof createParty !== 'function') return;
+        if (createParty._bfly) { clearInterval(iv); return; }
+        const _c = createParty;
+        const w = function () {
+            const me = u_();
+            const on = !!(me && wears(me));
+            if (on) zoneBypass = true;
+            try { return _c.apply(this, arguments); }
+            finally { zoneBypass = false; }
+        };
+        w._bfly = true; if (_c._kit) w._kit = true;
+        createParty = w; window.createParty = w;
+        clearInterval(iv);
+        console.log('[환영 나비] 방 — 구역 한계 넘기 연결');
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// 출발 — 방장이 장착자면 「방금 다른 팀이 진입했습니다」 검사를 건너뛴다 (만들 때와 같다)
+(function hookLaunch() {
+    const iv = setInterval(function () {
+        if (typeof launchParty !== 'function') return;
+        if (launchParty._bfly) { clearInterval(iv); return; }
+        const _l = launchParty;
+        const w = function () {
+            const me = u_();
+            let on = false;
+            try { const p = (typeof getMyParty === 'function') ? getMyParty() : party(); on = !!(me && wears(me) && p && p.leader === me.code); } catch (e) { on = false; }
+            if (on) zoneBypass = true;
+            try { return _l.apply(this, arguments); }
+            finally { zoneBypass = false; }
+        };
+        w._bfly = true; if (_l._kit) w._kit = true;
+        launchParty = w; window.launchParty = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+function openZoneList(body) {
+    const me = u_();
+    if (!body || !me || !wears(me)) return 0;
+    let n = 0;
+    Array.prototype.forEach.call(body.querySelectorAll('div'), function (d) {
+        const f = (d.style && d.style.fontFamily) || '';
+        if (f.indexOf('monospace') < 0) return;
+        const code = String(d.textContent || '').trim();
+        if (typeof DARK_ZONES === 'undefined' || !DARK_ZONES[code]) return;
+        const z = DARK_ZONES[code];
+        if (!z || !(z.max > 1)) return;                                     // 1인 구역은 그냥 진입이다
+        const left = d.parentElement, row = left && left.parentElement, right = row && row.lastElementChild;
+        if (!right || right === left) return;
+        if (String(right.textContent || '').indexOf('⛔') < 0) return;      // 이미 열렸거나(아기 호랑이) 안 막힌 자리
+        try { if (typeof isZoneOpen === 'function' && !isZoneOpen(code)) return; } catch (e) { }
+        right.innerHTML = '<button class="game-btn" style="margin:0; padding:8px 12px;'
+            + ' font-size:11px; background:linear-gradient(145deg,#5a3f8a,#2a1d44) !important;'
+            + ' border-color:#a58cff !important;" onclick="createParty(\'' + esc(code) + '\')">'
+            + '🦋 파티<br>모집</button>';
+        n++;
+    });
+    return n;
+}
+(function hookZoneList() {
+    const iv = setInterval(function () {
+        if (typeof renderDarkness !== 'function') return;
+        if (renderDarkness._bfly) { clearInterval(iv); return; }
+        const _d = renderDarkness;
+        const w = function () {
+            const out = _d.apply(this, arguments);
+            try { openZoneList(document.getElementById('darkness-body')); } catch (e) { }
+            return out;
+        };
+        w._bfly = true; if (_d._kit) w._kit = true;
+        renderDarkness = w; window.renderDarkness = w;
+        clearInterval(iv);
+    }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
 
 console.log('[환영 나비] ' + NAME + ' 연결 — 상담사 지급 전용');
 })();
