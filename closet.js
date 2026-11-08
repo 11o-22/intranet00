@@ -160,7 +160,8 @@ const DOT = {
         'robe', 'han-duru', 'cape',
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
         'bunny-fur-b', 'bunny-suit', 'lingerie', 'bunny-fur-f',
-        'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo'],
+        'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in', 'glove', 'bungeo',
+        'gold-leash'],                                        // 🪢 금 목줄 (2026-11-08) — 옷 위로 늘어진다
     // ★ 몸보다 **뒤**에 까는 장 (2026-10-25 · 잎 우산) — 몸 · 옷 · 머리 · 악세 모두가 이 위에 그려진다.
     //   적힌 차례대로 아래부터 — 물 웅덩이(무조건 신발 밑) → 줄기(무조건 등 뒤).
     //   칸(item)에 back: [...] 으로 적는다. 토끼(bare)에게는 안 깐다 (악세와 같다) — RAB_OK 에 적힌 것만 깐다.
@@ -236,8 +237,8 @@ const DOT = {
                  'red-bikini': [0, 1, 2, 3, 4, 5],
                  // 바니걸 (2026-11-08) — 의상 · 뒤 털 · 스타킹은 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 (머리띠는 첫 칸을 들썩임 몫만큼 내린 것과 같아 그대로 둔다)
                  'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
-                 // 란제리 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
-                 'lingerie': [0, 1, 2, 3, 4, 5],
+                 // 란제리 · 금 목줄 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
+                 'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 풀어진 셔츠 · 여성용 속옷 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
@@ -282,6 +283,8 @@ const DOT = {
     //   red-bikini-off — 처음 주신 레드 비키비키니 그림(벗겨지는 그림)을 그대로 옮겨 둔 것. 서기 줄이 여성 체형 서기 칸과 맞는다.
     //   광장(plaza.js 「벗기기」)이 dotActor 의 strip(칸) 으로 넘긴다.
     STRIP: { 'red-bikini': { sheet: 'red-bikini-off' } },
+    // ★ 금 목줄 (2026-11-08) — 이 장을 그리고 있는 사람(여성 체형 · 금 목줄)을 광장에서 누르면 [ 끌고가기 ] (plaza.js)
+    LEASH: 'gold-leash',
     // ★ 까기 (2026-11-08) — 칸 · 입은 것 → 바뀌는 것. 광장(plaza.js 「까기」)이 dotPeel 로 바꾼다. 그 장을 그리고 있어야(여성 체형) 뜬다.
     PEEL: [{ k: 'top', from: 'wshirt', to: 'wshirt-open', sheet: 'w-shirt' }],
     // ★ 가만히 서 있으면 나오는 동작 — 사번 0000 · 8449 두 사람만 (2026-10-17)
@@ -695,6 +698,10 @@ const DOT_SLOTS = [
             //   머리띠는 머리 위(top) · 들썩임을 따라 내린다. 스타킹은 그려 주신 투명도(알파 217) 그대로 — 몸 바로 위(over · Z 맨 앞쪽).
             //   legs — 스타킹을 신으면 몸판을 이 장으로 갈아 끼운다 (완전체 그림의 다리 · body-w-stk). 여성 체형 몸일 때만.
             { i: 'bunny-band', n: '바니걸 머리띠&초커', top: ['bunny-ears'], owner: true, fem: true, cat: '머리' },
+            // ★ 금 목줄 (2026-11-08 사용자 「Owner랑 상담사한테만 · 금 목줄 · 목 부분 · 여성 신체에만 · 찬 사원을 누르면 [끌고가기]」)
+            //   주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷(5=3 · 6=2) · 서기 여섯 칸은 들썩임을 따라 그려져 있다.
+            //   몸 위(over · Z 맨 뒤 = 제일 위)에 — 줄이 몸 앞으로 늘어진다. 광장 「끌고가기」(plaza.js)는 이 장(D.LEASH)을 그리고 있는 사람에게 뜬다.
+            { i: 'gleash', n: '금 목줄', over: ['gold-leash'], owner: true, fem: true, cat: '목' },
             { i: 'bunny-stk', n: '바니걸 스타킹', over: ['bunny-stk'], owner: true, fem: true, legs: 'body-w-stk', cat: '다리' },   // 밀실 거래 됨 (2026-10-24)
             // ★ LP 판 (2026-10-23) — 사운드 세트 · 상담사가 선물함으로 보내 준 사람만 · 거래하지 않는다.
             //   달면 광장에 LP 단추가 뜬다 — 피아노 · 디스코 (lp.js). 누르는 동안만 높은음자리표 · 음표가 둘레에 뜬다 (sound-lp-fx).
@@ -1085,7 +1092,22 @@ function look(user, override, all) {
     //   말풍선을 껐다 (2026-11-05 · dot.nwOff · dot.nw2Off) — { off: 1 } 를 얹어 말풍선만 걷은 장을 깐다 (고른 글씨는 남겨 둔다)
     if (d.nwOff) nw['nuow-friend'] = Object.assign({}, nw['nuow-friend'] || {}, { off: 1 });
     if (d.nw2Off) nw['nuow2-doll'] = Object.assign({}, nw['nuow2-doll'] || {}, { off: 1 });
-    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, layers: over, tops: tops, backs: backs, pick: pick, col: colOut || col, nw: Object.keys(nw).length ? nw : null, follow: fol };
+    // ★ 까기 (2026-11-08 사용자 「셔츠 물들였을 때랑 까기 상태의 셔츠일 때에 색깔 똑같게」) — 까인 옷(풀어진 셔츠 w-shirt-open)은
+    //   원래 옷(셔츠 w-shirt)에 물들인 색을 그대로 쓴다. 셀 수 없는 칸으로 붙여 옷장 · 팔레트가 베껴 저장하지 않게 한다 (위 under 와 같다)
+    let colFin = colOut || col;
+    (D.PEEL || []).forEach(function (pe) {
+        const sl = slotOf(pe.k);
+        const toIt = sl ? sl.items.filter(function (x) { return x.i === pe.to; })[0] : null;
+        if (!toIt || !pe.sheet) return;
+        const c = colFin[pe.sheet];
+        if (c == null || c === '') return;
+        (toIt.over || []).concat(toIt.top || [], toIt.back || []).forEach(function (o) {
+            if (o === pe.sheet || (colFin[o] != null && colFin[o] !== '')) return;
+            if (colFin === col) colFin = Object.assign({}, col);
+            Object.defineProperty(colFin, o, { value: c, enumerable: false });
+        });
+    });
+    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, layers: over, tops: tops, backs: backs, pick: pick, col: colFin, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
 // ★ 까기 (2026-11-08) — 이 사람이 지금 깔 수 있는 것을 입었나 (그 장을 그리고 있나) · 있으면 그 D.PEEL 칸
@@ -1724,6 +1746,8 @@ function actor(user, opt) {
         facing: function () { return dir; },
         // ★ 벗기기 (2026-11-08) — 벗길 수 있는 옷(D.STRIP)을 입었나 · 이 칸에서 이미 다 벗겼으면 거짓
         strips: function () { return !!(stripEl && st !== 'gone'); },
+        // ★ 금 목줄을 찼나 (2026-11-08 · D.LEASH) — 광장 「끌고가기」
+        leashed: function () { return !!(D.LEASH && sheets.indexOf(D.LEASH) >= 0); },
         // f — 벗겨지는 장 서기 줄의 몇 번째 칸(0~5) · 'gone' 이면 그 옷을 걷는다 · null 이면 원래대로
         strip: function (f) {
             if (!stripEl || !STS) return false;

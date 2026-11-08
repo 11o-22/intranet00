@@ -1814,6 +1814,209 @@ function askLocked() {
 }
 
 // ==========================================
+// 🪢 끌고가기 — 금 목줄 (2026-11-08 사용자)
+// ==========================================
+//
+//   「금 목줄 … 이거 찬 여성 신체 사원을 눌렀을 시에 [끌고가기] 버튼 뜨게 하고 누를 시 상대방에게
+//    [ ~사원이 끌고가려고 합니다 동의합니까? ] 를 띄우고 동의 시 끌고가려는 사원이 가는 쪽으로 자동으로 끌려가게 하자.」
+//
+//   · 금 목줄(closet.js D.LEASH · 여성 체형 · 상담사 + Owner 만 찬다)을 찬 남을 누르면 [ 끌고가기 ]
+//   · 누르면 그 사람 화면에 [ 동의 ] · [ 거절 ] — 동의하면 끄는 사람이 가는 대로 따라간다 (한 걸음 뒤 · LS_GAP)
+//     방을 옮기면 같은 방 같은 번호로 따라 들어간다. 끌려가는 동안은 제 손으로 못 움직인다.
+//   · 끄는 사람은 [ 놓아주기 ] · 끌려가는 사람은 화면의 [ 🪢 목줄 풀기 ] 로 언제든 푼다.
+//     끄는 사람이 광장을 나가거나 소식이 끊기면(LS_STALE) 저절로 풀린다. LS_WAIT 안에 답이 없으면 없던 일로.
+//
+//   plazaLeash/<끌려가는 사람 사번> = { id, by, bn, at, st: 'ask' | 'ok' | 'no', L: { room, inst, x, y, f, at } }
+//     L — 끄는 사람이 제 자리를 적는다 (바뀔 때마다 · 가만히 있어도 LS_BEAT 마다)
+const LS_PATH = 'plazaLeash';
+const LS_ITEM = ['leash', '🪢 끌고가기'], LS_OFF = ['unleash', '🪢 놓아주기'];
+const LS_WAIT = 20000, LS_STALE = 20000, LS_BEAT = 4000, LS_GAP = 64, LS_ROOM_GAP = 2500;
+const LS = { lead: null, led: null };            // lead — 내가 끄는 것 { code, id, ref, cb, sent, sentAt } · led — 내가 끌려가는 것 { by, bn, id, L, goAt }
+function lsPeerWears(code) {
+    const q = run && run.peers && run.peers[code];
+    return !!(q && q.one && !q.one.wf && q.one.actor && typeof q.one.actor.leashed === 'function' && q.one.actor.leashed());
+}
+function lsMeWears() {
+    try { const L = window.dotLook(u_()); return !!(L && L.layers && L.layers.indexOf('gold-leash') >= 0); } catch (e) { return false; }
+}
+// 메뉴에 넣을 것 — 남이고 · 금 목줄을 찼고 · 내가 끌고 있으면 [ 놓아주기 ], 아니면 (다른 사람을 끌고 있지 않을 때) [ 끌고가기 ]
+function lsItem(code) {
+    if (!run || !code || code === myCode()) return [];
+    if (LS.lead && LS.lead.code === code) return [LS_OFF];
+    if (LS.lead || !lsPeerWears(code)) return [];
+    return [LS_ITEM];
+}
+function lsLeadStop(quiet) {
+    const L = LS.lead;
+    if (!L) return;
+    LS.lead = null;
+    try { L.ref.off('value', L.cb); } catch (e) { }
+    clearTimeout(L.to);
+    if (!quiet) sysLine('🪢 ' + nameIn(L.code) + ' 사원의 목줄을 놓았습니다.');
+}
+function lsAsk(code) {
+    closeCarryMenu();
+    const me = u_(), d = db_();
+    if (!me || !d || !run || !lsItem(code).length || LS.lead) return;
+    const id = me.code + ':' + now();
+    const ref = d.ref(LS_PATH + '/' + code);
+    ref.set({ id: id, by: me.code, bn: nameOf(me), at: chatNow(), st: 'ask' });
+    sysLine('🪢 ' + nameIn(code) + ' 사원에게 끌고가도 되는지 물었습니다.');
+    const L = { code: code, id: id, ref: ref, cb: null, to: 0, sent: '', sentAt: 0, on: false };
+    L.cb = function (snap) {
+        const v = snap.val();
+        if (LS.lead !== L) return;
+        if (!v || v.id !== id) { const was = L.on; lsLeadStop(true); if (was) sysLine('🪢 ' + nameIn(code) + ' 사원이 목줄을 풀었습니다.'); return; }
+        if (v.st === 'no') { lsLeadStop(true); try { ref.transaction(function (cur) { return (cur && cur.id === id) ? null : undefined; }); } catch (e) { } sysLine('🪢 ' + nameIn(code) + ' 사원이 거절했습니다.'); return; }
+        if (v.st === 'ok' && !L.on) {
+            L.on = true; clearTimeout(L.to);
+            sysLine('🪢 ' + nameIn(code) + ' 사원이 동의했습니다 — 가는 대로 따라옵니다. [ 놓아주기 ] 로 풉니다.');
+            lsLeadTick(true);
+        }
+    };
+    ref.on('value', L.cb);
+    L.to = setTimeout(function () {
+        if (LS.lead !== L || L.on) return;
+        lsLeadStop(true);
+        try { ref.transaction(function (cur) { return (cur && cur.id === id && cur.st === 'ask') ? null : undefined; }); } catch (e) { }
+        sysLine('🪢 ' + nameIn(code) + ' 사원이 답하지 않았습니다.');
+    }, LS_WAIT);
+    LS.lead = L;
+}
+// 끄는 사람 — 내 자리를 적는다 (바뀌었거나 LS_BEAT 가 지났으면)
+function lsLeadTick(force) {
+    const L = LS.lead;
+    if (!L || !L.on) return;
+    if (!run) { lsRelease(L.code, true); return; }
+    const t = now();
+    const pos = { room: run.room, inst: run.inst || 1, x: Math.round(run.x), y: Math.round(run.y), f: (run.me && run.me.actor) ? run.me.actor.facing() : 1 };
+    const key = JSON.stringify(pos);
+    if (!force && key === L.sent && t - L.sentAt < LS_BEAT) return;
+    L.sent = key; L.sentAt = t;
+    pos.at = chatNow();
+    try { L.ref.child('L').set(pos); } catch (e) { }
+}
+function lsRelease(code, quiet) {
+    closeCarryMenu();
+    const L = LS.lead;
+    if (!L || L.code !== code) return;
+    const id = L.id, ref = L.ref;
+    lsLeadStop(quiet);
+    try { ref.transaction(function (cur) { return (cur && cur.id === id) ? null : undefined; }); } catch (e) { }
+}
+// ── 끌려가는 쪽 — 묻는 것이 오면 [ 동의 ] · [ 거절 ] · 동의한 뒤에는 L 을 따라간다
+(function lsListen() {
+    let on = false;
+    const iv = setInterval(function () {
+        const me = u_();
+        if (on || typeof database === 'undefined' || !database || !me) return;
+        on = true;
+        clearInterval(iv);
+        let first = true, seen = null;
+        database.ref(LS_PATH + '/' + me.code).on('value', function (snap) {
+            const v = snap.val();
+            if (first) { first = false; seen = (v && v.id) || null; if (v && v.st === 'ok') { try { snap.ref.remove(); } catch (e) { } } return; }   // 들어오기 전 것은 안 잇는다
+            if (!v || !v.id) { if (LS.led) lsLedStop('🪢 목줄이 풀렸습니다.'); return; }
+            if (LS.led && LS.led.id === v.id) { LS.led.L = v.L || LS.led.L; return; }
+            if (v.st === 'ask' && v.id !== seen) {
+                seen = v.id;
+                if (chatNow() - (Number(v.at) || 0) > LS_WAIT) return;
+                lsShow(v, snap.ref);
+                return;
+            }
+            if (v.st === 'ok' && !LS.led && v.by) {         // 내가 동의한 것 — 따라가기 시작
+                LS.led = { by: v.by, bn: v.bn || '', id: v.id, L: v.L || null, goAt: 0 };
+                lsLedUi(true);
+                try { wake(); } catch (e) { }
+            }
+        });
+    }, 1000);
+})();
+function lsShow(v, ref) {
+    const answer = function (a) {
+        ref.transaction(function (cur) {
+            if (!cur || cur.id !== v.id || cur.st !== 'ask') return;
+            return Object.assign({}, cur, { st: a });
+        });
+    };
+    if (!run || !lsMeWears()) { answer('no'); return; }       // 광장에 없거나 목줄을 안 찼으면 거절
+    const s = sheet('leash', '🪢 끌고가기', '<div class="plaza-pzlock">'
+        + '<div class="pl-t">' + esc(v.bn || '누군가') + ' 사원이 끌고가려고 합니다. 동의합니까?<br>'
+        + '동의하면 그 사원이 가는 대로 따라가고, 그동안 제 손으로는 움직일 수 없습니다. 화면의 [ 🪢 목줄 풀기 ] 로 언제든 풉니다.</div>'
+        + '<button data-a="ok">동의</button><button data-a="no">거절</button></div>');
+    if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('button[data-a]'), function (b) {
+        b.onclick = function () {
+            answer(b.dataset.a);
+            closeSheet();
+            if (b.dataset.a === 'ok') sysLine('🪢 동의했습니다 — ' + (v.bn || '그 사원') + ' 사원이 가는 대로 따라갑니다.');
+        };
+    });
+    setTimeout(function () { if (s.isConnected) closeSheet(); }, LS_WAIT);
+}
+function lsLedActive() { return !!(LS.led && run); }
+function lsLedStop(msg) {
+    if (!LS.led) return;
+    LS.led = null;
+    lsLedUi(false);
+    if (run) { run.tx = null; run.ty = null; run.tseg = null; }
+    if (msg) sysLine(msg);
+}
+// 끌려가는 사람이 푼다 — 적힌 것을 지우면 끄는 사람도 듣는다
+function lsLedQuit() {
+    const me = u_(), d = db_();
+    const L = LS.led;
+    if (!L) return;
+    lsLedStop('🪢 목줄을 풀었습니다.');
+    if (!me || !d) return;
+    try { d.ref(LS_PATH + '/' + me.code).transaction(function (cur) { return (cur && cur.id === L.id) ? null : undefined; }); } catch (e) { }
+}
+// 화면의 [ 🪢 목줄 풀기 ]
+function lsLedUi(on) {
+    let b = document.getElementById('plaza-leash-off');
+    if (!on) { if (b) b.remove(); return; }
+    if (b) return;
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return;
+    b = document.createElement('button');
+    b.id = 'plaza-leash-off';
+    b.textContent = '🪢 목줄 풀기';
+    b.style.cssText = 'position:absolute;left:50%;top:62px;transform:translateX(-50%);z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #c9a24a;background:rgba(40,30,10,.85);color:#ffe6a8;font-size:12px;font-weight:bold;';
+    b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    b.onclick = function () { lsLedQuit(); };
+    ov.appendChild(b);
+}
+// 걸음 틀마다 — 끄는 사람 뒤 한 걸음 자리로 걷는다 · 방이 다르면 그 방으로
+function lsFollowStep() {
+    const D0 = LS.led;
+    if (!D0 || !run) return;
+    const L = D0.L;
+    const t = now();
+    if (!lsMeWears()) { lsLedQuit(); return; }                                         // 목줄을 벗었다
+    if (!L) return;
+    if (chatNow() - (Number(L.at) || 0) > LS_STALE) { lsLedStop('🪢 ' + (D0.bn || '그 사원') + ' 사원의 소식이 끊겨 목줄이 풀렸습니다.'); return; }
+    if (L.room !== run.room || (L.inst || 1) !== (run.inst || 1)) {
+        if (!R[L.room] || cageMine()) return;
+        if (t - (D0.goAt || 0) < LS_ROOM_GAP) return;
+        D0.goAt = t;
+        run.tx = null; run.ty = null; run.tseg = null;
+        if (L.room !== run.room) {
+            sysLine('🪢 ' + (D0.bn || '그 사원') + ' 사원에게 끌려 ' + R[L.room].n + '(으)로 갑니다.');
+            run.forceInst = L.inst || 0;
+            goRoom(L.room, null, 0);
+        } else hopInst(L.inst || 1);
+        return;
+    }
+    const r = roomOf();
+    // 뒤 — 그림은 왼쪽을 보는 것이 기본(f 1)이고 f < 0 이면 뒤집어 오른쪽을 본다. 보는 쪽의 반대편 한 걸음에 선다
+    const gx = Math.max(P.EDGE + P.INSET, Math.min(r.w - P.EDGE - P.INSET, L.x + (L.f < 0 ? -1 : 1) * LS_GAP));
+    const dx = gx - run.x, dy = L.y - run.y;
+    if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) { if (run.tx != null) { run.tx = null; run.ty = null; run.tseg = null; } return; }
+    if (run.tx == null || Math.abs(run.tx - gx) > 3 || Math.abs((run.ty == null ? run.y : run.ty) - L.y) > 3) walkTo(gx, L.y);
+}
+setInterval(function () { try { lsLeadTick(false); } catch (e) { } }, 250);
+
+// ==========================================
 // 벗기기 (2026-11-08 사용자)
 // ==========================================
 //
@@ -3446,6 +3649,7 @@ function carryTap(cx, cy) {
         msItem(big).forEach(function (x) { items.push(x); });
         stItem(big).forEach(function (x) { items.push(x); });
         pkItem(big).forEach(function (x) { items.push(x); });
+        lsItem(big).forEach(function (x) { items.push(x); });          // 🪢 끌고가기 · 놓아주기
         items.push(INFO_ITEM);
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
@@ -3454,6 +3658,8 @@ function carryTap(cx, cy) {
             if (k === 'massage') { askPick('ms', big); return; }
             if (k === 'strip') { stDo(big); return; }
             if (k === 'peel') { pkDo(big); return; }
+            if (k === 'leash') { lsAsk(big); return; }
+            if (k === 'unleash') { lsRelease(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
             if (k === 'rps') { closeCarryMenu(); rpsStart(me, big); return; }
             climbDo(big, k);
@@ -3466,12 +3672,14 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), lsItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { askPick('tk', any); return; }
             if (k === 'massage') { askPick('ms', any); return; }
             if (k === 'strip') { stDo(any); return; }
             if (k === 'peel') { pkDo(any); return; }
+            if (k === 'leash') { lsAsk(any); return; }               // 🪢 끌고가기
+            if (k === 'unleash') { lsRelease(any); return; }
             infoOpen(any);
         }, '');
     }
@@ -3484,11 +3692,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), msItem(pick), stItem(pick), pkItem(pick), lsItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } if (k === 'leash') { lsAsk(pick); return; } if (k === 'unleash') { lsRelease(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(msItem(pick), stItem(pick), pkItem(pick), lsItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } if (k === 'leash') { lsAsk(pick); return; } if (k === 'unleash') { lsRelease(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -3505,6 +3713,7 @@ function carryTap(cx, cy) {
     msItem(pick).forEach(function (x) { items.push(x); });
     stItem(pick).forEach(function (x) { items.push(x); });
     pkItem(pick).forEach(function (x) { items.push(x); });
+    lsItem(pick).forEach(function (x) { items.push(x); });         // 🪢 끌고가기 · 놓아주기
     items.push(INFO_ITEM);
     return openMenu(cx, cy, nameIn(pick), items, function (k) {
         if (k === 'info') { infoOpen(pick); return; }
@@ -3514,6 +3723,8 @@ function carryTap(cx, cy) {
         if (k === 'massage') { askPick('ms', pick); return; }
         if (k === 'strip') { stDo(pick); return; }
         if (k === 'peel') { pkDo(pick); return; }
+        if (k === 'leash') { lsAsk(pick); return; }
+        if (k === 'unleash') { lsRelease(pick); return; }
         carryDo(pick, k);
     }, potion ? '🫙 ' : null);
 }
@@ -4460,6 +4671,8 @@ function tick(ts) {
     if (hsCall('frozen')) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; }
     // 💌 허락해 준 쑤시기 · 마사지를 받는 동안은 못 움직인다 (끝나거나 · 아무도 안 눌러 풀리면 다시 움직인다 · 2026-11-08)
     if (askLocked()) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; run.ax = 0; run.ay = 0; }
+    // 🪢 금 목줄에 끌려가는 동안은 제 손으로 못 움직인다 — 끄는 사람 뒤 한 걸음 자리로 걷는다 (2026-11-08)
+    if (lsLedActive()) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; lsFollowStep(); }
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();
