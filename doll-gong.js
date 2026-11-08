@@ -358,6 +358,18 @@ function shopUi() {
             ['봉제인형 용품 — 💤 꿈결', ['🎀 포옹 리본', '🧶 솜뭉치 간식']],
             ['수선 재료 — 포인트', ['🍶 청주', '🥣 메밀묵']]
         ];
+        // ★ 먹이 — 사택에서 팔던 다섯 가지를 여기로 (2026-11-08 사용자 「이름만 바꿔 잡화점으로 · 옛 펫 외형 쓰는 사람은 사택에 그대로」)
+        //   포인트로 · 한 번에 하나 · pet-food.js 주머니(u.petFood)에 든다 — 인형 돌보기 · 일괄 먹이에서 쓴다
+        const PF = window.PETFOOD;
+        const foodRows = function () {
+            if (!PF) return '';
+            return '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">먹이 — 포인트 <span style="color:#8f84b5;font-weight:normal">(포만도를 채운다 · 사흘이 100)</span></div>' + PF.LIST.map(function (f) {
+                const can = (Number(u.points) || 0) >= f.p;
+                const eff = (f.fill == null || f.fill >= 1 ? '포만도 가득' : '포만도 +' + Math.round(f.fill * 100)) + (f.cut < 0 ? ' · 쉬는 시간 전부' : f.cut ? ' · 쉬는 시간 ' + Math.round(f.cut / 60000) + '분' : '') + (f.up ? ' · 다음 탐사 +' + Math.round(f.up * 100) + '%' : '') + (f.bond === false ? ' · 교감 없음' : ' · 교감');
+                return '<div class="gb-row"><div class="tx"><b>' + esc(PF.name(f.n, u)) + '</b> <span style="font-size:10px;color:#8f84b5">· 가진 것 ' + PF.have(f.n, u) + '</span><div>' + esc(eff) + '</div><div>' + esc(PF.desc ? PF.desc(f.n, u) : '') + '</div><div>' + fmtN(f.p) + ' P</div></div>'
+                    + '<button class="gb-btn pri" data-food="' + esc(f.n) + '">산다</button></div>';
+            }).join('');
+        };
         const paint = function () {
             const html = '<h3>🧺 잡화점</h3><div class="sub">가진 것 — 💤 꿈결 <b style="color:#c9a8ff">' + fmtN(dream(u)) + ' D</b> · 포인트 <b style="color:#ffcf8f">' + fmtN(u.points) + ' P</b><br>꿈결과 포인트는 서로 대신할 수 없습니다.</div>'
                 + groups.map(function (g) {
@@ -369,6 +381,7 @@ function shopUi() {
                             + '<button class="gb-btn pri" data-buy="' + esc(k) + '">산다</button></div>';
                     }).join('');
                 }).join('')
+                + foodRows()
                 // ★ 망상 홈쇼핑에 있던 것 전부 — 치료 · 환몽알 · 돌봄 · 속성 룬 · 장비 · 방석 (#shop-dream 칸을 이 아래에 들인다 · 2026-11-07)
                 + '<div style="font-size:10.5px;color:#ffcf8f;margin:14px 0 4px">🩹 치료 · 🥚 환몽알 · 돌봄 · 💠 속성 룬 · ⚙ 장비 · 🏠 방석</div><div class="gb-host"></div>'
                 + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
@@ -377,7 +390,21 @@ function shopUi() {
             dreamPut(dim.querySelector('.gb-host'));
             Array.prototype.forEach.call(dim.querySelectorAll('[data-q]'), function (b) { b.onclick = function () { const k = b.dataset.q; qty[k] = Math.max(1, Math.min(99, qty[k] + Number(b.dataset.d))); paint(); }; });
             Array.prototype.forEach.call(dim.querySelectorAll('[data-buy]'), function (b) { b.onclick = function () { buy(b.dataset.buy); }; });
+            Array.prototype.forEach.call(dim.querySelectorAll('[data-food]'), function (b) { b.onclick = function () { buyFood(b.dataset.food); }; });
             dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+        };
+        // 먹이 — 포인트로 하나 (pet-food.js petFoodBuy 와 같은 셈 · 기록만 잡화점으로)
+        const buyFood = function (k) {
+            if (busy || !PF) return;
+            const f = PF.BY[k]; if (!f) return;
+            try { if (typeof isQuarantined === 'function' && isQuarantined(u)) { alert_('격리 중에는 살 수 없습니다.'); return; } } catch (e) { }
+            if ((Number(u.points) || 0) < f.p) { out = 'poor'; dim._close(); return; }
+            u.points = (Number(u.points) || 0) - f.p;
+            PF.add(f.n, 1);
+            M.log('[👺 잡화점] ' + PF.name(f.n, u) + ' (-' + fmtN(f.p) + ' P)', u);
+            try { if (typeof saveFields === 'function') saveFields({ points: 1, history: 1 }); } catch (e) { }
+            try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+            out = 'ok'; paint();
         };
         let busy = false;
         const buy = function (k) {
@@ -715,7 +742,7 @@ function feedAll() {
     const hungry = ids.filter(function (id) { return fullOf(ds[id]) < 100; })
         .sort(function (a, b) { return fullOf(ds[a]) - fullOf(ds[b]); });
     const PF = window.PETFOOD;      // pet-food.js — LIST · have · feed (창 없이 한 마리)
-    const foods = (PF ? PF.LIST.map(function (f) { return { n: f.n, fill: f.fill == null ? 1 : f.fill, bond: f.bond !== false, cut: f.cut, up: f.up, have: PF.have(f.n, u) }; }) : []).filter(function (f) { return f.have > 0; });
+    const foods = (PF ? PF.LIST.map(function (f) { return { n: f.n, shown: PF.name ? PF.name(f.n, u) : f.n, fill: f.fill == null ? 1 : f.fill, bond: f.bond !== false, cut: f.cut, up: f.up, have: PF.have(f.n, u) }; }) : []).filter(function (f) { return f.have > 0; });
     const snack = M.bagHas(M.ITEM.SNACK, u);
     const row = function (k, n, have, eff) {
         return '<button class="gb-btn" data-f="' + esc(k) + '" style="display:flex;justify-content:space-between;align-items:center;width:100%;margin:0 0 5px;text-align:left"' + (hungry.length ? '' : ' disabled') + '>'
@@ -723,10 +750,10 @@ function feedAll() {
     };
     let list = foods.map(function (f) {
         const eff = (f.fill >= 1 ? '포만도 가득' : '포만도 +' + Math.round(f.fill * 100)) + (f.bond ? ' · 교감' : '') + (f.cut < 0 ? ' · 쉬는 시간 전부' : f.cut ? ' · 쉬는 시간 -' + Math.round(f.cut / 60000) + '분' : '') + (f.up ? ' · 다음 탐사 +' + Math.round(f.up * 100) + '%' : '');
-        return row(f.n, f.n, f.have, eff);
+        return row(f.n, f.shown, f.have, eff);
     }).join('');
     if (snack > 0) list += row(M.ITEM.SNACK, M.ITEM.SNACK, snack, '포만도 가득 · 교감');
-    if (!list) list = '<div class="sub">가진 먹이가 없습니다 — 먹이는 사택에서, 🧶 솜뭉치 간식은 잡화점에서 삽니다.</div>';
+    if (!list) list = '<div class="sub">가진 먹이가 없습니다 — ' + ((PF && PF.oldArt && PF.oldArt(u)) ? '먹이는 사택에서, 🧶 솜뭉치 간식은 잡화점에서' : '먹이도 🧶 솜뭉치 간식도 잡화점에서') + ' 삽니다.</div>';
     const html = '<h3>① 일괄 먹이 주기</h3>'
         + '<div class="sub">배고픈 인형 ' + hungry.length + '마리 <span style="color:#8f84b5">(포만도 100 미만 · 전체 ' + ids.length + '마리)</span><br>'
         + '고른 먹이를 배고픈 인형부터 한 마리에 하나씩, 가진 만큼 줍니다. 인형 돌보기에서 주는 것과 같습니다.</div>'
@@ -741,7 +768,7 @@ function feedAll() {
             const have = (name === M.ITEM.SNACK) ? M.bagHas(M.ITEM.SNACK, u) : (PF ? PF.have(name, u) : 0);
             const n = Math.min(have, hungry.length);
             if (!n) return;
-            if (!confirm(name + ' ' + n + '개 — 배고픈 인형 ' + n + '마리에게 줄까요?' + (hungry.length > n ? '\n(' + (hungry.length - n) + '마리는 모자라 못 받습니다)' : ''))) return;
+            if (!confirm(((name !== M.ITEM.SNACK && PF && PF.name) ? PF.name(name, u) : name) + ' ' + n + '개 — 배고픈 인형 ' + n + '마리에게 줄까요?' + (hungry.length > n ? '\n(' + (hungry.length - n) + '마리는 모자라 못 받습니다)' : ''))) return;
             let fed = [], miss = [];
             if (name === M.ITEM.SNACK) {
                 const r = M.feed(hungry, u); fed = r.fed; if (r.short) miss.push(r.short + '마리는 간식이 모자라 못 받았습니다');
@@ -754,8 +781,9 @@ function feedAll() {
                 if (hungry.length > fed.length + miss.length) miss.push((hungry.length - fed.length - miss.length) + '마리는 먹이가 모자라 못 받았습니다');
             }
             dim._close();
-            alert_(name + ' — ' + fed.length + '마리에게 먹이를 주었습니다.' + (miss.length ? '\n' + miss.slice(0, 6).join('\n') : '') + '\n\n먹이를 받은 인형은 7일 동안 달아나지 않습니다.');
-            M.log('[🧸 보관소] 일괄 먹이 — ' + name + ' · ' + fed.length + '마리', u); M.saveHist();
+            const shown = (name !== M.ITEM.SNACK && PF && PF.name) ? PF.name(name, u) : name;
+            alert_(shown + ' — ' + fed.length + '마리에게 먹이를 주었습니다.' + (miss.length ? '\n' + miss.slice(0, 6).join('\n') : '') + '\n\n먹이를 받은 인형은 7일 동안 달아나지 않습니다.');
+            M.log('[🧸 보관소] 일괄 먹이 — ' + shown + ' · ' + fed.length + '마리', u); M.saveHist();
             boxPaint();
         };
     });
@@ -1162,7 +1190,7 @@ async function nap(S) {
 window.DOLLGONG = {
     sew: sew, shop: shop, trade: trade, box: box, dex: dex, mask: mask, nap: nap,
     repaint: function () { try { if (BX.a) boxPaint(); } catch (e) { } try { if (TR.dim) tradePaint(); } catch (e) { } },
-    boxOpen: boxOpen, boxClose: boxClose, panel: panel, icon: icon, dollLine: dollLine, css: css, prefetch: prefetch, stateCtx: stateCtx
+    boxOpen: boxOpen, boxClose: boxClose, shopUi: shopUi, panel: panel, icon: icon, dollLine: dollLine, css: css, prefetch: prefetch, stateCtx: stateCtx
 };
 window.dollBoxOpen = boxOpen;
 

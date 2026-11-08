@@ -473,7 +473,7 @@ window.petBondOpen = function (id) {
                 return '<button class="game-btn pb-food" data-n="' + esc(f.n) + '"'
                     + (out ? ' disabled' : '')
                     + ' style="' + BTN + ' text-align:left;' + (out ? ' opacity:.45;' : '') + '">'
-                    + esc(f.n) + '<span style="font-size:10px; color:#888; font-weight:normal;'
+                    + esc(F.name ? F.name(f.n, u) : f.n) + '<span style="font-size:10px; color:#888; font-weight:normal;'
                     + ' margin-left:6px;">×' + F.have(f.n, u) + '</span>'
                     + '<span style="font-size:9.5px; color:#8bc34a; font-weight:normal;'
                     + ' margin-left:6px;">'
@@ -482,7 +482,7 @@ window.petBondOpen = function (id) {
                     + '</span></button>';
             }).join('')
             : '<div style="font-size:10px; color:#666; padding:4px 0 8px 0;">'
-              + '가진 먹이가 없습니다. 사택에서 사 오십시오.</div>')
+              + '가진 먹이가 없습니다. ' + ((F && F.oldArt && F.oldArt(u)) ? '사택에서' : '도깨비 공방 잡화점에서') + ' 사 오십시오.</div>')
 
         + '<button id="pb-list" class="game-btn" style="' + BTN + ' margin-top:6px;">🧸 인형 목록으로</button>'
         + '<button id="pb-x" class="game-btn" style="' + BTN + GREY + '">닫는다</button>');

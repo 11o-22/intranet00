@@ -122,7 +122,7 @@ function petCard(u, key, label) {
 function stakeText(s) {
     if (!s || !s.n) return '<span style="color:#6f685e;">없음</span>';
     const kindName = { food: '먹이', care: '돌봄 물품', gear: '인형 장비', rune: '룬' }[s.k] || '';
-    return esc(s.k === 'rune' ? tagR(s.n) + ' 룬' : s.n) + (kindName ? ' <span style="color:#6f685e;">(' + kindName + ')</span>' : '');
+    return esc(s.k === 'rune' ? tagR(s.n) + ' 룬' : (s.k === 'food' && window.PETFOOD && PETFOOD.name ? PETFOOD.name(s.n) : s.n)) + (kindName ? ' <span style="color:#6f685e;">(' + kindName + ')</span>' : '');
 }
 function hpBar(label, hp, mine) {
     const v = Math.max(0, Math.min(HP, Number(hp) || 0));
@@ -358,7 +358,7 @@ function pickStake(cb, title) {
         + '<div style="max-height:46dvh; overflow-y:auto; margin-bottom:9px;">'
         + list.map(function (s, i) {
             return '<button class="game-btn bt-st" data-i="' + i + '" style="width:100%; margin:0 0 5px 0; padding:9px; font-size:11px; text-align:left; display:flex; justify-content:space-between; gap:8px;">'
-                + '<span>' + esc(s.k === 'rune' ? tagR(s.n) + ' 룬' : s.n) + '</span><span style="font-size:9.5px; color:#8d8578;">' + kindName[s.k] + ' · ' + s.c + '개</span></button>';
+                + '<span>' + esc(s.k === 'rune' ? tagR(s.n) + ' 룬' : (s.k === 'food' && window.PETFOOD && PETFOOD.name ? PETFOOD.name(s.n) : s.n)) + '</span><span style="font-size:9.5px; color:#8d8578;">' + kindName[s.k] + ' · ' + s.c + '개</span></button>';
         }).join('') + '</div>'
         + '<button id="bt-no" class="game-btn" style="' + BTN + GREY + '">그만둔다</button>');
     w.querySelector('#bt-no').onclick = shut;

@@ -366,7 +366,7 @@ window.petFeedPick = function (id) {
     const rows = F.LIST.filter(function (f) { return F.have(f.n, u) > 0; }).map(function (f) {
         return '<button class="game-btn pd-feed" data-n="' + esc(f.n) + '"'
             + ' style="width:100%; margin:0 0 6px 0; padding:10px; font-size:12px; text-align:left;">'
-            + '<span style="color:#ffcf8f; font-weight:bold;">' + esc(f.n) + '</span>'
+            + '<span style="color:#ffcf8f; font-weight:bold;">' + esc(F.name ? F.name(f.n, u) : f.n) + '</span>'
             + '<span style="font-size:10px; color:#888; margin-left:6px; font-weight:normal;">'
             + '×' + F.have(f.n, u) + '</span>'
             + '<div style="font-size:10px; color:#aaa; margin-top:3px; font-weight:normal;">'
@@ -377,7 +377,7 @@ window.petFeedPick = function (id) {
     const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold;">'
         + esc(nick) + '에게 무엇을</div>'
         + '<div style="font-size:9.5px; color:#6f685e; margin:4px 0 11px 0;">'
-        + '먹이는 사택에서 삽니다.</div>'
+        + '먹이는 ' + ((F.oldArt && F.oldArt(u)) ? '사택' : '도깨비 공방 잡화점') + '에서 삽니다.</div>'
         + (rows || '<div style="font-size:11px; color:#666; padding:14px 0; text-align:center;">'
             + '가진 먹이가 없습니다.<br>사택에서 사 오십시오.</div>')
         + '<button id="pd-x" class="game-btn" style="' + BTN + GREY + ' margin-top:5px;">닫는다</button>');
