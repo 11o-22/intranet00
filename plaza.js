@@ -1391,6 +1391,7 @@ function tkHeard(c, v) {
     if (!L) L = TKL[c] = { s: v.s, n: 0, rt: t, p2: 0, f: 0, st: t };
     L.s = v.s;
     L.rt = t;
+    if (v.lk) L.lk = 1;                                       // 허락 받고 하는 판 — 받는 사람은 못 움직인다
     if (n > L.n) L.n = n;
     if (L.n >= TK_MAX) L.p2 = t;
     tkRun();
@@ -1475,11 +1476,12 @@ function tkItem(code) {
     if (MSL[code] && !MSL[code].done) return [];          // 마사지 받는 중에는 안 뜬다 (2026-11-08)
     return [TK_ITEM];
 }
-function tkStart(code) {
+function tkStart(code, lk) {
     closeCarryMenu();
     if (!tkItem(code).length) return;
     run.tkOn = code;
     run.msOn = null;
+    run.lkOn = lk ? code : null;                              // 허락 받고 하는 것이면 받는 사람이 끝날 때까지 못 움직인다
     sysLine(nameIn(code) + ' 사원을 계속 누르세요.');
 }
 // 한 번 누름
@@ -1491,6 +1493,8 @@ function tkHit(code) {
     if (L && L.p2 && !L.done) return;                         // 7~12 가 도는 중 — 다 돌면 다시
     const fresh = !L || L.done || t - L.rt > TK_IDLE;
     if (fresh) L = TKL[code] = { s: me + ':' + t, n: 0, rt: t, p2: 0, f: 0, st: t };
+    const lk = (run.lkOn === code) ? 1 : 0;                   // 허락 받고 하는 판
+    if (lk) L.lk = 1;
     L.n = Math.min(TK_MAX, L.n + 1);
     L.rt = t; L.mine = 1; L.lt = t;
     if (L.n >= TK_MAX) L.p2 = t;
@@ -1502,10 +1506,10 @@ function tkHit(code) {
         const cn = ok ? (Number(cur.n) || 0) : 0;
         if (ok && cur.s === s) {
             if (cn >= TK_MAX) return;                          // 이미 다 셌다
-            return { s: s, n: Math.min(TK_MAX, cn + 1), t: t, by: me };
+            return { s: s, n: Math.min(TK_MAX, cn + 1), t: t, by: me, lk: (cur.lk || lk) ? 1 : 0 };
         }
-        if (ok && !fresh && cn < TK_MAX) return { s: cur.s, n: cn + 1, t: t, by: me };   // 그사이 남이 연 판 — 거기에 보탠다
-        return { s: s, n: n0, t: t, by: me };                  // 새 판 (묵은 것은 덮는다)
+        if (ok && !fresh && cn < TK_MAX) return { s: cur.s, n: cn + 1, t: t, by: me, lk: (cur.lk || lk) ? 1 : 0 };   // 그사이 남이 연 판 — 거기에 보탠다
+        return { s: s, n: n0, t: t, by: me, lk: lk };          // 새 판 (묵은 것은 덮는다)
     });
 }
 
@@ -1577,6 +1581,7 @@ function msHeard(c, v) {
     if (!L) L = MSL[c] = msNew(c, v.s, t);
     L.s = v.s;
     L.rt = t;
+    if (v.lk) L.lk = 1;                                       // 허락 받고 하는 판 — 받는 사람은 못 움직인다
     if (n > L.n) L.n = n;
     if (L.n >= MS_N && !L.p2) L.p2 = t;
     msRun();
@@ -1601,7 +1606,7 @@ function msTick() {
         const L = MSL[c];
         if (!L || L.done) return;
         // 받는 사람이 움직이면 풀린다 — 받는 사람 화면이 정한다
-        if (run && c === myCode() && L.x0 != null && Math.hypot(run.x - L.x0, run.y - L.y0) > MS_MOVE) {
+        if (run && c === myCode() && !L.lk && L.x0 != null && Math.hypot(run.x - L.x0, run.y - L.y0) > MS_MOVE) {
             msPaint(c, null);
             msDel(c, L.s, null);
             delete MSL[c];
@@ -1646,17 +1651,18 @@ function msDel(code, s, lt) {
 }
 // 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니고 · 쑤시는 중이 아니면
 function msItem(code) {
-    if (!run || !code || code === myCode()) return [];
+    if (!run || !code || code === myCode() || !cpOk(code)) return [];   // 커플이면 짝끼리 (2026-11-08)
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.massages) return [];
     if (TKL[code] && !TKL[code].done) return [];
     return [MS_ITEM];
 }
-function msStart(code) {
+function msStart(code, lk) {
     closeCarryMenu();
     if (!msItem(code).length) return;
     run.msOn = code;
     run.tkOn = null;
+    run.lkOn = lk ? code : null;                              // 허락 받고 하는 것이면 받는 사람이 끝날 때까지 못 움직인다
     sysLine(nameIn(code) + ' 사원을 계속 누르세요.');
 }
 // 한 번 누름 — 5~12 때도 눌러야 이어진다
@@ -1667,6 +1673,8 @@ function msHit(code) {
     let L = MSL[code];
     const fresh = !L || L.done || t - L.rt > MS_IDLE;
     if (fresh) L = MSL[code] = msNew(code, me + ':' + t, t);
+    const lk = (run.lkOn === code) ? 1 : 0;                   // 허락 받고 하는 판
+    if (lk) L.lk = 1;
     L.n = Math.min(MS_N, L.n + 1);
     L.rt = t; L.mine = 1; L.lt = t;
     if (L.n >= MS_N && !L.p2) L.p2 = t;
@@ -1676,9 +1684,130 @@ function msHit(code) {
     database.ref(MS_PATH + '/' + code).transaction(function (cur) {
         const ok = !!(cur && typeof cur === 'object');
         const cn = ok ? (Number(cur.n) || 0) : 0;
-        if (ok && cur.s === s) return { s: s, n: Math.min(MS_N, cn + 1), t: t, by: me };
-        if (ok && !fresh) return { s: cur.s, n: Math.min(MS_N, cn + 1), t: t, by: me };   // 그사이 남이 연 판 — 거기에 보탠다
-        return { s: s, n: n0, t: t, by: me };                 // 새 판 (묵은 것은 덮는다)
+        if (ok && cur.s === s) return { s: s, n: Math.min(MS_N, cn + 1), t: t, by: me, lk: (cur.lk || lk) ? 1 : 0 };
+        if (ok && !fresh) return { s: cur.s, n: Math.min(MS_N, cn + 1), t: t, by: me, lk: (cur.lk || lk) ? 1 : 0 };   // 그사이 남이 연 판 — 거기에 보탠다
+        return { s: s, n: n0, t: t, by: me, lk: lk };         // 새 판 (묵은 것은 덮는다)
+    });
+}
+
+// ==========================================
+// 💌 허락 받기 · 그냥 하기 (2026-11-08 사용자)
+// ==========================================
+//
+//   「받는 사람이 수락을 누를 시에 하는 식으로 하자. 쑤시기도 포함해서. 대신 선택지를 눌렀을 때에 허락 받기, 그냥 하기 칸을
+//    눌러서 그냥 하기로 하면 움직일 수 있게 하고.」
+//
+//   · [ 쑤시기 ] · [ 마사지 ] 를 누르면 「허락 받기」 · 「그냥 하기」 를 고른다
+//   · 그냥 하기 — 바로 시작한다. 받는 사람은 움직일 수 있다 (마사지는 움직이면 풀린다 · 쑤시기는 그대로)
+//   · 허락 받기 — 받는 사람 화면에 [ 수락 ] · [ 거절 ] 이 뜬다. 수락하면 묻던 사람이 시작하고, 그 판(lk)이 도는 동안
+//     받는 사람은 움직이지 못한다 — 다 돌거나 · 아무도 안 눌러 풀리면(TK_IDLE · MS_IDLE) 다시 움직인다 (ASK_LOCK_MAX 가 넘어도 푼다)
+//   · ASK_WAIT 안에 답이 없으면 없던 일로
+//
+//   plazaAsk/<받는 사람 사번> = { id, by, bn, k: 'tk' | 'ms', at, ans: 'ok' | 'no' }
+const ASK_PATH = 'plazaAsk';
+const ASK_WAIT = 20000;
+const ASK_LOCK_MAX = 60000;
+let askW = null;                                         // 내가 기다리는 답 { ref, cb, to }
+function askWhat(kind) { return kind === 'ms' ? '마사지' : '쑤시기'; }
+function askPick(kind, code) {
+    closeCarryMenu();
+    if (!(kind === 'ms' ? msItem(code) : tkItem(code)).length) return;
+    const q = run && run.peers && run.peers[code];
+    const b = (q && q.one && q.one.wrap) ? q.one.wrap.getBoundingClientRect() : null;
+    const x = b ? (b.left + b.right) / 2 : window.innerWidth / 2;
+    const y = b ? b.top + b.height * 0.45 : window.innerHeight / 2;
+    return openMenu(x, y, nameIn(code) + ' · ' + askWhat(kind), [['ask', '허락 받기'], ['just', '그냥 하기']], function (k) {
+        closeCarryMenu();
+        if (k === 'ask') { askSend(kind, code); return; }
+        if (kind === 'ms') msStart(code, false); else tkStart(code, false);
+    }, '');
+}
+function askStopWait() {
+    if (!askW) return;
+    try { askW.ref.off('value', askW.cb); } catch (e) { }
+    clearTimeout(askW.to);
+    askW = null;
+}
+function askSend(kind, code) {
+    const me = u_(), d = db_();
+    if (!me || !d) return;
+    askStopWait();
+    const id = me.code + ':' + now();
+    const ref = d.ref(ASK_PATH + '/' + code);
+    const drop = function (needOpen) {
+        ref.transaction(function (cur) { if (!cur || cur.id !== id || (needOpen && cur.ans)) return; return null; });
+    };
+    ref.set({ id: id, by: me.code, bn: nameOf(me), k: kind, at: chatNow() });
+    sysLine('💌 ' + nameIn(code) + ' 사원에게 ' + askWhat(kind) + ' 허락을 구했습니다.');
+    const cb = function (snap) {
+        const v = snap.val();
+        if (!v || v.id !== id || !v.ans) return;
+        askStopWait();
+        drop(false);
+        if (!run) return;
+        if (v.ans !== 'ok') { sysLine('💌 ' + nameIn(code) + ' 사원이 거절했습니다.'); return; }
+        if (!(kind === 'ms' ? msItem(code) : tkItem(code)).length) return;
+        sysLine('💌 ' + nameIn(code) + ' 사원이 수락했습니다.');
+        if (kind === 'ms') msStart(code, true); else tkStart(code, true);
+    };
+    ref.on('value', cb);
+    askW = { ref: ref, cb: cb, to: setTimeout(function () {
+        askStopWait();
+        drop(true);
+        sysLine('💌 ' + nameIn(code) + ' 사원이 답하지 않았습니다.');
+    }, ASK_WAIT) };
+}
+// 받는 사람 — 묻는 것이 오면 [ 수락 ] · [ 거절 ]
+(function askListen() {
+    let on = false;
+    const iv = setInterval(function () {
+        const me = u_();
+        if (on || typeof database === 'undefined' || !database || !me) return;
+        on = true;
+        clearInterval(iv);
+        let first = true, seen = null;
+        database.ref(ASK_PATH + '/' + me.code).on('value', function (snap) {
+            const v = snap.val();
+            if (first) { first = false; seen = (v && v.id) || null; return; }
+            if (!v || !v.id || v.ans || v.id === seen) return;
+            seen = v.id;
+            if (chatNow() - (Number(v.at) || 0) > ASK_WAIT) return;
+            askShow(v, snap.ref);
+        });
+    }, 1000);
+})();
+function askShow(v, ref) {
+    const answer = function (a) {
+        ref.transaction(function (cur) {
+            if (!cur || cur.id !== v.id || cur.ans) return;
+            return Object.assign({}, cur, { ans: a });
+        });
+    };
+    if (!run) { answer('no'); return; }                       // 광장에 없으면 거절
+    const what = askWhat(v.k);
+    const s = sheet('ask', '💌 허락', '<div class="plaza-pzlock">'
+        + '<div class="pl-t">' + esc(v.bn || '누군가') + ' 사원이 [ ' + what + ' ] 를 해도 되는지 묻습니다.<br>'
+        + '수락하면 ' + what + '가 끝날 때까지 움직일 수 없습니다.</div>'
+        + '<button data-a="ok">수락</button><button data-a="no">거절</button></div>');
+    if (!s) return;
+    Array.prototype.forEach.call(s.querySelectorAll('button[data-a]'), function (b) {
+        b.onclick = function () {
+            answer(b.dataset.a);
+            closeSheet();
+            if (b.dataset.a === 'ok') sysLine('💌 수락했습니다 — ' + what + '가 끝날 때까지 움직일 수 없습니다.');
+        };
+    });
+    setTimeout(function () { if (s.isConnected) closeSheet(); }, ASK_WAIT);
+}
+// 나 — 허락해 준 판을 받는 중인가 (그동안 못 움직인다)
+function askLocked() {
+    const me = myCode();
+    if (!me) return false;
+    const t = now();
+    return [TKL[me], MSL[me]].some(function (L) {
+        if (!L || L.done || !L.lk) return false;
+        if (L.lk0 == null) L.lk0 = t;
+        return t - L.lk0 < ASK_LOCK_MAX;
     });
 }
 
@@ -3277,12 +3406,14 @@ function carryTap(cx, cy) {
         const tp = personAt(cx, cy);
         if (tp && tp === run.tkOn && tkItem(tp).length) { tkHit(tp); return true; }
         run.tkOn = null;
+        run.lkOn = null;
     }
     // 마사지 — [ 마사지 ] 를 누른 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다 · 2026-11-08)
     if (run.msOn) {
         const mp = personAt(cx, cy);
         if (mp && mp === run.msOn && msItem(mp).length) { msHit(mp); return true; }
         run.msOn = null;
+        run.lkOn = null;
     }
     // 까기 — 본인이 제 사람을 누르면 [ 까기 ] (깔 것을 입었을 때만 · 남이 그 자리에 겹쳐 서 있으면 남이 먼저 · 2026-11-08)
     if (!personAt(cx, cy) && meAt(cx, cy) && pkSelfOk()) {
@@ -3317,8 +3448,8 @@ function carryTap(cx, cy) {
         return openMenu(cx, cy, nameIn(big), items, function (k) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
-            if (k === 'tickle') { tkStart(big); return; }
-            if (k === 'massage') { msStart(big); return; }
+            if (k === 'tickle') { askPick('tk', big); return; }
+            if (k === 'massage') { askPick('ms', big); return; }
             if (k === 'strip') { stDo(big); return; }
             if (k === 'peel') { pkDo(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
@@ -3335,8 +3466,8 @@ function carryTap(cx, cy) {
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
         return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
-            if (k === 'tickle') { tkStart(any); return; }
-            if (k === 'massage') { msStart(any); return; }
+            if (k === 'tickle') { askPick('tk', any); return; }
+            if (k === 'massage') { askPick('ms', any); return; }
             if (k === 'strip') { stDo(any); return; }
             if (k === 'peel') { pkDo(any); return; }
             infoOpen(any);
@@ -3352,10 +3483,10 @@ function carryTap(cx, cy) {
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
             return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'massage') { msStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'massage') { msStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { askPick('tk', pick); return; } if (k === 'massage') { askPick('ms', pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -3377,8 +3508,8 @@ function carryTap(cx, cy) {
         if (k === 'info') { infoOpen(pick); return; }
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
-        if (k === 'tickle') { tkStart(pick); return; }
-        if (k === 'massage') { msStart(pick); return; }
+        if (k === 'tickle') { askPick('tk', pick); return; }
+        if (k === 'massage') { askPick('ms', pick); return; }
         if (k === 'strip') { stDo(pick); return; }
         if (k === 'peel') { pkDo(pick); return; }
         carryDo(pick, k);
@@ -4325,6 +4456,8 @@ function tick(ts) {
     if (run.ax || run.ay) { ix = run.ax; iy = run.ay; }
     // 🫣 숨바꼭질 — 셀 동안의 술래 · 잡힌 사람은 못 움직인다
     if (hsCall('frozen')) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; }
+    // 💌 허락해 준 쑤시기 · 마사지를 받는 동안은 못 움직인다 (끝나거나 · 아무도 안 눌러 풀리면 다시 움직인다 · 2026-11-08)
+    if (askLocked()) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; run.ax = 0; run.ay = 0; }
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();
