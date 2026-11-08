@@ -47,6 +47,8 @@
 //   ■ 방 (2026-11-08 사용자 「나비들이랑 같이 탐사할 수 있게 · 다른 방과 별개의 방을 둘 수 있게 — 아기 호랑이처럼」)
 //     장착자는 **구역이 차 있어도** 방을 만들 수 있다 — 다른 팀이 편성해 두었거나 탐사 중인 구역에도 「🦋 파티 모집」이 열린다.
 //     (babyfox.js 와 같은 결 — isZoneTaken 을 만드는 동안만 건너뛴다. 나비는 붙은 사람 곁에서 늘 함께 가므로 따로 고르지 않는다)
+//     ★ 2026-11-09 사용자 「나비 포함해서 솔플이 안 된대서」 — 여기서는 방을 만들 수만 있었고 혼자서는 최소 인원에 걸려 출발하지 못했다.
+//       solo-room.js 가 맡는다: 제 나비가 하나라도 살아 있으면(ownFlies) 「🦋 나비들과 함께」 솔플 — 따로 두는 방 · 혼자면 최소 인원 1 · 구역 수에 안 든다.
 //
 // ■ 적히는 자리
 //
@@ -925,6 +927,9 @@ setInterval(function () { try { finPhase(); } catch (e) { } }, 1000);
 // ==========================================
 window.BFLY = {
     wears: function () { return wears(u_()); },
+    wearsU: wears,                                                       // 아무 사원이나 (solo-room.js)
+    // 이 사람 제 나비 가운데 살아 있고 남에게 붙이지 않은 것의 수 — 「나비들과 함께」 솔플 자격 (solo-room.js · 2026-11-09)
+    ownFlies: function (u) { try { if (!u || !wears(u)) return 0; return KEYS.filter(function (k) { return alive(u, k) && !st(u, k).to; }).length; } catch (e) { return 0; } },
     flyCount: flyCount,
     // 유리한 쪽 — 즉사 기믹이 아닌 것 가운데 DC 가 가장 낮은 것 (제 속성이면 3 낮게 본다)
     fav: function (vis, attr) {

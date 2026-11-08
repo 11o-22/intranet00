@@ -9,6 +9,8 @@
 // ■ 누가
 //   🌟 칠성군  차고 있고 염정성군의 속성을 하나라도 받아 둔 사람 (u.chil.yeom) — 염정성군이 함께 간다
 //   🐺 B조     차고 있고 데려갈 늑대를 셋으로 둔 사람 (u.ebWolves = 3) — 늑대 셋과 간다
+//   🦋 환영 나비 차고 있고 제 나비가 하나라도 살아 있는 사람 (BFLY.ownFlies) — 나비들과 함께 간다
+//              (2026-11-09 사용자 「환영 나비, 나비 포함해서 솔플이 안 된대서」 — butterfly.js 는 방만 만들어 주고 최소 인원은 못 낮췄다)
 //   🫧 흔적    칭호를 달고 있는 사람 (trace.js _trace)
 //
 // ■ 무엇이
@@ -27,6 +29,7 @@
 const KINDS = {
     chil:  { ic: '🌟', n: '칠성군',  with: '염정성군과 함께' },
     eb:    { ic: '🐺', n: '정예 B조', with: '늑대 셋과 함께' },
+    bfly:  { ic: '🦋', n: '환영 나비', with: '나비들과 함께' },
     trace: { ic: '🫧', n: '흔적',    with: '흔적을 달고' }
 };
 
@@ -45,6 +48,7 @@ function soloKind(u) {
     if (!u) return null;
     try { if (typeof window.chilWears === 'function' && window.chilWears(u) && u.chil && Array.isArray(u.chil.yeom) && u.chil.yeom.length) return 'chil'; } catch (e) { }
     try { if (typeof window.ebWears === 'function' && window.ebWears(u) && Number(u.ebWolves) >= (window.EB && window.EB.WOLF_MAX || 3)) return 'eb'; } catch (e) { }
+    try { if (window.BFLY && typeof window.BFLY.ownFlies === 'function' && window.BFLY.ownFlies(u) > 0) return 'bfly'; } catch (e) { }
     try { if (typeof window._trace === 'function' && window._trace(u)) return 'trace'; } catch (e) { }
     return null;
 }
@@ -254,5 +258,5 @@ window.soloRoomState = function () {
     const all = parties();
     Object.keys(all).forEach(function (pid) { const p = all[pid]; if (isSoloRoom(p)) console.log('  따로 두는 방', pid, p.zone, p.state, '방장', p.leaderName, '·', (KINDS[p.soloRoom.kind] || {}).n, '· 인원', members(p).length); });
 };
-console.log('[솔플] 따로 두는 방 — 🌟 칠성군(염정) · 🐺 B조(늑대 셋) · 🫧 흔적');
+console.log('[솔플] 따로 두는 방 — 🌟 칠성군(염정) · 🐺 B조(늑대 셋) · 🦋 환영 나비(나비들) · 🫧 흔적');
 })();
