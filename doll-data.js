@@ -63,6 +63,19 @@ function effOf(a, d) {
     if (BEATS[d] === a) return 0.75;
     return 1;
 }
+// ★ 속성은 인형마다 — 같은 종이라도 한 마리씩 다르다 (2026-11-08 사용자 「인형들마다 고정하지 말고 같은 인형인데도 랜덤으로 다 다른 속성」)
+//   · 잡을 때(야생이 들고 나온 속성) · 알에서 깨어날 때 · 받을 때 — 인형 기록(pets/<id>/att)에 적힌다
+//   · 적힌 것이 없는 인형(예전 것)은 열쇠·시각으로 늘 같은 값을 뽑고(attOf), attFix 가 한 번 적어 둔다
+//   · 종의 w(주의 문구 · 알 묶음)는 그대로 — 먹이·알 쪽에서 쓴다
+const ATTR_KEYS = Object.keys(ATTR);
+function randAtt() { return ATTR_KEYS[Math.floor(Math.random() * ATTR_KEYS.length)]; }
+function attOf(d) {
+    if (d && ATTR[d.att]) return d.att;
+    const key = String((d && d.id) || '') + ':' + String((d && d.at) || 0) + ':' + String((d && d.sp) || '');
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return ATTR_KEYS[h % ATTR_KEYS.length];
+}
 
 // 주머니 물건
 const ITEM = {
@@ -194,7 +207,7 @@ function stats(d, u) {
               def: Math.round((2 + lv * 0.5 + gi * 2 + n('resist') * 1.5) * 10) / 10, eva: Math.min(60, 5 + n('eva') * 3),
               crit: Math.min(60, Math.round(5 + luck * 8)), lv: lv, gi: gi };
     }
-    return { max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, lv: s.lv, gi: s.gi, g: GRADES[s.gi] || 'D', att: sp.w || 'wet' };
+    return { max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, lv: s.lv, gi: s.gi, g: GRADES[s.gi] || 'D', att: attOf(d) };
 }
 function gOf(d) { return stats(d).g; }
 // ★ 등급마다 레벨 상한 — D 10 · C 20 · B 30 · A 40 · S 50 (pet-gear.js LV_CAP)
@@ -389,7 +402,8 @@ function addDoll(o, u) {
     const sp = P().sp(o.sp) || 1;
     const id = P().newKey(sp, u);
     const t = now();
-    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(lvMax(gradeIdx(o.g || 'D')), Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t };
+    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(lvMax(gradeIdx(o.g || 'D')), Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t,
+                att: ATTR[o.att] ? o.att : randAtt() };          // ★ 속성 — 야생이 들고 온 것 · 없으면 아무거나 (인형마다)
     if (o.nick) d.nick = String(o.nick).slice(0, 12);
     P().pets(u)[id] = d;
     const s = stats(Object.assign({ id: id, sp: sp }, d), u);
@@ -514,6 +528,20 @@ function gradeCut() {
     }
 }
 setInterval(function () { try { gradeCut(); } catch (e) { } }, 4000);
+// ★ 속성이 안 적힌 인형(예전 것 · 알 · 받은 것)에 한 번 적어 둔다 — attOf 가 뽑는 값 그대로라 보이던 것과 같다 (2026-11-08)
+function attFix() {
+    const u = u_();
+    if (!u || !u.code || !u.dollMig) return;
+    const ds = dolls(u), p = {};
+    let n = 0;
+    Object.keys(ds).forEach(function (id) {
+        const d = ds[id];
+        if (!d || ATTR[d.att]) return;
+        d.att = attOf(d); p['pets/' + id + '/att'] = d.att; n++;
+    });
+    if (n) put(p, u);
+}
+setInterval(function () { try { attFix(); } catch (e) { } }, 5000);
 setInterval(function () { try { sweep(); } catch (e) { } }, 60 * 1000);
 setTimeout(function () { try { sweep(); } catch (e) { } }, 15000);
 
@@ -639,7 +667,7 @@ window.dollBagGive = function (name, n) {
 window.DOLL = {
     PARTY_MAX: PARTY_MAX, BOX_N: BOX_N, BOX_SIZE: BOX_SIZE, BOX_MAX: BOX_MAX, ESCAPE_MS: ESCAPE_MS, LV_MAX: LV_MAX,
     GRADES: GRADES, ATTR: ATTR, BEATS: BEATS, ITEM: ITEM, ITEM_DESC: ITEM_DESC, MON: MON, MON_BY: MON_BY,
-    eff: effOf, me: u_, now: now, today: today, esc: esc, alert: alert_, log: log_, josa: josa, isAdmin: isAdmin,
+    eff: effOf, attOf: attOf, randAtt: randAtt, me: u_, now: now, today: today, esc: esc, alert: alert_, log: log_, josa: josa, isAdmin: isAdmin,
     spOf: spOf, spName: spName, objOf: objOf,
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,

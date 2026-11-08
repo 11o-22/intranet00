@@ -158,7 +158,8 @@ function wildFoe(o) {
     const lv = o.lv || (o.tut ? 1 : 1 + Math.floor(Math.random() * 3));
     const fake = { sp: sp, g: g, lv: lv };
     const s = M.stats(fake);
-    return { wild: 1, sp: sp, g: g, lv: lv, name: M.spName(sp), att: s.att, hp: s.max, max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(sp), old: M.artOld(u) };   // 🎨 옛 펫 외형을 켠 사원에게는 야생도 옛 그림
+    const att = o.att || (M.randAtt ? M.randAtt() : s.att);      // ★ 속성은 한 마리씩 아무거나 — 잡으면 그대로 따라온다 (2026-11-08)
+    return { wild: 1, sp: sp, g: g, lv: lv, name: M.spName(sp), att: att, hp: s.max, max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, sk: skills(sp), old: M.artOld(u) };   // 🎨 옛 펫 외형을 켠 사원에게는 야생도 옛 그림
 }
 function monFoe(i) {
     const m = D().MON_BY[i];
@@ -971,7 +972,7 @@ async function throwRibbon() {
     await sleep(500);
     sit.remove();
     B.wrapped = true;
-    const r = M.addDoll({ sp: f.sp, g: f.g, lv: f.lv, hp: Math.max(1, Math.round(f.hp)) }, u);
+    const r = M.addDoll({ sp: f.sp, g: f.g, lv: f.lv, hp: Math.max(1, Math.round(f.hp)), att: f.att }, u);
     if (!r) {
         await say('보관함이 가득 차 있다! ' + f.name + D().josa(f.name, '이') + ' 리본을 풀고 달아났다……', 1800);
         return finish({ res: 'full' });

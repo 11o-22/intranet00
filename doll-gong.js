@@ -428,7 +428,7 @@ function dex(S) {
                     const e = dx[p.i] || {};
                     const s = !!e.s, c = !!e.c;
                     return '<div class="c"><div style="display:flex;justify-content:center;' + (s ? '' : 'filter:brightness(0) opacity(.5)') + '">' + '<div style="' + M.spriteCss(p.i, 44, false, M.artOld()) + '"></div></div>'
-                        + '<div class="no">No.' + String(p.i).padStart(2, '0') + (c ? ' 🎀' : '') + '</div><div>' + (s ? esc(p.n) + ' ' + (M.ATTR[p.w] || {}).e : '???') + '</div>'
+                        + '<div class="no">No.' + String(p.i).padStart(2, '0') + (c ? ' 🎀' : '') + '</div><div>' + (s ? esc(p.n) : '???') + '</div>'
                         + (c ? '<div class="no">' + (e.n || 1) + '마리</div>' : '') + '</div>';
                 }).join('') + '</div>';
         } else {

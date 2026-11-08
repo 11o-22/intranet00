@@ -215,6 +215,7 @@ function hatch(e) {
     if (!P().newKey && P().has(p.i, u)) { dup(p); return; }
 
     const rec = { g: 'D', at: now, fedAt: now, bond: 0 };
+    try { if (window.DOLL && typeof window.DOLL.randAtt === 'function') rec.att = window.DOLL.randAtt(); } catch (e) { }   // ★ 속성은 한 마리씩 아무거나 (2026-11-08)
 
     P().pets(u)[key] = rec;
     u.petEgg = null;
