@@ -1472,12 +1472,14 @@ function tkItem(code) {
     if (!run || !code || code === myCode() || !cpOk(code)) return [];
     const q = run.peers && run.peers[code];
     if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.tickles) return [];
+    if (MSL[code] && !MSL[code].done) return [];          // 마사지 받는 중에는 안 뜬다 (2026-11-08)
     return [TK_ITEM];
 }
 function tkStart(code) {
     closeCarryMenu();
     if (!tkItem(code).length) return;
     run.tkOn = code;
+    run.msOn = null;
     sysLine(nameIn(code) + ' 사원을 계속 누르세요.');
 }
 // 한 번 누름
@@ -1504,6 +1506,179 @@ function tkHit(code) {
         }
         if (ok && !fresh && cn < TK_MAX) return { s: cur.s, n: cn + 1, t: t, by: me };   // 그사이 남이 연 판 — 거기에 보탠다
         return { s: s, n: n0, t: t, by: me };                  // 새 판 (묵은 것은 덮는다)
+    });
+}
+
+// ==========================================
+// 마사지 (2026-11-08 사용자)
+// ==========================================
+//
+//   「여성 체형 상호작용으로 해서 1~12 전부 눈 감고 있게 해주고 [마사지] 로 해서 타인이 마사지 해주는 느낌. 홍조도 쭉 유지되게
+//    해주고 마사지 받는 동안에는 못 움직이게. (움직일 시 마사지가 풀림...) 1~4까지 약 30 번 정도 조금씩 더 빠르게 반복하다가
+//    5~12까지 갈 때에 천천히 느려지기. 다른 점은 7~12가 끝날 때까지 계속 터치해야 해.」 「5~12도 12까지 갈 때까지 계속 터치해야 해.」
+//
+//   · 몸이 마사지 장을 가진 남(여성 체형 · closet.js D.MASSAGE)을 누르면 [ 마사지 ] — 물약 모습 · 쑤시는 중에는 빼고
+//   · [ 마사지 ] 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다)
+//       1~4 를 되풀이 — 셀수록 빨라진다 (한 칸 MS_SLOW → MS_FAST) · MS_N(30) 번째에 5~12 로 — 한 칸씩 점점 느리게 (MS_END)
+//   · 5~12 가 끝날 때까지도 계속 눌러야 한다 — MS_IDLE 동안 아무도 안 누르면 그 자리에서 풀린다 (1~4 때도 같다)
+//   · 열두 칸 내내 눈 감은 얼굴 · 홍조 (closet.js)
+//   · 받는 사람이 움직이면 풀린다 — 받는 사람 화면이 제 자리를 재서 MS_MOVE 넘게 옮겨지면 칸을 걷는다
+//   · 여럿이 같이 누르면 같이 센다
+//
+//   plazaMassage/<사번> = { s: 판 열쇠, n: 센 수, t: 마지막으로 누른 때, by: 마지막으로 누른 사람 }
+const MS_PATH = 'plazaMassage';
+const MS_N = 30;
+const MS_SLOW = 240, MS_FAST = 80;                      // 1~4 한 칸 — 첫 번째 · 서른 번째 가까이
+const MS_END = [150, 200, 260, 330, 410, 500, 600, 700]; // 5~12 한 칸씩 — 점점 느리게
+const MS_IDLE = 2000;
+const MS_MOVE = 8;                                       // 받는 사람이 이만큼 넘게 옮겨지면 풀린다
+const MS_ITEM = ['massage', '마사지'];
+const MSL = {};                                          // 내 화면에서 도는 것 { s, n, rt, p2, f, st, done, mine, lt, x0, y0 }
+let msT = 0;
+function msIv(n) { const r = Math.max(0, Math.min(1, (n - 1) / (MS_N - 2))); return MS_SLOW - (MS_SLOW - MS_FAST) * r; }
+function msNew(code, s, t) {
+    const L = { s: s, n: 0, rt: t, p2: 0, f: 0, st: t };
+    if (run && code === myCode()) { L.x0 = run.x; L.y0 = run.y; }   // 받는 사람 — 처음 자리
+    return L;
+}
+(function msListen() {
+    let on = false;
+    const seen = {};
+    const iv = setInterval(function () {
+        if (on || typeof database === 'undefined' || !database || !u_()) return;
+        on = true;
+        clearInterval(iv);
+        let first = true;
+        database.ref(MS_PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(seen).forEach(function (c) {
+                if (v[c]) return;
+                const old = seen[c];
+                delete seen[c];
+                msGone(c, old);
+            });
+            Object.keys(v).forEach(function (c) {
+                const x = v[c];
+                if (!x || typeof x !== 'object') return;
+                const key = x.s + '|' + x.t;
+                if (seen[c] && seen[c].key === key) return;
+                seen[c] = { key: key, s: x.s };
+                if (!first) msHeard(c, x);
+            });
+            first = false;
+        });
+    }, 1000);
+})();
+function msHeard(c, v) {
+    const t = now();
+    const n = Math.min(MS_N, Number(v.n) || 0);
+    let L = MSL[c];
+    if (L && (L.done || (L.s !== v.s && t - L.rt > MS_IDLE))) L = null;
+    if (!L) L = MSL[c] = msNew(c, v.s, t);
+    L.s = v.s;
+    L.rt = t;
+    if (n > L.n) L.n = n;
+    if (L.n >= MS_N && !L.p2) L.p2 = t;
+    msRun();
+}
+function msGone(c, old) {
+    const L = MSL[c];
+    if (!L || (old && L.s !== old.s)) return;
+    if (!L.done) msPaint(c, null);
+    delete MSL[c];
+    if (run && run.msOn === c) run.msOn = null;
+}
+function msPaint(code, f) {
+    const one = tkOne(code);
+    if (!one || !one.actor || typeof one.actor.tickle !== 'function') return;
+    try { one.actor.tickle(one.wf ? null : f, 'ms'); } catch (e) { }
+}
+function msRun() { if (!msT) msT = setInterval(msTick, 30); }
+function msTick() {
+    const t = now();
+    let live = 0;
+    Object.keys(MSL).forEach(function (c) {
+        const L = MSL[c];
+        if (!L || L.done) return;
+        // 받는 사람이 움직이면 풀린다 — 받는 사람 화면이 정한다
+        if (run && c === myCode() && L.x0 != null && Math.hypot(run.x - L.x0, run.y - L.y0) > MS_MOVE) {
+            msPaint(c, null);
+            msDel(c, L.s, null);
+            delete MSL[c];
+            sysLine('💆 움직여서 마사지가 풀렸습니다.');
+            return;
+        }
+        if (t - L.rt > MS_IDLE) {                             // 아무도 안 누른다 — 그 자리에서 풀린다
+            msPaint(c, null);
+            if (L.mine) msDel(c, L.s, L.lt);
+            delete MSL[c];
+            if (run && run.msOn === c) run.msOn = null;
+            return;
+        }
+        if (L.p2) {
+            let e = t - L.p2, k2 = 0;
+            while (k2 < MS_END.length && e >= MS_END[k2]) { e -= MS_END[k2]; k2++; }
+            if (k2 >= MS_END.length) {                        // 12 까지 — 원래 모습으로
+                L.done = 1;
+                msPaint(c, null);
+                if (run && run.msOn === c) run.msOn = null;
+                if (L.mine) { const s = L.s; setTimeout(function () { msDel(c, s, null); }, 1000); }
+                return;
+            }
+            live++;
+            L.f = 4 + k2; msPaint(c, L.f);
+            return;
+        }
+        live++;
+        if (t - L.st >= msIv(L.n)) { L.f = (L.f + 1) % 4; L.st = t; }
+        msPaint(c, L.f);
+    });
+    if (!live && msT) { clearInterval(msT); msT = 0; }
+}
+// 걷는다 — 그 판이 그대로일 때만 (lt 가 있으면 그 뒤로 아무도 안 눌렀을 때만)
+function msDel(code, s, lt) {
+    if (typeof database === 'undefined' || !database) return;
+    database.ref(MS_PATH + '/' + code).transaction(function (cur) {
+        if (!cur || cur.s !== s) return;
+        if (lt != null && cur.t !== lt) return;
+        return null;
+    });
+}
+// 메뉴에 넣을 것 — 남이고 · 여성 체형이고 · 물약 모습이 아니고 · 쑤시는 중이 아니면
+function msItem(code) {
+    if (!run || !code || code === myCode()) return [];
+    const q = run.peers && run.peers[code];
+    if (!q || !q.one || q.one.wf || !q.one.actor || !q.one.actor.massages) return [];
+    if (TKL[code] && !TKL[code].done) return [];
+    return [MS_ITEM];
+}
+function msStart(code) {
+    closeCarryMenu();
+    if (!msItem(code).length) return;
+    run.msOn = code;
+    run.tkOn = null;
+    sysLine(nameIn(code) + ' 사원을 계속 누르세요.');
+}
+// 한 번 누름 — 5~12 때도 눌러야 이어진다
+function msHit(code) {
+    const me = myCode();
+    if (!me || !run || typeof database === 'undefined' || !database) return;
+    const t = now();
+    let L = MSL[code];
+    const fresh = !L || L.done || t - L.rt > MS_IDLE;
+    if (fresh) L = MSL[code] = msNew(code, me + ':' + t, t);
+    L.n = Math.min(MS_N, L.n + 1);
+    L.rt = t; L.mine = 1; L.lt = t;
+    if (L.n >= MS_N && !L.p2) L.p2 = t;
+    msRun();
+    msTick();
+    const s = L.s, n0 = L.n;
+    database.ref(MS_PATH + '/' + code).transaction(function (cur) {
+        const ok = !!(cur && typeof cur === 'object');
+        const cn = ok ? (Number(cur.n) || 0) : 0;
+        if (ok && cur.s === s) return { s: s, n: Math.min(MS_N, cn + 1), t: t, by: me };
+        if (ok && !fresh) return { s: cur.s, n: Math.min(MS_N, cn + 1), t: t, by: me };   // 그사이 남이 연 판 — 거기에 보탠다
+        return { s: s, n: n0, t: t, by: me };                 // 새 판 (묵은 것은 덮는다)
     });
 }
 
@@ -3103,6 +3278,12 @@ function carryTap(cx, cy) {
         if (tp && tp === run.tkOn && tkItem(tp).length) { tkHit(tp); return true; }
         run.tkOn = null;
     }
+    // 마사지 — [ 마사지 ] 를 누른 뒤에는 그 사람을 누를 때마다 센다 (다른 데를 누르면 그만둔다 · 2026-11-08)
+    if (run.msOn) {
+        const mp = personAt(cx, cy);
+        if (mp && mp === run.msOn && msItem(mp).length) { msHit(mp); return true; }
+        run.msOn = null;
+    }
     // 까기 — 본인이 제 사람을 누르면 [ 까기 ] (깔 것을 입었을 때만 · 남이 그 자리에 겹쳐 서 있으면 남이 먼저 · 2026-11-08)
     if (!personAt(cx, cy) && meAt(cx, cy) && pkSelfOk()) {
         return openMenu(cx, cy, nameIn(myCode()), [PK_ITEM], function (k) {
@@ -3129,6 +3310,7 @@ function carryTap(cx, cy) {
         if (!items.length && !wfOf(me)) sysLine('🍍 ' + nameIn(big) + ' 사원 — 머리 위도 손도 자리가 없습니다.');
         wfBonkItem(big).forEach(function (x) { items.push(x); });
         tkItem(big).forEach(function (x) { items.push(x); });
+        msItem(big).forEach(function (x) { items.push(x); });
         stItem(big).forEach(function (x) { items.push(x); });
         pkItem(big).forEach(function (x) { items.push(x); });
         items.push(INFO_ITEM);
@@ -3136,6 +3318,7 @@ function carryTap(cx, cy) {
             if (k === 'info') { infoOpen(big); return; }
             if (k === 'bonk') { wfBonk(big); return; }
             if (k === 'tickle') { tkStart(big); return; }
+            if (k === 'massage') { msStart(big); return; }
             if (k === 'strip') { stDo(big); return; }
             if (k === 'peel') { pkDo(big); return; }
             if (k === 'rpsx') { closeCarryMenu(); sysLine('✊ 방금 져서 조금 쉬어야 합니다.'); return; }
@@ -3150,9 +3333,10 @@ function carryTap(cx, cy) {
         const any = peerAt(cx, cy);
         if (!any) return false;
         const bk = wfBonkItem(any);                    // 🪄 도깨비 방망이를 쥐었으면 「때리기」
-        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), stItem(any), pkItem(any), [INFO_ITEM]), function (k) {
+        return openMenu(cx, cy, nameIn(any), bk.concat(tkItem(any), msItem(any), stItem(any), pkItem(any), [INFO_ITEM]), function (k) {
             if (k === 'bonk') { wfBonk(any); return; }
             if (k === 'tickle') { tkStart(any); return; }
+            if (k === 'massage') { msStart(any); return; }
             if (k === 'strip') { stDo(any); return; }
             if (k === 'peel') { pkDo(any); return; }
             infoOpen(any);
@@ -3167,11 +3351,11 @@ function carryTap(cx, cy) {
             return openMenu(cx, cy, nameIn(pick), wfBonkItem(pick).concat([INFO_ITEM]), function (k) { if (k === 'bonk') { wfBonk(pick); return; } infoOpen(pick); }, '🫙 ');
         }
         if (run.peers[w.by] && !cageMine() && !caged(w.by) && (roomOn(me, 'hand', pick) || roomOn(me, 'head', pick))) {
-            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]),
-                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
+            return openMenu(cx, cy, nameIn(pick) + ' — ' + nameIn(w.by) + ' 사원에게 있음', [['rps', '✊ 가위바위보로 뺏기']].concat(tkItem(pick), msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]),
+                function (k) { if (k === 'info') { infoOpen(pick); return; } if (k === 'tickle') { tkStart(pick); return; } if (k === 'massage') { msStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } closeCarryMenu(); rpsStart(pick, w.by); });
         }
         sysLine('🍍 ' + nameIn(pick) + ' 사원은 ' + nameIn(w.by) + ' 사원에게 가 있습니다.');
-        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
+        return openMenu(cx, cy, nameIn(pick), tkItem(pick).concat(msItem(pick), stItem(pick), pkItem(pick), [INFO_ITEM]), function (k) { if (k === 'tickle') { tkStart(pick); return; } if (k === 'massage') { msStart(pick); return; } if (k === 'strip') { stDo(pick); return; } if (k === 'peel') { pkDo(pick); return; } infoOpen(pick); }, '');
     }
     const mine = !!(w && w.by === me);
     const potion = !!wfOf(pick);                       // 🪄 소원권 물약 — 손으로만 든다
@@ -3185,6 +3369,7 @@ function carryTap(cx, cy) {
     if (!items.length) sysLine('🍍 손도 머리 위도 자리가 없습니다.');
     wfBonkItem(pick).forEach(function (x) { items.push(x); });
     tkItem(pick).forEach(function (x) { items.push(x); });
+    msItem(pick).forEach(function (x) { items.push(x); });
     stItem(pick).forEach(function (x) { items.push(x); });
     pkItem(pick).forEach(function (x) { items.push(x); });
     items.push(INFO_ITEM);
@@ -3193,6 +3378,7 @@ function carryTap(cx, cy) {
         if (k === 'wish') { wfUse(pick); return; }
         if (k === 'bonk') { wfBonk(pick); return; }
         if (k === 'tickle') { tkStart(pick); return; }
+        if (k === 'massage') { msStart(pick); return; }
         if (k === 'strip') { stDo(pick); return; }
         if (k === 'peel') { pkDo(pick); return; }
         carryDo(pick, k);

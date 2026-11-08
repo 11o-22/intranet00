@@ -269,6 +269,10 @@ const DOT = {
     //     주신 그림(1728 장)을 칸마다 +30 옮겨 tk-blush 로 — 서기 줄 여섯 칸이 같은 그림이라 서기 첫 칸에 세운다.
     //     머리 바로 위 층에 깔고 머리와 같이 내린다. 여러 머리에 대 보니 볼 자리에 맞았다. 끝나면 걷는다.
     TICKLE: { 'body-w': { sheet: 'body-w-tk', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 6, blush: 'tk-blush' } },
+    // ★ 마사지 (2026-11-08 사용자 「여성 체형 상호작용으로 해서 1~12 전부 눈 감고 있게 해주고 [마사지] 로 해서 … 홍조도 쭉 유지되게」)
+    //   주신 그림(1728 장)을 칸마다 +30 옮겨 body-w-ms 로 — 1·2번 칸에 어깨를 주무르는 손이 있고, 3~12 는 처음 쑤시기 그림과 같다.
+    //   재 보니 들썩임도 쑤시기와 같다 (짝수 칸이 4 내려감). 열두 칸 내내 눈을 감고(shut 12) 홍조를 깐다.
+    MASSAGE: { 'body-w': { sheet: 'body-w-ms', dy: [0, 4, 0, 4, 0, 4, 0, 4, 0, 4, 0, 4], shut: 12, blush: 'tk-blush' } },
     BLINK_SHUT: 3,
     // ★ 벗기기 (2026-11-08 사용자 「기존에 있는 건 다른 사원이 해당 의상을 입은 사원을 건드렸을 때 [ 벗기기 ] 버튼이 나왔을 때에
     //   7~12 프레임만 쓴 다음 그대로 아예 옷이 없어지게 해줘. (여성 체형.)」)
@@ -1470,20 +1474,24 @@ function actor(user, opt) {
     const bodyAt = (L.backs || []).length;
     const bodyEl = els[bodyAt];
     const TKS = (D.TICKLE && D.TICKLE[L.body]) || null;
-    const tkFol = TKS ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
-    if (TKS) { try { const im = new Image(); im.src = tkSrc(TKS.sheet); } catch (e) { } }   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
-    // 홍조 (TKS.blush) — 머리 바로 위에 숨겨 깔아 두고, 쑤시는 동안만 보인다 · 머리와 같이 내린다
+    // ★ 마사지 (2026-11-08 · D.MASSAGE) — 쑤시기와 같은 길로 장만 다르다. tickle(칸, 'ms') 로 부른다.
+    const TKK = { tk: TKS, ms: (D.MASSAGE && D.MASSAGE[L.body]) || null };
+    const tkAny = TKK.tk || TKK.ms;
+    const tkFol = tkAny ? els.filter(function (e, i) { return i !== bodyAt && (L.follow || {})[sheets[i]]; }) : [];
+    [TKK.tk, TKK.ms].forEach(function (sp) { if (sp) { try { const im = new Image(); im.src = tkSrc(sp.sheet); } catch (e) { } } });   // 미리 받아 둔다 — 처음 누를 때 몸이 비지 않게
+    // 홍조 (blush) — 머리 바로 위에 숨겨 깔아 두고, 쑤시는(마사지 받는) 동안만 보인다 · 머리와 같이 내린다
     let blushEl = null;
-    if (TKS && TKS.blush && head && sheets.indexOf(TKS.blush) < 0) {   // 옷에 홍조가 이미 있으면(바니걸) 두 겹 안 깐다
-        blushEl = layer(TKS.blush, k, null);
+    const blushSheet = (TKK.tk && TKK.tk.blush) || (TKK.ms && TKK.ms.blush) || null;
+    if (blushSheet && head && sheets.indexOf(blushSheet) < 0) {   // 옷에 홍조가 이미 있으면(바니걸) 두 겹 안 깐다
+        blushEl = layer(blushSheet, k, null);
         blushEl.style.display = 'none';
         blushEl.style.backgroundPosition = '0px -' + (D.H * k) + 'px';      // 서기 줄 첫 칸 (여섯 칸이 같다)
         box.insertBefore(blushEl, head.nextSibling);
         tkFol.push(blushEl);
     }
-    let tk = null;
-    // 지금 눈 감은 얼굴로 둘 칸인가 (TKS.shut 앞 · 1~6)
-    const tkShut = function () { return !!(TKS && TKS.shut && tk != null && tk >= 0 && tk < TKS.shut); };
+    let tk = null, tkSpec = null;                        // tkSpec — 지금 도는 것의 장 (쑤시기 · 마사지)
+    // 지금 눈 감은 얼굴로 둘 칸인가 (shut 앞 · 쑤시기 1~6 · 마사지 1~12)
+    const tkShut = function () { return !!(tkSpec && tkSpec.shut && tk != null && tk >= 0 && tk < tkSpec.shut); };
     // ★ 벗기기 (2026-11-08 · D.STRIP) — 입은 장(레드 비키비키니)을 벗겨지는 장으로 갈아 끼우고 서기 칸 0~5 를 한 번 · 끝나면 그 장을 걷는다.
     //   st — null 이면 벗기는 중이 아니다 · 0~5 이면 그 칸 · 'gone' 이면 다 벗겼다 (이 칸에서는 다시 안 입힌다).
     //   벗기는 동안 몸판은 같은 서기 칸에 세우고(들썩임도 그 칸 몫) 다른 층도 서 있는 모습으로 — 그림이 서 있는 몸에 맞춰 그려져 있다.
@@ -1753,12 +1761,17 @@ function actor(user, opt) {
         },
         // ★ 간지럽히기 (2026-11-07) — 몸이 간지럽히기 장을 가졌나 (여성 체형)
         tickles: !!TKS,
+        massages: !!TKK.ms,                                 // ★ 마사지 (2026-11-08) — 몸이 마사지 장을 가졌나 (여성 체형)
         // f — 간지럽히기 장의 몇 번째 칸(0~11)을 깐다 · null 이면 풀고 원래 움직임으로 (D.TICKLE)
-        tickle: function (f) {
-            if (!TKS || !bodyEl) return false;
+        //   kind — 'ms' 이면 마사지 장(D.MASSAGE) · 없으면 쑤시기. 도는 중에 다른 것이 오면 풀고 새로 건다.
+        tickle: function (f, kind) {
+            const spec = TKK[kind === 'ms' ? 'ms' : 'tk'];
+            if (f != null && !spec) return false;
+            if (!bodyEl || !tkAny) return false;
+            if (f != null && tk != null && tkSpec !== spec) this.tickle(null);
             if (f == null) {
                 if (tk == null) return true;
-                tk = null;
+                tk = null; tkSpec = null;
                 bodyEl.style.backgroundImage = bodyEl._tkWas || '';
                 tkFol.forEach(function (e) { e.style.transform = ''; });
                 if (blushEl) blushEl.style.display = 'none';   // 홍조를 걷는다
@@ -1770,10 +1783,11 @@ function actor(user, opt) {
             f = Math.max(0, Math.min(11, f | 0));
             if (tk == null) {
                 if (idleEl) idleOff();
+                tkSpec = spec;
                 bodyEl._tkWas = bodyEl.style.backgroundImage;
-                bodyEl.style.backgroundImage = 'url("' + tkSrc(TKS.sheet) + '")';
+                bodyEl.style.backgroundImage = 'url("' + tkSrc(spec.sheet) + '")';
                 if (bob) bob.lock = true;
-                if (blushEl) blushEl.style.display = '';     // 쑤시는 동안만 홍조
+                if (blushEl && spec.blush) blushEl.style.display = '';     // 쑤시는(마사지 받는) 동안만 홍조
                 tk = -1;
                 if (walking || posed != null) els.forEach(function (e) { put(e, 0, 1); });   // 걷던 옷도 서 있는 칸으로
             }
@@ -1782,7 +1796,7 @@ function actor(user, opt) {
             tk = f;
             if (head && tkShut() !== shutWas) put(head, tkShut() ? D.BLINK_SHUT : 0, 1);   // 1~6 이면 눈을 감고 · 7 로 넘어가면 뜬다
             bodyEl.style.backgroundPosition = '-' + ((f % 6) * D.W * k) + 'px -' + (Math.floor(f / 6) * D.H * k) + 'px';
-            const v = TKS.dy[f] || 0;
+            const v = tkSpec.dy[f] || 0;
             const t = v ? 'translateY(' + (v * k) + 'px)' : '';
             tkFol.forEach(function (e) { e.style.transform = t; });
             return true;
