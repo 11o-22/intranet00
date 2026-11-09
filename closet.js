@@ -968,6 +968,16 @@ function look(user, override, all) {
     const fol = {};                      // 몸이 들썩일 때 같이 내릴 장 (D.BOB) — 악세 · 머리 · 뒷머리
     const femAcc = [];                   // 여성 체형에서만 다는 악세 (fem · 2026-11-08 바니걸) — 다른 몸이면 아래에서 뗀다
     let legsImg = null, bodyImg = null;  // 신으면 몸판을 갈아 끼우는 악세 (legs · 바니걸 스타킹)
+    // ★ 불투명도 (2026-11-09 사용자 「여성 체형 의상 불투명도도 조절할 수 있는 기능 넣어줘」) — d.op = { 옷 열쇠: 10~100 }
+    //   여성 체형 옷(fem)에만 · 장 이름 → 0.1~1 로 L.op 에 실어 sprite · actor 가 그 층에 opacity 를 건다
+    const opIn = (d.op && typeof d.op === 'object') ? d.op : {};
+    const opMap = {};
+    const opTake = function (x) {
+        if (!x || !x.fem) return;
+        const v = Number(opIn[x.gk || x.i]);
+        if (!(v >= 10 && v < 100)) return;
+        (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { opMap[o] = Math.round(v) / 100; });
+    };
     DOT_SLOTS.forEach(function (s) {
         const list = all ? s.items.slice() : items(s, u);
         // ★ 여러 개 겹치는 칸(악세) — 적힌 차례대로 다 얹는다
@@ -982,6 +992,7 @@ function look(user, override, all) {
                 if (!x || !x.i) return;          // 없거나 못 가진 것은 건너뛴다
                 got.push(x.i);
                 if (x.fem) femAcc.push(x);
+                opTake(x);
                 if (x.legs) legsImg = x.legs;
                 (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { fol[o] = 1; });
                 (x.back || []).forEach(function (o) { backs.push(o); });
@@ -1002,6 +1013,7 @@ function look(user, override, all) {
         if (!it) it = list.filter(function (x) { return x.def; })[0] || list[0];
         pick[s.k] = it.i;
         chosen.push(it);
+        opTake(it);
         (it.back || []).forEach(function (o) { backs.push(o); });
         (it.over || []).forEach(function (o) { over.push(o); });
         (it.top || []).forEach(function (o) { tops.push(o); });
@@ -1133,7 +1145,7 @@ function look(user, override, all) {
             Object.defineProperty(colFin, o, { value: c, enumerable: false });
         });
     });
-    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, layers: over, tops: tops, backs: backs, pick: pick, col: colFin, nw: Object.keys(nw).length ? nw : null, follow: fol };
+    return { head: head, headPick: headPick, body: bodySheet, bodyImg: bodyImg, op: opMap, layers: over, tops: tops, backs: backs, pick: pick, col: colFin, nw: Object.keys(nw).length ? nw : null, follow: fol };
 }
 window.dotLook = look;
 // ★ 까기 (2026-11-08) — 이 사람이 지금 깔 수 있는 것을 입었나 (그 장을 그리고 있나) · 있으면 그 D.PEEL 칸
@@ -1396,6 +1408,7 @@ function sprite(user, opt) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
     if (L.bodyImg) els[(L.backs || []).length].style.backgroundImage = 'url("' + tkSrc(L.bodyImg) + '")';   // 스타킹 다리 (바니걸 · 2026-11-08)
+    if (L.op) els.forEach(function (e, i) { const o = L.op[sheets[i]]; if (o != null) e.style.opacity = String(o); });   // 불투명도 (여성 체형 옷 · 2026-11-09)
 
     const row = (pose === 'walk') ? 0 : 1;
     const put = function (el, col) {
@@ -1527,6 +1540,7 @@ function actor(user, opt) {
         const e = layer(s, k, col[s]); box.appendChild(e); return e;
     });
     if (L.bodyImg) els[(L.backs || []).length].style.backgroundImage = 'url("' + tkSrc(L.bodyImg) + '")';   // 스타킹 다리 (바니걸 · 2026-11-08)
+    if (L.op) els.forEach(function (e, i) { const o = L.op[sheets[i]]; if (o != null) e.style.opacity = String(o); });   // 불투명도 (여성 체형 옷 · 2026-11-09)
     const head = els[(L.backs || []).length + 1 + L.layers.length];   // 악세가 머리 뒤에 더 붙는다 · 몸 뒤에 깐 장이 앞에 있다
     els.forEach(function (e, i) { nwPut(e, sheets[i], L.nw); });      // 🐰 말풍선 글씨
     const flaps = flapsOf(els, sheets);
@@ -1951,7 +1965,7 @@ function cur() {
     const u = u_();
     if (!pick) {
         const L = look(u);
-        pick = { head: L.headPick || L.head, col: Object.assign({}, L.col) };
+        pick = { head: L.headPick || L.head, col: Object.assign({}, L.col), op: Object.assign({}, (u && u.dot && u.dot.op) || {}) };
         DOT_SLOTS.forEach(function (s) { pick[s.k] = L.pick[s.k] || ''; });
     }
     return pick;
@@ -2055,7 +2069,63 @@ function buildRows(u) {
         html += '<div class="cl-h">색 <i>🎨 컬러 팔레트 한 개</i></div>'
             + '<div id="closet-cols">' + colHtml() + '</div>';
     }
+    // ⑤ 불투명도 — 지금 입은 여성 체형 옷마다 하나씩 (2026-11-09). 여성 체형 옷을 입었을 때만 보인다.
+    html += '<div id="closet-ops">' + opHtml() + '</div>';
     return html;
+}
+
+// ★ 불투명도 (2026-11-09 사용자 「여성 체형 의상 불투명도도 조절할 수 있는 기능 넣어줘」)
+//   지금 입고 그려지는 여성 체형 옷(fem)마다 막대 하나 — 10 ~ 100 (10씩). 옷 열쇠(gk || i)마다 pick.op 에 적고,
+//   [ 갈아입기 ] 를 누르면 me.dot.op 로 간다 (commit). 광장은 u.dot 을 통째로 주고받으므로 남의 화면에도 같다.
+function wornFem(dotv) {
+    const u = Object.assign({}, u_() || {}, { dot: dotv });
+    const L = look(u);
+    const drawn = {};
+    (L.backs || []).concat(L.layers || [], L.tops || []).forEach(function (o) { drawn[o] = 1; });
+    const out = [], seen = {};
+    DOT_SLOTS.forEach(function (sl) {
+        const ids = sl.max ? accSplit(dotv[sl.k]) : [dotv[sl.k] || ''];
+        ids.forEach(function (id) {
+            const it = sl.items.filter(function (x) { return x.i === id; })[0];
+            if (!it || !it.fem) return;
+            const sh = (it.back || []).concat(it.over || [], it.top || []);
+            if (!sh.some(function (o) { return drawn[o]; })) return;
+            const key = it.gk || it.i;
+            if (seen[key]) return;
+            seen[key] = 1;
+            out.push({ key: key, name: it.n });
+        });
+    });
+    return out;
+}
+function opHtml() {
+    const p = cur();
+    const list = wornFem(p);
+    if (!list.length) return '';
+    const op = p.op || {};
+    return '<div class="cl-h">불투명도 <i>여성 체형 옷</i></div>' + list.map(function (x) {
+        const v = (Number(op[x.key]) >= 10 && Number(op[x.key]) < 100) ? Math.round(Number(op[x.key])) : 100;
+        return rowOf(x.name, '<input type="range" class="cl-op" min="10" max="100" step="10" value="' + v + '" data-k="' + esc_(x.key) + '"'
+            + ' style="flex:1;min-width:120px;accent-color:#d9a05a;">'
+            + '<b class="cl-opv" style="min-width:42px;text-align:right;font-weight:normal;font-size:12px;">' + v + '%</b>');
+    }).join('');
+}
+function paintOps() {
+    const box = document.getElementById('closet-ops');
+    if (!box) return;
+    box.innerHTML = opHtml();
+    Array.prototype.forEach.call(box.querySelectorAll('input.cl-op'), function (r) {
+        const lab = r.parentNode && r.parentNode.querySelector('.cl-opv');
+        r.oninput = function () {
+            const v = Math.max(10, Math.min(100, Math.round(Number(r.value) / 10) * 10));
+            if (lab) lab.textContent = v + '%';
+            const p = cur();
+            p.op = Object.assign({}, p.op || {});
+            if (v >= 100) delete p.op[r.dataset.k]; else p.op[r.dataset.k] = v;
+            paintDoll();
+            saveSoon();
+        };
+    });
 }
 
 // 색 알 — 갈아입을 때마다 **이 줄만** 다시 그린다 (다른 줄의 민 자리는 지킨다)
@@ -2128,6 +2198,10 @@ function commit() {
     DOT_SLOTS.forEach(function (s) { out[s.k] = p[s.k] || ''; });
     // ★ 물들인 색도 같이 적는다 — 안 적으면 갈아입을 때마다 색이 날아간다
     out.col = Object.assign({}, p.col || {});
+    // 불투명도 — 100 은 안 적는다 (2026-11-09)
+    const op = {};
+    Object.keys(p.op || {}).forEach(function (k) { const v = Number(p.op[k]); if (v >= 10 && v < 100) op[k] = Math.round(v); });
+    if (Object.keys(op).length) out.op = op;
     if (me.dot && me.dot.nw) out.nw = me.dot.nw;        // 🐰 말풍선 글씨는 옷장이 안 다루므로 그대로 둔다
     if (me.dot && me.dot.nw2) out.nw2 = me.dot.nw2;
     me.dot = out;
@@ -2220,6 +2294,7 @@ function tap(kind, k, v) {
     if (setSel) { setSel = null; setAsk = null; paintSets(); }     // 손으로 갈아입었다 — 고른 코디 표시를 푼다
     markOn();
     paintCols();      // 갈아입었으니 물들일 거리도 달라진다
+    paintOps();       // 불투명도 막대도 (입은 여성 체형 옷이 달라진다)
     paintDoll();
     saveSoon();
 }
@@ -2256,12 +2331,13 @@ function setSnap() {
     const d = { head: p.head };
     DOT_SLOTS.forEach(function (s) { d[s.k] = p[s.k] || ''; });
     d.col = Object.assign({}, p.col || {});
+    if (p.op && Object.keys(p.op).length) d.op = Object.assign({}, p.op);   // 불투명도도 코디에 (2026-11-09)
     return d;
 }
 function setFit(d, u) {
     d = moveOld(d);
     const p = cur();
-    const out = { col: Object.assign({}, (d && d.col) || {}) };
+    const out = { col: Object.assign({}, (d && d.col) || {}), op: Object.assign({}, (d && d.op) || {}) };   // op — 불투명도도 그 코디대로 (2026-11-09)
     const hd = DOT_HEADS.filter(function (h) { return h.i === d.head; })[0];
     out.head = (hd && allowed(hd, u)) ? d.head : p.head;
     DOT_SLOTS.forEach(function (s) {
@@ -2338,7 +2414,7 @@ function setTap(kind, k) {
         }
         pick = setFit(S[k].d, u);                                // 찬 칸 — 그 모습으로 갈아입는다
         setSel = k;
-        paintSets(); markOn(); paintCols(); paintDoll(); saveSoon();
+        paintSets(); markOn(); paintCols(); paintOps(); paintDoll(); saveSoon();
         setSay((S[k].n || ('코디 ' + no)) + ' 을(를) 입었습니다.');
         return;
     }
