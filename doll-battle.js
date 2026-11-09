@@ -96,8 +96,39 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function rnd(a, b) { return a + Math.random() * (b - a); }
 function skills(sp) {
     const J = window.JOURNEY_SK;
-    const sk = (J && J.SK && (J.SK[Number(sp)] || J.SK[1])) || { a: [['몸통 박치기', 'hit'], ['솜 뭉치기', 'multi'], ['꾹 누르기', 'heavy']], d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] };
+    const key = (window.PET && typeof window.PET.sp === 'function') ? window.PET.sp(sp) : Number(sp);   // 둘째 마리(113) 도 제 종(13)의 기술
+    const sk = (J && J.SK && (J.SK[key] || J.SK[1])) || { a: [['몸통 박치기', 'hit'], ['솜 뭉치기', 'multi'], ['꾹 누르기', 'heavy']], d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] };
     return sk;
+}
+// ==========================================
+// 상태 — 🧸 캐릭터 봉제인형 기술 (2026-11-09 사용자 「이자헌 부수기 · 날리기 · 빼앗기 / 브라운 소각 · 조명 끄기 · 자리 바꾸기 /
+//        호유원 금제 · 상담 · 역병 / 김솔음 읽기 · 수정 · 부수기 / 백사헌 빼앗기 · 응시 · 찍기」)
+// ==========================================
+//   싸우는 것(내 인형 · 괴담 · 야생 · 상대 인형)마다 st = { stun, dot:{ n, dmg }, blind, swap, invuln }
+//   stun   읽기 — 다음 차례를 건너뛴다 (차례가 올 때 1 줄어든다)
+//   dot    역병 — 차례가 올 때마다 dmg 를 맞는다, n 턴
+//   blind  조명 끄기 — 다음 공격의 명중 −50 (공격할 때 1 줄어든다)
+//   swap   자리 바꾸기 — 다음에 맞을 피해를 그대로 상대에게 돌린다 (한 번)
+//   invuln 응시 — 상대 공격 n 번을 무적으로 받는다
+//   세 전투(혼자 · 여럿이 괴담 · 사원 대 사원)가 strike() 하나를 쓰므로 여기서 다 본다. 여럿이 괴담 판은 st 를 서버에도 적는다.
+function stOf(c) { if (!c.st || typeof c.st !== 'object') c.st = {}; return c.st; }
+function stHas(c) { const s = c && c.st; return !!(s && (s.stun || s.dot || s.blind || s.swap || s.invuln)); }
+// 차례가 올 때 → { dot, skip, lines }
+function stTick(c, nm) {
+    const s = stOf(c), out = { dot: 0, skip: false, lines: [] };
+    if (s.dot && s.dot.n > 0) {
+        out.dot = Math.max(1, Math.round(s.dot.dmg)); s.dot.n--; if (s.dot.n <= 0) delete s.dot;
+        out.lines.push(nm + D().josa(nm, '이') + ' 역병에 시달린다! (' + out.dot + ')');
+    }
+    if (s.stun > 0) { s.stun--; out.skip = true; out.lines.push(nm + D().josa(nm, '은') + ' 읽혀서 움직이지 못한다!'); }
+    return out;
+}
+// 짧은 표 — 상태 창에 붙인다
+function stTag(c) {
+    const s = c && c.st; if (!s) return '';
+    const t = [];
+    if (s.stun) t.push('묶임'); if (s.dot) t.push('역병 ' + s.dot.n); if (s.blind) t.push('눈가림'); if (s.swap) t.push('자리 바꿈'); if (s.invuln) t.push('무적 ' + s.invuln);
+    return t.join(' · ');
 }
 function T() {
     const J = window.JOURNEY_SK || {};
@@ -551,13 +582,17 @@ async function flashAll(n) {
 // 셈
 // ==========================================
 //   공격 하나 — { dmg, hit, crit, eff, n } (n 은 몇 번 맞았나)
-function strike(a, d, type, guard) {
+function strike(a, d, type, guard, names) {
     const t = T().ATK[type] || T().ATK.hit;
     const hits = t.n || 1;
     let total = 0, landed = 0, crit = false;
     const eff = D().eff(a.att, d.att);
+    const sa = stOf(a), sd = stOf(d);
+    const blind = sa.blind > 0; if (blind) sa.blind--;            // 조명 끄기 — 이 공격의 명중 −50
+    const an = (names && names.a) || a.name || '', dn = (names && names.d) || d.name || '';
+    const lines = [];
     for (let i = 0; i < hits; i++) {
-        let hc = (t.h || 95) - (d.eva || 0) / 2;
+        let hc = (t.h || 95) - (d.eva || 0) / 2 - (blind ? 50 : 0);
         if (guard && guard.dodge) hc = Math.min(hc, 100 - guard.dodge);
         if (Math.random() * 100 >= hc) continue;
         const c = Math.random() * 100 < (a.crit || 5) + (t.crit || 0);
@@ -568,7 +603,28 @@ function strike(a, d, type, guard) {
         total += Math.max(1, Math.round(dm));
         landed++;
     }
-    return { dmg: total, hit: landed > 0, crit: crit, eff: eff, n: landed, drain: t.drain ? Math.round(total * t.drain) : 0 };
+    const r = { dmg: total, hit: landed > 0, crit: crit, eff: eff, n: landed, drain: t.drain ? Math.round(total * t.drain) : 0, back: 0, heal: 0, lines: lines, util: !!t.util };
+    if (blind) lines.push(an + D().josa(an, '은') + ' 불 꺼진 어둠 속에서 더듬거렸다.');
+    if (!r.hit) return r;
+    if (t.util) { r.dmg = 0; r.drain = 0; r.crit = false; r.n = 0; }       // 효과만 내는 기술
+    // 맞는 쪽의 보호 — 응시(무적) · 자리 바꾸기(그대로 돌려준다)
+    if (r.dmg > 0 && sd.invuln > 0) { sd.invuln--; lines.push(dn + D().josa(dn, '은') + ' 응시한 채 꿈쩍도 하지 않았다 — 피해 없음' + (sd.invuln ? ' (무적 ' + sd.invuln + ' 남음)' : '')); r.dmg = 0; r.drain = 0; }
+    else if (r.dmg > 0 && sd.swap) { delete sd.swap; r.back = r.dmg; r.dmg = 0; r.drain = 0; lines.push(dn + D().josa(dn, '이') + ' 자리를 바꿨다! ' + r.back + '의 피해가 ' + an + '에게 그대로 돌아갔다!'); }
+    // 건다
+    if (t.stun) { sd.stun = Math.max(sd.stun || 0, t.stun); lines.push(an + D().josa(an, '이') + ' ' + dn + D().josa(dn, '을') + ' 읽었다 — 다음 차례를 움직이지 못한다!'); }
+    if (t.dot) { sd.dot = { n: t.dot, dmg: Math.max(1, Math.round(a.atk * 1.6 * (t.dotM || 0.5))) }; lines.push(dn + D().josa(dn, '이') + ' 역병에 걸렸다! (' + t.dot + '턴 동안 ' + sd.dot.dmg + '씩)'); }
+    if (t.blind) { sd.blind = Math.max(sd.blind || 0, t.blind); lines.push('조명이 꺼졌다 — ' + dn + '의 다음 공격이 빗나가기 쉽다.'); }
+    if (t.swap) { sa.swap = 1; lines.push(an + D().josa(an, '이') + ' 자리를 바꿀 채비를 했다 — 다음에 맞을 피해를 그대로 돌려준다.'); }
+    if (t.invuln) { sa.invuln = Math.max(sa.invuln || 0, t.invuln); lines.push(an + D().josa(an, '이') + ' 가만히 응시한다 — 상대의 공격 ' + t.invuln + '번을 받지 않는다.'); }
+    if (t.selfHeal) { r.heal = Math.max(1, Math.round((a.max || 0) * t.selfHeal)); }
+    return r;
+}
+// 공격 뒤 — 되돌아온 피해(자리 바꾸기) · 제 회복(상담) 을 셈에 넣는다 (혼자 싸움은 attack() 이 따로 그린다)
+function strikeAfter(a, d, r) {
+    const out = [];
+    if (r.back && a.hp > 0) { a.hp = Math.max(0, a.hp - r.back); }
+    if (r.heal && a.hp > 0) { a.hp = Math.min(a.max, a.hp + r.heal); out.push((a.name || '') + D().josa(a.name || '', '이') + ' 마음을 다잡았다 — ' + r.heal + ' 회복'); }
+    return out;
 }
 async function setHp(who, v) {
     const c = (who === 'me') ? B.me : B.foe;
@@ -584,17 +640,20 @@ async function attack(atkr, sk, guard) {
     await say(fmt(pick(TX.use), vName), 1100);
     await lunge(atkr);
     const r = strike(A, Dd, sk[1], guard);
-    if (!r.hit) { await say(fmt(pick(TX.miss), vName), 1200); return r; }
-    await blink(atkr === 'me' ? 'foe' : 'me');
+    if (!r.hit) { for (let i = 0; i < r.lines.length; i++) await say(r.lines[i], 1000); await say(fmt(pick(TX.miss), vName), 1200); return r; }
+    if (r.dmg > 0) await blink(atkr === 'me' ? 'foe' : 'me');
     // 호감도가 가득 찬 인형은 한 싸움에 한 번 — 쓰러지기 직전에 버틴다 (지문 9)
     let held = false;
     if (atkr === 'foe' && Dd.hp - r.dmg <= 0 && (Number(Dd.bond) || 0) >= 100 && !Dd.held) { Dd.held = 1; held = true; r.dmg = Math.max(0, Dd.hp - 1); }
-    await setHp(atkr === 'me' ? 'foe' : 'me', Dd.hp - r.dmg);
+    if (r.dmg > 0) await setHp(atkr === 'me' ? 'foe' : 'me', Dd.hp - r.dmg);
+    for (let i = 0; i < r.lines.length; i++) { await say(r.lines[i], 1200); paintStat(); }
+    if (r.back && A.hp > 0) { await lunge(atkr === 'me' ? 'foe' : 'me'); await setHp(atkr, A.hp - r.back); }
+    if (r.heal && A.hp > 0) { fx('💚', atkr === 'me' ? [60, 170] : [230, 60]); await setHp(atkr, A.hp + r.heal); await say(fmt('{a이} 마음을 다잡았다 — ' + r.heal + ' 회복', vName), 1000); }
     if (held) await say(fmt(pick(TX.hold), { d: Dd.name }), 1500);
     if (r.n > 1) await say(r.n + '번 맞았다!', 900);
     if (r.crit) await say(fmt(pick(TX.crit), vName), 1000);
-    if (r.eff > 1) await say(pick(TX.great), 1000);
-    else if (r.eff < 1) await say(pick(TX.weak), 1000);
+    if (r.dmg > 0 && r.eff > 1) await say(pick(TX.great), 1000);
+    else if (r.dmg > 0 && r.eff < 1) await say(pick(TX.weak), 1000);
     if (r.drain && A.hp > 0) { await setHp(atkr, A.hp + r.drain); await say(fmt('{a이} 기운을 조금 빨아들였다!', vName), 900); }
     // 되받기
     if (guard && guard.reflect && Dd.hp > 0) {
@@ -603,8 +662,8 @@ async function attack(atkr, sk, guard) {
         await setHp(atkr, A.hp - back);
         await say(fmt('{d이} 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', vName), 1100);
     }
-    if (Dd.hp > 0 && Dd.hp / Dd.max < 0.25 && Math.random() < 0.5) await say(fmt(pick(TX.low), { d: Dd.name }), 1000);
-    else if (Dd.hp > 0 && Math.random() < 0.35) await say(fmt(pick(TX.hurt), { d: Dd.name }), 1000);
+    if (r.dmg > 0 && Dd.hp > 0 && Dd.hp / Dd.max < 0.25 && Math.random() < 0.5) await say(fmt(pick(TX.low), { d: Dd.name }), 1000);
+    else if (r.dmg > 0 && Dd.hp > 0 && Math.random() < 0.35) await say(fmt(pick(TX.hurt), { d: Dd.name }), 1000);
     else if (Dd.hp > 0 && atkr === 'me' && Math.random() < 0.15) await say(fmt(pick(TX.hitJoy), vName), 900);
     return r;
 }
@@ -633,6 +692,10 @@ async function foeTurn(guard) {
         else await say(f.name + D().josa(f.name, '이') + ' 이쪽을 노려보고 있다……', 1200);
         return;
     }
+    const tk = stTick(f, f.name);
+    for (let i = 0; i < tk.lines.length; i++) await say(tk.lines[i], 1200);
+    if (tk.dot) { await blink('foe'); await setHp('foe', f.hp - tk.dot); if (f.hp <= 0) return null; }
+    if (tk.skip) return null;
     const mv = pick(f.sk.a);
     const r = await attack('foe', mv, guard);
     if (B.me.hp <= 0) await myFaint();
@@ -714,6 +777,14 @@ async function loop() {
     const M = D();
     for (;;) {
         if (!B) return { res: 'gone' };
+        // 내 인형의 상태 — 역병 · 묶임 (캐릭터 봉제인형 기술 · 2026-11-09)
+        if (B.me && stHas(B.me)) {
+            menu(0);
+            const tk = stTick(B.me, B.me.name);
+            for (let i = 0; i < tk.lines.length; i++) await say(tk.lines[i], 1200);
+            if (tk.dot) { await blink('me'); await setHp('me', B.me.hp - tk.dot); if (B.me.hp <= 0) { await myFaint(); if (B.me == null && !B.tut && (B.kind === 'mon' || hadDolls())) return loseAll(); continue; } }
+            if (tk.skip) { const end = await afterMine(null); if (end) return end; continue; }
+        }
         // 지문 — 무엇을 할까
         const who = B.me ? B.me.name : '당신';
         const idle = B.me && Math.random() < 0.3;
@@ -1051,6 +1122,18 @@ function resolveRound(run, now) {
     const guards = {};
     const touch = function (c, k) { P['fight/part/' + c + '/' + k] = 1; P['members/' + c + '/dolls/' + k + '/hp'] = Math.max(0, Math.round(mem[c].dolls[k].hp)); };
     const live = function () { return order.filter(function (c) { const m = mem[c]; return !m.out && m.act && m.dolls && m.dolls[m.act] && m.dolls[m.act].hp > 0; }); };
+    // 쓰러졌다 — 다음 인형이 있으면 나오고, 없으면 그 사원은 빠진다
+    const fallDoll = function (c) {
+        const m = mem[c], d = m.dolls[m.act], nm = d.nick || D().spName(d.sp);
+        log.push({ t: fmt(pick(TX.faint), { d: nm }), ko: c, key: m.act });
+        const k2 = aliveKey(m, null);
+        if (k2) {
+            m.act = k2; P['members/' + c + '/act'] = k2;
+            const d2 = m.dolls[k2];
+            log.push({ t: m.name + ' — ' + fmt(pick(TX.go), { a: d2.nick || D().spName(d2.sp) }), go: c, key: k2 });
+            P['fight/part/' + c + '/' + k2] = 1;
+        } else { m.out = 1; P['members/' + c + '/out'] = 1; log.push({ t: m.name + ' 사원의 봉제인형이 모두 지쳤다.' }); }
+    };
     // 내보낸 인형이 없으면 다음 것으로
     order.forEach(function (c) {
         const m = mem[c];
@@ -1085,6 +1168,18 @@ function resolveRound(run, now) {
             continue;
         }
         const sk = skills(d.sp);
+        // 🧸 상태 — 역병 · 묶임 (캐릭터 봉제인형 기술 · 2026-11-09)
+        if (stHas(d)) {
+            const tk = stTick(d, nm);
+            tk.lines.forEach(function (l) { log.push({ t: l }); });
+            if (tk.dot) {
+                d.hp = Math.max(0, d.hp - tk.dot); touch(c, m.act); P['members/' + c + '/dolls/' + m.act + '/st'] = d.st || null;
+                log.push({ t: fmt(pick(TX.hurt), { d: nm }), hit: c, key: m.act, hp: d.hp });
+                if (d.hp <= 0) { fallDoll(c); continue; }
+            }
+            P['members/' + c + '/dolls/' + m.act + '/st'] = d.st || null;
+            if (tk.skip) continue;
+        }
         // 💠 먹인 속성 룬으로 친다 — 세고 빗나가지 않는다 (급소 자주) · 룬 공격은 속성을 안 탄다
         if (k.indexOf('rn:') === 0) {
             const rl = Array.isArray(d.runes) ? d.runes : (d.runes ? Object.keys(d.runes).map(function (x) { return d.runes[x]; }) : []);
@@ -1109,18 +1204,33 @@ function resolveRound(run, now) {
         }
         const s1 = sk.a[Number(k.slice(1))] || sk.a[0];
         log.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: c });
-        const r = strike(d, foe, s1[1], null);
-        if (!r.hit) { log.push({ t: fmt(pick(TX.miss), { a: nm, d: foe.name }) }); continue; }
-        foe.hp = Math.max(0, foe.hp - r.dmg);
-        log.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: foe.name })), hit: 'foe', hp: foe.hp });
-        if (r.eff > 1) log.push({ t: pick(TX.great) }); else if (r.eff < 1) log.push({ t: pick(TX.weak) });
+        const r = strike(d, foe, s1[1], null, { a: nm, d: foe.name });
+        if (!r.hit) { r.lines.forEach(function (l) { log.push({ t: l }); }); log.push({ t: fmt(pick(TX.miss), { a: nm, d: foe.name }) }); continue; }
+        if (r.dmg > 0) {
+            foe.hp = Math.max(0, foe.hp - r.dmg);
+            log.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: foe.name })), hit: 'foe', hp: foe.hp });
+            if (r.eff > 1) log.push({ t: pick(TX.great) }); else if (r.eff < 1) log.push({ t: pick(TX.weak) });
+        }
+        r.lines.forEach(function (l) { log.push({ t: l }); });
+        if (r.back && d.hp > 0) { d.hp = Math.max(0, d.hp - r.back); touch(c, m.act); log.push({ t: fmt(pick(TX.hurt), { d: nm }), hit: c, key: m.act, hp: d.hp }); }
+        if (r.heal && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.heal); touch(c, m.act); log.push({ t: nm + D().josa(nm, '이') + ' 마음을 다잡았다 — ' + r.heal + ' 회복', heal: c, key: m.act, hp: d.hp }); }
         if (r.drain && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.drain); touch(c, m.act); log.push({ t: nm + D().josa(nm, '이') + ' 기운을 조금 빨아들였다!', heal: c, key: m.act, hp: d.hp }); }
+        P['members/' + c + '/dolls/' + m.act + '/st'] = d.st || null;
+        if (d.hp <= 0) { fallDoll(c); }
         if (foe.hp <= 0) won = true;
     }
     // ② 괴담 차례
     if (!won) {
+        // 🧸 괴담의 상태 — 역병 · 묶임 (캐릭터 봉제인형 기술)
+        let foeSkip = false;
+        if (stHas(foe)) {
+            const tk = stTick(foe, foe.name);
+            tk.lines.forEach(function (l) { log.push({ t: l }); });
+            if (tk.dot) { foe.hp = Math.max(0, foe.hp - tk.dot); log.push({ t: fmt(pick(TX.hurt), { d: foe.name }), hit: 'foe', hp: foe.hp }); if (foe.hp <= 0) won = true; }
+            foeSkip = tk.skip;
+        }
         const hits = (foe.boss && order.length >= 2) ? 2 : 1;
-        for (let h = 0; h < hits && !won; h++) {
+        for (let h = 0; h < hits && !won && !foeSkip; h++) {
             const al = live();
             if (!al.length) break;
             const tau = al.filter(function (c) { return guards[c] && guards[c].taunt; });
@@ -1128,35 +1238,30 @@ function resolveRound(run, now) {
             const m = mem[c], d = m.dolls[m.act], nm = d.nick || D().spName(d.sp);
             const mv = pick(D().MON_BY[foe.i].mv);
             log.push({ t: fmt(pick(TX.use), { a: foe.name, m: mv[0] }), f: 1 });
-            const r = strike(foe, d, mv[1], guards[c]);
-            if (!r.hit) { log.push({ t: fmt(pick(TX.miss), { a: foe.name, d: nm }) }); continue; }
+            const r = strike(foe, d, mv[1], guards[c], { a: foe.name, d: nm });
+            if (!r.hit) { r.lines.forEach(function (l) { log.push({ t: l }); }); log.push({ t: fmt(pick(TX.miss), { a: foe.name, d: nm }) }); continue; }
             let dmg = r.dmg, held = false;
-            if (d.hp - dmg <= 0 && (Number(d.bond) || 0) >= 100 && !d.held) { d.held = 1; held = true; dmg = Math.max(0, d.hp - 1); P['members/' + c + '/dolls/' + m.act + '/held'] = 1; }
+            if (dmg > 0 && d.hp - dmg <= 0 && (Number(d.bond) || 0) >= 100 && !d.held) { d.held = 1; held = true; dmg = Math.max(0, d.hp - 1); P['members/' + c + '/dolls/' + m.act + '/held'] = 1; }
             d.hp = Math.max(0, d.hp - dmg);
             touch(c, m.act);
-            log.push({ t: (r.crit ? '급소에 맞았다! ' : '') + fmt(pick(TX.hurt), { d: nm }), hit: c, key: m.act, hp: d.hp });
+            P['members/' + c + '/dolls/' + m.act + '/st'] = d.st || null;
+            if (dmg > 0) log.push({ t: (r.crit ? '급소에 맞았다! ' : '') + fmt(pick(TX.hurt), { d: nm }), hit: c, key: m.act, hp: d.hp });
+            r.lines.forEach(function (l) { log.push({ t: l }); });
+            if (r.back) { foe.hp = Math.max(0, foe.hp - r.back); log.push({ t: fmt(pick(TX.hurt), { d: foe.name }), hit: 'foe', hp: foe.hp }); if (foe.hp <= 0) won = true; }
             if (held) log.push({ t: fmt(pick(TX.hold), { d: nm }) });
-            if (r.eff > 1) log.push({ t: pick(TX.great) });
+            if (dmg > 0 && r.eff > 1) log.push({ t: pick(TX.great) });
             const g = guards[c];
-            if (g && g.reflect && d.hp > 0) {
+            if (g && g.reflect && dmg > 0 && d.hp > 0) {
                 const back = Math.max(1, Math.round(r.dmg * g.reflect));
                 foe.hp = Math.max(0, foe.hp - back);
                 log.push({ t: nm + D().josa(nm, '이') + ' 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', hit: 'foe', hp: foe.hp });
                 if (foe.hp <= 0) won = true;
             }
-            if (d.hp <= 0) {
-                log.push({ t: fmt(pick(TX.faint), { d: nm }), ko: c, key: m.act });
-                const k2 = aliveKey(m, null);
-                if (k2) {
-                    m.act = k2; P['members/' + c + '/act'] = k2;
-                    const d2 = m.dolls[k2];
-                    log.push({ t: m.name + ' — ' + fmt(pick(TX.go), { a: d2.nick || D().spName(d2.sp) }), go: c, key: k2 });
-                    P['fight/part/' + c + '/' + k2] = 1;
-                } else { m.out = 1; P['members/' + c + '/out'] = 1; log.push({ t: m.name + ' 사원의 봉제인형이 모두 지쳤다.' }); }
-            }
+            if (d.hp <= 0) fallDoll(c);
         }
     }
     P['fight/foe/hp'] = foe.hp;
+    P['fight/foe/st'] = foe.st || null;
     if (won || foe.hp <= 0) {
         log.push({ t: fmt(pick(TX.faint), { d: foe.name }), ko: 'foe' });
         const drops = {};
@@ -1399,6 +1504,13 @@ function resolvePvp(cur) {
         const d = S[s], e = S[t];
         if (d.hp <= 0) continue;
         const nm = nmOf(s), en = nmOf(t), sk = skills(d.sp);
+        // 🧸 상태 — 역병 · 묶임 (캐릭터 봉제인형 기술 · 2026-11-09)
+        if (stHas(d)) {
+            const tk = stTick(d, nm);
+            tk.lines.forEach(function (l) { play.push({ t: l }); });
+            if (tk.dot) { d.hp = Math.max(0, d.hp - tk.dot); play.push({ t: fmt(pick(TX.hurt), { d: nm }), hit: s, hp: d.hp }); if (d.hp <= 0) { fell(s); continue; } }
+            if (tk.skip) continue;
+        }
         let k = String(cur.pick[s] || 'a0');
         if (k.indexOf('sw:') === 0) {                                  // 🔁 바꿔 내보낸다 — 이번 턴은 이것으로 끝
             const id = k.slice(3);
@@ -1439,15 +1551,20 @@ function resolvePvp(cur) {
         }
         const s1 = sk.a[Number(k.slice(1))] || sk.a[0];
         play.push({ t: fmt(pick(TX.use), { a: nm, m: s1[0] }), a: s });
-        const r = strike(d, e, s1[1], guards[t]);
-        if (!r.hit) { play.push({ t: fmt(pick(TX.miss), { a: nm, d: en }) }); flat.push({ r: round, who: s, atk: 'skill', dmg: 0, blocked: false }); continue; }
-        e.hp = Math.max(0, e.hp - r.dmg);
-        play.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: en })) + ' (' + r.dmg + ')', hit: t, hp: e.hp });
-        if (r.eff > 1) play.push({ t: pick(TX.great) }); else if (r.eff < 1) play.push({ t: pick(TX.weak) });
+        const r = strike(d, e, s1[1], guards[t], { a: nm, d: en });
+        if (!r.hit) { r.lines.forEach(function (l) { play.push({ t: l }); }); play.push({ t: fmt(pick(TX.miss), { a: nm, d: en }) }); flat.push({ r: round, who: s, atk: 'skill', dmg: 0, blocked: false }); continue; }
+        if (r.dmg > 0) {
+            e.hp = Math.max(0, e.hp - r.dmg);
+            play.push({ t: (r.n > 1 ? r.n + '번 맞았다! ' : '') + (r.crit ? fmt(pick(TX.crit), { a: nm }) : fmt(pick(TX.hit), { a: nm, d: en })) + ' (' + r.dmg + ')', hit: t, hp: e.hp });
+            if (r.eff > 1) play.push({ t: pick(TX.great) }); else if (r.eff < 1) play.push({ t: pick(TX.weak) });
+        }
+        r.lines.forEach(function (l) { play.push({ t: l }); });
         flat.push({ r: round, who: s, atk: 'skill', dmg: r.dmg, blocked: !!(guards[t] && guards[t].take) });
+        if (r.back && d.hp > 0) { d.hp = Math.max(0, d.hp - r.back); play.push({ t: fmt(pick(TX.hurt), { d: nm }) + ' (' + r.back + ')', hit: s, hp: d.hp }); }
+        if (r.heal && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.heal); play.push({ t: nm + D().josa(nm, '이') + ' 마음을 다잡았다 — ' + r.heal + ' 회복', heal: s, hp: d.hp }); }
         if (r.drain && d.hp > 0) { d.hp = Math.min(d.max, d.hp + r.drain); play.push({ t: nm + D().josa(nm, '이') + ' 기운을 조금 빨아들였다!', heal: s, hp: d.hp }); }
         const g = guards[t];
-        if (g && g.reflect && e.hp > 0) {
+        if (g && g.reflect && r.dmg > 0 && e.hp > 0) {
             const back = Math.max(1, Math.round(r.dmg * g.reflect));
             d.hp = Math.max(0, d.hp - back);
             play.push({ t: en + D().josa(en, '이') + ' 맞받아쳤다! ' + back + '만큼 되돌려 주었다!', hit: s, hp: d.hp });

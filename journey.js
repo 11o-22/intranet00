@@ -50,10 +50,22 @@ const OV = 'jr-ov';
 // ==========================================
 //   공격 종류  hit 보통 · heavy 강타(160% · 75% 명중) · multi 두 번(65% 씩) · pierce 방어 무시(110%) · drain 흡수(90% · 40% 회복) · sure 확정(85% · 치명 +25)
 //   방어 종류  guard 피해 절반 · dodge 75% 로 피함 · counter 70% 받고 60% 되돌림 · heal 30% 회복 · taunt 적을 끌어 65% 받음
-const ATK_T = { hit: { m: 1.0, h: 95 }, heavy: { m: 1.6, h: 75 }, multi: { m: 0.65, h: 90, n: 2 }, pierce: { m: 1.1, h: 90, pierce: 1 }, drain: { m: 0.9, h: 95, drain: 0.4 }, sure: { m: 0.85, h: 100, crit: 25 } };
+const ATK_T = { hit: { m: 1.0, h: 95 }, heavy: { m: 1.6, h: 75 }, multi: { m: 0.65, h: 90, n: 2 }, pierce: { m: 1.1, h: 90, pierce: 1 }, drain: { m: 0.9, h: 95, drain: 0.4 }, sure: { m: 0.85, h: 100, crit: 25 },
+    // 🧸 캐릭터 봉제인형 기술 (2026-11-09 사용자 「캐릭터 봉제인형들 공격 스킬이 다 똑같아 — 다 다르게」)
+    //   util 이 붙은 것은 봉제인형 전투(doll-battle.js)에서 피해 대신 효과만 낸다 — 여정(여기)에서는 m 만큼의 보통 공격으로 떨어진다
+    burn:    { m: 1.0, h: 100, crit: 45 },                 // 소각 — 확정 명중 · 치명타 확률 ↑
+    dark:    { m: 0.8, h: 95, blind: 1 },                  // 조명 끄기 — 상대의 다음 공격 명중 −50
+    swap:    { m: 0.5, h: 100, util: 1, swap: 1 },         // 자리 바꾸기 — 상대의 다음 공격 피해를 그대로 상대에게 돌린다 (나는 안 맞는다)
+    seal:    { m: 0.9, h: 95, drain: 0.6 },                // 금제 — 준 피해의 6할을 가져온다
+    counsel: { m: 0.5, h: 100, util: 1, selfHeal: 0.3 },   // 상담 — 제 체력 30% 회복
+    plague:  { m: 0.6, h: 95, dot: 2, dotM: 0.5 },         // 역병 — 2턴 동안 차례마다 도트 피해
+    read:    { m: 0.5, h: 90, util: 1, stun: 1 },          // 읽기 — 상대(괴담 · 야생 · 상대 인형)의 다음 차례를 묶는다
+    gaze:    { m: 0.5, h: 100, util: 1, invuln: 2 }        // 응시 — 상대 공격 두 번을 무적으로 받는다
+};
 const DEF_T = { guard: { take: 0.5 }, dodge: { dodge: 75 }, counter: { take: 0.7, reflect: 0.6 }, heal: { heal: 0.3 }, taunt: { take: 0.65, taunt: 1 } };
 const GEAR_T = { crit: { atk: 1, m: 1.5, h: 100, crit: 100 }, heavy: { atk: 1, m: 1.8, h: 100 }, dodge: { def: 1, dodge: 100 }, pierce: { atk: 1, m: 1.5, h: 100, pierce: 1 }, guard: { def: 1, take: 0.3, heal: 0.15 } };
-const T_NAME = { hit: '보통', heavy: '강타', multi: '두 번', pierce: '방어 무시', drain: '흡수', sure: '확정 명중', guard: '피해 절반', dodge: '피하기', counter: '되받기', heal: '회복', taunt: '끌어오기' };
+const T_NAME = { hit: '보통', heavy: '강타', multi: '두 번', pierce: '방어 무시', drain: '흡수', sure: '확정 명중', guard: '피해 절반', dodge: '피하기', counter: '되받기', heal: '회복', taunt: '끌어오기',
+    burn: '확정 명중 · 치명타 ↑', dark: '상대 명중 ↓', swap: '피해 돌려주기', seal: '크게 흡수', counsel: '회복 30%', plague: '2턴 도트', read: '한 턴 묶기', gaze: '2턴 무적' };
 
 const RECALL = {
     1: '창틀의 볕이 옮겨 가는 것을 세며 주인이 돌아올 시간을 쟀다. 부르면 안 가는 것은 자존심이지, 기다리지 않아서가 아니었다.',
@@ -153,7 +165,13 @@ const SK = {
     22: { a: [['하울링', 'sure'], ['물어뜯기', 'heavy'], ['연속 물기', 'multi']],              d: [['앞에 서기', 'taunt'], ['되물기', 'counter']] },
     23: { a: [['양털 돌진', 'hit'], ['들이받기', 'heavy'], ['뛰어오르기', 'sure']],            d: [['양털 뭉치기', 'guard'], ['꾸벅 졸기', 'heal']] },
     24: { a: [['인분 흩뿌리기', 'sure'], ['날개 치기', 'multi'], ['더듬이 찌르기', 'pierce']],  d: [['바람에 흩어지기', 'dodge'], ['날개 접기', 'guard']] },
-    25: { a: [['고성방가', 'sure'], ['부리 쪼기', 'multi'], ['날개 치기', 'hit']],             d: [['어깨 뒤로', 'dodge'], ['깃 고르기', 'heal']] }
+    25: { a: [['고성방가', 'sure'], ['부리 쪼기', 'multi'], ['날개 치기', 'hit']],             d: [['어깨 뒤로', 'dodge'], ['깃 고르기', 'heal']] },
+    // 🧸 캐릭터 봉제인형 (2026-11-09 사용자) — 나머지 캐릭터는 아직 기본 기술(SK[1])
+    32: { a: [['부수기', 'heavy'], ['날리기', 'hit'], ['빼앗기', 'drain']],                   d: [['몸 돌리기', 'dodge'], ['버티기', 'guard']] },          // 이자헌
+    34: { a: [['소각', 'burn'], ['조명 끄기', 'dark'], ['자리 바꾸기', 'swap']],               d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] },      // 브라운
+    41: { a: [['금제', 'seal'], ['상담', 'counsel'], ['역병', 'plague']],                     d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] },      // 호유원
+    26: { a: [['읽기', 'read'], ['수정', 'pierce'], ['부수기', 'heavy']],                     d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] },      // 김솔음
+    27: { a: [['빼앗기', 'drain'], ['응시', 'gaze'], ['찍기', 'pierce']],                     d: [['웅크리기', 'guard'], ['폴짝 피하기', 'dodge']] }       // 백사헌
 };
 // 🧸 따라쟁이 봉제인형(doll-battle.js)도 같은 스킬표를 쓴다 — 동물마다 공격 셋 · 방어 둘
 window.JOURNEY_SK = { SK: SK, ATK_T: ATK_T, DEF_T: DEF_T, T_NAME: T_NAME };
@@ -762,6 +780,7 @@ function resolve(r) {
                 }
                 if (!hits) say(p.nick + ' — ' + atk.n + '. 빗나갔다.');
                 else { mon.hp = Math.max(0, mon.hp - total); say(p.nick + ' — ' + atk.n + ' → ' + mon.n + ' 에 ' + total + (n > 1 ? ' (' + hits + '번)' : '')); if (atk.t.drain) { const h = Math.round(total * atk.t.drain); p.hp = Math.min(p.max, p.hp + h); say(p.nick + josa(p.nick, '이') + ' ' + h + ' 만큼 숨을 돌렸다'); } }
+                if (atk.t.selfHeal) { const h = Math.round(p.max * atk.t.selfHeal); p.hp = Math.min(p.max, p.hp + h); say(p.nick + josa(p.nick, '이') + ' 마음을 다잡았다 — ' + h + ' 회복'); }
             } else if (defT) {
                 p.guard = defT.t;
                 if (defT.t.heal) { const h = Math.round(p.max * defT.t.heal); p.hp = Math.min(p.max, p.hp + h); say(p.nick + ' — ' + defT.n + '. ' + h + ' 회복'); }
