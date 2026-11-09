@@ -1850,14 +1850,18 @@ function askLocked() {
 //     콘솔로도 된다: eventInvite('사번') · eventUninvite('사번') · eventInvites()
 //     초대가 오면 그 사람 화면에 알린다. 안에 있는데 초대가 취소되면 광장으로 돌려보낸다.
 //   · 문지기는 goRoom — 어느 길로 오든(따라가기 · 끌려가기 · 동료 목록 · 콘솔) 초대가 없으면 못 든다. 상담사는 늘 든다.
+//   · 📱 모바일(pointer: coarse)에서만 든다 — PC 는 목록에도 안 보이고 goRoom 에서도 막힌다. 상담사는 PC 에서도 든다 (시험용).
 //   · 🍍 파인애플(작아진 사람)은 이 방 안에서는 보통 크기다 (tinyOf) — 물약은 그대로라 나오면 도로 작아진다.
 //   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
 //     서 있는 동안은 걸음 · 바닥 짚기가 안 먹는다 — [내려오기] 를 눌러야 덱으로 내려온다 (사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」).
 const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [-90, 90, -180, 180, 0, -270, 270], NEAR: 40 };   // 가운데 단추 양옆부터
 let evInv = null, evRef = null, evKnown = null;
 function evInvited(u) { u = u || u_(); if (!u) return false; if (isAdm(u)) return true; return !!(evInv && evInv[u.code]); }
+// 📱 모바일인가 — 손가락 화면(pointer: coarse) · 상담사는 PC 에서도 든다
+function evMobileOk(u) { u = u || u_(); if (isAdm(u)) return true; return touchy(); }
+window.plazaEventMobileOk = evMobileOk;
 function evFixed() { return !!(run && run.evFix); }
-window.plazaEventOk = function () { return evInvited(u_()); };
+window.plazaEventOk = function () { return evInvited(u_()) && evMobileOk(u_()); };
 // 초대 목록을 듣는다 — 내 초대가 새로 오면 알리고, 안에 있는데 취소되면 내보낸다
 function evListen() {
     const d = db_(); if (!d) return;
@@ -1892,6 +1896,7 @@ window.plazaEventGo = function () {
     const me = u_();
     if (!me) return;
     if (!evInvited(me)) { const t = '🎉 이벤트 맵은 상담사의 초대가 있어야 들어갈 수 있습니다.'; if (run) sysLine(t); else if (typeof showCustomAlert === 'function') showCustomAlert(t); return; }
+    if (!evMobileOk(me)) { const t = '🎉 이벤트 맵은 모바일에서만 들어갈 수 있습니다.'; if (run) sysLine(t); else if (typeof showCustomAlert === 'function') showCustomAlert(t); return; }
     if (!run) { try { window.plazaOpen(); } catch (e) { } }
     if (!run) return;
     closeSheet();
@@ -4760,6 +4765,12 @@ function goRoom(key, way, lv) {
     //     읽었는데 초대가 없고 아직 아무 방에도 안 섰으면(새로고침 복원) 광장으로 보낸다 — 전에는 그냥 돌아가 화면이 까맣게 비었다 (2026-11-09 사용자)
     if (R[key].invite && !evInvited(u_()) && evInv !== null) {
         sysLine('🎉 이벤트 맵은 상담사의 초대가 있어야 들어갈 수 있습니다.');
+        if (run.room && run.me) return;
+        key = P.START; way = null; lv = 0;
+    }
+    // 📱 이벤트 맵은 모바일(손가락 화면)에서만 — PC 는 못 든다 (상담사는 시험을 위해 예외 · 2026-11-09 사용자 「PC로는 못 들어가게 · 모바일로만」)
+    if (R[key].invite && !evMobileOk()) {
+        sysLine('🎉 이벤트 맵은 모바일에서만 들어갈 수 있습니다.');
         if (run.room && run.me) return;
         key = P.START; way = null; lv = 0;
     }
