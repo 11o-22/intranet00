@@ -112,7 +112,7 @@ function unitOf(rec, opt) {
         st: { atk: s.atk, chm: s.chm, def: s.def, sta: s.sta, spd: s.spd }, erase: null,
         rank: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0, acc: 0, eva: 0 },
         status: (rec.st && ST_NAME[rec.st.k]) ? rec.st.k : null, sc: (rec.st && rec.st.c) | 0,
-        mv: mv, pp: pp, trait: opt.trait != null ? opt.trait : ((rec.tr | 0) || 0), used: {},
+        mv: mv, pp: pp, trait: opt.trait != null ? opt.trait : (window.D2TR ? window.D2TR.trOf(rec) : ((rec.tr | 0) || 0)), used: {},   // 특성 — 기록 없으면 d2-traits 의 결정적 값
         dark: !!opt.dark, rec: { lv: s.lv, xp: rec.xp | 0, g: rec.g || s.g, iv: rec.iv, pr: rec.pr, ev: rec.ev, at: rec.at, id: rec.id, sp: rec.sp, att: el },
         guard: null, guardFired: false, guardLast: false, restUntil: 0, focus: false, calmTurn: 0, prio3: 0, baton: false, boost: [], flinch: false, flinchUsed: false, chainUsed: false,
         donut: false, show: null, limit: null, pendLimit: null, pendErase: null, enteredTurn: 0, enteredBy: '', lastMove: 0, fainted: false, evN: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 }, met: {}
@@ -263,7 +263,7 @@ function start(opt) {
     const S = { turn: 1, me: 'A', mode: opt.mode || 'pve', log: [], tlog: [], over: null, need: null, pickAt: 0, in: {}, field: { reverse: null, pendReverse: null },
         sides: { A: { units: [], act: 0, decoy: null, nail: 0, auto: !!(opt.auto && opt.auto.A), switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0 },
                  B: { units: [], act: 0, decoy: null, nail: 0, auto: !(opt.auto && opt.auto.B === false), switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0 } } };
-    (opt.my || []).forEach(function (rec) { S.sides.A.units.push(unitOf(rec, { trait: rec.tr })); });
+    (opt.my || []).forEach(function (rec) { S.sides.A.units.push(unitOf(rec, {})); });
     (opt.foe || []).forEach(function (f) { S.sides.B.units.push(f.rec ? unitOf(f.rec, { name: f.name, dark: !!f.dark, trait: f.trait, el: f.el }) : foeOf(f, rng)); });
     if (opt.foeUnits) opt.foeUnits.forEach(function (u) { S.sides.B.units.push(u); });
     if (!S.sides.A.units.length || !S.sides.B.units.length) throw new Error('양쪽에 인형이 있어야 합니다.');
