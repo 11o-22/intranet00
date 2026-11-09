@@ -33,7 +33,7 @@
 //   d2  1                                 새 모델로 옮겨 왔다는 표
 //
 // ■ 옮겨 오기 (migrateAll — 3단계 뒤 한 번)
-//   개체치 · 성격이 없는 인형은 열쇠·태어난 때로 늘 같은 값을 뽑는다(결정적 난수) — 기기마다 같은 값이 나오게. 지금은 iv · pr 만 미리 적어 둔다 (fixIv · 5초마다).
+//   개체치 · 성격이 없는 인형은 열쇠·태어난 때로 늘 같은 값을 뽑는다(결정적 난수 · 종은 열쇠에서 나오므로 안 섞는다) — 기기마다 같은 값이 나오게. 지금은 iv · pr 만 미리 적어 둔다 (fixIv · 5초마다).
 //   레벨은 예전 「등급마다 Lv 1 부터」 를 새 구간으로 — 등급 구간 안에 들어오게 (C Lv 3 → 11 · C Lv 15 → 15). 등급은 안 내려간다.
 //   HP 는 비율을 지킨다.
 //
@@ -94,7 +94,7 @@ function rollIv(r) {
     return { pr: pr, iv: iv };
 }
 // 기록이 없는 인형의 개체치 — 열쇠 · 태어난 때 · 종으로 늘 같은 값
-function ivFallback(d) { return rollIv(rngOf('d2:' + String((d && d.id) || '') + ':' + String((d && d.at) || 0) + ':' + String((d && d.sp) || ''))); }
+function ivFallback(d) { return rollIv(rngOf('d2:' + String((d && d.id) || '') + ':' + String((d && d.at) || 0))); }   // 열쇠 · 태어난 때만 (sp 는 열쇠에서 나온다)
 function ivOf(d) {
     if (d && d.iv && PERS[int(d.pr)]) { const iv = {}; KEYS.concat(['hp']).forEach(function (k) { iv[k] = int(d.iv[k]); }); return { pr: int(d.pr), iv: iv }; }
     return ivFallback(d);

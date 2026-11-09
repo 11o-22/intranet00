@@ -472,6 +472,7 @@
       "doll-data.js",
       "awk-rune.js",
       "d2-core.js",
+      "d2-skills.js",
       "doll-scene.js",
       "doll-battle.js",
       "doll-gong.js",
