@@ -427,14 +427,16 @@ const R = P.ROOMS;
 
 // 🎉 이벤트 맵 — 풀 파티 (2026-11-09 사용자 「이 배경을 이벤트 맵으로 · 상담사가 초대를 해야만 · 광장처럼 · 가운데 무대가 잘 보이도록 · 무대 중앙 [고정]」)
 //   주신 그림(2350x3060 · 도트 한 칸 5픽셀)을 한 칸 한 점(470x612)으로 두고 네 배(1880x2448)로 그린다 — 사람 몫이 광장과 같다.
-//   그림 아래 25%(y 1850~)가 어두운 벽이라 광장처럼 잘라(cut 600) 채팅 · 미니맵 자리로 쓴다 → 무대(y 900~1200)가 화면 가운데 온다.
-//   바닥 띠는 **수영장 앞 테두리**(네온 띠 · y 1600~1676) — 무대 · 수영장이 가려지지 않는 관객 자리.
+//   위 하늘(top 320)과 아래 어두운 벽(cut 700)을 잘라 창에 맞추므로 무대(y 700~1230)가 광장 방보다 1.3배쯤 크게 보인다
+//   (2026-11-09 사용자 「무대가 조금 더 확대」). 잘라 낸 몫은 창 밖 — 채팅 · 미니맵은 수영장 위에 얹힌다.
+//   바닥 띠는 **무대 계단 아래 덱**(긴 의자와 수영장 사이 · y 1372~1412) — 사용자 「물 위가 아니라 저기 바닥을 걸어야」.
 //   무대 위로는 걸어서 못 올라간다 — 무대 중앙의 [📍 고정] 을 눌러 서고, 다시 누르거나 움직이면 내려온다 (아래 「이벤트 맵」).
 //   max 1 — 방은 하나. 초대받은 사람은 몇 명이든 한 방에 든다 (goRoom 이 forceInst 1 · 넘침 옮기기는 옮길 방이 없어 안 한다).
-R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-pool.webp', w: 1880, h: 2448, cut: 600, k: 1, pix: 1, max: 1, invite: 1,
-            floor: [1600, 1676],
-            // [고정] 단추는 무대 중앙선 · 계단 발치(y 1470 — 단추는 아래끝 기준이라 화면 크기와 상관없이 선 사람 발 아래에 온다)
-            spots: [ { x: 940, y: 1470, get n() { return evFixed() ? '내려오기' : '고정'; }, i: '📍', fn: 'plazaEventFix' },
+R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-pool.webp', w: 1880, h: 2448, top: 320, cut: 700, k: 1, pix: 1, max: 1, invite: 1,
+            floor: [1372, 1412],
+            // [고정] 단추는 무대 한가운데(DJ 탁자 앞 · 아래끝 y 1215). 서는 자리는 단추 양옆(EV.SLOTS)이라 단추를 가리지 않는다.
+            //   내가 서 있는 동안은 「내려오기」가 계단 발치(1470)로 내려온다
+            spots: [ { x: 940, get y() { return evFixed() ? 1470 : 1215; }, get n() { return evFixed() ? '내려오기' : '고정'; }, i: '📍', fn: 'plazaEventFix' },
                      { x: 1790, n: '광장으로', ic: 'out', go: P.START } ] };
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
@@ -1846,7 +1848,7 @@ function askLocked() {
 //   · 🍍 파인애플(작아진 사람)은 이 방 안에서는 보통 크기다 (tinyOf) — 물약은 그대로라 나오면 도로 작아진다.
 //   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
 //     서 있는 동안은 걸음이 안 먹고, 다시 누르거나(내려오기) 조이스틱 · 바닥 짚기로 움직이면 수영장 앞 테두리로 내려온다.
-const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [0, -95, 95, -190, 190, -285, 285], NEAR: 40 };
+const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [-90, 90, -180, 180, 0, -270, 270], NEAR: 40 };   // 가운데 단추 양옆부터
 let evInv = null, evRef = null, evKnown = null;
 function evInvited(u) { u = u || u_(); if (!u) return false; if (isAdm(u)) return true; return !!(evInv && evInv[u.code]); }
 function evFixed() { return !!(run && run.evFix); }
@@ -4341,8 +4343,9 @@ function zoomOf(r) {
     const vb = v ? viewBox() : { w: 0, h: 760 };
     const vh = vb.h || 760, vw = vb.w || 0;
     const cut = (r.cut != null) ? r.cut : (P.CUT || 0);
-    const zH = vh / Math.max(200, r.h - cut);
-    if (run) { run._cy = 0; run._wide = false; }
+    const top = r.top || 0;                                      // 🎉 위쪽도 잘라 낸다 (이벤트 맵 — 하늘을 덜 보이고 무대를 키운다 · 2026-11-09)
+    const zH = vh / Math.max(200, r.h - cut - top);
+    if (run) { run._cy = top * zH; run._wide = false; }
     // 넓은 터치 화면 — 방이 창보다 좁을 때만 (위 WIDE 설명)
     const W = P.WIDE;
     if (!W || !run || cut <= 0 || !vw || r.w * zH >= vw || !touchy()) return zH;
@@ -4508,6 +4511,7 @@ function paintSpots() {
         e.style.left = Math.round(s.x * z) + 'px';
         e.style.top = Math.round((s.y != null ? s.y : b[0] - 10) * z) + 'px';
         e.innerHTML = '<div class="b">' + ico(s) + '</div><div class="t">' + esc(s.n) + '</div>';
+        if (s.z != null) e.style.zIndex = String(s.z);        // 🎉 사람 뒤에 두는 단추 (무대 위 [고정] — 선 사람이 가린다)
         // ★ 게시판 — 단추가 아니라 **세워 둔 판**으로 그린다 (board.js 가 그림을 준다).
         //   사람처럼 선 자리(y)로 앞뒤를 가린다 — 판 뒤를 지나가는 사람은 가려진다.
         if (s.board && typeof window.plazaBoardArt === 'function') {
