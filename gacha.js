@@ -199,6 +199,9 @@ const GACHA_FEM = [
     { k: 'gleash',     n: '금 목줄',            s: ['gold-leash'] }
 ];
 GACHA.fem = { n: '여성 체형 의상 뽑기', ic: 'wearshop', one: 30000, ten: 300000, miss: 50 };
+// 밀실 거래(p2p-wear.js · p2p-fix.js)가 본다 — 여성 체형 의상은 옷장 권한(dotGrant)이 본체라 따로 옮긴다 (2026-11-09 사용자 「여성 체형용 의상도 밀실로 거래가 가능하게」)
+window.GACHA_FEM = GACHA_FEM;
+window.GACHA_FEM_KEYS = {}; GACHA_FEM.forEach(function (x) { window.GACHA_FEM_KEYS[x.k] = x; });
 
 (function gacha() {
 

@@ -45,6 +45,12 @@
 //   사번 지정(nos)은 주고받을 거리가 아니라 빠집니다. 악세 마흔아홉 가지는
 //   gacha.js 가 나중에 밀어 넣으므로, 가짓수가 바뀌면 표를 다시 셉니다.
 //
+// ■ ★ 여성 체형 의상 (2026-11-09 사용자 「여성 체형용 의상도 밀실로 거래가 가능하게」)
+//
+//   레드 비키비키니 · 바니걸 · 셔츠 · 금 목줄 … (gacha.js GACHA_FEM) 은 옷장 권한 users/<열쇠>/dotGrant/<옷열쇠> 가
+//   본체다 (closet.js hasGrant). wardrobe 에도 같이 적히지만 상담사가 선물함으로 준 것은 dotGrant 에만 있다.
+//   그래서 「가졌나」는 둘 중 하나라도 있으면 가진 것으로 보고, 옮길 때(p2p-fix.js)는 dotGrant 를 옮기고 wardrobe 를 따라 맞춘다.
+//
 // ■ 콘솔
 //       p2pWearList()   주고받을 수 있는 옷 전부
 //       p2pWearMine()   내가 가진 것
@@ -63,6 +69,8 @@ function val(id) { const e = el(id); return e ? e.value : ''; }
 // ==========================================
 // 무엇이 있나
 // ==========================================
+function femKeys() { return (window.GACHA_FEM_KEYS && typeof window.GACHA_FEM_KEYS === 'object') ? window.GACHA_FEM_KEYS : {}; }
+function isFem(k) { return !!femKeys()[k]; }
 function build() {
     const out = [];
     if (typeof DOT_SLOTS === 'undefined') return out;
@@ -72,6 +80,13 @@ function build() {
             if (it.noTrade) return;          // 상담사가 선물로만 주는 것 (유리 펜)
             out.push({ k: it.own, n: it.n, slot: s.n });
         });
+    });
+    // ★ 여성 체형 의상 — 옷장 열쇠(i)가 곧 거래 열쇠
+    const F = femKeys();
+    Object.keys(F).forEach(function (k) {
+        let slot = '여성 체형';
+        DOT_SLOTS.forEach(function (s) { s.items.forEach(function (it) { if (it.i === k) slot = s.n + ' · 여성 체형'; }); });
+        out.push({ k: k, n: F[k].n, slot: slot });
     });
     return out;
 }
@@ -88,8 +103,14 @@ function byKey(k) {
     return got[0] || null;
 }
 function has(u, k) {
-    try { return !!(u && u.wardrobe && u.wardrobe[k]); } catch (e) { return false; }
+    try {
+        if (!u) return false;
+        if (u.wardrobe && u.wardrobe[k]) return true;
+        if (isFem(k) && u.dotGrant && u.dotGrant[k]) return true;      // 여성 체형 의상 — 권한만 있어도 가진 것
+        return false;
+    } catch (e) { return false; }
 }
+window.p2pWearIsFem = isFem;
 function mine() {
     const u = u_();
     return all().filter(function (x) { return has(u, x.k); });

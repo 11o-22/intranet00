@@ -125,13 +125,34 @@ function giveItems(c, name, qty) {
 //     없어지는데 받는 쪽에는 더 생길 것이 없어 그냥 사라진다. 그것은
 //     제안을 넣을 때와 수락할 때 p2p-wear.js 가 미리 막는다.
 //   무엇이라 부르는 옷인지(이름표)는 p2p-wear.js 가 들고 있다.
+function femKey(key) { try { return !!(window.GACHA_FEM_KEYS && window.GACHA_FEM_KEYS[key]); } catch (e) { return false; } }
 function takeWear(c, key) {
+    // ★ 여성 체형 의상 (2026-11-09) — 옷장 권한(dotGrant)이 본체. 그것을 지우고 wardrobe 도 따라 지운다 (없어도 그만)
+    if (femKey(key)) {
+        return txn('users/' + c + '/dotGrant/' + key, function (srv) {
+            if (!srv) return;
+            return null;
+        }).then(function (ok) {
+            if (!ok) {
+                // 권한은 없는데 wardrobe 에만 있는 옛 기록 — 그것이라도 지운다
+                return txn('users/' + c + '/' + WARD + '/' + key, function (srv) { if (!srv) return; return null; });
+            }
+            return database.ref('users/' + c + '/' + WARD + '/' + key).remove().then(function () { return true; }, function () { return true; });
+        });
+    }
     return txn('users/' + c + '/' + WARD + '/' + key, function (srv) {
         if (!srv) return;                 // 안 가지고 있다 — 그만둔다 (undefined 는 그만두기)
         return null;                      // null 은 「지운다」
     });
 }
 function giveWear(c, key) {
+    if (femKey(key)) {
+        return txn('users/' + c + '/dotGrant/' + key, function (srv) { return srv || 1; })
+            .then(function (ok) {
+                if (!ok) return false;
+                return txn('users/' + c + '/' + WARD + '/' + key, function (srv) { return srv || Date.now(); });
+            });
+    }
     return txn('users/' + c + '/' + WARD + '/' + key, function (srv) {
         return srv || Date.now();         // 이미 있으면 그대로 둔다
     });
@@ -309,12 +330,15 @@ function install() {
             //   그래서 양쪽 옷장을 먼저 본다 (내 것은 손에 있고, 상대 것은
             //   서버에서 한 번 읽는다). 잠가 둔 거래는 PENDING 으로 풀어 둔다.
             if (oBu.concat(dBu).some(function (x) { return x.k === 'wear'; })) {
-                const myW = (currentUser && currentUser.wardrobe) || {};
-                let hisW = {};
+                const myW = (currentUser && currentUser.wardrobe) || {}, myG = (currentUser && currentUser.dotGrant) || {};
+                let hisW = {}, hisG = {};
                 try { hisW = (await database.ref('users/' + him + '/' + WARD).once('value')).val() || {}; }
                 catch (e) { }
-                const dup = oBu.filter(function (x) { return x.k === 'wear' && myW[x.v]; })
-                    .concat(dBu.filter(function (x) { return x.k === 'wear' && hisW[x.v]; }));
+                try { hisG = (await database.ref('users/' + him + '/dotGrant').once('value')).val() || {}; }     // ★ 여성 체형 의상은 권한도 본다
+                catch (e) { }
+                const own = function (W, G, k) { return !!(W[k] || (femKey(k) && G[k])); };
+                const dup = oBu.filter(function (x) { return x.k === 'wear' && own(myW, myG, x.v); })
+                    .concat(dBu.filter(function (x) { return x.k === 'wear' && own(hisW, hisG, x.v); }));
                 if (dup.length) {
                     await database.ref('p2pDeals/' + idx + '/status').set('PENDING');
                     note('이미 가진 옷', false, dup.map(function (x) { return x.v; }).join(','));
