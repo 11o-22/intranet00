@@ -1474,14 +1474,14 @@ function tkDel(code, s, lt) {
         return null;
     });
 }
-// 💑 커플이 있는 사람은 커플끼리만 (2026-11-08 사용자 「쑤시기 버튼이나 벗기기 버튼은 커플 있는 사람들은 커플만 가능하게 하자」)
-//   상대에게 커플이 있으면 그 짝만 · 나에게 커플이 있으면 내 짝에게만 — 둘 다 없으면 누구나 (쑤시기 · 벗기기)
+// 💑 커플이 있는 사람은 그 짝만 (2026-11-08 사용자 「쑤시기 버튼이나 벗기기 버튼은 커플 있는 사람들은 커플만 가능하게 하자」)
+//   ★ 2026-11-09 사용자 「솔로인 사람들이 커플들을 못 누르게 하는데 커플들은 솔로인 사람 누를 수 있게 해줘. 까기나 벗기기도 마찬가지로」
+//     상대에게 커플이 있으면 그 짝만 누를 수 있다 · 나에게 커플이 있어도 솔로인 사람은 누를 수 있다 (다른 커플은 그 짝만)
+//     쑤시기 · 마사지 · 벗기기 · 까기가 함께 쓴다
 function cpOk(code) {
-    const me = myCode(), u = u_();
+    const me = myCode();
     const du = (typeof db !== 'undefined' && db && db.users) ? db.users[code] : null;
-    const mine = (u && u.couple && u.couple.partner) || null;
     const theirs = (du && du.couple && du.couple.partner) || null;
-    if (mine && mine !== code) return false;
     if (theirs && theirs !== me) return false;
     return true;
 }
