@@ -475,6 +475,7 @@
       "d2-skills.js",
       "d2-battle.js",
       "d2-traits.js",
+      "d2-items.js", "d2-learn.js",
       "doll-scene.js",
       "doll-battle.js",
       "doll-gong.js",

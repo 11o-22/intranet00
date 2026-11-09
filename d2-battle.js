@@ -72,7 +72,7 @@ const MSG = {
     64: '다음 턴부터 2턴간 느린 인형이 먼저 움직인다!', 65: '황룡의 계약으로 행동 순서가 뒤바뀌었다!', 66: '{효과명} 효과가 끝났다!',
     67: '{대상}은/는 다음 턴부터 2턴간 유틸기만 쓸 수 있다!', 68: '{대상}은/는 유틸기만 사용할 수 있게 되었다!', 69: '{대상}은/는 다음 턴부터 마지막으로 쓴 기술만 반복해야 한다!', 70: '{대상}은/는 2턴간 {제한기술명}만 사용할 수 있게 되었다!',
     71: '양초의 불빛이 {결과명}의 힘을 비추었다!', 72: '{사용자}은/는 도넛을 먹기 시작했다!', 73: '이미 먹고 있다!', 74: '무대의 막이 내려가기 시작했다!', 75: '{대상}에게 남은 턴: {남은턴}', 76: '{사용자}의 카운트다운이 취소되었다!',
-    80: '{대상}에게 {아이템명}을/를 사용했다!', 94: '다음으로 내보낼 인형을 선택해 주세요.', 112: '더 이상 경험치를 보관할 수 없다!', 113: '카운트다운은 이미 시작되고 있다!'
+    80: '{대상}에게 {아이템명}을/를 사용했다!', 81: '{대상}의 {기술명} PP가 {수치} 회복되었다!', 82: '{대상}은/는 HP {회복후HP}로 다시 움직일 수 있게 되었다!', 91: '{대상}의 훈련이 {횟수}회의 유효 행동 동안 2배로 기록된다!', 93: '{대상}의 훈련 보조가 끝났다!', 94: '다음으로 내보낼 인형을 선택해 주세요.', 112: '더 이상 경험치를 보관할 수 없다!', 113: '카운트다운은 이미 시작되고 있다!'
 };
 // 조사 — 마지막 글자의 받침 (숫자 · 영문도)
 function jong(s) {
@@ -115,7 +115,7 @@ function unitOf(rec, opt) {
         mv: mv, pp: pp, trait: opt.trait != null ? opt.trait : (window.D2TR ? window.D2TR.trOf(rec) : ((rec.tr | 0) || 0)), used: {},   // 특성 — 기록 없으면 d2-traits 의 결정적 값
         dark: !!opt.dark, rec: { lv: s.lv, xp: rec.xp | 0, g: rec.g || s.g, iv: rec.iv, pr: rec.pr, ev: rec.ev, at: rec.at, id: rec.id, sp: rec.sp, att: el },
         guard: null, guardFired: false, guardLast: false, restUntil: 0, focus: false, calmTurn: 0, prio3: 0, baton: false, boost: [], flinch: false, flinchUsed: false, chainUsed: false,
-        donut: false, show: null, limit: null, pendLimit: null, pendErase: null, enteredTurn: 0, enteredBy: '', lastMove: 0, fainted: false, evN: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 }, met: {}
+        donut: false, show: null, limit: null, pendLimit: null, pendErase: null, enteredTurn: 0, enteredBy: '', lastMove: 0, fainted: false, evN: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 }, met: {}, aid: Math.max(0, rec.aid | 0), dope: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0, acc: 0, eva: 0 }
     };
 }
 // 상대(야생 · 괴담) — spec { name, lv, el, g, pr, iv, mv:{a,u}, trait, dark, hp }
@@ -143,6 +143,16 @@ function fire(S, u, no) { if (ONCE[no]) u.used[no] = 1; log(S, 35, { 사용자: 
 
 const STOP = { stop: 1 }, NEED = { need: 1 };
 
+// ── 유효 훈련 — 한 행동에 능력치마다 최대 1회 · 훈련 보조(aid)가 남아 있으면 2회로 적고 보조 1 소모 (노력치 21 · 아이템 08)
+function credit(S, u, keys) {
+    const ks = Object.keys(keys || {}).filter(function (k) { return keys[k] && STATS5.indexOf(k) >= 0; });
+    if (!ks.length) return;
+    const two = u.aid > 0;
+    ks.forEach(function (k) { u.evN[k] += two ? 2 : 1; });
+    if (two) { u.aid--; if (u.aid === 0) log(S, 93, { 대상: u.name }); }
+}
+function dopeClear(u) { RANKS.forEach(function (k) { u.dope[k] = 0; }); }
+
 // ==========================================
 // 랭크 변화 (U5 · A6 · T2) — 돌려주는 값은 실제 변화량
 //   src: 'self' | 'foe' (상대에 의한 하락인가) · byUnit: 원인 인형 · quiet: 문구 없이(바통 대입 등은 쓰지 않는다 — 대입은 따로)
@@ -162,6 +172,8 @@ function rankChange(S, u, k, n, src, opt) {
         return 0;
     }
     u.rank[k] = now;
+    if (d < 0 && u.dope && u.dope[k] > 0) u.dope[k] = Math.max(0, u.dope[k] + d);        // 하락은 도핑 몫부터 (아이템 08)
+    if (opt.dope && d > 0) u.dope[k] += d;
     log(S, d > 0 ? 31 : 32, { 대상: u.name, 능력치: rankName(k) });
     if (d < 0 && src === 'foe') {
         if (canUse(u, 4)) { fire(S, u, 4); rankChange(S, u, 'atk', 1, 'self', { trait: 1 }); }
@@ -179,7 +191,7 @@ function resetRanks(u) { RANKS.forEach(function (k) { u.rank[k] = 0; }); }
 // ==========================================
 // 기절 (+5) · 교체 (S1~S5)
 // ==========================================
-function clearTemp(u) { u.guard = null; u.guardFired = false; u.focus = false; u.prio3 = 0; u.boost = []; u.flinch = false; u.donut = false; u.show = null; u.limit = null; u.pendLimit = null; u.baton = false; u.restUntil = 0; u.calmTurn = 0; resetRanks(u); }
+function clearTemp(u) { dopeClear(u); u.guard = null; u.guardFired = false; u.focus = false; u.prio3 = 0; u.boost = []; u.flinch = false; u.donut = false; u.show = null; u.limit = null; u.pendLimit = null; u.baton = false; u.restUntil = 0; u.calmTurn = 0; resetRanks(u); }
 function faint(S, u, cause) {
     cause = cause || {};
     if (u.fainted) return;
@@ -240,6 +252,7 @@ function enter(S, s, idx, why, carry) {
 function recall(S, s, why) {
     const sd = S.sides[s], u = cur(S, s);
     let carry = null;
+    if (why === 'baton') { RANKS.forEach(function (k) { u.rank[k] = Math.max(k === 'eva' ? 0 : -6, u.rank[k] - (u.dope[k] || 0)); }); dopeClear(u); }
     if (why === 'baton') carry = { rank: copy(u.rank), boost: u.boost.filter(function (b) { return !b.dope; }), focus: u.focus, prio3: u.prio3, masterTrait: has(u, 10) && canUse(u, 10), masterName: u.name };
     if (carry && carry.masterTrait) u.used[10] = 1;
     log(S, 37, { 사용자: u.name }, 'recall');
@@ -311,7 +324,7 @@ function ai2(S, s, rng, list) { if (!list.length) return { k: 'skill', no: 59 };
 // ==========================================
 function turn(S0, input) {
     const S = copy(S0);
-    S.in = input || {}; S.pickAt = 0; S.need = null; S.tlog = [];
+    S.in = input || {}; S.pickAt = 0; S.need = null; S.tlog = []; S.tcons = [];
     const seed = (S.in.seed != null ? String(S.in.seed) : 'd2t') + ':' + S.turn;
     const rng = rngOf(seed);
     S.rng = null;
@@ -325,7 +338,8 @@ function turn(S0, input) {
     let grow = null;
     if (S.over) grow = settle(S);
     delete S.in; delete S.rng;
-    return { S: S, log: S.tlog, over: S.over, grow: grow, need: null };
+    const cons = S.tcons; delete S.tcons;
+    return { S: S, log: S.tlog, over: S.over, grow: grow, need: null, cons: cons };
 }
 
 function runTurn(S, rng) {
@@ -451,7 +465,7 @@ function doSwitch(S, s, a, rng) {
 // 아이템 (+3) — 5단계 d2-items.js 가 D2IT.use 를 준다. 없으면 안내만.
 function doItem(S, s, a, rng) {
     a.done = true;
-    if (window.D2IT && typeof window.D2IT.use === 'function') { window.D2IT.use(S, s, a, rng, { log: log, say: say, cur: cur, alive: alive, ceil: ceil, faint: faint }); return; }
+    if (window.D2IT && typeof window.D2IT.use === 'function') { window.D2IT.use(S, s, a, rng, { log: log, say: say, cur: cur, alive: alive, ceil: ceil, faint: faint, rankChange: rankChange, heal: heal, ST_NAME: ST_NAME }); return; }
     say(S, '(아이템은 아직 없다)');
 }
 
@@ -494,9 +508,10 @@ function tryR(S, s, a, rng) {
 function fired(S, s, a) {
     const u = a.unit, sk = K().get(a.no);
     u.participated = 1;
+    a.ev = a.ev || {};
     if (sk.slot === 'A' && a.no !== 59) {
-        if (sk.kind === 'phys') u.evN.atk++; else if (sk.kind === 'mag') u.evN.chm++;
-        if ((sk.pri | 0) >= 1 || u.prio3 > 0) u.evN.spd++;
+        if (sk.kind === 'phys') a.ev.atk = 1; else if (sk.kind === 'mag') a.ev.chm = 1;
+        if ((sk.pri | 0) >= 1 || u.prio3 > 0) a.ev.spd = 1;
     }
     if (sk.slot === 'U') S.sides[s].usedUtil = S.turn;
     a.fired = true;
@@ -507,6 +522,7 @@ function doSkill(S, s, a, rng) {
     fired(S, s, a);
     a.done = true;
     if (sk.slot === 'A') attack(S, s, a, rng); else util(S, s, a, rng);
+    if (alive(a.unit) || a.ev) credit(S, a.unit, a.ev);
 }
 
 // ==========================================
@@ -522,7 +538,7 @@ function attack(S, s, a, rng) {
     let hit = false, dHP = 0, receiverDecoy = false;
     // A1.1 완전 방어 · 무효
     let blocked = false;
-    if (f.guard === 'full') { log(S, 8, { 대상: f.name }); blocked = true; }
+    if (f.guard === 'full') { log(S, 8, { 대상: f.name }); blocked = true; if (!isStruggle && (sk.kind === 'phys' || sk.kind === 'mag')) defEv(S, f, sk.kind); }
     else if (canUse(f, 33) && f.enteredBy === 'switch' && f.enteredTurn === S.turn && !f.decoyUsedTurn) { fire(S, f, 33); log(S, 36, { 사용자: f.name, 특성명: TRAIT[33] }); f.decoyUsedTurn = S.turn; blocked = true; }
     else if (isOhko && f.dark) { log(S, 11); blocked = true; }
     if (!blocked) {
@@ -595,6 +611,7 @@ function attack(S, s, a, rng) {
                 else if (survived) { fire(S, f, survived); log(S, 13, { 대상: f.name, 수치: dHP }); }
                 else log(S, 13, { 대상: f.name, 수치: dHP });
                 if (dHP > 0) { MIuses(S, u, f, consume); }
+                if (!isStruggle && (sk.kind === 'phys' || sk.kind === 'mag') && (MG < 1 || survived === 'endure')) defEv(S, f, sk.kind);   // 받아치기 경감 · 버티기 생존 → 방어력/굳건함 훈련
                 if (f.hp === 0) faint(S, f, { k: 'foeAttack' });             // A2 (+5) — 끝나면 STOP 이거나 새 인형이 나와 있다
             }
         }
@@ -618,8 +635,8 @@ function attack(S, s, a, rng) {
             let ok = 0; for (let i = 0; i < rolls; i++) if (rng() < Math.min(1, p)) ok++;
             if (a.chain) fire(S, u, 31);
             for (let i = 0; i < ok; i++) {
-                if (fx.rank.who === 'self') { rankChange(S, u, fx.rank.k, fx.rank.n, 'self'); if (fx.rank.k === 'spd' && fx.rank.n > 0) u.evN.spd++; }
-                else if (tgtAlive) { rankChange(S, f, fx.rank.k, fx.rank.n, 'foe'); if (fx.rank.k === 'spd' && fx.rank.n < 0) u.evN.spd++; }
+                if (fx.rank.who === 'self') { const d = rankChange(S, u, fx.rank.k, fx.rank.n, 'self'); if (fx.rank.k === 'spd' && d > 0) a.ev.spd = 1; }
+                else if (tgtAlive) { const d = rankChange(S, f, fx.rank.k, fx.rank.n, 'foe'); if (fx.rank.k === 'spd' && d < 0) a.ev.spd = 1; }
             }
         }
         if (fx.reveal && tgtAlive) { const pr = C().perOf(f.rec); log(S, 63, { 대상: f.name, 특성명: TRAIT[f.trait] || '없음', 특기1: C().NAME[pr.a], 특기2: C().NAME[pr.b] }); f.revealed = 1; }
@@ -634,6 +651,14 @@ function MIuses(S, u, f, consume) {
     consume.forEach(function (c) { if (c === 'boost') { const b = u.boost.shift(); if (b && b.trait) { } } else u.used[c] = 1; });
 }
 // 버티기로 살았다 — 불굴
+// 방어류 유틸기로 실제로 막거나 줄였다 — 물리면 방어력 · 마법이면 굳건함 (한 발동에 유형별 최대 1회 · 노력치 18)
+function defEv(S, f, kind) {
+    f.defEvTurn = f.defEvTurn || {};
+    const k = kind === 'phys' ? 'def' : 'sta';
+    if (f.defEvTurn[k] === S.turn) return;
+    f.defEvTurn[k] = S.turn;
+    const o = {}; o[k] = 1; credit(S, f, o);
+}
 function unyield(S, f) { if (canUse(f, 22)) { fire(S, f, 22); rankChange(S, f, 'atk', 1, 'self'); } }
 function giveStatus(S, t, k, bySide) {
     if (!alive(t)) return false;
@@ -687,12 +712,12 @@ function util(S, s, a, rng) {
             }
             if (r.who === 'self' && n > 0 && sk.cat.indexOf('랭크 상승') >= 0 && u.rank[r.k] <= -2 && canUse(u, 11)) { fire(S, u, 11); n += 1; }
             const d = rankChange(S, tgt, r.k, n, r.who === 'self' ? 'self' : 'foe');
-            if (r.k === 'spd' && d && ((r.who === 'self' && d > 0) || (r.who === 'foe' && d < 0))) u.evN.spd++;
+            if (r.k === 'spd' && d && ((r.who === 'self' && d > 0) || (r.who === 'foe' && d < 0))) a.ev.spd = 1;
         });
         return;
     }
     if (fx.baton) { u.baton = true; sd.batonDue = true; log(S, 39, { 사용자: u.name }); return; }
-    if (fx.prio3) { u.prio3 = has(u, 25) ? 4 : 3; u.evN.spd++; log(S, 29, { 사용자: u.name }); return; }
+    if (fx.prio3) { u.prio3 = has(u, 25) ? 4 : 3; a.ev.spd = 1; log(S, 29, { 사용자: u.name }); return; }
     if (fx.focus) {
         u.focus = true; if (has(u, 35)) u.calmTurn = S.turn; log(S, 27, { 사용자: u.name });
         if (alive(f) && canUse(f, 29)) { fire(S, f, 29); rankChange(S, f, 'spd', 1, 'self'); }
@@ -772,7 +797,7 @@ function settle(S) {
     const out = { win: S.over.win, units: [] };
     const win = S.over.win === 'A';
     S.sides.A.units.forEach(function (u, i) {
-        const g = { idx: i, key: u.key, hp: u.hp, pp: u.pp, status: u.status ? { k: u.status, c: u.sc } : null, xp: 0, ev: {}, lv0: u.lv, lv: u.lv, up: 0, wait: false, lost: 0 };
+        const g = { idx: i, key: u.key, hp: u.hp, pp: u.pp, status: u.status ? { k: u.status, c: u.sc } : null, aid: u.aid, xp: 0, ev: {}, lv0: u.lv, lv: u.lv, up: 0, wait: false, lost: 0 };
         // 노력치 — 완료한 유효 행동은 승패 무관
         STATS5.forEach(function (k) { if (u.evN[k]) g.ev[k] = u.evN[k]; });
         // 경험치 — PvE 승리 · 기절하지 않은 참여 개체
@@ -814,6 +839,7 @@ function applyGrow(grow, recs) {
         rec.hp = g.hp; p['pets/' + id + '/hp'] = g.hp;
         rec.pp = Object.assign({}, rec.pp || {}); Object.keys(g.pp).forEach(function (no) { rec.pp[no] = g.pp[no]; }); p['pets/' + id + '/pp'] = rec.pp;
         rec.st = g.status; p['pets/' + id + '/st'] = g.status;
+        rec.aid = g.aid | 0; p['pets/' + id + '/aid'] = g.aid | 0;
         if (g.xp) { const r = D2.addXp(rec, g.xp); p['pets/' + id + '/lv'] = rec.lv; p['pets/' + id + '/xp'] = rec.xp; p['pets/' + id + '/hp'] = rec.hp; }
         Object.keys(g.ev).forEach(function (k) { D2.evAdd(rec, k, g.ev[k]); }); if (Object.keys(g.ev).length) p['pets/' + id + '/ev'] = rec.ev;
     });
