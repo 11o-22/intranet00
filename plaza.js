@@ -440,7 +440,8 @@ R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-poo
             // [고정] 단추는 무대 한가운데(DJ 탁자 앞 · 아래끝 y 1215). 서는 자리는 단추 양옆(EV.SLOTS)이라 단추를 가리지 않는다.
             //   내가 서 있는 동안은 「내려오기」가 계단 발치(1470)로 내려온다
             //   stay — 광장을 닫지 않고 그 자리에서 한다 (상담사는 광장이 바탕이 아니라 fn 단추가 광장을 닫아 버렸다 · 2026-11-09 사용자 「상담사 계정은 무대 고정하면 광장 밖으로 쫓겨나」)
-            spots: [ { x: 940, get y() { return evFixed() ? 1470 : 1215; }, get n() { return evFixed() ? '내려오기' : '고정'; }, i: '📍', fn: 'plazaEventFix', stay: true },
+            //   서 있는 동안 [내려오기] 는 화면 오른쪽 위에 따로 뜬다 (evOffUi · 사용자 「내려오기 버튼이 채팅창이랑 겹쳐서 잘 안 눌려 · 오른쪽 위쪽에」)
+            spots: [ { x: 940, y: 1215, get n() { return evFixed() ? '고정 중' : '고정'; }, i: '📍', fn: 'plazaEventFix', stay: true },
                      { x: 1790, n: '광장으로', ic: 'out', go: P.START } ] };
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
@@ -1901,7 +1902,7 @@ window.plazaEventGo = function () {
 // [📍 고정] — 무대 중앙에 선다 · 다시 누르면 내려온다
 window.plazaEventFix = function () {
     if (!run || run.room !== EV.ROOM || !run.me) return;
-    if (run.evFix) { evRelease(); sysLine('무대에서 내려왔습니다.'); paintSpots(); return; }
+    if (run.evFix) { evRelease(); sysLine('무대에서 내려왔습니다.'); return; }
     if (carryMine() || lsLedActive() || askLocked()) { sysLine('지금은 무대에 설 수 없습니다.'); return; }
     // 이미 선 사람 옆 빈자리
     const taken = {};
@@ -1918,8 +1919,9 @@ window.plazaEventFix = function () {
     putOne(run.me, run.x, run.y);
     camera(true);
     try { send(false); } catch (e) { }
-    sysLine('📍 무대에 섰습니다 — [내려오기] 를 눌러야 내려옵니다.');
+    sysLine('📍 무대에 섰습니다 — 오른쪽 위 [내려오기] 를 눌러야 내려옵니다.');
     paintSpots();
+    evOffUi(true);
 };
 function evRelease() {
     if (!run || !run.evFix) return;
@@ -1928,6 +1930,22 @@ function evRelease() {
     if (r && r.floor) { run.y = r.floor[0] + 30; try { segStep(r, 0); } catch (e) { } }
     putOne(run.me, run.x, run.y);
     try { paintSpots(); } catch (e) { }
+    evOffUi(false);
+}
+// [내려오기] — 화면 오른쪽 위에 고정해 둔 단추 (채팅창과 안 겹치게 · 2026-11-09 사용자)
+function evOffUi(on) {
+    let b = document.getElementById('plaza-ev-off');
+    if (!on) { if (b) b.remove(); return; }
+    if (b) return;
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return;
+    b = document.createElement('button');
+    b.id = 'plaza-ev-off';
+    b.textContent = '📍 내려오기';
+    b.style.cssText = 'position:absolute;right:12px;top:62px;z-index:60;padding:8px 14px;border-radius:14px;border:1px solid #d4af37;background:rgba(40,30,10,.88);color:#ffe6a8;font-size:12px;font-weight:bold;box-shadow:0 3px 12px rgba(0,0,0,.5);';
+    b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    b.onclick = function (e) { e.stopPropagation(); if (run && run.evFix) { evRelease(); sysLine('무대에서 내려왔습니다.'); } else evOffUi(false); };
+    ov.appendChild(b);
 }
 // 상담사 — 초대 · 취소
 function evRefOf(code) { const d = db_(); return d ? d.ref(EV.PATH + '/invite/' + code) : null; }
@@ -4740,7 +4758,7 @@ function goRoom(key, way, lv) {
     // 🎉 이벤트 맵 — 상담사가 초대한 사람만 (어느 길로 오든 · 따라가기 · 끌려가기 · 동료 목록 포함)
     if (R[key].invite && !evInvited(u_())) { sysLine('🎉 이벤트 맵은 상담사의 초대가 있어야 들어갈 수 있습니다.'); return; }
     if (R[key].invite) run.forceInst = 1;                   // 몇 명이든 한 방
-    run.evFix = null;                                       // 무대 고정은 방을 나가면 풀린다
+    run.evFix = null; try { evOffUi(false); } catch (e) { }   // 무대 고정은 방을 나가면 풀린다
     // 🔒 갇혔으면 가두리 방 밖으로는 못 간다 — 이미 거기 있으면 그대로, 밖이면 그리로 데려간다
     const cg = cageMine();
     if (cg && key !== cg) {
@@ -4884,6 +4902,7 @@ function tick(ts) {
     // 🎉 이벤트 무대 「고정」 — 서 있는 동안은 그 자리에 붙어 있다. 조이스틱 · 바닥 짚기로는 안 내려오고 [내려오기] 를 눌러야 내려온다
     //   (2026-11-09 사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」)
     if (run.evFix) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; run.tx = null; run.ty = null; run.tseg = null; run.x = run.evFix.x; run.y = run.evFix.y; run.vx = run.vy = 0; }
+    else if (run._evOffSeen !== false && document.getElementById('plaza-ev-off')) evOffUi(false);   // 남은 단추는 걷는다 (광장을 닫았다 다시 열었을 때)
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();
