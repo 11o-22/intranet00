@@ -19,6 +19,8 @@
 //      그래서 다른 팀은 이 방과 상관없이 그 구역에 방을 만들고 들어간다.
 //   ② 이 사람은 구역이 차 있어도 방을 만들고 출발한다 (환영 나비 · 아기 호랑이와 같은 결 — 목록의 ⛔ 자리에 모집 단추).
 //   ③ 방에 이 사람 혼자면 최소 인원이 1 — 혼자 출발한다 (어둠 안은 흔적 솔플과 같다 · 인원 1로 돈다).
+//   ④ 둘 이상이면 같이 가는 것(🦋 나비 · 🐺 늑대 · 🌟 염정성군)을 머릿수에 넣는다 — 최소 인원 = max(1, 구역 최소 − 그 수)
+//      (2026-11-09 사용자 「환영 나비가 명수로 안 쳐져」 · companions)
 //
 // ■ 콘솔
 //   soloRoomState()
@@ -62,6 +64,31 @@ function aloneLeader(p) {
     if (members(p).length !== 1) return null;
     return soloKind(userOf(p.leader));
 }
+// ★ 사람 아닌 머릿수 (2026-11-09 사용자 「환영 나비가 명수로 안 쳐져」) — 같이 가는 것들을 최소 인원에 넣는다
+//   🦋 환영 나비를 찬 사람마다 제 나비(살아 있고 남에게 안 붙인 것) · 🐺 B조 방장의 늑대(ebWolves · 셋까지) · 🌟 칠성군(염정 속성)을 찬 사람마다 염정성군 1
+//   → 방 최소 인원 = max(1, 구역 최소 − 이 수). 혼자이고 솔플 자격이면 그냥 1.
+function companions(p) {
+    const out = { n: 0, bits: [] };
+    let fly = 0, wolf = 0, yeom = 0;
+    members(p).forEach(function (c) {
+        const u = userOf(c); if (!u) return;
+        try { if (window.BFLY && typeof window.BFLY.ownFlies === 'function') fly += window.BFLY.ownFlies(u); } catch (e) { }
+        try { if (c === p.leader && typeof window.ebWears === 'function' && window.ebWears(u)) wolf += Math.max(0, Math.min((window.EB && window.EB.WOLF_MAX) || 3, Number(u.ebWolves) || 0)); } catch (e) { }
+        try { if (typeof window.chilWears === 'function' && window.chilWears(u) && u.chil && Array.isArray(u.chil.yeom) && u.chil.yeom.length) yeom += 1; } catch (e) { }
+    });
+    if (fly) out.bits.push('🦋 나비 ' + fly);
+    if (wolf) out.bits.push('🐺 늑대 ' + wolf);
+    if (yeom) out.bits.push('🌟 염정성군 ' + yeom);
+    out.n = fly + wolf + yeom;
+    return out;
+}
+// 이 방의 최소 인원 — 구역 표의 min 대신
+function minFor(p, z) {
+    if (!p || !z) return (z && z.min) || 1;
+    if (aloneLeader(p)) return 1;
+    return Math.max(1, (z.min || 1) - companions(p).n);
+}
+window.soloRoomMin = function (p) { try { return minFor(p, DARK_ZONES[p.zone]); } catch (e) { return null; } };
 
 // ==========================================
 // ① 구역 셈에서 뺀다
@@ -157,7 +184,8 @@ function soloPid(pid) { return !!(pid && (isSoloRoom(parties()[pid]) || isSoloRo
                 const p = (typeof getMyParty === 'function') ? getMyParty() : null;
                 if (me && p && p.leader === me.code && DARK_ZONES[p.zone]) {
                     if (isSoloRoom(p) || soloKind(me)) bypass = true;               // 「방금 다른 팀이 진입했습니다」 를 건너뛴다
-                    if (aloneLeader(p) && DARK_ZONES[p.zone].min > 1) { z = DARK_ZONES[p.zone]; min0 = z.min; z.min = 1; }
+                    const nm = minFor(p, DARK_ZONES[p.zone]);
+                    if (nm < DARK_ZONES[p.zone].min) { z = DARK_ZONES[p.zone]; min0 = z.min; z.min = nm; }
                 }
             } catch (e) { }
             try { return _l.apply(this, arguments); }
@@ -180,20 +208,30 @@ function soloPid(pid) { return !!(pid && (isSoloRoom(parties()[pid]) || isSoloRo
         if (renderPartyRoom._solo) { clearInterval(iv); return; }
         const _r = renderPartyRoom;
         const w = function (p, body) {
-            let z = null, min0 = null, kind = null;
+            let z = null, min0 = null, kind = null, nm = null, comp = null;
             try {
                 kind = aloneLeader(p);
-                if (kind && DARK_ZONES[p.zone] && DARK_ZONES[p.zone].min > 1) { z = DARK_ZONES[p.zone]; min0 = z.min; z.min = 1; }
+                if (p && DARK_ZONES[p.zone]) {
+                    comp = companions(p);
+                    nm = minFor(p, DARK_ZONES[p.zone]);
+                    if (nm < DARK_ZONES[p.zone].min) { z = DARK_ZONES[p.zone]; min0 = z.min; z.min = nm; }
+                }
             } catch (e) { }
             let out;
             try { out = _r.apply(this, arguments); } finally { if (z && min0 != null) z.min = min0; }
             try {
                 const host = body || document.getElementById('dark-party-body');
                 const k = kind || ((isSoloRoom(p)) ? p.soloRoom.kind : null);
-                if (host && k && KINDS[k] && !host.querySelector('.solo-room-note')) {
+                const cnt = members(p).length;
+                let line = '';
+                if (kind) line = ' — 혼자서도 출발할 수 있습니다 (최소 인원 ' + (min0 || 1) + ' → 1).';
+                else if (comp && comp.n && min0 != null) line = ' — ' + comp.bits.join(' · ') + ' 을(를) 머릿수에 넣습니다: ' + cnt + ' + ' + comp.n + ' = ' + (cnt + comp.n) + ' (최소 인원 ' + min0 + ' → ' + nm + ').';
+                else if (comp && comp.n) line = ' — ' + comp.bits.join(' · ') + ' 이(가) 함께 갑니다.';
+                if (host && (k || (comp && comp.n)) && !host.querySelector('.solo-room-note')) {
+                    const head = k && KINDS[k] ? KINDS[k].ic + ' <b>' + esc(KINDS[k].with) + '</b>' : '<b>같이 가는 것</b>';
                     const note = '<div class="solo-room-note" style="margin:0 0 10px; padding:8px 10px; border:1px dashed #6b5a2e; border-radius:6px; font-size:10.5px; line-height:1.7; color:#d8cba8; background:rgba(0,0,0,0.25);">'
-                        + KINDS[k].ic + ' <b>' + esc(KINDS[k].with) + '</b>' + (kind ? ' — 혼자서도 출발할 수 있습니다 (최소 인원 ' + (min0 || 1) + ' → 1).' : '')
-                        + '<br><span style="color:#9a8a6a;">이 방은 따로 두는 방입니다 — 구역을 차지한 것으로 세지 않아 다른 팀도 같은 구역에 들어갈 수 있습니다.</span></div>';
+                        + head + line
+                        + (isSoloRoom(p) ? '<br><span style="color:#9a8a6a;">이 방은 따로 두는 방입니다 — 구역을 차지한 것으로 세지 않아 다른 팀도 같은 구역에 들어갈 수 있습니다.</span>' : '') + '</div>';
                     const btn = Array.prototype.filter.call(host.querySelectorAll('button'), function (b) { return /어둠으로 진입|대기 중/.test(b.textContent || ''); })[0];
                     if (btn) btn.insertAdjacentHTML('beforebegin', note);
                     else host.insertAdjacentHTML('beforeend', note);
