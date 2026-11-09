@@ -1436,10 +1436,17 @@ function tkOne(code) {
     const q = run.peers && run.peers[code];
     return q ? q.one : null;
 }
+// 🔎 상담사 콘솔용 (2026-11-09 사용자 「상담사 계정 도구 콘솔로 특정 사원을 쳐서 … 몇 번을 클릭했고 … 걸린 시간」)
+//   콘솔(tk-watch.js)이 window.plazaTkProbe 를 걸어 두면, 상담사 화면에서만 누름 · 칸 바뀜을 알려 준다 — 다른 계정은 부르지 않는다
+function tkProbe(kind, what, code, f) {
+    if (typeof window.plazaTkProbe !== 'function' || !isAdm()) return;
+    try { window.plazaTkProbe(kind, what, code, f, now()); } catch (e) { }
+}
 function tkPaint(code, f) {
     const one = tkOne(code);
     if (!one || !one.actor || typeof one.actor.tickle !== 'function') return;
     try { one.actor.tickle(one.wf ? null : f); } catch (e) { }
+    tkProbe('tk', 'paint', code, one.wf ? null : f);
 }
 function tkRun() { if (!tkT) tkT = setInterval(tkTick, 30); }
 function tkTick() {
@@ -1515,6 +1522,7 @@ function tkStart(code, lk) {
 function tkHit(code) {
     const me = myCode();
     if (!me || !run || typeof database === 'undefined' || !database) return;
+    tkProbe('tk', 'hit', code, null);                          // 콘솔용 — 7~12 중이라 안 먹히는 누름도 센다
     const t = now();
     let L = TKL[code];
     if (L && L.p2 && !L.done) return;                         // 7~12 가 도는 중 — 다 돌면 다시
@@ -1624,6 +1632,7 @@ function msPaint(code, f) {
     const one = tkOne(code);
     if (!one || !one.actor || typeof one.actor.tickle !== 'function') return;
     try { one.actor.tickle(one.wf ? null : f, 'ms'); } catch (e) { }
+    tkProbe('ms', 'paint', code, one.wf ? null : f);
 }
 function msRun() { if (!msT) msT = setInterval(msTick, 30); }
 function msTick() {
@@ -1696,6 +1705,7 @@ function msStart(code, lk) {
 function msHit(code) {
     const me = myCode();
     if (!me || !run || typeof database === 'undefined' || !database) return;
+    tkProbe('ms', 'hit', code, null);                          // 콘솔용
     const t = now();
     let L = MSL[code];
     const fresh = !L || L.done || t - L.rt > MS_IDLE;
