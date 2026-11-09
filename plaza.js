@@ -1135,6 +1135,9 @@ function tinyOf(u) {
     if (u.code && wfOf(u.code)) return true;             // 🪄 소원권(물약)이 된 동안 — 작은 사람처럼 들린다
     const hsT = hsCall('tiny');                          // 🫣 숨바꼭질 — 술래는 보통 크기 · 나머지는 파인애플 크기
     if (hsT != null) return !!hsT;
+    // 🎉 이벤트 맵 안에서는 파인애플이 잠시 풀린다 — 보통 크기로 선다 (2026-11-09 사용자 「이벤트 맵 들어갈 때에는 파인애플이 일시적으로 풀리게」)
+    //   물약(timedEffects)은 그대로 두므로 나오면 도로 작아진다. 내 자리 기록의 sm 도 이 값으로 나가 남의 화면에서도 보통 크기다.
+    if (run && run.room === EV.ROOM) return false;
     const t = now();
     return (Array.isArray(u.timedEffects) ? u.timedEffects : []).some(function (e) {
         return e && e.name === TINY_FX && (e.fixed || !e.expireAt || e.expireAt > t);
@@ -1840,6 +1843,7 @@ function askLocked() {
 //     콘솔로도 된다: eventInvite('사번') · eventUninvite('사번') · eventInvites()
 //     초대가 오면 그 사람 화면에 알린다. 안에 있는데 초대가 취소되면 광장으로 돌려보낸다.
 //   · 문지기는 goRoom — 어느 길로 오든(따라가기 · 끌려가기 · 동료 목록 · 콘솔) 초대가 없으면 못 든다. 상담사는 늘 든다.
+//   · 🍍 파인애플(작아진 사람)은 이 방 안에서는 보통 크기다 (tinyOf) — 물약은 그대로라 나오면 도로 작아진다.
 //   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
 //     서 있는 동안은 걸음이 안 먹고, 다시 누르거나(내려오기) 조이스틱 · 바닥 짚기로 움직이면 수영장 앞 테두리로 내려온다.
 const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [0, -95, 95, -190, 190, -285, 285], NEAR: 40 };
