@@ -62,7 +62,8 @@ function css() {
     ].join('\n');
     document.head.appendChild(s);
 }
-function shut() { const e = document.getElementById('d2l-dim'); if (e) e.remove(); const m = document.getElementById('d2l-menu'); if (m) m.remove(); }
+let onShut = null;
+function shut() { const e = document.getElementById('d2l-dim'); if (e) e.remove(); const m = document.getElementById('d2l-menu'); if (m) m.remove(); const f = onShut; onShut = null; if (typeof f === 'function') { try { f(); } catch (x) { } } }
 function withDolls(u) { const D = DL(); const ds = D.dolls(u); let list = []; try { list = D.withList(u); } catch (e) { list = Object.keys(ds); } return list.map(function (k) { return ds[String(k)]; }).filter(Boolean); }
 function picOf(d) { try { return window.PET.icon(d.id); } catch (e) { return ''; } }
 
@@ -80,11 +81,13 @@ function save(d, before, msg) {
 
 // ── 창
 const ST = { k: null, pend: null, mv: null };          // pend: 배울 기술 번호 · mv: 옮기는 { slot, i }
-function open(key) {
+//   open(열쇠, onClose) — onClose 는 창이 닫힐 때 (조는 도깨비 대화로 돌아가게)
+function open(key, onClose) {
     const u = u_(), D = DL(); if (!u || !D) return;
     css(); shut();
+    if (typeof onClose === 'function') onShut = onClose;
     const dolls = withDolls(u);
-    if (!dolls.length) { alert_('선택할 수 있는 인형이 없다!'); return; }
+    if (!dolls.length) { alert_('선택할 수 있는 인형이 없다!'); const f = onShut; onShut = null; if (f) f(); return; }
     if (key == null || !dolls.some(function (d) { return String(d.id) === String(key); })) { pickDoll(dolls); return; }
     ST.k = String(key); ST.pend = null; ST.mv = null;
     paint();
@@ -99,7 +102,7 @@ function pickDoll(dolls) {
     h += '</div>';
     pan.innerHTML = h; dim.appendChild(pan); document.body.appendChild(dim);
     pan.querySelector('.d2l-x').onclick = shut;
-    Array.prototype.forEach.call(pan.querySelectorAll('.d2l-row'), function (row) { row.querySelector('button').onclick = function () { open(row.getAttribute('data-k')); }; });
+    Array.prototype.forEach.call(pan.querySelectorAll('.d2l-row'), function (row) { row.querySelector('button').onclick = function () { const f = onShut; onShut = null; open(row.getAttribute('data-k'), f); }; });
 }
 function paint() {
     const u = u_(), D = DL(), S = SK();
@@ -133,7 +136,7 @@ function paint() {
     dim.innerHTML = h;
     const pan = dim.firstChild;
     pan.querySelector('.d2l-x').onclick = shut;
-    pan.querySelector('.d2l-chg').onclick = function () { shut(); pickDoll(withDolls(u)); };
+    pan.querySelector('.d2l-chg').onclick = function () { const f = onShut; onShut = null; shut(); onShut = f; pickDoll(withDolls(u)); };
     Array.prototype.forEach.call(pan.querySelectorAll('.d2l-row'), function (row) {
         const no = Number(row.getAttribute('data-no'));
         row.querySelector('.d2l-det').onclick = function () { alert_(S.detail(no, d)); };

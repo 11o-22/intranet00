@@ -21,10 +21,14 @@
 //     체력  60 + Lv·6 + 등급·20 + 저항·4                    공격  8 + Lv·1.5 + 등급·4 + 판정·2 + 근력 + 애교·2/3
 //     방어  2 + Lv·0.5 + 등급·2 + 저항·1.5 + 인내 + 애교/3   회피% 5 + 회피·3 + 눈치·3   치명% 5 + 행운/8 + 경청·3   보스 추가 피해 기믹·4
 //
+// ✗ 2026-11-10 사용자 「판에서 뺌 — 환불」 — 인형 전투 2차(개체치 · 성격 · 노력치 · 기술 · 특성)에는 장비 자리가 없다.
+//   잡화점의 장비 칸 · 인형 칸의 「장비」 단추를 없앴다. 가진 것(주머니) · 낀 것은 전부 개당 5,000 P 로 돌려준다 (사원마다 한 번 · u.petGearRefund · refundAll).
+//   레벨 · 경험치 · 등급업 · 수치 함수는 옛 글 여정(journey.js)이 아직 부르므로 남겨 둔다 — 인형의 진짜 수치는 d2-core.js (doll-data.js DOLL.stats).
+//
 // ■ 콘솔
-//   petGearState()           주머니 · 펫마다 낀 것 · Lv
-//   petGearGive('🎀 리본 목걸이', 1[, 사번])   상담사
-//   petXpGive(번호, n)       상담사 — 내 펫에 경험치
+//   petGearState()           주머니 · 펫마다 낀 것 · Lv (옛 셈)
+//   petGearGive('🎀 리본 목걸이', 1[, 사번])   상담사 (돌려주기 뒤라 의미 없음)
+//   petXpGive(번호, n)       상담사 — 내 펫에 경험치 (옛 셈)
 
 (function petGear() {
 
@@ -131,6 +135,8 @@ function shardCount(grade, u) { const set = shardSet(grade); if (!set) return 0;
 // 사기 · 끼우기 · 빼기
 // ==========================================
 window.petGearBuy = function (name) {
+    alert_('반려동물용 장비는 더 이상 팔지 않습니다.'); return;
+    // eslint-disable-next-line no-unreachable
     if (typeof buyGuard === 'function' && !buyGuard()) return;
     const u = u_(), g = BY[name];
     if (!u || !g || g.from) return;
@@ -257,19 +263,42 @@ function boxHtml() {
                 + '<button class="game-btn" style="flex:0 0 auto; margin:0; padding:6px 9px; font-size:10px;" onclick="petGearBuy(\'' + esc(g.n) + '\')">' + PRICE.toLocaleString() + ' P</button></div>';
         }).join('');
 }
-function paint() {
-    const host = document.querySelector('#dream-body') || document.querySelector('#pet-shop-body');
-    if (!host || !u_()) return;
-    let el = document.getElementById('pet-gear-box');
-    if (!el) { el = document.createElement('div'); el.id = 'pet-gear-box'; el.style.cssText = 'margin-bottom:14px;'; }
-    const rune = document.getElementById('pet-rune-box');
-    const stay = document.getElementById('pet-stay-box');
-    const anchor = (rune && rune.parentNode === host) ? rune : ((stay && stay.parentNode === host) ? stay : null);
-    if (anchor) { if (anchor.nextSibling !== el) host.insertBefore(el, anchor.nextSibling); }
-    else if (el.parentNode !== host || host.firstChild !== el) host.insertBefore(el, host.firstChild);
-    const h = boxHtml();
-    if (el.innerHTML !== h) el.innerHTML = h;
+// ✗ 장비 칸은 더 이상 그리지 않는다 (2026-11-10) — 남아 있으면 치운다
+function paint() { const el = document.getElementById('pet-gear-box'); if (el) el.remove(); }
+// ★ 돌려주기 — 가진 것 · 낀 것 전부 개당 5,000 P (사원마다 한 번)
+let refundBusy = false;
+function refundAll() {
+    const u = u_();
+    if (!u || !u.code || u.petGearRefund || refundBusy) return;
+    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
+    const b = bag(u), names = [];
+    let n = 0;
+    Object.keys(b).forEach(function (k) { const v = Number(b[k]) || 0; if (v > 0) { n += v; names.push(k + ' ×' + v); } });
+    const ps = P().pets(u), wornIds = [];
+    Object.keys(ps).forEach(function (k) { const s = ps[k]; if (s && typeof s === 'object' && s.gear) { n++; names.push(s.gear + ' (낀 것)'); wornIds.push(k); } });
+    refundBusy = true;
+    const t = Date.now(), paid = n * PRICE;
+    const d = (typeof database !== 'undefined' && database) ? database : null;
+    const finish = function () {
+        const up = { petGear: null, petGearRefund: t };
+        wornIds.forEach(function (k) { up['pets/' + k + '/gear'] = null; try { delete ps[k].gear; } catch (e) { } });
+        u.petGear = {}; u.petGearRefund = t;
+        if (d) d.ref('users/' + u.code).update(up).catch(function () { });
+        else { try { if (typeof saveFields === 'function') saveFields({ petGear: 1, petGearRefund: 1 }); } catch (e) { } }
+        if (n) {
+            log_('[환불] 반려동물용 장비 ' + n + '개를 거두고 ' + paid.toLocaleString() + ' P 를 돌려받았습니다. (' + names.join(' · ') + ')');
+            try { if (typeof saveFields === 'function') saveFields({ history: 1 }); } catch (e) { }
+            ui();
+            setTimeout(function () { alert_('🐾 반려동물용 장비가 회수되었습니다.\n\n' + n + '개 — ' + paid.toLocaleString() + ' P 를 돌려드렸습니다.\n\n봉제인형 수치가 새 체계(개체치 · 성격 · 노력치 · 기술 · 특성)로 바뀌어 장비는 판에서 뺐습니다.'); }, 1800);
+        }
+        refundBusy = false;
+    };
+    if (!n) { finish(); return; }
+    if (d) d.ref('users/' + u.code + '/points').transaction(function (v) { return (Number(v) || 0) + paid; }).then(function (r) { if (r && r.committed) u.points = Number(r.snapshot.val()) || 0; finish(); }).catch(function () { refundBusy = false; });
+    else { u.points = (Number(u.points) || 0) + paid; try { if (typeof saveFields === 'function') saveFields({ points: 1 }); } catch (e) { } finish(); }
 }
+setInterval(function () { try { refundAll(); } catch (e) { } }, 6000);
+setTimeout(function () { try { refundAll(); } catch (e) { } }, 4000);
 window.petGearPaint = paint;
 (function hookShop() {
     const iv = setInterval(function () {
@@ -302,37 +331,14 @@ function box(html) {
     document.body.appendChild(w);
     return w;
 }
-window.petGearOpen = function (key, after) {
-    const u = u_();
-    if (!u || !P().pets(u)[String(key)]) return;
-    const nm = P().nick(key, u), cur = worn(key, u);
-    const st = stats(key, u);
-    const list = ALL.filter(function (g) { return have(g.n, u) > 0; });
-    const w = box('<div style="font-size:12px; color:#ffcf8f; font-weight:bold; margin-bottom:4px;">' + esc(nm) + ' — 장비</div>'
-        + '<div style="font-size:9.5px; color:#6f685e; margin-bottom:9px; line-height:1.6;">인형 하나에 하나만 낍니다. 장비 하나는 한 마리만 — 끼우면 주머니에서 빠지고, 뺀 것은 주머니로 돌아옵니다.<br>여정 수치 — 체력 ' + st.max + ' · 공격 ' + st.atk + ' · 방어 ' + st.def + ' · 회피 ' + st.eva + '% · 치명 ' + st.crit + '%</div>'
-        + '<div style="font-size:11px; color:#c9a227; margin-bottom:8px;">낀 것: ' + (cur ? esc(cur) + ' <span style="color:#6f685e;">(' + esc(addText(BY[cur].add)) + ' · 「' + esc(BY[cur].sk.n) + '」)</span>' : '<span style="color:#6f685e;">없음</span>') + '</div>'
-        + (cur ? '<button id="pg-off" class="game-btn" style="' + BTN + GREY + '">뺀다 — 주머니로</button>' : '')
-        + (list.length ? list.map(function (g) {
-            return '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid rgba(255,255,255,0.06);">'
-                + '<div style="flex:1; min-width:0;"><div style="font-size:11.5px; color:#e8d7b4;">' + esc(g.n) + ' <span style="font-size:10px; color:#8d8578;">· ' + have(g.n, u) + '개</span></div>'
-                + '<div style="font-size:9.5px; color:#6f685e; margin-top:2px;">' + esc(addText(g.add)) + ' · 「' + esc(g.sk.n) + '」 ' + esc(g.sk.d) + '</div></div>'
-                + '<button class="game-btn pg-on" data-n="' + esc(g.n) + '" style="flex:0 0 auto; margin:0; padding:7px 10px; font-size:10px;">낀다</button></div>';
-        }).join('') : '<div style="font-size:10.5px; color:#6f685e; padding:6px 0;">주머니에 장비가 없습니다. 망상 홈쇼핑 🐾 인형 숍에서 삽니다.</div>')
-        + '<button id="pg-x" class="game-btn" style="' + BTN + GREY + ' margin-top:10px;">닫는다</button>');
-    w.querySelector('#pg-x').onclick = function () { shut(); if (typeof after === 'function') after(); };
-    const off = w.querySelector('#pg-off');
-    if (off) off.onclick = function () { const r = unequip(key); if (!r.ok) { alert_(r.why); return; } window.petGearOpen(key, after); };
-    Array.prototype.forEach.call(w.querySelectorAll('.pg-on'), function (b) {
-        b.onclick = function () { const r = equip(key, b.dataset.n); if (!r.ok) { alert_(r.why); return; } window.petGearOpen(key, after); };
-    });
-};
+window.petGearOpen = function (key, after) { alert_('반려동물용 장비는 판에서 뺐습니다 — 가진 것은 5,000 P 씩 돌려드렸습니다.'); if (typeof after === 'function') after(); };
 
 window.PETGEAR = {
     BASIC: BASIC, DROP: DROP, LEGACY: LEGACY, ALL: ALL, BY: BY, PRICE: PRICE, LV_MAX: LV_MAX, LV_CAP: LV_CAP, lvMax: lvMax, lvCapOf: lvCapOf, STAT_NAME: STAT_NAME, ATTR_EFF: ATTR_EFF,
     bag: bag, have: have, add: add, worn: worn, equip: equip, unequip: unequip, addText: addText,
     lv: lvOf, xp: xpOf, needXp: needXp, addXp: addXp, gradeIdx: gradeIdx, canGradeUp: canGradeUp, gradeUp: gradeUp, gradeNeed: gradeNeed,
     SHARDS: SHARDS, shardBag: shardBag, shardHave: shardHave, shardAdd: shardAdd, shardSet: shardSet, shardCount: shardCount,
-    attrs: attrs, stats: stats
+    attrs: attrs, stats: stats, refundAll: refundAll
 };
 
 // ==========================================

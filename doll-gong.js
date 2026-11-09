@@ -6,7 +6,7 @@
 // 2026-11-07 사용자 기획안 (도깨비 공방 — 수선소 · 잡화점 · 펫 교환소 · 봉제인형 보관함 · 튜토리얼)
 //
 // ■ 수선소   청주 1 · 메밀묵 1 로 인형 하나를 체력 가득 (일괄 수선 — 고른 것 모두 · 필요한 수를 먼저 보여 준다)
-// ■ 잡화점   🎀 포옹 리본 100 D · 🧶 솜뭉치 간식 30 D (꿈결) · 🍶 청주 3,000 P · 🥣 메밀묵 2,000 P (포인트)
+// ■ 잡화점   🎀 포옹 리본 100 D · 🧶 솜뭉치 간식 30 D (꿈결) · 🍶 청주 3,000 P · 🥣 메밀묵 2,000 P (포인트) · 🧷 봉제인형 아이템 20종 (꿈결 · d2-items.js · 2026-11-10)
 //            ※ 망상 홈쇼핑 물건을 옮겨 오는 것은 꿈결 값이 정해지면 넣는다 (지금은 자리만)
 // ■ 교환소   1 : 1 — 둘 다 한 마리씩 올리고, 둘 다 「준비 완료」 → 둘 다 「최종 승인」 해야 바뀐다.
 //            dollTrade/<열쇠> = { at, ac, bc, a:{code,name,doll,ready,ok}, b:{…}, state, exec }
@@ -382,8 +382,11 @@ function shopUi() {
                     }).join('');
                 }).join('')
                 + foodRows()
-                // ★ 망상 홈쇼핑에 있던 것 전부 — 치료 · 환몽알 · 돌봄 · 속성 룬 · 장비 · 방석 (#shop-dream 칸을 이 아래에 들인다 · 2026-11-07)
-                + '<div style="font-size:10.5px;color:#ffcf8f;margin:14px 0 4px">🩹 치료 · 🥚 환몽알 · 돌봄 · 💠 속성 룬 · ⚙ 장비 · 🏠 방석</div><div class="gb-host"></div>'
+                // ★ 봉제인형 아이템 20종 — 꿈결 (인형 전투 2차 · d2-items.js · 6단계 2026-11-10 · 기획 「아이템」 10 「잡화점에 아이템 카테고리」)
+                + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">🧷 봉제인형 아이템 — 💤 꿈결</div>'
+                + '<div class="gb-row"><div class="tx"><b>HP 회복 · PP 회복 · 상태 치료 · 기절 회복 · 도핑 · 훈련 보조 — 20종</b><div>20~100 꿈결 · 산 것은 소지품에 · 전투 중에도 쓴다 (한 턴)</div></div><button class="gb-btn pri" data-k="d2items">목록 보기</button></div>'
+                // ★ 망상 홈쇼핑에 있던 것 전부 — 치료 · 환몽알 · 돌봄 · 속성 룬 · 방석 (#shop-dream 칸을 이 아래에 들인다 · 2026-11-07) · ✗ 장비는 뺐다 (2026-11-10)
+                + '<div style="font-size:10.5px;color:#ffcf8f;margin:14px 0 4px">🩹 치료 · 🥚 환몽알 · 돌봄 · 💠 속성 룬 · 🏠 방석</div><div class="gb-host"></div>'
                 + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
             if (!dim) dim = panel(html, function () { dreamPut(null); resolve(out); });
             else dim.firstChild.innerHTML = html;
@@ -392,6 +395,7 @@ function shopUi() {
             Array.prototype.forEach.call(dim.querySelectorAll('[data-buy]'), function (b) { b.onclick = function () { buy(b.dataset.buy); }; });
             Array.prototype.forEach.call(dim.querySelectorAll('[data-food]'), function (b) { b.onclick = function () { buyFood(b.dataset.food); }; });
             dim.querySelector('[data-k=x]').onclick = function () { dim._close(); };
+            const d2b = dim.querySelector('[data-k=d2items]'); if (d2b) d2b.onclick = function () { if (window.D2IT) window.D2IT.shopOpen('shop', function () { out = out || 'ok'; paint(); }); };
         };
         // 먹이 — 포인트로 하나 (pet-food.js petFoodBuy 와 같은 셈 · 기록만 잡화점으로)
         const buyFood = function (k) {
@@ -833,16 +837,18 @@ function dollMenu(id) {
     const at = new Date(d.at || 0);
     const days = Math.ceil(M.fedLeft(d) / 86400000);
     const html = '<div style="display:flex;gap:12px;align-items:center">' + icon(d.sp, 72) + '<div><h3>' + esc(M.nickOf(d)) + (d.fav ? ' <span style="color:#e6b400">★</span>' : '') + '</h3>'
-        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (s.lv < M.lvMaxOf(d) ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + ' · 상한 Lv ' + M.lvMaxOf(d) + ')' : ' (최고)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
-        + '<div class="gb-row"><div class="tx"><div style="font-size:11px;color:#d8ceff;line-height:1.7">체력 ' + Math.ceil(M.hpOf(d)) + ' / ' + s.max + ' · 공격 ' + s.atk + ' · 방어 ' + s.def + ' · 회피 ' + s.eva + '% · 급소 ' + s.crit + '%<br>'
+        + '<div class="sub" style="margin:0">' + esc(M.spName(d.sp)) + ' · 도감 No.' + String(d.sp).padStart(2, '0') + ' · ' + (M.ATTR[s.att] || {}).e + ' ' + (M.ATTR[s.att] || {}).n + ' 속성<br>등급 ' + s.g + ' · Lv.' + s.lv + (M.xpNeed(s.lv) ? ' (경험치 ' + (d.xp || 0) + '/' + M.xpNeed(s.lv) + (s.lv >= M.lvMaxOf(d) && s.lv < 100 ? ' · 각성 돌파 필요' : ' · 상한 Lv ' + M.lvMaxOf(d)) + ')' : ' (최대)') + ' · 교감 ♥' + M.bondOf(d) + '/' + M.BOND_MAX + '</div></div></div>'
+        // ★ 인형 전투 2차 수치 (6단계 · 2026-11-10) — HP · 공격력 · 매력 · 방어력 · 굳건함 · 속도 · 성격 · 특성 · 기술 5칸
+        + '<div class="gb-row"><div class="tx"><div style="font-size:11px;color:#d8ceff;line-height:1.7">HP ' + Math.ceil(M.hpOf(d)) + ' / ' + s.max + ' · 공격력 ' + s.atk + ' · 매력 ' + s.chm + ' · 방어력 ' + s.def + ' · 굳건함 ' + s.sta + ' · 속도 ' + s.spd + '<br>'
+        + (window.D2 ? '성격 ' + esc(window.D2.perOf(d).n) + ' (특기 ' + esc(window.D2.NAME[window.D2.perOf(d).a]) + ' · ' + esc(window.D2.NAME[window.D2.perOf(d).b]) + ')' : '') + (window.D2TR ? ' · 특성 ' + esc((window.D2TR.get(window.D2TR.trOf(d)) || { n: '없음' }).n) : '') + '<br>'
         + '포만도 ' + fullOf(d) + ' / 100 — ' + (days > 0 ? days + '일 안에 먹이를 주세요' : '곧 달아납니다!') + '<br>잡은 날 ' + at.getFullYear() + '.' + (at.getMonth() + 1) + '.' + at.getDate() + ' · ' + (inW ? '동행 중' : '보관함') + '</div>'
-        + '<div style="margin-top:6px">기술 — ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { a: [] }).a.map(function (x) { return x[0]; }).join(' · ')) + ' / ' + esc(((window.JOURNEY_SK && JOURNEY_SK.SK[d.sp]) || { d: [] }).d.map(function (x) { return x[0]; }).join(' · ')) + '</div></div></div>'
+        + (window.D2SK ? '<div style="margin-top:6px">기술 — ' + (function () { const mv = window.D2SK.mvOf(d), nm = function (no) { return no ? esc(window.D2SK.get(no).n) + ' <span style="color:#8f84b5">' + window.D2SK.ppOf(d, no) + '/' + window.D2SK.get(no).pp + '</span>' : '<span style="color:#6a5f88">빈칸</span>'; }; return '공격기 ' + mv.a.map(nm).join(' · ') + '<br>유틸기 ' + mv.u.map(nm).join(' · '); })() + '</div>' : '') + '</div></div>'
         + '<div class="gb-row"><input id="gb-nick" maxlength="12" placeholder="별명 (비우면 종 이름)" value="' + esc(d.nick || '') + '" style="flex:1;padding:7px;border-radius:7px;border:1px solid #6d5aa0;background:#2b2140;color:#fff"><button class="gb-btn" data-k="nick">바꾼다</button></div>'
         + (function () {
             const nd = M.gradeNeed(id, u);
             if (!nd.rune) return '';
-            return '<div class="gb-row"><div class="tx"><div style="font-size:10.5px;color:' + (nd.ok ? '#9fd8ef' : '#8f84b5') + '">💠 ' + esc(nd.rune) + ' ' + nd.have + '개 — ' + (nd.ok ? '각성할 수 있습니다' : esc(nd.why)) + '</div></div>'
-                + (nd.ok ? '<button class="gb-btn pri" data-k="up">각성 (' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + ')</button>' : '') + '</div>';
+            return '<div class="gb-row"><div class="tx"><div style="font-size:10.5px;color:' + (nd.ok ? '#9fd8ef' : '#8f84b5') + '">💠 ' + esc(nd.rune) + ' ' + nd.have + '개 — ' + (nd.ok ? '각성 돌파할 수 있습니다 (레벨은 그대로 · 등급만 다음으로)' : esc(nd.why)) + '</div></div>'
+                + (nd.ok ? '<button class="gb-btn pri" data-k="up">각성 돌파 (' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + ')</button>' : '') + '</div>';
         })()
         + '<div class="gb-btns"><button class="gb-btn pri" data-k="care">🧸 돌보기</button><button class="gb-btn" data-k="fav">' + (d.fav ? '☆ 즐겨찾기 해제' : '★ 즐겨찾기') + '</button><button class="gb-btn" data-k="mv">' + (inW ? '보관함으로' : '동행으로') + '</button></div>'
         + '<div class="gb-btns"><button class="gb-btn" data-k="rel"' + (d.fav ? ' disabled' : '') + ' style="color:#ffb3b3">놓아주기</button><button class="gb-btn" data-k="x">닫는다</button></div>';
@@ -863,7 +869,7 @@ function dollMenu(id) {
     if (upB) upB.onclick = function () {
         const r = M.gradeUp(id);
         if (!r.ok) { alert_(r.why); return; }
-        alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성했습니다.\n\nLv 1 부터 다시 오릅니다.');
+        alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성 돌파했습니다.\n\nLv ' + r.lv + ' 그대로 이어서 오릅니다.');
         dim._close(); boxPaint();
     };
     dim.querySelector('[data-k=fav]').onclick = function () { M.patchDoll(id, { fav: d.fav ? null : 1 }, u); dim._close(); boxPaint(); };
@@ -1155,13 +1161,13 @@ function runeUi() {
         const ds = M.dolls(u);
         const ready = Object.keys(ds).filter(function (id) { return M.gradeNeed(id, u).ok; });
         const lv10 = Object.keys(ds).filter(function (id) { const nd = M.gradeNeed(id, u); return !nd.ok && nd.rune && M.stats(ds[id]).lv >= M.lvMaxOf(ds[id]); });
-        const html = '<h3>💠 각성 공방</h3><div class="sub">펫 동행 어둠(여정 · 아케이드존)에서 괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각이 나오지만 드뭅니다.<br>조각 셋 → 룬 하나. 등급 상한 레벨(D 10 · C 20 · B 30 · A 40)에 닿은 인형에게 다음 등급의 룬을 쓰면 각성합니다 (Lv 1 부터 다시).</div>'
+        const html = '<h3>💠 각성 공방</h3><div class="sub">펫 동행 어둠(여정 · 아케이드존)에서 괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각이 나오지만 드뭅니다.<br>조각 셋 → 룬 하나. 등급 상한 레벨(D 10 · C 20 · B 30 · A 40)에 닿은 인형에게 다음 등급의 룬을 쓰면 각성 돌파합니다 — 레벨은 그대로, 등급만 다음으로 (S 는 Lv 100 까지).</div>'
             + ['C', 'B', 'A', 'S'].map(function (g) {
                 const sh = A.have(A.SHARD(g), u), rn = A.have(A.RUNE(g), u);
                 return '<div class="gb-row"><div class="tx"><b>' + g + '급</b> <span style="font-size:10px;color:#8f84b5">· ' + ({ C: 'D → C', B: 'C → B', A: 'B → A', S: 'A → S' })[g] + '</span><div>조각 ' + sh + '개 · 룬 ' + rn + '개</div></div>'
                     + '<button class="gb-btn' + (sh >= 3 ? ' pri' : '') + '" data-c="' + g + '"' + (sh >= 3 ? '' : ' disabled') + '>합치기' + (sh >= 6 ? ' ×' + Math.floor(sh / 3) : '') + '</button></div>';
             }).join('')
-            + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">각성할 수 있는 인형</div>'
+            + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 2px">각성 돌파할 수 있는 인형</div>'
             + (ready.length ? ready.map(function (id) { const d = ds[id], s = M.stats(d), nd = M.gradeNeed(id, u); return '<div class="gb-row">' + icon(d.sp, 36) + '<div class="tx">' + dollLine(d) + '<div>💠 ' + esc(nd.rune) + '</div></div><button class="gb-btn pri" data-u="' + id + '">' + s.g + ' → ' + M.GRADES[M.gradeIdx(s.g) + 1] + '</button></div>'; }).join('')
                             : '<div class="sub">' + (lv10.length ? '상한 레벨에 닿은 인형 ' + lv10.length + '마리 — 다음 등급의 룬이 없습니다.' : '상한 레벨에 닿은 인형이 없습니다.') + '</div>')
             + '<div class="gb-btns"><button class="gb-btn" data-x="1">닫는다</button></div>';
@@ -1173,18 +1179,38 @@ function runeUi() {
                 const d = M.dolls(u)[b.dataset.u];
                 const r = M.gradeUp(b.dataset.u);
                 if (!r.ok) { alert_(r.why); return; }
-                alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성했습니다.\n\nLv 1 부터 다시 오릅니다.');
+                alert_('💠 ' + M.nickOf(d) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 각성 돌파했습니다.\n\nLv ' + r.lv + ' 그대로 이어서 오릅니다.');
                 paint();
             };
         });
     };
     paint();
 }
+// ★ 6단계(2026-11-10) — 조는 도깨비: 기존 대화 + 「기술 관리 / 도깨비 상점 / 닫기」 (기획 「조는 도깨비」 01 · 03)
+//   기술 관리 — d2-learn.js (동행 인형 선택 → 배우기 · 잊기 · 교환 · 자리 바꾸기) · 도깨비 상점 — 택 로고 각인기 100,000 꿈결 (d2-items.js shopOpen('gob'))
 async function nap(S) {
-    try { S.sys('(쿨…… 쿨……)', 9000); } catch (e) { }
-    const l = await greetLines('nap', ['……쿨…… 쿨……', '……으음…… 메밀묵은 내 거야……', '……김서방…… 리본…… 다섯 개……']);
-    try { S.sys('', 10); } catch (e) { }
-    await S.talk(l, '조는 도깨비');
+    const WHO = '조는 도깨비';
+    for (let n = 0; ; n++) {
+        let i;
+        if (n === 0) {
+            try { S.sys('(쿨…… 쿨……)', 9000); } catch (e) { }
+            const l = await greetLines('nap', ['……쿨…… 쿨……', '……으음…… 메밀묵은 내 거야……', '……김서방…… 리본…… 다섯 개……']);
+            try { S.sys('', 10); } catch (e) { }
+            if (l.length > 1) await S.talk(l.slice(0, -1), WHO);
+            i = await S.ask(WHO, l[l.length - 1], ['기술 관리', '도깨비 상점', '닫기']);
+        } else i = await S.ask(WHO, pick(['……으음…… 또 뭐……?', '……쿨…… 아, 아직 있었어……?']), ['기술 관리', '도깨비 상점', '닫기']);
+        if (i === 0) {
+            if (!window.D2LN) { await S.talk(['……기술은…… 아직…… 쿨……'], WHO); continue; }
+            await new Promise(function (res) { window.D2LN.open(null, res); });
+            continue;
+        }
+        if (i === 1) {
+            if (!window.D2IT) { await S.talk(['……가게는…… 닫았어…… 쿨……'], WHO); continue; }
+            await new Promise(function (res) { window.D2IT.shopOpen('gob', res); });
+            continue;
+        }
+        return;
+    }
 }
 
 window.DOLLGONG = {

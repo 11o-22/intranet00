@@ -178,7 +178,8 @@ function css() {
     ].join('\n');
     document.head.appendChild(s);
 }
-function shut() { const e = document.getElementById('d2i-dim'); if (e) e.remove(); }
+let onShut = null;
+function shut() { const e = document.getElementById('d2i-dim'); if (e) e.remove(); const f = onShut; onShut = null; if (typeof f === 'function') { try { f(); } catch (x) { } } }
 function panel(title) {
     css(); shut();
     const dim = document.createElement('div'); dim.id = 'd2i-dim'; dim.className = 'd2i-dim';
@@ -229,7 +230,7 @@ function confirmOpen(name, d, no) {
 }
 
 // ==========================================
-// 상점 — 꿈결 (조는 도깨비 「도깨비 상점」) · 20 + 각인기
+// 상점 — 꿈결 · 잡화점 「아이템」(20종) / 조는 도깨비 「도깨비 상점」(택 로고 각인기)
 // ==========================================
 function shopList() { const T = TR(); const out = ORDER.map(function (n) { return { n: n, g: ITEMS[n].g, p: ITEMS[n].p, d: ITEMS[n].d }; }); if (T) out.push({ n: T.ITEM, g: 'eng', p: T.PRICE_DREAM, d: '원하는 일반 특성으로 택 로고 변경 (전투 밖에서 소지품으로 사용)' }); return out; }
 function buy(name, n, u) {
@@ -243,7 +244,7 @@ function buy(name, n, u) {
     const give = function () {
         if (!Array.isArray(u.inventory)) u.inventory = [];
         for (let i = 0; i < n; i++) u.inventory.push(name);
-        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[👺 도깨비 상점] ' + name + ' ×' + n + ' (-' + fmtN(tot) + ' 꿈결)'); } catch (e) { }
+        try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[👺 ' + (it.g === 'eng' ? '도깨비 상점' : '잡화점') + '] ' + name + ' ×' + n + ' (-' + fmtN(tot) + ' 꿈결)'); } catch (e) { }
         try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
         try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
         return { ok: true, msg: name + ' ' + n + '개를 구매했다!', tot: tot };
@@ -254,13 +255,19 @@ function buy(name, n, u) {
         .then(function (r) { if (!r || !r.committed) return { ok: false, why: '꿈결이 부족하다!' }; if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {}; u.kroom.dream = Math.max(0, Math.floor(Number(r.snapshot.val()) || 0)); return give(); })
         .catch(function () { return { ok: false, why: '사지 못했습니다. 다시 해 주세요.' }; });
 }
-function shopOpen() {
+//   mode 'gob'  조는 도깨비 「도깨비 상점」 — 택 로고 각인기만 (기획 「조는 도깨비」 03)
+//   mode 'shop' 도깨비 공방 잡화점 「아이템」 — 일반 소모품 20종 (기획 「아이템」 10) · 기본
+//   onClose     닫힐 때 부른다 (대화 흐름으로 돌아가게)
+function shopOpen(mode, onClose) {
     const u = u_(); if (!u) return;
-    const pan = panel('👺 도깨비 상점 — 꿈결');
-    const qty = {}; const list = shopList();
+    const gob = mode === 'gob';
+    const title = gob ? '👺 도깨비 상점 — 꿈결' : '🧷 봉제인형 아이템 — 꿈결';
+    const pan = panel(title);
+    onShut = (typeof onClose === 'function') ? onClose : null;
+    const qty = {}; const list = shopList().filter(function (x) { return gob ? x.g === 'eng' : x.g !== 'eng'; });
     const paint = function () {
-        let h = '<div class="d2i-sub">보유 꿈결 ' + fmtN(dream(u)) + ' D</div>';
-        GROUPS.concat(['eng']).forEach(function (g) {
+        let h = '<div class="d2i-sub">보유 꿈결 ' + fmtN(dream(u)) + ' D' + (gob ? ' · 각인기는 소지품에서 사용 — 소유 인형 선택 → 일반 특성 30종 가운데 하나로 (전투 중 불가)' : ' · 산 것은 소지품에 들어가고, 쓸 때 동행 인형을 고른다 · 전투 중에도 쓴다 (한 턴)') + '</div>';
+        (gob ? ['eng'] : GROUPS).forEach(function (g) {
             const rows = list.filter(function (x) { return x.g === g; }); if (!rows.length) return;
             h += '<div class="d2i-grp">' + esc(G[g]) + '</div>';
             rows.forEach(function (x) {
@@ -268,7 +275,7 @@ function shopOpen() {
                 h += '<div class="d2i-row" data-n="' + esc(x.n) + '"><div class="n"><b>' + esc(x.n) + ' <span style="color:#ffd766;font-weight:normal">' + fmtN(x.p) + ' D</span></b><small>' + esc(x.d) + '</small><small>가진 것 ' + count(x.n, u) + '개 · 합계 ' + fmtN(tot) + ' D · 구매 후 ' + fmtN(Math.max(0, dream(u) - tot)) + ' D</small></div><div class="d2i-qty"><button class="d2i-m">−</button><span>' + q + '</span><button class="d2i-p">+</button></div><button class="d2i-btn d2i-buy"' + (poor ? ' disabled' : '') + '>구매</button></div>';
             });
         });
-        pan.innerHTML = '<h3>👺 도깨비 상점 — 꿈결 <button class="d2i-x">닫기</button></h3>' + h;
+        pan.innerHTML = '<h3>' + title + ' <button class="d2i-x">닫기</button></h3>' + h;
         pan.querySelector('.d2i-x').onclick = shut;
         Array.prototype.forEach.call(pan.querySelectorAll('.d2i-row'), function (row) {
             const n = row.getAttribute('data-n');
@@ -278,7 +285,7 @@ function shopOpen() {
                 const q = qty[n] || 1, it = list.find(function (x) { return x.n === n; });
                 if (!confirm_(n + ' ' + q + '개를 ' + fmtN(it.p * q) + '꿈결에 구매할까요?')) return;
                 row.querySelector('.d2i-buy').disabled = true;
-                buy(n, q, u).then(function (r) { if (!r.ok) alert_(r.why); else alert_(r.msg); paint(); });
+                buy(n, q, u).then(function (r) { if (!r.ok) alert_(r.why); else alert_(r.msg); if (document.getElementById('d2i-dim')) paint(); });
             };
         });
     };
@@ -292,7 +299,7 @@ function confirm_(t) { try { if (typeof window.d2Confirm === 'function') return 
 (function hook() {
     const iv = setInterval(function () {
         if (typeof ITEM_CATALOG === 'undefined' || typeof useInventoryItem !== 'function') return;
-        ORDER.forEach(function (n) { if (!ITEM_CATALOG[n]) ITEM_CATALOG[n] = { price: 0, usable: true, targetable: false, effect: 'd2_item', noSell: true, desc: ITEMS[n].d + ' (도깨비 상점 · ' + ITEMS[n].p + ' 꿈결)' }; });
+        ORDER.forEach(function (n) { if (!ITEM_CATALOG[n]) ITEM_CATALOG[n] = { price: 0, usable: true, targetable: false, effect: 'd2_item', noSell: true, desc: ITEMS[n].d + ' (도깨비 공방 잡화점 · ' + ITEMS[n].p + ' 꿈결)' }; });
         if (!useInventoryItem._d2i) {
             const _u = useInventoryItem;
             useInventoryItem = function (itemName) { if (!isItem(itemName)) return _u.apply(this, arguments); useOpen(itemName); };

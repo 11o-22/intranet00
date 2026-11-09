@@ -5,8 +5,7 @@
 //
 // 2026-11-10 사용자 「인형 전투 시스템 2차.xlsx — 단계별로 쭉 갈아엎자」 — 1단계
 //   기획 탭 「개체치」「레벨링」「노력치」「공통 규칙 10」 을 그대로 옮겼다.
-//   ★ 아직 전투 · 화면에 쓰지 않는다. 플레이어에게는 그대로 보이고, 상담사 콘솔 d2State() · d2Roll() 로만 본다.
-//     전투 코어(3단계)가 서면 한꺼번에 갈아 끼운다 (migrateAll).
+//   ★ 6단계(2026-11-10)부터 이것이 인형의 수치다 — doll-data.js DOLL.stats 가 statsOf 를 돌려준다. 옛 기록은 fixAll 이 5초마다 채운다.
 //
 // ■ 능력치 여섯 — HP 와 다섯 (공격력 atk · 매력 chm · 방어력 def · 굳건함 sta · 속도 spd)
 //   개체치 B   Lv.1 기본값. 특기 2종은 15~30, 일반 3종은 0~20, HP(H₀)는 18~22. 개체마다 다르고 한 번 정해지면 안 바뀐다.
@@ -33,7 +32,7 @@
 //   d2  1                                 새 모델로 옮겨 왔다는 표
 //
 // ■ 옮겨 오기 (migrateAll — 3단계 뒤 한 번)
-//   개체치 · 성격이 없는 인형은 열쇠·태어난 때로 늘 같은 값을 뽑는다(결정적 난수 · 종은 열쇠에서 나오므로 안 섞는다) — 기기마다 같은 값이 나오게. 지금은 iv · pr 만 미리 적어 둔다 (fixIv · 5초마다).
+//   개체치 · 성격이 없는 인형은 열쇠·태어난 때로 늘 같은 값을 뽑는다(결정적 난수 · 종은 열쇠에서 나오므로 안 섞는다) — 기기마다 같은 값이 나오게. fixAll 이 5초마다 iv · pr · lv · hp · mv · tr 을 채운다.
 //   레벨은 예전 「등급마다 Lv 1 부터」 를 새 구간으로 — 등급 구간 안에 들어오게 (C Lv 3 → 11 · C Lv 15 → 15). 등급은 안 내려간다.
 //   HP 는 비율을 지킨다.
 //
@@ -211,7 +210,7 @@ function fixOne(d, all) {
     if (!(d.iv && PERS[int(d.pr)])) { const f = ivFallback(d); p.iv = f.iv; p.pr = f.pr; }
     if (all) {
         const g = GRADES.indexOf(d.g) >= 0 ? d.g : 'D';
-        const was = Object.assign({}, d, p), max0 = (function () { try { return DL().stats(d).max; } catch (e) { return 0; } })();
+        const was = Object.assign({}, d, p), max0 = (function () { try { return (DL().statsOld || DL().stats)(d).max; } catch (e) { return 0; } })();
         p.lv = lvMap(g, d.lv); p.g = g;
         if (!d.ev) p.ev = { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 };
         const tmp = Object.assign({}, was, p);
@@ -222,42 +221,40 @@ function fixOne(d, all) {
     }
     return p;
 }
-// 내 인형들 — iv · pr 만 미리 적어 둔다 (지금 · 5초마다). 값은 결정적이라 어느 기기에서 적어도 같다.
+// ★ 6단계(2026-11-10) — 갈아 끼웠다. 내 인형 가운데 새 기록(d2)이 없는 것 · 기술(mv)이 없는 것 · 특성(tr)이 없는 것을 5초마다 채운다.
+//   (옛 인형 · 알에서 깬 것 · 교환 · 입양으로 온 것 모두 여기서 맞춰진다. 값은 결정적이라 어느 기기에서 적어도 같다.)
+//   돌려주는 값은 쓴 조각 수 (Promise).
 let fixBusy = false;
-function fixIv() {
-    const u = u_(), D = DL();
-    if (!u || !u.code || !D || fixBusy) return;
-    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
-    const ds = D.dolls(u), p = {};
-    let n = 0;
-    Object.keys(ds).forEach(function (id) {
-        const d = ds[id];
-        if (!d || (d.iv && PERS[int(d.pr)])) return;
-        const f = fixOne(d, false);
-        if (!f.iv) return;
-        d.iv = f.iv; d.pr = f.pr; p['pets/' + id + '/iv'] = f.iv; p['pets/' + id + '/pr'] = f.pr; n++;
-    });
-    if (!n) return;
-    fixBusy = true;
-    D.put(p, u).then(function () { fixBusy = false; }, function () { fixBusy = false; });
-}
-// 전부 — 갈아 끼울 때 한 번 (3단계). 돌려주는 값은 쓴 조각 수.
-function migrateAll(u) {
-    u = u || u_(); const D = DL();
+function fixAll(u) {
+    u = u || u_(); const D = DL(), SK = window.D2SK, TR = window.D2TR;
     if (!u || !u.code || !D) return Promise.resolve(0);
     const ds = D.dolls(u), p = {};
     let n = 0;
     Object.keys(ds).forEach(function (id) {
         const d = ds[id];
-        if (!d || d.d2) return;
-        const f = fixOne(d, true);
-        Object.keys(f).forEach(function (k) { p['pets/' + id + '/' + k] = f[k]; d[k] = f[k]; });
+        if (!d) return;
+        const f = d.d2 ? ((d.iv && PERS[int(d.pr)]) ? {} : fixOne(d, false)) : fixOne(d, true);
+        Object.keys(f).forEach(function (k) { d[k] = f[k]; });
+        try { if (SK) { const m = SK.fixMv(d); if (m) { f.mv = m.mv; f.pp = m.pp; d.mv = m.mv; d.pp = m.pp; } } } catch (e) { }
+        try { if (TR) { const t = TR.fixTr(d); if (t) { f.tr = t.tr; d.tr = t.tr; } } } catch (e) { }
+        if (!Object.keys(f).length) return;
+        Object.keys(f).forEach(function (k) { p['pets/' + id + '/' + k] = f[k]; });
         n++;
     });
     if (!n) return Promise.resolve(0);
     return D.put(p, u).then(function () { return n; });
 }
-setInterval(function () { try { fixIv(); } catch (e) { } }, 5000);
+function fixTick() {
+    const u = u_();
+    if (!u || !u.code || fixBusy) return;
+    try { if (typeof window.clockReady === 'function' && !window.clockReady()) return; } catch (e) { }
+    if (!u.dollMig) return;                                              // 펫 칸으로 옮겨 온 뒤에 (doll-data.js migrate)
+    fixBusy = true;
+    fixAll(u).then(function (n) { fixBusy = false; if (n) { try { if (typeof window.dollRepaint === 'function') window.dollRepaint(); } catch (e) { } } }, function () { fixBusy = false; });
+}
+const migrateAll = fixAll;
+setInterval(function () { try { fixTick(); } catch (e) { } }, 5000);
+setTimeout(function () { try { fixTick(); } catch (e) { } }, 2500);
 
 // ==========================================
 // 바깥에 내어 준다
@@ -271,7 +268,7 @@ window.D2 = {
     lvOf: lvOf, gOf: gOf, gradeOfLv: gradeOfLv, capOf: capOf, R: R, cum: cum, xpWin: xpWin, addXp: addXp, waiting: waiting, breakNeed: breakNeed, breakUp: breakUp,
     stat: stat, maxHp: maxHp, hpOf: hpOf, statsOf: statsOf, statText: statText,
     rollWild: rollWild, mk: mk,
-    lvMap: lvMap, fixOne: fixOne, fixIv: fixIv, migrateAll: migrateAll
+    lvMap: lvMap, fixOne: fixOne, fixAll: fixAll, migrateAll: migrateAll
 };
 
 // ==========================================

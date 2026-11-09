@@ -5,12 +5,15 @@
 //
 // 2026-11-10 사용자 「인형 전투 시스템 2차.xlsx — 단계별로 쭉 갈아엎자」 — 3단계
 //   기획 탭 「최종 데미지」「순서 처리」「공통 규칙」「공통 출력문」 과 「특성」 의 전투 중 발동을 옮겼다.
-//   ★ 화면은 아직 예전 것(doll-battle.js). 이 엔진은 순수 함수라 상담사 콘솔 d2Fight() 로만 돌려 본다. 화면 교체는 마지막 단계.
+//   ★ 6단계(2026-11-10) — 화면(doll-battle.js)이 이 엔진을 쓴다. 출몰 · 여정(여럿이) · 결투 모두.
 //
 // ■ 쓰는 법 — 되감기 가능한 한 턴
-//   S = D2BT.start({ my: [인형 기록…], foe: [상대…], auto: { B: true }, seed })      전투 최초 B1 (등장 · 등장 특성 · 첫 턴 준비)
-//   r = D2BT.turn(S, { A: 행동, B: 행동, picks: [], seed })                              한 턴 전부 (-2 → +4 → P1 → +3 → +2/+1/0 → -1)
-//       행동  { k: 'skill', no }  ·  { k: 'switch', idx }  ·  { k: 'item', item, idx, no }   (B 가 auto 면 B 행동은 엔진이 고른다 — D2BT.ai)
+//   S = D2BT.start({ my: [인형 기록…], foe: [상대…], allies: [{ my, owner, code }…], auto: { B: true }, seed, mode })   전투 최초 B1 (등장 · 등장 특성)
+//       allies 가 있으면 진영 C · D 가 A 와 함께 B 를 친다 — 여정(여럿이 · 동시 출전). S.order = ['A','C','D','B'] · S.allies.
+//   r = D2BT.turn(S, { A: 행동, B: 행동, C: 행동, picks: [], seed })                      한 턴 전부 (-2 → +4 → P1 → +3 → +2/+1/0 → -1)
+//       행동  { k: 'skill', no }  ·  { k: 'switch', idx }  ·  { k: 'item', item, idx, no }  ·  { k: 'rune', i } 먹인 룬으로 친다  ·  { k: 'rd', i } 룬으로 막는다  ·  { k: 'pass' } 아무것도 안 한다(포획 · 도망 턴)
+//             (B 가 auto 면 B 행동은 엔진이 고른다 — D2BT.ai · 안 준 진영의 행동도 엔진이 고른다)
+//       출력문 한 줄 { t, k, id, f: { 진영: [칸, HP, 최대] }, s, i, act } — f 는 그 순간의 HP 스냅샷 (화면이 체력 바를 따라 그린다)
 //       r.need = { pick: 'A', why: 'faint'|'baton', cands: [idx…] }  → 기절·바통 선택이 필요하면 S 는 그대로 두고 멈춘다.
 //              선택을 picks 에 덧붙여 **같은 S 로 다시** turn() 을 부른다 (같은 seed → 같은 결과 · 그래서 되감기가 된다).
 //       r.S     새 상태 (입력 S 는 안 건드린다) · r.log [{ t, k }] 이번 턴 출력문 · r.over { win: 'A'|'B' } · r.grow 전투 뒤 성장 (E1)
@@ -92,9 +95,37 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function ceil(v) { return Math.ceil(v - 1e-9); }
 function copy(o) { return JSON.parse(JSON.stringify(o)); }
 function rankMul(r) { return r >= 0 ? (2 + r) / 2 : 2 / (2 - r); }
-function other(s) { return s === 'A' ? 'B' : 'A'; }
-function sideName(S, s) { return s === S.me ? '아군 진영' : '상대 진영'; }
+// ── 진영 — A(나) · B(상대) 가 기본. 여정(여럿이)은 동료 진영 C · D 가 A 와 함께 B 를 친다 (6단계 · 2026-11-10 사용자 「동시 출전」)
+//   S.order  모든 진영 차례 ['A','C','D','B'] · S.allies ['A','C','D'] · S.tgt  B 가 이번 행동에서 노리는 아군 진영
+//   other(S, s) — 아군 진영이면 'B', B 면 지금 노리는 아군 진영 (없으면 살아 있는 첫 아군)
+function allies(S) { return S.allies || ['A']; }
+function sideOf(S, u) { const o = S.order || ['A', 'B']; for (let i = 0; i < o.length; i++) if (S.sides[o[i]].units.indexOf(u) >= 0) return o[i]; return 'A'; }
+function liveAllies(S) { return allies(S).filter(function (s) { return !S.sides[s].out && alive(cur(S, s)); }); }
+function other(S, s) {
+    if (s !== 'B') return 'B';
+    if (S.tgt && !S.sides[S.tgt].out && alive(cur(S, S.tgt))) return S.tgt;
+    const la = liveAllies(S); return la.length ? la[0] : allies(S)[0];
+}
+// 상대편에 나와 있는 인형들 (B 에게는 아군 전부 · 아군에게는 B 하나)
+function oppUnits(S, s) { if (s !== 'B') return [cur(S, 'B')].filter(alive); return liveAllies(S).map(function (x) { return cur(S, x); }); }
+function fieldUnits(S) { return (S.order || ['A', 'B']).filter(function (s) { return !S.sides[s].out; }).map(function (s) { return cur(S, s); }).filter(alive); }
+// B 의 표적 — 살아 있는 아군 진영 가운데 무작위 (전에 고른 것이 아직 서 있으면 그대로)
+function pickTgt(S, rng) {
+    const la = liveAllies(S);
+    if (!la.length) return null;
+    if (S.tgt && la.indexOf(S.tgt) >= 0 && S.tgtTurn === S.turn) return S.tgt;
+    S.tgt = la.length === 1 ? la[0] : la[Math.floor(rng() * la.length)]; S.tgtTurn = S.turn;
+    return S.tgt;
+}
+function sideName(S, s) { return s === 'B' ? '상대 진영' : '아군 진영'; }
 function rankName(k) { return K().RANK_NAME[k] || k; }
+// 💠 속성 룬 — 먹인 룬으로 친다 (옛 출몰 전투의 룬 공격 · 2026-11-10 사용자 「전투 행동으로 유지」)
+//   위력 60 · 필중 · 무속성(속성 상성 · 자속 보정 없음) · 물리 · PP 없음 · 룬 상성(애교 › 근력 › 경청 › 인내 › 눈치 › 애교)으로 막으면 피해 1/3
+const RUNE_BEATS = { '애교': '근력', '근력': '경청', '경청': '인내', '인내': '눈치', '눈치': '애교' };
+const RUNE_PW = 60;
+function runeSk(name) { return { no: 'rune', n: '💠 ' + name + ' 룬', slot: 'A', pp: null, pw: RUNE_PW, acc: 'sure', kind: 'phys', pri: 0, tgt: 'foe', el: 'none', cat: '공격', fx: {}, rune: name }; }
+function runesOf(u) { const r = u.runes; return Array.isArray(r) ? r.filter(Boolean) : (r && typeof r === 'object') ? Object.keys(r).sort().map(function (k) { return r[k]; }).filter(Boolean) : []; }
+function skOf(a) { if (a.sk) return a.sk; return a.no === 'rune' ? runeSk(a.rune || '') : K().get(a.no); }
 
 // ==========================================
 // 개체 만들기
@@ -115,7 +146,8 @@ function unitOf(rec, opt) {
         mv: mv, pp: pp, trait: opt.trait != null ? opt.trait : (window.D2TR ? window.D2TR.trOf(rec) : ((rec.tr | 0) || 0)), used: {},   // 특성 — 기록 없으면 d2-traits 의 결정적 값
         dark: !!opt.dark, rec: { lv: s.lv, xp: rec.xp | 0, g: rec.g || s.g, iv: rec.iv, pr: rec.pr, ev: rec.ev, at: rec.at, id: rec.id, sp: rec.sp, att: el },
         guard: null, guardFired: false, guardLast: false, restUntil: 0, focus: false, calmTurn: 0, prio3: 0, baton: false, boost: [], flinch: false, flinchUsed: false, chainUsed: false,
-        donut: false, show: null, limit: null, pendLimit: null, pendErase: null, enteredTurn: 0, enteredBy: '', lastMove: 0, fainted: false, evN: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 }, met: {}, aid: Math.max(0, rec.aid | 0), dope: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0, acc: 0, eva: 0 }
+        donut: false, show: null, limit: null, pendLimit: null, pendErase: null, enteredTurn: 0, enteredBy: '', lastMove: 0, fainted: false, evN: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 }, met: {}, aid: Math.max(0, rec.aid | 0), dope: { atk: 0, chm: 0, def: 0, sta: 0, spd: 0, acc: 0, eva: 0 },
+        runes: runesOf(rec), runeGuard: null, g: rec.g || s.g, art: !!opt.art
     };
 }
 // 상대(야생 · 괴담) — spec { name, lv, el, g, pr, iv, mv:{a,u}, trait, dark, hp }
@@ -125,7 +157,9 @@ function foeOf(spec, rng) {
     rec.id = spec.id || null; rec.sp = spec.sp || null; rec.att = spec.el || rec.att || (function () { const ks = Object.keys(EL_NAME); return ks[Math.floor((rng || Math.random)() * ks.length)]; })();
     if (spec.mv) rec.mv = spec.mv; else if (!rec.mv) { const f = SK.fixMv(Object.assign({ id: spec.id || 'foe' }, rec), rng); rec.mv = f.mv; rec.pp = f.pp; }
     if (spec.hp != null) rec.hp = spec.hp;
-    return unitOf(rec, { name: spec.name || '따라쟁이 봉제인형', el: rec.att, trait: spec.trait || 0, dark: !!spec.dark });
+    const u = unitOf(rec, { name: spec.name || '따라쟁이 봉제인형', el: rec.att, trait: spec.trait || 0, dark: !!spec.dark, art: !!spec.art });
+    if (spec.hpMul && spec.hpMul > 0) { u.max = ceil(u.max * spec.hpMul); u.hp = spec.hp != null ? Math.min(u.max, u.hp) : u.max; }   // 여럿이 치는 괴담은 더 질기다
+    return u;
 }
 function cur(S, s) { const sd = S.sides[s]; return sd.units[sd.act]; }
 function alive(u) { return !!u && !u.fainted && u.hp > 0; }
@@ -133,8 +167,10 @@ function bench(S, s) { const sd = S.sides[s]; return sd.units.map(function (u, i
 function base(u, k) { return (u.erase && u.erase.k === k) ? u.erase.v : u.st[k]; }
 function eff(u, k) { return base(u, k) * rankMul(u.rank[k]); }
 function speed(u) { return eff(u, 'spd'); }
-function log(S, id, v, kind) { const t = fmt(id, v); S.log.push({ t: t, k: kind || 'msg', id: id }); S.tlog.push({ t: t, k: kind || 'msg', id: id }); }
-function say(S, t, kind) { S.log.push({ t: t, k: kind || 'sys' }); S.tlog.push({ t: t, k: kind || 'sys' }); }
+// 출력문 한 줄 — 화면이 그 순간의 HP 를 따라 그리도록 나와 있는 인형들의 HP 스냅샷(f)을 같이 적는다 { 진영: [칸, HP, 최대] }
+function snap(S) { const o = {}; (S.order || ['A', 'B']).forEach(function (s) { const sd = S.sides[s], u = sd.units[sd.act]; if (u) o[s] = [sd.act, u.hp, u.max]; }); return o; }
+function log(S, id, v, kind, meta) { const t = fmt(id, v); const e = Object.assign({ t: t, k: kind || 'msg', id: id, f: snap(S) }, meta || {}); S.log.push(e); S.tlog.push(e); }
+function say(S, t, kind, meta) { const e = Object.assign({ t: t, k: kind || 'sys', f: snap(S) }, meta || {}); S.log.push(e); S.tlog.push(e); }
 
 // 특성 — 가졌나 · 전투당 1회 소모
 function has(u, no) { return u.trait === no; }
@@ -160,7 +196,7 @@ function dopeClear(u) { RANKS.forEach(function (k) { u.dope[k] = 0; }); }
 function rankChange(S, u, k, n, src, opt) {
     opt = opt || {};
     if (!alive(u) || !n) return 0;
-    const sideOf = S.sides.A.units.indexOf(u) >= 0 ? 'A' : 'B';
+    const so = sideOf(S, u);
     // T2 — 상대에 의한 하락: 배짱(무효) → 승부욕 · 앙갚음
     if (n < 0 && src === 'foe') {
         if (canUse(u, 8)) { fire(S, u, 8); log(S, 36, { 사용자: u.name, 특성명: TRAIT[8] }); return 0; }
@@ -177,7 +213,7 @@ function rankChange(S, u, k, n, src, opt) {
     log(S, d > 0 ? 31 : 32, { 대상: u.name, 능력치: rankName(k) });
     if (d < 0 && src === 'foe') {
         if (canUse(u, 4)) { fire(S, u, 4); rankChange(S, u, 'atk', 1, 'self', { trait: 1 }); }
-        if (canUse(u, 9)) { fire(S, u, 9); const f = cur(S, other(sideOf)); if (alive(f)) rankChange(S, f, 'spd', -1, 'foe', { trait: 1 }); }
+        if (canUse(u, 9)) { fire(S, u, 9); const f = cur(S, other(S, so)); if (alive(f)) rankChange(S, f, 'spd', -1, 'foe', { trait: 1 }); }
     }
     // 아홉여우병 — 대상의 실제 변화를 병을 옮긴 쪽의 필드 인형에게 (복사된 것은 다시 복사하지 않는다)
     if (u.status === 'fox' && !opt.copied && u.foxBy) {
@@ -196,16 +232,18 @@ function faint(S, u, cause) {
     cause = cause || {};
     if (u.fainted) return;
     u.hp = 0; u.fainted = true;
-    log(S, 21, { 대상: u.name }, 'faint');
-    const s = S.sides.A.units.indexOf(u) >= 0 ? 'A' : 'B', sd = S.sides[s];
+    const s = sideOf(S, u), sd = S.sides[s];
+    log(S, 21, { 대상: u.name }, 'faint', { s: s, i: sd.units.indexOf(u) });
     clearTemp(u);
     // 이 인형이 건 예약 취소 — 상대에게 건 삭제 예약
-    S.sides[other(s)].units.forEach(function (x) { if (x.pendErase && x.pendErase.by === u.key + '@' + s) x.pendErase = null; });
+    (S.order || ['A', 'B']).forEach(function (x) { if (x === s) return; S.sides[x].units.forEach(function (y) { if (y.pendErase && y.pendErase.by === u.key + '@' + s) y.pendErase = null; }); });
     sd.lastFaint = { turn: S.turn, by: cause.k || '', will: has(u, 30) && cause.k === 'destiny' };
     if (!bench(S, s).length) {
-        S.over = { win: other(s) };
-        log(S, S.over.win === S.me ? 22 : '22b', {}, 'over');
-        throw STOP;
+        if (s === 'B') { S.over = { win: 'A' }; log(S, 22, {}, 'over'); throw STOP; }
+        sd.out = true;                                                  // 이 아군 진영은 다 쓰러졌다
+        if (!liveAllies(S).length) { S.over = { win: 'B' }; log(S, '22b', {}, 'over'); throw STOP; }
+        if (allies(S).length > 1) say(S, (sd.owner || '동료') + ' 사원의 봉제인형이 모두 지쳤다.', 'sys', { s: s });
+        return;
     }
     enterPick(S, s, 'faint');
 }
@@ -221,7 +259,7 @@ function enterPick(S, s, why) {
         S.pickAt++;
         idx = cands.indexOf(Number(p)) >= 0 ? Number(p) : cands[0];
     }
-    if (!sd.auto) log(S, 94, {}, 'ui');
+    if (!sd.auto) log(S, 94, {}, 'ui', { s: s });
     enter(S, s, idx, why);
 }
 // S3~S5 등장 · 등장 특성
@@ -229,7 +267,7 @@ function enter(S, s, idx, why, carry) {
     const sd = S.sides[s]; sd.act = idx;
     const u = sd.units[idx];
     u.enteredTurn = S.turn; u.enteredBy = why; u.flinchUsed = false;
-    log(S, 38, { 사용자: u.name }, 'enter');
+    log(S, 38, { 사용자: u.name }, 'enter', { s: s, i: idx });
     if (carry) {               // 바통 계승
         RANKS.forEach(function (k) { u.rank[k] = carry.rank[k]; });
         u.boost = carry.boost.slice(); u.focus = carry.focus; u.prio3 = carry.prio3;
@@ -240,13 +278,15 @@ function enter(S, s, idx, why, carry) {
     // S4 등장 특성 — 준비만전 · 재빠른 발 · 허세 · 복수심 · 유언(앞 인형)
     if (canUse(u, 12)) { fire(S, u, 12); rankChange(S, u, 'acc', 1, 'self'); }
     if (canUse(u, 14)) { fire(S, u, 14); rankChange(S, u, 'spd', 1, 'self'); }
-    if (canUse(u, 13)) { const f = cur(S, other(s)); if (alive(f)) { fire(S, u, 13); rankChange(S, f, 'atk', -1, 'foe'); } }
+    if (canUse(u, 13)) { const f = cur(S, other(S, s)); if (alive(f)) { fire(S, u, 13); rankChange(S, f, 'atk', -1, 'foe'); } }
     if (why === 'faint' && sd.lastFaint && sd.lastFaint.by === 'foeAttack' && canUse(u, 15)) { fire(S, u, 15); rankChange(S, u, 'atk', 1, 'self'); }
     if (why === 'faint' && sd.lastFaint && sd.lastFaint.will) { sd.lastFaint.will = false; log(S, 35, { 사용자: sd.lastFaint.name || '앞선 인형', 특성명: TRAIT[30] }, 'trait'); rankChange(S, u, 'atk', 1, 'self'); }
-    // 상대의 집중은 대상이 바뀌면 풀린다
-    const f = cur(S, other(s)); if (alive(f) && f.focus && why !== 'first') { f.focus = false; log(S, 28, { 사용자: f.name }); }
-    // 만남 기록 — 경험치 분배용
-    const g = cur(S, other(s)); if (alive(g)) { u.met[other(s) + ':' + S.sides[other(s)].act] = u.lv; g.met[s + ':' + idx] = g.lv; }
+    // 상대의 집중은 대상이 바뀌면 풀린다 · 만남 기록(경험치 분배용) — 상대편에 나와 있는 인형 모두와
+    oppUnits(S, s).forEach(function (f) {
+        if (f.focus && why !== 'first') { f.focus = false; log(S, 28, { 사용자: f.name }); }
+        const fs = sideOf(S, f);
+        u.met[fs + ':' + S.sides[fs].act] = u.lv; f.met[s + ':' + idx] = f.lv;
+    });
 }
 // S2 회수 (일반 · 바통 · B조 교대) — 돌려주는 값: 바통이면 계승 묶음
 function recall(S, s, why) {
@@ -255,7 +295,7 @@ function recall(S, s, why) {
     if (why === 'baton') { RANKS.forEach(function (k) { u.rank[k] = Math.max(k === 'eva' ? 0 : -6, u.rank[k] - (u.dope[k] || 0)); }); dopeClear(u); }
     if (why === 'baton') carry = { rank: copy(u.rank), boost: u.boost.filter(function (b) { return !b.dope; }), focus: u.focus, prio3: u.prio3, masterTrait: has(u, 10) && canUse(u, 10), masterName: u.name };
     if (carry && carry.masterTrait) u.used[10] = 1;
-    log(S, 37, { 사용자: u.name }, 'recall');
+    log(S, 37, { 사용자: u.name }, 'recall', { s: s, i: sd.act });
     if (u.show != null) { u.show = null; log(S, 76, { 사용자: u.name }); }
     if (canUse(u, 17) && (u.status === 'poison' || u.status === 'para')) { fire(S, u, 17); log(S, 25, { 대상: u.name, 상태이상: ST_NAME[u.status] }); u.status = null; u.sc = 0; }
     if (u.status === 'fox') { log(S, 25, { 대상: u.name, 상태이상: ST_NAME.fox }); u.status = null; u.foxBy = null; }
@@ -270,22 +310,37 @@ function recall(S, s, why) {
 // ==========================================
 // 전투 시작 (B1)
 // ==========================================
+//   opt.my [기록…] 내 인형 (진영 A) · opt.foe [상대…] (진영 B) · opt.allies [{ my: [기록…], owner: 이름, code }] 동료 진영 C · D (여정 여럿이)
+//   opt.auto { A, B, C, D } — 엔진이 고르나 (B 는 기본 참) · opt.owner A 의 주인 이름 · opt.art { A: 옛 그림? … }
+function mkSide(auto) { return { units: [], act: 0, decoy: null, nail: 0, auto: !!auto, switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0, out: false, owner: null, code: null }; }
 function start(opt) {
     opt = opt || {};
     const rng = rngOf(opt.seed || ('d2bt:' + Date.now()));
     const S = { turn: 1, me: 'A', mode: opt.mode || 'pve', log: [], tlog: [], over: null, need: null, pickAt: 0, in: {}, field: { reverse: null, pendReverse: null },
-        sides: { A: { units: [], act: 0, decoy: null, nail: 0, auto: !!(opt.auto && opt.auto.A), switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0 },
-                 B: { units: [], act: 0, decoy: null, nail: 0, auto: !(opt.auto && opt.auto.B === false), switched: 0, usedUtil: 0, lastFaint: null, guard1Turn: 0 } } };
-    (opt.my || []).forEach(function (rec) { S.sides.A.units.push(unitOf(rec, {})); });
-    (opt.foe || []).forEach(function (f) { S.sides.B.units.push(f.rec ? unitOf(f.rec, { name: f.name, dark: !!f.dark, trait: f.trait, el: f.el }) : foeOf(f, rng)); });
+        order: ['A'], allies: ['A'], tgt: null, tgtTurn: 0,
+        sides: { A: mkSide(opt.auto && opt.auto.A), B: mkSide(!(opt.auto && opt.auto.B === false)) } };
+    S.sides.A.owner = opt.owner || null; S.sides.A.code = opt.code || null;
+    (opt.my || []).forEach(function (rec) { S.sides.A.units.push(unitOf(rec, { art: !!(opt.art && opt.art.A) })); });
+    // 동료 진영 — C · D
+    const AK = ['C', 'D'];
+    (opt.allies || []).slice(0, AK.length).forEach(function (al, i) {
+        const s = AK[i]; S.sides[s] = mkSide(opt.auto && opt.auto[s]); S.sides[s].owner = al.owner || null; S.sides[s].code = al.code || null;
+        (al.my || []).forEach(function (rec) { S.sides[s].units.push(unitOf(rec, { art: !!al.art })); });
+        if (!S.sides[s].units.length) { delete S.sides[s]; return; }
+        S.order.push(s); S.allies.push(s);
+    });
+    S.order.push('B');
+    (opt.foe || []).forEach(function (f) { S.sides.B.units.push(f.rec ? unitOf(f.rec, { name: f.name, dark: !!f.dark, trait: f.trait, el: f.el, art: !!f.art }) : foeOf(f, rng)); });
     if (opt.foeUnits) opt.foeUnits.forEach(function (u) { S.sides.B.units.push(u); });
     if (!S.sides.A.units.length || !S.sides.B.units.length) throw new Error('양쪽에 인형이 있어야 합니다.');
-    S.sides.A.act = firstAlive(S, 'A'); S.sides.B.act = firstAlive(S, 'B');
+    S.order.forEach(function (s) { S.sides[s].act = firstAlive(S, s); });
     S.tlog = [];
-    // 등장 — 속도 높은 쪽부터
-    const a = cur(S, 'A'), b = cur(S, 'B');
-    const order = speed(a) > speed(b) ? ['A', 'B'] : speed(a) < speed(b) ? ['B', 'A'] : (rng() < 0.5 ? ['A', 'B'] : ['B', 'A']);
-    order.forEach(function (s) { enter(S, s, S.sides[s].act, 'first'); });
+    // 등장 — 속도 높은 쪽부터 (같으면 무작위)
+    const ord = S.order.slice();
+    const tb = {}; if (ord.length > 2) ord.forEach(function (s) { tb[s] = rng(); });
+    if (ord.length === 2) { const a = cur(S, 'A'), b = cur(S, 'B'); if (speed(a) < speed(b) || (speed(a) === speed(b) && rng() >= 0.5)) ord.reverse(); }
+    else ord.sort(function (x, y) { const d = speed(cur(S, y)) - speed(cur(S, x)); return d || (tb[x] - tb[y]); });
+    ord.forEach(function (s) { enter(S, s, S.sides[s].act, 'first'); });
     return S;
 }
 function firstAlive(S, s) { const i = S.sides[s].units.findIndex(alive); return i < 0 ? 0 : i; }
@@ -344,8 +399,9 @@ function turn(S0, input) {
 
 function runTurn(S, rng) {
     const T = S.turn;
+    const ORD = S.order || ['A', 'B'];
     // ── -2.1 다음 턴 효과 활성화
-    ['A', 'B'].forEach(function (s) {
+    ORD.forEach(function (s) {
         S.sides[s].units.forEach(function (u) {
             if (!alive(u)) return;
             if (u.pendErase && u.pendErase.at === T) {
@@ -363,14 +419,24 @@ function runTurn(S, rng) {
         });
     });
     if (S.field.pendReverse && S.field.pendReverse.from === T) { S.field.reverse = S.field.pendReverse; S.field.pendReverse = null; log(S, 65); }
-    // ── -2.2 행동 결정 (입력 · auto 는 엔진)
+    // ── -2.2 행동 결정 (입력 · auto 는 엔진) — 다 쓰러진 아군 진영은 건너뛴다
     const acts = {};
-    ['A', 'B'].forEach(function (s) {
+    const LIVE = ORD.filter(function (s) { return !S.sides[s].out && alive(cur(S, s)); });
+    if (S.tgtTurn !== T) S.tgt = null;
+    LIVE.forEach(function (s) {
         const u = cur(S, s);
         let a = S.sides[s].auto ? ai(S, s, rng) : (S.in[s] || null);
         if (!a) a = ai(S, s, rng);
         a = copy(a);
-        if (a.k === 'skill') {
+        if (a.k === 'rune') {                                             // 💠 먹인 룬으로 친다 → 기술 행동(no 'rune')
+            const rl = runesOf(u), nm = rl[a.i | 0];
+            if (nm) { a = { k: 'skill', no: 'rune', rune: nm, i: a.i | 0 }; }
+            else { const list = usableList(S, s, u); a = list.length ? { k: 'skill', no: list[0] } : { k: 'skill', no: 59, why: usableAny(u) ? 51 : 7 }; }
+        } else if (a.k === 'rd') {                                        // 💠 룬으로 막는다 — 룬이 없으면 아무것도 안 한다
+            const rl = runesOf(u), nm = rl[a.i | 0];
+            a = nm ? { k: 'rd', rune: nm } : { k: 'pass' };
+        }
+        if (a.k === 'skill' && a.no !== 'rune') {
             const no = a.no | 0, sk = K().get(no);
             const list = usableList(S, s, u);
             const equipped = K().equipped(u);
@@ -383,42 +449,63 @@ function runTurn(S, rng) {
         }
         if (a.k === 'switch') { const b = bench(S, s); if (b.indexOf(a.idx | 0) < 0) a = b.length ? { k: 'switch', idx: b[0] } : ai(S, s, rng); }
         if (S.sides[s].batonDue) a = { k: 'baton' };            // 바통 예약 실행 턴 — 이것이 이번 턴 행동
+        if (a.k === 'skill') a.sk = skOf(a);
         acts[s] = a; acts[s].side = s; acts[s].unit = cur(S, s); acts[s].unitIdx = S.sides[s].act;
     });
     // ── -2.3 순서 기준 (우선도 · 속도 · 황룡)
     function prioOf(a) {
         if (a.k === 'switch' || a.k === 'baton') return 4;
         if (a.k === 'item') return 3;
-        const sk = K().get(a.no); if (!sk) return 0;
+        if (a.k === 'rd') return 2;
+        if (a.k !== 'skill') return 0;
+        const sk = a.sk; if (!sk) return 0;
         if (a.no === 74) return 4;
         if (a.no === 69) return a.candle === 'guard' ? 2 : 0;
         let p = sk.pri | 0;
         if (sk.slot === 'A' && a.unit.prio3 > 0) p = Math.max(p, 1);
         return p;
     }
-    const spdNow = { A: speed(cur(S, 'A')), B: speed(cur(S, 'B')) }, lvNow = { A: cur(S, 'A').lv, B: cur(S, 'B').lv };
-    function firstOf(pA, pB, isItem) {
-        if (pA !== pB) return pA > pB ? 'A' : 'B';
+    const spdNow = {}, lvNow = {};
+    LIVE.forEach(function (s) { spdNow[s] = speed(cur(S, s)); lvNow[s] = cur(S, s).lv; });
+    // x 가 y 보다 먼저인가 — 우선도 → 속도(황룡은 역 · 아이템은 안 탄다) → 아이템이면 레벨 → 무작위
+    function before(x, y, px, py, isItem) {
+        if (px !== py) return px > py;
         const rev = !!S.field.reverse && !isItem;
-        if (spdNow.A !== spdNow.B) { const fast = spdNow.A > spdNow.B ? 'A' : 'B'; return rev ? other(fast) : fast; }
-        if (isItem && lvNow.A !== lvNow.B) return lvNow.A > lvNow.B ? 'A' : 'B';
-        return rng() < 0.5 ? 'A' : 'B';
+        if (spdNow[x] !== spdNow[y]) { const fast = spdNow[x] > spdNow[y]; return rev ? !fast : fast; }
+        if (isItem && lvNow[x] !== lvNow[y]) return lvNow[x] > lvNow[y];
+        const lead = ORD.indexOf(x) < ORD.indexOf(y) ? x : y;             // 비기면 무작위 — 차례표 앞쪽이 절반 확률로 먼저
+        const w = rng() < 0.5 ? lead : (lead === x ? y : x);
+        return w === x;
     }
-    S.sides.A.usedUtil = 0; S.sides.B.usedUtil = 0;
-    // ── +4 교체 (일반 · 바통 실행 · B조 교대) — 둘 다면 속도순
-    const sw = ['A', 'B'].filter(function (s) { return prioOf(acts[s]) === 4; });
-    if (sw.length === 2) { const f = firstOf(4, 4); sw.sort(function (x) { return x === f ? -1 : 1; }); }
-    sw.forEach(function (s) { if (!S.over) doSwitch(S, s, acts[s], rng); });
+    // 삽입 정렬 — 비교 순서가 늘 같아 어느 기기에서 돌려도 같은 차례 (무작위는 비길 때만 뽑는다)
+    function order(list, isItem) {
+        const out = [];
+        list.forEach(function (s) {
+            let i = out.length;
+            while (i > 0 && before(s, out[i - 1], prioOf(acts[s]), prioOf(acts[out[i - 1]]), isItem)) i--;
+            out.splice(i, 0, s);
+        });
+        return out;
+    }
+    ORD.forEach(function (s) { S.sides[s].usedUtil = 0; });
+    const bTgt = function () { if (acts.B) pickTgt(S, rng); };
+    // ── +4 교체 (일반 · 바통 실행 · B조 교대) — 여럿이면 속도순
+    const sw = order(LIVE.filter(function (s) { return prioOf(acts[s]) === 4; }));
+    sw.forEach(function (s) { if (!S.over) { if (s === 'B') bTgt(); doSwitch(S, s, acts[s], rng); } });
     // ── P1 양초 추첨
-    ['A', 'B'].forEach(function (s) { const a = acts[s]; if (a.k === 'skill' && a.no === 69 && alive(a.unit) && !a.done) { const r = rng(); a.candle = r < 0.4 ? 'guard' : r < 0.8 ? 'heal' : 'rank'; if (a.candle === 'rank') a.candleK = RANKS[Math.floor(rng() * 7)]; } });
+    LIVE.forEach(function (s) { const a = acts[s]; if (a.k === 'skill' && a.no === 69 && alive(a.unit) && !a.done) { const r = rng(); a.candle = r < 0.4 ? 'guard' : r < 0.8 ? 'heal' : 'rank'; if (a.candle === 'rank') a.candleK = RANKS[Math.floor(rng() * 7)]; } });
     // ── +3 아이템
-    const it = ['A', 'B'].filter(function (s) { return acts[s].k === 'item'; });
-    if (it.length === 2) { const f = firstOf(3, 3, true); it.sort(function (x) { return x === f ? -1 : 1; }); }
-    it.forEach(function (s) { if (!S.over) doItem(S, s, acts[s], rng); });
-    // ── +2 / +1 / 0 기술 — 우선도 큰 쪽부터, 같으면 속도(황룡은 역)
-    const rest = ['A', 'B'].filter(function (s) { return acts[s].k === 'skill' && !acts[s].done; });
-    rest.sort(function (x, y) { const px = prioOf(acts[x]), py = prioOf(acts[y]); if (px !== py) return py - px; return firstOf(px, py) === x ? -1 : 1; });
-    rest.forEach(function (s) { if (!S.over) doSkill(S, s, acts[s], rng); });
+    const it = order(LIVE.filter(function (s) { return acts[s].k === 'item'; }), true);
+    it.forEach(function (s) { if (!S.over) { if (s === 'B') bTgt(); doItem(S, s, acts[s], rng); } });
+    // ── +2 룬 방어 (선언) · +2 / +1 / 0 기술 — 우선도 큰 쪽부터, 같으면 속도(황룡은 역)
+    const rest = order(LIVE.filter(function (s) { return (acts[s].k === 'skill' && !acts[s].done) || acts[s].k === 'rd'; }));
+    rest.forEach(function (s) {
+        if (S.over) return;
+        const a = acts[s];
+        if (a.k === 'rd') { if (alive(a.unit) && S.sides[s].units[a.unitIdx] === a.unit) { a.unit.runeGuard = a.rune; a.unit.participated = 1; say(S, fix(a.unit.name + '은/는 💠 ' + a.rune + ' 룬을 들어 막을 채비를 했다!'), 'msg', { s: s }); } return; }
+        if (s === 'B') bTgt();
+        doSkill(S, s, a, rng);
+    });
     // ── -1 턴 사이 정비
     endTurn(S, rng);
     S.turn++;
@@ -474,11 +561,12 @@ function doItem(S, s, a, rng) {
 // ==========================================
 //   돌려주는 값 참이면 R5 까지 통과 (R6 발동은 fired())
 function tryR(S, s, a, rng) {
-    const u = a.unit, no = a.no, sk = K().get(no);
+    const u = a.unit, no = a.no, sk = skOf(a);
     if (!alive(u) || S.sides[s].units[a.unitIdx] !== u) return false;      // R0 — 기절 · 교체됨
-    // R0.1 PP · 기회 소모
-    if (no === 59) log(S, a.why === 51 ? 51 : 7, { 사용자: u.name });
-    else { u.pp[no] = Math.max(0, (u.pp[no] | 0) - 1); log(S, 1, { 사용자: u.name, 기술명: sk.n }); }
+    // R0.1 PP · 기회 소모 (룬은 PP 가 없다)
+    if (no === 59) log(S, a.why === 51 ? 51 : 7, { 사용자: u.name }, 'msg', { s: s });
+    else if (no === 'rune') log(S, 1, { 사용자: u.name, 기술명: sk.n }, 'msg', { s: s, act: 1 });
+    else { u.pp[no] = Math.max(0, (u.pp[no] | 0) - 1); log(S, 1, { 사용자: u.name, 기술명: sk.n }, 'msg', { s: s, act: 1 }); }
     u.lastMove = no;
     if (sk.fx.oncePerAppear) { a.flinchWasUsed = u.flinchUsed; u.flinchUsed = true; }
     if (sk.cat === '복합 공격' && has(u, 31) && !u.chainUsed) { u.chainUsed = true; a.chain = true; }
@@ -498,15 +586,15 @@ function tryR(S, s, a, rng) {
     if (no === 61) { if (S.sides[s].decoy) { log(S, 54); return false; } if (Math.min(ceil(u.max / 4), u.hp - 1) <= 0) { log(S, 2); return false; } }
     if (no === 76) { if (Math.min(ceil(u.max / 4), u.hp - 1) <= 0 || !bench(S, s).length) { log(S, 2); return false; } }
     if (no === 71 && u.donut) { log(S, 73); return false; }
-    if (no === 73) { if (cur(S, 'A').show != null || cur(S, 'B').show != null) { log(S, 113); return false; } }
-    if (no === 60) { const f = cur(S, other(s)); if (!alive(f) || f.erase || f.pendErase) { log(S, 11); return false; } const vs = STATS5.map(function (k) { return f.st[k]; }); if (Math.max.apply(null, vs) === Math.min.apply(null, vs)) { log(S, 11); return false; } }
-    if (no === 70) { if (S.sides[other(s)].switched === S.turn) { log(S, 2); return false; } }
-    if (no === 64) { if (S.sides[other(s)].nail >= 2) { log(S, 11); return false; } }
+    if (no === 73) { if (fieldUnits(S).some(function (x) { return x.show != null; })) { log(S, 113); return false; } }
+    if (no === 60) { const f = cur(S, other(S, s)); if (!alive(f) || f.erase || f.pendErase) { log(S, 11); return false; } const vs = STATS5.map(function (k) { return f.st[k]; }); if (Math.max.apply(null, vs) === Math.min.apply(null, vs)) { log(S, 11); return false; } }
+    if (no === 70) { if (S.sides[other(S, s)].switched === S.turn) { log(S, 2); return false; } }
+    if (no === 64) { if (S.sides[other(S, s)].nail >= 2) { log(S, 11); return false; } }
     return true;
 }
 // R6 — 실제 발동 기록 · 유효 훈련
 function fired(S, s, a) {
-    const u = a.unit, sk = K().get(a.no);
+    const u = a.unit, sk = skOf(a);
     u.participated = 1;
     a.ev = a.ev || {};
     if (sk.slot === 'A' && a.no !== 59) {
@@ -518,7 +606,7 @@ function fired(S, s, a) {
 }
 function doSkill(S, s, a, rng) {
     if (!tryR(S, s, a, rng)) { a.done = true; return; }
-    const sk = K().get(a.no);
+    const sk = skOf(a);
     fired(S, s, a);
     a.done = true;
     if (sk.slot === 'A') attack(S, s, a, rng); else util(S, s, a, rng);
@@ -530,10 +618,10 @@ function doSkill(S, s, a, rng) {
 // ==========================================
 function elOfSkill(sk, u) { return sk.el === 'self' ? u.el : sk.el; }
 function attack(S, s, a, rng) {
-    const u = a.unit, sk = K().get(a.no), os = other(s), fsd = S.sides[os];
+    const u = a.unit, sk = skOf(a), os = other(S, s), fsd = S.sides[os];
     const f = cur(S, os);
     if (!alive(f)) return;
-    const isStruggle = a.no === 59, isOhko = !!sk.fx.ohko;
+    const isStruggle = a.no === 59, isOhko = !!sk.fx.ohko, isRune = a.no === 'rune';
     const sureHit = sk.acc === 'sure' || (u.focus && !(isOhko && f.dark) && !f.dark);
     let hit = false, dHP = 0, receiverDecoy = false;
     // A1.1 완전 방어 · 무효
@@ -578,8 +666,9 @@ function attack(S, s, a, rng) {
             else { A = base(u, 'atk'); RA = rankMul(u.rank.atk); B = base(f, 'def'); RB = rankMul(f.rank.def); }
             const U = ((0.4 * L + 2) * P / 50) * ((A * RA + 20) / (B * RB + 20)) + 2;
             const el = elOfSkill(sk, u);
-            const MS = isStruggle ? 1 : (el === u.el ? 1 : 0.8);
-            const MT = isStruggle ? 1 : (BEATS[el] === f.el ? 1.5 : BEATS[f.el] === el ? 0.75 : 1);
+            const noEl = isStruggle || isRune;                            // 발버둥 · 룬은 무속성 — 자속 · 상성 없음
+            const MS = noEl ? 1 : (el === u.el ? 1 : 0.8);
+            const MT = noEl ? 1 : (BEATS[el] === f.el ? 1.5 : BEATS[f.el] === el ? 0.75 : 1);
             // MO 공격자 특성
             let MO = 1; const consume = [];
             if (canUse(u, 3) && fsd.usedUtil === S.turn && !a.foeUtilAfter) { MO *= 1.2; consume.push(3); }
@@ -593,7 +682,10 @@ function attack(S, s, a, rng) {
             if (has(f, 24) && f.hp * 2 <= f.max) MI *= 0.85;
             if (has(f, 35) && f.calmTurn === S.turn) MI *= 0.5;
             const MG = f.guard === 'half' ? 0.5 : 1;
-            const D = ceil(U * MS * MT * MO * MI * MG);
+            // 💠 룬 상성 — 받는 쪽이 들고 있는 룬이 치는 룬을 이기면 1/3
+            const runeBlock = isRune && f.runeGuard && RUNE_BEATS[f.runeGuard] === sk.rune;
+            if (runeBlock) say(S, fix(f.name + '은/는 💠 ' + f.runeGuard + ' 룬으로 받아 넘겼다! (피해 1/3)'), 'msg');
+            const D = runeBlock ? ceil(ceil(U * MS * MT * MO * MI * MG) / 3) : ceil(U * MS * MT * MO * MI * MG);
             if (receiverDecoy) {
                 const dec = fsd.decoy; dHP = Math.min(dec.hp, D); dec.hp -= dHP;
                 log(S, 55, { 진영: sideName(S, os), 수치: dHP });
@@ -679,7 +771,7 @@ function heal(S, t, q, quietFull) {
     return got;
 }
 function util(S, s, a, rng) {
-    const u = a.unit, sk = K().get(a.no), fx = sk.fx, os = other(s), f = cur(S, os), sd = S.sides[s];
+    const u = a.unit, sk = skOf(a), fx = sk.fx, os = other(S, s), f = cur(S, os), sd = S.sides[s];
     // 낚시꾼 — 상대가 이번 턴 완전 방어를 썼고 내가 유틸을 쓴다
     if (canUse(u, 27) && S.sides[os].guard1Turn === S.turn) { fire(S, u, 27); u.boost.push({ trait: 27 }); log(S, 48, { 사용자: u.name }); }
     if (a.no === 69) {                                                  // 양초 — 추첨 결과 실행
@@ -739,7 +831,7 @@ function util(S, s, a, rng) {
     if (fx.limit === 'util') { if (alive(f)) { f.pendLimit = { kind: 'util', at: S.turn + 1 }; log(S, 67, { 대상: f.name }); } return; }
     if (fx.limit === 'last') { if (alive(f)) { f.pendLimit = { kind: 'last', at: S.turn + 1 }; log(S, 69, { 대상: f.name }); } return; }
     if (fx.donut) { u.donut = true; log(S, 72, { 사용자: u.name }); return; }
-    if (fx.showtime) { [cur(S, 'A'), cur(S, 'B')].forEach(function (x) { if (alive(x)) x.show = 2; }); u.showBy = s; S.field.showBy = s; log(S, 74); return; }
+    if (fx.showtime) { fieldUnits(S).forEach(function (x) { x.show = 2; }); u.showBy = s; S.field.showBy = s; log(S, 74); return; }
     if (fx.allyHeal) {
         const c = Math.min(ceil(u.max / 4), u.hp - 1); u.hp -= c; log(S, 52, { 사용자: u.name, 수치: c });
         const b = bench(S, s); const idx = b.indexOf(a.idx | 0) >= 0 ? (a.idx | 0) : b[0]; const t = sd.units[idx];
@@ -752,7 +844,8 @@ function util(S, s, a, rng) {
 // ==========================================
 function endTurn(S, rng) {
     const T = S.turn;
-    const field = ['A', 'B'].map(function (s) { return { s: s, u: cur(S, s) }; }).filter(function (x) { return alive(x.u); });
+    const ORD = (S.order || ['A', 'B']).filter(function (s) { return !S.sides[s].out; });
+    const field = ORD.map(function (s) { return { s: s, u: cur(S, s) }; }).filter(function (x) { return alive(x.u); });
     // -1.1 독 — 느린 쪽 → 낮은 레벨 → 무작위
     const poisoned = field.filter(function (x) { return x.u.status === 'poison'; });
     poisoned.sort(function (a, b) { const d = speed(a.u) - speed(b.u); if (d) return d; const l = a.u.lv - b.u.lv; if (l) return l; return rng() < 0.5 ? -1 : 1; });
@@ -766,18 +859,18 @@ function endTurn(S, rng) {
         if (u.hp === 0) faint(S, u, { k: 'poison' });
     });
     // -1.2 도넛 지속 회복 (빠른 쪽부터)
-    const donuts = ['A', 'B'].map(function (s) { return cur(S, s); }).filter(function (u) { return alive(u) && u.donut; }).sort(function (a, b) { return speed(b) - speed(a); });
+    const donuts = ORD.map(function (s) { return cur(S, s); }).filter(function (u) { return alive(u) && u.donut; }).sort(function (a, b) { return speed(b) - speed(a); });
     donuts.forEach(function (u) { heal(S, u, ceil(u.max / 16 * (has(u, 21) ? 1.2 : 1))); });
     // -1.3 강제 휴식 해제
-    ['A', 'B'].forEach(function (s) { const u = cur(S, s); if (alive(u) && u.restUntil === T) { u.restUntil = 0; log(S, 26, { 사용자: u.name }); if (canUse(u, 28)) { fire(S, u, 28); heal(S, u, ceil(u.max / 16)); } } });
+    ORD.forEach(function (s) { const u = cur(S, s); if (alive(u) && u.restUntil === T) { u.restUntil = 0; log(S, 26, { 사용자: u.name }); if (canUse(u, 28)) { fire(S, u, 28); heal(S, u, ceil(u.max / 16)); } } });
     // -1.4 상태 카운트 · 자연 해제 (이번 턴에 등장한 인형은 제외)
-    ['A', 'B'].forEach(function (s) { const u = cur(S, s); if (!alive(u) || !(u.status === 'poison' || u.status === 'para') || (u.enteredTurn === T && u.enteredBy !== 'first') || u.stTurn === T) return; if (field.every(function (x) { return x.u !== u; })) return; u.sc++; if (u.sc >= 3 && rng() < 0.3) { log(S, 25, { 대상: u.name, 상태이상: ST_NAME[u.status] }); u.status = null; u.sc = 0; } });
+    ORD.forEach(function (s) { const u = cur(S, s); if (!alive(u) || !(u.status === 'poison' || u.status === 'para') || (u.enteredTurn === T && u.enteredBy !== 'first') || u.stTurn === T) return; if (field.every(function (x) { return x.u !== u; })) return; u.sc++; if (u.sc >= 3 && rng() < 0.3) { log(S, 25, { 대상: u.name, 상태이상: ST_NAME[u.status] }); u.status = null; u.sc = 0; } });
     // -1.5 기간 종료
-    ['A', 'B'].forEach(function (s) {
+    (S.order || ['A', 'B']).forEach(function (s) {
         const sd = S.sides[s];
         sd.units.forEach(function (u) {
             u.guardLast = (u.guard === 'full' && u.guardFired && alive(u));
-            u.guard = null; u.guardFired = false; u.flinch = false; u.decoyUsedTurn = 0;
+            u.guard = null; u.guardFired = false; u.flinch = false; u.decoyUsedTurn = 0; u.runeGuard = null;
             if (u.prio3 > 0) { u.prio3--; if (u.prio3 === 0 && alive(u)) log(S, 30, { 사용자: u.name, 효과명: '선제태세' }); }
             if (u.limit && u.limit.until <= T) { if (alive(u)) log(S, 30, { 사용자: u.name, 효과명: u.limit.kind === 'util' ? '유틸기 제한' : '반복 기술 제한' }); u.limit = null; }
         });
@@ -792,58 +885,69 @@ function endTurn(S, rng) {
 // ==========================================
 // E1 — 전투 뒤 성장 (돌려줄 뿐 — 기록에 쓰는 것은 부르는 쪽)
 // ==========================================
+//   돌려주는 값 { win, units: [A 진영 인형들], bySide: { A: [...], C: [...], B: [...] } } — 상대(B) 쪽도 적어 둔다 (결투에서 양쪽이 제 기록을 쓴다)
 function settle(S) {
     const D2 = C();
-    const out = { win: S.over.win, units: [] };
+    const out = { win: S.over.win, units: [], bySide: {} };
     const win = S.over.win === 'A';
-    S.sides.A.units.forEach(function (u, i) {
-        const g = { idx: i, key: u.key, hp: u.hp, pp: u.pp, status: u.status ? { k: u.status, c: u.sc } : null, aid: u.aid, xp: 0, ev: {}, lv0: u.lv, lv: u.lv, up: 0, wait: false, lost: 0 };
-        // 노력치 — 완료한 유효 행동은 승패 무관
-        STATS5.forEach(function (k) { if (u.evN[k]) g.ev[k] = u.evN[k]; });
-        // 경험치 — PvE 승리 · 기절하지 않은 참여 개체
-        if (win && S.mode === 'pve' && alive(u)) {
-            S.sides.B.units.forEach(function (f, j) {
-                if (!f.fainted) return;
-                const key = 'B:' + j; if (u.met[key] == null) return;
-                const N = S.sides.A.units.filter(function (x) { return alive(x) && x.met[key] != null; }).length;
-                if (N) g.xp += D2.xpWin(u.met[key], f.lv, N);
-            });
-        }
-        out.units.push(g);
+    const AL = allies(S);
+    (S.order || ['A', 'B']).forEach(function (s) {
+        const list = [];
+        S.sides[s].units.forEach(function (u, i) {
+            const g = { side: s, idx: i, key: u.key, hp: u.hp, pp: u.pp, status: u.status ? { k: u.status, c: u.sc } : null, aid: u.aid, xp: 0, ev: {}, lv0: u.lv, lv: u.lv, up: 0, wait: false, lost: 0, part: !!(u.participated || u.enteredTurn) };
+            // 노력치 — 완료한 유효 행동은 승패 무관
+            STATS5.forEach(function (k) { if (u.evN[k]) g.ev[k] = u.evN[k]; });
+            // 경험치 — PvE 승리 · 기절하지 않은 참여 개체 (아군 진영 모두가 나눠 받는다)
+            if (s !== 'B' && win && S.mode === 'pve' && alive(u)) {
+                S.sides.B.units.forEach(function (f, j) {
+                    if (!f.fainted) return;
+                    const key = 'B:' + j; if (u.met[key] == null) return;
+                    let N = 0; AL.forEach(function (x) { S.sides[x].units.forEach(function (y) { if (alive(y) && y.met[key] != null) N++; }); });
+                    if (N) g.xp += D2.xpWin(u.met[key], f.lv, N);
+                });
+            }
+            list.push(g);
+        });
+        out.bySide[s] = list;
     });
-    out.units.forEach(function (g) {
-        const u = S.sides.A.units[g.idx];
-        if (g.xp) {
-            log(S, 40, { 사용자: u.name, 수치: g.xp }, 'grow');
-            const rec = copy(u.rec); rec.hp = u.hp;
-            const r = D2.addXp(rec, g.xp);
-            g.lv = r.lv; g.up = r.up; g.xpNow = r.xp; g.lost = r.lost; g.wait = r.wait; g.hpAfter = rec.hp; g.gAfter = rec.g;
-            if (r.up) log(S, 41, { 사용자: u.name, 레벨: r.lv }, 'grow');
-            if (r.wait) log(S, 42, {}, 'grow');
-            if (r.lost) log(S, 112, {}, 'grow');
-        }
-        Object.keys(g.ev).forEach(function (k) {
-            const rec = copy(u.rec); const before = D2.evOf(rec, k); const r = D2.evAdd(rec, k, g.ev[k]);
-            if (r && r.up) log(S, 43, { 사용자: u.name, 능력치: D2.NAME[k], 수치: r.up }, 'grow');
+    out.units = out.bySide.A;
+    AL.forEach(function (s) {
+        out.bySide[s].forEach(function (g) {
+            const u = S.sides[s].units[g.idx];
+            if (g.xp) {
+                log(S, 40, { 사용자: u.name, 수치: g.xp }, 'grow', { s: s });
+                const rec = copy(u.rec); rec.hp = u.hp;
+                const r = D2.addXp(rec, g.xp);
+                g.lv = r.lv; g.up = r.up; g.xpNow = r.xp; g.lost = r.lost; g.wait = r.wait; g.hpAfter = rec.hp; g.gAfter = rec.g;
+                if (r.up) log(S, 41, { 사용자: u.name, 레벨: r.lv }, 'grow', { s: s });
+                if (r.wait) log(S, 42, {}, 'grow', { s: s });
+                if (r.lost) log(S, 112, {}, 'grow', { s: s });
+            }
+            Object.keys(g.ev).forEach(function (k) {
+                const rec = copy(u.rec); const r = D2.evAdd(rec, k, g.ev[k]);
+                if (r && r.up) log(S, 43, { 사용자: u.name, 능력치: D2.NAME[k], 수치: r.up }, 'grow', { s: s });
+            });
         });
     });
     return out;
 }
-// 기록에 적는다 — grow 를 받아 u.pets 에 (hp · pp · 상태 · 경험치 · 노력치)
-function applyGrow(grow, recs) {
-    const D2 = C(), SK = K(), D = DL();
+// 기록에 적는다 — grow 를 받아 u.pets 에 (hp · pp · 상태 · 경험치 · 노력치). side 를 주면 그 진영의 것을 (기본 A) · u 는 기록 주인
+function applyGrow(grow, recs, side, u) {
+    const D2 = C(), D = DL();
     const p = {};
-    grow.units.forEach(function (g) {
+    const list = (grow.bySide && grow.bySide[side || 'A']) || grow.units || [];
+    list.forEach(function (g) {
         const rec = recs[g.idx]; if (!rec || !rec.id) return;
         const id = rec.id;
-        rec.hp = g.hp; p['pets/' + id + '/hp'] = g.hp;
-        rec.pp = Object.assign({}, rec.pp || {}); Object.keys(g.pp).forEach(function (no) { rec.pp[no] = g.pp[no]; }); p['pets/' + id + '/pp'] = rec.pp;
-        rec.st = g.status; p['pets/' + id + '/st'] = g.status;
+        const gpp = (g.pp && typeof g.pp === 'object') ? g.pp : {}, gev = (g.ev && typeof g.ev === 'object') ? g.ev : {};   // 서버를 거치면 빈 칸이 사라진다
+        rec.hp = Math.max(0, g.hp | 0); p['pets/' + id + '/hp'] = rec.hp;
+        rec.pp = Object.assign({}, rec.pp || {}); Object.keys(gpp).forEach(function (no) { if (gpp[no] != null) rec.pp[no] = gpp[no]; }); p['pets/' + id + '/pp'] = rec.pp;
+        rec.st = g.status || null; p['pets/' + id + '/st'] = g.status || null;
         rec.aid = g.aid | 0; p['pets/' + id + '/aid'] = g.aid | 0;
-        if (g.xp) { const r = D2.addXp(rec, g.xp); p['pets/' + id + '/lv'] = rec.lv; p['pets/' + id + '/xp'] = rec.xp; p['pets/' + id + '/hp'] = rec.hp; }
-        Object.keys(g.ev).forEach(function (k) { D2.evAdd(rec, k, g.ev[k]); }); if (Object.keys(g.ev).length) p['pets/' + id + '/ev'] = rec.ev;
+        if (g.xp) { D2.addXp(rec, g.xp); p['pets/' + id + '/lv'] = rec.lv; p['pets/' + id + '/xp'] = rec.xp; p['pets/' + id + '/hp'] = rec.hp; }
+        Object.keys(gev).forEach(function (k) { D2.evAdd(rec, k, gev[k]); }); if (Object.keys(gev).length) p['pets/' + id + '/ev'] = rec.ev;
     });
-    if (D && Object.keys(p).length) return D.put(p);
+    if (D && Object.keys(p).length) return D.put(p, u);
     return Promise.resolve(false);
 }
 

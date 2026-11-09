@@ -193,13 +193,21 @@ function saveHist() { try { if (typeof saveFields === 'function') saveFields({ h
 // 인형 하나의 수치 — 펫 수치 그대로 (pet-gear.js PETGEAR.stats · 등급 · Lv · 장비)
 // ==========================================
 function gradeIdx(g) { const i = GRADES.indexOf(g); return i < 0 ? 0 : i; }
+// ★ 6단계(2026-11-10) — 수치는 인형 전투 2차(d2-core.js D2.statsOf)의 것: HP · 공격력 · 매력 · 방어력 · 굳건함 · 속도. 회피 · 급소는 없다(0).
+//   옛 셈(펫 수치 + 장비)은 statsOld 로 남겨 두고 옮겨 올 때 HP 비율을 지키는 데만 쓴다.
 function stats(d, u) {
+    const D2 = window.D2;
+    if (!D2) return statsOld(d, u);
+    const s = D2.statsOf(d || {});
+    return { max: s.max, hp: s.hp, atk: s.atk, chm: s.chm, def: s.def, sta: s.sta, spd: s.spd, eva: 0, crit: 0, lv: s.lv, gi: gradeIdx(s.g), g: s.g, att: attOf(d), pr: s.pr, per: s.per };
+}
+function statsOld(d, u) {
     u = u || u_();
     const sp = spOf(d && d.sp) || { st: {}, w: 'wet' };
     let s = null;
     try { if (d && d.id && window.PETGEAR && P().pets(u)[d.id] === d) s = window.PETGEAR.stats(d.id, u); } catch (e) { s = null; }
-    if (!s) {                               // 남의 인형(교환 창) — 같은 셈을 직접
-        const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min(lvMax(gi), Number(d && d.lv) || 1));
+    if (!s) {
+        const gi = gradeIdx(d && d.g), lv = Math.max(1, Math.min([10, 20, 30, 40, 50][gi] || 10, Number(d && d.lv) || 1));
         const st = (gi >= 2) ? (sp.st || {}) : {};
         const n = function (k) { return Number(st[k]) || 0; };
         const luck = n('luck') >= 10 ? n('luck') / 20 : n('luck');
@@ -210,9 +218,9 @@ function stats(d, u) {
     return { max: s.max, atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, lv: s.lv, gi: s.gi, g: GRADES[s.gi] || 'D', att: attOf(d) };
 }
 function gOf(d) { return stats(d).g; }
-// ★ 등급마다 레벨 상한 — D 10 · C 20 · B 30 · A 40 · S 50 (pet-gear.js LV_CAP)
-function lvMax(gi) { try { return window.PETGEAR.lvMax(gi); } catch (e) { return [10, 20, 30, 40, 50][Math.max(0, Math.min(4, Number(gi) || 0))]; } }
-function lvMaxOf(d) { return lvMax(gradeIdx(d && d.g)); }
+// ★ 등급마다 레벨 상한 — D 10 · C 20 · B 30 · A 40 · S 100 (d2-core.js CAP · 각성 돌파 전에는 안 오른다)
+function lvMax(gi) { try { return window.D2.CAP[GRADES[Math.max(0, Math.min(4, Number(gi) || 0))]]; } catch (e) { return [10, 20, 30, 40, 100][Math.max(0, Math.min(4, Number(gi) || 0))]; } }
+function lvMaxOf(d) { try { return window.D2.capOf(d); } catch (e) { return lvMax(gradeIdx(d && d.g)); } }
 function hpOf(d) {
     const s = stats(d);
     const h = (d && d.hp != null) ? Number(d.hp) : s.max;
@@ -222,7 +230,7 @@ function nickOf(d) {
     if (d && d.nick && String(d.nick).trim()) return String(d.nick).trim();
     return spName(d && d.sp);
 }
-function xpNeed(lv) { try { return window.PETGEAR.needXp(lv); } catch (e) { return 20 + lv * 10; } }
+function xpNeed(lv) { try { return window.D2.R(lv); } catch (e) { return Math.ceil(20 + 4 * lv + 0.6 * lv * lv); } }
 // 등급을 무게로 뽑는다 — 야생에서 만나는 것
 function rollGrade(luck) {
     const r = Math.random() * 100 - (Number(luck) || 0);
@@ -402,9 +410,26 @@ function addDoll(o, u) {
     const sp = P().sp(o.sp) || 1;
     const id = P().newKey(sp, u);
     const t = now();
-    const d = { g: o.g || 'D', lv: Math.max(1, Math.min(lvMax(gradeIdx(o.g || 'D')), Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t,
+    const g = GRADES.indexOf(o.g) >= 0 ? o.g : 'D';
+    const d = { g: g, lv: Math.max(1, Math.min(lvMax(gradeIdx(g)), Number(o.lv) || 1)), xp: Number(o.xp) || 0, at: o.at || t, fedAt: t, bond: Math.max(0, Number(o.bond) || 0), ord: t,
                 att: ATTR[o.att] ? o.att : randAtt() };          // ★ 속성 — 야생이 들고 온 것 · 없으면 아무거나 (인형마다)
     if (o.nick) d.nick = String(o.nick).slice(0, 12);
+    // ★ 인형 전투 2차 — 개체치 · 성격 · 노력치 · 기술 · 특성 (6단계 · 2026-11-10). 준 것이 있으면 그대로, 없으면 새로 뽑는다
+    try {
+        const D2 = window.D2, SK = window.D2SK, TRm = window.D2TR;
+        if (D2) {
+            d.lv = D2.lvMap(g, d.lv);
+            const w = D2.rollWild({ g: g, lv: d.lv });
+            d.iv = (o.iv && typeof o.iv === 'object') ? o.iv : w.iv; d.pr = D2.PERS[Number(o.pr)] ? Number(o.pr) : w.pr;
+            d.ev = (o.ev && typeof o.ev === 'object') ? o.ev : { atk: 0, chm: 0, def: 0, sta: 0, spd: 0 };
+            d.xp = Math.min(d.xp, D2.R(d.lv) || 0);
+            d.d2 = 1;
+            const tmp = Object.assign({ id: id, sp: sp }, d);
+            if (SK) { if (o.mv && typeof o.mv === 'object') { d.mv = o.mv; d.pp = (o.pp && typeof o.pp === 'object') ? o.pp : {}; } else { const f = SK.fixMv(tmp); if (f) { d.mv = f.mv; d.pp = f.pp; } } }
+            if (TRm) d.tr = TRm.get(Number(o.tr)) ? Number(o.tr) : TRm.roll();
+            if (o.aid) d.aid = Number(o.aid) || 0;
+        }
+    } catch (e) { console.warn('[🧸] 새 인형 2차 기록', e); }
     P().pets(u)[id] = d;
     const s = stats(Object.assign({ id: id, sp: sp }, d), u);
     d.hp = (o.hp != null) ? Math.max(1, Math.min(s.max, Number(o.hp))) : s.max;
@@ -551,25 +576,46 @@ setTimeout(function () { try { sweep(); } catch (e) { } }, 15000);
 // ==========================================
 // 경험치 · 호감도 · 등급업 — 펫과 같은 길 (pet-gear.js · pet-data.js · awk-rune.js)
 // ==========================================
-//   돌려주는 값 { lv, up } (up 은 오른 Lv 수)
+//   돌려주는 값 { lv, up, wait, lost } (up 은 오른 Lv 수 · wait 돌파 필요 · lost 넘쳐 사라진 경험치) — d2-core.js addXp (레벨이 오르면 최대 · 현재 HP 가 2씩 는다)
 function giveXp(id, n, u) {
     u = u || u_();
     const d = dolls(u)[id];
-    if (!d || !window.PETGEAR) return null;
-    const was = stats(d, u).max, h0 = hpOf(d);
-    const r = window.PETGEAR.addXp(id, n);
+    if (!d || !window.D2) return null;
+    const r = window.D2.addXp(d, n);
     if (!r) return null;
-    const up = r.lv - r.lv0;
-    if (up && h0 > 0) patchDoll(id, { hp: Math.min(stats(d, u).max, h0 + (stats(d, u).max - was)) }, u);
-    return { lv: r.lv, up: up };
+    const p = { lv: d.lv, xp: d.xp };
+    if (d.hp != null) p.hp = d.hp;
+    patchDoll(id, p, u);
+    return { lv: r.lv, up: r.up, wait: r.wait, lost: r.lost };
 }
 const BOND_MAX = 100;
 function bondOf(d, u) { try { return P().bond(d.id, u || u_()); } catch (e) { return 0; } }
 function bondUp(id, u) {
     try { const patch = {}; const got = P().bondUp(String(id), patch); if (got) P().patch(String(id), patch); return got; } catch (e) { return 0; }
 }
-function gradeNeed(id, u) { try { return window.PETGEAR.gradeNeed(String(id), u || u_()); } catch (e) { return { ok: false, why: '등급업을 할 수 없습니다.' }; } }
-function gradeUp(id) { try { return window.PETGEAR.gradeUp(String(id)); } catch (e) { return { ok: false, why: '등급업을 할 수 없습니다.' }; } }
+// 각성 돌파 — 상한 레벨(10 · 20 · 30 · 40)에서 다음 등급의 각성의 룬 하나로. 레벨은 그대로, 등급만 다음으로 (d2-core.js breakNeed · breakUp)
+function gradeNeed(id, u) {
+    u = u || u_();
+    const d = dolls(u)[id];
+    if (!d || !window.D2) return { ok: false, why: '각성 돌파를 할 수 없습니다.', rune: null, have: 0 };
+    const r = window.D2.breakNeed(d, u);
+    if (!r.rune) r.rune = null;
+    return r;
+}
+function gradeUp(id, u) {
+    u = u || u_();
+    const d = dolls(u)[id];
+    const need = gradeNeed(id, u);
+    if (!need.ok) return { ok: false, why: need.why };
+    if (!window.AWK || !window.AWK.add(need.rune, -1, u)) return { ok: false, why: need.rune + '이 없습니다.' };
+    const r = window.D2.breakUp(d);
+    if (!r) { try { window.AWK.add(need.rune, 1, u); } catch (e) { } return { ok: false, why: '각성 돌파를 할 수 없습니다.' }; }
+    const p = { g: d.g, lv: d.lv, xp: d.xp }; if (d.hp != null) p.hp = d.hp;
+    patchDoll(id, p, u);
+    log_('[🧸] ' + nickOf(d) + ' — 각성 돌파 ' + r.from + ' → ' + r.to + ' (Lv ' + r.lv + ' · ' + need.rune + ')', u);
+    saveHist();
+    return { ok: true, from: r.from, to: r.to, lv: r.lv, up: r.up };
+}
 
 // ==========================================
 // 옮겨 오기 — 사원마다 한 번
@@ -674,7 +720,7 @@ window.DOLL = {
     spOf: spOf, spName: spName, objOf: objOf,
     dolls: dolls, bag: bag, dex: dex, darkDex: darkDex, withList: withList, boxList: boxList,
     put: put, saveHist: saveHist,
-    stats: stats, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf, lvMax: lvMax, lvMaxOf: lvMaxOf,
+    stats: stats, statsOld: statsOld, hpOf: hpOf, nickOf: nickOf, xpNeed: xpNeed, rollGrade: rollGrade, gradeIdx: gradeIdx, gOf: gOf, lvMax: lvMax, lvMaxOf: lvMaxOf,
     spriteCss: spriteCss, monCss: monCss, cellOf: cellOf, isChr: isChr, artOld: artOld, oldCss: oldCss, artSet: artSet, artSwitchHtml: artSwitchHtml, artSwitchWire: artSwitchWire, wordFix: wordFix,
     bagHas: bagHas, bagAdd: bagAdd,
     dexSeen: dexSeen, dexCaught: dexCaught, darkSeen: darkSeen,

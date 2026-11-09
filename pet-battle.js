@@ -224,11 +224,14 @@ function dollSnap(key, u) {
     if (!D || !u) return null;
     const d = D.dolls(u)[String(key)];
     if (!d) return null;
+    // ★ 6단계(2026-11-10) — 인형 기록 전체 (개체치 · 성격 · 노력치 · 레벨 · 기술 · PP · 특성 · 상태 · 먹인 룬). 엔진(D2BT)이 이것으로 개체를 만든다.
     const s = D.stats(d);
-    const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
+    const o = JSON.parse(JSON.stringify(d));
+    o.sp = d.sp; o.g = s.g; o.lv = s.lv; o.max = s.max; o.hp = Math.round(D.hpOf(d)); o.att = s.att; o.bond = D.bondOf(d);
+    ['fav', 'ord', 'fedAt', 'bd', 'with', 'out', 'rest', 'jsleep', 'hurt', 'stv', 'gear'].forEach(function (x) { delete o[x]; });
     if (d.nick) o.nick = String(d.nick).slice(0, 12);
     try { if (D.artOld(u)) o.art = 'old'; } catch (e) { }   // 🎨 예전 펫 그림 — 상대 화면에도
-    try { const f = R().fed(key, u); if (f.length) { o.runes = f; o.runeN = R().uses(key, u); } } catch (e) { }
+    try { const f = R().fed(key, u); if (f.length) o.runes = f; else delete o.runes; } catch (e) { }
     return o;
 }
 function isDollFight(o) { return !!(o && o.a && o.b && o.a.doll && o.b.doll && window.DOLLBT && window.DOLLBT.pvp && window.DOLLBT.resolvePvp); }
@@ -444,14 +447,15 @@ function pvpOpen(o) {
     try { const st = window.plazaStage && window.plazaStage(); if (st && RM[st.room]) loc = RM[st.room]; } catch (e) { }
     window.DOLLBT.pvp({
         side: side, loc: loc, names: { a: o.a.name, b: o.b.name }, get: get,
+        // 고른 것은 제 칸(pick/<side>)에만 적는다 — 판 전체를 다시 쓰면 상대가 막 적은 것을 덮을 수 있다
         pick: function (k) {
-            tx(key, function (cur) {
-                if (!cur || cur.stage !== 'fight') return;
-                cur.pick = cur.pick || {};
-                if (cur.pick[side]) return;
-                cur.pick[side] = String(k);
-                return cur;
-            });
+            const r = ref(); if (!r) return;
+            const v = live[key]; if (!v || v.stage !== 'fight') return;
+            r.child(key + '/pick/' + side).transaction(function (c) { return c ? undefined : ((k && typeof k === 'object') ? k : String(k)); });
+        },
+        pickq: function (idx) {
+            const r = ref(); if (!r) return;
+            r.child(key + '/pickq').transaction(function (c) { const q = Array.isArray(c) ? c.slice() : (c && typeof c === 'object' ? Object.keys(c).sort().map(function (x) { return c[x]; }) : []); q.push(Number(idx)); return q; });
         },
         forfeit: function () {
             tx(key, function (cur) {
@@ -469,6 +473,8 @@ function pvpOpen(o) {
                     const pl = playOf(v, round);
                     if (pl) { clearInterval(iv); return res(pl); }
                     if (v.stage === 'done') { clearInterval(iv); return res(null); }
+                    // 🧸 내 쪽이 다음 인형을 골라야 한다 (기절 · 바통) — 기다림을 끊고 선택창으로
+                    if (v.need && v.need.side === (side === 'a' ? 'A' : 'B') && (Array.isArray(v.pickq) ? v.pickq.length : Object.keys(v.pickq || {}).length) <= Number(v.need.at || 0)) { clearInterval(iv); return res('need'); }
                     // 상대가 3분 넘게 안 고른다 — 기권 처리 (옛 창의 「기권 처리」 단추와 같다)
                     if (!awayAsked && v.pick && v.pick[side] && !v.pick[other(side)] && Date.now() - Number(v.roundAt || v.at || 0) > PICK_WAIT) {
                         awayAsked = true;
@@ -616,7 +622,11 @@ function prepView(o) {
             cur[side] = Object.assign({}, cur[side] || {}, { ready: 1, runes: runes, hp: HP, doll: doll || null, dolls: doll ? dolls : null, act: doll ? String(mine.pet) : null, used: doll ? used : null });
             if (cur.a && cur.a.ready && cur.b && cur.b.ready) {
                 cur.stage = 'fight'; cur.round = 1; cur.first = 'a'; cur.roundAt = Date.now(); cur.pick = null; cur.log = []; cur.play = null;
-                if (cur.a.doll && cur.b.doll) { cur.a.hp = Number(cur.a.doll.hp) || 0; cur.b.hp = Number(cur.b.doll.hp) || 0; }
+                if (cur.a.doll && cur.b.doll) {
+                    cur.a.hp = Number(cur.a.doll.hp) || 0; cur.b.hp = Number(cur.b.doll.hp) || 0;
+                    // 🧸 인형 전투 2차 — 엔진 상태를 판에 (6단계 · 2026-11-10). 둘 다 준비되는 순간 한 번 만든다
+                    try { cur.d2 = window.DOLLBT.pvpStart(cur, 'pvp:' + o._k); } catch (e) { console.warn('[인형 배틀] 전투 시작', e); cur.d2 = null; }
+                }
                 else { cur.a.hp = HP; cur.b.hp = HP; }
             }
             return cur;
@@ -739,10 +749,17 @@ function fightView(o) {
 // 둘 다 골랐으면 그 판을 푼다 — 어느 쪽 화면이든, 트랜잭션이라 한 번만 풀린다
 function fightResolve(o) {
     if (!o.pick || !o.pick.a || !o.pick.b) return;
-    if (isDollFight(o)) {                                             // 🧸 인형끼리 — 셈은 doll-battle.js 가
+    if (isDollFight(o)) {                                             // 🧸 인형끼리 — 셈은 doll-battle.js 가 (엔진 d2-battle.js)
+        // 선택(기절 · 바통)을 기다리는 중이면 그 사원이 고를 때까지 (pickq 가 늘 때까지)
+        if (o.need && !(Array.isArray(o.pickq) ? o.pickq.length : Object.keys(o.pickq || {}).length) > Number(o.need.at || 0)) { /* 아래 트랜잭션에서 다시 본다 */ }
         tx(o._k, function (cur) {
             if (!cur || cur.stage !== 'fight' || !cur.pick || !cur.pick.a || !cur.pick.b) return;
-            return window.DOLLBT.resolvePvp(cur);
+            const qn = Array.isArray(cur.pickq) ? cur.pickq.length : Object.keys(cur.pickq || {}).length;
+            if (cur.need && qn <= Number(cur.need.at || 0)) return;
+            cur._k = o._k;
+            const r = window.DOLLBT.resolvePvp(cur);
+            if (r) delete r._k;
+            return r;
         });
         return;
     }

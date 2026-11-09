@@ -233,22 +233,30 @@ function oneView(id) {
               + esc(P().statText(p.st)) + ')</span>')
         + line('주의 문구', esc(P().WARN[p.w].n))
         // ★ 성별 · 성격 · 스킬 · 먹인 룬 (pet-trait.js · pet-rune.js · 2026-10-27)
+        // 성별 · 기질 (pet-trait.js — 「성격」 이름은 인형 전투 2차의 특기 성격이 쓴다 · 옛 동물 스킬 줄은 뺐다 · 2026-11-10)
         + (window.PETTRAIT ? line('성별', esc(PETTRAIT.sexName(PETTRAIT.sex(id, me))))
-            + line('성격', esc(PETTRAIT.perName(id, me)))
-            + line('스킬', (function () { const sk = PETTRAIT.skill(id); return sk ? esc(sk.n) + ' <span style="color:#6f685e;">— ' + esc(sk.d) + '</span>' : '-'; })()) : '')
-        // ★ 여정 레벨 · 장비 (pet-gear.js · journey.js · 2026-10-28)
-        + (window.PETGEAR ? line('여정 Lv', (function () {
-            const lv = PETGEAR.lv(id, me), xp = PETGEAR.xp(id, me);
-            return 'Lv ' + lv + (lv >= PETGEAR.lvCapOf(id, me) ? ' <span style="color:#d4af37;">— 가득</span>' : ' <span style="color:#6f685e;">(' + xp + ' / ' + PETGEAR.needXp(lv) + ' · 상한 ' + PETGEAR.lvCapOf(id, me) + ')</span>');
-        })()) + line('각성의 룬', (function () {
-            const nd = PETGEAR.gradeNeed(id, me);
-            if (!nd.rune) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';
-            return '<span style="color:' + (nd.have ? '#9fd8ef' : '#6f685e') + ';">💠 ' + esc(nd.rune) + ' ' + nd.have + '개</span>'
-                + ' <span style="color:#6f685e;">' + (nd.ok ? '· 등급업 가능' : '· ' + esc(nd.why)) + '</span>';
-        })()) + line('장비', (function () {
-            const g = PETGEAR.worn(id, me);
-            return g ? esc(g) + ' <span style="color:#6f685e;">(' + esc(PETGEAR.addText(PETGEAR.BY[g].add)) + ')</span>' : '<span style="color:#8d8578;">없음</span>';
-        })()) : '')
+            + line('기질', esc(PETTRAIT.perName(id, me))) : '')
+        // ★ 인형 전투 2차 — 레벨 · 경험치 · 각성 돌파 · 성격 · 특성 · 능력치 · 기술 (6단계 · 2026-11-10 · d2-core.js · d2-skills.js · d2-traits.js)
+        + (window.D2 && window.DOLL ? (function () {
+            const D = window.DOLL, d = D.dolls(me)[String(id)];
+            if (!d) return '';
+            const st = D.stats(d), need = D2.R(st.lv), wait = D2.waiting(d);
+            let h = line('Lv', 'Lv ' + st.lv + (need ? ' <span style="color:#6f685e;">(' + (Number(d.xp) || 0) + ' / ' + need + (wait ? ' · 각성 돌파 필요' : ' · 상한 Lv ' + D.lvMaxOf(d)) + ')</span>' : ' <span style="color:#d4af37;">— 최대</span>'));
+            h += line('각성 돌파', (function () {
+                const nd = D.gradeNeed(id, me);
+                if (!nd.rune) return '<span style="color:#6f685e;">' + esc(nd.why) + '</span>';
+                return '<span style="color:' + (nd.have ? '#9fd8ef' : '#6f685e') + ';">💠 ' + esc(nd.rune) + ' ' + nd.have + '개</span>' + ' <span style="color:#6f685e;">' + (nd.ok ? '· 돌파 가능' : '· ' + esc(nd.why)) + '</span>';
+            })());
+            const pr = D2.perOf(d);
+            h += line('성격', esc(pr.n) + ' <span style="color:#6f685e;">(특기 ' + esc(D2.NAME[pr.a]) + ' · ' + esc(D2.NAME[pr.b]) + ')</span>');
+            if (window.D2TR) { const tr = D2TR.get(D2TR.trOf(d)); h += line('특성', tr ? esc(tr.n) + (tr.rare ? ' <span style="color:#d4af37;">희귀</span>' : '') + ' <span style="color:#6f685e;">— ' + esc(tr.e) + '</span>' : '-'); }
+            h += line('능력치', 'HP ' + st.hp + '/' + st.max + ' · 공 ' + st.atk + ' · 매 ' + st.chm + ' · 방 ' + st.def + ' · 굳 ' + st.sta + ' · 속 ' + st.spd);
+            if (window.D2SK) {
+                const mv = D2SK.mvOf(d), nm = function (no) { return no ? esc(D2SK.get(no).n) + ' <span style="color:#6f685e;">' + D2SK.ppOf(d, no) + '/' + D2SK.get(no).pp + '</span>' : '<span style="color:#5f594f;">빈칸</span>'; };
+                h += line('공격기', mv.a.map(nm).join('<br>')) + line('유틸기', mv.u.map(nm).join('<br>'));
+            }
+            return h;
+        })() : '')
         + (window.PETRUNE ? line('룬', (function () {
             const r = PETRUNE.fed(id, me);
             return (r.length ? r.map(PETRUNE.tag).map(esc).join(' · ') : '<span style="color:#8d8578;">없음</span>')
@@ -285,8 +293,7 @@ function oneView(id) {
         + '<button id="pet-care" class="game-btn" style="' + BTN + '">쓰다듬고 먹인다</button>'
         + '<button id="pet-nick" class="game-btn" style="' + BTN + '">이름 붙이기</button>'
         + (window.PETRUNE ? '<button id="pet-rune" class="game-btn" style="' + BTN + '">룬 먹이기</button>' : '')
-        + (window.PETGEAR ? '<button id="pet-gear" class="game-btn" style="' + BTN + '">장비</button>'
-            + (PETGEAR.canGradeUp(id, me) ? '<button id="pet-up" class="game-btn" style="' + BTN + ' background:linear-gradient(145deg,#6b4a1d,#38250e) !important; border-color:#ffd766 !important; color:#ffe9bd !important;">등급업 — ' + esc(s.g || 'D') + ' → ' + esc(P().GRADES[PETGEAR.gradeIdx(id, me) + 1] || '') + '</button>' : '') : '')
+        + ((window.DOLL && window.D2 && DOLL.gradeNeed(id, me).ok) ? '<button id="pet-up" class="game-btn" style="' + BTN + ' background:linear-gradient(145deg,#6b4a1d,#38250e) !important; border-color:#ffd766 !important; color:#ffe9bd !important;">각성 돌파 — ' + esc(s.g || 'D') + ' → ' + esc(DOLL.gradeNeed(id, me).to || '') + '</button>' : '')
         // ✗ 입양 보내기 — 도깨비 공방 교환소로 바뀌었다 (2026-11-07)
         + '<button id="pet-back" class="game-btn" style="' + BTN + GREY + '">목록으로</button>');
 
@@ -318,13 +325,11 @@ function oneView(id) {
     w.querySelector('#pet-nick').onclick = function () { nickView(id); };
     const rn = w.querySelector('#pet-rune');           // pet-rune.js 가 있을 때만 붙는다
     if (rn) rn.onclick = function () { shut(); window.petRuneFeedOpen(id, function () { oneView(id); }); };
-    const gr = w.querySelector('#pet-gear');           // pet-gear.js
-    if (gr) gr.onclick = function () { shut(); window.petGearOpen(id, function () { oneView(id); }); };
-    const up = w.querySelector('#pet-up');
+    const up = w.querySelector('#pet-up');             // 각성 돌파 (d2-core.js — 레벨은 그대로, 등급만 다음으로)
     if (up) up.onclick = function () {
-        const r = PETGEAR.gradeUp(id);
+        const r = window.DOLL.gradeUp(id, me);
         if (!r.ok) { alert_(r.why); return; }
-        alert_(P().nick(id, me) + ' — ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 올랐습니다.\n\n여정 Lv 1 부터 다시 오릅니다.');
+        alert_(P().nick(id, me) + ' — 각성 돌파! ' + r.from + ' 등급에서 ' + r.to + ' 등급으로 올랐습니다.\n\nLv ' + r.lv + ' 그대로 이어서 오릅니다.' + (r.up ? ' (쌓인 경험치로 바로 Lv ' + r.lv + ')' : ''));
         oneView(id);
     };
     const ad = w.querySelector('#pet-adopt');          // pet-adopt.js 가 있을 때만 붙는다

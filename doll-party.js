@@ -16,14 +16,14 @@
 // ■ 여럿이
 //   방(dollLobby)을 만들면 셋까지 들어온다. 방장이 출발하면 모두 같은 판(dollRun)에 들어간다.
 //   맵은 각자 화면이지만 파티는 한 줄로 걷는다 — 방장이 걷고, 나머지는 그 뒤를 따라간다 (서로가 보인다).
-//   괴담에 닿으면 모두 전투 화면으로 — 사원마다 제 동행 인형 하나를 내보내 기술을 고르고,
-//   다 고르면(25초가 지나면 저절로) 방장 화면이 한 판을 푼다 (doll-battle.js resolveRound). 방장이 끊기면 45초 뒤 남은 사람이 푼다.
+//   괴담에 닿으면 모두 전투 화면으로 — 사원마다 제 진영(인형 셋)이 있어 **동시에** 싸운다 (인형 전투 2차 엔진 d2-battle.js · 6단계 2026-11-10).
+//   다 고르면(25초가 지나면 저절로 · 안 고른 사원은 엔진이 대신) 방장 화면이 한 턴을 푼다 (doll-battle.js resolveParty). 방장이 끊기면 45초 뒤 남은 사람이 푼다.
 //   쓰러뜨리면 사원마다 경험치 · 교감 · 룬 조각을 제 기록에 받는다. 보스까지 가면 보상 (첫번째 여정 포인트 · 아케이드존 꿈결).
 //
 // ■ 적히는 자리
 //   dollLobby/<열쇠> = { at, j, diff, lead, leadName, members: { 사번: { name, at } }, run }
 //   dollRun/<열쇠>   = { at, j, diff, lead, stage(walk·fight·clear·lose·quit), x, order:[사번…], mons:[{ i, x, y, boss, dead }],
-//                        members: { 사번: { name, dolls: { 열쇠: 수치 }, act, out, left } }, fight: { … doll-battle.js } }
+//                        members: { 사번: { name, dolls: { 열쇠: 인형 기록 }, act, out, left } }, fight: { id, m, foe, round, d2(엔진 상태), picks, pickq, need, log, res, grow, drops … doll-battle.js } }
 //
 // ■ 콘솔
 //   dollPartyState()
@@ -73,13 +73,15 @@ function ready() {
         return D.hpOf(s) > 0;
     });
 }
+// ★ 6단계(2026-11-10) — 인형 기록 전체를 판에 적는다 (개체치 · 성격 · 노력치 · 레벨 · 기술 · PP · 특성 · 상태 · 먹인 룬). 엔진(D2BT)이 이것으로 개체를 만든다.
 function snap(k) {
-    const D = M(), d = D.dolls()[k], s = D.stats(d);
-    const o = { sp: d.sp, g: s.g, lv: s.lv, max: s.max, hp: Math.round(D.hpOf(d)), atk: s.atk, def: s.def, eva: s.eva, crit: s.crit, att: s.att, bond: D.bondOf(d) };
+    const D = M(), d = D.dolls()[k];
+    const o = JSON.parse(JSON.stringify(d));
+    o.sp = d.sp; o.hp = Math.round(D.hpOf(d)); o.att = D.attOf(d);
+    ['fav', 'ord', 'fedAt', 'bd', 'with', 'out', 'rest', 'jsleep', 'hurt', 'stv', 'gear'].forEach(function (x) { delete o[x]; });
     if (d.nick) o.nick = String(d.nick).slice(0, 12);
     if (D.artOld(u_())) o.art = 'old';                   // 🎨 예전 펫 그림으로 보는 사원 (동료 화면에도)
-    // 💠 먹인 속성 룬 — 여정에서도 공격 수단 (pet-rune.js · 2026-11-07 사용자)
-    try { const R = window.PETRUNE; if (R) { const f = R.fed(k, u_()); if (f.length) { o.runes = f; o.runeN = R.uses(k, u_()); } } } catch (e) { }
+    try { const R = window.PETRUNE; if (R) { const f = R.fed(k, u_()); if (f.length) o.runes = f; else delete o.runes; } } catch (e) { }
     return o;
 }
 
@@ -168,10 +170,10 @@ function paint() {
                 const on = VIEW.j === j;
                 return '<div style="border:1px solid ' + (on ? '#a78bdb' : '#3d2f5c') + ';border-radius:10px;padding:9px;margin:8px 0;background:' + (on ? 'rgba(120,90,190,.16)' : 'transparent') + '" data-j="' + j + '">'
                     + '<div style="font-size:12px;color:#fff3d6;font-weight:bold">' + J[j].ic + ' 『 ' + esc(J[j].n) + ' 』 <span style="font-size:10px;color:#9fd8ef">오늘 ' + left(j) + ' / ' + DAY + '</span></div>'
-                    + '<div class="sub" style="margin:4px 0 0">' + esc(J[j].d) + '<br>끝까지 가면 ' + payText(j, VIEW.diff) + (J[j].gear ? ' · 35% 로 펫 장비' : '') + '</div></div>';
+                    + '<div class="sub" style="margin:4px 0 0">' + esc(J[j].d) + '<br>끝까지 가면 ' + payText(j, VIEW.diff) + '</div></div>';
             }).join('')
             + '<div style="display:flex;gap:4px;align-items:center;margin:6px 0"><span style="font-size:10.5px;color:#ffcf8f;flex:0 0 auto">난이도</span>' + GR5.map(function (g) { return '<button class="gb-btn' + (VIEW.diff === g ? ' pri' : '') + '" data-d="' + g + '" style="flex:1;padding:6px 0">' + g + '</button>'; }).join('') + '</div>'
-            + '<div class="sub" style="margin:0">난이도 ' + VIEW.diff + ' — 나오는 조각 ' + window.AWK.CAP[VIEW.diff].map(function (g) { return g + '급'; }).join(' · ') + ' · 괴담 체력 ×' + window.DOLLBT.MUL.hp[GR5.indexOf(VIEW.diff)] + ' · 공격 ×' + window.DOLLBT.MUL.atk[GR5.indexOf(VIEW.diff)] + '</div>'
+            + '<div class="sub" style="margin:0">난이도 ' + VIEW.diff + ' — 나오는 조각 ' + window.AWK.CAP[VIEW.diff].map(function (g) { return g + '급'; }).join(' · ') + ' · 괴담 Lv ' + window.DOLLBT.LV_OF_DIFF[VIEW.diff][0] + '~' + window.DOLLBT.LV_OF_DIFF[VIEW.diff][1] + ' (보스 +3) · 같이 가면 괴담 HP 가 는다</div>'
             + '<div class="gb-btns"><button class="gb-btn pri" data-k="solo">혼자 떠난다</button><button class="gb-btn" data-k="make">방을 만든다</button></div>'
             + '<div style="font-size:10.5px;color:#ffcf8f;margin:12px 0 2px">열린 방</div>'
             + (open.length ? open.map(function (o) { return '<div class="gb-row"><div class="tx"><b>' + esc(o.leadName) + ' 사원의 방</b><div>' + J[o.j].ic + ' ' + esc(J[o.j].n) + ' · 난이도 ' + o.diff + ' · ' + Object.keys(o.members).length + '/3</div></div><button class="gb-btn" data-join="' + esc(o._k) + '">들어간다</button></div>'; }).join('')
@@ -287,8 +289,9 @@ function norm(v) {
         if (F.log) Object.keys(F.log).forEach(function (r) {
             if (F.log[r] == null) return;
             F.log[r] = arr(F.log[r]);
-            F.log[r].forEach(function (e) { if (e && e.drops) Object.keys(e.drops).forEach(function (c) { e.drops[c] = arr(e.drops[c]); }); });
         });
+        if (F.drops) Object.keys(F.drops).forEach(function (c) { F.drops[c] = arr(F.drops[c]); });
+        if (F.pickq) F.pickq = arr(F.pickq);
     }
     return v;
 }
@@ -301,6 +304,8 @@ function onRun(s) {
         const F = v.fight;
         if (!F || F.id !== w.id) { w.r(null); return false; }
         if (F.log && F.log[w.round]) { w.r(F.log[w.round]); return false; }
+        // 🧸 내가 다음 인형을 골라야 한다 (기절 · 바통) — 기다림을 끊고 선택창으로 (doll-battle.js partyFight)
+        if (F.need && F.need.code === S.code && arr(F.pickq).length <= Number(F.need.at || 0)) { w.r('need'); return false; }
         return true;
     });
     // 전투가 열렸다
@@ -315,19 +320,32 @@ function tick() {
     tryResolve(true);
 }
 function isLead() { return !!(S.run && S.run.lead === S.code); }
-function alive(v) { return (v.order || []).filter(function (c) { const m = v.members[c]; return m && !m.left && !m.out && m.dolls; }); }
+function alive(v) {
+    const F = v.fight, S2 = F && F.d2;
+    return (v.order || []).filter(function (c) {
+        const m = v.members[c]; if (!m || m.left || !m.dolls) return false;
+        if (S2 && S2.sides) { const sd = Object.keys(S2.sides).map(function (k) { return S2.sides[k]; }).filter(function (x) { return x && x.code === c; })[0]; if (sd) return !sd.out && arr(sd.units).some(function (u) { return u && u.hp > 0 && !u.fainted; }); }
+        return !m.out;
+    });
+}
 function tryResolve(byClock) {
     const v = S.run;
     if (!v || !v.fight || v.fight.res || v.stage !== 'fight') return;
     const F = v.fight, t = now();
+    if (!F.d2) return;                                                   // 엔진 상태가 아직 안 적혔다 (방장이 만든다)
     const al = alive(v);
     const all = al.every(function (c) { return F.picks && F.picks[c]; });
     const waited = t - Number(F.roundAt || 0);
-    const mine = (isLead() && (all || waited > PICK_MS)) || (!isLead() && waited > FAIL_MS);
+    // 선택(기절 · 바통)을 기다리는 중 — 그 사원이 골랐으면(pickq 가 늘었으면) 바로 다시 푼다 · 45초가 지나면 엔진이 첫 후보로
+    const needed = !!F.need;
+    const needOk = needed && (arr(F.pickq).length > Number(F.need.at || 0) || t - Number(F.needAt || F.roundAt || 0) > FAIL_MS);
+    if (needed && !needOk) return;
+    const mine = (isLead() && (all || waited > PICK_MS || needOk)) || (!isLead() && waited > FAIL_MS);
     if (!mine) return;
     S.ref.child('fight/lock').transaction(function (c) { return (Number(c) || 0) >= F.round ? undefined : F.round; }).then(function (r) {
         if (!r || !r.committed) return;
         const P = window.DOLLBT.resolve(v, now());
+        if (!P) return;
         return S.ref.update(P);
     }).catch(function (e) { console.warn('[🐾] 판 풀기 실패', e); });
 }
@@ -341,11 +359,14 @@ function startFight(id) {
         code: S.code, lead: isLead(), loc: (J[v.j] && J[v.j].bt) || 'arcade',
         get: function () { return S.run; },
         pick: function (k) { const p = {}; p['fight/picks/' + S.code] = k; S.ref.update(p); },
+        pickq: function (idx) { S.ref.child('fight/pickq').transaction(function (c) { c = arr(c); c.push(Number(idx)); return c; }); S.ref.update({ 'fight/needAt': now() }); },
+        applyWin: function (grow, side) { applyWin(id, grow, side); },
         waitLog: function (round) {
             return new Promise(function (r) {
                 const F = S.run && S.run.fight;
                 if (!F || F.id !== id) return r(null);
                 if (F.log && F.log[round]) return r(F.log[round]);
+                if (F.need && F.need.code === S.code && arr(F.pickq).length <= Number(F.need.at || 0)) return r('need');
                 S.waiters.push({ id: id, round: round, r: r });
             });
         },
@@ -364,38 +385,32 @@ function startFight(id) {
         if (run && (run.stage === 'clear' || run.stage === 'lose') && !S.ended) endRun(run.stage);
     });
 }
-// 판마다 — 내 인형 체력 · 이기면 경험치 · 교감 · 룬 조각 (한 번만)
-function applyLog(id, lg) {
+// 이겼다 — 경험치 · 노력치(엔진 grow 를 내 진영 기록에) · 교감 · 룬 조각 (한 번만)
+function applyWin(id, grow, side) {
     const v = S.run, D = M(), u = u_();
     if (!v || !u) return;
+    const tag = id + ':win';
+    if (S.applied[tag]) return;
+    S.applied[tag] = 1;
+    try {
+        const sd = grow && grow.bySide && grow.bySide[side];
+        if (sd) {
+            const ds = D.dolls(u), recs = arr(sd).map(function (g) { return ds[String(g.key)] ? window.DOLLBT.recOf(ds[String(g.key)], g.key) : null; });
+            window.D2BT.applyGrow(grow, recs, side, u);
+            arr(sd).forEach(function (g) { if (g.xp && ds[String(g.key)]) D.log('[🐾 여정] ' + D.nickOf(ds[String(g.key)]) + ' 경험치 +' + g.xp + (g.up ? ' → Lv ' + g.lv : '') + (g.wait ? ' (각성 돌파 필요)' : ''), u); });
+        }
+    } catch (e) { console.warn('[🐾] 성장 기록', e); }
     const me = v.members && v.members[S.code];
-    if (me && me.dolls) Object.keys(me.dolls).forEach(function (k) {
-        const d = D.dolls(u)[k];
-        if (d && Math.round(D.hpOf(d)) !== Math.round(me.dolls[k].hp)) D.patchDoll(k, { hp: Math.max(0, Math.round(me.dolls[k].hp)) }, u);
-    });
-    lg.forEach(function (e) {
-        // 💠 전투가 끝났다(이김 · 짐) — 내보냈던 인형의 먹인 룬이 한 번씩 닳는다 (일곱 번이면 깨진다)
-        if ((e.win || e.lose) && !S.applied[id + ':wear']) {
-            S.applied[id + ':wear'] = 1;
-            const part0 = (v.fight && v.fight.part && v.fight.part[S.code]) || {};
-            try { const R = window.PETRUNE; if (R) Object.keys(part0).forEach(function (k) { if (D.dolls(u)[k]) { const b = R.wear(k, u); if (b && b.length) { try { window.DOLLSCENE.sys('💠 ' + b.map(R.tag).join(' · ') + ' 룬이 깨졌다 (전투 ' + R.WEAR_MAX + '번)', 4000); } catch (x) { } } } }); } catch (e2) { }
-        }
-        if (!e.win) return;
-        const tag = id + ':win';
-        if (S.applied[tag]) return;
-        S.applied[tag] = 1;
-        const part = (v.fight && v.fight.part && v.fight.part[S.code]) || {};
-        Object.keys(part).forEach(function (k) { if (D.dolls(u)[k]) D.giveXp(k, e.xp, u); });
-        if (me && me.act && D.dolls(u)[me.act]) D.bondUp(me.act, u);
-        const got = (e.drops && e.drops[S.code]) || [];
-        got.forEach(function (g) { window.AWK.add(window.AWK.SHARD(g), 1, u); });
-        if (got.length) {
-            D.log('[🐾 여정] 💠 ' + got.map(function (g) { return window.AWK.SHARD(g); }).join(' · ') + ' 을 주웠습니다.', u);
-            D.saveHist();
-            try { window.DOLLSCENE.sys('💠 ' + got.map(function (g) { return window.AWK.SHARD(g); }).join(' · ') + ' 을 주웠다! (각성 공방에서 셋을 합친다)', 5000); } catch (x) { }
-        }
-    });
+    try { const act = v.fight && v.fight.d2 && v.fight.d2.sides && v.fight.d2.sides[side]; const cu = act && arr(act.units)[act.act]; if (cu && cu.key && D.dolls(u)[cu.key]) D.bondUp(cu.key, u); } catch (e) { }
+    const got = arr((v.fight && v.fight.drops && v.fight.drops[S.code]) || []);
+    got.forEach(function (g) { window.AWK.add(window.AWK.SHARD(g), 1, u); });
+    if (got.length) {
+        D.log('[🐾 여정] 💠 ' + got.map(function (g) { return window.AWK.SHARD(g); }).join(' · ') + ' 을 주웠습니다.', u);
+        try { window.DOLLSCENE.sys('💠 ' + got.map(function (g) { return window.AWK.SHARD(g); }).join(' · ') + ' 을 주웠다! (각성 공방에서 셋을 합친다)', 5000); } catch (x) { }
+    }
+    D.saveHist();
 }
+function applyLog(id, lg) { /* 판마다의 HP · PP 기록은 전투 화면(doll-battle.js writeMine)이 한다 */ }
 
 // ── 끝
 async function endRun(why) {
@@ -412,10 +427,7 @@ async function endRun(why) {
                 u.points = (Number(u.points) || 0) + n;
                 try { saveFields({ points: 1 }); } catch (e) { }
                 lines.push('여정을 끝까지 갔습니다 — ' + n.toLocaleString() + ' P');
-                if (Math.random() < J.j1.gear && window.PETGEAR && PETGEAR.DROP && PETGEAR.DROP.length) {
-                    const g = PETGEAR.DROP[Math.floor(Math.random() * PETGEAR.DROP.length)];
-                    PETGEAR.add(g.n, 1); lines.push('길에서 주운 것 — ' + g.n);
-                }
+                // ✗ 펫 장비 드롭은 뺐다 (2026-11-10 사용자 「장비는 판에서 뺌」)
             } else {
                 try {
                     const r = await db_().ref('users/' + u.code + '/kroom/dream').transaction(function (x) { return Math.max(0, Math.floor(Number(x) || 0)) + n; });
@@ -519,9 +531,12 @@ const PT = {
         const ms = PT.mons(), m = ms[i];
         if (!m || m.dead) return false;
         const n = alive(v).length || 1;
-        const foe = window.DOLLBT.foeFor(m.i, v.diff, n);
+        const id = Date.now();
+        const foe = window.DOLLBT.monSpec(m.i, v.diff, n, 'mon:' + S.runKey + ':' + i);
         const intro = (v.j === 'j1' && J1() && J1().enc[i]) ? String(J1().enc[i].in).replace(/<br>/g, ' ') : '';
-        S.ref.update({ stage: 'fight', x: Math.round(PT.leadX()), fight: { id: Date.now(), m: i, foe: foe, round: 1, roundAt: now(), intro: intro } });
+        let d2 = null;
+        try { d2 = window.DOLLBT.partyStart(v, foe, S.runKey + ':' + id); } catch (e) { console.warn('[🐾] 전투 시작', e); return false; }
+        S.ref.update({ stage: 'fight', x: Math.round(PT.leadX()), fight: { id: id, m: i, foe: foe, round: 1, roundAt: now(), intro: intro, d2: d2 } });
         return true;
     },
     pushBack: function (x) { if (isLead() && S.ref) S.ref.update({ x: Math.round(x) }); },
