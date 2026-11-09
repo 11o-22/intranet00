@@ -424,7 +424,8 @@ const DOT_SLOTS = [
             //   남(커플이면 짝)이 [ 까기 ] 하거나 본인이 저를 눌러 [ 까기 ] 하면 풀어진 셔츠로 바뀐다 (D.PEEL · plaza.js 「까기」).
             //   바뀐 것은 옷장에서 다시 입을 때까지 그대로 — 풀어진 셔츠(hide)는 옷장에 안 보인다.
             { i: 'wshirt', n: '셔츠', over: ['w-shirt'], owner: true, fem: true },
-            { i: 'wshirt-open', n: '셔츠', over: ['w-shirt-open'], owner: true, fem: true, hide: true }
+            //   gk — 옷장 권한은 여민 셔츠(wshirt)를 따른다 (2026-11-09 — 받은 사람(dotGrant)이 까면 제 화면에서 권한이 없어 잠옷이 나오던 것)
+            { i: 'wshirt-open', n: '셔츠', over: ['w-shirt-open'], owner: true, fem: true, hide: true, gk: 'wshirt' }
         ]
     },
     {
@@ -792,7 +793,7 @@ window.dotFemOk = femOk;
 //   dotGrant('사번', 'fem') 주기 · dotGrant('사번', 'fem', false) 거두기. owner: true 인 것(여성 체형 · 그 옷들)에 쓴다
 function hasGrant(it, user) {
     const u = user || u_();
-    return !!(u && u.dotGrant && u.dotGrant[it.i]);
+    return !!(u && u.dotGrant && u.dotGrant[it.gk || it.i]);   // gk — 다른 칸의 권한을 따르는 것 (풀어진 셔츠 → 셔츠)
 }
 function hasNo(it, u) {
     const n = noOf(u); if (!n) return false;
@@ -1163,7 +1164,15 @@ window.dotUndress = function (user) {
     const u = user || u_();
     if (!u) return false;
     const d = Object.assign({}, (u.dot && typeof u.dot === 'object') ? u.dot : {});
-    DOT_SLOTS.forEach(function (s) { if (!s.max && s.k !== 'shape') d[s.k] = ''; });
+    DOT_SLOTS.forEach(function (s) {
+        if (s.k === 'shape') return;
+        if (!s.max) { d[s.k] = ''; return; }
+        // 악세 가운데 다리에 신는 것(바니걸 스타킹 · 「다리」)도 벗는다 — 2026-11-09 사용자 「벗기기 누르면 여성 신체 그대로 나와야 해」
+        d[s.k] = accJoin(accSplit(d[s.k]).filter(function (id) {
+            const it = s.items.filter(function (x) { return x.i === id; })[0];
+            return !(it && it.cat === '다리');
+        }), s.max);
+    });
     u.dot = d;
     if (u === u_()) save({ dot: 1 });
     try { if (typeof window.closetReset === 'function') window.closetReset(); } catch (e) { }
