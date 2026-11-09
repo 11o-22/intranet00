@@ -427,12 +427,12 @@ const R = P.ROOMS;
 
 // 🎉 이벤트 맵 — 풀 파티 (2026-11-09 사용자 「이 배경을 이벤트 맵으로 · 상담사가 초대를 해야만 · 광장처럼 · 가운데 무대가 잘 보이도록 · 무대 중앙 [고정]」)
 //   주신 그림(2350x3060 · 도트 한 칸 5픽셀)을 한 칸 한 점(470x612)으로 두고 네 배(1880x2448)로 그린다 — 사람 몫이 광장과 같다.
-//   위 하늘(top 320)과 아래 어두운 벽(cut 700)을 잘라 창에 맞추므로 무대(y 700~1230)가 광장 방보다 1.3배쯤 크게 보인다
-//   (2026-11-09 사용자 「무대가 조금 더 확대」). 잘라 낸 몫은 창 밖 — 채팅 · 미니맵은 수영장 위에 얹힌다.
+//   위 하늘(top 440)과 아래 어두운 벽(cut 790)을 잘라 창에 맞추므로 무대(y 700~1230)가 광장 방보다 1.5배쯤 크게 보인다
+//   (2026-11-09 사용자 「무대가 조금 더 확대」 → 「무대를 조금 더 크기를 키우자」). 잘라 낸 몫은 창 밖 — 채팅 · 미니맵은 수영장 위에 얹힌다.
 //   바닥 띠는 **무대 계단 아래 덱**(긴 의자와 수영장 사이 · y 1372~1412) — 사용자 「물 위가 아니라 저기 바닥을 걸어야」.
 //   무대 위로는 걸어서 못 올라간다 — 무대 중앙의 [📍 고정] 을 눌러 서고, 다시 누르거나 움직이면 내려온다 (아래 「이벤트 맵」).
 //   max 1 — 방은 하나. 초대받은 사람은 몇 명이든 한 방에 든다 (goRoom 이 forceInst 1 · 넘침 옮기기는 옮길 방이 없어 안 한다).
-R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-pool.webp', w: 1880, h: 2448, top: 320, cut: 700, k: 1, pix: 1, max: 1, invite: 1,
+R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-pool.webp', w: 1880, h: 2448, top: 440, cut: 790, k: 1, pix: 1, max: 1, invite: 1,
             floor: [1372, 1412],
             // [고정] 단추는 무대 한가운데(DJ 탁자 앞 · 아래끝 y 1215). 서는 자리는 단추 양옆(EV.SLOTS)이라 단추를 가리지 않는다.
             //   내가 서 있는 동안은 「내려오기」가 계단 발치(1470)로 내려온다
@@ -1847,7 +1847,7 @@ function askLocked() {
 //   · 문지기는 goRoom — 어느 길로 오든(따라가기 · 끌려가기 · 동료 목록 · 콘솔) 초대가 없으면 못 든다. 상담사는 늘 든다.
 //   · 🍍 파인애플(작아진 사람)은 이 방 안에서는 보통 크기다 (tinyOf) — 물약은 그대로라 나오면 도로 작아진다.
 //   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
-//     서 있는 동안은 걸음이 안 먹고, 다시 누르거나(내려오기) 조이스틱 · 바닥 짚기로 움직이면 수영장 앞 테두리로 내려온다.
+//     서 있는 동안은 걸음 · 바닥 짚기가 안 먹는다 — [내려오기] 를 눌러야 덱으로 내려온다 (사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」).
 const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [-90, 90, -180, 180, 0, -270, 270], NEAR: 40 };   // 가운데 단추 양옆부터
 let evInv = null, evRef = null, evKnown = null;
 function evInvited(u) { u = u || u_(); if (!u) return false; if (isAdm(u)) return true; return !!(evInv && evInv[u.code]); }
@@ -1914,7 +1914,7 @@ window.plazaEventFix = function () {
     putOne(run.me, run.x, run.y);
     camera(true);
     try { send(false); } catch (e) { }
-    sysLine('📍 무대에 섰습니다 — 다시 누르거나 움직이면 내려옵니다.');
+    sysLine('📍 무대에 섰습니다 — [내려오기] 를 눌러야 내려옵니다.');
     paintSpots();
 };
 function evRelease() {
@@ -4877,11 +4877,9 @@ function tick(ts) {
     if (askLocked()) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; run.ax = 0; run.ay = 0; }
     // 🪢 금 목줄에 끌려가는 동안은 제 손으로 못 움직인다 — 끄는 사람 뒤 한 걸음 자리로 걷는다 (2026-11-08)
     if (lsLedActive()) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; lsFollowStep(); }
-    // 🎉 이벤트 무대 「고정」 — 서 있는 동안은 그 자리에 붙어 있고, 제 손으로 움직이거나 바닥을 짚으면 내려온다 (2026-11-09)
-    if (run.evFix) {
-        if (Math.abs(ix) + Math.abs(iy) > 0.4 || run.tx != null) evRelease();
-        else { ix = 0; iy = 0; run.ax = 0; run.ay = 0; run.x = run.evFix.x; run.y = run.evFix.y; run.vx = run.vy = 0; }
-    }
+    // 🎉 이벤트 무대 「고정」 — 서 있는 동안은 그 자리에 붙어 있다. 조이스틱 · 바닥 짚기로는 안 내려오고 [내려오기] 를 눌러야 내려온다
+    //   (2026-11-09 사용자 「내려오기 버튼 누르기 전까지는 못 내려오게」)
+    if (run.evFix) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; run.tx = null; run.ty = null; run.tseg = null; run.x = run.evFix.x; run.y = run.evFix.y; run.vx = run.vy = 0; }
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();

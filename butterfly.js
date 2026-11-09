@@ -31,9 +31,9 @@
 //                    소멸한 나비는 자정에 돌아오고, 레벨은 남는다.
 //                    경험 — 살아 나온 탐사마다 +1 · 능력을 쓸 때마다 +1 · 다음 레벨까지 Lv×5.
 //                    K의 방 혼자 — 나비가 하나라도 남아 있으면 혼자가 아니다 (혼자 S · A 규칙이 풀린다).
-//   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 즉사 한 번 회피(맞은 수만큼).
-//                    (✗ 회수품 ×2.5 · 성공 정산 ×1.5 는 뺐다 — 2026-11-08 사용자 「포인트랑 회수품 확률 버프 싹 빼주고」)
-//                    두 번 다 맞으면 포만감·오염도 5시간 동결,
+//   ⑥ 에로스의 마지막 숨결  하루 두 번, 본인이나 사원에게. 맞은 날 하루 — 굴림 +2 · 회수품 ×2.5 ·
+//                    성공 정산 ×1.5 · 즉사 한 번 회피(맞은 수만큼). 두 번 다 맞으면 포만감·오염도 5시간 동결,
+//                    (2026-11-08 에 회수품 · 정산 배수를 뺐다가 → 2026-11-09 사용자 「기존에 있던 거 다시 추가」로 되살렸다)
 //                    어둠 탐사 · K의 방 횟수가 다시 찬다 (맞는 사람마다 하루 한 번 · bflyBreath.charged).
 //                    ✗ 2026-10-26 까지는 펫이 5시간 잠들었다 (따라오지 않음) — 사용자가 뺐다.
 //
@@ -41,8 +41,11 @@
 //                    하루 세 번. 나올 때 오염도는 퇴원 값(쓰러짐 40). 제 二 신도(여우 신도)가 먼저 꺼냈으면 횟수를 쓰지 않는다.
 //                    u.bflyOut = { day, n }   오늘 쓴 귀환
 //
-//   ✗ 포인트 배수(맹약 ×1.5~2 · 모이라이 · 숨결 ×1.5 · 상한 ×1.5) · 회수품 배수(숨결 ×2.5)는 모두 뺐다 (2026-11-08 사용자).
-//     multNow 는 늘 ×1 — 맹약을 맺은 장착자가 쓰러져도 포인트를 잃지 않는 것(pactKeep)만 남는다.
+//   포인트 — 맹약(×1.5~2) · 모이라이(유예 1번 ×1.33 · 2번 ×1.67 · 3번 ×2) · 숨결(×1.5) 를 다 곱해도 PTS_CAP(×1.5) 까지.
+//            꿈결(K의 방)은 불리지 않는다. 맹약을 맺은 장착자가 쓰러져도 포인트를 잃지 않는다(pactKeep).
+//            (2026-11-08 에 다 뺐다가 → 2026-11-09 사용자 「회수품이랑 포인트 버프 기존에 있던 거 다시 추가」로 되살렸다)
+//   ⑧ 나비 살리기 (2026-11-09 사용자 「환영 나비가 죽을 시에 마리당 하루 세 번 살릴 수 있게」)
+//            소멸한 나비는 자정까지 기다리지 않고 나비 창의 [살리기] 로 되살린다 — 마리당 하루 REVIVE(3)번 (st.rev · 자정에 0).
 //
 //   ■ 방 (2026-11-08 사용자 「나비들이랑 같이 탐사할 수 있게 · 다른 방과 별개의 방을 둘 수 있게 — 아기 호랑이처럼」)
 //     장착자는 **구역이 차 있어도** 방을 만들 수 있다 — 다른 팀이 편성해 두었거나 탐사 중인 구역에도 「🦋 파티 모집」이 열린다.
@@ -79,7 +82,8 @@ const BFLY_CFG = {
     OUT: 3,                // 쓰러져 상담실 · 선녀탕으로 가게 되면 바로 꺼낸다 — 하루 세 번 (2026-10-26)
     EROS: 2, EROS_ROLL: 2, EROS_LOOT: 2.5, EROS_PTS: 1.5, EROS_HOURS: 5,
     NULL_AT: 5, HEAL_POLL: 2, HEAL_HP: 10, HEAL_MIND: 3,
-    PTS_CAP: 1.5                     // ★ 포인트 배수는 1.5 까지 (2026-10-27 · 대신 보정 · 판정은 상한에 안 걸린다 — gear-cap.js)
+    PTS_CAP: 1.5,                    // ★ 포인트 배수는 1.5 까지 (2026-10-27 · 대신 보정 · 판정은 상한에 안 걸린다 — gear-cap.js)
+    REVIVE: 3                        // 🕊 소멸한 나비 살리기 — 마리당 하루 세 번 (2026-11-09 사용자)
 };
 
 (function butterfly() {
@@ -166,15 +170,33 @@ function wake(u) {
     });
     return changed;
 }
-// 자정이 지나면 소멸한 나비가 돌아온다 (레벨은 그대로)
+// 자정이 지나면 소멸한 나비가 돌아온다 (레벨은 그대로) · 살리기 횟수(rev)도 0
 function dayRoll(u) {
     if (!u || u.bflyDay === today()) return false;
     u.bflyDay = today();
-    KEYS.forEach(function (k) { st(u, k).gone = 0; });
+    KEYS.forEach(function (k) { st(u, k).gone = 0; st(u, k).rev = 0; });
     try { if (u === u_()) { save({ bfly: 1, bflyDay: 1 }); selfNote(u); } } catch (e) { }
     return true;
 }
 function lvOf(u, k) { return Math.max(1, Math.min(C.LV_MAX, Number(st(u, k).lv) || 1)); }
+// 🕊 살리기 — 오늘 남은 수 · 되살린다 (마리당 하루 C.REVIVE 번 · 레벨 · 이름 · 곁은 그대로)
+function revLeft(u, k) { return Math.max(0, C.REVIVE - (Number(st(u, k).rev) || 0)); }
+function revive(k) {
+    const me = u_(); if (!me || !wears(me)) return false;
+    dayRoll(me);
+    const s = st(me, k), x = BY_K[k];
+    if (!s.gone) { alert_((s.nick || x.n + ' 나비') + josa(s.nick || x.n + ' 나비', '은', '는') + ' 소멸하지 않았습니다.'); return false; }
+    if (revLeft(me, k) <= 0) { alert_((s.nick || x.n + ' 나비') + josa(s.nick || x.n + ' 나비', '은', '는') + ' 오늘 ' + C.REVIVE + '번을 다 살렸습니다.\n\n자정이 지나면 돌아옵니다.'); return false; }
+    s.gone = 0; s.rev = (Number(s.rev) || 0) + 1;
+    patch(me.code, k, { gone: 0, rev: s.rev });
+    const nick = s.nick || x.n + ' 나비';
+    log_(me, '[' + NAME + '] ' + nick + josa(nick, '을', '를') + ' 살렸습니다. (오늘 ' + s.rev + ' / ' + C.REVIVE + ')');
+    save({ bfly: 1, history: 1 });
+    selfNote(me);
+    toast('🕊 ' + nick + ' — 돌아왔다 (오늘 살리기 ' + s.rev + ' / ' + C.REVIVE + ')');
+    return true;
+}
+window.bflyReviveOne = revive;                 // 장착자 본인 — 나비 하나 (상담사용 bflyRevive(사번) 과 다르다)
 function alive(u, k) { if (!u) return false; dayRoll(u); return !st(u, k).gone; }
 
 function patch(code, k, p) {
@@ -442,7 +464,7 @@ window.bflyBreathe = function (code) {
         }
     } catch (e) { }
     shut();
-    alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 즉사 한 번 회피'
+    alert_('🦋 에로스의 마지막 숨결 — ' + (t === me ? '당신' : t.name + ' 사원') + '\n\n오늘 하루 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피'
         + (twice ? '\n\n두 번째 숨결 — 포만감·오염도가 ' + C.EROS_HOURS + '시간 멈춥니다.'
             + (charge ? '\n어둠 탐사 · K의 방 횟수가 다시 찼습니다.' : '\n(횟수 충전은 오늘 이미 받았습니다)') : '')
         + '\n\n(오늘 남은 숨결 ' + (C.EROS - erosUsed(me)) + '번)');
@@ -817,9 +839,19 @@ function smashBtn() {
 // ==========================================
 // 정산 — 포인트 ×2 까지 · 치유 나비 · 경험
 // ==========================================
-// ✗ 포인트 배수는 뺐다 (2026-11-08 사용자 「포인트랑 회수품 확률 버프 싹 빼주고」) — 늘 ×1
-//   (전에는 맹약 ×1.5~2 · 모이라이 유예 수 · 숨결 ×1.5 를 곱해 C.PTS_CAP 까지였다)
-function multNow() { return { m: 1, why: [] }; }
+// 포인트 배수 — 맹약 ×1.5~2 · 모이라이 유예 수 · 숨결 ×1.5 를 곱해 C.PTS_CAP 까지 (2026-11-09 되살림)
+function multNow() {
+    const me = u_(), r = run();
+    if (!me || !r) return { m: 1, why: [] };
+    let m = 1; const why = [];
+    if (wears(me) && myPact().length) {
+        if (!r._bfPactMult) r._bfPactMult = C.PACT_PTS[0] + Math.random() * (C.PACT_PTS[1] - C.PACT_PTS[0]);
+        m *= r._bfPactMult; why.push('맹약 ×' + r._bfPactMult.toFixed(2));
+    }
+    if (r._bfMoira) { const mm = 1 + Math.min(C.MOIRA, r._bfMoira) / C.MOIRA * (C.PTS_CAP - 1); m *= mm; why.push('모이라이 ×' + mm.toFixed(2)); }
+    if (breathN(me) > 0) { m *= C.EROS_PTS; why.push('숨결 ×' + C.EROS_PTS); }
+    return { m: Math.min(C.PTS_CAP, m), why: why };
+}
 function runXp() { KEYS.forEach(function (k) { if (usable(k)) xpAdd(k, 1); }); }
 window.bflyRunXp = runXp;
 (function hookResult() {
@@ -868,8 +900,9 @@ window.bflyRunXp = runXp;
         if (emLootMult._bfly) { clearInterval(iv); return; }
         const _e = emLootMult;
         const w = function () {
-            // ✗ 숨결의 회수품 ×2.5 는 뺐다 (2026-11-08 사용자) — 그대로 넘긴다
-            return _e.apply(this, arguments);
+            let m = _e.apply(this, arguments);
+            try { if (breathN(u_()) > 0) { m *= C.EROS_LOOT; if (window.gearLootMark) window.gearLootMark('bfly', C.EROS_LOOT); } } catch (e) { }   // 겹치면 가장 높은 하나만 (gear-cap.js) · 2026-11-09 되살림
+            return m;
         };
         w._bfly = true;
         emLootMult = w; window.emLootMult = w;
@@ -1033,7 +1066,7 @@ window.bflyKGuess = function (i) {
             try { if (typeof saveSelfFull === 'function') saveSelfFull(); } catch (e) { }
             try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
             alert_(NAME + '\n\n육체에서 떨어져 나온 것들이 날개를 폅니다.\n'
-                + KEYS.map(function (k) { return BY_K[k].icon + ' ' + BY_K[k].n + ' 나비 Lv.' + lvOf(me, k) + (st(me, k).gone ? ' (소멸 — 자정에 돌아온다)' : st(me, k).to ? ' (' + nameOf(st(me, k).to) + ' 사원 곁)' : ' — 내 곁 · 적용 중'); }).join('\n')
+                + KEYS.map(function (k) { return BY_K[k].icon + ' ' + BY_K[k].n + ' 나비 Lv.' + lvOf(me, k) + (st(me, k).gone ? ' (소멸 — 나비 창에서 살리거나 자정에 돌아온다)' : st(me, k).to ? ' (' + nameOf(st(me, k).to) + ' 사원 곁)' : ' — 내 곁 · 적용 중'); }).join('\n')
                 + '\n\n사원증 특이사항에 「🦋 내 곁의 나비」 줄로 보입니다.\n장착칸의 [🦋 환영 나비] 로 부릅니다.');
         };
         w._bfly = true;
@@ -1082,7 +1115,7 @@ window.bflyMenu = function () {
     selfNote(me);
     const rows = KINDS.map(function (x) {
         const s = st(me, x.k), lv = lvOf(me, x.k);
-        const state = s.gone ? '<span style="color:#8a6a7a;">소멸 — 자정에 돌아온다</span>'
+        const state = s.gone ? '<span style="color:#8a6a7a;">소멸 — ' + (revLeft(me, x.k) > 0 ? '살리기 ' + revLeft(me, x.k) + '번 남음' : '자정에 돌아온다') + '</span>'
             : s.to ? '<span style="color:#8fd18f;">' + esc(nameOf(s.to)) + ' 사원 곁 · 적용 중</span>'
             : '<span style="color:#9fe6b0;">『 내 곁 』 적용 중</span>';
         return '<button class="game-btn bf-one" data-k="' + x.k + '" style="' + BTN + ' padding:9px 11px; margin-bottom:6px;' + (s.gone ? GREY : '') + '">'
@@ -1099,7 +1132,7 @@ window.bflyMenu = function () {
         + '🕊 나비의 귀환 — 쓰러져 상담실 · 선녀탕으로 가면 바로 꺼낸다 · 오늘 남은 <b style="color:#c9b8ff;">' + outLeft(me) + ' / ' + C.OUT + '</b><br>'
         + '🌫 레테의 수의 — 탐사당 ' + C.LETHE + '번' + ' · 장착자 본인만' + (r ? ' (이번 탐사 남은 ' + letheLeft() + ')' : '') + '<br>'
         + '💋 에로스의 마지막 숨결 — 오늘 남은 <b style="color:#ffb3c7;">' + (C.EROS - erosUsed(me)) + ' / ' + C.EROS + '</b>'
-        + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
+        + (breathN(me) ? '<br><span style="color:#ffb3c7;">　└ 오늘 내게 걸린 숨결 ' + breathN(me) + '번 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 회피 남은 ' + breathDodgeLeft(me) + '</span>' : '') + '<br>'
         + '🔗 영혼의 맹약 — ' + (p ? (myPact().length ? myPact().map(nameOf).map(esc).join(', ') : '아직 없음') : '방에 있을 때 맺는다') + '</div>';
     const w = box(head('🦋 환영 나비', '육체와 영혼을 가른 것들. 나비를 눌러 내 곁이나 사원 곁에 두고, 이름을 짓습니다.')
         + rows + info
@@ -1115,7 +1148,19 @@ window.bflyMenu = function () {
 function one(k) {
     const me = u_();
     const s = st(me, k), x = BY_K[k];
-    if (s.gone) { alert_(x.n + ' 나비는 소멸했습니다.\n\n자정이 지나면 돌아옵니다. 레벨은 그대로입니다.'); return; }
+    if (s.gone) {
+        // 🕊 살리기 (2026-11-09 사용자 「죽을 시에 마리당 하루 세 번 살릴 수 있게」)
+        const left = revLeft(me, k), nick = s.nick || x.n + ' 나비';
+        const w = box(head(x.icon + ' ' + nick + ' · Lv.' + lvOf(me, k) + ' — 소멸', left > 0
+                ? '날개가 흩어졌지만 아직 부를 수 있습니다. 오늘 남은 살리기 <b style="color:#c9b8ff;">' + left + ' / ' + C.REVIVE + '</b>. 레벨 · 이름 · 곁은 그대로입니다.'
+                : '오늘 ' + C.REVIVE + '번을 다 살렸습니다. 자정이 지나면 돌아옵니다. 레벨은 그대로입니다.')
+            + (left > 0 ? '<button id="bf-rev" class="game-btn" style="' + BTN + ' text-align:center; border-color:#a58cff !important;">🕊 살린다 (' + left + '번 남음)</button>' : '')
+            + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
+        w.querySelector('#bf-x').onclick = window.bflyMenu;
+        const rb = w.querySelector('#bf-rev');
+        if (rb) rb.onclick = function () { if (revive(k)) window.bflyMenu(); };
+        return;
+    }
     const where = s.to ? '지금 <b style="color:#8fd18f;">' + esc(nameOf(s.to)) + ' 사원 곁</b>에서 적용 중입니다.' : '지금 <b style="color:#9fe6b0;">당신 곁</b>에서 적용 중입니다.';
     const w = box(head(x.icon + ' ' + (s.nick || x.n + ' 나비') + ' · Lv.' + lvOf(me, k), esc(x.d(lvOf(me, k))) + '<br>' + where)
         + '<button id="bf-self" class="game-btn" style="' + BTN + ' text-align:center;' + (s.to ? '' : ' border-color:#5fae7a !important;') + '">🦋 내 곁에 둔다' + (s.to ? ' — 거둬 온다' : '') + '</button>'
@@ -1131,7 +1176,7 @@ function one(k) {
 function keepSelf(k) {
     const me = u_(), s = st(me, k), x = BY_K[k];
     if (!me || !wears(me)) return;
-    if (s.gone) { alert_(x.n + ' 나비는 소멸했습니다.\n\n자정이 지나면 돌아옵니다.'); return; }
+    if (s.gone) { alert_(x.n + ' 나비는 소멸했습니다.\n\n나비 창에서 살리거나(하루 ' + C.REVIVE + '번) 자정이 지나면 돌아옵니다.'); return; }
     const nick = s.nick || x.n + ' 나비';
     const was = s.to ? nameOf(s.to) : null;
     if (s.to) detach(me.code, k);
@@ -1249,7 +1294,7 @@ window.bflyErosPick = function () {
         return '<button class="game-btn bf-er" data-c="' + esc(t.code) + '" style="' + BTN + '">' + (t === me ? '본인' : esc(t.name))
             + (n ? ' <span style="font-size:9px; color:#ffb3c7;">오늘 숨결 ' + n + '번' + (n === 1 ? ' — 한 번 더면 5시간 동결 · 어둠 · K의 방 횟수 충전' : '') + '</span>' : '') + '</button>';
     }).join('');
-    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 · K의 방 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
+    const w = box(head('💋 에로스의 마지막 숨결', '오늘 남은 숨결 ' + left + '번. 맞은 날 하루 — 굴림 +' + C.EROS_ROLL + ' · 회수품 ×' + C.EROS_LOOT + ' · 성공 정산 ×' + C.EROS_PTS + ' · 즉사 한 번 회피.<br>한 사람이 두 번 다 맞으면 포만감·오염도 ' + C.EROS_HOURS + '시간 동결, 어둠 탐사 · K의 방 횟수가 다시 찹니다 (한 사람에 하루 한 번).')
         + '<div style="' + SCROLL + '">' + rows + '</div>'
         + '<button id="bf-x" class="game-btn" style="' + BTN + GREY + ' text-align:center;">돌아간다</button>');
     w.querySelector('#bf-x').onclick = window.bflyMenu;
