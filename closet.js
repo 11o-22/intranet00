@@ -1032,27 +1032,8 @@ function look(user, override, all) {
                 chosen.splice(i, 1);
             }
         }
-        // ★ 여성 체형의 기본 옷은 란제리 (2026-11-08 사용자 「여성체형으로 될 시에 기본으로 란제리를 입게」)
-        //   여성 체형 옷(fem)을 하나도 안 고르고 보통 옷(잠옷 같은 것)을 입고 있으면 란제리로 바꿔 그린다 — 고른 것은 그대로 두고 그림만.
-        //   다 벗은 상태(모든 칸 「없음」 · 벗기기 dotUndress)는 그대로 둔다 — 란제리를 억지로 입히지 않는다
-        if (bodySheet === D.FEM_BODY) {
-            const os = slotOf('outer');
-            const ling = os ? os.items.filter(function (x) { return x.i === 'lingerie'; })[0] : null;
-            const cur = os ? chosen.filter(function (x) { return os.items.indexOf(x) >= 0; })[0] : null;
-            const anyFem = chosen.some(function (x) { return x.fem && !x.shape; });
-            const wearing = chosen.some(function (x) { return !x.shape && ((x.over || []).length || (x.top || []).length || (x.back || []).length); });
-            if (ling && !anyFem && wearing) {
-                if (cur) {
-                    const off = {};
-                    (cur.back || []).concat(cur.over || [], cur.top || []).forEach(function (o) { off[o] = 1; });
-                    [over, tops, backs].forEach(function (arr) { for (let j = arr.length - 1; j >= 0; j--) if (off[arr[j]]) arr.splice(j, 1); });
-                    chosen.splice(chosen.indexOf(cur), 1);
-                }
-                chosen.push(ling);
-                pick[os.k] = ling.i;                                    // 옷장에도 란제리가 골라진 것으로 보인다
-                (ling.over || []).forEach(function (o) { over.push(o); });
-            }
-        }
+        // ✗ 여성 체형이면 란제리를 저절로 입히던 것(2026-11-08)은 뺐다 — 2026-11-09 사용자 「벗기기 하면 아무런 옷도 입지 않게 · 란제리도
+        //   기본적으로 옷장에 들어가 있는 식으로만」. 란제리는 여성 체형을 쓸 수 있는 사람의 옷장(겉옷)에 늘 있고(femBase), 골라야 입는다.
         // ★ 스타킹을 신은 여성 체형 몸 — 몸판만 그 다리 그림으로 (이름은 그대로 body-w — 들썩임 · 쑤시기 같은 것은 그 이름으로 찾는다)
         if (bodySheet === D.FEM_BODY && legsImg) bodyImg = legsImg;
         const lone = chosen.filter(function (x) { return x.alone; })[0];
