@@ -385,6 +385,9 @@ const PLAZA = {
         { g: 'life',  n: '마작',       i: '🀄', ic: 'mahjong', fn: 'mjOpen' },
         // 🫣 숨바꼭질 — 둘 이상 · 접속한 사람을 불러 (hideseek.js · 2026-11-02 사용자)
         { g: 'life',  n: '숨바꼭질',   i: '🫣', ic: 'hide',    fn: 'hsOpen' },
+        // 🎉 이벤트 맵 — 상담사가 초대한 사람에게만 보인다 · 상담사에게는 초대 칸 (2026-11-09 사용자)
+        { g: 'life',  n: '이벤트 맵',  i: '🎉', fn: 'plazaEventGo', when: function () { return typeof window.plazaEventOk === 'function' && window.plazaEventOk(); } },
+        { g: 'life',  n: '이벤트 초대', i: '💌', fn: 'plazaEventInvite', when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
         { g: 'life',  n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
         // ⑥ 상점
@@ -421,6 +424,18 @@ const R = P.ROOMS;
     //   저절로 고르는 방(1 ~ max)에는 안 들어서, 비밀번호를 친 사람만 든다 (아래 「비밀방」)
     R.pz_fox.secret = 3;
 })();
+
+// 🎉 이벤트 맵 — 풀 파티 (2026-11-09 사용자 「이 배경을 이벤트 맵으로 · 상담사가 초대를 해야만 · 광장처럼 · 가운데 무대가 잘 보이도록 · 무대 중앙 [고정]」)
+//   주신 그림(2350x3060 · 도트 한 칸 5픽셀)을 한 칸 한 점(470x612)으로 두고 네 배(1880x2448)로 그린다 — 사람 몫이 광장과 같다.
+//   그림 아래 25%(y 1850~)가 어두운 벽이라 광장처럼 잘라(cut 600) 채팅 · 미니맵 자리로 쓴다 → 무대(y 900~1200)가 화면 가운데 온다.
+//   바닥 띠는 **수영장 앞 테두리**(네온 띠 · y 1600~1676) — 무대 · 수영장이 가려지지 않는 관객 자리.
+//   무대 위로는 걸어서 못 올라간다 — 무대 중앙의 [📍 고정] 을 눌러 서고, 다시 누르거나 움직이면 내려온다 (아래 「이벤트 맵」).
+//   max 1 — 방은 하나. 초대받은 사람은 몇 명이든 한 방에 든다 (goRoom 이 forceInst 1 · 넘침 옮기기는 옮길 방이 없어 안 한다).
+R.event = { n: '🎉 이벤트 · 풀 파티', pn: '풀 파티', img: 'event-pool.webp', w: 1880, h: 2448, cut: 600, k: 1, pix: 1, max: 1, invite: 1,
+            floor: [1600, 1676],
+            // [고정] 단추는 무대 중앙선 · 계단 발치(y 1470 — 단추는 아래끝 기준이라 화면 크기와 상관없이 선 사람 발 아래에 온다)
+            spots: [ { x: 940, y: 1470, get n() { return evFixed() ? '내려오기' : '고정'; }, i: '📍', fn: 'plazaEventFix' },
+                     { x: 1790, n: '광장으로', ic: 'out', go: P.START } ] };
 
 // ★ 돌아오는 길을 저절로 만든다 — 한쪽만 적어도 양쪽이 통한다
 (function link() {
@@ -1812,6 +1827,144 @@ function askLocked() {
         return t - L.lk0 < ASK_LOCK_MAX;
     });
 }
+
+// ==========================================
+// 🎉 이벤트 맵 — 풀 파티 (2026-11-09 사용자)
+// ==========================================
+//
+//   「이 배경을 이벤트 맵으로 해서 이곳은 상담사가 초대를 해야만 들어갈 수 있게 해주고 광장처럼 해주되
+//    가운데 무대가 잘 보이도록 해줘. 그리고 무대 중앙에 [ 고정 ] 버튼을 두고 사원이 그 고정 버튼을 누르면 거기에 설 수 있게 해주라.」
+//
+//   · 방 표는 위 R.event (사진 · 바닥 띠 · 자르기). 목록(☰ 생활)의 「🎉 이벤트 맵」은 초대받은 사람에게만 보인다.
+//   · 초대 — plazaEvent/invite/<사번> = { by, at }. 상담사는 ☰ 「💌 이벤트 초대」 칸에서 사원을 찾아 초대 · 취소한다.
+//     콘솔로도 된다: eventInvite('사번') · eventUninvite('사번') · eventInvites()
+//     초대가 오면 그 사람 화면에 알린다. 안에 있는데 초대가 취소되면 광장으로 돌려보낸다.
+//   · 문지기는 goRoom — 어느 길로 오든(따라가기 · 끌려가기 · 동료 목록 · 콘솔) 초대가 없으면 못 든다. 상담사는 늘 든다.
+//   · [📍 고정] — 무대 중앙(EV.STAGE)에 선다. 이미 선 사람이 있으면 그 옆 빈자리(EV.SLOTS 차례)에 선다.
+//     서 있는 동안은 걸음이 안 먹고, 다시 누르거나(내려오기) 조이스틱 · 바닥 짚기로 움직이면 수영장 앞 테두리로 내려온다.
+const EV = { ROOM: 'event', PATH: 'plazaEvent', STAGE: { x: 940, y: 1196 }, SLOTS: [0, -95, 95, -190, 190, -285, 285], NEAR: 40 };
+let evInv = null, evRef = null, evKnown = null;
+function evInvited(u) { u = u || u_(); if (!u) return false; if (isAdm(u)) return true; return !!(evInv && evInv[u.code]); }
+function evFixed() { return !!(run && run.evFix); }
+window.plazaEventOk = function () { return evInvited(u_()); };
+// 초대 목록을 듣는다 — 내 초대가 새로 오면 알리고, 안에 있는데 취소되면 내보낸다
+function evListen() {
+    const d = db_(); if (!d) return;
+    if (evRef) { try { evRef.off(); } catch (e) { } }
+    evRef = d.ref(EV.PATH + '/invite');
+    evRef.on('value', function (snap) {
+        const v = snap.val() || {};
+        const me = u_(), was = evInv;
+        evInv = v;
+        if (me && !isAdm(me)) {
+            const had = !!(was && was[me.code]), has = !!v[me.code];
+            if (was && !had && has) {
+                const t = '🎉 상담사가 이벤트 맵(풀 파티)에 초대했습니다 — ☰ 목록 「이벤트 맵」으로 들어갈 수 있습니다.';
+                if (run) sysLine(t); else if (typeof showCustomAlert === 'function') showCustomAlert(t);
+            }
+            if (run && run.room === EV.ROOM && !has && run.me) { sysLine('🎉 이벤트 맵 초대가 끝나 광장으로 돌아왔습니다.'); goRoom(P.START, null, 0); }
+        }
+        try { if (sheetOpen('evinv')) evInviteSheet(); } catch (e) { }
+    });
+}
+(function evBoot() {
+    const iv = setInterval(function () {
+        const d = db_(), me = u_();
+        if (!d || !me) return;
+        if (evKnown === me.code) return;
+        evKnown = me.code; evInv = null;
+        evListen();
+    }, 1500);
+})();
+// ☰ 「이벤트 맵」 — 초대받은 사람 · 상담사
+window.plazaEventGo = function () {
+    const me = u_();
+    if (!me) return;
+    if (!evInvited(me)) { const t = '🎉 이벤트 맵은 상담사의 초대가 있어야 들어갈 수 있습니다.'; if (run) sysLine(t); else if (typeof showCustomAlert === 'function') showCustomAlert(t); return; }
+    if (!run) { try { window.plazaOpen(); } catch (e) { } }
+    if (!run) return;
+    closeSheet();
+    if (run.room === EV.ROOM) { sysLine('이미 이벤트 맵에 있습니다.'); return; }
+    run.forceInst = 1;
+    goRoom(EV.ROOM, null, 0);
+};
+// [📍 고정] — 무대 중앙에 선다 · 다시 누르면 내려온다
+window.plazaEventFix = function () {
+    if (!run || run.room !== EV.ROOM || !run.me) return;
+    if (run.evFix) { evRelease(); sysLine('무대에서 내려왔습니다.'); paintSpots(); return; }
+    if (carryMine() || lsLedActive() || askLocked()) { sysLine('지금은 무대에 설 수 없습니다.'); return; }
+    // 이미 선 사람 옆 빈자리
+    const taken = {};
+    Object.keys(run.peers).forEach(function (c) {
+        const q = run.peers[c]; if (!q || !q.at || now() - q.at > P.STALE_MS) return;
+        if (Math.abs((q.ty != null ? q.ty : q.y) - EV.STAGE.y) > 12) return;
+        EV.SLOTS.forEach(function (o, i) { if (Math.abs((q.tx != null ? q.tx : q.x) - (EV.STAGE.x + o)) < EV.NEAR) taken[i] = 1; });
+    });
+    let slot = 0; for (let i = 0; i < EV.SLOTS.length; i++) if (!taken[i]) { slot = i; break; }
+    run.evFix = { x: EV.STAGE.x + EV.SLOTS[slot], y: EV.STAGE.y };
+    run.tx = null; run.ty = null; run.tseg = null; run.vx = run.vy = 0; run.ax = 0; run.ay = 0;
+    run.x = run.evFix.x; run.y = run.evFix.y;
+    try { run.me.actor.face(1); } catch (e) { }
+    putOne(run.me, run.x, run.y);
+    camera(true);
+    try { send(false); } catch (e) { }
+    sysLine('📍 무대에 섰습니다 — 다시 누르거나 움직이면 내려옵니다.');
+    paintSpots();
+};
+function evRelease() {
+    if (!run || !run.evFix) return;
+    run.evFix = null;
+    const r = roomOf();
+    if (r && r.floor) { run.y = r.floor[0] + 30; try { segStep(r, 0); } catch (e) { } }
+    putOne(run.me, run.x, run.y);
+    try { paintSpots(); } catch (e) { }
+}
+// 상담사 — 초대 · 취소
+function evRefOf(code) { const d = db_(); return d ? d.ref(EV.PATH + '/invite/' + code) : null; }
+window.eventInvite = function (code, on) {
+    const me = u_();
+    if (!isAdm(me)) { console.log('[이벤트] 상담사만 초대할 수 있습니다.'); return false; }
+    code = String(code || '').trim(); if (!code) return false;
+    const r = evRefOf(code); if (!r) return false;
+    if (on === false) { r.remove(); console.log('[이벤트] 초대 취소 — ' + code); return true; }
+    r.set({ by: me.code, at: chatNow() });
+    console.log('[이벤트] 초대 — ' + code);
+    return true;
+};
+window.eventUninvite = function (code) { return window.eventInvite(code, false); };
+window.eventInvites = function () { const v = evInv || {}; const ks = Object.keys(v); console.log('[이벤트] 초대 ' + ks.length + '명 — ' + ks.join(', ')); return ks; };
+window.plazaEventInvite = function () { if (!isAdm(u_())) return; if (!run) { try { window.plazaOpen(); } catch (e) { } } if (run) evInviteSheet(); };
+function evInviteSheet() {
+    const was = document.getElementById('plaza-ev-q'), q0 = was ? was.value : '';
+    const s = sheet('evinv', '💌 이벤트 초대', '<div class="plaza-mates"><div class="mt-head">초대한 사원만 🎉 이벤트 맵(풀 파티)에 들어갑니다.</div>'
+        + '<input id="plaza-ev-q" placeholder="이름 · 사번으로 찾기" autocomplete="off" style="width:100%;box-sizing:border-box;margin:0 0 8px;padding:8px 10px;border-radius:8px;border:1px solid #3a3a48;background:#15151e;color:#ffe9bd;font-size:12px;">'
+        + '<div class="ev-list"></div></div>');
+    if (!s) return;
+    const inp = s.querySelector('#plaza-ev-q'), box = s.querySelector('.ev-list');
+    inp.value = q0;
+    inp.addEventListener('keydown', function (e) { e.stopPropagation(); });
+    const paintList = function () {
+        const inv = evInv || {}, q = (inp.value || '').trim().toLowerCase();
+        let users = [];
+        try { users = Object.keys(db.users || {}).map(function (c) { return db.users[c]; }).filter(function (x) { return x && x.code && x.code !== P.ADMIN; }); } catch (e) { }
+        let rows = users.map(function (x) { return { c: x.code, name: x.name || x.code, on: !!inv[x.code] }; });
+        if (q) rows = rows.filter(function (r) { return String(r.name).toLowerCase().indexOf(q) >= 0 || String(r.c).indexOf(q) >= 0; });
+        rows.sort(function (a, b) { return (b.on - a.on) || String(a.name).localeCompare(String(b.name), 'ko'); });
+        const n = Object.keys(inv).length;
+        box.innerHTML = '<div class="mt-head">초대 ' + n + '명' + (q ? ' · 찾은 ' + rows.length + '명' : '') + '</div>'
+            + (rows.length ? rows.slice(0, 80).map(function (r) {
+                return '<div class="mt-row"><div class="mt-who"><b>' + esc(r.name) + '</b><span>' + esc(r.c) + (r.on ? ' · 🎉 초대됨' : '') + '</span></div>'
+                    + '<button data-c="' + esc(r.c) + '" data-on="' + (r.on ? 1 : 0) + '"' + (r.on ? ' style="opacity:.75"' : '') + '>' + (r.on ? '취소' : '초대') + '</button></div>';
+            }).join('') + (rows.length > 80 ? '<div class="mt-empty">… 더 있습니다. 이름이나 사번으로 찾아 주세요.</div>' : '')
+            : '<div class="mt-empty">찾는 사원이 없습니다.</div>');
+        Array.prototype.forEach.call(box.querySelectorAll('button[data-c]'), function (b) {
+            b.onclick = function () { window.eventInvite(b.dataset.c, b.dataset.on !== '1'); };
+        });
+    };
+    inp.addEventListener('input', paintList);
+    paintList();
+}
+window.plazaEventState = function () { console.log('[이벤트] 초대받음', evInvited(), '· 초대 목록', Object.keys(evInv || {}), '· 무대 고정', run && run.evFix); };
 
 // ==========================================
 // 🪢 끌고가기 — 금 목줄 (2026-11-08 사용자)
@@ -4332,6 +4485,7 @@ function ico(o, cls) {
 }
 
 function spotOk(s) {
+    if (s.when) { try { if (!s.when()) return false; } catch (e) { return false; } }     // 🎉 보이는 조건 (이벤트 맵)
     if (s.fn) return typeof window[s.fn] === 'function';
     if (s.tab && !document.getElementById(s.tab)) return false;
     if (s.sub && !document.getElementById(s.sub)) return false;
@@ -4571,6 +4725,10 @@ function goApp(s) {
 function goRoom(key, way, lv) {
     if (!run || !R[key]) return;
     if (HS() && R[key].photo && !hsCall('photoOk')) { sysLine('🫣 숨바꼭질 중에는 포토존에 갈 수 없습니다.'); return; }
+    // 🎉 이벤트 맵 — 상담사가 초대한 사람만 (어느 길로 오든 · 따라가기 · 끌려가기 · 동료 목록 포함)
+    if (R[key].invite && !evInvited(u_())) { sysLine('🎉 이벤트 맵은 상담사의 초대가 있어야 들어갈 수 있습니다.'); return; }
+    if (R[key].invite) run.forceInst = 1;                   // 몇 명이든 한 방
+    run.evFix = null;                                       // 무대 고정은 방을 나가면 풀린다
     // 🔒 갇혔으면 가두리 방 밖으로는 못 간다 — 이미 거기 있으면 그대로, 밖이면 그리로 데려간다
     const cg = cageMine();
     if (cg && key !== cg) {
@@ -4711,6 +4869,11 @@ function tick(ts) {
     if (askLocked()) { ix = 0; iy = 0; run.tx = null; run.ty = null; run.tseg = null; run.ax = 0; run.ay = 0; }
     // 🪢 금 목줄에 끌려가는 동안은 제 손으로 못 움직인다 — 끄는 사람 뒤 한 걸음 자리로 걷는다 (2026-11-08)
     if (lsLedActive()) { ix = 0; iy = 0; run.ax = 0; run.ay = 0; lsFollowStep(); }
+    // 🎉 이벤트 무대 「고정」 — 서 있는 동안은 그 자리에 붙어 있고, 제 손으로 움직이거나 바닥을 짚으면 내려온다 (2026-11-09)
+    if (run.evFix) {
+        if (Math.abs(ix) + Math.abs(iy) > 0.4 || run.tx != null) evRelease();
+        else { ix = 0; iy = 0; run.ax = 0; run.ay = 0; run.x = run.evFix.x; run.y = run.evFix.y; run.vx = run.vy = 0; }
+    }
 
     // 🍍 들려 있으면 내 걸음 대신 든 사람에게 붙는다 (손 — 못 움직임 · 머리 — 좌우만)
     carryCheck();
