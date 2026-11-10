@@ -1246,7 +1246,10 @@ async function partyFight(o) {
         next = r + 1;
         const nowRun = o.get();
         if (nowRun && nowRun.fight) {
-            const caught = Number(nowRun.fight.round) < next || !!nowRun.fight.res && Number(nowRun.fight.round) <= next;
+            // ★ 따라잡았나 — 판 r 의 출력문을 다 보면 서버의 round 는 r + 1 (= next) 이다. 「<」 로 적혀 있어 끝판 말고는 한 번도 맞지 않았다 (2026-11-10 사용자
+            //   「PP 전체 회복템을 먹었는데 안 차서 안 써지고 · 2회 남은 기술이 8번 써진다」) — 화면의 엔진 상태(PP · 상태)가 첫 판 그대로 멈춰 있었고,
+            //   판마다 적는 기록(writeMine)과 쓴 용품 빼기(consume)도 끝판에만 돌았다.
+            const caught = Number(nowRun.fight.round) <= next;
             if (nowRun.fight.d2 && caught) { B.S = normS(copy(nowRun.fight.d2)); syncShown(); paintStat(); allyPaint(); }
             // 내 기록 — 판마다 · 소모한 아이템
             try { if (side && caught) { writeMine(B.S, side, u_(), null); consume(arrOf(nowRun.fight.cons)); } } catch (e) { }

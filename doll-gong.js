@@ -324,6 +324,7 @@ function sewUi() {
             M.bagAdd('🍶 청주', -nW, u);
             M.bagAdd('🥣 메밀묵', -nJ, u);
             list.forEach(function (id) { M.patchDoll(id, { hp: M.stats(ds[id]).max, st: null, pp: ppFull(ds[id]) }, u); });
+            try { if (window.DOLLPARTY && window.DOLLPARTY.syncDoll) list.forEach(function (id) { window.DOLLPARTY.syncDoll(id); }); } catch (e) { }   // 여정 중이면 그 판의 인형 사본에도
             M.log('[👺 수선소] 봉제인형 ' + list.length + '마리를 고쳤습니다 (🍶 -' + nW + ' · 🥣 -' + nJ + ').', u);
             M.saveHist();
             done = true;

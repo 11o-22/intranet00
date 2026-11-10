@@ -567,7 +567,25 @@ const PT = {
         return true;
     },
     pushBack: function (x) { if (isLead() && S.ref) S.ref.update({ x: Math.round(x) }); },
-    quit: quit
+    quit: quit,
+    // ★ 여정 중에 전투 밖에서 인형 기록을 바꿨다 (소지품 용품 · 수선) — 이 판의 인형 사본에도 (2026-11-10)
+    //   다음 괴담은 사본으로 판을 열므로, 안 적으면 PP 를 채워도 · 고쳐도 전투에 안 들어갔다
+    syncDoll: function (id) {
+        try {
+            const v = S.run, me = u_();
+            if (!v || !S.ref || !me || S.ended || S.fightOn) return false;
+            const m = v.members && v.members[S.code], ds = m && obj(m.dolls);
+            if (!ds || !ds[String(id)]) return false;
+            const d = M().dolls(me)[String(id)]; if (!d) return false;
+            const b = 'members/' + S.code + '/dolls/' + id + '/', up = {};
+            up[b + 'hp'] = Math.max(0, Math.round(M().hpOf(d)));
+            up[b + 'pp'] = JSON.parse(JSON.stringify(d.pp || {}));
+            up[b + 'st'] = (d.st && d.st.k) ? { k: d.st.k, c: d.st.c | 0 } : null;
+            up[b + 'aid'] = Math.max(0, d.aid | 0);
+            S.ref.update(up).catch(function () { });
+            return true;
+        } catch (e) { return false; }
+    }
 };
 window.DOLLPARTY = PT;
 

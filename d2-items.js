@@ -150,6 +150,7 @@ function applyRec(d, name, no, u) {
     else if (fx.revive) { d.hp = Math.max(1, ceil(v.max * fx.revive)); p['pets/' + id + '/hp'] = d.hp; out.push(fix(DL().nickOf(d) + '은/는 HP ' + d.hp + '로 다시 움직일 수 있게 되었다!')); }
     else if (fx.aid) { d.aid = fx.aid; p['pets/' + id + '/aid'] = d.aid; out.push(fix(DL().nickOf(d) + '의 훈련이 ' + fx.aid + '회의 유효 행동 동안 2배로 기록된다!')); }
     try { DL().put(p, u); } catch (e) { }
+    try { if (window.DOLLPARTY && window.DOLLPARTY.syncDoll) window.DOLLPARTY.syncDoll(id); } catch (e) { }   // 여정 중이면 이 판의 인형 사본에도
     try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, name, 1); else { const i = u.inventory.indexOf(name); if (i >= 0) u.inventory.splice(i, 1); } } catch (e) { }
     try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, '[🧸 아이템] ' + name + ' → ' + DL().nickOf(d)); } } catch (e) { }
     try { if (typeof saveFields === 'function') saveFields({ inventory: 1, history: 1 }); } catch (e) { }
