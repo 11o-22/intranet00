@@ -8,18 +8,22 @@
 //
 //   곡    snd/rhythm-<열쇠>.mp3  (마스터링 — -14 LUFS · 최고 -1 dBTP)
 //   채보  rhythm/<열쇠>.json      (tools/rhythm-chart.py 가 곡을 듣고 만든 것 — 16분 격자 · 템포가 바뀌어도 따라간다)
-//   그림  rhythm/<열쇠>.jpg       (곡에 들어 있던 표지)
+//   표지는 쓰지 않는다 — 까만 칸 (2026-11-10 사용자)
 //
 //   ■ 화면 — 가로. 휴대폰을 세워 두면 화면을 돌려 그린다 (손가락 자리도 같이 돌린다).
 //            들어갈 때 전체 화면 · 가로 고정을 해 본다 (되는 기기만).
+//   ★ 2026-11-10 사용자 「터치감이 안 좋아 — Deemo 같은 형식으로」
+//     · 칸이 없다 — 노트가 멀리(위 가운데)에서 원근으로 내려와 판정선에 닿는다. 노트마다 가로 자리가 있다.
+//     · 화면 어디를 눌러도 된다 — **가로 자리만** 본다 (노트 폭 + 여유). 빈 곳을 눌러도 벌이 없다.
+//     · 판정 CHARMING ±55 ms · NORMAL ±140 · 그 뒤 MISS (슬라이드는 ±120 안에 손가락이 지나가면 CHARMING)
+//     · 점수는 정확도(%) — CHARMING 100% · NORMAL 60% · 길게 누르기는 머리 · 꼬리 둘로 센다
+//     · 결과에 평균 타이밍(빠르게 / 늦게) — 「싱크에 반영」으로 바로 맞춘다
 //   ■ 노트
-//     · 터치         내려오는 칸을 판정선에서 누른다
-//     · 길게 누르기   누른 채 끝까지 — 머리와 꼬리를 따로 센다 · 손을 일찍 떼면 꼬리는 놓침
-//     · 슬라이드     초록 마름모 — 손가락이 그 칸에 닿아 있으면 된다 (줄로 이어진 것을 손을 떼지 않고 쓸어 넘긴다)
-//   ■ 판정   PERFECT ±45 ms · GREAT ±90 · GOOD ±130 · 그 뒤는 MISS (슬라이드는 ±110 안에 닿으면)
-//   ■ 점수   1,000,000 점 만점 — PERFECT 100% · GREAT 75% · GOOD 40% · 길게 누르기는 머리 · 꼬리 둘로 센다
+//     · 터치         흰 건반 — 판정선에 닿을 때 그 자리를 누른다
+//     · 길게 누르기   흰 건반 + 띠 — 누른 채 끝까지 (손가락이 옆으로 조금 흘러도 된다) · 일찍 떼면 꼬리는 MISS
+//     · 슬라이드     노란 건반 — 손가락이 그 자리에 닿아 있거나 지나가면 된다 (누르지 않고 쓸어도 된다)
 //   ■ 설정   속도 · 싱크(소리가 늦게 들리면 +) · 타격음 — 이 기기에 적어 둔다
-//   ■ 기록   곡 · 난이도마다 최고 점수 — 이 기기에 (rgBest)
+//   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest)
 //   ■ 키보드 S D F J K L · 스페이스 = 멈춤 (컴퓨터에서 시험)
 //
 //   콘솔   rhythmOpen()
@@ -29,12 +33,15 @@
 
 const ADMIN = 'kario0987';
 const SONGS = [
-    { key: 'airplane', title: 'In the Airplane', artist: 'qltmxm403', audio: 'snd/rhythm-airplane.mp3', cover: 'rhythm/airplane.jpg', chart: 'rhythm/airplane.json', color: '#7ec8ff' },
-    { key: 'client', title: '내담자 여러분께', artist: 'qltmxm403', audio: 'snd/rhythm-client.mp3', cover: 'rhythm/client.jpg', chart: 'rhythm/client.json', color: '#ffb3d1' }
+    { key: 'airplane', title: 'In the Airplane', artist: 'Benz', audio: 'snd/rhythm-airplane.mp3', chart: 'rhythm/airplane.json', color: '#7ec8ff' },
+    { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1' }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
-const LANES = 6;
-const W_PERFECT = 45, W_GREAT = 90, W_GOOD = 130, W_SLIDE = 110, W_SLIDE_P = 70;
+const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
+const W_CHARM = 55, W_NORMAL = 140, W_SLIDE = 120;
+const HIT_PAD = 0.075;                // 노트 폭 바깥으로 이만큼(판정선 폭의 몫)까지 맞은 것으로
+const NOTE_W = [0.15, 0.15, 0.12];    // 터치 · 길게 누르기 · 슬라이드 — 판정선 폭의 몫
+function xOfLane(l) { return 0.08 + l * (0.84 / (LANES - 1)); }
 const LEAD = 2.2;                     // 곡 앞에 비우는 초
 const HOLD_EARLY_OK = 140;            // 꼬리 — 끝나기 이만큼 전에 떼도 성공
 const KEYS = ['s', 'd', 'f', 'j', 'k', 'l'];
@@ -53,15 +60,19 @@ function saveSet() { saveJ(SET_KEY, SET); }
 // ==========================================
 // 소리
 // ==========================================
-const AU = { ctx: null, bufs: {}, src: null, gain: null, startAt: 0, click: null, sess: null };
+const AU = { ctx: null, bufs: {}, src: null, gain: null, startAt: 0, click: null, sess: null, lag: {}, lagNow: 0 };
 function ctx() {
     if (!AU.ctx) {
         const C = window.AudioContext || window.webkitAudioContext;
         AU.ctx = new C({ latencyHint: 'interactive' });
         AU.gain = AU.ctx.createGain(); AU.gain.gain.value = 1; AU.gain.connect(AU.ctx.destination);
-        // 타격음 — 짧은 딸깍
-        const sr = AU.ctx.sampleRate, n = Math.floor(sr * 0.03), b = AU.ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
-        for (let i = 0; i < n; i++) { const t = i / sr; d[i] = (Math.sin(2 * Math.PI * 2100 * t) * 0.6 + (Math.random() * 2 - 1) * 0.25) * Math.exp(-t * 180); }
+        // 타격음 — 부드러운 건반 소리 (사인 두 겹이 빨리 사그라든다 + 아주 짧은 닿는 소리)
+        const sr = AU.ctx.sampleRate, n = Math.floor(sr * 0.14), b = AU.ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+        for (let i = 0; i < n; i++) {
+            const t = i / sr;
+            d[i] = (Math.sin(2 * Math.PI * 1046.5 * t) * 0.55 + Math.sin(2 * Math.PI * 2093 * t) * 0.18) * Math.exp(-t * 38) * Math.min(1, t * 900)
+                 + (Math.random() * 2 - 1) * 0.12 * Math.exp(-t * 700);
+        }
         AU.click = b;
     }
     if (AU.ctx.state !== 'running') { try { AU.ctx.resume(); } catch (e) { } }
@@ -100,7 +111,10 @@ function playClick(v) {
     } catch (e) { }
 }
 // 곡의 지금 시각 (ms) — 소리가 실제로 나가는 때에 맞춘다
-function songMs() {
+//   ★ 2026-11-10 사용자 「박자가 이상하게 어긋나」
+//     · 소리 시계(getOutputTimestamp)는 칸 단위로 들쭉날쭉하다 — 화면 시계(performance.now)에 붙여 두고 천천히만 따라가게 (떨림 · 판정 흔들림을 없앤다)
+//     · mp3 앞 공백 — 브라우저마다 앞 25 ms 를 자르기도 · 안 자르기도 한다. 채보의 앞머리 지문(head)과 받은 곡을 대 보고 그만큼 민다 (AU.lag)
+function rawMs() {
     const c = AU.ctx; if (!c) return 0;
     const lat = c.outputLatency || c.baseLatency || 0;
     let t = c.currentTime - lat;
@@ -114,7 +128,47 @@ function songMs() {
             }
         }
     } catch (e) { }
-    return (t - AU.startAt) * 1000 - (Number(SET.offset) || 0);
+    return (t - AU.startAt) * 1000 - (AU.lagNow || 0);
+}
+const CK = { base: null };
+function clockReset() { CK.base = null; }
+function songMs() {
+    const pn = performance.now();
+    const raw = rawMs();
+    if (AU.ctx && AU.ctx.state !== 'running') { CK.base = null; return raw - (Number(SET.offset) || 0); }
+    const want = raw - pn;
+    if (CK.base == null || Math.abs(want - CK.base) > 80) CK.base = want;        // 처음 · 멈췄다 이어 감 — 바로 맞춘다
+    else CK.base += (want - CK.base) * 0.02;                                     // 그 밖에는 아주 천천히만
+    return pn + CK.base - (Number(SET.offset) || 0);
+}
+// 받은 곡의 앞머리를 채보의 지문과 대 본다 — 받은 곡이 늦게 시작하면 + (ms)
+function headLag(buf, head) {
+    try {
+        if (!head || !head.length || !buf) return 0;
+        const sr = buf.sampleRate, nb = Math.min(head.length + 140, Math.floor(buf.length / sr * 1000));
+        const a = buf.getChannelData(0), b = buf.numberOfChannels > 1 ? buf.getChannelData(1) : a;
+        const env = new Float32Array(nb);
+        let mx = 0;
+        for (let i = 0; i < nb; i++) {
+            const s0 = Math.floor(i * sr / 1000), s1 = Math.floor((i + 1) * sr / 1000);
+            let sum = 0;
+            for (let j = s0; j < s1; j++) sum += Math.abs((a[j] + b[j]) * 0.5);
+            env[i] = sum / Math.max(1, s1 - s0);
+            if (env[i] > mx) mx = env[i];
+        }
+        let best = 0, bc = -1;
+        for (let lag = -20; lag <= 120; lag++) {
+            let num = 0, a2 = 0, b2 = 0;
+            for (let i = 0; i < head.length; i++) {
+                const j = i + lag; if (j < 0 || j >= nb) continue;
+                const v = env[j] / (mx || 1);
+                num += head[i] * v; a2 += head[i] * head[i]; b2 += v * v;
+            }
+            const c = num / Math.sqrt(a2 * b2 + 1e-12);
+            if (c > bc) { bc = c; best = lag; }
+        }
+        return bc > 0.8 ? best : 0;
+    } catch (e) { return 0; }
 }
 
 // ==========================================
@@ -131,17 +185,17 @@ function css() {
         '#rg-st{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;}',
         '#rg-st canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}',
         '#rg-ui{position:absolute;inset:0;}',
-        '.rg-bg{position:absolute;inset:-30px;background-size:cover;background-position:center;filter:blur(18px) brightness(.35) saturate(1.2);transform:scale(1.08);}',
+        '.rg-bg{position:absolute;inset:0;background:#000;}',
         '.rg-sel{position:absolute;inset:0;display:flex;gap:14px;padding:14px 18px;box-sizing:border-box;}',
         '.rg-col{display:flex;flex-direction:column;gap:10px;min-width:0;}',
         '.rg-h{font-size:12px;letter-spacing:4px;color:#9ab;opacity:.9;}',
         '.rg-song{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
         '.rg-song.on{background:rgba(255,255,255,.16);border-color:var(--c);box-shadow:0 0 14px -4px var(--c);}',
-        '.rg-song img{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0;}',
+        '.rg-song i.rg-sq{width:52px;height:52px;border-radius:8px;background:#000;border:1px solid rgba(255,255,255,.14);flex-shrink:0;}',
         '.rg-song b{display:block;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
         '.rg-song small{font-size:11px;color:#aab;}',
         '.rg-big{flex:1;display:flex;gap:16px;align-items:center;min-width:0;}',
-        '.rg-jacket{width:min(36%,230px);aspect-ratio:1;height:auto;border-radius:14px;object-fit:cover;box-shadow:0 10px 40px rgba(0,0,0,.6);flex-shrink:0;}',
+        '.rg-jacket{width:min(36%,230px);aspect-ratio:1;height:auto;border-radius:14px;background:#000;border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 40px rgba(0,0,0,.6);flex-shrink:0;}',
         '.rg-info{display:flex;flex-direction:column;gap:9px;min-width:0;flex:1;}',
         '.rg-title{font-size:22px;font-weight:bold;color:#fff;line-height:1.2;}',
         '.rg-diffs{display:flex;gap:8px;flex-wrap:wrap;}',
@@ -241,7 +295,7 @@ function menu() {
     const chart = CH[s.key];
     if (!chart) loadChart(s).then(function () { if (MODE === 'menu' && song().key === s.key) menu(); }).catch(function () { });
     const songs = SONGS.map(function (x) {
-        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><img src="' + x.cover + '" alt=""><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + '</small></div></div>';
+        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + '</small></div></div>';
     }).join('');
     const bpm = chart ? (Array.isArray(chart.bpm) ? chart.bpm[0] + '–' + chart.bpm[1] : chart.bpm) : '…';
     const len = chart ? Math.floor(chart.dur / 60000) + ':' + String(Math.floor(chart.dur / 1000) % 60).padStart(2, '0') : '';
@@ -249,9 +303,9 @@ function menu() {
         const c = chart && chart.charts[d[0]];
         const b = bestOf(s.key, d[0]);
         return '<button class="rg-diff' + (SET.diff === d[0] ? ' on' : '') + '" data-diff="' + d[0] + '" style="--c:' + d[3] + '"><b>' + d[1] + '</b><i>' + (c ? c.level : '·') + '</i><small>' + (c ? c.count + ' 노트' : '') + '</small>'
-            + '<small>' + (b ? b.rank + ' · ' + b.score.toLocaleString() + (b.ap ? ' · AP' : b.fc ? ' · FC' : '') : '—') + '</small></button>';
+            + '<small>' + (b ? (b.score / 10000).toFixed(2) + '%' + (b.ap ? ' · AC' : b.fc ? ' · FC' : '') : '—') + '</small></button>';
     }).join('');
-    UI.innerHTML = '<div class="rg-bg" style="background-image:url(\'' + s.cover + '\')"></div>'
+    UI.innerHTML = '<div class="rg-bg"></div>'
         + '<button class="rg-btn rg-x" data-k="x">✕</button>'
         + '<div class="rg-sel">'
         + '<div class="rg-col" style="width:min(34%,240px);"><div class="rg-h">🎵 RHYTHM · 상담사 전용</div>' + songs + '<div style="flex:1"></div>'
@@ -259,10 +313,10 @@ function menu() {
         + '<div class="rg-row"><span>싱크</span><span class="rg-step"><button data-k="of-">−</button><span>' + (SET.offset > 0 ? '+' : '') + SET.offset + 'ms</span><button data-k="of+">+</button></span>'
         + '<button class="rg-btn" data-k="hit" style="padding:6px 10px;font-size:12px;">타격음 ' + (SET.hit ? 'ON' : 'OFF') + '</button></div>'
         + '<div style="font-size:10px;color:#889;line-height:1.5;">소리가 노트보다 늦게 들리면 싱크를 + 로</div></div>'
-        + '<div class="rg-big"><img class="rg-jacket" src="' + s.cover + '" alt=""><div class="rg-info">'
+        + '<div class="rg-big"><div class="rg-jacket"></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div style="font-size:12px;color:#aab;">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-row" style="font-size:11px;color:#99a;">⬜ 터치 · ▮ 길게 누르기 · ◆ 슬라이드(손가락이 닿아 있으면) · 키보드 S D F J K L</div>'
+        + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
         + '<div><button class="rg-btn rg-go" data-k="go">START</button></div>'
         + '</div></div></div>'
         + (rot ? '<div class="rg-rot">휴대폰을 가로로 눕혀서 하면 편합니다</div>' : '');
@@ -299,7 +353,7 @@ function start() {
         }
     } catch (e) { }
     MODE = 'load';
-    UI.innerHTML = '<div class="rg-bg" style="background-image:url(\'' + s.cover + '\')"></div><div class="rg-load">불러오는 중…</div>';
+    UI.innerHTML = '<div class="rg-bg"></div><div class="rg-load">불러오는 중…</div>';
     Promise.all([loadSong(s), loadChart(s)]).then(function (r) {
         if (!OV || MODE !== 'load') return;
         begin(s, d, r[0], r[1]);
@@ -312,23 +366,26 @@ function start() {
 function begin(s, d, buf, chart) {
     const c = chart.charts[d];
     const notes = c.notes.map(function (n, i) {
-        return { i: i, t: n[0], lane: n[1], k: n[2], len: n[2] === 1 ? n[3] : 0, ch: n[2] === 2 ? n[3] : 0, done: false, j: null, hold: null, tail: null, fx: 0 };
+        return { i: i, t: n[0], lane: n[1], x: xOfLane(n[1]), w: NOTE_W[n[2]] || 0.15, k: n[2], len: n[2] === 1 ? n[3] : 0, ch: n[2] === 2 ? n[3] : 0,
+                 done: false, j: null, hold: null, tail: null };
     });
-    // 슬라이드 줄 — 같은 번호끼리 차례대로
+    // 슬라이드 줄 — 같은 번호끼리 차례대로 (희미한 줄로 잇는다)
     const chains = {};
     notes.forEach(function (n) { if (n.k === 2) (chains[n.ch] = chains[n.ch] || []).push(n); });
     const total = notes.reduce(function (a, n) { return a + (n.k === 1 ? 2 : 1); }, 0);
     P = { s: s, d: d, chart: chart, notes: notes, chains: chains, total: total, score: 0, combo: 0, maxCombo: 0,
-          cnt: { p: 0, g: 0, gd: 0, m: 0 }, ptr: {}, keys: {}, flash: [], judge: null, fx: [], first: 0, ended: false, pauseAt: 0 };
+          cnt: { c: 0, n: 0, m: 0 }, offs: [], ptr: {}, judge: null, fx: [], parts: [], ended: false, head: 0 };
     UI.innerHTML = '<button class="rg-pause" data-k="pause">❚❚</button>';
     UI.querySelector('[data-k="pause"]').onclick = function (e) { e.stopPropagation(); pause(); };
     bindInput();
+    if (AU.lag[s.key] == null) AU.lag[s.key] = headLag(buf, chart.head);
+    AU.lagNow = AU.lag[s.key];
+    clockReset();
     const cx = ctx();
     AU.src = cx.createBufferSource(); AU.src.buffer = buf; AU.src.connect(AU.gain);
     AU.startAt = cx.currentTime + LEAD;
     AU.src.start(AU.startAt);
     AU.src.onended = function () { if (P && MODE === 'play') P.audioEnd = true; };
-    P.bg = new Image(); P.bg.src = s.cover;
     MODE = 'play';
 }
 function stopPlay() {
@@ -347,6 +404,7 @@ function pause() {
     m.querySelector('[data-k="r"]').onclick = function () {
         m.remove();
         try { AU.ctx.resume(); } catch (e) { }
+        clockReset();
         MODE = 'play';
     };
     m.querySelector('[data-k="re"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } start(); };
@@ -355,140 +413,124 @@ function pause() {
 function onVis() { if (document.hidden) pause(); }
 
 // ==========================================
-// 판정
+// 판정 — 가로 자리만 본다 (Deemo 처럼)
 // ==========================================
-function addScore(kind) {
+function addScore(kind, dt) {
     const base = 1000000 / Math.max(1, P.total);
-    const r = kind === 'p' ? 1 : kind === 'g' ? 0.75 : kind === 'gd' ? 0.4 : 0;
-    P.score += base * r;
+    P.score += base * (kind === 'c' ? 1 : kind === 'n' ? 0.6 : 0);
     P.cnt[kind]++;
     if (kind === 'm') P.combo = 0;
     else { P.combo++; if (P.combo > P.maxCombo) P.maxCombo = P.combo; }
-    P.judge = { k: kind, at: performance.now() };
+    P.judge = { k: kind, at: performance.now(), dt: dt };
 }
-function gradeOf(dt) {
-    const a = Math.abs(dt);
-    return a <= W_PERFECT ? 'p' : a <= W_GREAT ? 'g' : a <= W_GOOD ? 'gd' : null;
+function near(n, u, pad) { return u != null && Math.abs(u - n.x) <= n.w / 2 + pad; }
+function burst(n, kind) {
+    const t = performance.now();
+    P.fx.push({ x: n.x, w: n.w, at: t, k: kind });
+    if (P.fx.length > 30) P.fx.shift();
+    for (let q = 0; q < 9; q++) {
+        const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+        P.parts.push({ x: n.x + (Math.random() - 0.5) * n.w * 0.8, at: t, vx: Math.cos(a) * (0.08 + Math.random() * 0.22), vy: Math.sin(a) * (0.5 + Math.random() * 0.9), k: kind });
+    }
+    if (P.parts.length > 160) P.parts.splice(0, P.parts.length - 160);
 }
-function hitFx(lane, kind) {
-    P.fx.push({ lane: lane, at: performance.now(), k: kind });
-    if (P.fx.length > 40) P.fx.shift();
-}
-// 칸을 눌렀다
-function press(lane, pid) {
-    if (!P || MODE !== 'play') return;
+// 눌렀다 — 판정 안 · 가로 자리 안에서 가장 이른 노트 (같으면 더 가까운 것)
+function press(u, pid) {
+    if (!P || MODE !== 'play' || u == null) return;
     const now = songMs();
-    P.flash[lane] = performance.now();
-    // 그 칸에서 판정 안에 드는 가장 이른 터치 · 길게 누르기 머리
-    let best = null;
-    for (let i = 0; i < P.notes.length; i++) {
+    let best = null, bestScore = 1e9;
+    for (let i = P.head; i < P.notes.length; i++) {
         const n = P.notes[i];
-        if (n.done || n.k === 2 || n.lane !== lane) continue;
         const dt = now - n.t;
-        if (dt < -W_GOOD) break;            // 아직 멀다 (시각 순)
-        if (dt > W_GOOD) continue;
-        best = n; break;
+        if (dt < -W_NORMAL) break;                    // 아직 멀다 (시각 순)
+        if (n.done || n.k === 2 || dt > W_NORMAL) continue;
+        if (!near(n, u, HIT_PAD)) continue;
+        const sc = Math.abs(dt) + Math.abs(u - n.x) * 400;
+        if (best == null || n.t < best.t - 30 || (Math.abs(n.t - best.t) <= 30 && sc < bestScore)) { best = n; bestScore = sc; }
     }
     if (!best) return;
     const dt = now - best.t;
-    const g = gradeOf(dt) || 'gd';
+    const g = Math.abs(dt) <= W_CHARM ? 'c' : 'n';
     best.done = true; best.j = g;
-    addScore(g);
-    hitFx(lane, g);
-    playClick(0.32);
-    if (best.k === 1) { best.hold = pid; P.ptr[pid] && (P.ptr[pid].hold = best); }
+    P.offs.push(dt);
+    addScore(g, dt);
+    burst(best, g);
+    playClick(0.26);
+    if (best.k === 1) { best.hold = pid; if (P.ptr[pid]) P.ptr[pid].hold = best; }
 }
-// 손을 뗐다 · 칸을 벗어났다
 function releaseHold(n, now) {
     if (!n || n.tail) return;
-    const end = n.t + n.len;
-    if (now >= end - HOLD_EARLY_OK) { n.tail = 'p'; addScore('p'); hitFx(n.lane, 'p'); }
+    if (now >= n.t + n.len - HOLD_EARLY_OK) { n.tail = 'c'; addScore('c'); burst(n, 'c'); }
     else { n.tail = 'm'; addScore('m'); }
     n.hold = null;
 }
 function step(now) {
-    // 슬라이드 — 손가락이 그 칸에 닿아 있으면
-    const lanesDown = {};
-    Object.keys(P.ptr).forEach(function (id) { const q = P.ptr[id]; if (q && q.lane != null) lanesDown[q.lane] = true; });
-    Object.keys(P.keys).forEach(function (l) { if (P.keys[l]) lanesDown[l] = true; });
-    for (let i = 0; i < P.notes.length; i++) {
+    const us = [];
+    Object.keys(P.ptr).forEach(function (id) { const q = P.ptr[id]; if (q && q.u != null) us.push(q.u); });
+    while (P.head < P.notes.length && P.notes[P.head].done && (P.notes[P.head].k !== 1 || P.notes[P.head].tail)) P.head++;
+    for (let i = P.head; i < P.notes.length; i++) {
         const n = P.notes[i];
         const dt = now - n.t;
-        if (dt < -W_GOOD - 200) break;
+        if (dt < -W_NORMAL - 300) break;
         if (n.done) {
-            // 길게 누르기 — 끝까지 눌렀으면 꼬리
             if (n.k === 1 && !n.tail) {
                 if (n.j === 'm') { n.tail = 'm'; addScore('m'); continue; }
-                const held = n.hold != null && !!P.ptr[n.hold] && P.ptr[n.hold].lane === n.lane;
-                if (!held) releaseHold(n, now);
-                else if (now >= n.t + n.len) releaseHold(n, now);
+                const q = n.hold != null ? P.ptr[n.hold] : null;
+                const held = !!q && near(n, q.u, HIT_PAD * 1.8);
+                if (!held || now >= n.t + n.len) releaseHold(n, now);
             }
             continue;
         }
         if (n.k === 2) {
-            if (lanesDown[n.lane] && dt >= -W_SLIDE && dt <= W_SLIDE) {
-                if (dt >= -60 || Math.abs(dt) <= W_SLIDE_P) {
-                    n.done = true; n.j = Math.abs(dt) <= W_SLIDE_P ? 'p' : 'g';
-                    addScore(n.j); hitFx(n.lane, n.j); playClick(0.18);
-                }
+            if (dt >= -60 && dt <= W_SLIDE && us.some(function (u) { return near(n, u, HIT_PAD * 1.3); })) {
+                n.done = true; n.j = 'c'; addScore('c'); burst(n, 'c'); playClick(0.14);
             } else if (dt > W_SLIDE) { n.done = true; n.j = 'm'; addScore('m'); }
             continue;
         }
-        if (dt > W_GOOD) {
+        if (dt > W_NORMAL) {
             n.done = true; n.j = 'm'; addScore('m');
             if (n.k === 1) { n.tail = 'm'; addScore('m'); }
         }
     }
-    // 끝
-    const last = P.notes.length ? P.notes[P.notes.length - 1] : null;
-    const lastEnd = last ? Math.max.apply(null, P.notes.slice(-20).map(function (n) { return n.t + (n.len || 0); })) : 0;
-    if (!P.ended && (now > P.chart.dur + 600 || (P.audioEnd && now > lastEnd + 800))) {
+    const tailEnd = P.notes.length ? Math.max.apply(null, P.notes.slice(-24).map(function (n) { return n.t + (n.len || 0); })) : 0;
+    if (!P.ended && (now > P.chart.dur + 600 || (P.audioEnd && now > tailEnd + 800))) {
         P.ended = true;
-        setTimeout(result, 700);
+        setTimeout(result, 900);
     }
 }
 
 // ==========================================
-// 손가락 · 키보드
+// 자리 — 원근 (멀리 위 가운데 → 판정선)
 // ==========================================
-let L = null;        // 칸 자리 (그리기와 같은 값)
+let L = null;
+const DEPTH = 2.4;                     // 멀리 있을 때 1 / (1 + DEPTH) 크기
 function layout() {
     if (!VW) return;
-    const usable = Math.min(VW * 0.94, VH * 2.3);
-    const laneW = usable / LANES;
-    const left = (VW - usable) / 2;
-    L = { left: left, laneW: laneW, right: left + usable, judgeY: VH * 0.83, top: 0 };
+    const lineW = Math.min(VW * 0.9, VH * 2.2);
+    L = { lineW: lineW, lineL: (VW - lineW) / 2, cx: VW / 2, yJ: VH * 0.82, yV: -VH * 0.32, nh: Math.max(12, VH * 0.042) };
 }
-function laneAt(x) {
-    if (!L) return null;
-    let i = Math.floor((x - L.left) / L.laneW);
-    if (x < L.left - L.laneW * 0.6 || x > L.right + L.laneW * 0.6) return null;
-    return Math.max(0, Math.min(LANES - 1, i));
-}
+function scaleAt(p) { return p <= 1 ? 1 / (1 + (1 - p) * DEPTH) : 1 + (p - 1) * 0.6; }
+function yAt(s) { return L.yV + (L.yJ - L.yV) * s; }
+function xAt(u, s) { return L.cx + (u - 0.5) * L.lineW * s; }
+function uOf(x) { if (!L) return null; return (x - L.lineL) / L.lineW; }
+
+// ==========================================
+// 손가락 · 키보드
+// ==========================================
 function pd(e) {
     if (MODE !== 'play' || !P) return;
     if (e.target && e.target.closest && e.target.closest('.rg-pause,.rg-modal')) return;
     e.preventDefault();
     const p = toStage(e.clientX, e.clientY);
-    const lane = laneAt(p.x);
-    P.ptr[e.pointerId] = { lane: lane, hold: null };
+    const u = uOf(p.x);
+    P.ptr[e.pointerId] = { u: u, hold: null, at: performance.now() };
     try { ST.setPointerCapture && ST.setPointerCapture(e.pointerId); } catch (x) { }
-    if (lane != null) press(lane, e.pointerId);
+    press(u, e.pointerId);
 }
 function pm(e) {
     if (!P || !P.ptr[e.pointerId]) return;
     const p = toStage(e.clientX, e.clientY);
-    const lane = laneAt(p.x);
-    const q = P.ptr[e.pointerId];
-    if (lane !== q.lane) {
-        // 길게 누르는 칸을 벗어났다 — 반 칸까지는 봐준다
-        if (q.hold && L) {
-            const cx = L.left + (q.hold.lane + 0.5) * L.laneW;
-            if (Math.abs(p.x - cx) <= L.laneW * 1.05) { q.lane = q.hold.lane; return; }
-        }
-        q.lane = lane;
-        if (lane != null) P.flash[lane] = performance.now();
-    }
+    P.ptr[e.pointerId].u = uOf(p.x);
 }
 function pu(e) {
     if (!P || !P.ptr[e.pointerId]) return;
@@ -496,7 +538,7 @@ function pu(e) {
     delete P.ptr[e.pointerId];
     if (q.hold && MODE === 'play') releaseHold(q.hold, songMs());
 }
-// 무대 전체에서 받는다 — 위에 덮인 글자 칸(#rg-ui)을 눌러도 칸으로 간다 (단추 · 멈춤 창은 빼고)
+// 무대 전체에서 받는다 — 위에 덮인 글자 칸(#rg-ui)을 눌러도 (단추 · 멈춤 창은 빼고)
 function bindInput() {
     ST.addEventListener('pointerdown', pd);
     ST.addEventListener('pointermove', pm);
@@ -519,24 +561,21 @@ function onKey(e) {
     const lane = KEYS.indexOf(k);
     if (lane < 0 || e.repeat) return;
     e.preventDefault(); e.stopPropagation();
-    P.keys[lane] = true;
     const id = 'k' + lane;
-    P.ptr[id] = { lane: lane, hold: null, key: true };
-    press(lane, id);
+    P.ptr[id] = { u: xOfLane(lane), hold: null, key: true };
+    press(xOfLane(lane), id);
 }
 function onKeyUp(e) {
     if (!P) return;
-    const k = (e.key || '').toLowerCase();
-    const lane = KEYS.indexOf(k);
+    const lane = KEYS.indexOf((e.key || '').toLowerCase());
     if (lane < 0) return;
-    P.keys[lane] = false;
     pu({ pointerId: 'k' + lane });
 }
 
 // ==========================================
 // 그리기
 // ==========================================
-const JTX = { p: ['PERFECT', '#9ff3ff'], g: ['GREAT', '#ffe066'], gd: ['GOOD', '#a8ff9a'], m: ['MISS', '#ff7a8a'] };
+const JTX = { c: ['CHARMING', '#ffe3f2', '#ff9ccf'], n: ['NORMAL', '#cfeaff', '#7ec8ff'], m: ['MISS', '#a3a3b3', '#6b6b7a'] };
 function raf() {
     if (!OV) return;
     requestAnimationFrame(raf);
@@ -546,187 +585,220 @@ function raf() {
     draw(now);
 }
 function rr(g, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
     g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+// 건반 하나 — 가운데 (cx, cy) · 폭 w · 높이 h
+function key(g, cx, cy, w, h, kind, glow) {
+    const x = cx - w / 2, y = cy - h / 2;
+    g.save();
+    g.shadowColor = kind === 2 ? 'rgba(255,214,90,0.7)' : 'rgba(210,230,255,0.55)';
+    g.shadowBlur = glow ? 18 : 8;
+    const gr = g.createLinearGradient(0, y, 0, y + h);
+    if (kind === 2) { gr.addColorStop(0, '#fff3b8'); gr.addColorStop(0.55, '#ffd34d'); gr.addColorStop(1, '#d99a12'); }
+    else { gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.6, '#eef1f8'); gr.addColorStop(1, '#b8c2d6'); }
+    g.fillStyle = gr;
+    rr(g, x, y, w, h, Math.min(5, h * 0.3)); g.fill();
+    g.shadowBlur = 0;
+    g.strokeStyle = kind === 2 ? 'rgba(120,80,0,0.55)' : 'rgba(40,50,80,0.55)'; g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x + 3, y + 2, w - 6, Math.max(1, h * 0.14));
+    g.restore();
 }
 function draw(now) {
     const g = G2; if (!g || !L) return;
-    const vis = 6000 / SET.speed;                     // 위에서 판정선까지 걸리는 ms
-    const pxms = L.judgeY / vis;
-    const yOf = function (t) { return L.judgeY - (t - now) * pxms; };
+    const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
+    const pOf = function (t) { return 1 - (t - now) / vis; };
+    const tnow = performance.now();
     g.clearRect(0, 0, VW, VH);
-    // 바탕
-    if (P.bg && P.bg.complete && P.bg.naturalWidth) {
-        g.save(); g.globalAlpha = 0.18;
-        const s = Math.max(VW, VH);
-        g.drawImage(P.bg, (VW - s) / 2, (VH - s) / 2, s, s);
-        g.restore();
-    }
-    g.fillStyle = 'rgba(5,6,14,0.72)'; g.fillRect(0, 0, VW, VH);
-    // 칸
-    for (let i = 0; i < LANES; i++) {
-        const x = L.left + i * L.laneW;
-        g.fillStyle = i % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.055)';
-        g.fillRect(x, 0, L.laneW, VH);
-        const f = P.flash[i] ? Math.max(0, 1 - (performance.now() - P.flash[i]) / 220) : 0;
-        const held = Object.keys(P.ptr).some(function (id) { return P.ptr[id] && P.ptr[id].lane === i; });
-        const a = Math.max(f * 0.35, held ? 0.16 : 0);
-        if (a > 0) {
-            const gr = g.createLinearGradient(0, L.judgeY, 0, L.judgeY - VH * 0.55);
-            gr.addColorStop(0, 'rgba(150,210,255,' + a + ')'); gr.addColorStop(1, 'rgba(150,210,255,0)');
-            g.fillStyle = gr; g.fillRect(x, 0, L.laneW, L.judgeY);
-        }
-    }
-    g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 1;
-    for (let i = 0; i <= LANES; i++) { const x = L.left + i * L.laneW; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, VH); g.stroke(); }
-    // 마디 줄
-    g.strokeStyle = 'rgba(255,255,255,0.10)';
+    // 바탕 — 까맣게 (2026-11-10 사용자 「표지 없이 까만색으로」)
+    g.fillStyle = '#000'; g.fillRect(0, 0, VW, VH);
+    // 바닥 — 원근 사다리꼴 (멀리 → 판정선)
+    const s0 = scaleAt(0), y0 = yAt(s0);
+    g.save();
+    g.beginPath();
+    g.moveTo(xAt(0, s0), y0); g.lineTo(xAt(1, s0), y0); g.lineTo(xAt(1, 1), L.yJ); g.lineTo(xAt(0, 1), L.yJ); g.closePath();
+    const fl = g.createLinearGradient(0, y0, 0, L.yJ);
+    fl.addColorStop(0, 'rgba(120,150,220,0.0)'); fl.addColorStop(1, 'rgba(140,170,240,0.13)');
+    g.fillStyle = fl; g.fill();
+    g.strokeStyle = 'rgba(190,210,255,0.18)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(xAt(0, s0), y0); g.lineTo(xAt(0, 1), L.yJ); g.moveTo(xAt(1, s0), y0); g.lineTo(xAt(1, 1), L.yJ); g.stroke();
+    g.restore();
+    // 마디 — 바닥을 가로지르는 희미한 줄
     const bars = P.chart.bars;
+    g.strokeStyle = 'rgba(200,215,255,0.08)'; g.lineWidth = 1;
     for (let i = 0; i < bars.length; i++) {
-        const y = yOf(bars[i]);
-        if (y < -2) continue; if (y > L.judgeY) continue;
-        g.beginPath(); g.moveTo(L.left, y); g.lineTo(L.right, y); g.stroke();
+        const p = pOf(bars[i]); if (p < 0 || p > 1) continue;
+        const sc = scaleAt(p), y = yAt(sc);
+        g.beginPath(); g.moveTo(xAt(0, sc), y); g.lineTo(xAt(1, sc), y); g.stroke();
     }
     // 판정선
-    g.fillStyle = 'rgba(160,220,255,0.9)'; g.fillRect(L.left, L.judgeY - 2, L.right - L.left, 4);
-    g.fillStyle = 'rgba(160,220,255,0.18)'; g.fillRect(L.left, L.judgeY + 2, L.right - L.left, VH - L.judgeY);
-    // 칸 아래 글자 (키)
-    g.fillStyle = 'rgba(255,255,255,0.22)'; g.font = Math.round(Math.min(16, L.laneW * 0.22)) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i < LANES; i++) g.fillText(KEYS[i].toUpperCase(), L.left + (i + 0.5) * L.laneW, L.judgeY + (VH - L.judgeY) / 2);
-
-    const nh = Math.max(10, Math.min(22, VH * 0.035));
-    const pad = L.laneW * 0.06;
-    // 슬라이드 줄
-    Object.keys(P.chains).forEach(function (c) {
-        const ch = P.chains[c];
-        g.strokeStyle = 'rgba(120,255,170,0.55)'; g.lineWidth = Math.max(4, L.laneW * 0.12); g.lineCap = 'round';
-        g.beginPath();
-        let started = false;
-        for (let i = 0; i < ch.length; i++) {
-            const n = ch[i];
-            const y = yOf(n.t); const x = L.left + (n.lane + 0.5) * L.laneW;
-            if (n.done && n.j !== 'm' && i < ch.length - 1 && ch[i + 1].done) continue;
-            if (!started) { g.moveTo(x, Math.min(y, L.judgeY)); started = true; } else g.lineTo(x, y);
-        }
-        g.stroke();
+    g.save();
+    g.shadowColor = 'rgba(190,215,255,0.9)'; g.shadowBlur = 14;
+    g.fillStyle = 'rgba(235,242,255,0.95)'; g.fillRect(L.lineL, L.yJ - 1.5, L.lineW, 3);
+    g.restore();
+    g.fillStyle = 'rgba(235,242,255,0.9)';
+    [L.lineL, L.lineL + L.lineW].forEach(function (x) { g.beginPath(); g.arc(x, L.yJ, 4, 0, Math.PI * 2); g.fill(); });
+    // 손가락 자리 — 판정선 위 은은한 빛
+    Object.keys(P.ptr).forEach(function (id) {
+        const q = P.ptr[id]; if (!q || q.u == null) return;
+        const x = xAt(q.u, 1);
+        const rg = g.createRadialGradient(x, L.yJ, 0, x, L.yJ, L.lineW * 0.07);
+        rg.addColorStop(0, 'rgba(200,225,255,0.45)'); rg.addColorStop(1, 'rgba(200,225,255,0)');
+        g.fillStyle = rg; g.fillRect(x - L.lineW * 0.07, L.yJ - L.lineW * 0.07, L.lineW * 0.14, L.lineW * 0.14);
     });
-    // 노트 (뒤에서부터)
-    for (let i = P.notes.length - 1; i >= 0; i--) {
+    // 슬라이드 줄 — 희미하게
+    Object.keys(P.chains).forEach(function (c) {
+        const ch = P.chains[c]; if (ch.length < 2) return;
+        g.strokeStyle = 'rgba(255,214,90,0.28)'; g.lineWidth = 3; g.lineCap = 'round';
+        g.beginPath(); let st = false;
+        for (let i = 0; i < ch.length; i++) {
+            const n = ch[i]; const p = pOf(n.t); if (p < 0) break; if (n.done && i < ch.length - 1 && ch[i + 1].done) continue;
+            const sc = scaleAt(Math.min(p, 1)); const x = xAt(n.x, sc), y = yAt(sc);
+            if (!st) { g.moveTo(x, y); st = true; } else g.lineTo(x, y);
+        }
+        if (st) g.stroke();
+    });
+    // 노트 — 먼 것부터 (가까운 것이 위에)
+    let last = P.head;
+    while (last < P.notes.length && pOf(P.notes[last].t) >= 0) last++;
+    for (let i = last - 1; i >= P.head; i--) {
         const n = P.notes[i];
-        const y = yOf(n.t);
-        const x = L.left + n.lane * L.laneW + pad, w = L.laneW - pad * 2;
+        const p = pOf(n.t);
         if (n.k === 1) {
-            if (n.tail) continue;                                   // 끝났다
+            if (n.tail) continue;
             const holding = n.done && n.j !== 'm' && n.hold != null;
             if (n.done && !holding) continue;
-            const ye = yOf(n.t + n.len);
-            const yh = holding ? L.judgeY : y;
-            if (yh < -nh) continue;                                 // 아직 위
-            const top = Math.max(-10, ye), bot = Math.min(VH, yh);
-            if (bot > top) {
-                const gr = g.createLinearGradient(0, top, 0, bot);
-                gr.addColorStop(0, holding ? 'rgba(255,215,120,0.75)' : 'rgba(255,200,90,0.45)');
-                gr.addColorStop(1, holding ? 'rgba(255,240,180,0.9)' : 'rgba(255,200,90,0.6)');
-                g.fillStyle = gr;
-                g.fillRect(x + w * 0.18, top, w * 0.64, bot - top);
-            }
-            if (ye > -nh) { g.fillStyle = '#ffd36a'; rr(g, x, ye - nh * 0.35, w, nh * 0.7, 4); g.fill(); }
-            g.fillStyle = holding ? '#fff3c4' : '#ffbe3c';
-            rr(g, x, yh - nh / 2, w, nh, 6); g.fill();
-            g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 2; g.stroke();
+            const pe = Math.max(0, pOf(n.t + n.len));
+            const ph = holding ? 1 : p;
+            if (ph < 0) continue;
+            // 띠 — 꼬리에서 머리까지 (원근으로 좁아진다)
+            const steps = 10;
+            g.beginPath();
+            for (let q = 0; q <= steps; q++) { const pp = pe + (ph - pe) * q / steps; const sc = scaleAt(pp); const x = xAt(n.x - n.w * 0.32, sc); const y = yAt(sc); if (q === 0) g.moveTo(x, y); else g.lineTo(x, y); }
+            for (let q = steps; q >= 0; q--) { const pp = pe + (ph - pe) * q / steps; const sc = scaleAt(pp); g.lineTo(xAt(n.x + n.w * 0.32, sc), yAt(sc)); }
+            g.closePath();
+            const ys = yAt(scaleAt(pe)), yh = yAt(scaleAt(ph));
+            const bg2 = g.createLinearGradient(0, ys, 0, yh);
+            bg2.addColorStop(0, holding ? 'rgba(210,230,255,0.25)' : 'rgba(200,215,245,0.15)');
+            bg2.addColorStop(1, holding ? 'rgba(235,245,255,0.75)' : 'rgba(210,225,255,0.45)');
+            g.fillStyle = bg2; g.fill();
+            g.strokeStyle = holding ? 'rgba(255,255,255,0.8)' : 'rgba(220,232,255,0.45)'; g.lineWidth = 1.2; g.stroke();
+            if (pe > 0) { const sc = scaleAt(pe); key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc * 0.7, L.nh * sc * 0.5, 0, false); }
+            const sc = scaleAt(ph);
+            key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc, 1, holding);
             continue;
         }
-        if (n.done || y < -nh || y > VH + nh) continue;
-        if (n.k === 2) {
-            const cx = x + w / 2, r = Math.min(w * 0.32, nh * 0.95);
-            g.fillStyle = '#62f5a0';
-            g.beginPath(); g.moveTo(cx, y - r); g.lineTo(cx + r, y); g.lineTo(cx, y + r); g.lineTo(cx - r, y); g.closePath(); g.fill();
-            g.strokeStyle = '#e8fff0'; g.lineWidth = 2; g.stroke();
-            continue;
-        }
-        const gr = g.createLinearGradient(0, y - nh / 2, 0, y + nh / 2);
-        gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#8fd6ff');
-        g.fillStyle = gr;
-        rr(g, x, y - nh / 2, w, nh, 6); g.fill();
-        g.strokeStyle = 'rgba(40,120,200,0.9)'; g.lineWidth = 2; g.stroke();
+        if (n.done || p < 0 || p > 1.25) continue;
+        const sc = scaleAt(p);
+        key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc * (n.k === 2 ? 0.8 : 1), n.k, false);
     }
-    // 맞힌 자리 빛
-    const tnow = performance.now();
+    // 맞힌 자리 — 번쩍 · 부서지는 빛
     P.fx.forEach(function (f) {
-        const k = (tnow - f.at) / 300; if (k >= 1) return;
-        const cx = L.left + (f.lane + 0.5) * L.laneW;
-        g.save(); g.globalAlpha = 1 - k;
-        g.strokeStyle = f.k === 'p' ? '#9ff3ff' : f.k === 'g' ? '#ffe066' : '#a8ff9a'; g.lineWidth = 3;
-        g.beginPath(); g.arc(cx, L.judgeY, L.laneW * (0.25 + k * 0.45), 0, Math.PI * 2); g.stroke();
+        const k = (tnow - f.at) / 260; if (k >= 1) return;
+        const w = f.w * L.lineW * (1 + k * 0.5), x = xAt(f.x, 1);
+        g.save(); g.globalAlpha = (1 - k) * 0.9;
+        const c = f.k === 'c' ? '255,228,244' : '200,230,255';
+        const rg = g.createRadialGradient(x, L.yJ, 0, x, L.yJ, w * 0.75);
+        rg.addColorStop(0, 'rgba(' + c + ',0.95)'); rg.addColorStop(1, 'rgba(' + c + ',0)');
+        g.fillStyle = rg; g.fillRect(x - w, L.yJ - w * 0.75, w * 2, w * 1.5);
         g.restore();
     });
-    // 판정 글자 · 콤보
+    P.parts = P.parts.filter(function (q) { return tnow - q.at < 520; });
+    P.parts.forEach(function (q) {
+        const k = (tnow - q.at) / 520;
+        const x = xAt(q.x + q.vx * k * 0.35, 1), y = L.yJ + q.vy * k * VH * 0.35 + k * k * VH * 0.25;
+        g.fillStyle = q.k === 'c' ? 'rgba(255,225,240,' + (1 - k) + ')' : 'rgba(200,230,255,' + (1 - k) + ')';
+        g.fillRect(x - 2, y - 2, 4, 4);
+    });
+    // 판정 글자 · 빠르게 / 늦게 · 콤보
     if (P.judge) {
         const k = (tnow - P.judge.at) / 520;
         if (k < 1) {
             const J = JTX[P.judge.k];
-            g.save(); g.globalAlpha = 1 - k * k;
-            g.fillStyle = J[1]; g.font = 'bold ' + Math.round(VH * 0.065) + 'px sans-serif'; g.textAlign = 'center';
-            g.fillText(J[0], VW / 2, L.judgeY - VH * 0.2 - k * 10);
+            g.save(); g.globalAlpha = 1 - k * k; g.textAlign = 'center';
+            g.shadowColor = J[2]; g.shadowBlur = 12;
+            g.fillStyle = J[1]; g.font = '600 ' + Math.round(VH * 0.055) + 'px Georgia, serif';
+            g.fillText(J[0], VW / 2, L.yJ - VH * 0.17 - k * 8);
+            if (P.judge.k === 'n' && P.judge.dt != null) {
+                g.shadowBlur = 0; g.font = Math.round(VH * 0.03) + 'px sans-serif';
+                g.fillStyle = P.judge.dt < 0 ? '#8fd0ff' : '#ffb38a';
+                g.fillText(P.judge.dt < 0 ? 'FAST' : 'SLOW', VW / 2, L.yJ - VH * 0.17 + VH * 0.045 - k * 8);
+            }
             g.restore();
         }
     }
-    if (P.combo >= 3) {
-        g.fillStyle = 'rgba(255,255,255,0.9)'; g.font = 'bold ' + Math.round(VH * 0.11) + 'px sans-serif'; g.textAlign = 'center';
-        g.fillText(String(P.combo), VW / 2, VH * 0.36);
-        g.fillStyle = 'rgba(255,255,255,0.5)'; g.font = Math.round(VH * 0.03) + 'px sans-serif';
-        g.fillText('COMBO', VW / 2, VH * 0.36 + VH * 0.045);
+    if (P.combo >= 5) {
+        g.save(); g.textAlign = 'center';
+        g.fillStyle = 'rgba(255,255,255,0.88)'; g.font = '300 ' + Math.round(VH * 0.1) + 'px Georgia, serif';
+        g.fillText(String(P.combo), VW / 2, VH * 0.3);
+        g.fillStyle = 'rgba(255,255,255,0.45)'; g.font = Math.round(VH * 0.026) + 'px Georgia, serif';
+        g.fillText('C O M B O', VW / 2, VH * 0.3 + VH * 0.045);
+        g.restore();
     }
-    // 위 띠 — 진행 · 점수
+    // 위 — 진행 · 정확도
     const prog = Math.max(0, Math.min(1, now / P.chart.dur));
-    g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(0, 0, VW, 3);
-    g.fillStyle = P.s.color; g.fillRect(0, 0, VW * prog, 3);
-    g.fillStyle = '#fff'; g.font = 'bold ' + Math.round(VH * 0.045) + 'px sans-serif'; g.textAlign = 'right'; g.textBaseline = 'top';
-    g.fillText(String(Math.round(P.score)).padStart(7, '0'), VW - 12, 10);
-    g.font = Math.round(VH * 0.028) + 'px sans-serif'; g.fillStyle = 'rgba(255,255,255,0.6)';
+    g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, 0, VW, 2);
+    g.fillStyle = P.s.color; g.fillRect(0, 0, VW * prog, 2);
+    const done = P.cnt.c + P.cnt.n + P.cnt.m;
+    const acc = done ? (P.cnt.c + P.cnt.n * 0.6) / done * 100 : 100;
+    g.textAlign = 'right'; g.textBaseline = 'top';
+    g.fillStyle = '#fff'; g.font = '600 ' + Math.round(VH * 0.048) + 'px Georgia, serif';
+    g.fillText(acc.toFixed(2) + '%', VW - 14, 10);
+    g.font = Math.round(VH * 0.027) + 'px sans-serif'; g.fillStyle = 'rgba(255,255,255,0.55)';
     const D = DIFFS.find(function (d) { return d[0] === P.d; });
-    g.fillText(P.s.title + ' · ' + D[1] + ' ' + P.chart.charts[P.d].level, VW - 12, 10 + VH * 0.052);
+    g.fillText(P.s.title + ' · ' + D[1] + ' ' + P.chart.charts[P.d].level, VW - 14, 12 + VH * 0.055);
     g.textBaseline = 'alphabetic';
     if (now < 0) {
-        g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = 'bold ' + Math.round(VH * 0.06) + 'px sans-serif'; g.textAlign = 'center';
-        g.fillText(now < -1200 ? 'READY' : 'GO!', VW / 2, VH * 0.5);
+        g.save(); g.textAlign = 'center';
+        g.fillStyle = 'rgba(255,255,255,' + Math.min(1, -now / 600) + ')'; g.font = '300 ' + Math.round(VH * 0.07) + 'px Georgia, serif';
+        g.fillText(P.s.title, VW / 2, VH * 0.42);
+        g.font = Math.round(VH * 0.03) + 'px Georgia, serif'; g.fillStyle = 'rgba(255,255,255,0.55)';
+        g.fillText(P.s.artist, VW / 2, VH * 0.42 + VH * 0.06);
+        g.restore();
     }
 }
 
 // ==========================================
 // 끝
 // ==========================================
-function rankOf(sc) { return sc >= 980000 ? 'SSS' : sc >= 950000 ? 'SS' : sc >= 920000 ? 'S' : sc >= 880000 ? 'A' : sc >= 800000 ? 'B' : sc >= 700000 ? 'C' : 'D'; }
-const RANK_C = { SSS: '#fff6a8', SS: '#ffe066', S: '#ffd36a', A: '#9ff3ff', B: '#a8ff9a', C: '#d0c0ff', D: '#ff7a8a' };
 function result() {
     if (!P || !OV) return;
     MODE = 'result';
     stopPlay();
-    const sc = Math.round(P.score), rank = rankOf(sc);
-    const fc = P.cnt.m === 0, ap = fc && P.cnt.g === 0 && P.cnt.gd === 0;
+    const sc = Math.round(P.score), pct = (sc / 10000).toFixed(2);
+    const fc = P.cnt.m === 0, ac = fc && P.cnt.n === 0;
     const best = loadJ(BEST_KEY, {}), k = P.s.key + '/' + P.d, old = best[k];
     const newBest = !old || sc > old.score;
-    if (newBest) best[k] = { score: sc, rank: rank, fc: fc, ap: ap, at: Date.now() };
-    else if ((fc && !old.fc) || (ap && !old.ap)) { best[k].fc = old.fc || fc; best[k].ap = old.ap || ap; }
+    if (newBest) best[k] = { score: sc, fc: fc, ap: ac, at: Date.now() };
+    else { best[k].fc = old.fc || fc; best[k].ap = old.ap || ac; }
     saveJ(BEST_KEY, best);
+    // 평균 타이밍 — 맞힌 터치 · 길게 누르기 머리
+    const offs = P.offs.slice().sort(function (a, b) { return a - b; });
+    const mid = offs.length ? offs[Math.floor(offs.length / 2)] : 0;
+    const avg = offs.length >= 8 ? Math.round(mid) : null;
     const D = DIFFS.find(function (d) { return d[0] === P.d; });
-    UI.innerHTML = '<div class="rg-bg" style="background-image:url(\'' + P.s.cover + '\')"></div>'
-        + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:20px 28px;">'
+    UI.innerHTML = '<div class="rg-bg"></div>'
+        + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:18px 28px;">'
         + '<div style="font-size:13px;color:#aab;">' + esc(P.s.title) + ' · <b style="color:' + D[3] + '">' + D[1] + ' ' + P.chart.charts[P.d].level + '</b></div>'
-        + '<div class="rg-res"><div class="rg-rank" style="color:' + RANK_C[rank] + '">' + rank + '</div>'
-        + '<div class="rg-tbl"><div style="font-size:26px;font-weight:bold;">' + sc.toLocaleString() + (newBest ? ' <small style="font-size:12px;color:#ffe066;">NEW BEST</small>' : '') + '</div>'
-        + (ap ? '<div style="color:#9ff3ff;font-weight:bold;letter-spacing:2px;">ALL PERFECT</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:2px;">FULL COMBO</div>' : '')
-        + '<div><b style="color:#9ff3ff">PERFECT</b>' + P.cnt.p + '</div><div><b style="color:#ffe066">GREAT</b>' + P.cnt.g + '</div>'
-        + '<div><b style="color:#a8ff9a">GOOD</b>' + P.cnt.gd + '</div><div><b style="color:#ff7a8a">MISS</b>' + P.cnt.m + '</div>'
-        + '<div><b>MAX COMBO</b>' + P.maxCombo + '</div></div></div>'
-        + '<div style="display:flex;gap:10px;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button></div>'
-        + '</div></div>';
+        + '<div class="rg-res"><div style="text-align:center;"><div class="rg-rank" style="font-family:Georgia,serif;font-weight:300;font-size:64px;color:#fff;">' + pct + '<small style="font-size:26px;">%</small></div>'
+        + (ac ? '<div style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:3px;">FULL COMBO</div>' : '')
+        + (newBest ? '<div style="font-size:12px;color:#ffe066;">NEW BEST</div>' : '') + '</div>'
+        + '<div class="rg-tbl"><div><b style="color:#ff9ccf">CHARMING</b>' + P.cnt.c + '</div><div><b style="color:#7ec8ff">NORMAL</b>' + P.cnt.n + '</div>'
+        + '<div><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div><b>MAX COMBO</b>' + P.maxCombo + '</div>'
+        + (avg != null ? '<div style="font-size:12px;color:#ccd;">평균 ' + (avg > 0 ? '+' : '') + avg + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
+        + '</div></div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button>'
+        + (avg != null && Math.abs(avg) > 12 ? '<button class="rg-btn" data-k="sync">싱크에 반영 (' + ((SET.offset + avg) > 0 ? '+' : '') + Math.max(-300, Math.min(300, SET.offset + avg)) + 'ms)</button>' : '')
+        + '</div></div></div>';
     UI.querySelector('[data-k="re"]').onclick = function () { start(); };
     UI.querySelector('[data-k="q"]').onclick = function () { menu(); };
+    const sy = UI.querySelector('[data-k="sync"]');
+    if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '싱크 ' + (SET.offset > 0 ? '+' : '') + SET.offset + 'ms 로 맞췄습니다'; sy.disabled = true; };
 }
 
 window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 싱크: SET.offset, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; } };   // 시험 · 콘솔
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();

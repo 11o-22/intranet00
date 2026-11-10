@@ -22,6 +22,7 @@ from scipy.io import wavfile
 from scipy.signal import stft, find_peaks
 
 HOP = 240                 # 48k 에서 5 ms
+BIAS = 0.011              # 결이 실제 소리보다 이만큼 일찍 선다 — 노트를 그만큼 늦춘다
 NFFT = 2048
 
 
@@ -157,7 +158,8 @@ def main():
         return float(np.interp(t, lt, ld))
 
     grid = track_grid(env, fps, per_curve)
-    grid = grid + off          # 틀 가운데로
+    # 틀 가운데로 + 잡는 쪽의 이른 버릇 (킥 · 하이햇을 정해진 시각에 깐 소리로 재 보니 결이 9~14 ms 일찍 섰다 · 2026-11-10)
+    grid = grid + off + BIAS
     # 격자 앞뒤를 채운다 (조용한 앞 · 뒤에도 박을 그어 둔다)
     d0 = per_curve(grid[0])
     pre = []
@@ -430,7 +432,11 @@ def main():
 
     bars = [int(round(grid[i] * 1000)) for i in range(K) if pos[i] == 0]
     bpms = sorted(set(int(round(60 / (per_curve(t) * 4))) for t in np.arange(1, dur, 5)))
-    data = {'key': key, 'title': title, 'artist': artist, 'dur': int(dur * 1000),
+    # 앞머리 지문 — 처음 1.5 초를 1 ms 칸의 크기로 (게임이 받은 곡과 대 보고, 브라우저마다 다른 mp3 앞 공백을 저절로 맞춘다)
+    sr1 = sr // 1000
+    head = np.abs(x[:sr1 * 1500]).reshape(-1, sr1).mean(axis=1)
+    head = [round(float(v), 4) for v in head / (head.max() + 1e-9)]
+    data = {'key': key, 'title': title, 'artist': artist, 'dur': int(dur * 1000), 'head': head,
             'bpm': bpms[0] if len(bpms) == 1 else [bpms[0], bpms[-1]], 'bars': bars, 'charts': charts}
     out = 'rhythm/' + key + '.json'
     with open(out, 'w') as fp:
