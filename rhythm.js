@@ -30,7 +30,7 @@
 //     · 화면은 한 프레임 앞을 그린다 (그린 그림은 다음 프레임에 보인다)
 //     · 「싱크 맞추기」 — 딸깍 소리에 맞춰 누르면 판정 싱크가 저절로 · 노트가 선에 닿는 때를 보고 화면 싱크를 ±
 //   ★ 2026-11-11 사용자 「제대로 성공한 판정에 따라 랭크 · 리듬게임 랭킹」
-//     · 랭크 — 정확도(CHARMING 100% · NORMAL 60% · MISS 0)로 SSS(ALL CHARMING) · SS 98 · S 95 · A 90 · B 80 · C 70 · D
+//     · 랭크 — 정확도(CHARMING 100% · NORMAL 60% · MISS 0)로 L(ALL CHARMING · 2026-11-11 사용자) · SS 98 · S 95 · A 90 · B 80 · C 70 · D
 //     · 랭킹 — 곡 · 난이도마다 사람별 최고 기록 (rhythmRank/<곡>/<난이도>/<사번>) · 곡 고르기의 「🏆 랭킹」 · 결과에 순위
 //   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest) · 랭킹은 서버에
 //   ■ 키보드 S D F J K L · 스페이스 = 멈춤 (컴퓨터에서 시험)
@@ -69,8 +69,8 @@ if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET)
 function saveSet() { saveJ(SET_KEY, SET); }
 function sgn(v) { return (v > 0 ? '+' : '') + v; }
 
-// 랭크 — 정확도로 (ALL CHARMING 은 SSS)
-const RANKS = [['SSS', 100, '#ffc1e3'], ['SS', 98, '#ffe066'], ['S', 95, '#ffd34d'], ['A', 90, '#7ec8ff'], ['B', 80, '#8fe3a8'], ['C', 70, '#c9c9d6'], ['D', 0, '#8a8a99']];
+// 랭크 — 정확도로 (ALL CHARMING 은 L)
+const RANKS = [['L', 100, '#ffc1e3'], ['SS', 98, '#ffe066'], ['S', 95, '#ffd34d'], ['A', 90, '#7ec8ff'], ['B', 80, '#8fe3a8'], ['C', 70, '#c9c9d6'], ['D', 0, '#8a8a99']];
 function rankOf(score, ac) {
     if (ac) return RANKS[0];
     const pct = (Number(score) || 0) / 10000;
