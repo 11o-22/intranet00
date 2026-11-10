@@ -305,10 +305,43 @@ function norm(v) {
     }
     return v;
 }
+// ★ 판의 인형 사본 → 내 인형 기록 (2026-11-10 사용자 「소지품 동행 중 인형 상태와 진짜 현재 상태가 연동이 안 된다 —
+//   소지품의 인형은 풀피라 회복템을 못 쓰거나, 기절이 아니라 부활템을 못 쓴다」)
+//   사본은 판을 푸는 쪽이 판마다 적는다(doll-battle.js snapBack) — 내 화면이 전투를 다 못 봤어도(늦게 들어옴 · 새로고침 · 다른 화면)
+//   전투 밖에서는 기록이 사본을 따라간다. 전투 중에는 전투 화면이 판마다 적으니(writeMine) 건드리지 않는다.
+//   거꾸로(소지품 · 수선 → 사본)는 PT.syncDoll.
+function syncRecs(v) {
+    try {
+        const me = u_();
+        if (!me || !v || !v.members || S.fightOn || window.D2BT_ACTIVE || S.ended) return;
+        const m = v.members[S.code], ds = m && obj(m.dolls);
+        if (!ds) return;
+        const live = M().dolls(me);
+        Object.keys(ds).forEach(function (k) {
+            const sn = ds[k], d = live[k];
+            if (!sn || !d || sn.hp == null) return;
+            const up = {};
+            const hp = Math.max(0, Math.round(Number(sn.hp)));
+            if (isFinite(hp) && Math.round(M().hpOf(d)) !== hp) up.hp = hp;
+            const st = (sn.st && sn.st.k) ? { k: sn.st.k, c: sn.st.c | 0 } : null;
+            const st0 = (d.st && d.st.k) ? { k: d.st.k, c: d.st.c | 0 } : null;
+            if (JSON.stringify(st) !== JSON.stringify(st0)) up.st = st;
+            if (sn.pp && typeof sn.pp === 'object') {
+                const pp = {}; Object.keys(sn.pp).forEach(function (no) { if (sn.pp[no] != null) pp[no] = Number(sn.pp[no]) || 0; });
+                const pp0 = {}; Object.keys(d.pp || {}).forEach(function (no) { if (d.pp[no] != null) pp0[no] = Number(d.pp[no]) || 0; });
+                if (Object.keys(pp).some(function (no) { return pp[no] !== pp0[no]; })) up.pp = Object.assign(pp0, pp);
+            }
+            const aid = Math.max(0, sn.aid | 0);
+            if (sn.aid != null && aid !== (d.aid | 0)) up.aid = aid;
+            if (Object.keys(up).length) M().patchDoll(k, up, me);
+        });
+    } catch (e) { console.warn('[🐾] 기록 맞추기', e); }
+}
 function onRun(s) {
     const v = norm(s.val());
     S.run = v;
     if (!v) { endRun('gone'); return; }
+    syncRecs(v);
     // 기다리는 전투 화면에 판 지문을 넘긴다
     S.waiters = S.waiters.filter(function (w) {
         const F = v.fight;
@@ -383,6 +416,7 @@ function startFight(id) {
         applyLog: function (lg) { applyLog(id, lg); }
     }).then(function (res) {
         S.fightOn = null;
+        syncRecs(S.run);                                         // 전투가 끝났다 — 기록을 판의 사본에 맞춘다
         const r = res && res.res;
         const m = v && v.fight ? v.fight.m : null;
         try { window.DOLLSCENE.fightEnd(r, m); } catch (e) { }
@@ -418,6 +452,7 @@ function applyWin(id, grow, side) {
             const d = ds2[k]; if (!d) return;
             const b = 'members/' + S.code + '/dolls/' + k + '/';
             up[b + 'lv'] = Number(d.lv) || 1; up[b + 'xp'] = Number(d.xp) || 0;
+            up[b + 'hp'] = Math.max(0, Math.round(M().hpOf(d)));          // 레벨이 오르며 는 HP 도
             if (d.ev && typeof d.ev === 'object') up[b + 'ev'] = JSON.parse(JSON.stringify(d.ev));
             if (d.g) up[b + 'g'] = d.g;
         });
