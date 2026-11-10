@@ -117,9 +117,11 @@ window.darkAddState = function () {
         const w = function () {
             if (depth) return _g.apply(this, arguments);
             depth++;
+            // 안쪽(count-cap)이 0 에서 자르지 않게 — 기본 한도를 넘겨 쓴 만큼이 더 받은 수에서 빠져야 한다 (2026-11-10)
+            window.__darkRawDepth = (window.__darkRawDepth || 0) + 1;
             let n;
-            try { n = _g.apply(this, arguments); } finally { depth--; }
-            try { n = (Number(n) || 0) + (window.darkAddToday() || 0); } catch (e) { }
+            try { n = _g.apply(this, arguments); } finally { depth--; window.__darkRawDepth = Math.max(0, (window.__darkRawDepth || 1) - 1); }
+            try { n = Math.max(0, (Number(n) || 0) + (window.darkAddToday() || 0)); } catch (e) { n = Math.max(0, Number(n) || 0); }
             return n;
         };
         Object.keys(_g).forEach(function (k) { try { w[k] = _g[k]; } catch (e) { } });

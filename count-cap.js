@@ -182,6 +182,9 @@ window.capDarkOver = darkOver;
             const n = _g.apply(this, arguments);
             let over = 0;
             try { over = darkOver(); } catch (e) { }
+            // ★ dark-add.js 가 「더 받은 수」를 얹을 때는 0 에서 자르지 않은 값을 준다 (2026-11-10 —
+            //   여기서 0 으로 자르면, 밤샘 신청서로 더 받은 횟수를 써도 0 + 더 받은 수 로 그대로 남아 차감되지 않았다)
+            if (window.__darkRawDepth > 0) return n - over;
             return Math.max(0, n - over);
         };
         mine._capDark = true;
