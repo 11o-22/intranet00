@@ -689,8 +689,13 @@ async function bagMenu(opt) {
         if (B.kind === 'wild') h += '<button data-k="ribbon"' + ((n > 0 && (B.tut || catchLeft(u) > 0)) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (B.tut ? '' : (catchLeft(u) > 0 ? ' <small style="color:#524173">(오늘 포획 ' + catchN(u) + '/' + CATCH_MAX + ')</small>' : ' — 오늘은 더 잡을 수 없다 (' + CATCH_MAX + '마리)')) + '</button>';
         else if (B.kind === 'pvp') h += '<div class="lb">🎀 포옹 리본은 사원의 인형에게 쓸 수 없다</div>';
         else h += '<div class="lb">🎀 포옹 리본은 어둠에서 쓸 수 없다</div>';
-        if (items.length) h += '<div class="lb">🧷 아이템 — 쓰면 그 턴을 쓴다 (교체 다음 · 방어보다 먼저)</div>' + items.map(function (nm) { const it = I.get(nm); return '<button data-k="it:' + esc(nm) + '">' + esc(nm) + ' ×' + I.count(nm, u) + ' <small style="color:#524173;font-weight:normal">— ' + esc(it.d) + '</small></button>'; }).join('');
-        else h += '<div class="lb">🧷 봉제인형 아이템이 없다 — 도깨비 공방 잡화점에서 꿈결로 산다</div>';
+        // 🧷 펫 용품 — 분류별로 (HP 회복 · PP 회복 · 상태 치료 · 기절 회복 · 도핑 · 훈련 보조 · 2026-11-10 사용자)
+        if (items.length) h += '<div class="lb">🧷 펫 용품 — 쓰면 그 턴을 쓴다 (교체 다음 · 방어보다 먼저)</div>' + I.GROUPS.map(function (g) {
+            const gs = items.filter(function (nm) { return I.get(nm).g === g; });
+            if (!gs.length) return '';
+            return '<div class="lb" style="color:#7a4a6a;margin-top:6px">· ' + esc(I.G[g]) + '</div>' + gs.map(function (nm) { const it = I.get(nm); return '<button data-k="it:' + esc(nm) + '">' + esc(nm) + ' ×' + I.count(nm, u) + ' <small style="color:#524173;font-weight:normal">— ' + esc(it.d) + '</small></button>'; }).join('');
+        }).join('');
+        else h += '<div class="lb">🧷 펫 용품이 없다 — 도깨비 공방 잡화점에서 꿈결로 산다</div>';
         h += '<button data-k="back">돌아간다</button>';
         menuBox(h);
         B.ui.txt.textContent = '무엇을 쓸까?';

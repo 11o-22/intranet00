@@ -310,7 +310,55 @@ function confirm_(t) { try { if (typeof window.d2Confirm === 'function') return 
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 
-window.D2IT = { ITEMS: ITEMS, ORDER: ORDER, GROUPS: GROUPS, G: G, get: get, isItem: isItem, count: count, dream: dream, check: check, viewOfUnit: viewOfUnit, viewOfRec: viewOfRec, use: use, applyRec: applyRec, useOpen: useOpen, shopOpen: shopOpen, shopList: shopList, buy: buy, shut: shut };
+// ==========================================
+// 소지품 — 「🧸 펫 용품」 칸 · 안에서 분류별로 (2026-11-10 사용자 「펫 용품(전투 중 사용하는 용품) 카테고리별로 보일 수 있게」)
+//   invcat.js 의 칸 목록에 한 칸을 더하고(회복 다음), 그 칸 안에서 HP 회복 · PP 회복 · 상태 치료 · 기절 회복 · 도핑 · 훈련 보조 · 각인 차례로 작은 제목을 단다.
+// ==========================================
+function invItemG(n) { if (ITEMS[n]) return ITEMS[n].g; if (TR() && n === TR().ITEM) return 'eng'; return null; }
+(function invHook() {
+    const iv = setInterval(function () {
+        if (typeof INV_CATS === 'undefined' || typeof invCatOf !== 'function' || typeof applyInvCats !== 'function') return;
+        if (!INV_CATS.some(function (c) { return c.id === 'pet'; })) {
+            const at = INV_CATS.findIndex(function (c) { return c.id === 'heal'; });
+            INV_CATS.splice(at < 0 ? INV_CATS.length - 1 : at + 1, 0, { id: 'pet', name: '펫 용품', icon: '🧸', color: '#ffb3d1' });
+        }
+        if (!invCatOf._d2pet) {
+            const _c = invCatOf;
+            invCatOf = function (n) { if (invItemG(n)) return 'pet'; return _c.apply(this, arguments); };
+            invCatOf._d2pet = true;
+        }
+        if (!applyInvCats._d2pet) {
+            const _a = applyInvCats;
+            applyInvCats = function () { const r = _a.apply(this, arguments); try { invSubGroups(); } catch (e) { console.warn('[🧸] 펫 용품 분류', e); } return r; };
+            applyInvCats._d2pet = true;
+        }
+        clearInterval(iv);
+        try { if (typeof renderInventory === 'function' && document.getElementById('inventory-list-container')) renderInventory(); } catch (e) { }
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+function invSubGroups() {
+    const box = document.getElementById('inventory-list-container');
+    if (!box) return;
+    const cards = Array.from(box.querySelectorAll('.inv-card')).filter(function (el) { return invItemG(el.dataset.invName || ''); });
+    if (!cards.length) return;
+    const body = cards[0].parentNode;
+    if (!body || body.querySelector('.d2-inv-sub')) return;
+    const order = ORDER.concat(TR() ? [TR().ITEM] : []);
+    GROUPS.concat(['eng']).forEach(function (g) {
+        const list = cards.filter(function (el) { return invItemG(el.dataset.invName) === g; })
+            .sort(function (a, b) { return order.indexOf(a.dataset.invName) - order.indexOf(b.dataset.invName); });
+        if (!list.length) return;
+        const h = document.createElement('div');
+        h.className = 'd2-inv-sub';
+        h.style.cssText = 'font-size:10.5px; color:#ffb3d1; margin:8px 2px 4px; padding-bottom:2px; border-bottom:1px dashed rgba(255,179,209,.35);';
+        h.textContent = G[g] + ' · ' + list.length + '종';
+        body.appendChild(h);
+        list.forEach(function (el) { body.appendChild(el); });
+    });
+}
+
+window.D2IT = { invItemG: invItemG, ITEMS: ITEMS, ORDER: ORDER, GROUPS: GROUPS, G: G, get: get, isItem: isItem, count: count, dream: dream, check: check, viewOfUnit: viewOfUnit, viewOfRec: viewOfRec, use: use, applyRec: applyRec, useOpen: useOpen, shopOpen: shopOpen, shopList: shopList, buy: buy, shut: shut };
 window.d2ShopOpen = shopOpen;
 window.d2ItemUse = useOpen;
 window.d2Items = function () { console.log('%c===== 🧸 아이템 20 + 각인기 =====', 'color:#ffb74d; font-size:13px'); console.table(shopList().map(function (x) { return { 이름: x.n, 분류: G[x.g], 가격: x.p + ' D', 가진것: count(x.n), 설명: x.d.slice(0, 50) }; })); };
