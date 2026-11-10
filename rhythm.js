@@ -22,6 +22,8 @@
 //     · 터치         흰 건반 — 판정선에 닿을 때 그 자리를 누른다
 //     · 길게 누르기   흰 건반 + 띠 — 누른 채 끝까지 (손가락이 옆으로 조금 흘러도 된다) · 일찍 떼면 꼬리는 MISS
 //     · 슬라이드     노란 건반 — 손가락이 그 자리에 닿아 있거나 지나가면 된다 (누르지 않고 쓸어도 된다)
+//     · 지그재그     초록 건반 — 슬라이드와 같다 · 왼 · 오른 칸을 번갈아 (채보 종류 3 · 2026-11-11 사용자 「초록색 · 양손 지그재그도」)
+//                    양손 — 왼손 0 ↔ 2 칸 · 오른손 5 ↔ 3 칸을 거울처럼
 //   ■ 설정   속도 · 싱크 · 타격음 — 이 기기에 적어 둔다
 //   ★ 2026-11-11 사용자 「싱크가 아직도 좀 안 맞아」
 //     · 싱크를 둘로 나눴다 — **판정 싱크**(누른 때를 얼마나 당겨 보나) · **화면 싱크**(노트를 얼마나 일찍 그리나)
@@ -406,7 +408,7 @@ function menu() {
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div style="font-size:12px;color:#aab;">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
+        + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) · 초록 건반 지그재그(좌우로 쓸기 · 양손도) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
         + '<div style="display:flex;gap:10px;align-items:center;"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn" data-k="rank">🏆 랭킹</button></div>'
         + '</div></div></div>'
         + (rot ? '<div class="rg-rot">휴대폰을 가로로 눕혀서 하면 편합니다</div>' : '');
@@ -479,7 +481,8 @@ function start() {
 function begin(s, d, buf, chart) {
     const c = chart.charts[d];
     const notes = c.notes.map(function (n, i) {
-        return { i: i, t: n[0], lane: n[1], x: xOfLane(n[1]), w: NOTE_W[n[2]] || 0.15, k: n[2], len: n[2] === 1 ? n[3] : 0, ch: n[2] === 2 ? n[3] : 0,
+        const k = n[2] === 3 ? 2 : n[2];               // 지그재그(3)는 슬라이드처럼 판정 — 초록으로만 그린다
+        return { i: i, t: n[0], lane: n[1], x: xOfLane(n[1]), w: NOTE_W[k] || 0.15, k: k, z: n[2] === 3, len: k === 1 ? n[3] : 0, ch: k === 2 ? n[3] : 0,
                  done: false, j: null, hold: null, tail: null };
     });
     // 슬라이드 줄 — 같은 번호끼리 차례대로 (희미한 줄로 잇는다)
@@ -858,15 +861,16 @@ function rr(g, x, y, w, h, r) {
 function key(g, cx, cy, w, h, kind, glow) {
     const x = cx - w / 2, y = cy - h / 2;
     g.save();
-    g.shadowColor = kind === 2 ? 'rgba(255,214,90,0.7)' : 'rgba(210,230,255,0.55)';
+    g.shadowColor = kind === 3 ? 'rgba(110,240,150,0.7)' : kind === 2 ? 'rgba(255,214,90,0.7)' : 'rgba(210,230,255,0.55)';
     g.shadowBlur = glow ? 18 : 8;
     const gr = g.createLinearGradient(0, y, 0, y + h);
-    if (kind === 2) { gr.addColorStop(0, '#fff3b8'); gr.addColorStop(0.55, '#ffd34d'); gr.addColorStop(1, '#d99a12'); }
+    if (kind === 3) { gr.addColorStop(0, '#dcffe6'); gr.addColorStop(0.55, '#5fe08a'); gr.addColorStop(1, '#1f9e52'); }
+    else if (kind === 2) { gr.addColorStop(0, '#fff3b8'); gr.addColorStop(0.55, '#ffd34d'); gr.addColorStop(1, '#d99a12'); }
     else { gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.6, '#eef1f8'); gr.addColorStop(1, '#b8c2d6'); }
     g.fillStyle = gr;
     rr(g, x, y, w, h, Math.min(5, h * 0.3)); g.fill();
     g.shadowBlur = 0;
-    g.strokeStyle = kind === 2 ? 'rgba(120,80,0,0.55)' : 'rgba(40,50,80,0.55)'; g.lineWidth = 1.2; g.stroke();
+    g.strokeStyle = kind === 3 ? 'rgba(0,80,30,0.55)' : kind === 2 ? 'rgba(120,80,0,0.55)' : 'rgba(40,50,80,0.55)'; g.lineWidth = 1.2; g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x + 3, y + 2, w - 6, Math.max(1, h * 0.14));
     g.restore();
 }
@@ -918,7 +922,7 @@ function draw(now) {
     // 슬라이드 줄 — 희미하게
     Object.keys(P.chains).forEach(function (c) {
         const ch = P.chains[c]; if (ch.length < 2) return;
-        g.strokeStyle = 'rgba(255,214,90,0.38)'; g.lineWidth = 3; g.lineCap = 'round';                // 지그재그도 이 줄로 보인다
+        g.strokeStyle = ch[0].z ? 'rgba(110,240,150,0.45)' : 'rgba(255,214,90,0.38)'; g.lineWidth = 3; g.lineCap = 'round';     // 지그재그는 초록 줄
         g.beginPath(); let st = false;
         for (let i = 0; i < ch.length; i++) {
             const n = ch[i]; const p = pOf(n.t); if (p < 0) break; if (n.done && i < ch.length - 1 && ch[i + 1].done) continue;
@@ -959,7 +963,7 @@ function draw(now) {
         }
         if (n.done || p < 0 || p > 1.25) continue;
         const sc = scaleAt(p);
-        key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc * (n.k === 2 ? 0.8 : 1), n.k, false);
+        key(g, xAt(n.x, sc), yAt(sc), n.w * L.lineW * sc, L.nh * sc * (n.k === 2 ? 0.8 : 1), n.z ? 3 : n.k, false);
     }
     // 맞힌 자리 — 번쩍 · 부서지는 빛
     P.fx.forEach(function (f) {

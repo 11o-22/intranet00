@@ -16,6 +16,10 @@
 #          · 노말 1.05 → 1.5 · 하드 1.9 → 2.7 (한 박에)
 #          · 지그재그 — 새로 울린 음의 높이(배음 합)가 낮 · 높 · 낮 · 높 … 으로 여섯 번 넘게 이어지는 곳 (8분 · 하드는 16분도)
 #            → 노란 슬라이드가 왼 · 오른 칸을 번갈아 (낮은 음 왼쪽 · 높은 음 오른쪽) · 그 사이 다른 노트는 비운다
+#        ★ 2026-11-11 사용자 「지그재그는 초록색 · 양손으로 지그재그 하는 파트도」
+#          · 지그재그는 종류 3 (초록 슬라이드) — 게임에서는 슬라이드와 똑같이 판정한다
+#          · 양손 — 8분 지그재그 가운데 소리가 큰 쪽 몇 줄 (넷에 하나 반쯤 · 적어도 하나)
+#            왼손 0 ↔ 2 칸 · 오른손 5 ↔ 3 칸 — 거울처럼 (낮은 음에 벌리고 · 높은 음에 모은다)
 #   5. 6칸에 놓는다 — 높낮이를 칸으로 (낮은 소리 왼쪽 · 높은 소리 오른쪽) · 같은 칸 연타 · 무리한 뜀은 고친다
 #
 #   노트 한 줄 = [시각(ms), 칸(0~5), 종류, 덧값]
@@ -495,15 +499,32 @@ def main():
                 if used_until.get(ln2, -1) < i:
                     notes.append([int(round(grid[i] * 1000)), ln2, 0, 0])
         # 지그재그 — 낮은 음 왼쪽 · 높은 음 오른쪽 칸을 번갈아 (곡의 그 자리 높이로 왼 · 가운데 · 오른 쪽)
-        for r, amp in zigs:
+        #   양손 — 8분 지그재그 가운데 소리가 큰 줄 (40 % · 적어도 하나)
+        two = set()
+        z8 = [zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2]
+        if z8:
+            z8.sort(key=lambda zi: -float(R[zigs[zi][0]].mean()))
+            two = set(z8[:max(1, int(math.ceil(len(z8) * 0.4)))])
+        for zi, (r, amp) in enumerate(zigs):
+            first_low = PIT[r[1]] > PIT[r[0]]           # 처음이 오르면 처음 음은 낮은 쪽
+            if zi in two:
+                chain += 1
+                cl = chain
+                chain += 1
+                cr = chain
+                for q, i in enumerate(r):
+                    low = (q % 2 == 0) == first_low
+                    t = int(round(grid[i] * 1000))
+                    notes.append([t, 0 if low else 2, 3, cl])
+                    notes.append([t, 5 if low else 3, 3, cr])
+                continue
             chain += 1
             centre = int(np.clip(np.searchsorted(qs, float(np.median(C[r]))), 0, 5))
             lo = int(np.clip(centre - amp // 2, 0, 5 - amp))
             hi = lo + amp
-            first_low = PIT[r[1]] > PIT[r[0]]           # 처음이 오르면 처음 음은 낮은 쪽
             for q, i in enumerate(r):
                 low = (q % 2 == 0) == first_low
-                notes.append([int(round(grid[i] * 1000)), lo if low else hi, 2, chain])
+                notes.append([int(round(grid[i] * 1000)), lo if low else hi, 3, chain])
         # 길게 누르는 칸에 걸친 다른 노트는 치운다 (같은 칸)
         notes.sort(key=lambda n: (n[0], n[1]))
         clean = []
@@ -533,12 +554,12 @@ def main():
                 continue
             out.append(n)
         nps = len(out) / max(1, (last_ok - first_ok))
-        kinds = {0: 0, 1: 0, 2: 0}
+        kinds = {0: 0, 1: 0, 2: 0, 3: 0}
         for n in out:
             kinds[n[2]] += 1
-        level = int(round(min(15, max(1, 1.2 + nps * 2.0 + kinds[1] / max(1, len(out)) * 3 + kinds[2] / max(1, len(out)) * 4))))
+        level = int(round(min(15, max(1, 1.2 + nps * 2.0 + kinds[1] / max(1, len(out)) * 3 + (kinds[2] + kinds[3]) / max(1, len(out)) * 4))))
         charts[diff] = {'level': level, 'count': len(out), 'nps': round(nps, 2), 'kinds': kinds, 'notes': out}
-        print(diff, 'notes', len(out), 'nps %.2f' % nps, 'level', level, kinds, 'zigzag', [('%.1fs' % grid[r[0]], len(r), r[1] - r[0]) for r, a in zigs])
+        print(diff, 'notes', len(out), 'nps %.2f' % nps, 'level', level, kinds, 'zigzag', [('%.1fs' % grid[r[0]], len(r), r[1] - r[0], '양손' if zi in two else '') for zi, (r, a) in enumerate(zigs)])
 
     bars = [int(round(grid[i] * 1000)) for i in range(K) if pos[i] == 0]
     bpms = sorted(set(int(round(60 / (per_curve(t) * 4))) for t in np.arange(1, dur, 5)))
