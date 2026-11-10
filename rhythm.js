@@ -431,8 +431,9 @@ function menu() {
 // 🏆 랭킹 — 지금 곡 · 난이도 (위 칸으로 난이도를 바꾼다)
 function rankModal(d) {
     const s = song();
-    const old = UI.querySelector('.rg-modal'); if (old) old.remove();
-    const m = document.createElement('div'); m.className = 'rg-modal';
+    // ★ 랭킹 창만 걷는다 — 결과 화면도 .rg-modal 이라, 전에는 랭킹을 열면 결과가 지워져 닫으면 까만 화면만 남았다 (2026-11-11 사용자)
+    const old = UI.querySelector('.rg-rkmodal'); if (old) old.remove();
+    const m = document.createElement('div'); m.className = 'rg-modal rg-rkmodal';
     const tabs = DIFFS.map(function (x) { return '<button class="rg-btn rg-tab' + (x[0] === d ? ' on' : '') + '" data-d="' + x[0] + '" style="--c:' + x[3] + '">' + x[1] + '</button>'; }).join('');
     m.innerHTML = '<div class="rg-box rg-rkbox"><div style="display:flex;align-items:center;gap:8px;width:100%;"><b style="flex:1;">🏆 ' + esc(s.title) + '</b><button class="rg-btn" data-k="c" style="padding:5px 10px;">✕</button></div>'
         + '<div style="display:flex;gap:6px;">' + tabs + '</div><div class="rg-rklist">불러오는 중…</div></div>';
