@@ -8,6 +8,9 @@
 //     2026-10-31 사용자 「이벤트 샵 바로 넣어 줘」 — 값이 없으면 **열려 있다** (false 로 적어야 닫힌다).
 //     (예전 열쇠 wonderEvent/on 은 시험하며 false 가 남았을 수 있어 쓰지 않는다)
 //     꺼져 있어도 관리자에게는 ??? 샵 위에 미리보기로 보인다.
+//   ★ 2026-11-10 사용자 「이벤트 숍 치우고 이전의 ??? 상점으로 돌리자」 — 닫는다 (CLOSED).
+//     서버 열쇠(wonderEvent/shop)와 상관없이 ??? 샵이 그대로 나오고, 관리자 미리보기도 뺐다.
+//     이미 가진 물건은 그대로 — 챕터 · 연계판에서 쓰는 것(WONDER.has / spend)은 안 건드린다.
 //   · 진열당 항목마다 5개까지 (??? 샵과 같은 진열 시간표).
 //   · 값은 전부 100 ~ 200 P (2026-10-31 사용자 — 예전 900 ~ 2,200 P 를 같은 차례로 줄였다).
 //   · 물건은 적힌 챕터와 그 챕터의 연계판 안에서만 쓴다. 들어갈 때 반입해서 🎒 로 쓰거나,
@@ -88,7 +91,8 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 // ==========================================
 // 켜짐
 // ==========================================
-let ON = true;
+const CLOSED = true;          // ★ 2026-11-10 이벤트 샵 닫음 — ??? 상점으로 돌린다
+let ON = !CLOSED;
 X.shopOn = function () { return ON; };
 (function listen() {
     const iv = setInterval(function () {
@@ -98,7 +102,7 @@ X.shopOn = function () { return ON; };
         try {
             d.ref('wonderEvent/shop').on('value', function (s) {
                 const was = ON;
-                ON = s.val() !== false;
+                ON = !CLOSED && s.val() !== false;
                 if (was !== ON) repaint();
             });
         } catch (e) { }
@@ -167,7 +171,7 @@ window.buyWonderItem = function (name) {
     const u = me();
     const ch = OF[name];
     if (!u || !ch) return;
-    if (!ON && !isAdmin()) { alertMsg('지금은 열려 있지 않습니다.'); return; }
+    if (CLOSED || (!ON && !isAdmin())) { alertMsg('지금은 열려 있지 않습니다.'); return; }
     try { if (typeof buyGuard === 'function' && !buyGuard()) return; } catch (e) { }
     const it = ITEM_CATALOG[name];
     const rec = recOf();
@@ -188,7 +192,7 @@ window.buyWonderItem = function (name) {
 window.wonderBuyTheme = function (ch) {
     const u = me();
     if (!u || !LIST[ch]) return;
-    if (!ON && !isAdmin()) { alertMsg('지금은 열려 있지 않습니다.'); return; }
+    if (CLOSED || (!ON && !isAdmin())) { alertMsg('지금은 열려 있지 않습니다.'); return; }
     const rec = recOf();
     const calls = LIST[ch].filter(function (r) { return isAdmin() || (rec[r[0]] || 0) < CAP; })
         .map(function (r) { return { fn: 'buyWonderItem', args: [r[0]], name: r[0] }; });
@@ -218,7 +222,7 @@ function repaint() {
             const box = document.getElementById('qshop-body');
             if (box && me() && ON) { box.innerHTML = shopHtml(false); return; }
             const out = _r.apply(this, arguments);
-            if (box && me() && isAdmin()) {
+            if (box && me() && isAdmin() && !CLOSED) {
                 try { box.insertAdjacentHTML('afterbegin', '<div style="border:1px dashed #5a4a2a; border-radius:6px; padding:0 8px 10px 8px; margin-bottom:16px;">' + shopHtml(true) + '</div>'); } catch (e) { }
             }
             return out;

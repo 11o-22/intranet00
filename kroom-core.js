@@ -601,7 +601,13 @@ function profOf(k, u, a) {
 function nextAttr(k, u) {
     const open = openList(k, u);
     // 🔥 재난의 길을 걷는 사원은 전용 장비에 없는 속성도 연다 — 열 가지 전부 (2026-10-30)
-    const pool = onPath(k) ? Object.keys(ATTR) : heldAttrs(u);
+    let pool = onPath(k) ? Object.keys(ATTR) : heldAttrs(u);
+    // 🌀 교란자의 길 — 전용 장비에 없는 속성을 셋까지 더 연다 (2026-11-10 「추가로 3 개 속성을 더 100레벨로」)
+    if (!onPath(k) && onJam(k)) {
+        const held = heldAttrs(u);
+        const extra = open.filter(function (a) { return held.indexOf(a) < 0; }).length;
+        pool = extra >= JAM_MORE ? held : held.concat(Object.keys(ATTR).filter(function (a) { return held.indexOf(a) < 0; }));
+    }
     return pool.filter(function (a) { return open.indexOf(a) < 0; })[0] || null;
 }
 function canOpenAttr(k, u) {
@@ -679,7 +685,7 @@ function attrAsk() {
     const a = nextAttr(k, u), c = curAttr(k, u);
     show('속성', `탁자 너머에 문이 하나 더 있다. 아까까지는 벽이었다.<br><br>
         ${ATTR[c] ? ATTR[c].i + ' ' + ATTR[c].n + '은(는) 끝까지 걸었다. ' : ''}문틈으로 다른 결이 새어 든다.<br>
-        <b style="color:#fff;">${ATTR[a].i} ${ATTR[a].n}</b> <span style="font-size:11px; color:#888;">— ${heldAttrs(u).indexOf(a) >= 0 ? '전용 장비 ' + nthOf(u, a) + ' 속성' : '🔥 재난의 길 — 전용 장비에 없는 속성'}</span><br><br>
+        <b style="color:#fff;">${ATTR[a].i} ${ATTR[a].n}</b> <span style="font-size:11px; color:#888;">— ${heldAttrs(u).indexOf(a) >= 0 ? '전용 장비 ' + nthOf(u, a) + ' 속성' : ((onJam(k) && !onPath(k)) ? '🌀 교란자의 길' : '🔥 재난의 길') + ' — 전용 장비에 없는 속성'}</span><br><br>
         <span style="font-size:11px; color:#8fb8c4; line-height:1.8;">열면 그 속성의 직업 카드를 새로 고르고 <b>D · Lv 1</b> 부터 시작합니다.<br>
         지금까지 키운 속성은 그대로 남아, 다음부터 문 앞에서 골라 들어갈 수 있습니다.</span>`,
         darkChoiceBtn('문을 연다. — ' + ATTR[a].i + ' ' + ATTR[a].n + ' D · Lv 1', 'kroomAttrOpen()')
@@ -734,7 +740,7 @@ window.kroomAttrPick = function (a) {
 function mainSwap(k, u) {
     const m = mainAttr(u);
     if (!m || !k) return null;
-    if (onPath(k)) return null;                           // 🔥 재난의 길 — 장비의 첫 속성에 매이지 않는다 (2026-10-30)
+    if (onPath(k) || onJam(k)) return null;               // 🔥 재난의 길 · 🌀 교란자의 길 — 장비의 첫 속성에 매이지 않는다 (장비 밖 속성을 「사라진 옛 속성」으로 보지 않게)
     const open = openList(k, u);
     if (open.indexOf(m) >= 0) return null;                // 새 첫 속성의 자리가 이미 있다
     const held = heldAttrs(u);
@@ -804,7 +810,7 @@ function afterMain() {
         // 🔥 재난의 길 — 상담사가 지정했으면 붉은 카드 (2026-10-30). 들어서면 문(속성)을 다시 묻는다 — 바로 새 속성을 열 수 있게
         if (pathOffered()) { pathPopup(function (went) { if (went) attrGate(goOn); else goOn(); }); return; }
         // 🌀 교란자의 길 — 상담사가 지정했으면 파란 카드 (2026-11-10)
-        if (jamOffered()) { jamPopup(function () { goOn(); }); return; }
+        if (jamOffered()) { jamPopup(function (went) { if (went) attrGate(goOn); else goOn(); }); return; }
         if (hiddenOffered()) { hiddenPopup(goOn); return; }
         goOn();
     });
@@ -3695,12 +3701,18 @@ function hLive(c) {
     return (k && typeof k === 'object' && !stale(k) && k.job && JOBS[k.job]) ? k : null;
 }
 // ★ 같은 히든 직업을 누가 이미 받았나 (2026-10-30 사용자 — 히든 직업마다 한 사람) · 받은 사람 이름, 없으면 ''
+// ★ 지워진 사원(users/<사번> 이 없음)이 받았던 히든 직업은 주인으로 치지 않는다 — 다시 뽑힌다 (2026-11-10 사용자 「히든 은신은 삭제된 유저 데이터라 다시 뽑아야」)
+function userGone(c) {
+    const book = (typeof db !== 'undefined' && db && db.users) || null;
+    if (!book || Object.keys(book).length < 2) return false;          // 사원 목록이 아직 안 왔다
+    return !book[c];
+}
 function hiddenTakenBy(key, exceptCode, book_) {
     const all = book_ || hAll || {};
     if (!key) return '';
     const c = Object.keys(all).filter(function (x) {
         const w = all[x] || {};
-        return x !== exceptCode && w.key === key && (w.state === 'accepted' || w.state === 'L');
+        return x !== exceptCode && w.key === key && (w.state === 'accepted' || w.state === 'L') && !userGone(x);
     })[0];
     return c ? ((all[c] || {}).name || c) : '';
 }
@@ -4102,7 +4114,7 @@ function pathLvs(k, u) {
 // 히든 직업을 받았나 — K 의 방 기록(지금 · 접어 둔 속성) 과 kroomHidden 둘 다 본다
 function pathHadHidden(k, h) { return hadHidden(k) || !!(h && (h.state === 'accepted' || h.state === 'L')); }
 function pathEligible(k, u, h) {
-    if (!k || typeof k !== 'object' || stale(k) || onPath(k)) return false;
+    if (!k || typeof k !== 'object' || stale(k) || onPath(k) || onJam(k)) return false;     // 🌀 교란자는 재난의 길에 안 오른다 (2026-11-10)
     if (pathHadHidden(k, h)) return false;
     return pathFull(k, u).length >= PATH_NEED;
 }
@@ -4136,7 +4148,7 @@ setInterval(function () { try { if (me() && !kr) pathCheck(); } catch (e) { } },
 
 function pathOffered() {
     const k = prof();
-    return !!(pMine && pMine.state === 'offered' && k && !onPath(k) && !pathHadHidden(k, hMine));
+    return !!(pMine && pMine.state === 'offered' && k && !onPath(k) && !onJam(k) && !pathHadHidden(k, hMine));
 }
 
 // 붉은 카드 — 『 재난의 길로 들어서겠습니까? 』
@@ -4404,15 +4416,17 @@ window.kroomPathState = function () {
 };
 
 // ==========================================
-// 12. 🌀 교란자의 길 — 재난의 길을 두 번째로 끝까지 걸은 사원에게 (2026-11-10 사용자)
+// 12. 🌀 교란자의 길 — 재난의 길 조건을 (두 번째로) 채운 다른 사원에게 (2026-11-10 사용자)
 // ==========================================
 //   「재앙의 길 두번째 달성한 사람한테는 교란자의 길을 줄 수 있게 해줘. 카드는 파란색으로.」
-//   ■ 조건 — 🔥 재난의 길에 들어선 뒤, 들어설 때의 세 속성(k.path.attrs) 말고 **세 속성을 더** 최고 Lv (Lv 100).
-//            (콘솔로 걷게 한 사람처럼 attrs 가 없으면 최고 Lv 속성이 여섯 이상)
-//            히든 직업을 받은 사원은 오르지 않는다. 한 사람에 한 번.
+//   「재앙의 길에 들어선 사람은 교란의 길에 못 뜨게 해줘. 다른 사람이 떠야 해.」
+//   ■ 조건 — 재난의 길과 같은 조건(열린 속성 셋이 최고 Lv)을 채웠고, 🔥 재난의 길에 들어서지 않은 사원.
+//            히든 직업을 받은 사원은 오르지 않는다. 한 사람에 한 번. (교란자는 재난의 길 목록에도 안 오른다)
 //   ■ 흐름 — 재난의 길과 같다. 조건을 채우면 상담사에게 알림 (통제 콘솔 「교란자의 길 관리」) → 지정하면
 //            다음에 K 의 방에 들어설 때 파란 카드 『 교란자의 길로 들어서겠습니까? 』 → 들어선다 / 거절한다.
-//   ■ 들어서면 — kroom.jam = { at, by, attrs } 를 적는다. 효과는 사용자가 나중에 정한다 (지금은 기록만).
+//   ■ 들어서면 — kroom.jam = { at, by, attrs(그때 최고 Lv 이던 속성) }.
+//            「교란자는 추가로 3 개 속성을 더 100레벨로 올릴 수 있고」 — 전용 장비에 없는 속성을 셋까지 더 연다 (nextAttr).
+//            그 셋을 모두 최고 Lv 로 올리면 부가 특성 「교란」 (아래).
 //   kroomPath2/<사번> = { state, code, name, no, lvs, at, offeredAt, offeredBy, answeredAt }  (state 는 재난의 길과 같다)
 const J_NODE = 'kroomPath2';
 const JAM_MORE = 3;
@@ -4420,16 +4434,17 @@ const JAM_NAME = '교란자의 길';
 let jMine = null, jMineRef = null, jMineCode = '';
 let jAll = {}, jAllOn = false, jSwept = false;
 function onJam(k) { return !!(k && typeof k === 'object' && k.jam && k.jam.at); }
-// 재난의 길에 들어선 뒤 새로 끝까지 걸은 속성
-function jamFull(k, u) {
-    const was = (k && k.path && Array.isArray(k.path.attrs)) ? k.path.attrs : null;
-    const full = pathFull(k, u);
-    return was ? full.filter(function (a) { return was.indexOf(a) < 0; }) : full.slice(PATH_NEED);
-}
+// 끝까지 걸은 속성 (재난의 길 조건과 같은 셈)
+function jamFull(k, u) { return pathFull(k, u); }
 function jamEligible(k, u, h) {
-    if (!k || typeof k !== 'object' || stale(k) || !onPath(k) || onJam(k)) return false;
+    if (!k || typeof k !== 'object' || stale(k) || onPath(k) || onJam(k)) return false;
     if (pathHadHidden(k, h)) return false;
-    return jamFull(k, u).length >= JAM_MORE;
+    return pathFull(k, u).length >= PATH_NEED;
+}
+// 교란자가 전용 장비 밖에서 더 연 속성 — 셋까지
+function jamExtra(k, u) {
+    const held = heldAttrs(u);
+    return openList(k, u).filter(function (a) { return held.indexOf(a) < 0; });
 }
 window.kroomOnJam = function (u) { return onJam(prof(u || me())); };
 
@@ -4454,14 +4469,14 @@ function jamCheck() {
     saveProf();
     const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), lvs: pathLvs(k, u), at: now() };
     d.ref(J_NODE + '/' + u.code).transaction(function (cur) { return (cur && cur.state) ? undefined : entry; }).catch(function () { });
-    addHistoryLog(u, '[K 의 방] 불길 너머에서 세 갈래를 더 걸었다. 발밑이 차갑다.');
+    addHistoryLog(u, '[K 의 방] 세 갈래 끝에서 길이 흔들린다. 발밑이 차갑다.');
     try { saveFields({ history: 1 }); } catch (e) { }
 }
 setInterval(function () { try { if (me() && !kr) jamCheck(); } catch (e) { } }, 20000);
 
 function jamOffered() {
     const k = prof();
-    return !!(jMine && jMine.state === 'offered' && k && onPath(k) && !onJam(k) && !pathHadHidden(k, hMine));
+    return !!(jMine && jMine.state === 'offered' && k && !onPath(k) && !onJam(k) && !pathHadHidden(k, hMine));
 }
 
 // 파란 카드 — 『 교란자의 길로 들어서겠습니까? 』
@@ -4531,7 +4546,8 @@ function jamPopup(cont) {
         + '<div class="kjam-at">' + more.map(function (a) { return ATTR[a] ? ATTR[a].i : ''; }).join(' ') + '</div></div>'
         + '<div class="kjam-q">『 ' + esc(JAM_NAME) + '로 들어서겠습니까? 』</div>'
         + '<div class="kjam-note">' + (more.length ? more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' — ' : '')
-        + '불길 너머에서 세 갈래를 더 끝까지 걸었다.<br>'
+        + '세 갈래를 끝까지 걸었다.<br>'
+        + '들어서면 전용 장비에 없는 속성 셋을 더 Lv ' + LV_MAX + ' 까지 걸을 수 있다.<br>'
         + '한 번 들어서면 돌아오지 않는다.</div>'
         + '<div class="kjam-btns"><button class="kjam-no">거절한다</button><button class="kjam-yes">들어선다</button></div>';
     document.body.appendChild(ov);
@@ -4540,16 +4556,16 @@ function jamPopup(cont) {
     ov.querySelector('.kjam-yes').onclick = function () {
         if (done) return; done = true;
         if (!cont) { ov.remove(); return; }                   // 상담사 미리 보기 — 아무것도 바꾸지 않는다
-        k.jam = { at: now(), by: (jMine && jMine.offeredBy) || null, attrs: more.slice(0, JAM_MORE) };   // 이 셋 말고 셋을 더 걸으면 부가 특성 「교란」
+        k.jam = { at: now(), by: (jMine && jMine.offeredBy) || null, attrs: more.slice() };   // 그때 끝까지 걸은 속성 — 이것 말고 셋을 더 걸으면 부가 특성 「교란」
         saveProf();
-        addHistoryLog(u, '[K 의 방] 🌀 ' + JAM_NAME + '로 들어섰다 — ' + more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' 을(를) 더 끝까지 걷고.');
+        addHistoryLog(u, '[K 의 방] 🌀 ' + JAM_NAME + '로 들어섰다 — ' + more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' 을(를) 끝까지 걷고.');
         try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
         try { db_().ref(J_NODE + '/' + u.code).update({ state: 'accepted', answeredAt: now(), lvs: pathLvs(k, u) }); } catch (e) { }
         if (jMine) jMine.state = 'accepted';
         if (darkRun && darkRun.isParty) { try { sendPartyChat(u.name + ' 사원이 ' + JAM_NAME + '로 들어섰습니다.', true); } catch (e) { } }
         ov.classList.add('done');
         ov.querySelector('.kjam-q').innerHTML = '🌀 ' + esc(JAM_NAME) + ' 🌀';
-        ov.querySelector('.kjam-note').innerHTML = '불이 꺼진 자리에 물결이 인다.';
+        ov.querySelector('.kjam-note').innerHTML = '길 밖의 세 갈래가 열린다.';
         ov.querySelector('.kjam-btns').remove();
         close(true);
     };
@@ -4621,7 +4637,7 @@ setInterval(function () {
         });
         if (news.length) {
             jSeenPut(seen);
-            try { showCustomAlert('🌀 ' + JAM_NAME + '\n\n' + news.map(function (v) { return '🌀 ' + v.name + ' 사원' + (v.no ? ' (' + v.no + ')' : '') + ' — 재난의 길에서 세 속성 더 최고 Lv'; }).join('\n') + '\n\n통제 콘솔 「' + JAM_NAME + ' 관리」에서 정할 수 있습니다.'); } catch (e) { }
+            try { showCustomAlert('🌀 ' + JAM_NAME + '\n\n' + news.map(function (v) { return '🌀 ' + v.name + ' 사원' + (v.no ? ' (' + v.no + ')' : '') + ' — 세 속성 최고 Lv (재난의 길 아님)'; }).join('\n') + '\n\n통제 콘솔 「' + JAM_NAME + ' 관리」에서 정할 수 있습니다.'); } catch (e) { }
         }
         const wait = Object.keys(jAll).filter(function (c) { return (jAll[c] || {}).state === 'ready' && jMeets(c, jAll[c]); }).length;
         const btn = document.getElementById('btn-admin-console');
@@ -4659,7 +4675,7 @@ function jamPaint() {
             + '<span style="font-size:10px; color:#888;">' + esc(v.no || c) + '</span>'
             + '<span style="margin-left:auto; font-size:10px; color:' + st[1] + ';">' + esc(st[0]) + '</span></div>'
             + '<div style="font-size:11px; color:#a8ccff; margin-top:5px;">' + Object.keys(lvs).map(function (a) { return (ATTR[a] ? ATTR[a].i + ' ' + ATTR[a].n : a) + ' Lv ' + lvs[a]; }).join(' · ') + '</div>'
-            + ((v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && !jMeets(c, v) ? '<div style="font-size:10px; color:#ff8a80; margin-top:4px;">지금은 조건(재난의 길 · 세 속성 더 최고 Lv · 히든 직업 없음)에 맞지 않습니다.</div>' : '')
+            +             ((v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && !jMeets(c, v) ? '<div style="font-size:10px; color:#ff8a80; margin-top:4px;">지금은 조건(세 속성 최고 Lv · 재난의 길 아님 · 히든 직업 없음)에 맞지 않습니다.</div>' : '')
             + (btns ? '<div style="display:flex; gap:6px; margin-top:8px;">' + btns + '</div>' : '')
             + '</div>';
     }).join('');
@@ -4669,7 +4685,7 @@ window.kroomJamAct = function (code, act) {
     if (!u || u.code !== ADMIN || !d) return;
     const v = jAll[code]; if (!v) return;
     if (act === 'offer' && !jMeets(code, v)) {
-        try { showCustomAlert((v.name || code) + ' 사원은 지금 조건에 맞지 않습니다.\n\n재난의 길에 들어선 뒤 세 속성을 더 최고 Lv 로 올렸고, 히든 직업을 받지 않은 사원에게만 줄 수 있습니다.'); } catch (e) { }
+        try { showCustomAlert((v.name || code) + ' 사원은 지금 조건에 맞지 않습니다.\n\n세 속성을 최고 Lv 로 올렸고, 재난의 길에 들어서지 않았고, 히든 직업을 받지 않은 사원에게만 줄 수 있습니다.'); } catch (e) { }
         return;
     }
     let up = null;
@@ -4692,8 +4708,8 @@ window.kroomJamAct = function (code, act) {
         const html = '<div class="admin-panel-box" id="admin-jam-box" style="border-color:#2a62c0; background-color:#060e1a;">'
             + '<h4 style="color:#7ab8ff;">🌀 ' + JAM_NAME + ' 관리 (K 의 방)</h4>'
             + '<div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.6;">'
-            + '조건 — 🔥 재난의 길에 들어선 뒤, 들어설 때의 세 속성 말고 세 속성을 더 최고 Lv (Lv ' + LV_MAX + ') 까지 올린 사원. 히든 직업을 받은 사원은 오르지 않습니다.<br>'
-            + '지정하면 그 사원이 K 의 방에 들어설 때 파란 카드 『 ' + JAM_NAME + '로 들어서겠습니까? 』 가 뜹니다. 한 사람에 한 번. (들어선 뒤의 효과는 아직 없습니다 — 기록만)'
+            + '조건 — 재난의 길과 같이 세 속성을 최고 Lv (Lv ' + LV_MAX + ') 까지 올렸고, 🔥 재난의 길에 들어서지 않은 사원. 히든 직업을 받은 사원은 오르지 않습니다.<br>'
+            + '지정하면 그 사원이 K 의 방에 들어설 때 파란 카드 『 ' + JAM_NAME + '로 들어서겠습니까? 』 가 뜹니다. 들어서면 전용 장비에 없는 속성 셋을 더 Lv ' + LV_MAX + ' 까지 올릴 수 있습니다. 한 사람에 한 번.'
             + '</div><div id="admin-jam-list"></div>'
             + '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:7px; font-size:10px;" onclick="kroomJamPreview()">카드 모양 보기</button></div>';
         if (anchor && (anchor.id === 'admin-path-box' || anchor.id === 'admin-hidden-box')) anchor.insertAdjacentHTML('afterend', html);
@@ -4719,7 +4735,7 @@ window.kroomJamState = function () {
     const u = me(), k = prof(u); if (!k) return;
     console.log('%c===== 🌀 ' + JAM_NAME + ' =====', 'color:#7ab8ff; font-size:13px');
     console.log('  재난의 길: ' + (onPath(k) ? '걷는 중' : '아니오') + ' · 교란자의 길: ' + (onJam(k) ? '들어섬 (' + new Date(k.jam.at).toLocaleString() + ')' : '아니오')
-        + ' · 더 걸은 속성 ' + jamFull(k, u).length + ' / ' + JAM_MORE + ' · 서버 상태 ' + ((jMine && jMine.state) || '없음'));
+        + ' · 최고 Lv 속성 ' + jamFull(k, u).length + ' · 장비 밖 속성 ' + jamExtra(k, u).length + ' / ' + JAM_MORE + ' · 서버 상태 ' + ((jMine && jMine.state) || '없음'));
     if (onJam(k)) console.log('  부가 특성 「교란」: ' + (k.jamTrait && k.jamTrait.at ? '있음' : '없음 — 세 속성 더 ' + jamMore(k, u).length + ' / ' + JAM_MORE));
 };
 
@@ -4728,8 +4744,8 @@ window.kroomJamState = function () {
 // ------------------------------------------
 //   「교란자는 추가로 3 개 속성을 더 100레벨로 올릴 수 있고 다 올린 후에 부가 특성 '교란'을 줘.
 //    교란 - 같이 동행하는 이들의 선택지를 교란시킨다. (커스텀 장비 효과도 교란.) 이 부가 특성은 받은 본인만 알 수 있게.」
-//   ■ 얻기 — 교란자의 길에 들어설 때 더 걸었던 세 속성(k.jam.attrs) 말고 세 속성을 더 최고 Lv → k.jamTrait = { at }
-//            (재난의 길을 걸으면 열 가지 속성을 다 연다 — 3 + 3 + 3 = 아홉)
+//   ■ 얻기 — 교란자의 길에 들어설 때 끝까지 걸었던 속성(k.jam.attrs) 말고 세 속성을 더 최고 Lv → k.jamTrait = { at }
+//            (교란자는 전용 장비에 없는 속성을 셋까지 더 연다 — nextAttr)
 //            본인 화면에만 알린다 — 기록(history) · 상담사 콘솔 · 남의 화면 어디에도 적지 않는다. K 의 방 막대에 본인만 🌀 교란.
 //   ■ 먹히는 곳 — K 의 방 파티에서만. 같은 방에 교란을 가진 사람이 있으면 그 사람 말고 다른 사원들의 화면에서
 //            ① 선택지 순서가 섞이고 글자 몇 자가 ■ 로 가려진다 (장면마다 같은 모양 — 다시 그려도 그대로)
@@ -4742,7 +4758,7 @@ const JAM_HIDE = 0.3;         // 선택지 글자가 ■ 로 가려지는 몫
 function jamMore(k, u) {
     if (!onJam(k)) return [];
     const full = jamFull(k, u);
-    const got = (k.jam && Array.isArray(k.jam.attrs) && k.jam.attrs.length) ? k.jam.attrs : full.slice(0, JAM_MORE);
+    const got = (k.jam && Array.isArray(k.jam.attrs) && k.jam.attrs.length) ? k.jam.attrs : heldAttrs(u);
     return full.filter(function (a) { return got.indexOf(a) < 0; });
 }
 function jamTraitCheck() {
@@ -4872,6 +4888,8 @@ window.KROOM = { hard: function () { return hard(); }, _set: function (o) { kr =
     decide: function (c, a) { return decide(c, a); },
     doom: function (c) { return doom(c); },               // 시험용 — 즉사 기믹 초읽기를 바로 띄운다
     jamOn: function () { return jamOnMe(); },            // 🌀 같은 방에 교란을 가진 사람이 있나 (나는 빼고)
+    nextAttr: function () { return nextAttr(prof(), me()); },   // 다음에 열 속성 (없으면 null)
+    hiddenOwner: function (key) { return hiddenTakenBy(key, ''); },   // 그 히든 직업의 주인 (지워진 사원은 빼고)
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
 console.log('[K 의 방] ' + K_CODE + ' — 직업 ' + Object.keys(JOBS).length + ' · 던전 ' + Object.keys(DUNS).length + ' (준비 ' + Object.keys(DUNS).filter(function (d) { return DUNS[d].ready; }).length + ') — kroomState()');
