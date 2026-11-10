@@ -1114,6 +1114,25 @@ function partyStart(run, spec, seed) {
     S.log = [];
     return copy(S);                                                     // ★ 서버에 적는다 — undefined 가 한 칸이라도 있으면 실서버가 쓰기를 통째로 거부한다 (2026-11-10)
 }
+// ★ 판마다 run 의 인형 사본(members/<사번>/dolls)에도 HP · PP · 상태 · 보조를 적는다 (2026-11-10 사용자)
+//   다음 괴담(partyStart)은 이 사본으로 판을 연다 — 안 적으면 매번 데려왔던 체력 · 상태로 되돌아갔다.
+//   인형 기록(users/<사번>/pets)은 각자 화면이 판마다 적는다 (writeMine) — 수선소에서 고치기 전까지 그대로 남는다.
+function snapBack(P, run, S) {
+    if (!S || !S.sides || !run || !run.members) return;
+    arrOf(S.allies).forEach(function (s) {
+        const sd = S.sides[s], c = sd && sd.code;
+        if (!c || !run.members[c]) return;
+        const ds = objOf(run.members[c].dolls);
+        arrOf(sd.units).forEach(function (u) {
+            if (!u || u.key == null || !ds[String(u.key)]) return;
+            const b = 'members/' + c + '/dolls/' + u.key + '/';
+            P[b + 'hp'] = Math.max(0, Math.round(Number(u.hp) || 0));
+            P[b + 'pp'] = copy(objOf(u.pp));
+            P[b + 'st'] = u.status ? { k: u.status, c: u.sc | 0 } : null;
+            P[b + 'aid'] = Math.max(0, u.aid | 0);
+        });
+    });
+}
 // 한 턴을 푼다 — 돌려주는 값은 run 아래에 적을 칸들 (update 한 번) · 방장(또는 대신 푸는 사람)이 부른다
 function resolveParty(run, now) {
     const F = run.fight, P = {};
@@ -1125,6 +1144,7 @@ function resolveParty(run, now) {
         P['fight/res'] = 'run'; P['stage'] = 'walk';
         P['fight/log/' + F.round] = [{ t: (run.members[run.lead] || {}).name + ' 사원이 물러서자고 손짓했다. 파티가 괴담에게서 물러났다!', k: 'sys', run: 1, f: {} }];
         P['fight/round'] = F.round + 1; P['fight/picks'] = null; P['fight/roundAt'] = now;
+        snapBack(P, run, S);
         return P;
     }
     const input = { picks: arrOf(F.pickq), seed: F.id + ':' + F.round };
@@ -1143,6 +1163,7 @@ function resolveParty(run, now) {
     P['fight/picks'] = null; P['fight/pickq'] = null; P['fight/need'] = null;
     P['fight/roundAt'] = now;
     P['fight/cons'] = r.cons && r.cons.length ? r.cons : null;
+    snapBack(P, run, S2);
     if (r.over) {
         if (r.over.win === 'A') {
             const drops = {};

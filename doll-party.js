@@ -410,6 +410,19 @@ function applyWin(id, grow, side) {
             arr(sd).forEach(function (g) { if (g.xp && ds[String(g.key)]) D.log('[🐾 여정] ' + D.nickOf(ds[String(g.key)]) + ' 경험치 +' + g.xp + (g.up ? ' → Lv ' + g.lv : '') + (g.wait ? ' (각성 돌파 필요)' : ''), u); });
         }
     } catch (e) { console.warn('[🐾] 성장 기록', e); }
+    // ★ 오른 레벨 · 경험치 · 노력치를 이 판의 인형 사본에도 — 다음 괴담이 지금 모습으로 (HP · PP · 상태는 판을 푸는 쪽이 적는다 · doll-battle.js snapBack)
+    try {
+        const mine = v.members && v.members[S.code] && obj(v.members[S.code].dolls);
+        const ds2 = D.dolls(u), up = {};
+        if (mine && S.ref) Object.keys(mine).forEach(function (k) {
+            const d = ds2[k]; if (!d) return;
+            const b = 'members/' + S.code + '/dolls/' + k + '/';
+            up[b + 'lv'] = Number(d.lv) || 1; up[b + 'xp'] = Number(d.xp) || 0;
+            if (d.ev && typeof d.ev === 'object') up[b + 'ev'] = JSON.parse(JSON.stringify(d.ev));
+            if (d.g) up[b + 'g'] = d.g;
+        });
+        if (Object.keys(up).length) S.ref.update(up).catch(function () { });
+    } catch (e) { }
     const me = v.members && v.members[S.code];
     try { const act = v.fight && v.fight.d2 && v.fight.d2.sides && v.fight.d2.sides[side]; const cu = act && arr(act.units)[act.act]; if (cu && cu.key && D.dolls(u)[cu.key]) D.bondUp(cu.key, u); } catch (e) { }
     const got = arr((v.fight && v.fight.drops && v.fight.drops[S.code]) || []);
