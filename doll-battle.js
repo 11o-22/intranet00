@@ -340,14 +340,14 @@ function portraitSrc(sp, old) {
 }
 function hpColor(p) { return p > 0.5 ? '#4cd964' : (p > 0.2 ? '#ffcc00' : '#ff3b30'); }
 const ST_SHORT = { poison: '독', para: '마비', fox: '아홉여우병' };
-function tagOf(u) {
+function tagOf(u, hideRanks) {
     if (!u) return '';
     const t = [];
     if (u.status) t.push(ST_SHORT[u.status] || u.status);
     if (u.guard === 'full') t.push('방어'); else if (u.guard === 'half') t.push('받아치기'); else if (u.guard === 'endure') t.push('버티기');
     if (u.focus) t.push('집중');
     if (u.runeGuard) t.push('룬 방어');
-    const rk = ['atk', 'chm', 'def', 'sta', 'spd'].filter(function (k) { return u.rank && u.rank[k]; }).map(function (k) { return ({ atk: '공', chm: '매', def: '방', sta: '굳', spd: '속' })[k] + (u.rank[k] > 0 ? '+' : '') + u.rank[k]; });
+    const rk = hideRanks ? [] : ['atk', 'chm', 'def', 'sta', 'spd'].filter(function (k) { return u.rank && u.rank[k]; }).map(function (k) { return ({ atk: '공', chm: '매', def: '방', sta: '굳', spd: '속' })[k] + (u.rank[k] > 0 ? '+' : '') + u.rank[k]; });
     if (rk.length) t.push(rk.join(' '));
     return t.length ? '<span class="tag">' + esc(t.join(' · ')) + '</span>' : '';
 }
@@ -356,7 +356,7 @@ function paintStat() {
     const f = foe_(), m = me_(), A = D().ATTR;
     const sh = B.shown;
     if (f) {
-        q('.fnm').innerHTML = esc(f.name) + '  ' + (B.mon != null ? (B.boss ? '보스' : (B.kind2 || '괴담')) : (unitG(f) + ' Lv.' + f.lv)) + tagOf(f);
+        q('.fnm').innerHTML = esc(f.name) + '  ' + (B.mon != null ? (B.boss ? '보스' : (B.kind2 || '괴담')) : (unitG(f) + ' Lv.' + f.lv)) + tagOf(f, true);   // 상대 랭크는 숨긴다
         q('.fat').textContent = (A[f.el] || {}).e || '';
         const fh = sh[foeSide()] != null ? sh[foeSide()] : f.hp;
         const fp = Math.max(0, fh) / f.max;
@@ -578,10 +578,14 @@ function hpTick(e) {
     });
     return out;
 }
+// 상대 진영인가 — 나(아군 진영 A · C · D)에게는 B, 결투의 B 에게는 A
+function oppSide(s) { if (!s || !B) return false; return mySide() === 'B' ? s !== 'B' : s === 'B'; }
 async function playLine(e, opt) {
     opt = opt || {};
     if (!B) return;
     const k = e.k, id = e.id;
+    // ★ 상대의 랭크 변화(증가 · 감소 · 상한 · 하한 · 초기화 · 바통 계승 · 아홉여우병 전이)는 보이지 않는다 (2026-11-10 사용자)
+    if (e.rk && oppSide(e.rk)) return;
     // 행동 — 기술 사용 줄이면 그 진영이 앞으로 나선다
     if (e.act && e.s) await lunge(e.s);
     // 등장 · 회수 · 기절 — 그림을 갈아 끼운다
@@ -1103,7 +1107,7 @@ function partyStart(run, spec, seed) {
         allies: rest.map(function (c) { return { my: recsOf(c), owner: run.members[c].name, code: c, art: artOf(c) }; }),
         foe: [spec], auto: { B: true }, seed: seed, mode: 'pve' });
     S.log = [];
-    return S;
+    return copy(S);                                                     // ★ 서버에 적는다 — undefined 가 한 칸이라도 있으면 실서버가 쓰기를 통째로 거부한다 (2026-11-10)
 }
 // 한 턴을 푼다 — 돌려주는 값은 run 아래에 적을 칸들 (update 한 번) · 방장(또는 대신 푸는 사람)이 부른다
 function resolveParty(run, now) {
@@ -1255,7 +1259,7 @@ function pvpStart(cur, seed) {
         auto: { A: false, B: false }, seed: seed, mode: 'pvp' });
     S.sides.B.owner = cur.b.name; S.sides.B.code = cur.b.code;
     S.log = [];
-    return S;
+    return copy(S);                                                     // ★ 서버에 적는다 — undefined 를 빼고
 }
 //   트랜잭션 안에서 — cur 를 고쳐 돌려준다 (둘 다 골랐을 때만)
 function resolvePvp(cur) {

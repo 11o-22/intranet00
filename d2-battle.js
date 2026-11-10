@@ -13,7 +13,8 @@
 //   r = D2BT.turn(S, { A: 행동, B: 행동, C: 행동, picks: [], seed })                      한 턴 전부 (-2 → +4 → P1 → +3 → +2/+1/0 → -1)
 //       행동  { k: 'skill', no }  ·  { k: 'switch', idx }  ·  { k: 'item', item, idx, no }  ·  { k: 'rune', i } 먹인 룬으로 친다  ·  { k: 'rd', i } 룬으로 막는다  ·  { k: 'pass' } 아무것도 안 한다(포획 · 도망 턴)
 //             (B 가 auto 면 B 행동은 엔진이 고른다 — D2BT.ai · 안 준 진영의 행동도 엔진이 고른다)
-//       출력문 한 줄 { t, k, id, f: { 진영: [칸, HP, 최대] }, s, i, act } — f 는 그 순간의 HP 스냅샷 (화면이 체력 바를 따라 그린다)
+//       출력문 한 줄 { t, k, id, f: { 진영: [칸, HP, 최대] }, s, i, act, rk } — f 는 그 순간의 HP 스냅샷 (화면이 체력 바를 따라 그린다)
+//       rk = 랭크가 바뀐 인형의 진영 (MSG-031~034 · 049 · 050 · 060) — 화면은 상대 진영의 랭크 변화를 보여 주지 않는다 (2026-11-10 사용자)
 //       r.need = { pick: 'A', why: 'faint'|'baton', cands: [idx…] }  → 기절·바통 선택이 필요하면 S 는 그대로 두고 멈춘다.
 //              선택을 picks 에 덧붙여 **같은 S 로 다시** turn() 을 부른다 (같은 seed → 같은 결과 · 그래서 되감기가 된다).
 //       r.S     새 상태 (입력 S 는 안 건드린다) · r.log [{ t, k }] 이번 턴 출력문 · r.over { win: 'A'|'B' } · r.grow 전투 뒤 성장 (E1)
@@ -154,7 +155,7 @@ function unitOf(rec, opt) {
 function foeOf(spec, rng) {
     const D2 = C(), SK = K();
     const rec = spec.rec || D2.mk(spec.lv || 5, { rng: rng, pr: spec.pr, iv: spec.iv });
-    rec.id = spec.id || null; rec.sp = spec.sp || null; rec.att = spec.el || rec.att || (function () { const ks = Object.keys(EL_NAME); return ks[Math.floor((rng || Math.random)() * ks.length)]; })();
+    rec.id = spec.id || null; rec.sp = spec.sp || null; if (rec.at == null) rec.at = 0; rec.att = spec.el || rec.att || (function () { const ks = Object.keys(EL_NAME); return ks[Math.floor((rng || Math.random)() * ks.length)]; })();
     if (spec.mv) rec.mv = spec.mv; else if (!rec.mv) { const f = SK.fixMv(Object.assign({ id: spec.id || 'foe' }, rec), rng); rec.mv = f.mv; rec.pp = f.pp; }
     if (spec.hp != null) rec.hp = spec.hp;
     const u = unitOf(rec, { name: spec.name || '따라쟁이 봉제인형', el: rec.att, trait: spec.trait || 0, dark: !!spec.dark, art: !!spec.art });
@@ -204,13 +205,13 @@ function rankChange(S, u, k, n, src, opt) {
     const lo = k === 'eva' ? 0 : -6, hi = 6;
     const was = u.rank[k], now = clamp(was + n, lo, hi), d = now - was;
     if (d === 0) {
-        log(S, n > 0 ? 33 : 34, { 대상: u.name, 능력치: rankName(k) });
+        log(S, n > 0 ? 33 : 34, { 대상: u.name, 능력치: rankName(k) }, 'msg', { rk: so });
         return 0;
     }
     u.rank[k] = now;
     if (d < 0 && u.dope && u.dope[k] > 0) u.dope[k] = Math.max(0, u.dope[k] + d);        // 하락은 도핑 몫부터 (아이템 08)
     if (opt.dope && d > 0) u.dope[k] += d;
-    log(S, d > 0 ? 31 : 32, { 대상: u.name, 능력치: rankName(k) });
+    log(S, d > 0 ? 31 : 32, { 대상: u.name, 능력치: rankName(k) }, 'msg', { rk: so });
     if (d < 0 && src === 'foe') {
         if (canUse(u, 4)) { fire(S, u, 4); rankChange(S, u, 'atk', 1, 'self', { trait: 1 }); }
         if (canUse(u, 9)) { fire(S, u, 9); const f = cur(S, other(S, so)); if (alive(f)) rankChange(S, f, 'spd', -1, 'foe', { trait: 1 }); }
@@ -218,7 +219,7 @@ function rankChange(S, u, k, n, src, opt) {
     // 아홉여우병 — 대상의 실제 변화를 병을 옮긴 쪽의 필드 인형에게 (복사된 것은 다시 복사하지 않는다)
     if (u.status === 'fox' && !opt.copied && u.foxBy) {
         const t = cur(S, u.foxBy);
-        if (alive(t) && t !== u) { log(S, 60, { 대상: t.name }); rankChange(S, t, k, d, 'self', { copied: 1 }); }
+        if (alive(t) && t !== u) { log(S, 60, { 대상: t.name }, 'msg', { rk: sideOf(S, t) }); rankChange(S, t, k, d, 'self', { copied: 1 }); }
     }
     return d;
 }
@@ -271,7 +272,7 @@ function enter(S, s, idx, why, carry) {
     if (carry) {               // 바통 계승
         RANKS.forEach(function (k) { u.rank[k] = carry.rank[k]; });
         u.boost = carry.boost.slice(); u.focus = carry.focus; u.prio3 = carry.prio3;
-        if (RANKS.some(function (k) { return carry.rank[k]; }) || carry.boost.length || carry.focus || carry.prio3) log(S, 50, { 대상: u.name });
+        if (RANKS.some(function (k) { return carry.rank[k]; }) || carry.boost.length || carry.focus || carry.prio3) log(S, 50, { 대상: u.name }, 'msg', { rk: s });
         if (carry.master && canUse(u, 10) === false && carry.masterTrait) { }
         if (carry.masterTrait) { log(S, 35, { 사용자: carry.masterName, 특성명: TRAIT[10] }, 'trait'); rankChange(S, u, 'spd', 1, 'self'); }
     }
@@ -643,7 +644,7 @@ function attack(S, s, a, rng) {
     }
     if (hit) {
         // A1.4 — 똑바로 붙어!
-        if (sk.fx.resetRanks) { [u, f].forEach(function (x) { resetRanks(x); log(S, 49, { 대상: x.name }); }); }
+        if (sk.fx.resetRanks) { [u, f].forEach(function (x) { resetRanks(x); log(S, 49, { 대상: x.name }, 'msg', { rk: sideOf(S, x) }); }); }
         // A1.5b 수신 대상
         receiverDecoy = !!fsd.decoy;
         if (isOhko) {

@@ -11,7 +11,8 @@
 //   j1   『 첫번째 여정 - 주인을 찾아서. 』  문틈손 · 젖은 신발 · 네발이 · 등불이 → 가짜 주인 (그 여정의 글을 그대로 띄운다)
 //   arc  『 매직버니 아케이드존 』            깜짝 선물 토끼 · 튀어나오는 토끼 · 목마 · 풍선 · 거울 · 눈알병 가운데 넷 → 북 치는 토끼
 //   난이도 D · C · B · A · S — 괴담이 세지고 경험치 · 보상이 늘고, 높은 등급 룬 조각이 나온다 (awk-rune.js)
-//   하루 세 번씩 (여정마다 따로 · dollRunUse/<사번>/<여정>)
+//   하루 다섯 번씩 (여정마다 따로 · dollRunUse/<사번>/<여정> = { d: 날짜, n: 쓴 수 }) — 2026-11-10 사용자 3 → 5
+//   상담사 콘솔 「🐾 여정 횟수」 — 고른 사원의 오늘 횟수를 충전(다시 5번)하거나 +N번 더 준다 (n 을 깎는다 · 0 아래로도) · 「전체 충전」에도 들어간다
 //
 // ■ 여럿이
 //   방(dollLobby)을 만들면 셋까지 들어온다. 방장이 출발하면 모두 같은 판(dollRun)에 들어간다.
@@ -32,7 +33,7 @@
 'use strict';
 
 const LOBBY = 'dollLobby', RUN = 'dollRun', USE = 'dollRunUse';
-const DAY = 3;
+const DAY = 5;                 // ★ 2026-11-10 사용자 「여정 횟수를 5회로」 (전에는 3)
 const LOBBY_LIVE = 10 * 60 * 1000;
 const PICK_MS = 25000, FAIL_MS = 45000, WAIT_MEM = 15000;
 const GR5 = ['D', 'C', 'B', 'A', 'S'];
@@ -86,7 +87,7 @@ function snap(k) {
 }
 
 // ==========================================
-// 하루 세 번
+// 하루 다섯 번
 // ==========================================
 const USED = {};
 function usedBind() {
@@ -122,10 +123,11 @@ function lobBind() {
         // 내가 들어 있는 방이 출발했나
         Object.keys(VIEW.lob).forEach(function (k) {
             const L = VIEW.lob[k];
+            // 출발한 지 오래된 방은 치운다 (한 시간 · 누구 화면에서든) — 남아 있으면 재접속 때마다 다시 본다
+            if (L && L.run && now() - Number(L.at || 0) > 3600 * 1000) { try { VIEW.lobRef.child(k).remove(); } catch (e) { } return; }
             if (L && L.run && L.members && me && L.members[me.code] && !S.runKey && !S.seenRun[L.run]) {
                 S.seenRun[L.run] = 1;
-                if (VIEW.dim) { VIEW.dim._close(); VIEW.dim = null; }
-                enter(L.run);
+                enter(L.run);                                            // 창은 정말 들어갈 때 enter 가 닫는다 (지난 판이면 그대로 둔다)
             }
         });
         if (VIEW.dim) paint();
@@ -169,7 +171,7 @@ function paint() {
             + Object.keys(J).map(function (j) {
                 const on = VIEW.j === j;
                 return '<div style="border:1px solid ' + (on ? '#a78bdb' : '#3d2f5c') + ';border-radius:10px;padding:9px;margin:8px 0;background:' + (on ? 'rgba(120,90,190,.16)' : 'transparent') + '" data-j="' + j + '">'
-                    + '<div style="font-size:12px;color:#fff3d6;font-weight:bold">' + J[j].ic + ' 『 ' + esc(J[j].n) + ' 』 <span style="font-size:10px;color:#9fd8ef">오늘 ' + left(j) + ' / ' + DAY + '</span></div>'
+                    + '<div style="font-size:12px;color:#fff3d6;font-weight:bold">' + J[j].ic + ' 『 ' + esc(J[j].n) + ' 』 <span style="font-size:10px;color:#9fd8ef">오늘 남은 ' + left(j) + '번 (하루 ' + DAY + ')</span></div>'
                     + '<div class="sub" style="margin:4px 0 0">' + esc(J[j].d) + '<br>끝까지 가면 ' + payText(j, VIEW.diff) + '</div></div>';
             }).join('')
             + '<div style="display:flex;gap:4px;align-items:center;margin:6px 0"><span style="font-size:10.5px;color:#ffcf8f;flex:0 0 auto">난이도</span>' + GR5.map(function (g) { return '<button class="gb-btn' + (VIEW.diff === g ? ' pri' : '') + '" data-d="' + g + '" style="flex:1;padding:6px 0">' + g + '</button>'; }).join('') + '</div>'
@@ -255,7 +257,15 @@ function enter(key) {
     d.ref(RUN + '/' + key).once('value').then(function (s) {
         const v = s.val();
         if (!v || !v.members || !v.members[me.code]) return;
+        // ★ 2026-11-10 사용자 「멋대로 횟수가 차감돼」 — 출발한 방(dollLobby 의 run)이 남아 있어, 새로고침 · 재접속 때마다 그 판에 다시 「들어가며」 횟수를 또 썼다.
+        //   이미 들어갔던 판(내 인형이 적혀 있다) · 끝난 판 · 나온 판 · 두 시간 넘은 판은 다시 들어가지 않는다 (하던 판 잇기는 아래 20초 시계가 횟수 없이 한다).
+        const m0 = v.members[me.code];
+        if (m0.dolls || m0.left || m0.out || ['clear', 'lose', 'quit'].indexOf(v.stage) >= 0 || now() - Number(v.at || 0) > 2 * 3600 * 1000) return;
+        if (S.entering === key) return;
+        S.entering = key;
+        if (VIEW.dim) { try { VIEW.dim._close(); } catch (e) { } VIEW.dim = null; }
         useOne(v.j).then(function (ok) {
+            S.entering = null;
             const mref = d.ref(RUN + '/' + key + '/members/' + me.code);
             if (!ok) { mref.update({ out: 1, left: 1 }); alert_('『 ' + J[v.j].n + ' 』 은 오늘 더 들어갈 수 없습니다.'); return; }
             const ks = ready();
@@ -536,13 +546,111 @@ const PT = {
         const intro = (v.j === 'j1' && J1() && J1().enc[i]) ? String(J1().enc[i].in).replace(/<br>/g, ' ') : '';
         let d2 = null;
         try { d2 = window.DOLLBT.partyStart(v, foe, S.runKey + ':' + id); } catch (e) { console.warn('[🐾] 전투 시작', e); return false; }
-        S.ref.update({ stage: 'fight', x: Math.round(PT.leadX()), fight: { id: id, m: i, foe: foe, round: 1, roundAt: now(), intro: intro, d2: d2 } });
+        const fight = JSON.parse(JSON.stringify({ id: id, m: i, foe: foe, round: 1, roundAt: now(), intro: intro, d2: d2 }));   // undefined 를 빼고 (실서버는 섞이면 거부)
+        S.ref.update({ stage: 'fight', x: Math.round(PT.leadX()), fight: fight }).catch(function (e) {
+            console.warn('[🐾] 전투 시작 기록 실패', e);
+            try { window.DOLLSCENE.sys('괴담과의 전투를 시작하지 못했습니다. 잠시 뒤 다시 다가가 주세요.', 4000); } catch (x) { }
+        });
         return true;
     },
     pushBack: function (x) { if (isLead() && S.ref) S.ref.update({ x: Math.round(x) }); },
     quit: quit
 };
 window.DOLLPARTY = PT;
+
+// ==========================================
+// 상담사 콘솔 — 🐾 여정 횟수 (2026-11-10 사용자 「상담사 콘솔에 여정 횟수도 추가하는 거」)
+// ==========================================
+//   위에서 고른 사원(getAdminTargets)에게 — 「충전」 오늘 쓴 수를 0 으로(다시 하루치) · 「+N」 오늘 쓴 수에서 N 을 뺀다(0 아래로도 → 하루치보다 많이)
+//   여정마다(첫번째 여정 · 아케이드존) 또는 둘 다. 날이 바뀌면 보통처럼 새로 센다.
+const ADM_BOX = 'adm-doll-run-box';
+function admTargets() { try { return (typeof getAdminTargets === 'function') ? getAdminTargets() : []; } catch (e) { return []; } }
+function admGive(codes, js, mode, k) {
+    const d = db_(), t = M().today();
+    if (!d) return Promise.resolve([]);
+    const jobs = [];
+    codes.forEach(function (code) {
+        js.forEach(function (j) {
+            jobs.push(d.ref(USE + '/' + code + '/' + j).transaction(function (c) {
+                const n = (c && c.d === t) ? (Number(c.n) || 0) : 0;
+                return { d: t, n: mode === 'full' ? 0 : n - k };
+            }).then(function (r) { const v = r && r.snapshot && r.snapshot.val(); return { code: code, j: j, left: Math.max(0, DAY - (Number(v && v.n) || 0)) }; }));
+        });
+    });
+    return Promise.all(jobs);
+}
+window.adminDollRunGive = function (mode) {
+    const codes = admTargets();
+    if (!codes.length) { alert_('대상을 고르거나 사번을 적어 주십시오.'); return Promise.resolve(null); }
+    const sel = document.getElementById('adm-drun-j'), inp = document.getElementById('adm-drun-n');
+    const which = sel ? sel.value : 'all';
+    const js = which === 'all' ? Object.keys(J) : [which];
+    const k = Math.max(1, Math.min(50, Math.floor(Number(inp && inp.value) || 1)));
+    return admGive(codes, js, mode, k).then(function (rs) {
+        const by = {};
+        rs.forEach(function (r) { (by[r.code] = by[r.code] || []).push(J[r.j].n + ' 남은 ' + r.left + '번'); });
+        const what = (mode === 'full' ? '충전 (오늘 다시 ' + DAY + '번)' : '+' + k + '번') + ' — ' + (which === 'all' ? '두 여정' : '『 ' + J[which].n + ' 』');
+        const names = [];
+        codes.forEach(function (code) {
+            const t = (typeof db !== 'undefined' && db.users) ? db.users[code] : null;
+            if (!t) return;
+            names.push(t.name + ' — ' + (by[code] || []).join(' · '));
+            try {
+                if (typeof addHistoryLog === 'function') addHistoryLog(t, '[당국 개입] 🐾 여정 횟수 ' + what);
+                t._adminStamp = Date.now();
+                if (typeof updateUserFields === 'function') updateUserFields(code, { history: t.history });
+            } catch (e) { }
+        });
+        alert_('🐾 여정 횟수 ' + what + '\n\n' + names.join('\n'));
+        return rs;
+    });
+};
+(function adminBox() {
+    function mount() {
+        const scr = document.getElementById('admin-screen');
+        if (!scr || document.getElementById(ADM_BOX)) return;
+        const anchor = scr.querySelector('.action-buttons');
+        const html = '<div class="admin-panel-box" id="' + ADM_BOX + '" style="border-color:#7a5fb8; background-color:#140f22;">'
+            + '<h4 style="color:#d9c8ff;">🐾 여정 횟수</h4>'
+            + '<div style="font-size:10px; color:#aaa; margin-bottom:8px; line-height:1.6;">위에서 고른 사원(또는 적어 넣은 사번)의 <b>오늘</b> 여정 횟수 — 하루 ' + DAY + '번, 여정마다 따로. 날이 바뀌면 새로 셉니다.</div>'
+            + '<div style="display:flex; gap:6px; margin-bottom:8px;">'
+            + '<select id="adm-drun-j" style="flex:1; padding:6px; background:#222; color:#eee; border:1px solid #555; border-radius:6px; font-size:11px;"><option value="all">두 여정 모두</option>'
+            + Object.keys(J).map(function (j) { return '<option value="' + j + '">' + J[j].ic + ' ' + esc(J[j].n) + '</option>'; }).join('') + '</select>'
+            + '<input id="adm-drun-n" type="number" min="1" max="50" value="1" style="width:56px; padding:6px; background:#222; color:#eee; border:1px solid #555; border-radius:6px; font-size:11px;"></div>'
+            + '<div style="display:flex; gap:6px;">'
+            + '<button class="game-btn" style="flex:1; margin:0; font-size:11px; background:linear-gradient(145deg,#5b3f9a,#3b2766); border-color:#2a1b4a;" onclick="adminDollRunGive(\'full\')">충전<br>(오늘 다시 ' + DAY + '번)</button>'
+            + '<button class="game-btn" style="flex:1; margin:0; font-size:11px; background:linear-gradient(145deg,#6b4a1d,#38250e); border-color:#ffd766;" onclick="adminDollRunGive(\'add\')">+ 적은 수만큼<br>더 주기</button>'
+            + '</div></div>';
+        if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
+        else scr.insertAdjacentHTML('beforeend', html);
+    }
+    const iv = setInterval(function () {
+        if (typeof openAdminScreen !== 'function') return;
+        if (openAdminScreen._dollRun) { clearInterval(iv); return; }
+        const _o = openAdminScreen;
+        const w = function () { const r = _o.apply(this, arguments); setTimeout(mount, 180); return r; };
+        Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
+        w._dollRun = true;
+        openAdminScreen = w; window.openAdminScreen = w;
+        clearInterval(iv);
+    }, 500);
+    // 「전체 충전」에 여정도 (2026-11-10)
+    const iv2 = setInterval(function () {
+        if (typeof adminResetLimits !== 'function') return;
+        if (adminResetLimits._dollRun) { clearInterval(iv2); return; }
+        const _r = adminResetLimits;
+        const w = function (kind) {
+            const codes = admTargets();
+            const r = _r.apply(this, arguments);
+            if (kind === 'all' && codes.length) admGive(codes, Object.keys(J), 'full', 0).catch(function () { });
+            return r;
+        };
+        w._dollRun = true;
+        adminResetLimits = w; window.adminResetLimits = w;
+        clearInterval(iv2);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); clearInterval(iv2); }, 60000);
+})();
 
 window.dollPartyOpen = function () {
     if (!G() || !M()) return;
