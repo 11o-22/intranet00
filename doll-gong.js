@@ -5,7 +5,7 @@
 //
 // 2026-11-07 사용자 기획안 (도깨비 공방 — 수선소 · 잡화점 · 펫 교환소 · 봉제인형 보관함 · 튜토리얼)
 //
-// ■ 수선소   청주 1 · 메밀묵 1 로 인형 하나를 체력 가득 (일괄 수선 — 고른 것 모두 · 필요한 수를 먼저 보여 준다)
+// ■ 수선소   청주 1 · 메밀묵 1 로 인형 하나를 체력 가득 · 상태이상 해제 · PP 가득 (2026-11-10 사용자 · 일괄 수선 — 고른 것 모두 · 필요한 수를 먼저 보여 준다)
 // ■ 잡화점   🎀 포옹 리본 100 D · 🧶 솜뭉치 간식 30 D (꿈결) · 🍶 청주 3,000 P · 🥣 메밀묵 2,000 P (포인트) · 🧷 봉제인형 아이템 20종 (꿈결 · d2-items.js · 2026-11-10)
 //            ※ 망상 홈쇼핑 물건을 옮겨 오는 것은 꿈결 값이 정해지면 넣는다 (지금은 자리만)
 // ■ 교환소   1 : 1 — 둘 다 한 마리씩 올리고, 둘 다 「준비 완료」 → 둘 다 「최종 승인」 해야 바뀐다.
@@ -270,26 +270,41 @@ async function sew(S) {
         return;
     }
 }
+// PP — 끼운 기술(과 기록에 남은 기술)을 모두 가득 · 끝없는 것(발버둥)은 뺀다
+function ppFull(d) {
+    const SK = window.D2SK, pp = Object.assign({}, (d && d.pp) || {});
+    if (!SK) return pp;
+    const nos = SK.equipped(d).map(String);
+    Object.keys(pp).forEach(function (k) { if (nos.indexOf(k) < 0) nos.push(k); });
+    nos.forEach(function (k) { const s = SK.get(Number(k)); if (s && s.pp != null) pp[k] = SK.ppMax(Number(k)); });
+    return pp;
+}
+function ppLow(d) {
+    const SK = window.D2SK;
+    if (!SK || !d) return false;
+    return SK.equipped(d).some(function (no) { const s = SK.get(no); return s && s.pp != null && SK.ppOf(d, no) < SK.ppMax(no); });
+}
 function sewUi() {
     return new Promise(function (resolve) {
         const M = D(), u = u_();
         const ds = M.dolls(u), w = M.withList(u);
         const ids = w.concat(M.boxList(u)).filter(function (id) { return ds[id]; });
         const sel = {};
-        const hurt = function (id) { return M.hpOf(ds[id]) < M.stats(ds[id]).max; };
+        // 고칠 데가 있나 — 체력이 닳았거나 · 상태이상이 걸렸거나 · PP 가 줄었거나
+        const hurt = function (id) { const d = ds[id]; return M.hpOf(d) < M.stats(d).max || !!(d.st && d.st.k) || ppLow(d); };
         let dim = null, done = false;
         const paint = function () {
             const n = Object.keys(sel).filter(function (k) { return sel[k]; }).length;
             const allN = ids.filter(hurt).length;
             const have = { '🍶 청주': M.bagHas('🍶 청주', u), '🥣 메밀묵': M.bagHas('🥣 메밀묵', u) };
             const html = '<h3>✂ 봉제인형 수선</h3>'
-                + '<div class="sub">인형 하나에 🍶 청주 ' + FIX['🍶 청주'] + ' · 🥣 메밀묵 ' + FIX['🥣 메밀묵'] + '. 체력이 가득 찹니다 (외형 · 능력치 · 기록은 그대로).<br>가진 것 — 🍶 ' + have['🍶 청주'] + ' · 🥣 ' + have['🥣 메밀묵'] + '</div>'
+                + '<div class="sub">인형 하나에 🍶 청주 ' + FIX['🍶 청주'] + ' · 🥣 메밀묵 ' + FIX['🥣 메밀묵'] + '. 체력 · PP 가 가득 차고 상태이상이 풀립니다 (외형 · 능력치 · 기록은 그대로).<br>가진 것 — 🍶 ' + have['🍶 청주'] + ' · 🥣 ' + have['🥣 메밀묵'] + '</div>'
                 + (ids.length ? ids.map(function (id) {
                     const d = ds[id], h = hurt(id);
                     return '<label class="gb-row" style="' + (h ? '' : 'opacity:.45') + '"><input type="checkbox" data-id="' + id + '"' + (sel[id] ? ' checked' : '') + (h ? '' : ' disabled') + '>' + icon(d.sp, 36)
                         + '<div class="tx">' + dollLine(d) + hpBar(d) + '</div><span style="font-size:9px;color:#8f84b5">' + (w.indexOf(id) >= 0 ? '동행' : '보관') + '</span></label>';
                 }).join('') : '<div class="sub">고칠 인형이 없습니다.</div>')
-                + '<div class="sub" style="margin-top:8px">고른 것 ' + n + '마리 — 🍶 ' + n * FIX['🍶 청주'] + ' · 🥣 ' + n * FIX['🥣 메밀묵'] + ' 필요 · 다친 인형 모두(' + allN + '마리)는 🍶 ' + allN + ' · 🥣 ' + allN + '</div>'
+                + '<div class="sub" style="margin-top:8px">고른 것 ' + n + '마리 — 🍶 ' + n * FIX['🍶 청주'] + ' · 🥣 ' + n * FIX['🥣 메밀묵'] + ' 필요 · 고칠 인형 모두(' + allN + '마리)는 🍶 ' + allN + ' · 🥣 ' + allN + '</div>'
                 + '<div class="gb-btns"><button class="gb-btn pri" data-k="one"' + (n ? '' : ' disabled') + '>수선하기</button><button class="gb-btn" data-k="all"' + (allN ? '' : ' disabled') + '>일괄 수선</button><button class="gb-btn" data-k="x">취소</button></div>';
             if (!dim) dim = panel(html, function () { if (!done) resolve(false); });
             else dim.firstChild.innerHTML = html;
@@ -308,7 +323,7 @@ function sewUi() {
             }
             M.bagAdd('🍶 청주', -nW, u);
             M.bagAdd('🥣 메밀묵', -nJ, u);
-            list.forEach(function (id) { M.patchDoll(id, { hp: M.stats(ds[id]).max }, u); });
+            list.forEach(function (id) { M.patchDoll(id, { hp: M.stats(ds[id]).max, st: null, pp: ppFull(ds[id]) }, u); });
             M.log('[👺 수선소] 봉제인형 ' + list.length + '마리를 고쳤습니다 (🍶 -' + nW + ' · 🥣 -' + nJ + ').', u);
             M.saveHist();
             done = true;
@@ -1214,7 +1229,7 @@ async function nap(S) {
 }
 
 window.DOLLGONG = {
-    sew: sew, shop: shop, trade: trade, box: box, dex: dex, mask: mask, nap: nap,
+    sew: sew, sewUi: sewUi, shop: shop, trade: trade, box: box, dex: dex, mask: mask, nap: nap,
     repaint: function () { try { if (BX.a) boxPaint(); } catch (e) { } try { if (TR.dim) tradePaint(); } catch (e) { } },
     boxOpen: boxOpen, boxClose: boxClose, shopUi: shopUi, panel: panel, icon: icon, dollLine: dollLine, css: css, prefetch: prefetch, stateCtx: stateCtx
 };
