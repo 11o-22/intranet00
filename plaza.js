@@ -390,6 +390,8 @@ const PLAZA = {
         { g: 'life',  n: '이벤트 초대', i: '💌', fn: 'plazaEventInvite', when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
         { g: 'life',  n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
+        // 🎵 리듬 게임 — 상담사만 (rhythm.js · 2026-11-10 사용자 「일단은 상담사만 · 메뉴칸에」) · 광장 위에 띄운다
+        { g: 'life',  n: '리듬 게임',  i: '🎵', fn: 'rhythmOpen', stay: 1, when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },

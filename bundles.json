@@ -482,7 +482,8 @@
       "doll-party.js",
       "doll-walk.js",
       "solo-room.js",
-      "gear-room.js"
+      "gear-room.js",
+      "rhythm.js"
     ]
   ]
 }
