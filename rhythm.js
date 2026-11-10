@@ -33,8 +33,8 @@
 
 const ADMIN = 'kario0987';
 const SONGS = [
-    { key: 'airplane', title: 'In the Airplane', artist: 'Benz', audio: 'snd/rhythm-airplane.mp3', chart: 'rhythm/airplane.json', color: '#7ec8ff' },
-    { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1' }
+    { key: 'airplane', title: 'In the Airplane', artist: 'Benz', audio: 'snd/rhythm-airplane.mp3', chart: 'rhythm/airplane.json', color: '#7ec8ff', cover: 'rhythm/airplane-cover.jpg' },
+    { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1', cover: 'rhythm/client-cover.jpg' }      // 표지 (2026-11-11 사용자) — 없는 곡은 까만 칸
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
@@ -191,11 +191,11 @@ function css() {
         '.rg-h{font-size:12px;letter-spacing:4px;color:#9ab;opacity:.9;}',
         '.rg-song{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
         '.rg-song.on{background:rgba(255,255,255,.16);border-color:var(--c);box-shadow:0 0 14px -4px var(--c);}',
-        '.rg-song i.rg-sq{width:52px;height:52px;border-radius:8px;background:#000;border:1px solid rgba(255,255,255,.14);flex-shrink:0;}',
+        '.rg-song i.rg-sq{width:52px;height:52px;border-radius:8px;background:#000 center/cover no-repeat;border:1px solid rgba(255,255,255,.14);flex-shrink:0;}',
         '.rg-song b{display:block;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
         '.rg-song small{font-size:11px;color:#aab;}',
         '.rg-big{flex:1;display:flex;gap:16px;align-items:center;min-width:0;}',
-        '.rg-jacket{width:min(36%,230px);aspect-ratio:1;height:auto;border-radius:14px;background:#000;border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 40px rgba(0,0,0,.6);flex-shrink:0;}',
+        '.rg-jacket{width:min(36%,230px);aspect-ratio:1;height:auto;border-radius:14px;background:#000 center/cover no-repeat;border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 40px rgba(0,0,0,.6);flex-shrink:0;}',
         '.rg-info{display:flex;flex-direction:column;gap:9px;min-width:0;flex:1;}',
         '.rg-title{font-size:22px;font-weight:bold;color:#fff;line-height:1.2;}',
         '.rg-diffs{display:flex;gap:8px;flex-wrap:wrap;}',
@@ -288,6 +288,7 @@ window.rhythmClose = close;
 // ==========================================
 let MODE = 'off';        // menu · load · play · pause · result
 function song() { return SONGS.find(function (s) { return s.key === SET.song; }) || SONGS[0]; }
+function coverCss(x) { return x.cover ? ' style="background-image:url(\'' + x.cover + '\')"' : ''; }
 function bestOf(k, d) { const b = loadJ(BEST_KEY, {}); return b[k + '/' + d] || null; }
 function menu() {
     MODE = 'menu';
@@ -295,7 +296,7 @@ function menu() {
     const chart = CH[s.key];
     if (!chart) loadChart(s).then(function () { if (MODE === 'menu' && song().key === s.key) menu(); }).catch(function () { });
     const songs = SONGS.map(function (x) {
-        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + '</small></div></div>';
+        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"' + coverCss(x) + '></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + '</small></div></div>';
     }).join('');
     const bpm = chart ? (Array.isArray(chart.bpm) ? chart.bpm[0] + '–' + chart.bpm[1] : chart.bpm) : '…';
     const len = chart ? Math.floor(chart.dur / 60000) + ':' + String(Math.floor(chart.dur / 1000) % 60).padStart(2, '0') : '';
@@ -313,7 +314,7 @@ function menu() {
         + '<div class="rg-row"><span>싱크</span><span class="rg-step"><button data-k="of-">−</button><span>' + (SET.offset > 0 ? '+' : '') + SET.offset + 'ms</span><button data-k="of+">+</button></span>'
         + '<button class="rg-btn" data-k="hit" style="padding:6px 10px;font-size:12px;">타격음 ' + (SET.hit ? 'ON' : 'OFF') + '</button></div>'
         + '<div style="font-size:10px;color:#889;line-height:1.5;">소리가 노트보다 늦게 들리면 싱크를 + 로</div></div>'
-        + '<div class="rg-big"><div class="rg-jacket"></div><div class="rg-info">'
+        + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div style="font-size:12px;color:#aab;">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
         + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
