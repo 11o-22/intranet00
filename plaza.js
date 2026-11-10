@@ -344,6 +344,8 @@ const PLAZA = {
         { g: 'point', n: '포인트' },
         { g: 'dark',  n: '탐사' },
         { g: 'life',  n: '생활' },
+        // 🎮 오락 — 인형 · 펫 · 놀이를 생활에서 떼어 따로 (2026-11-10 사용자)
+        { g: 'fun',   n: '오락' },
         { g: 'shop',  n: '상점' }
     ],
     MENU: [
@@ -378,20 +380,20 @@ const PLAZA = {
         // ⑤ 생활
         { g: 'life',  n: '사택',       i: '🏠', ic: 'house',   tab: 'tab-house',    sub: 'house-main' },
         { g: 'life',  n: '옷장',       i: '👔', ic: 'closet',  tab: 'tab-house',    sub: 'house-closet' },
-        { g: 'life',  n: '인형 돌보기',  i: '🧸', ic: 'pet',     fn: 'petOpen' },
+        { g: 'fun',   n: '인형 돌보기',  i: '🧸', ic: 'pet',     fn: 'petOpen' },
         // 📸 포토존 — 장소 목록 → 1번 · 2번 방 (안에 있는 사람까지) → 누르면 그 방으로
         { g: 'life',  n: '포토존',     i: '📸', ic: 'camera',  sheet: 'photo' },
         // 🀄 마작 — 누구나 (2026-10-31 사용자 · 전에는 상담실 · 선녀탕 안에서만) · 3인 · 4인 (mj-ui.js)
-        { g: 'life',  n: '마작',       i: '🀄', ic: 'mahjong', fn: 'mjOpen' },
+        { g: 'fun',   n: '마작',       i: '🀄', ic: 'mahjong', fn: 'mjOpen' },
         // 🫣 숨바꼭질 — 둘 이상 · 접속한 사람을 불러 (hideseek.js · 2026-11-02 사용자)
-        { g: 'life',  n: '숨바꼭질',   i: '🫣', ic: 'hide',    fn: 'hsOpen' },
+        { g: 'fun',   n: '숨바꼭질',   i: '🫣', ic: 'hide',    fn: 'hsOpen' },
         // 🎉 이벤트 맵 — 상담사가 초대한 사람에게만 보인다 · 상담사에게는 초대 칸 (2026-11-09 사용자)
         { g: 'life',  n: '이벤트 맵',  i: '🎉', fn: 'plazaEventGo', when: function () { return typeof window.plazaEventOk === 'function' && window.plazaEventOk(); } },
         { g: 'life',  n: '이벤트 초대', i: '💌', fn: 'plazaEventInvite', when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
-        { g: 'life',  n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
+        { g: 'fun',   n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
         // 🎵 리듬 게임 — 상담사만 (rhythm.js · 2026-11-10 사용자 「일단은 상담사만 · 메뉴칸에」) · 광장 위에 띄운다
-        { g: 'life',  n: '리듬 게임',  i: '🎵', fn: 'rhythmOpen', stay: 1, when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
+        { g: 'fun',   n: '리듬 게임',  i: '🎵', fn: 'rhythmOpen', stay: 1, when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
