@@ -129,6 +129,17 @@ function markHelper(pid) {
     }, 700);
 }
 
+// 일반 어둠 횟수를 쓰지 않는 파티인가 — 이상한 나라의 ■■■ (부탁 파티 포함) · 토크 쇼에 초대받은 사람
+function freeOfTries(party) {
+    try {
+        if (!party) return false;
+        if (window.WONDER && window.WONDER.CODE && party.zone === window.WONDER.CODE) return true;
+        if (party.talkShow && party.talkShow.by && typeof window.showInvited === 'function'
+            && currentUser && window.showInvited(party, currentUser.code)) return true;
+    } catch (e) { }
+    return false;
+}
+
 // 횟수 검사를 잠깐 통과시킨다 — 헬퍼는 횟수를 쓰지 않으니까
 function withTriesOpen(fn) {
     if (typeof getDarkTriesLeft !== 'function') return fn();
@@ -290,10 +301,14 @@ function withTriesOpen(fn) {
             // ② 넷 중 하나라도 맞으면 헬퍼 — 명단 표시 · 방의 헬퍼 표 · 이 기기의 헬퍼 탐사 · 남은 횟수 0
             let left = 1;
             try {
+                // ★ 일반 어둠 횟수를 쓰지 않는 길은 「남은 횟수 0」으로 헬퍼를 만들지 않는다 (2026-11-11 사용자 「이 헬퍼 버그도」)
+                //   이상한 나라의 ■■■ 는 횟수가 없는데(부탁 파티도), 일반 어둠 횟수를 다 쓴 사원이 들어가면 여기서 헬퍼가 되어
+                //   끝나고 회수품을 몽땅 되돌렸다. 토크 쇼에 초대받은 사람도 횟수를 쓰지 않는다.
+                if (party && freeOfTries(party)) left = 99;
                 // ★ K 의 방은 K 의 방 횟수로 본다 (2026-11-10 사용자 「Benz · 백야 사원이 K 의 방 헬퍼 버그」) — 일반 어둠 횟수를
                 //   다 쓴 사원이 K 의 방 일행에 들면, K 의 방 횟수가 남아 있어도 「남은 횟수 0」으로 헬퍼가 되었다.
                 //   이 방에서 이미 K 의 방 횟수를 냈으면(새로고침으로 다시 출발 · kroomPaid) 0 이어도 헬퍼로 바꾸지 않는다.
-                if (party && party.zone === 'Qtrew-???-999' && typeof window.kroomTriesLeft === 'function') {
+                else if (party && party.zone === 'Qtrew-???-999' && typeof window.kroomTriesLeft === 'function') {
                     left = Number(window.kroomTriesLeft());
                     if (currentUser && party.id && currentUser.kroomPaid === party.id) left = Math.max(1, left);
                 } else if (typeof getDarkTriesLeft === 'function') left = Number(getDarkTriesLeft());
