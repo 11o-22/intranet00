@@ -126,7 +126,7 @@ function stage() { try { return (typeof window.plazaStage === 'function') ? wind
 function posOf(code) { try { return (typeof window.plazaPosOf === 'function') ? window.plazaPosOf(code) : null; } catch (e) { return null; } }
 function closeOv(id) { const e = document.getElementById(id); if (e) e.remove(); }
 
-// ⏰ 쉬는 시간 (rest-time.js — 2026-11-05 부터 날마다 오전 10시 ~ 오후 6시 · 인트라넷 전체를 덮고 로그아웃시킨다)
+// ⏰ 쉬는 시간 (rest-time.js — 2026-11-10 부터 월~금 10~12시 · 14~17시 · 인트라넷 전체를 덮고 로그아웃시킨다)
 //   그 사이 하던 행맨 판은 취소(why:'rest')로 적고 걷는다 — 쉬는 시간이 끝나고 다시 들어왔을 때 묵은 판이 이어지지 않게. 상품은 없다.
 //   알림은 rest-time.js 의 덮개가 띄우므로 여기서는 조용히.
 const REST_MSG = '휴식을 취하실 시간입니다.';
