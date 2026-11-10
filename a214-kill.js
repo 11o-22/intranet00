@@ -407,8 +407,14 @@ function fallen(text) {
     try {
         const loot = (typeof DARK_LOOT_BY_ZONE !== 'undefined' && DARK_LOOT_BY_ZONE[ZONE]) || [];
         if (!Array.isArray(currentUser.inventory)) currentUser.inventory = [];
+        // ★ 2026-11-10 사용자 — 커스텀 장비로 만든 방은 ×0.1 · 사람 하나로 든 탐사는 바이올린을 굴리지 않는다 (gear-room.js)
+        let g = null;
+        try { g = (typeof window.gearRoomOf === 'function') ? window.gearRoomOf() : null; } catch (e) { }
+        const mult = (g && g.mult > 0) ? g.mult : 1;
+        const solo = g ? !!g.solo : ((Number(r.memberCount) || 1) <= 1);
         loot.forEach(function (l) {
-            if (Math.random() < l.chance) { currentUser.inventory.push(l.name); gained.push(l.name); }
+            if (solo && /바이올린/.test(String(l.name || ''))) return;
+            if (Math.random() < l.chance * mult) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
     } catch (e) { }
 

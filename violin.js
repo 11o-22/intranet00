@@ -29,6 +29,13 @@
 //   신도에게 당해 쓰러질 때 도는 쪽(a214-kill.js 의 fallen)은 배율을
 //   안 먹이므로 표에 그대로 둔다 — 그쪽은 늘 0.001% 다.
 //
+// ■ 솔로 · 커스텀 장비로 만든 방 (2026-11-10 사용자)
+//
+//   「커스텀 장비로 솔로로 돌 때에는 빛을 찾아서에서 바이올린 나올 확률 0%로 해줘.
+//    일반적으로 단체로 들어갈 때만 기존에 설정해 둔 확률로 하고.」
+//   빛을 찾아서는 최소 4인이라 사람 하나로 든 탐사는 커스텀 장비로만 된다 — 굴리지 않는다.
+//   커스텀 장비로 만든 방(gear-room.js)에 여럿이 들면 위 확률 ×0.1. 쓰러질 때 도는 쪽도 같다.
+//
 // ■ 하나뿐인 것을 어떻게 못 박나
 //
 //   굴림에 걸려도 그것만으로는 못 가진다. 최상위 자리 하나를 선점한다.
@@ -169,7 +176,9 @@ function claim() {
         const w = function () {
             const inZone = (typeof darkRun !== 'undefined') && darkRun && darkRun.zone === ZONE;
             // 정산이 끝나면 darkRun 이 null 이 된다 — 배율은 **미리** 재 둔다
-            const rate = inZone ? rollRate(me()) : 0;
+            // ★ 2026-11-10 사용자 — 사람 하나로 든 탐사(커스텀 장비 솔로)는 0% · 커스텀 장비로 만든 방은 ×0.1 (gear-room.js) · 그 밖의 단체는 그대로
+            const g = gearOf();
+            const rate = (inZone && !g.solo) ? rollRate(me()) * g.mult : 0;
             let pulled = null;
             // 표에서 잠시 뺀다 — 안 그러면 배율을 먹는다
             try {
@@ -184,7 +193,7 @@ function claim() {
             finally {
                 try { if (pulled) DARK_LOOT_BY_ZONE[ZONE].push(pulled); } catch (e) { }
             }
-            if (inZone) { try { tryRoll(rate); } catch (e) { console.warn('[🎻]', e); } }
+            if (inZone && rate > 0) { try { tryRoll(rate); } catch (e) { console.warn('[🎻]', e); } }
             return out;
         };
         w._violin = true;
@@ -214,6 +223,12 @@ function lootMult(u) {
 }
 function rollRate(u) {
     return Math.min(RATE_CAP, RATE * lootMult(u));
+}
+// 이 탐사가 솔로인가 · 커스텀 장비로 만든 방인가 (gear-room.js) — 못 읽으면 사람 수만 본다
+function gearOf() {
+    try { if (typeof window.gearRoomOf === 'function') { const g = window.gearRoomOf(); if (g) return g; } } catch (e) { }
+    const r = (typeof darkRun !== 'undefined') ? darkRun : null;
+    return { solo: !!(r && (Number(r.memberCount) || 1) <= 1), mult: 1 };
 }
 
 function tryRoll(rate) {

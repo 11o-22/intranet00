@@ -4928,6 +4928,7 @@ setTimeout(() => { if (currentUser.pollution >= 100) startFoxRoomSequence(); }, 
             if (darkRun.a214Purge) c *= 3;                     // ★ A-214 전원 처리한 신도 — 확률 200% 상승
             if (gearValue(currentUser, 'luck') > 0) c *= 2;    // ★ 행운
             if (typeof emLootMult === 'function') c *= emLootMult(currentUser);   // ★ 에메랄드 하네스
+            if (typeof window.gearRoomMult === 'function') c *= window.gearRoomMult();   // ★ 커스텀 장비로 만든 방 ×0.1 (gear-room.js)
             if (Math.random() < c) { currentUser.inventory.push(l.name); gained.push(l.name); }
         });
 
