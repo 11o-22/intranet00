@@ -803,6 +803,8 @@ function afterMain() {
     attrGate(function () {
         // 🔥 재난의 길 — 상담사가 지정했으면 붉은 카드 (2026-10-30). 들어서면 문(속성)을 다시 묻는다 — 바로 새 속성을 열 수 있게
         if (pathOffered()) { pathPopup(function (went) { if (went) attrGate(goOn); else goOn(); }); return; }
+        // 🌀 교란자의 길 — 상담사가 지정했으면 파란 카드 (2026-11-10)
+        if (jamOffered()) { jamPopup(function () { goOn(); }); return; }
         if (hiddenOffered()) { hiddenPopup(goOn); return; }
         goOn();
     });
@@ -1198,7 +1200,7 @@ function bar() {
     const d = kr.dun ? DUNS[kr.dun] : null;
     return `<div style="background:rgba(0,0,0,0.35); border:1px solid #23343b; border-radius:6px; padding:8px 10px; margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; font-size:10px; color:#8fb8c4; margin-bottom:5px;">
-            <span>Lv ${k.lv} · ${kr.job ? ATTR[JOBS[kr.job][0]].i + ' ' + esc(jobName(kr.job, k.grade)) + ' ' + k.grade : ''}</span>
+            <span>Lv ${k.lv} · ${kr.job ? ATTR[JOBS[kr.job][0]].i + ' ' + esc(jobName(kr.job, k.grade)) + ' ' + k.grade : ''}${k.jamTrait && k.jamTrait.at ? ' · <span style="color:#7ab8ff;">🌀 교란</span>' : ''}</span>
             <span>${d ? esc(d.n || kr.dun) + (kr.floor ? ' · ' + kr.floor + '층' : '') : ''}</span>
         </div>${rows}
         ${kr.gear && Object.keys(kr.gear).length ? '<div style="font-size:10px; color:#b9a3e0; margin-top:4px;">' + Object.keys(kr.gear).map(function (a) { return ATTR[a].i + ' ' + GEAR_K[a].n + ' ' + kr.gear[a].left + '/' + kr.gear[a].n; }).join(' · ') + '</div>' : ''}
@@ -1677,6 +1679,7 @@ window.kroomNext = function () {
     if (kr.idx >= fl.length) { rest(); return; }
     const it = fl[kr.idx];
     kr.cur = it;
+    kr._jamVis = null;
     // 정신력이 바닥이면 한 번 폭주 — 고를 수 없다
     if (kr.stats.spirit <= 0 && !kr._panic) {
         kr._panic = true;
@@ -1697,6 +1700,10 @@ window.kroomNext = function () {
     const fsee = foxSee();                                    // 🎐 여우 신도 — 회피 7 이상
     const skull = jisanOn() || bw || fsee;                    // 📖 읽어내기 · 🦋 프시케의 유리 · 🎐 회피 — 즉사 기믹에 🈲 (🎐 는 ☪️)
     kr._bfFav = bw ? B.fav(vis, JOBS[kr.job][0]) : -1;        // 🦋 유리한 쪽 — ◈
+    // 🌀 같은 방의 누군가가 「교란」을 가졌다 — 선택지 순서가 섞이고 글자가 가려진다 (12. 교란자의 길)
+    const J = jamOnMe();
+    if (J) vis = jamShuffle(vis, it.sc.t);
+    kr._jamVis = J ? vis.filter(function (v) { const c = v.o.cost ? Object.keys(v.o.cost)[0] : null; return !c || (kr.stats[c] || 0) >= v.o.cost[c]; }).map(function (v) { return v.i; }) : null;
     show(it.sc.t, head + tag + it.sc.x + (fs ? '<br><br><span style="color:#9fd8ef;">' + fs.line + '</span>' : '')
         + (bw && kr._bfFav >= 0 ? '<br><br><span style="font-size:11px; color:#c9b8ff;">— 유리 너머로 한쪽이 맑게 비친다. (◈)</span>' : '')
         + (fsee && vis.some(function (v) { return v.o.doom; }) ? '<br><br><span style="font-size:11px; color:#f0c987;">「 여우 꼬리가 한쪽을 가린다. ☪️ 가 붙은 쪽은 죽는 길이다. 」</span>' : ''),
@@ -1707,7 +1714,7 @@ window.kroomNext = function () {
             const can = !cost || (kr.stats[cost] || 0) >= o.cost[cost];
             const lab = (skull && o.doom ? (fsee ? '☪️ ' : '<span style="color:#ff6b6b;">🈲</span> ') : '')
                 + (v.i === kr._bfFav ? '<span style="color:#c9b8ff;">◈</span> ' : '')
-                + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + o.l + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
+                + (o.job ? '<span style="color:#d4af37;">◇</span> ' : '') + (J ? jamText(o.l, it.sc.t + ':' + v.i) : o.l) + (cost ? ' <span style="font-size:10px; color:' + BARC[cost] + ';">(' + RES[cost] + ' ' + o.cost[cost] + ')</span>' : '')
                 + (o.only ? ' <span style="font-size:10px; color:#8fb8c4;">' + ATTR[o.only].i + '</span>' : '');
             return can ? darkChoiceBtn(lab, 'kroomPick(' + v.i + ')')
                        : `<button class="game-btn" disabled style="width:100%; margin:0 0 8px 0; padding:12px; text-align:left; font-size:12px; opacity:.4;">${lab}</button>`;
@@ -1729,6 +1736,7 @@ const PASS = { l: '이를 악물고 지나간다.', dc: 12,
     ng: '지나가긴 했다.<br><br>지나가는 동안 몇 번 부딪혔다. 몸이 기억한다.', lose: { hp: -8, mind: -6 } };
 window.kroomPick = function (i) {
     if (!kr || !kr.cur || kr._picking) return;
+    if (i >= 0) i = jamSwap(i);                               // 🌀 교란 — 가끔 다른 선택지로
     const it = kr.cur;
     let o = (i === -1) ? Object.assign({ k: JOBS[kr.job][0] }, PASS) : it.sc.o[i]; if (!o) return;
     kr._picking = true; setTimeout(function () { if (kr) kr._picking = false; }, 400);
@@ -4395,6 +4403,433 @@ window.kroomPathState = function () {
     console.log('  속성 — ' + JSON.stringify(pathLvs(k, u)) + (onPath(k) ? ' · 다음에 열 수 있는 속성: ' + (nextAttr(k, u) ? ATTR[nextAttr(k, u)].n : '없음 (열 가지 다 열었다)') : ''));
 };
 
+// ==========================================
+// 12. 🌀 교란자의 길 — 재난의 길을 두 번째로 끝까지 걸은 사원에게 (2026-11-10 사용자)
+// ==========================================
+//   「재앙의 길 두번째 달성한 사람한테는 교란자의 길을 줄 수 있게 해줘. 카드는 파란색으로.」
+//   ■ 조건 — 🔥 재난의 길에 들어선 뒤, 들어설 때의 세 속성(k.path.attrs) 말고 **세 속성을 더** 최고 Lv (Lv 100).
+//            (콘솔로 걷게 한 사람처럼 attrs 가 없으면 최고 Lv 속성이 여섯 이상)
+//            히든 직업을 받은 사원은 오르지 않는다. 한 사람에 한 번.
+//   ■ 흐름 — 재난의 길과 같다. 조건을 채우면 상담사에게 알림 (통제 콘솔 「교란자의 길 관리」) → 지정하면
+//            다음에 K 의 방에 들어설 때 파란 카드 『 교란자의 길로 들어서겠습니까? 』 → 들어선다 / 거절한다.
+//   ■ 들어서면 — kroom.jam = { at, by, attrs } 를 적는다. 효과는 사용자가 나중에 정한다 (지금은 기록만).
+//   kroomPath2/<사번> = { state, code, name, no, lvs, at, offeredAt, offeredBy, answeredAt }  (state 는 재난의 길과 같다)
+const J_NODE = 'kroomPath2';
+const JAM_MORE = 3;
+const JAM_NAME = '교란자의 길';
+let jMine = null, jMineRef = null, jMineCode = '';
+let jAll = {}, jAllOn = false, jSwept = false;
+function onJam(k) { return !!(k && typeof k === 'object' && k.jam && k.jam.at); }
+// 재난의 길에 들어선 뒤 새로 끝까지 걸은 속성
+function jamFull(k, u) {
+    const was = (k && k.path && Array.isArray(k.path.attrs)) ? k.path.attrs : null;
+    const full = pathFull(k, u);
+    return was ? full.filter(function (a) { return was.indexOf(a) < 0; }) : full.slice(PATH_NEED);
+}
+function jamEligible(k, u, h) {
+    if (!k || typeof k !== 'object' || stale(k) || !onPath(k) || onJam(k)) return false;
+    if (pathHadHidden(k, h)) return false;
+    return jamFull(k, u).length >= JAM_MORE;
+}
+window.kroomOnJam = function (u) { return onJam(prof(u || me())); };
+
+// 사원 쪽 — 조건을 채우면 한 번 올린다
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d) return;
+    if (jMineCode === u.code) return;
+    try { if (jMineRef) jMineRef.off(); } catch (e) { }
+    jMineCode = u.code; jMine = null;
+    jMineRef = d.ref(J_NODE + '/' + u.code);
+    jMineRef.on('value', function (s) { jMine = s.val() || null; });
+}, 1500);
+function jamCheck() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code === ADMIN) return;
+    const k = prof(u);
+    if (jMine && jMine.state) return;
+    if (k.jamAsk) return;
+    if (!jamEligible(k, u, hMine)) return;
+    k.jamAsk = now();
+    saveProf();
+    const entry = { state: 'ready', code: u.code, name: u.name || '', no: String(u.no || ''), lvs: pathLvs(k, u), at: now() };
+    d.ref(J_NODE + '/' + u.code).transaction(function (cur) { return (cur && cur.state) ? undefined : entry; }).catch(function () { });
+    addHistoryLog(u, '[K 의 방] 불길 너머에서 세 갈래를 더 걸었다. 발밑이 차갑다.');
+    try { saveFields({ history: 1 }); } catch (e) { }
+}
+setInterval(function () { try { if (me() && !kr) jamCheck(); } catch (e) { } }, 20000);
+
+function jamOffered() {
+    const k = prof();
+    return !!(jMine && jMine.state === 'offered' && k && onPath(k) && !onJam(k) && !pathHadHidden(k, hMine));
+}
+
+// 파란 카드 — 『 교란자의 길로 들어서겠습니까? 』
+function jamCss() {
+    if (document.getElementById('kjam-css')) return;
+    const st = document.createElement('style');
+    st.id = 'kjam-css';
+    st.textContent = [
+        '#kjam-ov{position:fixed;inset:0;z-index:2147483200;display:flex;flex-direction:column;align-items:center;justify-content:center;',
+        '  padding:20px;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,rgba(8,26,70,.94) 0%,rgba(4,8,22,.97) 45%,rgba(1,2,8,.99) 80%);',
+        '  animation:kjamFade 1.2s ease both;}',
+        '#kjam-ov .kjam-mote{position:absolute;bottom:-10px;width:3px;height:3px;border-radius:50%;background:#a8d8ff;',
+        '  box-shadow:0 0 6px #3c8cff,0 0 12px rgba(60,140,255,.6);opacity:0;animation:kjamRise linear infinite;pointer-events:none;}',
+        '#kjam-ov .kjam-ring{position:absolute;width:330px;height:330px;border-radius:50%;top:50%;left:50%;margin:-215px 0 0 -165px;',
+        '  border:1px solid rgba(60,140,255,.22);box-shadow:0 0 60px rgba(40,110,255,.14) inset;animation:kjamSpin 40s linear infinite;pointer-events:none;}',
+        '#kjam-ov .kjam-ring:after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px dashed rgba(90,160,255,.16);}',
+        '#kjam-ov .kjam-card{position:relative;width:168px;aspect-ratio:2/3;border-radius:14px;display:flex;flex-direction:column;',
+        '  align-items:center;justify-content:center;background:linear-gradient(155deg,#0a2a5a 0%,#040e24 52%,#08244e 100%);',
+        '  border:2px solid #4a9aff;box-shadow:0 0 18px rgba(60,140,255,.8),0 0 60px rgba(30,100,255,.4),inset 0 0 24px rgba(110,170,255,.3);',
+        '  animation:kjamIn 1.7s cubic-bezier(.2,.8,.2,1) both,kjamGlow 2.4s ease-in-out 1.7s infinite;}',
+        '#kjam-ov .kjam-card:before{content:"";position:absolute;inset:7px;border-radius:9px;border:1px solid rgba(130,190,255,.4);}',
+        '#kjam-ov .kjam-card:after{content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;',
+        '  background:linear-gradient(115deg,transparent 32%,rgba(190,225,255,.4) 50%,transparent 68%);background-size:260% 100%;',
+        '  animation:kjamSheen 3.6s ease-in-out 1.7s infinite;}',
+        '#kjam-ov .kjam-tag{position:absolute;top:16px;font-size:9px;letter-spacing:6px;color:#7ab8ff;}',
+        '#kjam-ov .kjam-ico{font-size:44px;text-shadow:0 0 14px #3c8cff,0 0 30px rgba(40,120,255,.7);}',
+        '#kjam-ov .kjam-nm{margin-top:12px;font-size:19px;letter-spacing:4px;color:#dceaff;text-shadow:0 0 10px rgba(60,140,255,.9);',
+        '  font-family:"Nanum Myeongjo","Noto Serif KR",serif;font-weight:bold;}',
+        '#kjam-ov .kjam-at{position:absolute;bottom:16px;font-size:10px;letter-spacing:3px;color:#6a9ad0;}',
+        '#kjam-ov .kjam-q{margin-top:30px;font-size:17px;letter-spacing:3px;color:#c8e0ff;text-align:center;line-height:1.7;',
+        '  text-shadow:0 0 12px rgba(60,140,255,.8);font-family:"Nanum Myeongjo","Noto Serif KR",serif;animation:kjamFade 1.4s ease 1.3s both;}',
+        '#kjam-ov .kjam-note{margin-top:10px;font-size:11px;color:#90a8c4;text-align:center;line-height:1.7;animation:kjamFade 1.4s ease 1.8s both;}',
+        '#kjam-ov .kjam-btns{display:flex;gap:10px;margin-top:22px;animation:kjamFade 1.4s ease 2.2s both;}',
+        '#kjam-ov .kjam-btns button{padding:11px 22px;border-radius:999px;font-size:13px;cursor:pointer;font-family:inherit;}',
+        '#kjam-ov .kjam-yes{background:linear-gradient(145deg,#3a7ae0,#12308a);color:#ecf4ff;font-weight:bold;border:1px solid #6aa8ff;',
+        '  box-shadow:0 0 16px rgba(60,140,255,.6);}',
+        '#kjam-ov .kjam-no{background:rgba(0,0,0,.25);color:#8094b0;border:1px solid #22385a;}',
+        '#kjam-ov.done .kjam-card{animation:kjamBurst 1.2s ease both;}',
+        '@keyframes kjamFade{from{opacity:0}to{opacity:1}}',
+        '@keyframes kjamIn{0%{transform:translateY(40px) rotateY(180deg) scale(.55);opacity:0;filter:brightness(3)}',
+        '  55%{opacity:1}100%{transform:none;opacity:1;filter:none}}',
+        '@keyframes kjamGlow{0%,100%{box-shadow:0 0 18px rgba(60,140,255,.8),0 0 60px rgba(30,100,255,.4),inset 0 0 24px rgba(110,170,255,.3)}',
+        '  50%{box-shadow:0 0 32px rgba(90,170,255,1),0 0 110px rgba(40,110,255,.6),inset 0 0 36px rgba(140,190,255,.45)}}',
+        '@keyframes kjamSheen{0%{background-position:160% 0}100%{background-position:-60% 0}}',
+        '@keyframes kjamRise{0%{transform:translateY(0) translateX(0);opacity:0}12%{opacity:.95}100%{transform:translateY(-112vh) translateX(24px);opacity:0}}',
+        '@keyframes kjamSpin{to{transform:rotate(360deg)}}',
+        '@keyframes kjamBurst{0%{filter:brightness(1)}35%{filter:brightness(2.6);transform:scale(1.08)}100%{filter:brightness(1.2);transform:scale(1)}}'
+    ].join('\n');
+    document.head.appendChild(st);
+}
+function jamPopup(cont) {
+    const u = me(), k = prof(u);
+    jamCss();
+    const old = document.getElementById('kjam-ov'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'kjam-ov';
+    let mote = '';
+    for (let i = 0; i < 34; i++) {
+        mote += '<i class="kjam-mote" style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-duration:'
+            + (5 + Math.random() * 8).toFixed(1) + 's;animation-delay:' + (Math.random() * 8).toFixed(1) + 's;"></i>';
+    }
+    const more = jamFull(k, u);
+    ov.innerHTML = mote + '<div class="kjam-ring"></div>'
+        + '<div class="kjam-card"><div class="kjam-tag">DISRUPTOR</div>'
+        + '<div class="kjam-ico">🌀</div>'
+        + '<div class="kjam-nm">' + esc(JAM_NAME) + '</div>'
+        + '<div class="kjam-at">' + more.map(function (a) { return ATTR[a] ? ATTR[a].i : ''; }).join(' ') + '</div></div>'
+        + '<div class="kjam-q">『 ' + esc(JAM_NAME) + '로 들어서겠습니까? 』</div>'
+        + '<div class="kjam-note">' + (more.length ? more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' — ' : '')
+        + '불길 너머에서 세 갈래를 더 끝까지 걸었다.<br>'
+        + '한 번 들어서면 돌아오지 않는다.</div>'
+        + '<div class="kjam-btns"><button class="kjam-no">거절한다</button><button class="kjam-yes">들어선다</button></div>';
+    document.body.appendChild(ov);
+    let done = false;
+    const close = function (went) { setTimeout(function () { ov.remove(); if (typeof cont === 'function') cont(went); }, 1900); };
+    ov.querySelector('.kjam-yes').onclick = function () {
+        if (done) return; done = true;
+        if (!cont) { ov.remove(); return; }                   // 상담사 미리 보기 — 아무것도 바꾸지 않는다
+        k.jam = { at: now(), by: (jMine && jMine.offeredBy) || null, attrs: more.slice(0, JAM_MORE) };   // 이 셋 말고 셋을 더 걸으면 부가 특성 「교란」
+        saveProf();
+        addHistoryLog(u, '[K 의 방] 🌀 ' + JAM_NAME + '로 들어섰다 — ' + more.map(function (a) { return ATTR[a] ? ATTR[a].n : a; }).join(' · ') + ' 을(를) 더 끝까지 걷고.');
+        try { saveFields({ kroom: 1, history: 1 }); } catch (e) { }
+        try { db_().ref(J_NODE + '/' + u.code).update({ state: 'accepted', answeredAt: now(), lvs: pathLvs(k, u) }); } catch (e) { }
+        if (jMine) jMine.state = 'accepted';
+        if (darkRun && darkRun.isParty) { try { sendPartyChat(u.name + ' 사원이 ' + JAM_NAME + '로 들어섰습니다.', true); } catch (e) { } }
+        ov.classList.add('done');
+        ov.querySelector('.kjam-q').innerHTML = '🌀 ' + esc(JAM_NAME) + ' 🌀';
+        ov.querySelector('.kjam-note').innerHTML = '불이 꺼진 자리에 물결이 인다.';
+        ov.querySelector('.kjam-btns').remove();
+        close(true);
+    };
+    ov.querySelector('.kjam-no').onclick = function () {
+        if (done) return; done = true;
+        if (!cont) { ov.remove(); return; }
+        try { db_().ref(J_NODE + '/' + u.code).update({ state: 'declined', answeredAt: now() }); } catch (e) { }
+        if (jMine) jMine.state = 'declined';
+        addHistoryLog(u, '[K 의 방] 파란 카드를 덮었다.');
+        try { saveFields({ history: 1 }); } catch (e) { }
+        ov.querySelector('.kjam-card').style.transition = 'opacity 1.2s, transform 1.2s';
+        ov.querySelector('.kjam-card').style.opacity = '0';
+        ov.querySelector('.kjam-card').style.transform = 'rotateY(180deg) scale(.7)';
+        ov.querySelector('.kjam-q').innerHTML = '물결이 가라앉는다.';
+        ov.querySelector('.kjam-note').innerHTML = '';
+        ov.querySelector('.kjam-btns').remove();
+        close(false);
+    };
+}
+window.kroomJamPreview = function () { jamPopup(null); };      // 상담사 — 카드 모양 보기 (아무것도 안 바뀐다)
+
+// 상담사 — 조건을 채운 사원을 찾아 올린다 · 못 채우게 된 ready 는 거둔다
+function jMeets(c, v) {
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    const k = pLive(c);
+    if (k) return jamEligible(k, book[c], hAll[c]);
+    return false;
+}
+function jamSweep() {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN) return 0;
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    let n = 0;
+    Object.keys(jAll).forEach(function (c) {
+        const h = jAll[c];
+        if (!h || h.state !== 'ready' || !pLive(c) || jMeets(c, h)) return;
+        d.ref(J_NODE + '/' + c).transaction(function (cur) { return (!cur || cur.state !== 'ready') ? undefined : null; })
+            .then(function (res) { if (res && res.committed) console.log('[교란자의 길] ' + (((book[c] || {}).name) || h.name || c) + ' — 지금은 조건에 맞지 않아 목록에서 거뒀습니다.'); })
+            .catch(function () { });
+    });
+    Object.keys(book).forEach(function (c) {
+        if (c === ADMIN || (jAll[c] && jAll[c].state)) return;
+        const w = book[c], k = w && w.kroom;
+        if (!k || !jamEligible(k, w, hAll[c])) return;
+        const entry = { state: 'ready', code: c, name: w.name || '', no: String(w.no || ''), lvs: pathLvs(k, w), at: now(), by: 'sweep' };
+        n++;
+        d.ref(J_NODE + '/' + c).transaction(function (cur) { return (cur && cur.state) ? undefined : entry; }).catch(function () { });
+    });
+    return n;
+}
+window.kroomJamSweep = jamSweep;
+setInterval(function () { try { if (jAllOn) jamSweep(); } catch (e) { } }, 60000);
+function jSeen() { try { return JSON.parse(localStorage.getItem('kJamSeen') || '{}'); } catch (e) { return {}; } }
+function jSeenPut(m) { try { localStorage.setItem('kJamSeen', JSON.stringify(m)); } catch (e) { } }
+setInterval(function () {
+    const u = me(), d = db_();
+    if (!u || !d || u.code !== ADMIN || jAllOn) return;
+    jAllOn = true;
+    d.ref(J_NODE).on('value', function (s) {
+        jAll = s.val() || {};
+        if (!jSwept) { jSwept = true; setTimeout(function () { try { jamSweep(); } catch (e) { } }, 9000); }
+        const seen = jSeen(), news = [];
+        Object.keys(jAll).forEach(function (c) {
+            const v = jAll[c] || {};
+            if (v.state !== 'ready' || !jMeets(c, v)) return;
+            const id = c + ':' + v.at;
+            if (seen[id]) return;
+            seen[id] = 1; news.push(v);
+        });
+        if (news.length) {
+            jSeenPut(seen);
+            try { showCustomAlert('🌀 ' + JAM_NAME + '\n\n' + news.map(function (v) { return '🌀 ' + v.name + ' 사원' + (v.no ? ' (' + v.no + ')' : '') + ' — 재난의 길에서 세 속성 더 최고 Lv'; }).join('\n') + '\n\n통제 콘솔 「' + JAM_NAME + ' 관리」에서 정할 수 있습니다.'); } catch (e) { }
+        }
+        const wait = Object.keys(jAll).filter(function (c) { return (jAll[c] || {}).state === 'ready' && jMeets(c, jAll[c]); }).length;
+        const btn = document.getElementById('btn-admin-console');
+        if (btn && wait > 0) btn.classList.add('notify-dot');
+        try { jamPaint(); } catch (e) { }
+    });
+}, 1500);
+const J_STATE = {
+    ready: ['조건 달성 — 정해 주세요', '#7ab8ff'], offered: ['지정함 — K 의 방에 들어서면 파란 카드', '#c9a8ff'],
+    accepted: ['들어섬', '#4CAF50'], declined: ['사원이 거절함', '#ff8a80'], denied: ['주지 않기로 함', '#888']
+};
+function jamPaint() {
+    const box = document.getElementById('admin-jam-list');
+    if (!box) return;
+    const order = { ready: 0, offered: 1, declined: 2, denied: 3, accepted: 4 };
+    const codes = Object.keys(jAll).filter(function (c) { const v = jAll[c] || {}; return !(v.state === 'ready' && !jMeets(c, v)); })
+        .sort(function (a, b) { return (order[(jAll[a] || {}).state] || 9) - (order[(jAll[b] || {}).state] || 9) || ((jAll[b] || {}).at || 0) - ((jAll[a] || {}).at || 0); });
+    if (!codes.length) { box.innerHTML = '<div style="font-size:11px; color:#777; padding:8px 0;">아직 조건을 채운 사원이 없습니다.</div>'; return; }
+    const book = (typeof db !== 'undefined' && db.users) || {};
+    box.innerHTML = codes.map(function (c) {
+        const v = jAll[c] || {};
+        const st = J_STATE[v.state] || [v.state, '#aaa'];
+        const k = pLive(c);
+        const lvs = k ? pathLvs(k, book[c]) : (v.lvs || {});
+        let btns = '';
+        if (v.state === 'ready' || v.state === 'denied' || v.state === 'declined') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px; background:linear-gradient(145deg,#2a62c0,#10307a) !important; color:#ecf4ff !important; border-color:#6aa8ff !important;" onclick="kroomJamAct(\'' + c + '\',\'offer\')">'
+                + (v.state === 'ready' ? '지정한다' : '다시 지정한다') + '</button>';
+            if (v.state === 'ready') btns += '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomJamAct(\'' + c + '\',\'deny\')">주지 않는다</button>';
+        } else if (v.state === 'offered') {
+            btns = '<button class="game-btn" style="flex:1; margin:0; padding:8px; font-size:11px;" onclick="kroomJamAct(\'' + c + '\',\'withdraw\')">지정을 거둔다</button>';
+        }
+        return '<div style="border:1px solid #22385a; border-radius:6px; padding:10px; margin-bottom:8px; background:rgba(60,140,255,.05);">'
+            + '<div style="display:flex; align-items:center; gap:6px; font-size:12px;"><b style="color:#fff;">' + esc(v.name || c) + '</b>'
+            + '<span style="font-size:10px; color:#888;">' + esc(v.no || c) + '</span>'
+            + '<span style="margin-left:auto; font-size:10px; color:' + st[1] + ';">' + esc(st[0]) + '</span></div>'
+            + '<div style="font-size:11px; color:#a8ccff; margin-top:5px;">' + Object.keys(lvs).map(function (a) { return (ATTR[a] ? ATTR[a].i + ' ' + ATTR[a].n : a) + ' Lv ' + lvs[a]; }).join(' · ') + '</div>'
+            + ((v.state === 'offered' || v.state === 'declined' || v.state === 'denied') && !jMeets(c, v) ? '<div style="font-size:10px; color:#ff8a80; margin-top:4px;">지금은 조건(재난의 길 · 세 속성 더 최고 Lv · 히든 직업 없음)에 맞지 않습니다.</div>' : '')
+            + (btns ? '<div style="display:flex; gap:6px; margin-top:8px;">' + btns + '</div>' : '')
+            + '</div>';
+    }).join('');
+}
+window.kroomJamAct = function (code, act) {
+    const u = me(), d = db_();
+    if (!u || u.code !== ADMIN || !d) return;
+    const v = jAll[code]; if (!v) return;
+    if (act === 'offer' && !jMeets(code, v)) {
+        try { showCustomAlert((v.name || code) + ' 사원은 지금 조건에 맞지 않습니다.\n\n재난의 길에 들어선 뒤 세 속성을 더 최고 Lv 로 올렸고, 히든 직업을 받지 않은 사원에게만 줄 수 있습니다.'); } catch (e) { }
+        return;
+    }
+    let up = null;
+    if (act === 'offer') up = { state: 'offered', offeredAt: now(), offeredBy: u.code };
+    else if (act === 'deny') up = { state: 'denied', answeredAt: now() };
+    else if (act === 'withdraw') up = { state: 'ready', offeredAt: null };
+    if (!up) return;
+    d.ref(J_NODE + '/' + code).update(up).then(function () {
+        try {
+            showCustomAlert(act === 'offer' ? (v.name + ' 사원에게 ' + JAM_NAME + '을 지정했습니다.\n\n다음에 K 의 방에 들어설 때 파란 카드가 뜹니다.')
+                : act === 'deny' ? (v.name + ' 사원에게는 주지 않기로 했습니다.') : '지정을 거두었습니다.');
+        } catch (e) { }
+    }).catch(function (e) { try { showCustomAlert('적지 못했습니다.\n\n' + (e && e.message)); } catch (x) { } });
+};
+(function jamPanel() {
+    function make() {
+        const scr = document.getElementById('admin-screen');
+        if (!scr || document.getElementById('admin-jam-box')) return;
+        const anchor = document.getElementById('admin-path-box') || document.getElementById('admin-hidden-box') || scr.querySelector('.action-buttons');
+        const html = '<div class="admin-panel-box" id="admin-jam-box" style="border-color:#2a62c0; background-color:#060e1a;">'
+            + '<h4 style="color:#7ab8ff;">🌀 ' + JAM_NAME + ' 관리 (K 의 방)</h4>'
+            + '<div style="font-size:10px; color:#aaa; margin-bottom:10px; line-height:1.6;">'
+            + '조건 — 🔥 재난의 길에 들어선 뒤, 들어설 때의 세 속성 말고 세 속성을 더 최고 Lv (Lv ' + LV_MAX + ') 까지 올린 사원. 히든 직업을 받은 사원은 오르지 않습니다.<br>'
+            + '지정하면 그 사원이 K 의 방에 들어설 때 파란 카드 『 ' + JAM_NAME + '로 들어서겠습니까? 』 가 뜹니다. 한 사람에 한 번. (들어선 뒤의 효과는 아직 없습니다 — 기록만)'
+            + '</div><div id="admin-jam-list"></div>'
+            + '<button class="game-btn" style="width:100%; margin:8px 0 0 0; padding:7px; font-size:10px;" onclick="kroomJamPreview()">카드 모양 보기</button></div>';
+        if (anchor && (anchor.id === 'admin-path-box' || anchor.id === 'admin-hidden-box')) anchor.insertAdjacentHTML('afterend', html);
+        else if (anchor) anchor.insertAdjacentHTML('beforebegin', html);
+        else scr.insertAdjacentHTML('beforeend', html);
+    }
+    const iv = setInterval(function () {
+        if (typeof openAdminScreen !== 'function') return;
+        if (openAdminScreen._kJam) { clearInterval(iv); return; }
+        const _o = openAdminScreen;
+        const w = function () {
+            const r = _o.apply(this, arguments);
+            setTimeout(function () { make(); jamPaint(); }, 260);
+            return r;
+        };
+        Object.keys(_o).forEach(function (k) { try { w[k] = _o[k]; } catch (e) { } });
+        w._kJam = true;
+        openAdminScreen = w; window.openAdminScreen = w;
+        clearInterval(iv);
+    }, 500);
+})();
+window.kroomJamState = function () {
+    const u = me(), k = prof(u); if (!k) return;
+    console.log('%c===== 🌀 ' + JAM_NAME + ' =====', 'color:#7ab8ff; font-size:13px');
+    console.log('  재난의 길: ' + (onPath(k) ? '걷는 중' : '아니오') + ' · 교란자의 길: ' + (onJam(k) ? '들어섬 (' + new Date(k.jam.at).toLocaleString() + ')' : '아니오')
+        + ' · 더 걸은 속성 ' + jamFull(k, u).length + ' / ' + JAM_MORE + ' · 서버 상태 ' + ((jMine && jMine.state) || '없음'));
+    if (onJam(k)) console.log('  부가 특성 「교란」: ' + (k.jamTrait && k.jamTrait.at ? '있음' : '없음 — 세 속성 더 ' + jamMore(k, u).length + ' / ' + JAM_MORE));
+};
+
+// ------------------------------------------
+// 🌀 부가 특성 「교란」 (2026-11-10 사용자)
+// ------------------------------------------
+//   「교란자는 추가로 3 개 속성을 더 100레벨로 올릴 수 있고 다 올린 후에 부가 특성 '교란'을 줘.
+//    교란 - 같이 동행하는 이들의 선택지를 교란시킨다. (커스텀 장비 효과도 교란.) 이 부가 특성은 받은 본인만 알 수 있게.」
+//   ■ 얻기 — 교란자의 길에 들어설 때 더 걸었던 세 속성(k.jam.attrs) 말고 세 속성을 더 최고 Lv → k.jamTrait = { at }
+//            (재난의 길을 걸으면 열 가지 속성을 다 연다 — 3 + 3 + 3 = 아홉)
+//            본인 화면에만 알린다 — 기록(history) · 상담사 콘솔 · 남의 화면 어디에도 적지 않는다. K 의 방 막대에 본인만 🌀 교란.
+//   ■ 먹히는 곳 — K 의 방 파티에서만. 같은 방에 교란을 가진 사람이 있으면 그 사람 말고 다른 사원들의 화면에서
+//            ① 선택지 순서가 섞이고 글자 몇 자가 ■ 로 가려진다 (장면마다 같은 모양 — 다시 그려도 그대로)
+//            ② 고른 것이 가끔(JAM_SWAP) 다른 선택지로 바뀐다
+//            ③ 커스텀 장비 효과가 장면마다 JAM_GEAR 확률로 먹히지 않는다 (WONDER_GEAR_OFF 를 감싼다 — 장비 파일들이 모두 이것을 본다)
+//            교란을 가진 본인은 그대로. 동행인에게는 까닭을 보이지 않는다.
+const JAM_SWAP = 0.25;        // 고른 것이 다른 것으로 바뀔 확률
+const JAM_GEAR = 0.5;         // 커스텀 장비 효과가 그 장면에서 안 먹힐 확률
+const JAM_HIDE = 0.3;         // 선택지 글자가 ■ 로 가려지는 몫
+function jamMore(k, u) {
+    if (!onJam(k)) return [];
+    const full = jamFull(k, u);
+    const got = (k.jam && Array.isArray(k.jam.attrs) && k.jam.attrs.length) ? k.jam.attrs : full.slice(0, JAM_MORE);
+    return full.filter(function (a) { return got.indexOf(a) < 0; });
+}
+function jamTraitCheck() {
+    const u = me();
+    if (!u || u.code === ADMIN) return;
+    const k = prof(u);
+    if (!k || stale(k) || !onJam(k) || (k.jamTrait && k.jamTrait.at)) return;
+    if (jamMore(k, u).length < JAM_MORE) return;
+    k.jamTrait = { at: now() };
+    saveProf();
+    try { saveFields({ kroom: 1 }); } catch (e) { }
+    try {
+        showCustomAlert('🌀 부가 특성 「교란」\n\n교란자의 길에서 세 갈래를 더 끝까지 걸었다.\n\n'
+            + '교란 — 같이 동행하는 이들의 선택지를 교란시킨다. (커스텀 장비 효과도 교란)\n'
+            + 'K 의 방에서 같은 방에 든 이들에게 먹힌다.\n\n이 특성은 당신만 알고 있습니다.');
+    } catch (e) { }
+}
+setInterval(function () { try { if (me() && !kr) jamTraitCheck(); } catch (e) { } }, 20000);
+window.kroomJamTrait = function () { const k = prof(); return !!(k && k.jamTrait && k.jamTrait.at); };    // 본인 것만
+
+// 같은 K 의 방 파티에 교란을 가진 다른 사람이 있나 (나는 빼고)
+function jamOnMe() {
+    try {
+        if (!kr || typeof darkRun === 'undefined' || !darkRun || !darkRun.kroom || !darkRun.isParty) return false;
+        const mine = me() && me().code;
+        return members().some(function (c) {
+            if (c === mine) return false;
+            const w = (typeof db !== 'undefined' && db.users) ? db.users[c] : null;
+            const k = w && w.kroom;
+            return !!(k && typeof k === 'object' && !stale(k) && k.jamTrait && k.jamTrait.at);
+        });
+    } catch (e) { return false; }
+}
+// 장면마다 같은 모양 — 씨앗 난수
+function jamRng(seed) {
+    let h = 2166136261;
+    const s = String(seed) + '|' + ((me() && me().code) || '');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return function () { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function jamShuffle(vis, seed) {
+    const r = jamRng('mix:' + seed), a = vis.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    if (a.length > 1 && a.every(function (v, i) { return v === vis[i]; })) a.push(a.shift());      // 그대로면 한 칸 민다
+    return a;
+}
+// 글 — 태그 밖 글자만 가린다
+function jamText(s, seed) {
+    const r = jamRng('hide:' + seed);
+    return String(s == null ? '' : s).split(/(<[^>]*>)/).map(function (part) {
+        if (!part || part.charAt(0) === '<') return part;
+        return part.replace(/[^\s.,!?…·「」『』()\[\]'"~\-—:;]/g, function (ch) { return r() < JAM_HIDE ? '■' : ch; });
+    }).join('');
+}
+// 고른 것 — 가끔 다른 선택지로 (고를 수 있는 것 가운데서)
+function jamSwap(i) {
+    const list = kr && kr._jamVis;
+    if (!list || list.length < 2 || list.indexOf(i) < 0 || !jamOnMe()) return i;
+    if (Math.random() >= JAM_SWAP) return i;
+    const others = list.filter(function (x) { return x !== i; });
+    return others[Math.floor(Math.random() * others.length)];
+}
+// 커스텀 장비 — 장면마다 JAM_GEAR 확률로 안 먹힌다
+function jamGearOff() {
+    if (!jamOnMe()) return false;
+    const key = (kr.dun || '') + ':' + kr.floor + ':' + kr.idx;
+    if (!kr._jamGear || kr._jamGear.key !== key) kr._jamGear = { key: key, off: Math.random() < JAM_GEAR };
+    return kr._jamGear.off;
+}
+(function jamGearHook() {
+    const iv = setInterval(function () {
+        const f = window.WONDER_GEAR_OFF;
+        if (typeof f !== 'function') return;
+        if (f._jam) { clearInterval(iv); return; }
+        const w = function (zone) {
+            const out = f.apply(this, arguments);
+            if (out || (zone !== undefined && zone !== null)) return out;
+            try { return jamGearOff(); } catch (e) { return out; }
+        };
+        Object.keys(f).forEach(function (x) { try { w[x] = f[x]; } catch (e) { } });
+        w._jam = true;
+        window.WONDER_GEAR_OFF = w;
+        clearInterval(iv);
+    }, 500);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+
 window.kroomState = function () {
     const k = prof(); if (!k) return;
     console.log('%c===== 『 K 의 방 』 =====', 'color:#7fd3e6; font-size:13px');
@@ -4436,6 +4871,7 @@ window.kroomGive = function (who, field, val) {
 window.KROOM = { hard: function () { return hard(); }, _set: function (o) { kr = o; }, JOBS: JOBS, ATTR: ATTR, DUNS: DUNS, DATA: DATA, L_JOBS: L_JOBS, HIDDEN: HIDDEN, hiddenProgress: function (k) { return hiddenProgress(k); }, hiddenCheck: function () { return hiddenCheck(); }, ITEMS: ITEMS, needExp: needExp, expNeed: expNeed, lvCap: lvCap, load: loadFor, visible: function (o) { return visible(o); }, plan: function () { return plan(); }, state: function () { return kr; },
     decide: function (c, a) { return decide(c, a); },
     doom: function (c) { return doom(c); },               // 시험용 — 즉사 기믹 초읽기를 바로 띄운다
+    jamOn: function () { return jamOnMe(); },            // 🌀 같은 방에 교란을 가진 사람이 있나 (나는 빼고)
     kv: kv, shopItem: shopItem, shopSrc: shopSrc, itemSmash: function () { return itemSmash(); }, lastChance: function (t) { return lastChance(t); } };
 
 console.log('[K 의 방] ' + K_CODE + ' — 직업 ' + Object.keys(JOBS).length + ' · 던전 ' + Object.keys(DUNS).length + ' (준비 ' + Object.keys(DUNS).filter(function (d) { return DUNS[d].ready; }).length + ') — kroomState()');

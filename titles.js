@@ -439,12 +439,17 @@ function petList() {
     return (P && Array.isArray(P.LIST)) ? P.LIST : [];
 }
 function petsReady() { return petList().length > 0; }
+// ★ 2026-11-10 — 같은 종을 둘 이상 잡으면 열쇠가 종 번호 + 100·n (103 · 203 …) 이다 (pet-data.js petNewKey).
+//   종 번호 열쇠(3)만 세던 탓에, 첫 인형을 보내고 둘째 것(103)만 남은 종이 빠져 42종을 다 잡아도 41에 멈췄다 — 열쇠를 종으로 바꿔 센다.
 function petsHave(u) {
     const v = u && u.pets;
-    const o = {};
-    if (Array.isArray(v)) v.forEach(function (x, i) { if (x) o[String(i)] = x; });
-    else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { if (v[k]) o[k] = v[k]; });
-    return petList().filter(function (sp) { return !!o[String(sp.i)]; }).length;
+    const P = window.PET;
+    const spOf = (P && typeof P.sp === 'function') ? P.sp : function (k) { const n = Math.floor(Number(k)) || 0; return n > 0 ? n % 100 : 0; };
+    const have = {};
+    const add = function (k, x) { if (x) { const s = spOf(k); if (s) have[String(s)] = 1; } };
+    if (Array.isArray(v)) v.forEach(function (x, i) { add(i, x); });
+    else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { add(k, v[k]); });
+    return petList().filter(function (sp) { return !!have[String(sp.i)]; }).length;
 }
 function petsAllOwned(u) {
     const all = petList().length;
