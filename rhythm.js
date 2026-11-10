@@ -22,8 +22,17 @@
 //     · 터치         흰 건반 — 판정선에 닿을 때 그 자리를 누른다
 //     · 길게 누르기   흰 건반 + 띠 — 누른 채 끝까지 (손가락이 옆으로 조금 흘러도 된다) · 일찍 떼면 꼬리는 MISS
 //     · 슬라이드     노란 건반 — 손가락이 그 자리에 닿아 있거나 지나가면 된다 (누르지 않고 쓸어도 된다)
-//   ■ 설정   속도 · 싱크(소리가 늦게 들리면 +) · 타격음 — 이 기기에 적어 둔다
-//   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest)
+//   ■ 설정   속도 · 싱크 · 타격음 — 이 기기에 적어 둔다
+//   ★ 2026-11-11 사용자 「싱크가 아직도 좀 안 맞아」
+//     · 싱크를 둘로 나눴다 — **판정 싱크**(누른 때를 얼마나 당겨 보나) · **화면 싱크**(노트를 얼마나 일찍 그리나)
+//       전에는 하나가 둘을 같이 밀어서, 「싱크에 반영」을 누를수록 노트가 소리보다 점점 늦게 닿았다.
+//     · 누른 때는 손가락이 닿은 그 순간(이벤트 시각)으로 잰다 — 화면을 그리느라 늦게 받은 만큼 늦게 판정하지 않게
+//     · 화면은 한 프레임 앞을 그린다 (그린 그림은 다음 프레임에 보인다)
+//     · 「싱크 맞추기」 — 딸깍 소리에 맞춰 누르면 판정 싱크가 저절로 · 노트가 선에 닿는 때를 보고 화면 싱크를 ±
+//   ★ 2026-11-11 사용자 「제대로 성공한 판정에 따라 랭크 · 리듬게임 랭킹」
+//     · 랭크 — 정확도(CHARMING 100% · NORMAL 60% · MISS 0)로 SSS(ALL CHARMING) · SS 98 · S 95 · A 90 · B 80 · C 70 · D
+//     · 랭킹 — 곡 · 난이도마다 사람별 최고 기록 (rhythmRank/<곡>/<난이도>/<사번>) · 곡 고르기의 「🏆 랭킹」 · 결과에 순위
+//   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest) · 랭킹은 서버에
 //   ■ 키보드 S D F J K L · 스페이스 = 멈춤 (컴퓨터에서 시험)
 //
 //   콘솔   rhythmOpen()
@@ -54,8 +63,48 @@ function loadJ(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'nu
 function saveJ(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
 function say(m) { try { showCustomAlert(m); } catch (e) { alert(m); } }
 
-const SET = Object.assign({ speed: 5, offset: 0, hit: true, song: 'airplane', diff: 'normal' }, loadJ(SET_KEY, {}));
+const SET = Object.assign({ speed: 5, offset: 0, vis: 0, hit: true, song: 'airplane', diff: 'normal' }, loadJ(SET_KEY, {}));
+// 싱크가 둘로 나뉘면서 뜻이 바뀌었다 — 전 값은 버리고 0 에서 (2026-11-11)
+if (SET.sv !== 2) { SET.offset = 0; SET.vis = 0; SET.sv = 2; saveJ(SET_KEY, SET); }
 function saveSet() { saveJ(SET_KEY, SET); }
+function sgn(v) { return (v > 0 ? '+' : '') + v; }
+
+// 랭크 — 정확도로 (ALL CHARMING 은 SSS)
+const RANKS = [['SSS', 100, '#ffc1e3'], ['SS', 98, '#ffe066'], ['S', 95, '#ffd34d'], ['A', 90, '#7ec8ff'], ['B', 80, '#8fe3a8'], ['C', 70, '#c9c9d6'], ['D', 0, '#8a8a99']];
+function rankOf(score, ac) {
+    if (ac) return RANKS[0];
+    const pct = (Number(score) || 0) / 10000;
+    for (let i = 1; i < RANKS.length; i++) if (pct >= RANKS[i][1]) return RANKS[i];
+    return RANKS[RANKS.length - 1];
+}
+// 랭킹 — 서버
+const RANK_PATH = 'rhythmRank';
+function db_() { return (typeof database !== 'undefined' && database) ? database : null; }
+function srv() { try { if (typeof window.serverNow === 'function') { const t = Number(window.serverNow()); if (t > 1.5e12) return t; } } catch (e) { } return Date.now(); }
+function myName() { const u = u_(); return (u && ((u.badge && u.badge.nickname) || u.name)) || (u && u.code) || ''; }
+function rankList(sk, d) {
+    const db = db_(); if (!db) return Promise.resolve([]);
+    return db.ref(RANK_PATH + '/' + sk + '/' + d).once('value').then(function (snap) {
+        const v = (snap && snap.val()) || {};
+        return Object.keys(v).map(function (c) { const r = v[c] || {}; return { code: c, s: Number(r.s) || 0, fc: !!r.fc, ac: !!r.ac, n: r.n || c, at: Number(r.at) || 0 }; })
+            .filter(function (r) { return r.s > 0; })
+            .sort(function (a, b) { return b.s - a.s || a.at - b.at; });
+    }).catch(function () { return []; });
+}
+// 끝까지 친 판 — 내 최고면 올린다 (아니어도 FC · AC 는 남긴다)
+function rankSave(sk, d, run) {
+    const db = db_(), u = u_(); if (!db || !u || !u.code) return Promise.resolve(false);
+    return new Promise(function (res) {
+        db.ref(RANK_PATH + '/' + sk + '/' + d + '/' + u.code).transaction(function (cur) {
+            if (cur && Number(cur.s) >= run.s) {
+                if ((run.fc && !cur.fc) || (run.ac && !cur.ac)) return Object.assign({}, cur, { fc: !!(cur.fc || run.fc), ac: !!(cur.ac || run.ac) });
+                return;
+            }
+            return { s: run.s, r: rankOf(run.s, run.ac)[0], fc: !!(run.fc || (cur && cur.fc)), ac: !!(run.ac || (cur && cur.ac)), n: myName(), at: srv(),
+                     c: run.c, nn: run.n, m: run.m, mc: run.mc };
+        }, function (err, ok) { res(!err && !!ok); });
+    });
+}
 
 // ==========================================
 // 소리
@@ -132,14 +181,36 @@ function rawMs() {
 }
 const CK = { base: null };
 function clockReset() { CK.base = null; }
-function songMs() {
+// 한 프레임에 한 번 — 소리 시계 쪽으로 천천히 끌어 둔다
+function clockTick() {
     const pn = performance.now();
-    const raw = rawMs();
-    if (AU.ctx && AU.ctx.state !== 'running') { CK.base = null; return raw - (Number(SET.offset) || 0); }
-    const want = raw - pn;
+    if (!AU.ctx || AU.ctx.state !== 'running') { CK.base = null; return; }
+    const want = rawMs() - pn;
     if (CK.base == null || Math.abs(want - CK.base) > 80) CK.base = want;        // 처음 · 멈췄다 이어 감 — 바로 맞춘다
     else CK.base += (want - CK.base) * 0.02;                                     // 그 밖에는 아주 천천히만
-    return pn + CK.base - (Number(SET.offset) || 0);
+}
+// 곡 시각 (싱크 빼기 전)
+function clockMs() {
+    if (!AU.ctx || AU.ctx.state !== 'running') return rawMs();
+    if (CK.base == null) clockTick();
+    return performance.now() + CK.base;
+}
+// ★ 판정 시계 — 판정 싱크만큼 당겨 본다 (+ 면 늦게 눌러도 맞게)
+function songMs() { return clockMs() - (Number(SET.offset) || 0); }
+// ★ 화면 시계 — 한 프레임 앞 + 화면 싱크 (+ 면 노트가 더 일찍 닿는다)
+const FR = { last: 0, dt: 16.7 };
+function frameTick() {
+    const t = performance.now();
+    if (FR.last) { const d = t - FR.last; if (d > 4 && d < 50) FR.dt += (d - FR.dt) * 0.1; }
+    FR.last = t;
+}
+function visMs() { return clockMs() + Math.min(25, FR.dt) + (Number(SET.vis) || 0); }
+// 손가락이 닿은 그 순간 — 이벤트를 늦게 받았으면 그만큼 거슬러 올라간다
+function evAge(e) {
+    const ts = e && Number(e.timeStamp);
+    if (!ts) return 0;
+    const a = performance.now() - ts;
+    return (a >= 0 && a <= 250) ? a : 0;
 }
 // 받은 곡의 앞머리를 채보의 지문과 대 본다 — 받은 곡이 늦게 시작하면 + (ms)
 function headLag(buf, head) {
@@ -221,7 +292,23 @@ function css() {
         '.rg-rank{font-size:84px;font-weight:900;line-height:1;text-shadow:0 0 24px currentColor;}',
         '.rg-tbl{font-size:13px;line-height:1.75;}',
         '.rg-tbl b{display:inline-block;min-width:104px;}',
-        '.rg-rot{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:#889;}'
+        '.rg-rot{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;color:#889;}',
+        // 랭크 글자 · 싱크 맞추기 · 랭킹
+        '.rg-rk{font-style:normal;font-weight:900;color:var(--r);text-shadow:0 0 8px var(--r);}',
+        '.rg-diff.on .rg-rk{color:#111;text-shadow:none;}',
+        '.rg-cal-box{position:absolute;top:10px;left:12px;width:min(46%,330px);background:rgba(12,12,22,.86);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;z-index:3;box-sizing:border-box;}',
+        '.rg-cal-tip{font-size:11px;color:#99a;line-height:1.45;}',
+        '.rg-rkbox{width:min(92%,460px);max-height:88%;box-sizing:border-box;align-items:stretch;padding:12px 14px;}',
+        '.rg-tab{flex:1;padding:6px 4px;font-size:12px;letter-spacing:1px;border:2px solid var(--c);background:transparent;}',
+        '.rg-tab.on{background:var(--c);color:#111;font-weight:bold;}',
+        '.rg-rklist{overflow-y:auto;min-height:0;flex:1 1 auto;font-size:13px;}',
+        '.rg-rkrow{display:flex;align-items:center;gap:8px;padding:6px 6px;border-bottom:1px solid rgba(255,255,255,.07);}',
+        '.rg-rkrow.me{background:rgba(255,255,255,.1);border-radius:8px;}',
+        '.rg-rkrow .no{width:24px;text-align:right;color:#aab;font-weight:bold;}',
+        '.rg-rkrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+        '.rg-rkrow .rg-rk{width:34px;text-align:center;}',
+        '.rg-rkrow .pc{width:62px;text-align:right;font-family:Georgia,serif;}',
+        '.rg-rkrow small{width:22px;font-size:10px;color:#ffe066;}'
     ].join('\n');
     document.head.appendChild(s);
 }
@@ -267,6 +354,7 @@ function open() {
     raf();
 }
 function close() {
+    calStop(); C = null;
     stopPlay();
     if (!OV) return;
     window.removeEventListener('resize', fit);
@@ -303,22 +391,23 @@ function menu() {
     const diffs = DIFFS.map(function (d) {
         const c = chart && chart.charts[d[0]];
         const b = bestOf(s.key, d[0]);
+        const rk = b ? rankOf(b.score, b.ap) : null;
         return '<button class="rg-diff' + (SET.diff === d[0] ? ' on' : '') + '" data-diff="' + d[0] + '" style="--c:' + d[3] + '"><b>' + d[1] + '</b><i>' + (c ? c.level : '·') + '</i><small>' + (c ? c.count + ' 노트' : '') + '</small>'
-            + '<small>' + (b ? (b.score / 10000).toFixed(2) + '%' + (b.ap ? ' · AC' : b.fc ? ' · FC' : '') : '—') + '</small></button>';
+            + '<small>' + (b ? '<em class="rg-rk" style="--r:' + rk[2] + '">' + rk[0] + '</em> ' + (b.score / 10000).toFixed(2) + '%' + (b.ap ? '' : b.fc ? ' · FC' : '') : '—') + '</small></button>';
     }).join('');
     UI.innerHTML = '<div class="rg-bg"></div>'
         + '<button class="rg-btn rg-x" data-k="x">✕</button>'
         + '<div class="rg-sel">'
         + '<div class="rg-col" style="width:min(34%,240px);"><div class="rg-h">🎵 RHYTHM · 상담사 전용</div>' + songs + '<div style="flex:1"></div>'
         + '<div class="rg-row"><span>속도</span><span class="rg-step"><button data-k="sp-">−</button><span>' + SET.speed.toFixed(1) + '</span><button data-k="sp+">+</button></span></div>'
-        + '<div class="rg-row"><span>싱크</span><span class="rg-step"><button data-k="of-">−</button><span>' + (SET.offset > 0 ? '+' : '') + SET.offset + 'ms</span><button data-k="of+">+</button></span>'
+        + '<div class="rg-row"><button class="rg-btn" data-k="cal" style="padding:6px 10px;font-size:12px;">⏱ 싱크 맞추기</button>'
         + '<button class="rg-btn" data-k="hit" style="padding:6px 10px;font-size:12px;">타격음 ' + (SET.hit ? 'ON' : 'OFF') + '</button></div>'
-        + '<div style="font-size:10px;color:#889;line-height:1.5;">소리가 노트보다 늦게 들리면 싱크를 + 로</div></div>'
+        + '<div style="font-size:10px;color:#889;line-height:1.5;">판정 ' + sgn(SET.offset) + 'ms · 화면 ' + sgn(SET.vis) + 'ms</div></div>'
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div style="font-size:12px;color:#aab;">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
         + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
-        + '<div><button class="rg-btn rg-go" data-k="go">START</button></div>'
+        + '<div style="display:flex;gap:10px;align-items:center;"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn" data-k="rank">🏆 랭킹</button></div>'
         + '</div></div></div>'
         + (rot ? '<div class="rg-rot">휴대폰을 가로로 눕혀서 하면 편합니다</div>' : '');
     Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); menu(); }; });
@@ -329,12 +418,35 @@ function menu() {
             if (k === 'x') { close(); return; }
             if (k === 'sp-') SET.speed = Math.max(1, Math.round((SET.speed - 0.5) * 10) / 10);
             if (k === 'sp+') SET.speed = Math.min(12, Math.round((SET.speed + 0.5) * 10) / 10);
-            if (k === 'of-') SET.offset = Math.max(-300, SET.offset - 5);
-            if (k === 'of+') SET.offset = Math.min(300, SET.offset + 5);
             if (k === 'hit') SET.hit = !SET.hit;
             if (k === 'go') { saveSet(); start(); return; }
+            if (k === 'cal') { saveSet(); calEnter(); return; }
+            if (k === 'rank') { rankModal(SET.diff); return; }
             saveSet(); menu();
         };
+    });
+}
+// 🏆 랭킹 — 지금 곡 · 난이도 (위 칸으로 난이도를 바꾼다)
+function rankModal(d) {
+    const s = song();
+    const old = UI.querySelector('.rg-modal'); if (old) old.remove();
+    const m = document.createElement('div'); m.className = 'rg-modal';
+    const tabs = DIFFS.map(function (x) { return '<button class="rg-btn rg-tab' + (x[0] === d ? ' on' : '') + '" data-d="' + x[0] + '" style="--c:' + x[3] + '">' + x[1] + '</button>'; }).join('');
+    m.innerHTML = '<div class="rg-box rg-rkbox"><div style="display:flex;align-items:center;gap:8px;width:100%;"><b style="flex:1;">🏆 ' + esc(s.title) + '</b><button class="rg-btn" data-k="c" style="padding:5px 10px;">✕</button></div>'
+        + '<div style="display:flex;gap:6px;">' + tabs + '</div><div class="rg-rklist">불러오는 중…</div></div>';
+    UI.appendChild(m);
+    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    m.querySelector('[data-k="c"]').onclick = function () { m.remove(); };
+    Array.prototype.forEach.call(m.querySelectorAll('[data-d]'), function (b) { b.onclick = function () { rankModal(b.dataset.d); }; });
+    rankList(s.key, d).then(function (list) {
+        const box = m.querySelector('.rg-rklist'); if (!box || !m.isConnected) return;
+        const me = (u_() || {}).code;
+        if (!list.length) { box.innerHTML = '<div style="color:#889;padding:14px 0;text-align:center;">아직 기록이 없습니다</div>'; return; }
+        box.innerHTML = list.slice(0, 50).map(function (r, i) {
+            const rk = rankOf(r.s, r.ac);
+            return '<div class="rg-rkrow' + (r.code === me ? ' me' : '') + '"><span class="no">' + (i + 1) + '</span><span class="nm">' + esc(r.n) + '</span>'
+                + '<em class="rg-rk" style="--r:' + rk[2] + '">' + rk[0] + '</em><span class="pc">' + (r.s / 10000).toFixed(2) + '%</span><small>' + (r.ac ? 'AC' : r.fc ? 'FC' : '') + '</small></div>';
+        }).join('');
     });
 }
 
@@ -411,7 +523,148 @@ function pause() {
     m.querySelector('[data-k="re"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } start(); };
     m.querySelector('[data-k="q"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } menu(); };
 }
-function onVis() { if (document.hidden) pause(); }
+function onVis() { if (document.hidden) { if (MODE === 'cal') calExit(); else pause(); } }
+
+// ==========================================
+// 싱크 맞추기 (2026-11-11 사용자 「싱크가 아직도 좀 안 맞아」)
+//   딸깍 소리(곡과 같은 길로 나간다)가 600 ms 마다 · 노트가 그 때마다 판정선에 닿는다.
+//   · 소리에 맞춰 누르면 — 누른 때와 딸깍의 차이(가운데 값)가 판정 싱크가 된다 (여섯 번부터 · 마지막 열여섯 번)
+//   · 노트가 선에 닿는 때가 딸깍과 어긋나 보이면 — 화면 싱크 ±
+// ==========================================
+const CAL_BEAT = 600, CAL_MIN = 6, CAL_KEEP = 16;
+let C = null;
+function metroBuf(acc) {
+    const c = ctx(), sr = c.sampleRate, n = Math.floor(sr * 0.06), b = c.createBuffer(1, n, sr), d = b.getChannelData(0);
+    const f = acc ? 2200 : 1500;
+    for (let i = 0; i < n; i++) { const t = i / sr; d[i] = (Math.sin(2 * Math.PI * f * t) * 0.8 + (Math.random() * 2 - 1) * 0.25 * Math.exp(-t * 900)) * Math.exp(-t * 70); }
+    return b;
+}
+function median(a) { if (!a.length) return 0; const s = a.slice().sort(function (x, y) { return x - y; }); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function calEnter() {
+    const c = ctx(); sessionOn();
+    if (!AU.met) AU.met = [metroBuf(false), metroBuf(true)];
+    stopPlay();
+    AU.startAt = c.currentTime + 0.8; AU.lagNow = 0; clockReset();
+    C = { next: 0, srcs: [], taps: [], fx: [], last: null };
+    MODE = 'cal';
+    calUI();
+    bindInput();
+}
+function calStop() {
+    if (!C) return;
+    C.srcs.forEach(function (s) { try { s.stop(); } catch (e) { } });
+    C.srcs = [];
+}
+function calExit() { calStop(); C = null; unbindInput(); menu(); }
+function calTick() {
+    if (!C || !AU.ctx) return;
+    const c = AU.ctx;
+    while (AU.startAt + C.next * CAL_BEAT / 1000 < c.currentTime + 0.3) {
+        const at = AU.startAt + C.next * CAL_BEAT / 1000;
+        if (at >= c.currentTime) {
+            try { const s = c.createBufferSource(); s.buffer = AU.met[C.next % 4 === 0 ? 1 : 0]; const g = c.createGain(); g.gain.value = 0.9; s.connect(g); g.connect(AU.gain); s.start(at); C.srcs.push(s); } catch (e) { }
+        }
+        C.next++;
+    }
+    if (C.srcs.length > 12) C.srcs.splice(0, C.srcs.length - 12);
+}
+function calTap(age, pt) {
+    if (!C) return;
+    const t = clockMs() - (age || 0);
+    const k = Math.round(t / CAL_BEAT);
+    if (k < 0) return;
+    const d = t - k * CAL_BEAT;
+    C.fx.push({ at: performance.now(), d: d, x: pt && L ? Math.max(0, Math.min(1, uOf(pt.x))) : 0.5 });
+    if (C.fx.length > 12) C.fx.shift();
+    if (Math.abs(d) > 260) return;
+    C.taps.push(d); if (C.taps.length > CAL_KEEP) C.taps.shift();
+    C.last = Math.round(d);
+    if (C.taps.length >= CAL_MIN) { SET.offset = Math.max(-300, Math.min(300, Math.round(median(C.taps)))); saveSet(); }
+    calRead();
+}
+function calSpread() {
+    if (C.taps.length < CAL_MIN) return null;
+    const m = median(C.taps);
+    return Math.round(median(C.taps.map(function (x) { return Math.abs(x - m); })));
+}
+function calRead() {
+    if (!C || !UI) return;
+    const a = UI.querySelector('[data-v="of"]'), b = UI.querySelector('[data-v="vis"]'), n = UI.querySelector('[data-v="n"]');
+    if (a) a.textContent = sgn(SET.offset) + 'ms';
+    if (b) b.textContent = sgn(SET.vis) + 'ms';
+    if (n) {
+        const sp = calSpread();
+        n.textContent = C.taps.length < CAL_MIN ? ('딸깍에 맞춰 누르기 ' + C.taps.length + ' / ' + CAL_MIN)
+            : ('누른 ' + C.taps.length + '번 · 흔들림 ±' + sp + 'ms' + (sp > 35 ? ' — 조금 더 눌러 주세요' : ' — 맞췄습니다'));
+    }
+}
+function calUI() {
+    UI.innerHTML = '<div class="rg-bg" style="background:transparent"></div>'
+        + '<div class="rg-cal-box">'
+        + '<div style="display:flex;align-items:center;gap:8px;"><button class="rg-btn" data-k="back" style="padding:6px 10px;font-size:12px;">← 곡 고르기</button><b style="letter-spacing:2px;">싱크 맞추기</b></div>'
+        + '<div class="rg-cal-tip">딸깍 소리에 맞춰 화면 아무 데나 톡톡 — 판정 싱크가 저절로 맞춰집니다</div>'
+        + '<div class="rg-row"><span style="min-width:62px;">판정 싱크</span><span class="rg-step"><button data-k="of-">−</button><span data-v="of"></span><button data-k="of+">+</button></span></div>'
+        + '<div class="rg-cal-tip" data-v="n"></div>'
+        + '<div class="rg-row"><span style="min-width:62px;">화면 싱크</span><span class="rg-step"><button data-k="vi-">−</button><span data-v="vis"></span><button data-k="vi+">+</button></span></div>'
+        + '<div class="rg-cal-tip">노트가 딸깍보다 늦게 선에 닿아 보이면 + · 일찍 닿아 보이면 −</div>'
+        + '<div style="display:flex;gap:8px;"><button class="rg-btn" data-k="re" style="padding:7px 12px;font-size:12px;">다시 재기</button><button class="rg-btn" data-k="zero" style="padding:7px 12px;font-size:12px;">둘 다 0</button></div>'
+        + '</div>';
+    Array.prototype.forEach.call(UI.querySelectorAll('[data-k]'), function (el) {
+        el.onclick = function (e) {
+            e.stopPropagation();
+            const k = el.dataset.k;
+            if (k === 'back') { calExit(); return; }
+            if (k === 'of-') SET.offset = Math.max(-300, SET.offset - 5);
+            if (k === 'of+') SET.offset = Math.min(300, SET.offset + 5);
+            if (k === 'vi-') SET.vis = Math.max(-300, SET.vis - 5);
+            if (k === 'vi+') SET.vis = Math.min(300, SET.vis + 5);
+            if (k === 're') { C.taps = []; C.last = null; }
+            if (k === 'zero') { SET.offset = 0; SET.vis = 0; C.taps = []; C.last = null; }
+            saveSet(); calRead();
+        };
+    });
+    calRead();
+}
+function drawCal() {
+    const g = G2; if (!g || !L || !C) return;
+    const now = visMs();
+    const vis = 7000 / SET.speed;
+    const pOf = function (t) { return 1 - (t - now) / vis; };
+    const bars = [];
+    for (let k = Math.max(0, Math.floor((now - 200) / CAL_BEAT)); k * CAL_BEAT < now + vis; k += 4) bars.push(k * CAL_BEAT);
+    drawStage(g, pOf, bars);
+    // 딸깍마다 노트 하나 — 가운데
+    const k0 = Math.max(0, Math.floor(now / CAL_BEAT));
+    for (let k = k0 + Math.ceil(vis / CAL_BEAT) + 1; k >= k0; k--) {
+        const p = pOf(k * CAL_BEAT); if (p < 0 || p > 1) continue;
+        const sc = scaleAt(p);
+        key(g, xAt(0.5, sc), yAt(sc), 0.15 * L.lineW * sc, L.nh * sc, k % 4 === 0 ? 2 : 0, false);
+    }
+    // 노트가 선에 닿는 순간 — 판정선이 번쩍
+    const since = now - Math.floor(now / CAL_BEAT) * CAL_BEAT;
+    if (now >= 0 && since < 140) {
+        const a = 1 - since / 140;
+        g.save(); g.globalAlpha = a;
+        const x = xAt(0.5, 1), w = 0.22 * L.lineW;
+        const rg = g.createRadialGradient(x, L.yJ, 0, x, L.yJ, w);
+        rg.addColorStop(0, 'rgba(255,240,250,0.95)'); rg.addColorStop(1, 'rgba(255,240,250,0)');
+        g.fillStyle = rg; g.fillRect(x - w, L.yJ - w * 0.7, w * 2, w * 1.4);
+        g.restore();
+    }
+    // 누른 자리 — 차이 (판정 싱크를 뺀 값 · 0 근처면 맞다)
+    const tnow = performance.now();
+    C.fx.forEach(function (f) {
+        const k = (tnow - f.at) / 700; if (k >= 1) return;
+        const d = Math.round(f.d - (C.taps.length >= CAL_MIN ? SET.offset : 0));
+        const x = xAt(f.x, 1);
+        g.save(); g.globalAlpha = 1 - k; g.textAlign = 'center';
+        g.fillStyle = Math.abs(d) <= W_CHARM ? '#ffd0ea' : '#9fd4ff';
+        g.font = '600 ' + Math.round(VH * 0.045) + 'px Georgia, serif';
+        g.fillText(sgn(d) + 'ms', x, L.yJ - VH * 0.1 - k * 14);
+        g.beginPath(); g.arc(x, L.yJ, 8 + k * 26, 0, Math.PI * 2); g.strokeStyle = 'rgba(255,255,255,' + (0.7 * (1 - k)) + ')'; g.lineWidth = 2; g.stroke();
+        g.restore();
+    });
+}
 
 // ==========================================
 // 판정 — 가로 자리만 본다 (Deemo 처럼)
@@ -436,9 +689,9 @@ function burst(n, kind) {
     if (P.parts.length > 160) P.parts.splice(0, P.parts.length - 160);
 }
 // 눌렀다 — 판정 안 · 가로 자리 안에서 가장 이른 노트 (같으면 더 가까운 것)
-function press(u, pid) {
+function press(u, pid, age) {
     if (!P || MODE !== 'play' || u == null) return;
-    const now = songMs();
+    const now = songMs() - (age || 0);
     let best = null, bestScore = 1e9;
     for (let i = P.head; i < P.notes.length; i++) {
         const n = P.notes[i];
@@ -519,14 +772,20 @@ function uOf(x) { if (!L) return null; return (x - L.lineL) / L.lineW; }
 // 손가락 · 키보드
 // ==========================================
 function pd(e) {
+    if (MODE === 'cal') {
+        if (e.target && e.target.closest && e.target.closest('button,.rg-cal-box')) return;
+        e.preventDefault(); calTap(evAge(e), toStage(e.clientX, e.clientY));
+        return;
+    }
     if (MODE !== 'play' || !P) return;
     if (e.target && e.target.closest && e.target.closest('.rg-pause,.rg-modal')) return;
     e.preventDefault();
+    const age = evAge(e);
     const p = toStage(e.clientX, e.clientY);
     const u = uOf(p.x);
     P.ptr[e.pointerId] = { u: u, hold: null, at: performance.now() };
     try { ST.setPointerCapture && ST.setPointerCapture(e.pointerId); } catch (x) { }
-    press(u, e.pointerId);
+    press(u, e.pointerId, age);
 }
 function pm(e) {
     if (!P || !P.ptr[e.pointerId]) return;
@@ -537,7 +796,7 @@ function pu(e) {
     if (!P || !P.ptr[e.pointerId]) return;
     const q = P.ptr[e.pointerId];
     delete P.ptr[e.pointerId];
-    if (q.hold && MODE === 'play') releaseHold(q.hold, songMs());
+    if (q.hold && MODE === 'play') releaseHold(q.hold, songMs() - evAge(e));
 }
 // 무대 전체에서 받는다 — 위에 덮인 글자 칸(#rg-ui)을 눌러도 (단추 · 멈춤 창은 빼고)
 function bindInput() {
@@ -556,6 +815,11 @@ function unbindInput() {
 function onKey(e) {
     if (!OV) return;
     const k = (e.key || '').toLowerCase();
+    if (MODE === 'cal') {
+        if (k === 'escape') { calExit(); e.preventDefault(); return; }
+        if ((k === ' ' || KEYS.indexOf(k) >= 0) && !e.repeat) { e.preventDefault(); e.stopPropagation(); calTap(evAge(e), null); }
+        return;
+    }
     if (k === 'escape') { if (MODE === 'play') pause(); e.preventDefault(); return; }
     if (MODE !== 'play' || !P) return;
     if (k === ' ') { pause(); e.preventDefault(); return; }
@@ -564,13 +828,13 @@ function onKey(e) {
     e.preventDefault(); e.stopPropagation();
     const id = 'k' + lane;
     P.ptr[id] = { u: xOfLane(lane), hold: null, key: true };
-    press(xOfLane(lane), id);
+    press(xOfLane(lane), id, evAge(e));
 }
 function onKeyUp(e) {
     if (!P) return;
     const lane = KEYS.indexOf((e.key || '').toLowerCase());
     if (lane < 0) return;
-    pu({ pointerId: 'k' + lane });
+    pu({ pointerId: 'k' + lane, timeStamp: e.timeStamp });
 }
 
 // ==========================================
@@ -580,10 +844,11 @@ const JTX = { c: ['CHARMING', '#ffe3f2', '#ff9ccf'], n: ['NORMAL', '#cfeaff', '#
 function raf() {
     if (!OV) return;
     requestAnimationFrame(raf);
+    frameTick();
+    if (MODE === 'cal') { clockTick(); calTick(); drawCal(); return; }
     if (MODE !== 'play' && MODE !== 'pause') { if (G2) G2.clearRect(0, 0, VW, VH); return; }
-    const now = MODE === 'play' ? songMs() : (P.lastNow || 0);
-    if (MODE === 'play') { P.lastNow = now; step(now); }
-    draw(now);
+    if (MODE === 'play') { clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); }
+    draw(P.lastVis || 0);
 }
 function rr(g, x, y, w, h, r) {
     r = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -605,11 +870,8 @@ function key(g, cx, cy, w, h, kind, glow) {
     g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x + 3, y + 2, w - 6, Math.max(1, h * 0.14));
     g.restore();
 }
-function draw(now) {
-    const g = G2; if (!g || !L) return;
-    const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
-    const pOf = function (t) { return 1 - (t - now) / vis; };
-    const tnow = performance.now();
+// 바탕 · 바닥 · 마디 · 판정선
+function drawStage(g, pOf, bars) {
     g.clearRect(0, 0, VW, VH);
     // 바탕 — 까맣게 (2026-11-10 사용자 「표지 없이 까만색으로」)
     g.fillStyle = '#000'; g.fillRect(0, 0, VW, VH);
@@ -625,7 +887,6 @@ function draw(now) {
     g.beginPath(); g.moveTo(xAt(0, s0), y0); g.lineTo(xAt(0, 1), L.yJ); g.moveTo(xAt(1, s0), y0); g.lineTo(xAt(1, 1), L.yJ); g.stroke();
     g.restore();
     // 마디 — 바닥을 가로지르는 희미한 줄
-    const bars = P.chart.bars;
     g.strokeStyle = 'rgba(200,215,255,0.08)'; g.lineWidth = 1;
     for (let i = 0; i < bars.length; i++) {
         const p = pOf(bars[i]); if (p < 0 || p > 1) continue;
@@ -639,6 +900,13 @@ function draw(now) {
     g.restore();
     g.fillStyle = 'rgba(235,242,255,0.9)';
     [L.lineL, L.lineL + L.lineW].forEach(function (x) { g.beginPath(); g.arc(x, L.yJ, 4, 0, Math.PI * 2); g.fill(); });
+}
+function draw(now) {
+    const g = G2; if (!g || !L) return;
+    const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
+    const pOf = function (t) { return 1 - (t - now) / vis; };
+    const tnow = performance.now();
+    drawStage(g, pOf, P.chart.bars);
     // 손가락 자리 — 판정선 위 은은한 빛
     Object.keys(P.ptr).forEach(function (id) {
         const q = P.ptr[id]; if (!q || q.u == null) return;
@@ -650,7 +918,7 @@ function draw(now) {
     // 슬라이드 줄 — 희미하게
     Object.keys(P.chains).forEach(function (c) {
         const ch = P.chains[c]; if (ch.length < 2) return;
-        g.strokeStyle = 'rgba(255,214,90,0.28)'; g.lineWidth = 3; g.lineCap = 'round';
+        g.strokeStyle = 'rgba(255,214,90,0.38)'; g.lineWidth = 3; g.lineCap = 'round';                // 지그재그도 이 줄로 보인다
         g.beginPath(); let st = false;
         for (let i = 0; i < ch.length; i++) {
             const n = ch[i]; const p = pOf(n.t); if (p < 0) break; if (n.done && i < ch.length - 1 && ch[i + 1].done) continue;
@@ -778,28 +1046,42 @@ function result() {
     const mid = offs.length ? offs[Math.floor(offs.length / 2)] : 0;
     const avg = offs.length >= 8 ? Math.round(mid) : null;
     const D = DIFFS.find(function (d) { return d[0] === P.d; });
+    const rk = rankOf(sc, ac);
+    const run = { s: sc, fc: fc, ac: ac, c: P.cnt.c, n: P.cnt.n, m: P.cnt.m, mc: P.maxCombo };
+    const sk = P.s.key, dk = P.d;
     UI.innerHTML = '<div class="rg-bg"></div>'
-        + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:18px 28px;">'
+        + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:16px 28px;">'
         + '<div style="font-size:13px;color:#aab;">' + esc(P.s.title) + ' · <b style="color:' + D[3] + '">' + D[1] + ' ' + P.chart.charts[P.d].level + '</b></div>'
-        + '<div class="rg-res"><div style="text-align:center;"><div class="rg-rank" style="font-family:Georgia,serif;font-weight:300;font-size:64px;color:#fff;">' + pct + '<small style="font-size:26px;">%</small></div>'
+        + '<div class="rg-res"><div style="text-align:center;">'
+        + '<div class="rg-rank rg-rk" style="--r:' + rk[2] + ';font-family:Georgia,serif;font-size:' + (rk[0].length > 2 ? 58 : 72) + 'px;">' + rk[0] + '</div>'
+        + '<div style="font-family:Georgia,serif;font-weight:300;font-size:30px;color:#fff;">' + pct + '<small style="font-size:16px;">%</small></div>'
         + (ac ? '<div style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:3px;">FULL COMBO</div>' : '')
         + (newBest ? '<div style="font-size:12px;color:#ffe066;">NEW BEST</div>' : '') + '</div>'
         + '<div class="rg-tbl"><div><b style="color:#ff9ccf">CHARMING</b>' + P.cnt.c + '</div><div><b style="color:#7ec8ff">NORMAL</b>' + P.cnt.n + '</div>'
         + '<div><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div><b>MAX COMBO</b>' + P.maxCombo + '</div>'
-        + (avg != null ? '<div style="font-size:12px;color:#ccd;">평균 ' + (avg > 0 ? '+' : '') + avg + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
+        + (avg != null ? '<div style="font-size:12px;color:#ccd;">평균 ' + sgn(avg) + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
+        + '<div data-v="place" style="font-size:12px;color:#ffe9a8;">🏆 랭킹 올리는 중…</div>'
         + '</div></div>'
-        + '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button>'
-        + (avg != null && Math.abs(avg) > 12 ? '<button class="rg-btn" data-k="sync">싱크에 반영 (' + ((SET.offset + avg) > 0 ? '+' : '') + Math.max(-300, Math.min(300, SET.offset + avg)) + 'ms)</button>' : '')
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button><button class="rg-btn" data-k="rank">🏆 랭킹</button>'
+        + (avg != null && Math.abs(avg) > 12 ? '<button class="rg-btn" data-k="sync">판정 싱크에 반영 (' + sgn(Math.max(-300, Math.min(300, SET.offset + avg))) + 'ms)</button>' : '')
         + '</div></div></div>';
     UI.querySelector('[data-k="re"]').onclick = function () { start(); };
     UI.querySelector('[data-k="q"]').onclick = function () { menu(); };
+    UI.querySelector('[data-k="rank"]').onclick = function () { rankModal(dk); };
     const sy = UI.querySelector('[data-k="sync"]');
-    if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '싱크 ' + (SET.offset > 0 ? '+' : '') + SET.offset + 'ms 로 맞췄습니다'; sy.disabled = true; };
+    if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '판정 싱크 ' + sgn(SET.offset) + 'ms 로 맞췄습니다'; sy.disabled = true; };
+    // 랭킹 — 올리고 내 자리를 본다
+    rankSave(sk, dk, run).then(function () { return rankList(sk, dk); }).then(function (list) {
+        const el = UI && UI.querySelector('[data-v="place"]'); if (!el) return;
+        const me = (u_() || {}).code;
+        const i = list.findIndex(function (r) { return r.code === me; });
+        el.textContent = i >= 0 ? ('🏆 랭킹 ' + (i + 1) + '위 / ' + list.length + '명') : '🏆 랭킹에 올리지 못했습니다';
+    });
 }
 
 window.rhythmState = function () {
-    console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 싱크: SET.offset, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
+    console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag };   // 시험 · 콘솔
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();

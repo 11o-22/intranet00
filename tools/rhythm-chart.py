@@ -10,8 +10,12 @@
 #   3. 격자마다 세기 · 자리(박 · 8분 · 16분) · 높낮이(소리 무게중심)를 잰다
 #   4. 난이도마다 고른다
 #        이지   — 박 위주 · 한 박에 0.6 개쯤 · 길게 누르기 · 짧은 슬라이드 조금
-#        노말   — 8분까지 · 한 박에 1.1 개쯤 · 길게 누르기 · 슬라이드 · 강박에 가끔 동시
-#        하드   — 16분까지 · 한 박에 2 개쯤 · 동시 · 길게 누르며 치기 · 긴 슬라이드
+#        노말   — 8분까지 · 한 박에 1.5 개쯤 · 길게 누르기 · 슬라이드 · 지그재그 슬라이드 · 강박에 가끔 동시
+#        하드   — 16분까지 · 한 박에 2.7 개쯤 · 동시 · 길게 누르며 치기 · 긴 슬라이드 · 지그재그 슬라이드
+#        ★ 2026-11-11 사용자 「노말 · 하드 둘 다 내려오는 바 수를 늘리고, 음이 왔다갔다 하면서 길게 될 때는 지그재그 슬라이드도」
+#          · 노말 1.05 → 1.5 · 하드 1.9 → 2.7 (한 박에)
+#          · 지그재그 — 새로 울린 음의 높이(배음 합)가 낮 · 높 · 낮 · 높 … 으로 여섯 번 넘게 이어지는 곳 (8분 · 하드는 16분도)
+#            → 노란 슬라이드가 왼 · 오른 칸을 번갈아 (낮은 음 왼쪽 · 높은 음 오른쪽) · 그 사이 다른 노트는 비운다
 #   5. 6칸에 놓는다 — 높낮이를 칸으로 (낮은 소리 왼쪽 · 높은 소리 오른쪽) · 같은 칸 연타 · 무리한 뜀은 고친다
 #
 #   노트 한 줄 = [시각(ms), 칸(0~5), 종류, 덧값]
@@ -60,6 +64,70 @@ def analyse(sr, x):
     mm = (f >= 160) & (f < 4000)
     mid_db = 20 * np.log10(np.sqrt((mag[mm] ** 2).mean(axis=0)) + 1e-9)
     return fps, off, env, cen, rdb, mid_db
+
+
+def onset_pitch(sr, x, grid, off_bias):
+    """격자마다 새로 울린 음의 높이 (MIDI 번호 · 배음 합) 와 세기 — 지그재그 슬라이드를 찾는다."""
+    N = 4096
+    win = np.hanning(N)
+    df = sr / N
+    fr = np.arange(N // 2 + 1) * df
+    mm = (fr >= 100) & (fr < 5000)
+    cands = 2 ** (np.arange(np.log2(110) * 48, np.log2(1100) * 48) / 48)      # 1/4 반음 간격
+    idx = np.arange(N // 2 + 1)
+    offs = np.arange(-0.025, 0.0301, 0.005)
+    pit = np.zeros(len(grid))
+    pstr = np.zeros(len(grid))
+    for gi, tt in enumerate(grid):
+        t0 = tt - off_bias
+        frames = []
+        for o in offs:
+            a = int(round((t0 + o) * sr)) - N // 2
+            if a < 0 or a + N > len(x):
+                frames.append(None)
+                continue
+            frames.append(np.log1p(1000 * np.abs(np.fft.rfft(x[a:a + N] * win)) / (N / 4)))
+        best = None
+        for k in range(1, len(frames)):
+            if frames[k] is None or frames[k - 1] is None:
+                continue
+            fl = np.maximum(0, frames[k] - frames[k - 1])
+            sm = float(fl[mm].sum())
+            if best is None or sm > best[0]:
+                best = (sm, fl)
+        if best is None:
+            continue
+        col = best[1]
+        sc = np.zeros(len(cands))
+        for h in range(1, 6):
+            sc += np.interp(cands * h / df, idx, col) / h ** 0.8
+        pit[gi] = 12 * np.log2(cands[int(np.argmax(sc))] / 440) + 69
+        pstr[gi] = best[0]
+    return pit, pstr
+
+
+def zig_runs(pit, pstr, ok, step, n_min, n_max):
+    """높이가 낮 · 높 · 낮 · 높 … 으로 번갈아 이어지는 격자 줄 (간격 step) — [격자 번호들]"""
+    th = np.percentile(pstr[pstr > 0], 55) if (pstr > 0).any() else 1e9
+    K = len(pit)
+    out = []
+    last = -1
+    for s0 in range(K):
+        if s0 <= last or not ok[s0] or pstr[s0] < th:
+            continue
+        seq = [s0]
+        while seq[-1] + step < K and ok[seq[-1] + step] and pstr[seq[-1] + step] >= th and len(seq) < n_max:
+            seq.append(seq[-1] + step)
+        d = np.diff(pit[seq])
+        if not len(d) or abs(d[0]) < 1:
+            continue
+        n = 1
+        while n < len(d) and abs(d[n]) >= 1 and np.sign(d[n]) != np.sign(d[n - 1]):
+            n += 1
+        if n + 1 >= n_min:
+            out.append(seq[:n + 1])
+            last = seq[n]
+    return out
 
 
 def local_period(env, fps, sub=4, lo=60, hi=200, win=12.0, step=2.0):
@@ -176,6 +244,7 @@ def main():
         t += d1
     grid = np.concatenate([grid, np.array(post)])
     K = len(grid)
+    PIT, PSTR = onset_pitch(sr, x, grid, 0.0)                       # 격자 = 소리 시각 · 그 앞뒤 틀에서 새로 오른 소리를 본다
 
     # 격자마다 세기
     def feat(name, t, wnd=0.02):
@@ -232,12 +301,38 @@ def main():
     rng = np.random.default_rng(7)
     SPEC = {
         'easy':   {'per_beat': 0.5, 'mods': (0, 4, 8, 12, 2, 6, 10, 14), 'gap': 2, 'pref': 4, 'hold': (4, 12), 'hold_p': 0.12, 'slide': (2, 3), 'slide_step': (4,), 'slide_n': 0.6, 'chord': 0.0},
-        'normal': {'per_beat': 1.05, 'mods': (0, 2, 4, 6, 8, 10, 12, 14), 'gap': 2, 'pref': 2, 'hold': (3, 12), 'hold_p': 0.12, 'slide': (3, 4), 'slide_step': (2,), 'slide_n': 1.0, 'chord': 0.08},
-        'hard':   {'per_beat': 1.9, 'mods': tuple(range(16)), 'gap': 1, 'pref': 1, 'hold': (2, 12), 'hold_p': 0.1, 'slide': (4, 6), 'slide_step': (1, 2), 'slide_n': 1.6, 'chord': 0.16},
+        'normal': {'per_beat': 1.5, 'mods': (0, 2, 4, 6, 8, 10, 12, 14), 'gap': 2, 'pref': 2, 'hold': (3, 12), 'hold_p': 0.12, 'slide': (3, 4), 'slide_step': (2,), 'slide_n': 1.0, 'chord': 0.08},
+        'hard':   {'per_beat': 2.7, 'mods': tuple(range(16)), 'gap': 1, 'pref': 1, 'hold': (2, 12), 'hold_p': 0.1, 'slide': (4, 6), 'slide_step': (1, 2), 'slide_n': 1.6, 'chord': 0.16},
     }
+    # 지그재그 — (간격 · 칸 너비) 들 · 최소 · 최대 음 수 · 30 초에 몇 줄
+    ZIG = {'normal': {'steps': ((2, 2),), 'min': 6, 'max': 10, 'per30': 1.2},
+           'hard':   {'steps': ((2, 3), (1, 2)), 'min': 6, 'max': 12, 'per30': 1.8}}
     charts = {}
     for diff, S in SPEC.items():
         ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods'])) for i in range(K)])
+        # 지그재그 자리를 먼저 잡고 — 그 사이는 다른 노트를 비운다
+        zigs = []
+        if diff in ZIG:
+            Z = ZIG[diff]
+            okz = np.array([(grid[i] >= first_ok + 1 and grid[i] <= last_ok - 0.5 and active[i]) for i in range(K)])
+            cand = []
+            for step, amp in Z['steps']:
+                for r in zig_runs(PIT, PSTR, okz, step, Z['min'], Z['max']):
+                    cand.append((len(r) * step + 0.02 * float(PSTR[r].mean()), r, amp))
+            cand.sort(key=lambda c: -c[0])
+            want = max(1, int(Z['per30'] * (last_ok - first_ok) / 30))
+            for _, r, amp in cand:
+                if len(zigs) >= want:
+                    break
+                if any(not (r[-1] + 6 < z[0][0] or r[0] > z[0][-1] + 6) for z in zigs):
+                    continue
+                if any(abs(grid[r[0]] - grid[z[0][0]]) < 4.0 for z in zigs):
+                    continue
+                zigs.append((r, amp))
+            zigs.sort(key=lambda z: z[0][0])
+            for r, amp in zigs:
+                ok[max(0, r[0] - 1):min(K, r[-1] + 2)] = False
+        zig_span = [(r[0] - 1, r[-1] + 1) for r, amp in zigs]
         sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
         if diff == 'easy':
             sc = sc * np.where(pos % 4 == 0, 1.6, 0.6)
@@ -354,6 +449,11 @@ def main():
                 hl = min(s_len, S['hold'][1], room)
             else:
                 hl = min(s_len, S['hold'][1])          # 노말 · 하드 — 누르는 동안 다른 칸이 와도 된다
+            for za, zb in zig_span:                    # 지그재그 앞에서 끝낸다 (두 손 다 비운다)
+                if i < za <= i + hl + 1:
+                    hl = min(hl, za - i - 2)
+            if hl < S['hold'][0]:
+                continue
             cand_h.append((s_len + 0.5 * strength[i], i, hl))
         cand_h.sort(reverse=True)
         want_h = int(len(sel) * S['hold_p'])
@@ -394,6 +494,16 @@ def main():
                 ln2 = 5 - ln if abs((5 - ln) - ln) >= 2 else (ln + 3) % 6
                 if used_until.get(ln2, -1) < i:
                     notes.append([int(round(grid[i] * 1000)), ln2, 0, 0])
+        # 지그재그 — 낮은 음 왼쪽 · 높은 음 오른쪽 칸을 번갈아 (곡의 그 자리 높이로 왼 · 가운데 · 오른 쪽)
+        for r, amp in zigs:
+            chain += 1
+            centre = int(np.clip(np.searchsorted(qs, float(np.median(C[r]))), 0, 5))
+            lo = int(np.clip(centre - amp // 2, 0, 5 - amp))
+            hi = lo + amp
+            first_low = PIT[r[1]] > PIT[r[0]]           # 처음이 오르면 처음 음은 낮은 쪽
+            for q, i in enumerate(r):
+                low = (q % 2 == 0) == first_low
+                notes.append([int(round(grid[i] * 1000)), lo if low else hi, 2, chain])
         # 길게 누르는 칸에 걸친 다른 노트는 치운다 (같은 칸)
         notes.sort(key=lambda n: (n[0], n[1]))
         clean = []
@@ -428,7 +538,7 @@ def main():
             kinds[n[2]] += 1
         level = int(round(min(15, max(1, 1.2 + nps * 2.0 + kinds[1] / max(1, len(out)) * 3 + kinds[2] / max(1, len(out)) * 4))))
         charts[diff] = {'level': level, 'count': len(out), 'nps': round(nps, 2), 'kinds': kinds, 'notes': out}
-        print(diff, 'notes', len(out), 'nps %.2f' % nps, 'level', level, kinds)
+        print(diff, 'notes', len(out), 'nps %.2f' % nps, 'level', level, kinds, 'zigzag', [('%.1fs' % grid[r[0]], len(r), r[1] - r[0]) for r, a in zigs])
 
     bars = [int(round(grid[i] * 1000)) for i in range(K) if pos[i] == 0]
     bpms = sorted(set(int(round(60 / (per_curve(t) * 4))) for t in np.arange(1, dur, 5)))
