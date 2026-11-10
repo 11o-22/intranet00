@@ -80,11 +80,7 @@ function pick() {
     let room = '';
     try { room = (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : ''; } catch (e) { }
     if (!room) return null;
-    if (room === 'pz_halloween') return 'pzh';
-    if (PLAZA_ROOMS[room]) {
-        try { if (typeof PLAZA !== 'undefined' && PLAZA.HALLOWEEN === false) return null; } catch (e) { }
-        return 'plaza';
-    }
+    // ✗ 2026-11-10 사용자 「핼러윈 음악도 없애자」 — 할로윈 광장 곡 · 포토존 「핼러윈」 곡 모두 끔 (이상한 나라 곡만 남는다)
     return null;
 }
 
