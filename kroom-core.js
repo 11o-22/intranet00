@@ -1086,7 +1086,11 @@ function start(isParty, pid) {
     const u = me();
     hookItems();
     const old = (typeof darkRun !== 'undefined') ? darkRun : null;
-    const helper = isParty ? (helperIn(pid) || !!(old && old.helper)) : helperSwitch();
+    // ★ 일행 — party-helper.js 출발 판단과 같게 (2026-11-10): 명단 · 방의 헬퍼 표 · 이 기기의 헬퍼 탐사 · K 의 방 횟수 0 (이 방에 아직 안 냈으면).
+    //   전에는 명단 표시가 이 자리에 아직 안 와 있으면 보통으로 열려, darkRun 은 헬퍼 · K 의 방 정산은 보통으로 갈라졌다.
+    const helper = isParty ? (helperIn(pid) || !!(old && old.helper)
+        || (typeof window.helperOf === 'function' && !!window.helperOf(pid, u.code))
+        || (kLeft() <= 0 && !kPaid(pid))) : helperSwitch();
     darkRun = {
         zone: K_CODE, step: 0, modifier: 0, success: 0, fail: 0,
         carryEquips: (typeof darkRun !== 'undefined' && darkRun && darkRun.carryEquips) || [],

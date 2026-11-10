@@ -289,7 +289,15 @@ function withTriesOpen(fn) {
             const me = (party && party.members) ? party.members[currentUser.code] : null;
             // ② 넷 중 하나라도 맞으면 헬퍼 — 명단 표시 · 방의 헬퍼 표 · 이 기기의 헬퍼 탐사 · 남은 횟수 0
             let left = 1;
-            try { if (typeof getDarkTriesLeft === 'function') left = Number(getDarkTriesLeft()); } catch (e) { }
+            try {
+                // ★ K 의 방은 K 의 방 횟수로 본다 (2026-11-10 사용자 「Benz · 백야 사원이 K 의 방 헬퍼 버그」) — 일반 어둠 횟수를
+                //   다 쓴 사원이 K 의 방 일행에 들면, K 의 방 횟수가 남아 있어도 「남은 횟수 0」으로 헬퍼가 되었다.
+                //   이 방에서 이미 K 의 방 횟수를 냈으면(새로고침으로 다시 출발 · kroomPaid) 0 이어도 헬퍼로 바꾸지 않는다.
+                if (party && party.zone === 'Qtrew-???-999' && typeof window.kroomTriesLeft === 'function') {
+                    left = Number(window.kroomTriesLeft());
+                    if (currentUser && party.id && currentUser.kroomPaid === party.id) left = Math.max(1, left);
+                } else if (typeof getDarkTriesLeft === 'function') left = Number(getDarkTriesLeft());
+            } catch (e) { }
             const noTries = !(left > 0);
             const helper = !!me && (helperOf(party, currentUser.code) || noTries);
             const keep = currentUser ? currentUser.darkTries : null;
