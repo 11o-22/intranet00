@@ -171,7 +171,7 @@ const DOT = {
     //   ★ 검은 고양이 헤일로의 헤일로(cat-halo-halo · 2026-10-31)는 **맨 아래** — 몸 · 옷 · 웅덩이보다도 뒤.
     //   ★ Null Owner 의 틈(nuow-rift · 2026-11-03)도 맨 아래 — 등 뒤에서 열리는 틈과 손.
     //   ★ Null Owner 2 의 여우불(nuow2-fox · 2026-11-03)도 맨 아래 — 등 뒤에서 푸른 불이 일고 여우가 뛴다.
-    BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem'],
+    BACK_Z: ['nuow2-fox', 'nuow-rift', 'cat-halo-halo', 'leaf-puddle', 'leaf-stem', 'pepero-big-choco', 'pepero-big-straw'],
     // ★ **맨 앞**에 두는 장 — 악세를 몇 개 달아도 이것들이 제일 위다. 적힌 차례대로 — 잎(무조건 앞) → 빗물(잎 위).
     //   ★ 검은 고양이 헤일로의 고양이(cat-halo-cat · 2026-10-31)는 그보다도 앞 — **모든 층(다른 옷 · 악세 포함) 가운데 맨 앞**.
     //   ★ Null Owner 의 착한 친구(nuow-friend · 2026-11-03)도 맨 앞 — 발치에 앉은 토끼 인형과 말풍선.
@@ -761,7 +761,12 @@ const DOT_SLOTS = [
             //   주신 그림은 1728x768 (칸 288) — 다른 1728 장들처럼 칸마다 가로 +30 으로 352 칸에 옮겼다
             //   ★ 같은 날 사용자 「코 쪽에 가 있다 — 입 쪽으로 내려줘」 — 4px(2 도트) 내려 끝이 입(h01 기준 y 180~183)에 닿게
             { i: 'pepero-choco', n: '빼빼로 초코', top: ['pepero-choco'], own: 'pepero-choco', cat: '얼굴' },
-            { i: 'pepero-straw', n: '빼빼로 딸기', top: ['pepero-straw'], own: 'pepero-straw', cat: '얼굴' }
+            { i: 'pepero-straw', n: '빼빼로 딸기', top: ['pepero-straw'], own: 'pepero-straw', cat: '얼굴' },
+            // 대왕 초코 빼빼로 · 대왕 딸기 빼빼로 (2026-11-11 · 사용자 「등 악세로 · 상담사만 줄 수 있게」) — 등 뒤로 비스듬히 멘 커다란 빼빼로
+            //   주신 그림은 1728x768 (칸 288) 에 서기 첫 칸 하나뿐 — 열두 칸에 똑같이 깔고(+30 → 352 칸),
+            //   걷기 2 · 4 · 6 칸은 몸이 4px 내려앉으므로 함께 4px 내렸다. 몸 뒤(BACK_Z)에 깐다.
+            { i: 'pepero-big-choco', n: '대왕 초코 빼빼로', back: ['pepero-big-choco'], own: 'pepero-big-choco', cat: '등' },
+            { i: 'pepero-big-straw', n: '대왕 딸기 빼빼로', back: ['pepero-big-straw'], own: 'pepero-big-straw', cat: '등' }
         ]
     }
 ];
