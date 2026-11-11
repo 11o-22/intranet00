@@ -291,12 +291,14 @@ SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6)}
 #   normal — 노말 한 박에 노트 수 배 · hard — 하드 노트 수(노말의 HARD_X 배)에 또 곱함
 #   zig — 지그재그 줄 수 배 · two — 8분 지그재그 가운데 양손으로 하는 몫 (보통 0.4) · chord — 노말 동시 몫 배
 #   fill16 — 하드에서 그래도 모자라면 박을 선율 옆 16분 자리까지 (다른 손)
-HARDER = {'handicap': {'normal': 1.35, 'hard': 1.15, 'zig': 1.8, 'two': 0.65, 'chord': 1.8, 'fill16': True}}
+HARDER = {'handicap': {'normal': 1.1, 'hard': 0.98, 'alt': True, 'fill16': True}}
+#   ✗ 처음(2026-11-11)엔 'normal': 1.35, 'hard': 1.15, 'zig': 1.8, 'two': 0.65, 'chord': 1.8, 'fill16': True 로 촘촘하게 했다 (노말 629 · 하드 1070 · 초당 8)
+#     → 사용자 「너무 촘촘해서 안 될 것 같아. 딱 쇼타임 정도로만 맞춰주고 레벨은 17로」 — Showtime! (노말 초당 4.0 · 하드 6.68) 에 맞춘 값으로
 
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
-LV_FIX = {'showtime': {'hard': 17},
+LV_FIX = {'showtime': {'hard': 17}, 'handicap': {'hard': 17},   # Handicap 하드 17 (2026-11-11 사용자)
           'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
           'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
 
@@ -526,7 +528,7 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         if any(lanes.get(j) == ln for j in range(q - 2, q + 3) if j in mel):
             ln = {5: 4, 4: 5, 0: 1, 1: 0}[ln]
         # 박이 8분 안으로 붙어 오면 같은 칸을 연타하지 않게 — 그 쪽 두 칸을 번갈아 (2026-11-11 · 「어렵게」 곡만 — 다른 곡 채보는 그대로 다시 뽑히게)
-        if S.get('fill16') and lb_[0] is not None and q - lb_[0] <= 2 and lb_[1] == ln:
+        if (S.get('fill16') or S.get('alt')) and lb_[0] is not None and q - lb_[0] <= 2 and lb_[1] == ln:
             alt = {5: 4, 4: 5, 0: 1, 1: 0}[ln]
             if not any(lanes.get(j) == alt for j in range(q - 1, q + 2) if j in mel):
                 ln = alt
@@ -788,6 +790,7 @@ def main():
                 S['chord'] = S['chord'] * HX.get('chord', 1)
             S['slide_n'] = S['slide_n'] * HX.get('zig', 1)
             S['fill16'] = bool(HX.get('fill16'))
+            S['alt'] = bool(HX.get('alt'))
         ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods'])) for i in range(K)])
         # 지그재그 자리를 먼저 잡고 — 그 사이는 다른 노트를 비운다
         zigs = []
