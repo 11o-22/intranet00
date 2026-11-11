@@ -387,8 +387,13 @@ function injectSkinStyle() {
     }
     if (st.textContent !== SKIN_CSS) st.textContent = SKIN_CSS;
     // style.css 보다 뒤에 오도록 항상 맨 끝으로
-    if (document.head.lastElementChild !== st) document.head.appendChild(st);
+    //   단 frame-size.js 의 규칙(4 초마다 저도 맨 끝으로 간다)과는 겹치는 데가 없으니 그 뒤에 있어도 둔다 —
+    //   둘이 번갈아 맨 끝을 다투면 3~4 초마다 큰 규칙 묶음을 뺐다 넣어 화면 전체를 다시 계산했다 (2026-11-11)
+    for (let n = st.nextElementSibling; n; n = n.nextElementSibling) {
+        if (!SKIN_AFTER_OK[n.id]) { document.head.appendChild(st); break; }
+    }
 }
+const SKIN_AFTER_OK = { 'frame-size-css': 1 };
 
 // 두 색을 섞는다 (t = b 쪽 비율 0~1)
 function skinBlend(a, b, t) {
@@ -577,6 +582,25 @@ function uiSkinCardHtml() {
         if (currentUser) applyUiSkin(currentUser);
         return r;
     };
+
+    // ★ 벽지를 칠해 둔 동안에는 소속 · 커플 테마를 아예 칠하지 않는다 (2026-11-11 깜박임)
+    //   전에는 updateUI 마다 「소속 · 커플 테마를 칠하고(className = "" · 커플 바탕색 · 무늬 칸) → 바로 벽지가 걷어 내는」
+    //   일이 되풀이됐다. 그 사이에 그리는 함수들이 화면 크기를 재며 스타일을 한 번 계산하므로,
+    //   body · .container 의 transition(0.5 초)이 「테마 색 쪽으로 → 다시 벽지 색으로」 두 번씩 돌았다.
+    //   남이 움직이면 updateUI 는 3 초마다 돌아서, 커플이거나 테마 색이 벽지와 크게 다른 사원(연구 · 개발의 흰 테마 등)은 계속 깜박였다.
+    //   벽지가 걷히면(clearUiSkin 이 표식을 먼저 지운다) 그때 원래 테마가 다시 칠해진다.
+    //   이상한 나라의 보라 · 토크쇼의 갈색도 같은 기계로 칠하므로 그동안은 마찬가지로 건너뛴다.
+    function skinOwns(user) {
+        return !!((user && user.uiSkin) || (document.body && document.body.dataset && document.body.dataset.uiSkin));
+    }
+    if (typeof applyDepartmentTheme === 'function') {
+        const _dept = applyDepartmentTheme;
+        applyDepartmentTheme = function (user) { if (skinOwns(user)) return; return _dept.apply(this, arguments); };
+    }
+    if (typeof applyCoupleTheme === 'function') {
+        const _cp = applyCoupleTheme;
+        applyCoupleTheme = function (user) { if (skinOwns(user)) return; return _cp.apply(this, arguments); };
+    }
 
     const _renderInventory = renderInventory;
     renderInventory = function () {
