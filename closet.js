@@ -257,7 +257,8 @@ const DOT = {
     // ★ 서기 칸마다 위아래로 들썩이는 몸 (2026-11-06 사용자 「움직일 때 얼굴 헤어 악세도 같이 움직이게 해줘」)
     //   몸 장 이름 → 서기 줄 칸마다 내려가는 도트 수 (칸 0 이 기준). 재 보면 여성 체형은 머리 · 몸통 · 팔이
     //   칸 0~5 에 0 · 2 · 4 · 2 · 0 · 2 도트씩 통째로 내려간다 (다리 · 발은 그대로).
-    //   그 몸일 때 머리(얼굴 · 머리카락) · 뒷머리 · 악세를 같은 만큼 내린다 (옷은 몸에 그려 맞춘 대로 둔다).
+    //   그 몸일 때 머리(얼굴 · 머리카락) · 뒷머리 · 악세를 같은 만큼 내린다.
+    //   ★ 2026-11-12 — 옷(상의 · 겉옷 · 망토 · 장갑)도 같이 내린다 (여성 체형 옷 fem 은 들썩임을 따라 그려져 있어 빼고 · 하의 · 구두는 그대로 · look()).
     BOB: { 'body-w': [0, 2, 4, 2, 0, 2] },
     //   안 따라 내리는 악세 — 바닥에 앉은 것 · 몸과 떨어져 따로 서 있는 것
     NO_BOB: ['nyang-gray', 'nyang-calico', 'nyang-white', 'leaf-puddle', 'sound-lp',
@@ -1088,6 +1089,18 @@ function look(user, override, all) {
                 for (let i = arr.length - 1; i >= 0; i--) if (drop[arr[i]]) arr.splice(i, 1);
             });
         }
+    }
+    // ★ 들썩이는 몸(여성 체형 · D.BOB)이면 옷도 같이 내린다 — 상의 · 겉옷 · 망토 · 장갑 (2026-11-12 사용자
+    //   「여성 체형을 하면 기존에 있던 옷들이 그냥 떠 보여서 · 기존의 옷들도 위아래로 같이 오르락내리락」)
+    //   · 여성 체형 옷(fem)은 서기 칸마다 들썩임을 따라 그려져 있어 빼고 (두 번 내려가지 않게)
+    //   · 하의 · 구두는 몸의 다리 · 발이 그대로라 안 내린다
+    if (!hd.solo && !hd.bare && D.BOB && D.BOB[bodySheet]) {
+        const bobSlots = ['top', 'outer', 'cape', 'glove'].map(slotOf).filter(Boolean);
+        chosen.forEach(function (x) {
+            if (!x || x.fem) return;
+            if (!bobSlots.some(function (sl) { return sl.items.indexOf(x) >= 0; })) return;
+            (x.back || []).concat(x.over || [], x.top || []).forEach(function (o) { fol[o] = 1; });
+        });
     }
     over.sort(function (a, b) { return D.Z.indexOf(a) - D.Z.indexOf(b); });
     // 한 벌로 그려진 머리는 옷을 안 겹친다 — 고른 것은 그대로 두되 안 그린다
