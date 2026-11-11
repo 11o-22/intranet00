@@ -796,6 +796,9 @@ function stampSafe(ov) {
         '.plaza-cage{position:absolute;pointer-events:none;}',
         // 🍲 냄비 — 뒤쪽(김 · 뒷전 · 국 뒤 절반)과 앞쪽(국 앞 절반 · 몸통)을 따로 깔아 안에 든 사람이 국 속에 선다 (2026-11-11)
         '.plaza-pot{position:absolute;background-repeat:no-repeat;image-rendering:pixelated;image-rendering:crisp-edges;cursor:pointer;}',
+        // 김 — 좌우로 뒤집기만 되풀이해 피어오르는 것처럼 (2026-11-11 사용자 「연기만 좌우 반전해서 움직이는 효과」) · transform 이라 다시 칠하지 않는다
+        '.plaza-pot.steam{pointer-events:none;will-change:transform;animation:plazaPotSteam 1.2s steps(1,end) infinite;}',
+        '@keyframes plazaPotSteam{0%{transform:scaleX(1);}50%{transform:scaleX(-1);}100%{transform:scaleX(1);}}',
         '.plaza-pot-t{position:absolute;transform:translateX(-50%);font-size:10px;font-weight:bold;color:#e8dcc8;white-space:nowrap;',
         '  text-shadow:0 1px 3px #000,0 0 5px #000;pointer-events:none;}',
         // 🎃 핼러윈 — 방 그림 바로 위에 우중충한 막(사람 · 입구보다 아래) · 바닥의 호박
@@ -4122,6 +4125,8 @@ const POT = {
     CX: 12.75,          // 그림에서 냄비 가운데 (점)
     SHOW: 0.6,          // 안에 든 사람 몸 가운데 국 위로 보이는 몫 (머리 · 어깨)
     NEAR: 70,           // 냄비 앞 이만큼 안이면 손이 닿는다
+    IN: 26,             // 안에 든 사람이 국 속에서 좌우로 다닐 수 있는 폭 (가운데서 한쪽 · 방 px)
+    STEAM: 15,          // 김 — 이 줄까지 (따로 깔아 좌우로 뒤집으며 피어오르게)
     ROOMS: ['dfront', 'dream', 'casino', 'plaza', 'post', 'gate', 'bureau', 'dshop']
 };
 const POTS = {};
@@ -4223,7 +4228,11 @@ function paintPot() {
         run.el.appendChild(e);
         return e;
     };
-    mk(0, cut, 100 + POT.BASE - 2);                     // 뒤 — 안에 든 사람(BASE-1)보다 뒤
+    const st = Math.round(POT.STEAM * px);
+    const sEl = mk(0, st, 100 + POT.BASE - 2);           // 김 — 냄비 가운데를 축으로 좌우로 뒤집는다
+    sEl.classList.add('steam');
+    sEl.style.transformOrigin = Math.round(POT.CX * px) + 'px 50%';
+    mk(st, cut - st, 100 + POT.BASE - 2);               // 뒤 — 뒷전 · 국 뒤 절반 (안에 든 사람(BASE-1)보다 뒤)
     mk(cut, Hh - cut, 100 + POT.BASE);                  // 앞
     const t = document.createElement('div');
     t.className = 'plaza-pot-t';
@@ -4327,8 +4336,12 @@ function potPin() {
         if (now() - (run.potWarp || 0) > 3000) { run.potWarp = now(); run.forceInst = pm.i || 0; goRoom(pm.r, null, 0); }
         return true;
     }
-    run.x = POT.X; run.y = POT.BASE - 1; run.lv = 0; run.seg = 'up';
-    run.tx = null; run.ty = null; run.tseg = null; run.vx = run.vy = 0;
+    // ★ 국 속에서는 좌우로 다닌다 (2026-11-11 사용자 「냄비 안에서는 움직일 수 있도록」) — 앞뒤(y)는 그대로
+    const x0 = POT.X - POT.IN, x1 = POT.X + POT.IN;
+    if (Math.abs(run.x - POT.X) > POT.IN + 6) { run.x = POT.X; run.tx = null; }     // 막 들어왔다 — 가운데로
+    run.x = Math.max(x0, Math.min(x1, run.x)); run.y = POT.BASE - 1; run.lv = 0; run.seg = 'up';
+    run.vy = 0;
+    if (run.tx != null) { run.tx = Math.max(x0, Math.min(x1, run.tx)); run.ty = POT.BASE - 1; run.tseg = null; }
     run.potGo = null;
     return true;
 }
@@ -5296,8 +5309,8 @@ function tick(ts) {
         if (hsPin.room && hsPin.room !== run.room && R[hsPin.room]) { goRoom(hsPin.room, null, hsPin.lv || 0); return; }
         if (hsPin.x != null) { run.x = hsPin.x; run.y = hsPin.y; run.vx = run.vy = 0; }
     }
-    const potIn_ = potPin();                // 🍲 냄비 속이면 그 자리에 박아 둔다
-    run.me.actor.moving(potIn_ ? false : (cm ? cmMove : moving));
+    potPin();                               // 🍲 냄비 속이면 국 속(좌우로만)에 둔다
+    run.me.actor.moving(cm ? cmMove : moving);
     const myLift = jumpLift(run.me, run.jumpT0);                                  // 🍍 점프
     if (run.jumpT0) { poseJump(run.me, run.jumpT0); if (!jumping(run.jumpT0)) run.jumpT0 = 0; }   // 뛰는 동안은 걸음 4번 모션으로 멈춰 선다 · 내려오면 푼다
     putOne(run.me, run.x, run.y, myLift);
