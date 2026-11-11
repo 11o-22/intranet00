@@ -162,6 +162,8 @@ function pbOn(gesture) {
 function pbOff() {
     clearTimeout(S._pbT);
     if (S.piano || Date.now() - (S.pbAt || 0) < LP.PB_IDLE - 100) { S._pbT = setTimeout(pbOff, LP.PB_IDLE); return; }
+    // ★ 리듬 게임이 열려 있거나 플레이리스트가 도는 동안은 소리 종류를 되돌리지 않는다 — 아이폰에서 그쪽 소리 장치가 끊긴다 (2026-11-11)
+    try { if (document.getElementById('rg-ov') || (typeof window.playlistOn === 'function' && window.playlistOn())) { S._pbT = setTimeout(pbOff, LP.PB_IDLE); return; } } catch (e) { }
     try { if (hasAS() && navigator.audioSession.type === 'playback') navigator.audioSession.type = 'auto'; } catch (e) { }
     silentOff();
     S.pbWant = false; S.pbAt = 0;

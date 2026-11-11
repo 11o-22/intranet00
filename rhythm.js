@@ -279,8 +279,14 @@ function ctx() {
     if (AU.ctx.state !== 'running') { try { AU.ctx.resume(); } catch (e) { } }
     return AU.ctx;
 }
+// ★ 이미 'playback' 이면 다시 쓰지 않는다 — 소리 장치가 도는 중에 소리 종류를 바꾸면 아이폰이 소리 장치를 끊어 버린다 (2026-11-11)
+//   되돌릴 값은 처음 한 번만 적는다 (두 번째 곡에서 'playback' 을 원래 값으로 적어 두던 것)
 function sessionOn() {
-    try { if (navigator.audioSession && 'type' in navigator.audioSession) { AU.sess = navigator.audioSession.type; navigator.audioSession.type = 'playback'; } } catch (e) { }
+    try {
+        if (!(navigator.audioSession && 'type' in navigator.audioSession)) return;
+        if (AU.sess == null) AU.sess = navigator.audioSession.type;
+        if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
+    } catch (e) { }
 }
 function sessionOff() {
     try { if (navigator.audioSession && AU.sess != null) navigator.audioSession.type = AU.sess; } catch (e) { }
@@ -294,6 +300,8 @@ function decode(ab) {
 }
 function loadSong(s) {
     if (AU.bufs[s.key]) return Promise.resolve(AU.bufs[s.key]);
+    // ★ 앞 곡을 쥔 채 다음 곡을 풀면 잠깐 두 곡 몫(100 MB 넘게)을 쥔다 — 휴대폰에서 풀기가 막히지 않게 먼저 놓는다 (2026-11-11)
+    Object.keys(AU.bufs).forEach(function (k) { delete AU.bufs[k]; });
     return fetch(s.audio).then(function (r) { if (!r.ok) throw new Error('곡을 받지 못했습니다 (' + r.status + ')'); return r.arrayBuffer(); })
         .then(decode).then(function (b) {
             // 풀어 둔 곡은 한 곡에 50 MB 가까이 — 곡이 일곱이라 지금 곡만 남긴다 (휴대폰 메모리)
@@ -820,8 +828,8 @@ function start() {
     if (!owned(song())) { if (song().price) buyModal(song()); else needModal(song()); return; }
     previewStop(true);
     const s = song(), d = SET.diff;
-    // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정
-    ctx(); sessionOn();
+    // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정 (소리 종류를 먼저 — 도는 소리 장치 위에서 바꾸지 않게)
+    sessionOn(); ctx();
     try {
         if (!document.fullscreenElement && OV.requestFullscreen) {
             OV.requestFullscreen({ navigationUI: 'hide' }).then(function () {
@@ -865,7 +873,45 @@ function begin(s, d, buf, chart) {
     AU.startAt = cx.currentTime + LEAD;
     AU.src.start(AU.startAt);
     AU.src.onended = function () { if (P && MODE === 'play') P.audioEnd = true; };
+    P.buf = buf;
+    wdReset();
     MODE = 'play';
+}
+// ★ 소리 장치가 멈춰 있으면 판의 시계도 멈춘다 — 채보가 안 내려오고 곡도 안 나온다 (2026-11-11 사용자 「한 곡 하고 다음 곡을 누르면 채보가 안 내려온다」)
+//   아이폰은 다른 소리(광장 피아노 · 소리 종류 바꿈 · 전화 · 다른 앱)가 끼어들면 소리 장치를 「끊김」으로 두고, 누르기 전에는 다시 안 켜 준다.
+//   1.5 초 넘게 소리 시계가 안 가면 「▶ 눌러서 시작」 — 누른 손짓 안에서 소리 장치를 새로 만들어 그 곡을 처음부터 다시 튼다.
+const WD = { last: null, at: 0, tried: 0, on: false };
+function wdReset() { WD.last = null; WD.at = performance.now(); WD.tried = 0; wakeHide(); }
+function watchdog() {
+    if (MODE !== 'play' || !P) { if (WD.on) wakeHide(); return; }
+    const c = AU.ctx, pn = performance.now();
+    const t = c ? c.currentTime : -1;
+    if (c && c.state === 'running' && t !== WD.last) { WD.last = t; WD.at = pn; if (WD.on) wakeHide(); return; }
+    if (c && c.state === 'suspended' && pn - WD.tried > 1000) { WD.tried = pn; try { c.resume(); } catch (e) { } }
+    if (pn - WD.at > 1500 && !WD.on) wakeShow();
+}
+function wakeShow() {
+    if (!UI || UI.querySelector('.rg-wake')) return;
+    WD.on = true;
+    const m = document.createElement('div'); m.className = 'rg-modal rg-wake';
+    m.innerHTML = '<div class="rg-box" style="align-items:center;text-align:center;gap:10px;"><div style="font-size:13px;color:#ccd;line-height:1.7;">소리가 멈춰 있습니다<br><small style="color:#99a;">눌러 주시면 이 곡을 처음부터 다시 시작합니다</small></div>'
+        + '<button class="rg-btn rg-go" data-k="wake">▶ 눌러서 시작</button></div>';
+    UI.appendChild(m);
+    m.querySelector('[data-k="wake"]').onclick = function (e) { e.stopPropagation(); wakeGo(); };
+}
+function wakeHide() { WD.on = false; const m = UI && UI.querySelector('.rg-wake'); if (m) m.remove(); }
+function wakeGo() {
+    if (!P) return;
+    const s = P.s, d = P.d, chart = P.chart, buf = P.buf || AU.bufs[s.key];
+    wakeHide();
+    stopPlay();
+    previewStop(true);
+    // 누른 손짓 안에서 — 묵은 소리 장치는 닫고 새로 연다
+    const old = AU.ctx; AU.ctx = null;
+    try { if (old && old.state !== 'closed') old.close(); } catch (e) { }
+    sessionOn(); ctx();
+    if (!buf) { MODE = 'load'; start(); return; }
+    begin(s, d, buf, chart);
 }
 function stopPlay() {
     try { if (AU.src) { AU.src.onended = null; AU.src.stop(); } } catch (e) { }
@@ -884,6 +930,7 @@ function pause() {
         m.remove();
         try { AU.ctx.resume(); } catch (e) { }
         clockReset();
+        wdReset();
         MODE = 'play';
     };
     m.querySelector('[data-k="re"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } start(); };
@@ -1266,7 +1313,7 @@ function raf() {
     frameTick();
     if (MODE === 'cal') { clockTick(); calTick(); drawCal(); return; }
     if (MODE !== 'play' && MODE !== 'pause') { if (G2) G2.clearRect(0, 0, VW, VH); return; }
-    if (MODE === 'play') { clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); }
+    if (MODE === 'play') { watchdog(); clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); }
     draw(P.lastVis || 0);
 }
 function rr(g, x, y, w, h, r) {
