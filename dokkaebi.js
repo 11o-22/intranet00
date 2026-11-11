@@ -9,6 +9,8 @@
 //   · 판정 +2
 //   · 그날 **세 번째로 남을 구해 내면** 「도깨비의 가호」 — 12시간 무적
 //       어둠 · EPIC · K의 방에서 쓰러지지 않는다 · 오염도가 오르지 않는다 (재난 — 기록 소실은 빼고)
+//       ★ 2026-11-11 사용자 「도깨비불은 한 판에 3번만 살려주자」 — 쓰러짐을 막는 것은 **한 판에 세 번까지** (그 판에 적어 둔다 · dokSaves)
+//         네 번째부터는 그대로 쓰러진다. 오염도가 안 오르는 것 · 판정 +2 는 그대로.
 //   · 가호가 끝나면 12시간 동안 도깨비 불이 **아무 효과도 없다** (쿨타임 — 행운 · 판정 · 갈림길 표시까지)
 //   · 쿨타임이 끝나는 때 200,000 P 가 들어온다 (그때 화면이 꺼져 있었으면 다음에 들어올 때)
 //   · 값 2,500,000 P · 복사기로 못 베낀다 (spaceitems.js NO_COPY)
@@ -34,6 +36,7 @@ const DOK = {
     PRICE: 2500000,
     DESC: '길을 밝히는 장난꾸러기 불',
     BON: 2,                       // 판정 +2
+    SAVES: 3,                     // 가호가 쓰러짐을 막는 수 — 한 판에 (2026-11-11)
     NEED: 3,                      // 그날 몇 번째 구출에서 가호가 켜지나
     ON_MS: 12 * 3600 * 1000,      // 가호 — 무적
     CD_MS: 12 * 3600 * 1000,      // 그 뒤 쿨타임 — 효과 없음
@@ -126,13 +129,25 @@ window.dokRescued = function (where) {
 // 가호 — 쓰러지지 않는다 (어둠 · EPIC · K의 방 · 재난은 빼고)
 // ==========================================
 const LINE = '<br><br><span style="color:#ff9e5e;">— 불씨 하나가 앞을 가로막는다. 깔깔 웃는 소리가 난다.<br>도깨비의 가호다. 아무것도 닿지 않았다.</span>';
-function block(reasonText, nextFn) {
+// holder — 그 판 (어둠 darkRun · EPIC er · K의 방 상태) · 막은 수를 거기에 적는다
+function block(reasonText, nextFn, holder) {
     const u = me(), r = run();
     if (!u || !r || !wears(u) || !guarded(u)) return false;
+    const h = holder || r;
+    const used = Number(h.dokSaves) || 0;
+    if (used >= DOK.SAVES) {
+        try { r.log.push('[🔥 도깨비의 가호] 이번 판에서는 더 막아 주지 않는다 (' + DOK.SAVES + '번 다 씀)'); } catch (e) { }
+        return false;
+    }
+    h.dokSaves = used + 1;
+    if (h !== r) r.dokSaves = Math.max(Number(r.dokSaves) || 0, h.dokSaves);
+    const left = DOK.SAVES - h.dokSaves;
     r.fail = Math.max(0, (r.fail || 0) - 1);
-    try { r.log.push('[🔥 도깨비의 가호] 쓰러지지 않음'); } catch (e) { }
+    try { r.log.push('[🔥 도깨비의 가호] 쓰러지지 않음 (' + h.dokSaves + ' / ' + DOK.SAVES + ')'); } catch (e) { }
+    const tail = '<br><span style="color:#c98a5e; font-size:11px;">'
+        + (left > 0 ? '불씨가 조금 작아졌다. (이번 판 ' + left + '번 남음)' : '불씨가 사그라든다. 이번 판에서는 더 막아 주지 않는다.') + '</span>';
     try {
-        darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + LINE, darkChoiceBtn('숨을 고른다.', nextFn));
+        darkBodyEl().innerHTML = darkBox('—', String(reasonText || '') + LINE + tail, darkChoiceBtn('숨을 고른다.', nextFn));
         if (r.isParty && typeof mountDarkChat === 'function') mountDarkChat('normal');
     } catch (e) { }
     try { if (typeof saveDB === 'function') saveDB(); } catch (e) { }
@@ -145,7 +160,7 @@ function block(reasonText, nextFn) {
         const _d = darkDeath;
         const w = function (reasonText) {
             const r = run();
-            if (r && !r._dead && !r.epic && !r.kroom && block(reasonText, 'renderDarkStep();')) return;
+            if (r && !r._dead && !r.epic && !r.kroom && block(reasonText, 'renderDarkStep();', r)) return;
             return _d.apply(this, arguments);
         };
         w._dok = true;
@@ -161,7 +176,7 @@ function block(reasonText, nextFn) {
         const _d = epicDeath;
         const w = function (txt) {
             let E = null; try { E = er; } catch (e) { }
-            if (E && !E.dead && block(txt, 'epicMap()')) return;
+            if (E && !E.dead && block(txt, 'epicMap()', E)) return;
             return _d.apply(this, arguments);
         };
         w._dok = true;
@@ -179,7 +194,7 @@ function block(reasonText, nextFn) {
             const kr = window.KROOM.state();
             if (kr && !kr.dead && !kr._settled) {
                 const why = (typeof text === 'string' && text) || (kr._doomCfg && kr._doomCfg.dieText) || '거기서 끝났다.';
-                if (block(why, 'kroomNext()')) {
+                if (block(why, 'kroomNext()', kr)) {
                     try { if (kr._doomT) { clearInterval(kr._doomT); kr._doomT = 0; } } catch (e) { }
                     if (kr.down) { kr.down = false; if (kr.stats && kr.stats.hp <= 0) kr.stats.hp = 20; }
                     return;
@@ -191,6 +206,42 @@ function block(reasonText, nextFn) {
         window.kroomDie = w;
         clearInterval(iv);
     }, 400);
+    setTimeout(function () { clearInterval(iv); }, 60000);
+})();
+// 한 판에 막은 수 — 새로고침으로 이어 가도 남게 (darkRuns/<사번>/dokSaves)
+(function hookKeepSaves() {
+    const iv = setInterval(function () {
+        if (typeof saveDarkRunState !== 'function' || typeof acceptDarkResume !== 'function') return;
+        if (!saveDarkRunState._dokSaves) {
+            const _s = saveDarkRunState;
+            const w = function () {
+                const out = _s.apply(this, arguments);
+                try {
+                    const r = run(), u = me();
+                    if (r && u && Number(r.dokSaves) > 0 && typeof database !== 'undefined' && database)
+                        database.ref('darkRuns/' + u.code + '/dokSaves').set(Number(r.dokSaves)).catch(function () { });
+                } catch (e) { }
+                return out;
+            };
+            Object.keys(_s).forEach(function (k) { try { w[k] = _s[k]; } catch (e) { } });
+            w._dokSaves = true;
+            saveDarkRunState = w; window.saveDarkRunState = w;
+        }
+        if (!acceptDarkResume._dokSaves) {
+            const _a = acceptDarkResume;
+            const w2 = function () {
+                let snap = null;
+                try { snap = window._pendingResume || null; } catch (e) { }
+                const out = _a.apply(this, arguments);
+                try { const r = run(); if (r && snap && Number(snap.dokSaves) > 0) r.dokSaves = Math.max(Number(r.dokSaves) || 0, Number(snap.dokSaves)); } catch (e) { }
+                return out;
+            };
+            Object.keys(_a).forEach(function (k) { try { w2[k] = _a[k]; } catch (e) { } });
+            w2._dokSaves = true;
+            acceptDarkResume = w2; window.acceptDarkResume = w2;
+        }
+        clearInterval(iv);
+    }, 500);
     setTimeout(function () { clearInterval(iv); }, 60000);
 })();
 // 가호 — 오염도가 오르지 않는다 (재난 — 기록 소실 창이 떠 있으면 빼고)
