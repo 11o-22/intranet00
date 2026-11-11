@@ -11,6 +11,10 @@
 //   둘 다 공용시설 행운을 올리는 것이라, 영구히 굳으면 공용시설 승률이
 //   영영 올라간 채로 남는다. 그래서 투명 물약으로는 못 굳히게 한다.
 //
+//   · 유리구슬     — 다섯 시간 행운 300% (2026-11-11 사용자 「유리구슬이 물약으로 고정이 되는 오류 — 고정된 건 풀어줘」)
+//     물약이 아니라 구슬이라 굳으면 안 된다. 이미 굳은 것은 아래 4 가 푼다 — 원래 끝 시각은 굳힐 때 지워져서
+//     남지 않았으므로, 푼 때부터 다섯 시간 뒤에 끝나게 둔다 (같은 이름의 안 굳은 것이 또 있으면 하나로 합친다).
+//
 // 그리고 고정된 것은 종류를 가리지 않고 제거약으로 풀 수 있게 둔다.
 // (제거약은 원래 이름이 '물약'으로 끝나는 것만 건드린다 — cure-fix.js)
 
@@ -39,7 +43,7 @@
 // 2. 고정할 효과 뽑기
 // ==========================================
 // 영구히 굳으면 안 되는 것들 — 여기에 이름을 더하면 후보에서 빠진다
-const NO_FIX = ['감자맛 물약', '아이의 운'];
+const NO_FIX = ['감자맛 물약', '아이의 운', '유리구슬'];
 window.CLEAR_NO_FIX = NO_FIX;      // 복제품 투명 물약(copy-potion.js)도 같은 것을 뺀다 (2026-10-20)
 
 function canFix(e) {
@@ -158,6 +162,103 @@ function commit(u, pick, isOthers) {
         console.log('[투명] 무작위 고정 연결 (뺀 것: ' + NO_FIX.join(', ') + ')');
     }, 500);
 })();
+
+// ==========================================
+// 4. 이미 굳은 유리구슬을 푼다 (2026-11-11)
+//    · 내 것 — 들어와 있는 동안 늘 본다 (내 화면에서 고쳐 저장)
+//    · 다른 사원 것 — 상담사 화면에서 한 번 훑어 서버에서 그 사원의 걸린 효과만 트랜잭션으로 고친다 (들어와 있는 사원과 엇갈리지 않게)
+// ==========================================
+const BEAD = '유리구슬', BEAD_MS = 5 * 3600000;
+function srvNow() { try { if (typeof window.serverNow === 'function') { const t = Number(window.serverNow()); if (t > 1.5e12) return t; } } catch (e) { } return Date.now(); }
+function unfixBead(list) {
+    if (!Array.isArray(list)) return 0;
+    let n = 0;
+    const now = srvNow();
+    list.forEach(function (e) {
+        if (e && e.fixed && String(e.name || '').trim() === BEAD) {
+            e.fixed = false; e.expireAt = now + BEAD_MS; e.unfixedAt = now; n++;
+        }
+    });
+    if (!n) return 0;
+    // 같은 이름 안 굳은 것이 여럿이면 하나로 (늦게 끝나는 쪽)
+    let keep = null;
+    for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        if (!e || e.fixed || String(e.name || '').trim() !== BEAD) continue;
+        if (!keep) { keep = e; continue; }
+        keep.expireAt = Math.max(Number(keep.expireAt) || 0, Number(e.expireAt) || 0);
+        list.splice(i, 1);
+    }
+    return n;
+}
+// 내 것 — 고정은 저장할 때 「굳은 쪽이 이긴다」(save-merge pickEff)라 그 자리에서 풀면 서버의 굳은 것에 도로 덮인다.
+//   그래서 특수 제거약처럼 **이름으로 빼는 트랜잭션**으로 먼저 지우고(내 화면에서도 빼고), 지워진 뒤에 다섯 시간짜리로 새로 건다.
+let beadBusy = false;
+function beadTx(code) {
+    const d = (typeof database !== 'undefined' && database) ? database : null;
+    if (!d) return Promise.resolve();
+    return d.ref('users/' + code + '/timedEffects').transaction(function (cur) {
+        if (!cur) return cur;
+        const arr = Array.isArray(cur) ? cur : Object.keys(cur).map(function (k) { return cur[k]; });
+        return arr.filter(function (e) { return !(e && String(e.name || '').trim() === BEAD); });
+    }).catch(function (e) { console.warn('[투명] 유리구슬 빼기 실패', e); });
+}
+setInterval(function () {
+    try {
+        const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+        if (!u || beadBusy || !Array.isArray(u.timedEffects)) return;
+        if (!u.timedEffects.some(function (e) { return e && e.fixed && String(e.name || '').trim() === BEAD; })) return;
+        beadBusy = true;
+        const code = u.code, now = srvNow();
+        let end = now + BEAD_MS, desc = '행운 300% 상승';
+        u.timedEffects.forEach(function (e) {
+            if (!e || String(e.name || '').trim() !== BEAD) return;
+            if (e.desc) desc = e.desc;
+            if (!e.fixed && Number(e.expireAt) > end && Number(e.expireAt) < 1e14) end = Number(e.expireAt);
+        });
+        u.timedEffects = u.timedEffects.filter(function (e) { return !(e && String(e.name || '').trim() === BEAD); });
+        beadTx(code).then(function () {
+            try { if (typeof saveFields === 'function') saveFields({ timedEffects: 1 }); } catch (e) { }
+            setTimeout(function () {
+                try {
+                    const v = (typeof currentUser !== 'undefined') ? currentUser : null;
+                    if (v && v.code === code) {
+                        if (!Array.isArray(v.timedEffects)) v.timedEffects = [];
+                        v.timedEffects = v.timedEffects.filter(function (e) { return !(e && String(e.name || '').trim() === BEAD); });
+                        v.timedEffects.push({ name: BEAD, desc: desc, expireAt: end });
+                        if (typeof addHistoryLog === 'function') addHistoryLog(v, '[투명 물약] 유리구슬은 고정할 수 없어 고정을 풀었습니다. (다섯 시간 뒤 끝남)');
+                        if (typeof saveFields === 'function') saveFields({ timedEffects: 1, history: 1 });
+                        if (typeof updateUI === 'function') updateUI();
+                        console.log('[투명] 굳은 유리구슬을 풀었습니다 (내 것)');
+                    }
+                } catch (e) { }
+                beadBusy = false;
+            }, 2500);
+        });
+    } catch (e) { beadBusy = false; }
+}, 3000);
+let beadSwept = false;
+setInterval(function () {
+    try {
+        if (beadSwept) return;
+        const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+        if (!u || u.code !== 'kario0987' || typeof database === 'undefined' || !database) return;
+        const all = (typeof db !== 'undefined' && db && db.users) ? db.users : null;
+        if (!all || Object.keys(all).length < 2) return;
+        beadSwept = true;
+        const hit = Object.keys(all).filter(function (c) {
+            return c !== u.code && (all[c].timedEffects || []).some(function (e) { return e && e.fixed && String(e.name || '').trim() === BEAD; });
+        });
+        hit.forEach(function (c) {
+            database.ref('users/' + c + '/timedEffects').transaction(function (cur) {
+                if (!Array.isArray(cur)) return;                 // 아직 못 읽었거나 없다 — 그대로 (사원이 들어오면 제 화면에서 푼다)
+                return unfixBead(cur) ? cur : undefined;
+            }).then(function (r) { if (r && r.committed) console.log('[투명] 굳은 유리구슬을 풀었습니다 — ' + c); }).catch(function () { });
+        });
+        if (hit.length) console.log('[투명] 굳은 유리구슬 — ' + hit.length + '명 풀기');
+    } catch (e) { }
+}, 4000);
+window.beadUnfix = unfixBead;
 
 // ==========================================
 // 확인
