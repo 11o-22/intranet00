@@ -1259,7 +1259,7 @@ function result() {
         + '<div class="rg-res"><div style="text-align:center;">'
         + '<div class="rg-rank rg-rk" style="--r:' + rk[2] + ';font-family:Georgia,serif;font-size:' + (rk[0].length > 2 ? 58 : 72) + 'px;">' + rk[0] + '</div>'
         + '<div style="font-family:Georgia,serif;font-weight:300;font-size:30px;color:#fff;">' + pct + '<small style="font-size:16px;">%</small></div>'
-        + (ac ? '<div style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:3px;">FULL COMBO</div>' : '')
+        + (ac ? '<div style="color:#ffc1e3;font-weight:bold;letter-spacing:3px;">ALL CHARMING</div>' : fc ? '<div style="color:#ffe066;font-weight:bold;letter-spacing:3px;">ALL COMBO</div>' : '')       // MISS 없이 끝까지 (2026-11-11 사용자 「FULL COMBO → ALL COMBO」)
         + (newBest ? '<div style="font-size:12px;color:#ffe066;">NEW BEST</div>' : '') + '</div>'
         + '<div class="rg-tbl"><div><b style="color:#ff9ccf">CHARMING</b>' + P.cnt.c + '</div><div><b style="color:#7ec8ff">NORMAL</b>' + P.cnt.n + '</div>'
         + '<div><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div><b>MAX COMBO</b>' + P.maxCombo + '</div>'
