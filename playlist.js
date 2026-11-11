@@ -36,7 +36,7 @@ const PATH = 'playlists';
 const SET_KEY = 'plSet';
 const MAX_LISTS = 20;
 // 곡 길이 (ms) — 목록에 미리 적어 둔다 (리듬 채보의 dur). 새 곡은 한 번 틀면 재서 이 기기에 적어 둔다
-const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600,
+const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120,
               winterfloat: 163080, whitexmas: 120800, showtime: 126800 };
 
 function u_() { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; }
@@ -147,8 +147,9 @@ function shuffled(arr) {
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
     return a;
 }
+// 🔒 해금하지 않은 곡(rhythm.js price)은 차례에서 뺀다 — 목록에는 자물쇠로 보이고, 누르면 그 자리에서 해금 (2026-11-11 사용자 「천지인」)
 function baseOf(src) {
-    const all = songs().map(function (s) { return s.key; });
+    const all = songs().filter(function (s) { return !s.locked; }).map(function (s) { return s.key; });
     if (src === 'all') return all;
     const l = LISTS[src];
     return l ? l.s.filter(function (k) { return all.indexOf(k) >= 0; }) : [];
@@ -441,6 +442,7 @@ function songRow(s, opts) {
     return '<div class="pl-row' + (cur ? ' cur' : '') + '" data-a="pick" data-k="' + esc(s.key) + '" data-src="' + esc(opts.src) + '" style="--rc:' + esc(s.color || '#ffd79a') + '">'
         + '<div class="pl-th" style="' + cov(s) + '"></div>'
         + '<div class="pl-tx"><b>' + esc(s.title) + '</b><span>' + esc(s.artist || 'Benz') + (durOf(s.key) ? ' · ' + fmt(durOf(s.key)) : '') + '</span></div>'
+        + (s.locked ? '<button class="pl-mini-b" data-a="buy" data-k="' + esc(s.key) + '" style="color:#ffd79a;">🔒 ' + Number(s.price || 0).toLocaleString() + 'P</button>' : '')
         + (opts.tail || '') + '</div>';
 }
 
@@ -532,7 +534,7 @@ function pickerHtml() {
         const has = l && l.s.indexOf(s.key) >= 0;
         return '<div class="pl-row" data-a="tgls" data-k="' + esc(s.key) + '"><div class="pl-chk' + (has ? ' on' : '') + '">' + (has ? '✓' : '') + '</div>'
             + '<div class="pl-th" style="' + cov(s) + ';width:34px;height:34px;"></div>'
-            + '<div class="pl-tx"><b>' + esc(s.title) + '</b><span>' + esc(s.artist || 'Benz') + '</span></div></div>';
+            + '<div class="pl-tx"><b>' + esc(s.title) + '</b><span>' + esc(s.artist || 'Benz') + (s.locked ? ' · 🔒 해금해야 들림' : '') + '</span></div></div>';
     }).join('');
     return h;
 }
@@ -574,8 +576,11 @@ function onClick(e) {
         case 'prev': prev(); return;
         case 'shuf': setShuf(!SET.shuf); return;
         case 'rep': cycleRep(); return;
+        case 'buy': e.stopPropagation(); buy(el.dataset.k); return;
         case 'pick': {
             const k = el.dataset.k, src = el.dataset.src;
+            const sg = song(k);
+            if (sg && sg.locked) { buy(k, src); return; }
             if (Q.key === k && Q.src === src && A) { toggle(); return; }
             playFrom(src, k); return;
         }
@@ -639,6 +644,21 @@ function onClick(e) {
             saveLists(); afterListEdit(id); full(); return;
         }
     }
+}
+// 🔒 해금 — rhythm.js 가 포인트를 빼고 적는다 · 되면 그 곡을 바로 튼다
+function buy(k, src) {
+    const s = song(k);
+    if (!s || !s.locked) return;
+    if (typeof window.rhythmBuy !== 'function') return;
+    if (!confirm('「' + s.title + '」은(는) 해금해야 들을 수 있습니다.\n' + Number(s.price || 0).toLocaleString() + 'P 로 해금할까요?\n(리듬 게임에서도 같이 열립니다)')) return;
+    const r = window.rhythmBuy(k);
+    if (!r || !r.ok) {
+        const msg = '해금하지 못했습니다.\n\n' + ((r && r.why) || '');
+        try { if (typeof showCustomAlert === 'function') showCustomAlert(msg); else alert(msg); } catch (e) { }
+        return;
+    }
+    full();
+    playFrom(src || 'all', k);
 }
 // 듣고 있는 플리를 고치면 — 다음 곡 차례도 맞춘다 (지금 곡은 그대로 · 지금 곡을 뺐으면 그 곡이 끝난 뒤 남은 차례로)
 function afterListEdit(id) {

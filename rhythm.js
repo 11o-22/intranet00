@@ -56,7 +56,12 @@ const SONGS = [
     { key: 'whitexmas', title: 'White Christmas Day', artist: 'Benz', audio: 'snd/rhythm-whitexmas.mp3', chart: 'rhythm/whitexmas.json', color: '#e6f0ff', cover: 'rhythm/whitexmas-cover.jpg' },
     // ★ 2026-11-11 사용자 「Showtime! (처음엔 Show time! → 붙여서) · 표지는 투명 배경 그대로 · 음질 상향과 마스터링 꼭」 — 위가 12~15 dB 어둡고 낮은 가운데가 두꺼워 그쪽을 고쳤다 · -14 LUFS
     //   표지는 투명 배경 그대로 (정사각에 가운데로 · 안 자르게) — 칸 · 판 바탕의 까만색이 비쳐 보인다
-    { key: 'showtime', title: 'Showtime!', artist: 'Benz', audio: 'snd/rhythm-showtime.mp3', chart: 'rhythm/showtime.json', color: '#f2c45a', cover: 'rhythm/showtime-cover.png' }
+    { key: 'showtime', title: 'Showtime!', artist: 'Benz', audio: 'snd/rhythm-showtime.mp3', chart: 'rhythm/showtime.json', color: '#f2c45a', cover: 'rhythm/showtime-cover.png' },
+    // ★ 2026-11-11 사용자 「이거 리듬게임에 넣어 주고 아티스트 이름을 Optimal 로 · 해금 조건을 걸자. 10000p 로」 · 제목 「천지인」
+    //   음원은 40~80 Hz 가 두껍고 2 kHz 위가 어두웠다 — 웅웅임 걷고 · 가장 낮은 저음 조금 · 존재감 · 위 공기를 고쳐 -14 LUFS
+    //   표지는 따로 주신다고 하셨다 — 받기 전까지는 까만 칸 (cover 를 비워 둔다)
+    //   price — 그 값을 한 번 내야 치고 · 플레이리스트에서도 듣는다 (owned 참고)
+    { key: 'cheonjiin', title: '천지인', artist: 'Optimal', audio: 'snd/rhythm-cheonjiin.mp3', chart: 'rhythm/cheonjiin.json', color: '#7fd6c2', cover: '', price: 10000 }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
@@ -87,6 +92,28 @@ const SET_KEY = 'rgSet', BEST_KEY = 'rgBest';
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function isAdmin() { const u = u_(); return !!(u && u.code === ADMIN); }
+// 🔒 해금 — 값(price)이 붙은 곡은 그 값을 한 번 내야 친다 (플레이리스트에서 듣는 것도) · 상담사는 늘 열림 (2026-11-11 사용자 「천지인 — 해금 조건 10000p」)
+//   users/<사번>/rhythmOwn = { 곡: 해금한 시각 }
+function owned(s) {
+    if (!s || !s.price) return true;
+    if (isAdmin()) return true;
+    const u = u_();
+    return !!(u && u.rhythmOwn && typeof u.rhythmOwn === 'object' && u.rhythmOwn[s.key]);
+}
+function buySong(s) {
+    const u = u_();
+    if (!s || !u) return { ok: false, why: '로그인이 필요합니다' };
+    if (owned(s)) return { ok: true };
+    const pts = Math.floor(Number(u.points) || 0);
+    if (pts < s.price) return { ok: false, why: '포인트가 모자랍니다 (보유 ' + pts.toLocaleString() + ' P)' };
+    u.points = pts - s.price;
+    if (!u.rhythmOwn || typeof u.rhythmOwn !== 'object') u.rhythmOwn = {};
+    u.rhythmOwn[s.key] = Date.now();
+    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 「' + s.title + '」 해금 (-' + s.price.toLocaleString() + ' P)'); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ points: 1, rhythmOwn: 1, history: 1 }); } catch (e) { }
+    try { if (typeof updateUI === 'function') updateUI(); } catch (e) { }
+    return { ok: true };
+}
 // ★ 2026-11-11 사용자 「상담사가 테스터로 정한 사람들은 리듬게임이 보이게」 — 관리 화면의 테스터 지정(testers/<사번> · index.html testerList)
 function isTester() { try { const u = u_(); return !!(u && typeof testerList !== 'undefined' && testerList && testerList[u.code]); } catch (e) { return false; } }
 // ★ 2026-11-11 사용자 「리듬게임 이제 전 사원이 다 할 수 있게」 — 들어와 있는 사원이면 누구나
@@ -552,7 +579,9 @@ function close() {
 }
 window.rhythmOpen = open;
 // 🎧 플레이리스트(playlist.js)가 곡 목록을 빌려 쓴다 (2026-11-11) — 곡을 새로 넣으면 플레이리스트에도 저절로 들어간다
-window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color }; }); };
+window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, locked: !owned(s) }; }); };
+// 플레이리스트에서 해금 — { ok, why }
+window.rhythmBuy = function (key) { return buySong(SONGS.find(function (s) { return s.key === key; })); };
 window.rhythmClose = close;
 
 // ==========================================
@@ -588,7 +617,7 @@ function menu() {
     const chart = CH[s.key];
     if (!chart) loadChart(s).then(function () { if (MODE === 'menu' && song().key === s.key) menu(); }).catch(function () { });
     const songs = SONGS.map(function (x) {
-        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"' + coverCss(x) + '></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + '</small></div></div>';
+        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"' + coverCss(x) + '></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + (owned(x) ? '' : ' · 🔒 ' + x.price.toLocaleString() + 'P') + '</small></div></div>';
     }).join('');
     const bpm = chart ? (Array.isArray(chart.bpm) ? chart.bpm[0] + '–' + chart.bpm[1] : chart.bpm) : '…';
     const len = chart ? Math.floor(chart.dur / 60000) + ':' + String(Math.floor(chart.dur / 1000) % 60).padStart(2, '0') : '';
@@ -609,7 +638,8 @@ function menu() {
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div class="rg-meta">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-acts"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn rg-ic" data-k="rank" title="랭킹">🏆</button></div>'
+        + '<div class="rg-acts">' + (owned(s) ? '<button class="rg-btn rg-go" data-k="go">START</button>' : '<button class="rg-btn rg-go" data-k="buy">🔒 ' + s.price.toLocaleString() + 'P 해금</button>')
+        + '<button class="rg-btn rg-ic" data-k="rank" title="랭킹">🏆</button></div>'
         + '</div></div></div>';
     const sl = UI.querySelector('.rg-songs');
     if (sl) {
@@ -624,6 +654,7 @@ function menu() {
             const k = el.dataset.k;
             if (k === 'x') { close(); return; }
             if (k === 'go') { saveSet(); start(); return; }
+            if (k === 'buy') { buyModal(song()); return; }
             if (k === 'set') { setModal(); return; }
             if (k === 'rank') { rankModal(SET.diff); return; }
         };
@@ -678,6 +709,28 @@ function setModal() {
         };
     });
 }
+// 🔒 해금 창 — 리듬 게임 위(전체 화면)에 띄우므로 사내 알림창 대신 제 창으로
+function buyModal(s) {
+    const old = UI.querySelector('.rg-buymodal'); if (old) old.remove();
+    const u = u_();
+    const pts = Math.floor(Number(u && u.points) || 0);
+    const m = document.createElement('div'); m.className = 'rg-modal rg-buymodal';
+    m.innerHTML = '<div class="rg-box" style="gap:10px;align-items:center;text-align:center;min-width:260px;">'
+        + '<b style="font-size:16px;">🔒 「' + esc(s.title) + '」</b>'
+        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + s.price.toLocaleString() + 'P 로 해금하면 계속 칠 수 있습니다<br><small style="color:#99a;">보유 ' + pts.toLocaleString() + ' P</small></div>'
+        + '<div data-v="why" style="font-size:12px;color:#ff9b9b;min-height:1em;"></div>'
+        + '<div style="display:flex;gap:10px;"><button class="rg-btn rg-go" data-k="ok"' + (pts < s.price ? ' disabled style="opacity:.45"' : '') + '>해금</button><button class="rg-btn" data-k="no">취소</button></div></div>';
+    UI.appendChild(m);
+    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    m.querySelector('[data-k="no"]').onclick = function () { m.remove(); };
+    m.querySelector('[data-k="ok"]').onclick = function () {
+        const r = buySong(s);
+        if (!r.ok) { m.querySelector('[data-v="why"]').textContent = r.why || '해금하지 못했습니다'; return; }
+        m.remove();
+        if (MODE === 'menu') menu();
+    };
+    if (pts < s.price) m.querySelector('[data-v="why"]').textContent = '포인트가 모자랍니다';
+}
 // 🏆 랭킹 — 지금 곡 · 난이도 (위 칸으로 난이도를 바꾼다)
 function rankModal(d) {
     const s = song();
@@ -709,6 +762,7 @@ function rankModal(d) {
 // ==========================================
 let P = null;        // 지금 판
 function start() {
+    if (!owned(song())) { buyModal(song()); return; }
     previewStop(true);
     const s = song(), d = SET.diff;
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정
