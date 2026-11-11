@@ -35,7 +35,8 @@
 //     · 랭크 — 정확도(CHARMING 100% · NORMAL 60% · MISS 0)로 L(ALL CHARMING · 2026-11-11 사용자) · SS 98 · S 95 · A 90 · B 80 · C 70 · D 60 · E 40 · F (2026-11-11 사용자)
 //     · 랭킹 — 곡 · 난이도마다 사람별 최고 기록 (rhythmRank/<곡>/<난이도>/<사번>) · 곡 고르기의 「🏆 랭킹」 · 결과에 순위
 //   ■ 기록   곡 · 난이도마다 최고 정확도 — 이 기기에 (rgBest) · 랭킹은 서버에
-//   ■ 키보드 S D F J K L · 스페이스 = 멈춤 (컴퓨터에서 시험)
+//   ■ 키보드 S D F J K L · 스페이스 = 멈춤 — PC(마우스가 있는 기기)에서는 판정선 밑에 키를 보여 준다 (2026-11-11)
+//     여섯 줄 키는 ⚙ 설정의 「키 배치」에서 줄마다 바꾼다 (같은 키를 고르면 두 줄이 서로 바뀐다 · 기본값으로 되돌리기)
 //
 //   콘솔   rhythmOpen()
 
@@ -65,7 +66,22 @@ const NOTE_W = [0.15, 0.15, 0.12];    // 터치 · 길게 누르기 · 슬라이
 function xOfLane(l) { return 0.08 + l * (0.84 / (LANES - 1)); }
 const LEAD = 2.2;                     // 곡 앞에 비우는 초
 const HOLD_EARLY_OK = 140;            // 꼬리 — 끝나기 이만큼 전에 떼도 성공
-const KEYS = ['s', 'd', 'f', 'j', 'k', 'l'];
+const KEYS_DEF = ['s', 'd', 'f', 'j', 'k', 'l'];
+// ★ 여섯 줄 키는 설정에서 하나씩 바꾼다 (2026-11-11 사용자 「설정에서 6 줄 키 개별 배치」) — SET.keys · 이 기기에 적어 둔다
+const KEY_BAN = [' ', 'escape', 'tab', 'enter', 'shift', 'control', 'alt', 'meta', 'capslock', 'contextmenu', 'dead', 'process', 'unidentified'];
+function keys() {
+    const k = SET && SET.keys;
+    if (Array.isArray(k) && k.length === 6 && k.every(function (x) { return typeof x === 'string' && x && KEY_BAN.indexOf(x) < 0; })
+        && new Set(k).size === 6) return k;
+    return KEYS_DEF;
+}
+const KEY_SYM = { arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓', backspace: '⌫', delete: 'Del', insert: 'Ins', home: 'Home', end: 'End', pageup: 'PgUp', pagedown: 'PgDn' };
+function keyLabel(k) { return KEY_SYM[k] || (k.length === 1 ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1, 4)); }
+let bindLane = null;               // 설정 창에서 바꾸려고 고른 줄 — 다음 키가 그 줄로
+// ★ PC 는 판정선 밑에 키 표시 (2026-11-11 사용자 「PC 리듬게임은 밑에 키 표시를 두자」) — 마우스가 있는 기기 · 또는 키보드로 한 번이라도 쳤으면
+const PC_KEYS = (function () { try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (e) { return false; } })();
+let kbUsed = false;
+function showKeys() { return PC_KEYS || kbUsed; }
 const SET_KEY = 'rgSet', BEST_KEY = 'rgBest';
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
@@ -378,9 +394,12 @@ function css() {
         '.rg-meta{font-size:12px;color:#99a;letter-spacing:.5px;}',
         '.rg-acts{display:flex;gap:10px;align-items:center;margin-top:4px;}',
         '.rg-ic{width:48px;height:48px;padding:0;font-size:20px;background:rgba(255,255,255,.08);}',
-        '.rg-setbox{min-width:250px;align-items:stretch;gap:12px;}',
+        '.rg-box.rg-setbox{min-width:250px;max-width:340px;align-items:stretch;gap:12px;}',
         '.rg-setbox .rg-row{justify-content:space-between;font-size:13px;}',
         '.rg-tog{padding:6px 14px;font-size:12px;min-width:84px;}',
+        '.rg-keys{display:flex;gap:6px;}',
+        '.rg-key{flex:1;min-width:0;height:34px;padding:0;font-size:14px;font-weight:bold;background:rgba(255,255,255,.08);border:1px solid rgba(220,230,255,.25);}',
+        '.rg-key.on{background:rgba(235,242,255,.92);color:#14141c;}',
         '.rg-songs{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;}',
         '.rg-song{flex-shrink:0;display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
         '.rg-song.on{background:rgba(255,255,255,.16);border-color:var(--c);box-shadow:0 0 14px -4px var(--c);}',
@@ -577,21 +596,40 @@ function setModal() {
         + '<div class="rg-row"><span>속도</span><span class="rg-step"><button data-k="sp-">−</button><span data-v="sp"></span><button data-k="sp+">+</button></span></div>'
         + '<div class="rg-row"><span>타격음</span><button class="rg-btn rg-tog" data-k="hit"></button></div>'
         + '<div class="rg-row"><span>싱크</span><button class="rg-btn rg-tog" data-k="cal">⏱ 맞추기</button></div>'
-        + '<div class="rg-cal-tip" data-v="sync" style="text-align:right;"></div></div>';
+        + '<div class="rg-cal-tip" data-v="sync" style="text-align:right;"></div>'
+        // 키 배치 — PC 에서만 (판정선 밑 키 표시와 같은 때)
+        + (showKeys() ? '<div class="rg-row" style="flex-direction:column;align-items:stretch;gap:6px;"><div style="display:flex;justify-content:space-between;align-items:center;"><span>키 배치</span>'
+            + '<button class="rg-btn" data-k="kdef" style="padding:4px 10px;font-size:11px;">기본값</button></div>'
+            + '<div class="rg-keys">' + [0, 1, 2, 3, 4, 5].map(function (i) { return '<button class="rg-btn rg-key" data-lane="' + i + '"></button>'; }).join('') + '</div>'
+            + '<div class="rg-cal-tip" data-v="khint">바꿀 줄을 누르고 원하는 키를 누르세요</div></div>' : '')
+        + '</div>';
     UI.appendChild(m);
     const paint = function () {
         m.querySelector('[data-v="sp"]').textContent = SET.speed.toFixed(1);
         m.querySelector('[data-k="hit"]').textContent = SET.hit ? 'ON' : 'OFF';
         m.querySelector('[data-v="sync"]').textContent = '판정 ' + sgn(SET.offset) + 'ms · 화면 ' + sgn(SET.vis) + 'ms';
+        const ks = keys();
+        Array.prototype.forEach.call(m.querySelectorAll('[data-lane]'), function (b) {
+            const i = Number(b.dataset.lane);
+            b.textContent = bindLane === i ? '…' : keyLabel(ks[i]);
+            b.classList.toggle('on', bindLane === i);
+        });
+        const h = m.querySelector('[data-v="khint"]');
+        if (h) h.textContent = bindLane != null ? (bindLane + 1) + '번 줄 — 원하는 키를 누르세요 (Esc 는 그만두기)' : '바꿀 줄을 누르고 원하는 키를 누르세요';
     };
+    window.__rgKeyPaint = function () { if (m.isConnected) paint(); };
     paint();
-    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    m.onclick = function (e) { if (e.target === m) { bindLane = null; m.remove(); } };
+    Array.prototype.forEach.call(m.querySelectorAll('[data-lane]'), function (b) {
+        b.onclick = function (e) { e.stopPropagation(); const i = Number(b.dataset.lane); bindLane = (bindLane === i) ? null : i; paint(); };
+    });
     Array.prototype.forEach.call(m.querySelectorAll('[data-k]'), function (el) {
         el.onclick = function (e) {
             e.stopPropagation();
             const k = el.dataset.k;
-            if (k === 'c') { m.remove(); return; }
-            if (k === 'cal') { m.remove(); saveSet(); calEnter(); return; }
+            if (k === 'c') { bindLane = null; m.remove(); return; }
+            if (k === 'cal') { bindLane = null; m.remove(); saveSet(); calEnter(); return; }
+            if (k === 'kdef') { bindLane = null; SET.keys = KEYS_DEF.slice(); }
             if (k === 'sp-') SET.speed = Math.max(1, Math.round((SET.speed - 0.5) * 10) / 10);
             if (k === 'sp+') SET.speed = Math.min(12, Math.round((SET.speed + 0.5) * 10) / 10);
             if (k === 'hit') SET.hit = !SET.hit;
@@ -994,16 +1032,31 @@ function unbindInput() {
 function onKey(e) {
     if (!OV) return;
     const k = (e.key || '').toLowerCase();
+    // 설정 창 — 줄을 골라 두었으면 이 키를 그 줄로 (이미 다른 줄에 있던 키면 서로 바꾼다 · Esc 는 그만두기)
+    if (bindLane != null) {
+        e.preventDefault(); e.stopPropagation();
+        if (e.repeat) return;
+        const lane = bindLane; bindLane = null;
+        if (k !== 'escape' && k && KEY_BAN.indexOf(k) < 0) {
+            const ks = keys().slice(), at = ks.indexOf(k);
+            if (at >= 0 && at !== lane) ks[at] = ks[lane];
+            ks[lane] = k;
+            SET.keys = ks; saveSet();
+        }
+        try { if (typeof window.__rgKeyPaint === 'function') window.__rgKeyPaint(); } catch (x) { }
+        return;
+    }
     if (MODE === 'cal') {
         if (k === 'escape') { calExit(); e.preventDefault(); return; }
-        if ((k === ' ' || KEYS.indexOf(k) >= 0) && !e.repeat) { e.preventDefault(); e.stopPropagation(); calTap(evAge(e), null); }
+        if ((k === ' ' || keys().indexOf(k) >= 0) && !e.repeat) { e.preventDefault(); e.stopPropagation(); calTap(evAge(e), null); }
         return;
     }
     if (k === 'escape') { if (MODE === 'play') pause(); e.preventDefault(); return; }
     if (MODE !== 'play' || !P) return;
     if (k === ' ') { pause(); e.preventDefault(); return; }
-    const lane = KEYS.indexOf(k);
+    const lane = keys().indexOf(k);
     if (lane < 0 || e.repeat) return;
+    kbUsed = true;
     e.preventDefault(); e.stopPropagation();
     const id = 'k' + lane;
     P.ptr[id] = { u: xOfLane(lane), hold: null, key: true };
@@ -1011,7 +1064,7 @@ function onKey(e) {
 }
 function onKeyUp(e) {
     if (!P) return;
-    const lane = KEYS.indexOf((e.key || '').toLowerCase());
+    const lane = keys().indexOf((e.key || '').toLowerCase());
     if (lane < 0) return;
     pu({ pointerId: 'k' + lane, timeStamp: e.timeStamp });
 }
@@ -1186,6 +1239,22 @@ function draw(now) {
         g.fillStyle = q.k === 'c' ? 'rgba(255,225,240,' + (1 - k) + ')' : 'rgba(200,230,255,' + (1 - k) + ')';
         g.fillRect(x - 2, y - 2, 4, 4);
     });
+    // PC — 판정선 밑에 키 (누르고 있으면 밝게)
+    if (showKeys()) {
+        const ky = L.yJ + Math.min(VH * 0.09, (VH - L.yJ) * 0.55);
+        const ks = Math.max(18, Math.min(32, VH * 0.064));
+        g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.font = '600 ' + Math.round(ks * 0.52) + 'px sans-serif';
+        keys().forEach(function (k, i) {
+            const x = xAt(xOfLane(i), 1), on = !!P.ptr['k' + i];
+            rr(g, x - ks / 2, ky - ks / 2, ks, ks, Math.min(6, ks * 0.22));
+            g.fillStyle = on ? 'rgba(235,242,255,0.92)' : 'rgba(255,255,255,0.07)'; g.fill();
+            g.strokeStyle = on ? 'rgba(255,255,255,0.95)' : 'rgba(220,230,255,0.32)'; g.lineWidth = 1.2; g.stroke();
+            g.fillStyle = on ? '#14141c' : 'rgba(235,240,255,0.72)';
+            g.fillText(keyLabel(k), x, ky + 1);
+        });
+        g.restore();
+    }
     // 판정 글자 · 빠르게 / 늦게 · 콤보
     if (P.judge) {
         const k = (tnow - P.judge.at) / 520;
