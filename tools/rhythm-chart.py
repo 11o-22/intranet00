@@ -277,6 +277,11 @@ def track_grid(env, fps, per_curve):
     return np.array(path) / fps
 
 
+# 사용자가 양손(두 줄 · 양쪽)으로 정한 지그재그 — 곡 안에서 나오는 차례 (0 = 처음)
+#   2026-11-11 사용자 「쇼타임 지그재그 처음이랑 두 번 나오는 거 한 개가 아니라 두 개 양쪽으로 지그재그 하는 걸로」
+ZIG_TWO = {'showtime': {'normal': (0, 1), 'hard': (0, 1)}}
+
+
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
 LV_FIX = {'showtime': {'hard': 17},
@@ -755,6 +760,7 @@ def main():
             # 노트 수 — 정리 전 하드처럼 노말의 1.72 배 (2026-11-11 사용자 「하드 조금만 더 노트 수를 늘리자. 기존처럼」) · 지그재그 노트 몫은 뺀다
             z8_ = sorted([zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2], key=lambda zi: -float(R[zigs[zi][0]].mean()))
             two_ = set(z8_[:max(1, int(math.ceil(len(z8_) * 0.4)))]) if z8_ else set()
+            two_ |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}
             zn_ = sum(len(r) * (2 if zi in two_ else 1) for zi, (r, amp) in enumerate(zigs))
             notes, chain = hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S,
                                       int(HARD_X * charts['normal']['count']) - zn_)
@@ -927,6 +933,7 @@ def main():
         if z8:
             z8.sort(key=lambda zi: -float(R[zigs[zi][0]].mean()))
             two = set(z8[:max(1, int(math.ceil(len(z8) * 0.4)))])
+        two |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}      # 사용자가 양손으로 정한 줄
         for zi, (r, amp) in enumerate(zigs):
             first_low = PIT[r[1]] > PIT[r[0]]           # 처음이 오르면 처음 음은 낮은 쪽
             if zi in two:
