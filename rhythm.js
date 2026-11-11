@@ -157,8 +157,104 @@ function decode(ab) {
 function loadSong(s) {
     if (AU.bufs[s.key]) return Promise.resolve(AU.bufs[s.key]);
     return fetch(s.audio).then(function (r) { if (!r.ok) throw new Error('곡을 받지 못했습니다 (' + r.status + ')'); return r.arrayBuffer(); })
-        .then(decode).then(function (b) { AU.bufs[s.key] = b; return b; });
+        .then(decode).then(function (b) {
+            // 풀어 둔 곡은 한 곡에 50 MB 가까이 — 곡이 일곱이라 지금 곡만 남긴다 (휴대폰 메모리)
+            Object.keys(AU.bufs).forEach(function (k) { if (k !== s.key) delete AU.bufs[k]; });
+            AU.bufs[s.key] = b; return b;
+        });
 }
+
+// ==========================================
+// 미리 듣기 (2026-11-11 사용자 「곡들 눌러보면 일정 부분을 한 10 초 정도 재생 — 예시 느낌으로」)
+//   곡을 누르면 그 곡에서 노트가 가장 빽빽한 10 초(대개 후렴)를 마디 머리부터 · 앞뒤를 부드럽게 키우고 줄인다.
+//   통째로 풀지 않는다 — 그 10 초 언저리 바이트만 받아(Range · 안 되면 받은 것에서 잘라) 그만큼만 풀어 튼다
+//   (곡 하나를 다 풀면 50 MB 가까이라 일곱 곡을 눌러 보면 휴대폰이 버겁다 · mp3 는 192 kbps 고정 = 초당 24000 바이트).
+//   누르는 손짓 안에서 소리 장치를 깨워 둔다 (아이폰).  START · 싱크 맞추기 · 닫기 · 화면을 떠나면 멈춘다.
+// ==========================================
+const PREVIEW_MS = 10000;
+const MP3_BPS = 24000;                       // 192 kbps
+const PV = { cur: null };
+function previewAt(ch) {
+    const c = (ch && ch.charts && (ch.charts.hard || ch.charts.normal)) || null;
+    const ts = c ? c.notes.map(function (n) { return n[0]; }) : [];
+    const dur = Number(ch && ch.dur) || 0;
+    let best = 0, bi = 0, j = 0;
+    for (let i = 0; i < ts.length; i++) {
+        while (j < ts.length && ts[j] < ts[i] + PREVIEW_MS) j++;
+        if (j - i > best) { best = j - i; bi = i; }
+    }
+    let t = ts.length ? ts[bi] : dur * 0.3;
+    const bars = (ch && ch.bars) || [];
+    let b = null;
+    for (let i = 0; i < bars.length; i++) { if (bars[i] <= t + 30) b = bars[i]; else break; }
+    if (b != null && t - b < 2500) t = b;                         // 마디 머리부터
+    return Math.max(0, Math.min(t - 150, dur - PREVIEW_MS - 500));
+}
+// mp3 틀(프레임) 머리 — 다음 틀까지 이어지는 자리라야 진짜 머리다 (MPEG-1 Layer III)
+const MP3_KBPS = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320], MP3_SR = [44100, 48000, 32000];
+function mp3Len(u, i) {
+    if (i + 4 > u.length || u[i] !== 0xFF || (u[i + 1] & 0xFE) !== 0xFA) return 0;
+    const bi = u[i + 2] >> 4, si = (u[i + 2] >> 2) & 3, pad = (u[i + 2] >> 1) & 1;
+    if (bi === 0 || bi === 15 || si === 3) return 0;
+    return Math.floor(144000 * MP3_KBPS[bi] / MP3_SR[si]) + pad;
+}
+function mp3Sync(u) {
+    for (let i = 0; i + 4 < u.length && i < 8192; i++) {
+        const n = mp3Len(u, i);
+        if (n && mp3Len(u, i + n) && mp3Len(u, i + n + mp3Len(u, i + n))) return i;
+    }
+    return -1;
+}
+function previewChunk(s, at) {
+    const a = Math.max(0, Math.floor(at / 1000 * MP3_BPS) - 2400);
+    const b = Math.floor((at + PREVIEW_MS + 800) / 1000 * MP3_BPS) + 2400;
+    return fetch(s.audio, { headers: { Range: 'bytes=' + a + '-' + b } }).then(function (r) {
+        if (!r.ok) throw new Error('곡을 받지 못했습니다 (' + r.status + ')');
+        return r.arrayBuffer().then(function (ab) { return r.status === 206 ? ab : ab.slice(a, b + 1); });
+    }).then(function (ab) {
+        const i = mp3Sync(new Uint8Array(ab));
+        if (i < 0) throw new Error('mp3 머리를 못 찾았습니다');
+        // 이 조각의 첫 틀 — 곡에서 몇 초쯤 (앞머리 태그 · 빈 틀 · 인코더 지연만큼 실제는 59 ms 이르다 — 통째로 푼 것과 대 봄)
+        const from = (a + i) / MP3_BPS - 0.059;
+        return decode(ab.slice(i)).then(function (buf) { return { buf: buf, skip: Math.max(0, at / 1000 - from) }; });
+    });
+}
+function previewStop(fast) {
+    const my = PV.cur; PV.cur = null;
+    if (!my) return;
+    clearTimeout(my.t);
+    const c = AU.ctx, g = my.g, n = my.node;
+    if (!c || !g || !n) return;
+    const out = fast ? 0.08 : 0.5;
+    try { const t = c.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + out); n.stop(t + out + 0.02); } catch (e) { try { n.stop(); } catch (x) { } }
+}
+function previewPlay(s) {
+    previewStop(true);
+    if (!s || !s.audio) return;
+    ctx();                                                        // 손짓 안에서 소리 장치를 깨운다
+    const my = { key: s.key, at: null, armed: false, t: 0, g: null, node: null, t0: 0, skip: 0 };
+    PV.cur = my;
+    loadChart(s).then(function (ch) {
+        if (PV.cur !== my) return null;
+        my.at = previewAt(ch);
+        return previewChunk(s, my.at);
+    }).then(function (o) {
+        if (!o || PV.cur !== my || !AU.ctx) return;
+        const c = AU.ctx, L = PREVIEW_MS / 1000;
+        const src = c.createBufferSource(); src.buffer = o.buf;
+        const g = c.createGain(); g.gain.value = 0;
+        src.connect(g); g.connect(c.destination);
+        const t = c.currentTime + 0.03;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.85, t + 0.6);
+        g.gain.setValueAtTime(0.85, t + L - 1.6);
+        g.gain.linearRampToValueAtTime(0, t + L);
+        src.start(t, o.skip, L + 0.05);
+        my.node = src; my.g = g; my.t0 = t; my.skip = o.skip; my.armed = true;
+        my.t = setTimeout(function () { if (PV.cur === my) previewStop(); }, PREVIEW_MS + 150);
+    }).catch(function (e) { console.warn('[🎵] 미리 듣기', e && e.message); if (PV.cur === my) PV.cur = null; });
+}
+window.rhythmPreviewState = function () { const m = PV.cur, c = AU.ctx; return m ? { key: m.key, at: m.at, armed: m.armed, pos: (m.armed && c) ? Math.round(m.at + (c.currentTime - m.t0) * 1000) : null, gain: m.g ? m.g.gain.value : null } : null; };
 const CH = {};
 function loadChart(s) {
     if (CH[s.key]) return Promise.resolve(CH[s.key]);
@@ -378,6 +474,7 @@ function open() {
     raf();
 }
 function close() {
+    previewStop(true);
     calStop(); C = null;
     stopPlay();
     if (!OV) return;
@@ -457,7 +554,7 @@ function menu() {
         if (songTop != null) sl.scrollTop = songTop;
         else { const on = sl.querySelector('.rg-song.on'); if (on) sl.scrollTop = Math.max(0, on.offsetTop - sl.offsetTop - 8); }
     }
-    Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); menu(); }; });
+    Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); previewPlay(song()); menu(); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-diff]'), function (el) { el.onclick = function () { SET.diff = el.dataset.diff; saveSet(); menu(); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-k]'), function (el) {
         el.onclick = function () {
@@ -530,6 +627,7 @@ function rankModal(d) {
 // ==========================================
 let P = null;        // 지금 판
 function start() {
+    previewStop(true);
     const s = song(), d = SET.diff;
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정
     ctx(); sessionOn();
@@ -600,7 +698,7 @@ function pause() {
     m.querySelector('[data-k="re"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } start(); };
     m.querySelector('[data-k="q"]').onclick = function () { m.remove(); stopPlay(); try { AU.ctx.resume(); } catch (e) { } menu(); };
 }
-function onVis() { if (document.hidden) { if (MODE === 'cal') calExit(); else pause(); } }
+function onVis() { if (document.hidden) { previewStop(true); if (MODE === 'cal') calExit(); else pause(); } }
 
 // ==========================================
 // 싱크 맞추기 (2026-11-11 사용자 「싱크가 아직도 좀 안 맞아」)
@@ -618,6 +716,7 @@ function metroBuf(acc) {
 }
 function median(a) { if (!a.length) return 0; const s = a.slice().sort(function (x, y) { return x - y; }); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function calEnter() {
+    previewStop(true);
     const c = ctx(); sessionOn();
     if (!AU.met) AU.met = [metroBuf(false), metroBuf(true)];
     stopPlay();
@@ -1187,6 +1286,6 @@ function result() {
 window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf };   // 시험 · 콘솔
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
