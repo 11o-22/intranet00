@@ -54,9 +54,9 @@ const SONGS = [
     { key: 'returnhome', title: 'Return Home', artist: 'Benz', audio: 'snd/rhythm-returnhome.mp3', chart: 'rhythm/returnhome.json', color: '#ffcf8a', cover: 'rhythm/returnhome-cover2.jpg' },     // 표지 바꿈 (2026-11-11 사용자)
     { key: 'winterfloat', title: 'Winter Float', artist: 'Benz', audio: 'snd/rhythm-winterfloat.mp3', chart: 'rhythm/winterfloat.json', color: '#9fe3ff', cover: 'rhythm/winterfloat-cover.jpg' },
     { key: 'whitexmas', title: 'White Christmas Day', artist: 'Benz', audio: 'snd/rhythm-whitexmas.mp3', chart: 'rhythm/whitexmas.json', color: '#e6f0ff', cover: 'rhythm/whitexmas-cover.jpg' },
-    // ★ 2026-11-11 사용자 「Show time! · 표지는 투명 배경 그대로 · 음질 상향과 마스터링 꼭」 — 위가 12~15 dB 어둡고 낮은 가운데가 두꺼워 그쪽을 고쳤다 · -14 LUFS
+    // ★ 2026-11-11 사용자 「Showtime! (처음엔 Show time! → 붙여서) · 표지는 투명 배경 그대로 · 음질 상향과 마스터링 꼭」 — 위가 12~15 dB 어둡고 낮은 가운데가 두꺼워 그쪽을 고쳤다 · -14 LUFS
     //   표지는 투명 배경 그대로 (정사각에 가운데로 · 안 자르게) — 칸 · 판 바탕의 까만색이 비쳐 보인다
-    { key: 'showtime', title: 'Show time!', artist: 'Benz', audio: 'snd/rhythm-showtime.mp3', chart: 'rhythm/showtime.json', color: '#f2c45a', cover: 'rhythm/showtime-cover.png' }
+    { key: 'showtime', title: 'Showtime!', artist: 'Benz', audio: 'snd/rhythm-showtime.mp3', chart: 'rhythm/showtime.json', color: '#f2c45a', cover: 'rhythm/showtime-cover.png' }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
