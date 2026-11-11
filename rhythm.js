@@ -551,6 +551,8 @@ function close() {
     MODE = 'off';
 }
 window.rhythmOpen = open;
+// 🎧 플레이리스트(playlist.js)가 곡 목록을 빌려 쓴다 (2026-11-11) — 곡을 새로 넣으면 플레이리스트에도 저절로 들어간다
+window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color }; }); };
 window.rhythmClose = close;
 
 // ==========================================

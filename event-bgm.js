@@ -76,6 +76,8 @@ function pick() {
     if (off) return null;
     // 🎹 피아노를 치는 동안(창이 열려 있거나 방금 피아노 소리가 났으면)은 쉰다 (2026-10-31 사용자)
     try { if (typeof window.lpPianoBusy === 'function' && window.lpPianoBusy()) return null; } catch (e) { }
+    // 🎧 플레이리스트로 음악을 듣는 동안은 쉰다 (2026-11-11 · playlist.js)
+    try { if (typeof window.playlistOn === 'function' && window.playlistOn()) return null; } catch (e) { }
     if (inRunW() || partyW() || briefOpenW()) return darkMuted() ? null : wonderTrack();
     let room = '';
     try { room = (typeof window.plazaRoomNow === 'function') ? window.plazaRoomNow() : ''; } catch (e) { }

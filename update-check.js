@@ -55,7 +55,8 @@ function bar() {
 }
 function act() {
     if (!pending) return;
-    if (document.visibilityState === 'hidden') { if (!busy(false)) reload(); return; }
+    // 🎧 플레이리스트가 도는 중(화면을 끄고 듣는 중)이면 저절로 새로 열지 않는다 — 음악이 끊긴다 (2026-11-11 · 띠를 눌러 여는 것은 된다)
+    if (document.visibilityState === 'hidden') { if (!busy(false) && !(typeof window.playlistOn === 'function' && window.playlistOn())) reload(); return; }
     bar();
 }
 function check() {
