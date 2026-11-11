@@ -751,7 +751,8 @@ const DOT_SLOTS = [
             //   인형을 누르면 글씨 세 글자 · 글자마다 색을 고른다 (nuow-text.js).
             { i: 'nuow2', n: 'Null Owner 2', back: ['nuow2-fox'], top: ['nuow2-doll'], own: 'nuow2', noTrade: true, cat: '그 밖' },
             // 빼빼로 초코 · 빼빼로 딸기 (2026-11-11 빼빼로 데이 · 사용자 「얼굴에 · 상담사가 주는 형식으로」) — 입에 문 빼빼로 한 개
-            //   주신 그림은 1728x768 (칸 288) — 다른 1728 장들처럼 칸마다 가로 +30 으로 352 칸에 옮겼다 (담배 ac10 과 입 자리가 같다)
+            //   주신 그림은 1728x768 (칸 288) — 다른 1728 장들처럼 칸마다 가로 +30 으로 352 칸에 옮겼다
+            //   ★ 같은 날 사용자 「코 쪽에 가 있다 — 입 쪽으로 내려줘」 — 4px(2 도트) 내려 끝이 입(h01 기준 y 180~183)에 닿게
             { i: 'pepero-choco', n: '빼빼로 초코', top: ['pepero-choco'], own: 'pepero-choco', cat: '얼굴' },
             { i: 'pepero-straw', n: '빼빼로 딸기', top: ['pepero-straw'], own: 'pepero-straw', cat: '얼굴' }
         ]
