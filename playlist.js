@@ -36,7 +36,7 @@ const PATH = 'playlists';
 const SET_KEY = 'plSet';
 const MAX_LISTS = 20;
 // 곡 길이 (ms) — 목록에 미리 적어 둔다 (리듬 채보의 dur). 새 곡은 한 번 틀면 재서 이 기기에 적어 둔다
-const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120,
+const DUR = { airplane: 147120, client: 168240, devotion: 159680, evilhigh: 147640, returnhome: 100600, cheonjiin: 153120, handicap: 135943,
               winterfloat: 163080, whitexmas: 120800, showtime: 126800 };
 
 function u_() { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; }
@@ -55,10 +55,21 @@ function loadOwn() {
     const c = who(), db = db_();
     if (!c || u_() || !db || ownFor === c) return Promise.resolve(OWN);
     ownFor = c;
-    return db.ref('users/' + c + '/rhythmOwn').once('value').then(function (snap) { OWN = (snap && snap.val()) || {}; return OWN; }).catch(function () { return OWN; });
+    const R_ORDER = ['L', 'SS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
+    return db.ref('users/' + c + '/rhythmOwn').once('value').then(function (snap) {
+        OWN = Object.assign({}, (snap && snap.val()) || {});
+        // 조건으로 여는 곡(Handicap ← 내담자 여러분께 HARD B 이상) — 아직 rhythmOwn 에 안 적혔어도 랭킹 기록이 채웠으면 연다 (읽기만)
+        return Promise.all(songs().filter(function (s) { return s.needSpec && !OWN[s.key]; }).map(function (s) {
+            const n = s.needSpec;
+            return db.ref('rhythmRank/' + n.song + '/' + n.diff + '/' + c).once('value').then(function (r) {
+                const v = r && r.val();
+                if (v && v.r && R_ORDER.indexOf(v.r) >= 0 && R_ORDER.indexOf(v.r) <= R_ORDER.indexOf(n.rank)) OWN[s.key] = 1;
+            }).catch(function () { });
+        })).then(function () { return OWN; });
+    }).catch(function () { return OWN; });
 }
 function isLocked(s) {
-    if (!s || !s.price) return false;
+    if (!s || (!s.price && !s.needSpec)) return false;
     if (u_()) return !!s.locked;
     const c = who();
     if (c === 'kario0987') return false;
@@ -400,7 +411,8 @@ function open() {
     OV.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.classList.contains('pl-in')) { e.preventDefault(); commitName(); } });
     OV.addEventListener('pointerdown', function (e) { if (e.target === OV) close(); });
     full();
-    Promise.all([loadLists(), loadOwn()]).then(function () { if (OV) full(); });
+    const chk = (u_() && typeof window.rhythmCheckNeeds === 'function') ? window.rhythmCheckNeeds() : Promise.resolve(false);
+    Promise.all([loadLists(), loadOwn(), chk]).then(function () { if (OV) full(); });
 }
 function close() {
     if (OV) { OV.remove(); OV = null; }
@@ -467,7 +479,7 @@ function songRow(s, opts) {
     return '<div class="pl-row' + (cur ? ' cur' : '') + '" data-a="pick" data-k="' + esc(s.key) + '" data-src="' + esc(opts.src) + '" style="--rc:' + esc(s.color || '#ffd79a') + '">'
         + '<div class="pl-th" style="' + cov(s) + '"></div>'
         + '<div class="pl-tx"><b>' + esc(s.title) + '</b><span>' + esc(s.artist || 'Benz') + (durOf(s.key) ? ' · ' + fmt(durOf(s.key)) : '') + '</span></div>'
-        + (isLocked(s) ? '<button class="pl-mini-b" data-a="buy" data-k="' + esc(s.key) + '" style="color:#ffd79a;">🔒 ' + Number(s.price || 0).toLocaleString() + 'P</button>' : '')
+        + (isLocked(s) ? '<button class="pl-mini-b" data-a="buy" data-k="' + esc(s.key) + '" style="color:#ffd79a;">🔒 ' + (s.price ? Number(s.price).toLocaleString() + 'P' : '조건') + '</button>' : '')
         + (opts.tail || '') + '</div>';
 }
 
@@ -674,6 +686,11 @@ function onClick(e) {
 function buy(k, src) {
     const s = song(k);
     if (!s || !isLocked(s)) return;
+    if (!s.price) {                                        // 조건으로 여는 곡 — 포인트로 못 연다
+        const msg = '「' + s.title + '」은(는) 리듬 게임에서 ' + (s.need || '조건') + ' 을 받으면 열립니다.';
+        try { if (typeof showCustomAlert === 'function' && !restOn()) showCustomAlert(msg); else alert(msg); } catch (e) { }
+        return;
+    }
     if (!u_()) {                                           // 쉬는 시간 — 로그아웃되어 있어 포인트를 쓸 수 없다
         try { if (typeof showCustomAlert === 'function' && !restOn()) showCustomAlert('들어와서 해금할 수 있습니다.'); else alert('「' + s.title + '」은(는) 해금해야 들을 수 있습니다.\n쉬는 시간이 끝나고 들어와서 해금해 주세요.'); } catch (e) { }
         return;

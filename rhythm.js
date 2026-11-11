@@ -61,7 +61,13 @@ const SONGS = [
     //   음원은 40~80 Hz 가 두껍고 2 kHz 위가 어두웠다 — 웅웅임 걷고 · 가장 낮은 저음 조금 · 존재감 · 위 공기를 고쳐 -14 LUFS
     //   표지 — 주신 그림(1536x1024 · 보랏빛 달 · 두루미)을 정사각으로 (가로 300 ~ 1324 · 달과 두루미 셋이 다 들게) · 720
     //   price — 그 값을 한 번 내야 치고 · 플레이리스트에서도 듣는다 (owned 참고)
-    { key: 'cheonjiin', title: '천지인', artist: 'Optimal', audio: 'snd/rhythm-cheonjiin.mp3', chart: 'rhythm/cheonjiin.json', color: '#c9a8ff', cover: 'rhythm/cheonjiin-cover.jpg', price: 10000 }
+    { key: 'cheonjiin', title: '천지인', artist: 'Optimal', audio: 'snd/rhythm-cheonjiin.mp3', chart: 'rhythm/cheonjiin.json', color: '#c9a8ff', cover: 'rhythm/cheonjiin-cover.jpg', price: 10000 },
+    // ★ 2026-11-11 사용자 「Handicap — 리듬게임에 넣어 주고 · 이미지는 준 걸로 · 어렵게 · 엔딩 페이드아웃 · 음질 상향 · 잡음 없애고 마스터링 · Benz 거야
+    //   · 내담자 여러분께 하드 모드 B 이상 받아야 열리는 거로」
+    //   음원 — 클릭 걷기 · 옅은 잡음 걷기 · 40~160 Hz 덜고 가운데 위 · 존재감 · 위 공기 · 좌우 조금 넓게 · 끝 네 마디 페이드아웃 · -14 LUFS
+    //   채보 — 8분이 2:1 로 출렁이는(셔플) 곡이라 격자를 출렁이는 자리에 맞췄다 · 노말 · 하드 모두 「어렵게」 (tools/rhythm-chart.py SWING · HARDER)
+    //   need — 그 곡 · 그 난이도에서 그 랭크 이상을 받으면 열린다 (needMet · checkNeeds)
+    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg', need: { song: 'client', diff: 'hard', rank: 'B' } }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
@@ -95,15 +101,62 @@ function isAdmin() { const u = u_(); return !!(u && u.code === ADMIN); }
 // 🔒 해금 — 값(price)이 붙은 곡은 그 값을 한 번 내야 친다 (플레이리스트에서 듣는 것도) · 상담사는 늘 열림 (2026-11-11 사용자 「천지인 — 해금 조건 10000p」)
 //   users/<사번>/rhythmOwn = { 곡: 해금한 시각 }
 function owned(s) {
-    if (!s || !s.price) return true;
+    if (!s || (!s.price && !s.need)) return true;
     if (isAdmin()) return true;
     const u = u_();
     return !!(u && u.rhythmOwn && typeof u.rhythmOwn === 'object' && u.rhythmOwn[s.key]);
+}
+// 🔓 조건 해금 — 「내담자 여러분께」 HARD B 이상 같은 것 (2026-11-11 사용자 「Handicap 은 내담자 여러분께 하드 모드 B 이상 받아야 열리게」)
+//   랭킹 기록(rhythmRank/<곡>/<난이도>/<사번>)의 최고 랭크로 본다 — 예전에 받아 둔 것도 친다. 되면 rhythmOwn 에 적는다.
+function rankIdx(r) { for (let i = 0; i < RANKS.length; i++) if (RANKS[i][0] === r) return i; return RANKS.length; }
+function needText(s) {
+    const n = s && s.need; if (!n) return '';
+    const t = SONGS.find(function (x) { return x.key === n.song; });
+    const d = DIFFS.find(function (x) { return x[0] === n.diff; });
+    return '「' + (t ? t.title : n.song) + '」 ' + (d ? d[1] : n.diff) + ' ' + n.rank + ' 이상';
+}
+function grantNeed(s) {
+    const u = u_();
+    if (!u || owned(s)) return false;
+    if (!u.rhythmOwn || typeof u.rhythmOwn !== 'object') u.rhythmOwn = {};
+    u.rhythmOwn[s.key] = Date.now();
+    try { if (typeof addHistoryLog === 'function') addHistoryLog(u, '[🎵 리듬 게임] 「' + s.title + '」 열림 — ' + needText(s)); } catch (e) { }
+    try { if (typeof saveFields === 'function') saveFields({ rhythmOwn: 1, history: 1 }); } catch (e) { }
+    return true;
+}
+function checkNeeds() {
+    const db = db_(), u = u_();
+    if (!db || !u || !u.code) return Promise.resolve(false);
+    const todo = SONGS.filter(function (s) { return s.need && !owned(s); });
+    if (!todo.length) return Promise.resolve(false);
+    return Promise.all(todo.map(function (s) {
+        return db.ref(RANK_PATH + '/' + s.need.song + '/' + s.need.diff + '/' + u.code).once('value').then(function (snap) {
+            const v = snap && snap.val();
+            if (!v || !(Number(v.s) > 0)) return false;
+            const r = v.r || rankOf(Number(v.s), !!v.ac)[0];
+            return rankIdx(r) <= rankIdx(s.need.rank) ? grantNeed(s) : false;
+        }).catch(function () { return false; });
+    })).then(function (rs) { return rs.some(Boolean); });
+}
+function needModal(s) {
+    const old = UI.querySelector('.rg-buymodal'); if (old) old.remove();
+    const b = bestOf(s.need.song, s.need.diff);
+    const m = document.createElement('div'); m.className = 'rg-modal rg-buymodal';
+    m.innerHTML = '<div class="rg-box" style="gap:10px;align-items:center;text-align:center;min-width:260px;">'
+        + '<b style="font-size:16px;">🔒 「' + esc(s.title) + '」</b>'
+        + '<div style="font-size:13px;color:#ccd;line-height:1.7;">' + esc(needText(s)) + ' 을 받으면 열립니다'
+        + (b ? '<br><small style="color:#99a;">이 기기 최고 ' + rankOf(b.score, b.ap)[0] + ' · ' + (b.score / 10000).toFixed(2) + '%</small>' : '') + '</div>'
+        + '<div style="display:flex;gap:10px;"><button class="rg-btn rg-go" data-k="go">그 곡으로</button><button class="rg-btn" data-k="no">닫기</button></div></div>';
+    UI.appendChild(m);
+    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    m.querySelector('[data-k="no"]').onclick = function () { m.remove(); };
+    m.querySelector('[data-k="go"]').onclick = function () { m.remove(); SET.song = s.need.song; SET.diff = s.need.diff; saveSet(); songTop = null; menu(); };
 }
 function buySong(s) {
     const u = u_();
     if (!s || !u) return { ok: false, why: '로그인이 필요합니다' };
     if (owned(s)) return { ok: true };
+    if (!s.price) return { ok: false, why: needText(s) + ' 을 받으면 열립니다' };
     const pts = Math.floor(Number(u.points) || 0);
     if (pts < s.price) return { ok: false, why: '포인트가 모자랍니다 (보유 ' + pts.toLocaleString() + ' P)' };
     u.points = pts - s.price;
@@ -556,6 +609,7 @@ function open() {
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('keyup', onKeyUp, true);
+    checkNeeds().then(function (got) { if (got && MODE === 'menu') menu(); });
     fit();
     songTop = null;            // 새로 열면 고른 곡이 보이게
     menu();
@@ -579,7 +633,8 @@ function close() {
 }
 window.rhythmOpen = open;
 // 🎧 플레이리스트(playlist.js)가 곡 목록을 빌려 쓴다 (2026-11-11) — 곡을 새로 넣으면 플레이리스트에도 저절로 들어간다
-window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, locked: !owned(s) }; }); };
+window.rhythmSongs = function () { return SONGS.map(function (s) { return { key: s.key, title: s.title, artist: s.artist, audio: s.audio, cover: s.cover, color: s.color, price: s.price || 0, need: s.need ? needText(s) : '', needSpec: s.need || null, locked: !owned(s) }; }); };
+window.rhythmCheckNeeds = checkNeeds;
 // 플레이리스트에서 해금 — { ok, why }
 window.rhythmBuy = function (key) { return buySong(SONGS.find(function (s) { return s.key === key; })); };
 window.rhythmClose = close;
@@ -617,7 +672,7 @@ function menu() {
     const chart = CH[s.key];
     if (!chart) loadChart(s).then(function () { if (MODE === 'menu' && song().key === s.key) menu(); }).catch(function () { });
     const songs = SONGS.map(function (x) {
-        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"' + coverCss(x) + '></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + (owned(x) ? '' : ' · 🔒 ' + x.price.toLocaleString() + 'P') + '</small></div></div>';
+        return '<div class="rg-song' + (x.key === s.key ? ' on' : '') + '" data-song="' + x.key + '" style="--c:' + x.color + '"><i class="rg-sq"' + coverCss(x) + '></i><div style="min-width:0"><b>' + esc(x.title) + '</b><small>' + esc(x.artist) + (owned(x) ? '' : x.price ? ' · 🔒 ' + x.price.toLocaleString() + 'P' : ' · 🔒 ' + needText(x)) + '</small></div></div>';
     }).join('');
     const bpm = chart ? (Array.isArray(chart.bpm) ? chart.bpm[0] + '–' + chart.bpm[1] : chart.bpm) : '…';
     const len = chart ? Math.floor(chart.dur / 60000) + ':' + String(Math.floor(chart.dur / 1000) % 60).padStart(2, '0') : '';
@@ -638,7 +693,7 @@ function menu() {
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
         + '<div class="rg-title">' + esc(s.title) + '</div><div class="rg-meta">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-acts">' + (owned(s) ? '<button class="rg-btn rg-go" data-k="go">START</button>' : '<button class="rg-btn rg-go" data-k="buy">🔒 ' + s.price.toLocaleString() + 'P 해금</button>')
+        + '<div class="rg-acts">' + (owned(s) ? '<button class="rg-btn rg-go" data-k="go">START</button>' : s.price ? '<button class="rg-btn rg-go" data-k="buy">🔒 ' + s.price.toLocaleString() + 'P 해금</button>' : '<button class="rg-btn rg-go" data-k="buy">🔒 잠김</button>')
         + '<button class="rg-btn rg-ic" data-k="rank" title="랭킹">🏆</button></div>'
         + '</div></div></div>';
     const sl = UI.querySelector('.rg-songs');
@@ -654,7 +709,7 @@ function menu() {
             const k = el.dataset.k;
             if (k === 'x') { close(); return; }
             if (k === 'go') { saveSet(); start(); return; }
-            if (k === 'buy') { buyModal(song()); return; }
+            if (k === 'buy') { if (song().price) buyModal(song()); else needModal(song()); return; }
             if (k === 'set') { setModal(); return; }
             if (k === 'rank') { rankModal(SET.diff); return; }
         };
@@ -762,7 +817,7 @@ function rankModal(d) {
 // ==========================================
 let P = null;        // 지금 판
 function start() {
-    if (!owned(song())) { buyModal(song()); return; }
+    if (!owned(song())) { if (song().price) buyModal(song()); else needModal(song()); return; }
     previewStop(true);
     const s = song(), d = SET.diff;
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정
@@ -1483,6 +1538,15 @@ function result() {
     const sy = UI.querySelector('[data-k="sync"]');
     if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '판정 싱크 ' + sgn(SET.offset) + 'ms 로 맞췄습니다'; sy.disabled = true; };
     // 꿈결 — 하드 · D 이상
+    // 🔓 이 판으로 조건을 채운 곡 (Handicap ← 내담자 여러분께 HARD B 이상)
+    SONGS.forEach(function (x) {
+        if (!x.need || owned(x) || x.need.song !== sk || x.need.diff !== dk) return;
+        if (rankIdx(rk[0]) > rankIdx(x.need.rank)) return;
+        if (grantNeed(x)) {
+            const box = UI && UI.querySelector('.rg-tbl');
+            if (box) box.insertAdjacentHTML('beforeend', '<div style="font-size:12px;color:' + x.color + ';">🔓 「' + esc(x.title) + '」 열림</div>');
+        }
+    });
     if (pay) dreamGive(pay, '[🎵 리듬 게임] ' + P.s.title + ' HARD ' + lv + ' · ' + rk[0] + ' — 💤 꿈결 +' + pay.toLocaleString() + ' D').then(function (g) {
         const el = UI && UI.querySelector('[data-v="dream"]'); if (!el) return;
         el.textContent = g.ok ? '💤 꿈결 +' + pay.toLocaleString() + ' D · 오늘 ' + g.n + '/' + DREAM_DAY

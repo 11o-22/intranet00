@@ -281,6 +281,18 @@ def track_grid(env, fps, per_curve):
 #   2026-11-11 사용자 「쇼타임 지그재그 처음이랑 두 번 나오는 거 한 개가 아니라 두 개 양쪽으로 지그재그 하는 걸로」
 ZIG_TWO = {'showtime': {'normal': (0, 1), 'hard': (0, 1)}}
 
+# 셔플(스윙)로 출렁이는 곡 — 박 안 16분 넷의 자리 (박 길이의 몫). 곧은 곡은 (0, .25, .5, .75)
+#   Handicap — 8분이 2:1 로 출렁인다 (마디를 48 칸으로 접어 보니 박 0 · 2/3 에 소리가 몰렸다 · 2026-11-11)
+#   → 앞 8분(길게)을 0 · 1/3, 뒤 8분(짧게)을 2/3 · 5/6 으로
+SWING = {'handicap': (0, 1 / 3, 2 / 3, 5 / 6)}
+
+
+# 사용자가 「어렵게」라고 한 곡 — 노말 · 하드 둘 다 더 촘촘하게 (2026-11-11 사용자 「Handicap … 어렵게」)
+#   normal — 노말 한 박에 노트 수 배 · hard — 하드 노트 수(노말의 HARD_X 배)에 또 곱함
+#   zig — 지그재그 줄 수 배 · two — 8분 지그재그 가운데 양손으로 하는 몫 (보통 0.4) · chord — 노말 동시 몫 배
+#   fill16 — 하드에서 그래도 모자라면 박을 선율 옆 16분 자리까지 (다른 손)
+HARDER = {'handicap': {'normal': 1.35, 'hard': 1.15, 'zig': 1.8, 'two': 0.65, 'chord': 1.8, 'fill16': True}}
+
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
 #   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
@@ -290,6 +302,18 @@ LV_FIX = {'showtime': {'hard': 17},
 
 
 HOLD_GAP = 250
+
+
+def lane_gap(notes, ms):
+    """같은 칸에 ms 안으로 붙은 터치는 뒤의 것을 뺀다 (지그재그 · 슬라이드 줄은 그대로).
+    셔플 격자(SWING)는 뒤 8분 안의 두 16분이 박의 1/6 (124 BPM 에서 80 ms) 밖에 안 떨어져, 같은 칸이면 칠 수가 없다."""
+    out, last = [], {}
+    for n in sorted(notes, key=lambda n: (n[0], n[1])):
+        if n[2] == 0 and n[1] in last and n[0] - last[n[1]] < ms:
+            continue
+        out.append(n)
+        last[n[1]] = n[0] + (n[3] if n[2] == 1 else 0)
+    return out
 
 
 def hold_gap(notes):
@@ -483,7 +507,7 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         return not any(j in mel for j in range(q - 1, q + 2))
     beats = [q for q in range(K) if ok[q] and pos[q] % 4 == 0 and free(q) and drum(q) >= 0.18]
     # 모자라면 차례로 — 8분(선율과 16분 띄움) → 4분(선율 바로 옆 16분도) → 8분(선율 바로 옆 16분도) · 선율과 같은 자리는 끝까지 비운다
-    for step_ in ((2, True), (0, False), (2, False)):
+    for step_ in ((2, True), (0, False), (2, False)) + (((1, False), (3, False)) if S.get('fill16') else ()):
         room = int(0.94 * want) - len(kept) - len(beats)
         if room <= 0:
             break
@@ -493,6 +517,7 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
               and (free(q) if strict else True) and drum(q) >= (0.1 if md else 0.18)]
         beats = sorted(beats + sorted(cc, key=lambda q: -drum(q))[:room])
     beat_set = set(beats)
+    lb_ = [None, None]                                        # 바로 앞 박 (자리 · 칸)
     for q in beats:
         near_m = [j for j in kept if abs(j - q) <= 6]
         ref = lanes[min(near_m, key=lambda j: (abs(j - q), j))] if near_m else 2
@@ -500,7 +525,13 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         ln = (5 if kick else 4) if ref <= 2 else (0 if kick else 1)
         if any(lanes.get(j) == ln for j in range(q - 2, q + 3) if j in mel):
             ln = {5: 4, 4: 5, 0: 1, 1: 0}[ln]
+        # 박이 8분 안으로 붙어 오면 같은 칸을 연타하지 않게 — 그 쪽 두 칸을 번갈아 (2026-11-11 · 「어렵게」 곡만 — 다른 곡 채보는 그대로 다시 뽑히게)
+        if S.get('fill16') and lb_[0] is not None and q - lb_[0] <= 2 and lb_[1] == ln:
+            alt = {5: 4, 4: 5, 0: 1, 1: 0}[ln]
+            if not any(lanes.get(j) == alt for j in range(q - 1, q + 2) if j in mel):
+                ln = alt
         lanes[q] = ln
+        lb_[0], lb_[1] = q, ln
     sel = sorted(kept + beats)
     # 4. 슬라이드 — 선율이 같은 간격(16분 · 8분)으로 네 개 넘게 이어지며 한쪽으로만 오르거나 내리는 곳 (3 반음 넘게)
     #    오르면 오른쪽으로 · 내리면 왼쪽으로 — 높이가 그대로이거나 오르내리면 슬라이드로 만들지 않는다
@@ -684,6 +715,23 @@ def main():
     beat_off = int(np.argmax([F['low'][i::4].sum() + 0.5 * F['all'][i::4].sum() for i in range(4)]))
     bar_off = beat_off + 4 * int(np.argmax([F['low'][beat_off + 4 * j::16].sum() for j in range(4)]))
     pos = (np.arange(K) - bar_off) % 16
+    # ★ 셔플(스윙) 곡 — 박 안 16분 넷의 자리를 SWING 대로 옮기고, 격자에 딸린 값들을 다시 잰다 (박 자리 · 마디선은 그대로)
+    if key in SWING:
+        Wsw = SWING[key]
+        bi = [i for i in range(K) if pos[i] % 4 == 0]
+        g2 = grid.copy()
+        for a, b in zip(bi[:-1], bi[1:]):
+            if b - a != 4:
+                continue
+            Lb = grid[b] - grid[a]
+            for q in range(1, 4):
+                g2[a + q] = grid[a] + Lb * Wsw[q]
+        grid = g2
+        PIT, PSTR = onset_pitch(sr, x, grid, 0.0)
+        MEL = melody_onsets(sr, x, grid)
+        F = {k: np.array([feat(k, t) for t in grid]) for k in ('all', 'low', 'mid', 'high')}
+        C = np.array([cen[int(min(len(cen) - 1, max(0, (t - off) * fps)))] for t in grid])
+        R = np.array([rdb[int(min(len(rdb) - 1, max(0, (t - off) * fps)))] for t in grid])
     metric = np.where(pos == 0, 1.0, np.where(pos % 4 == 0, 0.8, np.where(pos % 2 == 0, 0.55, 0.35)))
 
     loud = R - np.percentile(R, 95)                 # 0 이 가장 큰 쪽 · 음수
@@ -731,7 +779,15 @@ def main():
     ZIG = {'normal': {'steps': ((2, 2),), 'min': 6, 'max': 10, 'per30': 1.2},
            'hard':   {'steps': ((2, 3), (1, 2)), 'min': 6, 'max': 12, 'per30': 1.8}}
     charts = {}
+    HX = HARDER.get(key)
     for diff, S in SPEC.items():
+        if HX and diff in ('normal', 'hard'):
+            S = dict(S)
+            if diff == 'normal':
+                S['per_beat'] = S['per_beat'] * HX.get('normal', 1)
+                S['chord'] = S['chord'] * HX.get('chord', 1)
+            S['slide_n'] = S['slide_n'] * HX.get('zig', 1)
+            S['fill16'] = bool(HX.get('fill16'))
         ok = np.array([(grid[i] >= first_ok and grid[i] <= last_ok and active[i] and (pos[i] in S['mods'])) for i in range(K)])
         # 지그재그 자리를 먼저 잡고 — 그 사이는 다른 노트를 비운다
         zigs = []
@@ -743,7 +799,7 @@ def main():
                 for r in zig_runs(PIT, PSTR, okz, step, Z['min'], Z['max']):
                     cand.append((len(r) * step + 0.02 * float(PSTR[r].mean()), r, amp))
             cand.sort(key=lambda c: -c[0])
-            want = max(1, int(Z['per30'] * (last_ok - first_ok) / 30))
+            want = max(1, int(Z['per30'] * (HX.get('zig', 1) if HX else 1) * (last_ok - first_ok) / 30))
             for _, r, amp in cand:
                 if len(zigs) >= want:
                     break
@@ -759,11 +815,11 @@ def main():
         if diff == 'hard':
             # 노트 수 — 정리 전 하드처럼 노말의 1.72 배 (2026-11-11 사용자 「하드 조금만 더 노트 수를 늘리자. 기존처럼」) · 지그재그 노트 몫은 뺀다
             z8_ = sorted([zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2], key=lambda zi: -float(R[zigs[zi][0]].mean()))
-            two_ = set(z8_[:max(1, int(math.ceil(len(z8_) * 0.4)))]) if z8_ else set()
+            two_ = set(z8_[:max(1, int(math.ceil(len(z8_) * (HX.get('two', 0.4) if HX else 0.4))))]) if z8_ else set()
             two_ |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}
             zn_ = sum(len(r) * (2 if zi in two_ else 1) for zi, (r, amp) in enumerate(zigs))
             notes, chain = hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S,
-                                      int(HARD_X * charts['normal']['count']) - zn_)
+                                      int(HARD_X * (HX.get('hard', 1) if HX else 1) * charts['normal']['count']) - zn_)
         else:
             sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
             if diff == 'easy':
@@ -932,7 +988,7 @@ def main():
         z8 = [zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2]
         if z8:
             z8.sort(key=lambda zi: -float(R[zigs[zi][0]].mean()))
-            two = set(z8[:max(1, int(math.ceil(len(z8) * 0.4)))])
+            two = set(z8[:max(1, int(math.ceil(len(z8) * (HX.get('two', 0.4) if HX else 0.4))))])
         two |= {zi for zi in ZIG_TWO.get(key, {}).get(diff, ()) if zi < len(zigs)}      # 사용자가 양손으로 정한 줄
         for zi, (r, amp) in enumerate(zigs):
             first_low = PIT[r[1]] > PIT[r[0]]           # 처음이 오르면 처음 음은 낮은 쪽
@@ -984,6 +1040,8 @@ def main():
             out.append(n)
         out = one_side(out)
         out = hold_gap(out)
+        if key in SWING or HX:
+            out = lane_gap(out, 120)
         nps = len(out) / max(1, (last_ok - first_ok))
         kinds = {0: 0, 1: 0, 2: 0, 3: 0}
         for n in out:
