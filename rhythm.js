@@ -48,11 +48,11 @@ const SONGS = [
     { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1', cover: 'rhythm/client-cover.jpg' },     // 표지 (2026-11-11 사용자) — 없는 곡은 까만 칸
     // ★ 2026-11-11 사용자 「이것들도 전부 리듬게임에 · 아티스트는 전부 Benz · 음질 개선하고 마스터링해서 꼭」
     //   곡마다 EQ 를 고쳐(먹먹한 낮은 가운데 덜기 · 어두운 위쪽 살리기 · 좁은 스테레오 조금 넓히기) · 가벼운 압축 · 리미터 · -14 LUFS
-    { key: 'devotion', title: 'Devotion', artist: 'Benz', audio: 'snd/rhythm-devotion.mp3', chart: 'rhythm/devotion.json', color: '#ff9fb2' },
+    { key: 'devotion', title: 'Devotion', artist: 'Benz', audio: 'snd/rhythm-devotion.mp3', chart: 'rhythm/devotion.json', color: '#ff9fb2', cover: 'rhythm/devotion-cover.jpg' },
     { key: 'evilhigh', title: 'Evil High', artist: 'Benz', audio: 'snd/rhythm-evilhigh.mp3', chart: 'rhythm/evilhigh.json', color: '#b48cff' },
     { key: 'returnhome', title: 'Return Home', artist: 'Benz', audio: 'snd/rhythm-returnhome.mp3', chart: 'rhythm/returnhome.json', color: '#ffcf8a' },
     { key: 'winterfloat', title: 'Winter Float', artist: 'Benz', audio: 'snd/rhythm-winterfloat.mp3', chart: 'rhythm/winterfloat.json', color: '#9fe3ff' },
-    { key: 'whitexmas', title: 'White Christmas Day', artist: 'Benz', audio: 'snd/rhythm-whitexmas.mp3', chart: 'rhythm/whitexmas.json', color: '#e6f0ff' }
+    { key: 'whitexmas', title: 'White Christmas Day', artist: 'Benz', audio: 'snd/rhythm-whitexmas.mp3', chart: 'rhythm/whitexmas.json', color: '#e6f0ff', cover: 'rhythm/whitexmas-cover.jpg' }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
