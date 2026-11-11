@@ -114,23 +114,40 @@ function rankOf(score, ac) {
 // ★ 꿈결 — 하드 한정 · 랭크별 (2026-11-11 사용자)
 //   D 100 · C 150 · B 200 · A 250 · S 300 · SS 350 · L 400 (E · F 는 없음) · 하드 레벨 15 이상 곡은 +50
 //   착용한 커스텀 장비 · 다른 아이템 영향 없이 고정 — 꿈결 계산(kroom)을 거치지 않고 서버 값에 그대로 더한다
+//   하루에 딱 20 번까지 (2026-11-11 사용자) — rhythmDream/<사번> = { d: 날짜, n: 받은 번 } · 트랜잭션으로 한 칸씩 잡는다
 const DREAM_PAY = { L: 400, SS: 350, S: 300, A: 250, B: 200, C: 150, D: 100 };
+const DREAM_DAY = 20, DREAM_PATH = 'rhythmDream';
+function dayStr() { try { if (typeof getTodayStr === 'function') return getTodayStr(); } catch (e) { } const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
+// 오늘 몫 한 칸을 잡는다 — 잡으면 { ok, n }, 다 찼으면 { ok: false, full: true }
+function dreamSlot(code, delta) {
+    const db = db_(), d = dayStr();
+    return db.ref(DREAM_PATH + '/' + code).transaction(function (cur) {
+        const n = (cur && cur.d === d) ? (Number(cur.n) || 0) : 0;
+        if (delta > 0 && n >= DREAM_DAY) return;
+        return { d: d, n: Math.max(0, n + delta) };
+    }).then(function (r) { return r && r.committed ? { ok: true, n: Number(r.snapshot.val().n) || 0 } : { ok: false, full: true }; })
+      .catch(function () { return { ok: false }; });
+}
 function dreamPay(d, rk, lv) {
     if (d !== 'hard') return 0;
     const n = DREAM_PAY[rk] || 0;
     return n ? n + ((Number(lv) || 0) >= 15 ? 50 : 0) : 0;
 }
+// 받으면 { ok: true, n: 오늘 받은 번 } · 오늘 몫이 다 찼으면 { full: true }
 function dreamGive(n, why) {
     const db = db_(), u = u_();
-    if (!db || !u || !u.code || !(n > 0)) return Promise.resolve(false);
-    return db.ref('users/' + u.code + '/kroom/dream').transaction(function (x) { return Math.max(0, Math.floor(Number(x) || 0)) + n; })
-        .then(function (r) {
-            if (!r || !r.committed) return false;
-            if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {};
-            u.kroom.dream = Math.max(0, Math.floor(Number(r.snapshot.val()) || 0));
-            try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, why); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
-            return true;
-        }).catch(function () { return false; });
+    if (!db || !u || !u.code || !(n > 0)) return Promise.resolve({ ok: false });
+    return dreamSlot(u.code, 1).then(function (sl) {
+        if (!sl.ok) return sl;
+        return db.ref('users/' + u.code + '/kroom/dream').transaction(function (x) { return Math.max(0, Math.floor(Number(x) || 0)) + n; })
+            .then(function (r) {
+                if (!r || !r.committed) throw new Error('no commit');
+                if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {};
+                u.kroom.dream = Math.max(0, Math.floor(Number(r.snapshot.val()) || 0));
+                try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, why + ' (오늘 ' + sl.n + '/' + DREAM_DAY + ')'); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
+                return { ok: true, n: sl.n };
+            }).catch(function () { dreamSlot(u.code, -1); return { ok: false }; });   // 못 받았으면 잡은 칸을 돌려준다
+    });
 }
 // 랭킹 — 서버
 const RANK_PATH = 'rhythmRank';
@@ -933,21 +950,31 @@ function burst(n, kind) {
     }
     if (P.parts.length > 160) P.parts.splice(0, P.parts.length - 160);
 }
-// 눌렀다 — 판정 안 · 가로 자리 안에서 가장 이른 노트 (같으면 더 가까운 것)
+// 누른 자리의 줄 (가장 가까운 칸)
+function laneOf(u) { return Math.max(0, Math.min(LANES - 1, Math.round((u - xOfLane(0)) / (xOfLane(1) - xOfLane(0))))); }
+// 눌렀다 — 줄마다 판정 안의 가장 이른 노트 하나씩만 후보로 두고, 그 가운데
+//   「시각 차 + 옆 줄이면 90 + 가로 거리」가 가장 작은 것.
+// ★ 2026-11-11 사용자 「롱노트 전 · 중 · 후로 일반 노트가 조금 씹힌다」
+//   전에는 가로 자리 안에서 「가장 이른 노트」를 무조건 골랐다. 그래서 롱노트 머리를 누른 손가락이
+//   옆 줄의 조금 이른 노트를 가로채면 롱노트가 머리부터 통째로 날아가고(MISS 둘), 옆 줄 노트를 치려던
+//   손가락은 칠 것이 없어졌다. 이제는 누른 줄의 노트가 먼저이고, 옆 줄 노트는 시각이 훨씬 맞을 때만 고른다.
 function press(u, pid, age) {
-    if (!P || MODE !== 'play' || u == null) return;
+    if (!P || MODE !== 'play' || u == null) return false;
     const now = songMs() - (age || 0);
+    const ln = laneOf(u), seen = {};
     let best = null, bestScore = 1e9;
     for (let i = P.head; i < P.notes.length; i++) {
         const n = P.notes[i];
         const dt = now - n.t;
         if (dt < -W_NORMAL) break;                    // 아직 멀다 (시각 순)
         if (n.done || n.k === 2 || dt > W_NORMAL) continue;
+        if (seen[n.lane]) continue;                   // 그 줄은 가장 이른 것만
         if (!near(n, u, HIT_PAD)) continue;
-        const sc = Math.abs(dt) + Math.abs(u - n.x) * 400;
-        if (best == null || n.t < best.t - 30 || (Math.abs(n.t - best.t) <= 30 && sc < bestScore)) { best = n; bestScore = sc; }
+        seen[n.lane] = 1;
+        const sc = Math.abs(dt) + (n.lane === ln ? 0 : 90) + Math.abs(u - n.x) * 150;
+        if (sc < bestScore) { best = n; bestScore = sc; }
     }
-    if (!best) return;
+    if (!best) return false;
     const dt = now - best.t;
     const g = Math.abs(dt) <= W_CHARM ? 'c' : 'n';
     best.done = true; best.j = g;
@@ -956,6 +983,25 @@ function press(u, pid, age) {
     burst(best, g);
     playClick(0.26);
     if (best.k === 1) { best.hold = pid; if (P.ptr[pid]) P.ptr[pid].hold = best; }
+    if (P.ptr[pid]) P.ptr[pid].used = true;
+    return true;
+}
+// 롱노트 머리를 조금 일찍(판정 바깥 · 0.4 초 안) 눌러 그대로 버티고 있으면, 머리가 닿을 때 잡아 준다 (NORMAL)
+//   그 손가락이 아무 노트도 치지 않았고 · 아무것도 누르고 있지 않고 · 그 줄 위에 있을 때만
+const HOLD_CATCH = 400;
+function holdCatch(n, now) {
+    const ids = Object.keys(P.ptr);
+    for (let i = 0; i < ids.length; i++) {
+        const q = P.ptr[ids[i]];
+        if (!q || q.used || q.hold || q.t == null || q.u == null) continue;
+        const early = n.t - q.t;
+        if (early <= 0 || early > HOLD_CATCH) continue;
+        if (laneOf(q.u) !== n.lane || !near(n, q.u, HIT_PAD)) continue;
+        n.done = true; n.j = 'n'; n.hold = ids[i]; q.hold = n; q.used = true;
+        addScore('n', now - n.t); burst(n, 'n'); playClick(0.26);
+        return true;
+    }
+    return false;
 }
 function releaseHold(n, now) {
     if (!n || n.tail) return;
@@ -986,6 +1032,7 @@ function step(now) {
             } else if (dt > W_SLIDE) { n.done = true; n.j = 'm'; addScore('m'); }
             continue;
         }
+        if (n.k === 1 && dt >= 0 && dt <= W_NORMAL && holdCatch(n, now)) continue;
         if (dt > W_NORMAL) {
             n.done = true; n.j = 'm'; addScore('m');
             if (n.k === 1) { n.tail = 'm'; addScore('m'); }
@@ -1028,7 +1075,7 @@ function pd(e) {
     const age = evAge(e);
     const p = toStage(e.clientX, e.clientY);
     const u = uOf(p.x);
-    P.ptr[e.pointerId] = { u: u, hold: null, at: performance.now() };
+    P.ptr[e.pointerId] = { u: u, hold: null, at: performance.now(), t: songMs() - age, used: false };
     try { ST.setPointerCapture && ST.setPointerCapture(e.pointerId); } catch (x) { }
     press(u, e.pointerId, age);
 }
@@ -1087,8 +1134,9 @@ function onKey(e) {
     kbUsed = true;
     e.preventDefault(); e.stopPropagation();
     const id = 'k' + lane;
-    P.ptr[id] = { u: xOfLane(lane), hold: null, key: true };
-    press(xOfLane(lane), id, evAge(e));
+    const age = evAge(e);
+    P.ptr[id] = { u: xOfLane(lane), hold: null, key: true, t: songMs() - age, used: false };
+    press(xOfLane(lane), id, age);
 }
 function onKeyUp(e) {
     if (!P) return;
@@ -1379,9 +1427,10 @@ function result() {
     const sy = UI.querySelector('[data-k="sync"]');
     if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '판정 싱크 ' + sgn(SET.offset) + 'ms 로 맞췄습니다'; sy.disabled = true; };
     // 꿈결 — 하드 · D 이상
-    if (pay) dreamGive(pay, '[🎵 리듬 게임] ' + P.s.title + ' HARD ' + lv + ' · ' + rk[0] + ' — 💤 꿈결 +' + pay.toLocaleString() + ' D').then(function (ok) {
+    if (pay) dreamGive(pay, '[🎵 리듬 게임] ' + P.s.title + ' HARD ' + lv + ' · ' + rk[0] + ' — 💤 꿈결 +' + pay.toLocaleString() + ' D').then(function (g) {
         const el = UI && UI.querySelector('[data-v="dream"]'); if (!el) return;
-        el.textContent = ok ? '💤 꿈결 +' + pay.toLocaleString() + ' D' : '💤 꿈결을 받지 못했습니다';
+        el.textContent = g.ok ? '💤 꿈결 +' + pay.toLocaleString() + ' D · 오늘 ' + g.n + '/' + DREAM_DAY
+            : g.full ? '💤 오늘 꿈결 ' + DREAM_DAY + '번을 다 받았습니다' : '💤 꿈결을 받지 못했습니다';
     });
     // 랭킹 — 올리고 내 자리를 본다
     rankSave(sk, dk, run).then(function () { return rankList(sk, dk); }).then(function (list) {

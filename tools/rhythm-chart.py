@@ -280,6 +280,54 @@ def track_grid(env, fps, per_curve):
 LV_FIX = {'showtime': {'hard': 17}}
 
 
+HOLD_GAP = 250
+
+
+def hold_gap(notes):
+    """★ 2026-11-11 사용자 「롱노트 전 · 중 · 후로 일반 노트가 조금 씹히는 느낌」
+    길게 누르기 바로 앞(머리 250 ms 전 안)이나 바로 뒤(끝 250 ms 안)에 같은 칸 터치가 있으면,
+    한 손가락으로 「치고 → 곧바로 다시 눌러 버티기」 · 「떼자마자 다시 치기」가 되어 둘 중 하나가 씹힌다.
+    그 터치를 가까운 다른 칸으로 옮긴다 — 그 칸에 120 ms 안 노트가 없고, 같은 시각 노트가 이미 둘이 아니고,
+    그 칸이 누르는 중이 아니고, 그때 누르고 있는 다른 롱노트가 있으면 그 롱노트의 한쪽 규칙(one_side)을 지키는 칸으로만.
+    자리가 없으면 뺀다."""
+    notes = sorted([list(n) for n in notes], key=lambda n: (n[0], n[1]))
+    holds = [n for n in notes if n[2] == 1]
+    gone = set()
+    live = lambda: [m for m in notes if id(m) not in gone]
+
+    def fits(n, c):
+        lv = [m for m in live() if m is not n]
+        if any(m[1] == c and abs(m[0] - n[0]) < 120 for m in lv):
+            return False
+        if sum(1 for m in lv if m[0] == n[0]) >= 2:
+            return False
+        for g in holds:
+            if id(g) in gone:
+                continue
+            g0, g1 = g[0], g[0] + g[3] + HOLD_TAIL
+            if g[1] == c and g0 - HOLD_GAP <= n[0] <= g[0] + g[3] + HOLD_GAP:
+                return False                                  # 누르고 있는 칸 (그 앞뒤 250 ms 도)
+            if g0 <= n[0] <= g1:                              # 그때 누르는 롱노트 — 다른 노트들과 같은 쪽으로만
+                side = [m[1] - g[1] for m in lv if m is not g and g0 <= m[0] <= g1 and m[1] != g[1]]
+                if c == g[1] or any((c - g[1]) * sd < 0 for sd in side):
+                    return False
+        return True
+
+    for h in holds:
+        L, t0, t1 = h[1], h[0], h[0] + h[3]
+        for n in notes:
+            if n[2] != 0 or n[1] != L or id(n) in gone:
+                continue
+            if not (t0 - HOLD_GAP <= n[0] < t0 or t1 + 60 < n[0] <= t1 + HOLD_GAP):
+                continue
+            for c in sorted([c for c in range(6) if c != L], key=lambda c: (abs(c - L), c)):
+                if fits(n, c):
+                    n[1] = c
+                    break
+            else:
+                gone.add(id(n))
+    return live()
+
 def main():
     wav, key, title, artist = sys.argv[1:5]
     sr, x = load(wav)
@@ -624,6 +672,7 @@ def main():
                 continue
             out.append(n)
         out = one_side(out)
+        out = hold_gap(out)
         nps = len(out) / max(1, (last_ok - first_ok))
         kinds = {0: 0, 1: 0, 2: 0, 3: 0}
         for n in out:
