@@ -348,6 +348,8 @@ def hold_gap(notes):
 #   지그재그 · 양손 지그재그 · 한쪽 규칙 · 롱노트 앞뒤 규칙은 그대로.
 MEL_LO, MEL_HI = 330, 1500
 MEL_CORE = 2.6          # 뚜렷한 선율 음
+MEL_TH2 = 1.2           # 노트가 모자랄 때 더 받는 흐린 음
+HARD_X = 1.72           # 하드 노트 수 = 노말의 이만큼 (정리 전 하드가 1.72 ~ 1.81 배)
 MEL_TH = 1.6            # 빗살 대비 — 가짜 곡(북 · 베이스 · 패드 · 선율)에서 선율은 4.5 ~ 6.7 · 나머지는 거의 1.3 아래 · 실제 곡은 반주가 두꺼워 조금 낮춘다
 
 
@@ -424,6 +426,20 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         if abs(p - float(np.median(cp[m]))) <= 7:
             P[i] = p
             kept.append(i)
+    # ③ 그래도 노트가 모자라면(선율이 노트의 8 할쯤 되게) 더 흐린 음(MEL_TH2 ~)도 — 앞뒤 두 박 안 뚜렷한 음들 높이에서 5 반음 안 · 센 순서로
+    #    (2026-11-11 사용자 「하드 조금만 더 노트 수를 늘리자. 기존처럼」)
+    need = int(0.8 * want) - len(kept)
+    if need > 0:
+        c2 = []
+        for i in range(K):
+            if not ok[i] or i in P or pon[i] < MEL_TH2:
+                continue
+            m = np.abs(ct - grid[i]) <= 2 * beat_s
+            if m.any() and abs(float(pit[i]) - float(np.median(cp[m]))) <= 5:
+                c2.append((pon[i], i))
+        for _, i in sorted(c2, reverse=True)[:need]:
+            P[i] = float(pit[i])
+            kept.append(i)
     kept.sort()
     mel = set(kept)
     # 2. 칸 — 앞뒤 네 마디(열여섯 박) 안의 선율 높이로 (10 ~ 90 % 를 0 ~ 5 칸에 · 좁으면 가운데로)
@@ -453,7 +469,7 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
         prev = (i, ln)
     # 3. 부가 — 박(킥 · 스네어)을 정리해서 넣는다 (2026-11-11 사용자 「노트를 많이 하되 멜로디 라인은 대부분 찍히게 · 부가적인 것들을 정리」)
     #    · 선율 음과 겹치지 않는 자리(앞뒤 16분 안에 선율 음이 없는 곳)에만
-    #    · 먼저 박(4분) 자리 — 그래도 노트가 모자라면(노말의 1.55 배까지) 8분 자리를 센 순서로
+    #    · 먼저 박(4분) 자리 — 그래도 노트가 모자라면 8분 자리를 센 순서로 · 그래도 모자라면 선율 바로 옆 16분 자리까지 (선율과 같은 자리는 비운다)
     #    · 칸은 늘 선율 반대쪽 손 — 가까운 선율 음이 왼쪽(0~2)이면 오른쪽 끝(킥 5 · 스네어 4), 오른쪽이면 왼쪽 끝(킥 0 · 스네어 1)
     def drum(q):
         return max(F['low'][q], F['mid'][q] * 0.9, F['high'][q] * 0.6)
@@ -461,10 +477,16 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
     def free(q):
         return not any(j in mel for j in range(q - 1, q + 2))
     beats = [q for q in range(K) if ok[q] and pos[q] % 4 == 0 and free(q) and drum(q) >= 0.18]
-    room = want - len(kept) - len(beats)
-    if room > 0:
-        c8 = sorted([q for q in range(K) if ok[q] and pos[q] % 4 == 2 and free(q) and drum(q) >= 0.1], key=lambda q: -drum(q))
-        beats = sorted(beats + c8[:room])
+    # 모자라면 차례로 — 8분(선율과 16분 띄움) → 4분(선율 바로 옆 16분도) → 8분(선율 바로 옆 16분도) · 선율과 같은 자리는 끝까지 비운다
+    for step_ in ((2, True), (0, False), (2, False)):
+        room = int(0.94 * want) - len(kept) - len(beats)
+        if room <= 0:
+            break
+        md, strict = step_
+        have = set(beats)
+        cc = [q for q in range(K) if ok[q] and q not in have and q not in mel and pos[q] % 4 == md
+              and (free(q) if strict else True) and drum(q) >= (0.1 if md else 0.18)]
+        beats = sorted(beats + sorted(cc, key=lambda q: -drum(q))[:room])
     beat_set = set(beats)
     for q in beats:
         near_m = [j for j in kept if abs(j - q) <= 6]
@@ -585,17 +607,18 @@ def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok,
                 chord_c.append((float(F['low'][i]) + (0.5 if pos[i] == 0 else 0), i, t, ln2))
         if i in mel:
             prev_mel = i
-    # 동시 — 노트가 모자란 만큼(노말의 1.55 배까지) 킥이 센 자리부터 · 두 박에 한 번까지
+    # 동시 — 노트가 모자란 만큼 킥이 센 자리부터 · 두 박에 한 번 (모자라면 한 박에 한 번까지)
     room = want - len(notes)
     put = []
-    for _, i, t, ln2 in sorted(chord_c, reverse=True):
-        if room <= 0:
-            break
-        if any(abs(grid[i] - grid[j]) < 2 * beat_s for j in put):
-            continue
-        notes.append([t, ln2, 0, 0])
-        put.append(i)
-        room -= 1
+    for gap_b in (2, 1):                                   # 두 박에 한 번 → 모자라면 한 박에 한 번까지
+        for _, i, t, ln2 in sorted(chord_c, reverse=True):
+            if room <= 0:
+                break
+            if i in put or any(abs(grid[i] - grid[j]) < gap_b * beat_s - 1e-6 for j in put):
+                continue
+            notes.append([t, ln2, 0, 0])
+            put.append(i)
+            room -= 1
     print('  하드 — 선율 %d · 박 %d · 동시 %d · 슬라이드 %d 줄 · 길게 %d' % (len(kept), len(beats), len(put), made, sum(1 for n in notes if n[2] == 1)))
     return notes, chain
 
@@ -729,8 +752,12 @@ def main():
                 ok[max(0, r[0] - 1):min(K, r[-1] + 2)] = False
         zig_span = [(r[0] - 1, r[-1] + 1) for r, amp in zigs]
         if diff == 'hard':
+            # 노트 수 — 정리 전 하드처럼 노말의 1.72 배 (2026-11-11 사용자 「하드 조금만 더 노트 수를 늘리자. 기존처럼」) · 지그재그 노트 몫은 뺀다
+            z8_ = sorted([zi for zi, (r, amp) in enumerate(zigs) if r[1] - r[0] >= 2], key=lambda zi: -float(R[zigs[zi][0]].mean()))
+            two_ = set(z8_[:max(1, int(math.ceil(len(z8_) * 0.4)))]) if z8_ else set()
+            zn_ = sum(len(r) * (2 if zi in two_ else 1) for zi, (r, amp) in enumerate(zigs))
             notes, chain = hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S,
-                                      int(1.55 * charts['normal']['count']))
+                                      int(HARD_X * charts['normal']['count']) - zn_)
         else:
             sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
             if diff == 'easy':
