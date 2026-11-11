@@ -59,9 +59,9 @@ const SONGS = [
     { key: 'showtime', title: 'Showtime!', artist: 'Benz', audio: 'snd/rhythm-showtime.mp3', chart: 'rhythm/showtime.json', color: '#f2c45a', cover: 'rhythm/showtime-cover.png' },
     // ★ 2026-11-11 사용자 「이거 리듬게임에 넣어 주고 아티스트 이름을 Optimal 로 · 해금 조건을 걸자. 10000p 로」 · 제목 「천지인」
     //   음원은 40~80 Hz 가 두껍고 2 kHz 위가 어두웠다 — 웅웅임 걷고 · 가장 낮은 저음 조금 · 존재감 · 위 공기를 고쳐 -14 LUFS
-    //   표지는 따로 주신다고 하셨다 — 받기 전까지는 까만 칸 (cover 를 비워 둔다)
+    //   표지 — 주신 그림(1536x1024 · 보랏빛 달 · 두루미)을 정사각으로 (가로 300 ~ 1324 · 달과 두루미 셋이 다 들게) · 720
     //   price — 그 값을 한 번 내야 치고 · 플레이리스트에서도 듣는다 (owned 참고)
-    { key: 'cheonjiin', title: '천지인', artist: 'Optimal', audio: 'snd/rhythm-cheonjiin.mp3', chart: 'rhythm/cheonjiin.json', color: '#7fd6c2', cover: '', price: 10000 }
+    { key: 'cheonjiin', title: '천지인', artist: 'Optimal', audio: 'snd/rhythm-cheonjiin.mp3', chart: 'rhythm/cheonjiin.json', color: '#c9a8ff', cover: 'rhythm/cheonjiin-cover.jpg', price: 10000 }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)

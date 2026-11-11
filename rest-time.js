@@ -114,11 +114,19 @@ function cover(show) {
             + 'display:flex;justify-content:center;align-items:center;flex-direction:column;touch-action:none;user-select:none;';
         el.innerHTML = '<div style="font-size:42px;margin-bottom:18px;">🌙</div>'
             + '<div style="color:#d4af37;font-size:15px;font-weight:bold;letter-spacing:1px;text-align:center;padding:0 24px;">' + MSG + '</div>'
+            // 🎧 쉬는 시간에도 플레이리스트는 듣는다 (2026-11-11 사용자 「셧다운 중에도 플레이 리스트는 들을 수 있게」 · playlist.js)
+            + '<button id="rest-pl" style="margin-top:22px;background:rgba(212,175,55,.08);border:1px solid #5a4a1c;border-radius:10px;color:#d4af37;'
+            + 'font-size:13px;padding:9px 16px;cursor:pointer;font-family:inherit;">🎧 플레이리스트</button>'
             // 상담사 · 테스터만 들어갈 수 있다 — 덮개를 잠시 걷어 로그인 칸을 보이게 한다 (다른 사번은 로그인에서 다시 막힌다)
             + '<button id="rest-adm" style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);left:50%;transform:translateX(-50%);'
             + 'background:none;border:1px solid #2a2a2a;border-radius:8px;color:#555;font-size:11px;padding:6px 12px;cursor:pointer;">상담사 · 테스터 로그인</button>';
         ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'wheel', 'contextmenu'].forEach(function (ev) {
             el.addEventListener(ev, function (e) {
+                if (e.target && e.target.closest && e.target.closest('#rest-pl')) {
+                    e.stopPropagation();
+                    if (ev === 'click') { e.preventDefault(); try { if (typeof window.playlistOpen === 'function') window.playlistOpen(); } catch (x) { } }
+                    return;
+                }
                 if (e.target && e.target.closest && e.target.closest('#rest-adm')) {
                     e.stopPropagation();
                     if (ev === 'click') { e.preventDefault(); peekUntil = Date.now() + 120000; cover(false); }
@@ -134,6 +142,7 @@ function cover(show) {
 }
 // 덮개가 있는 동안 자판도 막는다 (광장 방향키 · 채팅 엔터 등)
 document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.closest && e.target.closest('#pl-ov')) return;      // 🎧 플레이리스트 창(덮개 위)에서 플리 이름은 적는다
     const el = document.getElementById('rest-time-overlay');
     if (el && el.style.display === 'flex') { e.stopPropagation(); e.preventDefault(); }
 }, true);
@@ -187,7 +196,10 @@ function tick() {
     cover(true);
     if (u && !kicked) {
         kicked = true;
+        // __restKick — 쉬는 시간이라 내보내는 것 (플레이리스트는 이때는 끄지 않고 이어 튼다 · playlist.js)
+        window.__restKick = true;
         try { if (typeof window.logout === 'function') window.logout(); } catch (e) { console.warn('[쉬는 시간] 로그아웃', e); }
+        finally { window.__restKick = false; }
     }
     if (!u) kicked = false;
 }
