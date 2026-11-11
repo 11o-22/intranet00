@@ -134,6 +134,72 @@ def zig_runs(pit, pstr, ok, step, n_min, n_max):
     return out
 
 
+HOLD_TAIL = 80        # 꼬리 끝나고 이만큼까지도 손이 아직 거기 있다
+
+
+def one_side(notes):
+    """길게 누르는 동안 다른 노트는 한쪽에만 — 한 손은 누르고 있으니 나머지 한 손으로 칠 수 있게.
+    ★ 2026-11-11 사용자 「2나 5에서 꾹 누를 때 134 · 346 을 오가는 타일이 많다 — 손이 셋이 아닌 이상 힘드니
+      1에만 · 3456에만 · 6에만 · 1234에만 있게」 — 2 · 5 뿐 아니라 어느 칸에서 누르든 같다.
+    누르는 칸 L 의 왼쪽 · 오른쪽 가운데 노트가 많은 쪽(같으면 칸이 넓은 쪽)으로 모은다 — 다른 쪽 노트는 L 을 기준으로
+    거울처럼 넘긴다(거리를 그대로). 슬라이드(2 · 3)는 줄째로 넘겨 모양을 지킨다. 넘길 자리가 막히면 그 쪽 옆 칸 · 그래도 막히면 뺀다."""
+    notes = sorted([list(n) for n in notes], key=lambda n: (n[0], n[1]))
+    for _ in range(3):                                     # 줄째로 넘긴 것이 다른 누르기에 걸릴 수 있어 몇 번 돈다
+        changed = False
+        holds = [n for n in notes if n[2] == 1]
+        for h in holds:
+            t0, t1, L = h[0], h[0] + h[3] + HOLD_TAIL, h[1]
+            oth = [n for n in notes if n is not h and t0 <= n[0] <= t1]
+            left = [n for n in oth if n[1] < L]
+            right = [n for n in oth if n[1] > L]
+            if not left or not right:
+                continue
+            wl, wr = L, 5 - L                              # 그쪽 칸 수
+            go_right = (len(right) > len(left)) or (len(right) == len(left) and wr >= wl)
+            if (go_right and wr == 0) or (not go_right and wl == 0):
+                go_right = not go_right
+            bad = left if go_right else right
+            lo, hi = (L + 1, 5) if go_right else (0, L - 1)
+            moved_chains = set()
+            drop = []
+            for n in bad:
+                if n[2] in (2, 3) and n[3]:
+                    key = (n[2], n[3])
+                    if key in moved_chains:
+                        continue
+                    moved_chains.add(key)
+                    for m in notes:                         # 줄째로 넘긴다
+                        if m[2] == n[2] and m[3] == n[3]:
+                            m[1] = int(min(5, max(0, 2 * L - m[1])))
+                            if t0 <= m[0] <= t1:
+                                m[1] = int(min(hi, max(lo, m[1])))
+                    continue
+                want = int(min(hi, max(lo, 2 * L - n[1])))
+                taken = {m[1] for m in notes if m is not n and m[0] == n[0]}
+                cands = sorted(range(lo, hi + 1), key=lambda c: abs(c - want))
+                for c in cands:
+                    if c not in taken:
+                        n[1] = c
+                        break
+                else:
+                    drop.append(n)
+            if drop:
+                ids = {id(x) for x in drop}
+                notes = [m for m in notes if id(m) not in ids]
+            changed = True
+        if not changed:
+            break
+    # 같은 시각 같은 칸으로 겹친 것은 하나만
+    out, seen = [], set()
+    for n in sorted(notes, key=lambda n: (n[0], n[1])):
+        k = (n[0], n[1])
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(n)
+    return out
+
+
 def local_period(env, fps, sub=4, lo=60, hi=200, win=12.0, step=2.0):
     """창마다 16분 길이(초) — 봉우리들의 원 평균으로."""
     e = env['all']
@@ -553,6 +619,7 @@ def main():
             if len(same) >= 2:
                 continue
             out.append(n)
+        out = one_side(out)
         nps = len(out) / max(1, (last_ok - first_ok))
         kinds = {0: 0, 1: 0, 2: 0, 3: 0}
         for n in out:
