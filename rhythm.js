@@ -60,12 +60,13 @@ const SONGS = [
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
-const W_CHARM = 55, W_NORMAL = 140, W_SLIDE = 120;
-const HIT_PAD = 0.075;                // 노트 폭 바깥으로 이만큼(판정선 폭의 몫)까지 맞은 것으로
+// ★ 2026-11-11 사용자 「타일 터치 판정 조금 더 완화 · 터치가 잘 먹게」 — 55/140/120 → 65/165/150 · 바깥으로 넓힘
+const W_CHARM = 65, W_NORMAL = 165, W_SLIDE = 150;
+const HIT_PAD = 0.085;                // 노트 폭 바깥으로 이만큼(판정선 폭의 몫)까지 맞은 것으로
 const NOTE_W = [0.15, 0.15, 0.12];    // 터치 · 길게 누르기 · 슬라이드 — 판정선 폭의 몫
 function xOfLane(l) { return 0.08 + l * (0.84 / (LANES - 1)); }
 const LEAD = 2.2;                     // 곡 앞에 비우는 초
-const HOLD_EARLY_OK = 140;            // 꼬리 — 끝나기 이만큼 전에 떼도 성공
+const HOLD_EARLY_OK = 180;            // 꼬리 — 끝나기 이만큼 전에 떼도 성공
 const KEYS_DEF = ['s', 'd', 'f', 'j', 'k', 'l'];
 // ★ 여섯 줄 키는 설정에서 하나씩 바꾼다 (2026-11-11 사용자 「설정에서 6 줄 키 개별 배치」) — SET.keys · 이 기기에 적어 둔다
 const KEY_BAN = [' ', 'escape', 'tab', 'enter', 'shift', 'control', 'alt', 'meta', 'capslock', 'contextmenu', 'dead', 'process', 'unidentified'];
@@ -109,6 +110,27 @@ function rankOf(score, ac) {
     const pct = (Number(score) || 0) / 10000;
     for (let i = 1; i < RANKS.length; i++) if (pct >= RANKS[i][1]) return RANKS[i];
     return RANKS[RANKS.length - 1];
+}
+// ★ 꿈결 — 하드 한정 · 랭크별 (2026-11-11 사용자)
+//   D 100 · C 150 · B 200 · A 250 · S 300 · SS 350 · L 400 (E · F 는 없음) · 하드 레벨 15 이상 곡은 +50
+//   착용한 커스텀 장비 · 다른 아이템 영향 없이 고정 — 꿈결 계산(kroom)을 거치지 않고 서버 값에 그대로 더한다
+const DREAM_PAY = { L: 400, SS: 350, S: 300, A: 250, B: 200, C: 150, D: 100 };
+function dreamPay(d, rk, lv) {
+    if (d !== 'hard') return 0;
+    const n = DREAM_PAY[rk] || 0;
+    return n ? n + ((Number(lv) || 0) >= 15 ? 50 : 0) : 0;
+}
+function dreamGive(n, why) {
+    const db = db_(), u = u_();
+    if (!db || !u || !u.code || !(n > 0)) return Promise.resolve(false);
+    return db.ref('users/' + u.code + '/kroom/dream').transaction(function (x) { return Math.max(0, Math.floor(Number(x) || 0)) + n; })
+        .then(function (r) {
+            if (!r || !r.committed) return false;
+            if (!u.kroom || typeof u.kroom !== 'object') u.kroom = {};
+            u.kroom.dream = Math.max(0, Math.floor(Number(r.snapshot.val()) || 0));
+            try { if (typeof addHistoryLog === 'function') { addHistoryLog(u, why); if (typeof saveFields === 'function') saveFields({ history: 1 }); } } catch (e) { }
+            return true;
+        }).catch(function () { return false; });
 }
 // 랭킹 — 서버
 const RANK_PATH = 'rhythmRank';
@@ -894,7 +916,13 @@ function addScore(kind, dt) {
     else { P.combo++; if (P.combo > P.maxCombo) P.maxCombo = P.combo; }
     P.judge = { k: kind, at: performance.now(), dt: dt };
 }
-function near(n, u, pad) { return u != null && Math.abs(u - n.x) <= n.w / 2 + pad; }
+// 맨 가장자리 줄은 그 바깥 어디를 눌러도 맞은 것으로 (화면 끝을 눌러도 먹게)
+const X_EDGE0 = xOfLane(0) + 1e-6, X_EDGE1 = xOfLane(LANES - 1) - 1e-6;
+function near(n, u, pad) {
+    if (u == null) return false;
+    if ((n.x <= X_EDGE0 && u < n.x) || (n.x >= X_EDGE1 && u > n.x)) return true;
+    return Math.abs(u - n.x) <= n.w / 2 + pad;
+}
 function burst(n, kind) {
     const t = performance.now();
     P.fx.push({ x: n.x, w: n.w, at: t, k: kind });
@@ -947,13 +975,13 @@ function step(now) {
             if (n.k === 1 && !n.tail) {
                 if (n.j === 'm') { n.tail = 'm'; addScore('m'); continue; }
                 const q = n.hold != null ? P.ptr[n.hold] : null;
-                const held = !!q && near(n, q.u, HIT_PAD * 1.8);
+                const held = !!q && near(n, q.u, HIT_PAD * 2.2);
                 if (!held || now >= n.t + n.len) releaseHold(n, now);
             }
             continue;
         }
         if (n.k === 2) {
-            if (dt >= -60 && dt <= W_SLIDE && us.some(function (u) { return near(n, u, HIT_PAD * 1.3); })) {
+            if (dt >= -90 && dt <= W_SLIDE && us.some(function (u) { return near(n, u, HIT_PAD * 1.4); })) {
                 n.done = true; n.j = 'c'; addScore('c'); burst(n, 'c'); playClick(0.14);
             } else if (dt > W_SLIDE) { n.done = true; n.j = 'm'; addScore('m'); }
             continue;
@@ -1325,6 +1353,9 @@ function result() {
     const rk = rankOf(sc, ac);
     const run = { s: sc, fc: fc, ac: ac, c: P.cnt.c, n: P.cnt.n, m: P.cnt.m, mc: P.maxCombo };
     const sk = P.s.key, dk = P.d;
+    const lv = P.chart.charts[P.d].level;
+    const pay = P.paid ? 0 : dreamPay(dk, rk[0], lv);
+    P.paid = true;
     UI.innerHTML = '<div class="rg-bg"></div>'
         + '<div class="rg-modal" style="background:transparent"><div class="rg-box" style="padding:16px 28px;">'
         + '<div style="font-size:13px;color:#aab;">' + esc(P.s.title) + ' · <b style="color:' + D[3] + '">' + D[1] + ' ' + P.chart.charts[P.d].level + '</b></div>'
@@ -1337,6 +1368,7 @@ function result() {
         + '<div><b style="color:#a3a3b3">MISS</b>' + P.cnt.m + '</div><div><b>MAX COMBO</b>' + P.maxCombo + '</div>'
         + (avg != null ? '<div style="font-size:12px;color:#ccd;">평균 ' + sgn(avg) + 'ms · ' + (Math.abs(avg) <= 12 ? '딱 맞음' : avg > 0 ? '늦게 누름' : '빠르게 누름') + '</div>' : '')
         + '<div data-v="place" style="font-size:12px;color:#ffe9a8;">🏆 랭킹 올리는 중…</div>'
+        + (pay ? '<div data-v="dream" style="font-size:12px;color:#c9a8ff;">💤 꿈결 +' + pay.toLocaleString() + ' D …</div>' : '')
         + '</div></div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;"><button class="rg-btn" data-k="re">다시</button><button class="rg-btn" data-k="q">곡 고르기</button><button class="rg-btn" data-k="rank">🏆 랭킹</button>'
         + (avg != null && Math.abs(avg) > 12 ? '<button class="rg-btn" data-k="sync">판정 싱크에 반영 (' + sgn(Math.max(-300, Math.min(300, SET.offset + avg))) + 'ms)</button>' : '')
@@ -1346,6 +1378,11 @@ function result() {
     UI.querySelector('[data-k="rank"]').onclick = function () { rankModal(dk); };
     const sy = UI.querySelector('[data-k="sync"]');
     if (sy) sy.onclick = function () { SET.offset = Math.max(-300, Math.min(300, SET.offset + avg)); saveSet(); sy.textContent = '판정 싱크 ' + sgn(SET.offset) + 'ms 로 맞췄습니다'; sy.disabled = true; };
+    // 꿈결 — 하드 · D 이상
+    if (pay) dreamGive(pay, '[🎵 리듬 게임] ' + P.s.title + ' HARD ' + lv + ' · ' + rk[0] + ' — 💤 꿈결 +' + pay.toLocaleString() + ' D').then(function (ok) {
+        const el = UI && UI.querySelector('[data-v="dream"]'); if (!el) return;
+        el.textContent = ok ? '💤 꿈결 +' + pay.toLocaleString() + ' D' : '💤 꿈결을 받지 못했습니다';
+    });
     // 랭킹 — 올리고 내 자리를 본다
     rankSave(sk, dk, run).then(function () { return rankList(sk, dk); }).then(function (list) {
         const el = UI && UI.querySelector('[data-v="place"]'); if (!el) return;

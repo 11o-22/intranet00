@@ -276,6 +276,10 @@ def track_grid(env, fps, per_curve):
     return np.array(path) / fps
 
 
+# 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
+LV_FIX = {'showtime': {'hard': 17}}
+
+
 def main():
     wav, key, title, artist = sys.argv[1:5]
     sr, x = load(wav)
@@ -625,6 +629,7 @@ def main():
         for n in out:
             kinds[n[2]] += 1
         level = int(round(min(15, max(1, 1.2 + nps * 2.0 + kinds[1] / max(1, len(out)) * 3 + (kinds[2] + kinds[3]) / max(1, len(out)) * 4))))
+        level = LV_FIX.get(key, {}).get(diff, level)        # 사용자가 정한 레벨
         charts[diff] = {'level': level, 'count': len(out), 'nps': round(nps, 2), 'kinds': kinds, 'notes': out}
         print(diff, 'notes', len(out), 'nps %.2f' % nps, 'level', level, kinds, 'zigzag', [('%.1fs' % grid[r[0]], len(r), r[1] - r[0], '양손' if zi in two else '') for zi, (r, a) in enumerate(zigs)])
 
