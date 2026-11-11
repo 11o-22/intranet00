@@ -794,6 +794,10 @@ function stampSafe(ov) {
         '.plaza-spot:active .b{background:rgba(60,42,22,.9);}',
         // 🔒 가두리 — 사람처럼 선 자리(zy)로 앞뒤를 가린다. 누름은 받지 않는다
         '.plaza-cage{position:absolute;pointer-events:none;}',
+        // 🍲 냄비 — 뒤쪽(김 · 뒷전 · 국 뒤 절반)과 앞쪽(국 앞 절반 · 몸통)을 따로 깔아 안에 든 사람이 국 속에 선다 (2026-11-11)
+        '.plaza-pot{position:absolute;background-repeat:no-repeat;image-rendering:pixelated;image-rendering:crisp-edges;cursor:pointer;}',
+        '.plaza-pot-t{position:absolute;transform:translateX(-50%);font-size:10px;font-weight:bold;color:#e8dcc8;white-space:nowrap;',
+        '  text-shadow:0 1px 3px #000,0 0 5px #000;pointer-events:none;}',
         // 🎃 핼러윈 — 방 그림 바로 위에 우중충한 막(사람 · 입구보다 아래) · 바닥의 호박
         '.plaza-gloom{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0;',
         '  background:radial-gradient(ellipse at 50% 38%,rgba(0,0,0,0) 30%,rgba(8,4,16,.5) 100%),',
@@ -2235,7 +2239,7 @@ function lsFollowStep() {
     if (!L) return;
     if (chatNow() - (Number(L.at) || 0) > LS_STALE) { lsLedStop('🪢 ' + (D0.bn || '그 사원') + ' 사원의 소식이 끊겨 목줄이 풀렸습니다.'); return; }
     if (L.room !== run.room || (L.inst || 1) !== (run.inst || 1)) {
-        if (!R[L.room] || cageMine()) return;
+        if (!R[L.room] || heldRoom()) return;
         if (t - (D0.goAt || 0) < LS_ROOM_GAP) return;
         D0.goAt = t;
         run.tx = null; run.ty = null; run.tseg = null;
@@ -2636,6 +2640,7 @@ function zz() { return (run && run.z) || 1; }
 
 function putOne(one, x, y, lift) {
     const z = zz();
+    lift = (lift || 0) + potLift(one);                                        // 🍲 냄비 속 — 머리와 어깨만 국 위로
     const L = Math.round(x * z - one.w / 2);
     const T = Math.round(y * z - (one.h - (one.foot || 0)) - (lift || 0));   // 🍍 lift — 점프로 떠 있는 높이(px)
     // ★ 칸 아래끝이 곧 발이 아니다 — 새 규격은 발밑이 여덟 도트 비어 있다.
@@ -3097,6 +3102,7 @@ function carryDo(c, k) {
     if (!q || !q.sm) { sysLine('🍍 지금은 작지 않습니다.'); return; }
     if (tinyOf(u_())) { sysLine('🍍 작아진 채로는 들 수 없습니다.'); return; }
     if (caged(c) || cageMine()) { sysLine('🔒 가두리 때문에 들 수 없습니다.'); return; }
+    if (potted(c)) { sysLine('🍲 냄비 안에 있습니다 — 냄비를 눌러 꺼내 주세요.'); return; }
     if (w && w.by !== me) { sysLine('🍍 ' + nameIn(w.by) + ' 사원에게 가 있습니다.'); return; }
     if (k === 'head' && wfOf(c)) { sysLine('🫙 소원권은 손으로만 듭니다.'); return; }
     if (!roomOn(me, k, c)) { sysLine('🍍 ' + noTxt(k) + '.'); return; }
@@ -3126,6 +3132,7 @@ function climbDo(by, k) {
     if (!q || q.sm) { sysLine('🍍 올라갈 수 없습니다.'); return; }
     if (!tinyOf(u_())) return;
     if (caged(by) || cageMine()) { sysLine('🔒 가두리 때문에 갈 수 없습니다.'); return; }
+    if (potMine()) { sysLine('🍲 냄비 안에 있어 갈 수 없습니다.'); return; }
     const w = carrierOf(me);
     if (w && w.by !== by) { sysLine('🍍 ' + nameIn(w.by) + ' 사원에게 ' + ((run.on && run.on.by === w.by) ? '올라가' : '들려') + ' 있어 갈 수 없습니다.'); return; }
     if (!roomOn(by, k, me)) { sysLine('🍍 ' + nameIn(by) + ' 사원 — ' + noTxt(k) + '.'); return; }
@@ -3190,7 +3197,7 @@ function walkTo(x, y) {
 
 // ── 작은 사람 쪽 — 내가 들려 있나 · 들려 있으면 그 자리로
 function carryMine() {
-    if (!run || !tinyOf(u_()) || caged(myCode())) return null;
+    if (!run || !tinyOf(u_()) || caged(myCode()) || potMine()) return null;
     return carrierOf(myCode());
 }
 // 머리 위에 올라설 때 — 비어 있는 자리
@@ -3329,7 +3336,7 @@ function followListen() {
         if (!v.by || !R[v.room] || now() - (Number(v.at) || 0) > 15000) return;
         if ((Number(v.at) || 0) <= (run.folAt || 0)) return;                 // 이미 받은 것
         run.folAt = Number(v.at) || 0;
-        if (!tinyOf(u_()) || cageMine()) return;
+        if (!tinyOf(u_()) || heldRoom()) return;
         const lb = run.lastBy;
         if (!lb || lb.by !== v.by || now() - lb.t > 15000) return;          // 방금까지 그 사람에게 들려 있었어야 한다
         run.folBy = { by: v.by, t: now() };
@@ -3769,7 +3776,7 @@ function tinyAt(cx, cy) {
     let pick = null, bd = 1e9;
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
-        if (!q || !q.sm || q.hid) return;
+        if (!q || !q.sm || q.hid || potted(c)) return;     // 🍲 냄비 속 사람은 냄비를 눌러 꺼낸다
         const b = q.one.wrap.getBoundingClientRect();
         const t = b.top + b.height * 0.3;                  // 칸 위쪽은 비어 있다 — 몸이 있는 아래쪽만
         if (cx < b.left - PAD || cx > b.right + PAD || cy < t - PAD || cy > b.bottom + PAD) return;
@@ -3779,7 +3786,7 @@ function tinyAt(cx, cy) {
     return pick;
 }
 function bigAt(cx, cy) {
-    if (!run || !tinyOf(u_()) || cageMine()) return null;
+    if (!run || !tinyOf(u_()) || cageMine() || potMine()) return null;
     let pick = null, bd = 1e9;
     Object.keys(run.peers).forEach(function (c) {
         const q = run.peers[c];
@@ -4092,6 +4099,246 @@ setInterval(function () {
         sysLine('🔓 가두리에서 풀려났습니다.');
     }
 }, 800);
+
+// ==========================================
+// 🍲 냄비 — 방마다 구석에 하나 (2026-11-11 사용자)
+// ==========================================
+//
+//   「각 맵의 구석에 하나씩 · 손에 파인애플을 쥔 채 냄비를 누르면 파인애플이 된 사원이 안에 들어간다」
+//   「넣은 사람만 꺼냄」 → 같은 날 「남이 꺼내 줄 수도」 — 안에 든 본인만 빼고 누구나 꺼낸다 (스스로는 못 나온다).
+//
+//   plazaPot/<사번> = { s: 자리 열쇠(plaza~2 …), r: 방, i: 방 번호, by: 넣은 사람, bn: 그 이름, at }
+//     · 안에 든 사람 화면이 제 자리를 냄비 속에 박아 두고(potPin) 다른 방으로 못 간다 (가두리처럼 다시 들어와도 그 냄비로)
+//     · 보는 화면마다 그 사람을 냄비 속으로 들어 올려(putOne lift) 뒤쪽 · 앞쪽 냄비 장 사이에 그린다 — 머리와 어깨만 국 위로
+//     · 꺼내면 — 꺼낸 사람이 보통 크기이고 빈손이 있으면 손에 든다 · 아니면 냄비 앞에 내려선다
+//     · 파인애플이 풀리면(원래 크기) 저절로 나온다 · 소원권 물약(🪄)은 파인애플이 아니라 못 넣는다
+const POT = {
+    PATH: 'plazaPot',
+    X: 190,             // 냄비 가운데 (방 왼쪽 구석 · 위층 길)
+    BASE: 852,          // 냄비 바닥 — 길(845~905)의 뒤쪽. 이보다 앞에 선 사람은 냄비 앞으로 지나간다
+    PX: 4.35,           // 그림 한 점 = 방 몇 px (사람 도트와 같은 굵기)
+    W: 26, H: 39,       // 그림 크기 (점)
+    CUT: 20,            // 이 줄부터 앞쪽 장 (국 앞 절반 · 몸통 · 불)
+    CX: 12.75,          // 그림에서 냄비 가운데 (점)
+    SHOW: 0.6,          // 안에 든 사람 몸 가운데 국 위로 보이는 몫 (머리 · 어깨)
+    NEAR: 70,           // 냄비 앞 이만큼 안이면 손이 닿는다
+    ROOMS: ['dfront', 'dream', 'casino', 'plaza', 'post', 'gate', 'bureau', 'dshop']
+};
+const POTS = {};
+function potRoomOk(k) { return POT.ROOMS.indexOf(k) >= 0; }
+function potOf(code) { const v = code ? POTS[code] : null; return (v && v.r && R[v.r]) ? v : null; }
+function potted(code) { return !!potOf(code); }
+// 내가 냄비 안인가 — 파인애플이 풀렸으면 아니다 (나오기는 아래 시계가 한다)
+function potMine() {
+    const u = u_();
+    if (!u) return null;
+    const v = potOf(u.code);
+    if (!v) return null;
+    if (run && run.room === EV.ROOM) return v;           // 이벤트 맵에서는 파인애플이 잠시 풀린다 — 그래도 냄비는 그대로
+    return tinyOf(u) ? v : null;
+}
+// 이 방(이 번호) 냄비에 든 사람들
+function potHere() {
+    if (!run) return [];
+    const sk = seatKey(run.room, run.inst);
+    return Object.keys(POTS).filter(function (c) { const v = potOf(c); return v && v.s === sk; });
+}
+// 안에 든 사람을 얼마나 들어 올리나 (화면 px) — 발은 몸통 속, 머리와 어깨만 국(CUT 줄) 위로
+function potLift(one) {
+    if (!run || !one || !one.code) return 0;
+    const v = potOf(one.code);
+    if (!v || v.r !== run.room || v.s !== seatKey(run.room, run.inst)) return 0;
+    const sp = spec(), k = one.w / sp.W, z = zz();
+    const body = (sp.H - sp.FOOT - 116) * k;              // 몸 키 (화면 px) — 머리 꼭대기 116 (옷장 그림 규격)
+    const cut = (POT.H - POT.CUT) * POT.PX * z;           // 앞쪽 장 윗줄 — 바닥에서 위로
+    return Math.max(0, Math.round(cut - body * (1 - POT.SHOW)));   // 국 위로 몸의 SHOW 만큼
+}
+// 붙들린 곳 — 가두리 또는 냄비 (다른 방으로 끌려가지 않게 볼 때)
+function heldRoom() { const pm = potMine(); return cageMine() || (pm ? pm.r : ''); }
+
+(function potListen() {
+    let on = false, was = null;
+    const iv = setInterval(function () {
+        const u = u_(), d = db_();
+        if (on || !d || !u) return;
+        on = true;
+        clearInterval(iv);
+        d.ref(POT.PATH).on('value', function (snap) {
+            const v = snap.val() || {};
+            Object.keys(POTS).forEach(function (c) { if (!v[c]) delete POTS[c]; });
+            Object.keys(v).forEach(function (c) { if (v[c] && typeof v[c] === 'object') POTS[c] = v[c]; });
+            const me = u_();
+            if (me) {
+                const m = POTS[me.code] || null;
+                const key = m ? (m.at || 1) : 0;
+                if (key && key !== (was && was.at)) {
+                    if (now() - (Number(m.at) || 0) < 60000) {
+                        sysLine('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다! 다른 사원이 꺼내 줄 때까지 나올 수 없습니다.');
+                        try { if (typeof showCustomAlert === 'function') showCustomAlert('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다!\n\n보글보글… 다른 사원이 꺼내 줄 때까지 나올 수 없습니다.'); } catch (e) { }
+                    }
+                } else if (!key && was && run) {
+                    // 나왔다 — 들려 나가지 않았으면 냄비 앞에 내려선다
+                    if (!carryMine() && run.room === was.r) {
+                        run.x = POT.X + 60; run.y = Math.min(roomOf().floor[1] - 4, POT.BASE + 26);
+                        run.lv = 0; run.seg = 'up'; run.tx = null; run.tseg = null; run.vx = run.vy = 0;
+                        try { putOne(run.me, run.x, run.y); resend(); } catch (e) { }
+                    }
+                    sysLine('🍲 냄비에서 나왔습니다.');
+                }
+                was = m;
+            }
+            try { if (run) { paintPot(); wake(); } } catch (e) { }
+        });
+    }, 1000);
+    // 파인애플이 풀렸으면 — 저절로 나온다 (내 것만 · 상담사는 남의 것도 걷지 않는다)
+    setInterval(function () {
+        const u = u_(), d = db_();
+        if (!u || !d || !POTS[u.code] || !run || run.room === EV.ROOM) return;
+        if (tinyOf(u)) return;
+        try { d.ref(POT.PATH + '/' + u.code).remove(); } catch (e) { }
+        delete POTS[u.code];
+    }, 3000);
+})();
+
+// 냄비 그리기 — 뒤쪽 장(김 · 뒷전 · 국 뒤 절반) · 앞쪽 장(국 앞 절반 · 몸통 · 불) · 이름표
+function paintPot() {
+    if (!run || !run.el) return;
+    Array.prototype.forEach.call(run.el.querySelectorAll('.plaza-pot, .plaza-pot-t'), function (e) { e.remove(); });
+    if (!potRoomOk(run.room)) return;
+    const z = zz(), px = POT.PX * z;
+    const left = Math.round((POT.X - POT.CX * POT.PX) * z);
+    const top = Math.round((POT.BASE - POT.H * POT.PX) * z);
+    const W = Math.round(POT.W * px), Hh = Math.round(POT.H * px), cut = Math.round(POT.CUT * px);
+    const mk = function (y0, h, zi) {
+        const e = document.createElement('div');
+        e.className = 'plaza-pot';
+        e.style.left = left + 'px'; e.style.top = (top + y0) + 'px';
+        e.style.width = W + 'px'; e.style.height = h + 'px';
+        e.style.backgroundImage = 'url("' + P.DIR + 'pot.png")';
+        e.style.backgroundSize = W + 'px ' + Hh + 'px';
+        e.style.backgroundPosition = '0 ' + (-y0) + 'px';
+        e.style.zIndex = String(zi);
+        e.addEventListener('pointerdown', function (ev) { ev.preventDefault(); ev.stopPropagation(); });
+        e.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); potTap(); });
+        run.el.appendChild(e);
+        return e;
+    };
+    mk(0, cut, 100 + POT.BASE - 2);                     // 뒤 — 안에 든 사람(BASE-1)보다 뒤
+    mk(cut, Hh - cut, 100 + POT.BASE);                  // 앞
+    const t = document.createElement('div');
+    t.className = 'plaza-pot-t';
+    t.style.left = Math.round(POT.X * z) + 'px';
+    t.style.top = (top + Hh + 2) + 'px';
+    t.style.zIndex = String(100 + POT.BASE);
+    const n = potHere().length;
+    t.textContent = '🍲 냄비' + (n ? ' · ' + n + '명' : '');
+    run.el.appendChild(t);
+}
+
+// 냄비를 눌렀다 — 손에 파인애플이 있으면 넣고, 없으면 안에 든 사람을 꺼낸다
+function potTap() {
+    if (!run || !potRoomOk(run.room)) return;
+    if (potMine()) { sysLine('🍲 스스로는 나올 수 없습니다 — 다른 사원이 냄비를 눌러 꺼내 줘야 합니다.'); return; }
+    if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
+    if (HS()) { sysLine('🫣 숨바꼭질 중에는 냄비를 쓸 수 없습니다.'); return; }
+    const me = myCode();
+    const hand = listOf(run.carry).filter(function (x) {
+        const w = carrierOf(x.c), q = run.peers[x.c];
+        return x.k === 'hand' && w && w.by === me && q && q.sm && !wfOf(x.c) && !potted(x.c);
+    });
+    if (hand.length) { potGo('in', hand[0].c); return; }
+    const inPot = potHere().filter(function (c) { return c !== me; });
+    if (!inPot.length) { sysLine('🍲 보글보글 끓고 있다. 파인애플이 된 사원을 손에 들고 누르면 냄비에 넣을 수 있습니다.'); return; }
+    if (inPot.length === 1) { potGo('out', inPot[0]); return; }
+    potPick(inPot);
+}
+// 여럿이 들어 있으면 — 누구를 꺼낼지
+function potPick(list) {
+    closeSheet();
+    const box = document.createElement('div');
+    box.className = 'plaza-sheet';
+    box.id = 'plaza-pot-pick';
+    box.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:2147483000;background:rgba(18,16,22,.96);border:1px solid #5a4a3a;border-radius:14px;padding:12px;min-width:220px;box-shadow:0 8px 24px rgba(0,0,0,.6);';
+    box.innerHTML = '<div style="font-size:12px;color:#ffe9bd;font-weight:bold;margin-bottom:8px;">🍲 누구를 꺼낼까요?</div>'
+        + list.map(function (c) { return '<button data-c="' + esc(c) + '" style="display:block;width:100%;margin:0 0 6px;padding:9px;border-radius:9px;border:1px solid #4a3f33;background:#2a231c;color:#f3e6cf;font-size:12px;font-family:inherit;">' + esc(nameIn(c)) + '</button>'; }).join('')
+        + '<button data-x="1" style="display:block;width:100%;padding:8px;border-radius:9px;border:1px solid #333;background:#1a1a1a;color:#aaa;font-size:11px;font-family:inherit;">닫기</button>';
+    box.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    box.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        const b = ev.target.closest('button'); if (!b) return;
+        box.remove();
+        if (b.dataset.c) potGo('out', b.dataset.c);
+    });
+    document.body.appendChild(box);
+}
+// 멀면 냄비 앞까지 걸어가서 한다 (손으로 움직이면 그만둔다)
+function potNear() { return Math.abs(run.x - POT.X) <= POT.NEAR + 40 && Math.abs(run.y - POT.BASE) <= 70 && (run.lv || 0) === 0; }
+function potGo(act, c) {
+    run.potGo = { act: act, c: c, at: now() };
+    if (potNear()) { potPend(); return; }
+    walkTo(POT.X + POT.NEAR, Math.min(roomOf().floor[1] - 4, POT.BASE + 24));
+}
+function potPend() {
+    const g = run && run.potGo;
+    if (!g) return;
+    if (now() - g.at > 20000) { run.potGo = null; return; }
+    if (!potNear()) { if (run.tx == null) walkTo(POT.X + POT.NEAR, Math.min(roomOf().floor[1] - 4, POT.BASE + 24)); return; }
+    run.potGo = null;
+    run.tx = null; run.ty = null; run.tseg = null;
+    if (g.act === 'in') potIn(g.c); else potOut(g.c);
+}
+function potIn(c) {
+    const d = db_(), u = u_(), me = myCode();
+    if (!d || !u || !run) return;
+    const w = carrierOf(c), q = run.peers[c];
+    if (!w || w.by !== me || !q || !q.sm) { sysLine('🍲 손에 든 파인애플이 없습니다.'); return; }
+    if (wfOf(c)) { sysLine('🫙 소원권은 냄비에 넣을 수 없습니다.'); return; }
+    const v = { s: seatKey(run.room, run.inst), r: run.room, i: run.inst || 1, by: me, bn: nameOf(u), at: now() };
+    POTS[c] = v;
+    try { d.ref(POT.PATH + '/' + c).set(v); } catch (e) { }
+    // 손에서 내려놓는다 (스스로 올라온 기록도 이때까지 것은 무효)
+    run.carry = listOf(run.carry).filter(function (x) { return x.c !== c; });
+    if (!run.carry.length) run.carry = null;
+    run.dn = run.dn || {}; run.dn[c] = now();
+    resend(); remap();
+    sysLine('🍲 ' + nameIn(c) + ' 사원을 냄비에 넣었습니다. 보글보글…');
+    paintPot(); wake();
+}
+function potOut(c) {
+    const d = db_(), me = myCode();
+    if (!d || !run) return;
+    if (c === me) return;
+    if (!potted(c)) { sysLine('🍲 이미 나왔습니다.'); return; }
+    delete POTS[c];
+    try { d.ref(POT.PATH + '/' + c).remove(); } catch (e) { }
+    const q = run.peers[c];
+    if (q && q.sm && !tinyOf(u_()) && !cageMine() && roomOn(me, 'hand', c)) {
+        run.carry = listOf(run.carry).filter(function (x) { return x.c !== c; }).concat([{ c: c, k: 'hand', at: now() }]);
+        resend(); remap();
+        sysLine('🍲 ' + nameIn(c) + ' 사원을 냄비에서 꺼내 손에 들었습니다.');
+    } else sysLine('🍲 ' + nameIn(c) + ' 사원을 냄비에서 꺼냈습니다.');
+    paintPot(); wake();
+}
+// 매 틀 — 안에 들어 있으면 냄비 속에 박아 둔다 (다른 방이면 그 냄비로 데려간다)
+function potPin() {
+    const pm = potMine();
+    if (!pm) return false;
+    if (pm.r !== run.room || (pm.i || 1) !== (run.inst || 1)) {
+        if (now() - (run.potWarp || 0) > 3000) { run.potWarp = now(); run.forceInst = pm.i || 0; goRoom(pm.r, null, 0); }
+        return true;
+    }
+    run.x = POT.X; run.y = POT.BASE - 1; run.lv = 0; run.seg = 'up';
+    run.tx = null; run.ty = null; run.tseg = null; run.vx = run.vy = 0;
+    run.potGo = null;
+    return true;
+}
+window.plazaPotState = function () {
+    return Object.keys(POTS).map(function (c) {
+        const v = POTS[c] || {};
+        const one = run ? (c === myCode() ? run.me : (run.peers[c] && run.peers[c].one)) : null;
+        return { 사번: c, 이름: nameIn(c), 방: v.s, 넣은사람: v.bn || v.by, 분: Math.round((now() - (Number(v.at) || 0)) / 60000), 들어올림: one ? potLift(one) : null };
+    });
+};
 
 // ==========================================
 // ★ 층 — 한 방에 위층과 지하가 같이 있다
@@ -4447,6 +4694,7 @@ function paintRoom() {
     paintExits();
     paintSpots();
     paintCage();                    // 🔒 가두리 (그 방에 있으면)
+    paintPot();                     // 🍲 냄비 (구석)
     paintHalloween();               // 🎃 핼러윈 — 호박 셋 · 우중충한 막
 }
 
@@ -4581,6 +4829,7 @@ function paintSpots() {
             // 🐰 시설 앞에 선 내 토끼 인형을 누른 것이면 — 시설 대신 말풍선 글씨 창 (nuow-text.js · 토끼 둘레만 본다)
             try { if (typeof window.nuowTap === 'function' && window.nuowTap(ev.clientX, ev.clientY)) return; } catch (x) { }
             if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
+            if (potMine()) { sysLine('🍲 냄비 안에서는 쓸 수 없습니다.'); return; }
             if (s.go) { const hb = hsCall('block', 'door', s.go); if (hb) { sysLine(hb); return; } }     // 🫣
             goApp(s);
         });
@@ -4797,6 +5046,12 @@ function goRoom(key, way, lv) {
         if (run.room === cg && run.me) { sysLine('🔒 가두리에 갇혀 있어 나갈 수 없습니다.'); return; }
         key = cg; way = null; lv = 0;
     }
+    // 🍲 냄비 속이면 그 방 밖으로는 못 간다 — 밖이면 그 냄비로 데려간다
+    const pmg = potMine();
+    if (!cg && pmg && R[pmg.r] && key !== pmg.r) {
+        if (run.room === pmg.r && run.me) { sysLine('🍲 냄비 안에 있어 나갈 수 없습니다.'); return; }
+        key = pmg.r; way = null; lv = 0; run.forceInst = pmg.i || 0;
+    }
     const r = R[key];
 
     // 🍍 방을 옮기면 — 든 사람들은 따라오게 적어 두고(followMark), 들려 있던 것(나)은 풀린다
@@ -4946,6 +5201,7 @@ function tick(ts) {
         ix = 0; iy = 0; run.vx = 0; run.vy = 0;
         run.tx = null; run.ty = null; run.tseg = null;
     } else if (run.cpend && (ix || iy)) run.cpend = null;      // 손으로 움직이면 집으러 가던 것을 그만둔다
+    if (run.potGo && (ix || iy)) run.potGo = null;            // 🍲 냄비로 가던 것도
 
     // ★ 민 쪽으로 **천천히 붙고 천천히 떨어진다** (P.EASE).
     //   손이 떨려도 사람이 안 꺾이고, 손을 떼도 뚝 서지 않고 한 발 더 간다.
@@ -5040,7 +5296,8 @@ function tick(ts) {
         if (hsPin.room && hsPin.room !== run.room && R[hsPin.room]) { goRoom(hsPin.room, null, hsPin.lv || 0); return; }
         if (hsPin.x != null) { run.x = hsPin.x; run.y = hsPin.y; run.vx = run.vy = 0; }
     }
-    run.me.actor.moving(cm ? cmMove : moving);
+    const potIn_ = potPin();                // 🍲 냄비 속이면 그 자리에 박아 둔다
+    run.me.actor.moving(potIn_ ? false : (cm ? cmMove : moving));
     const myLift = jumpLift(run.me, run.jumpT0);                                  // 🍍 점프
     if (run.jumpT0) { poseJump(run.me, run.jumpT0); if (!jumping(run.jumpT0)) run.jumpT0 = 0; }   // 뛰는 동안은 걸음 4번 모션으로 멈춰 선다 · 내려오면 푼다
     putOne(run.me, run.x, run.y, myLift);
@@ -5048,6 +5305,7 @@ function tick(ts) {
     send(cm ? cmMove : moving);
     jumpPaint();
     if (!cm) carryPend();                   // 🍍 집으러 가는 중이면 — 닿았으면 집는다
+    if (!cm) potPend();                     // 🍲 냄비로 걸어가는 중이면 — 닿았으면 넣는다 · 꺼낸다
 
     let busy = moving || wantSeg || run.tx != null || cmMove || !!(cm && typeof run.hoT === 'number') || myLift > 0 || jumping(run.jumpT0);
     const carried = M().of;                 // 🍍 들린 사람은 아래 carryPaint 가 든 사람에게 붙여 그린다
