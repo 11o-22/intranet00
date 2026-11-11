@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 🎵 리듬 게임 — 상담사 · 테스터 (2026-11-10 사용자 · 테스터는 2026-11-11)
+// ★ 🎵 리듬 게임 — 전 사원 (2026-11-10 상담사만 → 11-11 테스터도 → 11-11 전 사원)
 // bundles.json 마지막 묶음 · 광장 ☰ 「생활」 → 「리듬 게임」
 // ==========================================
 //
@@ -69,7 +69,8 @@ function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null
 function isAdmin() { const u = u_(); return !!(u && u.code === ADMIN); }
 // ★ 2026-11-11 사용자 「상담사가 테스터로 정한 사람들은 리듬게임이 보이게」 — 관리 화면의 테스터 지정(testers/<사번> · index.html testerList)
 function isTester() { try { const u = u_(); return !!(u && typeof testerList !== 'undefined' && testerList && testerList[u.code]); } catch (e) { return false; } }
-function canPlay() { return isAdmin() || isTester(); }
+// ★ 2026-11-11 사용자 「리듬게임 이제 전 사원이 다 할 수 있게」 — 들어와 있는 사원이면 누구나
+function canPlay() { return !!u_(); }
 window.rhythmCan = canPlay;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function loadJ(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
