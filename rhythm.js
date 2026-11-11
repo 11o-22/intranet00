@@ -829,7 +829,7 @@ function start() {
     previewStop(true);
     const s = song(), d = SET.diff;
     // 손짓 안에서 — 소리 · 전체 화면 · 가로 고정 (소리 종류를 먼저 — 도는 소리 장치 위에서 바꾸지 않게)
-    sessionOn(); ctx();
+    sessionOn(); ctx(); keepAlive();
     try {
         if (!document.fullscreenElement && OV.requestFullscreen) {
             OV.requestFullscreen({ navigationUI: 'hide' }).then(function () {
@@ -869,6 +869,7 @@ function begin(s, d, buf, chart) {
     AU.lagNow = AU.lag[s.key];
     clockReset();
     const cx = ctx();
+    keepAlive();
     AU.src = cx.createBufferSource(); AU.src.buffer = buf; AU.src.connect(AU.gain);
     AU.startAt = cx.currentTime + LEAD;
     AU.src.start(AU.startAt);
@@ -879,7 +880,7 @@ function begin(s, d, buf, chart) {
 }
 // ★ 소리 장치가 멈춰 있으면 판의 시계도 멈춘다 — 채보가 안 내려오고 곡도 안 나온다 (2026-11-11 사용자 「한 곡 하고 다음 곡을 누르면 채보가 안 내려온다」)
 //   아이폰은 다른 소리(광장 피아노 · 소리 종류 바꿈 · 전화 · 다른 앱)가 끼어들면 소리 장치를 「끊김」으로 두고, 누르기 전에는 다시 안 켜 준다.
-//   1.5 초 넘게 소리 시계가 안 가면 「▶ 눌러서 시작」 — 누른 손짓 안에서 소리 장치를 새로 만들어 그 곡을 처음부터 다시 튼다.
+//   조용히 깨워 봐도 3 초 넘게 소리 시계가 안 가면 「▶ 눌러서 시작」 — 누른 손짓 안에서 소리 장치를 새로 만들어 그 곡을 처음부터 다시 튼다.
 const WD = { last: null, at: 0, tried: 0, on: false };
 function wdReset() { WD.last = null; WD.at = performance.now(); WD.tried = 0; wakeHide(); }
 function watchdog() {
@@ -887,8 +888,9 @@ function watchdog() {
     const c = AU.ctx, pn = performance.now();
     const t = c ? c.currentTime : -1;
     if (c && c.state === 'running' && t !== WD.last) { WD.last = t; WD.at = pn; if (WD.on) wakeHide(); return; }
-    if (c && c.state === 'suspended' && pn - WD.tried > 1000) { WD.tried = pn; try { c.resume(); } catch (e) { } }
-    if (pn - WD.at > 1500 && !WD.on) wakeShow();
+    // 먼저 조용히 깨워 본다 — 멈춤 · 끊김이면 다시 켜고, 깨워 두기가 없으면 다시 건다 (창은 3 초 넘게 안 될 때만)
+    if (c && c.state !== 'closed' && pn - WD.tried > 1000) { WD.tried = pn; try { if (c.state !== 'running') c.resume(); } catch (e) { } keepAlive(); }
+    if (pn - WD.at > 3000 && !WD.on) wakeShow();
 }
 function wakeShow() {
     if (!UI || UI.querySelector('.rg-wake')) return;
@@ -909,13 +911,34 @@ function wakeGo() {
     // 누른 손짓 안에서 — 묵은 소리 장치는 닫고 새로 연다
     const old = AU.ctx; AU.ctx = null;
     try { if (old && old.state !== 'closed') old.close(); } catch (e) { }
-    sessionOn(); ctx();
+    sessionOn(); ctx(); keepAlive();
     if (!buf) { MODE = 'load'; start(); return; }
     begin(s, d, buf, chart);
+}
+// ★ 깨워 두기 — 아이폰은 아무 소리도 안 나는 동안 소리 시계를 세워 두기도 한다.
+//   곡은 2.2 초 뒤에 시작하게 걸어 두는데(LEAD), 그 빈 동안 시계가 서면 곡이 영영 시작되지 않고 채보도 안 내려온다.
+//   첫 곡은 미리 듣기 소리가 나던 끝이라 괜찮고, 결과 화면에서 한참 조용했다가 다음 곡을 누르면 걸렸다 (2026-11-11 사용자 「다음 곡에서 채보가 안 내려온다」 · 「눌러서 시작이 너무 자주 뜬다」).
+//   START 를 누른 순간부터 판이 끝날 때까지 들리지 않을 만큼 작은 소리를 되풀이해 흘려 시계가 서지 않게 한다.
+function keepAlive() {
+    const c = AU.ctx; if (!c || c.state === 'closed') return;
+    if (AU.keep && AU.keep.c === c) return;
+    keepStop();
+    try {
+        const n = Math.round(c.sampleRate * 0.5), b = c.createBuffer(1, n, c.sampleRate), d = b.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 1e-5;      // −100 dB — 들리지 않는다
+        const src = c.createBufferSource(); src.buffer = b; src.loop = true;
+        src.connect(c.destination); src.start(0);
+        AU.keep = { c: c, src: src };
+    } catch (e) { AU.keep = null; }
+}
+function keepStop() {
+    const k = AU.keep; AU.keep = null;
+    if (k) { try { k.src.stop(); k.src.disconnect(); } catch (e) { } }
 }
 function stopPlay() {
     try { if (AU.src) { AU.src.onended = null; AU.src.stop(); } } catch (e) { }
     AU.src = null;
+    keepStop();
     try { if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); } catch (e) { }
     unbindInput();
 }
