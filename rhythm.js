@@ -1,5 +1,5 @@
 // ==========================================
-// ★ 🎵 리듬 게임 — 상담사 전용 (2026-11-10 사용자)
+// ★ 🎵 리듬 게임 — 상담사 · 테스터 (2026-11-10 사용자 · 테스터는 2026-11-11)
 // bundles.json 마지막 묶음 · 광장 ☰ 「생활」 → 「리듬 게임」
 // ==========================================
 //
@@ -67,6 +67,10 @@ const SET_KEY = 'rgSet', BEST_KEY = 'rgBest';
 
 function u_() { return (typeof currentUser !== 'undefined') ? currentUser : null; }
 function isAdmin() { const u = u_(); return !!(u && u.code === ADMIN); }
+// ★ 2026-11-11 사용자 「상담사가 테스터로 정한 사람들은 리듬게임이 보이게」 — 관리 화면의 테스터 지정(testers/<사번> · index.html testerList)
+function isTester() { try { const u = u_(); return !!(u && typeof testerList !== 'undefined' && testerList && testerList[u.code]); } catch (e) { return false; } }
+function canPlay() { return isAdmin() || isTester(); }
+window.rhythmCan = canPlay;
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function loadJ(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
 function saveJ(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
@@ -269,6 +273,14 @@ function css() {
         '.rg-sel{position:absolute;inset:0;display:flex;gap:14px;padding:14px 18px;box-sizing:border-box;}',
         '.rg-col{display:flex;flex-direction:column;gap:10px;min-width:0;}',
         '.rg-h{font-size:12px;letter-spacing:4px;color:#9ab;opacity:.9;}',
+        '.rg-left{width:min(34%,240px);}',
+        '.rg-set{align-self:flex-start;padding:7px 14px;font-size:12px;background:rgba(255,255,255,.08);}',
+        '.rg-meta{font-size:12px;color:#99a;letter-spacing:.5px;}',
+        '.rg-acts{display:flex;gap:10px;align-items:center;margin-top:4px;}',
+        '.rg-ic{width:48px;height:48px;padding:0;font-size:20px;background:rgba(255,255,255,.08);}',
+        '.rg-setbox{min-width:250px;align-items:stretch;gap:12px;}',
+        '.rg-setbox .rg-row{justify-content:space-between;font-size:13px;}',
+        '.rg-tog{padding:6px 14px;font-size:12px;min-width:84px;}',
         '.rg-songs{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;}',
         '.rg-song{flex-shrink:0;display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
         '.rg-song.on{background:rgba(255,255,255,.16);border-color:var(--c);box-shadow:0 0 14px -4px var(--c);}',
@@ -280,7 +292,7 @@ function css() {
         '.rg-info{display:flex;flex-direction:column;gap:9px;min-width:0;flex:1;}',
         '.rg-title{font-size:22px;font-weight:bold;color:#fff;line-height:1.2;}',
         '.rg-diffs{display:flex;gap:8px;flex-wrap:wrap;}',
-        '.rg-diff{flex:1;min-width:84px;padding:8px 6px;border-radius:10px;border:2px solid var(--c);background:rgba(0,0,0,.3);color:#fff;text-align:center;cursor:pointer;font-family:inherit;}',
+        '.rg-diff{flex:1;min-width:84px;padding:10px 6px;border-radius:10px;border:2px solid var(--c);background:rgba(0,0,0,.3);color:#fff;text-align:center;cursor:pointer;font-family:inherit;}',
         '.rg-diff.on{background:var(--c);color:#111;}',
         '.rg-diff b{display:block;font-size:13px;letter-spacing:2px;}',
         '.rg-diff i{font-style:normal;font-size:20px;font-weight:bold;}',
@@ -341,7 +353,7 @@ function toStage(cx, cy) {
 }
 
 function open() {
-    if (!isAdmin()) { say('아직 준비 중입니다.'); return; }
+    if (!canPlay()) { say('아직 준비 중입니다.'); return; }
     if (OV) return;
     css();
     OV = document.createElement('div'); OV.id = 'rg-ov';
@@ -423,24 +435,21 @@ function menu() {
         const c = chart && chart.charts[d[0]];
         const b = bestOf(s.key, d[0]);
         const rk = b ? rankOf(b.score, b.ap) : null;
-        return '<button class="rg-diff' + (SET.diff === d[0] ? ' on' : '') + '" data-diff="' + d[0] + '" style="--c:' + d[3] + '"><b>' + d[1] + '</b><i>' + (c ? c.level : '·') + '</i><small>' + (c ? c.count + ' 노트' : '') + '</small>'
+        return '<button class="rg-diff' + (SET.diff === d[0] ? ' on' : '') + '" data-diff="' + d[0] + '" style="--c:' + d[3] + '"><b>' + d[1] + '</b><i>' + (c ? c.level : '·') + '</i>'
             + '<small>' + (b ? '<em class="rg-rk" style="--r:' + rk[2] + '">' + rk[0] + '</em> ' + (b.score / 10000).toFixed(2) + '%' + (b.ap ? '' : b.fc ? ' · FC' : '') : '—') + '</small></button>';
     }).join('');
     UI.innerHTML = '<div class="rg-bg"></div>'
         + '<button class="rg-btn rg-x" data-k="x">✕</button>'
         + '<div class="rg-sel">'
-        + '<div class="rg-col" style="width:min(34%,240px);"><div class="rg-h">🎵 RHYTHM · 상담사 전용</div><div class="rg-songs">' + songs + '</div>'
-        + '<div class="rg-row"><span>속도</span><span class="rg-step"><button data-k="sp-">−</button><span>' + SET.speed.toFixed(1) + '</span><button data-k="sp+">+</button></span></div>'
-        + '<div class="rg-row"><button class="rg-btn" data-k="cal" style="padding:6px 10px;font-size:12px;">⏱ 싱크 맞추기</button>'
-        + '<button class="rg-btn" data-k="hit" style="padding:6px 10px;font-size:12px;">타격음 ' + (SET.hit ? 'ON' : 'OFF') + '</button></div>'
-        + '<div style="font-size:10px;color:#889;line-height:1.5;">판정 ' + sgn(SET.offset) + 'ms · 화면 ' + sgn(SET.vis) + 'ms</div></div>'
+        // ★ 2026-11-11 사용자 「인터페이스 깔끔하게 — 너무 번잡해 · 하드 밑 글씨는 없애고」
+        //   설명 글 · 노트 수 · 싱크 숫자 · 「가로로 눕혀서」 글을 뺐다. 속도 · 타격음 · 싱크 맞추기는 ⚙ 설정 창 하나로.
+        + '<div class="rg-col rg-left"><div class="rg-h">RHYTHM</div><div class="rg-songs">' + songs + '</div>'
+        + '<button class="rg-btn rg-set" data-k="set">⚙ 설정</button></div>'
         + '<div class="rg-big"><div class="rg-jacket"' + coverCss(s) + '></div><div class="rg-info">'
-        + '<div class="rg-title">' + esc(s.title) + '</div><div style="font-size:12px;color:#aab;">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
+        + '<div class="rg-title">' + esc(s.title) + '</div><div class="rg-meta">' + esc(s.artist) + (chart ? ' · BPM ' + bpm + ' · ' + len : '') + '</div>'
         + '<div class="rg-diffs">' + diffs + '</div>'
-        + '<div class="rg-row" style="font-size:11px;color:#99a;line-height:1.5;">흰 건반 터치 · 띠 달린 건반 길게 누르기 · 노란 건반 슬라이드(손가락이 지나가면) · 초록 건반 지그재그(좌우로 쓸기 · 양손도) — 화면 어디든 노트의 가로 자리를 누르면 됩니다</div>'
-        + '<div style="display:flex;gap:10px;align-items:center;"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn" data-k="rank">🏆 랭킹</button></div>'
-        + '</div></div></div>'
-        + (rot ? '<div class="rg-rot">휴대폰을 가로로 눕혀서 하면 편합니다</div>' : '');
+        + '<div class="rg-acts"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn rg-ic" data-k="rank" title="랭킹">🏆</button></div>'
+        + '</div></div></div>';
     const sl = UI.querySelector('.rg-songs');
     if (sl) {
         dragScroll(sl);
@@ -453,13 +462,39 @@ function menu() {
         el.onclick = function () {
             const k = el.dataset.k;
             if (k === 'x') { close(); return; }
+            if (k === 'go') { saveSet(); start(); return; }
+            if (k === 'set') { setModal(); return; }
+            if (k === 'rank') { rankModal(SET.diff); return; }
+        };
+    });
+}
+// ⚙ 설정 — 속도 · 타격음 · 싱크 맞추기 (곡 고르기 화면을 다시 그리지 않고 그 자리에서 바뀐다)
+function setModal() {
+    const old = UI.querySelector('.rg-setmodal'); if (old) old.remove();
+    const m = document.createElement('div'); m.className = 'rg-modal rg-setmodal';
+    m.innerHTML = '<div class="rg-box rg-setbox"><div style="display:flex;align-items:center;gap:8px;"><b style="flex:1;letter-spacing:2px;">설정</b><button class="rg-btn" data-k="c" style="padding:5px 10px;">✕</button></div>'
+        + '<div class="rg-row"><span>속도</span><span class="rg-step"><button data-k="sp-">−</button><span data-v="sp"></span><button data-k="sp+">+</button></span></div>'
+        + '<div class="rg-row"><span>타격음</span><button class="rg-btn rg-tog" data-k="hit"></button></div>'
+        + '<div class="rg-row"><span>싱크</span><button class="rg-btn rg-tog" data-k="cal">⏱ 맞추기</button></div>'
+        + '<div class="rg-cal-tip" data-v="sync" style="text-align:right;"></div></div>';
+    UI.appendChild(m);
+    const paint = function () {
+        m.querySelector('[data-v="sp"]').textContent = SET.speed.toFixed(1);
+        m.querySelector('[data-k="hit"]').textContent = SET.hit ? 'ON' : 'OFF';
+        m.querySelector('[data-v="sync"]').textContent = '판정 ' + sgn(SET.offset) + 'ms · 화면 ' + sgn(SET.vis) + 'ms';
+    };
+    paint();
+    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    Array.prototype.forEach.call(m.querySelectorAll('[data-k]'), function (el) {
+        el.onclick = function (e) {
+            e.stopPropagation();
+            const k = el.dataset.k;
+            if (k === 'c') { m.remove(); return; }
+            if (k === 'cal') { m.remove(); saveSet(); calEnter(); return; }
             if (k === 'sp-') SET.speed = Math.max(1, Math.round((SET.speed - 0.5) * 10) / 10);
             if (k === 'sp+') SET.speed = Math.min(12, Math.round((SET.speed + 0.5) * 10) / 10);
             if (k === 'hit') SET.hit = !SET.hit;
-            if (k === 'go') { saveSet(); start(); return; }
-            if (k === 'cal') { saveSet(); calEnter(); return; }
-            if (k === 'rank') { rankModal(SET.diff); return; }
-            saveSet(); menu();
+            saveSet(); paint();
         };
     });
 }
@@ -531,6 +566,7 @@ function begin(s, d, buf, chart) {
     UI.innerHTML = '<button class="rg-pause" data-k="pause">❚❚</button>';
     UI.querySelector('[data-k="pause"]').onclick = function (e) { e.stopPropagation(); pause(); };
     bindInput();
+    bgFor(s);                                      // 바탕 표지를 미리 받아 둔다
     if (AU.lag[s.key] == null) AU.lag[s.key] = headLag(buf, chart.head);
     AU.lagNow = AU.lag[s.key];
     clockReset();
@@ -911,11 +947,38 @@ function key(g, cx, cy, w, h, kind, glow) {
     g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x + 3, y + 2, w - 6, Math.max(1, h * 0.14));
     g.restore();
 }
+// 판 바탕 — 표지를 흐리고 어둡게 깐다 (2026-11-11 사용자 「게임 시작 시에 표지가 배경으로 박히게」)
+//   한 번 그려 두고(크기가 바뀌면 다시) 프레임마다 붙이기만 한다 · 표지가 없는 곡은 까맣게
+const BG = { key: null, img: null, cv: null, w: 0, h: 0 };
+function bgFor(s) {
+    if (!s || !s.cover) return null;
+    if (BG.key !== s.key) { BG.key = s.key; BG.cv = null; BG.img = new Image(); BG.img.src = s.cover; }
+    const im = BG.img;
+    if (!im || !im.complete || !im.naturalWidth) return null;
+    if (!BG.cv || BG.w !== VW || BG.h !== VH) {
+        const c = document.createElement('canvas');
+        const sc = 0.5;                                   // 흐리게 할 것이라 반 크기면 넉넉하다
+        c.width = Math.max(1, Math.round(VW * sc)); c.height = Math.max(1, Math.round(VH * sc));
+        const g = c.getContext('2d');
+        const r = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight) * 1.08;   // 흐린 가장자리가 비지 않게 조금 크게
+        const w = im.naturalWidth * r, h = im.naturalHeight * r;
+        try { g.filter = 'blur(5px)'; } catch (e) { }
+        g.drawImage(im, (c.width - w) / 2, (c.height - h) / 2, w, h);
+        try { g.filter = 'none'; } catch (e) { }
+        g.fillStyle = 'rgba(0,0,0,0.68)'; g.fillRect(0, 0, c.width, c.height);
+        const v = g.createRadialGradient(c.width / 2, c.height * 0.55, c.height * 0.2, c.width / 2, c.height * 0.55, c.width * 0.75);
+        v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.45)');
+        g.fillStyle = v; g.fillRect(0, 0, c.width, c.height);
+        BG.cv = c; BG.w = VW; BG.h = VH;
+    }
+    return BG.cv;
+}
 // 바탕 · 바닥 · 마디 · 판정선
-function drawStage(g, pOf, bars) {
+function drawStage(g, pOf, bars, bg) {
     g.clearRect(0, 0, VW, VH);
-    // 바탕 — 까맣게 (2026-11-10 사용자 「표지 없이 까만색으로」)
+    // 바탕 — 까맣게 (2026-11-10 사용자 「표지 없이 까만색으로」) · 판에서는 표지를 흐리게 (2026-11-11)
     g.fillStyle = '#000'; g.fillRect(0, 0, VW, VH);
+    if (bg) g.drawImage(bg, 0, 0, VW, VH);
     // 바닥 — 원근 사다리꼴 (멀리 → 판정선)
     const s0 = scaleAt(0), y0 = yAt(s0);
     g.save();
@@ -947,7 +1010,7 @@ function draw(now) {
     const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
     const pOf = function (t) { return 1 - (t - now) / vis; };
     const tnow = performance.now();
-    drawStage(g, pOf, P.chart.bars);
+    drawStage(g, pOf, P.chart.bars, bgFor(P.s));
     // 손가락 자리 — 판정선 위 은은한 빛
     Object.keys(P.ptr).forEach(function (id) {
         const q = P.ptr[id]; if (!q || q.u == null) return;

@@ -393,7 +393,8 @@ const PLAZA = {
         // 🕵️ 행맨 — 5~9명 · 포토존 일곱 곳을 이어 붙인 판에서 (mafia.js · 2026-11-03 사용자)
         { g: 'fun',   n: '행맨',       i: '🕵️', ic: 'hangman', fn: 'mfOpen' },
         // 🎵 리듬 게임 — 상담사만 (rhythm.js · 2026-11-10 사용자 「일단은 상담사만 · 메뉴칸에」) · 광장 위에 띄운다
-        { g: 'fun',   n: '리듬 게임',  i: '🎵', fn: 'rhythmOpen', stay: 1, when: function () { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
+        //   테스터도 (2026-11-11 사용자 「상담사가 테스터로 정한 사람들은 리듬게임이 보이게」 — rhythm.js rhythmCan)
+        { g: 'fun',   n: '리듬 게임',  i: '🎵', fn: 'rhythmOpen', stay: 1, when: function () { if (typeof window.rhythmCan === 'function') return window.rhythmCan(); return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.code === PLAZA.ADMIN); } },
         // ⑥ 상점
         { g: 'shop',  n: '유쾌 판매소', i: '🛒', ic: 'shop',   tab: 'tab-shop',     sub: 'shop-regular' },
         { g: 'shop',  n: '???',        i: '❓', ic: 'unknown', tab: 'tab-shop',     sub: 'shop-unknown' },
