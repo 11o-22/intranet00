@@ -2431,7 +2431,9 @@ window.__newItemWear = wearNew;
         try { addAim(); addCount(); } catch (e) { }
         busy = false;
     };
-    new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
+    // ★ 단추가 새로 붙거나 단추 글자가 바뀐 때만 — 전에는 문서 어디서 글자 하나만 바뀌어도(세션 시계 · 광장 말풍선 …)
+    //   온 문서의 단추를 다 뒤졌다 (2026-11-11 사용자 「발열 · 렉」 — 광장에서 가장 많이 도는 일이었다)
+    new MutationObserver(function (recs) { if (ni2BtnTouched(recs)) run(); }).observe(document.body, { childList: true, subtree: true });
     setTimeout(run, 900);
 })();
 
@@ -2646,7 +2648,7 @@ function liftSeal(t) {
         busy = false;
     };
 
-    new MutationObserver(run).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(function (recs) { if (ni2BtnTouched(recs)) run(); }).observe(document.body, { childList: true, subtree: true });   // 단추가 바뀐 때만 (2026-11-11 발열)
 
     const iv = setInterval(function () {
         if (typeof renderInventory !== 'function') return;
@@ -2715,3 +2717,18 @@ window.newItemState = function () {
 console.log('[신규] 26종 등록 — newItemState() · heartState() · giveSilverHeart(사번)');
 
 })();
+
+// 문서 전체를 지켜보는 MutationObserver 가 정말 볼 일이 있나 — 단추가 붙었거나 단추 안이 바뀌었을 때만 (2026-11-11 발열)
+function ni2BtnTouched(recs) {
+    for (let i = 0; i < recs.length; i++) {
+        const r = recs[i], t = r.target;
+        if (t && t.nodeType === 1 && (t.tagName === 'BUTTON' || (t.closest && t.closest('button')))) return true;
+        const a = r.addedNodes;
+        for (let j = 0; j < a.length; j++) {
+            const n = a[j];
+            if (n.nodeType !== 1) continue;
+            if (n.tagName === 'BUTTON' || (n.querySelector && n.querySelector('button'))) return true;
+        }
+    }
+    return false;
+}

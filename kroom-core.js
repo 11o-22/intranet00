@@ -1149,7 +1149,8 @@ function teamUp() {
         if (!kr) return;
         try { d.ref('kroomTeams/' + kr.team + '/at').set(now()); } catch (e) { }
         runBeat();
-        try { if (darkRun && darkRun.isParty && kr.stats && kr.max) pubStat(); } catch (e) { }   // 스탯이 그대로여도 살아 있다고 알린다
+        // 스탯이 그대로여도 살아 있다고 알린다 — 4분 넘게 안 올렸을 때만 (darkParties 는 모든 사원이 통째로 받는다 · 30초마다 쓰면 모두가 무거워진다)
+        try { if (darkRun && darkRun.isParty && kr.stats && kr.max && now() - (kr._statAt || 0) > 4 * 60 * 1000) pubStat(); } catch (e) { }
     }, 30000);
 }
 function teamDown() {
@@ -2195,6 +2196,7 @@ function pubStat() {
         if (res) { v[res] = kr.stats[res]; v['max_' + res] = kr.max[res]; }
         v.max_hp = kr.max.hp; v.max_spirit = kr.max.spirit;
         d.ref('darkParties/' + darkRun.partyId + '/kStat/' + me().code).set(v);
+        kr._statAt = v.at;
     }, 300);
 }
 function teamStats() {

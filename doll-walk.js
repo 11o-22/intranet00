@@ -147,7 +147,13 @@ function tick() {
     });
     Object.keys(F.peers).forEach(function (c) { if (!seen[c]) { drop(F.peers[c]); delete F.peers[c]; } });
 }
-(function loop() { try { tick(); } catch (e) { } requestAnimationFrame(loop); })();
+// ★ 데리고 다니는 인형이 화면에 하나도 없으면 틀마다 돌지 않고 0.4 초마다 한 번만 살핀다 (2026-11-11 사용자 「발열 · 렉」)
+//   전에는 광장 밖 · 인형 없는 사람도 언제나 1초에 60번 돌아 휴대폰이 쉬지 못했다
+(function loop() {
+    let busy = false;
+    try { tick(); busy = !!F.me || Object.keys(F.peers).length > 0; } catch (e) { }
+    if (busy && !document.hidden) requestAnimationFrame(loop); else setTimeout(loop, 400);
+})();
 
 // 자리 묶음에 실어 보내는 것 — 데리고 다니는 인형의 종
 window.plazaExtra = function () { const sp = leadSp(u_()); if (sp == null) return {}; const o = { pt: sp }; try { if (D().artOld(u_())) o.po = 1; } catch (e) { } return o; };

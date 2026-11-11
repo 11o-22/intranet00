@@ -502,6 +502,9 @@ function headLag(buf, head) {
 // 화면
 // ==========================================
 let OV = null, ST = null, CV = null, G2 = null, UI = null;
+// ★ 판 바탕(표지 · 바닥 · 판정선)은 밑 장(CB)에 한 번만 그리고, 위 장(CV)에는 움직이는 것만 (2026-11-11 사용자 「발열 · 렉」)
+let CB = null, GB = null;
+const STILL = { key: null, clr: false, pauseAt: 0, dirty: false };
 let rot = false, VW = 0, VH = 0;
 function css() {
     if (document.getElementById('rg-css')) return;
@@ -511,6 +514,8 @@ function css() {
         '#rg-ov{position:fixed;inset:0;z-index:2147483000;background:#07070d;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;font-family:inherit;color:#eef;}',
         '#rg-st{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;}',
         '#rg-st canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}',
+        // ★ 리듬 게임이 덮고 있는 동안 밑의 광장은 칠하지 않는다 — 남들이 걸으면 보이지도 않는 광장을 계속 다시 칠했다 (2026-11-11 발열)
+        'body.rg-on #plaza-view{visibility:hidden !important;}',
         '#rg-ui{position:absolute;inset:0;}',
         '.rg-bg{position:absolute;inset:0;background:#000;}',
         '.rg-sel{position:absolute;inset:0;display:flex;gap:14px;padding:14px 18px;box-sizing:border-box;}',
@@ -587,9 +592,12 @@ function fit() {
     VW = rot ? h : w; VH = rot ? w : h;
     ST.style.width = VW + 'px'; ST.style.height = VH + 'px';
     ST.style.transform = rot ? ('translateX(' + w + 'px) rotate(90deg)') : 'none';
-    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    // ★ 2.5 → 2 — 휴대폰(3배 화면)에서 칠할 점이 3분의 1 넘게 준다 · 눈으로는 거의 같다 (2026-11-11 발열)
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     CV.width = Math.round(VW * dpr); CV.height = Math.round(VH * dpr);
     G2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (CB) { CB.width = CV.width; CB.height = CV.height; GB.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    STILL.key = null; STILL.clr = false; STILL.dirty = true;
     layout();
 }
 // 손가락 자리 → 무대 자리 (세워 두면 돌려서)
@@ -604,10 +612,13 @@ function open() {
     css();
     OV = document.createElement('div'); OV.id = 'rg-ov';
     ST = document.createElement('div'); ST.id = 'rg-st';
+    CB = document.createElement('canvas'); GB = CB.getContext('2d', { alpha: false }); CB.style.display = 'none';
     CV = document.createElement('canvas'); G2 = CV.getContext('2d');
     UI = document.createElement('div'); UI.id = 'rg-ui';
-    ST.appendChild(CV); ST.appendChild(UI); OV.appendChild(ST);
+    ST.appendChild(CB); ST.appendChild(CV); ST.appendChild(UI); OV.appendChild(ST);
+    STILL.key = null; STILL.clr = false;
     document.body.appendChild(OV);
+    document.body.classList.add('rg-on');
     ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart', 'touchmove', 'touchend', 'click', 'wheel', 'contextmenu'].forEach(function (t) {
         OV.addEventListener(t, function (e) { e.stopPropagation(); if (t === 'contextmenu') e.preventDefault(); }, { passive: t !== 'contextmenu' });
     });
@@ -636,7 +647,8 @@ function close() {
     try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) { }
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { }
     sessionOff();
-    OV.remove(); OV = null; ST = null; CV = null; G2 = null; UI = null;
+    document.body.classList.remove('rg-on');
+    OV.remove(); OV = null; ST = null; CV = null; G2 = null; UI = null; CB = null; GB = null; STILL.key = null;
     MODE = 'off';
 }
 window.rhythmOpen = open;
@@ -945,6 +957,7 @@ function stopPlay() {
 function pause() {
     if (MODE !== 'play') return;
     MODE = 'pause';
+    STILL.pauseAt = performance.now();
     try { AU.ctx.suspend(); } catch (e) { }
     const m = document.createElement('div'); m.className = 'rg-modal';
     m.innerHTML = '<div class="rg-box"><b style="letter-spacing:4px;">PAUSE</b><button class="rg-btn" data-k="r" style="width:180px">계속</button><button class="rg-btn" data-k="re" style="width:180px">처음부터</button><button class="rg-btn" data-k="q" style="width:180px">곡 고르기</button></div>';
@@ -1334,28 +1347,64 @@ function raf() {
     if (!OV) return;
     requestAnimationFrame(raf);
     frameTick();
-    if (MODE === 'cal') { clockTick(); calTick(); drawCal(); return; }
-    if (MODE !== 'play' && MODE !== 'pause') { if (G2) G2.clearRect(0, 0, VW, VH); return; }
+    const still = (MODE === 'play' || MODE === 'pause') && !!P;
+    if (CB && (CB.style.display !== 'none') !== still) CB.style.display = still ? '' : 'none';
+    if (MODE === 'cal') { STILL.clr = false; clockTick(); calTick(); drawCal(); return; }
+    // 곡 고르기 · 결과 — 한 번만 지우고 쉰다 (전에는 틀마다 온 화면을 지웠다)
+    if (MODE !== 'play' && MODE !== 'pause') { if (G2 && !STILL.clr) { G2.clearRect(0, 0, VW, VH); STILL.clr = true; } return; }
+    STILL.clr = false;
     if (MODE === 'play') { watchdog(); clockTick(); P.lastNow = songMs(); P.lastVis = visMs(); step(P.lastNow); }
+    // 멈춤 — 판정 글자가 사그라질 동안만 그리고 쉰다 (화면 크기가 바뀌면 한 번 더)
+    else if (performance.now() - STILL.pauseAt > 700 && !STILL.dirty) return;
+    STILL.dirty = false;
     draw(P.lastVis || 0);
 }
 function rr(g, x, y, w, h, r) {
     r = Math.max(0, Math.min(r, w / 2, h / 2));
     g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
+// ★ 건반 둘레 빛 — 전에는 노트마다 shadowBlur 로 그때그때 흐렸다(휴대폰에서 가장 비싼 일 중 하나).
+//   이제 종류마다 한 번 흐려 둔 빛 조각을 아홉 조각(네 귀 · 네 변 · 가운데)으로 늘여 붙인다 — 모양은 같다 (2026-11-11 발열)
+const GLOW = {};
+function glowCol(kind) { return kind === 3 ? 'rgba(110,240,150,0.7)' : kind === 2 ? 'rgba(255,214,90,0.7)' : 'rgba(210,230,255,0.55)'; }
+function glowSprite(kind, glow, dpr) {
+    const k = kind + (glow ? 'g' : '') + '@' + dpr;
+    if (GLOW[k]) return GLOW[k];
+    const blur = glow ? 18 : 8;                                   // shadowBlur 는 화면 점 단위 (변환을 안 탄다)
+    const pad = Math.ceil(blur / dpr) + 3;                         // 빛이 번지는 폭 (CSS px)
+    const core = 12, W = core + pad * 2;
+    const c = document.createElement('canvas'); c.width = Math.ceil(W * dpr); c.height = Math.ceil(W * dpr);
+    const g = c.getContext('2d');
+    // 모양은 왼쪽 밖에 그리고 그림자만 안으로 옮겨 남긴다
+    const off = W * 2;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.shadowColor = glowCol(kind); g.shadowBlur = blur; g.shadowOffsetX = off * dpr;
+    rr(g, pad - off, pad, core, core, 4); g.fillStyle = '#fff'; g.fill();
+    return (GLOW[k] = { c: c, pad: pad, core: core, W: W, s: dpr });
+}
+function glowDraw(g, sp, x, y, w, h) {
+    const P2 = sp.pad, s = sp.s, C = sp.c, cw = sp.core;
+    const sx = [0, P2, P2 + cw], sw = [P2, cw, P2];
+    const dx = [x - P2, x, x + w], dw = [P2, w, P2];
+    const dy = [y - P2, y, y + h], dh = [P2, h, P2];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+        if (i === 1 && j === 1) continue;                          // 가운데는 건반이 덮는다
+        if (dw[i] <= 0 || dh[j] <= 0) continue;
+        g.drawImage(C, sx[i] * s, sx[j] * s, sw[i] * s, sw[j] * s, dx[i], dy[j], dw[i], dh[j]);
+    }
+}
 // 건반 하나 — 가운데 (cx, cy) · 폭 w · 높이 h
 function key(g, cx, cy, w, h, kind, glow) {
     const x = cx - w / 2, y = cy - h / 2;
+    const dpr = CV && VW ? CV.width / VW : 1;
+    glowDraw(g, glowSprite(kind, glow, Math.round(dpr * 100) / 100), x, y, w, h);
     g.save();
-    g.shadowColor = kind === 3 ? 'rgba(110,240,150,0.7)' : kind === 2 ? 'rgba(255,214,90,0.7)' : 'rgba(210,230,255,0.55)';
-    g.shadowBlur = glow ? 18 : 8;
     const gr = g.createLinearGradient(0, y, 0, y + h);
     if (kind === 3) { gr.addColorStop(0, '#dcffe6'); gr.addColorStop(0.55, '#5fe08a'); gr.addColorStop(1, '#1f9e52'); }
     else if (kind === 2) { gr.addColorStop(0, '#fff3b8'); gr.addColorStop(0.55, '#ffd34d'); gr.addColorStop(1, '#d99a12'); }
     else { gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.6, '#eef1f8'); gr.addColorStop(1, '#b8c2d6'); }
     g.fillStyle = gr;
     rr(g, x, y, w, h, Math.min(5, h * 0.3)); g.fill();
-    g.shadowBlur = 0;
     g.strokeStyle = kind === 3 ? 'rgba(0,80,30,0.55)' : kind === 2 ? 'rgba(120,80,0,0.55)' : 'rgba(40,50,80,0.55)'; g.lineWidth = 1.2; g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(x + 3, y + 2, w - 6, Math.max(1, h * 0.14));
     g.restore();
@@ -1389,6 +1438,23 @@ function bgFor(s) {
 // 바탕 · 바닥 · 마디 · 판정선
 function drawStage(g, pOf, bars, bg) {
     g.clearRect(0, 0, VW, VH);
+    stageBase(g, bg);
+    stageBars(g, pOf, bars);
+    stageLine(g);
+}
+// 판 바탕 한 장 — 곡 · 화면 크기 · 표지가 다 받아졌나가 바뀔 때만 밑 장에 다시 그린다
+function stillPaint(s) {
+    if (!GB || !L) return false;
+    const bg = bgFor(s);
+    const k = (s ? s.key : '') + '|' + VW + 'x' + VH + '|' + (bg ? 1 : 0) + '|' + L.yJ + '|' + L.lineW;
+    if (STILL.key === k) return true;
+    STILL.key = k;
+    GB.clearRect(0, 0, VW, VH);
+    stageBase(GB, bg);
+    stageLine(GB);
+    return true;
+}
+function stageBase(g, bg) {
     // 바탕 — 까맣게 (2026-11-10 사용자 「표지 없이 까만색으로」) · 판에서는 표지를 흐리게 (2026-11-11)
     g.fillStyle = '#000'; g.fillRect(0, 0, VW, VH);
     if (bg) g.drawImage(bg, 0, 0, VW, VH);
@@ -1403,6 +1469,8 @@ function drawStage(g, pOf, bars, bg) {
     g.strokeStyle = 'rgba(190,210,255,0.18)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(xAt(0, s0), y0); g.lineTo(xAt(0, 1), L.yJ); g.moveTo(xAt(1, s0), y0); g.lineTo(xAt(1, 1), L.yJ); g.stroke();
     g.restore();
+}
+function stageBars(g, pOf, bars) {
     // 마디 — 바닥을 가로지르는 희미한 줄
     g.strokeStyle = 'rgba(200,215,255,0.08)'; g.lineWidth = 1;
     for (let i = 0; i < bars.length; i++) {
@@ -1410,6 +1478,8 @@ function drawStage(g, pOf, bars, bg) {
         const sc = scaleAt(p), y = yAt(sc);
         g.beginPath(); g.moveTo(xAt(0, sc), y); g.lineTo(xAt(1, sc), y); g.stroke();
     }
+}
+function stageLine(g) {
     // 판정선
     g.save();
     g.shadowColor = 'rgba(190,215,255,0.9)'; g.shadowBlur = 14;
@@ -1423,7 +1493,8 @@ function draw(now) {
     const vis = 7000 / SET.speed;                     // 멀리서 판정선까지 걸리는 ms
     const pOf = function (t) { return 1 - (t - now) / vis; };
     const tnow = performance.now();
-    drawStage(g, pOf, P.chart.bars, bgFor(P.s));
+    if (stillPaint(P.s)) { g.clearRect(0, 0, VW, VH); stageBars(g, pOf, P.chart.bars); }
+    else drawStage(g, pOf, P.chart.bars, bgFor(P.s));
     // 손가락 자리 — 판정선 위 은은한 빛
     Object.keys(P.ptr).forEach(function (id) {
         const q = P.ptr[id]; if (!q || q.u == null) return;
@@ -1634,6 +1705,6 @@ function result() {
 window.rhythmState = function () {
     console.log({ 모드: MODE, 곡: SET.song, 난이도: SET.diff, 속도: SET.speed, 판정싱크: SET.offset, 화면싱크: SET.vis, 점수: P && Math.round(P.score), 콤보: P && P.combo, 판정: P && P.cnt, 소리: AU.ctx && AU.ctx.state });
 };
-window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt };   // 시험 · 콘솔
+window.rhythmDebug = { P: function () { return P; }, now: function () { return songMs(); }, mode: function () { return MODE; }, L: function () { return L; }, lag: function () { return AU.lag; }, headLag: headLag, vis: function () { return visMs(); }, clock: function () { return clockMs(); }, cal: function () { return C; }, set: SET, rankOf: rankOf, previewChunk: previewChunk, previewAt: previewAt, drawOnce: function () { if (P && L) draw(P.lastVis || 0); } };   // 시험 · 콘솔
 console.log('[🎵 리듬] rhythmOpen() — 상담사 전용');
 })();
