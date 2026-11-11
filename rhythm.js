@@ -6,7 +6,7 @@
 //   「직접 작곡한 두 곡 — 마스터링해서 리듬게임으로 쓰자. 모바일 기준 가로로 눕혀서 6칸 정도,
 //     이지 · 노말 · 하드, 터치 · 길게 누르기 · 슬라이드까지. 일단은 상담사만. 메뉴칸에 놔줘.」
 //
-//   곡    snd/rhythm-<열쇠>.mp3  (마스터링 — -14 LUFS · 최고 -1 dBTP)
+//   곡    snd/rhythm-<열쇠>.mp3  (마스터링 — -14 LUFS · 최고 -1 dBTP) · 일곱 곡 (2026-11-11 다섯 곡 더 · 곡 목록은 끌어서 내린다)
 //   채보  rhythm/<열쇠>.json      (tools/rhythm-chart.py 가 곡을 듣고 만든 것 — 16분 격자 · 템포가 바뀌어도 따라간다)
 //   표지는 쓰지 않는다 — 까만 칸 (2026-11-10 사용자)
 //
@@ -44,8 +44,15 @@
 
 const ADMIN = 'kario0987';
 const SONGS = [
-    { key: 'airplane', title: 'In the Airplane', artist: 'Benz', audio: 'snd/rhythm-airplane.mp3', chart: 'rhythm/airplane.json', color: '#7ec8ff', cover: 'rhythm/airplane-cover.jpg' },
-    { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1', cover: 'rhythm/client-cover.jpg' }      // 표지 (2026-11-11 사용자) — 없는 곡은 까만 칸
+    { key: 'airplane', title: 'In the Airplane', artist: 'Benz', audio: 'snd/rhythm-airplane.mp3', chart: 'rhythm/airplane.json', color: '#7ec8ff', cover: 'rhythm/airplane-cover2.jpg' },   // 표지 바꿈 (2026-11-11 사용자 · 픽셀 비행기)
+    { key: 'client', title: '내담자 여러분께', artist: 'Benz', audio: 'snd/rhythm-client.mp3', chart: 'rhythm/client.json', color: '#ffb3d1', cover: 'rhythm/client-cover.jpg' },     // 표지 (2026-11-11 사용자) — 없는 곡은 까만 칸
+    // ★ 2026-11-11 사용자 「이것들도 전부 리듬게임에 · 아티스트는 전부 Benz · 음질 개선하고 마스터링해서 꼭」
+    //   곡마다 EQ 를 고쳐(먹먹한 낮은 가운데 덜기 · 어두운 위쪽 살리기 · 좁은 스테레오 조금 넓히기) · 가벼운 압축 · 리미터 · -14 LUFS
+    { key: 'devotion', title: 'Devotion', artist: 'Benz', audio: 'snd/rhythm-devotion.mp3', chart: 'rhythm/devotion.json', color: '#ff9fb2' },
+    { key: 'evilhigh', title: 'Evil High', artist: 'Benz', audio: 'snd/rhythm-evilhigh.mp3', chart: 'rhythm/evilhigh.json', color: '#b48cff' },
+    { key: 'returnhome', title: 'Return Home', artist: 'Benz', audio: 'snd/rhythm-returnhome.mp3', chart: 'rhythm/returnhome.json', color: '#ffcf8a' },
+    { key: 'winterfloat', title: 'Winter Float', artist: 'Benz', audio: 'snd/rhythm-winterfloat.mp3', chart: 'rhythm/winterfloat.json', color: '#9fe3ff' },
+    { key: 'whitexmas', title: 'White Christmas Day', artist: 'Benz', audio: 'snd/rhythm-whitexmas.mp3', chart: 'rhythm/whitexmas.json', color: '#e6f0ff' }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)
@@ -262,7 +269,8 @@ function css() {
         '.rg-sel{position:absolute;inset:0;display:flex;gap:14px;padding:14px 18px;box-sizing:border-box;}',
         '.rg-col{display:flex;flex-direction:column;gap:10px;min-width:0;}',
         '.rg-h{font-size:12px;letter-spacing:4px;color:#9ab;opacity:.9;}',
-        '.rg-song{display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
+        '.rg-songs{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;}',
+        '.rg-song{flex-shrink:0;display:flex;gap:10px;align-items:center;padding:8px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);cursor:pointer;}',
         '.rg-song.on{background:rgba(255,255,255,.16);border-color:var(--c);box-shadow:0 0 14px -4px var(--c);}',
         '.rg-song i.rg-sq{width:52px;height:52px;border-radius:8px;background:#000 center/cover no-repeat;border:1px solid rgba(255,255,255,.14);flex-shrink:0;}',
         '.rg-song b{display:block;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
@@ -352,6 +360,7 @@ function open() {
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('keyup', onKeyUp, true);
     fit();
+    songTop = null;            // 새로 열면 고른 곡이 보이게
     menu();
     raf();
 }
@@ -380,7 +389,27 @@ let MODE = 'off';        // menu · load · play · pause · result
 function song() { return SONGS.find(function (s) { return s.key === SET.song; }) || SONGS[0]; }
 function coverCss(x) { return x.cover ? ' style="background-image:url(\'' + x.cover + '\')"' : ''; }
 function bestOf(k, d) { const b = loadJ(BEST_KEY, {}); return b[k + '/' + d] || null; }
+// 끌어서 내리는 목록 — 화면을 돌려 그려도(세로로 든 휴대폰) 손가락 방향대로 · 끌었으면 그 손짓은 누름으로 치지 않는다
+function dragScroll(el) {
+    if (!el || el._drag) return;
+    el._drag = true;
+    let st = null;
+    el.addEventListener('pointerdown', function (e) { const p = toStage(e.clientX, e.clientY); st = { y: p.y, top: el.scrollTop, id: e.pointerId, moved: false }; });
+    el.addEventListener('pointermove', function (e) {
+        if (!st || e.pointerId !== st.id) return;
+        const dy = toStage(e.clientX, e.clientY).y - st.y;
+        if (Math.abs(dy) > 6) st.moved = true;
+        if (st.moved) el.scrollTop = st.top - dy;
+    });
+    const end = function () { if (st && st.moved) el._dragAt = Date.now(); st = null; };
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('pointerleave', end);
+    el.addEventListener('click', function (e) { if (el._dragAt && Date.now() - el._dragAt < 350) { e.stopPropagation(); e.preventDefault(); } }, true);
+    el.addEventListener('wheel', function (e) { el.scrollTop += e.deltaY; e.preventDefault(); }, { passive: false });
+}
+let songTop = null;       // 곡 목록을 다시 그려도 내려 둔 자리 그대로
 function menu() {
+    const sl0 = UI && UI.querySelector('.rg-songs');
+    if (sl0) songTop = sl0.scrollTop;
     MODE = 'menu';
     const s = song();
     const chart = CH[s.key];
@@ -400,7 +429,7 @@ function menu() {
     UI.innerHTML = '<div class="rg-bg"></div>'
         + '<button class="rg-btn rg-x" data-k="x">✕</button>'
         + '<div class="rg-sel">'
-        + '<div class="rg-col" style="width:min(34%,240px);"><div class="rg-h">🎵 RHYTHM · 상담사 전용</div>' + songs + '<div style="flex:1"></div>'
+        + '<div class="rg-col" style="width:min(34%,240px);"><div class="rg-h">🎵 RHYTHM · 상담사 전용</div><div class="rg-songs">' + songs + '</div>'
         + '<div class="rg-row"><span>속도</span><span class="rg-step"><button data-k="sp-">−</button><span>' + SET.speed.toFixed(1) + '</span><button data-k="sp+">+</button></span></div>'
         + '<div class="rg-row"><button class="rg-btn" data-k="cal" style="padding:6px 10px;font-size:12px;">⏱ 싱크 맞추기</button>'
         + '<button class="rg-btn" data-k="hit" style="padding:6px 10px;font-size:12px;">타격음 ' + (SET.hit ? 'ON' : 'OFF') + '</button></div>'
@@ -412,6 +441,12 @@ function menu() {
         + '<div style="display:flex;gap:10px;align-items:center;"><button class="rg-btn rg-go" data-k="go">START</button><button class="rg-btn" data-k="rank">🏆 랭킹</button></div>'
         + '</div></div></div>'
         + (rot ? '<div class="rg-rot">휴대폰을 가로로 눕혀서 하면 편합니다</div>' : '');
+    const sl = UI.querySelector('.rg-songs');
+    if (sl) {
+        dragScroll(sl);
+        if (songTop != null) sl.scrollTop = songTop;
+        else { const on = sl.querySelector('.rg-song.on'); if (on) sl.scrollTop = Math.max(0, on.offsetTop - sl.offsetTop - 8); }
+    }
     Array.prototype.forEach.call(UI.querySelectorAll('[data-song]'), function (el) { el.onclick = function () { SET.song = el.dataset.song; saveSet(); menu(); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-diff]'), function (el) { el.onclick = function () { SET.diff = el.dataset.diff; saveSet(); menu(); }; });
     Array.prototype.forEach.call(UI.querySelectorAll('[data-k]'), function (el) {
@@ -445,6 +480,7 @@ function rankModal(d) {
         const box = m.querySelector('.rg-rklist'); if (!box || !m.isConnected) return;
         const me = (u_() || {}).code;
         if (!list.length) { box.innerHTML = '<div style="color:#889;padding:14px 0;text-align:center;">아직 기록이 없습니다</div>'; return; }
+        dragScroll(box);
         box.innerHTML = list.slice(0, 50).map(function (r, i) {
             const rk = rankOf(r.s, r.ac);
             return '<div class="rg-rkrow' + (r.code === me ? ' me' : '') + '"><span class="no">' + (i + 1) + '</span><span class="nm">' + esc(r.n) + '</span>'
