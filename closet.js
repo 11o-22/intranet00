@@ -749,7 +749,11 @@ const DOT_SLOTS = [
             //   달리고 인형은 종이를 날리며 따라오고, 멈추면 여우불이 타올랐다 사그라지고 인형은 말풍선에 글을 적는다.
             //   말풍선 글씨는 오른쪽을 볼 때 짝(nuow2-doll-r · 글씨만 미리 뒤집음)으로 바꿔 단다 (FACE_PAIR).
             //   인형을 누르면 글씨 세 글자 · 글자마다 색을 고른다 (nuow-text.js).
-            { i: 'nuow2', n: 'Null Owner 2', back: ['nuow2-fox'], top: ['nuow2-doll'], own: 'nuow2', noTrade: true, cat: '그 밖' }
+            { i: 'nuow2', n: 'Null Owner 2', back: ['nuow2-fox'], top: ['nuow2-doll'], own: 'nuow2', noTrade: true, cat: '그 밖' },
+            // 빼빼로 초코 · 빼빼로 딸기 (2026-11-11 빼빼로 데이 · 사용자 「얼굴에 · 상담사가 주는 형식으로」) — 입에 문 빼빼로 한 개
+            //   주신 그림은 1728x768 (칸 288) — 다른 1728 장들처럼 칸마다 가로 +30 으로 352 칸에 옮겼다 (담배 ac10 과 입 자리가 같다)
+            { i: 'pepero-choco', n: '빼빼로 초코', top: ['pepero-choco'], own: 'pepero-choco', cat: '얼굴' },
+            { i: 'pepero-straw', n: '빼빼로 딸기', top: ['pepero-straw'], own: 'pepero-straw', cat: '얼굴' }
         ]
     }
 ];
