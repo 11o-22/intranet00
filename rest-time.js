@@ -13,7 +13,10 @@
 //
 //   · 그동안은 화면 전체를 「휴식을 취하실 시간입니다.」로 덮고 들어오지 못하게 한다 (로그인 · 자동 로그인 막음).
 //   · 이미 들어와 있던 사원은 10시가 되는 순간 로그아웃시킨다 (점검 때 쫓아내는 것과 같은 logout()).
-//   · 상담사(kario0987) 계정만 예외 — 들어갈 수 있다. 저장해 둔 자동 로그인으로 들어가거나, 덮개 아래 「상담사 로그인」을 누르면
+//   · 상담사(kario0987) 계정은 예외 — 들어갈 수 있다.
+//   ★ 2026-11-11 사용자 「테스터들은 셧다운제 무관하게 들어갈 수 있게」 — 상담사가 테스터로 정한 사원(testers/<사번>)도 예외.
+//     로그인할 때는 서버의 testers/<사번> 을 한 번 확인한다 (testerList 가 아직 안 내려왔어도 막히지 않게 · 5초까지 기다림).
+//     덮개 아래 단추 이름도 「상담사 · 테스터 로그인」. 저장해 둔 자동 로그인으로 들어가거나, 덮개 아래 「상담사 로그인」을 누르면
 //     덮개가 2분 걷혀 로그인 칸이 보인다 (다른 사번을 넣으면 그 자리에서 다시 덮인다).
 //   · 시각은 서버 시각(clock.js serverNow)으로 잰다. 기기 시계를 바꿔도 안 된다. 날짜 · 시는 한국 시각(+9)으로 센다.
 //   · 12시 · 오후 5시(2026-11-09 까지는 6시)가 지나면 덮개가 저절로 걷힌다.
@@ -45,8 +48,27 @@ function inTime() {
     return wins(t, t + 1).length > 0;
 }
 function cu() { try { return (typeof currentUser !== 'undefined') ? currentUser : null; } catch (e) { return null; } }
-// 그 사번이 막히나 — 사번이 없으면(로그인 전) 막힌다
-function blocked(code) { return inTime() && code !== ADMIN; }
+// 테스터 — index.html 의 testerList(testers/ 를 듣는 것) · 로그인할 때 서버에서 확인한 것
+const TST = {};
+function testerNow(code) {
+    if (!code) return false;
+    try { if (typeof testerList !== 'undefined' && testerList && testerList[code]) return true; } catch (e) { }
+    // 로그인할 때 서버에서 확인한 것은 잠깐(1분)만 믿는다 — 그 사이 목록이 내려온다 · 나중에 풀리면 목록대로
+    const t = TST[code];
+    return !!(t && t.v && Date.now() - t.at < 60000);
+}
+function testerCheck(code) {
+    if (!code) return Promise.resolve(false);
+    if (testerNow(code)) return Promise.resolve(true);
+    const d = (typeof database !== 'undefined' && database) ? database : null;
+    if (!d) return Promise.resolve(false);
+    return Promise.race([
+        d.ref('testers/' + code).once('value').then(function (sn) { const v = !!(sn && sn.val()); TST[code] = { v: v, at: Date.now() }; return v; }),
+        new Promise(function (r) { setTimeout(function () { r(false); }, 5000); })
+    ]).catch(function () { return false; });
+}
+// 그 사번이 막히나 — 사번이 없으면(로그인 전) 막힌다 · 상담사 · 테스터는 안 막힌다
+function blocked(code) { return inTime() && code !== ADMIN && !testerNow(code); }
 window.restTimeOn = function (code) { return blocked(code == null ? ((cu() && cu().code) || '') : code); };
 window.restTimeMsg = MSG;
 // 쉬는 시간 칸들 — [t0, t1) 와 겹치는 것 (time-freeze.js 가 시간을 멈춘 만큼 되돌릴 때 쓴다)
@@ -86,9 +108,9 @@ function cover(show) {
             + 'display:flex;justify-content:center;align-items:center;flex-direction:column;touch-action:none;user-select:none;';
         el.innerHTML = '<div style="font-size:42px;margin-bottom:18px;">🌙</div>'
             + '<div style="color:#d4af37;font-size:15px;font-weight:bold;letter-spacing:1px;text-align:center;padding:0 24px;">' + MSG + '</div>'
-            // 상담사만 들어갈 수 있다 — 덮개를 잠시 걷어 로그인 칸을 보이게 한다 (다른 사번은 로그인에서 다시 막힌다)
+            // 상담사 · 테스터만 들어갈 수 있다 — 덮개를 잠시 걷어 로그인 칸을 보이게 한다 (다른 사번은 로그인에서 다시 막힌다)
             + '<button id="rest-adm" style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);left:50%;transform:translateX(-50%);'
-            + 'background:none;border:1px solid #2a2a2a;border-radius:8px;color:#555;font-size:11px;padding:6px 12px;cursor:pointer;">상담사 로그인</button>';
+            + 'background:none;border:1px solid #2a2a2a;border-radius:8px;color:#555;font-size:11px;padding:6px 12px;cursor:pointer;">상담사 · 테스터 로그인</button>';
         ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'wheel', 'contextmenu'].forEach(function (ev) {
             el.addEventListener(ev, function (e) {
                 if (e.target && e.target.closest && e.target.closest('#rest-adm')) {
@@ -117,14 +139,19 @@ function wrapLogin() {
     const w = function () {
         let code = '';
         try { code = String((document.getElementById('code-input') || {}).value || '').trim(); } catch (e) { }
+        const self = this, args = arguments;
         if (blocked(code)) {
-            peekUntil = 0;
-            cover(true);
-            try { if (typeof showAutoLoginOverlay === 'function') showAutoLoginOverlay(false); } catch (e) { }
-            return Promise.resolve(null);
+            // 테스터인지 서버에서 한 번 더 본다 — 테스터 목록이 아직 안 내려왔을 수 있다
+            const shut = function () {
+                peekUntil = 0;
+                cover(true);
+                try { if (typeof showAutoLoginOverlay === 'function') showAutoLoginOverlay(false); } catch (e) { }
+                return null;
+            };
+            if (!code) return Promise.resolve(shut());
+            return testerCheck(code).then(function (isT) { return isT ? w.apply(self, args) : shut(); });
         }
         // ⏸ 끝난 쉬는 시간만큼 시계를 아직 안 밀었으면(time-freeze.js) 밀 때까지 잠깐 기다렸다 들어간다 (12초까지)
-        const self = this, args = arguments;
         if (typeof window.timeFreezePending === 'function' && window.timeFreezePending()) {
             return new Promise(function (res) {
                 const t0 = Date.now();
@@ -149,7 +176,7 @@ function tick() {
     const u = cu();
     const on = inTime();
     if (!on) { cover(false); kicked = false; return; }
-    if (u && u.code === ADMIN) { cover(false); return; }
+    if (u && (u.code === ADMIN || testerNow(u.code))) { cover(false); return; }
     if (!u && peekUntil > Date.now()) { cover(false); return; }
     cover(true);
     if (u && !kicked) {
