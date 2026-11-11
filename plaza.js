@@ -1807,22 +1807,33 @@ function askSend(kind, code) {
     }, ASK_WAIT) };
 }
 // 받는 사람 — 묻는 것이 오면 [ 수락 ] · [ 거절 ]
+//   ★ 2026-11-12 — 까기(pkListen)와 같은 까닭으로, 계정이 바뀌면 옛 칸을 떼고 지금 계정 칸에 다시 건다
 (function askListen() {
-    let on = false;
-    const iv = setInterval(function () {
+    let code = '', ref = null, cb = null;
+    setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
         const me = u_();
-        if (on || typeof database === 'undefined' || !database || !me) return;
-        on = true;
-        clearInterval(iv);
+        const c = (me && me.code) ? String(me.code) : '';
+        if (c === code) return;
+        if (ref) { try { ref.off('value', cb); } catch (e) { } ref = null; }
+        code = c;
+        if (!c) return;
         let first = true, seen = null;
-        database.ref(ASK_PATH + '/' + me.code).on('value', function (snap) {
+        cb = function (snap) {
             const v = snap.val();
-            if (first) { first = false; seen = (v && v.id) || null; return; }
+            if (first) {
+                first = false; seen = (v && v.id) || null;
+                if (v && v.id && !v.ans && chatNow() - (Number(v.at) || 0) <= ASK_WAIT) askShow(v, snap.ref);   // 붙기 직전에 온 물음은 아직 살아 있다
+                return;
+            }
             if (!v || !v.id || v.ans || v.id === seen) return;
             seen = v.id;
+            if (myCode() !== c) return;
             if (chatNow() - (Number(v.at) || 0) > ASK_WAIT) return;
             askShow(v, snap.ref);
-        });
+        };
+        ref = database.ref(ASK_PATH + '/' + c);
+        ref.on('value', cb);
     }, 1000);
 })();
 function askShow(v, ref) {
@@ -2376,23 +2387,41 @@ function stDo(code) {
 //   plazaPeel/<사번> = { id, by: 깐 사람, bn: 그 이름, at } — 그 사람 화면이 듣고 제 옷을 바꾼다 (들어오기 전 것은 안 듣는다)
 const PK_PATH = 'plazaPeel';
 const PK_ITEM = ['peel', '까기'];
+// ★ 2026-11-12 사용자 「그 셔츠 타인이 눌렀을 때 까기를 하면 … 까져야 하는데 안 돼」 — 듣는 칸을 처음 들어온 계정에 한 번만 걸어 두어서,
+//   같은 창에서 로그아웃하고 다른 계정으로 들어오면(자동 로그인으로 먼저 들어간 창 등) 옛 계정 칸만 듣고 있었다 → 남이 깐 신호가 안 들렸다.
+//   끌고가기(lsListen)처럼 지금 계정이 바뀌면 옛 칸을 떼고 새 칸에 다시 건다. 붙기 직전(몇 초 안)에 온 신호는 그대로 받는다.
+const PK_FRESH = 8000;
 (function pkListen() {
-    let on = false;
-    const iv = setInterval(function () {
+    let code = '', ref = null, cb = null;
+    setInterval(function () {
+        if (typeof database === 'undefined' || !database) return;
         const me = u_();
-        if (on || typeof database === 'undefined' || !database || !me) return;
-        on = true;
-        clearInterval(iv);
+        const c = (me && me.code) ? String(me.code) : '';
+        if (c === code) return;
+        if (ref) { try { ref.off('value', cb); } catch (e) { } ref = null; }
+        code = c;
+        if (!c) return;
         let first = true, seen = null;
-        database.ref(PK_PATH + '/' + me.code).on('value', function (snap) {
+        const take = function (snap, v) {
+            seen = v.id;
+            if (myCode() !== c) return;
+            pkApply(v.bn || '');
+            const id = v.id;
+            snap.ref.transaction(function (cur) { if (!cur || cur.id !== id) return; return null; });   // 다 쓴 칸은 걷는다
+        };
+        cb = function (snap) {
             const v = snap.val();
             const id = v && v.id;
-            if (first) { first = false; seen = id || null; return; }
+            if (first) {
+                first = false; seen = id || null;
+                if (id && chatNow() - (Number(v.at) || 0) <= PK_FRESH) take(snap, v);
+                return;
+            }
             if (!id || id === seen) return;
-            seen = id;
-            pkApply(v.bn || '');
-            snap.ref.transaction(function (cur) { if (!cur || cur.id !== id) return; return null; });   // 다 쓴 칸은 걷는다
-        });
+            take(snap, v);
+        };
+        ref = database.ref(PK_PATH + '/' + c);
+        ref.on('value', cb);
     }, 1000);
 })();
 // 나 — 내 옷을 풀어진 것으로 바꾸고 광장 모습을 다시 알린다
