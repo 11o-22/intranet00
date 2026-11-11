@@ -30,7 +30,10 @@
 //
 // ■ 동행 — 신도를 사람 곁에 붙여 보낸다 (본인도 된다 · 거둬 올 때까지)
 //
-//   보낼 때 신도가 지닐 능력치를 정한다. 동행 중인 신도의 역병은 뿌리게 명하지 못한다.
+//   보낼 때 신도가 지닐 능력치를 정한다. 동행 중인 신도의 역병은 (장착자가) 뿌리게 명하지 못한다.
+//   ★ 2026-11-11 사용자 — 대신 **동행을 받은 사람**이 그 신도의 역병을 장착자와 똑같이 뿌린다
+//     (남에게는 몇 번이든 · 수치도 마음대로 / 본인에게는 하루 한 번 · 한 가지 — u.foxSelfDay).
+//     뿌린 사람(by)은 동행을 받은 사람이다 — 걸린 사람의 탐사 몫도 그 사람에게 간다. via = 신도 주인.
 //   제 一 신도  판정 · 행운 · 기믹 파훼 · 회피 · 즉사 무효 (0 = 안 줌)
 //               행운 — 눈이 9 이하면 주사위를 뒤집어 15~20 으로 만든다 (탐사당 수치만큼)
 //               회피 7 이상 — 피할 길을 알려 준다 (☪️)
@@ -164,6 +167,19 @@ function dName(u, d) { const n = nickOf(u, d); return D_NAME[d] + (n ? '(' + n +
 function busy(u, d) { const c = cult(u)[d]; return c.to ? c.to : null; }       // 동행 중이면 누구 곁인가
 function withWhom(u, d) { const c = busy(u, d); return c === u.code ? '당신과' : nameOf(c) + ' 사원과'; }
 function selfUsed(u) { return !!(u && obj(u.foxCult) && u.foxCult.selfDay === today()); }
+// ★ 이 신도에게 역병을 명할 수 있나 (2026-11-11) — 장착자(그 신도가 동행 중이 아닐 때) · 그 신도가 곁에 동행하는 사람
+//   { owner: 신도 주인, own: 장착자 본인인가 }
+function canCmd(me, d) {
+    if (!me) return null;
+    if (wears(me)) return busy(me, d) ? null : { owner: me, own: true };
+    const w = withOf(me, d);
+    if (w && w.by !== me.code) return { owner: w.owner, own: false };
+    return null;
+}
+// 곁에 동행하는 남의 신도 — 역병을 명할 수 있는 것
+function mates(me) { return DS.filter(function (d) { const w = withOf(me, d); return !!(w && w.by !== me.code && !wears(me)); }); }
+// 본인 몫 — 장착자는 foxCult.selfDay · 동행을 받은 사람은 foxSelfDay (하루 한 번 · 한 가지)
+function selfDone(me) { return !!(me && (wears(me) ? selfUsed(me) : me.foxSelfDay === today())); }
 
 // ==========================================
 // 역병 — 걸린 쪽
@@ -335,10 +351,15 @@ setInterval(function () {
 function spread(d, k, code, v) {
     const me = u_(), t = userOf(code), P = PL_BY[k];
     if (!me || !t || !P || P.d !== d) return false;
-    if (!wears(me)) { alert_(NAME + ' 을(를) 차고 있어야 합니다.'); return false; }
+    const cm = canCmd(me, d);
+    if (!cm) {
+        if (wears(me) && busy(me, d)) alert_(dName(me, d) + '는 지금 ' + withWhom(me, d) + ' 동행 중입니다.\n\n동행 중인 신도의 역병은 뿌리게 명하지 못합니다.');
+        else alert_(NAME + ' 을(를) 차고 있거나, 여우 신도가 곁에 동행하고 있어야 합니다.');
+        return false;
+    }
+    const boss = cm.owner;                                  // 신도의 주인 — 이름(제 一 신도(…))은 그쪽 것
     const self = (code === me.code);
-    if (busy(me, d)) { alert_(dName(me, d) + '는 지금 ' + withWhom(me, d) + ' 동행 중입니다.\n\n동행 중인 신도의 역병은 뿌리게 명하지 못합니다.'); return false; }
-    if (self && selfUsed(me)) { alert_('본인에게는 하루 딱 한 번 · 한 가지만 쓸 수 있습니다.\n\n오늘은 이미 썼습니다.'); return false; }
+    if (self && selfDone(me)) { alert_('본인에게는 하루 딱 한 번 · 한 가지만 쓸 수 있습니다.\n\n오늘은 이미 썼습니다.'); return false; }
     if (P.vals && P.vals.indexOf(v) < 0) { alert_('수치가 맞지 않습니다.'); return false; }
     let rq = null;
     if (k === 'rescue') {
@@ -349,9 +370,10 @@ function spread(d, k, code, v) {
         rq = { until: nu, ms: Math.max(0, cur - nu), out: nu <= now() + 1500 };
     }
     const e = { v: v, until: now() + C.HOUR, by: me.code, byName: me.name || '', d: d, at: now() };
+    if (!cm.own) { e.via = boss.code; e.viaName = boss.name || ''; }     // 동행을 받은 사람이 뿌렸다 — 신도 주인
     if (k === 'nodeath') e.left = v;
     if (k === 'rescue') e.w = bathOf(t) ? 'bath' : 'fox';
-    e.line = '🎐 ' + dName(me, d) + '가 역병을 뿌립니다. - ' + kindTxt(k, e);
+    e.line = '🎐 ' + dName(boss, d) + '가 역병을 뿌립니다. - ' + kindTxt(k, e);
     // ★ 2026-10-31 사용자 — 구출은 역병이 아니다. 그냥 꺼내 주거나(시간을 줄여 주거나) 끝이고, 한 시간 동안 남는 것이 없다
     //   (특이사항 줄 · foxPl · 몫 나누기 모두 없음). 예전에 걸어 둔 구출 역병이 있으면 걷는다.
     const keep = (k !== 'rescue');
@@ -361,17 +383,18 @@ function spread(d, k, code, v) {
     if (keep) { t.foxPl[k] = e; addNote(t, e.line); }
     else delete t.foxPl[k];
     const say = kindTxt(k, e);
-    log_(t, '[' + NAME + '] ' + (self ? '' : (me.name || '') + ' 사원의 ') + dName(me, d) + (keep ? '가 역병을 뿌렸습니다 — ' + say + ' (한 시간)' : '가 ' + (rq && rq.out ? (e.w === 'bath' ? '선녀탕' : '상담실') + '에서 꺼내 주었습니다.' : (e.w === 'bath' ? '선녀탕' : '상담실') + ' 시간을 ' + v + '시간 줄여 주었습니다.')));
+    log_(t, '[' + NAME + '] ' + (self ? '' : (me.name || '') + ' 사원의 ') + (cm.own ? '' : '곁에 동행하는 ') + dName(boss, d) + (keep ? '가 역병을 뿌렸습니다 — ' + say + ' (한 시간)' : '가 ' + (rq && rq.out ? (e.w === 'bath' ? '선녀탕' : '상담실') + '에서 꺼내 주었습니다.' : (e.w === 'bath' ? '선녀탕' : '상담실') + ' 시간을 ' + v + '시간 줄여 주었습니다.')));
     let call = null;
     if (rq) {
-        call = { k: rq.out ? 'out' : 'cut', ms: rq.ms, until: rq.until, by: me.code, byName: me.name || '', nick: dName(me, 'd2'), at: now() };
+        call = { k: rq.out ? 'out' : 'cut', ms: rq.ms, until: rq.until, by: me.code, byName: me.name || '', nick: dName(boss, 'd2'), at: now() };
         t.quarantineUntil = rq.until;
         t.foxCall = call;
     }
     if (self) {
-        cult(me).selfDay = today();
+        const f = { badge: 1, history: 1 };
+        if (cm.own) { cult(me).selfDay = today(); f.foxCult = 1; }
+        else { me.foxSelfDay = today(); f.foxSelfDay = 1; }
         mineSet('foxPl/' + k, keep ? e : null);
-        const f = { badge: 1, history: 1, foxCult: 1 };
         if (call) { me.foxCallSeen = call.at; outPending = true; f.quarantineUntil = 1; f.foxCall = 1; f.foxCallSeen = 1; }
         save(f);
         try { if (typeof updateUI === 'function') updateUI(); } catch (er2) { }
@@ -380,7 +403,7 @@ function spread(d, k, code, v) {
         if (call) { paths.quarantineUntil = rq.until; paths.foxCall = call; }
         push(code, paths);
         t.hasItemUsedOnMe = true;
-        log_(me, '[' + NAME + '] ' + dName(me, d) + ' → ' + t.name + ' 사원 · ' + say);
+        log_(me, '[' + NAME + '] ' + dName(boss, d) + (cm.own ? '' : ' (' + (boss.name || '') + ' 사원의 신도 · 동행)') + ' → ' + t.name + ' 사원 · ' + say);
         save({ history: 1 });
     }
     return { e: e, say: say, call: call, self: self, t: t };
@@ -1393,7 +1416,7 @@ function on(w, sel, fn) { const el = w.querySelector(sel); if (el) el.onclick = 
 window.foxdMenu = function () {
     const me = u_();
     if (!me) return;
-    if (!wears(me)) { alert_(NAME + ' 을(를) 차고 있어야 합니다.'); return; }
+    if (!wears(me)) { if (mates(me).length) { mateMenu(); return; } alert_(NAME + ' 을(를) 차고 있어야 합니다.'); return; }
     cult(me);
     const card = function (d) {
         const c = cult(me)[d];
@@ -1422,6 +1445,31 @@ window.foxdMenu = function () {
     Array.prototype.forEach.call(w.querySelectorAll('.fd-wi'), function (b) { b.onclick = function () { withMenu(b.dataset.d); }; });
     Array.prototype.forEach.call(w.querySelectorAll('.fd-nk'), function (b) { b.onclick = function () { nickAsk(b.dataset.d); }; });
 };
+// ★ 동행을 받은 사람의 창 (2026-11-11) — 곁의 신도에게 역병을 뿌리게 명한다 (장착자와 똑같이)
+function mateMenu() {
+    const me = u_();
+    const ds = mates(me);
+    if (!ds.length) { shut(); return; }
+    const card = function (d) {
+        const w = withOf(me, d);
+        const kinds = PL.filter(function (x) { return x.d === d; }).map(function (x) { return x.n; }).join(' · ');
+        return '<div style="border:1px solid #5a2e26; border-radius:8px; padding:10px 11px; margin-bottom:9px; background:rgba(120,40,30,0.10);">'
+            + '<div style="display:flex; justify-content:space-between; align-items:baseline; gap:6px;"><span style="font-size:12.5px; color:#f0c987;">🦊 ' + esc(dName(w.owner, d)) + '</span><span style="font-size:9.5px; color:#9fe6b0;">' + esc(w.owner.name || '') + ' 사원의 신도 · 당신과 동행 중</span></div>'
+            + '<div style="font-size:9.5px; color:#8a7560; margin:4px 0 8px;">역병 — ' + kinds + '</div>'
+            + '<button class="game-btn fd-sp" data-d="' + d + '" style="width:100%; margin:0; padding:9px 4px; font-size:11px;' + RED + '">역병을 뿌린다</button></div>';
+    };
+    const mine = infected();
+    const w = box(head(NAME, '곁에 동행하는 신도에게 역병을 뿌리게 명할 수 있습니다 — 장착자와 똑같이. 남에게는 몇 번이든 · 수치도 마음대로, 본인에게는 하루 딱 한 번 한 가지. 역병은 한 시간.<br>역병에 걸린 사람이 탐사에서 얻은 포인트 · 경험치는 당신에게도 똑같이 들어옵니다.')
+        + ds.map(card).join('')
+        + '<div style="font-size:10.5px; color:#bbb; line-height:1.8; padding:8px 10px; border:1px solid #3a2420; border-radius:6px; margin-bottom:9px;">'
+        + '본인에게 오늘 남은 역병 <b style="color:#f0c987;">' + (selfDone(me) ? 0 : 1) + ' / 1</b><br>'
+        + '지금 내 역병이 걸린 사원 <b style="color:#f0c987;">' + mine.length + '</b>명'
+        + (mine.length ? '<div style="font-size:9.5px; color:#a08a70; margin-top:3px;">' + mine.slice(0, 12).map(function (x) { return esc(x.name) + ' (' + x.what.join(' · ') + ' · ' + span(x.left) + ')'; }).join('<br>') + '</div>' : '')
+        + '</div>'
+        + '<button id="fd-x" class="game-btn" style="' + MID + GREY + '">닫는다</button>');
+    on(w, '#fd-x', shut);
+    Array.prototype.forEach.call(w.querySelectorAll('.fd-sp'), function (b) { b.onclick = function () { kindPick(b.dataset.d); }; });
+}
 // 내 역병이 걸린 사원
 function infected() {
     const me = u_(), out = [];
@@ -1460,13 +1508,18 @@ function nickAsk(d) {
 // --- 역병을 뿌린다 — 무엇을 ---
 function kindPick(d) {
     const me = u_();
-    if (busy(me, d)) { alert_(dName(me, d) + '는 지금 ' + withWhom(me, d) + ' 동행 중입니다.\n\n동행 중인 신도의 역병은 뿌리게 명하지 못합니다. 먼저 거둬 오십시오.'); return; }
+    const cm = canCmd(me, d);
+    if (!cm) {
+        if (wears(me) && busy(me, d)) alert_(dName(me, d) + '는 지금 ' + withWhom(me, d) + ' 동행 중입니다.\n\n동행 중인 신도의 역병은 뿌리게 명하지 못합니다. 먼저 거둬 오십시오.');
+        else { shut(); alert_('지금은 이 신도에게 명할 수 없습니다.'); }
+        return;
+    }
     const rows = PL.filter(function (x) { return x.d === d; }).map(function (x) {
         const range = x.vals ? ' <span style="font-size:9.5px; color:#a08a70;">' + (x.k === 'luckx' ? x.vals[0] + '~' + x.vals[x.vals.length - 1] + '%' : x.vals[0] + '~' + x.vals[x.vals.length - 1]) + '</span>' : '';
         return '<button class="game-btn fd-k" data-k="' + x.k + '" style="' + BTN + '">' + esc(x.n) + range
             + '<div style="font-size:9px; color:#8a7560; margin-top:3px; white-space:normal;">' + esc(x.desc) + '</div></button>';
     }).join('');
-    const w = box(head('🦊 ' + dName(me, d) + ' — 어떤 역병을', '한 시간 동안 걸립니다. 같은 역병을 다시 뿌리면 새 수치로 바뀝니다.')
+    const w = box(head('🦊 ' + dName(cm.owner, d) + ' — 어떤 역병을', '한 시간 동안 걸립니다. 같은 역병을 다시 뿌리면 새 수치로 바뀝니다.')
         + rows + '<button id="fd-x" class="game-btn" style="' + MID + GREY + '">돌아간다</button>');
     on(w, '#fd-x', window.foxdMenu);
     Array.prototype.forEach.call(w.querySelectorAll('.fd-k'), function (b) { b.onclick = function () { whoPick(d, b.dataset.k); }; });
@@ -1477,7 +1530,7 @@ function whoPick(d, k) {
     const rescue = (k === 'rescue');
     let list = users().filter(function (x) { return x.code !== me.code; });
     if (rescue) list = list.filter(inQ);
-    const used = selfUsed(me), selfOk = !used && (!rescue || inQ(me));
+    const used = selfDone(me), selfOk = !used && (!rescue || inQ(me));
     const rows = list.map(function (t) {
         const cur = plOf(t, k);
         const q = rescue ? ' <span style="font-size:9.5px; color:#a08a70;">' + (bathOf(t) ? '♨ 선녀탕' : '🦊 상담실') + ' · ' + span(t.quarantineUntil - now()) + ' 남음</span>' : '';
@@ -1518,12 +1571,13 @@ function valPick(d, k, code) {
     const me = u_(), t = userOf(code), P = PL_BY[k];
     if (!t) return;
     const who = code === me.code ? '본인' : t.name + ' 사원';
+    const cm = canCmd(me, d), boss = (cm && cm.owner) || me;
     const done = function (res) {
         if (!res) return;
         shut();
-        let msg = '🎐 ' + dName(me, d) + '가 ' + (res.self ? '당신' : t.name + ' 사원') + '에게 역병을 뿌렸습니다.\n\n' + res.say + ' — 한 시간';
+        let msg = '🎐 ' + dName(boss, d) + '가 ' + (res.self ? '당신' : t.name + ' 사원') + '에게 역병을 뿌렸습니다.\n\n' + res.say + ' — 한 시간';
         if (res.call && res.self) {
-            msg = res.call.k === 'out' ? '🎐 ' + dName(me, 'd2') + '가 당신을 부릅니다.\n\n' + (bathOf(t) ? '선녀탕' : '상담실') + ' 문이 열립니다.'
+            msg = res.call.k === 'out' ? '🎐 ' + dName(boss, 'd2') + '가 당신을 부릅니다.\n\n' + (bathOf(t) ? '선녀탕' : '상담실') + ' 문이 열립니다.'
                 : '🎐 여우의 역병이 당신의 시간을 잡아먹습니다. - ' + span(res.call.ms) + '\n\n남은 시간 ' + span(res.call.until - now());
         } else if (res.call) msg += '\n\n' + (res.call.k === 'out' ? (bathOf(t) ? '선녀탕' : '상담실') + ' 문이 열립니다.' : span(res.call.ms) + '을 잡아먹었습니다. 남은 시간 ' + span(res.call.until - now()));
         if (res.self) msg += '\n\n(본인 몫 — 오늘은 더 쓸 수 없습니다)';
@@ -1802,6 +1856,7 @@ function plazaList() {
         const host = document.getElementById('inventory-list-container');
         if (!host) return;
         const old = document.getElementById(ID);
+        mateStick(host);
         if (!wears(u_())) { if (old) old.remove(); return; }
         if (old && old.isConnected) return;
         let card = null;
@@ -1818,6 +1873,28 @@ function plazaList() {
         b.textContent = '🎐 여우 신도';
         b.onclick = window.foxdMenu;
         row.appendChild(b);
+    }
+    // ★ 동행을 받은 사람 — 소지품 맨 위에 「곁의 여우 신도」 칸 (2026-11-11)
+    function mateStick(host) {
+        const MID_ID = 'foxd-mate-card';
+        const me = u_(), old = document.getElementById(MID_ID);
+        const ds = me ? mates(me) : [];
+        if (!ds.length) { if (old) old.remove(); return; }
+        const key = ds.map(function (d) { const w = withOf(me, d); return d + ':' + w.by + ':' + (w.nick || ''); }).join('|');
+        if (old && old.isConnected && old.parentNode === host && old.dataset.k === key) return;
+        if (old) old.remove();
+        const c = document.createElement('div');
+        c.id = MID_ID; c.dataset.k = key;
+        c.style.cssText = 'display:flex; align-items:center; gap:8px; background:rgba(120,40,30,0.14); border:1px solid #c9564a; padding:9px 10px; margin-bottom:12px; border-radius:6px;';
+        const names = ds.map(function (d) { return dName(withOf(me, d).owner, d); }).join(' · ');
+        c.innerHTML = '<div style="flex:1; min-width:0; font-size:11px; color:#f0c987; line-height:1.6;">🎐 ' + esc(names) + '<div style="font-size:9.5px; color:#a08a70;">곁에 동행 중 — 역병을 뿌리게 명할 수 있습니다</div></div>';
+        const b = document.createElement('button');
+        b.className = 'game-btn';
+        b.style.cssText = 'margin:0; padding:6px 10px; font-size:11px; flex-shrink:0;' + RED;
+        b.textContent = '🎐 여우 신도';
+        b.onclick = window.foxdMenu;
+        c.appendChild(b);
+        host.insertBefore(c, host.firstChild);
     }
     (function wrapRender() {
         const iv = setInterval(function () {
@@ -1838,7 +1915,7 @@ function plazaList() {
         try {
             const ov = document.getElementById('dark-run-overlay');
             const old = document.getElementById('foxd-run-btn');
-            if (!ov || ov.style.display === 'none' || !wears(u_()) || wOff()) { if (old) old.remove(); return; }
+            if (!ov || ov.style.display === 'none' || !(wears(u_()) || mates(u_()).length) || wOff()) { if (old) old.remove(); return; }
             if (old) return;
             const mute = document.getElementById('dark-mute-btn');
             if (!mute) return;
@@ -1854,13 +1931,14 @@ function plazaList() {
     setInterval(function () {
         try {
             const me = u_(), old = document.getElementById('foxd-out-btn');
-            const can = !!(me && wears(me) && inQ(me) && !selfUsed(me) && !busy(me, 'd2'));
+            const cm = me ? canCmd(me, 'd2') : null;           // 장착자 · 제 二 신도가 곁에 동행하는 사람 (2026-11-11)
+            const can = !!(me && cm && inQ(me) && !selfDone(me));
             if (!can) { if (old) old.remove(); return; }
             if (old) return;
             const b = document.createElement('button');
             b.id = 'foxd-out-btn'; b.className = 'game-btn';
             b.style.cssText = 'position:fixed; left:50%; transform:translateX(-50%); bottom:132px; z-index:99998; padding:11px 18px; font-size:12px; border-radius:22px; box-shadow:0 4px 14px rgba(0,0,0,0.5);' + RED;
-            b.textContent = '🎐 ' + dName(me, 'd2') + '를 부른다';
+            b.textContent = '🎐 ' + dName(cm.owner, 'd2') + '를 부른다';
             b.onclick = function () { valPick('d2', 'rescue', me.code); };
             document.body.appendChild(b);
         } catch (e) { }
