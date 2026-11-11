@@ -156,7 +156,7 @@ const DOT = {
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
     Z: ['gold-leash',                                           // 🪢 금 목줄 (2026-11-09 사용자 「옷 위가 아니라 옷 아래로」) — 몸 바로 위 · 모든 옷 밑
         'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'han-inner',
-        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble',
+        'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape',
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
@@ -571,7 +571,10 @@ const DOT_SLOTS = [
             //   받은 그림은 1728x768 (칸 288 — 지난 규격) · 칸마다 가로 +30 으로 352 칸에 옮겼다 (세로는 그대로 맞았다).
             //   의상 · 장화 · 후드는 걷기 줄 네 칸만 와서 5·6번째를 3·2번째로 채웠다 · 서기는 첫 칸.
             //   뉴비 의상 — 노란 윗옷에 보라 반바지가 한 장 (겉옷 칸)
-            { i: 'newbie', n: '뉴비 의상', over: ['newbie-outfit'], own: 'newbie-outfit', noTrade: true }
+            { i: 'newbie', n: '뉴비 의상', over: ['newbie-outfit'], own: 'newbie-outfit', noTrade: true },
+            // ★ 가래떡 의상 (2026-11-11 사용자 「가래떡 의상으로 · 상담사만 줄 수 있게」) — 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
+            //   주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷만 와서 뉴비 의상처럼 5·6번째를 3·2번째로 · 서기는 첫 칸.
+            { i: 'garaetteok', n: '가래떡 의상', over: ['garaetteok'], own: 'garaetteok' }
             // (룩키마트 의상 · 가을 니트 · 체육복은 2026-10-23 상의 칸으로 옮겼다)
             // ★ 가을 니트 (2026-10-23) — 주신 그림은 1728x768 (칸 288) 에 머리 · 손 · 다리까지 그려진 통짜.
             //   칸마다 가로 +30 으로 352 칸에 옮기니 몸 그림과 자리가 딱 맞아, 몸과 자리 · 색이 똑같은 칸을 빼고
