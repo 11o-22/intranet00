@@ -12,6 +12,7 @@
 #        이지   — 박 위주 · 한 박에 0.6 개쯤 · 길게 누르기 · 짧은 슬라이드 조금
 #        노말   — 8분까지 · 한 박에 1.5 개쯤 · 길게 누르기 · 슬라이드 · 지그재그 슬라이드 · 강박에 가끔 동시
 #        하드   — 16분까지 · 한 박에 2.7 개쯤 · 동시 · 길게 누르며 치기 · 긴 슬라이드 · 지그재그 슬라이드
+#        ★ 2026-11-11 하드는 선율을 따라간다 — hard_chart() 머리말 (선율 음 → 높이대로 칸 · 박은 쉬는 곳에 다른 손으로 · 노말의 1.4 ~ 1.5 배)
 #        ★ 2026-11-11 사용자 「노말 · 하드 둘 다 내려오는 바 수를 늘리고, 음이 왔다갔다 하면서 길게 될 때는 지그재그 슬라이드도」
 #          · 노말 1.05 → 1.5 · 하드 1.9 → 2.7 (한 박에)
 #          · 지그재그 — 새로 울린 음의 높이(배음 합)가 낮 · 높 · 낮 · 높 … 으로 여섯 번 넘게 이어지는 곳 (8분 · 하드는 16분도)
@@ -277,7 +278,10 @@ def track_grid(env, fps, per_curve):
 
 
 # 사용자가 정한 레벨 — 다시 뽑아도 이 값 (2026-11-11 사용자 「쇼타임은 하드 레벨을 17로」)
-LV_FIX = {'showtime': {'hard': 17}}
+#   하드를 선율 따라가기로 다시 짠 뒤(2026-11-11)에도 하드 레벨 표시는 그 전 값 그대로 둔다 — 꿈결 +50 (레벨 15 이상)이 이 표시에 붙어 있다
+LV_FIX = {'showtime': {'hard': 17},
+          'airplane': {'hard': 15}, 'client': {'hard': 11}, 'devotion': {'hard': 11}, 'evilhigh': {'hard': 15},
+          'returnhome': {'hard': 15}, 'winterfloat': {'hard': 15}, 'whitexmas': {'hard': 13}}
 
 
 HOLD_GAP = 250
@@ -328,6 +332,274 @@ def hold_gap(notes):
                 gone.add(id(n))
     return live()
 
+# ==========================================
+# ★ 하드 — 선율을 따라간다 (2026-11-11 사용자)
+#   「곡도 시스템도 다 좋은데 채보가 많이 헷갈린다. 하드 기준으로 메인 멜로디와 부수적인 리듬이나 비트가
+#     전부 노트로 나온다는 느낌 — 좀 정리되면 좋겠다」
+#   전에는 격자마다 「가장 센 결」(킥 · 스네어 · 하이햇 · 선율 · 아르페지오 무엇이든)을 골라 놓고,
+#   칸은 그 소리의 무게중심으로 정했다. 그래서 북 · 반주 · 선율이 한 줄에 섞이고 칸이 제멋대로 뛰었다.
+#   이제는
+#     1. 선율 음역(330 Hz ~ 1.5 kHz)에서 새로 울린 「음높이 있는」 소리만 노트로 — 빗살(배음 합) 대비로 잰다.
+#        북 · 하이햇처럼 고르게 퍼진 소리는 빗살 대비가 낮아 빠진다. 한 줄기에서 크게 벗어난 높이(반주 · 베이스 배음)도 뺀다.
+#     2. 칸은 그 음의 높이로 — 두 마디 안에서 낮은 음은 왼쪽 · 높은 음은 오른쪽. 같은 음은 같은 칸
+#        (16분으로 빠르게 되풀이하면 옆 칸과 번갈아).
+#     3. 선율이 한 박 넘게 쉬는 곳에만 박(킥 2번 칸 · 스네어 3번 칸)을 넣어 박자를 이어 준다.
+#     4. 길게 누르기는 그 음이 실제로 이어 울리는 곳 · 동시는 반 마디 첫머리의 센 킥을 다른 손 바깥 칸으로 (두 박에 한 번까지).
+#   지그재그 · 양손 지그재그 · 한쪽 규칙 · 롱노트 앞뒤 규칙은 그대로.
+MEL_LO, MEL_HI = 330, 1500
+MEL_CORE = 2.6          # 뚜렷한 선율 음
+MEL_TH = 1.6            # 빗살 대비 — 가짜 곡(북 · 베이스 · 패드 · 선율)에서 선율은 4.5 ~ 6.7 · 나머지는 거의 1.3 아래 · 실제 곡은 반주가 두꺼워 조금 낮춘다
+
+
+def melody_onsets(sr, x, grid):
+    N = 4096
+    win = np.hanning(N)
+    df = sr / N
+    fr = np.arange(N // 2 + 1) * df
+    band = (fr >= 120) & (fr < 5000)
+    cands = 2 ** (np.arange(np.log2(MEL_LO) * 48, np.log2(MEL_HI) * 48) / 48)
+    cm = 12 * np.log2(cands / 440) + 69
+    idx = np.arange(N // 2 + 1)
+    W = [(h, 1 / h ** 0.8) for h in range(1, 7)]
+
+    def spec(c):
+        a = int(round(c * sr)) - N // 2
+        if a < 0 or a + N > len(x):
+            return None
+        sp = np.log1p(1000 * np.abs(np.fft.rfft(x[a:a + N] * win)) / (N / 4))
+        sp[~band] = 0
+        return sp
+
+    def comb(col):
+        sc = np.zeros(len(cands))
+        for h, w in W:
+            sc += np.interp(cands * h / df, idx, col) * w
+        return sc
+    K = len(grid)
+    pon = np.zeros(K)
+    pit = np.zeros(K)
+    SB = np.zeros((K, len(cands)))
+    for i, t in enumerate(grid):
+        A = spec(t - 0.045)
+        B = spec(t + 0.045)
+        if A is None or B is None:
+            continue
+        sc = comb(np.maximum(0, B - A))
+        j = int(np.argmax(sc))
+        pon[i] = sc[j] - np.median(sc)
+        pit[i] = cm[j]
+        sb = comb(B)
+        SB[i] = sb - np.median(sb)
+    return pon, pit, SB, cm
+
+
+def hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S, want):
+    pon, pit, SB, cm = MEL
+    beat_s = 1.0 / beats_per_sec
+    # 1. 선율 — 두 단계로 고른다
+    #    ① 뚜렷한 음 (빗살 대비 MEL_CORE 넘게) — 한 줄기(앞 여섯 음의 가운데 높이)에서 9 반음 넘게 벗어나면 뺀다
+    #    ② 흐린 음 (MEL_TH ~ MEL_CORE) — 앞뒤 세 박 안의 뚜렷한 음들 높이에서 7 반음 안일 때만 (가려진 선율 음은 살리고 반주는 뺀다)
+    P = {}
+    core = []
+    for i in range(K):
+        if not ok[i] or pon[i] < MEL_CORE:
+            continue
+        p = float(pit[i])
+        if core and grid[i] - grid[core[-1]] < 4 * beat_s:
+            ref = float(np.median([P[j] for j in core[-6:]]))
+            if abs(p - ref) > 9 and pon[i] < MEL_CORE * 1.7:
+                continue
+        P[i] = p
+        core.append(i)
+    ct = np.array([grid[j] for j in core]) if core else np.zeros(0)
+    cp = np.array([P[j] for j in core]) if core else np.zeros(0)
+    kept = list(core)
+    for i in range(K):
+        if not ok[i] or i in P or pon[i] < MEL_TH:
+            continue
+        m = np.abs(ct - grid[i]) <= 3 * beat_s
+        if not m.any():
+            continue
+        p = float(pit[i])
+        if abs(p - float(np.median(cp[m]))) <= 7:
+            P[i] = p
+            kept.append(i)
+    kept.sort()
+    mel = set(kept)
+    # 2. 칸 — 앞뒤 네 마디(열여섯 박) 안의 선율 높이로 (10 ~ 90 % 를 0 ~ 5 칸에 · 좁으면 가운데로)
+    win_s = 16 * beat_s
+    lanes = {}
+    for i in kept:
+        m = np.abs(ct - grid[i]) <= win_s                       # 뚜렷한 음들의 높이로 잰다
+        if not m.any():
+            m = np.abs(ct - grid[i]) <= 4 * win_s
+        lo, hi = np.percentile(cp[m], [10, 90]) if m.any() else (P[i] - 3.5, P[i] + 3.5)
+        span = max(hi - lo, 7.0)
+        mid = (lo + hi) / 2
+        lanes[i] = int(np.clip(round((P[i] - (mid - span / 2)) / span * 5), 0, 5))
+    prev = None
+    for i in kept:                                               # 선율끼리만 — 한 손이 따라가는 줄
+        ln = lanes[i]
+        if prev is not None:
+            pi, pl = prev
+            dk = i - pi
+            if ln == pl and dk < 2:                              # 같은 칸 16분 — 옆 칸과 번갈아
+                ln = pl + (1 if pl < 3 else -1)
+            maxjump = 5 if dk >= 4 else (3 if dk >= 2 else 2)    # 빠를수록 가깝게
+            if abs(ln - pl) > maxjump:
+                ln = pl + (maxjump if ln > pl else -maxjump)
+        ln = int(min(5, max(0, ln)))
+        lanes[i] = ln
+        prev = (i, ln)
+    # 3. 부가 — 박(킥 · 스네어)을 정리해서 넣는다 (2026-11-11 사용자 「노트를 많이 하되 멜로디 라인은 대부분 찍히게 · 부가적인 것들을 정리」)
+    #    · 선율 음과 겹치지 않는 자리(앞뒤 16분 안에 선율 음이 없는 곳)에만
+    #    · 먼저 박(4분) 자리 — 그래도 노트가 모자라면(노말의 1.55 배까지) 8분 자리를 센 순서로
+    #    · 칸은 늘 선율 반대쪽 손 — 가까운 선율 음이 왼쪽(0~2)이면 오른쪽 끝(킥 5 · 스네어 4), 오른쪽이면 왼쪽 끝(킥 0 · 스네어 1)
+    def drum(q):
+        return max(F['low'][q], F['mid'][q] * 0.9, F['high'][q] * 0.6)
+
+    def free(q):
+        return not any(j in mel for j in range(q - 1, q + 2))
+    beats = [q for q in range(K) if ok[q] and pos[q] % 4 == 0 and free(q) and drum(q) >= 0.18]
+    room = want - len(kept) - len(beats)
+    if room > 0:
+        c8 = sorted([q for q in range(K) if ok[q] and pos[q] % 4 == 2 and free(q) and drum(q) >= 0.1], key=lambda q: -drum(q))
+        beats = sorted(beats + c8[:room])
+    beat_set = set(beats)
+    for q in beats:
+        near_m = [j for j in kept if abs(j - q) <= 6]
+        ref = lanes[min(near_m, key=lambda j: (abs(j - q), j))] if near_m else 2
+        kick = F['low'][q] >= F['mid'][q] * 0.9
+        ln = (5 if kick else 4) if ref <= 2 else (0 if kick else 1)
+        if any(lanes.get(j) == ln for j in range(q - 2, q + 3) if j in mel):
+            ln = {5: 4, 4: 5, 0: 1, 1: 0}[ln]
+        lanes[q] = ln
+    sel = sorted(kept + beats)
+    # 4. 슬라이드 — 선율이 같은 간격(16분 · 8분)으로 네 개 넘게 이어지며 한쪽으로만 오르거나 내리는 곳 (3 반음 넘게)
+    #    오르면 오른쪽으로 · 내리면 왼쪽으로 — 높이가 그대로이거나 오르내리면 슬라이드로 만들지 않는다
+    notes = []
+    chain = 0
+    taken = set()
+    n_slide_target = int(S['slide_n'] * (last_ok - first_ok) / 30)
+    runs = []
+    for step in S['slide_step']:
+        j = 0
+        while j < len(kept):
+            k = j
+            while k + 1 < len(kept) and kept[k + 1] - kept[k] == step and not any(b_ in beat_set for b_ in range(kept[k], kept[k + 1])):
+                k += 1
+            # 한쪽으로만 가는 가장 긴 앞머리
+            best = None
+            for e in range(j + S['slide'][0] - 1, k + 1):
+                d = np.diff([P[kept[q]] for q in range(j, e + 1)])
+                if (np.all(d >= -0.5) or np.all(d <= 0.5)) and abs(P[kept[e]] - P[kept[j]]) >= 3:
+                    best = e
+            if best is not None:
+                runs.append((j, best))
+            j = j + 1 if best is None else best + 1
+    runs.sort(key=lambda r: -sum(pon[kept[q]] for q in range(r[0], r[1] + 1)))
+    made = 0
+    last_slide_t = -99
+    for (a, b) in runs:
+        if made >= n_slide_target:
+            break
+        ln_n = min(S['slide'][1], b - a + 1)
+        if any(kept[a + q] in taken for q in range(ln_n)):
+            continue
+        t0 = grid[kept[a]]
+        if abs(t0 - last_slide_t) < 2.0:
+            continue
+        l0 = lanes[kept[a]]
+        dirn = 1 if P[kept[a + ln_n - 1]] >= P[kept[a]] else -1
+        if not (0 <= l0 + dirn * (ln_n - 1) <= 5):
+            dirn = -dirn
+        if not (0 <= l0 + dirn * (ln_n - 1) <= 5):
+            l0 = 0 if dirn > 0 else 5
+        chain += 1
+        for q in range(ln_n):
+            i = kept[a + q]
+            lanes[i] = l0 + dirn * q
+            taken.add(i)
+            notes.append([int(round(grid[i] * 1000)), lanes[i], 2, chain])
+        made += 1
+        last_slide_t = t0
+    # 5. 길게 누르기 — 그 음이 실제로 이어 울리는 동안 (같은 음을 다시 치거나 · 세기가 60 % 아래로 지면 끝)
+    #    다른 높이의 음이 그 사이에 오면(반주 · 화음) 다른 손으로 친다 — 한쪽 규칙(one_side)이 한쪽으로 모은다
+    def sustain(i):
+        c = int(np.argmin(np.abs(cm - P[i])))
+        v0 = SB[i][c]
+        if v0 < 1.0:
+            return 0
+        n = 0
+        for j in range(i + 1, min(K, i + S['hold'][1] + 1)):
+            if (j in mel and (abs(P[j] - P[i]) < 0.8 or pon[j] >= 2 * MEL_TH)) or SB[j][c] < 0.6 * v0:
+                break
+            n += 1
+        return n
+    cand_h = []
+    for i in kept:
+        if i in taken:
+            continue
+        hl = sustain(i)
+        for za, zb in zig_span:
+            if i < za <= i + hl + 1:
+                hl = min(hl, za - i - 2)
+        if hl >= 3:
+            cand_h.append((hl + 0.3 * pon[i], i, hl))
+    cand_h.sort(reverse=True)
+    want_h = int(len(sel) * S['hold_p'])
+    hold_at = {i: hl for _, i, hl in cand_h[:want_h]}
+    # 6. 터치 · 길게 누르기 · 동시
+    used_until = {}
+    hold_on = {}
+    chord_c = []
+    prev_mel = -99
+    for i in sel:
+        if i in taken:
+            prev_mel = i if i in mel else prev_mel
+            continue
+        ln = lanes[i]
+        if used_until.get(ln, -1) >= i:
+            for c2 in (ln + 1, ln - 1, ln + 2, ln - 2):
+                if 0 <= c2 <= 5 and used_until.get(c2, -1) < i:
+                    ln = c2
+                    break
+            else:
+                continue
+        busy = sum(1 for c2, u2 in used_until.items() if u2 >= i and c2 != ln and hold_on.get(c2))
+        hl = hold_at.get(i, 0) if busy == 0 else 0
+        t = int(round(grid[i] * 1000))
+        if hl > 0:
+            notes.append([t, ln, 1, int(round((grid[min(K - 1, i + hl)] - grid[i]) * 1000))])
+            used_until[ln] = i + hl + 1
+            hold_on[ln] = True
+        else:
+            notes.append([t, ln, 0, 0])
+            if used_until.get(ln, -1) < i:
+                hold_on[ln] = False
+            used_until[ln] = max(used_until.get(ln, -1), i)
+        # 동시 후보 — 선율 음이 반 마디 첫머리(킥 자리)에 오고 킥이 셀 때 · 다른 손 바깥 칸(선율이 왼쪽이면 5 · 오른쪽이면 0)
+        if i in mel and pos[i] % 8 == 0 and hl == 0 and busy == 0 and F['low'][i] >= 0.45:
+            ln2 = 5 if ln <= 2 else 0
+            if used_until.get(ln2, -1) < i:
+                chord_c.append((float(F['low'][i]) + (0.5 if pos[i] == 0 else 0), i, t, ln2))
+        if i in mel:
+            prev_mel = i
+    # 동시 — 노트가 모자란 만큼(노말의 1.55 배까지) 킥이 센 자리부터 · 두 박에 한 번까지
+    room = want - len(notes)
+    put = []
+    for _, i, t, ln2 in sorted(chord_c, reverse=True):
+        if room <= 0:
+            break
+        if any(abs(grid[i] - grid[j]) < 2 * beat_s for j in put):
+            continue
+        notes.append([t, ln2, 0, 0])
+        put.append(i)
+        room -= 1
+    print('  하드 — 선율 %d · 박 %d · 동시 %d · 슬라이드 %d 줄 · 길게 %d' % (len(kept), len(beats), len(put), made, sum(1 for n in notes if n[2] == 1)))
+    return notes, chain
+
+
 def main():
     wav, key, title, artist = sys.argv[1:5]
     sr, x = load(wav)
@@ -367,6 +639,7 @@ def main():
     grid = np.concatenate([grid, np.array(post)])
     K = len(grid)
     PIT, PSTR = onset_pitch(sr, x, grid, 0.0)                       # 격자 = 소리 시각 · 그 앞뒤 틀에서 새로 오른 소리를 본다
+    MEL = melody_onsets(sr, x, grid)                                 # 하드 — 선율 따라가기 (2026-11-11)
 
     # 격자마다 세기
     def feat(name, t, wnd=0.02):
@@ -455,167 +728,171 @@ def main():
             for r, amp in zigs:
                 ok[max(0, r[0] - 1):min(K, r[-1] + 2)] = False
         zig_span = [(r[0] - 1, r[-1] + 1) for r, amp in zigs]
-        sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
-        if diff == 'easy':
-            sc = sc * np.where(pos % 4 == 0, 1.6, 0.6)
-        n_beats = (last_ok - first_ok) * beats_per_sec
-        target = int(S['per_beat'] * n_beats * float(active.mean()))
-        order = np.argsort(-sc)
-        pick = np.zeros(K, bool)
-        cnt = 0
-        for i in order:
-            if cnt >= target:
-                break
-            if not ok[i] or sc[i] < 0.12:
-                continue
-            g = S['gap']
-            if pick[max(0, i - g + 1):i + g].any():
-                continue
-            pick[i] = True
-            cnt += 1
-        # 들리는데 너무 오래 비면 채운다 (박 두 개 넘게 · 이지는 네 개)
-        gapmax = 16 if diff == 'easy' else 8
-        idx = list(np.where(pick)[0])
-        i = 0
-        while i < len(idx) - 1:
-            a, b = idx[i], idx[i + 1]
-            if b - a > gapmax:
-                cand = [j for j in range(a + S['pref'] * 2, b - S['pref'] * 2 + 1) if ok[j] and pos[j] % S['pref'] == 0]
-                if cand:
-                    j = max(cand, key=lambda q: sc[q] + 0.3 * metric[q])
-                    if sc[j] > 0.05:
-                        pick[j] = True
-                        idx.insert(i + 1, j)
-                        continue
-            i += 1
-        sel = list(np.where(pick)[0])
-
-        # 칸
-        lanes = {}
-        prev = None
-        for i in sel:
-            ln = lane_of(i)
-            if prev is not None:
-                pi, pl = prev
-                dk = i - pi
-                # 같은 칸 연타 — 8분보다 빠르면(하드) · 4분보다 빠르면(이지·노말) 옆으로
-                lim = 2 if diff == 'hard' else 4
-                if ln == pl and dk < lim:
-                    ln = pl + (1 if (pl < 3) else -1)
-                # 무리한 뜀 — 빠를수록 가깝게
-                maxjump = 5 if dk >= 8 else (3 if dk >= 4 else 2)
-                if abs(ln - pl) > maxjump:
-                    ln = pl + (maxjump if ln > pl else -maxjump)
-            ln = int(min(5, max(0, ln)))
-            lanes[i] = ln
-            prev = (i, ln)
-
-        notes = []
-        used_until = {}                      # 칸 → 길게 누르기가 끝나는 격자
-        hold_on = {}                         # 칸 → 지금 길게 누르는 중인가
-        chain = 0
-        taken = set()
-        # 슬라이드 — 고른 노트가 촘촘히 이어지는 곳 (같은 간격 · 높은 소리 쪽)
-        n_slide_target = int(S['slide_n'] * (last_ok - first_ok) / 30)   # 30초에 몇 줄
-        runs = []
-        for step in S['slide_step']:
-            j = 0
-            while j < len(sel):
-                k = j
-                while k + 1 < len(sel) and sel[k + 1] - sel[k] == step:
-                    k += 1
-                if k - j + 1 >= S['slide'][0]:
-                    runs.append((j, k))
-                j = k + 1
-        runs.sort(key=lambda r: -sum(F['high'][sel[q]] + F['mid'][sel[q]] for q in range(r[0], r[1] + 1)))
-        made = 0
-        last_slide_t = -99
-        for (a, b) in runs:
-            if made >= n_slide_target:
-                break
-            ln_n = min(S['slide'][1], b - a + 1)
-            if any(sel[a + q] in taken for q in range(ln_n)):
-                continue
-            t0 = grid[sel[a]]
-            if t0 - last_slide_t < (4.0 if diff == 'easy' else 2.0):
-                continue
-            # 방향 — 높낮이가 오르면 오른쪽 · 아니면 왼쪽 · 끝 칸 쪽에서는 안쪽으로
-            l0 = lanes[sel[a]]
-            up = C[sel[a + ln_n - 1]] >= C[sel[a]]
-            dirn = 1 if up else -1
-            if l0 + dirn * (ln_n - 1) > 5 or l0 + dirn * (ln_n - 1) < 0:
-                dirn = -dirn
-            if l0 + dirn * (ln_n - 1) > 5 or l0 + dirn * (ln_n - 1) < 0:
-                l0 = 0 if dirn > 0 else 5
-            chain += 1
-            for q in range(ln_n):
-                i = sel[a + q]
-                lanes[i] = l0 + dirn * q
-                taken.add(i)
-                notes.append([int(round(grid[i] * 1000)), lanes[i], 2, chain])
-            made += 1
-            last_slide_t = grid[sel[a + ln_n - 1]]
-        # 길게 누르기 — 이어지는 소리가 긴 자리부터 (목표 몫만큼)
-        cand_h = []
-        for n_i, i in enumerate(sel):
-            if i in taken:
-                continue
-            nxt = sel[n_i + 1] if n_i + 1 < len(sel) else K - 1
-            room = nxt - i - (2 if diff != 'hard' else 1)
-            s_len = sustain_len(i, S['hold'][1])
-            if s_len < S['hold'][0]:
-                continue
+        if diff == 'hard':
+            notes, chain = hard_chart(grid, K, pos, ok, F, R, active, MEL, zig_span, first_ok, last_ok, beats_per_sec, S,
+                                      int(1.55 * charts['normal']['count']))
+        else:
+            sc = strength * metric * (1.0 + 0.25 * np.clip(loud / 30 + 1, 0, 1))
             if diff == 'easy':
-                if room < S['hold'][0]:
+                sc = sc * np.where(pos % 4 == 0, 1.6, 0.6)
+            n_beats = (last_ok - first_ok) * beats_per_sec
+            target = int(S['per_beat'] * n_beats * float(active.mean()))
+            order = np.argsort(-sc)
+            pick = np.zeros(K, bool)
+            cnt = 0
+            for i in order:
+                if cnt >= target:
+                    break
+                if not ok[i] or sc[i] < 0.12:
                     continue
-                hl = min(s_len, S['hold'][1], room)
-            else:
-                hl = min(s_len, S['hold'][1])          # 노말 · 하드 — 누르는 동안 다른 칸이 와도 된다
-            for za, zb in zig_span:                    # 지그재그 앞에서 끝낸다 (두 손 다 비운다)
-                if i < za <= i + hl + 1:
-                    hl = min(hl, za - i - 2)
-            if hl < S['hold'][0]:
-                continue
-            cand_h.append((s_len + 0.5 * strength[i], i, hl))
-        cand_h.sort(reverse=True)
-        want_h = int(len(sel) * S['hold_p'])
-        hold_at = {}
-        last_end = -1
-        for _, i, hl in cand_h:
-            if len(hold_at) >= want_h:
-                break
-            hold_at[i] = hl
-        # 터치 · 길게 누르기
-        for n_i, i in enumerate(sel):
-            if i in taken:
-                continue
-            ln = lanes[i]
-            if used_until.get(ln, -1) >= i:
-                # 그 칸은 누르고 있는 중 — 옆 칸으로
-                for cand in (ln + 1, ln - 1, ln + 2, ln - 2):
-                    if 0 <= cand <= 5 and used_until.get(cand, -1) < i:
-                        ln = cand
-                        break
+                g = S['gap']
+                if pick[max(0, i - g + 1):i + g].any():
+                    continue
+                pick[i] = True
+                cnt += 1
+            # 들리는데 너무 오래 비면 채운다 (박 두 개 넘게 · 이지는 네 개)
+            gapmax = 16 if diff == 'easy' else 8
+            idx = list(np.where(pick)[0])
+            i = 0
+            while i < len(idx) - 1:
+                a, b = idx[i], idx[i + 1]
+                if b - a > gapmax:
+                    cand = [j for j in range(a + S['pref'] * 2, b - S['pref'] * 2 + 1) if ok[j] and pos[j] % S['pref'] == 0]
+                    if cand:
+                        j = max(cand, key=lambda q: sc[q] + 0.3 * metric[q])
+                        if sc[j] > 0.05:
+                            pick[j] = True
+                            idx.insert(i + 1, j)
+                            continue
+                i += 1
+            sel = list(np.where(pick)[0])
+
+            # 칸
+            lanes = {}
+            prev = None
+            for i in sel:
+                ln = lane_of(i)
+                if prev is not None:
+                    pi, pl = prev
+                    dk = i - pi
+                    # 같은 칸 연타 — 8분보다 빠르면(하드) · 4분보다 빠르면(이지·노말) 옆으로
+                    lim = 2 if diff == 'hard' else 4
+                    if ln == pl and dk < lim:
+                        ln = pl + (1 if (pl < 3) else -1)
+                    # 무리한 뜀 — 빠를수록 가깝게
+                    maxjump = 5 if dk >= 8 else (3 if dk >= 4 else 2)
+                    if abs(ln - pl) > maxjump:
+                        ln = pl + (maxjump if ln > pl else -maxjump)
+                ln = int(min(5, max(0, ln)))
+                lanes[i] = ln
+                prev = (i, ln)
+
+            notes = []
+            used_until = {}                      # 칸 → 길게 누르기가 끝나는 격자
+            hold_on = {}                         # 칸 → 지금 길게 누르는 중인가
+            chain = 0
+            taken = set()
+            # 슬라이드 — 고른 노트가 촘촘히 이어지는 곳 (같은 간격 · 높은 소리 쪽)
+            n_slide_target = int(S['slide_n'] * (last_ok - first_ok) / 30)   # 30초에 몇 줄
+            runs = []
+            for step in S['slide_step']:
+                j = 0
+                while j < len(sel):
+                    k = j
+                    while k + 1 < len(sel) and sel[k + 1] - sel[k] == step:
+                        k += 1
+                    if k - j + 1 >= S['slide'][0]:
+                        runs.append((j, k))
+                    j = k + 1
+            runs.sort(key=lambda r: -sum(F['high'][sel[q]] + F['mid'][sel[q]] for q in range(r[0], r[1] + 1)))
+            made = 0
+            last_slide_t = -99
+            for (a, b) in runs:
+                if made >= n_slide_target:
+                    break
+                ln_n = min(S['slide'][1], b - a + 1)
+                if any(sel[a + q] in taken for q in range(ln_n)):
+                    continue
+                t0 = grid[sel[a]]
+                if t0 - last_slide_t < (4.0 if diff == 'easy' else 2.0):
+                    continue
+                # 방향 — 높낮이가 오르면 오른쪽 · 아니면 왼쪽 · 끝 칸 쪽에서는 안쪽으로
+                l0 = lanes[sel[a]]
+                up = C[sel[a + ln_n - 1]] >= C[sel[a]]
+                dirn = 1 if up else -1
+                if l0 + dirn * (ln_n - 1) > 5 or l0 + dirn * (ln_n - 1) < 0:
+                    dirn = -dirn
+                if l0 + dirn * (ln_n - 1) > 5 or l0 + dirn * (ln_n - 1) < 0:
+                    l0 = 0 if dirn > 0 else 5
+                chain += 1
+                for q in range(ln_n):
+                    i = sel[a + q]
+                    lanes[i] = l0 + dirn * q
+                    taken.add(i)
+                    notes.append([int(round(grid[i] * 1000)), lanes[i], 2, chain])
+                made += 1
+                last_slide_t = grid[sel[a + ln_n - 1]]
+            # 길게 누르기 — 이어지는 소리가 긴 자리부터 (목표 몫만큼)
+            cand_h = []
+            for n_i, i in enumerate(sel):
+                if i in taken:
+                    continue
+                nxt = sel[n_i + 1] if n_i + 1 < len(sel) else K - 1
+                room = nxt - i - (2 if diff != 'hard' else 1)
+                s_len = sustain_len(i, S['hold'][1])
+                if s_len < S['hold'][0]:
+                    continue
+                if diff == 'easy':
+                    if room < S['hold'][0]:
+                        continue
+                    hl = min(s_len, S['hold'][1], room)
                 else:
+                    hl = min(s_len, S['hold'][1])          # 노말 · 하드 — 누르는 동안 다른 칸이 와도 된다
+                for za, zb in zig_span:                    # 지그재그 앞에서 끝낸다 (두 손 다 비운다)
+                    if i < za <= i + hl + 1:
+                        hl = min(hl, za - i - 2)
+                if hl < S['hold'][0]:
                     continue
-            # 누르고 있는 칸이 이미 하나면 (노말 · 하드) 두 번째 길게 누르기는 안 만든다 — 한 손은 비워 둔다
-            busy = sum(1 for c2, u2 in used_until.items() if u2 >= i and c2 != ln and hold_on.get(c2))
-            hl = hold_at.get(i, 0) if busy == 0 else 0
-            if hl > 0:
-                dur_ms = int(round((grid[min(K - 1, i + hl)] - grid[i]) * 1000))
-                notes.append([int(round(grid[i] * 1000)), ln, 1, dur_ms])
-                used_until[ln] = i + hl + 1
-                hold_on[ln] = True
-            else:
-                notes.append([int(round(grid[i] * 1000)), ln, 0, 0])
-                if used_until.get(ln, -1) < i:
-                    hold_on[ln] = False
-                used_until[ln] = max(used_until.get(ln, -1), i)
-            # 동시 — 강박에 반대 손 쪽으로 (누르는 중이 아닐 때)
-            if S['chord'] > 0 and hl == 0 and busy == 0 and pos[i] % 8 == 0 and F['low'][i] > 0.5 and rng.random() < S['chord'] * 2.5:
-                ln2 = 5 - ln if abs((5 - ln) - ln) >= 2 else (ln + 3) % 6
-                if used_until.get(ln2, -1) < i:
-                    notes.append([int(round(grid[i] * 1000)), ln2, 0, 0])
+                cand_h.append((s_len + 0.5 * strength[i], i, hl))
+            cand_h.sort(reverse=True)
+            want_h = int(len(sel) * S['hold_p'])
+            hold_at = {}
+            last_end = -1
+            for _, i, hl in cand_h:
+                if len(hold_at) >= want_h:
+                    break
+                hold_at[i] = hl
+            # 터치 · 길게 누르기
+            for n_i, i in enumerate(sel):
+                if i in taken:
+                    continue
+                ln = lanes[i]
+                if used_until.get(ln, -1) >= i:
+                    # 그 칸은 누르고 있는 중 — 옆 칸으로
+                    for cand in (ln + 1, ln - 1, ln + 2, ln - 2):
+                        if 0 <= cand <= 5 and used_until.get(cand, -1) < i:
+                            ln = cand
+                            break
+                    else:
+                        continue
+                # 누르고 있는 칸이 이미 하나면 (노말 · 하드) 두 번째 길게 누르기는 안 만든다 — 한 손은 비워 둔다
+                busy = sum(1 for c2, u2 in used_until.items() if u2 >= i and c2 != ln and hold_on.get(c2))
+                hl = hold_at.get(i, 0) if busy == 0 else 0
+                if hl > 0:
+                    dur_ms = int(round((grid[min(K - 1, i + hl)] - grid[i]) * 1000))
+                    notes.append([int(round(grid[i] * 1000)), ln, 1, dur_ms])
+                    used_until[ln] = i + hl + 1
+                    hold_on[ln] = True
+                else:
+                    notes.append([int(round(grid[i] * 1000)), ln, 0, 0])
+                    if used_until.get(ln, -1) < i:
+                        hold_on[ln] = False
+                    used_until[ln] = max(used_until.get(ln, -1), i)
+                # 동시 — 강박에 반대 손 쪽으로 (누르는 중이 아닐 때)
+                if S['chord'] > 0 and hl == 0 and busy == 0 and pos[i] % 8 == 0 and F['low'][i] > 0.5 and rng.random() < S['chord'] * 2.5:
+                    ln2 = 5 - ln if abs((5 - ln) - ln) >= 2 else (ln + 3) % 6
+                    if used_until.get(ln2, -1) < i:
+                        notes.append([int(round(grid[i] * 1000)), ln2, 0, 0])
         # 지그재그 — 낮은 음 왼쪽 · 높은 음 오른쪽 칸을 번갈아 (곡의 그 자리 높이로 왼 · 가운데 · 오른 쪽)
         #   양손 — 8분 지그재그 가운데 소리가 큰 줄 (40 % · 적어도 하나)
         two = set()
