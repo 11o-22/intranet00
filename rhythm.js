@@ -67,7 +67,7 @@ const SONGS = [
     //   음원 — 클릭 걷기 · 옅은 잡음 걷기 · 40~160 Hz 덜고 가운데 위 · 존재감 · 위 공기 · 좌우 조금 넓게 · 끝 네 마디 페이드아웃 · -14 LUFS
     //   채보 — 8분이 2:1 로 출렁이는(셔플) 곡이라 격자를 출렁이는 자리에 맞췄다 · 노말 · 하드 모두 「어렵게」 (tools/rhythm-chart.py SWING · HARDER)
     //   need — 그 곡 · 그 난이도에서 그 랭크 이상을 받으면 열린다 (needMet · checkNeeds)
-    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg', need: { song: 'client', diff: 'hard', rank: 'B' } }
+    { key: 'handicap', title: 'Handicap', artist: 'Benz', audio: 'snd/rhythm-handicap.mp3', chart: 'rhythm/handicap.json', color: '#6fd3a0', cover: 'rhythm/handicap-cover.jpg?v=2', need: { song: 'client', diff: 'hard', rank: 'B' } }
 ];
 const DIFFS = [['easy', 'EASY', '이지', '#5fd18a'], ['normal', 'NORMAL', '노말', '#ffc94a'], ['hard', 'HARD', '하드', '#ff5f73']];
 const LANES = 6;                      // 채보의 칸 수 — 화면에서는 가로 자리로 바꾼다 (xOfLane)

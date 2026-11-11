@@ -1149,6 +1149,7 @@ function teamUp() {
         if (!kr) return;
         try { d.ref('kroomTeams/' + kr.team + '/at').set(now()); } catch (e) { }
         runBeat();
+        try { if (darkRun && darkRun.isParty && kr.stats && kr.max) pubStat(); } catch (e) { }   // 스탯이 그대로여도 살아 있다고 알린다
     }, 30000);
 }
 function teamDown() {
@@ -2208,6 +2209,24 @@ function teamStats() {
         .map(function (c) { return Object.assign({ code: c }, st[c]); }));
 }
 
+// 손을 뻗어 줄 수 있는 동료 — 탐사에 남아 있는 일행(alive · 없으면 members) 중 나 · 죽은 사람 · 쓰러진 사람을 뺀다
+//   ★ 전에는 kStat 이 10분 안에 올라온 사람만 셌다. kStat 은 스탯이 바뀔 때만 올라가서,
+//     한동안 스탯이 그대로인 동료는 같이 있어도 빠져 「부를 사람이 없다」로 바로 끝났다 (2026-11-11)
+function rescuers() {
+    if (!darkRun || !darkRun.isParty || typeof darkParties === 'undefined') return [];
+    const p = darkParties[darkRun.partyId] || {};
+    const st = p.kStat || {};
+    const pool = Object.keys((p.alive && Object.keys(p.alive).length) ? p.alive : (p.members || {}));
+    return pool.filter(function (c) {
+        if (!c || c === me().code) return false;
+        const v = st[c];
+        if (!v) return true;                                   // 아직 스탯을 안 올렸어도 같이 있는 사람
+        if (v.dead) return false;
+        if (v.down && now() - (v.at || 0) < 10 * 60 * 1000) return false;
+        return true;
+    });
+}
+
 // ==========================================
 // 6. 다른 팀과 만나기 — 같은 던전 · 같은 층
 // ==========================================
@@ -2309,7 +2328,7 @@ function doom(cfg) {
         return;
     }
     const d = db_();
-    const alive = darkRun.isParty ? teamStats().filter(function (m) { return m.code !== me().code && !m.down; }).length : 0;
+    const alive = rescuers().length;
     if (!d || !darkRun.isParty || !alive) {
         show(cfg.title || '—', (cfg.text || '') + `<br><br><span style="color:#ff6b6b;">부를 사람이 없다.</span>`, darkChoiceBtn('—', 'kroomDie()'));
         return;
@@ -2374,7 +2393,7 @@ function doomRearm() {
 // 체력이 바닥 — 치유가 고치면 일어서고(판정 · 2026-10-20 전에는 무조건), 아니면 끌어내기를 기다린다
 function fall(txt) {
     kr.down = true; pubStat();
-    const healer = darkRun.isParty && teamStats().some(function (m) { return m.code !== me().code && attrOf(m.code) === 'heal' && !m.down; });
+    const healer = rescuers().some(function (c) { return attrOf(c) === 'heal'; });
     doom({ title: '쓰러짐', what: '쓰러졌습니다' + (healer ? ' (치유로 일으켜 세울 수 있습니다)' : ''), dc: 12, sec: 75,
            text: txt + '<br><br>무릎이 먼저 꺾였다. 바닥이 가깝다.', dieText: '일어서지 못했다.' });
 }
