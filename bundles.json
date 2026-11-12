@@ -486,7 +486,8 @@
       "gear-room.js",
       "rhythm.js",
       "playlist.js",
-      "house-room.js"
+      "house-room.js",
+      "purge-wuniform.js"
     ]
   ]
 }
