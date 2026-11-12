@@ -468,7 +468,7 @@ function miniOpen(d, done) {
         '<div style="width:100%; max-width:420px; background:#0d0d0d; border:1px solid #5a4a2a;'
         + ' border-radius:8px; padding:18px; text-align:center;">'
         + '<div style="font-size:13px; font-weight:bold; color:' + GCOLOR[d.grade] + ';">'
-        + d.name + ' <span style="font-size:10px; color:#888;">' + d.grade + '등급</span></div>'
+        + d.name + ' <span style="font-size:10px; color:#888;">' + (d.sub != null ? d.sub : d.grade + '등급') + '</span></div>'
         + '<div id="cook-round" style="font-size:10px; color:#888; margin:6px 0 14px 0;"></div>'
         + '<div id="cook-bar" style="position:relative; height:34px; background:#1a1a1a;'
         + ' border:1px solid #333; border-radius:5px; overflow:hidden;">'
@@ -655,8 +655,10 @@ window._cookFrac = function (at) { return miniFrac(at); };
 
 window.cookCancel = function () {
     if (!mini) return;
+    const onCancel = mini.d && mini.d.onCancel;          // 요리가 아닌 곳(🍲 냄비에서 나오기)에서 빌려 쓸 때
     mini.over = true;
     miniClose();
+    if (typeof onCancel === 'function') { try { onCancel(); } catch (e) { } return; }
     showCustomAlert('요리를 그만두었습니다.\n\n재료는 그대로입니다.');
 };
 

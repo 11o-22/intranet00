@@ -4200,7 +4200,10 @@ setInterval(function () {
 // ==========================================
 //
 //   「각 맵의 구석에 하나씩 · 손에 파인애플을 쥔 채 냄비를 누르면 파인애플이 된 사원이 안에 들어간다」
-//   「넣은 사람만 꺼냄」 → 같은 날 「남이 꺼내 줄 수도」 — 안에 든 본인만 빼고 누구나 꺼낸다 (스스로는 못 나온다).
+//   「넣은 사람만 꺼냄」 → 같은 날 「남이 꺼내 줄 수도」 — 안에 든 본인만 빼고 누구나 꺼낸다.
+//   ★ 2026-11-12 사용자 「냄비 안에 있는 말랑이들이 칸 맞추기 미니게임(요리할 때 나오는 거)으로 나올 수 있게 · 나온다 버튼이 밑에 뜨면 누르고 미니게임」
+//     안에 든 사람 화면 아래에 「🍲 나온다」 단추 → 행복 식당의 눈금(초록 칸) 맞추기(POT_ESC.GRADE 등급 판) → 맞히면 스스로 나온다 (potEscape)
+//     놓치면 POT_ESC.WAIT 동안 다시 못 누른다. 남이 꺼내 주는 것은 그대로.
 //
 //   plazaPot/<사번> = { s: 자리 열쇠(plaza~2 …), r: 방, i: 방 번호, by: 넣은 사람, bn: 그 이름, at }
 //     · 안에 든 사람 화면이 제 자리를 냄비 속에 박아 두고(potPin) 다른 방으로 못 간다 (가두리처럼 다시 들어와도 그 냄비로)
@@ -4270,8 +4273,8 @@ function heldRoom() { const pm = potMine(); return cageMine() || (pm ? pm.r : ''
                 const key = m ? (m.at || 1) : 0;
                 if (key && key !== (was && was.at)) {
                     if (now() - (Number(m.at) || 0) < 60000) {
-                        sysLine('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다! 다른 사원이 꺼내 줄 때까지 나올 수 없습니다.');
-                        try { if (typeof showCustomAlert === 'function') showCustomAlert('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다!\n\n보글보글… 다른 사원이 꺼내 줄 때까지 나올 수 없습니다.'); } catch (e) { }
+                        sysLine('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다! 아래 「나온다」 단추로 칸 맞추기에 성공하거나, 다른 사원이 꺼내 줘야 나옵니다.');
+                        try { if (typeof showCustomAlert === 'function') showCustomAlert('🍲 ' + (m.bn || '누군가') + ' 사원이 당신을 냄비에 넣었습니다!\n\n보글보글… 아래 「나온다」 단추를 눌러 칸 맞추기에 성공하면 나올 수 있습니다.\n(다른 사원이 꺼내 줄 수도 있습니다)'); } catch (e) { }
                     }
                 } else if (!key && was && run) {
                     // 나왔다 — 들려 나가지 않았으면 냄비 앞에 내려선다
@@ -4287,6 +4290,7 @@ function heldRoom() { const pm = potMine(); return cageMine() || (pm ? pm.r : ''
             try { if (run) { paintPot(); wake(); } } catch (e) { }
         });
     }, 1000);
+    setInterval(function () { try { potEscUi(); } catch (e) { } }, 500);      // 🍲 「나온다」 단추 — 안에 있을 때만 (없으면 아무 일도 안 한다)
     // 파인애플이 풀렸으면 — 저절로 나온다 (내 것만 · 상담사는 남의 것도 걷지 않는다)
     setInterval(function () {
         const u = u_(), d = db_();
@@ -4339,7 +4343,7 @@ function paintPot() {
 // 냄비를 눌렀다 — 손에 파인애플이 있으면 넣고, 없으면 안에 든 사람을 꺼낸다
 function potTap() {
     if (!run || !potRoomOk(run.room)) return;
-    if (potMine()) { sysLine('🍲 스스로는 나올 수 없습니다 — 다른 사원이 냄비를 눌러 꺼내 줘야 합니다.'); return; }
+    if (potMine()) { sysLine('🍲 아래 「나온다」 단추를 눌러 칸 맞추기에 성공하면 나올 수 있습니다. (다른 사원이 냄비를 눌러 꺼내 줄 수도 있습니다)'); return; }
     if (cageMine()) { sysLine('🔒 가두리 안에서는 쓸 수 없습니다.'); return; }
     if (HS()) { sysLine('🫣 숨바꼭질 중에는 냄비를 쓸 수 없습니다.'); return; }
     const me = myCode();
@@ -4419,6 +4423,54 @@ function potOut(c) {
         sysLine('🍲 ' + nameIn(c) + ' 사원을 냄비에서 꺼내 손에 들었습니다.');
     } else sysLine('🍲 ' + nameIn(c) + ' 사원을 냄비에서 꺼냈습니다.');
     paintPot(); wake();
+}
+// ★ 🍲 스스로 나오기 — 아래 「나온다」 단추 → 눈금(초록 칸) 맞추기 → 맞히면 나온다 (2026-11-12 사용자)
+const POT_ESC = { GRADE: 'A', WAIT: 10000 };          // 행복 식당 A 등급 판 (초록 칸 13% · 두 번) · 놓치면 10초 뒤 다시
+let potEscAt = 0, potEscOn = false;
+function potEscUi() {
+    const pm = run ? potMine() : null;
+    const on = !!(pm && run.el && pm.r === run.room);
+    let b = document.getElementById('plaza-pot-out');
+    if (!on) {
+        if (b) b.remove();
+        if (potEscOn) { potEscOn = false; try { if (window._cookMiniClose) window._cookMiniClose(); } catch (e) { } }   // 그 사이 남이 꺼냈다 · 광장을 닫았다
+        return;
+    }
+    const ov = document.getElementById('plaza-ov');
+    if (!ov) return;
+    if (!b) {
+        b = document.createElement('button');
+        b.id = 'plaza-pot-out';
+        b.className = 'plaza-keep';
+        b.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--plaza-safe-bot,env(safe-area-inset-bottom,0px)) + 128px);z-index:60;'
+            + 'padding:11px 22px;border-radius:16px;border:1px solid #e0a352;background:rgba(58,30,12,.92);color:#ffe2b3;font-size:13.5px;font-weight:bold;'
+            + 'font-family:inherit;box-shadow:0 4px 14px rgba(0,0,0,.55);white-space:nowrap;';
+        b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+        b.onclick = function (e) { e.stopPropagation(); potEscape(); };
+        ov.appendChild(b);
+    }
+    const left = Math.ceil((potEscAt + POT_ESC.WAIT - now()) / 1000);
+    const tx = left > 0 ? '🍲 나온다 (' + left + '초 뒤)' : '🍲 나온다';
+    if (b.textContent !== tx) b.textContent = tx;
+    const op = left > 0 ? '.55' : '1';
+    if (b.style.opacity !== op) b.style.opacity = op;
+}
+function potEscape() {
+    const pm = run ? potMine() : null;
+    if (!pm || potEscOn) return;
+    const left = Math.ceil((potEscAt + POT_ESC.WAIT - now()) / 1000);
+    if (left > 0) { sysLine('🍲 국이 미끄럽다… ' + left + '초 뒤에 다시 해 보세요.'); return; }
+    if (typeof window._cookMiniOpen !== 'function') { sysLine('🍲 지금은 나올 수 없습니다 — 다른 사원이 꺼내 줘야 합니다.'); return; }
+    potEscOn = true;
+    window._cookMiniOpen({ name: '🍲 냄비에서 나오기', grade: POT_ESC.GRADE, sub: '칸 맞추기',
+        onCancel: function () { potEscOn = false; sysLine('🍲 나오기를 그만두었습니다.'); } },
+    function (ok) {
+        potEscOn = false;
+        const d = db_(), u = u_();
+        if (!d || !u || !POTS[u.code]) return;            // 그 사이 남이 꺼내 줬다
+        if (!ok) { potEscAt = now(); sysLine('🍲 미끄러져 다시 국 속으로 빠졌습니다… (' + Math.round(POT_ESC.WAIT / 1000) + '초 뒤 다시)'); potEscUi(); return; }
+        try { d.ref(POT.PATH + '/' + u.code).remove(); } catch (e) { }     // 나왔다 — 듣는 칸(potListen)이 냄비 앞에 내려 세운다
+    });
 }
 // 매 틀 — 안에 들어 있으면 냄비 속에 박아 둔다 (다른 방이면 그 냄비로 데려간다)
 function potPin() {
