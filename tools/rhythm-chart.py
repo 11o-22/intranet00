@@ -312,8 +312,10 @@ HARDER = {'handicap': {'normal': 1.1, 'hard': 1.105, 'alt': True, 'fill16': True
           'genesis': {'normal': 1.3, 'hard': 1.32, 'alt': True, 'chords': True},
           # ★ 2026-11-12 사용자 「둘 다 난이도는 16으로 맞춰 주고 (하드 기준)」 — 山君 · Legacy 하드 (노말은 그대로)
           #   레벨 15 곡들(Handicap · Genesis — 초당 6.4 ~ 6.7)과 17 인 Showtime! 사이로 · 16분 채움(fill16) · 박 칸 번갈아(alt)
-          'sangun': {'hard': 1.3, 'alt': True, 'fill16': True},
-          'legacy': {'hard': 1.3, 'alt': True, 'fill16': True}}
+          #   → 2026-11-12 사용자 「山君 이랑 Legacy 16 치고는 좀 쉬워서 채보를 더 넣자. 조금 더 어렵게」 — 하드 1.3 → 1.5 배 · 선율에 박이 세게 같이 오면 다른 손 동시(chords)
+          #     (노말 · 이지는 그대로 · 레벨 표시는 16 그대로)
+          'sangun': {'hard': 1.5, 'alt': True, 'fill16': True, 'chords': True},
+          'legacy': {'hard': 1.5, 'alt': True, 'fill16': True, 'chords': True}}
 #   ★ 2026-11-12 사용자 「새로 넣은 리듬게임 하드가 너무 쉬운데 15레벨 정도로 어렵게」 — Genesis 하드 (노말은 그대로)
 #     셋잇단 격자는 한 박에 세 칸뿐이라 선율 · 박만으로는 초당 4.3 개에서 찬다 → 선율 음에 박이 같이 세게 오면 다른 손 동시(chords)를 셋잇단 한 칸 간격까지 · 하드 노트 수 1.32 배 · 박 칸 번갈아(alt)
 #   ★ 2026-11-12 사용자 「그김에 핸디캡도 채보 더 넣고 한 100정도」 — Handicap 하드 0.98 → 1.105 (880 → 980 개쯤)
