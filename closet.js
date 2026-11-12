@@ -155,12 +155,12 @@ const DOT = {
     //   ★ 뉴비 세트 (2026-10-25) — 장화는 신발 줄 끝 · 의상은 겉옷 줄(사운드 의상 다음) · 병아리 후드 그림자(newbie-hood-in)는
     //     늑대 잠옷 그림자 다음 (머리카락 뒤 · 옷 위). 후드 바깥(newbie-hood)은 머리 위(top).
     Z: ['gold-leash',                                           // 🪢 금 목줄 (2026-11-09 사용자 「옷 위가 아니라 옷 아래로」) — 몸 바로 위 · 모든 옷 밑
-        'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'han-inner',
+        'sound-lp', 'sexy-pantsu', 'gochu', 'red-bikini', 'bunny-stk', 'sound-coat-in', 'pj-bottom', 'w-panty', 'shoes', 'shoes-black', 'han-shoes', 'maker-shoes', 'sound-shoes', 'newbie-boots', 'sailor-shoes', 'pj-top', 'w-shirt', 'w-shirt-open', 'knit', 'gym-suit', 'm-shirt', 'han-inner',
         'dress', 'tuxedo', 'suit', 'black-suit', 'dream-suit', 'brown-suit', 'agent1', 'agent2', 'maker-outfit', 'sound-outfit', 'newbie-outfit', 'sailor-bubble', 'garaetteok',
         'school-m', 'sdress', 'devil-m', 'devil-f',         // 의상 1차 (2026-11-04)
         'robe', 'han-duru', 'cape',
         // 바니걸 (2026-11-08) — 뒤 털 → 의상 → 앞 털. 완전체 그림에서 털 한 장(옆으로 늘어진 털)은 의상 밑, 다른 한 장(걸을 때 감기는 털)은 의상 위였다
-        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'bunny-fur-f',
+        'bunny-fur-b', 'bunny-suit', 'lingerie', 'slave-tee', 'w-uniform-in', 'w-uniform', 'bunny-fur-f',
         'sound-coat', 'maker-outer-in', 'wolf-pj-in', 'newbie-hood-in',
         'apron',                                            // 🧺 에이프런 (2026-11-11) — 모든 옷 위 · 장갑 밑
         'glove', 'bungeo'],
@@ -240,7 +240,7 @@ const DOT = {
                  // 바니걸 (2026-11-08) — 의상 · 뒤 털 · 스타킹은 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 (머리띠는 첫 칸을 들썩임 몫만큼 내린 것과 같아 그대로 둔다)
                  'bunny-suit': [0, 1, 2, 3, 4, 5], 'bunny-fur-b': [0, 1, 2, 3, 4, 5], 'bunny-stk': [0, 1, 2, 3, 4, 5],
                  // 란제리 · 금 목줄 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
-                 'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5],
+                 'lingerie': [0, 1, 2, 3, 4, 5], 'gold-leash': [0, 1, 2, 3, 4, 5], 'slave-tee': [0, 1, 2, 3, 4, 5], 'w-uniform': [0, 1, 2, 3, 4, 5], 'w-uniform-in': [0, 1, 2, 3, 4, 5],
                  // 셔츠 (여성 체형 · 2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다 · 몸과 같은 시계로 돈다
                  'w-shirt': [0, 1, 2, 3, 4, 5],
                  // 풀어진 셔츠 · 여성용 속옷 (2026-11-08) — 서기 줄 여섯 칸이 몸의 들썩임을 따라 그려져 있다
@@ -431,7 +431,10 @@ const DOT_SLOTS = [
             //   바뀐 것은 옷장에서 다시 입을 때까지 그대로 — 풀어진 셔츠(hide)는 옷장에 안 보인다.
             { i: 'wshirt', n: '셔츠', over: ['w-shirt'], owner: true, fem: true },
             //   gk — 옷장 권한은 여민 셔츠(wshirt)를 따른다 (2026-11-09 — 받은 사람(dotGrant)이 까면 제 화면에서 권한이 없어 잠옷이 나오던 것)
-            { i: 'wshirt-open', n: '셔츠', over: ['w-shirt-open'], owner: true, fem: true, hide: true, gk: 'wshirt' }
+            { i: 'wshirt-open', n: '셔츠', over: ['w-shirt-open'], owner: true, fem: true, hide: true, gk: 'wshirt' },
+            // ★ 남성 셔츠 (2026-11-12 사용자 「여성 교복 남성 셔츠로 해서 … 둘 다 상담사만 넣을 수 있게」) — 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
+            //   주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷만 와서 5·6번째를 3·2번째로 · 서기는 첫 칸
+            { i: 'mshirt', n: '남성 셔츠', over: ['m-shirt'], own: 'm-shirt' }
         ]
     },
     {
@@ -562,6 +565,12 @@ const DOT_SLOTS = [
             //   주신 그림 1728x768 (칸 288 · 알파 224 — 주신 그대로) → 칸마다 +30 으로 352 칸. 걷기 넷(5=3 · 6=2) · 서기 여섯 칸은 들썩임을 따라 그려져 있다.
             //   keep — 망토 칸(바니걸 털 망토)만은 같이 그린다 (2026-11-08 사용자 「슬레이브 목티 위에도 바니걸 털망토 입을 수 있게」) — Z 는 뒤 털 → 목티 → 앞 털
             { i: 'slavetee', n: '슬레이브 목티', over: ['slave-tee'], owner: true, fem: true, alone: true, keep: ['cape'] },
+            // ★ 여성 교복 (2026-11-12 사용자 「여성 교복은 여성 체형만 입을 수 있게 · 상담사만 넣을 수 있게」) — 상담사가 선물함으로 보내 준 사람만 (wear-gift.js)
+            //   흰 셔츠에 검은 치마 한 장 · 주신 그림 1728x768 (칸 288) → 칸마다 +30 으로 352 칸. 걷기 넷(5=3 · 6=2) · 서기 여섯 칸은 몸의 들썩임을 따라 그려져 있다 (FLAP_COLS)
+            //   fem — 몸이 여성 체형일 때만 · alone — 다른 칸 옷은 안 그린다 (치마 밑으로 잠옷 바지가 비치지 않게 · 슬레이브 목티와 같다) · keep — 망토 칸은 같이
+            //   w-uniform-in — 셔츠 가운데가 열려 있어 여성 체형 몸의 가슴이 드러나므로, 란제리 윗부분(치마 위까지)을 셔츠 안에 받쳐 가렸다 ·
+            //   옆모습 걷기 칸에서 그래도 비어져 나오는 곳은 셔츠 색으로 덧칠했다 (몸 그림의 분홍 점이 한 점도 안 보이게 — 열두 칸 모두 쟀다)
+            { i: 'wuniform', n: '여성 교복', over: ['w-uniform-in', 'w-uniform'], own: 'w-uniform', fem: true, alone: true, keep: ['cape'] },
             // ★ 의상 뽑기 탈 세 벌 + 퐁실 의상 (2026-10-25) — 주신 그림은 432x192 (칸 72x96) 라
             //   네 배로 늘려 칸마다 가로 +30 으로 352 칸에 옮겼다 (다섯 벌 · 2026-10-23 과 같은 길).
             //   탈 셋은 머리까지 감싸고 얼굴만 뚫려 있어 **머리 위**(top)에 얹는다 — 늑대 잠옷 바깥과 같다.
