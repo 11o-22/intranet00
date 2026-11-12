@@ -53,10 +53,15 @@ function bar() {
     b.onclick = function () { const w = busy(false); if (w) { b.textContent = '✦ ' + w + ' 을(를) 마친 뒤에 눌러 주세요'; return; } reload(); };
     document.body.appendChild(b);
 }
+function plOn() {
+    try { if (typeof window.playlistAlive === 'function' && window.playlistAlive()) return true; } catch (e) { }
+    try { return typeof window.playlistOn === 'function' && !!window.playlistOn(); } catch (e) { return false; }
+}
 function act() {
     if (!pending) return;
     // 🎧 플레이리스트가 도는 중(화면을 끄고 듣는 중)이면 저절로 새로 열지 않는다 — 음악이 끊긴다 (2026-11-11 · 띠를 눌러 여는 것은 된다)
-    if (document.visibilityState === 'hidden') { if (!busy(false) && !(typeof window.playlistOn === 'function' && window.playlistOn())) reload(); return; }
+    //   ★ 2026-11-13 사용자 「플레이리스트를 할 때엔 앱 자체가 안 꺼지게」 — 곡이 넘어가는 사이 · 잠깐 멈춰 둔 동안에도 (playlistAlive: 플리를 틀어 둔 동안 내내)
+    if (document.visibilityState === 'hidden') { if (!busy(false) && !plOn()) reload(); return; }
     bar();
 }
 function check() {

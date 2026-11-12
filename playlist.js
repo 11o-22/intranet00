@@ -26,6 +26,12 @@
 //   리듬 게임을 열면 잠시 멈추고, 닫으면 이어 튼다. 이상한 나라 배경 음악은 플리가 도는 동안 쉰다 (event-bgm.js).
 //   반복 · 무작위는 이 기기에 적어 둔다.
 //
+// ■ ★ 화면을 꺼도 다음 곡으로 (2026-11-13 사용자 「전체 반복 무작위 할 때에 폰을 끄면 다음 노래로 안 넘어가는 것 · 플레이리스트를 할 때엔 앱 자체가 안 꺼지게」)
+//   화면이 꺼진 동안에는 곡이 끝난 뒤 다음 곡을 그제서야 받아 오느라 소리가 끊기고, 소리가 끊긴 화면은 기기가 재워 버린다 (다음 곡이 안 나온다).
+//   → 듣는 동안 **다음 곡을 미리 통째로 받아 둔다** (PRE · blob). 곡이 끝나면 받아 둔 것을 그 자리에서 튼다 — 받을 것이 없으니 끊기지 않는다.
+//   → 곡이 넘어가는 사이에는 잠금 화면에 「멈춤」으로 알리지 않는다 (adv) · 넘어가다 막히면 다시 해 보고, 화면을 다시 켰을 때 이어 준다.
+//   → 플리를 틀어 둔 동안(멈춰 둔 것도)은 새 판이 올라와도 저절로 새로 열지 않는다 (update-check.js · playlistAlive) — 위쪽 띠를 눌러 연다.
+//
 // ■ 콘솔
 //   playlistState()
 
@@ -150,18 +156,81 @@ function newList(name) {
 // 재생기
 // ==========================================
 let A = null;
-const Q = { src: 'all', base: [], order: [], i: -1, key: null };
+const Q = { src: 'all', base: [], order: [], i: -1, key: null, next: null };
 let byRhythm = false;
+let want = false;           // 듣는 중이어야 하나 — 사용자가 멈추거나 끄기 전까지 (기기가 끊은 것과 가른다)
+let adv = false;            // 곡이 끝나 다음 곡으로 넘어가는 사이
+
+// ★ 다음 곡 미리 받아 두기 (2026-11-13) — key → { url: blob 주소 · at }. 지금 곡 · 다음 곡 말고는 오래된 것부터 버린다
+const PRE = {};
+const PRE_KEEP = 3;
+const preFail = {};
+function preUrl(k) { const e = PRE[k]; return (e && e.url) || null; }
+function preload(k) {
+    const s = k && song(k);
+    if (!s || !s.audio || typeof fetch !== 'function' || !window.URL || !URL.createObjectURL) return;
+    if (PRE[k]) { PRE[k].at = Date.now(); return; }
+    if (Date.now() - (preFail[k] || 0) < 15000) return;                   // 방금 못 받았으면 조금 있다가
+    const e = PRE[k] = { url: null, at: Date.now() };
+    // Range 를 붙여 받는다 — 서버가 206 으로 통째로 주고, 서비스 워커(sw.js)는 206 을 꾸러미에 넣지 않는다
+    //   (꾸러미에 통째로 든 곡은 <audio> 가 주소로 틀 때 조각 요청에 200 을 받게 된다 — 지금보다 늘리지 않는다)
+    let total = 0;
+    fetch(s.audio, { headers: { Range: 'bytes=0-' } }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        const m = /\/(\d+)\s*$/.exec(r.headers.get('Content-Range') || '');
+        total = m ? Number(m[1]) : 0;
+        return r.blob();
+    }).then(function (b) {
+        if (PRE[k] !== e) return;
+        if (!b || !b.size || (total && b.size !== total)) { delete PRE[k]; preFail[k] = Date.now() + 600000; return; }   // 덜 받았으면 안 쓴다 (한동안 다시 받지 않는다 — 그 곡은 예전처럼 주소로 튼다)
+        e.url = URL.createObjectURL(/^audio\//.test(b.type) ? b : new Blob([b], { type: 'audio/mpeg' }));
+        preTrim();
+    }).catch(function () { preFail[k] = Date.now(); if (PRE[k] === e) delete PRE[k]; });
+}
+function preDrop(k) {
+    const e = PRE[k];
+    if (!e) return;
+    delete PRE[k];
+    if (e.url && !(A && A.src === e.url)) { try { URL.revokeObjectURL(e.url); } catch (x) { } }
+}
+function preTrim() {
+    const keep = [Q.key, Q.next];
+    const old = Object.keys(PRE).filter(function (k) { return keep.indexOf(k) < 0 && PRE[k].url && !(A && A.src === PRE[k].url); })
+        .sort(function (a, b) { return PRE[a].at - PRE[b].at; });
+    while (Object.keys(PRE).length > PRE_KEEP && old.length) preDrop(old.shift());
+}
+function preClear() { Object.keys(PRE).forEach(function (k) { const e = PRE[k]; delete PRE[k]; if (e && e.url) { try { URL.revokeObjectURL(e.url); } catch (x) { } } }); }
+// 곡이 끝나면 저절로 나올 곡 — step(1, true) 가 고를 것과 같다 (무작위 한 바퀴 끝이면 다음 바퀴를 미리 섞어 둔다 · Q.wrap)
+function nextKey() {
+    if (!Q.order.length || !Q.key) return null;
+    if (SET.rep === 'one') return Q.key;
+    if (Q.i + 1 < Q.order.length) return Q.order[Q.i + 1];
+    if (SET.rep === 'off') return null;
+    if (SET.shuf) { if (!Q.wrap) Q.wrap = wrapOrder(); return Q.wrap[0] || null; }
+    return Q.order[0];
+}
+function wrapOrder() {
+    const last = Q.order[Q.order.length - 1];
+    const o = shuffled(Q.base);
+    if (o.length > 1 && o[0] === last) o.push(o.shift());                 // 방금 곡이 바로 또 나오지 않게
+    return o;
+}
+function preNext() {
+    if (!Q.key || !want) return;
+    Q.next = nextKey();
+    if (Q.next) preload(Q.next);
+}
 
 function audio() {
     if (A) return A;
     A = new Audio();
     A.preload = 'auto';
     A.setAttribute('playsinline', '');
-    A.addEventListener('ended', function () { step(1, true); });
+    A.addEventListener('ended', function () { adv = true; step(1, true); if (adv) advRetry(0); mediaState(); });
     A.addEventListener('play', function () { paint(); mediaState(); });
-    A.addEventListener('playing', function () { errs = 0; });
-    A.addEventListener('pause', function () { paint(); mediaState(); });
+    A.addEventListener('playing', function () { errs = 0; adv = false; Q.blobErr = null; mediaState(); preNext(); });
+    // 곡이 끝날 때도 pause 가 먼저 온다 — 다음 곡으로 넘어갈 참이면 잠금 화면에는 「멈춤」으로 알리지 않는다
+    A.addEventListener('pause', function () { paint(); if (!(A.ended && want)) mediaState(); });
     A.addEventListener('loadedmetadata', function () {
         if (Q.key && isFinite(A.duration) && A.duration > 0 && !DUR[Q.key]) { durCache[Q.key] = Math.round(A.duration * 1000); saveJ('plDur', durCache); }
         paintTime();
@@ -170,11 +239,13 @@ function audio() {
     A.addEventListener('timeupdate', function () {
         paintTime();
         const now = Date.now();
-        if (now - lastPos > 4000) { lastPos = now; mediaPos(); }
+        if (now - lastPos > 4000) { lastPos = now; mediaPos(); preNext(); }   // 다음 곡을 아직 못 받았거나 차례가 바뀌었으면 다시 (받아 둔 것이면 아무 일도 없다)
     });
     A.addEventListener('error', function () {
         // 받지 못한 곡 — 다음 곡으로 (한 바퀴를 다 돌면 멈춘다)
         if (!Q.key) return;
+        // 받아 둔 것(blob)으로 틀다 막혔으면 — 그것을 버리고 같은 곡을 주소로 한 번 더
+        if (/^blob:/.test(A.src || '') && Q.blobErr !== Q.key) { Q.blobErr = Q.key; preDrop(Q.key); playKey(Q.key); return; }
         errs++;
         if (errs < Math.max(1, Q.order.length)) step(1, true);
     });
@@ -202,6 +273,7 @@ function makeOrder(cur) {
         Q.order = (cur && Q.base.indexOf(cur) >= 0 ? [cur] : []).concat(shuffled(rest));
     } else Q.order = Q.base.slice();
     Q.i = cur ? Q.order.indexOf(cur) : -1;
+    Q.wrap = null;
 }
 function sessionOn() { try { if (navigator.audioSession && 'type' in navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { } }
 
@@ -210,15 +282,39 @@ function playKey(k) {
     if (!s) return;
     const a = audio();
     Q.key = k;
-    const want = new URL(s.audio, location.href).href;
-    if (a.src !== want) { a.src = s.audio; try { a.load(); } catch (e) { } }
+    want = true;
+    // 받아 둔 것이 있으면 그것으로 (네트워크 없이 바로 나온다 — 화면이 꺼져 있어도) · 없으면 주소로
+    const pre = (Q.blobErr === k) ? null : preUrl(k);
+    const to = pre || new URL(s.audio, location.href).href;
+    if (a.src !== to) { a.src = pre || s.audio; try { a.load(); } catch (e) { } }
     else a.currentTime = 0;
+    if (PRE[k]) PRE[k].at = Date.now();
     sessionOn();
     const p = a.play();
     if (p && p.catch) p.catch(function () { paint(); });
     mediaMeta();
     paint();
 }
+// 넘어가다 막혔을 때 (화면이 꺼진 동안 재생을 못 시작했다) — 몇 번 다시 해 본다 · 화면을 다시 켜면 wake 가 이어 준다
+const ADV_WAIT = [400, 1200, 3000, 8000];
+let advT = null;
+function advRetry(n) {
+    clearTimeout(advT);
+    if (n >= ADV_WAIT.length) return;
+    advT = setTimeout(function () {
+        if (!adv || !want || !A || !Q.key) return;
+        if (A.paused) { sessionOn(); const p = A.play(); if (p && p.catch) p.catch(function () { }); }
+        advRetry(n + 1);
+    }, ADV_WAIT[n]);
+}
+function wake() {
+    if (!want || !A || !Q.key) return;
+    if (A.ended) { adv = true; step(1, true); return; }                    // 끝난 채 멈춰 있었다 — 다음 곡으로
+    if (adv && A.paused) { sessionOn(); const p = A.play(); if (p && p.catch) p.catch(function () { }); }
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) wake(); });
+window.addEventListener('pageshow', wake);
+window.addEventListener('focus', wake);
 // 어느 목록에서 어느 곡부터
 function playFrom(src, k) {
     Q.src = src;
@@ -234,13 +330,11 @@ function step(dir, auto) {
     if (auto && SET.rep === 'one') { playKey(Q.key); return; }
     let i = Q.i + dir;
     if (i >= Q.order.length) {
-        if (auto && SET.rep === 'off') { Q.i = Q.order.length - 1; try { A.pause(); A.currentTime = 0; } catch (e) { } paint(); return; }
-        if (SET.shuf) {                                   // 한 바퀴 돌았으면 다시 섞는다 — 방금 곡이 바로 또 나오지 않게
-            const last = Q.order[Q.order.length - 1];
-            let o = shuffled(Q.base);
-            if (o.length > 1 && o[0] === last) { o.push(o.shift()); }
-            Q.order = o;
+        if (auto && SET.rep === 'off') { Q.i = Q.order.length - 1; want = false; adv = false; try { A.pause(); A.currentTime = 0; } catch (e) { } paint(); mediaState(); return; }
+        if (SET.shuf) {                                   // 한 바퀴 돌았으면 다시 섞는다 — 방금 곡이 바로 또 나오지 않게 (미리 섞어 둔 것이 있으면 그것 · nextKey)
+            Q.order = (Q.wrap && Q.wrap.length === Q.base.length) ? Q.wrap : wrapOrder();
         }
+        Q.wrap = null;
         i = 0;
     }
     if (i < 0) i = Q.order.length - 1;
@@ -259,12 +353,14 @@ function toggle() {
         if (b.length) playFrom(src, SET.shuf ? b[Math.floor(Math.random() * b.length)] : b[0]);
         return;
     }
-    if (A.paused) { sessionOn(); const p = A.play(); if (p && p.catch) p.catch(function () { }); }
-    else A.pause();
+    if (A.paused) { want = true; sessionOn(); const p = A.play(); if (p && p.catch) p.catch(function () { }); }
+    else { want = false; adv = false; A.pause(); }
 }
 function stop() {
+    want = false; adv = false; clearTimeout(advT);
     if (A) { try { A.pause(); A.removeAttribute('src'); A.load(); } catch (e) { } }
-    Q.key = null; Q.i = -1;
+    Q.key = null; Q.i = -1; Q.next = null; Q.wrap = null;
+    preClear();
     byRhythm = false;
     try { if (navigator.mediaSession) navigator.mediaSession.metadata = null; } catch (e) { }
     paint();
@@ -272,15 +368,20 @@ function stop() {
 function setShuf(on) {
     SET.shuf = !!on; saveSet();
     makeOrder(Q.key);
+    preNext();
     paint();
 }
 function cycleRep() {
     SET.rep = SET.rep === 'all' ? 'one' : SET.rep === 'one' ? 'off' : 'all';
     saveSet();
+    Q.wrap = null;
+    preNext();
     paint();
 }
-function playing() { return !!(A && Q.key && !A.paused); }
+function playing() { return !!(A && Q.key && (!A.paused || adv)); }
 window.playlistOn = playing;
+// 플리를 틀어 둔 동안 (멈춰 둔 것도) — 이 화면을 저절로 새로 열면 안 된다 (update-check.js)
+window.playlistAlive = function () { return !!(A && Q.key); };
 
 // ==========================================
 // 잠금 화면 · 알림창 (Media Session)
@@ -294,7 +395,7 @@ function mediaMeta() {
         navigator.mediaSession.metadata = new MediaMetadata({ title: s.title, artist: s.artist || 'Benz', album: srcName(Q.src), artwork: art });
     } catch (e) { }
 }
-function mediaState() { try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = Q.key ? (A && !A.paused ? 'playing' : 'paused') : 'none'; } catch (e) { } }
+function mediaState() { try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = Q.key ? ((A && !A.paused) || adv ? 'playing' : 'paused') : 'none'; } catch (e) { } }
 function mediaPos() {
     try {
         if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !A) return;
@@ -305,8 +406,8 @@ function mediaPos() {
 (function mediaHandlers() {
     if (!('mediaSession' in navigator)) return;
     const on = function (k, f) { try { navigator.mediaSession.setActionHandler(k, f); } catch (e) { } };
-    on('play', function () { if (Q.key) { sessionOn(); A.play(); } else toggle(); });
-    on('pause', function () { if (A) A.pause(); });
+    on('play', function () { if (Q.key) { want = true; if (A.ended) { adv = true; step(1, true); return; } sessionOn(); const p = A.play(); if (p && p.catch) p.catch(function () { }); } else toggle(); });
+    on('pause', function () { want = false; adv = false; if (A) A.pause(); });
     on('previoustrack', function () { prev(); });
     on('nexttrack', function () { step(1, false); });
     on('seekto', function (d) { if (A && d && d.seekTime != null) { A.currentTime = d.seekTime; mediaPos(); } });
@@ -843,6 +944,6 @@ window.playlistState = function () {
     console.log(out);
     return out;
 };
-window.playlistDebug = { A: function () { return A; }, Q: Q, SET: SET, lists: function () { return LISTS; }, step: step, playFrom: playFrom };
+window.playlistDebug = { A: function () { return A; }, Q: Q, SET: SET, lists: function () { return LISTS; }, step: step, playFrom: playFrom, PRE: PRE, nextKey: nextKey, wake: wake, flags: function () { return { want: want, adv: adv }; } };
 console.log('[🎧 플레이리스트] 광장 ☰ 생활 · playlistOpen()');
 })();
