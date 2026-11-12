@@ -412,6 +412,13 @@ function css() {
         '#hr-zoom .hr-b{min-width:34px;font-size:16px;font-weight:bold;padding:3px 8px;}',
         '#hr-zoom span{font-size:11px;color:#f2e6c9;min-width:40px;text-align:center;text-shadow:0 0 3px #000;}',
         '#hr-tool .hr-b{padding:5px 8px;}',
+        // 🤝 사람 상호작용 (2026-11-12) — 사람을 누르면 뜨는 칸 · 가위바위보
+        '.hr-menu{position:absolute;z-index:8;background:rgba(18,16,13,.95);border:1px solid #6b5a36;border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px;min-width:128px;box-shadow:0 4px 14px rgba(0,0,0,.6);}',
+        '.hr-menu .n{font-size:12px;font-weight:bold;color:#ffe08a;padding:2px 4px 4px;white-space:nowrap;}',
+        '.hr-menu .hr-b{text-align:left;}',
+        '.hr-wf{position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;image-rendering:pixelated;}',
+        '.hr-rps .row{display:flex;gap:8px;justify-content:center;}',
+        '.hr-rps .row .hr-b{font-size:26px;padding:8px 14px;}',
         '.hr-modal{position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;}',
         '.hr-box{background:#1b1813;border:1px solid #6b5a36;border-radius:12px;padding:16px;min-width:240px;max-width:min(360px,90vw);max-height:80vh;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6;}',
         '.hr-box .acts{display:flex;gap:8px;justify-content:center;}',
@@ -437,8 +444,9 @@ function pickZ() {
 
 function spec() { try { if (typeof window.dotSpec === 'function') return window.dotSpec(); } catch (e) { } return { W: 352, H: 384, FOOT: 32 }; }
 
-function mkOne(user, label, other) {
-    const sp = spec(), k = S.z / 4;
+function mkOne(user, label, other, opt) {
+    opt = opt || {};
+    const sp = spec(), k = S.z / 4 * (opt.tiny ? TINY : 1);          // 🍍 작은 사람 — 광장처럼 5분의 1
     const wrap = document.createElement('div');
     wrap.className = 'hr-one';
     const w = sp.W * k, h = sp.H * k;
@@ -450,14 +458,26 @@ function mkOne(user, label, other) {
     tag.textContent = label;
     tag.style.bottom = ((sp.H - HEAD_TOP) * k + 3) + 'px';
     wrap.appendChild(tag);
+    // 🫙 소원권(도깨비 방망이에 맞은 사람) — 사람 대신 물약 병 (광장과 같은 그림 · 같은 배)
+    const WA = window.plazaWishApi;
+    if (opt.wf && WA) {
+        const kind = opt.wf === 2 ? 2 : 1, sz = WA.size[kind] || WA.size[1];
+        const s2 = (sp.H * k * WA.tall) / WA.body;
+        try { if (a) a.el.style.opacity = '0'; } catch (e) { }
+        const im = document.createElement('img');
+        im.className = 'hr-wf'; im.src = WA.img[kind] || WA.img[1]; im.alt = ''; im.draggable = false;
+        im.style.width = (sz[0] * s2).toFixed(1) + 'px'; im.style.height = (sz[1] * s2).toFixed(1) + 'px';
+        im.style.bottom = ((sp.FOOT * k) - (WA.below[kind] || 0) * s2).toFixed(1) + 'px';
+        wrap.insertBefore(im, tag);
+    }
     S.scene.appendChild(wrap);
-    return { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null, bubAt: 0 };
+    return { wrap: wrap, actor: a, tag: tag, w: w, h: h, foot: sp.FOOT * k, bub: null, bubAt: 0, tiny: !!opt.tiny, wf: opt.wf || 0 };
 }
 function dropOne(o) { if (!o) return; try { if (o.actor) o.actor.stop(); } catch (e) { } try { o.wrap.remove(); } catch (e) { } }
-function putOne(o, x, y) {
+function putOne(o, x, y, zOver) {
     const z = S.z;
     o.wrap.style.transform = 'translate3d(' + (x * z - o.w / 2).toFixed(1) + 'px,' + (y * z - (o.h - o.foot)).toFixed(1) + 'px,0)';
-    o.wrap.style.zIndex = String(Math.round(y) * 2 + 1);
+    o.wrap.style.zIndex = String(zOver != null ? zOver : Math.round(y) * 2 + 1);           // 들린 사람은 든 사람 바로 앞
 }
 function bubble(o, text) {
     if (!o) return;
@@ -476,6 +496,323 @@ function feed(who, text) {
     if (S.lines.length > 5) S.lines.shift();
     const el = S.ov.querySelector('#hr-feed');
     if (el) el.innerHTML = S.lines.map(function (l) { return '<div><b>' + esc(l.who) + '</b> ' + esc(l.text) + '</div>'; }).join('');
+}
+
+// ==========================================
+// ★ 🤝 사람 상호작용 (2026-11-12 사용자 「사택에서도 광장처럼 모든 상호작용이 가능하게 해줘.」)
+// ==========================================
+//   사람을 누르면 광장처럼 고르는 칸이 뜬다 (꾸미는 중에는 사람이 숨으므로 안 뜬다)
+//     👤 정보 보기 · 🍍 작은 사람(파인애플) 손에 든다 / 머리에 얹는다 / 내려놓는다 · 작은 내가 큰 사람에게 올라가기 / 손에 앉기
+//     ✊ 가위바위보 — 든 사람에게서 빠져나가기 · 남이 든 작은 사람 뺏기 · 🪄 도깨비 방망이 때리기 · 🫙 소원권 사용
+//   ✗ 쑤시기 · 젖 마사지 · 벗기기 · 까기 · 끌고가기는 사택에 옮기지 않았다
+//   든 · 올라간 기록은 광장 자리 기록과 같은 꼴(cy · on · dn · sm)로 houseRoom/<집>/<사번> 에 실린다 — 누가 누구를 드는지는 광장과 같은 셈(cmapNow)
+//   멀면 그 사람에게 걸어가서 한다 (벽에 막히면 그만둔다)
+//   houseRps/<집>/<작은 사람> { a: 건 사람, b: 맞선 사람, k: 'esc' 빠져나가기 | 'take' 뺏기, at, p: { 사번: 'r'|'p'|'s' }, res }
+const TINY = 1 / 5;
+const CARRY = { HAND_UP: 78, HAND_X: 46, HAND_X2: 46, HEAD_SINK: 8, HEAD_SLOTS: [0, -15, 15, -30, 30], HEAD_MAX: 5, HAND_MAX: 2, NEAR: 16, DN_KEEP: 60000 };   // 광장과 같은 값 (칸 점 — 사택 한 단위는 그 4분의 1)
+const CARRY_WORD = { hand: '손에 든다', head: '머리에 얹는다' };
+const CLIMB_WORD = { head: '올라가기', hand: '손에 앉기' };
+const RPS_ICO = { r: '✊', p: '✋', s: '✌️' }, RPS_BEAT = { r: 's', p: 'r', s: 'p' };
+const RPS_COOL = 30000, RPS_WAIT = 25000;
+function tinyMe() { try { return typeof window.plazaTinyOf === 'function' && !!window.plazaTinyOf(u_()); } catch (e) { return false; } }
+function wishKind(code) { try { return window.plazaWishApi ? (window.plazaWishApi.kind(code) | 0) : 0; } catch (e) { return 0; } }
+function caged(code) { try { return !!(typeof window.gaduriOf === 'function' && window.gaduriOf(code)); } catch (e) { return false; } }
+function listOf(v) {
+    if (Array.isArray(v)) return v.filter(Boolean);
+    if (v && typeof v === 'object') { if (v.c) return [v]; return Object.keys(v).map(function (k) { return v[k]; }).filter(Boolean); }
+    return [];
+}
+function toastSay(t) { toast(t); }
+// 여기 있는 사람들의 기록 (나 + 남)
+function present() {
+    const o = {}, me = me_();
+    if (!S) return o;
+    o[me] = { cy: S.carry, on: S.on, dn: S.dn, sm: S.sm };
+    Object.keys(S.peers).forEach(function (c) { const p = S.peers[c]; if (p && p.one) o[c] = { cy: p.cy, on: p.on, dn: p.dn, sm: p.sm }; });
+    return o;
+}
+// 누가 누구를 — 광장 carryMapNow 와 같은 셈 (같은 둘 사이는 나중에 적은 것 · 여럿이 다투면 먼저 잡은 쪽 · 자리는 먼저 온 순서)
+function cmapNow() {
+    const P = present(), pairs = {};
+    const ok = function (by, c) { return by && c && by !== c && P[by] && P[c] && !P[by].sm && P[c].sm && !caged(c) && !caged(by); };
+    const claim = function (by, c, k, at) {
+        const key = by + '|' + c;
+        let q = pairs[key];
+        if (!q) q = pairs[key] = { by: by, c: c, start: at, last: -1, k: k };
+        if (at < q.start) q.start = at;
+        if (at >= q.last) { q.last = at; q.k = k; }
+    };
+    Object.keys(P).forEach(function (code) {
+        listOf(P[code].cy).forEach(function (x) { if (x && (x.k === 'hand' || x.k === 'head') && ok(code, x.c)) claim(code, x.c, x.k, Number(x.at) || 0); });
+        const o = P[code].on;
+        if (o && o.by && (o.k === 'hand' || o.k === 'head') && ok(o.by, code)) {
+            const cut = Number(((P[o.by] && P[o.by].dn) || {})[code]) || 0;
+            if ((Number(o.at) || 0) > cut) claim(o.by, code, o.k, Number(o.at) || 0);
+        }
+    });
+    const best = {};
+    Object.keys(pairs).forEach(function (key) { const q = pairs[key], b = best[q.c]; if (!b || q.start < b.start || (q.start === b.start && q.by < b.by)) best[q.c] = q; });
+    const of = {}, by = {}, full = {};
+    Object.keys(best).map(function (c) { return best[c]; }).sort(function (a, z) { return (a.start - z.start) || (a.c < z.c ? -1 : 1); }).forEach(function (q) {
+        const h = by[q.by] || (by[q.by] = { head: [], hand: [] });
+        if (h[q.k].length >= (q.k === 'head' ? CARRY.HEAD_MAX : CARRY.HAND_MAX)) { full[q.c] = q.by; return; }
+        h[q.k].push(q.c);
+        of[q.c] = { by: q.by, k: q.k, start: q.start };
+    });
+    return { of: of, by: by, full: full };
+}
+function CM() { return (S && S.cm) || cmapNow(); }
+function carrierOf(c) { return CM().of[c] || null; }
+function roomOn(by, k, except) { const h = CM().by[by]; const n = h ? h[k].filter(function (c) { return c !== except; }).length : 0; return n < (k === 'head' ? CARRY.HEAD_MAX : CARRY.HAND_MAX); }
+function noTxt(k) { return k === 'head' ? '머리 위가 꽉 찼습니다' : '양손이 다 찼습니다'; }
+function posOf(c) {
+    if (!S) return null;
+    if (c === me_()) return { x: S.x, y: S.y, one: S.me, face: (S.me && S.me.actor) ? (S.me.actor.facing() || 1) : 1 };
+    const p = S.peers[c]; if (!p || !p.one) return null;
+    return { x: p.x, y: p.y, one: p.one, face: (p.one.actor ? (p.one.actor.facing() || 1) : 1) };
+}
+// 손 · 머리 자리 (집 좌표 — 작은 사람의 발이 닿는 곳) · 광장 attachAt 과 같은 셈 (칸 점 ÷ 4)
+function attachAt(h, k, i) {
+    const sp = spec();
+    if (k === 'head') return { x: h.x + (CARRY.HEAD_SLOTS[i % CARRY.HEAD_SLOTS.length] || 0) / 4, y: h.y - (sp.H - sp.FOOT - HEAD_TOP - CARRY.HEAD_SINK) / 4 };
+    if (i === 1) return { x: h.x + h.face * CARRY.HAND_X2 / 4, y: h.y - CARRY.HAND_UP / 4 };
+    return { x: h.x - h.face * CARRY.HAND_X / 4, y: h.y - CARRY.HAND_UP / 4 };
+}
+// 한 장면마다 — 내 상태(작아짐 · 물약) · 내 든 목록 정리 · 들린 사람을 든 사람에게 붙여 그린다
+function carryTick(t) {
+    const me = me_();
+    if (t - (S.smAt || 0) > 700) {                                  // 🍍 · 🫙 이 바뀌었나
+        S.smAt = t;
+        const sm = tinyMe(), wk = wishKind(me);
+        if (sm !== !!S.sm || wk !== (S.wk | 0)) {
+            S.sm = sm; S.wk = wk; S.cv = (S.cv | 0) + 1;
+            if (S.me) { const f = S.me.actor ? S.me.actor.facing() : 1; dropOne(S.me); S.me = mkOne(u_(), nameOf(u_()), false, { tiny: sm, wf: wk }); try { S.me.actor.face(f); } catch (e) { } }
+            if (sm) { if (S.carry && S.carry.length) { S.carry = []; S.cv++; } }   // 작아지면 들고 있던 사람을 내려놓는다
+            else if (S.on) { S.on = null; S.cv++; }
+        }
+    }
+    S.cm = cmapNow();
+    const m = S.cm;
+    // 내 든 목록 — 여기 없거나 작지 않거나 남에게 간 사람은 걷는다
+    if (S.carry && S.carry.length) {
+        const keep = S.carry.filter(function (x) { const w = m.of[x.c]; return w && w.by === me; });
+        if (keep.length !== S.carry.length) { S.carry = keep; S.cv = (S.cv | 0) + 1; }
+    }
+    if (S.on) { const w = m.of[me]; if (!w || w.by !== S.on.by) { S.on = null; S.cv = (S.cv | 0) + 1; } }
+    if (S.dn) { Object.keys(S.dn).forEach(function (c) { if (t - S.dn[c] > CARRY.DN_KEEP) delete S.dn[c]; }); }
+    // 그린다 — 나 · 남 모두
+    Object.keys(m.of).forEach(function (c) {
+        const w = m.of[c], h = posOf(w.by), o = posOf(c);
+        if (!h || !o || !o.one) return;
+        const list = (m.by[w.by] || {})[w.k] || [];
+        const a = attachAt(h, w.k, Math.max(0, list.indexOf(c)));
+        const hz = parseInt(h.one.wrap.style.zIndex, 10) || (Math.round(h.y) * 2 + 1);
+        if (c === me) { S.x = a.x; S.y = a.y; } else { const p = S.peers[c]; p.x = p.tx = a.x; p.y = p.ty = a.y; }
+        putOne(o.one, a.x, a.y, hz + 1 + list.indexOf(c));
+    });
+}
+// 지금 들려 있나 (나)
+function heldMe() { const w = S ? CM().of[me_()] : null; return w || null; }
+
+// ── 누른 자리의 사람 (꾸미는 중이 아니면) — 작은 사람이 앞서고, 겹치면 앞(아래)에 있는 사람
+function personAt(cx, cy) {
+    if (!S || S.edit) return null;
+    let best = null, bz = -1;
+    Object.keys(S.peers).forEach(function (c) {
+        const p = S.peers[c]; if (!p || !p.one) return;
+        const b = p.one.wrap.getBoundingClientRect();
+        const half = b.width * (p.sm ? 0.32 : 0.2), mid = b.left + b.width / 2;
+        const top = b.top + b.height * (p.sm ? 0.3 : 0.28), bot = b.bottom - b.height * 0.04;
+        if (cx < mid - half || cx > mid + half || cy < top || cy > bot) return;
+        const z = (parseInt(p.one.wrap.style.zIndex, 10) || 0) + (p.sm ? 100000 : 0);
+        if (z > bz) { bz = z; best = c; }
+    });
+    return best;
+}
+function closeMenu() { if (S && S.menu) { try { S.menu.remove(); } catch (e) { } S.menu = null; } if (S && S.menuT) { clearTimeout(S.menuT); S.menuT = 0; } }
+function openMenu(cx, cy, title, items, onPick) {
+    closeMenu();
+    const m = document.createElement('div');
+    m.className = 'hr-menu';
+    m.innerHTML = '<div class="n">' + esc(title) + '</div>' + items.map(function (it) { return '<button class="hr-b" data-k="' + esc(it[0]) + '">' + it[1] + '</button>'; }).join('');
+    S.ov.appendChild(m);
+    S.menu = m;
+    m.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    const vw = S.ov.clientWidth || 360, vh = S.ov.clientHeight || 640, mw = m.offsetWidth || 130, mh = m.offsetHeight || 90;
+    m.style.left = Math.round(Math.max(8, Math.min(vw - mw - 8, cx - mw / 2))) + 'px';
+    m.style.top = Math.round(Math.max(56, Math.min(vh - mh - 8, cy - mh - 14))) + 'px';
+    m.querySelectorAll('[data-k]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); const k = b.getAttribute('data-k'); closeMenu(); onPick(k); }; });
+    S.menuT = setTimeout(closeMenu, 7000);
+    return true;
+}
+function infoOpen(c) { try { if (typeof window.openEmpDetailModal === 'function') window.openEmpDetailModal(c); } catch (e) { } }
+// 사람을 눌렀다 — 광장 carryTap 과 같은 갈래 (쑤시기 · 마사지 · 벗기기 · 까기 · 끌고가기 빼고)
+function personTap(c, cx, cy) {
+    const me = me_(), p = S.peers[c];
+    if (!p) return false;
+    const items = [];
+    const WA = window.plazaWishApi;
+    const bat = function () { try { return WA ? WA.batItem(c) : []; } catch (e) { return []; } };
+    const w = carrierOf(c), mw = carrierOf(me);
+    if (S.sm && !p.sm) {
+        // 작은 내가 큰 사람에게 — 올라가기 · 손에 앉기 · (든 사람이면) 가위바위보로 빠져나가기
+        if (!(mw && mw.by !== c) && !S.wk) ['head', 'hand'].forEach(function (k) { if (!(mw && mw.k === k) && roomOn(c, k, me)) items.push([k, CLIMB_WORD[k]]); });
+        if (mw && mw.by === c) {
+            const left = RPS_COOL - (now() - (S.rpsLost || 0));
+            items.push(left > 0 ? ['rpsx', '✊ 가위바위보 (' + Math.ceil(left / 1000) + '초 뒤)'] : ['rps-esc', '✊ 가위바위보로 빠져나가기']);
+        }
+    } else if (!S.sm && p.sm) {
+        if (w && w.by !== me) {
+            // 남이 든 작은 사람 — 가위바위보로 뺏기 (소원권은 못 뺏는다)
+            if (!p.wk && (roomOn(me, 'hand', c) || roomOn(me, 'head', c)) && !caged(me) && !caged(w.by)) items.push(['rps-take', '✊ 가위바위보로 뺏기 (' + esc(nameIn(w.by)) + ' 사원에게 있음)']);
+        } else {
+            const mine = !!(w && w.by === me);
+            ['hand', 'head'].forEach(function (k) { if (p.wk && k !== 'hand') return; if (mine && w.k === k) return; if (roomOn(me, k, c)) items.push([k, CARRY_WORD[k]]); });
+            if (mine && p.wk) items.unshift(['wish', '🫙 소원권 사용']);
+            if (mine) items.push(['down', '내려놓는다']);
+        }
+    }
+    bat().forEach(function (x) { items.push(x); });
+    items.push(['info', '👤 정보 보기']);
+    return openMenu(cx, cy, (p.wk ? '🫙 ' : (p.sm ? '🍍 ' : '')) + nameIn(c), items, function (k) {
+        if (k === 'info') { infoOpen(c); return; }
+        if (k === 'bonk') { if (WA) WA.bonk(c, toastSay); return; }
+        if (k === 'wish') { if (WA) WA.use(c, toastSay, function () { dropCarry(c); }); return; }
+        if (k === 'down') { dropCarry(c); toast('🍍 ' + nameIn(c) + ' 사원을 내려놓았습니다'); return; }
+        if (k === 'rpsx') { toast('✊ 방금 져서 조금 쉬어야 합니다'); return; }
+        if (k === 'rps-esc') { rpsStart(c, 'esc'); return; }
+        if (k === 'rps-take') { rpsStart(c, 'take'); return; }
+        if (S.sm) goDo({ t: 'climb', c: c, k: k }); else goDo({ t: 'take', c: c, k: k });
+    });
+}
+function dropCarry(c) {
+    if (!S) return;
+    S.carry = listOf(S.carry).filter(function (x) { return x.c !== c; });
+    S.dn = S.dn || {}; S.dn[c] = now();
+    S.cv = (S.cv | 0) + 1; S.cm = cmapNow();
+}
+// 가까우면 바로 · 멀면 걸어가서 (S.goto)
+function near(c) { const o = posOf(c); return o && Math.abs(o.x - S.x) <= CARRY.NEAR && Math.abs(o.y - S.y) <= CARRY.NEAR * 0.7; }
+function goDo(job) {
+    if (caged(me_()) || caged(job.c)) { toast('🔒 가두리 때문에 할 수 없습니다'); return; }
+    if (job.t === 'take') {
+        const p = S.peers[job.c];
+        if (!p || !p.sm) { toast('🍍 지금은 작지 않습니다'); return; }
+        const w = carrierOf(job.c);
+        if (w && w.by !== me_()) { toast('🍍 ' + nameIn(w.by) + ' 사원에게 가 있습니다'); return; }
+        if (!roomOn(me_(), job.k, job.c)) { toast('🍍 ' + noTxt(job.k)); return; }
+        if (w && w.by === me_()) { doJob(job); return; }                 // 이미 내게 — 손 ↔ 머리
+    }
+    if (job.t === 'climb') {
+        const mw = carrierOf(me_());
+        if (mw && mw.by === job.c) { doJob(job); return; }               // 이미 그 사람에게 — 손 ↔ 머리
+        if (!roomOn(job.c, job.k, me_())) { toast('🍍 ' + nameIn(job.c) + ' 사원 — ' + noTxt(job.k)); return; }
+    }
+    if (near(job.c)) { doJob(job); return; }
+    if (heldMe()) { toast('🍍 들려 있어 갈 수 없습니다'); return; }
+    S.goto = { job: job, at: now(), lx: S.x, ly: S.y, st: now() };
+}
+function doJob(job) {
+    const me = me_(), t = now();
+    S.goto = null;
+    if (job.t === 'take') {
+        const list = listOf(S.carry), e = list.filter(function (x) { return x.c === job.c; })[0];
+        if (e) e.k = job.k; else list.push({ c: job.c, k: job.k, at: t });
+        S.carry = list;
+        S.dn = S.dn || {}; S.dn[job.c] = t;                              // 스스로 올라온 기록은 꺼 둔다 (이제 내가 정한다)
+        S.cv = (S.cv | 0) + 1; S.cm = cmapNow();
+        toast('🍍 ' + nameIn(job.c) + ' 사원을 ' + (job.k === 'head' ? '머리에 얹었습니다' : '손에 들었습니다'));
+        if (S.peers[job.c] && S.peers[job.c].wk) toast('🫙 소원권을 주웠습니다 — 눌러서 「🫙 소원권 사용」');
+        return;
+    }
+    if (job.t === 'climb') {
+        S.on = { by: job.c, k: job.k, at: t };
+        S.cv = (S.cv | 0) + 1; S.cm = cmapNow();
+    }
+}
+// 걸어가기 — 한 장면마다 (손으로 움직이면 그만둔다 · 벽에 막혀 1.5초 못 가면 그만둔다)
+function gotoStep(dt) {
+    const g = S.goto; if (!g) return null;
+    const o = posOf(g.job.c);
+    if (!o) { S.goto = null; return null; }
+    if (near(g.job.c)) { const job = g.job; S.goto = null; goDo(job); return null; }
+    const t = now();
+    if (t - g.st > 1500) {
+        if (Math.hypot(S.x - g.lx, S.y - g.ly) < 4) { S.goto = null; toast('가까이 가서 다시 눌러 주십시오'); return null; }
+        g.st = t; g.lx = S.x; g.ly = S.y;
+    }
+    if (t - g.at > 15000) { S.goto = null; return null; }
+    return { dx: o.x - S.x, dy: o.y - S.y };
+}
+
+// ── ✊ 가위바위보 — esc: 들린 내가 든 사람과 · take: 남이 든 작은 사람을 두고 든 사람과
+function rpsRef(sub) { const d = db_(); return (d && S) ? d.ref('houseRps/' + S.hk + (sub ? '/' + sub : '')) : null; }
+function rpsStart(c, kind) {
+    const me = me_();
+    let tiny, a = me, b;
+    if (kind === 'esc') { const w = carrierOf(me); if (!w || w.by !== c) return; tiny = me; b = c; }
+    else { const w = carrierOf(c); if (!w || w.by === me) return; tiny = c; b = w.by; }
+    const r = rpsRef(tiny); if (!r) return;
+    r.transaction(function (cur) {
+        if (cur && now() - (Number(cur.at) || 0) < RPS_WAIT && !cur.res) return;      // 이미 하는 중
+        return { a: a, b: b, k: kind, at: now() };
+    }, function (err, ok) { if (err || !ok) toast('✊ 이미 가위바위보를 하고 있습니다'); });
+}
+function rpsListen() {
+    const r = rpsRef(); if (!r) return;
+    r.on('value', function (s) { if (!S) return; S.rps = s.val() || {}; rpsPaint(); });
+    S.refs.push(r);
+}
+function rpsPaint() {
+    if (!S) return;
+    const me = me_(), all = S.rps || {};
+    let mine = null, tiny = null;
+    Object.keys(all).forEach(function (c) { const g = all[c]; if (g && (g.a === me || g.b === me) && !mine) { mine = g; tiny = c; } });
+    let m = S.ov.querySelector('.hr-rps');
+    if (!mine) { if (m) m.remove(); return; }
+    const t = now();
+    if (!mine.res && t - (Number(mine.at) || 0) > RPS_WAIT) {                  // 아무도 안 냈다 — 걷는다 (건 사람이)
+        if (mine.a === me) { const rr = rpsRef(tiny); if (rr) rr.remove(); }
+        if (m) m.remove(); return;
+    }
+    const foe = mine.a === me ? mine.b : mine.a, pk = mine.p || {};
+    const title = mine.k === 'esc' ? (tiny === me ? nameIn(foe) + ' 사원에게서 빠져나가기' : nameIn(tiny) + ' 사원이 빠져나가려 합니다')
+                                   : (mine.a === me ? nameIn(foe) + ' 사원에게서 ' + nameIn(tiny) + ' 사원 뺏기' : nameIn(mine.a) + ' 사원이 ' + nameIn(tiny) + ' 사원을 뺏으려 합니다');
+    let body;
+    if (mine.res) {
+        const r = mine.res;
+        body = '<div style="text-align:center;font-size:30px;">' + RPS_ICO[pk[mine.a]] + ' vs ' + RPS_ICO[pk[mine.b]] + '</div><div style="text-align:center;">'
+            + (r === 'draw' ? '비겼습니다 — 다시!' : (esc(nameIn(r)) + ' 사원이 이겼습니다!')) + '</div>';
+    } else if (pk[me]) body = '<div style="text-align:center;">' + RPS_ICO[pk[me]] + ' 냈습니다 — ' + esc(nameIn(foe)) + ' 사원을 기다리는 중…</div>';
+    else body = '<div class="row"><button class="hr-b" data-r="r">✊</button><button class="hr-b" data-r="p">✋</button><button class="hr-b" data-r="s">✌️</button></div>';
+    const h = '<div class="hr-box"><b>✊ 가위바위보</b><small style="color:#aaa;">' + esc(title) + '</small>' + body + '</div>';
+    if (!m) { m = document.createElement('div'); m.className = 'hr-modal hr-rps'; m.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); S.ov.appendChild(m); }
+    if (m._h !== h) {
+        m._h = h; m.innerHTML = h;
+        m.querySelectorAll('[data-r]').forEach(function (b) {
+            b.onclick = function () { const rr = rpsRef(tiny + '/p/' + me); if (rr) rr.set(b.getAttribute('data-r')); };
+        });
+    }
+    // 둘 다 냈다 — 건 사람(a)의 화면이 판정을 적는다
+    if (!mine.res && pk[mine.a] && pk[mine.b] && mine.a === me) {
+        const x = pk[mine.a], y = pk[mine.b];
+        const res = x === y ? 'draw' : (RPS_BEAT[x] === y ? mine.a : mine.b);
+        const rr = rpsRef(tiny); if (rr) rr.update({ res: res, rt: now() });
+    }
+    // 판정 뒤 — 각자 제 몫을 한다 (든 사람이 내려놓는다 · 뺏은 사람이 든다 · 진 쪽은 잠시 쉰다)
+    if (mine.res && S.rpsDone !== tiny + ':' + mine.rt) {
+        S.rpsDone = tiny + ':' + mine.rt;
+        const r = mine.res;
+        if (r === 'draw') {
+            setTimeout(function () { if (mine.a === me) { const rr = rpsRef(tiny); if (rr) rr.update({ p: null, res: null, rt: null, at: now() }); } }, 1400);
+        } else {
+            const holder = mine.b, escWin = r === mine.a;
+            if (escWin && holder === me) dropCarry(tiny);                                    // 내가 진 든 사람 — 내려놓는다
+            if (escWin && mine.k === 'take' && mine.a === me) { const list = listOf(S.carry); list.push({ c: tiny, k: roomOn(me, 'hand', tiny) ? 'hand' : 'head', at: now() }); S.carry = list; S.cv = (S.cv | 0) + 1; }
+            if (!escWin && mine.a === me) S.rpsLost = now();
+            setTimeout(function () { if (mine.a === me) { const rr = rpsRef(tiny); if (rr) rr.remove(); } }, 1800);
+        }
+    }
 }
 
 // ==========================================
@@ -509,7 +846,8 @@ function enter(host) {
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
     document.body.appendChild(ov);
     S = {
-        host: hk, hk: hk, mem: mem, member: mine, mine: mine, md: {}, sh: {}, migr: {}, region: 'C', ov: ov, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
+        host: hk, hk: hk, mem: mem, member: mine, mine: mine, md: {}, sh: {}, migr: {}, region: 'C', ov: ov,
+        carry: [], on: null, dn: {}, cv: 0, scv: 0, sm: false, wk: 0, cm: null, goto: null, menu: null, rps: {}, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
         scene: ov.querySelector('#hr-scene'), z: 1, deco: {}, flist: [], fel: {}, peers: {}, lines: [],
         x: SPAWN.x, y: SPAWN.y, f: 1, moving: false, keys: {}, joy: null, drag: null, sel: null, edit: false,
         sx: -1, sy: -1, sMoving: false, sFace: 0, sent: 0, say: '', sayAt: 0, sSayAt: 0, last: now(), raf: 0, refs: []
@@ -581,7 +919,8 @@ function build() {
     S.ov.querySelector('#hr-frame').style.backgroundImage = 'url("' + DIR + 'frame.webp")';
     paintDeco();
     const u = u_();
-    S.me = mkOne(u, nameOf(u), false);
+    S.sm = tinyMe(); S.wk = wishKind(u.code);
+    S.me = mkOne(u, nameOf(u), false, { tiny: S.sm, wf: S.wk });
     try { S.me.actor.face(1); } catch (e) { }
     putOne(S.me, S.x, S.y);
     S.built = true;
@@ -665,6 +1004,7 @@ function listen() {
     rr.on('value', function (s) { if (!S) return; S.room = s.val() || {}; peersPaint(S.room); });
     S.refs.push(rr);
     S.myRef = d.ref('houseRoom/' + S.hk + '/' + u.code);
+    rpsListen();
     try { S.myRef.onDisconnect().remove(); } catch (e) { }
     S.sent = 0;
     send(false, true);
@@ -702,16 +1042,19 @@ function send(moving, force) {
     if (!S || !S.myRef) return;
     const t = now();
     const face = S.me && S.me.actor ? S.me.actor.facing() : S.f;
-    const changed = Math.abs(S.x - S.sx) > 0.5 || Math.abs(S.y - S.sy) > 0.5 || moving !== S.sMoving || face !== S.sFace || S.sayAt !== S.sSayAt;
+    const changed = Math.abs(S.x - S.sx) > 0.5 || Math.abs(S.y - S.sy) > 0.5 || moving !== S.sMoving || face !== S.sFace || S.sayAt !== S.sSayAt || S.cv !== S.scv;
     const stopping = !moving && S.sMoving;
     if (!force && !stopping && t - S.sent < BEAT_MS && (!changed || t - S.sent < SEND_MS)) return;
-    S.sent = t; S.sx = S.x; S.sy = S.y; S.sMoving = moving; S.sFace = face; S.sSayAt = S.sayAt;
+    S.sent = t; S.sx = S.x; S.sy = S.y; S.sMoving = moving; S.sFace = face; S.sSayAt = S.sayAt; S.scv = S.cv;
     const u = u_(); if (!u) return;
     let dot = null;
     try { dot = (typeof window.dotShownDot === 'function' ? window.dotShownDot(u) : u.dot) || null; } catch (e) { dot = u.dot || null; }
     try {
         S.myRef.set({ n: nameOf(u), x: Math.round(S.x), y: Math.round(S.y), f: face, m: moving ? 1 : 0, d: dot,
-                      s: S.say || null, st: S.sayAt || 0, at: t });
+                      s: S.say || null, st: S.sayAt || 0, at: t,
+                      // 🍍 작은 사람 · 🫙 소원권 · 든 사람 · 올라간 곳 · 내려놓은 때 (광장 자리 기록과 같은 꼴)
+                      sm: S.sm ? 1 : 0, wk: S.wk || 0, cy: (S.carry && S.carry.length) ? S.carry : null, on: S.on || null,
+                      dn: (S.dn && Object.keys(S.dn).length) ? S.dn : null });
     } catch (e) { }
 }
 function peersPaint(room) {
@@ -725,10 +1068,11 @@ function peersPaint(room) {
         seen[c] = 1;
         let p = S.peers[c];
         if (!p) { p = S.peers[c] = { x: Number(v.x) || SPAWN.x, y: Number(v.y) || SPAWN.y, one: null, st: 0, dk: '' }; }
-        const dk = JSON.stringify(v.d || {});
+        p.sm = !!v.sm; p.wk = Number(v.wk) || 0; p.cy = v.cy || null; p.on = v.on || null; p.dn = v.dn || null;
+        const dk = JSON.stringify(v.d || {}) + '|' + (p.sm ? 1 : 0) + '|' + p.wk;
         if (!p.one || p.dk !== dk) {
             if (p.one) dropOne(p.one);
-            p.one = mkOne({ code: c, dot: v.d || {} }, v.n || nameIn(c), true);
+            p.one = mkOne({ code: c, dot: v.d || {} }, v.n || nameIn(c), true, { tiny: p.sm, wf: p.wk });
             p.dk = dk;
             p.x = Number(v.x) || p.x; p.y = Number(v.y) || p.y;
             putOne(p.one, p.x, p.y);
@@ -765,6 +1109,15 @@ function loop() {
     let mag = 1;
     if (S.joy && (S.joy.dx || S.joy.dy)) { dx = S.joy.dx; dy = S.joy.dy; mag = Math.min(1, Math.hypot(dx, dy)); }
     if (S.edit && S.sel) { dx = 0; dy = 0; }                 // 가구를 놓는 동안엔 가구만 움직인다
+    // 🍍 들려 있으면 못 걷는다 — 스스로 올라간 것이면 움직이는 순간 내려온다
+    const held = heldMe();
+    if (held && (Math.abs(dx) > 0.08 || Math.abs(dy) > 0.08)) {
+        if (S.on && S.on.by === held.by) { const h = posOf(held.by); S.on = null; S.cv = (S.cv | 0) + 1; S.cm = cmapNow(); if (h) { S.x = h.x + 10; S.y = h.y + 2; if (cellAt(S.x, S.y) !== 255) { S.x = h.x; S.y = h.y; } } }
+        dx = 0; dy = 0;
+    }
+    // 걸어가서 하기 — 손으로 움직이면 그만둔다
+    if (S.goto && (Math.abs(dx) > 0.08 || Math.abs(dy) > 0.08)) S.goto = null;
+    else if (S.goto && !held) { const g = gotoStep(dt); if (g) { const l = Math.hypot(g.dx, g.dy) || 1; dx = g.dx / l; dy = g.dy / l; mag = 1; } }
     const len = Math.hypot(dx, dy);
     let moving = false;
     if (len > 0.08) {
@@ -803,8 +1156,10 @@ function loop() {
         putOne(p.one, p.x, p.y);
         if (p.one.bub && t - p.one.bubAt > 6000) bubble(p.one, null);
     });
+    carryTick(t);
     camera();
     toolPlace();
+    if (S.rps && Object.keys(S.rps).length) rpsPaint();
     send(moving);
     S.raf = requestAnimationFrame(loop);
 }
@@ -874,6 +1229,9 @@ function pointerSetup() {
             return;
         }
         const inp = S.ov.querySelector('#hr-in'); if (inp && document.activeElement === inp) inp.blur();
+        closeMenu();
+        // 🤝 사람을 눌렀다 — 고르는 칸 (걷지 않는다)
+        if (!S.edit) { const pc = personAt(e.clientX, e.clientY); if (pc) { const r0 = S.ov.getBoundingClientRect(); personTap(pc, e.clientX - r0.left, e.clientY - r0.top); e.preventDefault(); return; } }
         if (S.edit) {
             const el = e.target && e.target.closest ? e.target.closest('.hr-fu') : null;
             {
@@ -964,6 +1322,7 @@ let furnSub = null;            // 가구 칸 — 'own' 내 가구 · 'shop' 가�
 function ownCount() { let n = 0; FURN.forEach(function (f, t) { n += ownedOf(t); }); return n; }
 function editToggle() {
     if (!S || !S.mine) return;
+    closeMenu();
     S.edit = !S.edit;
     S.ov.classList.toggle('edit', S.edit);
     const b = S.ov.querySelector('[data-k="edit"]'); if (b) b.classList.toggle('on', S.edit);
@@ -1342,7 +1701,9 @@ window.houseRoomState = function () {
                  z: S.z, x: Math.round(S.x), y: Math.round(S.y), cell: cellAt(S.x, S.y), edit: S.edit, sel: S.sel,
                  wall: wallNo(), floor: floorNo(), skins: { L: [skinOf('L', 'w'), skinOf('L', 'f')], R: [skinOf('R', 'w'), skinOf('R', 'f')], C: [skinOf('C', 'w'), skinOf('C', 'f')] },
                  furn: S.flist.map(function (v) { const a = anchorOf(v); return { id: v.id, n: FURN[v.t].n, t: v.t, d: v.d, x: v.x, y: v.y, own: v.own, src: v.src, reg: regionAt(a.x, a.y), ok: placeOk(v) }; }),
-                 peers: Object.keys(S.peers), invited: Object.keys(INV) }
+                 peers: Object.keys(S.peers), invited: Object.keys(INV),
+                 peerSm: Object.keys(S.peers).some(function (c) { return S.peers[c].sm; }), peerPos: (function () { const c = Object.keys(S.peers)[0]; return c ? [Math.round(S.peers[c].x), Math.round(S.peers[c].y)] : null; })(),
+                 carry: S.carry, on: S.on, sm: S.sm }
              : { open: false, invited: Object.keys(INV) };
 };
 window.houseRoomDebug = { FURN: FURN, FB: FB, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: gradeOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };

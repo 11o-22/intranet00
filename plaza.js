@@ -1189,6 +1189,14 @@ const WF = {};
 function wfOf(code) { const v = code ? WF[code] : null; return (v && Number(v.until) > Date.now()) ? v : null; }
 function wfKind(code) { const v = wfOf(code); return v ? (Number(v.k) === 2 ? 2 : 1) : 0; }
 window.plazaWishOf = function (code) { return wfOf(code); };
+// 🏠 사택 상호작용이 쓴다 (2026-11-12 사용자 「사택에서도 광장처럼 모든 상호작용이 가능하게」) — 광장이 안 열려 있어도 된다
+window.plazaWishApi = {
+    img: WF_IMG, size: WF_SZ, below: WF_BELOW, body: WF_BODY, tall: WF_TALL,
+    kind: function (code) { return wfKind(code); },
+    batItem: function (code) { return wfBonkItem(code); },
+    bonk: function (code, say) { wfBonk(code, say); },
+    use: function (code, say, done) { wfUse(code, { say: say, held: true, done: done }); }
+};
 window.plazaWishForms = function () {
     return Object.keys(WF).map(function (c) { const v = WF[c] || {}; return { 사번: c, 물약: Number(v.k) === 2 ? '🌙 달' : '⏰ 시계', 때린사람: v.bn || v.by, 남은분: Math.max(0, Math.round((Number(v.until) - Date.now()) / 60000)) }; });
 };
@@ -1266,10 +1274,12 @@ function wfBonkItem(code) {
     if (!code || code === myCode() || !wfBatOn() || wfOf(code)) return [];
     return [['bonk', '🪄 때리기']];
 }
-function wfBonk(code) {
+// say — 알림 줄 (사택 화면이 부를 때는 그쪽 글줄 · 2026-11-12 사택 상호작용) · 광장이 안 열려 있어도 된다
+function wfBonk(code, say) {
+    const sysLine = say || window.__plazaSys;
     closeCarryMenu();
     const u = u_();
-    if (!u || !run || !wfBatOn()) return;
+    if (!u || (!run && !say) || !wfBatOn()) return;
     if (wfOf(code)) { sysLine('🪄 ' + nameIn(code) + ' 사원은 이미 소원권입니다.'); return; }
     if (typeof database === 'undefined' || !database) return;
     const kind = Math.random() < 0.5 ? 1 : 2;
@@ -1305,11 +1315,14 @@ function wfBonk(code) {
     });
 }
 // 🫙 든 물약을 쓴다 — 소원을 보내고 그 사원은 원래대로
-function wfUse(code) {
+// opt { say, held, done } — 사택 화면이 부를 때: 들고 있는지는 사택이 따진다(held) · 소원을 빌면 done()
+function wfUse(code, opt) {
+    opt = opt || {};
+    const sysLine = opt.say || window.__plazaSys;
     closeCarryMenu();
     const v = wfOf(code);
     if (!v) { sysLine('🫙 ' + nameIn(code) + ' 사원은 이미 원래 모습입니다.'); wfBtnPaint(); return; }
-    const w = carrierOf(code);
+    const w = opt.held ? { by: myCode() } : carrierOf(code);
     if (!w || w.by !== myCode()) { sysLine('🫙 손에 들고 있어야 쓸 수 있습니다.'); return; }
     if (typeof window.wishAsk !== 'function' || typeof window.wishSend !== 'function') return;
     const who = nameIn(code);
@@ -1331,6 +1344,7 @@ function wfUse(code) {
                 resend(); remap();
             }
             wfBtnPaint();
+            try { if (opt.done) opt.done(); } catch (e) { }
             sysLine('🫙 소원을 빌었습니다 — ' + who + ' 사원이 원래 모습으로 돌아왔습니다.');
             try { showCustomAlert('물약이 손에서 사라졌습니다.\n\n' + who + ' 사원이 원래 모습으로 돌아왔습니다.\n누가 읽었는지는 알 수 없습니다.'); } catch (e) { }
         });
@@ -6837,6 +6851,7 @@ function addLine(who, text, code, key, at) {
 function sysLine(text) {
     pushLine({ sys: 1, t: text });
 }
+window.__plazaSys = sysLine;
 
 function say(text) {
     const u = u_(); if (!run || !u) return;
