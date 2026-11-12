@@ -122,7 +122,7 @@ function use(S, s, a, rng, H) {
     else if (fx.revive) { if (u.fainted || u.hp <= 0) { u.fainted = false; u.hp = Math.max(1, ceil(u.max * fx.revive)); H.log(S, 82, { 대상: u.name, 회복후HP: u.hp }); done = true; } else H.log(S, 11); }
     else if (fx.dope) { const d = H.rankChange(S, u, fx.dope, 1, 'self', { dope: 1 }); done = d > 0; if (!done) { /* 상한 — 한도 문구는 rankChange 가 냈다 */ } }
     else if (fx.aid) { if (u.aid > 0) H.log(S, 11); else { u.aid = fx.aid; H.log(S, 91, { 대상: u.name, 횟수: fx.aid }); done = true; } }
-    if (done) { S.tcons.push({ s: s, item: a.item }); a.consumed = true; }
+    if (done) { S.tcons.push({ s: s, item: a.item, by: sd.own || sd.code || null }); a.consumed = true; }      // by — 쓴 사원 (더블 여정: 자리가 바뀌어도 그 사람 소지품에서 뺀다)
 }
 function ppApply(t, mode, no, say) {
     const eq = SK().equipped(t).filter(function (n) { return n !== 59; });

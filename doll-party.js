@@ -21,6 +21,14 @@
 //   다 고르면(25초가 지나면 저절로 · 안 고른 사원은 엔진이 대신) 방장 화면이 한 턴을 푼다 (doll-battle.js resolveParty). 방장이 끊기면 45초 뒤 남은 사람이 푼다.
 //   쓰러뜨리면 사원마다 경험치 · 교감 · 룬 조각을 제 기록에 받는다. 보스까지 가면 보상 (첫번째 여정 포인트 · 아케이드존 꿈결).
 //
+// ■ ★ 더블 배틀 여정 (2026-11-12 사용자 「펫 전투 더블 추가 · 여정이랑 출몰지 둘 다 · 끝까지 다」 — 3단계)
+//   떠나기 전에 「전투 방식」 을 고른다 — 싱글(지금까지처럼 사원마다 한 마리씩 동시에) · 더블(두 자리에서 2 : 2)
+//   더블 방은 둘까지 (탐사자당 한 자리 · 기획 DB03.1). 혼자면 두 자리를 다 맡는다 (왼쪽 → 오른쪽 → 전체 확인).
+//   괴담은 둘씩 나온다 — 닿은 괴담 + 그다음 살아 있는 괴담 (보스는 혼자 · 남은 하나도 혼자 — 그때는 둘이 치는 만큼 HP 가 는다)
+//   한 사원의 인형이 다 지치면 그 사원은 물러나고 자리를 남은 사원에게 넘긴다 (다음 준비 단계에 남은 사원의 인형이 그 자리를 채운다 · DB03.2 · DB5.5)
+//   쓰러진 자리는 그 턴에는 비워 두고, 턴이 끝난 뒤 자리 주인이 다음 인형을 고른다 (충원 판 — fight.refill · need)
+//   판 기록 — run.dbl = 1 · fight.foes [상대 둘] · fight.m2 같이 나온 괴담 · fight.picks/<사번> = { A: 행동, C: 행동 } (맡은 자리마다)
+//
 // ■ 적히는 자리
 //   dollLobby/<열쇠> = { at, j, diff, lead, leadName, members: { 사번: { name, at } }, run }
 //   dollRun/<열쇠>   = { at, j, diff, lead, stage(walk·fight·clear·lose·quit), x, order:[사번…], mons:[{ i, x, y, boss, dead }],
@@ -112,7 +120,7 @@ function useOne(j) {
 // ==========================================
 // 방 — 고르고 · 모이고 · 떠난다
 // ==========================================
-const VIEW = { dim: null, j: 'j1', diff: 'D', lob: {}, lobRef: null, my: null };
+const VIEW = { dim: null, j: 'j1', diff: 'D', dbl: false, lob: {}, lobRef: null, my: null };
 function lobBind() {
     const d = db_();
     if (!d || VIEW.lobRef) return;
@@ -158,13 +166,13 @@ function paint() {
     if (L) {
         const ms = Object.keys(L.members || {});
         const isLead = L.lead === me.code;
-        html = '<h3>' + J[L.j].ic + ' ' + esc(J[L.j].n) + ' · 난이도 ' + L.diff + '</h3><div class="sub">' + esc(L.leadName) + ' 사원의 방 — 셋까지 같이 떠납니다. 방장이 출발하면 모두 같은 어둠에 들어갑니다.</div>'
+        html = '<h3>' + J[L.j].ic + ' ' + esc(J[L.j].n) + ' · 난이도 ' + L.diff + (L.dbl ? ' · 더블 배틀' : '') + '</h3><div class="sub">' + esc(L.leadName) + ' 사원의 방 — ' + (L.dbl ? '둘' : '셋') + '까지 같이 떠납니다. 방장이 출발하면 모두 같은 어둠에 들어갑니다.' + (L.dbl ? '<br>더블 배틀 — 두 자리에서 2 : 2. 둘이 가면 한 자리씩, 혼자 가면 두 자리를 다 맡습니다.' : '') + '</div>'
             + ms.map(function (c) { const x = L.members[c]; return '<div class="gb-row"><div class="tx"><b>' + esc(x.name) + '</b>' + (c === L.lead ? ' <span style="color:#ffcf8f;font-size:10px">방장</span>' : '') + '</div></div>'; }).join('')
             + '<div style="font-size:10.5px;color:#ffcf8f;margin:10px 0 4px">내 동행</div>' + partyHtml()
             + '<div class="gb-btns">' + (isLead ? '<button class="gb-btn pri" data-k="go">출발한다 (' + ms.length + '명)</button>' : '<div class="sub" style="flex:1">방장이 출발하기를 기다리는 중…</div>') + '<button class="gb-btn" data-k="leave">나간다</button></div>';
     } else {
         const open = Object.keys(VIEW.lob).map(function (k) { return Object.assign({ _k: k }, VIEW.lob[k]); })
-            .filter(function (o) { return o && !o.run && o.members && Object.keys(o.members).length < 3 && now() - Number(o.at || 0) < LOBBY_LIVE; })
+            .filter(function (o) { return o && !o.run && o.members && Object.keys(o.members).length < (o.dbl ? 2 : 3) && now() - Number(o.at || 0) < LOBBY_LIVE; })
             .sort(function (a, b) { return b.at - a.at; });
         html = '<h3>🐾 여정</h3><div class="sub">봉제인형(동행 셋)이 함께 떠나는 어둠. 혼자도, 셋까지 같이도 갈 수 있고, 같이 가면 같이 싸웁니다.<br>괴담을 쓰러뜨리면 각성의 룬 조각이 나옵니다 — 난이도가 높을수록 높은 등급 조각 (드물게).</div>'
             + '<div style="font-size:10.5px;color:#ffcf8f;margin:4px 0">내 동행</div>' + partyHtml()
@@ -176,9 +184,12 @@ function paint() {
             }).join('')
             + '<div style="display:flex;gap:4px;align-items:center;margin:6px 0"><span style="font-size:10.5px;color:#ffcf8f;flex:0 0 auto">난이도</span>' + GR5.map(function (g) { return '<button class="gb-btn' + (VIEW.diff === g ? ' pri' : '') + '" data-d="' + g + '" style="flex:1;padding:6px 0">' + g + '</button>'; }).join('') + '</div>'
             + '<div class="sub" style="margin:0">난이도 ' + VIEW.diff + ' — 나오는 조각 ' + window.AWK.CAP[VIEW.diff].map(function (g) { return g + '급'; }).join(' · ') + ' · 괴담 Lv ' + window.DOLLBT.LV_OF_DIFF[VIEW.diff][0] + '~' + window.DOLLBT.LV_OF_DIFF[VIEW.diff][1] + ' (보스 +3) · 같이 가면 괴담 HP 가 는다</div>'
+            + '<div style="display:flex;gap:4px;align-items:center;margin:8px 0 2px"><span style="font-size:10.5px;color:#ffcf8f;flex:0 0 auto">전투 방식</span>'
+            + '<button class="gb-btn' + (!VIEW.dbl ? ' pri' : '') + '" data-m="0" style="flex:1;padding:6px 0">싱글</button><button class="gb-btn' + (VIEW.dbl ? ' pri' : '') + '" data-m="1" style="flex:1;padding:6px 0">더블</button></div>'
+            + '<div class="sub" style="margin:0">' + (VIEW.dbl ? '더블 — 두 자리에서 2 : 2. 괴담이 둘씩 나옵니다 · 방은 둘까지 (둘이면 한 자리씩 · 혼자면 두 자리 다)' : '싱글 — 사원마다 한 마리씩 내어 같이 싸웁니다 · 방은 셋까지') + '</div>'
             + '<div class="gb-btns"><button class="gb-btn pri" data-k="solo">혼자 떠난다</button><button class="gb-btn" data-k="make">방을 만든다</button></div>'
             + '<div style="font-size:10.5px;color:#ffcf8f;margin:12px 0 2px">열린 방</div>'
-            + (open.length ? open.map(function (o) { return '<div class="gb-row"><div class="tx"><b>' + esc(o.leadName) + ' 사원의 방</b><div>' + J[o.j].ic + ' ' + esc(J[o.j].n) + ' · 난이도 ' + o.diff + ' · ' + Object.keys(o.members).length + '/3</div></div><button class="gb-btn" data-join="' + esc(o._k) + '">들어간다</button></div>'; }).join('')
+            + (open.length ? open.map(function (o) { return '<div class="gb-row"><div class="tx"><b>' + esc(o.leadName) + ' 사원의 방</b><div>' + J[o.j].ic + ' ' + esc(J[o.j].n) + ' · 난이도 ' + o.diff + (o.dbl ? ' · 더블' : '') + ' · ' + Object.keys(o.members).length + '/' + (o.dbl ? 2 : 3) + '</div></div><button class="gb-btn" data-join="' + esc(o._k) + '">들어간다</button></div>'; }).join('')
                          : '<div class="sub">열린 방이 없습니다.</div>')
             + '<div class="gb-btns"><button class="gb-btn" data-k="x">닫는다</button></div>';
     }
@@ -187,11 +198,12 @@ function paint() {
     const P = VIEW.dim;
     Array.prototype.forEach.call(P.querySelectorAll('[data-j]'), function (b) { b.onclick = function () { VIEW.j = b.dataset.j; paint(); }; });
     Array.prototype.forEach.call(P.querySelectorAll('[data-d]'), function (b) { b.onclick = function () { VIEW.diff = b.dataset.d; paint(); }; });
+    Array.prototype.forEach.call(P.querySelectorAll('[data-m]'), function (b) { b.onclick = function () { VIEW.dbl = b.dataset.m === '1'; paint(); }; });
     Array.prototype.forEach.call(P.querySelectorAll('[data-join]'), function (b) { b.onclick = function () { joinLobby(b.dataset.join); }; });
     const on = function (k, f) { const b = P.querySelector('[data-k=' + k + ']'); if (b) b.onclick = f; };
     on('x', function () { P._close(); });
-    on('solo', function () { if (canGo(VIEW.j)) start(VIEW.j, VIEW.diff, null); });
-    on('make', function () { if (canGo(VIEW.j)) makeLobby(VIEW.j, VIEW.diff); });
+    on('solo', function () { if (canGo(VIEW.j)) start(VIEW.j, VIEW.diff, null, VIEW.dbl); });
+    on('make', function () { if (canGo(VIEW.j)) makeLobby(VIEW.j, VIEW.diff, VIEW.dbl); });
     on('go', function () { const L2 = myLobby(); if (L2 && canGo(L2.j)) start(L2.j, L2.diff, L2); });
     on('leave', function () { const L2 = myLobby(); if (L2) leaveLobby(L2); });
 }
@@ -203,11 +215,13 @@ function canGo(j) {
     if (!ready().length) { alert_('함께 갈 봉제인형이 없습니다.\n(동행 중이고 체력이 남은 인형이 하나는 있어야 합니다 — 도깨비 공방 보관소 · 수선소)'); return false; }
     return true;
 }
-function makeLobby(j, diff) {
+function makeLobby(j, diff, dbl) {
     const me = u_(), d = db_();
     const ref = d.ref(LOBBY).push();
     const m = {}; m[me.code] = { name: me.name, at: now() };
-    ref.set({ at: now(), j: j, diff: diff, lead: me.code, leadName: me.name, members: m }).then(function () {
+    const rec = { at: now(), j: j, diff: diff, lead: me.code, leadName: me.name, members: m };
+    if (dbl) rec.dbl = 1;                                                // 더블 배틀 방 — 둘까지
+    ref.set(rec).then(function () {
         try { ref.child('members/' + me.code).onDisconnect().remove(); } catch (e) { }
         paint();
     });
@@ -217,7 +231,7 @@ function joinLobby(k) {
     if (!L || !canGo(L.j)) return;
     db_().ref(LOBBY + '/' + k + '/members').transaction(function (c) {
         c = c || {};
-        if (Object.keys(c).length >= 3 && !c[me.code]) return;
+        if (Object.keys(c).length >= (L.dbl ? 2 : 3) && !c[me.code]) return;
         c[me.code] = { name: me.name, at: now() };
         return c;
     }).then(function (r) { if (!r || !r.committed) alert_('방이 가득 찼습니다.'); else paint(); });
@@ -239,13 +253,16 @@ function genMons(j) {
     const pool = J[j].mons ? J[j].mons.slice() : J[j].pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 4);
     return pool.map(function (i, n) { const m = sc.mons[n] || sc.mons[sc.mons.length - 1]; return { i: i, x: m.x, y: m.y }; }).concat([{ i: J[j].boss, x: sc.boss.x, y: sc.boss.y, boss: 1 }]);
 }
-function start(j, diff, lobby) {
+function start(j, diff, lobby, dbl) {
     const me = u_(), d = db_();
+    if (lobby) dbl = !!lobby.dbl;
     const ref = d.ref(RUN).push();
     const order = lobby ? Object.keys(lobby.members).sort(function (a, b) { return (a === lobby.lead ? -1 : b === lobby.lead ? 1 : (lobby.members[a].at || 0) - (lobby.members[b].at || 0)); }) : [me.code];
     const members = {};
     order.forEach(function (c) { members[c] = { name: (lobby ? lobby.members[c].name : me.name) }; });
-    ref.set({ at: now(), j: j, diff: diff, lead: me.code, stage: 'walk', x: 80, order: order, members: members, mons: genMons(j) }).then(function () {
+    const rec = { at: now(), j: j, diff: diff, lead: me.code, stage: 'walk', x: 80, order: order, members: members, mons: genMons(j) };
+    if (dbl) rec.dbl = 1;
+    ref.set(rec).then(function () {
         if (lobby) d.ref(LOBBY + '/' + lobby._k).update({ run: ref.key });
         if (VIEW.dim) { VIEW.dim._close(); VIEW.dim = null; }
         S.seenRun[ref.key] = 1;
@@ -365,6 +382,11 @@ function tick() {
 function isLead() { return !!(S.run && S.run.lead === S.code); }
 function alive(v) {
     const F = v.fight, S2 = F && F.d2;
+    if (S2 && S2.dbl && S2.sides) {                                      // 더블 — 살아 있는 인형이 선 자리의 주인들 (맡은 자리마다 행동을 낸다)
+        const out = [];
+        ['A', 'C'].forEach(function (k) { const sd = S2.sides[k]; if (!sd || !(sd.act >= 0)) return; const u = arr(sd.units)[sd.act]; const c = sd.own || sd.code; if (u && u.hp > 0 && !u.fainted && c && out.indexOf(c) < 0 && v.members[c] && !v.members[c].left) out.push(c); });
+        return out;
+    }
     return (v.order || []).filter(function (c) {
         const m = v.members[c]; if (!m || m.left || !m.dolls) return false;
         if (S2 && S2.sides) { const sd = Object.keys(S2.sides).map(function (k) { return S2.sides[k]; }).filter(function (x) { return x && x.code === c; })[0]; if (sd) return !sd.out && arr(sd.units).some(function (u) { return u && u.hp > 0 && !u.fainted; }); }
@@ -423,7 +445,10 @@ function startFight(id) {
         // 이긴 뒤 — 첫번째 여정의 글
         const run = S.run;
         if (r === 'win' && run && run.j === 'j1' && J1() && m != null && J1().enc[m] && window.DOLLSCENE.run()) {
-            window.DOLLSCENE.talk([{ sys: 1, t: String(J1().enc[m].out).replace(/<br>/g, '\n') }]).then(function () { if (S.run && (S.run.stage === 'clear' || S.run.stage === 'lose')) endRun(S.run.stage); });
+            const m2 = v && v.fight ? v.fight.m2 : null;
+            const lines = [{ sys: 1, t: String(J1().enc[m].out).replace(/<br>/g, '\n') }];
+            if (m2 != null && J1().enc[m2]) lines.push({ sys: 1, t: String(J1().enc[m2].out).replace(/<br>/g, '\n') });
+            window.DOLLSCENE.talk(lines).then(function () { if (S.run && (S.run.stage === 'clear' || S.run.stage === 'lose')) endRun(S.run.stage); });
             return;
         }
         if (run && (run.stage === 'clear' || run.stage === 'lose') && !S.ended) endRun(run.stage);
@@ -439,9 +464,11 @@ function applyWin(id, grow, side) {
     try {
         const sd = grow && grow.bySide && grow.bySide[side];
         if (sd) {
-            const ds = D.dolls(u), recs = arr(sd).map(function (g) { return ds[String(g.key)] ? window.DOLLBT.recOf(ds[String(g.key)], g.key) : null; });
+            // 더블 — 같은 목록에 동료의 인형도 들어 있다 (g.own = 주인 사번) → 내 것만
+            const mineG = function (g) { return !(g && g.own && g.own !== S.code); };
+            const ds = D.dolls(u), recs = arr(sd).map(function (g) { return (mineG(g) && ds[String(g.key)]) ? window.DOLLBT.recOf(ds[String(g.key)], g.key) : null; });
             window.D2BT.applyGrow(grow, recs, side, u);
-            arr(sd).forEach(function (g) { if (g.xp && ds[String(g.key)]) D.log('[🐾 여정] ' + D.nickOf(ds[String(g.key)]) + ' 경험치 +' + g.xp + (g.up ? ' → Lv ' + g.lv : '') + (g.wait ? ' (각성 돌파 필요)' : ''), u); });
+            arr(sd).forEach(function (g) { if (g.xp && mineG(g) && ds[String(g.key)]) D.log('[🐾 여정] ' + D.nickOf(ds[String(g.key)]) + ' 경험치 +' + g.xp + (g.up ? ' → Lv ' + g.lv : '') + (g.wait ? ' (각성 돌파 필요)' : ''), u); });
         }
     } catch (e) { console.warn('[🐾] 성장 기록', e); }
     // ★ 오른 레벨 · 경험치 · 노력치를 이 판의 인형 사본에도 — 다음 괴담이 지금 모습으로 (HP · PP · 상태는 판을 푸는 쪽이 적는다 · doll-battle.js snapBack)
@@ -459,7 +486,11 @@ function applyWin(id, grow, side) {
         if (Object.keys(up).length) S.ref.update(up).catch(function () { });
     } catch (e) { }
     const me = v.members && v.members[S.code];
-    try { const act = v.fight && v.fight.d2 && v.fight.d2.sides && v.fight.d2.sides[side]; const cu = act && arr(act.units)[act.act]; if (cu && cu.key && D.dolls(u)[cu.key]) D.bondUp(cu.key, u); } catch (e) { }
+    try {
+        const d2 = v.fight && v.fight.d2;
+        if (d2 && d2.dbl && d2.sides) ['A', 'C'].forEach(function (k) { const sd2 = d2.sides[k]; const cu = sd2 && (sd2.own || sd2.code) === S.code && sd2.act >= 0 ? arr(sd2.units)[sd2.act] : null; if (cu && cu.key && cu.hp > 0 && D.dolls(u)[cu.key]) D.bondUp(cu.key, u); });
+    } catch (e) { }
+    try { const act = v.fight && v.fight.d2 && !v.fight.d2.dbl && v.fight.d2.sides && v.fight.d2.sides[side]; const cu = act && arr(act.units)[act.act]; if (cu && cu.key && D.dolls(u)[cu.key]) D.bondUp(cu.key, u); } catch (e) { }
     const got = arr((v.fight && v.fight.drops && v.fight.drops[S.code]) || []);
     got.forEach(function (g) { window.AWK.add(window.AWK.SHARD(g), 1, u); });
     if (got.length) {
@@ -590,11 +621,19 @@ const PT = {
         if (!m || m.dead) return false;
         const n = alive(v).length || 1;
         const id = Date.now();
-        const foe = window.DOLLBT.monSpec(m.i, v.diff, n, 'mon:' + S.runKey + ':' + i);
-        const intro = (v.j === 'j1' && J1() && J1().enc[i]) ? String(J1().enc[i].in).replace(/<br>/g, ' ') : '';
+        const introOf = function (k) { return (v.j === 'j1' && J1() && J1().enc[k]) ? String(J1().enc[k].in).replace(/<br>/g, ' ') : ''; };
+        let foe, foes = null, m2 = null, intro = introOf(i);
+        if (v.dbl) {
+            // ★ 더블 — 닿은 괴담 + 그다음 살아 있는 괴담 (보스는 혼자). 둘이 나오면 한 마리씩 맡는 셈이라 HP 는 그대로, 혼자 나오면 둘이 치는 만큼 는다
+            if (!m.boss) { for (let k = 1; k < ms.length && m2 == null; k++) { const j = (i + k) % ms.length, x = ms[j]; if (x && !x.dead && !x.boss) m2 = j; } }
+            const each = m2 != null ? 1 : 2;
+            foe = window.DOLLBT.monSpec(m.i, v.diff, each, 'mon:' + S.runKey + ':' + i);
+            foes = [foe];
+            if (m2 != null) { foes.push(window.DOLLBT.monSpec(ms[m2].i, v.diff, each, 'mon:' + S.runKey + ':' + m2)); const t2 = introOf(m2); if (t2) intro = intro ? intro + ' ' + t2 : t2; }
+        } else foe = window.DOLLBT.monSpec(m.i, v.diff, n, 'mon:' + S.runKey + ':' + i);
         let d2 = null;
-        try { d2 = window.DOLLBT.partyStart(v, foe, S.runKey + ':' + id); } catch (e) { console.warn('[🐾] 전투 시작', e); return false; }
-        const fight = JSON.parse(JSON.stringify({ id: id, m: i, foe: foe, round: 1, roundAt: now(), intro: intro, d2: d2 }));   // undefined 를 빼고 (실서버는 섞이면 거부)
+        try { d2 = window.DOLLBT.partyStart(v, foes || foe, S.runKey + ':' + id); } catch (e) { console.warn('[🐾] 전투 시작', e); return false; }
+        const fight = JSON.parse(JSON.stringify({ id: id, m: i, m2: m2, foe: foe, foes: foes, round: 1, roundAt: now(), intro: intro, d2: d2 }));   // undefined 를 빼고 (실서버는 섞이면 거부)
         S.ref.update({ stage: 'fight', x: Math.round(PT.leadX()), fight: fight }).catch(function (e) {
             console.warn('[🐾] 전투 시작 기록 실패', e);
             try { window.DOLLSCENE.sys('괴담과의 전투를 시작하지 못했습니다. 잠시 뒤 다시 다가가 주세요.', 4000); } catch (x) { }

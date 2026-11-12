@@ -106,6 +106,7 @@ function objOf(v) { if (!v || typeof v !== 'object') return {}; if (Array.isArra
 function normS(S) {
     if (!S || !S.sides) return S;
     S.order = arrOf(S.order); S.allies = arrOf(S.allies); S.log = S.log ? arrOf(S.log) : []; S.tlog = [];
+    if (S.dbl) { S.foes = arrOf(S.foes); S.crew = arrOf(S.crew); }
     Object.keys(S.sides).forEach(function (s) {
         const sd = S.sides[s]; sd.units = arrOf(sd.units);
         sd.units.forEach(function (u) {
@@ -117,6 +118,7 @@ function normS(S) {
         });
     });
     S.field = S.field || {}; S.in = S.in || {};
+    if (S.dbl) { try { BT().link(S); } catch (e) { } }                  // 같은 편 두 자리는 인형 목록 하나를 같이 쓴다
     return S;
 }
 // 기록 → 엔진에 넣을 인형 (열쇠 · 종을 칸 안에 — 서버에서 온 것은 enumerable 이 아니라 사라진다)
@@ -734,7 +736,12 @@ function pickNext(cands, why) {
         menu(3);
         B.ui.txt.textContent = why === 'baton' ? '마음을 이어받을 인형을 고르세요.' : '다음으로 내보낼 인형을 선택해 주세요.';
         const box = menuBox(dollStrip(sd.units, sd.act, 'pick'));
-        Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { const i = Number(String(b.dataset.k).slice(3)); b.disabled = cands.indexOf(i) < 0; });
+        Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+            const i = Number(String(b.dataset.k).slice(3)); b.disabled = cands.indexOf(i) < 0;
+            const x = sd.units[i];
+            if (B.dbl && B.code && x && x.own && x.own !== B.code && cands.indexOf(i) < 0) b.style.display = 'none';      // 더블 여정 — 동료의 인형은 숨긴다 (괜찮습니다, 제가 할게요 의 후보는 남긴다)
+            if (B.dbl && b.classList.contains('cur') && !(x && x.hp > 0 && !x.fainted)) b.classList.remove('cur');
+        });
         B.pick = function (k) { fadeRm(box); menu(0); resolve(Number(String(k).slice(3))); };
     });
 }
@@ -814,12 +821,15 @@ async function itemPick(name) {
 // 소모된 아이템을 소지품에서 뺀다 (엔진이 돌려준 cons 가운데 내 진영 것)
 function consume(cons) {
     const u = u_();
-    const mine = function (s) { return s === mySide() || (B && B.dbl && s === 'C'); };   // 더블 — 오른쪽 자리(C)도 내 것
+    const mine = function (s, c) {
+        if (c && c.by != null && B && B.code) return c.by === B.code;          // 더블 여정 — 쓴 사원 (자리 주인)
+        return s === mySide() || (B && B.dbl && B.kind === 'wild' && s === 'C');   // 출몰지 더블 — 오른쪽 자리(C)도 내 것
+    };
     (cons || []).forEach(function (c) {
-        if (!mine(c.s)) return;
+        if (!mine(c.s, c)) return;
         try { if (typeof removeItemFromInventory === 'function') removeItemFromInventory(u, c.item, 1); } catch (e) { }
     });
-    if ((cons || []).some(function (c) { return mine(c.s); })) { try { if (typeof saveFields === 'function') saveFields({ inventory: 1 }); } catch (e) { } try { if (typeof updateUI === 'function') updateUI(); } catch (e) { } }
+    if ((cons || []).some(function (c) { return mine(c.s, c); })) { try { if (typeof saveFields === 'function') saveFields({ inventory: 1 }); } catch (e) { } try { if (typeof updateUI === 'function') updateUI(); } catch (e) { } }
 }
 // 내 턴의 행동 하나를 고른다 — 돌려주는 값: 행동 또는 'run' · 'ribbon'
 async function chooseAction(opt) {
@@ -1095,7 +1105,7 @@ function partialGrow(S, side) {
 function wearRunes(S, side, u) {
     const RT = window.PETRUNE; if (!RT || !S || !S.sides || !S.sides[side] || (B && B.tut)) return;
     let broke = [];
-    S.sides[side].units.forEach(function (x) { if (x.key && (x.enteredTurn || x.participated)) { try { broke = broke.concat(RT.wear(x.key, u) || []); } catch (e) { } } });
+    S.sides[side].units.forEach(function (x) { if (S.dbl && x.own && u && x.own !== u.code) return; if (x.key && (x.enteredTurn || x.participated)) { try { broke = broke.concat(RT.wear(x.key, u) || []); } catch (e) { } } });   // 더블 여정 — 같은 목록의 동료 인형은 빼고
     if (broke.length) { setTimeout(function () { try { window.DOLLSCENE.sys('💠 ' + broke.map(RT.tag).join(' · ') + ' 룬이 깨졌다 (전투 ' + RT.WEAR_MAX + '번)', 4000); } catch (x) { } }, 1600); }
 }
 
@@ -1207,7 +1217,11 @@ function paintPos(s, mode) {
     const u = sideUnit(s);
     if (!u || u.fainted || (B.shown[s] != null && B.shown[s] <= 0)) { e.innerHTML = ''; return; }     // 빈자리 · 이번 턴에 쓰러진 자리
     const back = !isFoeS(s);
-    e.innerHTML = '<div class="' + (back ? 'bob2' : 'bob') + '" style="' + D().spriteCss(u.sp || 1, P.px, back, unitArt(u)) + '"></div>';
+    if (u.mon != null) {                                                // 괴담 — 조금 크게 (보스는 더)
+        const px = u.boss ? 62 : 46;
+        e.innerHTML = '<div style="' + D().monCss(u.mon, px) + '"></div>';
+        e.style.left = (P.cx - px / 2) + 'px'; e.style.top = (P.foot - px + 3) + 'px';
+    } else e.innerHTML = '<div class="' + (back ? 'bob2' : 'bob') + '" style="' + D().spriteCss(u.sp || 1, P.px, back, unitArt(u)) + '"></div>';
     e.style.filter = ''; e.style.opacity = '1'; e.style.transform = '';
 }
 // 작은 스테이터스 넷 — 바뀐 것만 고쳐 쓴다
@@ -1221,7 +1235,7 @@ function paintStatDbl() {
         if (box._vis !== vis) { box._vis = vis; box.style.visibility = vis ? '' : 'hidden'; }
         if (!vis) return;
         const foeS = isFoeS(s);
-        const nm = esc(u.name) + ' ' + unitG(u) + ' Lv.' + u.lv + tagOf(u, foeS);
+        const nm = esc(u.name) + ' ' + (u.mon != null ? (u.boss ? '보스' : '괴담') : (unitG(u) + ' Lv.' + u.lv)) + tagOf(u, foeS);
         if (box._nm !== nm) { box._nm = nm; box.querySelector('.nm').innerHTML = nm; }
         const at = (A[u.el] || {}).e || '';
         if (box._at !== at) { box._at = at; box.querySelector('.el').textContent = at; }
@@ -1240,8 +1254,8 @@ function tgtCard(s, u, can, self) {
     if (!u) { e.innerHTML = '<div class="tx">' + esc(DB.NAME[s]) + ' — 빈자리</div>'; return; }
     const p = Math.max(0, Math.min(1, u.hp / Math.max(1, u.max)));
     const px = 36;
-    e.innerHTML = '<div class="sp" style="width:' + px + 'px;height:' + px + 'px"><div style="' + D().spriteCss(u.sp || 1, px, false, unitArt(u)) + '"></div></div>'
-        + '<div class="tx">' + esc(u.name) + '<small>' + esc(DB.NAME[s]) + ' · ' + unitG(u) + ' Lv.' + u.lv + (isFoeS(s) ? '' : ' · ' + Math.ceil(Math.max(0, u.hp)) + '/' + u.max) + '</small>'
+    e.innerHTML = '<div class="sp" style="width:' + px + 'px;height:' + px + 'px"><div style="' + (u.mon != null ? D().monCss(u.mon, px) : D().spriteCss(u.sp || 1, px, false, unitArt(u))) + '"></div></div>'
+        + '<div class="tx">' + esc(u.name) + '<small>' + esc(DB.NAME[s]) + ' · ' + (u.mon != null ? (u.boss ? '보스' : '괴담') : (unitG(u) + ' Lv.' + u.lv)) + (isFoeS(s) ? '' : ' · ' + Math.ceil(Math.max(0, u.hp)) + '/' + u.max) + '</small>'
         + '<div class="hp"><i style="width:' + Math.round(p * 100) + '%;background:' + hpColor(p) + '"></i></div></div>';
 }
 function targetPick(s, mode, opt) {
@@ -1274,8 +1288,9 @@ function targetPick(s, mode, opt) {
                 tb.innerHTML = '<div class="lb">대기 중인 인형</div>' + bench.map(function (i) {
                     const u = sd.units[i], v = I ? I.check(I.viewOfUnit(u, false), opt.item, null, true) : { ok: false };
                     const p = Math.max(0, Math.min(1, u.hp / Math.max(1, u.max)));
+                    const who = (B.S.crew && B.S.crew.length > 1) ? (B.S.crew.filter(function (c) { return (c.code || null) === (u.own || null); })[0] || {}).name : '';
                     return '<button data-k="tb:' + i + '"' + (v.ok ? '' : ' disabled') + '><span class="s"><span style="position:absolute;left:0;top:0;' + D().spriteCss(u.sp || 1, 28, false, unitArt(u)) + '"></span></span>'
-                        + esc(u.name) + '<small style="font-weight:normal;font-size:6px">' + Math.ceil(Math.max(0, u.hp)) + '/' + u.max + (u.fainted || u.hp <= 0 ? ' · 쓰러짐' : '') + '</small></button>';
+                        + esc(u.name) + '<small style="font-weight:normal;font-size:6px">' + (who ? esc(who) + ' · ' : '') + Math.ceil(Math.max(0, u.hp)) + '/' + u.max + (u.fainted || u.hp <= 0 ? ' · 쓰러짐' : '') + '</small></button>';
                 }).join('');
                 Array.prototype.forEach.call(tb.querySelectorAll('button'), function (b) {
                     b.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
@@ -1307,7 +1322,8 @@ async function bagMenuDbl(s) {
         const n = M.bagHas(M.ITEM.RIBBON, u);
         const items = I ? I.ORDER.filter(function (nm) { return I.count(nm, u) > 0; }) : [];
         let h = dollStrip(sd.units, sd.act, 'switch');
-        h += '<button data-k="ribbon"' + ((n > 0 && catchLeft(u) > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (catchLeft(u) > 0 ? ' <small style="color:#524173">(오늘 포획 ' + catchN(u) + '/' + CATCH_MAX + ')</small>' : ' — 오늘은 더 잡을 수 없다 (' + CATCH_MAX + '마리)') + '</button>';
+        if (B.kind === 'wild') h += '<button data-k="ribbon"' + ((n > 0 && catchLeft(u) > 0) ? '' : ' disabled') + '>🎀 포옹 리본 ×' + n + (catchLeft(u) > 0 ? ' <small style="color:#524173">(오늘 포획 ' + catchN(u) + '/' + CATCH_MAX + ')</small>' : ' — 오늘은 더 잡을 수 없다 (' + CATCH_MAX + '마리)') + '</button>';
+        else h += '<div class="lb">🎀 포옹 리본은 어둠에서 쓸 수 없다</div>';
         if (items.length) h += '<div class="lb">🧷 펫 용품 — 쓰면 이 인형의 그 턴을 쓴다 (교체 다음 · 방어보다 먼저)</div>' + I.GROUPS.map(function (g) {
             const gs = items.filter(function (nm) { return I.get(nm).g === g; });
             if (!gs.length) return '';
@@ -1316,9 +1332,13 @@ async function bagMenuDbl(s) {
         else h += '<div class="lb">🧷 펫 용품이 없다 — 도깨비 공방 잡화점에서 꿈결로 산다</div>';
         h += '<button data-k="back">돌아간다</button>';
         const box = menuBox(h);
-        // 옆자리에 나와 있는 인형도 바꿔 낼 수 없다
-        const oa = B.S.sides[other].act;
-        Array.prototype.forEach.call(box.querySelectorAll('.dstrip button'), function (b) { const i = Number(String(b.dataset.k).slice(3)); if (i === oa && liveAt(other)) { b.disabled = true; const sm = b.querySelector('small'); if (sm) sm.textContent = Math.ceil(Math.max(0, sd.units[i].hp)) + '/' + sd.units[i].max + ' · 옆자리'; } });
+        // 옆자리에 나와 있는 인형 · 동료의 인형은 바꿔 낼 수 없다 (탐사자는 제 인형만 낸다)
+        const oa = B.S.sides[other].act, myOwn = sd.own || null;
+        Array.prototype.forEach.call(box.querySelectorAll('.dstrip button'), function (b) {
+            const i = Number(String(b.dataset.k).slice(3)), x = sd.units[i], sm = b.querySelector('small');
+            if ((x.own || null) !== myOwn) { b.disabled = true; b.style.display = 'none'; }
+            else if (i === oa && liveAt(other)) { b.disabled = true; if (sm) sm.textContent = Math.ceil(Math.max(0, x.hp)) + '/' + x.max + ' · 옆자리'; }
+        });
         B.ui.txt.textContent = '무엇을 쓸까?';
         const k = await wait();
         menu(0);
@@ -1420,8 +1440,8 @@ function actLine(s, a) {
     return u.name + ': ' + t;
 }
 // 두 자리 다 — 왼쪽 → 오른쪽 → 전체 확인 (DB02.2) · 돌려주는 값 { A, C } · 'run'
-async function chooseDbl() {
-    const order = ['A', 'C'].filter(liveAt);
+async function chooseDbl(sides) {
+    const order = (sides || ['A', 'C']).filter(liveAt);
     const acts = {};
     let i = 0;
     for (;;) {
@@ -1596,7 +1616,7 @@ async function beginDbl(opt) {
     await Promise.all(ms.map(function (s) { return whiteIn(s); }));
     showStat(true, true);
     await sleep(300);
-    const rest = B.S.log.filter(function (e) { return e.k !== 'enter'; });
+    const rest = B.S.log.filter(function (e) { return e.k !== 'enter'; }).map(function (e) { return e.k === 'swap' ? Object.assign({}, e, { k: 'msg' }) : e; });   // 자리잡기로 바뀐 자리는 이미 그려져 있다 — 글만
     if (rest.length) await playLog(rest);
     return loopDbl();
 }
@@ -1643,6 +1663,21 @@ function sideOfCode(S, code) { const o = arrOf(S.order); for (let i = 0; i < o.l
 function partyStart(run, spec, seed) {
     const order = arrOf(run.order).filter(function (c) { const m = run.members[c]; return m && !m.left && m.dolls; });
     const recsOf = function (c) { const ds = objOf(run.members[c].dolls); return Object.keys(ds).map(function (k) { return recOf(ds[k], k); }).filter(function (r) { return D().hpOf(r) > 0; }); };
+    if (run.dbl) {
+        // ★ 더블 — 탐사자 둘까지 · 탐사자당 한 자리 (혼자면 두 자리 다) · 상대는 둘 (또는 보스 하나)
+        const artOf2 = function (c) { const ds = objOf(run.members[c].dolls); const k = Object.keys(ds)[0]; return !!(k && ds[k] && ds[k].art); };
+        let crew = order.filter(function (c) { return recsOf(c).length; });
+        if (run.lead && crew.indexOf(run.lead) > 0) crew = [run.lead].concat(crew.filter(function (c) { return c !== run.lead; }));
+        crew = crew.slice(0, 2);
+        if (!crew.length) throw new Error('싸울 인형이 없습니다.');
+        const S2 = BT().start({ dbl: true, team: crew.map(function (c) { return { code: c, owner: run.members[c].name, my: recsOf(c), art: artOf2(c), auto: false }; }),
+            foe: Array.isArray(spec) ? spec : [spec], auto: { B: true }, seed: seed, mode: 'pve' });
+        const first = S2.log.slice();
+        S2.log = [];
+        const out = copy(S2);
+        out.first = copy(first.filter(function (e) { return e.k !== 'enter'; }));     // 등장 특성 줄 (자리잡기 등) — 화면이 처음에 보여 준다
+        return out;
+    }
     let lead = run.lead && order.indexOf(run.lead) >= 0 ? run.lead : order[0];
     if (!recsOf(lead).length) lead = order.filter(function (c) { return recsOf(c).length; })[0];   // 방장 인형이 다 지쳤으면 다음 사원이 A
     if (!lead) throw new Error('싸울 인형이 없습니다.');
@@ -1659,6 +1694,18 @@ function partyStart(run, spec, seed) {
 //   인형 기록(users/<사번>/pets)은 각자 화면이 판마다 적는다 (writeMine) — 수선소에서 고치기 전까지 그대로 남는다.
 function snapBack(P, run, S) {
     if (!S || !S.sides || !run || !run.members) return;
+    if (S.dbl) {                                                        // 더블 — 한 목록에 두 사원의 인형이 들어 있다 (u.own = 주인)
+        arrOf(S.sides.A.units).forEach(function (u) {
+            const c = u && u.own; if (!c || !run.members[c] || u.key == null) return;
+            const ds = objOf(run.members[c].dolls); if (!ds[String(u.key)]) return;
+            const b = 'members/' + c + '/dolls/' + u.key + '/';
+            P[b + 'hp'] = Math.max(0, Math.round(Number(u.hp) || 0));
+            P[b + 'pp'] = copy(objOf(u.pp));
+            P[b + 'st'] = u.status ? { k: u.status, c: u.sc | 0 } : null;
+            P[b + 'aid'] = Math.max(0, u.aid | 0);
+        });
+        return;
+    }
     arrOf(S.allies).forEach(function (s) {
         const sd = S.sides[s], c = sd && sd.code;
         if (!c || !run.members[c]) return;
@@ -1674,7 +1721,74 @@ function snapBack(P, run, S) {
     });
 }
 // 한 턴을 푼다 — 돌려주는 값은 run 아래에 적을 칸들 (update 한 번) · 방장(또는 대신 푸는 사람)이 부른다
+// ★ 더블 여정의 한 판 — 턴 하나, 또는 충원 판(F.refill — 빈자리를 그 자리 주인이 골라 채운다 · DB05.3)
+//   턴을 푼 뒤 빈자리가 있으면: 엔진이 고를 수 있는 것(상대)은 그 자리에서 채워 같은 판 출력에 잇고, 사원이 골라야 하면 다음 판을 충원 판으로 둔다
+//   picks/<사번> = { A: 행동, C: 행동 } — 그 사원이 맡은 자리마다 (안 낸 자리는 엔진이 대신)
+const REFILL_WAIT = 45000;
+function resolvePartyDbl(run, now) {
+    const F = run.fight, P = {};
+    const S = normS(copy(F.d2));
+    const picks = F.picks || {};
+    const boss = !!(F.foe && F.foe.boss);
+    if (picks[run.lead] === 'run' && !boss && !F.refill) {
+        P['fight/res'] = 'run'; P['stage'] = 'walk';
+        P['fight/log/' + F.round] = [{ t: (run.members[run.lead] || {}).name + ' 사원이 물러서자고 손짓했다. 파티가 괴담에게서 물러났다!', k: 'sys', run: 1, f: {} }];
+        P['fight/round'] = F.round + 1; P['fight/picks'] = null; P['fight/roundAt'] = now;
+        snapBack(P, run, S);
+        return P;
+    }
+    const late = !!F.need && now - Number(F.needAt || F.roundAt || 0) > REFILL_WAIT;       // 고르기를 너무 오래 기다렸다 — 엔진이 첫 후보로
+    const needOf = function (nd) { const sd = S.sides[nd.pick] || {}; return { side: nd.pick, code: sd.own || sd.code || null, cands: nd.cands, why: nd.why, at: arrOf(F.pickq).length, refill: F.refill ? 1 : null }; };
+    const seed = F.id + ':' + F.round;
+    let S2, lg, cons = null, over = null, grow = null;
+    try {
+        if (F.refill) {
+            const rf = BT().refill(S, { picks: arrOf(F.pickq), seed: seed, autoPick: late });
+            if (rf.need) { P['fight/need'] = needOf(rf.need); P['fight/needAt'] = now; P['fight/lock'] = null; return P; }
+            S2 = rf.S; lg = rf.log;
+        } else {
+            const input = { picks: arrOf(F.pickq), seed: seed, autoPick: late };
+            arrOf(S.allies).forEach(function (s) { const c = S.sides[s].own || S.sides[s].code; const a = picks[c]; if (a && typeof a === 'object' && a[s] && a[s].k) input[s] = a[s]; });
+            const r = BT().turn(S, input);
+            if (r.need) { P['fight/need'] = needOf(r.need); P['fight/needAt'] = now; P['fight/lock'] = null; return P; }
+            S2 = r.S; lg = r.log; cons = r.cons; over = r.over; grow = r.grow;
+        }
+    } catch (e) { console.warn('[🐾] 더블 판 풀기', e); P['fight/res'] = 'lose'; P['stage'] = 'lose'; return P; }
+    let nextRefill = null;
+    if (!over) {
+        // 다음 준비 — 빈자리 충원. 고를 것이 있으면 다음 판이 충원 판
+        const rf = BT().refill(S2, { picks: [], seed: F.id + ':' + (F.round + 1) });
+        if (rf.need) nextRefill = { side: rf.need.pick, code: (S2.sides[rf.need.pick] || {}).own || (S2.sides[rf.need.pick] || {}).code || null, cands: rf.need.cands, why: 'faint', at: 0, refill: 1 };
+        else { S2 = rf.S; lg = lg.concat(rf.log); }
+    }
+    S2.log = []; delete S2.tlog; delete S2.first;
+    if (!lg.length) lg = [{ t: '', k: 'ui', f: {} }];                    // 빈 판은 서버에 안 남는다 — 기다리는 화면이 풀리게 한 줄
+    P['fight/d2'] = copy(S2);
+    P['fight/log/' + F.round] = copy(lg);
+    P['fight/round'] = F.round + 1;
+    P['fight/picks'] = null; P['fight/pickq'] = null;
+    P['fight/need'] = nextRefill; P['fight/refill'] = nextRefill ? 1 : null; P['fight/needAt'] = nextRefill ? now : null;
+    P['fight/roundAt'] = now;
+    P['fight/cons'] = cons && cons.length ? cons : null;
+    snapBack(P, run, S2);
+    if (over) {
+        if (over.win === 'A') {
+            const drops = {}, nFoe = arrOf(F.foes).length || 1;
+            arrOf(run.order).forEach(function (c) {
+                const m = run.members[c]; if (!m || m.left || !m.dolls || !window.AWK) return;
+                let g = []; for (let i = 0; i < nFoe; i++) g = g.concat(window.AWK.rollDrop(run.diff || 'D', !!(arrOf(F.foes)[i] || F.foe).boss));
+                if (g.length) drops[c] = g;
+            });
+            P['fight/res'] = 'win'; P['fight/grow'] = copy(grow); P['fight/drops'] = drops;
+            P['mons/' + F.m + '/dead'] = 1;
+            if (F.m2 != null) P['mons/' + F.m2 + '/dead'] = 1;
+            P['stage'] = boss ? 'clear' : 'walk';
+        } else { P['fight/res'] = 'lose'; P['stage'] = 'lose'; }
+    }
+    return P;
+}
 function resolveParty(run, now) {
+    if (run && run.fight && run.fight.d2 && run.fight.d2.dbl) return resolvePartyDbl(run, now);
     const F = run.fight, P = {};
     const S = normS(copy(F.d2));
     const picks = F.picks || {};
@@ -1720,16 +1834,98 @@ function writeMine(S, side, u, grow) {
     const recs = myRecs(u);
     const sd = S.sides[side]; if (!sd) return;
     const byKey = {}; recs.forEach(function (r) { byKey[String(r.id)] = r; });
-    const list = sd.units.map(function (x, i) { return byKey[String(x.key)] || null; });
+    const list = sd.units.map(function (x, i) { return (S.dbl && x.own && u && x.own !== u.code) ? null : (byKey[String(x.key)] || null); });   // 더블 — 같은 목록의 동료 인형은 건너뛴다
     const g = grow || partialGrow(S, side);
     try { BT().applyGrow(g, list, side, u); mirror(list, u); } catch (e) { console.warn('[🧸] 기록', e); }
 }
 //   o = { code, lead, loc, get() 지금 판, pick(행동), pickq(칸), waitLog(round) → Promise(log | null), applyWin(grow, drops) }
+// ★ 더블 여정의 전투 화면 — 자리 넷 · 내가 맡은 자리(들)의 행동을 고른다 · 충원 판에서는 내 빈자리에 낼 인형을 고른다
+async function partyFightDbl(o) {
+    const run0 = o.get(), F0 = run0.fight;
+    const S = normS(copy(F0.d2));
+    const ui = build(o.loc || 'arcade', true);
+    const mineNow = function () { return ['A', 'C'].filter(function (x) { const sd = B.S.sides[x]; return sd && (sd.own || sd.code) === o.code; }); };
+    B = { ui: ui, kind: 'party', dbl: true, side: 'A', S: S, shown: {}, shownIdx: {}, pick: null, mon: F0.foe.mon, boss: !!F0.foe.boss, kind2: F0.foe.kind || '괴담', recs: [], code: o.code, lead: !!o.lead };
+    B.watch = !mineNow().length;
+    window.D2BT_ACTIVE = true;
+    ui.ov.addEventListener('pointerdown', onTap);
+    syncShown();
+    ['B', 'E'].forEach(function (x) { paintPos(x); });
+    paintStat();
+    await enterFx(ui, true);
+    await sleep(60);
+    ui.gF.style.transform = 'translateX(0)'; ui.gM.style.transform = 'translateX(0)';
+    await sleep(850);
+    const fs = ['B', 'E'].filter(liveAt).map(sideUnit);
+    let fresh = false; fs.forEach(function (f) { if (f.mon != null && D().darkSeen(f.mon)) fresh = true; });
+    if (F0.intro) await say(F0.intro, 2600);
+    await say((B.boss ? '무대 위의 ' : '') + fs.map(function (f) { return f.name; }).join(' · ') + D().josa(fs[fs.length - 1].name, '이') + ' 나타났다!' + (fresh ? ' (어둠 도감에 적혔다)' : ''), 1500);
+    showStat(true, false);
+    const ms = ['A', 'C'].filter(liveAt);
+    ms.forEach(function (x) { paintPos(x); const e = sprOf(x); if (e) e.style.opacity = '0'; });
+    paintStat();
+    if (ms.length) { await say(ms.map(function (x) { return sideUnit(x).name; }).join(', ') + '! 가자!', 1000); await Promise.all(ms.map(function (x) { return whiteIn(x); })); }
+    showStat(true, true);
+    if (Number(F0.round) <= 1 && arrOf(S.first).length) await playLog(arrOf(S.first).map(function (e) { return e.k === 'swap' ? Object.assign({}, e, { k: 'msg' }) : e; }));   // 등장 특성 (자리잡기 · 허세 …) — 바뀐 자리는 이미 그려져 있다
+    if (!B) return { res: 'gone' };
+    // 등장 특성으로 바뀐 자리 · 랭크를 맞춘다
+    { const r0 = o.get(); if (r0 && r0.fight && r0.fight.d2) { B.S = normS(copy(r0.fight.d2)); syncShown(); ['A', 'C', 'B', 'E'].forEach(function (x) { paintPos(x); }); paintStat(); } }
+    let next = Number(F0.round) || 1;
+    for (;;) {
+        const run = o.get();
+        if (!B) return { res: 'gone' };
+        if (!run || !run.fight) return partyEnd({ res: 'gone' }, o);
+        const F = run.fight;
+        const r = next;
+        if (!F.res && Number(F.round) === r) {
+            const mine = mineNow().filter(liveAt);
+            if (F.need && F.need.code === o.code && arrOf(F.pickq).length <= Number(F.need.at || 0)) {
+                const idx = await pickNext(arrOf(F.need.cands).map(Number), F.need.why);
+                if (!B) return { res: 'gone' };
+                o.pickq(idx);
+            } else if (mine.length && !(F.picks && F.picks[o.code]) && !F.need && !F.refill) {
+                const acts = await chooseDbl(mine);
+                if (!B) return { res: 'gone' };
+                if (acts === 'run') {
+                    if (!o.lead) { await say('물러서는 것은 파티장만 정할 수 있다.', 1200); continue; }
+                    if (F.foe.boss) { await say('무대 위의 것에게서는 도망칠 수 없다!', 1200); continue; }
+                    menu(0); o.pick('run');
+                } else if (acts) { menu(0); o.pick(copy(acts)); }
+            }
+            menu(0);
+            const anyMine = mineNow().length || (B.S.sides.A.units || []).some(function (x) { return (x.own || null) === o.code && x.hp > 0 && !x.fainted; });
+            B.ui.txt.textContent = !anyMine ? '내 봉제인형이 모두 지쳤다 — 동료의 싸움을 지켜본다…' : (F.need ? (F.need.code === o.code ? '' : '동료가 다음 인형을 고르는 중…') : '다른 사원이 고르기를 기다리는 중…');
+        }
+        const lg = await o.waitLog(r);
+        if (!B) return { res: 'gone' };
+        if (lg === 'need') continue;
+        if (!lg) return partyEnd({ res: 'gone' }, o);
+        await playLog(arrOf(lg));
+        if (!B) return { res: 'gone' };
+        next = r + 1;
+        const nowRun = o.get();
+        if (nowRun && nowRun.fight) {
+            const caught = Number(nowRun.fight.round) <= next;
+            if (nowRun.fight.d2 && caught) { B.S = normS(copy(nowRun.fight.d2)); syncShown(); ['A', 'C', 'B', 'E'].forEach(function (x) { paintPos(x); }); paintStat(); }
+            try { if (caught) { writeMine(B.S, 'A', u_(), null); consume(arrOf(nowRun.fight.cons)); } } catch (e) { }
+            if (nowRun.fight.res && caught) {
+                const res = nowRun.fight.res;
+                if (res === 'win') {
+                    try { if (nowRun.fight.grow) o.applyWin(nowRun.fight.grow, 'A'); } catch (e) { }
+                    const mm = mineNow().filter(liveAt).map(sideUnit)[0];
+                    if (mm) await say(fmt(pick(TX.win), { a: mm.name }), 1100);
+                }
+                return partyEnd({ res: res }, o);
+            }
+        }
+    }
+}
 async function partyFight(o) {
     if (B) return { res: 'busy' };
     const run0 = o.get();
     const F0 = run0.fight;
     if (!F0 || !F0.d2) return { res: 'gone' };
+    if (F0.d2.dbl) return partyFightDbl(o);
     const S = normS(copy(F0.d2));
     const side = sideOfCode(S, o.code);
     const ui = build(o.loc || 'arcade');
@@ -1803,7 +1999,7 @@ async function partyFight(o) {
 }
 async function partyEnd(r, o) {
     if (!B) return r;
-    try { if (B.S && B.side && !B.watch) wearRunes(B.S, B.side, u_()); } catch (e) { }
+    try { if (B.S && B.side && (!B.watch || B.dbl)) wearRunes(B.S, B.side, u_()); } catch (e) { }
     menu(0);
     const ov = B.ui.ov;
     await exitFx(B.ui);
