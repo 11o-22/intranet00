@@ -35,6 +35,29 @@
 //
 // ■ 누가 들어가나
 //   집주인 · 집주인의 룸메이트(house.roomie — 어느 쪽에 적혀 있든) · 집주인이 초대한 사원 · 꾸미기는 집주인만
+//   ★ 2026-11-12 사용자 「사택은 A등급 이상부터 들어갈 수 있게」 — 그 집의 등급(houseGrade · 둘 중 높은 쪽)이 A · S · L 일 때만 (손님도 그 집 등급으로)
+//
+// ■ ★ 같이 쓰는 사택 (2026-11-12 사용자)
+//   「각자 사택이 있는데, 그렇게 말고 동거하면 공유하는 식으로 하자. 대신 자신이 산 건 자신의 보관함에 있는 식이고.
+//     그 대신 양쪽의 방은 각각 꾸밀 수 있게 하자. 벽지나 바닥 등등. 이건 룸메가 바꼈을 때 자기 방은 유지되게 (거실 타인 방 제외.)
+//     두 사원이 있으면 랜덤으로 왼쪽 오른쪽 자리 되게 하고, 만일 바껴서 위치가 바뀌면 가구 설치한 그대로 좌우반전만 된 식으로 옮겨지는 형식으로.」
+//   「동거인이 방을 꾸며주길 원하면, 자신의 방에 들어가서 방 꾸미기 허용.」
+//   물어보고 정한 것 — 거실은 둘 다 꾸민다(각자 자기 보관함 것으로 · 남이 놓은 가구는 못 옮긴다 · 룸메가 바뀌면 거실 가구는 각자 보관함으로) ·
+//                     허용받은 동거인은 자기 것으로 내 방을 꾸민다(룸메가 바뀌면 그 가구는 동거인 보관함으로) ·
+//                     혼자 사는 사원은 양쪽 방을 다 쓴다(룸메가 생기면 남는 방 가구는 보관함으로)
+//   집은 가운데(x 515.5)를 두고 좌우가 똑같다 — 위 큰 방 + 가운데 복도 = 거실 C · 왼쪽 날개 L · 오른쪽 날개 R (regionAt)
+//   집 열쇠 hk — 서로를 가리키는 룸메이트 둘이면 두 사번을 줄 세워 「_」로 · 혼자면 내 사번 (hkOf)
+//
+//   houseMine/<사번>       { inv: { 가구: 개수 }, ow: { 벽지: 1 }, of: { 바닥지: 1 },     — 내 보관함 (어느 집에 살든 따라온다)
+//                            room: { w, wa, f, fa, furn: { 열쇠: { t, d, x, y } } } }   — 내 방. 가구 자리는 **왼쪽(L) 날개 기준**으로 적고
+//                                                                                    오른쪽 방에 살면 좌우를 뒤집어 그린다 (mirrorV — 옆모습 1 ↔ 3)
+//   houseShared/<hk>       { side: { 사번: 'L'|'R' } (처음 들어올 때 무작위 · transaction),
+//                            liv: { w, f } 거실 벽지 · 바닥지,
+//                            rw: { 방 주인: { w, wa, f, fa } } 허용받은 동거인이 바꾼 그 방 벽지 · 바닥지 (방 주인이 나중에 바꾸면 그쪽) · '_x' 혼자 사는 집의 남는 방,
+//                            allow: { 방 주인: 1 } 동거인에게 내 방 꾸미기를 허용,
+//                            furn: { 열쇠: { t, d, x, y, by } } 거실 · 남는 방 · 허용받은 남의 방에 놓은 가구 (집 좌표 그대로 · by 가 산 사람) }
+//   룸메이트가 바뀌면 hk 가 바뀐다 → 거실 · 남의 방 · 남는 방에 놓았던 가구는 새 집 기록에 없으니 저절로 보관함으로 돌아온다 (보관함 개수 = 산 개수 − 지금 집에 놓인 내 것)
+//   예전 houseDeco/<사번> 은 처음 들어올 때 houseMine 으로 옮긴다 — 산 것(가구 · 벽지 · 바닥지)과 고른 벽지 · 바닥지는 내 방으로, 놓아 둔 가구는 보관함으로
 //
 // ■ 콘솔
 //   houseRoomState()
@@ -130,18 +153,88 @@ function cellAt(x, y) { x = Math.round(x); y = Math.round(y); if (!MASK || x < 0
 // ==========================================
 // 꾸민 것
 // ==========================================
-function decoOf() { return (S && S.deco) || {}; }
-function wallNo(d) { const v = Number((d || decoOf()).w) || 1; return (v >= 1 && v <= WALLS) ? v : 1; }
-function floorNo(d) { const v = Number((d || decoOf()).f) || 1; return (v >= 1 && v <= FLOORS) ? v : 1; }
-function ownWall(n, d) { d = d || decoOf(); return n === 1 || !!(d.ow && d.ow[n]); }
-function ownFloor(n, d) { d = d || decoOf(); return n === 1 || !!(d.of && d.of[n]); }
-function furnList(d) {
-    const f = (d || decoOf()).furn || {};
-    return Object.keys(f).map(function (id) { const v = f[id] || {}; return { id: id, t: v.t | 0, d: (v.d | 0) & 3, x: Number(v.x) || 0, y: Number(v.y) || 0 }; })
-        .filter(function (v) { return v.t >= 0 && v.t < FURN.length; });
+// ==========================================
+// ★ 같이 쓰는 사택 (2026-11-12) — 자리 · 집 열쇠 · 보관함 · 방
+// ==========================================
+const Y0 = 395, X1 = 468, X2 = 564;          // 거실 아래끝 · 왼쪽 날개 오른끝 · 오른쪽 날개 왼끝 (walk.png 에서 잰 값 · 좌우가 1031 을 두고 똑같다)
+const REGS = ['L', 'R', 'C'];
+function regionAt(x, y) { if (y < Y0) return 'C'; if (x < X1) return 'L'; if (x >= X2) return 'R'; return 'C'; }
+function mateOf(c) { c = String(c || ''); const r = roomieOf(c); return (r && roomieOf(r) === c) ? r : null; }   // 서로 가리키는 짝만
+function hkOf(c) { c = String(c || ''); if (c.indexOf('_') >= 0) return c; const m = mateOf(c); return m ? [c, m].sort().join('_') : c; }
+function membersOf(hk) { return String(hk || '').split('_').filter(Boolean); }
+// 좌우 뒤집기 — 그림이 차지하는 칸을 가운데(1031) 를 두고 뒤집고 옆모습은 반대쪽 옆모습으로
+function mirrorV(v) {
+    const d2 = v.d === 1 ? 3 : (v.d === 3 ? 1 : v.d);
+    const b = FB[v.t][v.d], b2 = FB[v.t][d2];
+    return { t: v.t, d: d2, x: 1032 - v.x - b[2] - b2[0], y: v.y };
 }
-function ownedOf(t, d) { const inv = (d || decoOf()).inv || {}; return Math.max(0, Number(inv[t]) || 0); }
-function placedOf(t, d) { return furnList(d).filter(function (v) { return v.t === t; }).length; }
+function me_() { const u = u_(); return u ? String(u.code) : ''; }
+function shared() { return (S && S.sh) || {}; }
+function mineOf(c) { return (S && S.md && S.md[c]) || {}; }
+function sideOf(c) { const v = (shared().side || {})[c]; return (v === 'L' || v === 'R') ? v : null; }
+function mySide() { return sideOf(me_()); }
+function solo() { return !!(S && S.mem.length === 1); }
+// 그 날개의 방 주인 — 사번 · 혼자 사는 집의 남는 날개는 '_x' · 아직 모르면 null
+function ownerAt(reg) {
+    if (!S || reg === 'C') return null;
+    const c = S.mem.filter(function (m) { return sideOf(m) === reg; })[0];
+    if (c) return c;
+    return (solo() && sideOf(S.mem[0])) ? '_x' : null;
+}
+function clampSkin(v, n) { v = Number(v) || 1; return (v >= 1 && v <= n) ? v : 1; }
+// 벽지 · 바닥지 — 자리마다 (k: 'w' | 'f')
+function skinOf(reg, k) {
+    const n = k === 'w' ? WALLS : FLOORS, sh = shared();
+    if (reg === 'C') return clampSkin((sh.liv || {})[k], n);
+    const o = ownerAt(reg);
+    if (!o) return 1;
+    const rw = (sh.rw || {})[o] || {};
+    if (o === '_x') return clampSkin(rw[k], n);
+    const a = mineOf(o).room || {};
+    if (rw[k] && (Number(rw[k + 'a']) || 0) > (Number(a[k + 'a']) || 0)) return clampSkin(rw[k], n);   // 허용받은 동거인이 더 나중에 바꿨다
+    return clampSkin(a[k], n);
+}
+function curReg() { return (S && S.region) || 'C'; }
+function wallNo(reg) { return skinOf(reg || curReg(), 'w'); }
+function floorNo(reg) { return skinOf(reg || curReg(), 'f'); }
+function myStore() { return mineOf(me_()); }
+function ownWall(n) { const d = myStore(); return n === 1 || !!(d.ow && d.ow[n]); }
+function ownFloor(n) { const d = myStore(); return n === 1 || !!(d.of && d.of[n]); }
+function normF(x) { x = x || {}; return { t: x.t | 0, d: (x.d | 0) & 3, x: Number(x.x) || 0, y: Number(x.y) || 0 }; }
+// 지금 집에 놓인 가구 전부 — 두 사람의 방(왼쪽 기준 → 그 사람 자리로) + 같이 쓰는 자리
+function furnList() {
+    const out = [];
+    if (!S) return out;
+    S.mem.forEach(function (c) {
+        const sd = sideOf(c); if (!sd) return;
+        const f = (mineOf(c).room || {}).furn || {};
+        Object.keys(f).forEach(function (k) {
+            let v = normF(f[k]); if (v.t < 0 || v.t >= FURN.length) return;
+            if (sd === 'R') v = mirrorV(v);
+            v.id = 'm.' + c + '.' + k; v.src = 'm'; v.own = c; v.key = k;
+            out.push(v);
+        });
+    });
+    const sf = shared().furn || {};
+    Object.keys(sf).forEach(function (k) {
+        const x = sf[k] || {};
+        const v = normF(x); if (v.t < 0 || v.t >= FURN.length) return;
+        v.id = 's.' + k; v.src = 's'; v.own = String(x.by || ''); v.key = k;
+        out.push(v);
+    });
+    return out;
+}
+function ownedOf(t) { const inv = myStore().inv || {}; return Math.max(0, Number(inv[t]) || 0); }
+// 지금 집에 놓인 내 것 — 내 방(어느 집이든 따라온다) + 이 집의 같이 쓰는 자리에 내가 놓은 것
+function placedOf(t) {
+    const m = me_();
+    let n = 0;
+    const f = (myStore().room || {}).furn || {};
+    Object.keys(f).forEach(function (k) { if ((f[k] && f[k].t | 0) === t) n++; });
+    const sf = shared().furn || {};
+    Object.keys(sf).forEach(function (k) { const x = sf[k]; if (x && String(x.by) === m && (x.t | 0) === t) n++; });
+    return n;
+}
 function bbOf(v) { return FB[v.t][v.d]; }
 function baseOf(v) { return v.y + bbOf(v)[3]; }                    // 발밑 (앞뒤 차례)
 function footOf(v) {
@@ -151,6 +244,45 @@ function footOf(v) {
 }
 function anchorOf(v) { const b = bbOf(v); return { x: v.x + (b[0] + b[2]) / 2, y: v.y + b[3] - 1 }; }
 function placeOk(v) { const a = anchorOf(v); return cellAt(a.x, a.y) >= 128; }
+// 내가 여기에 놓을 수 있나 — 내 방 · 거실 · (혼자면) 남는 방 · 동거인이 허용한 그 방
+function canPlaceAt(reg) {
+    if (!S || !S.member) return false;
+    if (reg === 'C') return true;
+    const sd = mySide(); if (!sd) return false;
+    if (reg === sd) return true;
+    const o = ownerAt(reg);
+    if (o === '_x') return true;
+    return !!(o && (shared().allow || {})[o]);
+}
+function placeOkMe(v) { const a = anchorOf(v); return placeOk(v) && canPlaceAt(regionAt(a.x, a.y)); }
+function canTouch(v) { return !!(v && S && S.member && v.own === me_()); }                 // 내가 산 것만 옮기고 돌린다
+function canPutAway(v) {                                                                   // + 내 방에 동거인이 놓은 것은 넣어(동거인 보관함으로) 줄 수 있다
+    if (canTouch(v)) return true;
+    if (!v || !S || !S.member || v.src !== 's') return false;
+    const a = anchorOf(v); return regionAt(a.x, a.y) === mySide();
+}
+function regLabel(reg) {
+    if (reg === 'C') return '거실';
+    if (reg === mySide()) return '내 방';
+    const o = ownerAt(reg);
+    if (o === '_x') return '남는 방 (혼자 쓰는 동안)';
+    if (o) return nameIn(o) + ' 사원의 방' + ((shared().allow || {})[o] ? ' (꾸미기 허용됨)' : '');
+    return '방';
+}
+// 그 집 등급 — A 이상만 들어간다 (2026-11-12)
+const GR = ['D', 'C', 'B', 'A', 'S', 'L'];
+function gradeOf(hk) {
+    let best = -1;
+    membersOf(hk).forEach(function (c) {
+        const x = users()[c] || ((u_() && String(u_().code) === c) ? u_() : null);
+        let g = null;
+        try { if (x && typeof houseGrade === 'function') g = houseGrade(x); } catch (e) { }
+        if (!g && x && x.house) g = x.house.grade;
+        best = Math.max(best, GR.indexOf(g || 'D'));
+    });
+    return GR[Math.max(0, best)];
+}
+function gradeOk(hk) { return GR.indexOf(gradeOf(hk)) >= GR.indexOf('A'); }
 function blockedAt(x, y, skipId) {
     if (!S) return false;
     const L = S.flist || [];
@@ -187,19 +319,19 @@ function invListen() {
         }
         invFirst = false;
         // 들어가 있던 집에서 초대가 거둬졌다
-        if (S && S.host !== u.code && !isMate(S.host, u.code) && !INV[S.host]) {
+        if (S && !S.member && !S.mem.some(function (c) { return !!INV[c]; })) {
             leave(); try { if (typeof showCustomAlert === 'function') showCustomAlert('🏠 초대가 거둬져 사택에서 나왔습니다.'); } catch (e) { }
         }
         try { boxPaint(); } catch (e) { }
     });
 }
 setInterval(function () { try { invListen(); } catch (e) { } }, 2000);
-function canEnter(host) {
+function canEnter(hk) {
     const u = u_();
-    if (!u || !host) return false;
-    if (host === u.code) return true;
-    if (isMate(host, u.code)) return true;
-    return !!INV[host];
+    if (!u || !hk) return false;
+    const mem = membersOf(hk);
+    if (mem.indexOf(String(u.code)) >= 0) return true;
+    return mem.some(function (c) { return !!INV[c]; });         // 둘 중 누구에게든 초대받았다
 }
 
 // ==========================================
@@ -215,6 +347,12 @@ function css() {
         '#hr-view{position:absolute;inset:0;overflow:hidden;}',
         '#hr-world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;}',
         '.hr-l{position:absolute;left:0;top:0;background-repeat:no-repeat;image-rendering:pixelated;pointer-events:none;}',
+        // 자리마다 벽지 · 바닥지 (2026-11-12 같이 쓰는 사택) — 왼쪽 날개 · 오른쪽 날개 · 거실(위 큰 방 + 가운데 복도)
+        '.rg-L{clip-path:polygon(0 38.2752%,45.3488% 38.2752%,45.3488% 100%,0 100%);}',
+        '.rg-R{clip-path:polygon(54.6512% 38.2752%,100% 38.2752%,100% 100%,54.6512% 100%);}',
+        '.rg-C{clip-path:polygon(0 0,100% 0,100% 38.2752%,54.6512% 38.2752%,54.6512% 100%,45.3488% 100%,45.3488% 38.2752%,0 38.2752%);}',
+        '#hr-box .hr-b.go:disabled{opacity:.55;cursor:default;}',
+        '#hr-box .note{font-size:11px;color:#c9a96a;margin-top:4px;}',
         '#hr-scene{position:absolute;left:0;top:0;}',
         '.hr-fu{position:absolute;background-repeat:no-repeat;image-rendering:pixelated;pointer-events:none;}',
         '#hr-ov.edit .hr-fu{pointer-events:auto;cursor:grab;}',
@@ -344,19 +482,22 @@ function feed(who, text) {
 function enter(host) {
     const u = u_(), d = db_();
     if (!u) return;
-    host = String(host || u.code);
-    if (!canEnter(host)) { try { showCustomAlert('🏠 그 사택에는 들어갈 수 없습니다.\n(집주인 · 룸메이트 · 초대받은 사원만)'); } catch (e) { } return; }
+    const hk = hkOf(host || u.code);                       // 사번을 받아도 그 사람이 사는 집(룸메이트와 같이)으로
+    if (!canEnter(hk)) { try { showCustomAlert('🏠 그 사택에는 들어갈 수 없습니다.\n(사는 사원 · 초대받은 사원만)'); } catch (e) { } return; }
+    if (!gradeOk(hk)) { try { showCustomAlert('🏠 사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다.\n(지금 ' + gradeOf(hk) + ' 등급)'); } catch (e) { } return; }
     if (typeof window.dotActor !== 'function') { try { showCustomAlert('🏠 사람 그림을 아직 못 불렀습니다. 잠시 뒤에 다시 해 주십시오.'); } catch (e) { } return; }
     if (S) leave();
     css();
     const ov = document.createElement('div');
     ov.id = 'hr-ov';
-    const mine = host === u.code;
+    const mem = membersOf(hk), mine = mem.indexOf(String(u.code)) >= 0;
     ov.innerHTML = '<div id="hr-view"><div id="hr-world">'
-        + '<div class="hr-l" id="hr-floor"></div><div class="hr-l" id="hr-wall"></div><div class="hr-l" id="hr-frame"></div><div id="hr-scene"></div>'
+        + '<div class="hr-l rg-L" id="hr-floor-L"></div><div class="hr-l rg-R" id="hr-floor-R"></div><div class="hr-l rg-C" id="hr-floor-C"></div>'
+        + '<div class="hr-l rg-L" id="hr-wall-L"></div><div class="hr-l rg-R" id="hr-wall-R"></div><div class="hr-l rg-C" id="hr-wall-C"></div>'
+        + '<div class="hr-l" id="hr-frame"></div><div id="hr-scene"></div>'
         + '</div></div>'
         + '<div id="hr-top"><div id="hr-title"></div>'
-        + (mine ? '<button class="hr-b" data-k="edit">🛠 꾸미기</button><button class="hr-b" data-k="inv">💌 초대</button>' : '')
+        + (mine ? '<button class="hr-b" data-k="allow" style="display:none"></button><button class="hr-b" data-k="edit">🛠 꾸미기</button><button class="hr-b" data-k="inv">💌 초대</button>' : '')
         + '<button class="hr-b" data-k="x">✕ 나가기</button></div>'
         + '<div id="hr-chat"><div id="hr-feed"></div><input id="hr-in" maxlength="60" placeholder="말하기 (Enter)" autocomplete="off"></div>'
         + '<div id="hr-tool"><button class="hr-b" data-t="rot">↻ 돌리기</button><button class="hr-b" data-t="put">📦 넣기</button><button class="hr-b on" data-t="ok">✓ 놓기</button></div>'
@@ -366,7 +507,7 @@ function enter(host) {
         + '<div id="hr-load">🏠 사택에 들어가는 중…</div>';
     document.body.appendChild(ov);
     S = {
-        host: host, mine: mine, ov: ov, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
+        host: hk, hk: hk, mem: mem, member: mine, mine: mine, md: {}, sh: {}, migr: {}, region: 'C', ov: ov, view: ov.querySelector('#hr-view'), world: ov.querySelector('#hr-world'),
         scene: ov.querySelector('#hr-scene'), z: 1, deco: {}, flist: [], fel: {}, peers: {}, lines: [],
         x: SPAWN.x, y: SPAWN.y, f: 1, moving: false, keys: {}, joy: null, drag: null, sel: null, edit: false,
         sx: -1, sy: -1, sMoving: false, sFace: 0, sent: 0, say: '', sayAt: 0, sSayAt: 0, last: now(), raf: 0, refs: []
@@ -386,6 +527,7 @@ function enter(host) {
     ov.querySelector('[data-k="x"]').onclick = function () { leave(); };
     const eb = ov.querySelector('[data-k="edit"]'); if (eb) eb.onclick = function () { editToggle(); };
     const ib = ov.querySelector('[data-k="inv"]'); if (ib) ib.onclick = function () { inviteModal(); };
+    const ab = ov.querySelector('[data-k="allow"]'); if (ab) ab.onclick = function () { allowToggle(); };
     ov.querySelectorAll('#hr-tool [data-t]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); toolDo(b.getAttribute('data-t')); }; });
     ov.querySelectorAll('#hr-zoom [data-z]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); zoomStep(Number(b.getAttribute('data-z'))); }; });
     const inp = ov.querySelector('#hr-in');
@@ -431,8 +573,7 @@ function build() {
     const z = S.z = (S.edit && S.zEdit) ? S.zEdit : pickZ();
     const W = N * z;
     S.world.style.width = W + 'px'; S.world.style.height = W + 'px';
-    ['hr-floor', 'hr-wall', 'hr-frame'].forEach(function (id) {
-        const el = S.ov.querySelector('#' + id);
+    S.ov.querySelectorAll('#hr-world .hr-l').forEach(function (el) {
         el.style.width = W + 'px'; el.style.height = W + 'px'; el.style.backgroundSize = W + 'px ' + W + 'px';
     });
     S.ov.querySelector('#hr-frame').style.backgroundImage = 'url("' + DIR + 'frame.webp")';
@@ -458,7 +599,8 @@ function title() {
     if (!S) return;
     const el = S.ov.querySelector('#hr-title'); if (!el) return;
     const n = 1 + Object.keys(S.peers).filter(function (c) { return S.peers[c].one; }).length;
-    el.innerHTML = '🏠 ' + esc(S.mine ? '내 사택' : (nameIn(S.host) + ' 사원의 사택')) + '<small>' + n + '명</small>';
+    const ttl = S.member ? (S.mem.length > 1 ? '우리 사택 · ' + S.mem.map(nameIn).join(' · ') : '내 사택') : (S.mem.map(nameIn).join(' · ') + ' 사원의 사택');
+    el.innerHTML = '🏠 ' + esc(ttl) + '<small>' + n + '명</small>';
 }
 
 // ==========================================
@@ -466,12 +608,13 @@ function title() {
 // ==========================================
 function paintDeco() {
     if (!S || !S.built && !S.world) return;
-    const d = decoOf();
-    const fl = S.ov.querySelector('#hr-floor'), wl = S.ov.querySelector('#hr-wall');
-    const fu = 'url("' + DIR + 'floor' + floorNo(d) + '.webp")', wu = 'url("' + DIR + 'wall' + wallNo(d) + '.webp")';
-    if (fl.style.backgroundImage !== fu) fl.style.backgroundImage = fu;
-    if (wl.style.backgroundImage !== wu) wl.style.backgroundImage = wu;
-    S.flist = furnList(d);
+    REGS.forEach(function (r) {
+        const fl = S.ov.querySelector('#hr-floor-' + r), wl = S.ov.querySelector('#hr-wall-' + r);
+        const fu = 'url("' + DIR + 'floor' + skinOf(r, 'f') + '.webp")', wu = 'url("' + DIR + 'wall' + skinOf(r, 'w') + '.webp")';
+        if (fl && fl.style.backgroundImage !== fu) fl.style.backgroundImage = fu;
+        if (wl && wl.style.backgroundImage !== wu) wl.style.backgroundImage = wu;
+    });
+    S.flist = furnList();
     const z = S.z, seen = {};
     S.flist.forEach(function (v) {
         seen[v.id] = 1;
@@ -489,6 +632,7 @@ function paintDeco() {
     });
     Object.keys(S.fel).forEach(function (id) { if (!seen[id]) { S.fel[id].remove(); delete S.fel[id]; if (S.sel === id) select(null); } });
     if (S.editEl) editPaint();
+    allowPaint();
 }
 function furnPaint(el, v) {
     const z = S.z, r = (v.t / 2) | 0, c = (v.t % 2) * 4 + v.d;
@@ -498,7 +642,7 @@ function furnPaint(el, v) {
     el.style.transform = 'translate3d(' + (v.x * z) + 'px,' + (v.y * z) + 'px,0)';
     el.style.zIndex = String(Math.round(baseOf(v)) * 2);
     el.classList.toggle('sel', S.sel === v.id);
-    el.classList.toggle('bad', !placeOk(v));
+    el.classList.toggle('bad', canTouch(v) ? !placeOkMe(v) : false);
 }
 
 // ==========================================
@@ -507,16 +651,50 @@ function furnPaint(el, v) {
 function listen() {
     const d = db_(), u = u_();
     if (!d || !u) return;
-    const dr = d.ref('houseDeco/' + S.host);
-    dr.on('value', function (s) { if (!S) return; S.deco = s.val() || {}; paintDeco(); });
-    S.refs.push(dr);
-    const rr = d.ref('houseRoom/' + S.host);
+    S.mem.forEach(function (c) {                          // 사는 두 사람의 보관함 · 방
+        const r = d.ref('houseMine/' + c);
+        r.on('value', function (s) { if (!S) return; const v = s.val(); S.md[c] = v || {}; if (!v) migrate(c); paintDeco(); });
+        S.refs.push(r);
+    });
+    const sr = d.ref('houseShared/' + S.hk);             // 같이 쓰는 자리
+    sr.on('value', function (s) { if (!S) return; S.sh = s.val() || {}; ensureSides(); paintDeco(); });
+    S.refs.push(sr);
+    const rr = d.ref('houseRoom/' + S.hk);
     rr.on('value', function (s) { if (!S) return; S.room = s.val() || {}; peersPaint(S.room); });
     S.refs.push(rr);
-    S.myRef = d.ref('houseRoom/' + S.host + '/' + u.code);
+    S.myRef = d.ref('houseRoom/' + S.hk + '/' + u.code);
     try { S.myRef.onDisconnect().remove(); } catch (e) { }
     S.sent = 0;
     send(false, true);
+}
+// 왼쪽 · 오른쪽 — 처음 들어온 사람이 무작위로 정한다 (둘이 동시에 들어와도 한 번만 · transaction)
+function ensureSides() {
+    if (!S || !S.member || S.sideBusy) return;
+    const mem = S.mem.slice(), cur = shared().side || {};
+    if (mem.every(function (c) { return cur[c] === 'L' || cur[c] === 'R'; })) return;
+    const r = shRef('side'); if (!r) return;
+    S.sideBusy = true;
+    const s0 = S;
+    r.transaction(function (c) {
+        if (c && mem.every(function (m) { return c[m] === 'L' || c[m] === 'R'; })) return;
+        const flip = Math.random() < 0.5, o = {};
+        o[mem[0]] = flip ? 'R' : 'L';
+        if (mem[1]) o[mem[1]] = flip ? 'L' : 'R';
+        return o;
+    }, function () { s0.sideBusy = false; });
+}
+// 예전 houseDeco/<사번> → houseMine/<사번> (산 것 · 고른 벽지 · 바닥지는 내 방으로 · 놓아 둔 가구는 보관함으로)
+function migrate(c) {
+    if (!S || !S.member || S.migr[c]) return;
+    S.migr[c] = 1;
+    const d = db_(); if (!d) return;
+    d.ref('houseDeco/' + c).once('value').then(function (s) {
+        const o = s.val();
+        if (!o || typeof o !== 'object') return;
+        const nv = { room: { w: Number(o.w) || 1, f: Number(o.f) || 1, wa: 1, fa: 1 }, from: 'houseDeco' };
+        if (o.inv) nv.inv = o.inv; if (o.ow) nv.ow = o.ow; if (o.of) nv.of = o.of;
+        return d.ref('houseMine/' + c).transaction(function (cur) { return cur ? undefined : nv; });
+    }).catch(function () { });
 }
 function send(moving, force) {
     if (!S || !S.myRef) return;
@@ -603,6 +781,15 @@ function loop() {
     }
     S.moving = moving;
     if (moving && S.focus) S.focus = null;
+    // 지금 서 있는 자리(내 방 · 거실 · 남의 방) — 벽지 · 바닥지 칸과 「룸메 꾸미기 허용」 단추가 이것을 따른다
+    const reg = regionAt(S.x, S.y);
+    if (reg !== S.region) { S.region = reg; if (S.editEl && editTab !== 'furn') editPaint(); allowPaint(); }
+    // 룸메이트가 바뀌었다 (월요일 재배정 등) — 집이 달라졌으니 나온다
+    if (S.member && t - (S.hkAt || 0) > 3000) {
+        S.hkAt = t;
+        const nk = hkOf(me_());
+        if (nk !== S.hk) { leave(); try { showCustomAlert('🏠 룸메이트가 바뀌어 사택에서 나왔습니다. 다시 들어가 주십시오.'); } catch (e) { } return; }
+    }
     // 남 — 받은 자리로 다가간다
     Object.keys(S.peers).forEach(function (c) {
         const p = S.peers[c]; if (!p.one) return;
@@ -689,14 +876,17 @@ function pointerSetup() {
             const el = e.target && e.target.closest ? e.target.closest('.hr-fu') : null;
             {
                 // 가구를 누르면 그 가구 · 놓는 중에 빈 곳을 누르면 고른 가구 — 끄는 만큼 가구만 움직인다 (사람은 안 걷는다)
-                const id = el ? el.getAttribute('data-id') : S.sel;
-                const v = id ? S.flist.find(function (q) { return q.id === id; }) : null;
-                if (!v && S.sel) select(null);
+                //   남이 산 가구는 고르지 않는다 (내 방에 동거인이 놓은 것은 골라서 📦 넣기만)
+                let v = el ? S.flist.find(function (q) { return q.id === el.getAttribute('data-id'); }) : null;
+                if (v && !(canTouch(v) || canPutAway(v))) v = null;
+                if (!v && S.sel) { v = S.flist.find(function (q) { return q.id === S.sel; }) || null; if (!v) select(null); }
                 if (v) {
-                    if (S.sel !== id) select(id);
-                    const w = toWorld(e.clientX, e.clientY);
-                    S.drag = { id: id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: { id: v.id, t: v.t, d: v.d, x: v.x, y: v.y }, x0: v.x, y0: v.y, moved: false, cam: camAt() };
-                    try { view.setPointerCapture(e.pointerId); } catch (er) { }
+                    if (S.sel !== v.id) select(v.id);
+                    if (canTouch(v)) {
+                        const w = toWorld(e.clientX, e.clientY);
+                        S.drag = { id: v.id, pid: e.pointerId, ox: w.x - v.x, oy: w.y - v.y, v: Object.assign({}, v), x0: v.x, y0: v.y, moved: false, cam: camAt() };
+                        try { view.setPointerCapture(e.pointerId); } catch (er) { }
+                    }
                     e.preventDefault();
                     return;
                 }
@@ -744,8 +934,12 @@ function pointerSetup() {
             const dg = S.drag; S.drag = null;
             const v = dg.v;
             if (dg.moved) {
-                if (placeOk(v)) furnSave(v);
-                else { v.x = dg.x0; v.y = dg.y0; const el = S.fel[v.id]; if (el) furnPaint(el, v); toast('집 밖에는 놓을 수 없습니다'); }
+                if (placeOkMe(v)) furnWrite(v);
+                else {
+                    const a0 = anchorOf(v), bad = placeOk(v) ? regLabel(regionAt(a0.x, a0.y)) : '';
+                    v.x = dg.x0; v.y = dg.y0; const el = S.fel[v.id]; if (el) furnPaint(el, v);
+                    toast(bad ? bad + '에는 놓을 수 없습니다' : '집 밖에는 놓을 수 없습니다');
+                }
                 // 놓는 동안엔 사람이 안 걸으므로 — 가구가 화면 가장자리로 가면 화면을 가구 쪽으로 옮겨 더 끌 수 있게
                 const a = anchorOf(v), vw = S.view.clientWidth || 800, vh = S.view.clientHeight || 600;
                 const sx = a.x * S.z + (S.tx || 0), sy = a.y * S.z + (S.ty || 0);
@@ -765,7 +959,7 @@ function pointerSetup() {
 // ==========================================
 let editTab = 'furn';
 let furnSub = null;            // 가구 칸 — 'own' 내 가구 · 'shop' 가구 상점 (처음엔 산 가구가 있으면 내 가구)
-function ownCount(d) { let n = 0; FURN.forEach(function (f, t) { n += ownedOf(t, d); }); return n; }
+function ownCount() { let n = 0; FURN.forEach(function (f, t) { n += ownedOf(t); }); return n; }
 function editToggle() {
     if (!S || !S.mine) return;
     S.edit = !S.edit;
@@ -799,22 +993,22 @@ function picCss(t, box) {
 }
 function editPaint() {
     if (!S || !S.editEl) return;
-    const el = S.editEl, d = decoOf(), u = u_();
+    const el = S.editEl, u = u_();
     el.querySelectorAll('[data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === editTab); });
     const list = el.querySelector('.list'), sub = el.querySelector('.sub');
     const pts = '보유 ' + won(Math.floor(Number(u && u.points) || 0));
     let h = '';
     if (editTab === 'furn') {
-        const ownN = ownCount(d);
+        const ownN = ownCount();
         if (!furnSub) furnSub = ownN ? 'own' : 'shop';
         sub.innerHTML = '<button class="hr-b' + (furnSub === 'own' ? ' on' : '') + '" data-sub="own">📦 내 가구 ' + ownN + '</button>'
             + '<button class="hr-b' + (furnSub === 'shop' ? ' on' : '') + '" data-sub="shop">🛒 가구 상점</button>';
         sub.querySelectorAll('[data-sub]').forEach(function (b) { b.onclick = function () { furnSub = b.getAttribute('data-sub'); editPaint(); }; });
         if (furnSub === 'own') {
-            el.querySelector('.pts').textContent = '가구를 누르면 방에 놓입니다 · 놓인 가구는 눌러 끌어 옮깁니다';
+            el.querySelector('.pts').textContent = '지금 ' + regLabel(curReg()) + ' · 가구를 누르면 내 앞에 놓입니다 · 놓인 내 가구는 눌러 끌어 옮깁니다';
             FURN.forEach(function (f, t) {
-                const own = ownedOf(t, d); if (!own) return;
-                const placed = placedOf(t, d), left = Math.max(0, own - placed);
+                const own = ownedOf(t); if (!own) return;
+                const placed = placedOf(t), left = Math.max(0, own - placed);
                 h += '<div class="hr-card tap' + (left ? '' : ' done') + '" data-own="' + t + '"><div class="pic"><i style="' + picCss(t, 64) + '"></i></div><b>' + esc(f.n) + '</b>'
                     + '<small>' + (left ? '눌러서 놓기 · 남은 ' + left + '/' + own : '다 놓음 ' + own + '/' + own + ' · 눌러서 고르기') + '</small></div>';
             });
@@ -822,19 +1016,21 @@ function editPaint() {
         } else {
             el.querySelector('.pts').textContent = pts;
             FURN.forEach(function (f, t) {
-                const own = ownedOf(t, d);
+                const own = ownedOf(t);
                 h += '<div class="hr-card"><div class="pic"><i style="' + picCss(t, 64) + '"></i></div><b>' + esc(f.n) + '</b><small>' + won(f.p) + (own ? ' · 보유 ' + own : '') + '</small>'
                     + '<div class="row"><button class="hr-b" data-buy="' + t + '">사기</button></div></div>';
             });
         }
     } else {
         sub.innerHTML = '';
-        el.querySelector('.pts').textContent = pts;
-        const isW = editTab === 'wall', n = isW ? WALLS : FLOORS, cur = isW ? wallNo(d) : floorNo(d);
+        // 벽지 · 바닥지는 지금 서 있는 자리(내 방 · 거실 · 허용받은 동거인 방 · 남는 방)에 — 걸어서 옮겨 가며 바꾼다
+        const reg = curReg(), okReg = canPlaceAt(reg);
+        el.querySelector('.pts').textContent = pts + ' · 지금 ' + regLabel(reg) + (okReg ? '' : ' — 여기는 꾸밀 수 없습니다');
+        const isW = editTab === 'wall', n = isW ? WALLS : FLOORS, cur = isW ? wallNo(reg) : floorNo(reg);
         for (let i = 1; i <= n; i++) {
-            const own = isW ? ownWall(i, d) : ownFloor(i, d);
+            const own = isW ? ownWall(i) : ownFloor(i);
             h += '<div class="hr-card' + (i === cur ? ' cur' : '') + '"><div class="th" style="background-image:url(' + DIR + (isW ? 'wall' : 'floor') + i + '-t.webp)"></div><b>' + (isW ? '벽지 ' : '바닥지 ') + i + '</b>'
-                + (i === cur ? '<small>쓰는 중</small>' : own ? '<button class="hr-b" data-use="' + i + '">바꾸기</button>' : '<button class="hr-b" data-buy2="' + i + '">' + won(isW ? WALL_P : FLOOR_P) + ' 사기</button>') + '</div>';
+                + (i === cur ? '<small>쓰는 중</small>' : own ? (okReg ? '<button class="hr-b" data-use="' + i + '">바꾸기</button>' : '<small>보유</small>') : '<button class="hr-b" data-buy2="' + i + '">' + won(isW ? WALL_P : FLOOR_P) + ' 사기</button>') + '</div>';
         }
     }
     list.innerHTML = h;
@@ -874,12 +1070,13 @@ function toast(text) {
     S.ov.appendChild(t);
     setTimeout(function () { t.remove(); }, 2200);
 }
-function decoRef(sub) { const d = db_(); return d ? d.ref('houseDeco/' + S.host + (sub ? '/' + sub : '')) : null; }
+function mineRef(c, sub) { const d = db_(); return d ? d.ref('houseMine/' + c + (sub ? '/' + sub : '')) : null; }
+function shRef(sub) { const d = db_(); return (d && S) ? d.ref('houseShared/' + S.hk + (sub ? '/' + sub : '')) : null; }
 function buyFurn(t) {
     const f = FURN[t]; if (!f || !S || !S.mine) return;
-    ask('「' + esc(f.n) + '」을(를) <b>' + won(f.p) + '</b> 에 살까요?<br><small style="color:#aaa;">산 가구는 이 사택에 놓을 수 있습니다</small>', '사기', function () {
+    ask('「' + esc(f.n) + '」을(를) <b>' + won(f.p) + '</b> 에 살까요?<br><small style="color:#aaa;">산 가구는 내 보관함에 들어가 내 방 · 거실에 놓을 수 있습니다</small>', '사기', function () {
         if (!pay(f.p, '가구 「' + f.n + '」 구입')) { editPaint(); return; }
-        const r = decoRef('inv/' + t);
+        const r = mineRef(me_(), 'inv/' + t);
         if (r) r.transaction(function (c) { return (Number(c) || 0) + 1; }, function (err, ok) { if (err || !ok) toast('저장하지 못했습니다'); else toast('「' + f.n + '」을(를) 샀습니다 — 눌러서 놓습니다'); });
         furnSub = 'own';                                   // 산 가구가 바로 보이게 — 📦 내 가구로 넘긴다
         editPaint();
@@ -888,42 +1085,75 @@ function buyFurn(t) {
 function buySkin(tab, n) {
     if (!S || !S.mine) return;
     const isW = tab === 'wall', price = isW ? WALL_P : FLOOR_P, lab = (isW ? '벽지 ' : '바닥지 ') + n;
-    ask('「' + lab + '」을(를) <b>' + won(price) + '</b> 에 사서 바로 바꿀까요?', '사기', function () {
+    const reg = curReg(), okReg = canPlaceAt(reg);
+    ask('「' + lab + '」을(를) <b>' + won(price) + '</b> 에 살까요?<br><small style="color:#aaa;">' + (okReg ? '사서 바로 ' + esc(regLabel(reg)) + '에 바릅니다' : '내 보관함에 들어갑니다') + '</small>', '사기', function () {
         if (!pay(price, lab + ' 구입')) { editPaint(); return; }
-        const up = {}; up[(isW ? 'ow/' : 'of/') + n] = 1; up[isW ? 'w' : 'f'] = n;
-        const r = decoRef(); if (r) r.update(up).catch(function () { toast('저장하지 못했습니다'); });
+        const up = {}; up[(isW ? 'ow/' : 'of/') + n] = 1;
+        const r = mineRef(me_());
+        if (r) r.update(up).then(function () { if (okReg && S) useSkin(tab, n, reg, true); }).catch(function () { toast('저장하지 못했습니다'); });
     });
 }
-function useSkin(tab, n) {
+// 지금 서 있는 자리에 바른다 — 내 방은 내 기록(룸메가 바뀌어도 남는다) · 거실 · 동거인 방 · 남는 방은 이 집 기록
+function useSkin(tab, n, reg, bought) {
     if (!S || !S.mine) return;
-    const isW = tab === 'wall';
-    if (!(isW ? ownWall(n) : ownFloor(n))) return;
-    const up = {}; up[isW ? 'w' : 'f'] = n;
-    const r = decoRef(); if (r) r.update(up);
+    const isW = tab === 'wall', k = isW ? 'w' : 'f';
+    if (!bought && !(isW ? ownWall(n) : ownFloor(n))) return;      // bought — 방금 산 것 (내 기록이 아직 안 내려왔어도)
+    reg = reg || curReg();
+    if (!canPlaceAt(reg)) { toast('여기는 꾸밀 수 없습니다'); return; }
+    const up = {}; up[k] = n;
+    let r = null;
+    if (reg === 'C') r = shRef('liv');
+    else if (reg === mySide()) { up[k + 'a'] = now(); r = mineRef(me_(), 'room'); }
+    else { const o = ownerAt(reg); if (!o) return; up[k + 'a'] = now(); r = shRef('rw/' + o); }
+    if (r) r.update(up).catch(function () { toast('저장하지 못했습니다'); });
+}
+// 🔓 동거인에게 내 방 꾸미기 허용 (2026-11-12 사용자 「동거인이 방을 꾸며주길 원하면, 자신의 방에 들어가서 방 꾸미기 허용」)
+//   내 방에 서 있을 때만 단추가 뜬다 · 이 집(지금 동거인)에만 — 룸메가 바뀌면 다시 허용해야 한다
+function allowPaint() {
+    if (!S) return;
+    const b = S.ov.querySelector('[data-k="allow"]'); if (!b) return;
+    const show = S.member && S.mem.length > 1 && !!mySide() && curReg() === mySide();
+    b.style.display = show ? '' : 'none';
+    if (!show) return;
+    const on = !!(shared().allow || {})[me_()];
+    const tx = on ? '🔓 룸메 꾸미기 허용 중' : '🔒 룸메 꾸미기 허용';
+    if (b.textContent !== tx) b.textContent = tx;
+    b.classList.toggle('on', on);
+}
+function allowToggle() {
+    if (!S || !S.member || S.mem.length < 2 || curReg() !== mySide()) return;
+    const on = !!(shared().allow || {})[me_()];
+    const mate = S.mem.filter(function (c) { return c !== me_(); })[0];
+    const go = function () {
+        const r = shRef('allow/' + me_()); if (!r) return;
+        (on ? r.remove() : r.set(1)).then(function () { toast(on ? '방 꾸미기 허용을 껐습니다' : nameIn(mate) + ' 사원이 내 방을 꾸밀 수 있습니다'); }).catch(function () { toast('저장하지 못했습니다'); });
+    };
+    if (on) { go(); return; }
+    ask('🔓 <b>' + esc(nameIn(mate)) + '</b> 사원에게 내 방 꾸미기를 허용할까요?<br><small style="color:#aaa;">동거인은 자기 보관함의 가구 · 벽지 · 바닥지로 꾸밉니다 · 룸메가 바뀌면 그 가구는 동거인 보관함으로 돌아갑니다</small>', '허용', go);
 }
 function putNew(t) {
     if (!S || !S.mine) return;
     const left = ownedOf(t) - placedOf(t);
     if (left <= 0) return;
+    if (!canPlaceAt(regionAt(S.x, S.y))) { toast(regLabel(regionAt(S.x, S.y)) + '에는 놓을 수 없습니다 — 내 방이나 거실로 가서 놓아 주십시오'); return; }
     const b = FB[t][0];
     // 내 바로 위쪽(뒤)에 — 집 안이 아니면 몇 군데를 더 짚어 본다
     const tries = [[0, -10], [0, 30], [-60, -10], [60, -10], [0, -70]];
     let v = null;
     for (let i = 0; i < tries.length && !v; i++) {
         const c = { t: t, d: 0, x: Math.round(S.x + tries[i][0] - (b[0] + b[2]) / 2), y: Math.round(S.y + tries[i][1] - b[3]) };
-        if (placeOk(c)) v = c;
+        if (placeOkMe(c)) v = c;
     }
-    if (!v) v = { t: t, d: 0, x: Math.round(516 - (b[0] + b[2]) / 2), y: Math.round(300 - b[3]) };
-    const r = decoRef('furn'); if (!r) return;
-    const ref = r.push();
-    v.id = ref.key;
-    ref.set({ t: v.t, d: v.d, x: v.x, y: v.y }).then(function () { if (S) select(v.id); }).catch(function () { toast('놓지 못했습니다'); });
+    if (!v) v = { t: t, d: 0, x: Math.round(516 - (b[0] + b[2]) / 2), y: Math.round(300 - b[3]) };   // 거실 가운데
+    const d = db_(); if (!d) return;
+    v.key = d.ref('houseShared').push().key; v.src = null; v.own = me_();
+    furnWrite(v, function (id) { if (S) select(id); });
 }
 // 📦 내 가구 칸에서 누르면 — 남은 것이 있으면 내 앞에 하나 놓고 고른다 · 다 놓았으면 놓인 것을 차례로 골라 화면을 그쪽으로 옮긴다
 function ownTap(t) {
     if (!S || !S.mine || !ownedOf(t)) return;
     if (ownedOf(t) - placedOf(t) > 0) { S.focus = null; putNew(t); return; }
-    const on = S.flist.filter(function (v) { return v.t === t; });
+    const on = S.flist.filter(function (v) { return v.t === t && v.own === me_(); });
     if (!on.length) return;
     S.cyc = S.cyc || {};
     const i = ((S.cyc[t] || 0) + (S.sel && on.some(function (v) { return v.id === S.sel; }) ? 1 : 0)) % on.length;
@@ -933,9 +1163,26 @@ function ownTap(t) {
     select(v.id);
     if (on.length > 1) toast('놓인 「' + FURN[t].n + '」 ' + (i + 1) + '/' + on.length);
 }
-function furnSave(v) {
-    const r = decoRef('furn/' + v.id); if (!r) return;
-    r.update({ t: v.t, d: v.d, x: v.x, y: v.y }).catch(function () { toast('저장하지 못했습니다'); });
+// 내 가구를 적는다 — 놓인 자리가 내 방이면 내 기록(왼쪽 기준으로 · 룸메가 바뀌어도 따라온다), 아니면 이 집 기록(by 나)
+//   자리를 옮겨 기록이 바뀌면 예전 것을 지우고 같은 열쇠로 새로 쓴다 (한 번에 · 고른 것도 새 이름을 따라간다)
+function furnPath(v) { return v.src === 'm' ? ('houseMine/' + v.own + '/room/furn/' + v.key) : ('houseShared/' + S.hk + '/furn/' + v.key); }
+function furnWrite(v, done) {
+    const d = db_(); if (!d || !S || !v.key) return;
+    const a = anchorOf(v), me = me_(), sd = mySide();
+    const tgt = (regionAt(a.x, a.y) === sd) ? 'm' : 's';
+    const up = {};
+    if (v.src && v.src !== tgt) up[furnPath(v)] = null;
+    let id;
+    if (tgt === 'm') {
+        const c = sd === 'R' ? mirrorV(v) : v;
+        up['houseMine/' + me + '/room/furn/' + v.key] = { t: c.t, d: c.d, x: c.x, y: c.y };
+        id = 'm.' + me + '.' + v.key;
+    } else {
+        up['houseShared/' + S.hk + '/furn/' + v.key] = { t: v.t, d: v.d, x: v.x, y: v.y, by: me };
+        id = 's.' + v.key;
+    }
+    if (v.id && S.sel === v.id && id !== v.id) S.sel = id;
+    d.ref().update(up).then(function () { if (done) done(id); }).catch(function () { toast('저장하지 못했습니다'); if (S && S.sel === id && !S.flist.some(function (q) { return q.id === id; })) select(null); });
 }
 function select(id) {
     if (!S) return;
@@ -952,6 +1199,8 @@ function toolPlace() {
     const tool = S.ov.querySelector('#hr-tool'); if (!tool) return;
     const v = S.sel && S.edit ? (S.drag && S.drag.id === S.sel ? S.drag.v : S.flist.find(function (q) { return q.id === S.sel; })) : null;
     if (!v) { if (tool.style.display !== 'none') tool.style.display = 'none'; return; }
+    const rb = tool.querySelector('[data-t="rot"]'), mineV = canTouch(v);
+    if (rb && rb.style.display !== (mineV ? '' : 'none')) rb.style.display = mineV ? '' : 'none';   // 동거인 것 — 📦 넣기만
     const b = bbOf(v);
     const x = (v.x + (b[0] + b[2]) / 2) * S.z + (S.tx || 0), y = (v.y + b[1]) * S.z + (S.ty || 0) - 6;
     tool.style.display = 'flex';
@@ -963,12 +1212,18 @@ function toolDo(k) {
     const v = S.flist.find(function (q) { return q.id === S.sel; });
     if (!v) { select(null); return; }
     if (k === 'ok') { select(null); return; }
-    if (k === 'put') { const r = decoRef('furn/' + v.id); if (r) r.remove(); select(null); return; }
+    if (k === 'put') {
+        if (!canPutAway(v)) return;
+        const d = db_(); if (d) d.ref(furnPath(v)).remove();
+        if (!canTouch(v)) toast(nameIn(v.own) + ' 사원의 보관함으로 돌려 보냈습니다');
+        select(null); return;
+    }
     if (k === 'rot') {
+        if (!canTouch(v)) return;
         const a = anchorOf(v);
         const nd = (v.d + 1) & 3, nb = FB[v.t][nd];
-        const nv = { id: v.id, t: v.t, d: nd, x: Math.round(a.x - (nb[0] + nb[2]) / 2), y: Math.round(a.y + 1 - nb[3]) };
-        furnSave(nv);
+        const nv = Object.assign({}, v, { d: nd, x: Math.round(a.x - (nb[0] + nb[2]) / 2), y: Math.round(a.y + 1 - nb[3]) });
+        furnWrite(nv);
     }
 }
 
@@ -980,7 +1235,7 @@ function inviteModal() {
     const d = db_(), u = u_(); if (!d || !u) return;
     const m = document.createElement('div');
     m.className = 'hr-modal';
-    m.innerHTML = '<div class="hr-box"><b>💌 사택 초대</b><small style="color:#aaa;">초대한 사원은 이 사택에 들어올 수 있습니다 (룸메이트는 초대 없이도)</small>'
+    m.innerHTML = '<div class="hr-box"><b>💌 사택 초대</b><small style="color:#aaa;">초대한 사원은 우리 사택에 들어올 수 있습니다 (룸메이트는 초대 없이도)</small>'
         + '<div class="cap" style="font-size:11px;color:#d9c48a;">초대한 사원</div><div class="ul" data-u="now"></div>'
         + '<input data-q placeholder="이름 · 사번으로 찾기"><div class="ul" data-u="all"></div>'
         + '<div class="acts"><button class="hr-b" data-a="x">닫기</button></div></div>';
@@ -1046,14 +1301,14 @@ function boxPaint() {
         const ttl = host.querySelector('.panel-title');
         if (ttl && ttl.parentNode === host) ttl.insertAdjacentElement('afterend', el); else host.insertBefore(el, host.firstChild);
     }
-    const mate = roomieOf(u.code) || Object.keys(users()).find(function (c) { return roomieOf(c) === u.code; }) || null;
-    const invs = Object.keys(INV || {}).filter(function (h) { return h !== u.code && h !== mate; });
-    let h = '<button class="hr-b on go" data-hr="' + esc(u.code) + '">🏠 사택 안으로 들어가기</button>';
-    if (mate || invs.length) {
-        h += '<div class="sub">';
-        if (mate) h += '<div class="cap">룸메이트 사택</div><button class="hr-b" data-hr="' + esc(mate) + '">🛏 ' + esc(nameIn(mate)) + ' 사원의 사택</button>';
-        if (invs.length) h += '<div class="cap">초대받은 사택</div>' + invs.map(function (c) { return '<button class="hr-b" data-hr="' + esc(c) + '">💌 ' + esc((INV[c] && INV[c].n) || nameIn(c)) + ' 사원의 사택</button>'; }).join('');
-        h += '</div>';
+    // ★ 2026-11-12 같이 쓰는 사택 — 룸메이트와 한 집이라 「룸메이트 사택」 칸은 없다 · A 등급 이상 사택만 들어간다
+    const mate = mateOf(u.code);
+    const hk = hkOf(u.code), ok = gradeOk(hk);
+    const invs = Object.keys(INV || {}).filter(function (h) { return h !== String(u.code) && h !== mate; });
+    let h = '<button class="hr-b on go" data-hr="' + esc(u.code) + '"' + (ok ? '' : ' disabled') + '>🏠 사택 안으로 들어가기' + (mate ? ' (' + esc(nameIn(mate)) + ' 사원과 함께)' : '') + '</button>';
+    if (!ok) h += '<div class="note">사택 안은 A 등급 이상 사택부터 들어갈 수 있습니다 (지금 ' + esc(gradeOf(hk)) + ' 등급)</div>';
+    if (invs.length) {
+        h += '<div class="sub"><div class="cap">초대받은 사택</div>' + invs.map(function (c) { return '<button class="hr-b" data-hr="' + esc(c) + '">💌 ' + esc((INV[c] && INV[c].n) || nameIn(c)) + ' 사원의 사택</button>'; }).join('') + '</div>';
     }
     if (el._h !== h) {
         el._h = h;
@@ -1081,10 +1336,12 @@ function boxPaint() {
 window.houseEnter = function (host) { enter(host); };
 window.houseLeave = function () { leave(); };
 window.houseRoomState = function () {
-    return S ? { host: S.host, mine: S.mine, z: S.z, x: Math.round(S.x), y: Math.round(S.y), cell: cellAt(S.x, S.y), edit: S.edit, sel: S.sel,
-                 wall: wallNo(), floor: floorNo(), furn: S.flist.map(function (v) { return { id: v.id, n: FURN[v.t].n, d: v.d, x: v.x, y: v.y, ok: placeOk(v) }; }),
+    return S ? { host: S.host, hk: S.hk, mem: S.mem, mine: S.mine, side: mySide(), sides: shared().side || {}, region: S.region, allow: shared().allow || {},
+                 z: S.z, x: Math.round(S.x), y: Math.round(S.y), cell: cellAt(S.x, S.y), edit: S.edit, sel: S.sel,
+                 wall: wallNo(), floor: floorNo(), skins: { L: [skinOf('L', 'w'), skinOf('L', 'f')], R: [skinOf('R', 'w'), skinOf('R', 'f')], C: [skinOf('C', 'w'), skinOf('C', 'f')] },
+                 furn: S.flist.map(function (v) { const a = anchorOf(v); return { id: v.id, n: FURN[v.t].n, t: v.t, d: v.d, x: v.x, y: v.y, own: v.own, src: v.src, reg: regionAt(a.x, a.y), ok: placeOk(v) }; }),
                  peers: Object.keys(S.peers), invited: Object.keys(INV) }
              : { open: false, invited: Object.keys(INV) };
 };
-window.houseRoomDebug = { FURN: FURN, FB: FB, cellAt: cellAt, loadMask: loadMask, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
+window.houseRoomDebug = { FURN: FURN, FB: FB, cellAt: cellAt, loadMask: loadMask, mirrorV: mirrorV, regionAt: regionAt, hkOf: hkOf, gradeOf: gradeOf, setPos: function (x, y) { if (S) { S.x = x; S.y = y; } }, keys: function (k) { if (S) S.keys = k || {}; } };
 })();
